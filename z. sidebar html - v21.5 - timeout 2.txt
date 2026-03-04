@@ -1,0 +1,1665 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    /* === KHAI BÁO BIẾN MÀU SẮC (GIỮ NGUYÊN CODE CŨ) === */
+    :root { 
+      --p: #1a73e8; /* Xanh dương Google */
+      --bg: #f8f9fa; /* Nền xám nhạt */
+      --txt: #202124; /* Chữ chính */
+      --sub: #5f6368; /* Chữ phụ */
+      --border: #dadce0; /* Viền */
+      --hover: #f1f3f4; /* Hover */
+      --err-bg: #fce8e6; /* Lỗi nền */
+      --err-bd: #c5221f; /* Lỗi viền */
+      --job-bg: #e6f4ea; /* Job nền */
+      --job-txt: #137333; /* Job chữ */
+      --pin-color: #fbbc04; /* [MỚI] Màu vàng cho ghim */
+    }
+    
+    * { box-sizing: border-box; } 
+    body { 
+      font-family: 'Roboto', sans-serif;
+      margin: 0; background: var(--bg); color: var(--txt);
+      font-size: 14px; overflow: hidden; display: flex; flex-direction: column; height: 100vh;
+    }
+    
+    /* === 1. HEADER & SEARCH (GIỮ NGUYÊN CSS CŨ) === */
+    .header { 
+      background: #fff; border-bottom: 1px solid var(--border);
+      padding: 0 8px; height: 48px; display: flex; align-items: center; gap: 4px;
+      flex-shrink: 0; z-index: 50; position: relative;
+    }
+    .spacer { flex: 1; }
+    .icon-btn { 
+      width: 32px; height: 32px; border: none; background: transparent;
+      border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      color: var(--sub); transition: 0.2s;
+    }
+    .icon-btn:hover { background: var(--hover); color: var(--txt); }
+    .icon-btn.active { color: #f9ab00; background: #fef7e0; }
+    .icon-btn svg { width: 20px; height: 20px; fill: currentColor; }
+    .icon-btn.disabled { opacity: 0.3; pointer-events: none; }
+
+    /* Loader Line */
+    #loader-line { 
+      height: 3px; width: 100%; background: transparent; overflow: hidden;
+      position: absolute; bottom: 0; left: 0; z-index: 52; display: none;
+    }
+    #loader-line div { 
+      width: 30%; height: 100%; background: var(--p);
+      position: absolute; left: -30%; animation: loading 1s infinite linear;
+    }
+
+    /* Search Panel */
+    #search-panel { 
+      width: 100%; background: #fff; border-bottom: 1px solid var(--border);
+      padding: 8px; z-index: 49; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+      display: none; flex-shrink: 0;
+    }
+    .search-inp-wrap { position: relative; }
+    .search-inp { 
+      width: 100%; padding: 6px 30px 6px 10px; border: 1px solid var(--border);
+      border-radius: 4px; font-size: 14px; outline: none;
+    }
+    .search-inp:focus { border-color: var(--p); box-shadow: 0 0 0 2px rgba(26,115,232,0.2); }
+    
+    .suggest-box { 
+      max-height: 80vh; overflow-y: auto; border: 1px solid var(--border);
+      background: #fff; position: absolute; width: 100%; z-index: 1000;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.15); border-radius: 0 0 4px 4px;
+      display: none; top: 100%; margin-top: 1px;
+    }
+    .s-item { padding: 6px 10px; border-bottom: 1px solid #f1f3f4; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+    .s-name { font-weight: 500; color: #202124; font-size: 14px; margin-bottom: 2px; }
+    .s-sub { font-size: 11px; color: #5f6368; line-height: 1.3; }
+    .s-item:hover, .s-item.active { background: #e8f0fe; color: var(--p); }
+
+    /* === 2. MAIN LAYOUT (Card, Fixed Area) === */
+    #fixed-area { flex-shrink: 0; padding: 6px 8px 0 8px; background: var(--bg); z-index: 40; }
+    #scroll-area { flex-grow: 1; overflow-y: auto; padding: 0 8px 80px 8px; scroll-behavior: smooth; }
+    
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #dadce0; border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: #bdc1c6; }
+
+    .card { 
+      background: #fff; border: 1px solid var(--border); border-radius: 8px;
+      padding: 10px; margin-bottom: 8px; box-shadow: 0 1px 2px rgba(60,64,67,0.05);
+    }
+
+    /* === 3. [UPDATE] INFO STYLE (CĂN LỀ CHUẨN V14.2) === */
+    .c-name { 
+      font-size: 15px; font-weight: 700; color: var(--p);
+      line-height: 1.4; margin-bottom: 6px; 
+      text-align: justify; /* [YC] Tên công ty căn đều 2 bên */
+    }
+    .info-row { 
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 13px; color: var(--txt); margin-bottom: 4px;
+    }
+    /* [YC] Mã KH căn trái, MST căn phải */
+    .info-left { font-weight: 500; color: #333; text-align: left; } 
+    .info-right { font-weight: 600; color: #000; text-align: right; } 
+
+    /* === 4. NOTE STYLE === */
+    .card-header { 
+      display: flex; justify-content: space-between; align-items: center; 
+      margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px dashed #eee;
+    }
+    .card-title { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--sub); }
+    .action-link { 
+      font-size: 11px; font-weight: 600; color: var(--p); cursor: pointer; 
+      display: flex; align-items: center; gap: 3px; 
+    }
+    .action-link:hover { text-decoration: underline; }
+    .note-content { 
+      background: #fce8e6; color: #c5221f; padding: 8px; border-radius: 4px; 
+      font-size: 13px; border-left: 3px solid #d93025; white-space: pre-wrap; line-height: 1.4;
+    }
+
+    /* === 5. [UPDATE] TRANSACTION LIST (HỖ TRỢ GHIM) === */
+    .tx-list { display: flex; flex-direction: column; gap: 6px; }
+    .tx-item { background: #fff; border-bottom: 1px solid #f1f3f4; padding-bottom: 6px; position: relative; }
+    .tx-item:last-child { border-bottom: none; padding-bottom: 0; }
+    
+    .tx-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
+    .tx-meta-left { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+    
+    .tx-date { font-weight: 700; color: var(--p); }
+    .tx-prod { font-weight: 700; color: #c5221f; }
+    
+    /* [MỚI] Icon Pin (Ghim) */
+    .tx-pin-icon { width: 14px; height: 14px; fill: var(--pin-color); margin-right: 4px; display: none; }
+    .tx-item.is-pinned .tx-pin-icon { display: inline-block; } /* Hiện icon nếu có class is-pinned */
+    .tx-item.is-pinned { background: #fffcf0; padding: 4px; border-radius: 4px; } /* Nền vàng nhẹ cho dòng ghim */
+
+    .tx-job { 
+      font-size: 10px; font-weight: 700; background: var(--job-bg); color: var(--job-txt); 
+      padding: 2px 6px; border-radius: 4px; 
+    }
+    .tx-body { font-size: 14px; color: #444; line-height: 1.4; margin-top: 2px; white-space: pre-wrap; }
+    .tx-edit-icon { cursor: pointer; color: #9aa0a6; margin-left: 4px; display: none; }
+    .tx-item:hover .tx-edit-icon { display: inline-block; color: var(--p); }
+
+    /* === 6. FORM OVERLAY (GIỮ NGUYÊN STYLE) === */
+    .overlay { 
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+      background: #fff; z-index: 100; padding: 0 15px; overflow-y: auto;
+    }
+    .form-head { 
+      display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; 
+      margin-bottom: 15px; position: sticky; top: 0; background: #fff; z-index: 10;
+    }
+    .form-title { font-size: 16px; font-weight: 700; color: var(--p); flex-grow: 1; }
+    .form-actions-right { display: flex; align-items: center; gap: 8px; }
+
+    .btn-close { 
+      cursor: pointer; font-size: 20px; color: #bdc1c6; padding: 4px; 
+      line-height: 1; transition: 0.2s; display: flex; align-items: center; justify-content: center;
+      border-radius: 50%; width: 28px; height: 28px;
+    } 
+    .btn-close:hover { color: #5f6368; background: #f1f3f4; }
+    
+    .btn-save-icon { 
+      width: 28px; height: 28px; background: #f1f3f4; color: var(--p);
+      border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s;
+    }
+    .btn-save-icon:hover { background: #d2e3fc; color: #174ea6; }
+    .btn-save-icon svg { width: 18px; height: 18px; fill: currentColor; }
+    
+    .modal-loader { height: 3px; width: 100%; background: transparent; position: absolute; bottom: 0; left: 0; overflow: hidden; display: none; }
+    .modal-loader div { width: 30%; height: 100%; background: var(--p); position: absolute; left: -30%; animation: loading 1s infinite linear; }
+    
+    .inp-group { margin-bottom: 12px; position: relative; } 
+    .lbl { font-size: 11px; color: var(--sub); font-weight: 500; margin-bottom: 4px; display: block; text-transform: uppercase; }
+    .inp { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 14px; outline: none; font-family: inherit; transition: 0.2s; }
+    .inp:focus { border-color: var(--p); }
+    .inp-error { border-color: var(--err-bd) !important; background-color: var(--err-bg) !important; }
+    .inp-highlight { background-color: #fff9c4 !important; transition: background-color 0.5s; }
+    .inp-row { display: flex; gap: 10px; margin-bottom: 12px; } 
+    .inp-col { flex: 1; position: relative; }
+    
+    .btn { width: 100%; padding: 10px; border: none; border-radius: 4px; font-weight: 600; cursor: pointer; margin-top: 10px; margin-bottom: 30px; font-size: 14px; }
+    .btn-p { background: var(--p); color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+    .btn-p:hover { background: #155db5; }
+
+    @keyframes loading { 0% { left: -30%; } 100% { left: 100%; } }
+
+    #error-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 9999;
+      display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px;
+    }
+    #error-overlay svg { width: 64px; height: 64px; fill: #ea4335; margin-bottom: 20px; }
+    #error-overlay h2 { margin: 0 0 10px 0; color: #ea4335; }
+    .err-number { font-weight: bold; color: #202124; }
+  </style>
+</head>
+<body>
+  <div id="error-overlay"></div>
+
+  <div class="header">
+    <button id="btn-auto" class="icon-btn" onclick="toggleAuto()" title="Tự động bắt link"><svg viewBox="0 0 24 24"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg></button>
+    <button id="btn-search" class="icon-btn" onclick="toggleSearch()" title="Tìm kiếm"><svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg></button>
+    <button class="icon-btn" onclick="forceReload()" title="Load lại data"><svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-8 3.58-8 8s3.58 8 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg></button>
+    <div id="loader-line"><div></div></div>
+    <div class="spacer"></div>
+    <button id="btn-edit-cust" class="icon-btn disabled" onclick="openForm('cust', true)" title="Sửa Khách Hàng"><svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>
+    <button class="icon-btn" onclick="openForm('cust', false)" title="Thêm Khách Hàng"><svg viewBox="0 0 24 24"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></button>
+  </div>
+
+  <div id="search-panel">
+    <div class="search-inp-wrap">
+      <input type="text" id="inp-search" class="search-inp" placeholder="Nhập tên, sđt, mã..." autocomplete="off">
+      <div id="suggest-search" class="suggest-box"></div>
+    </div>
+  </div>
+
+  <div id="fixed-area">
+    <div id="empty-state" style="text-align:center; margin-top:20px; color:#999; font-size: 12px;">
+      <div>Vui lòng chọn khách hàng</div>
+    </div>
+
+    <div id="cust-card" class="card" style="display:none;">
+       <div id="c-name" class="c-name">...</div>
+       <div class="info-row">
+          <span id="c-code" class="info-left"></span> 
+          <span id="c-tax" class="info-right"></span>  
+       </div>
+       <div class="info-row">
+          <span id="c-contact" class="info-left"></span>
+          <span id="c-phone" class="info-right"></span>
+       </div>
+    </div>
+  </div>
+
+  <div id="scroll-area">
+    <div id="note-card" class="card" style="display:none;">
+       <div class="card-header">
+          <span class="card-title">Ghi Chú</span>
+          <div id="note-action-area"></div>
+       </div>
+       <div id="note-content-area"></div>
+    </div>
+
+    <div id="tx-card" class="card" style="display:none;">
+      <div class="card-header">
+          <span class="card-title">Lịch sử làm việc</span>
+         <div class="action-link" onclick="openForm('tx', false)">
+            <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg> Thêm
+         </div>
+      </div>
+      <div id="tx-list" class="tx-list"></div>
+    </div>
+  </div>
+
+  <div id="form-cust" class="overlay">
+     <div class="form-head">
+        <span class="form-title" id="fc-title">Thêm Khách Hàng</span>
+        <div class="form-actions-right">
+            <span class="btn-close" onclick="closeForm()" title="Đóng">✕</span>
+            <button class="btn-save-icon" onclick="saveCust()" title="Lưu dữ liệu"><svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg></button>
+        </div>
+        <div class="modal-loader"><div></div></div>
+     </div>
+     
+     <div class="inp-row">
+        <div class="inp-col"><label class="lbl">Mã KH (*)</label><input id="n-code" class="inp" data-col="@KH_MA_KH"></div>
+        <div class="inp-col"><label class="lbl">Mã số thuế (*)</label><input id="n-tax" class="inp" data-col="@KH_MST"></div>
+     </div>
+     <div class="inp-group"><label class="lbl">Tên công ty (*)</label><input id="n-name" class="inp" data-col="@KH_TEN_CTY"></div>
+     <div class="inp-group"><label class="lbl">Người liên hệ (*)</label><input id="n-contact" class="inp" data-col="@KH_NGUOI_LIEN_HE"></div>
+     <div class="inp-group"><label class="lbl">Điện thoại (*)</label><input id="n-phone" class="inp" data-col="@KH_PHONE"></div>
+     <div class="inp-group"><label class="lbl">Địa chỉ (*)</label><input id="n-addr" class="inp" data-col="@KH_DIA_CHI"></div>
+     
+     <div class="inp-row">
+       <div class="inp-col">
+          <label class="lbl">Sản phẩm (*)</label>
+          <input id="n-prod" class="inp" placeholder="--Chọn--" autocomplete="off" data-list="product" data-col="@KH_SAN_PHAM">
+          <div id="drop-prod" class="suggest-box"></div>
+       </div>
+       <div class="inp-col">
+          <label class="lbl">Nhóm KH (*)</label>
+          <input id="n-group" class="inp" placeholder="--Chọn--" autocomplete="off" data-list="group" data-col="@KH_NHOM_KH">
+          <div id="drop-group" class="suggest-box"></div>
+       </div>
+     </div>
+     
+     <div class="inp-group"><label class="lbl">Ghi chú</label><textarea id="n-note" class="inp" rows="2" data-col="@KH_GHI_CHU"></textarea></div>
+     <div class="inp-group"><label class="lbl">Email</label><input id="n-email" class="inp" data-col="@KH_EMAIL"></div>
+     <div class="inp-group"><label class="lbl">Website</label><input id="n-web" class="inp" data-col="@KH_WEBSITE"></div>
+     <div class="inp-group">
+        <label class="lbl">Công ty mẹ</label>
+        <input id="n-parent" class="inp" placeholder="--Chọn hoặc nhập--" autocomplete="off" data-list="companies" data-col="@KH_CONG_TY_ME">
+        <div id="drop-parent" class="suggest-box"></div>
+     </div>
+     
+     <div class="inp-row">
+        <div class="inp-col">
+            <label class="lbl">Ngày đóng thầu</label>
+            <input type="date" id="n-bid" class="inp" data-col="@KH_NGAY_DONG_THAU">
+        </div>
+        <div class="inp-col">
+           <label class="lbl">Xác thực (*)</label>
+           <input id="n-verify" class="inp" placeholder="--Chọn--" autocomplete="off" data-list="verify" data-col="@KH_XAC_THUC">
+           <div id="drop-verify" class="suggest-box"></div>
+        </div>
+     </div>
+
+     <div class="inp-row">
+        <div class="inp-col">
+           <label class="lbl">Nguồn KH (*)</label>
+           <input id="n-source" class="inp" placeholder="--Chọn--" autocomplete="off" data-list="source" data-col="@KH_NGUON_KH">
+           <div id="drop-source" class="suggest-box"></div>
+        </div>
+        <div class="inp-col">
+           <label class="lbl">Nhập vào FBM (*)</label>
+           <input id="n-fbm" class="inp" placeholder="--Chọn--" autocomplete="off" data-list="fbm" data-col="@KH_FBM_STATUS">
+           <div id="drop-fbm" class="suggest-box"></div>
+        </div>
+     </div>
+     
+     <div class="inp-group"><label class="lbl">Ngày nhập liệu</label><input id="n-created" class="inp" readonly style="background:#f1f3f4; color:#777;"></div>
+     <button class="btn btn-p" onclick="saveCust()">LƯU DỮ LIỆU</button>
+  </div>
+
+  <div id="form-tx" class="overlay">
+     <div class="form-head">
+        <span class="form-title" id="ft-title">Giao Dịch</span>
+        <div class="form-actions-right">
+            <span class="btn-close" onclick="closeForm()" title="Đóng">✕</span>
+            <button class="btn-save-icon" onclick="saveTx()" title="Lưu dữ liệu"><svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg></button>
+        </div>
+        <div class="modal-loader"><div></div></div>
+     </div>
+     <input type="hidden" id="tx-row">
+     
+     <div class="inp-group"><label class="lbl">Mã KH</label><input id="tx-id" class="inp" readonly style="background:#f1f3f4;"></div>
+     
+     <div class="inp-row">
+        <div class="inp-col" style="flex: 2; min-width: 0; margin-right: 10px;">
+            <label class="lbl">Ngày làm việc (*)</label>
+            <input type="date" id="tx-date" class="inp" data-col="@ACT_NGAY_LAM_VIEC" style="width:100%">
+        </div>
+        
+        <div class="inp-col" style="flex: 1; min-width: 0;">
+            <label class="lbl">Sản phẩm (*)</label>
+            <input id="tx-prod" class="inp" placeholder="--Chọn--" autocomplete="off" data-list="product" data-col="@ACT_SAN_PHAM" style="width:100%">
+            <div id="drop-tx-prod" class="suggest-box"></div>
+        </div>
+     </div>
+
+     <div class="inp-row">
+        <div class="inp-col" style="flex: 2; min-width: 0; margin-right: 10px;">
+           <label class="lbl">Công việc (*)</label>
+           <input id="tx-status" class="inp" placeholder="--Chọn--" autocomplete="off" data-list="status" data-col="@ACT_CONG_VIEC" style="width:100%">
+           <div id="drop-tx-status" class="suggest-box"></div>
+        </div>
+
+        <div class="inp-col" style="flex: 1; min-width: 0;">
+            <label class="lbl">Ghim</label>
+            <input id="tx-pin" class="inp" placeholder="--Chọn--" autocomplete="off" data-col="@ACT_GHIM" style="width:100%">
+            <div id="drop-tx-pin" class="suggest-box"></div>
+        </div>
+      </div>
+     
+     <div class="inp-group">
+        <label class="lbl">Nội dung chi tiết (*)</label>
+        <textarea id="tx-content" class="inp" rows="4" data-col="@ACT_NOI_DUNG_CONG_VIEC"></textarea>
+     </div>
+     
+     <div class="inp-group">
+        <label class="lbl">Giá trị hợp đồng</label>
+        <input id="tx-val" class="inp" placeholder="0" data-col="@ACT_GIA_TRI_HOP_DONG">
+     </div>
+
+     <div class="inp-row">
+        <div class="inp-col">
+           <label class="lbl">Điền vào FBM (*)</label>
+           <input id="tx-fbm" class="inp" placeholder="--Chọn--" autocomplete="off" data-list="fbm" data-col="@ACT_FBM_STATUS">
+           <div id="drop-tx-fbm" class="suggest-box"></div>
+        </div>
+        <div class="inp-col">
+          <label class="lbl">Người nhập (*)</label>
+          <input id="tx-user" class="inp" data-col="@ACT_NGUOI_NHAP_LIEU" placeholder="--Chọn--" autocomplete="off">
+          <div id="drop-tx-user" class="suggest-box"></div> 
+        </div>
+     </div>
+
+     <div class="inp-group"><label class="lbl">Ngày nhập liệu</label><input id="tx-created" class="inp" readonly style="background:#f1f3f4; color:#777;"></div>
+     <button class="btn btn-p" onclick="saveTx()">LƯU DỮ LIỆU</button>
+  </div>
+
+  <div id="form-note" class="overlay">
+      <div class="form-head">
+         <span class="form-title">Ghi Chú</span>
+         <div class="form-actions-right">
+            <span class="btn-close" onclick="closeForm()" title="Đóng">✕</span>
+            <button class="btn-save-icon" onclick="saveNoteLogic()" title="Lưu dữ liệu"><svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg></button>
+         </div>
+         <div class="modal-loader"><div></div></div>
+      </div>
+      <textarea id="inp-note-edit" class="inp" rows="6"></textarea>
+      <button class="btn btn-p" onclick="saveNoteLogic()">LƯU GHI CHÚ</button>
+  </div>
+
+  <script>
+    // === 1. KHAI BÁO BIẾN TOÀN CỤC (CORE STATE) ===
+    
+    // DB: Chứa dữ liệu đã được giải nén và đánh chỉ mục (Index)
+    // acts_map: Thay vì lưu mảng acts, ta lưu dạng Map { "KH001": [Tx1, Tx2], ... } để truy xuất tức thì
+    var DB = { 
+        listKH: [], 
+        acts_map: {}, // [BIG DATA] Index Map cho giao dịch O(1)
+        maps: {},     // Bản đồ vị trí khách hàng trên các sheet Quản lý
+        versions: {}, // Lưu phiên bản data để check sync
+        help: { status: [], product: [], group: [], verify: [], fbm: [], source: [], companies: [], defaults: {} },
+        qlSystem: {},
+        qlConfig: {} // [MỚI] Thêm dòng này để chứa config Server gửi về
+    };
+    
+    // APP: Lưu trạng thái ứng dụng
+    var APP = { 
+        isAuto: true, isSearch: false, currentID: null, sheetID: null, newCustID: null,
+        loadingActs: false, // Cờ đang tải ngầm Act
+        actNextRow: 0,       // Con trỏ dòng tiếp theo cần tải của Act
+        isEditingControl: false // [MỚI] Biến nhớ: Có đang sửa cấu hình không?
+    };
+
+    var currentFocus = -1;
+    var lastSheetName = "";
+
+    // === 2. KHỞI TẠO ỨNG DỤNG ===
+    window.onload = function() {
+       initDB(); // Load dữ liệu ban đầu
+       
+       // UI Setup (Giữ nguyên logic cũ)
+       document.getElementById('btn-auto').classList.add('active');
+       setupInputKeyboard('inp-search', 'suggest-search');
+       document.getElementById('inp-search').addEventListener('input', function(e){ handleSearch(e.target.value); });
+       
+       // Setup Dropdowns (Thêm các trường mới)
+       setupDropdown('n-group', 'drop-group', 'group');
+       setupDropdown('n-prod', 'drop-prod', 'product');
+       setupDropdown('n-verify', 'drop-verify', 'verify');
+       setupDropdown('n-source', 'drop-source', 'source'); // [MỚI]
+       setupDropdown('n-fbm', 'drop-fbm', 'fbm');          // [MỚI]
+       
+       setupDropdown('tx-prod', 'drop-tx-prod', 'product');
+       setupDropdown('tx-status', 'drop-tx-status', 'status');
+       setupDropdown('tx-fbm', 'drop-tx-fbm', 'fbm');      // [MỚI]
+       setupDropdown('tx-user', 'drop-tx-user', 'users');
+       setupDropdown('tx-pin', 'drop-tx-pin', 'pins');
+
+       setupDropdown('n-parent', 'drop-parent', 'companies', 11, true);
+       
+       setupPasteAutoFill();
+       setupEnterNavigation();
+
+       // Tắt tính năng gợi ý điền của chrome
+       disableAutocompleteGlobal();
+       
+       // Handshake với Extension
+       setInterval(() => { window.top.postMessage({ action: 'CRM_HANDSHAKE' }, '*'); }, 500);
+    };
+
+    // === 3. XỬ LÝ DỮ LIỆU TỪ SERVER (DECOMPRESSION & INDEXING) ===
+
+    /**
+     * Hàm lấy dữ liệu khởi tạo (Đã bổ sung tính năng an toàn)
+     */
+    function initDB(targetSheet, targetRow) { 
+       showLoader(true); // Bật loading
+       
+       google.script.run
+          .withSuccessHandler(res => { 
+              // 1. Tắt cờ data bẩn ở Server (Logic cũ)
+              google.script.run.clearFlags("FULL");
+
+              // 2. Tắt loading (Logic cũ)
+              showLoader(false); 
+
+              // ============================================================
+              // [BẮT ĐẦU: ĐOẠN CODE MỚI THÊM VÀO - CẦU DAO AN TOÀN]
+              // ============================================================
+              // === [MỚI 1] Logic ẩn màn hình lỗi nếu tải thành công ===
+              // Nếu Server không trả về lỗi OVERLOAD, ta phải chắc chắn ẩn màn hình đỏ đi
+              if (res.error !== "OVERLOAD") {
+                  document.getElementById('error-overlay').style.display = 'none';
+              }
+
+              // === [MỚI 2] Logic hiển thị lỗi OVERLOAD ===
+              if (res.error === "OVERLOAD") {
+                  var errDiv = document.getElementById('error-overlay');
+                  var countStr = res.details.count.toLocaleString('vi-VN');
+                  var limitStr = res.details.limit.toLocaleString('vi-VN');
+                  
+                  errDiv.innerHTML = `
+                      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                      <h2>HỆ THỐNG QUÁ TẢI!</h2>
+                      <p>Đã phát hiện <b class="err-number">${countStr}</b> ô tính đang hoạt động.</p>
+                      <p style="font-size:13px; color:#555; margin-top:5px;">Giới hạn cho phép: <b>${limitStr}</b> ô.</p>
+                      <p style="font-size:12px; margin-top:15px; color:#d93025;">
+                        Vui lòng xóa các <b>CỘT TRỐNG (bên phải)</b> và <b>HÀNG TRỐNG (bên dưới)</b> trong file Google Sheet để giảm tải bộ nhớ.
+                      </p>
+                      <button onclick="retryLoadUI(this)" style="margin-top:20px; cursor:pointer; padding:8px 16px; border:1px solid #ccc; background:#fff; border-radius:4px;">Thử tải lại</button>
+                  `;
+                  
+                  errDiv.style.display = 'flex';
+                  return; // Dừng hàm ngay tại đây
+              }
+
+              // ============================================================
+              // [KẾT THÚC: ĐOẠN CODE MỚI]
+              // ============================================================
+              
+              if (res.error) return alert("Lỗi: " + res.error);
+              
+              // Xử lý Config & Maps
+              if (res.help) DB.help = res.help;
+              if (res.maps) DB.maps = res.maps;
+              if (res.qlSystem) DB.qlSystem = res.qlSystem;
+
+              // Xử lý ListKH
+              if (res.listKH && res.listKH.headers) {
+                  DB.listKH = convertArrayToObject(res.listKH.headers, res.listKH.data);
+                  processCompanies(); 
+              }
+              
+              // Render giao diện (nếu đang xem khách)
+              if (APP.newCustID) { renderCustomer(APP.newCustID); APP.newCustID = null; }
+              else if (APP.currentID) { renderCustomer(APP.currentID); }
+
+              // Nếu được gọi từ logic Reload -> Render sheet ngay lập tức
+              if (targetSheet && targetRow) {
+                  handleSheetTrigger(targetRow, targetSheet);
+              }
+
+              // Tải ngầm Act
+              APP.actNextRow = 0;
+              DB.acts_map = {}; 
+              loadMoreActs(); 
+
+          })
+          .withFailureHandler(err => {
+               showLoader(false); // Tắt loading
+               console.error(err);
+               alert("⚠️ Không thể tải dữ liệu. Vui lòng kiểm tra kết nối mạng và Reload lại sidebar.");
+          })
+          .getInitialData();
+    }
+    /**
+     * Hàm tải Act theo từng gói (Chunking)
+     * Gọi đệ quy cho đến khi hết dữ liệu.
+     */
+    function loadMoreActs() {
+        APP.loadingActs = true;
+        // Hiển thị loader nhỏ góc dưới nếu cần (Optional)
+        
+        google.script.run
+            .withSuccessHandler(res => {
+                if (!res.acts || !res.acts.headers) return;
+
+                // 1. Giải nén Act
+                var acts = convertArrayToObject(res.acts.headers, res.acts.data);
+                
+                // 2. [INDEXING] Đưa vào Map ngay lập tức
+                acts.forEach(act => {
+                    // Tạo key nếu chưa có
+                    if (!DB.acts_map[act.id]) DB.acts_map[act.id] = [];
+                    
+                    // Tính toán giá trị ngày tháng dạng số để sort nhanh (YYYYMMDD)
+                    act._dateVal = dateToNum(act.date);
+
+                    DB.acts_map[act.id].push(act);
+                });
+
+                // 3. Nếu đang xem khách hàng nào đó -> Re-render để hiện giao dịch vừa tải được
+                if (APP.currentID && DB.acts_map[APP.currentID]) {
+                    // Chỉ re-render phần giao dịch để không nháy màn hình (Advanced optimization)
+                    renderTxOnly(APP.currentID);
+                }
+
+                // 4. Kiểm tra xem còn dữ liệu không
+                if (res.hasMore) {
+                    APP.actNextRow = res.nextRow;
+                    // Tiếp tục tải gói tiếp theo (Delay 50ms để không nghẽn trình duyệt)
+                    setTimeout(loadMoreActs, 50);
+                } else {
+                    APP.loadingActs = false;
+                    console.log("Đã tải xong toàn bộ Act!");
+                    showLoader(false); // <--- CHỈ TẮT KHI TẢI HẾT TOÀN BỘ
+                }
+            })
+            .withFailureHandler(err => {
+                APP.loadingActs = false; // Reset cờ để không bị kẹt
+                showLoader(false);
+                console.warn("Lỗi tải ngầm Act (có thể do mạng):", err);
+                // Không cần alert làm phiền người dùng vì đây là chạy ngầm
+            })
+            .getActData(APP.actNextRow, 5000); // Tải gói 5000 dòng
+    }
+
+    // === Hàm tải lại Map (ID khách) của một Sheet quản lý cụ thể ===
+    function reloadOnlyMap(sheetName, row, clearSysFlag, isFilterChange) {
+        showLoader(true);
+        
+        // Nếu là do sửa bộ lọc -> Gọi hàm forceRefreshMap (Render lại ngay)
+        // Nếu chỉ là reload thường -> Gọi getOnlyMap (Nhẹ hơn)
+        var apiFunc = isFilterChange ? 'forceRefreshMap' : 'getOnlyMap';
+
+        google.script.run
+            .withSuccessHandler(res => {
+                // Xóa cờ hệ thống nếu cần
+                if (clearSysFlag) google.script.run.clearFlags("SYS");
+                
+                // Tắt loading
+                showLoader(false);
+
+                // [SỬA 1] Kiểm tra xem Server có trả về lỗi TIMEOUT không
+                if (res && res.error === "TIMEOUT") {
+                    showTimeoutError(); // Gọi hàm hiện màn hình đỏ
+                    return; // Dừng lại, không xử lý tiếp
+                }
+
+                // [SỬA 2] Chỉ cập nhật Map nếu kết quả trả về là một MẢNG hợp lệ
+                // (Tránh trường hợp trả về object lỗi hoặc null mà code cũ vẫn chạy tiếp)
+                if (Array.isArray(res)) {
+                    DB.maps[sheetName] = res;
+                    handleSheetTrigger(row, sheetName);
+                }
+            })
+            .withFailureHandler(err => {
+                // [BỔ SUNG] Xử lý trường hợp lỗi mạng hoặc lỗi script khác
+                showLoader(false);
+                console.error("Lỗi reloadOnlyMap:", err);
+                alert("Lỗi kết nối: " + err.message); 
+            })
+            [apiFunc](sheetName); // Gọi hàm động dựa trên tên biến apiFunc
+    }
+
+    // Hàm tiện ích: Chuyển Array of Arrays -> Array of Objects
+    function convertArrayToObject(headers, data) {
+        return data.map(row => {
+            var obj = {};
+            headers.forEach((key, index) => {
+                obj[key] = row[index];
+            });
+            return obj;
+        });
+    }
+
+    // Hàm trích xuất công ty mẹ (Logic cũ)
+    function processCompanies() {
+        if (DB.listKH.length > 0) {
+            var names = DB.listKH.map(x => x.name).filter(n => n && n.trim() !== "");
+            DB.help.companies = [...new Set(names)].sort();
+        }
+    }
+
+    // === 4. LOGIC SYNC THÔNG MINH & RELOAD (DIRTY FLAG MODE) ===
+
+    var currentActiveSheet = ""; // Lưu tên sheet đang đứng
+
+    // === WINDOW EVENT LISTENER: LAI TẠO (LOADER SỚM + LOGIC CHUẨN) ===
+    // === WINDOW EVENT LISTENER: LOGIC THÔNG MINH (SMART CONTROLLER) ===
+    window.addEventListener("message", function(e) {
+       var d = e.data;
+       if(d.action === 'CRM_TRIGGER') {
+          
+          var isManagementSheet = d.sheet.startsWith("!");
+          var sheetName = d.sheet;
+          var row = d.row;
+          var col = d.col; // Nhận thêm cột
+
+          // 1. Nếu chuyển sang sheet khác -> Check Sync ngay
+          if (sheetName !== currentActiveSheet && isManagementSheet) {
+              currentActiveSheet = sheetName;
+              showLoader(true); // Bật loading
+
+              // === BẮT ĐẦU ĐOẠN CODE SỬA ===
+              google.script.run
+                  .withSuccessHandler(res => {
+                      // --- PHẦN XỬ LÝ THÀNH CÔNG (GIỮ NGUYÊN LOGIC CŨ) ---
+                      if (res.action === "RELOAD_DONE") {
+                          console.log("✅ Dữ liệu đã được cập nhật mới nhất từ Server.");
+                          initDB(sheetName, row); 
+                      }
+                      else if (res.action === "MAP_LOAD") {
+                          reloadOnlyMap(sheetName, row, true); 
+                      }
+                      else {
+                          showLoader(false);
+                          APP.isEditingControl = false; 
+                          handleSheetTriggerSmart(row, col, sheetName); 
+                      }
+                  })
+                  .withFailureHandler(err => {
+                      // --- PHẦN BỔ SUNG: XỬ LÝ KHI MẤT MẠNG / LỖI ---
+                      
+                      // 1. Quan trọng nhất: Tắt Loading để không bị treo giao diện
+                      showLoader(false);
+                      
+                      // 2. Reset trạng thái sheet hiện tại để lần sau click lại vẫn nhận
+                      currentActiveSheet = ""; 
+
+                      // 3. Ghi log lỗi ra console để kiểm tra (F12)
+                      console.error("Lỗi CheckSync:", err);
+
+                      // 4. Thông báo cho người dùng biết
+                      alert("⚠️ Mất kết nối Internet! Không thể đồng bộ dữ liệu Sheet quản lý.");
+                  })
+                  .checkSyncStatus(sheetName); 
+              // === KẾT THÚC ĐOẠN CODE SỬA ===
+
+              return;
+          }
+          
+          // 2. Nếu vẫn ở sheet cũ -> Xử lý logic chuyển vùng (Context Switching)
+          if (sheetName === currentActiveSheet) {
+              handleSheetTriggerSmart(row, col, sheetName);
+          } else {
+              // Các sheet thường (ListKH, Act)
+              currentActiveSheet = sheetName;
+              showLoader(false);
+          }
+       }
+    });
+
+    // === HÀM LOGIC CỐT LÕI: CHECK VÙNG & RELOAD ===
+    function handleSheetTriggerSmart(row, col, sheetName) {
+       if (!APP.isAuto) return;
+       if (APP.newCustID) return;
+
+       // A. Kiểm tra xem chuột có đang ở "Vùng Cấm" (Control Zone) không?
+       var isRestricted = checkIsControlZone(sheetName, row, col);
+
+       // B. Logic Quyết định Reload
+       // Nếu: Lúc trước đang sửa (True) --> Bây giờ ra ngoài (False) ==> RELOAD
+       if (APP.isEditingControl === true && isRestricted === false) {
+           console.log("🛠️ Vừa sửa cấu hình xong -> Reload Map ngay!");
+           reloadOnlyMap(sheetName, row, false, true); // true = force refresh
+           APP.isEditingControl = false; // Reset cờ
+           return; 
+       }
+
+       // C. Cập nhật trạng thái hiện tại
+       APP.isEditingControl = isRestricted;
+
+       // D. Logic Hiển thị khách hàng (Chỉ hiển thị khi ở Vùng An Toàn & Sheet Quản lý)
+       if (sheetName.startsWith("!") && isRestricted === false && row >= 4) {
+           var map = DB.maps[sheetName];
+           if(map && (row - 4) < map.length) {
+               var custID = map[row - 4];
+               if (custID !== APP.currentID) {
+                   APP.sheetID = custID;
+                   renderCustomer(custID);
+               }
+           }
+       }
+    }
+
+    // === HÀM KIỂM TRA VÙNG CẤM (BẢN VÁ LỖI AN TOÀN) ===
+    // === HÀM KIỂM TRA VÙNG CẤM (BẢN VÁ LỖI AN TOÀN) ===
+    function checkIsControlZone(sheetName, row, col) {
+        // 1. Kiểm tra an toàn: Nếu DB chưa load xong -> Coi như an toàn để không crash
+        if (!DB || !DB.qlConfig) return false;
+
+        // 2. Hàng 1 (Mã cột): Luôn là vùng cấm
+        if (row === 1) return true;
+
+        // 3. Hàng 3 (Bộ lọc): Luôn là vùng cấm
+        if (row === 3) return true;
+
+        // 4. Kiểm tra Cột Sort động
+        var config = DB.qlConfig[sheetName]; 
+        
+        // Nếu sheet này không có config (VD sheet Act, ListKH...) -> An toàn
+        if (!config) return false;
+
+        // Lưu ý: 'col' từ Extension gửi về là 1-based (A=1)
+        // 'sort' và 'level' từ Server là 0-based (A=0)
+        // Nên phải trừ 1 để so sánh
+        var colIndex = col - 1; 
+
+        if (colIndex === config.sort) return true;  // Đang ở cột @QL_SORT
+        if (colIndex === config.level) return true; // Đang ở cột @QL_SORT_LEVEL
+
+        return false;
+    }
+
+    function handleSheetTrigger(row, sheet) { 
+       if (!APP.isAuto) return;
+       if (APP.newCustID) return; // Đang xem khách mới tạo thì không nhảy lung tung
+
+       // Logic hiển thị từ RAM (Zero Latency)
+       if(sheet.startsWith("!")) {
+           var map = DB.maps[sheet];
+           // Map là mảng ID [KH1, KH2...]. Row sheet bắt đầu từ 1. Data bắt đầu từ dòng 4.
+           // -> Index = Row - 4
+           if(map && row >= 4 && (row - 4) < map.length) {
+               var custID = map[row - 4];
+               // Chỉ render nếu khác khách đang xem
+               if (custID !== APP.currentID) {
+                   APP.sheetID = custID;
+                   renderCustomer(custID);
+               }
+           } else {
+               // Click ra ngoài vùng data -> Reset về trống
+               // document.getElementById('empty-state').style.display = 'block';
+               // document.getElementById('cust-card').style.display = 'none';
+           }
+       }
+    }
+
+    // === 5. RENDER GIAO DIỆN (ĐÃ TỐI ƯU UX) ===
+
+    function renderCustomer(id) {
+       APP.currentID = id;
+       var c = DB.listKH.find(x => x.id == id);
+       
+       var btnEditCust = document.getElementById('btn-edit-cust');
+       if(c) btnEditCust.classList.remove('disabled'); else btnEditCust.classList.add('disabled');
+
+       if(!c) return;
+
+       // 1. Hiển thị thông tin khách (Info Card)
+       document.getElementById('empty-state').style.display='none';
+       document.getElementById('cust-card').style.display='block';
+       document.getElementById('note-card').style.display='block';
+       document.getElementById('tx-card').style.display='block';
+
+       document.getElementById('c-name').innerText = c.name || "(Chưa có tên)";
+       document.getElementById('c-code').innerText = c.id;
+       document.getElementById('c-tax').innerText = c.tax || "";
+       document.getElementById('c-phone').innerText = c.phone || "";
+       document.getElementById('c-contact').innerText = c.contact || "";
+
+       // 2. Render Ghi chú (Logic ẩn hiện nút Thêm/Sửa)
+       var noteAction = document.getElementById('note-action-area');
+       var noteContent = document.getElementById('note-content-area');
+       
+       if(c.note && c.note.trim() !== "") {
+           noteAction.innerHTML = `<div class="action-link" onclick="openNoteEdit()"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg> Sửa</div>`;
+           noteContent.innerHTML = `<div class="note-content">${c.note}</div>`;
+           noteContent.style.display = 'block';
+       } else {
+           noteAction.innerHTML = `<div class="action-link" onclick="openNoteEdit()"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg> Thêm mới</div>`;
+           noteContent.style.display = 'none';
+       }
+
+       // 3. Render Giao dịch (Gọi hàm tách biệt)
+       renderTxOnly(id);
+    }
+
+    // Hàm render riêng cho Giao dịch (để gọi lại khi Lazy Load cập nhật)
+    function renderTxOnly(id) {
+       // [BIG DATA] Lấy từ Map O(1)
+       var txs = DB.acts_map[id] || [];
+       
+       // Sắp xếp: Chỉ sắp xếp theo Ngày (Giảm dần) -> STT (Giảm dần)
+       // [ĐÃ BỎ] Logic ưu tiên Ghim lên đầu
+       txs.sort((a,b) => {
+          // Ngày giảm dần
+          if (b._dateVal !== a._dateVal) return b._dateVal - a._dateVal;
+          // STT giảm dần
+          return b.stt - a.stt;
+       });
+
+       var html = "";
+       if(txs.length == 0) {
+           html = "<div style='text-align:center; color:#999; padding:10px; font-size:13px;'>Chưa có giao dịch</div>";
+       } else {
+          txs.forEach(t => {
+             // [ĐÃ BỎ] Class "is-pinned" và Icon SVG
+             
+             html += `
+             <div class="tx-item">
+                <div class="tx-meta">
+                   <div class="tx-meta-left">
+                      <span class="tx-date">${t.date}</span>
+                      <span class="tx-prod">${t.prod}</span>
+                   </div>
+                   <div style="display:flex; align-items:center">
+                      <span class="tx-job">${t.job}</span> 
+                      <svg class="tx-edit-icon" onclick='editTx(${t.row})' viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                   </div>
+                </div>
+                <div class="tx-body">${t.content}</div>
+             </div>`;
+          });
+       }
+       document.getElementById('tx-list').innerHTML = html;
+    }
+
+    // Helper Date to Num (dd-mm-yyyy -> yyyymmdd)
+    function dateToNum(dStr) {
+        if(!dStr) return 0;
+        // Tự động nhận diện cắt theo dấu - hoặc /
+        var p = dStr.split(/[-/]/); 
+        
+        // Server V14.2 trả về dd-mm-yyyy hoặc dd/mm/yyyy
+        if(p.length === 3) {
+            // Chuyển về số yyyymmdd để so sánh
+            return parseInt(p[2] + p[1] + p[0]); 
+        }
+        return 0;
+    }
+
+    function forceReload() { 
+        showLoader(true);
+        // Bật cờ bẩn -> Rồi gọi initDB để tải lại
+        google.script.run
+            .withSuccessHandler(() => {
+                initDB();
+            })
+            .withFailureHandler(err => {
+                showLoader(false);
+                alert("Không thể reload. Lỗi mạng!");
+            })
+            .triggerFullReload();
+    }
+    
+    // === 6. XỬ LÝ FORM (OPEN & FILL DATA) ===
+
+    function openForm(type, isEdit, data) {
+       // Reset UI
+       document.querySelectorAll('.overlay').forEach(e => e.style.display = 'none');
+       document.body.classList.add('modal-open');
+       document.querySelectorAll('.inp-error').forEach(e => e.classList.remove('inp-error'));
+       document.querySelectorAll('.inp-highlight').forEach(e => e.classList.remove('inp-highlight'));
+
+       // Hàm helper: Điền giá trị ngầm định từ Config
+       var applyDefaults = function(containerID) {
+           var container = document.getElementById(containerID);
+           var inputs = container.querySelectorAll('input[data-col], textarea[data-col]');
+           inputs.forEach(el => {
+               var colKey = el.getAttribute('data-col');
+               // 1. Nếu có config ngầm định
+               if (DB.help.defaults && DB.help.defaults[colKey]) {
+                   var defVal = DB.help.defaults[colKey];
+                   if (defVal === "{TODAY}") {
+                       if (el.type === 'date') el.valueAsDate = new Date();
+                       else el.value = new Date().toLocaleDateString('vi-VN');
+                   } else {
+                       if (el.type === 'date') el.value = toInputDate(defVal);
+                       else el.value = defVal;
+                   }
+               } 
+               // 2. Nếu không, reset trắng (trừ date)
+               else if (el.type !== 'date') {
+                   el.value = "";
+               }
+           });
+       };
+
+       if(type === 'cust') {
+          document.getElementById('form-cust').style.display = 'block';
+          document.getElementById('fc-title').innerText = isEdit ? "Sửa Khách Hàng" : "Thêm Khách Hàng";
+          
+          if(isEdit && APP.currentID) {
+             var c = DB.listKH.find(x => x.id == APP.currentID);
+             if (!c) return alert("Không tìm thấy thông tin khách hàng!");
+             
+             setValue('n-code', c.id); document.getElementById('n-code').readOnly = true;
+             setValue('n-name', c.name); setValue('n-tax', c.tax);
+             setValue('n-phone', c.phone); setValue('n-contact', c.contact);
+             setValue('n-addr', c.addr); setValue('n-email', c.email);
+             setValue('n-web', c.web); setValue('n-parent', c.parent);
+             setValue('n-group', c.group); setValue('n-prod', c.prod);
+             setValue('n-bid', toInputDate(c.bid)); setValue('n-note', c.note); 
+             setValue('n-verify', c.verify);
+             // [MỚI] Điền trường mới
+             setValue('n-source', c.source); 
+             setValue('n-fbm', c.fbm);
+             
+             setValue('n-created', c.created ? c.created : new Date().toLocaleDateString('vi-VN'));
+          } else {
+             // ADD NEW MODE
+             document.getElementById('n-code').readOnly = false;
+             // Reset form thủ công các trường cơ bản
+             ['n-code','n-name','n-tax','n-phone','n-contact','n-email','n-web','n-parent','n-group','n-prod','n-bid','n-note','n-created','n-source','n-fbm'].forEach(id => setValue(id,""));
+             
+             // Áp dụng giá trị ngầm định
+             applyDefaults('form-cust');
+             document.getElementById('n-created').value = new Date().toLocaleDateString('vi-VN'); 
+          }
+       }
+       else if (type === 'tx') {
+          // Kiểm tra xem đã chọn khách chưa
+          if(!APP.currentID) { alert("Chọn khách hàng trước!"); closeForm(); return; }
+          
+          // Hiển thị form
+          document.getElementById('form-tx').style.display = 'block';
+          setValue('tx-id', APP.currentID);
+          
+          // === TRƯỜNG HỢP 1: SỬA GIAO DỊCH (EDIT MODE) ===
+          if(isEdit && data) {
+              document.getElementById('ft-title').innerText = "Sửa Giao Dịch";
+              
+              // Điền các giá trị cũ vào form
+              setValue('tx-row', data.row); 
+              setValue('tx-date', toInputDate(data.date));
+              setValue('tx-prod', data.prod); 
+              setValue('tx-status', data.job); 
+              setValue('tx-content', data.content);
+              setValue('tx-val', data.val);
+              
+              // [SỬA QUAN TRỌNG] Load giá trị Ghim dạng text (không phải checkbox nữa)
+              setValue('tx-pin', data.pin); 
+              
+              setValue('tx-fbm', data.fbm);
+              setValue('tx-user', data.user);
+              
+              setValue('tx-created', data.created ? data.created : new Date().toLocaleDateString('vi-VN'));
+          } 
+          // === TRƯỜNG HỢP 2: THÊM MỚI (ADD NEW MODE) ===
+          else {
+              document.getElementById('ft-title').innerText = "Thêm Giao Dịch";
+              
+              // Reset trắng các ô nhập liệu
+              setValue('tx-row', ""); 
+              setValue('tx-content', ""); 
+              setValue('tx-status', ""); 
+              document.getElementById('tx-date').value = "";
+              
+              // [SỬA QUAN TRỌNG] Reset ô Ghim về rỗng
+              setValue('tx-pin', ""); 
+
+              // 1. Điền giá trị ngầm định từ Sheet Help (nếu có)
+              applyDefaults('form-tx');
+
+              // 2. Logic ngày tháng (Fallback nếu chưa có ngầm định)
+              var elDate = document.getElementById('tx-date');
+              if (!elDate.value) elDate.valueAsDate = new Date(); // Mặc định hôm nay
+
+              // 3. Logic đoán Sản phẩm (Lấy từ giao dịch gần nhất hoặc từ thông tin khách)
+              // (Code cũ của bạn vẫn giữ nguyên ở đây)
+              if (!document.getElementById('tx-prod').value) {
+                  // Mảng DB.acts_map đã được sắp xếp ở hàm renderTxOnly (Ghim -> Ngày -> STT)
+                  // Nên phần tử [0] chính là giao dịch quan trọng nhất/gần nhất
+                  var lastTx = DB.acts_map[APP.currentID] ? DB.acts_map[APP.currentID][0] : null; 
+                  var defProd = lastTx ? lastTx.prod : (DB.listKH.find(x => x.id == APP.currentID)?.prod || "");
+                  setValue('tx-prod', defProd);
+              }
+              
+              // 4. [LOGIC MỚI - THÔNG MINH] Kế thừa giá trị Ghim
+              // Lấy giá trị Ghim của giao dịch xếp trên cùng (gần nhất/quan trọng nhất)
+              if (APP.currentID && DB.acts_map[APP.currentID] && DB.acts_map[APP.currentID].length > 0) {
+                  var lastTxForPin = DB.acts_map[APP.currentID][0];
+                  // Nếu giao dịch cũ đó có ghim (VD: "Ưu tiên 1") -> Tự điền vào giao dịch mới
+                  if (lastTxForPin && lastTxForPin.pin) {
+                      setValue('tx-pin', lastTxForPin.pin);
+                  }
+              }
+              
+              document.getElementById('tx-created').value = new Date().toLocaleDateString('vi-VN');
+          }
+       }
+    }
+
+    function openNoteEdit() { 
+       if(!APP.currentID) return;
+       var c = DB.listKH.find(x => x.id == APP.currentID); 
+       setValue('inp-note-edit', c.note); 
+       document.getElementById('form-note').style.display = 'block'; 
+    }
+
+    function closeForm() { 
+        document.querySelectorAll('.overlay').forEach(e => e.style.display = 'none'); 
+        document.body.classList.remove('modal-open');
+    }
+    
+    function setValue(id, val) { document.getElementById(id).value = val || ""; }
+
+    // === 7. OPTIMISTIC UI: SAVE LOGIC (LƯU VÀ HIỂN THỊ NGAY) ===
+
+    // Lưu Khách Hàng
+    function saveCust() { 
+       // Validate
+       var req = ['n-code', 'n-name', 'n-tax', 'n-phone', 'n-contact', 'n-addr', 'n-group', 'n-prod', 'n-verify', 'n-source', 'n-fbm'];
+       if(!validate(req)) return;
+
+       // Check trùng (chỉ khi Thêm mới)
+       var code = document.getElementById('n-code').value.trim();
+       var isEditMode = document.getElementById('n-code').readOnly;
+       if (!isEditMode) {
+           var exists = DB.listKH.find(x => x.id.toLowerCase() === code.toLowerCase());
+           if (exists) {
+               alert("Mã khách hàng [" + code + "] đã tồn tại!");
+               document.getElementById('n-code').classList.add('inp-error');
+               return;
+           }
+       }
+
+       // Gom dữ liệu
+       var d = { 
+           code: code, name: document.getElementById('n-name').value, 
+           tax: document.getElementById('n-tax').value, phone: document.getElementById('n-phone').value, 
+           contact: document.getElementById('n-contact').value, addr: document.getElementById('n-addr').value, 
+           email: document.getElementById('n-email').value, web: document.getElementById('n-web').value, 
+           parent: document.getElementById('n-parent').value, group: document.getElementById('n-group').value, 
+           prod: document.getElementById('n-prod').value, bid: document.getElementById('n-bid').value, 
+           note: document.getElementById('n-note').value, verify: document.getElementById('n-verify').value,
+           source: document.getElementById('n-source').value, // [MỚI]
+           fbm: document.getElementById('n-fbm').value        // [MỚI]
+       };
+
+       // 1. CẬP NHẬT RAM NGAY LẬP TỨC (Optimistic)
+       if (isEditMode) {
+           var idx = DB.listKH.findIndex(x => x.id == d.code);
+           if (idx > -1) {
+               // Merge dữ liệu mới vào cũ
+               Object.assign(DB.listKH[idx], {
+                   name: d.name, tax: d.tax, phone: d.phone, contact: d.contact,
+                   addr: d.addr, email: d.email, web: d.web, parent: d.parent,
+                   group: d.group, prod: d.prod, bid: d.bid ? parseDateVN(d.bid) : "",
+                   note: d.note, verify: d.verify, source: d.source, fbm: d.fbm
+               });
+           }
+       } else {
+           // Thêm mới vào RAM
+           DB.listKH.push({
+               id: d.code, name: d.name, tax: d.tax, phone: d.phone, contact: d.contact,
+               addr: d.addr, email: d.email, web: d.web, parent: d.parent,
+               group: d.group, prod: d.prod, bid: d.bid ? parseDateVN(d.bid) : "",
+               note: d.note, verify: d.verify, source: d.source, fbm: d.fbm,
+               created: new Date().toLocaleDateString('vi-VN')
+           });
+           APP.newCustID = d.code; // Đánh dấu để ưu tiên hiển thị
+           processCompanies(); // Cập nhật lại list công ty mẹ
+       }
+
+       // 2. Render lại ngay
+       closeForm();
+       renderCustomer(d.code);
+
+       // 3. Gửi Server (Background Sync)
+       showLoader(true); // <--- BẬT LOADING
+       
+       google.script.run
+           .withSuccessHandler(res => {
+               showLoader(false); 
+               if(res.error) alert("Lỗi lưu Server: " + res.error);
+               // Không cần initDB() lại vì RAM đã chuẩn rồi
+           })
+           .withFailureHandler(err => {
+               showLoader(false); // Tắt loading ngay
+               console.error(err);
+               alert("❌ LỖI MẠNG: Khách hàng này CHƯA được lưu vào Sheet!\nVui lòng kiểm tra internet và lưu lại.");
+           })
+           .saveCustomer(d);
+    }
+
+    // Lưu Giao Dịch - [ĐÃ SỬA ĐỂ CẬP NHẬT MAP]
+    function saveTx() {
+       var req = ['tx-date', 'tx-prod', 'tx-status', 'tx-content', 'tx-fbm'];
+       if(!validate(req)) return;
+
+       var d = { 
+           row: document.getElementById('tx-row').value, id: document.getElementById('tx-id').value, 
+           date: document.getElementById('tx-date').value, prod: document.getElementById('tx-prod').value, 
+           status: document.getElementById('tx-status').value, content: document.getElementById('tx-content').value, 
+           val: document.getElementById('tx-val').value,
+           pin: document.getElementById('tx-pin').value, // Lấy giá trị text (VD: "Ưu tiên 1")
+           fbm: document.getElementById('tx-fbm').value,           
+           user: document.getElementById('tx-user').value          
+       };
+       
+       var displayDate = parseDateVN(d.date); 
+
+       // 1. CẬP NHẬT RAM NGAY LẬP TỨC
+       if (!DB.acts_map[d.id]) DB.acts_map[d.id] = [];
+       var txList = DB.acts_map[d.id];
+       
+       if (d.row) { // EDIT
+           var t = txList.find(x => x.row == d.row);
+           if (t) {
+               t.date = displayDate; t.prod = d.prod; t.job = d.status; 
+               t.content = d.content; t.val = d.val; 
+               t.pin = d.pin; // [GIỮ] Lưu giá trị text
+               t.fbm = d.fbm; t.user = d.user;
+               t._dateVal = dateToNum(displayDate); 
+               // [ĐÃ XÓA] t._isPinned = ... (Không cần thiết nữa)
+           }
+       } else { // ADD NEW
+           var newTx = {
+               row: "TEMP", 
+               stt: 999999, 
+               id: d.id, date: displayDate, prod: d.prod, job: d.status,
+               content: d.content, val: d.val, 
+               pin: d.pin, // [GIỮ] Lưu giá trị text
+               fbm: d.fbm, user: d.user,
+               _dateVal: dateToNum(displayDate)
+               // [ĐÃ XÓA] _isPinned: ... (Không cần thiết nữa)
+           };
+           txList.push(newTx);
+       }
+
+       // 2. Render lại giao diện chi tiết ngay lập tức
+       closeForm();
+       renderTxOnly(d.id);
+
+       // 3. Gửi Server
+       showLoader(true); 
+
+       google.script.run
+           .withSuccessHandler(res => {
+               showLoader(false); 
+               if(res.error) {
+                   alert("Lỗi lưu Server: " + res.error);
+               }
+               else if (res.success) {
+                   // A. Update Row/STT nếu là thêm mới
+                   if (!d.row && DB.acts_map[d.id]) {
+                       var tempTx = DB.acts_map[d.id].find(x => x.row === "TEMP");
+                       if (tempTx) {
+                           tempTx.row = res.row;
+                           tempTx.stt = res.stt;
+                           renderTxOnly(d.id); 
+                       }
+                   }
+                   // B. Cập nhật Bản đồ vị trí (Map) ngay lập tức
+                   if (res.newMap && res.sheetName) {
+                       console.log("♻️ Đã cập nhật Map mới cho sheet: " + res.sheetName);
+                       DB.maps[res.sheetName] = res.newMap;
+                   }
+               }
+           })
+           .withFailureHandler(err => {
+               showLoader(false); // Tắt loading ngay
+               console.error(err);
+               alert("❌ LỖI MẠNG: Giao dịch CHƯA được lưu!\nVui lòng kiểm tra internet và lưu lại.");
+           })
+           .saveTransaction(d);
+    }
+
+    function saveNoteLogic() { 
+       // 1. Bật Loader ngay lập tức
+       showModalLoader(true); 
+       showLoader(true); 
+
+       var newNote = document.getElementById('inp-note-edit').value;
+       
+       // 2. Update RAM (Optimistic UI) - Hiển thị ngay cho người dùng sướng
+       var c = DB.listKH.find(x => x.id == APP.currentID);
+       if(c) c.note = newNote;
+       
+       renderCustomer(APP.currentID); 
+       closeForm();
+       showModalLoader(false);
+       
+       // 3. Gọi Server và CHỜ phản hồi mới tắt Loader
+       google.script.run
+           .withSuccessHandler(function() {
+               showLoader(false); 
+               showModalLoader(false); // Tắt loader của popup
+           })
+           .withFailureHandler(function(err) {
+               showLoader(false);
+               showModalLoader(false); // Tắt loader của popup
+               alert("❌ Lỗi lưu ghi chú: " + err.message);
+           })
+           .updateNoteOnly(APP.currentID, newNote);
+    }
+
+    // === 8. CÁC TIỆN ÍCH KHÁC (SEARCH, PASTE, VALIDATE...) ===
+    
+    // Validate Form
+    function validate(ids) {
+       var isValid = true; var firstError = null;
+       for(var i=0; i<ids.length; i++) {
+          var el = document.getElementById(ids[i]);
+          var val = el.value.trim();
+          var hasError = false;
+          if(!val) hasError = true; // Check rỗng
+          
+          var listKey = el.getAttribute('data-list');
+          // Check danh sách (nếu có)
+          if(!hasError && listKey && DB.help[listKey]) {
+              var exists = DB.help[listKey].some(item => item.toLowerCase() === val.toLowerCase());
+              if(!exists) hasError = true;
+          }
+
+          if(hasError) {
+              el.classList.add('inp-error');
+              if(!firstError) firstError = el;
+              isValid = false;
+              el.addEventListener('input', function() { this.classList.remove('inp-error'); }, {once: true});
+          } else {
+              el.classList.remove('inp-error');
+          }
+       }
+       if(!isValid && firstError) firstError.focus();
+       return isValid;
+    }
+
+    // Xử lý tìm kiếm (Search Local RAM)
+    function handleSearch(key) { 
+       var list = document.getElementById('suggest-search');
+       currentFocus = -1; 
+       if (!key || key.trim() === "") { list.style.display = 'none'; return; }
+       
+       key = key.toLowerCase().trim();
+       var m = [], c = 0;
+       
+       // Duyệt qua 5000 khách trong RAM
+       for (var i = 0; i < DB.listKH.length; i++) {
+           if (c > 20) break; // [LIMIT] Chỉ hiện 20 kết quả
+           var x = DB.listKH[i];
+           
+           var matchName = x.name && x.name.toLowerCase().includes(key);
+           var matchPhone = x.phone && String(x.phone).includes(key);
+           var matchID = x.id && x.id.toLowerCase().includes(key);
+           var matchTax = x.tax && String(x.tax).includes(key);
+
+           if (matchName || matchPhone || matchID || matchTax) {
+               m.push(x);
+               c++;
+           }
+       }
+
+       if (m.length > 0) {
+           var h = "";
+           m.forEach(i => {
+               var subText = i.id;
+               if (i.tax) subText += " | " + i.tax;
+               if (i.phone) subText += " | " + i.phone;
+               h += `<div class="s-item" onclick="selectSearch('${i.id}')">
+                       <div><div class="s-name">${i.name}</div><div class="s-sub">${subText}</div></div>
+                     </div>`;
+           });
+           list.innerHTML = h; list.style.display = 'block';
+           currentFocus = 0; addActive(list.getElementsByClassName("s-item"));
+       } else { list.style.display = 'none'; } 
+    }
+
+    function selectSearch(id){ renderCustomer(id); document.getElementById('suggest-search').style.display='none'; }
+    function toggleSearch() { 
+       APP.isSearch = !APP.isSearch;
+       var p = document.getElementById('search-panel'); 
+       if(APP.isSearch) {
+           p.style.display = 'block'; document.getElementById('btn-search').classList.add('active');
+           document.getElementById('inp-search').focus();
+       } else {
+           p.style.display = 'none'; document.getElementById('btn-search').classList.remove('active');
+           document.getElementById('inp-search').value = "";
+           document.getElementById('suggest-search').style.display = 'none';
+           if(APP.sheetID) renderCustomer(APP.sheetID);
+       } 
+    }
+    function toggleAuto() { APP.isAuto=!APP.isAuto; document.getElementById('btn-auto').classList.toggle('active'); }
+
+    // Paste Logic & Helper Functions (Giữ nguyên logic cũ tối ưu)
+    function setupPasteAutoFill() {
+       var codeInput = document.getElementById('n-code');
+       codeInput.addEventListener('paste', function(e) {
+          e.preventDefault();
+          var clipboardData = (e.clipboardData || window.clipboardData).getData('text');
+          var lines = clipboardData.replace(/\r\n/g, '\n').replace(/\t/g, '\n').split('\n').map(x => x.trim()).filter(x => x !== "");
+          fillAndHighlight('n-code', lines[0], true); 
+          if (lines.length === 1) return;
+          if (lines.length >= 5) {
+             fillAndHighlight('n-name', lines[1]); fillAndHighlight('n-tax', lines[2]);
+             fillAndHighlight('n-contact', lines[3]); fillAndHighlight('n-phone', cleanPhone(lines[4]));
+          }
+          if (lines.length >= 6) { if (lines[5].includes('@') && lines[5].includes('.')) fillAndHighlight('n-email', lines[5]); }
+       });
+    }
+
+    // Dropdown Keyboard Nav (Giữ nguyên)
+    // === CODE MỚI: HÀM SETUP DROPDOWN (CÓ TÙY CHỌN ẨN KHI RỖNG) ===
+    // === CODE MỚI: HÀM SETUP DROPDOWN (THÔNG MINH - TỰ ĐỘNG CO GIÃN) ===
+    function setupDropdown(inputId, listId, dataKey, limit, requireInput) {
+       var inp = document.getElementById(inputId); 
+       var box = document.getElementById(listId);
+       
+       var show = () => { 
+           // 1. Kiểm tra điều kiện Ẩn (nếu requireInput = true mà rỗng)
+           if (requireInput && inp.value.trim() === "") {
+               box.style.display = 'none';
+               return;
+           }
+           
+           // 2. Render dữ liệu
+           renderDropdownList(box, inp, DB.help[dataKey], true, limit); 
+           
+           // 3. [TÍNH NĂNG MỚI] Tự động tính toán chiều cao tối đa
+           // Lấy vị trí của ô input so với khung nhìn trình duyệt
+           var rect = inp.getBoundingClientRect();
+           var windowHeight = window.innerHeight;
+           
+           // Tính khoảng trống bên dưới: Tổng chiều cao - Đáy input - 15px (khoảng đệm)
+           var spaceBelow = windowHeight - rect.bottom - 15;
+           
+           // Đảm bảo chiều cao tối thiểu là 100px (để không bị quá bé nếu input nằm sát đáy)
+           // Nếu khoảng trống < 100px thì vẫn cho phép cao 150px (chấp nhận che khuất 1 chút hoặc scroll nhẹ)
+           // Nhưng ưu tiên theo yêu cầu của bạn là "vừa với vùng hiển thị"
+           var dynamicMaxHeight = spaceBelow > 100 ? spaceBelow : 150; 
+           
+           // Gán Max-Height động vào style
+           box.style.maxHeight = dynamicMaxHeight + "px";
+
+           // 4. Hiển thị box
+           box.style.display = 'block'; 
+       };
+
+       // [UPDATE V14.3] Sự kiện Focus: Tự bôi đen text nếu có giá trị
+       inp.addEventListener('focus', function() {
+           // Nếu ô đã có giá trị -> Bôi đen (Select All)
+           if (this.value && this.value.trim() !== "") {
+               var that = this;
+               // Dùng setTimeout để đảm bảo chạy sau khi trình duyệt focus xong
+               setTimeout(function() { that.select(); }, 50);
+           }
+           // Gọi hàm hiển thị dropdown như cũ
+           show();
+       });
+       
+       inp.addEventListener('click', () => { 
+           if (requireInput && inp.value.trim() === "") return;
+
+           // Cho phép click để hiện lại nếu đang ẩn
+           if(box.style.display==='none'||box.style.display==='') { 
+               // Gọi lại hàm show để tính toán lại chiều cao (vì có thể user vừa cuộn chuột)
+               show();
+           }
+       });
+       
+       inp.addEventListener('input', () => { 
+           if (requireInput && inp.value.trim() === "") {
+               box.style.display = 'none';
+               return;
+           }
+           renderDropdownList(box, inp, DB.help[dataKey], false, limit); 
+           if (box.innerHTML !== "") {
+                // Tính toán lại chiều cao ngay khi đang gõ (đề phòng gõ xong list dài ra)
+                var rect = inp.getBoundingClientRect();
+                var spaceBelow = window.innerHeight - rect.bottom - 15;
+                var dynamicMaxHeight = spaceBelow > 100 ? spaceBelow : 150;
+                box.style.maxHeight = dynamicMaxHeight + "px";
+                
+                box.style.display = 'block';
+           }
+       });
+       
+       setupInputKeyboard(inputId, listId);
+       // Delay tắt để user kịp click chọn item
+       inp.addEventListener('blur', () => setTimeout(() => { box.style.display = 'none'; }, 200));
+    }
+    
+    // === HÀM RENDER DROPDOWN ĐÃ NÂNG CẤP (V14.2 UX) ===
+    function renderDropdownList(box, inp, dataArr, ignoreFilter, limit) {
+        var val = inp.value.trim();
+        var valLower = val.toLowerCase();
+        var matches = [];
+        var max = limit || 100000;
+
+        // 1. Lọc dữ liệu
+        for (var i = 0; i < dataArr.length; i++) {
+            var item = dataArr[i];
+            if (ignoreFilter || item.toLowerCase().includes(valLower)) {
+                matches.push(item);
+            }
+        }
+
+        // 2. [YÊU CẦU 2] Logic ưu tiên: Đưa giá trị hiện tại lên đầu danh sách (nếu khớp)
+        if (val !== "") {
+            // Tìm xem giá trị trong ô input có nằm trong danh sách kết quả không
+            var exactIdx = matches.findIndex(x => x.toLowerCase() === valLower);
+            
+            // Nếu có, cắt nó ra và đưa lên đầu mảng
+            if (exactIdx > -1) {
+                var exactItem = matches.splice(exactIdx, 1)[0];
+                matches.unshift(exactItem);
+            }
+        }
+
+        // 3. Cắt giới hạn hiển thị (để tránh lag nếu list quá dài)
+        if (matches.length > max) {
+            matches = matches.slice(0, max);
+            var hasMore = true;
+        }
+
+        // 4. Render HTML
+        var html = "";
+        matches.forEach(item => {
+            // Thêm sự kiện onclick chọn item
+            html += `<div class="s-item" onclick="selectItem('${item}', '${inp.id}')">${item}</div>`;
+        });
+
+        if (hasMore) html += `<div style='padding:6px 10px; font-style:italic; color:#999; font-size:12px;'>...</div>`;
+        if (matches.length === 0) html = "<div style='padding:8px; color:#999'>Không tìm thấy</div>";
+
+        box.innerHTML = html;
+
+        // 5. [UPDATE V14.3] Logic chọn thông minh
+       if (matches.length > 0) {
+           var items = box.getElementsByClassName("s-item");
+           
+           // Nếu ô nhập liệu TRỐNG -> KHÔNG chọn dòng nào cả (để tránh ấn nhầm)
+           if (val === "") {
+               currentFocus = -1; 
+               removeActive(items); // Đảm bảo không dòng nào sáng
+           } 
+           // Nếu ô đã CÓ CHỮ -> Tự động chọn dòng đầu tiên (như cũ)
+           else {
+               currentFocus = 0;
+               addActive(items);
+           }
+       } else {
+           currentFocus = -1;
+       }
+    }
+
+    function selectItem(val, inputId) { document.getElementById(inputId).value = val; focusNextInput(document.getElementById(inputId)); }
+
+    // Helpers
+    function cleanPhone(str) { if (!str) return ""; return str.replace(/\./g, '').replace(/[^0-9]/g, ''); }
+    function fillAndHighlight(elementId, value, force) {
+       var el = document.getElementById(elementId); if (!el) return;
+       if (el.value.trim() === "" || force) { el.value = value; el.classList.add('inp-highlight'); 
+       var rm = function() { el.classList.remove('inp-highlight'); el.removeEventListener('input', rm); el.removeEventListener('click', rm); };
+       el.addEventListener('input', rm); el.addEventListener('click', rm); }
+    }
+    function focusNextInput(currentEl) {
+       var selector = 'input:not([disabled]):not([readonly]):not([type="hidden"]), textarea:not([disabled]):not([readonly]), button.btn-p';
+       var focusables = Array.from(document.querySelectorAll(selector)).filter(x => x.offsetParent !== null);
+       var index = focusables.indexOf(currentEl);
+       if (index > -1 && index < focusables.length - 1) focusables[index + 1].focus();
+    }
+    function setupEnterNavigation() {
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                var el = e.target;
+                if (el.tagName === 'TEXTAREA' || el.tagName === 'BUTTON') return;
+                var nextEl = el.nextElementSibling;
+                if(nextEl && nextEl.classList.contains('suggest-box') && nextEl.style.display === 'block') return;
+                e.preventDefault(); focusNextInput(el);
+            }
+        });
+    }
+    function setupInputKeyboard(inputId, listId) {
+      var inp = document.getElementById(inputId);
+      inp.addEventListener("keydown", function(e) {
+          var box = document.getElementById(listId);
+          if (box.style.display === 'none') return;
+          var items = box.getElementsByClassName("s-item");
+          if (e.key === "Enter" || e.key === "Tab") {
+             if (currentFocus > -1 && items[currentFocus]) { e.preventDefault(); items[currentFocus].click(); } 
+             else if (e.key === "Enter" && items.length > 0) { e.preventDefault(); items[0].click(); }
+             return;
+          }
+          if (e.key === "ArrowDown") { currentFocus++; addActive(items); } 
+          else if (e.key === "ArrowUp") { currentFocus--; addActive(items); } 
+      });
+    }
+    function addActive(items) { if (!items) return; removeActive(items);
+      if (currentFocus >= items.length) currentFocus = 0; if (currentFocus < 0) currentFocus = items.length - 1; 
+      items[currentFocus].classList.add("active"); items[currentFocus].scrollIntoView({block: "nearest"});
+    }
+    function removeActive(items) { for (var i = 0; i < items.length; i++) items[i].classList.remove("active"); }
+    
+    function showLoader(isLoading) {
+        var loader = document.getElementById('loader-line');
+        if (loader) {
+            loader.style.display = isLoading ? 'block' : 'none';
+        }
+    }
+
+    function showModalLoader(b) { document.querySelectorAll('.modal-loader').forEach(e => e.style.display = b ? 'block' : 'none'); }
+    
+    // Date Helpers (Đã tối ưu)
+    function parseDateVN(str) { 
+      if(!str) return ""; 
+      // Trường hợp input từ thẻ date (yyyy-mm-dd) -> chuyển thành dd-mm-yyyy
+      if(str.match(/^\d{4}-\d{2}-\d{2}$/)) { 
+          var p = str.split('-'); 
+          return p[2] + '-' + p[1] + '-' + p[0]; // [SỬA]: Dùng dấu gạch ngang
+      }
+      var p = str.split(/[-/]/); 
+      if(p.length === 3) return p[0] + "-" + p[1] + "-" + p[2]; // [SỬA]: Chuẩn hóa mọi thứ về dấu gạch ngang
+      return str; 
+    }
+
+    function toInputDate(v) { 
+      if(!v) return ""; var str = String(v).trim();
+      if(str.match(/^\d{4}-\d{2}-\d{2}$/)) return str;
+      var vnDate = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+      if (vnDate) { return `${vnDate[3]}-${("0"+vnDate[2]).slice(-2)}-${("0"+vnDate[1]).slice(-2)}`; }
+      return str; // Fallback
+    }
+
+    // === BỔ SUNG HÀM SỬA GIAO DỊCH (Dán vào cuối thẻ script trong sidebar.html) ===
+    function editTx(row) {
+        // 1. Kiểm tra xem có đang chọn khách hàng không
+        if (!APP.currentID || !DB.acts_map[APP.currentID]) return;
+
+        // 2. Tìm giao dịch trong RAM dựa vào row
+        // Lưu ý: row được truyền vào từ onclick là số, cần so sánh lỏng (==) hoặc ép kiểu
+        var tx = DB.acts_map[APP.currentID].find(x => x.row == row);
+
+        // 3. Nếu tìm thấy thì mở form sửa
+        if (tx) {
+            openForm('tx', true, tx);
+        } else {
+            console.error("Không tìm thấy giao dịch dòng:", row);
+        }
+    }
+
+    // === HÀM MỚI: Xử lý nút thử lại trên màn hình lỗi ===
+    function retryLoadUI(btnElement) {
+        // 1. Đổi giao diện nút để báo hiệu đang chạy
+        if(btnElement) {
+            btnElement.innerText = "Đang kiểm tra...";
+            btnElement.disabled = true; // Chặn click liên tục
+            btnElement.style.background = "#f1f3f4"; // Làm mờ nút
+            btnElement.style.cursor = "wait";
+        }
+
+        // 2. Gọi lệnh reload từ Server
+        google.script.run
+           .withSuccessHandler(() => {
+               initDB(); 
+           })
+           .withFailureHandler(err => {
+               if(btnElement) {
+                   btnElement.innerText = "Thử lại";
+                   btnElement.disabled = false;
+                   btnElement.style.cursor = "pointer";
+               }
+               alert("Vẫn không kết nối được server. Vui lòng thử lại sau.");
+           })
+           .triggerFullReload();
+    }
+
+    // === HÀM MỚI: Tắt gợi ý trình duyệt cho toàn bộ ô nhập liệu ===
+    function disableAutocompleteGlobal() {
+        var inputs = document.querySelectorAll('input, textarea');
+        inputs.forEach(function(el) {
+            // Chỉ tắt nếu chưa được tắt thủ công
+            if (!el.getAttribute('autocomplete')) {
+                el.setAttribute('autocomplete', 'off');
+            }
+        });
+    }
+
+    // === Thêm mới vào cuối script ===
+    function showTimeoutError() {
+        var errDiv = document.getElementById('error-overlay');
+        errDiv.innerHTML = `
+            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+            <h2>SERVER ĐANG BẬN!</h2>
+            <p>Hệ thống đang xử lý dữ liệu hoặc mạng chậm.</p>
+            <p style="font-size:13px; color:#555; margin-top:5px;">Quá thời gian chờ (15s).</p>
+            <button onclick="retryLoadUI(this)" style="margin-top:20px; cursor:pointer; padding:8px 16px; border:1px solid #ccc; background:#fff; border-radius:4px;">Thử lại ngay</button>
+        `;
+        errDiv.style.display = 'flex';
+    }
+
+  </script>
+</body>
+</html>
