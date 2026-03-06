@@ -1,0 +1,12 @@
+﻿/**
+ * PROJECT: ShinCRM_Master_Workspace
+ * FILE: manifest.json
+ * TITLE: Manifest V3
+ * ROLE: Config
+ * -------------------------------------------------------------------------
+ * CHI TIẾT ĐẶC TẢ:
+ * Khai báo quyền permissions, host_permissions (Zalo, FBM, Sheets) và service worker.
+ * -------------------------------------------------------------------------
+ * NGÀY KHỞI TẠO: 06/03/2026
+ */
+
