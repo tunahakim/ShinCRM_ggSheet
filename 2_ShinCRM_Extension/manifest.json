@@ -1,12 +1,18 @@
-﻿/**
- * PROJECT: ShinCRM_Master_Workspace
- * FILE: manifest.json
- * TITLE: Manifest V3
- * ROLE: Config
- * -------------------------------------------------------------------------
- * CHI TIẾT ĐẶC TẢ:
- * Khai báo quyền permissions, host_permissions (Zalo, FBM, Sheets) và service worker.
- * -------------------------------------------------------------------------
- * NGÀY KHỞI TẠO: 06/03/2026
- */
-
+﻿{
+  "manifest_version": 3,
+  "name": "CRM Local Pro V21",
+  "version": "21.0",
+  "description": "CRM Google Sheet - Local Mode (No Server Lag)",
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": ["https://docs.google.com/spreadsheets/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://docs.google.com/spreadsheets/*"],
+      "js": [
+        "content_scripts/bridge/iframe_bridge.js",
+        "content_scripts/scout/sheet_scout.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
