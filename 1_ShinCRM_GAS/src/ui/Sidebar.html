@@ -1,4 +1,4 @@
-﻿/**
+﻿<!-- 
  * PROJECT: ShinCRM_Master_Workspace
  * FILE: Sidebar.html
  * TITLE: Sidebar UI
@@ -8,5 +8,239 @@
  * Khung xương HTML, thanh tiến trình load data.
  * -------------------------------------------------------------------------
  * NGÀY KHỞI TẠO: 06/03/2026
- */
+ -->
 
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- Vị trí thẻ <style> </style> cũ -->
+  <?!= include('src/ui/Styles'); ?>
+
+</head>
+<body>
+  <div id="error-overlay"></div>
+
+  <div class="header">
+    <button id="btn-auto" class="icon-btn" onclick="toggleAuto()" title="Tự động bắt link"><svg viewBox="0 0 24 24"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg></button>
+    <button id="btn-search" class="icon-btn" onclick="toggleSearch()" title="Tìm kiếm"><svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg></button>
+    <button class="icon-btn" onclick="forceReload()" title="Load lại data"><svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-8 3.58-8 8s3.58 8 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg></button>
+    <div id="loader-line"><div></div></div>
+    <div class="spacer"></div>
+    <button id="btn-edit-cust" class="icon-btn disabled" onclick="openForm('cust', true)" title="Sửa Khách Hàng"><svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>
+    <button class="icon-btn" onclick="openForm('cust', false)" title="Thêm Khách Hàng"><svg viewBox="0 0 24 24"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></button>
+  </div>
+
+  <div id="search-panel">
+    <div class="search-inp-wrap">
+      <input type="text" id="inp-search" class="search-inp" placeholder="Nhập tên, sđt, mã..." autocomplete="off">
+      <div id="suggest-search" class="suggest-box"></div>
+    </div>
+  </div>
+
+  <div id="fixed-area">
+    <div id="empty-state" style="text-align:center; margin-top:20px; color:#999; font-size: 12px;">
+      <div>Vui lòng chọn khách hàng</div>
+    </div>
+
+    <div id="cust-card" class="card" style="display:none;">
+       <div id="c-name" class="c-name">...</div>
+       <div class="info-row">
+          <span id="c-code" class="info-left"></span> 
+          <span id="c-tax" class="info-right"></span>  
+       </div>
+       <div class="info-row">
+          <span id="c-contact" class="info-left"></span>
+          <span id="c-phone" class="info-right"></span>
+       </div>
+    </div>
+  </div>
+
+  <div id="scroll-area">
+    <div id="note-card" class="card" style="display:none;">
+       <div class="card-header">
+          <span class="card-title">Ghi Chú</span>
+          <div id="note-action-area"></div>
+       </div>
+       <div id="note-content-area"></div>
+    </div>
+
+    <div id="tx-card" class="card" style="display:none;">
+      <div class="card-header">
+          <span class="card-title">Lịch sử làm việc</span>
+         <div class="action-link" onclick="openForm('tx', false)">
+            <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg> Thêm
+         </div>
+      </div>
+      <div id="tx-list" class="tx-list"></div>
+    </div>
+  </div>
+
+  <div id="form-cust" class="overlay">
+     <div class="form-head">
+        <span class="form-title" id="fc-title">Thêm Khách Hàng</span>
+        <div class="form-actions-right">
+            <span class="btn-close" onclick="closeForm()" title="Đóng">✕</span>
+            <button class="btn-save-icon" onclick="saveCust()" title="Lưu dữ liệu"><svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg></button>
+        </div>
+        <div class="modal-loader"><div></div></div>
+     </div>
+     
+     <div class="inp-row">
+        <div class="inp-col"><label class="lbl">Mã KH (*)</label><input id="n-code" class="inp" data-col="@KH_MA_KH"></div>
+        <div class="inp-col"><label class="lbl">Mã số thuế (*)</label><input id="n-tax" class="inp" data-col="@KH_MST"></div>
+     </div>
+     <div class="inp-group"><label class="lbl">Tên công ty (*)</label><input id="n-name" class="inp" data-col="@KH_TEN_CTY"></div>
+     <div class="inp-group"><label class="lbl">Người liên hệ (*)</label><input id="n-contact" class="inp" data-col="@KH_NGUOI_LIEN_HE"></div>
+     <div class="inp-group"><label class="lbl">Điện thoại (*)</label><input id="n-phone" class="inp" data-col="@KH_PHONE"></div>
+     <div class="inp-group"><label class="lbl">Địa chỉ (*)</label><input id="n-addr" class="inp" data-col="@KH_DIA_CHI"></div>
+     
+     <div class="inp-row">
+       <div class="inp-col">
+          <label class="lbl">Sản phẩm (*)</label>
+          <input id="n-prod" class="inp" placeholder="--Chọn--" autocomplete="off" data-list="product" data-col="@KH_SAN_PHAM">
+          <div id="drop-prod" class="suggest-box"></div>
+       </div>
+       <div class="inp-col">
+          <label class="lbl">Nhóm KH (*)</label>
+          <input id="n-group" class="inp" placeholder="--Chọn--" autocomplete="off" data-list="group" data-col="@KH_NHOM_KH">
+          <div id="drop-group" class="suggest-box"></div>
+       </div>
+     </div>
+     
+     <div class="inp-group"><label class="lbl">Ghi chú</label><textarea id="n-note" class="inp" rows="2" data-col="@KH_GHI_CHU"></textarea></div>
+     <div class="inp-group"><label class="lbl">Email</label><input id="n-email" class="inp" data-col="@KH_EMAIL"></div>
+     <div class="inp-group"><label class="lbl">Website</label><input id="n-web" class="inp" data-col="@KH_WEBSITE"></div>
+     <div class="inp-group">
+        <label class="lbl">Công ty mẹ</label>
+        <input id="n-parent" class="inp" placeholder="--Chọn hoặc nhập--" autocomplete="off" data-list="companies" data-col="@KH_CONG_TY_ME">
+        <div id="drop-parent" class="suggest-box"></div>
+     </div>
+     
+     <div class="inp-row">
+        <div class="inp-col">
+            <label class="lbl">Ngày đóng thầu</label>
+            <input type="date" id="n-bid" class="inp" data-col="@KH_NGAY_DONG_THAU">
+        </div>
+        <div class="inp-col">
+           <label class="lbl">Xác thực (*)</label>
+           <input id="n-verify" class="inp" placeholder="--Chọn--" autocomplete="off" data-list="verify" data-col="@KH_XAC_THUC">
+           <div id="drop-verify" class="suggest-box"></div>
+        </div>
+     </div>
+
+     <div class="inp-row">
+        <div class="inp-col">
+           <label class="lbl">Nguồn KH (*)</label>
+           <input id="n-source" class="inp" placeholder="--Chọn--" autocomplete="off" data-list="source" data-col="@KH_NGUON_KH">
+           <div id="drop-source" class="suggest-box"></div>
+        </div>
+        <div class="inp-col">
+           <label class="lbl">Nhập vào FBM (*)</label>
+           <input id="n-fbm" class="inp" placeholder="--Chọn--" autocomplete="off" data-list="fbm" data-col="@KH_FBM_STATUS">
+           <div id="drop-fbm" class="suggest-box"></div>
+        </div>
+     </div>
+     
+     <div class="inp-group"><label class="lbl">Ngày nhập liệu</label><input id="n-created" class="inp" readonly style="background:#f1f3f4; color:#777;"></div>
+     <button class="btn btn-p" onclick="saveCust()">LƯU DỮ LIỆU</button>
+  </div>
+
+  <div id="form-tx" class="overlay">
+     <div class="form-head">
+        <span class="form-title" id="ft-title">Giao Dịch</span>
+        <div class="form-actions-right">
+            <span class="btn-close" onclick="closeForm()" title="Đóng">✕</span>
+            <button class="btn-save-icon" onclick="saveTx()" title="Lưu dữ liệu"><svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg></button>
+        </div>
+        <div class="modal-loader"><div></div></div>
+     </div>
+     <input type="hidden" id="tx-row">
+     
+     <div class="inp-group"><label class="lbl">Mã KH</label><input id="tx-id" class="inp" readonly style="background:#f1f3f4;"></div>
+     
+     <div class="inp-row">
+        <div class="inp-col" style="flex: 2; min-width: 0; margin-right: 10px;">
+            <label class="lbl">Ngày làm việc (*)</label>
+            <input type="date" id="tx-date" class="inp" data-col="@ACT_NGAY_LAM_VIEC" style="width:100%">
+        </div>
+        
+        <div class="inp-col" style="flex: 1; min-width: 0;">
+            <label class="lbl">Sản phẩm (*)</label>
+            <input id="tx-prod" class="inp" placeholder="--Chọn--" autocomplete="off" data-list="product" data-col="@ACT_SAN_PHAM" style="width:100%">
+            <div id="drop-tx-prod" class="suggest-box"></div>
+        </div>
+     </div>
+
+     <div class="inp-row">
+        <div class="inp-col" style="flex: 2; min-width: 0; margin-right: 10px;">
+           <label class="lbl">Công việc (*)</label>
+           <input id="tx-status" class="inp" placeholder="--Chọn--" autocomplete="off" data-list="status" data-col="@ACT_CONG_VIEC" style="width:100%">
+           <div id="drop-tx-status" class="suggest-box"></div>
+        </div>
+
+        <div class="inp-col" style="flex: 1; min-width: 0;">
+            <label class="lbl">Ghim</label>
+            <input id="tx-pin" class="inp" placeholder="--Chọn--" autocomplete="off" data-col="@ACT_GHIM" style="width:100%">
+            <div id="drop-tx-pin" class="suggest-box"></div>
+        </div>
+      </div>
+     
+     <div class="inp-group">
+        <label class="lbl">Nội dung chi tiết (*)</label>
+        <textarea id="tx-content" class="inp" rows="4" data-col="@ACT_NOI_DUNG_CONG_VIEC"></textarea>
+     </div>
+     
+     <div class="inp-group">
+        <label class="lbl">Giá trị hợp đồng</label>
+        <input id="tx-val" class="inp" placeholder="0" data-col="@ACT_GIA_TRI_HOP_DONG">
+     </div>
+
+     <div class="inp-row">
+        <div class="inp-col">
+           <label class="lbl">Điền vào FBM (*)</label>
+           <input id="tx-fbm" class="inp" placeholder="--Chọn--" autocomplete="off" data-list="fbm" data-col="@ACT_FBM_STATUS">
+           <div id="drop-tx-fbm" class="suggest-box"></div>
+        </div>
+        <div class="inp-col">
+          <label class="lbl">Người nhập (*)</label>
+          <input id="tx-user" class="inp" data-col="@ACT_NGUOI_NHAP_LIEU" placeholder="--Chọn--" autocomplete="off">
+          <div id="drop-tx-user" class="suggest-box"></div> 
+        </div>
+     </div>
+
+     <div class="inp-group"><label class="lbl">Ngày nhập liệu</label><input id="tx-created" class="inp" readonly style="background:#f1f3f4; color:#777;"></div>
+     <button class="btn btn-p" onclick="saveTx()">LƯU DỮ LIỆU</button>
+  </div>
+
+  <div id="form-note" class="overlay">
+      <div class="form-head">
+         <span class="form-title">Ghi Chú</span>
+         <div class="form-actions-right">
+            <span class="btn-close" onclick="closeForm()" title="Đóng">✕</span>
+            <button class="btn-save-icon" onclick="saveNoteLogic()" title="Lưu dữ liệu"><svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg></button>
+         </div>
+         <div class="modal-loader"><div></div></div>
+      </div>
+      <textarea id="inp-note-edit" class="inp" rows="6"></textarea>
+      <button class="btn btn-p" onclick="saveNoteLogic()">LƯU GHI CHÚ</button>
+  </div>
+
+  <!-- Thay thế var DB và var APP <script> </script> cũ -->
+  <?!= include('src/ui/Store_RAM'); ?>
+
+  <!-- Thay thế phần còn lại trong <script> </script> cũ  -->
+  <?!= include('src/ui/UI_Logic'); ?>
+
+  <!-- Chờ phát triển -->
+  <?!= include('src/ui/Store_Config'); ?>
+
+  <!-- Chờ phát triển -->
+  <?!= include('src/ui/UI_Debugger'); ?>
+
+
+
+</body>
+</html>

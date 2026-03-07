@@ -34,7 +34,7 @@ function showSidebar() {
 
 function showSidebar() {
   // 1. Đổi thành createTemplateFromFile
-  var html = HtmlService.createTemplateFromFile("1. GAS - Old/SidebarOld") 
+  var html = HtmlService.createTemplateFromFile("src/ui/Sidebar") 
     .evaluate() // 2. BẮT BUỘC phải có dòng này để kích hoạt hàm include ghép file
     .setTitle("CRM Local V14.2") 
     .setWidth(450); 
