@@ -1,4 +1,4 @@
-﻿/**
+﻿<!--
  * PROJECT: ShinCRM_Master_Workspace
  * FILE: Store_RAM.html
  * TITLE: Bộ nhớ RAM
@@ -8,5 +8,32 @@
  * Biến DB, acts_map (O(1) lookup).
  * -------------------------------------------------------------------------
  * NGÀY KHỞI TẠO: 06/03/2026
- */
+ -->
+
+ <script>
+    // === 1. KHAI BÁO BIẾN TOÀN CỤC (CORE STATE) ===
+    
+    // DB: Chứa dữ liệu đã được giải nén và đánh chỉ mục (Index)
+    // acts_map: Thay vì lưu mảng acts, ta lưu dạng Map { "KH001": [Tx1, Tx2], ... } để truy xuất tức thì
+    var DB = { 
+        listKH: [], 
+        acts_map: {}, // [BIG DATA] Index Map cho giao dịch O(1)
+        maps: {},     // Bản đồ vị trí khách hàng trên các sheet Quản lý
+        versions: {}, // Lưu phiên bản data để check sync
+        help: { status: [], product: [], group: [], verify: [], fbm: [], source: [], companies: [], defaults: {} },
+        qlSystem: {},
+        qlConfig: {} // [MỚI] Thêm dòng này để chứa config Server gửi về
+    };
+    
+    // APP: Lưu trạng thái ứng dụng
+    var APP = { 
+        isAuto: true, isSearch: false, currentID: null, sheetID: null, newCustID: null,
+        loadingActs: false, // Cờ đang tải ngầm Act
+        actNextRow: 0,       // Con trỏ dòng tiếp theo cần tải của Act
+        isEditingControl: false // [MỚI] Biến nhớ: Có đang sửa cấu hình không?
+    };
+
+    var currentFocus = -1;
+    var lastSheetName = "";
+ </script>
 

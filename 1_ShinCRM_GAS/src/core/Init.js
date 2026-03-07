@@ -18,10 +18,26 @@ function onOpen() {
     .addToUi();
 }
 
+
+/**
+ * Đây là function showSidebar() cũ, trước khi chỉnh sửa để dùng Template.
+ * Mình giữ lại đây để bạn dễ so sánh và hiểu rõ hơn về sự khác biệt giữa hai cách tạo Sidebar.
+ * Cách cũ này dùng createHtmlOutputFromFile trực tiếp, không hỗ trợ include() để ghép nhiều file HTML lại với nhau.
+ * 
 function showSidebar() {
-  var html = HtmlService.createHtmlOutputFromFile("1. GAS - Old/Sidebar")
+  var html = HtmlService.createHtmlOutputFromFile("1. GAS - Old/SidebarOld")
     .setTitle("CRM Local V14.2") // [GIỮ NGUYÊN] Tiêu đề cũ
     .setWidth(450); // [GIỮ NGUYÊN] Width 450px
+  SpreadsheetApp.getUi().showSidebar(html);
+}
+**/
+
+function showSidebar() {
+  // 1. Đổi thành createTemplateFromFile
+  var html = HtmlService.createTemplateFromFile("1. GAS - Old/SidebarOld") 
+    .evaluate() // 2. BẮT BUỘC phải có dòng này để kích hoạt hàm include ghép file
+    .setTitle("CRM Local V14.2") 
+    .setWidth(450); 
   SpreadsheetApp.getUi().showSidebar(html);
 }
 
