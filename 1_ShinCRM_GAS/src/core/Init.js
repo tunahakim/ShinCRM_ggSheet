@@ -17,9 +17,12 @@ function onOpen() {
     .addItem("Mở Sidebar", "showSidebar")
     .addToUi();
 }
-
 function showSidebar() {
-  var html = HtmlService.createHtmlOutputFromFile("1. GAS - Old/SidebarOld")
+  // 1. Phải dùng Template để thực thi được lệnh include
+  var template = HtmlService.createTemplateFromFile('1. GAS - Old/SidebarOld'); 
+  
+  // 2. Thực thi lệnh nạp (evaluate)
+  var html = template.evaluate()
     .setTitle("CRM Local V14.2") // [GIỮ NGUYÊN] Tiêu đề cũ
     .setWidth(450); // [GIỮ NGUYÊN] Width 450px
   SpreadsheetApp.getUi().showSidebar(html);
