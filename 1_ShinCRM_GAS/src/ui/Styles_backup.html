@@ -1,0 +1,804 @@
+﻿<!-- 
+ * PROJECT: ShinCRM_Master_Workspace
+ * FILE: Styles.html
+ * TITLE: Sidebar CSS
+ * ROLE: Style
+ * -------------------------------------------------------------------------
+ * CHI TIẾT ĐẶC TẢ:
+ * Định dạng giao diện cho toàn bộ ứng dụng, bao gồm:
+  * - Bảng màu sắc chủ đạo và trạng thái (Màu xanh dương, xám, đỏ lỗi, xanh lá công việc).
+  * - Kiểu dáng ô nhập liệu (Bo góc, viền mỏng, hiệu ứng focus và lỗi).
+  * - Bố cục dàn trang (Hàng ngang, cột, khoảng cách đều).
+  * - Định dạng nhãn (Chữ in hoa nhỏ, màu xám phụ).
+  * - Định dạng nút bấm (Nền màu, chữ trắng, hiệu ứng hover).
+ * -------------------------------------------------------------------------
+ * NGÀY KHỞI TẠO: 06/03/2026
+ -->
+
+<!-- <style>
+  /**
+   * =========================================================================
+   * HÀM CẤU HÌNH: :root (KHAI BÁO BIẾN MÀU SẮC)
+   * =========================================================================
+   * - Mục đích: Lưu trữ toàn bộ mã màu cốt lõi của hệ thống vào các biến.
+   * - Cách hoạt động: Khai báo 1 lần ở gốc (:root), gọi lại ở nhiều nơi qua hàm var().
+   * - Kết quả trả về: Bộ thông số màu sắc đồng nhất cho toàn bộ giao diện.
+   * - Cách sử dụng: Thay vì viết #1a73e8, hãy viết var(--p). Đổi 1 chỗ, cập nhật toàn hệ thống.
+   * - @param {Global} Hệ thống màu sắc áp dụng cho toàn bộ file HTML.
+   */
+  :root { 
+    --p: #1a73e8;           /* Màu Xanh dương chủ đạo (Google style) */
+    --bg: #f8f9fa;          /* Màu Nền xám nhạt cho toàn bộ ứng dụng */
+    --txt: #202124;         /* Màu Chữ chính (đen xám dễ đọc) */
+    --sub: #5f6368;         /* Màu Chữ phụ (xám) dành cho ghi chú, nhãn */
+    --border: #dadce0;      /* Màu Viền tiêu chuẩn */
+    --hover: #f1f3f4;       /* Màu nền mờ khi đưa chuột qua các vùng tương tác */
+    --err-bg: #fce8e6;      /* Màu Lỗi nền (đỏ nhạt) */
+    --err-bd: #c5221f;      /* Màu Lỗi viền (đỏ đậm) */
+    --job-bg: #e6f4ea;      /* Màu Job nền (xanh lá nhạt) cho trạng thái công việc */
+    --job-txt: #137333;     /* Màu Job chữ (xanh lá đậm) */
+    --pin-color: #fbbc04;   /* Màu vàng cho icon ghim (Pin) */
+  }
+  
+  /**
+   * =========================================================================
+   * HÀM RESET & THÂN TRANG: * và body
+   * =========================================================================
+   * - Mục đích: Xóa bỏ định dạng thừa của trình duyệt và cấu hình khung sườn ứng dụng.
+   * - Cách hoạt động: Ép box-sizing chuẩn, thiết lập font chữ và khóa thanh cuộn ngoài.
+   * - Kết quả trả về: Giao diện tràn viền 100% màn hình, không bị xô lệch.
+   * - @param {HTMLElement} body - Thẻ gốc bao bọc toàn bộ giao diện Sidebar.
+   */
+  * { 
+    box-sizing: border-box; /* Tính toán chiều rộng bao gồm cả viền và padding */
+  } 
+  body { 
+    font-family: 'Roboto', sans-serif; /* Áp dụng font chữ Roboto tiêu chuẩn */
+    margin: 0;              /* Xóa viền trắng mặc định xung quanh trình duyệt */
+    background: var(--bg);  /* Trải màu nền xám nhạt lên toàn bộ ứng dụng */
+    color: var(--txt);      /* Áp dụng màu chữ đen xám làm mặc định */
+    font-size: 14px;        /* Cỡ chữ mặc định của hệ thống là 14px */
+    overflow: hidden;       /* Ẩn thanh cuộn mặc định của cửa sổ trình duyệt */
+    display: flex;          /* Bật chế độ Flexbox để dàn xếp các khối */
+    flex-direction: column; /* Sắp xếp các khối con nối đuôi nhau từ trên xuống dưới */
+    height: 100vh;          /* Chiều cao ứng dụng bằng đúng 100% chiều cao màn hình (Viewport Height) */
+  }
+  
+  /**
+   * =========================================================================
+   * 1. HÀM GIAO DIỆN HEADER & SEARCH
+   * =========================================================================
+   * - Mục đích: Định dạng thanh điều hướng trên cùng, các nút icon và thanh tìm kiếm.
+   * - Cách hoạt động: Cố định Header ở trên, tạo hiệu ứng hover cho nút, xử lý hộp gợi ý.
+   * - Kết quả trả về: Thanh công cụ dính chặt trên cùng, nút bấm có hiệu ứng mượt.
+   * - @param {HTMLDivElement} .header - Khối chứa thanh tiêu đề.
+   * - @param {HTMLButtonElement} .icon-btn - Các nút bấm hình icon trên thanh tiêu đề.
+   */
+  .header { 
+    background: #fff;       /* Đổ nền trắng cho thanh tiêu đề */
+    border-bottom: 1px solid var(--border); /* Kẻ vạch xám dưới đáy thanh tiêu đề */
+    padding: 0 8px;         /* Không cách lề trên dưới, lùi vào trái phải 8px */
+    height: 48px;           /* Cố định chiều cao thanh header là 48px */
+    display: flex;          /* Dàn các phần tử bên trong theo hàng ngang */
+    align-items: center;    /* Căn giữa các phần tử theo trục dọc */
+    gap: 4px;               /* Tạo khoảng cách 4px giữa các nút icon */
+    flex-shrink: 0;         /* Không cho phép thanh này bị bóp méo khi màn hình nhỏ */
+    z-index: 50;            /* Đẩy thanh này nổi lên trên các thành phần khác (lớp số 50) */
+    position: relative;     /* Đặt làm mốc tọa độ cho thanh loading màu xanh chạy ngang */
+  }
+  .spacer { 
+    flex: 1;                /* Chiếm toàn bộ không gian trống, đẩy các nút dạt ra 2 bên */
+  }
+  .icon-btn { 
+    width: 32px;            /* Nút hình vuông rộng 32px */
+    height: 32px;           /* Nút hình vuông cao 32px */
+    border: none;           /* Xóa đường viền thô cứng mặc định của nút */
+    background: transparent;/* Làm nền nút trong suốt */
+    border-radius: 50%;     /* Bo tròn nút thành hình tròn hoàn hảo */
+    cursor: pointer;        /* Biến con trỏ chuột thành hình bàn tay khi trỏ vào */
+    display: flex;          /* Bật flex để căn chỉnh icon SVG bên trong */
+    align-items: center;    /* Căn icon ra giữa theo chiều dọc */
+    justify-content: center;/* Căn icon ra giữa theo chiều ngang */
+    color: var(--sub);      /* Đổ màu xám cho icon */
+    transition: 0.2s;       /* Tạo hiệu ứng chuyển đổi màu sắc mượt trong 0.2 giây */
+  }
+  .icon-btn:hover { 
+    background: var(--hover); /* Đổ nền xám nhạt khi chuột lướt qua */
+    color: var(--txt);      /* Chuyển icon sang màu đen đậm hơn */
+  }
+  .icon-btn.active { 
+    color: #f9ab00;         /* Đổi icon sang màu vàng nếu nút đang bật (active) */
+    background: #fef7e0;    /* Đổ nền vàng nhạt để báo hiệu trạng thái kích hoạt */
+  }
+  .icon-btn svg { 
+    width: 20px;            /* Khống chế kích thước hình vẽ SVG bên trong là 20px */
+    height: 20px;           /* Cao 20px */
+    fill: currentColor;     /* Hình vẽ SVG sẽ tự động ăn theo màu (color) của thẻ cha */
+  }
+  .icon-btn.disabled { 
+    opacity: 0.3;           /* Làm mờ nút đi 70% khi bị vô hiệu hóa */
+    pointer-events: none;   /* Chặn mọi click chuột vào nút này */
+  }
+
+  /* --- Hiệu ứng Loader Line (Thanh chạy ngang khi gọi API) --- */
+  #loader-line { 
+    height: 3px;            /* Thanh loading mỏng 3px */
+    width: 100%;            /* Chạy dài suốt chiều ngang màn hình */
+    background: transparent;/* Nền trong suốt */
+    overflow: hidden;       /* Giấu đi phần vạch xanh chạy tràn ra ngoài */
+    position: absolute;     /* Neo tọa độ vào thanh .header */
+    bottom: 0;              /* Ép dính xuống mép dưới cùng của thanh header */
+    left: 0;                /* Kéo dính vào mép trái */
+    z-index: 52;            /* Nổi lên trên header (lớp số 52) */
+    display: none;          /* Mặc định ẩn, chỉ bật lên bằng JS khi tải dữ liệu */
+  }
+  #loader-line div { 
+    width: 30%;             /* Đoạn vạch xanh dài bằng 30% màn hình */
+    height: 100%;           /* Chiều cao bằng thẻ cha (3px) */
+    background: var(--p);   /* Đổ màu xanh chủ đạo cho vạch chạy */
+    position: absolute;     /* Neo vào thanh #loader-line */
+    left: -30%;             /* Điểm xuất phát: Nằm khuất bên ngoài lề trái */
+    animation: loading 1s infinite linear; /* Chạy hiệu ứng 'loading' tuần hoàn không ngừng */
+  }
+
+  /* --- Bảng Tìm Kiếm (Search Panel) --- */
+  #search-panel { 
+    width: 100%;            /* Trải rộng 100% màn hình */
+    background: #fff;       /* Nền trắng */
+    border-bottom: 1px solid var(--border); /* Viền xám dưới đáy */
+    padding: 8px;           /* Thụt lề mọi hướng 8px */
+    z-index: 49;            /* Lớp số 49 (nằm dưới header lớp 50) */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05); /* Đổ bóng nhẹ tạo độ sâu */
+    display: none;          /* Mặc định ẩn */
+    flex-shrink: 0;         /* Không cho co nén khung tìm kiếm */
+  }
+  .search-inp-wrap { 
+    position: relative;     /* Cột mốc tọa độ cho hộp suggest-box bay bên dưới */
+  }
+  .search-inp { 
+    width: 100%;            /* Ô nhập chữ rộng 100% */
+    padding: 6px 30px 6px 10px; /* Thụt lề: trên 6px, phải 30px (để chừa chỗ icon), dưới 6px, trái 10px */
+    border: 1px solid var(--border); /* Viền xám */
+    border-radius: 4px;     /* Bo góc nhẹ 4px */
+    font-size: 14px;        /* Cỡ chữ gõ vào là 14px */
+    outline: none;          /* Tắt viền xanh mặc định của trình duyệt */
+  }
+  .search-inp:focus { 
+    border-color: var(--p); /* Đổi viền sang màu xanh khi click gõ chữ */
+    box-shadow: 0 0 0 2px rgba(26,115,232,0.2); /* Tạo quầng sáng xanh mờ bao quanh viền */
+  }
+  
+  /* --- Hộp Gợi Ý (Suggest Box) dùng chung cho Dropdown và Tìm kiếm --- */
+  .suggest-box { 
+    max-height: 80vh;       /* Chiều cao tối đa không vượt quá 80% màn hình */
+    overflow-y: auto;       /* Tự động hiện thanh cuộn nếu danh sách dài */
+    border: 1px solid var(--border); /* Viền xám bao quanh hộp */
+    background: #fff;       /* Nền hộp màu trắng */
+    position: absolute;     /* Neo lơ lửng bám theo ô input cha */
+    width: 100%;            /* Chiều rộng bằng ô input cha */
+    z-index: 1000;          /* Phải chèn lớp cực cao (1000) để đè lên mọi form bên dưới */
+    box-shadow: 0 4px 6px rgba(0,0,0,0.15); /* Đổ bóng đen mờ cho hộp nổi lên */
+    border-radius: 0 0 4px 4px; /* Chỉ bo góc 4px ở 2 cạnh dưới, cạnh trên vuông góc */
+    display: none;          /* Mặc định ẩn */
+    top: 100%;              /* Dính sát mép dưới của ô input */
+    margin-top: 1px;        /* Cách ô input 1px để không bị dính nét */
+  }
+  .s-item { 
+    padding: 6px 10px;      /* Căn lề dòng gợi ý */
+    border-bottom: 1px solid #f1f3f4; /* Kẻ vạch xám siêu nhạt phân cách các dòng */
+    cursor: pointer;        /* Biểu tượng bàn tay khi trỏ vào dòng */
+    display: flex;          /* Dàn hàng ngang */
+    justify-content: space-between; /* Đẩy tên sang trái, mô tả phụ sang phải */
+    align-items: center;    /* Căn giữa theo chiều cao dòng */
+  }
+  .s-name { 
+    font-weight: 500;       /* Tên hiển thị (Tên KH, Tên SP) in đậm nhẹ */
+    color: #202124;         /* Chữ đen đậm */
+    font-size: 14px;        /* Cỡ chữ 14 */
+    margin-bottom: 2px;     /* Đẩy phần mô tả phụ xuống 2px */
+  }
+  .s-sub { 
+    font-size: 11px;        /* Mô tả phụ (MST, Phone) bé hơn (11px) */
+    color: #5f6368;         /* Chữ xám */
+    line-height: 1.3;       /* Khoảng cách dòng 1.3 */
+  }
+  .s-item:hover, .s-item.active { 
+    background: #e8f0fe;    /* Đổ nền xanh nhạt khi rê chuột hoặc dùng phím mũi tên chọn */
+    color: var(--p);        /* Đổi màu chữ sang xanh chủ đạo */
+  }
+
+  /**
+   * =========================================================================
+   * 2. HÀM MAIN LAYOUT & SCROLLBAR (BỐ CỤC CHÍNH)
+   * =========================================================================
+   * - Mục đích: Chia màn hình làm 2 phần: Phía trên cố định, phía dưới cuộn được.
+   * - @param {HTMLDivElement} #fixed-area - Khu vực chứa tên Khách hàng (Cố định).
+   * - @param {HTMLDivElement} #scroll-area - Khu vực chứa danh sách Giao dịch (Cuộn).
+   */
+  #fixed-area { 
+    flex-shrink: 0;         /* Không cho phép khu vực này bị ép nhỏ lại */
+    padding: 6px 8px 0 8px; /* Lề: trên 6px, phải 8px, dưới 0, trái 8px */
+    background: var(--bg);  /* Đổ nền xám hệ thống */
+    z-index: 40;            /* Nổi lên trên lớp nội dung cuộn (lớp 40) */
+  }
+  #scroll-area { 
+    flex-grow: 1;           /* Chiếm trọn không gian còn lại của màn hình */
+    overflow-y: auto;       /* Bật thanh cuộn dọc cho khu vực này */
+    padding: 0 8px 80px 8px;/* Độn đáy 80px để nội dung cuối cùng không bị dính mép dưới */
+    scroll-behavior: smooth;/* Cuộn trang mượt mà */
+  }
+  
+  /* --- Thiết kế thanh cuộn (Scrollbar) chuẩn Google --- */
+  ::-webkit-scrollbar { 
+    width: 4px;             /* Bóp thanh cuộn dọc nhỏ lại còn 4px cho thanh lịch */
+    height: 4px;            /* Bóp thanh cuộn ngang nhỏ lại còn 4px */
+  }
+  ::-webkit-scrollbar-track { 
+    background: transparent;/* Rãnh cuộn trong suốt để lộ nền xám bên dưới */
+  }
+  ::-webkit-scrollbar-thumb { 
+    background: #dadce0;    /* Nút cuộn (con chạy) màu xám */
+    border-radius: 2px;     /* Bo tròn 2 đầu con chạy */
+  }
+  ::-webkit-scrollbar-thumb:hover { 
+    background: #bdc1c6;    /* Con chạy đậm màu hơn chút khi trỏ chuột vào */
+  }
+
+  .card { 
+    background: #fff;       /* Nền thẻ màu trắng */
+    border: 1px solid var(--border); /* Viền thẻ xám */
+    border-radius: 8px;     /* Bo góc thẻ 8px */
+    padding: 10px;          /* Thụt lề chữ vào trong 10px */
+    margin-bottom: 8px;     /* Cách thẻ phía dưới 8px */
+    box-shadow: 0 1px 2px rgba(60,64,67,0.05); /* Đổ bóng mờ tạo khối nổi nhẹ */
+  }
+
+  /**
+   * =========================================================================
+   * 3. HÀM INFO STYLE (HIỂN THỊ THÔNG TIN KHÁCH HÀNG)
+   * =========================================================================
+   * - Mục đích: Trang trí các thông tin cứng của Khách (Tên công ty, MST, SĐT).
+   */
+  .c-name { 
+    font-size: 15px;        /* Tên công ty to 15px */
+    font-weight: 700;       /* In đậm tên */
+    color: var(--p);        /* Tên màu xanh */
+    line-height: 1.4;       /* Khoảng cách dòng 1.4 */
+    margin-bottom: 6px;     /* Cách phần thông tin dưới 6px */
+    text-align: justify;    /* [Yêu cầu của bạn] Căn đều 2 lề văn bản cho đẹp */
+  }
+  .info-row { 
+    display: flex;          /* Dàn hàng ngang */
+    justify-content: space-between; /* Đẩy 2 cụm thông tin sang 2 bên vách */
+    align-items: center;    /* Căn giữa dọc */
+    font-size: 13px;        /* Chữ thông tin bé 13px */
+    color: var(--txt);      /* Màu đen tiêu chuẩn */
+    margin-bottom: 4px;     /* Cách dòng bên dưới 4px */
+  }
+  .info-left { 
+    font-weight: 500;       /* Dữ liệu bên trái (Mã KH) in đậm vừa */
+    color: #333;            /* Màu xám đen */
+    text-align: left;       /* Căn sát lề trái */
+  } 
+  .info-right { 
+    font-weight: 600;       /* Dữ liệu bên phải (MST) in đậm hơn */
+    color: #000;            /* Màu đen tuyền nguyên chất */
+    text-align: right;      /* Căn sát lề phải */
+  } 
+
+  /**
+   * =========================================================================
+   * 4. HÀM NOTE STYLE (GHI CHÚ VÀ TIÊU ĐỀ THẺ)
+   * =========================================================================
+   */
+  .card-header { 
+    display: flex;          /* Dàn ngang tiêu đề và nút bấm */
+    justify-content: space-between; /* Đẩy xa nhau */
+    align-items: center;    /* Căn giữa dọc */
+    margin-bottom: 6px;     /* Khoảng cách xuống nội dung dưới */
+    padding-bottom: 4px;    /* Khoảng cách nội tại tới viền dưới */
+    border-bottom: 1px dashed #eee; /* Kẻ đường đứt nét phân cách tiêu đề */
+  }
+  .card-title { 
+    font-size: 11px;        /* Chữ 11px */
+    font-weight: 700;       /* In đậm */
+    text-transform: uppercase; /* Viết HOA toàn bộ */
+    color: var(--sub);      /* Màu chữ xám phụ */
+  }
+  .action-link { 
+    font-size: 11px;        /* Link chức năng cỡ 11px */
+    font-weight: 600;       /* In đậm vừa */
+    color: var(--p);        /* Màu xanh link */
+    cursor: pointer;        /* Con trỏ bàn tay */
+    display: flex;          /* Kích hoạt flex để kết hợp icon */
+    align-items: center;    /* Căn giữa icon và chữ */
+    gap: 3px;               /* Icon cách chữ 3px */
+  }
+  .action-link:hover { 
+    text-decoration: underline; /* Gạch chân khi trỏ chuột vào báo hiệu click được */
+  }
+  .note-content { 
+    background: #fce8e6;    /* Nền đỏ nhạt (Cảnh báo quan trọng) */
+    color: #c5221f;         /* Chữ đỏ đậm */
+    padding: 8px;           /* Độn lề 8px */
+    border-radius: 4px;     /* Bo góc */
+    font-size: 13px;        /* Chữ 13px */
+    border-left: 3px solid #d93025; /* Thêm vạch kẻ đỏ đậm ở lề trái tạo điểm nhấn */
+    white-space: pre-wrap;  /* Giữ nguyên định dạng xuống dòng của người dùng nhập vào */
+    line-height: 1.4;       /* Giãn dòng chữ */
+  }
+
+  /**
+   * =========================================================================
+   * 5. HÀM TRANSACTION LIST (DANH SÁCH GIAO DỊCH & GHIM)
+   * =========================================================================
+   */
+  .tx-list { 
+    display: flex;          /* Flex xếp dọc các giao dịch */
+    flex-direction: column; 
+    gap: 6px;               /* Các giao dịch cách nhau 6px */
+  }
+  .tx-item { 
+    background: #fff;       /* Nền giao dịch trắng */
+    border-bottom: 1px solid #f1f3f4; /* Kẻ vạch xám phân cách dưới cùng */
+    padding-bottom: 6px;    /* Đẩy vạch cách nội dung 6px */
+    position: relative;     /* Cột mốc tọa độ cho icon chỉnh sửa */
+  }
+  .tx-item:last-child { 
+    border-bottom: none;    /* Giao dịch cuối cùng không cần kẻ vạch dưới */
+    padding-bottom: 0;      /* Xóa lề dưới của giao dịch cuối */
+  }
+  .tx-meta { 
+    display: flex;          /* Dàn ngang các thẻ dữ liệu (Ngày, Sản phẩm, Công việc) */
+    justify-content: space-between; /* Tách 2 nhóm về 2 phía */
+    align-items: center;    /* Căn giữa dọc */
+    margin-bottom: 2px;     /* Cách nội dung 2px */
+  }
+  .tx-meta-left { 
+    display: flex;          /* Cụm thông tin trái đứng gần nhau */
+    gap: 8px;               /* Cách nhau 8px */
+    align-items: center;    
+    font-size: 13px;        
+  }
+  .tx-date { 
+    font-weight: 700;       /* Ngày tháng in đậm */
+    color: var(--p);        /* Ngày tháng màu xanh */
+  }
+  .tx-prod { 
+    font-weight: 700;       /* Tên sản phẩm in đậm */
+    color: #c5221f;         /* Tên sản phẩm màu đỏ */
+  }
+  
+  /* Cấu trúc Icon Ghim (Pin) */
+  .tx-pin-icon { 
+    width: 14px;            /* Khống chế SVG ghim 14px */
+    height: 14px;           
+    fill: var(--pin-color); /* Tô màu vàng lấy từ :root */
+    margin-right: 4px;      /* Cách chữ bên cạnh 4px */
+    display: none;          /* Mặc định GIẤU ĐI */
+  }
+  .tx-item.is-pinned .tx-pin-icon { 
+    display: inline-block;  /* HIỆN ICON LÊN nếu thẻ cha có class is-pinned */
+  } 
+  .tx-item.is-pinned { 
+    background: #fffcf0;    /* ĐỔI NỀN VÀNG NHẠT để đánh dấu giao dịch quan trọng */
+    padding: 4px;           /* Tạo khoảng cách lề */
+    border-radius: 4px;     /* Bo góc cho hộp giao dịch ghim */
+  }
+
+  .tx-job { 
+    font-size: 10px;        /* Nhãn Trạng thái CV chữ cực bé 10px */
+    font-weight: 700;       /* In đậm */
+    background: var(--job-bg); /* Đổ nền xanh lá nhạt */
+    color: var(--job-txt);  /* Chữ xanh lá đậm */
+    padding: 2px 6px;       /* Căng lề tạo thành hình viên thuốc */
+    border-radius: 4px;     /* Bo 4 góc viên thuốc */
+  }
+  .tx-body { 
+    font-size: 14px;        /* Nội dung giao dịch chữ to dễ đọc */
+    color: #1B1B1B;         /* Màu đen tuyền (như mã cũ của bạn) */
+    line-height: 1.4;       /* Giãn dòng rộng */
+    margin-top: 2px;        /* Cách khối meta ở trên 2px */
+    white-space: pre-wrap;  /* Tôn trọng dấu Xuống Dòng của người dùng nhập vào Form */
+  } 
+  .tx-edit-icon { 
+    cursor: pointer;        /* Bàn tay tương tác */
+    color: #9aa0a6;         /* Icon sửa bút chì màu xám nhạt */
+    margin-left: 4px;       /* Cách chữ 4px */
+    display: none;          /* Mặc định GIẤU icon sửa đi cho gọn mắt */
+  }
+  .tx-item:hover .tx-edit-icon { 
+    display: inline-block;  /* Chỉ khi TRỎ CHUỘT vào giao dịch đó mới HIỆN icon sửa */
+    color: var(--p);        /* Hover thì đổi bút chì thành màu xanh */
+  }
+
+  /**
+   * =========================================================================
+   * 6. HÀM FORM OVERLAY & INPUTS (CÁC COMPONENT FORM NHẬP LIỆU)
+   * =========================================================================
+   */
+  .overlay { 
+    display: none;          /* Mặc định ẩn màn hình Form Nhập liệu */
+    position: fixed;        /* Cố định ghim chết form vào màn hình, đè lên mọi thứ */
+    top: 0; left: 0;        /* Xuất phát từ góc trên cùng bên trái */
+    width: 100%; height: 100%; /* Trải kín 100% diện tích Sidebar */
+    background: #fff;       /* Nền trắng che lấp màn hình cũ phía sau */
+    z-index: 100;           /* Phải chèn ở lớp cực cao (100) */
+    padding: 0 15px;        /* Lùi lề nội dung trái phải 15px */
+    overflow-y: auto;       /* Bật cuộn dọc cho form nếu có nhiều input */
+  }
+  .form-head { 
+    display: flex;          /* Dàn ngang Tiêu đề form và Nút bấm */
+    align-items: center;    /* Căn giữa dọc */
+    padding: 12px 0;        /* Cách viền trên dưới 12px */
+    border-bottom: 1px solid #eee; /* Kẻ vạch xám dưới tiêu đề */
+    margin-bottom: 15px;    /* Cách form input bên dưới 15px */
+    position: sticky;       /* Keo dính: Khi cuộn chuột, thanh này dính trên đỉnh */
+    top: 0;                 /* Tọa độ dính là 0px */
+    background: #fff;       /* Đổ màu nền trắng để chữ form cuộn qua không nhìn xuyên thấu */
+    z-index: 10;            /* Nổi lên trên các input của form (lớp 10) */
+  }
+  .form-title { 
+    font-size: 16px;        /* Tiêu đề Form cỡ lớn 16px */
+    font-weight: 700;       /* In đậm */
+    color: var(--p);        /* Màu xanh dương */
+    flex-grow: 1;           /* Đẩy nhóm nút Đóng/Lưu bay hết sang lề bên phải */
+  }
+  .form-actions-right { 
+    display: flex;          /* Nút Đóng và Nút Lưu đứng ngang nhau */
+    align-items: center; 
+    gap: 8px;               /* Hai nút cách nhau 8px */
+  }
+
+  .btn-close { 
+    cursor: pointer;        /* Bàn tay tương tác */
+    font-size: 20px;        /* Chữ X cỡ 20px */
+    color: #bdc1c6;         /* Chữ X xám nhạt */
+    padding: 4px;           
+    line-height: 1;         
+    transition: 0.2s;       /* Hiệu ứng mượt 0.2s */
+    display: flex;          
+    align-items: center; 
+    justify-content: center;
+    border-radius: 50%;     /* Bo tròn vùng hover của nút X */
+    width: 28px;            /* Cố định khung chứa chữ X */
+    height: 28px;
+  } 
+  .btn-close:hover { 
+    color: #5f6368;         /* Chữ X đậm lên khi hover */
+    background: #f1f3f4;    /* Đổ nền xám nhạt hình tròn bao quanh chữ X */
+  }
+  
+  .btn-save-icon { 
+    width: 28px;            /* Nút tròn Save 28px */
+    height: 28px;           
+    background: #f1f3f4;    /* Nền xám nhạt */
+    color: var(--p);        /* Icon check xanh dương */
+    border: none;           /* Bỏ viền mặc định */
+    border-radius: 50%;     /* Bo tròn hoàn hảo */
+    cursor: pointer;        
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    transition: 0.2s;       
+  }
+  .btn-save-icon:hover { 
+    background: #d2e3fc;    /* Nền đổi thành xanh nhạt khi hover */
+    color: #174ea6;         /* Icon check xanh đậm hơn */
+  }
+  .btn-save-icon svg { 
+    width: 18px;            /* Size của vector dấu check */
+    height: 18px; 
+    fill: currentColor;     /* Kế thừa màu color của thẻ cha */
+  }
+  
+  .modal-loader { 
+    height: 3px; width: 100%; background: transparent; position: absolute; bottom: 0; left: 0; overflow: hidden; display: none; 
+    /* Thuộc tính Loading Line (Sao chép y hệt của header) áp dụng riêng cho Form */
+  }
+  .modal-loader div { 
+    width: 30%; height: 100%; background: var(--p); position: absolute; left: -30%; animation: loading 1s infinite linear; 
+  }
+  
+  /* CÁC COMPONENTS CỦA UI_FACTORY (Nhãn, Ô gõ, Bố cục hàng cột) */
+  .inp-group { 
+    margin-bottom: 12px;    /* Nhóm input cách nhau 12px */
+    position: relative;     /* Mốc tọa độ */
+  } 
+  .lbl { 
+    font-size: 11px;        /* Cỡ chữ Nhãn 11px */
+    color: var(--sub);      /* Nhãn xám phụ */
+    font-weight: 500;       /* Đậm vừa */
+    margin-bottom: 4px;     /* Nhãn cách ô bên dưới 4px */
+    display: block;         /* Tách ra 1 dòng riêng */
+    text-transform: uppercase; /* Viết in hoa toàn bộ tên nhãn */
+  }
+  .inp { 
+    width: 100%;            /* Ô nhập liệu tràn lề thẻ cha */
+    padding: 8px;           /* Căn trong 8px */
+    border: 1px solid var(--border); /* Viền xám */
+    border-radius: 4px;     /* Bo góc */
+    font-size: 14px;        /* Chữ gõ 14px */
+    outline: none;          /* Bỏ quầng viền default */
+    font-family: inherit;   /* Bắt input dùng Font Roboto */
+    transition: 0.2s;       /* Hiệu ứng đổi màu 0.2s */
+  }
+  .inp:focus { 
+    border-color: var(--p); /* Nhấp gõ chữ thì viền thành màu xanh dương */
+  }
+  .inp-error { 
+    border-color: var(--err-bd) !important; /* Dùng !important chèn quyền cao nhất: Đổi viền viền đỏ */
+    background-color: var(--err-bg) !important; /* Đổi nền nền đỏ nhạt */
+  }
+  .inp-highlight { 
+    background-color: #fff9c4 !important; /* Hightlight nền vàng khi update */
+    transition: background-color 0.5s;    /* Phai màu dần đi trong 0.5 giây */
+  }
+  .inp-row { 
+    display: flex;          /* Bật Flex cho khung chứa các cột */
+    gap: 10px;              /* Các ô cách nhau 10px */
+    margin-bottom: 12px;    /* Cách hàng dưới 12px */
+  } 
+  .inp-col { 
+    flex: 1;                /* Cột tự động nở rộng bằng nhau */
+    position: relative;     /* Cột mốc neo cho các menu thả xuống */
+  }
+  
+  .btn { 
+    width: 100%;            /* Nút bấm Form rộng 100% */
+    padding: 10px;          /* Căn trong 10px */
+    border: none;           /* Xóa viền */
+    border-radius: 4px;     /* Bo góc 4px */
+    font-weight: 600;       /* Chữ đậm */
+    cursor: pointer;        /* Con trỏ bàn tay */
+    margin-top: 10px;       /* Cách trên 10px */
+    margin-bottom: 30px;    /* Đẩy đáy form 30px lên */
+    font-size: 14px;        
+  }
+  .btn-p { 
+    background: var(--p);   /* Nút màu xanh dương (primary) */
+    color: #fff;            /* Chữ trắng */
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2); /* Đổ bóng nút tạo cảm giác ấn được */
+  }
+  .btn-p:hover { 
+    background: #155db5;    /* Hover đổi màu xanh sẫm */
+  }
+
+  /* Định nghĩa hiệu ứng keyframe cho Loading Line */
+  @keyframes loading { 
+    0% { left: -30%; }      /* Chạy từ trái (-30% màn hình) */
+    100% { left: 100%; }    /* Kéo dài tới hết lề phải (100%) */
+  }
+
+  /**
+   * =========================================================================
+   * 7. HÀM ERROR OVERLAY (MÀN HÌNH BÁO LỖI HỆ THỐNG)
+   * =========================================================================
+   */
+  #error-overlay {
+    position: fixed;        /* Phủ kín màn hình */
+    top: 0; left: 0; 
+    width: 100%; height: 100%; 
+    background: #fff;       /* Nền trắng cản trở thao tác khác */
+    z-index: 9999;          /* Phải chèn lớp cao nhất toàn vũ trụ (9999) */
+    display: none;          /* Mặc định ẩn, khi GAS lỗi mới gọi lên */
+    flex-direction: column; /* Xếp dọc icon và chữ */
+    align-items: center;    /* Căn giữa dọc */
+    justify-content: center;/* Căn giữa ngang */
+    text-align: center;     
+    padding: 20px;
+  }
+  #error-overlay svg { 
+    width: 64px; height: 64px; /* Icon cảnh báo to khổng lồ 64px */
+    fill: #ea4335;          /* Đổ màu đỏ tươi (Màu Google Warning) */
+    margin-bottom: 20px;    /* Cách chữ báo lỗi 20px */
+  }
+  #error-overlay h2 { 
+    margin: 0 0 10px 0;     /* Định dạng thẻ h2 */
+    color: #ea4335;         /* Tiêu đề lỗi màu đỏ */
+  }
+  .err-number { 
+    font-weight: bold;      /* Dòng thông báo mã số lỗi in đậm */
+    color: #202124;         /* Màu đen xám */
+  }
+</style> -->
+
+
+
+
+<!-- Style cũ (Giữ nguyên để tham khảo, sẽ dần được thay thế bằng CSS mới trong tương lai gần) -->
+ 
+<style>
+  /* === KHAI BÁO BIẾN MÀU SẮC (GIỮ NGUYÊN CODE CŨ) === */
+  :root { 
+    --p: #1a73e8; /* Xanh dương Google */
+    --bg: #f8f9fa; /* Nền xám nhạt */
+    --txt: #202124; /* Chữ chính */
+    --sub: #5f6368; /* Chữ phụ */
+    --border: #dadce0; /* Viền */
+    --hover: #f1f3f4; /* Hover */
+    --err-bg: #fce8e6; /* Lỗi nền */
+    --err-bd: #c5221f; /* Lỗi viền */
+    --job-bg: #e6f4ea; /* Job nền */
+    --job-txt: #137333; /* Job chữ */
+    --pin-color: #fbbc04; /* [MỚI] Màu vàng cho ghim */
+  }
+  
+  * { box-sizing: border-box; } 
+  body { 
+    font-family: 'Roboto', sans-serif;
+    margin: 0; background: var(--bg); color: var(--txt);
+    font-size: 14px; overflow: hidden; display: flex; flex-direction: column; height: 100vh;
+  }
+  
+  /* === 1. HEADER & SEARCH (GIỮ NGUYÊN CSS CŨ) === */
+  .header { 
+    background: #fff; border-bottom: 1px solid var(--border);
+    padding: 0 8px; height: 48px; display: flex; align-items: center; gap: 4px;
+    flex-shrink: 0; z-index: 50; position: relative;
+  }
+  .spacer { flex: 1; }
+  .icon-btn { 
+    width: 32px; height: 32px; border: none; background: transparent;
+    border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    color: var(--sub); transition: 0.2s;
+  }
+  .icon-btn:hover { background: var(--hover); color: var(--txt); }
+  .icon-btn.active { color: #f9ab00; background: #fef7e0; }
+  .icon-btn svg { width: 20px; height: 20px; fill: currentColor; }
+  .icon-btn.disabled { opacity: 0.3; pointer-events: none; }
+
+  /* Loader Line */
+  #loader-line { 
+    height: 3px; width: 100%; background: transparent; overflow: hidden;
+    position: absolute; bottom: 0; left: 0; z-index: 52; display: none;
+  }
+  #loader-line div { 
+    width: 30%; height: 100%; background: var(--p);
+    position: absolute; left: -30%; animation: loading 1s infinite linear;
+  }
+
+  /* Search Panel */
+  #search-panel { 
+    width: 100%; background: #fff; border-bottom: 1px solid var(--border);
+    padding: 8px; z-index: 49; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    display: none; flex-shrink: 0;
+  }
+  .search-inp-wrap { position: relative; }
+  .search-inp { 
+    width: 100%; padding: 6px 30px 6px 10px; border: 1px solid var(--border);
+    border-radius: 4px; font-size: 14px; outline: none;
+  }
+  .search-inp:focus { border-color: var(--p); box-shadow: 0 0 0 2px rgba(26,115,232,0.2); }
+  
+  .suggest-box { 
+    max-height: 80vh; overflow-y: auto; border: 1px solid var(--border);
+    background: #fff; position: absolute; width: 100%; z-index: 1000;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.15); border-radius: 0 0 4px 4px;
+    display: none; top: 100%; margin-top: 1px;
+  }
+  .s-item { padding: 6px 10px; border-bottom: 1px solid #f1f3f4; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+  .s-name { font-weight: 500; color: #202124; font-size: 14px; margin-bottom: 2px; }
+  .s-sub { font-size: 11px; color: #5f6368; line-height: 1.3; }
+  .s-item:hover, .s-item.active { background: #e8f0fe; color: var(--p); }
+
+  /* === 2. MAIN LAYOUT (Card, Fixed Area) === */
+  #fixed-area { flex-shrink: 0; padding: 6px 8px 0 8px; background: var(--bg); z-index: 40; }
+  #scroll-area { flex-grow: 1; overflow-y: auto; padding: 0 8px 80px 8px; scroll-behavior: smooth; }
+  
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #dadce0; border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: #bdc1c6; }
+
+  .card { 
+    background: #fff; border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px; margin-bottom: 8px; box-shadow: 0 1px 2px rgba(60,64,67,0.05);
+  }
+
+  /* === 3. [UPDATE] INFO STYLE (CĂN LỀ CHUẨN V14.2) === */
+  .c-name { 
+    font-size: 15px; font-weight: 700; color: var(--p);
+    line-height: 1.4; margin-bottom: 6px; 
+    text-align: justify; /* [YC] Tên công ty căn đều 2 bên */
+  }
+  .info-row { 
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 13px; color: var(--txt); margin-bottom: 4px;
+  }
+  /* [YC] Mã KH căn trái, MST căn phải */
+  .info-left { font-weight: 500; color: #333; text-align: left; } 
+  .info-right { font-weight: 600; color: #000; text-align: right; } 
+
+  /* === 4. NOTE STYLE === */
+  .card-header { 
+    display: flex; justify-content: space-between; align-items: center; 
+    margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px dashed #eee;
+  }
+  .card-title { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--sub); }
+  .action-link { 
+    font-size: 11px; font-weight: 600; color: var(--p); cursor: pointer; 
+    display: flex; align-items: center; gap: 3px; 
+  }
+  .action-link:hover { text-decoration: underline; }
+  .note-content { 
+    background: #fce8e6; color: #c5221f; padding: 8px; border-radius: 4px; 
+    font-size: 13px; border-left: 3px solid #d93025; white-space: pre-wrap; line-height: 1.4;
+  }
+
+  /* === 5. [UPDATE] TRANSACTION LIST (HỖ TRỢ GHIM) === */
+  .tx-list { display: flex; flex-direction: column; gap: 6px; }
+  .tx-item { background: #fff; border-bottom: 1px solid #f1f3f4; padding-bottom: 6px; position: relative; }
+  .tx-item:last-child { border-bottom: none; padding-bottom: 0; }
+  
+  .tx-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
+  .tx-meta-left { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+  
+  .tx-date { font-weight: 700; color: var(--p); }
+  .tx-prod { font-weight: 700; color: #c5221f; }
+  
+  /* [MỚI] Icon Pin (Ghim) */
+  .tx-pin-icon { width: 14px; height: 14px; fill: var(--pin-color); margin-right: 4px; display: none; }
+  .tx-item.is-pinned .tx-pin-icon { display: inline-block; } /* Hiện icon nếu có class is-pinned */
+  .tx-item.is-pinned { background: #fffcf0; padding: 4px; border-radius: 4px; } /* Nền vàng nhẹ cho dòng ghim */
+
+  .tx-job { 
+    font-size: 10px; font-weight: 700; background: var(--job-bg); color: var(--job-txt); 
+    padding: 2px 6px; border-radius: 4px; 
+  }
+  .tx-body { font-size: 14px; color: #1B1B1B; line-height: 1.4; margin-top: 2px; white-space: pre-wrap; } /* màu cũ là #444444 */
+  .tx-edit-icon { cursor: pointer; color: #9aa0a6; margin-left: 4px; display: none; }
+  .tx-item:hover .tx-edit-icon { display: inline-block; color: var(--p); }
+
+  /* === 6. FORM OVERLAY (GIỮ NGUYÊN STYLE) === */
+  .overlay { 
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+    background: #fff; z-index: 100; padding: 0 15px; overflow-y: auto;
+  }
+  .form-head { 
+    display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; 
+    margin-bottom: 15px; position: sticky; top: 0; background: #fff; z-index: 10;
+  }
+  .form-title { font-size: 16px; font-weight: 700; color: var(--p); flex-grow: 1; }
+  .form-actions-right { display: flex; align-items: center; gap: 8px; }
+
+  .btn-close { 
+    cursor: pointer; font-size: 20px; color: #bdc1c6; padding: 4px; 
+    line-height: 1; transition: 0.2s; display: flex; align-items: center; justify-content: center;
+    border-radius: 50%; width: 28px; height: 28px;
+  } 
+  .btn-close:hover { color: #5f6368; background: #f1f3f4; }
+  
+  .btn-save-icon { 
+    width: 28px; height: 28px; background: #f1f3f4; color: var(--p);
+    border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s;
+  }
+  .btn-save-icon:hover { background: #d2e3fc; color: #174ea6; }
+  .btn-save-icon svg { width: 18px; height: 18px; fill: currentColor; }
+  
+  .modal-loader { height: 3px; width: 100%; background: transparent; position: absolute; bottom: 0; left: 0; overflow: hidden; display: none; }
+  .modal-loader div { width: 30%; height: 100%; background: var(--p); position: absolute; left: -30%; animation: loading 1s infinite linear; }
+  
+  .inp-group { margin-bottom: 12px; position: relative; } 
+  .lbl { font-size: 11px; color: var(--sub); font-weight: 500; margin-bottom: 4px; display: block; text-transform: uppercase; }
+  .inp { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 14px; outline: none; font-family: inherit; transition: 0.2s; }
+  .inp:focus { border-color: var(--p); }
+  .inp-error { border-color: var(--err-bd) !important; background-color: var(--err-bg) !important; }
+  .inp-highlight { background-color: #fff9c4 !important; transition: background-color 0.5s; }
+  .inp-row { display: flex; gap: 10px; margin-bottom: 12px; } 
+  .inp-col { flex: 1; position: relative; }
+  
+  .btn { width: 100%; padding: 10px; border: none; border-radius: 4px; font-weight: 600; cursor: pointer; margin-top: 10px; margin-bottom: 30px; font-size: 14px; }
+  .btn-p { background: var(--p); color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+  .btn-p:hover { background: #155db5; }
+
+  @keyframes loading { 0% { left: -30%; } 100% { left: 100%; } }
+
+  #error-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 9999;
+    display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px;
+  }
+  #error-overlay svg { width: 64px; height: 64px; fill: #ea4335; margin-bottom: 20px; }
+  #error-overlay h2 { margin: 0 0 10px 0; color: #ea4335; }
+  .err-number { font-weight: bold; color: #202124; }
+</style>
