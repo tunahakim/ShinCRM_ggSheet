@@ -1,0 +1,202 @@
+<script>
+/**
+ * =========================================================================
+ * ĐỐI TƯỢNG: UIFactory
+ * =========================================================================
+ * * 1. MỤC ĐÍCH: 
+ * Nơi tập trung toàn bộ logic sinh ra mã HTML. Đối tượng này hoạt động theo 
+ * mô hình Singleton (Chỉ có 1 bản thể duy nhất trong toàn hệ thống).
+ * * 2. CÁCH HOẠT ĐỘNG:
+ * Nhận các "Nguyên liệu" (như tên cột, cấu hình Schema, độ rộng) -> Đưa vào các
+ * hàm _build nội bộ -> Đúc ra "Thành phẩm" là chuỗi HTML (<input>, <select>).
+ * * 3. HƯỚNG DẪN SỬ DỤNG (DÀNH CHO NGƯỜI MỚI):
+ * Để sử dụng nhà máy này, bạn chỉ cần gọi tên đối tượng kèm theo hàm của nó.
+ * * VÍ DỤ CƠ BẢN:
+ * Lấy cấu hình của cột "Nhóm KH" từ RAM:
+ * var configNhomKH = DB.MASTER_SCHEMA.ListKH["@KH_NHOM_KH"];
+ * * Gọi hàm đúc ô nhập liệu rộng 50%:
+ * var htmlNhomKH = UIFactory.createControl("@KH_NHOM_KH", configNhomKH, "50%");
+ * * Gọi hàm bọc nó vào 1 hàng:
+ * var htmlRow = UIFactory.createRow(htmlNhomKH);
+ * =========================================================================
+ */
+const UIFactory = {
+
+  /**
+   * -------------------------------------------------------------------------
+   * HÀM: createRow
+   * MỤC ĐÍCH: Bọc các khối HTML (các cột) vào trong một hàng ngang (flexbox).
+   * -------------------------------------------------------------------------
+   * @param {String} htmlContent - Chuỗi HTML của các thẻ con bên trong. 
+   * VD: `<div class="inp-col">...</div> <div class="inp-col">...</div>`
+   * @returns {String} Chuỗi HTML đã được bọc trong thẻ <div class="inp-row">.
+   */
+  createRow: function(htmlContent) {
+    return `<div class="inp-row">${htmlContent}</div>`;
+  },
+
+  /**
+   * -------------------------------------------------------------------------
+   * HÀM: createFormHeader
+   * MỤC ĐÍCH: Vẽ thanh tiêu đề trên cùng của Form (chứa Nút Đóng và Nút Lưu).
+   * -------------------------------------------------------------------------
+   * @param {String} title - Dòng chữ tiêu đề in đậm. VD: "THÊM KHÁCH HÀNG MỚI"
+   * @param {String} closeAction - Tên hàm JS sẽ thực thi khi bấm dấu X. VD: "UI_Logic.closeForm()"
+   * @param {String} saveAction - Tên hàm JS sẽ thực thi khi bấm icon Lưu. VD: "UI_Logic.saveCustomer()"
+   * @returns {String} Chuỗi HTML của thẻ <div class="form-head">
+   */
+  createFormHeader: function(title, closeAction, saveAction) {
+    return `
+      <div class="form-head">
+        <span class="form-title">${title}</span>
+        <div class="form-actions-right">
+            <span class="btn-close" onclick="${closeAction}" title="Đóng">✕</span>
+            <button class="btn-save-icon" onclick="${saveAction}" title="Lưu dữ liệu">
+              <svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>
+            </button>
+        </div>
+        <div class="modal-loader"><div></div></div>
+      </div>
+    `;
+  },
+
+  /**
+   * -------------------------------------------------------------------------
+   * HÀM ĐIỀU PHỐI (QUAN TRỌNG NHẤT): createControl
+   * MỤC ĐÍCH: Đọc cấu hình từ Schema và tự động gọi đúng hàm con để vẽ HTML.
+   * -------------------------------------------------------------------------
+   * @param {String} key - Mã cột vật lý. VD: "@KH_TEN_CTY"
+   * @param {Object} config - Cấu trúc Object lấy từ Schema. 
+   * VD: { label: "Tên công ty", required: true, ui: { control: "Text", source: null } }
+   * @param {String} width - Kích thước độ rộng của cột (CSS Flex). VD: "100%", "50%", "33%"
+   * @param {String} [labelOverride=null] - (Tham số tùy chọn) Tên nhãn muốn hiển thị ghi đè lên nhãn gốc. 
+   * VD: Truyền "SĐT" thay vì "Điện thoại" của Schema.
+   * * @returns {String} Khối HTML hoàn chỉnh gồm: div.inp-col > label + input
+   */
+  createControl: function(key, config, width, labelOverride = null) {
+    
+    // Bảo vệ lỗi: Nếu config trống, trả về HTML báo lỗi để không sập giao diện
+    if (!config || !config.ui) return `<div class="inp-col" style="color:red">Lỗi: Missing Schema for ${key}</div>`;
+
+    // 1. Trả về ngay thẻ Hidden nếu control là ẩn (Không cần vẽ vỏ cột và nhãn)
+    if (config.ui.control === "Hidden") return this._buildHidden(key);
+
+    // 2. Chốt tên nhãn (Ưu tiên tên ghi đè, nếu không có lấy tên gốc)
+    const finalLabelText = labelOverride ? labelOverride : config.label;
+    const labelHtml = this._buildLabel(finalLabelText, config.required);
+    
+    // 3. Phân loại và đúc thẻ Input
+    let inputHtml = "";
+    switch (config.ui.control) {
+      case "Text":       inputHtml = this._buildText(key); break;
+      case "Readonly":   inputHtml = this._buildReadonly(key); break;
+      case "Select":     inputHtml = this._buildSelect(key, config.ui.source); break;
+      case "Lookup":     inputHtml = this._buildLookup(key, config.ui.source); break;
+      case "Datepicker": inputHtml = this._buildDatepicker(key); break;
+      case "Textarea":   inputHtml = this._buildTextarea(key); break;
+      default:           inputHtml = `<input type="text" value="Lỗi: ${config.ui.control}" readonly>`; break;
+    }
+
+    // 4. Căn chỉnh độ rộng
+    const flexStyle = (width === '100%') ? '1 1 100%' : '1';
+
+    // 5. Đóng gói và trả về
+    return `
+      <div class="inp-col" style="flex: ${flexStyle};">
+        ${labelHtml}
+        ${inputHtml}
+      </div>
+    `;
+  },
+
+  // =========================================================================
+  // CÁC HÀM CON CHUYÊN TRÁCH (PRIVATE HELPERS)
+  // Chỉ dùng nội bộ trong đối tượng UIFactory, người ngoài không nên gọi trực tiếp.
+  // =========================================================================
+
+  /**
+   * Tạo thẻ <label>. 
+   * @param {String} text - Nội dung nhãn (VD: "Mã số thuế")
+   * @param {Boolean} isRequired - Có bắt buộc nhập không? (true/false)
+   * @returns {String} VD: `<label class="lbl">Mã số thuế <span style="color:red">*</span></label>`
+   */
+  _buildLabel: function(text, isRequired) {
+    const asterisk = isRequired ? ' <span style="color:red">*</span>' : '';
+    return `<label class="lbl">${text}${asterisk}</label>`;
+  },
+
+  /**
+   * @param {String} key - ID cột (VD: "@KH_STT")
+   * @returns {String} Thẻ `<input type="hidden">`
+   */
+  _buildHidden: function(key) {
+    return `<input type="hidden" id="n-${key}" data-col="${key}">`;
+  },
+
+  /**
+   * @param {String} key - ID cột (VD: "@KH_TEN_CTY")
+   * @returns {String} Thẻ `<input type="text">` cơ bản
+   */
+  _buildText: function(key) {
+    return `<input type="text" id="n-${key}" class="inp" data-col="${key}">`;
+  },
+
+  /**
+   * @param {String} key - ID cột (VD: "@KH_NGAY_NHAP_LIEU")
+   * @returns {String} Thẻ `<input readonly>` có nền màu xám
+   */
+  _buildReadonly: function(key) {
+    return `<input type="text" id="n-${key}" class="inp" readonly style="background:#f1f3f4; color:#777;" data-col="${key}">`;
+  },
+
+  /**
+   * @param {String} key - ID cột (VD: "@KH_NHOM_KH")
+   * @param {String} source - Nguồn dữ liệu từ Schema (VD: "@DM_NHOM_KH")
+   * @returns {String} Cấu trúc kết hợp `<input>` và `<div class="suggest-box">`
+   */
+  _buildSelect: function(key, source) {
+    const listId = `drop-${key}`;
+    return `
+      <input type="text" id="n-${key}" class="inp" placeholder="--Chọn--" autocomplete="off" data-list="${source}" data-col="${key}">
+      <div id="${listId}" class="suggest-box"></div>
+    `;
+  },
+
+  /**
+   * -------------------------------------------------------------------------
+   * HÀM: _buildLookup (Tra cứu động)
+   * MỤC ĐÍCH: Đúc ra cụm giao diện tìm kiếm dành riêng cho nguồn dữ liệu động
+   * (Như tìm Công ty mẹ từ toàn bộ danh sách Khách hàng).
+   * -------------------------------------------------------------------------
+   * @param {String} key - ID cột (VD: "@KH_CONG_TY_ME")
+   * @param {String} source - Nguồn quét (VD: "@KH_TEN_CTY")
+   * @returns {String} HTML của ô Lookup.
+   * LƯU Ý TƯƠNG LAI: Đã được tách riêng khỏi _buildSelect. Nếu sau này cần thêm 
+   * icon Kính lúp hoặc CSS riêng cho ô Lookup, chỉ cần sửa tại đây.
+   */
+  _buildLookup: function(key, source) {
+    const listId = `drop-${key}`;
+    return `
+      <input type="text" id="n-${key}" class="inp lookup-inp" placeholder="🔍 Gõ để tìm kiếm..." autocomplete="off" data-list="${source}" data-col="${key}">
+      <div id="${listId}" class="suggest-box"></div>
+    `;
+  },
+  
+  /**
+   * @param {String} key - ID cột (VD: "@KH_NGAY_DONG_THAU")
+   * @returns {String} Thẻ `<input type="date">` gọi lịch hệ thống
+   */
+  _buildDatepicker: function(key) {
+    return `<input type="date" id="n-${key}" class="inp" data-col="${key}">`;
+  },
+
+  /**
+   * @param {String} key - ID cột (VD: "@KH_GHI_CHU")
+   * @returns {String} Thẻ `<textarea>` cao 2 dòng
+   */
+  _buildTextarea: function(key) {
+    return `<textarea id="n-${key}" class="inp" rows="2" data-col="${key}"></textarea>`;
+  }
+
+};
+</script>
