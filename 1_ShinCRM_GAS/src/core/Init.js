@@ -19,7 +19,7 @@ function onOpen() {
 }
 function showSidebar() {
   // 1. Phải dùng Template để thực thi được lệnh include
-  var template = HtmlService.createTemplateFromFile('1. GAS - Old/SidebarOld'); 
+  var template = HtmlService.createTemplateFromFile('1. GAS - Old/Sidebar'); 
   
   // 2. Thực thi lệnh nạp (evaluate)
   var html = template.evaluate()
@@ -36,9 +36,8 @@ function showSidebar() {
  * @return {string} Nội dung văn bản thuần túy của file đó.
  */
 function include(filename) {
-  // 1. HtmlService.createHtmlOutputFromFile(filename): 
-  //    Tạo một đối tượng Output từ file có tên tương ứng trong dự án.
-  // 2. .getContent(): 
-  //    Lấy toàn bộ nội dung text bên trong file đó để trả về cho trình duyệt.
-  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+  var content = HtmlService.createHtmlOutputFromFile(filename).getContent();
+  
+  // Xóa ký tự BOM (\uFEFF) tàng hình và loại bỏ khoảng trắng/xuống dòng thừa ở 2 đầu
+  return content.replace(/^\uFEFF/, '').trim();
 }
