@@ -30,8 +30,9 @@ function showSidebar() {
     .setWidth(450); // [GIỮ NGUYÊN] Width 450px
   SpreadsheetApp.getUi().showSidebar(html);
 }
-**/
+*/
 
+/**
 function showSidebar() {
   // 1. Đổi thành createTemplateFromFile
   var html = HtmlService.createTemplateFromFile("src/ui/Sidebar") 
@@ -39,6 +40,24 @@ function showSidebar() {
     .setTitle("CRM Local V14.2") 
     .setWidth(450); 
   SpreadsheetApp.getUi().showSidebar(html);
+}
+*/
+
+function showSidebar() {
+  var template = HtmlService.createTemplateFromFile('src/ui/Sidebar'); 
+  
+  // 1. Dịch template ra chuỗi HTML thô
+  var rawHtml = template.evaluate().getContent();
+  
+  // 2. [CẦU DAO BẢO VỆ] Dọn dẹp BOM tàng hình và khoảng trắng cho file GỐC
+  var cleanHtml = rawHtml.replace(/^\uFEFF/, '').trim();
+  
+  // 3. Đóng gói lại thành HtmlOutput và cấu hình hiển thị
+  var htmlOutput = HtmlService.createHtmlOutput(cleanHtml)
+    .setTitle("CRM Local V14.2") 
+    .setWidth(450); 
+    
+  SpreadsheetApp.getUi().showSidebar(htmlOutput);
 }
 
 /**
@@ -53,5 +72,8 @@ function include(filename) {
   //    Tạo một đối tượng Output từ file có tên tương ứng trong dự án.
   // 2. .getContent(): 
   //    Lấy toàn bộ nội dung text bên trong file đó để trả về cho trình duyệt.
-  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+  var content = HtmlService.createHtmlOutputFromFile(filename).getContent();
+  
+  // Xóa ký tự BOM (\uFEFF) tàng hình và loại bỏ khoảng trắng/xuống dòng thừa ở 2 đầu
+  return content.replace(/^\uFEFF/, '').trim();
 }
