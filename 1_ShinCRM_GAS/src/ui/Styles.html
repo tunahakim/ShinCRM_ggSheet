@@ -1,195 +1,206 @@
-<style>
-  /* === KHAI BÁO BIẾN MÀU SẮC (GIỮ NGUYÊN CODE CŨ) === */
-  :root { 
-    --p: #1a73e8; /* Xanh dương Google */
-    --bg: #f8f9fa; /* Nền xám nhạt */
-    --txt: #202124; /* Chữ chính */
-    --sub: #5f6368; /* Chữ phụ */
-    --border: #dadce0; /* Viền */
-    --hover: #f1f3f4; /* Hover */
-    --err-bg: #fce8e6; /* Lỗi nền */
-    --err-bd: #c5221f; /* Lỗi viền */
-    --job-bg: #e6f4ea; /* Job nền */
-    --job-txt: #137333; /* Job chữ */
-    --pin-color: #fbbc04; /* Màu vàng cho ghim */
-  }
-  
-  * { box-sizing: border-box; /* Tính kích thước bao gồm cả viền và đệm */ } 
-  body { 
-    font-family: 'Roboto', sans-serif; /* Font chuẩn */
-    margin: 0; background: var(--bg); color: var(--txt); /* Reset lề, đổ màu nền và màu chữ */
-    font-size: 14px; overflow: hidden; display: flex; flex-direction: column; height: 100vh; /* Cỡ chữ 14, bật Flexbox xếp dọc, tràn viền */
-  }
-  
-  /* === 1. HEADER & SEARCH === */
-  .header { 
-    background: #fff; border-bottom: 1px solid var(--border); /* Nền trắng, kẻ viền xám dưới */
-    padding: 0 8px; height: 48px; display: flex; align-items: center; gap: 4px; /* Cao 48px, dàn nút nằm ngang cách nhau 4px */
-    flex-shrink: 0; z-index: 50; position: relative; /* Không cho phép co móp, đẩy nổi lên trên */
-  }
-  .spacer { flex: 1; /* Chiếm hết khoảng trống để đẩy nút sang 2 bên */ }
-  .icon-btn { 
-    width: 32px; height: 32px; border: none; background: transparent; /* Kích thước nút 32x32, xóa viền và nền */
-    border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; /* Bo tròn, hình bàn tay, căn giữa icon */
-    color: var(--sub); transition: 0.2s; /* Màu xám, hiệu ứng chuyển màu mượt */
-  }
-  .icon-btn:hover { background: var(--hover); color: var(--txt); /* Hover đổi nền xám nhạt, icon đậm hơn */ }
-  .icon-btn.active { color: #f9ab00; background: #fef7e0; /* Nút bật thì đổi icon vàng, nền vàng nhạt */ }
-  .icon-btn svg { width: 20px; height: 20px; fill: currentColor; /* Kích thước icon 20x20, tự ăn theo màu color */ }
-  .icon-btn.disabled { opacity: 0.3; pointer-events: none; /* Mờ đi và khóa click khi bị disabled */ }
+﻿<!-- 
+ * PROJECT: ShinCRM_Master_Workspace
+ * FILE: Styles.html
+ * TITLE: Sidebar CSS
+ * ROLE: Style
+ * -------------------------------------------------------------------------
+ * CHI TIẾT ĐẶC TẢ:
+ * Định dạng Roboto, z-index Search, căn lề justify.
+ * -------------------------------------------------------------------------
+ * NGÀY KHỞI TẠO: 06/03/2026
+ -->
 
-  /* Loader Line (Thanh tải ngang) */
-  #loader-line { 
-    height: 3px; width: 100%; background: transparent; overflow: hidden; /* Cao 3px, ẩn phần thừa */
-    position: absolute; bottom: 0; left: 0; z-index: 52; display: none; /* Bám đáy header, nằm trên cùng */
-  }
-  #loader-line div { 
-    width: 30%; height: 100%; background: var(--p); /* Khối chạy màu xanh dài 30% */
-    position: absolute; left: -30%; animation: loading 1s infinite linear; /* Hiệu ứng chạy từ trái qua phải */
-  }
+  <style>
+    /* === KHAI BÁO BIẾN MÀU SẮC (GIỮ NGUYÊN CODE CŨ) === */
+    :root { 
+      --p: #1a73e8; /* Xanh dương Google */
+      --bg: #f8f9fa; /* Nền xám nhạt */
+      --txt: #202124; /* Chữ chính */
+      --sub: #5f6368; /* Chữ phụ */
+      --border: #dadce0; /* Viền */
+      --hover: #f1f3f4; /* Hover */
+      --err-bg: #fce8e6; /* Lỗi nền */
+      --err-bd: #c5221f; /* Lỗi viền */
+      --job-bg: #e6f4ea; /* Job nền */
+      --job-txt: #137333; /* Job chữ */
+      --pin-color: #fbbc04; /* [MỚI] Màu vàng cho ghim */
+    }
+    
+    * { box-sizing: border-box; } 
+    body { 
+      font-family: 'Roboto', sans-serif;
+      margin: 0; background: var(--bg); color: var(--txt);
+      font-size: 14px; overflow: hidden; display: flex; flex-direction: column; height: 100vh;
+    }
+    
+    /* === 1. HEADER & SEARCH (GIỮ NGUYÊN CSS CŨ) === */
+    .header { 
+      background: #fff; border-bottom: 1px solid var(--border);
+      padding: 0 8px; height: 48px; display: flex; align-items: center; gap: 4px;
+      flex-shrink: 0; z-index: 50; position: relative;
+    }
+    .spacer { flex: 1; }
+    .icon-btn { 
+      width: 32px; height: 32px; border: none; background: transparent;
+      border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      color: var(--sub); transition: 0.2s;
+    }
+    .icon-btn:hover { background: var(--hover); color: var(--txt); }
+    .icon-btn.active { color: #f9ab00; background: #fef7e0; }
+    .icon-btn svg { width: 20px; height: 20px; fill: currentColor; }
+    .icon-btn.disabled { opacity: 0.3; pointer-events: none; }
 
-  /* Search Panel (Bảng tìm kiếm) */
-  #search-panel { 
-    width: 100%; background: #fff; border-bottom: 1px solid var(--border); /* Rộng 100%, nền trắng, viền dưới */
-    padding: 8px; z-index: 49; box-shadow: 0 2px 5px rgba(0,0,0,0.05); /* Đệm 8px, đổ bóng nhẹ */
-    display: none; flex-shrink: 0; /* Mặc định ẩn, không co móp */
-  }
-  .search-inp-wrap { position: relative; /* Neo tọa độ cho hộp suggest bay phía dưới */ }
-  .search-inp { 
-    width: 100%; padding: 6px 30px 6px 10px; border: 1px solid var(--border); /* Chừa lề phải 30px cho icon X */
-    border-radius: 4px; font-size: 14px; outline: none; /* Bo góc 4px, xóa viền focus mặc định */
-  }
-  .search-inp:focus { border-color: var(--p); box-shadow: 0 0 0 2px rgba(26,115,232,0.2); /* Viền xanh, tỏa quầng sáng mờ */ }
-  
-  .suggest-box { 
-    max-height: 80vh; overflow-y: auto; border: 1px solid var(--border); /* Cao tối đa 80% màn hình, bật cuộn */
-    background: #fff; position: absolute; width: 100%; z-index: 1000; /* Nền trắng, bay lơ lửng, lớp cao nhất */
-    box-shadow: 0 4px 6px rgba(0,0,0,0.15); border-radius: 0 0 4px 4px; /* Đổ bóng, bo 2 góc dưới */
-    display: none; top: 100%; margin-top: 1px; /* Nằm ngay dưới mép ô input */
-  }
-  .s-item { padding: 6px 10px; border-bottom: 1px solid #f1f3f4; cursor: pointer; display: flex; justify-content: space-between; align-items: center; /* Dàn ngang kết quả tìm kiếm */ }
-  .s-name { font-weight: 500; color: #202124; font-size: 14px; margin-bottom: 2px; /* Tên in đậm vừa */ }
-  .s-sub { font-size: 11px; color: #5f6368; line-height: 1.3; /* Mô tả phụ nhỏ và nhạt màu hơn */ }
-  .s-item:hover, .s-item.active { background: #e8f0fe; color: var(--p); /* Hover đổ nền xanh nhạt, chữ xanh */ }
+    /* Loader Line */
+    #loader-line { 
+      height: 3px; width: 100%; background: transparent; overflow: hidden;
+      position: absolute; bottom: 0; left: 0; z-index: 52; display: none;
+    }
+    #loader-line div { 
+      width: 30%; height: 100%; background: var(--p);
+      position: absolute; left: -30%; animation: loading 1s infinite linear;
+    }
 
-  /* === 2. MAIN LAYOUT (Bố cục cuộn) === */
-  #fixed-area { flex-shrink: 0; padding: 6px 8px 0 8px; background: var(--bg); z-index: 40; /* Khối tên KH: cố định, không co */ }
-  #scroll-area { flex-grow: 1; overflow-y: auto; padding: 0 8px 80px 8px; scroll-behavior: smooth; /* Khối Giao dịch: lấp đầy chỗ trống, bật cuộn dọc */ }
-  
-  ::-webkit-scrollbar { width: 4px; height: 4px; /* Thanh cuộn nhỏ gọn 4px */ }
-  ::-webkit-scrollbar-track { background: transparent; /* Rãnh cuộn trong suốt */ }
-  ::-webkit-scrollbar-thumb { background: #dadce0; border-radius: 2px; /* Nút cuộn xám, bo góc */ }
-  ::-webkit-scrollbar-thumb:hover { background: #bdc1c6; /* Hover nút cuộn đậm hơn */ }
+    /* Search Panel */
+    #search-panel { 
+      width: 100%; background: #fff; border-bottom: 1px solid var(--border);
+      padding: 8px; z-index: 49; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+      display: none; flex-shrink: 0;
+    }
+    .search-inp-wrap { position: relative; }
+    .search-inp { 
+      width: 100%; padding: 6px 30px 6px 10px; border: 1px solid var(--border);
+      border-radius: 4px; font-size: 14px; outline: none;
+    }
+    .search-inp:focus { border-color: var(--p); box-shadow: 0 0 0 2px rgba(26,115,232,0.2); }
+    
+    .suggest-box { 
+      max-height: 80vh; overflow-y: auto; border: 1px solid var(--border);
+      background: #fff; position: absolute; width: 100%; z-index: 1000;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.15); border-radius: 0 0 4px 4px;
+      display: none; top: 100%; margin-top: 1px;
+    }
+    .s-item { padding: 6px 10px; border-bottom: 1px solid #f1f3f4; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+    .s-name { font-weight: 500; color: #202124; font-size: 14px; margin-bottom: 2px; }
+    .s-sub { font-size: 11px; color: #5f6368; line-height: 1.3; }
+    .s-item:hover, .s-item.active { background: #e8f0fe; color: var(--p); }
 
-  .card { 
-    background: #fff; border: 1px solid var(--border); border-radius: 8px; /* Thẻ thông tin: trắng, bo góc 8px */
-    padding: 10px; margin-bottom: 8px; box-shadow: 0 1px 2px rgba(60,64,67,0.05); /* Đệm trong 10px, đổ bóng mờ */
-  }
+    /* === 2. MAIN LAYOUT (Card, Fixed Area) === */
+    #fixed-area { flex-shrink: 0; padding: 6px 8px 0 8px; background: var(--bg); z-index: 40; }
+    #scroll-area { flex-grow: 1; overflow-y: auto; padding: 0 8px 80px 8px; scroll-behavior: smooth; }
+    
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #dadce0; border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: #bdc1c6; }
 
-  /* === 3. INFO STYLE (Chi tiết Khách hàng) === */
-  .c-name { 
-    font-size: 15px; font-weight: 700; color: var(--p); /* Tên công ty: to, in đậm, màu xanh */
-    line-height: 1.4; margin-bottom: 6px; 
-    text-align: justify; /* Căn lề đều 2 bên theo yêu cầu */
-  }
-  .info-row { 
-    display: flex; justify-content: space-between; align-items: center; /* Dàn ngang MST và Mã KH */
-    font-size: 13px; color: var(--txt); margin-bottom: 4px;
-  }
-  .info-left { font-weight: 500; color: #333; text-align: left; /* Mã KH in đậm vừa, bên trái */ } 
-  .info-right { font-weight: 600; color: #000; text-align: right; /* MST in đậm hơn, bên phải */ } 
+    .card { 
+      background: #fff; border: 1px solid var(--border); border-radius: 8px;
+      padding: 10px; margin-bottom: 8px; box-shadow: 0 1px 2px rgba(60,64,67,0.05);
+    }
 
-  /* === 4. NOTE STYLE (Ghi chú) === */
-  .card-header { 
-    display: flex; justify-content: space-between; align-items: center;  /* Tiêu đề thẻ Ghi chú/Lịch sử */
-    margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px dashed #eee; /* Gạch đứt nét phân cách */
-  }
-  .card-title { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--sub); /* Tiêu đề thẻ in hoa, nhỏ */ }
-  .action-link { 
-    font-size: 11px; font-weight: 600; color: var(--p); cursor: pointer;  /* Link nút Thêm/Sửa màu xanh */
-    display: flex; align-items: center; gap: 3px; 
-  }
-  .action-link:hover { text-decoration: underline; /* Trỏ vào thì gạch chân */ }
-  .note-content { 
-    background: #fce8e6; color: #c5221f; padding: 8px; border-radius: 4px;  /* Nền đỏ nhạt cảnh báo */
-    font-size: 13px; border-left: 3px solid #d93025; white-space: pre-wrap; line-height: 1.4; /* Kẻ viền trái đỏ đậm, giữ format xuống dòng */
-  }
+    /* === 3. [UPDATE] INFO STYLE (CĂN LỀ CHUẨN V14.2) === */
+    .c-name { 
+      font-size: 15px; font-weight: 700; color: var(--p);
+      line-height: 1.4; margin-bottom: 6px; 
+      text-align: justify; /* [YC] Tên công ty căn đều 2 bên */
+    }
+    .info-row { 
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 13px; color: var(--txt); margin-bottom: 4px;
+    }
+    /* [YC] Mã KH căn trái, MST căn phải */
+    .info-left { font-weight: 500; color: #333; text-align: left; } 
+    .info-right { font-weight: 600; color: #000; text-align: right; } 
 
-  /* === 5. TRANSACTION LIST (Danh sách Giao dịch) === */
-  .tx-list { display: flex; flex-direction: column; gap: 6px; /* Xếp dọc các giao dịch cách nhau 6px */ }
-  .tx-item { background: #fff; border-bottom: 1px solid #f1f3f4; padding-bottom: 6px; position: relative; /* Gạch dưới mỗi dòng */ }
-  .tx-item:last-child { border-bottom: none; padding-bottom: 0; /* Dòng cuối không gạch */ }
-  
-  .tx-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; /* Khối chứa Ngày - SP - Job */ }
-  .tx-meta-left { display: flex; gap: 8px; align-items: center; font-size: 13px; /* Ngày và SP sát nhau */ }
-  
-  .tx-date { font-weight: 700; color: var(--p); /* Ngày in đậm xanh */ }
-  .tx-prod { font-weight: 700; color: #c5221f; /* SP in đậm đỏ */ }
-  
-  /* Icon Pin (Ghim) */
-  .tx-pin-icon { width: 14px; height: 14px; fill: var(--pin-color); margin-right: 4px; display: none; /* Khống chế icon ghim, mặc định ẩn */ }
-  .tx-item.is-pinned .tx-pin-icon { display: inline-block; } /* Hiện icon ghim nếu có class */
-  .tx-item.is-pinned { background: #fffcf0; padding: 4px; border-radius: 4px; } /* Đổi nền dòng thành vàng nhạt nếu được ghim */
+    /* === 4. NOTE STYLE === */
+    .card-header { 
+      display: flex; justify-content: space-between; align-items: center; 
+      margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px dashed #eee;
+    }
+    .card-title { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--sub); }
+    .action-link { 
+      font-size: 11px; font-weight: 600; color: var(--p); cursor: pointer; 
+      display: flex; align-items: center; gap: 3px; 
+    }
+    .action-link:hover { text-decoration: underline; }
+    .note-content { 
+      background: #fce8e6; color: #c5221f; padding: 8px; border-radius: 4px; 
+      font-size: 13px; border-left: 3px solid #d93025; white-space: pre-wrap; line-height: 1.4;
+    }
 
-  .tx-job { 
-    font-size: 10px; font-weight: 700; background: var(--job-bg); color: var(--job-txt); /* Nhãn Công việc nền xanh chữ xanh */
-    padding: 2px 6px; border-radius: 4px; 
-  }
-  .tx-body { font-size: 14px; color: #1B1B1B; line-height: 1.4; margin-top: 2px; white-space: pre-wrap; } /* Nội dung giao dịch, giữ xuống dòng */
-  .tx-edit-icon { cursor: pointer; color: #9aa0a6; margin-left: 4px; display: none; /* Nút sửa (bút chì), mặc định ẩn */ }
-  .tx-item:hover .tx-edit-icon { display: inline-block; color: var(--p); /* Chỉ hiện nút sửa xanh khi trỏ chuột vào dòng */ }
+    /* === 5. [UPDATE] TRANSACTION LIST (HỖ TRỢ GHIM) === */
+    .tx-list { display: flex; flex-direction: column; gap: 6px; }
+    .tx-item { background: #fff; border-bottom: 1px solid #f1f3f4; padding-bottom: 6px; position: relative; }
+    .tx-item:last-child { border-bottom: none; padding-bottom: 0; }
+    
+    .tx-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
+    .tx-meta-left { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+    
+    .tx-date { font-weight: 700; color: var(--p); }
+    .tx-prod { font-weight: 700; color: #c5221f; }
+    
+    /* [MỚI] Icon Pin (Ghim) */
+    .tx-pin-icon { width: 14px; height: 14px; fill: var(--pin-color); margin-right: 4px; display: none; }
+    .tx-item.is-pinned .tx-pin-icon { display: inline-block; } /* Hiện icon nếu có class is-pinned */
+    .tx-item.is-pinned { background: #fffcf0; padding: 4px; border-radius: 4px; } /* Nền vàng nhẹ cho dòng ghim */
 
-  /* === 6. FORM OVERLAY (Màn hình bật lên) === */
-  .overlay { 
-    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; /* Phủ kín toàn bộ trình duyệt */
-    background: #fff; z-index: 100; padding: 0 15px; overflow-y: auto; /* Nền trắng đè lên mọi thứ, bật cuộn */
-  }
-  .form-head { 
-    display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee;  /* Thanh tiêu đề Form */
-    margin-bottom: 15px; position: sticky; top: 0; background: #fff; z-index: 10; /* Dính chặt trên cùng khi cuộn */
-  }
-  .form-title { font-size: 16px; font-weight: 700; color: var(--p); flex-grow: 1; /* Tiêu đề Form màu xanh to */ }
-  .form-actions-right { display: flex; align-items: center; gap: 8px; /* Cụm nút Lưu và Đóng sát nhau */ }
+    .tx-job { 
+      font-size: 10px; font-weight: 700; background: var(--job-bg); color: var(--job-txt); 
+      padding: 2px 6px; border-radius: 4px; 
+    }
+    .tx-body { font-size: 14px; color: #1B1B1B; line-height: 1.4; margin-top: 2px; white-space: pre-wrap; } /* màu cũ là #444444 */
+    .tx-edit-icon { cursor: pointer; color: #9aa0a6; margin-left: 4px; display: none; }
+    .tx-item:hover .tx-edit-icon { display: inline-block; color: var(--p); }
 
-  .btn-close { 
-    cursor: pointer; font-size: 20px; color: #bdc1c6; padding: 4px; /* Nút X tắt Form */
-    line-height: 1; transition: 0.2s; display: flex; align-items: center; justify-content: center;
-    border-radius: 50%; width: 28px; height: 28px; /* Khung tròn 28px cho nút X */
-  } 
-  .btn-close:hover { color: #5f6368; background: #f1f3f4; /* Hover X đổi nền */ }
-  
-  .btn-save-icon { 
-    width: 28px; height: 28px; background: #f1f3f4; color: var(--p); /* Nút Lưu tròn, icon xanh */
-    border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s;
-  }
-  .btn-save-icon:hover { background: #d2e3fc; color: #174ea6; /* Hover Lưu đổi màu */ }
-  .btn-save-icon svg { width: 18px; height: 18px; fill: currentColor; }
-  
-  .modal-loader { height: 3px; width: 100%; background: transparent; position: absolute; bottom: 0; left: 0; overflow: hidden; display: none; /* Loader của riêng Form */ }
-  .modal-loader div { width: 30%; height: 100%; background: var(--p); position: absolute; left: -30%; animation: loading 1s infinite linear; }
-  
-  /* Ô nhập liệu trong Form */
-  .inp-group { margin-bottom: 12px; position: relative; /* Bao bọc Nhãn và Ô gõ */ } 
-  .lbl { font-size: 11px; color: var(--sub); font-weight: 500; margin-bottom: 4px; display: block; text-transform: uppercase; /* Nhãn in hoa xám */ }
-  .inp { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 14px; outline: none; font-family: inherit; transition: 0.2s; /* Ô gõ text */ }
-  .inp:focus { border-color: var(--p); /* Ô gõ khi nhấp chuột vào */ }
-  .inp-error { border-color: var(--err-bd) !important; background-color: var(--err-bg) !important; /* Đỏ rực nếu lỗi trống */ }
-  .inp-highlight { background-color: #fff9c4 !important; transition: background-color 0.5s; /* Sáng vàng khi dùng tool auto điền */ }
-  .inp-row { display: flex; gap: 10px; margin-bottom: 12px; /* Dàn 2 ô trên 1 hàng ngang */ } 
-  .inp-col { flex: 1; position: relative; /* Cột chứa ô nhập liệu chia đều không gian */ }
-  
-  .btn { width: 100%; padding: 10px; border: none; border-radius: 4px; font-weight: 600; cursor: pointer; margin-top: 10px; margin-bottom: 30px; font-size: 14px; /* Nút bấm to dài dưới cùng */ }
-  .btn-p { background: var(--p); color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); /* Nút chính màu xanh */ }
-  .btn-p:hover { background: #155db5; }
+    /* === 6. FORM OVERLAY (GIỮ NGUYÊN STYLE) === */
+    .overlay { 
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+      background: #fff; z-index: 100; padding: 0 15px; overflow-y: auto;
+    }
+    .form-head { 
+      display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; 
+      margin-bottom: 15px; position: sticky; top: 0; background: #fff; z-index: 10;
+    }
+    .form-title { font-size: 16px; font-weight: 700; color: var(--p); flex-grow: 1; }
+    .form-actions-right { display: flex; align-items: center; gap: 8px; }
 
-  @keyframes loading { 0% { left: -30%; } 100% { left: 100%; } /* Keyframe cho thanh chạy ngang */ }
+    .btn-close { 
+      cursor: pointer; font-size: 20px; color: #bdc1c6; padding: 4px; 
+      line-height: 1; transition: 0.2s; display: flex; align-items: center; justify-content: center;
+      border-radius: 50%; width: 28px; height: 28px;
+    } 
+    .btn-close:hover { color: #5f6368; background: #f1f3f4; }
+    
+    .btn-save-icon { 
+      width: 28px; height: 28px; background: #f1f3f4; color: var(--p);
+      border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s;
+    }
+    .btn-save-icon:hover { background: #d2e3fc; color: #174ea6; }
+    .btn-save-icon svg { width: 18px; height: 18px; fill: currentColor; }
+    
+    .modal-loader { height: 3px; width: 100%; background: transparent; position: absolute; bottom: 0; left: 0; overflow: hidden; display: none; }
+    .modal-loader div { width: 30%; height: 100%; background: var(--p); position: absolute; left: -30%; animation: loading 1s infinite linear; }
+    
+    .inp-group { margin-bottom: 12px; position: relative; } 
+    .lbl { font-size: 11px; color: var(--sub); font-weight: 500; margin-bottom: 4px; display: block; text-transform: uppercase; }
+    .inp { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 14px; outline: none; font-family: inherit; transition: 0.2s; }
+    .inp:focus { border-color: var(--p); }
+    .inp-error { border-color: var(--err-bd) !important; background-color: var(--err-bg) !important; }
+    .inp-highlight { background-color: #fff9c4 !important; transition: background-color 0.5s; }
+    .inp-row { display: flex; gap: 10px; margin-bottom: 12px; } 
+    .inp-col { flex: 1; position: relative; }
+    
+    .btn { width: 100%; padding: 10px; border: none; border-radius: 4px; font-weight: 600; cursor: pointer; margin-top: 10px; margin-bottom: 30px; font-size: 14px; }
+    .btn-p { background: var(--p); color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+    .btn-p:hover { background: #155db5; }
 
-  /* Màn hình báo lỗi đỏ ngầu */
-  #error-overlay {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 9999; /* Phủ cao nhất */
-    display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px;
-  }
-  #error-overlay svg { width: 64px; height: 64px; fill: #ea4335; margin-bottom: 20px; /* Icon cảnh báo to đỏ */ }
-  #error-overlay h2 { margin: 0 0 10px 0; color: #ea4335; }
-  .err-number { font-weight: bold; color: #202124; }
-</style>
+    @keyframes loading { 0% { left: -30%; } 100% { left: 100%; } }
+
+    #error-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 9999;
+      display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px;
+    }
+    #error-overlay svg { width: 64px; height: 64px; fill: #ea4335; margin-bottom: 20px; }
+    #error-overlay h2 { margin: 0 0 10px 0; color: #ea4335; }
+    .err-number { font-weight: bold; color: #202124; }
+  </style>

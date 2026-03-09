@@ -48,16 +48,10 @@ function showSidebar() {
  * * @param {string} filename - Tên file cần lấy nội dung (không bao gồm đuôi file .html).
  * @return {string} Nội dung văn bản thuần túy của file đó.
  */
-// function include(filename) {
-//   // 1. HtmlService.createHtmlOutputFromFile(filename): 
-//   //    Tạo một đối tượng Output từ file có tên tương ứng trong dự án.
-//   // 2. .getContent(): 
-//   //    Lấy toàn bộ nội dung text bên trong file đó để trả về cho trình duyệt.
-//   return HtmlService.createHtmlOutputFromFile(filename).getContent();
-// }
-
 function include(filename) {
-  var content = HtmlService.createHtmlOutputFromFile(filename).getContent();
-  // Xóa ký tự BOM ẩn (\uFEFF) và gọt bỏ khoảng trắng/xuống dòng ở 2 đầu
-  return content.replace(/^\uFEFF/, '').trim();
+  // 1. HtmlService.createHtmlOutputFromFile(filename): 
+  //    Tạo một đối tượng Output từ file có tên tương ứng trong dự án.
+  // 2. .getContent(): 
+  //    Lấy toàn bộ nội dung text bên trong file đó để trả về cho trình duyệt.
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
