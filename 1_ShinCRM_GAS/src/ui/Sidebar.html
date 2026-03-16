@@ -12,14 +12,31 @@
 
 <!DOCTYPE html>
 <html>
+
 <head>
   <base target="_top">
+  
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   
+  <script>
+    /**
+    * Mục đích: Khai báo hằng số MASTER_SCHEMA toàn cục và tự động kiểm tra nạp DNA.
+    * Cách hoạt động: 
+    * 1. Tiếp nhận chuỗi JSON được tiêm từ hàm getMasterSchema() của Server.
+    * 2. Tự động in kết quả ra Console để lập trình viên xác nhận mà không cần gõ lệnh thủ công.
+    */
+    const MASTER_SCHEMA = <?!= getMasterSchema(); ?>;
+    
+    // Tự động in dòng thông báo này để xác nhận DNA đã nạp thành công
+    console.log("🧬 DNA SHIN-CRM ĐÃ NẠP:", MASTER_SCHEMA);
+  </script>
+
   <!-- Vị trí thẻ <style> </style> cũ -->
   <?!= include('src/ui/Styles'); ?>
+  
 
 </head>
+
 <body>
   <div id="error-overlay"></div>
 
