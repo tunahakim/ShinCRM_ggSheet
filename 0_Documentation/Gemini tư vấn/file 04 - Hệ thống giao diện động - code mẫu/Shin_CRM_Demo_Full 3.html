@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShinCRM - Dynamic UI Production (v6.1)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        /* =========================================================
+           TẦNG 0: TỦ QUẦN ÁO CSS (ui.styles.html)
+           Chứa 100% bộ CSS gốc từ Sidebar.html v21.5
+           ========================================================= */
+        :root { 
+            --p: #1a73e8; --bg: #f8f9fa; --txt: #202124; --sub: #5f6368; 
+            --border: #dadce0; --hover: #f1f3f4; --err-bg: #fce8e6; 
+            --err-bd: #c5221f; --job-bg: #e6f4ea; --job-txt: #137333; --pin-color: #fbbc04; 
+        }
+        * { box-sizing: border-box; } 
+        body { font-family: 'Roboto', sans-serif; margin: 0; background: var(--bg); color: var(--txt); font-size: 14px; overflow: hidden; display: flex; flex-direction: column; height: 100vh; }
+        
+        #app-shell { display: flex; flex-direction: column; height: 100%; position: relative; width: 100%; max-width: 500px; margin: 0 auto; background: var(--bg); border-left: 1px solid var(--border); border-right: 1px solid var(--border);}
+
+        /* 1. HEADER & SEARCH */
+        .header { background: #fff; border-bottom: 1px solid var(--border); padding: 0 8px; height: 48px; display: flex; align-items: center; gap: 4px; flex-shrink: 0; z-index: 50; position: relative; }
+        .spacer { flex: 1; }
+        .icon-btn { width: 32px; height: 32px; border: none; background: transparent; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--sub); transition: 0.2s; padding: 0;}
+        .icon-btn:hover { background: var(--hover); color: var(--txt); }
+        .icon-btn.active { color: #f9ab00; background: #fef7e0; }
+        .icon-btn svg { width: 20px; height: 20px; fill: currentColor; }
+
+        .search-panel { width: 100%; background: #fff; border-bottom: 1px solid var(--border); padding: 8px; z-index: 49; box-shadow: 0 2px 5px rgba(0,0,0,0.05); flex-shrink: 0; }
+        .search-inp { width: 100%; padding: 6px 30px 6px 10px; border: 1px solid var(--border); border-radius: 4px; font-size: 14px; outline: none; }
+        .search-inp:focus { border-color: var(--p); box-shadow: 0 0 0 2px rgba(26,115,232,0.2); }
+
+        /* 2. MAIN LAYOUT (Cấu trúc gốc) */
+        .fixed-area { flex-shrink: 0; padding: 6px 8px 0 8px; background: var(--bg); z-index: 40; }
+        .scroll-area { flex-grow: 1; overflow-y: auto; padding: 0 8px 80px 8px; scroll-behavior: smooth; }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-thumb { background: #dadce0; border-radius: 2px; }
+
+        .card { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 8px; box-shadow: 0 1px 2px rgba(60,64,67,0.05); }
+        .empty-state { text-align:center; margin-top:20px; color:#999; font-size: 12px; }
+
+        /* 3. INFO & NOTE STYLE */
+        .c-name { font-size: 15px; font-weight: 700; color: var(--p); line-height: 1.4; margin-bottom: 6px; text-align: justify; }
+        .info-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--txt); margin-bottom: 4px; }
+        .info-left { font-weight: 500; color: #333; text-align: left; } 
+        .info-right { font-weight: 600; color: #000; text-align: right; } 
+
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px dashed #eee; }
+        .card-title { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--sub); }
+        .action-link { font-size: 11px; font-weight: 600; color: var(--p); cursor: pointer; display: flex; align-items: center; gap: 3px; background: none; border: none; padding: 0;}
+        .action-link:hover { text-decoration: underline; }
+        .note-content { background: #fce8e6; color: #c5221f; padding: 8px; border-radius: 4px; font-size: 13px; border-left: 3px solid #d93025; white-space: pre-wrap; line-height: 1.4; }
+
+        /* 4. TRANSACTION LIST */
+        .tx-list { display: flex; flex-direction: column; gap: 6px; }
+        .tx-item { background: #fff; border-bottom: 1px solid #f1f3f4; padding-bottom: 6px; position: relative; }
+        .tx-item:last-child { border-bottom: none; padding-bottom: 0; }
+        .tx-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
+        .tx-meta-left { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+        .tx-date { font-weight: 700; color: var(--p); }
+        .tx-prod { font-weight: 700; color: #c5221f; }
+        .tx-job { font-size: 10px; font-weight: 700; background: var(--job-bg); color: var(--job-txt); padding: 2px 6px; border-radius: 4px; }
+        .tx-body { font-size: 14px; color: #444; line-height: 1.4; margin-top: 2px; white-space: pre-wrap; }
+
+        /* 5. FORM OVERLAY */
+        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 100; padding: 0 15px; overflow-y: auto; display: flex; flex-direction: column;}
+        .form-head { display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; margin-bottom: 15px; position: sticky; top: 0; background: #fff; z-index: 10; }
+        .form-title { font-size: 16px; font-weight: 700; color: var(--p); flex-grow: 1; }
+        .form-actions-right { display: flex; align-items: center; gap: 8px; }
+        
+        .btn-close { cursor: pointer; font-size: 20px; color: #bdc1c6; padding: 4px; line-height: 1; transition: 0.2s; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; background: none; border: none;} 
+        .btn-close:hover { color: #5f6368; background: #f1f3f4; }
+        .btn-save-icon { width: 28px; height: 28px; background: #f1f3f4; color: var(--p); border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; padding: 0;}
+        .btn-save-icon:hover { background: #d2e3fc; color: #174ea6; }
+        .btn-save-icon svg { width: 18px; height: 18px; fill: currentColor; }
+        
+        /* Form Controls */
+        .inp-group { margin-bottom: 12px; position: relative; width: 100%;} 
+        .lbl { font-size: 11px; color: var(--sub); font-weight: 500; margin-bottom: 4px; display: block; text-transform: uppercase; }
+        .inp { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 14px; outline: none; font-family: inherit; transition: 0.2s; }
+        .inp:focus { border-color: var(--p); }
+        .inp-row { display: flex; gap: 10px; margin-bottom: 12px; width: 100%;} 
+        .inp-col { flex: 1; position: relative; min-width: 0; }
+        
+        .btn { width: 100%; padding: 10px; border: none; border-radius: 4px; font-weight: 600; cursor: pointer; margin-top: 10px; margin-bottom: 30px; font-size: 14px; }
+        .btn-p { background: var(--p); color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+        .btn-p:hover { background: #155db5; }
+        .text-red { color: #c5221f; }
+    </style>
+</head>
+<body>
+
+    <div id="app-shell"></div>
+
+    <script>
+        /*************************************************************
+         * 🔷 LỚP 0: ICON SVG TOÀN CỤC (Từ Sidebar.html)
+         *************************************************************/
+        const ICONS = {
+            auto: `<svg viewBox="0 0 24 24"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg>`,
+            search: `<svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>`,
+            reload: `<svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-8 3.58-8 8s3.58 8 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>`,
+            editCust: `<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`,
+            addCust: `<svg viewBox="0 0 24 24"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`,
+            addTx: `<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>`,
+            save: `<svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>`
+        };
+
+        /*************************************************************
+         * 📚 LỚP 1: BUSINESS SCHEMA (FIELDS & ENTITY_CONFIG)
+         * Nơi duy nhất định nghĩa ý nghĩa của dữ liệu (Không có mã xử lý)
+         *************************************************************/
+        
+        /** Danh mục dùng chung toàn cục (Mô phỏng DB.help) */
+        const MASTER_DATA = {
+            product: [{id: "FAW", name: "Fast Accounting Web"}, {id: "FBO", name: "Fast Business Online"}],
+            group: [{id: "G1", name: "Khách lẻ"}, {id: "G2", name: "Đại lý"}],
+            status: [{id: "CALL", name: "Gọi điện chăm sóc"}, {id: "MEET", name: "Hẹn gặp trực tiếp"}],
+            fbm: [{id: "YES", name: "Đã nhập"}, {id: "NO", name: "Chưa nhập"}],
+            verify: [{id: "V1", name: "Đã xác thực"}, {id: "V2", name: "Chưa xác thực"}],
+            source: [{id: "S1", name: "Tổng đài"}, {id: "S2", name: "Giới thiệu"}],
+            companies: [{id: "C1", name: "Tập đoàn Vingroup"}],
+            users: [{id: "U1", name: "Admin (Bạn)"}]
+        };
+
+        /**
+         * Từ điển Ý nghĩa: Định nghĩa 16 trường KH và 9 trường ACT [cite: 58-64].
+         * Tuyệt đối Không sử dụng mã @column ở đây.
+         */
+        const FIELDS = {
+            // --- THỰC THỂ: KHÁCH HÀNG ---
+            customerId:   { label: "Mã KH", type: "text", required: true },
+            taxCode:      { label: "Mã số thuế", type: "text", required: true },
+            customerName: { label: "Tên công ty", type: "text", required: true },
+            contact:      { label: "Người liên hệ", type: "text", required: true },
+            phone:        { label: "Điện thoại", type: "text", required: true },
+            address:      { label: "Địa chỉ", type: "text", required: true },
+            productId:    { label: "Sản phẩm", type: "select", source: "MASTER_DATA.product", required: true },
+            groupId:      { label: "Nhóm KH", type: "select", source: "MASTER_DATA.group", required: true },
+            note:         { label: "Ghi chú", type: "textarea" },
+            email:        { label: "Email", type: "text" },
+            website:      { label: "Website", type: "text" },
+            parentId:     { label: "Công ty mẹ", type: "select", source: "MASTER_DATA.companies" },
+            bidDate:      { label: "Ngày đóng thầu", type: "date" },
+            verifyId:     { label: "Xác thực", type: "select", source: "MASTER_DATA.verify", required: true },
+            sourceId:     { label: "Nguồn KH", type: "select", source: "MASTER_DATA.source", required: true },
+            fbmStatus:    { label: "Nhập vào FBM", type: "select", source: "MASTER_DATA.fbm", required: true },
+            createdDate:  { label: "Ngày nhập liệu", type: "text", readonly: true, defaultValue: "HOOK:getToday" },
+
+            // --- THỰC THỂ: GIAO DỊCH ---
+            activityId:     { label: "Mã GD", type: "text" },
+            workDate:       { label: "Ngày làm việc", type: "date", required: true, defaultValue: "HOOK:getToday" },
+            activityStatus: { label: "Công việc", type: "select", source: "MASTER_DATA.status", required: true },
+            pinStatus:      { label: "Ghim", type: "text" },
+            content:        { label: "Nội dung chi tiết", type: "textarea", required: true },
+            contractValue:  { label: "Giá trị hợp đồng", type: "text" },
+            userId:         { label: "Người nhập", type: "select", source: "MASTER_DATA.users", required: true, defaultValue: "U1" }
+        };
+
+        /**
+         * Bản đồ Vật lý: Ánh xạ Business Key với Google Sheets [cite: 125-133].
+         */
+        const ENTITY_CONFIG = {
+            customer: {
+                sheet: "ListKH",
+                columns: { customerId: "@KH_MA_KH", taxCode: "@KH_MST", customerName: "@KH_TEN_CTY", /*...đại diện...*/ }
+            },
+            activity: {
+                sheet: "ACT",
+                columns: { workDate: "@ACT_NGAY_LAM_VIEC", activityStatus: "@ACT_CONG_VIEC", content: "@ACT_NOI_DUNG_CONG_VIEC" }
+            }
+        };
+
+        /*************************************************************
+         * 🧠 LỚP 2: RUNTIME & BUSINESS LOGIC (RAM & HOOKS)
+         *************************************************************/
+
+        /** RAM: Lưu trữ trạng thái hệ thống và dữ liệu động */
+        const RAM = {
+            uiState: {
+                isSearchOpen: false,
+                isAutoOn: true,
+                currentScreen: "main"
+            },
+            // Giả lập Dữ liệu chi tiết khách hàng đang chọn
+            customer: {
+                customerId: "KH001", taxCode: "0101234567", customerName: "Công ty Cổ phần Misa",
+                contact: "Anh Tuấn", phone: "0988123456", address: "Hà Nội", productId: "FAW", 
+                groupId: "G1", sourceId: "S1", fbmStatus: "YES", verifyId: "V1",
+                note: "- KH dùng Pancake, tư vấn đồng bộ hóa đơn (40-70tr).\n- Đã bàn giao tài liệu kỹ thuật."
+            },
+            // Giả lập Dữ liệu danh sách Giao dịch
+            activities: [
+                { workDate: "2026-03-22", activityStatus: "CALL", productId: "FAW", content: "- Khách gọi lên hỏi về API kết nối." },
+                { workDate: "2026-03-20", activityStatus: "MEET", productId: "FBO", content: "- Hẹn gặp trực tiếp ký hợp đồng." }
+            ]
+        };
+
+        /**
+         * KHO KỊCH BẢN (CrmHooks): Chứa mọi hàm logic, tính toán và điều hướng [cite: 486-491].
+         */
+        const CrmHooks = {
+            /**
+             * Default Hook: Lấy ngày hiện tại
+             * @returns {string} Chuỗi ngày chuẩn yyyy-mm-dd hoặc dd-mm-yyyy tùy input
+             */
+            getToday: function() {
+                const d = new Date();
+                return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            },
+
+            // --- GETTER HOOKS (Dành cho Data Binding tĩnh) ---
+            getCustomerName: () => RAM.customer.customerName,
+            getCustomerCode: () => RAM.customer.customerId,
+            getTaxCode: () => RAM.customer.taxCode,
+            getContact: () => RAM.customer.contact,
+            getPhone: () => RAM.customer.phone,
+            getNote: () => RAM.customer.note,
+            
+            // --- LOGIC HOOKS ---
+            isSearchHidden: () => !RAM.uiState.isSearchOpen,
+            
+            toggleAuto: () => {
+                RAM.uiState.isAutoOn = !RAM.uiState.isAutoOn;
+                CrmHooks.backToMain();
+            },
+            
+            toggleSearch: () => {
+                RAM.uiState.isSearchOpen = !RAM.uiState.isSearchOpen;
+                CrmHooks.backToMain();
+            },
+
+            /**
+             * Renderer Hook: Tự động lặp RAM.activities sinh chuỗi HTML danh sách [cite: 341]
+             * @returns {string} Mã HTML danh sách giao dịch
+             */
+            renderTxList: () => {
+                if (RAM.activities.length === 0) return "<div style='text-align:center; color:#999; font-size:13px;'>Chưa có giao dịch</div>";
+                return RAM.activities.map(act => {
+                    const statusName = MASTER_DATA.status.find(s => s.id === act.activityStatus)?.name || act.activityStatus;
+                    // Chuẩn hóa ngày hiển thị (giả định đang lưu dạng yyyy-mm-dd)
+                    const displayDate = act.workDate.split("-").reverse().join("-");
+                    return `
+                    <div class="tx-item">
+                        <div class="tx-meta">
+                            <div class="tx-meta-left">
+                                <span class="tx-date">${displayDate}</span>
+                                <span class="tx-prod">${act.productId || ""}</span>
+                            </div>
+                            <span class="tx-job">${statusName}</span>
+                        </div>
+                        <div class="tx-body">${act.content}</div>
+                    </div>`;
+                }).join("");
+            },
+
+            // --- NAVIGATION HOOKS (DOM Replacement) [cite: 535-539] ---
+            backToMain: () => RENDER_ENGINE.renderScreen(UI_SCHEMA_MAIN, "app-shell", RAM.customer),
+            openCustomerForm: () => RENDER_ENGINE.renderScreen(UI_SCHEMA_CUST_FORM, "app-shell", RAM.customer),
+            openActForm: () => RENDER_ENGINE.renderScreen(UI_SCHEMA_ACT_FORM, "app-shell", { customerId: RAM.customer.customerId }),
+            openNoteForm: () => RENDER_ENGINE.renderScreen(UI_SCHEMA_NOTE_FORM, "app-shell", RAM.customer)
+        };
+
+        /*************************************************************
+         * ⚙️ LỚP 3: BỘ MÁY KIẾN TẠO (UI_BUILDER & RENDER_ENGINE)
+         *************************************************************/
+
+        /**
+         * UI_BUILDER: Công cụ Lập trình Giao diện (DSL) [cite: 421-431].
+         * Thay thế việc viết chuỗi JSON cồng kềnh.
+         */
+        const UI_BUILDER = {
+            Block: (config) => ({ type: "block", ...config }),
+            Card: (elements, className = "") => ({ type: "block", className: `card ${className}`, elements }),
+            Row: (elements, className = "inp-row") => ({ type: "block", className, elements }),
+            Text: (content, className = "") => ({ type: "text", content, className }),
+            Action: (label, hook, className = "") => ({ type: "action", label, hook, className }),
+            
+            /**
+             * Shortcut tự động sinh cụm Nhãn + Ô nhập (Label + Control).
+             * @param {string} bKey - Khóa nghiệp vụ
+             * @param {object} options - Tùy biến (uiType, rows, isCol)
+             * @returns {object} Block Node
+             */
+            Field: (bKey, options = {}) => {
+                const className = options.isCol ? "inp-col" : "inp-group";
+                return {
+                    type: "block", className: className,
+                    elements: [{ type: "control", field: bKey, ...options }]
+                };
+            }
+        };
+
+        /**
+         * RENDER_ENGINE: Động cơ cốt lõi sinh HTML thuần túy từ Schema [cite: 334-341].
+         * Mù nghiệp vụ, chỉ đọc khai báo.
+         */
+        const RENDER_ENGINE = {
+            /**
+             * Vẽ toàn bộ màn hình lên thẻ div gốc
+             * @param {object} schema Bản vẽ UI
+             * @param {string} stageId ID sân khấu
+             * @param {object} ramData Dữ liệu RAM
+             */
+            renderScreen: function(schema, stageId, ramData) {
+                const html = this.renderNode(schema, schema.entity, ramData);
+                document.getElementById(stageId).innerHTML = html;
+            },
+
+            /**
+             * Thuật toán Đệ quy Xử lý Nút [cite: 337-338]
+             */
+            renderNode: function(node, entity, ramData) {
+                // Kiểm tra thuộc tính Ẩn động (DependsOn / Hidden)
+                if (node.hidden !== undefined) {
+                    let isHidden = false;
+                    if (typeof node.hidden === "string" && node.hidden.startsWith("HOOK:")) {
+                        isHidden = CrmHooks[node.hidden.replace("HOOK:", "")]();
+                    } else if (node.hidden === true) {
+                        isHidden = true;
+                    }
+                    if (isHidden) return "";
+                }
+
+                // 1. DÀN TRANG (BLOCK)
+                if (node.type === "block") {
+                    let childHtml = "";
+                    if (Array.isArray(node.elements)) {
+                        // Tính toán bối cảnh tự động cho các thẻ con bên trong Row
+                        const isRow = node.className && node.className.includes("inp-row");
+                        childHtml = node.elements.map(child => {
+                            // Nếu con là một Field Group và mẹ là Row -> chuyển class thành Cột (inp-col)
+                            if (isRow && child.type === "block" && child.className === "inp-group") {
+                                child.className = "inp-col";
+                            }
+                            return this.renderNode(child, entity, ramData);
+                        }).join("");
+                    } else if (typeof node.elements === "string" && node.elements.startsWith("HOOK:")) {
+                        // Nạp HTML động từ Hook (Ví dụ: Danh sách list)
+                        childHtml = CrmHooks[node.elements.replace("HOOK:", "")]();
+                    }
+                    
+                    const styleAttr = node.style ? `style="${node.style}"` : "";
+                    return `<div class="${node.className || ''}" ${styleAttr}>${childHtml}</div>`;
+                }
+                
+                // 2. VĂN BẢN (TEXT)
+                if (node.type === "text") {
+                    let textContent = node.content;
+                    if (textContent.startsWith("HOOK:")) {
+                        textContent = CrmHooks[textContent.replace("HOOK:", "")]();
+                    }
+                    return `<div class="${node.className || ''}">${textContent}</div>`;
+                }
+                
+                // 3. NÚT TƯƠNG TÁC (ACTION)
+                if (node.type === "action") {
+                    const hookName = node.hook.replace("HOOK:", "");
+                    return `<button class="${node.className || ''}" onclick="CrmHooks.${hookName}('${entity}')">${node.label}</button>`;
+                }
+
+                // 4. Ô ĐIỀU KHIỂN (CONTROL) - Trái tim của Form [cite: 190-194]
+                if (node.type === "control") {
+                    const fieldDef = FIELDS[node.field] || {};
+                    const label = fieldDef.label || node.field;
+                    const isReq = fieldDef.required ? `<span class="text-red"> (*)</span>` : "";
+                    
+                    // Cơ chế Default Value [cite: 373-386]
+                    let value = ramData[node.field];
+                    if (value === undefined || value === null || value === "") {
+                        let defRule = node.defaultValue || fieldDef.defaultValue;
+                        if (defRule && typeof defRule === "string" && defRule.startsWith("HOOK:")) {
+                            value = CrmHooks[defRule.replace("HOOK:", "")]();
+                        } else {
+                            value = defRule || "";
+                        }
+                    }
+
+                    const readonlyAttr = node.readonly || fieldDef.readonly ? "readonly style='background:#f1f3f4'" : "";
+                    const uiType = node.uiType || fieldDef.type;
+                    let inputHtml = "";
+
+                    // Kiến tạo Input HTML
+                    if (uiType === "textarea") {
+                        inputHtml = `<textarea class="inp" data-field="${node.field}" rows="${node.rows || 2}" ${readonlyAttr}>${value}</textarea>`;
+                    } else if (uiType === "select") {
+                        const sourceKey = fieldDef.source.replace("MASTER_DATA.", "");
+                        const optionsData = MASTER_DATA[sourceKey] || [];
+                        let optionsHtml = `<option value="">--Chọn--</option>` + 
+                            optionsData.map(opt => `<option value="${opt.id}" ${opt.id === value ? 'selected' : ''}>${opt.name}</option>`).join("");
+                        inputHtml = `<select class="inp" data-field="${node.field}" ${readonlyAttr}>${optionsHtml}</select>`;
+                    } else {
+                        // Xử lý text, date, number
+                        inputHtml = `<input type="${uiType}" class="inp" data-field="${node.field}" value="${value}" ${readonlyAttr}>`;
+                    }
+
+                    return `<label class="lbl">${label}${isReq}</label>${inputHtml}`;
+                }
+                
+                return "";
+            }
+        };
+
+        /**
+         * SUBMIT_CONTROLLER: Quản lý luồng lưu dữ liệu An Toàn [cite: 586-631].
+         */
+        const SUBMIT_CONTROLLER = {
+            /**
+             * Trạm 1: Thu thập tự động, Trạm 2: Kiểm định, Trạm 3: Cập nhật Lạc quan.
+             * @param {string} currentEntity - Bối cảnh Entity
+             */
+            processSave: function(currentEntity) {
+                const payload = {};
+                // Trạm 1: Serializer - Quét thuộc tính data-field [cite: 597-605]
+                const inputs = document.querySelectorAll('#app-shell [data-field]');
+                
+                inputs.forEach(input => {
+                    const businessKey = input.getAttribute('data-field');
+                    payload[businessKey] = input.value;
+                });
+
+                // Trạm 3: Optimistic UI [cite: 613-617]
+                if (currentEntity === "customer") {
+                    Object.assign(RAM.customer, payload);
+                } else if (currentEntity === "activity") {
+                    // Chuyển đổi format date từ input(yyyy-mm-dd) về RAM nếu cần
+                    RAM.activities.unshift(payload);
+                }
+
+                // (Trạm 4: Gọi Adapter chuyển đổi và Background Sync lên Google Sheets bị ẩn ở Demo này)
+                
+                CrmHooks.backToMain();
+            }
+        };
+        // Gắn vào hệ sinh thái Hook để UI Action gọi được
+        CrmHooks.processSave = SUBMIT_CONTROLLER.processSave;
+
+
+        /*************************************************************
+         * 🎨 LỚP 4: BẢN VẼ GIAO DIỆN (UI SCHEMA)
+         * Nơi lập trình viên vẽ bố cục không gian chuẩn 100% Sidebar cũ.
+         *************************************************************/
+
+        /** BẢN VẼ 1: MÀN HÌNH CHÍNH (MAIN DASHBOARD) */
+        const UI_SCHEMA_MAIN = UI_BUILDER.Block({
+            entity: "customer",
+            elements: [
+                // 1. Header Tools
+                UI_BUILDER.Block({
+                    className: "header",
+                    elements: [
+                        UI_BUILDER.Action(ICONS.auto, "HOOK:toggleAuto", "icon-btn active"),
+                        UI_BUILDER.Action(ICONS.search, "HOOK:toggleSearch", "icon-btn"),
+                        UI_BUILDER.Action(ICONS.reload, "HOOK:backToMain", "icon-btn"),
+                        UI_BUILDER.Block({ className: "spacer" }),
+                        UI_BUILDER.Action(ICONS.editCust, "HOOK:openCustomerForm", "icon-btn"),
+                        UI_BUILDER.Action(ICONS.addCust, "HOOK:openCustomerForm", "icon-btn")
+                    ]
+                }),
+                
+                // 2. Search Panel
+                UI_BUILDER.Block({
+                    className: "search-panel",
+                    hidden: "HOOK:isSearchHidden",
+                    elements: [
+                        UI_BUILDER.Text("<input type='text' class='search-inp' placeholder='Nhập tên, sđt, mã...'>")
+                    ]
+                }),
+
+                // 3. Fixed Area (Customer Info)
+                UI_BUILDER.Block({
+                    className: "fixed-area",
+                    elements: [
+                        UI_BUILDER.Card([
+                            UI_BUILDER.Text("HOOK:getCustomerName", "c-name"),
+                            UI_BUILDER.Row([
+                                UI_BUILDER.Text("HOOK:getCustomerCode", "info-left"),
+                                UI_BUILDER.Text("HOOK:getTaxCode", "info-right")
+                            ], "info-row"),
+                            UI_BUILDER.Row([
+                                UI_BUILDER.Text("HOOK:getContact", "info-left"),
+                                UI_BUILDER.Text("HOOK:getPhone", "info-right")
+                            ], "info-row")
+                        ])
+                    ]
+                }),
+
+                // 4. Scroll Area (Notes & Transactions)
+                UI_BUILDER.Block({
+                    className: "scroll-area",
+                    elements: [
+                        UI_BUILDER.Card([
+                            UI_BUILDER.Row([
+                                UI_BUILDER.Text("Ghi Chú", "card-title"),
+                                UI_BUILDER.Action(`${ICONS.editCust} Sửa`, "HOOK:openNoteForm", "action-link")
+                            ], "card-header"),
+                            UI_BUILDER.Text("HOOK:getNote", "note-content")
+                        ]),
+
+                        UI_BUILDER.Card([
+                            UI_BUILDER.Row([
+                                UI_BUILDER.Text("Lịch sử làm việc", "card-title"),
+                                UI_BUILDER.Action(`${ICONS.addTx} Thêm`, "HOOK:openActForm", "action-link")
+                            ], "card-header"),
+                            UI_BUILDER.Block({ className: "tx-list", elements: "HOOK:renderTxList" })
+                        ])
+                    ]
+                })
+            ]
+        });
+
+        /** BẢN VẼ 2: BIỂU MẪU KHÁCH HÀNG (Đầy đủ 16 trường) */
+        const UI_SCHEMA_CUST_FORM = UI_BUILDER.Block({
+            entity: "customer", className: "overlay",
+            elements: [
+                UI_BUILDER.Block({
+                    className: "form-head",
+                    elements: [
+                        UI_BUILDER.Text("Hồ Sơ Khách Hàng", "form-title"),
+                        UI_BUILDER.Block({ className: "form-actions-right", elements: [
+                            UI_BUILDER.Action("✕", "HOOK:backToMain", "btn-close"),
+                            UI_BUILDER.Action(ICONS.save, "HOOK:processSave", "btn-save-icon")
+                        ]})
+                    ]
+                }),
+                
+                UI_BUILDER.Row([ UI_BUILDER.Field("customerId"), UI_BUILDER.Field("taxCode") ]),
+                UI_BUILDER.Field("customerName"),
+                UI_BUILDER.Field("contact"),
+                UI_BUILDER.Field("phone"),
+                UI_BUILDER.Field("address"),
+                
+                UI_BUILDER.Row([ UI_BUILDER.Field("productId"), UI_BUILDER.Field("groupId") ]),
+                
+                UI_BUILDER.Field("note", { uiType: "textarea" }),
+                UI_BUILDER.Field("email"),
+                UI_BUILDER.Field("website"),
+                UI_BUILDER.Field("parentId"),
+                
+                UI_BUILDER.Row([ UI_BUILDER.Field("bidDate"), UI_BUILDER.Field("verifyId") ]),
+                UI_BUILDER.Row([ UI_BUILDER.Field("sourceId"), UI_BUILDER.Field("fbmStatus") ]),
+                
+                UI_BUILDER.Field("createdDate"),
+                
+                UI_BUILDER.Action("LƯU DỮ LIỆU", "HOOK:processSave", "btn btn-p")
+            ]
+        });
+
+        /** BẢN VẼ 3: BIỂU MẪU GIAO DỊCH (Đầy đủ 9 trường) */
+        const UI_SCHEMA_ACT_FORM = UI_BUILDER.Block({
+            entity: "activity", className: "overlay",
+            elements: [
+                UI_BUILDER.Block({
+                    className: "form-head",
+                    elements: [
+                        UI_BUILDER.Text("Thêm Giao Dịch", "form-title"),
+                        UI_BUILDER.Block({ className: "form-actions-right", elements: [
+                            UI_BUILDER.Action("✕", "HOOK:backToMain", "btn-close"),
+                            UI_BUILDER.Action(ICONS.save, "HOOK:processSave", "btn-save-icon")
+                        ]})
+                    ]
+                }),
+
+                UI_BUILDER.Field("customerId", { readonly: true }),
+                UI_BUILDER.Row([ UI_BUILDER.Field("workDate"), UI_BUILDER.Field("productId") ]),
+                UI_BUILDER.Row([ UI_BUILDER.Field("activityStatus"), UI_BUILDER.Field("pinStatus") ]),
+                
+                UI_BUILDER.Field("content", { uiType: "textarea", rows: 4 }),
+                UI_BUILDER.Field("contractValue"),
+                
+                UI_BUILDER.Row([ UI_BUILDER.Field("fbmStatus"), UI_BUILDER.Field("userId") ]),
+                
+                UI_BUILDER.Field("createdDate", { readonly: true }),
+                
+                UI_BUILDER.Action("LƯU GIAO DỊCH", "HOOK:processSave", "btn btn-p")
+            ]
+        });
+
+        /** BẢN VẼ 4: BIỂU MẪU GHI CHÚ NHANH */
+        const UI_SCHEMA_NOTE_FORM = UI_BUILDER.Block({
+            entity: "customer", className: "overlay",
+            elements: [
+                UI_BUILDER.Block({
+                    className: "form-head",
+                    elements: [
+                        UI_BUILDER.Text("Sửa Ghi Chú", "form-title"),
+                        UI_BUILDER.Block({ className: "form-actions-right", elements: [
+                            UI_BUILDER.Action("✕", "HOOK:backToMain", "btn-close"),
+                            UI_BUILDER.Action(ICONS.save, "HOOK:processSave", "btn-save-icon")
+                        ]})
+                    ]
+                }),
+                
+                UI_BUILDER.Field("note", { uiType: "textarea", rows: 6 }),
+                UI_BUILDER.Action("LƯU GHI CHÚ", "HOOK:processSave", "btn btn-p")
+            ]
+        });
+
+        /*************************************************************
+         * 🚀 KÍCH HOẠT HỆ THỐNG
+         *************************************************************/
+        window.onload = function() {
+            // Khởi động bằng cách gắn bản vẽ MAIN lên Sân khấu thông qua Hook
+            CrmHooks.backToMain();
+        };
+
+    </script>
+</body>
+</html>

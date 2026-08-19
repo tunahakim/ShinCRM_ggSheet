@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShinCRM - Pure Schema UI v6.2 (Production Ready)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        /* =========================================================
+           TẦNG 0: TỦ QUẦN ÁO CSS (ui.styles.html)
+           Kế thừa 100% hệ thống màu sắc và layout từ Sidebar v21.5
+           Tuyệt đối không chứa logic không gian của các khối động.
+           ========================================================= */
+        :root { 
+            --p: #1a73e8; /* Xanh dương Google */
+            --bg: #f8f9fa; /* Nền xám nhạt */
+            --txt: #202124; /* Chữ chính */
+            --sub: #5f6368; /* Chữ phụ */
+            --border: #dadce0; /* Viền */
+            --hover: #f1f3f4; /* Hover */
+            --err-bg: #fce8e6; /* Lỗi nền */
+            --err-bd: #c5221f; /* Lỗi viền */
+            --job-bg: #e6f4ea; /* Job nền */
+            --job-txt: #137333; /* Job chữ */
+            --pin-color: #fbbc04; /* Màu vàng cho ghim */
+        }
+        
+        * { box-sizing: border-box; } 
+        body { 
+            font-family: 'Roboto', sans-serif;
+            margin: 0; background: var(--bg);
+            color: var(--txt);
+            font-size: 14px; overflow: hidden; 
+            display: flex; flex-direction: column; height: 100vh;
+        }
+
+        /* Điểm neo vật lý duy nhất của hệ thống (Sân khấu - Không do Engine tạo ra) */
+        #app-shell { 
+            flex-grow: 1; display: flex; flex-direction: column; 
+            height: 100%; position: relative; width: 100%; max-width: 500px; margin: 0 auto;
+            background: var(--bg); border-left: 1px solid var(--border); 
+            border-right: 1px solid var(--border); overflow: hidden;
+        }
+
+        /* === 1. HEADER & SEARCH === */
+        .header { 
+            background: #fff; border-bottom: 1px solid var(--border);
+            padding: 0 8px; height: 48px; display: flex; 
+            align-items: center; gap: 4px; flex-shrink: 0; z-index: 50;
+        }
+        .spacer { flex: 1; }
+        .icon-btn { 
+            width: 32px; height: 32px; border: none; background: transparent; 
+            border-radius: 50%; cursor: pointer; display: flex; align-items: center; 
+            justify-content: center; color: var(--sub); transition: 0.2s; padding: 0;
+        }
+        .icon-btn:hover { background: var(--hover); color: var(--txt); }
+        .icon-btn.active { color: #f9ab00; background: #fef7e0; }
+        .icon-btn svg { width: 20px; height: 20px; fill: currentColor; }
+
+        .search-panel { 
+            width: 100%; background: #fff; border-bottom: 1px solid var(--border);
+            padding: 8px; z-index: 49; box-shadow: 0 2px 5px rgba(0,0,0,0.05); flex-shrink: 0;
+        }
+        .search-inp-wrap { position: relative; }
+        .search-inp { 
+            width: 100%; padding: 6px 30px 6px 10px; border: 1px solid var(--border); 
+            border-radius: 4px; font-size: 14px; outline: none;
+        }
+        .search-inp:focus { border-color: var(--p); box-shadow: 0 0 0 2px rgba(26,115,232,0.2); }
+        .suggest-box { 
+            max-height: 80vh; overflow-y: auto; border: 1px solid var(--border);
+            background: #fff; position: absolute; width: 100%; z-index: 1000;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.15); border-radius: 0 0 4px 4px;
+            top: 100%; margin-top: 1px; display: flex; flex-direction: column;
+        }
+        .s-item { 
+            padding: 6px 10px; border-bottom: 1px solid #f1f3f4; cursor: pointer; 
+            display: flex; justify-content: space-between; align-items: center; 
+        }
+        .s-item:hover { background: #e8f0fe; color: var(--p); }
+        .s-name { font-weight: 500; color: #202124; font-size: 14px; margin-bottom: 2px; }
+        .s-sub { font-size: 11px; color: #5f6368; line-height: 1.3; }
+
+        /* === 2. MAIN LAYOUT (CARD, SCROLL) === */
+        .fixed-area { padding: 6px 8px 0 8px; background: var(--bg); z-index: 40; }
+        
+        /* Đã xóa flex-grow: 1. Engine sẽ tự động gán flex khi có lệnh autoExpand: false */
+        .scroll-area { padding: 0 8px 20px 8px; scroll-behavior: smooth; }
+        .empty-state { text-align:center; padding:20px; color:#999; font-size: 12px; }
+        
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-thumb { background: #dadce0; border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: #bdc1c6; }
+
+        .card { 
+            background: #fff; border: 1px solid var(--border); border-radius: 8px; 
+            padding: 10px; margin-bottom: 8px; box-shadow: 0 1px 2px rgba(60,64,67,0.05); 
+        }
+
+        /* === 3. INFO STYLE === */
+        .c-name { font-size: 15px; font-weight: 700; color: var(--p); line-height: 1.4; margin-bottom: 6px; text-align: justify; }
+        .info-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--txt); margin-bottom: 4px; }
+        .info-left { font-weight: 500; color: #333; text-align: left; } 
+        .info-right { font-weight: 600; color: #000; text-align: right; } 
+
+        /* === 4. NOTE STYLE === */
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px dashed #eee; }
+        .card-title { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--sub); }
+        .action-link { font-size: 11px; font-weight: 600; color: var(--p); cursor: pointer; display: flex; align-items: center; gap: 3px; background: none; border: none; padding: 0; }
+        .action-link:hover { text-decoration: underline; }
+        .note-content { background: #fce8e6; color: #c5221f; padding: 8px; border-radius: 4px; font-size: 13px; border-left: 3px solid #d93025; white-space: pre-wrap; line-height: 1.4; }
+
+        /* === 5. TRANSACTION LIST === */
+        .tx-list { display: flex; flex-direction: column; gap: 6px; }
+        .tx-item { background: #fff; border-bottom: 1px solid #f1f3f4; padding-bottom: 6px; position: relative; }
+        .tx-item:last-child { border-bottom: none; padding-bottom: 0; }
+
+        .tx-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
+        .tx-meta-left { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+        .tx-meta-right { display: flex; align-items: center; }
+
+        .tx-date { font-weight: 700; color: var(--p); }
+        .tx-prod { font-weight: 700; color: #c5221f; }
+        .tx-job { font-size: 10px; font-weight: 700; background: var(--job-bg); color: var(--job-txt); padding: 2px 6px; border-radius: 4px; }
+        .tx-body { font-size: 14px; color: #444; line-height: 1.4; margin-top: 2px; white-space: pre-wrap; }
+
+        /* --- HOVER ICON LOGIC --- */
+        .tx-edit-wrap { 
+            width: 0; 
+            opacity: 0; 
+            overflow: hidden; 
+            transition: all 0.2s ease-in-out; /* Đã sửa lại thành 0.2s để trượt mượt mà */
+            display: flex; 
+            align-items: center;
+            justify-content: center;
+        }
+
+        .tx-item:hover .tx-edit-wrap { 
+            width: 18px; 
+            opacity: 1;
+            margin-left: 4px; 
+        }
+
+        .tx-edit-wrap.action-link {
+            margin: 0; padding: 0; background: none; border: none;
+            color: var(--p); font-size: 11px; gap: 3px;
+        }
+
+        /* === 6. FORM OVERLAY === */
+        /* Đã tước bỏ position: absolute, width, height, overflow. Giao lại cho Engine xử lý */
+        .overlay { 
+            background: #fff; 
+            z-index: 100; 
+            padding: 0 15px;
+        }
+        
+        .form-head { 
+            display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; 
+            margin-bottom: 15px; background: #fff; z-index: 10;
+        }
+        .form-title { font-size: 16px; font-weight: 700; color: var(--p); flex-grow: 1; }
+        .form-actions-right { display: flex; align-items: center; gap: 8px; }
+
+        .btn-close { 
+            cursor: pointer; font-size: 20px; color: #bdc1c6; padding: 4px; line-height: 1; 
+            transition: 0.2s; display: flex; align-items: center; justify-content: center; 
+            border-radius: 50%; width: 28px; height: 28px; background: none; border: none;
+        } 
+        .btn-close:hover { color: #5f6368; background: #f1f3f4; }
+        
+        .btn-save-icon { 
+            width: 28px; height: 28px; background: #f1f3f4; color: var(--p); border: none; 
+            border-radius: 50%; cursor: pointer; display: flex; align-items: center; 
+            justify-content: center; transition: 0.2s; padding: 0;
+        }
+        .btn-save-icon:hover { background: #d2e3fc; color: #174ea6; }
+        .btn-save-icon svg { width: 18px; height: 18px; fill: currentColor; }
+        
+        .inp-group { margin-bottom: 12px; position: relative; width: 100%; } 
+        .lbl { font-size: 11px; color: var(--sub); font-weight: 500; margin-bottom: 4px; display: block; text-transform: uppercase; }
+        .inp { 
+            width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; 
+            font-size: 14px; outline: none; font-family: inherit; transition: 0.2s; 
+        }
+        .inp:focus { border-color: var(--p); }
+        .inp-error { border-color: var(--err-bd) !important; background-color: var(--err-bg) !important; }
+        .inp-row { display: flex; gap: 10px; margin-bottom: 12px; width: 100%; } 
+        
+        /* Đã xóa flex: 1. Engine sẽ tự động gán flex khi không có width cố định */
+        .inp-col { position: relative; }
+        
+        .btn { 
+            width: 100%; padding: 10px; border: none; border-radius: 4px; font-weight: 600;
+            cursor: pointer; margin-top: 10px; margin-bottom: 10px; font-size: 14px; 
+        }
+        .btn-p { background: var(--p); color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+        .btn-p:hover { background: #155db5; }
+        .text-red { color: #c5221f; }
+
+        /* === 7. FORM SANDWICH COMPONENTS === */
+
+        /* Header: Luôn nằm trên cùng, không bị co giãn */
+        .form-head { 
+            display: flex; 
+            align-items: center; 
+            padding: 10px 15px; 
+            border-bottom: 1px solid var(--border); 
+            background: #fff; 
+            flex-shrink: 0; /* Đảm bảo không bị ép bẹp khi nội dung body quá dài */
+            z-index: 10;
+        }
+
+        /* Body: Vùng chứa nội dung nhập liệu */
+        .form-body { 
+            padding: 15px; 
+            background: #fff;
+        }
+
+        /* Footer: Luôn nằm dưới cùng, không bị co giãn */
+        .form-footer { 
+            padding: 5px 15px; 
+            border-top: 0px solid var(--border); 
+            background: #fff; 
+            flex-shrink: 0; /* Đảm bảo nút bấm luôn hiển thị rõ ràng */
+            box-shadow: 0 0 0 rgba(0,0,0,0); 
+            z-index: 10;
+        }
+
+        /* ==== Tinh chỉnh bổ sung cho các ô nhập liệu trong Body ==== */
+        .form-body .inp-group { margin-bottom: 15px; }
+
+        /* Khóa các biến số để Engine tính toán chính xác */
+        textarea.inp {
+            line-height: 1.5 !important; 
+            padding: 8px !important;
+            font-size: 14px !important;
+            box-sizing: border-box !important;
+        }
+                
+        /* ==== Toast Notification ==== */
+        .toast {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: #333; color: #fff; padding: 10px 20px; border-radius: 4px;
+            font-size: 13px; z-index: 9999; display: none; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="app-shell"></div>
+
+    <div id="sys-toast" class="toast"></div>
+
+    <script>
+        /*************************************************************
+         * 🔷 LỚP 0: ASSETS & UTILITIES (TÀI NGUYÊN TĨNH)
+         * Cung cấp các hằng số Icon SVG. Không chứa logic nghiệp vụ.
+         *************************************************************/
+        
+        /** @constant {Object} ASSETS - Kho lưu trữ Icon SVG chuẩn của ShinCRM */
+        const ASSETS = {
+            auto: `<svg viewBox="0 0 24 24"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg>`,
+            search: `<svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>`,
+            reload: `<svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-8 3.58-8 8s3.58 8 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>`,
+            editCust: `<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`,
+            addCust: `<svg viewBox="0 0 24 24"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`,
+            addTx: `<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>`,
+            save: `<svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>`,
+            editTx: `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`
+        };
+
+        /** * @description Tiện ích UI (Ngoài phạm vi Dynamic Engine)
+         */
+        const UI_HELPER = {
+            showToast: function(msg, type = "success") {
+                const t = document.getElementById("sys-toast");
+                t.innerText = msg;
+                t.style.backgroundColor = type === "error" ? "#c5221f" : "#137333";
+                t.style.display = "block";
+                setTimeout(() => t.style.display = "none", 3000);
+            }
+        };
+
+        /*************************************************************
+         * 📚 LỚP 1: BUSINESS SCHEMA (FIELDS & ENTITY_CONFIG)
+         * Theo Chương III và IV v6.2. Nơi duy nhất định nghĩa cấu trúc.
+         *************************************************************/
+        
+        /** * @constant {Object} MASTER_DATA
+         * @description Kho dữ liệu danh mục tĩnh dùng cho các ô thả xuống (Dropdown).
+         */
+        const MASTER_DATA = {
+            product: [{id: "FAW", name: "Fast Accounting Web"}, {id: "FBO", name: "Fast Business Online"}, {id: "FA11", name: "Fast Accounting 11"}],
+            group: [{id: "G1", name: "Khách lẻ"}, {id: "G2", name: "Đại lý"}],
+            status: [{id: "CALL", name: "Gọi điện chăm sóc"}, {id: "MEET", name: "Hẹn gặp"}],
+            fbm: [{id: "YES", name: "Đã nhập"}, {id: "NO", name: "Chưa nhập"}],
+            verify: [{id: "V1", name: "Đã xác thực"}, {id: "V2", name: "Chưa xác thực"}],
+            source: [{id: "S1", name: "Website"}, {id: "S2", name: "Facebook"}],
+            companies: [{id: "C1", name: "Công ty Mẹ A"}],
+            users: [{id: "U1", name: "Nguyen Van A"}]
+        };
+
+        /** * @constant {Object} FIELDS
+         * @description Từ điển nghiệp vụ. Định nghĩa 16 trường KH và 9 trường Giao dịch.
+         * Tuyệt đối KHÔNG chứa mã vật lý `@column` ở đây.
+         */
+        const FIELDS = {
+            // --- THỰC THỂ KHÁCH HÀNG ---
+            customerId:   { label: "Mã KH", type: "text", required: true },
+            taxCode:      { label: "Mã số thuế", type: "text", required: true },
+            customerName: { label: "Tên công ty", type: "text", required: true },
+            contact:      { label: "Người liên hệ", type: "text", required: true },
+            phone:        { label: "Điện thoại", type: "text", required: true },
+            address:      { label: "Địa chỉ", type: "text", required: true },
+            productId:    { label: "Sản phẩm", type: "select", source: "MASTER_DATA.product", required: true },
+            groupId:      { label: "Nhóm KH", type: "select", source: "MASTER_DATA.group", required: true },
+            note:         { label: "Ghi chú", type: "textarea" },
+            email:        { label: "Email", type: "text" },
+            website:      { label: "Website", type: "text" },
+            parentId:     { label: "Công ty mẹ", type: "select", source: "MASTER_DATA.companies" },
+            bidDate:      { label: "Ngày đóng thầu", type: "date" },
+            verifyId:     { label: "Xác thực", type: "select", source: "MASTER_DATA.verify", required: true },
+            sourceId:     { label: "Nguồn KH", type: "select", source: "MASTER_DATA.source", required: true },
+            fbmStatus:    { label: "Nhập vào FBM", type: "select", source: "MASTER_DATA.fbm", required: true },
+            createdDate:  { label: "Ngày nhập liệu", type: "text", readonly: true, defaultValue: "HOOK:getToday" },
+
+            // --- THỰC THỂ GIAO DỊCH ---
+            activityId:     { label: "Mã GD", type: "text" },
+            workDate:       { label: "Ngày làm việc", type: "date", required: true, defaultValue: "HOOK:getToday" },
+            activityStatus: { label: "Công việc", type: "select", source: "MASTER_DATA.status", required: true },
+            pinStatus:      { label: "Ghim", type: "text" },
+            content:        { label: "Nội dung chi tiết", type: "textarea", required: true },
+            contractValue:  { label: "Giá trị hợp đồng", type: "number" },
+            userId:         { label: "Người nhập", type: "select", source: "MASTER_DATA.users", required: true, defaultValue: "U1" },
+
+            // --- TRƯỜNG ẢO DÀNH CHO HỆ THỐNG UI ---
+            searchQuery:    { label: "Tìm kiếm", type: "text" }
+        };
+
+        /** * @constant {Object} ENTITY_CONFIG
+         * @description Bản đồ Vật lý. Nơi DUY NHẤT ánh xạ Business Key với Google Sheets.
+         */
+        const ENTITY_CONFIG = {
+            customer: {
+                sheet: "ListKH",
+                columns: { 
+                    customerId: "@KH_MA_KH", taxCode: "@KH_MST", customerName: "@KH_TEN_CTY", 
+                    contact: "@KH_NGUOI_LIEN_HE", phone: "@KH_PHONE", address: "@KH_DIA_CHI",
+                    productId: "@KH_SAN_PHAM", groupId: "@KH_NHOM_KH", note: "@KH_GHI_CHU",
+                    email: "@KH_EMAIL", website: "@KH_WEBSITE", parentId: "@KH_CONG_TY_ME",
+                    bidDate: "@KH_NGAY_DONG_THAU", verifyId: "@KH_XAC_THUC", sourceId: "@KH_NGUON_KH",
+                    fbmStatus: "@KH_FBM_STATUS", createdDate: "@KH_NGAY_TAO"
+                }
+            },
+            activity: {
+                sheet: "ACT",
+                columns: { 
+                    activityId: "@ACT_ID", customerId: "@ACT_MA_KH", workDate: "@ACT_NGAY_LAM_VIEC", 
+                    productId: "@ACT_SAN_PHAM", activityStatus: "@ACT_CONG_VIEC", pinStatus: "@ACT_GHIM",
+                    content: "@ACT_NOI_DUNG_CONG_VIEC", contractValue: "@ACT_GIA_TRI_HOP_DONG", 
+                    fbmStatus: "@ACT_FBM_STATUS", userId: "@ACT_NGUOI_NHAP_LIEU", createdDate: "@ACT_NGAY_TAO"
+                }
+            }
+        };
+
+        /*************************************************************
+         * 🧠 LỚP 2: RUNTIME & BUSINESS LOGIC (RAM, HOOKS)
+         * Nơi lưu trữ trạng thái và chứa 100% thuật toán điều kiện.
+         *************************************************************/
+
+        /** * @constant {Object} RAM 
+         * @description Bộ nhớ tạm lưu trữ Business Object thuần túy.
+         */
+        const RAM = {
+            uiState: {
+                isSearchOpen: false,
+                isAutoOn: true,
+                currentScreen: "main"
+            },
+            currentCustomerId: "KH001",
+            
+            // Giả lập Database Khách Hàng (Thay cho ListKH)
+            dbCustomers: [
+                {
+                    customerId: "KH001", taxCode: "0101234567", customerName: "Công ty Cổ phần Misa",
+                    contact: "Anh Tuấn", phone: "0988123456", address: "Hà Nội", productId: "FAW", 
+                    groupId: "G1", sourceId: "S1", fbmStatus: "YES", verifyId: "V1",
+                    note: "- a Công TV phòng ERP hỗ trợ.\n- KH hẹn sang làm việc gấp."
+                },
+                {
+                    customerId: "KH002", taxCode: "0312456789", customerName: "Tập đoàn Vingroup",
+                    contact: "Chị Lan", phone: "0911222333", address: "TP.HCM", productId: "FBO", 
+                    groupId: "G2", sourceId: "S2", fbmStatus: "NO", verifyId: "V1",
+                    note: ""
+                }
+            ],
+            
+            // Map lưu trữ giao dịch theo mã Khách hàng (O(1) Lookup)
+            acts_map: {
+                "KH001": [
+                    { activityId: "A1", workDate: "2026-01-16", activityStatus: "MEET", productId: "FAW", content: "- Khách hẹn sang trao đổi trực tiếp" },
+                    { activityId: "A2", workDate: "2026-01-16", activityStatus: "CALL", productId: "FAW", content: "- KH vừa sản xuất vừa thương mại, dùng pancake\n- Pancake giới thiệu dùng Fast vì đã kết nối với Fast rồi.\n- Báo 2 phương án:\n  + Lôi từ tổng cục thuế về: 3-5 triệu\n  + Lôi từ Pancake về: 40-70 triệu" },
+                    { activityId: "A3", workDate: "2026-01-15", activityStatus: "CALL", productId: "FAW", content: "kh liên hệ lại nhu cầu tư vấn. đã chuyển\nTấn Anh." }
+                ]
+            },
+
+            searchMatches: [], // Chứa kết quả tìm kiếm tạm thời
+
+            /** @description Lấy thông tin khách hàng hiện tại */
+            getCurrentCustomer: function() {
+                return this.dbCustomers.find(c => c.customerId === this.currentCustomerId) || {};
+            }
+        };
+
+        /**
+         * @constant {Object} DATA_ADAPTER
+         * @description Bộ thông dịch. Dịch dữ liệu trước khi lưu trữ vật lý.
+         */
+        const DATA_ADAPTER = {
+            mapObjectToRow: function(entity, businessObj) {
+                const config = ENTITY_CONFIG[entity];
+                if (!config) return {};
+                const physicalRow = {};
+                for (let bKey in config.columns) {
+                    const physicalCol = config.columns[bKey];
+                    physicalRow[physicalCol] = businessObj[bKey] !== undefined ? businessObj[bKey] : "";
+                }
+                return physicalRow;
+            }
+        };
+
+        /** * @constant {Object} CrmHooks 
+         * @description Trái tim của Tầng Business Logic. Chứa mọi thuật toán xử lý và điều hướng.
+         * QUAN TRỌNG: Các hàm Hook Render TUYỆT ĐỐI KHÔNG trả về chuỗi HTML tĩnh.
+         * Phải trả về mảng các đối tượng Schema (UI_BUILDER Nodes) để Engine xử lý đệ quy.
+         */
+        const CrmHooks = {
+            /** @returns {string} Ngày hiện tại định dạng YYYY-MM-DD */
+            getToday: () => new Date().toISOString().split('T')[0],
+
+            // --- GETTER HOOKS (Dành cho text tĩnh) ---
+            getCustomerName: () => RAM.getCurrentCustomer().customerName || "(Vui lòng chọn khách hàng)",
+            getCustomerCode: () => RAM.getCurrentCustomer().customerId || "N/A",
+            getTaxCode: () => RAM.getCurrentCustomer().taxCode || "",
+            getContact: () => RAM.getCurrentCustomer().contact || "",
+            getPhone: () => RAM.getCurrentCustomer().phone || "",
+            getNote: () => RAM.getCurrentCustomer().note || "",
+            
+            // --- LOGIC HOOKS ĐIỀU KIỂN ---
+            isSearchHidden: () => !RAM.uiState.isSearchOpen,
+            
+            toggleAuto: () => {
+                RAM.uiState.isAutoOn = !RAM.uiState.isAutoOn;
+                CrmHooks.backToMain();
+            },
+            
+            toggleSearch: () => {
+                RAM.uiState.isSearchOpen = !RAM.uiState.isSearchOpen;
+                if (!RAM.uiState.isSearchOpen) RAM.searchMatches = [];
+                CrmHooks.backToMain();
+            },
+
+            // --- PURE SCHEMA RENDER HOOKS ---
+            /**
+             * @description Khởi tạo cấu trúc Schema cho danh sách giao dịch.
+             * Tuyệt đối tuân thủ "Zero HTML". Trả về mảng Block.
+             * @returns {Array<Object>} Mảng các UI Schema Nodes
+             */
+            renderTxList: function() {
+                const txs = RAM.acts_map[RAM.currentCustomerId] || [];
+                
+                if (txs.length === 0) {
+                    // Trả về một Schema Block thông báo rỗng
+                    return [ UI_BUILDER.Text("Chưa có giao dịch", "empty-state") ];
+                }
+
+                // Trả về mảng các Block tương ứng với mỗi giao dịch
+                return txs.map(act => {
+                    const statusName = MASTER_DATA.status.find(s => s.id === act.activityStatus)?.name || act.activityStatus;
+                    const displayDate = act.workDate ? act.workDate.split("-").reverse().join("-") : "";
+                    
+                    return UI_BUILDER.Block({
+                        className: "tx-item",
+                        elements: [
+                            // Dòng Header của 1 giao dịch (Đã làm phẳng & Gom nhóm Trái - Phải)
+                            UI_BUILDER.Row([
+                                
+                                // NHÓM TRÁI: Chứa Ngày và Sản phẩm
+                                UI_BUILDER.Block({
+                                    className: "tx-meta-left",
+                                    elements: [
+                                        UI_BUILDER.Text(displayDate, "tx-date"),
+                                        UI_BUILDER.Text(act.productId || "", "tx-prod")
+                                    ]
+                                }),
+                                                             
+                                // NHÓM PHẢI: Chứa Trạng thái công việc và Nút Sửa
+                                UI_BUILDER.Block({
+                                    className: "tx-meta-right",
+                                    elements: [
+                                        UI_BUILDER.Text(statusName, "tx-job"),
+                                        UI_BUILDER.Action([UI_BUILDER.Icon(ASSETS.editTx)], `HOOK:openActForm:${act.activityId}`, "tx-edit-wrap action-link")
+                                    ]
+                                })
+                                
+                            ], "tx-meta"),
+                            // Dòng Nội dung
+                            UI_BUILDER.Text(act.content || "", "tx-body")
+                        ]
+                    });
+                });
+            },
+
+            /**
+             * @description Trả về cấu trúc Schema cho hộp thoại gợi ý tìm kiếm
+             * @returns {Array<Object>} Mảng Schema Nodes
+             */
+            renderSearchSuggests: function() {
+                if (RAM.searchMatches.length === 0) return [];
+                
+                return RAM.searchMatches.map(item => {
+                    return UI_BUILDER.Block({
+                        className: "s-item",
+                        action: `HOOK:selectSearch:${item.customerId}`, // Custom Block Action
+                        elements: [
+                            UI_BUILDER.Block({
+                                elements: [
+                                    UI_BUILDER.Text(item.customerName, "s-name"),
+                                    UI_BUILDER.Text(`${item.customerId} | ${item.phone}`, "s-sub")
+                                ]
+                            })
+                        ]
+                    });
+                });
+            },
+
+            /**
+             * @description Xử lý sự kiện khi gõ vào thanh tìm kiếm
+             * @param {string} bKey - Business Key (searchQuery)
+             */
+            executeSearch: function() {
+                const searchInp = document.querySelector('[data-field="searchQuery"]');
+                const keyword = searchInp ? searchInp.value.trim().toLowerCase() : "";
+                
+                if (keyword === "") {
+                    RAM.searchMatches = [];
+                } else {
+                    RAM.searchMatches = RAM.dbCustomers.filter(c => 
+                        (c.customerName && c.customerName.toLowerCase().includes(keyword)) ||
+                        (c.phone && c.phone.includes(keyword)) ||
+                        (c.customerId && c.customerId.toLowerCase().includes(keyword))
+                    ).slice(0, 10); // Lấy tối đa 10 kết quả
+                }
+                
+                // Chỉ vẽ lại vùng Search (Tối ưu hóa đệ quy trong tương lai, hiện tại vẽ lại màn hình)
+                CrmHooks.backToMain(); 
+                
+                // Trả focus lại cho ô nhập liệu (Do vẽ lại làm mất focus)
+                setTimeout(() => {
+                    const inp = document.querySelector('[data-field="searchQuery"]');
+                    if (inp) {
+                        inp.value = keyword;
+                        inp.focus();
+                    }
+                }, 50);
+            },
+
+            /**
+             * @description Chọn 1 kết quả từ hộp tìm kiếm
+             * @param {string} custId 
+             */
+            selectSearch: function(custId) {
+                RAM.currentCustomerId = custId;
+                RAM.uiState.isSearchOpen = false;
+                RAM.searchMatches = [];
+                CrmHooks.backToMain();
+            },
+
+            // --- NAVIGATION HOOKS (ĐIỀU HƯỚNG DOM REPLACEMENT) ---
+            backToMain: () => {
+                RAM.uiState.currentScreen = "main";
+                RENDER_ENGINE.renderScreen(UI_SCHEMA_MAIN, "app-shell", RAM.getCurrentCustomer());
+            },
+            openCustomerForm: () => {
+                RAM.uiState.currentScreen = "form_cust";
+                RENDER_ENGINE.renderScreen(UI_SCHEMA_CUST_FORM, "app-shell", RAM.getCurrentCustomer());
+            },
+            openActForm: () => {
+                RAM.uiState.currentScreen = "form_act";
+                // Truyền mã KH hiện tại sang ngữ cảnh Giao dịch
+                RENDER_ENGINE.renderScreen(UI_SCHEMA_ACT_FORM, "app-shell", { customerId: RAM.currentCustomerId });
+            },
+            openNoteForm: () => {
+                RAM.uiState.currentScreen = "form_note";
+                RENDER_ENGINE.renderScreen(UI_SCHEMA_NOTE_FORM, "app-shell", RAM.getCurrentCustomer());
+            }
+        };
+
+        /*************************************************************
+         * ⚙️ LỚP 3: ENGINE LAYER (BUILDER & RENDERER)
+         * Cỗ máy kiến tạo "Pure Schema". Mù nghiệp vụ, chỉ đọc khai báo.
+         *************************************************************/
+
+        /** * @constant {Object} UI_BUILDER 
+         * @description Công cụ DSL theo Chương 8. Phác thảo Schema chuẩn xác không cần viết JSON tay.
+         */
+        const UI_BUILDER = {
+            /**
+             * @description Khởi tạo Block chuẩn - Nền tảng của cấu trúc.
+             * @param {Object} config - Cấu hình khối
+             * @returns {Object} JSON Node
+             */
+            Block: function(config = {}) {
+                return {
+                    type: "block",
+                    entity: config.entity || null,
+                    hidden: config.hidden !== undefined ? config.hidden : false,
+                    action: config.action || null, // Hỗ trợ click vào block
+                    spatialConfig: {
+                        width: config.spatialConfig?.width || config.width || null,
+                        position: config.spatialConfig?.position || "dynamic",
+                        scroll: config.spatialConfig?.scroll || false,
+                        autoExpand: config.spatialConfig?.autoExpand !== undefined ? config.spatialConfig.autoExpand : true,
+                        maxHeight: config.spatialConfig?.maxHeight || null
+                    },
+                    className: config.className || "",
+                    style: config.style || "",
+                    elements: config.elements || []
+                };
+            },
+
+
+            // --- Layout Builders ---
+            View: (entity, elements) => UI_BUILDER.Block({ entity: entity, className: "overlay", spatialConfig: {position: "absolute", scroll: true, autoExpand: false }, elements: elements}),
+            Card: (elements, className = "") => UI_BUILDER.Block({ className: `card ${className}`, elements }),
+            Row: (elements, className = "inp-row") => UI_BUILDER.Block({ className, elements }),
+            
+            // --- Content Atoms ---
+            Text: (content, className = "") => ({ type: "text", content, className }),
+            
+            /** * @description Render Action. Bọc các Element con (như Text/Icon) vào trong một nút bấm.
+             */
+            Action: (elements, hook, className = "") => ({ 
+                type: "action", 
+                elements: Array.isArray(elements) ? elements : [UI_BUILDER.Text(elements)], 
+                hook: hook, 
+                className: className 
+            }),
+            
+            /** @description Render Icon nguyên tử (tránh viết thẻ SVG vào trong HTML chuỗi) */
+            Icon: (svgString, className = "") => ({ type: "icon", content: svgString, className }),
+
+            /**
+             * @description Composite Builder (Phức hợp). Kết hợp Atom Text (Label) và Atom Control.
+             * Tuân thủ quy tắc 8.4: Tự động đóng gói vào một Column Block.
+             * * @param {string} bKey - Business Key (Khóa nghiệp vụ).
+             * @param {Object} options - Tùy biến: uiType, width (%, px), rows, maxRows...
+             */
+            Field: (bKey, options = {}) => {
+                const fieldDef = FIELDS[bKey] || {};
+                const labelText = fieldDef.label || bKey;
+                const reqMark = fieldDef.required ? " (*)" : "";
+                
+                return UI_BUILDER.Block({
+                    // Truyền width thẳng vào spatialConfig thay vì tự viết style
+                    spatialConfig: { width: options.width },
+                    // Nếu nằm trong Row, Engine sẽ tự đổi inp-group thành inp-col.
+                    className: options.isCol ? "inp-col" : "inp-group",
+                    elements: [
+                        // Giai đoạn 1: Chèn nguyên tử Label (Atoms).
+                        UI_BUILDER.Text(labelText + reqMark, `lbl ${fieldDef.required ? "text-red" : ""}`),
+                        
+                        // Giai đoạn 2: Chèn nguyên tử Control (Atoms).
+                        { 
+                            type: "control", 
+                            field: bKey, 
+                            ...options // Kế thừa các tham số như uiType, placeholder, autoExpand...
+                        }
+                    ]
+                });
+            },
+
+            /** @description Nút Control gốc. Dùng cho các trường hợp không cần Label (VD: Thanh tìm kiếm) */
+            Control: (bKey, options = {}) => ({ type: "control", field: bKey, ...options })
+        };
+
+        /** * @constant {Object} RENDER_ENGINE 
+         * @description Máy ảo đệ quy thông dịch Schema.
+         */
+        const RENDER_ENGINE = {
+            /**
+             * @description Kết xuất toàn bộ giao diện, thực hiện DOM Replacement
+             */
+            renderScreen: function(schema, stageId, ramData) {
+                const html = this.renderNode(schema, schema.entity, ramData);
+                document.getElementById(stageId).innerHTML = html;
+            },
+
+            /**
+             * @description Hàm đệ quy xử lý từng Schema Node
+             * @returns {string} Chuỗi HTML đã thông dịch
+             */
+            renderNode: function(node, entity, ramData) {
+                // XỬ LÝ ĐIỀU KIỆN TÀNG HÌNH
+                if (node.hidden !== undefined) {
+                    let isHidden = false;
+                    if (typeof node.hidden === "string" && node.hidden.startsWith("HOOK:")) {
+                        isHidden = CrmHooks[node.hidden.replace("HOOK:", "")]();
+                    } else if (node.hidden === true) {
+                        isHidden = true;
+                    }
+                    if (isHidden) return "";
+                }
+
+                // 1. DÀN TRANG (BLOCK CONTAINER)
+                if (node.type === "block") {
+                    let childHtml = "";
+                    let elementsToRender = node.elements;
+
+                    // KIỂM TRA PURE SCHEMA HOOK: Hook phải trả về Array Schema Nodes
+                    if (typeof node.elements === "string" && node.elements.startsWith("HOOK:")) {
+                        const hookResult = CrmHooks[node.elements.replace("HOOK:", "")]();
+                        if (Array.isArray(hookResult)) {
+                            elementsToRender = hookResult; // Mảng các khối
+                        } else if (typeof hookResult === "object" && hookResult !== null) {
+                            elementsToRender = [hookResult]; // Một khối đơn
+                        } else {
+                            childHtml = String(hookResult); // Fallback an toàn nếu Hook trả nhầm text
+                            elementsToRender = [];
+                        }
+                    }
+
+                    // Đệ quy phần tử con
+                    if (Array.isArray(elementsToRender)) {
+                        const isRow = node.className && node.className.includes("inp-row");
+                        childHtml += elementsToRender.map(child => {
+                            if (isRow && child.type === "block" && child.className === "inp-group") {
+                                child.className = "inp-col"; // Thuật toán tự chia cột của Composite
+                            }
+                            return this.renderNode(child, entity, ramData);
+                        }).join("");
+                    }
+
+                    // THÔNG DỊCH SPATIAL CONFIG THÀNH CSS VẬT LÝ
+                    let spatialStyles = "";
+                    const sp = node.spatialConfig || {};
+
+                    // 1. TRỤC NGANG (WIDTH & CHIA CỘT)
+                    if (sp.width) {
+                        spatialStyles += `flex: 0 0 ${sp.width}; max-width: ${sp.width}; width: ${sp.width}; `;
+                    } else if (node.className && node.className.includes("inp-col")) {
+                        spatialStyles += "flex: 1; min-width: 0; ";
+                    }
+
+                    // 2. VỊ TRÍ (POSITION) & HỖ TRỢ OVERLAY
+                    if (sp.position === "fixed" || (node.className && node.className.includes("overlay"))) {
+                        spatialStyles += "position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 100; ";
+                    } else if (sp.position === "absolute") {
+                        spatialStyles += "position: absolute; ";
+                    } else {
+                        spatialStyles += "position: relative; ";
+                    }
+
+                    // 3. TRỤC DỌC & CƠ CHẾ KẸP SANDWICH
+                    if (sp.autoExpand === false) {
+                        spatialStyles += "flex: 1; min-height: 0; display: flex; flex-direction: column; ";
+                    } else {
+                        spatialStyles += "flex-shrink: 0; "; 
+                    }
+
+                    // 4. KHẢ NĂNG CUỘN (SCROLL)
+                    if (sp.scroll === true) {
+                        spatialStyles += "overflow-y: auto; overflow-x: hidden; ";
+                    } else if (sp.autoExpand === false) {
+                        spatialStyles += "overflow: hidden; ";
+                    }
+
+                    // 5. TRẦN CHIỀU CAO
+                    if (sp.maxHeight) {
+                        spatialStyles += `max-height: ${sp.maxHeight}; `;
+                    }
+
+                    const finalStyle = (node.style ? node.style + ";" : "") + spatialStyles;
+
+                    // Hỗ trợ Action trực tiếp trên Block (dùng cho list tìm kiếm)
+                    let blockAction = "";
+                    if (node.action && node.action.startsWith("HOOK:")) {
+                        const parts = node.action.split(":");
+                        const hookArg = parts[2] ? `'${parts[2]}'` : `'${entity}'`;
+                        blockAction = `onclick="CrmHooks.${parts[1]}(${hookArg})" style="cursor:pointer;"`;
+                    }
+
+                    return `<div class="${node.className || ''}" style="${finalStyle}" ${blockAction}>${childHtml}</div>`;
+                }
+                
+                // 2. NGUYÊN TỬ VĂN BẢN (TEXT ATOM)
+                if (node.type === "text") {
+                    let text = node.content;
+                    if (text.startsWith("HOOK:")) text = CrmHooks[text.replace("HOOK:", "")]();
+                    return `<div class="${node.className || ''}">${text}</div>`;
+                }
+
+                // 3. NGUYÊN TỬ ICON SVG (ICON ATOM)
+                if (node.type === "icon") {
+                    return `<span class="${node.className || ''}">${node.content}</span>`;
+                }
+                
+                // 4. NÚT TƯƠNG TÁC (ACTION ATOM)
+                if (node.type === "action") {
+                    const hookParts = node.hook.replace("HOOK:", "").split(":");
+                    const hookName = hookParts[0];
+                    const hookArg = hookParts[1] || entity;
+                    
+                    // Render các icon/text con nằm trong nút
+                    const childHtml = node.elements.map(c => this.renderNode(c, entity, ramData)).join("");
+                    return `<button class="${node.className || ''}" onclick="CrmHooks.${hookName}('${hookArg}')">${childHtml}</button>`;
+                }
+
+                // 5. Ô ĐIỀU KHIỂN (CONTROL ATOM) - Điểm nhập liệu tương tác
+                if (node.type === "control") {
+                    const fieldDef = FIELDS[node.field] || {};
+                    const uiType = node.uiType || fieldDef.type;
+                    const isReadonly = node.readonly || fieldDef.readonly;
+                    const readonlyAttr = isReadonly ? "readonly style='background:#f1f3f4; color:#777;'" : "";
+                    const classNames = node.className || 'inp';
+                    
+                    // Binding Giá trị
+                    let value = ramData[node.field];
+                    if (value === undefined || value === null || value === "") {
+                        const def = node.defaultValue || fieldDef.defaultValue;
+                        value = (def && typeof def === "string" && def.startsWith("HOOK:")) ? CrmHooks[def.replace("HOOK:", "")]() : (def || "");
+                    }
+
+                    // Hỗ trợ thuộc tính bắt sự kiện (event binding)
+                    const eventAttr = node.onInput ? `oninput="CrmHooks.${node.onInput}('${node.field}')"` : "";
+                    const placeholderAttr = node.placeholder ? `placeholder="${node.placeholder}"` : "";
+
+                    // Thông dịch ra thẻ HTML lõi
+                    if (uiType === "textarea") {
+                        // 1. Lấy thông số từ Schema (Kế thừa từ UI_BUILDER.Field đã sửa)
+                        const minR = node.minRows || node.rows || 2;
+                        const maxR = node.maxRows || 5;
+
+                        // 2. Các hằng số vật lý (Dựa trên font 14px và line-height 1.5)
+                        const lineH = 21;      // Chiều cao 1 dòng
+                        const padV = 16;       // Tổng padding trên/dưới
+                        const borderV = 2;     // Tổng độ dày viền
+
+                        // 3. Tính toán pixel thực tế
+                        const minPixel = (minR * lineH) + padV + borderV;
+                        const maxPixel = (maxR * lineH) + padV + borderV;
+
+                        // 4. Lệnh thực thi tự giãn nở (Auto-expand) khi gõ phím
+                        const autoExpandAttr = node.autoExpand ? 
+                            `oninput="this.style.height = '${minPixel}px'; 
+                                    let scrollH = this.scrollHeight;
+                                    this.style.height = (scrollH + ${borderV}) + 'px'; 
+                                    this.style.overflowY = (scrollH + ${borderV} >= ${maxPixel}) ? 'auto' : 'hidden';"` 
+                            : "";
+
+                        // 5. Gán style vật lý và chặn kéo tay (resize: none)
+                        const styleAttr = `style="min-height: ${minPixel}px; max-height: ${maxPixel}px; resize: none; overflow-y: hidden;"`;
+
+                        return `<textarea class="${classNames}" data-field="${node.field}" ${autoExpandAttr} ${styleAttr} ${placeholderAttr}>${value}</textarea>`;
+                    }
+
+                    else if (uiType === "select") {
+                        let sourceKey = "";
+                        if (fieldDef.source) sourceKey = fieldDef.source.replace("MASTER_DATA.", "");
+                        const optionsData = MASTER_DATA[sourceKey] || [];
+                        
+                        let optsHtml = `<option value="">--Chọn--</option>`;
+                        optsHtml += optionsData.map(o => {
+                            const isSelected = (o.id === value) ? "selected" : "";
+                            return `<option value="${o.id}" ${isSelected}>${o.name}</option>`;
+                        }).join("");
+                        
+                        return `<select class="${classNames}" data-field="${node.field}" ${readonlyAttr}>${optsHtml}</select>`;
+                    } 
+                    else {
+                        // date, text, number
+                        return `<input type="${uiType}" class="${classNames}" data-field="${node.field}" value="${value}" ${readonlyAttr} ${placeholderAttr} ${eventAttr}>`;
+                    }
+                }
+                
+                return "";
+            }
+        };
+
+        /**
+         * @constant {Object} SUBMIT_CONTROLLER
+         * @description Thu thập, kiểm định và lưu trữ (Pipeline an toàn).
+         */
+        const SUBMIT_CONTROLLER = {
+            processSave: function(currentEntity) {
+                const payload = {};
+                const inputs = document.querySelectorAll('#app-shell [data-field]');
+                let hasError = false;
+
+                // 1. Quét DOM tự động qua data-field
+                inputs.forEach(input => {
+                    const bKey = input.getAttribute('data-field');
+                    const value = input.value.trim();
+                    payload[bKey] = value;
+
+                    // 2. Validate
+                    const isRequired = FIELDS[bKey] && FIELDS[bKey].required;
+                    if (isRequired && !value) {
+                        input.classList.add('inp-error');
+                        hasError = true;
+                        input.addEventListener('input', function() { this.classList.remove('inp-error'); }, {once: true});
+                    }
+                });
+
+                if (hasError) {
+                    UI_HELPER.showToast("Vui lòng điền đủ các trường bắt buộc!", "error");
+                    return;
+                }
+
+                // 3. Optimistic Update vào RAM
+                if (currentEntity === "customer") {
+                    const cIdx = RAM.dbCustomers.findIndex(c => c.customerId === payload.customerId);
+                    if (cIdx > -1) {
+                        Object.assign(RAM.dbCustomers[cIdx], payload);
+                    } else {
+                        RAM.dbCustomers.push(payload);
+                    }
+                    RAM.currentCustomerId = payload.customerId;
+
+                } else if (currentEntity === "activity") {
+                    if (!RAM.acts_map[RAM.currentCustomerId]) RAM.acts_map[RAM.currentCustomerId] = [];
+                    payload.activityId = "ACT_" + new Date().getTime();
+                    RAM.acts_map[RAM.currentCustomerId].unshift(payload);
+                }
+
+                // 4. Background Sync
+                const physicalRowData = DATA_ADAPTER.mapObjectToRow(currentEntity, payload);
+                console.log("🚀 Đang gửi Background Sync Payload:", physicalRowData);
+                
+                UI_HELPER.showToast("Đã lưu dữ liệu thành công!");
+                CrmHooks.backToMain();
+            }
+        };
+        CrmHooks.processSave = SUBMIT_CONTROLLER.processSave;
+
+
+        /*************************************************************
+         * 🎨 LỚP 4: BẢN VẼ UI (UI SCHEMA)
+         * Tuân thủ tuyệt đối việc dùng UI_BUILDER.
+         * Tuyệt đối không chứa HTML tĩnh như `<input>` hay `<div>`.
+         *************************************************************/
+
+        /** @description BẢN VẼ 1: MÀN HÌNH CHÍNH (DASHBOARD) */
+        const UI_SCHEMA_MAIN = UI_BUILDER.Block({
+            entity: "customer",
+            spatialConfig: { position: "relative", autoExpand: false, scroll: false }, // Chiếm trọn màn hình
+            elements: [
+                // === HEADER ===
+                UI_BUILDER.Block({
+                    className: "header",
+                    elements: [
+                        UI_BUILDER.Action([UI_BUILDER.Icon(ASSETS.auto)], "HOOK:toggleAuto", "icon-btn active"),
+                        UI_BUILDER.Action([UI_BUILDER.Icon(ASSETS.search)], "HOOK:toggleSearch", "icon-btn"),
+                        UI_BUILDER.Action([UI_BUILDER.Icon(ASSETS.reload)], "HOOK:backToMain", "icon-btn"),
+                        UI_BUILDER.Block({ className: "spacer" }), // Đẩy các nút sang phải
+                        UI_BUILDER.Action([UI_BUILDER.Icon(ASSETS.editCust)], "HOOK:openCustomerForm", "icon-btn"),
+                        UI_BUILDER.Action([UI_BUILDER.Icon(ASSETS.addCust)], "HOOK:openCustomerForm", "icon-btn")
+                    ]
+                }),
+                
+                // === SEARCH PANEL (KIỂU PURE SCHEMA HOÀN TOÀN) ===
+                UI_BUILDER.Block({
+                    className: "search-panel",
+                    hidden: "HOOK:isSearchHidden",
+                    elements: [
+                        UI_BUILDER.Block({
+                            className: "search-inp-wrap",
+                            elements: [
+                                // Sử dụng Node Control để vẽ input thay vì viết mã HTML
+                                UI_BUILDER.Control("searchQuery", { 
+                                    uiType: "text", 
+                                    className: "search-inp", 
+                                    placeholder: "Nhập tên, sđt, mã...",
+                                    onInput: "executeSearch" // Bắt sự kiện gõ phím
+                                })
+                            ]
+                        }),
+                        UI_BUILDER.Block({
+                            className: "suggest-box",
+                            elements: "HOOK:renderSearchSuggests" // Trả về mảng Schema cho danh sách tìm kiếm
+                        })
+                    ]
+                }),
+
+                // === KHU VỰC CỐ ĐỊNH (THÔNG TIN KHÁCH HÀNG) ===
+                UI_BUILDER.Block({
+                    className: "fixed-area",
+                    spatialConfig: { autoExpand: true }, 
+                    elements: [
+                        UI_BUILDER.Card([
+                            UI_BUILDER.Text("HOOK:getCustomerName", "c-name"),
+                            UI_BUILDER.Row([
+                                UI_BUILDER.Text("HOOK:getCustomerCode", "info-left"),
+                                UI_BUILDER.Text("HOOK:getTaxCode", "info-right")
+                            ], "info-row"),
+                            UI_BUILDER.Row([
+                                UI_BUILDER.Text("HOOK:getContact", "info-left"),
+                                UI_BUILDER.Text("HOOK:getPhone", "info-right")
+                            ], "info-row")
+                        ]),
+
+                        // ========= TEST =========
+                        // UI_BUILDER.Card([
+                        //     UI_BUILDER.Row([UI_BUILDER.Text("Test xem ở đây thì Card sẽ hiển thị thế nào", "card-title")]),
+                                
+                        //     UI_BUILDER.Row([    
+                        //         UI_BUILDER.Field("phone",{width: "20%"}),
+                        //         UI_BUILDER.Field("address")
+                        //     ])
+                        // ])
+                    ]
+                }),
+
+                // === KHU VỰC CUỘN (GHI CHÚ & TIMELINE) ===
+                UI_BUILDER.Block({
+                    className: "scroll-area",
+                    spatialConfig: { scroll: true, autoExpand: false }, // Cho phép cuộn nội bộ
+                    elements: [
+
+                        // Card Ghi chú
+                        UI_BUILDER.Card([
+                            UI_BUILDER.Row([
+                                UI_BUILDER.Text("GHI CHÚ", "card-title"),
+                                UI_BUILDER.Action([UI_BUILDER.Icon(ASSETS.editTx), UI_BUILDER.Text(" Sửa")], "HOOK:openNoteForm", "action-link")
+                            ], "card-header"),
+                            
+                            // Bọc nội dung ghi chú vào một Block có giới hạn chiều cao
+                            UI_BUILDER.Block({
+                                className: "note-content-wrapper",
+                                spatialConfig: {
+                                    scroll: true,        // Tự động hiện thanh cuộn nếu nội dung dài
+                                    autoExpand: true,    // Tự giãn cao đến mức trần
+                                    maxHeight: "120px"   // Giới hạn chiều cao tối đa tại đây
+                                },
+                                elements: [
+                                    UI_BUILDER.Text("HOOK:getNote", "note-content")
+                                ]
+                            })
+                        ]),
+
+                        // Card Lịch sử Giao dịch
+                        UI_BUILDER.Card([
+                            UI_BUILDER.Row([
+                                UI_BUILDER.Text("LỊCH SỬ LÀM VIỆC", "card-title"),
+                                UI_BUILDER.Action([UI_BUILDER.Icon(ASSETS.addTx), UI_BUILDER.Text(" Thêm")], "HOOK:openActForm", "action-link")
+                            ], "card-header"),
+                            // Nạp MẢNG SCHEMA từ Hook để vẽ danh sách giao dịch (Pure Schema)
+                            UI_BUILDER.Block({ className: "tx-list", elements: "HOOK:renderTxList" })
+                        ])
+                    ]
+                })
+            ]
+        });
+
+        /** @description BẢN VẼ 2: BIỂU MẪU KHÁCH HÀNG (16 TRƯỜNG CHUẨN Composite Field) */
+        const UI_SCHEMA_CUST_FORM = UI_BUILDER.Block({
+            entity: "customer", className: "overlay",spatialConfig: {position: "dynamic", scroll: false, autoExpand: false},
+            elements: [
+                UI_BUILDER.Block({
+                    className: "form-head", spatialConfig: { position: "dynamic" },
+                    elements: [
+                        UI_BUILDER.Text("Hồ Sơ Khách Hàng", "form-title"),
+                        UI_BUILDER.Block({
+                            className: "form-actions-right",
+                            elements: [
+                                UI_BUILDER.Action([UI_BUILDER.Text("✕")], "HOOK:backToMain", "btn-close"),
+                                UI_BUILDER.Action([UI_BUILDER.Icon(ASSETS.save)], "HOOK:processSave", "btn-save-icon")
+                            ]
+                        })
+                    ]
+                }),
+                UI_BUILDER.Block({
+                    className: "form-body", spatialConfig: {position: "dynamic", scroll: true,  autoExpand: false},
+                    elements: [
+                        UI_BUILDER.Row([ UI_BUILDER.Field("customerId"), UI_BUILDER.Field("taxCode") ]),
+                        UI_BUILDER.Field("customerName"),
+                        UI_BUILDER.Field("contact"),
+                        UI_BUILDER.Field("phone"),
+                        UI_BUILDER.Field("address"),
+                        UI_BUILDER.Row([ UI_BUILDER.Field("productId"), UI_BUILDER.Field("groupId") ]),
+                        UI_BUILDER.Field("note", { uiType: "textarea", minRows: 2, maxRows: 10, autoExpand: true }),
+                        UI_BUILDER.Field("email"),
+                        UI_BUILDER.Field("website"),
+                        UI_BUILDER.Field("parentId"),
+                        UI_BUILDER.Row([ UI_BUILDER.Field("bidDate"), UI_BUILDER.Field("verifyId") ]),
+                        UI_BUILDER.Row([ UI_BUILDER.Field("sourceId"), UI_BUILDER.Field("fbmStatus") ]),
+                        UI_BUILDER.Field("createdDate"),
+                        // UI_BUILDER.Action([UI_BUILDER.Text("LƯU DỮ LIỆU")], "HOOK:processSave", "btn btn-p"),
+                    ]
+                }),
+                UI_BUILDER.Block({
+                    className: "form-footer",spatialConfig: { position: "dynamic" },
+                    elements: [
+                        UI_BUILDER.Action([UI_BUILDER.Text("LƯU THÔNG TIN")], "HOOK:processSave", "btn btn-p")
+                    ]
+                })
+            ]
+        });
+
+        /** @description BẢN VẼ 3: BIỂU MẪU GIAO DỊCH (9 TRƯỜNG CHUẨN Composite Field) */
+        const UI_SCHEMA_ACT_FORM = UI_BUILDER.Block({
+            entity: "activity", className: "overlay",
+            elements: [
+                UI_BUILDER.Block({
+                    className: "form-head",
+                    elements: [
+                        UI_BUILDER.Text("Thêm Giao Dịch", "form-title"),
+                        UI_BUILDER.Block({
+                            className: "form-actions-right",
+                            elements: [
+                                UI_BUILDER.Action([UI_BUILDER.Text("✕")], "HOOK:backToMain", "btn-close"),
+                                UI_BUILDER.Action([UI_BUILDER.Icon(ASSETS.save)], "HOOK:processSave", "btn-save-icon")
+                            ]
+                        })
+                    ]
+                }),
+                UI_BUILDER.Field("customerId", { readonly: true }), 
+                UI_BUILDER.Row([ UI_BUILDER.Field("workDate"), UI_BUILDER.Field("productId") ]),
+                UI_BUILDER.Row([ UI_BUILDER.Field("activityStatus"), UI_BUILDER.Field("pinStatus") ]),
+                UI_BUILDER.Field("content", { uiType: "textarea", minRows: 5, maxRows: 10, autoExpand: true }),
+                UI_BUILDER.Field("contractValue"),
+                UI_BUILDER.Row([ UI_BUILDER.Field("fbmStatus"), UI_BUILDER.Field("userId") ]),
+                UI_BUILDER.Action([UI_BUILDER.Text("LƯU GIAO DỊCH")], "HOOK:processSave", "btn btn-p")
+            ]
+        });
+
+        /** @description BẢN VẼ 4: FORM SỬA GHI CHÚ NHANH */
+        const UI_SCHEMA_NOTE_FORM = UI_BUILDER.Block({
+            entity: "customer", className: "overlay",
+            elements: [
+                UI_BUILDER.Block({
+                    className: "form-head",
+                    elements: [
+                        UI_BUILDER.Text("Sửa Ghi Chú", "form-title"),
+                        UI_BUILDER.Block({
+                            className: "form-actions-right",
+                            elements: [
+                                UI_BUILDER.Action([UI_BUILDER.Text("✕")], "HOOK:backToMain", "btn-close"),
+                                UI_BUILDER.Action([UI_BUILDER.Icon(ASSETS.save)], "HOOK:processSave", "btn-save-icon")
+                            ]
+                        })
+                    ]
+                }),
+                UI_BUILDER.Field("note", { uiType: "textarea", minRows: 8, maxRows: 15, autoExpand: true }),
+                UI_BUILDER.Action([UI_BUILDER.Text("CẬP NHẬT GHI CHÚ")], "HOOK:processSave", "btn btn-p")
+            ]
+        });
+
+        /*************************************************************
+         * 🚀 INITIALIZATION (KÍCH HOẠT HỆ THỐNG VÀO TRẠNG THÁI ACTIVE)
+         *************************************************************/
+        window.onload = function() {
+            console.log("🚀 ShinCRM Pure Dynamic UI v6.2 Booting...");
+            CrmHooks.backToMain();
+        };
+
+    </script>
+</body>
+</html>
