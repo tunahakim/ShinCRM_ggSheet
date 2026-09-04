@@ -12,4 +12,4 @@
 ## 3. Git Commit
 
 - Viết tiếng Việt có dấu
-- Viết cả Description - không hard wrap. Viết ngắn gọn không lan man dài dòng.
+- Viết cả Description - không hard wrap. Viết ngắn gọn không lan man dài dòng. Mỗi ý là 1 dòng.
