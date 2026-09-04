@@ -1,0 +1,17 @@
+# Bí mật OAuth và thẻ đăng nhập. Chặn trước khi có, không phải chặn sau khi lỡ commit —
+# đẩy một khóa lên GitHub rồi thì xóa commit cũng không rút lại được, phải thu hồi khóa.
+creds.json
+client_secret*.json
+.clasprc.json
+*.pem
+*.key
+
+# Tệp tạm của Node và của hệ điều hành
+node_modules/
+npm-debug.log*
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Tệp thử của bộ kiểm thử, sinh ra rồi xóa trong cùng một lượt chạy
+tests/_probe.js
