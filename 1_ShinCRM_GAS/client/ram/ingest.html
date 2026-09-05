@@ -48,6 +48,8 @@ function ingestRowMapArray(map) {
  *
  * Bộ tự kiểm schema ném lỗi khi có vấn đề, và ném là đúng: một bảng khai sai không sửa được từ trong sidebar, nên chạy tiếp
  * chỉ để hỏng ở một chỗ khó truy hơn. Bên gọi bọc lời gọi này trong `try` và vẽ thông báo ra màn hình, nên lỗi vẫn tới mắt người.
+ *
+ * Ba bảng khai giao diện dò bằng `typeof` vì hộp cát tầng dữ liệu của bộ kiểm offline cố ý không nạp `client/ui/*`. Thiếu thì phần kiểm bố cục có tên trong `skipped`, và `tests/cases/schemaCheck.js` chốt rằng với đủ bốn bảng thì nó thật sự chạy.
  */
 function ingestCore(payload) {
   storeReset();
@@ -61,7 +63,10 @@ function ingestCore(payload) {
   var check = checkSchema({
     dataSchema: payload.schema,
     categoryCodes: Object.keys(payload.categories),
-    configDefaultCodes: Object.keys(payload.config.defaults)
+    configDefaultCodes: Object.keys(payload.config.defaults),
+    uiSchema: typeof UI_SCHEMA === 'undefined' ? null : UI_SCHEMA,
+    actions: typeof ACTIONS === 'undefined' ? null : ACTIONS,
+    slots: typeof SLOTS === 'undefined' ? null : SLOTS
   });
 
   if (check.problems.length) {

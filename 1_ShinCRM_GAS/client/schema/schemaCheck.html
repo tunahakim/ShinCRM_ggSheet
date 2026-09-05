@@ -24,7 +24,10 @@ var SCHEMA_CHECK_CODE_PATTERN = /^@[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$/;
  *
  * `input.dataSchema` là bắt buộc. Các mục còn lại thiếu thì phép kiểm tương ứng bị bỏ qua và có tên trong `skipped`:
  * `categoryCodes` (mảng mã `@CAT_` có thật trên sheet), `functionTables` ({ DEFAULTS, NORMALIZERS, VALIDATORS }),
- * `configDefaultCodes` (mảng mã cột có dòng trong bảng ngầm định gõ tay của `Config`), `uiSchema`.
+ * `configDefaultCodes` (mảng mã cột có dòng trong bảng ngầm định gõ tay của `Config`), và bộ ba `uiSchema` + `actions` + `slots`.
+ *
+ * Phần kiểm `UI_SCHEMA` gọi `screenBuild` và `renderFieldPath` của hai tệp nhúng **sau** tệp này. Chạy được vì lời gọi xảy ra
+ * lúc khởi động, không phải lúc nạp tệp; đổi lại là không được gọi `checkSchema` ở tầng ngoài cùng của một thẻ script.
  */
 function checkSchema(input) {
   var problems = [];
@@ -133,13 +136,103 @@ function checkSchema(input) {
     skipped.push('luật một nguồn ngầm định giữa DATA_SCHEMA và Config');
   }
 
-  // Tên trường trong UI_SCHEMA phải có trong DATA_SCHEMA.
-  if (input.uiSchema) {
-    skipped.push('UI_SCHEMA — chặng 1.3 dựng bảng đó thì bổ sung phép kiểm vào đây');
+  // Bản khai bố cục: tên hành động, tên slot, đường dẫn trường. **`[RÀNG BUỘC CỨNG]`** tài liệu 04 Phần 7.
+  if (input.uiSchema && input.actions && input.slots) {
+    schemaCheckUi(input, problems);
   } else {
-    skipped.push('tên trường của UI_SCHEMA có trong DATA_SCHEMA');
+    skipped.push('tên hành động, tên slot và đường dẫn trường của UI_SCHEMA');
   }
 
   return { problems: problems, skipped: skipped };
+}
+
+/** Chỗ để người đọc nhận ra Block nào sai: nhãn, chữ, tên trường, tên icon — thứ gì có thì lấy. Nhờ nó mà câu báo lỗi đọc được như tài liệu hứa: nút "LƯU DỮ LIỆU" trỏ tới hàm không có trong bảng. */
+function schemaCheckWhere(node, man) {
+  return 'màn "' + man + '" · ' + (node.label || node.text || node.field || node.icon || node.role);
+}
+
+/** Một mục menu. Kiểm riêng vì `menu` không đi qua `Block` nên không tệp nào khác nhìn vào bên trong nó — tài liệu 03 Phần 9. */
+function schemaCheckMenuItem(muc, cho, moi) {
+  if (!muc || typeof muc !== 'object') {
+    moi.problems.push(cho + ' có mục menu không phải object.');
+    return;
+  }
+  if (!muc.label) { moi.problems.push(cho + ' có mục menu thiếu `label` nên hiện ra một dòng trắng.'); }
+  if (!muc.action) {
+    moi.problems.push(cho + ' có mục menu "' + muc.label + '" thiếu `action`.');
+  } else if (!Object.prototype.hasOwnProperty.call(moi.actions, muc.action)) {
+    moi.problems.push(cho + ' có mục menu "' + muc.label + '" trỏ tới hàm "' + muc.action + '" không có trong bảng ACTIONS.');
+  }
+  if (muc.toggle && muc.value !== undefined) {
+    moi.problems.push(cho + ' có mục menu "' + muc.label + '" vừa là công tắc vừa mang `value`. Chọn một.');
+  }
+}
+
+/** Một node và cả con cháu nó. `titleActions` đi qua `screenBar` đúng đường mà engine dùng, để bản khai thô cũng được soi. */
+function schemaCheckNode(node, moi) {
+  if (!node || !node.role) { return; }
+  var cho = schemaCheckWhere(node, moi.man);
+
+  if (node.action && !Object.prototype.hasOwnProperty.call(moi.actions, node.action)) {
+    moi.problems.push(cho + ' trỏ tới hàm "' + node.action + '" không có trong bảng ACTIONS.');
+  }
+
+  if (node.menu) {
+    if (!Array.isArray(node.menu)) { moi.problems.push(cho + ' có `menu` không phải mảng.'); }
+    else { node.menu.forEach(function (muc) { schemaCheckMenuItem(muc, cho, moi); }); }
+  }
+
+  if (node.role === 'field') { schemaCheckFieldPath(node, cho, moi); }
+
+  if (typeof node.elements === 'string') {
+    if (!Object.prototype.hasOwnProperty.call(moi.slots, node.elements)) {
+      moi.problems.push(cho + ' lấy nội dung từ slot "' + node.elements + '" không có trong bảng SLOTS.');
+    }
+  } else if (Array.isArray(node.elements)) {
+    node.elements.forEach(function (con) { schemaCheckNode(con, moi); });
+  }
+
+  if (Array.isArray(node.titleActions)) {
+    screenBar(node.titleActions, cho).forEach(function (con) { schemaCheckNode(con, moi); });
+  }
+}
+
+/** Đường dẫn trường tra được trong `DATA_SCHEMA`. Dùng chính `renderFieldPath` của engine, và biến câu ném của nó thành một dòng báo — bộ kiểm này phải kể ra hết chứ không dừng ở lỗi đầu tiên. */
+function schemaCheckFieldPath(node, cho, moi) {
+  var duong;
+  try {
+    duong = renderFieldPath(node, { entity: moi.entity });
+  } catch (err) {
+    moi.problems.push(cho + ': ' + err.message);
+    return;
+  }
+
+  if (!moi.dataSchema[duong.entity]) {
+    moi.problems.push(cho + ' trỏ tới thực thể "' + duong.entity + '" không có trong DATA_SCHEMA.');
+  } else if (!moi.dataSchema[duong.entity][duong.name]) {
+    moi.problems.push(cho + ' trỏ tới trường "' + duong.entity + '.' + duong.name + '" không có trong DATA_SCHEMA.');
+  }
+}
+
+/**
+ * Duyệt cả `UI_SCHEMA` qua đúng bộ dịch mà engine dùng, nên không có bản sao thứ hai của lối viết tắt.
+ *
+ * Bản khai dịch không nổi thì ghi một dòng rồi đi màn khác: một màn hỏng không được che ba màn còn lại.
+ */
+function schemaCheckUi(input, problems) {
+  Object.keys(input.uiSchema).forEach(function (man) {
+    var decl = input.uiSchema[man];
+    var moi = { man: man, entity: decl && decl.entity, dataSchema: input.dataSchema, actions: input.actions, slots: input.slots, problems: problems };
+
+    var dung;
+    try {
+      dung = screenBuild(decl, man);
+    } catch (err) {
+      problems.push('màn "' + man + '" không dịch được: ' + err.message);
+      return;
+    }
+
+    dung.header.concat(dung.body, dung.footer).forEach(function (node) { schemaCheckNode(node, moi); });
+  });
 }
 </script>

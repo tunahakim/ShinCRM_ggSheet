@@ -139,3 +139,31 @@ Không tài liệu nào cho tiêu đề form một chỗ đứng. Code cũ đặ
 ### 5.5. Ba lớp CSS mà `UI_SCHEMA` gọi tên nhưng chưa ai viết
 
 `shin-save-wide` và `shin-note-tall` được `UI_SCHEMA` gọi từ đầu mà không có một dòng CSS nào trong repo. **Đang chọn:** viết chúng cùng `shin-form-title` và `shin-carried` vào `<style>` riêng của `formScreen.html`, theo đúng luật ở `Sidebar.html:18` — style chết cùng màn thì ở cùng màn. Nút lưu ở ba màn form được thêm `shin-primary` vào `className` để đúng màu nút chính của bản cũ, vì `shin-save-wide` chỉ nên lo bề rộng.
+
+## 6. Bảng mười sáu hành động — bốn chỗ tự quyết
+
+### 6.1. Chữ ký `(payload) => void` của tài liệu 04:104 đã hẹp hơn thực tế
+
+Tài liệu 04 dòng 104 viết mỗi hành động là `(payload) => void`. Không đúng nữa: `cancelForm` và bốn cửa mở form phải trả `focusId` ra ngoài để bên nghe click đặt con trỏ — chính là điều mục 5.4 chốt — còn ba núm chọn trả `Promise` để bên gọi bắt được lượt gửi thất bại. Trả `void` thì hai việc đó buộc phải làm bên trong thân hàm, tức mười sáu thân hàm đều chạm DOM và bộ kiểm offline mất luôn khả năng gọi chúng.
+
+**Đang chọn: nới chữ ký thành `(payload) => any`**, đọc là "hành động làm xong việc của mình rồi trả phần dư cho bên phát click". Đây là nới chứ không phải đổi: một hành động không có gì trả về thì vẫn cứ trả `undefined` như cũ. Chưa sửa tài liệu 04 vì còn phải xem bên phát click ăn hết những gì được trả hay không — sửa sau khi dựng xong bộ phát, kèm mô tả phần dư gồm những gì.
+
+### 6.2. Sáu hành động của chặng sau ném lỗi có tên, không để thân rỗng
+
+Sáu trong mười sáu tên thuộc chặng 1.4 và 1.5: `saveForm`, `deleteSelectedActivities`, `deleteActivity`, `undoDelete`, `renderActiveViewSheet`, cộng `toggleSearchPanel` còn nằm trong chặng này nhưng sau bảng. Để thân rỗng thì bấm nút không có gì xảy ra — đúng cái hỏng mà tài liệu 04 Phần 7 lập ra để chống, và là cái hỏng tệ nhất với người dùng không phải lập trình viên. Bỏ tên khỏi bảng thì phép kiểm khởi động đỏ vì `UI_SCHEMA` đã khai đủ mười sáu tên.
+
+**Đang chọn: `actionsChuaDung(viec, chang)` ném một câu tiếng người có tên việc và số chặng.** Tên có mặt nên phép kiểm khởi động xanh, mà bấm vào thì hiện ra "chưa dựng, thuộc chặng 1.4" chứ không im lặng. Sáu chỗ này là sáu dòng phải xóa ở chặng tương ứng, và bộ kiểm ghim đúng con số sáu để không ai kịp quên.
+
+### 6.3. Phép kiểm tên lúc khởi động ở `schemaCheck.html`, và nó gọi ngược lên tệp nhúng sau
+
+Tài liệu mục tiêu xếp phép kiểm tên vào cùng gạch đầu dòng với `actions.html`. Nhưng đặt nó trong `actions.html` thì phải chép lại ba thứ: lối viết tắt `{group, rows}` của `screenBuild`, cách `screenBar` bung `titleActions`, và luật đường dẫn trường của `renderFieldPath`. Ba bản chép ấy sẽ lệch, và lệch theo hướng tệ nhất — bộ kiểm xanh còn sidebar thật thì đỏ.
+
+**Đang chọn: `schemaCheckUi` trong `client/schema/schemaCheck.html`**, dùng lại đúng ba hàm của engine. Cái giá là `schemaCheck.html` gọi hàm của hai tệp nhúng **sau** nó. Chạy được vì lời gọi xảy ra lúc khởi động chứ không lúc nạp tệp, và đã ghi vào docstring của tệp kèm điều kiện kèm theo: **không được gọi `checkSchema` ở tầng ngoài cùng của một thẻ `<script>`**.
+
+### 6.4. `ingestCore` che ba bảng giao diện bằng `typeof`, và bộ kiểm giữ chỗ hở đó
+
+Nối phép kiểm mới vào `checkSchema` nghĩa là `ingestCore` phải đưa `UI_SCHEMA`, `ACTIONS`, `SLOTS` vào. Nhưng `tests/lib/dung-client.js` cố ý chỉ nạp sáu tệp tầng dữ liệu, nên `ramStore.js` gọi `ingestCore` là nổ `ReferenceError`. Hai đường: nhồi năm tệp giao diện vào hộp cát tầng dữ liệu, hoặc để `ingestCore` chịu được cảnh thiếu bảng.
+
+**Đang chọn đường thứ hai:** ba biểu thức `typeof … === 'undefined' ? null : …`, và `checkSchema` tự khai vào `skipped` là đã bỏ qua. Đường thứ nhất phá mất câu mà hộp cát tầng dữ liệu đang chứng minh — rằng sáu tệp ấy chạy được khi không có DOM.
+
+Chỗ hở còn lại: một sidebar thật quên một dòng `include` thì phép kiểm cũng bị bỏ qua trong im lặng. Bịt bằng hai phép kiểm offline chứ không bằng code chạy: một ca gọi `checkSchema` với đủ bốn bảng thật và đòi `skipped` chỉ còn ba dòng, và một ca soi danh sách `include` của `Sidebar.html` phải phủ đúng mọi tệp `client/`.
