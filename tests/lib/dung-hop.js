@@ -9,14 +9,34 @@
 const { napServer, taoHopCat } = require('./load-gas');
 const { taoStubsGas } = require('./gas-stubs');
 
-/** Bộ tệp máy chủ mà mọi ca kiểm chạm sheet đều cần: mở tệp, khai hình dữ liệu, đọc hàng mã, tham số, cửa ghi log. */
+/**
+ * Bộ tệp máy chủ mà mọi ca kiểm chạm sheet đều cần, xếp theo chiều phụ thuộc.
+ *
+ * Thứ tự ở đây **không** quyết định việc hàm nào gọi được hàm nào — Apps Script dùng chung một vùng tên nên hàm nào cũng thấy hàm nào, bất kể tệp nạp trước hay sau. Xếp theo chiều phụ thuộc là để người đọc thấy được tầng: mở tệp → khai hình → đọc/ghi ô → tham số → log → tiện ích → đọc bản ghi → trạng thái → gom lượt nạp → vỏ bọc lỗi.
+ *
+ * Ba tệp cố ý **không** có trong danh sách này, và lý do thuộc về từng tệp chứ không phải một luật chung:
+ *   - `server/sheet/SetupSheets.js` — dựng khung sheet, chỉ ca kiểm nói về việc dựng sheet mới cần, và nó tự nạp thêm.
+ *   - `server/entry/Menu.js` — mọi việc của nó đều đi qua `SpreadsheetApp.getUi()` và `HtmlService`, hai thứ hộp cát không có. Nạp vào thì chỉ có thêm mấy cái tên, không thêm điều gì chứng minh được; phép nghiệm thu của nó là `probeSidebarTemplate` trên Google.
+ *   - cả thư mục `server/dev/` — cửa chạy hàm lúc phát triển, không thuộc đường chạy thật.
+ */
 const TEP_NEN = [
   'server/sheet/Book.js',
   'server/data/DataSchema.js',
   'server/data/SheetLayout.js',
   'server/sheet/SheetIo.js',
+  'server/sheet/SheetGrid.js',
   'server/config/Settings.js',
-  'server/log/LogGate.js'
+  'server/log/LogGate.js',
+  'server/util/DateText.js',
+  'server/util/TextNormalize.js',
+  'server/sheet/CellBudget.js',
+  'server/sheet/EntityRead.js',
+  'server/sheet/CategoryRead.js',
+  'server/sheet/ConfigRead.js',
+  'server/state/DirtyState.js',
+  'server/service/LoadService.js',
+  'server/entry/ErrorReport.js',
+  'server/entry/EntryPoint.js'
 ];
 
 /**
@@ -65,4 +85,18 @@ function dungHop(chon) {
   return ra;
 }
 
-module.exports = { dungHop, ghiHangMa, TEP_NEN };
+/**
+ * Ghi một ô vào sheet giả, tìm cột **theo mã** ở hàng 1 chứ không theo thứ tự.
+ *
+ * Nằm ở đây vì nó là việc dựng hoàn cảnh, và vì nó ghi theo đúng cách code thật tra cột: nhờ vậy một tệp ca kiểm không phải tự chốt cứng "mã số thuế là cột thứ ba", tức là chèn thêm một cột vào hoàn cảnh không làm đỏ những phép kiểm chẳng liên quan gì tới thứ tự cột.
+ */
+function ghiO(nen, tenSheet, hang, ma, giaTri) {
+  const cot = nen[tenSheet].codes.indexOf(ma) + 1;
+  if (cot === 0) {
+    throw new Error('Hàng 1 của sheet "' + tenSheet + '" không có mã ' + ma + '. Có: ' + nen[tenSheet].codes.join(', ') + '.');
+  }
+  nen[tenSheet].sheet.getRange(hang, cot).setValue(giaTri);
+  return cot;
+}
+
+module.exports = { dungHop, ghiHangMa, ghiO, TEP_NEN };

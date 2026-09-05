@@ -182,6 +182,14 @@ function taoBook(tenSheets) {
   const book = {
     getId: () => 'tep-gia-trong-bo-nho',
     getName: () => 'ShinCRM (tệp giả)',
+
+    /**
+     * Múi giờ tệp. Trả về đúng múi giờ Việt Nam vì đó là múi giờ tệp thật, và vì đường đọc bản ghi truyền giá trị này xuống `dateToText`.
+     *
+     * Giới hạn phải biết, và nó thuộc về `Utilities.formatDate` giả chứ không thuộc về đây: hàm giả đó **bỏ qua** tham số múi giờ. Nên phép kiểm offline chỉ chứng minh được rằng chuỗi múi giờ được truyền qua đúng đường, chứ không chứng minh được giờ in ra là giờ Việt Nam. Câu hỏi sau chỉ trả lời được bằng `probeDateText` trên Google.
+     */
+    getSpreadsheetTimeZone: () => 'Asia/Ho_Chi_Minh',
+
     getSheetByName: (ten) => sheets[ten] || null,
     getSheets: () => Object.keys(sheets).map((ten) => sheets[ten]),
     insertSheet(ten) {

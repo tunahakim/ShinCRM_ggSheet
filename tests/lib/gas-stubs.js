@@ -14,18 +14,20 @@ function dem2(n) {
 }
 
 /**
- * `formatDate` giả. Chỉ hiểu `yyyy-MM-dd HH:mm:ss` và `yyyy-MM-dd`, và bỏ qua tham số múi giờ.
+ * `formatDate` giả. Chỉ hiểu ba khuôn mà dự án dùng, và bỏ qua tham số múi giờ.
  *
- * Bỏ qua múi giờ là giới hạn phải biết: phép kiểm ở đây không chứng minh được cột `Lúc` ghi đúng giờ Việt Nam. Việc đó chỉ chứng minh được trên Google, và `dumpSettings` cùng `probeLogGate` là chỗ nhìn thấy nó.
+ * Ba khuôn: `yyyy-MM-dd` và `yyyy-MM-dd HH:mm` là hai dạng chuỗi thời gian chốt ở tài liệu 05 Phần 3, còn `yyyy-MM-dd HH:mm:ss` là dạng cột `Lúc` của sheet `Log`. Khuôn của `Log` có giây vì đó là dấu vết pháp y, còn dữ liệu nghiệp vụ thì không có giây.
+ *
+ * Bỏ qua múi giờ là giới hạn phải biết: phép kiểm ở đây không chứng minh được cột `Lúc` ghi đúng giờ Việt Nam. Việc đó chỉ chứng minh được trên Google, và `dumpSettings`, `probeLogGate`, `probeDateText` là chỗ nhìn thấy nó.
  */
 function formatDateGia(date, timezone, format) {
   const d = date instanceof Date ? date : new Date(date);
   const ngay = d.getFullYear() + '-' + dem2(d.getMonth() + 1) + '-' + dem2(d.getDate());
+  const gioPhut = dem2(d.getHours()) + ':' + dem2(d.getMinutes());
 
   if (format === 'yyyy-MM-dd') { return ngay; }
-  if (format === 'yyyy-MM-dd HH:mm:ss') {
-    return ngay + ' ' + dem2(d.getHours()) + ':' + dem2(d.getMinutes()) + ':' + dem2(d.getSeconds());
-  }
+  if (format === 'yyyy-MM-dd HH:mm') { return ngay + ' ' + gioPhut; }
+  if (format === 'yyyy-MM-dd HH:mm:ss') { return ngay + ' ' + gioPhut + ':' + dem2(d.getSeconds()); }
 
   throw new Error('formatDate giả chưa biết khuôn "' + format + '". Thêm khuôn vào tests/lib/gas-stubs.js chứ đừng để nó trả về chuỗi sai.');
 }
