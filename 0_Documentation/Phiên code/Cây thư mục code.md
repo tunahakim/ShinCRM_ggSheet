@@ -75,7 +75,8 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │       ├── DevToken.js           Thẻ bí mật của cửa trên. Không vào git, nhưng CÓ đẩy lên Google.
 │       ├── Smoke.js              Phép thử nhanh: mở được tệp Sheet không, đọc được gì.
 │       ├── DumpGrid.js           Đo lưới từng sheet: bao nhiêu hàng, bao nhiêu cột, còn chỗ ghi thêm bao nhiêu hàng.
-│       └── MeasureLog.js         Đo chi phí thật của deleteRows trên sheet Log lớn. Con số trong tài liệu 10 đến từ đây.
+│       ├── MeasureLog.js         Đo chi phí thật của deleteRows trên sheet Log lớn. Con số trong tài liệu 10 đến từ đây.
+│       └── MeasureChunk.js       Đo chi phí đọc gói giao dịch ở nhiều cỡ gói, để chốt CHUNK_ROWS. Ghi 5.000 hàng giả rồi xóa; chặn nếu sheet Activity không rỗng.
 │
 ├── client\                       Code chạy trong sidebar. Tệp .html bọc thẻ <script>, hoặc bọc thẻ <style> nếu là tệp chỉ có CSS.
 │   │                             Thư mục con chia theo MỤC ĐÍCH, không chia theo đuôi thẻ.
