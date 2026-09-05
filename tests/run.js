@@ -25,7 +25,11 @@ const NHOM_CA = [
   require('./cases/cellBudget'),
   require('./cases/entityRead'),
   require('./cases/categoryRead'),
-  require('./cases/configRead')
+  require('./cases/configRead'),
+  require('./cases/dirtyState'),
+  require('./cases/schemaAccess'),
+  require('./cases/loadService'),
+  require('./cases/ramStore')
 ];
 
 console.log('ShinCRM — bộ kiểm thử offline');
