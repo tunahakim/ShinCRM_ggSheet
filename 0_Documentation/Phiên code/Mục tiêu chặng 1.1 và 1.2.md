@@ -22,7 +22,7 @@ Hai chỗ đã sửa: phép nới lưới nằm ở `server/sheet/SheetGrid.js` 
 
 **Một tệp một việc.** Đây là luật thật, còn con số 250 dòng chỉ là mùi báo động — quá 250 dòng thì dừng lại tự hỏi tệp này có đang gánh hai việc không. Bảng khai dữ liệu (`DATA_SCHEMA`, `UI_SCHEMA`, `SYNC_SCHEMA`) được dài, vì chúng là dữ liệu phẳng chứ không phải logic, và chẻ một bảng khai ra nhiều tệp là mở đường cho hai bảng lệch nhau trong im lặng.
 
-**Không framework giao diện.** Giữ nguyên ràng buộc cứng của tài liệu 04. Làm đẹp bằng khối biến CSS ở `client/ui/tokens.html` — bảng màu, phông, bo góc, đổ bóng, khoảng đệm — cộng bộ icon SVG nhúng thẳng vào tệp nên không phụ thuộc mạng. Mọi quyết định về không gian vẫn chỉ nằm ở `spatialConfig`.
+**Không framework giao diện.** Giữ nguyên ràng buộc cứng của tài liệu 04. Làm đẹp bằng khối biến CSS ở `client/style/tokens.html` — bảng màu, phông, bo góc, đổ bóng, khoảng đệm — cộng bộ icon SVG nhúng thẳng vào tệp nên không phụ thuộc mạng. Mọi quyết định về không gian vẫn chỉ nằm ở `spatialConfig`.
 
 **Mỗi bước phải tự kiểm được.** Không có bước nào "viết xong rồi mai xem". Ba đường kiểm đang có: `node tests/run.js` cho hàm thuần, `node tests/check-sheet.js` đọc sheet thật qua CSV, `node tests/gas.js <hàm>` chạy hàm thật trên tệp Sheet.
 
@@ -43,7 +43,7 @@ Việc này quan trọng nhất ở phía HTML, và chủ dự án đã bị l�
 ```js
 // Đúng
 HtmlService.createTemplateFromFile('client/Sidebar');
-<?!= include('client/ui/tokens'); ?>
+<?!= include('client/style/tokens'); ?>
 
 // Sai — Google không tìm thấy tệp, lỗi chỉ nổ lúc chạy chứ không nổ lúc đẩy
 <?!= include('tokens'); ?>
@@ -89,10 +89,10 @@ Vẫn chưa có giao diện nhìn được. Chặng này chỉ lo việc dữ li
 | `client/util/serverCall.html` | Chỗ duy nhất gọi `google.script.run`, bọc thành `Promise` và tự lo dải tiến trình. |
 | `client/schema/schemaAccess.html` | Cửa duy nhất đọc bảng khai trường, gõ sai tên trường thì ném lỗi kèm gợi ý. |
 | `client/Sidebar.html` | Khung năm vùng cố định, nhúng các tệp client bằng `include()`. Chưa vẽ trường nào. |
-| `client/ui/tokens.html` | Khối biến CSS của cả sidebar. Dựng ở chặng này để chặng 1.3 chỉ việc dùng. |
-| `client/ui/frame.html` | Bố cục năm vùng, cho bố cục bánh kẹp có sẵn ở mọi màn. |
+| `client/style/tokens.html` | Khối biến CSS của cả sidebar. Dựng ở chặng này để chặng 1.3 chỉ việc dùng. |
+| `client/style/frame.html` | Bố cục năm vùng, cho bố cục bánh kẹp có sẵn ở mọi màn. |
 | `client/ui/progress.html` | Dải tiến trình, đếm số lời gọi đang chờ. |
-| `client/ui/statusScreen.html` | Ba màn không có form: đang nạp, vượt trần số ô, lỗi. |
+| `client/screen/statusScreen.html` | Ba màn không có form: đang nạp, vượt trần số ô, lỗi. |
 
 ### Nghiệm thu
 

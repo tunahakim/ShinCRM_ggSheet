@@ -6,8 +6,10 @@
  * ta tìm đến khi muốn đổi diện mạo — còn bố cục năm vùng thì gần như không bao giờ đổi. Trộn hai thứ vào một tệp nghĩa là
  * mỗi lần muốn đổi màu lại phải đọc qua phần bố cục để tìm.
  *
- * Tài liệu 04 Phần 10 ghi một tệp `client/ui/styles.html`; ở đây nó tách thành `tokens` (biến) và `frame` (bố cục năm
- * vùng), rồi chặng dựng form sẽ thêm tệp thứ ba cho các thành phần. Luật "đẹp bằng CSS thuần, không framework" giữ nguyên.
+ * Tài liệu 04 Phần 10 ghi một tệp `client/ui/styles.html`; ở đây nó tách thành `client/style/tokens.html` (biến) và
+ * `client/style/frame.html` (bố cục năm vùng), rồi chặng dựng form sẽ thêm tệp thứ ba cho các thành phần. Thư mục
+ * `client/style/` chỉ giữ hình thức **dùng chung cho mọi màn**; style của riêng một màn thì ở cùng tệp màn đó trong
+ * `client/screen/`. Luật "đẹp bằng CSS thuần, không framework" giữ nguyên.
  *
  * Không dùng thư viện nào, không tải phông từ mạng: sidebar Apps Script nằm trong iframe và mọi thứ tải từ ngoài đều
  * thêm một lần chờ vào đúng lúc người dùng đang chờ nạp dữ liệu.

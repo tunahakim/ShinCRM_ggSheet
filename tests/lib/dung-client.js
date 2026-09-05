@@ -11,7 +11,7 @@ const { napClient, taoHopCat } = require('./load-gas');
 /**
  * Tầng dữ liệu phía sidebar, xếp theo chiều phụ thuộc để người đọc thấy tầng: chuẩn hóa chữ → cửa đọc bảng khai → bộ tự kiểm → kho → đường bung gói.
  *
- * Ba nhóm tệp client cố ý **không** có ở đây: `client/util/serverCall.html` cần `google.script.run`, `client/ui/*` cần DOM, và `client/ram/bootstrap.html` cần cả hai. Phép nghiệm thu của chúng là mở sidebar thật trên Google.
+ * Ba nhóm tệp client cố ý **không** có ở đây: `client/util/serverCall.html` cần `google.script.run`, còn `client/ui/*` và `client/screen/*` cần DOM, và `client/ram/bootstrap.html` cần cả hai. Phép nghiệm thu của chúng là mở sidebar thật trên Google.
  */
 const TEP_CLIENT = [
   'client/util/textNormalize.html',

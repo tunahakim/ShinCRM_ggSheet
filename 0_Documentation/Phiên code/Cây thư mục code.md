@@ -32,7 +32,7 @@ D:\ShinCRM_ggSheet\
 Ba điều phải biết về thư mục này, cả ba đều đã từng gây lỗi thật:
 
 - Tệp `.js` ở máy, đẩy lên Google thành `.gs`. Tệp client phải là `.html` bọc thẻ `<script>`.
-- **Tên tệp trên Google là cả đường dẫn**: `server/log/LogGate.js` ở máy thành tệp tên `server/log/LogGate` trên Google. Nên `include()` và `createTemplateFromFile()` phải nhận tên đầy đủ — `include('client/ui/styles')`, không phải `include('styles')`.
+- **Tên tệp trên Google là cả đường dẫn**: `server/log/LogGate.js` ở máy thành tệp tên `server/log/LogGate` trên Google. Nên `include()` và `createTemplateFromFile()` phải nhận tên đầy đủ — `include('client/style/tokens')`, không phải `include('tokens')`.
 - Apps Script **không có `import`**. Mọi tệp máy chủ dùng chung một vùng tên toàn cục, nên hai tệp khai trùng một tên thì bản nạp sau lặng lẽ thắng. Thư mục ở đây là để người đọc tìm được việc, không phải để máy ngăn cách.
 
 ```
@@ -78,6 +78,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │       └── MeasureLog.js         Đo chi phí thật của deleteRows trên sheet Log lớn. Con số trong tài liệu 10 đến từ đây.
 │
 ├── client\                       Code chạy trong sidebar. Tệp .html bọc thẻ <script>, hoặc bọc thẻ <style> nếu là tệp chỉ có CSS.
+│   │                             Thư mục con chia theo MỤC ĐÍCH, không chia theo đuôi thẻ.
 │   ├── Sidebar.html              Trang gốc của sidebar: nhúng mọi tệp client theo đúng thứ tự rồi gọi lượt nạp đầu tiên.
 │   ├── ram\                      Kho dữ liệu trong RAM của sidebar, và đường nhận dữ liệu từ máy chủ.
 │   │   ├── store.html            Kho runtime cùng bảy đường tra duy nhất được chạm vào nó. Không đường nào nhận tham số chế độ xem.
@@ -86,11 +87,13 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   ├── schema\
 │   │   ├── schemaAccess.html     Cửa tra bảng khai bên client. Hỏi tên trường không có thì ném lỗi kèm gợi ý tên gần đúng, không trả về undefined.
 │   │   └── schemaCheck.html      Phép tự kiểm bảng khai cột, chạy được ở cả hai phía.
-│   ├── ui\                       Khung nhìn và các màn chung. spatialConfig giữ toàn quyền về khoảng cách.
-│   │   ├── tokens.html           Khối biến CSS: màu, cỡ chữ, khoảng cách. Chỉ có <style>, không khai tên JavaScript nào.
-│   │   ├── frame.html            Khung sidebar: thanh trên, vùng cuộn, chân trang. Cũng chỉ có <style>.
-│   │   ├── progress.html         Vạch tiến trình cho mọi lượt gọi máy chủ.
-│   │   └── statusScreen.html     Màn trạng thái chiếm trọn khung: đang nạp, lỗi, và màn chặn khi vượt trần ngân sách ô.
+│   ├── style\                    Hình thức DÙNG CHUNG cho mọi màn. Chỉ có <style>, không khai tên JavaScript nào.
+│   │   ├── tokens.html           Khối biến CSS: màu, cỡ chữ, khoảng cách. Đổi diện mạo thì vào đây.
+│   │   └── frame.html            Bố cục năm vùng: thanh trên, vạch tiến trình, khối thông tin, thân cuộn, chân trang.
+│   ├── ui\                       Bộ máy giao diện màn nào cũng gọi được. spatialConfig giữ toàn quyền về khoảng cách.
+│   │   └── progress.html         Vạch tiến trình cho mọi lượt gọi máy chủ. Đếm số lời gọi đang chờ, không giữ một cờ bật tắt.
+│   ├── screen\                   Một tệp một màn người dùng nhìn thấy. Màn được mang theo style riêng, vì style đó chết cùng màn đó.
+│   │   └── statusScreen.html     Ba màn không có form: tóm tắt lượt nạp, lỗi nạp, và màn chặn khi vượt trần ngân sách ô.
 │   └── util\
 │       ├── serverCall.html       Bọc google.script.run thành Promise kèm vạch tiến trình. Cố ý KHÔNG tự hiện lỗi — việc đó của bên gọi.
 │       └── textNormalize.html    Bản sinh đôi client của server\util\TextNormalize.js. [RÀNG BUỘC CỨNG] hai bản phải giống nhau.
@@ -157,10 +160,15 @@ Không sửa tên trong tài liệu thiết kế vì hai lẽ: chúng là bản 
 | `client/ram/store.js` | `client/ram/store.html` |
 | `client/ram/ingest.js` | `client/ram/ingest.html` |
 | `client/schema/schemaAccess.js` | `client/schema/schemaAccess.html` |
+| `client/ui/styles.html` | `client/style/tokens.html` + `client/style/frame.html` |
+| `client/ui/tokens.html` | `client/style/tokens.html` |
+| `client/ui/frame.html` | `client/style/frame.html` |
 
 Tám tệp máy chủ dựng ở chặng 1.1 và 1.2 không có trong bảng này vì tài liệu thiết kế không đặt tên cho chúng: `SheetGrid.js`, `CellBudget.js`, `EntityRead.js`, `CategoryRead.js`, `ConfigRead.js`, `DateText.js`, `EntryPoint.js`, `ErrorReport.js`. Tài liệu nói *phải làm gì* ở các phần tương ứng, còn việc gom mỗi luật vào một tệp là quyết định của phiên code — nên chỗ tra chúng là cây thư mục ở trên, không phải bảng này.
 
-Bốn dòng cuối bảng lệch vì một lý do khác hẳn các dòng trên, đã ghi ở tài liệu làm việc `Mục tiêu chặng 1.1 và 1.2.md`: **mọi** tệp client trên Apps Script buộc phải là `.html`, không phải `.js` như tài liệu 04 Phần 10 và 05 Phần 13 viết.
+Bốn dòng `client/...js` lệch vì một lý do khác hẳn các dòng trên, đã ghi ở tài liệu làm việc `Mục tiêu chặng 1.1 và 1.2.md`: **mọi** tệp client trên Apps Script buộc phải là `.html`, không phải `.js` như tài liệu 04 Phần 10 và 05 Phần 13 viết.
+
+Ba dòng cuối lệch vì thư mục: tài liệu 04 gom cả CSS vào `client/ui/`, còn code chia `client/style/` cho hình thức dùng chung, `client/ui/` cho bộ máy giao diện, `client/screen/` cho từng màn. Chủ dự án chốt cách chia này 05/09/2026 và tài liệu 04 Phần 10 đã sửa theo.
 
 ## Thư mục sẽ dựng ở các chặng tới
 
@@ -169,6 +177,7 @@ Ghi ra đây để chỗ đặt tệp mới là điều đã quyết trước, k
 ```
 server\gate\                      Các cửa ghi có kỷ luật: WriteGate, IdGate, DeleteGate — cùng họ với LogGate.
 server\view\                      Dựng sheet quản lý: đọc bộ lọc, sắp xếp, vẽ lại vùng dữ liệu.
-client\form\                      Dựng biểu mẫu từ bảng khai cột.
 client\save\                      Đường lưu: gom dữ liệu form, gọi máy chủ, hoàn tác.
 ```
+
+Biểu mẫu **không** có thư mục riêng: bộ máy dựng form là `client\ui\` (uiBuilder, renderEngine, actions, slots), bảng khai form là `client\schema\` (uiSchema, fieldLogic), và mỗi màn có form là một tệp trong `client\screen\`.

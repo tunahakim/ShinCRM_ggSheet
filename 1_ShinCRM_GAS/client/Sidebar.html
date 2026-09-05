@@ -13,11 +13,15 @@
     phụ thuộc, và `bootstrap` vào cuối vì nó là thứ gọi mọi thứ khác. `textNormalize` tự chạy bảng ca chuẩn ngay lúc nạp
     nên nó phải vào trước những chỗ dùng tới nó.
 
+    Bốn thư mục con của `client/` chia theo mục đích, không chia theo đuôi thẻ: `style/` là hình thức dùng chung cho mọi
+    màn, `ui/` là bộ máy màn nào cũng gọi được, `screen/` là một tệp một màn người dùng nhìn thấy, còn `ram/`, `schema/`,
+    `util/` thì đúng như tên. Một tệp trong `screen/` được mang theo style riêng của nó, vì style đó chết cùng màn đó.
+
     **Đường dẫn trong `include` là cả đường dẫn, không có đuôi tệp.** Khi clasp đẩy lên Google, tên tệp trên đó chính là
-    đường dẫn ở máy: `client/ui/tokens.html` thành tệp tên `client/ui/tokens`. Ghi tên cụt là lỗi chỉ lộ ra lúc chạy thật.
+    đường dẫn ở máy: `client/style/tokens.html` thành tệp tên `client/style/tokens`. Ghi tên cụt là lỗi chỉ lộ ra lúc chạy thật.
   -->
-  <?!= include('client/ui/tokens') ?>
-  <?!= include('client/ui/frame') ?>
+  <?!= include('client/style/tokens') ?>
+  <?!= include('client/style/frame') ?>
 </head>
 
 <body>
@@ -49,7 +53,7 @@
   <?!= include('client/ram/store') ?>
   <?!= include('client/ram/ingest') ?>
   <?!= include('client/ui/progress') ?>
-  <?!= include('client/ui/statusScreen') ?>
+  <?!= include('client/screen/statusScreen') ?>
   <?!= include('client/ram/bootstrap') ?>
 
   <script>

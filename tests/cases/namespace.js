@@ -48,7 +48,7 @@ function tenKhaiBao(code) {
 /**
  * Đọc phần mã thật của một tệp: tệp `.html` thì cắt ruột thẻ `<script>`, tệp `.js` thì lấy nguyên.
  *
- * Tệp client chỉ có `<style>` — `client/ui/tokens.html` và `client/ui/frame.html` — không khai tên nào nên trả về chuỗi rỗng. Nhưng tệp **không có cả hai** thẻ thì ném lỗi: một tệp client rỗng ruột là tệp bị nhúng vào trang mà chẳng đưa gì vào, và nó sẽ lặng lẽ không làm gì thay vì báo lỗi ở chỗ dùng.
+ * Tệp client chỉ có `<style>` — `client/style/tokens.html` và `client/style/frame.html` — không khai tên nào nên trả về chuỗi rỗng. Nhưng tệp **không có cả hai** thẻ thì ném lỗi: một tệp client rỗng ruột là tệp bị nhúng vào trang mà chẳng đưa gì vào, và nó sẽ lặng lẽ không làm gì thay vì báo lỗi ở chỗ dùng.
  */
 function docMa(duongDanTuongDoi) {
   const raw = fs.readFileSync(path.join(GAS_DIR, duongDanTuongDoi), 'utf8');

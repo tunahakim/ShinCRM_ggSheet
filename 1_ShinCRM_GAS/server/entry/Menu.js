@@ -52,7 +52,7 @@ function shinShowSidebar() {
 /**
  * Nhét nội dung một tệp html khác vào chỗ gọi, dùng trong thẻ scriptlet của template.
  *
- * Tham số là **cả đường dẫn không có đuôi**: `include('client/ui/styles')`, không phải `include('styles')`.
+ * Tham số là **cả đường dẫn không có đuôi**: `include('client/style/tokens')`, không phải `include('tokens')`.
  */
 function include(path) {
   return HtmlService.createHtmlOutputFromFile(path).getContent();
