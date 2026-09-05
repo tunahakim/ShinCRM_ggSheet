@@ -66,7 +66,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   └── LoadService.js        Gom cả một lượt nạp: đo ngân sách ô, đọc tham số, danh mục, toàn bộ khách, rồi giao dịch theo gói.
 │   ├── log\
 │   │   ├── LogGate.js            Cửa ghi log: gom dòng trong RAM, ghi xuống sheet Log bằng đúng một lệnh, che bí mật, cắt log theo hai trần.
-│   │   └── ClientTiming.js       Cửa nhận bản đo thời gian ĐO Ở TRÌNH DUYỆT rồi ghi một dòng. Máy chủ không tự thấy tiền đi đường, nên số này phải do client gửi. Không tin số client: kẹp trần, bỏ khóa lạ.
+│   │   └── ClientTiming.js       Cửa nhận bản đo thời gian ĐO Ở TRÌNH DUYỆT rồi đệm một dòng vết. Máy chủ không tự thấy tiền đi đường, nên số này phải do client gửi. Không tin số client: kẹp trần, bỏ khóa lạ.
 │   ├── entry\                    Cửa vào hệ thống, và nửa đưa lỗi tới mắt người.
 │   │   ├── EntryPoint.js         Vỏ bọc runEntryPoint: ghi log kèm vết, báo cho người dùng, ném lại lỗi, và luôn xả bộ đệm log ở finally.
 │   │   ├── ErrorReport.js        Đưa lỗi tới mắt người theo bốn kênh. Lỗi ở onOpen thì để dành, hiện ở lần mở sidebar sau.
@@ -78,6 +78,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │       ├── DumpGrid.js           Đo lưới từng sheet: bao nhiêu hàng, bao nhiêu cột, còn chỗ ghi thêm bao nhiêu hàng.
 │       ├── MeasureLog.js         Đo chi phí thật của deleteRows trên sheet Log lớn. Con số trong tài liệu 10 đến từ đây.
 │       ├── MeasureChunk.js       Đo đường nạp trên dữ liệu đang có, không ghi ô nào: measureFirstPaint đo thời gian tới khung hình đầu, measureChunkRows so các cỡ gói.
+│       ├── LogTraceSwitch.js     Bật/tắt tham số LOG_TRACE ở sheet Config: devLogTraceOn ghi "all", devLogTraceOff xóa trắng. Tra cột theo mã hàng 1 nên không gõ sai khối.
 │       └── SeedFake.js           Sinh dữ liệu giả cho Customer, Activity, Category và ĐỂ LẠI trên sheet để mở ra xem được. Mọi cột @ lõi khai đều có giá trị. Xóa bằng wipeFakeData.
 │
 ├── client\                       Code chạy trong sidebar. Tệp .html bọc thẻ <script>, hoặc bọc thẻ <style> nếu là tệp chỉ có CSS.

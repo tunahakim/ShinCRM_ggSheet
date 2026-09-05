@@ -21,6 +21,7 @@ var DEV_RUNNER_ALLOWED = [
   'smokeTest', 'smokeDiag', 'setupSheets', 'verifySheets', 'measureDeleteRows', 'measureChunkRows', 'measureFirstPaint',
   'seedFakeData', 'seedFakeCategory', 'wipeFakeData',
   'dumpColumnMap', 'dumpSettings', 'dumpSheetGrid',
+  'devLogTraceOn', 'devLogTraceOff',
   'probeBadColumnCode', 'probeLogGate', 'probeDateText', 'probeSheetGrid', 'probeCellBudget',
   'probeEntityRead', 'probeCategoryRead', 'probeConfigRead', 'probeDirtyState',
   'probeErrorReport', 'probeEntryPoint', 'probeLoadAll', 'probeSidebarTemplate', 'probeClientTiming'
