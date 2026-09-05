@@ -21,9 +21,13 @@
  *
  * Bắt lỗi ở đây **không phải nuốt lỗi**: máy chủ đã ghi dòng log kèm vết gọi trước khi ném, còn việc còn lại của client là
  * hiện nó lên. Nếu không bắt thì thông báo chỉ nằm trong console của trình duyệt, chỗ mà chủ dự án không có lý do gì để mở.
+ *
+ * Bản đo thời gian chỉ gửi ở đường chạy xuôi. Đường lỗi thì không, vì lượt gửi đó cũng đi qua `google.script.run`: nếu thứ
+ * vừa gãy chính là đường truyền thì nó gãy lần nữa và cuốn theo thông báo lỗi thật — đúng lúc người dùng cần đọc thông báo
+ * đó nhất. Lượt chạy vỡ đã có dòng log kèm vết gọi do máy chủ tự ghi.
  */
 async function sidebarBoot() {
-  var batDau = Date.now();
+  callTimingReset(Date.now());
 
   try {
     statusInfoLine('Đang đo ngân sách ô và nạp lõi…');
@@ -36,18 +40,23 @@ async function sidebarBoot() {
 
     var skipped = ingestCore(core);
     statusInfoLine('Tra cứu khách đã chạy — đang nạp giao dịch ở chế độ nền…');
+    callTimingFirstPaint(Date.now());
 
     var loaded = await bootLoadActivities(core.activity.total);
 
     ingestActivityDone();
+    var timing = callTimingReport(Date.now());
+
     statusLoadSummary({
       core: core,
       activityRecords: loaded.records,
       activityChunks: loaded.chunks,
       warnings: core.warnings,
       skipped: skipped,
-      ms: Date.now() - batDau
+      timing: timing
     });
+
+    await callServer('logClientTiming', [timing]);
   } catch (err) {
     statusLoadError(err && err.message ? err.message : String(err));
   }

@@ -1,0 +1,65 @@
+<script>
+/**
+ * Sổ đo thời gian của từng vòng gọi máy chủ. Không chạm DOM, không chạm `google`, nên kiểm được offline.
+ *
+ * Vì sao cần: sheet `Log` chỉ ghi được thứ **máy chủ** tự đo, tức thời gian tính toán bên trong một lời gọi. Nó không thấy tiền đi đường của `google.script.run`, không thấy thời gian trình duyệt bung một khối 680 KB, và không cộng năm gói lại thành một con số. Kết quả là một lượt nạp người dùng chờ 40 giây hiện ra trong log thành "3,6 giây" rồi "3,5 giây" — mỗi con số đều đúng, và cả bảng vẫn nói sai chuyện.
+ *
+ * Chỗ duy nhất đo được đủ là phía client, vì chỉ nó biết cả hai đầu của một vòng. Sổ này giữ những con số đó rồi trả về một bản tóm tắt để ghi vào `Log`.
+ *
+ * **Hiệu số mới là phần đáng xem.** `msMayChu` là thứ log cũ đã có. `msDiDuong` — client đo được trừ máy chủ báo — là phần chưa ai đo, và nó là con số quyết định cỡ gói: nếu mỗi vòng tốn vài giây tiền đi đường thì gói to đi ít vòng có thể bù lại phần tính toán chậm hơn của nó.
+ */
+
+/** Sổ của lượt khởi động đang chạy. Một biến toàn cục vì một sidebar chỉ có một lượt khởi động, và bên gọi không phải mang sổ đi theo qua bốn tầng hàm. */
+var CALL_TIMING = { calls: [], startedAt: null, firstPaintAt: null };
+
+/** Mở sổ mới. Gọi ở đầu trình tự khởi động, để lượt đo không dính con số của lượt trước khi người dùng bấm nạp lại. */
+function callTimingReset(now) {
+  CALL_TIMING = { calls: [], startedAt: now, firstPaintAt: null };
+}
+
+/**
+ * Ghi một vòng vào sổ: tên hàm, thời gian client đo được, thời gian máy chủ tự báo.
+ *
+ * `msServer` vắng — hàm máy chủ không trả khóa `ms` — thì ghi `null` chứ không ghi `0`. Ghi `0` là nói "máy chủ tính toán tức thì", một câu sai làm phồng phần tiền đi đường lên đúng bằng phần bị mất.
+ */
+function callTimingRecord(name, msClient, msServer) {
+  var soClient = Number(msClient);
+  var soServer = Number(msServer);
+
+  CALL_TIMING.calls.push({
+    name: String(name),
+    msClient: isFinite(soClient) && soClient >= 0 ? Math.round(soClient) : 0,
+    msServer: isFinite(soServer) && soServer >= 0 ? Math.round(soServer) : null
+  });
+}
+
+/** Đánh dấu mốc khung hình đầu tiên — lúc sidebar đã vẽ xong và tra cứu đã chạy được. Mốc này không phải một vòng gọi nên nó ở riêng. */
+function callTimingFirstPaint(now) {
+  if (CALL_TIMING.firstPaintAt === null) { CALL_TIMING.firstPaintAt = now; }
+}
+
+/**
+ * Bản tóm tắt để ghi vào `Log`. Trả về object phẳng gồm toàn số, vì nó đi qua `google.script.run` rồi vào cột `Chi tiết kỹ thuật`.
+ *
+ * `msKhachLamViec` là phần còn lại sau khi trừ mọi vòng gọi khỏi tổng — tức thời gian bung dữ liệu và vẽ. Nó có thể ra số âm nếu đồng hồ máy nhảy giữa lượt chạy; kẹp về 0 thay vì gửi một số âm, vì một số âm trong log là thứ làm người đọc mất thời gian nghi ngờ chính phép đo.
+ */
+function callTimingReport(now) {
+  var tong = CALL_TIMING.startedAt === null ? 0 : Math.max(0, Math.round(now - CALL_TIMING.startedAt));
+  var coDoMayChu = CALL_TIMING.calls.filter(function (c) { return c.msServer !== null; });
+
+  var msClient = CALL_TIMING.calls.reduce(function (s, c) { return s + c.msClient; }, 0);
+  var msMayChu = coDoMayChu.reduce(function (s, c) { return s + c.msServer; }, 0);
+  var msDiDuong = coDoMayChu.reduce(function (s, c) { return s + Math.max(0, c.msClient - c.msServer); }, 0);
+
+  return {
+    soVong: CALL_TIMING.calls.length,
+    msTong: tong,
+    msKhungHinhDau: CALL_TIMING.firstPaintAt === null ? null : Math.max(0, Math.round(CALL_TIMING.firstPaintAt - CALL_TIMING.startedAt)),
+    msMayChu: msMayChu,
+    msDiDuong: msDiDuong,
+    msDiDuongMoiVong: coDoMayChu.length === 0 ? null : Math.round(msDiDuong / coDoMayChu.length),
+    msKhachLamViec: Math.max(0, tong - msClient),
+    vong: CALL_TIMING.calls.map(function (c) { return c.name + ' ' + c.msClient + '/' + (c.msServer === null ? '?' : c.msServer); })
+  };
+}
+</script>

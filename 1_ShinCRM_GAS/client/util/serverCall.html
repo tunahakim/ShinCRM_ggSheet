@@ -12,6 +12,9 @@
  *
  * **Không tự hiện lỗi.** Việc hiện thuộc bên gọi, vì cùng một lỗi thì đường nạp lõi phải vẽ màn chặn cả khung, còn đường
  * nạp gói nền chỉ nên ghi một dòng trong khối thông tin. Một hàm hiện lỗi chung ở đây sẽ hiện sai ở một trong hai ca.
+ *
+ * Phép đo thời gian mỗi vòng cũng nằm ở đây, và cũng vì lý do "một cửa duy nhất": đây là chỗ duy nhất thấy được **cả hai
+ * đầu** của một vòng gọi, nên là chỗ duy nhất đo được tiền đi đường. Việc giữ và cộng các con số thuộc `callTiming`.
  */
 
 /**
@@ -23,10 +26,19 @@
 function callServer(name, args) {
   return new Promise(function (resolve, reject) {
     progressBegin();
+    var batDau = Date.now();
 
     var runner = google.script.run
-      .withSuccessHandler(function (result) { progressEnd(); resolve(result); })
-      .withFailureHandler(function (err) { progressEnd(); reject(err); });
+      .withSuccessHandler(function (result) {
+        progressEnd();
+        callTimingRecord(name, Date.now() - batDau, result && result.ms);
+        resolve(result);
+      })
+      .withFailureHandler(function (err) {
+        progressEnd();
+        callTimingRecord(name, Date.now() - batDau, null);
+        reject(err);
+      });
 
     runner[name].apply(runner, args || []);
   });

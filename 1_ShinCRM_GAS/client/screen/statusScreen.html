@@ -124,14 +124,24 @@ function statusKeyValues(pairs) {
   return '<dl class="shin-kv">' + items.join('') + '</dl>';
 }
 
+/** Một con số mili giây kèm cách đọc theo giây, vì "45.145 ms" thì phải nhẩm mới biết là 45 giây. `null` nghĩa là không đo được. */
+function statusMs(ms) {
+  if (ms === null || ms === undefined) { return 'không đo được'; }
+  return statusNumber(ms) + ' ms (' + (ms / 1000).toFixed(1) + ' s)';
+}
+
 /**
  * Bản tóm tắt lượt nạp — màn tạm của chặng này, thay bằng màn `view` khi có bộ render.
  *
  * Nó in cả danh sách phép tự kiểm **bị bỏ qua** vì thiếu đầu vào. Bỏ qua trong im lặng là cách chắc chắn nhất để có một bộ
  * kiểm xanh mà chẳng kiểm gì, nên chỗ nào bỏ qua thì chỗ đó phải đọc được bằng mắt.
+ *
+ * Khối thời gian tách làm bốn phần vì một con số duy nhất không trả lời được câu "chậm ở đâu". Thời gian tính toán của máy
+ * chủ và tiền đi đường của `google.script.run` là hai thứ sửa bằng hai cách khác nhau, nên chúng phải hiện thành hai dòng.
  */
 function statusLoadSummary(info) {
   var core = info.core;
+  var timing = info.timing || {};
   var categoryValues = Object.keys(Store.categories).reduce(function (sum, code) { return sum + Store.categories[code].length; }, 0);
 
   var parts = ['<div class="shin-screen">', '<h2>Nạp xong</h2>'];
@@ -144,9 +154,19 @@ function statusLoadSummary(info) {
     ['Danh mục', Object.keys(Store.categories).length + ' cột / ' + statusNumber(categoryValues) + ' giá trị'],
     ['Config', 'tham số ' + Object.keys(Store.config.params).length + ' · ngầm định ' + Object.keys(Store.config.defaults).length + ' · bộ đếm ' + Object.keys(Store.config.counters).length + ' · sắp xếp ' + Store.config.sort.length + ' cấp'],
     ['Ngân sách ô', statusNumber(core.budget.total) + ' / ' + statusNumber(core.budget.ceiling) + ' (' + core.budget.ceilingSource + ')'],
-    ['Thời gian', 'lõi ' + core.ms + ' ms · cả lượt ' + info.ms + ' ms'],
     ['Trạng thái giao dịch', Store.activityState]
   ]));
+
+  parts.push('<div class="shin-box"><b>Thời gian lượt nạp này</b>'
+    + statusKeyValues([
+      ['Tổng — thứ bạn chờ', statusMs(timing.msTong)],
+      ['Tới khung hình đầu tiên', statusMs(timing.msKhungHinhDau)],
+      ['Máy chủ tính toán', statusMs(timing.msMayChu) + ' — cộng cả ' + (timing.soVong || 0) + ' vòng'],
+      ['Tiền đi đường', statusMs(timing.msDiDuong) + ' — mỗi vòng ' + statusMs(timing.msDiDuongMoiVong)],
+      ['Trình duyệt bung và vẽ', statusMs(timing.msKhachLamViec)]
+    ])
+    + '<p>Ba phần dưới cộng lại bằng phần trên. Sheet <code>Log</code> nhận đúng năm con số này ở dòng <code>sidebarBoot</code>; các dòng <code>loadCore</code> và <code>loadActivityChunk</code> chỉ đo phần tính toán của <b>một</b> lời gọi, nên không so trực tiếp với tổng được.</p>'
+    + '</div>');
 
   if (info.warnings && info.warnings.length) {
     parts.push('<div class="shin-box shin-box--warn"><b>Cảnh báo</b><br>' + info.warnings.map(statusEscape).join('<br>') + '</div>');

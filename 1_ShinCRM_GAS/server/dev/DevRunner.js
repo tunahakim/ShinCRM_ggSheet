@@ -23,7 +23,7 @@ var DEV_RUNNER_ALLOWED = [
   'dumpColumnMap', 'dumpSettings', 'dumpSheetGrid',
   'probeBadColumnCode', 'probeLogGate', 'probeDateText', 'probeSheetGrid', 'probeCellBudget',
   'probeEntityRead', 'probeCategoryRead', 'probeConfigRead', 'probeDirtyState',
-  'probeErrorReport', 'probeEntryPoint', 'probeLoadAll', 'probeSidebarTemplate'
+  'probeErrorReport', 'probeEntryPoint', 'probeLoadAll', 'probeSidebarTemplate', 'probeClientTiming'
 ];
 
 /**
