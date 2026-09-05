@@ -37,6 +37,12 @@ var SETTINGS = {
    * Đường cong hình chữ U, và hai đầu đắt vì hai lý do khác nhau. Gói nhỏ trả tiền cho số vòng gọi. Gói lớn trả tiền cho việc Google phải dựng một khối kết quả 2,2 MB trong một lượt — chi phí đó không tăng theo đường thẳng.
    *
    * **Lượt đo đầu, chạy trên sheet rỗng rồi tự ghi hàng giả, cho kết quả phẳng và kết luận đó sai.** Hàng giả lúc ấy nội dung ngắn và cả tệp chỉ có sheet `Activity` có dữ liệu. Sai số đó là lý do phép đo bây giờ chỉ đọc dữ liệu có thật trên sheet.
+   *
+   * **Bảng trên chỉ đo phần máy chủ.** Phần còn thiếu — tiền đi đường của `google.script.run` — đo được ngày 05/09/2026 từ phía sidebar: **2.208 ms mỗi vòng**. Một lượt mở sidebar thật mất 43,9 s, chia ra máy chủ 30,6 s (70 phần trăm), đi đường 13,2 s (30 phần trăm), trình duyệt bung và vẽ 0,075 s. Con số cuối nhỏ tới mức không cần bàn: bung dữ liệu vào RAM gần như miễn phí.
+   *
+   * Cộng cả hai phần thì 2.000 vẫn thắng, và đây là phép cộng đầy đủ cuối cùng chốt con số này. Gói 10.000 tiết kiệm bốn vòng gọi, tức 8,5 s tiền đi đường, nhưng trả thêm 13–17 s ở phần máy chủ. Tổng ước tính 48–54 s so với 43,9 s đo được. **Chốt hẳn 2.000.**
+   *
+   * Lượt đo đó còn cho một lý do thứ hai để không dùng gói to: năm gói cùng cỡ 2.000 hàng mất 4,66 / 4,49 / **9,02** / 3,70 / 3,85 giây phía máy chủ. Cùng số hàng, cùng số cột, mà một gói đắt gấp 1,75 lần bốn gói kia. Phương sai đó không mất đi khi gói to hơn — nó chỉ chuyển thành một lượt gọi duy nhất không có đường lùi.
    */
   CHUNK_ROWS: 2000,
   /**
