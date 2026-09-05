@@ -1,0 +1,145 @@
+<script>
+/**
+ * Bộ tự kiểm bảng khai schema, theo danh sách phép kiểm ở tài liệu 03 Phần 5.
+ *
+ * Nó ở phía sidebar vì tài liệu chốt vậy, và lý do là thực tế: phép kiểm `source` trỏ đúng danh mục cần nội dung sheet
+ * `Category`, mà sidebar là nơi đầu tiên có đủ cả `DATA_SCHEMA`, `UI_SCHEMA` và `Category` trong tay cùng lúc.
+ *
+ * Chỉ có **một** bản của bộ kiểm này, và nó là bản này. Bộ kiểm Node nạp chính tệp này rồi chạy trên bảng khai thật cộng
+ * dữ liệu giả, nên luật được kiểm lúc phát triển và lúc chạy thật là cùng một đoạn code, không phải hai bản anh em.
+ *
+ * Hàm trả về cả danh sách phép kiểm đã BỎ QUA vì thiếu đầu vào. Bỏ qua trong im lặng là cách chắc chắn nhất để có một
+ * bộ kiểm xanh mà chẳng kiểm gì.
+ */
+
+/** Kiểu và độ chi tiết hợp lệ. Giữ bản sao ở đây vì tệp client không đọc được `DataSchema.gs`; bộ kiểm Node so hai bản với nhau. */
+var SCHEMA_CHECK_TYPES = ['TEXT', 'NUMBER', 'DATE', 'SELECT'];
+var SCHEMA_CHECK_PRECISIONS = ['day', 'minute'];
+
+/** Mã cột đúng dạng: `@`, chữ HOA và số, phân tách bằng gạch dưới, không dấu chấm. Tài liệu 02 Phần 2.3. */
+var SCHEMA_CHECK_CODE_PATTERN = /^@[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$/;
+
+/**
+ * Chạy toàn bộ phép kiểm khai được với những gì bên gọi đưa vào.
+ *
+ * `input.dataSchema` là bắt buộc. Các mục còn lại thiếu thì phép kiểm tương ứng bị bỏ qua và có tên trong `skipped`:
+ * `categoryCodes` (mảng mã `@CAT_` có thật trên sheet), `functionTables` ({ DEFAULTS, NORMALIZERS, VALIDATORS }),
+ * `configDefaultCodes` (mảng mã cột có dòng trong bảng ngầm định gõ tay của `Config`), `uiSchema`.
+ */
+function checkSchema(input) {
+  var problems = [];
+  var skipped = [];
+  var dataSchema = input && input.dataSchema;
+
+  if (!dataSchema) {
+    throw new Error('checkSchema cần dataSchema. Không có bảng khai thì không có gì để kiểm.');
+  }
+
+  var codeOwner = {};
+
+  Object.keys(dataSchema).forEach(function (entity) {
+    var fields = dataSchema[entity];
+
+    Object.keys(fields).forEach(function (fieldName) {
+      var field = fields[fieldName];
+      var at = entity + '.' + fieldName;
+
+      if (!field.code) {
+        problems.push(at + ' thiếu `code`.');
+      } else if (!SCHEMA_CHECK_CODE_PATTERN.test(field.code)) {
+        problems.push(at + ' có mã cột "' + field.code + '" sai dạng. Mã phải mở đầu bằng @, viết HOA, phân tách bằng gạch dưới, không dấu chấm.');
+      } else if (codeOwner[field.code]) {
+        problems.push('mã cột "' + field.code + '" khai ở hai chỗ: ' + codeOwner[field.code] + ' và ' + at + '.');
+      } else {
+        codeOwner[field.code] = at;
+      }
+
+      if (!field.label) {
+        problems.push(at + ' thiếu `label`.');
+      }
+
+      if (SCHEMA_CHECK_TYPES.indexOf(field.type) === -1) {
+        problems.push(at + ' có type "' + field.type + '", phải là một trong ' + SCHEMA_CHECK_TYPES.join(', ') + '.');
+      }
+
+      if (field.type === 'SELECT') {
+        var hasSource = typeof field.source === 'string' && field.source !== '';
+        var hasOptions = Array.isArray(field.options) && field.options.length > 0;
+        if (hasSource && hasOptions) {
+          problems.push(at + ' là SELECT nhưng có cả `source` lẫn `options`. Phải có đúng một trong hai.');
+        } else if (!hasSource && !hasOptions) {
+          problems.push(at + ' là SELECT nhưng không có `source` cũng không có `options`.');
+        }
+      } else if (field.source || field.options) {
+        problems.push(at + ' không phải SELECT nhưng có `source` hoặc `options`.');
+      }
+
+      if (field.type === 'DATE') {
+        if (SCHEMA_CHECK_PRECISIONS.indexOf(field.precision) === -1) {
+          problems.push(at + ' là DATE nhưng `precision` là "' + field.precision + '", phải là day hoặc minute.');
+        }
+      } else if (field.precision) {
+        problems.push(at + ' không phải DATE nhưng có `precision`.');
+      }
+    });
+  });
+
+  // Phép kiểm cần nội dung sheet Category.
+  if (Array.isArray(input.categoryCodes)) {
+    Object.keys(dataSchema).forEach(function (entity) {
+      var fields = dataSchema[entity];
+      Object.keys(fields).forEach(function (fieldName) {
+        var source = fields[fieldName].source;
+        if (source && input.categoryCodes.indexOf(source) === -1) {
+          problems.push(entity + '.' + fieldName + ' trỏ `source` tới "' + source + '" nhưng sheet Category không có mã cột đó.');
+        }
+      });
+    });
+  } else {
+    skipped.push('source trỏ đúng danh mục trên sheet Category');
+  }
+
+  // Phép kiểm cần ba bảng hàm của tài liệu 03 Phần 6.
+  var tables = input.functionTables;
+  if (tables && tables.DEFAULTS && tables.NORMALIZERS && tables.VALIDATORS) {
+    var pairs = [['default', 'DEFAULTS'], ['normalize', 'NORMALIZERS'], ['validate', 'VALIDATORS']];
+    Object.keys(dataSchema).forEach(function (entity) {
+      var fields = dataSchema[entity];
+      Object.keys(fields).forEach(function (fieldName) {
+        pairs.forEach(function (pair) {
+          var name = fields[fieldName][pair[0]];
+          if (name && typeof tables[pair[1]][name] !== 'function') {
+            problems.push(entity + '.' + fieldName + ' khai `' + pair[0] + ': "' + name + '"` nhưng bảng ' + pair[1] + ' không có hàm tên đó.');
+          }
+        });
+      });
+    });
+  } else {
+    skipped.push('tên hàm trong default, normalize, validate có trong bảng tra');
+  }
+
+  // Luật một nguồn ngầm định của tài liệu 03 Phần 2.
+  if (Array.isArray(input.configDefaultCodes)) {
+    Object.keys(dataSchema).forEach(function (entity) {
+      var fields = dataSchema[entity];
+      Object.keys(fields).forEach(function (fieldName) {
+        var field = fields[fieldName];
+        if (field.default && input.configDefaultCodes.indexOf(field.code) !== -1) {
+          problems.push(entity + '.' + fieldName + ' có `default` trong DATA_SCHEMA và đồng thời có dòng trong bảng ngầm định của Config. Chỉ được một nơi.');
+        }
+      });
+    });
+  } else {
+    skipped.push('luật một nguồn ngầm định giữa DATA_SCHEMA và Config');
+  }
+
+  // Tên trường trong UI_SCHEMA phải có trong DATA_SCHEMA.
+  if (input.uiSchema) {
+    skipped.push('UI_SCHEMA — chặng 1.3 dựng bảng đó thì bổ sung phép kiểm vào đây');
+  } else {
+    skipped.push('tên trường của UI_SCHEMA có trong DATA_SCHEMA');
+  }
+
+  return { problems: problems, skipped: skipped };
+}
+</script>

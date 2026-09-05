@@ -13,7 +13,32 @@
  */
 
 /** Danh sách trắng: tên hàm mà cửa này được phép chạy. Thêm tên vào đây là việc có ý thức, không phải việc tình cờ. */
-var DEV_RUNNER_ALLOWED = ['smokeTest', 'smokeDiag', 'setupSheets', 'verifySheets', 'measureDeleteRows'];
+var DEV_RUNNER_ALLOWED = [
+  'smokeTest', 'smokeDiag', 'setupSheets', 'verifySheets', 'measureDeleteRows',
+  'dumpColumnMap', 'probeBadColumnCode'
+];
+
+/**
+ * Đổi thứ hàm trả về thành văn bản đọc được.
+ *
+ * Vì sao cần hàm này: cửa chạy chỉ nói được văn bản, nên trước đây nó gọi `String(result)`. Một hàm trả về đối tượng thì
+ * `String()` cho ra đúng chữ "[object Object]" — chạy xong, không lỗi, và không biết gì hơn lúc chưa chạy. Một phép nghiệm thu
+ * không đọc được kết quả thì bằng không có phép nghiệm thu.
+ *
+ * Mảng xuống dòng từng phần tử vì các phép nghiệm thu đều trả về mảng dòng báo cáo. Đối tượng thì JSON có thụt lề.
+ */
+function devFormatResult(result) {
+  if (result === undefined) { return '(hàm không trả về gì)'; }
+  if (result === null) { return '(hàm trả về null)'; }
+  if (typeof result === 'string') { return result; }
+  if (Array.isArray(result)) {
+    return result.map(function (item) { return devFormatResult(item); }).join('\n');
+  }
+  if (typeof result === 'object') {
+    try { return JSON.stringify(result, null, 2); } catch (loiJson) { return String(result); }
+  }
+  return String(result);
+}
 
 /**
  * Nhận lời gọi từ bên ngoài. Trả về văn bản thuần, mở đầu bằng OK hoặc LOI để phía gọi đọc được kết quả mà không phải bóc HTML.
@@ -49,7 +74,7 @@ function doGet(e) {
     var started = new Date().getTime();
     var result = scope[name]();
     var elapsed = new Date().getTime() - started;
-    return reply('OK\nHàm: ' + name + '\nHết: ' + elapsed + ' ms\n\n' + (result === undefined ? '(hàm không trả về gì)' : String(result)));
+    return reply('OK\nHàm: ' + name + '\nHết: ' + elapsed + ' ms\n\n' + devFormatResult(result));
   } catch (loi) {
     var chiTiet = loi && loi.stack ? loi.stack : String(loi);
     return reply('LOI\nHàm: ' + name + '\n' + chiTiet);

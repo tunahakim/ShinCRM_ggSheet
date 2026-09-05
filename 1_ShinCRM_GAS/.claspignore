@@ -1,0 +1,16 @@
+# Danh sách tệp KHÔNG đẩy lên Apps Script.
+#
+# Vì sao phải có tệp này: clasp đọc .claspignore chứ không đọc .gitignore. Không có tệp này thì `clasp push`
+# đẩy mọi tệp khớp đuôi khai trong .clasp.json — mà `jsonExtensions` có `.json`, nên `creds.json` chứa bí mật
+# OAuth sẽ nằm luôn trong dự án Apps Script. Chặn ở đây là chặn đường bí mật lên Google.
+#
+# Ngược lại, server/DevToken.js CỐ Ý không có trong danh sách này: cửa chạy hàm lúc phát triển cần thẻ đó
+# ở phía Google mới hoạt động. Nó bị chặn ở .gitignore, tức chặn đường vào git, không phải chặn đường lên Google.
+
+creds.json
+client_secret*.json
+.clasprc.json
+.dev-token
+.dev-runner.json
+*.pem
+*.key

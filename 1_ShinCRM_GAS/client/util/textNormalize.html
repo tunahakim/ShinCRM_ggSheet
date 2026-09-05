@@ -1,0 +1,67 @@
+<script>
+/**
+ * Bản sinh đôi phía trang sidebar của `server/TextNormalize.gs`. Ruột hàm phải giống hệt bản kia, và bảng ca chuẩn cũng vậy.
+ *
+ * Vì sao tệp này đuôi `.html` chứ không phải `.js` như tài liệu 04 Phần 10 ghi: đẩy `.js` lên Apps Script theo đường tệp
+ * mã nguồn thì Google coi nó là code máy chủ, còn đẩy theo đường tệp HTML thì nội dung bị đổi ký tự — `a < b` về thành
+ * `a &lt; b`, tức JavaScript vỡ cú pháp. Nên client là tệp `.html` bọc thẻ `<script>`, nhúng vào `Sidebar.html` bằng `include()`.
+ *
+ * Sửa tệp này thì phải sửa `server/TextNormalize.gs` cùng lúc. `node tests/run.js` nạp hai tệp vào hai hộp cát riêng rồi so,
+ * nên quên một bên là bộ kiểm đỏ ngay.
+ */
+
+/** Bảng ca chuẩn của tài liệu 02 Phần 12. Phải giống hệt bảng trong `server/TextNormalize.gs`. */
+var TEXT_NORMALIZE_CASES = [
+  ['Hà Nội', 'ha noi'],
+  ['CÔNG TY TNHH', 'cong ty tnhh'],
+  ['  Đà   Nẵng  ', 'da nang'],
+  ['Nguyễn Văn Đức', 'nguyen van duc'],
+  ['0101-002', '0101-002'],
+  ['81. Tiềm năng cao', '81. tiem nang cao'],
+  ['', '']
+];
+
+/** Đưa một chuỗi về dạng so khớp. Ruột giống hệt bản máy chủ; xem tệp đó để biết vì sao thứ tự bốn bước không đổi được. */
+function normalizeText(value) {
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  var text = String(value);
+  text = text.replace(/đ/g, 'd').replace(/Đ/g, 'D');
+  text = text.normalize('NFD').replace(/\p{M}/gu, '');
+  text = text.toLowerCase();
+  text = text.replace(/\s+/g, ' ').trim();
+
+  return text;
+}
+
+/** Chạy bảng ca chuẩn, trả về danh sách ca sai. Danh sách rỗng là đạt. */
+function textNormalizeSelfCheck() {
+  var problems = [];
+  for (var i = 0; i < TEXT_NORMALIZE_CASES.length; i++) {
+    var input = TEXT_NORMALIZE_CASES[i][0];
+    var expected = TEXT_NORMALIZE_CASES[i][1];
+    var actual = normalizeText(input);
+    if (actual !== expected) {
+      problems.push('normalizeText("' + input + '") ra "' + actual + '" nhưng phải ra "' + expected + '"');
+    }
+  }
+  return problems;
+}
+
+/**
+ * Chạy bảng ca ngay lúc trang sidebar nạp xong tệp này.
+ *
+ * Ném lỗi ở đây làm sidebar dừng giữa đường. Chưa hay, nhưng còn hơn để người dùng gõ tìm khách mà không ra rồi tưởng là mất khách.
+ * Chặng 1.3 dựng `client/util/reportError` thì đổi chỗ này thành một khung báo lỗi đọc được thay vì dừng im.
+ */
+(function () {
+  var problems = textNormalizeSelfCheck();
+  if (problems.length) {
+    var message = 'normalizeText phía sidebar sai bảng ca chuẩn của tài liệu 02 Phần 12: ' + problems.join(' | ');
+    console.error(message);
+    throw new Error(message);
+  }
+})();
+</script>

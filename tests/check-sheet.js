@@ -1,9 +1,11 @@
 /**
  * Nghiệm thu khung sheet thật, chạy bằng Node trên máy, không cần mở editor Apps Script.
  *
- * Vì sao nó tồn tại: `verifySheets` trong SetupSheets.gs làm đúng việc này nhưng phải có người bấm chạy trong editor. Tệp Sheet đang mở quyền đọc theo đường liên kết, nên bản dựng hàng 1 tải về được bằng đường xuất CSV của Google — tức một phiên code không có người ngồi cạnh vẫn tự nghiệm thu được khung sheet.
+ * Vì sao nó tồn tại: `verifySheets` phía GAS làm đúng việc này nhưng phải có người bấm chạy trong editor. Tệp Sheet đang mở quyền đọc theo đường liên kết, nên bản dựng hàng 1 tải về được bằng đường xuất CSV của Google — tức một phiên code không có người ngồi cạnh vẫn tự nghiệm thu được khung sheet.
  *
- * Nó đọc bảng khai từ chính SetupSheets.gs chứ không giữ bản sao thứ hai. Hai bản sao là hai chỗ để lệch nhau trong im lặng, đúng cái bệnh mà tài liệu 00 Phần 6 ghi lại từ `Schema.js` và `mapKH`.
+ * Nó không giữ bản sao danh sách cột nào. Nó nạp chính các tệp khai của dự án rồi hỏi `sheetCoreColumns()`, đúng hàm mà chương trình dùng lúc chạy. Hai bản sao là hai chỗ để lệch nhau trong im lặng, đúng cái bệnh mà tài liệu 00 Phần 6 ghi lại từ `Schema.js` và `mapKH`.
+ *
+ * Nó cũng nạp `SYNC_SCHEMA` — thứ mà **lõi không được đọc**. Ở đây thì được, và chỉ ở đây: bộ kiểm phải phân biệt được tám cột đồng bộ hợp lệ với cột lạ ai đó chèn vào, mà lõi thì không cần phân biệt vì lõi không chạm cột nào ngoài phần của nó.
  *
  * Chạy: node tests/check-sheet.js
  * Đạt thì mã thoát 0, không đạt thì khác 0.
@@ -11,22 +13,21 @@
  * Giới hạn phải biết: đường xuất CSV chỉ đọc, nên tệp này KHÔNG thay được `verifySheets` ở phần đóng băng hàng — CSV không mang thông tin đó. Phần ấy vẫn phải chạy trong editor.
  */
 
-const fs = require('fs');
-const path = require('path');
-const vm = require('vm');
-
-const SETUP_FILE = path.join(__dirname, '..', '1_ShinCRM_GAS', 'server', 'SetupSheets.gs');
+const { napServer, taoHopCat } = require('./lib/load-gas');
 
 /**
- * Nạp các biến khai báo của SetupSheets.gs vào một hộp cát.
- * Thân hàm không chạy nên không cần SpreadsheetApp; chỉ các `var` ở tầng ngoài cùng trở thành thuộc tính của hộp cát.
+ * Nạp các tệp khai của dự án vào một hộp cát dùng chung, đúng như cách Apps Script cho mọi tệp dùng chung một vùng tên.
+ *
+ * Chỉ nạp tệp khai và tệp có hàm thuần. Không nạp `TextNormalize.js` vì tệp đó tự chạy phép tự kiểm lúc nạp — việc đó thuộc `tests/run.js`, lôi vào đây chỉ làm một phép kiểm hỏng báo đỏ ở hai chỗ.
  */
 function loadDeclaration() {
-  const source = fs.readFileSync(SETUP_FILE, 'utf8');
-  const sandbox = {};
-  vm.createContext(sandbox);
-  vm.runInContext(source, sandbox, { filename: SETUP_FILE });
-  return sandbox;
+  return napServer(
+    taoHopCat(),
+    'server/Book.js',
+    'server/DataSchema.js',
+    'server/SheetLayout.js',
+    'fbm_sync/SyncSchema.js'
+  );
 }
 
 /** Tách một dòng CSV có bọc nháy kép, kể cả khi giá trị chứa dấu phẩy hoặc nháy kép đôi. */
@@ -77,9 +78,14 @@ async function fetchRow1(fileId, sheetName) {
   return parseCsvLine(firstLine);
 }
 
-/** So hàng 1 đọc về với danh sách mã mong đợi. Trả về danh sách vấn đề, rỗng là đạt. */
+/**
+ * So hàng 1 đọc về với danh sách mã mong đợi. Trả về danh sách vấn đề, rỗng là đạt.
+ *
+ * `expected` gồm cột lõi cộng cột đồng bộ. Cột nào có thật trên sheet mà không nằm trong danh sách đó thì được nêu ra dưới dạng ghi chú chứ không thành lỗi: tài liệu 02 cho người dùng tự thêm cột riêng, nên một cột không quen mặt là chuyện bình thường, còn một cột lõi nằm sai chỗ mới là chuyện.
+ */
 function compareCodes(actual, expected) {
   const problems = [];
+  const notes = [];
 
   expected.forEach((code, index) => {
     if (actual[index] !== code) {
@@ -90,7 +96,7 @@ function compareCodes(actual, expected) {
   if (actual.length > expected.length) {
     const extra = actual.slice(expected.length).filter((cell) => cell !== '');
     if (extra.length) {
-      problems.push('có ' + extra.length + ' cột lạ phía sau: ' + extra.join(', '));
+      notes.push('thêm ' + extra.length + ' cột ngoài bảng khai: ' + extra.join(', '));
     }
   }
 
@@ -102,7 +108,7 @@ function compareCodes(actual, expected) {
     seen.add(code);
   });
 
-  return problems;
+  return { problems, notes };
 }
 
 async function main() {
@@ -113,11 +119,13 @@ async function main() {
   console.log('Tệp: ' + fileId);
   console.log('='.repeat(60));
 
-  const targets = Object.keys(decl.SETUP_SHEETS).map((name) => ({
+  const targets = Object.keys(decl.SHEET_LAYOUT).map((name) => ({
     name,
-    expected: decl.SETUP_SHEETS[name].map((column) => column[0])
+    coreCount: decl.sheetCoreColumns(name).length,
+    expected: decl.sheetCoreColumns(name)
+      .concat(decl.syncColumnsForSheet(name))
+      .map((column) => column[0])
   }));
-  targets.push({ name: 'Log', expected: decl.SETUP_LOG_HEADERS });
 
   let failed = 0;
 
@@ -131,12 +139,16 @@ async function main() {
       continue;
     }
 
-    const problems = compareCodes(actual, target.expected);
+    const syncCount = target.expected.length - target.coreCount;
+    const syncText = syncCount ? ' + ' + syncCount + ' cột đồng bộ' : '';
+    const { problems, notes } = compareCodes(actual, target.expected);
+
     if (problems.length) {
       failed += 1;
       console.log('❌ ' + target.name + ' — ' + problems.join('; '));
     } else {
-      console.log('✅ ' + target.name + ' — ' + target.expected.length + ' cột đúng');
+      console.log('✅ ' + target.name + ' — ' + target.coreCount + ' cột lõi' + syncText + ' đúng'
+        + (notes.length ? ' (' + notes.join('; ') + ')' : ''));
     }
   }
 
@@ -145,7 +157,7 @@ async function main() {
     console.log('❌ KHÔNG ĐẠT — ' + failed + ' sheet sai');
     process.exit(1);
   }
-  console.log('✅ ĐẠT — hàng 1 của cả năm sheet khớp bảng khai trong SetupSheets.gs');
+  console.log('✅ ĐẠT — hàng 1 của cả năm sheet khớp DATA_SCHEMA, SHEET_LAYOUT và SYNC_SCHEMA');
   process.exit(0);
 }
 
