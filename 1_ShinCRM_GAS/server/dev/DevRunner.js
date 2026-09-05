@@ -18,7 +18,8 @@
  * Xếp theo tầng, cùng thứ tự với đường nạp thật: dựng sheet, rồi các phép đọc lẻ, rồi cả đường nạp, rồi khung sidebar. Chạy lần lượt từ trên xuống thì hỏng ở đâu là biết tầng nào hỏng, thay vì chỉ biết "sidebar không mở".
  */
 var DEV_RUNNER_ALLOWED = [
-  'smokeTest', 'smokeDiag', 'setupSheets', 'verifySheets', 'measureDeleteRows', 'measureChunkRows',
+  'smokeTest', 'smokeDiag', 'setupSheets', 'verifySheets', 'measureDeleteRows', 'measureChunkRows', 'measureFirstPaint',
+  'seedFakeData', 'seedFakeCategory', 'wipeFakeData',
   'dumpColumnMap', 'dumpSettings', 'dumpSheetGrid',
   'probeBadColumnCode', 'probeLogGate', 'probeDateText', 'probeSheetGrid', 'probeCellBudget',
   'probeEntityRead', 'probeCategoryRead', 'probeConfigRead', 'probeDirtyState',
