@@ -15,3 +15,9 @@ desktop.ini
 
 # Tệp thử của bộ kiểm thử, sinh ra rồi xóa trong cùng một lượt chạy
 tests/_probe.js
+
+# Thẻ bí mật của cửa chạy hàm lúc phát triển. clasp vẫn đẩy DevToken.gs lên Google vì clasp đọc .claspignore
+# chứ không đọc .gitignore — chặn ở đây là chặn đường thẻ lọt vào git, không phải chặn đường nó lên Google.
+1_ShinCRM_GAS/.dev-token
+1_ShinCRM_GAS/.dev-runner.json
+1_ShinCRM_GAS/server/DevToken.gs

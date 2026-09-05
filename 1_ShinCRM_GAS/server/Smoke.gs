@@ -3,20 +3,47 @@
  * Không có nghiệp vụ nào ở đây, và tệp này sẽ bị xóa khi chặng 1.1 có tệp thật để chạy thử.
  */
 
-/** ID của tệp Sheet mới. Chốt cứng ở đây để mọi lời gọi tự kiểm được mình đang đứng trên đúng tệp, không phải tệp đang đi bán hàng. */
-var SMOKE_EXPECTED_SPREADSHEET_ID = '1jEQMWMn5jRUBDGXrQxbK0hpld6gGwlAXSZpoRQm8lpI';
+/**
+ * Hàm soi lỗi tạm của chặng 1.0: nó không ném lỗi mà kể lại từng bước một, để biết bước nào chết khi chạy không có người ngồi trước máy.
+ * Xóa cùng lúc với cả tệp này khi chặng 1.1 có hàm thật để chạy thử.
+ */
+function smokeDiag() {
+  var steps = [];
+  var buoc = function (ten, viec) {
+    try {
+      steps.push(ten + ': OK — ' + viec());
+    } catch (loi) {
+      steps.push(ten + ': LỖI — ' + (loi && loi.message ? loi.message : String(loi)));
+    }
+  };
 
-/** In ra một dòng để xác nhận đường ống chạy được, kèm phép đối chiếu ID tệp đang mở. */
+  buoc('getActiveSpreadsheet', function () {
+    var a = SpreadsheetApp.getActiveSpreadsheet();
+    return a === null ? 'trả về null' : 'trả về đối tượng';
+  });
+  buoc('getActiveSpreadsheet().getId', function () {
+    return SpreadsheetApp.getActiveSpreadsheet().getId();
+  });
+  buoc('openById', function () {
+    return SpreadsheetApp.openById(SETUP_EXPECTED_SPREADSHEET_ID).getName();
+  });
+  buoc('Session.getEffectiveUser', function () {
+    return Session.getEffectiveUser().getEmail() || '(rỗng)';
+  });
+
+  var report = steps.join('\n');
+  console.log(report);
+  return report;
+}
 function smokeTest() {
-  var file = SpreadsheetApp.getActiveSpreadsheet();
+  var file = shinOpenBook();
   var actualId = file.getId();
-  var matched = actualId === SMOKE_EXPECTED_SPREADSHEET_ID;
 
   var lines = [
     'ShinCRM chặng 1.0 — thử đường ống',
     'Tên tệp: ' + file.getName(),
     'ID tệp: ' + actualId,
-    'Đúng tệp mới: ' + (matched ? 'ĐÚNG' : 'SAI — dừng lại, đây không phải tệp dành cho bản mới'),
+    'Đúng tệp mới: ' + (actualId === SETUP_EXPECTED_SPREADSHEET_ID ? 'ĐÚNG' : 'SAI — dừng lại, đây không phải tệp dành cho bản mới'),
     'Múi giờ: ' + file.getSpreadsheetTimeZone(),
     'Các sheet đang có: ' + file.getSheets().map(function (sheet) { return sheet.getName(); }).join(', ')
   ];
