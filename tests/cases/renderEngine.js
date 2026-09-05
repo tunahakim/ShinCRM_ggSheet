@@ -293,6 +293,47 @@ function chay(so) {
   } catch (err) { /* lỗi này là điều đang kiểm */ }
   check(so, 'một vùng dựng lỗi thì không vùng nào bị gán, màn không có trạng thái nửa cũ nửa mới',
     [hop.document._els['sidebar-header'].innerHTML, hop.document._els['sidebar-body'].innerHTML], ['', '']);
+
+  quetDuongGan(so);
+}
+
+/**
+ * Đếm mọi chỗ trong `client/` gán `innerHTML`, rồi đối chiếu với danh sách được phép.
+ *
+ * Vì sao phải quét mã nguồn thay vì gọi hàm: `[RÀNG BUỘC CỨNG]` tài liệu 04 Phần 6 nói `renderTarget` là cơ chế **duy nhất** để đổi nội dung màn hình. Đó là luật về chỗ *không* có code, mà không phép kiểm nào gọi hàm được để chứng minh một đường tắt không tồn tại — chỉ có đọc mã nguồn.
+ *
+ * Ba tệp trong danh sách, mỗi tệp một lý do đứng riêng, và cả ba đều không phải đường tắt: engine là chính chủ; hộp gợi ý tìm kiếm là đồ đạc cố định nằm ngoài bốn vùng, và ruột nó vẫn do `SLOTS.searchSuggestions` sinh Block rồi `renderNodes` đổi thành chuỗi, chứ không ai ghép HTML bằng tay; màn chặn vẽ **trước khi** engine có dữ liệu để chạy, nên nó không thể đi qua engine.
+ *
+ * Chốt cả con số cho `renderEngine.html`: đúng hai lời gán — một của `renderScreen` gán trọn bốn vùng một lượt, một của `renderTarget` gán ruột một Block. Lời gán thứ ba trong chính engine nghĩa là có thêm một đường đổi màn hình mà tài liệu chưa biết.
+ */
+function quetDuongGan(so) {
+  section('renderEngine — chỉ ba tệp được gán innerHTML, không ai mở đường tắt vào DOM');
+
+  const { liet } = require('./namespace');
+  const { docTep, catRuotScript } = require('../lib/load-gas');
+  const { stripComments } = require('../lib/strip-comments');
+
+  const dem = {};
+  const docMa = (tep) => {
+    const raw = docTep(tep);
+    // Tệp trong `client/style/` chỉ có thẻ `<style>` nên `catRuotScript` từ chối nó. Quét thẳng nội dung thô của những tệp đó thay vì bỏ qua: bỏ qua thì một thẻ `<script>` lạc vào tệp style là một chỗ mù, mà CSS thật thì không bao giờ chứa chữ `innerHTML`.
+    return raw.indexOf('<script') === -1 ? raw : stripComments(catRuotScript(raw, tep));
+  };
+
+  liet('client', '.html').forEach((tep) => {
+    const khop = docMa(tep).match(/\.innerHTML\s*=[^=]/g);
+    if (khop) { dem[tep] = khop.length; }
+  });
+
+  const thay = Object.keys(dem).sort().map((tep) => tep + ':' + dem[tep]);
+  check(so, 'đúng ba tệp gán innerHTML, và engine chỉ có hai lời gán — thêm một lời nữa là thêm một đường đổi màn hình',
+    thay,
+    ['client/screen/statusScreen.html:1', 'client/ui/renderEngine.html:2', 'client/ui/search.html:3']);
+
+  // Hai luật đi kèm của cùng điều khoản: không ai được đặt giá trị, ẩn hiện hay đổi lớp CSS của một phần tử từ bên ngoài bộ máy. Quét ba tệp `screen/` vì đó là chỗ dễ ngứa tay nhất — một màn muốn tự sửa một chữ trên chính nó.
+  const tepMan = liet('client/screen', '.html').filter((t) => t.indexOf('statusScreen') === -1);
+  const chamDom = tepMan.filter((tep) => /\.(innerHTML|textContent|className|hidden)\s*=[^=]|classList|getElementById/.test(docMa(tep)));
+  check(so, 'tệp màn hình không tự chạm DOM — mọi thay đổi đi qua bản khai rồi qua engine', chamDom, []);
 }
 
 module.exports = { chay };

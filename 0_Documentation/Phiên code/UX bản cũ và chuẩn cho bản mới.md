@@ -220,9 +220,13 @@ Bản mới có ba thứ bản cũ không có, và chúng đổi cách hiện th
 
 Xếp theo mức người dùng thấy ngay:
 
-1. **Vẽ trước, gửi sau.** Thuộc chặng 1.4 (`saveFlow`). Ghi ở đây để chặng đó không quên: đóng form và cập nhật RAM trước, gọi máy chủ sau, và lỗi mạng phải nói rõ "chưa lưu được". Nút Lưu cũng phải khóa trong lúc gửi — cơ chế đã có sẵn, chỉ cần node `button` của `UI_SCHEMA` nhận thêm khóa `busy` để engine ghi ra `data-busy`, phần còn lại `dispatch.html` lo.
+1. **Khóa nút Lưu trong lúc gửi, và lỗi mạng phải nói rõ "chưa lưu được".** Thuộc chặng 1.4 (`saveFlow`). Cơ chế khóa đã có sẵn, chỉ cần node `button` của `UI_SCHEMA` nhận thêm khóa `busy` để engine ghi ra `data-busy`, phần còn lại `dispatch.html` lo.
 
 --> Phản hồi của tôi (chủ dự án): cái này thì cần căn cứ vào tài liệu xem tài liệu đang duyệt như thế nào. Việc vẽ trước, gửi sau đôi khi cũng hơi nguy hiểm nếu lưu không thành công nhưng sidebar đã vẽ lại --> khiến người dùng tưởng thành công và tắt tab luôn.
+
+--> Trả lời (đã tra tài liệu): chủ dự án đúng, và tài liệu đứng cùng phía. Tài liệu 04 Phần 8 có một dòng `[RÀNG BUỘC CỨNG]`: "**Không có cập nhật lạc quan.** RAM chỉ đổi sau khi Apps Script xác nhận đã ghi" — kèm đúng lý do chủ dự án vừa nói, rằng báo "đã lưu" trong khi sheet chưa có gì là rủi ro mất dữ liệu thật, đắt hơn nhiều so với cái lợi vài trăm mili giây. Dòng đó cấm luôn cả hàng đợi đồng bộ ngầm, lưu nháp xuống bộ nhớ trình duyệt, và tự thử lại. Nên **món "vẽ trước, gửi sau" bị gạch khỏi danh sách phải làm**, chỉ còn lại phần khóa nút Lưu ở trên. Luồng đúng là năm trạm của tài liệu 04 Phần 7: thu thập → làm sạch → khóa nút rồi gửi → sơn lỗi lên ô nếu cửa ghi trả về danh sách trường không đạt → thành công thì mới thay bản ghi trong RAM bằng đúng bản máy chủ trả về rồi vẽ lại.
+
+Chỗ duy nhất trong hệ được phép cho người dùng thấy kết quả trước khi máy chủ xác nhận là **xóa**, và nó lách được đúng vì không phá luật: tài liệu 06 Phần 6 cho client giữ một *tập chờ xóa*, bộ render lọc bỏ những mã trong tập đó nên dòng biến mất ngay, nhưng `Store` không bị sửa một chữ nào — tập chờ xóa là lớp che ở tầng hiển thị, và hết `SETTINGS.UNDO_DELAY_MS` mới gọi máy chủ. Bấm Hoàn tác chỉ là bỏ mã khỏi tập rồi vẽ lại, không có gì phải khôi phục. Đó là cách lấy được cảm giác nhanh mà không mượn trước một lời hứa chưa chắc giữ được.
 
 2. **Lỗi hiện tại ô, không hiện bằng hộp thoại.** Cũng chặng 1.4: viền đỏ trên ô sai, con trỏ về ô sai đầu tiên, màu đỏ tự mất khi gõ lại. `--shin-error` và `--shin-error-soft` đã có.
 
