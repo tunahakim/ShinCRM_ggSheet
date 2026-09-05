@@ -1,0 +1,87 @@
+<script>
+/**
+ * Trình tự khởi động sidebar, theo tài liệu 05 Phần 4. Ba bước, bước sau chỉ bắt đầu khi bước trước xong.
+ *
+ * Tệp này biết **thứ tự**, không biết cách làm từng việc: gọi máy chủ là việc của `serverCall`, bung dữ liệu là việc của
+ * `ingest`, vẽ là việc của màn hình. Giữ ranh giới đó vì thứ tự ba bước là thứ tài liệu chốt bằng ràng buộc cứng, nên nó
+ * phải đọc được trong một màn hình code mà không phải lần qua chi tiết của ba việc kia.
+ *
+ * Vì sao tách `activity` xuống bước ba: nó là phần nặng nhất và không cần thiết để tra cứu một khách. Đẩy nó xuống sau kéo
+ * thời gian tới khung hình đầu tiên xuống còn vài giây thay vì vài chục giây. Trong lúc nó chạy nền, sidebar dùng được bình
+ * thường, riêng phần lịch sử làm việc bị hạn chế theo bảng ở tài liệu 05 Phần 5.
+ *
+ * Tệp này dùng `async` / `await`, khác với phần còn lại của dự án viết theo lối ES5. Lý do: trình tự ba bước nối tiếp nhau
+ * viết bằng hàm gọi lại (callback) sẽ thành ba tầng lồng, và vòng lặp nạp gói — chạy tới khi máy chủ báo hết — thì lồng
+ * không biết bao nhiêu tầng. Code chạy trong iframe của Apps Script, tức trình duyệt của người dùng, nên cú pháp này an
+ * toàn ở đây; phía máy chủ thì vẫn ES5.
+ */
+
+/**
+ * Chạy cả ba bước. Mọi lỗi đều rơi vào một chỗ, và chỗ đó vẽ ra màn báo lỗi đọc được.
+ *
+ * Bắt lỗi ở đây **không phải nuốt lỗi**: máy chủ đã ghi dòng log kèm vết gọi trước khi ném, còn việc còn lại của client là
+ * hiện nó lên. Nếu không bắt thì thông báo chỉ nằm trong console của trình duyệt, chỗ mà chủ dự án không có lý do gì để mở.
+ */
+async function sidebarBoot() {
+  var batDau = Date.now();
+
+  try {
+    statusInfoLine('Đang đo ngân sách ô và nạp lõi…');
+    var core = await callServer('loadCore');
+
+    if (core.blocked) {
+      statusBudgetBlocked(core.budget);
+      return;
+    }
+
+    var skipped = ingestCore(core);
+    statusInfoLine('Tra cứu khách đã chạy — đang nạp giao dịch ở chế độ nền…');
+
+    var loaded = await bootLoadActivities(core.activity.total);
+
+    ingestActivityDone();
+    statusLoadSummary({
+      core: core,
+      activityRecords: loaded.records,
+      activityChunks: loaded.chunks,
+      warnings: core.warnings,
+      skipped: skipped,
+      ms: Date.now() - batDau
+    });
+  } catch (err) {
+    statusLoadError(err && err.message ? err.message : String(err));
+  }
+}
+
+/**
+ * Vòng nạp gói `activity`: gọi lại tới khi máy chủ báo hết, mỗi gói xếp vào bộ nhớ ngay.
+ *
+ * Con trỏ do máy chủ cấp và client chỉ truyền lại nguyên văn — client không tự tính gói tiếp theo, vì số hàng trên sheet có
+ * thể đổi giữa hai lần gọi và chỉ máy chủ biết mình vừa đọc tới đâu.
+ *
+ * Chặn cứng ở 10.000 vòng: nếu máy chủ trả một con trỏ không tiến thì vòng này quay mãi và trình duyệt treo, còn người dùng
+ * chỉ thấy dải tiến trình chạy không bao giờ hết. Thà ném một câu nói rõ là con trỏ có vấn đề.
+ */
+async function bootLoadActivities(total) {
+  var cursor = null;
+  var chunks = 0;
+  var records = 0;
+
+  do {
+    var chunk = await callServer('loadActivityChunk', [cursor]);
+    records += ingestActivityChunk(chunk);
+    chunks += 1;
+    cursor = chunk.nextCursor;
+
+    if (total) {
+      statusInfoLine('Đang nạp giao dịch: ' + statusNumber(records) + '/' + statusNumber(total) + '…');
+    }
+
+    if (chunks > 10000) {
+      throw new Error('Vòng nạp gói giao dịch không dừng sau 10.000 gói — con trỏ máy chủ trả về không tiến.');
+    }
+  } while (cursor);
+
+  return { chunks: chunks, records: records };
+}
+</script>

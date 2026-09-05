@@ -1,0 +1,34 @@
+<script>
+/**
+ * Chỗ duy nhất trong sidebar gọi `google.script.run`. Bọc nó thành `Promise` và tự lo dải tiến trình.
+ *
+ * Vì sao gom về một chỗ: `google.script.run` dùng cặp `withSuccessHandler` / `withFailureHandler`, tức mỗi lời gọi là một
+ * cặp hàm lồng nhau. Ba lời gọi nối tiếp viết theo kiểu đó thành ba tầng lồng, và tầng nào quên `withFailureHandler` thì
+ * lỗi biến mất không dấu vết — máy chủ đã ghi log, nhưng người đang ngồi trước máy thì không thấy gì và tưởng hệ thống treo.
+ * Bọc một lần ở đây thì `await` đọc như code chạy tuần tự, và không có đường nào quên bắt lỗi.
+ *
+ * Cặp `progressBegin` / `progressEnd` cũng nằm ở đây vì cùng lý do: một lời gọi nào đó quên bật dải thì dải sai, mà không
+ * ai đọc code thấy nó sai. Bật ở cửa duy nhất thì không có gì phải nhớ.
+ *
+ * **Không tự hiện lỗi.** Việc hiện thuộc bên gọi, vì cùng một lỗi thì đường nạp lõi phải vẽ màn chặn cả khung, còn đường
+ * nạp gói nền chỉ nên ghi một dòng trong khối thông tin. Một hàm hiện lỗi chung ở đây sẽ hiện sai ở một trong hai ca.
+ */
+
+/**
+ * Gọi một hàm máy chủ. `name` là tên hàm, `args` là mảng tham số.
+ *
+ * Ném lỗi khi máy chủ ném — theo bảng ở tài liệu 10 Phần 8, hàm sidebar ném lại lỗi để `withFailureHandler` hiện, và đây
+ * chính là chỗ nhận nó.
+ */
+function callServer(name, args) {
+  return new Promise(function (resolve, reject) {
+    progressBegin();
+
+    var runner = google.script.run
+      .withSuccessHandler(function (result) { progressEnd(); resolve(result); })
+      .withFailureHandler(function (err) { progressEnd(); reject(err); });
+
+    runner[name].apply(runner, args || []);
+  });
+}
+</script>

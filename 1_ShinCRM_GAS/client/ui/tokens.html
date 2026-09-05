@@ -1,0 +1,62 @@
+<style>
+/*
+ * Khối biến CSS của cả sidebar: màu, khoảng cách, cỡ chữ, bán kính, bóng.
+ *
+ * Vì sao tách khỏi tệp bố cục và khỏi tệp trang trí: một biến đổi ở đây thì cả giao diện đổi theo, nên đây là chỗ người
+ * ta tìm đến khi muốn đổi diện mạo — còn bố cục năm vùng thì gần như không bao giờ đổi. Trộn hai thứ vào một tệp nghĩa là
+ * mỗi lần muốn đổi màu lại phải đọc qua phần bố cục để tìm.
+ *
+ * Tài liệu 04 Phần 10 ghi một tệp `client/ui/styles.html`; ở đây nó tách thành `tokens` (biến) và `frame` (bố cục năm
+ * vùng), rồi chặng dựng form sẽ thêm tệp thứ ba cho các thành phần. Luật "đẹp bằng CSS thuần, không framework" giữ nguyên.
+ *
+ * Không dùng thư viện nào, không tải phông từ mạng: sidebar Apps Script nằm trong iframe và mọi thứ tải từ ngoài đều
+ * thêm một lần chờ vào đúng lúc người dùng đang chờ nạp dữ liệu.
+ */
+
+:root {
+  /* Màu nền và màu chữ. Thang xám đi từ nền trắng tới chữ đen mềm, không dùng đen tuyệt đối vì nó làm chữ nhỏ bị gắt. */
+  --shin-bg: #ffffff;
+  --shin-bg-sunken: #f6f7f9;
+  --shin-bg-hover: #eef1f5;
+  --shin-border: #dfe3e8;
+  --shin-border-strong: #c3cad3;
+  --shin-text: #1f2933;
+  --shin-text-soft: #52606d;
+  --shin-text-faint: #7b8794;
+
+  /* Màu nhấn và màu nghĩa. Bốn màu nghĩa khớp bốn giá trị cột `Kết quả` của sheet `Log`, để một thứ trên màn hình và một
+     dòng log nói về cùng một tình trạng thì cùng màu. */
+  --shin-primary: #1a73e8;
+  --shin-primary-dark: #1557b0;
+  --shin-primary-soft: #e8f0fe;
+  --shin-ok: #137333;
+  --shin-warn: #b06000;
+  --shin-warn-soft: #fef7e0;
+  --shin-error: #c5221f;
+  --shin-error-soft: #fce8e6;
+
+  /* Khoảng cách theo thang 4px. Mọi số đo không gian trong hệ lấy từ đây, không gõ số rời. */
+  --shin-gap-1: 4px;
+  --shin-gap-2: 8px;
+  --shin-gap-3: 12px;
+  --shin-gap-4: 16px;
+  --shin-gap-5: 24px;
+
+  /* Cỡ chữ. Sidebar rộng khoảng 300px nên cỡ nền là 13px chứ không phải 16px; to hơn thì một dòng chứa được quá ít chữ. */
+  --shin-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  --shin-font-mono: "Cascadia Mono", Consolas, "Courier New", monospace;
+  --shin-text-xs: 11px;
+  --shin-text-sm: 12px;
+  --shin-text-md: 13px;
+  --shin-text-lg: 15px;
+
+  /* Hình khối. */
+  --shin-radius: 6px;
+  --shin-radius-sm: 4px;
+  --shin-shadow: 0 1px 3px rgba(31, 41, 51, 0.12);
+
+  /* Số đo của khung. Vùng header và dải tiến trình cao cố định, nên chúng là biến chứ không phải số gõ trong bố cục. */
+  --shin-header-height: 40px;
+  --shin-progress-height: 3px;
+}
+</style>

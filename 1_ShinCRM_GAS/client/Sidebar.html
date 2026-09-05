@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+
+  <!--
+    Khung sidebar: năm vùng cố định của tài liệu 04 Phần 3, viết cứng đúng một lần ở đây, không khai trong schema, vì nó
+    không bao giờ đổi. Tệp này cố tình **rỗng nội dung** — nó không biết gì về khách, về form, về danh mục. Mọi thứ hiện
+    lên trong vùng thân đều do code đổ vào lúc chạy.
+
+    Thứ tự nhúng không tùy ý. Hai tệp style vào trước để khung có hình ngay từ khung hình đầu; các tệp code vào theo chiều
+    phụ thuộc, và `bootstrap` vào cuối vì nó là thứ gọi mọi thứ khác. `textNormalize` tự chạy bảng ca chuẩn ngay lúc nạp
+    nên nó phải vào trước những chỗ dùng tới nó.
+
+    **Đường dẫn trong `include` là cả đường dẫn, không có đuôi tệp.** Khi clasp đẩy lên Google, tên tệp trên đó chính là
+    đường dẫn ở máy: `client/ui/tokens.html` thành tệp tên `client/ui/tokens`. Ghi tên cụt là lỗi chỉ lộ ra lúc chạy thật.
+  -->
+  <?!= include('client/ui/tokens') ?>
+  <?!= include('client/ui/frame') ?>
+</head>
+
+<body>
+  <div id="sidebar-root">
+
+    <!-- Vùng 1 — Header. Cao cố định, ghim đỉnh. Hàng icon và hộp tìm kiếm vào đây ở chặng dựng form. -->
+    <div id="sidebar-header">
+      <b>ShinCRM</b>
+    </div>
+
+    <!-- Vùng 2 — Dải tiến trình. Cao vài pixel, chạy khi có lời gọi máy chủ đang chờ. -->
+    <div id="sidebar-progress"></div>
+
+    <!-- Vùng 3 — Khối thông tin chung. Cao theo nội dung. -->
+    <div id="sidebar-info">Đang mở…</div>
+
+    <!-- Vùng 4 — Thân. Chiếm hết phần dư, cuộn dọc khi tràn. -->
+    <div id="sidebar-body"></div>
+
+    <!-- Vùng 5 — Chân. Ghim đáy, ẩn khi màn không khai vùng này. -->
+    <div id="sidebar-footer" hidden></div>
+
+  </div>
+
+  <?!= include('client/util/textNormalize') ?>
+  <?!= include('client/util/serverCall') ?>
+  <?!= include('client/schema/schemaAccess') ?>
+  <?!= include('client/schema/schemaCheck') ?>
+  <?!= include('client/ram/store') ?>
+  <?!= include('client/ram/ingest') ?>
+  <?!= include('client/ui/progress') ?>
+  <?!= include('client/ui/statusScreen') ?>
+  <?!= include('client/ram/bootstrap') ?>
+
+  <script>
+    // Chạy trình tự khởi động ngay khi trang nạp xong. Không chờ sự kiện nào khác: các thẻ script nằm cuối thân trang nên
+    // tới đây năm vùng đã có mặt trong DOM.
+    sidebarBoot();
+  </script>
+</body>
+</html>

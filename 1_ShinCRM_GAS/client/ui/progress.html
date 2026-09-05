@@ -1,0 +1,35 @@
+<script>
+/**
+ * Dải tiến trình: bật khi có bất kỳ lời gọi máy chủ nào đang chờ, tắt khi hết. Tài liệu 04 Phần 3, tài liệu 05 Phần 5.
+ *
+ * Nó đếm số lời gọi đang chờ chứ không giữ một cờ bật tắt. Với một cờ, hai lời gọi chồng nhau thì lời gọi xong trước sẽ
+ * tắt dải trong khi lời gọi kia còn đang chạy — người dùng thấy hệ thống báo xong rồi vẫn phải chờ, và đó là kiểu chỉ báo
+ * làm mất lòng tin vào mọi chỉ báo khác. Trên đường nạp nền, các gói `activity` gọi liên tiếp nên ca này là ca thường, không phải ca lạ.
+ *
+ * Đếm xuống dưới 0 thì kẹp lại ở 0. Một lần `progressEnd` gọi hai lần do lỗi ở chỗ khác không được biến dải tiến trình
+ * thành thứ không bao giờ chạy nữa.
+ */
+
+/** Số lời gọi máy chủ đang chờ. */
+var progressPending = 0;
+
+/** Bật dải nếu đang có việc, tắt nếu không. Đọc lại thẻ mỗi lần thay vì giữ tham chiếu, vì tệp này nạp trước khi thân trang có thẻ. */
+function progressPaint() {
+  var strip = document.getElementById('sidebar-progress');
+  if (!strip) { return; }
+
+  if (progressPending > 0) { strip.classList.add('is-running'); } else { strip.classList.remove('is-running'); }
+}
+
+/** Ghi nhận một lời gọi máy chủ vừa bắt đầu. */
+function progressBegin() {
+  progressPending += 1;
+  progressPaint();
+}
+
+/** Ghi nhận một lời gọi máy chủ vừa xong, dù xuôi hay lỗi. */
+function progressEnd() {
+  progressPending = Math.max(0, progressPending - 1);
+  progressPaint();
+}
+</script>

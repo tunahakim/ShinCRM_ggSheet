@@ -1,0 +1,165 @@
+<style>
+/*
+ * Style của riêng ba màn không-có-form dưới đây, nằm cùng tệp vì không màn nào khác dùng tới. Khi chặng dựng form có tệp
+ * style chung cho các thành phần thì phần nào dùng lại được sẽ chuyển sang đó, phần riêng của màn chặn thì ở lại.
+ */
+.shin-screen { display: flex; flex-direction: column; gap: var(--shin-gap-3); }
+.shin-screen h2 { margin: 0; font-size: var(--shin-text-lg); }
+.shin-screen p { margin: 0; color: var(--shin-text-soft); }
+
+.shin-box { padding: var(--shin-gap-3); border-radius: var(--shin-radius); border: 1px solid var(--shin-border); }
+.shin-box--warn { border-color: #f0c36d; background: var(--shin-warn-soft); color: var(--shin-warn); }
+.shin-box--error { border-color: #f2a9a7; background: var(--shin-error-soft); color: var(--shin-error); }
+
+.shin-table { width: 100%; border-collapse: collapse; font-size: var(--shin-text-sm); }
+.shin-table th, .shin-table td { padding: var(--shin-gap-1) var(--shin-gap-2); border-bottom: 1px solid var(--shin-border); text-align: right; }
+.shin-table th:first-child, .shin-table td:first-child { text-align: left; }
+.shin-table th { color: var(--shin-text-faint); font-weight: 600; }
+.shin-table td.shin-num { font-family: var(--shin-font-mono); }
+
+.shin-kv { display: grid; grid-template-columns: auto 1fr; gap: var(--shin-gap-1) var(--shin-gap-3); font-size: var(--shin-text-sm); }
+.shin-kv dt { color: var(--shin-text-faint); }
+.shin-kv dd { margin: 0; font-family: var(--shin-font-mono); }
+</style>
+
+<script>
+/**
+ * Ba màn hình không cần bộ render: màn chặn vì vượt trần ngân sách ô, màn báo lượt nạp vỡ, và bản tóm tắt lượt nạp.
+ *
+ * Màn chặn là **`[RÀNG BUỘC CỨNG]`** của tài liệu 05 Phần 6, và nó ở lại vĩnh viễn: vượt trần thì chặn hoàn toàn, và màn
+ * cảnh báo phải kèm bảng chỉ mặt thủ phạm — tên sheet, số hàng, số cột, số ô, sắp giảm dần. Lý do có bảng đó: nguyên nhân
+ * vượt trần thường gặp nhất không phải nhiều dữ liệu mà là một sheet còn nguyên hàng và cột trống thừa. Không có bảng thì
+ * người dùng biết mình vượt trần mà không biết phải làm gì, và cái màn chặn trở thành một cánh cửa khóa không có chìa.
+ *
+ * Bản tóm tắt lượt nạp thì tạm: chặng này chưa có bộ render nên nó là thứ duy nhất vẽ ra được, và nó tồn tại để trả lời
+ * đúng câu hỏi nghiệm thu của chặng — nạp được bao nhiêu bản ghi, mất bao nhiêu mili giây, có cảnh báo gì. Chặng dựng form
+ * thay nó bằng màn `view` thật.
+ *
+ * Cả ba màn đều tự thoát ký tự cho mọi thứ đọc từ sheet. Tên sheet do người dùng đặt, và một tên sheet có dấu `<` mà đem
+ * ghép thẳng vào HTML thì màn báo lỗi hỏng đúng lúc đang cần nó nhất.
+ */
+
+/** Thoát bốn ký tự có nghĩa trong HTML. Mọi giá trị đọc từ sheet đi qua đây trước khi ghép vào chuỗi HTML. */
+function statusEscape(value) {
+  return String(value === null || value === undefined ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/** Chèn dấu chấm phân cách hàng nghìn theo cách viết số của tiếng Việt, để `500000` đọc thành `500.000`. */
+function statusNumber(value) {
+  return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+/** Đặt nội dung cho một vùng của khung. Vùng nào truyền `null` thì bị ẩn. */
+function statusSetRegion(id, html) {
+  var node = document.getElementById(id);
+  if (!node) { return; }
+
+  if (html === null) { node.hidden = true; return; }
+  node.hidden = false;
+  node.innerHTML = html;
+}
+
+/** Bảng chỉ mặt thủ phạm: một hàng một sheet, số ô giảm dần. Máy chủ đã sắp sẵn theo thứ tự đó nên ở đây không sắp lại lần nữa. */
+function statusBudgetTable(sheets) {
+  var rows = sheets.map(function (s) {
+    return '<tr><td>' + statusEscape(s.name) + '</td>'
+      + '<td class="shin-num">' + statusNumber(s.rows) + '</td>'
+      + '<td class="shin-num">' + statusNumber(s.columns) + '</td>'
+      + '<td class="shin-num">' + statusNumber(s.cells) + '</td></tr>';
+  });
+
+  return '<table class="shin-table"><thead><tr><th>Sheet</th><th>Hàng</th><th>Cột</th><th>Số ô</th></tr></thead>'
+    + '<tbody>' + rows.join('') + '</tbody></table>';
+}
+
+/**
+ * Màn chặn vì vượt trần ngân sách ô. Chiếm trọn khung và không cho thao tác gì khác.
+ *
+ * Nó nói ba điều theo đúng thứ tự người đọc cần: vượt bao nhiêu, sheet nào gây ra, và làm gì để hết. Việc phải làm gần như
+ * luôn là xóa hàng và cột trống thừa của sheet đứng đầu bảng, nên câu hướng dẫn nói thẳng ra điều đó chứ không nói chung chung.
+ */
+function statusBudgetBlocked(budget) {
+  var html = '<div class="shin-screen">'
+    + '<h2>Tệp đã vượt trần ngân sách ô</h2>'
+    + '<div class="shin-box shin-box--warn">Tệp đang có <b>' + statusNumber(budget.total) + '</b> ô lưới, trần đang đặt là <b>'
+    + statusNumber(budget.ceiling) + '</b> ô. ShinCRM dừng ở đây và <b>không đọc một ô dữ liệu nào</b>, vì chạy tiếp trên một tệp quá nặng thì mọi thao tác đều có thể hết thời gian giữa đường.</div>'
+    + '<p>Trần tính bằng tổng số ô lưới của mọi sheet, <b>kể cả ô rỗng</b>. Vì vậy nguyên nhân thường gặp nhất không phải nhiều dữ liệu, mà là một sheet còn nguyên hàng và cột trống thừa.</p>'
+    + statusBudgetTable(budget.sheets)
+    + '<p>Việc cần làm: mở sheet đứng đầu bảng, xóa hẳn các hàng và cột trống ở cuối lưới (chọn hàng, bấm phải, Xóa hàng — không phải xóa nội dung), rồi mở lại bảng làm việc. Muốn nới trần thì sửa tham số <code>TRAN_SO_O</code> ở sheet <code>Config</code>.</p>'
+    + '</div>';
+
+  statusSetRegion('sidebar-info', 'Đang chặn — chưa nạp dữ liệu');
+  statusSetRegion('sidebar-body', html);
+  statusSetRegion('sidebar-footer', null);
+}
+
+/** Màn báo lượt nạp vỡ. Hiện nguyên văn thông báo lỗi, vì người đọc là chủ dự án và chuỗi đó là thứ đem đi đối chiếu với sheet `Log`. */
+function statusLoadError(message) {
+  var html = '<div class="shin-screen">'
+    + '<h2>Không nạp được dữ liệu</h2>'
+    + '<div class="shin-box shin-box--error">' + statusEscape(message) + '</div>'
+    + '<p>Lượt chạy này đã ghi một dòng vào sheet <code>Log</code> kèm vết gọi. Đóng rồi mở lại bảng làm việc để thử lần nữa.</p>'
+    + '</div>';
+
+  statusSetRegion('sidebar-info', 'Nạp thất bại');
+  statusSetRegion('sidebar-body', html);
+  statusSetRegion('sidebar-footer', null);
+}
+
+/** Một dòng ngắn trong khối thông tin chung, dùng để báo tiến độ nạp nền. */
+function statusInfoLine(text) {
+  statusSetRegion('sidebar-info', statusEscape(text));
+}
+
+/** Danh sách khóa–giá trị của bản tóm tắt. Nhận mảng cặp để thứ tự hiện đúng thứ tự viết. */
+function statusKeyValues(pairs) {
+  var items = pairs.map(function (pair) {
+    return '<dt>' + statusEscape(pair[0]) + '</dt><dd>' + statusEscape(pair[1]) + '</dd>';
+  });
+
+  return '<dl class="shin-kv">' + items.join('') + '</dl>';
+}
+
+/**
+ * Bản tóm tắt lượt nạp — màn tạm của chặng này, thay bằng màn `view` khi có bộ render.
+ *
+ * Nó in cả danh sách phép tự kiểm **bị bỏ qua** vì thiếu đầu vào. Bỏ qua trong im lặng là cách chắc chắn nhất để có một bộ
+ * kiểm xanh mà chẳng kiểm gì, nên chỗ nào bỏ qua thì chỗ đó phải đọc được bằng mắt.
+ */
+function statusLoadSummary(info) {
+  var core = info.core;
+  var categoryValues = Object.keys(Store.categories).reduce(function (sum, code) { return sum + Store.categories[code].length; }, 0);
+
+  var parts = ['<div class="shin-screen">', '<h2>Nạp xong</h2>'];
+
+  parts.push(statusKeyValues([
+    ['Khách', statusNumber(Object.keys(Store.customers).length) + ' bản ghi'],
+    ['Giao dịch', statusNumber(info.activityRecords) + ' bản ghi / ' + info.activityChunks + ' gói'],
+    ['Khách có giao dịch', statusNumber(Object.keys(Store.activitiesByCustomer).length)],
+    ['Chỉ mục tìm kiếm', statusNumber(Store.searchIndex.length) + ' phần tử'],
+    ['Danh mục', Object.keys(Store.categories).length + ' cột / ' + statusNumber(categoryValues) + ' giá trị'],
+    ['Config', 'tham số ' + Object.keys(Store.config.params).length + ' · ngầm định ' + Object.keys(Store.config.defaults).length + ' · bộ đếm ' + Object.keys(Store.config.counters).length + ' · sắp xếp ' + Store.config.sort.length + ' cấp'],
+    ['Ngân sách ô', statusNumber(core.budget.total) + ' / ' + statusNumber(core.budget.ceiling) + ' (' + core.budget.ceilingSource + ')'],
+    ['Thời gian', 'lõi ' + core.ms + ' ms · cả lượt ' + info.ms + ' ms'],
+    ['Trạng thái giao dịch', Store.activityState]
+  ]));
+
+  if (info.warnings && info.warnings.length) {
+    parts.push('<div class="shin-box shin-box--warn"><b>Cảnh báo</b><br>' + info.warnings.map(statusEscape).join('<br>') + '</div>');
+  }
+
+  if (info.skipped && info.skipped.length) {
+    parts.push('<div class="shin-box"><b>Phép tự kiểm schema bị bỏ qua vì thiếu đầu vào</b><br>' + info.skipped.map(statusEscape).join('<br>') + '</div>');
+  }
+
+  parts.push('<p>Đây là màn tạm của chặng nạp dữ liệu. Chặng sau thay nó bằng màn xem khách.</p>', '</div>');
+
+  statusSetRegion('sidebar-info', 'Sẵn sàng');
+  statusSetRegion('sidebar-body', parts.join(''));
+  statusSetRegion('sidebar-footer', null);
+}
+</script>
