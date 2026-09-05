@@ -122,6 +122,9 @@ function configGet(name, fallback) {
   return Object.prototype.hasOwnProperty.call(params, name) ? params[name] : missing;
 }
 
+/** Tên công tắc chế độ vết ở khối tham số hệ thống của `Config`. Tên nằm cạnh hàm đọc nó, cùng lối với `CELL_BUDGET_CONFIG_NAME` ở `CellBudget.gs`: mỗi cái tên thuộc về chỗ đọc nó, còn `ConfigParams.gs` chỉ đi gom lại. */
+var LOG_TRACE_CONFIG_NAME = 'LOG_TRACE';
+
 /**
  * `LOG_TRACE` có phủ nguồn này không. Rỗng là tắt, `all` là bật hết, còn lại là danh sách tên nguồn cách nhau bằng dấu phẩy. Tài liệu 10 Phần 3.
  *
@@ -130,7 +133,7 @@ function configGet(name, fallback) {
 function logTraceCoversSource(source) {
   var value = '';
   try {
-    value = configGet('LOG_TRACE');
+    value = configGet(LOG_TRACE_CONFIG_NAME);
   } catch (khongDocDuocConfig) {
     return false;
   }

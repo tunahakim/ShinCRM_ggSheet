@@ -6,11 +6,10 @@
  * **Đây là công cụ giai đoạn phát triển, nằm trong `server/dev/` và bị xóa cùng cả thư mục trước khi tệp có dữ liệu thật.** Chỗ đúng cho một công tắc lâu dài là sheet quản trị của chặng 1.5. Trước khi xóa thư mục này thì phải chạy `devLogTraceOff` — vì chế độ vết ghi bí mật ra nguyên văn, và tài liệu 10 Phần 7 cấm chia sẻ tệp trong lúc nó đang bật.
  */
 
-/** Tên tham số và tên khối cột, giữ ở một chỗ để hai hàm dưới không có bản sao nào lệch nhau. */
-var LOG_TRACE_PARAM_NAME = 'LOG_TRACE';
-
 /**
  * Ghi một giá trị vào dòng `LOG_TRACE` của khối tham số hệ thống. Có dòng rồi thì sửa, chưa có thì thêm ngay dưới dòng cuối **của chính cột tham số** — không phải dưới `getLastRow()` của cả sheet, vì mỗi khối chạy dọc độc lập nên lấy dòng cuối của cả sheet là chừa lại một khoảng trống giữa bảng.
+ *
+ * Tên tham số lấy từ `LOG_TRACE_CONFIG_NAME` ở `Settings.gs`, không giữ bản sao ở đây: một cái tên khai hai chỗ là một chỗ sẽ đổi mà chỗ kia không.
  */
 function devLogTraceSet(value) {
   var columnMap = readColumnMap('Config');
@@ -28,7 +27,7 @@ function devLogTraceSet(value) {
       var name = String(row[0] === null || row[0] === undefined ? '' : row[0]).trim();
       if (!name) { return; }
       lastFilled = firstDataRow + index;
-      if (name === LOG_TRACE_PARAM_NAME) { target = firstDataRow + index; }
+      if (name === LOG_TRACE_CONFIG_NAME) { target = firstDataRow + index; }
     });
   }
 
@@ -36,7 +35,7 @@ function devLogTraceSet(value) {
   if (!target) {
     target = lastFilled + 1;
     added = true;
-    sheet.getRange(target, keyColumn).setValue(LOG_TRACE_PARAM_NAME);
+    sheet.getRange(target, keyColumn).setValue(LOG_TRACE_CONFIG_NAME);
   }
   sheet.getRange(target, valueColumn).setValue(value);
 
@@ -44,7 +43,7 @@ function devLogTraceSet(value) {
   resetSettingsCache();
 
   var report = [
-    (added ? 'Đã thêm' : 'Đã sửa') + ' dòng ' + LOG_TRACE_PARAM_NAME + ' ở hàng ' + target + ' của sheet Config.',
+    (added ? 'Đã thêm' : 'Đã sửa') + ' dòng ' + LOG_TRACE_CONFIG_NAME + ' ở hàng ' + target + ' của sheet Config.',
     'Giá trị mới: "' + value + '"' + (value ? '' : ' (rỗng nghĩa là tắt)'),
     'Đọc lại qua chính đường chương trình dùng — LOG_TRACE phủ nguồn "sidebar"? ' + logTraceCoversSource('sidebar'),
     'Phủ nguồn "fbm_sync"? ' + logTraceCoversSource('fbm_sync')

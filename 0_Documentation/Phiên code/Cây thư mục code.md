@@ -44,7 +44,8 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │
 ├── server\                       Code chạy phía Google, không có DOM, không thấy trang web.
 │   ├── config\
-│   │   └── Settings.js           Hằng số phía code (SETTINGS) và khối tham số hệ thống của sheet Config. Nơi duy nhất biết LOG_TRACE đang bật cho nguồn nào.
+│   │   ├── Settings.js           Hằng số phía code (SETTINGS) và khối tham số hệ thống của sheet Config. Nơi duy nhất biết LOG_TRACE đang bật cho nguồn nào.
+│   │   └── ConfigParams.js       Danh mục núm vặn: có những tham số nào, mỗi tham số gõ giá trị gì là hợp lệ. Settings.js biết một tham số đang là bao nhiêu, tệp này biết có những tham số nào.
 │   ├── data\
 │   │   ├── DataSchema.js         Khai 33 cột dữ liệu người dùng: mã cột, nhãn, kiểu, ràng buộc. Nguồn sự thật của hàng 1.
 │   │   └── SheetLayout.js        Khai khung năm sheet: mấy hàng tiêu đề, dữ liệu bắt đầu từ hàng nào, màu tiêu đề, tiêu đề sheet Log.
@@ -56,7 +57,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── EntityRead.js         Đọc bản ghi Customer và Activity ra dạng { fields, rows, rowIndexes } truyền được sang client. Bỏ hàng không có mã và đếm số hàng đã bỏ.
 │   │   ├── CategoryRead.js       Đọc sheet Category thành "mã danh mục → danh sách giá trị". Biết loại cột đi kèm _FBM mà không loại nhầm @CAT_CHO_PHEP_FBM.
 │   │   ├── ConfigRead.js         Đọc bốn khối còn lại của sheet Config. Khóa trùng thì ném lỗi; riêng khối sắp xếp thì thứ tự hàng mang nghĩa nên đọc theo đường khác.
-│   │   └── SetupSheets.js        Dựng và kiểm khung năm sheet từ hai tệp khai ở data\. Chạy được nhiều lần, không phá dữ liệu đang có.
+│   │   └── SetupSheets.js        Dựng và kiểm khung năm sheet từ hai tệp khai ở data\, và gieo sẵn tên tham số hệ thống vào Config để khỏi phải đoán tên. Chạy được nhiều lần, không phá dữ liệu đang có.
 │   ├── util\
 │   │   ├── DateText.js           Biên giới duy nhất giữa Date và hai dạng chuỗi thời gian của dự án. google.script.run không mang Date qua được, nên mọi mốc thời gian đi đường chuỗi.
 │   │   └── TextNormalize.js      Chuẩn hóa văn bản trước khi so sánh. Có một bản sinh đôi ở client\util\ — hai bản phải giống nhau từng dòng.
@@ -138,6 +139,7 @@ tests\
     ├── dateText.js               Hai dạng chuỗi thời gian, và ba luật im lặng khi sai: ô rỗng, ô gõ lạ, precision gõ sai.
     ├── sheetGrid.js              Lưới là hữu hạn, setValues không tự nới, và ca rỗng là ca thường xuyên chứ không phải ngoại lệ.
     ├── cellBudget.js             Cái bẫy gõ "500.000" thành 500, và bảng thủ phạm phải sắp giảm dần.
+    ├── setupSheets.js            Chạy lại lần thứ hai có phá gì không: giá trị người dùng đã vặn phải còn nguyên, và tên mới nối dưới dòng cuối của chính cột tham số.
     ├── entityRead.js             Tra cột theo mã chứ không theo thứ tự, hàng trắng bị đếm, và không giá trị nào còn là Date.
     ├── categoryRead.js           Cái bẫy @CAT_CHO_PHEP_FBM, và mọi trường SELECT đều tìm được danh mục của mình.
     ├── configRead.js             Khóa trùng thì chặn, còn khối sắp xếp thì thứ tự hàng là nghĩa.
@@ -173,7 +175,7 @@ Không sửa tên trong tài liệu thiết kế vì hai lẽ: chúng là bản 
 | `client/ui/tokens.html` | `client/style/tokens.html` |
 | `client/ui/frame.html` | `client/style/frame.html` |
 
-Tám tệp máy chủ dựng ở chặng 1.1 và 1.2 không có trong bảng này vì tài liệu thiết kế không đặt tên cho chúng: `SheetGrid.js`, `CellBudget.js`, `EntityRead.js`, `CategoryRead.js`, `ConfigRead.js`, `DateText.js`, `EntryPoint.js`, `ErrorReport.js`. Tài liệu nói *phải làm gì* ở các phần tương ứng, còn việc gom mỗi luật vào một tệp là quyết định của phiên code — nên chỗ tra chúng là cây thư mục ở trên, không phải bảng này.
+Chín tệp máy chủ dựng ở chặng 1.1 và 1.2 không có trong bảng này vì tài liệu thiết kế không đặt tên cho chúng: `SheetGrid.js`, `CellBudget.js`, `EntityRead.js`, `CategoryRead.js`, `ConfigRead.js`, `DateText.js`, `EntryPoint.js`, `ErrorReport.js`, `ConfigParams.js`. Tài liệu nói *phải làm gì* ở các phần tương ứng, còn việc gom mỗi luật vào một tệp là quyết định của phiên code — nên chỗ tra chúng là cây thư mục ở trên, không phải bảng này.
 
 Bốn dòng `client/...js` lệch vì một lý do khác hẳn các dòng trên, đã ghi ở tài liệu làm việc `Mục tiêu chặng 1.1 và 1.2.md`: **mọi** tệp client trên Apps Script buộc phải là `.html`, không phải `.js` như tài liệu 04 Phần 10 và 05 Phần 13 viết.
 
