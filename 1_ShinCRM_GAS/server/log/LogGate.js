@@ -253,11 +253,11 @@ function logSheet() {
  * lúc log bắt đầu có ích.
  *
  * Nới thừa `LOG_GRID_SLACK` hàng chứ không nới vừa đủ: nới vừa đủ nghĩa là gần như mọi lượt nhả sau đó đều tốn thêm một lệnh gọi.
+ *
+ * Phép nới thật nằm ở `SheetGrid.gs`, vì bài học về lưới hữu hạn phải nằm ở một chỗ duy nhất mà cả đường ghi log lẫn đường nạp dữ liệu đều đi qua. Còn **nới thừa bao nhiêu** thì vẫn là chính sách riêng của sheet `Log`: đây là sheet duy nhất bị ghi thêm vài dòng mỗi lượt chạy, nên nó cần đệm dày hơn các sheet khác.
  */
 function logEnsureRoom(sheet, endRow) {
-  var maxRows = sheet.getMaxRows();
-  if (endRow <= maxRows) { return; }
-  sheet.insertRowsAfter(maxRows, endRow - maxRows + LOG_GRID_SLACK);
+  sheetGridEnsureRoom(sheet, endRow, LOG_GRID_SLACK);
 }
 
 /**
