@@ -87,7 +87,7 @@ function chay(so) {
     coNgay.customer.rows.some((row) => row.some((o) => hop.dateTextIsDate(o))), false);
 
   // Đường chặn. Trần đặt thấp hơn kích thước lưới thật của tệp giả nên phép đo phải chặn.
-  const chan = dungNap([['TRAN_SO_O', '10']]);
+  const chan = dungNap([['CELL_BUDGET', '10']]);
   const bao = chan.hop.loadCore();
   check(so, 'vượt trần thì blocked mang TÊN LÝ DO chứ không phải true', bao.blocked, 'cellBudget');
   check(so, 'gói bị chặn chỉ có bốn khóa, và KHÔNG có customer — bằng chứng là chưa đọc ô dữ liệu nào',

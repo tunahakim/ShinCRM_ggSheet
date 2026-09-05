@@ -9,9 +9,9 @@
 const { dungHop } = require('../lib/dung-hop');
 const { section, check, checkContains, ghiLoiNap } = require('../lib/assert');
 
-/** Dựng hộp cát có `Config` kèm một giá trị `TRAN_SO_O` đã gõ. Truyền `null` nghĩa là chưa ai gõ tham số đó. */
+/** Dựng hộp cát có `Config` kèm một giá trị `CELL_BUDGET` đã gõ. Truyền `null` nghĩa là chưa ai gõ tham số đó. */
 function dungTran(giaTri) {
-  return dungHop({ sheets: ['Config'], thamSo: giaTri === null ? [] : [['TRAN_SO_O', giaTri]] });
+  return dungHop({ sheets: ['Config'], thamSo: giaTri === null ? [] : [['CELL_BUDGET', giaTri]] });
 }
 
 function chay(so) {
@@ -24,7 +24,7 @@ function chay(so) {
     return ghiLoiNap(so, 'nạp được server/sheet/CellBudget.js', err);
   }
 
-  check(so, 'chưa ai gõ TRAN_SO_O thì dùng trần mặc định, không cảnh báo gì',
+  check(so, 'chưa ai gõ CELL_BUDGET thì dùng trần mặc định, không cảnh báo gì',
     nen.hop.cellBudgetCeiling(), { ceiling: 500000, source: 'default', warning: '' });
   check(so, 'trần mặc định đúng tài liệu 05 Phần 6', nen.hop.CELL_BUDGET_DEFAULT, 500000);
 
@@ -40,7 +40,7 @@ function chay(so) {
   // Ném lỗi ở đây là chặn lượt mở sidebar vì một ô gõ sai, mà chặn thì mất luôn đường vào để sửa ô đó.
   ['nhiều', '0', '-5', 'năm trăm nghìn', '1e6'].forEach((raw) => {
     const tran = dungTran(raw).hop.cellBudgetCeiling();
-    check(so, 'gõ "' + raw + '" thì rơi về mặc định, không chặn', [tran.ceiling, tran.source, tran.warning.includes('TRAN_SO_O')], [500000, 'default', true]);
+    check(so, 'gõ "' + raw + '" thì rơi về mặc định, không chặn', [tran.ceiling, tran.source, tran.warning.includes('CELL_BUDGET')], [500000, 'default', true]);
   });
 
   const khongCoConfig = dungHop({ sheets: [] }).hop;

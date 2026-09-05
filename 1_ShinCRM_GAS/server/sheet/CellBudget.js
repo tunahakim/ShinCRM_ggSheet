@@ -11,8 +11,12 @@
 /** Trần mặc định khi `Config` chưa khai: năm trăm nghìn ô. Tài liệu 05 Phần 6. */
 var CELL_BUDGET_DEFAULT = 500000;
 
-/** Tên tham số ở khối tham số hệ thống của sheet `Config`. Trần ở `Config` chứ không ở `SETTINGS` vì đây là quyết định vận hành mà người dùng được phép đổi mà không cần mở code. */
-var CELL_BUDGET_CONFIG_NAME = 'TRAN_SO_O';
+/**
+ * Tên tham số ở khối tham số hệ thống của sheet `Config`. Trần ở `Config` chứ không ở `SETTINGS` vì đây là quyết định vận hành mà người dùng được phép đổi mà không cần mở code.
+ *
+ * Tên viết tiếng Anh hoa, cùng dạng với `LOG_TRACE` — khối tham số chỉ có đúng hai cái tên này, và một cột hai dòng mà mỗi dòng một thứ tiếng thì trông như nhặt được chứ không như đặt ra. Chủ dự án giao quyền chọn cho phiên code 05/09/2026, kèm điều kiện tiếng Việt thì phải có dấu — mà dấu trong một khóa tra khớp chính xác là chỗ hỏng chờ sẵn, vì Sheet tự sửa chữ và người gõ tay hay gõ thiếu dấu. Cột tiêu đề `Tham số` và `Giá trị` vẫn tiếng Việt, và lời giải thích cho người dùng nằm ở màn chặn.
+ */
+var CELL_BUDGET_CONFIG_NAME = 'CELL_BUDGET';
 
 /**
  * Trần đang có hiệu lực, kèm lý do nếu phải rơi về mặc định.

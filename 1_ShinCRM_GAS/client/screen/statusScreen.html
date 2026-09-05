@@ -89,7 +89,7 @@ function statusBudgetBlocked(budget) {
     + statusNumber(budget.ceiling) + '</b> ô. ShinCRM dừng ở đây và <b>không đọc một ô dữ liệu nào</b>, vì chạy tiếp trên một tệp quá nặng thì mọi thao tác đều có thể hết thời gian giữa đường.</div>'
     + '<p>Trần tính bằng tổng số ô lưới của mọi sheet, <b>kể cả ô rỗng</b>. Vì vậy nguyên nhân thường gặp nhất không phải nhiều dữ liệu, mà là một sheet còn nguyên hàng và cột trống thừa.</p>'
     + statusBudgetTable(budget.sheets)
-    + '<p>Việc cần làm: mở sheet đứng đầu bảng, xóa hẳn các hàng và cột trống ở cuối lưới (chọn hàng, bấm phải, Xóa hàng — không phải xóa nội dung), rồi mở lại bảng làm việc. Muốn nới trần thì sửa tham số <code>TRAN_SO_O</code> ở sheet <code>Config</code>.</p>'
+    + '<p>Việc cần làm: mở sheet đứng đầu bảng, xóa hẳn các hàng và cột trống ở cuối lưới (chọn hàng, bấm phải, Xóa hàng — không phải xóa nội dung), rồi mở lại bảng làm việc. Muốn nới trần thì sửa tham số <code>CELL_BUDGET</code> ở sheet <code>Config</code>.</p>'
     + '</div>';
 
   statusSetRegion('sidebar-info', 'Đang chặn — chưa nạp dữ liệu');
