@@ -1,13 +1,9 @@
 /**
- * Hàm dựng khung tệp Sheet: năm sheet với đúng số hàng tiêu đề và đúng mã cột của phần lõi.
+ * Hàm dựng khung tệp Sheet: năm sheet với đúng số hàng tiêu đề và đúng mã cột của phần lõi, cộng phép gieo tên tham số hệ thống vào `Config`.
  *
- * Vì sao dựng bằng code chứ không gõ tay: hàng 1 là căn cứ duy nhất để code nhận cột, nên một mã gõ lệch một chữ là một lỗi không có gì bắt được cho tới lúc nạp. Sinh hàng 1 từ cùng bảng khai mà chương trình đọc lúc chạy thì hai bên không có đường lệch nhau.
+ * Dựng bằng code chứ không gõ tay vì hàng 1 là căn cứ duy nhất để code nhận cột — một mã gõ lệch một chữ không có gì bắt được cho tới lúc nạp. Tệp này không giữ danh sách cột nào của riêng nó, nó hỏi `sheetCoreColumns()`; danh sách tên tham số hỏi `ConfigParams.gs`.
  *
- * Tệp này không giữ danh sách cột nào của riêng nó. Nó hỏi `sheetCoreColumns()` — nghĩa là hỏi `DATA_SCHEMA` với hai sheet kho, hỏi `SheetLayout.gs` với `Category`, `Config` và `Log`. Trước đây nó giữ một bản sao danh sách cột, và bản sao đó đã hết việc.
- *
- * Nó chỉ dựng phần cột của **lõi**. Tám cột thuần đồng bộ do `fbm_sync` tự dựng ở giai đoạn 3, nên chạy hàm này lại trên sheet đã có cột đồng bộ thì các cột đó nằm ngoài vùng ghi và không bị đụng tới.
- *
- * Ngoài hàng tiêu đề, nó gieo thêm đúng một thứ: tên các tham số hệ thống vào cột `Tham số` của sheet `Config`, giá trị để trống. Danh sách tên ở `ConfigParams.gs`, không ở đây.
+ * Chỉ dựng phần cột của **lõi**. Tám cột thuần đồng bộ do `fbm_sync` tự dựng ở giai đoạn 3, nằm ngoài vùng ghi nên chạy lại không đụng tới.
  */
 
 /**
@@ -64,13 +60,9 @@ function setupSheets() {
 }
 
 /**
- * Gieo tên các tham số hệ thống vào cột `Tham số` của sheet `Config`, ô giá trị để trống.
+ * Gieo tên tham số hệ thống vào cột `Tham số` của `Config`, ô giá trị để trống.
  *
- * Chỉ thêm tên **còn thiếu**, và không bao giờ chạm vào ô giá trị. Không có luật đó thì mỗi lần chạy lại `setupSheets` là một lần xóa sạch các núm người dùng đã vặn — mà hàm này sinh ra để chạy lại được nhiều lần.
- *
- * Thêm vào ngay dưới dòng cuối **của chính cột tham số**, không phải dưới `getLastRow()` của cả sheet: năm khối của `Config` chạy dọc độc lập nên một khối bộ đếm dài hơn sẽ đẩy các tên mới xuống dưới một khoảng trống trắng.
- *
- * Ghi chú giải thích đặt trên ô **tên**, và viết lại mỗi lượt chạy để nó không lạc hậu so với code. Ô tên là ô của code; ô giá trị là ô của người dùng. Ranh giới đó là toàn bộ lý do hàm này chạy lại được mà không phá gì.
+ * Ô tên là ô của code (ghi chú viết lại mỗi lượt), ô giá trị là ô của người dùng — không bao giờ chạm. Ranh giới đó là lý do chạy lại được nhiều lần mà không xóa mất núm người dùng đã vặn. Tên mới nối dưới dòng cuối của **chính cột tham số**, vì năm khối của `Config` chạy dọc độc lập nên `getLastRow()` của cả sheet sẽ chừa lại khoảng trắng.
  */
 function seedConfigParams(file) {
   var columnMap = readColumnMap('Config');
@@ -94,7 +86,7 @@ function seedConfigParams(file) {
   var missing = catalog.filter(function (item) { return !rowOfName[item.name]; });
 
   if (missing.length) {
-    // Nới lưới trước khi ghi vì `setValues` không tự nới. Nới vừa đủ, không nới thừa: khối này gieo một lần rồi thôi, còn mỗi hàng thừa là mười ô trừ vào ngân sách ô.
+    // `setValues` không tự nới lưới. Nới vừa đủ: mỗi hàng thừa là mười ô trừ vào ngân sách ô.
     sheetGridEnsureRoom(sheet, lastFilled + missing.length, 0);
     sheet.getRange(lastFilled + 1, nameColumn, missing.length, 1).setValues(missing.map(function (item) { return [item.name]; }));
     missing.forEach(function (item, index) { rowOfName[item.name] = lastFilled + 1 + index; });
@@ -112,11 +104,9 @@ function seedConfigParams(file) {
 /**
  * Kiểm lại khung vừa dựng, đọc ngược từ sheet lên chứ không tin bảng khai.
  *
- * Phần đối chiếu mã cột giao hẳn cho `readColumnMap()` — chính hàm mà chương trình dùng lúc chạy thật. Viết lại phép đối chiếu ở đây là tạo ra hai bộ luật, và bộ nghiệm thu dễ dãi hơn bộ chạy thật thì nghiệm thu xanh mà chạy thật đỏ.
+ * Phần đối chiếu mã cột giao hẳn cho `readColumnMap()` — chính hàm chương trình dùng lúc chạy thật, vì hai bộ luật thì bộ nghiệm thu dễ dãi hơn sẽ xanh trong khi chạy thật đỏ. Chỉ hai thứ nó không xem mà ở đây phải xem: số hàng đóng băng, và thứ tự cột lõi (lệch thứ tự chỉ là dấu hiệu sheet dựng từ bản khai cũ, nên thành ghi chú chứ không thành lỗi).
  *
- * Chỉ hai thứ `readColumnMap` không xem mà ở đây phải xem: số hàng đóng băng, và thứ tự cột lõi. Thứ tự cột không phải luật — code luôn tra theo mã — nhưng lệch thứ tự so với bảng khai là dấu hiệu sheet dựng từ bản khai cũ, nên nói ra thành ghi chú, không thành lỗi.
- *
- * Thứ ba là khối tham số hệ thống: đủ tên trong danh mục chưa, và mỗi tên đang mang giá trị gì. Có phần này vì một phép gieo không được nghiệm thu là một phép gieo chỉ tồn tại trong lời kể — và vì cùng lúc đó nó trả lời được câu người dùng hay hỏi nhất, "cái núm này đang bật hay tắt".
+ * Thứ ba là khối tham số hệ thống: đủ tên chưa, mỗi tên đang mang giá trị gì — đây cũng là chỗ trả lời câu "cái núm này đang bật hay tắt".
  */
 function verifySheets() {
   var problems = [];
@@ -161,9 +151,9 @@ function verifySheets() {
     }
   });
 
-  // Đọc khối tham số qua chính `configParams()` mà chương trình dùng lúc chạy, không dựng đường đọc thứ hai. Nó ném lỗi khi có tên khai trùng, nên bọc lại: một tên trùng không được phép giết cả bản báo cáo.
+  // Đọc qua chính `configParams()` chương trình dùng, không dựng đường đọc thứ hai. Nó ném lỗi khi có tên trùng, nên bọc lại: một tên trùng không được giết cả bản báo cáo.
   try {
-    // Xóa bộ nhớ tạm trước khi đọc: một hàm nghiệm thu phải nói về sheet **đang** như thế nào, không phải như thế nào lúc ai đó đọc nó lần đầu trong cùng lượt chạy.
+    // Xóa bộ nhớ tạm trước khi đọc: nghiệm thu phải nói về sheet **đang** như thế nào.
     resetSettingsCache();
     var params = configParams();
     var names = configParamNames();

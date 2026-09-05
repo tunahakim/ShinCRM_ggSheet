@@ -1,11 +1,9 @@
 /**
- * Ca kiểm cho `server/sheet/SetupSheets.js` và `server/config/ConfigParams.js`: dựng khung năm sheet, và gieo tên tham số hệ thống vào khối tham số của `Config`.
+ * Ca kiểm cho `server/sheet/SetupSheets.js` và `server/config/ConfigParams.js`.
  *
- * Điều đáng kiểm nhất ở đây không phải "dựng đúng thì ra đúng" mà **chạy lại lần thứ hai có phá gì không**. `setupSheets` sinh ra để chạy nhiều lần, nên mỗi lượt chạy lại là một cơ hội xóa mất giá trị người dùng vừa gõ — và một hàm chỉ hỏng ở lượt chạy thứ hai là hàm sẽ hỏng sau khi đã có người tin nó.
+ * Điều đáng kiểm nhất không phải "dựng đúng thì ra đúng" mà **chạy lại lần thứ hai có phá gì không** — một hàm chỉ hỏng ở lượt chạy thứ hai là hàm sẽ hỏng sau khi đã có người tin nó. Điều thứ hai: tên mới phải nối dưới dòng cuối của chính cột tham số, vì năm khối của `Config` chạy dọc độc lập.
  *
- * Điều thứ hai: tên mới phải nối vào dưới dòng cuối **của chính cột tham số**. Năm khối của `Config` chạy dọc độc lập, nên lấy `getLastRow()` của cả sheet là chừa lại một khoảng trắng giữa bảng — sai lặng lẽ, không ai thấy cho tới lúc mở sheet ra xem.
- *
- * Giới hạn phải biết: tệp Sheet giả nuốt `setNote` mà không giữ lại, nên ở đây không chứng minh được ghi chú ô thật sự hiện ra. Chỗ thấy nó là chạy `node tests/gas.js setupSheets` rồi trỏ chuột vào ô tên trên sheet thật.
+ * Giới hạn: tệp Sheet giả nuốt `setNote`, nên ở đây không chứng minh được ghi chú ô hiện ra thật. Chỗ thấy nó là chạy `node tests/gas.js setupSheets` rồi trỏ chuột vào ô tên.
  */
 
 const { dungHop, ghiO, TEP_NEN } = require('../lib/dung-hop');
@@ -15,9 +13,7 @@ const { section, check, checkContains, ghiLoiNap } = require('../lib/assert');
 const TEP = TEP_NEN.concat(['server/sheet/SetupSheets.js']);
 
 /**
- * Dựng hộp cát chỉ có sheet `Config`, để chính `setupSheets` phải tự dựng bốn sheet còn lại.
- *
- * Bắt nó tự dựng là cố ý: đường chạy thật lần đầu tiên là đường chạy trên một tệp gần như trắng, và đó là đường ít được chạy lại nhất nên cũng là đường dễ hỏng lâu nhất.
+ * Dựng hộp cát chỉ có sheet `Config`, để chính `setupSheets` phải tự dựng bốn sheet còn lại — đường chạy thật lần đầu là đường chạy trên tệp gần như trắng, và cũng là đường ít được chạy lại nhất.
  */
 function dungKhung(thamSo) {
   return dungHop({ sheets: ['Config'], thamSo: thamSo, tep: TEP });
