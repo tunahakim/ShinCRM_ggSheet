@@ -165,7 +165,7 @@ function statusLoadSummary(info) {
       ['Tiền đi đường', statusMs(timing.msDiDuong) + ' — mỗi vòng ' + statusMs(timing.msDiDuongMoiVong)],
       ['Trình duyệt bung và vẽ', statusMs(timing.msKhachLamViec)]
     ])
-    + '<p>Ba phần dưới cộng lại bằng phần trên. Sheet <code>Log</code> nhận đúng năm con số này ở dòng <code>sidebarBoot</code>; các dòng <code>loadCore</code> và <code>loadActivityChunk</code> chỉ đo phần tính toán của <b>một</b> lời gọi, nên không so trực tiếp với tổng được.</p>'
+    + '<p>Ba phần dưới cộng lại bằng phần trên. Năm con số này luôn hiện ở đây, nhưng chỉ <b>được ghi</b> vào sheet <code>Log</code> ở dòng <code>sidebarBoot</code> khi tham số <code>LOG_TRACE</code> ở sheet <code>Config</code> đang bật; ngày thường thì tắt để log không đầy dòng báo mọi thứ bình thường.</p>'
     + '</div>');
 
   if (info.warnings && info.warnings.length) {

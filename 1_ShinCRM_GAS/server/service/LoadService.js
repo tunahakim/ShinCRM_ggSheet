@@ -10,6 +10,8 @@
  * **Máy chủ không trả số hàng như một phần của bản ghi.** Số hàng chỉ xuất hiện ở `rowMap`, cây cầu tọa độ trả lời câu "người dùng vừa bấm vào hàng này trên sheet, đó là khách nào". Bản ghi thì nhận dạng bằng mã, không bằng vị trí — vì vị trí đổi mỗi lần sheet được sắp lại, còn mã thì không.
  *
  * **Điều tệp này chưa làm, và cố ý chưa:** `reloadRecords`, đường nạp lại đúng mấy bản ghi bẩn. Nó cần khối trạng thái bẩn có **chiều ghi** mới có gì để nạp lại, mà chiều ghi thuộc chặng làm mới dữ liệu. Viết bây giờ là viết một hàm luôn nhận danh sách rỗng.
+ *
+ * **Hai dòng "nạp xong" đều là dòng vết, không phải dòng luôn ghi.** Chủ dự án chốt ngày 05/09/2026: bật debug thì ghi chi tiết, ngày thường ẩn hết. Công tắc là tham số `LOG_TRACE` ở sheet `Config`. Một lượt mở sidebar trơn để lại **không** dòng nào, vì "mọi thứ bình thường" không đáng ghi ba lần mỗi lượt; lượt nào có lỗi thì vòng đệm vết tự bung ra sheet kèm dòng lỗi, nên đúng lúc cần chẩn đoán vẫn có đủ số liệu. Dòng cảnh báo vượt trần ngân sách ô thì vẫn `logEvent` — nó không phải chuyện bình thường.
  */
 
 /** Nguồn ghi log của mọi đường trong tệp này. Sidebar gọi qua `google.script.run` nên theo bảng ở tài liệu 10 Phần 8, nguồn là `sidebar` và kênh báo lỗi là ném lại cho `withFailureHandler`. */
@@ -55,7 +57,7 @@ function loadCore() {
     var warnings = danhMuc.warnings.slice();
     if (budget.warning) { warnings.push(budget.warning); }
 
-    logEvent({
+    logTrace({
       source: LOAD_SOURCE,
       action: 'loadCore',
       outcome: LOG_OK,
@@ -158,7 +160,7 @@ function loadActivityChunk(cursor, chunkRows) {
     var ms = Date.now() - batDau;
 
     if (done) {
-      logEvent({
+      logTrace({
         source: LOAD_SOURCE,
         action: 'loadActivityChunk',
         outcome: LOG_OK,

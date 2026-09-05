@@ -1,5 +1,5 @@
 /**
- * Cửa nhận bản đo thời gian **từ phía sidebar** rồi ghi một dòng vào sheet `Log`. Tài liệu 10 Phần 3.
+ * Cửa nhận bản đo thời gian **từ phía sidebar** rồi đệm một dòng vết cho sheet `Log`. Tài liệu 10 Phần 3. Dòng chỉ ra sheet khi công tắc `LOG_TRACE` bật — xem docstring của `logClientTiming`.
  *
  * Vì sao phải có cửa riêng thay vì để `loadCore` tự ghi: máy chủ không đo được thứ đáng đo. Một lượt chạy Apps Script chỉ biết thời gian tính toán bên trong chính nó; nó không thấy tiền đi đường của `google.script.run`, không thấy trình duyệt bung khối kết quả mất bao lâu, và không biết lượt khởi động cần mấy vòng. Cộng lại thì con số máy chủ tự báo có thể chỉ bằng một nửa thời gian người dùng thật sự chờ — và một cột thời gian nói sai một nửa còn tệ hơn không có cột nào, vì người đọc tin nó.
  *
@@ -29,6 +29,8 @@ function clientTimingRounds(value) {
  * Ghi bản đo của một lượt khởi động sidebar. Trả về `{ ok: true }` để client biết dòng đã ra.
  *
  * Ghi **một** dòng cho cả lượt, không phải một dòng mỗi vòng. Lý do giống chỗ chọn ghi log ở gói cuối của `loadActivityChunk`: sáu dòng cho một lượt mở sidebar sẽ làm loãng sheet `Log` tới mức không tìm ra thứ đáng xem, mà thứ đáng xem ở đây là bản tổng — riêng từng vòng thì đã nằm trong khóa `vong` của cùng dòng đó.
+ *
+ * **Dòng vết, không phải dòng luôn ghi.** Chủ dự án chốt ngày 05/09/2026: bật debug thì ghi chi tiết, ngày thường ẩn hết. Nên dòng này chỉ ra sheet khi tham số `LOG_TRACE` ở sheet `Config` phủ nguồn `sidebar`. Tắt công tắc thì một lượt mở sidebar trơn không tốn dòng log nào — và vì đây là lượt gọi riêng, không nằm trong lượt chạy đã lỗi, nên tắt là tắt hẳn chứ không có đường tự bung ra như các dòng vết khác.
  */
 function logClientTiming(timing) {
   return runEntryPoint('logClientTiming', LOAD_SOURCE, 'throw', function () {
@@ -38,7 +40,7 @@ function logClientTiming(timing) {
     CLIENT_TIMING_KEYS.forEach(function (khoa) { detail[khoa] = clientTimingNumber(nguon[khoa]); });
     detail.vong = clientTimingRounds(nguon.vong);
 
-    logEvent({
+    logTrace({
       source: LOAD_SOURCE,
       action: 'sidebarBoot',
       outcome: LOG_OK,
@@ -46,7 +48,7 @@ function logClientTiming(timing) {
       detail: detail
     });
 
-    return { ok: true };
+    return { ok: true, ghiRaSheet: logTraceCoversSource(LOAD_SOURCE) };
   });
 }
 
@@ -54,9 +56,17 @@ function logClientTiming(timing) {
  * Phép nghiệm thu chạy được trên Google: gửi một bản đo tử tế và một bản đo toàn rác, rồi đọc lại xem cửa vào đã kẹp đúng chưa.
  *
  * Nó chạy được **không cần mở sidebar**, nên hình dạng dòng log kiểm được ngay ở máy. Còn con số thật thì vẫn phải mở sidebar mới có, vì chỉ trình duyệt đo được cả hai đầu một vòng gọi.
+ *
+ * Báo cáo nói rõ công tắc `LOG_TRACE` đang bật hay tắt, vì ba dòng này là dòng vết: tắt công tắc thì phép nghiệm thu vẫn đạt mà sheet `Log` không có dòng nào — và một báo cáo nói "đã ghi ba dòng" trong khi sheet trống là báo cáo làm người đọc đi tìm lỗi ở chỗ không có lỗi.
+ *
+ * Số dòng đếm bằng cách đo hàng cuối của sheet `Log` trước và sau, **không** bằng giá trị `flushLog()` trả về. Lý do: `logClientTiming` chạy trong `runEntryPoint`, mà vỏ bọc đó tự nhả log ở `finally` — nên tới lượt gọi `flushLog()` cuối thì bộ đệm đã rỗng và nó luôn trả về 0, ở cả hai chế độ.
  */
 function probeClientTiming() {
   var report = [];
+  var raSheet = logTraceCoversSource(LOAD_SOURCE);
+  var truoc = logSheet().getLastRow();
+
+  report.push('Công tắc LOG_TRACE phủ nguồn "' + LOAD_SOURCE + '": ' + raSheet + (raSheet ? ' — ba dòng dưới đây sẽ ra sheet Log.' : ' — ba dòng dưới đây CHỈ nằm trong vòng đệm, sheet Log không có dòng nào. Muốn thấy thì chạy devLogTraceOn.'));
 
   logClientTiming({ soVong: 6, msTong: 40000, msKhungHinhDau: 8500, msMayChu: 21100, msDiDuong: 16900, msDiDuongMoiVong: 2817, msKhachLamViec: 2000, vong: ['loadCore 8000/3600'] });
   report.push('Bản đo tử tế: đã đệm một dòng sidebarBoot.');
@@ -72,8 +82,8 @@ function probeClientTiming() {
   logClientTiming(null);
   report.push('Gọi với null không ném: đã đệm một dòng toàn null.');
 
-  flushLog();
-  report.push('Đã nhả log. Mở sheet Log xem ba dòng sidebarBoot vừa ghi.');
+  var soDong = logSheet().getLastRow() - truoc;
+  report.push('Sheet Log nhận thêm ' + soDong + ' dòng' + (raSheet ? ' — phải là 3, mở sheet Log xem ba dòng sidebarBoot.' : ', phải là 0 vì công tắc đang tắt.'));
 
   report.forEach(function (line) { Logger.log(line); });
   return report;
