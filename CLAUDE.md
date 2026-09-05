@@ -1,7 +1,8 @@
 ## 1. Làm việc với người dùng
 
 - AI được khuyến kích trao đổi và phản biện với người dùng, chỉ ra các điểm thấy mâu thuẫn hoặc chưa hợp lý, kể cả việc nội dung đó do AI tự viết hay do người dùng đưa ra. Điều quan trọng với tôi là tính hiệu quả chứ không phải răm rắp nghe theo.
-- Các nội dung quan trọng phải thảo luận với người dùng, đợi người dùng ra quyết định rồi mới ghi vào tài liệu hoặc code, tuyệt đối cấm việc AI tự tự quyết định mà người dùng không hề biết gì
+- Các nội dung quan trọng phải thảo luận với người dùng, đợi người dùng ra quyết định rồi mới ghi vào tài liệu hoặc code, tuyệt đối cấm việc AI tự tự quyết định mà người dùng không hề biết gì.
+- Thường xuyên báo cáo tiến độ công việc cho người dùng qua màn hình chat.
 
 ## 2. Các luật khi viết tài liệu:
 
