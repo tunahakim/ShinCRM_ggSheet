@@ -12,17 +12,29 @@
  */
 var BLOCK_ROLES = ['box', 'card', 'row', 'text', 'field', 'button', 'icon', 'check'];
 
-/** Khóa dùng được ở mọi vai: đúng sáu khóa của bảng trong tài liệu 04 Phần 4, cộng `label` vì nút, icon và trường đều có chữ hiện ra, cộng `pick` vì dòng nào do slot sinh ra cũng phải mang mã bản ghi của nó. */
-var BLOCK_KEYS_COMMON = ['id', 'className', 'spatialConfig', 'action', 'menu', 'elements', 'label', 'pick'];
+/**
+ * Khóa dùng được ở mọi vai: năm khóa của bảng trong tài liệu 04 Phần 4 mà `renderEngine` xử lý theo cùng một đường cho tám vai, cộng `pick` vì dòng nào do slot sinh ra cũng phải mang mã bản ghi của nó.
+ *
+ * `elements` và `label` từng nằm ở đây rồi bị dời xuống bảng dưới, vì "mọi vai nhận được" mà chỉ vài vai vẽ ra là một cái bẫy: `Card({ label: 'GHI CHÚ' })` đi qua mọi phép kiểm, dựng được, vẽ được, và chữ không bao giờ hiện — chỗ khai đúng tên phải là `title`. Đó đúng là loại lỗi "sửa schema mà hình thức không đổi" mà `blockCheckKeys` bên dưới ra đời để chặn, nên để nó ở lại là tự bịt mắt mình.
+ */
+var BLOCK_KEYS_COMMON = ['id', 'className', 'spatialConfig', 'action', 'menu', 'pick'];
 
-/** Khóa riêng của từng vai. Vai không có tên trong bảng này thì chỉ dùng được khóa chung. */
+/**
+ * Khóa riêng của từng vai.
+ *
+ * Luật của bảng này: một khóa chỉ được có tên trong một vai khi phần lá của vai đó **thật sự đọc tới nó**. Ba vai chứa con nhận `elements`, năm vai lá thì không — con của một cái nút chữ chẳng bao giờ được vẽ. Bốn vai có chữ hiện ra nhận `label`, bốn vai còn lại thì không.
+ *
+ * `tests/cases/blockKeys.js` canh đúng luật này: mỗi cặp (vai, khóa) trong bảng phải làm chuỗi HTML đổi khác. Thêm một khóa vào đây mà quên dạy lá dùng nó thì bộ kiểm đỏ ngay, chứ không đợi tới lúc có người mở sidebar ra nhìn.
+ */
 var BLOCK_KEYS_BY_ROLE = {
-  card: ['title', 'titleActions'],
+  box: ['elements'],
+  card: ['elements', 'title', 'titleActions'],
+  row: ['elements'],
   text: ['text'],
-  field: ['field', 'control', 'readonly', 'width'],
-  icon: ['icon', 'tooltip', 'align'],
-  button: ['align'],
-  check: []
+  field: ['field', 'control', 'readonly', 'width', 'label'],
+  button: ['align', 'label'],
+  icon: ['icon', 'tooltip', 'align', 'label'],
+  check: ['label']
 };
 
 /**

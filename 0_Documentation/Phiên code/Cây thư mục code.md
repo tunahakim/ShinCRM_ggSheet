@@ -177,7 +177,9 @@ tests\
     ├── callTiming.js             Phép trừ "client đo được trừ máy chủ báo". Sai chỗ này thì tiền đi đường hiện ra sai, và cỡ gói bị chọn theo một con số bịa.
     ├── bootstrap.js              Hai hàm thuần của trình tự khởi động: cảnh báo dữ liệu nổ hộp thoại còn phép kiểm bị bỏ qua chỉ xuống console, và bậc thang cỡ gói đọc từ SETTINGS.
     ├── uiBuilder.js              Cây Block và lối viết tắt của UI_SCHEMA. Phần đáng kiểm không phải "dựng đúng thì ra đúng" mà "dựng sai thì có chặn không".
+    ├── blockKeys.js              Nửa còn lại của phép kiểm khóa Block: vai nhận khóa nào thì phần lá phải vẽ ra khóa đó. Đây là ca `{icon, label}` chỉ ra glyph, và ca `Card({label})` khai đúng cú pháp mà chữ không bao giờ hiện.
     ├── uiSchema.js               Bảng khai bố cục giữ hợp đồng với ba tệp khác: mọi đường dẫn trường tra được trong DATA_SCHEMA, mọi tên hàm có trong ACTIONS, và bốn màn dựng qua screenBuild không nổ.
+    ├── cssClass.js               Tên lớp CSS cũng ở chung một vùng tên như biến JS: trùng tên thì tệp nạp sau lặng lẽ thắng. Đây là ca `.shin-box` của tệp màn đè `.shin-box` dùng chung, ăn mất 26 pixel bề ngang.
     ├── renderEngine.js           Cây Block thành HTML: ký tự đặc biệt trong tên công ty, spatialConfig khai rồi mà bố cục không đổi, data-field thiếu đường dẫn, luật chỉ-đọc bị mở khóa; kèm phép quét mã nguồn chốt đúng ba tệp được gán innerHTML.
     ├── slots.js                  Dòng lịch sử giữ đúng thứ tự thời gian kể cả khi có bản ghi đã xóa chen giữa, và KHÔNG dòng nào mang field — engine tra một bản ghi cho một thực thể.
     ├── viewScreen.js             Bốn cái hỏng-trong-im-lặng của màn xem: mã card lệch giữa hai tệp, đổi khách mà chỉ vẽ lại một vùng, đổi khách lúc đang gõ dở, và tệp màn tự chạm DOM.

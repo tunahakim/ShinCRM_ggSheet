@@ -38,6 +38,8 @@ const NHOM_CA = [
   require('./cases/callTiming'),
   require('./cases/bootstrap'),
   require('./cases/uiBuilder'),
+  require('./cases/blockKeys'),
+  require('./cases/cssClass'),
   require('./cases/uiSchema'),
   require('./cases/renderEngine'),
   require('./cases/slots'),
