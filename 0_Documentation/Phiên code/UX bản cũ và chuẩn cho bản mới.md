@@ -212,15 +212,16 @@ Bản mới có ba thứ bản cũ không có, và chúng đổi cách hiện th
 | Hai giá trị một hàng | Khối thông tin chung: tên công ty một hàng, rồi `mã khách • người liên hệ` bên trái với **số điện thoại ghim mép phải**. Bốn giá trị trong hai dòng, đúng mẹo của bản cũ. Không có điện thoại thì hàng phụ về một cột chứ không để lại thẻ rỗng. |
 | Chip co theo chữ của nó | `.shin-badge { flex: 0 0 auto }`. Không có dòng đó thì luật chia đều của `.shin-row` cho chip "Đã xóa" ăn nửa bề ngang và tên công ty bị ép còn một nửa. |
 | Form trống mở ra đã có sẵn giá trị đoán | `client/schema/fieldLogic.html`, bảy hàm ngầm định. Ba ca của bản cũ đều có: ngày làm việc là hôm nay, ghim kế tục giao dịch gần nhất, và sản phẩm kế tục giao dịch gần nhất rồi **rơi tiếp về sản phẩm khai ở hồ sơ khách** khi khách chưa có giao dịch nào — đúng nếp hai bậc của bản cũ. Hơn bản cũ: ô nào máy tự đoán thì trả về trong `carried` để nhuộm màu, còn bản cũ điền im lặng nên người dùng không phân biệt được giá trị mình gõ với giá trị máy đoán. |
+| Nút Thử lại trên màn báo lỗi, tự tắt lúc đang chạy | `statusScreen.html` vẽ một nút mang `data-action="reloadAll"` và `data-busy="Đang thử lại…"`; `dispatch.html` thấy `data-busy` thì tắt nút và đổi chữ cho tới khi hành động xong. Hơn bản cũ ở hai chỗ: bản cũ viết riêng một hàm `retryLoadUI` chỉ để làm việc này còn bản mới là một thuộc tính dùng được cho mọi nút gọi máy chủ, và bản cũ tự đổi màu nền bằng `style` trong lúc bản mới để `:disabled` lo — nút tắt thì luôn trông giống nhau ở mọi chỗ. |
+| Số ô, số hàng, số bản ghi đều có dấu chấm nghìn | `statusNumber()`, dùng ở cả ba màn của `statusScreen.html`. `500000` đọc thành `500.000`. |
 
 ### 3.2 Phải làm — món bản cũ có mà bản mới còn thiếu
 
 Xếp theo mức người dùng thấy ngay:
 
 1. **Khối ghi chú rỗng: chỗ bấm.** Bản cũ ẩn hẳn vùng nội dung khi không có ghi chú và đổi liên kết thành dấu cộng + "Thêm mới". Bản mới hiện `(chưa có)` bằng `.shin-readtext:empty::before`, và giữ cách này vì nó cho một khoảng bấm rộng bằng cả khối thay cho một cái bút chì 20 pixel ở góc — nhưng `.shin-readtext` hiện **chưa mang `data-action`** nên bấm vào chữ đó không mở gì, lời hứa kia chưa thành. Phải cho control `readText` nhận khóa `action` thành `data-action` trên chính thẻ của nó, và khi đó `renderField` không sinh thêm nút bút chì ở hàng nhãn nữa. Nhãn nút thì **cố ý không đổi** theo nội dung: `titleActions` của `Card` chạy ngay lúc tệp `uiSchema` nạp nên nó không biết khách nào đang xem, mà nhét điều kiện vào tệp đó là phá luật "chỉ có dữ liệu, không một dòng logic".
-2. **Vẽ trước, gửi sau.** Thuộc chặng 1.4 (`saveFlow`). Ghi ở đây để chặng đó không quên: đóng form và cập nhật RAM trước, gọi máy chủ sau, và lỗi mạng phải nói rõ "chưa lưu được".
+2. **Vẽ trước, gửi sau.** Thuộc chặng 1.4 (`saveFlow`). Ghi ở đây để chặng đó không quên: đóng form và cập nhật RAM trước, gọi máy chủ sau, và lỗi mạng phải nói rõ "chưa lưu được". Nút Lưu cũng phải khóa trong lúc gửi — cơ chế đã có sẵn, chỉ cần node `button` của `UI_SCHEMA` nhận thêm khóa `busy` để engine ghi ra `data-busy`, phần còn lại `dispatch.html` lo.
 3. **Lỗi hiện tại ô, không hiện bằng hộp thoại.** Cũng chặng 1.4: viền đỏ trên ô sai, con trỏ về ô sai đầu tiên, màu đỏ tự mất khi gõ lại. `--shin-error` và `--shin-error-soft` đã có.
-4. **Màn lỗi và màn quá tải.** `statusScreen.html` đã có ba màn. Phải soát rằng nút thử lại tự tắt lúc đang chạy như bản cũ, và số ô có dấu chấm nghìn.
 
 ### 3.3 Cố ý làm khác bản cũ
 

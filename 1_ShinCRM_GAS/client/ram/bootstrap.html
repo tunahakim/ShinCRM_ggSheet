@@ -30,6 +30,9 @@ async function sidebarBoot() {
   callTimingReset(Date.now());
 
   try {
+    // Bộ phát click gắn **trước** mọi thứ khác, vì nó không cần một hạt dữ liệu nào mà màn báo lỗi thì có nút Thử lại. Gắn ở cuối như trước thì lượt nạp đầu tiên mà vỡ sẽ vẽ ra một cái nút bấm không kêu. Hàm này chạy nhiều lần cũng chỉ gắn một tai nghe.
+    dispatchInstall();
+
     statusInfoLine('Đang đo ngân sách ô và nạp lõi…');
     var core = await callServer('loadCore');
 
@@ -56,7 +59,6 @@ async function sidebarBoot() {
       timing: timing
     };
 
-    dispatchInstall();
     menuInstall();
     collapseInstall();
     searchInstall();

@@ -61,29 +61,64 @@ function dispatchAfter(ket) {
 }
 
 /**
+ * Nút mang `data-busy` thì tự tắt và đổi chữ trong lúc hành động của nó còn chạy, rồi trả về hàm bật lại.
+ *
+ * Chỉ nút nào khai `data-busy` mới bị tắt, chứ không tắt mọi nút: phần lớn hành động vẽ lại vùng ngay trong cùng một nhịp nên nút cũ biến mất trước khi ai kịp bấm lần hai, và tắt bừa thì có ngày một nút chờ mãi một `Promise` không bao giờ về. Chỗ cần khóa là chỗ **gọi máy chủ rồi mới vẽ**: nút Thử lại của màn báo lỗi, và nút Lưu của chặng sau.
+ *
+ * Giá trị của `data-busy` là chữ hiện trong lúc chạy. Một thuộc tính lo cả hai việc — tắt nút và đổi chữ — vì hai việc đó luôn đi cùng nhau: một nút tắt mà chữ không đổi thì người dùng tưởng nó hỏng.
+ *
+ * Chữ đổi ở `.shin-btn-label` nếu nút có ô chữ riêng, chứ không ghi thẳng vào `textContent` của nút: nút do engine sinh ra bọc nhãn trong một `<span>` và có thể còn một glyph bên cạnh, mà ghi đè cả ruột nút thì glyph đó biến mất và không bao giờ về.
+ */
+function dispatchBusy(el) {
+  if (!el || el.tagName !== 'BUTTON' || !el.hasAttribute('data-busy')) { return null; }
+
+  var oChu = el.querySelector ? el.querySelector('.shin-btn-label') : null;
+  var noiChu = oChu || el;
+  var chuCu = noiChu.textContent;
+  el.disabled = true;
+  noiChu.textContent = el.getAttribute('data-busy') || chuCu;
+
+  return function () {
+    el.disabled = false;
+    noiChu.textContent = chuCu;
+  };
+}
+
+/**
  * Gọi một hành động theo tên rồi ăn phần dư nó trả về.
  *
  * Hành động trả `Promise` — bốn núm đổi cách xem và nút Nạp lại — thì lỗi tới muộn, nên phải bắt ở nhánh chối chứ không chỉ ở `try`. Bỏ nhánh đó là để một lượt gửi thất bại trôi vào im lặng, đúng loại lỗi mà tài liệu 04 Phần 7 lập ra để chống.
+ *
+ * `el` là phần tử vừa bấm, và nó chỉ dùng cho một việc duy nhất: khóa nút mang `data-busy` cho tới lúc hành động xong. Không truyền cũng chạy được — đường gọi từ console lúc nghiệm thu không có nút nào.
  */
-function dispatchRun(ten, payload) {
+function dispatchRun(ten, payload, el) {
   if (typeof ACTIONS === 'undefined' || !Object.prototype.hasOwnProperty.call(ACTIONS, ten)) {
     dispatchError(new Error('Nút vừa bấm gọi hành động "' + ten + '" không có trong bảng ACTIONS. Đây là lỗi bản khai bố cục, không phải bạn làm sai — phép kiểm lúc khởi động lẽ ra phải bắt được nó.'));
     return null;
   }
 
+  var xong = dispatchBusy(el);
   var ket;
   try {
     ket = ACTIONS[ten](payload);
   } catch (err) {
+    if (xong) { xong(); }
     dispatchError(err);
     return null;
   }
 
   if (ket && typeof ket.then === 'function') {
-    ket.then(dispatchAfter, dispatchError);
+    ket.then(function (giaTri) {
+      if (xong) { xong(); }
+      return dispatchAfter(giaTri);
+    }, function (err) {
+      if (xong) { xong(); }
+      dispatchError(err);
+    });
     return ket;
   }
 
+  if (xong) { xong(); }
   dispatchAfter(ket);
   return ket;
 }
@@ -111,7 +146,7 @@ function dispatchClick(e) {
   }
 
   e.preventDefault();
-  dispatchRun(el.getAttribute('data-action'), dispatchPayload(el));
+  dispatchRun(el.getAttribute('data-action'), dispatchPayload(el), el);
 }
 
 /** Gắn tai nghe vào khung. Gọi nhiều lần cũng chỉ gắn một cái, vì nút Nạp lại chạy lại cả trình tự khởi động. */

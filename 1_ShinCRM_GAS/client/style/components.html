@@ -281,6 +281,14 @@
 .shin-button.shin-primary:hover { background: var(--shin-primary-dark); border-color: var(--shin-primary-dark); }
 .shin-button.shin-danger { color: var(--shin-error); }
 
+/*
+ * Nút đang chờ máy chủ. `dispatch.html` tự đặt `disabled` cho nút mang `data-busy`, nên trạng thái này phải nhìn ra được là "đang chạy" chứ không phải "hỏng".
+ *
+ * Khai sau `.shin-primary` nên nó thắng mà không cần `!important`: hai luật cùng độ mạnh, luật viết sau ăn. Nút Thử lại là nút primary, mà một nút xanh đậm đang tắt thì không ai tin là nó đã tắt.
+ */
+.shin-button:disabled { border-color: var(--shin-border); background: var(--shin-bg-sunken); color: var(--shin-text-faint); cursor: progress; }
+.shin-button:disabled:hover { background: var(--shin-bg-sunken); }
+
 /* Nút glyph vuông. Khai sau nút và sau hàng nên nó thắng luật chia đều của `.shin-row > *` mà không cần `!important`. */
 .shin-icon {
   flex: 0 0 auto;

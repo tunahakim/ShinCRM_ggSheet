@@ -229,3 +229,11 @@ Bản cũ đoán ô sản phẩm theo hai bậc: lấy của giao dịch gần n
 **Đã chọn: thêm `carryForwardProduct` với đúng hai bậc của bản cũ, và khai `default` đó lên `activity.product`.** Ô nào đoán được thì tên trường vào danh sách `carried` để form nhuộm màu, nên người dùng nhìn ra ngay đâu là chữ mình gõ và đâu là chữ máy đoán — chỗ này hơn bản cũ, bản cũ điền im lặng.
 
 Kèm theo là một cửa tra mới `Store.hasCustomer(id)`. Lý do phải có: `Store.getCustomer` cố ý **ném lỗi** khi không tra ra mã, vì nó là cửa của nơi *vẽ* một khách và vẽ trượt thì người dùng tưởng mất dữ liệu. Còn ở đây bên gọi chỉ đang *đoán* một ô, nên hậu quả đúng của việc tra trượt là một ô trống, không phải một form sập. Hai hậu quả khác nhau thì phải hai cửa khác nhau, chứ không phải bọc `try` quanh cửa cũ.
+
+### 7.8. Nút chờ máy chủ khóa bằng một thuộc tính `data-busy`, và bộ phát click gắn sớm hơn
+
+Màn báo lượt nạp vỡ trước lượt này **không có nút Thử lại** — nó bảo người dùng đóng rồi mở lại bảng làm việc, tức ba cú bấm qua menu Tiện ích mở rộng. Bản cũ có nút, và nút đó tự đổi chữ thành "Đang kiểm tra…" rồi tự tắt trong lúc gọi.
+
+**Đã chọn: thuộc tính `data-busy` trên nút, `dispatch.html` đọc nó.** Nút nào khai `data-busy="chữ lúc chạy"` thì bộ phát click tắt nút và đổi chữ trước khi gọi hành động, bật lại khi hành động xong — kể cả nhánh `Promise` bị chối. Không tắt bừa mọi nút, vì phần lớn hành động vẽ lại vùng ngay trong cùng một nhịp nên nút cũ biến mất trước khi ai kịp bấm lần hai; chỗ cần khóa là chỗ gọi máy chủ rồi mới vẽ. Chặng 1.4 dùng lại đúng cơ chế này cho nút Lưu, chỉ cần node `button` của `UI_SCHEMA` nhận thêm khóa `busy`.
+
+**Kéo theo một thay đổi trong trình tự khởi động:** `dispatchInstall()` chuyển lên **dòng đầu** của khối `try` trong `sidebarBoot`, thay vì nằm ở cuối cùng với năm bộ gắn tai nghe khác. Lý do: nó không cần một hạt dữ liệu nào, mà gắn ở cuối thì lượt nạp đầu tiên bị vỡ sẽ vẽ ra một cái nút bấm không kêu — đúng loại lỗi im lặng khó tìm nhất. Vẫn để trong `try` để một khung thiếu `sidebar-root` còn ra được màn báo lỗi.

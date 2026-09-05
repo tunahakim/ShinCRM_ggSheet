@@ -97,12 +97,19 @@ function statusBudgetBlocked(budget) {
   statusSetRegion('sidebar-footer', null);
 }
 
-/** Màn báo lượt nạp vỡ. Hiện nguyên văn thông báo lỗi, vì người đọc là chủ dự án và chuỗi đó là thứ đem đi đối chiếu với sheet `Log`. */
+/**
+ * Màn báo lượt nạp vỡ. Hiện nguyên văn thông báo lỗi, vì người đọc là chủ dự án và chuỗi đó là thứ đem đi đối chiếu với sheet `Log`.
+ *
+ * Nút Thử lại gọi thẳng hành động `reloadAll` chứ không có đường gọi riêng, nên nó đi qua bộ phát click như mọi nút khác. Nhờ `data-busy` mà nó tự tắt và đổi chữ trong lúc chạy — bấm liên tục vào một nút đang gọi máy chủ là cách chắc chắn để có ba lượt nạp chồng nhau. Thất bại lần nữa thì `sidebarBoot` vẽ lại chính màn này, tức một nút mới còn nguyên, nên không cần đường bật lại riêng.
+ *
+ * Vẫn giữ câu nói về việc đóng mở lại bảng làm việc, vì có loại vỡ mà nút này không cứu được: chính đường truyền tới máy chủ gãy.
+ */
 function statusLoadError(message) {
   var html = '<div class="shin-screen">'
     + '<h2>Không nạp được dữ liệu</h2>'
     + '<div class="shin-box shin-box--error">' + statusEscape(message) + '</div>'
-    + '<p>Lượt chạy này đã ghi một dòng vào sheet <code>Log</code> kèm vết gọi. Đóng rồi mở lại bảng làm việc để thử lần nữa.</p>'
+    + '<div><button type="button" class="shin-button shin-primary" data-action="reloadAll" data-busy="Đang thử lại…">Thử lại</button></div>'
+    + '<p>Lượt chạy này đã ghi một dòng vào sheet <code>Log</code> kèm vết gọi. Bấm Thử lại, hoặc đóng rồi mở lại bảng làm việc nếu bấm mấy lần vẫn vỡ.</p>'
     + '</div>';
 
   statusSetRegion('sidebar-info', 'Nạp thất bại');
