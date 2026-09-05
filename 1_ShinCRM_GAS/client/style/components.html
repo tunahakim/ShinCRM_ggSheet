@@ -151,25 +151,14 @@
 
 /* --- Hai control gõ-để-lọc --------------------------------------- */
 
-/* Hộp danh sách bung ra bằng `position: absolute` nên nó không đẩy hàng dưới xuống lúc mở. */
+/*
+  Hộp danh sách bung ra bằng `position: absolute` nên nó không đẩy hàng dưới xuống lúc mở.
+
+  **Không có mũi tên sổ xuống.** Sidebar rộng khoảng 300 pixel, một mũi tên cộng khoảng chừa cho nó ăn 24 pixel bề
+  ngang — bằng ba bốn chữ, mà ba bốn chữ cuối của tên công ty mới là thứ phân biệt hai khách trùng đầu tên. Bản cũ
+  không vẽ mũi tên và bù lại bằng việc **chọn vào ô là tự bung danh sách**, nên người dùng không mất đường mở nào.
+*/
 .shin-combo { position: relative; }
-
-.shin-combo .shin-input { padding-right: var(--shin-gap-5); }
-
-/* Mũi tên vẽ bằng viền chứ không bằng ký tự `▾`: ở 11px thì glyph đó ra một cái gạch ngang trên phông Segoe UI, người dùng đọc thành dấu trừ. Vẽ bằng viền thì hình tam giác không phụ thuộc phông máy nào. */
-.shin-combo > .shin-caret {
-  position: absolute;
-  top: 50%;
-  right: var(--shin-gap-3);
-  transform: translateY(-50%);
-  font-size: 0;
-  width: 0;
-  height: 0;
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
-  border-top: 5px solid var(--shin-text-faint);
-  pointer-events: none;
-}
 
 .shin-combo-list {
   position: absolute;
@@ -185,6 +174,19 @@
   box-shadow: var(--shin-shadow);
 }
 
+/*
+  Bung **lên trên** thay vì xuống dưới. Danh sách là `position: absolute` nên vùng thân cắt phần tràn của nó: một ô nằm
+  sát đáy form mà bung xuống thì người dùng nhận được một khe trống cao ba pixel. `client/ui/combo.html` đo chỗ hở trên
+  và dưới lúc chạy rồi đặt lớp này, đồng thời đặt `max-height` thẳng trên thẻ — nên số `180px` ở trên chỉ là mức mặc định
+  cho lúc chưa ai đo.
+
+  Bản cũ luôn bung xuống và chịu cảnh bị cắt.
+*/
+.shin-combo-list.is-up {
+  top: auto;
+  bottom: calc(100% + 2px);
+}
+
 /* Một dòng của danh sách. Nội dung dòng do phần bàn phím đổ vào; hình thức thì thuộc về đây. */
 .shin-combo-item {
   padding: var(--shin-gap-1) var(--shin-gap-2);
@@ -194,6 +196,29 @@
 
 .shin-combo-item:hover,
 .shin-combo-item.is-active { background: var(--shin-primary-soft); }
+
+/* Dòng phụ của ô tra khách: mã khách và tỉnh. Hai khách trùng tên là chuyện thường, và đây là chỗ phân biệt chúng. */
+.shin-combo-meta {
+  color: var(--shin-text-faint);
+  font-size: var(--shin-text-xs);
+}
+
+/*
+  Hai dòng chú thích, **không bấm được**: `Không tìm thấy` và `Gõ thêm để lọc hẹp`.
+
+  Nói ra thay vì bỏ trống. Một hộp trống thì người dùng không biết là gõ sai, là danh mục chưa có mục đó, hay là sidebar
+  vừa hỏng. `cursor: default` để con trỏ chuột nói luôn rằng bấm vào đây không có gì xảy ra.
+*/
+.shin-combo-empty,
+.shin-combo-more {
+  padding: var(--shin-gap-1) var(--shin-gap-2);
+  color: var(--shin-text-faint);
+  font-size: var(--shin-text-xs);
+  font-style: italic;
+  cursor: default;
+}
+
+.shin-combo-more { border-top: 1px solid var(--shin-border); }
 
 /* Vệt vàng của ô vừa được điền tự động, giữ đúng thói quen của bản cũ. */
 .shin-input.is-filled { background: var(--shin-warn-soft); }

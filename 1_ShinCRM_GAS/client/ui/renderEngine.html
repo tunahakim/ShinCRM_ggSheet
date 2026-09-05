@@ -211,12 +211,25 @@ function renderControlAttrs(o, lop) {
     + renderAttr('data-field', o.path) + (o.readonly ? ' data-readonly="1"' : '');
 }
 
-/** Khung chung của hai control gõ-để-lọc: ô nhập, mũi tên, và một hộp danh sách rỗng để phần bàn phím đổ nội dung vào sau. */
+/**
+ * Hai thuộc tính tắt trợ giúp của trình duyệt, đặt trên mọi ô nhập.
+ *
+ * `autocomplete="off"`: Chrome tự nhớ những gì đã gõ vào ô cùng tên rồi bày ra một hộp gợi ý **của riêng nó**, vẽ đè lên
+ * hộp gợi ý của sidebar và sắp theo thứ tự người dùng từng gõ chứ không theo dữ liệu thật. Bản cũ phải quét cả DOM sau
+ * mỗi lần vẽ để dập nó; ở đây mọi ô đều đi qua một hàm nên đặt được ngay lúc dựng chuỗi, không cần quét gì.
+ *
+ * `spellcheck="false"`: tên riêng và mã khách gạch chân đỏ hết, mà không có chữ nào để sửa.
+ */
+function renderInputGuard() {
+  return ' autocomplete="off" spellcheck="false"';
+}
+
+/** Khung chung của hai control gõ-để-lọc: ô nhập và một hộp danh sách rỗng để phần bàn phím đổ nội dung vào sau. Không mũi tên — bù lại bằng phép tự bung lúc ô nhận con trỏ, xem `client/ui/inputs.html`. */
 function renderCombo(o, lop, them) {
   return '<div class="shin-combo ' + lop + '">'
-    + '<input type="text" role="combobox" aria-expanded="false" autocomplete="off"'
-    + renderControlAttrs(o, 'shin-input') + renderAttr('value', o.value) + them + (o.readonly ? ' readonly' : '') + '>'
-    + '<span class="shin-caret" aria-hidden="true">▾</span>'
+    + '<input type="text" role="combobox" aria-expanded="false"'
+    + renderControlAttrs(o, 'shin-input') + renderAttr('value', o.value) + renderInputGuard() + them
+    + (o.readonly ? ' readonly' : '') + '>'
     + '<div class="shin-combo-list" hidden></div>'
     + '</div>';
 }
@@ -225,11 +238,11 @@ function renderCombo(o, lop, them) {
 var RENDER_CONTROLS = {
   text: function (o) {
     return '<input type="text"' + renderControlAttrs(o, 'shin-input') + renderAttr('value', o.value)
-      + (o.readonly ? ' readonly' : '') + '>';
+      + renderInputGuard() + (o.readonly ? ' readonly' : '') + '>';
   },
   textarea: function (o) {
     return '<textarea rows="3"' + renderControlAttrs(o, 'shin-input shin-textarea')
-      + (o.readonly ? ' readonly' : '') + '>' + renderEscape(o.value) + '</textarea>';
+      + renderInputGuard() + (o.readonly ? ' readonly' : '') + '>' + renderEscape(o.value) + '</textarea>';
   },
   /**
    * Chữ chỉ đọc, cao theo nội dung. Control thứ tám, thêm vào vì card GHI CHÚ của màn xem khai `overflow: 'collapse'` mà một ô nhập thì cao cố định nên phép thu gọn không bao giờ chạm tới — nút "Xem thêm" không bao giờ hiện, và một ghi chú dài nằm gọn trong một dòng ô nhập.
@@ -242,12 +255,12 @@ var RENDER_CONTROLS = {
   },
   number: function (o) {
     return '<input type="text" inputmode="numeric"' + renderControlAttrs(o, 'shin-input shin-number')
-      + renderAttr('value', valueTextNumber(o.value)) + (o.readonly ? ' readonly' : '') + '>';
+      + renderAttr('value', valueTextNumber(o.value)) + renderInputGuard() + (o.readonly ? ' readonly' : '') + '>';
   },
   date: function (o) {
     return '<input' + renderAttr('type', o.khai.precision === 'minute' ? 'datetime-local' : 'date')
       + renderControlAttrs(o, 'shin-input shin-date') + renderAttr('value', valueTextDateInput(o.value))
-      + (o.readonly ? ' readonly' : '') + '>';
+      + renderInputGuard() + (o.readonly ? ' readonly' : '') + '>';
   },
   select: function (o) {
     return renderCombo(o, 'shin-combo-select', renderAttr('data-source', o.khai.source));

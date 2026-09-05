@@ -27,6 +27,25 @@ html, body {
 
 [hidden] { display: none !important; }
 
+/*
+  Thanh cuộn mảnh, dùng cho mọi vùng cuộn được: vùng thân, danh sách gợi ý, lớp menu, ô nhập nhiều dòng.
+
+  Thanh cuộn mặc định của Chrome rộng 15 pixel. Trên một sidebar rộng 300, đó là 5% bề ngang tiêu cho một cái máng
+  trượt. Bản cũ đặt 4 pixel; ở đây 6, vì 4 pixel thì khó bấm đúng vào con trượt bằng chuột — đổi 2 pixel bề ngang lấy
+  một con trượt kéo được là đáng.
+
+  **Không** khai `scrollbar-width: thin` cạnh đây: từ Chrome 121, hễ có mặt thuộc tính chuẩn đó thì trình duyệt bỏ qua
+  hết nhóm `::-webkit-scrollbar`, và `thin` của Chrome là khoảng 11 pixel — khai thêm cho Firefox thì mất luôn 6 pixel
+  ở Chrome, mà sidebar này đi cùng một Extension của Chrome.
+*/
+::-webkit-scrollbar { width: 6px; height: 6px; }
+
+::-webkit-scrollbar-track { background: transparent; }
+
+::-webkit-scrollbar-thumb { background: var(--shin-border-strong); border-radius: 3px; }
+
+::-webkit-scrollbar-thumb:hover { background: var(--shin-text-faint); }
+
 /* Gốc của khung: một cột cao đúng bằng khung sidebar, không cuộn — phần cuộn là việc của vùng thân. */
 #sidebar-root {
   display: flex;

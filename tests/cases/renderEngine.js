@@ -148,7 +148,7 @@ function chay(so) {
   check(so, 'trường khai cụt lấy entity của màn, và `data-field` mang đủ đường dẫn',
     o({ field: 'companyName' }),
     '<div class="shin-field"><div class="shin-field-head"><label class="shin-label" for="shin-f-customer-companyName">Tên công ty</label></div>'
-    + '<input type="text" class="shin-input" id="shin-f-customer-companyName" data-field="customer.companyName" value="Cty &quot;Xanh&quot; &amp; Co"></div>');
+    + '<input type="text" class="shin-input" id="shin-f-customer-companyName" data-field="customer.companyName" value="Cty &quot;Xanh&quot; &amp; Co" autocomplete="off" spellcheck="false"></div>');
 
   check(so, 'nhãn khai ở UI_SCHEMA thắng nhãn ở bảng khai trường',
     o({ field: 'companyName', label: 'Tên KH' }).indexOf('>Tên KH</label>') > 0, true);
@@ -176,6 +176,20 @@ function chay(so) {
     [combo.indexOf('data-source="@CAT_TINH_THANH"') > 0, combo.indexOf('role="combobox"') > 0,
       combo.indexOf('<div class="shin-combo-list" hidden></div>') > 0],
     [true, true, true]);
+
+  // Mũi tên sổ xuống ăn 24 pixel bề ngang của một sidebar rộng 300 — bỏ hẳn, và bù bằng phép tự bung lúc ô nhận con trỏ.
+  check(so, 'ô gõ-để-lọc không vẽ mũi tên, nhưng nút menu thì vẫn còn mũi tên của nó',
+    [combo.indexOf('shin-caret') === -1,
+      hop.renderNode(hop.Icon({ label: 'Đang xem', menu: [{ label: 'A', action: 'a' }] }), null).indexOf('shin-caret') > 0],
+    [true, true]);
+
+  // Bản cũ phải quét cả DOM sau mỗi lần vẽ để dập hộp gợi ý của Chrome; ở đây mọi ô đi qua một hàm nên đặt được ngay lúc dựng chuỗi.
+  check(so, 'mọi ô nhập đều tắt gợi ý của Chrome và tắt gạch chân chính tả',
+    ['text', 'textarea', 'number', 'date'].map((c) => {
+      const s = o({ field: c === 'number' ? 'activity.contractValue' : c === 'date' ? 'bidClosingDate' : 'companyName', control: c });
+      return s.indexOf('autocomplete="off"') > 0 && s.indexOf('spellcheck="false"') > 0;
+    }).concat([combo.indexOf('autocomplete="off"') > 0, combo.indexOf('spellcheck="false"') > 0]),
+    [true, true, true, true, true, true]);
 
   check(so, 'customerPicker là ô gõ-để-lọc mang dấu riêng để phần bàn phím biết đường tra khách',
     o({ field: 'parentCompanyName', control: 'customerPicker' }).indexOf('data-picker="customer"') > 0, true);
@@ -216,7 +230,7 @@ function chay(so) {
   check(so, 'không có bản ghi thì ô rỗng — đó là ca form thêm mới, không phải lỗi',
     hop.renderNode(hop.Field({ field: 'companyName' }), { entity: 'customer', records: {} }),
     '<div class="shin-field"><div class="shin-field-head"><label class="shin-label" for="shin-f-customer-companyName">Tên công ty</label></div>'
-    + '<input type="text" class="shin-input" id="shin-f-customer-companyName" data-field="customer.companyName"></div>');
+    + '<input type="text" class="shin-input" id="shin-f-customer-companyName" data-field="customer.companyName" autocomplete="off" spellcheck="false"></div>');
 
   section('renderEngine — gán vào khung, chống nháy, và vẽ lại một vùng');
 

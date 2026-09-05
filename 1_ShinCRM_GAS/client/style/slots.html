@@ -14,6 +14,26 @@
 
 .shin-act-row:last-of-type { border-bottom: 0; }
 
+/*
+  Ô chọn và nút bút chì **ẩn cho tới khi chuột dê vào dòng**. Card lịch sử là chỗ dày chữ nhất của sidebar; hai nút nhân
+  cho vài chục dòng thành một rừng biểu tượng nhấp nháy, mà mỗi lúc người dùng chỉ sửa đúng một dòng.
+
+  Ẩn bằng `opacity` chứ không bằng `display: none`: mất chỗ thì dòng chữ giật ngang mỗi lần chuột đi qua, đọc rất mệt.
+  Ô đã đánh dấu thì **ở lại**, vì người dùng tích vài dòng rồi mới bấm xóa — mất dấu tích là mất luôn cái đang chọn.
+  `:focus-within` cho đường bàn phím: Tab tới nút nào thì nút đó phải hiện ra, không thì con trỏ đi trong bóng tối.
+*/
+.shin-act-row .shin-check-box,
+.shin-act-row .shin-icon {
+  opacity: 0;
+  transition: opacity 90ms linear;
+}
+
+.shin-act-row:hover .shin-check-box,
+.shin-act-row:hover .shin-icon,
+.shin-act-row:focus-within .shin-check-box,
+.shin-act-row:focus-within .shin-icon,
+.shin-act-row .shin-check-box:checked { opacity: 1; }
+
 /* Ngày và loại việc là chữ nhận dạng dòng nên đậm hơn nội dung; nội dung mới là phần dài. */
 .shin-act-head {
   color: var(--shin-text);
