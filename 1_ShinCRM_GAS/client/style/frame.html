@@ -5,8 +5,13 @@
  * Nhờ khung này, bố cục "bánh kẹp" — thân cuộn được, nút Lưu luôn nhìn thấy ở đáy — có sẵn cho mọi màn mà schema không
  * phải khai gì. `spatialConfig` chỉ còn việc ở các Block bên trong thân.
  *
- * Tệp này cố tình **không** chứa màu, không chứa cỡ chữ, không chứa style của thành phần nào bên trong thân: nó chỉ chia
- * không gian. Mọi con số ở đây lấy từ biến trong `client/style/tokens.html`.
+ * Tệp này cố tình **không** chứa màu chữ, không chứa cỡ chữ, không chứa style của thành phần nào bên trong thân: nó chỉ
+ * chia không gian, cộng màu nền của từng vùng vì nền là thuộc tính của cái khung chứ không của cái nằm trong khung. Mọi
+ * con số ở đây lấy từ biến trong `client/style/tokens.html`.
+ *
+ * **Lề ngang của mọi vùng là 8 pixel**, không phải 12. Sidebar rộng khoảng 300 pixel, mà một card còn một lớp lề riêng
+ * bên trong nữa: 12 cộng 12 là 24 pixel mỗi bên, tức một phần sáu bề ngang tiêu cho khoảng trắng. Bản cũ đặt 8 và đó là
+ * con số đúng — chủ dự án nhìn bản mới liền nói "lề 2 bên còn khá rộng".
  *
  * Ẩn một vùng thì đặt thuộc tính `hidden` lên chính thẻ đó, không đổi `class`. Dùng thuộc tính có sẵn của HTML thì trình
  * đọc màn hình cũng hiểu là vùng đó không còn, còn một lớp CSS tự đặt thì chỉ mắt người thấy.
@@ -60,7 +65,7 @@ html, body {
   display: flex;
   align-items: center;
   gap: var(--shin-gap-2);
-  padding: 0 var(--shin-gap-3);
+  padding: 0 var(--shin-gap-2);
   border-bottom: 1px solid var(--shin-border);
   background: var(--shin-bg);
 }
@@ -97,7 +102,7 @@ html, body {
 /* Hộp tìm khách — món đồ cố định thứ sáu, không phải một trong năm vùng nên nó không có `flex` co giãn, chỉ cao theo nội dung. */
 #shin-search {
   flex: 0 0 auto;
-  padding: var(--shin-gap-2) var(--shin-gap-3);
+  padding: var(--shin-gap-1) var(--shin-gap-2);
   border-bottom: 1px solid var(--shin-border);
   background: var(--shin-bg-sunken);
 }
@@ -122,24 +127,32 @@ html, body {
   box-shadow: var(--shin-shadow);
 }
 
-/* Vùng 3 — Khối thông tin chung. Cao theo nội dung. */
+/* Vùng 3 — Khối thông tin chung. Cao theo nội dung, **nền trắng như một card**: đây là khối chữ to nhất và quan trọng nhất
+   của cả sidebar, nên nó đứng cùng hạng với card chứ không phải một dải phụ màu xám. Cỡ chữ và màu chữ của ruột khối thì ở
+   `client/style/slots.html`, cùng chỗ với slot dựng ra nó. */
 #sidebar-info {
   flex: 0 0 auto;
-  padding: var(--shin-gap-2) var(--shin-gap-3);
+  padding: var(--shin-gap-2);
   border-bottom: 1px solid var(--shin-border);
-  background: var(--shin-bg-sunken);
-  font-size: var(--shin-text-sm);
-  color: var(--shin-text-soft);
+  background: var(--shin-bg);
 }
 
+/* Khoảng giữa ba hàng của khối: tên công ty, rồi hai hàng hai cột. Bốn pixel, đúng con số bản cũ đặt cho `.info-row` — dày
+   hơn thì khối này chiếm chỗ của phần thân, mỏng hơn thì ba hàng dính thành một mảng chữ. */
+#sidebar-info .shin-row + .shin-row { margin-top: var(--shin-gap-1); }
+
 /* Vùng 4 — Thân. Chiếm hết phần dư và cuộn dọc khi tràn. `min-height: 0` là điều kiện để một con flex biết cuộn; thiếu nó
-   thì thân nở ra theo nội dung và đẩy vùng chân ra khỏi khung. */
+   thì thân nở ra theo nội dung và đẩy vùng chân ra khỏi khung.
+
+   Nền **lõm** chứ không trắng: mọi thứ trong thân đều nằm trong card trắng, nên một nền lõm là cách làm mép card hiện ra mà
+   không phải kẻ thêm một đường viền nào. Đúng nếp bản cũ — trang màu #f8f9fa, card màu trắng. */
 #sidebar-body {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: var(--shin-gap-3);
+  padding: var(--shin-gap-2);
+  background: var(--shin-bg-sunken);
 }
 
 /* Vùng 5 — Chân. Ghim đáy. */
@@ -148,7 +161,7 @@ html, body {
   display: flex;
   align-items: center;
   gap: var(--shin-gap-2);
-  padding: var(--shin-gap-2) var(--shin-gap-3);
+  padding: var(--shin-gap-2);
   border-top: 1px solid var(--shin-border);
   background: var(--shin-bg);
 }

@@ -4,7 +4,7 @@
  *
  * Vì sao một tai nghe chứ không gắn từng nút: mỗi lượt vẽ thay sạch ruột bốn vùng, nên nút gắn tai nghe riêng sẽ mất tai nghe ngay lượt vẽ sau. Đặt ở khung thì khung không bao giờ bị vẽ lại, và nút nào mang `data-action` cũng bấm được kể cả nút do `SLOTS` mới sinh ra một giây trước.
  *
- * Tệp này là **chỗ duy nhất** làm ba việc mà mười sáu hành động cố ý không làm: đọc `data-*` thành `payload`, đặt con trỏ theo `focusId` được trả về, và đưa lỗi tới mắt người dùng. Nhờ vậy `actions.html` không chạm DOM và kiểm được offline — `Câu hỏi đêm.md` mục 6.1.
+ * Tệp này là **chỗ duy nhất** làm ba việc mà mười lăm hành động cố ý không làm: đọc `data-*` thành `payload`, đặt con trỏ theo `focusId` được trả về, và đưa lỗi tới mắt người dùng. Nhờ vậy `actions.html` không chạm DOM và kiểm được offline — `Câu hỏi đêm.md` mục 6.1.
  */
 
 /** Khung ngoài cùng của sidebar. Không bao giờ bị vẽ lại, nên tai nghe đặt ở đây sống suốt phiên. */
@@ -47,14 +47,17 @@ function dispatchFocus(ket) {
 }
 
 /**
- * Việc dọn sau mỗi hành động: đặt con trỏ, đo lại các khối thu gọn, rồi cho hộp tìm khớp lại với màn đang mở.
+ * Việc dọn sau mỗi hành động: đặt con trỏ, kéo lại chiều cao các ô nhiều dòng, đo lại các khối thu gọn, rồi cho hộp tìm khớp lại với màn đang mở.
  *
  * Phải đo lại vì hành động nào cũng có thể đã vẽ lại một vùng, và lượt vẽ thay sạch ruột vùng nên nút "Xem thêm" của lượt trước biến mất cùng phép đo của nó. Đo sớm hơn thì không được: chỉ sau khi hành động vẽ xong thì `scrollHeight` mới là con số thật.
+ *
+ * Ô nhiều dòng phải kéo **trước** phép đo khối thu gọn, vì kéo xong là khối chứa nó cao lên — đo trước thì con số của phép thu gọn là chiều cao của lượt trước.
  *
  * Hộp tìm cũng phải hỏi lại ở đây vì lượt vẽ vừa rồi có thể đã đổi màn — mà dấu bật trên nút kính lúp thì nằm trong vùng header vừa bị thay.
  */
 function dispatchAfter(ket) {
   dispatchFocus(ket);
+  if (typeof inputsGrowAll === 'function') { inputsGrowAll(); }
   if (typeof collapseScan === 'function') { collapseScan(); }
   if (typeof searchSyncScreen === 'function') { searchSyncScreen(); }
   return ket;

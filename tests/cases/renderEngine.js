@@ -75,7 +75,7 @@ function chay(so) {
   check(so, 'nút glyph: tooltip vào cả title lẫn aria-label, glyph nội tuyến ngay trong nút',
     [nutIcon.indexOf('title="Hủy" aria-label="Hủy"') > 0, nutIcon.indexOf('<svg class="shin-glyph"') > 0], [true, true]);
   checkThrows(so, 'tên glyph lạ thì nổ kèm danh sách tên đúng, chứ không vẽ nút trống',
-    () => hop.renderNode(hop.Icon('bánh-xe'), null), 'Chín tên hiện có');
+    () => hop.renderNode(hop.Icon('bánh-xe'), null), 'Các tên hiện có');
 
   // Mục menu **không** được nhồi vào thuộc tính HTML: nó ở lại sổ tra, tệp menu tra theo khóa.
   const nutMenu = hop.renderNode(hop.Icon({ id: 'nut-khac', icon: 'more', tooltip: 'Khác', menu: [{ label: 'Bám theo ô đang chọn', action: 'toggleFollowSelection', toggle: true }] }), null);
@@ -175,6 +175,13 @@ function chay(so) {
   check(so, 'SELECT thành ô gõ-để-lọc, mang tên danh mục và một hộp danh sách đóng sẵn',
     [combo.indexOf('data-source="@CAT_TINH_THANH"') > 0, combo.indexOf('role="combobox"') > 0,
       combo.indexOf('<div class="shin-combo-list" hidden></div>') > 0],
+    [true, true, true]);
+
+  // Không có mũi tên thì chữ mờ trong ô là thứ **duy nhất** nói rằng ô này có danh sách, và nói luôn là có được gõ tay hay không.
+  check(so, 'hai ô gõ-để-lọc mang hai chữ mời khác nhau, đúng chữ bản cũ đặt',
+    [combo.indexOf('placeholder="--Chọn--"') > 0,
+      o({ field: 'parentCompanyName', control: 'customerPicker' }).indexOf('placeholder="--Chọn hoặc nhập--"') > 0,
+      o({ field: 'companyName' }).indexOf('placeholder') === -1],
     [true, true, true]);
 
   // Mũi tên sổ xuống ăn 24 pixel bề ngang của một sidebar rộng 300 — bỏ hẳn, và bù bằng phép tự bung lúc ô nhận con trỏ.

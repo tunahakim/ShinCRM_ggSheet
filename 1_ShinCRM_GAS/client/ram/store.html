@@ -137,7 +137,32 @@ Store.getCustomerIdByRow = function (sheetName, rowIndex) {
 };
 
 /**
+ * Cắt chuỗi người dùng gõ thành các mẩu **phải khớp hết**, mỗi mẩu đã đưa về dạng so khớp.
+ *
+ * Hai luật, và luật nào cũng có một ca thật đứng sau:
+ *
+ * **Gõ lộn thứ tự vẫn ra.** Tìm `tan 9 tien` phải ra `Công ty Xây dựng Tân Tiến 9`. Người dùng nhớ tên khách theo mảnh chứ không nhớ theo thứ tự — nhớ có chữ "Tân", có số 9 — nên bắt gõ đúng thứ tự là bắt nhớ thứ tự, mà nhớ được thứ tự thì đã gõ đủ tên rồi. Mỗi khoảng trắng là một mẩu riêng, và một khách khớp khi haystack chứa **tất cả** các mẩu, ở bất kỳ đâu.
+ *
+ * **Ngoặc kép là một cụm liền nhau.** `"dong a"` chỉ khớp chỗ nào có đúng `dong a` cạnh nhau, còn `dong a` không ngoặc thì khớp cả `Á Đông`. Đây là đường thoát khi luật trên trả về quá nhiều: mẩu một chữ như `a` nằm trong gần như mọi tên công ty Việt.
+ *
+ * Dấu ngoặc kép lẻ — lúc người dùng vừa gõ dấu mở mà chưa gõ dấu đóng — bị **bỏ khỏi mẩu** chứ không giữ lại: giữ thì mẩu mang một ký tự không bao giờ có trong haystack, và hộp tìm im lặng trắng bảng ngay từ ký tự đầu tiên của một cụm còn đang gõ dở.
+ */
+function storeSearchTokens(query) {
+  var ra = [];
+
+  String(query == null ? '' : query).replace(/"([^"]*)"|(\S+)/g, function (_ca, cum, tu) {
+    var chu = normalizeText(cum === undefined ? String(tu).replace(/"/g, '') : cum);
+    if (chu) { ra.push(chu); }
+    return '';
+  });
+
+  return ra;
+}
+
+/**
  * Tìm khách theo chuỗi gõ vào: **khách còn sống trước, rồi tới khách đã xóa**, cắt tới `limit`. Tài liệu 05 Phần 9.
+ *
+ * Phép so khớp là **mọi mẩu đều phải có mặt**, xem `storeSearchTokens` để biết cách cắt mẩu và cách viết ngoặc kép.
  *
  * Hai điểm dễ làm sai, cả hai đều nằm ở đây:
  *
@@ -151,14 +176,16 @@ Store.getCustomerIdByRow = function (sheetName, rowIndex) {
  * Phần tử trả về là **bản ghi khách**, nên nơi vẽ đã có sẵn `recordStatus` để dán nhãn "Đã xóa" mà không tra thêm lần nào.
  */
 Store.searchCustomers = function (query, limit) {
-  var needle = normalizeText(query);
-  if (!needle) { return []; }
+  var can = storeSearchTokens(query);
+  if (!can.length) { return []; }
 
   var alive = [];
   var deleted = [];
 
   Store.searchIndex.forEach(function (entry) {
-    if (entry.haystack.indexOf(needle) < 0) { return; }
+    for (var i = 0; i < can.length; i++) {
+      if (entry.haystack.indexOf(can[i]) < 0) { return; }
+    }
 
     var customer = Store.customers[entry.id];
     if (!customer) { return; }

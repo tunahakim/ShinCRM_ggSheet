@@ -136,6 +136,17 @@ function chayTraCuu(so, nen, hop, hangDau) {
   check(so, 'chuỗi rỗng trả về rỗng chứ không trả cả danh sách', hop.Store.searchCustomers('  '), []);
   check(so, 'limit cắt đúng số lượng', hop.Store.searchCustomers('dong a', 1).length, 1);
 
+  // Gõ lộn thứ tự, và ngoặc kép để bó cụm. Chủ dự án chốt ngày 06/09/2026: tìm phải như Everything.
+  check(so, 'gõ các mẩu lộn thứ tự vẫn ra khách — bắt gõ đúng thứ tự tên là bắt nhớ cả tên',
+    hop.Store.searchCustomers('a dung xay').map((k) => k.id), ['KH0001']);
+  check(so, 'ngoặc kép bó lại thành cụm liền nhau: "xay dung" ra khách, còn "dung xay" thì không ai khớp',
+    [hop.Store.searchCustomers('"xay dung"').map((k) => k.id), hop.Store.searchCustomers('"dung xay"')],
+    [['KH0001'], []]);
+  check(so, 'ngoặc kép mới mở mà chưa đóng thì bị bỏ khỏi mẩu, không làm trắng bảng giữa lúc đang gõ',
+    hop.Store.searchCustomers('"dong').map((k) => k.id), ['KH0001', 'KH0002']);
+  check(so, 'ô chỉ có một dấu ngoặc kép tính là chưa gõ gì, không phải một truy vấn không khớp ai',
+    hop.Store.searchCustomers('"'), []);
+
   check(so, 'mã số thuế của khách ĐÃ XÓA vẫn tính là đã dùng — cửa ghi đếm cả hàng đó trên sheet',
     hop.Store.isTaxNumberTaken('0109999999'), true);
   check(so, 'exceptId cho bản ghi khỏi tự báo trùng với chính nó', hop.Store.isTaxNumberTaken('0109999999', 'KH0002'), false);

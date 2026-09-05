@@ -96,6 +96,8 @@ function searchHideList() {
  *
  * Ô rỗng thì ẩn hẳn danh sách chứ không hiện câu "không có khách nào khớp": lúc mới mở hộp thì ô vốn rỗng, và một câu báo không tìm thấy khi chưa gõ gì là một câu sai.
  *
+ * Hỏi `storeSearchTokens` chứ không hỏi `normalizeText`: một ô chỉ có dấu ngoặc kép vừa mở thì chuẩn hóa ra chuỗi không rỗng nhưng cắt mẩu ra rỗng — vẫn là ca "chưa gõ gì", và báo không tìm thấy ở đó cũng là một câu sai.
+ *
  * Gõ tới đâu tự sáng dòng đầu, nên gõ xong bấm `Enter` là ra khách mà không phải với tay tới mũi xuống.
  */
 function searchPaint() {
@@ -103,7 +105,7 @@ function searchPaint() {
   var inp = searchInputEl();
   if (!box || !inp) { return null; }
 
-  if (!normalizeText(inp.value)) {
+  if (!storeSearchTokens(inp.value).length) {
     box.innerHTML = '';
     box.hidden = true;
     searchFocusAt = -1;

@@ -1,11 +1,11 @@
 <script>
 /*
- * Chín glyph SVG nội tuyến. Schema gọi glyph bằng tên, engine tra bảng này. Tài liệu 03 Phần 9.
+ * Bộ glyph SVG nội tuyến. Schema gọi glyph bằng tên, engine tra bảng này. Tài liệu 03 Phần 9.
  *
  * Nội tuyến chứ không tải phông biểu tượng từ mạng: sidebar nằm trong iframe, mỗi lần tải ngoài là một lần chờ thêm đúng lúc người dùng đang chờ nạp dữ liệu.
  */
 
-/** Thuộc tính chung của mọi glyph. Gom một chỗ nên chín glyph không lệch nét nhau; màu lấy theo màu chữ của nút chứa nó. */
+/** Thuộc tính chung của mọi glyph. Gom một chỗ nên các glyph không lệch nét nhau; màu lấy theo màu chữ của nút chứa nó. */
 var ICON_SVG_OPEN = '<svg class="shin-glyph" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"'
   + ' fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">';
 
@@ -20,11 +20,13 @@ var ICON_PATHS = {
     + '<circle cx="8" cy="8" r="1.15" fill="currentColor" stroke="none"/>'
     + '<circle cx="8" cy="12.6" r="1.15" fill="currentColor" stroke="none"/>',
   pencil: '<path d="M3 13l.9-3 6.4-6.4 2.1 2.1L6 12.1z"/><path d="M9.6 4.3l2.1 2.1"/>',
+  trash: '<path d="M3.4 4.6h9.2"/><path d="M6.4 4.6V3.2h3.2v1.4"/>'
+    + '<path d="M4.6 4.6l.6 8.2h5.6l.6-8.2"/><path d="M6.9 7v3.4M9.1 7v3.4"/>',
   addUser: '<circle cx="6.4" cy="5.2" r="2.4"/><path d="M2.2 13.2c0-2.4 1.9-4 4.2-4 .9 0 1.8.2 2.5.7"/><path d="M11.6 9.4v4.2M9.5 11.5h4.2"/>',
   plus: '<path d="M8 3.2v9.6M3.2 8h9.6"/>'
 };
 
-/** Tên chín glyph theo thứ tự khai. Phép tự kiểm tên icon trong schema dùng chung hàm này nên không có hai bản danh sách lệch nhau. */
+/** Tên các glyph theo thứ tự khai. Phép tự kiểm tên icon trong schema dùng chung hàm này nên không có hai bản danh sách lệch nhau. */
 function iconNames() {
   return Object.keys(ICON_PATHS);
 }
@@ -32,7 +34,7 @@ function iconNames() {
 /** Một glyph thành chuỗi SVG. Tên lạ thì ném lỗi kèm danh sách tên đúng — vẽ ô trống thì lỗi hiện ra dưới dạng "nút không có hình", loại lỗi phải đoán. */
 function iconSvg(ten) {
   if (!Object.prototype.hasOwnProperty.call(ICON_PATHS, ten)) {
-    throw new Error('Không có glyph "' + ten + '". Chín tên hiện có: ' + iconNames().join(', ') + '.');
+    throw new Error('Không có glyph "' + ten + '". Các tên hiện có: ' + iconNames().join(', ') + '.');
   }
   return ICON_SVG_OPEN + ICON_PATHS[ten] + '</svg>';
 }

@@ -27,24 +27,30 @@ function slotFilterActivities(list, nac) {
   return list.filter(function (a) { return (a.recordStatus || STORE_ACTIVE) === muon; });
 }
 
-/** Chữ trên một dòng lịch sử: ngày, loại việc, giá trị hợp đồng nếu có. Nội dung xuống dòng dưới. */
+/**
+ * Ba mẩu chữ đầu một dòng lịch sử, **mỗi mẩu một node riêng** chứ không nối thành một chuỗi.
+ *
+ * Vì sao không nối: ngày là mốc để mắt nhảy dọc, loại việc là thứ để phân nhóm, giá trị hợp đồng là con số đáng chú ý nhất — bản cũ cho ba thứ đó ba màu khác nhau (ngày xanh, loại việc chip xanh lá, giá trị đỏ) và nhờ vậy quét mắt xuống ba chục dòng vẫn thấy ngay dòng nào là đơn chốt. Nối thành `'03/09 • Chốt đơn • 1.200.000 đ'` thì cả ba cùng một màu xám, và cái dấu `•` chiếm chỗ mà không nói gì.
+ */
 function slotActivityHead(a) {
-  var phan = [valueTextDate(a.workDate)];
-  if (a.taskType) { phan.push(a.taskType); }
-  if (a.contractValue) { phan.push(valueTextNumber(a.contractValue) + ' đ'); }
-  return phan.join(' • ');
+  var phan = [Text({ text: valueTextDate(a.workDate), className: 'shin-act-date' })];
+  if (a.taskType) { phan.push(Text({ text: a.taskType, className: 'shin-act-type' })); }
+  if (a.contractValue) { phan.push(Text({ text: valueTextNumber(a.contractValue) + ' đ', className: 'shin-act-value' })); }
+  return phan;
 }
 
-/** Một dòng lịch sử. Ô đánh dấu để chọn nhiều dòng, nút bút chì mở form sửa, và chip "Đã xóa" khi bản ghi đã xóa mềm. */
+/**
+ * Một dòng lịch sử: hàng đầu là ngày/loại việc/giá trị cộng hai nút, hàng dưới là nội dung.
+ *
+ * **Hai nút bút chì và thùng rác, chỉ hiện khi trỏ chuột vào dòng** — không có ô đánh dấu và không có nút xóa hàng loạt. Chủ dự án chốt vậy 06/09/2026: ô đánh dấu ăn chỗ ở mọi dòng để phục vụ một việc hiếm, còn xóa hàng loạt thì bắt người dùng làm hai bước (tích rồi bấm) cho việc mà chín phần mười lần chỉ xóa một dòng. Nút nằm ngay trên dòng cần xóa nên không có đường nhấn sai dòng.
+ */
 function slotActivityRow(a) {
   var daXoa = (a.recordStatus || STORE_ACTIVE) === STORE_DELETED;
-  var dau = [
-    Check({ pick: a.id, label: 'Chọn giao dịch ' + a.id }),
-    Text({ text: slotActivityHead(a), className: 'shin-act-head' })
-  ];
+  var dau = slotActivityHead(a);
 
   if (daXoa) { dau.push(Text({ text: 'Đã xóa', className: 'shin-badge shin-badge-deleted' })); }
   dau.push(Icon({ icon: 'pencil', tooltip: 'Sửa giao dịch', action: 'openActivityForm', pick: a.id, align: 'right' }));
+  dau.push(Icon({ icon: 'trash', tooltip: 'Xóa giao dịch', action: 'deleteActivity', pick: a.id }));
 
   return Block({
     className: 'shin-act-row' + (daXoa ? ' shin-act-deleted' : ''),
@@ -67,9 +73,7 @@ SLOTS.activityList = function (ctx) {
     return slotEmpty(Prefs.activityView === 'deleted' ? 'Khách này không có giao dịch nào đã xóa.' : 'Khách này chưa có giao dịch nào.');
   }
 
-  var out = list.map(slotActivityRow);
-  out.push(Button({ label: 'XÓA DÒNG ĐÃ CHỌN', action: 'deleteSelectedActivities', className: 'shin-danger shin-act-delete' }));
-  return out;
+  return list.map(slotActivityRow);
 };
 
 /**
@@ -98,10 +102,21 @@ SLOTS.searchSuggestions = function (ctx) {
   });
 };
 
+/** Một hàng phụ hai cột của khối thông tin. Rỗng cả hai bên thì trả `null` để bên gọi bỏ hàng — một hàng trắng vẫn ăn chiều cao. */
+function slotInfoRow(trai, phai) {
+  if (!trai && !phai) { return null; }
+  return Row([
+    Text({ text: trai || '', className: 'shin-info-left' }),
+    Text({ text: phai || '', className: 'shin-info-right' })
+  ]);
+}
+
 /**
  * Khối thông tin chung: đang làm việc cho khách nào. Tài liệu 03 Phần 8 — bật ở ba màn để người dùng luôn thấy.
  *
- * Hàng phụ chia **hai cột**, đúng mẹo tiết kiệm chiều cao của bản cũ: mã khách với người liên hệ bên trái, số điện thoại ghim mép phải. Số điện thoại là thứ hay phải chép ra nhất, nên nó được một chỗ cố định để mắt tìm mà không phải đọc hết dòng.
+ * **Đây là khối chữ to nhất của sidebar, không phải một dải phụ.** Chủ dự án nhìn bản trước liền nói "phần thông tin chung khách hàng: quá nhỏ, tôi cần nó như code gốc" — bản trước nhồi mã khách, người liên hệ và điện thoại vào một dòng chữ 11 pixel màu nhạt. Bản cũ làm ngược: tên công ty 15 pixel xanh đậm, rồi hai hàng chữ 13 pixel màu đen chia hai cột.
+ *
+ * Hai hàng phụ chia **hai cột** để tiết kiệm chiều cao, và cột phải giữ đúng hai thứ hay phải chép ra nhất: mã số thuế với số điện thoại. Chỗ cố định thì mắt tìm được mà không phải đọc hết dòng.
  *
  * Khách đã xóa mềm thì thêm chip "Đã xóa". Việc khóa ba cửa mở form là của `ACTIONS`, không phải của slot này — slot chỉ hiện, không chặn.
  */
@@ -114,12 +129,9 @@ SLOTS.infoBarContent = function (ctx) {
     dong.push(Text({ text: 'Đã xóa', className: 'shin-badge shin-badge-deleted' }));
   }
 
-  var trai = [ban.id];
-  if (ban.contactPerson) { trai.push(ban.contactPerson); }
-  var chuTrai = Text({ text: trai.join(' • '), className: 'shin-info-meta' });
-
-  return [Row(dong), ban.phone
-    ? Row([chuTrai, Text({ text: ban.phone, className: 'shin-info-meta shin-text-right' })])
-    : chuTrai];
+  var ra = [Row(dong)];
+  var hang = [slotInfoRow(ban.id, ban.taxNumber), slotInfoRow(ban.contactPerson, ban.phone)];
+  hang.forEach(function (h) { if (h) { ra.push(h); } });
+  return ra;
 };
 </script>

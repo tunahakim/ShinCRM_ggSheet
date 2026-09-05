@@ -224,11 +224,16 @@ function renderInputGuard() {
   return ' autocomplete="off" spellcheck="false"';
 }
 
-/** Khung chung của hai control gõ-để-lọc: ô nhập và một hộp danh sách rỗng để phần bàn phím đổ nội dung vào sau. Không mũi tên — bù lại bằng phép tự bung lúc ô nhận con trỏ, xem `client/ui/inputs.html`. */
-function renderCombo(o, lop, them) {
+/**
+ * Khung chung của hai control gõ-để-lọc: ô nhập và một hộp danh sách rỗng để phần bàn phím đổ nội dung vào sau. Không mũi tên — bù lại bằng phép tự bung lúc ô nhận con trỏ, xem `client/ui/inputs.html`.
+ *
+ * `goi` là chữ mờ trong ô lúc ô còn rỗng, và nó là **thứ duy nhất nói cho người dùng biết ô này có danh sách**: không có mũi tên thì một ô trống của `select` trông y hệt một ô chữ tự do. Bản cũ đặt `--Chọn--` cho ô chỉ chọn được trong danh sách và `--Chọn hoặc nhập--` cho ô cho phép gõ giá trị mới; hai chữ khác nhau vì hai luật khác nhau, và người dùng biết trước mình có được gõ tay hay không.
+ */
+function renderCombo(o, lop, goi, them) {
   return '<div class="shin-combo ' + lop + '">'
     + '<input type="text" role="combobox" aria-expanded="false"'
-    + renderControlAttrs(o, 'shin-input') + renderAttr('value', o.value) + renderInputGuard() + them
+    + renderControlAttrs(o, 'shin-input') + renderAttr('value', o.value) + renderAttr('placeholder', goi)
+    + renderInputGuard() + them
     + (o.readonly ? ' readonly' : '') + '>'
     + '<div class="shin-combo-list" hidden></div>'
     + '</div>';
@@ -267,10 +272,10 @@ var RENDER_CONTROLS = {
       + renderInputGuard() + (o.readonly ? ' readonly' : '') + '>';
   },
   select: function (o) {
-    return renderCombo(o, 'shin-combo-select', renderAttr('data-source', o.khai.source));
+    return renderCombo(o, 'shin-combo-select', '--Chọn--', renderAttr('data-source', o.khai.source));
   },
   customerPicker: function (o) {
-    return renderCombo(o, 'shin-combo-picker', ' data-picker="customer"');
+    return renderCombo(o, 'shin-combo-picker', '--Chọn hoặc nhập--', ' data-picker="customer"');
   },
   badge: function (o) {
     return '<span' + renderControlAttrs(o, 'shin-badge' + renderBadgeClass(o.khai)) + '>' + renderEscape(o.value) + '</span>';

@@ -105,12 +105,12 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   └── slots.html            Hình thức riêng của ba vùng do SLOTS sinh ra: dòng lịch sử, hộp gợi ý tìm khách, khối thông tin chung. Tách khỏi components.html vì các lớp này chỉ một tệp sinh ra.
 │   ├── ui\                       Bộ máy giao diện màn nào cũng gọi được. spatialConfig giữ toàn quyền về khoảng cách.
 │   │   ├── progress.html         Vạch tiến trình cho mọi lượt gọi máy chủ. Đếm số lời gọi đang chờ, không giữ một cờ bật tắt.
-│   │   ├── icons.html            Chín glyph SVG nội tuyến, tra theo tên. Tên lạ thì ném lỗi chứ không vẽ nút trống.
+│   │   ├── icons.html            Bộ glyph SVG nội tuyến, tra theo tên. Tên lạ thì ném lỗi chứ không vẽ nút trống.
 │   │   ├── uiBuilder.html        Hình dạng MỘT node Block, và bảy hàm dựng Card/Row/Text/Field/Button/Icon/Check. Khóa lạ bị ném lỗi — đó là cách luật "không có style tự do" thành thật.
 │   │   ├── screenBuild.html      Lối viết tắt của UI_SCHEMA thành cây Block: mảng lồng mảng, chuỗi trần thay cho object, cụm group/rows. Không chạm DOM nên kiểm được offline.
 │   │   ├── slots.html            Ba vùng nội dung mà UI_SCHEMA không khai trước được: danh sách giao dịch, hộp gợi ý tìm khách, khối thông tin chung. Trả về cây Block chứ không trả chuỗi HTML.
 │   │   ├── renderEngine.html     Cây Block thành HTML rồi gán vào bốn vùng. Thoát ký tự, dịch spatialConfig thành style, và renderTarget — cách DUY NHẤT đổi nội dung màn.
-│   │   ├── actions.html          Mười sáu hành động của cả hệ thống, tra theo tên. Không chạm DOM và không gọi máy chủ trực tiếp, nên mười sáu thân hàm kiểm được offline. Việc chặng sau thì ném lỗi có tên chứ không để thân rỗng.
+│   │   ├── actions.html          Mười lăm hành động của cả hệ thống, tra theo tên. Không chạm DOM và không gọi máy chủ trực tiếp, nên mười lăm thân hàm kiểm được offline. Việc chặng sau thì ném lỗi có tên chứ không để thân rỗng.
 │   │   ├── dispatch.html         Một tai nghe click duy nhất đặt ở khung. Chỗ DUY NHẤT đọc data-* thành payload, đặt con trỏ theo focusId, và đưa lỗi vào alert — nhờ vậy actions.html không chạm DOM.
 │   │   ├── menu.html             Lớp menu nổi dựng từ dấu data-menu của engine. Dấu tích và chấm tròn đọc ở Prefs. Mục con vẫn mang data-action, nên menu không mở thêm đường gọi hàm nào.
 │   │   ├── collapse.html         Đo xem khối có tràn trần chiều cao hay không rồi mới quyết có nút Xem thêm — phép đo mà bản khai không nói được vì nó phụ thuộc nội dung thật.
@@ -182,7 +182,7 @@ tests\
     ├── slots.js                  Dòng lịch sử giữ đúng thứ tự thời gian kể cả khi có bản ghi đã xóa chen giữa, và KHÔNG dòng nào mang field — engine tra một bản ghi cho một thực thể.
     ├── viewScreen.js             Bốn cái hỏng-trong-im-lặng của màn xem: mã card lệch giữa hai tệp, đổi khách mà chỉ vẽ lại một vùng, đổi khách lúc đang gõ dở, và tệp màn tự chạm DOM.
     ├── formScreen.js             Bốn cái hỏng-trong-im-lặng của ba màn form: tiêu đề suy sai vì bản ghi mới đã có mã xem trước, ô kế tục không có dấu, form giao dịch thiếu bản ghi khách, và đóng form lồng thì rơi thẳng về màn xem.
-    └── actions.js                Bảng mười sáu hành động: một tên rơi khỏi bảng là nút bấm không làm gì, ba cửa mở form phải khóa khi khách đã xóa mềm, và việc chặng sau phải ném lỗi đọc được chứ không im.
+    └── actions.js                Bảng mười lăm hành động: một tên rơi khỏi bảng là nút bấm không làm gì, ba cửa mở form phải khóa khi khách đã xóa mềm, và việc chặng sau phải ném lỗi đọc được chứ không im.
 ```
 
 ## Bảng tra: tên trong tài liệu thiết kế → tệp thật

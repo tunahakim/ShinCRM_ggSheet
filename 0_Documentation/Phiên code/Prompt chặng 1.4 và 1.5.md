@@ -27,61 +27,19 @@ Ba điều kiện nghiệm thu, thiếu một là chưa xong:
 
 ## Nền đang có, và nó đúng tới đâu
 
-Chiều đọc chạy thông trên Sheet DEV thật với 1.700 khách và 10.000 giao dịch. Đã dựng: tầng dữ liệu, bộ nạp theo gói, kho RAM, bộ máy vẽ, bốn màn, bảng mười sáu hành động, bộ phát click, lớp menu nổi, phép đo thu gọn. Bản triển khai trên Google đang ở **@24**, tức mọi thứ vừa kể đã có mặt trên Sheet DEV.
+Chiều đọc chạy thông trên Sheet DEV thật với 1.700 khách và 10.000 giao dịch. Đã dựng: tầng dữ liệu, bộ nạp theo gói, kho RAM, bộ máy vẽ, bốn màn, bảng mười lăm hành động, bộ phát click, lớp menu nổi, phép đo thu gọn, hộp tìm khách, các nếp bàn phím của form, và bản xem sidebar chạy tại máy (`node tests/preview.js`).
 
 Trình tự khởi động hiện kết bằng: `dispatchInstall()` → `menuInstall()` → `collapseInstall()` → `screenViewDropStale()` → `screenViewGo()` → `collapseScan()` → `bootTellProblems(...)`. Tức lượt vẽ cuối là **màn xem khách**, không còn là màn tóm tắt lượt nạp.
 
-Chiều ghi chưa có một dòng nào. Sáu tên trong `ACTIONS` còn là vỏ rỗng, đều ném lỗi qua `actionsChuaDung()` ở `client/ui/actions.html`: `toggleSearchPanel` thuộc chặng 1.3; `saveForm`, `deleteSelectedActivities`, `deleteActivity`, `undoDelete` thuộc 1.4; `renderActiveViewSheet` thuộc 1.5. Xóa hàm `actionsChuaDung` khi cái cuối cùng có thân thật.
-
-**Chưa ai nhìn màn xem bằng mắt.** Toàn bộ phần vừa kể được chứng minh bằng bộ kiểm offline và bằng `probeSidebarTemplate` — tức "khung dựng được, đủ năm vùng, đủ tệp nhúng", không phải "nhìn ra đúng cái cần nhìn". Khoảng cách giữa hai câu đó chính là việc của phiên này.
-
-## Đường tự soi bằng mắt — dựng cái này trước mọi thứ khác
-
-Chủ dự án chưa chốt mục này; nêu ra rồi hỏi một câu, họ gạch thì bỏ. Nhưng nếu làm thì làm trước, vì nó đổi vòng lặp sửa giao diện từ "một vòng một lượt chờ người khác" thành "một vòng vài giây".
-
-Ý: dựng một bản sidebar chạy được trong trình duyệt ngay tại máy, không cần Google.
-
-- `tests/preview.js` — đọc `1_ShinCRM_GAS/client/Sidebar.html`, thay mỗi thẻ `<?!= include('X') ?>` bằng nội dung của `1_ShinCRM_GAS/X.html`, rồi ghi ra một tệp `.html` gộp. Đúng phép thay chuỗi, không dựng lại gì. Sidebar thật cũng chỉ là phép thay đó, do `include()` ở `server/entry/Menu.js` làm.
-- Bản giả của `google.script.run`: một object có `withSuccessHandler(fn)` và `withFailureHandler(fn)` cùng trả về chính nó, thêm một phương thức cho mỗi tên hàm máy chủ mà sidebar gọi — `loadCore`, `loadActivityChunk`, `userPrefsWrite`, `logClientTiming` — mỗi phương thức gọi hàm nhận thành công qua `setTimeout(..., 0)`. Cắm bản giả ở tầng `google.script.run` chứ không thay `callServer`, để `serverCall.html`, dải tiến trình và phép đo thời gian vẫn chạy nguyên.
-- Gói dữ liệu cho bản giả: **chụp một lượt thật rồi cắt nhỏ**, đừng viết tay. `ingestCore` chạy `checkSchema` trên chính gói đó, nên một bảng khai bịa ra sẽ bị nó chặn ngay; và mục đích của việc nhìn bằng mắt là thấy chuỗi thật với độ dài thật. Cách chụp: thêm một hàm dò trong `server/dev/` trả về `JSON.stringify` của `loadCore()` đã cắt còn khoảng 20 khách, cộng một gói `loadActivityChunk` cắt còn khoảng 60 giao dịch, lưu thành tệp JSON ở máy. Hàm dò nằm trong `server/dev/` để nó chết cùng thư mục đó, và tên phải thêm vào danh sách trắng của `tests/gas.js`.
-- Tệp gộp và tệp JSON đều **không vào git**: thêm vào `.gitignore`. Chúng là ảnh chụp của dữ liệu Sheet DEV, và một trong hai sẽ phình lên rất nhanh.
-
-Bốn chỗ bản xem tại máy **không** nói được, nên nó không thay được mắt chủ dự án ở lượt nghiệm thu cuối:
-
-1. Sidebar của Google Sheets rộng khoảng 300 pixel và code không hề gọi `setWidth`, nên đó là bề rộng thật. Xem ở cửa sổ rộng hơn là xem một bố cục khác. Ép khung xem về 300 pixel.
-2. Google nhét CSS riêng của họ vào iframe của sidebar. Có thứ chỉ lệch ở đó.
-3. Phông chữ và cách trình duyệt của chủ dự án dựng chữ có thể khác máy bạn, mà `data-collapse` đo bằng dòng chữ nên phép thu gọn nhạy đúng với chỗ này.
-4. Mọi thứ đi qua `google.script.run` thật — độ trễ, lỗi máy chủ, cờ chặn ngân sách ô — đều là bản giả ở đây.
-
-## Chặng 1.3 — phần còn lại, theo đúng thứ tự này
-
-### 1.3a. Nhìn đúng
-
-Mở bản xem tại máy ở bề rộng 300 pixel và soi từ trên xuống. Bản khai bố cục là `client/schema/uiSchema.html`, đọc nó để biết cái gì *phải* hiện ra; chỗ nào hiện ra khác thì lỗi nằm ở `client/ui/renderEngine.html`, `screenBuild.html`, `slots.html` hoặc bốn tệp `client/style/`.
-
-Những gì phải thấy trên màn xem: hàng header sáu icon, bốn bên trái (tìm khách, vẽ sheet quản trị, nạp lại, khác) và hai bên phải (sửa khách, thêm khách) — `align: 'right'` là `margin-left: auto`, nên nó đẩy chính nó và mọi thứ sau nó sang phải. Dưới đó là dải tiến trình, khối thông tin chung, rồi hai card: GHI CHÚ có nút bút chì "Sửa" trên hàng tiêu đề, và LỊCH SỬ LÀM VIỆC có "Thêm" cùng menu "Đang xem". Nút "Xem thêm" chỉ được hiện khi ghi chú thật sự tràn quá ba dòng — không tràn thì **không có nút nào**, đó là luật tài liệu 04 Phần 5 chứ không phải chỗ để tùy ý.
-
-Ba màn form: hàng header đổi thành hủy bên trái, lưu bên phải; thân form là các hàng một hoặc hai trường; chân form có một nút rộng. Soi kỹ chỗ hai trường chung một hàng và chỗ `width: '65%'` của trường địa chỉ, vì 300 pixel là hẹp và đây là chỗ bố cục vỡ trước tiên.
+Chiều ghi chưa có một dòng nào. Bốn tên trong `ACTIONS` còn là vỏ rỗng, đều ném lỗi qua `actionsChuaDung()` ở `client/ui/actions.html`: `saveForm`, `deleteActivity`, `undoDelete` thuộc chặng 1.4; `renderActiveViewSheet` thuộc 1.5. Xóa hàm `actionsChuaDung` khi cái cuối cùng có thân thật.
 
 Bố cục nào chưa vừa mắt thì **sửa CSS, đừng sửa bản khai**. Bản khai nói cái gì có mặt, CSS nói nó rộng bao nhiêu — trộn hai việc là mất chính cái mà bản thiết kế đánh đổi rất nhiều để có.
 
-### 1.3b. Chuyển màn hình được bằng nút
-
-Hiện có một chỗ tắc mà bộ kiểm không thấy: ba trong bốn cửa mở form gọi `actionsCustomerAlive()`, tức **phải có khách đang xem**; mà Extension chưa nối và hộp tìm khách chưa dựng, nên không còn đường nào bấm ra một khách. Đường duy nhất còn lại là gõ console. Chỉ có "Thêm khách" mở được form khi chưa chọn ai.
-
-Nên **hộp tìm khách thuộc ưu tiên số 1, không phải việc để sau**. Nó là cái nút biến "chuyển màn hình được" thành sự thật.
-
-`Câu hỏi đêm.md` mục 4.6 ghi ba đường dựng và nghiêng về đường thứ hai: coi hộp tìm khách là đồ khung cố định trong `Sidebar.html` giống `sidebar-progress`, do một tệp `client/ui/search.html` điều khiển, cùng loại với `menu.html` và `collapse.html`. Lý do nghiêng: thẻ `input` phải nằm *ngoài* vùng bị vẽ lại, nếu không thì mỗi chữ gõ vào là một lượt vẽ và con trỏ bay khỏi ô — tài liệu 04:94. Chốt với chủ dự án một câu rồi dựng, vì đây là thứ họ sẽ nhìn thấy.
-
-Dữ liệu để tìm đã có sẵn: `Store.searchIndex` là mảng `{id, haystack}` do `ingestCore` dựng. Thay thân `ACTIONS.toggleSearchPanel`, và mỗi dòng gợi ý mang `data-action="setCurrentCustomer"` cùng `data-pick="<mã khách>"` — không mở đường gọi hàm mới nào.
-
-Kèm theo là các nếp bàn phím của bản cũ, chủ dự án chốt giữ đúng như cũ: dán tự tách trường, dropdown, Enter nhảy ô kế tiếp, dọn số điện thoại. Nguồn đọc là `9_Code_cu_tham_chieu/src/ui/UI_Logic.html` khoảng dòng 935–1142. Bê sang dạng `SLOTS`/`ACTIONS`, đừng bê nguyên khối.
-
-Xong 1.3b thì phần trông đợi ở `tests/cases/actions.js` mục 6 rụng từ sáu tên xuống năm.
+## Chặng 1.3 — phần còn lại, theo đúng thứ tự này
 
 ### 1.3c. Nghiệm thu bằng mắt chủ dự án trên Sheet DEV
 
-Đẩy code kèm `--push` rồi mời chủ dự án mở sidebar. Danh sách họ bấm: hết mười sáu hành động, mở và đóng cả ba màn form, cả đường menu và cả đường thu gọn. Sáu vỏ rỗng sẽ hiện hộp thoại "chưa dựng — thuộc chặng 1.4/1.5", và đó là kết quả **đúng** ở lượt này, không phải lỗi.
+Đẩy code kèm `--push` rồi mời chủ dự án mở sidebar. Danh sách họ bấm: hết mười lăm hành động, mở và đóng cả ba màn form, cả đường menu và cả đường thu gọn. Bốn vỏ rỗng sẽ hiện hộp thoại "chưa dựng — thuộc chặng 1.4/1.5", và đó là kết quả **đúng** ở lượt này, không phải lỗi.
 
 Nhận ảnh chụp màn hình thì sửa ngay vòng đó, đừng dồn.
 
@@ -93,7 +51,7 @@ Cùng lúc còn một món nợ của chặng 1.2: nhánh dự phòng của than
 
 ### 1.3e. Soát ngược tài liệu 04
 
-Đi hết mọi mục `[RÀNG BUỘC CỨNG]` của `04. Bộ máy render và luồng lưu.md` cho phần giao diện, đối chiếu với code. Bốn mục dễ trượt nhất: `renderTarget` là đường **duy nhất** đổi nội dung màn (Phần 6); menu **không** mở thêm đường gọi hàm nào, mục con vẫn tra tên trong `ACTIONS` (Phần 4B); mười sáu tên hành động là danh sách đóng, ghim bởi `TEN_HANH_DONG` ở `tests/cases/uiSchema.js` (Phần 7); nội dung không tràn thì không có nút thu gọn nào (Phần 5).
+Đi hết mọi mục `[RÀNG BUỘC CỨNG]` của `04. Bộ máy render và luồng lưu.md` cho phần giao diện, đối chiếu với code. Bốn mục dễ trượt nhất: `renderTarget` là đường **duy nhất** đổi nội dung màn (Phần 6); menu **không** mở thêm đường gọi hàm nào, mục con vẫn tra tên trong `ACTIONS` (Phần 4B); danh sách tên hành động là danh sách đóng, ghim bởi `TEN_HANH_DONG` ở `tests/cases/uiSchema.js` (Phần 7); nội dung không tràn thì không có nút thu gọn nào (Phần 5).
 
 ## Chặng 1.4 — lưu được. Đây là mốc "đã dùng được để đi bán hàng".
 
@@ -105,7 +63,7 @@ Phải dựng:
 - `server/FieldLogic.js` — bản máy chủ của sáu hàm ngầm định và các hàm kiểm giá trị. Bên client đã có `client/schema/fieldLogic.html`; hai bên phải cho cùng kết quả, và tài liệu 03 coi máy chủ là bên nói lời cuối.
 - Xóa mềm và hoàn tác: `recordStatus` chuyển `active` ↔ `deleted`, không xóa hàng thật khỏi sheet.
 
-Bốn vỏ rỗng phải thay bằng việc thật: `saveForm`, `deleteSelectedActivities`, `deleteActivity`, `undoDelete`.
+Ba vỏ rỗng phải thay bằng việc thật: `saveForm`, `deleteActivity`, `undoDelete`.
 
 ## Chặng 1.5 — làm mới và sheet quản trị
 

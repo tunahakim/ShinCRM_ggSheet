@@ -1,5 +1,5 @@
 /**
- * Ca kiểm của `client/ui/actions.html` — bảng mười sáu hành động. Tài liệu 04 Phần 7.
+ * Ca kiểm của `client/ui/actions.html` — bảng mười lăm hành động. Tài liệu 04 Phần 7.
  *
  * Chỗ đáng kiểm nhất ở đây là loại hỏng-trong-im-lặng: một tên rơi khỏi bảng thì nút bấm không làm gì; ba cửa mở form không tự đóng khi khách đã xóa mềm; nút chưa dựng của chặng sau lặng lẽ không phản hồi. Cả ba đều không làm bộ kiểm nào khác đỏ.
  *
@@ -76,7 +76,7 @@ function dungCanh() {
 }
 
 function chay(so) {
-  section('actions — bảng mười sáu tên, và ranh giới của tệp');
+  section('actions — bảng mười lăm tên, và ranh giới của tệp');
 
   let hop;
   try {
@@ -85,7 +85,7 @@ function chay(so) {
     return ghiLoiNap(so, 'nạp bảng hành động cùng bộ máy vẽ, bốn màn và kho RAM thật', err);
   }
 
-  check(so, 'đủ mười sáu tên và đúng thứ tự bảng tài liệu 04 Phần 7 — bảng này là chỗ nhìn một phát thấy hết việc sidebar làm được',
+  check(so, 'đủ mười lăm tên và đúng thứ tự bảng tài liệu 04 Phần 7 — bảng này là chỗ nhìn một phát thấy hết việc sidebar làm được',
     Object.keys(hop.ACTIONS), TEN_HANH_DONG);
 
   check(so, '`ACTIONS_NAMES` tính từ chính bảng nên không có bản danh sách thứ hai để lệch',
@@ -228,7 +228,7 @@ function chay(so) {
   checkThrows(so, 'mã khách không có trong kho thì để lỗi của `Store.getCustomer` bay lên — `[RÀNG BUỘC CỨNG]` tài liệu 05 Phần 9, đổi thành `null` là vẽ ra một khách vừa mất sạch dữ liệu',
     () => hop4.ACTIONS.setCurrentCustomer({ pick: 'CUS-999999' }), 'CUS-999999');
 
-  section('actions — năm việc của chặng sau: có tên trong bảng, thân hàm hét lên');
+  section('actions — bốn việc của chặng sau: có tên trong bảng, thân hàm hét lên');
 
   const hop5 = dungCanh();
   hop5.screenStateSetCustomer('CUS-000001');
@@ -242,9 +242,9 @@ function chay(so) {
       return /chưa dựng/.test(String(err.message));
     }
   });
-  check(so, 'đúng năm hành động chưa dựng, mỗi cái nói rõ nó thuộc chặng nào — nút không phản hồi mà chẳng nói gì đúng là ca tài liệu 04 Phần 7 chống',
+  check(so, 'đúng bốn hành động chưa dựng, mỗi cái nói rõ nó thuộc chặng nào — nút không phản hồi mà chẳng nói gì đúng là ca tài liệu 04 Phần 7 chống',
     chuaDung.slice().sort(),
-    ['deleteActivity', 'deleteSelectedActivities', 'renderActiveViewSheet', 'saveForm', 'undoDelete']);
+    ['deleteActivity', 'renderActiveViewSheet', 'saveForm', 'undoDelete']);
 
   checkThrows(so, 'nút xóa một giao dịch kiểm `pick` trước khi báo chưa dựng, nên lỗi khai Block không bị lời báo của chặng sau che mất',
     () => hop5.ACTIONS.deleteActivity({}), 'data-pick');

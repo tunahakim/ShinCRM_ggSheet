@@ -92,10 +92,10 @@ function chay(so) {
   check(so, 'nấc "chỉ đã xóa" mà khách không có bản ghi đã xóa thì nói riêng chuyện đó',
     chuCua(nacXoa.SLOTS.activityList(ctxCua(nacXoa, 'CUS-000002'))), ['Khách này không có giao dịch nào đã xóa.']);
 
-  // Ba nấc lọc, trên cùng một khách có ba giao dịch mà một đã xóa mềm.
+  // Ba nấc lọc, trên cùng một khách có ba giao dịch mà một đã xóa mềm. Mã dòng đọc ở nút bút chì — dòng không còn ô đánh dấu.
   const dem = (h) => {
     const ra = h.SLOTS.activityList(ctxCua(h, 'CUS-000001'));
-    return ra.filter((n) => n.role === 'box').map((row) => moiNode([row], []).filter((n) => n.role === 'check')[0].pick);
+    return ra.filter((n) => n.role === 'box').map((row) => moiNode([row], []).filter((n) => n.role === 'icon')[0].pick);
   };
 
   check(so, 'nấc "chỉ còn dùng" bỏ bản ghi đã xóa mềm', dem(hop), ['ACT-000002', 'ACT-000001']);
@@ -105,26 +105,28 @@ function chay(so) {
 
   const tatCa = dungCanh('all').SLOTS.activityList(ctxCua(dungCanh('all'), 'CUS-000001'));
 
-  check(so, 'cuối danh sách là nút xóa nhiều dòng, mang class báo nguy',
-    (() => { const nut = tatCa[tatCa.length - 1]; return [nut.role, nut.label, nut.action, nut.className]; })(),
-    ['button', 'XÓA DÒNG ĐÃ CHỌN', 'deleteSelectedActivities', 'shin-danger shin-act-delete']);
+  // Chủ dự án bỏ việc xóa hàng loạt ngày 06/09/2026: ô đánh dấu ăn chỗ ở mọi dòng để phục vụ một việc hiếm.
+  check(so, 'danh sách không còn ô đánh dấu nào và không còn nút xóa hàng loạt — mỗi dòng tự có thùng rác của nó',
+    [moiNode(tatCa, []).filter((n) => n.role === 'check').length, tatCa.filter((n) => n.role === 'button').length],
+    [0, 0]);
 
-  check(so, 'danh sách rỗng thì không có nút xóa — không có gì để chọn',
-    hop.SLOTS.activityList(ctxCua(hop, 'CUS-000002')).filter((n) => n.role === 'button').length, 0);
+  // Một dòng đầy đủ: ba mẩu chữ đầu dòng là **ba node riêng**, vì ba màu của bản cũ nằm ở ba lớp khác nhau.
+  check(so, 'dòng đầy đủ: ngày kiểu Việt, loại việc, tiền có dấu chấm nghìn, rồi nội dung ở dòng riêng',
+    chuCua([tatCa[0]]), ['03/09/2026', 'Chốt đơn', '1.200.000 đ', 'Khách đồng ý giá']);
+  check(so, 'giá trị hợp đồng rỗng thì không sinh node giá trị',
+    chuCua([tatCa[2]]), ['01/09/2026', 'Gọi điện', 'Chào hàng lần đầu']);
+  check(so, 'giá trị hợp đồng bằng 0 cũng không sinh node — 0 đồng là chưa có hợp đồng',
+    chuCua([tatCa[1]]), ['02/09/2026', 'Gửi báo giá', 'Đã xóa', 'Gửi bản chào\nkèm chiết khấu']);
 
-  // Một dòng đầy đủ: ngày kiểu Việt, loại việc, tiền có dấu chấm nghìn.
-  check(so, 'chữ đầu dòng gộp ngày kiểu Việt, loại việc và giá trị hợp đồng',
-    chuCua([tatCa[0]]), ['03/09/2026 • Chốt đơn • 1.200.000 đ', 'Khách đồng ý giá']);
-  check(so, 'giá trị hợp đồng rỗng thì không hiện dấu chấm giữa trống',
-    chuCua([tatCa[2]])[0], '01/09/2026 • Gọi điện');
-  check(so, 'giá trị hợp đồng bằng 0 cũng không hiện — 0 đồng là chưa có hợp đồng',
-    chuCua([tatCa[1]])[0], '02/09/2026 • Gửi báo giá');
+  check(so, 'ba mẩu chữ đầu dòng mang ba lớp riêng — gộp chúng thành một chuỗi là mất luôn ba màu',
+    moiNode([tatCa[0]], []).filter((n) => n.role === 'text').map((n) => n.className),
+    ['shin-act-date', 'shin-act-type', 'shin-act-value', 'shin-act-content']);
 
   check(so, 'nội dung giao dịch nằm ở dòng riêng, giữ nguyên dấu xuống dòng người dùng gõ',
-    chuCua([tatCa[1]])[2], 'Gửi bản chào\nkèm chiết khấu');
+    chuCua([tatCa[1]]).slice(-1)[0], 'Gửi bản chào\nkèm chiết khấu');
 
   check(so, 'dòng đã xóa mềm mang class gạch ngang, và có chip "Đã xóa"',
-    [tatCa[1].className, chuCua([tatCa[1]])[1]], ['shin-act-row shin-act-deleted', 'Đã xóa']);
+    [tatCa[1].className, chuCua([tatCa[1]])[2]], ['shin-act-row shin-act-deleted', 'Đã xóa']);
   check(so, 'dòng còn dùng không mang class gạch ngang và không có chip',
     [tatCa[0].className, chuCua([tatCa[0]]).indexOf('Đã xóa')], ['shin-act-row', -1]);
 
@@ -132,9 +134,9 @@ function chay(so) {
     (() => { const b = moiNode([tatCa[0]], []).filter((n) => n.role === 'icon')[0]; return [b.icon, b.action, b.pick, b.align]; })(),
     ['pencil', 'openActivityForm', 'ACT-000002', 'right']);
 
-  check(so, 'ô đánh dấu mang mã giao dịch và một nhãn đọc được cho trình đọc màn hình',
-    (() => { const o = moiNode([tatCa[0]], []).filter((n) => n.role === 'check')[0]; return [o.pick, o.label]; })(),
-    ['ACT-000002', 'Chọn giao dịch ACT-000002']);
+  check(so, 'cạnh bút sửa là thùng rác của chính dòng đó — xóa một dòng là một cú bấm, không phải tích rồi bấm',
+    (() => { const b = moiNode([tatCa[0]], []).filter((n) => n.role === 'icon')[1]; return [b.icon, b.action, b.pick]; })(),
+    ['trash', 'deleteActivity', 'ACT-000002']);
 
   // Luật cứng của danh sách: không node nào mang `field`, vì engine tra một bản ghi cho một thực thể.
   check(so, 'không dòng nào mang field — bộ thu thập lúc lưu không bao giờ thấy danh sách này',
@@ -158,26 +160,28 @@ function chay(so) {
     chuCua(hop.SLOTS.searchSuggestions(ctxCua(hop, '', { search: [hop.Store.getCustomer('CUS-000003')] }))),
     ['(chưa có tên)', 'CUS-000003']);
 
-  // Khối thông tin chung. Hàng phụ chia hai cột để số điện thoại ghim mép phải — mẹo tiết kiệm chiều cao của bản cũ.
+  // Khối thông tin chung: tên công ty một hàng, rồi hai hàng hai cột. Cột phải giữ mã số thuế và điện thoại — hai thứ hay phải chép ra nhất.
   check(so, 'chưa chọn khách thì khối thông tin chung cũng nói chưa chọn khách',
     chuCua(hop.SLOTS.infoBarContent(ctxCua(hop, ''))), ['Chưa chọn khách hàng nào.']);
 
-  check(so, 'khối thông tin chung: tên công ty, rồi mã khách • người liên hệ bên trái và điện thoại ghim mép phải',
+  check(so, 'khối thông tin chung: tên công ty, rồi hàng mã khách với mã số thuế, rồi hàng người liên hệ với điện thoại',
     chuCua(hop.SLOTS.infoBarContent(ctxCua(hop, 'CUS-000001'))),
-    ['Công ty Thép Hòa Phát', 'CUS-000001 • Anh Tuấn', '0912345678']);
+    ['Công ty Thép Hòa Phát', 'CUS-000001', '0900123456', 'Anh Tuấn', '0912345678']);
 
-  check(so, 'điện thoại nằm ở cột phải, nhận đúng lớp ghim mép phải',
+  check(so, 'mã số thuế và điện thoại nằm ở cột phải, nhận đúng lớp ghim mép phải',
     moiNode(hop.SLOTS.infoBarContent(ctxCua(hop, 'CUS-000001')), [])
-      .filter((n) => n.className && n.className.indexOf('shin-text-right') !== -1).map((n) => n.text),
-    ['0912345678']);
+      .filter((n) => n.className === 'shin-info-right').map((n) => n.text),
+    ['0900123456', '0912345678']);
 
   check(so, 'khách đã xóa mềm thì khối thông tin chung có chip "Đã xóa"',
     chuCua(hop.SLOTS.infoBarContent(ctxCua(hop, 'CUS-000002'))),
-    ['Thép Việt Đức', 'Đã xóa', 'CUS-000002', '0987654321']);
+    ['Thép Việt Đức', 'Đã xóa', 'CUS-000002', '0900999888', '0987654321']);
 
-  // Không có điện thoại thì hàng phụ về một cột, chứ không để lại một thẻ rỗng ở mép phải.
-  check(so, 'khách chưa có điện thoại thì hàng phụ không sinh cột phải rỗng',
-    chuCua(hop.SLOTS.infoBarContent(ctxCua(hop, 'CUS-000003'))).length, 2);
+  // Rỗng cả hai cột thì bỏ hẳn hàng: một hàng trắng vẫn ăn chiều cao của khối, mà khối này ghim trên đầu mọi màn.
+  check(so, 'hàng nào rỗng cả hai cột thì không sinh ra — khách chưa có người liên hệ và điện thoại chỉ còn hai hàng',
+    [hop.SLOTS.infoBarContent(ctxCua(hop, 'CUS-000003')).length,
+      chuCua(hop.SLOTS.infoBarContent(ctxCua(hop, 'CUS-000003')))],
+    [2, ['(chưa có tên)', 'CUS-000003']]);
 
   check(so, 'khối thông tin chung cũng không mang field nào',
     moiNode(hop.SLOTS.infoBarContent(ctxCua(hop, 'CUS-000001')), []).filter((n) => n.field).length, 0);

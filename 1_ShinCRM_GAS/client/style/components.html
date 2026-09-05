@@ -27,30 +27,38 @@
 
 .shin-card {
   display: block;
-  margin-bottom: var(--shin-gap-3);
+  margin-bottom: var(--shin-gap-2);
   border: 1px solid var(--shin-border);
   border-radius: var(--shin-radius);
   background: var(--shin-bg);
+  box-shadow: var(--shin-shadow-card);
 }
 
 .shin-card:last-child { margin-bottom: 0; }
 
-/* Hàng tiêu đề nằm ngoài thẻ ruột nên nó không bị cuộn mất khi ruột card bị ghim trần. */
+/*
+ * Hàng tiêu đề nằm ngoài thẻ ruột nên nó không bị cuộn mất khi ruột card bị ghim trần.
+ *
+ * **Không nền, không viền liền, chỉ một gạch đứt mờ** — và cao đúng 24 pixel. Bản trước làm nó thành một dải màu lõm chạy
+ * hết bề ngang card, viền liền, lề 8 trên 12 dưới: cao 34 pixel cho một chữ 12 pixel, và ba card xếp dọc thành ba cái mũ.
+ * Chủ dự án nói "phần tiêu đề của các thẻ đang khá cao"; bản cũ chỉ có `padding-bottom: 4px` với một gạch đứt #eee, tức
+ * tiêu đề là **nhãn của khối chữ bên dưới** chứ không phải một thanh riêng.
+ *
+ * Lề ngang phải bằng lề ngang của `.shin-card-body`, không thì chữ tiêu đề lệch một nhịp so với chữ trong ruột.
+ */
 .shin-card-head {
   display: flex;
   align-items: center;
   gap: var(--shin-gap-2);
-  padding: var(--shin-gap-2) var(--shin-gap-3);
-  border-bottom: 1px solid var(--shin-border);
-  background: var(--shin-bg-sunken);
-  border-radius: var(--shin-radius) var(--shin-radius) 0 0;
+  padding: 6px var(--shin-gap-2) var(--shin-gap-1);
+  border-bottom: 1px dashed var(--shin-border-faint);
 }
 
 .shin-card-title {
   flex: 1 1 auto;
   min-width: 0;
-  font-size: var(--shin-text-sm);
-  font-weight: 600;
+  font-size: var(--shin-text-xs);
+  font-weight: 700;
   color: var(--shin-text-soft);
   text-transform: uppercase;
   letter-spacing: 0.02em;
@@ -63,10 +71,28 @@
   gap: var(--shin-gap-1);
 }
 
-.shin-card-body { padding: var(--shin-gap-3); }
+/*
+ * Nút trong hàng tiêu đề card: **thấp 20 pixel và màu xanh**, không phải nút glyph vuông 28 pixel như ở header.
+ *
+ * Hai lý do. Chiều cao: một nút 28 pixel nong hàng tiêu đề lên 39 pixel, tức bao nhiêu công cắt lề ở trên cũng vô nghĩa.
+ * Màu: bản cũ vẽ chỗ này thành một đường dẫn chữ xanh ("＋ Thêm", "✎ Sửa") chứ không phải một cái nút, vì nó là **lối phụ**
+ * của card — nhìn ra được nhưng không tranh chỗ với nội dung.
+ */
+.shin-card-head .shin-icon {
+  height: 20px;
+  min-width: 20px;
+  padding: 0 2px;
+  color: var(--shin-primary);
+  font-size: var(--shin-text-xs);
+  font-weight: 600;
+}
+
+.shin-card-head .shin-icon:hover { background: var(--shin-primary-soft); }
+
+.shin-card-body { padding: var(--shin-gap-2); }
 
 /* Hai hàng liền nhau trong card cách nhau đúng một nhịp, không phải nhịp của hàng ngoài card. */
-.shin-card-body > .shin-row + .shin-row { margin-top: var(--shin-gap-3); }
+.shin-card-body > .shin-row + .shin-row { margin-top: var(--shin-gap-2); }
 
 /* --- Trường và nhãn ---------------------------------------------- */
 
@@ -126,6 +152,9 @@
   box-shadow: 0 0 0 2px var(--shin-primary-soft);
 }
 
+/* Chữ mời trong ô còn rỗng: nhạt hơn hẳn chữ thật, vì nó là lời hướng dẫn chứ không phải dữ liệu. `font-style` để nghiêng cho chắc — người dùng phân biệt được cả khi màn hình đang chỉnh sáng lệch. */
+.shin-input::placeholder { color: var(--shin-text-faint); font-style: italic; opacity: 1; }
+
 /* Ô chỉ đọc vẫn là ô nhập chứ không thành chữ trơn: người dùng còn chọn và sao chép được nội dung. */
 .shin-input[readonly] {
   background: var(--shin-bg-sunken);
@@ -133,7 +162,23 @@
   border-color: var(--shin-border);
 }
 
-.shin-textarea { resize: vertical; }
+/*
+ * Ô nhập nhiều dòng: **tự cao theo nội dung tới trần mười dòng, quá trần mới cuộn nội bộ.**
+ *
+ * Chia việc giữa hai chỗ. Ở đây khai trần — một chỗ duy nhất giữ con số mười, tính từ `--shin-textarea-lines` nhân chiều
+ * cao dòng nhân cỡ chữ, cộng hai lớp lề trên dưới và hai nét viền. Còn phần cho ô **thấp lại khi ít chữ** thì ở
+ * `client/ui/inputs.html`: nó đặt `height` bằng chiều cao nội dung thật, rồi `max-height` ở đây tự chặn lại.
+ *
+ * Vì sao không để nguyên `rows="3"` và cuộn: ba dòng là chỗ đủ cho một câu, mà ô nội dung giao dịch thường dài năm bảy
+ * dòng — người dùng gõ xong không đọc lại được cái mình vừa gõ nếu không cuộn. Chủ dự án nói đúng chỗ đó.
+ *
+ * `resize: vertical` giữ lại làm đường lùi: nếu phần tự cao không chạy được vì lý do nào đó thì vẫn còn cách kéo tay.
+ */
+.shin-textarea {
+  resize: vertical;
+  max-height: calc(var(--shin-textarea-lines) * var(--shin-line-height) * var(--shin-text-md) + 2 * var(--shin-gap-1) + 2px);
+  overflow-y: auto;
+}
 
 /* Chữ chỉ đọc: không viền, không nền, cao theo nội dung để phép thu gọn của card đo được đúng chiều cao thật. `pre-wrap` giữ các lần xuống dòng người dùng đã gõ, `break-word` chặn một địa chỉ web dài đẩy ngang cả sidebar 300 pixel. */
 .shin-readtext {
@@ -160,20 +205,32 @@
 /* --- Hai control gõ-để-lọc --------------------------------------- */
 
 /*
-  Hộp danh sách bung ra bằng `position: absolute` nên nó không đẩy hàng dưới xuống lúc mở.
-
-  **Không có mũi tên sổ xuống.** Sidebar rộng khoảng 300 pixel, một mũi tên cộng khoảng chừa cho nó ăn 24 pixel bề
-  ngang — bằng ba bốn chữ, mà ba bốn chữ cuối của tên công ty mới là thứ phân biệt hai khách trùng đầu tên. Bản cũ
-  không vẽ mũi tên và bù lại bằng việc **chọn vào ô là tự bung danh sách**, nên người dùng không mất đường mở nào.
-*/
+ * **Không có mũi tên sổ xuống.** Sidebar rộng khoảng 300 pixel, một mũi tên cộng khoảng chừa cho nó ăn 24 pixel bề ngang — bằng ba bốn chữ, mà ba bốn chữ cuối của tên công ty mới là thứ phân biệt hai khách trùng đầu tên. Bản cũ không vẽ mũi tên và bù lại bằng việc **chọn vào ô là tự bung danh sách**, nên người dùng không mất đường mở nào.
+ *
+ * `position: relative` là mốc cho hộp danh sách bên dưới neo vào.
+ */
 .shin-combo { position: relative; }
 
+/*
+  Hộp danh sách bung ra bằng `position: absolute` nên nó không đẩy hàng dưới xuống lúc mở.
+
+  **Bề ngang không dính theo bề ngang của ô.** Trường `Tỉnh thành` nằm ở cột phải của một hàng hai cột thì chỉ rộng chừng
+  130 pixel, mà "Thành phố Hồ Chí Minh" cần hơn thế — danh sách bó đúng bề ngang ô thì mọi mục dài đều bị ngắt dòng hoặc
+  cắt cụt. `min-width: 100%` giữ sàn là bề ngang ô, `width: max-content` cho nó nở theo mục dài nhất, và trần thì bằng bề
+  ngang sidebar trừ hai lề. Phần **kéo lại vào trong khung** — vì vùng thân là một hộp `overflow: hidden` nên nó cắt mất
+  phần tràn — do `client/ui/combo.html` tính lúc chạy: nó đặt thẳng `width` và `left` lên thẻ.
+
+  Con số ở đây chỉ là mức mặc định cho lúc chưa ai đo, giống cách `max-height` bên dưới hoạt động.
+*/
 .shin-combo-list {
   position: absolute;
   z-index: 5;
   top: calc(100% + 2px);
   left: 0;
-  right: 0;
+  right: auto;
+  min-width: 100%;
+  width: max-content;
+  max-width: calc(100vw - 2 * var(--shin-gap-2));
   max-height: 180px;
   overflow-y: auto;
   border: 1px solid var(--shin-border-strong);
@@ -251,9 +308,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-/* Giá trị ghim mép phải của một hàng hai cột: số điện thoại luôn ở đúng một chỗ nên mắt tìm được mà không phải đọc. */
-.shin-text-right { text-align: right; }
 
 .shin-badge-cong-viec { background: var(--shin-primary-soft); color: var(--shin-primary-dark); }
 .shin-badge-uu-tien { background: var(--shin-warn-soft); color: var(--shin-warn); }

@@ -7,52 +7,91 @@
 
 /* --- Dòng lịch sử làm việc --------------------------------------- */
 
+/*
+  **Không viền quanh, không lề hai bên, chỉ một gạch mờ dưới chân.** Chủ dự án nhìn bản trước liền nói "mỗi lịch sử lại ở
+  trong một khung chữ nhật bo viền — lại còn có lề với hai bên, với tôi khá xấu"; bản cũ chỉ có `border-bottom` màu #f1f3f4
+  và `padding-bottom: 6px`, còn hai bên thì dòng chữ ăn sát mép trong của card. Card đã là cái khung rồi, kẻ thêm khung cho
+  từng dòng bên trong nó là kẻ khung trong khung.
+
+  Gạch dưới lấy vạch **mờ nhất** của thang màu: đậm hơn một nấc thì ba chục dòng liền nhau nhìn ra thành một bảng kẻ ô.
+  Dòng cuối bỏ cả gạch lẫn lề dưới, vì card đã tự có lề dưới của nó.
+*/
 .shin-act-row {
-  padding: var(--shin-gap-2) 0;
-  border-bottom: 1px solid var(--shin-border);
+  padding-bottom: var(--shin-gap-2);
+  margin-bottom: var(--shin-gap-2);
+  border-bottom: 1px solid var(--shin-border-faint);
 }
 
-.shin-act-row:last-of-type { border-bottom: 0; }
+.shin-act-row:last-of-type { padding-bottom: 0; margin-bottom: 0; border-bottom: 0; }
 
 /*
-  Ô chọn và nút bút chì **ẩn cho tới khi chuột dê vào dòng**. Card lịch sử là chỗ dày chữ nhất của sidebar; hai nút nhân
-  cho vài chục dòng thành một rừng biểu tượng nhấp nháy, mà mỗi lúc người dùng chỉ sửa đúng một dòng.
+  Hai nút bút chì và thùng rác **ẩn cho tới khi chuột dê vào dòng**. Card lịch sử là chỗ dày chữ nhất của sidebar; hai nút
+  nhân cho vài chục dòng thành một rừng biểu tượng, mà mỗi lúc người dùng chỉ sửa hoặc xóa đúng một dòng.
 
   Ẩn bằng `opacity` chứ không bằng `display: none`: mất chỗ thì dòng chữ giật ngang mỗi lần chuột đi qua, đọc rất mệt.
-  Ô đã đánh dấu thì **ở lại**, vì người dùng tích vài dòng rồi mới bấm xóa — mất dấu tích là mất luôn cái đang chọn.
   `:focus-within` cho đường bàn phím: Tab tới nút nào thì nút đó phải hiện ra, không thì con trỏ đi trong bóng tối.
+
+  Nút ở đây **thấp 18 pixel**, không phải nút glyph vuông 28 pixel như ở thanh trên. Hàng đầu của một dòng lịch sử chỉ cao
+  chừng 18 pixel; một cái nút 28 nong nó lên 28 và ba chục dòng cộng lại thành hơn 300 pixel trắng.
+
+  Thùng rác đỏ, bút chì xanh: hai việc khác hạng thì hai màu khác nhau, và cái không hoàn tác được ngay thì phải là cái đỏ.
 */
-.shin-act-row .shin-check-box,
 .shin-act-row .shin-icon {
+  height: 18px;
+  width: 18px;
+  min-width: 18px;
+  padding: 0;
+  color: var(--shin-primary);
   opacity: 0;
   transition: opacity 90ms linear;
 }
 
-.shin-act-row:hover .shin-check-box,
 .shin-act-row:hover .shin-icon,
-.shin-act-row:focus-within .shin-check-box,
-.shin-act-row:focus-within .shin-icon,
-.shin-act-row .shin-check-box:checked { opacity: 1; }
+.shin-act-row:focus-within .shin-icon { opacity: 1; }
 
-/* Ngày và loại việc là chữ nhận dạng dòng nên đậm hơn nội dung; nội dung mới là phần dài. */
-.shin-act-head {
-  color: var(--shin-text);
+.shin-act-row .shin-icon + .shin-icon { margin-left: 2px; color: var(--shin-error); }
+
+.shin-act-row .shin-glyph { width: 13px; height: 13px; }
+
+/*
+  Ba mẩu chữ đầu dòng, ba màu — đúng nếp bản cũ. Ngày xanh đậm là mốc để mắt nhảy dọc; loại việc là **chip xanh lá** nên nó
+  đọc ra thành một cái nhãn chứ không lẫn vào chữ; giá trị hợp đồng đỏ đậm vì đó là con số cần thấy trước tiên.
+
+  Cả ba đều `flex: 0 0 auto` để co theo chữ của mình, thắng luật chia đều của `.shin-row > *` nhờ tệp này nạp sau
+  `components.html`. Không có nó thì ngày, loại việc và giá trị mỗi thứ ăn đúng một phần bề ngang bằng nhau.
+*/
+.shin-act-date,
+.shin-act-type,
+.shin-act-value {
+  flex: 0 0 auto;
   font-size: var(--shin-text-sm);
-  font-weight: 600;
+  font-weight: 700;
 }
 
+.shin-act-date { color: var(--shin-primary); }
+
+.shin-act-value { color: var(--shin-error); }
+
+.shin-act-type {
+  padding: 1px var(--shin-gap-1);
+  border-radius: var(--shin-radius-sm);
+  background: #e6f4ea;
+  color: var(--shin-ok);
+  font-size: var(--shin-text-xs);
+}
+
+/* Nội dung là phần dài và là phần người ta đọc, nên nó cỡ chữ nền và màu chữ chính — không phải màu phụ. */
 .shin-act-content {
   margin-top: 2px;
-  color: var(--shin-text-soft);
-  font-size: var(--shin-text-sm);
+  color: var(--shin-text);
+  font-size: var(--shin-text-md);
   white-space: pre-wrap;
 }
 
 /* Dòng đã xóa mềm mờ đi nhưng **không** ẩn: nó vẫn giữ đúng vị trí thời gian của mình trên dòng thời gian. */
-.shin-act-deleted .shin-act-head,
+.shin-act-deleted .shin-act-date,
+.shin-act-deleted .shin-act-value,
 .shin-act-deleted .shin-act-content { color: var(--shin-text-soft); text-decoration: line-through; }
-
-.shin-act-delete { margin-top: var(--shin-gap-3); }
 
 /* --- Dòng gợi ý tìm khách ---------------------------------------- */
 
@@ -75,7 +114,36 @@
 
 /* --- Khối thông tin chung ---------------------------------------- */
 
-.shin-info-name { color: var(--shin-text); font-size: var(--shin-text-md); font-weight: 600; }
+/*
+  **Tên công ty là chữ to nhất của cả sidebar, và nó màu xanh.** Bản trước cho nó 13 pixel màu chữ thường, ngang với mọi
+  dòng khác, và chủ dự án nói ngay "quá nhỏ, tôi cần nó như code gốc". Bản cũ đặt 15 pixel, đậm 700, màu xanh chủ đạo — to
+  và có màu vì đây là câu trả lời cho câu hỏi "tôi đang làm việc cho ai", câu hỏi mà người dùng hỏi lại mỗi vài giây.
 
-.shin-info-meta { margin-top: 2px; color: var(--shin-text-soft); font-size: var(--shin-text-xs); }
+  `text-align: justify` là mẹo của bản cũ: tên công ty thường dài hơn một dòng trong 276 pixel, và dàn đều hai mép thì hai
+  dòng đó thành một khối chữ gọn thay vì một bậc thang.
+*/
+.shin-info-name {
+  color: var(--shin-primary);
+  font-size: var(--shin-text-lg);
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: justify;
+}
+
+/*
+  Hai hàng phụ: cỡ chữ nền và **màu chữ chính**, không phải màu phụ. Đây là mã số thuế và số điện thoại — thứ người ta chép
+  ra để gọi và để xuất hóa đơn, nên chúng phải đọc được ngay chứ không phải là ghi chú bên lề.
+
+  Bên phải căn mép phải và đậm hơn bên trái một nấc, đúng nếp `.info-row` của bản cũ: hai cột ghim hai mép thì mắt tìm số
+  điện thoại ở đúng một chỗ mà không phải đọc hết dòng, và cái quan trọng hơn thì đậm hơn.
+*/
+.shin-info-left,
+.shin-info-right {
+  color: var(--shin-text);
+  font-size: var(--shin-text-md);
+}
+
+.shin-info-left { font-weight: 500; }
+
+.shin-info-right { font-weight: 600; text-align: right; }
 </style>

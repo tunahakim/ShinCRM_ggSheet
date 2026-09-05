@@ -62,9 +62,15 @@ Tài liệu 07 Phần 6 nói đọc ba núm "một lần lúc mở sidebar trong
 
 Tài liệu 05 Phần 7 khai hình dạng `Store` với đúng bảy thành viên. **Đang chọn: `Prefs` là biến toàn cục riêng, không nhét vào `Store`** — cùng lý do `Schema` và `SETTINGS` cũng ở ngoài: `Store` giữ dữ liệu, ba thứ kia là bảng khai và thói dùng. Thêm nữa, `prefsSet` **đổi RAM ngay rồi mới gửi lên máy chủ**, không đợi xác nhận: bấm một núm mà giao diện đợi một vòng gọi mới nhảy thì cảm giác là hệ thống chậm, còn việc ghi trượt thì lần mở sau đọc lại đúng giá trị cũ.
 
-### 3.5. `setCurrentCustomer` là hàm thứ mười sáu của `ACTIONS`
+### 3.5. Bảng `ACTIONS` đổi hai chỗ: thêm `setCurrentCustomer`, bỏ `deleteSelectedActivities`
 
-Tài liệu 04 Phần 7 liệt kê 15 tên. Hộp gợi ý tìm khách sinh ra dòng bấm được, và mọi dòng bấm được phải trỏ tới một tên trong bảng. **Đang chọn: thêm `setCurrentCustomer`.** Cùng hàm này về sau là đường Extension gọi khi người dùng click một ô trên sheet, nên nó phải có tên trong bảng dù thế nào. Tài liệu 04 Phần 7 đã sửa theo.
+Tài liệu 04 Phần 7 liệt kê 15 tên, trong đó có `deleteSelectedActivities`. Hai lần sửa, và bảng vẫn đúng mười lăm tên.
+
+Thêm `setCurrentCustomer`: hộp gợi ý tìm khách sinh ra dòng bấm được, và mọi dòng bấm được phải trỏ tới một tên trong bảng. Cùng hàm này về sau là đường Extension gọi khi người dùng click một ô trên sheet, nên nó phải có tên trong bảng dù thế nào.
+
+Bỏ `deleteSelectedActivities`: chủ dự án chốt ngày 06/09/2026 rằng ô đánh dấu nhiều dòng cộng nút xóa hàng loạt vừa xấu vừa ăn chỗ, thay bằng nút thùng rác hiện lúc trỏ chuột vào từng dòng — nút đó gọi `deleteActivity` đã có sẵn.
+
+Cả hai đều đã sửa vào tài liệu 04 Phần 7. Ràng buộc của phần đó là bảng **đóng và tra theo tên**, không phải bảng có đúng bao nhiêu dòng — nên `TEN_HANH_DONG` ở `tests/cases/uiSchema.js` ghim danh sách tên, và con số chỉ là hệ quả.
 
 ### 3.6. `valueTextDate` — dạng ngày để đọc, khác dạng ngày để nuôi thẻ `input`
 
@@ -112,9 +118,9 @@ Chỗ này để lại một việc thật cho chặng sau: mã khách đang xem
 
 `sidebarBoot()` từng kết thúc bằng `statusLoadSummary(...)`, và `statusScreen.html` tự nói hai lần rằng màn tóm tắt này là màn tạm. **Đã đổi: khởi động vẽ màn xem.**
 
-Còn lại câu hỏi màn tóm tắt đi đâu. Tài liệu mục tiêu ghi là cho nó một mục menu, nhưng làm vậy phải thêm tên thứ mười bảy vào bảng `ACTIONS`, mà mười sáu tên là **`[RÀNG BUỘC CỨNG]`** của tài liệu 04 Phần 7 và đang bị bộ kiểm ghim đúng con số. **Đang chọn đường không thêm hành động nào:** `sidebarBoot` cất bản tóm tắt vào `BOOT_LAST_SUMMARY`, `bootShowSummary()` gọi được từ console lúc nghiệm thu, và phần duy nhất mà người dùng thật cần thấy — danh sách cảnh báo cùng danh sách phép kiểm bị bỏ qua — thì `bootTellProblems` đưa vào `alert` **chỉ khi có**. Lượt nạp sạch thì mở thẳng vào màn xem, không gì chắn đường.
+Còn lại câu hỏi màn tóm tắt đi đâu. Tài liệu mục tiêu ghi là cho nó một mục menu, nhưng làm vậy phải thêm một tên nữa vào bảng `ACTIONS`, mà danh sách đóng là **`[RÀNG BUỘC CỨNG]`** của tài liệu 04 Phần 7 và đang bị bộ kiểm ghim theo tên. **Đang chọn đường không thêm hành động nào:** `sidebarBoot` cất bản tóm tắt vào `BOOT_LAST_SUMMARY`, `bootShowSummary()` gọi được từ console lúc nghiệm thu, và phần duy nhất mà người dùng thật cần thấy — danh sách cảnh báo cùng danh sách phép kiểm bị bỏ qua — thì `bootTellProblems` đưa vào `alert` **chỉ khi có**. Lượt nạp sạch thì mở thẳng vào màn xem, không gì chắn đường.
 
-Chỗ này cần chủ dự án chốt, vì nó đổi một dòng của tài liệu mục tiêu và vì nó là thứ người dùng nhìn thấy: giữ đường console, hay chấp nhận tên thứ mười bảy để có một mục menu thật?
+Chỗ này cần chủ dự án chốt, vì nó đổi một dòng của tài liệu mục tiêu và vì nó là thứ người dùng nhìn thấy: giữ đường console, hay chấp nhận thêm một tên hành động để có một mục menu thật?
 
 ### 4.5. Thứ tự dựng chặng 1.3 đổi so với tài liệu mục tiêu
 
@@ -148,19 +154,19 @@ Không tài liệu nào cho tiêu đề form một chỗ đứng. Code cũ đặ
 
 `shin-save-wide` và `shin-note-tall` được `UI_SCHEMA` gọi từ đầu mà không có một dòng CSS nào trong repo. **Đang chọn:** viết chúng cùng `shin-form-title` và `shin-carried` vào `<style>` riêng của `formScreen.html`, theo đúng luật ở `Sidebar.html:18` — style chết cùng màn thì ở cùng màn. Nút lưu ở ba màn form được thêm `shin-primary` vào `className` để đúng màu nút chính của bản cũ, vì `shin-save-wide` chỉ nên lo bề rộng.
 
-## 6. Bảng mười sáu hành động — bốn chỗ tự quyết
+## 6. Bảng mười lăm hành động — bốn chỗ tự quyết
 
 ### 6.1. Chữ ký `(payload) => void` của tài liệu 04:104 đã hẹp hơn thực tế
 
-Tài liệu 04 dòng 104 viết mỗi hành động là `(payload) => void`. Không đúng nữa: `cancelForm` và bốn cửa mở form phải trả `focusId` ra ngoài để bên nghe click đặt con trỏ — chính là điều mục 5.4 chốt — còn ba núm chọn trả `Promise` để bên gọi bắt được lượt gửi thất bại. Trả `void` thì hai việc đó buộc phải làm bên trong thân hàm, tức mười sáu thân hàm đều chạm DOM và bộ kiểm offline mất luôn khả năng gọi chúng.
+Tài liệu 04 dòng 104 viết mỗi hành động là `(payload) => void`. Không đúng nữa: `cancelForm` và bốn cửa mở form phải trả `focusId` ra ngoài để bên nghe click đặt con trỏ — chính là điều mục 5.4 chốt — còn ba núm chọn trả `Promise` để bên gọi bắt được lượt gửi thất bại. Trả `void` thì hai việc đó buộc phải làm bên trong thân hàm, tức mười lăm thân hàm đều chạm DOM và bộ kiểm offline mất luôn khả năng gọi chúng.
 
 **Đã chốt và đã sửa tài liệu 04 thành `(payload) => phần dư`**, kèm một đoạn nói phần dư gồm những gì: một object mang `focusId`, một `Promise`, hoặc cả hai, hoặc không gì cả. Bộ phát click đã dựng và nó ăn đúng hai hình dạng đó — `focusId` thì đặt con trỏ, `Promise` thì bắt cả nhánh chối — nên không còn hình dạng thứ ba nào bị bỏ rơi.
 
-### 6.2. Sáu hành động của chặng sau ném lỗi có tên, không để thân rỗng
+### 6.2. Hành động của chặng sau ném lỗi có tên, không để thân rỗng
 
-Sáu trong mười sáu tên thuộc chặng 1.4 và 1.5: `saveForm`, `deleteSelectedActivities`, `deleteActivity`, `undoDelete`, `renderActiveViewSheet`, cộng `toggleSearchPanel` còn nằm trong chặng này nhưng sau bảng. Để thân rỗng thì bấm nút không có gì xảy ra — đúng cái hỏng mà tài liệu 04 Phần 7 lập ra để chống, và là cái hỏng tệ nhất với người dùng không phải lập trình viên. Bỏ tên khỏi bảng thì phép kiểm khởi động đỏ vì `UI_SCHEMA` đã khai đủ mười sáu tên.
+Bốn trong mười lăm tên còn thuộc chặng 1.4 và 1.5: `saveForm`, `deleteActivity`, `undoDelete` thuộc 1.4, `renderActiveViewSheet` thuộc 1.5. Để thân rỗng thì bấm nút không có gì xảy ra — đúng cái hỏng mà tài liệu 04 Phần 7 lập ra để chống, và là cái hỏng tệ nhất với người dùng không phải lập trình viên. Bỏ tên khỏi bảng thì phép kiểm khởi động đỏ vì `UI_SCHEMA` đã khai đủ tên.
 
-**Đang chọn: `actionsChuaDung(viec, chang)` ném một câu tiếng người có tên việc và số chặng.** Tên có mặt nên phép kiểm khởi động xanh, mà bấm vào thì hiện ra "chưa dựng, thuộc chặng 1.4" chứ không im lặng. Sáu chỗ này là sáu dòng phải xóa ở chặng tương ứng, và bộ kiểm ghim đúng con số sáu để không ai kịp quên.
+**Đang chọn: `actionsChuaDung(viec, chang)` ném một câu tiếng người có tên việc và số chặng.** Tên có mặt nên phép kiểm khởi động xanh, mà bấm vào thì hiện ra "chưa dựng, thuộc chặng 1.4" chứ không im lặng. Bốn chỗ này là bốn dòng phải xóa ở chặng tương ứng, và bộ kiểm ghim đúng con số bốn để không ai kịp quên. Xóa luôn `actionsChuaDung` khi cái cuối cùng có thân thật.
 
 ### 6.3. Phép kiểm tên lúc khởi động ở `schemaCheck.html`, và nó gọi ngược lên tệp nhúng sau
 
@@ -274,8 +280,32 @@ Trước khi đẩy lên Sheet DEV, soi lại từng dòng ràng buộc cứng c
 
 **Phần 4B — menu không mở thêm đường gọi hàm nào. Đạt.** Cả `client/` chỉ có đúng một chỗ đọc bảng `ACTIONS`, là `dispatch.html`. `menu.html` dựng mục con bằng `data-action` như mọi Block khác, nên mục menu chịu chung phép kiểm tên hành động lúc khởi động.
 
-**Phần 7 — mười sáu tên hành động là danh sách đóng. Đạt.** `TEN_HANH_DONG` vẫn đúng mười sáu tên, và bảng `ACTIONS` không mọc thêm tên nào ngoài danh sách.
+**Phần 7 — danh sách tên hành động là danh sách đóng. Đạt.** `TEN_HANH_DONG` vẫn khớp từng tên một với bảng `ACTIONS`, và bảng không mọc thêm tên nào ngoài danh sách.
 
 **Phần 5 — nội dung không tràn thì không hiện nút thu gọn nào. Đạt, nhưng chỉ xác nhận bằng đọc mã.** `collapseApply` dọn nút cũ trước rồi mới đo, và ở nấc `fit` nó thoát ra trước khi dựng bất kỳ nút nào. Không chốt được bằng phép kiểm vì phép đo cần `scrollHeight` với `clientHeight` mà DOM giả không có — cùng lý do đã bỏ ca kiểm cho `collapse` ở mục 7.2. Chỗ này nghiệm thu bằng mắt trên Sheet DEV: một ghi chú ngắn thì không được có nút "Xem thêm" nào ở dưới.
 
 **Phần 8 — "Không có cập nhật lạc quan" là ràng buộc cứng, và bản kê UX đang đòi ngược lại.** Món số 1 của Phần 3.2 trong `UX bản cũ và chuẩn cho bản mới.md` viết "vẽ trước, gửi sau: đóng form và cập nhật RAM trước, gọi máy chủ sau" — do chính phiên này viết ra khi mô tả bản cũ. Chủ dự án đọc và ngờ ngay là nguy hiểm. Tài liệu 04 Phần 8 đứng cùng phía chủ dự án, bằng đúng lý do đó: RAM chỉ đổi sau khi Apps Script xác nhận đã ghi, vì báo "đã lưu" trong khi sheet chưa có gì là rủi ro mất dữ liệu thật. **Đã gạch món đó khỏi bản kê**, giữ lại phần khóa nút Lưu, và ghi rõ luồng đúng là năm trạm của tài liệu 04 Phần 7. Đáng ghi lại vì đây là lần một bản mô tả do AI viết suýt thành yêu cầu code phạm ràng buộc cứng — cái bắt được nó là câu hỏi "tài liệu đang duyệt như thế nào", không phải bộ kiểm.
+
+### 7.12. Tìm khách kiểu Everything: tài liệu chưa từng nói, nhưng vẫn làm
+
+Chủ dự án nhớ rằng tài liệu có nói tìm khách phải như Everything (phần mềm tìm tệp trên Windows, gõ các mẩu lộn thứ tự vẫn ra). **Ký ức đó không khớp tài liệu.** Quét cả `0_Documentation/` thì chữ "Everything" không xuất hiện một lần nào; tài liệu 05 chỉ khai bó rơm tìm kiếm (chuỗi gộp mọi trường có `searchable: true`) cùng luật xếp khách còn sống trước khách đã xóa mềm. Bản cũ thì càng không: `handleSearch` của nó là một phép `includes` chuỗi liền, gõ lộn thứ tự là trắng bảng.
+
+**Vẫn làm, vì việc này đúng.** Người bán hàng nhớ tên khách theo mảnh — nhớ có chữ "Tân", nhớ có số 9 — chứ không nhớ theo thứ tự; bắt gõ đúng thứ tự là bắt nhớ cả tên, mà nhớ được cả tên thì đã không cần hộp tìm. Cách cắt mẩu nằm ở `storeSearchTokens` trong `client/ram/store.html`, ngay cạnh hàm so khớp: mỗi khoảng trắng là một mẩu, và khách khớp khi bó rơm chứa **tất cả** các mẩu ở bất kỳ đâu. Ngoặc kép bó lại thành cụm liền nhau, là đường thoát khi luật trên trả về quá nhiều — mẩu một chữ như `a` nằm trong gần như mọi tên công ty Việt. Ngoặc kép mới mở mà chưa đóng thì bị bỏ khỏi mẩu, không thì hộp tìm trắng bảng ngay ký tự đầu của một cụm còn đang gõ dở.
+
+Chỗ hở còn lại, cố ý: **không có gì trên màn hình mách rằng viết ngoặc kép thì tìm chính xác.** Chữ mời trong ô đã dài đúng bằng bề ngang 300 pixel (`Tên, mã, số điện thoại, mã số thuế…`), thêm chữ nữa là bị cắt. Ai không biết mẹo đó thì vẫn dùng được hộp tìm như thường.
+
+### 7.13. Bề ngang dropdown: nở theo mục dài nhất rồi kẹp trong khung, không bó theo ô
+
+Chủ dự án đưa ba lựa chọn — tự co dãn theo nội dung, hoặc to bằng cả sidebar, hoặc để phiên này gợi ý — và **chọn phương án thứ tư**: CSS cho nó `min-width: 100%` cộng `width: max-content` để nở theo mục dài nhất, rồi `comboSpread` trong `client/ui/combo.html` đo lúc chạy để kéo nó về trong khung.
+
+Vì sao không bó theo bề ngang ô: trường `Tỉnh thành` nằm ở cột phải của một hàng hai cột thì rộng chừng 130 pixel, mà "Thành phố Hồ Chí Minh" cần hơn thế — mọi mục dài đều bị ngắt dòng, và một danh sách hai chục mục ngắt dòng thì cao gấp đôi mà đọc khó hơn. Vì sao không để cứng bằng cả sidebar: một danh sách hai mục ngắn như `Có` / `Không` mà rộng 276 pixel thì trông như lỗi.
+
+Vì sao phần kẹp phải viết bằng JavaScript chứ không bằng `max-width`: vùng thân là hộp `overflow: hidden`, nên một danh sách rộng 260 pixel neo `left: 0` ở ô cột phải sẽ tràn khỏi mép phải và bị cắt mất **đúng phần chữ dài** — tức cắt mất chính cái mà việc nở ra định cho người dùng thấy. `max-width` chỉ giới hạn bề ngang chứ không dịch chỗ đứng, nên nó không đỡ được ca này. Lớp menu nổi đã đo `getBoundingClientRect` lúc chạy vì cùng một lý do, nên đây không phải một nếp mới trong hệ. Phép đo phải chạy **sau** khi hộp đã hiện và đã có trần chiều cao: hộp còn ẩn thì mọi phép đo trả về 0, và chưa có trần thì chưa biết nó có thanh cuộn hay không — mà có thanh cuộn thì phải cộng thêm đúng 6 pixel, không thì mục dài nhất lại bị ngắt dòng.
+
+### 7.14. Ô nhiều dòng tự cao: trần mười dòng ở CSS, chiều cao thật ở JavaScript
+
+Chủ dự án muốn ô nhiều dòng cao theo nội dung, quá mười dòng mới cuộn nội bộ. Chia làm hai tầng, cố ý: `max-height` với biến `--shin-textarea-lines` ở `.shin-textarea` giữ **trần**, còn `inputsGrow` trong `client/ui/inputs.html` chỉ đặt `height` bằng chiều cao nội dung thật. Nhờ vậy đổi trần là đổi một con số ở một chỗ, và JavaScript không cần biết mười dòng là bao nhiêu pixel.
+
+Sàn thì không phải viết dòng nào: `height: auto` trên một `textarea` trả về đúng chiều cao theo `rows`, mà thẻ đã có `rows="3"` sẵn — nên ô rỗng vẫn cao ba dòng như bản cũ. Phải xóa `height` trước khi đọc `scrollHeight` vì `scrollHeight` không bao giờ nhỏ hơn chiều cao hiện tại, không xóa thì ô chỉ cao lên được mà không thấp lại: gõ mười dòng rồi xóa sạch vẫn để lại một khe trống mười dòng.
+
+`inputsGrowAll()` gọi trong `dispatchAfter` **trước** `collapseScan()`, vì kéo một ô cao lên là khối chứa nó cao lên theo — đo phép thu gọn trước thì con số ấy là của lượt vẽ trước. Cần một lượt quét sau khi vẽ chứ không chỉ nghe mỗi cú gõ, vì lúc mở form sửa thì các ô đã có sẵn nội dung cũ mà chưa ai gõ chữ nào.

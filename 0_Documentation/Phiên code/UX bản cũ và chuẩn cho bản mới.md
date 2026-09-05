@@ -205,8 +205,8 @@ Bản mới có ba thứ bản cũ không có, và chúng đổi cách hiện th
 | Chặn hộp gợi ý của Chrome | `renderInputGuard()` đặt `autocomplete="off"` và `spellcheck="false"` vào **mọi** ô ngay lúc dựng chuỗi. Gọn hơn bản cũ: bản cũ phải quét cả DOM sau mỗi lượt vẽ vì thẻ nó viết tay trong HTML, bản mới thì mọi thẻ đi qua một hàm. |
 | Chữ chỉ đọc chọn và sao chép được | `.shin-input[readonly]` giữ nền lõm, không đổi thành chữ trơn. |
 | Đóng form từng lớp | `formScreen` mở lồng được và đóng đúng một lớp mỗi lần — bản cũ đóng tất cả `.overlay` một lượt. |
-| Nút trên dòng lịch sử chỉ hiện khi trỏ chuột | `client/style/slots.html` để ô đánh dấu và bút chì ở `opacity: 0`, hiện khi `:hover`, `:focus-within`, hoặc khi ô **đang được tích** — dòng đã chọn thì dấu tích ở lại kể cả lúc chuột đi khỏi. Giữ chỗ bằng `opacity` nên dòng chữ không giật ngang. |
-| Ô combo không mũi tên, chọn vào ô là tự bung | `client/ui/combo.html`. Hơn bản cũ ở ba chỗ: lọc **không dấu**, ô rỗng thì **không sáng dòng nào** nên Enter cho qua ô không điền bừa mục đầu, và trần cao đo lúc chạy rồi **bung lên trên** khi phía dưới hẹp — bản cũ luôn bung xuống và bị vùng thân cắt mất. |
+| Nút trên dòng lịch sử chỉ hiện khi trỏ chuột | `client/style/slots.html` để bút chì và thùng rác ở `opacity: 0`, hiện khi `:hover` hoặc `:focus-within` — đường thứ hai là để Tab tới nút nào thì nút đó sáng lên, không thì con trỏ bàn phím đi trong bóng tối. Giữ chỗ bằng `opacity` nên dòng chữ không giật ngang. Hơn bản cũ: bản cũ chỉ có bút chì, bản mới thêm thùng rác cùng chỗ cùng nếp. |
+| Ô combo không mũi tên, chọn vào ô là tự bung | `client/ui/combo.html`. Hơn bản cũ ở bốn chỗ: lọc **không dấu**, ô rỗng thì **không sáng dòng nào** nên Enter cho qua ô không điền bừa mục đầu, trần cao đo lúc chạy rồi **bung lên trên** khi phía dưới hẹp — bản cũ luôn bung xuống và bị vùng thân cắt mất — và bề ngang nở theo mục dài nhất rồi kẹp lại trong khung, xem 3.3. Chữ mời trong ô giữ đúng của bản cũ: `--Chọn--` cho ô chỉ được chọn, `--Chọn hoặc nhập--` cho ô nhập được chữ mới. |
 | Enter nhảy ô, chặng cuối là nút Lưu | `client/ui/inputs.html`. Nhường phím cho ô nhiều dòng và cho combo đang mở danh sách. |
 | Dán một khối thành cả form khách | `client/ui/inputs.html`, năm cột, số điện thoại lọc còn chữ số, ô thư điện tử chỉ nhận dòng có `@` và dấu chấm, chỗ máy tự điền nhuộm vàng cho tới khi người dùng gõ hoặc bấm vào. Neo vào ô tên công ty chứ không phải ô mã khách — xem `Câu hỏi đêm.md` 7.6. |
 | Hai giá trị một hàng | Khối thông tin chung: tên công ty một hàng, rồi `mã khách • người liên hệ` bên trái với **số điện thoại ghim mép phải**. Bốn giá trị trong hai dòng, đúng mẹo của bản cũ. Không có điện thoại thì hàng phụ về một cột chứ không để lại thẻ rỗng. |
@@ -235,9 +235,11 @@ Chỗ duy nhất trong hệ được phép cho người dùng thấy kết quả
 | Bản cũ | Bản mới | Vì sao |
 | --- | --- | --- |
 | Nút tia sét bật/tắt tự bắt ô trên Sheet | Chưa có, thuộc chặng Extension | Giữ lại, không bỏ. Ghi ở đây để chặng đó không quên đây là một nút người dùng dùng hàng ngày. |
-| Xóa giao dịch: không có | Ô đánh dấu nhiều dòng + xóa mềm + hoàn tác | Bản cũ không xóa được giao dịch. Đây là thứ bản mới thêm. |
+| Xóa giao dịch: không có | Nút thùng rác hiện lúc trỏ chuột vào dòng, cạnh nút bút chì, cùng xóa mềm và hoàn tác | Bản cũ không xóa được giao dịch. Đây là thứ bản mới thêm. Chủ dự án chốt ngày 06/09/2026 rằng nó đi theo nếp bút chì của bản cũ chứ không dùng ô đánh dấu nhiều dòng: ô đánh dấu ăn chỗ ở mọi dòng để phục vụ một việc hiếm. |
 | `alert` cho mọi lỗi | `alert` chỉ cho lỗi ngoài tầm người dùng (mạng, máy chủ) | Lỗi điền sai thì hiện tại ô. |
 | Hai nút lưu mỗi form | Một nút, ghim đáy khung | Vùng 5 giải quyết đúng vấn đề mà hai nút của bản cũ đang chữa cháy. |
 | Bôi đen giá trị cũ sau `setTimeout` 50ms | Giữ nguyên 50ms | Không có cách nào chắc chắn hơn: `select()` gọi ngay trong `focus` bị chính trình duyệt ghi đè. |
 | Thanh cuộn 4 pixel | 6 pixel | Kéo được bằng chuột. |
-| Tìm khách khớp có dấu | Khớp cả không dấu | Gõ "cty thep bac ninh" phải ra "Công ty Thép Bắc Ninh". |
+| Tìm khách khớp có dấu, khớp chuỗi liền | Khớp cả không dấu, và gõ lộn thứ tự vẫn ra | Gõ "cty thep bac ninh" phải ra "Công ty Thép Bắc Ninh", gõ "tan 9 tien" phải ra "Công ty Xây dựng Tân Tiến 9". Chủ dự án chốt ngày 06/09/2026. Cần bó cụm liền nhau thì đặt trong ngoặc kép. |
+| Ô nhiều dòng cao cố định ba dòng | Tự cao theo nội dung, trần mười dòng rồi mới cuộn nội bộ | Ghi chú dài là việc thường ngày, mà cuộn trong một ô ba dòng thì không đọc được cả đoạn. |
+| Dropdown rộng bằng ô | Nở theo mục dài nhất, kẹp trong khung sidebar | Ô "Tỉnh thành" ở cột phải rộng chừng 130 pixel, mà "Thành phố Hồ Chí Minh" cần hơn thế — mọi mục dài đều bị ngắt dòng. |

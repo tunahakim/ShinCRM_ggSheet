@@ -1,10 +1,10 @@
 <script>
 /*
- * Hai nếp gõ chung cho mọi form: **Enter nhảy sang ô kế tiếp**, và **dán một khối thành nhiều ô**.
+ * Ba nếp chung cho mọi form: **Enter nhảy sang ô kế tiếp**, **dán một khối thành nhiều ô**, và **ô nhiều dòng tự cao theo nội dung**.
  *
  * Tách khỏi `client/ui/combo.html` theo đúng ranh giới giữa `menu.html` và `dispatch.html`: bên kia là một control tự lo phần của nó, bên này là luật đi lại giữa các ô của cả form. Trộn hai việc vào một tệp thì mở ra phải đọc cả hai mới biết phím Enter chạy vào nhánh nào.
  *
- * Cả hai nếp chỉ chạm những thẻ mang `data-field`, nên ô tìm khách ở đầu sidebar — không có `data-field` — giữ nguyên nếp bàn phím riêng của nó.
+ * Hai nếp đầu chỉ chạm những thẻ mang `data-field`, nên ô tìm khách ở đầu sidebar — không có `data-field` — giữ nguyên nếp bàn phím riêng của nó.
  */
 
 /** Dấu đã gắn tai nghe. */
@@ -139,6 +139,47 @@ function inputsPaste(e) {
 }
 
 
+/* ─── Ô nhiều dòng tự cao theo nội dung ─── */
+
+/**
+ * Kéo chiều cao một ô nhiều dòng cho vừa đúng nội dung đang có.
+ *
+ * Trần **mười dòng** không nằm ở đây mà ở `.shin-textarea` trong `client/style/components.html`: hàm này chỉ đặt `height` bằng chiều cao nội dung thật, còn `max-height` bên đó tự chặn và tự bật cuộn nội bộ. Nhờ chia vậy nên đổi trần là đổi một con số ở một chỗ.
+ *
+ * Sàn thì do `rows="3"` của thẻ giữ: `height: auto` trên một `textarea` trả về đúng chiều cao ba dòng, nên `scrollHeight` không bao giờ nhỏ hơn thế và ô rỗng vẫn cao ba dòng như bản cũ.
+ *
+ * Vì sao phải xóa `height` trước khi đọc `scrollHeight`: `scrollHeight` không bao giờ nhỏ hơn chiều cao hiện tại của ô, nên không xóa thì ô chỉ cao lên được mà không thấp lại — gõ mười dòng rồi xóa sạch vẫn để lại một khe trống mười dòng.
+ *
+ * Phần cộng thêm là **hai nét viền**: ô dùng `box-sizing: border-box` nên `height` tính cả viền, còn `scrollHeight` thì không, và thiếu hai pixel đó là ô hiện thanh cuộn ngay khi vừa đủ chữ.
+ */
+function inputsGrow(el) {
+  if (!el || el.tagName !== 'TEXTAREA') { return null; }
+
+  el.style.height = 'auto';
+  el.style.height = (el.scrollHeight + el.offsetHeight - el.clientHeight) + 'px';
+  return el;
+}
+
+/** Mỗi cú gõ là đo lại. Tai nghe riêng chứ không nhồi vào `inputsUnfill`: hai việc chẳng liên quan gì nhau, gộp lại thì đọc tên hàm không đoán được nó làm gì. */
+function inputsGrowOn(e) {
+  inputsGrow(e.target);
+}
+
+/**
+ * Đo lại mọi ô nhiều dòng của màn đang mở. Gọi sau mỗi lượt vẽ, xem `dispatchAfter` trong `client/ui/dispatch.html`.
+ *
+ * Cần một lượt quét sau khi vẽ vì lúc mở form sửa, các ô đã có sẵn nội dung cũ mà chưa ai gõ chữ nào — không quét thì mọi ô đứng ở ba dòng mặc định, đúng cái nếp mà chủ dự án đang muốn bỏ.
+ */
+function inputsGrowAll() {
+  var goc = document.getElementById(DISPATCH_ROOT_ID);
+  if (!goc) { return 0; }
+
+  var tat = goc.querySelectorAll('textarea');
+  for (var i = 0; i < tat.length; i += 1) { inputsGrow(tat[i]); }
+  return tat.length;
+}
+
+
 /* ─── Nối dây ─── */
 
 function inputsInstall() {
@@ -151,6 +192,7 @@ function inputsInstall() {
   goc.addEventListener('keydown', inputsKeydown);
   goc.addEventListener('paste', inputsPaste);
   goc.addEventListener('input', inputsUnfill);
+  goc.addEventListener('input', inputsGrowOn);
   goc.addEventListener('click', inputsUnfill);
 
   goc.setAttribute(INPUTS_MARK, '1');

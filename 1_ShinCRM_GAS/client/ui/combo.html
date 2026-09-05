@@ -8,7 +8,7 @@
  *
  * Một tai nghe đặt ở khung chứ không gắn từng ô, cùng lý do với bộ phát click: mỗi lượt vẽ thay sạch ruột cả vùng nên ô nào gắn tai nghe riêng cũng mất nó ở lượt sau.
  *
- * Dòng danh sách **không mang `data-action`**: nó không phải một trong mười sáu hành động, nó chỉ điền chữ vào một ô. Tệp này tự bắt cú bấm lên dòng, còn bộ phát click thấy một cú bấm không có việc gì thì chỉ đóng menu rồi thôi.
+ * Dòng danh sách **không mang `data-action`**: nó không phải một trong mười lăm hành động, nó chỉ điền chữ vào một ô. Tệp này tự bắt cú bấm lên dòng, còn bộ phát click thấy một cú bấm không có việc gì thì chỉ đóng menu rồi thôi.
  */
 
 /** Nhịp chờ trước khi bôi đen chữ có sẵn trong ô, tính bằng milli giây. Bôi ngay lúc `focus` thì cú nhấp chuột đặt lại con trỏ ngay sau đó và xóa mất phần bôi. */
@@ -26,6 +26,9 @@ var COMBO_GAP = 8;
 /** Trần và sàn chiều cao danh sách. Sàn 96 pixel là khoảng ba dòng — thấp hơn thì cuộn trong một khe hẹp còn mệt hơn gõ thêm chữ. */
 var COMBO_LIST_MIN = 96;
 var COMBO_LIST_MAX = 220;
+
+/** Bề ngang thanh cuộn, đúng con số `client/style/frame.html` đặt cho `::-webkit-scrollbar`. Đổi ở đó thì đổi cả ở đây. */
+var COMBO_SCROLLBAR = 6;
 
 /** Dòng đang sáng, `-1` là không dòng nào. Chỉ một danh sách mở tại một lúc nên một biến là đủ. */
 var comboFocusAt = -1;
@@ -179,6 +182,36 @@ function comboFit(inp) {
   return { len: len, cao: Math.max(COMBO_LIST_MIN, Math.min(cho, COMBO_LIST_MAX)) };
 }
 
+/**
+ * Bề ngang và chỗ đứng ngang của danh sách, cũng **đo lúc chạy**.
+ *
+ * Vì sao danh sách không bó theo bề ngang ô: trường `Tỉnh thành` nằm ở cột phải của một hàng hai cột thì rộng chừng 130 pixel, mà "Thành phố Hồ Chí Minh" cần hơn thế — mọi mục dài đều bị ngắt dòng, và một danh sách hai chục mục ngắt dòng thì cao gấp đôi mà đọc khó hơn. CSS đã cho nó `width: max-content` để nở theo mục dài nhất; việc còn lại là **kéo nó về trong khung**.
+ *
+ * Phải kéo bằng JavaScript vì vùng thân là hộp `overflow: hidden`: một danh sách rộng 260 pixel neo `left: 0` ở ô cột phải sẽ tràn khỏi mép phải và bị cắt mất đúng phần chữ dài — chỗ hỏng mà `max-width` một mình không đỡ được, vì `max-width` chỉ giới hạn bề ngang chứ không dịch chỗ đứng. Cùng lý do với lớp menu nổi, chỉ khác là ở đây không cần `position: fixed` vì chỉ kẹp theo ngang.
+ *
+ * Ô nào cũng ít nhất rộng bằng chính nó (`min-width: 100%` ở CSS), và trần là bề ngang trong của vùng thân trừ hai khoảng hở.
+ */
+function comboSpread(inp, box) {
+  var than = document.getElementById(RENDER_REGIONS.body);
+  var khung = than ? than.getBoundingClientRect() : { left: 0, right: window.innerWidth };
+  var neo = (comboWrap(inp) || inp).getBoundingClientRect();
+
+  var trai = khung.left + COMBO_GAP;
+  var phai = khung.right - COMBO_GAP;
+
+  box.style.width = '';
+  box.style.left = '';
+
+  // Thanh cuộn nội bộ ăn vào lòng hộp, nên danh sách có cuộn phải rộng thêm đúng bề ngang thanh cuộn, không thì mục dài nhất bị ngắt dòng lại.
+  var them = box.scrollHeight > box.clientHeight ? COMBO_SCROLLBAR : 0;
+  var rong = Math.min(Math.max(box.getBoundingClientRect().width + them, neo.width), phai - trai);
+
+  var x = Math.min(neo.left, phai - rong);
+  if (x < trai) { x = trai; }
+
+  return { rong: rong, trai: x - neo.left };
+}
+
 /** Bỏ hết dòng sáng. Ca ô rỗng: sáng dòng đầu thì bấm Enter cho qua ô là điền bừa mục đầu tiên. */
 function comboUnmark(inp) {
   comboRows(inp).forEach(function (r) { r.classList.remove('is-active'); });
@@ -256,6 +289,12 @@ function comboPaint(inp) {
   if (do_.len) { box.classList.add('is-up'); } else { box.classList.remove('is-up'); }
   box.style.maxHeight = do_.cao + 'px';
   box.hidden = false;
+
+  // Đo bề ngang sau khi hộp đã hiện và đã có trần chiều cao: hộp còn `hidden` thì mọi phép đo trả về 0, và chưa có trần thì chưa biết nó có cuộn hay không.
+  var be = comboSpread(inp, box);
+  box.style.width = be.rong + 'px';
+  box.style.left = be.trai + 'px';
+
   inp.setAttribute('aria-expanded', 'true');
 
   if (can) { comboMark(inp, 0); } else { comboUnmark(inp); }

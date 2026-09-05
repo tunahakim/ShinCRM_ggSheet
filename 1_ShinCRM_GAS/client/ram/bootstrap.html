@@ -83,7 +83,7 @@ async function sidebarBoot() {
  */
 var BOOT_LAST_SUMMARY = null;
 
-/** Vẽ lại màn tóm tắt của lượt nạp gần nhất. Không phải một trong mười sáu hành động, nên nó không có nút nào — đường vào là console lúc nghiệm thu, và nút Nạp lại đưa màn hình về lại màn xem. */
+/** Vẽ lại màn tóm tắt của lượt nạp gần nhất. Không phải một trong mười lăm hành động, nên nó không có nút nào — đường vào là console lúc nghiệm thu, và nút Nạp lại đưa màn hình về lại màn xem. */
 function bootShowSummary() {
   if (!BOOT_LAST_SUMMARY) { return null; }
   return statusLoadSummary(BOOT_LAST_SUMMARY);

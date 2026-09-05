@@ -1,10 +1,12 @@
 <script>
 /*
- * `ACTIONS` — mười sáu hành động của cả hệ thống, tài liệu 04 Phần 7. Nhìn một phát là thấy hết những gì sidebar làm được.
+ * `ACTIONS` — mười lăm hành động của cả hệ thống, tài liệu 04 Phần 7. Nhìn một phát là thấy hết những gì sidebar làm được.
  *
  * Chữ ký `(payload) => any`, với `payload` là `{pick, value}` do bộ phát click đọc từ `data-pick` và `data-value`. Tài liệu 04 Phần 7 viết `=> void`, nhưng phần lớn hành động phải trả kết quả vẽ để bộ phát click lấy `focusId`, còn bốn núm đổi cách xem trả về Promise để nó bắt được lượt gửi thất bại — `Câu hỏi đêm.md` mục 6.1. Schema chỉ chứa **tên hàm dạng chuỗi** và engine tra bảng này, nên một tên gõ sai bị bắt lúc khởi động chứ không hiện ra dưới dạng "bấm nút không có gì xảy ra".
  *
- * Tệp này không chạm DOM và không gọi `google.script.run` trực tiếp: việc vẽ đã nằm trong `renderScreen`, còn hai việc còn lại — đặt con trỏ vào ô đầu, hiện lỗi lên mắt người — thì trả về cho bộ phát click. Nhờ vậy mười sáu thân hàm kiểm được offline, và một bảng tra tên đúng là loại chỗ mà lỗi chính tả nằm im được rất lâu.
+ * Tài liệu 04 Phần 7 khai mười lăm tên, trong đó có `deleteSelectedActivities` cho việc xóa hàng loạt; chủ dự án bỏ việc đó ngày 06/09/2026 nên tên ấy rời bảng, và `setCurrentCustomer` mà tài liệu 04 Phần 2 khai riêng vào thay chỗ. Ràng buộc của tài liệu là bảng **đóng và tra theo tên**, không phải bảng có đúng bao nhiêu dòng.
+ *
+ * Tệp này không chạm DOM và không gọi `google.script.run` trực tiếp: việc vẽ đã nằm trong `renderScreen`, còn hai việc còn lại — đặt con trỏ vào ô đầu, hiện lỗi lên mắt người — thì trả về cho bộ phát click. Nhờ vậy mọi thân hàm kiểm được offline, và một bảng tra tên đúng là loại chỗ mà lỗi chính tả nằm im được rất lâu.
  */
 
 var ACTIONS = {};
@@ -144,10 +146,6 @@ ACTIONS.cancelForm = function () {
 
 /* ─── Xóa mềm và hoàn tác ─── */
 
-ACTIONS.deleteSelectedActivities = function () {
-  actionsChuaDung('Xóa dòng đã chọn', '1.4');
-};
-
 ACTIONS.deleteActivity = function (payload) {
   actionsPick(payload, 'Xóa giao dịch');
   actionsChuaDung('Xóa một giao dịch', '1.4');
@@ -166,6 +164,6 @@ ACTIONS.setCurrentCustomer = function (payload) {
 };
 
 
-/** Mười sáu tên, tính từ chính bảng. Phép kiểm khởi động và các thông báo lỗi đều đọc ở đây, nên không có bản danh sách thứ hai để lệch. */
+/** Mười lăm tên, tính từ chính bảng. Phép kiểm khởi động và các thông báo lỗi đều đọc ở đây, nên không có bản danh sách thứ hai để lệch. */
 var ACTIONS_NAMES = Object.keys(ACTIONS);
 </script>

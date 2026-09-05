@@ -11,12 +11,12 @@ const { section, check, ghiDat, ghiTruot, ghiLoiNap } = require('../lib/assert')
 /** Bốn màn, để duyệt chứ không gõ lại tên ở từng phép kiểm. */
 const MAN = ['view', 'customerForm', 'activityForm', 'noteForm'];
 
-/** Mười lăm tên hành động của tài liệu 04 Phần 7, cộng `setCurrentCustomer` mà tài liệu 04 Phần 2 khai riêng. */
+/** Tên hành động của tài liệu 04 Phần 7, trừ `deleteSelectedActivities` mà chủ dự án bỏ ngày 06/09/2026, cộng `setCurrentCustomer` mà tài liệu 04 Phần 2 khai riêng. */
 const TEN_HANH_DONG = [
   'toggleFollowSelection', 'toggleAutoRenderView', 'toggleSearchPanel', 'setActivityView',
   'renderActiveViewSheet', 'reloadAll', 'openCustomerForm', 'openCustomerFormBlank',
   'openActivityForm', 'openNoteForm', 'saveForm', 'cancelForm',
-  'deleteSelectedActivities', 'deleteActivity', 'undoDelete', 'setCurrentCustomer'
+  'deleteActivity', 'undoDelete', 'setCurrentCustomer'
 ];
 
 /** Mọi node trong một cây Block, kể cả con của con. */

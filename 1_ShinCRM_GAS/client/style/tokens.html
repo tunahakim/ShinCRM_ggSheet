@@ -22,6 +22,10 @@
   --shin-bg-hover: #eef1f5;
   --shin-border: #dfe3e8;
   --shin-border-strong: #c3cad3;
+  /* Vạch mờ nhất của thang: dùng để **chia** chứ không để **khoanh**. Đường ngăn hai dòng lịch sử và gạch dưới tiêu đề card
+     đều lấy màu này — đậm hơn một nấc thì vài chục dòng liền nhau nhìn ra thành một bảng kẻ ô, đúng chỗ chủ dự án nói "mỗi
+     lịch sử lại ở trong một khung chữ nhật bo viền". Bản cũ đặt #f1f3f4 cho đúng việc này. */
+  --shin-border-faint: #f1f3f4;
   --shin-text: #1f2933;
   --shin-text-soft: #52606d;
   --shin-text-faint: #7b8794;
@@ -58,6 +62,13 @@
   --shin-radius: 6px;
   --shin-radius-sm: 4px;
   --shin-shadow: 0 1px 3px rgba(31, 41, 51, 0.12);
+  /* Bóng của card: nhạt hơn hẳn bóng của lớp nổi. Card không nổi lên trên gì cả, nó chỉ cần **tách khỏi nền lõm** của vùng
+     thân; một cái bóng thật thì mười cái card xếp dọc thành mười lớp kính chồng nhau. */
+  --shin-shadow-card: 0 1px 2px rgba(31, 41, 51, 0.06);
+
+  /* Trần chiều cao ô nhập nhiều dòng, tính bằng **số dòng chữ**. Chủ dự án chốt mười: dưới trần thì ô tự cao theo nội dung,
+     quá trần mới sinh thanh cuộn nội bộ. Để ở đây vì cả CSS lẫn phần tự cao của `client/ui/inputs.html` đều đo theo nó. */
+  --shin-textarea-lines: 10;
 
   /* Số đo của khung. Vùng header và dải tiến trình cao cố định, nên chúng là biến chứ không phải số gõ trong bố cục. */
   --shin-header-height: 40px;

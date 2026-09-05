@@ -18,13 +18,8 @@ Ba điều kiện nghiệm thu, thiếu một là chưa xong:
 
 **Chặng 1.2 — còn một việc:** nhánh dự phòng của thang gói (`bootChunkWithFallback` ở `client/ram/bootstrap.html`) chưa có đường kiểm tự động. Thang chính thì đã chạy thật rồi — lượt nạp trên Sheet DEV chia 10.000 giao dịch thành 5 gói. Nhánh dự phòng chỉ chạm tới khi một gói thật sự quá to, nên nó chờ một lượt nạp cố tình hạ cỡ gói xuống.
 
-**Chặng 1.3 — vẽ được form.** Bộ máy giao diện đã đủ để bấm, và bản triển khai trên Sheet DEV đang ở @24. Ưu tiên chủ dự án chốt cho phần còn lại: sidebar phải **nhìn đúng bằng mắt thường** và **chuyển được giữa các màn hình bằng nút**, trước mọi việc khác.
-- [ ] Đường tự soi bố cục ngay tại máy, ở bề rộng 300 pixel đúng như sidebar thật
-- [ ] Soát và sửa bố cục màn xem cùng ba màn form cho vừa 300 pixel — sửa CSS, không sửa bản khai
-- [ ] Hộp tìm khách: khi Extension chưa nối thì đây là đường duy nhất bấm ra được một khách, nên nó thuộc ưu tiên một chứ không phải việc để sau. Kèm các nếp bàn phím của code cũ sang dạng `SLOTS`/`ACTIONS`: dán tự tách trường, dropdown, Enter nhảy ô, dọn số điện thoại
-- [ ] Nghiệm thu bằng mắt chủ dự án trên Sheet DEV thật: bấm hết mười sáu hành động, mở và đóng ba màn form, thử cả đường menu và đường thu gọn
-- [ ] Món nợ ca kiểm, làm sau khi đã nhìn xong: một DOM giả tối thiểu đủ để gọi `dispatchPayload`, `menuMark`, `menuItemElement` và ba nấc của `collapseApply`
-- [ ] Soát ngược mọi `[RÀNG BUỘC CỨNG]` của tài liệu 04 cho phần giao diện
+**Chặng 1.3 — vẽ được form.** Bộ máy giao diện đã đủ để bấm, đã có đường tự soi bố cục tại máy (`node tests/preview.js`), hộp tìm khách chạy được, và một lượt sửa bố cục theo bản kê nhận xét của chủ dự án ngày 06/09/2026. Còn đúng một việc:
+- [ ] Nghiệm thu bằng mắt chủ dự án trên Sheet DEV thật: bấm hết mười lăm hành động, mở và đóng ba màn form, thử cả đường menu và đường thu gọn
 
 **Chặng 1.4 — lưu được:** `client/save/saveFlow.html`, `server/gate/` cửa ghi, `server/FieldLogic`, xóa mềm và hoàn tác.
 
