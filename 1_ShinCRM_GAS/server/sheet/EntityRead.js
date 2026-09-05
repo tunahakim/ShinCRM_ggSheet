@@ -20,6 +20,19 @@ function entityReadFields(entity) {
 }
 
 /**
+ * Số hàng dữ liệu của một thực thể, không đọc ô nào.
+ *
+ * Có hàm riêng thay vì hỏi `entityReadContext(entity).rowCount` vì `loadCore` chỉ cần **con số** để báo cho dải tiến trình biết mẫu số, mà dựng cả bối cảnh thì tốn thêm một lệnh đọc hàng 1 và một lệnh hỏi múi giờ — hai lệnh gọi mạng cho một câu hỏi đã trả lời được bằng `getLastRow`.
+ */
+function entityRowCount(entity) {
+  var sheetName = ENTITY_SHEETS[entity];
+  if (!sheetName) {
+    throw new Error('Không có sheet khai cho thực thể "' + entity + '" trong ENTITY_SHEETS.');
+  }
+  return sheetGridDataRowCount(shinOpenSheet(sheetName), SHEET_FIRST_DATA_ROW);
+}
+
+/**
  * Gom sẵn mọi thứ cần cho việc đọc một thực thể: sheet, bảng tra mã cột, múi giờ tệp, và bảng chỉ số cột theo tên trường.
  *
  * Tách ra thành một hàm riêng vì đây là phần **đắt và không đổi** của phép đọc: mở sheet, đọc cả hàng 1, hỏi múi giờ tệp. Nạp giao dịch chia thành nhiều gói, nên nếu mỗi gói tự dựng lại mấy thứ này thì một tệp mười gói tốn thêm ba mươi lệnh gọi mạng cho cùng một câu trả lời. Dựng một lần rồi truyền vào từng gói.
