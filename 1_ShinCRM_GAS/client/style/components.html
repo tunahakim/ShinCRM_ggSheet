@@ -225,9 +225,14 @@
 
 /* --- Chip -------------------------------------------------------- */
 
-/* Màu theo **danh mục**, không theo giá trị: `@CAT_UU_TIEN` ra một màu cho cả bốn mức, nên thêm một mức mới vào sheet `Category` thì không phải sửa CSS. Danh mục không có lớp riêng thì chip xám. */
+/*
+  Màu theo **danh mục**, không theo giá trị: `@CAT_UU_TIEN` ra một màu cho cả bốn mức, nên thêm một mức mới vào sheet `Category` thì không phải sửa CSS. Danh mục không có lớp riêng thì chip xám.
+
+  `flex: 0 0 auto` cho chip **co theo chữ của nó**, thắng luật chia đều của `.shin-row > *` nhờ nằm sau trong tệp. Không có nó thì chip "Đã xóa" nằm cạnh tên công ty ăn đúng nửa bề ngang, và tên công ty — thứ dài nhất, quan trọng nhất trên khối thông tin chung — bị ép còn một nửa của 276 pixel.
+*/
 .shin-badge {
   display: inline-block;
+  flex: 0 0 auto;
   max-width: 100%;
   padding: 1px var(--shin-gap-2);
   border-radius: 999px;
@@ -238,6 +243,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Giá trị ghim mép phải của một hàng hai cột: số điện thoại luôn ở đúng một chỗ nên mắt tìm được mà không phải đọc. */
+.shin-text-right { text-align: right; }
 
 .shin-badge-cong-viec { background: var(--shin-primary-soft); color: var(--shin-primary-dark); }
 .shin-badge-uu-tien { background: var(--shin-warn-soft); color: var(--shin-warn); }

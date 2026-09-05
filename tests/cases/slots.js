@@ -158,17 +158,26 @@ function chay(so) {
     chuCua(hop.SLOTS.searchSuggestions(ctxCua(hop, '', { search: [hop.Store.getCustomer('CUS-000003')] }))),
     ['(chưa có tên)', 'CUS-000003']);
 
-  // Khối thông tin chung.
+  // Khối thông tin chung. Hàng phụ chia hai cột để số điện thoại ghim mép phải — mẹo tiết kiệm chiều cao của bản cũ.
   check(so, 'chưa chọn khách thì khối thông tin chung cũng nói chưa chọn khách',
     chuCua(hop.SLOTS.infoBarContent(ctxCua(hop, ''))), ['Chưa chọn khách hàng nào.']);
 
-  check(so, 'khối thông tin chung: tên công ty, rồi mã khách • người liên hệ • điện thoại',
+  check(so, 'khối thông tin chung: tên công ty, rồi mã khách • người liên hệ bên trái và điện thoại ghim mép phải',
     chuCua(hop.SLOTS.infoBarContent(ctxCua(hop, 'CUS-000001'))),
-    ['Công ty Thép Hòa Phát', 'CUS-000001 • Anh Tuấn • 0912345678']);
+    ['Công ty Thép Hòa Phát', 'CUS-000001 • Anh Tuấn', '0912345678']);
+
+  check(so, 'điện thoại nằm ở cột phải, nhận đúng lớp ghim mép phải',
+    moiNode(hop.SLOTS.infoBarContent(ctxCua(hop, 'CUS-000001')), [])
+      .filter((n) => n.className && n.className.indexOf('shin-text-right') !== -1).map((n) => n.text),
+    ['0912345678']);
 
   check(so, 'khách đã xóa mềm thì khối thông tin chung có chip "Đã xóa"',
     chuCua(hop.SLOTS.infoBarContent(ctxCua(hop, 'CUS-000002'))),
-    ['Thép Việt Đức', 'Đã xóa', 'CUS-000002 • 0987654321']);
+    ['Thép Việt Đức', 'Đã xóa', 'CUS-000002', '0987654321']);
+
+  // Không có điện thoại thì hàng phụ về một cột, chứ không để lại một thẻ rỗng ở mép phải.
+  check(so, 'khách chưa có điện thoại thì hàng phụ không sinh cột phải rỗng',
+    chuCua(hop.SLOTS.infoBarContent(ctxCua(hop, 'CUS-000003'))).length, 2);
 
   check(so, 'khối thông tin chung cũng không mang field nào',
     moiNode(hop.SLOTS.infoBarContent(ctxCua(hop, 'CUS-000001')), []).filter((n) => n.field).length, 0);

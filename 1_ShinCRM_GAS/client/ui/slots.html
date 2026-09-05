@@ -101,6 +101,8 @@ SLOTS.searchSuggestions = function (ctx) {
 /**
  * Khối thông tin chung: đang làm việc cho khách nào. Tài liệu 03 Phần 8 — bật ở ba màn để người dùng luôn thấy.
  *
+ * Hàng phụ chia **hai cột**, đúng mẹo tiết kiệm chiều cao của bản cũ: mã khách với người liên hệ bên trái, số điện thoại ghim mép phải. Số điện thoại là thứ hay phải chép ra nhất, nên nó được một chỗ cố định để mắt tìm mà không phải đọc hết dòng.
+ *
  * Khách đã xóa mềm thì thêm chip "Đã xóa". Việc khóa ba cửa mở form là của `ACTIONS`, không phải của slot này — slot chỉ hiện, không chặn.
  */
 SLOTS.infoBarContent = function (ctx) {
@@ -112,10 +114,12 @@ SLOTS.infoBarContent = function (ctx) {
     dong.push(Text({ text: 'Đã xóa', className: 'shin-badge shin-badge-deleted' }));
   }
 
-  var phu = [ban.id];
-  if (ban.contactPerson) { phu.push(ban.contactPerson); }
-  if (ban.phone) { phu.push(ban.phone); }
+  var trai = [ban.id];
+  if (ban.contactPerson) { trai.push(ban.contactPerson); }
+  var chuTrai = Text({ text: trai.join(' • '), className: 'shin-info-meta' });
 
-  return [Row(dong), Text({ text: phu.join(' • '), className: 'shin-info-meta' })];
+  return [Row(dong), ban.phone
+    ? Row([chuTrai, Text({ text: ban.phone, className: 'shin-info-meta shin-text-right' })])
+    : chuTrai];
 };
 </script>
