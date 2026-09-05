@@ -35,6 +35,8 @@ function smokeDiag() {
   console.log(report);
   return report;
 }
+
+/** In ra một dòng để xác nhận đường ống chạy được, kèm phép đối chiếu ID tệp đang mở. */
 function smokeTest() {
   var file = shinOpenBook();
   var actualId = file.getId();

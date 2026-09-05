@@ -3,8 +3,7 @@
   "projectId": "test-project-cho-claude-opus",
   "rootDir": "",
   "scriptExtensions": [
-    ".gs",
-    ".js"
+    ".gs"
   ],
   "htmlExtensions": [
     ".html"
