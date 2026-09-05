@@ -21,7 +21,7 @@ Hai đầu đắt vì hai lý do khác nhau. Gói nhỏ trả tiền cho số v�
 
 **Đã làm: đặt 2.000, và vẫn dựng đường lùi như chủ dự án yêu cầu** — bậc thang 2.000 → 500 → 200. Gói nào thất bại thì gọi lại **đúng con trỏ đó** với cỡ nhỏ hơn, hết bậc mới ném lỗi. Đường lùi vẫn cần dù 2.000 đã đo là an toàn, vì phép đo nói lên chi phí trung bình còn thứ giết một lượt nạp là ca xấu nhất: một giao dịch có ô ghi chú vài nghìn chữ làm gói chứa nó nặng gấp nhiều lần gói thường.
 
-**Cần chủ dự án xác nhận:** giữ 2.000, hay vẫn muốn 10.000 dù đo được là chậm hơn. Đổi thì sửa `SETTINGS.CHUNK_ROWS` ở `server/config/Settings.js` và con số ghim ở `tests/cases/settings.js`.
+**Cần chủ dự án xác nhận:** giữ 2.000, hay vẫn muốn 10.000 dù đo được là chậm hơn. Đổi thì sửa `SETTINGS.CHUNK_ROWS` ở `server/config/Settings.js` và con số ghim ở `tests/cases/settings.js`. Đọc mục 3 trước khi quyết — phép đo trên chỉ tính phần máy chủ, và phần còn lại có thể xóa gần hết khoảng cách giữa hai lựa chọn.
 
 ## 2. Câu hỏi "chọn thế nào thì hiển thị lên sidebar nhanh nhất" — cỡ gói không phải câu trả lời
 
@@ -40,6 +40,19 @@ Muốn khung hình đầu tiên nhanh hơn thì phải cắt vào chính 680 KB 
 
 **Đang chọn: không làm gì**, và ghi lại ở đây để chủ dự án biết có ba đường.
 
-## 3. Phần vẫn chưa đo được
+## 3. Cột thời gian trong sheet `Log` đọc ra một nửa sự thật — đã dựng đồng hồ đủ, còn chờ một lượt mở sidebar
 
-Tiền đi đường của `google.script.run` mỗi vòng, và thời gian trình duyệt bung một gói. Cả hai nằm phía sidebar nên phải mở sidebar thật trên Google mới đo được, và lúc đó cần chủ dự án ngồi ở máy. Nếu tiền đi đường mỗi vòng lớn — vài giây một vòng như tài liệu 05 dự đoán — thì nó cộng vào **từng** gói, và lúc đó gói to có lợi hơn phần thắng 16 giây mà phép đo phía máy chủ thấy. Đo xong mới kết luận được, và đây là lý do con số 2.000 nên được xem là chốt tạm chứ không phải chốt hẳn.
+Chủ dự án chờ 30 giây tới 1 phút, sheet `Log` ghi 3–4 giây. Không con số nào trong đó sai, nhưng cả bảng nói sai chuyện: `loadCore.ms` là thời gian tính toán bên trong **một** lời gọi, `msGoiCuoi` là gói **cuối** trong năm gói. Cả hai đều không thấy tiền đi đường của `google.script.run`, không thấy trình duyệt bung khối 680 KB, và không cộng sáu vòng lại thành một con số.
+
+Thời gian thật vẫn nằm trong bảng log cũ, ở cột `Lúc`: khoảng cách giữa dòng `loadCore` và dòng `loadActivityChunk` của cùng lượt là 22, 29, 44 và 33 giây. Cộng thêm phần `loadCore` tự báo thì cả lượt là 26 đến 74 giây — đúng khoảng chủ dự án cảm nhận.
+
+Máy chủ không đo được phần còn lại, vì chỉ trình duyệt thấy được cả hai đầu một vòng gọi. Nay sidebar tự đo và ghi một dòng `sidebarBoot` gồm năm con số: tổng, tới khung hình đầu tiên, máy chủ tính toán, tiền đi đường, trình duyệt bung và vẽ. Ba con số sau cộng lại bằng tổng.
+
+**Cần chủ dự án mở sidebar một lượt** rồi gửi lại dòng `sidebarBoot`. Con số `msDiDuongMoiVong` trong đó là thứ chốt được mục 1. Ước lượng thô từ bốn dòng log cũ là 2–3 giây mỗi vòng, và nếu đúng khoảng đó thì phép cộng ra thế này:
+
+| | Vòng gọi | Máy chủ tính toán | Tiền đi đường ước tính | Cộng |
+|---|---|---|---|---|
+| Gói 2.000 | 6 | 16,2 s | 12–18 s | 28–34 s |
+| Gói 10.000 | 2 | 27,0 s | 4–6 s | 31–33 s |
+
+Tức hai bên gần bằng nhau, không phải "2.000 nhanh hơn 50 phần trăm" như phép đo phía máy chủ một mình nói. Phần thắng 10,8 giây của gói 2.000 gần như bị bốn vòng gọi thêm ăn hết. Đây là lý do con số 2.000 vẫn là chốt tạm: nó không sai, nhưng nó cũng không hơn 10.000 đủ nhiều để đáng bỏ qua ca xấu nhất mà gói to gặp phải.
