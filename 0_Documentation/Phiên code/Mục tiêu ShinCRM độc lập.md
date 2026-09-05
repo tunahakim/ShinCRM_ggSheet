@@ -18,16 +18,14 @@ Ba điều kiện nghiệm thu, thiếu một là chưa xong:
 
 **Chặng 1.2 — còn một việc:** thang gói dự phòng phía client (`bootChunkLadder`, `bootChunkWithFallback` ở `client/ram/bootstrap.html`) chưa có đường kiểm tự động, phải mở sidebar thật mới chạm tới.
 
-**Chặng 1.3 — vẽ được form:**
-- [ ] `client/ui/renderEngine.html` — vẽ đệ quy, `renderTarget`, chống nháy bằng cách dựng cả chuỗi rồi gán một lần
-- [ ] `client/ui/icons.html` — chín glyph SVG nội tuyến
-- [ ] `client/ui/actions.html` và `client/ui/slots.html` — hai bảng tra, kèm phép kiểm tên lúc khởi động
-- [ ] `client/schema/uiSchema.html` — bốn màn
-- [ ] `client/schema/fieldLogic.html` — sáu luật `DEFAULTS`
-- [ ] `client/ram/screenState.html` — `currentCustomerId`, `screen`, `formStack`
-- [ ] Bốn tệp `client/screen/`
-- [ ] Bổ sung phép kiểm menu vào `client/schema/schemaCheck.html`
-- [ ] Bê các nếp bàn phím của code cũ sang dạng `SLOTS`/`ACTIONS`: dán tự tách trường, dropdown, Enter nhảy ô, dọn số điện thoại
+**Chặng 1.3 — vẽ được form.** Thứ tự dưới đây đổi so với bản trước vì phần lớn thân hàm của `ACTIONS` phải gọi vào hai tệp màn, dựng bảng trước là dựng vỏ rỗng không kiểm được — `Câu hỏi đêm.md` mục 4.5.
+- [ ] `client/screen/formScreen.html` — mở, đóng, lồng form; tiêu đề suy từ bản ghi
+- [ ] `client/ui/actions.html` — bảng `ACTIONS` mười sáu hành động, kèm phép kiểm tên lúc khởi động
+- [ ] Bộ phát click: một tai nghe đặt ở khung, tìm `[data-action]` gần nhất, gọi `ACTIONS[tên]`
+- [ ] `client/ui/menu.html` và `client/ui/collapse.html` — hai nửa chạm DOM mà engine cố ý không nhận, xem `Câu hỏi đêm.md` mục 2.1
+- [ ] Hộp tìm kiếm, và bê các nếp bàn phím của code cũ sang dạng `SLOTS`/`ACTIONS`: dán tự tách trường, dropdown, Enter nhảy ô, dọn số điện thoại
+- [ ] Bổ sung phép kiểm `UI_SCHEMA` và menu vào `client/schema/schemaCheck.html`
+- [ ] Nối các tệp mới vào danh sách `include` của `client/Sidebar.html`, và đổi lượt vẽ cuối của `sidebarBoot()` từ `statusLoadSummary` sang `screenViewGo()`
 
 **Chặng 1.4 — lưu được:** `client/save/saveFlow.html`, `server/gate/` cửa ghi, `server/FieldLogic`, xóa mềm và hoàn tác.
 

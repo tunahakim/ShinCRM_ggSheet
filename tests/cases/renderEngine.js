@@ -7,14 +7,7 @@
 const { napClient, taoHopCat } = require('../lib/load-gas');
 const { dungHop } = require('../lib/dung-hop');
 const { section, check, checkThrows, ghiLoiNap } = require('../lib/assert');
-
-/** Bốn vùng khung giả, đủ để `renderScreen` và `renderTarget` chạy mà không cần mở sidebar trên Google. */
-function khungGia(themId) {
-  const els = {};
-  ['sidebar-header', 'sidebar-info', 'sidebar-body', 'sidebar-footer'].concat(themId || [])
-    .forEach((id) => { els[id] = { id: id, innerHTML: '', hidden: false }; });
-  return { _els: els, getElementById: (id) => els[id] || null };
-}
+const { khungGia } = require('../lib/khung-gia');
 
 function chay(so) {
   section('renderEngine — thoát ký tự và spatialConfig thành style');

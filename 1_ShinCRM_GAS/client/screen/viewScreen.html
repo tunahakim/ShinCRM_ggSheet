@@ -1,0 +1,68 @@
+<script>
+/*
+ * Màn xem khách — màn mặc định của sidebar. Tài liệu 03 Phần 8, tài liệu 04 Phần 6.
+ *
+ * Tệp này biết **khi nào vẽ lại cái gì**, không biết vẽ ra sao: bố cục ở `UI_SCHEMA`, nội dung động ở `SLOTS`, chuỗi HTML ở `renderEngine`. Nó cũng là chỗ duy nhất nối `ScreenState.currentCustomerId` với `Store`, vì cả màn này lẫn bảng `ACTIONS` đều cần câu trả lời "khách đang xem là bản ghi nào".
+ */
+
+/** Phải khớp `id` của card lịch sử khai trong `UI_SCHEMA.view`. Bộ kiểm so hai bên với nhau, nên hai bản không lệch nhau âm thầm được. */
+var SCREEN_VIEW_HISTORY_ID = 'shin-card-history';
+
+/**
+ * Bản ghi khách đang xem. `null` chỉ có một nghĩa: **chưa chọn khách nào**.
+ *
+ * Có mã mà mã đó không tra ra bản ghi thì để lỗi của `Store.getCustomer` bay lên, không đổi thành `null` — tài liệu 05 Phần 9 **`[RÀNG BUỘC CỨNG]`**. Đổi thành `null` là vẽ ra một khách trắng, và người dùng sẽ tưởng khách vừa mất dữ liệu thay vì biết bản đồ dòng đã cũ.
+ */
+function screenViewCustomer() {
+  var id = ScreenState.currentCustomerId;
+  if (!id) { return null; }
+  return Store.getCustomer(id);
+}
+
+/** Khách đang xem đã xóa mềm hay chưa. Ba cửa mở form đóng lại theo câu trả lời này — tài liệu 03 Phần 8. */
+function screenViewDeleted() {
+  var ban = screenViewCustomer();
+  return !!ban && (ban.recordStatus || STORE_ACTIVE) === STORE_DELETED;
+}
+
+/** Bản ghi cho lượt vẽ. `search` có mặt sẵn dù rỗng, để hộp gợi ý có đúng một khóa để đổ kết quả vào rồi vẽ lại vùng của nó. */
+function screenViewRecords() {
+  return { customer: screenViewCustomer(), search: [] };
+}
+
+/**
+ * Vẽ cả màn xem, trả về bốn chuỗi engine vừa dựng.
+ *
+ * Đổi khách thì vẽ cả màn chứ không chỉ vẽ lại card lịch sử: khối thông tin chung và card ghi chú cũng đổi theo khách, vẽ lại một trong ba thì hai cái kia đứng ở dữ liệu của khách cũ.
+ */
+function screenViewRender() {
+  return renderScreen(screenBuild(UI_SCHEMA.view, 'view'), { records: screenViewRecords() });
+}
+
+/** Về màn xem rồi vẽ. Dùng ở cuối trình tự khởi động, sau khi đóng hết form, và sau khi lưu xong. */
+function screenViewGo() {
+  screenStateGoView();
+  return screenViewRender();
+}
+
+/**
+ * Vẽ lại riêng card lịch sử — đường của nấc xem và của lúc nạp giao dịch xong.
+ *
+ * Đang mở form thì bỏ qua chứ không ném lỗi: card đó không có trên màn, và nấc mới sẽ hiện đúng khi quay về màn xem.
+ */
+function screenViewActivityCard() {
+  if (ScreenState.screen !== SCREEN_VIEW) { return null; }
+  return renderTarget(SCREEN_VIEW_HISTORY_ID);
+}
+
+/**
+ * Đổi khách đang xem rồi vẽ. Đây là đích của cả hai nguồn-chọn: Extension bắt click ô, và hộp gợi ý tìm khách.
+ *
+ * Đang mở form thì chỉ đổi số chứ không vẽ. Người dùng đang gõ dở, mà bản nháp chỉ được cất khi có bộ thu thập — giật màn dưới chân họ lúc này là mất những gì vừa gõ.
+ */
+function screenViewSetCustomer(id) {
+  screenStateSetCustomer(id);
+  if (ScreenState.screen !== SCREEN_VIEW) { return null; }
+  return screenViewRender();
+}
+</script>

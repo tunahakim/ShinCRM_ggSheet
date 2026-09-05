@@ -85,3 +85,35 @@ Tài liệu 04 Phần 4B nói mục con vẽ dấu tích "theo trạng thái đa
 ### 3.10. Giá trị lạ trong `UserProperties` rơi về ngầm định, kể cả với công tắc bật tắt
 
 Trước khi sửa, nhánh đọc núm nhiều nấc trả về ngầm định khi gặp giá trị lạ, còn nhánh công tắc bật tắt thì mọi thứ không phải `'true'` đều thành `false` — kể cả chuỗi rác. **Đang chọn: cả hai nhánh rơi về ngầm định**, để luật phát biểu được thành một câu. Đổi lại là một chuỗi rác trong `prefFollowSelection` bây giờ cho ra `true` chứ không phải `false`. Chấp nhận được vì `userPrefsWrite` kiểm trước khi ghi, nên giá trị lạ chỉ vào được kho đó nếu có người sửa tay `UserProperties`; và cả hai núm này chỉ đổi *khi nào* vẽ, không đổi dữ liệu nào, nên không có giá trị nào là chiều nguy hiểm. **Đây là chỗ tôi sửa hành vi code đang chạy, không phải chỗ tôi khai thêm luật mới** — nếu chủ dự án muốn công tắc rơi về `false` thì nói một câu là đổi lại được.
+
+## 4. Màn xem khách — sáu chỗ tự quyết
+
+Sáu chỗ gặp khi dựng `client/screen/viewScreen.html` ngày 06/09/2026. Năm chỗ đầu đã chọn xong và code đang chạy theo; chỗ thứ sáu là việc chưa dựng, ghi ra để lúc dựng không phải quyết lại.
+
+### 4.1. Đổi khách thì vẽ lại CẢ màn, không vẽ lại riêng card lịch sử
+
+Tài liệu 04:94 nói "danh sách lịch sử làm việc đổi khi chọn khách khác", đọc thẳng thì thành `renderTarget` một card. Nhưng khối thông tin chung và card ghi chú cũng đổi theo khách — vẽ lại một trong ba thì hai cái kia đứng ở dữ liệu khách cũ, mà đó là kiểu hỏng người dùng tin theo chứ không nhận ra. **Đang chọn: `renderScreen` cả màn.** Không đắt hơn đáng kể vì bốn chuỗi vẫn dựng trong bộ nhớ rồi gán một lượt, tức luật chống nháy vẫn nguyên. `renderTarget` riêng card lịch sử vẫn dùng, nhưng chỉ cho hai đường thật của nó: đổi nấc xem, và nạp xong gói giao dịch.
+
+### 4.2. Đang mở form thì đổi khách chỉ đổi số, không vẽ
+
+`screenState.html:32` nói rõ cấm hay cho phép đổi khách lúc đang gõ dở là quyết định của hành động. Bản nháp chỉ cất được khi có bộ thu thập, mà bộ thu thập thuộc chặng 1.4. **Đang chọn: `screenViewSetCustomer` cập nhật `currentCustomerId` rồi trả `null` không vẽ gì.** Hệ quả phải ghi ra: khối thông tin chung đứng ở khách cũ suốt thời gian form còn mở, và người dùng thấy tên một khách trong khi form sẽ lưu vào khách khác. Khi có bộ thu thập ở chặng 1.4 thì đường đúng là cất nháp rồi vẽ lại — lúc đó xóa hẳn cách tạm này.
+
+### 4.3. Mã khách không tra ra bản ghi thì để lỗi bay lên, không đổi thành rỗng
+
+Tôi viết `screenViewCustomer` trả `null` cho mã không còn trong RAM, lấy lý do là ca thật sau một lượt nạp lại mà khách đã bị xóa hẳn. Sai: tài liệu 05 Phần 9 **`[RÀNG BUỘC CỨNG]`** chọn hướng ngược lại, và lý do của nó đúng hơn lý do của tôi — trả về rỗng thì màn hiện một khách trắng và người dùng tưởng khách mất dữ liệu, thay vì biết bản đồ dòng đã cũ. **Đang chọn: chỉ trả `null` khi chưa chọn khách nào; có mã mà tra không ra thì để lỗi bay lên.**
+
+Chỗ này để lại một việc thật cho chặng sau: mã khách đang xem trỏ tới một khách vừa bị xóa hẳn khỏi sheet thì lượt vẽ kế tiếp sẽ nổ. Người có thẩm quyền dọn là `reloadAll` — nó là chỗ duy nhất RAM đổi cả khối, nên một phép kiểm ở đó rẻ hơn một phép kiểm ở mọi lượt vẽ. Tài liệu 05:173 cũng xếp luật này về phía tài liệu làm mới dữ liệu.
+
+### 4.4. Trình tự khởi động vẽ màn xem, `statusLoadSummary` giữ lại nhưng chưa có cửa gọi
+
+`sidebarBoot()` đang kết thúc bằng `statusLoadSummary(...)`, và `statusScreen.html` tự nói hai lần rằng màn tóm tắt này là màn tạm, sẽ thay bằng màn xem thật. **Đang chọn: khởi động vẽ màn xem**, còn `statusLoadSummary` giữ nguyên hàm để chạy nghiệm thu gọi được. Câu hỏi còn lại: về lâu dài màn tóm tắt lượt nạp ở đâu — một mục trong menu, hay xóa hẳn? Tôi không tự thêm mục menu vì mục menu là thứ người dùng nhìn thấy.
+
+### 4.5. Thứ tự dựng chặng 1.3 đổi so với tài liệu mục tiêu
+
+`Mục tiêu ShinCRM độc lập.md` xếp `actions.html` trước. Nhưng phần lớn trong 16 thân hàm của `ACTIONS` phải gọi vào `viewScreen`/`formScreen`, nên dựng bảng trước là dựng 16 cái vỏ rỗng không kiểm được. **Đang chọn thứ tự: `viewScreen` → `formScreen` → `actions` → bộ phát click → `menu` + `collapse` → hộp tìm kiếm và các nếp bàn phím → phép kiểm `UI_SCHEMA` vào `schemaCheck`.** Thứ tự trong một chặng không phải luật có trong tài liệu thiết kế, nên đây là chỗ được phép tự sắp.
+
+### 4.6. Hộp tìm kiếm không phải một `field`, nên chưa biết nó ở đâu
+
+`Sidebar.html:32` nói hộp tìm kiếm thuộc vùng header. Nhưng `Block` không có vai `input`, `screenBar` chỉ sinh ra `Button` và `Icon`, và hộp tìm kiếm không phải một trường của `DATA_SCHEMA` nên không dựng bằng `Field` được. Thêm nữa tài liệu 04:94 đòi danh sách gợi ý vẽ lại theo từng chữ gõ **mà không mất con trỏ**, tức thẻ `input` phải nằm *ngoài* vùng bị vẽ lại.
+
+Ba đường: thêm vai thứ chín cho `Block`; hoặc coi hộp tìm kiếm là đồ khung cố định trong `Sidebar.html` (giống `sidebar-progress`) do một tệp `client/ui/search.html` chạm DOM điều khiển, cùng loại với `menu.html` và `collapse.html`; hoặc một `Block` bọc mà slot của nó sinh ra thẻ `input`. **Chưa chọn** — để lại tới bước dựng hộp tìm kiếm, vì hai bước trước nó không phụ thuộc câu trả lời. Nghiêng về đường thứ hai: nó giữ được luật con trỏ mà không phải nới hình dạng `Block` cho một trường hợp duy nhất.
