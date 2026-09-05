@@ -45,10 +45,19 @@ function tenKhaiBao(code) {
   return ten;
 }
 
-/** Đọc phần mã thật của một tệp: tệp `.html` thì cắt ruột thẻ `<script>`, tệp `.js` thì lấy nguyên. */
+/**
+ * Đọc phần mã thật của một tệp: tệp `.html` thì cắt ruột thẻ `<script>`, tệp `.js` thì lấy nguyên.
+ *
+ * Tệp client chỉ có `<style>` — `client/ui/tokens.html` và `client/ui/frame.html` — không khai tên nào nên trả về chuỗi rỗng. Nhưng tệp **không có cả hai** thẻ thì ném lỗi: một tệp client rỗng ruột là tệp bị nhúng vào trang mà chẳng đưa gì vào, và nó sẽ lặng lẽ không làm gì thay vì báo lỗi ở chỗ dùng.
+ */
 function docMa(duongDanTuongDoi) {
   const raw = fs.readFileSync(path.join(GAS_DIR, duongDanTuongDoi), 'utf8');
-  return duongDanTuongDoi.endsWith('.html') ? catRuotScript(raw, duongDanTuongDoi) : raw;
+  if (!duongDanTuongDoi.endsWith('.html')) { return raw; }
+
+  if (/<script\b/i.test(raw)) { return catRuotScript(raw, duongDanTuongDoi); }
+  if (/<style\b/i.test(raw)) { return ''; }
+
+  throw new Error('Tệp client "' + duongDanTuongDoi + '" không có thẻ <script> cũng không có thẻ <style>. Nhúng nó vào trang thì không đưa gì vào cả.');
 }
 
 /** Kiểm một vùng tên: không tên nào được khai ở hai tệp. */
