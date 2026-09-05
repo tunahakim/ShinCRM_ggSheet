@@ -12,10 +12,17 @@
  *   3. Khóa LockService để hai lời gọi không ghi chồng lên nhau.
  */
 
-/** Danh sách trắng: tên hàm mà cửa này được phép chạy. Thêm tên vào đây là việc có ý thức, không phải việc tình cờ. */
+/**
+ * Danh sách trắng: tên hàm mà cửa này được phép chạy. Thêm tên vào đây là việc có ý thức, không phải việc tình cờ.
+ *
+ * Xếp theo tầng, cùng thứ tự với đường nạp thật: dựng sheet, rồi các phép đọc lẻ, rồi cả đường nạp, rồi khung sidebar. Chạy lần lượt từ trên xuống thì hỏng ở đâu là biết tầng nào hỏng, thay vì chỉ biết "sidebar không mở".
+ */
 var DEV_RUNNER_ALLOWED = [
   'smokeTest', 'smokeDiag', 'setupSheets', 'verifySheets', 'measureDeleteRows',
-  'dumpColumnMap', 'probeBadColumnCode', 'dumpSettings', 'probeLogGate', 'dumpSheetGrid'
+  'dumpColumnMap', 'dumpSettings', 'dumpSheetGrid',
+  'probeBadColumnCode', 'probeLogGate', 'probeDateText', 'probeSheetGrid', 'probeCellBudget',
+  'probeEntityRead', 'probeCategoryRead', 'probeConfigRead', 'probeDirtyState',
+  'probeErrorReport', 'probeEntryPoint', 'probeLoadAll', 'probeSidebarTemplate'
 ];
 
 /**
