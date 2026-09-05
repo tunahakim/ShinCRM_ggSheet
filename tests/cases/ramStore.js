@@ -136,6 +136,35 @@ function chayTraCuu(so, nen, hop, hangDau) {
   check(so, 'chuỗi rỗng trả về rỗng chứ không trả cả danh sách', hop.Store.searchCustomers('  '), []);
   check(so, 'limit cắt đúng số lượng', hop.Store.searchCustomers('dong a', 1).length, 1);
 
+  // Ghế dành riêng cho khách đã xóa. Chủ dự án gặp đúng ca này ngày 06/09/2026: gõ tên thì khách đã xóa không ra, gõ số
+  // điện thoại thì ra. Không phải lỗi so khớp — tên khớp nhiều khách còn sống hơn `limit`, nên phép cắt xén mất khách đã
+  // xóa nằm cuối danh sách, mà người dùng thì không có cách nào biết là danh sách đã bị cắt.
+  check(so, 'khách đã xóa vẫn lên tới danh sách dù truy vấn khớp nhiều khách còn sống hơn cả limit',
+    (() => {
+      const rieng = dungClient();
+      rieng.Schema = hop.Schema;
+      rieng.storeReset();
+      for (let i = 1; i <= 40; i += 1) {
+        rieng.Store.upsertRecord('customer', { id: 'KHS' + i, companyName: 'Thép Đồng Tâm ' + i, recordStatus: 'active' });
+      }
+      rieng.Store.upsertRecord('customer', { id: 'KHX1', companyName: 'Thép Đồng Tâm cũ', recordStatus: 'deleted' });
+      const ra = rieng.Store.searchCustomers('dong tam', 20);
+      return [ra.length, ra.filter((k) => k.recordStatus === 'deleted').map((k) => k.id)];
+    })(),
+    [20, ['KHX1']]);
+
+  check(so, 'không có khách đã xóa nào khớp thì không để trống ghế nào — limit vẫn đầy khách còn sống',
+    (() => {
+      const rieng = dungClient();
+      rieng.Schema = hop.Schema;
+      rieng.storeReset();
+      for (let i = 1; i <= 40; i += 1) {
+        rieng.Store.upsertRecord('customer', { id: 'KHS' + i, companyName: 'Thép Đồng Tâm ' + i, recordStatus: 'active' });
+      }
+      return rieng.Store.searchCustomers('dong tam', 20).length;
+    })(),
+    20);
+
   // Gõ lộn thứ tự, và ngoặc kép để bó cụm. Chủ dự án chốt ngày 06/09/2026: tìm phải như Everything.
   check(so, 'gõ các mẩu lộn thứ tự vẫn ra khách — bắt gõ đúng thứ tự tên là bắt nhớ cả tên',
     hop.Store.searchCustomers('a dung xay').map((k) => k.id), ['KH0001']);

@@ -16,7 +16,7 @@
 var DATA_SCHEMA = {
 
   customer: {
-    id: { code: '@CUS_MA_KH', type: 'TEXT', label: 'Mã khách', readonly: true, default: 'nextCustomerCode' },
+    id: { code: '@CUS_MA_KH', type: 'TEXT', label: 'Mã khách', readonly: true, searchable: true, default: 'nextCustomerCode' },
     companyName: { code: '@CUS_TEN_CTY', type: 'TEXT', label: 'Tên công ty', required: true, searchable: true },
     taxNumber: { code: '@CUS_MST', type: 'TEXT', label: 'Mã số thuế', unique: true, searchable: true, normalize: 'codeLike', validate: 'taxNumberFormat' },
     phone: { code: '@CUS_SDT', type: 'TEXT', label: 'Điện thoại', searchable: true, normalize: 'codeLike' },

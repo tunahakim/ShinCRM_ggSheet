@@ -27,34 +27,58 @@ function slotFilterActivities(list, nac) {
   return list.filter(function (a) { return (a.recordStatus || STORE_ACTIVE) === muon; });
 }
 
+/** Số dòng nội dung một giao dịch hiện ra trước khi thu gọn. Chủ dự án chốt khoảng mười tới mười lăm ngày 06/09/2026, mười hai là giữa thang. */
+var SLOT_ACTIVITY_LINES = 12;
+
 /**
- * Ba mẩu chữ đầu một dòng lịch sử, **mỗi mẩu một node riêng** chứ không nối thành một chuỗi.
+ * Nhóm bên trái của hàng đầu: ngày, chip "Đã xóa" nếu có, rồi tên sản phẩm.
  *
- * Vì sao không nối: ngày là mốc để mắt nhảy dọc, loại việc là thứ để phân nhóm, giá trị hợp đồng là con số đáng chú ý nhất — bản cũ cho ba thứ đó ba màu khác nhau (ngày xanh, loại việc chip xanh lá, giá trị đỏ) và nhờ vậy quét mắt xuống ba chục dòng vẫn thấy ngay dòng nào là đơn chốt. Nối thành `'03/09 • Chốt đơn • 1.200.000 đ'` thì cả ba cùng một màu xám, và cái dấu `•` chiếm chỗ mà không nói gì.
+ * Ngày xanh đậm là mốc để mắt nhảy dọc, sản phẩm đỏ đậm là thứ để phân loại nhanh — đúng cặp `.tx-date` với `.tx-prod` của bản cũ. **Không có cột giá trị hợp đồng**: chủ dự án bỏ nó ngày 06/09/2026, vì một dòng lịch sử là để nhớ đã nói gì với khách, còn tiền thì tra ở form.
  */
-function slotActivityHead(a) {
+function slotActivityLeft(a, daXoa) {
   var phan = [Text({ text: valueTextDate(a.workDate), className: 'shin-act-date' })];
-  if (a.taskType) { phan.push(Text({ text: a.taskType, className: 'shin-act-type' })); }
-  if (a.contractValue) { phan.push(Text({ text: valueTextNumber(a.contractValue) + ' đ', className: 'shin-act-value' })); }
-  return phan;
+  if (daXoa) { phan.push(Text({ text: 'Đã xóa', className: 'shin-badge shin-badge-deleted' })); }
+  if (a.product) { phan.push(Text({ text: a.product, className: 'shin-act-prod' })); }
+  return Block({ className: 'shin-act-left', elements: phan });
 }
 
 /**
- * Một dòng lịch sử: hàng đầu là ngày/loại việc/giá trị cộng hai nút, hàng dưới là nội dung.
+ * Nhóm bên phải của hàng đầu: chip loại việc, rồi thùng rác, rồi **bút chì ngoài cùng**.
+ *
+ * Bút chì ngoài cùng là chỗ chủ dự án chỉ ra ngày 06/09/2026, và nó đúng: sửa là việc làm mười lần thì xóa mới một lần, nên cái hay bấm phải là cái gần mép nhất, còn cái xóa được thì phải nằm sâu hơn một nhịp.
+ *
+ * Hai nút mang `className` riêng thay vì để CSS đếm thứ tự bằng `.shin-icon + .shin-icon`. Đếm thứ tự thì hôm nay đổi chỗ hai nút là mai màu đỏ nhảy sang cái bút chì.
+ */
+function slotActivityRight(a) {
+  var phan = [];
+  if (a.taskType) { phan.push(Text({ text: a.taskType, className: 'shin-act-type' })); }
+  phan.push(Icon({ icon: 'trash', tooltip: 'Xóa giao dịch', action: 'deleteActivity', pick: a.id, className: 'shin-act-del' }));
+  phan.push(Icon({ icon: 'pencil', tooltip: 'Sửa giao dịch', action: 'openActivityForm', pick: a.id, className: 'shin-act-edit' }));
+  return Block({ className: 'shin-act-right', elements: phan });
+}
+
+/**
+ * Một dòng lịch sử: hàng đầu chia **hai nhóm ghim hai mép**, hàng dưới là nội dung có trần chiều cao.
+ *
+ * Hai nhóm chứ không phải một hàng phẳng, đúng cặp `.tx-meta-left` với nhóm phải của bản cũ. Một hàng phẳng thì mọi mẩu chữ cùng đứng cạnh nhau và hai cái nút bị đẩy tràn khỏi mép card — chính cái chủ dự án chụp ảnh chỉ ra. Hai nhóm thì nhóm phải luôn ghim mép phải, và lúc trỏ chuột vào thì hai nút hiện ra **đẩy chip loại việc co vào**, đúng nếp bản cũ.
  *
  * **Hai nút bút chì và thùng rác, chỉ hiện khi trỏ chuột vào dòng** — không có ô đánh dấu và không có nút xóa hàng loạt. Chủ dự án chốt vậy 06/09/2026: ô đánh dấu ăn chỗ ở mọi dòng để phục vụ một việc hiếm, còn xóa hàng loạt thì bắt người dùng làm hai bước (tích rồi bấm) cho việc mà chín phần mười lần chỉ xóa một dòng. Nút nằm ngay trên dòng cần xóa nên không có đường nhấn sai dòng.
+ *
+ * Nội dung khai `overflow: 'collapse'` nên một giao dịch dài bị cắt ở `SLOT_ACTIVITY_LINES` dòng và `client/ui/collapse.html` gắn nút "Xem thêm" cho riêng dòng đó. Thu gọn chứ không cuộn nội bộ: một khung cuộn lồng trong khung cuộn của vùng thân sẽ ăn mất cú lăn chuột đang muốn cuộn cả danh sách.
  */
 function slotActivityRow(a) {
   var daXoa = (a.recordStatus || STORE_ACTIVE) === STORE_DELETED;
-  var dau = slotActivityHead(a);
-
-  if (daXoa) { dau.push(Text({ text: 'Đã xóa', className: 'shin-badge shin-badge-deleted' })); }
-  dau.push(Icon({ icon: 'pencil', tooltip: 'Sửa giao dịch', action: 'openActivityForm', pick: a.id, align: 'right' }));
-  dau.push(Icon({ icon: 'trash', tooltip: 'Xóa giao dịch', action: 'deleteActivity', pick: a.id }));
 
   return Block({
     className: 'shin-act-row' + (daXoa ? ' shin-act-deleted' : ''),
-    elements: [Row(dau), Text({ text: a.content || '', className: 'shin-act-content' })]
+    elements: [
+      Row({ className: 'shin-act-head', elements: [slotActivityLeft(a, daXoa), slotActivityRight(a)] }),
+      Text({
+        text: a.content || '',
+        className: 'shin-act-content',
+        spatialConfig: { overflow: 'collapse', collapsedLines: SLOT_ACTIVITY_LINES }
+      })
+    ]
   });
 }
 

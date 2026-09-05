@@ -15,10 +15,11 @@ const KHACH = [
   { id: 'CUS-000003', companyName: '', taxNumber: '', recordStatus: 'active' }
 ];
 
+/** Ba giao dịch dùng cho cả nhóm ca. ACT-000002 vẫn giữ `contractValue` để chứng minh dòng lịch sử **không** vẽ tiền nữa, còn ACT-000001 để trống sản phẩm để chứng minh node sản phẩm không sinh ra khi rỗng. */
 const GIAO_DICH = [
-  { id: 'ACT-000001', customerId: 'CUS-000001', workDate: '2026-09-01', taskType: 'Gọi điện', content: 'Chào hàng lần đầu', contractValue: '', recordStatus: 'active' },
-  { id: 'ACT-000002', customerId: 'CUS-000001', workDate: '2026-09-03', taskType: 'Chốt đơn', content: 'Khách đồng ý giá', contractValue: 1200000, recordStatus: 'active' },
-  { id: 'ACT-000003', customerId: 'CUS-000001', workDate: '2026-09-02', taskType: 'Gửi báo giá', content: 'Gửi bản chào\nkèm chiết khấu', contractValue: 0, recordStatus: 'deleted' }
+  { id: 'ACT-000001', customerId: 'CUS-000001', workDate: '2026-09-01', taskType: 'Gọi điện', product: '', content: 'Chào hàng lần đầu', contractValue: '', recordStatus: 'active' },
+  { id: 'ACT-000002', customerId: 'CUS-000001', workDate: '2026-09-03', taskType: 'Chốt đơn', product: 'Thép hộp', content: 'Khách đồng ý giá', contractValue: 1200000, recordStatus: 'active' },
+  { id: 'ACT-000003', customerId: 'CUS-000001', workDate: '2026-09-02', taskType: 'Gửi báo giá', product: 'Thép tấm', content: 'Gửi bản chào\nkèm chiết khấu', contractValue: 0, recordStatus: 'deleted' }
 ];
 
 /** Mọi node trong một mảng Block, kể cả con của con. */
@@ -92,7 +93,7 @@ function chay(so) {
   check(so, 'nấc "chỉ đã xóa" mà khách không có bản ghi đã xóa thì nói riêng chuyện đó',
     chuCua(nacXoa.SLOTS.activityList(ctxCua(nacXoa, 'CUS-000002'))), ['Khách này không có giao dịch nào đã xóa.']);
 
-  // Ba nấc lọc, trên cùng một khách có ba giao dịch mà một đã xóa mềm. Mã dòng đọc ở nút bút chì — dòng không còn ô đánh dấu.
+  // Ba nấc lọc, trên cùng một khách có ba giao dịch mà một đã xóa mềm. Mã dòng đọc ở nút đầu tiên của dòng — nay là thùng rác, vì bút sửa đã dời ra ngoài cùng.
   const dem = (h) => {
     const ra = h.SLOTS.activityList(ctxCua(h, 'CUS-000001'));
     return ra.filter((n) => n.role === 'box').map((row) => moiNode([row], []).filter((n) => n.role === 'icon')[0].pick);
@@ -110,33 +111,45 @@ function chay(so) {
     [moiNode(tatCa, []).filter((n) => n.role === 'check').length, tatCa.filter((n) => n.role === 'button').length],
     [0, 0]);
 
-  // Một dòng đầy đủ: ba mẩu chữ đầu dòng là **ba node riêng**, vì ba màu của bản cũ nằm ở ba lớp khác nhau.
-  check(so, 'dòng đầy đủ: ngày kiểu Việt, loại việc, tiền có dấu chấm nghìn, rồi nội dung ở dòng riêng',
-    chuCua([tatCa[0]]), ['03/09/2026', 'Chốt đơn', '1.200.000 đ', 'Khách đồng ý giá']);
-  check(so, 'giá trị hợp đồng rỗng thì không sinh node giá trị',
+  // Hàng đầu chia **hai nhóm ghim hai mép**, đúng bố cục `.tx-meta` của bản cũ. Bản trước xếp một hàng phẳng rồi đẩy nút
+  // bằng `margin-left: auto`, nên tổng bề ngang vượt lòng card là cái thùng rác lòi ra ngoài mép — chủ dự án chụp ảnh chỉ ra.
+  check(so, 'hàng đầu chia hai nhóm ghim hai mép, không phải một hàng phẳng',
+    moiNode([tatCa[0]], []).filter((n) => n.role === 'box' || n.role === 'row').map((n) => n.className),
+    ['shin-act-row', 'shin-act-head', 'shin-act-left', 'shin-act-right']);
+
+  // Chủ dự án bỏ cột tiền khỏi dòng lịch sử ngày 06/09/2026: một dòng lịch sử là để nhớ đã nói gì với khách, tiền thì tra ở form.
+  check(so, 'dòng đầy đủ: ngày kiểu Việt, sản phẩm, chip loại việc, rồi nội dung ở dòng riêng',
+    chuCua([tatCa[0]]), ['03/09/2026', 'Thép hộp', 'Chốt đơn', 'Khách đồng ý giá']);
+  check(so, 'không dòng nào vẽ giá trị hợp đồng nữa, dù bản ghi vẫn có số tiền',
+    chuCua(tatCa).filter((t) => t.indexOf('1.200.000') !== -1), []);
+  check(so, 'giao dịch chưa ghi sản phẩm thì không sinh node sản phẩm, không để lại chỗ trống',
     chuCua([tatCa[2]]), ['01/09/2026', 'Gọi điện', 'Chào hàng lần đầu']);
-  check(so, 'giá trị hợp đồng bằng 0 cũng không sinh node — 0 đồng là chưa có hợp đồng',
-    chuCua([tatCa[1]]), ['02/09/2026', 'Gửi báo giá', 'Đã xóa', 'Gửi bản chào\nkèm chiết khấu']);
 
   check(so, 'ba mẩu chữ đầu dòng mang ba lớp riêng — gộp chúng thành một chuỗi là mất luôn ba màu',
     moiNode([tatCa[0]], []).filter((n) => n.role === 'text').map((n) => n.className),
-    ['shin-act-date', 'shin-act-type', 'shin-act-value', 'shin-act-content']);
+    ['shin-act-date', 'shin-act-prod', 'shin-act-type', 'shin-act-content']);
+
+  // Chủ dự án chốt trần mười tới mười lăm dòng cho mỗi giao dịch ngày 06/09/2026. Không có trần thì một giao dịch dài đẩy cả danh sách xuống dưới màn hình.
+  check(so, 'nội dung mỗi giao dịch có trần chiều cao nên giao dịch dài tự sinh nút "Xem thêm" của riêng nó',
+    (() => { const t = moiNode([tatCa[1]], []).filter((n) => n.className === 'shin-act-content')[0]; return [t.spatialConfig.overflow, t.spatialConfig.collapsedLines]; })(),
+    ['collapse', 12]);
 
   check(so, 'nội dung giao dịch nằm ở dòng riêng, giữ nguyên dấu xuống dòng người dùng gõ',
     chuCua([tatCa[1]]).slice(-1)[0], 'Gửi bản chào\nkèm chiết khấu');
 
   check(so, 'dòng đã xóa mềm mang class gạch ngang, và có chip "Đã xóa"',
-    [tatCa[1].className, chuCua([tatCa[1]])[2]], ['shin-act-row shin-act-deleted', 'Đã xóa']);
+    [tatCa[1].className, chuCua([tatCa[1]])[1]], ['shin-act-row shin-act-deleted', 'Đã xóa']);
   check(so, 'dòng còn dùng không mang class gạch ngang và không có chip',
     [tatCa[0].className, chuCua([tatCa[0]]).indexOf('Đã xóa')], ['shin-act-row', -1]);
 
-  check(so, 'bút sửa của mỗi dòng mang mã giao dịch của chính dòng đó, nằm bên phải',
-    (() => { const b = moiNode([tatCa[0]], []).filter((n) => n.role === 'icon')[0]; return [b.icon, b.action, b.pick, b.align]; })(),
-    ['pencil', 'openActivityForm', 'ACT-000002', 'right']);
+  // Chủ dự án chốt ngày 06/09/2026: bút sửa ra ngoài cùng. Sửa là việc làm mười lần thì xóa mới một lần, nên cái hay bấm phải gần mép nhất.
+  check(so, 'bút sửa là nút ngoài cùng bên phải, mang mã giao dịch của chính dòng đó',
+    (() => { const ic = moiNode([tatCa[0]], []).filter((n) => n.role === 'icon'); const b = ic[ic.length - 1]; return [b.icon, b.action, b.pick, b.className]; })(),
+    ['pencil', 'openActivityForm', 'ACT-000002', 'shin-act-edit']);
 
-  check(so, 'cạnh bút sửa là thùng rác của chính dòng đó — xóa một dòng là một cú bấm, không phải tích rồi bấm',
-    (() => { const b = moiNode([tatCa[0]], []).filter((n) => n.role === 'icon')[1]; return [b.icon, b.action, b.pick]; })(),
-    ['trash', 'deleteActivity', 'ACT-000002']);
+  check(so, 'thùng rác đứng trước bút sửa, và mang lớp màu riêng chứ không nhờ CSS đếm thứ tự',
+    (() => { const ic = moiNode([tatCa[0]], []).filter((n) => n.role === 'icon'); return [ic.map((n) => n.icon), ic[0].action, ic[0].pick, ic[0].className]; })(),
+    [['trash', 'pencil'], 'deleteActivity', 'ACT-000002', 'shin-act-del']);
 
   // Luật cứng của danh sách: không node nào mang `field`, vì engine tra một bản ghi cho một thực thể.
   check(so, 'không dòng nào mang field — bộ thu thập lúc lưu không bao giờ thấy danh sách này',

@@ -160,18 +160,27 @@ function storeSearchTokens(query) {
 }
 
 /**
+ * Số ghế dành riêng cho khách đã xóa mềm trong một lượt kết quả tìm.
+ *
+ * Có nó vì không có nó thì cùng một hộp tìm kiếm trả lời hai kiểu: gõ tên công ty ra bốn chục khách còn sống nên khách đã
+ * xóa bị cắt mất, còn gõ số điện thoại chỉ ra một khách nên khách đã xóa hiện lên. Chủ dự án gặp đúng ca đó và gọi nó là
+ * lỗi — đúng, vì người dùng không có cách nào biết là danh sách đã bị cắt.
+ *
+ * Ba ghế chứ không phải nửa danh sách: khách đã xóa là thứ đi tìm để hoàn tác hoặc để biết vì sao trùng, không phải thứ
+ * để đọc cả trang.
+ */
+var STORE_SEARCH_DELETED_SLOTS = 3;
+
+/**
  * Tìm khách theo chuỗi gõ vào: **khách còn sống trước, rồi tới khách đã xóa**, cắt tới `limit`. Tài liệu 05 Phần 9.
  *
  * Phép so khớp là **mọi mẩu đều phải có mặt**, xem `storeSearchTokens` để biết cách cắt mẩu và cách viết ngoặc kép.
  *
- * Hai điểm dễ làm sai, cả hai đều nằm ở đây:
- *
  * **Không được dừng lượt duyệt khi đã đủ `limit` kết quả.** Kết quả khớp sớm chưa chắc là kết quả sẽ được giữ — một khách
  * đã xóa khớp ở đầu chỉ mục vẫn phải nhường chỗ cho một khách còn sống khớp ở cuối chỉ mục.
  *
- * Nếu riêng khách còn sống đã vượt `limit` thì khách đã xóa không lên tới danh sách. Chấp nhận: đi tìm một khách đã xóa cụ
- * thể thì người dùng gõ một truy vấn cụ thể, còn để khách đã xóa chen vào giữa lúc gõ dở thì hộp tìm kiếm đắt hơn nhiều lần
- * cái nó đổi được.
+ * Phép cắt để dành `STORE_SEARCH_DELETED_SLOTS` ghế cuối cho khách đã xóa, và chỉ để dành khi có khách đã xóa để ngồi vào.
+ * Nhờ vậy hễ một khách đã xóa khớp truy vấn thì nó lên tới danh sách, dù truy vấn đó khớp bao nhiêu khách còn sống.
  *
  * Phần tử trả về là **bản ghi khách**, nên nơi vẽ đã có sẵn `recordStatus` để dán nhãn "Đã xóa" mà không tra thêm lần nào.
  */
@@ -192,7 +201,11 @@ Store.searchCustomers = function (query, limit) {
     if (customer.recordStatus === STORE_DELETED) { deleted.push(customer); } else { alive.push(customer); }
   });
 
-  return alive.concat(deleted).slice(0, limit || alive.length + deleted.length);
+  if (!limit || alive.length + deleted.length <= limit) { return alive.concat(deleted); }
+
+  var ghe = Math.min(STORE_SEARCH_DELETED_SLOTS, deleted.length, Math.floor(limit / 2));
+  var laySong = Math.max(0, Math.min(alive.length, limit - ghe));
+  return alive.slice(0, laySong).concat(deleted.slice(0, limit - laySong));
 };
 
 /**

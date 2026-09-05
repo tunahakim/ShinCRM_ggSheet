@@ -114,10 +114,24 @@ function collapseScan() {
   return ket;
 }
 
-/** Lật nấc của khối chứa nút vừa bấm, rồi đo lại chính khối đó. */
+/**
+ * Khối mà nút này thuộc về: tra **hai bên cạnh nút**, không tra cả trong cha.
+ *
+ * `collapseApply` luôn gắn nút sát khối — nút "Xem thêm" đứng liền sau khối, còn cặp nút "Thu gọn" đứng liền trước và liền sau. Nên hai anh em liền kề là chỗ duy nhất cần tra.
+ *
+ * Bản trước tra bằng `cha.querySelector('[data-collapse]')`, tức lấy khối **đầu tiên** trong cha. Nó chạy đúng chỉ nhờ mỗi cha đang chứa vừa đúng một khối thu gọn được. Từ lượt này mỗi dòng lịch sử cũng thu gọn được, nên chỉ cần một ngày nào có hai khối chung một cha là mọi nút cùng lật khối đầu — đúng loại lỗi im lặng khó tìm nhất.
+ */
+function collapseOwner(nut) {
+  var truoc = nut.previousElementSibling;
+  if (truoc && truoc.hasAttribute && truoc.hasAttribute('data-collapse')) { return truoc; }
+  var sau = nut.nextElementSibling;
+  if (sau && sau.hasAttribute && sau.hasAttribute('data-collapse')) { return sau; }
+  return null;
+}
+
+/** Lật nấc của khối cạnh nút vừa bấm, rồi đo lại chính khối đó. */
 function collapseToggle(nut) {
-  var cha = nut.parentNode;
-  var el = cha ? cha.querySelector('[data-collapse]') : null;
+  var el = collapseOwner(nut);
   if (!el) { return null; }
 
   if (nut.getAttribute('data-collapse-btn') === 'open') { collapseFree(el, true); } else { collapseShut(el); }
