@@ -1,0 +1,129 @@
+<script>
+/*
+ * Viên gạch duy nhất của giao diện: `Block`, cộng sáu hàm điền sẵn tham số cho nó. Tài liệu 04 Phần 4.
+ *
+ * Tệp này **không vẽ gì và không chạm DOM**. Nó nhận một object khai, chặn mọi khóa không có tên, rồi trả về một node đã chuẩn hóa; việc dịch node thành HTML là của `renderEngine`. Tách hai việc vì phép kiểm khai báo phải chạy được không cần DOM — nhờ vậy bộ kiểm offline gọi được đúng hàm thật, còn nếu trộn vào chỗ dựng HTML thì cả cụm chỉ nghiệm thu được bằng cách mở sidebar thật trên Google.
+ */
+
+/**
+ * Bảy vai của một Block. Vai quyết định phần lá mà `renderEngine` vẽ.
+ *
+ * Đây **không** phải khóa `tag` mà tài liệu 04 Phần 4 cấm. `tag` là để người khai schema gõ thẳng tên thẻ HTML; còn `role` do chính sáu hàm dựng đặt, người khai schema không bao giờ gõ tới nó. Có vai thì phần lá là một lựa chọn duy nhất và tra được; nếu suy theo tổ hợp khóa nào đang có mặt thì một Block mang cả `field` lẫn `icon` là một ca không ai định nghĩa.
+ */
+var BLOCK_ROLES = ['box', 'card', 'row', 'text', 'field', 'button', 'icon'];
+
+/** Khóa dùng được ở mọi vai: đúng sáu khóa của bảng trong tài liệu 04 Phần 4, cộng `label` vì nút, icon và trường đều có chữ hiện ra. */
+var BLOCK_KEYS_COMMON = ['id', 'className', 'spatialConfig', 'action', 'menu', 'elements', 'label'];
+
+/** Khóa riêng của từng vai. Vai không có tên trong bảng này thì chỉ dùng được khóa chung. */
+var BLOCK_KEYS_BY_ROLE = {
+  card: ['title', 'titleActions'],
+  text: ['text'],
+  field: ['field', 'control', 'readonly', 'width'],
+  icon: ['icon', 'tooltip', 'align'],
+  button: ['align']
+};
+
+/**
+ * Chặn khóa lạ ngay lúc dựng cây thay vì để nó rơi vào im lặng.
+ *
+ * Đây là chỗ hiện thực luật "không có khóa `style` tự do" của tài liệu 04 Phần 4. Gõ sai tên khóa — `spatialconfig` thay vì `spatialConfig` — mà không ai chặn thì lỗi hiện ra dưới dạng "sửa schema mà bố cục không đổi", loại lỗi tệ nhất cho người không đọc được code.
+ */
+function blockCheckKeys(role, spec) {
+  var choPhep = BLOCK_KEYS_COMMON.concat(BLOCK_KEYS_BY_ROLE[role] || []);
+  Object.keys(spec).forEach(function (khoa) {
+    if (choPhep.indexOf(khoa) === -1) {
+      throw new Error('Block vai "' + role + '" không có khóa "' + khoa + '". Các khóa dùng được: ' + choPhep.join(', ') + '.');
+    }
+  });
+}
+
+/** Gộp khóa viết tắt `width` của tài liệu 03 Phần 8 vào `spatialConfig`, để mỗi node chỉ có đúng một nơi nói về không gian. Khai độ rộng ở cả hai nơi là mâu thuẫn nên chặn, không tự chọn bên nào. */
+function blockSpatial(spec) {
+  var kg = {};
+  var khai = spec.spatialConfig || {};
+  Object.keys(khai).forEach(function (k) { kg[k] = khai[k]; });
+  if (spec.width !== undefined) {
+    if (kg.width !== undefined) { throw new Error('Block khai độ rộng ở hai nơi: `width` và `spatialConfig.width`. Chọn một.'); }
+    kg.width = spec.width;
+  }
+  return kg;
+}
+
+/**
+ * Chuẩn hóa `elements`: **một mảng node**, hoặc **một chuỗi tên hàm trong bảng `SLOTS`** — tài liệu 04 Phần 6.
+ *
+ * Một chuỗi trần nằm trong mảng thì bị chặn: "tên trường" và "tên slot" là hai thứ khác nhau, để engine đoán là mở đường cho một trường gõ sai tên lặng lẽ thành một slot không tồn tại.
+ */
+function blockElements(elements) {
+  if (elements === undefined || elements === null) { return null; }
+  if (typeof elements === 'string') { return elements; }
+  if (!Array.isArray(elements)) {
+    throw new Error('`elements` phải là mảng Block hoặc một chuỗi tên hàm trong bảng SLOTS, đang nhận kiểu ' + typeof elements + '.');
+  }
+  return elements.map(function (con, i) {
+    if (!con || typeof con !== 'object' || BLOCK_ROLES.indexOf(con.role) === -1) {
+      throw new Error('Phần tử thứ ' + (i + 1) + ' trong `elements` không phải Block. Dựng nó bằng Card, Row, Text, Field, Button hoặc Icon; chuỗi trần chỉ dùng được khi cả `elements` là tên slot.');
+    }
+    return con;
+  });
+}
+
+/**
+ * Dựng một node đã chuẩn hóa. Mọi hàm dựng khác đều đi qua đây, nên đây là chỗ duy nhất biết hình dạng một node.
+ *
+ * Node nào cũng mang đủ mười bảy khóa, kể cả khóa không có nghĩa với vai của nó — `text` trên một Card chẳng hạn. Cố ý: engine đọc thẳng `node.field` mà không phải hỏi khóa có tồn tại không, và một hình dạng duy nhất thì không có ca nào để đoán.
+ *
+ * `menu` đi qua đây **nguyên trạng**. Phép kiểm "một mục không được vừa mang `toggle` vừa mang `value`" thuộc bộ tự kiểm lúc khởi động ở `schemaCheck`, cùng đường với phép kiểm tên hàm, vì chỗ đó quét cả `UI_SCHEMA` và báo hết lỗi một lượt bằng tiếng người — còn chặn ở đây thì mỗi lần chỉ thấy đúng một lỗi, lúc vẽ.
+ */
+function Block(spec, role) {
+  var y = spec || {};
+  var vai = role || 'box';
+  if (BLOCK_ROLES.indexOf(vai) === -1) {
+    throw new Error('Vai Block "' + vai + '" không có. Các vai: ' + BLOCK_ROLES.join(', ') + '.');
+  }
+  blockCheckKeys(vai, y);
+
+  return {
+    role: vai,
+    id: y.id || null,
+    className: y.className || '',
+    spatialConfig: blockSpatial(y),
+    action: y.action || null,
+    menu: y.menu || null,
+    elements: blockElements(y.elements),
+    label: y.label === undefined ? null : y.label,
+    title: y.title === undefined ? null : y.title,
+    titleActions: y.titleActions || null,
+    text: y.text === undefined ? null : y.text,
+    field: y.field || null,
+    control: y.control || null,
+    readonly: y.readonly === true,
+    icon: y.icon || null,
+    tooltip: y.tooltip || null,
+    align: y.align || 'left'
+  };
+}
+
+/** Khối có khung và có tiêu đề, `titleActions` là hàng hành động trên tiêu đề — và nó là **mảng** kể cả khi có đúng một mục, tài liệu 04 Phần 4B. */
+function Card(spec) { return Block(spec, 'card'); }
+
+/** Một hàng ngang. Nhận thẳng mảng con cho gọn, vì một hàng gần như luôn chỉ có con. */
+function Row(spec) { return Block(Array.isArray(spec) ? { elements: spec } : spec, 'row'); }
+
+/**
+ * Chữ thuần. Nhận thẳng chuỗi cho gọn.
+ *
+ * Tên `Text` do tài liệu 04 Phần 4 chỉ định, và khai nó ở tầm toàn cục **che** `window.Text` của trình duyệt — hàm dựng node văn bản của DOM. Hệ này dựng HTML bằng chuỗi nên không dùng tới bản của trình duyệt, nhưng ai định gọi `document.createTextNode` hay `instanceof Text` thì phải biết chỗ này.
+ */
+function Text(spec) { return Block(typeof spec === 'string' ? { text: spec } : spec, 'text'); }
+
+/** Một trường dữ liệu. `field` ghi đủ đường dẫn khi trường không thuộc `entity` của màn, ví dụ `customer.note` trên form giao dịch. */
+function Field(spec) { return Block(spec, 'field'); }
+
+/** Nút có chữ. Nhận thẳng chuỗi nhãn cho gọn. */
+function Button(spec) { return Block(typeof spec === 'string' ? { label: spec } : spec, 'button'); }
+
+/** Nút mang glyph, có thể kèm chữ như các mục `titleActions`, và kèm `menu` thì engine vẽ thêm mũi tên sổ xuống. */
+function Icon(spec) { return Block(typeof spec === 'string' ? { icon: spec } : spec, 'icon'); }
+</script>

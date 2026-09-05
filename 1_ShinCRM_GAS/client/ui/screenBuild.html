@@ -1,0 +1,96 @@
+<script>
+/*
+ * Dịch bản khai một màn trong `UI_SCHEMA` thành cây Block. Tài liệu 03 Phần 8 và Phần 9.
+ *
+ * Vì sao tách khỏi `uiBuilder`: `uiBuilder` biết **hình dạng một node**, tệp này biết **lối viết tắt của schema** — mảng lồng mảng, chuỗi trần thay cho object, `group` và `rows`. Hai luật đổi vì hai lý do khác nhau: thêm một khóa cho Block là chuyện của cái trước, đổi cách viết bố cục là chuyện của cái sau.
+ *
+ * Tệp này cũng **không chạm DOM**, nên bộ kiểm offline gọi được đúng hàm thật.
+ */
+
+/** Một phần tử trong hàng: chuỗi trần là dạng viết tắt của object chỉ có `field` — tài liệu 03 Phần 8. */
+function screenFieldSpec(phanTu, viTri) {
+  if (typeof phanTu === 'string') { return { field: phanTu }; }
+  if (phanTu && typeof phanTu === 'object' && typeof phanTu.field === 'string') { return phanTu; }
+  throw new Error('Phần tử ở ' + viTri + ' phải là tên trường, hoặc object có khóa `field`.');
+}
+
+/**
+ * Một mục của `header`, `titleActions` hay `footer` thành Block.
+ *
+ * Có `button` là nút chữ, còn lại là nút glyph — và nút glyph vắng `icon` vẫn hợp lệ, đó là ca `{ label: "Đang xem", menu: [...] }` ở card lịch sử. Nhận diện theo khóa `button` chứ không theo vùng, vì cùng một mục phải dựng được ở cả ba vùng mà không đổi cách viết.
+ */
+function screenBarItem(muc, viTri) {
+  if (!muc || typeof muc !== 'object') { throw new Error('Mục ở ' + viTri + ' phải là object.'); }
+  if (typeof muc.button === 'string') {
+    var nut = { label: muc.button };
+    ['action', 'className', 'id', 'menu', 'align', 'spatialConfig'].forEach(function (k) {
+      if (muc[k] !== undefined) { nut[k] = muc[k]; }
+    });
+    return Button(nut);
+  }
+  return Icon(muc);
+}
+
+/** Cả một hàng mục thành mảng Block. Vắng khai thì trả mảng rỗng, vì vùng không khai là vùng engine ẩn hẳn. */
+function screenBar(items, viTri) {
+  if (items === undefined || items === null) { return []; }
+  if (!Array.isArray(items)) { throw new Error('`' + viTri + '` phải là mảng, kể cả khi chỉ có một mục.'); }
+  return items.map(function (muc, i) { return screenBarItem(muc, viTri + ' mục ' + (i + 1)); });
+}
+
+/**
+ * Thân màn thành mảng Block. Hai lối khai, nhận diện theo nội dung chứ không theo tên màn.
+ *
+ * Màn `view` khai thẳng bằng cây Block vì nó không lặp theo trường. Ba màn form khai bằng cụm `{ group, rows }` vì chúng lặp theo trường, và lối viết đó là chỗ tiết kiệm lớn nhất của cả thiết kế: thêm một trường lên form là thêm một chuỗi vào một mảng.
+ *
+ * Trộn hai lối trong cùng một thân thì chặn. Không phải vì khó làm, mà vì một thân nửa cây nửa cụm là thứ không ai đọc ra được thứ tự hiện trên màn.
+ */
+function screenBody(body) {
+  if (body === undefined || body === null) { return []; }
+  if (!Array.isArray(body)) { throw new Error('`body` phải là mảng.'); }
+
+  var laBlock = body.map(function (phan) {
+    return !!(phan && typeof phan === 'object' && BLOCK_ROLES.indexOf(phan.role) !== -1);
+  });
+  if (laBlock.indexOf(true) !== -1 && laBlock.indexOf(false) !== -1) {
+    throw new Error('`body` trộn cây Block với cụm { group, rows }. Chọn một lối cho cả thân màn.');
+  }
+  if (laBlock[0] === true) { return body; }
+
+  return body.map(function (cum, i) {
+    if (!cum || typeof cum !== 'object' || !Array.isArray(cum.rows)) {
+      throw new Error('Cụm thứ ' + (i + 1) + ' của `body` phải có khóa `rows` là mảng các hàng.');
+    }
+    return Card({
+      title: cum.group === undefined ? null : cum.group,
+      className: cum.className || '',
+      elements: cum.rows.map(function (hang, h) {
+        if (!Array.isArray(hang)) { throw new Error('Hàng ' + (h + 1) + ' của cụm ' + (i + 1) + ' phải là mảng, vì cùng một mảng là cùng một hàng.'); }
+        return Row(hang.map(function (phanTu, c) {
+          return Field(screenFieldSpec(phanTu, 'cụm ' + (i + 1) + ' hàng ' + (h + 1) + ' ô ' + (c + 1)));
+        }));
+      })
+    });
+  });
+}
+
+/**
+ * Cả một màn thành bốn thứ engine cần để vẽ. Nhận bản khai, không nhận tên màn, nên gọi được mà không cần `UI_SCHEMA` đã nạp.
+ *
+ * `title` giữ nguyên hình dạng đã khai — object `{ add, edit }` ở form, vắng ở màn `view` — vì việc chọn "Thêm" hay "Sửa" phụ thuộc bản ghi đang mở, mà bản ghi thì tệp này không biết.
+ */
+function screenBuild(decl, ten) {
+  var nhan = ten || 'màn';
+  if (!decl || typeof decl !== 'object') { throw new Error('Bản khai của ' + nhan + ' không có.'); }
+  if (typeof decl.entity !== 'string') { throw new Error('Màn ' + nhan + ' thiếu khóa `entity` — thực thể mà màn này ghi vào.'); }
+
+  return {
+    entity: decl.entity,
+    title: decl.title === undefined ? null : decl.title,
+    infoBar: decl.infoBar === true,
+    header: screenBar(decl.header, nhan + '.header'),
+    body: screenBody(decl.body),
+    footer: screenBar(decl.footer, nhan + '.footer')
+  };
+}
+</script>
