@@ -1,0 +1,124 @@
+<script>
+/*
+ * `UI_SCHEMA` — bản khai bố cục của bốn màn. Tài liệu 03 Phần 8 và Phần 9.
+ *
+ * Đây là **nơi thứ hai** của luật hai nơi: thêm một trường lên form là thêm một chuỗi vào một mảng ở đây, không sửa gì khác. Tệp chỉ có dữ liệu, không một dòng logic.
+ *
+ * Thân màn `view` gọi `Card` và `Field` **ngay lúc tệp nạp**, nên `client/ui/uiBuilder` phải `include` trước tệp này trong `Sidebar.html`. Với tệp HTML thì thứ tự nạp đúng bằng thứ tự thẻ `include`, khác hẳn tệp `.gs` phía máy chủ nơi Google tự chọn thứ tự.
+ */
+
+var UI_SCHEMA = {};
+
+/** Hai mục header dùng chung cho ba màn form: hủy bên trái, lưu bên phải. */
+var UI_FORM_HEADER = [
+  { icon: 'close', tooltip: 'Hủy', action: 'cancelForm' },
+  { icon: 'check', tooltip: 'Lưu', action: 'saveForm', align: 'right' }
+];
+
+UI_SCHEMA.view = {
+  entity: 'customer',
+  infoBar: true,
+
+  header: [
+    { icon: 'search', tooltip: 'Tìm khách', action: 'toggleSearchPanel' },
+    { icon: 'table', tooltip: 'Vẽ lại sheet quản trị', action: 'renderActiveViewSheet' },
+    { icon: 'refresh', tooltip: 'Nạp lại', action: 'reloadAll' },
+    { icon: 'more', tooltip: 'Khác', menu: [
+      { label: 'Bám theo ô đang chọn', action: 'toggleFollowSelection', toggle: true },
+      { label: 'Tự động sắp xếp sheet', action: 'toggleAutoRenderView', toggle: true }
+    ] },
+    { icon: 'pencil', tooltip: 'Sửa khách', action: 'openCustomerForm', align: 'right' },
+    { icon: 'addUser', tooltip: 'Thêm khách', action: 'openCustomerFormBlank' }
+  ],
+
+  body: [
+    Card({
+      title: 'GHI CHÚ',
+      titleActions: [{ icon: 'pencil', label: 'Sửa', action: 'openNoteForm' }],
+      spatialConfig: { maxHeight: '160px', overflow: 'collapse', collapsedLines: 3 },
+      elements: [Field({ field: 'customer.note', readonly: true })]
+    }),
+    Card({
+      id: 'shin-card-history',
+      title: 'LỊCH SỬ LÀM VIỆC',
+      titleActions: [
+        { icon: 'plus', label: 'Thêm', action: 'openActivityForm' },
+        { label: 'Đang xem', menu: [
+          { label: 'Tất cả', action: 'setActivityView', value: 'all' },
+          { label: 'Chỉ còn dùng', action: 'setActivityView', value: 'active' },
+          { label: 'Chỉ đã xóa', action: 'setActivityView', value: 'deleted' }
+        ] }
+      ],
+      elements: 'activityList'
+    })
+  ]
+};
+
+UI_SCHEMA.customerForm = {
+  entity: 'customer',
+  title: { add: 'Thêm Khách Hàng', edit: 'Sửa Khách Hàng' },
+  infoBar: false,
+
+  header: UI_FORM_HEADER,
+
+  body: [
+    { group: '', rows: [
+      ['companyName'],
+      ['id', 'taxNumber'],
+      ['contactPerson', 'phone'],
+      ['product', 'customerGroup'],
+      [{ field: 'note', control: 'textarea' }]
+    ] },
+    { group: '', rows: [
+      ['email'],
+      ['website'],
+      [{ field: 'address', width: '65%' }, 'province'],
+      [{ field: 'parentCompanyName', control: 'customerPicker' }],
+      [{ field: 'searchAliases', control: 'textarea' }],
+      ['bidClosingDate', 'verifyStatus'],
+      ['leadSource', 'allowFbmPush'],
+      ['createdAt']
+    ] }
+  ],
+
+  footer: [{ button: 'LƯU DỮ LIỆU', action: 'saveForm', className: 'shin-save-wide' }]
+};
+
+UI_SCHEMA.activityForm = {
+  entity: 'activity',
+  title: { add: 'Thêm Giao Dịch', edit: 'Sửa Giao Dịch' },
+  infoBar: true,
+
+  header: UI_FORM_HEADER,
+
+  body: [
+    { group: '', rows: [
+      ['customerId'],
+      ['workDate', 'product'],
+      ['taskType', 'priority'],
+      [{ field: 'content', control: 'textarea' }],
+      ['contractValue', 'dueAt'],
+      ['allowFbmPush', 'enteredBy'],
+      [{ field: 'customer.note', control: 'textarea', readonly: true, action: 'openNoteForm' }]
+    ] }
+  ],
+
+  footer: [{ button: 'LƯU GIAO DỊCH', action: 'saveForm', className: 'shin-save-wide' }]
+};
+
+UI_SCHEMA.noteForm = {
+  entity: 'customer',
+  title: 'Ghi Chú Khách Hàng',
+  infoBar: true,
+
+  header: UI_FORM_HEADER,
+
+  body: [
+    { group: '', rows: [
+      [{ field: 'note', control: 'textarea', className: 'shin-note-tall' }]
+    ] }
+  ],
+
+  footer: [{ button: 'LƯU GHI CHÚ', action: 'saveForm', className: 'shin-save-wide' }]
+};
+</script>

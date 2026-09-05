@@ -1,0 +1,121 @@
+<script>
+/*
+ * `SLOTS` — ba vùng nội dung mà `UI_SCHEMA` không khai được bằng dòng dữ liệu. Tài liệu 04 Phần 7.
+ *
+ * Chữ ký là `(ctx) => mảng Block`, với `ctx` là `{entity, records, screen}` do engine truyền vào. Slot **không** dựng chuỗi HTML: nó dựng Block rồi engine vẽ, nên mọi luật thoát ký tự và mọi lớp CSS vẫn có đúng một chỗ.
+ *
+ * Vì sao ba vùng này không khai được: danh sách giao dịch dài bao nhiêu là do dữ liệu, hộp gợi ý phụ thuộc chữ đang gõ, và khối thông tin chung đổi theo trạng thái khách. Cả ba đều là "tùy lúc chạy", còn schema là "biết trước".
+ */
+
+var SLOTS = {};
+
+/** Chữ hiện ra khi không có gì để hiện. Một dòng chữ nhạt, không phải khoảng trắng — khoảng trắng khiến người dùng tưởng đang nạp dở. */
+function slotEmpty(chu) {
+  return [Text({ text: chu, className: 'shin-empty' })];
+}
+
+/** Mã khách của ngữ cảnh đang vẽ. Lấy từ bản ghi trong `ctx` chứ không đọc `ScreenState`, để slot kiểm được offline. */
+function slotCustomerId(ctx) {
+  var ban = ctx && ctx.records ? ctx.records.customer : null;
+  return ban && ban.id ? ban.id : '';
+}
+
+/** Lọc theo nấc đang chọn. Không sắp lại và không trộn: mảng trong RAM đã đúng thứ tự thời gian, tài liệu 03 Phần 8 **`[RÀNG BUỘC CỨNG]`**. */
+function slotFilterActivities(list, nac) {
+  if (nac === 'all') { return list.slice(); }
+  var muon = nac === 'deleted' ? STORE_DELETED : STORE_ACTIVE;
+  return list.filter(function (a) { return (a.recordStatus || STORE_ACTIVE) === muon; });
+}
+
+/** Chữ trên một dòng lịch sử: ngày, loại việc, giá trị hợp đồng nếu có. Nội dung xuống dòng dưới. */
+function slotActivityHead(a) {
+  var phan = [valueTextDate(a.workDate)];
+  if (a.taskType) { phan.push(a.taskType); }
+  if (a.contractValue) { phan.push(valueTextNumber(a.contractValue) + ' đ'); }
+  return phan.join(' • ');
+}
+
+/** Một dòng lịch sử. Ô đánh dấu để chọn nhiều dòng, nút bút chì mở form sửa, và chip "Đã xóa" khi bản ghi đã xóa mềm. */
+function slotActivityRow(a) {
+  var daXoa = (a.recordStatus || STORE_ACTIVE) === STORE_DELETED;
+  var dau = [
+    Check({ pick: a.id, label: 'Chọn giao dịch ' + a.id }),
+    Text({ text: slotActivityHead(a), className: 'shin-act-head' })
+  ];
+
+  if (daXoa) { dau.push(Text({ text: 'Đã xóa', className: 'shin-badge shin-badge-deleted' })); }
+  dau.push(Icon({ icon: 'pencil', tooltip: 'Sửa giao dịch', action: 'openActivityForm', pick: a.id, align: 'right' }));
+
+  return Block({
+    className: 'shin-act-row' + (daXoa ? ' shin-act-deleted' : ''),
+    elements: [Row(dau), Text({ text: a.content || '', className: 'shin-act-content' })]
+  });
+}
+
+/**
+ * Danh sách giao dịch của khách đang xem, lọc theo nấc đang nhớ ở `Prefs.activityView`.
+ *
+ * Ba dòng chữ khi rỗng nói ba chuyện khác nhau — chưa chọn khách, đang nạp, khách này không có giao dịch nào ở nấc đang xem — vì cả ba đều là ca thật và người dùng phải phân biệt được.
+ */
+SLOTS.activityList = function (ctx) {
+  var id = slotCustomerId(ctx);
+  if (!id) { return slotEmpty('Chưa chọn khách hàng nào.'); }
+  if (Store.activityState === STORE_LOADING) { return slotEmpty('Đang nạp lịch sử làm việc…'); }
+
+  var list = slotFilterActivities(Store.getActivities(id), Prefs.activityView);
+  if (!list.length) {
+    return slotEmpty(Prefs.activityView === 'deleted' ? 'Khách này không có giao dịch nào đã xóa.' : 'Khách này chưa có giao dịch nào.');
+  }
+
+  var out = list.map(slotActivityRow);
+  out.push(Button({ label: 'XÓA DÒNG ĐÃ CHỌN', action: 'deleteSelectedActivities', className: 'shin-danger shin-act-delete' }));
+  return out;
+};
+
+/**
+ * Hộp gợi ý của ô tìm khách. Mỗi dòng bấm được, mang `data-pick` là mã khách để phần bàn phím đọc.
+ *
+ * `ctx.records.search` là kết quả bên gọi đã tra sẵn bằng `Store.searchCustomers`. Slot không tự tra vì nó không biết người dùng đang gõ gì — chữ đang gõ nằm trong DOM, và tệp này không chạm DOM.
+ */
+SLOTS.searchSuggestions = function (ctx) {
+  var ket = (ctx && ctx.records && ctx.records.search) || [];
+  if (!ket.length) { return slotEmpty('Không có khách nào khớp.'); }
+
+  return ket.map(function (c) {
+    var phu = [c.id];
+    if (c.phone) { phu.push(c.phone); }
+    if (c.province) { phu.push(c.province); }
+
+    return Block({
+      className: 'shin-suggest' + ((c.recordStatus || STORE_ACTIVE) === STORE_DELETED ? ' shin-suggest-deleted' : ''),
+      action: 'setCurrentCustomer',
+      pick: c.id,
+      elements: [
+        Text({ text: c.companyName || '(chưa có tên)', className: 'shin-suggest-name' }),
+        Text({ text: phu.join(' • '), className: 'shin-suggest-meta' })
+      ]
+    });
+  });
+};
+
+/**
+ * Khối thông tin chung: đang làm việc cho khách nào. Tài liệu 03 Phần 8 — bật ở ba màn để người dùng luôn thấy.
+ *
+ * Khách đã xóa mềm thì thêm chip "Đã xóa". Việc khóa ba cửa mở form là của `ACTIONS`, không phải của slot này — slot chỉ hiện, không chặn.
+ */
+SLOTS.infoBarContent = function (ctx) {
+  var ban = ctx && ctx.records ? ctx.records.customer : null;
+  if (!ban || !ban.id) { return slotEmpty('Chưa chọn khách hàng nào.'); }
+
+  var dong = [Text({ text: ban.companyName || '(chưa có tên)', className: 'shin-info-name' })];
+  if ((ban.recordStatus || STORE_ACTIVE) === STORE_DELETED) {
+    dong.push(Text({ text: 'Đã xóa', className: 'shin-badge shin-badge-deleted' }));
+  }
+
+  var phu = [ban.id];
+  if (ban.contactPerson) { phu.push(ban.contactPerson); }
+  if (ban.phone) { phu.push(ban.phone); }
+
+  return [Row(dong), Text({ text: phu.join(' • '), className: 'shin-info-meta' })];
+};
+</script>

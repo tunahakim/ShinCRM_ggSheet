@@ -1,0 +1,101 @@
+<script>
+/*
+ * `DEFAULTS` — sáu ngầm định tính-toán, tức những giá trị máy tự điền vào form trước khi người dùng gõ. Tài liệu 03 Phần 6.
+ *
+ * Bảng này ở phía client vì ngầm định là thứ điền vào form, và hai hàm kế tục phải tra `Store`. Hai bảng còn lại của tài liệu 03 Phần 6 — `NORMALIZERS` và `VALIDATORS` — cố ý **không** có ở đây: chúng chỉ tồn tại một bản phía máy chủ và chỉ cửa ghi được gọi.
+ *
+ * Chữ ký chung: `(entity, record) => giá trị`. `record` là bản ghi đang dựng, nên hàm nào cần biết khách nào thì đọc `record.customerId`.
+ */
+
+/** Hai chữ số cho ngày và giờ, và sáu chữ số cho mã. */
+function fieldLogicPad(so, chuSo) {
+  var s = String(so);
+  while (s.length < chuSo) { s = '0' + s; }
+  return s;
+}
+
+/** Hôm nay dạng `YYYY-MM-DD` theo giờ máy người dùng. Đây là dạng chuỗi ngày duy nhất của dự án, tài liệu 05 Phần 11. */
+function fieldLogicToday(moc) {
+  var d = moc || new Date();
+  return d.getFullYear() + '-' + fieldLogicPad(d.getMonth() + 1, 2) + '-' + fieldLogicPad(d.getDate(), 2);
+}
+
+/** Bây giờ dạng `YYYY-MM-DD HH:mm`. Dấu cách chứ không phải chữ `T`: chữ `T` là chuyện riêng của thẻ `input`, và `valueTextDateInput` lo việc đó. */
+function fieldLogicNow(moc) {
+  var d = moc || new Date();
+  return fieldLogicToday(d) + ' ' + fieldLogicPad(d.getHours(), 2) + ':' + fieldLogicPad(d.getMinutes(), 2);
+}
+
+/**
+ * Mã **xem trước** của bản ghi mới: bộ đếm trong `Store.config.counters` cộng một.
+ *
+ * Đây không phải mã thật. Mã thật do cửa cấp mã phía máy chủ phát ra bên trong khóa của cửa ghi — **`[RÀNG BUỘC CỨNG]`** tài liệu 06 Phần 8. Con số ở đây chỉ để ô mã trên form không trống trơn, và nó không bao giờ đi đâu cả: trường `id` khai `readonly` nên bộ thu thập lúc lưu bỏ qua nó. Nếu về sau ai bỏ `readonly` khỏi `id` thì mã đoán này sẽ lọt xuống sheet — đó là lý do dòng này viết dài hơn phần code.
+ *
+ * Chưa nạp `Config` thì trả rỗng chứ không đoán số 1, vì một ô mã hiện `CUS-000001` trong khi sheet đã có nghìn khách là thứ gây hiểu sai nặng hơn một ô trống.
+ */
+function fieldLogicNextCode(entity, tien) {
+  var counters = (Store && Store.config && Store.config.counters) || {};
+  if (!Object.prototype.hasOwnProperty.call(counters, entity)) { return ''; }
+
+  var hienTai = Number(counters[entity]);
+  if (isNaN(hienTai) || hienTai < 0) { return ''; }
+
+  return tien + fieldLogicPad(hienTai + 1, 6);
+}
+
+/**
+ * Giá trị kế tục: lấy từ lần làm việc gần nhất **còn sống** của cùng khách. Tài liệu 02 Phần 8 và tài liệu 03 Phần 4.
+ *
+ * Khách chưa có lần làm việc nào thì trả rỗng — đó là câu trả lời đúng, không phải lỗi. Dùng `Store.getLatestActivity` chứ không tự đọc `getActivities(id)[0]`, vì phần tử đầu mảng có thể là một giao dịch đã xóa mềm.
+ */
+function fieldLogicCarry(record, ten) {
+  var id = record && record.customerId;
+  if (!id) { return ''; }
+
+  var last = Store.getLatestActivity(id);
+  if (!last || last[ten] === null || last[ten] === undefined) { return ''; }
+  return last[ten];
+}
+
+/** Sáu ngầm định của tài liệu 03 Phần 6. Tên khai trong `DATA_SCHEMA` bằng chuỗi, tra ở bảng này — cùng luật với `ACTIONS` và `SLOTS`. */
+var DEFAULTS = {
+  today: function () { return fieldLogicToday(); },
+  now: function () { return fieldLogicNow(); },
+  nextCustomerCode: function () { return fieldLogicNextCode('customer', 'CUS-'); },
+  nextActivityCode: function () { return fieldLogicNextCode('activity', 'ACT-'); },
+  carryForwardPriority: function (entity, record) { return fieldLogicCarry(record, 'priority'); },
+  carryForwardDueAt: function (entity, record) { return fieldLogicCarry(record, 'dueAt'); }
+};
+
+/** Hai ngầm định thuộc loại kế tục. Khai bằng tên hàm chứ không bằng tên trường, để đổi trường nào dùng kế tục thì chỉ sửa `DATA_SCHEMA`. */
+var FIELD_LOGIC_CARRY_DEFAULTS = ['carryForwardPriority', 'carryForwardDueAt'];
+
+/**
+ * Bản ghi trắng của một form thêm mới: mọi trường có `default` đều chạy hàm ngầm định, theo đúng thứ tự khai trong `DATA_SCHEMA`.
+ *
+ * Trả về cả `record` lẫn `carried` — danh sách tên trường vừa nhận giá trị kế tục — vì tài liệu 03 Phần 4 đòi ô kế tục phải nhìn ra được bằng mắt, và chỗ duy nhất biết điều đó là đây.
+ *
+ * `seed` là những giá trị bên gọi đã biết trước, ví dụ `customerId` của form giao dịch. Nó vào trước khi các hàm ngầm định chạy, vì hai hàm kế tục cần nó.
+ */
+function fieldLogicNewRecord(entity, seed) {
+  var record = {};
+  var carried = [];
+
+  Object.keys(seed || {}).forEach(function (k) { record[k] = seed[k]; });
+
+  Object.keys(Schema[entity]).forEach(function (ten) {
+    var khai = Schema[entity][ten];
+    if (!khai.default || record[ten] !== undefined) { return; }
+
+    if (!Object.prototype.hasOwnProperty.call(DEFAULTS, khai.default)) {
+      throw new Error('Trường "' + entity + '.' + ten + '" khai ngầm định "' + khai.default + '" không có trong bảng DEFAULTS. Các tên hiện có: ' + Object.keys(DEFAULTS).join(', ') + '.');
+    }
+
+    var giaTri = DEFAULTS[khai.default](entity, record);
+    record[ten] = giaTri;
+    if (FIELD_LOGIC_CARRY_DEFAULTS.indexOf(khai.default) !== -1 && giaTri !== '') { carried.push(ten); }
+  });
+
+  return { record: record, carried: carried };
+}
+</script>

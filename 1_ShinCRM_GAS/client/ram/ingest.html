@@ -56,6 +56,7 @@ function ingestCore(payload) {
   Schema = buildSchema(payload.schema);
   Store.categories = payload.categories;
   Store.config = payload.config;
+  prefsIngest(payload.prefs);
 
   var check = checkSchema({
     dataSchema: payload.schema,

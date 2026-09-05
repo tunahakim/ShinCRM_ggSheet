@@ -18,6 +18,7 @@ const TEP_CLIENT = [
   'client/schema/schemaAccess.html',
   'client/schema/schemaCheck.html',
   'client/ram/store.html',
+  'client/ram/prefs.html',
   'client/ram/ingest.html'
 ];
 

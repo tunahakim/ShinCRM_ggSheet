@@ -203,6 +203,9 @@
 .shin-badge-xac-thuc { background: #e6f4ea; color: var(--shin-ok); }
 .shin-badge-cho-phep-fbm { background: var(--shin-primary-soft); color: var(--shin-primary-dark); }
 
+/* Chip "Đã xóa" không suy từ danh mục nào — `recordStatus` là trạng thái hệ thống, không phải một mức người dùng chọn. */
+.shin-badge-deleted { background: var(--shin-error-soft); color: var(--shin-error); }
+
 /* --- Nút chữ, nút glyph, chữ trơn -------------------------------- */
 
 .shin-button {
@@ -262,4 +265,21 @@
 .shin-field-edit:focus-visible { outline: 2px solid var(--shin-primary); outline-offset: 1px; }
 
 .shin-text { min-width: 0; overflow-wrap: break-word; }
+
+/* --- Ô đánh dấu chọn dòng ---------------------------------------- */
+
+/* Thẻ ngoài là `<label>` nên bấm vào cả vùng đều lật được ô đánh dấu, dễ trúng hơn hẳn một ô 13px trên sidebar hẹp. */
+.shin-check {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  cursor: pointer;
+}
+
+.shin-check-box { width: 14px; height: 14px; margin: 0; cursor: pointer; accent-color: var(--shin-primary); }
+
+/* --- Chữ khi rỗng ------------------------------------------------ */
+
+.shin-empty { padding: var(--shin-gap-3) 0; color: var(--shin-text-soft); font-size: var(--shin-text-sm); font-style: italic; }
 </style>

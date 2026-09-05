@@ -41,3 +41,47 @@ Tài liệu khai `infoBar` là cờ bật/tắt mà không nói vùng đó lấy
 ### 2.5. Ô chỉ đọc mang thêm `data-readonly="1"`
 
 Chỉ-đọc hiện ra ba dạng khác nhau trong HTML: `<input readonly>`, `<textarea readonly>`, và `<span class="shin-badge">` không phải ô nhập. Bộ thu thập lúc lưu mà phải nhận cả ba dạng thì thành ba luật. **Đang chọn: mọi ô chỉ đọc mang thêm `data-readonly="1"`** để bộ thu thập chỉ cần một luật. Ô nào cũng mang `data-field` đủ đường dẫn, kể cả ô chỉ đọc — lọc bằng `data-readonly`, không lọc bằng việc có hay không có `data-field`.
+
+## 3. Bảng khai bố cục và ba núm chọn — mười chỗ tự quyết
+
+Mười chỗ gặp khi dựng `uiSchema`, `slots`, `screenState`, `prefs`, `fieldLogic` và `UserPrefs` hai ngày 05–06/09/2026. Cả mười đã chọn xong, code và bộ kiểm đang chạy theo cách đã chọn; ghi ra đây vì chúng là quyết định của tôi, không phải câu chữ có sẵn trong tài liệu.
+
+### 3.1. Vai thứ tám `Check`, và `pick` thành khóa chung của Block
+
+Tài liệu 03 Phần 8 đòi dòng lịch sử có ô đánh dấu để chọn nhiều dòng, còn tài liệu 04 Phần 4 chỉ khai sáu hàm dựng và không hàm nào vẽ được ô đánh dấu. **Đang chọn: thêm hàm dựng thứ bảy `Check` mang vai thứ tám, và thêm `pick` vào danh sách khóa dùng được ở mọi vai** — vì dòng nào do slot sinh ra cũng phải mang mã bản ghi của chính nó, không riêng ô đánh dấu. `Check` **không** mang `data-field`, nên bộ thu thập lúc lưu không bao giờ thấy nó. Tài liệu 04 Phần 4 và Phần 10 đã sửa theo.
+
+### 3.2. Hai công tắc bật tắt mặc định BẬT
+
+Tài liệu nói rõ ngầm định của chế độ xem card lịch sử là `active` (tài liệu 03:284) nhưng không nói ngầm định của `followSelection` và `autoRenderView`. **Đang chọn: cả hai mặc định `true`.** Lý do: cả hai chỉ đổi *khi nào* vẽ, không đổi dữ liệu nào, nên bật là chiều tiện hơn mà không có rủi ro; và người mở sidebar lần đầu mà click ô trên sheet không thấy gì xảy ra thì sẽ tưởng hệ thống hỏng.
+
+### 3.3. Khối núm chọn đi kèm gói `loadCore`, trừ đường bị chặn vì trần ô
+
+Tài liệu 07 Phần 6 nói đọc ba núm "một lần lúc mở sidebar trong lượt nạp vốn đã có" mà không nói nó nằm ở khóa nào của gói. **Đang chọn: thêm khóa `prefs` vào gói `loadCore`**, và đường `blocked: 'cellBudget'` **cố ý không** mang nó — màn chặn không có núm nào để vặn, gửi thêm một khối là gửi thứ không ai đọc.
+
+### 3.4. `Prefs` nằm ngoài `Store`, và đổi RAM trước khi máy chủ xác nhận
+
+Tài liệu 05 Phần 7 khai hình dạng `Store` với đúng bảy thành viên. **Đang chọn: `Prefs` là biến toàn cục riêng, không nhét vào `Store`** — cùng lý do `Schema` và `SETTINGS` cũng ở ngoài: `Store` giữ dữ liệu, ba thứ kia là bảng khai và thói dùng. Thêm nữa, `prefsSet` **đổi RAM ngay rồi mới gửi lên máy chủ**, không đợi xác nhận: bấm một núm mà giao diện đợi một vòng gọi mới nhảy thì cảm giác là hệ thống chậm, còn việc ghi trượt thì lần mở sau đọc lại đúng giá trị cũ.
+
+### 3.5. `setCurrentCustomer` là hàm thứ mười sáu của `ACTIONS`
+
+Tài liệu 04 Phần 7 liệt kê 15 tên. Hộp gợi ý tìm khách sinh ra dòng bấm được, và mọi dòng bấm được phải trỏ tới một tên trong bảng. **Đang chọn: thêm `setCurrentCustomer`.** Cùng hàm này về sau là đường Extension gọi khi người dùng click một ô trên sheet, nên nó phải có tên trong bảng dù thế nào. Tài liệu 04 Phần 7 đã sửa theo.
+
+### 3.6. `valueTextDate` — dạng ngày để đọc, khác dạng ngày để nuôi thẻ `input`
+
+Tài liệu 04 Phần 10 khai `client/util/valueText.html` là chỗ đổi giá trị thành chữ "để đặt vào ô", tức chỉ nói chiều nuôi thẻ `input`. Card lịch sử thì cần `dd/mm/yyyy` cho người Việt đọc. **Đang chọn: hai hàm riêng trong cùng tệp** — `valueTextDateInput` giữ dạng máy đọc, `valueTextDate` cho chữ bày ra. Một hàm nhận thêm một cờ chọn dạng thì mỗi lời gọi phải đọc thêm một tham số mới biết nó đang trả về gì.
+
+### 3.7. `client/style/slots.html` tách riêng khỏi `components.html`
+
+Tài liệu 04 Phần 10 chỉ có `components.html` cho "các lớp mà renderEngine sinh ra". Các lớp của dòng lịch sử, hộp gợi ý và khối thông tin chung thì **không** do engine sinh ra — chúng do đúng một tệp là `client/ui/slots.html` sinh ra. **Đang chọn: một tệp CSS riêng**, để sửa hình thức dòng lịch sử thì không phải mở tệp giữ hình thức của mọi màn. Tài liệu 04 Phần 10 đã thêm dòng này.
+
+### 3.8. Bốn câu chữ rỗng khác nhau trong danh sách giao dịch
+
+Tài liệu không nói danh sách rỗng thì hiện gì. **Đang chọn: bốn câu cho bốn tình huống thật** — chưa chọn khách, đang nạp lịch sử, khách này chưa có giao dịch nào, và khách này không có giao dịch nào *đã xóa* (khi đang ở nấc "chỉ đã xóa"). Dùng chung một câu thì người dùng không phân biệt được "chưa nạp xong" với "khách này thật sự chưa có gì", và đó đúng là câu hỏi họ cần trả lời trước khi bấm tiếp.
+
+### 3.9. Dấu tích và dấu radio của menu đọc từ `Prefs`
+
+Tài liệu 04 Phần 4B nói mục con vẽ dấu tích "theo trạng thái đang nhớ của công tắc đó" mà không nói đọc ở đâu. **Đang chọn: `client/ui/menu.html` đọc `Prefs`**, không gọi máy chủ và không đọc `UserProperties`. `Prefs` là bản sao trong RAM của đúng kho đó, và nó đã đúng ngay từ lượt nạp đầu tiên. Tệp `menu.html` chưa dựng — ghi ra đây để lúc dựng không phải quyết lại.
+
+### 3.10. Giá trị lạ trong `UserProperties` rơi về ngầm định, kể cả với công tắc bật tắt
+
+Trước khi sửa, nhánh đọc núm nhiều nấc trả về ngầm định khi gặp giá trị lạ, còn nhánh công tắc bật tắt thì mọi thứ không phải `'true'` đều thành `false` — kể cả chuỗi rác. **Đang chọn: cả hai nhánh rơi về ngầm định**, để luật phát biểu được thành một câu. Đổi lại là một chuỗi rác trong `prefFollowSelection` bây giờ cho ra `true` chứ không phải `false`. Chấp nhận được vì `userPrefsWrite` kiểm trước khi ghi, nên giá trị lạ chỉ vào được kho đó nếu có người sửa tay `UserProperties`; và cả hai núm này chỉ đổi *khi nào* vẽ, không đổi dữ liệu nào, nên không có giá trị nào là chiều nguy hiểm. **Đây là chỗ tôi sửa hành vi code đang chạy, không phải chỗ tôi khai thêm luật mới** — nếu chủ dự án muốn công tắc rơi về `false` thì nói một câu là đổi lại được.

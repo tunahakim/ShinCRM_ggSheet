@@ -35,12 +35,13 @@ function formatDateGia(date, timezone, format) {
 /**
  * Dựng cả bộ thứ toàn cục cho một hộp cát.
  *
- * `sheets` là tên các sheet dựng sẵn trong tệp giả. `props` là `DocumentProperties` ban đầu — truyền sẵn khóa dọn log vào đây là cách chặn phép quét tuổi log chạy trong một phép kiểm không nói về nó.
+ * `sheets` là tên các sheet dựng sẵn trong tệp giả. `props` là `DocumentProperties` ban đầu — truyền sẵn khóa dọn log vào đây là cách chặn phép quét tuổi log chạy trong một phép kiểm không nói về nó. `userProps` là `UserProperties` ban đầu, một kho riêng: hai kho trộn vào nhau thì một phép kiểm về núm chọn sẽ ăn phải khóa trạng thái bẩn.
  */
 function taoStubsGas(options) {
   const chon = options || {};
   const gia = taoBook(chon.sheets || []);
   const props = Object.assign({}, chon.props || {});
+  const userProps = Object.assign({}, chon.userProps || {});
   const daLog = [];
   const daConsole = [];
 
@@ -89,15 +90,21 @@ function taoStubsGas(options) {
         getProperty: (key) => (Object.prototype.hasOwnProperty.call(props, key) ? props[key] : null),
         setProperty: (key, value) => { props[key] = String(value); },
         deleteProperty: (key) => { delete props[key]; }
+      }),
+      getUserProperties: () => ({
+        getProperty: (key) => (Object.prototype.hasOwnProperty.call(userProps, key) ? userProps[key] : null),
+        setProperty: (key, value) => { userProps[key] = String(value); },
+        deleteProperty: (key) => { delete userProps[key]; }
       })
     },
 
-    // Bốn thứ dưới đây không có bên Google, chỉ để phép kiểm xem lại: tệp giả, bộ đếm lệnh gọi, những dòng Logger đã in, và những dòng console đã giữ.
+    // Sáu thứ dưới đây không có bên Google, chỉ để phép kiểm xem lại: tệp giả, bộ đếm lệnh gọi, những dòng Logger đã in, những dòng console đã giữ, và hai kho thuộc tính.
     _book: gia.book,
     _dem: gia.dem,
     _daLog: daLog,
     _daConsole: daConsole,
-    _props: props
+    _props: props,
+    _userProps: userProps
   };
 }
 

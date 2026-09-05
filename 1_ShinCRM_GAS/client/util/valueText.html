@@ -29,4 +29,20 @@ function valueTextDateInput(giaTri) {
   var text = giaTri === null || giaTri === undefined ? '' : String(giaTri).trim();
   return text.indexOf(' ') > 0 ? text.replace(' ', 'T') : text;
 }
+
+/**
+ * Chuỗi thời gian thành chữ bày ra đọc: `dd/mm/yyyy`, kèm giờ nếu chuỗi có giờ.
+ *
+ * Khác `valueTextDateInput` ở chỗ dùng: hàm kia nuôi thẻ `input` nên phải giữ dạng máy đọc, hàm này nuôi chữ trên card lịch sử nên theo nếp người Việt đọc. Chuỗi không đúng dạng thì trả nguyên văn.
+ */
+function valueTextDate(giaTri) {
+  var text = giaTri === null || giaTri === undefined ? '' : String(giaTri).trim();
+  if (!text) { return ''; }
+
+  var phan = text.split(/[ T]/);
+  var ngay = phan[0].split('-');
+  if (ngay.length !== 3) { return text; }
+
+  return ngay[2] + '/' + ngay[1] + '/' + ngay[0] + (phan[1] ? ' ' + phan[1] : '');
+}
 </script>

@@ -1,19 +1,19 @@
 <script>
 /*
- * Viên gạch duy nhất của giao diện: `Block`, cộng sáu hàm điền sẵn tham số cho nó. Tài liệu 04 Phần 4.
+ * Viên gạch duy nhất của giao diện: `Block`, cộng bảy hàm điền sẵn tham số cho nó. Tài liệu 04 Phần 4.
  *
  * Tệp này **không vẽ gì và không chạm DOM**. Nó nhận một object khai, chặn mọi khóa không có tên, rồi trả về một node đã chuẩn hóa; việc dịch node thành HTML là của `renderEngine`. Tách hai việc vì phép kiểm khai báo phải chạy được không cần DOM — nhờ vậy bộ kiểm offline gọi được đúng hàm thật, còn nếu trộn vào chỗ dựng HTML thì cả cụm chỉ nghiệm thu được bằng cách mở sidebar thật trên Google.
  */
 
 /**
- * Bảy vai của một Block. Vai quyết định phần lá mà `renderEngine` vẽ.
+ * Tám vai của một Block. Vai quyết định phần lá mà `renderEngine` vẽ.
  *
- * Đây **không** phải khóa `tag` mà tài liệu 04 Phần 4 cấm. `tag` là để người khai schema gõ thẳng tên thẻ HTML; còn `role` do chính sáu hàm dựng đặt, người khai schema không bao giờ gõ tới nó. Có vai thì phần lá là một lựa chọn duy nhất và tra được; nếu suy theo tổ hợp khóa nào đang có mặt thì một Block mang cả `field` lẫn `icon` là một ca không ai định nghĩa.
+ * Đây **không** phải khóa `tag` mà tài liệu 04 Phần 4 cấm. `tag` là để người khai schema gõ thẳng tên thẻ HTML; còn `role` do chính bảy hàm dựng đặt, người khai schema không bao giờ gõ tới nó. Có vai thì phần lá là một lựa chọn duy nhất và tra được; nếu suy theo tổ hợp khóa nào đang có mặt thì một Block mang cả `field` lẫn `icon` là một ca không ai định nghĩa.
  */
-var BLOCK_ROLES = ['box', 'card', 'row', 'text', 'field', 'button', 'icon'];
+var BLOCK_ROLES = ['box', 'card', 'row', 'text', 'field', 'button', 'icon', 'check'];
 
-/** Khóa dùng được ở mọi vai: đúng sáu khóa của bảng trong tài liệu 04 Phần 4, cộng `label` vì nút, icon và trường đều có chữ hiện ra. */
-var BLOCK_KEYS_COMMON = ['id', 'className', 'spatialConfig', 'action', 'menu', 'elements', 'label'];
+/** Khóa dùng được ở mọi vai: đúng sáu khóa của bảng trong tài liệu 04 Phần 4, cộng `label` vì nút, icon và trường đều có chữ hiện ra, cộng `pick` vì dòng nào do slot sinh ra cũng phải mang mã bản ghi của nó. */
+var BLOCK_KEYS_COMMON = ['id', 'className', 'spatialConfig', 'action', 'menu', 'elements', 'label', 'pick'];
 
 /** Khóa riêng của từng vai. Vai không có tên trong bảng này thì chỉ dùng được khóa chung. */
 var BLOCK_KEYS_BY_ROLE = {
@@ -21,7 +21,8 @@ var BLOCK_KEYS_BY_ROLE = {
   text: ['text'],
   field: ['field', 'control', 'readonly', 'width'],
   icon: ['icon', 'tooltip', 'align'],
-  button: ['align']
+  button: ['align'],
+  check: []
 };
 
 /**
@@ -63,7 +64,7 @@ function blockElements(elements) {
   }
   return elements.map(function (con, i) {
     if (!con || typeof con !== 'object' || BLOCK_ROLES.indexOf(con.role) === -1) {
-      throw new Error('Phần tử thứ ' + (i + 1) + ' trong `elements` không phải Block. Dựng nó bằng Card, Row, Text, Field, Button hoặc Icon; chuỗi trần chỉ dùng được khi cả `elements` là tên slot.');
+      throw new Error('Phần tử thứ ' + (i + 1) + ' trong `elements` không phải Block. Dựng nó bằng Card, Row, Text, Field, Button, Icon hoặc Check; chuỗi trần chỉ dùng được khi cả `elements` là tên slot.');
     }
     return con;
   });
@@ -72,7 +73,7 @@ function blockElements(elements) {
 /**
  * Dựng một node đã chuẩn hóa. Mọi hàm dựng khác đều đi qua đây, nên đây là chỗ duy nhất biết hình dạng một node.
  *
- * Node nào cũng mang đủ mười bảy khóa, kể cả khóa không có nghĩa với vai của nó — `text` trên một Card chẳng hạn. Cố ý: engine đọc thẳng `node.field` mà không phải hỏi khóa có tồn tại không, và một hình dạng duy nhất thì không có ca nào để đoán.
+ * Node nào cũng mang đủ mười tám khóa, kể cả khóa không có nghĩa với vai của nó — `text` trên một Card chẳng hạn. Cố ý: engine đọc thẳng `node.field` mà không phải hỏi khóa có tồn tại không, và một hình dạng duy nhất thì không có ca nào để đoán.
  *
  * `menu` đi qua đây **nguyên trạng**. Phép kiểm "một mục không được vừa mang `toggle` vừa mang `value`" thuộc bộ tự kiểm lúc khởi động ở `schemaCheck`, cùng đường với phép kiểm tên hàm, vì chỗ đó quét cả `UI_SCHEMA` và báo hết lỗi một lượt bằng tiếng người — còn chặn ở đây thì mỗi lần chỉ thấy đúng một lỗi, lúc vẽ.
  */
@@ -101,7 +102,8 @@ function Block(spec, role) {
     readonly: y.readonly === true,
     icon: y.icon || null,
     tooltip: y.tooltip || null,
-    align: y.align || 'left'
+    align: y.align || 'left',
+    pick: y.pick === undefined ? null : y.pick
   };
 }
 
@@ -126,4 +128,11 @@ function Button(spec) { return Block(typeof spec === 'string' ? { label: spec } 
 
 /** Nút mang glyph, có thể kèm chữ như các mục `titleActions`, và kèm `menu` thì engine vẽ thêm mũi tên sổ xuống. */
 function Icon(spec) { return Block(typeof spec === 'string' ? { icon: spec } : spec, 'icon'); }
+
+/**
+ * Ô đánh dấu chọn dòng. `pick` là mã bản ghi mà dòng này mang.
+ *
+ * Vai thứ tám, thêm vào vì tài liệu 03 Phần 8 đòi "dòng lịch sử có ô đánh dấu, chọn được nhiều dòng" mà bảy vai cũ không vai nào vẽ được ô đánh dấu. Nó **không** mang `data-field` nên bộ thu thập lúc lưu không bao giờ thấy nó; danh sách đang chọn đọc từ DOM ngay lúc bấm xóa, nên không sinh thêm một chỗ giữ trạng thái.
+ */
+function Check(spec) { return Block(typeof spec === 'string' ? { pick: spec } : spec, 'check'); }
 </script>

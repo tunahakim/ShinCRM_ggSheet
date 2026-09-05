@@ -1,0 +1,58 @@
+<style>
+/*
+ * Diện mạo của ba vùng do `client/ui/slots.html` dựng: dòng lịch sử, dòng gợi ý tìm khách, khối thông tin chung.
+ *
+ * Tách khỏi `components.html` vì tệp đó chỉ tả những lớp **engine** sinh ra cho mọi màn. Các lớp ở đây do slot đặt qua `className`, nên chúng đi cùng slot: đổi cách bày một dòng lịch sử thì mở đúng hai tệp cạnh nhau, không phải lục tệp dùng chung.
+ */
+
+/* --- Dòng lịch sử làm việc --------------------------------------- */
+
+.shin-act-row {
+  padding: var(--shin-gap-2) 0;
+  border-bottom: 1px solid var(--shin-border);
+}
+
+.shin-act-row:last-of-type { border-bottom: 0; }
+
+/* Ngày và loại việc là chữ nhận dạng dòng nên đậm hơn nội dung; nội dung mới là phần dài. */
+.shin-act-head {
+  color: var(--shin-text);
+  font-size: var(--shin-text-sm);
+  font-weight: 600;
+}
+
+.shin-act-content {
+  margin-top: 2px;
+  color: var(--shin-text-soft);
+  font-size: var(--shin-text-sm);
+  white-space: pre-wrap;
+}
+
+/* Dòng đã xóa mềm mờ đi nhưng **không** ẩn: nó vẫn giữ đúng vị trí thời gian của mình trên dòng thời gian. */
+.shin-act-deleted .shin-act-head,
+.shin-act-deleted .shin-act-content { color: var(--shin-text-soft); text-decoration: line-through; }
+
+.shin-act-delete { margin-top: var(--shin-gap-3); }
+
+/* --- Dòng gợi ý tìm khách ---------------------------------------- */
+
+.shin-suggest {
+  padding: var(--shin-gap-2);
+  border-radius: var(--shin-radius-sm);
+  cursor: pointer;
+}
+
+.shin-suggest:hover { background: var(--shin-primary-soft); }
+
+.shin-suggest-name { color: var(--shin-text); font-size: var(--shin-text-md); font-weight: 600; }
+
+.shin-suggest-meta { color: var(--shin-text-soft); font-size: var(--shin-text-xs); }
+
+.shin-suggest-deleted .shin-suggest-name { text-decoration: line-through; color: var(--shin-text-soft); }
+
+/* --- Khối thông tin chung ---------------------------------------- */
+
+.shin-info-name { color: var(--shin-text); font-size: var(--shin-text-md); font-weight: 600; }
+
+.shin-info-meta { margin-top: 2px; color: var(--shin-text-soft); font-size: var(--shin-text-xs); }
+</style>

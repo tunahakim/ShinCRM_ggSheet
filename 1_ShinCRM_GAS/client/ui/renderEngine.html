@@ -40,6 +40,9 @@ function renderCollapsedLines(kg) {
 /** Hai giá trị của núm `overflow`. Một núm hai nấc chứ không hai cờ đúng-sai, vì cuộn và thu gọn loại trừ nhau. */
 var RENDER_OVERFLOW_VALUES = ['scroll', 'collapse'];
 
+/** Năm khóa của tài liệu 04 Phần 5, không có khóa thứ sáu. Khai tên lạ thì ném lỗi, vì một khóa engine không biết là một dòng schema không làm gì mà cũng không báo gì. */
+var RENDER_SPATIAL_KEYS = ['width', 'autoExpand', 'maxHeight', 'overflow', 'collapsedLines'];
+
 /**
  * `spatialConfig` thành phần ruột của `style`. Khai rỗng thì trả chuỗi rỗng: độ rộng chia đều và chiều cao theo nội dung là mặc định, mà mặc định thì để CSS nói một lần ở `components.html` chứ không lặp vào từng thẻ.
  *
@@ -51,6 +54,11 @@ function renderSpatialStyle(kg) {
   var thuGon = c.overflow === 'collapse';
   var tran = c.maxHeight === undefined ? '' : renderLength(c.maxHeight);
 
+  Object.keys(c).forEach(function (k) {
+    if (RENDER_SPATIAL_KEYS.indexOf(k) === -1) {
+      throw new Error('`spatialConfig` không có khóa "' + k + '". Năm khóa: ' + RENDER_SPATIAL_KEYS.join(', ') + '.');
+    }
+  });
   if (c.overflow !== undefined && RENDER_OVERFLOW_VALUES.indexOf(c.overflow) === -1) {
     throw new Error('`overflow` chỉ nhận "scroll" hoặc "collapse", đang nhận "' + c.overflow + '".');
   }
@@ -88,7 +96,7 @@ function renderSpatialAttrs(kg) {
 var RENDER_INDEX = { nodes: {}, menus: {}, ctx: null, dem: 0 };
 
 /** Thẻ HTML của từng vai. */
-var RENDER_TAG_BY_ROLE = { box: 'div', card: 'section', row: 'div', text: 'div', field: 'div', button: 'button', icon: 'button' };
+var RENDER_TAG_BY_ROLE = { box: 'div', card: 'section', row: 'div', text: 'div', field: 'div', button: 'button', icon: 'button', check: 'label' };
 
 /** Control suy từ `type` khi `UI_SCHEMA` không khai. Tài liệu 03 Phần 7. */
 var RENDER_CONTROL_BY_TYPE = { TEXT: 'text', NUMBER: 'number', DATE: 'date', SELECT: 'select' };
@@ -125,6 +133,7 @@ function renderNodeAttrs(node) {
   if (node.role !== 'card') { ra += renderSpatialAttrs(node.spatialConfig); }
   if (node.role !== 'field') { ra += renderActionAttrs(node); }
   if (node.role === 'icon') { ra += renderAttr('title', node.tooltip) + renderAttr('aria-label', node.tooltip || node.label); }
+  if (node.role !== 'check') { ra += renderAttr('data-pick', node.pick); }
 
   return ra;
 }
@@ -290,6 +299,11 @@ var RENDER_INNER_BY_ROLE = {
   button: function (node) { return '<span class="shin-btn-label">' + renderEscape(node.label) + '</span>' + renderMenuCaret(node); },
   icon: function (node) {
     return (node.icon ? iconSvg(node.icon) : '<span class="shin-btn-label">' + renderEscape(node.label) + '</span>') + renderMenuCaret(node);
+  },
+  check: function (node) {
+    if (!node.pick) { throw new Error('Block vai "check" thiếu khóa `pick` — ô đánh dấu phải biết nó chọn bản ghi nào.'); }
+    return '<input type="checkbox" class="shin-check-box"' + renderAttr('data-pick', node.pick)
+      + renderAttr('aria-label', node.label || 'Chọn dòng') + '>';
   }
 };
 

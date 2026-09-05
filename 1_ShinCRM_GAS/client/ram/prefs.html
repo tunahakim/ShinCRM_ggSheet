@@ -1,0 +1,66 @@
+<script>
+/*
+ * `Prefs` — ba núm chọn của sidebar phía client. Tài liệu 07 Phần 6, tài liệu 04 Phần 2, tài liệu 03 Phần 8.
+ *
+ * Ở ngoài `Store` chứ không nằm trong, vì tài liệu 05 Phần 7 chốt hình dạng của `Store` là dữ liệu nghiệp vụ và không thêm thành viên nào. Núm chọn là thói dùng, nhớ ở `UserProperties` phía máy chủ, không phải dữ liệu của tệp.
+ *
+ * Đường đi: `loadCore` trả về `payload.prefs` → `prefsIngest` → bấm núm thì `prefsSet` đổi số trong RAM rồi gọi `userPrefsWrite` phía máy chủ. Đổi RAM trước để giao diện phản hồi ngay; ngoại lệ của luật "chỉ đổi sau khi máy chủ xác nhận" là hợp lệ vì đây không phải dữ liệu nghiệp vụ — sai thì lần mở sau tự về đúng.
+ */
+
+/** Ba nấc của chế độ xem card lịch sử. Tài liệu 03 Phần 8. */
+var PREFS_ACTIVITY_VIEWS = ['all', 'active', 'deleted'];
+
+/** Ngầm định phải khớp `USER_PREFS` phía máy chủ. Chỉ dùng khi `loadCore` chưa về — sau ingest thì giá trị của máy chủ là giá trị đúng. */
+var Prefs = {
+  followSelection: true,
+  autoRenderView: true,
+  activityView: 'active'
+};
+
+var PREFS_NAMES = Object.keys(Prefs);
+
+/** Về ba ngầm định. Dùng lúc nạp lại từ đầu, và trong bộ kiểm để mỗi ca chạy trên trạng thái sạch. */
+function prefsReset() {
+  Prefs.followSelection = true;
+  Prefs.autoRenderView = true;
+  Prefs.activityView = 'active';
+}
+
+/** Nhận khối núm từ `loadCore`. Thiếu khối, hay thiếu một núm, đều giữ ngầm định — gói cũ không làm sập lượt mở. */
+function prefsIngest(block) {
+  PREFS_NAMES.forEach(function (name) {
+    if (block && block[name] !== undefined) { Prefs[name] = block[name]; }
+  });
+  return Prefs;
+}
+
+/**
+ * Đổi một núm: kiểm tên và giá trị, đổi RAM, rồi trả về hàm gọi máy chủ để bên hành động tự quyết khi nào gửi.
+ *
+ * Không tự gọi `google.script.run` ở đây vì tệp này phải kiểm được offline. Trả về `{prefs, name, value}` để `ACTIONS` gửi đi.
+ */
+function prefsSet(name, value) {
+  if (PREFS_NAMES.indexOf(name) === -1) {
+    throw new Error('Không có núm chọn "' + name + '". Ba núm: ' + PREFS_NAMES.join(', ') + '.');
+  }
+
+  if (name === 'activityView') {
+    if (PREFS_ACTIVITY_VIEWS.indexOf(value) === -1) {
+      throw new Error('Chế độ xem card lịch sử chỉ nhận một trong ' + PREFS_ACTIVITY_VIEWS.join(', ') + ', nhận được: ' + JSON.stringify(value) + '.');
+    }
+  } else if (value !== true && value !== false) {
+    throw new Error('Núm "' + name + '" là công tắc bật tắt nên chỉ nhận `true` hoặc `false`, nhận được: ' + JSON.stringify(value) + '.');
+  }
+
+  Prefs[name] = value;
+  return { name: name, value: value, prefs: Prefs };
+}
+
+/** Lật một công tắc bật tắt. Chế độ xem không lật được vì nó ba nấc. */
+function prefsToggle(name) {
+  if (name === 'activityView') {
+    throw new Error('`activityView` có ba nấc nên không lật được, gọi `prefsSet` với một trong ' + PREFS_ACTIVITY_VIEWS.join(', ') + '.');
+  }
+  return prefsSet(name, !Prefs[name]);
+}
+</script>

@@ -1,0 +1,106 @@
+<script>
+/*
+ * Ba thứ làm nên trạng thái giao diện, không hơn. Tài liệu 04 Phần 8.
+ *
+ * Gom vào một object `ScreenState` chứ không để ba biến toàn cục rời, vì một trong ba tên là `screen` — mà `window.screen` là thuộc tính có sẵn của trình duyệt và chỉ có getter, nên `var screen = 'view'` sẽ **im lặng không ăn**. Đúng loại bọ mà tài liệu 01 gọi là bọ tên trùng trong một không gian tên duy nhất.
+ *
+ * Tệp này không chạm DOM và không gọi máy chủ: nó chỉ giữ số. Việc vẽ là của `renderEngine`, việc thu thập bản nháp là của đường lưu.
+ */
+
+/** Bốn màn của hệ, tài liệu 04 Phần 8. Ba màn form đẩy được vào ngăn xếp; `view` thì không, nó là đáy. */
+var SCREEN_NAMES = ['view', 'customerForm', 'activityForm', 'noteForm'];
+var SCREEN_VIEW = 'view';
+
+/**
+ * `formStack` giữ **mọi** form đang mở, đỉnh là form đang hiện. Nhờ vậy bản ghi gốc của form đang gõ có chỗ ở, và lúc đóng form lồng thì bỏ đỉnh đi là đỉnh mới thành form cần vẽ lại.
+ *
+ * `screen` vẫn là một trường thật chứ không suy ra từ đỉnh ngăn xếp, vì tài liệu khai nó là một trong ba thứ của trạng thái — push và pop có nhiệm vụ giữ hai bên khớp nhau.
+ */
+var ScreenState = {
+  currentCustomerId: '',
+  screen: SCREEN_VIEW,
+  formStack: []
+};
+
+/** Về trạng thái trắng. Dùng lúc nạp lại từ đầu, và trong bộ kiểm để mỗi ca chạy trên trạng thái sạch. */
+function screenStateReset() {
+  ScreenState.currentCustomerId = '';
+  ScreenState.screen = SCREEN_VIEW;
+  ScreenState.formStack = [];
+}
+
+/** Đổi khách đang xem. Không dọn ngăn xếp form: đổi khách lúc đang gõ dở là ca của nguồn-chọn, và cấm hay cho phép là quyết định của hành động, không phải của chỗ giữ số. */
+function screenStateSetCustomer(id) {
+  ScreenState.currentCustomerId = String(id === null || id === undefined ? '' : id);
+  return ScreenState.currentCustomerId;
+}
+
+/** Đỉnh ngăn xếp — form đang hiện — hoặc `null` khi đang ở màn `view`. */
+function screenStateTop() {
+  return ScreenState.formStack.length ? ScreenState.formStack[ScreenState.formStack.length - 1] : null;
+}
+
+/**
+ * Mở một form: đẩy vào ngăn xếp rồi chuyển màn. Bản ghi rỗng là thêm mới, có mã là sửa — tài liệu 04 Phần 8.
+ *
+ * Muốn giữ những gì đang gõ ở form hiện tại thì gọi `screenStateSetDraft` **trước** khi gọi hàm này. Tách hai bước vì bộ thu thập thuộc đường lưu, còn tệp này không biết đọc DOM.
+ */
+function screenStateOpenForm(man, entity, record) {
+  if (SCREEN_NAMES.indexOf(man) === -1) {
+    throw new Error('Không có màn "' + man + '". Bốn màn: ' + SCREEN_NAMES.join(', ') + '.');
+  }
+  if (man === SCREEN_VIEW) {
+    throw new Error('`view` không phải form nên không đẩy vào ngăn xếp được. Muốn về màn xem thì gọi `screenStateGoView`.');
+  }
+  if (typeof entity !== 'string' || !entity) {
+    throw new Error('Mở màn "' + man + '" mà thiếu tên thực thể — thực thể quyết định form này ghi vào sheet nào.');
+  }
+
+  ScreenState.formStack.push({ screen: man, entity: entity, record: record || {}, draft: {} });
+  ScreenState.screen = man;
+  return screenStateTop();
+}
+
+/** Cất bản nháp vào form đang hiện. Chỉ cất, không kiểm bắt buộc: kiểm tra chỉ xảy ra lúc bấm lưu — **`[RÀNG BUỘC CỨNG]`** tài liệu 04 Phần 8. */
+function screenStateSetDraft(draft) {
+  var top = screenStateTop();
+  if (!top) { throw new Error('Không có form nào đang mở để cất bản nháp.'); }
+
+  top.draft = draft || {};
+  return top;
+}
+
+/**
+ * Đóng form đang hiện. Trả về form cần vẽ lại, hoặc `null` khi đã về màn `view`.
+ *
+ * Form trả về mang theo `draft` của chính nó, nên bên vẽ dựng lại được nguyên những gì người dùng đang gõ.
+ */
+function screenStateCloseForm() {
+  if (!ScreenState.formStack.length) {
+    throw new Error('Không có form nào đang mở để đóng. Màn hiện tại là "' + ScreenState.screen + '".');
+  }
+
+  ScreenState.formStack.pop();
+  var top = screenStateTop();
+  ScreenState.screen = top ? top.screen : SCREEN_VIEW;
+  return top;
+}
+
+/** Bỏ hết form đang mở và về màn xem. Dùng sau khi lưu xong hoặc khi đổi khách, chứ không dùng cho nút Hủy — nút Hủy đóng đúng một form. */
+function screenStateGoView() {
+  ScreenState.formStack = [];
+  ScreenState.screen = SCREEN_VIEW;
+  return SCREEN_VIEW;
+}
+
+/** Dữ liệu để vẽ form đang hiện: bản nháp đè lên bản ghi gốc. Bản nháp rỗng thì ra đúng bản ghi gốc, nên hàm này dùng được cho cả lần mở đầu tiên. */
+function screenStateFormRecord() {
+  var top = screenStateTop();
+  if (!top) { return null; }
+
+  var out = {};
+  Object.keys(top.record).forEach(function (k) { out[k] = top.record[k]; });
+  Object.keys(top.draft).forEach(function (k) { out[k] = top.draft[k]; });
+  return out;
+}
+</script>

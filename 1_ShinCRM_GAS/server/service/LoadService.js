@@ -20,7 +20,7 @@ var LOAD_SOURCE = 'sidebar';
 /**
  * Nạp phần lõi. Đây là lời gọi đầu tiên của mỗi lượt mở sidebar.
  *
- * Trả về `{ ok: true, blocked: false, settings, schema, config, categories, customer, activity, budget, dirty, warnings, ms }` ở đường bình thường, hoặc `{ ok: true, blocked: 'cellBudget', budget, dirty, ms }` khi vượt trần ngân sách ô.
+ * Trả về `{ ok: true, blocked: false, settings, schema, config, categories, customer, activity, prefs, budget, dirty, warnings, ms }` ở đường bình thường, hoặc `{ ok: true, blocked: 'cellBudget', budget, dirty, ms }` khi vượt trần ngân sách ô.
  *
  * **Đo ngân sách ô là việc đầu tiên, trước khi đọc một ô dữ liệu nào.** Vượt trần thì dừng ngay tại đó. Phép đo không đọc ô nào nên nó gần như miễn phí, còn đọc dữ liệu trong một tệp đã quá ì là cách chắc nhất để lượt chạy chết ở giữa đường — và chết ở giữa đường thì người dùng thấy sidebar treo, không thấy nguyên nhân.
  *
@@ -82,6 +82,7 @@ function loadCore() {
       customer: { fields: khach.fields, rows: khach.rows, blankRows: khach.blankRows },
       rowMaps: loadRowMaps(khach),
       activity: { total: soGiaoDich, chunkRows: SETTINGS.CHUNK_ROWS },
+      prefs: userPrefsRead(),
       budget: budget,
       dirty: dirtyStateRead(),
       warnings: warnings,

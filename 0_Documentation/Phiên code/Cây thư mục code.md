@@ -62,7 +62,8 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── DateText.js           Biên giới duy nhất giữa Date và hai dạng chuỗi thời gian của dự án. google.script.run không mang Date qua được, nên mọi mốc thời gian đi đường chuỗi.
 │   │   └── TextNormalize.js      Chuẩn hóa văn bản trước khi so sánh. Có một bản sinh đôi ở client\util\ — hai bản phải giống nhau từng dòng.
 │   ├── state\
-│   │   └── DirtyState.js         Cờ "sheet đã lệch so với RAM", giữ ở DocumentProperties. Đọc không bao giờ ném lỗi, vì nó đi kèm mọi lượt trả về.
+│   │   ├── DirtyState.js         Cờ "sheet đã lệch so với RAM", giữ ở DocumentProperties. Đọc không bao giờ ném lỗi, vì nó đi kèm mọi lượt trả về.
+│   │   └── UserPrefs.js          Ba núm chọn của sidebar, giữ ở UserProperties. Chiều đọc không bao giờ ném vì nó nằm trên đường nạp lõi; chiều ghi ném ngay vì giá trị lạ ở đó là code gọi sai.
 │   ├── service\
 │   │   └── LoadService.js        Gom cả một lượt nạp: đo ngân sách ô, đọc tham số, danh mục, toàn bộ khách, rồi giao dịch theo gói.
 │   ├── log\
@@ -88,19 +89,25 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   ├── ram\                      Kho dữ liệu trong RAM của sidebar, và đường nhận dữ liệu từ máy chủ.
 │   │   ├── store.html            Kho runtime cùng bảy đường tra duy nhất được chạm vào nó. Không đường nào nhận tham số chế độ xem.
 │   │   ├── ingest.html           Chỗ DUY NHẤT biết hình dạng đường truyền { fields, rows }. Bung thành object đúng một lần ở đây.
+│   │   ├── screenState.html      Màn nào đang hiện, khách nào đang xem, form đang sửa bản ghi nào. Một object chứ ba biến rời — vì window.screen là tên trình duyệt đã chiếm, khai trùng thì lặng lẽ không có tác dụng.
+│   │   ├── prefs.html            Bản sao ba núm chọn trong RAM. Ngầm định ở đây phải khớp từng núm với bảng khai máy chủ; việc gửi lên máy chủ là của ACTIONS, tệp này không gọi google.script.run.
 │   │   └── bootstrap.html        Trình tự khởi động: nạp lõi, hiện màn hình, rồi nạp giao dịch theo gói ở phía sau.
 │   ├── schema\
 │   │   ├── schemaAccess.html     Cửa tra bảng khai bên client. Hỏi tên trường không có thì ném lỗi kèm gợi ý tên gần đúng, không trả về undefined.
+│   │   ├── uiSchema.html         Khai bố cục bốn màn bằng dữ liệu: thanh trên, thân, chân trang, và những trường nào nằm ở đâu. Không một dòng logic — mọi câu hỏi "màn này trông thế nào" trả lời được bằng cách đọc tệp này.
+│   │   ├── fieldLogic.html       Sáu hàm ngầm định của tài liệu 03 Phần 6: giá trị điền sẵn khi mở form trống, và giá trị mang theo từ giao dịch trước.
 │   │   └── schemaCheck.html      Phép tự kiểm bảng khai cột, chạy được ở cả hai phía.
 │   ├── style\                    Hình thức DÙNG CHUNG cho mọi màn. Chỉ có <style>, không khai tên JavaScript nào.
 │   │   ├── tokens.html           Khối biến CSS: màu, cỡ chữ, khoảng cách. Đổi diện mạo thì vào đây.
 │   │   ├── frame.html            Bố cục năm vùng: thanh trên, vạch tiến trình, khối thông tin, thân cuộn, chân trang.
-│   │   └── components.html       Hình thức của thứ engine dựng ra: hàng, card, trường, ô nhập, chip, nút. Hai mặc định của spatialConfig nói ở đây một lần thay vì dán vào từng thẻ.
+│   │   ├── components.html       Hình thức của thứ engine dựng ra: hàng, card, trường, ô nhập, chip, nút. Hai mặc định của spatialConfig nói ở đây một lần thay vì dán vào từng thẻ.
+│   │   └── slots.html            Hình thức riêng của ba vùng do SLOTS sinh ra: dòng lịch sử, hộp gợi ý tìm khách, khối thông tin chung. Tách khỏi components.html vì các lớp này chỉ một tệp sinh ra.
 │   ├── ui\                       Bộ máy giao diện màn nào cũng gọi được. spatialConfig giữ toàn quyền về khoảng cách.
 │   │   ├── progress.html         Vạch tiến trình cho mọi lượt gọi máy chủ. Đếm số lời gọi đang chờ, không giữ một cờ bật tắt.
 │   │   ├── icons.html            Chín glyph SVG nội tuyến, tra theo tên. Tên lạ thì ném lỗi chứ không vẽ nút trống.
-│   │   ├── uiBuilder.html        Hình dạng MỘT node Block, và sáu hàm dựng Card/Row/Text/Field/Button/Icon. Khóa lạ bị ném lỗi — đó là cách luật "không có style tự do" thành thật.
+│   │   ├── uiBuilder.html        Hình dạng MỘT node Block, và bảy hàm dựng Card/Row/Text/Field/Button/Icon/Check. Khóa lạ bị ném lỗi — đó là cách luật "không có style tự do" thành thật.
 │   │   ├── screenBuild.html      Lối viết tắt của UI_SCHEMA thành cây Block: mảng lồng mảng, chuỗi trần thay cho object, cụm group/rows. Không chạm DOM nên kiểm được offline.
+│   │   ├── slots.html            Ba vùng nội dung mà UI_SCHEMA không khai trước được: danh sách giao dịch, hộp gợi ý tìm khách, khối thông tin chung. Trả về cây Block chứ không trả chuỗi HTML.
 │   │   └── renderEngine.html     Cây Block thành HTML rồi gán vào bốn vùng. Thoát ký tự, dịch spatialConfig thành style, và renderTarget — cách DUY NHẤT đổi nội dung màn.
 │   ├── screen\                   Một tệp một màn người dùng nhìn thấy. Màn được mang theo style riêng, vì style đó chết cùng màn đó.
 │   │   └── statusScreen.html     Ba màn không có form: tóm tắt lượt nạp, lỗi nạp, và màn chặn khi vượt trần ngân sách ô.
@@ -148,12 +155,18 @@ tests\
     ├── categoryRead.js           Cái bẫy @CAT_CHO_PHEP_FBM, và mọi trường SELECT đều tìm được danh mục của mình.
     ├── configRead.js             Khóa trùng thì chặn, còn khối sắp xếp thì thứ tự hàng là nghĩa.
     ├── dirtyState.js             Khối trạng thái bẩn KHÔNG BAO GIỜ được ném, kể cả khi tệp thuộc tính hỏng hoặc đọc dở dang.
+    ├── userPrefs.js              Ba núm chọn phía máy chủ: giá trị lạ đều rơi về ngầm định, và ghi một núm KHÔNG được để lại dấu vết nào ở DocumentProperties.
     ├── schemaAccess.js           Cửa đọc bảng khai: tên gõ sai nổ ngay kèm gợi ý, còn tên máy như toJSON thì phải đi qua.
+    ├── fieldLogic.js             Sáu hàm ngầm định: mã kế tiếp lấy từ bộ đếm dạng chuỗi, và giá trị mang theo từ giao dịch gần nhất CÒN SỐNG.
     ├── loadService.js            Hình dạng gói loadCore, đường chặn vì ngân sách ô, và con trỏ gói giao dịch đi ngược từ hàng cuối.
     ├── ramStore.js               NGHIỆM THU CHẶNG 1.2: hai hộp cát, dữ liệu đi qua cầu google.script.run thật, và ba luật tra cứu khác nhau của Store.
+    ├── screenState.js            Ngăn xếp form: screen là trường thật chứ không suy ra từ đỉnh ngăn xếp, nên push và pop phải giữ hai bên khớp. Kiểm luôn bẫy window.screen.
+    ├── prefs.js                  Ngầm định phía client khớp từng núm với máy chủ — lệch thì lần mở đầu tiên hiện một nấc rồi tự nhảy sang nấc khác.
     ├── callTiming.js             Phép trừ "client đo được trừ máy chủ báo". Sai chỗ này thì tiền đi đường hiện ra sai, và cỡ gói bị chọn theo một con số bịa.
     ├── uiBuilder.js              Cây Block và lối viết tắt của UI_SCHEMA. Phần đáng kiểm không phải "dựng đúng thì ra đúng" mà "dựng sai thì có chặn không".
-    └── renderEngine.js           Cây Block thành HTML: ký tự đặc biệt trong tên công ty, spatialConfig khai rồi mà bố cục không đổi, data-field thiếu đường dẫn, và luật chỉ-đọc bị mở khóa.
+    ├── uiSchema.js               Bảng khai bố cục giữ hợp đồng với ba tệp khác: mọi đường dẫn trường tra được trong DATA_SCHEMA, mọi tên hàm có trong ACTIONS, và bốn màn dựng qua screenBuild không nổ.
+    ├── renderEngine.js           Cây Block thành HTML: ký tự đặc biệt trong tên công ty, spatialConfig khai rồi mà bố cục không đổi, data-field thiếu đường dẫn, và luật chỉ-đọc bị mở khóa.
+    └── slots.js                  Dòng lịch sử giữ đúng thứ tự thời gian kể cả khi có bản ghi đã xóa chen giữa, và KHÔNG dòng nào mang field — engine tra một bản ghi cho một thực thể.
 ```
 
 ## Bảng tra: tên trong tài liệu thiết kế → tệp thật
@@ -180,7 +193,7 @@ Không sửa tên trong tài liệu thiết kế vì hai lẽ: chúng là bản 
 | `client/ui/tokens.html` | `client/style/tokens.html` |
 | `client/ui/frame.html` | `client/style/frame.html` |
 
-Chín tệp máy chủ dựng ở chặng 1.1 và 1.2 không có trong bảng này vì tài liệu thiết kế không đặt tên cho chúng: `SheetGrid.js`, `CellBudget.js`, `EntityRead.js`, `CategoryRead.js`, `ConfigRead.js`, `DateText.js`, `EntryPoint.js`, `ErrorReport.js`, `ConfigParams.js`. Tài liệu nói *phải làm gì* ở các phần tương ứng, còn việc gom mỗi luật vào một tệp là quyết định của phiên code — nên chỗ tra chúng là cây thư mục ở trên, không phải bảng này.
+Mười tệp máy chủ không có trong bảng này vì tài liệu thiết kế không đặt tên cho chúng: `SheetGrid.js`, `CellBudget.js`, `EntityRead.js`, `CategoryRead.js`, `ConfigRead.js`, `DateText.js`, `EntryPoint.js`, `ErrorReport.js`, `ConfigParams.js`, `UserPrefs.js`. Tài liệu nói *phải làm gì* ở các phần tương ứng — với `UserPrefs.js` là tài liệu 07 Phần 6, chỗ ra luật "mọi núm chọn nhớ ở `UserProperties`" mà không đặt tên tệp — còn việc gom mỗi luật vào một tệp là quyết định của phiên code, nên chỗ tra chúng là cây thư mục ở trên, không phải bảng này.
 
 Bốn dòng `client/...js` lệch vì một lý do khác hẳn các dòng trên, đã ghi ở tài liệu làm việc `Mục tiêu chặng 1.1 và 1.2.md`: **mọi** tệp client trên Apps Script buộc phải là `.html`, không phải `.js` như tài liệu 04 Phần 10 và 05 Phần 13 viết.
 
