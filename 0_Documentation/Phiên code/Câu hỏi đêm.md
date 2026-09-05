@@ -221,3 +221,11 @@ Bản cũ neo cú dán vào ô `n-code` vì lúc đó mã khách gõ tay đượ
 **Đã chọn: neo vào ô tên công ty, và nếu dòng đầu của khối trông như một mã khách thì bỏ dòng đó.** Nếp tay của chủ dự án là chép nguyên một hàng bắt đầu bằng mã khách, nên phép bỏ dòng đầu giữ cho nếp tay đó vẫn xếp đúng cột. Mẫu nhận dạng: hai tới bốn chữ in hoa, gạch ngang, rồi từ ba số.
 
 **Điểm còn mơ hồ, chờ mắt chủ dự án:** thứ tự năm cột của khối dán đang là tên công ty, mã số thuế, người liên hệ, số điện thoại, thư điện tử — lấy theo bản cũ. Nếu nếp chép thật khác thì sửa đúng một mảng `INPUTS_PASTE_FIELDS` trong `client/ui/inputs.html`.
+
+### 7.7. Sản phẩm của giao dịch mới kế tục hai bậc, và `Store` mọc thêm một cửa tra
+
+Bản cũ đoán ô sản phẩm theo hai bậc: lấy của giao dịch gần nhất, không có giao dịch nào thì lấy của hồ sơ khách. Bản mới trước lượt này **không đoán ô này chút nào** — bảng `DEFAULTS` có ngày hôm nay, có ghim, có hạn xử lý, nhưng thiếu sản phẩm. Mà `activity.product` khai `required`, nên thiếu phép đoán là mỗi giao dịch bắt người dùng chọn lại một mặt hàng mà mười lần thì chín lần vẫn là mặt hàng cũ.
+
+**Đã chọn: thêm `carryForwardProduct` với đúng hai bậc của bản cũ, và khai `default` đó lên `activity.product`.** Ô nào đoán được thì tên trường vào danh sách `carried` để form nhuộm màu, nên người dùng nhìn ra ngay đâu là chữ mình gõ và đâu là chữ máy đoán — chỗ này hơn bản cũ, bản cũ điền im lặng.
+
+Kèm theo là một cửa tra mới `Store.hasCustomer(id)`. Lý do phải có: `Store.getCustomer` cố ý **ném lỗi** khi không tra ra mã, vì nó là cửa của nơi *vẽ* một khách và vẽ trượt thì người dùng tưởng mất dữ liệu. Còn ở đây bên gọi chỉ đang *đoán* một ô, nên hậu quả đúng của việc tra trượt là một ô trống, không phải một form sập. Hai hậu quả khác nhau thì phải hai cửa khác nhau, chứ không phải bọc `try` quanh cửa cũ.

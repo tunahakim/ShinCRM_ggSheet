@@ -1,8 +1,8 @@
 <script>
 /*
- * `DEFAULTS` — sáu ngầm định tính-toán, tức những giá trị máy tự điền vào form trước khi người dùng gõ. Tài liệu 03 Phần 6.
+ * `DEFAULTS` — bảy ngầm định tính-toán, tức những giá trị máy tự điền vào form trước khi người dùng gõ. Tài liệu 03 Phần 6.
  *
- * Bảng này ở phía client vì ngầm định là thứ điền vào form, và hai hàm kế tục phải tra `Store`. Hai bảng còn lại của tài liệu 03 Phần 6 — `NORMALIZERS` và `VALIDATORS` — cố ý **không** có ở đây: chúng chỉ tồn tại một bản phía máy chủ và chỉ cửa ghi được gọi.
+ * Bảng này ở phía client vì ngầm định là thứ điền vào form, và ba hàm kế tục phải tra `Store`. Hai bảng còn lại của tài liệu 03 Phần 6 — `NORMALIZERS` và `VALIDATORS` — cố ý **không** có ở đây: chúng chỉ tồn tại một bản phía máy chủ và chỉ cửa ghi được gọi.
  *
  * Chữ ký chung: `(entity, record) => giá trị`. `record` là bản ghi đang dựng, nên hàm nào cần biết khách nào thì đọc `record.customerId`.
  */
@@ -57,18 +57,35 @@ function fieldLogicCarry(record, ten) {
   return last[ten];
 }
 
-/** Sáu ngầm định của tài liệu 03 Phần 6. Tên khai trong `DATA_SCHEMA` bằng chuỗi, tra ở bảng này — cùng luật với `ACTIONS` và `SLOTS`. */
+/**
+ * Sản phẩm đoán cho form giao dịch mới: **lần làm việc gần nhất trước, hồ sơ khách sau**.
+ *
+ * Đây là ca duy nhất có hai nguồn, và thứ tự này lấy đúng của bản cũ: một khách bán nhiều mặt hàng thì mặt hàng của lần làm việc vừa rồi sát với việc đang làm hơn là mặt hàng khai ở hồ sơ. Khách chưa có lần làm việc nào thì hồ sơ là thứ duy nhất còn lại, và nó vẫn hơn một ô trống — trường này khai `required` nên bỏ trống là bắt người dùng gõ thêm một lần.
+ *
+ * Không gọi `Store.getCustomer` mà hỏi `Store.hasCustomer` trước, vì `getCustomer` cố ý ném lỗi khi không tra ra mã: một phép đoán không được quyền làm sập cả form chỉ vì bộ nhớ vừa cũ đi.
+ */
+function fieldLogicCarryProduct(record) {
+  var tuLanTruoc = fieldLogicCarry(record, 'product');
+  if (tuLanTruoc) { return tuLanTruoc; }
+
+  var id = record && record.customerId;
+  if (!id || !Store.hasCustomer(id)) { return ''; }
+  return Store.getCustomer(id).product || '';
+}
+
+/** Bảy ngầm định của tài liệu 03 Phần 6. Tên khai trong `DATA_SCHEMA` bằng chuỗi, tra ở bảng này — cùng luật với `ACTIONS` và `SLOTS`. */
 var DEFAULTS = {
   today: function () { return fieldLogicToday(); },
   now: function () { return fieldLogicNow(); },
   nextCustomerCode: function () { return fieldLogicNextCode('customer', 'CUS-'); },
   nextActivityCode: function () { return fieldLogicNextCode('activity', 'ACT-'); },
   carryForwardPriority: function (entity, record) { return fieldLogicCarry(record, 'priority'); },
-  carryForwardDueAt: function (entity, record) { return fieldLogicCarry(record, 'dueAt'); }
+  carryForwardDueAt: function (entity, record) { return fieldLogicCarry(record, 'dueAt'); },
+  carryForwardProduct: function (entity, record) { return fieldLogicCarryProduct(record); }
 };
 
-/** Hai ngầm định thuộc loại kế tục. Khai bằng tên hàm chứ không bằng tên trường, để đổi trường nào dùng kế tục thì chỉ sửa `DATA_SCHEMA`. */
-var FIELD_LOGIC_CARRY_DEFAULTS = ['carryForwardPriority', 'carryForwardDueAt'];
+/** Ba ngầm định thuộc loại kế tục, tức loại phải nhuộm màu cho mắt nhìn ra. Khai bằng tên hàm chứ không bằng tên trường, để đổi trường nào dùng kế tục thì chỉ sửa `DATA_SCHEMA`. */
+var FIELD_LOGIC_CARRY_DEFAULTS = ['carryForwardPriority', 'carryForwardDueAt', 'carryForwardProduct'];
 
 /**
  * Bản ghi trắng của một form thêm mới: mọi trường có `default` đều chạy hàm ngầm định, theo đúng thứ tự khai trong `DATA_SCHEMA`.

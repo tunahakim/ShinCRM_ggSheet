@@ -209,17 +209,18 @@ Bản mới có ba thứ bản cũ không có, và chúng đổi cách hiện th
 | Ô combo không mũi tên, chọn vào ô là tự bung | `client/ui/combo.html`. Hơn bản cũ ở ba chỗ: lọc **không dấu**, ô rỗng thì **không sáng dòng nào** nên Enter cho qua ô không điền bừa mục đầu, và trần cao đo lúc chạy rồi **bung lên trên** khi phía dưới hẹp — bản cũ luôn bung xuống và bị vùng thân cắt mất. |
 | Enter nhảy ô, chặng cuối là nút Lưu | `client/ui/inputs.html`. Nhường phím cho ô nhiều dòng và cho combo đang mở danh sách. |
 | Dán một khối thành cả form khách | `client/ui/inputs.html`, năm cột, số điện thoại lọc còn chữ số, ô thư điện tử chỉ nhận dòng có `@` và dấu chấm, chỗ máy tự điền nhuộm vàng cho tới khi người dùng gõ hoặc bấm vào. Neo vào ô tên công ty chứ không phải ô mã khách — xem `Câu hỏi đêm.md` 7.6. |
+| Hai giá trị một hàng | Khối thông tin chung: tên công ty một hàng, rồi `mã khách • người liên hệ` bên trái với **số điện thoại ghim mép phải**. Bốn giá trị trong hai dòng, đúng mẹo của bản cũ. Không có điện thoại thì hàng phụ về một cột chứ không để lại thẻ rỗng. |
+| Chip co theo chữ của nó | `.shin-badge { flex: 0 0 auto }`. Không có dòng đó thì luật chia đều của `.shin-row` cho chip "Đã xóa" ăn nửa bề ngang và tên công ty bị ép còn một nửa. |
+| Form trống mở ra đã có sẵn giá trị đoán | `client/schema/fieldLogic.html`, bảy hàm ngầm định. Ba ca của bản cũ đều có: ngày làm việc là hôm nay, ghim kế tục giao dịch gần nhất, và sản phẩm kế tục giao dịch gần nhất rồi **rơi tiếp về sản phẩm khai ở hồ sơ khách** khi khách chưa có giao dịch nào — đúng nếp hai bậc của bản cũ. Hơn bản cũ: ô nào máy tự đoán thì trả về trong `carried` để nhuộm màu, còn bản cũ điền im lặng nên người dùng không phân biệt được giá trị mình gõ với giá trị máy đoán. |
 
 ### 3.2 Phải làm — món bản cũ có mà bản mới còn thiếu
 
 Xếp theo mức người dùng thấy ngay:
 
-1. **Ẩn cả khối khi rỗng và đổi nhãn nút theo trạng thái.** Bản cũ ẩn vùng nội dung ghi chú và đổi "Sửa" thành "Thêm mới". Bản mới có `.shin-readtext:empty::before` hiện chữ "(chưa có)" — giữ cách này vì nó cho một chỗ để bấm vào, nhưng nút cạnh nhãn phải đổi glyph theo có nội dung hay không.
-2. **Hai giá trị một hàng.** `UI_SCHEMA` có `Row` và `align: "right"` nên khai được ngay; phải soát lại bản khai của màn xem để dùng đúng nếp này thay vì mỗi trường một dòng.
-3. **Vẽ trước, gửi sau.** Thuộc chặng 1.4 (`saveFlow`). Ghi ở đây để chặng đó không quên: đóng form và cập nhật RAM trước, gọi máy chủ sau, và lỗi mạng phải nói rõ "chưa lưu được".
-4. **Lỗi hiện tại ô, không hiện bằng hộp thoại.** Cũng chặng 1.4: viền đỏ trên ô sai, con trỏ về ô sai đầu tiên, màu đỏ tự mất khi gõ lại. `--shin-error` và `--shin-error-soft` đã có.
-5. **Đoán giá trị khi mở form trống.** `client/schema/fieldLogic.html` đã có sáu hàm ngầm định — phải kiểm rằng chúng phủ đủ ba ca của bản cũ: hôm nay, sản phẩm của giao dịch gần nhất, ghim của giao dịch gần nhất.
-6. **Màn lỗi và màn quá tải.** `statusScreen.html` đã có ba màn. Phải soát rằng nút thử lại tự tắt lúc đang chạy như bản cũ, và số ô có dấu chấm nghìn.
+1. **Khối ghi chú rỗng: chỗ bấm.** Bản cũ ẩn hẳn vùng nội dung khi không có ghi chú và đổi liên kết thành dấu cộng + "Thêm mới". Bản mới hiện `(chưa có)` bằng `.shin-readtext:empty::before`, và giữ cách này vì nó cho một khoảng bấm rộng bằng cả khối thay cho một cái bút chì 20 pixel ở góc — nhưng `.shin-readtext` hiện **chưa mang `data-action`** nên bấm vào chữ đó không mở gì, lời hứa kia chưa thành. Phải cho control `readText` nhận khóa `action` thành `data-action` trên chính thẻ của nó, và khi đó `renderField` không sinh thêm nút bút chì ở hàng nhãn nữa. Nhãn nút thì **cố ý không đổi** theo nội dung: `titleActions` của `Card` chạy ngay lúc tệp `uiSchema` nạp nên nó không biết khách nào đang xem, mà nhét điều kiện vào tệp đó là phá luật "chỉ có dữ liệu, không một dòng logic".
+2. **Vẽ trước, gửi sau.** Thuộc chặng 1.4 (`saveFlow`). Ghi ở đây để chặng đó không quên: đóng form và cập nhật RAM trước, gọi máy chủ sau, và lỗi mạng phải nói rõ "chưa lưu được".
+3. **Lỗi hiện tại ô, không hiện bằng hộp thoại.** Cũng chặng 1.4: viền đỏ trên ô sai, con trỏ về ô sai đầu tiên, màu đỏ tự mất khi gõ lại. `--shin-error` và `--shin-error-soft` đã có.
+4. **Màn lỗi và màn quá tải.** `statusScreen.html` đã có ba màn. Phải soát rằng nút thử lại tự tắt lúc đang chạy như bản cũ, và số ô có dấu chấm nghìn.
 
 ### 3.3 Cố ý làm khác bản cũ
 

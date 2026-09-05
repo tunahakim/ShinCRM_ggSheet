@@ -1,7 +1,7 @@
 /**
- * Ca kiểm của `client/schema/fieldLogic.html` — sáu hàm ngầm định của tài liệu 03 Phần 6.
+ * Ca kiểm của `client/schema/fieldLogic.html` — bảy hàm ngầm định của tài liệu 03 Phần 6.
  *
- * Hai chỗ đáng kiểm nhất đều là chỗ hỏng-trong-im-lặng: mã xem trước sinh ra từ bộ đếm mà bộ đếm là **chuỗi** trong `Store.config`, và hai ngầm định kế tục phải đi qua `Store.getLatestActivity` chứ không phải phần tử đầu mảng — phần tử đầu có thể là một giao dịch đã xóa mềm.
+ * Ba chỗ đáng kiểm nhất đều là chỗ hỏng-trong-im-lặng: mã xem trước sinh ra từ bộ đếm mà bộ đếm là **chuỗi** trong `Store.config`, ba ngầm định kế tục phải đi qua `Store.getLatestActivity` chứ không phải phần tử đầu mảng — phần tử đầu có thể là một giao dịch đã xóa mềm, và riêng sản phẩm còn phải rơi tiếp về hồ sơ khách khi khách chưa có lần làm việc nào.
  */
 
 const { napClient, taoHopCat } = require('../lib/load-gas');
@@ -9,7 +9,7 @@ const { dungHop } = require('../lib/dung-hop');
 const { section, check, checkThrows, ghiLoiNap } = require('../lib/assert');
 
 function chay(so) {
-  section('fieldLogic — sáu ngầm định tính được của form');
+  section('fieldLogic — bảy ngầm định tính được của form');
 
   let hop;
   try {
@@ -59,11 +59,31 @@ function chay(so) {
   check(so, 'giao dịch đầu mảng đã xóa mềm thì kế tục lấy bản còn dùng, không lấy bản đã xóa',
     hop.DEFAULTS.carryForwardPriority('activity', { customerId: 'CUS-000002' }), 'Vừa');
 
+  // Sản phẩm là ca duy nhất có hai nguồn: lần làm việc gần nhất trước, hồ sơ khách sau.
+  hop.Store.customers['CUS-000001'] = { id: 'CUS-000001', companyName: 'Thép Hòa Phát', product: 'Tôn mạ kẽm' };
+  hop.Store.customers['CUS-000005'] = { id: 'CUS-000005', companyName: 'Cơ khí Đà Nẵng', product: 'Ống thép đúc' };
+  hop.Store.activitiesByCustomer['CUS-000001'][0].product = 'Thép hình H';
+
+  check(so, 'sản phẩm ưu tiên lấy của lần làm việc gần nhất, không lấy của hồ sơ khách',
+    hop.DEFAULTS.carryForwardProduct('activity', { customerId: 'CUS-000001' }), 'Thép hình H');
+
+  check(so, 'khách chưa có lần làm việc nào thì sản phẩm rơi về hồ sơ khách chứ không để trống',
+    hop.DEFAULTS.carryForwardProduct('activity', { customerId: 'CUS-000005' }), 'Ống thép đúc');
+
+  check(so, 'mã khách không có trong bộ nhớ thì sản phẩm ra rỗng, không làm sập form',
+    hop.DEFAULTS.carryForwardProduct('activity', { customerId: 'CUS-000404' }), '');
+
+  // Hồ sơ khách bỏ trống ô sản phẩm: vẫn phải ra rỗng, chứ không ra `undefined` rồi in ra chữ "undefined".
+  hop.Store.customers['CUS-000006'] = { id: 'CUS-000006', companyName: 'Thép Việt Nhật' };
+  check(so, 'hồ sơ khách bỏ trống sản phẩm thì ra rỗng chứ không ra undefined',
+    hop.DEFAULTS.carryForwardProduct('activity', { customerId: 'CUS-000006' }), '');
+
   // Dựng bản ghi mới: `seed` vào trước để hai hàm kế tục có mã khách mà tra.
   const moi = hop.fieldLogicNewRecord('activity', { customerId: 'CUS-000001' });
   check(so, 'bản ghi mới nhận seed rồi mới chạy các hàm ngầm định', moi.record.customerId, 'CUS-000001');
-  check(so, 'bản ghi mới mang cả hai giá trị kế tục và báo tên hai trường đã kế tục',
-    [moi.record.priority, moi.record.dueAt, moi.carried.sort()], ['Cao', '2026-09-10', ['dueAt', 'priority']]);
+  check(so, 'bản ghi mới mang cả ba giá trị kế tục và báo tên ba trường đã kế tục',
+    [moi.record.priority, moi.record.dueAt, moi.record.product, moi.carried.sort()],
+    ['Cao', '2026-09-10', 'Thép hình H', ['dueAt', 'priority', 'product']]);
   check(so, 'trường khai ngầm định today thì có ngày, không để trống', /^\d{4}-\d{2}-\d{2}$/.test(moi.record.workDate), true);
 
   const rong = hop.fieldLogicNewRecord('activity', { customerId: 'CUS-000404' });

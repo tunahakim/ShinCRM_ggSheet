@@ -93,6 +93,15 @@ Store.getCustomer = function (id) {
   throw new Error('Không có khách mã "' + id + '" trong bộ nhớ. Bộ nhớ đang giữ ' + Object.keys(Store.customers).length + ' khách; nếu mã này vừa lấy từ bản đồ dòng thì bản đồ đó đã cũ.');
 };
 
+/**
+ * Có khách mã này trong bộ nhớ hay không. Đây là cửa dành cho nơi **đoán** một giá trị, còn `getCustomer` là cửa dành cho nơi **vẽ** một khách.
+ *
+ * Hai cửa khác nhau vì hậu quả khác nhau: vẽ sai một khách thì người dùng tưởng dữ liệu bị mất nên phải hét lên, còn đoán trượt một ô ngầm định thì chỉ là một ô trống nên không được phép làm sập cả form.
+ */
+Store.hasCustomer = function (id) {
+  return Object.prototype.hasOwnProperty.call(Store.customers, id);
+};
+
 /** Mảng giao dịch của một khách, **cả còn sống lẫn đã xóa mềm**, đã sắp xếp. Chưa có thì mảng rỗng — ở đây rỗng là câu trả lời đúng, không phải dấu hiệu sai. */
 Store.getActivities = function (customerId) {
   return Store.activitiesByCustomer[customerId] || [];

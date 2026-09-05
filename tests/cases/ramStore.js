@@ -106,6 +106,12 @@ function chayTraCuu(so, nen, hop, hangDau) {
   checkThrows(so, 'lời lỗi nói luôn bộ nhớ đang giữ bao nhiêu khách, để người sửa biết là nạp hụt hay tra sai',
     () => hop.Store.getCustomer('KH9999'), 'đang giữ 3 khách');
 
+  // Cửa dành cho nơi đoán giá trị: cùng câu hỏi nhưng trả lời bằng đúng/sai, để một phép đoán không làm sập cả form.
+  check(so, 'hasCustomer trả đúng/sai chứ không ném, kể cả với mã không có',
+    [hop.Store.hasCustomer('KH0001'), hop.Store.hasCustomer('KH9999')], [true, false]);
+  check(so, 'hasCustomer không nhận nhầm tên thuộc tính sẵn có của đối tượng làm mã khách',
+    hop.Store.hasCustomer('toString'), false);
+
   check(so, 'getActivities của khách chưa có giao dịch trả MẢNG RỖNG, không ném — ở đây rỗng là câu trả lời đúng',
     hop.Store.getActivities('KH0002'), []);
   check(so, 'getActivities của mã không tồn tại cũng trả mảng rỗng, không ném', hop.Store.getActivities('KH9999'), []);
