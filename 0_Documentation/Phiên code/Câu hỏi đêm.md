@@ -237,3 +237,17 @@ Màn báo lượt nạp vỡ trước lượt này **không có nút Thử lại
 **Đã chọn: thuộc tính `data-busy` trên nút, `dispatch.html` đọc nó.** Nút nào khai `data-busy="chữ lúc chạy"` thì bộ phát click tắt nút và đổi chữ trước khi gọi hành động, bật lại khi hành động xong — kể cả nhánh `Promise` bị chối. Không tắt bừa mọi nút, vì phần lớn hành động vẽ lại vùng ngay trong cùng một nhịp nên nút cũ biến mất trước khi ai kịp bấm lần hai; chỗ cần khóa là chỗ gọi máy chủ rồi mới vẽ. Chặng 1.4 dùng lại đúng cơ chế này cho nút Lưu, chỉ cần node `button` của `UI_SCHEMA` nhận thêm khóa `busy`.
 
 **Kéo theo một thay đổi trong trình tự khởi động:** `dispatchInstall()` chuyển lên **dòng đầu** của khối `try` trong `sidebarBoot`, thay vì nằm ở cuối cùng với năm bộ gắn tai nghe khác. Lý do: nó không cần một hạt dữ liệu nào, mà gắn ở cuối thì lượt nạp đầu tiên bị vỡ sẽ vẽ ra một cái nút bấm không kêu — đúng loại lỗi im lặng khó tìm nhất. Vẫn để trong `try` để một khung thiếu `sidebar-root` còn ra được màn báo lỗi.
+
+### 7.9. Chỉ `readText` được mang `data-action` trên chính thẻ ô
+
+Card GHI CHÚ hứa một chỗ bấm rộng bằng cả khối chữ, nhưng `.shin-readtext` không mang `data-action` nên bấm vào chữ không mở gì — cả khối chỉ là chữ để đọc, và cửa duy nhất vào form ghi chú là cái bút chì 13 pixel ở tiêu đề card.
+
+**Đã chọn: control `readText` nhận khóa `action` thành `data-action` trên chính thẻ `div` của nó, và khi nó mang thì hàng nhãn thôi mọc bút chì.** Không mở đường này cho các control khác, vì mọi control còn lại đều là ô nhập: bấm vào ô để gõ mà nó nhảy sang màn khác là một cái bẫy. Đây là lý do luật nằm trong chính hàm `RENDER_CONTROLS.readText` chứ không nằm ở `renderControlAttrs` dùng chung — chỗ đặt luật cũng là chỗ giới hạn nó.
+
+Ba điều cố ý **không** làm kèm:
+
+- **Không bỏ bút chì ở tiêu đề card.** Một `div` không nhận được con trỏ bàn phím, nên nếu bỏ nút đó thì người dùng chỉ đi bằng bàn phím sẽ không còn đường nào vào form ghi chú. Bút chì ở tiêu đề là cửa cho bàn phím, khối chữ là đích cho chuột. Bút chì ở **hàng nhãn của trường** thì bỏ, vì nó nằm ngay sát khối chữ nên hai cửa dán vào nhau cho cùng một việc.
+- **Không thêm `role="button"` với `tabindex="0"` cho khối chữ.** Khai vai nút thì bàn phím phải gọi được bằng Enter và Space, mà bộ phát click chỉ nghe cú bấm chuột — khai một vai rồi không giữ lời thì tệ hơn là không khai, nhất là với trình đọc màn hình.
+- **Không thêm viền, không thêm lề cho khối bấm được.** Chỉ đổi nền lúc trỏ chuột tới. Một khung viền quanh ghi chú làm nó trông như ô nhập đang tắt, còn thêm lề thì chữ lệch so với các card khác trong một sidebar rộng 300 pixel.
+
+Nhãn nút cũng **cố ý không đổi** theo nội dung — không có chuyện rỗng thì hiện "Thêm mới" như bản cũ. `titleActions` của `Card` chạy ngay lúc tệp `uiSchema` nạp nên nó không biết khách nào đang xem, mà nhét điều kiện vào tệp đó là phá luật "chỉ có dữ liệu, không một dòng logic".

@@ -146,6 +146,14 @@
 
 .shin-readtext:empty::before { content: '(chưa có)'; color: var(--shin-text-soft); font-style: italic; }
 
+/*
+ * Khối chữ chỉ đọc **có việc gắn kèm**, tức bấm vào là mở form. Chọn theo `[data-action]` chứ không đặt thêm một tên lớp riêng: cái làm nó bấm được chính là thuộc tính đó, nên luật hình thức bám đúng vào nó thì không có đường lệch nhau.
+ *
+ * Chỉ đổi nền lúc trỏ chuột tới, không thêm viền cũng không thêm lề: một khung viền quanh ghi chú làm nó trông như ô nhập đang tắt, còn thêm lề thì chữ lệch so với các card khác trong một sidebar rộng 300 pixel. Bút chì ở tiêu đề card vẫn còn — nó là cửa cho bàn phím, vì `div` này không nhận được con trỏ.
+ */
+.shin-readtext[data-action] { cursor: pointer; border-radius: var(--shin-radius-sm); }
+.shin-readtext[data-action]:hover { background: var(--shin-bg-hover); }
+
 /* Số căn phải để mắt so hàng nghìn theo cột, đúng nếp bảng tính. */
 .shin-number { text-align: right; font-variant-numeric: tabular-nums; }
 

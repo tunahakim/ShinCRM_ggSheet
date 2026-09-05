@@ -248,10 +248,14 @@ var RENDER_CONTROLS = {
    * Chữ chỉ đọc, cao theo nội dung. Control thứ tám, thêm vào vì card GHI CHÚ của màn xem khai `overflow: 'collapse'` mà một ô nhập thì cao cố định nên phép thu gọn không bao giờ chạm tới — nút "Xem thêm" không bao giờ hiện, và một ghi chú dài nằm gọn trong một dòng ô nhập.
    *
    * Luôn chỉ đọc, không phải theo cờ ở bản khai: nó vẽ ra `div` nên không có đường gõ, và để bộ thu thập lúc lưu chắc chắn bỏ qua thay vì đọc ra chuỗi rỗng rồi xóa mất ghi chú cũ.
+   *
+   * Đây là control **duy nhất** được mang `data-action` trên chính thẻ ô, vì nó là control duy nhất vẽ ra một thẻ không bấm được sẵn: cả khối chữ thành chỗ bấm thì mở form ghi chú dễ hơn nhắm một cái bút chì 20 pixel ở góc. Ô nhập thì tuyệt đối không — bấm vào ô để gõ mà nó nhảy sang màn khác là một cái bẫy.
    */
   readText: function (o) {
     o.readonly = true;
-    return '<div' + renderControlAttrs(o, 'shin-readtext') + '>' + renderEscape(o.value) + '</div>';
+    return '<div' + renderControlAttrs(o, 'shin-readtext')
+      + (o.action ? renderAttr('data-action', o.action) + ' title="Sửa"' : '')
+      + '>' + renderEscape(o.value) + '</div>';
   },
   number: function (o) {
     return '<input type="text" inputmode="numeric"' + renderControlAttrs(o, 'shin-input shin-number')
@@ -302,7 +306,7 @@ function renderFieldCarried(ctx, duong) {
 }
 
 
-/** Ruột một trường: hàng nhãn, kèm nút bút chì khi trường khai `action`, rồi tới ô. */
+/** Ruột một trường: hàng nhãn, kèm nút bút chì khi trường khai `action`, rồi tới ô. Ô loại `readText` thì tự nhận việc lên chính nó và hàng nhãn thôi mọc bút chì — xem bên dưới. */
 function renderFieldInner(node, ctx) {
   var duong = renderFieldPath(node, ctx);
   var khai = renderFieldSchema(duong);
@@ -320,7 +324,11 @@ function renderFieldInner(node, ctx) {
     carried: renderFieldCarried(ctx, duong),
     khai: khai
   };
-  var but = node.action
+  // `readText` vẽ ra một khối chữ, nên nó tự nhận `action` lên chính thẻ mình: cả khối là chỗ bấm, và hàng nhãn không mọc thêm bút chì để cùng một việc có hai cửa cạnh nhau. Mọi control còn lại là ô nhập nên việc phải nằm ở một nút riêng.
+  var tuNhanViec = control === 'readText' && !!node.action;
+  if (tuNhanViec) { o.action = node.action; }
+
+  var but = node.action && !tuNhanViec
     ? '<button type="button" class="shin-field-edit" title="Sửa"' + renderAttr('data-action', node.action) + '>' + iconSvg('pencil') + '</button>'
     : '';
 

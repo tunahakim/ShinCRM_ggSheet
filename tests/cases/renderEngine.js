@@ -214,6 +214,19 @@ function chay(so) {
       doc.indexOf('>dòng 1\ndòng 2</div>') > 0, doc.indexOf('<input') === -1],
     [true, true, true, true]);
 
+  // Cả khối ghi chú là chỗ bấm, thay cho một cái bút chì 20 pixel ở góc. Hai nửa phải đi cùng nhau: mang được việc, và **thôi** mọc bút chì — mọc cả hai thì cùng một việc có hai cửa dán sát nhau.
+  const ghiChu = o({ field: 'note', control: 'readText', action: 'openNoteForm' });
+  check(so, 'readText khai action thì cả khối chữ mang data-action, và hàng nhãn không mọc thêm bút chì',
+    [ghiChu.indexOf('data-action="openNoteForm"') > 0, ghiChu.indexOf('title="Sửa"') > 0,
+      ghiChu.indexOf('shin-field-edit') === -1, doc.indexOf('data-action') === -1],
+    [true, true, true, true]);
+
+  // Ô nhập tuyệt đối không được mang việc: bấm vào ô để gõ mà nó nhảy sang màn khác là một cái bẫy.
+  check(so, 'control loại ô nhập thì action vẫn nằm ở nút bút chì riêng, không lên chính ô',
+    [o({ field: 'note', control: 'textarea', action: 'openNoteForm' }).indexOf('<textarea rows="3" class="shin-input shin-textarea" id="shin-f-customer-note" data-field="customer.note" autocomplete') > 0,
+      o({ field: 'note', control: 'textarea', action: 'openNoteForm' }).indexOf('shin-field-edit') > 0],
+    [true, true]);
+
   // Luật một chiều của tài liệu 03 Phần 7: UI siết thêm được, mở khóa thì không.
   check(so, 'chỉ-đọc: bảng khai khóa thì khóa, UI siết thêm được, UI mở khóa thì không',
     [o({ field: 'id' }).indexOf(' readonly>') > 0,
