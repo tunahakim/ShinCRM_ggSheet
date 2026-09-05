@@ -114,7 +114,9 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── dispatch.html         Một tai nghe click duy nhất đặt ở khung. Chỗ DUY NHẤT đọc data-* thành payload, đặt con trỏ theo focusId, và đưa lỗi vào alert — nhờ vậy actions.html không chạm DOM.
 │   │   ├── menu.html             Lớp menu nổi dựng từ dấu data-menu của engine. Dấu tích và chấm tròn đọc ở Prefs. Mục con vẫn mang data-action, nên menu không mở thêm đường gọi hàm nào.
 │   │   ├── collapse.html         Đo xem khối có tràn trần chiều cao hay không rồi mới quyết có nút Xem thêm — phép đo mà bản khai không nói được vì nó phụ thuộc nội dung thật.
-│   │   └── search.html           Hộp tìm khách: ô nhập nằm ngoài bốn vùng engine vẽ nên con trỏ không nhảy sau mỗi chữ. Dòng gợi ý bấm hay Enter đều đi qua đúng một bộ phát click.
+│   │   ├── search.html           Hộp tìm khách: ô nhập nằm ngoài bốn vùng engine vẽ nên con trỏ không nhảy sau mỗi chữ. Dòng gợi ý bấm hay Enter đều đi qua đúng một bộ phát click.
+│   │   ├── combo.html            Hành vi của ô gõ-để-lọc: con trỏ vào ô là tự bung danh sách nên không cần mũi tên ăn 24 pixel bề ngang, lọc không dấu, và đo chỗ hở lúc chạy để bung lên khi dưới hẹp.
+│   │   └── inputs.html           Hai nếp gõ chung của mọi form: Enter nhảy sang ô kế tiếp và dừng ở nút Lưu, và dán một khối nhiều dòng thành nhiều ô rồi nhuộm vàng chỗ máy tự điền.
 │   ├── screen\                   Một tệp một màn người dùng nhìn thấy. Màn được mang theo style riêng, vì style đó chết cùng màn đó.
 │   │   ├── statusScreen.html     Ba màn không có form: tóm tắt lượt nạp, lỗi nạp, và màn chặn khi vượt trần ngân sách ô.
 │   │   ├── viewScreen.html       Màn xem khách — màn mặc định. Biết KHI NÀO vẽ lại cái gì, không biết vẽ ra sao. Chỗ duy nhất nối ScreenState.currentCustomerId với Store.

@@ -1,0 +1,159 @@
+<script>
+/*
+ * Hai nếp gõ chung cho mọi form: **Enter nhảy sang ô kế tiếp**, và **dán một khối thành nhiều ô**.
+ *
+ * Tách khỏi `client/ui/combo.html` theo đúng ranh giới giữa `menu.html` và `dispatch.html`: bên kia là một control tự lo phần của nó, bên này là luật đi lại giữa các ô của cả form. Trộn hai việc vào một tệp thì mở ra phải đọc cả hai mới biết phím Enter chạy vào nhánh nào.
+ *
+ * Cả hai nếp chỉ chạm những thẻ mang `data-field`, nên ô tìm khách ở đầu sidebar — không có `data-field` — giữ nguyên nếp bàn phím riêng của nó.
+ */
+
+/** Dấu đã gắn tai nghe. */
+var INPUTS_MARK = 'data-inputs';
+
+/**
+ * Ô nhận cú dán khối. **Ô tên công ty**, không phải ô mã khách như bản cũ: mã khách giờ do máy chủ cấp và ô đó chỉ đọc, dán vào không có tác dụng.
+ *
+ * Vẫn đỡ được nếp tay của chủ dự án: khối chép ra thường bắt đầu bằng đúng dòng mã khách, nên nếu dòng đầu trông như một mã thì bỏ dòng đó rồi mới xếp phần còn lại — xem `INPUTS_CODE_LINE`.
+ */
+var INPUTS_PASTE_AT = 'customer.companyName';
+
+/** Thứ tự cột của khối dán, theo nếp chép từ sheet hoặc từ Zalo của chủ dự án. */
+var INPUTS_PASTE_FIELDS = [
+  'customer.companyName',
+  'customer.taxNumber',
+  'customer.contactPerson',
+  'customer.phone',
+  'customer.email'
+];
+
+/** Dòng trông như một mã khách: hai tới bốn chữ in hoa, gạch ngang, rồi từ ba số. */
+var INPUTS_CODE_LINE = /^[A-Z]{2,4}-\d{3,}$/;
+
+
+/* ─── Chuỗi ô đi lại ─── */
+
+/**
+ * Các ô Enter đi qua được, theo đúng thứ tự trên màn hình.
+ *
+ * Đọc lại DOM mỗi lần chứ không giữ sẵn một danh sách: khối gập mở ra là thêm ô, form đổi là đổi hết, mà một danh sách giữ sẵn thì trỏ vào những thẻ đã bị lượt vẽ trước xóa.
+ *
+ * Chặng cuối là **nút LƯU DỮ LIỆU** ở chân màn: nhập tới ô cuối rồi bấm Enter thì con trỏ đứng trên nút lưu, bấm Enter lần nữa là lưu. Không cần rời tay khỏi bàn phím lần nào.
+ */
+function inputsChain() {
+  var tat = document.querySelectorAll('#' + RENDER_REGIONS.body + ' [data-field], #' + RENDER_REGIONS.footer + ' .shin-save-wide');
+  var ra = [];
+
+  for (var i = 0; i < tat.length; i += 1) {
+    var el = tat[i];
+    var nhan = el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'BUTTON';
+    if (!nhan || el.readOnly || el.disabled || el.offsetParent === null) { continue; }
+    ra.push(el);
+  }
+  return ra;
+}
+
+/** Đưa con trỏ sang ô kế tiếp. Ô cuối rồi thì đứng yên chứ không chạy vòng về đầu: chạy vòng thì người dùng tưởng mình vừa gõ xong ô cuối lại thấy con trỏ ở ô đầu, không hiểu vì sao. */
+function inputsFocusNext(el) {
+  var chuoi = inputsChain();
+  var at = chuoi.indexOf(el);
+  if (at === -1 || at + 1 >= chuoi.length) { return null; }
+
+  chuoi[at + 1].focus();
+  return chuoi[at + 1];
+}
+
+/**
+ * Phím Enter trong một ô nhập.
+ *
+ * Ba chỗ nhường phím: ô nhiều dòng (Enter ở đó là xuống dòng thật), ô combo đang mở danh sách (`combo.html` chọn mục trước), và mọi thẻ không phải ô nhập.
+ */
+function inputsKeydown(e) {
+  if (e.key !== 'Enter' || e.shiftKey) { return; }
+
+  var el = e.target;
+  if (!el || !el.getAttribute || !el.getAttribute('data-field')) { return; }
+  if (el.tagName === 'TEXTAREA') { return; }
+  if (typeof comboIsOpen === 'function' && comboWrap(el) && comboIsOpen(el)) { return; }
+
+  e.preventDefault();
+  inputsFocusNext(el);
+}
+
+
+/* ─── Dán một khối thành nhiều ô ─── */
+
+/** Bỏ mọi ký tự không phải số. Số điện thoại chép từ Zalo hay từ sheet hay mang dấu chấm, dấu cách, dấu ngoặc. */
+function inputsCleanPhone(chu) {
+  return String(chu).replace(/[^0-9]/g, '');
+}
+
+/** Tách khối dán thành các dòng: xuống dòng hoặc Tab đều là hết một ô. Bỏ dòng trống — chép từ sheet hay dính một dòng trống ở cuối. */
+function inputsPasteSplit(chu) {
+  return String(chu == null ? '' : chu)
+    .split(/\r\n|\r|\n|\t/)
+    .map(function (d) { return d.trim(); })
+    .filter(function (d) { return d !== ''; });
+}
+
+/** Điền một ô rồi nhuộm vàng nó. Nhuộm để người dùng soi ngay được máy vừa đặt gì vào đâu — máy đoán cột thì có lúc đoán lệch. */
+function inputsFill(duong, giaTri) {
+  var el = document.querySelector('[data-field="' + duong + '"]');
+  if (!el || el.readOnly || el.disabled) { return null; }
+
+  el.value = giaTri;
+  el.classList.add('is-filled');
+  return el;
+}
+
+/** Ô nào người dùng đã gõ hoặc đã bấm vào thì bỏ màu vàng: đã soi rồi thì không cần dấu nhắc soi nữa. */
+function inputsUnfill(e) {
+  if (e.target && e.target.classList) { e.target.classList.remove('is-filled'); }
+}
+
+/**
+ * Cú dán vào ô tên công ty.
+ *
+ * Chỉ ra tay khi khối có **từ hai dòng**; một dòng thì để trình duyệt dán như thường, vì đó là ca người dùng sửa đúng một ô.
+ *
+ * Ô thư điện tử chỉ nhận khi dòng đó **có `@` và có dấu chấm**: một dòng không phải thư điện tử nằm ở khe đó gần như chắc chắn là khối chép có cột khác, và điền bừa vào thì lỗi chỉ lộ ra lúc gửi thư.
+ */
+function inputsPaste(e) {
+  var el = e.target;
+  if (!el || !el.getAttribute || el.getAttribute('data-field') !== INPUTS_PASTE_AT) { return; }
+
+  var tho = e.clipboardData && e.clipboardData.getData ? e.clipboardData.getData('text') : '';
+  var dong = inputsPasteSplit(tho);
+  if (dong.length < 2) { return; }
+
+  e.preventDefault();
+  if (INPUTS_CODE_LINE.test(dong[0])) { dong.shift(); }
+
+  for (var i = 0; i < INPUTS_PASTE_FIELDS.length && i < dong.length; i += 1) {
+    var duong = INPUTS_PASTE_FIELDS[i];
+    var v = dong[i];
+
+    if (duong === 'customer.phone') { v = inputsCleanPhone(v); }
+    if (duong === 'customer.email' && !(v.indexOf('@') > 0 && v.indexOf('.') > 0)) { continue; }
+    inputsFill(duong, v);
+  }
+}
+
+
+/* ─── Nối dây ─── */
+
+function inputsInstall() {
+  var goc = document.getElementById(DISPATCH_ROOT_ID);
+  if (!goc) {
+    throw new Error('Khung sidebar thiếu phần tử "' + DISPATCH_ROOT_ID + '" nên phím Enter không nhảy được sang ô kế tiếp.');
+  }
+  if (goc.getAttribute(INPUTS_MARK) === '1') { return false; }
+
+  goc.addEventListener('keydown', inputsKeydown);
+  goc.addEventListener('paste', inputsPaste);
+  goc.addEventListener('input', inputsUnfill);
+  goc.addEventListener('click', inputsUnfill);
+
+  goc.setAttribute(INPUTS_MARK, '1');
+  return true;
+}
+</script>

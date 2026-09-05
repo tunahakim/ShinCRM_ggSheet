@@ -208,8 +208,16 @@ Nút cũ ghi "Xem thêm — đang thu gọn còn 3 dòng", số 3 lấy từ `da
 
 **Đã chọn: nhãn còn hai chữ "Xem thêm".** Ngắn hơn, và không nói một con số mà nó không giữ được.
 
-### 7.5. Mũi tên combobox vẽ bằng viền CSS thay cho ký tự `▾`
+### 7.5. Combobox không có mũi tên sổ xuống
 
-Ký tự `▾` ở cỡ 11 pixel trên phông Segoe UI ra một cái gạch ngang — nhìn thành dấu trừ nằm sát chữ trong ô. Ô nhập lại chỉ chừa `padding-right: 16px` mà mũi tên chiếm từ 8 tới 17 pixel, nên giá trị dài chạy vào dưới mũi tên.
+Ký tự `▾` ở cỡ 11 pixel trên phông Segoe UI ra một cái gạch ngang, nhìn thành dấu trừ nằm sát chữ trong ô; vẽ tam giác bằng `border` thì hình đúng nhưng vẫn phải nới chừa phải lên 24 pixel để chữ không chạy vào dưới nó. Trên một sidebar rộng khoảng 300 pixel, 24 pixel là ba bốn chữ — mà mấy chữ cuối của tên công ty mới là thứ phân biệt hai khách trùng đầu tên.
 
-**Đã chọn: vẽ tam giác bằng `border` và nới chừa phải lên 24 pixel.** Hình tam giác vẽ bằng viền thì không phụ thuộc phông của máy nào.
+**Đã chọn: bỏ hẳn mũi tên và bỏ luôn khoảng chừa, bù lại bằng phép con trỏ vào ô là tự bung danh sách.** Lấy nguyên nếp của bản cũ. Người dùng không mất đường mở nào, còn `.shin-caret` thì vẫn ở lại cho nút menu — chỗ đó mũi tên là dấu duy nhất cho biết bấm vào sẽ có menu bung ra.
+
+### 7.6. Cú dán khối neo vào ô tên công ty, không phải ô mã khách
+
+Bản cũ neo cú dán vào ô `n-code` vì lúc đó mã khách gõ tay được. Bản này khai `customer.id` là `readonly` với `default: 'nextCustomerCode'` — mã do máy chủ cấp, dán vào ô đó không có tác dụng gì.
+
+**Đã chọn: neo vào ô tên công ty, và nếu dòng đầu của khối trông như một mã khách thì bỏ dòng đó.** Nếp tay của chủ dự án là chép nguyên một hàng bắt đầu bằng mã khách, nên phép bỏ dòng đầu giữ cho nếp tay đó vẫn xếp đúng cột. Mẫu nhận dạng: hai tới bốn chữ in hoa, gạch ngang, rồi từ ba số.
+
+**Điểm còn mơ hồ, chờ mắt chủ dự án:** thứ tự năm cột của khối dán đang là tên công ty, mã số thuế, người liên hệ, số điện thoại, thư điện tử — lấy theo bản cũ. Nếu nếp chép thật khác thì sửa đúng một mảng `INPUTS_PASTE_FIELDS` trong `client/ui/inputs.html`.

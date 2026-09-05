@@ -1,0 +1,359 @@
+<script>
+/*
+ * Ô gõ-để-lọc — phần hành vi của hai control `select` và `customerPicker`.
+ *
+ * Engine chỉ để lại cái vỏ: một `<input role="combobox">` và một `<div class="shin-combo-list" hidden>` rỗng. Tệp này là phần đổ nội dung vào cái vỏ đó, đúng cách `client/ui/menu.html` đổ nội dung vào lớp menu nổi.
+ *
+ * **Không có mũi tên sổ xuống.** Sidebar rộng khoảng 300 pixel; một mũi tên cộng khoảng chừa cho nó ăn 24 pixel, bằng ba bốn chữ — mà mấy chữ cuối của tên công ty mới là thứ phân biệt hai khách trùng đầu tên. Bù lại: **con trỏ vào ô là danh sách tự bung**, nên không mất đường mở nào. Nếp này lấy nguyên của bản cũ `9_Code_cu_tham_chieu/src/ui/UI_Logic.html`.
+ *
+ * Một tai nghe đặt ở khung chứ không gắn từng ô, cùng lý do với bộ phát click: mỗi lượt vẽ thay sạch ruột cả vùng nên ô nào gắn tai nghe riêng cũng mất nó ở lượt sau.
+ *
+ * Dòng danh sách **không mang `data-action`**: nó không phải một trong mười sáu hành động, nó chỉ điền chữ vào một ô. Tệp này tự bắt cú bấm lên dòng, còn bộ phát click thấy một cú bấm không có việc gì thì chỉ đóng menu rồi thôi.
+ */
+
+/** Nhịp chờ trước khi bôi đen chữ có sẵn trong ô, tính bằng milli giây. Bôi ngay lúc `focus` thì cú nhấp chuột đặt lại con trỏ ngay sau đó và xóa mất phần bôi. */
+var COMBO_SELECT_DELAY = 50;
+
+/** Nhịp chờ trước khi ẩn danh sách lúc rời ô. Ngắn hơn thì cú bấm chuột vào một dòng rơi vào chỗ trống — cùng lý do ở `client/ui/search.html`. */
+var COMBO_BLUR_DELAY = 200;
+
+/** Trần số dòng của ô tra khách. Bản cũ cũng 11: nguồn của nó là cả 1.700 khách, bung hết ra thì danh sách vô dụng. */
+var COMBO_PICKER_LIMIT = 11;
+
+/** Khoảng hở giữa danh sách và mép vùng thân, tính bằng pixel. */
+var COMBO_GAP = 8;
+
+/** Trần và sàn chiều cao danh sách. Sàn 96 pixel là khoảng ba dòng — thấp hơn thì cuộn trong một khe hẹp còn mệt hơn gõ thêm chữ. */
+var COMBO_LIST_MIN = 96;
+var COMBO_LIST_MAX = 220;
+
+/** Dòng đang sáng, `-1` là không dòng nào. Chỉ một danh sách mở tại một lúc nên một biến là đủ. */
+var comboFocusAt = -1;
+
+/**
+ * Hẹn giờ bôi đen. Một biến dùng chung là đủ vì thân hẹn giờ kiểm lại con trỏ đang ở đâu trước khi bôi.
+ *
+ * Hẹn giờ ẩn danh sách thì **không** dùng biến chung: nó gắn lên chính thẻ ô nhập (`_comboBlur`). Tab nhanh qua hai ô trong vòng 200 milli giây mà chung một biến thì cú hủy của ô sau xóa luôn hẹn giờ của ô trước, và danh sách của ô trước treo lại trên form.
+ */
+var comboSelectTimer = null;
+
+/** Dấu đã gắn tai nghe, để nút Nạp lại chạy lại trình tự khởi động mà không gắn thêm cái thứ hai. */
+var COMBO_MARK = 'data-combo';
+
+
+/* ─── Tra thẻ ─── */
+
+/** Khung `.shin-combo` của một ô nhập, `null` nếu thẻ vừa nhận không phải ô nhập của một combo. Dòng danh sách không mang lớp `shin-input` nên nó không lọt qua đây. */
+function comboWrap(el) {
+  if (!el || !el.closest || !el.classList || !el.classList.contains('shin-input')) { return null; }
+  return el.closest('.shin-combo');
+}
+
+function comboListOf(inp) {
+  var khung = comboWrap(inp);
+  return khung ? khung.querySelector('.shin-combo-list') : null;
+}
+
+/** Đọc từ chính DOM chứ không giữ thêm một biến cờ — hai chỗ nhớ một việc thì có ngày lệch. */
+function comboIsOpen(inp) {
+  var box = comboListOf(inp);
+  return !!box && !box.hidden;
+}
+
+/** Ô tra khách hay ô danh mục. Ô tra khách chỉ bung khi đã gõ, ô danh mục bung ngay để người dùng xem có những gì. */
+function comboIsPicker(inp) {
+  return inp.getAttribute('data-picker') === 'customer';
+}
+
+/** Các dòng chọn được. Dòng chú thích không tính, nên `comboFocusAt` không bao giờ trỏ vào một dòng không điền được gì. */
+function comboRows(inp) {
+  var box = comboListOf(inp);
+  if (!box) { return []; }
+  return Array.prototype.slice.call(box.querySelectorAll('.shin-combo-item'));
+}
+
+
+/* ─── Nguồn giá trị ─── */
+
+/** Bảng khai của trường, tra từ `data-field`. Trả `null` khi chưa nạp schema — lúc đó danh sách rỗng chứ không nổ. */
+function comboDecl(inp) {
+  var duong = String(inp.getAttribute('data-field') || '').split('.');
+  if (duong.length !== 2 || typeof Schema === 'undefined' || !Schema || !Schema[duong[0]]) { return null; }
+  return Schema[duong[0]][duong[1]] || null;
+}
+
+/**
+ * Nguồn giá trị của một ô danh mục: hoặc `options` khai thẳng trong bảng khai trường, hoặc danh mục trong `Store`.
+ *
+ * Hỏi bảng khai chứ không hỏi `data-source` trên thẻ, vì `data-source` chỉ có ở ca danh mục — trường khai `options` thì thẻ không mang gì và một ô như thế sẽ bung ra danh sách rỗng mà không ai biết vì sao.
+ */
+function comboSource(inp) {
+  var khai = comboDecl(inp);
+  if (!khai) { return []; }
+  if (khai.options) { return khai.options; }
+  if (khai.source && Store.categories && Store.categories[khai.source]) { return Store.categories[khai.source]; }
+  return [];
+}
+
+/**
+ * Các dòng khớp với chữ đang gõ. Trả `{ rows, con }` — `con` là dấu "còn nữa", để danh sách nói ra thay vì cắt im lặng.
+ *
+ * Lọc bằng `normalizeText` nên gõ `ha noi` ra `Hà Nội`, và lọc theo `includes` chứ không theo đầu chuỗi nên gõ `thep` ra `Công ty thép Việt`.
+ *
+ * Mục khớp **đúng** chữ đang có trong ô thì kéo lên đầu: mở lại một ô đã điền là thấy ngay giá trị hiện tại, không phải cuộn đi tìm.
+ */
+function comboMatches(inp, chu) {
+  var can = normalizeText(chu);
+
+  if (comboIsPicker(inp)) {
+    if (!can) { return { rows: [], con: false }; }
+    var ket = Store.searchCustomers(chu, COMBO_PICKER_LIMIT + 1);
+    return {
+      rows: ket.slice(0, COMBO_PICKER_LIMIT).map(function (c) {
+        return { value: c.companyName, meta: c.id + (c.province ? ' • ' + c.province : '') };
+      }),
+      con: ket.length > COMBO_PICKER_LIMIT
+    };
+  }
+
+  var rows = [];
+  comboSource(inp).forEach(function (v) {
+    if (!can || normalizeText(v).indexOf(can) !== -1) { rows.push({ value: v, meta: '' }); }
+  });
+
+  if (can) {
+    for (var i = 1; i < rows.length; i += 1) {
+      if (normalizeText(rows[i].value) === can) { rows.unshift(rows.splice(i, 1)[0]); break; }
+    }
+  }
+
+  return { rows: rows, con: false };
+}
+
+
+/* ─── Vẽ danh sách ─── */
+
+/** Một dòng chọn được. Dựng bằng DOM chứ không nối chuỗi HTML: giá trị là chữ người dùng gõ vào sheet `Category`, và `textContent` tự lo phần thoát ký tự. */
+function comboItemElement(o) {
+  var d = document.createElement('div');
+  d.className = 'shin-combo-item';
+  d.setAttribute('data-value', o.value);
+  d.setAttribute('role', 'option');
+
+  var chu = document.createElement('div');
+  chu.textContent = o.value;
+  d.appendChild(chu);
+
+  if (o.meta) {
+    var phu = document.createElement('div');
+    phu.className = 'shin-combo-meta';
+    phu.textContent = o.meta;
+    d.appendChild(phu);
+  }
+  return d;
+}
+
+/** Dòng chú thích, không chọn được. */
+function comboNoteElement(chu, lop) {
+  var d = document.createElement('div');
+  d.className = lop;
+  d.textContent = chu;
+  return d;
+}
+
+/**
+ * Chiều cao trần và hướng bung, **đo lúc chạy** chứ không phải một số cứng.
+ *
+ * Đo trong lòng vùng thân vì danh sách là `position: absolute` nên vùng thân cắt phần tràn: một ô sát đáy form mà bung xuống thì danh sách bị cắt mất, người dùng thấy một hộp trống. Bên nào rộng hơn thì bung bên đó — bản cũ luôn bung xuống và chịu cảnh đó.
+ */
+function comboFit(inp) {
+  var than = document.getElementById(RENDER_REGIONS.body);
+  var khung = than ? than.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
+  var o = inp.getBoundingClientRect();
+
+  var duoi = khung.bottom - o.bottom - COMBO_GAP;
+  var tren = o.top - khung.top - COMBO_GAP;
+  var len = duoi < COMBO_LIST_MIN && tren > duoi;
+  var cho = len ? tren : duoi;
+
+  return { len: len, cao: Math.max(COMBO_LIST_MIN, Math.min(cho, COMBO_LIST_MAX)) };
+}
+
+/** Bỏ hết dòng sáng. Ca ô rỗng: sáng dòng đầu thì bấm Enter cho qua ô là điền bừa mục đầu tiên. */
+function comboUnmark(inp) {
+  comboRows(inp).forEach(function (r) { r.classList.remove('is-active'); });
+  comboFocusAt = -1;
+  return -1;
+}
+
+/** Sáng đúng một dòng, chạy vòng ở hai đầu — cùng nếp với hộp tìm khách. */
+function comboMark(inp, at) {
+  var rows = comboRows(inp);
+  if (!rows.length) { return comboUnmark(inp); }
+
+  var i = at;
+  if (i >= rows.length) { i = 0; }
+  if (i < 0) { i = rows.length - 1; }
+
+  for (var k = 0; k < rows.length; k += 1) { rows[k].classList.remove('is-active'); }
+  rows[i].classList.add('is-active');
+  if (rows[i].scrollIntoView) { rows[i].scrollIntoView({ block: 'nearest' }); }
+
+  comboFocusAt = i;
+  return i;
+}
+
+/** Ẩn danh sách. Gọi lúc đã ẩn cũng không sao — hẹn giờ rời ô gọi hàm này mà không hỏi trước. */
+function comboHide(inp) {
+  var box = comboListOf(inp);
+  if (!box) { return null; }
+
+  box.hidden = true;
+  box.classList.remove('is-up');
+  inp.setAttribute('aria-expanded', 'false');
+  comboFocusAt = -1;
+  return box;
+}
+
+/**
+ * Ẩn mọi danh sách đang mở, trừ một ô được chỉ định.
+ *
+ * **Nhiều nhất một danh sách mở tại một lúc.** Hai hộp cùng bung trông như sidebar hỏng, và `comboFocusAt` chỉ có một chỗ nhớ nên phím mũi tên sẽ chạy trên hộp này mà sáng dòng ở hộp kia.
+ */
+function comboHideAll(tru) {
+  var mo = document.querySelectorAll('.shin-combo-list:not([hidden])');
+  for (var i = 0; i < mo.length; i += 1) {
+    var inp = mo[i].parentNode.querySelector('.shin-input');
+    if (inp && inp !== tru) { comboHide(inp); }
+  }
+  return mo.length;
+}
+
+/**
+ * Vẽ lại danh sách theo chữ đang có trong ô, rồi hiện nó.
+ *
+ * Gõ tới đâu tự sáng dòng đầu nên gõ xong bấm Enter là xong; còn ô rỗng thì không dòng nào sáng.
+ */
+function comboPaint(inp) {
+  var box = comboListOf(inp);
+  if (!box) { return null; }
+
+  var can = normalizeText(inp.value);
+  if (comboIsPicker(inp) && !can) { comboHide(inp); return null; }
+
+  var ket = comboMatches(inp, inp.value);
+  box.textContent = '';
+  box.setAttribute('role', 'listbox');
+
+  if (!ket.rows.length) {
+    box.appendChild(comboNoteElement('Không tìm thấy', 'shin-combo-empty'));
+  } else {
+    for (var i = 0; i < ket.rows.length; i += 1) { box.appendChild(comboItemElement(ket.rows[i])); }
+    if (ket.con) { box.appendChild(comboNoteElement('Gõ thêm để lọc hẹp', 'shin-combo-more')); }
+  }
+
+  var do_ = comboFit(inp);
+  if (do_.len) { box.classList.add('is-up'); } else { box.classList.remove('is-up'); }
+  box.style.maxHeight = do_.cao + 'px';
+  box.hidden = false;
+  inp.setAttribute('aria-expanded', 'true');
+
+  if (can) { comboMark(inp, 0); } else { comboUnmark(inp); }
+  return ket;
+}
+
+/** Mở danh sách và hẹn giờ bôi đen chữ có sẵn. Ô chỉ đọc thì không mở gì: nó không nhận chữ nên một danh sách bung ra là một lời hứa hão. */
+function comboOpen(inp) {
+  if (inp.readOnly || inp.disabled) { return null; }
+  comboHideAll(inp);
+  comboPaint(inp);
+
+  if (comboSelectTimer) { clearTimeout(comboSelectTimer); }
+  comboSelectTimer = setTimeout(function () {
+    if (document.activeElement === inp && inp.select) { inp.select(); }
+  }, COMBO_SELECT_DELAY);
+
+  return inp;
+}
+
+/** Chọn một mục: điền, ẩn danh sách, rồi **nhảy luôn sang ô kế tiếp**. Một mục là một lần bấm, không có bước xác nhận. */
+function comboPick(inp, giaTri) {
+  inp.value = giaTri;
+  inp.classList.remove('is-filled');
+  comboHide(inp);
+  if (typeof inputsFocusNext === 'function') { inputsFocusNext(inp); }
+  return giaTri;
+}
+
+
+/* ─── Bàn phím, chuột, và nối dây ─── */
+
+/**
+ * Bàn phím trong ô combo.
+ *
+ * `Enter` lúc **không dòng nào sáng** thì không chọn gì và cũng không chặn phím: ẩn danh sách rồi để phím rơi xuống nếp nhảy ô của `client/ui/inputs.html`. Nhờ vậy gõ qua một ô combo mà không chọn gì vẫn đi tiếp được bằng đúng một phím.
+ */
+function comboKeydown(e) {
+  var inp = e.target;
+  if (!comboWrap(inp)) { return; }
+
+  if (e.key === 'Escape' || e.keyCode === 27) { comboHide(inp); return; }
+
+  if (!comboIsOpen(inp)) {
+    if (e.key === 'ArrowDown') { e.preventDefault(); comboOpen(inp); }
+    return;
+  }
+
+  var rows = comboRows(inp);
+
+  if (e.key === 'Enter' || e.key === 'Tab') {
+    if (!rows.length || comboFocusAt === -1) { comboHide(inp); return; }
+    e.preventDefault();
+    comboPick(inp, rows[comboFocusAt].getAttribute('data-value'));
+    return;
+  }
+
+  if (!rows.length) { return; }
+  if (e.key === 'ArrowDown') { e.preventDefault(); comboMark(inp, comboFocusAt + 1); return; }
+  if (e.key === 'ArrowUp') { e.preventDefault(); comboMark(inp, comboFocusAt - 1); }
+}
+
+/** Cú bấm: lên một dòng thì chọn dòng đó, lên chính ô nhập lúc danh sách đang ẩn thì bung lại. */
+function comboClick(e) {
+  var goc = e.target;
+  if (!goc || !goc.closest) { return; }
+
+  var dong = goc.closest('.shin-combo-item');
+  if (dong) {
+    var inp = dong.closest('.shin-combo').querySelector('.shin-input');
+    if (inp) { comboPick(inp, dong.getAttribute('data-value')); }
+    return;
+  }
+
+  if (comboWrap(goc) && !comboIsOpen(goc)) { comboOpen(goc); }
+}
+
+/** Gắn tai nghe vào khung. Gọi nhiều lần cũng chỉ gắn một lần. */
+function comboInstall() {
+  var goc = document.getElementById(DISPATCH_ROOT_ID);
+  if (!goc) {
+    throw new Error('Khung sidebar thiếu phần tử "' + DISPATCH_ROOT_ID + '" nên ô gõ-để-lọc không bung được danh sách.');
+  }
+  if (goc.getAttribute(COMBO_MARK) === '1') { return false; }
+
+  goc.addEventListener('focusin', function (e) { if (comboWrap(e.target)) { comboOpen(e.target); } });
+  goc.addEventListener('input', function (e) { if (comboWrap(e.target)) { comboPaint(e.target); } });
+  goc.addEventListener('keydown', comboKeydown);
+  goc.addEventListener('click', comboClick);
+
+  goc.addEventListener('focusout', function (e) {
+    var inp = e.target;
+    if (!comboWrap(inp)) { return; }
+    if (inp._comboBlur) { clearTimeout(inp._comboBlur); }
+    inp._comboBlur = setTimeout(function () { comboHide(inp); }, COMBO_BLUR_DELAY);
+  });
+
+  goc.setAttribute(COMBO_MARK, '1');
+  return true;
+}
+</script>

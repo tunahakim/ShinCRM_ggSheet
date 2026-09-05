@@ -193,7 +193,7 @@ Bản mới có ba thứ bản cũ không có, và chúng đổi cách hiện th
 
 | Món | Bản mới |
 | --- | --- |
-| Thanh cuộn siêu mảnh | Đã có ở 3.2 — bản mới để 6 pixel thay vì 4, vì 4 pixel khó trúng chuột; xem ghi chú dưới. |
+| Thanh cuộn siêu mảnh | 6 pixel ở `client/style/frame.html`, con trượt `--shin-border-strong`. Rộng hơn bản cũ 2 pixel vì 4 pixel khó trúng chuột; xem 3.3. |
 | Lề ngang hẹp | `--shin-gap-3` = 12 pixel. Rộng hơn bản cũ 4 pixel một bên nhưng bù lại bản mới không có thẻ lồng trong thẻ. |
 | Cỡ chữ theo tầng | 11 / 12 / 13 / 15 pixel, khai thành biến ở `client/style/tokens.html` nên đổi một chỗ là đổi cả sidebar. |
 | Thông tin khách luôn nhìn thấy | Vùng 3 (`#sidebar-info`) ghim trên, không cuộn. Hơn bản cũ: nó bật ở **cả ba màn** kể cả khi đang mở form, nên lúc điền giao dịch vẫn thấy đang điền cho khách nào. |
@@ -202,26 +202,24 @@ Bản mới có ba thứ bản cũ không có, và chúng đổi cách hiện th
 | Hộp gợi ý đè lên thân | `position: absolute` + `z-index: 20`, trần `60vh`. |
 | Dấu sáng bàn phím cùng màu với trỏ chuột | `.shin-suggest.is-active` dùng đúng `--shin-primary-soft` như `:hover`. |
 | Tìm khách: bốn trường, trần 20, vòng lại, `scrollIntoView`, ẩn sau 200ms, chữ giữ lại sau khi chọn | Đã có đủ trong `client/ui/search.html`. Hơn bản cũ: khớp cả khi gõ **không dấu** (`normalizeText` bỏ dấu, `đ` thành `d`), và khách đã xóa mềm vẫn tìm được nhưng xếp sau và gạch ngang. |
-| Chặn hộp gợi ý của Chrome | Ô tìm khách đã có `autocomplete="off"` và `spellcheck="false"`. Còn phải phủ mọi ô do engine sinh — xem 3.2. |
+| Chặn hộp gợi ý của Chrome | `renderInputGuard()` đặt `autocomplete="off"` và `spellcheck="false"` vào **mọi** ô ngay lúc dựng chuỗi. Gọn hơn bản cũ: bản cũ phải quét cả DOM sau mỗi lượt vẽ vì thẻ nó viết tay trong HTML, bản mới thì mọi thẻ đi qua một hàm. |
 | Chữ chỉ đọc chọn và sao chép được | `.shin-input[readonly]` giữ nền lõm, không đổi thành chữ trơn. |
 | Đóng form từng lớp | `formScreen` mở lồng được và đóng đúng một lớp mỗi lần — bản cũ đóng tất cả `.overlay` một lượt. |
+| Nút trên dòng lịch sử chỉ hiện khi trỏ chuột | `client/style/slots.html` để ô đánh dấu và bút chì ở `opacity: 0`, hiện khi `:hover`, `:focus-within`, hoặc khi ô **đang được tích** — dòng đã chọn thì dấu tích ở lại kể cả lúc chuột đi khỏi. Giữ chỗ bằng `opacity` nên dòng chữ không giật ngang. |
+| Ô combo không mũi tên, chọn vào ô là tự bung | `client/ui/combo.html`. Hơn bản cũ ở ba chỗ: lọc **không dấu**, ô rỗng thì **không sáng dòng nào** nên Enter cho qua ô không điền bừa mục đầu, và trần cao đo lúc chạy rồi **bung lên trên** khi phía dưới hẹp — bản cũ luôn bung xuống và bị vùng thân cắt mất. |
+| Enter nhảy ô, chặng cuối là nút Lưu | `client/ui/inputs.html`. Nhường phím cho ô nhiều dòng và cho combo đang mở danh sách. |
+| Dán một khối thành cả form khách | `client/ui/inputs.html`, năm cột, số điện thoại lọc còn chữ số, ô thư điện tử chỉ nhận dòng có `@` và dấu chấm, chỗ máy tự điền nhuộm vàng cho tới khi người dùng gõ hoặc bấm vào. Neo vào ô tên công ty chứ không phải ô mã khách — xem `Câu hỏi đêm.md` 7.6. |
 
 ### 3.2 Phải làm — món bản cũ có mà bản mới còn thiếu
 
 Xếp theo mức người dùng thấy ngay:
 
-1. **Nút trên dòng lịch sử chỉ hiện khi trỏ chuột.** Hiện `slotActivityRow` luôn vẽ ô đánh dấu và bút chì. Phải để cả hai ở `opacity: 0` và chỉ hiện khi `.shin-act-row:hover`, `:focus-within`, hoặc khi ô đánh dấu **đang được tích** — dòng đã chọn thì ô đánh dấu phải hiện kể cả lúc chuột đi khỏi, không thì người dùng mất dấu mình chọn những dòng nào. Giữ chỗ bằng `opacity` chứ không bằng `display` để dòng không giật ngang lúc chuột đi qua.
-2. **Ô combo phải bỏ mũi tên và tự bung khi focus.** Hiện `components.html` vẽ một tam giác bằng viền ở `.shin-combo > .shin-caret` và chừa `padding-right: 24px` cho nó — đúng ngược với bản cũ. Bỏ cả mũi tên và khoảng chừa, lấy lại 24 pixel bề ngang; và `.shin-combo-list` hiện đang được engine sinh ra **rỗng, không có hành vi nào** — đây là lỗ hổng thấy được trên mọi form. Phần việc này là tệp `client/ui/inputs.html` sắp dựng, và nó phải mang đủ: tự bung khi focus, bôi đen giá trị cũ sau 50ms, lọc `includes`, kéo mục khớp đúng lên đầu, ô rỗng thì không sáng dòng nào, chọn mục là nhảy ô kế tiếp, trần cao đo lúc chạy, ẩn sau 200ms.
-3. **Enter nhảy ô.** Chưa có gì. Cùng tệp `inputs.html`, và phải nhường phím khi danh sách combo đang mở.
-4. **Dán tách dòng vào form khách.** Chưa có. Cùng tệp, cộng `cleanPhone` và vệt vàng `is-filled` — riêng CSS của vệt vàng thì đã có sẵn.
-5. **`autocomplete="off"` và `spellcheck="false"` cho mọi ô.** Bản mới sinh ô nhập ở `renderEngine`, nên đặt thẳng vào chỗ dựng thẻ là xong, không cần một hàm quét DOM lúc nạp như bản cũ. Đây là chỗ bản mới **làm gọn hơn** được: bản cũ phải quét vì thẻ viết tay trong HTML, bản mới thì mọi thẻ đi qua một hàm.
-6. **Thanh cuộn mảnh.** Chưa khai. Đặt `6px` với con trượt `--shin-border-strong`, và khai cả `scrollbar-width: thin` cho trình duyệt không phải Chrome. Chọn 6 thay vì 4 của bản cũ vì 4 pixel là bề ngang khó kéo bằng chuột; nội dung mất thêm 2 pixel nhưng kéo được.
-7. **Ẩn cả khối khi rỗng và đổi nhãn nút theo trạng thái.** Bản cũ ẩn vùng nội dung ghi chú và đổi "Sửa" thành "Thêm mới". Bản mới có `.shin-readtext:empty::before` hiện chữ "(chưa có)" — giữ cách này vì nó cho một chỗ để bấm vào, nhưng nút cạnh nhãn phải đổi glyph theo có nội dung hay không.
-8. **Hai giá trị một hàng.** `UI_SCHEMA` có `Row` và `align: "right"` nên khai được ngay; phải soát lại bản khai của màn xem để dùng đúng nếp này thay vì mỗi trường một dòng.
-9. **Vẽ trước, gửi sau.** Thuộc chặng 1.4 (`saveFlow`). Ghi ở đây để chặng đó không quên: đóng form và cập nhật RAM trước, gọi máy chủ sau, và lỗi mạng phải nói rõ "chưa lưu được".
-10. **Lỗi hiện tại ô, không hiện bằng hộp thoại.** Cũng chặng 1.4: viền đỏ trên ô sai, con trỏ về ô sai đầu tiên, màu đỏ tự mất khi gõ lại. `--shin-error` và `--shin-error-soft` đã có.
-11. **Đoán giá trị khi mở form trống.** `client/schema/fieldLogic.html` đã có sáu hàm ngầm định — phải kiểm rằng chúng phủ đủ ba ca của bản cũ: hôm nay, sản phẩm của giao dịch gần nhất, ghim của giao dịch gần nhất.
-12. **Màn lỗi và màn quá tải.** `statusScreen.html` đã có ba màn. Phải soát rằng nút thử lại tự tắt lúc đang chạy như bản cũ, và số ô có dấu chấm nghìn.
+1. **Ẩn cả khối khi rỗng và đổi nhãn nút theo trạng thái.** Bản cũ ẩn vùng nội dung ghi chú và đổi "Sửa" thành "Thêm mới". Bản mới có `.shin-readtext:empty::before` hiện chữ "(chưa có)" — giữ cách này vì nó cho một chỗ để bấm vào, nhưng nút cạnh nhãn phải đổi glyph theo có nội dung hay không.
+2. **Hai giá trị một hàng.** `UI_SCHEMA` có `Row` và `align: "right"` nên khai được ngay; phải soát lại bản khai của màn xem để dùng đúng nếp này thay vì mỗi trường một dòng.
+3. **Vẽ trước, gửi sau.** Thuộc chặng 1.4 (`saveFlow`). Ghi ở đây để chặng đó không quên: đóng form và cập nhật RAM trước, gọi máy chủ sau, và lỗi mạng phải nói rõ "chưa lưu được".
+4. **Lỗi hiện tại ô, không hiện bằng hộp thoại.** Cũng chặng 1.4: viền đỏ trên ô sai, con trỏ về ô sai đầu tiên, màu đỏ tự mất khi gõ lại. `--shin-error` và `--shin-error-soft` đã có.
+5. **Đoán giá trị khi mở form trống.** `client/schema/fieldLogic.html` đã có sáu hàm ngầm định — phải kiểm rằng chúng phủ đủ ba ca của bản cũ: hôm nay, sản phẩm của giao dịch gần nhất, ghim của giao dịch gần nhất.
+6. **Màn lỗi và màn quá tải.** `statusScreen.html` đã có ba màn. Phải soát rằng nút thử lại tự tắt lúc đang chạy như bản cũ, và số ô có dấu chấm nghìn.
 
 ### 3.3 Cố ý làm khác bản cũ
 
