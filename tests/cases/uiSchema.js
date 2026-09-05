@@ -192,4 +192,5 @@ function chay(so) {
     [daDung.noteForm.footer[0].role, daDung.noteForm.footer[0].label], ['button', 'LƯU GHI CHÚ']);
 }
 
-module.exports = { chay };
+// `TEN_HANH_DONG` xuất ra ngoài để `cases/actions.js` soi cùng một danh sách. Hai bản chép tay thì lệch được mà không ai đỏ.
+module.exports = { chay, TEN_HANH_DONG };

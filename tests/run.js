@@ -41,7 +41,8 @@ const NHOM_CA = [
   require('./cases/renderEngine'),
   require('./cases/slots'),
   require('./cases/viewScreen'),
-  require('./cases/formScreen')];
+  require('./cases/formScreen'),
+  require('./cases/actions')];
 
 console.log('ShinCRM — bộ kiểm thử offline');
 console.log('='.repeat(60));
