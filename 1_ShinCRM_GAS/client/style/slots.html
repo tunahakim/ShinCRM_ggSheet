@@ -17,70 +17,107 @@
   Dòng cuối bỏ cả gạch lẫn lề dưới, vì card đã tự có lề dưới của nó.
 */
 .shin-act-row {
-  padding-bottom: var(--shin-gap-2);
-  margin-bottom: var(--shin-gap-2);
+  padding-bottom: 6px;
+  margin-bottom: 6px;
   border-bottom: 1px solid var(--shin-border-faint);
 }
 
 .shin-act-row:last-of-type { padding-bottom: 0; margin-bottom: 0; border-bottom: 0; }
 
 /*
-  Hai nút bút chì và thùng rác **ẩn cho tới khi chuột dê vào dòng**. Card lịch sử là chỗ dày chữ nhất của sidebar; hai nút
-  nhân cho vài chục dòng thành một rừng biểu tượng, mà mỗi lúc người dùng chỉ sửa hoặc xóa đúng một dòng.
+  Hàng đầu **ghim hai mép**: nhóm trái ngày với sản phẩm, nhóm phải chip loại việc với hai nút. Đây là bố cục `.tx-meta` của
+  bản cũ, và nó giải đúng cái chủ dự án chụp ảnh chỉ ra — bản trước xếp mọi mẩu chữ thành một hàng phẳng rồi đẩy nút bằng
+  `margin-left: auto`, nên khi tổng bề ngang vượt lòng card thì cái thùng rác lòi ra ngoài mép.
 
-  Ẩn bằng `opacity` chứ không bằng `display: none`: mất chỗ thì dòng chữ giật ngang mỗi lần chuột đi qua, đọc rất mệt.
+  Nhóm trái `flex: 0 1 auto` nên **nó là bên chịu co**; nhóm phải `flex: 0 0 auto` nên chip và nút không bao giờ bị bóp. Cặp
+  số này chính là hành vi chủ dự án đòi: "khi dê chuột vào thì các nội dung ở hàng đầu sẽ co vào để hiện biểu tượng".
+
+  `align-items: center` đè `flex-start` của `.shin-row`: chip loại việc cao hơn dòng chữ thuần, để mép trên thì ngày và chip
+  lệch nhau một hai pixel, đủ để nhìn ra là lệch.
+*/
+.shin-act-head { justify-content: space-between; align-items: center; }
+
+.shin-act-left,
+.shin-act-right {
+  display: flex;
+  align-items: center;
+  gap: var(--shin-gap-2);
+  min-width: 0;
+}
+
+.shin-act-left { flex: 0 1 auto; }
+
+.shin-act-right { flex: 0 0 auto; }
+
+/*
+  Hai nút **ẩn hẳn cho tới khi chuột dê vào dòng**, và ẩn bằng `display: none` chứ không bằng `opacity`.
+
+  Bản trước dùng `opacity: 0` để chữ không giật ngang khi chuột đi qua. Chủ dự án chốt ngược lại ngày 06/09/2026: phải co
+  đúng như bản cũ. Và họ đúng — chỗ giữ sẵn cho hai cái nút vô hình là chỗ lấy từ tên sản phẩm ở **mọi** dòng, kể cả mấy
+  chục dòng chuột không bao giờ đi tới; đổi lại chỉ là một lần chữ co khi chuột đã vào đúng dòng đó.
+
   `:focus-within` cho đường bàn phím: Tab tới nút nào thì nút đó phải hiện ra, không thì con trỏ đi trong bóng tối.
 
   Nút ở đây **thấp 18 pixel**, không phải nút glyph vuông 28 pixel như ở thanh trên. Hàng đầu của một dòng lịch sử chỉ cao
   chừng 18 pixel; một cái nút 28 nong nó lên 28 và ba chục dòng cộng lại thành hơn 300 pixel trắng.
 
-  Thùng rác đỏ, bút chì xanh: hai việc khác hạng thì hai màu khác nhau, và cái không hoàn tác được ngay thì phải là cái đỏ.
+  Màu đặt theo `className` của từng nút, không đếm thứ tự bằng `.shin-icon + .shin-icon` như bản trước: bút chì nay đứng
+  ngoài cùng nên phép đếm cũ sẽ tô đỏ đúng cái bút. Thùng rác đỏ, bút chì xanh — cái không hoàn tác được ngay là cái đỏ.
 */
 .shin-act-row .shin-icon {
+  display: none;
   height: 18px;
   width: 18px;
   min-width: 18px;
   padding: 0;
-  color: var(--shin-primary);
-  opacity: 0;
-  transition: opacity 90ms linear;
 }
 
 .shin-act-row:hover .shin-icon,
-.shin-act-row:focus-within .shin-icon { opacity: 1; }
+.shin-act-row:focus-within .shin-icon { display: inline-flex; }
 
-.shin-act-row .shin-icon + .shin-icon { margin-left: 2px; color: var(--shin-error); }
+.shin-act-edit { color: var(--shin-primary); }
 
-.shin-act-row .shin-glyph { width: 13px; height: 13px; }
+.shin-act-del { color: var(--shin-error); }
+
+.shin-act-row .shin-glyph { width: 14px; height: 14px; }
 
 /*
-  Ba mẩu chữ đầu dòng, ba màu — đúng nếp bản cũ. Ngày xanh đậm là mốc để mắt nhảy dọc; loại việc là **chip xanh lá** nên nó
-  đọc ra thành một cái nhãn chứ không lẫn vào chữ; giá trị hợp đồng đỏ đậm vì đó là con số cần thấy trước tiên.
+  Ba mẩu chữ, ba màu — đúng nếp bản cũ. Ngày xanh đậm là mốc để mắt nhảy dọc; sản phẩm đỏ đậm là thứ để phân loại nhanh;
+  loại việc là **chip xanh lá** nên nó đọc ra thành một cái nhãn chứ không lẫn vào chữ.
 
-  Cả ba đều `flex: 0 0 auto` để co theo chữ của mình, thắng luật chia đều của `.shin-row > *` nhờ tệp này nạp sau
-  `components.html`. Không có nó thì ngày, loại việc và giá trị mỗi thứ ăn đúng một phần bề ngang bằng nhau.
+  Chỉ sản phẩm được cắt bằng ba chấm, ngày thì `flex: 0 0 auto`: một cái ngày cắt dở là một cái ngày sai, còn tên sản phẩm
+  cắt dở vẫn đọc ra được. Không có `min-width: 0` thì `text-overflow` không bao giờ chạy, vì hộp flex mặc định không co
+  xuống dưới bề rộng nội dung.
 */
 .shin-act-date,
-.shin-act-type,
-.shin-act-value {
-  flex: 0 0 auto;
+.shin-act-prod,
+.shin-act-type {
   font-size: var(--shin-text-sm);
   font-weight: 700;
 }
 
-.shin-act-date { color: var(--shin-primary); }
+.shin-act-date { flex: 0 0 auto; color: var(--shin-primary); }
 
-.shin-act-value { color: var(--shin-error); }
+.shin-act-prod {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--shin-error);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 
 .shin-act-type {
-  padding: 1px var(--shin-gap-1);
+  flex: 0 0 auto;
+  padding: 2px 6px;
   border-radius: var(--shin-radius-sm);
   background: #e6f4ea;
   color: var(--shin-ok);
-  font-size: var(--shin-text-xs);
+  font-size: var(--shin-text-2xs);
 }
 
-/* Nội dung là phần dài và là phần người ta đọc, nên nó cỡ chữ nền và màu chữ chính — không phải màu phụ. */
+/* Nội dung là phần dài và là phần người ta đọc, nên nó cỡ chữ nền và màu chữ chính — không phải màu phụ. Trần chiều cao thì
+   engine đặt bằng style nội tuyến từ `spatialConfig`, không phải ở đây. */
 .shin-act-content {
   margin-top: 2px;
   color: var(--shin-text);
@@ -90,8 +127,34 @@
 
 /* Dòng đã xóa mềm mờ đi nhưng **không** ẩn: nó vẫn giữ đúng vị trí thời gian của mình trên dòng thời gian. */
 .shin-act-deleted .shin-act-date,
-.shin-act-deleted .shin-act-value,
+.shin-act-deleted .shin-act-prod,
 .shin-act-deleted .shin-act-content { color: var(--shin-text-soft); text-decoration: line-through; }
+
+/* --- Khối ghi chú của khách -------------------------------------- */
+
+/*
+  **Một khối cảnh báo đỏ, không phải một đoạn chữ thường.** Bản cũ vẽ `.note-content` với nền đỏ nhạt, chữ đỏ và một vạch
+  đỏ dày 3 pixel bên trái; bản trước chuyển thành chữ đen 14 pixel không nền không vạch, tức mất hẳn tín hiệu.
+
+  Vì sao đỏ mới đúng: ghi chú của một khách là chỗ ghi "đừng quên" — nợ cũ, tính nết, điều đã hứa. Nó phải đập vào mắt trước
+  cả lịch sử làm việc, và bản cũ đạt được điều đó bằng đúng ba thuộc tính này.
+
+  `:not(:empty)` là chỗ then chốt: khách chưa có ghi chú thì **không** vẽ khối đỏ nào cả, để `(chưa có)` của `.shin-readtext`
+  hiện ra dạng chữ xám nghiêng. Bản cũ ẩn hẳn khối này lúc rỗng vì một hộp đỏ trống là một lời cảnh báo không có nội dung.
+
+  Cỡ chữ 13 chứ không phải 14: chữ trong khối đỏ đã nổi hẳn nhờ màu, nên nó không cần thêm cỡ để giành chỗ với tên công ty.
+*/
+.shin-note .shin-readtext:not(:empty) {
+  padding: var(--shin-gap-2);
+  border-radius: var(--shin-radius-sm);
+  border-left: 3px solid #d93025;
+  background: var(--shin-error-soft);
+  color: var(--shin-error);
+  font-size: var(--shin-text-sm);
+}
+
+/* Đè luật trỏ-chuột dùng chung của `.shin-readtext[data-action]` — nền xám của luật đó xóa mất màu đỏ. Đậm thêm một nấc là đủ để biết bấm được. */
+.shin-note .shin-readtext[data-action]:hover:not(:empty) { background: #fad2cf; }
 
 /* --- Dòng gợi ý tìm khách ---------------------------------------- */
 
@@ -140,7 +203,7 @@
 .shin-info-left,
 .shin-info-right {
   color: var(--shin-text);
-  font-size: var(--shin-text-md);
+  font-size: var(--shin-text-sm);
 }
 
 .shin-info-left { font-weight: 500; }

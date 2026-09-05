@@ -50,7 +50,7 @@
   display: flex;
   align-items: center;
   gap: var(--shin-gap-2);
-  padding: 6px var(--shin-gap-2) var(--shin-gap-1);
+  padding: var(--shin-card-pad) var(--shin-card-pad) var(--shin-gap-1);
   border-bottom: 1px dashed var(--shin-border-faint);
 }
 
@@ -72,24 +72,33 @@
 }
 
 /*
- * Nút trong hàng tiêu đề card: **thấp 20 pixel và màu xanh**, không phải nút glyph vuông 28 pixel như ở header.
+ * Nút trong hàng tiêu đề card: **một đường dẫn chữ xanh, không phải một cái nút**.
  *
- * Hai lý do. Chiều cao: một nút 28 pixel nong hàng tiêu đề lên 39 pixel, tức bao nhiêu công cắt lề ở trên cũng vô nghĩa.
- * Màu: bản cũ vẽ chỗ này thành một đường dẫn chữ xanh ("＋ Thêm", "✎ Sửa") chứ không phải một cái nút, vì nó là **lối phụ**
- * của card — nhìn ra được nhưng không tranh chỗ với nội dung.
+ * Bản cũ vẽ chỗ này thành `.action-link` — glyph 14 pixel liền một chữ, 11 pixel, đậm, màu xanh, không nền không viền
+ * ("＋ Thêm", "✎ Sửa"). Nó là **lối phụ** của card: nhìn ra được nhưng không tranh chỗ với nội dung. Một nút glyph vuông 28
+ * pixel như ở header thì nong hàng tiêu đề lên 39 pixel, tức bao nhiêu công cắt lề ở trên cũng vô nghĩa.
+ *
+ * `height: auto` để nó cao đúng bằng chữ, và `width: auto` thắng nút glyph vuông ở trên — cả hai đều cần vì `.shin-icon`
+ * ghim cả hai chiều bằng biến khung.
  */
 .shin-card-head .shin-icon {
-  height: 20px;
-  min-width: 20px;
-  padding: 0 2px;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  gap: 3px;
+  padding: 0;
+  border-radius: 0;
   color: var(--shin-primary);
   font-size: var(--shin-text-xs);
   font-weight: 600;
 }
 
-.shin-card-head .shin-icon:hover { background: var(--shin-primary-soft); }
+.shin-card-head .shin-icon .shin-glyph { width: 14px; height: 14px; }
 
-.shin-card-body { padding: var(--shin-gap-2); }
+/* Không đổi nền — bản cũ để nguyên. Gạch chân là dấu duy nhất, đúng nếp một đường dẫn chữ. */
+.shin-card-head .shin-icon:hover { background: none; text-decoration: underline; }
+
+.shin-card-body { padding: 6px var(--shin-card-pad) var(--shin-card-pad); }
 
 /* Hai hàng liền nhau trong card cách nhau đúng một nhịp, không phải nhịp của hàng ngoài card. */
 .shin-card-body > .shin-row + .shin-row { margin-top: var(--shin-gap-2); }
@@ -299,19 +308,21 @@
   display: inline-block;
   flex: 0 0 auto;
   max-width: 100%;
-  padding: 1px var(--shin-gap-2);
-  border-radius: 999px;
+  padding: 2px 6px;
+  border-radius: var(--shin-radius-sm);
   background: var(--shin-bg-hover);
   color: var(--shin-text-soft);
-  font-size: var(--shin-text-xs);
+  font-size: var(--shin-text-2xs);
+  font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.shin-badge-cong-viec { background: var(--shin-primary-soft); color: var(--shin-primary-dark); }
+/* Chip loại công việc là chip **xanh lá** của bản cũ (`.tx-job`), không phải chip xanh dương. Nó nằm cạnh mọi dòng lịch sử nên nó là chip người dùng thấy nhiều nhất, và bản cũ tách nó khỏi màu nhấn để nó không đọc ra như một chỗ bấm được. */
+.shin-badge-cong-viec { background: #e6f4ea; color: var(--shin-ok); }
 .shin-badge-uu-tien { background: var(--shin-warn-soft); color: var(--shin-warn); }
-.shin-badge-xac-thuc { background: #e6f4ea; color: var(--shin-ok); }
+.shin-badge-xac-thuc { background: var(--shin-primary-soft); color: var(--shin-primary-dark); }
 .shin-badge-cho-phep-fbm { background: var(--shin-primary-soft); color: var(--shin-primary-dark); }
 
 /* Chip "Đã xóa" không suy từ danh mục nào — `recordStatus` là trạng thái hệ thống, không phải một mức người dùng chọn. */
@@ -351,18 +362,22 @@
 .shin-button:disabled { border-color: var(--shin-border); background: var(--shin-bg-sunken); color: var(--shin-text-faint); cursor: progress; }
 .shin-button:disabled:hover { background: var(--shin-bg-sunken); }
 
-/* Nút glyph vuông. Khai sau nút và sau hàng nên nó thắng luật chia đều của `.shin-row > *` mà không cần `!important`. */
+/*
+ * Nút glyph tròn của header. **32 pixel, bo tròn hẳn, glyph 20 pixel** — đúng `.icon-btn` của bản cũ.
+ *
+ * Khai sau nút và sau hàng nên nó thắng luật chia đều của `.shin-row > *` mà không cần `!important`.
+ */
 .shin-icon {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 2px;
-  width: 28px;
-  height: 28px;
+  width: var(--shin-icon-btn);
+  height: var(--shin-icon-btn);
   padding: 0;
   border: 0;
-  border-radius: var(--shin-radius-sm);
+  border-radius: 50%;
   background: none;
   color: var(--shin-text-soft);
   font-family: inherit;
@@ -370,15 +385,24 @@
   cursor: pointer;
 }
 
+.shin-icon .shin-glyph { width: 20px; height: 20px; }
+
 .shin-icon:hover { background: var(--shin-bg-hover); color: var(--shin-text); }
 
 /* Nút đang bật — hiện chỉ có nút kính lúp lúc hộp tìm mở. Đánh dấu bằng `aria-pressed` chứ không bằng một lớp tự đặt, để trình đọc màn hình cũng nghe được trạng thái đó. */
 .shin-icon[aria-pressed="true"] { background: var(--shin-primary-soft); color: var(--shin-primary); }
 
-/* Có menu thì nút nở theo nội dung: mũi nhọn, và ca nút chỉ có chữ không có glyph. */
-.shin-icon.shin-has-menu { width: auto; padding: 0 var(--shin-gap-1); }
+/*
+ * Có menu **và** có chữ thì nút nở theo nội dung: đó là ca `{ label: "Đang xem", menu: [...] }` ở hàng tiêu đề card lịch sử.
+ *
+ * Nút chỉ có glyph thì giữ nguyên hình tròn 32 pixel như năm nút cùng hàng, và mũi nhọn ẩn đi. Bản cũ không có mũi nhọn nào trên header: một nút ba chấm tự nó đã nói "còn nữa", nên thêm một dấu 11 pixel cạnh glyph 20 pixel chỉ ra một hạt bẩn, mà lại làm đúng một nút trong hàng lệch hình khỏi các nút còn lại. Mũi nhọn vẫn nằm trong HTML — hợp đồng của `renderEngine` là "Block có menu thì có mũi nhọn", còn bày nó ra hay không là việc của CSS; hôm nào một nút header có chữ thì nó tự hiện.
+ */
+.shin-icon.shin-has-menu:has(.shin-btn-label) { width: auto; height: var(--shin-icon-btn); border-radius: var(--shin-radius-sm); padding: 0 var(--shin-gap-1); }
 
-.shin-glyph { flex: 0 0 auto; display: block; }
+.shin-icon.shin-has-menu:not(:has(.shin-btn-label)) .shin-caret { display: none; }
+
+/* Glyph nội tuyến không mang `width`/`height` trên thẻ nữa — bản cũ cũng để CSS quyết cỡ, nên cùng một glyph dùng lại được ở ba cỡ khác nhau. Con số ở đây là cỡ mặc định cho chỗ nào không khai riêng. */
+.shin-glyph { flex: 0 0 auto; display: block; width: 16px; height: 16px; }
 
 .shin-caret { flex: 0 0 auto; font-size: var(--shin-text-xs); line-height: 1; }
 
@@ -453,18 +477,21 @@
 
 /* --- Nút thu gọn và mở ------------------------------------------- */
 
-/* Cả hàng chứ không phải một nút nhỏ: đây là mép của một khối chữ bị cắt, và một dải rộng suốt bề ngang nói rõ hơn
-   rằng phần dưới còn nội dung. */
+/* Cả hàng vẫn bấm được — đây là mép của một khối chữ bị cắt, và một dải rộng suốt bề ngang là đích dễ bấm nhất — nhưng
+   **chữ nằm bên phải và thụt vào một nhịp**. Chủ dự án chốt vậy ngày 06/09/2026: bản trước để chữ sát mép trái, nên nó
+   đứng ngay dưới đầu dòng nội dung và đọc ra như một dòng nữa của chính đoạn văn. Bên phải thì nó rời khỏi cột chữ, và
+   thụt vào tám pixel thì nó không dính mép trong của card. */
 .shin-collapse-btn {
   display: block;
   width: 100%;
-  padding: var(--shin-gap-1) 0;
+  padding: var(--shin-gap-1) var(--shin-gap-2);
   border: 0;
   background: none;
   color: var(--shin-primary);
   font-family: inherit;
   font-size: var(--shin-text-xs);
-  text-align: left;
+  font-weight: 600;
+  text-align: right;
   cursor: pointer;
 }
 

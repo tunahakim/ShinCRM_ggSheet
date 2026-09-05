@@ -1,25 +1,32 @@
 <style>
 /*
- * Style của riêng ba màn không-có-form dưới đây, nằm cùng tệp vì không màn nào khác dùng tới. Khi chặng dựng form có tệp
- * style chung cho các thành phần thì phần nào dùng lại được sẽ chuyển sang đó, phần riêng của màn chặn thì ở lại.
+ * Style của riêng ba màn không-có-form dưới đây, nằm cùng tệp vì không màn nào khác dùng tới.
+ *
+ * **Mọi lớp ở đây mang tiền tố `shin-status`**, và đó là luật cứng của tệp này chứ không phải sở thích đặt tên. Lý do: tệp
+ * màn được `include` ở khu script, tức **sau** toàn bộ `client/style/`, nên một lớp trùng tên ở đây lặng lẽ thắng lớp cùng
+ * tên bên kia. Đúng chuyện đã xảy ra: `.shin-box` của tệp này đè `.shin-box` của `components.html`, và mọi dòng lịch sử trên
+ * màn xem mọc một cái khung 1 pixel với lề trong 12 pixel — mất 26 pixel bề ngang ở một sidebar chỉ rộng 300, đủ để tên sản
+ * phẩm bị cắt thành "Ống t…". Không có thông báo lỗi nào, vì trùng tên lớp CSS là hợp lệ với trình duyệt.
+ *
+ * Phép kiểm `tests/cases/cssClass.js` giờ quét trùng tên lớp giữa các tệp client, nên lỗi này không tái diễn trong im lặng.
  */
-.shin-screen { display: flex; flex-direction: column; gap: var(--shin-gap-3); }
-.shin-screen h2 { margin: 0; font-size: var(--shin-text-lg); }
-.shin-screen p { margin: 0; color: var(--shin-text-soft); }
+.shin-status { display: flex; flex-direction: column; gap: var(--shin-gap-3); }
+.shin-status h2 { margin: 0; font-size: var(--shin-text-lg); }
+.shin-status p { margin: 0; color: var(--shin-text-soft); }
 
-.shin-box { padding: var(--shin-gap-3); border-radius: var(--shin-radius); border: 1px solid var(--shin-border); }
-.shin-box--warn { border-color: #f0c36d; background: var(--shin-warn-soft); color: var(--shin-warn); }
-.shin-box--error { border-color: #f2a9a7; background: var(--shin-error-soft); color: var(--shin-error); }
+.shin-status-box { padding: var(--shin-gap-3); border-radius: var(--shin-radius); border: 1px solid var(--shin-border); }
+.shin-status-warn { border-color: #f0c36d; background: var(--shin-warn-soft); color: var(--shin-warn); }
+.shin-status-error { border-color: #f2a9a7; background: var(--shin-error-soft); color: var(--shin-error); }
 
-.shin-table { width: 100%; border-collapse: collapse; font-size: var(--shin-text-sm); }
-.shin-table th, .shin-table td { padding: var(--shin-gap-1) var(--shin-gap-2); border-bottom: 1px solid var(--shin-border); text-align: right; }
-.shin-table th:first-child, .shin-table td:first-child { text-align: left; }
-.shin-table th { color: var(--shin-text-faint); font-weight: 600; }
-.shin-table td.shin-num { font-family: var(--shin-font-mono); }
+.shin-status-table { width: 100%; border-collapse: collapse; font-size: var(--shin-text-sm); }
+.shin-status-table th, .shin-status-table td { padding: var(--shin-gap-1) var(--shin-gap-2); border-bottom: 1px solid var(--shin-border); text-align: right; }
+.shin-status-table th:first-child, .shin-status-table td:first-child { text-align: left; }
+.shin-status-table th { color: var(--shin-text-faint); font-weight: 600; }
+.shin-status-table td.shin-status-num { font-family: var(--shin-font-mono); }
 
-.shin-kv { display: grid; grid-template-columns: auto 1fr; gap: var(--shin-gap-1) var(--shin-gap-3); font-size: var(--shin-text-sm); }
-.shin-kv dt { color: var(--shin-text-faint); }
-.shin-kv dd { margin: 0; font-family: var(--shin-font-mono); }
+.shin-status-kv { display: grid; grid-template-columns: auto 1fr; gap: var(--shin-gap-1) var(--shin-gap-3); font-size: var(--shin-text-sm); }
+.shin-status-kv dt { color: var(--shin-text-faint); }
+.shin-status-kv dd { margin: 0; font-family: var(--shin-font-mono); }
 </style>
 
 <script>
@@ -67,12 +74,12 @@ function statusSetRegion(id, html) {
 function statusBudgetTable(sheets) {
   var rows = sheets.map(function (s) {
     return '<tr><td>' + statusEscape(s.name) + '</td>'
-      + '<td class="shin-num">' + statusNumber(s.rows) + '</td>'
-      + '<td class="shin-num">' + statusNumber(s.columns) + '</td>'
-      + '<td class="shin-num">' + statusNumber(s.cells) + '</td></tr>';
+      + '<td class="shin-status-num">' + statusNumber(s.rows) + '</td>'
+      + '<td class="shin-status-num">' + statusNumber(s.columns) + '</td>'
+      + '<td class="shin-status-num">' + statusNumber(s.cells) + '</td></tr>';
   });
 
-  return '<table class="shin-table"><thead><tr><th>Sheet</th><th>Hàng</th><th>Cột</th><th>Số ô</th></tr></thead>'
+  return '<table class="shin-status-table"><thead><tr><th>Sheet</th><th>Hàng</th><th>Cột</th><th>Số ô</th></tr></thead>'
     + '<tbody>' + rows.join('') + '</tbody></table>';
 }
 
@@ -83,9 +90,9 @@ function statusBudgetTable(sheets) {
  * luôn là xóa hàng và cột trống thừa của sheet đứng đầu bảng, nên câu hướng dẫn nói thẳng ra điều đó chứ không nói chung chung.
  */
 function statusBudgetBlocked(budget) {
-  var html = '<div class="shin-screen">'
+  var html = '<div class="shin-status">'
     + '<h2>Tệp đã vượt trần ngân sách ô</h2>'
-    + '<div class="shin-box shin-box--warn">Tệp đang có <b>' + statusNumber(budget.total) + '</b> ô lưới, trần đang đặt là <b>'
+    + '<div class="shin-status-box shin-status-warn">Tệp đang có <b>' + statusNumber(budget.total) + '</b> ô lưới, trần đang đặt là <b>'
     + statusNumber(budget.ceiling) + '</b> ô. ShinCRM dừng ở đây và <b>không đọc một ô dữ liệu nào</b>, vì chạy tiếp trên một tệp quá nặng thì mọi thao tác đều có thể hết thời gian giữa đường.</div>'
     + '<p>Trần tính bằng tổng số ô lưới của mọi sheet, <b>kể cả ô rỗng</b>. Vì vậy nguyên nhân thường gặp nhất không phải nhiều dữ liệu, mà là một sheet còn nguyên hàng và cột trống thừa.</p>'
     + statusBudgetTable(budget.sheets)
@@ -105,9 +112,9 @@ function statusBudgetBlocked(budget) {
  * Vẫn giữ câu nói về việc đóng mở lại bảng làm việc, vì có loại vỡ mà nút này không cứu được: chính đường truyền tới máy chủ gãy.
  */
 function statusLoadError(message) {
-  var html = '<div class="shin-screen">'
+  var html = '<div class="shin-status">'
     + '<h2>Không nạp được dữ liệu</h2>'
-    + '<div class="shin-box shin-box--error">' + statusEscape(message) + '</div>'
+    + '<div class="shin-status-box shin-status-error">' + statusEscape(message) + '</div>'
     + '<div><button type="button" class="shin-button shin-primary" data-action="reloadAll" data-busy="Đang thử lại…">Thử lại</button></div>'
     + '<p>Lượt chạy này đã ghi một dòng vào sheet <code>Log</code> kèm vết gọi. Bấm Thử lại, hoặc đóng rồi mở lại bảng làm việc nếu bấm mấy lần vẫn vỡ.</p>'
     + '</div>';
@@ -128,7 +135,7 @@ function statusKeyValues(pairs) {
     return '<dt>' + statusEscape(pair[0]) + '</dt><dd>' + statusEscape(pair[1]) + '</dd>';
   });
 
-  return '<dl class="shin-kv">' + items.join('') + '</dl>';
+  return '<dl class="shin-status-kv">' + items.join('') + '</dl>';
 }
 
 /** Một con số mili giây kèm cách đọc theo giây, vì "45.145 ms" thì phải nhẩm mới biết là 45 giây. `null` nghĩa là không đo được. */
@@ -151,7 +158,7 @@ function statusLoadSummary(info) {
   var timing = info.timing || {};
   var categoryValues = Object.keys(Store.categories).reduce(function (sum, code) { return sum + Store.categories[code].length; }, 0);
 
-  var parts = ['<div class="shin-screen">', '<h2>Nạp xong</h2>'];
+  var parts = ['<div class="shin-status">', '<h2>Nạp xong</h2>'];
 
   parts.push(statusKeyValues([
     ['Khách', statusNumber(Object.keys(Store.customers).length) + ' bản ghi'],
@@ -164,7 +171,7 @@ function statusLoadSummary(info) {
     ['Trạng thái giao dịch', Store.activityState]
   ]));
 
-  parts.push('<div class="shin-box"><b>Thời gian lượt nạp này</b>'
+  parts.push('<div class="shin-status-box"><b>Thời gian lượt nạp này</b>'
     + statusKeyValues([
       ['Tổng — thứ bạn chờ', statusMs(timing.msTong)],
       ['Tới khung hình đầu tiên', statusMs(timing.msKhungHinhDau)],
@@ -176,11 +183,11 @@ function statusLoadSummary(info) {
     + '</div>');
 
   if (info.warnings && info.warnings.length) {
-    parts.push('<div class="shin-box shin-box--warn"><b>Cảnh báo</b><br>' + info.warnings.map(statusEscape).join('<br>') + '</div>');
+    parts.push('<div class="shin-status-box shin-status-warn"><b>Cảnh báo</b><br>' + info.warnings.map(statusEscape).join('<br>') + '</div>');
   }
 
   if (info.skipped && info.skipped.length) {
-    parts.push('<div class="shin-box"><b>Phép tự kiểm schema bị bỏ qua vì thiếu đầu vào</b><br>' + info.skipped.map(statusEscape).join('<br>') + '</div>');
+    parts.push('<div class="shin-status-box"><b>Phép tự kiểm schema bị bỏ qua vì thiếu đầu vào</b><br>' + info.skipped.map(statusEscape).join('<br>') + '</div>');
   }
 
   parts.push('<p>Đây là màn tạm của chặng nạp dữ liệu. Chặng sau thay nó bằng màn xem khách.</p>', '</div>');

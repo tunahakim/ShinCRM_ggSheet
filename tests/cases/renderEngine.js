@@ -37,10 +37,18 @@ function chay(so) {
     ['flex: 0 0 120px; max-width: 120px', 'flex: 0 0 70%; max-width: 70%']);
   check(so, 'width "auto" là chia đều phần dư nên không sinh style', kg({ width: 'auto' }), '');
 
-  // Màn `view` khai trần ghi chú bằng chuỗi `"160px"`, còn tài liệu 04 Phần 5 ghi đơn vị là px — nên cả hai dạng phải đi được.
-  check(so, 'maxHeight nhận cả số và chuỗi, và sinh ra vùng cuộn được',
-    [kg({ maxHeight: 160 }), kg({ maxHeight: '160px' })],
-    ['max-height: 160px; overflow-y: auto', 'max-height: 160px; overflow-y: auto']);
+  // Tài liệu 04 Phần 5 ghi đơn vị là px, còn card ghi chú của màn `view` khai trần bằng token `var(--shin-read-max-height)`
+  // — nên cả ba dạng phải đi được, và dạng token phải đi qua **nguyên văn** chứ không bị dán thêm `px`.
+  check(so, 'maxHeight nhận số, chuỗi px và cả token CSS, rồi sinh ra vùng cuộn được',
+    [kg({ maxHeight: 160 }), kg({ maxHeight: '160px' }), kg({ maxHeight: 'var(--shin-read-max-height)' })],
+    ['max-height: 160px; overflow-y: auto', 'max-height: 160px; overflow-y: auto',
+      'max-height: var(--shin-read-max-height); overflow-y: auto']);
+
+  check(so, 'overflow "scroll" là cuộn nội bộ nên không gắn dấu data-collapse, chỉ "collapse" mới gắn',
+    [kg({ maxHeight: 'var(--shin-read-max-height)', overflow: 'scroll' }),
+      hop.renderSpatialAttrs({ maxHeight: 'var(--shin-read-max-height)', overflow: 'scroll' }).indexOf('data-collapse') !== -1,
+      hop.renderSpatialAttrs({ overflow: 'collapse', collapsedLines: 12 }).indexOf('data-collapse="12"') !== -1],
+    ['max-height: var(--shin-read-max-height); overflow-y: auto', false, true]);
 
   check(so, 'autoExpand false ghim chiều cao đúng bằng maxHeight',
     kg({ autoExpand: false, maxHeight: 200 }), 'height: 200px; overflow-y: auto');

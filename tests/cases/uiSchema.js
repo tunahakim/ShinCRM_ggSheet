@@ -143,8 +143,9 @@ function chay(so) {
 
   check(so, 'card lịch sử có id để vẽ lại riêng khi đổi nấc xem', cards[1].id, 'shin-card-history');
   check(so, 'card lịch sử lấy nội dung từ slot activityList, không khai cây con', cards[1].elements, 'activityList');
-  check(so, 'card ghi chú thu gọn theo trần chiều cao, không theo số dòng',
-    [cards[0].spatialConfig.maxHeight, cards[0].spatialConfig.overflow, cards[0].spatialConfig.collapsedLines], ['160px', 'collapse', 3]);
+  check(so, 'card ghi chú cuộn nội bộ theo trần chiều cao, không sinh nút thu gọn',
+    [cards[0].spatialConfig.maxHeight, cards[0].spatialConfig.overflow, cards[0].spatialConfig.collapsedLines],
+    ['var(--shin-read-max-height)', 'scroll', undefined]);
   check(so, 'ghi chú trên màn view là trường chỉ đọc — sửa nó phải đi qua noteForm',
     moiNode(cards[0].elements, []).map((n) => n.field + ':' + n.readonly), ['customer.note:true']);
 

@@ -350,8 +350,20 @@ var RENDER_INNER_BY_ROLE = {
   text: function (node) { return renderEscape(node.text); },
   field: renderFieldInner,
   button: function (node) { return '<span class="shin-btn-label">' + renderEscape(node.label) + '</span>' + renderMenuCaret(node); },
+  /**
+   * Glyph **và** chữ, cả hai khi cả hai được khai — chứ không phải chọn một.
+   *
+   * Trước đây lá này vẽ glyph rồi bỏ hẳn `label`, nên `{ icon: 'pencil', label: 'Sửa' }` ở `titleActions` ra một cái bút chì trơ trọi: đúng cái đã làm hàng tiêu đề card lệch khỏi bản cũ, nơi mục đó là một đường dẫn chữ xanh `✎ Sửa`. Chính docstring của `Icon` cũng đã hứa "có thể kèm chữ" từ đầu.
+   *
+   * Không khai gì thì chặn ngay: một nút không glyph không chữ vẫn nhận `data-action` và vẫn bấm được, nên nó là một chỗ bấm vô hình — loại lỗi chỉ lộ ra khi người dùng bấm trượt.
+   */
   icon: function (node) {
-    return (node.icon ? iconSvg(node.icon) : '<span class="shin-btn-label">' + renderEscape(node.label) + '</span>') + renderMenuCaret(node);
+    if (!node.icon && !node.label) {
+      throw new Error('Block vai "icon" không khai cả `icon` lẫn `label` — nút sẽ vẽ ra rỗng mà vẫn bấm được. Các glyph dùng được: ' + iconNames().join(', ') + '.');
+    }
+    return (node.icon ? iconSvg(node.icon) : '')
+      + (node.label ? '<span class="shin-btn-label">' + renderEscape(node.label) + '</span>' : '')
+      + renderMenuCaret(node);
   },
   check: function (node) {
     if (!node.pick) { throw new Error('Block vai "check" thiếu khóa `pick` — ô đánh dấu phải biết nó chọn bản ghi nào.'); }

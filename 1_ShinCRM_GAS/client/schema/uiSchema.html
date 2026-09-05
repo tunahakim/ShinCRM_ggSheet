@@ -35,8 +35,9 @@ UI_SCHEMA.view = {
     Card({
       title: 'GHI CHÚ',
       titleActions: [{ icon: 'pencil', label: 'Sửa', action: 'openNoteForm' }],
-      spatialConfig: { maxHeight: '160px', overflow: 'collapse', collapsedLines: 3 },
-      elements: [Field({ field: 'customer.note', control: 'readText', readonly: true, label: '', action: 'openNoteForm' })]
+      spatialConfig: { maxHeight: 'var(--shin-read-max-height)', overflow: 'scroll' },
+      // `shin-note` bật khối cảnh báo đỏ của bản cũ — nền đỏ nhạt, chữ đỏ, vạch đỏ trái. Luật nằm ở `client/style/slots.html`.
+      elements: [Field({ field: 'customer.note', control: 'readText', readonly: true, label: '', action: 'openNoteForm', className: 'shin-note' })]
     }),
     Card({
       id: 'shin-card-history',

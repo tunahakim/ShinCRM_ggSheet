@@ -16,19 +16,25 @@
  */
 
 :root {
-  /* Màu nền và màu chữ. Thang xám đi từ nền trắng tới chữ đen mềm, không dùng đen tuyệt đối vì nó làm chữ nhỏ bị gắt. */
+  /*
+   * Màu nền và màu chữ — **đúng thang xám Material của bản cũ**, không phải một thang tự chọn.
+   *
+   * Bản trước dùng một thang xám hơi ngả xanh (#f6f7f9, #dfe3e8, #1f2933). Từng màu đều dùng được, nhưng sidebar nằm trong
+   * bảng tính Google mà chính bảng tính dùng thang Material, nên lệch thang là lệch với thứ bao quanh nó. Chủ dự án chốt
+   * ngày 06/09/2026: vẻ ngoài bản cũ là đích. `9_Code_cu_tham_chieu/src/ui/Styles.html` là bản đặc tả của khối này.
+   */
   --shin-bg: #ffffff;
-  --shin-bg-sunken: #f6f7f9;
-  --shin-bg-hover: #eef1f5;
-  --shin-border: #dfe3e8;
-  --shin-border-strong: #c3cad3;
+  --shin-bg-sunken: #f8f9fa;
+  --shin-bg-hover: #f1f3f4;
+  --shin-border: #dadce0;
+  --shin-border-strong: #bdc1c6;
   /* Vạch mờ nhất của thang: dùng để **chia** chứ không để **khoanh**. Đường ngăn hai dòng lịch sử và gạch dưới tiêu đề card
      đều lấy màu này — đậm hơn một nấc thì vài chục dòng liền nhau nhìn ra thành một bảng kẻ ô, đúng chỗ chủ dự án nói "mỗi
      lịch sử lại ở trong một khung chữ nhật bo viền". Bản cũ đặt #f1f3f4 cho đúng việc này. */
   --shin-border-faint: #f1f3f4;
-  --shin-text: #1f2933;
-  --shin-text-soft: #52606d;
-  --shin-text-faint: #7b8794;
+  --shin-text: #202124;
+  --shin-text-soft: #5f6368;
+  --shin-text-faint: #80868b;
 
   /* Màu nhấn và màu nghĩa. Bốn màu nghĩa khớp bốn giá trị cột `Kết quả` của sheet `Log`, để một thứ trên màn hình và một
      dòng log nói về cùng một tình trạng thì cùng màu. */
@@ -48,30 +54,53 @@
   --shin-gap-4: 16px;
   --shin-gap-5: 24px;
 
-  /* Cỡ chữ. Sidebar rộng khoảng 300px nên cỡ nền là 13px chứ không phải 16px; to hơn thì một dòng chứa được quá ít chữ. */
-  --shin-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  /*
+   * Phông và cỡ chữ — **đúng bản cũ**: Roboto, cỡ nền 14px.
+   *
+   * Roboto đứng đầu vì bảng tính Google dùng chính phông đó, nên sidebar và thứ bao quanh nó cùng một nét chữ. Không tải từ
+   * mạng: máy nào có Roboto thì dùng, không có thì lùi về Arial. Bản trước để `-apple-system` với `"Segoe UI"` đứng trước
+   * nên trên Windows nó ra Segoe UI, tức khác phông với chính bảng tính đang chứa nó.
+   *
+   * Năm nấc cỡ chữ khớp năm nấc bản cũ dùng thật: 10 cho chip, 11 cho tiêu đề card và đường dẫn phụ, 13 cho hàng thông tin
+   * và chữ phụ, 14 cho chữ nền và nội dung công việc, 15 cho tên công ty. Bản trước hạ mỗi nấc đi một bậc để chứa thêm chữ
+   * trên sidebar hẹp; cộng lại thì ra một sidebar trông khác hẳn, và chủ dự án nhìn ra ngay.
+   */
+  --shin-font: Roboto, Arial, sans-serif;
   --shin-font-mono: "Cascadia Mono", Consolas, "Courier New", monospace;
+  --shin-text-2xs: 10px;
   --shin-text-xs: 11px;
-  --shin-text-sm: 12px;
-  --shin-text-md: 13px;
+  --shin-text-sm: 13px;
+  --shin-text-md: 14px;
   --shin-text-lg: 15px;
-  /* Chiều cao dòng là biến vì bộ máy render nhân nó với số dòng để tính trần của khối đang thu gọn. */
-  --shin-line-height: 1.45;
+  /* Chiều cao dòng là biến vì bộ máy render nhân nó với số dòng để tính trần của khối đang thu gọn. Bản cũ đặt 1.4. */
+  --shin-line-height: 1.4;
 
-  /* Hình khối. */
-  --shin-radius: 6px;
+  /* Hình khối. Bán kính card 8px và bóng rất nhạt đều là số của bản cũ. */
+  --shin-radius: 8px;
   --shin-radius-sm: 4px;
-  --shin-shadow: 0 1px 3px rgba(31, 41, 51, 0.12);
+  --shin-shadow: 0 2px 6px rgba(60, 64, 67, 0.15);
   /* Bóng của card: nhạt hơn hẳn bóng của lớp nổi. Card không nổi lên trên gì cả, nó chỉ cần **tách khỏi nền lõm** của vùng
      thân; một cái bóng thật thì mười cái card xếp dọc thành mười lớp kính chồng nhau. */
-  --shin-shadow-card: 0 1px 2px rgba(31, 41, 51, 0.06);
+  --shin-shadow-card: 0 1px 2px rgba(60, 64, 67, 0.05);
+
+  /* Lề trong của card, bằng số của bản cũ. Hàng tiêu đề và thẻ ruột đều lấy theo nó nên chữ hai chỗ thẳng một cột. */
+  --shin-card-pad: 10px;
 
   /* Trần chiều cao ô nhập nhiều dòng, tính bằng **số dòng chữ**. Chủ dự án chốt mười: dưới trần thì ô tự cao theo nội dung,
      quá trần mới sinh thanh cuộn nội bộ. Để ở đây vì cả CSS lẫn phần tự cao của `client/ui/inputs.html` đều đo theo nó. */
   --shin-textarea-lines: 10;
 
-  /* Số đo của khung. Vùng header và dải tiến trình cao cố định, nên chúng là biến chứ không phải số gõ trong bố cục. */
-  --shin-header-height: 40px;
+  /* Trần của khối **chữ chỉ đọc** dài: card GHI CHÚ ở màn xem. Cùng mười dòng với ô nhập, để cái người dùng đọc và cái họ
+     sửa cao bằng nhau — bấm Sửa mà khối chữ đổi chiều cao thì mắt phải tìm lại chỗ đang đọc.
+
+     Là một độ dài chứ không phải một con số, vì `spatialConfig.maxHeight` của bản khai cần đúng một giá trị CSS. Đơn vị `em`
+     nên nó co theo cỡ chữ của khối, không phải một số pixel gõ cứng. */
+  --shin-read-max-height: calc(10em * var(--shin-line-height));
+
+  /* Số đo của khung. Vùng header và dải tiến trình cao cố định, nên chúng là biến chứ không phải số gõ trong bố cục. Header
+     48px và nút glyph tròn 32px là số của bản cũ; bản trước hạ xuống 40 và 28 nên cả dải đầu sidebar thấp hơn một nấc. */
+  --shin-header-height: 48px;
+  --shin-icon-btn: 32px;
   --shin-progress-height: 3px;
 }
 </style>

@@ -9,9 +9,10 @@
  * chia không gian, cộng màu nền của từng vùng vì nền là thuộc tính của cái khung chứ không của cái nằm trong khung. Mọi
  * con số ở đây lấy từ biến trong `client/style/tokens.html`.
  *
- * **Lề ngang của mọi vùng là 8 pixel**, không phải 12. Sidebar rộng khoảng 300 pixel, mà một card còn một lớp lề riêng
- * bên trong nữa: 12 cộng 12 là 24 pixel mỗi bên, tức một phần sáu bề ngang tiêu cho khoảng trắng. Bản cũ đặt 8 và đó là
- * con số đúng — chủ dự án nhìn bản mới liền nói "lề 2 bên còn khá rộng".
+ * **Lề ngang là 8 pixel ở mọi vùng trừ vùng thân, nơi nó bằng không.** Sidebar rộng khoảng 300 pixel, mà một card còn một
+ * lớp lề riêng bên trong nữa: 12 cộng 12 là 24 pixel mỗi bên, tức một phần sáu bề ngang tiêu cho khoảng trắng. Bản cũ đặt 8
+ * và đó là con số đúng — chủ dự án nhìn bản mới liền nói "lề 2 bên còn khá rộng". Riêng vùng thân thì chủ dự án chốt tiếp
+ * ngày 06/09/2026 là card ăn hết bề ngang, nên ở đó lề ngang về không; lý do đầy đủ ghi tại chính `#sidebar-body` bên dưới.
  *
  * Ẩn một vùng thì đặt thuộc tính `hidden` lên chính thẻ đó, không đổi `class`. Dùng thuộc tính có sẵn của HTML thì trình
  * đọc màn hình cũng hiểu là vùng đó không còn, còn một lớp CSS tự đặt thì chỉ mắt người thấy.
@@ -59,12 +60,13 @@ html, body {
   overflow: hidden;
 }
 
-/* Vùng 1 — Header. Cao cố định, ghim đỉnh, hàng icon xếp ngang. */
+/* Vùng 1 — Header. Cao cố định, ghim đỉnh, hàng icon xếp ngang. Khe 4 pixel đúng như bản cũ: nút icon đã tròn 32 pixel nên
+   mắt tự tách chúng ra, khe rộng thêm chỉ ăn chỗ của cái nút thứ bảy sau này. */
 #sidebar-header {
   flex: 0 0 var(--shin-header-height);
   display: flex;
   align-items: center;
-  gap: var(--shin-gap-2);
+  gap: var(--shin-gap-1);
   padding: 0 var(--shin-gap-2);
   border-bottom: 1px solid var(--shin-border);
   background: var(--shin-bg);
@@ -145,13 +147,23 @@ html, body {
    thì thân nở ra theo nội dung và đẩy vùng chân ra khỏi khung.
 
    Nền **lõm** chứ không trắng: mọi thứ trong thân đều nằm trong card trắng, nên một nền lõm là cách làm mép card hiện ra mà
-   không phải kẻ thêm một đường viền nào. Đúng nếp bản cũ — trang màu #f8f9fa, card màu trắng. */
+   không phải kẻ thêm một đường viền nào. Đúng nếp bản cũ — trang màu #f8f9fa, card màu trắng.
+
+   **Lề chỉ có trên và dưới, hai bên bằng không**: card ăn hết bề ngang sidebar. Chủ dự án chốt vậy ngày 06/09/2026 — "cho nó
+   rộng hết, rồi bo góc cũng được". Sidebar chỉ rộng chừng 300 pixel nên tám pixel mỗi bên là mười sáu pixel bề ngang chữ,
+   đủ để một tên công ty dài xuống thêm một dòng. Card vẫn bo góc nên mắt vẫn thấy đó là một khối riêng dù nó chạm hai mép.
+
+   Bỏ lề hai bên là an toàn vì **mọi thứ trong vùng thân đều nằm trong card**: `screenBody` gói từng cụm của form vào một
+   `Card`, còn màn xem thì bản khai đã là hai `Card`. Không có mẩu chữ trần nào để chạm mép.
+
+   Đổi lại, thanh cuộn đứng chiếm sáu pixel bên phải nên khe phải hở hơn khe trái sáu pixel khi danh sách dài. Chấp nhận:
+   đổi lấy mười sáu pixel chữ thì hơn. */
 #sidebar-body {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: var(--shin-gap-2);
+  padding: var(--shin-gap-2) 0;
   background: var(--shin-bg-sunken);
 }
 
