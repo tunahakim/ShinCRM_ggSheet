@@ -1,0 +1,152 @@
+<style>
+/* Ba lớp mà `UI_SCHEMA` gọi tên ở riêng ba màn form, cộng dấu ô kế tục do engine đánh. Ở đây chứ không ở `components.html` vì chúng chết cùng form — tài liệu 03 Phần 8. */
+
+/* Tiêu đề nằm bên trái vùng header, ✕ và ✓ ở hai đầu. `flex: 1 1 auto` để nó ăn hết chỗ trống, nhờ đó `margin-left: auto` của nút ✓ không phải làm gì thêm. */
+.shin-form-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--shin-primary);
+  font-size: var(--shin-text-lg);
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Nút lưu ở vùng footer: rộng hết dải, cao hơn nút thường vì đây là nút bấm nhiều nhất cả ngày. */
+.shin-save-wide {
+  width: 100%;
+  padding: var(--shin-gap-2) var(--shin-gap-3);
+  font-weight: 600;
+}
+
+/* Ô ghi chú của màn `noteForm` là màn chỉ có một trường, nên cho nó cao hẳn thay vì ba dòng như textarea thường. */
+.shin-note-tall { min-height: 160px; }
+
+/* Ô đang mang giá trị kế tục từ lần làm việc trước — tài liệu 03 Phần 4. Nền vàng nhạt chứ không viền: viền dễ bị nhầm với ô đang lỗi. */
+.shin-carried { background: var(--shin-warn-soft); }
+.shin-carried:focus { background: var(--shin-bg); }
+</style>
+<script>
+/*
+ * Ba màn form — thêm, sửa, và ghi chú. Tài liệu 04 Phần 8, tài liệu 03 Phần 9.
+ *
+ * Cùng vai với `viewScreen`: biết **khi nào vẽ cái gì**, không biết vẽ ra sao. Một tệp lo cả ba màn vì ba màn chỉ khác nhau ở bản khai trong `UI_SCHEMA`, còn trình tự mở, đóng, lồng và suy tiêu đề thì y hệt nhau.
+ *
+ * Chưa có bộ thu thập DOM (chặng 1.4) nên mở form lồng chưa cất được những gì đang gõ ở form dưới. Chỗ nối sẵn đã có: gọi `screenStateSetDraft` trước `screenFormOpen`.
+ */
+
+/** Bản khai của một màn form. Tên sai thì hét ngay kèm danh sách tên đúng, chứ không để `screenBuild` báo "bản khai không có". */
+function screenFormDecl(man) {
+  if (typeof UI_SCHEMA === 'undefined' || !UI_SCHEMA || !UI_SCHEMA[man]) {
+    throw new Error('`UI_SCHEMA` không có màn "' + man + '". Ba màn form: customerForm, activityForm, noteForm.');
+  }
+  return UI_SCHEMA[man];
+}
+
+/**
+ * Tiêu đề thật của form: đang thêm ra "Thêm", đang sửa ra "Sửa" — tài liệu 04 Phần 8.
+ *
+ * Đọc cờ `themMoi` của khung ngăn xếp chứ không đọc `record.id`: bản ghi của form thêm đã mang mã xem trước, nên `record.id` luôn có giá trị và mọi form thêm sẽ đề chữ "Sửa".
+ *
+ * Nhận cả hai dạng khai vì `noteForm` khai tiêu đề bằng một chuỗi trần: màn đó luôn là sửa, khách nào cũng đã có dòng rồi mới ghi chú được.
+ */
+function screenFormTitle(title, themMoi) {
+  if (typeof title === 'string') { return title; }
+  if (!title || typeof title !== 'object' || typeof title.add !== 'string' || typeof title.edit !== 'string') {
+    throw new Error('`title` của màn form phải là chuỗi, hoặc object có đủ `add` và `edit`.');
+  }
+  return themMoi ? title.add : title.edit;
+}
+
+/**
+ * Chèn tiêu đề vào vùng header, ngay trước mục căn phải đầu tiên — ra `[✕][tiêu đề]…[✓]`, đúng nếp của bản cũ.
+ *
+ * Chèn thay vì khai thẳng trong `UI_SCHEMA` vì tiêu đề phụ thuộc bản ghi đang mở, mà `UI_SCHEMA` là bản khai tĩnh. Vắng mục căn phải thì nối vào cuối.
+ */
+function screenFormHeader(header, tieuDe) {
+  var out = header.slice();
+  var i = 0;
+  while (i < out.length && out[i].align !== 'right') { i += 1; }
+  out.splice(i, 0, Text({ text: tieuDe, className: 'shin-form-title' }));
+  return out;
+}
+
+/**
+ * Bản ghi cho lượt vẽ, theo bảng bốn màn của tài liệu 03 Phần 9.
+ *
+ * Form của thực thể khác `customer` vẫn được cấp thêm bản ghi khách, vì hai chỗ cần nó: khối thông tin chung, và ô `customer.note` chỉ-đọc ở hàng cuối form giao dịch.
+ */
+function screenFormRecords(man, record) {
+  var recs = {};
+  recs[man.entity] = record;
+  if (man.entity !== 'customer') { recs.customer = screenViewCustomer(); }
+  return recs;
+}
+
+/** Đi khắp cây Block của thân màn, gọi `fn` cho từng node. Dùng để tìm ô đầu tiên, không dùng để vẽ. */
+function screenFormWalk(nodes, fn) {
+  (nodes || []).forEach(function (node) {
+    fn(node);
+    screenFormWalk(node.elements, fn);
+  });
+}
+
+/**
+ * Id ô nhập được đầu tiên của form, hoặc `null` khi cả form chỉ-đọc.
+ *
+ * Chỉ tính ra id chứ không tự gọi `focus`: tệp này không chạm DOM nên bộ kiểm offline gọi được, và việc đặt con trỏ thuộc tệp nghe click — tệp duy nhất được phép chạm DOM ngoài engine.
+ */
+function screenFormFirstCellId(man) {
+  var found = null;
+  screenFormWalk(man.body, function (node) {
+    if (found || node.role !== 'field') { return; }
+    var duong = renderFieldPath(node, { entity: man.entity });
+    if (renderFieldReadonly(node, Schema[duong.entity][duong.name])) { return; }
+    found = renderFieldId(duong);
+  });
+  return found;
+}
+
+/** Vẽ form đang ở đỉnh ngăn xếp. Trả về bốn chuỗi engine dựng, cộng `focusId` để bên gọi đặt con trỏ. */
+function screenFormRender() {
+  var top = screenStateTop();
+  if (!top) { throw new Error('Không có form nào đang mở để vẽ. Màn hiện tại là "' + ScreenState.screen + '".'); }
+
+  var man = screenBuild(screenFormDecl(top.screen), top.screen);
+  var record = screenStateFormRecord();
+  man.header = screenFormHeader(man.header, screenFormTitle(man.title, top.themMoi));
+
+  var html = renderScreen(man, { records: screenFormRecords(man, record), carried: top.carried });
+  html.focusId = screenFormFirstCellId(man);
+  return html;
+}
+
+/** Mở form **sửa**: bản ghi đã có sẵn, bên gọi tra từ `Store` rồi truyền vào. */
+function screenFormOpen(man, record) {
+  screenStateOpenForm(man, screenFormDecl(man).entity, record);
+  return screenFormRender();
+}
+
+/**
+ * Mở form **thêm mới**: dựng bản ghi trắng bằng `fieldLogicNewRecord` rồi mở.
+ *
+ * `seed` là giá trị bên gọi đã biết trước, ví dụ `customerId` của form giao dịch. Danh sách ô kế tục đi kèm vào ngăn xếp để engine đánh dấu được ở mọi lượt vẽ lại, không chỉ lượt đầu.
+ */
+function screenFormOpenNew(man, seed) {
+  var entity = screenFormDecl(man).entity;
+  var moi = fieldLogicNewRecord(entity, seed);
+  screenStateOpenFormNew(man, entity, moi.record, moi.carried);
+  return screenFormRender();
+}
+
+/**
+ * Đóng đúng một form — đường của nút ✕ và nút Hủy.
+ *
+ * Dưới nó còn form thì vẽ lại form đó cùng bản nháp của chính nó; hết form thì về màn xem. Không dùng `screenViewGo` vì `screenStateCloseForm` đã đặt màn về `view` rồi, gọi thêm chỉ dọn lại một ngăn xếp đang rỗng.
+ */
+function screenFormClose() {
+  var duoi = screenStateCloseForm();
+  return duoi ? screenFormRender() : screenViewRender();
+}
+</script>

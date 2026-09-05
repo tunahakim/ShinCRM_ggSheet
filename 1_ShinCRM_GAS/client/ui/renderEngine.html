@@ -207,8 +207,8 @@ function renderBadgeClass(khai) {
 
 /** Thuộc tính chung của mọi ô: id để nhãn trỏ tới, `data-field` mang đường dẫn đầy đủ, và dấu chỉ-đọc cho bộ thu thập. */
 function renderControlAttrs(o, lop) {
-  return renderAttr('class', lop) + renderAttr('id', o.id) + renderAttr('data-field', o.path)
-    + (o.readonly ? ' data-readonly="1"' : '');
+  return renderAttr('class', lop + (o.carried ? ' shin-carried' : '')) + renderAttr('id', o.id)
+    + renderAttr('data-field', o.path) + (o.readonly ? ' data-readonly="1"' : '');
 }
 
 /** Khung chung của hai control gõ-để-lọc: ô nhập, mũi tên, và một hộp danh sách rỗng để phần bàn phím đổ nội dung vào sau. */
@@ -259,11 +259,28 @@ function renderFieldSchema(duong) {
   return Schema[duong.entity][duong.name];
 }
 
+/** Id của ô một trường. Công thức nằm ở một chỗ duy nhất vì bên vẽ và bên đặt con trỏ đều cần. */
+function renderFieldId(duong) {
+  return 'shin-f-' + duong.entity + '-' + duong.name;
+}
+
+/** Chỉ-đọc là hoặc bảng khai trường hoặc dòng `UI_SCHEMA`, không có đường ngược lại: `node.readonly` chỉ cộng thêm chứ không mở khóa được trường mà `DATA_SCHEMA` đã khóa — **`[RÀNG BUỘC CỨNG]`** tài liệu 03 Phần 7. */
+function renderFieldReadonly(node, khai) {
+  return khai.readonly === true || node.readonly === true;
+}
+
 /**
- * Ruột một trường: hàng nhãn, kèm nút bút chì khi trường khai `action`, rồi tới ô.
+ * Ô này có đang mang giá trị kế tục từ bản ghi trước không — tài liệu 03 dòng 96 giao việc đánh dấu cho engine.
  *
- * Chỉ-đọc là hoặc bảng khai trường hoặc dòng `UI_SCHEMA`, không có đường ngược lại: `node.readonly` chỉ cộng thêm chứ không mở khóa được trường mà `DATA_SCHEMA` đã khóa — `[RÀNG BUỘC CỨNG]` tài liệu 03 Phần 7.
+ * `ctx.carried` là danh sách tên trường của chính thực thể màn đang mở, nên phải so cả `entity`: `customer.note` nằm trên màn giao dịch không được ăn dấu vì `activity` tình cờ cũng có trường tên `note`.
  */
+function renderFieldCarried(ctx, duong) {
+  if (!ctx.carried || duong.entity !== ctx.entity) { return false; }
+  return ctx.carried.indexOf(duong.name) !== -1;
+}
+
+
+/** Ruột một trường: hàng nhãn, kèm nút bút chì khi trường khai `action`, rồi tới ô. */
 function renderFieldInner(node, ctx) {
   var duong = renderFieldPath(node, ctx);
   var khai = renderFieldSchema(duong);
@@ -275,9 +292,10 @@ function renderFieldInner(node, ctx) {
 
   var o = {
     path: duong.entity + '.' + duong.name,
-    id: 'shin-f-' + duong.entity + '-' + duong.name,
+    id: renderFieldId(duong),
     value: renderFieldValue(ctx, duong),
-    readonly: khai.readonly === true || node.readonly === true,
+    readonly: renderFieldReadonly(node, khai),
+    carried: renderFieldCarried(ctx, duong),
     khai: khai
   };
   var but = node.action
@@ -341,7 +359,12 @@ function renderRegionElement(ten) {
  * Dựng đủ bốn chuỗi trong RAM rồi mới gán — chống nháy, `[RÀNG BUỘC CỨNG]` tài liệu 04 Phần 6. Gán dần từng vùng thì người dùng thấy màn hiện theo mảnh, và một lỗi ở vùng cuối để lại màn nửa cũ nửa mới.
  */
 function renderScreen(man, boiCanh) {
-  var nen = { entity: man.entity, records: (boiCanh && boiCanh.records) || {}, screen: man };
+  var nen = {
+    entity: man.entity,
+    records: (boiCanh && boiCanh.records) || {},
+    carried: (boiCanh && boiCanh.carried) || null,
+    screen: man
+  };
   RENDER_INDEX = { nodes: {}, menus: {}, ctx: nen, dem: 0 };
 
   var html = {

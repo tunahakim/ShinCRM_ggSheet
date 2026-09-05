@@ -111,7 +111,8 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   └── renderEngine.html     Cây Block thành HTML rồi gán vào bốn vùng. Thoát ký tự, dịch spatialConfig thành style, và renderTarget — cách DUY NHẤT đổi nội dung màn.
 │   ├── screen\                   Một tệp một màn người dùng nhìn thấy. Màn được mang theo style riêng, vì style đó chết cùng màn đó.
 │   │   ├── statusScreen.html     Ba màn không có form: tóm tắt lượt nạp, lỗi nạp, và màn chặn khi vượt trần ngân sách ô.
-│   │   └── viewScreen.html       Màn xem khách — màn mặc định. Biết KHI NÀO vẽ lại cái gì, không biết vẽ ra sao. Chỗ duy nhất nối ScreenState.currentCustomerId với Store.
+│   │   ├── viewScreen.html       Màn xem khách — màn mặc định. Biết KHI NÀO vẽ lại cái gì, không biết vẽ ra sao. Chỗ duy nhất nối ScreenState.currentCustomerId với Store.
+│   │   └── formScreen.html       Ba màn form dùng chung một trình tự: mở sửa, mở thêm mới, mở lồng, đóng từng lớp. Suy tiêu đề rồi chèn vào vùng header, và tính id ô nhập đầu tiên cho bên đặt con trỏ.
 │   └── util\
 │       ├── serverCall.html       Bọc google.script.run thành Promise kèm vạch tiến trình. Cửa duy nhất thấy cả hai đầu một vòng gọi, nên phép đo thời gian cũng ở đây. Cố ý KHÔNG tự hiện lỗi — việc đó của bên gọi.
 │       ├── callTiming.html       Sổ đo từng vòng gọi. Tách tổng thời gian thành ba phần: máy chủ tính toán, tiền đi đường, trình duyệt bung và vẽ.
@@ -169,7 +170,8 @@ tests\
     ├── uiSchema.js               Bảng khai bố cục giữ hợp đồng với ba tệp khác: mọi đường dẫn trường tra được trong DATA_SCHEMA, mọi tên hàm có trong ACTIONS, và bốn màn dựng qua screenBuild không nổ.
     ├── renderEngine.js           Cây Block thành HTML: ký tự đặc biệt trong tên công ty, spatialConfig khai rồi mà bố cục không đổi, data-field thiếu đường dẫn, và luật chỉ-đọc bị mở khóa.
     ├── slots.js                  Dòng lịch sử giữ đúng thứ tự thời gian kể cả khi có bản ghi đã xóa chen giữa, và KHÔNG dòng nào mang field — engine tra một bản ghi cho một thực thể.
-    └── viewScreen.js             Bốn cái hỏng-trong-im-lặng của màn xem: mã card lệch giữa hai tệp, đổi khách mà chỉ vẽ lại một vùng, đổi khách lúc đang gõ dở, và tệp màn tự chạm DOM.
+    ├── viewScreen.js             Bốn cái hỏng-trong-im-lặng của màn xem: mã card lệch giữa hai tệp, đổi khách mà chỉ vẽ lại một vùng, đổi khách lúc đang gõ dở, và tệp màn tự chạm DOM.
+    └── formScreen.js             Bốn cái hỏng-trong-im-lặng của ba màn form: tiêu đề suy sai vì bản ghi mới đã có mã xem trước, ô kế tục không có dấu, form giao dịch thiếu bản ghi khách, và đóng form lồng thì rơi thẳng về màn xem.
 ```
 
 ## Bảng tra: tên trong tài liệu thiết kế → tệp thật

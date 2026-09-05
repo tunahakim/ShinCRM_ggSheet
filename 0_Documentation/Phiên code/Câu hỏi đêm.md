@@ -117,3 +117,25 @@ Chỗ này để lại một việc thật cho chặng sau: mã khách đang xem
 `Sidebar.html:32` nói hộp tìm kiếm thuộc vùng header. Nhưng `Block` không có vai `input`, `screenBar` chỉ sinh ra `Button` và `Icon`, và hộp tìm kiếm không phải một trường của `DATA_SCHEMA` nên không dựng bằng `Field` được. Thêm nữa tài liệu 04:94 đòi danh sách gợi ý vẽ lại theo từng chữ gõ **mà không mất con trỏ**, tức thẻ `input` phải nằm *ngoài* vùng bị vẽ lại.
 
 Ba đường: thêm vai thứ chín cho `Block`; hoặc coi hộp tìm kiếm là đồ khung cố định trong `Sidebar.html` (giống `sidebar-progress`) do một tệp `client/ui/search.html` chạm DOM điều khiển, cùng loại với `menu.html` và `collapse.html`; hoặc một `Block` bọc mà slot của nó sinh ra thẻ `input`. **Chưa chọn** — để lại tới bước dựng hộp tìm kiếm, vì hai bước trước nó không phụ thuộc câu trả lời. Nghiêng về đường thứ hai: nó giữ được luật con trỏ mà không phải nới hình dạng `Block` cho một trường hợp duy nhất.
+
+## 5. Ba màn form — năm chỗ tự quyết
+
+### 5.1. Cờ thêm-mới thay cho phép đọc `record.id`
+
+Tài liệu 04:123 viết "rỗng là thêm mới, có mã là sửa". Câu đó sai từ lúc `DATA_SCHEMA` khai `id` có ngầm định `nextCustomerCode`/`nextActivityCode`: bản ghi của form thêm **đã** mang mã xem trước, nên đọc `record.id` thì mọi form thêm đều đề chữ "Sửa". Bọ này đã thật sự nổ ra trong bộ kiểm, không phải suy đoán. **Đã sửa tài liệu 04** và khung ngăn xếp mang thêm cờ `themMoi`, đặt bởi hai cửa riêng `screenStateOpenForm` (sửa) và `screenStateOpenFormNew` (thêm) chứ không bởi một tham số thứ năm.
+
+### 5.2. Dấu ô kế tục do engine đánh, và danh sách kế tục sống trong ngăn xếp
+
+Tài liệu 03 dòng 96 giao đúng việc này cho engine, và tài liệu 04 Phần 6 **`[RÀNG BUỘC CỨNG]`** cấm mọi tệp ngoài engine đổi lớp CSS. **Đang chọn:** `renderScreen` nhận thêm khóa `carried` trong bối cảnh, `renderFieldCarried` so cả tên thực thể để `customer.note` trên form giao dịch không ăn dấu vì trùng tên, và danh sách kế tục nằm trong khung ngăn xếp cùng bản nháp — có thế nó mới sống qua một form lồng.
+
+### 5.3. Tiêu đề form vào vùng header, chèn trước mục căn phải đầu tiên
+
+Không tài liệu nào cho tiêu đề form một chỗ đứng. Code cũ đặt nó bên trái một dải dính đầu màn, ✕ và ✓ bên phải. **Đang chọn: dựng đúng lại nếp đó** — `formScreen` chèn một `Text` mang lớp `shin-form-title` vào `man.header` ngay trước mục đầu tiên có `align === 'right'`, ra `[✕][tiêu đề][✓]`. Chèn lúc vẽ chứ không khai trong `UI_SCHEMA` vì tiêu đề phụ thuộc bản ghi đang mở. `Text` không nhận khóa `align`, nên tiêu đề nằm trái và `margin-left: auto` của nút ✓ tự đẩy nó sang phải.
+
+### 5.4. `screenFormRender` trả về `focusId` chứ không tự gọi `focus`
+
+Đặt con trỏ vào ô nhập đầu tiên là việc phải làm, nhưng gọi `focus` thì tệp màn phải chạm DOM, mà khung giả của bộ kiểm cố tình chỉ có ba khả năng nên tệp sẽ nổ ngay ở đó. **Đang chọn: tính ra id rồi trả về**, việc gọi `focus` thuộc tệp nghe click — tệp duy nhất ngoài engine được phép chạm DOM. Id tính bằng đúng `renderFieldId` và `renderFieldReadonly` của engine, không chép lại công thức sang tệp thứ hai.
+
+### 5.5. Ba lớp CSS mà `UI_SCHEMA` gọi tên nhưng chưa ai viết
+
+`shin-save-wide` và `shin-note-tall` được `UI_SCHEMA` gọi từ đầu mà không có một dòng CSS nào trong repo. **Đang chọn:** viết chúng cùng `shin-form-title` và `shin-carried` vào `<style>` riêng của `formScreen.html`, theo đúng luật ở `Sidebar.html:18` — style chết cùng màn thì ở cùng màn. Nút lưu ở ba màn form được thêm `shin-primary` vào `className` để đúng màu nút chính của bản cũ, vì `shin-save-wide` chỉ nên lo bề rộng.

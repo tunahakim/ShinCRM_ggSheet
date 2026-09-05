@@ -40,12 +40,8 @@ function screenStateTop() {
   return ScreenState.formStack.length ? ScreenState.formStack[ScreenState.formStack.length - 1] : null;
 }
 
-/**
- * Mở một form: đẩy vào ngăn xếp rồi chuyển màn. Bản ghi rỗng là thêm mới, có mã là sửa — tài liệu 04 Phần 8.
- *
- * Muốn giữ những gì đang gõ ở form hiện tại thì gọi `screenStateSetDraft` **trước** khi gọi hàm này. Tách hai bước vì bộ thu thập thuộc đường lưu, còn tệp này không biết đọc DOM.
- */
-function screenStateOpenForm(man, entity, record) {
+/** Đẩy một khung vào ngăn xếp. Hai cửa mở form dưới đây chỉ khác nhau ở hai thứ, nên phần kiểm tên và chuyển màn nằm chung ở đây. */
+function screenStatePushForm(man, entity, record, carried, themMoi) {
   if (SCREEN_NAMES.indexOf(man) === -1) {
     throw new Error('Không có màn "' + man + '". Bốn màn: ' + SCREEN_NAMES.join(', ') + '.');
   }
@@ -56,9 +52,30 @@ function screenStateOpenForm(man, entity, record) {
     throw new Error('Mở màn "' + man + '" mà thiếu tên thực thể — thực thể quyết định form này ghi vào sheet nào.');
   }
 
-  ScreenState.formStack.push({ screen: man, entity: entity, record: record || {}, draft: {} });
+  ScreenState.formStack.push({
+    screen: man, entity: entity, record: record || {}, draft: {},
+    carried: carried || [], themMoi: themMoi === true
+  });
   ScreenState.screen = man;
   return screenStateTop();
+}
+
+/**
+ * Mở form **sửa** một bản ghi đã có.
+ *
+ * Muốn giữ những gì đang gõ ở form hiện tại thì gọi `screenStateSetDraft` **trước** khi gọi hàm này. Tách hai bước vì bộ thu thập thuộc đường lưu, còn tệp này không biết đọc DOM.
+ */
+function screenStateOpenForm(man, entity, record) {
+  return screenStatePushForm(man, entity, record, [], false);
+}
+
+/**
+ * Mở form **thêm mới**. Tài liệu 04 Phần 8 phân biệt hai ca bằng "bản ghi rỗng hay có mã", nhưng ở đây phải là một cờ riêng: bản ghi mới đã mang mã **xem trước** do `nextActivityCode` sinh ra, nên đọc `record.id` sẽ ra "sửa" ở mọi form thêm.
+ *
+ * `carried` là danh sách tên trường đang mang giá trị kế tục. Nó ở trong khung ngăn xếp cùng `record` và `draft` vì nó cũng phải sống qua một form lồng: đóng form lồng ra thì ô kế tục vẫn phải còn dấu.
+ */
+function screenStateOpenFormNew(man, entity, record, carried) {
+  return screenStatePushForm(man, entity, record, carried, true);
 }
 
 /** Cất bản nháp vào form đang hiện. Chỉ cất, không kiểm bắt buộc: kiểm tra chỉ xảy ra lúc bấm lưu — **`[RÀNG BUỘC CỨNG]`** tài liệu 04 Phần 8. */
@@ -102,5 +119,11 @@ function screenStateFormRecord() {
   Object.keys(top.record).forEach(function (k) { out[k] = top.record[k]; });
   Object.keys(top.draft).forEach(function (k) { out[k] = top.draft[k]; });
   return out;
+}
+
+/** Danh sách ô kế tục của form đang hiện, `null` khi không có form nào mở. Engine đọc nó để đánh dấu, tài liệu 03 Phần 4. */
+function screenStateFormCarried() {
+  var top = screenStateTop();
+  return top ? top.carried : null;
 }
 </script>

@@ -64,7 +64,20 @@ function chay(so) {
   check(so, 'bản ghi gốc không bị bản nháp làm bẩn', hop.screenStateTop().record.companyName, 'Tên cũ');
 
   hop.screenStateGoView();
-  check(so, 'không có form nào mở thì không có dữ liệu form để vẽ', hop.screenStateFormRecord(), null);
+  check(so, 'không có form nào mở thì không có dữ liệu form để vẽ',
+    [hop.screenStateFormRecord(), hop.screenStateFormCarried()], [null, null]);
+
+  // Hai cửa mở form khác nhau ở hai thứ: cờ thêm-mới và danh sách ô kế tục. Cờ phải là một trường riêng vì bản ghi mới đã mang mã xem trước, nên `record.id` không phân biệt được thêm với sửa.
+  hop.screenStateOpenFormNew('activityForm', 'activity', { id: 'ACT-000035', priority: 'Cao' }, ['priority']);
+  check(so, 'mở form thêm mới: cờ themMoi bật và danh sách ô kế tục vào ngăn xếp để sống qua form lồng',
+    [hop.screenStateTop().themMoi, hop.screenStateFormCarried()], [true, ['priority']]);
+
+  hop.screenStateOpenForm('noteForm', 'customer', { note: 'x' });
+  check(so, 'mở form sửa: cờ themMoi tắt và không có ô kế tục nào',
+    [hop.screenStateTop().themMoi, hop.screenStateFormCarried()], [false, []]);
+  check(so, 'đóng form lồng thì cờ và danh sách kế tục của form dưới còn nguyên',
+    [hop.screenStateCloseForm().themMoi, hop.screenStateFormCarried()], [true, ['priority']]);
+  hop.screenStateGoView();
 
   checkThrows(so, 'mở màn không có tên trong bốn màn thì nói rõ bốn màn là gì',
     () => hop.screenStateOpenForm('khachForm', 'customer', {}), 'Bốn màn');
