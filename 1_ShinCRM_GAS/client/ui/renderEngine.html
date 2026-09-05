@@ -1,0 +1,362 @@
+<script>
+/*
+ * Dịch cây Block thành HTML rồi gán vào các vùng của sidebar. Tài liệu 04 Phần 5, 6, 9.
+ *
+ * Đúng bốn việc: thoát ký tự, dịch `spatialConfig` thành style nội tuyến, dựng chuỗi HTML đệ quy, và `renderTarget` vẽ lại một vùng theo `id`. Menu sổ xuống (Phần 4B) và phép đo của chế độ thu gọn (Phần 5) ở tệp anh em — nhồi vào đây là dựng đúng cái tệp giao diện phình to mà luật nhà cấm.
+ *
+ * Nửa dựng chuỗi **không chạm DOM**: chỉ ba hàm cuối tệp gọi `document`. Nhờ vậy bộ kiểm offline gọi được hàm thật thay vì phải mở sidebar trên Google.
+ */
+
+/* --- Việc 1 — thoát ký tự --------------------------------------- */
+
+var RENDER_ESCAPE_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+
+/** Thoát chuỗi trước khi ghép vào HTML. `[RÀNG BUỘC CỨNG]` tài liệu 04 Phần 1: một tên công ty chứa dấu ngoặc kép là đủ làm vỡ form. */
+function renderEscape(giaTri) {
+  if (giaTri === null || giaTri === undefined) { return ''; }
+  return String(giaTri).replace(/[&<>"']/g, function (ky) { return RENDER_ESCAPE_MAP[ky]; });
+}
+
+/** Một thuộc tính HTML đã thoát. Giá trị rỗng thì không sinh thuộc tính, vì `data-field=""` vẫn khớp bộ chọn `[data-field]` và làm bộ thu thập nhận cả ô không có tên trường. */
+function renderAttr(ten, giaTri) {
+  if (giaTri === null || giaTri === undefined || giaTri === '') { return ''; }
+  return ' ' + ten + '="' + renderEscape(giaTri) + '"';
+}
+
+/* --- Việc 2 — spatialConfig thành style nội tuyến ---------------- */
+
+/** Số đo thành chuỗi CSS: số trần hiểu là px, chuỗi giữ nguyên đơn vị đã gõ (`"70%"`, `"160px"`). */
+function renderLength(giaTri) {
+  return typeof giaTri === 'number' ? giaTri + 'px' : String(giaTri).trim();
+}
+
+/** Số dòng còn lại khi thu gọn, mặc định 3 theo tài liệu 04 Phần 5. */
+function renderCollapsedLines(kg) {
+  var n = kg.collapsedLines === undefined ? 3 : Number(kg.collapsedLines);
+  if (!(n > 0)) { throw new Error('`collapsedLines` phải là số dòng lớn hơn 0, đang nhận "' + kg.collapsedLines + '".'); }
+  return n;
+}
+
+/** Hai giá trị của núm `overflow`. Một núm hai nấc chứ không hai cờ đúng-sai, vì cuộn và thu gọn loại trừ nhau. */
+var RENDER_OVERFLOW_VALUES = ['scroll', 'collapse'];
+
+/**
+ * `spatialConfig` thành phần ruột của `style`. Khai rỗng thì trả chuỗi rỗng: độ rộng chia đều và chiều cao theo nội dung là mặc định, mà mặc định thì để CSS nói một lần ở `components.html` chứ không lặp vào từng thẻ.
+ *
+ * `autoExpand: false` cần `maxHeight` mới có số để ghim chiều cao; thiếu thì ném lỗi chứ không lặng lẽ không làm gì. Khai cả `maxHeight` lẫn `overflow: "collapse"` thì trần lúc thu gọn là `maxHeight`, còn `collapsedLines` là đường dự phòng khi không khai trần.
+ */
+function renderSpatialStyle(kg) {
+  var c = kg || {};
+  var out = [];
+  var thuGon = c.overflow === 'collapse';
+  var tran = c.maxHeight === undefined ? '' : renderLength(c.maxHeight);
+
+  if (c.overflow !== undefined && RENDER_OVERFLOW_VALUES.indexOf(c.overflow) === -1) {
+    throw new Error('`overflow` chỉ nhận "scroll" hoặc "collapse", đang nhận "' + c.overflow + '".');
+  }
+  if (c.width !== undefined && c.width !== 'auto') {
+    out.push('flex: 0 0 ' + renderLength(c.width), 'max-width: ' + renderLength(c.width));
+  }
+
+  if (c.autoExpand === false) {
+    if (!tran) { throw new Error('`autoExpand: false` cần `maxHeight` để biết ghim chiều cao ở đâu.'); }
+    out.push('height: ' + tran);
+  } else if (tran && !thuGon) {
+    out.push('max-height: ' + tran);
+  }
+
+  if (thuGon) {
+    out.push('overflow: hidden', 'max-height: ' + (tran || 'calc(' + renderCollapsedLines(c) + 'em * var(--shin-line-height))'));
+  } else if (tran || c.autoExpand === false) {
+    out.push('overflow-y: auto');
+  }
+
+  return out.join('; ');
+}
+
+/** Style không gian cộng dấu `data-collapse`: hai thứ đi cùng nhau vì phép đo của chế độ thu gọn phải tìm đúng phần tử đang bị ghim trần. */
+function renderSpatialAttrs(kg) {
+  var c = kg || {};
+  var ra = renderAttr('style', renderSpatialStyle(c));
+  if (c.overflow === 'collapse') { ra += renderAttr('data-collapse', renderCollapsedLines(c)); }
+  return ra;
+}
+
+/* --- Việc 3 — dựng chuỗi HTML đệ quy ---------------------------- */
+
+/** Sổ tra của lượt vẽ hiện tại: Block theo `id` để `renderTarget` tìm lại, `menu` theo khóa để tệp menu tra. Dựng lại mỗi lượt vẽ cả màn. */
+var RENDER_INDEX = { nodes: {}, menus: {}, ctx: null, dem: 0 };
+
+/** Thẻ HTML của từng vai. */
+var RENDER_TAG_BY_ROLE = { box: 'div', card: 'section', row: 'div', text: 'div', field: 'div', button: 'button', icon: 'button' };
+
+/** Control suy từ `type` khi `UI_SCHEMA` không khai. Tài liệu 03 Phần 7. */
+var RENDER_CONTROL_BY_TYPE = { TEXT: 'text', NUMBER: 'number', DATE: 'date', SELECT: 'select' };
+
+/** Danh sách lớp CSS của một node: lớp theo vai, lớp trang trí của schema, và hai lớp engine tự thêm. */
+function renderClassList(node) {
+  var lop = ['shin-' + node.role];
+  if (node.className) { lop.push(node.className); }
+  if (node.align === 'right') { lop.push('shin-align-right'); }
+  if (node.menu) { lop.push('shin-has-menu'); }
+  return lop.join(' ');
+}
+
+/** `action` và `menu` thành thuộc tính. Menu vào sổ tra theo khóa thay vì nhồi cả mảng mục con vào một thuộc tính HTML. */
+function renderActionAttrs(node) {
+  var ra = renderAttr('data-action', node.action);
+  if (node.menu) {
+    var khoa = node.id || ('shin-menu-' + (RENDER_INDEX.dem += 1));
+    RENDER_INDEX.menus[khoa] = node.menu;
+    ra += renderAttr('data-menu', khoa);
+  }
+  return ra;
+}
+
+/**
+ * Thuộc tính của thẻ ngoài, theo vai.
+ *
+ * Ba chỗ lệch, mỗi chỗ một lý do: `card` nhường style không gian cho thẻ ruột để hàng tiêu đề không bị cuộn mất; `field` không nhận `data-action` vì `action` của trường là nút bút chì cạnh nhãn chứ không phải cả ô bấm được; hai vai nút cần `type="button"` để khỏi tự gửi form.
+ */
+function renderNodeAttrs(node) {
+  var ra = (node.role === 'button' || node.role === 'icon') ? ' type="button"' : '';
+  ra += renderAttr('id', node.id) + renderAttr('class', renderClassList(node));
+
+  if (node.role !== 'card') { ra += renderSpatialAttrs(node.spatialConfig); }
+  if (node.role !== 'field') { ra += renderActionAttrs(node); }
+  if (node.role === 'icon') { ra += renderAttr('title', node.tooltip) + renderAttr('aria-label', node.tooltip || node.label); }
+
+  return ra;
+}
+
+/** Gọi một hàm slot theo tên rồi vẽ các Block nó dựng. Tài liệu 04 Phần 6: hàm slot trả về node, không bao giờ trả về chuỗi HTML. */
+function renderSlot(ten, ctx) {
+  if (typeof SLOTS === 'undefined' || !SLOTS) {
+    throw new Error('Schema gọi slot "' + ten + '" mà bảng SLOTS chưa có. Thiếu `include` của tệp bảng slot.');
+  }
+  if (!Object.prototype.hasOwnProperty.call(SLOTS, ten)) {
+    throw new Error('Slot "' + ten + '" không có trong bảng SLOTS. Các tên hiện có: ' + Object.keys(SLOTS).join(', ') + '.');
+  }
+
+  var con = SLOTS[ten](ctx);
+  if (!Array.isArray(con)) {
+    throw new Error('Hàm slot "' + ten + '" phải trả về mảng Block, đang trả về ' + typeof con + '.');
+  }
+  return renderNodes(con, ctx);
+}
+
+/** Con của một node: mảng node, hoặc một chuỗi tên slot. */
+function renderChildren(node, ctx) {
+  if (node.elements === null || node.elements === undefined) { return ''; }
+  return typeof node.elements === 'string' ? renderSlot(node.elements, ctx) : renderNodes(node.elements, ctx);
+}
+
+/** Mũi tên sổ xuống của Block có `menu`. Lớp nổi và việc mở đóng là của tệp menu. */
+function renderMenuCaret(node) {
+  return node.menu ? '<span class="shin-caret" aria-hidden="true">▾</span>' : '';
+}
+
+/** Ruột một card: hàng tiêu đề rồi thẻ ruột. `titleActions` là mảng khai thô nên đi qua `screenBar` để thành Block, cùng đường với mục header. */
+function renderCardInner(node, ctx) {
+  var muc = screenBar(node.titleActions, 'titleActions của card');
+  var dau = '';
+
+  if (node.title || muc.length) {
+    dau = '<div class="shin-card-head"><div class="shin-card-title">' + renderEscape(node.title) + '</div>'
+      + (muc.length ? '<div class="shin-card-actions">' + renderNodes(muc, ctx) + '</div>' : '')
+      + '</div>';
+  }
+
+  return dau + '<div class="shin-card-body"' + renderSpatialAttrs(node.spatialConfig) + '>' + renderChildren(node, ctx) + '</div>';
+}
+
+/** Đường dẫn đầy đủ của một trường. Khai cụt thì lấy `entity` của màn — tài liệu 03 Phần 8. */
+function renderFieldPath(node, ctx) {
+  var khai = String(node.field || '');
+  if (!khai) { throw new Error('Block vai "field" thiếu khóa `field`.'); }
+
+  var phan = khai.split('.');
+  if (phan.length === 2) { return { entity: phan[0], name: phan[1] }; }
+  if (phan.length > 2) { throw new Error('Đường dẫn trường "' + khai + '" phải là `tên trường` hoặc `thực thể.tên trường`.'); }
+  if (!ctx || !ctx.entity) { throw new Error('Trường "' + khai + '" khai cụt mà ngữ cảnh vẽ không có `entity` để suy ra thực thể.'); }
+
+  return { entity: ctx.entity, name: khai };
+}
+
+/** Giá trị của trường, lấy từ bản ghi trong ngữ cảnh. Không có bản ghi thì rỗng — đó là ca form thêm mới, không phải lỗi. */
+function renderFieldValue(ctx, duong) {
+  var ban = ctx && ctx.records ? ctx.records[duong.entity] : null;
+  var v = ban ? ban[duong.name] : null;
+  return v === null || v === undefined ? '' : v;
+}
+
+/** Lớp màu của `badge`, suy theo danh mục chứ không theo giá trị: `@CAT_CONG_VIEC` ra `shin-badge-cong-viec`. Trường khai bằng `options` không có danh mục nên chip xám. */
+function renderBadgeClass(khai) {
+  if (!khai.source) { return ''; }
+  return ' shin-badge-' + String(khai.source).replace(/^@CAT_/, '').toLowerCase().replace(/_/g, '-');
+}
+
+/** Thuộc tính chung của mọi ô: id để nhãn trỏ tới, `data-field` mang đường dẫn đầy đủ, và dấu chỉ-đọc cho bộ thu thập. */
+function renderControlAttrs(o, lop) {
+  return renderAttr('class', lop) + renderAttr('id', o.id) + renderAttr('data-field', o.path)
+    + (o.readonly ? ' data-readonly="1"' : '');
+}
+
+/** Khung chung của hai control gõ-để-lọc: ô nhập, mũi tên, và một hộp danh sách rỗng để phần bàn phím đổ nội dung vào sau. */
+function renderCombo(o, lop, them) {
+  return '<div class="shin-combo ' + lop + '">'
+    + '<input type="text" role="combobox" aria-expanded="false" autocomplete="off"'
+    + renderControlAttrs(o, 'shin-input') + renderAttr('value', o.value) + them + (o.readonly ? ' readonly' : '') + '>'
+    + '<span class="shin-caret" aria-hidden="true">▾</span>'
+    + '<div class="shin-combo-list" hidden></div>'
+    + '</div>';
+}
+
+/** Bảy control của tài liệu 03 Phần 7. Ô nào cũng mang `data-field`, kể cả ô chỉ đọc, vì bộ thu thập lọc theo `data-readonly` chứ không theo việc có hay không có `data-field`. */
+var RENDER_CONTROLS = {
+  text: function (o) {
+    return '<input type="text"' + renderControlAttrs(o, 'shin-input') + renderAttr('value', o.value)
+      + (o.readonly ? ' readonly' : '') + '>';
+  },
+  textarea: function (o) {
+    return '<textarea rows="3"' + renderControlAttrs(o, 'shin-input shin-textarea')
+      + (o.readonly ? ' readonly' : '') + '>' + renderEscape(o.value) + '</textarea>';
+  },
+  number: function (o) {
+    return '<input type="text" inputmode="numeric"' + renderControlAttrs(o, 'shin-input shin-number')
+      + renderAttr('value', valueTextNumber(o.value)) + (o.readonly ? ' readonly' : '') + '>';
+  },
+  date: function (o) {
+    return '<input' + renderAttr('type', o.khai.precision === 'minute' ? 'datetime-local' : 'date')
+      + renderControlAttrs(o, 'shin-input shin-date') + renderAttr('value', valueTextDateInput(o.value))
+      + (o.readonly ? ' readonly' : '') + '>';
+  },
+  select: function (o) {
+    return renderCombo(o, 'shin-combo-select', renderAttr('data-source', o.khai.source));
+  },
+  customerPicker: function (o) {
+    return renderCombo(o, 'shin-combo-picker', ' data-picker="customer"');
+  },
+  badge: function (o) {
+    return '<span' + renderControlAttrs(o, 'shin-badge' + renderBadgeClass(o.khai)) + '>' + renderEscape(o.value) + '</span>';
+  }
+};
+
+/** Bảng khai của một trường. Tên thực thể hay tên trường sai thì chính `Schema` ném lỗi kèm gợi ý, nên ở đây chỉ canh ca schema chưa nạp. */
+function renderFieldSchema(duong) {
+  if (typeof Schema === 'undefined' || !Schema) {
+    throw new Error('Vẽ trường "' + duong.name + '" mà `Schema` chưa nạp — bản khai trường đi cùng gói nạp đầu tiên.');
+  }
+  return Schema[duong.entity][duong.name];
+}
+
+/**
+ * Ruột một trường: hàng nhãn, kèm nút bút chì khi trường khai `action`, rồi tới ô.
+ *
+ * Chỉ-đọc là hoặc bảng khai trường hoặc dòng `UI_SCHEMA`, không có đường ngược lại: `node.readonly` chỉ cộng thêm chứ không mở khóa được trường mà `DATA_SCHEMA` đã khóa — `[RÀNG BUỘC CỨNG]` tài liệu 03 Phần 7.
+ */
+function renderFieldInner(node, ctx) {
+  var duong = renderFieldPath(node, ctx);
+  var khai = renderFieldSchema(duong);
+  var control = node.control || RENDER_CONTROL_BY_TYPE[khai.type];
+
+  if (!Object.prototype.hasOwnProperty.call(RENDER_CONTROLS, control)) {
+    throw new Error('Trường "' + duong.name + '" khai control "' + control + '" không có. Bảy control: ' + Object.keys(RENDER_CONTROLS).join(', ') + '.');
+  }
+
+  var o = {
+    path: duong.entity + '.' + duong.name,
+    id: 'shin-f-' + duong.entity + '-' + duong.name,
+    value: renderFieldValue(ctx, duong),
+    readonly: khai.readonly === true || node.readonly === true,
+    khai: khai
+  };
+  var but = node.action
+    ? '<button type="button" class="shin-field-edit" title="Sửa"' + renderAttr('data-action', node.action) + '>' + iconSvg('pencil') + '</button>'
+    : '';
+
+  return '<div class="shin-field-head"><label class="shin-label"' + renderAttr('for', o.id) + '>'
+    + renderEscape(node.label === null ? khai.label : node.label) + '</label>' + but + '</div>'
+    + RENDER_CONTROLS[control](o);
+}
+
+/** Ruột từng vai. Nút và icon tự thêm mũi nhọn khi có menu, còn hộp và hàng thì chỉ có con. */
+var RENDER_INNER_BY_ROLE = {
+  box: renderChildren,
+  card: renderCardInner,
+  row: renderChildren,
+  text: function (node) { return renderEscape(node.text); },
+  field: renderFieldInner,
+  button: function (node) { return '<span class="shin-btn-label">' + renderEscape(node.label) + '</span>' + renderMenuCaret(node); },
+  icon: function (node) {
+    return (node.icon ? iconSvg(node.icon) : '<span class="shin-btn-label">' + renderEscape(node.label) + '</span>') + renderMenuCaret(node);
+  }
+};
+
+/** Một Block thành chuỗi HTML. Có `id` thì cất vào sổ tra để `renderTarget` vẽ lại được đúng nút đó về sau. */
+function renderNode(node, ctx) {
+  if (!node || BLOCK_ROLES.indexOf(node.role) === -1) {
+    throw new Error('Block phải có `role` thuộc: ' + BLOCK_ROLES.join(', ') + '. Đang nhận "' + (node && node.role) + '".');
+  }
+  if (node.id) { RENDER_INDEX.nodes[node.id] = node; }
+
+  var the = RENDER_TAG_BY_ROLE[node.role];
+  return '<' + the + renderNodeAttrs(node) + '>' + RENDER_INNER_BY_ROLE[node.role](node, ctx) + '</' + the + '>';
+}
+
+function renderNodes(nodes, ctx) {
+  var out = '';
+  for (var i = 0; i < nodes.length; i += 1) { out += renderNode(nodes[i], ctx); }
+  return out;
+}
+
+/* ─── Việc 4: gán chuỗi vào khung. Từ đây trở xuống mới có `document`. ─── */
+
+/** Bốn vùng engine được phép vẽ. Dải tiến trình không có trong bảng: nó bật tắt theo lượt gọi máy chủ, không thuộc màn nào. */
+var RENDER_REGIONS = { header: 'sidebar-header', info: 'sidebar-info', body: 'sidebar-body', footer: 'sidebar-footer' };
+
+function renderRegionElement(ten) {
+  var el = document.getElementById(RENDER_REGIONS[ten]);
+  if (!el) { throw new Error('Khung sidebar thiếu vùng "' + RENDER_REGIONS[ten] + '".'); }
+  return el;
+}
+
+/**
+ * Vẽ cả một màn. Trả về bốn chuỗi đã dựng để bộ kiểm đọc được mà không cần DOM.
+ *
+ * Dựng đủ bốn chuỗi trong RAM rồi mới gán — chống nháy, `[RÀNG BUỘC CỨNG]` tài liệu 04 Phần 6. Gán dần từng vùng thì người dùng thấy màn hiện theo mảnh, và một lỗi ở vùng cuối để lại màn nửa cũ nửa mới.
+ */
+function renderScreen(man, boiCanh) {
+  var nen = { entity: man.entity, records: (boiCanh && boiCanh.records) || {}, screen: man };
+  RENDER_INDEX = { nodes: {}, menus: {}, ctx: nen, dem: 0 };
+
+  var html = {
+    header: renderNodes(man.header, nen),
+    info: man.infoBar ? renderSlot('infoBarContent', nen) : '',
+    body: renderNodes(man.body, nen),
+    footer: renderNodes(man.footer, nen)
+  };
+
+  Object.keys(RENDER_REGIONS).forEach(function (ten) { renderRegionElement(ten).innerHTML = html[ten]; });
+  renderRegionElement('info').hidden = !man.infoBar;
+  renderRegionElement('footer').hidden = man.footer.length === 0;
+
+  return html;
+}
+
+/**
+ * Vẽ lại đúng một vùng theo `id` — cách duy nhất đổi nội dung màn, `[RÀNG BUỘC CỨNG]` tài liệu 04 Phần 6.
+ *
+ * Chỉ thay **ruột**, giữ thẻ ngoài: `style` không gian và `data-collapse` còn nguyên nên vùng không nhảy chiều cao lúc thay.
+ */
+function renderTarget(id) {
+  var node = RENDER_INDEX.nodes[id];
+  if (!node) { throw new Error('Màn đang mở không có Block nào mang id "' + id + '". Muốn vẽ lại thì Block phải khai `id`.'); }
+
+  var el = document.getElementById(id);
+  if (!el) { throw new Error('Block "' + id + '" có trong sổ tra nhưng không có trên màn — màn đã bị vẽ lại mà sổ tra chưa theo.'); }
+
+  el.innerHTML = RENDER_INNER_BY_ROLE[node.role](node, RENDER_INDEX.ctx);
+  return el;
+}
+</script>

@@ -94,16 +94,20 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   └── schemaCheck.html      Phép tự kiểm bảng khai cột, chạy được ở cả hai phía.
 │   ├── style\                    Hình thức DÙNG CHUNG cho mọi màn. Chỉ có <style>, không khai tên JavaScript nào.
 │   │   ├── tokens.html           Khối biến CSS: màu, cỡ chữ, khoảng cách. Đổi diện mạo thì vào đây.
-│   │   └── frame.html            Bố cục năm vùng: thanh trên, vạch tiến trình, khối thông tin, thân cuộn, chân trang.
+│   │   ├── frame.html            Bố cục năm vùng: thanh trên, vạch tiến trình, khối thông tin, thân cuộn, chân trang.
+│   │   └── components.html       Hình thức của thứ engine dựng ra: hàng, card, trường, ô nhập, chip, nút. Hai mặc định của spatialConfig nói ở đây một lần thay vì dán vào từng thẻ.
 │   ├── ui\                       Bộ máy giao diện màn nào cũng gọi được. spatialConfig giữ toàn quyền về khoảng cách.
 │   │   ├── progress.html         Vạch tiến trình cho mọi lượt gọi máy chủ. Đếm số lời gọi đang chờ, không giữ một cờ bật tắt.
+│   │   ├── icons.html            Chín glyph SVG nội tuyến, tra theo tên. Tên lạ thì ném lỗi chứ không vẽ nút trống.
 │   │   ├── uiBuilder.html        Hình dạng MỘT node Block, và sáu hàm dựng Card/Row/Text/Field/Button/Icon. Khóa lạ bị ném lỗi — đó là cách luật "không có style tự do" thành thật.
-│   │   └── screenBuild.html      Lối viết tắt của UI_SCHEMA thành cây Block: mảng lồng mảng, chuỗi trần thay cho object, cụm group/rows. Không chạm DOM nên kiểm được offline.
+│   │   ├── screenBuild.html      Lối viết tắt của UI_SCHEMA thành cây Block: mảng lồng mảng, chuỗi trần thay cho object, cụm group/rows. Không chạm DOM nên kiểm được offline.
+│   │   └── renderEngine.html     Cây Block thành HTML rồi gán vào bốn vùng. Thoát ký tự, dịch spatialConfig thành style, và renderTarget — cách DUY NHẤT đổi nội dung màn.
 │   ├── screen\                   Một tệp một màn người dùng nhìn thấy. Màn được mang theo style riêng, vì style đó chết cùng màn đó.
 │   │   └── statusScreen.html     Ba màn không có form: tóm tắt lượt nạp, lỗi nạp, và màn chặn khi vượt trần ngân sách ô.
 │   └── util\
 │       ├── serverCall.html       Bọc google.script.run thành Promise kèm vạch tiến trình. Cửa duy nhất thấy cả hai đầu một vòng gọi, nên phép đo thời gian cũng ở đây. Cố ý KHÔNG tự hiện lỗi — việc đó của bên gọi.
 │       ├── callTiming.html       Sổ đo từng vòng gọi. Tách tổng thời gian thành ba phần: máy chủ tính toán, tiền đi đường, trình duyệt bung và vẽ.
+│       ├── valueText.html        Giá trị trong RAM thành chuỗi bày vào ô: số có dấu chấm nghìn, chuỗi thời gian thành dạng thẻ input chịu nhận.
 │       └── textNormalize.html    Bản sinh đôi client của server\util\TextNormalize.js. [RÀNG BUỘC CỨNG] hai bản phải giống nhau.
 │
 └── fbm_sync\                     Module đồng bộ FBM. Đọc được DATA_SCHEMA; phần lõi TUYỆT ĐỐI không đọc ngược vào đây.
@@ -148,7 +152,8 @@ tests\
     ├── loadService.js            Hình dạng gói loadCore, đường chặn vì ngân sách ô, và con trỏ gói giao dịch đi ngược từ hàng cuối.
     ├── ramStore.js               NGHIỆM THU CHẶNG 1.2: hai hộp cát, dữ liệu đi qua cầu google.script.run thật, và ba luật tra cứu khác nhau của Store.
     ├── callTiming.js             Phép trừ "client đo được trừ máy chủ báo". Sai chỗ này thì tiền đi đường hiện ra sai, và cỡ gói bị chọn theo một con số bịa.
-    └── uiBuilder.js              Cây Block và lối viết tắt của UI_SCHEMA. Phần đáng kiểm không phải "dựng đúng thì ra đúng" mà "dựng sai thì có chặn không".
+    ├── uiBuilder.js              Cây Block và lối viết tắt của UI_SCHEMA. Phần đáng kiểm không phải "dựng đúng thì ra đúng" mà "dựng sai thì có chặn không".
+    └── renderEngine.js           Cây Block thành HTML: ký tự đặc biệt trong tên công ty, spatialConfig khai rồi mà bố cục không đổi, data-field thiếu đường dẫn, và luật chỉ-đọc bị mở khóa.
 ```
 
 ## Bảng tra: tên trong tài liệu thiết kế → tệp thật
@@ -171,7 +176,7 @@ Không sửa tên trong tài liệu thiết kế vì hai lẽ: chúng là bản 
 | `client/ram/store.js` | `client/ram/store.html` |
 | `client/ram/ingest.js` | `client/ram/ingest.html` |
 | `client/schema/schemaAccess.js` | `client/schema/schemaAccess.html` |
-| `client/ui/styles.html` | `client/style/tokens.html` + `client/style/frame.html` |
+| `client/ui/styles.html` | `client/style/tokens.html` + `client/style/frame.html` + `client/style/components.html` |
 | `client/ui/tokens.html` | `client/style/tokens.html` |
 | `client/ui/frame.html` | `client/style/frame.html` |
 
@@ -179,7 +184,7 @@ Chín tệp máy chủ dựng ở chặng 1.1 và 1.2 không có trong bảng n�
 
 Bốn dòng `client/...js` lệch vì một lý do khác hẳn các dòng trên, đã ghi ở tài liệu làm việc `Mục tiêu chặng 1.1 và 1.2.md`: **mọi** tệp client trên Apps Script buộc phải là `.html`, không phải `.js` như tài liệu 04 Phần 10 và 05 Phần 13 viết.
 
-Ba dòng cuối lệch vì thư mục: tài liệu 04 gom cả CSS vào `client/ui/`, còn code chia `client/style/` cho hình thức dùng chung, `client/ui/` cho bộ máy giao diện, `client/screen/` cho từng màn. Chủ dự án chốt cách chia này 05/09/2026 và tài liệu 04 Phần 10 đã sửa theo.
+Ba dòng cuối lệch vì thư mục: tài liệu 04 gom cả CSS vào `client/ui/`, còn code chia `client/style/` cho hình thức dùng chung, `client/ui/` cho bộ máy giao diện, `client/screen/` cho từng màn. Chủ dự án chốt cách chia này 05/09/2026 và tài liệu 04 Phần 10 đã sửa theo. Một `styles.html` của tài liệu thành ba tệp theo việc: `tokens.html` giữ biến, `frame.html` giữ năm vùng khung, `components.html` giữ các lớp mà renderEngine sinh ra.
 
 ## Thư mục sẽ dựng ở các chặng tới
 

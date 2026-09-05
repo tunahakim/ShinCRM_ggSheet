@@ -1,0 +1,32 @@
+<script>
+/*
+ * Dịch giá trị trong RAM thành chuỗi bày vào ô nhập. Song sinh phía client với `server/util/DateText.gs` ở chiều ra.
+ *
+ * Tách khỏi `renderEngine` vì đây là luật **định dạng**, còn engine là luật **bố cục**: đổi cách bày một con số thì không được phải mở tệp dựng HTML.
+ *
+ * Chiều ngược — chuỗi người dùng gõ về lại giá trị — thuộc bộ thu thập ở chặng 1.4, cố ý chưa viết: chưa có ai gọi thì chưa biết nó đúng hay sai.
+ */
+
+/** Số thành chuỗi có dấu chấm phân cách nghìn và dấu phẩy thập phân, đúng nếp Việt Nam và đúng nếp sheet đang bày. Không phải số thì trả nguyên văn, vì bày ra được vẫn hơn bày ra `NaN`. */
+function valueTextNumber(giaTri) {
+  if (giaTri === null || giaTri === undefined || giaTri === '') { return ''; }
+
+  var so = Number(giaTri);
+  if (isNaN(so)) { return String(giaTri); }
+
+  var phan = String(Math.abs(so)).split('.');
+  var nguyen = phan[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
+  return (so < 0 ? '-' : '') + nguyen + (phan[1] ? ',' + phan[1] : '');
+}
+
+/**
+ * Chuỗi thời gian của dự án thành giá trị của thẻ `input`.
+ *
+ * `input[type=date]` nhận đúng `YYYY-MM-DD` nên `precision: 'day'` đi qua nguyên vẹn; `input[type=datetime-local]` đòi chữ `T` ở chỗ dự án dùng dấu cách. Đây là toàn bộ khoảng cách giữa hai dạng chuỗi ở tài liệu 05 Phần 11 và cái trình duyệt chịu nhận.
+ */
+function valueTextDateInput(giaTri) {
+  var text = giaTri === null || giaTri === undefined ? '' : String(giaTri).trim();
+  return text.indexOf(' ') > 0 ? text.replace(' ', 'T') : text;
+}
+</script>

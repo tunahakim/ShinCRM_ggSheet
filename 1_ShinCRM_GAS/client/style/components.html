@@ -1,0 +1,265 @@
+<style>
+/*
+ * Hình thức của các thành phần bên trong thân sidebar: hàng, card, trường, ô nhập, chip, nút.
+ *
+ * Đây là tệp thứ ba của bộ style, sau `tokens.html` (biến) và `frame.html` (năm vùng). Ranh giới: tệp này trang trí thứ **engine dựng ra**, nên mỗi lớp ở đây khớp một lớp mà `renderEngine` sinh; style của riêng một màn thì ở cùng tệp màn đó.
+ *
+ * Mọi con số lấy từ biến trong `tokens.html`. Hai mặc định của `spatialConfig` — độ rộng chia đều và chiều cao theo nội dung — nói ở đây một lần, không dán style nội tuyến vào từng thẻ.
+ */
+
+/* --- Hàng và hộp ------------------------------------------------- */
+
+.shin-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--shin-gap-2);
+}
+
+/* `width: "auto"` nghĩa là chia đều phần dư. `min-width: 0` là điều kiện để một ô nhập dài không nong hàng rộng ra quá khung. */
+.shin-row > * { flex: 1 1 0; min-width: 0; }
+
+.shin-box { display: block; }
+
+/* `align: "right"` đẩy chính nó và mọi thứ sau nó sang phải, ở bất cứ vùng nào chứ không riêng header. */
+.shin-align-right { margin-left: auto; }
+
+/* --- Card -------------------------------------------------------- */
+
+.shin-card {
+  display: block;
+  margin-bottom: var(--shin-gap-3);
+  border: 1px solid var(--shin-border);
+  border-radius: var(--shin-radius);
+  background: var(--shin-bg);
+}
+
+.shin-card:last-child { margin-bottom: 0; }
+
+/* Hàng tiêu đề nằm ngoài thẻ ruột nên nó không bị cuộn mất khi ruột card bị ghim trần. */
+.shin-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--shin-gap-2);
+  padding: var(--shin-gap-2) var(--shin-gap-3);
+  border-bottom: 1px solid var(--shin-border);
+  background: var(--shin-bg-sunken);
+  border-radius: var(--shin-radius) var(--shin-radius) 0 0;
+}
+
+.shin-card-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--shin-text-sm);
+  font-weight: 600;
+  color: var(--shin-text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.shin-card-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--shin-gap-1);
+}
+
+.shin-card-body { padding: var(--shin-gap-3); }
+
+/* Hai hàng liền nhau trong card cách nhau đúng một nhịp, không phải nhịp của hàng ngoài card. */
+.shin-card-body > .shin-row + .shin-row { margin-top: var(--shin-gap-3); }
+
+/* --- Trường và nhãn ---------------------------------------------- */
+
+.shin-field { display: block; }
+
+.shin-field-head {
+  display: flex;
+  align-items: center;
+  gap: var(--shin-gap-1);
+  margin-bottom: 2px;
+}
+
+.shin-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--shin-text-xs);
+  color: var(--shin-text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Nút bút chì cạnh nhãn: bé, mờ, chỉ đậm lên khi trỏ tới — nó là lối phụ, không phải việc chính của trường. */
+.shin-field-edit {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--shin-text-faint);
+  cursor: pointer;
+}
+
+.shin-field-edit:hover { color: var(--shin-primary); }
+
+.shin-field-edit .shin-glyph { width: 13px; height: 13px; }
+
+/* --- Ô nhập ------------------------------------------------------ */
+
+.shin-input {
+  display: block;
+  width: 100%;
+  padding: var(--shin-gap-1) var(--shin-gap-2);
+  border: 1px solid var(--shin-border-strong);
+  border-radius: var(--shin-radius-sm);
+  background: var(--shin-bg);
+  color: var(--shin-text);
+  font-family: inherit;
+  font-size: var(--shin-text-md);
+  line-height: var(--shin-line-height);
+}
+
+.shin-input:focus {
+  outline: none;
+  border-color: var(--shin-primary);
+  box-shadow: 0 0 0 2px var(--shin-primary-soft);
+}
+
+/* Ô chỉ đọc vẫn là ô nhập chứ không thành chữ trơn: người dùng còn chọn và sao chép được nội dung. */
+.shin-input[readonly] {
+  background: var(--shin-bg-sunken);
+  color: var(--shin-text-soft);
+  border-color: var(--shin-border);
+}
+
+.shin-textarea { resize: vertical; }
+
+/* Số căn phải để mắt so hàng nghìn theo cột, đúng nếp bảng tính. */
+.shin-number { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* --- Hai control gõ-để-lọc --------------------------------------- */
+
+/* Hộp danh sách bung ra bằng `position: absolute` nên nó không đẩy hàng dưới xuống lúc mở. */
+.shin-combo { position: relative; }
+
+.shin-combo .shin-input { padding-right: var(--shin-gap-4); }
+
+.shin-combo > .shin-caret {
+  position: absolute;
+  top: 50%;
+  right: var(--shin-gap-2);
+  transform: translateY(-50%);
+  color: var(--shin-text-faint);
+  font-size: var(--shin-text-xs);
+  pointer-events: none;
+}
+
+.shin-combo-list {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--shin-border-strong);
+  border-radius: var(--shin-radius-sm);
+  background: var(--shin-bg);
+  box-shadow: var(--shin-shadow);
+}
+
+/* Một dòng của danh sách. Nội dung dòng do phần bàn phím đổ vào; hình thức thì thuộc về đây. */
+.shin-combo-item {
+  padding: var(--shin-gap-1) var(--shin-gap-2);
+  font-size: var(--shin-text-md);
+  cursor: pointer;
+}
+
+.shin-combo-item:hover,
+.shin-combo-item.is-active { background: var(--shin-primary-soft); }
+
+/* Vệt vàng của ô vừa được điền tự động, giữ đúng thói quen của bản cũ. */
+.shin-input.is-filled { background: var(--shin-warn-soft); }
+
+/* --- Chip -------------------------------------------------------- */
+
+/* Màu theo **danh mục**, không theo giá trị: `@CAT_UU_TIEN` ra một màu cho cả bốn mức, nên thêm một mức mới vào sheet `Category` thì không phải sửa CSS. Danh mục không có lớp riêng thì chip xám. */
+.shin-badge {
+  display: inline-block;
+  max-width: 100%;
+  padding: 1px var(--shin-gap-2);
+  border-radius: 999px;
+  background: var(--shin-bg-hover);
+  color: var(--shin-text-soft);
+  font-size: var(--shin-text-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shin-badge-cong-viec { background: var(--shin-primary-soft); color: var(--shin-primary-dark); }
+.shin-badge-uu-tien { background: var(--shin-warn-soft); color: var(--shin-warn); }
+.shin-badge-xac-thuc { background: #e6f4ea; color: var(--shin-ok); }
+.shin-badge-cho-phep-fbm { background: var(--shin-primary-soft); color: var(--shin-primary-dark); }
+
+/* --- Nút chữ, nút glyph, chữ trơn -------------------------------- */
+
+.shin-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--shin-gap-1);
+  padding: var(--shin-gap-1) var(--shin-gap-3);
+  border: 1px solid var(--shin-border-strong);
+  border-radius: var(--shin-radius-sm);
+  background: var(--shin-bg);
+  color: var(--shin-text);
+  font-family: inherit;
+  font-size: var(--shin-text-md);
+  line-height: var(--shin-line-height);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.shin-button:hover { background: var(--shin-bg-hover); }
+
+/* Hai lớp trang trí mà schema gọi tên qua `className`. */
+.shin-button.shin-primary { border-color: var(--shin-primary); background: var(--shin-primary); color: #ffffff; }
+.shin-button.shin-primary:hover { background: var(--shin-primary-dark); border-color: var(--shin-primary-dark); }
+.shin-button.shin-danger { color: var(--shin-error); }
+
+/* Nút glyph vuông. Khai sau nút và sau hàng nên nó thắng luật chia đều của `.shin-row > *` mà không cần `!important`. */
+.shin-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--shin-radius-sm);
+  background: none;
+  color: var(--shin-text-soft);
+  font-family: inherit;
+  font-size: var(--shin-text-md);
+  cursor: pointer;
+}
+
+.shin-icon:hover { background: var(--shin-bg-hover); color: var(--shin-text); }
+
+/* Có menu thì nút nở theo nội dung: mũi nhọn, và ca nút chỉ có chữ không có glyph. */
+.shin-icon.shin-has-menu { width: auto; padding: 0 var(--shin-gap-1); }
+
+.shin-glyph { flex: 0 0 auto; display: block; }
+
+.shin-caret { flex: 0 0 auto; font-size: var(--shin-text-xs); line-height: 1; }
+
+.shin-button:focus-visible,
+.shin-icon:focus-visible,
+.shin-field-edit:focus-visible { outline: 2px solid var(--shin-primary); outline-offset: 1px; }
+
+.shin-text { min-width: 0; overflow-wrap: break-word; }
+</style>
