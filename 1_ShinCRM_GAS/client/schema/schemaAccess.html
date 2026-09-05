@@ -1,0 +1,90 @@
+<script>
+/**
+ * Cửa duy nhất để đọc bảng khai trường: object `Schema`, dựng bằng Proxy có bẫy `get`. Tài liệu 03 Phần 5.
+ *
+ * Vì sao tệp này đuôi `.html` chứ không phải `.js` như tài liệu 04 Phần 10 ghi: xem đoạn giải thích ở đầu `client/util/textNormalize.html`.
+ *
+ * Việc nó làm là biến một lỗi **im lặng** thành một lỗi **ồn ào**. Gõ `Schema.customer.taxNo` mà nhận `undefined` thì
+ * dòng code kế tiếp đọc `.code` của `undefined`, và thông báo lỗi cuối cùng nói về `undefined` chứ không nói về cái tên
+ * gõ sai — người sửa phải lần ngược mấy tầng mới tới chỗ thật. Bẫy `get` ném ngay tại chỗ gọi, kèm tên sai và danh sách
+ * tên đúng, nên khoảng cách giữa nguyên nhân và thông báo bằng không. **`[RÀNG BUỘC CỨNG]`** của tài liệu 03 Phần 5.
+ *
+ * Bẫy `get` **cho ký hiệu (symbol) và vài tên máy đi qua**. Nếu ném với mọi tên không phải trường thì `console.log(Schema.customer)`
+ * và `JSON.stringify` cũng ném, vì chúng hỏi `Symbol.toStringTag`, `toJSON`, `then`... Một cái bẫy làm sập cả trình gỡ lỗi
+ * là cái bẫy sẽ bị ai đó tháo ra, nên nó chỉ ném với tên trông như tên trường.
+ */
+
+/** Tên máy được đi qua mà không ném. Chúng do trình chạy hoặc bộ gỡ lỗi hỏi, không phải do người viết code gõ sai tên trường. */
+var SCHEMA_PASS_THROUGH = ['toJSON', 'then', 'inspect', 'constructor', 'prototype', 'length', 'name', 'valueOf', 'toString', 'hasOwnProperty'];
+
+/**
+ * Đoán tên đúng gần nhất với tên vừa gõ sai.
+ *
+ * Cách tính là độ dài tiền tố chung không phân biệt hoa thường, cộng điểm nếu tên gõ sai nằm trong tên đúng. Cố tình
+ * không dùng khoảng cách sửa chuỗi (edit distance) đầy đủ: ca thật gần như luôn là gõ thiếu đuôi hoặc viết tắt
+ * (`taxNo` → `taxNumber`), và tiền tố chung xử đúng ca đó với mười dòng code thay vì năm mươi.
+ */
+function schemaSuggest(wrong, names) {
+  var lower = String(wrong).toLowerCase();
+  var best = '';
+  var bestScore = 0;
+
+  names.forEach(function (name) {
+    var candidate = name.toLowerCase();
+    var i = 0;
+    while (i < lower.length && i < candidate.length && lower.charAt(i) === candidate.charAt(i)) { i++; }
+
+    var score = i;
+    if (candidate.indexOf(lower) >= 0) { score += 2; }
+    if (score > bestScore) { bestScore = score; best = name; }
+  });
+
+  return bestScore > 0 ? best : '';
+}
+
+/** Dựng thông báo cho một tên không có trong bảng. Gộp ở đây để lỗi tầng thực thể và lỗi tầng trường đọc giống nhau. */
+function schemaMissingMessage(at, wrong, names) {
+  var message = at + ' không có ' + (at === 'Schema' ? 'thực thể' : 'trường') + ' "' + wrong + '".';
+  var suggestion = schemaSuggest(wrong, names);
+
+  if (suggestion) { message += ' Có phải bạn định gọi "' + suggestion + '"?'; }
+  message += ' Các tên hiện có: ' + names.join(', ') + '.';
+
+  return message;
+}
+
+/** Bọc một object phẳng trong Proxy ném lỗi khi đọc khóa không có. `at` là đường dẫn để in vào thông báo. */
+function schemaGuard(at, target) {
+  var names = Object.keys(target);
+
+  return new Proxy(target, {
+    get: function (obj, key) {
+      if (typeof key === 'symbol') { return obj[key]; }
+      if (Object.prototype.hasOwnProperty.call(obj, key)) { return obj[key]; }
+      if (SCHEMA_PASS_THROUGH.indexOf(key) >= 0) { return obj[key]; }
+
+      throw new Error(schemaMissingMessage(at, key, names));
+    }
+  });
+}
+
+/**
+ * Dựng `Schema` từ `DATA_SCHEMA` máy chủ gửi kèm gói nạp đầu tiên.
+ *
+ * Hai tầng được bọc: tầng thực thể (`Schema.khong_co_thuc_the`) và tầng trường (`Schema.customer.khong_co_truong`).
+ * Bản thân object mô tả một trường thì **không bọc**, vì đọc `.default` của một trường không khai `default` là câu hỏi
+ * hợp lệ và câu trả lời đúng là "không có", không phải một lỗi.
+ */
+function buildSchema(dataSchema) {
+  var entities = {};
+
+  Object.keys(dataSchema).forEach(function (entity) {
+    entities[entity] = schemaGuard('Schema.' + entity, dataSchema[entity]);
+  });
+
+  return schemaGuard('Schema', entities);
+}
+
+/** Bảng khai trường của cả hệ, gán một lần lúc ingest. Để `null` cho tới lúc đó, vì chưa nạp thì chưa có gì để đọc. */
+var Schema = null;
+</script>

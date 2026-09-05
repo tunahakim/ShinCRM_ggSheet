@@ -1,0 +1,228 @@
+<script>
+/**
+ * `Store` — toàn bộ dữ liệu runtime của sidebar, cùng bảy đường tra cứu duy nhất được phép chạm vào nó. Tài liệu 05 Phần 7, 8, 9.
+ *
+ * Vì sao tệp này đuôi `.html` chứ không phải `.js` như tài liệu 05 Phần 13 ghi: xem đoạn giải thích ở đầu `client/util/textNormalize.html`.
+ *
+ * Ba luật của tệp này, cả ba đều là **`[RÀNG BUỘC CỨNG]`** của tài liệu 05:
+ *
+ * 1. **Không đường tra nào nhận tham số kiểu `includeDeleted` hay một tham số chế độ xem.** `getActivities` luôn trả trọn mảng, `searchCustomers` luôn trả cả hai loại theo đúng một thứ tự. Công tắc hiển thị chỉ tồn tại ở tầng vẽ. Nếu công tắc chạm được vào đây thì cùng một lời gọi trả hai kết quả khác nhau tùy trạng thái giao diện, và mọi con bọ về sau phải hỏi "lúc đó công tắc ở nấc nào" trước khi đọc được.
+ * 2. **`upsertRecord` là cửa duy nhất làm đổi nội dung `Store`,** và chỉ được gọi với bản ghi do máy chủ trả về. Nhờ vậy việc cập nhật chỉ mục tìm kiếm và sắp lại mảng lịch sử có đúng một chỗ để quên — và chỗ đó nằm ngay đây.
+ * 3. **`getLatestActivity` là hàm duy nhất trả lời câu "lần làm việc gần nhất".** Không nơi nào được đọc `getActivities(id)[0]` để lấy "gần nhất", vì phần tử đầu mảng có thể là một giao dịch đã xóa mềm — mảng xếp theo thời gian, không dồn bản ghi đã xóa xuống cuối.
+ */
+
+/** Hai giá trị của trường `recordStatus`, theo `options` trong `DataSchema.gs`. */
+var STORE_ACTIVE = 'active';
+var STORE_DELETED = 'deleted';
+
+/** Hai giá trị của cờ trạng thái nạp `activity`. Tài liệu 05 Phần 5. */
+var STORE_LOADING = 'loading';
+var STORE_READY = 'ready';
+
+/**
+ * Kho bộ nhớ. Hình dạng đúng như bảng ở tài liệu 05 Phần 7, không thêm thành viên nào.
+ *
+ * `SETTINGS` và `Schema` cố tình **không** nằm trong đây: `Store` giữ dữ liệu, còn hai thứ kia là bảng khai. Chúng là biến toàn cục riêng, gán lúc ingest.
+ */
+var Store = {
+  customers: {},
+  activitiesByCustomer: {},
+  rowMaps: {},
+  searchIndex: [],
+  categories: {},
+  config: {},
+  activityState: STORE_LOADING
+};
+
+/** Dọn kho về trạng thái trắng. Dùng lúc nạp lại từ đầu, và trong bộ kiểm để mỗi ca chạy trên kho sạch. */
+function storeReset() {
+  Store.customers = {};
+  Store.activitiesByCustomer = {};
+  Store.rowMaps = {};
+  Store.searchIndex = [];
+  Store.categories = {};
+  Store.config = {};
+  Store.activityState = STORE_LOADING;
+}
+
+/**
+ * Bộ so sánh thứ tự giao dịch: `workDate` giảm dần, hòa thì `id` giảm dần. Tài liệu 05 Phần 8 **`[RÀNG BUỘC CỨNG]`**.
+ *
+ * Cả hai khóa đều là chuỗi so sánh trực tiếp được — `workDate` dạng `YYYY-MM-DD`, `id` dạng `ACT-` cộng sáu chữ số nên
+ * thứ tự chuỗi trùng thứ tự cấp phát. Không đổi sang `Date`, không dùng số hàng, không sinh trường phái sinh nào chỉ để sắp.
+ *
+ * Nó ở đây, trong tệp của `Store`, vì `upsertRecord` phải sắp lại một mảng và `ingest` phải sắp mọi mảng. Hai bản của cùng
+ * một bộ so sánh mà lệch nhau một chút thì card lịch sử hiện sai thứ tự và không có gì báo, nên chỉ được có một bản.
+ */
+function activityCompare(a, b) {
+  if (a.workDate !== b.workDate) { return a.workDate < b.workDate ? 1 : -1; }
+  if (a.id === b.id) { return 0; }
+  return a.id < b.id ? 1 : -1;
+}
+
+/**
+ * Ghép chuỗi `haystack` của một khách: mọi trường có cờ `searchable`, đưa về dạng so khớp bằng `normalizeText`.
+ *
+ * Dùng ở hai nơi — `ingest` dựng cả chỉ mục, `upsertRecord` dựng lại một phần tử — nên cũng chỉ được có một bản.
+ */
+function storeHaystack(customer) {
+  var parts = [];
+
+  Object.keys(Schema.customer).forEach(function (fieldName) {
+    if (Schema.customer[fieldName].searchable && customer[fieldName]) {
+      parts.push(String(customer[fieldName]));
+    }
+  });
+
+  return normalizeText(parts.join(' '));
+}
+
+/**
+ * Bản ghi khách theo mã. **Không có mã thì ném lỗi kèm mã sai, không trả về rỗng.** Tài liệu 05 Phần 9 **`[RÀNG BUỘC CỨNG]`**.
+ *
+ * Cùng tinh thần với `Schema`: một mã khách không tra ra bản ghi luôn là dấu hiệu bản đồ dòng đã cũ, và đó là thứ phải hét
+ * lên. Trả về rỗng thì màn hình hiện một khách trắng và người dùng tưởng khách bị mất dữ liệu.
+ *
+ * Khách đã xóa mềm vẫn tra ra bình thường — "đã xóa" là một giá trị của `recordStatus`, không phải sự vắng mặt.
+ */
+Store.getCustomer = function (id) {
+  if (Object.prototype.hasOwnProperty.call(Store.customers, id)) {
+    return Store.customers[id];
+  }
+
+  throw new Error('Không có khách mã "' + id + '" trong bộ nhớ. Bộ nhớ đang giữ ' + Object.keys(Store.customers).length + ' khách; nếu mã này vừa lấy từ bản đồ dòng thì bản đồ đó đã cũ.');
+};
+
+/** Mảng giao dịch của một khách, **cả còn sống lẫn đã xóa mềm**, đã sắp xếp. Chưa có thì mảng rỗng — ở đây rỗng là câu trả lời đúng, không phải dấu hiệu sai. */
+Store.getActivities = function (customerId) {
+  return Store.activitiesByCustomer[customerId] || [];
+};
+
+/**
+ * Lần làm việc gần nhất **còn sống**, hoặc `null`. Đi từ đầu mảng, trả về bản ghi đầu tiên không mang `deleted`.
+ *
+ * Phép đi này dừng ngay ở phần tử đầu trong ca thường, và chỉ đi thêm vài bước khi một khách vừa bị xóa mấy giao dịch mới
+ * nhất, nên nó không phải tìm kiếm theo nghĩa tốn kém.
+ */
+Store.getLatestActivity = function (customerId) {
+  var list = Store.getActivities(customerId);
+
+  for (var i = 0; i < list.length; i++) {
+    if (list[i].recordStatus !== STORE_DELETED) { return list[i]; }
+  }
+
+  return null;
+};
+
+/**
+ * Cầu nối tọa độ ô: mã khách ở một dòng của một sheet, hoặc rỗng.
+ *
+ * Rỗng là hành vi đúng, không phải lỗi: click vào vùng tiêu đề hay một dòng trống thì không mở gì. Vì thế hàm này ngược
+ * hẳn với `getCustomer` — ở đây bên gọi là một cú click bất kỳ của người dùng, còn ở kia bên gọi là code đã có mã trong tay.
+ */
+Store.getCustomerIdByRow = function (sheetName, rowIndex) {
+  var map = Store.rowMaps[sheetName];
+  if (!map) { return ''; }
+
+  return map[rowIndex] || '';
+};
+
+/**
+ * Tìm khách theo chuỗi gõ vào: **khách còn sống trước, rồi tới khách đã xóa**, cắt tới `limit`. Tài liệu 05 Phần 9.
+ *
+ * Hai điểm dễ làm sai, cả hai đều nằm ở đây:
+ *
+ * **Không được dừng lượt duyệt khi đã đủ `limit` kết quả.** Kết quả khớp sớm chưa chắc là kết quả sẽ được giữ — một khách
+ * đã xóa khớp ở đầu chỉ mục vẫn phải nhường chỗ cho một khách còn sống khớp ở cuối chỉ mục.
+ *
+ * Nếu riêng khách còn sống đã vượt `limit` thì khách đã xóa không lên tới danh sách. Chấp nhận: đi tìm một khách đã xóa cụ
+ * thể thì người dùng gõ một truy vấn cụ thể, còn để khách đã xóa chen vào giữa lúc gõ dở thì hộp tìm kiếm đắt hơn nhiều lần
+ * cái nó đổi được.
+ *
+ * Phần tử trả về là **bản ghi khách**, nên nơi vẽ đã có sẵn `recordStatus` để dán nhãn "Đã xóa" mà không tra thêm lần nào.
+ */
+Store.searchCustomers = function (query, limit) {
+  var needle = normalizeText(query);
+  if (!needle) { return []; }
+
+  var alive = [];
+  var deleted = [];
+
+  Store.searchIndex.forEach(function (entry) {
+    if (entry.haystack.indexOf(needle) < 0) { return; }
+
+    var customer = Store.customers[entry.id];
+    if (!customer) { return; }
+    if (customer.recordStatus === STORE_DELETED) { deleted.push(customer); } else { alive.push(customer); }
+  });
+
+  return alive.concat(deleted).slice(0, limit || alive.length + deleted.length);
+};
+
+/**
+ * Mã số thuế này đã có khách nào dùng chưa, **tính cả khách đã xóa mềm**. Tài liệu 05 Phần 9.
+ *
+ * Vì sao tính cả khách đã xóa: cửa ghi đếm số hàng trùng trên sheet, và ở đó bản ghi `deleted` vẫn còn nguyên. Nếu RAM bỏ
+ * qua chúng thì máy khách nói "chưa ai dùng" rồi máy chủ nói "trùng" — hai câu trả lời cho một câu hỏi, và người dùng gõ
+ * xong cả form mới biết.
+ *
+ * `exceptId` là mã khách đang sửa, để bản ghi không tự báo trùng với chính nó. Giá trị rỗng thì không ai "đã dùng" cả — một
+ * mã số thuế để trống không phải một mã số thuế bị chiếm.
+ */
+Store.isTaxNumberTaken = function (value, exceptId) {
+  var needle = String(value === null || value === undefined ? '' : value).trim();
+  if (!needle) { return false; }
+
+  var ids = Object.keys(Store.customers);
+  for (var i = 0; i < ids.length; i++) {
+    if (ids[i] === exceptId) { continue; }
+    if (String(Store.customers[ids[i]].taxNumber || '').trim() === needle) { return true; }
+  }
+
+  return false;
+};
+
+/**
+ * **Cửa duy nhất** làm đổi nội dung `Store`. Chỉ được gọi với bản ghi do máy chủ trả về. Tài liệu 05 Phần 9 **`[RÀNG BUỘC CỨNG]`**.
+ *
+ * Đổi `recordStatus` — xóa mềm hay phục hồi — đi qua đúng đường đi của một lần sửa thường: bản ghi ở nguyên vị trí trong
+ * mảng, đúng một trường đổi giá trị. Chỉ mục tìm kiếm cũng không thêm bớt phần tử nào, vì nó vốn phủ mọi khách.
+ *
+ * Giao dịch **không bao giờ đổi chủ**, vì `customerId` khai `readonly` trong `DataSchema.gs`. Nhờ vậy hàm này không phải
+ * quét mọi mảng để tìm bản cũ ở một khách khác. Nếu về sau `customerId` thôi `readonly` thì phải quay lại đọc chỗ này.
+ */
+Store.upsertRecord = function (entity, record) {
+  if (entity === 'customer') {
+    Store.customers[record.id] = record;
+    storeIndexCustomer(record);
+    return;
+  }
+
+  if (entity === 'activity') {
+    var list = Store.activitiesByCustomer[record.customerId] || [];
+    var at = -1;
+    for (var i = 0; i < list.length; i++) { if (list[i].id === record.id) { at = i; break; } }
+
+    if (at >= 0) { list[at] = record; } else { list.push(record); }
+    list.sort(activityCompare);
+    Store.activitiesByCustomer[record.customerId] = list;
+    return;
+  }
+
+  throw new Error('upsertRecord không biết thực thể "' + entity + '". Chỉ có "customer" và "activity".');
+};
+
+/** Ghi hoặc ghi đè một phần tử của chỉ mục tìm kiếm. Tách khỏi `upsertRecord` để đường `customer` của cửa duy nhất đọc còn ba dòng. */
+function storeIndexCustomer(customer) {
+  var haystack = storeHaystack(customer);
+
+  for (var i = 0; i < Store.searchIndex.length; i++) {
+    if (Store.searchIndex[i].id === customer.id) {
+      Store.searchIndex[i].haystack = haystack;
+      return;
+    }
+  }
+
+  Store.searchIndex.push({ id: customer.id, haystack: haystack });
+}
+</script>
