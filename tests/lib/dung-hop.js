@@ -35,6 +35,7 @@ const TEP_NEN = [
   'server/sheet/CategoryRead.js',
   'server/sheet/ConfigRead.js',
   'server/state/DirtyState.js',
+  'server/state/UserPrefs.js',
   'server/service/LoadService.js',
   'server/entry/ErrorReport.js',
   'server/entry/EntryPoint.js'
@@ -58,17 +59,17 @@ function ghiHangMa(hop, sheet, tenSheet, themCot) {
 }
 
 /**
- * Dựng hộp cát. `sheets` là tên các sheet có trong tệp giả, `props` là `DocumentProperties` ban đầu, `thamSo` là các cặp `[tên, giá trị]` ghi vào khối tham số của `Config`.
+ * Dựng hộp cát. `sheets` là tên các sheet có trong tệp giả, `props` là `DocumentProperties` ban đầu, `userProps` là `UserProperties` ban đầu, `thamSo` là các cặp `[tên, giá trị]` ghi vào khối tham số của `Config`.
  *
  * Trả về cả `dem` — bộ đếm lệnh gọi của tệp giả. Đó là thứ làm cho luật "cả lượt chỉ tốn một lệnh ghi" đo được ngay trên máy, thay vì phải tin vào con số mà chính code cần kiểm tự báo.
  */
 function dungHop(chon) {
   const y = chon || {};
   const tenSheets = y.sheets || ['Config', 'Log'];
-  const stubs = taoStubsGas({ sheets: tenSheets, props: y.props });
+  const stubs = taoStubsGas({ sheets: tenSheets, props: y.props, userProps: y.userProps });
   const hop = napServer(taoHopCat(stubs), ...(y.tep || TEP_NEN));
 
-  const ra = { hop: hop, stubs: stubs, book: stubs._book, dem: stubs._dem, daConsole: stubs._daConsole, props: stubs._props, sheet: (ten) => stubs._book.getSheetByName(ten) };
+  const ra = { hop: hop, stubs: stubs, book: stubs._book, dem: stubs._dem, daConsole: stubs._daConsole, props: stubs._props, userProps: stubs._userProps, sheet: (ten) => stubs._book.getSheetByName(ten) };
   tenSheets.forEach((ten) => { ra[ten] = { sheet: stubs._book.getSheetByName(ten), codes: ghiHangMa(hop, stubs._book.getSheetByName(ten), ten, y.themCot) }; });
 
   if (ra.Config) {
