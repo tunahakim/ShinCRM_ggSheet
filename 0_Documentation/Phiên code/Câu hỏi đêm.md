@@ -166,4 +166,4 @@ Nối phép kiểm mới vào `checkSchema` nghĩa là `ingestCore` phải đưa
 
 **Đang chọn đường thứ hai:** ba biểu thức `typeof … === 'undefined' ? null : …`, và `checkSchema` tự khai vào `skipped` là đã bỏ qua. Đường thứ nhất phá mất câu mà hộp cát tầng dữ liệu đang chứng minh — rằng sáu tệp ấy chạy được khi không có DOM.
 
-Chỗ hở còn lại: một sidebar thật quên một dòng `include` thì phép kiểm cũng bị bỏ qua trong im lặng. Bịt bằng hai phép kiểm offline chứ không bằng code chạy: một ca gọi `checkSchema` với đủ bốn bảng thật và đòi `skipped` chỉ còn ba dòng, và một ca soi danh sách `include` của `Sidebar.html` phải phủ đúng mọi tệp `client/`.
+Chỗ hở kèm theo: một sidebar thật quên một dòng `include` thì phép kiểm cũng bị bỏ qua trong im lặng. Bịt bằng hai phép kiểm offline chứ không bằng code chạy, và cả hai đã dựng: `tests/cases/schemaCheck.js` gọi `checkSchema` với đủ bốn bảng thật rồi đòi `skipped` chỉ còn ba dòng không có tên `UI_SCHEMA`, còn `tests/cases/namespace.js` soi danh sách `include` của `Sidebar.html` phải phủ đúng mọi tệp `client/` và không dòng nào trỏ vào chỗ trống.

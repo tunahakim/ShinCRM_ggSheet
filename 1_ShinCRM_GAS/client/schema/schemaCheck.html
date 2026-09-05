@@ -146,9 +146,9 @@ function checkSchema(input) {
   return { problems: problems, skipped: skipped };
 }
 
-/** Chỗ để người đọc nhận ra Block nào sai: nhãn, chữ, tên trường, tên icon — thứ gì có thì lấy. Nhờ nó mà câu báo lỗi đọc được như tài liệu hứa: nút "LƯU DỮ LIỆU" trỏ tới hàm không có trong bảng. */
+/** Chỗ để người đọc nhận ra Block nào sai: nhãn, chữ, tiêu đề card, lời chỉ dẫn, tên trường, tên icon — thứ gì có thì lấy, ưu tiên thứ người dùng đọc được trên màn. Nút glyph ở header chỉ có `tooltip` là chữ, nên thiếu nó thì câu báo lỗi rơi về tên glyph — "refresh" thay vì "Nạp lại". */
 function schemaCheckWhere(node, man) {
-  return 'màn "' + man + '" · ' + (node.label || node.text || node.field || node.icon || node.role);
+  return 'màn "' + man + '" · ' + (node.label || node.text || node.title || node.tooltip || node.field || node.icon || node.role);
 }
 
 /** Một mục menu. Kiểm riêng vì `menu` không đi qua `Block` nên không tệp nào khác nhìn vào bên trong nó — tài liệu 03 Phần 9. */

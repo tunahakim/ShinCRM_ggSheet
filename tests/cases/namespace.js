@@ -118,6 +118,36 @@ function chay(so) {
   const tepDongBo = liet('fbm_sync', '.js');
   check(so, 'phép quét tìm được SYNC_SCHEMA trong mã của chính tệp khai nó',
     tepDongBo.filter((tep) => /SYNC_SCHEMA/.test(stripComments(docMa(tep)))).length > 0, true);
+
+  kiemDuDuongNhung(so, tepClient);
+}
+
+/**
+ * Mọi tệp client đều có một dòng `include` trong `Sidebar.html`, và mọi dòng `include` đều trỏ tới một tệp có thật.
+ *
+ * Đây là **phép kiểm offline duy nhất** bắt được một dòng `include` bị thiếu. Hộp cát của các nhóm ca khác tự liệt kê tệp nó cần, nên một tệp không được nhúng vẫn kiểm xanh ở đây rồi im lặng vắng mặt trên Google — hàm trong đó thành `is not defined`, hoặc tệ hơn: rơi vào một nhánh dò bằng `typeof` và bị bỏ qua không một lời nào. `ingestCore` có đúng một nhánh như thế cho ba bảng khai giao diện, và nó chỉ an toàn nhờ phép kiểm này.
+ */
+function kiemDuDuongNhung(so, tepClient) {
+  const raw = fs.readFileSync(path.join(GAS_DIR, 'client/Sidebar.html'), 'utf8');
+  const mo = /include\(\s*['"]([^'"]+)['"]\s*\)/g;
+  const daNhung = [];
+  let khop;
+  while ((khop = mo.exec(raw)) !== null) { daNhung.push(khop[1]); }
+
+  const canNhung = tepClient.filter((tep) => tep !== 'client/Sidebar.html');
+  const thieu = canNhung.filter((tep) => daNhung.indexOf(tep.replace(/\.html$/, '')) === -1);
+  const treoLo = daNhung.filter((duong) => canNhung.indexOf(duong + '.html') === -1);
+
+  if (thieu.length || treoLo.length) {
+    ghiTruot(so, 'Sidebar.html nhúng đủ và chỉ nhúng tệp có thật', [].concat(
+      thieu.map((tep) => tep + ' không có dòng include nào — trên Google nó vắng mặt hoàn toàn'),
+      treoLo.map((duong) => "include('" + duong + "') trỏ tới tệp không có")));
+  } else {
+    ghiDat(so, 'Sidebar.html nhúng đủ ' + canNhung.length + ' tệp client, không dòng nào trỏ vào chỗ trống');
+  }
+
+  // Đuôi tệp trong `include` là lỗi chỉ lộ ra lúc chạy thật, vì tên tệp trên Google không có đuôi.
+  check(so, 'không dòng include nào mang đuôi tệp', daNhung.filter((d) => /\.html$|\.js$/.test(d)), []);
 }
 
 module.exports = { chay, liet, tenKhaiBao };

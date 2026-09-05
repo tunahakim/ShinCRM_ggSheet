@@ -93,6 +93,104 @@ function chay(so) {
 
   check(so, 'đúng tám cột thuần đồng bộ trong SYNC_SCHEMA', maDongBo.length, 8);
   check(so, 'không một cột đồng bộ nào lọt vào DATA_SCHEMA', lotVao, []);
+
+  section('schemaCheckUi — tên hành động, tên slot và đường dẫn trường của UI_SCHEMA');
+
+  let hopUi = null;
+  try {
+    hopUi = napClient(taoHopCat(),
+      'client/ui/icons.html', 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html',
+      'client/util/valueText.html', 'client/ui/renderEngine.html', 'client/ui/slots.html',
+      'client/schema/uiSchema.html', 'client/ui/actions.html', 'client/schema/schemaCheck.html');
+  } catch (err) {
+    return ghiLoiNap(so, 'nạp bản khai bố cục cùng bảng hành động và bảng slot', err);
+  }
+
+  /** Đủ ba bảng khai giao diện, để phần kiểm bố cục thật sự chạy. */
+  function soiUi(uiSchema) {
+    return hopUi.checkSchema({ dataSchema: hop.DATA_SCHEMA, uiSchema: uiSchema, actions: hopUi.ACTIONS, slots: hopUi.SLOTS });
+  }
+
+  const uiThat = soiUi(hopUi.UI_SCHEMA);
+  check(so, 'UI_SCHEMA thật không có vấn đề nào: mọi tên hành động, tên slot và đường dẫn trường đều tra được',
+    uiThat.problems, []);
+
+  // Đây là chỗ bịt lỗ của `Câu hỏi đêm.md` mục 6.4: `ingestCore` dò ba bảng giao diện bằng `typeof`, nên thiếu chúng thì phép kiểm rơi êm vào `skipped`. Phép kiểm này chốt rằng đưa đủ ba bảng vào thì nó ra khỏi `skipped` — nhờ vậy con số `skipped` mới nói được điều gì.
+  check(so, 'đưa đủ ba bảng giao diện thì phần kiểm bố cục ra khỏi danh sách bỏ qua, còn lại đúng ba phép bị bỏ',
+    [uiThat.skipped.length, uiThat.skipped.join(' | ').indexOf('UI_SCHEMA') !== -1], [3, false]);
+
+  /** Làm hỏng một chỗ trên bản sao của `UI_SCHEMA` rồi đòi đúng một câu chứa mẩu chữ cần thiết. */
+  function batLoiUi(label, lamHong, mauChu) {
+    const ui = banSao(hopUi.UI_SCHEMA);
+    lamHong(ui);
+    checkContains(so, label, soiUi(ui).problems, mauChu);
+  }
+
+  batLoiUi('bắt được nút chữ trỏ tới hàm không có trong bảng ACTIONS, và gọi tên nút đúng như người dùng thấy',
+    (u) => { u.customerForm.footer[0].action = 'saveFormNow'; },
+    'LƯU DỮ LIỆU trỏ tới hàm "saveFormNow"');
+
+  batLoiUi('bắt được nút glyph trỏ tới hàm không có trong bảng, và gọi tên bằng lời chỉ dẫn của nút',
+    (u) => { u.view.header[2].action = 'reloadAllNow'; },
+    'Nạp lại trỏ tới hàm "reloadAllNow"');
+
+  batLoiUi('bắt được mục trong `titleActions` của card — vùng này đi qua `screenBar` đúng đường engine dùng nên cũng phải được soi',
+    (u) => { u.view.body[1].titleActions[0].action = 'openActivityFormm'; },
+    '"openActivityFormm"');
+
+  batLoiUi('bắt được hành động gắn trên một trường chỉ-đọc — ô ghi chú trên form giao dịch bấm vào là mở form ghi chú',
+    (u) => { u.activityForm.body[0].rows[6][0].action = 'openNoteFormm'; },
+    'màn "activityForm" · customer.note trỏ tới hàm "openNoteFormm"');
+
+  batLoiUi('bắt được mục menu trỏ tới hàm không có trong bảng, và gọi tên mục menu chứ không gọi tên nút mẹ',
+    (u) => { u.view.header[3].menu[1].action = 'toggleAutoRenderViewx'; },
+    'mục menu "Tự động sắp xếp sheet" trỏ tới hàm "toggleAutoRenderViewx"');
+
+  batLoiUi('bắt được mục menu thiếu `action` — bấm vào không có gì xảy ra là loại lỗi im lặng nhất',
+    (u) => { delete u.view.header[3].menu[0].action; },
+    'mục menu "Bám theo ô đang chọn" thiếu `action`');
+
+  batLoiUi('bắt được mục menu thiếu `label`, vì nó hiện ra một dòng trắng bấm được',
+    (u) => { delete u.view.header[3].menu[0].label; },
+    'có mục menu thiếu `label`');
+
+  batLoiUi('bắt được mục menu vừa là công tắc vừa mang `value`',
+    (u) => { u.view.header[3].menu[0].value = 'all'; },
+    'vừa là công tắc vừa mang `value`');
+
+  batLoiUi('bắt được `menu` khai không phải mảng',
+    (u) => { u.view.header[3].menu = 'khong-phai-mang'; },
+    'màn "view" · Khác có `menu` không phải mảng');
+
+  batLoiUi('bắt được mục menu không phải object',
+    (u) => { u.view.header[3].menu[0] = 'Bám theo ô đang chọn'; },
+    'có mục menu không phải object');
+
+  batLoiUi('bắt được tên slot gõ sai, và gọi tên card bằng tiêu đề người dùng đọc được',
+    (u) => { u.view.body[1].elements = 'activityListt'; },
+    'màn "view" · LỊCH SỬ LÀM VIỆC lấy nội dung từ slot "activityListt"');
+
+  batLoiUi('bắt được trường không có trong DATA_SCHEMA, dù nó khai cụt và phải suy thực thể từ màn',
+    (u) => { u.customerForm.body[0].rows[0] = ['companyNamee']; },
+    'trỏ tới trường "customer.companyNamee" không có trong DATA_SCHEMA');
+
+  batLoiUi('bắt được thực thể không có trong DATA_SCHEMA',
+    (u) => { u.activityForm.body[0].rows[6] = [{ field: 'khachhang.note' }]; },
+    'trỏ tới thực thể "khachhang" không có trong DATA_SCHEMA');
+
+  batLoiUi('đường dẫn trường sai cú pháp thì kể lại lỗi của engine chứ không làm sập cả lượt kiểm',
+    (u) => { u.customerForm.body[0].rows[0] = [{ field: 'a.b.c' }]; },
+    'Đường dẫn trường "a.b.c" phải là');
+
+  // Một màn không dịch được thì `schemaCheckUi` bắt lỗi rồi đi tiếp. Phép kiểm này chốt điều đó: hai màn hỏng thì hiện đủ hai câu, chứ không phải màn đầu làm im ba màn còn lại — và đó chính là lý do phần kiểm này báo cả danh sách thay vì ném lỗi ở chỗ đầu tiên.
+  const uiHong = banSao(hopUi.UI_SCHEMA);
+  uiHong.view.body = 'khong-phai-mang';
+  delete uiHong.noteForm.entity;
+  const vanHong = soiUi(uiHong).problems;
+  check(so, 'một màn không dịch được không làm im các màn còn lại', [
+    vanHong.filter((d) => d.indexOf('màn "view" không dịch được') === 0).length,
+    vanHong.filter((d) => d.indexOf('màn "noteForm" không dịch được') === 0).length
+  ], [1, 1]);
 }
 
 module.exports = { chay };
