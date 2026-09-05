@@ -13,7 +13,7 @@
  */
 
 /** Danh sách trắng: tên hàm mà cửa này được phép chạy. Thêm tên vào đây là việc có ý thức, không phải việc tình cờ. */
-var DEV_RUNNER_ALLOWED = ['smokeTest', 'smokeDiag', 'setupSheets', 'verifySheets'];
+var DEV_RUNNER_ALLOWED = ['smokeTest', 'smokeDiag', 'setupSheets', 'verifySheets', 'measureDeleteRows'];
 
 /**
  * Nhận lời gọi từ bên ngoài. Trả về văn bản thuần, mở đầu bằng OK hoặc LOI để phía gọi đọc được kết quả mà không phải bóc HTML.

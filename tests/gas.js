@@ -1,8 +1,13 @@
 /**
  * Chạy một hàm GAS trên tệp Sheet thật từ dòng lệnh, không cần mở editor và không cần ai bấm Run.
  *
- * Dùng: node tests/gas.js <tênHàm>
+ * Dùng: node tests/gas.js <tênHàm> [--push]
  * Ví dụ: node tests/gas.js verifySheets
+ *        node tests/gas.js measureDeleteRows --push
+ *
+ * Cờ --push đẩy code lên rồi nâng bản triển khai lên phiên bản mới trước khi gọi. Cần nó mỗi khi code vừa đổi,
+ * vì bản triển khai ghim vào một phiên bản chứ không tự chạy code mới nhất — đẩy code mà quên nâng bản
+ * là chạy lại đúng code cũ và ngồi đoán mãi không hiểu vì sao sửa mà không thấy khác.
  *
  * Vì sao có tệp này: phiên code chạy đêm cần một đường chạy hàm thật, và Apps Script API (clasp run-function) không dùng được
  * với script gắn vào tệp Sheet — nó trả lỗi "reading from storage ... NOT_FOUND" trước khi chạm tới code. Đường thay thế là
@@ -17,8 +22,10 @@
 
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
-const CONFIG_FILE = path.join(__dirname, '..', '1_ShinCRM_GAS', '.dev-runner.json');
+const GAS_DIR = path.join(__dirname, '..', '1_ShinCRM_GAS');
+const CONFIG_FILE = path.join(GAS_DIR, '.dev-runner.json');
 
 function loadConfig() {
   if (!fs.existsSync(CONFIG_FILE)) {
@@ -49,15 +56,37 @@ async function callGas(functionName) {
   return text;
 }
 
+/** Đẩy code lên và nâng bản triển khai lên phiên bản mới. Cùng một deploymentId nên địa chỉ gọi không đổi. */
+function pushAndRedeploy(deploymentId) {
+  const clasp = (args) => execFileSync('npx', ['clasp'].concat(args), {
+    cwd: GAS_DIR,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    shell: true
+  });
+
+  process.stdout.write('Đẩy code lên… ');
+  clasp(['push', '--force']);
+  process.stdout.write('xong. Nâng bản triển khai… ');
+  const out = clasp(['update-deployment', deploymentId, '--description', '"Cua chay ham luc phat trien"']);
+  process.stdout.write(out.trim() + '\n\n');
+}
+
 async function main() {
-  const functionName = process.argv[2];
+  const args = process.argv.slice(2);
+  const functionName = args.filter(function (a) { return a.indexOf('--') !== 0; })[0];
+  const wantPush = args.indexOf('--push') !== -1;
+
   if (!functionName) {
-    console.error('Thiếu tên hàm. Dùng: node tests/gas.js <tênHàm>');
+    console.error('Thiếu tên hàm. Dùng: node tests/gas.js <tênHàm> [--push]');
     process.exit(1);
   }
 
   let output;
   try {
+    if (wantPush) {
+      pushAndRedeploy(loadConfig().deploymentId);
+    }
     output = await callGas(functionName);
   } catch (loi) {
     console.error('❌ ' + loi.message);
