@@ -251,3 +251,17 @@ Ba điều cố ý **không** làm kèm:
 - **Không thêm viền, không thêm lề cho khối bấm được.** Chỉ đổi nền lúc trỏ chuột tới. Một khung viền quanh ghi chú làm nó trông như ô nhập đang tắt, còn thêm lề thì chữ lệch so với các card khác trong một sidebar rộng 300 pixel.
 
 Nhãn nút cũng **cố ý không đổi** theo nội dung — không có chuyện rỗng thì hiện "Thêm mới" như bản cũ. `titleActions` của `Card` chạy ngay lúc tệp `uiSchema` nạp nên nó không biết khách nào đang xem, mà nhét điều kiện vào tệp đó là phá luật "chỉ có dữ liệu, không một dòng logic".
+
+### 7.10. Hộp thoại nổ mỗi lần mở sidebar, và cái lỗ nó đang che
+
+Mỗi lượt nạp trên Sheet DEV đều nổ một hộp thoại: *"Lượt nạp xong nhưng có 1 điều cần biết: • tên hàm trong default, normalize, validate có trong bảng tra"*. Đào ra thì nó không phải một cảnh báo mà là hai lỗi lồng nhau.
+
+**Lỗi thứ nhất — phép kiểm đòi đủ ba bảng mới chịu chạy.** `checkSchema` cũ viết `if (tables.DEFAULTS && tables.NORMALIZERS && tables.VALIDATORS)`, mà ba bảng đó cố ý **không sống cùng một chỗ**: `DEFAULTS` ở phía sidebar vì ngầm định là thứ điền vào form, còn `NORMALIZERS` với `VALIDATORS` chỉ có một bản phía máy chủ và chỉ cửa ghi được gọi. Nên bên nào gọi cũng thiếu, và cả ba phép kiểm chưa từng chạy ở đâu. Hậu quả thật, không phải giả định: `DATA_SCHEMA` hiện khai ba tên `normalize` (`codeLike`, `newlineLf`) và một tên `validate` (`taxNumberFormat`) — gõ sai một chữ trong đó thì không ai bắt, và lỗi chỉ hiện ra ở chặng 1.4 dưới dạng "lưu xong mà số điện thoại không được chuẩn hóa".
+
+**Đã chọn: soi từng bảng một.** Đưa được bảng nào thì soi bảng đó, bảng nào thiếu thì có tên riêng của nó trong `skipped`. `ingestCore` giờ đưa `DEFAULTS` vào, nên phép kiểm ấy thật sự chạy ở mọi lượt mở sidebar. Hai bảng máy chủ vẫn bỏ qua tới chặng 1.4 — nhưng giờ chúng bỏ qua **riêng lẻ và có tên**, và bộ kiểm offline soi được cả ba bằng bảng tra dựng tay, nên tên gõ sai bị bắt ngay tại máy.
+
+**Lỗi thứ hai — hộp thoại trộn hai loại tin có hai người đọc khác nhau.** `bootTellProblems` nối `warnings` với `skipped` rồi `alert` cả cụm. Nhưng `warnings` là cảnh báo **về dữ liệu trong sheet** — chủ dự án sửa được, và phải biết ngay — còn `skipped` là câu nói **về bộ kiểm**, người bán hàng không làm gì được với nó. Trộn lại thì mỗi lần mở sidebar đều có một hộp thoại chắn đường với đúng một câu không thay đổi, và tới tuần thứ hai người dùng bấm OK mà không đọc. Lúc đó cái cảnh báo thật cũng chịu chung số phận — đó mới là thiệt hại.
+
+**Đã chọn: `warnings` giữ hộp thoại, `skipped` xuống console.** Lời hứa "không bỏ qua trong im lặng" vẫn còn nguyên, chỉ dời chỗ giữ: `tests/cases/schemaCheck.js` chốt cứng con số phép kiểm bị bỏ qua, nên thêm một phép bỏ qua mới là bộ kiểm đỏ ngay tại máy — sớm hơn hẳn một hộp thoại mà người dùng đã học cách bấm qua. Cả hai danh sách vẫn nằm trong `BOOT_LAST_SUMMARY` để `bootShowSummary()` kể lại đầy đủ.
+
+Kèm theo là tệp ca kiểm mới `tests/cases/bootstrap.js`. Nó chỉ soi hai hàm thuần của trình tự khởi động — lời báo cuối lượt nạp và bậc thang cỡ gói — vì `sidebarBoot` thì `await` máy chủ và vẽ vào DOM. Có nó vì việc trộn lại hai danh sách là đúng loại lùi mà không ai nhìn ra bằng mắt.

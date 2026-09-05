@@ -175,6 +175,7 @@ tests\
     ├── screenState.js            Ngăn xếp form: screen là trường thật chứ không suy ra từ đỉnh ngăn xếp, nên push và pop phải giữ hai bên khớp. Kiểm luôn bẫy window.screen.
     ├── prefs.js                  Ngầm định phía client khớp từng núm với máy chủ — lệch thì lần mở đầu tiên hiện một nấc rồi tự nhảy sang nấc khác.
     ├── callTiming.js             Phép trừ "client đo được trừ máy chủ báo". Sai chỗ này thì tiền đi đường hiện ra sai, và cỡ gói bị chọn theo một con số bịa.
+    ├── bootstrap.js              Hai hàm thuần của trình tự khởi động: cảnh báo dữ liệu nổ hộp thoại còn phép kiểm bị bỏ qua chỉ xuống console, và bậc thang cỡ gói đọc từ SETTINGS.
     ├── uiBuilder.js              Cây Block và lối viết tắt của UI_SCHEMA. Phần đáng kiểm không phải "dựng đúng thì ra đúng" mà "dựng sai thì có chặn không".
     ├── uiSchema.js               Bảng khai bố cục giữ hợp đồng với ba tệp khác: mọi đường dẫn trường tra được trong DATA_SCHEMA, mọi tên hàm có trong ACTIONS, và bốn màn dựng qua screenBuild không nổ.
     ├── renderEngine.js           Cây Block thành HTML: ký tự đặc biệt trong tên công ty, spatialConfig khai rồi mà bố cục không đổi, data-field thiếu đường dẫn, và luật chỉ-đọc bị mở khóa.

@@ -90,12 +90,23 @@ function bootShowSummary() {
 }
 
 /**
- * Báo cảnh báo và phép kiểm bị bỏ qua của lượt nạp, chỉ khi thật sự có.
+ * Báo hai loại tin của lượt nạp, mỗi loại tới đúng người đọc của nó.
  *
- * Trước chặng này hai danh sách đó hiện sẵn trên màn tóm tắt. Giờ màn tóm tắt không còn tự hiện, mà bỏ chúng vào im lặng thì mất đúng cái mà chúng được lập ra để nói. `alert` chỉ nổ khi có nội dung, nên lượt nạp sạch vẫn mở thẳng vào màn xem không gì chắn đường.
+ * `warnings` là **cảnh báo về dữ liệu** — máy chủ nói có gì đó lệch trong sheet — nên nó chắn đường bằng `alert`: người sửa được là chủ dự án, và họ phải biết ngay.
+ *
+ * `skipped` là **phép kiểm không chạy được**, tức một câu nói về bộ kiểm chứ không phải về dữ liệu. Nó xuống console. Lý do: hai phép trong danh sách đó bỏ qua ở **mọi** lượt nạp và sẽ còn bỏ qua tới chặng 1.4, vì `NORMALIZERS` với `VALIDATORS` cố ý chỉ có một bản phía máy chủ nên sidebar không bao giờ nắm được chúng. Một hộp thoại nổ mỗi lần mở sidebar với đúng một câu mà người dùng không làm gì được là cách chắc chắn để tới tuần thứ hai họ bấm OK mà không đọc — rồi cái cảnh báo thật cũng chịu chung số phận đó.
+ *
+ * Chỗ giữ lời hứa "không bỏ qua trong im lặng" vẫn còn, chỉ dời đi: `tests/cases/schemaCheck.js` chốt cứng con số phép kiểm bị bỏ qua, nên thêm một phép bỏ qua mới là bộ kiểm đỏ ngay. Ngoài ra cả hai danh sách đều nằm trong `BOOT_LAST_SUMMARY` để `bootShowSummary()` kể lại đầy đủ.
+ *
+ * Trả về chuỗi đã hiện, hoặc `null` khi không có cảnh báo nào — bên kiểm cần biết hộp thoại có nổ hay không.
  */
 function bootTellProblems(info) {
-  var dong = (info.warnings || []).concat(info.skipped || []);
+  var boQua = info.skipped || [];
+  if (boQua.length && typeof console !== 'undefined' && console.info) {
+    console.info('Lượt nạp bỏ qua ' + boQua.length + ' phép kiểm:\n• ' + boQua.join('\n• '));
+  }
+
+  var dong = info.warnings || [];
   if (!dong.length) { return null; }
 
   var chu = 'Lượt nạp xong nhưng có ' + dong.length + ' điều cần biết:\n\n• ' + dong.join('\n• ')

@@ -33,7 +33,7 @@ function chay(so) {
   check(so, 'SCHEMA_CHECK_PRECISIONS khớp DATE_PRECISIONS', hop.SCHEMA_CHECK_PRECISIONS, hop.DATE_PRECISIONS);
 
   // Bỏ qua thì phải nói ra bỏ qua cái gì. Im lặng bỏ qua là cách chắc chắn nhất để có một bộ kiểm xanh mà chẳng kiểm gì.
-  check(so, 'nói ra đủ bốn phép kiểm bị bỏ qua khi thiếu đầu vào', ketQua.skipped.length, 4);
+  check(so, 'nói ra đủ sáu phép kiểm bị bỏ qua khi thiếu đầu vào', ketQua.skipped.length, 6);
 
   checkThrows(so, 'thiếu dataSchema thì ném lỗi chứ không trả về "không có vấn đề"',
     () => hop.checkSchema({}), 'cần dataSchema');
@@ -73,7 +73,22 @@ function chay(so) {
   check(so, 'mọi source của DATA_SCHEMA đều trỏ tới mã có thật trên Category',
     hop.checkSchema({ dataSchema: hop.DATA_SCHEMA, categoryCodes: maCategory }).problems, []);
   check(so, 'đưa categoryCodes vào thì bớt một phép kiểm bị bỏ qua',
-    hop.checkSchema({ dataSchema: hop.DATA_SCHEMA, categoryCodes: maCategory }).skipped.length, 3);
+    hop.checkSchema({ dataSchema: hop.DATA_SCHEMA, categoryCodes: maCategory }).skipped.length, 5);
+
+  // Ba bảng hàm soi rời nhau, vì `DEFAULTS` ở phía sidebar còn `NORMALIZERS` với `VALIDATORS` chỉ có một bản phía máy chủ. Đòi đủ cả ba mới chịu chạy — nếp cũ — thì bên nào gọi cũng thiếu, nên `normalize: 'codeLike'` gõ sai một chữ chưa từng bị ai bắt.
+  const banTra = { DEFAULTS: { today: () => '' }, NORMALIZERS: { codeLike: () => '', newlineLf: () => '' }, VALIDATORS: { taxNumberFormat: () => '' } };
+  check(so, 'đưa một bảng hàm thì soi đúng bảng đó, hai bảng còn lại mới bị bỏ qua',
+    [hop.checkSchema({ dataSchema: hop.DATA_SCHEMA, functionTables: { DEFAULTS: banTra.DEFAULTS } }).skipped.length,
+      hop.checkSchema({ dataSchema: hop.DATA_SCHEMA, functionTables: banTra }).skipped.length],
+    [5, 3]);
+
+  checkContains(so, 'tên hàm normalize gõ sai bị bắt, chứ không nằm im chờ tới chặng ghi',
+    hop.checkSchema({ dataSchema: (() => { const s = banSao(hop.DATA_SCHEMA); s.customer.phone.normalize = 'codelike'; return s; })(), functionTables: banTra }).problems,
+    'bảng NORMALIZERS không có hàm tên đó');
+
+  checkContains(so, 'tên hàm validate gõ sai cũng bị bắt',
+    hop.checkSchema({ dataSchema: (() => { const s = banSao(hop.DATA_SCHEMA); s.customer.taxNumber.validate = 'taxFormat'; return s; })(), functionTables: banTra }).problems,
+    'bảng VALIDATORS không có hàm tên đó');
 
   // Luật cứng của tài liệu 02 Phần 8.1: không một cột thuần đồng bộ nào được lọt vào DATA_SCHEMA.
   // Bộ kiểm được đọc cả hai bảng; lõi thì không. Đây là chỗ duy nhất trong dự án so hai bảng với nhau.
@@ -116,8 +131,8 @@ function chay(so) {
     uiThat.problems, []);
 
   // Đây là chỗ bịt lỗ của `Câu hỏi đêm.md` mục 6.4: `ingestCore` dò ba bảng giao diện bằng `typeof`, nên thiếu chúng thì phép kiểm rơi êm vào `skipped`. Phép kiểm này chốt rằng đưa đủ ba bảng vào thì nó ra khỏi `skipped` — nhờ vậy con số `skipped` mới nói được điều gì.
-  check(so, 'đưa đủ ba bảng giao diện thì phần kiểm bố cục ra khỏi danh sách bỏ qua, còn lại đúng ba phép bị bỏ',
-    [uiThat.skipped.length, uiThat.skipped.join(' | ').indexOf('UI_SCHEMA') !== -1], [3, false]);
+  check(so, 'đưa đủ ba bảng giao diện thì phần kiểm bố cục ra khỏi danh sách bỏ qua, còn lại đúng năm phép bị bỏ',
+    [uiThat.skipped.length, uiThat.skipped.join(' | ').indexOf('UI_SCHEMA') !== -1], [5, false]);
 
   /** Làm hỏng một chỗ trên bản sao của `UI_SCHEMA` rồi đòi đúng một câu chứa mẩu chữ cần thiết. */
   function batLoiUi(label, lamHong, mauChu) {

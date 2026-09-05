@@ -36,6 +36,7 @@ const NHOM_CA = [
   require('./cases/screenState'),
   require('./cases/prefs'),
   require('./cases/callTiming'),
+  require('./cases/bootstrap'),
   require('./cases/uiBuilder'),
   require('./cases/uiSchema'),
   require('./cases/renderEngine'),

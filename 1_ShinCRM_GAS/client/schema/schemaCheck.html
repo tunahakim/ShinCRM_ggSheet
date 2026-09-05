@@ -23,8 +23,9 @@ var SCHEMA_CHECK_CODE_PATTERN = /^@[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$/;
  * Chạy toàn bộ phép kiểm khai được với những gì bên gọi đưa vào.
  *
  * `input.dataSchema` là bắt buộc. Các mục còn lại thiếu thì phép kiểm tương ứng bị bỏ qua và có tên trong `skipped`:
- * `categoryCodes` (mảng mã `@CAT_` có thật trên sheet), `functionTables` ({ DEFAULTS, NORMALIZERS, VALIDATORS }),
- * `configDefaultCodes` (mảng mã cột có dòng trong bảng ngầm định gõ tay của `Config`), và bộ ba `uiSchema` + `actions` + `slots`.
+ * `categoryCodes` (mảng mã `@CAT_` có thật trên sheet), `functionTables` (đưa được bảng nào thì soi bảng đó — `{ DEFAULTS }`,
+ * `{ NORMALIZERS, VALIDATORS }`, hay cả ba), `configDefaultCodes` (mảng mã cột có dòng trong bảng ngầm định gõ tay của `Config`),
+ * và bộ ba `uiSchema` + `actions` + `slots`.
  *
  * Phần kiểm `UI_SCHEMA` gọi `screenBuild` và `renderFieldPath` của hai tệp nhúng **sau** tệp này. Chạy được vì lời gọi xảy ra
  * lúc khởi động, không phải lúc nạp tệp; đổi lại là không được gọi `checkSchema` ở tầng ngoài cùng của một thẻ script.
@@ -102,24 +103,25 @@ function checkSchema(input) {
     skipped.push('source trỏ đúng danh mục trên sheet Category');
   }
 
-  // Phép kiểm cần ba bảng hàm của tài liệu 03 Phần 6.
-  var tables = input.functionTables;
-  if (tables && tables.DEFAULTS && tables.NORMALIZERS && tables.VALIDATORS) {
-    var pairs = [['default', 'DEFAULTS'], ['normalize', 'NORMALIZERS'], ['validate', 'VALIDATORS']];
+  // Phép kiểm cần ba bảng hàm của tài liệu 03 Phần 6. Soi **từng bảng một**, vì ba bảng cố ý không sống cùng một chỗ: `DEFAULTS` ở phía sidebar còn `NORMALIZERS` với `VALIDATORS` chỉ có một bản phía máy chủ. Đòi đủ cả ba mới chịu chạy thì bên nào gọi cũng thiếu, tức cả ba phép kiểm không bao giờ chạy ở đâu — và đó đúng là chuyện đã xảy ra: ba tên hàm `normalize` cùng một tên `validate` trong `DATA_SCHEMA` chưa từng được đối chiếu lần nào.
+  var tables = input.functionTables || {};
+  [['default', 'DEFAULTS'], ['normalize', 'NORMALIZERS'], ['validate', 'VALIDATORS']].forEach(function (pair) {
+    var table = tables[pair[1]];
+    if (!table) {
+      skipped.push('tên hàm khai ở `' + pair[0] + '` có trong bảng ' + pair[1]);
+      return;
+    }
+
     Object.keys(dataSchema).forEach(function (entity) {
       var fields = dataSchema[entity];
       Object.keys(fields).forEach(function (fieldName) {
-        pairs.forEach(function (pair) {
-          var name = fields[fieldName][pair[0]];
-          if (name && typeof tables[pair[1]][name] !== 'function') {
-            problems.push(entity + '.' + fieldName + ' khai `' + pair[0] + ': "' + name + '"` nhưng bảng ' + pair[1] + ' không có hàm tên đó.');
-          }
-        });
+        var name = fields[fieldName][pair[0]];
+        if (name && typeof table[name] !== 'function') {
+          problems.push(entity + '.' + fieldName + ' khai `' + pair[0] + ': "' + name + '"` nhưng bảng ' + pair[1] + ' không có hàm tên đó.');
+        }
       });
     });
-  } else {
-    skipped.push('tên hàm trong default, normalize, validate có trong bảng tra');
-  }
+  });
 
   // Luật một nguồn ngầm định của tài liệu 03 Phần 2.
   if (Array.isArray(input.configDefaultCodes)) {
