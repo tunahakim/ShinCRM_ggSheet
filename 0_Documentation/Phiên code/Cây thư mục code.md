@@ -48,14 +48,28 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   ├── data\
 │   │   ├── DataSchema.js         Khai 33 cột dữ liệu người dùng: mã cột, nhãn, kiểu, ràng buộc. Nguồn sự thật của hàng 1.
 │   │   └── SheetLayout.js        Khai khung năm sheet: mấy hàng tiêu đề, dữ liệu bắt đầu từ hàng nào, màu tiêu đề, tiêu đề sheet Log.
-│   ├── sheet\
+│   ├── sheet\                    Mọi tệp chạm SpreadsheetApp. Ranh giới quan trọng nhất của cây này: tệp trong đây phải nghiệm thu trên Google, tệp ngoài đây kiểm được offline.
 │   │   ├── Book.js               Mở đúng tệp Sheet. Tách riêng vì đường mở khi có người ngồi trước máy khác đường mở lúc chạy tự động.
 │   │   ├── SheetIo.js            Đọc hàng 1 thành bảng tra "mã cột → số cột". Mọi thao tác cột đi qua đây, không ai được đếm cột bằng tay.
+│   │   ├── SheetGrid.js          Sự thật về lưới: đếm hàng dữ liệu, đọc một khối ô, nới lưới trước khi ghi. Ra đời từ lỗi thật làm sheet Log co xuống 7 hàng rồi tắt log trong im lặng.
+│   │   ├── CellBudget.js         Đo tổng số ô cả tệp và so với trần ở Config. Vượt trần thì chặn hẳn lượt nạp, kèm bảng chỉ mặt sheet nào phình to.
+│   │   ├── EntityRead.js         Đọc bản ghi Customer và Activity ra dạng { fields, rows, rowIndexes } truyền được sang client. Bỏ hàng không có mã và đếm số hàng đã bỏ.
+│   │   ├── CategoryRead.js       Đọc sheet Category thành "mã danh mục → danh sách giá trị". Biết loại cột đi kèm _FBM mà không loại nhầm @CAT_CHO_PHEP_FBM.
+│   │   ├── ConfigRead.js         Đọc bốn khối còn lại của sheet Config. Khóa trùng thì ném lỗi; riêng khối sắp xếp thì thứ tự hàng mang nghĩa nên đọc theo đường khác.
 │   │   └── SetupSheets.js        Dựng và kiểm khung năm sheet từ hai tệp khai ở data\. Chạy được nhiều lần, không phá dữ liệu đang có.
 │   ├── util\
+│   │   ├── DateText.js           Biên giới duy nhất giữa Date và hai dạng chuỗi thời gian của dự án. google.script.run không mang Date qua được, nên mọi mốc thời gian đi đường chuỗi.
 │   │   └── TextNormalize.js      Chuẩn hóa văn bản trước khi so sánh. Có một bản sinh đôi ở client\util\ — hai bản phải giống nhau từng dòng.
+│   ├── state\
+│   │   └── DirtyState.js         Cờ "sheet đã lệch so với RAM", giữ ở DocumentProperties. Đọc không bao giờ ném lỗi, vì nó đi kèm mọi lượt trả về.
+│   ├── service\
+│   │   └── LoadService.js        Gom cả một lượt nạp: đo ngân sách ô, đọc tham số, danh mục, toàn bộ khách, rồi giao dịch theo gói.
 │   ├── log\
 │   │   └── LogGate.js            Cửa ghi log: gom dòng trong RAM, ghi xuống sheet Log bằng đúng một lệnh, che bí mật, cắt log theo hai trần.
+│   ├── entry\                    Cửa vào hệ thống, và nửa đưa lỗi tới mắt người.
+│   │   ├── EntryPoint.js         Vỏ bọc runEntryPoint: ghi log kèm vết, báo cho người dùng, ném lại lỗi, và luôn xả bộ đệm log ở finally.
+│   │   ├── ErrorReport.js        Đưa lỗi tới mắt người theo bốn kênh. Lỗi ở onOpen thì để dành, hiện ở lần mở sidebar sau.
+│   │   └── Menu.js               onOpen, menu ShinCRM và lệnh mở sidebar. Mọi việc của nó đi qua getUi và HtmlService nên không kiểm offline được.
 │   └── dev\                      CHỈ DÙNG LÚC PHÁT TRIỂN — xóa cả thư mục này trước khi Sheet mang dữ liệu khách hàng thật.
 │       ├── DevRunner.js          Cửa web chạy một hàm trong danh sách trắng. Mở một địa chỉ chạy code dưới quyền chủ tệp.
 │       ├── DevToken.js           Thẻ bí mật của cửa trên. Không vào git, nhưng CÓ đẩy lên Google.
@@ -63,10 +77,22 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │       ├── DumpGrid.js           Đo lưới từng sheet: bao nhiêu hàng, bao nhiêu cột, còn chỗ ghi thêm bao nhiêu hàng.
 │       └── MeasureLog.js         Đo chi phí thật của deleteRows trên sheet Log lớn. Con số trong tài liệu 10 đến từ đây.
 │
-├── client\                       Code chạy trong sidebar, tệp .html bọc thẻ <script>.
+├── client\                       Code chạy trong sidebar. Tệp .html bọc thẻ <script>, hoặc bọc thẻ <style> nếu là tệp chỉ có CSS.
+│   ├── Sidebar.html              Trang gốc của sidebar: nhúng mọi tệp client theo đúng thứ tự rồi gọi lượt nạp đầu tiên.
+│   ├── ram\                      Kho dữ liệu trong RAM của sidebar, và đường nhận dữ liệu từ máy chủ.
+│   │   ├── store.html            Kho runtime cùng bảy đường tra duy nhất được chạm vào nó. Không đường nào nhận tham số chế độ xem.
+│   │   ├── ingest.html           Chỗ DUY NHẤT biết hình dạng đường truyền { fields, rows }. Bung thành object đúng một lần ở đây.
+│   │   └── bootstrap.html        Trình tự khởi động: nạp lõi, hiện màn hình, rồi nạp giao dịch theo gói ở phía sau.
 │   ├── schema\
+│   │   ├── schemaAccess.html     Cửa tra bảng khai bên client. Hỏi tên trường không có thì ném lỗi kèm gợi ý tên gần đúng, không trả về undefined.
 │   │   └── schemaCheck.html      Phép tự kiểm bảng khai cột, chạy được ở cả hai phía.
+│   ├── ui\                       Khung nhìn và các màn chung. spatialConfig giữ toàn quyền về khoảng cách.
+│   │   ├── tokens.html           Khối biến CSS: màu, cỡ chữ, khoảng cách. Chỉ có <style>, không khai tên JavaScript nào.
+│   │   ├── frame.html            Khung sidebar: thanh trên, vùng cuộn, chân trang. Cũng chỉ có <style>.
+│   │   ├── progress.html         Vạch tiến trình cho mọi lượt gọi máy chủ.
+│   │   └── statusScreen.html     Màn trạng thái chiếm trọn khung: đang nạp, lỗi, và màn chặn khi vượt trần ngân sách ô.
 │   └── util\
+│       ├── serverCall.html       Bọc google.script.run thành Promise kèm vạch tiến trình. Cố ý KHÔNG tự hiện lỗi — việc đó của bên gọi.
 │       └── textNormalize.html    Bản sinh đôi client của server\util\TextNormalize.js. [RÀNG BUỘC CỨNG] hai bản phải giống nhau.
 │
 └── fbm_sync\                     Module đồng bộ FBM. Đọc được DATA_SCHEMA; phần lõi TUYỆT ĐỐI không đọc ngược vào đây.
@@ -89,7 +115,7 @@ tests\
 │   ├── load-gas.js               Nạp tệp .js và .html thật vào hộp cát vm, dựng lại vùng tên chung của Apps Script.
 │   ├── fake-sheet.js             Tệp Sheet giả trong RAM, TỰ ĐẾM số lệnh setValues và deleteRows.
 │   ├── gas-stubs.js              Utilities, Logger, PropertiesService, console giả — vừa đủ phần mà code gọi tới.
-│   ├── dung-hop.js               Dựng sẵn hộp cát kèm sheet giả. Nơi duy nhất giữ danh sách đường dẫn tệp máy chủ.
+│   ├── dung-hop.js               Dựng sẵn hộp cát kèm sheet giả và hàm ghi ô theo mã cột. Nơi duy nhất giữ danh sách đường dẫn tệp máy chủ.
 │   └── strip-comments.js         Bỏ chú thích trước khi quét mã, để docstring được phép nhắc tên mà mã thì không.
 └── cases\
     ├── textNormalize.js          Hai bản sinh đôi server và client cho cùng kết quả trên một bảng ca dùng chung.
@@ -97,7 +123,13 @@ tests\
     ├── namespace.js              Không tên nào khai ở hai tệp. Bẫy số một của Apps Script.
     ├── settings.js               SETTINGS và khối tham số Config, kể cả ca sheet chưa có dòng nào.
     ├── logMask.js                Luật che bí mật. Sai một lần là bí mật ra sheet, không thu lại được.
-    └── logGate.js                Kỷ luật bộ đệm, "cả lượt một lệnh ghi", và hai trần cắt log.
+    ├── logGate.js                Kỷ luật bộ đệm, "cả lượt một lệnh ghi", và hai trần cắt log.
+    ├── dateText.js               Hai dạng chuỗi thời gian, và ba luật im lặng khi sai: ô rỗng, ô gõ lạ, precision gõ sai.
+    ├── sheetGrid.js              Lưới là hữu hạn, setValues không tự nới, và ca rỗng là ca thường xuyên chứ không phải ngoại lệ.
+    ├── cellBudget.js             Cái bẫy gõ "500.000" thành 500, và bảng thủ phạm phải sắp giảm dần.
+    ├── entityRead.js             Tra cột theo mã chứ không theo thứ tự, hàng trắng bị đếm, và không giá trị nào còn là Date.
+    ├── categoryRead.js           Cái bẫy @CAT_CHO_PHEP_FBM, và mọi trường SELECT đều tìm được danh mục của mình.
+    └── configRead.js             Khóa trùng thì chặn, còn khối sắp xếp thì thứ tự hàng là nghĩa.
 ```
 
 ## Bảng tra: tên trong tài liệu thiết kế → tệp thật
@@ -114,19 +146,24 @@ Không sửa tên trong tài liệu thiết kế vì hai lẽ: chúng là bản 
 | `server/SheetIo.gs` | `server/sheet/SheetIo.js` |
 | `server/TextNormalize.gs` | `server/util/TextNormalize.js` |
 | `server/LogGate.gs` | `server/log/LogGate.js` |
+| `server/LoadService.gs` | `server/service/LoadService.js` |
+| `server/DirtyState.gs` | `server/state/DirtyState.js` |
 | `client/util/textNormalize.js` | `client/util/textNormalize.html` |
+| `client/ram/store.js` | `client/ram/store.html` |
+| `client/ram/ingest.js` | `client/ram/ingest.html` |
+| `client/schema/schemaAccess.js` | `client/schema/schemaAccess.html` |
 
-Dòng cuối lệch vì một lý do khác hẳn các dòng trên, đã ghi ở tài liệu làm việc `Mục tiêu chặng 1.1 và 1.2.md`: tệp client trên Apps Script buộc phải là `.html`, không phải `.js` như tài liệu 04 Phần 10 viết.
+Tám tệp máy chủ dựng ở chặng 1.1 và 1.2 không có trong bảng này vì tài liệu thiết kế không đặt tên cho chúng: `SheetGrid.js`, `CellBudget.js`, `EntityRead.js`, `CategoryRead.js`, `ConfigRead.js`, `DateText.js`, `EntryPoint.js`, `ErrorReport.js`. Tài liệu nói *phải làm gì* ở các phần tương ứng, còn việc gom mỗi luật vào một tệp là quyết định của phiên code — nên chỗ tra chúng là cây thư mục ở trên, không phải bảng này.
+
+Bốn dòng cuối bảng lệch vì một lý do khác hẳn các dòng trên, đã ghi ở tài liệu làm việc `Mục tiêu chặng 1.1 và 1.2.md`: **mọi** tệp client trên Apps Script buộc phải là `.html`, không phải `.js` như tài liệu 04 Phần 10 và 05 Phần 13 viết.
 
 ## Thư mục sẽ dựng ở các chặng tới
 
 Ghi ra đây để chỗ đặt tệp mới là điều đã quyết trước, không phải điều quyết lúc đang gấp.
 
 ```
-server\service\                   Đường nghiệp vụ: nạp dữ liệu lên RAM, lưu, sửa, xóa, hoàn tác.
 server\gate\                      Các cửa ghi có kỷ luật: WriteGate, IdGate, DeleteGate — cùng họ với LogGate.
-server\entry\                     Cửa vào: onOpen, menu, mở sidebar, runEntryPoint và nửa báo lỗi tới mắt người.
-client\ui\                        Khung sidebar, khối biến CSS, biểu tượng SVG. spatialConfig giữ toàn quyền về khoảng cách.
-client\ram\                       Kho dữ liệu trong RAM của sidebar và đường nhận dữ liệu từ máy chủ.
+server\view\                      Dựng sheet quản lý: đọc bộ lọc, sắp xếp, vẽ lại vùng dữ liệu.
 client\form\                      Dựng biểu mẫu từ bảng khai cột.
+client\save\                      Đường lưu: gom dữ liệu form, gọi máy chủ, hoàn tác.
 ```
