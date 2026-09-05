@@ -12,8 +12,14 @@ Vướng ở chỗ: `SLOTS` và `ACTIONS` của tài liệu 04 nói về việc 
 
 **Câu hỏi cho chủ dự án:** ba hành vi này là "có thì tốt" hay "không có thì không dùng được"? Nếu là loại thứ hai thì nói sớm, vì nó đổi cách dựng `client/ui/actions`.
 
+===
+
+--> Câu trả lời của chủ dự án (tôi): hãy xem hành vi ở code cũ, nó đã làm đúng theo yêu cầu UX của tôi rồi.
+
 ## 2. Đuôi tệp phía client
 
 Đã ghi ở `Mục tiêu chặng 1.1 và 1.2.md`, mục "Đuôi tệp phía client". Cần một câu đồng ý để sửa tài liệu 04 Phần 10.
 
 **Đang tạm chọn:** dùng `.html`, vì `.js` đã thử và không chạy được trên Apps Script.
+
+--> Câu trả lời của chủ dự án (tôi): Đồng ý, bạn cũng có thể tham khảo các đuôi file code cũ vì đó là code đẫ chạy được trên gas
