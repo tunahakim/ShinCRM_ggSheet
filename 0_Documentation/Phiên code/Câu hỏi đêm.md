@@ -24,7 +24,7 @@ Năm chỗ gặp khi dựng `client/ui/renderEngine.html` ngày 05/09/2026. Cả
 
 Tài liệu 04 xếp cả bốn việc — dựng chuỗi, mở menu (Phần 4B), đo chiều cao để quyết có thu gọn hay không (Phần 5), vẽ lại một vùng (Phần 6) — vào cùng một mục "bộ máy render", nên đọc thẳng thì thành một tệp làm bốn việc.
 
-**Đang chọn: engine giữ đúng bốn việc thuần chuỗi** (thoát ký tự, dịch `spatialConfig`, dựng chuỗi đệ quy, `renderTarget`), còn menu và phép đo sang `client/ui/menu.html` và `client/ui/collapse.html` — hai tệp chưa dựng. Lý do: hai việc kia phải chạm DOM và phải chạy *sau* khi chuỗi đã gán, còn nửa dựng chuỗi thì không chạm DOM nên bộ kiểm offline gọi được hàm thật. Engine để lại đúng hai đường nối: `data-menu="<khóa>"` với mảng mục menu gửi kèm trong `RENDER_INDEX.menus`, và `data-collapse="<số dòng>"` trên phần tử bị chặn chiều cao. Không có JSON nào nằm trong thuộc tính HTML.
+**Đang chọn: engine giữ đúng bốn việc thuần chuỗi** (thoát ký tự, dịch `spatialConfig`, dựng chuỗi đệ quy, `renderTarget`), còn menu và phép đo sang `client/ui/menu.html` và `client/ui/collapse.html`. Lý do: hai việc kia phải chạm DOM và phải chạy *sau* khi chuỗi đã gán, còn nửa dựng chuỗi thì không chạm DOM nên bộ kiểm offline gọi được hàm thật. Engine để lại đúng hai đường nối: `data-menu="<khóa>"` với mảng mục menu gửi kèm trong `RENDER_INDEX.menus`, và `data-collapse="<số dòng>"` trên phần tử bị chặn chiều cao. Không có JSON nào nằm trong thuộc tính HTML.
 
 ### 2.2. Hình dạng bối cảnh render là hợp đồng riêng của engine
 
@@ -42,7 +42,7 @@ Tài liệu khai `infoBar` là cờ bật/tắt mà không nói vùng đó lấy
 
 Chỉ-đọc hiện ra ba dạng khác nhau trong HTML: `<input readonly>`, `<textarea readonly>`, và `<span class="shin-badge">` không phải ô nhập. Bộ thu thập lúc lưu mà phải nhận cả ba dạng thì thành ba luật. **Đang chọn: mọi ô chỉ đọc mang thêm `data-readonly="1"`** để bộ thu thập chỉ cần một luật. Ô nào cũng mang `data-field` đủ đường dẫn, kể cả ô chỉ đọc — lọc bằng `data-readonly`, không lọc bằng việc có hay không có `data-field`.
 
-## 3. Bảng khai bố cục và ba núm chọn — mười chỗ tự quyết
+## 3. Bảng khai bố cục và ba núm chọn — mười một chỗ tự quyết
 
 Mười chỗ gặp khi dựng `uiSchema`, `slots`, `screenState`, `prefs`, `fieldLogic` và `UserPrefs` hai ngày 05–06/09/2026. Cả mười đã chọn xong, code và bộ kiểm đang chạy theo cách đã chọn; ghi ra đây vì chúng là quyết định của tôi, không phải câu chữ có sẵn trong tài liệu.
 
@@ -80,7 +80,11 @@ Tài liệu không nói danh sách rỗng thì hiện gì. **Đang chọn: bốn
 
 ### 3.9. Dấu tích và dấu radio của menu đọc từ `Prefs`
 
-Tài liệu 04 Phần 4B nói mục con vẽ dấu tích "theo trạng thái đang nhớ của công tắc đó" mà không nói đọc ở đâu. **Đang chọn: `client/ui/menu.html` đọc `Prefs`**, không gọi máy chủ và không đọc `UserProperties`. `Prefs` là bản sao trong RAM của đúng kho đó, và nó đã đúng ngay từ lượt nạp đầu tiên. Tệp `menu.html` chưa dựng — ghi ra đây để lúc dựng không phải quyết lại.
+Tài liệu 04 Phần 4B nói mục con vẽ dấu tích "theo trạng thái đang nhớ của công tắc đó" mà không nói đọc ở đâu. **Đã chốt và đã dựng: `client/ui/menu.html` đọc `Prefs`**, không gọi máy chủ và không đọc `UserProperties`. `Prefs` là bản sao trong RAM của đúng kho đó, và nó đã đúng ngay từ lượt nạp đầu tiên.
+
+### 3.11. Menu tra từ tên hành động sang tên núm chọn bằng một bảng tường minh
+
+Mục con của menu chỉ khai `action`, còn dấu tích phải đọc `Prefs` theo *tên núm*. Hai tên đó không trùng nhau: `toggleFollowSelection` → `followSelection` thì cắt chữ `toggle` là ra, nhưng `setActivityView` → `activityView` thì không, vì `set` cắt xong còn `ActivityView` chứ không phải `activityView`. **Đang chọn: một bảng `MENU_PREF_BY_ACTION` ba dòng trong `menu.html`.** Đổi lại là có thêm một chỗ phải sửa khi sinh núm thứ tư — nhưng một luật cắt chữ đúng hai phần ba là luật sẽ sai lặng lẽ đúng vào lúc đó, mà cái sai của nó là "dấu tích không hiện", loại lỗi người dùng khó gọi tên. Tên núm vẫn do `PREFS_DEFAULTS` giữ, bảng này chỉ nối hai bên.
 
 ### 3.10. Giá trị lạ trong `UserProperties` rơi về ngầm định, kể cả với công tắc bật tắt
 
@@ -104,9 +108,13 @@ Tôi viết `screenViewCustomer` trả `null` cho mã không còn trong RAM, l�
 
 Chỗ này để lại một việc thật cho chặng sau: mã khách đang xem trỏ tới một khách vừa bị xóa hẳn khỏi sheet thì lượt vẽ kế tiếp sẽ nổ. Người có thẩm quyền dọn là `reloadAll` — nó là chỗ duy nhất RAM đổi cả khối, nên một phép kiểm ở đó rẻ hơn một phép kiểm ở mọi lượt vẽ. Tài liệu 05:173 cũng xếp luật này về phía tài liệu làm mới dữ liệu.
 
-### 4.4. Trình tự khởi động vẽ màn xem, `statusLoadSummary` giữ lại nhưng chưa có cửa gọi
+### 4.4. Trình tự khởi động vẽ màn xem, `statusLoadSummary` không có nút nào gọi
 
-`sidebarBoot()` đang kết thúc bằng `statusLoadSummary(...)`, và `statusScreen.html` tự nói hai lần rằng màn tóm tắt này là màn tạm, sẽ thay bằng màn xem thật. **Đang chọn: khởi động vẽ màn xem**, còn `statusLoadSummary` giữ nguyên hàm để chạy nghiệm thu gọi được. Câu hỏi còn lại: về lâu dài màn tóm tắt lượt nạp ở đâu — một mục trong menu, hay xóa hẳn? Tôi không tự thêm mục menu vì mục menu là thứ người dùng nhìn thấy.
+`sidebarBoot()` từng kết thúc bằng `statusLoadSummary(...)`, và `statusScreen.html` tự nói hai lần rằng màn tóm tắt này là màn tạm. **Đã đổi: khởi động vẽ màn xem.**
+
+Còn lại câu hỏi màn tóm tắt đi đâu. Tài liệu mục tiêu ghi là cho nó một mục menu, nhưng làm vậy phải thêm tên thứ mười bảy vào bảng `ACTIONS`, mà mười sáu tên là **`[RÀNG BUỘC CỨNG]`** của tài liệu 04 Phần 7 và đang bị bộ kiểm ghim đúng con số. **Đang chọn đường không thêm hành động nào:** `sidebarBoot` cất bản tóm tắt vào `BOOT_LAST_SUMMARY`, `bootShowSummary()` gọi được từ console lúc nghiệm thu, và phần duy nhất mà người dùng thật cần thấy — danh sách cảnh báo cùng danh sách phép kiểm bị bỏ qua — thì `bootTellProblems` đưa vào `alert` **chỉ khi có**. Lượt nạp sạch thì mở thẳng vào màn xem, không gì chắn đường.
+
+Chỗ này cần chủ dự án chốt, vì nó đổi một dòng của tài liệu mục tiêu và vì nó là thứ người dùng nhìn thấy: giữ đường console, hay chấp nhận tên thứ mười bảy để có một mục menu thật?
 
 ### 4.5. Thứ tự dựng chặng 1.3 đổi so với tài liệu mục tiêu
 
@@ -146,7 +154,7 @@ Không tài liệu nào cho tiêu đề form một chỗ đứng. Code cũ đặ
 
 Tài liệu 04 dòng 104 viết mỗi hành động là `(payload) => void`. Không đúng nữa: `cancelForm` và bốn cửa mở form phải trả `focusId` ra ngoài để bên nghe click đặt con trỏ — chính là điều mục 5.4 chốt — còn ba núm chọn trả `Promise` để bên gọi bắt được lượt gửi thất bại. Trả `void` thì hai việc đó buộc phải làm bên trong thân hàm, tức mười sáu thân hàm đều chạm DOM và bộ kiểm offline mất luôn khả năng gọi chúng.
 
-**Đang chọn: nới chữ ký thành `(payload) => any`**, đọc là "hành động làm xong việc của mình rồi trả phần dư cho bên phát click". Đây là nới chứ không phải đổi: một hành động không có gì trả về thì vẫn cứ trả `undefined` như cũ. Chưa sửa tài liệu 04 vì còn phải xem bên phát click ăn hết những gì được trả hay không — sửa sau khi dựng xong bộ phát, kèm mô tả phần dư gồm những gì.
+**Đã chốt và đã sửa tài liệu 04 thành `(payload) => phần dư`**, kèm một đoạn nói phần dư gồm những gì: một object mang `focusId`, một `Promise`, hoặc cả hai, hoặc không gì cả. Bộ phát click đã dựng và nó ăn đúng hai hình dạng đó — `focusId` thì đặt con trỏ, `Promise` thì bắt cả nhánh chối — nên không còn hình dạng thứ ba nào bị bỏ rơi.
 
 ### 6.2. Sáu hành động của chặng sau ném lỗi có tên, không để thân rỗng
 

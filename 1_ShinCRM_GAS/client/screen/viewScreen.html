@@ -39,6 +39,22 @@ function screenViewRender() {
   return renderScreen(screenBuild(UI_SCHEMA.view, 'view'), { records: screenViewRecords() });
 }
 
+/**
+ * Bỏ mã khách đang xem nếu lượt nạp vừa rồi không còn giữ bản ghi đó. Gọi ngay trước lượt vẽ cuối của trình tự khởi động.
+ *
+ * Vì sao cần: `ScreenState` sống qua cả lượt nạp lại, còn `Store` thì bị dựng lại từ đầu. Khách bị xóa hẳn khỏi sheet — hoặc chỉ là lượt nạp này lọc khác lượt trước — thì mã cũ còn nằm đó và `screenViewCustomer` sẽ ném đúng cái lỗi "bản đồ dòng đã cũ" của tài liệu 05 Phần 9, chặn cả màn.
+ *
+ * Ném lỗi ở đó là đúng, vì nó bắt được một bản đồ dòng cũ. Nhưng ngay sau một lượt nạp mới thì "mã không tra ra" không còn là dấu hiệu sai — nó chỉ là sự thật mới. `Câu hỏi đêm.md` mục 4.3 giao quyền dọn này cho đường nạp lại, và đây là chỗ thực hiện.
+ */
+function screenViewDropStale() {
+  var id = ScreenState.currentCustomerId;
+  if (!id) { return null; }
+  if (Object.prototype.hasOwnProperty.call(Store.customers, id)) { return id; }
+
+  screenStateSetCustomer('');
+  return null;
+}
+
 /** Về màn xem rồi vẽ. Dùng ở cuối trình tự khởi động, sau khi đóng hết form, và sau khi lưu xong. */
 function screenViewGo() {
   screenStateGoView();

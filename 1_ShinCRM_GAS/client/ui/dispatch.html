@@ -1,0 +1,126 @@
+<script>
+/*
+ * Bộ phát click — một tai nghe duy nhất đặt ở khung, tài liệu 04 Phần 7.
+ *
+ * Vì sao một tai nghe chứ không gắn từng nút: mỗi lượt vẽ thay sạch ruột bốn vùng, nên nút gắn tai nghe riêng sẽ mất tai nghe ngay lượt vẽ sau. Đặt ở khung thì khung không bao giờ bị vẽ lại, và nút nào mang `data-action` cũng bấm được kể cả nút do `SLOTS` mới sinh ra một giây trước.
+ *
+ * Tệp này là **chỗ duy nhất** làm ba việc mà mười sáu hành động cố ý không làm: đọc `data-*` thành `payload`, đặt con trỏ theo `focusId` được trả về, và đưa lỗi tới mắt người dùng. Nhờ vậy `actions.html` không chạm DOM và kiểm được offline — `Câu hỏi đêm.md` mục 6.1.
+ */
+
+/** Khung ngoài cùng của sidebar. Không bao giờ bị vẽ lại, nên tai nghe đặt ở đây sống suốt phiên. */
+var DISPATCH_ROOT_ID = 'sidebar-root';
+
+/** Dấu đã gắn tai nghe, để `sidebarBoot` gọi lại — đường của nút Nạp lại — không gắn thêm cái thứ hai. */
+var DISPATCH_MARK = 'data-dispatch';
+
+/**
+ * `payload` đọc từ chính phần tử vừa bấm: đúng hai khóa, đúng hai thuộc tính mà engine và tệp menu sinh ra.
+ *
+ * `null` của `getAttribute` đổi thành `undefined` cho `value` và `''` cho `pick`, vì đó là hai hình dạng "vắng mặt" mà `actionsValue` và `actionsPick` nhận ra để báo "bảng khai thiếu" — để nguyên `null` thì lỗi rơi xuống tầng dưới và hiện ra một câu nói về giá trị hợp lệ thay vì nói về bản khai.
+ */
+function dispatchPayload(el) {
+  var pick = el.getAttribute('data-pick');
+  var value = el.getAttribute('data-value');
+  return { pick: pick === null ? '' : pick, value: value === null ? undefined : value };
+}
+
+/**
+ * Đưa lỗi tới mắt người dùng. `alert` chứ không phải `console`: người đọc là chủ dự án, và họ không có lý do gì để mở console.
+ *
+ * Vẫn ghi thêm vào console một bản đầy đủ có vết gọi, vì `alert` chỉ hiện được một dòng chữ còn lúc đi tìm nguyên nhân thì cần cả vết.
+ */
+function dispatchError(err) {
+  if (typeof console !== 'undefined' && console.error) { console.error(err); }
+  alert(err && err.message ? err.message : String(err));
+}
+
+/**
+ * Đặt con trỏ vào ô mà lượt vẽ vừa chỉ định. Không có `focusId` là bình thường — màn xem không có ô nào để gõ.
+ *
+ * `focusId` trỏ tới ô không có trên màn thì im lặng bỏ qua: con trỏ không nhảy là một điều khó chịu nhỏ, còn một hộp báo lỗi chặn đường sau mỗi lần mở form là một điều khó chịu lớn.
+ */
+function dispatchFocus(ket) {
+  if (!ket || !ket.focusId) { return null; }
+  var el = document.getElementById(ket.focusId);
+  if (el && el.focus) { el.focus(); }
+  return el || null;
+}
+
+/**
+ * Việc dọn sau mỗi hành động: đặt con trỏ, rồi đo lại các khối thu gọn.
+ *
+ * Phải đo lại vì hành động nào cũng có thể đã vẽ lại một vùng, và lượt vẽ thay sạch ruột vùng nên nút "Xem thêm" của lượt trước biến mất cùng phép đo của nó. Đo sớm hơn thì không được: chỉ sau khi hành động vẽ xong thì `scrollHeight` mới là con số thật.
+ */
+function dispatchAfter(ket) {
+  dispatchFocus(ket);
+  if (typeof collapseScan === 'function') { collapseScan(); }
+  return ket;
+}
+
+/**
+ * Gọi một hành động theo tên rồi ăn phần dư nó trả về.
+ *
+ * Hành động trả `Promise` — bốn núm đổi cách xem và nút Nạp lại — thì lỗi tới muộn, nên phải bắt ở nhánh chối chứ không chỉ ở `try`. Bỏ nhánh đó là để một lượt gửi thất bại trôi vào im lặng, đúng loại lỗi mà tài liệu 04 Phần 7 lập ra để chống.
+ */
+function dispatchRun(ten, payload) {
+  if (typeof ACTIONS === 'undefined' || !Object.prototype.hasOwnProperty.call(ACTIONS, ten)) {
+    dispatchError(new Error('Nút vừa bấm gọi hành động "' + ten + '" không có trong bảng ACTIONS. Đây là lỗi bản khai bố cục, không phải bạn làm sai — phép kiểm lúc khởi động lẽ ra phải bắt được nó.'));
+    return null;
+  }
+
+  var ket;
+  try {
+    ket = ACTIONS[ten](payload);
+  } catch (err) {
+    dispatchError(err);
+    return null;
+  }
+
+  if (ket && typeof ket.then === 'function') {
+    ket.then(dispatchAfter, dispatchError);
+    return ket;
+  }
+
+  dispatchAfter(ket);
+  return ket;
+}
+
+/**
+ * Một cú bấm: tìm phần tử mang việc gần nhất tính từ chỗ bấm, rồi hoặc mở menu hoặc gọi hành động.
+ *
+ * Tìm ngược lên bằng `closest` vì chỗ bấm thật thường là con của nút — chữ trong `<span>`, hình trong `<svg>`. Mục menu mang cả `data-action` nên nó thắng ở đây, còn nút mẹ chỉ mang `data-menu`; nhờ vậy bấm vào mục menu là chạy việc chứ không phải đóng mở lại menu.
+ *
+ * Việc đóng menu đặt ở đây chứ không ở `menu.html`: tệp này là chỗ duy nhất biết "cú bấm vừa rồi có ý gì", nên nó cũng là chỗ đúng để nói "bấm bất cứ đâu ngoài nút mở menu thì đóng menu". Tài liệu 04 Phần 4B: bấm một mục con thì đóng menu **rồi mới** gọi hàm, và engine không vẽ lại gì sau đó — chính hàm đó tự vẽ.
+ */
+function dispatchClick(e) {
+  var goc = e.target;
+  if (!goc || !goc.closest) { return; }
+
+  var el = goc.closest('[data-action], [data-menu]');
+  var moMenu = el && !el.hasAttribute('data-action');
+
+  if (!moMenu && typeof menuClose === 'function') { menuClose(); }
+  if (!el) { return; }
+
+  if (moMenu) {
+    try { menuToggle(el); } catch (err) { dispatchError(err); }
+    return;
+  }
+
+  e.preventDefault();
+  dispatchRun(el.getAttribute('data-action'), dispatchPayload(el));
+}
+
+/** Gắn tai nghe vào khung. Gọi nhiều lần cũng chỉ gắn một cái, vì nút Nạp lại chạy lại cả trình tự khởi động. */
+function dispatchInstall() {
+  var goc = document.getElementById(DISPATCH_ROOT_ID);
+  if (!goc) {
+    throw new Error('Khung sidebar thiếu phần tử "' + DISPATCH_ROOT_ID + '" nên không gắn được bộ phát click. Mọi nút sẽ im lặng.');
+  }
+  if (goc.getAttribute(DISPATCH_MARK) === '1') { return goc; }
+
+  goc.addEventListener('click', dispatchClick);
+  goc.setAttribute(DISPATCH_MARK, '1');
+  return goc;
+}
+</script>

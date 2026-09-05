@@ -1,0 +1,161 @@
+<script>
+/*
+ * Lớp menu nổi — nửa chạm DOM mà engine cố ý không nhận, tài liệu 04 Phần 4B và `Câu hỏi đêm.md` mục 2.1.
+ *
+ * Engine chỉ để lại hai dấu: `data-menu="<khóa>"` trên nút mở, và mảng mục con nằm ở `RENDER_INDEX.menus[khóa]`. Tệp này dựng lớp nổi từ hai dấu đó.
+ *
+ * Ba luật của tài liệu 04 Phần 4B mà code dưới đây phải giữ: chỉ một menu mở tại một lúc; `Esc` hoặc bấm ra ngoài thì đóng; và menu **không mở thêm đường gọi hàm nào** — mọi mục con vẫn mang `data-action` để đi qua đúng bộ phát click, nên nó chịu chung phép kiểm tên hành động lúc khởi động.
+ */
+
+/** Lớp nổi chỉ có một, đặt trong khung để cú bấm mục con bay lên tới tai nghe của bộ phát click. */
+var MENU_LAYER_ID = 'shin-menu-layer';
+
+/**
+ * Tên hành động của mục menu ứng với núm nào trong `Prefs`. Dấu tích và dấu chấm tròn đọc ở đây, không hỏi máy chủ và không đọc `UserProperties` — `Câu hỏi đêm.md` mục 3.9.
+ *
+ * Bảng tra tường minh chứ không cắt chữ từ tên hành động: `toggleFollowSelection` → `followSelection` thì cắt được, nhưng `setActivityView` → `activityView` thì không, và một luật đúng hai phần ba là luật sẽ sai lúc có núm thứ tư.
+ */
+var MENU_PREF_BY_ACTION = {
+  toggleFollowSelection: 'followSelection',
+  toggleAutoRenderView: 'autoRenderView',
+  setActivityView: 'activityView'
+};
+
+/**
+ * Mục con đang được đánh dấu hay không, và đánh bằng hình gì.
+ *
+ * Hai hình dạng của tài liệu 04 Phần 4B loại trừ nhau: `toggle: true` là công tắc nên đánh dấu tích theo trạng thái bật/tắt; có `value` là một nấc của nhóm nên đánh chấm tròn khi giá trị đang nhớ trùng nấc đó. Các mục cùng `action` trong một menu tự thành một nhóm loại trừ, không cần khai tên nhóm.
+ *
+ * Không tra được núm thì trả `null` — mục vẫn bấm được, chỉ là không có ô đánh dấu. Đó là ca mục menu thường, ví dụ một mục chỉ mở form.
+ */
+function menuMark(muc) {
+  var num = MENU_PREF_BY_ACTION[muc.action];
+  if (!num || !Object.prototype.hasOwnProperty.call(Prefs, num)) { return null; }
+  if (muc.toggle) { return { hinh: 'check', bat: Prefs[num] === true }; }
+  if (muc.value !== undefined) { return { hinh: 'radio', bat: Prefs[num] === muc.value }; }
+  return null;
+}
+
+/**
+ * Một mục con thành một `<button>`.
+ *
+ * Dựng bằng DOM chứ không nối chuỗi HTML: nhãn mục menu là chữ do bản khai đặt, và `textContent` cùng `setAttribute` tự lo phần thoát ký tự mà không cần nhớ gọi hàm nào.
+ */
+function menuItemElement(muc) {
+  var b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'shin-menu-item';
+  b.setAttribute('data-action', muc.action || '');
+  if (muc.value !== undefined) { b.setAttribute('data-value', muc.value); }
+
+  var dau = menuMark(muc);
+  var o = document.createElement('span');
+  o.className = 'shin-menu-mark';
+  o.setAttribute('aria-hidden', 'true');
+  o.textContent = dau && dau.bat ? (dau.hinh === 'check' ? '✓' : '●') : '';
+  b.appendChild(o);
+
+  var chu = document.createElement('span');
+  chu.className = 'shin-menu-label';
+  chu.textContent = muc.label || '';
+  b.appendChild(chu);
+
+  if (dau) {
+    b.setAttribute('role', dau.hinh === 'check' ? 'menuitemcheckbox' : 'menuitemradio');
+    b.setAttribute('aria-checked', dau.bat ? 'true' : 'false');
+  }
+  return b;
+}
+
+/** Lấy lớp nổi, chưa có thì dựng. Con của khung, nên mọi cú bấm trong đó vẫn tới bộ phát click. */
+function menuLayer() {
+  var lop = document.getElementById(MENU_LAYER_ID);
+  if (lop) { return lop; }
+
+  var khung = document.getElementById(DISPATCH_ROOT_ID);
+  if (!khung) { throw new Error('Khung sidebar thiếu phần tử "' + DISPATCH_ROOT_ID + '" nên không đặt được lớp menu.'); }
+
+  lop = document.createElement('div');
+  lop.id = MENU_LAYER_ID;
+  lop.className = 'shin-menu';
+  lop.setAttribute('role', 'menu');
+  lop.hidden = true;
+  khung.appendChild(lop);
+  return lop;
+}
+
+/** Đóng menu đang mở. Gọi lúc chưa có menu nào cũng không sao — bộ phát click gọi hàm này ở mọi cú bấm. */
+function menuClose() {
+  var lop = document.getElementById(MENU_LAYER_ID);
+  if (!lop) { return null; }
+
+  var khoa = lop.getAttribute('data-of');
+  if (khoa) {
+    var nut = document.querySelector('[data-menu="' + khoa + '"]');
+    if (nut) { nut.setAttribute('aria-expanded', 'false'); }
+  }
+
+  lop.hidden = true;
+  lop.removeAttribute('data-of');
+  lop.textContent = '';
+  return lop;
+}
+
+/**
+ * Đặt lớp nổi ngay dưới nút mở. `position: fixed` nên tọa độ lấy từ `getBoundingClientRect` là dùng được luôn, không phải trừ đi vị trí của tổ tiên nào.
+ *
+ * Hai lần ép về trong khung: mép phải không được vượt bề rộng sidebar, và menu dài quá thì bật lên phía trên nút thay vì tràn xuống dưới đáy. Sidebar chỉ rộng khoảng 300px và cao bằng cả cửa sổ Sheet, nên cả hai ca đều gặp thật.
+ */
+function menuPlace(lop, nut) {
+  var o = nut.getBoundingClientRect();
+  var rongLop = Math.max(lop.offsetWidth, 160);
+  var caoLop = lop.offsetHeight;
+
+  var trai = Math.max(4, Math.min(o.left, window.innerWidth - rongLop - 4));
+  var tren = o.bottom + 2;
+  if (tren + caoLop > window.innerHeight - 4) { tren = Math.max(4, o.top - caoLop - 2); }
+
+  lop.style.left = trai + 'px';
+  lop.style.top = tren + 'px';
+  return { left: trai, top: tren };
+}
+
+/**
+ * Mở menu của một nút.
+ *
+ * Đo được kích thước rồi mới đặt chỗ, nên phải hiện lớp trước khi gọi `menuPlace` — lớp còn `hidden` thì `offsetHeight` bằng 0 và menu nào cũng tưởng mình vừa đủ chỗ.
+ */
+function menuOpen(nut) {
+  var khoa = nut.getAttribute('data-menu');
+  var muc = RENDER_INDEX.menus[khoa];
+  if (!muc || !muc.length) {
+    throw new Error('Nút "' + (nut.getAttribute('aria-label') || nut.textContent || khoa) + '" khai có menu nhưng sổ tra không còn mục nào. Lượt vẽ vừa rồi và cú bấm này đang lệch nhau.');
+  }
+
+  var lop = menuClose() || menuLayer();
+  for (var i = 0; i < muc.length; i += 1) { lop.appendChild(menuItemElement(muc[i])); }
+
+  lop.setAttribute('data-of', khoa);
+  lop.hidden = false;
+  nut.setAttribute('aria-expanded', 'true');
+  menuPlace(lop, nut);
+  return lop;
+}
+
+/** Bấm nút mở menu: đang mở menu của chính nó thì đóng, còn lại thì mở. */
+function menuToggle(nut) {
+  var lop = document.getElementById(MENU_LAYER_ID);
+  if (lop && !lop.hidden && lop.getAttribute('data-of') === nut.getAttribute('data-menu')) { return menuClose(); }
+  return menuOpen(nut);
+}
+
+/** `Esc` đóng menu. Đặt ở `document` vì con trỏ lúc đó thường vẫn ở nút mở, không ở trong lớp nổi. */
+function menuInstall() {
+  if (document.body.getAttribute('data-menu-esc') === '1') { return false; }
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' || e.keyCode === 27) { menuClose(); }
+  });
+  document.body.setAttribute('data-menu-esc', '1');
+  return true;
+}
+</script>

@@ -282,4 +282,71 @@
 /* --- Chữ khi rỗng ------------------------------------------------ */
 
 .shin-empty { padding: var(--shin-gap-3) 0; color: var(--shin-text-soft); font-size: var(--shin-text-sm); font-style: italic; }
+
+/* --- Lớp menu nổi ------------------------------------------------ */
+
+/* `fixed` chứ không `absolute`: khung sidebar là một cột `overflow: hidden`, nên một lớp `absolute` sẽ bị cắt mất phần
+   tràn ra ngoài vùng. Tọa độ do `menu.html` tính từ `getBoundingClientRect` của nút mở. */
+.shin-menu {
+  position: fixed;
+  z-index: 20;
+  min-width: 160px;
+  max-width: calc(100% - 8px);
+  padding: var(--shin-gap-1) 0;
+  border: 1px solid var(--shin-border-strong);
+  border-radius: var(--shin-radius);
+  background: var(--shin-bg);
+  box-shadow: var(--shin-shadow);
+}
+
+.shin-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--shin-gap-2);
+  width: 100%;
+  padding: var(--shin-gap-2) var(--shin-gap-3);
+  border: 0;
+  background: none;
+  color: var(--shin-text);
+  font-family: inherit;
+  font-size: var(--shin-text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.shin-menu-item:hover { background: var(--shin-bg-hover); }
+
+.shin-menu-item:focus-visible { outline: 2px solid var(--shin-primary); outline-offset: -2px; }
+
+/* Ô đánh dấu rộng cố định kể cả lúc rỗng, nên nhãn của mọi mục thẳng một cột dù mục nào đang được tích. */
+.shin-menu-mark {
+  flex: 0 0 12px;
+  color: var(--shin-primary);
+  font-size: var(--shin-text-sm);
+  line-height: 1;
+  text-align: center;
+}
+
+.shin-menu-label { flex: 1 1 auto; min-width: 0; }
+
+/* --- Nút thu gọn và mở ------------------------------------------- */
+
+/* Cả hàng chứ không phải một nút nhỏ: đây là mép của một khối chữ bị cắt, và một dải rộng suốt bề ngang nói rõ hơn
+   rằng phần dưới còn nội dung. */
+.shin-collapse-btn {
+  display: block;
+  width: 100%;
+  padding: var(--shin-gap-1) 0;
+  border: 0;
+  background: none;
+  color: var(--shin-primary);
+  font-family: inherit;
+  font-size: var(--shin-text-xs);
+  text-align: left;
+  cursor: pointer;
+}
+
+.shin-collapse-btn:hover { text-decoration: underline; }
+
+.shin-collapse-btn:focus-visible { outline: 2px solid var(--shin-primary); outline-offset: 1px; }
 </style>

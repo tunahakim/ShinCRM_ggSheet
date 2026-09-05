@@ -1,0 +1,142 @@
+<script>
+/*
+ * Thu gọn và mở lại — nửa chạm DOM thứ hai mà engine cố ý không nhận, tài liệu 04 Phần 5 và `Câu hỏi đêm.md` mục 2.1.
+ *
+ * Engine chỉ ghim trần chiều cao bằng `style` rồi để lại dấu `data-collapse="<số dòng>"`. Tệp này làm phần còn lại, phần mà bản khai không nói được vì nó phụ thuộc vào nội dung thật: **đo xem có tràn hay không**, rồi mới quyết có nút hay không.
+ *
+ * Luật của tài liệu 04 Phần 5, đúng ba nấc: nội dung không tràn thì không hiện nút nào; đang thu gọn thì một nút mở ở cuối khối; đang mở thì khối cao hết nội dung, không cuộn, và nút thu lại hiện ở **cả đầu và cuối** — vì lúc đã mở thì đầu khối có thể đã trôi khỏi tầm mắt.
+ */
+
+/** Lớp của nút do tệp này sinh ra. Cũng là dấu để lượt đo sau dọn sạch nút cũ trước khi đo lại. */
+var COLLAPSE_BTN_CLASS = 'shin-collapse-btn';
+
+/** Chỗ giữ nguyên văn `style` mà engine đã ghi, để lúc thu lại đặt về đúng cái trần cũ chứ không đoán lại. */
+var COLLAPSE_STYLE_MARK = 'data-collapse-style';
+
+/** Dấu "khối này đang mở". Đặt trên chính phần tử bị ghim trần, nên lượt vẽ lại cả màn xóa luôn — mở rồi vẽ lại thì về thu gọn, đúng ngầm định. */
+var COLLAPSE_OPEN_MARK = 'data-collapse-open';
+
+/** Nhớ nguyên văn `style` của engine, chỉ nhớ một lần. */
+function collapseKeepStyle(el) {
+  if (el.getAttribute(COLLAPSE_STYLE_MARK) === null) {
+    el.setAttribute(COLLAPSE_STYLE_MARK, el.getAttribute('style') || '');
+  }
+  return el.getAttribute(COLLAPSE_STYLE_MARK);
+}
+
+/** Về trạng thái bị ghim trần: đặt lại đúng `style` của engine. Cũng là trạng thái để đo, vì phải có trần mới biết nội dung tràn hay không. */
+function collapseShut(el) {
+  el.setAttribute('style', collapseKeepStyle(el));
+  el.removeAttribute(COLLAPSE_OPEN_MARK);
+  return el;
+}
+
+/** Bỏ trần: cao hết nội dung và không cuộn. Dùng cho cả ca đang mở và ca nội dung không tràn. */
+function collapseFree(el, moRa) {
+  collapseKeepStyle(el);
+  el.style.maxHeight = 'none';
+  el.style.overflow = 'visible';
+  if (moRa) { el.setAttribute(COLLAPSE_OPEN_MARK, '1'); } else { el.removeAttribute(COLLAPSE_OPEN_MARK); }
+  return el;
+}
+
+/** Nội dung có cao hơn trần hay không. Đo lúc đang bị ghim trần, và cộng 1px vì chiều cao dòng hay ra số lẻ. */
+function collapseOverflows(el) {
+  return el.scrollHeight > el.clientHeight + 1;
+}
+
+/**
+ * Một nút thu gọn hoặc mở.
+ *
+ * Không mang `data-action`: đây là việc của riêng DOM, không phải một trong mười sáu hành động, nên nó cố ý không đi qua bảng `ACTIONS`. Bộ phát click gặp nút này thì không thấy `data-action` nào và bỏ qua, còn tai nghe của tệp này bắt lấy nó qua `data-collapse-btn`.
+ */
+function collapseButton(dich, soDong) {
+  var b = document.createElement('button');
+  b.type = 'button';
+  b.className = COLLAPSE_BTN_CLASS;
+  b.setAttribute('data-collapse-btn', dich);
+  b.textContent = dich === 'open' ? ('Xem thêm — đang thu gọn còn ' + soDong + ' dòng') : 'Thu gọn';
+  return b;
+}
+
+/** Dọn mọi nút của lượt đo trước, chỉ trong đám con cùng cha với khối này. Đi bằng `children` chứ không bằng `:scope` để hộp cát của bộ kiểm không phải hiểu bộ chọn nào lạ. */
+function collapseClearButtons(el) {
+  var cha = el.parentNode;
+  if (!cha) { return 0; }
+
+  var cu = [];
+  for (var i = 0; i < cha.children.length; i += 1) {
+    if (cha.children[i].className === COLLAPSE_BTN_CLASS) { cu.push(cha.children[i]); }
+  }
+  for (var j = 0; j < cu.length; j += 1) { cha.removeChild(cu[j]); }
+  return cu.length;
+}
+
+/**
+ * Xử một khối: dọn nút cũ, thu về để đo, rồi dựng lại đúng số nút mà nấc hiện tại cần.
+ *
+ * Trả về nấc vừa chọn — `'fit'`, `'closed'` hay `'open'` — để bộ kiểm nói được về kết quả mà không phải tự đọc DOM.
+ */
+function collapseApply(el) {
+  var cha = el.parentNode;
+  var soDong = el.getAttribute('data-collapse') || '3';
+  var dangMo = el.getAttribute(COLLAPSE_OPEN_MARK) === '1';
+
+  collapseClearButtons(el);
+  collapseShut(el);
+  if (!collapseOverflows(el)) { collapseFree(el, false); return 'fit'; }
+
+  if (!dangMo) {
+    if (cha) { cha.insertBefore(collapseButton('open', soDong), el.nextSibling); }
+    return 'closed';
+  }
+
+  collapseFree(el, true);
+  if (cha) {
+    cha.insertBefore(collapseButton('shut', soDong), el);
+    cha.insertBefore(collapseButton('shut', soDong), el.nextSibling);
+  }
+  return 'open';
+}
+
+/**
+ * Quét cả bốn vùng và xử mọi khối có dấu `data-collapse`.
+ *
+ * Gọi sau mỗi lượt vẽ, vì lượt vẽ thay sạch ruột vùng nên nút của lượt trước biến mất cùng với phép đo của nó. Gọi lại nhiều lần không sao: mỗi lượt tự dọn nút cũ trước khi đo.
+ */
+function collapseScan() {
+  var khung = document.getElementById(DISPATCH_ROOT_ID);
+  if (!khung) { return []; }
+  var khoi = khung.querySelectorAll('[data-collapse]');
+  var ket = [];
+  for (var i = 0; i < khoi.length; i += 1) { ket.push(collapseApply(khoi[i])); }
+  return ket;
+}
+
+/** Lật nấc của khối chứa nút vừa bấm, rồi đo lại chính khối đó. */
+function collapseToggle(nut) {
+  var cha = nut.parentNode;
+  var el = cha ? cha.querySelector('[data-collapse]') : null;
+  if (!el) { return null; }
+
+  if (nut.getAttribute('data-collapse-btn') === 'open') { collapseFree(el, true); } else { collapseShut(el); }
+  collapseApply(el);
+  return el;
+}
+
+/** Tai nghe riêng, cũng đặt ở khung. Độc lập với bộ phát click: hai tai nghe trên cùng một phần tử không cản nhau, và nút thu gọn không có `data-action` nên bộ phát click không đụng tới. */
+function collapseInstall() {
+  var khung = document.getElementById(DISPATCH_ROOT_ID);
+  if (!khung) {
+    throw new Error('Khung sidebar thiếu phần tử "' + DISPATCH_ROOT_ID + '" nên không gắn được tai nghe thu gọn.');
+  }
+  if (khung.getAttribute('data-collapse-listen') === '1') { return khung; }
+
+  khung.addEventListener('click', function (e) {
+    var nut = e.target && e.target.closest ? e.target.closest('[data-collapse-btn]') : null;
+    if (nut) { collapseToggle(nut); }
+  });
+  khung.setAttribute('data-collapse-listen', '1');
+  return khung;
+}
+</script>

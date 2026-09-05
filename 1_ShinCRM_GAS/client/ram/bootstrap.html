@@ -47,19 +47,56 @@ async function sidebarBoot() {
     ingestActivityDone();
     var timing = callTimingReport(Date.now());
 
-    statusLoadSummary({
+    BOOT_LAST_SUMMARY = {
       core: core,
       activityRecords: loaded.records,
       activityChunks: loaded.chunks,
       warnings: core.warnings,
       skipped: skipped,
       timing: timing
-    });
+    };
+
+    dispatchInstall();
+    menuInstall();
+    collapseInstall();
+
+    screenViewDropStale();
+    screenViewGo();
+    collapseScan();
+    bootTellProblems(BOOT_LAST_SUMMARY);
 
     await callServer('logClientTiming', [timing]);
   } catch (err) {
     statusLoadError(err && err.message ? err.message : String(err));
   }
+}
+
+/**
+ * Tóm tắt của lượt nạp gần nhất, giữ lại sau khi màn tóm tắt thôi tự hiện.
+ *
+ * Từ chặng này lượt vẽ cuối là màn xem, nên con số của lượt nạp không còn nằm trên màn hình nữa. Giữ ở đây để `bootShowSummary()` gọi được từ console lúc nghiệm thu, và để chỗ nào cần thì tra lại mà không phải nạp lại.
+ */
+var BOOT_LAST_SUMMARY = null;
+
+/** Vẽ lại màn tóm tắt của lượt nạp gần nhất. Không phải một trong mười sáu hành động, nên nó không có nút nào — đường vào là console lúc nghiệm thu, và nút Nạp lại đưa màn hình về lại màn xem. */
+function bootShowSummary() {
+  if (!BOOT_LAST_SUMMARY) { return null; }
+  return statusLoadSummary(BOOT_LAST_SUMMARY);
+}
+
+/**
+ * Báo cảnh báo và phép kiểm bị bỏ qua của lượt nạp, chỉ khi thật sự có.
+ *
+ * Trước chặng này hai danh sách đó hiện sẵn trên màn tóm tắt. Giờ màn tóm tắt không còn tự hiện, mà bỏ chúng vào im lặng thì mất đúng cái mà chúng được lập ra để nói. `alert` chỉ nổ khi có nội dung, nên lượt nạp sạch vẫn mở thẳng vào màn xem không gì chắn đường.
+ */
+function bootTellProblems(info) {
+  var dong = (info.warnings || []).concat(info.skipped || []);
+  if (!dong.length) { return null; }
+
+  var chu = 'Lượt nạp xong nhưng có ' + dong.length + ' điều cần biết:\n\n• ' + dong.join('\n• ')
+    + '\n\nMàn hình vẫn dùng được bình thường. Mở console rồi gọi bootShowSummary() để xem đầy đủ con số của lượt nạp.';
+  alert(chu);
+  return chu;
 }
 
 /**

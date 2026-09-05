@@ -18,11 +18,9 @@ Ba điều kiện nghiệm thu, thiếu một là chưa xong:
 
 **Chặng 1.2 — còn một việc:** nhánh dự phòng của thang gói (`bootChunkWithFallback` ở `client/ram/bootstrap.html`) chưa có đường kiểm tự động. Thang chính thì đã chạy thật rồi — lượt nạp trên Sheet DEV chia 10.000 giao dịch thành 5 gói. Nhánh dự phòng chỉ chạm tới khi một gói thật sự quá to, nên nó chờ một lượt nạp cố tình hạ cỡ gói xuống.
 
-**Chặng 1.3 — vẽ được form.** Thứ tự dưới đây thay cho thứ tự ở `Câu hỏi đêm.md` mục 4.5, vì lý do sau: mười sáu hành động chỉ bấm được sau khi lượt vẽ cuối của boot đổi sang màn xem — màn tóm tắt lượt nạp hiện tại không có nút `data-action` nào. Nên bộ phát click, hai nửa DOM và cú đổi boot phải đi liền một khối rồi nghiệm thu ngay, trước khi mở sang hộp tìm kiếm là việc lớn nhất còn lại.
-- [ ] `client/ui/dispatch.html` — bộ phát click: một tai nghe đặt ở khung, tìm `[data-action]` gần nhất, gọi `ACTIONS[tên]`, đặt con trỏ theo `focusId` trả về, và đưa mọi lỗi ném ra — kể cả Promise bị chối — vào `alert()`
-- [ ] `client/ui/menu.html` và `client/ui/collapse.html` — hai nửa chạm DOM mà engine cố ý không nhận, xem `Câu hỏi đêm.md` mục 2.1. Menu phải giữ một đường vào màn tóm tắt lượt nạp, vì sau cú đổi boot bên dưới nó không còn tự hiện nữa
-- [ ] Đổi lượt vẽ cuối của `sidebarBoot()` từ `statusLoadSummary` sang `screenViewGo()`, thêm `screenViewDropStale()` ở `viewScreen.html` gọi ngay trước đó, và nối ba tệp mới vào danh sách `include` của `client/Sidebar.html`
+**Chặng 1.3 — vẽ được form.** Bộ máy giao diện đã đủ để bấm: bộ phát click, lớp menu nổi, phép đo thu gọn, và lượt vẽ cuối của boot đã đổi sang màn xem.
 - [ ] Nghiệm thu trên Sheet DEV thật, lần một: mở sidebar, bấm hết mười sáu hành động, mở và đóng ba màn form, thử cả đường menu và đường thu gọn
+- [ ] Phép kiểm offline cho ba tệp chạm DOM: một DOM giả tối thiểu đủ để gọi `dispatchPayload`, `menuMark`, `menuItemElement` và ba nấc của `collapseApply`
 - [ ] Hộp tìm kiếm, và bê các nếp bàn phím của code cũ sang dạng `SLOTS`/`ACTIONS`: dán tự tách trường, dropdown, Enter nhảy ô, dọn số điện thoại
 - [ ] Nghiệm thu trên Sheet DEV thật, lần hai, và soát ngược mọi `[RÀNG BUỘC CỨNG]` của tài liệu 04 cho phần giao diện
 
