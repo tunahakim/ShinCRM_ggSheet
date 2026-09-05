@@ -64,6 +64,14 @@ function dungCanh() {
     return 'đã nạp lại';
   };
 
+  // Hộp tìm khách sống ngoài hộp cát này vì nó chạm DOM thật. Thay bằng bản ghi lại để `toggleSearchPanel` chạy tới cuối
+  // thân hàm — không có nó thì hành động nổ "not defined" và ca kiểm đếm việc chưa dựng lại tưởng đó là một việc đã xong.
+  hop._daMoHop = [];
+  hop.searchToggle = () => {
+    hop._daMoHop.push('toggle');
+    return { focusId: 'shin-search-input' };
+  };
+
   return hop;
 }
 
@@ -220,7 +228,7 @@ function chay(so) {
   checkThrows(so, 'mã khách không có trong kho thì để lỗi của `Store.getCustomer` bay lên — `[RÀNG BUỘC CỨNG]` tài liệu 05 Phần 9, đổi thành `null` là vẽ ra một khách vừa mất sạch dữ liệu',
     () => hop4.ACTIONS.setCurrentCustomer({ pick: 'CUS-999999' }), 'CUS-999999');
 
-  section('actions — sáu việc của chặng sau: có tên trong bảng, thân hàm hét lên');
+  section('actions — năm việc của chặng sau: có tên trong bảng, thân hàm hét lên');
 
   const hop5 = dungCanh();
   hop5.screenStateSetCustomer('CUS-000001');
@@ -234,9 +242,9 @@ function chay(so) {
       return /chưa dựng/.test(String(err.message));
     }
   });
-  check(so, 'đúng sáu hành động chưa dựng, mỗi cái nói rõ nó thuộc chặng nào — nút không phản hồi mà chẳng nói gì đúng là ca tài liệu 04 Phần 7 chống',
+  check(so, 'đúng năm hành động chưa dựng, mỗi cái nói rõ nó thuộc chặng nào — nút không phản hồi mà chẳng nói gì đúng là ca tài liệu 04 Phần 7 chống',
     chuaDung.slice().sort(),
-    ['deleteActivity', 'deleteSelectedActivities', 'renderActiveViewSheet', 'saveForm', 'toggleSearchPanel', 'undoDelete']);
+    ['deleteActivity', 'deleteSelectedActivities', 'renderActiveViewSheet', 'saveForm', 'undoDelete']);
 
   checkThrows(so, 'nút xóa một giao dịch kiểm `pick` trước khi báo chưa dựng, nên lỗi khai Block không bị lời báo của chặng sau che mất',
     () => hop5.ACTIONS.deleteActivity({}), 'data-pick');

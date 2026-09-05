@@ -81,8 +81,9 @@ ACTIONS.toggleAutoRenderView = function () {
   return actionsPrefSend(prefsToggle('autoRenderView'));
 };
 
+/** Mở hoặc đóng hộp tìm khách. Hộp tìm là món đồ cố định ngoài bốn vùng nên mở nó không phải một lượt vẽ — DOM vẫn do `client/ui/search.html` tự chạm, tệp này chỉ gọi tên việc. */
 ACTIONS.toggleSearchPanel = function () {
-  actionsChuaDung('Hộp tìm khách', '1.3');
+  return searchToggle();
 };
 
 /** Đổi nấc xem card lịch sử. Vẽ lại **riêng card đó** chứ không cả màn: khối thông tin chung và card ghi chú không đổi theo nấc. */

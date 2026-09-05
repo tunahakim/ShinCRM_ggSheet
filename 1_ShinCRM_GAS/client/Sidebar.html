@@ -37,6 +37,17 @@
     <!-- Vùng 2 — Dải tiến trình. Cao vài pixel, chạy khi có lời gọi máy chủ đang chờ. -->
     <div id="sidebar-progress"></div>
 
+    <!--
+      Hộp tìm khách. Ẩn sẵn, nút kính lúp ở header mở ra. Nằm ngoài bốn vùng engine vẽ vì một ô `<input>` bị vẽ lại sau
+      từng chữ thì con trỏ nhảy ra khỏi ô — cùng lý do dải tiến trình ở trên cũng nằm ngoài.
+    -->
+    <div id="shin-search" hidden>
+      <div class="shin-search-wrap">
+        <input type="text" id="shin-search-input" class="shin-input" autocomplete="off" spellcheck="false" placeholder="Tên, mã, số điện thoại, mã số thuế…" aria-label="Tìm khách hàng">
+        <div id="shin-search-list" class="shin-search-list" hidden></div>
+      </div>
+    </div>
+
     <!-- Vùng 3 — Khối thông tin chung. Cao theo nội dung. -->
     <div id="sidebar-info">Đang mở…</div>
 
@@ -72,6 +83,7 @@
   <?!= include('client/ui/actions') ?>
   <?!= include('client/ui/menu') ?>
   <?!= include('client/ui/collapse') ?>
+  <?!= include('client/ui/search') ?>
   <?!= include('client/ui/dispatch') ?>
   <?!= include('client/ram/bootstrap') ?>
 

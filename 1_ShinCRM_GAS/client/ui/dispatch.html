@@ -47,13 +47,16 @@ function dispatchFocus(ket) {
 }
 
 /**
- * Việc dọn sau mỗi hành động: đặt con trỏ, rồi đo lại các khối thu gọn.
+ * Việc dọn sau mỗi hành động: đặt con trỏ, đo lại các khối thu gọn, rồi cho hộp tìm khớp lại với màn đang mở.
  *
  * Phải đo lại vì hành động nào cũng có thể đã vẽ lại một vùng, và lượt vẽ thay sạch ruột vùng nên nút "Xem thêm" của lượt trước biến mất cùng phép đo của nó. Đo sớm hơn thì không được: chỉ sau khi hành động vẽ xong thì `scrollHeight` mới là con số thật.
+ *
+ * Hộp tìm cũng phải hỏi lại ở đây vì lượt vẽ vừa rồi có thể đã đổi màn — mà dấu bật trên nút kính lúp thì nằm trong vùng header vừa bị thay.
  */
 function dispatchAfter(ket) {
   dispatchFocus(ket);
   if (typeof collapseScan === 'function') { collapseScan(); }
+  if (typeof searchSyncScreen === 'function') { searchSyncScreen(); }
   return ket;
 }
 

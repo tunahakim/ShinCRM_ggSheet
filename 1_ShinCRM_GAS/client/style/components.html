@@ -269,6 +269,9 @@
 
 .shin-icon:hover { background: var(--shin-bg-hover); color: var(--shin-text); }
 
+/* Nút đang bật — hiện chỉ có nút kính lúp lúc hộp tìm mở. Đánh dấu bằng `aria-pressed` chứ không bằng một lớp tự đặt, để trình đọc màn hình cũng nghe được trạng thái đó. */
+.shin-icon[aria-pressed="true"] { background: var(--shin-primary-soft); color: var(--shin-primary); }
+
 /* Có menu thì nút nở theo nội dung: mũi nhọn, và ca nút chỉ có chữ không có glyph. */
 .shin-icon.shin-has-menu { width: auto; padding: 0 var(--shin-gap-1); }
 

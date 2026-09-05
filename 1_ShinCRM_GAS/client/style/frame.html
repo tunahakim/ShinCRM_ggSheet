@@ -75,6 +75,34 @@ html, body {
   100% { left: 100%; }
 }
 
+/* Hộp tìm khách — món đồ cố định thứ sáu, không phải một trong năm vùng nên nó không có `flex` co giãn, chỉ cao theo nội dung. */
+#shin-search {
+  flex: 0 0 auto;
+  padding: var(--shin-gap-2) var(--shin-gap-3);
+  border-bottom: 1px solid var(--shin-border);
+  background: var(--shin-bg-sunken);
+}
+
+/* Mốc để danh sách gợi ý neo vào, nhờ vậy nó rơi xuống **đè lên** thân màn thay vì đẩy thân xuống. */
+.shin-search-wrap { position: relative; }
+
+/* Trần 60% chiều cao khung: đủ dài để thấy hết 20 dòng gợi ý mà vẫn để hở phần dưới, nên người dùng không mất dấu mình đang ở đâu.
+   `z-index` cao hơn danh sách của ô combo, vì hộp tìm nằm trên cùng khung và không bao giờ mở cùng lúc với một form. */
+.shin-search-list {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: var(--shin-gap-1);
+  border: 1px solid var(--shin-border-strong);
+  border-radius: var(--shin-radius-sm);
+  background: var(--shin-bg);
+  box-shadow: var(--shin-shadow);
+}
+
 /* Vùng 3 — Khối thông tin chung. Cao theo nội dung. */
 #sidebar-info {
   flex: 0 0 auto;
