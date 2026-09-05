@@ -2,6 +2,22 @@
 
 Tài liệu làm việc của phiên code, không phải tài liệu thiết kế. Việc nào xong thì xóa hẳn khỏi đây, dấu vết nằm ở lịch sử git.
 
+## Đang ở đâu
+
+Mục này tả **trạng thái hiện tại**, không phải lịch sử. Việc xong thì biến mất khỏi tài liệu, còn cái nó để lại thì hiện ra ở đây.
+
+- Chặng 1.1 **xong**, đã nghiệm thu trên tệp Sheet thật: đọc hàng mã cột, đọc tham số `Config`, và cửa ghi log ghi ba dòng trong một lượt bằng đúng một lệnh ghi, bí mật ra sheet dưới dạng nhãn che.
+- Bộ kiểm offline chạy `node tests/run.js` xanh, sáu chủ đề: chuẩn hóa văn bản, bảng khai cột, vùng tên chung, tham số hệ thống, luật che bí mật, kỷ luật cửa ghi log.
+- Thư mục `server/` đã chia theo việc — `config`, `data`, `sheet`, `util`, `log`, `dev` — thay vì rải phẳng. Bản đồ ở `Cây thư mục code.md`.
+- Trên Google có đúng 17 tệp, khớp từng tệp với bản ở máy, không còn tệp phẳng cũ sót lại.
+- Chặng 1.2 chưa đặt dòng code nào.
+
+### Điều học được, để chặng sau không đạp lại
+
+`setValues` **không tự nới sheet**. Lưới sheet là hữu hạn — sheet mới của Google có 1.000 hàng × 26 cột — và `deleteRows` **co lưới lại**. Ghép ba điều đó lại là một cái bẫy: phép đo `measureDeleteRows` từng chèn 5.000 hàng rồi xóa đi, để lại sheet `Log` với lưới 7 hàng, và lượt ghi log sau đó chết vì `getRange` chạm quá hàng cuối. Chết trong im lặng, vì cửa ghi log bắt mọi lỗi rồi đi tiếp theo đúng thiết kế.
+
+Hai chỗ đã sửa: cửa ghi log tự nới lưới trước khi ghi, và tệp Sheet giả của bộ kiểm giờ có lưới hữu hạn nên bẫy này bị bắt trên máy. Mọi tệp sắp viết mà ghi xuống sheet đều phải tính tới nó, không riêng gì log.
+
 ## Ba luật của phiên này
 
 **Một tệp một việc.** Đây là luật thật, còn con số 250 dòng chỉ là mùi báo động — quá 250 dòng thì dừng lại tự hỏi tệp này có đang gánh hai việc không. Bảng khai dữ liệu (`DATA_SCHEMA`, `UI_SCHEMA`, `SYNC_SCHEMA`) được dài, vì chúng là dữ liệu phẳng chứ không phải logic, và chẻ một bảng khai ra nhiều tệp là mở đường cho hai bảng lệch nhau trong im lặng.
@@ -10,7 +26,32 @@ Tài liệu làm việc của phiên code, không phải tài liệu thiết k�
 
 **Mỗi bước phải tự kiểm được.** Không có bước nào "viết xong rồi mai xem". Ba đường kiểm đang có: `node tests/run.js` cho hàm thuần, `node tests/check-sheet.js` đọc sheet thật qua CSV, `node tests/gas.js <hàm>` chạy hàm thật trên tệp Sheet.
 
-## Đuôi tệp phía client: `.html`, không phải `.js`
+## Luật đuôi tệp và tên tệp trên Apps Script
+
+Ba việc này đã trả giá để biết, nên ghi lại ở đây thay vì để phiên sau dò lại.
+
+### Tệp máy chủ: trên máy đuôi `.js`, trên Google thành `.gs`
+
+Trên máy để đuôi `.js` cho IDE hiểu là JavaScript mà mở tử tế. `clasp push` đọc `scriptExtensions` trong `.clasp.json` và tự đổi thành `.gs` khi đặt lên Google. Trong `.clasp.json` thì `.js` xếp trước `.gs`, vì `clasp pull` ghi ra đuôi đầu danh sách — xếp ngược lại là mỗi lần pull tự đổi hết tệp về `.gs`.
+
+### Tên tệp trên Google là **cả đường dẫn**, không phải tên cụt
+
+`clasp push` đẩy `server/SheetIo.js` lên thành một tệp tên đúng là `server/SheetIo.gs` — dấu gạch chéo nằm trong tên tệp, chứ Apps Script không có thư mục thật.
+
+Việc này quan trọng nhất ở phía HTML, và chủ dự án đã bị lỗi này một lần rồi: `HtmlService.createTemplateFromFile()` và scriptlet `include()` phải nhận **cả đường dẫn, bỏ đuôi**:
+
+```js
+// Đúng
+HtmlService.createTemplateFromFile('Sidebar');
+<?!= include('client/ui/styles'); ?>
+
+// Sai — Google không tìm thấy tệp, lỗi chỉ nổ lúc chạy chứ không nổ lúc đẩy
+<?!= include('styles'); ?>
+```
+
+Bản cũ ở `9_Code_cu_tham_chieu/` đã làm đúng cách này: `createTemplateFromFile('src/ui/Sidebar')` với `<?!= include('src/ui/Styles'); ?>`.
+
+### Tệp client: `.html`, không phải `.js`
 
 Tài liệu 04 Phần 10 ghi client là `.js`. Trên Apps Script thì không được, và đã thử nên biết chắc:
 
@@ -23,47 +64,7 @@ Nên client giữ tên logic của tài liệu nhưng đuôi `.html`, bên trong
 
 ## Cây thư mục
 
-```
-0_Documentation/
-  Opus 4.8 tư vấn/     19 tài liệu thiết kế
-  Nghiên cứu FBM/      16 chương API FBM
-  Phiên code/          tài liệu làm việc, gồm tệp này và Câu hỏi đêm.md
-1_ShinCRM_GAS/         dự án Apps Script, clasp push từ đây
-  server/              code máy chủ, đuôi .gs
-  client/              code sidebar, đuôi .html bọc thẻ script
-    schema/  ram/  ui/  save/  util/
-  Sidebar.html         khung bốn vùng cố định
-2_ShinCRM_Extension/   Chrome Extension
-9_Code_cu_tham_chieu/  code cũ, chỉ đọc, không sửa một dòng
-tests/                 bộ kiểm Node, không đẩy lên Google
-  lib/                 bộ nạp tệp .gs và .html vào hộp cát vm
-```
-
-## Chặng 1.1 — Đọc được sheet, ghi được log
-
-Mục tiêu một câu: **từ dòng lệnh gọi một hàm, nó đọc hàng mã cột của sheet thật rồi in ra bảng mã → chỉ số cột, và sai một mã là báo lỗi ngay chứ không đọc lệch cột.**
-
-Đây là chặng nền, không có giao diện. Nó tồn tại để mọi chặng sau không phải đoán cột nào là cột nào.
-
-### Tệp dựng trong chặng này
-
-| Tệp | Việc duy nhất của nó |
-|---|---|
-| `server/Settings.gs` | Đọc sheet `Config` thành một đối tượng cài đặt, có nhớ tạm trong một lượt chạy. Nơi duy nhất biết `LOG_TRACE` bật hay tắt. |
-| `server/TextNormalize.gs` | Hàm `normalizeText` phía máy chủ: bỏ dấu, về chữ thường, dồn khoảng trắng. Không biết gì về sheet. |
-| `client/util/textNormalize.html` | Bản sinh đôi của hàm trên, chạy trong trình duyệt. Hai bản phải cho cùng kết quả trên cùng một bảng ca kiểm. |
-| `server/DataSchema.gs` | Bảng khai `DATA_SCHEMA`: bản gốc duy nhất của mã `@`, kiểu dữ liệu, sheet chứa nó. Chỉ có dữ liệu, không có logic. |
-| `server/SheetIo.gs` | Đọc hàng 1 của một sheet, đối chiếu với `DATA_SCHEMA`, trả về bảng tra mã → chỉ số cột. Ném lỗi nêu tên mã sai. |
-| `server/LogGate.gs` | Gom log trong RAM rồi ghi xuống sheet `Log` bằng một lệnh `setValues`, kèm luật cắt cửa sổ. |
-| `tests/lib/load-gas.js` | Nạp tệp `.gs` và ruột thẻ `<script>` của tệp `.html` vào hộp cát `vm` để `tests/run.js` gọi được hàm thật. |
-
-### Nghiệm thu — chạy được bằng máy, không cần người ngồi xem
-
-1. `node tests/run.js` chạy hết bảy ca kiểm `normalizeText` của tài liệu 02 Phần 12, **cho cả hai bản** máy chủ và client, cộng một phép so hai bản với nhau. Bộ kiểm hiện đang bỏ qua vì chưa có hàm; sau chặng này nó phải thật sự chạy và số phép kiểm phải khác 0.
-2. `node tests/gas.js dumpColumnMap --push` in ra bảng mã → chỉ số cột của cả năm sheet đọc từ hàng 1 thật.
-3. `node tests/gas.js probeBadColumnCode --push` tự làm hỏng một mã ở hàng 1, đọc lại, xác nhận lỗi **nêu đúng tên mã sai**, rồi trả mã cũ về chỗ. Không có bước này thì phép chặn lệch cột chỉ là lời hứa.
-4. `node tests/gas.js probeLogGate --push` ghi ba dòng log trong một lượt, xác nhận sheet `Log` tăng đúng ba dòng và **chỉ tốn một lệnh ghi**.
-5. `node tests/check-sheet.js` vẫn xanh — bảng khai và sheet thật chưa lệch nhau.
+Bản đồ thư mục kèm mô tả từng tệp nằm ở `Cây thư mục code.md` cùng thư mục này. Giữ một bản duy nhất là có ý thức: hai bản đồ trong hai tệp thì trước sau gì cũng lệch nhau, và bản lệch còn hại hơn không có.
 
 ## Chặng 1.2 — Nạp toàn bộ dữ liệu vào RAM
 
@@ -75,7 +76,7 @@ Vẫn chưa có giao diện nhìn được. Chặng này chỉ lo việc dữ li
 
 | Tệp | Việc duy nhất của nó |
 |---|---|
-| `server/LoadService.gs` | Một lời gọi trả về toàn bộ dữ liệu năm sheet dưới dạng mảng, kèm số bản ghi và thời gian nạp. Không định dạng, không lọc. |
+| `server/LoadService.js` | Một lời gọi trả về toàn bộ dữ liệu năm sheet dưới dạng mảng, kèm số bản ghi và thời gian nạp. Không định dạng, không lọc. |
 | `client/ram/store.html` | Giữ dữ liệu trong RAM và trả lời câu hỏi tra cứu theo khóa. Không tự đi gọi máy chủ. |
 | `client/ram/ingest.html` | Nhận mảng thô từ máy chủ, dựng các bảng tra, rồi giao cho `store`. Nơi duy nhất biết hình dáng mảng thô. |
 | `Sidebar.html` | Khung bốn vùng cố định, nhúng các tệp client bằng `include()`. Chưa vẽ trường nào. |

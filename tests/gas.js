@@ -11,7 +11,7 @@
  *
  * Vì sao có tệp này: phiên code chạy đêm cần một đường chạy hàm thật, và Apps Script API (clasp run-function) không dùng được
  * với script gắn vào tệp Sheet — nó trả lỗi "reading from storage ... NOT_FOUND" trước khi chạm tới code. Đường thay thế là
- * bản triển khai web app trong server/DevRunner.gs. Tệp này chỉ là lớp gọi cho gọn, mọi cổng chặn nằm ở phía GAS.
+ * bản triển khai web app trong server/dev/DevRunner.gs. Tệp này chỉ là lớp gọi cho gọn, mọi cổng chặn nằm ở phía GAS.
  *
  * Địa chỉ và thẻ bí mật đọc từ 1_ShinCRM_GAS/.dev-runner.json — tệp đó bị .gitignore chặn, không vào git.
  *

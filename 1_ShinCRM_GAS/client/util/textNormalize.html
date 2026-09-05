@@ -1,16 +1,16 @@
 <script>
 /**
- * Bản sinh đôi phía trang sidebar của `server/TextNormalize.gs`. Ruột hàm phải giống hệt bản kia, và bảng ca chuẩn cũng vậy.
+ * Bản sinh đôi phía trang sidebar của `server/util/TextNormalize.gs`. Ruột hàm phải giống hệt bản kia, và bảng ca chuẩn cũng vậy.
  *
  * Vì sao tệp này đuôi `.html` chứ không phải `.js` như tài liệu 04 Phần 10 ghi: đẩy `.js` lên Apps Script theo đường tệp
  * mã nguồn thì Google coi nó là code máy chủ, còn đẩy theo đường tệp HTML thì nội dung bị đổi ký tự — `a < b` về thành
  * `a &lt; b`, tức JavaScript vỡ cú pháp. Nên client là tệp `.html` bọc thẻ `<script>`, nhúng vào `Sidebar.html` bằng `include()`.
  *
- * Sửa tệp này thì phải sửa `server/TextNormalize.gs` cùng lúc. `node tests/run.js` nạp hai tệp vào hai hộp cát riêng rồi so,
+ * Sửa tệp này thì phải sửa `server/util/TextNormalize.gs` cùng lúc. `node tests/run.js` nạp hai tệp vào hai hộp cát riêng rồi so,
  * nên quên một bên là bộ kiểm đỏ ngay.
  */
 
-/** Bảng ca chuẩn của tài liệu 02 Phần 12. Phải giống hệt bảng trong `server/TextNormalize.gs`. */
+/** Bảng ca chuẩn của tài liệu 02 Phần 12. Phải giống hệt bảng trong `server/util/TextNormalize.gs`. */
 var TEXT_NORMALIZE_CASES = [
   ['Hà Nội', 'ha noi'],
   ['CÔNG TY TNHH', 'cong ty tnhh'],

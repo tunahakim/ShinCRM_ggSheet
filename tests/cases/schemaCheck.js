@@ -18,7 +18,7 @@ function chay(so) {
   let hop = null;
   let maCategory = null;
   try {
-    hop = napServer(taoHopCat(), 'server/DataSchema.js', 'server/SheetLayout.js', 'fbm_sync/SyncSchema.js');
+    hop = napServer(taoHopCat(), 'server/data/DataSchema.js', 'server/data/SheetLayout.js', 'fbm_sync/SyncSchema.js');
     napClient(hop, 'client/schema/schemaCheck.html');
     maCategory = hop.CATEGORY_COLUMNS.map((cot) => cot[0]);
   } catch (err) {

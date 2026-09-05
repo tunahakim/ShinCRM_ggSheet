@@ -13,3 +13,8 @@
 
 - Viết tiếng Việt có dấu
 - Viết cả Description - không hard wrap. Viết ngắn gọn không lan man dài dòng. Mỗi ý là 1 dòng.
+
+## 4. Cây thư mục code
+
+- Dựng thêm tệp code hoặc thư mục code nào thì bổ sung ngay một dòng mô tả vào `0_Documentation/Phiên code/Cây thư mục code.md` trong cùng lượt làm việc đó, đừng để dồn sang lượt sau.
+- Tổ chức thư mục phải khoa học, mỗi tệp làm đúng một nhiệm vụ. Không rải phẳng hàng chục tệp vào một thư mục.

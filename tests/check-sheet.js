@@ -23,9 +23,9 @@ const { napServer, taoHopCat } = require('./lib/load-gas');
 function loadDeclaration() {
   return napServer(
     taoHopCat(),
-    'server/Book.js',
-    'server/DataSchema.js',
-    'server/SheetLayout.js',
+    'server/sheet/Book.js',
+    'server/data/DataSchema.js',
+    'server/data/SheetLayout.js',
     'fbm_sync/SyncSchema.js'
   );
 }

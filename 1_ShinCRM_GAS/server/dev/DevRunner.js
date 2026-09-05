@@ -15,7 +15,7 @@
 /** Danh sách trắng: tên hàm mà cửa này được phép chạy. Thêm tên vào đây là việc có ý thức, không phải việc tình cờ. */
 var DEV_RUNNER_ALLOWED = [
   'smokeTest', 'smokeDiag', 'setupSheets', 'verifySheets', 'measureDeleteRows',
-  'dumpColumnMap', 'probeBadColumnCode'
+  'dumpColumnMap', 'probeBadColumnCode', 'dumpSettings', 'probeLogGate', 'dumpSheetGrid'
 ];
 
 /**

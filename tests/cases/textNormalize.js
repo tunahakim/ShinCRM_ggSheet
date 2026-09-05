@@ -29,7 +29,7 @@ function chay(so) {
   let mayChu = null;
   let sidebar = null;
   try {
-    mayChu = napRieng('server/TextNormalize.js');
+    mayChu = napRieng('server/util/TextNormalize.js');
     sidebar = napRieng('client/util/textNormalize.html');
   } catch (err) {
     return ghiLoiNap(so, 'nạp hai bản normalizeText', err);

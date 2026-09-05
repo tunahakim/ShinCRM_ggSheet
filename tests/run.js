@@ -16,7 +16,10 @@ const { taoSo, section } = require('./lib/assert');
 const NHOM_CA = [
   require('./cases/textNormalize'),
   require('./cases/schemaCheck'),
-  require('./cases/namespace')
+  require('./cases/namespace'),
+  require('./cases/settings'),
+  require('./cases/logMask'),
+  require('./cases/logGate')
 ];
 
 console.log('ShinCRM — bộ kiểm thử offline');
