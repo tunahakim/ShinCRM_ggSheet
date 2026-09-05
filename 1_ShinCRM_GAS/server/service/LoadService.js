@@ -118,27 +118,41 @@ function loadRowMaps(khach) {
 }
 
 /**
+ * Cỡ gói dùng cho một lời gọi, đã kẹp lại trong ngưỡng an toàn.
+ *
+ * Client được phép **xin gói nhỏ hơn** — đó là đường lùi khi một gói cỡ chuẩn thất bại. Nó không được phép xin gói lớn hơn: một con số từ phía client đi thẳng vào `getRange` là một cái núm cho phép bên ngoài quyết định một lượt đọc lớn bao nhiêu, và cửa vào thì không tin bên gọi. Xin số vô nghĩa — chữ, số âm, số lẻ — thì im lặng dùng cỡ chuẩn, vì một lượt nạp nền không phải chỗ để dừng lại tranh luận về tham số.
+ */
+function loadChunkRows(requested) {
+  var so = Number(requested);
+  if (!isFinite(so) || so < 1) { return SETTINGS.CHUNK_ROWS; }
+  return Math.min(Math.floor(so), SETTINGS.CHUNK_ROWS);
+}
+
+/**
  * Nạp một gói `activity`, đi từ hàng cuối ngược lên.
  *
- * `cursor` là `null` ở lần gọi đầu, còn các lần sau truyền lại `nextCursor` của phản hồi trước. Trả về `{ ok, fields, rows, done, nextCursor, total, dirty, ms }`.
+ * `cursor` là `null` ở lần gọi đầu, còn các lần sau truyền lại `nextCursor` của phản hồi trước. `chunkRows` là cỡ gói client xin cho riêng lời gọi này; bỏ trống thì dùng `SETTINGS.CHUNK_ROWS`. Trả về `{ ok, fields, rows, done, nextCursor, total, chunkRows, dirty, ms }`.
  *
  * **Con trỏ mang số hàng chứ không mang số thứ tự gói.** Nếu client chỉ gửi "cho tôi gói thứ ba" thì hai gói liền nhau có thể đọc lệch nhau khi số hàng đổi giữa hai lần gọi — mà giữa hai lần gọi thì người dùng hoàn toàn có thể vừa thêm một dòng thẳng trên sheet. Số hàng cuối của gói là thứ tự nó nói ra, không phải thứ suy diễn từ trạng thái mà máy chủ không còn nhớ.
  *
+ * Chính vì con trỏ mang số hàng nên đường lùi cỡ gói mới chạy được: gọi lại **đúng con trỏ cũ** với cỡ nhỏ hơn là đọc lại đúng chỗ vừa thất bại, không lệch một hàng nào.
+ *
  * Gói cuối cùng — gói chạm tới hàng bốn — là chỗ ghi dòng log kết thúc. Ghi mỗi gói một dòng thì một tệp năm mươi gói để lại năm mươi dòng log cho một việc, làm loãng sheet `Log` tới mức không tìm ra thứ đáng xem; còn không ghi gì thì không ai biết lượt nạp nền đã xong hay đã chết giữa đường.
  */
-function loadActivityChunk(cursor) {
+function loadActivityChunk(cursor, chunkRows) {
   return runEntryPoint('loadActivityChunk', LOAD_SOURCE, 'throw', function () {
     var batDau = Date.now();
     var context = entityReadContext('activity');
     var firstDataRow = SHEET_FIRST_DATA_ROW;
     var lastDataRow = firstDataRow + context.rowCount - 1;
     var endRow = cursor && cursor.endRow ? cursor.endRow : lastDataRow;
+    var coGoi = loadChunkRows(chunkRows);
 
     if (context.rowCount <= 0 || endRow < firstDataRow) {
-      return { ok: true, fields: context.names, rows: [], done: true, nextCursor: null, total: context.rowCount, dirty: dirtyStateRead(), ms: Date.now() - batDau };
+      return { ok: true, fields: context.names, rows: [], done: true, nextCursor: null, total: context.rowCount, chunkRows: coGoi, dirty: dirtyStateRead(), ms: Date.now() - batDau };
     }
 
-    var startRow = Math.max(firstDataRow, endRow - SETTINGS.CHUNK_ROWS + 1);
+    var startRow = Math.max(firstDataRow, endRow - coGoi + 1);
     var goi = entityReadRange(context, startRow, endRow - startRow + 1);
     var done = startRow <= firstDataRow;
     var ms = Date.now() - batDau;
@@ -149,10 +163,10 @@ function loadActivityChunk(cursor) {
         action: 'loadActivityChunk',
         outcome: LOG_OK,
         reason: 'Nạp xong toàn bộ giao dịch',
-        detail: { tongHang: context.rowCount, hangTrangBoQua: goi.blankRows, msGoiCuoi: ms }
+        detail: { tongHang: context.rowCount, hangTrangBoQua: goi.blankRows, coGoiCuoi: coGoi, msGoiCuoi: ms }
       });
     } else {
-      logTrace({ source: LOAD_SOURCE, action: 'loadActivityChunk', outcome: LOG_OK, reason: 'Gói hàng ' + startRow + '–' + endRow, detail: { banGhi: goi.rows.length, ms: ms } });
+      logTrace({ source: LOAD_SOURCE, action: 'loadActivityChunk', outcome: LOG_OK, reason: 'Gói hàng ' + startRow + '–' + endRow, detail: { banGhi: goi.rows.length, coGoi: coGoi, ms: ms } });
     }
 
     return {
@@ -162,6 +176,7 @@ function loadActivityChunk(cursor) {
       done: done,
       nextCursor: done ? null : { endRow: startRow - 1 },
       total: context.rowCount,
+      chunkRows: coGoi,
       dirty: dirtyStateRead(),
       ms: ms
     };

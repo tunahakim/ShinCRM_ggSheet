@@ -148,7 +148,23 @@ function chayGoi(so, nen, hop, hangDau) {
   check(so, 'con trỏ trỏ vào vùng tiêu đề thì trả gói rỗng và done, không đọc hàng tiêu đề',
     [ngoai.rows.length, ngoai.done], [0, true]);
 
-  hop.SETTINGS.CHUNK_ROWS = 1000;
+  // Đường lùi cỡ gói. Cỡ chuẩn đang là 2, nên xin 1 là xin nhỏ hơn — phải được nhận.
+  const nho = hop.loadActivityChunk(null, 1);
+  check(so, 'client xin gói nhỏ hơn thì được nhận, và gói trả về nói rõ cỡ đã dùng',
+    [nho.rows.map((row) => row[0]), nho.chunkRows], [['GD0005'], 1]);
+
+  // Cùng con trỏ, cỡ khác nhau, phải bắt đầu từ đúng một hàng. Đây là điều làm cho việc thử lại sau khi gãy không lệch hàng nào.
+  check(so, 'lùi cỡ rồi gọi lại cùng con trỏ thì đọc lại đúng chỗ vừa gãy, không nhảy hàng',
+    hop.loadActivityChunk(goi1.nextCursor, 1).rows.map((row) => row[0]), ['GD0003']);
+
+  check(so, 'xin gói LỚN hơn cỡ chuẩn thì bị kẹp về cỡ chuẩn, cửa vào không tin bên gọi',
+    hop.loadActivityChunk(null, 999999).chunkRows, 2);
+
+  check(so, 'xin cỡ vô nghĩa thì im lặng dùng cỡ chuẩn, không làm gãy lượt nạp nền',
+    [hop.loadActivityChunk(null, 'to lên').chunkRows, hop.loadActivityChunk(null, -5).chunkRows, hop.loadActivityChunk(null, 0).chunkRows],
+    [2, 2, 2]);
+
+  hop.SETTINGS.CHUNK_ROWS = 2000;
   return so;
 }
 

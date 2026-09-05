@@ -25,11 +25,28 @@ var SETTINGS = {
   /**
    * Số hàng mỗi gói khi nạp `activity` theo gói. Tài liệu 05 Phần 4 chỉ định tên hằng này mà không cho con số.
    *
-   * **Con số 1.000 là con số tạm, chờ chủ dự án chốt.** Cơ sở chọn nó: một gói là một lệnh `getValues` đọc 1.000 hàng × 13 cột = 13.000 ô, thừa an toàn so với mọi hạn mức của Apps Script; và với khối lượng dự tính vài chục nghìn giao dịch thì cả lượt nạp nền tốn vài chục vòng gọi, mỗi vòng một tới hai giây — tức là dữ liệu lịch sử đầy đủ sau khoảng một phút, trong khi sidebar đã dùng được ngay từ giây thứ hai.
+   * **Con số 2.000 là con số đo được, không phải con số đoán.** Đo trên tệp DEV với 1.700 khách và 10.000 giao dịch giả, mỗi ô đều có dữ liệu, đọc đúng đường nạp thật. Hai lượt chạy cách nhau ít phút cho cùng một hình dáng, dù con số tuyệt đối của Google lượt sau chậm gấp đôi lượt trước:
    *
-   * Vặn con số này theo hai hướng đều có giá: gói lớn hơn thì ít vòng gọi hơn nhưng mỗi vòng nặng hơn và tới gần trần sáu phút của một lượt thực thi; gói nhỏ hơn thì mỗi vòng nhẹ nhưng số vòng nhân lên, mà phần lớn thời gian một vòng là tiền đi đường chứ không phải tiền đọc ô.
+   * | Cỡ gói | Lượt 1 | Lượt 2 | So với 2.000 |
+   * |---|---|---|---|
+   * | 1.000 | 21,4 s | 48,0 s | chậm hơn 32–41 phần trăm |
+   * | 2.000 | 16,2 s | 34,0 s | nhanh nhất cả hai lượt |
+   * | 5.000 | 19,9 s | 39,2 s | chậm hơn 15–23 phần trăm |
+   * | 10.000 | 27,0 s | 51,0 s | chậm hơn 50–66 phần trăm |
+   *
+   * Đường cong hình chữ U, và hai đầu đắt vì hai lý do khác nhau. Gói nhỏ trả tiền cho số vòng gọi. Gói lớn trả tiền cho việc Google phải dựng một khối kết quả 2,2 MB trong một lượt — chi phí đó không tăng theo đường thẳng.
+   *
+   * **Lượt đo đầu, chạy trên sheet rỗng rồi tự ghi hàng giả, cho kết quả phẳng và kết luận đó sai.** Hàng giả lúc ấy nội dung ngắn và cả tệp chỉ có sheet `Activity` có dữ liệu. Sai số đó là lý do phép đo bây giờ chỉ đọc dữ liệu có thật trên sheet.
    */
-  CHUNK_ROWS: 1000
+  CHUNK_ROWS: 2000,
+  /**
+   * Bậc thang lùi khi một gói gọi thất bại: thử lại **đúng con trỏ đó** với cỡ nhỏ hơn, lần lượt theo danh sách này.
+   *
+   * Chủ dự án yêu cầu có đường lùi 05/09/2026. Lý do nó cần thiết dù 2.000 đã đo là an toàn: phép đo nói lên chi phí **trung bình**, còn thứ giết một lượt nạp là ca xấu nhất — một giao dịch có ô ghi chú dài vài nghìn chữ thì gói chứa nó nặng gấp nhiều lần gói bình thường, và trần sáu phút mỗi lượt thực thi của Apps Script không quan tâm gói đó là ngoại lệ.
+   *
+   * Lùi chứ không bỏ: gói thất bại ở 2.000 hàng gần như luôn thành công ở 500. Bỏ cuộc ngay nghĩa là mất toàn bộ lịch sử làm việc vì một bản ghi.
+   */
+  CHUNK_ROWS_FALLBACK: [500, 200]
 };
 
 /**

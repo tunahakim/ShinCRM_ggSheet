@@ -27,18 +27,25 @@ function chay(so) {
     return ghiLoiNap(so, 'nạp được server/config/Settings.js', err);
   }
 
-  check(so, 'SETTINGS có đúng năm hằng đang được dùng',
+  check(so, 'SETTINGS có đúng sáu hằng đang được dùng',
     Object.keys(nen.hop.SETTINGS).sort(),
-    ['CHUNK_ROWS', 'LOG_MAX_ROWS', 'LOG_RETENTION_DAYS', 'LOG_SECRET_KEYS', 'LOG_TRACE_BUFFER']);
+    ['CHUNK_ROWS', 'CHUNK_ROWS_FALLBACK', 'LOG_MAX_ROWS', 'LOG_RETENTION_DAYS', 'LOG_SECRET_KEYS', 'LOG_TRACE_BUFFER']);
 
   check(so, 'giá trị bốn hằng đúng tài liệu 10 Phần 11',
     [nen.hop.SETTINGS.LOG_RETENTION_DAYS, nen.hop.SETTINGS.LOG_MAX_ROWS, nen.hop.SETTINGS.LOG_TRACE_BUFFER, nen.hop.SETTINGS.LOG_SECRET_KEYS.length],
     [30, 5000, 100, 7]);
 
-  // `CHUNK_ROWS` là hằng duy nhất trong `SETTINGS` mà tài liệu chỉ cho tên chứ không cho số. Con số 1.000 là con số tạm
-  // do phiên code chọn để chặng nạp gói chạy được, và nó đang chờ chủ dự án chốt — chỗ ghi việc chờ đó là `Câu hỏi đêm.md`.
-  // Phép kiểm này ghim con số tạm lại: đổi nó thì phép kiểm đỏ, tức là đổi có chủ ý chứ không phải trôi dần.
-  check(so, 'CHUNK_ROWS vẫn là con số tạm 1.000 chưa ai chốt lại', nen.hop.SETTINGS.CHUNK_ROWS, 1000);
+  // Con số 2.000 là con số đo được trên tệp DEV với 1.700 khách và 10.000 giao dịch giả, hai lượt đo cho cùng một hình dáng
+  // chữ U và 2.000 nhanh nhất cả hai lượt. Phép kiểm này ghim nó lại: đổi nó thì phép kiểm đỏ, tức là đổi có chủ ý chứ
+  // không phải trôi dần. Đo lại rồi đổi thì sửa cả con số ở đây và bảng số trong docstring của `Settings.js`.
+  check(so, 'CHUNK_ROWS là 2.000, con số đo được', nen.hop.SETTINGS.CHUNK_ROWS, 2000);
+
+  // Bậc thang lùi phải nhỏ dần và phải nhỏ hơn cỡ chuẩn, vì cả cơ chế lùi dựa trên đúng một điều: lần thử sau nhẹ hơn lần
+  // trước. Một bậc lớn hơn hoặc bằng bậc trước là một vòng thử lại chắc chắn thất bại y như lần đầu.
+  const bac = [nen.hop.SETTINGS.CHUNK_ROWS].concat(nen.hop.SETTINGS.CHUNK_ROWS_FALLBACK);
+  check(so, 'CHUNK_ROWS_FALLBACK có bậc và nhỏ dần đều',
+    [nen.hop.SETTINGS.CHUNK_ROWS_FALLBACK.length > 0, bac.every((so2, i) => i === 0 || so2 < bac[i - 1])],
+    [true, true]);
 
   // Hai tên này có trong tài liệu nhưng chưa có con số nào được chốt, và chặng đang làm cũng chưa cần tới chúng.
   // Phép kiểm này bắt việc ai đó điền số đoán vào, vì một hằng số trông như đã được quyết định thì không ai đi hỏi lại nữa.

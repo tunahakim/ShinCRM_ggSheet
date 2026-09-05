@@ -54,6 +54,36 @@ async function sidebarBoot() {
 }
 
 /**
+ * Bậc thang cỡ gói: cỡ chuẩn trước, rồi các cỡ lùi. Một mảng để vòng nạp chỉ cần đi tới phần tử kế tiếp.
+ *
+ * Đọc từ `SETTINGS` đã nạp về chứ không gõ cứng ở đây, vì cỡ gói là hằng phía máy chủ và hai bản sao của một con số thì có ngày lệch nhau. `SETTINGS` chưa về — trường hợp chỉ xảy ra nếu ai đó gọi hàm này ngoài trình tự khởi động — thì trả về `[null]`, tức một bậc duy nhất để máy chủ tự chọn cỡ chuẩn.
+ */
+function bootChunkLadder() {
+  if (typeof SETTINGS === 'undefined' || !SETTINGS || !SETTINGS.CHUNK_ROWS) { return [null]; }
+  return [SETTINGS.CHUNK_ROWS].concat(SETTINGS.CHUNK_ROWS_FALLBACK || []);
+}
+
+/**
+ * Xin một gói ở cỡ chuẩn, và **lùi cỡ rồi thử lại đúng con trỏ đó** nếu thất bại.
+ *
+ * Vì sao cần đường lùi: một gói thất bại vì nặng — hoặc chạm trần sáu phút mỗi lượt thực thi của Apps Script, hoặc khối kết quả quá lớn — thì gọi lại y nguyên chỉ thất bại y nguyên. Cùng con trỏ với cỡ nhỏ hơn thì đọc lại đúng chỗ vừa gãy mà không lệch một hàng nào, vì con trỏ mang số hàng.
+ *
+ * Hết bậc mà vẫn thất bại thì ném lỗi cuối cùng. Đường lùi là để cứu một gói nặng bất thường, không phải để che một máy chủ đang đổ.
+ */
+async function bootChunkWithFallback(cursor, onRetry) {
+  var ladder = bootChunkLadder();
+
+  for (var i = 0; i < ladder.length; i++) {
+    try {
+      return await callServer('loadActivityChunk', [cursor, ladder[i]]);
+    } catch (err) {
+      if (i === ladder.length - 1) { throw err; }
+      if (onRetry) { onRetry(ladder[i], ladder[i + 1]); }
+    }
+  }
+}
+
+/**
  * Vòng nạp gói `activity`: gọi lại tới khi máy chủ báo hết, mỗi gói xếp vào bộ nhớ ngay.
  *
  * Con trỏ do máy chủ cấp và client chỉ truyền lại nguyên văn — client không tự tính gói tiếp theo, vì số hàng trên sheet có
@@ -66,9 +96,14 @@ async function bootLoadActivities(total) {
   var cursor = null;
   var chunks = 0;
   var records = 0;
+  var retries = 0;
 
   do {
-    var chunk = await callServer('loadActivityChunk', [cursor]);
+    var chunk = await bootChunkWithFallback(cursor, function (hong, nho) {
+      retries += 1;
+      statusInfoLine('Gói ' + statusNumber(hong) + ' hàng không nạp được, đang thử lại với gói ' + statusNumber(nho) + ' hàng…');
+    });
+
     records += ingestActivityChunk(chunk);
     chunks += 1;
     cursor = chunk.nextCursor;
@@ -82,6 +117,6 @@ async function bootLoadActivities(total) {
     }
   } while (cursor);
 
-  return { chunks: chunks, records: records };
+  return { chunks: chunks, records: records, retries: retries };
 }
 </script>
