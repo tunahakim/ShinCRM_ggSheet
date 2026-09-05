@@ -5,13 +5,13 @@
  *
  * Đây cũng là nơi duy nhất biết `LOG_TRACE` đang bật cho nguồn nào. `LogGate` chỉ hỏi `logTraceCoversSource('fbm_sync')` và không biết công tắc nằm ở đâu — nên sau này có đổi chỗ công tắc thì `LogGate` không phải sửa.
  *
- * Điều tệp này cố tình KHÔNG làm: nó chỉ đọc khối tham số hệ thống, không đọc bốn khối còn lại của `Config`. Bốn khối kia có chủ riêng — ngầm định gõ tay thuộc đường lưu, sắp xếp mặc định thuộc sheet quản trị, bộ đếm thuộc cửa cấp mã, khai kiểu cột người dùng thuộc bảng khai. Dựng sẵn cả năm khối bây giờ là viết code chưa ai gọi, mà code chưa ai gọi thì không ai biết nó đúng hay sai.
+ * Điều tệp này cố tình KHÔNG làm: nó chỉ đọc khối tham số hệ thống, không đọc bốn khối còn lại của `Config`. Bốn khối kia đọc ở `ConfigRead.gs`, và ranh giới đó là cố ý: khối tham số nằm **dưới đường ghi log** nên nó phải đọc được cả khi mọi thứ khác đổ, còn bốn khối kia chỉ cần đọc được lúc nạp. Gộp chung thì một dấu ngoặc thiếu ở khối bộ đếm sẽ làm tắt luôn cả log.
  */
 
 /**
  * Hằng số phía code, một chỗ duy nhất theo tài liệu 01 Phần 2.8.
  *
- * Ở đây **chỉ có** những tham số mà tài liệu đã cho con số. Tài liệu cũng nhắc tên `LOCK_WAIT_MS`, `UNDO_DELAY_MS`, `CHUNK_ROWS` nhưng không cho giá trị; chúng sẽ vào đây cùng chặng dùng đến chúng, với con số do chủ dự án chốt. Điền số đoán bây giờ là dựng một hằng số trông như đã được quyết định, mà thực ra chưa ai quyết.
+ * Ở đây **chỉ có** những tham số mà tài liệu đã cho con số, cộng những tham số mà chặng đang làm buộc phải có một con số để chạy được. Tài liệu còn nhắc tên `LOCK_WAIT_MS` và `UNDO_DELAY_MS` mà không cho giá trị; chúng vào đây cùng chặng dùng đến chúng, với con số do chủ dự án chốt. Điền số đoán trước lúc cần là dựng một hằng số trông như đã được quyết định, mà thực ra chưa ai quyết.
  */
 var SETTINGS = {
   /** Hạn giữ log, tính theo ngày. Tài liệu 10 Phần 6. */
@@ -21,7 +21,15 @@ var SETTINGS = {
   /** Số dòng vết giữ trong vòng đệm RAM. Tài liệu 10 Phần 3. */
   LOG_TRACE_BUFFER: 100,
   /** Tên khóa phải che khi ghi log. Khớp theo chuỗi con, không phân biệt hoa thường. Tài liệu 10 Phần 7. */
-  LOG_SECRET_KEYS: ['cookie', 'token', 'key', 'secret', 'password', 'session', 'authorization']
+  LOG_SECRET_KEYS: ['cookie', 'token', 'key', 'secret', 'password', 'session', 'authorization'],
+  /**
+   * Số hàng mỗi gói khi nạp `activity` theo gói. Tài liệu 05 Phần 4 chỉ định tên hằng này mà không cho con số.
+   *
+   * **Con số 1.000 là con số tạm, chờ chủ dự án chốt.** Cơ sở chọn nó: một gói là một lệnh `getValues` đọc 1.000 hàng × 13 cột = 13.000 ô, thừa an toàn so với mọi hạn mức của Apps Script; và với khối lượng dự tính vài chục nghìn giao dịch thì cả lượt nạp nền tốn vài chục vòng gọi, mỗi vòng một tới hai giây — tức là dữ liệu lịch sử đầy đủ sau khoảng một phút, trong khi sidebar đã dùng được ngay từ giây thứ hai.
+   *
+   * Vặn con số này theo hai hướng đều có giá: gói lớn hơn thì ít vòng gọi hơn nhưng mỗi vòng nặng hơn và tới gần trần sáu phút của một lượt thực thi; gói nhỏ hơn thì mỗi vòng nhẹ nhưng số vòng nhân lên, mà phần lớn thời gian một vòng là tiền đi đường chứ không phải tiền đọc ô.
+   */
+  CHUNK_ROWS: 1000
 };
 
 /**
