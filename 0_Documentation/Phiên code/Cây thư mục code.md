@@ -20,6 +20,7 @@ Một tệp làm đúng một việc. Vượt quá khoảng 250 dòng thì đọ
 D:\ShinCRM_ggSheet\
 ├── CLAUDE.md                     Luật làm việc giữa chủ dự án và AI. Đọc trước mọi thứ khác.
 ├── README.md                     Giới thiệu dự án.
+├── .claude\launch.json           Khai một lệnh cho công cụ mở bản xem sidebar tại máy: node tests/preview.js --serve, cổng 4173.
 ├── 0_Documentation\              Tài liệu thiết kế. Nguồn sự thật của mọi dòng code.
 ├── 1_ShinCRM_GAS\                Code Apps Script — thứ được đẩy lên Google bằng clasp.
 ├── 2_ShinCRM_Extension\          Code Chrome Extension (chặng sau, chưa dựng).
@@ -136,6 +137,7 @@ Giới hạn phải biết: xanh ở đây nghĩa là **logic đúng**, không c
 ```
 tests\
 ├── run.js                        Chạy cả bộ. Thêm chủ đề mới thì thêm một tệp vào cases\ và một dòng vào đây.
+├── preview.js                    Gộp Sidebar.html thành một tệp mở được bằng trình duyệt, ghim khung 300 pixel và cắm google.script.run giả. Dữ liệu do chính hộp cát của bộ kiểm sinh ra nên không cần mạng và không ô nào của khách thật rời khỏi Google. Thêm --serve thì mở cổng 4173.
 ├── check-sheet.js                Đối chiếu hàng 1 của tệp Sheet thật với bảng khai. Cần mạng.
 ├── gas.js                        Chạy một hàm thật trên Google qua cửa DevRunner. Cần mạng.
 ├── lib\

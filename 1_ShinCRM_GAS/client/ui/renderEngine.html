@@ -221,7 +221,7 @@ function renderCombo(o, lop, them) {
     + '</div>';
 }
 
-/** Bảy control của tài liệu 03 Phần 7. Ô nào cũng mang `data-field`, kể cả ô chỉ đọc, vì bộ thu thập lọc theo `data-readonly` chứ không theo việc có hay không có `data-field`. */
+/** Tám control của tài liệu 03 Phần 7. Ô nào cũng mang `data-field`, kể cả ô chỉ đọc, vì bộ thu thập lọc theo `data-readonly` chứ không theo việc có hay không có `data-field`. */
 var RENDER_CONTROLS = {
   text: function (o) {
     return '<input type="text"' + renderControlAttrs(o, 'shin-input') + renderAttr('value', o.value)
@@ -230,6 +230,15 @@ var RENDER_CONTROLS = {
   textarea: function (o) {
     return '<textarea rows="3"' + renderControlAttrs(o, 'shin-input shin-textarea')
       + (o.readonly ? ' readonly' : '') + '>' + renderEscape(o.value) + '</textarea>';
+  },
+  /**
+   * Chữ chỉ đọc, cao theo nội dung. Control thứ tám, thêm vào vì card GHI CHÚ của màn xem khai `overflow: 'collapse'` mà một ô nhập thì cao cố định nên phép thu gọn không bao giờ chạm tới — nút "Xem thêm" không bao giờ hiện, và một ghi chú dài nằm gọn trong một dòng ô nhập.
+   *
+   * Luôn chỉ đọc, không phải theo cờ ở bản khai: nó vẽ ra `div` nên không có đường gõ, và để bộ thu thập lúc lưu chắc chắn bỏ qua thay vì đọc ra chuỗi rỗng rồi xóa mất ghi chú cũ.
+   */
+  readText: function (o) {
+    o.readonly = true;
+    return '<div' + renderControlAttrs(o, 'shin-readtext') + '>' + renderEscape(o.value) + '</div>';
   },
   number: function (o) {
     return '<input type="text" inputmode="numeric"' + renderControlAttrs(o, 'shin-input shin-number')
@@ -287,7 +296,7 @@ function renderFieldInner(node, ctx) {
   var control = node.control || RENDER_CONTROL_BY_TYPE[khai.type];
 
   if (!Object.prototype.hasOwnProperty.call(RENDER_CONTROLS, control)) {
-    throw new Error('Trường "' + duong.name + '" khai control "' + control + '" không có. Bảy control: ' + Object.keys(RENDER_CONTROLS).join(', ') + '.');
+    throw new Error('Trường "' + duong.name + '" khai control "' + control + '" không có. Các control: ' + Object.keys(RENDER_CONTROLS).join(', ') + '.');
   }
 
   var o = {

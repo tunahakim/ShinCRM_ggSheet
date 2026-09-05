@@ -49,13 +49,15 @@ function collapseOverflows(el) {
  * Một nút thu gọn hoặc mở.
  *
  * Không mang `data-action`: đây là việc của riêng DOM, không phải một trong mười sáu hành động, nên nó cố ý không đi qua bảng `ACTIONS`. Bộ phát click gặp nút này thì không thấy `data-action` nào và bỏ qua, còn tai nghe của tệp này bắt lấy nó qua `data-collapse-btn`.
+ *
+ * Nhãn cố ý không nói số dòng còn lại. Khối nào khai `maxHeight` thì trần đó thắng `collapsedLines` — `Câu hỏi đêm.md` mục 2.3 — nên con số kia sai đúng ở ca đang chạy thật: card GHI CHÚ ghim 160 pixel mà lại đi khoe "còn 3 dòng".
  */
-function collapseButton(dich, soDong) {
+function collapseButton(dich) {
   var b = document.createElement('button');
   b.type = 'button';
   b.className = COLLAPSE_BTN_CLASS;
   b.setAttribute('data-collapse-btn', dich);
-  b.textContent = dich === 'open' ? ('Xem thêm — đang thu gọn còn ' + soDong + ' dòng') : 'Thu gọn';
+  b.textContent = dich === 'open' ? 'Xem thêm' : 'Thu gọn';
   return b;
 }
 
@@ -79,7 +81,6 @@ function collapseClearButtons(el) {
  */
 function collapseApply(el) {
   var cha = el.parentNode;
-  var soDong = el.getAttribute('data-collapse') || '3';
   var dangMo = el.getAttribute(COLLAPSE_OPEN_MARK) === '1';
 
   collapseClearButtons(el);
@@ -87,14 +88,14 @@ function collapseApply(el) {
   if (!collapseOverflows(el)) { collapseFree(el, false); return 'fit'; }
 
   if (!dangMo) {
-    if (cha) { cha.insertBefore(collapseButton('open', soDong), el.nextSibling); }
+    if (cha) { cha.insertBefore(collapseButton('open'), el.nextSibling); }
     return 'closed';
   }
 
   collapseFree(el, true);
   if (cha) {
-    cha.insertBefore(collapseButton('shut', soDong), el);
-    cha.insertBefore(collapseButton('shut', soDong), el.nextSibling);
+    cha.insertBefore(collapseButton('shut'), el);
+    cha.insertBefore(collapseButton('shut'), el.nextSibling);
   }
   return 'open';
 }

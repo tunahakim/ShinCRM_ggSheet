@@ -135,6 +135,17 @@
 
 .shin-textarea { resize: vertical; }
 
+/* Chữ chỉ đọc: không viền, không nền, cao theo nội dung để phép thu gọn của card đo được đúng chiều cao thật. `pre-wrap` giữ các lần xuống dòng người dùng đã gõ, `break-word` chặn một địa chỉ web dài đẩy ngang cả sidebar 300 pixel. */
+.shin-readtext {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  font-size: var(--shin-text-md);
+  line-height: var(--shin-line-height);
+  color: var(--shin-text);
+}
+
+.shin-readtext:empty::before { content: '(chưa có)'; color: var(--shin-text-soft); font-style: italic; }
+
 /* Số căn phải để mắt so hàng nghìn theo cột, đúng nếp bảng tính. */
 .shin-number { text-align: right; font-variant-numeric: tabular-nums; }
 
@@ -143,15 +154,20 @@
 /* Hộp danh sách bung ra bằng `position: absolute` nên nó không đẩy hàng dưới xuống lúc mở. */
 .shin-combo { position: relative; }
 
-.shin-combo .shin-input { padding-right: var(--shin-gap-4); }
+.shin-combo .shin-input { padding-right: var(--shin-gap-5); }
 
+/* Mũi tên vẽ bằng viền chứ không bằng ký tự `▾`: ở 11px thì glyph đó ra một cái gạch ngang trên phông Segoe UI, người dùng đọc thành dấu trừ. Vẽ bằng viền thì hình tam giác không phụ thuộc phông máy nào. */
 .shin-combo > .shin-caret {
   position: absolute;
   top: 50%;
-  right: var(--shin-gap-2);
+  right: var(--shin-gap-3);
   transform: translateY(-50%);
-  color: var(--shin-text-faint);
-  font-size: var(--shin-text-xs);
+  font-size: 0;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid var(--shin-text-faint);
   pointer-events: none;
 }
 

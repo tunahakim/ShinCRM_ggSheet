@@ -175,3 +175,41 @@ Nối phép kiểm mới vào `checkSchema` nghĩa là `ingestCore` phải đưa
 **Đang chọn đường thứ hai:** ba biểu thức `typeof … === 'undefined' ? null : …`, và `checkSchema` tự khai vào `skipped` là đã bỏ qua. Đường thứ nhất phá mất câu mà hộp cát tầng dữ liệu đang chứng minh — rằng sáu tệp ấy chạy được khi không có DOM.
 
 Chỗ hở kèm theo: một sidebar thật quên một dòng `include` thì phép kiểm cũng bị bỏ qua trong im lặng. Bịt bằng hai phép kiểm offline chứ không bằng code chạy, và cả hai đã dựng: `tests/cases/schemaCheck.js` gọi `checkSchema` với đủ bốn bảng thật rồi đòi `skipped` chỉ còn ba dòng không có tên `UI_SCHEMA`, còn `tests/cases/namespace.js` soi danh sách `include` của `Sidebar.html` phải phủ đúng mọi tệp `client/` và không dòng nào trỏ vào chỗ trống.
+
+## 7. Chặng 1.3 — soi bố cục ở 300 pixel
+
+### 7.1. Bản xem tại máy sinh dữ liệu của chính nó, không chép dữ liệu thật về
+
+Prompt bàn giao đề nghị một hàm dò mới trong `server/dev/`, một vòng gọi qua mạng, một tệp JSON ảnh chụp dữ liệu Sheet DEV thật, kèm một dòng `.gitignore` và một dòng danh sách trắng cho `tests/gas.js`. Không cần tới bốn thứ đó: `tests/lib/dung-hop.js` đã chạy được `loadCore()` thật trên một tệp Sheet giả ngay tại máy — `tests/cases/ramStore.js` làm đúng vậy.
+
+**Đã chọn: `tests/preview.js` tự dựng hộp cát rồi tự sinh gói nạp.** Không mạng, không cửa dò, không tệp nào nằm ngoài git, và **không một ô nào của khách thật rời khỏi Google**. Giá phải trả là tên công ty và ghi chú do người viết bịa ra, trả bằng cách viết chúng dài đúng như thật: một ghi chú 355 ký tự, một địa chỉ 69 ký tự, mười hai tên công ty dài.
+
+Bốn điều bản xem này **không** nói được, ghi lại để đừng ai tin nó quá: CSS của chính Google rót vào iframe sidebar, phông của máy khác, độ trễ thật của `google.script.run`, và đường chặn vì vượt trần ngân sách ô.
+
+### 7.2. Món nợ ca kiểm cho `dispatch`, `menu`, `collapse` — bỏ, không hoãn
+
+`Mục tiêu ShinCRM độc lập.md` từng ghi món nợ "một DOM giả tối thiểu đủ để gọi `dispatchPayload`, `menuMark`, `menuItemElement` và ba nấc của `collapseApply`".
+
+**Đã chọn: bỏ hẳn món nợ đó.** Bản xem tại máy chạy đúng ba tệp ấy trên DOM thật của Chrome mỗi lần mở, và nó vừa bắt được hai lỗi mà một DOM giả ba khả năng không bao giờ bắt được — xem mục 7.3. Một DOM giả chỉ chứng minh code khớp với cái giả.
+
+### 7.3. Control thứ tám `readText`, vì card GHI CHÚ không bao giờ thu gọn được
+
+Tài liệu 03 Phần 8 khai card GHI CHÚ của màn xem bằng `Field({ field: "customer.note", readonly: true })`, và `note` có `type: 'TEXT'` nên engine suy ra control `text` — một ô nhập **một dòng**. Đo trên bản xem: khối chỉ cao 71 pixel trong khi trần là 160, nên `collapseApply` luôn chọn nấc `fit` và nút "Xem thêm" chưa từng hiện lần nào. Một ghi chú 355 ký tự nằm gọn trong một dòng ô nhập, người dùng đọc được chừng 35 ký tự đầu.
+
+Đây là tài liệu tự mâu thuẫn: chính tài liệu 03 Phần 7 viết "`note` là `TEXT` nhưng phải là ô nhiều dòng", mà ví dụ ở Phần 8 lại khai cụt.
+
+**Đã chọn: thêm control thứ tám `readText`** — vẽ ra `div` chữ trơn, cao theo nội dung, `white-space: pre-wrap` để giữ các lần xuống dòng người dùng đã gõ. Nó **luôn** chỉ đọc bất kể bản khai có đặt cờ hay không, vì nó không có đường gõ và vì bộ thu thập lúc lưu phải chắc chắn bỏ qua nó thay vì đọc ra chuỗi rỗng rồi xóa mất ghi chú cũ. Đã sửa cả tài liệu 03: thêm một dòng vào bảng control và sửa ví dụ ở Phần 8. Không chọn `control: 'textarea'` vì ô nhiều dòng vẫn cao cố định `rows="3"` nên trần card vẫn không bị chạm, và hai cơ chế cuộn lồng nhau.
+
+Sau khi sửa, ba ca đo đúng cả ba: ghi chú 355 ký tự thì ghim 160 pixel và hiện nút, ghi chú 31 ký tự thì cao 45 pixel và **không** có nút — đúng `[RÀNG BUỘC CỨNG]` tài liệu 04 Phần 5 — còn ghi chú rỗng thì hiện chữ nhạt "(chưa có)".
+
+### 7.4. Nhãn nút thu gọn bỏ con số dòng
+
+Nút cũ ghi "Xem thêm — đang thu gọn còn 3 dòng", số 3 lấy từ `data-collapse`. Nhưng mục 2.3 đã chốt `maxHeight` thắng `collapsedLines`, và card GHI CHÚ khai `maxHeight: '160px'`, nên con số kia sai đúng ở ca duy nhất đang chạy thật: ghim 160 pixel mà lại đi khoe "còn 3 dòng".
+
+**Đã chọn: nhãn còn hai chữ "Xem thêm".** Ngắn hơn, và không nói một con số mà nó không giữ được.
+
+### 7.5. Mũi tên combobox vẽ bằng viền CSS thay cho ký tự `▾`
+
+Ký tự `▾` ở cỡ 11 pixel trên phông Segoe UI ra một cái gạch ngang — nhìn thành dấu trừ nằm sát chữ trong ô. Ô nhập lại chỉ chừa `padding-right: 16px` mà mũi tên chiếm từ 8 tới 17 pixel, nên giá trị dài chạy vào dưới mũi tên.
+
+**Đã chọn: vẽ tam giác bằng `border` và nới chừa phải lên 24 pixel.** Hình tam giác vẽ bằng viền thì không phụ thuộc phông của máy nào.

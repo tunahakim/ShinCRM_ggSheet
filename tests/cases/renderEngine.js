@@ -190,8 +190,15 @@ function chay(so) {
       o({ field: 'recordStatus', control: 'badge' }).indexOf('class="shin-badge"') > 0],
     [true, true]);
 
-  checkThrows(so, 'tên control lạ bị chặn kèm bảy tên đúng',
-    () => o({ field: 'companyName', control: 'toggle' }), 'Bảy control');
+  checkThrows(so, 'tên control lạ bị chặn kèm danh sách tên đúng',
+    () => o({ field: 'companyName', control: 'toggle' }), 'Các control');
+
+  // Card GHI CHÚ của màn xem thu gọn theo chiều cao thật của chữ, nên control này phải ra một khối cao theo nội dung chứ không ra ô nhập cao cố định.
+  const doc = o({ field: 'note', control: 'readText' });
+  check(so, 'readText ra div chữ, tự mang dấu chỉ-đọc dù bản khai không đặt cờ',
+    [doc.indexOf('<div class="shin-readtext"') > 0, doc.indexOf('data-readonly="1"') > 0,
+      doc.indexOf('>dòng 1\ndòng 2</div>') > 0, doc.indexOf('<input') === -1],
+    [true, true, true, true]);
 
   // Luật một chiều của tài liệu 03 Phần 7: UI siết thêm được, mở khóa thì không.
   check(so, 'chỉ-đọc: bảng khai khóa thì khóa, UI siết thêm được, UI mở khóa thì không',

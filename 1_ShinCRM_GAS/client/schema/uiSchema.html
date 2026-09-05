@@ -36,7 +36,7 @@ UI_SCHEMA.view = {
       title: 'GHI CHÚ',
       titleActions: [{ icon: 'pencil', label: 'Sửa', action: 'openNoteForm' }],
       spatialConfig: { maxHeight: '160px', overflow: 'collapse', collapsedLines: 3 },
-      elements: [Field({ field: 'customer.note', readonly: true })]
+      elements: [Field({ field: 'customer.note', control: 'readText', readonly: true, label: '' })]
     }),
     Card({
       id: 'shin-card-history',

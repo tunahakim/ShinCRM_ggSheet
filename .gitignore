@@ -16,6 +16,10 @@ desktop.ini
 # Tệp thử của bộ kiểm thử, sinh ra rồi xóa trong cùng một lượt chạy
 tests/_probe.js
 
+# Bản gộp của sidebar để soi bố cục tại máy. Sinh lại bằng `node tests/preview.js` bất cứ lúc nào,
+# nên giữ trong git chỉ là giữ một bản chép sẽ lệch với tệp gốc.
+tests/xem-sidebar.html
+
 # Thẻ bí mật của cửa chạy hàm lúc phát triển. clasp vẫn đẩy DevToken lên Google vì clasp đọc .claspignore
 # chứ không đọc .gitignore — chặn ở đây là chặn đường thẻ lọt vào git, không phải chặn đường nó lên Google.
 # Chặn cả hai đuôi: tệp trên máy đuôi .js, nhưng bản trước đây đuôi .gs nên giữ luôn cho khỏi hở nếu quay lại.
