@@ -177,4 +177,36 @@ html, body {
   border-top: 1px solid var(--shin-border);
   background: var(--shin-bg);
 }
+
+/* Dải hoàn tác việc xóa — món đồ cố định thứ bảy, nằm dưới cùng và **đè lên** vùng chân trong lúc đếm ngược.
+   Nền vàng cảnh báo chứ không đỏ: việc chưa xảy ra, người dùng còn đường lùi. */
+.shin-undo {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--shin-gap-2);
+  padding: var(--shin-gap-1) var(--shin-gap-2);
+  border-top: 1px solid var(--shin-warn);
+  background: var(--shin-warn-soft);
+  color: var(--shin-warn);
+  font-size: var(--shin-text-sm);
+}
+
+/* Chữ ăn hết phần dư để nút Hoàn tác luôn ghim mép phải, không nhảy ngang theo từng giây đếm. */
+.shin-undo-text { flex: 1 1 auto; }
+
+.shin-undo-btn {
+  flex: 0 0 auto;
+  padding: var(--shin-gap-1) var(--shin-gap-2);
+  border: 1px solid var(--shin-warn);
+  border-radius: var(--shin-radius-sm);
+  background: var(--shin-bg);
+  color: var(--shin-warn);
+  font-family: inherit;
+  font-size: var(--shin-text-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.shin-undo-btn:hover { background: var(--shin-warn-soft); }
 </style>

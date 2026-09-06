@@ -171,6 +171,18 @@
   border-color: var(--shin-border);
 }
 
+/* Ô cửa ghi trả về là thiếu hoặc sai — hai màu đúng bản cũ (`.inp-error`). Bộ chọn hai lớp và đứng sau `:focus` để dấu đỏ
+   không bị viền xanh của ô đang chọn xóa mất: sau một lượt lưu trượt, chính ô sai là ô được đưa con trỏ tới. */
+.shin-input.shin-input-error {
+  border-color: var(--shin-error);
+  background: var(--shin-error-soft);
+}
+
+.shin-input.shin-input-error:focus {
+  border-color: var(--shin-error);
+  box-shadow: 0 0 0 2px var(--shin-error-soft);
+}
+
 /*
  * Ô nhập nhiều dòng: **tự cao theo nội dung tới trần mười dòng, quá trần mới cuộn nội bộ.**
  *
