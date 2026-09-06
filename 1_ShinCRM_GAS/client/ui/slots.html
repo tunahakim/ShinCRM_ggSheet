@@ -86,6 +86,8 @@ function slotActivityRow(a) {
  * Danh sách giao dịch của khách đang xem, lọc theo nấc đang nhớ ở `Prefs.activityView`.
  *
  * Ba dòng chữ khi rỗng nói ba chuyện khác nhau — chưa chọn khách, đang nạp, khách này không có giao dịch nào ở nấc đang xem — vì cả ba đều là ca thật và người dùng phải phân biệt được.
+ *
+ * Dòng đang chờ xóa bị bỏ ra ở đây, ở **tầng hiện**, chứ không bị bỏ khỏi `Store`: bấm Hoàn tác thì không phải dựng lại gì cả, chỉ bỏ mặt nạ đi — tài liệu 06 Phần 6 **`[RÀNG BUỘC CỨNG]`**. Dò bằng `typeof` vì bộ chờ nằm ở `client/save/`, ngoài hộp cát của bộ kiểm tầng vẽ.
  */
 SLOTS.activityList = function (ctx) {
   var id = slotCustomerId(ctx);
@@ -93,6 +95,7 @@ SLOTS.activityList = function (ctx) {
   if (Store.activityState === STORE_LOADING) { return slotEmpty('Đang nạp lịch sử làm việc…'); }
 
   var list = slotFilterActivities(Store.getActivities(id), Prefs.activityView);
+  if (typeof pendingDeleteFilter === 'function') { list = pendingDeleteFilter(list); }
   if (!list.length) {
     return slotEmpty(Prefs.activityView === 'deleted' ? 'Khách này không có giao dịch nào đã xóa.' : 'Khách này chưa có giao dịch nào.');
   }

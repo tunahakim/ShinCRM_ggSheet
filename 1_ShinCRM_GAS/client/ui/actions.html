@@ -136,7 +136,7 @@ ACTIONS.openNoteForm = function () {
 /* ─── Lưu và hủy ─── */
 
 ACTIONS.saveForm = function () {
-  actionsChuaDung('Nút Lưu', '1.4');
+  return saveFlowSubmit();
 };
 
 ACTIONS.cancelForm = function () {
@@ -146,13 +146,14 @@ ACTIONS.cancelForm = function () {
 
 /* ─── Xóa mềm và hoàn tác ─── */
 
+/** Chưa gửi gì lên máy chủ: mã vào bộ chờ, dải hoàn tác đếm ngược, hết hạn mới gọi cửa xóa — tài liệu 06 Phần 6. */
 ACTIONS.deleteActivity = function (payload) {
-  actionsPick(payload, 'Xóa giao dịch');
-  actionsChuaDung('Xóa một giao dịch', '1.4');
+  var id = actionsPick(payload, 'Xóa giao dịch'); // Lấy mã trước, vì JavaScript tra tên hàm xong mới tính tham số: gộp một dòng thì lỗi khai thiếu `data-pick` bị lỗi thiếu tệp che mất.
+  return pendingDeleteAdd('activity', id);
 };
 
 ACTIONS.undoDelete = function () {
-  actionsChuaDung('Hoàn tác việc xóa', '1.4');
+  return pendingDeleteUndo();
 };
 
 

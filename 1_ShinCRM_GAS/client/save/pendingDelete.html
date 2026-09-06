@@ -1,0 +1,152 @@
+<script>
+/*
+ * Xóa có hoàn tác. Tài liệu 06 Phần 6.
+ *
+ * Bấm Xóa **không gửi gì cả**: mã vào bộ chờ, dải hoàn tác đếm ngược, hết hạn mới có một lời gọi máy chủ. Bộ chờ là **mặt nạ ở tầng hiện, không phải phép sửa `Store`** `[RÀNG BUỘC CỨNG]` — nhờ vậy hoàn tác chỉ việc bỏ mặt nạ, không phải dựng lại gì.
+ *
+ * Đóng sidebar giữa lúc đếm thì lệnh xóa **không bao giờ được gửi**, và đó là hành vi đúng: không xóa an toàn hơn xóa nhầm. Nên tệp này cố ý không có tai nghe `beforeunload`.
+ */
+
+/** Dải hoàn tác trong `Sidebar.html`, nằm ngoài bốn vùng engine vẽ: một lượt vẽ lại vùng không được phép xóa nó giữa lúc đang đếm. */
+var PENDING_DELETE_STRIP_ID = 'shin-undo';
+var PENDING_DELETE_TEXT_ID = 'shin-undo-text';
+
+/** Nhịp đếm. Nhỏ hơn một giây để lệnh xóa không đi muộn quá một nhịp. */
+var PENDING_DELETE_TICK_MS = 250;
+
+/** Tên gọi từng thực thể, để câu trên dải đọc như tiếng người. */
+var PENDING_DELETE_LABEL = { activity: 'giao dịch', customer: 'khách hàng' };
+
+/** Hai danh sách chứ không một: cả hai đều bị che, nhưng chỉ `ids` còn hoàn tác được. Gộp lại thì mấy giây đi đường của lời gọi xóa là mấy giây nút Hoàn tác nói dối. */
+var PENDING_DELETE = { entity: '', ids: [], dangGui: [], deadline: 0, nhip: null };
+
+/** Hạn hoàn tác, lấy từ `SETTINGS` máy chủ gửi kèm gói nạp. Không có bản sao ở đây để hai con số không lệch nhau. */
+function pendingDeleteDelayMs() {
+  if (!SETTINGS || !SETTINGS.UNDO_DELAY_MS) {
+    throw new Error('Chưa nạp xong `SETTINGS` nên chưa biết hạn hoàn tác. Bấm Nạp lại rồi thử lần nữa.');
+  }
+  return SETTINGS.UNDO_DELAY_MS;
+}
+
+/** Mã này có đang bị che không — câu hỏi duy nhất mà trình vẽ danh sách đặt cho tệp này. */
+function pendingDeleteHas(id) {
+  return PENDING_DELETE.ids.indexOf(id) !== -1 || PENDING_DELETE.dangGui.indexOf(id) !== -1;
+}
+
+/** Bỏ những mã đang bị che khỏi một mảng bản ghi. Trình vẽ gọi qua đây để phép lọc chỉ có một bản. */
+function pendingDeleteFilter(list) {
+  return (list || []).filter(function (ban) { return !pendingDeleteHas(ban.id); });
+}
+
+/** Chữ trên dải, và cả việc hiện hay ẩn nó. Số giây làm tròn lên, để giây cuối vẫn đọc là "1 giây" chứ không phải "0 giây". */
+function pendingDeletePaint() {
+  var strip = document.getElementById(PENDING_DELETE_STRIP_ID);
+  var text = document.getElementById(PENDING_DELETE_TEXT_ID);
+  if (!strip || !text) { return null; }
+
+  var so = PENDING_DELETE.ids.length;
+  if (!so) { strip.hidden = true; return null; }
+
+  var giay = Math.max(1, Math.ceil((PENDING_DELETE.deadline - Date.now()) / 1000));
+  text.textContent = 'Đã xóa ' + so + ' ' + (PENDING_DELETE_LABEL[PENDING_DELETE.entity] || 'bản ghi') + ' — ' + giay + ' giây';
+  strip.hidden = false;
+  return giay;
+}
+
+/** Dừng nhịp đếm. Gọi ở cả ba đường ra — hoàn tác, gửi đi, và đổi thực thể — vì một nhịp còn chạy sau khi bộ chờ rỗng là một lượt gửi rỗng. */
+function pendingDeleteStopTick() {
+  if (PENDING_DELETE.nhip !== null) { clearInterval(PENDING_DELETE.nhip); }
+  PENDING_DELETE.nhip = null;
+}
+
+/** Đặt lại hạn rồi chạy nhịp. Mỗi lần bấm Xóa đều gia hạn cho cả lô: xóa ba dòng liền nhau thì được một lần đếm chung, không phải ba. */
+function pendingDeleteRestart() {
+  PENDING_DELETE.deadline = Date.now() + pendingDeleteDelayMs();
+  pendingDeleteStopTick();
+  pendingDeletePaint();
+
+  PENDING_DELETE.nhip = setInterval(function () {
+    if (Date.now() >= PENDING_DELETE.deadline) { pendingDeleteFire(); return; }
+    pendingDeletePaint();
+  }, PENDING_DELETE_TICK_MS);
+}
+
+/** Thêm mã vào bộ chờ rồi vẽ lại. Đang chờ thực thể khác thì gửi lô cũ đi trước: một lời gọi xóa chỉ mang được một thực thể, trộn hai là mất một. */
+function pendingDeleteAdd(entity, id) {
+  if (PENDING_DELETE.ids.length && PENDING_DELETE.entity !== entity) { pendingDeleteFire(); }
+
+  PENDING_DELETE.entity = entity;
+  if (PENDING_DELETE.ids.indexOf(id) === -1) { PENDING_DELETE.ids.push(id); }
+
+  pendingDeleteRestart();
+  return pendingDeleteRedraw(entity);
+}
+
+/** Hoàn tác: bỏ mặt nạ, không gửi gì cả. Mã đã gửi đi thì không gọi tới đây được nữa — dải đã ẩn từ lúc gửi. */
+function pendingDeleteUndo() {
+  var entity = PENDING_DELETE.entity;
+
+  pendingDeleteStopTick();
+  PENDING_DELETE.ids = [];
+  pendingDeletePaint();
+
+  return pendingDeleteRedraw(entity);
+}
+
+/**
+ * Hết hạn: gửi lô đi. Mã chuyển từ `ids` sang `dangGui` nên mặt nạ giữ nguyên suốt lượt đi đường — bỏ mặt nạ ở đây là để dòng hiện lại vài giây rồi biến mất lần nữa.
+ *
+ * Lời gọi này do đồng hồ bắn, không ai bấm, nên không có bộ phát click bắt lỗi hộ: nó tự bắt, tự bỏ mặt nạ, tự hiện lỗi.
+ */
+function pendingDeleteFire() {
+  pendingDeleteStopTick();
+  if (!PENDING_DELETE.ids.length) { return null; }
+
+  var entity = PENDING_DELETE.entity;
+  var ids = PENDING_DELETE.ids;
+
+  PENDING_DELETE.ids = [];
+  PENDING_DELETE.dangGui = PENDING_DELETE.dangGui.concat(ids);
+  pendingDeletePaint();
+
+  return callServer('deleteRecords', [entity, ids]).then(function (res) {
+    pendingDeleteDone(entity, ids, res);
+    return pendingDeleteRedraw(entity);
+  }, function (err) {
+    pendingDeleteUnmask(ids);
+    pendingDeleteRedraw(entity);
+    if (typeof dispatchError === 'function') { dispatchError(err); }
+    return null;
+  });
+}
+
+/** Bỏ mặt nạ của một lô mã. Tách ra vì cả đường thành công và đường thất bại đều phải làm đúng việc này. */
+function pendingDeleteUnmask(ids) {
+  PENDING_DELETE.dangGui = PENDING_DELETE.dangGui.filter(function (id) { return ids.indexOf(id) === -1; });
+}
+
+/** Đổ câu trả lời của cửa xóa vào RAM. `reasons` là những bản ghi chỉ xóa mềm được — hiện bằng `alert` vì một bản ghi tưởng đã xóa mà vẫn còn trên sheet không được để trôi qua im lặng. */
+function pendingDeleteDone(entity, ids, res) {
+  pendingDeleteUnmask(ids);
+
+  (res.hard || []).forEach(function (id) { Store.removeRecord(entity, id); });
+
+  if (res.soft && res.soft.rows && res.soft.rows.length) {
+    ingestUnpack(res.soft.fields, res.soft.rows).forEach(function (r) { Store.upsertRecord(entity, r); });
+  }
+  if (res.rowMaps) { Store.applyRowMaps(res.rowMaps); }
+
+  var ly = Object.keys(res.reasons || {});
+  if (ly.length) {
+    alert('Có ' + ly.length + ' bản ghi chỉ xóa mềm được — dòng vẫn còn trên sheet:\n' + ly.map(function (id) { return '• ' + id + ': ' + res.reasons[id]; }).join('\n'));
+  }
+  return res;
+}
+
+/** Vẽ lại chỗ vừa đổi. Giao dịch thì chỉ card lịch sử, vì khối thông tin chung và card ghi chú không đổi theo một dòng lịch sử. */
+function pendingDeleteRedraw(entity) {
+  if (entity === 'activity') { return screenViewActivityCard(); }
+  if (ScreenState.screen !== SCREEN_VIEW) { return null; }
+  return screenViewRender();
+}
+</script>

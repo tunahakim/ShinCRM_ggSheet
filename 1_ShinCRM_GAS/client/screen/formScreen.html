@@ -32,9 +32,17 @@
  * Ba màn form — thêm, sửa, và ghi chú. Tài liệu 04 Phần 8, tài liệu 03 Phần 9.
  *
  * Cùng vai với `viewScreen`: biết **khi nào vẽ cái gì**, không biết vẽ ra sao. Một tệp lo cả ba màn vì ba màn chỉ khác nhau ở bản khai trong `UI_SCHEMA`, còn trình tự mở, đóng, lồng và suy tiêu đề thì y hệt nhau.
- *
- * Chưa có bộ thu thập DOM (chặng 1.4) nên mở form lồng chưa cất được những gì đang gõ ở form dưới. Chỗ nối sẵn đã có: gọi `screenStateSetDraft` trước `screenFormOpen`.
  */
+
+/**
+ * Cất những gì đang gõ ở form dưới trước khi mở một form lồng lên trên. Không có form nào đang mở thì tự nó không làm gì.
+ *
+ * Dò bằng `typeof` vì bộ thu thập nằm ở `client/save/`, ngoài hộp cát tầng màn của bộ kiểm offline — cùng cách và cùng lý do với `dispatchAfter`. Thiếu nó thì mở form lồng vẫn chạy, chỉ là bản nháp không được cất; đó là mất một dòng người dùng vừa gõ, không phải một màn hình vỡ.
+ */
+function screenFormStash() {
+  if (typeof saveFlowStashDraft !== 'function') { return null; }
+  return saveFlowStashDraft();
+}
 
 /** Bản khai của một màn form. Tên sai thì hét ngay kèm danh sách tên đúng, chứ không để `screenBuild` báo "bản khai không có". */
 function screenFormDecl(man) {
@@ -124,6 +132,7 @@ function screenFormRender() {
 
 /** Mở form **sửa**: bản ghi đã có sẵn, bên gọi tra từ `Store` rồi truyền vào. */
 function screenFormOpen(man, record) {
+  screenFormStash();
   screenStateOpenForm(man, screenFormDecl(man).entity, record);
   return screenFormRender();
 }
@@ -134,6 +143,7 @@ function screenFormOpen(man, record) {
  * `seed` là giá trị bên gọi đã biết trước, ví dụ `customerId` của form giao dịch. Danh sách ô kế tục đi kèm vào ngăn xếp để engine đánh dấu được ở mọi lượt vẽ lại, không chỉ lượt đầu.
  */
 function screenFormOpenNew(man, seed) {
+  screenFormStash();
   var entity = screenFormDecl(man).entity;
   var moi = fieldLogicNewRecord(entity, seed);
   screenStateOpenFormNew(man, entity, moi.record, moi.carried);

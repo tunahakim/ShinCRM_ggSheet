@@ -1,13 +1,13 @@
 <script>
 /**
- * `Store` — toàn bộ dữ liệu runtime của sidebar, cùng bảy đường tra cứu duy nhất được phép chạm vào nó. Tài liệu 05 Phần 7, 8, 9.
+ * `Store` — toàn bộ dữ liệu runtime của sidebar, cùng mười đường tra cứu duy nhất được phép chạm vào nó. Tài liệu 05 Phần 7, 8, 9.
  *
  * Vì sao tệp này đuôi `.html` chứ không phải `.js` như tài liệu 05 Phần 13 ghi: xem đoạn giải thích ở đầu `client/util/textNormalize.html`.
  *
  * Ba luật của tệp này, cả ba đều là **`[RÀNG BUỘC CỨNG]`** của tài liệu 05:
  *
  * 1. **Không đường tra nào nhận tham số kiểu `includeDeleted` hay một tham số chế độ xem.** `getActivities` luôn trả trọn mảng, `searchCustomers` luôn trả cả hai loại theo đúng một thứ tự. Công tắc hiển thị chỉ tồn tại ở tầng vẽ. Nếu công tắc chạm được vào đây thì cùng một lời gọi trả hai kết quả khác nhau tùy trạng thái giao diện, và mọi con bọ về sau phải hỏi "lúc đó công tắc ở nấc nào" trước khi đọc được.
- * 2. **`upsertRecord` là cửa duy nhất làm đổi nội dung `Store`,** và chỉ được gọi với bản ghi do máy chủ trả về. Nhờ vậy việc cập nhật chỉ mục tìm kiếm và sắp lại mảng lịch sử có đúng một chỗ để quên — và chỗ đó nằm ngay đây.
+ * 2. **Chỉ có hai cửa làm đổi nội dung `Store`: `upsertRecord` và `removeRecord`,** và cả hai chỉ được gọi với câu trả lời của máy chủ. Nhờ vậy việc cập nhật chỉ mục tìm kiếm và sắp lại mảng lịch sử có đúng một chỗ để quên — và chỗ đó nằm ngay đây. Tài liệu 05 Phần 9 viết "một cửa" vì lúc viết chưa có cửa xóa; xóa hẳn bỏ dòng khỏi sheet, mà `upsertRecord` không có cách nào diễn tả việc một bản ghi thôi tồn tại. Điều mà luật này thật sự bảo vệ — RAM chỉ đổi theo lời máy chủ, và mọi đường đổi đều đi qua tệp này — vẫn còn nguyên.
  * 3. **`getLatestActivity` là hàm duy nhất trả lời câu "lần làm việc gần nhất".** Không nơi nào được đọc `getActivities(id)[0]` để lấy "gần nhất", vì phần tử đầu mảng có thể là một giao dịch đã xóa mềm — mảng xếp theo thời gian, không dồn bản ghi đã xóa xuống cuối.
  */
 
@@ -232,7 +232,7 @@ Store.isTaxNumberTaken = function (value, exceptId) {
 };
 
 /**
- * **Cửa duy nhất** làm đổi nội dung `Store`. Chỉ được gọi với bản ghi do máy chủ trả về. Tài liệu 05 Phần 9 **`[RÀNG BUỘC CỨNG]`**.
+ * **Cửa duy nhất** làm đổi nội dung một bản ghi trong `Store`. Chỉ được gọi với bản ghi do máy chủ trả về. Tài liệu 05 Phần 9 **`[RÀNG BUỘC CỨNG]`**.
  *
  * Đổi `recordStatus` — xóa mềm hay phục hồi — đi qua đúng đường đi của một lần sửa thường: bản ghi ở nguyên vị trí trong
  * mảng, đúng một trường đổi giá trị. Chỉ mục tìm kiếm cũng không thêm bớt phần tử nào, vì nó vốn phủ mọi khách.
@@ -274,4 +274,55 @@ function storeIndexCustomer(customer) {
 
   Store.searchIndex.push({ id: customer.id, haystack: haystack });
 }
+
+/**
+ * **Cửa thứ hai** làm đổi `Store`: bỏ hẳn một bản ghi khỏi bộ nhớ. Chỉ được gọi với mã nằm trong danh sách `hard` mà cửa xóa trả về.
+ *
+ * Vì sao không diễn tả xóa hẳn bằng `upsertRecord` với `recordStatus: 'deleted'`: dòng đó **không còn trên sheet**, nên một bản ghi ở lại RAM là một lời nói dối có hậu quả đo được — `isTaxNumberTaken` sẽ còn báo mã số thuế ấy bị chiếm, người dùng nhập lại đúng mã ấy cho khách mới thì máy khách chặn trong khi máy chủ cho qua. Hai câu trả lời cho một câu hỏi là đúng cái mà luật một-cửa muốn tránh, nên bịt bằng cách giả vờ xóa mềm là bịt sai chỗ.
+ *
+ * Mã không có trong bộ nhớ thì bỏ qua trong im lặng, cùng lý do với cửa xóa: kết cục mong muốn đã đạt.
+ *
+ * Đường `activity` **quét** các mảng lịch sử để tìm chủ của giao dịch, thay vì nhận thêm tham số `customerId`. Nhận thêm tham số nghĩa là bên gọi phải nhớ truyền đúng, mà truyền sai thì giao dịch ở lại RAM trong im lặng — trong khi quét thì không sai được, và một lần xóa quét vài chục nghìn phần tử vẫn nhanh hơn một lần vẽ lại màn hình.
+ */
+Store.removeRecord = function (entity, id) {
+  var ma = String(id === null || id === undefined ? '' : id).trim();
+  if (!ma) { return; }
+
+  if (entity === 'customer') {
+    delete Store.customers[ma];
+    delete Store.activitiesByCustomer[ma];
+
+    for (var i = 0; i < Store.searchIndex.length; i++) {
+      if (Store.searchIndex[i].id === ma) { Store.searchIndex.splice(i, 1); break; }
+    }
+    return;
+  }
+
+  if (entity === 'activity') {
+    var chuIds = Object.keys(Store.activitiesByCustomer);
+    for (var k = 0; k < chuIds.length; k++) {
+      var list = Store.activitiesByCustomer[chuIds[k]];
+      for (var j = 0; j < list.length; j++) {
+        if (list[j].id === ma) { list.splice(j, 1); return; }
+      }
+    }
+    return;
+  }
+
+  throw new Error('removeRecord không biết thực thể "' + entity + '". Chỉ có "customer" và "activity".');
+};
+
+/**
+ * Thay bản đồ dòng của một hoặc nhiều sheet bằng bản mới của máy chủ. Nhận đúng hình dạng `{ '<tên sheet>': { '<số hàng>': '<mã>' } }`.
+ *
+ * **Thay** chứ không trộn: xóa hẳn một dòng làm mọi dòng bên dưới xê dịch lên, nên bản cũ sai ở phần đuôi chứ không phải thiếu ở phần đuôi. Trộn vào thì những cặp cuối của bản cũ sống sót và trỏ vào khách đã dịch chỗ — đúng loại lỗi mà người dùng gặp dưới dạng "bấm vào khách này lại mở khách khác".
+ *
+ * Bản đồ rỗng thì không đổi gì, vì cửa xóa cố ý chỉ gửi bản đồ khi có dòng bị xóa hẳn.
+ */
+Store.applyRowMaps = function (rowMaps) {
+  var maps = rowMaps || {};
+  Object.keys(maps).forEach(function (sheetName) {
+    Store.rowMaps[sheetName] = ingestRowMapArray(maps[sheetName]);
+  });
+};
 </script>

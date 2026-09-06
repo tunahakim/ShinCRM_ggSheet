@@ -1,0 +1,68 @@
+<script>
+/*
+ * Bộ thu thập: những gì đang gõ trên form thành object bản ghi. Chiều ngược của `client/util/valueText.html`.
+ *
+ * Chia hai lớp để kiểm được: chỉ `formCollectAll` chạm `document`, còn lại chỉ đòi `getAttribute` và `value` nên bộ kiểm gọi được bằng node giả — khung DOM giả không có `querySelectorAll`.
+ *
+ * Lọc theo `data-readonly` chứ **không** theo `data-field`: ô chỉ đọc cũng mang `data-field`, lọc sai chỗ là ghi chữ trong card GHI CHÚ ngược lên sheet.
+ *
+ * **Không cắt khoảng trắng và không ép kiểu số** — cửa ghi đã làm cả hai, mà hai bộ phân tích số ở hai đầu dây thì lệch nhau lặng lẽ: nó không ném lỗi, nó lưu một con số khác. Chỉ ô ngày được sửa khuôn, vì chữ `T` và phần giây là thứ trình duyệt tự sinh.
+ */
+
+/** Chuỗi ô `date`/`datetime-local` về hai dạng ở tài liệu 05 Phần 11. Cắt giây vì `textToDate` không nhận giây, trượt khuôn thì cả chuỗi xuống ô dưới dạng chữ. */
+function formCollectDateText(text, precision) {
+  var t = (text === null || text === undefined ? '' : String(text)).trim().replace('T', ' ');
+  if (!t) { return ''; }
+  return precision === 'minute' ? t.slice(0, 16) : t.slice(0, 10);
+}
+
+/** Giá trị một ô, đọc theo khai của trường. Ô nào không có `value` — `readText` vẽ ra `div` — trả về chuỗi rỗng. */
+function formCollectValue(node, khai) {
+  var raw = node.value;
+  var text = raw === null || raw === undefined ? '' : String(raw);
+
+  if (khai && khai.type === 'DATE') { return formCollectDateText(text, khai.precision); }
+  return text;
+}
+
+/** Đường dẫn trên một ô thành `{ entity, name }`, hoặc `null` khi ô không phải ô trường hoặc là ô chỉ đọc. */
+function formCollectPath(node) {
+  if (!node || typeof node.getAttribute !== 'function') { return null; }
+  if (node.getAttribute('data-readonly') === '1') { return null; }
+
+  var duong = String(node.getAttribute('data-field') || '').split('.');
+  if (duong.length !== 2 || !duong[0] || !duong[1]) { return null; }
+
+  return { entity: duong[0], name: duong[1] };
+}
+
+/** Nhiều ô thành `{ '<thực thể>': { '<trường>': giá trị } }`. Gom theo thực thể chứ không phẳng, vì form giao dịch bày cả ô của `customer` và hai trường `note` sẽ đè lên nhau. */
+function formCollectNodes(nodes) {
+  var ra = {};
+
+  (nodes || []).forEach(function (node) {
+    var duong = formCollectPath(node);
+    if (!duong) { return; }
+
+    if (!ra[duong.entity]) { ra[duong.entity] = {}; }
+    ra[duong.entity][duong.name] = formCollectValue(node, Schema[duong.entity][duong.name]);
+  });
+
+  return ra;
+}
+
+/** Quét cả form đang mở. Hàm duy nhất của tệp chạm `document`, nên cũng là hàm duy nhất bộ kiểm offline không gọi. */
+function formCollectAll() {
+  return formCollectNodes(document.querySelectorAll('[data-field]'));
+}
+
+/** Phần của một thực thể, **ném lỗi** khi có ô nhập được của thực thể khác — gõ vào ô đó rồi bấm Lưu thì chữ ấy không đi đâu cả. Bản khai hôm nay không có ca đó; phép này đứng canh lượt sửa bản khai sau. */
+function formCollectEntity(nhom, entity) {
+  var la = Object.keys(nhom || {}).filter(function (ten) { return ten !== entity; });
+
+  if (la.length) {
+    throw new Error('Form của "' + entity + '" đang có ô nhập được của thực thể khác: ' + la.join(', ') + '. Một lượt lưu chỉ ghi được một thực thể — khai những ô đó là chỉ đọc, hoặc tách sang form riêng.');
+  }
+  return (nhom && nhom[entity]) || {};
+}
+</script>

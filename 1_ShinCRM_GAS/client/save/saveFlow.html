@@ -1,0 +1,139 @@
+<script>
+/*
+ * Đường bấm Lưu: đọc form, gửi lên cửa ghi, rồi hoặc tô đỏ chỗ sai hoặc đóng form. Tài liệu 06 Phần 4.
+ *
+ * Hai chỗ dễ làm sai. Một: **chỉ gửi trường đang có mặt trên form** cộng `id` cộng trường chỉ-đọc mang theo — cửa ghi kiểm `required` trên đúng những khóa bên gọi gửi, nên gửi cả bản ghi RAM (ảnh chụp có thể đã bốn tiếng) là vừa làm khách thiếu trường không sửa nổi ghi chú, vừa ghi đè cột người khác vừa sửa. Hai: **không dùng `data-busy` trên nút ✓** — nút không có `.shin-btn-label` nên `dispatchBusy` ghi thẳng `textContent` và glyph mất vĩnh viễn; chống bấm đôi bằng cờ `SAVE_FLOW.dangGui`.
+ */
+
+/** Trường máy — cửa ghi tự điền. Bản đối chiếu máy chủ là `WRITE_GATE_MACHINE_FIELDS`; sửa một bên thì mở bên kia. */
+var SAVE_FLOW_MACHINE = ['id', 'createdAt', 'recordStatus'];
+
+/** Lớp tô ô đang lỗi, khai ở `client/style/components.html`. */
+var SAVE_FLOW_ERROR_CLASS = 'shin-input-error';
+
+/** Cờ đang gửi, để hai cú bấm liền nhau không thành hai bản ghi. */
+var SAVE_FLOW = { dangGui: false };
+
+/** Cất nội dung đang gõ vào bản nháp, gọi trước khi mở form lồng. Không có form nào đang mở thì không làm gì. */
+function saveFlowStashDraft() {
+  var top = screenStateTop();
+  if (!top) { return null; }
+
+  var draft = formCollectEntity(formCollectAll(), top.entity);
+  screenStateSetDraft(draft);
+  return draft;
+}
+
+/** Trường chỉ-đọc phải mang theo từ bản ghi cũ vì ô của nó không gửi giá trị. Viết thành luật chứ không viết cứng `activity.customerId` — bảng khai thêm trường thì luật vẫn đúng. */
+function saveFlowCarryReadonly(top, record) {
+  var fields = Schema[top.entity];
+
+  Object.keys(fields).forEach(function (ten) {
+    if (SAVE_FLOW_MACHINE.indexOf(ten) !== -1) { return; }
+    if (fields[ten].readonly !== true) { return; }
+    if (Object.prototype.hasOwnProperty.call(record, ten)) { return; }
+
+    var cu = top.record ? top.record[ten] : '';
+    if (cu === undefined || cu === null || cu === '') { return; }
+    record[ten] = cu;
+  });
+
+  return record;
+}
+
+/**
+ * Bản ghi gửi lên máy chủ. **Phải là object khác với bản nháp**: bản nháp được đắp lên bản ghi ở mọi lượt vẽ, nên một khóa `id` rỗng lọt vào đó là ô mã khách trắng bóc ngay lượt sau.
+ *
+ * `id` rỗng khi thêm mới dù `top.record.id` có giá trị — đó là mã xem trước của `fieldLogicNextCode`, gửi lên là tự nhận đã có dòng mang mã đó.
+ */
+function saveFlowRecord(top, thu) {
+  var record = {};
+  Object.keys(thu).forEach(function (ten) { record[ten] = thu[ten]; });
+
+  record.id = top.themMoi ? '' : String((top.record && top.record.id) || '');
+  return saveFlowCarryReadonly(top, record);
+}
+
+/** Bỏ dấu đỏ ở mọi ô của form. Chạy trước mỗi lượt gửi, vì lượt trước có thể đã tô mà lần này chỗ đó đã sửa đúng. */
+function saveFlowClearErrors(entity) {
+  Object.keys(Schema[entity]).forEach(function (ten) {
+    var el = document.getElementById(renderFieldId({ entity: entity, name: ten }));
+    if (el && el.classList) { el.classList.remove(SAVE_FLOW_ERROR_CLASS); }
+  });
+}
+
+/** Tô đỏ ô cửa ghi trả về, trả `focusId` của ô sai đầu tiên. Dấu đỏ tự mất khi người dùng gõ lại — tai nghe `{ once: true }`, đúng nếp bản cũ. */
+function saveFlowPaintInvalid(entity, invalid) {
+  var dau = null;
+
+  (invalid || []).forEach(function (item) {
+    var el = document.getElementById(renderFieldId({ entity: entity, name: item.field }));
+    if (!el || !el.classList) { return; }
+
+    el.classList.add(SAVE_FLOW_ERROR_CLASS);
+    if (el.addEventListener) {
+      el.addEventListener('input', function () { el.classList.remove(SAVE_FLOW_ERROR_CLASS); }, { once: true });
+    }
+    if (!dau) { dau = el.id; }
+  });
+
+  return dau;
+}
+
+/** Câu báo gộp mọi trường không đạt, mỗi dòng một trường. Dùng `alert` vì đó là đường hiện lỗi duy nhất của sidebar — xem `dispatchError`. */
+function saveFlowInvalidMessage(invalid) {
+  var dong = (invalid || []).map(function (item) { return '• ' + item.reason; });
+  return 'Chưa lưu được. ' + (dong.length === 1 ? 'Một chỗ cần sửa:' : dong.length + ' chỗ cần sửa:') + '\n' + dong.join('\n');
+}
+
+/** Đổ câu trả lời của cửa ghi vào RAM. Dùng `res.rows` chứ không dùng bản vừa gửi: hàng đọc lại có đủ mọi cột, kể cả mã vừa cấp. */
+function saveFlowApply(entity, res) {
+  var recs = ingestUnpack(res.fields, res.rows);
+  recs.forEach(function (r) { Store.upsertRecord(entity, r); });
+
+  if (res.rowMaps) { Store.applyRowMaps(res.rowMaps); }
+  return recs[0] || null;
+}
+
+/** Đóng **một** lớp form: đóng cả ngăn xếp thì lưu ghi chú lồng trên form giao dịch là mất giao dịch đang gõ dở. Lưu khách mới thì màn xem chuyển sang chính khách đó. */
+function saveFlowClose(entity, ban, themMoi) {
+  var duoi = screenStateCloseForm();
+  if (duoi) { return screenFormRender(); }
+
+  if (themMoi && entity === 'customer' && ban && ban.id) { screenStateSetCustomer(ban.id); }
+  return screenViewRender();
+}
+
+/** Toàn bộ đường bấm Lưu, trả `Promise` để bộ phát click bắt được lượt gửi thất bại. Bấm lần hai lúc lượt đầu còn bay thì lặng lẽ bỏ qua — dải tiến trình đang chạy đã là câu trả lời. */
+function saveFlowSubmit() {
+  if (SAVE_FLOW.dangGui) { return null; }
+
+  var top = screenStateTop();
+  if (!top) { throw new Error('Không có form nào đang mở nên không có gì để lưu.'); }
+
+  var entity = top.entity;
+  var themMoi = top.themMoi;
+  var thu = formCollectEntity(formCollectAll(), entity);
+  var record = saveFlowRecord(top, thu);
+
+  saveFlowClearErrors(entity);
+  screenStateSetDraft(thu);
+
+  SAVE_FLOW.dangGui = true;
+  return callServer('saveRecord', [entity, record]).then(function (res) {
+    SAVE_FLOW.dangGui = false;
+
+    if (!res.ok) {
+      var focusId = saveFlowPaintInvalid(entity, res.invalid);
+      alert(saveFlowInvalidMessage(res.invalid));
+      return { focusId: focusId };
+    }
+
+    var ban = saveFlowApply(entity, res);
+    return saveFlowClose(entity, ban, themMoi);
+  }, function (err) {
+    SAVE_FLOW.dangGui = false;
+    throw err;
+  });
+}
+</script>
