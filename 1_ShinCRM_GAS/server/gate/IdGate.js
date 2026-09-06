@@ -61,7 +61,7 @@ function idGateMaxOnSheet(context) {
 function idGateCounterCell(entity) {
   var khoi = CONFIG_READ_BLOCKS.counters;
   var sheet = shinOpenSheet('Config');
-  var columnMap = readColumnMap('Config').map;
+  var columnMap = readColumnMap('Config');
   var cotLoai = columnIndex(columnMap, khoi.key);
   var cotGiaTri = columnIndex(columnMap, khoi.value);
   var firstRow = SHEET_LAYOUT.Config.firstDataRow;
