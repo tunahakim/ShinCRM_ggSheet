@@ -1,5 +1,5 @@
 /**
- * Những thứ toàn cục chỉ có trên Google, dựng lại vừa đủ để chạy code thật trong Node: `Utilities`, `Logger`, `PropertiesService`, cộng tệp Sheet giả.
+ * Những thứ toàn cục chỉ có trên Google, dựng lại vừa đủ để chạy code thật trong Node: `Utilities`, `Logger`, `PropertiesService`, `Session`, `LockService`, cộng tệp Sheet giả.
  *
  * Vì sao không nạp thẳng thư viện nào: mỗi thứ ở đây chỉ mô phỏng đúng phần mà code của dự án gọi tới. Dựng nhiều hơn là dựng thứ không ai kiểm, mà một bản mô phỏng không ai kiểm là một chỗ để lỗi nằm im.
  *
@@ -35,7 +35,7 @@ function formatDateGia(date, timezone, format) {
 /**
  * Dựng cả bộ thứ toàn cục cho một hộp cát.
  *
- * `sheets` là tên các sheet dựng sẵn trong tệp giả. `props` là `DocumentProperties` ban đầu — truyền sẵn khóa dọn log vào đây là cách chặn phép quét tuổi log chạy trong một phép kiểm không nói về nó. `userProps` là `UserProperties` ban đầu, một kho riêng: hai kho trộn vào nhau thì một phép kiểm về núm chọn sẽ ăn phải khóa trạng thái bẩn.
+ * `sheets` là tên các sheet dựng sẵn trong tệp giả. `props` là `DocumentProperties` ban đầu — truyền sẵn khóa dọn log vào đây là cách chặn phép quét tuổi log chạy trong một phép kiểm không nói về nó. `userProps` là `UserProperties` ban đầu, một kho riêng: hai kho trộn vào nhau thì một phép kiểm về núm chọn sẽ ăn phải khóa trạng thái bẩn. `chanKhoa: true` làm mọi lần `tryLock` thất bại.
  */
 function taoStubsGas(options) {
   const chon = options || {};
@@ -44,6 +44,7 @@ function taoStubsGas(options) {
   const userProps = Object.assign({}, chon.userProps || {});
   const daLog = [];
   const daConsole = [];
+  const khoa = { dem: 0, demNha: 0, dangGiu: false, chanKhoa: chon.chanKhoa === true, msCuoi: 0 };
 
   return {
     SpreadsheetApp: gia.SpreadsheetApp,
@@ -85,6 +86,34 @@ function taoStubsGas(options) {
 
     Logger: { log: (line) => daLog.push(String(line)) },
 
+    /**
+     * `Session` giả. Chỉ có múi giờ script, và cố ý trả về **cùng** múi giờ với tệp giả.
+     *
+     * Đó là điều kiện mà `textToDate` với `dateToText` dựa vào: chuỗi thành `Date` theo múi giờ script, `Date` thành chuỗi theo múi giờ tệp. Hai múi lệch nhau thì một mốc ghi xuống rồi đọc lên bị dịch vài giờ, và với `precision: 'day'` thì dịch cả sang ngày khác. Muốn kiểm trường hợp lệch thì đặt lệch **trong ca kiểm**, đừng đặt lệch mặc định ở đây.
+     */
+    Session: { getScriptTimeZone: () => 'Asia/Ho_Chi_Minh' },
+
+    /**
+     * `LockService` giả, một khóa dùng chung cho cả hộp cát.
+     *
+     * Nó mô phỏng đúng hai điều mà cửa ghi với cửa xóa dựa vào: `tryLock` đang giữ thì trả `false` chứ không chờ, và `releaseLock` nhả ra cho lần sau lấy được. Node chạy một luồng nên ở đây không có tranh chấp thật — giá trị của khóa giả là **đếm được**: `_khoa.dem` cho phép một ca kiểm chứng minh lô rỗng không lấy khóa, và `_khoa.dangGiu` cho phép chứng minh khóa được nhả cả khi thân hàm ném lỗi. Đó là hai lỗi mà đọc code bằng mắt rất dễ bỏ sót, còn trên Google thì hậu quả là cả tệp treo cho tới khi hết hạn khóa.
+     *
+     * `chanKhoa` bắt `tryLock` luôn trả `false`, để kiểm câu "Hệ thống bận. Vui lòng thử lại!" mà không cần hai luồng.
+     */
+    LockService: {
+      getDocumentLock: () => ({
+        tryLock: (ms) => {
+          khoa.dem += 1;
+          khoa.msCuoi = ms;
+          if (khoa.chanKhoa || khoa.dangGiu) { return false; }
+          khoa.dangGiu = true;
+          return true;
+        },
+        releaseLock: () => { khoa.dangGiu = false; khoa.demNha += 1; },
+        hasLock: () => khoa.dangGiu
+      })
+    },
+
     PropertiesService: {
       getDocumentProperties: () => ({
         getProperty: (key) => (Object.prototype.hasOwnProperty.call(props, key) ? props[key] : null),
@@ -98,13 +127,14 @@ function taoStubsGas(options) {
       })
     },
 
-    // Sáu thứ dưới đây không có bên Google, chỉ để phép kiểm xem lại: tệp giả, bộ đếm lệnh gọi, những dòng Logger đã in, những dòng console đã giữ, và hai kho thuộc tính.
+    // Bảy thứ dưới đây không có bên Google, chỉ để phép kiểm xem lại: tệp giả, bộ đếm lệnh gọi, những dòng Logger đã in, những dòng console đã giữ, hai kho thuộc tính, và trạng thái khóa.
     _book: gia.book,
     _dem: gia.dem,
     _daLog: daLog,
     _daConsole: daConsole,
     _props: props,
-    _userProps: userProps
+    _userProps: userProps,
+    _khoa: khoa
   };
 }
 

@@ -3,13 +3,20 @@
  *
  * Vì sao cần: những luật đáng lo nhất của dự án là luật về **số lệnh gọi** — "cả lượt chỉ tốn một `setValues`", "cắt log bằng một `deleteRows`". Trên Google thì đo được bằng đồng hồ và hạn mức, nhưng mỗi lần đo là một vòng đẩy code cộng chờ mạng, nên trong một phiên code người ta sẽ đo một lần rồi thôi. Ở đây tệp giả **tự đếm** từng lệnh, nên luật đó thành một phép kiểm chạy trong một giây.
  *
- * Giới hạn phải biết, và đây là chỗ ghi nó: tệp giả này **không phải Google**. Nó không có định dạng ô, không có công thức, không có hàng ẩn, không có giới hạn 10 triệu ô, và không có chuyện `getActiveSpreadsheet` trả về một đối tượng trông như tệp nhưng đụng vào là ném lỗi. Xanh ở đây nghĩa là logic đúng, không có nghĩa là chạy được trên Google — lời cuối vẫn thuộc về các phép nghiệm thu qua `node tests/gas.js`.
+ * Giới hạn phải biết, và đây là chỗ ghi nó: tệp giả này **không phải Google**. Nó nhớ khuôn hiển thị nhưng không có **hệ quả** của khuôn (ghi chuỗi số vào ô General ở đây không bị đổi thành số), không có công thức, không có hàng ẩn, không có giới hạn 10 triệu ô, và không có chuyện `getActiveSpreadsheet` trả về một đối tượng trông như tệp nhưng đụng vào là ném lỗi. Xanh ở đây nghĩa là logic đúng, không có nghĩa là chạy được trên Google — lời cuối vẫn thuộc về các phép nghiệm thu qua `node tests/gas.js`.
  */
 
 /** Một ô rỗng ra chuỗi rỗng, đúng như `getValues` của Google trả về. */
 function oRong(giaTri) {
   return giaTri === undefined || giaTri === null ? '' : giaTri;
 }
+
+/**
+ * Khuôn hiển thị của một ô Google chưa ai đụng tới. Đúng chuỗi này là thứ `getNumberFormat` trả về cho ô General.
+ *
+ * Để đúng chuỗi thật chứ không để chuỗi rỗng, vì đây chính là khuôn nuốt số 0 đầu của mã số thuế: một phép kiểm đọc thấy khuôn này nghĩa là cột đang hở, và nó phải đỏ.
+ */
+const KHUON_GENERAL = '0.###############';
 
 /**
  * Dựng một sheet giả. `dem` là bộ đếm dùng chung của cả tệp, để phép kiểm biết một lượt tốn mấy lệnh.
@@ -23,6 +30,7 @@ function oRong(giaTri) {
  */
 function taoSheet(ten, dem, luoi) {
   const cells = [];
+  const formats = [];
   let frozenRows = 0;
   let maxRows = (luoi && luoi.rows) || 1000;
   let maxCols = (luoi && luoi.cols) || 26;
@@ -34,6 +42,11 @@ function taoSheet(ten, dem, luoi) {
   const layDong = (i) => {
     while (cells.length <= i) { cells.push([]); }
     return cells[i];
+  };
+
+  const layDongKhuon = (i) => {
+    while (formats.length <= i) { formats.push([]); }
+    return formats[i];
   };
 
   const sheet = {
@@ -64,12 +77,20 @@ function taoSheet(ten, dem, luoi) {
     getMaxRows: () => maxRows,
     getMaxColumns: () => maxCols,
 
-    /** Nới lưới thêm hàng. Google chèn hàng trắng ngay sau `afterRow`, nên hàng đã có nội dung ở dưới bị đẩy xuống. */
+    /**
+     * Nới lưới thêm hàng. Google chèn hàng trắng ngay sau `afterRow`, nên hàng đã có nội dung ở dưới bị đẩy xuống.
+     *
+     * Hàng mới **thừa hưởng khuôn hiển thị của hàng ngay trên nó**, đúng như Google. Chép cả chỗ này vì đó là cơ chế duy nhất giữ cho hàng khách mới không rơi về khuôn General — nếu không có nó thì phép đặt khuôn một lần lúc dựng khung là vô nghĩa.
+     */
     insertRowsAfter(afterRow, howMany) {
       const them = howMany === undefined ? 1 : howMany;
       const trong = [];
-      for (let i = 0; i < them; i += 1) { trong.push([]); }
+      const khuonMau = (formats[afterRow - 1] || []).slice();
+      const khuonMoi = [];
+      for (let i = 0; i < them; i += 1) { trong.push([]); khuonMoi.push(khuonMau.slice()); }
       cells.splice(afterRow, 0, ...trong);
+      layDongKhuon(afterRow - 1);
+      formats.splice(afterRow, 0, ...khuonMoi);
       maxRows += them;
       dem.insertRows += 1;
       return sheet;
@@ -125,10 +146,36 @@ function taoSheet(ten, dem, luoi) {
         getValue() { return oRong((cells[row - 1] || [])[col - 1]); },
         setValue(v) { layDong(row - 1)[col - 1] = v; dem.setValues += 1; return range; },
 
+        /**
+         * Khuôn hiển thị — thứ duy nhất trong phần định dạng được mô phỏng thật, vì dự án **đọc lại** nó ở `verifySheets`.
+         *
+         * Vẫn không mô phỏng **hệ quả** của khuôn: ở đây ghi chuỗi `'0101243150'` vào ô khuôn General thì nó vẫn nằm nguyên là chuỗi, còn Google thì đổi thành số `101243150`. Nên phép kiểm offline chỉ chứng minh được cột đã được đặt đúng khuôn, không chứng minh được số 0 đầu sống sót; câu đó chỉ `probeWriteGate` trên Google trả lời được.
+         */
+        setNumberFormat(format) {
+          for (let r = 0; r < soDong; r += 1) {
+            const dich = layDongKhuon(row - 1 + r);
+            for (let c = 0; c < soCot; c += 1) { dich[col - 1 + c] = format; }
+          }
+          dem.setNumberFormat += 1;
+          return range;
+        },
+
+        getNumberFormats() {
+          const ra = [];
+          for (let r = 0; r < soDong; r += 1) {
+            const nguon = formats[row - 1 + r] || [];
+            const dong = [];
+            for (let c = 0; c < soCot; c += 1) { dong.push(nguon[col - 1 + c] || KHUON_GENERAL); }
+            ra.push(dong);
+          }
+          return ra;
+        },
+
+        getNumberFormat() { return (formats[row - 1] || [])[col - 1] || KHUON_GENERAL; },
+
         // Định dạng không được mô phỏng: dự án chỉ đặt chứ không đọc lại, nên nuốt là đủ và giả vờ có định dạng mới là nói dối.
         setFontWeight() { return range; },
         setBackground() { return range; },
-        setNumberFormat() { return range; },
         setNote() { return range; },
         clearNote() { return range; }
       };
@@ -148,6 +195,7 @@ function taoSheet(ten, dem, luoi) {
         throw new Error('deleteRows: xóa ' + soXoa + ' hàng từ hàng ' + row + ' là xóa hết các hàng không đóng băng của sheet "' + ten + '" (lưới ' + maxRows + ' hàng, đóng băng ' + frozenRows + '). Google từ chối việc này: "Rất tiếc, không thể xóa tất cả các hàng không được cố định."');
       }
       cells.splice(row - 1, soXoa);
+      formats.splice(row - 1, soXoa);
       maxRows -= soXoa;
       dem.deleteRows += 1;
       return sheet;
@@ -155,6 +203,7 @@ function taoSheet(ten, dem, luoi) {
 
     /** Chỉ dùng trong phép kiểm, không có bên Google: xem thẳng ruột sheet. */
     _cells: cells,
+    _khuon: formats,
     _soCot: soCotThat,
 
     /** Chỉ dùng trong phép kiểm: đặt lại lưới để dựng đúng hoàn cảnh sheet chật. */
@@ -174,7 +223,7 @@ function taoSheet(ten, dem, luoi) {
  * `getActiveSpreadsheet` cố ý **ném lỗi**, mô phỏng đường chạy khi không có ai ngồi trước máy — đúng đường mà `shinOpenBook` phải đi được, và cũng là đường đã từng làm lộ ra lỗi "reading from storage ... NOT_FOUND". `openById` thì trả về tệp giả bất kể ID, nên cổng chặn chạy nhầm tệp không được kiểm ở đây; nó chỉ kiểm được trên Google, nơi có tệp thật để mà nhầm.
  */
 function taoBook(tenSheets) {
-  const dem = { setValues: 0, deleteRows: 0, insertSheet: 0, insertRows: 0 };
+  const dem = { setValues: 0, deleteRows: 0, insertSheet: 0, insertRows: 0, setNumberFormat: 0 };
   const sheets = {};
 
   (tenSheets || []).forEach((ten) => { sheets[ten] = taoSheet(ten, dem); });

@@ -27,9 +27,9 @@ function chay(so) {
     return ghiLoiNap(so, 'nạp được server/config/Settings.js', err);
   }
 
-  check(so, 'SETTINGS có đúng sáu hằng đang được dùng',
+  check(so, 'SETTINGS có đúng tám hằng đang được dùng',
     Object.keys(nen.hop.SETTINGS).sort(),
-    ['CHUNK_ROWS', 'CHUNK_ROWS_FALLBACK', 'LOG_MAX_ROWS', 'LOG_RETENTION_DAYS', 'LOG_SECRET_KEYS', 'LOG_TRACE_BUFFER']);
+    ['CHUNK_ROWS', 'CHUNK_ROWS_FALLBACK', 'LOCK_WAIT_MS', 'LOG_MAX_ROWS', 'LOG_RETENTION_DAYS', 'LOG_SECRET_KEYS', 'LOG_TRACE_BUFFER', 'UNDO_DELAY_MS']);
 
   check(so, 'giá trị bốn hằng đúng tài liệu 10 Phần 11',
     [nen.hop.SETTINGS.LOG_RETENTION_DAYS, nen.hop.SETTINGS.LOG_MAX_ROWS, nen.hop.SETTINGS.LOG_TRACE_BUFFER, nen.hop.SETTINGS.LOG_SECRET_KEYS.length],
@@ -47,11 +47,11 @@ function chay(so) {
     [nen.hop.SETTINGS.CHUNK_ROWS_FALLBACK.length > 0, bac.every((so2, i) => i === 0 || so2 < bac[i - 1])],
     [true, true]);
 
-  // Hai tên này có trong tài liệu nhưng chưa có con số nào được chốt, và chặng đang làm cũng chưa cần tới chúng.
-  // Phép kiểm này bắt việc ai đó điền số đoán vào, vì một hằng số trông như đã được quyết định thì không ai đi hỏi lại nữa.
-  check(so, 'SETTINGS chưa chứa hai tham số chưa được chốt giá trị',
-    ['LOCK_WAIT_MS', 'UNDO_DELAY_MS'].filter((ten) => ten in nen.hop.SETTINGS),
-    []);
+  // Hai con số của chặng lưu. `LOCK_WAIT_MS` bằng đúng con số bản cũ đã chạy thật, nên phép kiểm này ghim nó lại: đổi nó
+  // là đổi một thứ chủ dự án đã sống cùng. `UNDO_DELAY_MS` không có tiền lệ nào, nên nó càng cần một chỗ để thấy được.
+  check(so, 'hai tham số của chặng lưu có mặt và đúng con số đã chốt',
+    [nen.hop.SETTINGS.LOCK_WAIT_MS, nen.hop.SETTINGS.UNDO_DELAY_MS],
+    [15000, 5000]);
 
   check(so, 'Config chưa có dòng nào thì trả về bảng rỗng, không ném lỗi', nen.hop.configParams(), {});
   check(so, 'configGet trả về giá trị thay thế khi không có tham số', nen.hop.configGet('KHONG_CO', 'mặc định'), 'mặc định');

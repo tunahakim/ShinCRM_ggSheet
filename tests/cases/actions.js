@@ -228,7 +228,7 @@ function chay(so) {
   checkThrows(so, 'mã khách không có trong kho thì để lỗi của `Store.getCustomer` bay lên — `[RÀNG BUỘC CỨNG]` tài liệu 05 Phần 9, đổi thành `null` là vẽ ra một khách vừa mất sạch dữ liệu',
     () => hop4.ACTIONS.setCurrentCustomer({ pick: 'CUS-999999' }), 'CUS-999999');
 
-  section('actions — bốn việc của chặng sau: có tên trong bảng, thân hàm hét lên');
+  section('actions — việc của chặng sau, và ba đường vừa nối vào chặng lưu');
 
   const hop5 = dungCanh();
   hop5.screenStateSetCustomer('CUS-000001');
@@ -242,12 +242,34 @@ function chay(so) {
       return /chưa dựng/.test(String(err.message));
     }
   });
-  check(so, 'đúng bốn hành động chưa dựng, mỗi cái nói rõ nó thuộc chặng nào — nút không phản hồi mà chẳng nói gì đúng là ca tài liệu 04 Phần 7 chống',
+  check(so, 'chỉ còn một hành động chưa dựng và nó nói rõ mình thuộc chặng nào — nút không phản hồi mà chẳng nói gì đúng là ca tài liệu 04 Phần 7 chống',
     chuaDung.slice().sort(),
-    ['deleteActivity', 'renderActiveViewSheet', 'saveForm', 'undoDelete']);
+    ['renderActiveViewSheet']);
 
-  checkThrows(so, 'nút xóa một giao dịch kiểm `pick` trước khi báo chưa dựng, nên lỗi khai Block không bị lời báo của chặng sau che mất',
+  checkThrows(so, 'nút xóa một giao dịch kiểm `pick` trước khi chạm bộ chờ, nên lỗi khai Block không bị đường xóa che mất',
     () => hop5.ACTIONS.deleteActivity({}), 'data-pick');
+
+  // Ba đường của chặng lưu sống ở `client/save/*`, ngoài hộp cát này. Thay bằng bản ghi lại để kiểm bảng gọi đúng tên và
+  // đúng tham số: phép đếm việc chưa dựng ở trên chỉ thấy "có ném lỗi", nên một tên hàm gõ sai vẫn lọt qua được nó.
+  const hop6 = dungCanh();
+  hop6._daGoi = [];
+  hop6.saveFlowSubmit = () => { hop6._daGoi.push('saveFlowSubmit'); return 'đã lưu'; };
+  hop6.pendingDeleteAdd = (entity, id) => { hop6._daGoi.push('pendingDeleteAdd(' + entity + ',' + id + ')'); return 'đã chờ'; };
+  hop6.pendingDeleteUndo = () => { hop6._daGoi.push('pendingDeleteUndo'); return 'đã hoàn tác'; };
+
+  check(so, 'nút Lưu giao thẳng cho `saveFlowSubmit` và trả nguyên kết quả về, để bộ phát click lấy được `focusId` của ô sai đầu tiên',
+    [hop6.ACTIONS.saveForm(), hop6._daGoi.join(' ')],
+    ['đã lưu', 'saveFlowSubmit']);
+
+  hop6._daGoi = [];
+  check(so, 'nút thùng rác chỉ đưa mã vào bộ chờ, không gọi máy chủ — xóa ngay lúc bấm thì không còn gì để hoàn tác',
+    [hop6.ACTIONS.deleteActivity({ pick: 'ACT-000001' }), hop6._daGoi.join(' '), hop6._daGui.length],
+    ['đã chờ', 'pendingDeleteAdd(activity,ACT-000001)', 0]);
+
+  hop6._daGoi = [];
+  check(so, 'nút Hoàn tác gọi đúng đường bỏ mặt nạ',
+    [hop6.ACTIONS.undoDelete(), hop6._daGoi.join(' ')],
+    ['đã hoàn tác', 'pendingDeleteUndo']);
 }
 
 module.exports = { chay };

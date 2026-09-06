@@ -12,7 +12,7 @@ const { taoStubsGas } = require('./gas-stubs');
 /**
  * Bộ tệp máy chủ mà mọi ca kiểm chạm sheet đều cần, xếp theo chiều phụ thuộc.
  *
- * Thứ tự ở đây **không** quyết định việc hàm nào gọi được hàm nào — Apps Script dùng chung một vùng tên nên hàm nào cũng thấy hàm nào, bất kể tệp nạp trước hay sau. Xếp theo chiều phụ thuộc là để người đọc thấy được tầng: mở tệp → khai hình → đọc/ghi ô → tham số → log → tiện ích → đọc bản ghi → trạng thái → gom lượt nạp → vỏ bọc lỗi.
+ * Thứ tự ở đây **không** quyết định việc hàm nào gọi được hàm nào — Apps Script dùng chung một vùng tên nên hàm nào cũng thấy hàm nào, bất kể tệp nạp trước hay sau. Xếp theo chiều phụ thuộc là để người đọc thấy được tầng: mở tệp → khai hình → đọc/ghi ô → tham số → log → tiện ích → đọc bản ghi → trạng thái → cửa ghi và cửa xóa → gom lượt nạp → vỏ bọc lỗi.
  *
  * Ba tệp cố ý **không** có trong danh sách này, và lý do thuộc về từng tệp chứ không phải một luật chung:
  *   - `server/sheet/SetupSheets.js` — dựng khung sheet, chỉ ca kiểm nói về việc dựng sheet mới cần, và nó tự nạp thêm.
@@ -36,6 +36,10 @@ const TEP_NEN = [
   'server/sheet/ConfigRead.js',
   'server/state/DirtyState.js',
   'server/state/UserPrefs.js',
+  'server/gate/FieldLogic.js',
+  'server/gate/IdGate.js',
+  'server/gate/WriteGate.js',
+  'server/gate/DeleteGate.js',
   'server/service/LoadService.js',
   'server/entry/ErrorReport.js',
   'server/entry/EntryPoint.js'
