@@ -65,8 +65,14 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   ├── state\
 │   │   ├── DirtyState.js         Cờ "sheet đã lệch so với RAM", giữ ở DocumentProperties. Đọc không bao giờ ném lỗi, vì nó đi kèm mọi lượt trả về.
 │   │   └── UserPrefs.js          Ba núm chọn của sidebar, giữ ở UserProperties. Chiều đọc không bao giờ ném vì nó nằm trên đường nạp lõi; chiều ghi ném ngay vì giá trị lạ ở đó là code gọi sai.
+│   ├── gate\                     Các cửa ghi có kỷ luật, cùng họ với LogGate: vào một chỗ, kiểm rồi mới ghi, một lượt một lệnh.
+│   │   ├── FieldLogic.js         Ba bảng chuẩn hóa - kiểm tra - bắt buộc của tài liệu 03 Phần 6, phía máy chủ. Cắt trắng và trần 50.000 ký tự là mặc định của bộ máy, không khai trong schema.
+│   │   ├── IdGate.js             Cấp mã bản ghi từ bộ đếm ở Config, chỉ chạy bên trong khóa của cửa ghi. Bộ đếm lạc hậu thì nhảy lên max+1 kèm dòng cảnh báo chứ không cấp mã đã có.
+│   │   ├── WriteGate.js          Cửa ghi duy nhất xuống sheet dữ liệu: khóa, cấp mã, ghi đúng cột đã khai bằng một hai lệnh, flush rồi nhả khóa. Không đạt một trường thì không ghi gì và không trả về số hàng.
+│   │   └── DeleteGate.js         Một nút Xóa, hai kết cục: xóa hẳn khi không tầng nào cản, xóa mềm khi có. Xóa nhiều dòng thì xóa từ dưới lên, và trả bản đồ dòng mới ngay trong cùng lần gọi.
 │   ├── service\
-│   │   └── LoadService.js        Gom cả một lượt nạp: đo ngân sách ô, đọc tham số, danh mục, toàn bộ khách, rồi giao dịch theo gói.
+│   │   ├── LoadService.js        Gom cả một lượt nạp: đo ngân sách ô, đọc tham số, danh mục, toàn bộ khách, rồi giao dịch theo gói.
+│   │   └── SaveService.js        Vỏ bọc vào ra của hai cửa ghi: bọc lỗi, gắn khối trạng thái bẩn, đo mili giây. Luật ghi nằm ở gate\, không nằm đây.
 │   ├── log\
 │   │   ├── LogGate.js            Cửa ghi log: gom dòng trong RAM, ghi xuống sheet Log bằng đúng một lệnh, che bí mật, cắt log theo hai trần.
 │   │   └── ClientTiming.js       Cửa nhận bản đo thời gian ĐO Ở TRÌNH DUYỆT rồi đệm một dòng vết. Máy chủ không tự thấy tiền đi đường, nên số này phải do client gửi. Không tin số client: kẹp trần, bỏ khóa lạ.
@@ -88,7 +94,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │                             Thư mục con chia theo MỤC ĐÍCH, không chia theo đuôi thẻ.
 │   ├── Sidebar.html              Trang gốc của sidebar: nhúng mọi tệp client theo đúng thứ tự rồi gọi lượt nạp đầu tiên.
 │   ├── ram\                      Kho dữ liệu trong RAM của sidebar, và đường nhận dữ liệu từ máy chủ.
-│   │   ├── store.html            Kho runtime cùng bảy đường tra duy nhất được chạm vào nó. Không đường nào nhận tham số chế độ xem.
+│   │   ├── store.html            Kho runtime cùng mười đường tra duy nhất được chạm vào nó. Không đường nào nhận tham số chế độ xem.
 │   │   ├── ingest.html           Chỗ DUY NHẤT biết hình dạng đường truyền { fields, rows }. Bung thành object đúng một lần ở đây.
 │   │   ├── screenState.html      Màn nào đang hiện, khách nào đang xem, form đang sửa bản ghi nào. Một object chứ ba biến rời — vì window.screen là tên trình duyệt đã chiếm, khai trùng thì lặng lẽ không có tác dụng.
 │   │   ├── prefs.html            Bản sao ba núm chọn trong RAM. Ngầm định ở đây phải khớp từng núm với bảng khai máy chủ; việc gửi lên máy chủ là của ACTIONS, tệp này không gọi google.script.run.
@@ -121,6 +127,10 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── statusScreen.html     Ba màn không có form: tóm tắt lượt nạp, lỗi nạp, và màn chặn khi vượt trần ngân sách ô.
 │   │   ├── viewScreen.html       Màn xem khách — màn mặc định. Biết KHI NÀO vẽ lại cái gì, không biết vẽ ra sao. Chỗ duy nhất nối ScreenState.currentCustomerId với Store.
 │   │   └── formScreen.html       Ba màn form dùng chung một trình tự: mở sửa, mở thêm mới, mở lồng, đóng từng lớp. Suy tiêu đề rồi chèn vào vùng header, và tính id ô nhập đầu tiên cho bên đặt con trỏ.
+│   ├── save\                     Đường ghi và đường xóa phía client. Tách khỏi ui\ vì đây là ba tệp duy nhất biết hình dạng câu trả lời của hai cửa máy chủ.
+│   │   ├── formCollect.html      Những gì đang gõ trên form thành object bản ghi. Lọc theo data-readonly chứ không theo data-field, và cố ý không ép kiểu số — cửa ghi là bộ phân tích duy nhất.
+│   │   ├── saveFlow.html         Đường bấm Lưu: gửi đúng những trường đang có mặt trên form, tô đỏ chỗ cửa ghi trả về, lưu xong thì đóng một lớp form chứ không đóng cả ngăn xếp.
+│   │   └── pendingDelete.html    Xóa có hoàn tác: bấm Xóa không gửi gì, mã vào bộ chờ và dải hoàn tác đếm ngược. Mặt nạ ở tầng hiện, Store không bị sửa cho tới khi máy chủ trả lời.
 │   └── util\
 │       ├── serverCall.html       Bọc google.script.run thành Promise kèm vạch tiến trình. Cửa duy nhất thấy cả hai đầu một vòng gọi, nên phép đo thời gian cũng ở đây. Cố ý KHÔNG tự hiện lỗi — việc đó của bên gọi.
 │       ├── callTiming.html       Sổ đo từng vòng gọi. Tách tổng thời gian thành ba phần: máy chủ tính toán, tiền đi đường, trình duyệt bung và vẽ.
@@ -222,9 +232,7 @@ Ba dòng cuối lệch vì thư mục: tài liệu 04 gom cả CSS vào `client/
 Ghi ra đây để chỗ đặt tệp mới là điều đã quyết trước, không phải điều quyết lúc đang gấp.
 
 ```
-server\gate\                      Các cửa ghi có kỷ luật: WriteGate, IdGate, DeleteGate — cùng họ với LogGate.
 server\view\                      Dựng sheet quản lý: đọc bộ lọc, sắp xếp, vẽ lại vùng dữ liệu.
-client\save\                      Đường lưu: gom dữ liệu form, gọi máy chủ, hoàn tác.
 ```
 
 Biểu mẫu **không** có thư mục riêng: bộ máy dựng form là `client\ui\` (uiBuilder, renderEngine, actions, slots), bảng khai form là `client\schema\` (uiSchema, fieldLogic), và mỗi màn có form là một tệp trong `client\screen\`.
