@@ -11,9 +11,23 @@
 /**
  * Hằng số phía code, một chỗ duy nhất theo tài liệu 01 Phần 2.8.
  *
- * Ở đây **chỉ có** những tham số mà tài liệu đã cho con số, cộng những tham số mà chặng đang làm buộc phải có một con số để chạy được. Tài liệu còn nhắc tên `LOCK_WAIT_MS` và `UNDO_DELAY_MS` mà không cho giá trị; chúng vào đây cùng chặng dùng đến chúng, với con số do chủ dự án chốt. Điền số đoán trước lúc cần là dựng một hằng số trông như đã được quyết định, mà thực ra chưa ai quyết.
+ * Ở đây **chỉ có** những tham số mà tài liệu đã cho con số, cộng những tham số mà chặng đang làm buộc phải có một con số để chạy được. Điền số đoán trước lúc cần là dựng một hằng số trông như đã được quyết định, mà thực ra chưa ai quyết.
  */
 var SETTINGS = {
+  /**
+   * Thời gian chờ khóa tệp trước khi bỏ cuộc, tính theo milli giây (millisecond — một phần nghìn giây). Tài liệu 06 Phần 2 chỉ định tên hằng này mà không cho con số.
+   *
+   * **15.000 là con số bản cũ đã chạy thật.** `9_Code_cu_tham_chieu/src/core/Api.js` gọi `lock.waitLock(15000)` và chủ dự án đã đi bán hàng bằng con số đó, nên nó là con số đã có người dùng chấp nhận chứ không phải con số vừa nghĩ ra.
+   *
+   * Vì sao không ngắn hơn: một lượt lưu bình thường giữ khóa dưới hai giây, nên chờ 15 giây chỉ xảy ra khi có một lượt lưu khác đang thật sự chạy. Ngắn hơn thì hai người bấm Lưu gần nhau sẽ thấy "hệ thống bận" trong khi chỉ cần chờ thêm một nhịp. Vì sao không dài hơn: Apps Script cho mỗi lượt chạy sáu phút, và một người ngồi nhìn nút Lưu quay quá 15 giây sẽ bấm lại — mà bấm lại lúc đang chờ khóa là cách chắc chắn nhất để xếp thêm một lượt chờ nữa.
+   */
+  LOCK_WAIT_MS: 15000,
+  /**
+   * Thời gian đếm ngược trước khi lệnh xóa thật sự được gửi đi, tính theo milli giây. Tài liệu 06 Phần 6.
+   *
+   * Bản cũ **không có** phép xóa và không có Hoàn tác, nên con số này không có tiền lệ nào để dựa vào. 5.000 là khoảng đủ để mắt đọc xong dòng "Đã xóa — Hoàn tác" và tay kịp với tới nút, và đủ ngắn để không ai ngồi chờ nó. Đây là con số quy ước của loại thông báo này ở phần lớn phần mềm, không phải con số đo được.
+   */
+  UNDO_DELAY_MS: 5000,
   /** Hạn giữ log, tính theo ngày. Tài liệu 10 Phần 6. */
   LOG_RETENTION_DAYS: 30,
   /** Trần số dòng của sheet `Log`. Tài liệu 10 Phần 6. */

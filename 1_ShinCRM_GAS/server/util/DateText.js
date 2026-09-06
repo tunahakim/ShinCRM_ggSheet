@@ -9,7 +9,7 @@
  *
  * Nhờ tính chất rộng cố định đó, dự án **không có** hàm so sánh hai mốc thời gian. Sắp `workDate` giảm dần là `b.workDate < a.workDate`, không cần phân tích ngày tháng, không cần thư viện. Viết một hàm bọc quanh phép so chữ chỉ để trông có vẻ nghiêm túc là thêm một chỗ để lỗi nằm im.
  *
- * Tệp này chỉ làm chiều **ra** — ô sheet thành chuỗi. Chiều **vào** (chuỗi thành giá trị ghi xuống ô) thuộc cửa ghi ở chặng 1.4, và cố ý chưa viết ở đây: chưa có ai gọi thì chưa ai biết nó đúng hay sai. Chỗ để nó là tệp này, khi tới lúc.
+ * Tệp này giữ **cả hai chiều**. Chiều ra — ô sheet thành chuỗi — là `dateToText`. Chiều vào — chuỗi người dùng gõ thành giá trị ghi xuống ô — là `textToDate`, thêm ở chặng lưu. Hai chiều ở chung một tệp vì chúng phải đối xứng: sửa khuôn ở một chiều mà quên chiều kia là cách chắc chắn nhất để một ngày lưu xuống rồi đọc lên thành một ngày khác.
  */
 
 /** Khuôn của `precision: 'day'`. */
@@ -64,6 +64,47 @@ function dateToText(value, precision, timezone) {
 }
 
 /**
+ * Chuỗi thời gian thành giá trị ghi xuống ô. Chiều ngược của `dateToText`. Rỗng trả về chuỗi rỗng, tức là xóa trắng ô.
+ *
+ * **Trả về `Date` thật chứ không trả về chuỗi**, dù chuỗi trông đơn giản hơn. Lý do: ô chứa `Date` thì Sheets biết nó là ngày, nên sắp xếp đúng, lọc đúng, và sheet quản trị ở chặng sau lọc được theo khoảng ngày. Ô chứa chuỗi `"2026-01-05"` thì mọi phép đó thành phép so chữ, và một cột ngày kiểu chữ là thứ không sửa lại được sau khi đã có nghìn dòng.
+ *
+ * **Chuỗi trượt khuôn thì đi qua nguyên văn, không ném lỗi và không tự đoán.** Đây là chỗ dễ mắc bẫy nhất của cả tệp: `new Date(2026, 12, 40)` không ném lỗi mà lặng lẽ thành ngày 09/01/2027. Một ngày sai mà trông hợp lệ thì không ai tìm ra, còn một ô hiện đúng chữ người dùng gõ thì nhìn là thấy. Nên phép kiểm khoảng ở đây chặt tới từng con số, và trượt là giữ nguyên chữ.
+ *
+ * Múi giờ: hàm dựng `Date` theo múi giờ **của script** (`appsscript.json`), còn Sheets bày ô ra theo múi giờ **của tệp**. Hai múi giờ này phải bằng nhau, và đó là lý do `probeDateText` in cả hai ra cạnh nhau — lệch nhau thì mọi mốc nửa đêm rơi sang ngày hôm trước.
+ */
+function textToDate(value, precision) {
+  var format = dateTextFormatOf(precision);
+
+  if (value === null || value === undefined) { return ''; }
+  if (dateTextIsDate(value)) { return isNaN(value.getTime()) ? '' : value; }
+
+  var text = String(value).trim();
+  if (!text) { return ''; }
+
+  // Nhận cả dấu cách và chữ `T` giữa ngày và giờ. Bộ thu thập gửi dấu cách, còn ô `datetime-local` của trình duyệt sinh ra chữ `T`;
+  // nhận cả hai ở đây rẻ hơn nhiều so với việc đi tìm xem một mốc mất giờ là do chỗ nào quên đổi.
+  var khop = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?$/.exec(text);
+  if (!khop) { return text; }
+
+  var nam = Number(khop[1]);
+  var thang = Number(khop[2]);
+  var ngay = Number(khop[3]);
+  var gio = khop[4] === undefined ? 0 : Number(khop[4]);
+  var phut = khop[5] === undefined ? 0 : Number(khop[5]);
+
+  if (thang < 1 || thang > 12 || ngay < 1 || ngay > 31 || gio > 23 || phut > 59) { return text; }
+  if (format === DATE_TEXT_DAY_FORMAT && khop[4] !== undefined) { gio = 0; phut = 0; }
+
+  var moc = new Date(nam, thang - 1, ngay, gio, phut, 0, 0);
+
+  // Chặn ngày không tồn tại: 31/02 đi qua phép kiểm khoảng ở trên nhưng `Date` sẽ tự đẩy nó thành 03/03. So lại ba con số
+  // là cách duy nhất bắt được việc tự đẩy đó, vì `Date` không có cờ nào nói rằng nó vừa sửa hộ.
+  if (moc.getFullYear() !== nam || moc.getMonth() !== thang - 1 || moc.getDate() !== ngay) { return text; }
+
+  return moc;
+}
+
+/**
  * Phép nghiệm thu chạy được trên Google, in ra để người ngồi ngoài xem.
  *
  * Có phép này vì `dateToText` là chỗ mà bộ kiểm thử offline **không chứng minh được điều quan trọng nhất**: `Utilities.formatDate` giả trong Node bỏ qua tham số múi giờ. Nên câu hỏi "đổi khuôn có đúng giờ Việt Nam không" chỉ trả lời được ở đây, trên Google, với `Utilities` thật.
@@ -71,13 +112,18 @@ function dateToText(value, precision, timezone) {
 function probeDateText() {
   var report = [];
   var moc = new Date(2026, 0, 5, 7, 30, 45);
+  var muiGioScript = Session.getScriptTimeZone();
+  var muiGioTep = shinOpenBook().getSpreadsheetTimeZone();
 
-  report.push('Múi giờ tệp Sheet: ' + shinOpenBook().getSpreadsheetTimeZone() + ' — múi giờ dự phòng: ' + DATE_TEXT_TIMEZONE);
+  report.push('Múi giờ script: ' + muiGioScript + ' — múi giờ tệp Sheet: ' + muiGioTep + ' — dự phòng: ' + DATE_TEXT_TIMEZONE);
+  report.push(muiGioScript === muiGioTep ? '  Hai múi giờ bằng nhau: đúng.' : '  ⚠ HAI MÚI GIỜ LỆCH NHAU. Mọi mốc nửa đêm sẽ rơi sang ngày hôm trước. Sửa appsscript.json cho khớp múi giờ tệp.');
   report.push('Mốc thử (7 giờ 30 phút 45 giây sáng ngày 05/01/2026 theo giờ máy chủ script):');
   report.push('  day    → "' + dateToText(moc, 'day') + '"    (chờ đợi: "2026-01-05")');
   report.push('  minute → "' + dateToText(moc, 'minute') + '" (chờ đợi: "2026-01-05 07:30", không có giây)');
   report.push('Ô rỗng: day → "' + dateToText('', 'day') + '" — null → "' + dateToText(null, 'minute') + '"');
   report.push('Ô gõ lạ: "chưa rõ" → "' + dateToText('chưa rõ', 'day') + '" (đi qua nguyên văn, cố ý không ném lỗi)');
+  report.push('Vòng tròn ra rồi vào: "2026-01-05 07:30" → ' + dateToText(textToDate('2026-01-05 07:30', 'minute'), 'minute', muiGioTep));
+  report.push('Ngày không tồn tại: "2026-02-31" → ' + JSON.stringify(textToDate('2026-02-31', 'day')) + ' (giữ nguyên chữ, không tự đẩy sang 03/03)');
 
   report.forEach(function (line) { Logger.log(line); });
   return report;
