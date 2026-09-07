@@ -3,7 +3,7 @@
  *
  * Vì sao cần: những luật đáng lo nhất của dự án là luật về **số lệnh gọi** — "cả lượt chỉ tốn một `setValues`", "cắt log bằng một `deleteRows`". Trên Google thì đo được bằng đồng hồ và hạn mức, nhưng mỗi lần đo là một vòng đẩy code cộng chờ mạng, nên trong một phiên code người ta sẽ đo một lần rồi thôi. Ở đây tệp giả **tự đếm** từng lệnh, nên luật đó thành một phép kiểm chạy trong một giây.
  *
- * Giới hạn phải biết, và đây là chỗ ghi nó: tệp giả này **không phải Google**. Nó nhớ khuôn hiển thị nhưng không có **hệ quả** của khuôn (ghi chuỗi số vào ô General ở đây không bị đổi thành số), không có công thức, không có hàng ẩn, không có giới hạn 10 triệu ô, và không có chuyện `getActiveSpreadsheet` trả về một đối tượng trông như tệp nhưng đụng vào là ném lỗi. Xanh ở đây nghĩa là logic đúng, không có nghĩa là chạy được trên Google — lời cuối vẫn thuộc về các phép nghiệm thu qua `node tests/gas.js`.
+ * Giới hạn phải biết, và đây là chỗ ghi nó: tệp giả này **không phải Google**. Nó nhớ khuôn hiển thị và đổi chuỗi chữ số thành số đúng như Google, nhưng phần đọc chuỗi của nó hẹp hơn thật (xem `epTheoKhuon`); nó không có công thức, không có hàng ẩn, không có giới hạn 10 triệu ô, và không có chuyện `getActiveSpreadsheet` trả về một đối tượng trông như tệp nhưng đụng vào là ném lỗi. Xanh ở đây nghĩa là logic đúng, không có nghĩa là chạy được trên Google — lời cuối vẫn thuộc về các phép nghiệm thu qua `node tests/gas.js`.
  */
 
 /** Một ô rỗng ra chuỗi rỗng, đúng như `getValues` của Google trả về. */
@@ -17,6 +17,22 @@ function oRong(giaTri) {
  * Để đúng chuỗi thật chứ không để chuỗi rỗng, vì đây chính là khuôn nuốt số 0 đầu của mã số thuế: một phép kiểm đọc thấy khuôn này nghĩa là cột đang hở, và nó phải đỏ.
  */
 const KHUON_GENERAL = '0.###############';
+
+/** Ô văn bản thuần — khuôn duy nhất giữ nguyên chuỗi số. */
+const KHUON_TEXT = '@';
+
+/**
+ * Hệ quả của khuôn ô: Google đổi chuỗi trông như số thành số, trừ khi ô đang ở khuôn văn bản thuần. Đây là chỗ số 0 đầu của mã số thuế và số điện thoại biến mất.
+ *
+ * Chỉ nhận **chuỗi toàn chữ số**, không dấu phân cách. Hẹp hơn Google có ý thức, và cái hẹp này là cố ý ở hai mức: `1.500` hay `1,500` thì nghĩa của dấu chấm phụ thuộc miền của tệp, mà đoán sai miền thì tệp giả không còn nghiêm hơn thật, nó chỉ **sai khác** thật — một ô hóa ra 1,5 trong khi Google cho 1500. Phần chưa mô phỏng (ngày tháng, phần trăm, công thức) vẫn là chỗ tệp giả dễ tính hơn thật, nên phép nghiệm thu trên Google vẫn là lời cuối.
+ */
+function epTheoKhuon(giaTri, khuon) {
+  if (typeof giaTri !== 'string' || khuon === KHUON_TEXT) { return giaTri; }
+
+  const text = giaTri.trim();
+  if (!text || !/^-?\d+$/.test(text)) { return giaTri; }
+  return Number(text);
+}
 
 /**
  * Dựng một sheet giả. `dem` là bộ đếm dùng chung của cả tệp, để phép kiểm biết một lượt tốn mấy lệnh.
@@ -137,19 +153,22 @@ function taoSheet(ten, dem, luoi) {
               throw new Error('setValues: vùng ' + soCot + ' cột nhưng dòng ' + (r + 1) + ' có ' + dong.length + ' ô.');
             }
             const dich = layDong(row - 1 + r);
-            dong.forEach((o, c) => { dich[col - 1 + c] = o; });
+            const khuonDong = formats[row - 1 + r] || [];
+            dong.forEach((o, c) => { dich[col - 1 + c] = epTheoKhuon(o, khuonDong[col - 1 + c] || KHUON_GENERAL); });
           });
           dem.setValues += 1;
           return range;
         },
 
         getValue() { return oRong((cells[row - 1] || [])[col - 1]); },
-        setValue(v) { layDong(row - 1)[col - 1] = v; dem.setValues += 1; return range; },
+        setValue(v) {
+          layDong(row - 1)[col - 1] = epTheoKhuon(v, (formats[row - 1] || [])[col - 1] || KHUON_GENERAL);
+          dem.setValues += 1;
+          return range;
+        },
 
         /**
-         * Khuôn hiển thị — thứ duy nhất trong phần định dạng được mô phỏng thật, vì dự án **đọc lại** nó ở `verifySheets`.
-         *
-         * Vẫn không mô phỏng **hệ quả** của khuôn: ở đây ghi chuỗi `'0101243150'` vào ô khuôn General thì nó vẫn nằm nguyên là chuỗi, còn Google thì đổi thành số `101243150`. Nên phép kiểm offline chỉ chứng minh được cột đã được đặt đúng khuôn, không chứng minh được số 0 đầu sống sót; câu đó chỉ `probeWriteGate` trên Google trả lời được.
+         * Khuôn hiển thị. Mô phỏng cả **hệ quả** của khuôn: ghi chuỗi `'0101243150'` vào ô chưa đặt khuôn văn bản thì nó thành số `101243150` ở đây, đúng như trên Google — xem `epTheoKhuon`.
          */
         setNumberFormat(format) {
           for (let r = 0; r < soDong; r += 1) {

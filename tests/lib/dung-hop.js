@@ -23,6 +23,7 @@ const TEP_NEN = [
   'server/sheet/Book.js',
   'server/data/DataSchema.js',
   'server/data/SheetLayout.js',
+  'server/data/ColumnFormat.js',
   'server/sheet/SheetIo.js',
   'server/sheet/SheetGrid.js',
   'server/config/Settings.js',
@@ -46,7 +47,28 @@ const TEP_NEN = [
 ];
 
 /**
- * Ghi hàng 1 cho một sheet giả.
+ * Đặt khuôn hiển thị cho vùng dữ liệu, đúng như `setupColumnFormats` làm trên sheet thật.
+ *
+ * Cần có vì tệp giả đã mô phỏng **hệ quả** của khuôn ô. Hộp cát không đặt khuôn thì nó là một sheet chưa ai dựng khung, nên mọi phép kiểm gieo mã số thuế `0101243150` vào đó đều mất số 0 đầu — mất đúng vì lý do Google mất, tức là hoàn cảnh dựng sai chứ không phải code sai.
+ */
+function datKhuonCot(hop, sheet, tenSheet, codes) {
+  if (!hop.SHEET_LAYOUT[tenSheet]) { return; }
+
+  const khuon = hop.columnFormatMap(tenSheet);
+  if (!khuon) { return; }
+
+  const firstDataRow = hop.SHEET_LAYOUT[tenSheet].firstDataRow;
+  const soDong = sheet.getMaxRows() - firstDataRow + 1;
+  if (soDong <= 0) { return; }
+
+  codes.forEach((code, i) => {
+    if (!khuon[code]) { return; }
+    sheet.getRange(firstDataRow, i + 1, soDong, 1).setNumberFormat(khuon[code]);
+  });
+}
+
+/**
+ * Ghi hàng 1 cho một sheet giả, rồi đặt khuôn hiển thị cho vùng dữ liệu.
  *
  * `themCot` chèn một mã lạ vào giữa hàng 1. Có tham số này để phép kiểm chứng minh được code tra cột theo mã chứ không theo thứ tự — người dùng chèn cột là quyền của họ, và luật hàng 1 nói vị trí cột suy ra từ mã.
  */
@@ -59,6 +81,7 @@ function ghiHangMa(hop, sheet, tenSheet, themCot) {
   let codes = hop.sheetCoreColumns(tenSheet).map((cot) => cot[0]);
   if (themCot) { codes = [codes[0], '@COT_RIENG_CUA_TOI'].concat(codes.slice(1)); }
   sheet.getRange(1, 1, 1, codes.length).setValues([codes]);
+  datKhuonCot(hop, sheet, tenSheet, codes);
   return codes;
 }
 
