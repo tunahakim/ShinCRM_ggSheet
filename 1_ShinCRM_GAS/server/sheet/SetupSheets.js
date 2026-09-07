@@ -104,38 +104,9 @@ function seedConfigParams(file) {
 }
 
 /**
- * Khuôn hiển thị (number format) của cột, tra theo kiểu khai. Đặt một lần lúc dựng khung, không đặt lại ở mỗi lượt Lưu.
+ * Đặt khuôn hiển thị cho **cả cột** của các cột lõi, ở mọi sheet có khai khuôn — hai sheet kho và `Category`. Bảng khuôn ở `server/data/ColumnFormat.js`.
  *
- * `'@'` nghĩa là ô văn bản thuần. Đây không phải chuyện thẩm mỹ mà là chuyện mất dữ liệu: ghi chuỗi `'0101243150'` vào một ô đang ở khuôn General thì Sheets tự hiểu đó là số và cắt luôn số 0 đầu, thành `101243150` — mã số thuế và số điện thoại sai vĩnh viễn mà không có thông báo nào. Bản cũ chống đúng chỗ này bằng `setNumberFormat("@")` trước từng lượt ghi mã số thuế.
- *
- * Hai khuôn ngày cũng là khuôn người đọc: chủ dự án đọc thẳng trên sheet, nên `dd/mm/yyyy` dễ nhìn hơn con số ngày tháng thô.
- */
-var COLUMN_FORMAT_BY_TYPE = { TEXT: '@', SELECT: '@', NUMBER: '#,##0.###' };
-
-/** Khuôn của cột `DATE`, tra theo `precision`. Trường `DATE` mà không khai `precision` là lỗi bảng khai, `SchemaCheck.gs` bắt trước. */
-var COLUMN_FORMAT_BY_PRECISION = { day: 'dd/mm/yyyy', minute: 'dd/mm/yyyy HH:mm' };
-
-/** Khuôn của một trường. Ném lỗi thay vì đoán, vì đoán sai khuôn ngày là một cột hiện sai suốt đời mà không ai để ý. */
-function columnFormatOf(entity, name, spec) {
-  if (spec.type === 'DATE') {
-    var format = COLUMN_FORMAT_BY_PRECISION[spec.precision];
-    if (!format) {
-      throw new Error('Trường "' + entity + '.' + name + '" kiểu DATE nhưng precision là "' + spec.precision + '" — chỉ có: ' + Object.keys(COLUMN_FORMAT_BY_PRECISION).join(', ') + '.');
-    }
-    return format;
-  }
-
-  var byType = COLUMN_FORMAT_BY_TYPE[spec.type];
-  if (!byType) {
-    throw new Error('Trường "' + entity + '.' + name + '" khai kiểu "' + spec.type + '", không có khuôn hiển thị cho kiểu này.');
-  }
-  return byType;
-}
-
-/**
- * Đặt khuôn hiển thị cho toàn bộ vùng dữ liệu của các cột lõi, cả hai sheet dữ liệu.
- *
- * Đặt ở đây — một lần, lúc dựng khung — chứ không đặt ở cửa ghi, vì ba lý do: cửa ghi mà đặt khuôn thì mỗi lượt Lưu tốn thêm vài lệnh gọi mạng; nó sẽ ghi đè khuôn mà người dùng tự chọn cho hàng của họ; và nó chỉ chữa được hàng mới trong khi hàng đã có sẵn vẫn hở. Đặt cho cả cột thì Sheets tự nhân khuôn đó sang hàng mới do `insertRowsAfter` thêm vào.
+ * Đặt cho cả cột chứ không cho từng hàng, để hàng mới do `insertRowsAfter` thêm vào tự thừa hưởng khuôn. Cửa ghi còn đặt lại khuôn cột chữ ngay trước mỗi lệnh ghi, vì khuôn đặt một lần lúc dựng khung không sống nổi qua một lượt người dùng tự đổi định dạng cột trên sheet.
  *
  * Gộp các cột liền nhau cùng khuôn thành một lệnh, theo luật gộp lệnh ghi của tài liệu 06.
  *
@@ -144,8 +115,7 @@ function columnFormatOf(entity, name, spec) {
 function setupColumnFormats() {
   var lines = [''];
 
-  Object.keys(ENTITY_SHEETS).forEach(function (entity) {
-    var sheetName = ENTITY_SHEETS[entity];
+  columnFormatSheets().forEach(function (sheetName) {
     var sheet = shinOpenSheet(sheetName);
     var firstDataRow = SHEET_LAYOUT[sheetName].firstDataRow;
     var maxRows = sheet.getMaxRows();
@@ -155,10 +125,10 @@ function setupColumnFormats() {
       return;
     }
 
-    var fields = DATA_SCHEMA[entity];
+    var formatByCode = columnFormatMap(sheetName);
     var columnMap = readColumnMap(sheetName);
-    var cols = Object.keys(fields).map(function (name) {
-      return { at: columnIndex(columnMap, fields[name].code), format: columnFormatOf(entity, name, fields[name]) };
+    var cols = Object.keys(formatByCode).map(function (code) {
+      return { at: columnIndex(columnMap, code), format: formatByCode[code] };
     }).sort(function (a, b) { return a.at - b.at; });
 
     var groups = [];
@@ -253,9 +223,8 @@ function verifySheets() {
   }
 
   // Khuôn hiển thị: đọc một hàng dữ liệu là đủ, vì khuôn đặt cho cả cột. Đây là phép kiểm duy nhất cho biết chỗ chống Sheets tự đổi chuỗi số thành số có thật đang bật trên tệp hay không.
-  Object.keys(ENTITY_SHEETS).forEach(function (entity) {
-    var sheetName = ENTITY_SHEETS[entity];
-    var fields = DATA_SCHEMA[entity];
+  columnFormatSheets().forEach(function (sheetName) {
+    var formatByCode = columnFormatMap(sheetName);
 
     try {
       var sheet = shinOpenSheet(sheetName);
@@ -268,15 +237,15 @@ function verifySheets() {
 
       var columnMap = readColumnMap(sheetName);
       var formats = sheet.getRange(firstDataRow, 1, 1, columnMap.lastColumn).getNumberFormats()[0];
-      var wrong = Object.keys(fields).filter(function (name) {
-        return formats[columnIndex(columnMap, fields[name].code) - 1] !== columnFormatOf(entity, name, fields[name]);
+      var wrong = Object.keys(formatByCode).filter(function (code) {
+        return formats[columnIndex(columnMap, code) - 1] !== formatByCode[code];
       });
 
       if (wrong.length) {
         problems.push(sheetName + ', khuôn hiển thị: sai ở ' + wrong.join(', '));
         lines.push('❌ ' + sheetName + ', khuôn hiển thị — sai ở ' + wrong.join(', ') + '. Chạy setupSheets để đặt lại.');
       } else {
-        lines.push('✅ ' + sheetName + ', khuôn hiển thị — ' + Object.keys(fields).length + ' cột lõi đúng khuôn, cột chữ ở khuôn văn bản thuần nên số 0 đầu không bị cắt');
+        lines.push('✅ ' + sheetName + ', khuôn hiển thị — ' + Object.keys(formatByCode).length + ' cột lõi đúng khuôn, cột chữ ở khuôn văn bản thuần nên số 0 đầu không bị cắt');
       }
     } catch (loiKhuon) {
       problems.push(sheetName + ', khuôn hiển thị: ' + loiKhuon.message);

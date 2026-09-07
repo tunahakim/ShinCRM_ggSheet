@@ -271,13 +271,28 @@ function writeGateUniqueCheck(plans, names, fields, source, context, invalid) {
 }
 
 /**
+ * Đặt lại khuôn văn bản thuần cho các ô của cột chữ sắp ghi, **ngay trước** lệnh ghi.
+ *
+ * Vì sao phải làm ở đây chứ không chỉ làm một lần lúc dựng khung: khuôn cột là thứ người dùng đổi được bằng hai cú bấm trên sheet, và đổi rồi thì lượt Lưu sau đó ghi `'0101243150'` vào một ô số — Sheets cắt số 0 đầu, không báo gì, và không có đường nào lấy lại. `verifySheets` phát hiện được chuyện đó nhưng chỉ khi có người chạy nó.
+ *
+ * **Chỉ cột chữ, và chỉ những ô sắp ghi.** Cột số và cột ngày không đặt lại: ghi số vào ô đang ở khuôn nào cũng không mất chữ số nào, nên đặt lại chỉ để xóa mất khuôn hiển thị người dùng tự chọn cho hàng của họ. Gom dải liền nhau bằng đúng `writeGateRanges` của đường ghi, nên một lượt lưu thường tốn thêm một lệnh.
+ */
+function writeGateForceTextFormat(context, firstRow, soDong, cotChu) {
+  if (!cotChu.length || soDong <= 0) { return; }
+
+  writeGateRanges(cotChu).forEach(function (dai) {
+    context.sheet.getRange(firstRow, dai[0] + 1, soDong, dai.length).setNumberFormat(COLUMN_FORMAT_TEXT);
+  });
+}
+
+/**
  * Ghi các bản ghi mới thành **một khối liền mạch** ngay dưới dòng cuối đang có dữ liệu.
  *
  * Tập cột của khối là **hợp** các khóa mà các bản ghi trong lô mang; bản ghi nào thiếu một khóa của tập đó thì ô ấy ghi rỗng. Đây là chỗ duy nhất cửa ghi ghi rỗng lên một khóa bản ghi không mang, và nó đúng vì dòng đang được dựng mới: ô đó vốn trống.
  *
  * Nới lưới trước khi ghi, vì `setValues` không tự nới — bài học ở `SheetGrid.gs`.
  */
-function writeGateWriteNew(moi, context, colOf, nameAt) {
+function writeGateWriteNew(moi, context, colOf, nameAt, laCotChu) {
   if (!moi.length) { return; }
 
   var keys = {};
@@ -286,7 +301,10 @@ function writeGateWriteNew(moi, context, colOf, nameAt) {
   var firstRow = SHEET_FIRST_DATA_ROW + context.rowCount;
   sheetGridEnsureRoom(context.sheet, firstRow + moi.length - 1, SHEET_GRID_SLACK);
 
-  writeGateRanges(Object.keys(keys).map(function (ten) { return colOf[ten]; })).forEach(function (dai) {
+  var cols = Object.keys(keys).map(function (ten) { return colOf[ten]; });
+  writeGateForceTextFormat(context, firstRow, moi.length, cols.filter(function (at) { return laCotChu[at]; }));
+
+  writeGateRanges(cols).forEach(function (dai) {
     var values = moi.map(function (plan) {
       return dai.map(function (at) {
         var ten = nameAt[at];
@@ -300,12 +318,15 @@ function writeGateWriteNew(moi, context, colOf, nameAt) {
 }
 
 /** Ghi các bản ghi đã có, mỗi bản ghi một dòng, mỗi dải cột liền nhau một lệnh. Bản ghi không mang khóa nào thì không tốn lệnh nào. */
-function writeGateWriteExisting(cu, context, colOf, nameAt) {
+function writeGateWriteExisting(cu, context, colOf, nameAt, laCotChu) {
   cu.forEach(function (plan) {
     var names = Object.keys(plan.values);
     if (!names.length) { return; }
 
-    writeGateRanges(names.map(function (ten) { return colOf[ten]; })).forEach(function (dai) {
+    var cols = names.map(function (ten) { return colOf[ten]; });
+    writeGateForceTextFormat(context, plan.row, 1, cols.filter(function (at) { return laCotChu[at]; }));
+
+    writeGateRanges(cols).forEach(function (dai) {
       var dong = dai.map(function (at) { return plan.values[nameAt[at]]; });
       context.sheet.getRange(plan.row, dai[0] + 1, 1, dai.length).setValues([dong]);
     });
@@ -341,11 +362,13 @@ function writeGateRun(entity, records, source, fields, batDau) {
   var names = Object.keys(fields);
   var colOf = {};
   var nameAt = {};
+  var laCotChu = {};
 
   names.forEach(function (ten) {
     var at = columnIndex(context.columnMap, fields[ten].code) - 1;
     colOf[ten] = at;
     nameAt[at] = ten;
+    if (columnFormatIsText(fields[ten])) { laCotChu[at] = true; }
   });
 
   var plans = writeGatePlans(records, writeGateRowById(context), context);
@@ -374,8 +397,8 @@ function writeGateRun(entity, records, source, fields, batDau) {
     });
   });
 
-  writeGateWriteNew(moi, context, colOf, nameAt);
-  writeGateWriteExisting(cu, context, colOf, nameAt);
+  writeGateWriteNew(moi, context, colOf, nameAt, laCotChu);
+  writeGateWriteExisting(cu, context, colOf, nameAt, laCotChu);
   SpreadsheetApp.flush();
 
   var doc = writeGateReadBack(plans, context);
