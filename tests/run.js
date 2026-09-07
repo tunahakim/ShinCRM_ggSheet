@@ -24,6 +24,7 @@ const NHOM_CA = [
   require('./cases/sheetGrid'),
   require('./cases/cellBudget'),
   require('./cases/setupSheets'),
+  require('./cases/columnFormat'),
   require('./cases/entityRead'),
   require('./cases/categoryRead'),
   require('./cases/configRead'),
