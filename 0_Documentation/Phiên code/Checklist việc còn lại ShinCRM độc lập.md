@@ -9,26 +9,26 @@ Tệp này là bàn giao: liệt kê mọi việc còn phải làm để hết G
 - Nguồn chuẩn thiết kế: `0_Documentation/Opus 4.8 tư vấn/` tài liệu 00 tới 08 cùng bốn hợp đồng. Tiến độ và quyết định các phiên: thư mục `0_Documentation/Phiên code/`.
 - Kế hoạch chi tiết của nhóm Việc 2 và Việc 3: bản plan `joyful-wobbling-honey` của phiên 06–07/09/2026, đọc nó trước khi bấm vào nhóm đó.
 
-## Nhóm 0 — Chốt lượt làm việc 08/09/2026
+## Nhóm 0 — Chốt lượt làm việc 08/09/2026 --> Đã thực hiện xong
 
-- [ ] Chủ dự án nghiệm thu dấu nháy đơn (quote prefix): lưu một khách từ sidebar rồi mở thanh công thức trên Sheet DEV, ô mã số thuế phải hiện `'…` còn ô tính hiện không dấu nháy. Code đã đẩy lên GAS ngày 08/09/2026, hàm `writeGateQuoteText` trong `1_ShinCRM_ggSheet/1_ShinCRM_GAS/server/gate/WriteGate.js`.
-- [ ] Chủ dự án nghiệm thu hộp tìm kiếm: mở hộp, gõ, vào form Sửa rồi quay ra — hộp hiện lại nguyên chữ đã gõ, bấm vào ô gõ là danh sách gợi ý hiện lại; hộp không nổi đè lên màn form; đóng hẳn chỉ bằng kính lúp hoặc Esc.
-- [ ] Xóa ba hàng probe 1704–1706 trên sheet Customer của Sheet DEV (ba hàng ghi thử dấu nháy, tên bắt đầu bằng `Test Cty`).
-- [ ] Xóa hàm `probeSeedQuoteRows` khỏi `1_ShinCRM_GAS/server/dev/DevRunner.js` và khỏi `DEV_RUNNER_ALLOWED` — phép probe đã hoàn thành vai trò, cửa dev chỉ giữ hàm còn dùng.
-- [ ] Commit tách nhóm phần đang bẩn trong cây làm việc: hộp tìm kiếm / dấu nháy đơn và hộp cát / tệp checklist này.
+- [x] Chủ dự án nghiệm thu dấu nháy đơn (quote prefix): lưu một khách từ sidebar rồi mở thanh công thức trên Sheet DEV, ô mã số thuế phải hiện `'…` còn ô tính hiện không dấu nháy. Code đã đẩy lên GAS ngày 08/09/2026, hàm `writeGateQuoteText` trong `1_ShinCRM_ggSheet/1_ShinCRM_GAS/server/gate/WriteGate.js`.
+- [x] Chủ dự án nghiệm thu hộp tìm kiếm: mở hộp, gõ, vào form Sửa rồi quay ra — hộp hiện lại nguyên chữ đã gõ, bấm vào ô gõ là danh sách gợi ý hiện lại; hộp không nổi đè lên màn form; đóng hẳn chỉ bằng kính lúp hoặc Esc.
+- [x] Xóa ba hàng probe 1704–1706 trên sheet Customer của Sheet DEV (ba hàng ghi thử dấu nháy, tên bắt đầu bằng `Test Cty`).
+- [x] Xóa hàm `probeSeedQuoteRows` khỏi `1_ShinCRM_GAS/server/dev/DevRunner.js` và khỏi `DEV_RUNNER_ALLOWED` — phép probe đã hoàn thành vai trò, cửa dev chỉ giữ hàm còn dùng.
+- [x] Commit tách nhóm phần đang bẩn trong cây làm việc: hộp tìm kiếm / dấu nháy đơn và hộp cát / tệp checklist này.
 
-## Nhóm 1 — Nghiệm thu chặng 1.3 và 1.4 bằng mắt chủ dự án
+## Nhóm 1 — Nghiệm thu chặng 1.3 và 1.4 bằng mắt chủ dự án --> Đã thực hiện xong
 
-- [ ] Bấm hết `Checklist nghiệm thu 1.3 và 1.4.md` trên Sheet DEV. Hai lỗi chủ dự án đã báo đều sửa xong: thiếu dấu sao ở trường bắt buộc, và dropdown nhận giá trị ngoài danh mục.
-- [ ] Dọn hai ghi chép cũ trong mục "Chỗ nhìn thấy sai" của tệp checklist đó — thiếu dấu sao và dropdown ngoài danh mục — vì cả hai đã sửa bằng các commit `647223e`, `0d10d4c`, `78910a4`; để nguyên là biến tài liệu thành kho lịch sử.
-- [ ] Mục "Chỗ nhìn thấy sai" trống trơn trước khi sang nhóm sau. Lỗi hộp tìm kiếm tự đóng phát hiện ngày 08/09/2026 đã sửa, thuộc nhóm 0.
+- [x] Bấm hết `Checklist nghiệm thu 1.3 và 1.4.md` trên Sheet DEV. Hai lỗi chủ dự án đã báo đều sửa xong: thiếu dấu sao ở trường bắt buộc, và dropdown nhận giá trị ngoài danh mục.
+- [x] Dọn hai ghi chép cũ trong mục "Chỗ nhìn thấy sai" của tệp checklist đó — thiếu dấu sao và dropdown ngoài danh mục — vì cả hai đã sửa bằng các commit `647223e`, `0d10d4c`, `78910a4`; để nguyên là biến tài liệu thành kho lịch sử.
+- [x] Mục "Chỗ nhìn thấy sai" trống trơn trước khi sang nhóm sau. Lỗi hộp tìm kiếm tự đóng phát hiện ngày 08/09/2026 đã sửa, thuộc nhóm 0.
 
 ## Nhóm 2 — Cầu nối Extension và cơ chế bám ô đang chọn
 
 Làm theo đúng thứ tự, mỗi mục một commit. Phía Extension chỉ sửa trong repo này; chủ dự án tự chép sang `D:\Program\0. Extension\MiniCRM_GoogleSheet` và tải lại — phiên code không chạm thư mục đó.
 
-- [ ] Extension bắn ảnh chụp trạng thái `CRM_CONTEXT` thay tin `CRM_TRIGGER`: đủ các trường sheet, gid, sheetName, cellRef thô, row/col/rowEnd/colEnd, selectionKind, cellText, isEditing, sheetTabs, at, seq. Hai tệp `2_ShinCRM_Extension/content_scripts/scout/sheet_scout.js` và `.../bridge/iframe_bridge.js`. Ghi vào docstring những thứ không đọc được vì lưới là canvas. Bản Extension đang chạy thật ngoài repo là V20.2 và có sẵn vá lỗi đổi tab — chỉ đọc nó để lấy nếp đó, không sửa nó.
-- [ ] Bịt hai lỗ an ninh của cầu nối: phía bridge chỉ bắt tay với origin googleusercontent nằm trong allowlist, đáp `CRM_HANDSHAKE_ACK` kèm đúng nonce, bỏ hẳn `'*'`; phía sidebar bỏ mọi tin sai nonce, sai spreadsheetId, hoặc sai origin.
+- [x] Extension bắn ảnh chụp trạng thái `CRM_CONTEXT` thay tin `CRM_TRIGGER`: đủ các trường sheet, gid, sheetName, cellRef thô, row/col/rowEnd/colEnd, selectionKind, cellText, isEditing, sheetTabs, at, seq. Hai tệp `2_ShinCRM_Extension/content_scripts/scout/sheet_scout.js` và `.../bridge/iframe_bridge.js`. Ghi vào docstring những thứ không đọc được vì lưới là canvas. Bản Extension đang chạy thật ngoài repo là V20.2 và có sẵn vá lỗi đổi tab — chỉ đọc nó để lấy nếp đó, không sửa nó.
+- [x] Bịt hai lỗ an ninh của cầu nối: phía bridge chỉ bắt tay với origin googleusercontent nằm trong allowlist, đáp `CRM_HANDSHAKE_ACK` kèm đúng nonce, bỏ hẳn `'*'`; phía sidebar bỏ mọi tin sai nonce, sai spreadsheetId, hoặc sai origin.
 - [ ] Sidebar: tệp mới `client/link/sheetLink.html` kèm dòng include trong `Sidebar.html`; giải mã khách ba bước — cellText khớp dạng mã khách, rồi `Store.getCustomerIdByRow`, rồi không làm gì. Chọn ra mã thì đi qua `ACTIONS.setCurrentCustomer`, không dựng event bus.
 - [ ] Máy chủ: tệp mới `server/service/SelectionService.js` với `probeSelectionCheap` (chỉ tên sheet và ô đang chọn) và `probeSelectionFull` (thêm tra mã khách); thêm `viewProbeSelection` vào danh sách trắng của DevRunner.
 - [ ] Nút sét thành icon riêng trên header màn xem, gộp làm một với `followSelection` và bỏ mục đó khỏi menu Khác; trạng thái nhớ ở UserProperties như mọi núm.
@@ -61,9 +61,14 @@ Nguồn chuẩn: tài liệu 07 (làm mới và sheet quản trị), 08 và 08A 
 
 - [ ] Thu hẹp bảng khóa Block: `elements` và `label` không còn là khóa chung của mọi vai — quyết định tạm đã tự chọn và đã ghi vào tài liệu 04 Phần 4, chờ chủ dự án duyệt rồi xóa mục khỏi `Câu hỏi đêm.md`. Đây là mục mở duy nhất còn lại trong tệp đó.
 
+--> Tôi chưa hiểu ý bạn, giải thích chi tiết giúp tôi
+
 ## Nhóm 5 — Cửa an toàn trước khi tệp Sheet mang dữ liệu thật
 
 - [ ] Xóa thư mục `server/dev/` (DevRunner) khỏi repo và xóa bản triển khai web app của nó trên Google. Cửa này mở một địa chỉ web chạy code dưới quyền chủ tệp, nên nó không được tồn tại cùng dữ liệu khách hàng.
+
+--> xóa nó thì có ảnh hưởng đến phiên đồng bộ FBM và bot tra cứu không?
+
 - [ ] Ràng buộc tắt chia sẻ link của tệp Sheet: đã chốt ngày 06/09/2026 dời sang phiên đồng bộ FBM, không làm trong lượt này — ghi ở đây để người tiếp theo không tưởng nó bị quên.
 
 ## Ngoài phạm vi ShinCRM độc lập

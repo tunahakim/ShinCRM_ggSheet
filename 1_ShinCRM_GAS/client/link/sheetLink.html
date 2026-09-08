@@ -1,0 +1,94 @@
+<script>
+/**
+ * `sheetLink` — tai nghe tin `CRM_CONTEXT` từ Extension, giải mã thành mã khách, rồi gọi `ACTIONS.setCurrentCustomer`.
+ *
+ * Ba tầng lọc trước khi dùng tin:
+ *   1. nonce — chỉ nhận tin mang đúng nonce mà sidebar vừa sinh, bỏ mọi tin lạ.
+ *   2. origin — chỉ nhận từ `docs.google.com`, bỏ tin từ iframe khác.
+ *   3. seq — bỏ tin cũ (seq nhỏ hơn seq đã dùng), tránh tin đến muộn đè tin mới.
+ *
+ * Ba bước giải mã khách, đúng thứ tự, bước trước trượt thì bước sau:
+ *   1. `cellText` khớp dạng mã khách (`CUS-000123` hoặc `KH000123`) và `Store.hasCustomer` xác nhận có thật.
+ *   2. `Store.getCustomerIdByRow(sheetName, row)` — bản đồ dòng đã nạp từ máy chủ.
+ *   3. Không có gì thì không làm gì.
+ *
+ * Chỉ gọi `setCurrentCustomer` khi `Prefs.followSelection` bật và đang ở màn `view` (không giật màn khi đang mở form).
+ */
+
+var SHEET_LINK_NONCE = '';
+var SHEET_LINK_SEQ = 0;
+var SHEET_LINK_BOOT_AT = 0;
+var SHEET_LINK_SPREADSHEET_ID = '';
+var sheetLinkInstalled = false;
+
+var SHEET_LINK_ORIGIN = 'https://docs.google.com';
+var SHEET_LINK_CODE_PATTERN = /^[A-Z]{2,4}-?[0-9]{6}$/;
+
+function sheetLinkNonceMake() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+function sheetLinkInstall() {
+  if (sheetLinkInstalled) { return; }
+  sheetLinkInstalled = true;
+  SHEET_LINK_NONCE = sheetLinkNonceMake();
+  SHEET_LINK_BOOT_AT = Date.now();
+  window.addEventListener('message', sheetLinkOnMessage);
+  sheetLinkHandshakePing();
+}
+
+function sheetLinkHandshakePing() {
+  if (window.top === window) { return; }
+  try {
+    window.top.postMessage({ action: 'CRM_HANDSHAKE', nonce: SHEET_LINK_NONCE }, SHEET_LINK_ORIGIN);
+  } catch (err) {
+    // Extension chưa cài hoặc trang chưa sẵn sàng — không sao, ping lại ở nhịp sau.
+  }
+}
+
+function sheetLinkOnMessage(event) {
+  var data = event.data;
+  if (!data || data.action !== 'CRM_CONTEXT') { return; }
+
+  // Tầng 1: nonce
+  if (data.nonce !== SHEET_LINK_NONCE) { return; }
+
+  // Tầng 2: origin
+  if (event.origin !== SHEET_LINK_ORIGIN) { return; }
+
+  // Tầng 3: spreadsheetId — chỉ nhận tin từ đúng tệp sheet sidebar đang phục vụ
+  if (SHEET_LINK_SPREADSHEET_ID && data.spreadsheetId !== SHEET_LINK_SPREADSHEET_ID) { return; }
+
+  // Tầng 4: seq — bỏ tin cũ
+  if (data.seq <= SHEET_LINK_SEQ) { return; }
+  SHEET_LINK_SEQ = data.seq;
+
+  // Không phản ứng khi người dùng đang gõ trong thanh công thức
+  if (data.isEditing) { return; }
+
+  sheetLinkApplyContext(data);
+}
+
+function sheetLinkApplyContext(ctx) {
+  if (!Prefs.followSelection) { return; }
+  if (ScreenState.screen !== SCREEN_VIEW) { return; }
+
+  var ma = sheetLinkCustomerIdFromContext(ctx);
+  if (!ma || ma === ScreenState.currentCustomerId) { return; }
+
+  ACTIONS.setCurrentCustomer({ pick: ma });
+}
+
+function sheetLinkCustomerIdFromContext(ctx) {
+  // Bước 1: cellText khớp dạng mã khách
+  var text = String(ctx.cellText || '').trim().toUpperCase();
+  if (SHEET_LINK_CODE_PATTERN.test(text) && Store.hasCustomer(text)) { return text; }
+
+  // Bước 2: bản đồ dòng
+  if (ctx.row > 0 && ctx.sheetName) {
+    return Store.getCustomerIdByRow(ctx.sheetName, ctx.row) || '';
+  }
+
+  // Bước 3: không có gì
+  return '';
+}
