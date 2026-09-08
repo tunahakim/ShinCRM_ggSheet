@@ -23,6 +23,10 @@ function saveRecord(entity, record) {
     var batDau = Date.now();
     var ra = writeGateSave({ entity: entity, records: [record], source: 'user' });
 
+    if (ra.ok && ra.fields && ra.rows) {
+      var idAt = ra.fields.indexOf('id');
+      if (idAt >= 0) { dirtyStateMarkRecords(ra.rows.map(function (row) { return row[idAt]; })); }
+    }
     ra.dirty = dirtyStateRead();
     ra.selection = selectionSnapshot();
     ra.ms = Date.now() - batDau;
@@ -42,6 +46,10 @@ function deleteRecords(entity, ids) {
     var batDau = Date.now();
     var ra = deleteGateRemove({ entity: entity, ids: ids });
 
+    if (ra.ok) {
+      var changed = (ra.hard || []).concat(Object.keys(ra.reasons || {}));
+      if (changed.length) { dirtyStateMarkRecords(changed); }
+    }
     ra.dirty = dirtyStateRead();
     ra.selection = selectionSnapshot();
     ra.ms = Date.now() - batDau;
