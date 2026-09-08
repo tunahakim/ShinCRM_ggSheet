@@ -115,6 +115,36 @@ function viewColumnA1(column, row) {
   return label + row;
 }
 
+var VIEW_ERROR_NOTE_PREFIX = '⛔ ShinCRM:';
+var VIEW_USER_NOTE_MARKER = '\n\nGhi chú trước đó:\n';
+
+function viewFilterErrorText(error) {
+  return [error.reason, error.hint].filter(function (part, i, all) { return part && all.indexOf(part) === i; }).join(' ');
+}
+
+function viewSetErrorNote(sheet, column, message) {
+  var cell = sheet.getRange(3, column);
+  var current = typeof cell.getNote === 'function' ? String(cell.getNote() || '') : '';
+  var userNote = current;
+  if (current.indexOf(VIEW_ERROR_NOTE_PREFIX) === 0) {
+    var markerAt = current.indexOf(VIEW_USER_NOTE_MARKER);
+    userNote = markerAt >= 0 ? current.slice(markerAt + VIEW_USER_NOTE_MARKER.length) : '';
+  }
+  cell.setNote(VIEW_ERROR_NOTE_PREFIX + ' ' + message + (userNote ? VIEW_USER_NOTE_MARKER + userNote : ''));
+}
+
+function viewClearErrorNotes(sheet, columns) {
+  columns.forEach(function (column) {
+    var cell = sheet.getRange(3, column);
+    if (typeof cell.getNote !== 'function') { return; }
+    var current = String(cell.getNote() || '');
+    if (current.indexOf(VIEW_ERROR_NOTE_PREFIX) !== 0) { return; }
+    var markerAt = current.indexOf(VIEW_USER_NOTE_MARKER);
+    if (markerAt >= 0) { cell.setNote(current.slice(markerAt + VIEW_USER_NOTE_MARKER.length)); }
+    else { cell.clearNote(); }
+  });
+}
+
 function viewColumnSpans(columns) {
   var sorted = columns.slice().sort(function (a, b) { return a - b; });
   var spans = [];
@@ -163,10 +193,19 @@ function viewRenderSheetLocked(book, sheet, name) {
     var raw = String(filterRow[column - 1] || '').trim();
     if (!raw) { return; }
     var parsed = filterParseCell(raw, fieldByCode[header[column - 1]]);
-    if (parsed.errors.length) { parsed.errors.forEach(function (error) { filterErrors.push({ cell: viewColumnA1(column, 3), error: error }); }); }
+    if (parsed.errors.length) { parsed.errors.forEach(function (error) { filterErrors.push({ cell: viewColumnA1(column, 3), column: column, error: error }); }); }
     else { filters[column] = parsed; }
   });
-  if (filterErrors.length) { throw new Error(filterErrors.map(function (item) { return 'Sheet "' + name + '", ô ' + item.cell + ': bạn gõ "' + item.error.raw + '". ' + item.error.reason + ' ' + item.error.hint + ' Sheet chưa được vẽ lại.'; }).join('\n')); }
+  if (filterErrors.length) {
+    var notes = {};
+    filterErrors.forEach(function (item) {
+      if (!notes[item.column]) { notes[item.column] = []; }
+      notes[item.column].push(viewFilterErrorText(item.error));
+    });
+    Object.keys(notes).forEach(function (column) { viewSetErrorNote(sheet, Number(column), notes[column].join('\n')); });
+    SpreadsheetApp.flush();
+    throw new Error(filterErrors.map(function (item) { return 'Sheet "' + name + '", ô ' + item.cell + ': bạn gõ "' + item.error.raw + '". ' + viewFilterErrorText(item.error) + ' Sheet chưa được vẽ lại.'; }).join('\n'));
+  }
 
   var localSort = sortSpecParse(viewReadSortPairs(sheet, headerMap, SHEET_FIRST_DATA_ROW, sheet.getLastRow()), sourceFieldByCode);
   if (localSort.errors.length) { throw new Error(localSort.errors.join('\n') + '\nSheet chưa được vẽ lại.'); }
@@ -204,6 +243,7 @@ function viewRenderSheetLocked(book, sheet, name) {
   }
   var rowMap = {};
   rows.forEach(function (row, i) { rowMap[String(SHEET_FIRST_DATA_ROW + i)] = row.customer[customerIdCode]; });
+  viewClearErrorNotes(sheet, writable);
   SpreadsheetApp.flush();
   dirtyStateClearViewSheet(name);
   return { ok: true, sheetName: name, rowMaps: (function () { var map = {}; map[name] = rowMap; return map; }()), rows: rows.length };
@@ -256,7 +296,7 @@ function prepareViewSheet(sheetName) {
   var header = sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(function (value) { return String(value || '').trim(); });
   var levelAt = header.indexOf('@VIEW_SORT_LEVEL') + 1;
   var colAt = header.indexOf('@VIEW_SORT_COL') + 1;
-  var note = 'Lọc ở hàng 3: dùng ; cho OR, <> cho phủ định, .. cho khoảng. Sắp xếp: chọn mã @CUS_ hoặc @ACT_ ở cột @VIEW_SORT_COL và chiều ở cột @VIEW_SORT_LEVEL.';
+  var note = FILTER_QUICK_REFERENCE;
   header.forEach(function (code, i) {
     if (code.indexOf('@CUS_') !== 0 && code.indexOf('@ACT_') !== 0 && code.indexOf('@VIEW_') !== 0) { return; }
     var cell = sheet.getRange(3, i + 1);

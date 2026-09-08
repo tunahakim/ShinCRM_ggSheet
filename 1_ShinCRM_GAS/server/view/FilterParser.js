@@ -55,21 +55,25 @@ function filterParseTerm(raw, field, now) {
   var text = String(raw || '').trim();
   var negative = false;
   if (text.indexOf('<>') === 0) { negative = true; text = text.slice(2).trim(); }
-  if (negative && /^(?:>=|<=|>|<)/.test(text)) { return { error: filterError(field, raw, FILTER_ERROR_MESSAGES.operator, FILTER_ERROR_MESSAGES.operator) }; }
+  if (negative && /^(?:>=|<=|>|<)/.test(text)) { return { error: filterError(field, raw, FILTER_ERROR_MESSAGES.operator, '') }; }
 
   var quoted = false;
   if (text.charAt(0) === '"' || text.charAt(text.length - 1) === '"') {
-    if (text.length < 2 || text.charAt(0) !== '"' || text.charAt(text.length - 1) !== '"') { return { error: filterError(field, raw, FILTER_ERROR_MESSAGES.quoted, FILTER_ERROR_MESSAGES.quoted) }; }
+    if (text.length < 2 || text.charAt(0) !== '"' || text.charAt(text.length - 1) !== '"') { return { error: filterError(field, raw, FILTER_ERROR_MESSAGES.quoted, '') }; }
     quoted = true;
     text = text.slice(1, -1);
   }
   if (quoted) { return { term: { negative: negative, kind: 'exact', value: type === 'TEXT' || type === 'SELECT' ? filterText(text) : text } }; }
 
+  if ((type === 'NUMBER' || type === 'DATE') && /^.+\s+-\s+.+$/.test(text)) {
+    return { error: filterError(field, raw, FILTER_ERROR_MESSAGES.rangeDash, '') };
+  }
+
   var op = /^(>=|<=|>|<)(.*)$/.exec(text);
   if (op) {
     if (type !== 'NUMBER' && type !== 'DATE') { return { error: filterError(field, raw, 'Toán tử so sánh chỉ dùng cho cột số hoặc ngày.', 'Dùng giá trị chữ hoặc nháy kép.') }; }
     var bound = type === 'NUMBER' ? filterNumber(op[2]) : filterDateValue(op[2], now);
-    if (bound === null || bound === undefined) { return { error: filterError(field, raw, type === 'NUMBER' ? FILTER_ERROR_MESSAGES.number : FILTER_ERROR_MESSAGES.date, type === 'NUMBER' ? FILTER_ERROR_MESSAGES.number : FILTER_ERROR_MESSAGES.date) }; }
+    if (bound === null || bound === undefined) { return { error: filterError(field, raw, type === 'NUMBER' ? FILTER_ERROR_MESSAGES.number : FILTER_ERROR_MESSAGES.date, '') }; }
     return { term: { negative: negative, kind: 'compare', op: op[1], value: type === 'DATE' ? bound.value : bound } };
   }
 
@@ -81,19 +85,19 @@ function filterParseTerm(raw, field, now) {
     if (left === null || right === null || left === undefined || right === undefined) { return { error: filterError(field, raw, type === 'NUMBER' ? FILTER_ERROR_MESSAGES.number : FILTER_ERROR_MESSAGES.date, 'Viết hai giá trị hợp lệ ở hai bên dấu ..') }; }
     var lv = type === 'DATE' ? left.value : left;
     var rv = type === 'DATE' ? right.value : right;
-    if (lv > rv) { return { error: filterError(field, raw, FILTER_ERROR_MESSAGES.rangeOrder, FILTER_ERROR_MESSAGES.rangeOrder) }; }
+    if (lv > rv) { return { error: filterError(field, raw, FILTER_ERROR_MESSAGES.rangeOrder, '') }; }
     return { term: { negative: negative, kind: 'range', from: lv, to: rv, precision: type === 'DATE' ? Math.max(left.length, right.length) : 0 } };
   }
 
   var wildcard = text.charAt(0) === '*' || text.charAt(text.length - 1) === '*';
   if (type === 'NUMBER' && !wildcard && text !== '') {
     var number = filterNumber(text);
-    if (number === null) { return { error: filterError(field, raw, FILTER_ERROR_MESSAGES.number, FILTER_ERROR_MESSAGES.number) }; }
+    if (number === null) { return { error: filterError(field, raw, FILTER_ERROR_MESSAGES.number, '') }; }
     return { term: { negative: negative, kind: 'number', value: number } };
   }
   if (type === 'DATE' && !wildcard && text !== '') {
     var date = filterDateValue(text, now);
-    if (!date) { return { error: filterError(field, raw, FILTER_ERROR_MESSAGES.date, FILTER_ERROR_MESSAGES.date) }; }
+    if (!date) { return { error: filterError(field, raw, FILTER_ERROR_MESSAGES.date, '') }; }
     return { term: { negative: negative, kind: 'date', value: date.value, precision: date.length } };
   }
   var starts = text.charAt(0) === '*';

@@ -57,10 +57,19 @@ function chay(so) {
   check(so, 'lượt vẽ có báo trạng thái và luôn nhả khóa', [base.nen.dem.toast, base.nen.stubs._khoa.dangGiu], [1, false]);
 
   base.view.getRange(3, 5).setValue('60..50');
+  base.view.getRange(3, 5).setNote('ghi chú riêng');
   base.view.getRange(4, 5).setValue('giữ nguyên');
   checkThrows(so, 'cú pháp lọc sai dừng trước khi đụng sheet', () => base.nen.hop.renderViewSheet('!Lead'), 'Giá trị đầu lớn hơn');
   check(so, 'nội dung cũ còn nguyên khi cú pháp lọc sai', base.view.getRange(4, 5).getValue(), 'giữ nguyên');
+  check(so, 'lỗi lọc được neo vào đúng ô mà không làm mất note người dùng',
+    [base.view.getRange(3, 5).getNote().indexOf('⛔ ShinCRM:') === 0, base.view.getRange(3, 5).getNote().includes('ghi chú riêng')], [true, true]);
   check(so, 'khóa được nhả cả khi parser ném lỗi', base.nen.stubs._khoa.dangGiu, false);
+  base.view.getRange(3, 5).setValue('');
+  base.nen.hop.renderViewSheet('!Lead');
+  check(so, 'vẽ thành công chỉ xóa note lỗi và trả lại note người dùng', base.view.getRange(3, 5).getNote(), 'ghi chú riêng');
+  base.nen.hop.prepareViewSheet('!Lead');
+  check(so, 'lệnh chuẩn bị gắn bảng tra nhanh đầy đủ vào ô hàng 3 chưa có note',
+    base.view.getRange(3, 1).getNote().includes('SẮP XẾP:'), true);
 
   const custom = taoNen(['@CUS_MA_KH', '@CUS_DOANH_THU']);
   gieoHaiKhach(custom.nen);

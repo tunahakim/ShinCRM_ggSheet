@@ -22,6 +22,7 @@ function onOpen() {
     .addItem('Làm mới dữ liệu sheet quản trị đang mở', 'shinRenderCurrentView')
     .addItem('Làm mới dữ liệu tất cả sheet quản trị', 'shinRenderAllViews')
     .addItem('Chuẩn bị sheet quản trị', 'shinPrepareCurrentView')
+    .addItem('Bảng tra nhanh cú pháp lọc', 'shinShowFilterQuickReference')
     .addToUi();
 
   // Nuốt lỗi ở đây là đúng, và đây là chỗ duy nhất trong dự án được nuốt: `runEntryPoint` đã ghi
@@ -54,6 +55,13 @@ function shinPrepareCurrentView() {
   return runEntryPoint('shinPrepareCurrentView', 'core', ERROR_CHANNEL_TOAST, function () {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
     return prepareViewSheet(sheet.getName());
+  });
+}
+
+function shinShowFilterQuickReference() {
+  return runEntryPoint('shinShowFilterQuickReference', 'core', ERROR_CHANNEL_ALERT, function () {
+    SpreadsheetApp.getUi().alert('Bảng tra nhanh cú pháp lọc', FILTER_QUICK_REFERENCE, SpreadsheetApp.getUi().ButtonSet.OK);
+    return true;
   });
 }
 

@@ -26,6 +26,8 @@ function chay(so) {
     hop.filterCellMatches(55, hop.filterParseCell('50..60', number), number)
   ], [true, true, true]);
   check(so, 'khoảng ngược báo lỗi thay vì lọc sai', hop.filterParseCell('60..50', number).errors.length, 1);
+  check(so, 'khoảng viết bằng dấu gạch ngang nhận đúng lỗi và không lặp câu gợi ý',
+    [hop.filterParseCell('10 - 50', number).errors[0].reason.includes('dấu gạch ngang'), hop.filterParseCell('10 - 50', number).errors[0].hint], [true, '']);
 
   const date = { type: 'DATE', code: '@ACT_NGAY_LAM_VIEC' };
   check(so, 'DATE cắt theo độ chi tiết người dùng gõ', hop.filterCellMatches('2026-03-10 14:30', hop.filterParseCell('2026-03-10', date, new Date(2026, 2, 10, 15)), date), true);

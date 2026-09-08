@@ -52,6 +52,7 @@ function epTheoKhuon(giaTri, khuon) {
 function taoSheet(ten, dem, luoi) {
   const cells = [];
   const formats = [];
+  const notes = [];
   let frozenRows = 0;
   let maxRows = (luoi && luoi.rows) || 1000;
   let maxCols = (luoi && luoi.cols) || 26;
@@ -68,6 +69,11 @@ function taoSheet(ten, dem, luoi) {
   const layDongKhuon = (i) => {
     while (formats.length <= i) { formats.push([]); }
     return formats[i];
+  };
+
+  const layDongNote = (i) => {
+    while (notes.length <= i) { notes.push([]); }
+    return notes[i];
   };
 
   const sheet = {
@@ -181,7 +187,7 @@ function taoSheet(ten, dem, luoi) {
           dem.setValues += 1;
           return range;
         },
-        getNote() { return ''; },
+        getNote() { return oRong((notes[row - 1] || [])[col - 1]); },
         setDataValidation() { return range; },
 
         /**
@@ -212,8 +218,8 @@ function taoSheet(ten, dem, luoi) {
         // Định dạng không được mô phỏng: dự án chỉ đặt chứ không đọc lại, nên nuốt là đủ và giả vờ có định dạng mới là nói dối.
         setFontWeight() { return range; },
         setBackground() { return range; },
-        setNote() { return range; },
-        clearNote() { return range; }
+        setNote(note) { layDongNote(row - 1)[col - 1] = String(note || ''); return range; },
+        clearNote() { layDongNote(row - 1)[col - 1] = ''; return range; }
       };
 
       return range;
