@@ -47,8 +47,8 @@ function chay(so) {
     data: { action: 'CRM_HANDSHAKE', nonce: 'nonce-kiem-thu' }
   });
   check(so, 'ACK trả đúng nonce về đúng origin đã bắt tay',
-    [dung.sent[0].data.action, dung.sent[0].data.nonce, dung.sent[0].targetOrigin, hop.lastContextKey],
-    ['CRM_HANDSHAKE_ACK', 'nonce-kiem-thu', 'https://abc-123.googleusercontent.com', '']);
+    [dung.sent[0].data.action, dung.sent[0].data.nonce, Boolean(dung.sent[0].data.sessionId), dung.sent[0].targetOrigin, hop.lastContextKey],
+    ['CRM_HANDSHAKE_ACK', 'nonce-kiem-thu', true, 'https://abc-123.googleusercontent.com', '']);
 
   hop.lastContextKey = 'ảnh vừa gửi';
   hop._onMessage({
@@ -60,8 +60,8 @@ function chay(so) {
 
   hop.sendContextToSidebar({ spreadsheetId: 'sheet-1', sheetName: 'Customer', row: 4 });
   check(so, 'CRM_CONTEXT mang cùng nonce nên sidebar không loại tin hợp lệ',
-    [dung.sent[2].data.action, dung.sent[2].data.nonce, dung.sent[2].data.spreadsheetId, dung.sent[2].targetOrigin],
-    ['CRM_CONTEXT', 'nonce-kiem-thu', 'sheet-1', 'https://abc-123.googleusercontent.com']);
+    [dung.sent[2].data.action, dung.sent[2].data.nonce, dung.sent[2].data.sessionId, dung.sent[2].data.spreadsheetId, dung.sent[2].targetOrigin],
+    ['CRM_CONTEXT', 'nonce-kiem-thu', dung.sent[0].data.sessionId, 'sheet-1', 'https://abc-123.googleusercontent.com']);
 
   const la = nguonTin();
   hop._onMessage({

@@ -11,7 +11,7 @@
  * NGÀY KHỞI TẠO: 06/03/2026
  */
 
-console.log("🚀 CRM Extension V21.1: iframe_bridge Loaded");
+console.log("🚀 CRM Extension V21.2: iframe_bridge Loaded");
 
 /*
  * An ninh của cầu nối, và giới hạn còn lại.
@@ -33,6 +33,7 @@ var SIDEBAR_ORIGIN_ALLOWLIST = [
 var sidebarWindow = null;
 var sidebarOrigin = '';
 var sidebarNonce = '';
+var extensionSessionId = Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 
 function isAllowedSidebarOrigin(origin) {
   for (var i = 0; i < SIDEBAR_ORIGIN_ALLOWLIST.length; i++) {
@@ -60,6 +61,7 @@ window.addEventListener('message', function (event) {
     event.source.postMessage({
       action: 'CRM_HANDSHAKE_ACK',
       nonce: sidebarNonce,
+      sessionId: extensionSessionId,
       at: Date.now()
     }, event.origin);
   } catch (err) {
@@ -75,6 +77,7 @@ function sendContextToSidebar(context) {
   try {
       context.action = 'CRM_CONTEXT';
       context.nonce = sidebarNonce;
+      context.sessionId = extensionSessionId;
       sidebarWindow.postMessage(context, sidebarOrigin);
   } catch (err) {
       sidebarWindow = null;

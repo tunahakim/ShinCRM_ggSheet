@@ -254,6 +254,27 @@ function chay(so) {
   check(so, 'CRM_CONTEXT đúng nonce đi trọn tới xử lý view, tin sai nonce bị bỏ',
     quaCau._calls,
     ['renderViewIfDirty(!Lead)']);
+
+  const taiLai = dungHopPoll();
+  batDau(taiLai);
+  taiLai.SHEET_LINK_SEQ = 99;
+  taiLai.sheetLinkOnMessage({
+    origin: taiLai.SHEET_LINK_ORIGIN,
+    data: { action: 'CRM_HANDSHAKE_ACK', nonce: taiLai.SHEET_LINK_NONCE, sessionId: 'extension-moi' }
+  });
+  const seqSauAckMoi = taiLai.SHEET_LINK_SEQ;
+  taiLai.sheetLinkOnMessage({
+    origin: taiLai.SHEET_LINK_ORIGIN,
+    data: { action: 'CRM_CONTEXT', nonce: taiLai.SHEET_LINK_NONCE, sessionId: 'extension-moi', spreadsheetId: 'sheet-1', seq: 1, sheetName: 'Customer', row: 4, col: 1 }
+  });
+  const seqSauContextMoi = taiLai.SHEET_LINK_SEQ;
+  taiLai.sheetLinkOnMessage({
+    origin: taiLai.SHEET_LINK_ORIGIN,
+    data: { action: 'CRM_CONTEXT', nonce: taiLai.SHEET_LINK_NONCE, sessionId: 'extension-cu', spreadsheetId: 'sheet-1', seq: 200, sheetName: 'Customer', row: 5, col: 1 }
+  });
+  check(so, 'tải lại Extension đặt lại seq đúng một lần và bỏ context sót từ phiên cũ',
+    [seqSauAckMoi, seqSauContextMoi, taiLai.SHEET_LINK_SEQ],
+    [0, 1, 1]);
 }
 
 module.exports = { chay };
