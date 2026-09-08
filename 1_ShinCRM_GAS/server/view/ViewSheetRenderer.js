@@ -133,5 +133,16 @@ function prepareViewSheet(sheetName) {
   var name = String(sheetName || '').trim();
   var sheet = shinOpenBook().getSheetByName(name);
   if (!sheet || name.charAt(0) !== '!') { throw new Error('Không tìm thấy sheet quản trị "' + name + '".'); }
-  return { ok: true, sheetName: name };
+  var lastColumn = sheet.getLastColumn();
+  if (lastColumn < 1) { return { ok: true, sheetName: name }; }
+  var header = sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(function (value) { return String(value || '').trim(); });
+  var levelAt = header.indexOf('@VIEW_SORT_LEVEL') + 1;
+  var colAt = header.indexOf('@VIEW_SORT_COL') + 1;
+  var note = 'Lọc ở hàng 3: dùng ; cho OR, <> cho phủ định, .. cho khoảng. Sắp xếp: chọn mã @CUS_ hoặc @ACT_ ở cột @VIEW_SORT_COL và chiều ở cột @VIEW_SORT_LEVEL.';
+  if (typeof sheet.getRange(3, 1).getNote === 'function' && !sheet.getRange(3, 1).getNote()) { sheet.getRange(3, 1).setNote(note); }
+  if (levelAt && typeof SpreadsheetApp.newDataValidation === 'function') {
+    var rule = SpreadsheetApp.newDataValidation().requireValueInList(['Tăng dần (A → Z)', 'Giảm dần (Z → A)'], true).setAllowInvalid(true).build();
+    sheet.getRange(SHEET_FIRST_DATA_ROW, levelAt, Math.max(1, sheet.getMaxRows() - SHEET_FIRST_DATA_ROW + 1), 1).setDataValidation(rule);
+  }
+  return { ok: true, sheetName: name, sortColumn: colAt, sortLevel: levelAt };
 }

@@ -181,6 +181,8 @@ function taoSheet(ten, dem, luoi) {
           dem.setValues += 1;
           return range;
         },
+        getNote() { return ''; },
+        setDataValidation() { return range; },
 
         /**
          * Khuôn hiển thị. Mô phỏng cả **hệ quả** của khuôn: ghi chuỗi `'0101243150'` vào ô chưa đặt khuôn văn bản thì nó thành số `101243150` ở đây, đúng như trên Google — xem `epTheoKhuon`.
