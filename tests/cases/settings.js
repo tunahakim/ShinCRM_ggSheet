@@ -27,9 +27,9 @@ function chay(so) {
     return ghiLoiNap(so, 'nạp được server/config/Settings.js', err);
   }
 
-  check(so, 'SETTINGS có đúng mười hai hằng đang được dùng',
+  check(so, 'SETTINGS có đúng mười ba hằng đang được dùng',
     Object.keys(nen.hop.SETTINGS).sort(),
-    ['CHUNK_ROWS', 'CHUNK_ROWS_FALLBACK', 'EXTENSION_ACK_TIMEOUT_MS', 'HANDSHAKE_PING_MS', 'LOCK_WAIT_MS', 'LOG_MAX_ROWS', 'LOG_RETENTION_DAYS', 'LOG_SECRET_KEYS', 'LOG_TRACE_BUFFER', 'SELECTION_POLL_IDLE_MS', 'SELECTION_POLL_MS', 'UNDO_DELAY_MS']);
+    ['CHUNK_ROWS', 'CHUNK_ROWS_FALLBACK', 'DIRTY_RECORD_LIMIT', 'EXTENSION_ACK_TIMEOUT_MS', 'HANDSHAKE_PING_MS', 'LOCK_WAIT_MS', 'LOG_MAX_ROWS', 'LOG_RETENTION_DAYS', 'LOG_SECRET_KEYS', 'LOG_TRACE_BUFFER', 'SELECTION_POLL_IDLE_MS', 'SELECTION_POLL_MS', 'UNDO_DELAY_MS']);
 
   check(so, 'giá trị bốn hằng đúng tài liệu 10 Phần 11',
     [nen.hop.SETTINGS.LOG_RETENTION_DAYS, nen.hop.SETTINGS.LOG_MAX_ROWS, nen.hop.SETTINGS.LOG_TRACE_BUFFER, nen.hop.SETTINGS.LOG_SECRET_KEYS.length],

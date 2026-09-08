@@ -68,6 +68,9 @@ var SETTINGS = {
    */
   CHUNK_ROWS_FALLBACK: [500, 200],
 
+  /** Số mã tối đa giữ trong dirtyRecords trước khi chuyển sang cờ bẩn toàn bộ. */
+  DIRTY_RECORD_LIMIT: 500,
+
   /** Nhịp dò chọn ô khi Extension vắng mặt. Chỉ cần khi không có Extension — có Extension thì tin tới liền, không dò. */
   SELECTION_POLL_MS: 2000,
   SELECTION_POLL_IDLE_MS: 6000,

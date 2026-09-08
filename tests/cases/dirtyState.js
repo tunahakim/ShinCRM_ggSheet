@@ -102,6 +102,31 @@ function chay(so) {
     nenRong.hop.probeDirtyState(),
     ['dirtyViewSheets: rỗng', 'dirtyRecords: rỗng', 'dirtyConfig: false', 'dirtyAll: false']);
 
+  const ghi = dungHop({ sheets: ['Config', 'Log'] });
+  check(so, 'đánh dấu sheet quản trị hợp nhất tên trùng',
+    ghi.hop.dirtyStateMarkViewSheet(' Bảng tổng ').viewSheets,
+    ['Bảng tổng']);
+  check(so, 'đánh dấu mã bản ghi hợp nhất và bỏ mã rỗng',
+    ghi.hop.dirtyStateMarkRecords(['KH0001', 'KH0001', '', 'KH0002']).records,
+    ['KH0001', 'KH0002']);
+  check(so, 'đánh dấu Config bật đúng cờ',
+    ghi.hop.dirtyStateMarkConfig().config, true);
+  check(so, 'vượt ngưỡng chuyển sang cờ toàn bộ và bỏ danh sách mã',
+    (function () {
+      const hop = dungHop({ sheets: ['Config', 'Log'] }).hop;
+      hop.SETTINGS.DIRTY_RECORD_LIMIT = 2;
+      return hop.dirtyStateMarkRecords(['A', 'B', 'C']);
+    }()),
+    { viewSheets: [], records: [], config: false, all: true });
+  check(so, 'xóa cờ theo nhóm không đụng nhóm còn lại',
+    (function () {
+      const hop = dungHop({ sheets: ['Config', 'Log'] }).hop;
+      hop.dirtyStateMarkConfig();
+      hop.dirtyStateMarkAll();
+      return hop.dirtyStateClear({ all: true });
+    }()),
+    { viewSheets: [], records: [], config: true, all: false });
+
   return so;
 }
 
