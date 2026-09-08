@@ -338,7 +338,9 @@ function renderFieldInner(node, ctx) {
     : '';
 
   return '<div class="shin-field-head"><label class="shin-label"' + renderAttr('for', o.id) + '>'
-    + renderEscape(node.label === null ? khai.label : node.label) + '</label>' + but + '</div>'
+    + renderEscape(node.label === null ? khai.label : node.label)
+    + (khai.required ? '<span class="shin-label-req" aria-hidden="true"> *</span>' : '')
+    + '</label>' + but + '</div>'
     + RENDER_CONTROLS[control](o);
 }
 
