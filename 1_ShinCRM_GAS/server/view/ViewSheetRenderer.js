@@ -76,6 +76,20 @@ function viewColumnSpans(columns) {
   return spans;
 }
 
+/** Đọc lại bản đồ dòng hiện có sau khi trigger đã làm mới sheet mà sidebar không nhận được giá trị trả về. */
+function viewSheetRowMaps(sheet, sheetName) {
+  var maps = {};
+  var rowMap = {};
+  maps[sheetName] = rowMap;
+  var idColumn = selectionColumnIndex(sheet, DATA_SCHEMA.customer.id.code);
+  if (!idColumn || sheet.getLastRow() < SHEET_FIRST_DATA_ROW) { return maps; }
+  var values = sheet.getRange(SHEET_FIRST_DATA_ROW, idColumn, sheet.getLastRow() - SHEET_FIRST_DATA_ROW + 1, 1).getValues();
+  values.forEach(function (row, i) {
+    if (row[0] !== '' && row[0] !== null && row[0] !== undefined) { rowMap[String(SHEET_FIRST_DATA_ROW + i)] = String(row[0]); }
+  });
+  return maps;
+}
+
 function renderViewSheet(sheetName) {
   var name = String(sheetName || '').trim();
   if (name.charAt(0) !== '!') { throw new Error('Sheet quản trị phải có tên bắt đầu bằng !.'); }
@@ -154,9 +168,11 @@ function viewProbeRenderCurrent() {
 
 function renderViewIfDirty(sheetName) {
   var name = String(sheetName || '').trim();
+  var sheet = shinOpenBook().getSheetByName(name);
+  if (!sheet || name.charAt(0) !== '!') { throw new Error('Không tìm thấy sheet quản trị "' + name + '".'); }
   var state = dirtyStateRead();
   if (state.all || state.config || state.viewSheets.indexOf(name) >= 0) { return renderViewSheet(name); }
-  return { ok: true, skipped: true, sheetName: name, rowMaps: {} };
+  return { ok: true, skipped: true, sheetName: name, rowMaps: viewSheetRowMaps(sheet, name) };
 }
 
 function prepareViewSheet(sheetName) {

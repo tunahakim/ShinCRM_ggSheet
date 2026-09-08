@@ -204,6 +204,7 @@ tests\
     ├── formScreen.js             Bốn cái hỏng-trong-im-lặng của ba màn form: tiêu đề suy sai vì bản ghi mới đã có mã xem trước, ô kế tục không có dấu, form giao dịch thiếu bản ghi khách, và đóng form lồng thì rơi thẳng về màn xem.
     ├── actions.js                Bảng mười lăm hành động: một tên rơi khỏi bảng là nút bấm không làm gì, ba cửa mở form phải khóa khi khách đã xóa mềm, và việc chặng sau phải ném lỗi đọc được chứ không im.
     ├── selectionPoll.js          Đồng hồ giả khóa luật ACK loại trừ mọi vòng gọi, bốn điều kiện dừng, chống vòng chồng và thang nhịp 2/6 giây.
+    ├── triggers.js               Trigger sửa sheet quản trị làm mới ngay; sửa kho đánh dấu mọi sheet quản trị cần làm mới.
     └── domUi.js                  DOM giả tối thiểu kiểm ba đường UI: phát click, menu nổi và thu gọn nội dung.
 ```
 

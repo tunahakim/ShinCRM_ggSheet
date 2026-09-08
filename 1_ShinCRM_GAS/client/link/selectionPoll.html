@@ -61,10 +61,11 @@ function selectionPollPositionKey(result) {
 }
 
 function selectionPollApplyResult(result) {
-  if (!result || !result.customerId || !Prefs.followSelection) { return; }
+  if (!result) { return; }
   if (SHEET_LINK_SPREADSHEET_ID && result.spreadsheetId !== SHEET_LINK_SPREADSHEET_ID) { return; }
-  if (ScreenState.screen !== SCREEN_VIEW || result.customerId === ScreenState.currentCustomerId) { return; }
-  ACTIONS.setCurrentCustomer({ pick: result.customerId });
+  if (typeof sheetLinkApplyContext === 'function') { return sheetLinkApplyContext(result); }
+  if (!result.customerId || !Prefs.followSelection || ScreenState.screen !== SCREEN_VIEW || result.customerId === ScreenState.currentCustomerId) { return; }
+  return ACTIONS.setCurrentCustomer({ pick: result.customerId });
 }
 
 function selectionPollWarn(err) {

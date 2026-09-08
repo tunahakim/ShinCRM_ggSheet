@@ -80,6 +80,13 @@ function dungHopPoll() {
     ACTIONS: { setCurrentCustomer: () => null }
   });
 
+  hop.Store = {
+    rowMaps: {},
+    applyRowMaps: (maps) => { hop.Store.rowMaps = maps; },
+    getCustomerIdByRow: () => '',
+    hasCustomer: () => false
+  };
+
   hop._clock = clock;
   hop._timers = timers;
   hop._intervals = intervals;
@@ -202,6 +209,18 @@ function chay(so) {
   bac._rootListeners.mouseenter();
   const mouse = Array.from(bac._timers.values())[0].delay;
   check(so, 'vị trí đổi, tab hiện lại, focus và chuột vào sidebar đều kéo về nhịp nhanh', [viTriDoi, hienLai, focus, mouse], [2000, 2000, 2000, 2000]);
+
+  const khongExtension = dungHopPoll();
+  batDau(khongExtension);
+  khongExtension._calls = [];
+  khongExtension.callServer = (name, args) => {
+    khongExtension._calls.push(name + '(' + ((args && args[0]) || '') + ')');
+    return syncValue({ ok: true, sheetName: '!Lead', rowMaps: { '!Lead': { '4': 'KH000001' } } });
+  };
+  khongExtension.selectionPollApplyResult({ spreadsheetId: 'sheet-1', sheetName: '!Lead', row: 4, col: 2, customerId: '' });
+  check(so, 'không có Extension thì kết quả full vẫn đi qua đường chuyển sheet và làm mới view bẩn',
+    [khongExtension._calls, khongExtension.Store.rowMaps],
+    [['renderViewIfDirty(!Lead)'], { '!Lead': { '4': 'KH000001' } }]);
 }
 
 module.exports = { chay };

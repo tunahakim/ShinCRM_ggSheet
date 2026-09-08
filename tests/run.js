@@ -51,6 +51,7 @@ const NHOM_CA = [
   require('./cases/selectionPoll'),
   require('./cases/viewLanguage'),
   require('./cases/viewRenderer'),
+  require('./cases/triggers'),
   require('./cases/refresh'),
   require('./cases/domUi')];
 

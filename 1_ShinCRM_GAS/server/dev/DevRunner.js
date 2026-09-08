@@ -25,7 +25,8 @@ var DEV_RUNNER_ALLOWED = [
   'probeBadColumnCode', 'probeLogGate', 'probeDateText', 'probeSheetGrid', 'probeCellBudget',
   'probeEntityRead', 'probeCategoryRead', 'probeConfigRead', 'probeDirtyState',
   'probeErrorReport', 'probeEntryPoint', 'probeLoadAll', 'probeSidebarTemplate', 'probeClientTiming',
-  'probeSaveGate', 'viewProbeSelection', 'viewProbeRenderCurrent', 'viewProbeCreateRender'
+  'probeSaveGate', 'viewProbeSelection', 'viewProbeRenderCurrent', 'viewProbeCreateRender', 'viewProbeAutoRender',
+  'probeTriggerState', 'shinInstallTriggers'
 ];
 
 /**

@@ -130,7 +130,7 @@ function sheetLinkApplyContext(ctx) {
 function sheetLinkApplyCustomerContext(ctx) {
   if (!Prefs.followSelection || ScreenState.screen !== SCREEN_VIEW) { return; }
 
-  var ma = sheetLinkCustomerIdFromContext(ctx);
+  var ma = ctx.customerId === undefined ? sheetLinkCustomerIdFromContext(ctx) : String(ctx.customerId || '');
   if (!ma || ma === ScreenState.currentCustomerId) { return; }
 
   ACTIONS.setCurrentCustomer({ pick: ma });

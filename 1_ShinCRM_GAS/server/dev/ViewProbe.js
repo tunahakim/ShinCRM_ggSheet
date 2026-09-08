@@ -32,3 +32,30 @@ function viewProbeCreateRender() {
     book.deleteSheet(sheet);
   }
 }
+
+/** Probe đường onEdit trên Google; script tự gọi handler vì thao tác ghi bằng script không phát sinh trigger. */
+function viewProbeAutoRender() {
+  var book = shinOpenBook();
+  if (book.getSheetByName(VIEW_PROBE_SHEET_NAME)) {
+    throw new Error('Đã có sheet ' + VIEW_PROBE_SHEET_NAME + '. Không tự xóa sheet probe cũ để tránh chạm dữ liệu ngoài ý muốn.');
+  }
+
+  var sheet = book.insertSheet(VIEW_PROBE_SHEET_NAME);
+  try {
+    sheet.getRange(1, 1, 1, 2).setValues([['@CUS_MA_KH', '@CUS_TEN_CTY']]);
+    var before = renderViewSheet(VIEW_PROBE_SHEET_NAME);
+    var firstId = sheet.getRange(SHEET_FIRST_DATA_ROW, 1).getValue();
+    sheet.getRange(3, 1).setValue('"' + firstId + '"');
+    var after = shinOnEdit({ range: sheet.getRange(3, 1) });
+    SpreadsheetApp.flush();
+    var firstAfter = sheet.getRange(SHEET_FIRST_DATA_ROW, 1).getValue();
+    return [
+      'Trước lọc: ' + before.rows + ' dòng',
+      'Sau onEdit: ' + after.rows + ' dòng',
+      'Mã giữ lại: ' + firstAfter,
+      'Đúng một dòng và đúng mã: ' + (after.rows === 1 && String(firstAfter) === String(firstId))
+    ];
+  } finally {
+    book.deleteSheet(sheet);
+  }
+}
