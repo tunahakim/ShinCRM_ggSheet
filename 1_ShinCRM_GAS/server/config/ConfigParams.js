@@ -3,6 +3,8 @@
 var CONFIG_PARAM_OWNER_USER = 'user';
 var CONFIG_PARAM_OWNER_SYSTEM = 'system';
 var SORT_LEVEL_OPTIONS = ['Tăng dần (A → Z)', 'Giảm dần (Z → A)'];
+/** Nguồn log đang có trong bản ShinCRM độc lập; `all` và tổ hợp hiện tại là lựa chọn vận hành, không phải nguồn mới. */
+var LOG_TRACE_SOURCE_OPTIONS = ['', 'all', 'core', 'sidebar', 'core,sidebar'];
 
 /** Hai bộ đếm dùng chung cặp cột tham số nhưng vẫn là trạng thái do cửa cấp mã sở hữu. */
 var ID_COUNTER_CONFIG_NAMES = {
@@ -21,6 +23,7 @@ function configParamCatalog() {
       name: LOG_TRACE_CONFIG_NAME,
       owner: CONFIG_PARAM_OWNER_USER,
       type: 'TEXT',
+      options: LOG_TRACE_SOURCE_OPTIONS,
       defaultValue: '',
       note: 'Bật chế độ ghi log chi tiết ra sheet Log.\n\n'
         + 'Để trống = tắt. Ngày thường để trống.\n'

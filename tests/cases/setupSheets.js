@@ -152,6 +152,8 @@ function chay(so) {
     guide.hop.CONFIG_COLUMNS.filter((column, index) => !guide.Config.sheet.getRange(3, index + 1).getNote()).map((column) => column[0]), []);
   check(so, 'cột kiểu có dropdown đúng bốn kiểu dữ liệu',
     guide.Config.sheet.getRange(4, 4).getDataValidation().values, guide.hop.DATA_TYPES);
+  check(so, 'LOG_TRACE có dropdown theo đúng nguồn log thật và các tổ hợp hiện tại',
+    guide.Config.sheet.getRange(4, 2).getDataValidation().values, guide.hop.LOG_TRACE_SOURCE_OPTIONS);
   check(so, 'ô CELL_BUDGET dùng kiểm tra số, không ép vào dropdown hữu hạn',
     guide.Config.sheet.getRange(5, 2).getDataValidation().criteria, 'NUMBER_GREATER_THAN_OR_EQUAL_TO');
 
