@@ -46,14 +46,14 @@ Làm theo đúng thứ tự, mỗi mục một commit. Phía Extension chỉ s�
 Nguồn chuẩn: tài liệu 07 (làm mới và sheet quản trị), 08 và 08A (ngôn ngữ lọc, sắp xếp và hợp đồng tham số). Đuôi tệp phía client theo nếp repo này là `.html`, không phải `.js` như bảng trong tài liệu 07 Phần 8.
 
 - [x] Chiều ghi của DirtyState: đọc ghi trạng thái bẩn và ngưỡng chuyển sang cờ bẩn toàn bộ, tài liệu 07 Phần 2 và Phần 3. API hợp nhất/dedupe/ngưỡng đã có; trigger và đường làm mới vẫn nằm ở các mục bên dưới.
-- [ ] Ngôn ngữ lọc và sắp xếp thành module riêng theo tài liệu 08 và hợp đồng 08A: ngữ pháp ba cấp ở hàng 3, bảng pattern bốn kiểu TEXT/SELECT/NUMBER/DATE, luật cắt độ chi tiết ngày, bốn từ khóa ngày tương đối, ngữ nghĩa Activity là lần gần nhất còn sống, hai cột sắp xếp cộng tie-break mã khách giảm dần và ô rỗng xếp cuối; sai cú pháp thì không chạm sheet và báo một lần đủ bốn ý ô nào, gõ gì, sai gì, viết đúng thế nào. `normalizeText` phía máy chủ phải giống hệt phía client.
-- [ ] `server/view/ViewSheetRenderer`: lọc, sắp, ghi một sheet quản trị và dựng bản đồ dòng mới trong cùng lần gọi, tài liệu 07 Phần 4 — đủ bảy bước đọc kho, loại giao dịch đã xóa, ghép lần làm việc gần nhất còn sống, lọc hàng 3, sắp xếp, một lệnh `clearContent` cộng `setValues`, dựng rowMap; khách không có giao dịch vẫn hiện một dòng.
-- [ ] `server/Triggers.gs`: `onEdit` dạng installable, `onOpen` dựng menu, hàm cài trigger — ba đường kích hoạt việc vẽ, tài liệu 07 Phần 5.
-- [ ] Ba lệnh view trong menu Sheets của `server/entry/Menu.js`: vẽ lại sheet đang mở, vẽ lại tất cả, và `prepareViewSheet` idempotent (làm nhiều lần cũng như một).
+- [x] Ngôn ngữ lọc và sắp xếp thành module riêng theo tài liệu 08 và hợp đồng 08A: parser ba cấp, pattern TEXT/SELECT/NUMBER/DATE, ngày tương đối, Activity lấy lần sống gần nhất, tie-break mã khách và ô rỗng cuối; cú pháp sai dừng trước khi chạm sheet. `normalizeText` phía máy chủ giống phía client.
+- [x] `server/view/ViewSheetRenderer`: lọc, sắp, ghi các dải cột `CUS_`/`ACT_` được phép và dựng bản đồ dòng mới trong cùng lần gọi; loại giao dịch đã xóa, ghép lần sống gần nhất, giữ khách chưa có giao dịch, và không xóa dữ liệu khi cú pháp sai.
+- [x] `server/Triggers.js`: có đường `shinOnEdit`/`shinOnChange` và hàm cài trigger installable; `onOpen` dựng menu.
+- [x] Ba lệnh view trong menu Sheets của `server/entry/Menu.js`: vẽ lại sheet đang mở, vẽ lại tất cả, và `prepareViewSheet` idempotent.
 - [ ] Công tắc tự động sắp xếp sheet, tài liệu 07 Phần 6.
 - [ ] Client `client/ram/refresh.html`: xử lý khối trạng thái bẩn đính kèm phản hồi và gọi nạp lại đúng phần cần, tài liệu 07 Phần 8.
 - [ ] Nối nút "Vẽ lại sheet quản trị" trên header vào việc vẽ thật — hiện nó cố ý báo "chưa dùng, chặng 1.5".
-- [ ] Bản đồ dòng của sheet quản trị trong `LoadService`: thêm một khóa vào cấu trúc đang có, không đổi hình dạng.
+- [x] Bản đồ dòng của sheet quản trị trong `LoadService`: thêm khóa theo tên sheet vào cấu trúc đang có, không đổi hình dạng.
 - [ ] Hai món nợ kiểm thử ghi ở `Prompt chặng 1.4 và 1.5.md`: ca kiểm tự động cho nhánh dự phòng `bootChunkWithFallback` của chặng 1.2, và ba ca offline cho `dispatch.html`, `menu.html`, `collapse.html` — ba tệp này chưa có ca nào vì hộp cát client chưa có `document`.
 - [ ] Nghiệm thu Google theo đúng câu chạy thử của chặng: gõ điều kiện lọc bằng dấu `!` trên sheet quản trị và thấy nó in ra đúng, sửa trên sheet thì sidebar nạp lại đúng phần cần.
 
