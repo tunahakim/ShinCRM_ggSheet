@@ -22,10 +22,10 @@ UI_SCHEMA.view = {
   header: [
     { icon: 'search', tooltip: 'Tìm khách', action: 'toggleSearchPanel' },
     { icon: 'bolt', tooltip: 'Bám theo ô đang chọn', action: 'toggleFollowSelection', toggle: 'followSelection' },
-    { icon: 'table', tooltip: 'Vẽ lại sheet đang mở', action: 'renderActiveViewSheet' },
+    { icon: 'table', tooltip: 'Cập nhật sheet đang mở', action: 'renderActiveViewSheet' },
     { icon: 'refresh', tooltip: 'Nạp lại', action: 'reloadAll' },
     { icon: 'more', tooltip: 'Khác', menu: [
-      { label: 'Tự động vẽ lại sau lưu', action: 'toggleAutoRenderView', toggle: true }
+      { label: 'Tự động cập nhật sheet sau khi lưu', action: 'toggleAutoRenderView', toggle: true }
     ] },
     { icon: 'pencil', tooltip: 'Sửa khách', action: 'openCustomerForm', align: 'right' },
     { icon: 'addUser', tooltip: 'Thêm khách', action: 'openCustomerFormBlank' }
