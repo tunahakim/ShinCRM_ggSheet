@@ -161,7 +161,7 @@ function logTraceCoversSource(source) {
     return false;
   }
 
-  if (!value) { return false; }
+  if (!value || value.toLowerCase() === 'off') { return false; }
   if (value.toLowerCase() === 'all') { return true; }
 
   var wanted = String(source === null || source === undefined ? '' : source).trim().toLowerCase();

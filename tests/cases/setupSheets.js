@@ -64,11 +64,11 @@ function chay(so) {
 
   check(so, 'gieo xong thì tham số người dùng để trống, bộ đếm mới bắt đầu từ max trên kho',
     nen.hop.configParams(),
-    { LOG_TRACE: '', CELL_BUDGET: '', ID_COUNTER_CUSTOMER: '0', ID_COUNTER_ACTIVITY: '0' });
+    { LOG_TRACE: 'off', CELL_BUDGET: '', ID_COUNTER_CUSTOMER: '0', ID_COUNTER_ACTIVITY: '0' });
 
   check(so, 'bốn tên nằm ngay hàng dữ liệu đầu, không chừa khoảng trắng',
     docKhoiThamSo(nen),
-    [[4, 'LOG_TRACE', ''], [5, 'CELL_BUDGET', ''], [6, 'ID_COUNTER_CUSTOMER', '0'], [7, 'ID_COUNTER_ACTIVITY', '0']]);
+    [[4, 'LOG_TRACE', 'off'], [5, 'CELL_BUDGET', ''], [6, 'ID_COUNTER_CUSTOMER', '0'], [7, 'ID_COUNTER_ACTIVITY', '0']]);
 
   // Năm lệnh ghi cho năm hàng tiêu đề, cộng đúng một lệnh cho cả khối tham số. Luật gộp lệnh ghi của tài liệu 06: hai tên thiếu vẫn là một lệnh, không phải hai.
   check(so, 'cả lượt dựng tốn 6 lệnh ghi: 5 hàng tiêu đề và 1 cho cả khối tham số', nen.dem.setValues, 6);
@@ -104,7 +104,7 @@ function chay(so) {
 
   check(so, 'khối sắp xếp dài hơn không đẩy tên tham số xuống dưới khoảng trắng',
     docKhoiThamSo(lech),
-    [[4, 'LOG_TRACE', ''], [5, 'CELL_BUDGET', ''], [6, 'ID_COUNTER_CUSTOMER', '0'], [7, 'ID_COUNTER_ACTIVITY', '0']]);
+    [[4, 'LOG_TRACE', 'off'], [5, 'CELL_BUDGET', ''], [6, 'ID_COUNTER_CUSTOMER', '0'], [7, 'ID_COUNTER_ACTIVITY', '0']]);
 
   section('Sheet đã có tên lạ và một tên trong danh mục nằm giữa khối');
 
@@ -115,7 +115,7 @@ function chay(so) {
 
   check(so, 'tên đã có giữ nguyên chỗ và giá trị, chỉ tên còn thiếu được nối vào cuối',
     docKhoiThamSo(tron),
-    [[4, 'GHI_CHU_RIENG', 'của tôi'], [5, 'CELL_BUDGET', '900000'], [6, 'MOT_TEN_LA', '7'], [7, 'LOG_TRACE', ''], [8, 'ID_COUNTER_CUSTOMER', '0'], [9, 'ID_COUNTER_ACTIVITY', '0']]);
+    [[4, 'GHI_CHU_RIENG', 'của tôi'], [5, 'CELL_BUDGET', '900000'], [6, 'MOT_TEN_LA', '7'], [7, 'LOG_TRACE', 'off'], [8, 'ID_COUNTER_CUSTOMER', '0'], [9, 'ID_COUNTER_ACTIVITY', '0']]);
 
   check(so, 'thiếu một tên cũng chỉ tốn một lệnh ghi cho khối tham số', tron.dem.setValues, 6);
 
@@ -127,7 +127,7 @@ function chay(so) {
 
   checkContains(so, 'nghiệm thu báo đạt sau khi dựng khung', dongDat, '✅ ĐẠT');
   checkContains(so, 'nghiệm thu kể tên từng tham số kèm giá trị đang mang', dongDat,
-    'Config, khối tham số — đủ 4 tên: LOG_TRACE = (trống, dùng mặc định), CELL_BUDGET = (trống, dùng mặc định), ID_COUNTER_CUSTOMER = "0", ID_COUNTER_ACTIVITY = "0"');
+    'Config, khối tham số — đủ 4 tên: LOG_TRACE = "off", CELL_BUDGET = (trống, dùng mặc định), ID_COUNTER_CUSTOMER = "0", ID_COUNTER_ACTIVITY = "0"');
 
   section('Di chuyển bộ đếm cũ và hướng dẫn nhập Config');
 
@@ -179,7 +179,7 @@ function chay(so) {
     resetResult.counters, { customer: 42, activity: 73 });
   check(so, 'reset xóa cấu hình người dùng và gieo lại đúng bốn tham số',
     [reset.hop.configReadAll().sheetSchema, reset.hop.configReadAll().sort, reset.hop.configParams()],
-    [{}, [], { LOG_TRACE: '', CELL_BUDGET: '', ID_COUNTER_CUSTOMER: '42', ID_COUNTER_ACTIVITY: '73' }]);
+    [{}, [], { LOG_TRACE: 'off', CELL_BUDGET: '', ID_COUNTER_CUSTOMER: '42', ID_COUNTER_ACTIVITY: '73' }]);
   check(so, 'reset không sửa bản ghi Customer và đánh dấu Config cùng mọi view bẩn',
     [reset.Customer.sheet.getRange(4, 2).getValue(), reset.hop.dirtyStateRead(), reset.stubs._khoa.dangGiu],
     ['Giữ nguyên khách', { viewSheets: ['!Lead'], records: [], config: true, all: false }, false]);
