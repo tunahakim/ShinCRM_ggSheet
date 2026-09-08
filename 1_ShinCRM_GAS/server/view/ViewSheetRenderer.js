@@ -129,6 +129,14 @@ function renderAllViewSheets() {
   return book.getSheets().filter(function (sheet) { return sheet.getName().charAt(0) === '!'; }).map(function (sheet) { return renderViewSheet(sheet.getName()); });
 }
 
+function viewProbeRenderCurrent() {
+  var sheet = shinOpenBook().getActiveSheet();
+  var result = renderViewSheet(sheet.getName());
+  var report = ['Sheet: ' + result.sheetName, 'Số dòng: ' + result.rows, 'RowMap: ' + JSON.stringify(result.rowMaps[result.sheetName] || {})];
+  report.forEach(function (line) { Logger.log(line); });
+  return report;
+}
+
 function prepareViewSheet(sheetName) {
   var name = String(sheetName || '').trim();
   var sheet = shinOpenBook().getSheetByName(name);
