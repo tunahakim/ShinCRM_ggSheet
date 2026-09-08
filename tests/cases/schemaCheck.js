@@ -159,11 +159,11 @@ function chay(so) {
 
   batLoiUi('bắt được mục menu trỏ tới hàm không có trong bảng, và gọi tên mục menu chứ không gọi tên nút mẹ',
     (u) => { u.view.header[4].menu[0].action = 'toggleAutoRenderViewx'; },
-    'mục menu "Tự động sắp xếp sheet" trỏ tới hàm "toggleAutoRenderViewx"');
+    'mục menu "Tự động vẽ lại sau lưu" trỏ tới hàm "toggleAutoRenderViewx"');
 
   batLoiUi('bắt được mục menu thiếu `action` — bấm vào không có gì xảy ra là loại lỗi im lặng nhất',
     (u) => { delete u.view.header[4].menu[0].action; },
-    'mục menu "Tự động sắp xếp sheet" thiếu `action`');
+    'mục menu "Tự động vẽ lại sau lưu" thiếu `action`');
 
   batLoiUi('bắt được mục menu thiếu `label`, vì nó hiện ra một dòng trắng bấm được',
     (u) => { delete u.view.header[4].menu[0].label; },
@@ -178,7 +178,7 @@ function chay(so) {
     'màn "view" · Khác có `menu` không phải mảng');
 
   batLoiUi('bắt được mục menu không phải object',
-    (u) => { u.view.header[4].menu[0] = 'Tự động sắp xếp sheet'; },
+    (u) => { u.view.header[4].menu[0] = 'Tự động vẽ lại sau lưu'; },
     'có mục menu không phải object');
 
   batLoiUi('bắt được tên slot gõ sai, và gọi tên card bằng tiêu đề người dùng đọc được',
