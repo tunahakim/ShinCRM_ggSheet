@@ -78,6 +78,7 @@ function actionsChuaDung(viec, chang) {
 ACTIONS.toggleFollowSelection = function () {
   var kq = prefsToggle('followSelection');
   screenViewRender();
+  if (typeof selectionPollPreferenceChanged === 'function') { selectionPollPreferenceChanged(); }
   return actionsPrefSend(kq);
 };
 

@@ -67,6 +67,8 @@
       <button type="button" class="shin-undo-btn" data-action="undoDelete">Hoàn tác</button>
     </div>
 
+    <div id="shin-extension-warning" class="shin-extension-warning" hidden>Thiếu Extension — sidebar tự dò, chậm hơn</div>
+
   </div>
 
   <?!= include('client/util/textNormalize') ?>
@@ -101,6 +103,7 @@
   <?!= include('client/ui/inputs') ?>
   <?!= include('client/ui/dispatch') ?>
   <?!= include('client/link/sheetLink') ?>
+  <?!= include('client/link/selectionPoll') ?>
   <?!= include('client/ram/bootstrap') ?>
 
   <script>

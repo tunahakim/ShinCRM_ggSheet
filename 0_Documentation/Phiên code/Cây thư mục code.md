@@ -95,8 +95,9 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 ├── client\                       Code chạy trong sidebar. Tệp .html bọc thẻ <script>, hoặc bọc thẻ <style> nếu là tệp chỉ có CSS.
 │   │                             Thư mục con chia theo MỤC ĐÍCH, không chia theo đuôi thẻ.
 │   ├── Sidebar.html              Trang gốc của sidebar: nhúng mọi tệp client theo đúng thứ tự rồi gọi lượt nạp đầu tiên.
-│   ├── link\                     Đứng ngoài mọi lời gọi google.script.run, nhưng ở đây vì lý do an ninh: chỉ nhận tin postMessage mang đúng nonce, đúng origin, đúng id tệp, và tin cũ thì bỏ.
-│   │   └── sheetLink.html        Tai nghe tin CRM_CONTEXT từ Extension: giải mã khách ba bước rồi bật followSelection. Bắt tay có tiếng đáp, đèn sống chết suy từ ACK chứ không suy từ im lặng.
+│   ├── link\                     Cầu nối ô đang chọn: ưu tiên postMessage an toàn từ Extension, khi vắng mới mở đường dò máy chủ có nhịp và luật dừng.
+│   │   ├── sheetLink.html        Tai nghe tin CRM_CONTEXT từ Extension: giải mã khách ba bước rồi bật followSelection. Bắt tay có tiếng đáp, đèn sống chết suy từ ACK chứ không suy từ im lặng.
+│   │   └── selectionPoll.html    Máy trạng thái dự phòng khi vắng Extension: nhịp dò 2/6 giây, bốn luật dừng, đèn sét bốn trạng thái và băng cảnh báo sau ba giây ân hạn.
 │   ├── ram\                      Kho dữ liệu trong RAM của sidebar, và đường nhận dữ liệu từ máy chủ.
 │   │   ├── store.html            Kho runtime cùng mười đường tra duy nhất được chạm vào nó. Không đường nào nhận tham số chế độ xem.
 │   │   ├── ingest.html           Chỗ DUY NHẤT biết hình dạng đường truyền { fields, rows }. Bung thành object đúng một lần ở đây.
@@ -200,7 +201,8 @@ tests\
     ├── slots.js                  Dòng lịch sử giữ đúng thứ tự thời gian kể cả khi có bản ghi đã xóa chen giữa, và KHÔNG dòng nào mang field — engine tra một bản ghi cho một thực thể.
     ├── viewScreen.js             Bốn cái hỏng-trong-im-lặng của màn xem: mã card lệch giữa hai tệp, đổi khách mà chỉ vẽ lại một vùng, đổi khách lúc đang gõ dở, và tệp màn tự chạm DOM.
     ├── formScreen.js             Bốn cái hỏng-trong-im-lặng của ba màn form: tiêu đề suy sai vì bản ghi mới đã có mã xem trước, ô kế tục không có dấu, form giao dịch thiếu bản ghi khách, và đóng form lồng thì rơi thẳng về màn xem.
-    └── actions.js                Bảng mười lăm hành động: một tên rơi khỏi bảng là nút bấm không làm gì, ba cửa mở form phải khóa khi khách đã xóa mềm, và việc chặng sau phải ném lỗi đọc được chứ không im.
+    ├── actions.js                Bảng mười lăm hành động: một tên rơi khỏi bảng là nút bấm không làm gì, ba cửa mở form phải khóa khi khách đã xóa mềm, và việc chặng sau phải ném lỗi đọc được chứ không im.
+    └── selectionPoll.js          Đồng hồ giả khóa luật ACK loại trừ mọi vòng gọi, bốn điều kiện dừng, chống vòng chồng và thang nhịp 2/6 giây.
 ```
 
 ## Bảng tra: tên trong tài liệu thiết kế → tệp thật

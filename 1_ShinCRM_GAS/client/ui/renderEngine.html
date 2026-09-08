@@ -431,6 +431,7 @@ function renderScreen(man, boiCanh) {
   Object.keys(RENDER_REGIONS).forEach(function (ten) { renderRegionElement(ten).innerHTML = html[ten]; });
   renderRegionElement('info').hidden = !man.infoBar;
   renderRegionElement('footer').hidden = man.footer.length === 0;
+  if (typeof selectionPollPaint === 'function') { selectionPollPaint(); }
 
   return html;
 }

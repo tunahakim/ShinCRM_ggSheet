@@ -1,0 +1,201 @@
+<script>
+/**
+ * Đường dự phòng khi không có Extension: hỏi vị trí ô theo nhịp 2/6 giây, và giữ cùng một sự thật cho bộ đếm, icon sét, băng cảnh báo.
+ *
+ * `CRM_CONTEXT` không tham gia quyết định Extension sống hay chết. Chỉ ACK của bắt tay được quyền đổi trạng thái đó; nếu sheet ngồi im hai phút thì ACK vẫn đủ để nhịp dò không gọi máy chủ lần nào.
+ */
+
+var SELECTION_POLL_STABLE_LIMIT = 3;
+var SELECTION_POLL_BANNER_ID = 'shin-extension-warning';
+var SELECTION_POLL = {
+  installed: false,
+  ready: false,
+  bootAt: 0,
+  timer: null,
+  inFlight: false,
+  lastPosition: '',
+  stableCount: 0,
+  intervalMs: 2000
+};
+
+function selectionPollMs(name, fallback) {
+  return sheetLinkMs(name, fallback);
+}
+
+/** `checking` giữ thời gian ân hạn, để lần mở sidebar không nháy cảnh báo sai trước khi Extension kịp đáp. */
+function selectionPollExtensionState(now) {
+  var luc = now === undefined ? Date.now() : now;
+  if (sheetLinkExtensionAlive(luc)) { return 'present'; }
+  if (!SHEET_LINK_LAST_ACK && luc - SELECTION_POLL.bootAt < selectionPollMs('EXTENSION_ACK_TIMEOUT_MS', 3000)) { return 'checking'; }
+  return 'missing';
+}
+
+function selectionPollSaving() {
+  return typeof SAVE_FLOW !== 'undefined' && SAVE_FLOW && SAVE_FLOW.dangGui === true;
+}
+
+function selectionPollEligible(now) {
+  return SELECTION_POLL.ready
+    && typeof Prefs !== 'undefined' && Prefs && Prefs.followSelection === true
+    && selectionPollExtensionState(now) === 'missing'
+    && !(typeof document !== 'undefined' && document.hidden)
+    && !selectionPollSaving();
+}
+
+function selectionPollClearTimer() {
+  if (SELECTION_POLL.timer !== null) {
+    clearTimeout(SELECTION_POLL.timer);
+    SELECTION_POLL.timer = null;
+  }
+}
+
+function selectionPollSchedule(delay) {
+  selectionPollClearTimer();
+  if (!selectionPollEligible() || SELECTION_POLL.inFlight) { return; }
+  SELECTION_POLL.timer = setTimeout(selectionPollTick, Math.max(0, Number(delay) || 0));
+}
+
+function selectionPollPositionKey(result) {
+  if (!result) { return ''; }
+  return [result.spreadsheetId, result.gid, result.sheetName, result.row, result.col, result.rowEnd, result.colEnd].join('|');
+}
+
+function selectionPollApplyResult(result) {
+  if (!result || !result.customerId || !Prefs.followSelection) { return; }
+  if (SHEET_LINK_SPREADSHEET_ID && result.spreadsheetId !== SHEET_LINK_SPREADSHEET_ID) { return; }
+  if (ScreenState.screen !== SCREEN_VIEW || result.customerId === ScreenState.currentCustomerId) { return; }
+  ACTIONS.setCurrentCustomer({ pick: result.customerId });
+}
+
+function selectionPollWarn(err) {
+  if (typeof console !== 'undefined' && console.warn) { console.warn('Không dò được ô đang chọn; sẽ thử lại ở nhịp sau.', err); }
+}
+
+function selectionPollFinish() {
+  SELECTION_POLL.inFlight = false;
+  selectionPollPaint();
+  if (selectionPollEligible()) { selectionPollSchedule(SELECTION_POLL.intervalMs); }
+  else { selectionPollClearTimer(); }
+}
+
+function selectionPollReadFull() {
+  if (!selectionPollEligible()) { return Promise.resolve(null); }
+  return callServer('probeSelectionFull').then(function (full) {
+    if (selectionPollEligible()) {
+      SELECTION_POLL.lastPosition = selectionPollPositionKey(full);
+      selectionPollApplyResult(full);
+    }
+    return full;
+  });
+}
+
+/** Một nhịp giữ cờ cho cả lượt cheap rồi full; gọi lại khi lời gọi trước chưa về chỉ bỏ nhịp, không dựng vòng thứ hai. */
+function selectionPollTick() {
+  SELECTION_POLL.timer = null;
+  if (!selectionPollEligible() || SELECTION_POLL.inFlight) { return null; }
+
+  SELECTION_POLL.inFlight = true;
+  return callServer('probeSelectionCheap').then(function (cheap) {
+    if (!selectionPollEligible()) { return null; }
+
+    var key = selectionPollPositionKey(cheap);
+    if (key !== SELECTION_POLL.lastPosition) {
+      SELECTION_POLL.lastPosition = key;
+      SELECTION_POLL.stableCount = 0;
+      SELECTION_POLL.intervalMs = selectionPollMs('SELECTION_POLL_MS', 2000);
+      return selectionPollReadFull();
+    }
+
+    SELECTION_POLL.stableCount += 1;
+    if (SELECTION_POLL.stableCount >= SELECTION_POLL_STABLE_LIMIT) {
+      SELECTION_POLL.intervalMs = selectionPollMs('SELECTION_POLL_IDLE_MS', 6000);
+    }
+    return null;
+  }).then(function (result) {
+    selectionPollFinish();
+    return result;
+  }, function (err) {
+    selectionPollWarn(err);
+    selectionPollFinish();
+    return null;
+  });
+}
+
+/** Bốn tín hiệu đánh thức dùng chung một cửa: vị trí đổi, tab hiện lại, sidebar focus, hoặc chuột đi vào sidebar. */
+function selectionPollWake() {
+  SELECTION_POLL.stableCount = 0;
+  SELECTION_POLL.intervalMs = selectionPollMs('SELECTION_POLL_MS', 2000);
+  if (selectionPollEligible() && !SELECTION_POLL.inFlight) { selectionPollSchedule(SELECTION_POLL.intervalMs); }
+}
+
+function selectionPollPaint() {
+  if (typeof document === 'undefined') { return; }
+  var state = selectionPollExtensionState();
+  var missing = state === 'missing';
+  var on = typeof Prefs !== 'undefined' && Prefs && Prefs.followSelection === true;
+  var bolt = document.querySelector ? document.querySelector('[data-action="toggleFollowSelection"]') : null;
+  var banner = document.getElementById ? document.getElementById(SELECTION_POLL_BANNER_ID) : null;
+
+  if (banner) { banner.hidden = !missing; }
+  if (!bolt) { return; }
+
+  bolt.classList.toggle('shin-extension-missing', missing);
+  bolt.setAttribute('data-extension-state', state);
+  bolt.setAttribute('aria-pressed', on ? 'true' : 'false');
+
+  var tooltip = on
+    ? (missing ? 'Không thấy Extension — đang tự dò, chậm hơn' : 'Đang bám ô — Extension chạy, tức thì')
+    : (missing ? 'Không bám ô, và không thấy Extension' : 'Không bám ô. Bật để sidebar theo ô đang chọn');
+  if (state === 'checking') { tooltip = 'Đang kiểm tra Extension…'; }
+  bolt.setAttribute('title', tooltip);
+  bolt.setAttribute('aria-label', tooltip);
+}
+
+/** Gọi từ nhịp bắt tay: đây là đồng hồ phát hiện ACK hết hạn, hoàn toàn không nhìn `CRM_CONTEXT`. */
+function selectionPollHeartbeat() {
+  selectionPollEvaluate();
+}
+
+function selectionPollOnAck() {
+  selectionPollEvaluate();
+}
+
+function selectionPollEvaluate() {
+  selectionPollPaint();
+  if (!selectionPollEligible()) {
+    selectionPollClearTimer();
+    return;
+  }
+  if (SELECTION_POLL.timer === null && !SELECTION_POLL.inFlight) { selectionPollSchedule(SELECTION_POLL.intervalMs); }
+}
+
+function selectionPollSetReady(ready) {
+  SELECTION_POLL.ready = ready === true;
+  selectionPollEvaluate();
+}
+
+function selectionPollPreferenceChanged() {
+  selectionPollWake();
+  selectionPollEvaluate();
+}
+
+function selectionPollVisibilityChanged() {
+  if (document.hidden) {
+    selectionPollEvaluate();
+    return;
+  }
+  selectionPollWake();
+}
+
+function selectionPollInstall() {
+  if (SELECTION_POLL.installed) { return; }
+  SELECTION_POLL.installed = true;
+  SELECTION_POLL.bootAt = Date.now();
+  SELECTION_POLL.intervalMs = selectionPollMs('SELECTION_POLL_MS', 2000);
+  document.addEventListener('visibilitychange', selectionPollVisibilityChanged);
+  window.addEventListener('focus', selectionPollWake);
+  var root = document.getElementById('sidebar-root');
+  if (root) { root.addEventListener('mouseenter', selectionPollWake); }
+  selectionPollPaint();
+}
+</script>

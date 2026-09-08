@@ -52,18 +52,20 @@ function sheetLinkSetSpreadsheetId(id) {
 }
 
 /** Extension còn sống không: ACK về trong ngưỡng, tính từ nhịp ping gần nhất. */
-function sheetLinkExtensionAlive() {
+function sheetLinkExtensionAlive(now) {
   if (!SHEET_LINK_LAST_ACK) { return false; }
-  return Date.now() - SHEET_LINK_LAST_ACK < sheetLinkMs('EXTENSION_ACK_TIMEOUT_MS', 3000);
+  return (now === undefined ? Date.now() : now) - SHEET_LINK_LAST_ACK < sheetLinkMs('EXTENSION_ACK_TIMEOUT_MS', 3000);
 }
 
 function sheetLinkHandshakePing() {
-  if (window.top === window) { return; }
-  try {
-    window.top.postMessage({ action: 'CRM_HANDSHAKE', nonce: SHEET_LINK_NONCE }, SHEET_LINK_ORIGIN);
-  } catch (err) {
-    // Extension chưa cài hoặc trang chưa sẵn sàng — không sao, ping lại ở nhịp sau.
+  if (window.top !== window) {
+    try {
+      window.top.postMessage({ action: 'CRM_HANDSHAKE', nonce: SHEET_LINK_NONCE }, SHEET_LINK_ORIGIN);
+    } catch (err) {
+      // Extension chưa cài hoặc trang chưa sẵn sàng — không sao, ping lại ở nhịp sau.
+    }
   }
+  if (typeof selectionPollHeartbeat === 'function') { selectionPollHeartbeat(); }
 }
 
 function sheetLinkOnMessage(event) {
@@ -76,6 +78,7 @@ function sheetLinkOnMessage(event) {
   if (data.action === 'CRM_HANDSHAKE_ACK') {
     if (data.nonce !== SHEET_LINK_NONCE) { return; }
     SHEET_LINK_LAST_ACK = Date.now();
+    if (typeof selectionPollOnAck === 'function') { selectionPollOnAck(); }
     return;
   }
 

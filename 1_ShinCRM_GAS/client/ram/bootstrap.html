@@ -32,6 +32,9 @@ async function sidebarBoot() {
   try {
     // Bộ phát click gắn **trước** mọi thứ khác, vì nó không cần một hạt dữ liệu nào mà màn báo lỗi thì có nút Thử lại. Gắn ở cuối như trước thì lượt nạp đầu tiên mà vỡ sẽ vẽ ra một cái nút bấm không kêu. Hàm này chạy nhiều lần cũng chỉ gắn một tai nghe.
     dispatchInstall();
+    selectionPollInstall();
+    sheetLinkInstall();
+    selectionPollSetReady(false);
 
     statusInfoLine('Đang đo ngân sách ô và nạp lõi…');
     var core = await callServer('loadCore');
@@ -43,6 +46,7 @@ async function sidebarBoot() {
 
     var skipped = ingestCore(core);
     sheetLinkSetSpreadsheetId(core.spreadsheetId);
+    selectionPollSetReady(true);
     statusInfoLine('Tra cứu khách đã chạy — đang nạp giao dịch ở chế độ nền…');
     callTimingFirstPaint(Date.now());
 
@@ -61,7 +65,6 @@ async function sidebarBoot() {
     };
 
     menuInstall();
-    sheetLinkInstall();
     collapseInstall();
     searchInstall();
     comboInstall();

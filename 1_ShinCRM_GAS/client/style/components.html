@@ -408,8 +408,22 @@
 /* Nút đang bật. Đánh dấu bằng `aria-pressed` để trình đọc màn hình cũng nghe được trạng thái đó. */
 .shin-icon[aria-pressed="true"] { background: var(--shin-primary-soft); color: var(--shin-primary); }
 
-/* Nút sét giữ đúng màu vàng của bản cũ; các trạng thái Extension sẽ bổ sung trên cùng nút ở đơn vị kế tiếp. */
+/* Nút sét giữ đúng màu vàng của bản cũ. Khi thiếu Extension, chấm nhỏ giữ cảnh báo ngay cả lúc công tắc đang tắt. */
 .shin-icon.shin-toggle[aria-pressed="true"] { background: var(--shin-warn-soft); color: var(--shin-bolt); }
+
+.shin-icon.shin-toggle.shin-extension-missing { position: relative; }
+.shin-icon.shin-toggle.shin-extension-missing[aria-pressed="true"] { color: var(--shin-warn); }
+.shin-icon.shin-toggle.shin-extension-missing::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 6px;
+  height: 6px;
+  border: 1px solid var(--shin-bg);
+  border-radius: 50%;
+  background: var(--shin-warn);
+}
 
 /*
  * Có menu **và** có chữ thì nút nở theo nội dung: đó là ca `{ label: "Đang xem", menu: [...] }` ở hàng tiêu đề card lịch sử.
