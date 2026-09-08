@@ -21,18 +21,13 @@ window.addEventListener('message', function(event) {
   }
 });
 
-// 2. [THAY ĐỔI] Hàm gửi thông tin thô sang Sidebar (Thêm col, Bỏ needReload)
-function sendToSidebar(sheetName, rowNumber, colNumber) {
+// 2. Bắn ảnh chụp trạng thái sang Sidebar. Sidebar tự quyết dùng trường nào.
+function sendContextToSidebar(context) {
   if (!sidebarWindow) return;
   try {
-      sidebarWindow.postMessage({
-        action: 'CRM_TRIGGER',
-        sheet: sheetName,
-        row: rowNumber,
-        col: colNumber // [MỚI] Gửi thêm cột
-      }, '*');
-      // console.log(`📡 Sent: ${sheetName} | R${rowNumber}:C${colNumber}`);
+      context.action = 'CRM_CONTEXT';
+      sidebarWindow.postMessage(context, '*');
   } catch (err) {
-      sidebarWindow = null; 
+      sidebarWindow = null;
   }
 }
