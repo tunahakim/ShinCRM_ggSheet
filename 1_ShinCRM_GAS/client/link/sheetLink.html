@@ -21,6 +21,7 @@ var SHEET_LINK_NONCE = '';
 var SHEET_LINK_SEQ = 0;
 var SHEET_LINK_SPREADSHEET_ID = '';
 var SHEET_LINK_LAST_ACK = 0;
+var SHEET_LINK_LAST_SHEET = '';
 var SHEET_LINK_PING_TIMER = null;
 var sheetLinkInstalled = false;
 
@@ -103,6 +104,21 @@ function sheetLinkOnMessage(event) {
 function sheetLinkApplyContext(ctx) {
   if (!Prefs.followSelection) { return; }
   if (ScreenState.screen !== SCREEN_VIEW) { return; }
+
+  var changedSheet = ctx.sheetName !== SHEET_LINK_LAST_SHEET;
+  SHEET_LINK_LAST_SHEET = ctx.sheetName || '';
+  if (changedSheet && ctx.sheetName && ctx.sheetName.charAt(0) === '!' && typeof callServer === 'function') {
+    callServer('renderViewIfDirty', [ctx.sheetName]).then(function (result) {
+      if (result && result.rowMaps && typeof Store.applyRowMaps === 'function') { Store.applyRowMaps(result.rowMaps); }
+      sheetLinkApplyCustomerContext(ctx);
+    });
+    return;
+  }
+  sheetLinkApplyCustomerContext(ctx);
+}
+
+function sheetLinkApplyCustomerContext(ctx) {
+  if (!Prefs.followSelection || ScreenState.screen !== SCREEN_VIEW) { return; }
 
   var ma = sheetLinkCustomerIdFromContext(ctx);
   if (!ma || ma === ScreenState.currentCustomerId) { return; }

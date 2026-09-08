@@ -137,6 +137,13 @@ function viewProbeRenderCurrent() {
   return report;
 }
 
+function renderViewIfDirty(sheetName) {
+  var name = String(sheetName || '').trim();
+  var state = dirtyStateRead();
+  if (state.all || state.config || state.viewSheets.indexOf(name) >= 0) { return renderViewSheet(name); }
+  return { ok: true, skipped: true, sheetName: name, rowMaps: {} };
+}
+
 function prepareViewSheet(sheetName) {
   var name = String(sheetName || '').trim();
   var sheet = shinOpenBook().getSheetByName(name);
