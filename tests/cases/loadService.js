@@ -17,11 +17,11 @@ const { section, check, ghiLoiNap } = require('../lib/assert');
 const NAM_SHEET = ['Customer', 'Activity', 'Category', 'Config', 'Log'];
 
 /** Hộp cát có cả năm sheet, kèm khóa dọn log đặt sẵn cho hôm nay để phép quét tuổi log không chen vào. */
-function dungNap(thamSo) {
+function dungNap(thamSo, dirtyProps) {
   return dungHop({
     sheets: NAM_SHEET,
     thamSo: thamSo,
-    props: { LOG_LAST_CLEANUP: formatDateGia(new Date(), 'Asia/Ho_Chi_Minh', 'yyyy-MM-dd') }
+    props: Object.assign({ LOG_LAST_CLEANUP: formatDateGia(new Date(), 'Asia/Ho_Chi_Minh', 'yyyy-MM-dd') }, dirtyProps || {})
   });
 }
 
@@ -66,6 +66,11 @@ function chay(so) {
   check(so, 'khối trạng thái bẩn có mặt trong MỌI phản hồi, kể cả phản hồi rỗng', Object.keys(rong.dirty).sort(), ['all', 'config', 'records', 'viewSheets']);
   check(so, 'gói lõi mang cả bảng khai để client dựng Schema', Object.keys(rong.schema).sort(), ['activity', 'customer']);
   check(so, 'ms là số, không phải chuỗi', typeof rong.ms, 'number');
+
+  const coDirty = dungNap(null, { dirtyViewSheets: '["!Lead"]', dirtyRecords: '["KH0001"]', dirtyConfig: 'true', dirtyAll: 'true' }).hop.loadCore();
+  check(so, 'nạp toàn bộ tiêu thụ cờ dữ liệu cũ nhưng giữ cờ sheet quản trị để sheet vẫn được vẽ lại',
+    coDirty.dirty,
+    { viewSheets: ['!Lead'], records: [], config: false, all: false });
 
   // Bảng tra hàng → mã. Chỉ sheet chứa khách có mặt; sheet Activity cố tình không có.
   ghiKhach(nen, hangDau, 'KH0001', 'Công ty Một');

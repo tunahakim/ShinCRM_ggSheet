@@ -127,6 +127,29 @@ function chay(so) {
     }()),
     { viewSheets: [], records: [], config: true, all: false });
 
+  check(so, 'lượt nạp toàn bộ nhận ba cờ dữ liệu nhưng giữ nguyên cờ sheet quản trị',
+    (function () {
+      const hop = dungHop({
+        sheets: ['Config', 'Log'],
+        props: { dirtyViewSheets: '["!Lead"]', dirtyRecords: '["KH0001"]', dirtyConfig: 'true', dirtyAll: 'false' }
+      }).hop;
+      const consumed = hop.dirtyStateTakeFullReload();
+      return [consumed, hop.dirtyStateRead()];
+    }()),
+    [
+      { records: ['KH0001'], config: true, all: false },
+      { viewSheets: ['!Lead'], records: [], config: false, all: false }
+    ]);
+
+  check(so, 'lượt nạp lõi thất bại trả lại cờ đã nhận mà không xóa cờ mới phát sinh',
+    (function () {
+      const hop = dungHop({ sheets: ['Config', 'Log'], props: { dirtyRecords: '["KH0001"]', dirtyConfig: 'true' } }).hop;
+      const consumed = hop.dirtyStateTakeFullReload();
+      hop.dirtyStateMarkRecords(['KH0002']);
+      return hop.dirtyStateRestoreFullReload(consumed);
+    }()),
+    { viewSheets: [], records: ['KH0002', 'KH0001'], config: true, all: false });
+
   return so;
 }
 

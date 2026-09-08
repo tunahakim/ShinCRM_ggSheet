@@ -29,7 +29,11 @@ function shinOnEdit(event) {
       if (shinViewEditNeedsRender(sheet, range)) { return renderViewSheet(name); }
       return;
     }
-    if (name === 'Config' || name === 'Category') { dirtyStateMarkConfig(); return; }
+    if (name === 'Config' || name === 'Category') {
+      dirtyStateMarkConfig();
+      if (name === 'Config') { dirtyStateMarkViewSheets(shinViewSheetNames(shinOpenBook())); }
+      return;
+    }
     var entity = name === ENTITY_SHEETS.customer ? 'customer' : name === ENTITY_SHEETS.activity ? 'activity' : '';
     if (!entity || range.getRow() < SHEET_FIRST_DATA_ROW) { return; }
     var column = selectionColumnIndex(sheet, DATA_SCHEMA[entity].id.code);

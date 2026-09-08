@@ -89,14 +89,22 @@ function loadCore() {
       return { ok: true, blocked: 'cellBudget', budget: budget, dirty: dirtyStateRead(), selection: selectionSnapshot(), ms: Date.now() - batDau };
     }
 
-    resetSettingsCache();
-
-    var config = configReadAll();
-    config.params = configParams();
-
-    var danhMuc = categoryReadAll();
-    var khach = entityReadAll('customer');
-    var soGiaoDich = entityRowCount('activity');
+    var consumedDirty = dirtyStateTakeFullReload();
+    var config;
+    var danhMuc;
+    var khach;
+    var soGiaoDich;
+    try {
+      resetSettingsCache();
+      config = configReadAll();
+      config.params = configParams();
+      danhMuc = categoryReadAll();
+      khach = entityReadAll('customer');
+      soGiaoDich = entityRowCount('activity');
+    } catch (err) {
+      dirtyStateRestoreFullReload(consumedDirty);
+      throw err;
+    }
     var ms = Date.now() - batDau;
 
     var warnings = danhMuc.warnings.slice();

@@ -157,6 +157,22 @@ function dirtyStateClearConfig() {
   return dirtyStateRead();
 }
 
+/** Nhận phần trạng thái mà một lượt nạp toàn bộ sắp xử lý; cờ phát sinh sau thời điểm này vẫn được giữ lại. */
+function dirtyStateTakeFullReload() {
+  var state = dirtyStateRead();
+  dirtyStateClear({ records: true, config: true, all: true });
+  return { records: state.records, config: state.config, all: state.all };
+}
+
+/** Trả lại phần đã nhận nếu lượt nạp lõi thất bại trước khi bàn giao dữ liệu cho client. */
+function dirtyStateRestoreFullReload(state) {
+  var consumed = state || {};
+  if (consumed.config) { dirtyStateMarkConfig(); }
+  if (consumed.all) { dirtyStateMarkAll(); }
+  else if (consumed.records && consumed.records.length) { dirtyStateMarkRecords(consumed.records); }
+  return dirtyStateRead();
+}
+
 /** Phép nghiệm thu chạy được trên Google: in khối trạng thái bẩn hiện có trên tệp thật. Sheet mới thì cả bốn đều rỗng, và đó là câu trả lời đúng cần nhìn thấy. */
 function probeDirtyState() {
   var state = dirtyStateRead();

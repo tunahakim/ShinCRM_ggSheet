@@ -17,7 +17,7 @@ function chay(so) {
   let nen;
   try {
     nen = dungHop({
-      sheets: ['Customer', 'Activity', 'Config', 'Log'],
+      sheets: ['Customer', 'Activity', 'Category', 'Config', 'Log'],
       tep: TEP_NEN.concat(['server/Triggers.js'])
     });
   } catch (err) {
@@ -43,6 +43,19 @@ function chay(so) {
   check(so, 'sửa trực tiếp kho đánh dấu bản ghi và tất cả sheet quản trị cần làm mới',
     [dirty.records, dirty.viewSheets.sort()],
     [['KH000001'], ['!Chăm sóc', '!Lead']]);
+
+  const config = nen.sheet('Config');
+  hop.dirtyStateClear();
+  hop.shinOnEdit({ range: eventRange(config, 4, 2) });
+  check(so, 'sửa Config đánh dấu nạp lại cấu hình và tất cả sheet quản trị',
+    hop.dirtyStateRead(),
+    { viewSheets: ['!Lead', '!Chăm sóc'], records: [], config: true, all: false });
+
+  hop.dirtyStateClear();
+  hop.shinOnEdit({ range: eventRange(nen.sheet('Category'), 4, 2) });
+  check(so, 'sửa Category chỉ đánh dấu nạp lại cấu hình, không làm bẩn sheet quản trị',
+    hop.dirtyStateRead(),
+    { viewSheets: [], records: [], config: true, all: false });
 }
 
 module.exports = { chay };
