@@ -31,7 +31,7 @@ function shinViewEditNeedsRender(sheet, range) {
 
 function shinOnEdit(event) {
   if (!event || !event.range) { return; }
-  return runEntryPoint('shinOnEdit', 'core', ERROR_CHANNEL_TOAST, function () {
+  return runEntryPoint('shinOnEdit', 'core', ERROR_CHANNEL_THROW, function () {
     var range = event.range;
     var sheet = range.getSheet();
     var name = sheet.getName();

@@ -3,16 +3,14 @@
  *
  * **Tên tệp khi đẩy lên Google là cả đường dẫn.** `client/Sidebar.html` ở máy trở thành tệp tên `client/Sidebar` trên Google, nên mọi lời gọi `createTemplateFromFile` và `include` phải ghi đủ đường dẫn, không được ghi tên cụt. Ghi tên cụt là lỗi đã từng xảy ra ở dự án cũ, và nó chỉ lộ ra lúc chạy thật chứ không lộ lúc đẩy code.
  *
- * **`onOpen` dựng thực đơn trước, làm mọi việc khác sau.** Đây là trigger đơn (simple trigger — trigger Google tự gọi, chạy với quyền hạn hẹp), nên vài dịch vụ có thể ném lỗi ở đây mà không ném ở chỗ khác. Nếu một việc phụ như nhả kho chờ ném lỗi trước khi thực đơn được dựng thì người dùng mất **đường vào duy nhất** của cả hệ thống — và mất đường vào thì không còn cách nào tự sửa. Nên thứ tự ở đây là một quyết định, không phải chuyện tình cờ.
+ * **`onOpen` chỉ dựng thực đơn.** Đây là trigger đơn (simple trigger — trigger Google tự gọi, chạy với quyền hạn hẹp), nên không ghép việc phụ như nhả kho lỗi vào đây. Kho lỗi được đưa qua `loadCore` khi sidebar đã có kênh hộp thoại lớn để hiển thị.
  */
 
 /** Tên thực đơn trên thanh menu. */
 var MENU_TITLE = 'ShinCRM';
 
 /**
- * Trigger đơn Google gọi mỗi lần tệp được mở.
- *
- * Dựng thực đơn xong mới nhả kho chờ, và phần nhả nằm trong vỏ bọc riêng để một lỗi ở đó không kéo theo thực đơn. Kênh hiển thị ở đây là `toast` theo bảng tài liệu 10 Phần 8, vì `getUi().alert()` không dùng được trong trigger.
+ * Trigger đơn Google gọi mỗi lần tệp được mở. Chỉ dựng menu; trigger nền không tự bật thông báo nhỏ của Google Sheets.
  */
 function onOpen() {
   SpreadsheetApp.getUi()
@@ -25,34 +23,24 @@ function onOpen() {
     .addItem('Bảng tra nhanh cú pháp lọc', 'shinShowFilterQuickReference')
     .addToUi();
 
-  // Nuốt lỗi ở đây là đúng, và đây là chỗ duy nhất trong dự án được nuốt: `runEntryPoint` đã ghi
-  // dòng log và đã hiện toast trước khi ném, nên cái bị chặn lại chỉ là việc ném tiếp. Nếu để nó
-  // ném thì mỗi lần mở tệp Google lại gắn cờ "thực thi thất bại" và gửi email, chỉ vì một việc
-  // phụ — còn dòng chẩn đoán thì vẫn nằm nguyên trên sheet `Log`.
-  try {
-    runEntryPoint('onOpen', 'core', ERROR_CHANNEL_TOAST, function () {
-      return flushPendingToast();
-    });
-  } catch (err) {
-    // đã ghi log và đã hiện ở trong vỏ bọc
-  }
 }
 
-function shinRenderCurrentView() {
-  return runEntryPoint('shinRenderCurrentView', 'core', ERROR_CHANNEL_TOAST, function () {
+function shinRenderCurrentView(source) {
+  var fromSidebar = source === 'sidebar';
+  return runEntryPoint('shinRenderCurrentView', fromSidebar ? 'sidebar' : 'core', fromSidebar ? ERROR_CHANNEL_THROW : ERROR_CHANNEL_ALERT, function () {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
     return renderViewSheet(sheet.getName());
   });
 }
 
 function shinRenderAllViews() {
-  return runEntryPoint('shinRenderAllViews', 'core', ERROR_CHANNEL_TOAST, function () {
+  return runEntryPoint('shinRenderAllViews', 'core', ERROR_CHANNEL_ALERT, function () {
     return renderAllViewSheets();
   });
 }
 
 function shinPrepareCurrentView() {
-  return runEntryPoint('shinPrepareCurrentView', 'core', ERROR_CHANNEL_TOAST, function () {
+  return runEntryPoint('shinPrepareCurrentView', 'core', ERROR_CHANNEL_ALERT, function () {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
     return prepareViewSheet(sheet.getName());
   });

@@ -107,7 +107,13 @@ function sheetLinkOnMessage(event) {
   if (data.seq <= SHEET_LINK_SEQ) { return; }
   SHEET_LINK_SEQ = data.seq;
 
-  sheetLinkApplyContext(data);
+  var applied = sheetLinkApplyContext(data);
+  if (applied && typeof applied.then === 'function') {
+    applied.then(null, function (err) {
+      if (typeof dispatchError === 'function') { dispatchError(err); }
+      else if (typeof console !== 'undefined' && console.error) { console.error(err); }
+    });
+  }
 }
 
 function sheetLinkViewState(sheetName) {
@@ -139,16 +145,30 @@ function sheetLinkViewApplyResult(sheetName, result) {
   return result;
 }
 
-/** Đồng bộ dữ liệu kho cũng chỉ có một lượt đang bay; ảnh tọa độ đến sau phải chờ cùng lượt thay vì đọc RAM cũ. */
+function sheetLinkDirtyNeedsData(dirty) {
+  return !!(dirty && (dirty.all || dirty.config || (dirty.records && dirty.records.length)));
+}
+
+function sheetLinkDirtyNeedsView(dirty, sheetName) {
+  return !!(dirty && dirty.viewSheets && dirty.viewSheets.indexOf(sheetName) >= 0);
+}
+
+function sheetLinkApplyDirtyData(dirty) {
+  if (!sheetLinkDirtyNeedsData(dirty)) { return null; }
+  if ((dirty.all || dirty.config) && typeof sidebarBoot === 'function') { return sidebarBoot(); }
+  if (dirty.records && dirty.records.length && typeof refreshDirtyRecords === 'function') { return refreshDirtyRecords(dirty.records); }
+  return null;
+}
+
+/** Đồng bộ dữ liệu kho cũng chỉ có một lượt đang bay; chỉ khóa sidebar sau khi máy chủ xác nhận có dữ liệu bẩn. */
 function sheetLinkSyncDirtyData() {
   if (SHEET_LINK_DATA_PENDING) { return SHEET_LINK_DATA_PENDING; }
   var settled = false;
   var work = callServer('getDirtyState').then(function (state) {
     var dirty = state && state.dirty;
-    if (!dirty) { return null; }
-    if ((dirty.all || dirty.config) && typeof sidebarBoot === 'function') { return sidebarBoot(); }
-    if (dirty.records && dirty.records.length && typeof refreshDirtyRecords === 'function') { return refreshDirtyRecords(dirty.records); }
-    return null;
+    if (!sheetLinkDirtyNeedsData(dirty)) { return null; }
+    var refresh = function () { return sheetLinkApplyDirtyData(dirty); };
+    return typeof sidebarBusyRun === 'function' ? sidebarBusyRun('Đang đồng bộ dữ liệu vừa thay đổi…', refresh) : refresh();
   });
   var request = work.then(function (result) {
     settled = true;
@@ -191,11 +211,25 @@ function sheetLinkInspectView(sheetName) {
   if (state.pending) { return state.pending; }
   if (state.inspecting) { return state.inspecting; }
   var settled = false;
-  var request = callServer('inspectViewState', [sheetName, state.revision]).then(function (result) {
+  var work = callServer('inspectViewState', [sheetName, state.revision]).then(function (result) {
+    if (!result) { return result; }
+    var dirty = result.dirty || {};
+    var refreshData = sheetLinkDirtyNeedsData(dirty);
+    var refreshView = !state.metaReady || result.changed || result.needsRender || sheetLinkDirtyNeedsView(dirty, sheetName);
+    if (!refreshData && !refreshView) { return result; }
+
+    var sync = function () {
+      var dataWork = sheetLinkApplyDirtyData(dirty);
+      var afterData = function () { return refreshView ? sheetLinkSyncView(sheetName) : result; };
+      return dataWork && typeof dataWork.then === 'function' ? dataWork.then(afterData) : afterData();
+    };
+    var message = refreshData ? 'Đang cập nhật dữ liệu và sheet ' + sheetName + '…' : 'Đang cập nhật sheet ' + sheetName + '…';
+    return typeof sidebarBusyRun === 'function' ? sidebarBusyRun(message, sync) : sync();
+  });
+  var request = work.then(function (result) {
     settled = true;
     state.inspecting = null;
-    if (!result || (!result.changed && !result.needsRender)) { return result; }
-    return sidebarBusyRun('Đang cập nhật sheet ' + sheetName + '…', function () { return sheetLinkSyncView(sheetName); });
+    return result;
   }, function (err) {
     settled = true;
     state.inspecting = null;
@@ -221,31 +255,36 @@ function sheetLinkApplyContext(ctx) {
   if (viewState && sheetLinkViewControlCell(viewState, ctx.row, ctx.col)) {
     viewState.watch = { key: positionKey, row: ctx.row, col: ctx.col };
   }
-  if (viewState && changedSheet && !ctx.rowMaps) { viewState.needsSync = true; }
+  if (viewState && changedSheet && !ctx.rowMaps && !viewState.metaReady) { viewState.needsSync = true; }
 
   SHEET_LINK_LAST_SHEET = ctx.sheetName || '';
   if (ctx.isEditing) { return; }
 
   var leavingDataSheet = changedSheet && (previousSheet === 'Customer' || previousSheet === 'Activity');
-  var needsBusyTransition = leavingDataSheet || (viewState && changedSheet && viewState.needsSync);
   var work = function () {
     var pending = null;
     var queue = function (next) { pending = pending ? pending.then(next) : next(); };
 
-    if (leavingDataSheet && typeof callServer === 'function') {
-      queue(sheetLinkSyncDirtyData);
-    } else if (SHEET_LINK_DATA_PENDING) {
-      queue(function () { return SHEET_LINK_DATA_PENDING; });
-    }
-
     if (viewState && ctx.rowMaps) {
       sheetLinkViewApplyResult(ctx.sheetName, ctx);
-    } else if (viewState && viewState.needsSync) {
-      queue(function () { return sheetLinkSyncView(ctx.sheetName); });
-    } else if (viewState && inspectAfterControl) {
-      queue(function () { return sheetLinkInspectView(ctx.sheetName); });
-    } else if (viewState && (viewState.pending || viewState.inspecting)) {
-      queue(function () { return viewState.pending || viewState.inspecting; });
+    } else if (viewState && changedSheet) {
+      if (!previousSheet && !viewState.metaReady && !SHEET_LINK_DATA_PENDING) {
+        queue(function () { return sheetLinkSyncView(ctx.sheetName); });
+      } else {
+        if (SHEET_LINK_DATA_PENDING) { queue(function () { return SHEET_LINK_DATA_PENDING; }); }
+        queue(function () { return sheetLinkInspectView(ctx.sheetName); });
+      }
+    } else {
+      if (leavingDataSheet && typeof callServer === 'function') { queue(sheetLinkSyncDirtyData); }
+      else if (SHEET_LINK_DATA_PENDING) { queue(function () { return SHEET_LINK_DATA_PENDING; }); }
+
+      if (viewState && (viewState.pending || viewState.inspecting)) {
+        queue(function () { return viewState.pending || viewState.inspecting; });
+      } else if (viewState && viewState.needsSync) {
+        queue(function () { return sheetLinkSyncView(ctx.sheetName); });
+      } else if (viewState && inspectAfterControl) {
+        queue(function () { return sheetLinkInspectView(ctx.sheetName); });
+      }
     }
 
     var applyLatest = function () {
@@ -255,10 +294,6 @@ function sheetLinkApplyContext(ctx) {
     return pending ? pending.then(applyLatest) : applyLatest();
   };
 
-  if (needsBusyTransition && typeof sidebarBusyRun === 'function') {
-    var message = viewState ? 'Đang cập nhật dữ liệu và sheet ' + ctx.sheetName + '…' : 'Đang đồng bộ dữ liệu vừa thay đổi…';
-    return sidebarBusyRun(message, work);
-  }
   return work();
 }
 

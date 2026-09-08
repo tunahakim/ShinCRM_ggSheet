@@ -38,25 +38,43 @@ function sidebarBusyActive() {
   return SIDEBAR_BUSY.operations.length > 0;
 }
 
-function sidebarBusyPaint() {
-  var root = document.getElementById('sidebar-root');
-  var overlay = document.getElementById('shin-busy-overlay');
-  var message = document.getElementById('shin-busy-message');
-  var active = sidebarBusyActive();
-  var current = active ? SIDEBAR_BUSY.operations[SIDEBAR_BUSY.operations.length - 1] : null;
-
-  if (root) {
-    root.setAttribute('aria-busy', active ? 'true' : 'false');
-    if (active) { root.setAttribute('inert', ''); }
-    else { root.removeAttribute('inert'); }
-  }
-  if (message && current) { message.textContent = current.message; }
-  if (overlay) { overlay.hidden = !active; }
+function sidebarBusyBlocked() {
+  return SIDEBAR_BUSY.operations.some(function (operation) { return operation.block; });
 }
 
-/** Khóa toàn sidebar; trả về một hàm chỉ mở đúng lượt đã khóa, kể cả khi có hai việc chồng nhau. */
-function sidebarBusyBegin(message) {
-  var operation = { id: ++SIDEBAR_BUSY.next, message: String(message || 'Đang xử lý dữ liệu…'), done: false };
+function sidebarBusyPaint() {
+  var root = document.getElementById('sidebar-root');
+  var progress = document.getElementById('sidebar-progress');
+  var overlay = document.getElementById('shin-busy-overlay');
+  var notice = document.getElementById('shin-busy-notice');
+  var active = sidebarBusyActive();
+  var blocked = sidebarBusyBlocked();
+  var current = active ? SIDEBAR_BUSY.operations[SIDEBAR_BUSY.operations.length - 1] : null;
+  var hasNotice = !!(current && current.message);
+
+  if (root) {
+    root.setAttribute('aria-busy', blocked ? 'true' : 'false');
+    if (blocked) { root.setAttribute('inert', ''); }
+    else { root.removeAttribute('inert'); }
+  }
+  if (notice) {
+    if (hasNotice) { notice.textContent = current.message; }
+    notice.hidden = !hasNotice;
+  }
+  if (overlay) {
+    overlay.hidden = !blocked;
+    if (blocked) {
+      var anchor = hasNotice ? notice : progress;
+      var edge = anchor && typeof anchor.getBoundingClientRect === 'function' ? anchor.getBoundingClientRect().bottom : 0;
+      overlay.style.top = Math.max(0, Math.ceil(edge)) + 'px';
+    }
+  }
+}
+
+/** Một cửa chung cho thông báo và khóa: bỏ message thì không có dải chữ, `block: false` thì không có overlay. */
+function sidebarBusyBegin(message, options) {
+  var opts = options || {};
+  var operation = { id: ++SIDEBAR_BUSY.next, message: message === null || message === undefined ? '' : String(message), block: opts.block !== false, done: false };
   SIDEBAR_BUSY.operations.push(operation);
   if (document.activeElement && document.activeElement.blur) { document.activeElement.blur(); }
   sidebarBusyPaint();
@@ -77,8 +95,8 @@ function sidebarBusyMessage(message) {
 }
 
 /** Bọc cả phần cập nhật RAM và vẽ lại, không chỉ thời gian lời gọi máy chủ đang bay. */
-function sidebarBusyRun(message, work) {
-  var finish = sidebarBusyBegin(message);
+function sidebarBusyRun(message, work, options) {
+  var finish = sidebarBusyBegin(message, options);
   var result;
   try {
     result = work();

@@ -25,6 +25,12 @@ async function chay(so) {
   hop.alert = (chu) => hopThoai.push(chu);
   hop.console = { info: (chu) => console_.push(chu), error: () => {} };
 
+  const loiCho = [];
+  hop.dispatchError = (err) => loiCho.push(err.message);
+  check(so, 'kho lỗi chờ dùng đúng kênh hộp thoại lớn và gộp thành một lần hiện',
+    [hop.bootTellPendingMessages([]), hop.bootTellPendingMessages(['lỗi một', 'lỗi hai']), loiCho.length, loiCho[0].includes('lỗi một') && loiCho[0].includes('lỗi hai')],
+    [null, 'ShinCRM ghi nhận 2 lỗi từ các lượt chạy nền trước đó:\n\n• lỗi một\n• lỗi hai', 1, true]);
+
   check(so, 'lượt nạp sạch thì không hộp thoại nào chắn đường',
     [hop.bootTellProblems({}), hopThoai.length, console_.length], [null, 0, 0]);
 

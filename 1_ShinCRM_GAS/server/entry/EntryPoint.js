@@ -14,7 +14,7 @@
 /**
  * Chạy phần ruột của một cửa vào trong vỏ bọc chuẩn.
  *
- * `name` là tên hành động ghi vào cột `Hành động` của sheet `Log`. `source` là nguồn theo bảng ở tài liệu 10 Phần 3. `channel` là kênh hiển thị theo bảng ở tài liệu 10 Phần 8, một trong `toast`, `alert`, `throw`, `pending`.
+ * `name` là tên hành động ghi vào cột `Hành động` của sheet `Log`. `source` là nguồn theo bảng ở tài liệu 10 Phần 3. `channel` là kênh hiển thị theo bảng ở tài liệu 10 Phần 8, một trong `alert`, `throw`, `pending`.
  *
  * **Không tự lấy `LockService`.** Khóa lấy ở tầng nghiệp vụ, nơi biết mình sắp ghi gì; lấy khóa ở đây là lấy khóa cho cả những lượt chỉ đọc, và khóa của dự án không tái nhập nên một lượt đọc giữ khóa sẽ chặn đúng lượt ghi đang chờ nó.
  */

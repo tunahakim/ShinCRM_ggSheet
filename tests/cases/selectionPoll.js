@@ -255,6 +255,19 @@ async function chay(so) {
     quaCau._calls,
     ['renderViewIfDirty(!Lead)']);
 
+  const loiQuaCau = dungHopPoll();
+  batDau(loiQuaCau);
+  loiQuaCau._errors = [];
+  loiQuaCau.dispatchError = (err) => { loiQuaCau._errors.push(err.message); };
+  loiQuaCau.sheetLinkApplyContext = () => Promise.reject(new Error('không đồng bộ được context'));
+  loiQuaCau.sheetLinkOnMessage({
+    origin: loiQuaCau.SHEET_LINK_ORIGIN,
+    data: { action: 'CRM_CONTEXT', nonce: loiQuaCau.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq: 1, sheetName: '!Lead', row: 4, col: 1 }
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  check(so, 'Promise xử lý CRM_CONTEXT bị từ chối chỉ đi qua dispatchError đúng một lần',
+    loiQuaCau._errors, ['không đồng bộ được context']);
+
   const cungSheet = dungHopPoll();
   batDau(cungSheet);
   cungSheet._calls = [];
@@ -334,6 +347,10 @@ async function chay(so) {
   chuyenSheet._busy = [];
   chuyenSheet.ACTIONS.setCurrentCustomer = ({ pick }) => { chuyenSheet._picked.push(pick); };
   chuyenSheet.sidebarBusyRun = (message, work) => { chuyenSheet._busy.push(message); return work(); };
+  chuyenSheet.refreshDirtyRecords = (ids) => {
+    chuyenSheet._calls.push('refreshDirtyRecords(' + ids.join(',') + ')');
+    return syncValue({ ok: true });
+  };
   const transitionReplies = [];
   chuyenSheet.callServer = (name) => {
     chuyenSheet._calls.push(name);
@@ -344,13 +361,19 @@ async function chay(so) {
   chuyenSheet.sheetLinkApplyContext({ sheetName: '!Lead', row: 4, col: 2 });
   chuyenSheet.sheetLinkApplyContext({ sheetName: '!Lead', row: 7, col: 2 });
   const callsBeforeDirtyReply = chuyenSheet._calls.slice();
-  transitionReplies[0].resolve({ ok: true, dirty: null });
+  transitionReplies[0].resolve({
+    ok: true,
+    changed: false,
+    needsRender: true,
+    revision: 1,
+    dirty: { all: false, config: false, records: ['KH000079'], viewSheets: ['!Lead'] }
+  });
   await new Promise((resolve) => setImmediate(resolve));
   transitionReplies[1].resolve({ ok: true, rowMaps: { '!Lead': { '4': 'KH000094', '7': 'KH000079' } }, viewMeta: { revision: 2, filterColumns: [1, 2], sortColumns: [] } });
   await new Promise((resolve) => setImmediate(resolve));
   check(so, 'rời sheet dữ liệu sang view dùng một overlay cho cả kiểm tra dirty và rowMap; tọa độ mới nhất chờ cùng lượt',
     [callsBeforeDirtyReply, chuyenSheet._calls, chuyenSheet._busy, chuyenSheet._picked],
-    [['getDirtyState'], ['getDirtyState', 'renderViewIfDirty'], ['Đang cập nhật dữ liệu và sheet !Lead…'], ['KH000079']]);
+    [['inspectViewState'], ['inspectViewState', 'refreshDirtyRecords(KH000079)', 'renderViewIfDirty'], ['Đang cập nhật dữ liệu và sheet !Lead…'], ['KH000079']]);
 
   const taiLai = dungHopPoll();
   batDau(taiLai);

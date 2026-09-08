@@ -9,8 +9,6 @@
  *
  * **Máy chủ không trả số hàng như một phần của bản ghi.** Số hàng chỉ xuất hiện ở `rowMap`, cây cầu tọa độ trả lời câu "người dùng vừa bấm vào hàng này trên sheet, đó là khách nào". Bản ghi thì nhận dạng bằng mã, không bằng vị trí — vì vị trí đổi mỗi lần sheet được sắp lại, còn mã thì không.
  *
- * **Điều tệp này chưa làm, và cố ý chưa:** `reloadRecords`, đường nạp lại đúng mấy bản ghi bẩn. Nó cần khối trạng thái bẩn có **chiều ghi** mới có gì để nạp lại, mà chiều ghi thuộc chặng làm mới dữ liệu. Viết bây giờ là viết một hàm luôn nhận danh sách rỗng.
- *
  * **Hai dòng "nạp xong" đều là dòng vết, không phải dòng luôn ghi.** Chủ dự án chốt ngày 05/09/2026: bật debug thì ghi chi tiết, ngày thường ẩn hết. Công tắc là tham số `LOG_TRACE` ở sheet `Config`. Một lượt mở sidebar trơn để lại **không** dòng nào, vì "mọi thứ bình thường" không đáng ghi ba lần mỗi lượt; lượt nào có lỗi thì vòng đệm vết tự bung ra sheet kèm dòng lỗi, nên đúng lúc cần chẩn đoán vẫn có đủ số liệu. Dòng cảnh báo vượt trần ngân sách ô thì vẫn `logEvent` — nó không phải chuyện bình thường.
  */
 
@@ -65,7 +63,7 @@ function reloadRecords(recordIds) {
 /**
  * Nạp phần lõi. Đây là lời gọi đầu tiên của mỗi lượt mở sidebar.
  *
- * Trả về `{ ok: true, blocked: false, settings, schema, config, categories, customer, activity, prefs, budget, dirty, warnings, ms }` ở đường bình thường, hoặc `{ ok: true, blocked: 'cellBudget', budget, dirty, ms }` khi vượt trần ngân sách ô.
+ * Trả về `{ ok: true, blocked: false, settings, schema, config, categories, customer, activity, prefs, budget, dirty, warnings, pendingMessages, ms }` ở đường bình thường, hoặc gói rút gọn vẫn có `pendingMessages` khi vượt trần ngân sách ô.
  *
  * **Đo ngân sách ô là việc đầu tiên, trước khi đọc một ô dữ liệu nào.** Vượt trần thì dừng ngay tại đó. Phép đo không đọc ô nào nên nó gần như miễn phí, còn đọc dữ liệu trong một tệp đã quá ì là cách chắc nhất để lượt chạy chết ở giữa đường — và chết ở giữa đường thì người dùng thấy sidebar treo, không thấy nguyên nhân.
  *
@@ -86,7 +84,7 @@ function loadCore() {
         detail: { total: budget.total, ceiling: budget.ceiling, sheets: budget.sheets }
       });
 
-      return { ok: true, blocked: 'cellBudget', budget: budget, dirty: dirtyStateRead(), selection: selectionSnapshot(), ms: Date.now() - batDau };
+      return { ok: true, blocked: 'cellBudget', budget: budget, dirty: dirtyStateRead(), selection: selectionSnapshot(), pendingMessages: takePendingMessages(), ms: Date.now() - batDau };
     }
 
     var consumedDirty = dirtyStateTakeFullReload();
@@ -109,6 +107,9 @@ function loadCore() {
 
     var warnings = danhMuc.warnings.slice();
     if (budget.warning) { warnings.push(budget.warning); }
+    if (config.params[LOG_TRACE_CONFIG_NAME]) {
+      warnings.push('LOG_TRACE đang bật (' + config.params[LOG_TRACE_CONFIG_NAME] + '). Sheet Log có thể chứa dữ liệu nhạy cảm nguyên văn; hãy tắt LOG_TRACE sau khi kiểm tra xong.');
+    }
 
     logTrace({
       source: LOAD_SOURCE,
@@ -141,6 +142,7 @@ function loadCore() {
       dirty: dirtyStateRead(),
       selection: selectionSnapshot(),
       warnings: warnings,
+      pendingMessages: takePendingMessages(),
       ms: ms
     };
   });

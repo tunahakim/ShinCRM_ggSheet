@@ -87,6 +87,14 @@ function chay(so) {
   check(so, 'lệnh chuẩn bị gắn bảng tra nhanh đầy đủ vào ô hàng 3 chưa có note',
     base.view.getRange(3, 1).getNote().includes('SẮP XẾP:'), true);
 
+  const leadingZero = taoNen(['@CUS_MST']);
+  ghiO(leadingZero.nen, 'Customer', 4, '@CUS_MA_KH', 'KH0001');
+  ghiO(leadingZero.nen, 'Customer', 4, '@CUS_MST', '0100000658');
+  leadingZero.nen.hop.renderViewSheet('!Lead');
+  check(so, 'cột chữ trên view được đặt khuôn trước khi ghi nên giữ nguyên số 0 đầu',
+    [leadingZero.view.getRange(4, 1).getValue(), leadingZero.view.getRange(4, 1).getNumberFormat()],
+    ['0100000658', '@']);
+
   const custom = taoNen(['@CUS_MA_KH', '@CUS_DOANH_THU']);
   gieoHaiKhach(custom.nen);
   const customCol = custom.nen.Customer.codes.length + 1;

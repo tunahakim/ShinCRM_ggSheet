@@ -8,9 +8,7 @@
  *   2. **Không bao giờ ném lỗi ra ngoài.** Đổi một dòng log lấy một khách là đổi lỗ. Hỏng thì `console.error` rồi đi tiếp.
  *   3. **Không kiểm giá trị của bên gọi.** Gõ sai một giá trị enum thì giá trị sai được ghi thẳng ra sheet để nó lộ ra khi lọc, chứ không ném lỗi. Chỗ này cố ý ngược với luật "sai schema thì báo lỗi ngay", vì luật 2 đứng trên.
  *
- * Điều tệp này chưa làm, và cố ý chưa: nửa "báo lỗi tới mắt người" của tài liệu 10 Phần 8 — `reportError`, `runEntryPoint`, `takePendingMessages`. Cả ba đều cần cửa vào có thật để hiện thông báo: menu, `onOpen`, sidebar. Chưa có cửa nào trong số đó thì viết chúng bây giờ là viết code không ai gọi được, và code không ai gọi được thì không ai biết nó đúng hay sai. Chúng vào cùng chặng dựng sidebar.
- *
- * Nên ở chặng này `flushLog` phải được gọi tay. Khi có `runEntryPoint` thì nó nằm trong `finally` của mọi cửa vào và không ai phải nhớ nữa.
+ * Tệp này chỉ sở hữu việc ghi. `ErrorReport.js` chọn kênh hiển thị, còn `EntryPoint.js` bảo đảm mọi cửa vào nhả bộ đệm trong `finally`; ranh giới này giữ lỗi giao diện khỏi làm hỏng việc ghi log.
  */
 
 /** Múi giờ ghi cột `Lúc`. Chốt cứng theo tài liệu 10 Phần 2 chứ không lấy múi giờ của tệp Sheet, vì múi giờ của tệp là thứ người dùng đổi được, mà cột `Lúc` thì phải đọc được như nhau ở mọi bản. */

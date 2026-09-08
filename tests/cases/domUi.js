@@ -6,19 +6,25 @@ const { section, check, ghiLoiNap } = require('../lib/assert');
 
 function dungCanh() {
   const dom = domGia();
+  const progress = dom.document.createElement('div');
+  progress.id = 'sidebar-progress';
+  progress.rect = { left: 0, top: 50, bottom: 53, right: 300 };
+  dom.root.appendChild(progress);
   const overlay = dom.document.createElement('div');
   overlay.id = 'shin-busy-overlay';
   overlay.hidden = true;
-  const message = dom.document.createElement('div');
-  message.id = 'shin-busy-message';
-  overlay.appendChild(message);
+  const notice = dom.document.createElement('div');
+  notice.id = 'shin-busy-notice';
+  notice.hidden = true;
+  notice.rect = { left: 0, top: 53, bottom: 81, right: 300 };
+  dom.root.appendChild(notice);
   dom.document.body.appendChild(overlay);
   const hop = napClient(taoHopCat({ document: dom.document, window: dom.window }),
     'client/ui/progress.html', 'client/ui/dispatch.html', 'client/ui/menu.html', 'client/ui/collapse.html');
   hop._alerts = [];
   hop.alert = (message) => { hop._alerts.push(String(message)); };
   hop.console = { error: () => {} };
-  return { hop, dom, overlay, message };
+  return { hop, dom, overlay, notice, progress };
 }
 
 async function chay(so) {
@@ -26,7 +32,7 @@ async function chay(so) {
 
   let canh;
   try { canh = dungCanh(); } catch (err) { return ghiLoiNap(so, 'nạp ba tệp UI DOM', err); }
-  const { hop, dom, overlay, message } = canh;
+  const { hop, dom, overlay, notice } = canh;
   const menuCloseReal = hop.menuClose;
 
   const nut = dom.document.createElement('button');
@@ -52,15 +58,24 @@ async function chay(so) {
 
   const moToanBo = hop.sidebarBusyBegin('Đang lưu khách hàng…');
   const moLong = hop.sidebarBusyBegin('Đang đồng bộ dữ liệu…');
-  check(so, 'trạng thái bận lồng nhau khóa toàn gốc và hiện lời báo của việc mới nhất',
-    [dom.root.getAttribute('inert'), dom.root.getAttribute('aria-busy'), overlay.hidden, message.textContent],
-    ['', 'true', false, 'Đang đồng bộ dữ liệu…']);
+  check(so, 'trạng thái bận lồng nhau khóa toàn gốc, đẩy lời báo vào luồng và phủ từ dưới lời báo',
+    [dom.root.getAttribute('inert'), dom.root.getAttribute('aria-busy'), overlay.hidden, notice.hidden, notice.textContent, overlay.style.top],
+    ['', 'true', false, false, 'Đang đồng bộ dữ liệu…', '81px']);
   moLong();
   check(so, 'xong việc lồng chỉ trở về lời báo trước, chưa mở sidebar sớm',
-    [dom.root.hasAttribute('inert'), overlay.hidden, message.textContent], [true, false, 'Đang lưu khách hàng…']);
+    [dom.root.hasAttribute('inert'), overlay.hidden, notice.textContent], [true, false, 'Đang lưu khách hàng…']);
   moToanBo();
   check(so, 'xong hết mới mở tương tác và ẩn lớp loading',
-    [dom.root.hasAttribute('inert'), dom.root.getAttribute('aria-busy'), overlay.hidden], [false, 'false', true]);
+    [dom.root.hasAttribute('inert'), dom.root.getAttribute('aria-busy'), overlay.hidden, notice.hidden], [false, 'false', true, true]);
+
+  const noticeOnly = hop.sidebarBusyBegin('Đang kiểm tra…', { block: false });
+  check(so, 'cùng component có thể chỉ hiện thông báo mà không khóa nội dung',
+    [dom.root.hasAttribute('inert'), overlay.hidden, notice.hidden, notice.textContent], [false, true, false, 'Đang kiểm tra…']);
+  noticeOnly();
+  const blockOnly = hop.sidebarBusyBegin('', { block: true });
+  check(so, 'cùng component có thể chỉ khóa dưới thanh loading mà không dựng dòng thông báo',
+    [dom.root.hasAttribute('inert'), overlay.hidden, notice.hidden, overlay.style.top], [true, false, true, '53px']);
+  blockOnly();
 
   const focus = dom.document.createElement('input');
   focus.id = 'o-can-focus';

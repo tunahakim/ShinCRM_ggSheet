@@ -56,7 +56,7 @@ function chay(so) {
   const rong = hop.loadCore();
   check(so, 'gói lõi có đúng bộ khóa tài liệu 05 chốt, không thiếu không thừa',
     Object.keys(rong).sort(),
-    ['activity', 'blocked', 'budget', 'categories', 'config', 'customer', 'dirty', 'ms', 'ok', 'prefs', 'rowMaps', 'schema', 'selection', 'settings', 'spreadsheetId', 'warnings'].sort());
+    ['activity', 'blocked', 'budget', 'categories', 'config', 'customer', 'dirty', 'ms', 'ok', 'pendingMessages', 'prefs', 'rowMaps', 'schema', 'selection', 'settings', 'spreadsheetId', 'warnings'].sort());
   check(so, 'sheet trắng nạp trót lọt và không bị chặn', [rong.ok, rong.blocked], [true, false]);
   check(so, 'gói lõi mang id tệp để client lọc tin postMessage đúng tệp', rong.spreadsheetId, nen.book.getId());
   check(so, 'không khách nào mà vẫn gửi đủ bảng tên trường', [rong.customer.rows.length, rong.customer.fields.length], [0, 20]);
@@ -66,6 +66,16 @@ function chay(so) {
   check(so, 'khối trạng thái bẩn có mặt trong MỌI phản hồi, kể cả phản hồi rỗng', Object.keys(rong.dirty).sort(), ['all', 'config', 'records', 'viewSheets']);
   check(so, 'gói lõi mang cả bảng khai để client dựng Schema', Object.keys(rong.schema).sort(), ['activity', 'customer']);
   check(so, 'ms là số, không phải chuỗi', typeof rong.ms, 'number');
+
+  const coLoiCho = dungNap(null, { LOG_PENDING: JSON.stringify(['2026-09-08 09:00:00 — lỗi nền']) });
+  const goiCoLoiCho = coLoiCho.hop.loadCore();
+  check(so, 'loadCore nhả kho lỗi chờ đúng một lần để sidebar hiện bằng hộp thoại lớn',
+    [goiCoLoiCho.pendingMessages, coLoiCho.hop._props.LOG_PENDING, coLoiCho.hop.loadCore().pendingMessages],
+    [['2026-09-08 09:00:00 — lỗi nền'], undefined, []]);
+
+  const batVet = dungNap([['LOG_TRACE', 'sidebar']]).hop.loadCore();
+  check(so, 'LOG_TRACE đang bật được cảnh báo qua gói nạp thay cho toast nhỏ',
+    batVet.warnings.some((warning) => warning.indexOf('LOG_TRACE đang bật') >= 0), true);
 
   const coDirty = dungNap(null, { dirtyViewSheets: '["!Lead"]', dirtyRecords: '["KH0001"]', dirtyConfig: 'true', dirtyAll: 'true' }).hop.loadCore();
   check(so, 'nạp toàn bộ tiêu thụ cờ dữ liệu cũ nhưng giữ cờ sheet quản trị để sheet vẫn được vẽ lại',
@@ -102,8 +112,8 @@ function chay(so) {
   const chan = dungNap([['CELL_BUDGET', '10']]);
   const bao = chan.hop.loadCore();
   check(so, 'vượt trần thì blocked mang TÊN LÝ DO chứ không phải true', bao.blocked, 'cellBudget');
-  check(so, 'gói bị chặn chỉ có bốn khóa, và KHÔNG có customer — bằng chứng là chưa đọc ô dữ liệu nào',
-    Object.keys(bao).sort(), ['blocked', 'budget', 'dirty', 'ms', 'ok', 'selection'].sort());
+  check(so, 'gói bị chặn chỉ có các khóa điều khiển, và KHÔNG có customer — bằng chứng là chưa đọc ô dữ liệu nào',
+    Object.keys(bao).sort(), ['blocked', 'budget', 'dirty', 'ms', 'ok', 'pendingMessages', 'selection'].sort());
   check(so, 'gói bị chặn vẫn mang bảng thủ phạm để người dùng biết dọn sheet nào',
     bao.budget.sheets.length > 0, true);
   check(so, 'gói bị chặn vẫn mang khối trạng thái bẩn', Object.keys(bao.dirty).sort(), ['all', 'config', 'records', 'viewSheets']);

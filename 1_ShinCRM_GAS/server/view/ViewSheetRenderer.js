@@ -311,6 +311,13 @@ function viewRenderSheetLocked(book, sheet, name) {
   var spans = viewColumnSpans(writable);
   var oldLast = Math.max(sheet.getLastRow(), SHEET_FIRST_DATA_ROW - 1);
   var oldRows = oldLast - SHEET_FIRST_DATA_ROW + 1;
+  var formatRows = Math.max(oldRows, rows.length);
+  var textColumns = writable.filter(function (column) { return columnFormatIsText(fieldByCode[header[column - 1]]); });
+  if (formatRows > 0) {
+    viewColumnSpans(textColumns).forEach(function (span) {
+      sheet.getRange(SHEET_FIRST_DATA_ROW, span[0], formatRows, span[1]).setNumberFormat(COLUMN_FORMAT_TEXT);
+    });
+  }
   if (oldRows > 0) { spans.forEach(function (span) { sheet.getRange(SHEET_FIRST_DATA_ROW, span[0], oldRows, span[1]).clearContent(); }); }
   if (rows.length) {
     spans.forEach(function (span) {
@@ -393,6 +400,7 @@ function inspectViewState(sheetName, knownRevision) {
         sheetName: name,
         changed: revision !== (Number(knownRevision) || 0),
         needsRender: state.all || state.config || state.viewSheets.indexOf(name) >= 0 || viewInputSignatureRead(sheet) !== viewInputSignature(sheet),
+        dirty: state,
         revision: revision,
         ms: Date.now() - started
       };

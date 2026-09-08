@@ -38,6 +38,9 @@
     <!-- Vùng 2 — Dải tiến trình. Cao vài pixel, chạy khi có lời gọi máy chủ đang chờ. -->
     <div id="sidebar-progress"></div>
 
+    <!-- Thông báo thao tác bận nằm trong luồng bố cục để khi hiện sẽ đẩy các vùng bên dưới xuống. -->
+    <div id="shin-busy-notice" class="shin-busy-notice" role="status" aria-live="polite" hidden>Đang xử lý dữ liệu…</div>
+
     <!--
       Hộp tìm khách. Ẩn sẵn, nút kính lúp ở header mở ra. Nằm ngoài bốn vùng engine vẽ vì một ô `<input>` bị vẽ lại sau
       từng chữ thì con trỏ nhảy ra khỏi ô — cùng lý do dải tiến trình ở trên cũng nằm ngoài.
@@ -71,10 +74,7 @@
 
   </div>
 
-  <div id="shin-busy-overlay" class="shin-busy-overlay" role="status" aria-live="polite" hidden>
-    <div class="shin-busy-bar" aria-hidden="true"><span></span></div>
-    <div id="shin-busy-message" class="shin-busy-message">Đang xử lý dữ liệu…</div>
-  </div>
+  <div id="shin-busy-overlay" class="shin-busy-overlay" aria-hidden="true" hidden></div>
 
   <?!= include('client/util/textNormalize') ?>
   <?!= include('client/util/valueText') ?>

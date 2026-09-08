@@ -1,11 +1,10 @@
 /**
  * Nửa "báo lỗi tới mắt người" của tài liệu 10 Phần 8: chọn kênh hiển thị theo cửa vào, và kho chờ cho những lúc không có ai ngồi trước máy.
  *
- * Vì sao không gộp vào `LogGate.gs`: hai việc có **hai luật ngược nhau**. Ghi log là việc không được phép hỏng và không được phép ném lỗi, nên nó không gọi `SpreadsheetApp` và không gọi `LockService`. Còn hiển thị lỗi thì buộc phải gọi `SpreadsheetApp.getUi()` hoặc `toast`, hai thứ **ném lỗi tùy theo cửa vào** — `getUi()` không dùng được trong trigger, và cả hai không dùng được trong `doPost`. Trộn chung là mời một lỗi hiển thị đi giết một dòng log.
+ * Vì sao không gộp vào `LogGate.gs`: hai việc có **hai luật ngược nhau**. Ghi log không được phép hỏng hay ném lỗi, còn hiển thị lỗi có thể gọi `SpreadsheetApp.getUi()` — dịch vụ không dùng được trong trigger nền. Trộn chung sẽ để lỗi của kênh hiển thị làm mất dòng log cần giữ.
  *
  * Bảng kênh theo cửa vào, đúng theo tài liệu 10 Phần 8:
- *   - `onOpen` → `toast`, cộng việc nhả kho chờ.
- *   - `onEdit` (trigger cài đặt) → `toast`.
+ *   - Trigger nền → ghi log rồi ném lại; không dùng thông báo nhỏ của Google Sheets.
  *   - Lệnh menu → `getUi().alert()`, được phép vì chính người dùng vừa bấm.
  *   - Hàm sidebar gọi qua `google.script.run` → **ném lại** để `withFailureHandler` hiện; không lưu kho chờ.
  *   - `doPost` từ Extension → không có người, nên lưu kho chờ.
@@ -19,8 +18,7 @@ var ERROR_PENDING_KEY = 'LOG_PENDING';
 /** Kho chờ giữ tối đa mấy phần tử mới nhất. Ngắn là cố ý: bản ghi bền vững luôn là sheet `Log`, nên mất một phần tử kho chờ không tốn gì, còn một khóa `DocumentProperties` phình quá chín kilobyte thì làm hỏng cả việc ghi. */
 var ERROR_PENDING_MAX = 5;
 
-/** Bốn kênh hiển thị. Khai thành hằng để chỗ gọi không gõ chuỗi tự do — gõ sai một kênh thì lỗi biến mất không dấu vết. */
-var ERROR_CHANNEL_TOAST = 'toast';
+/** Ba kênh hiển thị. Khai thành hằng để chỗ gọi không gõ chuỗi tự do — gõ sai một kênh thì lỗi biến mất không dấu vết. */
 var ERROR_CHANNEL_ALERT = 'alert';
 var ERROR_CHANNEL_THROW = 'throw';
 var ERROR_CHANNEL_PENDING = 'pending';
@@ -62,7 +60,7 @@ function errorPendingPush(message) {
 /**
  * Lấy các câu đang chờ ra và **xóa** khỏi kho. Nhả nghĩa là hiện rồi xóa.
  *
- * Sidebar gọi hàm này lúc mở và lúc làm mới, `toast` của `onOpen` và của `onEdit` cũng nhả nó — cái nào đến trước thì cái đó nhả. Không bao giờ ném lỗi: một kho chờ không đọc được không được phép làm sập lượt mở sidebar, vì lúc đó người dùng mất cả nội dung lẫn đường vào.
+ * `loadCore` gọi hàm này lúc mở hoặc nạp lại sidebar, rồi client hiện kết quả bằng hộp thoại lớn. Không bao giờ ném lỗi: một kho chờ không đọc được không được phép làm sập lượt mở sidebar, vì lúc đó người dùng mất cả nội dung lẫn đường vào.
  */
 function takePendingMessages() {
   try {
@@ -82,24 +80,14 @@ function takePendingMessages() {
 /**
  * Hiện một câu lên mắt người theo kênh của cửa vào. Không bao giờ ném lỗi.
  *
- * Kênh `throw` cố ý **không làm gì**: ở cửa sidebar thì chính việc ném lại lỗi là kênh hiển thị, `withFailureHandler` bên client nhận và vẽ. Thêm một `toast` nữa ở đó là hiện cùng một lỗi hai lần ở hai chỗ.
+ * Kênh `throw` cố ý **không làm gì**: ở cửa sidebar thì chính việc ném lại lỗi là kênh hiển thị, `withFailureHandler` bên client nhận và vẽ. Hiện thêm ở phía máy chủ sẽ làm cùng một lỗi xuất hiện hai lần.
  *
- * Mỗi kênh có `try/catch` riêng vì cùng một lời gọi hợp lệ ở cửa này lại ném lỗi ở cửa khác: `getUi()` chết trong trigger, `toast` chết trong `doPost`. Hỏng kênh thì rơi về kho chờ, và hỏng cả kho chờ thì còn `console.error` — nhưng dù hỏng tới đâu thì hàm này cũng không được phép làm mất lỗi gốc.
+ * Mỗi kênh có `try/catch` riêng vì `getUi()` chết trong trigger. Hỏng kênh thì rơi về kho chờ, và hỏng cả kho chờ thì còn `console.error` — nhưng dù hỏng tới đâu thì hàm này cũng không được phép làm mất lỗi gốc.
  */
 function reportError(err, channel) {
   var message = errorMessage(err);
 
   if (channel === ERROR_CHANNEL_THROW) { return; }
-
-  if (channel === ERROR_CHANNEL_TOAST) {
-    try {
-      SpreadsheetApp.getActiveSpreadsheet().toast(message, 'ShinCRM gặp lỗi', 8);
-      return;
-    } catch (khongToastDuoc) {
-      errorPendingPush(message);
-      return;
-    }
-  }
 
   if (channel === ERROR_CHANNEL_ALERT) {
     try {
@@ -112,20 +100,6 @@ function reportError(err, channel) {
   }
 
   errorPendingPush(message);
-}
-
-/** Hiện các câu đang chờ bằng `toast`, rồi xóa kho. Dùng ở `onOpen` và `onEdit`. Trả về số câu đã nhả để phép nghiệm thu đo được. */
-function flushPendingToast() {
-  var messages = takePendingMessages();
-  if (!messages.length) { return 0; }
-
-  try {
-    SpreadsheetApp.getActiveSpreadsheet().toast(messages.join('\n'), 'ShinCRM — lỗi lần trước', 10);
-  } catch (khongToastDuoc) {
-    console.error('Không toast được kho chờ, các câu đã mất: ' + messages.join(' | '));
-  }
-
-  return messages.length;
 }
 
 /** Phép nghiệm thu chạy được trên Google: đẩy một câu vào kho chờ, lấy ra, rồi kiểm kho đã sạch chưa. */
