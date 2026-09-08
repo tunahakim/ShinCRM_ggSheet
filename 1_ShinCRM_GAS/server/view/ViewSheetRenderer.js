@@ -118,6 +118,7 @@ function viewColumnA1(column, row) {
 var VIEW_ERROR_NOTE_PREFIX = '⛔ ShinCRM:';
 var VIEW_USER_NOTE_MARKER = '\n\nGhi chú trước đó:\n';
 var VIEW_INPUT_SIGNATURE_PREFIX = 'shinViewInput:';
+var VIEW_REVISION_PREFIX = 'shinViewRevision:';
 
 /** Dấu vân tay của đúng các ô người dùng dùng để điều khiển một sheet quản trị. */
 function viewInputSignature(sheet) {
@@ -125,7 +126,10 @@ function viewInputSignature(sheet) {
   if (lastColumn < 1) { return 'empty'; }
 
   var header = sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(function (value) { return String(value === null || value === undefined ? '' : value).trim(); });
-  var filterRow = sheet.getRange(3, 1, 1, lastColumn).getValues()[0].map(function (value) { return String(value === null || value === undefined ? '' : value).trim(); });
+  var rawFilterRow = sheet.getRange(3, 1, 1, lastColumn).getValues()[0];
+  var filterRow = rawFilterRow.map(function (value, i) {
+    return header[i].charAt(0) === '@' ? String(value === null || value === undefined ? '' : value).trim() : '';
+  });
   var headerMap = viewHeaderMap(header, sheet.getName());
   var sortPairs = viewReadSortPairs(sheet, headerMap, SHEET_FIRST_DATA_ROW, sheet.getLastRow()).filter(function (pair) { return pair.col || pair.level; });
   var raw = JSON.stringify([header, filterRow, sortPairs]);
@@ -133,8 +137,45 @@ function viewInputSignature(sheet) {
   return bytes.map(function (byte) { return ('0' + (byte & 0xFF).toString(16)).slice(-2); }).join('');
 }
 
+function viewInputMetaFromHeader(header, revision) {
+  var filterColumns = [];
+  var sortColumns = [];
+  header.forEach(function (code, i) {
+    if (code.charAt(0) === '@') { filterColumns.push(i + 1); }
+    if (code === '@VIEW_SORT_COL' || code === '@VIEW_SORT_LEVEL') { sortColumns.push(i + 1); }
+  });
+  return { revision: Number(revision) || 0, filterColumns: filterColumns, sortColumns: sortColumns };
+}
+
+function viewInputMeta(sheet) {
+  var lastColumn = sheet.getLastColumn();
+  if (lastColumn < 1) { return viewInputMetaFromHeader([], viewRevisionRead(sheet)); }
+  var header = sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(function (value) { return String(value === null || value === undefined ? '' : value).trim(); });
+  return viewInputMetaFromHeader(header, viewRevisionRead(sheet));
+}
+
 function viewInputSignatureKey(sheet) {
   return VIEW_INPUT_SIGNATURE_PREFIX + String(sheet.getSheetId());
+}
+
+function viewRevisionKey(sheet) {
+  return VIEW_REVISION_PREFIX + String(sheet.getSheetId());
+}
+
+function viewRevisionRead(sheet) {
+  try { return Number(PropertiesService.getDocumentProperties().getProperty(viewRevisionKey(sheet))) || 0; }
+  catch (khongDocDuoc) { return 0; }
+}
+
+function viewRevisionBump(sheet) {
+  try {
+    var next = viewRevisionRead(sheet) + 1;
+    PropertiesService.getDocumentProperties().setProperty(viewRevisionKey(sheet), String(next));
+    return next;
+  } catch (khongGhiDuoc) {
+    try { PropertiesService.getDocumentProperties().deleteProperty(viewInputSignatureKey(sheet)); } catch (khongXoaDuoc) {}
+    return 0;
+  }
 }
 
 function viewInputSignatureRead(sheet) {
@@ -215,8 +256,9 @@ function viewRenderSheetLocked(book, sheet, name) {
   if (lastColumn < 1) {
     dirtyStateClearViewSheet(name);
     viewInputSignatureWrite(sheet);
+    var emptyRevision = viewRevisionBump(sheet);
     var emptyMaps = {}; emptyMaps[name] = {};
-    return { ok: true, sheetName: name, rowMaps: emptyMaps, rows: 0 };
+    return { ok: true, sheetName: name, rowMaps: emptyMaps, viewMeta: viewInputMetaFromHeader([], emptyRevision), rows: 0 };
   }
   var header = sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(function (value) { return String(value || '').trim(); });
   var filterRow = sheet.getRange(3, 1, 1, lastColumn).getValues()[0];
@@ -282,12 +324,8 @@ function viewRenderSheetLocked(book, sheet, name) {
   SpreadsheetApp.flush();
   dirtyStateClearViewSheet(name);
   viewInputSignatureWrite(sheet);
-  return { ok: true, sheetName: name, rowMaps: (function () { var map = {}; map[name] = rowMap; return map; }()), rows: rows.length };
-}
-
-function viewRenderWithNoticeLocked(book, sheet, name) {
-  book.toast('Đang làm mới dữ liệu ' + name + '…', 'ShinCRM', 3);
-  return viewRenderSheetLocked(book, sheet, name);
+  var revision = viewRevisionBump(sheet);
+  return { ok: true, sheetName: name, rowMaps: (function () { var map = {}; map[name] = rowMap; return map; }()), viewMeta: viewInputMetaFromHeader(header, revision), rows: rows.length };
 }
 
 function renderViewSheet(sheetName) {
@@ -299,7 +337,7 @@ function renderViewSheet(sheetName) {
   var lock = LockService.getDocumentLock();
   if (!lock.tryLock(SETTINGS.LOCK_WAIT_MS)) { throw new Error('Hệ thống bận. Vui lòng thử lại!'); }
   try {
-    return viewRenderWithNoticeLocked(book, sheet, name);
+    return viewRenderSheetLocked(book, sheet, name);
   } finally {
     lock.releaseLock();
   }
@@ -329,12 +367,39 @@ function renderViewIfDirty(sheetName) {
     var state = dirtyStateRead();
     var inputChanged = viewInputSignatureRead(sheet) !== viewInputSignature(sheet);
     if (state.all || state.config || state.viewSheets.indexOf(name) >= 0 || inputChanged) {
-      return viewRenderWithNoticeLocked(book, sheet, name);
+      return viewRenderSheetLocked(book, sheet, name);
     }
-    return { ok: true, skipped: true, sheetName: name, rowMaps: viewSheetRowMaps(sheet, name) };
+    return { ok: true, skipped: true, sheetName: name, rowMaps: viewSheetRowMaps(sheet, name), viewMeta: viewInputMeta(sheet) };
   } finally {
     lock.releaseLock();
   }
+}
+
+/** Kiểm tra nhẹ trước khi client quyết định có cần khóa sidebar và đồng bộ rowMap hay không. */
+function inspectViewState(sheetName, knownRevision) {
+  return runEntryPoint('inspectViewState', 'sidebar', 'throw', function () {
+    var started = Date.now();
+    var name = String(sheetName || '').trim();
+    var book = shinOpenBook();
+    var sheet = book.getSheetByName(name);
+    if (!sheet || name.charAt(0) !== '!') { throw new Error('Không tìm thấy sheet quản trị "' + name + '".'); }
+    var lock = LockService.getDocumentLock();
+    if (!lock.tryLock(SETTINGS.LOCK_WAIT_MS)) { throw new Error('Hệ thống bận. Vui lòng thử lại!'); }
+    try {
+      var state = dirtyStateRead();
+      var revision = viewRevisionRead(sheet);
+      return {
+        ok: true,
+        sheetName: name,
+        changed: revision !== (Number(knownRevision) || 0),
+        needsRender: state.all || state.config || state.viewSheets.indexOf(name) >= 0 || viewInputSignatureRead(sheet) !== viewInputSignature(sheet),
+        revision: revision,
+        ms: Date.now() - started
+      };
+    } finally {
+      lock.releaseLock();
+    }
+  });
 }
 
 function prepareViewSheet(sheetName) {

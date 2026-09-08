@@ -126,8 +126,11 @@ function statusLoadError(message) {
 
 /** Một dòng ngắn trong khối thông tin chung, dùng để báo tiến độ nạp nền. */
 function statusInfoLine(text) {
+  if (typeof sidebarBusyActive === 'function' && sidebarBusyActive()) {
+    sidebarBusyMessage(text);
+    return;
+  }
   statusSetRegion('sidebar-info', statusEscape(text));
-  if (typeof sidebarBusyMessage === 'function') { sidebarBusyMessage(text); }
 }
 
 /** Danh sách khóa–giá trị của bản tóm tắt. Nhận mảng cặp để thứ tự hiện đúng thứ tự viết. */

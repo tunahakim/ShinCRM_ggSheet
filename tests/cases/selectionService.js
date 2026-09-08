@@ -60,7 +60,11 @@ function chay(so) {
 
   state.sheetName = '!Lead';
   state.row = 7;
-  check(so, 'sheet quản trị chỉ tra bản đồ của chính nó khi bản đồ đã có', hop.probeSelectionFull({ '!Lead': { '7': 'CUS-000006' }, Customer: { '7': 'CUS-SAI' } }).customerId, 'CUS-000006');
+  hop.renderViewIfDirty = () => ({ rowMaps: { '!Lead': { '7': 'CUS-000006' } }, viewMeta: { revision: 3, filterColumns: [1], sortColumns: [] } });
+  const viewSelection = hop.probeSelectionFull({ '!Lead': { '7': 'CUS-SAI' } });
+  check(so, 'polling trên sheet quản trị tự lấy rowMap mới trong cùng lượt thay vì tin bản đồ client cũ',
+    [viewSelection.customerId, viewSelection.rowMaps, viewSelection.viewMeta.revision],
+    ['CUS-000006', { '!Lead': { '7': 'CUS-000006' } }, 3]);
 
   state.sheetName = 'Customer';
   state.row = 6;

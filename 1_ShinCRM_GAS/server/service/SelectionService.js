@@ -108,7 +108,18 @@ function probeSelectionFull(rowMaps) {
     var started = Date.now();
     var context = selectionProbeContext();
     var snapshot = selectionSnapshotFromContext(context);
-    return selectionProbeReply(snapshot, started, selectionCustomerId(context, snapshot, rowMaps));
+    var effectiveMaps = rowMaps;
+    var view = null;
+    if (snapshot.sheetName && snapshot.sheetName.charAt(0) === '!') {
+      view = renderViewIfDirty(snapshot.sheetName);
+      effectiveMaps = view.rowMaps;
+    }
+    var reply = selectionProbeReply(snapshot, started, selectionCustomerId(context, snapshot, effectiveMaps));
+    if (view) {
+      reply.rowMaps = view.rowMaps;
+      reply.viewMeta = view.viewMeta;
+    }
+    return reply;
   });
 }
 

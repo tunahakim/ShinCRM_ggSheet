@@ -12,9 +12,19 @@ function shinRangeTouchesColumn(range, column) {
   return column > 0 && range.getColumn() <= column && range.getLastColumn() >= column;
 }
 
+/** Hàng 3 chỉ là hàng lọc dưới cột mang mã `@`; chữ ghi chú dưới cột thường không phải cấu hình view. */
+function shinRangeTouchesCodedFilter(sheet, range) {
+  if (!shinRangeTouchesRow(range, 3)) { return false; }
+  var first = range.getColumn();
+  var count = range.getLastColumn() - first + 1;
+  return sheet.getRange(1, first, 1, count).getValues()[0].some(function (value) {
+    return String(value === null || value === undefined ? '' : value).trim().charAt(0) === '@';
+  });
+}
+
 /** Chỉ ba vùng cấu hình của sheet quản trị được phép kích hoạt một lượt làm mới tự động. */
 function shinViewEditNeedsRender(sheet, range) {
-  if (shinRangeTouchesRow(range, 1) || shinRangeTouchesRow(range, 3)) { return true; }
+  if (shinRangeTouchesRow(range, 1) || shinRangeTouchesCodedFilter(sheet, range)) { return true; }
   return shinRangeTouchesColumn(range, selectionColumnIndex(sheet, '@VIEW_SORT_COL'))
     || shinRangeTouchesColumn(range, selectionColumnIndex(sheet, '@VIEW_SORT_LEVEL'));
 }

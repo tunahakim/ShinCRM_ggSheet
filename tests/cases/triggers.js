@@ -27,7 +27,7 @@ function chay(so) {
   const hop = nen.hop;
   const lead = nen.book.insertSheet('!Lead');
   nen.book.insertSheet('!Chăm sóc');
-  lead.getRange(1, 1, 1, 4).setValues([['@CUS_MA_KH', '@CUS_TEN_CTY', '@VIEW_SORT_COL', '@VIEW_SORT_LEVEL']]);
+  lead.getRange(1, 1, 1, 5).setValues([['@CUS_MA_KH', '@CUS_TEN_CTY', '@VIEW_SORT_COL', '@VIEW_SORT_LEVEL', 'Ghi chú thường']]);
   const rendered = [];
   hop.renderViewIfDirty = (name) => { rendered.push(name); return { ok: true, sheetName: name }; };
   hop.runEntryPoint = (name, source, channel, fn) => fn();
@@ -35,7 +35,8 @@ function chay(so) {
   hop.shinOnEdit({ range: eventRange(lead, 3, 2) });
   hop.shinOnEdit({ range: eventRange(lead, 4, 3) });
   hop.shinOnEdit({ range: eventRange(lead, 4, 2) });
-  check(so, 'hàng lọc và cột sắp xếp làm mới ngay; ô dữ liệu thường không làm mới', rendered, ['!Lead', '!Lead']);
+  hop.shinOnEdit({ range: eventRange(lead, 3, 5) });
+  check(so, 'hàng lọc dưới mã @ và cột sắp xếp làm mới; ô dữ liệu cùng hàng 3 dưới cột thường thì không', rendered, ['!Lead', '!Lead']);
 
   ghiO(nen, 'Customer', 4, '@CUS_MA_KH', 'KH000001');
   hop.shinOnEdit({ range: eventRange(nen.sheet('Customer'), 4, 2) });
