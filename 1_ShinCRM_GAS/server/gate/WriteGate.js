@@ -198,6 +198,33 @@ function writeGatePlans(records, rowById, context) {
 }
 
 /**
+ * Dựng bảng tra "mã danh mục → tập giá trị hợp lệ" cho các trường SELECT trong lô ghi.
+ *
+ * Đọc sheet `Category` **một lần** cho cả lô chứ không đọc mỗi trường một lần — một lần mở sheet là một vòng gọi mạng, và một lô ghi thường có nhiều trường SELECT cùng lúc.
+ *
+ * Trường không có `source` (chỉ có `options`) thì không cần tra sheet, nên bỏ qua ở đây và phép kiểm `selectAllowed[spec.source]` trả `undefined` cho chúng.
+ */
+function writeGateSelectCatalog(fields) {
+  var sources = {};
+  Object.keys(fields).forEach(function (ten) {
+    var spec = fields[ten];
+    if (spec.type === 'SELECT' && spec.source) { sources[spec.source] = true; }
+  });
+
+  var sourceNames = Object.keys(sources);
+  if (!sourceNames.length) { return {}; }
+
+  var cat = categoryReadAll();
+  var allowed = {};
+  sourceNames.forEach(function (src) {
+    var values = cat.categories[src] || [];
+    allowed[src] = {};
+    values.forEach(function (v) { allowed[src][String(v).trim()] = true; });
+  });
+  return allowed;
+}
+
+/**
  * Làm sạch, ép kiểu và kiểm từng trường của một bản ghi. Trả về qua `plan.values`, dồn lỗi vào `invalid`.
  *
  * **Ba trường của máy bị bỏ qua hoàn toàn ở đây.** Bản ghi mới thì chúng được điền sau, ngay trước lệnh ghi; bản ghi đã có thì đường ghi thường không bao giờ chạm tới chúng — `id` là địa chỉ nên sửa nó là đổi bản ghi thành bản ghi khác, `createdAt` là mốc quá khứ nên ghi lại nó bằng bất cứ giá trị nào cũng chỉ có thể làm nó sai đi, và `recordStatus` chỉ `DeleteGate` được đổi.
@@ -206,7 +233,7 @@ function writeGatePlans(records, rowById, context) {
  *
  * Nguồn `pull` không chạy `normalize`, `validate`, `required`. Nó vẫn chạy ba phép mặc định của bộ máy, vì ba phép đó là hình dạng ô chứ không phải phán xét nội dung. Tài liệu 06 Phần 4.
  */
-function writeGateBuild(plan, names, fields, source, invalid) {
+function writeGateBuild(plan, names, fields, source, invalid, selectAllowed) {
   var laUser = source === 'user';
 
   names.forEach(function (ten) {
@@ -228,6 +255,11 @@ function writeGateBuild(plan, names, fields, source, invalid) {
 
     if (laUser) {
       var loi = fieldLogicRequired(ep.value, spec) || fieldLogicValidate(ep.value, spec, plan.record);
+      if (!loi && spec.type === 'SELECT' && spec.source && selectAllowed
+          && selectAllowed[spec.source] && String(ep.value).trim()
+          && !selectAllowed[spec.source][String(ep.value).trim()]) {
+        loi = '"' + (spec.label || ten) + '" không chấp nhận giá trị "' + ep.value + '".';
+      }
       if (loi) { invalid.push(writeGateInvalid(plan, ten, spec, loi)); return; }
     }
 
@@ -374,7 +406,11 @@ function writeGateRun(entity, records, source, fields, batDau) {
   var plans = writeGatePlans(records, writeGateRowById(context), context);
   var invalid = [];
 
-  plans.forEach(function (plan) { writeGateBuild(plan, names, fields, source, invalid); });
+  // Đọc bảng danh mục một lần cho cả lô, chỉ khi nguồn là `user` — nguồn `pull` bỏ qua mọi phép kiểm giá trị. `Category` đọc từ sheet chứ không từ bộ nhớ, vì giá trị danh mục có thể đã đổi giữa hai lượt mở sidebar.
+  var selectAllowed = null;
+  if (source === 'user') { selectAllowed = writeGateSelectCatalog(fields); }
+
+  plans.forEach(function (plan) { writeGateBuild(plan, names, fields, source, invalid, selectAllowed); });
   writeGateUniqueCheck(plans, names, fields, source, context, invalid);
 
   if (invalid.length) {
