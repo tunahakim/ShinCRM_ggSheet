@@ -60,6 +60,46 @@ html, body {
   overflow: hidden;
 }
 
+/* Lớp bận nằm ngoài `sidebar-root` để gốc có thể mang `inert` mà lời báo vẫn được trình đọc màn hình đọc. */
+.shin-busy-overlay {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--shin-gap-3);
+  padding: var(--shin-gap-4);
+  background: rgba(255, 255, 255, 0.88);
+  cursor: wait;
+}
+
+.shin-busy-bar {
+  position: relative;
+  width: min(180px, 70vw);
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--shin-primary-soft);
+}
+
+.shin-busy-bar span {
+  position: absolute;
+  inset-block: 0;
+  width: 42%;
+  background: var(--shin-primary);
+  animation: shin-progress-slide 1.1s ease-in-out infinite;
+}
+
+.shin-busy-message {
+  max-width: 240px;
+  color: var(--shin-text);
+  font-size: var(--shin-text-md);
+  font-weight: 600;
+  text-align: center;
+}
+
 /* Vùng 1 — Header. Cao cố định, ghim đỉnh, hàng icon xếp ngang. Khe 4 pixel đúng như bản cũ: nút icon đã tròn 32 pixel nên
    mắt tự tách chúng ra, khe rộng thêm chỉ ăn chỗ của cái nút thứ bảy sau này. */
 #sidebar-header {

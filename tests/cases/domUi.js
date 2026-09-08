@@ -6,12 +6,19 @@ const { section, check, ghiLoiNap } = require('../lib/assert');
 
 function dungCanh() {
   const dom = domGia();
+  const overlay = dom.document.createElement('div');
+  overlay.id = 'shin-busy-overlay';
+  overlay.hidden = true;
+  const message = dom.document.createElement('div');
+  message.id = 'shin-busy-message';
+  overlay.appendChild(message);
+  dom.document.body.appendChild(overlay);
   const hop = napClient(taoHopCat({ document: dom.document, window: dom.window }),
-    'client/ui/dispatch.html', 'client/ui/menu.html', 'client/ui/collapse.html');
+    'client/ui/progress.html', 'client/ui/dispatch.html', 'client/ui/menu.html', 'client/ui/collapse.html');
   hop._alerts = [];
   hop.alert = (message) => { hop._alerts.push(String(message)); };
   hop.console = { error: () => {} };
-  return { hop, dom };
+  return { hop, dom, overlay, message };
 }
 
 async function chay(so) {
@@ -19,7 +26,7 @@ async function chay(so) {
 
   let canh;
   try { canh = dungCanh(); } catch (err) { return ghiLoiNap(so, 'nạp ba tệp UI DOM', err); }
-  const { hop, dom } = canh;
+  const { hop, dom, overlay, message } = canh;
   const menuCloseReal = hop.menuClose;
 
   const nut = dom.document.createElement('button');
@@ -42,6 +49,18 @@ async function chay(so) {
     [nutBan.disabled, nhan.textContent, nutBan.children.length], [true, 'Đang lưu…', 1]);
   moKhoa();
   check(so, 'dispatchBusy khôi phục đúng trạng thái sau khi xong', [nutBan.disabled, nhan.textContent], [false, 'Lưu']);
+
+  const moToanBo = hop.sidebarBusyBegin('Đang lưu khách hàng…');
+  const moLong = hop.sidebarBusyBegin('Đang đồng bộ dữ liệu…');
+  check(so, 'trạng thái bận lồng nhau khóa toàn gốc và hiện lời báo của việc mới nhất',
+    [dom.root.getAttribute('inert'), dom.root.getAttribute('aria-busy'), overlay.hidden, message.textContent],
+    ['', 'true', false, 'Đang đồng bộ dữ liệu…']);
+  moLong();
+  check(so, 'xong việc lồng chỉ trở về lời báo trước, chưa mở sidebar sớm',
+    [dom.root.hasAttribute('inert'), overlay.hidden, message.textContent], [true, false, 'Đang lưu khách hàng…']);
+  moToanBo();
+  check(so, 'xong hết mới mở tương tác và ẩn lớp loading',
+    [dom.root.hasAttribute('inert'), dom.root.getAttribute('aria-busy'), overlay.hidden], [false, 'false', true]);
 
   const focus = dom.document.createElement('input');
   focus.id = 'o-can-focus';

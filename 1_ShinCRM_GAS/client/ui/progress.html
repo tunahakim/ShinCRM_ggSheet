@@ -12,6 +12,7 @@
 
 /** Số lời gọi máy chủ đang chờ. */
 var progressPending = 0;
+var SIDEBAR_BUSY = { next: 0, operations: [] };
 
 /** Bật dải nếu đang có việc, tắt nếu không. Đọc lại thẻ mỗi lần thay vì giữ tham chiếu, vì tệp này nạp trước khi thân trang có thẻ. */
 function progressPaint() {
@@ -31,5 +32,70 @@ function progressBegin() {
 function progressEnd() {
   progressPending = Math.max(0, progressPending - 1);
   progressPaint();
+}
+
+function sidebarBusyActive() {
+  return SIDEBAR_BUSY.operations.length > 0;
+}
+
+function sidebarBusyPaint() {
+  var root = document.getElementById('sidebar-root');
+  var overlay = document.getElementById('shin-busy-overlay');
+  var message = document.getElementById('shin-busy-message');
+  var active = sidebarBusyActive();
+  var current = active ? SIDEBAR_BUSY.operations[SIDEBAR_BUSY.operations.length - 1] : null;
+
+  if (root) {
+    root.setAttribute('aria-busy', active ? 'true' : 'false');
+    if (active) { root.setAttribute('inert', ''); }
+    else { root.removeAttribute('inert'); }
+  }
+  if (message && current) { message.textContent = current.message; }
+  if (overlay) { overlay.hidden = !active; }
+}
+
+/** Khóa toàn sidebar; trả về một hàm chỉ mở đúng lượt đã khóa, kể cả khi có hai việc chồng nhau. */
+function sidebarBusyBegin(message) {
+  var operation = { id: ++SIDEBAR_BUSY.next, message: String(message || 'Đang xử lý dữ liệu…'), done: false };
+  SIDEBAR_BUSY.operations.push(operation);
+  if (document.activeElement && document.activeElement.blur) { document.activeElement.blur(); }
+  sidebarBusyPaint();
+
+  return function () {
+    if (operation.done) { return; }
+    operation.done = true;
+    SIDEBAR_BUSY.operations = SIDEBAR_BUSY.operations.filter(function (item) { return item.id !== operation.id; });
+    sidebarBusyPaint();
+  };
+}
+
+/** Đổi lời báo của việc đang nằm trên cùng, dùng cho từng bước của lượt nạp dài. */
+function sidebarBusyMessage(message) {
+  if (!sidebarBusyActive()) { return; }
+  SIDEBAR_BUSY.operations[SIDEBAR_BUSY.operations.length - 1].message = String(message || 'Đang xử lý dữ liệu…');
+  sidebarBusyPaint();
+}
+
+/** Bọc cả phần cập nhật RAM và vẽ lại, không chỉ thời gian lời gọi máy chủ đang bay. */
+function sidebarBusyRun(message, work) {
+  var finish = sidebarBusyBegin(message);
+  var result;
+  try {
+    result = work();
+  } catch (err) {
+    finish();
+    throw err;
+  }
+  if (result && typeof result.then === 'function') {
+    return result.then(function (value) {
+      finish();
+      return value;
+    }, function (err) {
+      finish();
+      throw err;
+    });
+  }
+  finish();
+  return result;
 }
 </script>

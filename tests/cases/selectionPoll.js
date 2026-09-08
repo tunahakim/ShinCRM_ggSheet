@@ -124,7 +124,7 @@ function batDau(hop) {
   hop.selectionPollSetReady(true);
 }
 
-function chay(so) {
+async function chay(so) {
   section('selectionPoll — ACK loại trừ polling và nhịp dự phòng không gọi chồng');
 
   let hop;
@@ -254,6 +254,43 @@ function chay(so) {
   check(so, 'CRM_CONTEXT đúng nonce đi trọn tới xử lý view, tin sai nonce bị bỏ',
     quaCau._calls,
     ['renderViewIfDirty(!Lead)']);
+
+  const cungSheet = dungHopPoll();
+  batDau(cungSheet);
+  cungSheet._calls = [];
+  cungSheet.callServer = (name, args) => {
+    cungSheet._calls.push(name + '(' + ((args && args[0]) || '') + ')');
+    return syncValue({ ok: true, skipped: true, rowMaps: { '!Lead': { '4': 'KH000001', '7': 'KH000079' } } });
+  };
+  cungSheet.Store.hasCustomer = () => true;
+  cungSheet.Store.getCustomerIdByRow = (sheet, row) => cungSheet.Store.rowMaps[sheet] && cungSheet.Store.rowMaps[sheet][row] || '';
+  cungSheet._picked = [];
+  cungSheet.ACTIONS.setCurrentCustomer = ({ pick }) => { cungSheet._picked.push(pick); };
+  cungSheet.sheetLinkApplyContext({ sheetName: '!Lead', row: 4, col: 2 });
+  cungSheet.sheetLinkApplyContext({ sheetName: '!Lead', row: 7, col: 2 });
+  check(so, 'đang ở nguyên sheet quản trị vẫn xác nhận rowMap trước từng lựa chọn',
+    [cungSheet._calls, cungSheet._picked],
+    [['renderViewIfDirty(!Lead)', 'renderViewIfDirty(!Lead)'], ['KH000001', 'KH000079']]);
+
+  const daoThuTu = dungHopPoll();
+  batDau(daoThuTu);
+  daoThuTu.Store.hasCustomer = () => true;
+  daoThuTu.Store.getCustomerIdByRow = (sheet, row) => daoThuTu.Store.rowMaps[sheet] && daoThuTu.Store.rowMaps[sheet][row] || '';
+  daoThuTu._picked = [];
+  daoThuTu.ACTIONS.setCurrentCustomer = ({ pick }) => { daoThuTu._picked.push(pick); };
+  const replies = [];
+  daoThuTu.callServer = () => new Promise((resolve) => { replies.push(resolve); });
+  daoThuTu.sheetLinkApplyContext({ sheetName: '!Lead', row: 4, col: 2 });
+  daoThuTu.sheetLinkApplyContext({ sheetName: '!Lead', row: 7, col: 2 });
+  replies[1]({ ok: true, rowMaps: { '!Lead': { '4': 'KH000094', '7': 'KH000079' } } });
+  await Promise.resolve();
+  await Promise.resolve();
+  replies[0]({ ok: true, rowMaps: { '!Lead': { '4': 'KH000094' } } });
+  await Promise.resolve();
+  await Promise.resolve();
+  check(so, 'phản hồi lựa chọn cũ về muộn không được ghi đè rowMap hoặc khách của lựa chọn mới',
+    [daoThuTu.Store.rowMaps, daoThuTu._picked],
+    [{ '!Lead': { '4': 'KH000094', '7': 'KH000079' } }, ['KH000079']]);
 
   const taiLai = dungHopPoll();
   batDau(taiLai);

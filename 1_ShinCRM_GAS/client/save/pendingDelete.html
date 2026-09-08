@@ -109,14 +109,16 @@ function pendingDeleteFire() {
   PENDING_DELETE.dangGui = PENDING_DELETE.dangGui.concat(ids);
   pendingDeletePaint();
 
-  return callServer('deleteRecords', [entity, ids]).then(function (res) {
-    pendingDeleteDone(entity, ids, res);
-    return pendingDeleteRedraw(entity);
-  }, function (err) {
-    pendingDeleteUnmask(ids);
-    pendingDeleteRedraw(entity);
-    if (typeof dispatchError === 'function') { dispatchError(err); }
-    return null;
+  return sidebarBusyRun('Đang xóa ' + ids.length + ' ' + (PENDING_DELETE_LABEL[entity] || 'bản ghi') + '…', function () {
+    return callServer('deleteRecords', [entity, ids]).then(function (res) {
+      pendingDeleteDone(entity, ids, res);
+      return pendingDeleteRedraw(entity);
+    }, function (err) {
+      pendingDeleteUnmask(ids);
+      pendingDeleteRedraw(entity);
+      if (typeof dispatchError === 'function') { dispatchError(err); }
+      return null;
+    });
   });
 }
 

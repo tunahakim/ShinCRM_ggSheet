@@ -134,6 +134,10 @@ function dispatchRun(ten, payload, el) {
  * Việc đóng menu đặt ở đây chứ không ở `menu.html`: tệp này là chỗ duy nhất biết "cú bấm vừa rồi có ý gì", nên nó cũng là chỗ đúng để nói "bấm bất cứ đâu ngoài nút mở menu thì đóng menu". Tài liệu 04 Phần 4B: bấm một mục con thì đóng menu **rồi mới** gọi hàm, và engine không vẽ lại gì sau đó — chính hàm đó tự vẽ.
  */
 function dispatchClick(e) {
+  if (typeof sidebarBusyActive === 'function' && sidebarBusyActive()) {
+    if (e && e.preventDefault) { e.preventDefault(); }
+    return;
+  }
   var goc = e.target;
   if (!goc || !goc.closest) { return; }
 

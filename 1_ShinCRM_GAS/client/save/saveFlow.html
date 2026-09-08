@@ -120,20 +120,22 @@ function saveFlowSubmit() {
   screenStateSetDraft(thu);
 
   SAVE_FLOW.dangGui = true;
-  return callServer('saveRecord', [entity, record]).then(function (res) {
-    SAVE_FLOW.dangGui = false;
+  return sidebarBusyRun(entity === 'customer' ? 'Đang lưu khách hàng…' : 'Đang lưu giao dịch…', function () {
+    return callServer('saveRecord', [entity, record]).then(function (res) {
+      SAVE_FLOW.dangGui = false;
 
-    if (!res.ok) {
-      var focusId = saveFlowPaintInvalid(entity, res.invalid);
-      alert(saveFlowInvalidMessage(res.invalid));
-      return { focusId: focusId };
-    }
+      if (!res.ok) {
+        var focusId = saveFlowPaintInvalid(entity, res.invalid);
+        alert(saveFlowInvalidMessage(res.invalid));
+        return { focusId: focusId };
+      }
 
-    var ban = saveFlowApply(entity, res);
-    return saveFlowClose(entity, ban, themMoi);
-  }, function (err) {
-    SAVE_FLOW.dangGui = false;
-    throw err;
+      var ban = saveFlowApply(entity, res);
+      return saveFlowClose(entity, ban, themMoi);
+    }, function (err) {
+      SAVE_FLOW.dangGui = false;
+      throw err;
+    });
   });
 }
 </script>

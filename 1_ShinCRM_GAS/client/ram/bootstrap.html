@@ -28,6 +28,7 @@
  */
 async function sidebarBoot() {
   callTimingReset(Date.now());
+  var finishBusy = typeof sidebarBusyBegin === 'function' ? sidebarBusyBegin('Đang nạp dữ liệu ShinCRM…') : null;
 
   try {
     // Bộ phát click gắn **trước** mọi thứ khác, vì nó không cần một hạt dữ liệu nào mà màn báo lỗi thì có nút Thử lại. Gắn ở cuối như trước thì lượt nạp đầu tiên mà vỡ sẽ vẽ ra một cái nút bấm không kêu. Hàm này chạy nhiều lần cũng chỉ gắn một tai nghe.
@@ -78,6 +79,8 @@ async function sidebarBoot() {
     await callServer('logClientTiming', [timing]);
   } catch (err) {
     statusLoadError(err && err.message ? err.message : String(err));
+  } finally {
+    if (finishBusy) { finishBusy(); }
   }
 }
 

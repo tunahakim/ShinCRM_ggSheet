@@ -117,6 +117,40 @@ function viewColumnA1(column, row) {
 
 var VIEW_ERROR_NOTE_PREFIX = '⛔ ShinCRM:';
 var VIEW_USER_NOTE_MARKER = '\n\nGhi chú trước đó:\n';
+var VIEW_INPUT_SIGNATURE_PREFIX = 'shinViewInput:';
+
+/** Dấu vân tay của đúng các ô người dùng dùng để điều khiển một sheet quản trị. */
+function viewInputSignature(sheet) {
+  var lastColumn = sheet.getLastColumn();
+  if (lastColumn < 1) { return 'empty'; }
+
+  var header = sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(function (value) { return String(value === null || value === undefined ? '' : value).trim(); });
+  var filterRow = sheet.getRange(3, 1, 1, lastColumn).getValues()[0].map(function (value) { return String(value === null || value === undefined ? '' : value).trim(); });
+  var headerMap = viewHeaderMap(header, sheet.getName());
+  var sortPairs = viewReadSortPairs(sheet, headerMap, SHEET_FIRST_DATA_ROW, sheet.getLastRow()).filter(function (pair) { return pair.col || pair.level; });
+  var raw = JSON.stringify([header, filterRow, sortPairs]);
+  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, raw);
+  return bytes.map(function (byte) { return ('0' + (byte & 0xFF).toString(16)).slice(-2); }).join('');
+}
+
+function viewInputSignatureKey(sheet) {
+  return VIEW_INPUT_SIGNATURE_PREFIX + String(sheet.getSheetId());
+}
+
+function viewInputSignatureRead(sheet) {
+  try { return PropertiesService.getDocumentProperties().getProperty(viewInputSignatureKey(sheet)) || ''; }
+  catch (khongDocDuoc) { return ''; }
+}
+
+/** Không làm hỏng lượt vẽ đã ghi xong chỉ vì kho thuộc tính tạm thời không nhận được dấu vân tay. */
+function viewInputSignatureWrite(sheet) {
+  try {
+    PropertiesService.getDocumentProperties().setProperty(viewInputSignatureKey(sheet), viewInputSignature(sheet));
+    return true;
+  } catch (khongGhiDuoc) {
+    return false;
+  }
+}
 
 function viewFilterErrorText(error) {
   return [error.reason, error.hint].filter(function (part, i, all) { return part && all.indexOf(part) === i; }).join(' ');
@@ -180,6 +214,7 @@ function viewRenderSheetLocked(book, sheet, name) {
   var lastColumn = sheet.getLastColumn();
   if (lastColumn < 1) {
     dirtyStateClearViewSheet(name);
+    viewInputSignatureWrite(sheet);
     var emptyMaps = {}; emptyMaps[name] = {};
     return { ok: true, sheetName: name, rowMaps: emptyMaps, rows: 0 };
   }
@@ -246,7 +281,13 @@ function viewRenderSheetLocked(book, sheet, name) {
   viewClearErrorNotes(sheet, writable);
   SpreadsheetApp.flush();
   dirtyStateClearViewSheet(name);
+  viewInputSignatureWrite(sheet);
   return { ok: true, sheetName: name, rowMaps: (function () { var map = {}; map[name] = rowMap; return map; }()), rows: rows.length };
+}
+
+function viewRenderWithNoticeLocked(book, sheet, name) {
+  book.toast('Đang làm mới dữ liệu ' + name + '…', 'ShinCRM', 3);
+  return viewRenderSheetLocked(book, sheet, name);
 }
 
 function renderViewSheet(sheetName) {
@@ -258,8 +299,7 @@ function renderViewSheet(sheetName) {
   var lock = LockService.getDocumentLock();
   if (!lock.tryLock(SETTINGS.LOCK_WAIT_MS)) { throw new Error('Hệ thống bận. Vui lòng thử lại!'); }
   try {
-    book.toast('Đang làm mới dữ liệu ' + name + '…', 'ShinCRM', 3);
-    return viewRenderSheetLocked(book, sheet, name);
+    return viewRenderWithNoticeLocked(book, sheet, name);
   } finally {
     lock.releaseLock();
   }
@@ -280,11 +320,21 @@ function viewProbeRenderCurrent() {
 
 function renderViewIfDirty(sheetName) {
   var name = String(sheetName || '').trim();
-  var sheet = shinOpenBook().getSheetByName(name);
+  var book = shinOpenBook();
+  var sheet = book.getSheetByName(name);
   if (!sheet || name.charAt(0) !== '!') { throw new Error('Không tìm thấy sheet quản trị "' + name + '".'); }
-  var state = dirtyStateRead();
-  if (state.all || state.config || state.viewSheets.indexOf(name) >= 0) { return renderViewSheet(name); }
-  return { ok: true, skipped: true, sheetName: name, rowMaps: viewSheetRowMaps(sheet, name) };
+  var lock = LockService.getDocumentLock();
+  if (!lock.tryLock(SETTINGS.LOCK_WAIT_MS)) { throw new Error('Hệ thống bận. Vui lòng thử lại!'); }
+  try {
+    var state = dirtyStateRead();
+    var inputChanged = viewInputSignatureRead(sheet) !== viewInputSignature(sheet);
+    if (state.all || state.config || state.viewSheets.indexOf(name) >= 0 || inputChanged) {
+      return viewRenderWithNoticeLocked(book, sheet, name);
+    }
+    return { ok: true, skipped: true, sheetName: name, rowMaps: viewSheetRowMaps(sheet, name) };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function prepareViewSheet(sheetName) {

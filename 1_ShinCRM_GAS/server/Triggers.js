@@ -26,7 +26,7 @@ function shinOnEdit(event) {
     var sheet = range.getSheet();
     var name = sheet.getName();
     if (name.charAt(0) === '!') {
-      if (shinViewEditNeedsRender(sheet, range)) { return renderViewSheet(name); }
+      if (shinViewEditNeedsRender(sheet, range)) { return renderViewIfDirty(name); }
       return;
     }
     if (name === 'Config' || name === 'Category') {

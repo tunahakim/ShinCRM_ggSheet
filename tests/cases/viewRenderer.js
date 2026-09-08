@@ -56,6 +56,15 @@ function chay(so) {
   check(so, 'rowMap dựng theo hàng thật sau khi ghi', Object.keys(result.rowMaps['!Lead']).sort(), ['4', '5']);
   check(so, 'lượt vẽ có báo trạng thái và luôn nhả khóa', [base.nen.dem.toast, base.nen.stubs._khoa.dangGiu], [1, false]);
 
+  check(so, 'đầu vào không đổi thì chỉ đọc lại rowMap, không vẽ thừa', base.nen.hop.renderViewIfDirty('!Lead').skipped, true);
+  base.view.getRange(3, 2).setValue('Hai');
+  const afterFilter = base.nen.hop.renderViewIfDirty('!Lead');
+  check(so, 'hàng lọc đổi trước khi trigger chạy vẫn bị dấu vân tay phát hiện và dựng rowMap mới',
+    [afterFilter.rows, afterFilter.rowMaps['!Lead'], base.view.getRange(4, 1).getValue()],
+    [1, { '4': 'KH0002' }, 'KH0002']);
+  base.view.getRange(3, 2).setValue('');
+  base.nen.hop.renderViewIfDirty('!Lead');
+
   base.view.getRange(3, 5).setValue('60..50');
   base.view.getRange(3, 5).setNote('ghi chú riêng');
   base.view.getRange(4, 5).setValue('giữ nguyên');

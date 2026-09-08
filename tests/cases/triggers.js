@@ -29,7 +29,7 @@ function chay(so) {
   nen.book.insertSheet('!Chăm sóc');
   lead.getRange(1, 1, 1, 4).setValues([['@CUS_MA_KH', '@CUS_TEN_CTY', '@VIEW_SORT_COL', '@VIEW_SORT_LEVEL']]);
   const rendered = [];
-  hop.renderViewSheet = (name) => { rendered.push(name); return { ok: true, sheetName: name }; };
+  hop.renderViewIfDirty = (name) => { rendered.push(name); return { ok: true, sheetName: name }; };
   hop.runEntryPoint = (name, source, channel, fn) => fn();
 
   hop.shinOnEdit({ range: eventRange(lead, 3, 2) });

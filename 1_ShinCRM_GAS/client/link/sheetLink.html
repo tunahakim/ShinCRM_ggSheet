@@ -23,6 +23,7 @@ var SHEET_LINK_SPREADSHEET_ID = '';
 var SHEET_LINK_LAST_ACK = 0;
 var SHEET_LINK_EXTENSION_SESSION = '';
 var SHEET_LINK_LAST_SHEET = '';
+var SHEET_LINK_APPLY_TICKET = 0;
 var SHEET_LINK_PING_TIMER = null;
 var sheetLinkInstalled = false;
 
@@ -108,39 +109,60 @@ function sheetLinkOnMessage(event) {
 }
 
 function sheetLinkApplyContext(ctx) {
+  var ticket = ++SHEET_LINK_APPLY_TICKET;
   var previousSheet = SHEET_LINK_LAST_SHEET;
   var changedSheet = ctx.sheetName !== previousSheet;
   SHEET_LINK_LAST_SHEET = ctx.sheetName || '';
   if (ctx.isEditing) { return; }
 
-  var pending = null;
-  if (changedSheet && (previousSheet === 'Customer' || previousSheet === 'Activity') && typeof callServer === 'function') {
-    pending = callServer('getDirtyState').then(function (state) {
-      var dirty = state && state.dirty;
-      if (!dirty) { return; }
-      if ((dirty.all || dirty.config) && typeof sidebarBoot === 'function') { return sidebarBoot(); }
-      if (dirty.records && dirty.records.length && typeof refreshDirtyRecords === 'function') { return refreshDirtyRecords(dirty.records); }
-      return null;
-    });
+  var work = function () {
+    var pending = null;
+    if (changedSheet && (previousSheet === 'Customer' || previousSheet === 'Activity') && typeof callServer === 'function') {
+      pending = callServer('getDirtyState').then(function (state) {
+        if (ticket !== SHEET_LINK_APPLY_TICKET) { return null; }
+        var dirty = state && state.dirty;
+        if (!dirty) { return null; }
+        if ((dirty.all || dirty.config) && typeof sidebarBoot === 'function') { return sidebarBoot(); }
+        if (dirty.records && dirty.records.length && typeof refreshDirtyRecords === 'function') { return refreshDirtyRecords(dirty.records); }
+        return null;
+      });
+    }
+
+    // Không chỉ lúc đổi tab: lọc hoặc sắp xếp vẽ lại ngay trên chính sheet hiện tại và làm mọi số hàng cũ mất nghĩa.
+    if (ctx.sheetName && ctx.sheetName.charAt(0) === '!' && typeof callServer === 'function') {
+      var refreshView = function () {
+        if (ticket !== SHEET_LINK_APPLY_TICKET) { return null; }
+        return callServer('renderViewIfDirty', [ctx.sheetName]);
+      };
+      pending = pending ? pending.then(refreshView) : refreshView();
+      pending = pending.then(function (result) {
+        if (ticket !== SHEET_LINK_APPLY_TICKET) { return null; }
+        if (result && result.rowMaps && typeof Store.applyRowMaps === 'function') { Store.applyRowMaps(result.rowMaps); }
+        return result;
+      });
+    }
+
+    var applyLatest = function () {
+      if (ticket !== SHEET_LINK_APPLY_TICKET) { return null; }
+      return sheetLinkApplyCustomerContext(ctx);
+    };
+    return pending ? pending.then(applyLatest) : applyLatest();
+  };
+
+  var syncingData = changedSheet && (previousSheet === 'Customer' || previousSheet === 'Activity');
+  var changingView = ctx.sheetName && ctx.sheetName.charAt(0) === '!' && (ctx.row === 1 || ctx.row === 3);
+  if ((syncingData || changingView) && typeof sidebarBusyRun === 'function') {
+    return sidebarBusyRun(changingView ? 'Đang cập nhật sheet ' + ctx.sheetName + '…' : 'Đang đồng bộ dữ liệu vừa thay đổi…', work);
   }
-  if (changedSheet && ctx.sheetName && ctx.sheetName.charAt(0) === '!' && typeof callServer === 'function') {
-    var refreshView = function () { return callServer('renderViewIfDirty', [ctx.sheetName]); };
-    pending = pending ? pending.then(refreshView) : refreshView();
-    pending = pending.then(function (result) {
-      if (result && result.rowMaps && typeof Store.applyRowMaps === 'function') { Store.applyRowMaps(result.rowMaps); }
-      return result;
-    });
-  }
-  if (pending) {
-    return pending.then(function () { return sheetLinkApplyCustomerContext(ctx); });
-  }
-  return sheetLinkApplyCustomerContext(ctx);
+  return work();
 }
 
 function sheetLinkApplyCustomerContext(ctx) {
   if (!Prefs.followSelection || ScreenState.screen !== SCREEN_VIEW) { return; }
 
-  var ma = ctx.customerId === undefined ? sheetLinkCustomerIdFromContext(ctx) : String(ctx.customerId || '');
+  // Trên sheet quản trị, mã máy chủ gửi kèm có thể được giải từ rowMap của lượt trước; sau đồng bộ phải tra lại từ RAM mới.
+  var isView = ctx.sheetName && ctx.sheetName.charAt(0) === '!';
+  var ma = ctx.customerId === undefined || isView ? sheetLinkCustomerIdFromContext(ctx) : String(ctx.customerId || '');
   if (!ma || ma === ScreenState.currentCustomerId) { return; }
 
   ACTIONS.setCurrentCustomer({ pick: ma });
