@@ -72,6 +72,8 @@ function taoSheet(ten, dem, luoi) {
 
   const sheet = {
     getName: () => ten,
+    getSheetId: () => Array.from(ten).reduce((sum, ch) => sum + ch.charCodeAt(0), 0),
+    getActiveRange: () => null,
 
     /** Dòng cuối có nội dung. Trả về 0 khi sheet trắng, đúng như Google. */
     getLastRow() {
@@ -171,6 +173,14 @@ function taoSheet(ten, dem, luoi) {
           dem.setValues += 1;
           return range;
         },
+        clearContent() {
+          for (let r = 0; r < soDong; r += 1) {
+            const dich = layDong(row - 1 + r);
+            for (let c = 0; c < soCot; c += 1) { dich[col - 1 + c] = ''; }
+          }
+          dem.setValues += 1;
+          return range;
+        },
 
         /**
          * Khuôn hiển thị. Mô phỏng cả **hệ quả** của khuôn: ghi chuỗi `'0101243150'` vào ô chưa đặt khuôn văn bản thì nó thành số `101243150` ở đây, đúng như trên Google — xem `epTheoKhuon`.
@@ -264,6 +274,7 @@ function taoBook(tenSheets) {
     getSpreadsheetTimeZone: () => 'Asia/Ho_Chi_Minh',
 
     getSheetByName: (ten) => sheets[ten] || null,
+    getActiveSheet: () => Object.keys(sheets).length ? sheets[Object.keys(sheets)[0]] : null,
     getSheets: () => Object.keys(sheets).map((ten) => sheets[ten]),
     insertSheet(ten) {
       sheets[ten] = taoSheet(ten, dem);

@@ -241,6 +241,7 @@ Ghi ra đây để chỗ đặt tệp mới là điều đã quyết trước, k
 
 ```
 server\view\                      Dựng sheet quản lý: đọc bộ lọc, sắp xếp, vẽ lại vùng dữ liệu.
+server\Triggers.js                 Trigger cài đặt đánh dấu dữ liệu bẩn và chuẩn bị sheet quản trị.
 ```
 
 Biểu mẫu **không** có thư mục riêng: bộ máy dựng form là `client\ui\` (uiBuilder, renderEngine, actions, slots), bảng khai form là `client\schema\` (uiSchema, fieldLogic), và mỗi màn có form là một tệp trong `client\screen\`.

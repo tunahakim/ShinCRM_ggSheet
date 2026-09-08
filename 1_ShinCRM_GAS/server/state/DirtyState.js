@@ -127,6 +127,14 @@ function dirtyStateClear(options) {
   return dirtyStateRead();
 }
 
+function dirtyStateClearViewSheet(sheetName) {
+  var target = String(sheetName === null || sheetName === undefined ? '' : sheetName).trim();
+  var props = PropertiesService.getDocumentProperties();
+  var remaining = dirtyStateRead().viewSheets.filter(function (name) { return name !== target; });
+  dirtyStateWriteList(props, DIRTY_KEYS.viewSheets, remaining);
+  return dirtyStateRead();
+}
+
 /** Phép nghiệm thu chạy được trên Google: in khối trạng thái bẩn hiện có trên tệp thật. Sheet mới thì cả bốn đều rỗng, và đó là câu trả lời đúng cần nhìn thấy. */
 function probeDirtyState() {
   var state = dirtyStateRead();

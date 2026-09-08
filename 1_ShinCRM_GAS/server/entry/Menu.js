@@ -18,6 +18,10 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu(MENU_TITLE)
     .addItem('Mở bảng làm việc', 'shinShowSidebar')
+    .addSeparator()
+    .addItem('Vẽ lại sheet quản trị đang mở', 'shinRenderCurrentView')
+    .addItem('Vẽ lại tất cả sheet quản trị', 'shinRenderAllViews')
+    .addItem('Chuẩn bị sheet quản trị', 'shinPrepareCurrentView')
     .addToUi();
 
   // Nuốt lỗi ở đây là đúng, và đây là chỗ duy nhất trong dự án được nuốt: `runEntryPoint` đã ghi
@@ -31,6 +35,26 @@ function onOpen() {
   } catch (err) {
     // đã ghi log và đã hiện ở trong vỏ bọc
   }
+}
+
+function shinRenderCurrentView() {
+  return runEntryPoint('shinRenderCurrentView', 'core', ERROR_CHANNEL_TOAST, function () {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    return renderViewSheet(sheet.getName());
+  });
+}
+
+function shinRenderAllViews() {
+  return runEntryPoint('shinRenderAllViews', 'core', ERROR_CHANNEL_TOAST, function () {
+    return renderAllViewSheets();
+  });
+}
+
+function shinPrepareCurrentView() {
+  return runEntryPoint('shinPrepareCurrentView', 'core', ERROR_CHANNEL_TOAST, function () {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    return prepareViewSheet(sheet.getName());
+  });
 }
 
 /**
