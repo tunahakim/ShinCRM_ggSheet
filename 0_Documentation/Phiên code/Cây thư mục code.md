@@ -202,7 +202,8 @@ tests\
     ├── viewScreen.js             Bốn cái hỏng-trong-im-lặng của màn xem: mã card lệch giữa hai tệp, đổi khách mà chỉ vẽ lại một vùng, đổi khách lúc đang gõ dở, và tệp màn tự chạm DOM.
     ├── formScreen.js             Bốn cái hỏng-trong-im-lặng của ba màn form: tiêu đề suy sai vì bản ghi mới đã có mã xem trước, ô kế tục không có dấu, form giao dịch thiếu bản ghi khách, và đóng form lồng thì rơi thẳng về màn xem.
     ├── actions.js                Bảng mười lăm hành động: một tên rơi khỏi bảng là nút bấm không làm gì, ba cửa mở form phải khóa khi khách đã xóa mềm, và việc chặng sau phải ném lỗi đọc được chứ không im.
-    └── selectionPoll.js          Đồng hồ giả khóa luật ACK loại trừ mọi vòng gọi, bốn điều kiện dừng, chống vòng chồng và thang nhịp 2/6 giây.
+    ├── selectionPoll.js          Đồng hồ giả khóa luật ACK loại trừ mọi vòng gọi, bốn điều kiện dừng, chống vòng chồng và thang nhịp 2/6 giây.
+    └── domUi.js                  DOM giả tối thiểu kiểm ba đường UI: phát click, menu nổi và thu gọn nội dung.
 ```
 
 ## Bảng tra: tên trong tài liệu thiết kế → tệp thật

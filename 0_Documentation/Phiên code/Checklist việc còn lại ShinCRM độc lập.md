@@ -50,11 +50,12 @@ Nguồn chuẩn: tài liệu 07 (làm mới và sheet quản trị), 08 và 08A 
 - [x] `server/view/ViewSheetRenderer`: lọc, sắp, ghi các dải cột `CUS_`/`ACT_` được phép và dựng bản đồ dòng mới trong cùng lần gọi; loại giao dịch đã xóa, ghép lần sống gần nhất, giữ khách chưa có giao dịch, và không xóa dữ liệu khi cú pháp sai.
 - [x] `server/Triggers.js`: có đường `shinOnEdit`/`shinOnChange` và hàm cài trigger installable; `onOpen` dựng menu.
 - [x] Ba lệnh view trong menu Sheets của `server/entry/Menu.js`: vẽ lại sheet đang mở, vẽ lại tất cả, và `prepareViewSheet` idempotent.
-- [ ] Công tắc tự động sắp xếp sheet: sau lưu/xóa đã đánh dấu các sheet quản trị và vẽ ngay sheet đang mở khi `autoRenderView` bật; còn nối đường chuyển sheet để vẽ sheet quản trị đang bẩn.
-- [ ] Client `client/ram/refresh.html`: xử lý khối trạng thái bẩn đính kèm phản hồi và gọi nạp lại đúng phần cần, tài liệu 07 Phần 8.
-- [ ] Nối nút "Vẽ lại sheet quản trị" trên header vào việc vẽ thật — hiện nó cố ý báo "chưa dùng, chặng 1.5".
+- [x] Công tắc tự động sắp xếp sheet: sau lưu/xóa đánh dấu các sheet quản trị và vẽ ngay sheet đang mở khi `autoRenderView` bật; khi Extension báo chuyển sang sheet quản trị, sidebar gọi `renderViewIfDirty` rồi cập nhật rowMap.
+- [x] Client `client/ram/refresh.html`: xử lý khối trạng thái bẩn, nạp lại đúng mã bản ghi khi rời sheet kho và cập nhật rowMap cùng lượt.
+- [x] Nối nút "Vẽ lại sheet quản trị" trên header vào `shinRenderCurrentView`.
 - [x] Bản đồ dòng của sheet quản trị trong `LoadService`: thêm khóa theo tên sheet vào cấu trúc đang có, không đổi hình dạng.
-- [ ] Hai món nợ kiểm thử ghi ở `Prompt chặng 1.4 và 1.5.md`: ca kiểm tự động cho nhánh dự phòng `bootChunkWithFallback` của chặng 1.2, và ba ca offline cho `dispatch.html`, `menu.html`, `collapse.html` — ba tệp này chưa có ca nào vì hộp cát client chưa có `document`.
+- [x] Ca kiểm tự động cho nhánh dự phòng `bootChunkWithFallback` của chặng 1.2: bộ kiểm ép lỗi từng bậc, xác nhận lùi đúng con trỏ và ném lỗi cuối cùng khi hết bậc.
+- [x] Ba ca offline cho `dispatch.html`, `menu.html`, `collapse.html`: thêm DOM giả tối thiểu và kiểm các đường phát click bất đồng bộ, menu một-lớp/đóng lại, cùng ba nấc thu gọn.
 - [ ] Nghiệm thu Google theo đúng câu chạy thử của chặng: gõ điều kiện lọc bằng dấu `!` trên sheet quản trị và thấy nó in ra đúng, sửa trên sheet thì sidebar nạp lại đúng phần cần.
 
 ## Nhóm 4 — Câu hỏi còn chờ chủ dự án duyệt

@@ -9,7 +9,7 @@
 const { napClient, taoHopCat } = require('../lib/load-gas');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 
-function chay(so) {
+async function chay(so) {
   section('bootstrap — cảnh báo nổ hộp thoại, phép kiểm bị bỏ qua thì xuống console');
 
   let hop = null;
@@ -52,6 +52,37 @@ function chay(so) {
   hop.SETTINGS = null;
   check(so, 'chưa có SETTINGS thì một bậc null để máy chủ tự chọn, chứ không gõ cứng một con số ở client',
     hop.bootChunkLadder(), [null]);
+
+  section('bootstrap — gói lỗi thì lùi đúng cỡ và giữ nguyên con trỏ');
+
+  hop.SETTINGS = { CHUNK_ROWS: 30, CHUNK_ROWS_FALLBACK: [15, 5] };
+  const calls = [];
+  const retries = [];
+  hop.callServer = (name, args) => {
+    calls.push([name, args]);
+    if (calls.length === 1) { return Promise.reject(new Error('gói quá nặng')); }
+    return Promise.resolve({ ok: true, nextCursor: null });
+  };
+  const cursor = { endRow: 100 };
+  const ket = await hop.bootChunkWithFallback(cursor, (hong, nho) => retries.push([hong, nho]));
+  check(so, 'gói thất bại được gọi lại cùng con trỏ ở bậc lùi kế tiếp',
+    [ket.ok, calls, retries],
+    [true, [['loadActivityChunk', [cursor, 30]], ['loadActivityChunk', [cursor, 15]]], [[30, 15]]]);
+
+  calls.length = 0;
+  let loiCuoi = null;
+  hop.callServer = (name, args) => {
+    calls.push([name, args]);
+    return Promise.reject(new Error('máy chủ vẫn lỗi'));
+  };
+  try {
+    await hop.bootChunkWithFallback(cursor);
+  } catch (err) {
+    loiCuoi = err;
+  }
+  check(so, 'hết mọi bậc lùi thì ném đúng lỗi cuối cùng, không nuốt lỗi',
+    [calls.map((call) => call[1][1]), loiCuoi && loiCuoi.message],
+    [[30, 15, 5], 'máy chủ vẫn lỗi']);
 }
 
 module.exports = { chay };

@@ -51,29 +51,39 @@ const NHOM_CA = [
   require('./cases/selectionPoll'),
   require('./cases/viewLanguage'),
   require('./cases/viewRenderer'),
-  require('./cases/refresh')];
+  require('./cases/refresh'),
+  require('./cases/domUi')];
 
 console.log('ShinCRM — bộ kiểm thử offline');
 console.log('='.repeat(60));
 
-const so = taoSo();
-NHOM_CA.forEach((nhom) => nhom.chay(so));
+async function main() {
+  const so = taoSo();
+  for (const nhom of NHOM_CA) {
+    await nhom.chay(so);
+  }
 
-section('Tổng kết');
-console.log('  Đạt: ' + so.passed + '   Không đạt: ' + so.failed);
+  section('Tổng kết');
+  console.log('  Đạt: ' + so.passed + '   Không đạt: ' + so.failed);
 
-// Không có phép kiểm nào chạy cũng là hỏng. Nếu không chặn ở đây, một lỗi nạp tệp sẽ cho ra "đạt" trong khi thực tế chẳng kiểm gì — một cái phanh giả nguy hơn không có phanh.
-if (so.passed === 0 && so.failed === 0) {
-  console.log('');
-  console.log('❌ KHÔNG một phép kiểm nào chạy. Hoặc chưa dựng hàm nào, hoặc đường nạp tệp đã hỏng.');
-  process.exit(2);
+  // Không có phép kiểm nào chạy cũng là hỏng. Nếu không chặn ở đây, một lỗi nạp tệp sẽ cho ra "đạt" trong khi thực tế chẳng kiểm gì — một cái phanh giả nguy hơn không có phanh.
+  if (so.passed === 0 && so.failed === 0) {
+    console.log('');
+    console.log('❌ KHÔNG một phép kiểm nào chạy. Hoặc chưa dựng hàm nào, hoặc đường nạp tệp đã hỏng.');
+    process.exit(2);
+  }
+
+  if (so.failed > 0) {
+    console.log('');
+    console.log('Các phép kiểm không đạt:');
+    so.failures.forEach((name) => console.log('  - ' + name));
+    process.exit(1);
+  }
+
+  process.exit(0);
 }
 
-if (so.failed > 0) {
-  console.log('');
-  console.log('Các phép kiểm không đạt:');
-  so.failures.forEach((name) => console.log('  - ' + name));
+main().catch((err) => {
+  console.error('❌ Bộ kiểm thử bị dừng: ' + (err && err.stack ? err.stack : err));
   process.exit(1);
-}
-
-process.exit(0);
+});
