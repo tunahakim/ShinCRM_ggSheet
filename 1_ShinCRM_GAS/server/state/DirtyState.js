@@ -142,6 +142,21 @@ function dirtyStateClearViewSheet(sheetName) {
   return dirtyStateRead();
 }
 
+function dirtyStateClearRecords(recordIds) {
+  var remove = {};
+  (Array.isArray(recordIds) ? recordIds : [recordIds]).forEach(function (id) { remove[String(id || '').trim()] = true; });
+  var props = PropertiesService.getDocumentProperties();
+  var remaining = dirtyStateRead().records.filter(function (id) { return !remove[id]; });
+  dirtyStateWriteList(props, DIRTY_KEYS.records, remaining);
+  return dirtyStateRead();
+}
+
+function dirtyStateClearConfig() {
+  var props = PropertiesService.getDocumentProperties();
+  props.deleteProperty(DIRTY_KEYS.config);
+  return dirtyStateRead();
+}
+
 /** Phép nghiệm thu chạy được trên Google: in khối trạng thái bẩn hiện có trên tệp thật. Sheet mới thì cả bốn đều rỗng, và đó là câu trả lời đúng cần nhìn thấy. */
 function probeDirtyState() {
   var state = dirtyStateRead();

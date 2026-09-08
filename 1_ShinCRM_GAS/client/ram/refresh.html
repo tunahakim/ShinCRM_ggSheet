@@ -1,0 +1,28 @@
+<script>
+/** Làm mới đúng các mã do trạng thái bẩn trả về; không tự đọc sheet hay đổi Store ngoài hai cửa của Store. */
+function refreshRecordsApply(result, requestedIds) {
+  if (!result || !result.ok) { return; }
+  var ids = (requestedIds || []).map(function (id) { return String(id || ''); });
+  var affectedCustomerIds = result.affectedCustomerIds || ids;
+  var customers = ingestUnpack(result.customer.fields, result.customer.rows);
+  var activities = ingestUnpack(result.activity.fields, result.activity.rows);
+  var customerIds = {};
+  customers.forEach(function (record) { customerIds[record.id] = true; Store.upsertRecord('customer', record); });
+  affectedCustomerIds.forEach(function (id) { if (!customerIds[id] && Store.customers[id]) { Store.removeRecord('customer', id); } });
+  var activityIds = {};
+  activities.forEach(function (record) { activityIds[record.id] = true; Store.upsertRecord('activity', record); });
+  affectedCustomerIds.forEach(function (id) {
+    var list = Store.activitiesByCustomer[id] || [];
+    list.slice().forEach(function (record) { if (!activityIds[record.id] && record.customerId === id) { Store.removeRecord('activity', record.id); } });
+  });
+  Store.applyRowMaps(result.rowMaps || {});
+  renderScreen();
+}
+
+function refreshDirtyRecords(ids) {
+  return callServer('reloadRecords', [ids]).then(function (result) {
+    refreshRecordsApply(result, ids);
+    return result;
+  });
+}
+</script>

@@ -17,6 +17,51 @@
 /** Nguồn ghi log của mọi đường trong tệp này. Sidebar gọi qua `google.script.run` nên theo bảng ở tài liệu 10 Phần 8, nguồn là `sidebar` và kênh báo lỗi là ném lại cho `withFailureHandler`. */
 var LOAD_SOURCE = 'sidebar';
 
+function getDirtyState() {
+  return runEntryPoint('getDirtyState', LOAD_SOURCE, 'throw', function () {
+    var started = Date.now();
+    return { ok: true, dirty: dirtyStateRead(), selection: selectionSnapshot(), ms: Date.now() - started };
+  });
+}
+
+function reloadRecords(recordIds) {
+  return runEntryPoint('reloadRecords', LOAD_SOURCE, 'throw', function () {
+    var started = Date.now();
+    var ids = (Array.isArray(recordIds) ? recordIds : [recordIds]).map(function (id) { return String(id || '').trim(); }).filter(function (id) { return id; });
+    var customerBlock = entityReadAll('customer');
+    var activityBlock = entityReadAll('activity');
+    var customerIds = {};
+    ids.forEach(function (id) { customerIds[id] = true; });
+    activityBlock.rows.forEach(function (row) {
+      var activity = {};
+      activityBlock.fields.forEach(function (field, i) { activity[field] = row[i]; });
+      if (ids.indexOf(activity.id) >= 0) { customerIds[activity.customerId] = true; }
+    });
+    var customers = [];
+    customerBlock.rows.forEach(function (row) {
+      var customer = {};
+      customerBlock.fields.forEach(function (field, i) { customer[field] = row[i]; });
+      if (customerIds[customer.id]) { customers.push(row); }
+    });
+    var activities = [];
+    activityBlock.rows.forEach(function (row) {
+      var customerId = row[activityBlock.fields.indexOf('customerId')];
+      if (customerIds[customerId]) { activities.push(row); }
+    });
+    dirtyStateClearRecords(ids);
+    return {
+      ok: true,
+      customer: { fields: customerBlock.fields, rows: customers },
+      activity: { fields: activityBlock.fields, rows: activities },
+      affectedCustomerIds: customers.map(function (row) { return row[customerBlock.fields.indexOf('id')]; }),
+      rowMaps: loadRowMaps(customerBlock),
+      dirty: dirtyStateRead(),
+      selection: selectionSnapshot(),
+      ms: Date.now() - started
+    };
+  });
+}
+
 /**
  * Nạp phần lõi. Đây là lời gọi đầu tiên của mỗi lượt mở sidebar.
  *

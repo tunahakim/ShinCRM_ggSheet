@@ -105,8 +105,18 @@ function sheetLinkApplyContext(ctx) {
   if (!Prefs.followSelection) { return; }
   if (ScreenState.screen !== SCREEN_VIEW) { return; }
 
-  var changedSheet = ctx.sheetName !== SHEET_LINK_LAST_SHEET;
+  var previousSheet = SHEET_LINK_LAST_SHEET;
+  var changedSheet = ctx.sheetName !== previousSheet;
   SHEET_LINK_LAST_SHEET = ctx.sheetName || '';
+  if (changedSheet && (previousSheet === 'Customer' || previousSheet === 'Activity') && typeof callServer === 'function') {
+    callServer('getDirtyState').then(function (state) {
+      var dirty = state && state.dirty;
+      if (!dirty) { return; }
+      if ((dirty.all || dirty.config) && typeof sidebarBoot === 'function') { return sidebarBoot(); }
+      if (dirty.records && dirty.records.length && typeof refreshDirtyRecords === 'function') { return refreshDirtyRecords(dirty.records); }
+      return null;
+    });
+  }
   if (changedSheet && ctx.sheetName && ctx.sheetName.charAt(0) === '!' && typeof callServer === 'function') {
     callServer('renderViewIfDirty', [ctx.sheetName]).then(function (result) {
       if (result && result.rowMaps && typeof Store.applyRowMaps === 'function') { Store.applyRowMaps(result.rowMaps); }
