@@ -25,7 +25,7 @@
 
 ## Kiểm thử và an toàn
 
-- Chạy `node tests/run.js` sau mỗi thay đổi và trước mỗi commit.
+- Chỉ viết và chạy kiểm thử cục bộ cho nhánh có thể hỏng âm thầm, mở nhầm dữ liệu hoặc tốn hạn mức; không phủ dày các hành vi người dùng có thể nghiệm thu trực tiếp trên Sheet DEV. Chạy bộ đầy đủ trước mốc bàn giao hoặc khi thay đổi hợp đồng dùng chung, không chạy lại sau mọi chỉnh sửa nhỏ.
 - Nghiệm thu Google thật bằng `node tests/gas.js <tên-hàm> --push`; thiếu `--push` là đang chạy bản cũ. Hàm dò mới phải có trong `DEV_RUNNER_ALLOWED`.
 - Chỉ thử trên Sheet DEV hoặc tệp trắng, không chạm Sheet đang chứa dữ liệu khách thật.
 - Trước khi đưa dữ liệu thật vào: xóa `server/dev/` và bản triển khai của nó, tắt chia sẻ bằng liên kết, và không chia sẻ tệp khi `LOG_TRACE` đang bật.
