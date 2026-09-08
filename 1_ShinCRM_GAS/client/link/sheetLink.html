@@ -95,21 +95,18 @@ function sheetLinkOnMessage(event) {
   if (data.seq <= SHEET_LINK_SEQ) { return; }
   SHEET_LINK_SEQ = data.seq;
 
-  // Không phản ứng khi người dùng đang gõ trong thanh công thức
-  if (data.isEditing) { return; }
-
   sheetLinkApplyContext(data);
 }
 
 function sheetLinkApplyContext(ctx) {
-  if (!Prefs.followSelection) { return; }
-  if (ScreenState.screen !== SCREEN_VIEW) { return; }
-
   var previousSheet = SHEET_LINK_LAST_SHEET;
   var changedSheet = ctx.sheetName !== previousSheet;
   SHEET_LINK_LAST_SHEET = ctx.sheetName || '';
+  if (ctx.isEditing) { return; }
+
+  var pending = null;
   if (changedSheet && (previousSheet === 'Customer' || previousSheet === 'Activity') && typeof callServer === 'function') {
-    callServer('getDirtyState').then(function (state) {
+    pending = callServer('getDirtyState').then(function (state) {
       var dirty = state && state.dirty;
       if (!dirty) { return; }
       if ((dirty.all || dirty.config) && typeof sidebarBoot === 'function') { return sidebarBoot(); }
@@ -118,13 +115,17 @@ function sheetLinkApplyContext(ctx) {
     });
   }
   if (changedSheet && ctx.sheetName && ctx.sheetName.charAt(0) === '!' && typeof callServer === 'function') {
-    callServer('renderViewIfDirty', [ctx.sheetName]).then(function (result) {
+    var refreshView = function () { return callServer('renderViewIfDirty', [ctx.sheetName]); };
+    pending = pending ? pending.then(refreshView) : refreshView();
+    pending = pending.then(function (result) {
       if (result && result.rowMaps && typeof Store.applyRowMaps === 'function') { Store.applyRowMaps(result.rowMaps); }
-      sheetLinkApplyCustomerContext(ctx);
+      return result;
     });
-    return;
   }
-  sheetLinkApplyCustomerContext(ctx);
+  if (pending) {
+    return pending.then(function () { return sheetLinkApplyCustomerContext(ctx); });
+  }
+  return sheetLinkApplyCustomerContext(ctx);
 }
 
 function sheetLinkApplyCustomerContext(ctx) {

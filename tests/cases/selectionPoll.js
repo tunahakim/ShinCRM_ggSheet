@@ -221,6 +221,19 @@ function chay(so) {
   check(so, 'không có Extension thì kết quả full vẫn đi qua đường chuyển sheet và làm mới view bẩn',
     [khongExtension._calls, khongExtension.Store.rowMaps],
     [['renderViewIfDirty(!Lead)'], { '!Lead': { '4': 'KH000001' } }]);
+
+  const tatSet = dungHopPoll();
+  batDau(tatSet);
+  tatSet.Prefs.followSelection = false;
+  tatSet._calls = [];
+  tatSet.callServer = (name, args) => {
+    tatSet._calls.push(name + '(' + ((args && args[0]) || '') + ')');
+    return syncValue({ ok: true, sheetName: '!Lead', rowMaps: { '!Lead': {} } });
+  };
+  tatSet.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: '!Lead', row: 1, col: 1, customerId: '' });
+  check(so, 'tắt nút sét chỉ ngừng đổi khách, không được chặn làm mới sheet quản trị khi Extension báo chuyển sheet',
+    tatSet._calls,
+    ['renderViewIfDirty(!Lead)']);
 }
 
 module.exports = { chay };
