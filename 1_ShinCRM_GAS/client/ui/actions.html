@@ -102,7 +102,10 @@ ACTIONS.setActivityView = function (payload) {
 /* ─── Sheet quản trị và nạp lại ─── */
 
 ACTIONS.renderActiveViewSheet = function () {
-  actionsChuaDung('Vẽ lại sheet quản trị', '1.5');
+  return callServer('shinRenderCurrentView').then(function (result) {
+    if (result && result.rowMaps && typeof Store.applyRowMaps === 'function') { Store.applyRowMaps(result.rowMaps); }
+    return result;
+  });
 };
 
 /** Nạp lại từ đầu. Đóng hết form trước khi gọi, vì `sidebarBoot` dọn sạch `Store` và một form đang mở sẽ trỏ vào bản ghi vừa bị bỏ. */

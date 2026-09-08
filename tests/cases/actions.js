@@ -52,6 +52,7 @@ function dungCanh() {
   hop._ramLucGui = [];
   hop.callServer = (name, args) => {
     hop._daGui.push(name + '(' + JSON.stringify(args) + ')');
+    if (!args || !args.length) { return loiHua({ ok: true, rowMaps: {} }); }
     hop._ramLucGui.push(hop.Prefs[args[0]]);
     const tra = { followSelection: hop.Prefs.followSelection, autoRenderView: hop.Prefs.autoRenderView, activityView: hop.Prefs.activityView };
     tra[args[0]] = args[1];
@@ -242,9 +243,9 @@ function chay(so) {
       return /chưa dựng/.test(String(err.message));
     }
   });
-  check(so, 'chỉ còn một hành động chưa dựng và nó nói rõ mình thuộc chặng nào — nút không phản hồi mà chẳng nói gì đúng là ca tài liệu 04 Phần 7 chống',
+  check(so, 'mọi hành động sidebar đã có đường xử lý, nút vẽ sheet quản trị gọi máy chủ',
     chuaDung.slice().sort(),
-    ['renderActiveViewSheet']);
+    []);
 
   checkThrows(so, 'nút xóa một giao dịch kiểm `pick` trước khi chạm bộ chờ, nên lỗi khai Block không bị đường xóa che mất',
     () => hop5.ACTIONS.deleteActivity({}), 'data-pick');
