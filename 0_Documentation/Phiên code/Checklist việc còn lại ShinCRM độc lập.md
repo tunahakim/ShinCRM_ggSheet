@@ -52,7 +52,7 @@ Nguồn chuẩn: tài liệu 07 (làm mới và sheet quản trị), 08 và 08A 
 - [x] Ba lệnh view trong menu Sheets của `server/entry/Menu.js`: vẽ lại sheet đang mở, vẽ lại tất cả, và `prepareViewSheet` idempotent.
 - [x] Công tắc tự động cập nhật sheet: sau lưu/xóa đánh dấu các sheet quản trị và cập nhật ngay sheet đang mở khi `autoRenderView` bật; khi Extension báo chuyển sang sheet quản trị, sidebar gọi `renderViewIfDirty` rồi cập nhật rowMap.
 - [x] Client `client/ram/refresh.html`: xử lý khối trạng thái bẩn, nạp lại đúng mã bản ghi khi rời sheet kho và cập nhật rowMap cùng lượt.
-- [x] Nối nút "Cập nhật sheet đang mở" trên header vào `shinRenderCurrentView`.
+- [x] Nối nút "Làm mới dữ liệu sheet quản trị đang mở" trên header vào `shinRenderCurrentView`.
 - [x] Bản đồ dòng của sheet quản trị trong `LoadService`: thêm khóa theo tên sheet vào cấu trúc đang có, không đổi hình dạng.
 - [x] Ca kiểm tự động cho nhánh dự phòng `bootChunkWithFallback` của chặng 1.2: bộ kiểm ép lỗi từng bậc, xác nhận lùi đúng con trỏ và ném lỗi cuối cùng khi hết bậc.
 - [x] Ba ca offline cho `dispatch.html`, `menu.html`, `collapse.html`: thêm DOM giả tối thiểu và kiểm các đường phát click bất đồng bộ, menu một-lớp/đóng lại, cùng ba nấc thu gọn.

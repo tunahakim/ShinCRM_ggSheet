@@ -19,8 +19,8 @@ function onOpen() {
     .createMenu(MENU_TITLE)
     .addItem('Mở bảng làm việc', 'shinShowSidebar')
     .addSeparator()
-    .addItem('Vẽ lại sheet quản trị đang mở', 'shinRenderCurrentView')
-    .addItem('Vẽ lại tất cả sheet quản trị', 'shinRenderAllViews')
+    .addItem('Làm mới dữ liệu sheet quản trị đang mở', 'shinRenderCurrentView')
+    .addItem('Làm mới dữ liệu tất cả sheet quản trị', 'shinRenderAllViews')
     .addItem('Chuẩn bị sheet quản trị', 'shinPrepareCurrentView')
     .addToUi();
 

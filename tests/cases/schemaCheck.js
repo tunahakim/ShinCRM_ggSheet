@@ -159,11 +159,11 @@ function chay(so) {
 
   batLoiUi('bắt được mục menu trỏ tới hàm không có trong bảng, và gọi tên mục menu chứ không gọi tên nút mẹ',
     (u) => { u.view.header[4].menu[0].action = 'toggleAutoRenderViewx'; },
-    'mục menu "Tự động cập nhật sheet sau khi lưu" trỏ tới hàm "toggleAutoRenderViewx"');
+    'mục menu "Tự động làm mới sheet quản trị sau khi lưu" trỏ tới hàm "toggleAutoRenderViewx"');
 
   batLoiUi('bắt được mục menu thiếu `action` — bấm vào không có gì xảy ra là loại lỗi im lặng nhất',
     (u) => { delete u.view.header[4].menu[0].action; },
-    'mục menu "Tự động cập nhật sheet sau khi lưu" thiếu `action`');
+    'mục menu "Tự động làm mới sheet quản trị sau khi lưu" thiếu `action`');
 
   batLoiUi('bắt được mục menu thiếu `label`, vì nó hiện ra một dòng trắng bấm được',
     (u) => { delete u.view.header[4].menu[0].label; },
