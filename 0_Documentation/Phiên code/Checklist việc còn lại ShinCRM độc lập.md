@@ -68,7 +68,7 @@ Nguồn chuẩn: tài liệu 07 (làm mới và sheet quản trị), 08 và 08A 
 ## Nhóm 5 — Cửa an toàn trước khi tệp Sheet mang dữ liệu thật
 
 - [x] Tắt `LOG_TRACE` trên Sheet DEV bằng `devLogTraceOff` ở GAS `@68`; đọc lại xác nhận không phủ nguồn `sidebar` hoặc `fbm_sync`.
-- [ ] Xóa thư mục `server/dev/` (DevRunner) khỏi repo và xóa bản triển khai web app của nó trên Google. Cửa này mở một địa chỉ web chạy code dưới quyền chủ tệp, nên nó không được tồn tại cùng dữ liệu khách hàng.
+- [ ] Xóa thư mục `server/dev/` (DevRunner), tệp bí mật cục bộ `1_ShinCRM_GAS/.dev-runner.json` và deployment `AKfycbzLkUrjkyGkq0h8jfPjYNP_1hyN1nbMODvRi_0q-ePw2pnOoHj0UuK7iqBsWqVCfo2F` trên Google. Đã đối chiếu deployment này đúng là “Cua chay ham luc phat trien” và đúng ID trong `.dev-runner.json`; không xóa deployment “API executable cho test tu dong”. Cửa DEV mở một địa chỉ web chạy code dưới quyền chủ tệp, nên không được tồn tại cùng dữ liệu khách hàng.
 
 --> xóa nó thì có ảnh hưởng đến phiên đồng bộ FBM và bot tra cứu không?
 
