@@ -78,6 +78,13 @@ function dirtyStateMarkViewSheet(sheetName) {
   return dirtyStateRead();
 }
 
+function dirtyStateMarkViewSheets(sheetNames) {
+  var props = PropertiesService.getDocumentProperties();
+  var state = dirtyStateRead();
+  dirtyStateWriteList(props, DIRTY_KEYS.viewSheets, state.viewSheets.concat(sheetNames || []));
+  return dirtyStateRead();
+}
+
 /** Đánh dấu các mã bản ghi; vượt ngưỡng thì bỏ danh sách và bật cờ toàn bộ. */
 function dirtyStateMarkRecords(recordIds) {
   var state = dirtyStateRead();

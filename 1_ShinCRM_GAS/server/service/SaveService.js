@@ -27,6 +27,7 @@ function saveRecord(entity, record) {
       var idAt = ra.fields.indexOf('id');
       if (idAt >= 0) { dirtyStateMarkRecords(ra.rows.map(function (row) { return row[idAt]; })); }
     }
+    if (ra.ok) { saveMarkViewsAndMaybeRender(); }
     ra.dirty = dirtyStateRead();
     ra.selection = selectionSnapshot();
     ra.ms = Date.now() - batDau;
@@ -50,11 +51,22 @@ function deleteRecords(entity, ids) {
       var changed = (ra.hard || []).concat(Object.keys(ra.reasons || {}));
       if (changed.length) { dirtyStateMarkRecords(changed); }
     }
+    if (ra.ok) { saveMarkViewsAndMaybeRender(); }
     ra.dirty = dirtyStateRead();
     ra.selection = selectionSnapshot();
     ra.ms = Date.now() - batDau;
     return ra;
   });
+}
+
+function saveMarkViewsAndMaybeRender() {
+  var book = shinOpenBook();
+  var views = book.getSheets().map(function (sheet) { return sheet.getName(); }).filter(function (name) { return name.charAt(0) === '!'; });
+  if (!views.length) { return; }
+  dirtyStateMarkViewSheets(views);
+  var prefs = userPrefsRead();
+  var active = book.getActiveSheet();
+  if (prefs.autoRenderView && active && views.indexOf(active.getName()) >= 0) { renderViewSheet(active.getName()); }
 }
 
 /**

@@ -50,7 +50,7 @@ Nguồn chuẩn: tài liệu 07 (làm mới và sheet quản trị), 08 và 08A 
 - [x] `server/view/ViewSheetRenderer`: lọc, sắp, ghi các dải cột `CUS_`/`ACT_` được phép và dựng bản đồ dòng mới trong cùng lần gọi; loại giao dịch đã xóa, ghép lần sống gần nhất, giữ khách chưa có giao dịch, và không xóa dữ liệu khi cú pháp sai.
 - [x] `server/Triggers.js`: có đường `shinOnEdit`/`shinOnChange` và hàm cài trigger installable; `onOpen` dựng menu.
 - [x] Ba lệnh view trong menu Sheets của `server/entry/Menu.js`: vẽ lại sheet đang mở, vẽ lại tất cả, và `prepareViewSheet` idempotent.
-- [ ] Công tắc tự động sắp xếp sheet, tài liệu 07 Phần 6.
+- [ ] Công tắc tự động sắp xếp sheet: sau lưu/xóa đã đánh dấu các sheet quản trị và vẽ ngay sheet đang mở khi `autoRenderView` bật; còn nối đường chuyển sheet để vẽ sheet quản trị đang bẩn.
 - [ ] Client `client/ram/refresh.html`: xử lý khối trạng thái bẩn đính kèm phản hồi và gọi nạp lại đúng phần cần, tài liệu 07 Phần 8.
 - [ ] Nối nút "Vẽ lại sheet quản trị" trên header vào việc vẽ thật — hiện nó cố ý báo "chưa dùng, chặng 1.5".
 - [x] Bản đồ dòng của sheet quản trị trong `LoadService`: thêm khóa theo tên sheet vào cấu trúc đang có, không đổi hình dạng.
