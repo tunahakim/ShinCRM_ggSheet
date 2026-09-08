@@ -38,8 +38,8 @@ Làm theo đúng thứ tự, mỗi mục một commit. Phía Extension chỉ s�
 - [x] Đính vị trí ô đang chọn vào mọi phản hồi máy chủ — lưu, xóa, nạp lại đều đã chạm máy chủ nên không tốn thêm vòng nào.
 - [x] Sửa tài liệu 07: Phần 2 thêm ngoại lệ polling duy nhất được nêu tên, Phần 3 bỏ câu "rơi về nút Nạp lại", Phần 6 thêm nút sét vào bảng núm nhớ.
 - [x] Hai ca kiểm offline `tests/cases/selectionPoll.js` (quan trọng nhất: có ACK đều thì không gọi máy chủ lần nào kể cả khi sheet ngồi im hai phút) và `tests/cases/selectionService.js`, đăng ký vào `NHOM_CA` trong `tests/run.js`.
-- [ ] Nghiệm thu Google: `node tests/gas.js viewProbeSelection --push`, đứng ở hàng khách phải ra đúng mã, đứng ở hàng 2 phải rỗng; ghi lại thời gian một vòng — quá một giây thì giãn nhịp dò.
-- [ ] Chủ dự án chép Extension và bấm năm phép thử tay theo đúng thứ tự trong plan: chưa cài, cài rồi, ca ngồi im hai phút, tắt Extension giữa chừng, và thang bậc nhịp dò.
+- [ ] Nghiệm thu Google: `node tests/gas.js viewProbeSelection --push`, đứng ở hàng khách phải ra đúng mã, đứng ở hàng 2 phải rỗng. Lượt đọc `Customer!A1` ngày 08/09/2026 trả rỗng đúng và hết 417 ms, nên nhịp 2 giây đạt; còn thiếu hai vị trí cần chủ dự án chọn.
+- [ ] Chủ dự án chép Extension và bấm năm phép thử tay theo đúng thứ tự trong plan: chưa cài, cài rồi, ca ngồi im hai phút, tắt Extension giữa chừng, và thang bậc nhịp dò. Đối chiếu ngày 08/09/2026: thư mục đang chạy mang tên V21 nhưng `content.js` vẫn gửi `CRM_TRIGGER` qua `postMessage('*')`; bản `CRM_CONTEXT`/ACK an toàn trong repo chưa được chép sang.
 
 ## Nhóm 3 — Chặng 1.5: làm mới dữ liệu và sheet quản trị
 
@@ -67,6 +67,7 @@ Nguồn chuẩn: tài liệu 07 (làm mới và sheet quản trị), 08 và 08A 
 
 ## Nhóm 5 — Cửa an toàn trước khi tệp Sheet mang dữ liệu thật
 
+- [x] Tắt `LOG_TRACE` trên Sheet DEV bằng `devLogTraceOff` ở GAS `@68`; đọc lại xác nhận không phủ nguồn `sidebar` hoặc `fbm_sync`.
 - [ ] Xóa thư mục `server/dev/` (DevRunner) khỏi repo và xóa bản triển khai web app của nó trên Google. Cửa này mở một địa chỉ web chạy code dưới quyền chủ tệp, nên nó không được tồn tại cùng dữ liệu khách hàng.
 
 --> xóa nó thì có ảnh hưởng đến phiên đồng bộ FBM và bot tra cứu không?
