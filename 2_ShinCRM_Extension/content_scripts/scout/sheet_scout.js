@@ -11,7 +11,7 @@
  * NGÀY KHỞI TẠO: 06/03/2026
  */
 
-console.log("🚀 CRM Extension V21.0: sheet_scout Loaded");
+console.log("🚀 CRM Extension V21.1: sheet_scout Loaded");
 
 var CONTEXT_VERSION = 1;
 var lastContextKey = "";   // dấu vết ảnh chụp cuối đã bắn (không gồm at/seq)

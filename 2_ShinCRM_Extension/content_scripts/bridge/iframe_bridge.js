@@ -11,7 +11,7 @@
  * NGÀY KHỞI TẠO: 06/03/2026
  */
 
-console.log("🚀 CRM Extension V21.0: iframe_bridge Loaded");
+console.log("🚀 CRM Extension V21.1: iframe_bridge Loaded");
 
 /*
  * An ninh của cầu nối, và giới hạn còn lại.
@@ -46,10 +46,15 @@ window.addEventListener('message', function (event) {
   var data = event.data;
   if (!data || data.action !== 'CRM_HANDSHAKE') { return; }
   if (!isAllowedSidebarOrigin(event.origin) || !event.source) { return; }
+  var nonce = String(data.nonce || '');
+  if (!nonce) { return; }
+
+  var newChannel = event.source !== sidebarWindow || event.origin !== sidebarOrigin || nonce !== sidebarNonce;
 
   sidebarWindow = event.source;
   sidebarOrigin = event.origin;
-  sidebarNonce = String(data.nonce || '');
+  sidebarNonce = nonce;
+  if (newChannel && typeof lastContextKey !== 'undefined') { lastContextKey = ''; }
 
   try {
     event.source.postMessage({

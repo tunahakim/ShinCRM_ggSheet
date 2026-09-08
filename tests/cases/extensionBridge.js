@@ -40,18 +40,27 @@ function chay(so) {
   try { hop = napBridge(); } catch (err) { return ghiLoiNap(so, 'nạp iframe_bridge.js', err); }
 
   const dung = nguonTin();
+  hop.lastContextKey = 'ảnh cũ';
   hop._onMessage({
     origin: 'https://abc-123.googleusercontent.com',
     source: dung.source,
     data: { action: 'CRM_HANDSHAKE', nonce: 'nonce-kiem-thu' }
   });
   check(so, 'ACK trả đúng nonce về đúng origin đã bắt tay',
-    [dung.sent[0].data.action, dung.sent[0].data.nonce, dung.sent[0].targetOrigin],
-    ['CRM_HANDSHAKE_ACK', 'nonce-kiem-thu', 'https://abc-123.googleusercontent.com']);
+    [dung.sent[0].data.action, dung.sent[0].data.nonce, dung.sent[0].targetOrigin, hop.lastContextKey],
+    ['CRM_HANDSHAKE_ACK', 'nonce-kiem-thu', 'https://abc-123.googleusercontent.com', '']);
+
+  hop.lastContextKey = 'ảnh vừa gửi';
+  hop._onMessage({
+    origin: 'https://abc-123.googleusercontent.com',
+    source: dung.source,
+    data: { action: 'CRM_HANDSHAKE', nonce: 'nonce-kiem-thu' }
+  });
+  check(so, 'nhịp bắt tay lặp lại không ép gửi CRM_CONTEXT thừa mỗi giây', hop.lastContextKey, 'ảnh vừa gửi');
 
   hop.sendContextToSidebar({ spreadsheetId: 'sheet-1', sheetName: 'Customer', row: 4 });
   check(so, 'CRM_CONTEXT mang cùng nonce nên sidebar không loại tin hợp lệ',
-    [dung.sent[1].data.action, dung.sent[1].data.nonce, dung.sent[1].data.spreadsheetId, dung.sent[1].targetOrigin],
+    [dung.sent[2].data.action, dung.sent[2].data.nonce, dung.sent[2].data.spreadsheetId, dung.sent[2].targetOrigin],
     ['CRM_CONTEXT', 'nonce-kiem-thu', 'sheet-1', 'https://abc-123.googleusercontent.com']);
 
   const la = nguonTin();
@@ -62,8 +71,16 @@ function chay(so) {
   });
   hop.sendContextToSidebar({ spreadsheetId: 'sheet-1', sheetName: '!Lead', row: 5 });
   check(so, 'bắt tay sai origin bị bỏ và không chiếm kênh đang dùng',
-    [la.sent.length, dung.sent[2].data.nonce, dung.sent[2].targetOrigin],
+    [la.sent.length, dung.sent[3].data.nonce, dung.sent[3].targetOrigin],
     [0, 'nonce-kiem-thu', 'https://abc-123.googleusercontent.com']);
+
+  const rong = nguonTin();
+  hop._onMessage({
+    origin: 'https://valid.googleusercontent.com',
+    source: rong.source,
+    data: { action: 'CRM_HANDSHAKE', nonce: '' }
+  });
+  check(so, 'bắt tay thiếu nonce bị bỏ thay vì làm rơi kênh hợp lệ', rong.sent.length, 0);
 }
 
 module.exports = { chay };
