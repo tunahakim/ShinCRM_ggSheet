@@ -186,6 +186,7 @@ tests\
     ├── schemaAccess.js           Cửa đọc bảng khai: tên gõ sai nổ ngay kèm gợi ý, còn tên máy như toJSON thì phải đi qua.
     ├── fieldLogic.js             Sáu hàm ngầm định: mã kế tiếp lấy từ bộ đếm dạng chuỗi, và giá trị mang theo từ giao dịch gần nhất CÒN SỐNG.
     ├── loadService.js            Hình dạng gói loadCore, đường chặn vì ngân sách ô, và con trỏ gói giao dịch đi ngược từ hàng cuối.
+    ├── selectionService.js       Tra ô đang chọn đúng theo Customer, Activity hoặc bản đồ dòng của sheet quản trị; vùng tiêu đề, hàng trống và sheet ngoài kho đều trả rỗng.
     ├── ramStore.js               NGHIỆM THU CHẶNG 1.2: hai hộp cát, dữ liệu đi qua cầu google.script.run thật, và ba luật tra cứu khác nhau của Store.
     ├── screenState.js            Ngăn xếp form: screen là trường thật chứ không suy ra từ đỉnh ngăn xếp, nên push và pop phải giữ hai bên khớp. Kiểm luôn bẫy window.screen.
     ├── prefs.js                  Ngầm định phía client khớp từng núm với máy chủ — lệch thì lần mở đầu tiên hiện một nấc rồi tự nhảy sang nấc khác.

@@ -1,85 +1,129 @@
 /**
- * `SelectionService` — hai đường tra nguồn chọn qua tọa độ, cho vòng dò khi không có Extension.
- *
- * Hai đường cùng một câu hỏi, khác mức trả lời:
- *   - `probeSelectionCheap` — chỉ cần tọa độ: sheet, ô đang chọn, row/col.
- *   - `probeSelectionFull` — thêm tra mã khách tại hàng đó (qua bản đồ dòng).
- *
- * Chung tiền đề: ô mỏng của `Range.getRow/getColumn` rẻ hơn ô dày của việc đọc cả hàng.
- * Vòng dò gọi cheap trước, có hàng thật mới gọi full.
+ * Hai đường đọc ô đang chọn khi không có Extension. Đường rẻ chỉ trả tọa độ; đường đầy đủ tra thêm mã khách và luôn đóng an toàn khi không chắc chắn.
  */
 
-function selectionProbeCore() {
-  // Mở tệp bằng `shinOpenBook` chứ không lấy tệp đang hoạt động: vòng dò chạy trong lượt thực thi riêng,
-  // ở đó không có "tệp đang hoạt động" nào cả, và cửa vào này phải chỉ vào đúng tệp đã khai.
+function selectionProbeContext() {
   var book = shinOpenBook();
   var sheet = book.getActiveSheet();
+  return { book: book, sheet: sheet, range: sheet ? sheet.getActiveRange() : null };
+}
+
+/** Ảnh chụp vị trí dùng chung cho mọi phản hồi máy chủ; không tự bọc cửa vào và không đọc trạng thái bẩn. */
+function selectionSnapshot() {
+  return selectionSnapshotFromContext(selectionProbeContext());
+}
+
+function selectionSnapshotFromContext(context) {
+  var sheet = context.sheet;
+  var range = context.range;
+  var row = range ? range.getRow() : 0;
+  var col = range ? range.getColumn() : 0;
+  var rowEnd = range ? range.getLastRow() : 0;
+  var colEnd = range ? range.getLastColumn() : 0;
+
   return {
-    spreadsheetId: book.getId(),
-    gid: String(sheet.getSheetId()),
-    sheetName: sheet.getName(),
-    range: sheet.getActiveRange()
+    spreadsheetId: context.book.getId(),
+    gid: sheet ? String(sheet.getSheetId()) : '',
+    sheetName: sheet ? sheet.getName() : '',
+    cellRef: range ? range.getA1Notation() : '',
+    row: row,
+    col: col,
+    rowEnd: rowEnd,
+    colEnd: colEnd,
+    selectionKind: range ? (row === rowEnd && col === colEnd ? 'cell' : 'range') : 'none'
   };
 }
 
-/** Tọa độ ô đang chọn — rẻ, không đọc giá trị. */
+function selectionProbeReply(snapshot, started, customerId) {
+  var reply = {
+    ok: true,
+    spreadsheetId: snapshot.spreadsheetId,
+    gid: snapshot.gid,
+    sheetName: snapshot.sheetName,
+    cellRef: snapshot.cellRef,
+    row: snapshot.row,
+    col: snapshot.col,
+    rowEnd: snapshot.rowEnd,
+    colEnd: snapshot.colEnd,
+    selectionKind: snapshot.selectionKind
+  };
+
+  if (customerId !== undefined) { reply.customerId = customerId; }
+  reply.dirty = dirtyStateRead();
+  reply.ms = Date.now() - started;
+  return reply;
+}
+
+/** Tìm đúng một cột theo mã. Không đoán khi mã thiếu hoặc bị nhân đôi. */
+function selectionColumnIndex(sheet, code) {
+  var lastColumn = sheet.getLastColumn();
+  if (lastColumn < 1) { return 0; }
+
+  var header = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
+  var found = 0;
+  for (var i = 0; i < header.length; i++) {
+    if (String(header[i] === null || header[i] === undefined ? '' : header[i]).trim() !== code) { continue; }
+    if (found) { return 0; }
+    found = i + 1;
+  }
+  return found;
+}
+
+/** Đổi dòng đang chọn thành mã khách mà không bao giờ dùng bản đồ của sheet khác. */
+function selectionCustomerId(context, snapshot, rowMaps) {
+  if (!snapshot.sheetName || snapshot.row < SHEET_FIRST_DATA_ROW) { return ''; }
+
+  if (snapshot.sheetName.charAt(0) === '!') {
+    var viewMap = rowMaps && rowMaps[snapshot.sheetName];
+    return viewMap ? String(viewMap[String(snapshot.row)] || '') : '';
+  }
+
+  var code = '';
+  if (snapshot.sheetName === ENTITY_SHEETS.customer) {
+    code = DATA_SCHEMA.customer.id.code;
+  } else if (snapshot.sheetName === ENTITY_SHEETS.activity) {
+    code = DATA_SCHEMA.activity.customerId.code;
+  } else {
+    return '';
+  }
+
+  var column = selectionColumnIndex(context.sheet, code);
+  if (!column) { return ''; }
+  var value = context.sheet.getRange(snapshot.row, column).getValue();
+  return String(value === null || value === undefined ? '' : value).trim();
+}
+
+/** Tọa độ ô đang chọn, không đọc giá trị ô. */
 function probeSelectionCheap() {
   return runEntryPoint('probeSelectionCheap', 'sidebar', 'throw', function () {
-    var core = selectionProbeCore();
-    var r = core.range;
-
-    return {
-      ok: true,
-      spreadsheetId: core.spreadsheetId,
-      gid: core.gid,
-      sheetName: core.sheetName,
-      cellRef: r ? r.getA1Notation() : '',
-      row: r ? r.getRow() : 0,
-      col: r ? r.getColumn() : 0,
-      rowEnd: r ? r.getLastRow() : 0,
-      colEnd: r ? r.getLastColumn() : 0,
-      selectionKind: 'range',
-      dirty: dirtyStateRead(),
-      ms: 0
-    };
+    var started = Date.now();
+    return selectionProbeReply(selectionSnapshot(), started);
   });
 }
 
-/** Tọa độ kèm mã khách tại hàng đang chọn — nhờ bản đồ dòng của máy chủ. */
-function probeSelectionFull() {
+/** Tọa độ kèm mã khách trên Customer, Activity hoặc bản đồ dòng của sheet quản trị. */
+function probeSelectionFull(rowMaps) {
   return runEntryPoint('probeSelectionFull', 'sidebar', 'throw', function () {
-    var cheap = probeSelectionCheap();
-    var map = {};
-    try { map = loadRowMap(entityReadAll('customer')); } catch (e) { map = {}; }
-    var customerId = (cheap.row && cheap.sheetName) ? String(map[String(cheap.row)] || '') : '';
-
-    return {
-      ok: cheap.ok,
-      spreadsheetId: cheap.spreadsheetId,
-      gid: cheap.gid,
-      sheetName: cheap.sheetName,
-      cellRef: cheap.cellRef,
-      row: cheap.row,
-      col: cheap.col,
-      rowEnd: cheap.rowEnd,
-      colEnd: cheap.colEnd,
-      customerId: customerId,
-      dirty: cheap.dirty,
-      ms: cheap.ms
-    };
+    var started = Date.now();
+    var context = selectionProbeContext();
+    var snapshot = selectionSnapshotFromContext(context);
+    return selectionProbeReply(snapshot, started, selectionCustomerId(context, snapshot, rowMaps));
   });
 }
 
-/** Nghiệm thu trên Google: đứng ở hàng khách thì ra mã, đứng ở hàng 2 thì rỗng. */
+/** Nghiệm thu trên Google: chọn hàng dữ liệu và hàng tiêu đề để đối chiếu mã khách cùng thời gian thật. */
 function viewProbeSelection() {
   return runEntryPoint('viewProbeSelection', 'sidebar', 'throw', function () {
-    var cheap = probeSelectionCheap();
-    var full = probeSelectionFull();
+    var started = Date.now();
+    var context = selectionProbeContext();
+    var snapshot = selectionSnapshotFromContext(context);
+    var full = selectionProbeReply(snapshot, started, selectionCustomerId(context, snapshot));
     var report = [];
-    report.push('cheap: row=' + cheap.row + ' col=' + cheap.col + ' sheet="' + cheap.sheetName + '" cellRef="' + cheap.cellRef + '"');
-    report.push('full: customerId="' + full.customerId + '"');
-    report.push('spreadsheetId: ' + cheap.spreadsheetId);
-    report.push('dirty: ' + JSON.stringify(cheap.dirty));
+    report.push('selection: row=' + full.row + ' col=' + full.col + ' sheet="' + full.sheetName + '" cellRef="' + full.cellRef + '"');
+    report.push('customerId="' + full.customerId + '"');
+    report.push('spreadsheetId: ' + full.spreadsheetId);
+    report.push('dirty: ' + JSON.stringify(full.dirty));
+    report.push('SelectionService: ' + full.ms + ' ms');
     return report;
   });
 }
