@@ -76,6 +76,7 @@ function loadCore() {
       ok: true,
       blocked: false,
       settings: SETTINGS,
+      spreadsheetId: book.getId(),
       schema: DATA_SCHEMA,
       config: config,
       categories: danhMuc.categories,

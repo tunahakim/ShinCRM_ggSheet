@@ -56,8 +56,9 @@ function chay(so) {
   const rong = hop.loadCore();
   check(so, 'gói lõi có đúng bộ khóa tài liệu 05 chốt, không thiếu không thừa',
     Object.keys(rong).sort(),
-    ['activity', 'blocked', 'budget', 'categories', 'config', 'customer', 'dirty', 'ms', 'ok', 'prefs', 'rowMaps', 'schema', 'settings', 'warnings'].sort());
+    ['activity', 'blocked', 'budget', 'categories', 'config', 'customer', 'dirty', 'ms', 'ok', 'prefs', 'rowMaps', 'schema', 'settings', 'spreadsheetId', 'warnings'].sort());
   check(so, 'sheet trắng nạp trót lọt và không bị chặn', [rong.ok, rong.blocked], [true, false]);
+  check(so, 'gói lõi mang id tệp để client lọc tin postMessage đúng tệp', rong.spreadsheetId, nen.book.getId());
   check(so, 'không khách nào mà vẫn gửi đủ bảng tên trường', [rong.customer.rows.length, rong.customer.fields.length], [0, 20]);
   check(so, 'khối activity chỉ báo số hàng và cỡ gói, không mang bản ghi nào', Object.keys(rong.activity).sort(), ['chunkRows', 'total']);
   check(so, 'cỡ gói lấy đúng từ SETTINGS chứ không gõ cứng ở đây', rong.activity.chunkRows, hop.SETTINGS.CHUNK_ROWS);

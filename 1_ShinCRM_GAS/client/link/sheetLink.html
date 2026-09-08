@@ -13,12 +13,15 @@
  *   3. Không có gì thì không làm gì.
  *
  * Chỉ gọi `setCurrentCustomer` khi `Prefs.followSelection` bật và đang ở màn `view` (không giật màn khi đang mở form).
+ *
+ * Tình trạng sống của Extension suy từ `CRM_HANDSHAKE_ACK`, **không** suy từ việc `CRM_CONTEXT` im lặng: sheet ngồi im thì Extension sống cũng không bắn tin nào, nên im lặng không phải bằng chứng vắng mặt.
  */
 
 var SHEET_LINK_NONCE = '';
 var SHEET_LINK_SEQ = 0;
-var SHEET_LINK_BOOT_AT = 0;
 var SHEET_LINK_SPREADSHEET_ID = '';
+var SHEET_LINK_LAST_ACK = 0;
+var SHEET_LINK_PING_TIMER = null;
 var sheetLinkInstalled = false;
 
 var SHEET_LINK_ORIGIN = 'https://docs.google.com';
@@ -28,13 +31,30 @@ function sheetLinkNonceMake() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
+/** Số mili giây cho các nhịp bắt tay và ngưỡng kết luận vắng mặt, đọc từ `SETTINGS` máy chủ gửi về; chưa về thì dùng số ngầm định. */
+function sheetLinkMs(ten, ngamDinh) {
+  if (typeof SETTINGS === 'undefined' || !SETTINGS || !SETTINGS[ten]) { return ngamDinh; }
+  return Number(SETTINGS[ten]) || ngamDinh;
+}
+
 function sheetLinkInstall() {
   if (sheetLinkInstalled) { return; }
   sheetLinkInstalled = true;
   SHEET_LINK_NONCE = sheetLinkNonceMake();
-  SHEET_LINK_BOOT_AT = Date.now();
   window.addEventListener('message', sheetLinkOnMessage);
   sheetLinkHandshakePing();
+  SHEET_LINK_PING_TIMER = setInterval(sheetLinkHandshakePing, sheetLinkMs('HANDSHAKE_PING_MS', 1000));
+}
+
+/** Gán id tệp sheet sau lượt nạp lõi, để tầng lọc thứ ba có gì mà lọc. */
+function sheetLinkSetSpreadsheetId(id) {
+  SHEET_LINK_SPREADSHEET_ID = String(id || '');
+}
+
+/** Extension còn sống không: ACK về trong ngưỡng, tính từ nhịp ping gần nhất. */
+function sheetLinkExtensionAlive() {
+  if (!SHEET_LINK_LAST_ACK) { return false; }
+  return Date.now() - SHEET_LINK_LAST_ACK < sheetLinkMs('EXTENSION_ACK_TIMEOUT_MS', 3000);
 }
 
 function sheetLinkHandshakePing() {
@@ -48,18 +68,26 @@ function sheetLinkHandshakePing() {
 
 function sheetLinkOnMessage(event) {
   var data = event.data;
-  if (!data || data.action !== 'CRM_CONTEXT') { return; }
+  if (!data) { return; }
+
+  // Tầng origin đi trước cả ACK: tin sai nguồn thì không được phép đụng tới trạng thái sống.
+  if (event.origin !== SHEET_LINK_ORIGIN) { return; }
+
+  if (data.action === 'CRM_HANDSHAKE_ACK') {
+    if (data.nonce !== SHEET_LINK_NONCE) { return; }
+    SHEET_LINK_LAST_ACK = Date.now();
+    return;
+  }
+
+  if (data.action !== 'CRM_CONTEXT') { return; }
 
   // Tầng 1: nonce
   if (data.nonce !== SHEET_LINK_NONCE) { return; }
 
-  // Tầng 2: origin
-  if (event.origin !== SHEET_LINK_ORIGIN) { return; }
-
-  // Tầng 3: spreadsheetId — chỉ nhận tin từ đúng tệp sheet sidebar đang phục vụ
+  // Tầng 2: spreadsheetId — chỉ nhận tin từ đúng tệp sheet sidebar đang phục vụ
   if (SHEET_LINK_SPREADSHEET_ID && data.spreadsheetId !== SHEET_LINK_SPREADSHEET_ID) { return; }
 
-  // Tầng 4: seq — bỏ tin cũ
+  // Tầng 3: seq — bỏ tin cũ
   if (data.seq <= SHEET_LINK_SEQ) { return; }
   SHEET_LINK_SEQ = data.seq;
 
@@ -92,3 +120,4 @@ function sheetLinkCustomerIdFromContext(ctx) {
   // Bước 3: không có gì
   return '';
 }
+</script>

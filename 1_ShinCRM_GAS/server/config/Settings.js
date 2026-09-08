@@ -66,7 +66,13 @@ var SETTINGS = {
    *
    * Lùi chứ không bỏ: gói thất bại ở 2.000 hàng gần như luôn thành công ở 500. Bỏ cuộc ngay nghĩa là mất toàn bộ lịch sử làm việc vì một bản ghi.
    */
-  CHUNK_ROWS_FALLBACK: [500, 200]
+  CHUNK_ROWS_FALLBACK: [500, 200],
+
+  /** Nhịp dò chọn ô khi Extension vắng mặt. Chỉ cần khi không có Extension — có Extension thì tin tới liền, không dò. */
+  SELECTION_POLL_MS: 2000,
+  SELECTION_POLL_IDLE_MS: 6000,
+  HANDSHAKE_PING_MS: 1000,
+  EXTENSION_ACK_TIMEOUT_MS: 3000
 };
 
 /**

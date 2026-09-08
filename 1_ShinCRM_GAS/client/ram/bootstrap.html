@@ -42,6 +42,7 @@ async function sidebarBoot() {
     }
 
     var skipped = ingestCore(core);
+    sheetLinkSetSpreadsheetId(core.spreadsheetId);
     statusInfoLine('Tra cứu khách đã chạy — đang nạp giao dịch ở chế độ nền…');
     callTimingFirstPaint(Date.now());
 

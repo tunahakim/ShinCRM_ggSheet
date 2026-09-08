@@ -73,7 +73,8 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   └── DeleteGate.js         Một nút Xóa, hai kết cục: xóa hẳn khi không tầng nào cản, xóa mềm khi có. Xóa nhiều dòng thì xóa từ dưới lên, và trả bản đồ dòng mới ngay trong cùng lần gọi.
 │   ├── service\
 │   │   ├── LoadService.js        Gom cả một lượt nạp: đo ngân sách ô, đọc tham số, danh mục, toàn bộ khách, rồi giao dịch theo gói.
-│   │   └── SaveService.js        Vỏ bọc vào ra của hai cửa ghi: bọc lỗi, gắn khối trạng thái bẩn, đo mili giây. Luật ghi nằm ở gate\, không nằm đây.
+│   │   ├── SaveService.js        Vỏ bọc vào ra của hai cửa ghi: bọc lỗi, gắn khối trạng thái bẩn, đo mili giây. Luật ghi nằm ở gate\, không nằm đây.
+│   │   └── SelectionService.js   Vòng dò khi không có Extension: probeSelectionCheap trả tọa độ ô đang chọn, probeSelectionFull thêm tra mã khách qua bản đồ dòng. Mở tệp bằng shinOpenBook chứ không lấy tệp đang hoạt động.
 │   ├── log\
 │   │   ├── LogGate.js            Cửa ghi log: gom dòng trong RAM, ghi xuống sheet Log bằng đúng một lệnh, che bí mật, cắt log theo hai trần.
 │   │   └── ClientTiming.js       Cửa nhận bản đo thời gian ĐO Ở TRÌNH DUYỆT rồi đệm một dòng vết. Máy chủ không tự thấy tiền đi đường, nên số này phải do client gửi. Không tin số client: kẹp trần, bỏ khóa lạ.
@@ -94,6 +95,8 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 ├── client\                       Code chạy trong sidebar. Tệp .html bọc thẻ <script>, hoặc bọc thẻ <style> nếu là tệp chỉ có CSS.
 │   │                             Thư mục con chia theo MỤC ĐÍCH, không chia theo đuôi thẻ.
 │   ├── Sidebar.html              Trang gốc của sidebar: nhúng mọi tệp client theo đúng thứ tự rồi gọi lượt nạp đầu tiên.
+│   ├── link\                     Đứng ngoài mọi lời gọi google.script.run, nhưng ở đây vì lý do an ninh: chỉ nhận tin postMessage mang đúng nonce, đúng origin, đúng id tệp, và tin cũ thì bỏ.
+│   │   └── sheetLink.html        Tai nghe tin CRM_CONTEXT từ Extension: giải mã khách ba bước rồi bật followSelection. Bắt tay có tiếng đáp, đèn sống chết suy từ ACK chứ không suy từ im lặng.
 │   ├── ram\                      Kho dữ liệu trong RAM của sidebar, và đường nhận dữ liệu từ máy chủ.
 │   │   ├── store.html            Kho runtime cùng mười đường tra duy nhất được chạm vào nó. Không đường nào nhận tham số chế độ xem.
 │   │   ├── ingest.html           Chỗ DUY NHẤT biết hình dạng đường truyền { fields, rows }. Bung thành object đúng một lần ở đây.
