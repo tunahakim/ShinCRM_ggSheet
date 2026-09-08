@@ -49,8 +49,8 @@ Nguồn chuẩn: tài liệu 07 (làm mới và sheet quản trị), 08 và 08A 
 - [x] Ngôn ngữ lọc và sắp xếp thành module riêng theo tài liệu 08 và hợp đồng 08A: parser ba cấp, pattern TEXT/SELECT/NUMBER/DATE, ngày tương đối, Activity lấy lần sống gần nhất, tie-break mã khách và ô rỗng cuối; cú pháp sai dừng trước khi chạm sheet. `normalizeText` phía máy chủ giống phía client.
 - [x] `server/view/ViewSheetRenderer`: lọc, sắp, ghi các dải cột `CUS_`/`ACT_` được phép và dựng bản đồ dòng mới trong cùng lần gọi; loại giao dịch đã xóa, ghép lần sống gần nhất, giữ khách chưa có giao dịch, và không xóa dữ liệu khi cú pháp sai.
 - [x] `server/Triggers.js`: có đường `shinOnEdit`/`shinOnChange` và hàm cài trigger installable; `onOpen` dựng menu.
-- [x] Ba lệnh view trong menu Sheets của `server/entry/Menu.js`: vẽ lại sheet đang mở, vẽ lại tất cả, và `prepareViewSheet` idempotent.
-- [x] Công tắc tự động cập nhật sheet: sau lưu/xóa đánh dấu các sheet quản trị và cập nhật ngay sheet đang mở khi `autoRenderView` bật; khi Extension báo chuyển sang sheet quản trị, sidebar gọi `renderViewIfDirty` rồi cập nhật rowMap.
+- [x] Ba lệnh view trong menu Sheets của `server/entry/Menu.js`: làm mới dữ liệu sheet đang mở, làm mới dữ liệu tất cả sheet, và `prepareViewSheet` idempotent.
+- [x] Công tắc tự động làm mới sheet: sau lưu/xóa đánh dấu các sheet quản trị và làm mới ngay sheet đang mở khi `autoRenderView` bật; khi Extension báo chuyển sang sheet quản trị, sidebar gọi `renderViewIfDirty` rồi cập nhật rowMap.
 - [x] Client `client/ram/refresh.html`: xử lý khối trạng thái bẩn, nạp lại đúng mã bản ghi khi rời sheet kho và cập nhật rowMap cùng lượt.
 - [x] Nối nút "Làm mới dữ liệu sheet quản trị đang mở" trên header vào `shinRenderCurrentView`.
 - [x] Bản đồ dòng của sheet quản trị trong `LoadService`: thêm khóa theo tên sheet vào cấu trúc đang có, không đổi hình dạng.
