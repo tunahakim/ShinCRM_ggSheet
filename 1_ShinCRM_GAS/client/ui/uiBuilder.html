@@ -33,7 +33,7 @@ var BLOCK_KEYS_BY_ROLE = {
   text: ['text'],
   field: ['field', 'control', 'readonly', 'width', 'label'],
   button: ['align', 'label'],
-  icon: ['icon', 'tooltip', 'align', 'label'],
+  icon: ['icon', 'tooltip', 'align', 'label', 'toggle'],
   check: ['label']
 };
 
@@ -85,7 +85,7 @@ function blockElements(elements) {
 /**
  * Dựng một node đã chuẩn hóa. Mọi hàm dựng khác đều đi qua đây, nên đây là chỗ duy nhất biết hình dạng một node.
  *
- * Node nào cũng mang đủ mười tám khóa, kể cả khóa không có nghĩa với vai của nó — `text` trên một Card chẳng hạn. Cố ý: engine đọc thẳng `node.field` mà không phải hỏi khóa có tồn tại không, và một hình dạng duy nhất thì không có ca nào để đoán.
+ * Node nào cũng mang đủ mười chín khóa, kể cả khóa không có nghĩa với vai của nó — `text` trên một Card chẳng hạn. Cố ý: engine đọc thẳng `node.field` mà không phải hỏi khóa có tồn tại không, và một hình dạng duy nhất thì không có ca nào để đoán.
  *
  * `menu` đi qua đây **nguyên trạng**. Phép kiểm "một mục không được vừa mang `toggle` vừa mang `value`" thuộc bộ tự kiểm lúc khởi động ở `schemaCheck`, cùng đường với phép kiểm tên hàm, vì chỗ đó quét cả `UI_SCHEMA` và báo hết lỗi một lượt bằng tiếng người — còn chặn ở đây thì mỗi lần chỉ thấy đúng một lỗi, lúc vẽ.
  */
@@ -115,7 +115,8 @@ function Block(spec, role) {
     icon: y.icon || null,
     tooltip: y.tooltip || null,
     align: y.align || 'left',
-    pick: y.pick === undefined ? null : y.pick
+    pick: y.pick === undefined ? null : y.pick,
+    toggle: y.toggle || null
   };
 }
 

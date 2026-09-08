@@ -101,8 +101,8 @@ function chay(so) {
 
   hop.ACTIONS.toggleFollowSelection();
   check(so, 'lật núm bám theo ô: RAM đã đổi **trước** lúc gọi máy chủ — tài liệu 07 Phần 6 chốt đúng thứ tự này',
-    [hop.Prefs.followSelection, hop._ramLucGui[0], hop._daGui[0]],
-    [false, false, 'userPrefsWrite(["followSelection",false])']);
+    [hop.Prefs.followSelection, hop._ramLucGui[0], hop._daGui[0], hop.document._els['sidebar-header'].innerHTML.indexOf('aria-pressed="false"') > 0],
+    [false, false, 'userPrefsWrite(["followSelection",false])', true]);
 
   hop.ACTIONS.toggleAutoRenderView();
   check(so, 'lật núm tự sắp xếp sheet: cùng đường, và khối núm máy chủ trả về được nhận lại',

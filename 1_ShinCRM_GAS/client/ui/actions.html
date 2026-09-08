@@ -76,7 +76,9 @@ function actionsChuaDung(viec, chang) {
 /* ─── Bốn núm đổi cách xem ─── */
 
 ACTIONS.toggleFollowSelection = function () {
-  return actionsPrefSend(prefsToggle('followSelection'));
+  var kq = prefsToggle('followSelection');
+  screenViewRender();
+  return actionsPrefSend(kq);
 };
 
 ACTIONS.toggleAutoRenderView = function () {

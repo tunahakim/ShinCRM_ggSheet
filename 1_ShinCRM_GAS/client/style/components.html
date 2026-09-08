@@ -405,8 +405,11 @@
 
 .shin-icon:hover { background: var(--shin-bg-hover); color: var(--shin-text); }
 
-/* Nút đang bật — hiện chỉ có nút kính lúp lúc hộp tìm mở. Đánh dấu bằng `aria-pressed` chứ không bằng một lớp tự đặt, để trình đọc màn hình cũng nghe được trạng thái đó. */
+/* Nút đang bật. Đánh dấu bằng `aria-pressed` để trình đọc màn hình cũng nghe được trạng thái đó. */
 .shin-icon[aria-pressed="true"] { background: var(--shin-primary-soft); color: var(--shin-primary); }
+
+/* Nút sét giữ đúng màu vàng của bản cũ; các trạng thái Extension sẽ bổ sung trên cùng nút ở đơn vị kế tiếp. */
+.shin-icon.shin-toggle[aria-pressed="true"] { background: var(--shin-warn-soft); color: var(--shin-bolt); }
 
 /*
  * Có menu **và** có chữ thì nút nở theo nội dung: đó là ca `{ label: "Đang xem", menu: [...] }` ở hàng tiêu đề card lịch sử.

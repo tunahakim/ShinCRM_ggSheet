@@ -50,6 +50,7 @@ const DAU_DO = [
   { vai: 'icon', khoa: 'tooltip', nen: { icon: 'pencil' }, gia: 'Sửa khách' },
   { vai: 'icon', khoa: 'align', nen: { icon: 'pencil' }, gia: 'right' },
   { vai: 'icon', khoa: 'label', nen: { icon: 'pencil' }, gia: 'Sửa' },
+  { vai: 'icon', khoa: 'toggle', nen: { icon: 'pencil' }, gia: 'followSelection' },
   { vai: 'button', khoa: 'align', nen: { label: 'LƯU' }, gia: 'right' },
   { vai: 'button', khoa: 'label', nen: {}, gia: 'LƯU DỮ LIỆU' },
   { vai: 'check', khoa: 'label', nen: { pick: 'GD-001' }, gia: 'Chọn dòng này' }

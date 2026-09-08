@@ -4,7 +4,7 @@
  *
  * Nội tuyến chứ không tải phông biểu tượng từ mạng: sidebar nằm trong iframe, mỗi lần tải ngoài là một lần chờ thêm đúng lúc người dùng đang chờ nạp dữ liệu.
  *
- * **Sáu glyph là bản sao đúng từng ký tự của bản cũ** (`9_Code_cu_tham_chieu/src/ui/Sidebar.html` và `UI_Logic.html`), theo yêu cầu của chủ dự án ngày 06/09/2026. Bốn glyph còn lại là việc mới của bản này nên bản cũ không có gì để sao, và chúng lấy đúng bộ Material Icons 24 pixel để nét không lệch với sáu cái kia.
+ * **Bảy glyph là bản sao đúng từng ký tự của bản cũ** (`9_Code_cu_tham_chieu/src/ui/Sidebar.html` và `UI_Logic.html`), theo yêu cầu của chủ dự án ngày 06/09/2026. Bốn glyph còn lại là việc mới của bản này nên bản cũ không có gì để sao, và chúng lấy đúng bộ Material Icons 24 pixel để nét không lệch với bảy cái kia.
  */
 
 /**
@@ -16,7 +16,7 @@
  */
 var ICON_SVG_OPEN = '<svg class="shin-glyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="currentColor">';
 
-/** Ruột từng glyph — chỉ hình, không màu và không kích thước. Sáu tên đầu chép từ bản cũ, bốn tên sau là Material Icons cho bốn việc bản cũ không có: menu khác, xóa giao dịch, đóng form, vẽ sheet quản trị. */
+/** Ruột từng glyph — chỉ hình, không màu và không kích thước. Bảy hình chép từ bản cũ; bốn hình mới là menu khác, xóa giao dịch, đóng form và vẽ sheet quản trị. */
 var ICON_PATHS = {
   search: '<path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>',
   refresh: '<path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-8 3.58-8 8s3.58 8 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>',
@@ -27,7 +27,8 @@ var ICON_PATHS = {
   more: '<path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>',
   trash: '<path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>',
   close: '<path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>',
-  table: '<path d="M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM8 20H4v-4h4v4zm0-6H4v-4h4v4zm0-6H4V4h4v4zm6 12h-4v-4h4v4zm0-6h-4v-4h4v4zm0-6h-4V4h4v4zm6 12h-4v-4h4v4zm0-6h-4v-4h4v4zm0-6h-4V4h4v4z"/>'
+  table: '<path d="M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM8 20H4v-4h4v4zm0-6H4v-4h4v4zm0-6H4V4h4v4zm6 12h-4v-4h4v4zm0-6h-4v-4h4v4zm0-6h-4V4h4v4zm6 12h-4v-4h4v4zm0-6h-4v-4h4v4zm0-6h-4V4h4v4z"/>',
+  bolt: '<path d="M7 2v11h3v9l7-12h-4l4-8z"/>'
 };
 
 /** Tên các glyph theo thứ tự khai. Phép tự kiểm tên icon trong schema dùng chung hàm này nên không có hai bản danh sách lệch nhau. */

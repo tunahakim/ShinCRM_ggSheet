@@ -101,22 +101,27 @@ var RENDER_TAG_BY_ROLE = { box: 'div', card: 'section', row: 'div', text: 'div',
 /** Control suy từ `type` khi `UI_SCHEMA` không khai. Tài liệu 03 Phần 7. */
 var RENDER_CONTROL_BY_TYPE = { TEXT: 'text', NUMBER: 'number', DATE: 'date', SELECT: 'select' };
 
-/** Danh sách lớp CSS của một node: lớp theo vai, lớp trang trí của schema, và hai lớp engine tự thêm. */
+/** Danh sách lớp CSS của một node: lớp theo vai, lớp trang trí của schema, và ba lớp engine tự thêm. */
 function renderClassList(node) {
   var lop = ['shin-' + node.role];
   if (node.className) { lop.push(node.className); }
   if (node.align === 'right') { lop.push('shin-align-right'); }
   if (node.menu) { lop.push('shin-has-menu'); }
+  if (node.role === 'icon' && node.toggle) { lop.push('shin-toggle'); }
   return lop.join(' ');
 }
 
-/** `action` và `menu` thành thuộc tính. Menu vào sổ tra theo khóa thay vì nhồi cả mảng mục con vào một thuộc tính HTML. */
+/** `action`, `menu` và trạng thái công tắc thành thuộc tính. Menu vào sổ tra theo khóa thay vì nhồi cả mảng mục con vào một thuộc tính HTML. */
 function renderActionAttrs(node) {
   var ra = renderAttr('data-action', node.action);
   if (node.menu) {
     var khoa = node.id || ('shin-menu-' + (RENDER_INDEX.dem += 1));
     RENDER_INDEX.menus[khoa] = node.menu;
     ra += renderAttr('data-menu', khoa);
+  }
+  if (node.toggle) {
+    var bat = typeof Prefs !== 'undefined' && Prefs && Prefs[node.toggle] === true;
+    ra += renderAttr('aria-pressed', bat ? 'true' : 'false');
   }
   return ra;
 }

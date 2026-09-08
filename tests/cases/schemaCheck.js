@@ -146,7 +146,7 @@ function chay(so) {
     'LƯU DỮ LIỆU trỏ tới hàm "saveFormNow"');
 
   batLoiUi('bắt được nút glyph trỏ tới hàm không có trong bảng, và gọi tên bằng lời chỉ dẫn của nút',
-    (u) => { u.view.header[2].action = 'reloadAllNow'; },
+    (u) => { u.view.header[3].action = 'reloadAllNow'; },
     'Nạp lại trỏ tới hàm "reloadAllNow"');
 
   batLoiUi('bắt được mục trong `titleActions` của card — vùng này đi qua `screenBar` đúng đường engine dùng nên cũng phải được soi',
@@ -158,27 +158,27 @@ function chay(so) {
     'màn "activityForm" · customer.note trỏ tới hàm "openNoteFormm"');
 
   batLoiUi('bắt được mục menu trỏ tới hàm không có trong bảng, và gọi tên mục menu chứ không gọi tên nút mẹ',
-    (u) => { u.view.header[3].menu[1].action = 'toggleAutoRenderViewx'; },
+    (u) => { u.view.header[4].menu[0].action = 'toggleAutoRenderViewx'; },
     'mục menu "Tự động sắp xếp sheet" trỏ tới hàm "toggleAutoRenderViewx"');
 
   batLoiUi('bắt được mục menu thiếu `action` — bấm vào không có gì xảy ra là loại lỗi im lặng nhất',
-    (u) => { delete u.view.header[3].menu[0].action; },
-    'mục menu "Bám theo ô đang chọn" thiếu `action`');
+    (u) => { delete u.view.header[4].menu[0].action; },
+    'mục menu "Tự động sắp xếp sheet" thiếu `action`');
 
   batLoiUi('bắt được mục menu thiếu `label`, vì nó hiện ra một dòng trắng bấm được',
-    (u) => { delete u.view.header[3].menu[0].label; },
+    (u) => { delete u.view.header[4].menu[0].label; },
     'có mục menu thiếu `label`');
 
   batLoiUi('bắt được mục menu vừa là công tắc vừa mang `value`',
-    (u) => { u.view.header[3].menu[0].value = 'all'; },
+    (u) => { u.view.header[4].menu[0].value = 'all'; },
     'vừa là công tắc vừa mang `value`');
 
   batLoiUi('bắt được `menu` khai không phải mảng',
-    (u) => { u.view.header[3].menu = 'khong-phai-mang'; },
+    (u) => { u.view.header[4].menu = 'khong-phai-mang'; },
     'màn "view" · Khác có `menu` không phải mảng');
 
   batLoiUi('bắt được mục menu không phải object',
-    (u) => { u.view.header[3].menu[0] = 'Bám theo ô đang chọn'; },
+    (u) => { u.view.header[4].menu[0] = 'Tự động sắp xếp sheet'; },
     'có mục menu không phải object');
 
   batLoiUi('bắt được tên slot gõ sai, và gọi tên card bằng tiêu đề người dùng đọc được',

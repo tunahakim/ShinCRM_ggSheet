@@ -21,10 +21,10 @@ UI_SCHEMA.view = {
 
   header: [
     { icon: 'search', tooltip: 'Tìm khách', action: 'toggleSearchPanel' },
+    { icon: 'bolt', tooltip: 'Bám theo ô đang chọn', action: 'toggleFollowSelection', toggle: 'followSelection' },
     { icon: 'table', tooltip: 'Vẽ lại sheet quản trị', action: 'renderActiveViewSheet' },
     { icon: 'refresh', tooltip: 'Nạp lại', action: 'reloadAll' },
     { icon: 'more', tooltip: 'Khác', menu: [
-      { label: 'Bám theo ô đang chọn', action: 'toggleFollowSelection', toggle: true },
       { label: 'Tự động sắp xếp sheet', action: 'toggleAutoRenderView', toggle: true }
     ] },
     { icon: 'pencil', tooltip: 'Sửa khách', action: 'openCustomerForm', align: 'right' },

@@ -85,6 +85,14 @@ function chay(so) {
   checkThrows(so, 'tên glyph lạ thì nổ kèm danh sách tên đúng, chứ không vẽ nút trống',
     () => hop.renderNode(hop.Icon('bánh-xe'), null), 'Các tên hiện có');
 
+  hop.Prefs = { followSelection: true };
+  const nutSetBat = hop.renderNode(hop.Icon({ icon: 'bolt', action: 'toggleFollowSelection', toggle: 'followSelection' }), null);
+  hop.Prefs.followSelection = false;
+  const nutSetTat = hop.renderNode(hop.Icon({ icon: 'bolt', action: 'toggleFollowSelection', toggle: 'followSelection' }), null);
+  check(so, 'nút công tắc mang lớp riêng và aria-pressed đọc từ Prefs',
+    [nutSetBat.indexOf('class="shin-icon shin-toggle"') > 0, nutSetBat.indexOf('aria-pressed="true"') > 0, nutSetTat.indexOf('aria-pressed="false"') > 0],
+    [true, true, true]);
+
   // Mục menu **không** được nhồi vào thuộc tính HTML: nó ở lại sổ tra, tệp menu tra theo khóa.
   const nutMenu = hop.renderNode(hop.Icon({ id: 'nut-khac', icon: 'more', tooltip: 'Khác', menu: [{ label: 'Bám theo ô đang chọn', action: 'toggleFollowSelection', toggle: true }] }), null);
   check(so, 'Block có menu: thêm lớp, thêm khóa tra, thêm mũi nhọn — và mục menu không lọt vào HTML',

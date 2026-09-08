@@ -19,8 +19,8 @@ function chay(so) {
 
   // Hình dạng node. Mọi node cùng một bộ khóa nên engine không phải hỏi khóa có tồn tại không.
   const hop1 = hop.Block({});
-  check(so, 'Block trần có vai box và đủ mười tám khóa',
-    [hop1.role, Object.keys(hop1).length], ['box', 18]);
+  check(so, 'Block trần có vai box và đủ mười chín khóa',
+    [hop1.role, Object.keys(hop1).length], ['box', 19]);
 
   check(so, 'bảy hàm dựng chỉ điền vai, không sinh loại node mới',
     [hop.Card({}).role, hop.Row([]).role, hop.Text('x').role, hop.Field({ field: 'a' }).role, hop.Button('L').role, hop.Icon('close').role, hop.Check('ACT-000001').role],
@@ -28,6 +28,9 @@ function chay(so) {
 
   check(so, 'Text, Button, Icon, Check nhận thẳng chuỗi cho gọn',
     [hop.Text('chữ').text, hop.Button('LƯU').label, hop.Icon('pencil').icon, hop.Check('ACT-000009').pick], ['chữ', 'LƯU', 'pencil', 'ACT-000009']);
+
+  check(so, 'nút glyph giữ tên núm toggle để engine đọc trạng thái trong Prefs',
+    hop.Icon({ icon: 'bolt', toggle: 'followSelection' }).toggle, 'followSelection');
 
   check(so, 'Row nhận thẳng mảng con', hop.Row([hop.Text('a')]).elements.length, 1);
 
