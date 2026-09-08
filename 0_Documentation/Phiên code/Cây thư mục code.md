@@ -84,6 +84,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   └── Menu.js               onOpen, menu ShinCRM và lệnh mở sidebar. Mọi việc của nó đi qua getUi và HtmlService nên không kiểm offline được.
 │   └── dev\                      CHỈ DÙNG LÚC PHÁT TRIỂN — xóa cả thư mục này trước khi Sheet mang dữ liệu khách hàng thật.
 │       ├── DevRunner.js          Cửa web chạy một hàm trong danh sách trắng. Mở một địa chỉ chạy code dưới quyền chủ tệp.
+│       ├── ViewProbe.js          Probe DEV tạo/xóa sheet quản trị tạm để nghiệm thu renderer thật trên Google.
 │       ├── DevToken.js           Thẻ bí mật của cửa trên. Không vào git, nhưng CÓ đẩy lên Google.
 │       ├── Smoke.js              Phép thử nhanh: mở được tệp Sheet không, đọc được gì.
 │       ├── DumpGrid.js           Đo lưới từng sheet: bao nhiêu hàng, bao nhiêu cột, còn chỗ ghi thêm bao nhiêu hàng.

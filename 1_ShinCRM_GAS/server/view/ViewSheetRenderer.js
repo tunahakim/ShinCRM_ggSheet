@@ -27,13 +27,21 @@ function viewLatestActivity(activities) {
   return latest;
 }
 
-function viewValues(customer, activity, headers, fieldByCode) {
+function viewValues(customer, activity, headers, fieldByCode, fieldNames) {
   var values = {};
   headers.forEach(function (code) {
-    if (code.indexOf('@CUS_') === 0) { values[code] = customer[fieldByCode[code] && fieldNameByCode('customer', code)]; }
-    else if (code.indexOf('@ACT_') === 0) { values[code] = activity && fieldByCode[code] ? activity[fieldNameByCode('activity', code)] : ''; }
+    if (code.indexOf('@CUS_') === 0) { values[code] = customer[fieldNames[code] || '']; }
+    else if (code.indexOf('@ACT_') === 0) { values[code] = activity && fieldByCode[code] ? activity[fieldNames[code] || ''] : ''; }
   });
   return values;
+}
+
+function viewFieldNames() {
+  var byCode = {};
+  Object.keys(DATA_SCHEMA).forEach(function (entity) {
+    Object.keys(DATA_SCHEMA[entity]).forEach(function (name) { byCode[DATA_SCHEMA[entity][name].code] = name; });
+  });
+  return byCode;
 }
 
 function fieldNameByCode(entity, code) {
@@ -77,27 +85,33 @@ function renderViewSheet(sheetName) {
   var lastColumn = sheet.getLastColumn();
   if (lastColumn < 1) { return { ok: true, sheetName: name, rowMaps: {} }; }
   var header = sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(function (value) { return String(value || '').trim(); });
+  var filterRow = sheet.getRange(3, 1, 1, lastColumn).getValues()[0];
   var headerMap = {};
   header.forEach(function (code, i) { if (code) { headerMap[code] = i + 1; } });
   var fieldByCode = viewFieldMaps();
+  var fieldNames = viewFieldNames();
   var writable = header.map(function (code, i) { return (code.indexOf('@CUS_') === 0 || code.indexOf('@ACT_') === 0) && fieldByCode[code] ? i + 1 : 0; }).filter(function (column) { return column > 0; });
+  var filters = {};
+  var filterErrors = [];
+  writable.forEach(function (column) {
+    var raw = String(filterRow[column - 1] || '').trim();
+    if (!raw) { return; }
+    var parsed = filterParseCell(raw, fieldByCode[header[column - 1]]);
+    if (parsed.errors.length) { parsed.errors.forEach(function (error) { filterErrors.push({ cell: column, error: error }); }); }
+    else { filters[column] = parsed; }
+  });
+  if (filterErrors.length) { throw new Error(filterErrors.map(function (item) { return name + ', ô cột ' + item.cell + ': ' + item.error.reason + '. ' + item.error.hint; }).join('\n')); }
   var customers = viewBlockObjects(entityReadAll('customer'));
   var activities = viewLatestActivity(viewBlockObjects(entityReadAll('activity')));
-  var errors = [];
   var rows = customers.map(function (customer) {
     var activity = activities[customer.id];
-    var values = viewValues(customer, activity, header, fieldByCode);
+    var values = viewValues(customer, activity, header, fieldByCode, fieldNames);
     writable.forEach(function (column) {
       var code = header[column - 1];
-      if (String(sheet.getRange(3, column).getValue() || '').trim()) {
-        var parsed = filterParseCell(sheet.getRange(3, column).getValue(), fieldByCode[code]);
-        if (parsed.errors.length) { parsed.errors.forEach(function (error) { errors.push({ cell: column, error: error }); }); }
-        else if (!filterCellMatches(values[code], parsed, fieldByCode[code])) { customer.__filtered = true; }
-      }
+      if (filters[column] && !filterCellMatches(values[code], filters[column], fieldByCode[code])) { customer.__filtered = true; }
     });
     return { customer: customer, values: values };
   }).filter(function (row) { return !row.customer.__filtered; });
-  if (errors.length) { throw new Error(errors.map(function (item) { return name + ', ô cột ' + item.cell + ': ' + item.error.reason + '. ' + item.error.hint; }).join('\n')); }
 
   var sortPairs = viewReadSortPairs(sheet, headerMap, SHEET_FIRST_DATA_ROW, sheet.getLastRow());
   var parsedSort = sortSpecParse(sortPairs, fieldByCode);
@@ -108,11 +122,12 @@ function renderViewSheet(sheetName) {
   ];
   viewSortRows(rows, specs);
 
+  var spans = viewColumnSpans(writable);
   var oldLast = Math.max(sheet.getLastRow(), SHEET_FIRST_DATA_ROW - 1);
   var oldRows = oldLast - SHEET_FIRST_DATA_ROW + 1;
-  if (oldRows > 0) { viewColumnSpans(writable).forEach(function (span) { sheet.getRange(SHEET_FIRST_DATA_ROW, span[0], oldRows, span[1]).clearContent(); }); }
+  if (oldRows > 0) { spans.forEach(function (span) { sheet.getRange(SHEET_FIRST_DATA_ROW, span[0], oldRows, span[1]).clearContent(); }); }
   if (rows.length) {
-    viewColumnSpans(writable).forEach(function (span) {
+    spans.forEach(function (span) {
       var matrix = rows.map(function (row) { return header.slice(span[0] - 1, span[0] - 1 + span[1]).map(function (code) { return row.values[code] === undefined ? '' : row.values[code]; }); });
       sheet.getRange(SHEET_FIRST_DATA_ROW, span[0], rows.length, span[1]).setValues(matrix);
     });
