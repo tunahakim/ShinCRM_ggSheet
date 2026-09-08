@@ -81,6 +81,12 @@ function chay(so) {
   check(so, 'khách đã xóa mềm vẫn nằm trong bảng tra, vì click vào hàng đó phải mở được',
     co.rowMaps.Customer['6'], 'KH0003');
 
+  const view = nen.book.insertSheet('!Lead');
+  view.getRange(1, 1, 1, 2).setValues([['@CUS_MA_KH', '@CUS_TEN_CTY']]);
+  view.getRange(4, 1, 1, 2).setValues([['KH0001', 'Công ty Một']]);
+  const coView = hop.loadCore();
+  check(so, 'loadCore thêm đúng một khóa rowMap cho sheet quản trị', coView.rowMaps['!Lead'], { '4': 'KH0001' });
+
   // Không một giá trị nào được là `Date`: `google.script.run` không mang `Date` qua, nó thành `null` bên client.
   ghiO(nen, 'Customer', hangDau, '@CUS_NGAY_NHAP_LIEU', new Date(2026, 8, 5, 14, 30, 0));
   const coNgay = hop.loadCore();

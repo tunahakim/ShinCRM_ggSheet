@@ -119,6 +119,20 @@ function loadRowMap(block) {
 function loadRowMaps(khach) {
   var maps = {};
   maps[ENTITY_SHEETS.customer] = loadRowMap(khach);
+  var book = shinOpenBook();
+  book.getSheets().forEach(function (sheet) {
+    var name = sheet.getName();
+    if (name.charAt(0) !== '!' || sheet.getLastColumn() < 1) { return; }
+    var lastColumn = sheet.getLastColumn();
+    var header = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
+    var idColumn = header.indexOf(DATA_SCHEMA.customer.id.code) + 1;
+    if (!idColumn || sheet.getLastRow() < SHEET_FIRST_DATA_ROW) { return; }
+    var count = sheet.getLastRow() - SHEET_FIRST_DATA_ROW + 1;
+    var values = sheet.getRange(SHEET_FIRST_DATA_ROW, idColumn, count, 1).getValues();
+    var map = {};
+    values.forEach(function (row, i) { if (row[0] !== '' && row[0] !== null && row[0] !== undefined) { map[String(SHEET_FIRST_DATA_ROW + i)] = String(row[0]); } });
+    maps[name] = map;
+  });
   return maps;
 }
 
