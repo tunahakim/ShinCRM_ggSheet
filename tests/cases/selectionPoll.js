@@ -234,6 +234,26 @@ function chay(so) {
   check(so, 'tắt nút sét chỉ ngừng đổi khách, không được chặn làm mới sheet quản trị khi Extension báo chuyển sheet',
     tatSet._calls,
     ['renderViewIfDirty(!Lead)']);
+
+  const quaCau = dungHopPoll();
+  batDau(quaCau);
+  quaCau.Prefs.followSelection = false;
+  quaCau._calls = [];
+  quaCau.callServer = (name, args) => {
+    quaCau._calls.push(name + '(' + ((args && args[0]) || '') + ')');
+    return syncValue({ ok: true, sheetName: '!Lead', rowMaps: { '!Lead': {} } });
+  };
+  quaCau.sheetLinkOnMessage({
+    origin: quaCau.SHEET_LINK_ORIGIN,
+    data: { action: 'CRM_CONTEXT', nonce: quaCau.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq: 1, sheetName: '!Lead', row: 4, col: 1 }
+  });
+  quaCau.sheetLinkOnMessage({
+    origin: quaCau.SHEET_LINK_ORIGIN,
+    data: { action: 'CRM_CONTEXT', nonce: 'nonce-sai', spreadsheetId: 'sheet-1', seq: 2, sheetName: '!Khac', row: 4, col: 1 }
+  });
+  check(so, 'CRM_CONTEXT đúng nonce đi trọn tới xử lý view, tin sai nonce bị bỏ',
+    quaCau._calls,
+    ['renderViewIfDirty(!Lead)']);
 }
 
 module.exports = { chay };
