@@ -32,6 +32,7 @@ const TEP_NEN = [
   'server/util/TextNormalize.js',
   'server/sheet/CellBudget.js',
   'server/config/ConfigParams.js',
+  'server/config/ConfigSheetSetup.js',
   'server/sheet/EntityRead.js',
   'server/sheet/CategoryRead.js',
   'server/sheet/ConfigRead.js',

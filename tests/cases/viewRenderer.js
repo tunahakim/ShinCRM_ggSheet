@@ -5,6 +5,7 @@ const TEP_VIEW = TEP_NEN.concat([
   'server/view/FilterMessages.js',
   'server/view/FilterParser.js',
   'server/view/SortSpec.js',
+  'server/view/ViewSheetSetup.js',
   'server/view/ViewSheetRenderer.js'
 ]);
 
@@ -83,9 +84,21 @@ function chay(so) {
   base.view.getRange(3, 5).setValue('');
   base.nen.hop.renderViewSheet('!Lead');
   check(so, 'vẽ thành công chỉ xóa note lỗi và trả lại note người dùng', base.view.getRange(3, 5).getNote(), 'ghi chú riêng');
-  base.nen.hop.prepareViewSheet('!Lead');
+  const prepared = base.nen.hop.prepareViewSheet('!Lead');
+  check(so, 'chuẩn bị view tự thêm đủ hai cột điều khiển còn thiếu và không trùng mã',
+    [prepared.addedColumns, base.view.getRange(1, 1, 1, 2).getValues()[0]],
+    [['@VIEW_SORT_COL', '@VIEW_SORT_LEVEL'], ['@VIEW_SORT_COL', '@VIEW_SORT_LEVEL']]);
   check(so, 'lệnh chuẩn bị gắn bảng tra nhanh đầy đủ vào ô hàng 3 chưa có note',
-    base.view.getRange(3, 1).getNote().includes('SẮP XẾP:'), true);
+    base.view.getRange(3, 3).getNote().includes('SẮP XẾP:'), true);
+  check(so, 'dropdown sắp xếp chỉ phủ đúng 10 cấp từ hàng 4 đến 13',
+    [base.view.getRange(4, 1).getDataValidation().criteria, base.view.getRange(13, 1).getDataValidation().criteria, base.view.getRange(14, 1).getDataValidation()],
+    ['VALUE_IN_LIST', 'VALUE_IN_LIST', null]);
+  check(so, 'chuẩn bị lần hai không thêm cột điều khiển trùng',
+    base.nen.hop.prepareViewSheet('!Lead').addedColumns, []);
+
+  base.view.getRange(14, 1, 1, 2).setValues([['@CUS_TEN_CTY', 'Tăng dần (A → Z)']]);
+  check(so, 'parser cục bộ dùng cùng trần 10 cấp nên bỏ qua hàng 14',
+    base.nen.hop.viewReadSortPairs(base.view, base.nen.hop.viewHeaderMap(base.nen.hop.viewSetupHeader(base.view), '!Lead'), 4, 14).length, 10);
 
   const leadingZero = taoNen(['@CUS_MST']);
   ghiO(leadingZero.nen, 'Customer', 4, '@CUS_MA_KH', 'KH0001');
@@ -146,6 +159,16 @@ function chay(so) {
   checkThrows(so, 'mã @ trùng ở hàng 1 bị chặn trước khi vẽ',
     () => duplicate.nen.hop.renderViewSheet('!Lead'), 'xuất hiện hai lần');
   check(so, 'lỗi mã trùng không xóa dữ liệu đang có', duplicate.view.getRange(4, 1, 1, 2).getValues(), [['cũ 1', 'cũ 2']]);
+
+  const created = dungHop({ sheets: ['Customer', 'Activity', 'Config', 'Category', 'Log'], tep: TEP_VIEW });
+  const newView = created.hop.createViewSheet('Tổng quan');
+  const newHeaders = created.book.getSheetByName('!Tổng quan').getRange(1, 1, 1, 13).getValues()[0];
+  check(so, 'tạo view tự thêm dấu ! và dùng trường từ DATA_SCHEMA, gồm ghi chú khách',
+    [newView.sheetName, newHeaders],
+    ['!Tổng quan', ['@VIEW_SORT_COL', '@VIEW_SORT_LEVEL', created.hop.DATA_SCHEMA.customer.id.code, created.hop.DATA_SCHEMA.customer.companyName.code,
+      created.hop.DATA_SCHEMA.customer.contactPerson.code, created.hop.DATA_SCHEMA.customer.phone.code, created.hop.DATA_SCHEMA.customer.verifyStatus.code,
+      created.hop.DATA_SCHEMA.customer.note.code, created.hop.DATA_SCHEMA.activity.workDate.code, created.hop.DATA_SCHEMA.activity.taskType.code,
+      created.hop.DATA_SCHEMA.activity.content.code, created.hop.DATA_SCHEMA.activity.priority.code, created.hop.DATA_SCHEMA.activity.dueAt.code]]);
 }
 
 module.exports = { chay };

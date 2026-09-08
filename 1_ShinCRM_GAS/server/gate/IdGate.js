@@ -12,12 +12,12 @@ var ID_GATE_PREFIXES = { customer: 'CUS-', activity: 'ACT-' };
 /** Số chữ số của phần đuôi. Đổi con số này là đổi khuôn mã của toàn bộ dữ liệu cũ, nên nó nằm đây một mình để không ai đổi nhầm. */
 var ID_GATE_DIGITS = 6;
 
-/** Tên loại ghi ở cột `@CFG_BO_DEM_LOAI` của khối bộ đếm. Dùng chính tên thực thể, để người mở sheet ra đọc là hiểu. */
+/** Tên tham số bộ đếm của từng thực thể trong cặp cột tham số chung. */
 function idGateCounterKey(entity) {
   if (!ID_GATE_PREFIXES[entity]) {
     throw new Error('Không có tiền tố mã cho thực thể "' + entity + '". Có: ' + Object.keys(ID_GATE_PREFIXES).join(', ') + '.');
   }
-  return entity;
+  return ID_COUNTER_CONFIG_NAMES[entity];
 }
 
 /** Dựng một mã từ số thứ tự. */
@@ -54,16 +54,15 @@ function idGateMaxOnSheet(context) {
 }
 
 /**
- * Vị trí ô bộ đếm của một thực thể trong khối bộ đếm của `Config`, cộng giá trị đang có.
+ * Vị trí ô bộ đếm của một thực thể trong cặp cột tham số của `Config`, cộng giá trị đang có.
  *
  * Trả về `{ row, valueColumn, current }`, và `row` bằng 0 khi chưa có dòng nào cho thực thể đó. Bên gọi tự quyết ghi vào dòng nào — hàm này chỉ đọc.
  */
 function idGateCounterCell(entity) {
-  var khoi = CONFIG_READ_BLOCKS.counters;
   var sheet = shinOpenSheet('Config');
   var columnMap = readColumnMap('Config');
-  var cotLoai = columnIndex(columnMap, khoi.key);
-  var cotGiaTri = columnIndex(columnMap, khoi.value);
+  var cotLoai = columnIndex(columnMap, '@CFG_THAM_SO');
+  var cotGiaTri = columnIndex(columnMap, '@CFG_THAM_SO_GIA_TRI');
   var firstRow = SHEET_LAYOUT.Config.firstDataRow;
   var soDong = sheet.getLastRow() - firstRow + 1;
 
@@ -76,13 +75,17 @@ function idGateCounterCell(entity) {
   var lechGiaTri = cotGiaTri - Math.min(cotLoai, cotGiaTri);
   var can = idGateCounterKey(entity);
 
+  var found = 0;
   for (var i = 0; i < values.length; i++) {
     if (String(values[i][lechLoai]).trim() === can) {
+      if (found) { throw new Error('Sheet Config có tham số khai trùng: ' + can + '. Mỗi tham số chỉ được một dòng — xóa dòng thừa rồi chạy lại.'); }
+      found = firstRow + i;
       ra.row = firstRow + i;
       ra.current = idGateNumberOf(values[i][lechGiaTri]);
-      return ra;
     }
   }
+
+  if (found) { return ra; }
 
   // Chưa có dòng nào cho thực thể này thì dòng mới đặt ngay sau dòng cuối đang có nội dung của khối.
   ra.row = 0;
@@ -126,6 +129,7 @@ function idGateIssue(entity, soLuong, context) {
   }
 
   o.sheet.getRange(dongGhi, o.valueColumn).setValue(batDau + can - 1);
+  resetSettingsCache();
   return ra;
 }
 

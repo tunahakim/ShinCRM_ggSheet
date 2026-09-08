@@ -1,13 +1,13 @@
 /**
- * Ca kiểm cho `server/sheet/SetupSheets.js` và `server/config/ConfigParams.js`.
+ * Ca kiểm cho `server/sheet/SetupSheets.js`, danh mục Config và migration bộ đếm cũ.
  *
  * Điều đáng kiểm nhất không phải "dựng đúng thì ra đúng" mà **chạy lại lần thứ hai có phá gì không** — một hàm chỉ hỏng ở lượt chạy thứ hai là hàm sẽ hỏng sau khi đã có người tin nó. Điều thứ hai: tên mới phải nối dưới dòng cuối của chính cột tham số, vì năm khối của `Config` chạy dọc độc lập.
  *
- * Giới hạn: tệp Sheet giả nuốt `setNote`, nên ở đây không chứng minh được ghi chú ô hiện ra thật. Chỗ thấy nó là chạy `node tests/gas.js setupSheets` rồi trỏ chuột vào ô tên.
+ * Tệp Sheet giả giữ ghi chú và validation để canh đúng nguồn metadata; hình thức cuối cùng vẫn nghiệm thu trên Google.
  */
 
 const { dungHop, ghiO, TEP_NEN } = require('../lib/dung-hop');
-const { section, check, checkContains, ghiLoiNap } = require('../lib/assert');
+const { section, check, checkContains, checkThrows, ghiLoiNap } = require('../lib/assert');
 
 /** `SetupSheets.js` không nằm trong bộ tệp nền, vì chỉ tệp ca kiểm này cần nó. */
 const TEP = TEP_NEN.concat(['server/sheet/SetupSheets.js']);
@@ -45,10 +45,9 @@ function chay(so) {
     return ghiLoiNap(so, 'nạp được server/sheet/SetupSheets.js', err);
   }
 
-  // Ghim nội dung và thứ tự danh mục bằng chính hai hằng tên, không bằng chuỗi gõ lại: đổi tên hằng mà quên đổi ở đây thì đỏ, còn gõ lại chuỗi thì hai chỗ lệch nhau mà vẫn xanh.
-  check(so, 'danh mục có đúng hai tham số mà code đang thật sự đọc',
+  check(so, 'danh mục có hai tham số người dùng và hai bộ đếm hệ thống',
     nen.hop.configParamNames(),
-    [nen.hop.LOG_TRACE_CONFIG_NAME, nen.hop.CELL_BUDGET_CONFIG_NAME]);
+    [nen.hop.LOG_TRACE_CONFIG_NAME, nen.hop.CELL_BUDGET_CONFIG_NAME, nen.hop.ID_COUNTER_CONFIG_NAMES.customer, nen.hop.ID_COUNTER_CONFIG_NAMES.activity]);
 
   // Một dòng tham số không có lời giải thích là một cái tên mà chủ dự án vẫn phải đi đoán giá trị hợp lệ — tức là phép gieo chỉ làm được một nửa việc nó hứa.
   check(so, 'mỗi tham số trong danh mục đều có ghi chú giải thích',
@@ -63,13 +62,13 @@ function chay(so) {
   nen.dem.setValues = 0;
   nen.hop.setupSheets();
 
-  check(so, 'gieo xong thì khối tham số có đủ tên, giá trị đều để trống',
+  check(so, 'gieo xong thì tham số người dùng để trống, bộ đếm mới bắt đầu từ max trên kho',
     nen.hop.configParams(),
-    { LOG_TRACE: '', CELL_BUDGET: '' });
+    { LOG_TRACE: '', CELL_BUDGET: '', ID_COUNTER_CUSTOMER: '0', ID_COUNTER_ACTIVITY: '0' });
 
-  check(so, 'hai tên nằm ngay hàng dữ liệu đầu, không chừa khoảng trắng',
+  check(so, 'bốn tên nằm ngay hàng dữ liệu đầu, không chừa khoảng trắng',
     docKhoiThamSo(nen),
-    [[4, 'LOG_TRACE', ''], [5, 'CELL_BUDGET', '']]);
+    [[4, 'LOG_TRACE', ''], [5, 'CELL_BUDGET', ''], [6, 'ID_COUNTER_CUSTOMER', '0'], [7, 'ID_COUNTER_ACTIVITY', '0']]);
 
   // Năm lệnh ghi cho năm hàng tiêu đề, cộng đúng một lệnh cho cả khối tham số. Luật gộp lệnh ghi của tài liệu 06: hai tên thiếu vẫn là một lệnh, không phải hai.
   check(so, 'cả lượt dựng tốn 6 lệnh ghi: 5 hàng tiêu đề và 1 cho cả khối tham số', nen.dem.setValues, 6);
@@ -84,28 +83,28 @@ function chay(so) {
   lai.dem.setValues = 0;
   lai.hop.setupSheets();
 
-  check(so, 'chạy lại không đụng ô giá trị người dùng đã gõ',
+  check(so, 'chạy lại không đụng ô giá trị người dùng đã gõ hay bộ đếm hệ thống',
     docKhoiThamSo(lai),
-    [[4, 'LOG_TRACE', 'all'], [5, 'CELL_BUDGET', '']]);
+    [[4, 'LOG_TRACE', 'all'], [5, 'CELL_BUDGET', ''], [6, 'ID_COUNTER_CUSTOMER', '0'], [7, 'ID_COUNTER_ACTIVITY', '0']]);
 
   check(so, 'chạy lại không thêm dòng trùng tên, nên configParams không ném lỗi',
     lai.hop.configParams(),
-    { LOG_TRACE: 'all', CELL_BUDGET: '' });
+    { LOG_TRACE: 'all', CELL_BUDGET: '', ID_COUNTER_CUSTOMER: '0', ID_COUNTER_ACTIVITY: '0' });
 
   check(so, 'chạy lại mà không thiếu tên nào thì không tốn lệnh ghi nào cho khối tham số', lai.dem.setValues, 5);
 
   section('Nối tên mới vào dưới dòng cuối của chính cột tham số');
 
-  // Khối bộ đếm dài tay tới hàng 20, cột tham số vẫn trắng. Lấy `getLastRow()` của cả sheet thì hai tên rơi xuống hàng 21 và 22, chừa lại 16 hàng trắng giữa bảng.
+  // Khối sắp xếp dài tới hàng 20, cột tham số vẫn trắng. Tên tham số vẫn phải bắt đầu từ hàng 4.
   const lech = dungKhung([]);
   for (let hang = 4; hang <= 20; hang += 1) {
-    ghiO(lech, 'Config', hang, '@CFG_BO_DEM_LOAI', 'loai_' + hang);
+    ghiO(lech, 'Config', hang, '@CFG_SORT_COL', '@CUS_COT_' + hang);
   }
   lech.hop.setupSheets();
 
-  check(so, 'khối bộ đếm dài hơn không đẩy tên tham số xuống dưới khoảng trắng',
+  check(so, 'khối sắp xếp dài hơn không đẩy tên tham số xuống dưới khoảng trắng',
     docKhoiThamSo(lech),
-    [[4, 'LOG_TRACE', ''], [5, 'CELL_BUDGET', '']]);
+    [[4, 'LOG_TRACE', ''], [5, 'CELL_BUDGET', ''], [6, 'ID_COUNTER_CUSTOMER', '0'], [7, 'ID_COUNTER_ACTIVITY', '0']]);
 
   section('Sheet đã có tên lạ và một tên trong danh mục nằm giữa khối');
 
@@ -116,7 +115,7 @@ function chay(so) {
 
   check(so, 'tên đã có giữ nguyên chỗ và giá trị, chỉ tên còn thiếu được nối vào cuối',
     docKhoiThamSo(tron),
-    [[4, 'GHI_CHU_RIENG', 'của tôi'], [5, 'CELL_BUDGET', '900000'], [6, 'MOT_TEN_LA', '7'], [7, 'LOG_TRACE', '']]);
+    [[4, 'GHI_CHU_RIENG', 'của tôi'], [5, 'CELL_BUDGET', '900000'], [6, 'MOT_TEN_LA', '7'], [7, 'LOG_TRACE', ''], [8, 'ID_COUNTER_CUSTOMER', '0'], [9, 'ID_COUNTER_ACTIVITY', '0']]);
 
   check(so, 'thiếu một tên cũng chỉ tốn một lệnh ghi cho khối tham số', tron.dem.setValues, 6);
 
@@ -128,7 +127,60 @@ function chay(so) {
 
   checkContains(so, 'nghiệm thu báo đạt sau khi dựng khung', dongDat, '✅ ĐẠT');
   checkContains(so, 'nghiệm thu kể tên từng tham số kèm giá trị đang mang', dongDat,
-    'Config, khối tham số — đủ 2 tên: LOG_TRACE = (trống, dùng mặc định), CELL_BUDGET = (trống, dùng mặc định)');
+    'Config, khối tham số — đủ 4 tên: LOG_TRACE = (trống, dùng mặc định), CELL_BUDGET = (trống, dùng mặc định), ID_COUNTER_CUSTOMER = "0", ID_COUNTER_ACTIVITY = "0"');
+
+  section('Di chuyển bộ đếm cũ và hướng dẫn nhập Config');
+
+  const cu = dungKhung([]);
+  const configCu = cu.Config.sheet;
+  configCu.getRange(1, 9, 1, 2).setValues([['@CFG_BO_DEM_LOAI', '@CFG_BO_DEM_GIA_TRI']]);
+  configCu.getRange(4, 9, 2, 2).setValues([['customer', 17], ['activity', 29]]);
+  cu.hop.setupSheets();
+  check(so, 'migration giữ đúng hai bộ đếm trong cặp tham số rồi xóa hai cột cũ',
+    [cu.hop.configCounterValues(cu.hop.configParams()), configCu.getLastColumn(), cu.dem.deleteColumns],
+    [{ customer: '17', activity: '29' }, 8, 2]);
+
+  const unknown = dungKhung([]);
+  unknown.Config.sheet.getRange(1, 9, 1, 2).setValues([['@CFG_BO_DEM_LOAI', '@CFG_BO_DEM_GIA_TRI']]);
+  unknown.Config.sheet.getRange(4, 9, 1, 2).setValues([['temporary', 5]]);
+  checkThrows(so, 'loại bộ đếm cũ không biết bị chặn trước khi xóa cột', () => unknown.hop.setupSheets(), 'temporary');
+  check(so, 'migration lỗi chưa xóa cột cũ', unknown.dem.deleteColumns, 0);
+
+  const guide = dungKhung([]);
+  guide.hop.setupSheets();
+  check(so, 'mọi cột Config đều có ghi chú ở hàng 3',
+    guide.hop.CONFIG_COLUMNS.filter((column, index) => !guide.Config.sheet.getRange(3, index + 1).getNote()).map((column) => column[0]), []);
+  check(so, 'cột kiểu có dropdown đúng bốn kiểu dữ liệu',
+    guide.Config.sheet.getRange(4, 4).getDataValidation().values, guide.hop.DATA_TYPES);
+  check(so, 'ô CELL_BUDGET dùng kiểm tra số, không ép vào dropdown hữu hạn',
+    guide.Config.sheet.getRange(5, 2).getDataValidation().criteria, 'NUMBER_GREATER_THAN_OR_EQUAL_TO');
+
+  section('Khôi phục Config mặc định không chạm dữ liệu nghiệp vụ');
+
+  const reset = dungKhung([]);
+  reset.hop.setupSheets();
+  reset.Customer = { sheet: reset.book.getSheetByName('Customer'), codes: reset.hop.readColumnMap('Customer').headerRow };
+  reset.Activity = { sheet: reset.book.getSheetByName('Activity'), codes: reset.hop.readColumnMap('Activity').headerRow };
+  ghiO(reset, 'Customer', 4, '@CUS_MA_KH', 'CUS-000042');
+  ghiO(reset, 'Customer', 4, '@CUS_TEN_CTY', 'Giữ nguyên khách');
+  ghiO(reset, 'Activity', 4, '@ACT_MA_GD', 'ACT-000073');
+  ghiO(reset, 'Activity', 4, '@ACT_MA_KH', 'CUS-000042');
+  ghiO(reset, 'Config', 4, '@CFG_THAM_SO_GIA_TRI', 'all');
+  ghiO(reset, 'Config', 4, '@CFG_COT_MA', '@CUS_COT_RIENG');
+  ghiO(reset, 'Config', 4, '@CFG_COT_KIEU', 'TEXT');
+  ghiO(reset, 'Config', 4, '@CFG_SORT_COL', '@CUS_TEN_CTY');
+  ghiO(reset, 'Config', 4, '@CFG_SORT_LEVEL', 'asc');
+  reset.book.insertSheet('!Lead');
+  reset.hop.resetSettingsCache();
+  const resetResult = reset.hop.resetConfigToDefaults();
+  check(so, 'reset tính lại hai bộ đếm từ mã lớn nhất thay vì đưa về 0',
+    resetResult.counters, { customer: 42, activity: 73 });
+  check(so, 'reset xóa cấu hình người dùng và gieo lại đúng bốn tham số',
+    [reset.hop.configReadAll().sheetSchema, reset.hop.configReadAll().sort, reset.hop.configParams()],
+    [{}, [], { LOG_TRACE: '', CELL_BUDGET: '', ID_COUNTER_CUSTOMER: '42', ID_COUNTER_ACTIVITY: '73' }]);
+  check(so, 'reset không sửa bản ghi Customer và đánh dấu Config cùng mọi view bẩn',
+    [reset.Customer.sheet.getRange(4, 2).getValue(), reset.hop.dirtyStateRead(), reset.stubs._khoa.dangGiu],
+    ['Giữ nguyên khách', { viewSheets: ['!Lead'], records: [], config: true, all: false }, false]);
 
   // Xóa ô tên để giả cảnh người dùng lỡ tay quét trắng một dòng. Không gọi `resetSettingsCache` ở đây là cố ý: chính `verifySheets` phải tự xóa, nếu không nó sẽ báo về sheet lúc nó đọc lần trước.
   thu.Config.sheet.getRange(4, thu.Config.cotTen).setValue('');

@@ -53,6 +53,7 @@ function taoSheet(ten, dem, luoi) {
   const cells = [];
   const formats = [];
   const notes = [];
+  const validations = [];
   let frozenRows = 0;
   let maxRows = (luoi && luoi.rows) || 1000;
   let maxCols = (luoi && luoi.cols) || 26;
@@ -74,6 +75,11 @@ function taoSheet(ten, dem, luoi) {
   const layDongNote = (i) => {
     while (notes.length <= i) { notes.push([]); }
     return notes[i];
+  };
+
+  const layDongValidation = (i) => {
+    while (validations.length <= i) { validations.push([]); }
+    return validations[i];
   };
 
   const sheet = {
@@ -105,6 +111,29 @@ function taoSheet(ten, dem, luoi) {
 
     getMaxRows: () => maxRows,
     getMaxColumns: () => maxCols,
+
+    insertColumnsBefore(beforeColumn, howMany) {
+      const them = howMany === undefined ? 1 : howMany;
+      [cells, formats, notes, validations].forEach((matrix) => {
+        matrix.forEach((row) => {
+          if (!Array.isArray(row)) { return; }
+          row.splice(beforeColumn - 1, 0, ...Array(them).fill(''));
+        });
+      });
+      maxCols += them;
+      dem.insertColumns += 1;
+      return sheet;
+    },
+
+    deleteColumn(column) {
+      if (maxCols <= 1) { throw new Error('deleteColumn: sheet phải còn ít nhất một cột.'); }
+      [cells, formats, notes, validations].forEach((matrix) => {
+        matrix.forEach((row) => { if (Array.isArray(row)) { row.splice(column - 1, 1); } });
+      });
+      maxCols -= 1;
+      dem.deleteColumns += 1;
+      return sheet;
+    },
 
     /**
      * Nới lưới thêm hàng. Google chèn hàng trắng ngay sau `afterRow`, nên hàng đã có nội dung ở dưới bị đẩy xuống.
@@ -188,7 +217,32 @@ function taoSheet(ten, dem, luoi) {
           return range;
         },
         getNote() { return oRong((notes[row - 1] || [])[col - 1]); },
-        setDataValidation() { return range; },
+        setDataValidation(rule) {
+          for (let r = 0; r < soDong; r += 1) {
+            const dich = layDongValidation(row - 1 + r);
+            for (let c = 0; c < soCot; c += 1) { dich[col - 1 + c] = rule || null; }
+          }
+          dem.setDataValidation += 1;
+          return range;
+        },
+        getDataValidation() { return (validations[row - 1] || [])[col - 1] || null; },
+        getDataValidations() {
+          const result = [];
+          for (let r = 0; r < soDong; r += 1) {
+            const source = validations[row - 1 + r] || [];
+            const output = [];
+            for (let c = 0; c < soCot; c += 1) { output.push(source[col - 1 + c] || null); }
+            result.push(output);
+          }
+          return result;
+        },
+        clearDataValidations() {
+          for (let r = 0; r < soDong; r += 1) {
+            const dich = layDongValidation(row - 1 + r);
+            for (let c = 0; c < soCot; c += 1) { dich[col - 1 + c] = null; }
+          }
+          return range;
+        },
 
         /**
          * Khuôn hiển thị. Mô phỏng cả **hệ quả** của khuôn: ghi chuỗi `'0101243150'` vào ô chưa đặt khuôn văn bản thì nó thành số `101243150` ở đây, đúng như trên Google — xem `epTheoKhuon`.
@@ -246,6 +300,7 @@ function taoSheet(ten, dem, luoi) {
     /** Chỉ dùng trong phép kiểm, không có bên Google: xem thẳng ruột sheet. */
     _cells: cells,
     _khuon: formats,
+    _validations: validations,
     _soCot: soCotThat,
 
     /** Chỉ dùng trong phép kiểm: đặt lại lưới để dựng đúng hoàn cảnh sheet chật. */
@@ -265,10 +320,14 @@ function taoSheet(ten, dem, luoi) {
  * `getActiveSpreadsheet` cố ý **ném lỗi**, mô phỏng đường chạy khi không có ai ngồi trước máy — đúng đường mà `shinOpenBook` phải đi được, và cũng là đường đã từng làm lộ ra lỗi "reading from storage ... NOT_FOUND". `openById` thì trả về tệp giả bất kể ID, nên cổng chặn chạy nhầm tệp không được kiểm ở đây; nó chỉ kiểm được trên Google, nơi có tệp thật để mà nhầm.
  */
 function taoBook(tenSheets) {
-  const dem = { setValues: 0, deleteRows: 0, insertSheet: 0, insertRows: 0, setNumberFormat: 0, toast: 0 };
+  const dem = { setValues: 0, deleteRows: 0, insertSheet: 0, insertRows: 0, insertColumns: 0, deleteColumns: 0, setNumberFormat: 0, setDataValidation: 0, toast: 0 };
   const sheets = {};
+  let activeSheet = null;
 
-  (tenSheets || []).forEach((ten) => { sheets[ten] = taoSheet(ten, dem); });
+  (tenSheets || []).forEach((ten) => {
+    sheets[ten] = taoSheet(ten, dem);
+    if (!activeSheet) { activeSheet = sheets[ten]; }
+  });
 
   const book = {
     getId: () => 'tep-gia-trong-bo-nho',
@@ -282,15 +341,21 @@ function taoBook(tenSheets) {
     getSpreadsheetTimeZone: () => 'Asia/Ho_Chi_Minh',
 
     getSheetByName: (ten) => sheets[ten] || null,
-    getActiveSheet: () => Object.keys(sheets).length ? sheets[Object.keys(sheets)[0]] : null,
+    getActiveSheet: () => activeSheet,
+    setActiveSheet(sheet) { activeSheet = sheet; return sheet; },
     getSheets: () => Object.keys(sheets).map((ten) => sheets[ten]),
     toast() { dem.toast += 1; return book; },
     insertSheet(ten) {
       sheets[ten] = taoSheet(ten, dem);
+      activeSheet = sheets[ten];
       dem.insertSheet += 1;
       return sheets[ten];
     },
-    deleteSheet(sheet) { delete sheets[sheet.getName()]; return book; },
+    deleteSheet(sheet) {
+      delete sheets[sheet.getName()];
+      if (activeSheet === sheet) { activeSheet = Object.keys(sheets).length ? sheets[Object.keys(sheets)[0]] : null; }
+      return book;
+    },
     _dem: dem
   };
 
@@ -299,7 +364,19 @@ function taoBook(tenSheets) {
       throw new Error('Tệp giả: không có tệp đang mở, đúng như lúc chạy không có ai ngồi trước máy.');
     },
     openById: () => book,
-    flush: () => undefined
+    flush: () => undefined,
+    newDataValidation() {
+      const rule = { criteria: '', values: [], allowInvalid: true, helpText: '' };
+      const builder = {
+        requireValueInList(values, showDropdown) { rule.criteria = 'VALUE_IN_LIST'; rule.values = values.slice(); rule.showDropdown = showDropdown !== false; return builder; },
+        requireNumberGreaterThanOrEqualTo(value) { rule.criteria = 'NUMBER_GREATER_THAN_OR_EQUAL_TO'; rule.values = [value]; return builder; },
+        requireDate() { rule.criteria = 'DATE'; rule.values = []; return builder; },
+        setAllowInvalid(value) { rule.allowInvalid = value; return builder; },
+        setHelpText(value) { rule.helpText = String(value || ''); return builder; },
+        build() { return Object.assign({}, rule, { values: rule.values.slice() }); }
+      };
+      return builder;
+    }
   };
 
   return { book: book, SpreadsheetApp: SpreadsheetApp, dem: dem };

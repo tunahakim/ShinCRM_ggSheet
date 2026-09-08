@@ -1,24 +1,23 @@
 /**
- * Đọc bốn khối còn lại của sheet `Config`. Tài liệu 02 Phần 10.
+ * Đọc ba khối cấu hình dạng bảng của sheet `Config` và dựng lại hợp đồng bộ đếm từ khối tham số.
  *
- * `Config` gồm **năm khối**, mỗi khối là một cặp cột đứng cạnh nhau, dữ liệu mỗi khối chạy dọc độc lập nên các khối dài ngắn khác nhau là chuyện thường. Khối thứ năm — tham số hệ thống — **không** đọc ở đây: nó đã có `configParams()` ở `Settings.js`, thứ nằm dưới đường ghi log nên phải nạp được cả khi mọi thứ khác đổ. Đọc lại nó lần thứ hai ở đây là dựng hai bản đọc cho một khối, và hai bản đọc cùng một thứ là hai bản sẽ lệch nhau vào một ngày nào đó.
+ * `Config` có các khối bảng đứng cạnh nhau; cặp tham số được `configParams()` ở `Settings.js` đọc riêng vì nằm trên đường ghi log. Đọc lại cặp này ở đây là dựng hai bản đọc cho một khối và mở đường cho chúng lệch nhau.
  *
- * Bốn khối đọc ở đây:
+ * Ba khối đọc ở đây:
  *   - **Sheet Schema** — kiểu của cột do người dùng tự thêm.
  *   - **Ngầm định gõ tay** — giá trị mặc định của từng trường.
  *   - **Sắp xếp mặc định** — khối *duy nhất* trong `Config` mà **thứ tự hàng mang nghĩa**.
- *   - **Bộ đếm cấp mã** — số hiện tại của từng dòng mã, do cửa cấp mã đọc và ghi.
+ * Bộ đếm cấp mã nằm chung cặp cột tham số, nhưng vẫn trả về riêng dưới khóa `counters` để client không phụ thuộc cách lưu vật lý.
  *
  * Đọc cả vùng bằng một lệnh rồi tự chẻ theo cột, cùng lý do như `CategoryRead.gs`.
  *
  * **Điều tệp này chưa làm, và cố ý chưa:** phép kiểm nhẹ của tài liệu 02 Phần 10 — ngầm định thuộc loại danh mục thì giá trị phải khớp một mục trong danh mục. Phép đó cần cả bảng ngầm định lẫn bảng danh mục nên không thuộc tệp nào trong hai tệp đọc, và nó chỉ có chỗ hiện ra khi bộ máy ngầm định có thật ở chặng dựng form. Nó vào cùng chặng đó, không phải chặng này.
  */
 
-/** Bốn khối đọc ở tệp này, khai bằng cặp mã cột. Khai thành bảng chứ không viết thẳng vào từng hàm vì cả bốn đọc theo cùng một cách. */
+/** Hai khối tra khóa ở tệp này; khối sắp xếp được đọc riêng vì thứ tự hàng mang nghĩa. */
 var CONFIG_READ_BLOCKS = {
   sheetSchema: { key: '@CFG_COT_MA', value: '@CFG_COT_KIEU', label: 'Sheet Schema' },
-  defaults: { key: '@CFG_NGAM_DINH_MA_COT', value: '@CFG_NGAM_DINH_GIA_TRI', label: 'Ngầm định gõ tay' },
-  counters: { key: '@CFG_BO_DEM_LOAI', value: '@CFG_BO_DEM_GIA_TRI', label: 'Bộ đếm cấp mã' }
+  defaults: { key: '@CFG_NGAM_DINH_MA_COT', value: '@CFG_NGAM_DINH_GIA_TRI', label: 'Ngầm định gõ tay' }
 };
 
 /**
@@ -74,7 +73,7 @@ function configReadSort(columnMap, rows) {
   return levels;
 }
 
-/** Cả bốn khối trong một lượt đọc. Trả về `{ sheetSchema, defaults, counters, sort }`. */
+/** Trả về hợp đồng ổn định `{ sheetSchema, defaults, counters, sort }`. */
 function configReadAll() {
   var sheetName = 'Config';
   var sheet = shinOpenSheet(sheetName);
@@ -85,12 +84,12 @@ function configReadAll() {
   return {
     sheetSchema: configReadBlock(CONFIG_READ_BLOCKS.sheetSchema, columnMap, rows),
     defaults: configReadBlock(CONFIG_READ_BLOCKS.defaults, columnMap, rows),
-    counters: configReadBlock(CONFIG_READ_BLOCKS.counters, columnMap, rows),
+    counters: configCounterValues(configParams()),
     sort: configReadSort(columnMap, rows)
   };
 }
 
-/** Phép nghiệm thu chạy được trên Google: in cả năm khối của `Config` trên tệp thật, kể cả khối tham số do `Settings.js` đọc. */
+/** Phép nghiệm thu chạy được trên Google: in các khối bảng của `Config`, kèm bộ đếm và tham số do `Settings.js` đọc. */
 function probeConfigRead() {
   var report = [];
   var khoi = configReadAll();

@@ -17,10 +17,13 @@ function onOpen() {
     .createMenu(MENU_TITLE)
     .addItem('Mở bảng làm việc', 'shinShowSidebar')
     .addSeparator()
+    .addItem('Tạo sheet quản trị mới…', 'shinCreateViewSheet')
     .addItem('Làm mới dữ liệu sheet quản trị đang mở', 'shinRenderCurrentView')
     .addItem('Làm mới dữ liệu tất cả sheet quản trị', 'shinRenderAllViews')
     .addItem('Chuẩn bị sheet quản trị', 'shinPrepareCurrentView')
     .addItem('Bảng tra nhanh cú pháp lọc', 'shinShowFilterQuickReference')
+    .addSeparator()
+    .addItem('Khôi phục toàn bộ Config về mặc định…', 'shinResetConfig')
     .addToUi();
 
 }
@@ -43,6 +46,30 @@ function shinPrepareCurrentView() {
   return runEntryPoint('shinPrepareCurrentView', 'core', ERROR_CHANNEL_ALERT, function () {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
     return prepareViewSheet(sheet.getName());
+  });
+}
+
+function shinCreateViewSheet() {
+  var ui = SpreadsheetApp.getUi();
+  var answer = ui.prompt('Tạo sheet quản trị mới', 'Nhập tên sheet. ShinCRM sẽ tự thêm dấu ! ở đầu nếu bạn không nhập.', ui.ButtonSet.OK_CANCEL);
+  if (answer.getSelectedButton() !== ui.Button.OK) { return { ok: false, cancelled: true }; }
+  return runEntryPoint('shinCreateViewSheet', 'core', ERROR_CHANNEL_ALERT, function () {
+    return createViewSheet(answer.getResponseText());
+  });
+}
+
+function shinResetConfig() {
+  var ui = SpreadsheetApp.getUi();
+  var answer = ui.alert(
+    'Khôi phục toàn bộ Config về mặc định?',
+    'Thao tác này sẽ xóa toàn bộ Sheet Schema, giá trị ngầm định, cấu hình sắp xếp chung và giá trị tham số bạn đã nhập.\n\n'
+      + 'ShinCRM sẽ dựng lại tiêu đề, ghi chú và danh sách tham số; hai bộ đếm mã được tính lại từ mã lớn nhất trong Customer và Activity. Dữ liệu khách hàng và lịch sử làm việc không bị sửa.\n\n'
+      + 'Bạn có chắc muốn tiếp tục?',
+    ui.ButtonSet.YES_NO
+  );
+  if (answer !== ui.Button.YES) { return { ok: false, cancelled: true }; }
+  return runEntryPoint('shinResetConfig', 'core', ERROR_CHANNEL_ALERT, function () {
+    return resetConfigToDefaults();
   });
 }
 

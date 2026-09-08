@@ -38,7 +38,7 @@ var CATEGORY_COLUMNS = [
 var CATEGORY_FBM_SUFFIX = '_FBM';
 
 /**
- * Năm khối của sheet `Config`, theo tài liệu 02 Phần 10. Mỗi khối là một cặp cột đứng cạnh nhau, dữ liệu mỗi khối
+ * Bốn khối của sheet `Config`. Mỗi khối là một cặp cột đứng cạnh nhau, dữ liệu mỗi khối
  * chạy dọc độc lập nên các khối dài ngắn khác nhau không sao.
  */
 var CONFIG_COLUMNS = [
@@ -49,9 +49,7 @@ var CONFIG_COLUMNS = [
   ['@CFG_NGAM_DINH_MA_COT', 'Ngầm định — mã cột'],
   ['@CFG_NGAM_DINH_GIA_TRI', 'Ngầm định — giá trị'],
   ['@CFG_SORT_COL', 'Sắp xếp — mã cột'],
-  ['@CFG_SORT_LEVEL', 'Sắp xếp — chiều'],
-  ['@CFG_BO_DEM_LOAI', 'Bộ đếm — loại mã'],
-  ['@CFG_BO_DEM_GIA_TRI', 'Bộ đếm — giá trị']
+  ['@CFG_SORT_LEVEL', 'Sắp xếp — chiều']
 ];
 
 /** Chín cột của sheet `Log`, theo tài liệu 10 Phần 2. Không mã `@`, một hàng tiêu đề, dữ liệu từ hàng 2. */

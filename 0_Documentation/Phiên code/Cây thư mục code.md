@@ -58,8 +58,8 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── CellBudget.js         Đo tổng số ô cả tệp và so với trần ở Config. Vượt trần thì chặn hẳn lượt nạp, kèm bảng chỉ mặt sheet nào phình to.
 │   │   ├── EntityRead.js         Đọc bản ghi Customer và Activity ra dạng { fields, rows, rowIndexes } truyền được sang client. Bỏ hàng không có mã và đếm số hàng đã bỏ.
 │   │   ├── CategoryRead.js       Đọc sheet Category thành "mã danh mục → danh sách giá trị". Biết loại cột đi kèm _FBM mà không loại nhầm @CAT_CHO_PHEP_FBM.
-│   │   ├── ConfigRead.js         Đọc bốn khối còn lại của sheet Config. Khóa trùng thì ném lỗi; riêng khối sắp xếp thì thứ tự hàng mang nghĩa nên đọc theo đường khác.
-│   │   └── SetupSheets.js        Dựng và kiểm khung năm sheet từ hai tệp khai ở data\, và gieo sẵn tên tham số hệ thống vào Config để khỏi phải đoán tên. Chạy được nhiều lần, không phá dữ liệu đang có.
+│   │   ├── ConfigRead.js         Đọc các khối bảng của Config và trả hợp đồng counters riêng dù bộ đếm đã lưu chung trong khối tham số.
+│   │   └── SetupSheets.js        Dựng và kiểm khung năm sheet từ hai tệp khai ở data\, rồi gọi lớp chuẩn bị Config. Chạy được nhiều lần, không phá dữ liệu đang có.
 │   ├── util\
 │   │   ├── DateText.js           Biên giới duy nhất giữa Date và hai dạng chuỗi thời gian của dự án. google.script.run không mang Date qua được, nên mọi mốc thời gian đi đường chuỗi.
 │   │   └── TextNormalize.js      Chuẩn hóa văn bản trước khi so sánh. Có một bản sinh đôi ở client\util\ — hai bản phải giống nhau từng dòng.
@@ -245,6 +245,8 @@ Ghi ra đây để chỗ đặt tệp mới là điều đã quyết trước, k
 
 ```
 server\view\                      Dựng sheet quản lý: đọc bộ lọc, sắp xếp, vẽ lại vùng dữ liệu.
+server\view\ViewSheetSetup.js     Tạo sheet quản trị mới từ DATA_SCHEMA, bổ sung hai cột điều khiển còn thiếu, ghi chú và validation 10 cấp sắp xếp.
+server\config\ConfigSheetSetup.js Migration bộ đếm Config cũ, dựng hướng dẫn/validation, gieo tham số và khôi phục Config về mặc định mà không chạm Customer/Activity.
 server\Triggers.js                 Trigger cài đặt đánh dấu dữ liệu bẩn và chuẩn bị sheet quản trị.
 ```
 

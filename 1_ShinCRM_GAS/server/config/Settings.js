@@ -5,7 +5,7 @@
  *
  * Đây cũng là nơi duy nhất biết `LOG_TRACE` đang bật cho nguồn nào. `LogGate` chỉ hỏi `logTraceCoversSource('fbm_sync')` và không biết công tắc nằm ở đâu — nên sau này có đổi chỗ công tắc thì `LogGate` không phải sửa.
  *
- * Điều tệp này cố tình KHÔNG làm: nó chỉ đọc khối tham số hệ thống, không đọc bốn khối còn lại của `Config`. Bốn khối kia đọc ở `ConfigRead.gs`, và ranh giới đó là cố ý: khối tham số nằm **dưới đường ghi log** nên nó phải đọc được cả khi mọi thứ khác đổ, còn bốn khối kia chỉ cần đọc được lúc nạp. Gộp chung thì một dấu ngoặc thiếu ở khối bộ đếm sẽ làm tắt luôn cả log.
+ * Điều tệp này cố tình KHÔNG làm: nó chỉ đọc cặp tham số, không đọc các khối bảng còn lại của `Config`. Bộ đếm cũng lưu trong cặp tham số nhưng được `ConfigRead.js` tách lại thành hợp đồng riêng; ranh giới đọc vẫn giữ để đường log không phụ thuộc các bảng cấu hình khác.
  */
 
 /**

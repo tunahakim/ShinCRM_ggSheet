@@ -95,7 +95,7 @@ function loadCore() {
     try {
       resetSettingsCache();
       config = configReadAll();
-      config.params = configParams();
+      config.params = configUserParams(configParams());
       danhMuc = categoryReadAll();
       khach = entityReadAll('customer');
       soGiaoDich = entityRowCount('activity');

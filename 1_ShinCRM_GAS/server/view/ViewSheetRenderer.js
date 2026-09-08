@@ -103,8 +103,9 @@ function viewSortRows(rows, specs) {
 function viewReadSortPairs(sheet, headerMap, firstRow, lastRow) {
   var colAt = headerMap['@VIEW_SORT_COL'];
   var levelAt = headerMap['@VIEW_SORT_LEVEL'];
-  if (!colAt || !levelAt || lastRow < firstRow) { return []; }
-  var rows = sheet.getRange(firstRow, 1, lastRow - firstRow + 1, Math.max(colAt, levelAt)).getValues();
+  var cappedLastRow = Math.min(lastRow, firstRow + VIEW_SORT_MAX_LEVELS - 1);
+  if (!colAt || !levelAt || cappedLastRow < firstRow) { return []; }
+  var rows = sheet.getRange(firstRow, 1, cappedLastRow - firstRow + 1, Math.max(colAt, levelAt)).getValues();
   return rows.map(function (row) { return { col: String(row[colAt - 1] || '').trim(), level: String(row[levelAt - 1] || '').trim() }; });
 }
 
@@ -408,34 +409,4 @@ function inspectViewState(sheetName, knownRevision) {
       lock.releaseLock();
     }
   });
-}
-
-function prepareViewSheet(sheetName) {
-  var name = String(sheetName || '').trim();
-  var sheet = shinOpenBook().getSheetByName(name);
-  if (!sheet || name.charAt(0) !== '!') { throw new Error('Không tìm thấy sheet quản trị "' + name + '".'); }
-  var lastColumn = sheet.getLastColumn();
-  if (lastColumn < 1) { return { ok: true, sheetName: name }; }
-  var header = sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(function (value) { return String(value || '').trim(); });
-  var levelAt = header.indexOf('@VIEW_SORT_LEVEL') + 1;
-  var colAt = header.indexOf('@VIEW_SORT_COL') + 1;
-  var note = FILTER_QUICK_REFERENCE;
-  header.forEach(function (code, i) {
-    if (code.indexOf('@CUS_') !== 0 && code.indexOf('@ACT_') !== 0 && code.indexOf('@VIEW_') !== 0) { return; }
-    var cell = sheet.getRange(3, i + 1);
-    if (typeof cell.getNote === 'function' && !cell.getNote()) { cell.setNote(note); }
-  });
-  var dataRows = Math.max(1, sheet.getMaxRows() - SHEET_FIRST_DATA_ROW + 1);
-  if (colAt && typeof SpreadsheetApp.newDataValidation === 'function') {
-    var sourceCodes = ['Customer', 'Activity'].reduce(function (all, sourceName) {
-      return all.concat(readColumnMap(sourceName).headerRow.filter(function (code) { return code.indexOf(sourceName === 'Customer' ? '@CUS_' : '@ACT_') === 0; }));
-    }, []);
-    var colRule = SpreadsheetApp.newDataValidation().requireValueInList(sourceCodes, true).setAllowInvalid(true).build();
-    sheet.getRange(SHEET_FIRST_DATA_ROW, colAt, dataRows, 1).setDataValidation(colRule);
-  }
-  if (levelAt && typeof SpreadsheetApp.newDataValidation === 'function') {
-    var rule = SpreadsheetApp.newDataValidation().requireValueInList(['Tăng dần (A → Z)', 'Giảm dần (Z → A)'], true).setAllowInvalid(true).build();
-    sheet.getRange(SHEET_FIRST_DATA_ROW, levelAt, dataRows, 1).setDataValidation(rule);
-  }
-  return { ok: true, sheetName: name, sortColumn: colAt, sortLevel: levelAt };
 }

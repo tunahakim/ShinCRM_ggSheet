@@ -1,5 +1,5 @@
 /**
- * Hàm dựng khung tệp Sheet: năm sheet với đúng số hàng tiêu đề và đúng mã cột của phần lõi, cộng phép gieo tên tham số hệ thống vào `Config`.
+ * Hàm dựng khung tệp Sheet: năm sheet với đúng số hàng tiêu đề và đúng mã cột của phần lõi; Config đi qua lớp chuẩn bị riêng để có migration, ghi chú và validation.
  *
  * Dựng bằng code chứ không gõ tay vì hàng 1 là căn cứ duy nhất để code nhận cột — một mã gõ lệch một chữ không có gì bắt được cho tới lúc nạp. Tệp này không giữ danh sách cột nào của riêng nó, nó hỏi `sheetCoreColumns()`; danh sách tên tham số hỏi `ConfigParams.gs`.
  *
@@ -13,7 +13,7 @@ function setupSheets() {
   var file = shinOpenBook();
   var report = ['ShinCRM — dựng khung sheet', 'Tệp: ' + file.getName(), ''];
 
-  Object.keys(SHEET_LAYOUT).forEach(function (sheetName) {
+  Object.keys(SHEET_LAYOUT).filter(function (sheetName) { return sheetName !== 'Config'; }).forEach(function (sheetName) {
     var layout = SHEET_LAYOUT[sheetName];
     var columns = sheetCoreColumns(sheetName);
     var sheet = file.getSheetByName(sheetName) || file.insertSheet(sheetName);
@@ -39,8 +39,12 @@ function setupSheets() {
     report.push('✅ ' + sheetName + ': ' + columns.length + ' cột lõi, ' + headerRows + ' hàng tiêu đề, dữ liệu từ hàng ' + layout.firstDataRow);
   });
 
-  // Gieo tên tham số sau vòng lặp trên, vì phép tra cột của nó đọc hàng 1 của `Config` — hàng vừa được ghi ở trên.
-  seedConfigParams(file).forEach(function (line) { report.push(line); });
+  var configResult = prepareConfigSheet(file);
+  report.push('✅ Config: ' + CONFIG_COLUMNS.length + ' cột lõi, ' + SHEET_HEADER_ROWS + ' hàng tiêu đề, dữ liệu từ hàng ' + SHEET_FIRST_DATA_ROW);
+  report.push('');
+  report.push('Khối tham số của Config: ' + configResult.seeded.total + ' tên trong danh mục, thêm mới ' + configResult.seeded.added.length
+    + (configResult.seeded.added.length ? ' (' + configResult.seeded.added.join(', ') + ')' : ' — các tên đã có sẵn, giá trị giữ nguyên'));
+  if (configResult.migration.found) { report.push('Đã chuyển hai bộ đếm cũ vào khối tham số và xóa hai cột bộ đếm cũ.'); }
 
   setupColumnFormats().forEach(function (line) { report.push(line); });
 
@@ -59,48 +63,6 @@ function setupSheets() {
   var text = report.join('\n');
   console.log(text);
   return text;
-}
-
-/**
- * Gieo tên tham số hệ thống vào cột `Tham số` của `Config`, ô giá trị để trống.
- *
- * Ô tên là ô của code (ghi chú viết lại mỗi lượt), ô giá trị là ô của người dùng — không bao giờ chạm. Ranh giới đó là lý do chạy lại được nhiều lần mà không xóa mất núm người dùng đã vặn. Tên mới nối dưới dòng cuối của **chính cột tham số**, vì năm khối của `Config` chạy dọc độc lập nên `getLastRow()` của cả sheet sẽ chừa lại khoảng trắng.
- */
-function seedConfigParams(file) {
-  var columnMap = readColumnMap('Config');
-  var nameColumn = columnIndex(columnMap, '@CFG_THAM_SO');
-  var firstDataRow = SHEET_LAYOUT.Config.firstDataRow;
-  var sheet = file.getSheetByName('Config');
-  var lastRow = sheet.getLastRow();
-  var rowOfName = {};
-  var lastFilled = firstDataRow - 1;
-
-  if (lastRow >= firstDataRow) {
-    sheet.getRange(firstDataRow, nameColumn, lastRow - firstDataRow + 1, 1).getValues().forEach(function (row, index) {
-      var name = String(row[0] === null || row[0] === undefined ? '' : row[0]).trim();
-      if (!name) { return; }
-      lastFilled = firstDataRow + index;
-      if (!rowOfName[name]) { rowOfName[name] = firstDataRow + index; }
-    });
-  }
-
-  var catalog = configParamCatalog();
-  var missing = catalog.filter(function (item) { return !rowOfName[item.name]; });
-
-  if (missing.length) {
-    // `setValues` không tự nới lưới. Nới vừa đủ: mỗi hàng thừa là mười ô trừ vào ngân sách ô.
-    sheetGridEnsureRoom(sheet, lastFilled + missing.length, 0);
-    sheet.getRange(lastFilled + 1, nameColumn, missing.length, 1).setValues(missing.map(function (item) { return [item.name]; }));
-    missing.forEach(function (item, index) { rowOfName[item.name] = lastFilled + 1 + index; });
-  }
-
-  catalog.forEach(function (item) { sheet.getRange(rowOfName[item.name], nameColumn).setNote(item.note); });
-
-  // Bộ nhớ tạm của `configParams` giữ bảng đọc trước lúc gieo, nên không xóa thì phần còn lại của lượt chạy này vẫn thấy khối tham số như cũ.
-  resetSettingsCache();
-
-  return ['', 'Khối tham số hệ thống của Config: ' + catalog.length + ' tham số trong danh mục, thêm mới ' + missing.length
-    + (missing.length ? ' (' + missing.map(function (item) { return item.name; }).join(', ') + '), giá trị để trống nghĩa là dùng mặc định' : ' — các tên đã có sẵn, giá trị giữ nguyên không đụng tới')];
 }
 
 /**

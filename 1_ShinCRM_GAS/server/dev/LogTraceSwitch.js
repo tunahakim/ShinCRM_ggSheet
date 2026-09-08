@@ -1,7 +1,7 @@
 /**
  * Công tắc chế độ ghi log chi tiết cho **tệp DEV**: bật hoặc tắt tham số `LOG_TRACE` ở sheet `Config`.
  *
- * Vì sao cần hàm này chứ không gõ tay: sheet `Config` có năm khối cặp cột đứng cạnh nhau, nên có năm cột trông giống "cột tên". Gõ vào sai khối thì tham số không có tác dụng gì, và cách hỏng đó không để lại dấu vết nào — người gõ chỉ thấy log vẫn trống rồi ngồi đoán. Hàm này tra cột theo mã hàng 1 nên không có đường gõ sai.
+ * Vì sao cần hàm này chứ không gõ tay: sheet `Config` có nhiều cặp cột đứng cạnh nhau, nên có nhiều cột trông giống "cột tên". Gõ vào sai khối thì tham số không có tác dụng gì, và cách hỏng đó không để lại dấu vết nào — người gõ chỉ thấy log vẫn trống rồi ngồi đoán. Hàm này tra cột theo mã hàng 1 nên không có đường gõ sai.
  *
  * **Đây là công cụ giai đoạn phát triển, nằm trong `server/dev/` và bị xóa cùng cả thư mục trước khi tệp có dữ liệu thật.** Chỗ đúng cho một công tắc lâu dài là sheet quản trị của chặng 1.5. Trước khi xóa thư mục này thì phải chạy `devLogTraceOff` — vì chế độ vết ghi bí mật ra nguyên văn, và tài liệu 10 Phần 7 cấm chia sẻ tệp trong lúc nó đang bật.
  */
