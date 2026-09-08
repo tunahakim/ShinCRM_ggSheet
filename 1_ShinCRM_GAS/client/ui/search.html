@@ -28,6 +28,9 @@ var SEARCH_BLUR_DELAY = 200;
 /** Dòng đang sáng, `-1` là không dòng nào. */
 var searchFocusAt = -1;
 
+/** Hộp đang mở nhưng tạm ẩn vì người dùng sang màn form; quay lại màn xem thì hiện lại nguyên chữ đã gõ. */
+var searchHeldOpen = false;
+
 /** Hẹn giờ ẩn danh sách, giữ lại để lần rời ô sau hủy cái cũ thay vì xếp thêm cái mới. */
 var searchBlurTimer = null;
 
@@ -164,6 +167,7 @@ function searchClose() {
   searchHideList();
 
   panel.hidden = true;
+  searchHeldOpen = false;
   searchStampToggle();
   return null;
 }
@@ -202,18 +206,26 @@ function searchKeydown(e) {
 }
 
 /**
- * Việc dọn sau mỗi hành động, do bộ phát click gọi: hộp tìm chỉ sống trên màn xem.
+ * Việc dọn sau mỗi hành động, do bộ phát click gọi: hộp tìm chỉ sống trên màn xem, nhưng **không mất đi** khi rời màn xem.
  *
- * Vì sao cần: nút mở hộp chỉ có ở header màn xem, nhưng mở hộp rồi bấm bút chì sửa khách thì form mở ra mà hộp vẫn nổi phía trên — và lúc đó chọn một khách sẽ **không có gì xảy ra**, vì `screenViewSetCustomer` từ chối đổi khách khi còn form đang mở. Đóng hộp lúc rời màn xem thì cái nút không bao giờ hứa một việc nó không làm.
+ * Quyết định 08/09/2026 của chủ dự án: tìm một khách rồi bấm Sửa thì quay lại màn xem hộp phải còn nguyên chữ đã gõ, không bắt tìm lại từ đầu. Nhưng hộp cũng không được nổi đè lên màn form — nên rời màn xem thì hộp **tạm ẩn** (giữ chữ, giữ danh sách), về màn xem thì hiện lại nguyên trạng. Đóng hẳn chỉ bằng nút kính lúp hoặc `Esc`.
  *
  * Đặt ở đây chứ không ở `formScreen`: các tệp trong `client/screen/` không được chạm DOM.
  */
 function searchSyncScreen() {
   if (ScreenState.screen !== SCREEN_VIEW) {
-    if (searchIsOpen()) { searchClose(); }
+    if (searchIsOpen()) {
+      searchHeldOpen = true;
+      searchPanelEl().hidden = true;
+    }
+    searchStampToggle();
     return false;
   }
 
+  if (searchHeldOpen) {
+    searchHeldOpen = false;
+    searchPanelEl().hidden = false;
+  }
   searchStampToggle();
   return true;
 }
@@ -234,6 +246,7 @@ function searchInstall() {
   if (inp.getAttribute(SEARCH_MARK) === '1') { return false; }
 
   inp.addEventListener('input', function () { searchPaint(); });
+  inp.addEventListener('focus', function () { searchPaint(); });
   inp.addEventListener('keydown', searchKeydown);
   inp.addEventListener('blur', function () {
     if (searchBlurTimer) { clearTimeout(searchBlurTimer); }
