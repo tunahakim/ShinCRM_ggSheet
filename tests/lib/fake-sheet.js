@@ -259,7 +259,7 @@ function taoSheet(ten, dem, luoi) {
  * `getActiveSpreadsheet` cố ý **ném lỗi**, mô phỏng đường chạy khi không có ai ngồi trước máy — đúng đường mà `shinOpenBook` phải đi được, và cũng là đường đã từng làm lộ ra lỗi "reading from storage ... NOT_FOUND". `openById` thì trả về tệp giả bất kể ID, nên cổng chặn chạy nhầm tệp không được kiểm ở đây; nó chỉ kiểm được trên Google, nơi có tệp thật để mà nhầm.
  */
 function taoBook(tenSheets) {
-  const dem = { setValues: 0, deleteRows: 0, insertSheet: 0, insertRows: 0, setNumberFormat: 0 };
+  const dem = { setValues: 0, deleteRows: 0, insertSheet: 0, insertRows: 0, setNumberFormat: 0, toast: 0 };
   const sheets = {};
 
   (tenSheets || []).forEach((ten) => { sheets[ten] = taoSheet(ten, dem); });
@@ -278,6 +278,7 @@ function taoBook(tenSheets) {
     getSheetByName: (ten) => sheets[ten] || null,
     getActiveSheet: () => Object.keys(sheets).length ? sheets[Object.keys(sheets)[0]] : null,
     getSheets: () => Object.keys(sheets).map((ten) => sheets[ten]),
+    toast() { dem.toast += 1; return book; },
     insertSheet(ten) {
       sheets[ten] = taoSheet(ten, dem);
       dem.insertSheet += 1;
