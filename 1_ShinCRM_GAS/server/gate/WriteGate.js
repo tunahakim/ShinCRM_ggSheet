@@ -217,7 +217,8 @@ function writeGateSelectCatalog(fields) {
   var cat = categoryReadAll();
   var allowed = {};
   sourceNames.forEach(function (src) {
-    var values = cat.categories[src] || [];
+    var values = cat.categories[src];
+    if (!values || !values.length) { return; }
     allowed[src] = {};
     values.forEach(function (v) { allowed[src][String(v).trim()] = true; });
   });

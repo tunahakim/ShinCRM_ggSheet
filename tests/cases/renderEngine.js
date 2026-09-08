@@ -152,14 +152,14 @@ function chay(so) {
   };
   const o = (spec) => hop.renderNode(hop.Field(spec), ctx);
 
-  // Một phép so nguyên chuỗi, vì bốn luật cùng nằm trong nó: đường dẫn đầy đủ ở `data-field`, nhãn lấy từ bảng khai, `for` khớp `id`, và tên công ty có dấu ngoặc kép không phá được thuộc tính.
+  // Một phép so nguyên chuỗi, vì bốn luật cùng nằm trong nó: đường dẫn đầy đủ ở `data-field`, nhãn lấy từ bảng khai, `for` khớp `id`, dấu * cho trường bắt buộc, và tên công ty có dấu ngoặc kép không phá được thuộc tính.
   check(so, 'trường khai cụt lấy entity của màn, và `data-field` mang đủ đường dẫn',
     o({ field: 'companyName' }),
-    '<div class="shin-field"><div class="shin-field-head"><label class="shin-label" for="shin-f-customer-companyName">Tên công ty</label></div>'
+    '<div class="shin-field"><div class="shin-field-head"><label class="shin-label" for="shin-f-customer-companyName">Tên công ty<span class="shin-label-req" aria-hidden="true"> *</span></label></div>'
     + '<input type="text" class="shin-input" id="shin-f-customer-companyName" data-field="customer.companyName" value="Cty &quot;Xanh&quot; &amp; Co" autocomplete="off" spellcheck="false"></div>');
 
   check(so, 'nhãn khai ở UI_SCHEMA thắng nhãn ở bảng khai trường',
-    o({ field: 'companyName', label: 'Tên KH' }).indexOf('>Tên KH</label>') > 0, true);
+    o({ field: 'companyName', label: 'Tên KH' }).indexOf('>Tên KH<span') > 0, true);
 
   checkThrows(so, 'đường dẫn ba đoạn bị chặn', () => o({ field: 'a.b.c' }), 'phải là `tên trường` hoặc');
   checkThrows(so, 'khai cụt mà ngữ cảnh không có entity thì bị chặn',
@@ -257,7 +257,7 @@ function chay(so) {
 
   check(so, 'không có bản ghi thì ô rỗng — đó là ca form thêm mới, không phải lỗi',
     hop.renderNode(hop.Field({ field: 'companyName' }), { entity: 'customer', records: {} }),
-    '<div class="shin-field"><div class="shin-field-head"><label class="shin-label" for="shin-f-customer-companyName">Tên công ty</label></div>'
+    '<div class="shin-field"><div class="shin-field-head"><label class="shin-label" for="shin-f-customer-companyName">Tên công ty<span class="shin-label-req" aria-hidden="true"> *</span></label></div>'
     + '<input type="text" class="shin-input" id="shin-f-customer-companyName" data-field="customer.companyName" autocomplete="off" spellcheck="false"></div>');
 
   section('renderEngine — gán vào khung, chống nháy, và vẽ lại một vùng');
