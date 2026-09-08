@@ -56,7 +56,7 @@ Nguồn chuẩn: tài liệu 07 (làm mới và sheet quản trị), 08 và 08A 
 - [x] Bản đồ dòng của sheet quản trị trong `LoadService`: thêm khóa theo tên sheet vào cấu trúc đang có, không đổi hình dạng.
 - [x] Ca kiểm tự động cho nhánh dự phòng `bootChunkWithFallback` của chặng 1.2: bộ kiểm ép lỗi từng bậc, xác nhận lùi đúng con trỏ và ném lỗi cuối cùng khi hết bậc.
 - [x] Ba ca offline cho `dispatch.html`, `menu.html`, `collapse.html`: thêm DOM giả tối thiểu và kiểm các đường phát click bất đồng bộ, menu một-lớp/đóng lại, cùng ba nấc thu gọn.
-- [ ] Nghiệm thu Google theo đúng câu chạy thử của chặng: gõ điều kiện lọc bằng dấu `!` trên sheet quản trị và thấy nó in ra đúng, sửa trên sheet thì sidebar nạp lại đúng phần cần.
+- [ ] Nghiệm thu Google theo đúng câu chạy thử của chặng: trên sheet quản trị có tên bắt đầu bằng `!` (ví dụ `!Lead`), gõ điều kiện lọc ở hàng 3 và thấy kết quả đúng; sửa trên sheet kho thì sidebar nạp lại đúng phần cần.
 
 ## Nhóm 4 — Câu hỏi còn chờ chủ dự án duyệt
 
