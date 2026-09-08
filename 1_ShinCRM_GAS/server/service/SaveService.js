@@ -24,6 +24,7 @@ function saveRecord(entity, record) {
     var ra = writeGateSave({ entity: entity, records: [record], source: 'user' });
 
     ra.dirty = dirtyStateRead();
+    ra.selection = selectionSnapshot();
     ra.ms = Date.now() - batDau;
     return ra;
   });
@@ -42,6 +43,7 @@ function deleteRecords(entity, ids) {
     var ra = deleteGateRemove({ entity: entity, ids: ids });
 
     ra.dirty = dirtyStateRead();
+    ra.selection = selectionSnapshot();
     ra.ms = Date.now() - batDau;
     return ra;
   });

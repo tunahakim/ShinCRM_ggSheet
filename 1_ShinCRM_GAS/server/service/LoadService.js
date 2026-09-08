@@ -41,7 +41,7 @@ function loadCore() {
         detail: { total: budget.total, ceiling: budget.ceiling, sheets: budget.sheets }
       });
 
-      return { ok: true, blocked: 'cellBudget', budget: budget, dirty: dirtyStateRead(), ms: Date.now() - batDau };
+      return { ok: true, blocked: 'cellBudget', budget: budget, dirty: dirtyStateRead(), selection: selectionSnapshot(), ms: Date.now() - batDau };
     }
 
     resetSettingsCache();
@@ -86,6 +86,7 @@ function loadCore() {
       prefs: userPrefsRead(),
       budget: budget,
       dirty: dirtyStateRead(),
+      selection: selectionSnapshot(),
       warnings: warnings,
       ms: ms
     };
@@ -153,7 +154,7 @@ function loadActivityChunk(cursor, chunkRows) {
     var coGoi = loadChunkRows(chunkRows);
 
     if (context.rowCount <= 0 || endRow < firstDataRow) {
-      return { ok: true, fields: context.names, rows: [], done: true, nextCursor: null, total: context.rowCount, chunkRows: coGoi, dirty: dirtyStateRead(), ms: Date.now() - batDau };
+      return { ok: true, fields: context.names, rows: [], done: true, nextCursor: null, total: context.rowCount, chunkRows: coGoi, dirty: dirtyStateRead(), selection: selectionSnapshot(), ms: Date.now() - batDau };
     }
 
     var startRow = Math.max(firstDataRow, endRow - coGoi + 1);
@@ -182,6 +183,7 @@ function loadActivityChunk(cursor, chunkRows) {
       total: context.rowCount,
       chunkRows: coGoi,
       dirty: dirtyStateRead(),
+      selection: selectionSnapshot(),
       ms: ms
     };
   });

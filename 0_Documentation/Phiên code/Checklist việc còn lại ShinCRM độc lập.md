@@ -30,14 +30,14 @@ Làm theo đúng thứ tự, mỗi mục một commit. Phía Extension chỉ s�
 - [x] Extension bắn ảnh chụp trạng thái `CRM_CONTEXT` thay tin `CRM_TRIGGER`: đủ các trường sheet, gid, sheetName, cellRef thô, row/col/rowEnd/colEnd, selectionKind, cellText, isEditing, sheetTabs, at, seq. Hai tệp `2_ShinCRM_Extension/content_scripts/scout/sheet_scout.js` và `.../bridge/iframe_bridge.js`. Ghi vào docstring những thứ không đọc được vì lưới là canvas. Bản Extension đang chạy thật ngoài repo là V20.2 và có sẵn vá lỗi đổi tab — chỉ đọc nó để lấy nếp đó, không sửa nó.
 - [x] Bịt hai lỗ an ninh của cầu nối: phía bridge chỉ bắt tay với origin googleusercontent nằm trong allowlist, đáp `CRM_HANDSHAKE_ACK` kèm đúng nonce, bỏ hẳn `'*'`; phía sidebar bỏ mọi tin sai nonce, sai spreadsheetId, hoặc sai origin.
 - [x] Sidebar: tệp mới `client/link/sheetLink.html` kèm dòng include trong `Sidebar.html`; giải mã khách ba bước — cellText khớp dạng mã khách, rồi `Store.getCustomerIdByRow`, rồi không làm gì. Chọn ra mã thì đi qua `ACTIONS.setCurrentCustomer`, không dựng event bus. `bootstrap.html` gọi `sheetLinkSetSpreadsheetId(core.spreadsheetId)` sau `ingestCore`.
-- [ ] Máy chủ: khung `server/service/SelectionService.js`, `viewProbeSelection` và đường mở tệp bằng `shinOpenBook()` đã có; còn phải sửa `probeSelectionFull` vì nó đang luôn tra bản đồ `Customer` theo số hàng, chưa phân biệt `Customer`, `Activity`, sheet quản trị và sheet không thuộc kho nên có thể trả nhầm khách.
 - [x] Nút sét thành icon riêng trên header màn xem, gộp làm một với `followSelection` và bỏ mục đó khỏi menu Khác; trạng thái nhớ ở UserProperties như mọi núm.
-- [ ] Bắt tay có tiếng đáp: sidebar bắn `CRM_HANDSHAKE` mỗi giây kèm nonce, bridge đáp ACK ngay; ba nhịp không đáp thì kết luận vắng Extension. Không suy tình trạng sống từ việc im lặng của `CRM_CONTEXT`.
-- [ ] Nhịp dò hai bậc 2 giây và 6 giây, chỉ chạy khi công tắc bật và vắng Extension và tab đang hiện; bốn tín hiệu đánh thức kéo về bậc nhanh; bốn luật loại trừ của bộ đếm. Bốn tham số khai ở SETTINGS.
-- [ ] Đèn báo bốn trạng thái trên chính icon sét, cộng băng cảnh báo một dòng khi vắng Extension, có thời gian ân hạn ba giây lúc mở sidebar.
-- [ ] Đính vị trí ô đang chọn vào mọi phản hồi máy chủ — lưu, xóa, nạp lại đều đã chạm máy chủ nên không tốn thêm vòng nào.
-- [ ] Sửa tài liệu 07: Phần 2 thêm ngoại lệ polling duy nhất được nêu tên, Phần 3 bỏ câu "rơi về nút Nạp lại", Phần 6 thêm nút sét vào bảng núm nhớ.
-- [ ] Hai ca kiểm offline `tests/cases/selectionPoll.js` (quan trọng nhất: có ACK đều thì không gọi máy chủ lần nào kể cả khi sheet ngồi im hai phút) và `tests/cases/selectionService.js`, đăng ký vào `NHOM_CA` trong `tests/run.js`.
+- [x] Máy chủ: `SelectionService` phân biệt `Customer`, `Activity`, sheet quản trị và sheet không thuộc kho; header, hàng trống và vùng không chắc chắn trả rỗng, không mở nhầm khách. `viewProbeSelection` và đường mở tệp bằng `shinOpenBook()` vẫn hoạt động.
+- [x] Bắt tay có tiếng đáp: sidebar bắn `CRM_HANDSHAKE` mỗi giây kèm nonce, bridge đáp ACK ngay; ba nhịp không đáp thì kết luận vắng Extension. Không suy tình trạng sống từ việc im lặng của `CRM_CONTEXT`.
+- [x] Nhịp dò hai bậc 2 giây và 6 giây, chỉ chạy khi công tắc bật và vắng Extension và tab đang hiện; bốn tín hiệu đánh thức kéo về bậc nhanh; bốn luật loại trừ của bộ đếm. Bốn tham số khai ở SETTINGS.
+- [x] Đèn báo bốn trạng thái trên chính icon sét, cộng băng cảnh báo một dòng khi vắng Extension, có thời gian ân hạn ba giây lúc mở sidebar.
+- [x] Đính vị trí ô đang chọn vào mọi phản hồi máy chủ — lưu, xóa, nạp lại đều đã chạm máy chủ nên không tốn thêm vòng nào.
+- [x] Sửa tài liệu 07: Phần 2 thêm ngoại lệ polling duy nhất được nêu tên, Phần 3 bỏ câu "rơi về nút Nạp lại", Phần 6 thêm nút sét vào bảng núm nhớ.
+- [x] Hai ca kiểm offline `tests/cases/selectionPoll.js` (quan trọng nhất: có ACK đều thì không gọi máy chủ lần nào kể cả khi sheet ngồi im hai phút) và `tests/cases/selectionService.js`, đăng ký vào `NHOM_CA` trong `tests/run.js`.
 - [ ] Nghiệm thu Google: `node tests/gas.js viewProbeSelection --push`, đứng ở hàng khách phải ra đúng mã, đứng ở hàng 2 phải rỗng; ghi lại thời gian một vòng — quá một giây thì giãn nhịp dò.
 - [ ] Chủ dự án chép Extension và bấm năm phép thử tay theo đúng thứ tự trong plan: chưa cài, cài rồi, ca ngồi im hai phút, tắt Extension giữa chừng, và thang bậc nhịp dò.
 

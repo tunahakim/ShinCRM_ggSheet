@@ -4,8 +4,9 @@
 
 function selectionProbeContext() {
   var book = shinOpenBook();
-  var sheet = book.getActiveSheet();
-  return { book: book, sheet: sheet, range: sheet ? sheet.getActiveRange() : null };
+  var sheet = typeof book.getActiveSheet === 'function' ? book.getActiveSheet() : null;
+  var range = sheet && typeof sheet.getActiveRange === 'function' ? sheet.getActiveRange() : null;
+  return { book: book, sheet: sheet, range: range };
 }
 
 /** Ảnh chụp vị trí dùng chung cho mọi phản hồi máy chủ; không tự bọc cửa vào và không đọc trạng thái bẩn. */
@@ -23,7 +24,7 @@ function selectionSnapshotFromContext(context) {
 
   return {
     spreadsheetId: context.book.getId(),
-    gid: sheet ? String(sheet.getSheetId()) : '',
+    gid: sheet && typeof sheet.getSheetId === 'function' ? String(sheet.getSheetId()) : '',
     sheetName: sheet ? sheet.getName() : '',
     cellRef: range ? range.getA1Notation() : '',
     row: row,
