@@ -57,6 +57,8 @@ Nguồn chuẩn: tài liệu 07 (làm mới và sheet quản trị), 08 và 08A 
 - [x] Ca kiểm tự động cho nhánh dự phòng `bootChunkWithFallback` của chặng 1.2: bộ kiểm ép lỗi từng bậc, xác nhận lùi đúng con trỏ và ném lỗi cuối cùng khi hết bậc.
 - [x] Ba ca offline cho `dispatch.html`, `menu.html`, `collapse.html`: thêm DOM giả tối thiểu và kiểm các đường phát click bất đồng bộ, menu một-lớp/đóng lại, cùng ba nấc thu gọn.
 - [x] Nghiệm thu Google phần sheet quản trị: bản GAS `@66`, phép `viewProbeAutoRender` sửa điều kiện lọc hàng 3 của `!Lead` qua đúng trigger `shinOnEdit`, kết quả tự đổi từ 97 dòng còn đúng một dòng `KH000097` rồi tự khôi phục. Renderer đã đọc cả cột người dùng trực tiếp từ kho, áp dụng đủ ba nấc sắp xếp, chặn mã sai trước khi xóa dữ liệu, gắn lỗi vào note đúng ô và có bảng tra nhanh trong menu.
+- [x] Hợp nhất bộ đếm vào cặp tham số Config: migration an toàn từ `@CFG_BO_DEM_*`, giữ hợp đồng `config.counters`, ghi chú và validation theo metadata, cùng lệnh khôi phục toàn bộ Config về mặc định nhưng tính lại bộ đếm từ mã lớn nhất và không chạm Customer/Activity.
+- [x] Hoàn thiện chuẩn bị sheet quản trị: tự thêm cột điều khiển còn thiếu không trùng mã, dropdown mã cột lấy từ Customer/Activity thật, giới hạn 10 cấp ở hàng 4–13, và menu tạo sheet mới với bộ trường Customer/Activity cơ bản gồm ghi chú khách hàng.
 - [ ] Chủ dự án nghiệm thu phần nối với sidebar: sửa một ô dữ liệu trên `Customer` hoặc `Activity`, chuyển sang `!Lead`, xác nhận sidebar nạp lại đúng khách vừa sửa và sheet quản trị tự cập nhật mà không bấm nút làm mới.
 
 ## Nhóm 4 — Câu hỏi còn chờ chủ dự án duyệt
