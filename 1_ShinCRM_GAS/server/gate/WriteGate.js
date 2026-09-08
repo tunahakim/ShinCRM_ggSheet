@@ -319,6 +319,18 @@ function writeGateForceTextFormat(context, firstRow, soDong, cotChu) {
 }
 
 /**
+ * Thêm dấu nháy đơn vào đầu mọi chuỗi ghi vào cột chữ — quyết định bắt buộc của chủ dự án ngày 08/09/2026.
+ *
+ * Vì sao: khuôn `@` giữ số 0 đầu lúc **code** ghi, nhưng không giữ được lúc **người dùng** đổi khuôn ô sang số hoặc Tự động rồi gõ lại ô đó. Dấu nháy đơn là dấu "đây là văn bản" của chính Google — ô mang nó thì thanh công thức hiện `'0101243150` còn ô hiện `0101243150`, và `getValue` đọc về chuỗi không có dấu nháy, nên đường nạp và mọi phép kiểm trùng không hề biết chuyện gì xảy ra. Thừa một dấu nháy dễ dọn hơn mất số 0 đầu.
+ *
+ * Đặt ở đây chứ không ở `writeGateBuild`: mọi phép kiểm — bắt buộc, hợp lệ, trùng — phải chạy trên giá trị sạch, và thêm dấu nháy trước chúng là tự làm lệch phép trùng với sheet. Chuỗi rỗng không thêm: ô rỗng phải ở lại rỗng.
+ */
+function writeGateQuoteText(giaTri) {
+  if (typeof giaTri !== 'string' || giaTri === '') { return giaTri; }
+  return "'" + giaTri;
+}
+
+/**
  * Ghi các bản ghi mới thành **một khối liền mạch** ngay dưới dòng cuối đang có dữ liệu.
  *
  * Tập cột của khối là **hợp** các khóa mà các bản ghi trong lô mang; bản ghi nào thiếu một khóa của tập đó thì ô ấy ghi rỗng. Đây là chỗ duy nhất cửa ghi ghi rỗng lên một khóa bản ghi không mang, và nó đúng vì dòng đang được dựng mới: ô đó vốn trống.
@@ -341,7 +353,8 @@ function writeGateWriteNew(moi, context, colOf, nameAt, laCotChu) {
     var values = moi.map(function (plan) {
       return dai.map(function (at) {
         var ten = nameAt[at];
-        return Object.prototype.hasOwnProperty.call(plan.values, ten) ? plan.values[ten] : '';
+        var giaTri = Object.prototype.hasOwnProperty.call(plan.values, ten) ? plan.values[ten] : '';
+        return laCotChu[at] ? writeGateQuoteText(giaTri) : giaTri;
       });
     });
     context.sheet.getRange(firstRow, dai[0] + 1, moi.length, dai.length).setValues(values);
@@ -360,7 +373,10 @@ function writeGateWriteExisting(cu, context, colOf, nameAt, laCotChu) {
     writeGateForceTextFormat(context, plan.row, 1, cols.filter(function (at) { return laCotChu[at]; }));
 
     writeGateRanges(cols).forEach(function (dai) {
-      var dong = dai.map(function (at) { return plan.values[nameAt[at]]; });
+      var dong = dai.map(function (at) {
+        var giaTri = plan.values[nameAt[at]];
+        return laCotChu[at] ? writeGateQuoteText(giaTri) : giaTri;
+      });
       context.sheet.getRange(plan.row, dai[0] + 1, 1, dai.length).setValues([dong]);
     });
   });

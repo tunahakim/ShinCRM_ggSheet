@@ -27,7 +27,12 @@ const KHUON_TEXT = '@';
  * Chỉ nhận **chuỗi toàn chữ số**, không dấu phân cách. Hẹp hơn Google có ý thức, và cái hẹp này là cố ý ở hai mức: `1.500` hay `1,500` thì nghĩa của dấu chấm phụ thuộc miền của tệp, mà đoán sai miền thì tệp giả không còn nghiêm hơn thật, nó chỉ **sai khác** thật — một ô hóa ra 1,5 trong khi Google cho 1500. Phần chưa mô phỏng (ngày tháng, phần trăm, công thức) vẫn là chỗ tệp giả dễ tính hơn thật, nên phép nghiệm thu trên Google vẫn là lời cuối.
  */
 function epTheoKhuon(giaTri, khuon) {
-  if (typeof giaTri !== 'string' || khuon === KHUON_TEXT) { return giaTri; }
+  if (typeof giaTri !== 'string') { return giaTri; }
+
+  // Dấu nháy đơn đầu chuỗi là dấu "đây là văn bản" người gõ đặt vào: Google nuốt dấu nháy đó và giữ phần còn lại nguyên dạng chuỗi, kể cả khi ô đang ở khuôn số. Đo trên sheet thật ngày 08/09/2026: `setValue("'0101243150")` đọc lại bằng `getValue` ra `0101243150` ở cả khuôn `@` lẫn khuôn General.
+  if (giaTri.charAt(0) === "'") { return giaTri.slice(1); }
+
+  if (khuon === KHUON_TEXT) { return giaTri; }
 
   const text = giaTri.trim();
   if (!text || !/^-?\d+$/.test(text)) { return giaTri; }
