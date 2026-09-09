@@ -70,6 +70,11 @@ async function chay(so) {
   check(so, 'bootstrap khong gui authorized cu', started.request.body.authorized, null);
   const resumed = orchestration.FbmSync.start({ mode: 'read' });
   check(so, 'start thu lai tiep tuc dung authorize Customer ban dau', [resumed.ok, resumed.resumed, resumed.request.meta.entity], [true, true, 'customer']);
+  const staleState = JSON.parse(props.data[orchestration.FbmSync.STATE_KEY]);
+  staleState.runId = 'old-run'; staleState.updatedAt = Date.now() - 120000;
+  props.data[orchestration.FbmSync.STATE_KEY] = JSON.stringify(staleState);
+  const restarted = orchestration.FbmSync.start({ mode: 'read' });
+  check(so, 'authorize cu qua mot phut duoc thay bang phien moi', [restarted.ok, restarted.resumed, orchestration.FbmSync.stateRead().runId === 'old-run'], [true, undefined, false]);
   check(so, 'lookup san pham dung controller FBM that', orchestration.FbmSync.SYNC_LOOKUPS.filter((item) => item.key === '@CAT_SAN_PHAM')[0].controller, 'crdmsp');
   const previewState = { metadata: {} };
   orchestration.FbmSync.previewRecords(previewState, 'customer', [{ fbmCustomerCode: 'ALT00010', companyName: 'Test', fbmId: 'A1' }]);
@@ -110,6 +115,9 @@ async function chay(so) {
   check(so, 'edit begin bi chan khi record dang bi sync khoa', recordLocks.FbmSync.editBegin('customer', 'C-1', 'h1').code, 'RECORD_BUSY');
   recordLocks.FbmSync.unlockRecord('customer', 'C-1');
   check(so, 'save duoc phep sau khi nha khoa sync', recordLocks.FbmSync.saveAllowed('customer', 'C-1', 'h1').ok, true);
+  recordLocks.FbmSync.lockRecord('customer', 'C-2', 'h2', 'user');
+  recordLocks.FbmSync.stateStart('', 'checking_session', 0);
+  check(so, 'phien sync moi giu khoa cua form nguoi dung', recordLocks.FbmSync.stateRead().locks['customer:C-2'].owner, 'user');
 
   const pushProps = { data: {} };
   const pushPropertyApi = { getProperty: (key) => pushProps.data[key] || null, setProperty: (key, value) => { pushProps.data[key] = String(value); } };

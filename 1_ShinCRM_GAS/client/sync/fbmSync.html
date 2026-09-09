@@ -160,12 +160,20 @@ function fbmSyncCancel() {
   FBM_SYNC_CLIENT.running = false;
   return callServer('fbmCancelSync').then(fbmSyncPaint);
 }
+/** Mô tả chặng đang chờ mà không ghi thêm tiến độ tạm vào GAS. */
+function fbmSyncWaitingStatus(status, message) {
+  var snapshot = status && (status.status || status) || {};
+  return Object.assign({}, snapshot, { message: message });
+}
 /** Chạy chuỗi request GAS -> Extension cho tới khi hết cursor. */
 function fbmSyncLoop(status) {
   fbmSyncPaint(status);
   if (!status || !status.request) { FBM_SYNC_CLIENT.running = false; return status; }
+  var entity = status.request.meta && status.request.meta.entity === 'activity' ? 'giao dịch' : 'khách hàng';
+  fbmSyncPaint(fbmSyncWaitingStatus(status, 'Đang chờ tab FBM trả dữ liệu ' + entity + '...'));
   return fbmSyncExtensionRequest(status.request).then(function (response) {
     if (!FBM_SYNC_CLIENT.running) { return fbmSyncStatusOnce(); }
+    fbmSyncPaint(fbmSyncWaitingStatus(status, 'Đã nhận phản hồi FBM; đang chờ GAS xử lý...'));
     return callServer('fbmContinueSync', [response]);
   }).then(fbmSyncLoop);
 }

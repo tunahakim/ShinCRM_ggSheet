@@ -164,10 +164,12 @@ FbmSync.start = function (options) {
   // Mỗi call chỉ trả một request; ngữ cảnh nhiều bước nằm trong DocumentProperties.
   var current = FbmSync.stateRead();
   if (current.runId && ['idle', 'done', 'error'].indexOf(current.phase) < 0) {
-    if (current.phase === 'checking_session' && current.cursor && current.cursor.kind === 'authorize_customer') {
+    var initialAuthorize = current.phase === 'checking_session' && current.cursor && current.cursor.kind === 'authorize_customer';
+    var recent = Date.now() - Number(current.updatedAt || 0) <= 60000;
+    if (initialAuthorize && recent) {
       return { ok: true, request: FbmSync.nextEnvelope(FbmSync.authorizeRequest('customer')), status: FbmSync.statusView(), resumed: true };
     }
-    return { ok: false, code: 'SYNC_ALREADY_RUNNING', status: FbmSync.statusView() };
+    if (!initialAuthorize) { return { ok: false, code: 'SYNC_ALREADY_RUNNING', status: FbmSync.statusView() }; }
   }
   if (typeof fbmEnsureSyncColumns === 'function') { fbmEnsureSyncColumns(); }
   var opt = options || {}, state = FbmSync.stateStart('', 'checking_session', 0);
