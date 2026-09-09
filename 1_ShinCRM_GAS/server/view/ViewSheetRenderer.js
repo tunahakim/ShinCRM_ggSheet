@@ -232,20 +232,6 @@ function viewColumnSpans(columns) {
   return spans;
 }
 
-/** Đọc lại bản đồ dòng hiện có sau khi trigger đã làm mới sheet mà sidebar không nhận được giá trị trả về. */
-function viewSheetRowMaps(sheet, sheetName) {
-  var maps = {};
-  var rowMap = {};
-  maps[sheetName] = rowMap;
-  var idColumn = selectionColumnIndex(sheet, DATA_SCHEMA.customer.id.code);
-  if (!idColumn || sheet.getLastRow() < SHEET_FIRST_DATA_ROW) { return maps; }
-  var values = sheet.getRange(SHEET_FIRST_DATA_ROW, idColumn, sheet.getLastRow() - SHEET_FIRST_DATA_ROW + 1, 1).getValues();
-  values.forEach(function (row, i) {
-    if (row[0] !== '' && row[0] !== null && row[0] !== undefined) { rowMap[String(SHEET_FIRST_DATA_ROW + i)] = String(row[0]); }
-  });
-  return maps;
-}
-
 function viewRenderSheetLocked(book, sheet, name) {
   var config = configReadAll();
   var customerContext = entityReadContext('customer');
@@ -258,8 +244,7 @@ function viewRenderSheetLocked(book, sheet, name) {
     dirtyStateClearViewSheet(name);
     viewInputSignatureWrite(sheet);
     var emptyRevision = viewRevisionBump(sheet);
-    var emptyMaps = {}; emptyMaps[name] = {};
-    return { ok: true, sheetName: name, rowMaps: emptyMaps, viewMeta: viewInputMetaFromHeader([], emptyRevision), rows: 0 };
+    return { ok: true, sheetName: name, viewMeta: viewInputMetaFromHeader([], emptyRevision), rows: 0 };
   }
   var header = sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(function (value) { return String(value || '').trim(); });
   var filterRow = sheet.getRange(3, 1, 1, lastColumn).getValues()[0];
@@ -326,14 +311,12 @@ function viewRenderSheetLocked(book, sheet, name) {
       sheet.getRange(SHEET_FIRST_DATA_ROW, span[0], rows.length, span[1]).setValues(matrix);
     });
   }
-  var rowMap = {};
-  rows.forEach(function (row, i) { rowMap[String(SHEET_FIRST_DATA_ROW + i)] = row.customer[customerIdCode]; });
   viewClearErrorNotes(sheet, writable);
   SpreadsheetApp.flush();
   dirtyStateClearViewSheet(name);
   viewInputSignatureWrite(sheet);
   var revision = viewRevisionBump(sheet);
-  return { ok: true, sheetName: name, rowMaps: (function () { var map = {}; map[name] = rowMap; return map; }()), viewMeta: viewInputMetaFromHeader(header, revision), rows: rows.length };
+  return { ok: true, sheetName: name, viewMeta: viewInputMetaFromHeader(header, revision), rows: rows.length };
 }
 
 function renderViewSheet(sheetName) {
@@ -359,7 +342,7 @@ function renderAllViewSheets() {
 function viewProbeRenderCurrent() {
   var sheet = shinOpenBook().getActiveSheet();
   var result = renderViewSheet(sheet.getName());
-  var report = ['Sheet: ' + result.sheetName, 'Số dòng: ' + result.rows, 'RowMap: ' + JSON.stringify(result.rowMaps[result.sheetName] || {})];
+  var report = ['Sheet: ' + result.sheetName, 'Số dòng: ' + result.rows];
   report.forEach(function (line) { Logger.log(line); });
   return report;
 }
@@ -377,13 +360,13 @@ function renderViewIfDirty(sheetName) {
     if (state.all || state.config || state.viewSheets.indexOf(name) >= 0 || inputChanged) {
       return viewRenderSheetLocked(book, sheet, name);
     }
-    return { ok: true, skipped: true, sheetName: name, rowMaps: viewSheetRowMaps(sheet, name), viewMeta: viewInputMeta(sheet) };
+    return { ok: true, skipped: true, sheetName: name, viewMeta: viewInputMeta(sheet) };
   } finally {
     lock.releaseLock();
   }
 }
 
-/** Kiểm tra nhẹ trước khi client quyết định có cần khóa sidebar và đồng bộ rowMap hay không. */
+/** Kiểm tra nhẹ trước khi client quyết định có cần khóa sidebar và làm mới view hay không. */
 function inspectViewState(sheetName, knownRevision) {
   return runEntryPoint('inspectViewState', 'sidebar', 'throw', function () {
     var started = Date.now();

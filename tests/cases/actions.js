@@ -52,7 +52,7 @@ function dungCanh() {
   hop._ramLucGui = [];
   hop.callServer = (name, args) => {
     hop._daGui.push(name + '(' + JSON.stringify(args) + ')');
-    if (!args || !args.length) { return loiHua({ ok: true, rowMaps: {} }); }
+    if (!args || !args.length) { return loiHua({ ok: true }); }
     hop._ramLucGui.push(hop.Prefs[args[0]]);
     const tra = { followSelection: hop.Prefs.followSelection, autoRenderView: hop.Prefs.autoRenderView, activityView: hop.Prefs.activityView };
     tra[args[0]] = args[1];

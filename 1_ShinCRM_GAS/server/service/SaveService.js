@@ -38,7 +38,7 @@ function saveRecord(entity, record) {
 /**
  * Xóa một hoặc nhiều bản ghi. Nhận mảng mã vì phép hoàn tác gom mấy lần bấm Xóa liền nhau thành một lời gọi.
  *
- * Trả về `{ ok: true, entity, hard, soft, reasons, rowMaps, dirty, ms }`. Client bỏ mọi mã trong `hard` khỏi bộ nhớ bằng `Store.removeRecord`, ghi đè mọi dòng trong `soft` bằng `Store.upsertRecord`, thay bản đồ dòng bằng `Store.applyRowMaps`, rồi hiện `reasons` nếu có — mỗi câu trong đó nói vì sao một bản ghi chỉ được xóa mềm.
+ * Trả về `{ ok: true, entity, hard, soft, reasons, dirty, ms }`. Client bỏ mọi mã trong `hard` khỏi bộ nhớ bằng `Store.removeRecord`, ghi đè mọi dòng trong `soft` bằng `Store.upsertRecord`, rồi hiện `reasons` nếu có — mỗi câu trong đó nói vì sao một bản ghi chỉ được xóa mềm.
  *
  * Đây là đường ghi duy nhất mà mảng đi tới tầng này, và nó khác `saveRecord` ở chỗ mảng mã có nguồn thật: dải hoàn tác đếm ngược một lần cho nhiều lần bấm.
  */
@@ -108,7 +108,6 @@ function probeSaveGate() {
 
   var xoa = deleteRecords('customer', [ma]);
   report.push('Xóa: xóa hẳn ' + JSON.stringify(xoa.hard) + ', xóa mềm ' + Object.keys(xoa.reasons).length + ', ' + xoa.ms + 'ms');
-  report.push('  bản đồ dòng gửi kèm cho sheet nào: ' + Object.keys(xoa.rowMaps).join(', '));
 
   var soHangCuoi = entityRowCount('customer');
   report.push((soHangCuoi === soHangDau ? '✅' : '❌') + ' Sau khi dọn: ' + soHangCuoi + ' hàng, ban đầu ' + soHangDau + ' hàng');

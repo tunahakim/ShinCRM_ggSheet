@@ -7,7 +7,7 @@
  *
  * **Một — xóa hẳn nhiều dòng thì xóa từ dưới lên.** Xóa dòng 5 làm dòng 9 thành dòng 8; xóa từ dưới lên thì số hàng của những dòng chưa xử lý không xê dịch giữa chừng. Đây là loại lỗi chỉ hiện ra khi xóa từ hai dòng trở lên, nên nó sống rất lâu trong một hệ mà người ta luôn xóa một dòng.
  *
- * **Hai — bản đồ dòng mới trả về ngay trong cùng lần gọi** `[RÀNG BUỘC CỨNG]`. Xóa hẳn làm mọi dòng bên dưới xê dịch, nên cây cầu "người dùng vừa bấm vào hàng này, đó là khách nào" hỏng ngay lúc lệnh xóa chạy xong. Tách việc dựng lại bản đồ thành một bước riêng là dựng một bước mà ai đó sẽ quên gọi.
+ * **Hai — đọc lại bản ghi mềm sau khi xóa hẳn.** Xóa hẳn làm mọi dòng bên dưới xê dịch, nên dữ liệu trả về phải được đọc lại theo mã sau khi thao tác hoàn tất.
  *
  * Cửa này **không xóa lan** sang giao dịch của khách bị xóa. Không có đường nào trên sidebar xóa một khách, nên phép xóa lan hôm nay là code không ai gọi; và một phép xóa lan chạm hai sheet trong một lần khóa thì phải được chốt bằng tay chứ không phải sinh ra như một hệ quả phụ.
  */
@@ -35,32 +35,7 @@ function deleteGateAllowHard(entity, id) {
 }
 
 /**
- * Bản đồ "số hàng → mã bản ghi" của một sheet, dựng bằng một lệnh đọc cột mã.
- *
- * Trả về object khóa chuỗi chứ không trả về mảng thưa, cùng lý do với `loadRowMap`: mảng thưa qua `google.script.run` biến mọi chỗ trống thành `null` và gửi hết chúng đi.
- */
-function deleteGateRowMap(context) {
-  var byId = writeGateRowById(context);
-  var map = {};
-  Object.keys(byId).forEach(function (ma) { map[String(byId[ma])] = ma; });
-  return map;
-}
-
-/**
- * Bản đồ dòng gửi về sau khi xóa. Chỉ dựng lại khi thật sự có dòng bị xóa hẳn, và chỉ cho sheet **có** bản đồ.
- *
- * Sheet `Activity` cố ý không có bản đồ dòng — không có đường nào bấm vào một giao dịch trên sheet để mở nó — nên xóa một giao dịch không làm hỏng bản đồ nào, và dựng lại là trả tiền cho một câu trả lời không ai hỏi.
- */
-function deleteGateRowMaps(entity, soXoaHan) {
-  if (!soXoaHan || entity !== 'customer') { return {}; }
-
-  var maps = {};
-  maps[ENTITY_SHEETS.customer] = deleteGateRowMap(entityReadContext('customer'));
-  return maps;
-}
-
-/**
- * Xóa một hoặc nhiều bản ghi. Nhận `{ entity, ids }`, trả về `{ ok, entity, hard, soft, reasons, rowMaps, ms }`.
+ * Xóa một hoặc nhiều bản ghi. Nhận `{ entity, ids }`, trả về `{ ok, entity, hard, soft, reasons, ms }`.
  *
  * `hard` là mảng mã đã xóa hẳn — bộ nhớ phải **bỏ** chúng đi. `soft` là `{ fields, rows }` của những dòng chỉ bị xóa mềm, đúng hình dạng đường nạp, để bộ nhớ ghi đè lại chúng qua `Store.upsertRecord`. `reasons` nói vì sao từng mã ấy không xóa hẳn được, để hiện cho người dùng đọc.
  *
@@ -79,7 +54,7 @@ function deleteGateRemove(yeuCau) {
     throw new Error('Không có thực thể "' + entity + '" trong DATA_SCHEMA. Chỉ có: ' + Object.keys(DATA_SCHEMA).join(', ') + '.');
   }
   if (!ids.length) {
-    return { ok: true, entity: entity, hard: [], soft: { fields: entityReadFields(entity), rows: [] }, reasons: {}, rowMaps: {}, ms: Date.now() - batDau };
+    return { ok: true, entity: entity, hard: [], soft: { fields: entityReadFields(entity), rows: [] }, reasons: {}, ms: Date.now() - batDau };
   }
 
   var khoa = LockService.getDocumentLock();
@@ -161,7 +136,6 @@ function deleteGateRun(entity, ids, batDau) {
     hard: maHard,
     soft: doc,
     reasons: reasons,
-    rowMaps: deleteGateRowMaps(entity, maHard.length),
     ms: ms
   };
 }

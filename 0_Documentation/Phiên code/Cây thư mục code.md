@@ -56,7 +56,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── SheetIo.js            Đọc hàng 1 thành bảng tra "mã cột → số cột". Mọi thao tác cột đi qua đây, không ai được đếm cột bằng tay.
 │   │   ├── SheetGrid.js          Sự thật về lưới: đếm hàng dữ liệu, đọc một khối ô, nới lưới trước khi ghi. Ra đời từ lỗi thật làm sheet Log co xuống 7 hàng rồi tắt log trong im lặng.
 │   │   ├── CellBudget.js         Đo tổng số ô cả tệp và so với trần ở Config. Vượt trần thì chặn hẳn lượt nạp, kèm bảng chỉ mặt sheet nào phình to.
-│   │   ├── EntityRead.js         Đọc bản ghi Customer và Activity ra dạng { fields, rows, rowIndexes } truyền được sang client. Bỏ hàng không có mã và đếm số hàng đã bỏ.
+│   │   ├── EntityRead.js         Đọc bản ghi Customer và Activity ra dạng { fields, rows } truyền được sang client. Bỏ hàng không có mã và đếm số hàng đã bỏ.
 │   │   ├── CategoryRead.js       Đọc sheet Category thành "mã danh mục → danh sách giá trị". Biết loại cột đi kèm _FBM mà không loại nhầm @CAT_CHO_PHEP_FBM.
 │   │   ├── ConfigRead.js         Đọc các khối bảng của Config và trả hợp đồng counters riêng dù bộ đếm đã lưu chung trong khối tham số.
 │   │   └── SetupSheets.js        Dựng và kiểm khung năm sheet từ hai tệp khai ở data\, rồi gọi lớp chuẩn bị Config. Chạy được nhiều lần, không phá dữ liệu đang có.
@@ -70,11 +70,11 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── FieldLogic.js         Ba bảng chuẩn hóa - kiểm tra - bắt buộc của tài liệu 03 Phần 6, phía máy chủ. Cắt trắng và trần 50.000 ký tự là mặc định của bộ máy, không khai trong schema.
 │   │   ├── IdGate.js             Cấp mã bản ghi từ bộ đếm ở Config, chỉ chạy bên trong khóa của cửa ghi. Bộ đếm lạc hậu thì nhảy lên max+1 kèm dòng cảnh báo chứ không cấp mã đã có.
 │   │   ├── WriteGate.js          Cửa ghi duy nhất xuống sheet dữ liệu: khóa, cấp mã, ghi đúng cột đã khai bằng một hai lệnh, flush rồi nhả khóa. Không đạt một trường thì không ghi gì và không trả về số hàng.
-│   │   └── DeleteGate.js         Một nút Xóa, hai kết cục: xóa hẳn khi không tầng nào cản, xóa mềm khi có. Xóa nhiều dòng thì xóa từ dưới lên, và trả bản đồ dòng mới ngay trong cùng lần gọi.
+│   │   └── DeleteGate.js         Một nút Xóa, hai kết cục: xóa hẳn khi không tầng nào cản, xóa mềm khi có. Xóa nhiều dòng thì xóa từ dưới lên và đọc lại bản ghi mềm.
 │   ├── service\
 │   │   ├── LoadService.js        Gom cả một lượt nạp: đo ngân sách ô, đọc tham số, danh mục, toàn bộ khách, rồi giao dịch theo gói.
 │   │   ├── SaveService.js        Vỏ bọc vào ra của hai cửa ghi: bọc lỗi, gắn khối trạng thái bẩn, đo mili giây. Luật ghi nằm ở gate\, không nằm đây.
-│   │   └── SelectionService.js   Vòng dò khi không có Extension: probeSelectionCheap trả tọa độ ô đang chọn, probeSelectionFull thêm tra mã khách qua bản đồ dòng. Mở tệp bằng shinOpenBook chứ không lấy tệp đang hoạt động.
+│   │   └── SelectionService.js   Vòng dò khi không có Extension: probeSelectionCheap trả tọa độ ô đang chọn, probeSelectionFull đọc trực tiếp cột mã của hàng đang chọn theo DATA_SCHEMA. Mở tệp bằng shinOpenBook chứ không lấy tệp đang hoạt động.
 │   ├── log\
 │   │   ├── LogGate.js            Cửa ghi log: gom dòng trong RAM, ghi xuống sheet Log bằng đúng một lệnh, che bí mật, cắt log theo hai trần.
 │   │   └── ClientTiming.js       Cửa nhận bản đo thời gian ĐO Ở TRÌNH DUYỆT rồi đệm một dòng vết. Máy chủ không tự thấy tiền đi đường, nên số này phải do client gửi. Không tin số client: kẹp trần, bỏ khóa lạ.
@@ -97,7 +97,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │                             Thư mục con chia theo MỤC ĐÍCH, không chia theo đuôi thẻ.
 │   ├── Sidebar.html              Trang gốc của sidebar: nhúng mọi tệp client theo đúng thứ tự rồi gọi lượt nạp đầu tiên.
 │   ├── link\                     Cầu nối ô đang chọn: ưu tiên postMessage an toàn từ Extension, khi vắng mới mở đường dò máy chủ có nhịp và luật dừng.
-│   │   ├── sheetLink.html        Tai nghe tin CRM_CONTEXT từ Extension: giải mã khách ba bước rồi bật followSelection. Bắt tay có tiếng đáp, đèn sống chết suy từ ACK chứ không suy từ im lặng.
+│   │   ├── sheetLink.html        Tai nghe CRM_CONTEXT từ Extension: kiểm tra customerId trực tiếp rồi bật followSelection. Bắt tay có tiếng đáp, đèn sống chết suy từ ACK chứ không suy từ im lặng.
 │   │   └── selectionPoll.html    Máy trạng thái dự phòng khi vắng Extension: nhịp dò 2/6 giây, bốn luật dừng, đèn sét bốn trạng thái và băng cảnh báo sau ba giây ân hạn.
 │   ├── ram\                      Kho dữ liệu trong RAM của sidebar, và đường nhận dữ liệu từ máy chủ.
 │   │   ├── store.html            Kho runtime cùng mười đường tra duy nhất được chạm vào nó. Không đường nào nhận tham số chế độ xem.
@@ -188,7 +188,7 @@ tests\
     ├── schemaAccess.js           Cửa đọc bảng khai: tên gõ sai nổ ngay kèm gợi ý, còn tên máy như toJSON thì phải đi qua.
     ├── fieldLogic.js             Sáu hàm ngầm định: mã kế tiếp lấy từ bộ đếm dạng chuỗi, và giá trị mang theo từ giao dịch gần nhất CÒN SỐNG.
     ├── loadService.js            Hình dạng gói loadCore, đường chặn vì ngân sách ô, và con trỏ gói giao dịch đi ngược từ hàng cuối.
-    ├── selectionService.js       Tra ô đang chọn đúng theo Customer, Activity hoặc bản đồ dòng của sheet quản trị; vùng tiêu đề, hàng trống và sheet ngoài kho đều trả rỗng.
+    ├── selectionService.js       Tra ô đang chọn đúng theo Customer, Activity hoặc cột mã hiện tại của sheet quản trị; vùng tiêu đề, hàng trống và sheet ngoài kho đều trả rỗng.
     ├── ramStore.js               NGHIỆM THU CHẶNG 1.2: hai hộp cát, dữ liệu đi qua cầu google.script.run thật, và ba luật tra cứu khác nhau của Store.
     ├── screenState.js            Ngăn xếp form: screen là trường thật chứ không suy ra từ đỉnh ngăn xếp, nên push và pop phải giữ hai bên khớp. Kiểm luôn bẫy window.screen.
     ├── prefs.js                  Ngầm định phía client khớp từng núm với máy chủ — lệch thì lần mở đầu tiên hiện một nấc rồi tự nhảy sang nấc khác.

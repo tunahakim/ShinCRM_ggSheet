@@ -136,8 +136,6 @@ function pendingDeleteDone(entity, ids, res) {
   if (res.soft && res.soft.rows && res.soft.rows.length) {
     ingestUnpack(res.soft.fields, res.soft.rows).forEach(function (r) { Store.upsertRecord(entity, r); });
   }
-  if (res.rowMaps) { Store.applyRowMaps(res.rowMaps); }
-
   var ly = Object.keys(res.reasons || {});
   if (ly.length) {
     alert('Có ' + ly.length + ' bản ghi chỉ xóa mềm được — dòng vẫn còn trên sheet:\n' + ly.map(function (id) { return '• ' + id + ': ' + res.reasons[id]; }).join('\n'));

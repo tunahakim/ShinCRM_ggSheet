@@ -29,7 +29,7 @@ Làm theo đúng thứ tự, mỗi mục một commit. Phía Extension chỉ s�
 
 - [x] Extension bắn ảnh chụp trạng thái `CRM_CONTEXT` thay tin `CRM_TRIGGER`: đủ các trường sheet, gid, sheetName, cellRef thô, row/col/rowEnd/colEnd, selectionKind, cellText, isEditing, sheetTabs, at, seq. Hai tệp `2_ShinCRM_Extension/content_scripts/scout/sheet_scout.js` và `.../bridge/iframe_bridge.js`. Ghi vào docstring những thứ không đọc được vì lưới là canvas. Bản Extension đang chạy thật ngoài repo là V20.2 và có sẵn vá lỗi đổi tab — chỉ đọc nó để lấy nếp đó, không sửa nó.
 - [x] Bịt hai lỗ an ninh của cầu nối: phía bridge chỉ bắt tay với origin googleusercontent nằm trong allowlist, đáp `CRM_HANDSHAKE_ACK` kèm đúng nonce, bỏ hẳn `'*'`; phía sidebar bỏ mọi tin sai nonce, sai spreadsheetId, hoặc sai origin.
-- [x] Sidebar: tệp mới `client/link/sheetLink.html` kèm dòng include trong `Sidebar.html`; giải mã khách ba bước — cellText khớp dạng mã khách, rồi `Store.getCustomerIdByRow`, rồi không làm gì. Chọn ra mã thì đi qua `ACTIONS.setCurrentCustomer`, không dựng event bus. `bootstrap.html` gọi `sheetLinkSetSpreadsheetId(core.spreadsheetId)` sau `ingestCore`.
+- [x] Sidebar: tệp mới `client/link/sheetLink.html` kèm dòng include trong `Sidebar.html`; nhận `customerId` trực tiếp từ `CRM_CONTEXT`, chỉ kiểm tra mã đó có trong `Store` rồi đi qua `ACTIONS.setCurrentCustomer`, không tra theo dòng và không dựng event bus. `bootstrap.html` gọi `sheetLinkSetSpreadsheetId(core.spreadsheetId)` sau `ingestCore`.
 - [x] Nút sét thành icon riêng trên header màn xem, gộp làm một với `followSelection` và bỏ mục đó khỏi menu Khác; trạng thái nhớ ở UserProperties như mọi núm.
 - [x] Máy chủ: `SelectionService` phân biệt `Customer`, `Activity`, sheet quản trị và sheet không thuộc kho; header, hàng trống và vùng không chắc chắn trả rỗng, không mở nhầm khách. `viewProbeSelection` và đường mở tệp bằng `shinOpenBook()` vẫn hoạt động.
 - [x] Bắt tay có tiếng đáp: sidebar bắn `CRM_HANDSHAKE` mỗi giây kèm nonce, bridge đáp ACK ngay; ba nhịp không đáp thì kết luận vắng Extension. Không suy tình trạng sống từ việc im lặng của `CRM_CONTEXT`.
@@ -47,13 +47,13 @@ Nguồn chuẩn: tài liệu 07 (làm mới và sheet quản trị), 08 và 08A 
 
 - [x] Chiều ghi của DirtyState: đọc ghi trạng thái bẩn và ngưỡng chuyển sang cờ bẩn toàn bộ, tài liệu 07 Phần 2 và Phần 3. API hợp nhất/dedupe/ngưỡng đã có; trigger và đường làm mới vẫn nằm ở các mục bên dưới.
 - [x] Ngôn ngữ lọc và sắp xếp thành module riêng theo tài liệu 08 và hợp đồng 08A: parser ba cấp, pattern TEXT/SELECT/NUMBER/DATE, ngày tương đối, Activity lấy lần sống gần nhất, tie-break mã khách và ô rỗng cuối; cú pháp sai dừng trước khi chạm sheet. `normalizeText` phía máy chủ giống phía client.
-- [x] `server/view/ViewSheetRenderer`: lọc, sắp, ghi các dải cột `CUS_`/`ACT_` được phép và dựng bản đồ dòng mới trong cùng lần gọi; loại giao dịch đã xóa, ghép lần sống gần nhất, giữ khách chưa có giao dịch, và không xóa dữ liệu khi cú pháp sai.
+- [x] `server/view/ViewSheetRenderer`: lọc, sắp và ghi các dải cột `CUS_`/`ACT_` được phép; loại giao dịch đã xóa, ghép lần sống gần nhất, giữ khách chưa có giao dịch, và không xóa dữ liệu khi cú pháp sai.
 - [x] `server/Triggers.js`: có đường `shinOnEdit`/`shinOnChange` và hàm cài trigger installable; `onOpen` dựng menu.
 - [x] Ba lệnh view trong menu Sheets của `server/entry/Menu.js`: làm mới dữ liệu sheet đang mở, làm mới dữ liệu tất cả sheet, và `prepareViewSheet` idempotent.
-- [x] Công tắc tự động làm mới sheet: sau lưu/xóa đánh dấu các sheet quản trị và làm mới ngay sheet đang mở khi `autoRenderView` bật; khi Extension báo chuyển sang sheet quản trị, sidebar gọi `renderViewIfDirty` rồi cập nhật rowMap.
-- [x] Client `client/ram/refresh.html`: xử lý khối trạng thái bẩn, nạp lại đúng mã bản ghi khi rời sheet kho và cập nhật rowMap cùng lượt.
+- [x] Công tắc tự động làm mới sheet: sau lưu/xóa đánh dấu các sheet quản trị và làm mới ngay sheet đang mở khi `autoRenderView` bật; khi Extension báo chuyển sang sheet quản trị, sidebar gọi `renderViewIfDirty` để cập nhật view metadata. Đường chọn khách không nhận dữ liệu vị trí.
+- [x] Client `client/ram/refresh.html`: xử lý khối trạng thái bẩn và nạp lại đúng mã bản ghi khi rời sheet kho; sheet quản trị được renderer đọc lại độc lập.
 - [x] Nối nút "Làm mới dữ liệu sheet quản trị đang mở" trên header vào `shinRenderCurrentView`.
-- [x] Bản đồ dòng của sheet quản trị trong `LoadService`: thêm khóa theo tên sheet vào cấu trúc đang có, không đổi hình dạng.
+- [x] Renderer sheet quản trị không giữ trạng thái vị trí: mỗi lượt đọc lại kho, lọc, sắp và ghi dữ liệu hiện tại.
 - [x] Ca kiểm tự động cho nhánh dự phòng `bootChunkWithFallback` của chặng 1.2: bộ kiểm ép lỗi từng bậc, xác nhận lùi đúng con trỏ và ném lỗi cuối cùng khi hết bậc.
 - [x] Ba ca offline cho `dispatch.html`, `menu.html`, `collapse.html`: thêm DOM giả tối thiểu và kiểm các đường phát click bất đồng bộ, menu một-lớp/đóng lại, cùng ba nấc thu gọn.
 - [x] Nghiệm thu Google phần sheet quản trị: bản GAS `@66`, phép `viewProbeAutoRender` sửa điều kiện lọc hàng 3 của `!Lead` qua đúng trigger `shinOnEdit`, kết quả tự đổi từ 97 dòng còn đúng một dòng `KH000097` rồi tự khôi phục. Renderer đã đọc cả cột người dùng trực tiếp từ kho, áp dụng đủ ba nấc sắp xếp, chặn mã sai trước khi xóa dữ liệu, gắn lỗi vào note đúng ô và có bảng tra nhanh trong menu.

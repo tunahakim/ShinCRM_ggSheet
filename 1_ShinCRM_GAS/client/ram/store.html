@@ -27,7 +27,6 @@ var STORE_READY = 'ready';
 var Store = {
   customers: {},
   activitiesByCustomer: {},
-  rowMaps: {},
   searchIndex: [],
   categories: {},
   config: {},
@@ -38,7 +37,6 @@ var Store = {
 function storeReset() {
   Store.customers = {};
   Store.activitiesByCustomer = {};
-  Store.rowMaps = {};
   Store.searchIndex = [];
   Store.categories = {};
   Store.config = {};
@@ -80,8 +78,8 @@ function storeHaystack(customer) {
 /**
  * Bản ghi khách theo mã. **Không có mã thì ném lỗi kèm mã sai, không trả về rỗng.** Tài liệu 05 Phần 9 **`[RÀNG BUỘC CỨNG]`**.
  *
- * Cùng tinh thần với `Schema`: một mã khách không tra ra bản ghi luôn là dấu hiệu bản đồ dòng đã cũ, và đó là thứ phải hét
- * lên. Trả về rỗng thì màn hình hiện một khách trắng và người dùng tưởng khách bị mất dữ liệu.
+ * Cùng tinh thần với `Schema`: một mã khách không tra ra bản ghi là dữ liệu không nhất quán, và đó là thứ phải hét lên. Trả
+ * về rỗng thì màn hình hiện một khách trắng và người dùng tưởng khách bị mất dữ liệu.
  *
  * Khách đã xóa mềm vẫn tra ra bình thường — "đã xóa" là một giá trị của `recordStatus`, không phải sự vắng mặt.
  */
@@ -90,7 +88,7 @@ Store.getCustomer = function (id) {
     return Store.customers[id];
   }
 
-  throw new Error('Không có khách mã "' + id + '" trong bộ nhớ. Bộ nhớ đang giữ ' + Object.keys(Store.customers).length + ' khách; nếu mã này vừa lấy từ bản đồ dòng thì bản đồ đó đã cũ.');
+  throw new Error('Không có khách mã "' + id + '" trong bộ nhớ. Bộ nhớ đang giữ ' + Object.keys(Store.customers).length + ' khách; mã nguồn không nhất quán với dữ liệu đã nạp.');
 };
 
 /**
@@ -121,19 +119,6 @@ Store.getLatestActivity = function (customerId) {
   }
 
   return null;
-};
-
-/**
- * Cầu nối tọa độ ô: mã khách ở một dòng của một sheet, hoặc rỗng.
- *
- * Rỗng là hành vi đúng, không phải lỗi: click vào vùng tiêu đề hay một dòng trống thì không mở gì. Vì thế hàm này ngược
- * hẳn với `getCustomer` — ở đây bên gọi là một cú click bất kỳ của người dùng, còn ở kia bên gọi là code đã có mã trong tay.
- */
-Store.getCustomerIdByRow = function (sheetName, rowIndex) {
-  var map = Store.rowMaps[sheetName];
-  if (!map) { return ''; }
-
-  return map[rowIndex] || '';
 };
 
 /**
@@ -312,17 +297,4 @@ Store.removeRecord = function (entity, id) {
   throw new Error('removeRecord không biết thực thể "' + entity + '". Chỉ có "customer" và "activity".');
 };
 
-/**
- * Thay bản đồ dòng của một hoặc nhiều sheet bằng bản mới của máy chủ. Nhận đúng hình dạng `{ '<tên sheet>': { '<số hàng>': '<mã>' } }`.
- *
- * **Thay** chứ không trộn: xóa hẳn một dòng làm mọi dòng bên dưới xê dịch lên, nên bản cũ sai ở phần đuôi chứ không phải thiếu ở phần đuôi. Trộn vào thì những cặp cuối của bản cũ sống sót và trỏ vào khách đã dịch chỗ — đúng loại lỗi mà người dùng gặp dưới dạng "bấm vào khách này lại mở khách khác".
- *
- * Bản đồ rỗng thì không đổi gì, vì cửa xóa cố ý chỉ gửi bản đồ khi có dòng bị xóa hẳn.
- */
-Store.applyRowMaps = function (rowMaps) {
-  var maps = rowMaps || {};
-  Object.keys(maps).forEach(function (sheetName) {
-    Store.rowMaps[sheetName] = ingestRowMapArray(maps[sheetName]);
-  });
-};
 </script>

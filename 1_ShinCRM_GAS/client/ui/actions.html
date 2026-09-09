@@ -117,7 +117,6 @@ ACTIONS.setActivityView = function (payload) {
 ACTIONS.renderActiveViewSheet = function () {
   return sidebarBusyRun('Đang cập nhật sheet quản trị…', function () {
     return callServer('shinRenderCurrentView', ['sidebar']).then(function (result) {
-      if (result && result.rowMaps && typeof Store.applyRowMaps === 'function') { Store.applyRowMaps(result.rowMaps); }
       return result;
     });
   });

@@ -91,7 +91,6 @@ function saveFlowApply(entity, res) {
   var recs = ingestUnpack(res.fields, res.rows);
   recs.forEach(function (r) { Store.upsertRecord(entity, r); });
 
-  if (res.rowMaps) { Store.applyRowMaps(res.rowMaps); }
   return recs[0] || null;
 }
 

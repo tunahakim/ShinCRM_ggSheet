@@ -6,7 +6,6 @@
  * Ba luật tra cứu **khác nhau** của `Store` là trọng tâm, vì chúng khác nhau có chủ ý và rất dễ bị "dọn cho đồng bộ":
  *   - `getCustomer` thiếu mã thì **ném lỗi** — bên gọi là code đã có mã trong tay, nên tra không ra nghĩa là bản đồ hàng đã cũ, và đó là thứ phải hét lên.
  *   - `getActivities` trả **mảng rỗng** — khách chưa có giao dịch nào là chuyện thường.
- *   - `getCustomerIdByRow` trả **chuỗi rỗng** — bên gọi là một cú click bất kỳ, và click vào hàng tiêu đề thì không mở gì.
  */
 
 const { dungHop, ghiO } = require('../lib/dung-hop');
@@ -115,17 +114,6 @@ function chayTraCuu(so, nen, hop, hangDau) {
   check(so, 'getActivities của khách chưa có giao dịch trả MẢNG RỖNG, không ném — ở đây rỗng là câu trả lời đúng',
     hop.Store.getActivities('KH0002'), []);
   check(so, 'getActivities của mã không tồn tại cũng trả mảng rỗng, không ném', hop.Store.getActivities('KH9999'), []);
-
-  // Cầu nối tọa độ. Ba câu trả lời khác nhau cho ba loại click, và cả ba đều là chuỗi rỗng chứ không phải lỗi.
-  check(so, 'getCustomerIdByRow trả đúng mã khách ở hàng đó', hop.Store.getCustomerIdByRow('Customer', hangDau), 'KH0001');
-  check(so, 'click vào hàng tiêu đề trả CHUỖI RỖNG, không ném — click vào đó thì không mở gì',
-    hop.Store.getCustomerIdByRow('Customer', 1), '');
-  check(so, 'click vào hàng trống giữa vùng dữ liệu cũng trả chuỗi rỗng',
-    hop.Store.getCustomerIdByRow('Customer', hangDau + 2), '');
-  check(so, 'click ở sheet không có bảng tra trả chuỗi rỗng — Activity cố tình không có bảng tra',
-    hop.Store.getCustomerIdByRow('Activity', hangDau), '');
-  check(so, 'bảng tra là MẢNG THƯA đánh chỉ số theo số hàng thật, đúng hình dạng tài liệu 05 Phần 7',
-    [Array.isArray(hop.Store.rowMaps.Customer), hop.Store.rowMaps.Customer[hangDau + 3]], [true, 'KH0003']);
 
   // Chỉ mục tìm kiếm: khách còn sống trước, khách đã xóa sau, và bỏ dấu thì vẫn khớp.
   check(so, 'tìm không dấu vẫn khớp tên có dấu', hop.Store.searchCustomers('dong a').map((k) => k.id), ['KH0001', 'KH0002']);

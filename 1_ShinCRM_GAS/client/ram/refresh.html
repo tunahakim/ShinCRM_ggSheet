@@ -15,7 +15,6 @@ function refreshRecordsApply(result, requestedIds) {
     var list = Store.activitiesByCustomer[id] || [];
     list.slice().forEach(function (record) { if (!activityIds[record.id] && record.customerId === id) { Store.removeRecord('activity', record.id); } });
   });
-  Store.applyRowMaps(result.rowMaps || {});
   renderScreen();
 }
 

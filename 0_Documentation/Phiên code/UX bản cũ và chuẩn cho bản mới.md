@@ -162,9 +162,9 @@ Vì sao cần: Chrome nhớ mọi thứ đã gõ vào một ô cùng tên và bu
 
 ### 1.11 Nối với Extension (tiện ích Chrome)
 
-Cứ 500 mili giây sidebar gửi `CRM_HANDSHAKE` (bắt tay) lên `window.top`. Extension bắt cú bấm ô trên Sheet rồi gửi lại `CRM_TRIGGER` kèm tên sheet, dòng, cột. Sidebar dịch dòng đó thành mã khách qua bản đồ vị trí trong RAM và đổi khách **không gọi máy chủ**.
+Cứ một giây sidebar gửi `CRM_HANDSHAKE` (bắt tay) lên `window.top`. Extension bắt cú bấm ô trên Sheet rồi gửi `CRM_CONTEXT` kèm tọa độ và `customerId` đã đọc từ live model. Sidebar kiểm tra mã có trong RAM rồi đổi khách **không gọi máy chủ**; khi Extension mất ACK mới dùng fallback máy chủ đọc trực tiếp cột mã trên hàng đang chọn.
 
-Ba luật của "vùng cấm" để việc tự đổi khách không cản việc sửa cấu hình sheet: hàng 1 (mã cột), hàng 3 (bộ lọc), và hai cột sắp xếp đều là vùng cấm. Đang ở vùng cấm thì không đổi khách; **rời vùng cấm ra ngoài** thì nạp lại bản đồ vị trí ngay — tức là sửa bộ lọc xong bấm ra ngoài là danh sách tự cập nhật.
+Ba luật của "vùng cấm" để việc tự đổi khách không cản việc sửa cấu hình sheet: hàng 1 (mã cột), hàng 3 (bộ lọc), và hai cột sắp xếp đều là vùng cấm. Đang ở vùng cấm thì không đổi khách; **rời vùng cấm ra ngoài** thì kiểm tra lại trạng thái view và chỉ làm mới sheet khi cần.
 
 ---
 

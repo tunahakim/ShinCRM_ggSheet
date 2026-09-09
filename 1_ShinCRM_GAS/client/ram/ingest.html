@@ -33,17 +33,6 @@ function ingestUnpack(fields, rows) {
 }
 
 /**
- * Đổi bảng tra hàng → mã của đường truyền (object khóa chuỗi) thành **mảng thưa** đánh chỉ số theo số hàng thật, đúng hình dạng chốt ở tài liệu 05 Phần 7.
- *
- * Ba phần tử đầu luôn rỗng vì hàng một tới ba là tiêu đề, và hàng nào không có bản ghi cũng rỗng. Tra vào chỗ rỗng trả về rỗng, và click vào đó không mở gì — đó là hành vi đúng, nên không cần cờ nào cho vùng tiêu đề.
- */
-function ingestRowMapArray(map) {
-  var arr = [];
-  Object.keys(map).forEach(function (key) { arr[Number(key)] = map[key]; });
-  return arr;
-}
-
-/**
  * Dựng bộ nhớ từ gói `loadCore`. Trả về danh sách phép kiểm đã bị bỏ qua, để bên gọi in ra chứ không im lặng.
  *
  * Bộ tự kiểm schema ném lỗi khi có vấn đề, và ném là đúng: một bảng khai sai không sửa được từ trong sidebar, nên chạy tiếp
@@ -77,10 +66,6 @@ function ingestCore(payload) {
   ingestUnpack(payload.customer.fields, payload.customer.rows).forEach(function (customer) {
     Store.customers[customer.id] = customer;
     Store.searchIndex.push({ id: customer.id, haystack: storeHaystack(customer) });
-  });
-
-  Object.keys(payload.rowMaps).forEach(function (sheetName) {
-    Store.rowMaps[sheetName] = ingestRowMapArray(payload.rowMaps[sheetName]);
   });
 
   Store.activityState = STORE_LOADING;

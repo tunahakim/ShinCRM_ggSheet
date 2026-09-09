@@ -3,11 +3,10 @@
  *
  * Tệp này biết về **thực thể và cột**: bảng khai trường nào, mã cột `@` nào, kiểu gì. Nó không biết về lưới (chuyện đó ở `SheetGrid.gs`) và không biết về trình tự khởi động hay cỡ gói (chuyện đó ở `LoadService.gs`).
  *
- * **Dạng truyền là Array of Arrays**, không phải mảng object: `{ fields, rows, rowIndexes }`. Lý do là kích thước. Một object có hai mươi khóa nhắc lại tên khóa ở từng bản ghi; với 1.700 khách thì tên trường được gửi 1.700 lần. Gửi bảng tên **một lần** ở `fields` rồi gửi các hàng giá trị thuần cắt payload xuống khoảng một phần ba, và payload là thứ quyết định lượt mở sidebar mất hai giây hay tám giây.
+ * **Dạng truyền là Array of Arrays**, không phải mảng object: `{ fields, rows }`. Lý do là kích thước. Một object có hai mươi khóa nhắc lại tên khóa ở từng bản ghi; với 1.700 khách thì tên trường được gửi 1.700 lần. Gửi bảng tên **một lần** ở `fields` rồi gửi các hàng giá trị thuần cắt payload xuống khoảng một phần ba, và payload là thứ quyết định lượt mở sidebar mất hai giây hay tám giây.
  *
  * `fields` chứa **tên trường**, tuyệt đối không chứa mã cột `@`. Mã cột chỉ tồn tại ở `DataSchema.gs` và ở hàng 1 của sheet; để nó lọt sang client là mở đường cho client tự đọc sheet theo mã, và khi đó bảng khai không còn là bản gốc duy nhất nữa.
  *
- * `rowIndexes` là số hàng thật trên sheet của từng bản ghi, xếp song song với `rows`. Cần nó vì client phải dựng `rowMaps` để trả lời câu hỏi "người dùng vừa bấm vào hàng này, đó là khách nào" — cầu nối tọa độ giữa sheet và sidebar. Không suy ra được số hàng bằng phép cộng dồn, vì hàng trắng giữa vùng dữ liệu bị bỏ qua.
  */
 
 /** Tên các trường của một thực thể, theo đúng thứ tự khai. Đây là bảng `fields` gửi kèm mỗi gói. */
@@ -86,16 +85,15 @@ function entityReadCell(value, field, timezone) {
 }
 
 /**
- * Đọc `rowCount` hàng kể từ hàng `firstRow`, dùng bối cảnh đã dựng sẵn. Trả về `{ entity, fields, rows, rowIndexes, blankRows }`.
+ * Đọc `rowCount` hàng kể từ hàng `firstRow`, dùng bối cảnh đã dựng sẵn. Trả về `{ entity, fields, rows, blankRows }`.
  *
  * **Bỏ qua hàng không có mã bản ghi**, và đếm số hàng đã bỏ vào `blankRows`. Đây không phải phép lọc theo nội dung — máy chủ vẫn gửi mọi bản ghi, kể cả bản ghi đã xóa mềm, đúng theo ràng buộc cứng của tài liệu 05 Phần 4. Đây là phép loại hàng **không phải bản ghi**: người dùng xóa nội dung một hàng mà không xóa hàng thì để lại một hàng trắng, và một hàng trắng đi tới client sẽ thành một khách có mã rỗng, ghi đè lên đúng ô `customers[""]` mà hàng trắng tiếp theo cũng nhắm vào. Đếm số hàng bỏ qua để con số đó hiện ra ở log thay vì biến mất trong im lặng.
  *
- * **Không đảo thứ tự trong gói.** Luật nạp ngược của tài liệu 05 Phần 4 nói về **gói nào đọc trước**, và việc chọn gói là của `LoadService.gs`. Trong một gói thì hàng vẫn xếp từ trên xuống, vì `rowIndexes` phải khớp với `rows` và vì client dù sao cũng sắp lại một lần sau khi nạp xong.
+ * **Không đảo thứ tự trong gói.** Luật nạp ngược của tài liệu 05 Phần 4 nói về **gói nào đọc trước**, và việc chọn gói là của `LoadService.gs`. Trong một gói, hàng vẫn xếp từ trên xuống để giữ thứ tự đọc ổn định.
  */
 function entityReadRange(context, firstRow, rowCount) {
   var block = sheetGridReadBlock(context.sheet, firstRow, rowCount, context.columnMap.lastColumn);
   var rows = [];
-  var rowIndexes = [];
   var blankRows = 0;
 
   block.forEach(function (raw, offset) {
@@ -107,10 +105,9 @@ function entityReadRange(context, firstRow, rowCount) {
     }
 
     rows.push(record);
-    rowIndexes.push(firstRow + offset);
   });
 
-  return { entity: context.entity, fields: context.names, rows: rows, rowIndexes: rowIndexes, blankRows: blankRows };
+  return { entity: context.entity, fields: context.names, rows: rows, blankRows: blankRows };
 }
 
 /** Đọc trọn một thực thể trong một lượt. Dùng cho `customer`, thứ tài liệu 05 Phần 4 yêu cầu nạp hết ngay ở `loadCore`. */
@@ -149,9 +146,7 @@ function probeEntityRead() {
     report.push(entity + ' (' + ENTITY_SHEETS[entity] + '): ' + goi.rows.length + ' bản ghi, ' + goi.blankRows + ' hàng trắng bỏ qua');
     report.push('  fields (' + goi.fields.length + '): ' + goi.fields.join(', '));
     report.push('  không có mã cột @ nào lọt vào fields? ' + !goi.fields.some(function (name) { return name.indexOf('@') === 0; }));
-    goi.rows.slice(0, 3).forEach(function (row, i) {
-      report.push('  hàng ' + goi.rowIndexes[i] + ': ' + JSON.stringify(row));
-    });
+    goi.rows.slice(0, 3).forEach(function (row) { report.push('  hàng mẫu: ' + JSON.stringify(row)); });
   });
 
   report.forEach(function (line) { Logger.log(line); });

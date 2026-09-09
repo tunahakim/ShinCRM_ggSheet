@@ -40,6 +40,9 @@ function chay(so) {
   ghiO(nen, 'Customer', 6, '@CUS_MA_KH', 'CUS-000006');
   ghiO(nen, 'Activity', 4, '@ACT_MA_GD', 'ACT-000004');
   ghiO(nen, 'Activity', 4, '@ACT_MA_KH', 'CUS-000099');
+  const lead = nen.book.getSheetByName('!Lead');
+  lead.getRange(1, 1).setValue('@CUS_MA_KH');
+  lead.getRange(7, 1).setValue('CUS-000007');
 
   check(so, 'Customer tra cột mã khách của Customer', hop.probeSelectionFull().customerId, 'CUS-000004');
 
@@ -48,11 +51,11 @@ function chay(so) {
 
   state.sheetName = 'Customer';
   state.row = 2;
-  check(so, 'hàng tiêu đề 1-3 luôn rỗng dù cùng số hàng có thể tồn tại ở bản đồ khác', hop.probeSelectionFull().customerId, '');
+  check(so, 'hàng tiêu đề 1-3 luôn rỗng', hop.probeSelectionFull().customerId, '');
 
   state.sheetName = 'Category';
   state.row = 4;
-  check(so, 'sheet ngoài kho trả rỗng, không dùng nhầm bản đồ Customer', hop.probeSelectionFull({ Category: { '4': 'CUS-SAI' } }).customerId, '');
+  check(so, 'sheet ngoài kho trả rỗng, không dùng nhầm dữ liệu Customer', hop.probeSelectionFull({ Category: { '4': 'CUS-SAI' } }).customerId, '');
 
   state.sheetName = 'Customer';
   state.row = 5;
@@ -60,11 +63,12 @@ function chay(so) {
 
   state.sheetName = '!Lead';
   state.row = 7;
-  hop.renderViewIfDirty = () => ({ rowMaps: { '!Lead': { '7': 'CUS-000006' } }, viewMeta: { revision: 3, filterColumns: [1], sortColumns: [] } });
+  const rendered = [];
+  hop.renderViewIfDirty = (sheetName) => { rendered.push(sheetName); };
   const viewSelection = hop.probeSelectionFull({ '!Lead': { '7': 'CUS-SAI' } });
-  check(so, 'polling trên sheet quản trị tự lấy rowMap mới trong cùng lượt thay vì tin bản đồ client cũ',
-    [viewSelection.customerId, viewSelection.rowMaps, viewSelection.viewMeta.revision],
-    ['CUS-000006', { '!Lead': { '7': 'CUS-000006' } }, 3]);
+  check(so, 'polling trên sheet quản trị đọc trực tiếp cột mã sau khi render',
+    [viewSelection.customerId, rendered],
+    ['CUS-000007', ['!Lead']]);
 
   state.sheetName = 'Customer';
   state.row = 6;

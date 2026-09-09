@@ -70,17 +70,12 @@ function selectionColumnIndex(sheet, code) {
   return found;
 }
 
-/** Đổi dòng đang chọn thành mã khách mà không bao giờ dùng bản đồ của sheet khác. */
-function selectionCustomerId(context, snapshot, rowMaps) {
+/** Đổi dòng đang chọn thành mã khách bằng cách đọc đúng cột mã của chính sheet đó. */
+function selectionCustomerId(context, snapshot) {
   if (!snapshot.sheetName || snapshot.row < SHEET_FIRST_DATA_ROW) { return ''; }
 
-  if (snapshot.sheetName.charAt(0) === '!') {
-    var viewMap = rowMaps && rowMaps[snapshot.sheetName];
-    return viewMap ? String(viewMap[String(snapshot.row)] || '') : '';
-  }
-
   var code = '';
-  if (snapshot.sheetName === ENTITY_SHEETS.customer) {
+  if (snapshot.sheetName === ENTITY_SHEETS.customer || snapshot.sheetName.charAt(0) === '!') {
     code = DATA_SCHEMA.customer.id.code;
   } else if (snapshot.sheetName === ENTITY_SHEETS.activity) {
     code = DATA_SCHEMA.activity.customerId.code;
@@ -102,24 +97,17 @@ function probeSelectionCheap() {
   });
 }
 
-/** Tọa độ kèm mã khách trên Customer, Activity hoặc bản đồ dòng của sheet quản trị. */
-function probeSelectionFull(rowMaps) {
+/** Tọa độ kèm mã khách đọc trực tiếp từ cột mã của sheet hiện tại. */
+function probeSelectionFull() {
   return runEntryPoint('probeSelectionFull', 'sidebar', 'throw', function () {
     var started = Date.now();
     var context = selectionProbeContext();
     var snapshot = selectionSnapshotFromContext(context);
-    var effectiveMaps = rowMaps;
-    var view = null;
     if (snapshot.sheetName && snapshot.sheetName.charAt(0) === '!') {
-      view = renderViewIfDirty(snapshot.sheetName);
-      effectiveMaps = view.rowMaps;
+      // Bảo đảm sheet quản trị đã được làm mới trước khi đọc ô mã hiện tại.
+      renderViewIfDirty(snapshot.sheetName);
     }
-    var reply = selectionProbeReply(snapshot, started, selectionCustomerId(context, snapshot, effectiveMaps));
-    if (view) {
-      reply.rowMaps = view.rowMaps;
-      reply.viewMeta = view.viewMeta;
-    }
-    return reply;
+    return selectionProbeReply(snapshot, started, selectionCustomerId(context, snapshot));
   });
 }
 

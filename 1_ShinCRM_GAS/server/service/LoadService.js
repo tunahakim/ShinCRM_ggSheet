@@ -7,7 +7,7 @@
  *
  * **Nạp ngược từ dòng cuối lên.** Cả hai thực thể đều đọc từ hàng cuối ngược về hàng bốn, vì bản ghi mới nhất nằm dưới cùng và đó là phần người dùng cần trước. Nên gói `activity` đầu tiên đã chứa phần lớn dữ liệu gần đây. Đây là ràng buộc cứng của tài liệu 05 Phần 4.
  *
- * **Máy chủ không trả số hàng như một phần của bản ghi.** Số hàng chỉ xuất hiện ở `rowMap`, cây cầu tọa độ trả lời câu "người dùng vừa bấm vào hàng này trên sheet, đó là khách nào". Bản ghi thì nhận dạng bằng mã, không bằng vị trí — vì vị trí đổi mỗi lần sheet được sắp lại, còn mã thì không.
+ * **Máy chủ nhận dạng bản ghi bằng mã, không bằng vị trí.** Vị trí đổi mỗi lần sheet được sắp lại, còn mã thì không. Đường chọn khách riêng đọc mã trực tiếp từ live model hoặc cột mã hiện tại.
  *
  * **Hai dòng "nạp xong" đều là dòng vết, không phải dòng luôn ghi.** Chủ dự án chốt ngày 05/09/2026: bật debug thì ghi chi tiết, ngày thường ẩn hết. Công tắc là tham số `LOG_TRACE` ở sheet `Config`. Một lượt mở sidebar trơn để lại **không** dòng nào, vì "mọi thứ bình thường" không đáng ghi ba lần mỗi lượt; lượt nào có lỗi thì vòng đệm vết tự bung ra sheet kèm dòng lỗi, nên đúng lúc cần chẩn đoán vẫn có đủ số liệu. Dòng cảnh báo vượt trần ngân sách ô thì vẫn `logEvent` — nó không phải chuyện bình thường.
  */
@@ -52,7 +52,6 @@ function reloadRecords(recordIds) {
       customer: { fields: customerBlock.fields, rows: customers },
       activity: { fields: activityBlock.fields, rows: activities },
       affectedCustomerIds: customers.map(function (row) { return row[customerBlock.fields.indexOf('id')]; }),
-      rowMaps: loadRowMaps(customerBlock),
       dirty: dirtyStateRead(),
       selection: selectionSnapshot(),
       ms: Date.now() - started
@@ -136,7 +135,6 @@ function loadCore() {
       config: config,
       categories: danhMuc.categories,
       customer: { fields: khach.fields, rows: khach.rows, blankRows: khach.blankRows },
-      rowMaps: loadRowMaps(khach),
       activity: { total: soGiaoDich, chunkRows: SETTINGS.CHUNK_ROWS },
       prefs: userPrefsRead(),
       budget: budget,
@@ -147,49 +145,6 @@ function loadCore() {
       ms: ms
     };
   });
-}
-
-/**
- * Bảng tra "số hàng trên sheet → mã bản ghi", dựng từ kết quả đọc.
- *
- * Trả về object có khóa là số hàng dạng chuỗi, không phải mảng thưa. Mảng thưa đi qua `google.script.run` sẽ biến các chỗ trống thành `null` và gửi hết chúng đi: một sheet 1.000 hàng chỉ có 20 khách sẽ gửi 980 chữ `null`. Object thì chỉ gửi đúng những hàng có bản ghi. Client bung nó thành mảng thưa lúc ingest, vì hình dạng chốt của `Store.rowMaps` ở tài liệu 05 Phần 7 là mảng thưa.
- */
-function loadRowMap(block) {
-  var idAt = block.fields.indexOf('id');
-  var map = {};
-
-  block.rowIndexes.forEach(function (rowIndex, i) {
-    map[String(rowIndex)] = block.rows[i][idAt];
-  });
-
-  return map;
-}
-
-/**
- * Khối `rowMaps` gửi cho client: khóa là **tên sheet**, giá trị là bảng tra hàng → mã khách.
- *
- * Gói theo tên sheet vì `Store.rowMaps` tra theo tên sheet, và vì chặng làm mới dữ liệu sẽ thêm các sheet quản trị vào đây — thêm một khóa, không đổi hình dạng. Nếu máy chủ gửi phẳng một bảng thì client phải tự gán tên sheet cho nó, tức tên sheet dữ liệu bị gõ cứng ở phía client, đúng thứ mà `ENTITY_SHEETS` tồn tại để tránh.
- *
- * **Chỉ sheet chứa khách có mặt ở đây.** Sheet `Activity` cố tình không có bảng tra: cầu tọa độ trả lời câu "người dùng vừa bấm vào hàng này, đó là **khách** nào", và không có đường nào bấm vào một giao dịch để mở nó. Gửi thêm một bảng không ai tra là gửi thêm một dòng payload cho mỗi giao dịch trên đường nạp nặng nhất của hệ.
- */
-function loadRowMaps(khach) {
-  var maps = {};
-  maps[ENTITY_SHEETS.customer] = loadRowMap(khach);
-  var book = shinOpenBook();
-  book.getSheets().forEach(function (sheet) {
-    var name = sheet.getName();
-    if (name.charAt(0) !== '!' || (typeof sheet.isSheetHidden === 'function' && sheet.isSheetHidden()) || sheet.getLastColumn() < 1) { return; }
-    var lastColumn = sheet.getLastColumn();
-    var header = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
-    var idColumn = header.indexOf(DATA_SCHEMA.customer.id.code) + 1;
-    if (!idColumn || sheet.getLastRow() < SHEET_FIRST_DATA_ROW) { return; }
-    var count = sheet.getLastRow() - SHEET_FIRST_DATA_ROW + 1;
-    var values = sheet.getRange(SHEET_FIRST_DATA_ROW, idColumn, count, 1).getValues();
-    var map = {};
-    values.forEach(function (row, i) { if (row[0] !== '' && row[0] !== null && row[0] !== undefined) { map[String(SHEET_FIRST_DATA_ROW + i)] = String(row[0]); } });
-    maps[name] = map;
-  });
-  return maps;
 }
 
 /**
@@ -278,9 +233,6 @@ function probeLoadAll() {
 
   report.push('loadCore: ' + core.ms + ' ms');
   report.push('  customer: ' + core.customer.rows.length + ' bản ghi, ' + core.customer.fields.length + ' trường, ' + core.customer.blankRows + ' hàng trắng bỏ qua');
-  Object.keys(core.rowMaps).forEach(function (name) {
-    report.push('  rowMaps["' + name + '"]: ' + Object.keys(core.rowMaps[name]).length + ' hàng có bản ghi');
-  });
   report.push('  categories: ' + Object.keys(core.categories).length + ' danh mục, tổng ' + Object.keys(core.categories).reduce(function (sum, code) { return sum + core.categories[code].length; }, 0) + ' giá trị');
   report.push('  config: params ' + Object.keys(core.config.params).length + ', ngầm định ' + Object.keys(core.config.defaults).length + ', bộ đếm ' + Object.keys(core.config.counters).length + ', sort ' + core.config.sort.length + ' cấp');
   report.push('  ngân sách ô: ' + core.budget.total + '/' + core.budget.ceiling);

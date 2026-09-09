@@ -7,7 +7,7 @@
  *
  * Hai, cột tra theo **mã** chứ không theo thứ tự. Phép kiểm dựng hoàn cảnh có một cột lạ chèn vào giữa, đúng việc mà người dùng được phép làm; nếu code đếm cột theo thứ tự khai thì mọi giá trị lệch đi một cột và vẫn chạy trơn tru — sai kiểu tệ nhất.
  *
- * Ba, `rowIndexes` là số hàng **thật** trên sheet, không phải số đếm dồn. Sai chỗ này thì người dùng bấm vào một hàng và sidebar mở ra khách khác, mà không có gì báo lỗi.
+ * Ba, hàng trắng bị bỏ qua khỏi `rows` nhưng vẫn được tính trong `blankRows`, để bản ghi rỗng không lọt vào RAM.
  *
  * Bốn, hàng không có mã bản ghi bị bỏ qua và được **đếm**. Một hàng trắng đi tới client sẽ thành một khách có mã rỗng, rồi hàng trắng thứ hai ghi đè lên đúng chỗ đó.
  */
@@ -51,7 +51,7 @@ function chay(so) {
   // Ca rỗng đi trước mọi ca khác, vì đó là ca của lượt mở sidebar đầu tiên trên sheet trắng.
   const goiRong = hop.entityReadAll('customer');
   check(so, 'sheet trắng đọc ra gói rỗng đúng hình dạng, không ném lỗi',
-    [goiRong.entity, goiRong.rows, goiRong.rowIndexes, goiRong.blankRows], ['customer', [], [], 0]);
+    [goiRong.entity, goiRong.rows, goiRong.blankRows], ['customer', [], 0]);
   check(so, 'gói rỗng vẫn gửi kèm bảng tên trường đầy đủ', goiRong.fields, ten);
 
   // Ba hàng: hai hàng có mã, một hàng ở GIỮA có nội dung nhưng không có mã.
@@ -68,7 +68,6 @@ function chay(so) {
 
   const goi = hop.entityReadAll('customer');
   check(so, 'đọc ra 2 bản ghi và đếm được 1 hàng không có mã', [goi.rows.length, goi.blankRows], [2, 1]);
-  check(so, 'rowIndexes là số hàng THẬT trên sheet, không phải số đếm dồn', goi.rowIndexes, [hangDau, hangDau + 2]);
   check(so, 'khoảng trắng hai đầu bị cắt', goi.rows[0][ten.indexOf('companyName')], 'Công ty Một');
   check(so, 'ô Date thành chuỗi YYYY-MM-DD, cắt giờ đi vì precision là day',
     goi.rows[0][ten.indexOf('bidClosingDate')], '2026-02-20');
@@ -82,8 +81,8 @@ function chay(so) {
 
   // Đọc theo gói: cùng một bối cảnh dùng cho nhiều gói, và hai gói kề nhau không được đọc trùng hàng.
   const bc = hop.entityReadContext('customer');
-  check(so, 'gói 1 hàng đọc đúng một bản ghi đầu', hop.entityReadRange(bc, hangDau, 1).rowIndexes, [hangDau]);
-  check(so, 'gói tiếp theo đọc từ hàng kế, không đọc lại hàng cũ', hop.entityReadRange(bc, hangDau + 1, 2).rowIndexes, [hangDau + 2]);
+  check(so, 'gói 1 hàng đọc đúng một bản ghi đầu', hop.entityReadRange(bc, hangDau, 1).rows.length, 1);
+  check(so, 'gói tiếp theo đọc từ hàng kế, không đọc lại hàng cũ', hop.entityReadRange(bc, hangDau + 1, 2).rows.length, 1);
   check(so, 'gói 0 hàng ra rỗng chứ không ném lỗi', hop.entityReadRange(bc, hangDau, 0).rows, []);
   check(so, 'gói bắt đầu ngoài lưới cũng ra rỗng', hop.entityReadRange(bc, bc.sheet.getMaxRows() + 5, 10).rows, []);
 

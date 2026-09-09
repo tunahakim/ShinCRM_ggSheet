@@ -43,7 +43,7 @@ function gieoHaiGiaoDich(nen) {
 }
 
 function chay(so) {
-  section('ViewSheetRenderer — giao dịch sống gần nhất, cột động, lọc, sắp và rowMap');
+  section('ViewSheetRenderer — giao dịch sống gần nhất, cột động, lọc và sắp');
   let base;
   try {
     base = taoNen(['@CUS_MA_KH', '@CUS_TEN_CTY', '@ACT_NGAY_LAM_VIEC', '@ACT_CONG_VIEC', '@ACT_GIA_TRI_HD', 'Ghi chú thường']);
@@ -53,23 +53,24 @@ function chay(so) {
 
   const result = base.nen.hop.renderViewSheet('!Lead');
   check(so, 'khách có giao dịch mới đã xóa mềm dùng lần sống trước đó', base.view.getRange(4, 4).getValue(), 'Email');
-  check(so, 'khách chưa có giao dịch vẫn có thể hiện thành dòng', Object.values(result.rowMaps['!Lead']).sort(), ['KH0001', 'KH0002']);
-  check(so, 'rowMap dựng theo hàng thật sau khi ghi', Object.keys(result.rowMaps['!Lead']).sort(), ['4', '5']);
+  check(so, 'khách chưa có giao dịch vẫn có thể hiện thành dòng',
+    [result.rows, [base.view.getRange(4, 1).getValue(), base.view.getRange(5, 1).getValue()].sort()],
+    [2, ['KH0001', 'KH0002']]);
   check(so, 'lượt vẽ không bật toast nhỏ ở Sheet và luôn nhả khóa', [base.nen.dem.toast, base.nen.stubs._khoa.dangGiu], [0, false]);
 
   check(so, 'metadata chỉ nhận cột có mã @ ở hàng lọc', result.viewMeta.filterColumns, [1, 2, 3, 4, 5]);
   base.view.getRange(3, 6).setValue('chữ dưới cột thường');
   check(so, 'đổi hàng 3 dưới cột thường không làm dấu vân tay view thay đổi', base.nen.hop.renderViewIfDirty('!Lead').skipped, true);
 
-  check(so, 'đầu vào không đổi thì chỉ đọc lại rowMap, không vẽ thừa', base.nen.hop.renderViewIfDirty('!Lead').skipped, true);
+  check(so, 'đầu vào không đổi thì chỉ đọc metadata, không vẽ thừa', base.nen.hop.renderViewIfDirty('!Lead').skipped, true);
   base.view.getRange(3, 2).setValue('Hai');
   const beforeRender = base.nen.hop.inspectViewState('!Lead', result.viewMeta.revision);
   check(so, 'cửa kiểm nhẹ nhận ra đầu vào đổi nhưng chưa tự vẽ', [beforeRender.changed, beforeRender.needsRender], [false, true]);
   const afterFilter = base.nen.hop.renderViewIfDirty('!Lead');
-  check(so, 'hàng lọc đổi trước khi trigger chạy vẫn bị dấu vân tay phát hiện và dựng rowMap mới',
-    [afterFilter.rows, afterFilter.rowMaps['!Lead'], base.view.getRange(4, 1).getValue()],
-    [1, { '4': 'KH0002' }, 'KH0002']);
-  check(so, 'vẽ xong tăng phiên bản để sidebar biết rowMap đã đổi', afterFilter.viewMeta.revision > result.viewMeta.revision, true);
+  check(so, 'hàng lọc đổi trước khi trigger chạy vẫn bị dấu vân tay phát hiện và dựng view mới',
+    [afterFilter.rows, base.view.getRange(4, 1).getValue()],
+    [1, 'KH0002']);
+  check(so, 'vẽ xong tăng phiên bản để sidebar biết view đã đổi', afterFilter.viewMeta.revision > result.viewMeta.revision, true);
   base.view.getRange(3, 2).setValue('');
   base.nen.hop.renderViewIfDirty('!Lead');
 

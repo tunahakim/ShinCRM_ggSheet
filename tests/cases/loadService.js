@@ -56,7 +56,7 @@ function chay(so) {
   const rong = hop.loadCore();
   check(so, 'gói lõi có đúng bộ khóa tài liệu 05 chốt, không thiếu không thừa',
     Object.keys(rong).sort(),
-    ['activity', 'blocked', 'budget', 'categories', 'config', 'customer', 'dirty', 'ms', 'ok', 'pendingMessages', 'prefs', 'rowMaps', 'schema', 'selection', 'settings', 'spreadsheetId', 'warnings'].sort());
+    ['activity', 'blocked', 'budget', 'categories', 'config', 'customer', 'dirty', 'ms', 'ok', 'pendingMessages', 'prefs', 'schema', 'selection', 'settings', 'spreadsheetId', 'warnings'].sort());
   check(so, 'sheet trắng nạp trót lọt và không bị chặn', [rong.ok, rong.blocked], [true, false]);
   check(so, 'gói lõi mang id tệp để client lọc tin postMessage đúng tệp', rong.spreadsheetId, nen.book.getId());
   check(so, 'không khách nào mà vẫn gửi đủ bảng tên trường', [rong.customer.rows.length, rong.customer.fields.length], [0, 20]);
@@ -85,25 +85,17 @@ function chay(so) {
     coDirty.dirty,
     { viewSheets: ['!Lead'], records: [], config: false, all: false });
 
-  // Bảng tra hàng → mã. Chỉ sheet chứa khách có mặt; sheet Activity cố tình không có.
+  // Bản ghi được nhận dạng bằng mã; hàng trắng giữa vùng dữ liệu không lọt vào RAM.
   ghiKhach(nen, hangDau, 'KH0001', 'Công ty Một');
   ghiKhach(nen, hangDau + 2, 'KH0003', 'Công ty Ba', 'deleted');
 
   const co = hop.loadCore();
   check(so, 'hai khách đọc ra, hàng trắng ở giữa không thành bản ghi', co.customer.rows.length, 2);
-  check(so, 'rowMaps chỉ có khóa của sheet chứa khách — Activity cố tình không có bảng tra', Object.keys(co.rowMaps), ['Customer']);
-  check(so, 'bảng tra khóa là số hàng dạng chuỗi, giá trị là mã khách',
-    co.rowMaps.Customer, { '4': 'KH0001', '6': 'KH0003' });
-  check(so, 'hàng không có bản ghi KHÔNG có khóa trong bảng tra — object chứ không phải mảng thưa',
-    Object.prototype.hasOwnProperty.call(co.rowMaps.Customer, '5'), false);
-  check(so, 'khách đã xóa mềm vẫn nằm trong bảng tra, vì click vào hàng đó phải mở được',
-    co.rowMaps.Customer['6'], 'KH0003');
 
   const view = nen.book.insertSheet('!Lead');
   view.getRange(1, 1, 1, 2).setValues([['@CUS_MA_KH', '@CUS_TEN_CTY']]);
   view.getRange(4, 1, 1, 2).setValues([['KH0001', 'Công ty Một']]);
   const coView = hop.loadCore();
-  check(so, 'loadCore thêm đúng một khóa rowMap cho sheet quản trị', coView.rowMaps['!Lead'], { '4': 'KH0001' });
 
   // Không một giá trị nào được là `Date`: `google.script.run` không mang `Date` qua, nó thành `null` bên client.
   ghiO(nen, 'Customer', hangDau, '@CUS_NGAY_NHAP_LIEU', new Date(2026, 8, 5, 14, 30, 0));

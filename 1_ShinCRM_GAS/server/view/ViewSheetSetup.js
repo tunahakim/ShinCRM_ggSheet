@@ -116,5 +116,5 @@ function createViewSheet(requestedName) {
   prepareViewSheet(name);
   var rendered = renderViewSheet(name);
   if (typeof file.setActiveSheet === 'function') { file.setActiveSheet(sheet); }
-  return { ok: true, sheetName: name, rows: rendered.rows, rowMaps: rendered.rowMaps, viewMeta: rendered.viewMeta };
+  return { ok: true, sheetName: name, rows: rendered.rows, viewMeta: rendered.viewMeta };
 }

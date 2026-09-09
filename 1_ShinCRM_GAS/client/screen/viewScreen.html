@@ -11,7 +11,7 @@ var SCREEN_VIEW_HISTORY_ID = 'shin-card-history';
 /**
  * Bản ghi khách đang xem. `null` chỉ có một nghĩa: **chưa chọn khách nào**.
  *
- * Có mã mà mã đó không tra ra bản ghi thì để lỗi của `Store.getCustomer` bay lên, không đổi thành `null` — tài liệu 05 Phần 9 **`[RÀNG BUỘC CỨNG]`**. Đổi thành `null` là vẽ ra một khách trắng, và người dùng sẽ tưởng khách vừa mất dữ liệu thay vì biết bản đồ dòng đã cũ.
+ * Có mã mà mã đó không tra ra bản ghi thì để lỗi của `Store.getCustomer` bay lên, không đổi thành `null` — tài liệu 05 Phần 9 **`[RÀNG BUỘC CỨNG]`**. Đổi thành `null` là vẽ ra một khách trắng và che mất lỗi nhất quán dữ liệu.
  */
 function screenViewCustomer() {
   var id = ScreenState.currentCustomerId;
@@ -42,9 +42,9 @@ function screenViewRender() {
 /**
  * Bỏ mã khách đang xem nếu lượt nạp vừa rồi không còn giữ bản ghi đó. Gọi ngay trước lượt vẽ cuối của trình tự khởi động.
  *
- * Vì sao cần: `ScreenState` sống qua cả lượt nạp lại, còn `Store` thì bị dựng lại từ đầu. Khách bị xóa hẳn khỏi sheet — hoặc chỉ là lượt nạp này lọc khác lượt trước — thì mã cũ còn nằm đó và `screenViewCustomer` sẽ ném đúng cái lỗi "bản đồ dòng đã cũ" của tài liệu 05 Phần 9, chặn cả màn.
+ * Vì sao cần: `ScreenState` sống qua cả lượt nạp lại, còn `Store` thì bị dựng lại từ đầu. Khách bị xóa hẳn khỏi sheet — hoặc chỉ là lượt nạp này không còn bản ghi đó — thì mã cũ còn nằm đó và `screenViewCustomer` sẽ ném lỗi mã không tồn tại, chặn cả màn.
  *
- * Ném lỗi ở đó là đúng, vì nó bắt được một bản đồ dòng cũ. Nhưng ngay sau một lượt nạp mới thì "mã không tra ra" không còn là dấu hiệu sai — nó chỉ là sự thật mới. `Câu hỏi đêm.md` mục 4.3 giao quyền dọn này cho đường nạp lại, và đây là chỗ thực hiện.
+ * Ném lỗi ở đó là đúng trong các đường vẽ bình thường; sau lượt nạp mới, hàm này dọn mã không còn trong Store trước khi vẽ. `Câu hỏi đêm.md` mục 4.3 giao quyền dọn này cho đường nạp lại, và đây là chỗ thực hiện.
  */
 function screenViewDropStale() {
   var id = ScreenState.currentCustomerId;

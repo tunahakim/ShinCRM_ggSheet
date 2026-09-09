@@ -20,11 +20,9 @@ function viewProbeCreateRender() {
     var result = renderViewSheet(VIEW_PROBE_SHEET_NAME);
     SpreadsheetApp.flush();
     var sample = result.rows ? sheet.getRange(4, 1, Math.min(result.rows, 5), 3).getValues() : [];
-    var rowMap = result.rowMaps[VIEW_PROBE_SHEET_NAME] || {};
     return [
       'Sheet probe: ' + VIEW_PROBE_SHEET_NAME,
       'Số dòng renderer ghi: ' + result.rows,
-      'Số khóa rowMap: ' + Object.keys(rowMap).length,
       'Mẫu 5 dòng đầu: ' + JSON.stringify(sample),
       'Trạng thái bẩn sau render: ' + JSON.stringify(dirtyStateRead())
     ];

@@ -81,9 +81,6 @@ function dungHopPoll() {
   });
 
   hop.Store = {
-    rowMaps: {},
-    applyRowMaps: (maps) => { hop.Store.rowMaps = maps; },
-    getCustomerIdByRow: () => '',
     hasCustomer: () => false
   };
 
@@ -215,12 +212,12 @@ async function chay(so) {
   khongExtension._calls = [];
   khongExtension.callServer = (name, args) => {
     khongExtension._calls.push(name + '(' + ((args && args[0]) || '') + ')');
-    return syncValue({ ok: true, sheetName: '!Lead', rowMaps: { '!Lead': { '4': 'KH000001' } } });
+    return syncValue({ ok: true, sheetName: '!Lead' });
   };
-  khongExtension.selectionPollApplyResult({ spreadsheetId: 'sheet-1', sheetName: '!Lead', row: 4, col: 2, customerId: 'KH000001', rowMaps: { '!Lead': { '4': 'KH000001' } }, viewMeta: { revision: 1, filterColumns: [1, 2], sortColumns: [] } });
-  check(so, 'không có Extension thì kết quả full chỉ làm mới metadata, không nạp rowMap vào RAM',
-    [khongExtension._calls, khongExtension.Store.rowMaps],
-    [['renderViewIfDirty(!Lead)'], {}]);
+  khongExtension.selectionPollApplyResult({ spreadsheetId: 'sheet-1', sheetName: '!Lead', row: 4, col: 2, customerId: 'KH000001', viewMeta: { revision: 1, filterColumns: [1, 2], sortColumns: [] } });
+  check(so, 'không có Extension thì kết quả full chỉ làm mới metadata, không dựng bộ nhớ theo dòng',
+    khongExtension._calls,
+    ['renderViewIfDirty(!Lead)']);
 
   const tatSet = dungHopPoll();
   batDau(tatSet);
@@ -228,7 +225,7 @@ async function chay(so) {
   tatSet._calls = [];
   tatSet.callServer = (name, args) => {
     tatSet._calls.push(name + '(' + ((args && args[0]) || '') + ')');
-    return syncValue({ ok: true, sheetName: '!Lead', rowMaps: { '!Lead': {} }, viewMeta: { revision: 1, filterColumns: [1], sortColumns: [] } });
+    return syncValue({ ok: true, sheetName: '!Lead', viewMeta: { revision: 1, filterColumns: [1], sortColumns: [] } });
   };
   tatSet.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: '!Lead', row: 1, col: 1, customerId: '' });
   check(so, 'tắt nút sét chỉ ngừng đổi khách, không được chặn làm mới sheet quản trị khi Extension báo chuyển sheet',
@@ -241,7 +238,7 @@ async function chay(so) {
   quaCau._calls = [];
   quaCau.callServer = (name, args) => {
     quaCau._calls.push(name + '(' + ((args && args[0]) || '') + ')');
-    return syncValue({ ok: true, sheetName: '!Lead', rowMaps: { '!Lead': {} }, viewMeta: { revision: 1, filterColumns: [1], sortColumns: [] } });
+    return syncValue({ ok: true, sheetName: '!Lead', viewMeta: { revision: 1, filterColumns: [1], sortColumns: [] } });
   };
   quaCau.sheetLinkOnMessage({
     origin: quaCau.SHEET_LINK_ORIGIN,
@@ -270,30 +267,27 @@ async function chay(so) {
   check(so, 'Promise context từ Extension không bật hộp thoại khi bị từ chối',
     [loiQuaCau._errors, loiQuaCau._consoleErrors], [[], ['không đồng bộ được context']]);
 
-  const rowMapCu = dungHopPoll();
-  batDau(rowMapCu);
-  rowMapCu.Store.hasCustomer = () => false;
-  rowMapCu.Store.getCustomerIdByRow = () => 'KH000093';
-  rowMapCu.Store.hasCustomer = () => true;
+  const directCustomer = dungHopPoll();
+  batDau(directCustomer);
+  directCustomer.Store.hasCustomer = () => true;
   check(so, 'mã customerId trực tiếp được dùng khi có trong Store',
-    rowMapCu.sheetLinkCustomerIdFromContext({ sheetName: '!Lead', row: 4, col: 2, customerId: 'KH000093' }), 'KH000093');
-  check(so, 'rowMap cũ không chọn khách trước khi RAM có bản ghi tương ứng',
-    rowMapCu.sheetLinkCustomerIdFromContext({ sheetName: '!Lead', row: 4, col: 2 }), '');
+    directCustomer.sheetLinkCustomerIdFromContext({ sheetName: '!Lead', row: 4, col: 2, customerId: 'KH000093' }), 'KH000093');
+  check(so, 'thiếu customerId thì không đoán khách từ tọa độ',
+    directCustomer.sheetLinkCustomerIdFromContext({ sheetName: '!Lead', row: 4, col: 2 }), '');
 
   const cungSheet = dungHopPoll();
   batDau(cungSheet);
   cungSheet._calls = [];
   cungSheet.callServer = (name, args) => {
     cungSheet._calls.push(name + '(' + ((args && args[0]) || '') + ')');
-    return syncValue({ ok: true, skipped: true, rowMaps: { '!Lead': { '4': 'KH000001', '7': 'KH000079' } }, viewMeta: { revision: 1, filterColumns: [1, 2], sortColumns: [] } });
+    return syncValue({ ok: true, skipped: true, viewMeta: { revision: 1, filterColumns: [1, 2], sortColumns: [] } });
   };
   cungSheet.Store.hasCustomer = () => true;
-  cungSheet.Store.getCustomerIdByRow = (sheet, row) => cungSheet.Store.rowMaps[sheet] && cungSheet.Store.rowMaps[sheet][row] || '';
   cungSheet._picked = [];
   cungSheet.ACTIONS.setCurrentCustomer = ({ pick }) => { cungSheet._picked.push(pick); };
   cungSheet.sheetLinkApplyContext({ sheetName: '!Lead', row: 4, col: 2, customerId: 'KH000001' });
   cungSheet.sheetLinkApplyContext({ sheetName: '!Lead', row: 7, col: 2, customerId: 'KH000079' });
-  check(so, 'sau lần vào sheet, mã do Extension gửi được dùng trực tiếp và không tra rowMap',
+  check(so, 'sau lần vào sheet, mã do Extension gửi được dùng trực tiếp và không tra theo vị trí',
     [cungSheet._calls, cungSheet._picked],
     [['renderViewIfDirty(!Lead)'], ['KH000001', 'KH000079']]);
 
@@ -301,11 +295,10 @@ async function chay(so) {
   batDau(bootReplay);
   bootReplay.ScreenState.screen = 'customerForm';
   bootReplay.Store.hasCustomer = () => true;
-  bootReplay.Store.getCustomerIdByRow = (sheet, row) => bootReplay.Store.rowMaps[sheet] && bootReplay.Store.rowMaps[sheet][row] || '';
   bootReplay._picked = [];
   bootReplay.ACTIONS.setCurrentCustomer = ({ pick }) => { bootReplay._picked.push(pick); };
   bootReplay.callServer = (name) => syncValue(name === 'renderViewIfDirty'
-    ? { rowMaps: { '!Lead': { '4': 'KH000079' } }, viewMeta: { revision: 1, filterColumns: [], sortColumns: [] } }
+    ? { viewMeta: { revision: 1, filterColumns: [], sortColumns: [] } }
     : {});
   bootReplay.sheetLinkApplyContext({ sheetName: '!Lead', row: 4, col: 2, customerId: 'KH000079' });
   bootReplay.ScreenState.screen = 'view';
@@ -315,7 +308,6 @@ async function chay(so) {
   const daoThuTu = dungHopPoll();
   batDau(daoThuTu);
   daoThuTu.Store.hasCustomer = () => true;
-  daoThuTu.Store.getCustomerIdByRow = (sheet, row) => daoThuTu.Store.rowMaps[sheet] && daoThuTu.Store.rowMaps[sheet][row] || '';
   daoThuTu._picked = [];
   daoThuTu.ACTIONS.setCurrentCustomer = ({ pick }) => { daoThuTu._picked.push(pick); };
   const replies = [];
@@ -323,17 +315,16 @@ async function chay(so) {
   daoThuTu.sheetLinkApplyContext({ sheetName: '!Lead', row: 4, col: 2, customerId: 'KH000094' });
   daoThuTu.sheetLinkApplyContext({ sheetName: '!Lead', row: 7, col: 2, customerId: 'KH000079' });
   const soRequestDangBay = replies.length;
-  replies[0]({ ok: true, rowMaps: { '!Lead': { '4': 'KH000094', '7': 'KH000079' } }, viewMeta: { revision: 1, filterColumns: [1, 2], sortColumns: [] } });
+  replies[0]({ ok: true, viewMeta: { revision: 1, filterColumns: [1, 2], sortColumns: [] } });
   await Promise.resolve();
   await Promise.resolve();
   check(so, 'hai lựa chọn trong lúc đồng bộ dùng chung một request và chỉ lựa chọn mới nhất được mở',
-    [soRequestDangBay, daoThuTu.Store.rowMaps, daoThuTu._picked],
-    [1, {}, ['KH000079']]);
+    [soRequestDangBay, daoThuTu._picked],
+    [1, ['KH000079']]);
 
   const cauHinh = dungHopPoll();
   batDau(cauHinh);
   cauHinh.Store.hasCustomer = () => true;
-  cauHinh.Store.getCustomerIdByRow = (sheet, row) => cauHinh.Store.rowMaps[sheet] && cauHinh.Store.rowMaps[sheet][row] || '';
   cauHinh.sidebarBusyRun = (message, work) => { cauHinh._busy.push(message); return work(); };
   cauHinh._busy = [];
   cauHinh._changed = false;
@@ -341,7 +332,7 @@ async function chay(so) {
   cauHinh.callServer = (name, args) => {
     cauHinh._calls.push(name + '(' + ((args && args[0]) || '') + ')');
     if (name === 'inspectViewState') { return syncValue({ ok: true, changed: cauHinh._changed, needsRender: false, revision: cauHinh._changed ? 2 : 1 }); }
-    return syncValue({ ok: true, rowMaps: { '!Lead': { '4': 'KH000094', '7': 'KH000079' } }, viewMeta: { revision: cauHinh._changed ? 2 : 1, filterColumns: [1, 2], sortColumns: [4] } });
+    return syncValue({ ok: true, viewMeta: { revision: cauHinh._changed ? 2 : 1, filterColumns: [1, 2], sortColumns: [4] } });
   };
   cauHinh.sheetLinkApplyContext({ sheetName: '!Lead', row: 4, col: 2, rowEnd: 4, colEnd: 2 });
   cauHinh._calls = [];
@@ -362,14 +353,13 @@ async function chay(so) {
   cauHinh._changed = true;
   cauHinh.sheetLinkApplyContext({ sheetName: '!Lead', row: 3, col: 2, rowEnd: 3, colEnd: 2 });
   cauHinh.sheetLinkApplyContext({ sheetName: '!Lead', row: 7, col: 2, rowEnd: 7, colEnd: 2 });
-  check(so, 'GAS xác nhận phiên bản đổi thì mới bật overlay và lấy rowMap mới đúng một lần',
+  check(so, 'GAS xác nhận phiên bản đổi thì mới bật overlay và làm mới đúng một lần',
     [cauHinh._calls, cauHinh._busy],
     [['inspectViewState(!Lead)', 'renderViewIfDirty(!Lead)'], ['Đang cập nhật sheet !Lead…']]);
 
   const chuyenSheet = dungHopPoll();
   batDau(chuyenSheet);
   chuyenSheet.Store.hasCustomer = () => true;
-  chuyenSheet.Store.getCustomerIdByRow = (sheet, row) => chuyenSheet.Store.rowMaps[sheet] && chuyenSheet.Store.rowMaps[sheet][row] || '';
   chuyenSheet._picked = [];
   chuyenSheet._busy = [];
   chuyenSheet.ACTIONS.setCurrentCustomer = ({ pick }) => { chuyenSheet._picked.push(pick); };
@@ -396,9 +386,9 @@ async function chay(so) {
     dirty: { all: false, config: false, records: ['KH000079'], viewSheets: ['!Lead'] }
   });
   await new Promise((resolve) => setImmediate(resolve));
-  transitionReplies[1].resolve({ ok: true, rowMaps: { '!Lead': { '4': 'KH000094', '7': 'KH000079' } }, viewMeta: { revision: 2, filterColumns: [1, 2], sortColumns: [] } });
+  transitionReplies[1].resolve({ ok: true, viewMeta: { revision: 2, filterColumns: [1, 2], sortColumns: [] } });
   await new Promise((resolve) => setImmediate(resolve));
-  check(so, 'rời sheet dữ liệu sang view dùng một overlay cho cả kiểm tra dirty và rowMap; tọa độ mới nhất chờ cùng lượt',
+  check(so, 'rời sheet dữ liệu sang view dùng một overlay cho cả kiểm tra dirty và làm mới; tọa độ mới nhất chờ cùng lượt',
     [callsBeforeDirtyReply, chuyenSheet._calls, chuyenSheet._busy, chuyenSheet._picked],
     [['inspectViewState'], ['inspectViewState', 'refreshDirtyRecords(KH000079)', 'renderViewIfDirty'], ['Đang cập nhật dữ liệu và sheet !Lead…'], ['KH000079']]);
 
