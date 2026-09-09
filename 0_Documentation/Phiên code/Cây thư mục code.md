@@ -251,3 +251,21 @@ server\Triggers.js                 Trigger cài đặt đánh dấu dữ liệu 
 ```
 
 Biểu mẫu **không** có thư mục riêng: bộ máy dựng form là `client\ui\` (uiBuilder, renderEngine, actions, slots), bảng khai form là `client\schema\` (uiSchema, fieldLogic), và mỗi màn có form là một tệp trong `client\screen\`.
+## Module đồng bộ FBM (giai đoạn 2)
+
+```
+1_ShinCRM_GAS/fbm_sync/
+|- schema/FbmFields.js          Field map, controller, trạng thái
+|- protocol/Protocol.js         Envelope và parse response
+|- transport/Transport.js       doPost và điều phối từng slice
+|- state/State.js               DocumentProperties, cursor, progress
+|- state/RecordLocks.js         Khóa bản ghi và kiểm tra revision
+|- state/Scheduler.js           Lịch heartbeat/quét, không gọi FBM trực tiếp
+|- read/GridRead.js             Grid metadata, phân trang, category request
+|- write/RequestBuilders.js     Builder Customer/Activity create/edit
+|- reconcile/Reconcile.js       Normalize, fingerprint, pull WriteGate
+|- report/Report.js             Trạng thái công khai cho Sidebar
+server/service/FbmSyncService.js Entry points ổn định cho Sidebar
+1_ShinCRM_GAS/client/sync/fbmSync.html UI màn hình đồng bộ độc lập, tiến độ và bridge request thô
+2_ShinCRM_Extension/content_scripts/fbm_sync/executor.js Fetch trong tab FBM
+```

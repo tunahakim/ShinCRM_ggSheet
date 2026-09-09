@@ -92,7 +92,7 @@ function readCellRef() {
     cachedNameBox = document.getElementById('t-name-box') || document.querySelector('.waffle-name-box');
   }
   if (!cachedNameBox) { return ""; }
-  return String(cachedNameBox.value || cachedNameBox.innerText || "").trim();
+  return String(cachedNameBox.value || cachedNameBox.innerText || "");
 }
 
 function readFormulaBar() {

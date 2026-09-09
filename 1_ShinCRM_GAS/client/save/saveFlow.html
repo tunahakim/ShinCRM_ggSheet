@@ -121,7 +121,11 @@ function saveFlowSubmit() {
 
   SAVE_FLOW.dangGui = true;
   return sidebarBusyRun(entity === 'customer' ? 'Đang lưu khách hàng…' : 'Đang lưu giao dịch…', function () {
-    return callServer('saveRecord', [entity, record]).then(function (res) {
+    var saveCall = record.id ? callServer('fbmCheckSave', [entity, record.id, record.fbmHash || '']).then(function (allowed) {
+      if (allowed && allowed.ok === false) { throw new Error(allowed.message || 'Bản ghi đang được đồng bộ.'); }
+      return callServer('saveRecord', [entity, record]);
+    }) : callServer('saveRecord', [entity, record]);
+    return saveCall.then(function (res) {
       SAVE_FLOW.dangGui = false;
 
       if (!res.ok) {
@@ -130,6 +134,7 @@ function saveFlowSubmit() {
         return { focusId: focusId };
       }
 
+      if (typeof screenFormSyncUnlock === 'function') { screenFormSyncUnlock(entity, top.record); }
       var ban = saveFlowApply(entity, res);
       return saveFlowClose(entity, ban, themMoi);
     }, function (err) {

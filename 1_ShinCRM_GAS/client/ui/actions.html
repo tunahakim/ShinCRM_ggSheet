@@ -91,6 +91,12 @@ ACTIONS.toggleSearchPanel = function () {
   return searchToggle();
 };
 
+/** Mở panel đồng bộ FBM; panel tự lấy snapshot hiện tại khi vừa mở. */
+ACTIONS.toggleSyncPanel = function () {
+  if (typeof syncPanelToggle !== 'function') { throw new Error('Panel đồng bộ chưa được nạp.'); }
+  return syncPanelToggle();
+};
+
 /** Đổi nấc xem card lịch sử. Vẽ lại **riêng card đó** chứ không cả màn: khối thông tin chung và card ghi chú không đổi theo nấc. */
 ACTIONS.setActivityView = function (payload) {
   var kq = prefsSet('activityView', actionsValue(payload, 'Nấc xem lịch sử'));

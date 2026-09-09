@@ -11,8 +11,8 @@
  */
 
 /** Tên các trường của một thực thể, theo đúng thứ tự khai. Đây là bảng `fields` gửi kèm mỗi gói. */
-function entityReadFields(entity) {
-  var fields = DATA_SCHEMA[entity];
+function entityReadFields(entity, schema) {
+  var fields = schema || DATA_SCHEMA[entity];
   if (!fields) {
     throw new Error('Không có thực thể "' + entity + '" trong DATA_SCHEMA. Chỉ có: ' + Object.keys(DATA_SCHEMA).join(', ') + '.');
   }
@@ -39,9 +39,9 @@ function entityRowCount(entity) {
  *
  * Múi giờ lấy từ tệp Sheet chứ không chốt cứng trong code — lý do ở `DateText.gs`.
  */
-function entityReadContext(entity) {
-  var fields = DATA_SCHEMA[entity];
-  var names = entityReadFields(entity);
+function entityReadContext(entity, schema) {
+  var fields = schema || DATA_SCHEMA[entity];
+  var names = entityReadFields(entity, fields);
   var sheetName = ENTITY_SHEETS[entity];
 
   if (!sheetName) {
@@ -114,9 +114,29 @@ function entityReadRange(context, firstRow, rowCount) {
 }
 
 /** Đọc trọn một thực thể trong một lượt. Dùng cho `customer`, thứ tài liệu 05 Phần 4 yêu cầu nạp hết ngay ở `loadCore`. */
-function entityReadAll(entity) {
-  var context = entityReadContext(entity);
+function entityReadAll(entity, schema) {
+  var context = entityReadContext(entity, schema);
   return entityReadRange(context, SHEET_FIRST_DATA_ROW, context.rowCount);
+}
+
+/**
+ * Đọc một thực thể với tập schema mở rộng do module gọi truyền vào.
+ * Tầng đọc chỉ biết cách hợp nhất khai báo; nó không biết module nào sở hữu schema đó.
+ */
+function entityReadAllCombined(entity, schemas) {
+  var danhSach = Array.isArray(schemas) ? schemas : [];
+  var fields = {};
+  danhSach.forEach(function (schema) {
+    var phan = schema && schema[entity];
+    if (!phan) { return; }
+    Object.keys(phan).forEach(function (name) {
+      if (fields[name]) { throw new Error('Trường "' + name + '" khai trùng trong schema đọc.'); }
+      fields[name] = phan[name];
+    });
+  });
+  if (!Object.keys(fields).length) { return entityReadAll(entity); }
+
+  return entityReadAll(entity, fields);
 }
 
 /** Phép nghiệm thu chạy được trên Google: đọc thử cả hai thực thể trên tệp thật và in ra bảng tên trường cùng vài hàng đầu. */

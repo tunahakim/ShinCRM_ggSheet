@@ -1,0 +1,120 @@
+<script>
+/* Sidebar chỉ hiển thị tiến độ; GAS là nguồn state duy nhất. */
+var FBM_SYNC_CLIENT = { installed: false, waiting: {}, timer: null, running: false };
+/** Timeout cho một request Extension để phiên không treo vô hạn khi tab FBM/bridge mất kết nối. */
+var FBM_SYNC_REQUEST_TIMEOUT_MS = 20000;
+
+/** Tạo nút điều khiển dùng chung cho panel tiến độ. */
+function fbmSyncMakeButton(id, label, primary) {
+  var button = document.createElement('button');
+  button.type = 'button'; button.id = id; button.className = 'shin-button' + (primary ? ' shin-primary' : ''); button.textContent = label;
+  return button;
+}
+/** Mở/đóng panel và chỉ hỏi GAS khi người dùng vừa mở panel. */
+function syncPanelToggle() {
+  var screen = document.getElementById('fbm-sync-screen');
+  if (!screen) { throw new Error('Sidebar thieu man dong bo FBM.'); }
+  screen.hidden = !screen.hidden;
+  return screen.hidden || typeof fbmSyncStatusOnce !== 'function' ? null : fbmSyncStatusOnce();
+}
+/** Vẽ snapshot status, không suy diễn nghiệp vụ ở client. */
+function fbmSyncPaint(status) {
+  var panel = document.getElementById('fbm-sync-content');
+  if (!panel || !status) { return; }
+  // GAS orchestration returns { ok, request, status }; the panel only paints the inner snapshot.
+  status = status.status || status;
+  panel.hidden = false; panel.textContent = '';
+  var title = document.createElement('div'); title.className = 'shin-sync-title'; title.textContent = 'Đồng bộ FBM'; panel.appendChild(title);
+  var phase = document.createElement('div'); phase.className = 'shin-sync-phase'; phase.textContent = status.label || status.phase || ''; panel.appendChild(phase);
+  if (status.session) { var session = document.createElement('div'); session.className = 'shin-sync-session'; session.textContent = 'Phiên FBM: Customer ' + (status.session.customer ? 'OK' : 'chưa có') + ' · Activity ' + (status.session.activity ? 'OK' : 'chưa có'); panel.appendChild(session); }
+  var count = status.counts || {};
+  var counts = document.createElement('div'); counts.className = 'shin-sync-count'; counts.textContent = 'Đã xử lý ' + Number(count.completed || 0) + ' · thành công ' + Number(count.succeeded || 0) + ' · lỗi ' + Number(count.error || 0) + ' · xung đột ' + Number(count.conflict || 0) + ' · hoãn ' + Number(count.skipped || 0); panel.appendChild(counts);
+  if (status.current) { var current = document.createElement('div'); current.className = 'shin-sync-current'; current.textContent = String(status.current); panel.appendChild(current); }
+  if (status.message) { var message = document.createElement('div'); message.className = 'shin-sync-message'; message.textContent = String(status.message); panel.appendChild(message); }
+  var actions = document.createElement('div'); actions.className = 'shin-sync-actions';
+  actions.appendChild(fbmSyncMakeButton('fbm-sync-start', 'Đồng bộ ngay', true));
+  if (status.phase && ['idle', 'done', 'error'].indexOf(status.phase) === -1) { actions.appendChild(fbmSyncMakeButton('fbm-sync-cancel', 'Dừng đồng bộ', false)); }
+  actions.appendChild(fbmSyncMakeButton('fbm-sync-status', 'Cập nhật trạng thái', false));
+  panel.appendChild(actions);
+}
+/** Đăng ký listener một lần cho response và các nút đồng bộ. */
+function fbmSyncInstall() {
+  if (FBM_SYNC_CLIENT.installed) { return; }
+  FBM_SYNC_CLIENT.installed = true;
+  window.addEventListener('message', function (event) {
+    var data = event.data || {};
+    if (data.action !== 'CRM_FBM_RESPONSE' || (typeof SHEET_LINK_NONCE !== 'undefined' && data.nonce !== SHEET_LINK_NONCE)) { return; }
+    var waiter = FBM_SYNC_CLIENT.waiting[data.id];
+    if (!waiter) { return; }
+    delete FBM_SYNC_CLIENT.waiting[data.id];
+    if (data.error) { waiter.reject(new Error(data.error)); } else { waiter.resolve(data.result); }
+  });
+  document.addEventListener('click', function (event) {
+    var target = event.target && event.target.closest ? event.target.closest('#fbm-sync-back, #fbm-sync-start, #fbm-sync-cancel, #fbm-sync-status') : null;
+    if (!target) { return; }
+    event.preventDefault();
+    if (target.id === 'fbm-sync-back') { syncScreenClose(); }
+    else if (target.id === 'fbm-sync-start') { fbmSyncRun('read'); }
+    else if (target.id === 'fbm-sync-cancel') { fbmSyncCancel(); }
+    else { fbmSyncStatusOnce(); }
+  });
+}
+/** Close the screen while keeping orchestration alive. */
+function syncScreenClose() {
+  var screen = document.getElementById('fbm-sync-screen');
+  if (screen) { screen.hidden = true; }
+  return screen;
+}
+/** Chuyển một envelope sang tab FBM và chờ response thô. */
+function fbmSyncExtensionRequest(request) {
+  fbmSyncInstall();
+  return new Promise(function (resolve, reject) {
+    var id = String(Date.now()) + '-' + Math.random().toString(36).slice(2);
+    FBM_SYNC_CLIENT.waiting[id] = { resolve: resolve, reject: reject };
+    (window.top === window ? window : window.top).postMessage({ action: 'CRM_FBM_REQUEST', id: id, nonce: SHEET_LINK_NONCE, request: request }, 'https://docs.google.com');
+    setTimeout(function () { if (FBM_SYNC_CLIENT.waiting[id]) { delete FBM_SYNC_CLIENT.waiting[id]; reject(new Error('Không nhận được phản hồi từ tab FBM sau 20 giây. Hãy kiểm tra tab FBM và Extension.')); } }, FBM_SYNC_REQUEST_TIMEOUT_MS);
+  });
+}
+/** Lấy status một lần, không tạo vòng polling khi không chạy. */
+function fbmSyncStatusOnce() { return callServer('fbmGetSyncStatus').then(fbmSyncPaint); }
+/** Dừng phiên ở GAS và hủy vòng chạy phía Sidebar. */
+function fbmSyncCancel() {
+  FBM_SYNC_CLIENT.running = false;
+  return callServer('fbmCancelSync').then(fbmSyncPaint);
+}
+/** Chạy chuỗi request GAS -> Extension cho tới khi hết cursor. */
+function fbmSyncLoop(status) {
+  fbmSyncPaint(status);
+  if (!status || !status.request) { FBM_SYNC_CLIENT.running = false; return status; }
+  return fbmSyncExtensionRequest(status.request).then(function (response) {
+    if (!FBM_SYNC_CLIENT.running) { return fbmSyncStatusOnce(); }
+    return callServer('fbmContinueSync', [response]);
+  }).then(fbmSyncLoop);
+}
+/** Mở phiên mới; chặn click trùng khi phiên đang chạy. */
+function fbmSyncRun(mode) {
+  if (FBM_SYNC_CLIENT.running) { return Promise.resolve(null); }
+  if (typeof sheetLinkExtensionAlive === 'function' && !sheetLinkExtensionAlive()) {
+    var missing = { label: 'Chưa kết nối Extension', phase: 'error', message: 'Chưa nhận được bắt tay từ Extension. Hãy tải lại Extension rồi mở lại tab FBM.', counts: {} };
+    fbmSyncPaint(missing);
+    return Promise.resolve(missing);
+  }
+  FBM_SYNC_CLIENT.running = true;
+  var work = callServer('fbmStartSync', [mode || 'read']).then(function (started) {
+    if (!started || !started.ok) { if (started && started.status) { fbmSyncPaint(started.status); } throw new Error((started && started.code) || 'Không thể bắt đầu đồng bộ.'); }
+    return fbmSyncLoop(started);
+  });
+  return work.then(function (value) { FBM_SYNC_CLIENT.running = false; return value; }, function (err) {
+    FBM_SYNC_CLIENT.running = false;
+    return callServer('fbmCancelSync').catch(function () { return null; }).then(function () {
+      fbmSyncPaint({ label: 'Lỗi', phase: 'error', message: err && err.message ? err.message : String(err), counts: {} });
+      return null;
+    });
+  });
+}
+/** Poll status thưa chỉ trong lúc có phiên hoạt động. */
+function fbmSyncStartPolling() {
+  if (FBM_SYNC_CLIENT.timer) { return; }
+  FBM_SYNC_CLIENT.timer = setInterval(function () { if (FBM_SYNC_CLIENT.running) { fbmSyncStatusOnce(); } }, 3000);
+}
+</script>

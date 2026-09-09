@@ -45,6 +45,15 @@ function isAllowedSidebarOrigin(origin) {
 // 1. Bắt tay: kiểm origin, ghi nhớ đích, đáp tiếng kèm đúng nonce.
 window.addEventListener('message', function (event) {
   var data = event.data;
+  if (data && data.action === 'CRM_FBM_REQUEST') {
+    // Chuyển nguyên request qua service worker; bridge không phân tích response FBM.
+    if (!isAllowedSidebarOrigin(event.origin) || event.source !== sidebarWindow || String(data.nonce || '') !== sidebarNonce) { return; }
+    chrome.runtime.sendMessage({ type: 'FBM_EXECUTE_REQUEST', id: data.id, request: data.request }, function (reply) {
+      var error = chrome.runtime.lastError;
+      try { event.source.postMessage({ action: 'CRM_FBM_RESPONSE', nonce: sidebarNonce, id: data.id, result: error ? null : (reply && reply.result), error: error ? error.message : (reply && reply.error) }, event.origin); } catch (err) { sidebarWindow = null; sidebarOrigin = ''; sidebarNonce = ''; }
+    });
+    return;
+  }
   if (!data || data.action !== 'CRM_HANDSHAKE') { return; }
   if (!isAllowedSidebarOrigin(event.origin) || !event.source) { return; }
   var nonce = String(data.nonce || '');

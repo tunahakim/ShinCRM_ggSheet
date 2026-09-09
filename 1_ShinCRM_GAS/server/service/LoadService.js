@@ -107,8 +107,9 @@ function loadCore() {
 
     var warnings = danhMuc.warnings.slice();
     if (budget.warning) { warnings.push(budget.warning); }
-    if (config.params[LOG_TRACE_CONFIG_NAME]) {
-      warnings.push('LOG_TRACE đang bật (' + config.params[LOG_TRACE_CONFIG_NAME] + '). Sheet Log có thể chứa dữ liệu nhạy cảm nguyên văn; hãy tắt LOG_TRACE sau khi kiểm tra xong.');
+    var traceMode = String(config.params[LOG_TRACE_CONFIG_NAME] || '').trim();
+    if (traceMode && traceMode.toLowerCase() !== 'off') {
+      warnings.push('LOG_TRACE đang bật (' + traceMode + '). Sheet Log có thể chứa dữ liệu nhạy cảm nguyên văn; hãy tắt LOG_TRACE sau khi kiểm tra xong.');
     }
 
     logTrace({

@@ -134,7 +134,22 @@ function screenFormRender() {
 function screenFormOpen(man, record) {
   screenFormStash();
   screenStateOpenForm(man, screenFormDecl(man).entity, record);
+  screenFormSyncLock(screenFormDecl(man).entity, record);
   return screenFormRender();
+}
+
+/** Giữ khóa user ở GAS trong suốt lúc form đang mở; lỗi nền không làm mất bản nháp. */
+function screenFormSyncLock(entity, record) {
+  if (!record || !record.id || typeof callServer !== 'function') { return; }
+  var pending = callServer('fbmBeginEdit', [entity, record.id, record.fbmHash || '']);
+  if (pending && typeof pending.then === 'function') { pending.then(function () {}, function () {}); }
+}
+
+/** Nhả khóa user khi đóng form; khóa sync không bị nhả nhầm. */
+function screenFormSyncUnlock(entity, record) {
+  if (!record || !record.id || typeof callServer !== 'function') { return; }
+  var pending = callServer('fbmEndEdit', [entity, record.id]);
+  if (pending && typeof pending.then === 'function') { pending.then(function () {}, function () {}); }
 }
 
 /**
@@ -156,6 +171,8 @@ function screenFormOpenNew(man, seed) {
  * Dưới nó còn form thì vẽ lại form đó cùng bản nháp của chính nó; hết form thì về màn xem. Không dùng `screenViewGo` vì `screenStateCloseForm` đã đặt màn về `view` rồi, gọi thêm chỉ dọn lại một ngăn xếp đang rỗng.
  */
 function screenFormClose() {
+  var top = screenStateTop();
+  if (top) { screenFormSyncUnlock(top.entity, top.record); }
   var duoi = screenStateCloseForm();
   return duoi ? screenFormRender() : screenViewRender();
 }

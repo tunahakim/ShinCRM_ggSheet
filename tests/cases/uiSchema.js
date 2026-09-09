@@ -13,7 +13,7 @@ const MAN = ['view', 'customerForm', 'activityForm', 'noteForm'];
 
 /** Tên hành động của tài liệu 04 Phần 7, trừ `deleteSelectedActivities` mà chủ dự án bỏ ngày 06/09/2026, cộng `setCurrentCustomer` mà tài liệu 04 Phần 2 khai riêng. */
 const TEN_HANH_DONG = [
-  'toggleFollowSelection', 'toggleAutoRenderView', 'toggleSearchPanel', 'setActivityView',
+  'toggleFollowSelection', 'toggleAutoRenderView', 'toggleSearchPanel', 'toggleSyncPanel', 'setActivityView',
   'renderActiveViewSheet', 'reloadAll', 'openCustomerForm', 'openCustomerFormBlank',
   'openActivityForm', 'openNoteForm', 'saveForm', 'cancelForm',
   'deleteActivity', 'undoDelete', 'setCurrentCustomer'
@@ -188,7 +188,7 @@ function chay(so) {
     daDung.view.body === hop.UI_SCHEMA.view.body, true);
   check(so, 'hàng header của màn view dựng thành bảy Icon, nút sét là followSelection và mục "Khác" chỉ còn núm tự sắp xếp',
     [daDung.view.header.map((n) => n.role).join(','), daDung.view.header[1].icon, daDung.view.header[1].toggle, daDung.view.header[4].action, daDung.view.header[4].menu.length],
-    ['icon,icon,icon,icon,icon,icon,icon', 'bolt', 'followSelection', null, 1]);
+    ['icon,icon,icon,icon,icon,icon,icon', 'bolt', 'followSelection', null, 2]);
   check(so, 'nút chân dựng thành Button có nhãn chữ, không thành Icon',
     [daDung.noteForm.footer[0].role, daDung.noteForm.footer[0].label], ['button', 'LƯU GHI CHÚ']);
 }

@@ -24,8 +24,9 @@ UI_SCHEMA.view = {
     { icon: 'bolt', tooltip: 'Bám theo ô đang chọn', action: 'toggleFollowSelection', toggle: 'followSelection' },
     { icon: 'table', tooltip: 'Làm mới dữ liệu sheet quản trị đang mở', action: 'renderActiveViewSheet' },
     { icon: 'refresh', tooltip: 'Nạp lại', action: 'reloadAll' },
-    { icon: 'more', tooltip: 'Khác', menu: [
-      { label: 'Tự động làm mới sheet quản trị sau khi lưu', action: 'toggleAutoRenderView', toggle: true }
+      { icon: 'more', tooltip: 'Khác', menu: [
+      { label: 'Tự động làm mới sheet quản trị sau khi lưu', action: 'toggleAutoRenderView', toggle: true },
+      { label: 'Mở đồng bộ FBM', action: 'toggleSyncPanel' }
     ] },
     { icon: 'pencil', tooltip: 'Sửa khách', action: 'openCustomerForm', align: 'right' },
     { icon: 'addUser', tooltip: 'Thêm khách', action: 'openCustomerFormBlank' }

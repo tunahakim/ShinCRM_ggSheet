@@ -55,6 +55,15 @@
     <!-- Vùng 3 — Khối thông tin chung. Cao theo nội dung. -->
     <div id="sidebar-info">Đang mở…</div>
 
+    <!-- Sync is a separate full-sidebar screen; hiding it never cancels the GAS session. -->
+    <div id="fbm-sync-screen" class="shin-sync-screen" hidden>
+      <div class="shin-sync-screen-header">
+        <button type="button" id="fbm-sync-back" class="shin-icon" aria-label="Quay lại">&#8592;</button>
+        <strong>Đồng bộ FBM</strong>
+      </div>
+      <div id="fbm-sync-content" class="shin-sync-screen-content"></div>
+    </div>
+
     <!-- Vùng 4 — Thân. Chiếm hết phần dư, cuộn dọc khi tràn. -->
     <div id="sidebar-body"></div>
 
@@ -95,6 +104,7 @@
   <?!= include('client/schema/fieldLogic') ?>
   <?!= include('client/schema/uiSchema') ?>
   <?!= include('client/ui/progress') ?>
+  <?!= include('client/sync/fbmSync') ?>
   <?!= include('client/screen/statusScreen') ?>
   <?!= include('client/screen/viewScreen') ?>
   <?!= include('client/screen/formScreen') ?>
@@ -115,6 +125,8 @@
   <script>
     // Chạy trình tự khởi động ngay khi trang nạp xong. Không chờ sự kiện nào khác: các thẻ script nằm cuối thân trang nên
     // tới đây năm vùng đã có mặt trong DOM.
+    fbmSyncInstall();
+    fbmSyncStartPolling();
     sidebarBoot();
   </script>
 </body>

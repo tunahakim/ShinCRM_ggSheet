@@ -76,6 +76,9 @@ function chay(so) {
   const batVet = dungNap([['LOG_TRACE', 'sidebar']]).hop.loadCore();
   check(so, 'LOG_TRACE đang bật được cảnh báo qua gói nạp thay cho toast nhỏ',
     batVet.warnings.some((warning) => warning.indexOf('LOG_TRACE đang bật') >= 0), true);
+  const tatVet = dungNap([['LOG_TRACE', 'off']]).hop.loadCore();
+  check(so, 'LOG_TRACE off không hiện cảnh báo bật log',
+    tatVet.warnings.some((warning) => warning.indexOf('LOG_TRACE đang bật') >= 0), false);
 
   const coDirty = dungNap(null, { dirtyViewSheets: '["!Lead"]', dirtyRecords: '["KH0001"]', dirtyConfig: 'true', dirtyAll: 'true' }).hop.loadCore();
   check(so, 'nạp toàn bộ tiêu thụ cờ dữ liệu cũ nhưng giữ cờ sheet quản trị để sheet vẫn được vẽ lại',

@@ -72,6 +72,7 @@ function dungCanh() {
     hop._daMoHop.push('toggle');
     return { focusId: 'shin-search-input' };
   };
+  hop.syncPanelToggle = () => 'fbm-panel';
 
   return hop;
 }

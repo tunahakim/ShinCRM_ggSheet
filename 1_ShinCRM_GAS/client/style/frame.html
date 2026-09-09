@@ -80,6 +80,36 @@ html, body {
   cursor: wait;
 }
 
+.shin-sync-screen {
+  position: fixed;
+  z-index: 40;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--shin-bg-sunken);
+}
+.shin-sync-screen-header {
+  flex: 0 0 var(--shin-header-height);
+  display: flex;
+  align-items: center;
+  gap: var(--shin-gap-1);
+  padding: 0 var(--shin-gap-2);
+  border-bottom: 1px solid var(--shin-border);
+  background: var(--shin-bg);
+}
+.shin-sync-screen-header strong { margin-left: var(--shin-gap-1); }
+.shin-sync-screen-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--shin-gap-2);
+}
+.shin-sync-title { font-weight: 600; }
+.shin-sync-phase { margin-top: 2px; color: var(--shin-primary); }
+.shin-sync-count, .shin-sync-current, .shin-sync-message { margin-top: 3px; font-size: var(--shin-text-sm); color: var(--shin-text-soft); overflow-wrap: anywhere; }
+.shin-sync-actions { display: flex; flex-wrap: wrap; gap: var(--shin-gap-1); margin-top: var(--shin-gap-2); }
+.shin-sync-actions .shin-button { flex: 1 1 96px; min-width: 0; min-height: 28px; padding: 0 var(--shin-gap-2); white-space: normal; overflow-wrap: anywhere; }
+
 /* Vùng 1 — Header. Cao cố định, ghim đỉnh, hàng icon xếp ngang. Khe 4 pixel đúng như bản cũ: nút icon đã tròn 32 pixel nên
    mắt tự tách chúng ra, khe rộng thêm chỉ ăn chỗ của cái nút thứ bảy sau này. */
 #sidebar-header {

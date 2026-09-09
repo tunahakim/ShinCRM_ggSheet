@@ -1,27 +1,9 @@
-/**
- * Bảng khai tám cột thuần đồng bộ của module `fbm_sync`, theo tài liệu 02 Phần 8.1 và tài liệu 03A.
- *
- * Tệp này nằm ngoài lõi có chủ ý. Cơ chế duy nhất giữ lõi khỏi ghi đè tám cột này là **lõi chỉ được truyền `DATA_SCHEMA`
- * vào cửa ghi**, và cửa ghi chỉ ghi những cột có khai trong schema mà bên gọi đưa. Nên hễ tám cột này lọt vào `DATA_SCHEMA`
- * là mỗi lần bấm Lưu form lại xóa trắng một cột mà lõi không có giá trị để điền.
- *
- * Chiều phụ thuộc chỉ có một hướng: `fbm_sync` **được** đọc `DATA_SCHEMA`, lõi **không bao giờ** đọc `SYNC_SCHEMA`.
- * Không có cơ chế nào của Apps Script chặn hộ chuyện đó — mọi tệp dùng chung một vùng tên toàn cục — nên nó là kỷ luật,
- * và tài liệu 09 Phần 13 đòi một hàm tự kiểm quét các tệp lõi tìm chuỗi `SYNC_SCHEMA`. Hàm đó thuộc giai đoạn 3.
- *
- * Vì sao dựng bảng này ngay bây giờ, khi giai đoạn 3 còn chưa tới: bộ kiểm khung sheet cần phân biệt "cột đồng bộ hợp lệ"
- * với "cột lạ ai đó chèn vào". Không có bảng này thì tám cột đang có trên sheet bị báo là cột lạ, và một bộ kiểm kêu oan
- * mỗi lần chạy là một bộ kiểm người ta sẽ thôi đọc.
- */
+// Apps Script does not guarantee file evaluation order; preserve modules already loaded.
+var FbmSync = (typeof FbmSync === 'undefined' || !FbmSync) ? {} : FbmSync;
 
-/**
- * Tám cột thuần đồng bộ, năm loại: mã nối, mã hiển thị, dấu vân dữ liệu, tình trạng đẩy, mốc đồng bộ.
- *
- * `Activity` cố ý chỉ có ba: không có mốc đồng bộ vì số dòng lớn gấp nhiều lần và mốc đó suy được từ lần quét,
- * không có mã hiển thị vì đường tra cứu tay bên FBM luôn đi qua hồ sơ khách.
- *
- * Thứ tự ở đây là thứ tự cột bày ra trên sheet, tiếp ngay sau phần cột của lõi.
- */
+/** Cột metadata riêng của đồng bộ; lõi chỉ nhận DATA_SCHEMA, không đọc ngược SYNC_SCHEMA. */
+
+/** Cột sync đặt sau cột lõi; Activity giữ ít cột vì mã khách là khóa tra cứu. */
 var SYNC_SCHEMA = {
 
   customer: {
@@ -40,11 +22,7 @@ var SYNC_SCHEMA = {
 
 };
 
-/**
- * Trả về danh sách `[mã cột, nhãn]` của phần đồng bộ trên một sheet, theo thứ tự bày ra. Sheet không có cột đồng bộ thì trả về mảng rỗng.
- *
- * Nhận tên sheet chứ không nhận tên thực thể, để bên gọi nói cùng một thứ tiếng với `sheetCoreColumns()`.
- */
+/** Trả danh sách cột sync theo tên sheet, giữ đúng thứ tự hiển thị. */
 function syncColumnsForSheet(sheetName) {
   var entity = { Customer: 'customer', Activity: 'activity' }[sheetName];
   if (!entity) { return []; }
@@ -53,4 +31,25 @@ function syncColumnsForSheet(sheetName) {
   return Object.keys(fields).map(function (fieldName) {
     return [fields[fieldName].code, fields[fieldName].label];
   });
+}
+
+/** Tự bổ sung cột sync còn thiếu; không đụng dữ liệu hoặc thứ tự cột lõi. */
+function fbmEnsureSyncColumns() {
+  var book = shinOpenBook(), report = [];
+  ['Customer', 'Activity'].forEach(function (sheetName) {
+    var sheet = book.getSheetByName(sheetName), expected = syncColumnsForSheet(sheetName);
+    if (!sheet || !expected.length) { return; }
+    var map = readColumnMap(sheetName), missing = expected.filter(function (item) { return !map.map[item[0]]; });
+    if (!missing.length) { return; }
+    var start = map.lastColumn + 1;
+    if (sheet.getMaxColumns() < start + missing.length - 1) { sheet.insertColumnsAfter(sheet.getMaxColumns(), start + missing.length - 1 - sheet.getMaxColumns()); }
+    sheet.getRange(1, start, 2, missing.length).setValues([
+      missing.map(function (item) { return item[0]; }),
+      missing.map(function (item) { return item[1]; })
+    ]);
+    sheet.getRange(1, start, 1, missing.length).setFontWeight('bold');
+    sheet.getRange(SHEET_FIRST_DATA_ROW, start, Math.max(1, sheet.getMaxRows() - SHEET_FIRST_DATA_ROW + 1), missing.length).setNumberFormat('@');
+    report.push(sheetName + ': thêm ' + missing.length + ' cột sync');
+  });
+  return report;
 }
