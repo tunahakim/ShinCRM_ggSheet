@@ -295,6 +295,9 @@ FbmSync.continue = function (rawResponse) {
     state.metadata.customerFields = customerGrid.fields;
     FbmSync.stateWrite(state);
     FbmSync.pullRecords('customer', customerRecords, state.mode);
+    state = FbmSync.stateRead();
+    FbmSync.previewRecords(state, 'customer', customerRecords);
+    FbmSync.stateWrite(state);
     var ids = customerGrid.rows.map(function (row) { return String(row.stt_rec_kh || '').trim(); }).filter(Boolean);
     var nextCustomer = FbmSync.customerNext(state, customerGrid.rows, customerGrid.total);
     var activityRequest = FbmSync.activityForCustomers(state, ids, nextCustomer, state.cursor.seen);
@@ -309,6 +312,9 @@ FbmSync.continue = function (rawResponse) {
     state.metadata.activityFields = activityGrid.fields;
     FbmSync.stateWrite(state);
     FbmSync.pullRecords('activity', activityRecords, state.mode);
+    state = FbmSync.stateRead();
+    FbmSync.previewRecords(state, 'activity', activityRecords);
+    FbmSync.stateWrite(state);
     var hasNext = activityGrid.rows.length >= Number(cursor.count || 100) && activityGrid.rows.length > 0;
     if (hasNext) {
       var lastActivity = activityGrid.rows[activityGrid.rows.length - 1];

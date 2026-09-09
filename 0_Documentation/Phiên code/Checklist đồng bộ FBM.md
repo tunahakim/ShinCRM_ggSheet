@@ -67,6 +67,7 @@ Tài liệu này theo dõi phạm vi đồng bộ FBM/ShinCRM. Không thực hi�
 
 - [x] Có khu vực trạng thái phase/count/error/conflict/skipped.
 - [x] Màn hình đồng bộ độc lập chiếm toàn Sidebar; nút quay lại chỉ ẩn màn hình, không hủy phiên đang chạy.
+- [x] Hiển thị preview đọc-only có giới hạn của Customer/Activity để nghiệm thu live mà không ghi Sheet.
 - [x] Có mục menu `Mở đồng bộ FBM` để mở/đóng khu vực trạng thái.
 - [x] Chỉ polling `getSyncStatus` khi có phiên hoạt động.
 - [ ] Rà soát hiển thị tiến độ thực tế trong Sidebar.

@@ -5,7 +5,7 @@ FbmSync.LOCK_KEY = 'FBM_SYNC_RECORD_LOCKS_V1';
 
 /** Tạo state rỗng với đủ field để các phiên cũ vẫn đọc được. */
 FbmSync.stateDefault = function () {
-  return { version: 1, runId: '', mode: 'read', phase: 'idle', entity: '', cursor: {}, session: { customerAuthorized: '', activityAuthorized: '', cookie: '', userId: '', lookups: {} }, metadata: { categoryGate: null, categoryBlocks: [] }, counts: { total: 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 }, current: '', message: '', startedAt: 0, updatedAt: 0, nextRunAt: 0, lastError: '', locks: {} };
+  return { version: 1, runId: '', mode: 'read', phase: 'idle', entity: '', cursor: {}, session: { customerAuthorized: '', activityAuthorized: '', cookie: '', userId: '', lookups: {} }, metadata: { categoryGate: null, categoryBlocks: [], preview: { customers: [], activities: [], truncated: false } }, counts: { total: 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 }, current: '', message: '', startedAt: 0, updatedAt: 0, nextRunAt: 0, lastError: '', locks: {} };
 };
 
 /** Lấy kho state cấp tài liệu, dùng chung giữa các lần gọi GAS. */
@@ -17,7 +17,7 @@ FbmSync.stateRead = function () {
     var raw = FbmSync.props().getProperty(FbmSync.STATE_KEY);
     if (!raw) { return fallback; }
     var parsed = JSON.parse(raw);
-    return Object.assign(fallback, parsed, { counts: Object.assign(fallback.counts, parsed.counts || {}), session: Object.assign(fallback.session, parsed.session || {}), metadata: Object.assign(fallback.metadata, parsed.metadata || {}), locks: parsed.locks || {} });
+    return Object.assign(fallback, parsed, { counts: Object.assign(fallback.counts, parsed.counts || {}), session: Object.assign(fallback.session, parsed.session || {}), metadata: Object.assign(fallback.metadata, parsed.metadata || {}, { preview: Object.assign(fallback.metadata.preview, (parsed.metadata || {}).preview || {}) }), locks: parsed.locks || {} });
   } catch (err) { return fallback; }
 };
 /** Ghi state, cập nhật timestamp và giữ cấu trúc nhất quán. */
@@ -26,6 +26,7 @@ FbmSync.stateWrite = function (state) {
   next.session = Object.assign(FbmSync.stateDefault().session, next.session || {});
   next.session.lookups = Object.assign({}, FbmSync.stateDefault().session.lookups, next.session.lookups || {});
   next.metadata = Object.assign(FbmSync.stateDefault().metadata, next.metadata || {});
+  next.metadata.preview = Object.assign(FbmSync.stateDefault().metadata.preview, next.metadata.preview || {});
   next.counts = Object.assign(FbmSync.stateDefault().counts, next.counts || {});
   next.updatedAt = Date.now();
   FbmSync.props().setProperty(FbmSync.STATE_KEY, JSON.stringify(next));

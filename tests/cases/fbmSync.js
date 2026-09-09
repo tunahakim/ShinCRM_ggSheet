@@ -61,6 +61,9 @@ async function chay(so) {
   check(so, 'start bat dau bang bootstrap Customer', started.request.meta.kind, 'authorize');
   check(so, 'bootstrap dung viewPage false', started.request.body.viewPage, false);
   check(so, 'bootstrap khong gui authorized cu', started.request.body.authorized, null);
+  const previewState = { metadata: {} };
+  orchestration.FbmSync.previewRecords(previewState, 'customer', [{ fbmCustomerCode: 'ALT00010', companyName: 'Test', fbmId: 'A1' }]);
+  check(so, 'preview luu ma va ten Customer doc tu FBM', previewState.metadata.preview.customers[0].code, 'ALT00010');
 
   const guards = taoHopCat({ FbmSync: {}, PropertiesService: { getScriptProperties: () => ({ getProperty: () => '' }), getDocumentProperties: () => ({ getProperty: () => null, setProperty: () => {} }) } });
   napServer(guards, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/transport/Transport.js');

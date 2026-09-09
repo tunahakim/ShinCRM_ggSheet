@@ -10,5 +10,23 @@ FbmSync.statusView = function () {
   var state = FbmSync.stateRead();
   return { ok: true, runId: state.runId, phase: state.phase, label: FbmSync.statusLabel(state.phase), entity: state.entity, cursor: state.cursor, session: { customer: !!state.session.customerAuthorized, activity: !!state.session.activityAuthorized }, metadata: state.metadata, counts: state.counts, current: state.current, message: state.message, startedAt: state.startedAt, updatedAt: state.updatedAt, nextRunAt: state.nextRunAt, lastError: state.lastError, locks: state.locks };
 };
+/** Keep a bounded read-only preview for live verification without writing Sheet data. */
+FbmSync.previewRecords = function (state, entity, records) {
+  state.metadata = state.metadata || {};
+  state.metadata.preview = state.metadata.preview || { customers: [], activities: [], truncated: false };
+  state.metadata.preview.customers = state.metadata.preview.customers || [];
+  state.metadata.preview.activities = state.metadata.preview.activities || [];
+  var target = entity === 'customer' ? state.metadata.preview.customers : state.metadata.preview.activities;
+  var limit = entity === 'customer' ? 10 : 50;
+  (records || []).forEach(function (record) {
+    if (target.length >= limit) { state.metadata.preview.truncated = true; return; }
+    if (entity === 'customer') {
+      target.push({ code: String(record.fbmCustomerCode || ''), name: String(record.companyName || ''), fbmId: String(record.fbmId || '') });
+    } else {
+      target.push({ customerCode: String(record.customerId || ''), date: String(record.workDate || ''), type: String(record.taskType || ''), content: String(record.content || '') });
+    }
+  });
+  return state;
+};
 /** API tương thích cho caller GAS cũ. */
 function fbmSyncStatus() { return FbmSync.statusView(); }
