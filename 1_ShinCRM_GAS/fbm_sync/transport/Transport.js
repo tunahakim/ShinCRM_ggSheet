@@ -4,6 +4,10 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 /** Chỉ cho phép ghi khi caller chọn write và cờ an toàn đã bật. */
 FbmSync.writeEnabled = function (mode) {
   if (mode !== 'write') { return false; }
+  return FbmSync.writeAllowed();
+};
+/** Cờ an toàn độc lập với mode; mặc định luôn tắt. */
+FbmSync.writeAllowed = function () {
   try { return PropertiesService.getScriptProperties().getProperty('FBM_SYNC_ALLOW_WRITES') === 'true'; } catch (err) { return false; }
 };
 /** Bọc request nội bộ thành envelope gửi qua Extension. */
@@ -165,6 +169,10 @@ FbmSync.start = function (options) {
   if (typeof fbmEnsureSyncColumns === 'function') { fbmEnsureSyncColumns(); }
   var opt = options || {}, state = FbmSync.stateStart('', 'checking_session', 0);
   state.mode = opt.mode === 'write' ? 'write' : 'read';
+  if (state.mode === 'write' && !FbmSync.writeAllowed()) {
+    state.phase = 'idle'; state.runId = ''; state.message = 'Chưa cho phép ghi thật lên FBM.'; FbmSync.stateWrite(state);
+    return { ok: false, code: 'SYNC_WRITES_DISABLED', status: FbmSync.statusView() };
+  }
   state.cursor = { kind: 'authorize_customer' };
   state.message = 'Dang kiem tra phien FBM...';
   FbmSync.stateWrite(state);

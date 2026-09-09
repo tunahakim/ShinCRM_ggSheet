@@ -105,7 +105,9 @@ function chay(so) {
 
   // Chiều phụ thuộc một hướng, tài liệu 09 Phần 13 và tài liệu 03 Phần 1: fbm_sync đọc được DATA_SCHEMA, lõi không đọc được SYNC_SCHEMA.
   // Chỉ quét phần mã. Docstring của tệp lõi ĐƯỢC phép nhắc tới tên bảng kia, và nên nhắc: giải thích vì sao chỗ này cố ý không đọc nó là thứ đáng có nhất trong tệp.
-  const tepLoi = liet('server', '.js').concat(tepClient);
+  // Entry point FBM nằm trong server/service nhưng thuộc module đồng bộ, không phải lõi độc lập.
+  const tepLoi = liet('server', '.js').concat(tepClient)
+    .filter((tep) => !/server[\\/]service[\\/]FbmSyncService\.js$/.test(tep));
   const viPham = tepLoi.filter((tep) => /SYNC_SCHEMA|FbmSync/.test(stripComments(docMa(tep))));
 
   if (viPham.length) {

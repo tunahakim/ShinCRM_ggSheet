@@ -1,6 +1,6 @@
 <script>
 /* Sidebar chỉ hiển thị tiến độ; GAS là nguồn state duy nhất. */
-var FBM_SYNC_CLIENT = { installed: false, waiting: {}, running: false };
+var FBM_SYNC_CLIENT = { installed: false, waiting: {}, running: false, mode: 'read', writeAllowed: false };
 /** Timeout cho một request Extension để phiên không treo vô hạn khi tab FBM/bridge mất kết nối. */
 var FBM_SYNC_REQUEST_TIMEOUT_MS = 20000;
 
@@ -23,6 +23,7 @@ function fbmSyncPaint(status) {
   if (!panel || !status) { return; }
   // GAS orchestration returns { ok, request, status }; the panel only paints the inner snapshot.
   status = status.status || status;
+  if (status.writeAllowed !== undefined) { FBM_SYNC_CLIENT.writeAllowed = status.writeAllowed === true; }
   panel.hidden = false; panel.textContent = '';
   var title = document.createElement('div'); title.className = 'shin-sync-title'; title.textContent = 'Đồng bộ FBM'; panel.appendChild(title);
   var phase = document.createElement('div'); phase.className = 'shin-sync-phase'; phase.textContent = status.label || status.phase || ''; panel.appendChild(phase);
@@ -35,8 +36,15 @@ function fbmSyncPaint(status) {
   fbmSyncPaintPreview(panel, status.metadata && status.metadata.preview);
   var actions = document.createElement('div'); actions.className = 'shin-sync-actions';
   var active = ['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(status.phase) >= 0;
+  var mode = document.createElement('select'); mode.id = 'fbm-sync-mode'; mode.className = 'shin-input'; mode.disabled = active;
+  [['read', 'Đọc thử'], ['write', 'Ghi thật']].forEach(function (item) { var option = document.createElement('option'); option.value = item[0]; option.textContent = item[1]; mode.appendChild(option); });
+  mode.value = FBM_SYNC_CLIENT.mode; mode.title = 'Chọn chiều chạy của phiên đồng bộ';
+  actions.appendChild(mode);
   actions.appendChild(fbmSyncMakeButton(active ? 'fbm-sync-cancel' : 'fbm-sync-start', active ? 'Dừng đồng bộ' : 'Đồng bộ ngay', !active));
   panel.appendChild(actions);
+  var gate = document.createElement('label'); gate.className = 'shin-sync-write-gate';
+  var check = document.createElement('input'); check.type = 'checkbox'; check.id = 'fbm-sync-write-gate'; check.checked = FBM_SYNC_CLIENT.writeAllowed; check.disabled = active;
+  gate.appendChild(check); gate.appendChild(document.createTextNode(' Cho phép ghi thật lên FBM')); panel.appendChild(gate);
 }
 /** Render only bounded, read-only fields returned by the GAS preview snapshot. */
 function fbmSyncPaintPreview(panel, preview) {
@@ -74,8 +82,14 @@ function fbmSyncInstall() {
     if (!target) { return; }
     event.preventDefault();
     if (target.id === 'fbm-sync-back') { syncScreenClose(); }
-    else if (target.id === 'fbm-sync-start') { fbmSyncRun('read'); }
+    else if (target.id === 'fbm-sync-start') { fbmSyncRun(FBM_SYNC_CLIENT.mode); }
     else if (target.id === 'fbm-sync-cancel') { fbmSyncCancel(); }
+  });
+  document.addEventListener('change', function (event) {
+    var target = event.target;
+    if (!target) { return; }
+    if (target.id === 'fbm-sync-mode') { FBM_SYNC_CLIENT.mode = target.value; }
+    if (target.id === 'fbm-sync-write-gate') { fbmSyncSetWriteGate(target.checked); }
   });
 }
 /** Close the screen while keeping orchestration alive. */
@@ -96,6 +110,10 @@ function fbmSyncExtensionRequest(request) {
 }
 /** Lấy status một lần, không tạo vòng polling khi không chạy. */
 function fbmSyncStatusOnce() { return callServer('fbmGetSyncStatus').then(fbmSyncPaint); }
+/** Đọc cờ ghi ở GAS và đồng bộ lại checkbox sau mỗi lần mở panel. */
+function fbmSyncSetWriteGate(enabled) {
+  return callServer('fbmSetWriteMode', [enabled === true]).then(function (result) { FBM_SYNC_CLIENT.writeAllowed = !!(result && result.enabled); return fbmSyncStatusOnce(); });
+}
 /** Dừng phiên ở GAS và hủy vòng chạy phía Sidebar. */
 function fbmSyncCancel() {
   FBM_SYNC_CLIENT.running = false;

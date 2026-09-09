@@ -7,6 +7,10 @@ function fbmContinueSync(response) { return runEntryPoint('fbmContinueSync', 'si
 function fbmCancelSync() { return runEntryPoint('fbmCancelSync', 'sidebar', 'throw', function () { return fbmSyncCancel(); }); }
 /** Đọc snapshot tiến độ hiện tại; Sidebar chỉ polling khi đang chạy. */
 function fbmGetSyncStatus() { return runEntryPoint('fbmGetSyncStatus', 'sidebar', 'throw', function () { return fbmSyncStatus(); }); }
+/** Đọc cờ cho phép ghi; mặc định tắt để không chạm dữ liệu FBM ngoài ý muốn. */
+function fbmGetWriteMode() { return runEntryPoint('fbmGetWriteMode', 'sidebar', 'throw', function () { return { enabled: FbmSync.writeAllowed() }; }); }
+/** Đổi cờ ghi thật theo thao tác chủ động của người dùng trên Sidebar. */
+function fbmSetWriteMode(enabled) { return runEntryPoint('fbmSetWriteMode', 'sidebar', 'throw', function () { return fbmSyncSetWriteMode(enabled === true); }); }
 /** Khóa record khi người dùng bắt đầu sửa. */
 function fbmBeginEdit(entity, id, revision) { return runEntryPoint('fbmBeginEdit', 'sidebar', 'throw', function () { return fbmSyncEditBegin(entity, id, revision); }); }
 /** Mở khóa record khi người dùng kết thúc sửa. */

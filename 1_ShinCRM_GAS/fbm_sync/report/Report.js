@@ -23,7 +23,7 @@ FbmSync.syncEntityLabel = function (entity, phase) {
 /** Trả về snapshot đầy đủ để Sidebar render một lần. */
 FbmSync.statusView = function () {
   var state = FbmSync.stateRead();
-  return { ok: true, runId: state.runId, mode: state.mode, phase: state.phase, label: FbmSync.statusLabel(state.phase), direction: FbmSync.syncDirection(state), entity: state.entity, entityLabel: FbmSync.syncEntityLabel(state.entity, state.phase), cursor: state.cursor, session: { customer: !!state.session.customerAuthorized, activity: !!state.session.activityAuthorized }, metadata: state.metadata, counts: state.counts, current: state.current, message: state.message, startedAt: state.startedAt, updatedAt: state.updatedAt, nextRunAt: state.nextRunAt, lastError: state.lastError, locks: state.locks };
+  return { ok: true, runId: state.runId, mode: state.mode, writeAllowed: FbmSync.writeAllowed(), phase: state.phase, label: FbmSync.statusLabel(state.phase), direction: FbmSync.syncDirection(state), entity: state.entity, entityLabel: FbmSync.syncEntityLabel(state.entity, state.phase), cursor: state.cursor, session: { customer: !!state.session.customerAuthorized, activity: !!state.session.activityAuthorized }, metadata: state.metadata, counts: state.counts, current: state.current, message: state.message, startedAt: state.startedAt, updatedAt: state.updatedAt, nextRunAt: state.nextRunAt, lastError: state.lastError, locks: state.locks };
 };
 /** Keep a bounded read-only preview for live verification without writing Sheet data. */
 FbmSync.previewRecords = function (state, entity, records) {
