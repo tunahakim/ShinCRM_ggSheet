@@ -110,8 +110,8 @@
 - [x] Chỉ FBM đổi → pull nội dung và baseline, giữ trường nội bộ.
 - [x] Chỉ ShinCRM đổi → không pull đè, chuyển ứng viên push nếu được phép.
 - [ ] Hai phía đổi → conflict, khóa, log, không ghi nội dung/baseline.
-- [ ] Customer vắng khỏi grid → `không thấy bên FBM`, không xóa và không đổi baseline.
-- [ ] Tombstone local có FBM ID không bị kéo lại thành dòng mới.
+- [x] Customer vắng khỏi grid → `không thấy bên FBM`, không xóa và không đổi baseline.
+- [x] Tombstone local có FBM ID không bị kéo lại thành dòng mới.
 - [ ] Customer ngừng đồng bộ loại cả Customer và Activity con khỏi hai chiều.
 - [x] Record đang được người dùng sửa được hoãn; missing scan bỏ qua và giữ nguyên bản nháp.
 
@@ -127,12 +127,12 @@
 ### Activity và marker
 
 - [x] Request Activity theo `externalKey stt_rec` nối đúng Customer nội bộ.
-- [ ] Activity mới không marker tạo dòng ShinCRM, cấp mã nội bộ, lưu FBM ID và baseline.
-- [ ] Marker trỏ dòng đang đẩy thì vá ID, không tạo trùng.
+- [x] Activity mới không marker tạo dòng ShinCRM, cấp mã nội bộ, lưu FBM ID và baseline.
+- [x] Marker trỏ dòng đang đẩy thì vá ID, không tạo trùng.
 - [ ] Marker trỏ dòng đã có FBM ID khác thì khóa và báo xử lý.
-- [ ] Marker mồ côi chỉ log, không tạo lại.
-- [ ] Activity thiếu hoặc placeholder `workDate` bị chặn và log, không tự điền ngày.
-- [ ] Hash Activity dùng cùng luật ba chiều như Customer.
+- [x] Marker mồ côi chỉ log, không tạo lại.
+- [x] Activity thiếu hoặc placeholder `workDate` bị chặn và log, không tự điền ngày.
+- [x] Hash Activity dùng cùng luật ba chiều như Customer.
 - [ ] Activity vắng trong bulk chỉ mang trạng thái không thấy bên FBM, không suy hard-delete.
 
 ### Ba lớp quét

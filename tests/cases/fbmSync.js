@@ -177,6 +177,7 @@ async function chay(so) {
   const lockedState = { mode: 'write', metadata: { categoryGate: {}, seen: { customer: {}, activity: {} } }, locks: { 'customer:C-LOCK': { owner: 'user', revision: 'r1' } } };
   edges.FbmSync.stateRead = () => lockedState;
   edges.FbmSync.stateWrite = () => {};
+  edges.FbmSync.validateIncomingCategories = () => [];
   edges.FbmSync.readLocal = () => [{ id: 'C-LOCK', fbmId: 'FBM-LOCK', fbmCustomerCode: 'ALT00010', companyName: 'Cũ', fbmHash: '' }];
   edges.writeGateSave = () => { lockedWrite = true; return { ok: true }; };
   const lockedPull = edges.FbmSync.pullWrite('customer', [edges.FbmSync.customerRecord({ stt_rec_kh: 'FBM-LOCK', ma_kh: 'ALT00010', ten_kh: 'Mới' }, {})]);
@@ -188,6 +189,29 @@ async function chay(so) {
   edges.FbmSync.readLocal = () => [{ id: 'C-MISSING', fbmId: 'FBM-MISSING', recordStatus: 'active' }];
   edges.writeGateSave = () => { missingWrite = true; return { ok: true }; };
   check(so, 'missing scan bo qua record dang user sua', [edges.FbmSync.markMissingAfterFullScan('customer', missingState).written, missingWrite], [0, false]);
+  let missingBatch;
+  const fullScanState = { mode: 'write', metadata: { seen: { customer: {} } }, locks: {} };
+  edges.FbmSync.scriptSettings = () => ({ testCustomerCode: '' });
+  edges.FbmSync.stateRead = () => fullScanState;
+  edges.FbmSync.readLocal = () => [{ id: 'C-MISSING', fbmId: 'FBM-MISSING', recordStatus: 'active' }, { id: 'C-TOMBSTONE', fbmId: 'FBM-TOMBSTONE', recordStatus: 'deleted' }];
+  edges.writeGateSave = (request) => { missingBatch = request; return { ok: true }; };
+  const missingResult = edges.FbmSync.markMissingAfterFullScan('customer', fullScanState);
+  check(so, 'Customer vang chi danh dau missing va bo qua tombstone', [missingResult.written, missingBatch.records.length, missingBatch.records[0].id, missingBatch.records[0].syncStatus], [1, 1, 'C-MISSING', edges.FbmSync.SYNC_STATUS.missing]);
+  let activityPullWrite;
+  edges.FbmSync.stateRead = () => ({ metadata: { categoryGate: gate, seen: { customer: {}, activity: {} } }, locks: {} });
+  edges.FbmSync.stateWrite = () => {};
+  edges.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-ACT', fbmCustomerCode: 'ALT00014' }] : [];
+  edges.writeGateSave = (request) => { activityPullWrite = request; return { ok: true }; };
+  const newActivity = edges.FbmSync.activityRecord({ id: 88, ma_kh: 'ALT00014', ten_cv: 'Gọi', details: 'Nội dung', end_date: '/Date(1757386800000)/' }, gate);
+  const activityPull = edges.FbmSync.pullWrite('activity', [newActivity]);
+  check(so, 'Activity pull moi noi dung vao Customer noi bo', [activityPull.written, activityPullWrite.records[0].customerId, activityPullWrite.records[0].fbmId], [1, 'CUS-ACT', 88]);
+  edges.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-ACT', fbmCustomerCode: 'ALT00014' }] : [];
+  const orphanActivity = edges.FbmSync.activityRecord({ id: 89, ma_kh: 'ALT00014', ten_cv: 'Gọi', details: 'Mồ côi #SC-ACT-UNKNOWN', end_date: '/Date(1757386800000)/' }, gate);
+  const orphanActivityResult = edges.FbmSync.pullWrite('activity', [orphanActivity]);
+  check(so, 'Activity marker mo coi khong tao dong moi', orphanActivityResult.written, 0);
+  const invalidActivity = edges.FbmSync.activityRecord({ id: 90, ma_kh: 'ALT00014', ten_cv: 'Gọi', details: 'Thiếu ngày', end_date: '' }, gate);
+  const invalidActivityResult = edges.FbmSync.pullWrite('activity', [invalidActivity]);
+  check(so, 'Activity thieu ngay bi chan an toan', invalidActivityResult.written, 0);
 
   const failedRecord = { id: 'C-FAIL', fbmId: 'FBM-FAIL', fbmCustomerCode: 'ALT00010', companyName: 'Cũ', allowFbmPush: 'Cho phép', syncStatus: edges.FbmSync.SYNC_STATUS.error };
   const failedHash = edges.FbmSync.hash(failedRecord, 'customer', {});
