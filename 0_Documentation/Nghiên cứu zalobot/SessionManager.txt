@@ -1,0 +1,188 @@
+/**
+ * ============================================================
+ * QUẢN LÝ SESSION TRONG GOOGLE SHEET
+ * ============================================================
+ * Mỗi user Zalo (chat_id) = 1 dòng trong sheet Sessions.
+ * ============================================================
+ */
+
+/**
+ * Lấy session theo chat_id
+ * @returns {object|null} { row, rowIndex, chatId, displayName, fbmUser, fbmPassword,
+ *   encryptSalt, fbmCookie, database, unit, userId, loginTime }
+ */
+function getSession(chatId) {
+  var sheet = _getSessionsSheet();
+  if (!sheet) return null;
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) { // Bỏ header dòng 0
+    if (String(data[i][0]) === String(chatId)) {
+      return _rowToSession(data[i], i + 1); // i+1 vì Sheet đánh số từ 1
+    }
+  }
+  return null;
+}
+
+/**
+ * Lưu session mới (hoặc cập nhật nếu đã tồn tại)
+ */
+function saveSession(sessionData) {
+  var sheet = _getSessionsSheet();
+  if (!sheet) return;
+  var data = sheet.getDataRange().getValues();
+  var existingRow = -1;
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(sessionData.chatId)) {
+      existingRow = i + 1;
+      break;
+    }
+  }
+  var rowData = _sessionToRow(sessionData);
+  if (existingRow > 0) {
+    // Cập nhật dòng cũ
+    sheet.getRange(existingRow, 1, 1, rowData.length).setValues([rowData]);
+  } else {
+    // Thêm dòng mới
+    sheet.appendRow(rowData);
+  }
+}
+
+/**
+ * Cập nhật cookie + login_time cho session đã tồn tại
+ */
+function updateSessionCookie(chatId, newCookie, newLoginTime) {
+  var sheet = _getSessionsSheet();
+  if (!sheet) return;
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(chatId)) {
+      var row = i + 1;
+      sheet.getRange(row, 6).setValue(newCookie);    // Cột F: fbm_cookie
+      sheet.getRange(row, 10).setValue(newLoginTime); // Cột J: login_time
+      return;
+    }
+  }
+}
+
+/**
+ * Xóa session (dùng cho /logout hoặc khi re-login fail)
+ */
+function deleteSession(chatId) {
+  var sheet = _getSessionsSheet();
+  if (!sheet) return;
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(chatId)) {
+      sheet.deleteRow(i + 1);
+      return;
+    }
+  }
+}
+
+/**
+ * Xóa dòng cũ + thêm dòng mới (dùng khi cần xóa lịch sử chỉnh sửa)
+ */
+function replaceSession(chatId, newSessionData) {
+  deleteSession(chatId);
+  saveSession(newSessionData);
+}
+
+/**
+ * Đọc password từ session, tự decrypt nếu cần.
+ * Nếu phát hiện plaintext → encrypt, xóa dòng cũ, thêm dòng mới.
+ * @returns {string|null} password gốc (plaintext)
+ */
+function getDecryptedPassword(session) {
+  var pwd = session.fbmPassword;
+  if (!pwd) return null;
+
+  if (isEncrypted(pwd)) {
+    // Đã mã hóa → decrypt
+    return decryptPassword(pwd, session.encryptSalt);
+  }
+
+  // Plaintext → user tự sửa Sheet
+  // Encrypt rồi thay thế dòng (xóa + thêm mới)
+  var newSalt = String(Date.now());
+  var encrypted = encryptPassword(pwd, newSalt);
+  var updatedSession = {
+    chatId: session.chatId,
+    displayName: session.displayName,
+    fbmUser: session.fbmUser,
+    fbmPassword: encrypted,
+    encryptSalt: newSalt,
+    fbmCookie: session.fbmCookie,
+    database: session.database,
+    unit: session.unit,
+    userId: session.userId,
+    loginTime: session.loginTime,
+  };
+  replaceSession(session.chatId, updatedSession);
+  return pwd; // Trả về plaintext gốc
+}
+
+/**
+ * Cập nhật cookie từ nguồn bên ngoài (Chrome extension)
+ * Dành cho tính năng mở rộng sau này.
+ */
+function updateSessionFromExternal(chatId, cookie, loginTime) {
+  updateSessionCookie(chatId, cookie, loginTime || Date.now());
+}
+
+// ============================================================
+// PRIVATE HELPERS
+// ============================================================
+
+function _getSessionsSheet() {
+  try {
+    if (!CONFIG.SHEET_ID) return null;
+    var ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+    var sheet = ss.getSheetByName(CONFIG.SHEET_SESSIONS);
+    if (!sheet) {
+      sheet = ss.insertSheet(CONFIG.SHEET_SESSIONS);
+      sheet.appendRow([
+        "chat_id", "display_name", "fbm_user", "fbm_password", "encrypt_salt",
+        "fbm_cookie", "database", "unit", "user_id", "login_time",
+        "fbm_payload_cookie"   // Cookie payload cho JSON body FBM API (VD: "500020372f578FHN_CRM_App")
+      ]);
+      sheet.getRange(1, 1, 1, 11).setFontWeight("bold");
+    }
+    return sheet;
+  } catch (e) {
+    logToSheet("SESSION", "Lỗi mở sheet Sessions", e.message);
+    return null;
+  }
+}
+
+function _rowToSession(row, rowIndex) {
+  return {
+    rowIndex: rowIndex,
+    chatId: String(row[0] || ""),
+    displayName: String(row[1] || ""),
+    fbmUser: String(row[2] || ""),
+    fbmPassword: String(row[3] || ""),
+    encryptSalt: String(row[4] || ""),
+    fbmCookie: String(row[5] || ""),
+    database: String(row[6] || ""),
+    unit: String(row[7] || ""),
+    userId: String(row[8] || ""),
+    loginTime: Number(row[9] || 0),
+    fbmPayloadCookie: String(row[10] || ""),  // Cookie payload cho JSON body (VD: "500020372f578FHN_CRM_App")
+  };
+}
+
+function _sessionToRow(s) {
+  return [
+    s.chatId || "",
+    s.displayName || "",
+    s.fbmUser || "",
+    s.fbmPassword || "",
+    s.encryptSalt || "",
+    s.fbmCookie || "",
+    s.database || "",
+    s.unit || "",
+    s.userId || "",
+    s.loginTime || 0,
+    s.fbmPayloadCookie || "",  // Cột K: Cookie payload cho JSON body FBM API
+  ];
+}

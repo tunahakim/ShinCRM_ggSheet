@@ -1,0 +1,396 @@
+/**
+ * ============================================================
+ * TIỆN ÍCH CHUNG — Utils.gs
+ * ============================================================
+ * 
+ * File này chứa các hàm tiện ích dùng chung cho toàn bộ project:
+ *   - md5()              : Hash MD5 (dùng khi login FBM)
+ *   - encryptPassword()  : Mã hóa password trước khi lưu vào Sheet
+ *   - decryptPassword()  : Giải mã password khi cần re-login
+ *   - isEncrypted()      : Kiểm tra password đã mã hóa chưa
+ *   - aspDateToDatetime(): Chuyển đổi ngày ASP.NET → dd/MM/yyyy HH:mm
+ *   - aspDateToDate()    : Chuyển đổi ngày ASP.NET → dd/MM/yyyy
+ *   - truncate()         : Cắt chuỗi dài
+ *   - extractCookies()   : Lấy cookie từ HTTP response (dùng khi GAS gọi trực tiếp)
+ *   - mergeCookies()     : Ghép 2 chuỗi cookie, loại trùng
+ *   - getProxyUrl()      : Đọc URL proxy từ Google Sheet tab Config
+ *   - callFBMViaProxy()  : Gọi FBM qua proxy — HÀM QUAN TRỌNG NHẤT
+ * 
+ * LƯU Ý:
+ *   Trong GAS, tất cả file .gs chia sẻ scope chung.
+ *   Hàm định nghĩa ở file nào cũng gọi được từ file khác.
+ *   Không cần import/require.
+ * ============================================================
+ */
+
+
+// ============================================================
+// MD5 HASH
+// ============================================================
+
+/**
+ * Tính MD5 hash của 1 chuỗi
+ * 
+ * GAS không có hàm MD5 sẵn, phải dùng Utilities.computeDigest
+ * Kết quả trả về là chuỗi hex 32 ký tự viết thường
+ * 
+ * Dùng khi:
+ *   - Hash password trước khi gửi lên FBM: MD5(salt + MD5(rawPassword))
+ *   - Bước 1: md5("1234567a@") → "5b90b0b35f1a601ef0e5d294a5c7e3ce"
+ *   - Bước 2: md5(salt + bước1) → chuỗi hash gửi lên FBM
+ * 
+ * @param {string} string - chuỗi cần hash
+ * @returns {string} chuỗi hex 32 ký tự (VD: "5b90b0b35f1a601ef0e5d294a5c7e3ce")
+ */
+function md5(string) {
+  // computeDigest trả về mảng byte (có thể âm trong Java)
+  var digest = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.MD5, string, Utilities.Charset.UTF_8
+  );
+
+  var hash = "";
+  for (var i = 0; i < digest.length; i++) {
+    var b = digest[i];
+    // Java byte có thể âm (-128 đến 127), cần chuyển về 0-255
+    if (b < 0) b += 256;
+    var h = b.toString(16);
+    // Đảm bảo luôn 2 ký tự (VD: "0a" thay vì "a")
+    if (h.length === 1) h = "0" + h;
+    hash += h;
+  }
+  return hash;
+}
+
+
+// ============================================================
+// COOKIE HELPERS
+// ============================================================
+
+/**
+ * Trích xuất cookie từ HTTP response headers
+ * 
+ * Hàm này dùng cho trường hợp GAS gọi trực tiếp (không qua proxy).
+ * Khi qua proxy, cookie nằm trong response.setCookie (proxy đã parse sẵn).
+ * Giữ lại để tương thích ngược.
+ * 
+ * @param {HTTPResponse} response - response từ UrlFetchApp.fetch()
+ * @returns {string} chuỗi cookie dạng "name1=value1; name2=value2"
+ */
+function extractCookies(response) {
+  var headers = response.getAllHeaders();
+  var raw = headers["Set-Cookie"];
+  if (!raw) return "";
+  var arr = Array.isArray(raw) ? raw : [raw];
+  return arr.map(function(c) { return c.split(";")[0]; }).join("; ");
+}
+
+/**
+ * Ghép 2 chuỗi cookie thành 1, loại bỏ trùng lặp
+ * 
+ * Dùng khi cần ghép cookie từ bước 1 (session) + bước 4 (auth)
+ * VD: mergeCookies("ASP.NET_SessionId=abc", "ASP.NET_SessionId=xyz; .ASPXAUTH=token")
+ *     → "ASP.NET_SessionId=xyz; .ASPXAUTH=token"
+ *     (ASP.NET_SessionId bị ghi đè bởi giá trị mới từ c2)
+ * 
+ * Nếu cookie mới (c2) chứa key trùng với cookie cũ (c1),
+ * cookie mới sẽ ghi đè cookie cũ (ưu tiên c2)
+ * 
+ * @param {string} c1 - cookie cũ (VD: "ASP.NET_SessionId=abc123")
+ * @param {string} c2 - cookie mới (VD: "ASP.NET_SessionId=xyz789; .ASPXAUTH=token")
+ * @returns {string} cookie đã ghép, loại bỏ trùng lặp
+ */
+function mergeCookies(c1, c2) {
+  // Nếu 1 trong 2 rỗng → trả về cái còn lại
+  if (!c2) return c1 || "";
+  if (!c1) return c2;
+
+  // Parse cả 2 chuỗi cookie thành object { name: "name=value" }
+  var cookieMap = {};
+
+  // Parse c1 (cookie cũ)
+  var parts1 = c1.split(";");
+  for (var i = 0; i < parts1.length; i++) {
+    var pair = parts1[i].trim();
+    if (pair) {
+      var eqIndex = pair.indexOf("=");
+      var name = eqIndex > 0 ? pair.substring(0, eqIndex).trim() : pair;
+      cookieMap[name] = pair;
+    }
+  }
+
+  // Parse c2 (cookie mới) — ghi đè nếu trùng key
+  var parts2 = c2.split(";");
+  for (var j = 0; j < parts2.length; j++) {
+    var pair2 = parts2[j].trim();
+    if (pair2) {
+      var eqIndex2 = pair2.indexOf("=");
+      var name2 = eqIndex2 > 0 ? pair2.substring(0, eqIndex2).trim() : pair2;
+      cookieMap[name2] = pair2;
+    }
+  }
+
+  // Ghép lại thành chuỗi
+  var result = [];
+  for (var key in cookieMap) {
+    if (cookieMap.hasOwnProperty(key)) {
+      result.push(cookieMap[key]);
+    }
+  }
+
+  return result.join("; ");
+}
+
+
+// ============================================================
+// ASP.NET DATE CONVERTER
+// ============================================================
+
+/**
+ * Chuyển ASP.NET Date → dd/MM/yyyy HH:mm
+ * 
+ * FBM trả ngày giờ dạng "/Date(1767927660000)/"
+ * Số trong ngoặc là Unix timestamp (milliseconds)
+ * 
+ * @param {string} aspDate - dạng "/Date(1767927660000)/"
+ * @returns {string} "09/01/2025 14:21" hoặc "" nếu không hợp lệ
+ */
+function aspDateToDatetime(aspDate) {
+  if (!aspDate) return "";
+  var m = String(aspDate).match(/Date\((-?\d+)\)/);
+  if (!m) return "";
+  var ts = parseInt(m[1], 10);
+  if (ts < 0 || isNaN(ts)) return "";
+  var d = new Date(ts);
+  return _pad(d.getDate()) + "/" + _pad(d.getMonth() + 1) + "/" + d.getFullYear()
+    + " " + _pad(d.getHours()) + ":" + _pad(d.getMinutes());
+}
+
+/**
+ * Chuyển ASP.NET Date → dd/MM/yyyy (không có giờ)
+ * 
+ * @param {string} aspDate - dạng "/Date(1767927660000)/"
+ * @returns {string} "09/01/2025" hoặc "" nếu không hợp lệ
+ */
+function aspDateToDate(aspDate) {
+  if (!aspDate) return "";
+  var m = String(aspDate).match(/Date\((-?\d+)\)/);
+  if (!m) return "";
+  var ts = parseInt(m[1], 10);
+  if (ts < 0 || isNaN(ts)) return "";
+  var d = new Date(ts);
+  return _pad(d.getDate()) + "/" + _pad(d.getMonth() + 1) + "/" + d.getFullYear();
+}
+
+/** Thêm số 0 phía trước nếu < 10: 9 → "09", 12 → "12" */
+function _pad(n) { return n < 10 ? "0" + n : String(n); }
+
+/**
+ * Cắt chuỗi nếu vượt quá độ dài cho phép
+ * 
+ * @param {string} text   - chuỗi gốc
+ * @param {number} maxLen - độ dài tối đa
+ * @returns {string} chuỗi đã cắt + "..." nếu quá dài
+ */
+function truncate(text, maxLen) {
+  if (!text) return "";
+  return text.length <= maxLen ? text : text.substring(0, maxLen - 3) + "...";
+}
+
+
+// ============================================================
+// MÃ HÓA / GIẢI MÃ PASSWORD (XOR + HEX)
+// ============================================================
+
+/**
+ * Mã hóa password bằng XOR với key (timestamp)
+ * 
+ * Thuật toán:
+ *   1. Duyệt từng ký tự của password
+ *   2. XOR charCode của ký tự với charCode của key (lặp vòng)
+ *   3. Chuyển kết quả sang hex 2 ký tự
+ *   4. Bọc bằng 🔐 ở 2 đầu
+ * 
+ * VD: encryptPassword("abc", "123") → "🔐505153🔐"
+ * 
+ * @param {string} password - mật khẩu gốc (VD: "1234567a@")
+ * @param {string} key      - khóa mã hóa, thường là timestamp (VD: "1774707655988")
+ * @returns {string} "🔐hex🔐" (VD: "🔐4a2f8b1c3d5e🔐")
+ */
+function encryptPassword(password, key) {
+  var k = String(key);
+  var hex = "";
+  for (var i = 0; i < password.length; i++) {
+    var pc = password.charCodeAt(i);        // charCode của ký tự password
+    var kc = k.charCodeAt(i % k.length);    // charCode của ký tự key (lặp vòng)
+    var xored = pc ^ kc;                    // XOR
+    var h = xored.toString(16);             // Chuyển sang hex
+    if (h.length === 1) h = "0" + h;       // Đảm bảo 2 ký tự
+    hex += h;
+  }
+  return CONFIG.ENCRYPT_MARKER + hex + CONFIG.ENCRYPT_MARKER;
+}
+
+/**
+ * Giải mã password từ dạng "🔐hex🔐" về plaintext
+ * 
+ * @param {string} encrypted - "🔐hex🔐"
+ * @param {string} key       - khóa giải mã (cùng timestamp khi encrypt)
+ * @returns {string} password gốc
+ */
+function decryptPassword(encrypted, key) {
+  var k = String(key);
+  var marker = CONFIG.ENCRYPT_MARKER;
+  var hex = encrypted;
+
+  // Bỏ marker 🔐 ở đầu
+  if (hex.indexOf(marker) === 0) {
+    hex = hex.substring(marker.length);
+  }
+  // Bỏ marker 🔐 ở cuối
+  if (hex.lastIndexOf(marker) === hex.length - marker.length) {
+    hex = hex.substring(0, hex.length - marker.length);
+  }
+
+  var result = "";
+  for (var i = 0; i < hex.length; i += 2) {
+    var b = parseInt(hex.substr(i, 2), 16);   // Hex → số
+    var kc = k.charCodeAt((i / 2) % k.length); // charCode key (lặp vòng)
+    result += String.fromCharCode(b ^ kc);     // XOR ngược → ký tự gốc
+  }
+  return result;
+}
+
+/**
+ * Kiểm tra password đã được mã hóa chưa
+ * 
+ * Nếu bắt đầu bằng 🔐 và kết thúc bằng 🔐 → đã mã hóa
+ * Nếu không → plaintext (user tự sửa trong Google Sheet)
+ * 
+ * @param {string} value - giá trị từ cột fbm_password trong sheet
+ * @returns {boolean} true nếu đã mã hóa
+ */
+function isEncrypted(value) {
+  if (!value) return false;
+  var marker = CONFIG.ENCRYPT_MARKER;
+  return value.indexOf(marker) === 0
+    && value.lastIndexOf(marker) === value.length - marker.length
+    && value.length > marker.length * 2;
+}
+
+
+// ============================================================
+// PROXY — Đọc URL từ Google Sheet
+// ============================================================
+
+/**
+ * Đọc URL proxy từ Google Sheet tab "Config"
+ * 
+ * Tab Config có 2 cột:
+ *   Cột A = Key (VD: "PROXY_URL")
+ *   Cột B = Value (VD: "https://xxx.trycloudflare.com")
+ * 
+ * URL này thay đổi mỗi khi điện thoại restart (cloudflared tạo URL mới)
+ * Script start.sh trên điện thoại tự cập nhật URL vào ô B2
+ * 
+ * @returns {string|null} URL proxy hoặc null nếu không tìm thấy
+ */
+function getProxyUrl() {
+  try {
+    var ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+    var sheet = ss.getSheetByName("Config");
+    if (!sheet) return null;
+
+    var data = sheet.getDataRange().getValues();
+    for (var i = 0; i < data.length; i++) {
+      if (String(data[i][0]).trim() === "PROXY_URL") {
+        var url = String(data[i][1]).trim();
+        return url || null;
+      }
+    }
+    return null;
+  } catch (e) {
+    logToSheet("PROXY", "Lỗi đọc PROXY_URL từ sheet Config", e.message);
+    return null;
+  }
+}
+
+
+// ============================================================
+// PROXY — GỌI FBM QUA PROXY (HÀM QUAN TRỌNG NHẤT)
+// ============================================================
+
+/**
+ * Gọi FBM qua proxy trên điện thoại
+ * 
+ * ĐÂY LÀ HÀM TRUNG TÂM — mọi request tới FBM đều đi qua hàm này.
+ * 
+ * Luồng hoạt động:
+ *   1. GAS build payload: { url, method, headers, body }
+ *   2. GAS gửi POST tới proxy URL (Cloudflare Tunnel)
+ *   3. Proxy nhận, forward nguyên si tới FBM bằng curl
+ *   4. Proxy trả về: { status, setCookie, headers, body, bodyLength }
+ *   5. GAS nhận kết quả, xử lý logic
+ * 
+ * Cookie được GAS quản lý hoàn toàn:
+ *   - Bước 1: GAS gọi GET Login.aspx → proxy trả setCookie
+ *   - Bước 2-4: GAS gửi cookie trong headers → proxy forward nguyên
+ *   - Sau login: GAS lưu cookie vào Google Sheet
+ *   - Khi search: GAS đọc cookie từ Sheet, gửi xuống proxy
+ * 
+ * @param {string} fbmUrl          - URL đầy đủ (VD: "https://fbo.com.vn:8888/Main/Login.aspx")
+ * @param {string} method          - "GET" hoặc "POST"
+ * @param {object} headers         - Headers gửi tới FBM
+ * @param {string|object} [body]   - Body gửi tới FBM (chỉ khi POST)
+ * @returns {object|null} { status, setCookie, headers, body, bodyLength } hoặc null
+ */
+function callFBMViaProxy(fbmUrl, method, headers, body) {
+  // Đọc URL proxy từ Google Sheet tab Config
+  var proxyUrl = getProxyUrl();
+  if (!proxyUrl) {
+    logToSheet("PROXY", "ERROR: Không tìm thấy PROXY_URL trong sheet Config",
+      "Kiểm tra: Google Sheet → tab Config → A2='PROXY_URL', B2=URL tunnel");
+    return null;
+  }
+
+  // Tạo payload gửi tới proxy
+  // Proxy nhận payload này, forward nguyên si tới FBM
+  var proxyPayload = {
+    url: fbmUrl,              // URL FBM đầy đủ
+    method: method || "GET",  // HTTP method
+    headers: headers || {}    // Headers (Cookie, Content-Type, Referer...)
+  };
+
+  // Chỉ thêm body khi POST và có body
+  if (method === "POST" && body !== undefined && body !== null) {
+    proxyPayload.body = body;
+  }
+
+  try {
+    // Gửi POST tới proxy
+    var res = UrlFetchApp.fetch(proxyUrl, {
+      method: "post",
+      contentType: "application/json",
+      payload: JSON.stringify(proxyPayload),
+      muteHttpExceptions: true   // Không throw exception khi HTTP 4xx/5xx
+    });
+
+    // Parse response từ proxy
+    var responseText = res.getContentText();
+
+    // Kiểm tra proxy có trả về JSON hợp lệ không
+    if (!responseText || responseText.charAt(0) !== "{") {
+      logToSheet("PROXY", "Response không phải JSON",
+        "HTTP " + res.getResponseCode() + " | Body: " + responseText.substring(0, 200));
+      return null;
+    }
+
+    var result = JSON.parse(responseText);
+    return result;
+
+  } catch (e) {
+    // Lỗi kết nối proxy (proxy tắt, tunnel hết hạn, mất mạng...)
+    logToSheet("PROXY", "Lỗi gọi proxy: " + e.message,
+      "URL: " + fbmUrl + " | Proxy: " + proxyUrl);
+    return null;
+  }
+}

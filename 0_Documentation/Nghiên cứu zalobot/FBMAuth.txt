@@ -1,0 +1,644 @@
+/**
+ * ============================================================
+ * FBMAuth.gs — ĐĂNG NHẬP FBM QUA PROXY
+ * ============================================================
+ * 
+ * MỤC ĐÍCH:
+ *   Đăng nhập vào hệ thống FBM (FastBusiness) để lấy cookie xác thực.
+ *   Cookie này cần thiết cho MỌI request FBM sau đó (tìm KH, giao dịch...).
+ * 
+ * LUỒNG ĐĂNG NHẬP (4 BƯỚC):
+ *   Bước 1: GET Login.aspx      → lấy cookie phiên (ASP.NET_SessionId) + salt
+ *   Bước 2: POST GetEntityData  → lấy tên database (VD: "FHN_CRM_App")
+ *   Bước 3: POST GetUnitData    → lấy mã đơn vị (VD: "CTY")
+ *   Bước 4: POST Login          → gửi username + hashed password → nhận cookie
+ * 
+ * TẠI SAO CẦN PROXY:
+ *   GAS chạy trên IP nước ngoài → FBM chặn.
+ *   Proxy trên điện thoại Android (Termux) dùng IP Việt Nam → FBM chấp nhận.
+ *   Proxy CHỈ forward request, KHÔNG xử lý logic.
+ *   GAS quản lý cookie, parse response, hash password — tất cả logic nằm ở đây.
+ * 
+ * COOKIE FLOW:
+ *   Bước 1: proxy trả setCookie = "ASP.NET_SessionId=abc123"
+ *   Bước 2-3-4: GAS gửi Cookie: "ASP.NET_SessionId=abc123" trong headers
+ *   Bước 4: FBM có thể trả thêm setCookie (auth cookie)
+ *   Cuối cùng: GAS ghép tất cả cookie → lưu vào Google Sheet → dùng cho search
+ * 
+ * FILE PHỤ THUỘC:
+ *   - Config.gs       : URL endpoints, hằng số
+ *   - Utils.gs        : md5(), callFBMViaProxy(), mergeCookies()
+ *   - LogService.gs   : logToSheet() để debug
+ *   - SessionManager.gs : lưu/đọc session
+ * ============================================================
+ */
+
+
+/**
+ * ============================================================
+ * HÀM CHÍNH: ĐĂNG NHẬP FBM
+ * ============================================================
+ * 
+ * Gọi hàm này khi:
+ *   - User gõ /login user|pass trên Zalo
+ *   - Session hết hạn (> 25 phút) → auto re-login
+ *   - Test thủ công từ Test.gs
+ * 
+ * @param {string} username    - Tên đăng nhập FBM (VD: "anhlt")
+ * @param {string} rawPassword - Mật khẩu gốc chưa mã hóa (VD: "1234567a@")
+ * @returns {object|null} Thành công: { fullCookie, database, unit, userId }
+ *                         Thất bại: null
+ * ============================================================
+ */
+function loginFBM(username, rawPassword) {
+  // URL gốc FBM (VD: "https://fbo.com.vn:8888")
+  var base = CONFIG.FBM_BASE_URL;
+
+  try {
+    // ============================================================
+    // BƯỚC 1: GET Login Page → lấy cookie + salt
+    // ============================================================
+    // 
+    // Mục đích:
+    //   1. Nhận cookie phiên ASP.NET_SessionId — cần gửi kèm các bước sau
+    //   2. Trích xuất salt từ HTML — cần để hash password
+    //
+    // Salt là gì?
+    //   FBM tạo chuỗi ngẫu nhiên 12 ký tự hex mỗi lần load trang login.
+    //   Salt được nhúng trong JavaScript: eval('\'2697e2\'+\'282a6d\'')
+    //   Mỗi lần login có salt khác nhau → hash password khác nhau
+    //   → Chống replay attack
+    //
+    // URL: https://fbo.com.vn:8888/Main/Login.aspx (GET)
+    // ============================================================
+
+    logToSheet("FBM_AUTH", "Bước 1: GET Login page...",
+      base + CONFIG.FBM_LOGIN_PAGE);
+
+    var res1 = callFBMViaProxy(
+      base + CONFIG.FBM_LOGIN_PAGE,   // URL đầy đủ
+      "GET",                           // Chỉ GET trang HTML
+      {}                               // Không cần header đặc biệt
+    );
+
+    // Kiểm tra proxy có trả về kết quả không
+    if (!res1 || res1.status !== 200) {
+      logToSheet("FBM_AUTH", "❌ Bước 1 THẤT BẠI: Không kết nối được FBM",
+        res1 ? ("Status: " + res1.status) : "proxy trả về null");
+      return null;
+    }
+
+    // --- Lấy cookie phiên từ Set-Cookie header ---
+    // Proxy đã parse sẵn: res1.setCookie = "ASP.NET_SessionId=abc123"
+    var initialCookie = res1.setCookie || "";
+    logToSheet("FBM_AUTH", "Bước 1: Cookie",
+      initialCookie ? initialCookie.substring(0, 80) : "KHÔNG CÓ COOKIE");
+
+    // --- Trích xuất salt từ HTML body ---
+    // HTML chứa đoạn JavaScript dạng:
+    //   ...u0027xxxx...u0027+...u0027yyyy...
+    // Regex tìm pattern này và lấy 2 phần hex
+    // Salt = phần1 + phần2 = "6c6dd4" + "446a2d" = "6c6dd4446a2d"
+    var html = res1.body || "";
+
+    var salt = "";
+
+    // Regex chính (match format phổ biến nhất từ FBM)
+    var saltRegex = /u0027([a-f0-9]{4,}).*?u0027\+.*?u0027([a-f0-9]{4,})/;
+    var saltMatch = html.match(saltRegex);
+    if (saltMatch && saltMatch.length >= 3) {
+      salt = saltMatch[1] + saltMatch[2];
+    }
+
+    // Nếu regex chính không match, thử regex backup
+    if (!salt) {
+      var backupRegex = /'([a-f0-9]{4,})'\s*\+\s*'([a-f0-9]{4,})'/;
+      var backupMatch = html.match(backupRegex);
+      if (backupMatch && backupMatch.length >= 3) {
+        salt = backupMatch[1] + backupMatch[2];
+      }
+    }
+
+    if (!salt) {
+      logToSheet("FBM_AUTH", "❌ Bước 1 THẤT BẠI: Không trích xuất được salt",
+        "HTML (300 ký tự đầu): " + html.substring(0, 300));
+      return null;
+    }
+
+    logToSheet("FBM_AUTH", "✅ Bước 1 OK",
+      "Salt: " + salt + " | Cookie: " + (initialCookie ? "CÓ" : "KHÔNG"));
+
+
+    // ============================================================
+    // BƯỚC 2: POST GetEntityData → lấy tên database
+    // ============================================================
+    //
+    // Mục đích: Hỏi FBM server có những database nào
+    // Thường chỉ trả về 1: "FHN_CRM_App"
+    //
+    // URL: https://fbo.com.vn:8888/Main/Login.aspx/GetEntityData
+    // Method: POST
+    // Body: "" (chuỗi rỗng — API không cần tham số)
+    //
+    // Response mẫu:
+    //   { "d": [["01", "Fast FBM Online", "FHN_CRM_App"]] }
+    // ============================================================
+
+    logToSheet("FBM_AUTH", "Bước 2: POST GetEntityData...");
+
+    // Headers chuẩn cho mọi request POST tới FBM
+    var fbmHeaders = {
+      "Cookie": initialCookie,                              // Cookie từ bước 1
+      "Content-Type": "application/json; charset=UTF-8",    // FBM yêu cầu JSON
+      "Referer": base + CONFIG.FBM_LOGIN_PAGE               // FBM kiểm tra Referer
+    };
+
+    logToSheet("FBM_AUTH", "Bước 2: Body gửi đi", ">>{}<<");
+
+    var res2 = callFBMViaProxy(
+      base + CONFIG.FBM_ENTITY_API,
+      "POST",
+      fbmHeaders,
+      "{}"    // JSON rỗng — đảm bảo có Content-Length
+    );
+
+    if (!res2 || res2.status !== 200) {
+      logToSheet("FBM_AUTH", "❌ Bước 2 THẤT BẠI",
+        res2 ? ("Status: " + res2.status + " | Body: " + (res2.body || "").substring(0, 200)) : "null");
+      return null;
+    }
+
+    // Cập nhật cookie nếu bước 2 trả thêm Set-Cookie
+    if (res2.setCookie) {
+      initialCookie = mergeCookies(initialCookie, res2.setCookie);
+    }
+
+    // Parse response JSON
+    var database = "";
+    try {
+      var entityData = JSON.parse(res2.body);
+      // entityData.d có thể là nhiều dạng:
+      //   Dạng 1: [["01", "Tên hiển thị", "TenDatabase"]]  → mảng 2 chiều
+      //   Dạng 2: ["FHN_CRM_App"]                           → mảng chuỗi
+      //   Dạng 3: [{ Ma_DL: "FHN_CRM_App", ... }]          → mảng object
+      if (entityData.d && Array.isArray(entityData.d) && entityData.d.length > 0) {
+        var firstItem = entityData.d[0];
+
+        if (Array.isArray(firstItem)) {
+          // Dạng 1: lấy phần tử cuối (thường là tên database)
+          database = firstItem[firstItem.length - 1];
+        } else if (typeof firstItem === "string") {
+          // Dạng 2: tìm phần tử chứa dấu _ (đặc trưng tên database)
+          for (var i = entityData.d.length - 1; i >= 0; i--) {
+            if (String(entityData.d[i]).indexOf("_") > -1) {
+              database = entityData.d[i];
+              break;
+            }
+          }
+          if (!database) database = entityData.d[entityData.d.length - 1];
+        } else if (firstItem && firstItem.Ma_DL) {
+          // Dạng 3: object
+          database = firstItem.Ma_DL;
+        }
+      }
+    } catch (parseErr) {
+      logToSheet("FBM_AUTH", "❌ Bước 2: Không parse được JSON",
+        (res2.body || "").substring(0, 200));
+      return null;
+    }
+
+    if (!database) {
+      database = "FHN_CRM_App"; // Fallback mặc định
+      logToSheet("FBM_AUTH", "⚠️ Bước 2: Dùng database mặc định", database);
+    }
+
+    logToSheet("FBM_AUTH", "✅ Bước 2 OK", "Database: " + database);
+
+
+    // ============================================================
+    // BƯỚC 3: POST GetUnitData → lấy mã đơn vị
+    // ============================================================
+    //
+    // Mục đích: Hỏi FBM "user này thuộc đơn vị nào?"
+    // Thường trả về 1: "CTY" (Công ty)
+    //
+    // URL: https://fbo.com.vn:8888/Main/Login.aspx/GetUnitData
+    // Body: { "u": "anhlt", "d": "FHN_CRM_App" }
+    //
+    // Response mẫu:
+    //   { "d": [["CTY", "Công ty", "Company"]] }
+    // ============================================================
+
+    logToSheet("FBM_AUTH", "Bước 3: POST GetUnitData...",
+      "User: " + username + " | DB: " + database);
+
+    // Cập nhật headers với cookie mới nhất
+    fbmHeaders["Cookie"] = initialCookie;
+
+    var res3 = callFBMViaProxy(
+      base + CONFIG.FBM_UNIT_API,
+      "POST",
+      fbmHeaders,
+      JSON.stringify({ u: username, d: database })
+    );
+
+    if (!res3 || res3.status !== 200) {
+      logToSheet("FBM_AUTH", "❌ Bước 3 THẤT BẠI",
+        res3 ? ("Status: " + res3.status) : "null");
+      return null;
+    }
+
+    // Cập nhật cookie
+    if (res3.setCookie) {
+      initialCookie = mergeCookies(initialCookie, res3.setCookie);
+    }
+
+    // Parse response
+    var unit = "";
+    try {
+      var unitData = JSON.parse(res3.body);
+      if (unitData.d && Array.isArray(unitData.d) && unitData.d.length > 0) {
+        var firstUnit = unitData.d[0];
+
+        if (Array.isArray(firstUnit)) {
+          // Dạng: [["CTY", "Công ty", "Company"]]
+          unit = firstUnit[0];
+        } else if (typeof firstUnit === "string") {
+          // Dạng: ["CTY"]
+          unit = firstUnit;
+        } else if (firstUnit && firstUnit.Ma_DV) {
+          // Dạng: [{ Ma_DV: "CTY", ... }]
+          unit = firstUnit.Ma_DV;
+        }
+      }
+    } catch (parseErr) {
+      logToSheet("FBM_AUTH", "❌ Bước 3: Không parse được JSON",
+        (res3.body || "").substring(0, 200));
+      return null;
+    }
+
+    if (!unit) {
+      unit = "CTY"; // Fallback mặc định
+      logToSheet("FBM_AUTH", "⚠️ Bước 3: Dùng unit mặc định", unit);
+    }
+
+    logToSheet("FBM_AUTH", "✅ Bước 3 OK", "Unit: " + unit);
+
+
+    // ============================================================
+    // BƯỚC 4: POST Login → đăng nhập chính thức
+    // ============================================================
+    //
+    // Cách hash password (2 lần MD5):
+    //   hash1 = MD5(rawPassword)       VD: MD5("1234567a@")
+    //   hash2 = MD5(salt + hash1)      VD: MD5("6c6dd4446a2d" + hash1)
+    //   → hash2 là password gửi lên FBM
+    //
+    // Tại sao hash 2 lần?
+    //   Lần 1: không gửi password thật qua mạng
+    //   Lần 2: mỗi lần login salt khác → hash khác → chống replay attack
+    //
+    // URL: https://fbo.com.vn:8888/Main/Login.aspx/Login
+    //
+    // Response thành công: { "d": true }
+    // Response thất bại:   { "d": null }
+    // ============================================================
+
+    logToSheet("FBM_AUTH", "Bước 4: POST Login...",
+      "User: " + username + " | DB: " + database + " | Unit: " + unit);
+
+    // Hash password 2 lần
+    var md5Password = md5(rawPassword);              // Lần 1
+    var hashedPassword = md5(salt + md5Password);    // Lần 2
+
+    var loginPayload = {
+      user: username,            // Tên đăng nhập
+      password: hashedPassword,  // Password đã hash 2 lần
+      database: database,        // Database từ bước 2
+      unit: unit,                // Đơn vị từ bước 3
+      language: "v",             // Tiếng Việt
+      value: salt,               // Gửi lại salt để server xác minh
+      force: true,               // Ép đăng nhập dù đang có session khác
+      storage: true              // Lưu session phía server
+    };
+
+    // Log payload (ẩn password)
+    logToSheet("FBM_AUTH", "Bước 4 payload", JSON.stringify({
+      user: username, database: database, unit: unit,
+      password: "***", salt: salt
+    }));
+
+    // Cập nhật headers với cookie mới nhất
+    fbmHeaders["Cookie"] = initialCookie;
+
+    var res4 = callFBMViaProxy(
+      base + CONFIG.FBM_LOGIN_API,
+      "POST",
+      fbmHeaders,
+      JSON.stringify(loginPayload)
+    );
+
+    if (!res4 || res4.status !== 200) {
+      logToSheet("FBM_AUTH", "❌ Bước 4 THẤT BẠI: Login request lỗi",
+        res4 ? ("Status: " + res4.status + " | Body: " + (res4.body || "").substring(0, 300)) : "null");
+      return null;
+    }
+
+    // Kiểm tra response body
+    var loginBody = res4.body || "";
+
+    // { "d": null } → sai username hoặc password
+    if (loginBody.indexOf('"d":null') > -1 || loginBody.indexOf('"d":false') > -1) {
+      logToSheet("FBM_AUTH", "❌ Bước 4: Sai username hoặc password",
+        "Response: " + loginBody.substring(0, 200));
+      return null;
+    }
+
+    // { "d": true } → thành công
+    if (loginBody.indexOf('"d":true') === -1) {
+      logToSheet("FBM_AUTH", "❌ Bước 4: Response không mong đợi",
+        "Response: " + loginBody.substring(0, 300));
+      return null;
+    }
+
+    logToSheet("FBM_AUTH", "✅ Bước 4 OK", "Login thành công!");
+
+
+    // ============================================================
+    // GHÉP COOKIE XÁC THỰC
+    // ============================================================
+    // Ghép cookie bước 1 (session) + cookie bước 4 (auth nếu có)
+    // FBM hiện tại chỉ dùng ASP.NET_SessionId
+    // Nhưng code vẫn ghép để tương thích nếu FBM thay đổi
+    // ============================================================
+
+    var fullCookie = initialCookie;
+    if (res4.setCookie) {
+      fullCookie = mergeCookies(initialCookie, res4.setCookie);
+    }
+
+    logToSheet("FBM_AUTH", "Full cookie", fullCookie.substring(0, 100));
+
+
+    // ============================================================
+    // TRÍCH XUẤT USER ID
+    // ============================================================
+    // userId là mã nội bộ FBM gán cho mỗi tài khoản (VD: "2037")
+    // Dùng trong externalKey khi query khách hàng:
+    //   "GetCustomerValidate('2037')" → chỉ trả KH mà user có quyền xem
+    // ============================================================
+
+    var extracted = _extractUserId(fullCookie, database);
+    var userId = extracted.userId;
+    var fbmPayloadCookie = extracted.fbmPayloadCookie;
+
+    logToSheet("FBM_AUTH", "🎉 ĐĂNG NHẬP HOÀN TẤT", JSON.stringify({
+      user: username, database: database, unit: unit,
+      userId: userId || "(không lấy được)",
+      cookie: fullCookie.substring(0, 60)
+    }));
+
+    return {
+      fullCookie: fullCookie,           // Cookie đầy đủ để gọi API FBM
+      database: database,               // Tên database (VD: "FHN_CRM_App")
+      unit: unit,                        // Mã đơn vị (VD: "CTY")
+      userId: userId || "",              // Mã nhân viên (VD: "2037")
+      fbmPayloadCookie: fbmPayloadCookie || ""  // Cookie payload cho FBM API (VD: "500020372f578FHN_CRM_App")
+    };
+
+  } catch (error) {
+    logToSheet("FBM_AUTH", "❌ Exception: " + error.message, error.stack);
+    return null;
+  }
+}
+
+
+/**
+ * ============================================================
+ * ĐẢM BẢO CÓ SESSION FBM HỢP LỆ
+ * ============================================================
+ * 
+ * Kiểm tra session còn sống không:
+ *   - Nếu < 25 phút → dùng cookie có sẵn
+ *   - Nếu >= 25 phút → tự động re-login bằng password đã lưu
+ * 
+ * Gọi hàm này TRƯỚC MỖI LẦN gọi FBM API (search, getTask...)
+ * 
+ * @param {string} chatId - Zalo chat_id
+ * @returns {object|null} { session, cookie } hoặc null
+ * ============================================================
+ */
+function ensureFBMSession(chatId) {
+  // Đọc session từ Google Sheet
+  var session = getSession(chatId);
+  if (!session) return null;
+
+  // Kiểm tra session còn sống không (< 25 phút)
+  var age = Date.now() - session.loginTime;
+  if (age < CONFIG.SESSION_TTL && session.fbmCookie) {
+    return { session: session, cookie: session.fbmCookie };
+  }
+
+  // Session hết hạn → Re-login tự động
+  logToSheet("FBM_AUTH", "Session hết hạn, re-login...",
+    "User: " + session.fbmUser + " | Age: " + Math.round(age / 60000) + " phút");
+
+  // Giải mã password từ Google Sheet
+  var password = getDecryptedPassword(session);
+  if (!password) {
+    logToSheet("FBM_AUTH", "❌ Không decrypt được password cho " + session.fbmUser);
+    return null;
+  }
+
+  // Re-login
+  var loginResult = loginFBM(session.fbmUser, password);
+  if (!loginResult) {
+    logToSheet("FBM_AUTH", "❌ Re-login thất bại cho " + session.fbmUser);
+    return null;
+  }
+
+  // Cập nhật session trong Google Sheet
+  var now = Date.now();
+  updateSessionCookie(chatId, loginResult.fullCookie, now);
+
+  // Reload session
+  session = getSession(chatId);
+  return { session: session, cookie: loginResult.fullCookie };
+}
+
+
+/**
+ * ============================================================
+ * TRÍCH XUẤT USER ID + COOKIE PAYLOAD TỪ FBM
+ * ============================================================
+ *
+ * MỤC ĐÍCH:
+ *   Sau khi login thành công, cần lấy 2 giá trị quan trọng:
+ *   - userId: mã nhân viên FBM (VD: "2037")
+ *     → Dùng trong externalKey: GetCustomerValidate('2037')
+ *     → Để FBM chỉ trả về KH mà user có quyền xem
+ *   - fbmPayloadCookie: chuỗi đặc biệt (VD: "500020372f578FHN_CRM_App")
+ *     → PHẢI gửi trong trường "cookie" của JSON payload
+ *     → Khi gọi GetGridViewPage (khác với HTTP Cookie header!)
+ *
+ * CÁCH HOẠT ĐỘNG:
+ *   1. GET trang zccrAccount.aspx qua proxy (cần đã login)
+ *   2. FBM trả HTML chứa JavaScript init code
+ *   3. Trong HTML có chuỗi: "cookie":"500020372f578FHN_CRM_App"
+ *   4. Parse chuỗi này ra fbmPayloadCookie
+ *   5. Trích xuất userId từ chuỗi đó
+ *
+ * CẤU TRÚC CHUỖI COOKIE PAYLOAD:
+ *   "500020372f578FHN_CRM_App"
+ *    ├── 5000        = prefix (4 ký tự, thay đổi mỗi lần login)
+ *    ├── 2037        = userId (mã nhân viên, 3-5 chữ số)
+ *    ├── 2f578       = hash (5 ký tự hex, thay đổi mỗi lần login)
+ *    └── FHN_CRM_App = database name (cố định)
+ *
+ *   Ví dụ khác:
+ *     "49902037c41d1FHN_CRM_App"  → userId = "2037"
+ *     "54601058ea35fFHN_CRM_App"  → userId = "1058"
+ *     "3a20999abc123FHN_CRM_App"  → userId = "999"
+ *
+ * CÁCH TRÍCH XUẤT userId:
+ *   Bước 1: Bỏ database ở cuối  → "499020374c924"  (13 ký tự)
+ *   Bước 2: Bỏ 4 ký tự đầu     → "20374c924"      (bỏ prefix)
+ *   Bước 3: Bỏ 5 ký tự cuối    → "2037"            (bỏ hash)
+ *   Kết quả: userId = "2037"
+ *
+ * @param {string} fullCookie - HTTP cookie đã login (VD: "ASP.NET_SessionId=abc123")
+ * @param {string} database   - tên database (VD: "FHN_CRM_App")
+ * @returns {object} { userId: "2037", fbmPayloadCookie: "500020372f578FHN_CRM_App" }
+ *                   Nếu lỗi: { userId: "", fbmPayloadCookie: "" }
+ * ============================================================
+ */
+function _extractUserId(fullCookie, database) {
+  // Giá trị mặc định khi lỗi
+  var EMPTY_RESULT = { userId: "", fbmPayloadCookie: "" };
+
+  try {
+    // ========================================================
+    // BƯỚC 1: GET trang zccrAccount.aspx qua proxy
+    // ========================================================
+    // Trang này là giao diện "Quản lý khách hàng" của FBM.
+    // Sau khi login, FBM render HTML chứa JavaScript khởi tạo,
+    // trong đó có chuỗi cookie payload cần thiết cho API calls.
+    //
+    // URL: https://fbo.com.vn:8888/Main/zccrAccount.aspx
+    // Method: GET
+    // Headers: Cookie (đã login) + Referer (bắt buộc)
+    // ========================================================
+
+    var pageUrl = CONFIG.FBM_BASE_URL + "/Main/zccrAccount.aspx";
+
+    logToSheet("FBM_AUTH", "_extractUserId: Bước 1 — GET " + pageUrl);
+
+    var result = callFBMViaProxy(pageUrl, "GET", {
+      "Cookie": fullCookie,
+      "Referer": CONFIG.FBM_BASE_URL + "/Default.aspx"
+    });
+
+    // Kiểm tra proxy có trả về kết quả không
+    if (!result || !result.body) {
+      logToSheet("FBM_AUTH", "❌ _extractUserId: Proxy trả về rỗng hoặc null");
+      return EMPTY_RESULT;
+    }
+
+    var html = result.body;
+    logToSheet("FBM_AUTH", "_extractUserId: Nhận HTML", "Length: " + html.length);
+
+
+    // ========================================================
+    // BƯỚC 2: Tìm chuỗi cookie payload trong HTML
+    // ========================================================
+    // HTML chứa đoạn JavaScript dạng:
+    //   ..."cookie":"500020372f578FHN_CRM_App"...
+    //
+    // Regex: "cookie":"([^"]+)"
+    //   - "cookie":"  = prefix cố định
+    //   - ([^"]+)     = capture group: mọi ký tự trừ dấu "
+    //   - "           = kết thúc chuỗi
+    // ========================================================
+
+    var cookieRegex = /"cookie":"([^"]+)"/;
+    var cookieMatch = html.match(cookieRegex);
+
+    if (!cookieMatch || !cookieMatch[1]) {
+      logToSheet("FBM_AUTH",
+        "❌ _extractUserId: Không tìm thấy cookie payload trong HTML",
+        "HTML length: " + html.length + " | 300 ký tự đầu: " + html.substring(0, 300));
+      return EMPTY_RESULT;
+    }
+
+    // fbmPayloadCookie = "500020372f578FHN_CRM_App" (toàn bộ chuỗi)
+    var fbmPayloadCookie = cookieMatch[1];
+    logToSheet("FBM_AUTH", "_extractUserId: Bước 2 OK — cookie payload = " + fbmPayloadCookie);
+
+
+    // ========================================================
+    // BƯỚC 3: Trích xuất userId từ cookie payload
+    // ========================================================
+    //
+    // Cấu trúc: [4 prefix] + [userId] + [5 hash] + [database]
+    //
+    // VD: "5000"  +  "2037"  +  "2f578"  +  "FHN_CRM_App"
+    //      ^^^^      ^^^^^^     ^^^^^^^     ^^^^^^^^^^^^^
+    //      prefix    userId     hash         database
+    //
+    // Thuật toán:
+    //   1. Bỏ database ở cuối:
+    //      "500020372f578FHN_CRM_App" → "500020372f578"
+    //
+    //   2. Phần còn lại = prefix(4) + userId(?) + hash(5) = 9 + userId
+    //      "500020372f578" có 13 ký tự → userId = 13 - 9 = 4 ký tự
+    //
+    //   3. Cắt: bỏ 4 đầu, bỏ 5 cuối → lấy giữa
+    //      "500020372f578"
+    //       ^^^^         = bỏ (prefix)
+    //           2037     = userId ← LẤY CÁI NÀY
+    //               2f578 = bỏ (hash)
+    // ========================================================
+
+    var userId = "";
+
+    // Bước 3a: Bỏ database name ở cuối chuỗi
+    // VD: "500020372f578FHN_CRM_App" → "500020372f578"
+    var withoutDb = fbmPayloadCookie;
+    if (database && fbmPayloadCookie.indexOf(database) > -1) {
+      var dbPosition = fbmPayloadCookie.indexOf(database);
+      withoutDb = fbmPayloadCookie.substring(0, dbPosition);
+    }
+
+    logToSheet("FBM_AUTH", "_extractUserId: Bước 3a — Bỏ database",
+      "Trước: \"" + fbmPayloadCookie + "\" → Sau: \"" + withoutDb + "\" (" + withoutDb.length + " ký tự)");
+
+    // Bước 3b: Cắt lấy userId ở giữa
+    // withoutDb phải > 9 ký tự (4 prefix + ít nhất 1 userId + 5 hash = 10)
+    // Thực tế userId thường 3-5 chữ số → withoutDb = 12-14 ký tự
+    if (withoutDb.length > 9) {
+      // Bỏ 4 ký tự đầu (prefix) + 5 ký tự cuối (hash)
+      userId = withoutDb.substring(4, withoutDb.length - 5);
+    } else {
+      logToSheet("FBM_AUTH",
+        "⚠️ _extractUserId: Chuỗi quá ngắn, không trích xuất được userId",
+        "withoutDb: \"" + withoutDb + "\" (" + withoutDb.length + " ký tự, cần > 9)");
+    }
+
+
+    // ========================================================
+    // KẾT QUẢ
+    // ========================================================
+
+    logToSheet("FBM_AUTH", "✅ _extractUserId hoàn tất",
+      "userId: \"" + userId + "\" | payloadCookie: \"" + fbmPayloadCookie + "\"");
+
+    return {
+      userId: userId,                    // VD: "2037"
+      fbmPayloadCookie: fbmPayloadCookie // VD: "500020372f578FHN_CRM_App"
+    };
+
+  } catch (e) {
+    logToSheet("FBM_AUTH", "❌ _extractUserId exception: " + e.message, e.stack);
+    return EMPTY_RESULT;
+  }
+}

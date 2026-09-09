@@ -1,0 +1,293 @@
+/**
+ * ============================================================
+ * ENTRY POINT: WEBHOOK HANDLER & ROUTER
+ * ============================================================
+ * Thiết kế theo Command Router pattern.
+ * Thêm tính năng mới = thêm handler + đăng ký trong COMMANDS.
+ * ============================================================
+ */
+
+// ============================================================
+// COMMAND ROUTER — Đăng ký lệnh ở đây
+// ============================================================
+var COMMANDS = {};  // Khởi tạo trong _initCommands()
+
+function _initCommands() {
+  COMMANDS = {};
+  COMMANDS[CONFIG.CMD_LOGIN] = handleLogin;
+  COMMANDS[CONFIG.CMD_LOGOUT] = handleLogout;
+  COMMANDS[CONFIG.CMD_HELP] = handleHelp;
+  COMMANDS[CONFIG.CMD_SEARCH_PHONE] = handleSearch;
+  COMMANDS[CONFIG.CMD_SEARCH_TAX] = handleSearch;
+  COMMANDS[CONFIG.CMD_SEARCH_NAME] = handleSearch;
+  COMMANDS[CONFIG.CMD_SEARCH_CODE] = handleSearch;
+  // Thêm lệnh mới ở đây:
+  // COMMANDS["/newcmd"] = handleNewCommand;
+}
+
+// ============================================================
+// WEBHOOK HANDLERS
+// ============================================================
+
+function doPost(e) {
+  try {
+    var body = JSON.parse(e.postData.contents);
+    logToSheet("WEBHOOK", "Nhận request", body);
+
+    var data = body.result || body;
+    var eventName = data.event_name;
+    var message = data.message;
+
+    if (!message || !message.chat || !message.chat.id) {
+      return _buildResponse("No chat info");
+    }
+
+    var chatId = message.chat.id;
+    var senderName = message.from ? message.from.display_name : "B\u1EA1n";
+
+    switch (eventName) {
+      case "message.text.received":
+        _routeTextMessage(chatId, senderName, message.text || "");
+        break;
+      case "message.image.received":
+      case "message.sticker.received":
+      case "message.unsupported.received":
+        sendMessage(chatId, "Hi\u1EC7n FBM Assistant ch\u1EC9 h\u1ED7 tr\u1EE3 tin nh\u1EAFn v\u0103n b\u1EA3n.");
+        break;
+      default:
+        logToSheet("WEBHOOK", "Unknown event: " + eventName);
+        break;
+    }
+
+    return _buildResponse("OK");
+  } catch (error) {
+    logToSheet("ERROR", "doPost: " + error.message, error.stack);
+    return _buildResponse("Error");
+  }
+}
+
+function doGet(e) {
+  if (e && e.parameter && e.parameter.action === "updateProxy") {
+    var newUrl = e.parameter.url;
+    if (newUrl) {
+      var ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+      var sheet = ss.getSheetByName("Config");
+      if (!sheet) return ContentService.createTextOutput("ERROR: No Config sheet");
+
+      var data = sheet.getDataRange().getValues();
+      for (var i = 0; i < data.length; i++) {
+        if (data[i][0] === "PROXY_URL") {
+          sheet.getRange(i + 1, 2).setValue(newUrl);
+          logToSheet("PROXY", "URL updated", newUrl);
+          return ContentService.createTextOutput("OK: " + newUrl);
+        }
+      }
+
+      sheet.appendRow(["PROXY_URL", newUrl]);
+      logToSheet("PROXY", "URL created", newUrl);
+      return ContentService.createTextOutput("OK: " + newUrl);
+    }
+  }
+
+  return ContentService.createTextOutput("FBM Assistant is running");
+}
+
+
+// ============================================================
+// ROUTER CHÍNH
+// ============================================================
+
+function _routeTextMessage(chatId, senderName, text) {
+  sendTyping(chatId);
+  _initCommands();
+
+  var trimmed = text.trim();
+  if (!trimmed) {
+    sendMessage(chatId, "Vui l\u00F2ng nh\u1EADp t\u1EEB kh\u00F3a. G\u00F5 /help \u0111\u1EC3 xem h\u01B0\u1EDBng d\u1EABn.");
+    return;
+  }
+
+  var lower = trimmed.toLowerCase();
+
+  // 1. Kiểm tra lệnh prefix
+  for (var cmd in COMMANDS) {
+    if (lower === cmd || lower.indexOf(cmd + " ") === 0) {
+      COMMANDS[cmd](chatId, senderName, trimmed);
+      return;
+    }
+  }
+
+  // 2. Kiểm tra session
+  var session = getSession(chatId);
+  if (!session) {
+    _sendLoginPrompt(chatId, senderName);
+    return;
+  }
+
+  // 3. Tra cứu tự do
+  handleFreeSearch(chatId, senderName, trimmed);
+}
+
+// ============================================================
+// HANDLERS
+// ============================================================
+
+/** Xử lý /login user|pass */
+function handleLogin(chatId, senderName, text) {
+  // Tách lấy phần sau "/login "
+  var content = text.substring(CONFIG.CMD_LOGIN.length).trim();
+  var parts = content.split("|");
+
+  if (parts.length !== 2 || !parts[0].trim() || !parts[1].trim()) {
+    sendMessage(chatId,
+      "\u274C Sai format. Vui l\u00F2ng nh\u1EADp:\n"
+      + CONFIG.CMD_LOGIN + " t\u00EAn\u0111\u0103ngnhap|m\u1EADtkh\u1EA9u\n"
+      + "V\u00ED d\u1EE5: " + CONFIG.CMD_LOGIN + " anhlt|matkhau123"
+    );
+    return;
+  }
+
+  var username = parts[0].trim();
+  var password = parts[1].trim();
+
+  sendMessage(chatId, "\u23F3 \u0110ang \u0111\u0103ng nh\u1EADp FBM...");
+
+  var loginResult = loginFBM(username, password);
+  if (!loginResult) {
+    sendMessage(chatId,
+      "\u274C Sai th\u00F4ng tin \u0111\u0103ng nh\u1EADp ho\u1EB7c kh\u00F4ng k\u1EBFt n\u1ED1i \u0111\u01B0\u1EE3c FBM.\n"
+      + "Vui l\u00F2ng th\u1EED l\u1EA1i: " + CONFIG.CMD_LOGIN + " user|pass"
+    );
+    return;
+  }
+
+  // Mã hóa password
+  var now = Date.now();
+  var encryptSalt = String(now);
+  var encryptedPwd = encryptPassword(password, encryptSalt);
+
+  // Lưu session
+  var sessionData = {
+    chatId: chatId,
+    displayName: senderName,
+    fbmUser: username,
+    fbmPassword: encryptedPwd,
+    encryptSalt: encryptSalt,
+    fbmCookie: loginResult.fullCookie,
+    database: loginResult.database,
+    unit: loginResult.unit,
+    userId: loginResult.userId,
+    loginTime: now,
+    fbmPayloadCookie: loginResult.fbmPayloadCookie,  // Cookie payload cho FBM API search
+  };
+
+  // Dùng replaceSession để xóa dòng cũ (nếu có) + thêm mới
+  replaceSession(chatId, sessionData);
+
+  sendMessage(chatId,
+    "\u2705 \u0110\u0103ng nh\u1EADp th\u00E0nh c\u00F4ng!\n"
+    + "User: " + username + "\n"
+    + "Database: " + loginResult.database + "\n\n"
+    + "B\u1EA1n c\u00F3 th\u1EC3 b\u1EAFt \u0111\u1EA7u tra c\u1EE9u kh\u00E1ch h\u00E0ng.\n"
+    + "G\u00F5 /help \u0111\u1EC3 xem h\u01B0\u1EDBng d\u1EABn."
+  );
+}
+
+/** Xử lý /logout */
+function handleLogout(chatId, senderName, text) {
+  deleteSession(chatId);
+  sendMessage(chatId, "\u{1F44B} \u0110\u00E3 \u0111\u0103ng xu\u1EA5t. Nh\u1EAFn tin b\u1EA5t k\u1EF3 \u0111\u1EC3 \u0111\u0103ng nh\u1EADp l\u1EA1i.");
+}
+
+/** Xử lý /help */
+function handleHelp(chatId, senderName, text) {
+  var msg = "\u{1F4D6} H\u01AF\u1EDANG D\u1EAEN S\u1EEC D\u1EE4NG FBM ASSISTANT\n"
+    + "\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\n"
+    + "\u{1F510} \u0110\u0102NG NH\u1EACP:\n"
+    + CONFIG.CMD_LOGIN + " t\u00EAn\u0111\u0103ngnhap|m\u1EADtkh\u1EA9u\n"
+    + "V\u00ED d\u1EE5: " + CONFIG.CMD_LOGIN + " anhlt|matkhau123\n\n"
+    + "\u{1F50D} TRA C\u1EE8U KH\u00C1CH H\u00C0NG:\n"
+    + "Nh\u1EADp tr\u1EF1c ti\u1EBFp t\u1EEB kh\u00F3a \u2014 Bot t\u1EF1 t\u00ECm theo S\u0110T, MST, T\u00EAn, M\u00E3 KH.\n\n"
+    + "\u{1F4CC} T\u00CCM THEO TR\u01AF\u1EDCNG C\u1EE4 TH\u1EC2:\n"
+    + "/sdt 0901234567 \u2014 T\u00ECm theo s\u1ED1 \u0111i\u1EC7n tho\u1EA1i\n"
+    + "/mst 0123456789 \u2014 T\u00ECm theo m\u00E3 s\u1ED1 thu\u1EBF\n"
+    + "/ten C\u00F4ng ty ABC \u2014 T\u00ECm theo t\u00EAn c\u00F4ng ty\n"
+    + "/mkh TLP20855 \u2014 T\u00ECm theo m\u00E3 kh\u00E1ch h\u00E0ng\n\n"
+    + "\u{1F6AA} \u0110\u0102NG XU\u1EA4T:\n"
+    + "/logout\n\n"
+    + "\u{1F4A1} K\u1EBET QU\u1EA2:\n"
+    + "\u2022 1 k\u1EBFt qu\u1EA3 \u2192 Chi ti\u1EBFt + l\u1ECBch s\u1EED giao d\u1ECBch\n"
+    + "\u2022 2-10 k\u1EBFt qu\u1EA3 \u2192 Danh s\u00E1ch, nh\u1EADp m\u00E3 KH xem chi ti\u1EBFt\n"
+    + "\u2022 Tr\u00EAn 10 \u2192 10 \u0111\u1EA7u ti\u00EAn, nh\u1EADp th\u00EAm th\u00F4ng tin t\u00ECm ch\u00EDnh x\u00E1c h\u01A1n";
+
+  sendMessage(chatId, msg);
+}
+
+/** Xử lý /sdt, /mst, /ten, /mkh */
+function handleSearch(chatId, senderName, text) {
+  var session = getSession(chatId);
+  if (!session) {
+    _sendLoginPrompt(chatId, senderName);
+    return;
+  }
+
+  try {
+    logToSheet("SEARCH", senderName + ": " + text);
+    var result = searchCustomer(chatId, text);
+    var messages = formatSearchResult(result, chatId);
+    sendMessages(chatId, messages);
+    logToSheet("SEARCH_RESULT", "Found: " + result.totalFound + " for: " + result.keyword);
+  } catch (error) {
+    logToSheet("ERROR", "handleSearch: " + error.message, error.stack);
+    sendMessage(chatId, "\u26A0\uFE0F \u0110\u00E3 x\u1EA3y ra l\u1ED7i khi tra c\u1EE9u. Vui l\u00F2ng th\u1EED l\u1EA1i sau.");
+  }
+}
+
+/** Xử lý text tự do (tra cứu tự động) */
+function handleFreeSearch(chatId, senderName, text) {
+  try {
+    logToSheet("SEARCH", senderName + ": " + text);
+    var result = searchCustomer(chatId, text);
+    var messages = formatSearchResult(result, chatId);
+    sendMessages(chatId, messages);
+    logToSheet("SEARCH_RESULT", "Found: " + result.totalFound + " for: " + result.keyword);
+  } catch (error) {
+    logToSheet("ERROR", "handleFreeSearch: " + error.message, error.stack);
+    sendMessage(chatId, "\u26A0\uFE0F \u0110\u00E3 x\u1EA3y ra l\u1ED7i khi tra c\u1EE9u. Vui l\u00F2ng th\u1EED l\u1EA1i sau.");
+  }
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+
+function _sendLoginPrompt(chatId, senderName) {
+  sendMessage(chatId,
+    "Ch\u00E0o " + senderName + "! \u0110\u1EC3 s\u1EED d\u1EE5ng FBM Assistant, "
+    + "vui l\u00F2ng \u0111\u0103ng nh\u1EADp:\n\n"
+    + CONFIG.CMD_LOGIN + " t\u00EAn\u0111\u0103ngnhap|m\u1EADtkh\u1EA9u\n\n"
+    + "V\u00ED d\u1EE5: " + CONFIG.CMD_LOGIN + " anhlt|matkhau123"
+  );
+}
+
+function _buildResponse(message) {
+  return ContentService
+    .createTextOutput(JSON.stringify({ message: message }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ============================================================
+// HOOK CHO TÍNH NĂNG TƯƠNG LAI
+// ============================================================
+
+/**
+ * Hàm này được gọi bởi Time-driven trigger (nếu thiết lập).
+ * Dùng cho: check trạng thái chăm sóc, gửi nhắc nhở tự động.
+ * Hiện tại chưa triển khai.
+ */
+function onScheduledCheck() {
+  // TODO: Triển khai sau
+  // Ví dụ: duyệt danh sách KH được bàn giao > 2 tiếng chưa nhập giao dịch
+  // → gửi tin nhắn cảnh báo cho nhân viên phụ trách
+  logToSheet("SCHEDULER", "Scheduled check chạy lúc " + new Date().toISOString());
+}

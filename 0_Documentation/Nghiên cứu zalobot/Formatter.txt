@@ -1,0 +1,208 @@
+/**
+ * ============================================================
+ * FORMATTER.GS — ĐỊNH DẠNG KẾT QUẢ THÀNH TIN NHẮN ZALO
+ * ============================================================
+ *
+ * 3 TRƯỜNG HỢP:
+ *   0 kết quả  → Thông báo + gợi ý
+ *   1 kết quả  → Chi tiết KH + lịch sử giao dịch
+ *   >1 kết quả → Danh sách KH
+ *
+ * HIỂN THỊ SỐ LƯỢNG:
+ *   KH:  "Hiển thị n/N" (n = displayRows, N = TotalRowCount)
+ *   GD:  "Giao dịch (m/M)" (m = displayTasks, M = TotalRowCount)
+ *
+ * FILE PHỤ THUỘC:
+ *   Config.gs, Utils.gs, FBMQuery.gs
+ * ============================================================
+ */
+
+
+// ============================================================
+// KÝ TỰ PHÂN CÁCH
+// ============================================================
+var LINE_SEP = "────────────────────";      // Ngăn cách KH / GD
+var LINE_BOLD = "════════════════════";     // Bao quanh chi tiết
+
+
+/**
+ * Format thông tin ngắn 1 KH (danh sách nhiều kết quả)
+ *
+ * Hiển thị:
+ *   🏢 CÔNG TY ABC
+ *   📋 Mã KH: TLP20728
+ *   📄 MST: 0108212031
+ *   👤 LH: Xuân Dương
+ *   📞 SĐT: 0867682760
+ */
+function formatCustomerShort(row) {
+  var ten = row[CONFIG.CI_TEN_KH] || "(Không có tên)";
+  var maKH = row[CONFIG.CI_MA_KH] || "—";
+  var mst = row[CONFIG.CI_MA_SO_THUE] || "—";
+  var lienHe = row[CONFIG.CI_NGUOI_LIEN_HE] || "—";
+  var sdt = row[CONFIG.CI_DIEN_THOAI] || "—";
+
+  return "\u{1F3E2} " + ten + "\n"
+    + "\u{1F4CB} Mã KH: " + maKH + "\n"
+    + "\u{1F4C4} MST: " + mst + "\n"
+    + "\u{1F464} LH: " + lienHe + "\n"
+    + "\u{1F4DE} SĐT: " + sdt;
+}
+
+
+/**
+ * Format thông tin chi tiết 1 KH (khi chỉ 1 kết quả)
+ *
+ * Hiển thị:
+ *   ═══════════════════
+ *   🏢 CÔNG TY ABC
+ *   📋 Mã KH: TLP20728
+ *   📄 MST: 0108212031
+ *   👤 Liên hệ: Xuân Dương
+ *   📞 SĐT: 0867682760
+ *   ═══════════════════
+ */
+function formatCustomerDetail(row) {
+  var ten = row[CONFIG.CI_TEN_KH] || "(Không có tên)";
+  var maKH = row[CONFIG.CI_MA_KH] || "—";
+  var mst = row[CONFIG.CI_MA_SO_THUE] || "—";
+  var lienHe = row[CONFIG.CI_NGUOI_LIEN_HE] || "—";
+  var sdt = row[CONFIG.CI_DIEN_THOAI] || "—";
+
+  return LINE_BOLD + "\n"
+    + "\u{1F3E2} " + ten + "\n"
+    + "\u{1F4CB} Mã KH: " + maKH + "\n"
+    + "\u{1F4C4} MST: " + mst + "\n"
+    + "\u{1F464} Liên hệ: " + lienHe + "\n"
+    + "\u{1F4DE} SĐT: " + sdt + "\n"
+    + LINE_BOLD;
+}
+
+
+/**
+ * Format 1 giao dịch
+ *
+ * Hiển thị:
+ *   📅 29/03/2026 14:21
+ *   💼 Gọi điện chăm sóc
+ *   📝 Khách có nhu cầu mua phần mềm...
+ *   👤 Lê Phương Thảo
+ */
+function formatTask(row) {
+  var ngayTao = aspDateToDatetime(row[CONFIG.TI_NGAY_TAO]);
+  var hanhDong = row[CONFIG.TI_HANH_DONG] || "—";
+  var noiDung = truncate(row[CONFIG.TI_NOI_DUNG] || "", 200);
+  var nguoiTao = row[CONFIG.TI_NGUOI_TAO_TEN] || "—";
+
+  return "\u{1F4C5} " + ngayTao + "\n"
+    + "\u{1F4BC} " + hanhDong + "\n"
+    + "\u{1F464} " + nguoiTao + "\n\n"
+    + noiDung ;
+}
+
+
+/**
+ * ============================================================
+ * FORMAT TOÀN BỘ KẾT QUẢ TÌM KIẾM
+ * ============================================================
+ */
+function formatSearchResult(searchResult, chatId) {
+  var rows = searchResult.rows;
+  var totalFound = searchResult.totalFound;           // TotalRowCount từ FBM
+  var keyword = searchResult.keyword;
+  var messages = [];
+  var maxLen = CONFIG.ZALO_MAX_TEXT_LENGTH;
+
+
+  // ============================================================
+  // 0 KẾT QUẢ
+  // ============================================================
+  if (!rows || rows.length === 0) {
+    messages.push(
+      "\u{1F50D} Tìm kiếm: \"" + keyword + "\"\n\n"
+      + "\u274C Không tìm thấy kết quả.\n\n"
+      + "Vui lòng kiểm tra lại hoặc thử từ khóa chi tiết hơn.\n\n"
+      + "\u{1F4A1} Mẹo tìm kiếm:\n"
+      + "/sdt [số ĐT] — Tìm theo SĐT\n"
+      + "/mst [mã ST] — Tìm theo MST\n"
+      + "/ten [tên] — Tìm theo tên\n"
+      + "/mkh [mã KH] — Tìm theo mã KH"
+    );
+    return messages;
+  }
+
+
+  // ============================================================
+  // 1 KẾT QUẢ → CHI TIẾT + GIAO DỊCH
+  // ============================================================
+  if (rows.length === 1) {
+    var row = rows[0];
+
+    // --- Thông tin KH ---
+    var msg = "\u{1F50D} Tìm kiếm: \"" + keyword + "\"\n"
+      + "\u2705 Tìm thấy 1 kết quả.\n\n"
+      + formatCustomerDetail(row);
+
+    // --- Lịch sử giao dịch ---
+    var taskResult = getCustomerTasks(chatId, row[CONFIG.CI_STT_REC]);
+    var taskRows = taskResult.rows;
+    var taskTotal = taskResult.totalRowCount;          // Tổng GD thực (VD: 13)
+
+    if (taskRows.length > 0) {
+      // Giới hạn số GD hiển thị theo MAX_DISPLAY_TASKS
+      var displayTasks = taskRows.slice(0, CONFIG.MAX_DISPLAY_TASKS);
+
+      // Header: "📝 Lịch sử giao dịch (5/13):"
+      msg += "\n\n\u{1F4DD} Lịch sử giao dịch (" + displayTasks.length + "/" + taskTotal + "):\n";
+
+      for (var i = 0; i < displayTasks.length; i++) {
+        var taskLine = "\n" + LINE_SEP + "\n" + formatTask(displayTasks[i]);
+
+
+        // Tách tin nhắn nếu sắp vượt 2000 ký tự
+        if (msg.length + taskLine.length > maxLen - 50) {
+          messages.push(msg);
+          msg = "\u{1F4DD} Lịch sử giao dịch (tiếp):\n";
+        }
+        msg += taskLine;
+      }
+    } else {
+      msg += "\n\n\u{1F4DD} Chưa có giao dịch nào.";
+    }
+
+    messages.push(msg);
+    return messages;
+  }
+
+
+  // ============================================================
+  // >1 KẾT QUẢ → DANH SÁCH
+  // ============================================================
+  var displayRows = rows.slice(0, CONFIG.MAX_DISPLAY_COMPANIES);
+
+  // Header
+  var msg = "\u{1F50D} Tìm kiếm: \"" + keyword + "\"\n"
+    + "\u{1F4CA} Hiển thị " + displayRows.length + "/" + totalFound + " kết quả.\n";
+
+  if (totalFound > displayRows.length) {
+    msg += "\u{1F4A1} Gõ từ khóa chi tiết hơn để thu hẹp kết quả.\n";
+  }
+
+  // Danh sách KH
+  for (var i = 0; i < displayRows.length; i++) {
+    var line = "\n" + LINE_SEP + "\n" + formatCustomerShort(displayRows[i]);
+
+    if (msg.length + line.length > maxLen - 100) {
+      messages.push(msg);
+      msg = "\u{1F4CB} Danh sách (tiếp):\n";
+    }
+    msg += line;
+  }
+
+  // Footer
+  msg += "\n\n" + LINE_SEP;
+  msg += "\n\u{1F4A1} Nhập mã khách hàng để xem chi tiết.";
+
+  messages.push(msg);
+  return messages;
+}

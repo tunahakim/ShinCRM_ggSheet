@@ -1,0 +1,78 @@
+/**
+ * ============================================================
+ * LOGIC PHÂN TÍCH INPUT & TÌM KIẾM
+ * ============================================================
+ */
+
+/**
+ * Phân tích input → xác định thứ tự tìm kiếm
+ * @returns {Array} mảng field names theo thứ tự ưu tiên
+ */
+function determineSearchOrder(input) {
+  var t = input.trim();
+
+  if (t.indexOf("-") > -1) {
+    return [CONFIG.FIELD_TAX, CONFIG.FIELD_NAME, CONFIG.FIELD_PHONE, CONFIG.FIELD_CODE];
+  }
+  if (/^\d+$/.test(t)) {
+    return [CONFIG.FIELD_PHONE, CONFIG.FIELD_TAX, CONFIG.FIELD_NAME, CONFIG.FIELD_CODE];
+  }
+  if (t.length === 8 && t.indexOf(" ") === -1) {
+    return [CONFIG.FIELD_CODE, CONFIG.FIELD_NAME, CONFIG.FIELD_TAX, CONFIG.FIELD_PHONE];
+  }
+  return [CONFIG.FIELD_NAME, CONFIG.FIELD_PHONE, CONFIG.FIELD_TAX, CONFIG.FIELD_CODE];
+}
+
+/**
+ * Parse prefix command
+ * @returns {object} { command: string|null, keyword: string }
+ */
+function parseSearchCommand(input) {
+  var t = input.trim();
+  var lower = t.toLowerCase();
+
+  var prefixes = [CONFIG.CMD_SEARCH_PHONE, CONFIG.CMD_SEARCH_TAX, CONFIG.CMD_SEARCH_NAME, CONFIG.CMD_SEARCH_CODE];
+  for (var i = 0; i < prefixes.length; i++) {
+    var p = prefixes[i];
+    if (lower.indexOf(p + " ") === 0) {
+      return { command: p, keyword: t.substring(p.length + 1).trim() };
+    }
+  }
+
+  return { command: null, keyword: t };
+}
+
+/** Map command → field name */
+function commandToField(command) {
+  var map = {};
+  map[CONFIG.CMD_SEARCH_PHONE] = CONFIG.FIELD_PHONE;
+  map[CONFIG.CMD_SEARCH_TAX] = CONFIG.FIELD_TAX;
+  map[CONFIG.CMD_SEARCH_NAME] = CONFIG.FIELD_NAME;
+  map[CONFIG.CMD_SEARCH_CODE] = CONFIG.FIELD_CODE;
+  return map[command] || null;
+}
+
+/**
+ * ============================================================
+ * HÀM CHÍNH: Tìm kiếm khách hàng
+ * ============================================================
+ * 
+ * @param {string} chatId
+ * @param {string} input - nội dung tin nhắn
+ * @returns {object} { rows, totalFound, keyword }
+ *          totalFound = TotalRowCount từ FBM (tổng thực)
+ * ============================================================
+ */
+function searchCustomer(chatId, input) {
+  var parsed = parseSearchCommand(input);
+
+  if (parsed.command) {
+    var field = commandToField(parsed.command);
+    var result = searchCustomerByField(chatId, field, parsed.keyword);
+    return { rows: result.rows, totalFound: result.totalRowCount, keyword: parsed.keyword };
+  }
+
+  var fields = determineSearchOrder(parsed.keyword);
+  var result = searchCustomerMultiField(chatId, fields, parsed.keyword);
+  return { rows: result.rows, totalFound: result.totalRowCount, keyword: parsed.keyword };
+}

@@ -1,0 +1,2326 @@
+/**
+ * ============================================================================
+ * TEST.GS — FILE TEST TOÀN DIỆN CHO HỆ THỐNG FBM ASSISTANT
+ * ============================================================================
+ *
+ * MỤC ĐÍCH:
+ *   File này chứa TẤT CẢ các hàm test để kiểm tra từng thành phần của hệ thống.
+ *   Chạy thủ công từ Apps Script Editor (KHÔNG tự động chạy).
+ *
+ * CÁCH SỬ DỤNG:
+ *   1. Mở Google Apps Script Editor (script.google.com)
+ *   2. Chọn file Test.gs ở thanh bên trái
+ *   3. Chọn tên hàm muốn chạy ở dropdown phía trên (VD: test_proxy)
+ *   4. Nhấn nút ▶ Run
+ *   5. Xem kết quả trong tab "Execution log" phía dưới
+ *   6. Nếu cần xem log chi tiết hơn → mở Google Sheet → tab "Log"
+ *
+ * THỨ TỰ TEST KHUYẾN NGHỊ (chạy lần lượt từ trên xuống):
+ *   ┌────┬──────────────────────────┬─────────────────────────────────────┐
+ *   │ #  │ Tên hàm                  │ Kiểm tra cái gì                    │
+ *   ├────┼──────────────────────────┼─────────────────────────────────────┤
+ *   │  1 │ test_proxy               │ Proxy trên điện thoại còn sống?    │
+ *   │  2 │ test_proxyIP             │ IP proxy là Việt Nam?              │
+ *   │  3 │ test_zaloBot             │ Bot Zalo hoạt động?                │
+ *   │  4 │ test_sendMessage         │ Gửi tin nhắn Zalo được?            │
+ *   │  5 │ test_setWebhook          │ Đăng ký webhook (chạy 1 lần)      │
+ *   │  6 │ test_getWebhookInfo      │ Xem webhook hiện tại               │
+ *   │  7 │ test_loginFBM            │ Đăng nhập FBM qua proxy            │
+ *   │  8 │ test_getSession          │ Đọc session từ Sheet               │
+ *   │  9 │ test_searchCustomer      │ Tìm KH tự do (smart lookup)       │
+ *   │ 10 │ test_searchByPhone       │ Tìm KH theo SĐT                   │
+ *   │ 11 │ test_searchByTax         │ Tìm KH theo MST                   │
+ *   │ 12 │ test_searchByName        │ Tìm KH theo tên                   │
+ *   │ 13 │ test_searchByCode        │ Tìm KH theo mã KH                 │
+ *   │ 14 │ test_getCustomerTasks    │ Lấy giao dịch của 1 KH            │
+ *   │ 15 │ test_fullFlow            │ Luồng tìm + format (xem log)      │
+ *   │ 16 │ test_fullFlowToZalo      │ Luồng tìm + gửi lên Zalo         │
+ *   │ 17 │ test_encrypt             │ Mã hóa / giải mã password         │
+ *   │ 18 │ test_logToSheet          │ Ghi log vào Google Sheet           │
+ *   │ 19 │ test_loginDirect         │ Login trực tiếp (debug proxy)      │
+ *   │ 20 │ test_debugLogin          │ Debug chi tiết từng bước login     │
+ *   └────┴──────────────────────────┴─────────────────────────────────────┘
+ *
+ * GIÁ TRỊ CẦN SỬA TRƯỚC KHI CHẠY:
+ *   Các giá trị placeholder đánh dấu bằng "← SỬA Ở ĐÂY" trong mỗi hàm.
+ *   Bảng tổng hợp giá trị cần sửa:
+ *
+ *   ┌─────────────────────┬──────────────────────────────────────────────────┐
+ *   │ Giá trị             │ Mô tả & Cách lấy                                │
+ *   ├─────────────────────┼──────────────────────────────────────────────────┤
+ *   │ username            │ Tên đăng nhập FBM, do admin cung cấp            │
+ *   │                     │ VD: "anhlt"                                      │
+ *   ├─────────────────────┼──────────────────────────────────────────────────┤
+ *   │ password            │ Mật khẩu FBM, do admin cung cấp                 │
+ *   │                     │ VD: "1234567a@"                                  │
+ *   ├─────────────────────┼──────────────────────────────────────────────────┤
+ *   │ TEST_CHAT_ID        │ Zalo chat_id để gửi tin test.                   │
+ *   │                     │ Cách lấy: Nhắn tin cho bot trên Zalo →          │
+ *   │                     │ mở Sheet tab Log → cột Data → tìm "chat.id"    │
+ *   │                     │ Paste vào CONFIG.TEST_CHAT_ID trong Config.gs   │
+ *   ├─────────────────────┼──────────────────────────────────────────────────┤
+ *   │ keyword             │ Từ khóa tìm kiếm KH, tùy bạn nhập             │
+ *   │                     │ VD: "fast", "0901234567", "TLP20855"            │
+ *   ├─────────────────────┼──────────────────────────────────────────────────┤
+ *   │ sttRec              │ Mã nội bộ KH (cột đầu tiên kết quả search)     │
+ *   │                     │ VD: "A000073082"                                │
+ *   ├─────────────────────┼──────────────────────────────────────────────────┤
+ *   │ PROXY_URL           │ TỰ ĐỘNG — điện thoại tự cập nhật vào Sheet     │
+ *   │                     │ Tab Config, ô B2 (không cần sửa tay)           │
+ *   ├─────────────────────┼──────────────────────────────────────────────────┤
+ *   │ SHEET_ID            │ ID của Google Sheet chính (chứa Sessions, Log)  │
+ *   │                     │ Lấy từ URL Sheet: docs.google.com/spreadsheets/ │
+ *   │                     │ d/xxxxxxxxx/edit → "xxxxxxxxx" là SHEET_ID     │
+ *   │                     │ Đã điền trong Config.gs, KHÔNG sửa ở đây       │
+ *   ├─────────────────────┼──────────────────────────────────────────────────┤
+ *   │ BOT_TOKEN           │ Token Zalo OA Bot, lấy từ Zalo Developer Portal│
+ *   │                     │ Đã điền trong Config.gs, KHÔNG sửa ở đây       │
+ *   ├─────────────────────┼──────────────────────────────────────────────────┤
+ *   │ WEBHOOK_URL         │ URL deploy của Apps Script (dạng .../exec)      │
+ *   │                     │ Đã điền trong Config.gs, KHÔNG sửa ở đây       │
+ *   └─────────────────────┴──────────────────────────────────────────────────┘
+ *
+ * CÁC HẰNG SỐ KHÔNG ĐƯỢC SỬA (đã định nghĩa trong Config.gs):
+ *   - SESSION_TTL         : 25 * 60 * 1000 ms (25 phút)
+ *   - MAX_DISPLAY_COMPANIES: 10 (tối đa 10 KH hiển thị)
+ *   - FBM_BASE_URL        : "https://fbo.com.vn:8888"
+ *   - FBM_LOGIN_PAGE      : "/Main/Login.aspx"
+ *   - FBM_LOGIN_API       : "/Main/Login.aspx/Login"
+ *   - FBM_ENTITY_API      : "/Main/Login.aspx/GetEntityData"
+ *   - FBM_UNIT_API        : "/Main/Login.aspx/GetUnitData"
+ *   - FBM_GRID_API        : "/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage"
+ *   - ENCRYPT_MARKER      : "🔐" (ký tự bọc password mã hóa)
+ *
+ * FILE PHỤ THUỘC:
+ *   Test.gs gọi hàm từ tất cả các file khác:
+ *   - Config.gs        : Đọc CONFIG.xxx (hằng số)
+ *   - Utils.gs         : md5(), callFBMViaProxy(), getProxyUrl(), mergeCookies(),
+ *                         encryptPassword(), decryptPassword(), isEncrypted(),
+ *                         aspDateToDatetime()
+ *   - LogService.gs    : logToSheet() (ghi log vào Sheet)
+ *   - ZaloAPI.gs       : getMe(), sendMessage(), sendMessages(), setWebhook(),
+ *                         getWebhookInfo(), sendTyping()
+ *   - SessionManager.gs: getSession(), saveSession(), deleteSession(),
+ *                         replaceSession(), updateSessionCookie(),
+ *                         getDecryptedPassword()
+ *   - FBMAuth.gs       : loginFBM(), ensureFBMSession(), _extractUserId()
+ *   - FBMQuery.gs      : searchCustomerByField(), searchCustomerMultiField(),
+ *                         getCustomerTasks(), callFBMApi()
+ *   - SearchLogic.gs   : searchCustomer(), parseSearchCommand(),
+ *                         determineSearchOrder(), commandToField()
+ *   - Formatter.gs     : formatSearchResult(), formatCustomerShort(),
+ *                         formatCustomerDetail(), formatTask()
+ *   - Main.gs          : doPost(), doGet() (webhook handler — không gọi từ test)
+ *
+ * LỊCH SỬ THAY ĐỔI:
+ *   - v1: Test cơ bản (proxy, zalo, login)
+ *   - v2: Thêm test search, task, full flow
+ *   - v3: Thêm test_loginDirect, test_debugLogin (debug proxy)
+ *   - v4: Viết lại toàn bộ — comment cực kỳ chi tiết, placeholder rõ ràng,
+ *          tích hợp proxy, đảm bảo tương thích với tất cả 10 file còn lại
+ * ============================================================================
+ */
+
+
+// ╔════════════════════════════════════════════════════════════════════════════╗
+// ║  NHÓM 1: TEST PROXY (Điện thoại Android → Termux → Cloudflare → FBM)    ║
+// ╚════════════════════════════════════════════════════════════════════════════╝
+
+
+/**
+ * ============================================================
+ * test_proxy — KIỂM TRA PROXY TRÊN ĐIỆN THOẠI
+ * ============================================================
+ *
+ * Kiểm tra 3 điều:
+ *   1. Google Sheet tab Config có chứa PROXY_URL không?
+ *      → Nếu không: điện thoại chưa chạy start.sh hoặc tunnel chưa cập nhật
+ *   2. Proxy (Node.js trên Termux) có đang chạy không?
+ *      → Gửi GET tới proxy URL, mong đợi nhận "FBM Proxy v4 is running"
+ *   3. Proxy có kết nối được tới FBM không?
+ *      → Gửi request GET Login.aspx qua proxy, mong đợi status 200
+ *
+ * KHI NÀO CHẠY:
+ *   - Sau khi điện thoại restart (kiểm tra Termux:Boot đã auto-start chưa)
+ *   - Khi bot ngừng phản hồi (nghi proxy tắt hoặc tunnel hết hạn)
+ *   - Khi mạng WiFi thay đổi (IP điện thoại đổi → tunnel cần restart)
+ *   - Trước khi chạy bất kỳ test nào khác (đảm bảo proxy sẵn sàng)
+ *
+ * KẾT QUẢ MONG ĐỢI:
+ *   ✅ Proxy URL: https://xxx-xxx-xxx-xxx.trycloudflare.com
+ *   ✅ Proxy đang chạy! Response: "FBM Proxy v4 is running"
+ *   ✅ FBM Status: 200 | Cookie: CÓ | Body: 21593
+ *
+ * KHÔNG CẦN SỬA GÌ — hàm này đọc tất cả từ Config.gs và Google Sheet.
+ *
+ * NẾU LỖI:
+ *   - "Không tìm thấy PROXY_URL":
+ *       → Mở Termux trên điện thoại, gõ: bash ~/fbm-proxy/start.sh
+ *       → Hoặc restart điện thoại (Termux:Boot sẽ tự chạy)
+ *   - "Không kết nối được proxy":
+ *       → Kiểm tra điện thoại có đang kết nối WiFi không
+ *       → Kiểm tra Termux có đang chạy không (xem notification bar)
+ *   - "FBM trả về status khác 200":
+ *       → FBM server có thể đang bảo trì
+ *       → Thử lại sau vài phút
+ * ============================================================
+ */
+function test_proxy() {
+  // --- Dòng phân cách trong Execution Log để dễ đọc ---
+  Logger.log("========== TEST PROXY ==========");
+
+  // --------------------------------------------------------
+  // BƯỚC 1: Đọc URL proxy từ Google Sheet tab "Config" ô B2
+  // --------------------------------------------------------
+  // Hàm getProxyUrl() (định nghĩa trong Utils.gs) sẽ:
+  //   1. Mở Google Sheet bằng CONFIG.SHEET_ID
+  //   2. Tìm tab "Config"
+  //   3. Tìm dòng có cột A = "PROXY_URL"
+  //   4. Trả về giá trị cột B (URL tunnel)
+  //
+  // URL này do script start.sh trên điện thoại tự cập nhật.
+  // Mỗi lần cloudflared restart → URL mới → start.sh gọi
+  // GAS webhook (doGet?action=updateProxy) để ghi vào ô B2.
+  // --------------------------------------------------------
+  var proxyUrl = getProxyUrl();
+
+  if (!proxyUrl) {
+    // Không tìm thấy URL → điện thoại chưa chạy hoặc tunnel chưa cập nhật
+    Logger.log("❌ Không tìm thấy PROXY_URL trong Google Sheet tab Config");
+    Logger.log("   → Nguyên nhân có thể:");
+    Logger.log("     1. Điện thoại chưa bật hoặc Termux chưa chạy");
+    Logger.log("     2. start.sh chưa chạy (tunnel chưa tạo URL)");
+    Logger.log("     3. Tab Config trong Sheet chưa có dòng PROXY_URL");
+    Logger.log("   → Cách sửa:");
+    Logger.log("     • Mở Termux trên điện thoại, gõ: bash ~/fbm-proxy/start.sh");
+    Logger.log("     • Hoặc restart điện thoại (Termux:Boot tự chạy)");
+    Logger.log("     • Đợi ~30 giây, chạy lại test này");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+
+  // URL tìm thấy → hiển thị
+  // VD: "https://electricity-future-manchester-mailman.trycloudflare.com"
+  Logger.log("✅ Proxy URL: " + proxyUrl);
+
+  // --------------------------------------------------------
+  // BƯỚC 2: Gọi GET trực tiếp tới proxy xem nó có sống không
+  // --------------------------------------------------------
+  // Khi gửi GET (không phải POST) tới proxy, server.js trả về
+  // text "FBM Proxy v4 is running" (health check endpoint).
+  //
+  // Nếu proxy tắt hoặc tunnel hết hạn → UrlFetchApp.fetch sẽ
+  // throw exception → catch bên dưới xử lý.
+  //
+  // muteHttpExceptions: true = không throw khi HTTP 4xx/5xx,
+  // nhưng vẫn throw khi không kết nối được (DNS fail, timeout).
+  // --------------------------------------------------------
+  try {
+    var healthCheckResponse = UrlFetchApp.fetch(proxyUrl, {
+      muteHttpExceptions: true  // Cho phép nhận HTTP 4xx/5xx thay vì throw
+    });
+
+    // Đọc nội dung response (string)
+    var healthBody = healthCheckResponse.getContentText();
+
+    // Kiểm tra response có chứa chuỗi đặc trưng không
+    // server.js trả về: "FBM Proxy v4 is running" khi nhận GET /
+    if (healthBody.indexOf("FBM Proxy") > -1) {
+      Logger.log("✅ Proxy đang chạy! Response: \"" + healthBody.trim() + "\"");
+    } else {
+      // Proxy phản hồi nhưng nội dung không đúng
+      // Có thể: Cloudflare trả trang lỗi, hoặc proxy bị sửa
+      Logger.log("⚠️ Proxy phản hồi nhưng nội dung không mong đợi:");
+      Logger.log("   Response: " + healthBody.substring(0, 200));
+      Logger.log("   → Có thể tunnel đang redirect, thử lại sau 30 giây");
+    }
+  } catch (healthError) {
+    // Không kết nối được proxy → tunnel hết hạn hoặc điện thoại offline
+    Logger.log("❌ Không kết nối được proxy: " + healthError.message);
+    Logger.log("   → Kiểm tra:");
+    Logger.log("     1. Điện thoại có đang kết nối WiFi không?");
+    Logger.log("     2. Termux có đang chạy không? (xem notification bar)");
+    Logger.log("     3. Thử mở Termux, gõ: bash ~/fbm-proxy/start.sh");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+
+  // --------------------------------------------------------
+  // BƯỚC 3: Gọi FBM qua proxy xem FBM có phản hồi không
+  // --------------------------------------------------------
+  // Gửi GET tới FBM Login Page thông qua proxy:
+  //   GAS → POST {url, method, headers} → Proxy → curl GET → FBM
+  //   FBM → HTML login page → Proxy → JSON {status, setCookie, body} → GAS
+  //
+  // callFBMViaProxy() (định nghĩa trong Utils.gs) sẽ:
+  //   1. Đọc proxyUrl từ Sheet
+  //   2. Tạo payload: { url: "https://fbo.com.vn:8888/Main/Login.aspx",
+  //                      method: "GET", headers: {} }
+  //   3. Gửi POST tới proxyUrl
+  //   4. Parse response JSON từ proxy
+  //   5. Trả về: { status: 200, setCookie: "ASP.NET_SessionId=xxx",
+  //                body: "<html>...</html>", bodyLength: 21593 }
+  //
+  // Kết quả mong đợi:
+  //   status = 200 (FBM phản hồi OK)
+  //   setCookie = "ASP.NET_SessionId=xxx" (FBM tạo session)
+  //   bodyLength ≈ 21593 (kích thước trang HTML login)
+  // --------------------------------------------------------
+  try {
+    // URL đầy đủ: "https://fbo.com.vn:8888" + "/Main/Login.aspx"
+    var fbmLoginUrl = CONFIG.FBM_BASE_URL + CONFIG.FBM_LOGIN_PAGE;
+
+    // Gọi qua proxy — method GET, không cần headers đặc biệt
+    var fbmResponse = callFBMViaProxy(fbmLoginUrl, "GET", {});
+
+    if (fbmResponse && fbmResponse.status === 200) {
+      // Thành công! Hiển thị thông tin chi tiết
+      Logger.log("✅ FBM Status: " + fbmResponse.status
+        + " | Cookie: " + (fbmResponse.setCookie ? "CÓ" : "KHÔNG")
+        + " | Body: " + fbmResponse.bodyLength);
+
+      // Thông tin bổ sung cho debug
+      if (fbmResponse.setCookie) {
+        // Cookie mẫu: "ASP.NET_SessionId=2er2ti5slhfiqfzsviqtmzmm"
+        Logger.log("   Cookie: " + fbmResponse.setCookie.substring(0, 80));
+      }
+    } else {
+      // FBM phản hồi nhưng status không phải 200
+      Logger.log("❌ FBM trả về status: " + (fbmResponse ? fbmResponse.status : "null"));
+      if (fbmResponse && fbmResponse.body) {
+        Logger.log("   Body (200 ký tự): " + fbmResponse.body.substring(0, 200));
+      }
+      Logger.log("   → FBM có thể đang bảo trì, thử lại sau vài phút");
+    }
+  } catch (fbmError) {
+    // Lỗi khi gọi FBM qua proxy
+    Logger.log("❌ Lỗi gọi FBM qua proxy: " + fbmError.message);
+    Logger.log("   → Proxy chạy OK nhưng không forward được tới FBM");
+    Logger.log("   → Có thể FBM đang bảo trì hoặc IP bị chặn");
+  }
+
+  Logger.log("========== KẾT THÚC ==========");
+}
+
+
+/**
+ * ============================================================
+ * test_proxyIP — KIỂM TRA IP CỦA PROXY
+ * ============================================================
+ *
+ * Mục đích:
+ *   Xem proxy đang dùng IP nào để gọi FBM.
+ *   FBM chỉ chấp nhận IP Việt Nam (VN) — nếu IP nước ngoài → bị chặn.
+ *   Proxy chạy trên điện thoại Android kết nối WiFi ở VN → IP VN.
+ *
+ * Cách hoạt động:
+ *   1. GAS gửi POST { url: "check-ip" } tới proxy
+ *   2. Proxy nhận "check-ip" → gọi ipinfo.io/json để tra IP
+ *   3. Proxy trả về { ip, city, region, country, org }
+ *   4. GAS hiển thị kết quả
+ *
+ * KẾT QUẢ MONG ĐỢI:
+ *   ✅ IP: 14.162.xxx.xxx | Quốc gia: VN | Thành phố: Hanoi
+ *
+ * NẾU LỖI:
+ *   - "IP không phải Việt Nam": proxy đang dùng VPN hoặc không ở VN
+ *   - "Lỗi": proxy tắt hoặc tunnel hết hạn
+ *
+ * KHÔNG CẦN SỬA GÌ.
+ * ============================================================
+ */
+function test_proxyIP() {
+  Logger.log("========== TEST IP PROXY ==========");
+
+  // --------------------------------------------------------
+  // Bước 1: Đọc URL proxy từ Google Sheet
+  // --------------------------------------------------------
+  var proxyUrl = getProxyUrl();
+  if (!proxyUrl) {
+    Logger.log("❌ Không tìm thấy PROXY_URL trong Sheet Config");
+    Logger.log("   → Chạy test_proxy() trước để kiểm tra proxy");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+
+  // --------------------------------------------------------
+  // Bước 2: Gửi request "check-ip" tới proxy
+  // --------------------------------------------------------
+  // server.js trên Termux xử lý đặc biệt khi url = "check-ip":
+  //   1. Gọi curl https://ipinfo.io/json
+  //   2. Parse JSON response
+  //   3. Trả về { ip, city, region, country, org }
+  //
+  // Payload gửi tới proxy:
+  //   { "url": "check-ip" }
+  //   → Đây KHÔNG phải URL thật, mà là keyword đặc biệt mà proxy nhận diện
+  // --------------------------------------------------------
+  try {
+    var ipResponse = UrlFetchApp.fetch(proxyUrl, {
+      method: "post",                         // Proxy chỉ nhận POST
+      contentType: "application/json",         // Proxy parse JSON body
+      payload: JSON.stringify({
+        url: "check-ip"                        // Keyword đặc biệt → proxy gọi ipinfo.io
+      }),
+      muteHttpExceptions: true                 // Không throw khi HTTP 4xx/5xx
+    });
+
+    // Parse response JSON từ proxy
+    var ipData = JSON.parse(ipResponse.getContentText());
+
+    // Hiển thị thông tin IP
+    // ipData mẫu: { ip: "14.162.156.78", city: "Hanoi", country: "VN", org: "VNPT" }
+    Logger.log("✅ IP: " + ipData.ip
+      + " | Quốc gia: " + ipData.country
+      + " | Thành phố: " + (ipData.city || "?")
+      + " | ISP: " + (ipData.org || "?"));
+
+    // Cảnh báo nếu IP không phải Việt Nam
+    if (ipData.country !== "VN") {
+      Logger.log("⚠️ CẢNH BÁO: IP không phải Việt Nam!");
+      Logger.log("   FBM sẽ CHẶN request từ IP nước ngoài.");
+      Logger.log("   → Kiểm tra điện thoại có đang ở Việt Nam không");
+      Logger.log("   → Kiểm tra điện thoại có đang dùng VPN không (tắt VPN đi)");
+    }
+
+  } catch (ipError) {
+    Logger.log("❌ Lỗi kiểm tra IP: " + ipError.message);
+    Logger.log("   → Chạy test_proxy() trước để đảm bảo proxy hoạt động");
+  }
+
+  Logger.log("========== KẾT THÚC ==========");
+}
+
+
+// ╔════════════════════════════════════════════════════════════════════════════╗
+// ║  NHÓM 2: TEST ZALO BOT (Kết nối Zalo OA)                                ║
+// ╚════════════════════════════════════════════════════════════════════════════╝
+
+
+/**
+ * ============================================================
+ * test_zaloBot — KIỂM TRA KẾT NỐI ZALO BOT
+ * ============================================================
+ *
+ * Mục đích:
+ *   Gọi API Zalo getMe() để xác nhận BOT_TOKEN trong Config.gs là hợp lệ.
+ *   Nếu token sai → bot không nhận/gửi tin nhắn được.
+ *
+ * Cách hoạt động:
+ *   1. getMe() (ZaloAPI.gs) gọi: POST https://bot-api.zaloplatforms.com/bot{TOKEN}/getMe
+ *   2. Zalo trả về: { ok: true, result: { account_name: "FBM Assistant" } }
+ *   3. Hàm này hiển thị kết quả
+ *
+ * KẾT QUẢ MONG ĐỢI:
+ *   ✅ Bot hoạt động! Tên: FBM Assistant
+ *
+ * NẾU LỖI:
+ *   - "Bot không hoạt động": BOT_TOKEN sai
+ *     → Vào Zalo Developer Portal → lấy token mới → paste vào Config.gs
+ *
+ * KHÔNG CẦN SỬA GÌ — BOT_TOKEN đã điền trong Config.gs.
+ * ============================================================
+ */
+function test_zaloBot() {
+  Logger.log("========== TEST ZALO BOT ==========");
+
+  // --------------------------------------------------------
+  // Gọi getMe() — API cơ bản nhất của Zalo Bot
+  // --------------------------------------------------------
+  // getMe() gọi endpoint: /bot{TOKEN}/getMe
+  // Token lấy từ CONFIG.BOT_TOKEN (Config.gs)
+  //
+  // Response thành công:
+  //   { ok: true, result: { account_name: "FBM Assistant", ... } }
+  // Response thất bại (token sai):
+  //   { ok: false, description: "Unauthorized" }
+  // --------------------------------------------------------
+  var result = getMe();
+
+  if (result.ok) {
+    // Token hợp lệ — bot đang hoạt động
+    Logger.log("✅ Bot hoạt động! Tên: " + result.result.account_name);
+    // Hiển thị thêm thông tin nếu có
+    if (result.result.account_id) {
+      Logger.log("   Account ID: " + result.result.account_id);
+    }
+  } else {
+    // Token sai hoặc bot bị vô hiệu hóa
+    Logger.log("❌ Bot không hoạt động!");
+    Logger.log("   Lỗi: " + (result.description || "Không xác định"));
+    Logger.log("   → Kiểm tra CONFIG.BOT_TOKEN trong Config.gs");
+    Logger.log("   → Vào Zalo Developer Portal (developers.zalo.me) để lấy token mới");
+    Logger.log("   → Token có thể hết hạn nếu không sử dụng lâu");
+  }
+
+  Logger.log("========== KẾT THÚC ==========");
+}
+
+
+// /**
+//  * ============================================================
+//  * test_sendMessage — GỬI TIN NHẮN TEST TỚI ZALO
+//  * ============================================================
+//  *
+//  * Mục đích:
+//  *   Gửi 1 tin nhắn test từ GAS tới Zalo, để xác nhận:
+//  *   - BOT_TOKEN hoạt động
+//  *   - TEST_CHAT_ID đúng
+//  *   - Bot có quyền gửi tin nhắn
+//  *
+//  * YÊU CẦU TRƯỚC KHI CHẠY:
+//  *   - CONFIG.TEST_CHAT_ID đã điền trong Config.gs
+//  *   - Cách lấy TEST_CHAT_ID:
+//  *     1. Trên điện thoại, mở Zalo → nhắn tin BẤT KỲ cho bot (VD: "hello")
+//  *     2. Mở Google Sheet → tab Log
+//  *     3. Tìm dòng có Source = "WEBHOOK", cột Data chứa JSON
+//  *     4. Trong JSON, tìm: "chat":{"id":"xxxxxxxxx"}
+//  *     5. Copy "xxxxxxxxx" → paste vào CONFIG.TEST_CHAT_ID trong Config.gs
+//  *     6. Lưu Config.gs (Ctrl+S)
+//  *
+//  * KẾT QUẢ MONG ĐỢI:
+//  *   ✅ Tin nhắn đã gửi! Kiểm tra Zalo.
+//  *   (Trên Zalo bạn sẽ nhận được: "🤖 Test từ FBM Assistant!...")
+//  *
+//  * NẾU LỖI:
+//  *   - "Chưa điền TEST_CHAT_ID": làm theo hướng dẫn trên
+//  *   - "Gửi thất bại": kiểm tra BOT_TOKEN, hoặc user đã block bot
+//  * ============================================================
+//  */
+// function test_sendMessage() {
+//   Logger.log("========== TEST GỬI TIN NHẮN ==========");
+
+//   // --------------------------------------------------------
+//   // Kiểm tra TEST_CHAT_ID đã được điền chưa
+//   // --------------------------------------------------------
+//   // TEST_CHAT_ID nằm trong CONFIG.TEST_CHAT_ID (Config.gs)
+//   // Nó là Zalo chat_id — mã định danh cuộc trò chuyện giữa bot và user
+//   // Mỗi user có 1 chat_id duy nhất với bot
+//   // --------------------------------------------------------
+//   if (!CONFIG.TEST_CHAT_ID) {
+//     Logger.log("❌ Chưa điền TEST_CHAT_ID trong Config.gs");
+//     Logger.log("   → Cách lấy:");
+//     Logger.log("     1. Nhắn tin bất kỳ cho bot trên Zalo (VD: 'hello')");
+//     Logger.log("     2. Mở Google Sheet → tab Log");
+//     Logger.log("     3. Tìm cột Data, tìm 'chat':{\"id\":\"xxxxxxxxx\"}");
+//     Logger.log("     4. Copy xxxxxxxxx → paste vào CONFIG.TEST_CHAT_ID");
+//     Logger.log("     5. Lưu Config.gs (Ctrl+S)");
+//     Logger.log("========== KẾT THÚC ==========");
+//     return;
+//   }
+
+//   Logger.log("TEST_CHAT_ID: " + CONFIG.TEST_CHAT_ID);
+
+//   // --------------------------------------------------------
+//   // Gửi tin nhắn test
+//   // --------------------------------------------------------
+//   // sendMessage() (ZaloAPI.gs) sẽ:
+//   //   1. Gọi POST /bot{TOKEN}/sendMessage
+//   //   2. Body: { chat_id: "xxx", text: "..." }
+//   //   3. Trả về: { ok: true } nếu thành công
+//   //
+//   // Tin nhắn tự động cắt nếu > 2000 ký tự (ZALO_MAX_TEXT_LENGTH)
+//   // --------------------------------------------------------
+//   var testMessage = "🤖 Test từ FBM Assistant!\n"
+//     + "Thời gian: " + new Date().toLocaleString("vi-VN") + "\n"
+//     + "Proxy + Zalo đang hoạt động bình thường.";
+
+//   var result = sendMessage(CONFIG.TEST_CHAT_ID, testMessage);
+
+//   if (result.ok) {
+//     Logger.log("✅ Tin nhắn đã gửi! Kiểm tra Zalo trên điện thoại.");
+//   } else {
+//     Logger.log("❌ Gửi thất bại!");
+//     Logger.log("   Lỗi: " + (result.description || "Không xác định"));
+//     Logger.log("   → Kiểm tra CONFIG.BOT_TOKEN có đúng không");
+//     Logger.log("   → Kiểm tra user có đang follow bot không (có thể đã block)");
+//   }
+
+//   Logger.log("========== KẾT THÚC ==========");
+// }
+
+
+// ╔════════════════════════════════════════════════════════════════════════════╗
+// ║  NHÓM 3: TEST WEBHOOK (Đăng ký URL nhận tin nhắn từ Zalo)               ║
+// ╚════════════════════════════════════════════════════════════════════════════╝
+
+
+/**
+ * ============================================================
+ * test_setWebhook — ĐĂNG KÝ WEBHOOK VỚI ZALO
+ * ============================================================
+ *
+ * Mục đích:
+ *   Đăng ký URL webhook để Zalo biết gửi tin nhắn tới đâu.
+ *   Khi user nhắn tin cho bot → Zalo gửi POST tới WEBHOOK_URL → GAS xử lý.
+ *
+ * ⚠️ CHỈ CẦN CHẠY 1 LẦN (hoặc khi đổi URL deploy).
+ *
+ * TRƯỚC KHI CHẠY:
+ *   1. Deploy Web App trong Apps Script:
+ *      • Chọn Deploy → New deployment → Web app
+ *      • Execute as: Me
+ *      • Who has access: Anyone
+ *      • Copy URL dạng: https://script.google.com/macros/s/.../exec
+ *   2. Paste URL vào CONFIG.WEBHOOK_URL trong Config.gs
+ *   3. Điền CONFIG.WEBHOOK_SECRET_TOKEN (chuỗi bất kỳ, VD: "mysecret123")
+ *   4. Lưu Config.gs (Ctrl+S)
+ *
+ * KẾT QUẢ MONG ĐỢI:
+ *   ✅ Webhook đã đăng ký! URL: https://script.google.com/.../exec
+ *
+ * SAU KHI ĐĂNG KÝ:
+ *   - Zalo sẽ gửi tin nhắn tới WEBHOOK_URL
+ *   - GAS nhận bằng hàm doPost() (Main.gs)
+ *   - doPost() route tới các handler tương ứng
+ * ============================================================
+ */
+function test_setWebhook() {
+  Logger.log("========== ĐĂNG KÝ WEBHOOK ==========");
+
+  // --------------------------------------------------------
+  // Kiểm tra WEBHOOK_URL đã điền chưa và có đúng format không
+  // --------------------------------------------------------
+  // URL deploy phải kết thúc bằng "/exec" (không phải "/dev")
+  // VD đúng:  https://script.google.com/macros/s/AKfycby.../exec
+  // VD sai:   https://script.google.com/macros/s/AKfycby.../dev
+  //           (dev chỉ dùng khi test, Zalo không gọi được)
+  // --------------------------------------------------------
+  if (!CONFIG.WEBHOOK_URL || CONFIG.WEBHOOK_URL.indexOf("/exec") === -1) {
+    Logger.log("❌ CONFIG.WEBHOOK_URL chưa điền hoặc không kết thúc bằng /exec");
+    Logger.log("   → Hướng dẫn:");
+    Logger.log("     1. Trong Apps Script → Deploy → New deployment → Web app");
+    Logger.log("     2. Execute as: Me | Who has access: Anyone");
+    Logger.log("     3. Copy URL dạng: https://script.google.com/.../exec");
+    Logger.log("     4. Paste vào CONFIG.WEBHOOK_URL trong Config.gs");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+
+  // --------------------------------------------------------
+  // Gọi API Zalo đăng ký webhook
+  // --------------------------------------------------------
+  // setWebhook() (ZaloAPI.gs) gọi: POST /bot{TOKEN}/setWebhook
+  // Body: { url: WEBHOOK_URL, secret_token: WEBHOOK_SECRET_TOKEN }
+  //
+  // secret_token là chuỗi bảo mật — Zalo gửi kèm mỗi request
+  // để GAS xác nhận request đến từ Zalo (không phải giả mạo).
+  // Hiện tại code chưa check secret_token trong doPost(),
+  // nhưng nên giữ để bảo mật sau này.
+  // --------------------------------------------------------
+  var result = setWebhook();
+
+  if (result && result.ok) {
+    Logger.log("✅ Webhook đã đăng ký thành công!");
+    Logger.log("   URL: " + CONFIG.WEBHOOK_URL);
+    Logger.log("   → Bây giờ khi user nhắn tin cho bot → Zalo gửi tới URL này");
+    Logger.log("   → GAS nhận bằng doPost() (Main.gs) và xử lý");
+  } else {
+    Logger.log("❌ Đăng ký webhook thất bại!");
+    Logger.log("   Response: " + JSON.stringify(result));
+    Logger.log("   → Kiểm tra CONFIG.BOT_TOKEN");
+    Logger.log("   → Kiểm tra CONFIG.WEBHOOK_URL (phải /exec, không phải /dev)");
+  }
+
+  Logger.log("========== KẾT THÚC ==========");
+}
+
+
+/**
+ * ============================================================
+ * test_getWebhookInfo — XEM THÔNG TIN WEBHOOK HIỆN TẠI
+ * ============================================================
+ *
+ * Mục đích:
+ *   Kiểm tra webhook hiện tại đã đăng ký với Zalo chưa, URL là gì.
+ *   Hữu ích khi cần xác nhận webhook hoạt động mà không muốn đăng ký lại.
+ *
+ * KẾT QUẢ MONG ĐỢI:
+ *   JSON chứa url hiện tại, VD:
+ *   { "ok": true, "result": { "url": "https://script.google.com/.../exec" } }
+ *
+ * KHÔNG CẦN SỬA GÌ.
+ * ============================================================
+ */
+function test_getWebhookInfo() {
+  Logger.log("========== THÔNG TIN WEBHOOK ==========");
+
+  // --------------------------------------------------------
+  // Gọi API Zalo getWebhookInfo
+  // --------------------------------------------------------
+  // getWebhookInfo() (ZaloAPI.gs) gọi: POST /bot{TOKEN}/getWebhookInfo
+  // Trả về thông tin webhook hiện tại đã đăng ký
+  // --------------------------------------------------------
+  var result = getWebhookInfo();
+
+  // Hiển thị toàn bộ response dạng JSON đẹp (indent 2 spaces)
+  Logger.log(JSON.stringify(result, null, 2));
+
+  // Phân tích kết quả
+  if (result && result.ok && result.result && result.result.url) {
+    Logger.log("   → Webhook URL hiện tại: " + result.result.url);
+  } else {
+    Logger.log("   → Chưa đăng ký webhook. Chạy test_setWebhook() để đăng ký.");
+  }
+
+  Logger.log("========== KẾT THÚC ==========");
+}
+
+
+// ╔════════════════════════════════════════════════════════════════════════════╗
+// ║  NHÓM 4: TEST ĐĂNG NHẬP FBM (Login qua Proxy)                           ║
+// ╚════════════════════════════════════════════════════════════════════════════╝
+
+
+/**
+ * ============================================================
+ * test_loginFBM — TEST ĐĂNG NHẬP FBM QUA PROXY
+ * ============================================================
+ *
+ * Mục đích:
+ *   Kiểm tra toàn bộ luồng đăng nhập FBM (4 bước):
+ *     Bước 1: GET Login.aspx → lấy ASP.NET_SessionId + salt
+ *     Bước 2: POST GetEntityData → lấy database ("FHN_CRM_App")
+ *     Bước 3: POST GetUnitData → lấy unit ("CTY")
+ *     Bước 4: POST Login → hash password + gửi → nhận cookie xác thực
+ *
+ *   Luồng request:
+ *     GAS → Proxy (Termux) → curl → FBM server (fbo.com.vn:8888)
+ *
+ * ⚠️ CẦN SỬA 2 GIÁ TRỊ:
+ *   - username: tên đăng nhập FBM (do admin cung cấp)
+ *   - password: mật khẩu FBM (plaintext, chưa hash)
+ *
+ * YÊU CẦU: Proxy đang chạy (test_proxy() thành công trước)
+ *
+ * KẾT QUẢ MONG ĐỢI:
+ *   ✅ Login thành công!
+ *   Database: FHN_CRM_App | Unit: CTY | UserID: 2037
+ *   Cookie: ASP.NET_SessionId=xxx...
+ *
+ * NẾU LỖI:
+ *   - "Không tìm thấy PROXY_URL": chạy test_proxy() trước
+ *   - "Login thất bại": xem sheet Log để biết bước nào lỗi
+ *     → Sai username/password → kiểm tra lại với admin
+ *     → FBM chặn IP → chạy test_proxyIP() xem IP có phải VN không
+ *     → FBM bảo trì → thử lại sau
+ *
+ * SAU KHI LOGIN THÀNH CÔNG:
+ *   - Hàm này CHỈ test login, KHÔNG lưu session
+ *   - Để lưu session (dùng cho search sau này):
+ *     → Nhắn /login user|pass cho bot trên Zalo
+ *     → Hoặc chạy test_loginAndSaveSession()
+ * ============================================================
+ */
+function test_loginFBM() {
+  // ================================================================
+  // ← SỬA THÔNG TIN ĐĂNG NHẬP FBM Ở ĐÂY
+  // ================================================================
+  // username: Tên đăng nhập FBM, do admin cung cấp
+  //           VD: "anhlt", "nguyenvana", "admin"
+  // password: Mật khẩu FBM gốc (plaintext, chưa hash)
+  //           VD: "1234567a@", "P@ssw0rd!", "matkhau123"
+  //           Code sẽ tự hash 2 lần MD5 trước khi gửi lên FBM
+  // ================================================================
+  var username = "anhlt";         // ← SỬA: tên đăng nhập FBM
+  var password = "1234567a@";     // ← SỬA: mật khẩu FBM
+  // ================================================================
+
+  Logger.log("========== TEST ĐĂNG NHẬP FBM ==========");
+  Logger.log("Username: " + username);
+  Logger.log("Password: " + password.charAt(0) + "***"
+    + password.charAt(password.length - 1) + " (" + password.length + " ký tự)");
+
+  // --------------------------------------------------------
+  // Kiểm tra proxy trước khi login
+  // --------------------------------------------------------
+  // Nếu proxy tắt → login sẽ fail → lãng phí thời gian debug
+  // Nên kiểm tra proxy sẵn sàng trước
+  // --------------------------------------------------------
+  var proxyUrl = getProxyUrl();
+  if (!proxyUrl) {
+    Logger.log("❌ Không tìm thấy PROXY_URL");
+    Logger.log("   → Chạy test_proxy() trước để kiểm tra proxy");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+  Logger.log("Proxy URL: " + proxyUrl);
+
+  // --------------------------------------------------------
+  // Gọi loginFBM() — hàm chính trong FBMAuth.gs
+  // --------------------------------------------------------
+  // loginFBM(username, password) thực hiện 4 bước:
+  //   Bước 1: GET Login.aspx qua proxy → lấy cookie + salt
+  //   Bước 2: POST GetEntityData qua proxy → lấy database
+  //   Bước 3: POST GetUnitData qua proxy → lấy unit
+  //   Bước 4: POST Login qua proxy → gửi MD5(salt + MD5(password))
+  //
+  // Nếu thành công, trả về object:
+  //   {
+  //     fullCookie: "ASP.NET_SessionId=abc123",  // Cookie xác thực
+  //     database: "FHN_CRM_App",                 // Tên database
+  //     unit: "CTY",                             // Mã đơn vị
+  //     userId: "2037"                           // Mã nhân viên FBM
+  //   }
+  //
+  // Nếu thất bại, trả về null.
+  // Chi tiết lỗi được ghi vào sheet Log (xem tab Log trong Google Sheet).
+  // --------------------------------------------------------
+  var loginResult = loginFBM(username, password);
+
+  if (loginResult) {
+    Logger.log("✅ Login thành công!");
+    Logger.log("   Database: " + loginResult.database);
+    Logger.log("   Unit    : " + loginResult.unit);
+    Logger.log("   UserID  : " + (loginResult.userId || "(không lấy được)"));
+    Logger.log("   Cookie  : " + loginResult.fullCookie.substring(0, 80) + "...");
+    Logger.log("   Payload : " + (loginResult.fbmPayloadCookie || "KHÔNG CÓ"));
+
+
+    // Gợi ý bước tiếp theo
+    Logger.log("");
+    Logger.log("   → Bước tiếp: nhắn /login " + username + "|" + password + " trên Zalo");
+    Logger.log("     để lưu session vào Sheet (cần cho search)");
+  } else {
+    Logger.log("❌ Login thất bại!");
+    Logger.log("   → Mở Google Sheet → tab Log để xem chi tiết lỗi");
+    Logger.log("   → Tìm dòng có Source = 'FBM_AUTH' và Message chứa '❌'");
+    Logger.log("   → Nguyên nhân phổ biến:");
+    Logger.log("     1. Sai username hoặc password");
+    Logger.log("     2. FBM server đang bảo trì");
+    Logger.log("     3. IP proxy bị FBM chặn (chạy test_proxyIP() kiểm tra)");
+    Logger.log("     4. Proxy trên điện thoại tắt (chạy test_proxy() kiểm tra)");
+  }
+
+  Logger.log("========== KẾT THÚC ==========");
+}
+
+
+/**
+ * ============================================================
+ * test_loginAndSaveSession — LOGIN + LƯU SESSION VÀO SHEET
+ * ============================================================
+ *
+ * Mục đích:
+ *   Login FBM qua proxy, sau đó lưu session vào Google Sheet tab Sessions.
+ *   Giống hệt khi user nhắn /login user|pass trên Zalo.
+ *   Sau khi chạy, có thể chạy test_searchCustomer() ngay.
+ *
+ * ⚠️ CẦN SỬA 2 GIÁ TRỊ: username, password
+ * ⚠️ CẦN CÓ: CONFIG.TEST_CHAT_ID (để lưu session cho chat_id này)
+ *
+ * KẾT QUẢ MONG ĐỢI:
+ *   ✅ Login + lưu session thành công!
+ *   → Mở Sheet tab Sessions → thấy dòng mới với chat_id = TEST_CHAT_ID
+ *
+ * SAU KHI CHẠY:
+ *   - Session được lưu trong tab Sessions
+ *   - Có thể chạy test_searchCustomer(), test_fullFlow()... ngay
+ *   - Session hết hạn sau 25 phút (SESSION_TTL) → tự re-login
+ * ============================================================
+ */
+function test_loginAndSaveSession() {
+  // ================================================================
+  // ← SỬA THÔNG TIN ĐĂNG NHẬP FBM Ở ĐÂY
+  // ================================================================
+  var username = "anhlt";         // ← SỬA: tên đăng nhập FBM
+  var password = "1234567a@";     // ← SỬA: mật khẩu FBM
+  // ================================================================
+
+  Logger.log("========== TEST LOGIN + LƯU SESSION ==========");
+
+  // --------------------------------------------------------
+  // Kiểm tra TEST_CHAT_ID
+  // --------------------------------------------------------
+  // Session được lưu theo chat_id.
+  // Cần TEST_CHAT_ID để biết lưu session cho ai.
+  // --------------------------------------------------------
+  if (!CONFIG.TEST_CHAT_ID) {
+    Logger.log("❌ Chưa điền CONFIG.TEST_CHAT_ID trong Config.gs");
+    Logger.log("   → Xem hướng dẫn trong test_sendMessage()");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+
+  // --------------------------------------------------------
+  // Bước 1: Login FBM qua proxy
+  // --------------------------------------------------------
+  Logger.log("Đang login FBM... (username: " + username + ")");
+  var loginResult = loginFBM(username, password);
+
+  if (!loginResult) {
+    Logger.log("❌ Login thất bại! Xem sheet Log để biết chi tiết.");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+
+  Logger.log("✅ Login OK! Database: " + loginResult.database
+    + " | Unit: " + loginResult.unit
+    + " | UserID: " + (loginResult.userId || "?"));
+
+  // --------------------------------------------------------
+  // Bước 2: Mã hóa password trước khi lưu vào Sheet
+  // --------------------------------------------------------
+  // Password KHÔNG lưu plaintext vào Sheet.
+  // Dùng XOR encryption với timestamp làm key:
+  //   encrypted = encryptPassword("1234567a@", "1774707655988")
+  //   → "🔐4a2f8b1c3d5e🔐"
+  //
+  // Khi cần re-login (session hết hạn 25 phút):
+  //   decrypted = decryptPassword("🔐4a2f8b1c3d5e🔐", "1774707655988")
+  //   → "1234567a@"
+  //
+  // timestamp (encryptSalt) lưu cùng dòng trong Sheet
+  // --------------------------------------------------------
+  var now = Date.now();                              // Timestamp hiện tại (ms)
+  var encryptSalt = String(now);                     // Dùng làm key mã hóa
+  var encryptedPassword = encryptPassword(password, encryptSalt);
+
+  Logger.log("Password mã hóa: " + encryptedPassword);
+
+  // --------------------------------------------------------
+  // Bước 3: Tạo object session data
+  // --------------------------------------------------------
+  // Object này sẽ được ghi thành 1 dòng trong sheet Sessions.
+  // Mỗi field tương ứng 1 cột:
+  //   A: chatId         = Zalo chat_id (mã cuộc trò chuyện)
+  //   B: displayName    = Tên hiển thị user trên Zalo
+  //   C: fbmUser        = Tên đăng nhập FBM
+  //   D: fbmPassword    = Password đã mã hóa (🔐hex🔐)
+  //   E: encryptSalt    = Key mã hóa (timestamp)
+  //   F: fbmCookie      = Cookie FBM (ASP.NET_SessionId=xxx)
+  //   G: database       = Tên database FBM (VD: "FHN_CRM_App")
+  //   H: unit           = Mã đơn vị (VD: "CTY")
+  //   I: userId         = Mã nhân viên FBM (VD: "2037")
+  //   J: loginTime      = Thời điểm login (timestamp ms)
+  // --------------------------------------------------------
+  var sessionData = {
+    chatId: CONFIG.TEST_CHAT_ID,
+    displayName: "Test User",
+    fbmUser: username,
+    fbmPassword: encryptedPassword,
+    encryptSalt: encryptSalt,
+    fbmCookie: loginResult.fullCookie,
+    database: loginResult.database,
+    unit: loginResult.unit,
+    userId: loginResult.userId,
+    loginTime: now,
+    fbmPayloadCookie: loginResult.fbmPayloadCookie  // Cookie payload cho FBM API
+  };
+
+  // --------------------------------------------------------
+  // Bước 4: Lưu session vào Sheet
+  // --------------------------------------------------------
+  // replaceSession() (SessionManager.gs) sẽ:
+  //   1. Tìm dòng có chat_id = TEST_CHAT_ID
+  //   2. Nếu có → xóa dòng cũ
+  //   3. Thêm dòng mới với data mới nhất
+  //
+  // Dùng replaceSession thay vì saveSession để đảm bảo
+  // không bị trùng lặp chat_id trong Sheet.
+  // --------------------------------------------------------
+  replaceSession(CONFIG.TEST_CHAT_ID, sessionData);
+
+  Logger.log("✅ Session đã lưu vào Sheet!");
+  Logger.log("   → Mở Google Sheet → tab Sessions → thấy dòng mới");
+  Logger.log("   → Chat ID: " + CONFIG.TEST_CHAT_ID);
+  Logger.log("   → Session hết hạn sau 25 phút (sẽ tự re-login)");
+  Logger.log("");
+  Logger.log("   → Bước tiếp: chạy test_searchCustomer() để tìm khách hàng");
+
+  Logger.log("========== KẾT THÚC ==========");
+}
+
+
+// ╔════════════════════════════════════════════════════════════════════════════╗
+// ║  NHÓM 5: TEST TRA CỨU KHÁCH HÀNG                                        ║
+// ╚════════════════════════════════════════════════════════════════════════════╝
+
+
+/**
+ * ============================================================
+ * test_searchCustomer — TÌM KHÁCH HÀNG TỰ DO (SMART LOOKUP)
+ * ============================================================
+ *
+ * Mục đích:
+ *   Tìm khách hàng bằng từ khóa bất kỳ — giống khi user nhắn tin
+ *   trực tiếp cho bot (không dùng lệnh /sdt, /mst...).
+ *
+ * SMART LOOKUP — Hệ thống tự xác định thứ tự tìm kiếm:
+ *   Dựa vào đặc điểm của từ khóa:
+ *   ┌──────────────────────┬────────────────────────────────────┐
+ *   │ Đặc điểm từ khóa     │ Thứ tự tìm                        │
+ *   ├──────────────────────┼────────────────────────────────────┤
+ *   │ Chỉ có số (0-9)      │ SĐT → MST → Tên → Mã KH          │
+ *   │ Chứa dấu "-"         │ MST → Tên → SĐT → Mã KH          │
+ *   │ 8 ký tự, không dấu   │ Mã KH → Tên → MST → SĐT          │
+ *   │   cách               │                                    │
+ *   │ Mặc định             │ Tên → SĐT → MST → Mã KH          │
+ *   └──────────────────────┴────────────────────────────────────┘
+ *
+ *   Logic nằm trong SearchLogic.gs (hàm determineSearchOrder).
+ *   Với mỗi field, gọi searchCustomerByField() (FBMQuery.gs)
+ *   → gộp kết quả → loại trùng theo stt_rec.
+ *
+ * ⚠️ CẦN SỬA: keyword (từ khóa tìm kiếm)
+ *
+ * YÊU CẦU:
+ *   - CONFIG.TEST_CHAT_ID đã điền
+ *   - Đã có session (chạy test_loginAndSaveSession() trước,
+ *     hoặc nhắn /login user|pass trên Zalo)
+ *
+ * KẾT QUẢ MONG ĐỢI:
+ *   Tìm thấy: 3 khách hàng
+ *     1. TLP20855 - Công ty Fast Business
+ *     2. TLP20856 - Công ty FastNet
+ *     ...
+ * ============================================================
+ */
+function test_searchCustomer() {
+  // ================================================================
+  // ← SỬA TỪ KHÓA TÌM KIẾM Ở ĐÂY
+  // ================================================================
+  // Thử các loại từ khóa khác nhau để test smart lookup:
+  //   "fast"         → tìm theo tên (mặc định)
+  //   "0901234567"   → tìm theo SĐT (toàn số)
+  //   "01-06688"     → tìm theo MST (chứa dấu -)
+  //   "TLP20855"     → tìm theo mã KH (8 ký tự)
+  // ================================================================
+  var keyword = "TLP20728";           // ← SỬA: từ khóa tìm kiếm
+  // ================================================================
+
+  Logger.log("========== TEST TÌM KHÁCH HÀNG ==========");
+  Logger.log("Từ khóa: \"" + keyword + "\"");
+
+  // --------------------------------------------------------
+  // Kiểm tra TEST_CHAT_ID
+  // --------------------------------------------------------
+  if (!CONFIG.TEST_CHAT_ID) {
+    Logger.log("❌ Chưa điền CONFIG.TEST_CHAT_ID trong Config.gs");
+    Logger.log("   → Xem hướng dẫn trong test_sendMessage()");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+
+  // --------------------------------------------------------
+  // Kiểm tra session
+  // --------------------------------------------------------
+  // searchCustomer() cần session để:
+  //   1. Lấy cookie (gửi kèm request FBM qua proxy)
+  //   2. Lấy userId (dùng trong externalKey lọc quyền xem KH)
+  //
+  // Session lưu trong sheet Sessions, tìm theo chat_id.
+  // Nếu chưa có → cần login trước.
+  // --------------------------------------------------------
+  var session = getSession(CONFIG.TEST_CHAT_ID);
+  if (!session) {
+    Logger.log("❌ Chưa có session cho TEST_CHAT_ID: " + CONFIG.TEST_CHAT_ID);
+    Logger.log("   → Cách 1: Chạy test_loginAndSaveSession() trong file Test.gs");
+    Logger.log("   → Cách 2: Nhắn /login user|pass cho bot trên Zalo");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+
+  Logger.log("Session: user=" + session.fbmUser
+    + " | DB=" + session.database
+    + " | UserID=" + session.userId);
+
+  // Kiểm tra session còn hạn không
+  var sessionAge = Date.now() - session.loginTime;
+  var sessionRemaining = CONFIG.SESSION_TTL - sessionAge;
+  if (sessionRemaining > 0) {
+    Logger.log("Session còn hạn: " + Math.round(sessionRemaining / 60000) + " phút");
+  } else {
+    Logger.log("⚠️ Session đã hết hạn (" + Math.round(sessionAge / 60000)
+      + " phút) — sẽ tự re-login khi gọi API");
+  }
+
+  // --------------------------------------------------------
+  // Gọi searchCustomer() — hàm tìm kiếm chính
+  // --------------------------------------------------------
+  // searchCustomer() (SearchLogic.gs) sẽ:
+  //   1. Gọi parseSearchCommand(keyword) → phân tích có prefix không
+  //      VD: "/sdt 0901234567" → command="/sdt", keyword="0901234567"
+  //      VD: "fast" → command=null, keyword="fast"
+  //   2. Nếu có command → tìm theo field tương ứng
+  //   3. Nếu không → gọi determineSearchOrder() → tìm multi-field
+  //   4. Trả về: { rows: [...], totalFound: N, keyword: "fast" }
+  //
+  // Mỗi row là mảng giá trị, index mapping theo CONFIG:
+  //   row[CI_STT_REC]    = "A000075988"  (mã nội bộ FBM)
+  //   row[CI_MA_KH]      = "TLP20855"    (mã khách hàng hiển thị)
+  //   row[CI_TEN_KH]     = "Công ty ABC" (tên công ty)
+  //   row[CI_MA_SO_THUE] = "0106688883"  (mã số thuế)
+  //   row[CI_NGUOI_LIEN_HE] = "Nguyễn Văn A" (người liên hệ)
+  //   row[CI_DIEN_THOAI] = "0901234567"  (số điện thoại)
+  // --------------------------------------------------------
+  var result = searchCustomer(CONFIG.TEST_CHAT_ID, keyword);
+
+  Logger.log("Tìm thấy: " + result.totalFound + " khách hàng");
+
+  // Hiển thị tối đa 5 kết quả đầu tiên
+  if (result.rows.length > 0) {
+    var displayCount = Math.min(result.rows.length, 5);
+    for (var i = 0; i < displayCount; i++) {
+      var row = result.rows[i];
+      Logger.log("  " + (i + 1) + ". [" + row[CONFIG.CI_STT_REC] + "] "
+        + (row[CONFIG.CI_MA_KH] || "?")
+        + " - " + (row[CONFIG.CI_TEN_KH] || "?")
+        + " | SĐT: " + (row[CONFIG.CI_DIEN_THOAI] || "—")
+        + " | MST: " + (row[CONFIG.CI_MA_SO_THUE] || "—"));
+    }
+    if (result.rows.length > 5) {
+      Logger.log("  ... và " + (result.rows.length - 5) + " kết quả nữa");
+    }
+  } else {
+    Logger.log("  Không tìm thấy kết quả nào.");
+    Logger.log("  → Thử từ khóa khác, hoặc kiểm tra session");
+  }
+
+  Logger.log("========== KẾT THÚC ==========");
+}
+
+
+/**
+ * ============================================================
+ * test_searchByPhone — TÌM KHÁCH HÀNG THEO SỐ ĐIỆN THOẠI
+ * ============================================================
+ *
+ * Mục đích:
+ *   Tìm KH bằng lệnh /sdt — giống khi user nhắn "/sdt 0901234567" trên Zalo.
+ *   Tìm trong trường "dien_thoai" (CONFIG.FIELD_PHONE) bằng toán tử LIKE (**).
+ *   VD: /sdt 0901 → tìm tất cả KH có SĐT chứa "0901"
+ *
+ * ⚠️ CẦN SỬA: phone (số điện thoại cần tìm)
+ * YÊU CẦU: TEST_CHAT_ID + session
+ *
+ * KẾT QUẢ MONG ĐỢI:
+ *   Tìm thấy: N
+ *   KH đầu: TLP20855 - Công ty ABC
+ * ============================================================
+ */
+function test_searchByPhone() {
+  // ================================================================
+  // ← SỬA SỐ ĐIỆN THOẠI Ở ĐÂY
+  // ================================================================
+  // Có thể nhập đầy đủ hoặc 1 phần:
+  //   "0901234567"  → tìm chính xác
+  //   "0901"        → tìm KH có SĐT chứa "0901"
+  //   "234567"      → tìm KH có SĐT chứa "234567"
+  // ================================================================
+  var phone = "0900000000";       // ← SỬA: số điện thoại cần tìm
+  // ================================================================
+
+  Logger.log("========== TEST TÌM THEO SĐT ==========");
+  Logger.log("SĐT: " + phone);
+
+  // Kiểm tra yêu cầu
+  if (!CONFIG.TEST_CHAT_ID) {
+    Logger.log("❌ Chưa điền CONFIG.TEST_CHAT_ID");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+  var session = getSession(CONFIG.TEST_CHAT_ID);
+  if (!session) {
+    Logger.log("❌ Chưa có session — chạy test_loginAndSaveSession() trước");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+
+  // --------------------------------------------------------
+  // Gọi searchCustomer với prefix "/sdt"
+  // --------------------------------------------------------
+  // searchCustomer() nhận input = "/sdt 0901234567"
+  // → parseSearchCommand() trả về: { command: "/sdt", keyword: "0901234567" }
+  // → commandToField("/sdt") = "dien_thoai"
+  // → searchCustomerByField(chatId, "dien_thoai", "0901234567")
+  // → FBM API filter: ["dien_thoai:**0901234567"] (LIKE)
+  // --------------------------------------------------------
+  var result = searchCustomer(CONFIG.TEST_CHAT_ID, "/sdt " + phone);
+
+  Logger.log("Tìm thấy: " + result.totalFound);
+  if (result.rows.length > 0) {
+    Logger.log("KH đầu: " + result.rows[0][CONFIG.CI_MA_KH]
+      + " - " + result.rows[0][CONFIG.CI_TEN_KH]
+      + " | SĐT: " + (result.rows[0][CONFIG.CI_DIEN_THOAI] || "—"));
+  }
+
+  Logger.log("========== KẾT THÚC ==========");
+}
+
+
+/**
+ * ============================================================
+ * test_searchByTax — TÌM KHÁCH HÀNG THEO MÃ SỐ THUẾ
+ * ============================================================
+ *
+ * Mục đích:
+ *   Tìm KH bằng lệnh /mst — giống khi user nhắn "/mst 0106688883" trên Zalo.
+ *   Tìm trong trường "ma_so_thue" (CONFIG.FIELD_TAX) bằng toán tử LIKE (**).
+ *
+ * ⚠️ CẦN SỬA: tax (mã số thuế cần tìm)
+ * YÊU CẦU: TEST_CHAT_ID + session
+ * ============================================================
+ */
+function test_searchByTax() {
+  // ================================================================
+  // ← SỬA MÃ SỐ THUẾ Ở ĐÂY
+  // ================================================================
+  // MST thường có 10 hoặc 13 số, có thể chứa dấu "-"
+  // VD: "0106688883", "0106688883-001", "01066"
+  // ================================================================
+  var tax = "0106688883";         // ← SỬA: mã số thuế cần tìm
+  // ================================================================
+
+  Logger.log("========== TEST TÌM THEO MST ==========");
+  Logger.log("MST: " + tax);
+
+  if (!CONFIG.TEST_CHAT_ID) {
+    Logger.log("❌ Chưa điền CONFIG.TEST_CHAT_ID");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+  var session = getSession(CONFIG.TEST_CHAT_ID);
+  if (!session) {
+    Logger.log("❌ Chưa có session — chạy test_loginAndSaveSession() trước");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+
+  // Gọi searchCustomer với prefix "/mst"
+  // → tìm trong trường "ma_so_thue" bằng LIKE
+  var result = searchCustomer(CONFIG.TEST_CHAT_ID, "/mst " + tax);
+
+  Logger.log("Tìm thấy: " + result.totalFound);
+  if (result.rows.length > 0) {
+    Logger.log("KH đầu: " + result.rows[0][CONFIG.CI_MA_KH]
+      + " - " + result.rows[0][CONFIG.CI_TEN_KH]
+      + " | MST: " + (result.rows[0][CONFIG.CI_MA_SO_THUE] || "—"));
+  }
+
+  Logger.log("========== KẾT THÚC ==========");
+}
+
+
+/**
+ * ============================================================
+ * test_searchByName — TÌM KHÁCH HÀNG THEO TÊN CÔNG TY
+ * ============================================================
+ *
+ * Mục đích:
+ *   Tìm KH bằng lệnh /ten — giống khi user nhắn "/ten Công ty" trên Zalo.
+ *   Tìm trong trường "ten_kh" (CONFIG.FIELD_NAME) bằng toán tử LIKE (**).
+ *   Có thể nhập 1 phần tên: "/ten fast" → tìm KH có tên chứa "fast"
+ *
+ * ⚠️ CẦN SỬA: name (tên công ty cần tìm)
+ * YÊU CẦU: TEST_CHAT_ID + session
+ * ============================================================
+ */
+function test_searchByName() {
+  // ================================================================
+  // ← SỬA TÊN CÔNG TY Ở ĐÂY
+  // ================================================================
+  // Nhập 1 phần tên cũng được (LIKE search):
+  //   "Công ty"     → tìm tất cả tên chứa "Công ty"
+  //   "fast"        → tìm tên chứa "fast"
+  //   "TNHH"        → tìm tên chứa "TNHH"
+  // ================================================================
+  var name = "Công ty";           // ← SỬA: tên công ty cần tìm
+  // ================================================================
+
+  Logger.log("========== TEST TÌM THEO TÊN ==========");
+  Logger.log("Tên: \"" + name + "\"");
+
+  if (!CONFIG.TEST_CHAT_ID) {
+    Logger.log("❌ Chưa điền CONFIG.TEST_CHAT_ID");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+  var session = getSession(CONFIG.TEST_CHAT_ID);
+  if (!session) {
+    Logger.log("❌ Chưa có session — chạy test_loginAndSaveSession() trước");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+
+  // Gọi searchCustomer với prefix "/ten"
+  // → tìm trong trường "ten_kh" bằng LIKE
+  var result = searchCustomer(CONFIG.TEST_CHAT_ID, "/ten " + name);
+
+  Logger.log("Tìm thấy: " + result.totalFound);
+  if (result.rows.length > 0) {
+    // Hiển thị tối đa 3 kết quả đầu
+    var displayCount = Math.min(result.rows.length, 3);
+    for (var i = 0; i < displayCount; i++) {
+      Logger.log("  " + (i + 1) + ". " + result.rows[i][CONFIG.CI_TEN_KH]);
+    }
+  }
+
+  Logger.log("========== KẾT THÚC ==========");
+}
+
+
+/**
+ * ============================================================
+ * test_searchByCode — TÌM KHÁCH HÀNG THEO MÃ KHÁCH HÀNG
+ * ============================================================
+ *
+ * Mục đích:
+ *   Tìm KH bằng lệnh /mkh — giống khi user nhắn "/mkh TLP20855" trên Zalo.
+ *   Tìm trong trường "ma_kh" (CONFIG.FIELD_CODE) bằng toán tử LIKE (**).
+ *
+ *   Mã KH (ma_kh) KHÁC với stt_rec:
+ *   - ma_kh = mã hiển thị (VD: "TLP20855") — user nhìn thấy
+ *   - stt_rec = mã nội bộ (VD: "A000075988") — FBM dùng nội bộ
+ *
+ * ⚠️ CẦN SỬA: code (mã khách hàng cần tìm)
+ * YÊU CẦU: TEST_CHAT_ID + session
+ * ============================================================
+ */
+function test_searchByCode() {
+  // ================================================================
+  // ← SỬA MÃ KHÁCH HÀNG Ở ĐÂY
+  // ================================================================
+  // Mã KH thường 8 ký tự, VD: "TLP20855", "NTX10001"
+  // Có thể nhập 1 phần: "TLP" → tìm tất cả mã bắt đầu bằng "TLP"
+  // ================================================================
+  var code = "TLP20855";          // ← SỬA: mã khách hàng cần tìm
+  // ================================================================
+
+  Logger.log("========== TEST TÌM THEO MÃ KH ==========");
+  Logger.log("Mã KH: " + code);
+
+  if (!CONFIG.TEST_CHAT_ID) {
+    Logger.log("❌ Chưa điền CONFIG.TEST_CHAT_ID");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+  var session = getSession(CONFIG.TEST_CHAT_ID);
+  if (!session) {
+    Logger.log("❌ Chưa có session — chạy test_loginAndSaveSession() trước");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+
+  // Gọi searchCustomer với prefix "/mkh"
+  // → tìm trong trường "ma_kh" bằng LIKE
+  var result = searchCustomer(CONFIG.TEST_CHAT_ID, "/mkh " + code);
+
+  Logger.log("Tìm thấy: " + result.totalFound);
+  if (result.rows.length > 0) {
+    Logger.log("KH đầu: " + result.rows[0][CONFIG.CI_MA_KH]
+      + " - " + result.rows[0][CONFIG.CI_TEN_KH]);
+  }
+
+  Logger.log("========== KẾT THÚC ==========");
+}
+
+
+// ╔════════════════════════════════════════════════════════════════════════════╗
+// ║  NHÓM 6: TEST GIAO DỊCH (Lịch sử chăm sóc khách hàng)                  ║
+// ╚════════════════════════════════════════════════════════════════════════════╝
+
+
+/**
+ * ============================================================
+ * test_getCustomerTasks — LẤY GIAO DỊCH CỦA 1 KHÁCH HÀNG
+ * ============================================================
+ *
+ * Mục đích:
+ *   Lấy lịch sử giao dịch (tasks) của 1 khách hàng cụ thể.
+ *   Giao dịch = cuộc gọi, email, gặp mặt, ghi chú... mà nhân viên ghi lại.
+ *
+ * ⚠️ CẦN SỬA: sttRec (mã nội bộ khách hàng)
+ *
+ * CÁCH LẤY sttRec:
+ *   1. Chạy test_searchCustomer() với từ khóa bất kỳ
+ *   2. Kết quả hiển thị dạng: [A000073082] TLP20855 - Công ty ABC
+ *   3. "A000073082" chính là sttRec (mã nội bộ, cột đầu tiên)
+ *   4. Copy giá trị đó → paste vào biến sttRec bên dưới
+ *
+ * LƯU Ý: sttRec (mã nội bộ) KHÁC với ma_kh (mã hiển thị):
+ *   - sttRec = "A000073082" (FBM dùng nội bộ, bắt đầu bằng "A")
+ *   - ma_kh  = "TLP20855"   (user nhìn thấy trên giao diện)
+ *
+ * YÊU CẦU: TEST_CHAT_ID + session
+ *
+ * KẾT QUẢ MONG ĐỢI:
+ *   Số giao dịch: 5
+ *     1. Gọi điện | Hoàn thành | 09/01/2025 14:21
+ *     2. Email    | Đang xử lý | 08/01/2025 10:15
+ *     ...
+ * ============================================================
+ */
+function test_getCustomerTasks() {
+  // ================================================================
+  // ← SỬA MÃ NỘI BỘ KHÁCH HÀNG Ở ĐÂY
+  // ================================================================
+  // sttRec = mã nội bộ FBM (cột đầu tiên khi tìm khách hàng)
+  // Bắt đầu bằng "A" + 9 chữ số
+  // Lấy từ kết quả test_searchCustomer()
+  // ================================================================
+  var sttRec = "A000073082";      // ← SỬA: mã nội bộ KH (lấy từ search)
+  // ================================================================
+
+  Logger.log("========== TEST GIAO DỊCH ==========");
+  Logger.log("stt_rec: " + sttRec);
+
+  if (!CONFIG.TEST_CHAT_ID) {
+    Logger.log("❌ Chưa điền CONFIG.TEST_CHAT_ID");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+  var session = getSession(CONFIG.TEST_CHAT_ID);
+  if (!session) {
+    Logger.log("❌ Chưa có session — chạy test_loginAndSaveSession() trước");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+
+  // --------------------------------------------------------
+  // Gọi getCustomerTasks() — FBMQuery.gs
+  // --------------------------------------------------------
+  // getCustomerTasks(chatId, sttRec) sẽ:
+  //   1. Tạo payload với controller = "zccrAccountTask"
+  //   2. externalKey: [{ Name: "stt_rec", Value: sttRec }]
+  //   3. Gọi callFBMApi() → qua proxy → FBM API GetGridViewPage
+  //   4. Trả về mảng rows (mỗi row là 1 giao dịch)
+  //
+  // Mỗi giao dịch (row) là mảng giá trị, index theo CONFIG:
+  //   row[TI_ID]           = mã giao dịch
+  //   row[TI_LOAI]         = loại giao dịch
+  //   row[TI_HANH_DONG]    = "Gọi điện", "Email", "Gặp mặt"...
+  //   row[TI_NOI_DUNG]     = nội dung chi tiết
+  //   row[TI_NGAY_TAO]     = "/Date(1767927660000)/" (ASP.NET format)
+  //   row[TI_NGAY_HEN]     = ngày hẹn
+  //   row[TI_TRANG_THAI]   = "Hoàn thành", "Đang xử lý"...
+  //   row[TI_NGUOI_TAO_TEN]= "Lê Phương Thảo" (tên người tạo)
+  //   row[TI_NGUOI_TAO_MA] = mã người tạo
+  //   row[TI_NGAY_CAP_NHAT]= ngày cập nhật cuối
+  //   row[TI_STT]          = số thứ tự
+  // --------------------------------------------------------
+  var taskResult = getCustomerTasks(CONFIG.TEST_CHAT_ID, sttRec);
+  var tasks = taskResult.rows || [];
+  var taskTotal = taskResult.totalRowCount || 0;
+
+  Logger.log("Số giao dịch: " + taskTotal + " (hiển thị: " + tasks.length + ")");
+
+  if (tasks.length > 0) {
+    // Hiển thị tối đa 5 giao dịch đầu
+    var displayCount = Math.min(tasks.length, 5);
+    for (var i = 0; i < displayCount; i++) {
+      var task = tasks[i];
+      // aspDateToDatetime chuyển "/Date(1767927660000)/" → "09/01/2025 14:21"
+      var ngayTao = aspDateToDatetime(task[CONFIG.TI_NGAY_TAO]);
+      Logger.log("  " + (i + 1) + ". "
+        + (task[CONFIG.TI_HANH_DONG] || "?")
+        + " | " + (task[CONFIG.TI_TRANG_THAI] || "?")
+        + " | " + ngayTao
+        + " | " + (task[CONFIG.TI_NGUOI_TAO_TEN] || "?"));
+    }
+    if (tasks.length > 5) {
+      Logger.log("  ... và " + (tasks.length - 5) + " giao dịch nữa");
+    }
+  } else {
+    Logger.log("  Không có giao dịch nào cho KH này.");
+  }
+
+  Logger.log("========== KẾT THÚC ==========");
+}
+
+
+// ╔════════════════════════════════════════════════════════════════════════════╗
+// ║  NHÓM 7: TEST TOÀN BỘ LUỒNG (End-to-End)                                ║
+// ╚════════════════════════════════════════════════════════════════════════════╝
+
+
+/**
+ * ============================================================
+ * test_fullFlow — TÌM KIẾM + FORMAT + HIỂN THỊ (TRONG LOG)
+ * ============================================================
+ *
+ * Mục đích:
+ *   Mô phỏng toàn bộ luồng xử lý khi user nhắn tin cho bot:
+ *     1. searchCustomer() → tìm KH trong FBM
+ *     2. formatSearchResult() → format kết quả thành tin nhắn Zalo
+ *     3. Logger.log → hiển thị tin nhắn (KHÔNG gửi lên Zalo)
+ *
+ *   So sánh với test_fullFlowToZalo:
+ *   - test_fullFlow: chỉ xem trong Execution Log (an toàn, không gửi tin)
+ *   - test_fullFlowToZalo: gửi thật lên Zalo (nhận tin trên điện thoại)
+ *
+ * ⚠️ CẦN SỬA: keyword
+ * YÊU CẦU: TEST_CHAT_ID + session
+ *
+ * KẾT QUẢ MONG ĐỢI:
+ *   --- Tin nhắn 1/1 ---
+ *   🔍 Tìm kiếm: "fast"
+ *   ✅ Tìm thấy 1 kết quả
+ *   ═══════════════════
+ *   🏢 Công ty Fast Business
+ *   📋 Mã KH: TLP20855
+ *   ...
+ * ============================================================
+ */
+function test_fullFlow() {
+  // ================================================================
+  // ← SỬA TỪ KHÓA Ở ĐÂY
+  // ================================================================
+  var keyword = "fast";           // ← SỬA: từ khóa tìm kiếm
+  // ================================================================
+
+  Logger.log("========== TEST FULL FLOW ==========");
+  Logger.log("Từ khóa: \"" + keyword + "\"");
+
+  if (!CONFIG.TEST_CHAT_ID) {
+    Logger.log("❌ Chưa điền CONFIG.TEST_CHAT_ID");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+  var session = getSession(CONFIG.TEST_CHAT_ID);
+  if (!session) {
+    Logger.log("❌ Chưa có session — chạy test_loginAndSaveSession() trước");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+
+  // --------------------------------------------------------
+  // Bước 1: Tìm kiếm KH trong FBM
+  // --------------------------------------------------------
+  // searchCustomer() trả về: { rows, totalFound, keyword }
+  // --------------------------------------------------------
+  var result = searchCustomer(CONFIG.TEST_CHAT_ID, keyword);
+  Logger.log("Tìm thấy: " + result.totalFound + " khách hàng");
+
+  // --------------------------------------------------------
+  // Bước 2: Format kết quả thành tin nhắn Zalo
+  // --------------------------------------------------------
+  // formatSearchResult() (Formatter.gs) chuyển rows thành mảng string.
+  // Mỗi string = 1 tin nhắn Zalo (tối đa 2000 ký tự).
+  //
+  // Logic format:
+  //   0 kết quả → "❌ Không tìm thấy..." + gợi ý
+  //   1 kết quả → chi tiết KH + giao dịch (gọi getCustomerTasks)
+  //   >1 kết quả → danh sách ngắn (mã KH, tên, MST, SĐT)
+  //   >10 kết quả → hiển thị 10 đầu + cảnh báo
+  // --------------------------------------------------------
+  var messages = formatSearchResult(result, CONFIG.TEST_CHAT_ID);
+
+  // --------------------------------------------------------
+  // Bước 3: Hiển thị tin nhắn trong Execution Log
+  // --------------------------------------------------------
+  // Giống hệt những gì user sẽ thấy trên Zalo
+  // Nhưng chỉ hiển thị ở đây, KHÔNG gửi lên Zalo
+  // --------------------------------------------------------
+  for (var i = 0; i < messages.length; i++) {
+    Logger.log("\n--- Tin nhắn " + (i + 1) + "/" + messages.length
+      + " (" + messages[i].length + " ký tự) ---");
+    Logger.log(messages[i]);
+  }
+
+  Logger.log("\n========== KẾT THÚC ==========");
+}
+
+
+/**
+ * ============================================================
+ * test_fullFlowToZalo — TÌM KIẾM + FORMAT + GỬI LÊN ZALO
+ * ============================================================
+ *
+ * Mục đích:
+ *   Giống test_fullFlow nhưng GỬI KẾT QUẢ THẬT LÊN ZALO.
+ *   Bạn sẽ nhận được tin nhắn trên Zalo y như user thật.
+ *
+ * ⚠️ CHÚ Ý: Hàm này GỬI TIN NHẮN THẬT lên Zalo!
+ *   Mỗi lần chạy = bot gửi tin nhắn cho bạn trên Zalo.
+ *   Không nên chạy liên tục (tránh spam).
+ *
+ * ⚠️ CẦN SỬA: keyword
+ * YÊU CẦU: TEST_CHAT_ID + session
+ *
+ * KẾT QUẢ MONG ĐỢI:
+ *   ✅ Đã gửi! Kiểm tra Zalo.
+ *   (Trên Zalo nhận được kết quả tìm kiếm đầy đủ)
+ * ============================================================
+ */
+function test_fullFlowToZalo() {
+  // ================================================================
+  // ← SỬA TỪ KHÓA Ở ĐÂY
+  // ================================================================
+  var keyword = "fast";           // ← SỬA: từ khóa tìm kiếm
+  // ================================================================
+
+  Logger.log("========== TEST FULL FLOW → ZALO ==========");
+
+  if (!CONFIG.TEST_CHAT_ID) {
+    Logger.log("❌ Chưa điền CONFIG.TEST_CHAT_ID");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+  var session = getSession(CONFIG.TEST_CHAT_ID);
+  if (!session) {
+    Logger.log("❌ Chưa có session — chạy test_loginAndSaveSession() trước");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+
+  // Bước 1: Tìm kiếm
+  var result = searchCustomer(CONFIG.TEST_CHAT_ID, keyword);
+  Logger.log("Tìm thấy: " + result.totalFound + " khách hàng");
+
+  // Bước 2: Format
+  var messages = formatSearchResult(result, CONFIG.TEST_CHAT_ID);
+  Logger.log("Số tin nhắn sẽ gửi: " + messages.length);
+
+  // Bước 3: Gửi lên Zalo
+  // sendMessages() (ZaloAPI.gs) gửi từng tin nhắn trong mảng
+  Logger.log("Đang gửi lên Zalo...");
+  sendMessages(CONFIG.TEST_CHAT_ID, messages);
+
+  Logger.log("✅ Đã gửi " + messages.length + " tin nhắn! Kiểm tra Zalo.");
+  Logger.log("========== KẾT THÚC ==========");
+}
+
+
+// ╔════════════════════════════════════════════════════════════════════════════╗
+// ║  NHÓM 8: TEST MÃ HÓA PASSWORD                                            ║
+// ╚════════════════════════════════════════════════════════════════════════════╝
+
+
+/**
+ * ============================================================
+ * test_encrypt — TEST MÃ HÓA & GIẢI MÃ PASSWORD
+ * ============================================================
+ *
+ * Mục đích:
+ *   Kiểm tra 3 hàm trong Utils.gs:
+ *   - encryptPassword(password, key) → "🔐hex🔐"
+ *   - decryptPassword(encrypted, key) → password gốc
+ *   - isEncrypted(value) → true/false
+ *
+ * Thuật toán XOR:
+ *   1. Duyệt từng ký tự password
+ *   2. XOR charCode với charCode của key (lặp vòng)
+ *   3. Kết quả → hex 2 ký tự → ghép → bọc "🔐...🔐"
+ *
+ * VD:
+ *   password = "abc", key = "123"
+ *   a XOR 1 = 97 XOR 49 = 80 → "50"
+ *   b XOR 2 = 98 XOR 50 = 80 → "50" (trùng nhưng giải mã vẫn đúng)
+ *   c XOR 3 = 99 XOR 51 = 80 → "50"
+ *   → "🔐505050🔐"
+ *
+ * KHÔNG CẦN SỬA GÌ (dùng giá trị test cố định).
+ *
+ * KẾT QUẢ MONG ĐỢI:
+ *   Password gốc : matkhau123
+ *   Đã mã hóa    : 🔐4a2f8b...🔐
+ *   Giải mã       : matkhau123
+ *   isEncrypted() : true
+ *   Khớp          : ✅ Khớp!
+ * ============================================================
+ */
+function test_encrypt() {
+  Logger.log("========== TEST MÃ HÓA ==========");
+
+  // --------------------------------------------------------
+  // Giá trị test — KHÔNG cần sửa
+  // --------------------------------------------------------
+  // password: chuỗi bất kỳ để test mã hóa
+  // key: giả lập timestamp (số lớn dạng string)
+  //      Trong thực tế, key = String(Date.now()) = "1774707655988"
+  // --------------------------------------------------------
+  var password = "matkhau123";           // Password test
+  var key = "1774707655988";             // Key test (giả lập timestamp)
+
+  // Mã hóa: password + key → "🔐hex🔐"
+  var encrypted = encryptPassword(password, key);
+
+  // Giải mã: "🔐hex🔐" + key → password gốc
+  var decrypted = decryptPassword(encrypted, key);
+
+  // Kiểm tra đã mã hóa chưa
+  var isEnc = isEncrypted(encrypted);
+
+  // Hiển thị kết quả
+  Logger.log("Password gốc : " + password);
+  Logger.log("Key (salt)   : " + key);
+  Logger.log("Đã mã hóa    : " + encrypted);
+  Logger.log("Giải mã       : " + decrypted);
+  Logger.log("isEncrypted() : " + isEnc);
+  Logger.log("Khớp          : " + (password === decrypted ? "✅ Khớp!" : "❌ KHÔNG khớp!"));
+
+  // Test thêm: chuỗi chưa mã hóa phải trả về false
+  var plainTextCheck = isEncrypted("matkhau123");
+  Logger.log("isEncrypted('matkhau123') : " + plainTextCheck + " (mong đợi: false)");
+
+  // Test: chuỗi rỗng phải trả về false
+  var emptyCheck = isEncrypted("");
+  Logger.log("isEncrypted('') : " + emptyCheck + " (mong đợi: false)");
+
+  Logger.log("========== KẾT THÚC ==========");
+}
+
+
+// ╔════════════════════════════════════════════════════════════════════════════╗
+// ║  NHÓM 9: TEST SESSION (Đọc/ghi session trong Google Sheet)               ║
+// ╚════════════════════════════════════════════════════════════════════════════╝
+
+
+/**
+ * ============================================================
+ * test_getSession — ĐỌC SESSION TỪ GOOGLE SHEET
+ * ============================================================
+ *
+ * Mục đích:
+ *   Đọc và hiển thị session đã lưu trong tab Sessions cho TEST_CHAT_ID.
+ *   Kiểm tra session có hợp lệ không, còn hạn không.
+ *
+ * Session lưu trong sheet Sessions với 10 cột:
+ *   A: chat_id    B: display_name  C: fbm_user     D: fbm_password
+ *   E: encrypt_salt  F: fbm_cookie  G: database    H: unit
+ *   I: user_id    J: login_time
+ *
+ * YÊU CẦU: TEST_CHAT_ID đã điền
+ *
+ * KẾT QUẢ MONG ĐỢI:
+ *   ✅ Tìm thấy session:
+ *      Chat ID : 1234567890
+ *      Tên     : Test User
+ *      FBM User: anhlt
+ *      Database: FHN_CRM_App
+ *      Còn hạn : 20 phút
+ * ============================================================
+ */
+function test_getSession() {
+  Logger.log("========== TEST SESSION ==========");
+
+  if (!CONFIG.TEST_CHAT_ID) {
+    Logger.log("❌ Chưa điền CONFIG.TEST_CHAT_ID trong Config.gs");
+    Logger.log("   → Xem hướng dẫn trong test_sendMessage()");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+
+  // --------------------------------------------------------
+  // Đọc session từ sheet Sessions
+  // --------------------------------------------------------
+  // getSession(chatId) (SessionManager.gs) sẽ:
+  //   1. Mở Google Sheet → tab Sessions
+  //   2. Tìm dòng có cột A (chat_id) = TEST_CHAT_ID
+  //   3. Parse dòng đó thành object session
+  //   4. Trả về session hoặc null nếu không tìm thấy
+  // --------------------------------------------------------
+  var session = getSession(CONFIG.TEST_CHAT_ID);
+
+  if (session) {
+    Logger.log("✅ Tìm thấy session:");
+    Logger.log("   Chat ID : " + session.chatId);
+    Logger.log("   Tên     : " + session.displayName);
+    Logger.log("   FBM User: " + session.fbmUser);
+    Logger.log("   Database: " + session.database);
+    Logger.log("   Unit    : " + session.unit);
+    Logger.log("   UserID  : " + session.userId);
+    Logger.log("   Login   : " + new Date(session.loginTime).toLocaleString("vi-VN"));
+
+    // Hiển thị cookie (cắt ngắn vì cookie dài)
+    if (session.fbmCookie) {
+      Logger.log("   Cookie  : " + session.fbmCookie.substring(0, 60) + "...");
+    } else {
+      Logger.log("   Cookie  : ❌ KHÔNG CÓ (chưa login hoặc bị xóa)");
+    }
+
+    // Hiển thị password (đã mã hóa hay chưa)
+    if (session.fbmPassword) {
+      var isPwdEncrypted = isEncrypted(session.fbmPassword);
+      Logger.log("   Password: " + (isPwdEncrypted ? "🔐 Đã mã hóa" : "⚠️ Plaintext!"));
+    }
+
+    // --------------------------------------------------------
+    // Kiểm tra session còn hạn không
+    // --------------------------------------------------------
+    // SESSION_TTL = 25 * 60 * 1000 = 1,500,000 ms = 25 phút
+    // Cookie FBM hết hạn sau 30 phút
+    // GAS auto re-login ở phút 25 (trước khi cookie chết)
+    // --------------------------------------------------------
+    var age = Date.now() - session.loginTime;
+    var remaining = CONFIG.SESSION_TTL - age;
+
+    if (remaining > 0) {
+      Logger.log("   Còn hạn : " + Math.round(remaining / 60000) + " phút"
+        + " (hết hạn lúc " + new Date(session.loginTime + CONFIG.SESSION_TTL).toLocaleTimeString("vi-VN") + ")");
+    } else {
+      Logger.log("   ⚠️ Đã hết hạn " + Math.round(Math.abs(remaining) / 60000) + " phút trước");
+      Logger.log("   → Khi gọi API, hệ thống sẽ tự re-login bằng password đã lưu");
+    }
+  } else {
+    Logger.log("❌ Không tìm thấy session cho TEST_CHAT_ID: " + CONFIG.TEST_CHAT_ID);
+    Logger.log("   → Cách 1: Chạy test_loginAndSaveSession() trong file Test.gs");
+    Logger.log("   → Cách 2: Nhắn /login user|pass cho bot trên Zalo");
+  }
+
+  Logger.log("========== KẾT THÚC ==========");
+}
+
+
+// ╔════════════════════════════════════════════════════════════════════════════╗
+// ║  NHÓM 10: TEST GHI LOG                                                    ║
+// ╚════════════════════════════════════════════════════════════════════════════╝
+
+
+/**
+ * ============================================================
+ * test_logToSheet — TEST GHI LOG VÀO GOOGLE SHEET
+ * ============================================================
+ *
+ * Mục đích:
+ *   Kiểm tra hàm logToSheet() (LogService.gs) có ghi được vào
+ *   tab "Log" trong Google Sheet không.
+ *
+ * logToSheet(source, message, data) ghi 1 dòng vào sheet Log:
+ *   Cột A: Thời gian (Date object)
+ *   Cột B: Source (VD: "TEST", "FBM_AUTH", "WEBHOOK")
+ *   Cột C: Message (mô tả ngắn)
+ *   Cột D: Data (dữ liệu chi tiết, có thể là JSON string)
+ *
+ * SAU KHI CHẠY:
+ *   Mở Google Sheet → tab Log → xem dòng cuối cùng
+ *   Phải thấy Source = "TEST", Message = "Test ghi log..."
+ *
+ * KHÔNG CẦN SỬA GÌ.
+ * ============================================================
+ */
+function test_logToSheet() {
+  Logger.log("========== TEST GHI LOG ==========");
+
+  // --------------------------------------------------------
+  // Ghi 1 dòng log vào sheet Log
+  // --------------------------------------------------------
+  // Tham số:
+  //   source  = "TEST" (nhãn để phân loại log)
+  //   message = mô tả ngắn gọn
+  //   data    = dữ liệu chi tiết (JSON string hoặc text)
+  //
+  // logToSheet tự giới hạn data ≤ 5000 ký tự (tránh vượt cell limit)
+  // Nếu sheet Log chưa tồn tại → tự tạo với header
+  // --------------------------------------------------------
+  var testData = JSON.stringify({
+    action: "test_logToSheet",
+    time: new Date().toISOString(),
+    proxyUrl: getProxyUrl() || "KHÔNG CÓ",
+    testChatId: CONFIG.TEST_CHAT_ID || "CHƯA ĐIỀN"
+  });
+
+  logToSheet("TEST", "Test ghi log từ Test.gs — nếu thấy dòng này trong Sheet thì OK!", testData);
+
+  Logger.log("✅ Đã ghi log! Kiểm tra:");
+  Logger.log("   1. Mở Google Sheet");
+  Logger.log("   2. Chuyển tới tab 'Log'");
+  Logger.log("   3. Kéo xuống dòng cuối cùng");
+  Logger.log("   4. Phải thấy: Source='TEST', Message='Test ghi log...'");
+
+  Logger.log("========== KẾT THÚC ==========");
+}
+
+
+// ╔════════════════════════════════════════════════════════════════════════════╗
+// ║  NHÓM 11: TEST DEBUG (Dành cho debug proxy + login chi tiết)              ║
+// ╚════════════════════════════════════════════════════════════════════════════╝
+
+
+/**
+ * ============================================================
+ * test_loginDirect — LOGIN TRỰC TIẾP QUA PROXY (BỎ QUA loginFBM)
+ * ============================================================
+ *
+ * Mục đích:
+ *   Bỏ qua hàm loginFBM() (FBMAuth.gs), gửi thẳng payload tới FBM
+ *   qua proxy để debug khi loginFBM() bị lỗi.
+ *
+ * Khi nào dùng:
+ *   - loginFBM() trả về null nhưng không biết lỗi ở đâu
+ *   - Muốn so sánh request từ GAS với request từ trình duyệt
+ *   - Debug proxy: xem proxy có forward đúng không
+ *
+ * ⚠️ CẦN SỬA: username, password (cùng giá trị với test_loginFBM)
+ *
+ * Luồng hoạt động:
+ *   1. GET Login.aspx → lấy cookie + salt (giống bước 1 của loginFBM)
+ *   2. Hash password: MD5(salt + MD5(password))
+ *   3. Build payload GIỐNG HỆT trình duyệt
+ *   4. Gửi qua proxy bằng UrlFetchApp.fetch (KHÔNG qua callFBMViaProxy)
+ *   5. Hiển thị raw response
+ *
+ * Điểm khác biệt với test_loginFBM:
+ *   - test_loginFBM gọi loginFBM() → trừu tượng, chỉ thấy kết quả
+ *   - test_loginDirect gửi thủ công → thấy raw response, dễ debug
+ * ============================================================
+ */
+function test_loginDirect() {
+  // ================================================================
+  // ← SỬA THÔNG TIN ĐĂNG NHẬP Ở ĐÂY
+  // ================================================================
+  var username = "anhlt";         // ← SỬA: tên đăng nhập FBM
+  var password = "1234567a@";     // ← SỬA: mật khẩu FBM
+  // ================================================================
+
+  Logger.log("========== TEST LOGIN TRỰC TIẾP ==========");
+
+  // --------------------------------------------------------
+  // Bước 1: Đọc proxy URL và kiểm tra proxy
+  // --------------------------------------------------------
+  var proxyUrl = getProxyUrl();
+  if (!proxyUrl) {
+    Logger.log("❌ Không có proxy URL — chạy test_proxy() trước");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+
+  var base = CONFIG.FBM_BASE_URL;  // "https://fbo.com.vn:8888"
+
+  // --------------------------------------------------------
+  // Bước 2: GET Login page → lấy cookie + salt
+  // --------------------------------------------------------
+  // Giống bước 1 của loginFBM() nhưng dùng callFBMViaProxy trực tiếp
+  // --------------------------------------------------------
+  Logger.log("Bước 1: GET " + base + CONFIG.FBM_LOGIN_PAGE);
+
+  var res1 = callFBMViaProxy(base + CONFIG.FBM_LOGIN_PAGE, "GET", {});
+  if (!res1 || res1.status !== 200) {
+    Logger.log("❌ Bước 1 lỗi: " + JSON.stringify(res1));
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+
+  // Lấy cookie từ response
+  var cookie = res1.setCookie || "";
+  Logger.log("Cookie: " + cookie.substring(0, 60));
+
+  // Trích xuất salt từ HTML
+  var html = res1.body || "";
+
+  // Regex tìm salt trong HTML login page của FBM
+  // FBM nhúng salt dạng: eval('\' xxxx \'+\' yyyy \'')
+  // Trong JSON encoding: \\u0027 = dấu nháy đơn
+  var saltRegex = /u0027([a-f0-9]{4,}).*?u0027\+.*?u0027([a-f0-9]{4,})/;
+  var saltMatch = html.match(saltRegex);
+
+  if (!saltMatch) {
+    Logger.log("❌ Không tìm thấy salt trong HTML");
+    Logger.log("   HTML (300 ký tự đầu): " + html.substring(0, 300));
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+
+  // Salt = phần 1 + phần 2
+  var salt = saltMatch[1] + saltMatch[2];
+  Logger.log("Salt: " + salt);
+
+  // --------------------------------------------------------
+  // Bước 3: Hash password 2 lần
+  // --------------------------------------------------------
+  // md5Password = MD5("1234567a@")
+  // hashedPassword = MD5(salt + md5Password) = MD5("6c6dd4446a2d" + "5b90b0...")
+  // --------------------------------------------------------
+  var md5Password = md5(password);
+  var hashedPassword = md5(salt + md5Password);
+
+  Logger.log("MD5(password): " + md5Password.substring(0, 16) + "...");
+  Logger.log("MD5(salt+md5): " + hashedPassword.substring(0, 16) + "...");
+
+  // --------------------------------------------------------
+  // Bước 4: Tạo payload và gửi qua proxy
+  // --------------------------------------------------------
+  // Build payload GIỐNG HỆT request từ trình duyệt khi login FBM
+  // --------------------------------------------------------
+  var loginPayload = {
+    user: username,
+    password: hashedPassword,
+    database: "FHN_CRM_App",
+    unit: "CTY",
+    language: "v",
+    value: salt,
+    force: true,
+    storage: true
+  };
+
+  // Proxy payload: GAS → proxy → FBM
+  var proxyPayload = {
+    url: base + CONFIG.FBM_LOGIN_API,   // "https://fbo.com.vn:8888/Main/Login.aspx/Login"
+    method: "POST",
+    headers: {
+      "Cookie": cookie,
+      "Content-Type": "application/json; charset=UTF-8",
+      "Referer": base + CONFIG.FBM_LOGIN_PAGE,
+      "Accept": "*/*",
+      "Accept-Language": "vi",
+      "Cache-Control": "no-cache",
+      "Pragma": "no-cache"
+    },
+    body: JSON.stringify(loginPayload)
+  };
+
+  Logger.log("Đang gửi login request...");
+  Logger.log("URL: " + proxyPayload.url);
+  Logger.log("Body: " + JSON.stringify(loginPayload).substring(0, 200));
+
+  // Gửi thẳng tới proxy bằng UrlFetchApp (KHÔNG qua callFBMViaProxy)
+  var res = UrlFetchApp.fetch(proxyUrl, {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify(proxyPayload),
+    muteHttpExceptions: true
+  });
+
+  // --------------------------------------------------------
+  // Bước 5: Hiển thị kết quả thô từ FBM
+  // --------------------------------------------------------
+  var rawResult = res.getContentText();
+  Logger.log("=== KẾT QUẢ TỪ FBM ===");
+  Logger.log(rawResult.substring(0, 500));
+
+  // Parse JSON nếu có thể
+  try {
+    var parsed = JSON.parse(rawResult);
+    Logger.log("Status: " + parsed.status);
+    Logger.log("setCookie: " + (parsed.setCookie || "KHÔNG"));
+    Logger.log("Body: " + (parsed.body || "").substring(0, 200));
+
+    // Kiểm tra login thành công hay thất bại
+    if (parsed.body && parsed.body.indexOf('"d":true') > -1) {
+      Logger.log("✅ LOGIN THÀNH CÔNG! (d:true)");
+    } else if (parsed.body && parsed.body.indexOf('"d":null') > -1) {
+      Logger.log("❌ LOGIN THẤT BẠI! (d:null) — sai username hoặc password");
+    } else {
+      Logger.log("⚠️ Response không mong đợi — cần kiểm tra body");
+    }
+  } catch (parseError) {
+    Logger.log("⚠️ Không parse được JSON: " + parseError.message);
+  }
+
+  Logger.log("========== KẾT THÚC ==========");
+}
+
+
+/**
+ * ============================================================
+ * test_debugLogin — DEBUG CHI TIẾT TỪNG BƯỚC LOGIN
+ * ============================================================
+ *
+ * Mục đích:
+ *   Debug chi tiết nhất — hiển thị CHÍNH XÁC:
+ *   - Cookie proxy trả về ở bước 1 (type, length, nội dung)
+ *   - Cookie GAS gửi lại ở bước 4 (so sánh có khớp không)
+ *   - Full JSON payload gửi tới proxy
+ *   - Raw response từ FBM
+ *
+ *   Dùng khi loginFBM() hoặc test_loginDirect() thất bại
+ *   và cần tìm CHÍNH XÁC vấn đề ở đâu.
+ *
+ * ⚠️ CẦN SỬA: username, password
+ * ============================================================
+ */
+function test_debugLogin() {
+  // ================================================================
+  // ← SỬA THÔNG TIN ĐĂNG NHẬP Ở ĐÂY
+  // ================================================================
+  var username = "anhlt";         // ← SỬA: tên đăng nhập FBM
+  var password = "1234567a@";     // ← SỬA: mật khẩu FBM
+  // ================================================================
+
+  Logger.log("========== DEBUG LOGIN ==========");
+
+  var proxyUrl = getProxyUrl();
+  if (!proxyUrl) {
+    Logger.log("❌ Không có proxy URL");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+
+  var base = CONFIG.FBM_BASE_URL;
+
+  // === BƯỚC 1: Lấy cookie chi tiết ===
+  Logger.log("--- BƯỚC 1: GET Login Page ---");
+
+  var r1 = UrlFetchApp.fetch(proxyUrl, {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify({
+      url: base + CONFIG.FBM_LOGIN_PAGE,
+      method: "GET",
+      headers: {}
+    }),
+    muteHttpExceptions: true
+  });
+
+  var d1 = JSON.parse(r1.getContentText());
+  Logger.log("Status: " + d1.status);
+  Logger.log("setCookie CHÍNH XÁC: [" + d1.setCookie + "]");
+  Logger.log("setCookie type: " + typeof d1.setCookie);
+  Logger.log("setCookie length: " + (d1.setCookie ? d1.setCookie.length : 0));
+
+  // Tìm salt
+  var html = d1.body || "";
+  var saltRegex = /u0027([a-f0-9]{4,}).*?u0027\+.*?u0027([a-f0-9]{4,})/;
+  var saltMatch = html.match(saltRegex);
+
+  if (!saltMatch) {
+    Logger.log("❌ Không tìm thấy salt");
+    Logger.log("HTML (300 ký tự): " + html.substring(0, 300));
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+
+  var salt = saltMatch[1] + saltMatch[2];
+  Logger.log("Salt: " + salt);
+
+  var cookie = d1.setCookie;
+
+  // === BƯỚC 4: Login — log CHI TIẾT payload ===
+  Logger.log("\n--- BƯỚC 4: Login ---");
+
+  var hashedPassword = md5(salt + md5(password));
+
+  // Body gửi tới FBM
+  var loginBody = JSON.stringify({
+    user: username,
+    password: hashedPassword,
+    database: "FHN_CRM_App",
+    unit: "CTY",
+    language: "v",
+    value: salt,
+    force: true,
+    storage: true
+  });
+
+  // Payload gửi tới proxy
+  var proxyPayload = {
+    url: base + CONFIG.FBM_LOGIN_API,
+    method: "POST",
+    headers: {
+      "Cookie": cookie,
+      "Content-Type": "application/json; charset=UTF-8",
+      "Referer": base + CONFIG.FBM_LOGIN_PAGE
+    },
+    body: loginBody
+  };
+
+  // Log CHÍNH XÁC từng field
+  Logger.log("url: " + proxyPayload.url);
+  Logger.log("method: " + proxyPayload.method);
+  Logger.log("headers.Cookie: [" + proxyPayload.headers.Cookie + "]");
+  Logger.log("headers.Content-Type: [" + proxyPayload.headers["Content-Type"] + "]");
+  Logger.log("headers.Referer: [" + proxyPayload.headers.Referer + "]");
+  Logger.log("body type: " + typeof loginBody);
+  Logger.log("body length: " + loginBody.length);
+  Logger.log("body: " + loginBody.substring(0, 300));
+
+  // Full JSON gửi tới proxy
+  var fullPayloadJson = JSON.stringify(proxyPayload);
+  Logger.log("\nFull proxy JSON length: " + fullPayloadJson.length);
+  Logger.log("Full proxy JSON (500 ký tự): " + fullPayloadJson.substring(0, 500));
+
+  // Gửi request
+  Logger.log("\nĐang gửi...");
+
+  var r4 = UrlFetchApp.fetch(proxyUrl, {
+    method: "post",
+    contentType: "application/json",
+    payload: fullPayloadJson,
+    muteHttpExceptions: true
+  });
+
+  var d4 = JSON.parse(r4.getContentText());
+
+  Logger.log("\n=== KẾT QUẢ TỪ FBM ===");
+  Logger.log("status: " + d4.status);
+  Logger.log("setCookie: " + (d4.setCookie || "KHÔNG"));
+  Logger.log("body: " + (d4.body || "").substring(0, 300));
+
+  // Phân tích kết quả
+  if (d4.body && d4.body.indexOf('"d":true') > -1) {
+    Logger.log("✅ LOGIN THÀNH CÔNG!");
+  } else if (d4.status === 500) {
+    Logger.log("❌ HTTP 500 — có thể do:");
+    Logger.log("   1. Cookie bị mất/sai giữa bước 1 và bước 4");
+    Logger.log("   2. Body JSON format sai (thiếu escape /)");
+    Logger.log("   3. FBM server lỗi tạm thời");
+  } else {
+    Logger.log("⚠️ Response không mong đợi — kiểm tra body ở trên");
+  }
+
+  Logger.log("========== KẾT THÚC ==========");
+}
+
+
+/**
+ * ============================================================
+ * test_loginBodyAsObject — DEBUG: GỬI BODY DẠNG OBJECT
+ * ============================================================
+ *
+ * Mục đích:
+ *   Test proxy xử lý body dạng object (thay vì string đã stringify).
+ *   So sánh 2 cách:
+ *     - body = JSON.stringify({user:"anhlt",...})  → proxy nhận string
+ *     - body = {user:"anhlt",...}                  → proxy nhận object, tự stringify
+ *
+ *   Nếu cả 2 cách đều trả "d":true → proxy xử lý đúng cả 2 format.
+ *
+ * ⚠️ CẦN SỬA: username, password
+ * ============================================================
+ */
+function test_loginBodyAsObject() {
+  // ================================================================
+  // ← SỬA THÔNG TIN ĐĂNG NHẬP Ở ĐÂY
+  // ================================================================
+  var username = "anhlt";         // ← SỬA: tên đăng nhập FBM
+  var password = "1234567a@";     // ← SỬA: mật khẩu FBM
+  // ================================================================
+
+  Logger.log("========== TEST BODY AS OBJECT ==========");
+
+  var proxyUrl = getProxyUrl();
+  if (!proxyUrl) {
+    Logger.log("❌ Không có proxy URL");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+
+  var base = CONFIG.FBM_BASE_URL;
+
+  // Bước 1: Lấy cookie + salt
+  Logger.log("Bước 1: GET login page...");
+
+  var r1 = UrlFetchApp.fetch(proxyUrl, {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify({
+      url: base + CONFIG.FBM_LOGIN_PAGE,
+      method: "GET",
+      headers: {}
+    }),
+    muteHttpExceptions: true
+  });
+
+  var d1 = JSON.parse(r1.getContentText());
+  var cookie = d1.setCookie;
+  var html = d1.body || "";
+  var saltRegex = /u0027([a-f0-9]{4,}).*?u0027\+.*?u0027([a-f0-9]{4,})/;
+  var saltMatch = html.match(saltRegex);
+
+  if (!saltMatch) {
+    Logger.log("❌ Không tìm thấy salt");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+
+  var salt = saltMatch[1] + saltMatch[2];
+  Logger.log("Cookie: " + (cookie || "").substring(0, 50));
+  Logger.log("Salt: " + salt);
+
+  var hashedPassword = md5(salt + md5(password));
+
+  // Bước 2: Gửi body là OBJECT (không stringify)
+  // Proxy server.js sẽ xử lý: nếu body là object → tự JSON.stringify
+  var proxyPayload = {
+    url: base + CONFIG.FBM_LOGIN_API,
+    method: "POST",
+    headers: {
+      "Cookie": cookie,
+      "Content-Type": "application/json; charset=UTF-8",
+      "Referer": base + CONFIG.FBM_LOGIN_PAGE
+    },
+    body: {                           // ← OBJECT, không phải string
+      user: username,
+      password: hashedPassword,
+      database: "FHN_CRM_App",
+      unit: "CTY",
+      language: "v",
+      value: salt,
+      force: true,
+      storage: true
+    }
+  };
+
+  Logger.log("body type trong payload: " + typeof proxyPayload.body + " (mong đợi: object)");
+  Logger.log("Đang gửi...");
+
+  var r2 = UrlFetchApp.fetch(proxyUrl, {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify(proxyPayload),
+    muteHttpExceptions: true
+  });
+
+  var d2 = JSON.parse(r2.getContentText());
+  Logger.log("=== KẾT QUẢ (body as object) ===");
+  Logger.log("status: " + d2.status);
+  Logger.log("setCookie: " + (d2.setCookie || "KHÔNG"));
+  Logger.log("body: " + (d2.body ? d2.body.substring(0, 200) : "empty"));
+
+  if (d2.body && d2.body.indexOf('"d":true') > -1) {
+    Logger.log("✅ Proxy xử lý object body OK!");
+  }
+
+  Logger.log("========== KẾT THÚC ==========");
+}
+
+
+/**
+ * ============================================================
+ * test_loginOnProxy — TEST CHẾ ĐỘ LOGIN TRÊN PROXY (LEGACY)
+ * ============================================================
+ *
+ * Mục đích:
+ *   Test chế độ action="login" trên proxy — proxy xử lý toàn bộ
+ *   5 bước login thay vì GAS xử lý.
+ *
+ *   ⚠️ CHẾ ĐỘ NÀY KHÔNG CÒN DÙNG (legacy).
+ *   Hệ thống hiện tại dùng forward mode (GAS quản lý login).
+ *   Giữ lại hàm này để debug nếu cần.
+ *
+ * ⚠️ CẦN SỬA: username, password
+ * ============================================================
+ */
+function test_loginOnProxy() {
+  // ================================================================
+  // ← SỬA THÔNG TIN ĐĂNG NHẬP Ở ĐÂY
+  // ================================================================
+  var username = "anhlt";         // ← SỬA: tên đăng nhập FBM
+  var password = "1234567a@";     // ← SỬA: mật khẩu FBM
+  // ================================================================
+
+  Logger.log("========== TEST LOGIN ON PROXY (LEGACY) ==========");
+
+  var proxyUrl = getProxyUrl();
+  if (!proxyUrl) {
+    Logger.log("❌ Không có proxy URL");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+
+  // Hash password lần 1 trước khi gửi
+  // (proxy nhận md5Password, tự hash lần 2 với salt)
+  var md5Password = md5(password);
+
+  var payload = {
+    action: "login",               // Chế độ login (proxy xử lý toàn bộ)
+    baseUrl: CONFIG.FBM_BASE_URL,  // "https://fbo.com.vn:8888"
+    user: username,
+    md5Password: md5Password       // MD5 lần 1
+  };
+
+  Logger.log("Gửi tới proxy (action=login)...");
+
+  var res = UrlFetchApp.fetch(proxyUrl, {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  });
+
+  var result = res.getContentText();
+  Logger.log("Kết quả: " + result.substring(0, 500));
+
+  Logger.log("========== KẾT THÚC ==========");
+}

@@ -1,0 +1,76 @@
+/**
+ * ============================================================
+ * ZALO BOT API
+ * ============================================================
+ */
+
+function callZaloAPI(method, payload) {
+  var url = CONFIG.ZALO_API_BASE + CONFIG.BOT_TOKEN + "/" + method;
+  var options = {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify(payload || {}),
+    muteHttpExceptions: true,
+  };
+  try {
+    var response = UrlFetchApp.fetch(url, options);
+    var body = JSON.parse(response.getContentText());
+    if (!body.ok) {
+      logToSheet("ZALO_API", method + " error", body);
+    }
+    return body;
+  } catch (error) {
+    logToSheet("ZALO_API", method + " exception", error.message);
+    return { ok: false, description: error.message };
+  }
+}
+
+/** Gửi tin nhắn, tự cắt nếu quá dài */
+function sendMessage(chatId, text) {
+  if (!text) return;
+  var maxLen = CONFIG.ZALO_MAX_TEXT_LENGTH;
+  if (text.length > maxLen) {
+    text = text.substring(0, maxLen - 50) + "\n\n... (nội dung bị cắt bớt)";
+  }
+  return callZaloAPI("sendMessage", { chat_id: chatId, text: text });
+}
+
+/** Gửi nhiều tin nhắn liên tiếp */
+function sendMessages(chatId, messages) {
+  for (var i = 0; i < messages.length; i++) {
+    sendMessage(chatId, messages[i]);
+  }
+}
+
+/** Hiển thị "đang gõ..." */
+function sendTyping(chatId) {
+  return callZaloAPI("sendChatAction", { chat_id: chatId, action: "typing" });
+}
+
+function getMe() {
+  return callZaloAPI("getMe");
+}
+
+function setWebhook() {
+  if (!CONFIG.WEBHOOK_URL || CONFIG.WEBHOOK_URL.indexOf("/exec") === -1) {
+    Logger.log("❌ WEBHOOK_URL chưa điền hoặc không phải /exec");
+    return;
+  }
+  var result = callZaloAPI("setWebhook", {
+    url: CONFIG.WEBHOOK_URL,
+    secret_token: CONFIG.WEBHOOK_SECRET_TOKEN,
+  });
+  Logger.log("Webhook URL: " + CONFIG.WEBHOOK_URL);
+  Logger.log(JSON.stringify(result, null, 2));
+  return result;
+}
+
+function deleteWebhook() {
+  return callZaloAPI("deleteWebhook");
+}
+
+function getWebhookInfo() {
+  var r = callZaloAPI("getWebhookInfo");
+  Logger.log(JSON.stringify(r, null, 2));
+  return r;
+}

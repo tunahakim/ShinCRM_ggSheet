@@ -1,0 +1,81 @@
+/**
+ * ============================================================
+ * test_setWebhook — ĐĂNG KÝ WEBHOOK VỚI ZALO
+ * ============================================================
+ *
+ * Mục đích:
+ *   Đăng ký URL webhook để Zalo biết gửi tin nhắn tới đâu.
+ *   Khi user nhắn tin cho bot → Zalo gửi POST tới WEBHOOK_URL → GAS xử lý.
+ *
+ * ⚠️ BẮT BUỘC PHẢI CHẠY KHI DEPLOY MỚI/ DEPLOY LẠI
+ * ⚠️ CHỈ CẦN CHẠY 1 LẦN (hoặc khi đổi URL deploy).
+ * ⚠️ Ở file test.gd có 1 hàm test y hệt, không khác gì.
+ *
+ * TRƯỚC KHI CHẠY:
+ *   1. Deploy Web App trong Apps Script:
+ *      • Chọn Deploy → New deployment → Web app
+ *      • Execute as: Me
+ *      • Who has access: Anyone
+ *      • Copy URL dạng: https://script.google.com/macros/s/.../exec
+ *   2. Paste URL vào CONFIG.WEBHOOK_URL trong Config.gs
+ *   3. Điền CONFIG.WEBHOOK_SECRET_TOKEN (chuỗi bất kỳ, VD: "mysecret123")
+ *   4. Lưu Config.gs (Ctrl+S)
+ *
+ * KẾT QUẢ MONG ĐỢI:
+ *   ✅ Webhook đã đăng ký! URL: https://script.google.com/.../exec
+ *
+ * SAU KHI ĐĂNG KÝ:
+ *   - Zalo sẽ gửi tin nhắn tới WEBHOOK_URL
+ *   - GAS nhận bằng hàm doPost() (Main.gs)
+ *   - doPost() route tới các handler tương ứng
+ * ============================================================
+ */
+function test_setWebhook() {
+  Logger.log("========== ĐĂNG KÝ WEBHOOK ==========");
+
+  // --------------------------------------------------------
+  // Kiểm tra WEBHOOK_URL đã điền chưa và có đúng format không
+  // --------------------------------------------------------
+  // URL deploy phải kết thúc bằng "/exec" (không phải "/dev")
+  // VD đúng:  https://script.google.com/macros/s/AKfycby.../exec
+  // VD sai:   https://script.google.com/macros/s/AKfycby.../dev
+  //           (dev chỉ dùng khi test, Zalo không gọi được)
+  // --------------------------------------------------------
+  if (!CONFIG.WEBHOOK_URL || CONFIG.WEBHOOK_URL.indexOf("/exec") === -1) {
+    Logger.log("❌ CONFIG.WEBHOOK_URL chưa điền hoặc không kết thúc bằng /exec");
+    Logger.log("   → Hướng dẫn:");
+    Logger.log("     1. Trong Apps Script → Deploy → New deployment → Web app");
+    Logger.log("     2. Execute as: Me | Who has access: Anyone");
+    Logger.log("     3. Copy URL dạng: https://script.google.com/.../exec");
+    Logger.log("     4. Paste vào CONFIG.WEBHOOK_URL trong Config.gs");
+    Logger.log("========== KẾT THÚC ==========");
+    return;
+  }
+
+  // --------------------------------------------------------
+  // Gọi API Zalo đăng ký webhook
+  // --------------------------------------------------------
+  // setWebhook() (ZaloAPI.gs) gọi: POST /bot{TOKEN}/setWebhook
+  // Body: { url: WEBHOOK_URL, secret_token: WEBHOOK_SECRET_TOKEN }
+  //
+  // secret_token là chuỗi bảo mật — Zalo gửi kèm mỗi request
+  // để GAS xác nhận request đến từ Zalo (không phải giả mạo).
+  // Hiện tại code chưa check secret_token trong doPost(),
+  // nhưng nên giữ để bảo mật sau này.
+  // --------------------------------------------------------
+  var result = setWebhook();
+
+  if (result && result.ok) {
+    Logger.log("✅ Webhook đã đăng ký thành công!");
+    Logger.log("   URL: " + CONFIG.WEBHOOK_URL);
+    Logger.log("   → Bây giờ khi user nhắn tin cho bot → Zalo gửi tới URL này");
+    Logger.log("   → GAS nhận bằng doPost() (Main.gs) và xử lý");
+  } else {
+    Logger.log("❌ Đăng ký webhook thất bại!");
+    Logger.log("   Response: " + JSON.stringify(result));
+    Logger.log("   → Kiểm tra CONFIG.BOT_TOKEN");
+    Logger.log("   → Kiểm tra CONFIG.WEBHOOK_URL (phải /exec, không phải /dev)");
+  }
+
+  Logger.log("========== KẾT THÚC ==========");
+}

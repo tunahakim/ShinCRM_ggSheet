@@ -1,0 +1,228 @@
+/**
+ * ============================================================
+ * LogService.gs — GHI LOG VÀO GOOGLE SHEET
+ * ============================================================
+ *
+ * 2 CHẾ ĐỘ LOG:
+ *   LOG_VERBOSE = true  → Ghi tất cả (debug, từng bước, chi tiết)
+ *   LOG_VERBOSE = false → Chỉ ghi lỗi, cảnh báo, kết quả quan trọng
+ *
+ * GIỚI HẠN:
+ *   Tối đa LOG_MAX_ROWS dòng (mặc định 3000).
+ *   Khi vượt quá → xóa dòng cũ nhất (FIFO).
+ *
+ * CÁCH SỬ DỤNG:
+ *   logToSheet("FBM_AUTH", "✅ Login thành công", "user: anhlt");
+ *     → LUÔN ghi (có emoji ✅ ❌ ⚠️ 🎉 = quan trọng)
+ *
+ *   logToSheet("FBM_AUTH", "Bước 1: GET Login page...", url);
+ *     → CHỈ ghi khi LOG_VERBOSE = true (không có emoji = chi tiết)
+ *
+ * QUY TẮC XÁC ĐỊNH LOG QUAN TRỌNG:
+ *   Message chứa 1 trong các ký hiệu sau → luôn ghi:
+ *     ✅  = thành công
+ *     ❌  = lỗi
+ *     ⚠️  = cảnh báo
+ *     🎉  = hoàn tất
+ *   Source là 1 trong các nhóm sau → luôn ghi:
+ *     ERROR, PROXY (khi lỗi), SYSTEM, WEBHOOK
+ *   Tất cả log khác → chỉ ghi khi LOG_VERBOSE = true
+ * ============================================================
+ */
+
+
+/**
+ * Ghi 1 dòng log vào sheet Log
+ *
+ * @param {string} source  - Nhãn nguồn (VD: "FBM_AUTH", "SEARCH", "ERROR")
+ * @param {string} message - Mô tả ngắn
+ * @param {*}      [data]  - Dữ liệu bổ sung (string, object, hoặc bỏ trống)
+ */
+function logToSheet(source, message, data) {
+  try {
+    if (!CONFIG.SHEET_ID) return;
+
+    // --------------------------------------------------------
+    // Xác định đây là log quan trọng hay log chi tiết
+    // --------------------------------------------------------
+    var isImportant = _isImportantLog(source, message);
+
+    // Nếu không quan trọng VÀ LOG_VERBOSE = false → bỏ qua
+    if (!isImportant && !CONFIG.LOG_VERBOSE) {
+      return;
+    }
+
+    // --------------------------------------------------------
+    // Chuẩn bị dữ liệu
+    // --------------------------------------------------------
+    var dataStr = "";
+    if (data !== undefined && data !== null) {
+      dataStr = typeof data === "object" ? JSON.stringify(data) : String(data);
+    }
+
+    // Giới hạn data để không vượt cell limit
+    if (dataStr.length > 3000) {
+      dataStr = dataStr.substring(0, 3000) + "...(truncated)";
+    }
+
+    // Ẩn thông tin nhạy cảm khi KHÔNG ở chế độ debug
+    // LOG_VERBOSE = true  → giữ nguyên (để debug)
+    // LOG_VERBOSE = false → ẩn password, cookie, token
+    if (!CONFIG.LOG_VERBOSE) {
+      message = _sanitizeLogData(message || "");
+      dataStr = _sanitizeLogData(dataStr);
+    }
+
+    // --------------------------------------------------------
+    // Ghi vào sheet
+    // --------------------------------------------------------
+    var ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+    var sheet = ss.getSheetByName(CONFIG.SHEET_LOG);
+
+    // Tạo sheet Log nếu chưa có
+    if (!sheet) {
+      sheet = ss.insertSheet(CONFIG.SHEET_LOG);
+      sheet.appendRow(["Thời gian", "Nguồn", "Message", "Data"]);
+      sheet.getRange(1, 1, 1, 4).setFontWeight("bold");
+    }
+
+    // Ghi dòng mới
+    sheet.appendRow([new Date(), source, message, dataStr]);
+
+    // --------------------------------------------------------
+    // Kiểm tra và xóa dòng cũ nếu vượt giới hạn
+    // --------------------------------------------------------
+    _trimLogRows(sheet);
+
+  } catch (err) {
+    // Không throw để không ảnh hưởng logic chính
+  }
+}
+
+
+/**
+ * ============================================================
+ * KIỂM TRA LOG CÓ QUAN TRỌNG KHÔNG
+ * ============================================================
+ *
+ * Log quan trọng = LUÔN ghi dù LOG_VERBOSE = false
+ *
+ * Tiêu chí:
+ *   1. Message chứa emoji trạng thái: ✅ ❌ ⚠️ 🎉
+ *   2. Source là nhóm luôn ghi: ERROR, SYSTEM, SCHEDULER
+ *   3. Message chứa từ khóa lỗi: "THẤT BẠI", "exception", "LOI"
+ *
+ * @param {string} source  - nhãn nguồn
+ * @param {string} message - nội dung
+ * @returns {boolean} true nếu quan trọng
+ * ============================================================
+ */
+function _isImportantLog(source, message) {
+  // --------------------------------------------------------
+  // Nhóm source LUÔN ghi (dù LOG_VERBOSE = false)
+  // --------------------------------------------------------
+  var importantSources = [
+    "ERROR",          // Lỗi hệ thống
+    "SYSTEM",         // Hệ thống (dọn log, khởi tạo)
+    "SCHEDULER",      // Tác vụ tự động
+    "ZALO_API",       // Lỗi Zalo API
+    "SEARCH_RESULT"   // Kết quả tìm kiếm (1 dòng tóm tắt)
+  ];
+  if (importantSources.indexOf(source) > -1) {
+    return true;
+  }
+
+  // --------------------------------------------------------
+  // Nhóm source CHỈ ghi dòng quan trọng (có emoji/từ khóa lỗi)
+  // Dòng chi tiết (không emoji) → chỉ ghi khi LOG_VERBOSE = true
+  // --------------------------------------------------------
+  // PROXY        : "URL updated" → quan trọng (có trong message check bên dưới)
+  //                "Lỗi gọi proxy" → quan trọng (chứa "Lỗi")
+  //                Các dòng khác → chi tiết
+  // WEBHOOK      : "Nhận request" → chi tiết (quá nhiều, mỗi tin nhắn 1 dòng)
+  // SEARCH       : "Nguyễn Văn A: 0901234567" → chi tiết
+  // FBM_AUTH     : "Bước 1: GET..." → chi tiết
+  //                "✅ Bước 1 OK" → quan trọng (có emoji)
+  // FBM_API      : "Proxy trả về null" → chi tiết
+  //                "❌ Retry cũng thất bại" → quan trọng (có emoji)
+  // SESSION      : chi tiết
+  // --------------------------------------------------------
+
+  // Message chứa emoji trạng thái → quan trọng
+  var msg = message || "";
+  if (msg.indexOf("\u2705") > -1) return true;  // ✅
+  if (msg.indexOf("\u274C") > -1) return true;  // ❌
+  if (msg.indexOf("\u26A0") > -1) return true;  // ⚠️
+  if (msg.indexOf("\uD83C\uDF89") > -1) return true; // 🎉
+  if (msg.indexOf("\uD83D\uDD10") > -1) return true; // 🔐
+
+  // Từ khóa lỗi / kết quả quan trọng trong message
+  var msgLower = msg.toLowerCase();
+  if (msgLower.indexOf("thất bại") > -1) return true;
+  if (msgLower.indexOf("that bai") > -1) return true;
+  if (msgLower.indexOf("exception") > -1) return true;
+  if (msgLower.indexOf("error") > -1) return true;
+  if (msgLower.indexOf("lỗi") > -1) return true;
+  if (msgLower.indexOf("loi") > -1) return true;
+  if (msg.indexOf("HOÀN TẤT") > -1 || msg.indexOf("HOAN TAT") > -1) return true;
+  if (msg.indexOf("SAN SANG") > -1) return true;
+  if (msg.indexOf("URL updated") > -1) return true;
+  if (msg.indexOf("URL created") > -1) return true;
+
+  // Mặc định: không quan trọng → chỉ ghi khi LOG_VERBOSE = true
+  return false;
+}
+
+
+/**
+ * ============================================================
+ * ẨN THÔNG TIN NHẠY CẢM TRONG LOG DATA
+ * ============================================================
+ */
+function _sanitizeLogData(dataStr) {
+  if (!dataStr) return dataStr;
+  dataStr = dataStr.replace(/"password"\s*:\s*"[^"]*"/gi, '"password":"***"');
+  dataStr = dataStr.replace(/"fbmPassword"\s*:\s*"[^"]*"/gi, '"fbmPassword":"***"');
+  dataStr = dataStr.replace(/"md5Password"\s*:\s*"[^"]*"/gi, '"md5Password":"***"');
+  dataStr = dataStr.replace(/ASP\.NET_SessionId=[a-zA-Z0-9]+/g, "ASP.NET_SessionId=***");
+  dataStr = dataStr.replace(/"token"\s*:\s*"[^"]*"/gi, '"token":"***"');
+  dataStr = dataStr.replace(/payloadCookie["\s:=]+[a-zA-Z0-9_]+"?/g, "payloadCookie:***");
+  return dataStr;
+}
+
+
+/**
+ * ============================================================
+ * XÓA DÒNG CŨ KHI VƯỢT GIỚI HẠN
+ * ============================================================
+ */
+function _trimLogRows(sheet) {
+  var maxRows = CONFIG.LOG_MAX_ROWS || 3000;
+  var totalRows = sheet.getLastRow();
+  if (totalRows <= maxRows + 1) return;
+  var rowsToDelete = totalRows - maxRows - 1;
+  if (rowsToDelete > 0) {
+    sheet.deleteRows(2, rowsToDelete);
+  }
+}
+
+
+/**
+ * ============================================================
+ * XÓA TOÀN BỘ LOG (GIỮ HEADER)
+ * ============================================================
+ */
+function clearAllLogs() {
+  try {
+    if (!CONFIG.SHEET_ID) return;
+    var ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+    var sheet = ss.getSheetByName(CONFIG.SHEET_LOG);
+    if (!sheet) return;
+    var totalRows = sheet.getLastRow();
+    if (totalRows <= 1) return;
+    sheet.deleteRows(2, totalRows - 1);
+    sheet.appendRow([new Date(), "SYSTEM", "Log đã được xóa sạch", ""]);
+  } catch (err) {
+    // Không throw
+  }
+}

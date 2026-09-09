@@ -1,0 +1,334 @@
+/**
+ * ============================================================
+ * FBMQuery.gs — TRA CỨU KHÁCH HÀNG & GIAO DỊCH QUA PROXY
+ * ============================================================
+ * 
+ * File này chứa các hàm gọi FBM API để:
+ *   - Tìm kiếm khách hàng (searchCustomerByField, searchCustomerMultiField)
+ *   - Lấy lịch sử giao dịch (getCustomerTasks)
+ * 
+ * MỌI REQUEST ĐỀU ĐI QUA PROXY:
+ *   callFBMApi() → callFBMViaProxy() → proxy Termux → curl → FBM server
+ * 
+ * COOKIE FLOW:
+ *   1. callFBMApi() gọi ensureFBMSession(chatId) → lấy cookie từ Sheet
+ *   2. Nếu session hết hạn → auto re-login → cập nhật cookie
+ *   3. Cookie được gửi qua proxy trong header → proxy forward nguyên si
+ * 
+ * HACK BẮT BUỘC — ESCAPE DẤU /:
+ *   FBM (ASP.NET WebForms) có bug: JSON body chứa / không escape → HTTP 500
+ *   Phải: var bodyData = JSON.stringify(payload).replace(/\//g, "\\/");
+ * 
+ * FILE PHỤ THUỘC:
+ *   - Config.gs       : endpoints, hằng số, index mapping
+ *   - FBMAuth.gs      : ensureFBMSession() để lấy cookie
+ *   - Utils.gs        : callFBMViaProxy() để gọi proxy
+ *   - LogService.gs   : ghi log
+ *   - SessionManager.gs : đọc/cập nhật session
+ * ============================================================
+ */
+
+
+/**
+ * ============================================================
+ * HÀM GỌI FBM API CHUNG — CÓ AUTO RETRY
+ * ============================================================
+ * 
+ * Mọi request tới FBM API đều đi qua hàm này.
+ * Nó tự động:
+ *   - Lấy cookie từ session
+ *   - Escape dấu / trong body
+ *   - Gửi qua proxy
+ *   - Retry 1 lần nếu session hết hạn hoặc HTTP 500
+ * 
+ * @param {string} chatId    - Zalo chat_id (để tìm session trong Sheet)
+ * @param {string} endpoint  - đường dẫn API (VD: CONFIG.FBM_GRID_API)
+ * @param {object} payload   - object body gửi tới FBM
+ * @param {boolean} [retried] - đã retry chưa (tránh loop vô tận)
+ * @returns {object|null} response.d từ FBM hoặc null nếu lỗi
+ * 
+ * Ví dụ:
+ *   var result = callFBMApi(chatId, CONFIG.FBM_GRID_API, searchPayload);
+ *   // result = { TotalRowCount: 5, Rows: [[...], [...]] }
+ * ============================================================
+ */
+function callFBMApi(chatId, endpoint, payload, retried) {
+  // --------------------------------------------------------
+  // Bước 1: Lấy session FBM (tự re-login nếu hết hạn)
+  // --------------------------------------------------------
+  var fbm = ensureFBMSession(chatId);
+  if (!fbm) {
+    logToSheet("FBM_API", "❌ Không có session cho chatId: " + chatId);
+    return null;
+  }
+
+  // --------------------------------------------------------
+  // Bước 2: Build request
+  // --------------------------------------------------------
+  var url = CONFIG.FBM_BASE_URL + endpoint;
+  var bodyData = JSON.stringify(payload).replace(/\//g, "\\/");
+
+  // Log chi tiết: filter đang tìm gì (chỉ ghi khi LOG_VERBOSE = true)
+  var filterInfo = "";
+  if (payload && payload.filter && payload.filter.length > 0) {
+    filterInfo = "filter: " + JSON.stringify(payload.filter);
+  } else if (payload && payload.externalKey) {
+    filterInfo = "externalKey: " + JSON.stringify(payload.externalKey).substring(0, 100);
+  }
+  logToSheet("FBM_API", "Gọi FBM: " + (payload.controller || "?"),
+    "endpoint: " + endpoint + " | " + filterInfo);
+
+  try {
+    // --------------------------------------------------------
+    // Bước 3: Gọi FBM qua proxy
+    // --------------------------------------------------------
+    var result = callFBMViaProxy(url, "POST", {
+      "Cookie": fbm.cookie,
+      "Content-Type": "application/json; charset=UTF-8",
+      "Accept": "*/*",
+      "Referer": CONFIG.FBM_BASE_URL + "/Main/zccrAccount.aspx"
+    }, bodyData);
+
+    if (!result) {
+      logToSheet("FBM_API", "❌ Proxy trả về null", url);
+      return null;
+    }
+
+    var code = result.status;
+    var text = result.body || "";
+
+    // Log chi tiết: FBM trả về gì
+    logToSheet("FBM_API", "FBM response: HTTP " + code,
+      "bodyLength: " + text.length + " | " + filterInfo);
+
+    // --------------------------------------------------------
+    // Session hết hạn? → Retry 1 lần
+    // --------------------------------------------------------
+    if (code === 401 || code === 403 || text.indexOf("Login.aspx") > -1) {
+      if (!retried) {
+        logToSheet("FBM_API", "⚠️ Session expired, retry...", url);
+        updateSessionCookie(chatId, "", 0);
+        return callFBMApi(chatId, endpoint, payload, true);
+      }
+      logToSheet("FBM_API", "❌ Retry cũng thất bại", url);
+      return null;
+    }
+
+    // --------------------------------------------------------
+    // HTTP 500 → retry 1 lần
+    // --------------------------------------------------------
+    if (code === 500 && !retried) {
+      logToSheet("FBM_API", "⚠️ HTTP 500, retry...", text.substring(0, 300));
+      Utilities.sleep(500);
+      return callFBMApi(chatId, endpoint, payload, true);
+    }
+
+    // --------------------------------------------------------
+    // Parse JSON response
+    // --------------------------------------------------------
+    var json = JSON.parse(text);
+    var d = json.d || null;
+
+    // Log chi tiết: kết quả parse
+    if (d && d.TotalRowCount !== undefined) {
+      logToSheet("FBM_API", "FBM trả về: " + (d.Rows ? d.Rows.length : 0) + " rows",
+        "TotalRowCount: " + d.TotalRowCount + " | " + filterInfo);
+    }
+
+    return d;
+
+  } catch (error) {
+    logToSheet("FBM_API", "❌ Exception: " + error.message, error.stack);
+    return null;
+  }
+}
+
+
+
+/**
+ * ============================================================
+ * TÌM KHÁCH HÀNG THEO 1 TRƯỜNG
+ * ============================================================
+ * 
+ * FBM dùng filter dạng: ["tên_trường:**từ_khóa"]
+ *   ** = toán tử LIKE (chứa)
+ *   VD: ["dien_thoai:**0901234567"] = KH có SĐT chứa "0901234567"
+ * 
+ * Các trường có thể tìm (định nghĩa trong Config.gs):
+ *   - dien_thoai  : Số điện thoại
+ *   - ma_so_thue  : Mã số thuế
+ *   - ten_kh      : Tên công ty
+ *   - ma_kh       : Mã khách hàng
+ * 
+ * @param {string} chatId    - Zalo chat_id
+ * @param {string} fieldName - tên trường FBM (VD: "dien_thoai")
+ * @param {string} keyword   - từ khóa tìm kiếm
+ * @returns {object} { rows: [...], totalRowCount: N }
+ * ============================================================
+ */
+function searchCustomerByField(chatId, fieldName, keyword) {
+  // Lấy session để có userId và fbmPayloadCookie
+  var session = getSession(chatId);
+  if (!session) return { rows: [], totalRowCount: 0 };
+
+  var payload = {
+    type: 1,                                          // 1 = query data
+    count: CONFIG.MAX_SEARCH_RESULTS,                 // Số KH FBM trả về (VD: 15)
+    language: "v",
+    controller: "zccrAccount",
+    viewId: null,
+    childObject: false,
+    lastPageIndex: 0,
+    firstPageItem: null,
+    lastPageItem: null,
+    lastRowCount: 0,
+    memvars: [{ Name: "user_id", OldValue: null, NewValue: "" }],
+    externalKey: [
+      {
+        Name: "stt_rec_kh in (select stt_rec_kh from dbo.zcFastBusiness$Function$GetCustomerValidate('"
+          + session.userId + "')) and 1",
+        Opr: "=",
+        Value: 1,
+        Type: "String",
+        Ignore: false,
+      },
+    ],
+    gridPageIndex: -2,                                // -2 = search mode (từ HAR)
+    gridPageValue: null,
+    gridRefresh: false,                               // false (từ HAR)
+    filter: [fieldName + ":**" + keyword],
+    sortExpression: null,
+    cookie: (session && session.fbmPayloadCookie) ? session.fbmPayloadCookie : null,
+    query: null,
+    parameter: null,
+    variable: "",
+  };
+
+  var result = callFBMApi(chatId, CONFIG.FBM_GRID_API, payload);
+  if (!result) return { rows: [], totalRowCount: 0 };
+
+  return {
+    rows: result.Rows || [],
+    totalRowCount: result.TotalRowCount || 0           // Tổng số thực từ FBM (VD: 792)
+  };
+}
+
+
+/**
+ * ============================================================
+ * TÌM KHÁCH HÀNG THEO NHIỀU TRƯỜNG — GỘP KẾT QUẢ, LOẠI TRÙNG
+ * ============================================================
+ * 
+ * Gửi N request (1 per field), gộp kết quả, loại trùng theo stt_rec.
+ * Giữ thứ tự ưu tiên: kết quả từ field đầu tiên xuất hiện trước.
+ * 
+ * VD: Tìm "0901234567"
+ *   Request 1: filter=["dien_thoai:**0901234567"] → 3 kết quả (A001, A002, A003)
+ *   Request 2: filter=["ma_so_thue:**0901234567"] → 1 kết quả (A004)
+ *   Request 3: filter=["ten_kh:**0901234567"]     → 0 kết quả
+ *   Request 4: filter=["ma_kh:**0901234567"]      → 0 kết quả
+ *   Gộp: A001, A002, A003, A004 (loại trùng theo stt_rec index 0)
+ * 
+ * @param {string} chatId  - Zalo chat_id
+ * @param {Array} fields   - mảng tên trường theo thứ tự ưu tiên
+ * @param {string} keyword - từ khóa tìm kiếm
+ * @returns {object} { rows: [...], totalRowCount: N }
+ * ============================================================
+ */
+function searchCustomerMultiField(chatId, fields, keyword) {
+  var allRows = [];
+  var seenIds = {};
+  var maxTotalRowCount = 0;    // Lấy TotalRowCount lớn nhất từ các lần query
+
+  for (var i = 0; i < fields.length; i++) {
+    var result = searchCustomerByField(chatId, fields[i], keyword);
+    
+    // Lấy TotalRowCount lớn nhất (vì mỗi field có thể trả số khác nhau)
+    if (result.totalRowCount > maxTotalRowCount) {
+      maxTotalRowCount = result.totalRowCount;
+    }
+
+    for (var j = 0; j < result.rows.length; j++) {
+      var sttRec = result.rows[j][CONFIG.CI_STT_REC];
+      if (!seenIds[sttRec]) {
+        seenIds[sttRec] = true;
+        allRows.push(result.rows[j]);
+      }
+    }
+  }
+
+  return {
+    rows: allRows,
+    totalRowCount: maxTotalRowCount                   // Tổng số thực lớn nhất
+  };
+}
+
+
+/**
+ * ============================================================
+ * LẤY GIAO DỊCH CỦA 1 KHÁCH HÀNG
+ * ============================================================
+ * 
+ * Dùng stt_rec (mã nội bộ KH) để tìm giao dịch.
+ * stt_rec KHÁC với ma_kh (mã khách hàng hiển thị).
+ * stt_rec là cột đầu tiên (index 0) trong kết quả tìm KH.
+ * 
+ * VD: Khách "TLP20855" có stt_rec = "A000075988"
+ *     → getCustomerTasks(chatId, "A000075988")
+ *     → trả về danh sách giao dịch của khách đó
+ * 
+ * Mỗi giao dịch là 1 mảng giá trị, mapping theo CONFIG:
+ *   row[TI_HANH_DONG] = "Gọi điện chăm sóc"
+ *   row[TI_NOI_DUNG]  = "Khách có nhu cầu mua phần mềm..."
+ *   row[TI_NGAY_TAO]  = "/Date(1767927660000)/"
+ *   row[TI_TRANG_THAI]= "Hoàn thành"
+ *   row[TI_NGUOI_TAO_TEN] = "Lê Phương Thảo"
+ * 
+ * @param {string} chatId  - Zalo chat_id
+ * @param {string} sttRec  - mã nội bộ KH (VD: "A000073082")
+ * @returns {object} { rows: [...], totalRowCount: N }
+ * ============================================================
+ */
+function getCustomerTasks(chatId, sttRec) {
+  var session = getSession(chatId);
+
+  var payload = {
+    type: 1,
+    count: CONFIG.MAX_TASK_RESULTS,                   // Số GD FBM trả về (VD: 10)
+    language: "v",
+    controller: "zccrAccountTask",
+    viewId: null,
+    childObject: false,
+    lastPageIndex: 0,
+    firstPageItem: null,
+    lastPageItem: null,
+    lastRowCount: 0,
+    memvars: [],
+    externalKey: [
+      {
+        Name: "stt_rec",
+        Opr: "=",
+        Value: sttRec,
+        Type: "String",
+        Ignore: false,
+      },
+    ],
+    gridPageIndex: 0,
+    gridPageValue: null,
+    gridRefresh: true,
+    filter: [],
+    sortExpression: null,
+    cookie: (session && session.fbmPayloadCookie) ? session.fbmPayloadCookie : null,
+    query: null,
+    parameter: null,
+    variable: "",
+  };
+
+  var result = callFBMApi(chatId, CONFIG.FBM_GRID_API, payload);
+  if (!result) return { rows: [], totalRowCount: 0 };
+
+  return {
+    rows: result.Rows || [],
+    totalRowCount: result.TotalRowCount || 0           // Tổng số GD thực (VD: 13)
+  };
+}

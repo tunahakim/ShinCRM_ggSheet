@@ -1,0 +1,117 @@
+/**
+ * ============================================================
+ * FBM ASSISTANT - CẤU HÌNH TẬP TRUNG
+ * ============================================================
+ * Mọi hằng số, thông số cấu hình đều nằm ở đây.
+ * Khi triển khai, chỉ cần sửa file này.
+ * ============================================================
+ */
+
+var CONFIG = {
+  // === ZALO BOT ===
+  BOT_TOKEN: "4402023485230713966:sYoRPPjmXEAfFVILVRXrrEMcuSqNDbHKuvNiIHNPAqzTvVcdpPAEFuhnBFfDyJHR",
+  WEBHOOK_SECRET_TOKEN: "fbm_assistant_secret_2026",
+  WEBHOOK_URL: "https://script.google.com/macros/s/AKfycbyT97hhYjB6vwqmh_jYqH_wDUoLE6IkRDDkZJWQ6yR--ZHe56YLKXAkbZ4qvYTPSCJ7/exec",
+  TEST_CHAT_ID: "70fab6be97f47eaa27e5",
+
+  // === ZALO API ===
+  ZALO_API_BASE: "https://bot-api.zaloplatforms.com/bot",
+  ZALO_MAX_TEXT_LENGTH: 2000,
+
+  // === FBM ===
+  FBM_BASE_URL: "https://fbo.com.vn:8888",
+  FBM_LOGIN_PAGE: "/Main/Login.aspx",
+  FBM_LOGIN_API: "/Main/Login.aspx/Login",
+  FBM_ENTITY_API: "/Main/Login.aspx/GetEntityData",
+  FBM_UNIT_API: "/Main/Login.aspx/GetUnitData",
+  FBM_GRID_API: "/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage",
+  FBM_DIR_API: "/AppService/FastBusiness.ReportExtenderService.asmx/GetDirViewPage",
+
+  // === GOOGLE SHEET ===
+  SHEET_ID: "1L2JRZTw0v4k1s0SPYYLXFDeOxZk4aiI7LzmTOvqwAPw",
+  SHEET_SESSIONS: "Sessions",
+  SHEET_LOG: "Log",
+
+  // === GIỚI HẠN & THỜI GIAN ===
+
+  // Số lượng KH tối đa FBM trả về mỗi lần tìm kiếm
+  // Giá trị này gửi trong trường "count" của payload GetGridViewPage
+  // FBM server sẽ trả về tối đa N dòng trong Rows[]
+  // TotalRowCount vẫn trả về tổng số thực (VD: 792)
+  MAX_SEARCH_RESULTS: 10,
+
+  // Số lượng giao dịch tối đa FBM trả về mỗi lần query
+  // Giá trị này gửi trong trường "count" của payload GetGridViewPage (zccrAccountTask)
+  // TotalRowCount vẫn trả về tổng số thực (VD: 13)
+  MAX_TASK_RESULTS: 25,
+
+  // Số lượng KH tối đa HIỂN THỊ trong tin nhắn Zalo
+  // Nếu MAX_SEARCH_RESULTS = 15 nhưng MAX_DISPLAY_COMPANIES = 10
+  // → FBM trả về 15, nhưng chỉ hiển thị 10 đầu tiên
+  // → Ghi chú "Hiển thị 10/792"
+  MAX_DISPLAY_COMPANIES: 10,
+
+  // Số lượng giao dịch tối đa HIỂN THỊ trong tin nhắn Zalo
+  // Nếu MAX_TASK_RESULTS = 10 nhưng MAX_DISPLAY_TASKS = 5
+  // → FBM trả về 10, nhưng chỉ hiển thị 5 gần nhất
+  // → Ghi chú "Giao dịch (5/13)"
+  MAX_DISPLAY_TASKS: 25,
+
+  // Thời gian của mỗi phiên làm việc (milliseconds)
+  // FBM cookie hết hạn sau 60 phút
+  // GAS tự re-login ở phút 55 (trước khi cookie chết)
+  // 5 phút = 55 * 60 * 1000 = 3.300.000 ms
+  SESSION_TTL: 25 * 60 * 1000,
+
+  
+  // === LOG ===
+  // true  = ghi TẤT CẢ log (debug, chi tiết từng bước login, cookie, payload...)
+  // false = chỉ ghi log QUAN TRỌNG (lỗi, cảnh báo, kết quả cuối cùng)
+  // Khi hệ thống chạy ổn định → đặt false
+  // Khi cần debug sự cố → đặt true
+  LOG_VERBOSE: false,
+
+  // Số dòng log tối đa trong sheet Log
+  // Khi vượt quá → tự động xóa dòng cũ nhất
+  LOG_MAX_ROWS: 3000,
+
+
+  // === BẢO MẬT ===
+  ENCRYPT_MARKER: "\uD83D\uDD10",  // 🔐
+
+  // === COMMAND PREFIX ===
+  CMD_LOGIN: "/login",
+  CMD_LOGOUT: "/logout",
+  CMD_HELP: "/help",
+  CMD_SEARCH_PHONE: "/sdt",
+  CMD_SEARCH_TAX: "/mst",
+  CMD_SEARCH_NAME: "/ten",
+  CMD_SEARCH_CODE: "/mkh",
+
+  // === FBM FIELD NAMES (dùng trong filter) ===
+  FIELD_PHONE: "dien_thoai",
+  FIELD_TAX: "ma_so_thue",
+  FIELD_NAME: "ten_kh",
+  FIELD_CODE: "ma_kh",
+
+  // === INDEX MAPPING - Khách hàng (zccrAccount Rows) ===
+  CI_STT_REC: 0,
+  CI_MA_KH: 1,
+  CI_TEN_KH: 2,
+  CI_MA_SO_THUE: 3,
+  CI_NGUOI_LIEN_HE: 4,
+  CI_DIEN_THOAI: 6,
+
+  // === INDEX MAPPING - Giao dịch (zccrAccountTask Rows) ===
+  TI_ID: 0,
+  TI_LOAI: 1,
+  TI_HANH_DONG: 2,
+  TI_NOI_DUNG: 3,
+  TI_NGAY_TAO: 4,
+  TI_NGAY_HEN: 5,
+  TI_TRANG_THAI: 6,
+  TI_NGUOI_TAO_TEN: 7,
+  TI_NGUOI_TAO_MA: 8,
+  TI_NGAY_CAP_NHAT: 9,
+  TI_STT: 10,
+};
