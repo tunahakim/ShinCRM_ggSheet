@@ -1,6 +1,6 @@
 <script>
 /* Sidebar chỉ hiển thị tiến độ; GAS là nguồn state duy nhất. */
-var FBM_SYNC_CLIENT = { installed: false, waiting: {}, running: false, mode: 'read', writeAllowed: false, openedAt: 0 };
+var FBM_SYNC_CLIENT = { installed: false, waiting: {}, running: false, mode: 'read', writeAllowed: false, openedAt: 0, relayConfigured: false };
 /** Timeout cho một request Extension để phiên không treo vô hạn khi tab FBM/bridge mất kết nối. */
 var FBM_SYNC_REQUEST_TIMEOUT_MS = 20000;
 
@@ -16,7 +16,19 @@ function syncPanelToggle() {
   if (!screen) { throw new Error('Sidebar thieu man dong bo FBM.'); }
   screen.hidden = !screen.hidden;
   if (!screen.hidden) { FBM_SYNC_CLIENT.openedAt = Date.now(); }
-  return screen.hidden || typeof fbmSyncStatusOnce !== 'function' ? null : fbmSyncStatusOnce(true);
+  if (screen.hidden || typeof fbmSyncStatusOnce !== 'function') { return null; }
+  return fbmSyncConfigureRelay().then(function () { return fbmSyncStatusOnce(true); });
+}
+/** Đưa cấu hình Web App/khóa sang Extension; không gửi cookie hay payload FBM. */
+function fbmSyncConfigureRelay() {
+  if (FBM_SYNC_CLIENT.relayConfigured || typeof callServer !== 'function') { return Promise.resolve(null); }
+  return callServer('fbmGetRelayConfig').then(function (config) {
+    FBM_SYNC_CLIENT.relayConfigured = true;
+    if (window.top !== window && config && config.url && config.key) {
+      window.top.postMessage({ action: 'CRM_FBM_CONFIG', nonce: SHEET_LINK_NONCE, config: { url: config.url, key: config.key } }, 'https://docs.google.com');
+    }
+    return config;
+  }).catch(function () { return null; });
 }
 /** Vẽ snapshot status, không suy diễn nghiệp vụ ở client. */
 function fbmSyncPaint(status, freshOpen) {
@@ -41,6 +53,7 @@ function fbmSyncPaint(status, freshOpen) {
   if (status.current) { var current = document.createElement('div'); current.className = 'shin-sync-current'; current.textContent = String(status.current); panel.appendChild(current); }
   if (status.message) { var message = document.createElement('div'); message.className = 'shin-sync-message'; message.textContent = String(status.message); panel.appendChild(message); }
   fbmSyncPaintPreview(panel, status.metadata && status.metadata.preview);
+  fbmSyncPaintAudit(panel, status.metadata && status.metadata.audit);
   var actions = document.createElement('div'); actions.className = 'shin-sync-actions';
   var active = ['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(status.phase) >= 0;
   var mode = document.createElement('select'); mode.id = 'fbm-sync-mode'; mode.className = 'shin-input'; mode.disabled = active;
@@ -95,6 +108,18 @@ function fbmSyncPaintPreview(panel, preview) {
     row.textContent = 'Giao dịch: ' + (item.date || '(không có ngày)') + ' · ' + (item.type || '(không có loại)') + ' · ' + (item.content || '(trống)'); list.appendChild(row);
   });
   if (preview.truncated) { var more = document.createElement('div'); more.className = 'shin-sync-preview-more'; more.textContent = 'Preview đã giới hạn số dòng.'; box.appendChild(more); }
+  panel.appendChild(box);
+}
+/** Hiển thị kết quả từng case nghiệm thu sau lượt Đọc thử. */
+function fbmSyncPaintAudit(panel, audit) {
+  if (!audit || !Array.isArray(audit.cases) || !audit.cases.length) { return; }
+  var box = document.createElement('div'); box.className = 'shin-sync-audit';
+  var title = document.createElement('div'); title.className = 'shin-sync-preview-title'; title.textContent = 'Kiểm tra ALT00010'; box.appendChild(title);
+  audit.cases.forEach(function (item) {
+    var row = document.createElement('div'); row.className = 'shin-sync-preview-row';
+    row.textContent = (item.status === 'PASS' ? '✓ ' : '✕ ') + String(item.name || '') + (item.detail ? ' · ' + String(item.detail) : '');
+    box.appendChild(row);
+  });
   panel.appendChild(box);
 }
 /** Đăng ký listener một lần cho response và các nút đồng bộ. */
@@ -168,7 +193,18 @@ function fbmSyncWaitingStatus(status, message) {
 /** Chạy chuỗi request GAS -> Extension cho tới khi hết cursor. */
 function fbmSyncLoop(status) {
   fbmSyncPaint(status);
-  if (!status || !status.request) { FBM_SYNC_CLIENT.running = false; return status; }
+  if (!status || !status.request) {
+    FBM_SYNC_CLIENT.running = false;
+    if (FBM_SYNC_CLIENT.mode === 'read' && typeof callServer === 'function') {
+      return callServer('fbmAuditAltState').then(function (audit) {
+        var snapshot = status && (status.status || status) || {};
+        snapshot.metadata = Object.assign({}, snapshot.metadata || {}, { audit: audit });
+        fbmSyncPaint(snapshot);
+        return snapshot;
+      }).catch(function () { return status; });
+    }
+    return status;
+  }
   var entity = status.request.meta && status.request.meta.entity === 'activity' ? 'giao dịch' : 'khách hàng';
   fbmSyncPaint(fbmSyncWaitingStatus(status, 'Đang chờ tab FBM trả dữ liệu ' + entity + '...'));
   return fbmSyncExtensionRequest(status.request).then(function (response) {

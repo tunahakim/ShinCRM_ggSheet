@@ -98,6 +98,13 @@ function isAllowedSidebarOrigin(origin) {
 // 1. Bắt tay: kiểm origin, ghi nhớ đích, đáp tiếng kèm đúng nonce.
 window.addEventListener('message', function (event) {
   var data = event.data;
+  if (data && data.action === 'CRM_FBM_CONFIG') {
+    if (!isAllowedSidebarOrigin(event.origin) || event.source !== sidebarWindow || String(data.nonce || '') !== sidebarNonce) { return; }
+    sendRequestToWorker({ type: 'FBM_CONFIGURE_RELAY', config: data.config || {} }, function (error, reply) {
+      if (error && console && console.warn) { console.warn('Không lưu được cấu hình relay FBM:', error); }
+    });
+    return;
+  }
   if (data && data.action === 'CRM_FBM_REQUEST') {
     // Chuyển nguyên request qua service worker; bridge không phân tích response FBM.
     if (!isAllowedSidebarOrigin(event.origin) || String(data.nonce || '') !== sidebarNonce) { return; }

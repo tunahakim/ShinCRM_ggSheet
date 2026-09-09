@@ -86,8 +86,26 @@ function sendToFbmTab(tabId, request) {
   });
 }
 
+/** Nộp heartbeat cho GAS khi đã cấu hình Web App; thiếu cấu hình thì chỉ giữ phiên FBM. */
+function relayHeartbeatToGas(reply) {
+  if (!chrome.storage || !chrome.storage.local || !chrome.storage.local.get) { return Promise.resolve(null); }
+  return new Promise(function (resolve) {
+    chrome.storage.local.get(['fbmWebAppUrl', 'fbmSyncKey'], function (config) {
+      var url = config && String(config.fbmWebAppUrl || '').trim(), key = config && String(config.fbmSyncKey || '').trim();
+      if (!url || !key) { resolve(null); return; }
+      fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: key, kind: 'heartbeat', response: reply && reply.result !== undefined ? reply.result : reply }) }).then(function () { resolve(null); }, function (error) { console.warn('Không relay được heartbeat cho GAS:', error); resolve(null); });
+    });
+  });
+}
+
 /** Định tuyến request từ Sidebar tới đúng tab FBM, không xử lý dữ liệu nghiệp vụ. */
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
+  if (message && message.type === 'FBM_CONFIGURE_RELAY') {
+    var config = message.config || {};
+    if (!chrome.storage || !chrome.storage.local) { sendResponse({ ok: false, error: 'Extension không có kho cấu hình.' }); return false; }
+    chrome.storage.local.set({ fbmWebAppUrl: String(config.url || ''), fbmSyncKey: String(config.key || '') }, function () { sendResponse({ ok: true }); });
+    return true;
+  }
   if (!message || message.type !== 'FBM_EXECUTE_REQUEST') { return false; }
   findFbmTab().then(function (tab) {
     if (!tab) { sendResponse({ error: 'Không tìm thấy tab FBM đang mở.' }); return; }
@@ -104,6 +122,6 @@ recoverSheetsBridges();
 /** Gửi request đọc tối thiểu; không gửi thao tác ghi từ alarm. */
 chrome.alarms.onAlarm.addListener(function (alarm) {
   if (!alarm || alarm.name !== 'fbm-heartbeat') { return; }
-  findFbmTab().then(function (tab) { if (tab) { return sendToFbmTab(tab.id, null); } });
+  findFbmTab().then(function (tab) { if (tab) { return sendToFbmTab(tab.id, null).then(relayHeartbeatToGas); } return null; }).catch(function (error) { console.warn('Heartbeat FBM thất bại:', error); });
 });
 
