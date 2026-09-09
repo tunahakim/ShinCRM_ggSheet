@@ -158,7 +158,7 @@
 - [x] Pull/push hoãn record có khóa user và giữ nguyên bản nháp.
 - [ ] Khóa sync làm form chỉ xem, chặn Save và luôn được nhả sau khi xong/lỗi.
 - [x] Record có `FBM_ID` chỉ được xóa mềm; không có đường gửi Delete FBM.
-- [ ] HTTP 500/401/403/Login.aspx giữ cursor hợp lệ và thử lại ở kỳ sau.
+- [x] HTTP 500/401/403/Login.aspx giữ cursor hợp lệ và thử lại ở kỳ sau.
 - [x] Bugs HTTP 200 gắn lỗi nghiệp vụ vào record và chỉ thử lại khi dữ liệu local đổi.
 - [x] Ghi báo thành công nhưng FBM không đổi → `đẩy không ăn`, khóa record, không lặp vô hạn.
 - [ ] Extension reload/service worker ngủ → state GAS không mất và pipeline đi tiếp đúng bước.

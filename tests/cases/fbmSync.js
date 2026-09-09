@@ -411,6 +411,13 @@ async function chay(so) {
   push.FbmSync.stateWrite(transportState);
   const http500 = push.FbmSync.continue({ ok: false, status: 500, body: '{"Message":"server"}' });
   check(so, 'HTTP 500 giu cursor doc hop le cho ky sau', [http500.ok, push.FbmSync.stateRead().phase, push.FbmSync.stateRead().cursor.kind], [false, 'error', 'customer_grid']);
+  [{ status: 401, body: '' }, { status: 403, body: '' }, { status: 200, body: '<form action="Login.aspx"></form>' }].forEach((failure) => {
+    const sessionState = push.FbmSync.stateStart('', 'read', 0);
+    sessionState.phase = 'pull_customer'; sessionState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 2, pageValue: ['x'] };
+    push.FbmSync.stateWrite(sessionState);
+    const sessionResult = push.FbmSync.continue({ ok: failure.status === 200, status: failure.status, body: failure.body });
+    check(so, 'Session error ' + failure.status + ' giu cursor de chay ky sau', [sessionResult.ok, push.FbmSync.stateRead().phase, push.FbmSync.stateRead().cursor.kind], [false, 'error', 'customer_grid']);
+  });
 
   const audit = taoHopCat({ FbmSync: {}, LOG_OK: 'ok', LOG_ERROR: 'error', FbmSyncLog: [] });
   napServer(audit, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/report/Probe.js');
