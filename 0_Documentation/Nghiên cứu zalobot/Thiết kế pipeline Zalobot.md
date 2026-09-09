@@ -1,509 +1,359 @@
-# Zalobot tra cứu ShinCRM (kiến trúc Google Sheet)
+# Zalobot tra cứu và thêm giao dịch ShinCRM
 
-Tài liệu này cô đọng kết quả đọc các tệp `.txt` trong thư mục nghiên cứu Zalobot cũ và chuyển chúng sang kiến trúc hiện tại. Bản cũ là một ứng dụng Termux + proxy + FBM; bản mới dùng Zalo làm giao diện văn bản và Google Sheet ShinCRM làm nguồn dữ liệu. Bot được phép đọc và ghi, nhưng không có mini app, nút inline hay callback như Telegram.
+Tài liệu này chuyển kết quả đọc code Termux/Zalo/FBM cũ sang kiến trúc ShinCRM hiện tại. Người dùng chat trực tiếp với Zalo Bot bằng văn bản thuần túy. Bot chỉ đọc và ghi Google Sheet ShinCRM; bot không gọi FBM trong lúc chat, không mở mini app, không có nút inline và không có callback như Telegram.
 
-## Kết luận kiến trúc
+## Phạm vi v1
 
-```text
-Zalo Platform
-    -> webhook relay (kiểm tra header secret)
-    -> GAS doPost (kiểm tra khóa nội bộ của relay)
-    -> kiểm tra request, quyền và trạng thái hội thoại theo chat_id
-    -> BotQuery đọc Customer/Activity từ Google Sheet
-    -> BotFormatter tạo tin nhắn chữ, menu số hoặc bản xem trước
-    -> BotWrite gọi WriteGate/DeleteGate khi người dùng xác nhận
-    -> Zalo Bot API (sendMessage)
-```
+Bot chỉ có ba nghiệp vụ:
 
-Bot không ghi trực tiếp bằng `SpreadsheetApp`. Mọi thay đổi nghiệp vụ phải đi qua cửa ghi chung của ShinCRM để dùng cùng khóa, kiểm tra, cấp mã, định dạng và đọc lại sau khi ghi.
+1. Tìm khách hàng.
+2. Xem thông tin khách và lịch sử giao dịch.
+3. Thêm một giao dịch mới cho khách đang xem.
 
-## Những gì giữ lại từ code cũ
+Bot không sửa thông tin khách, không sửa giao dịch đã ghi, không xóa dữ liệu và không tạo khách mới. Nếu nhập sai giao dịch sau khi đã lưu, bản đầu không có đường sửa qua Zalo; cần sửa bằng công cụ ShinCRM khác hoặc chốt riêng một phiên sau.
 
-- Mô hình `doPost` nhận sự kiện `message.text.received`, bỏ qua hoặc trả lời ngắn với loại tin nhắn không hỗ trợ.
-- Command Router: bảng lệnh ánh xạ tới handler, thêm lệnh không phải sửa một chuỗi `if` dài.
-- Lệnh tra cứu `/sdt`, `/mst`, `/ten`, `/mkh` và tra cứu tự do khi người dùng không gõ tiền tố.
-- Ba nhánh hiển thị: không có kết quả, một kết quả (kèm hoạt động gần đây), nhiều kết quả (danh sách để thu hẹp tiếp).
-- Giới hạn số bản ghi và tách tin nhắn theo giới hạn Zalo 2.000 ký tự; không cắt giữa dữ liệu quan trọng nếu có thể tránh.
-- `sendMessage`, `sendMessages`, `sendTyping`, `setWebhook` và log lỗi tập trung. Token phải nằm trong Script Properties hoặc vùng triển khai bí mật, không nằm trong mã nguồn.
+Trong tài liệu này, “giao dịch” là một dòng của sheet `Activity`. “Mã khách FBM” là trường `ma_kh` mà FBM hiển thị cho người dùng, được lưu tại cột đồng bộ `@CUS_MA_KH_FBM` (tên logic `fbmCustomerCode`) trong Google Sheet. Đây không phải mã nội bộ ShinCRM `@CUS_MA_KH`.
 
-## Những gì loại bỏ hoàn toàn
+## Cách người dùng tương tác
 
-| Phần của bản cũ | Lý do không mang sang |
+Người dùng chỉ mở cuộc trò chuyện cá nhân với Bot trên Zalo và gửi tin nhắn văn bản. Không cần đăng nhập FBM, không cần gửi mật khẩu, không cần gọi URL webhook và không cần thao tác relay. Relay/webhook là phần hạ tầng chạy phía sau để chuyển tin Zalo vào ứng dụng.
+
+Mỗi tin nhắn được hiểu theo trạng thái hiện tại của cuộc trò chuyện. Vì Zalo chỉ gửi văn bản, bot luôn trả lại hướng dẫn chữ và số thứ tự để người dùng gửi tin tiếp theo.
+
+## Lệnh và quy ước chung
+
+| Tin nhắn | Ý nghĩa |
 | --- | --- |
-| `FBMAuth`, `FBMQuery`, MD5/salt, cookie và `Sessions` | Không còn gọi FBM, không cần đăng nhập theo người dùng và không được lưu mật khẩu/cookie. |
-| `callFBMViaProxy`, Cloudflare Tunnel, Termux, `curl` | Không có máy trung gian; GAS đọc trực tiếp Google Sheet. |
-| `stt_rec`, mapping chỉ số hàng của FBM, escape dấu `/` | Đây là hợp đồng riêng của API FBM, không tồn tại trong ShinCRM. |
-| `/login`, `/logout`, tự đăng nhập lại, scheduler | Không có phiên FBM. Quyền bot dùng allowlist `chat_id`, không dùng mật khẩu gửi qua Zalo. |
-| Các token, URL triển khai, tài khoản và mật khẩu xuất hiện trong tệp cũ | Là bí mật đã lộ trong tài liệu; không sao chép. Token cũ cần được thu hồi nếu còn hiệu lực. |
+| `.help` | Xem hướng dẫn sử dụng ở mọi trạng thái. |
+| `.huy` | Hủy thao tác đang làm, xóa bản nháp và về trạng thái chờ tìm kiếm. |
+| `.sdt 0984333222` | Tìm theo số điện thoại. |
+| `.mst 0101234567` | Tìm theo mã số thuế. |
+| `.ten Công ty ABC` | Tìm theo tên công ty hoặc tên liên quan. |
+| `.mkh ALT00490` | Tìm chính xác theo mã khách FBM `ma_kh`, lấy từ `@CUS_MA_KH_FBM` trong Google Sheet. |
+| Văn bản không có tiền tố | Tìm tự do trong các trường được phép; số điện thoại, MST và tên được nhận diện theo nội dung. |
 
-## Hợp đồng dữ liệu hiện tại
+Tiền tố dùng dấu chấm, không dùng dấu gạch chéo. Lệnh không phân biệt chữ hoa/chữ thường; bot bỏ khoảng trắng thừa nhưng không tự ý bỏ dấu chấm hoặc gạch trong MST/SĐT nếu chưa có quy tắc kiểm thử tương ứng.
 
-Nguồn chuẩn là `1_ShinCRM_GAS/server/data/DataSchema.js`, không phải tên hay vị trí cột viết tay trong bot.
-
-- `Customer`: sheet có ba hàng đầu là phần tiêu đề, dữ liệu bắt đầu từ hàng 4. Đọc theo mã cột ở hàng 1 qua `readColumnMap`; không giả định cột A/B/C.
-- Trường tra cứu chính: `id`, `companyName`, `taxNumber`, `phone`, `contactPerson`, `searchAliases`. Chỉ trả bản ghi có `recordStatus = active` và có `id`.
-- `Activity`: nối với khách bằng `customerId`; chỉ lấy bản ghi `active` của khách đã chọn, sắp xếp hoạt động mới trước theo `workDate` rồi `createdAt` và giới hạn số dòng.
-- Dạng đọc nên tái sử dụng `entityReadAll`/`entityReadRange` để nhận `{ fields, rows }`. Khi dựng object để tìm kiếm, ánh xạ theo tên trong `fields`, không dùng chỉ số cố định.
-- Chuẩn hóa từ khóa bằng `normalizeText` hiện tại (bỏ dấu, gộp khoảng trắng, chữ thường). Không tự ý bỏ dấu chấm/gạch của mã số thuế hay số điện thoại nếu chưa có ca kiểm thử chứng minh an toàn; bổ sung chỉ mục chữ số riêng chỉ khi có nhu cầu rõ ràng.
-
-## Luồng xử lý một tin nhắn
-
-1. `doPost` parse JSON, kiểm tra có `event_name`, `message.chat.id` và nội dung hợp lệ; request sai chỉ trả JSON lỗi chung và ghi log kỹ thuật.
-2. Kiểm tra quyền trước khi đọc dữ liệu. Bản triển khai đầu tiên mặc định **fail closed**: chỉ `chat_id` trong allowlist mới được tra cứu. Cách lưu allowlist (Config hay Script Properties) cần chốt trước khi code.
-3. Router nhận `/help`, `/sdt`, `/mst`, `/ten`, `/mkh`; mọi văn bản khác là tìm tự do. Không còn nhánh đăng nhập FBM.
-4. `BotQuery` đọc `Customer` một lần, lọc theo các trường tra cứu và loại trùng theo `id`. Với đúng một khách, đọc `Activity` và lọc theo `customerId`.
-5. `BotFormatter` tạo tin nhắn thuần văn bản, giới hạn số khách/hoạt động theo cấu hình. Dữ liệu rỗng hiển thị bằng nhãn dễ hiểu; không đưa mã cột `@...` vào tin nhắn.
-6. Gửi từng tin qua Zalo API. Lỗi API không làm lộ chi tiết kỹ thuật cho người dùng; ghi `source = bot` và trả thông báo thử lại.
-
-## Hội thoại văn bản nhiều bước
-
-Webhook không giữ được biến giữa hai tin nhắn, nên cần `BotState` lưu theo `chat_id` trong `PropertiesService` (kèm `LockService`), hoặc một sheet trạng thái riêng nếu sau này cần xem thủ công. Không lưu cả bản sao khách; chỉ lưu mã và bản nháp nhỏ.
-
-Trạng thái tối thiểu:
+## Trạng thái hội thoại
 
 ```text
 IDLE
-  -> CHOOSE_CUSTOMER      (đang có danh sách ứng viên)
-  -> VIEW_CUSTOMER        (đang xem một khách)
-  -> CHOOSE_FIELD         (đang chọn trường cần sửa)
-  -> ENTER_VALUE          (đang chờ giá trị mới)
-  -> CONFIRM_SAVE         (đang chờ LƯU hoặc HỦY)
-  -> IDLE
+  -> CHOOSE_CUSTOMER       (có nhiều khách trùng từ khóa)
+  -> VIEW_CUSTOMER         (đang xem một khách và các giao dịch)
+  -> ADD_TRANSACTION       (đang nhập giao dịch mới)
+  -> CONFIRM_TRANSACTION   (đang duyệt bản xem trước để ghi)
+  -> VIEW_CUSTOMER
 ```
 
-State gồm `chatId`, `mode`, danh sách `candidateIds`, `selectedId`, `entity`, `field`, `draft`, dấu vân tay bản ghi lúc mở, `updatedAt` và thời điểm hết hạn. TTL đề xuất 15 phút; hết hạn thì xóa state và yêu cầu tìm lại.
+State được lưu theo `chat_id`, chỉ giữ mã khách nội bộ, mã giao dịch đang xem, bản nháp nhỏ và mốc hết hạn; không lưu cả bản sao hàng dữ liệu. TTL đề xuất là 15 phút. State hết hạn thì bot yêu cầu tìm lại khách.
 
-Ví dụ luồng sửa khách:
+## Pipeline 1: Tìm khách hàng
 
-1. Người dùng gửi `Nguyễn Ánh`. Bot trả danh sách hoặc một khách, mỗi lựa chọn có số thứ tự và mã khách.
-2. Người dùng gửi `1`. Router hiểu đây là chọn ứng viên vì state đang là `CHOOSE_CUSTOMER`, không hiểu là một truy vấn số.
-3. Bot trả chi tiết và menu chữ: `Sửa: 1 Tên công ty, 2 MST, 3 Điện thoại, 0 Hủy`.
-4. Người dùng gửi `3`; bot chuyển sang `ENTER_VALUE` và chỉ rõ đang chờ số điện thoại mới.
-5. Người dùng gửi giá trị mới; bot hiển thị bản xem trước `cũ -> mới` và yêu cầu gõ chính xác `LƯU` hoặc `HỦY`.
-6. Khi nhận `LƯU`, bot đọc lại bản ghi theo `selectedId`, kiểm tra bản ghi chưa bị xóa và phát hiện nếu người khác vừa sửa. Sau đó gửi bản ghi một phần theo tên trường tới `writeGateSave` với nguồn `bot`.
-7. Chỉ khi cửa ghi trả `ok: true` và dòng đọc lại thành công thì bot mới báo đã lưu, xóa state và hiển thị dữ liệu mới. Lỗi kiểm tra giữ bản nháp để người dùng sửa lại.
+### Đầu vào
 
-Số thứ tự chỉ có nghĩa trong state hiện tại. Tin `1` ở `IDLE` là từ khóa tìm kiếm; tin `1` ở `CHOOSE_FIELD` là tên trường. `/huy` luôn xóa state và không ghi gì. Không dùng Markdown button, `callback_query`, URL mini app hoặc giả định người dùng có thể gửi loại sự kiện khác văn bản.
-
-## Ghi qua cửa chung
-
-- Mở rộng `WRITE_GATE_SOURCES` thêm `bot`. Nguồn `bot` dùng đúng các kiểm tra của nguồn `user` (`required`, `unique`, `validate`, SELECT, kiểu dữ liệu), không được là đường tắt.
-- `writeGateBuild` phải coi `bot` là nguồn người dùng khi kiểm tra giá trị; log vẫn ghi nguồn thật là `bot`.
-- `BotWriteService` gọi `runEntryPoint(..., 'bot', ...)`, dựng `{ entity, records: [record], source: 'bot' }` và gọi `writeGateSave`. Không gọi `setValue`, `appendRow` hay sửa `recordStatus` trực tiếp.
-- Khi sửa, bản ghi gửi lên chỉ gồm `id` và trường người dùng vừa xác nhận. Cửa ghi đọc hàng hiện tại và giữ nguyên mọi trường không gửi.
-- Khi thêm hoạt động, `customerId` phải lấy từ `selectedId` đã xác minh ở server, không nhận mã khách tùy ý từ tin nhắn. Chức năng thêm mới nên làm sau khi luồng sửa đã ổn định.
-- Xóa chỉ triển khai sau; nếu có thì phải là lệnh riêng, xem trước, yêu cầu xác nhận lần hai và gọi `deleteRecords`/`DeleteGate`, không xóa dòng trực tiếp.
-
-## Quy ước hội thoại
-
-Đây là giao diện chữ nên mỗi tin nhắn chỉ có một ý nghĩa theo trạng thái hiện tại. Người dùng luôn có thể gửi `/huy` để bỏ bản nháp và `/help` để xem lại cách dùng. Bot không chờ nút bấm, không nhận `callback_query` và không mở mini app.
-
-| Trạng thái | Số được hiểu là |
-| --- | --- |
-| `IDLE` | Từ khóa tìm kiếm, không phải lựa chọn. |
-| `CHOOSE_CUSTOMER` | Số thứ tự khách trong danh sách hiện tại, hoặc mã khách đầy đủ. |
-| `VIEW_CUSTOMER` | Lệnh trong menu khách: sửa, thêm hoạt động, xem hoạt động, xóa. |
-| `CHOOSE_FIELD` | Số thứ tự trường cần sửa. |
-| `ENTER_VALUE` | Giá trị mới của trường vừa chọn. |
-| `CONFIRM_SAVE` | Chỉ `LƯU`, `HỦY` hoặc `ĐỔI`. |
-| `LIST_ACTIVITY` | Số thứ tự hoạt động hiện tại. |
-| `VIEW_ACTIVITY` | Sửa hoặc xóa hoạt động. |
-
-State phải lưu `message_id` cuối đã xử lý để webhook gửi lặp không ghi hai lần. Mỗi state có `expiresAt` (đề xuất 15 phút); state quá hạn bị xóa và bot yêu cầu tìm lại.
-
-## Pipeline 1: Nhận và xác thực tin
-
-**Đầu vào:** Zalo gửi POST JSON có `result.event_name`, `result.message.from`, `result.message.chat`, `message.text`, `message_id`, `date` và header `X-Bot-Api-Secret-Token`.
-
-1. Relay kiểm tra HTTPS, header secret và kích thước body. Sai secret trả HTTP 403, không chuyển tiếp.
-2. Relay bọc event hợp lệ trong envelope có khóa nội bộ ở body rồi POST tới GAS. GAS kiểm tra khóa đó trước khi lấy event.
-3. GAS bỏ qua `message_id` đã xử lý, từ chối `chat_type = GROUP` ở bản đầu và kiểm tra `chat_id` trong allowlist đọc/ghi.
-4. Chỉ `message.text.received` đi vào router. Ảnh, sticker, voice và event không hỗ trợ không được đọc sheet.
-
-**Phản hồi:**
+Ở trạng thái `IDLE`, người dùng gửi một trong các tin sau:
 
 ```text
-Chat ngoài allowlist:
-Bạn chưa được cấp quyền sử dụng ShinCRM Bot.
-
-Chat nhóm:
-ShinCRM Bot hiện chỉ hoạt động trong cuộc trò chuyện cá nhân.
-
-Tin ảnh/voice/sticker:
-Bot hiện chỉ xử lý tin nhắn văn bản.
+.sdt 0984333222
+.mst 0101234567
+.ten Công ty ABC
+.mkh ALT00490
+Nguyễn Ánh
 ```
 
-Request sai secret không trả tin nhắn Zalo; relay trả HTTP 403. Request đúng secret nhưng JSON sai chỉ ghi log lỗi và trả JSON lỗi chung, không để webhook tự lặp vô hạn.
+### Cách bot xử lý
 
-## Pipeline 2: Trợ giúp và hủy
+1. Router nhận tiền tố dấu chấm. Tiền tố `.sdt`, `.mst`, `.ten` chỉ tìm đúng trường tương ứng; `.mkh` tìm đúng `fbmCustomerCode`/`@CUS_MA_KH_FBM`.
+2. Với tin tự do, bot thử các trường tìm kiếm đã cho phép: mã khách FBM, tên công ty, MST, điện thoại, người liên hệ và từ khóa phụ.
+3. Bot đọc dữ liệu khách từ Google Sheet theo schema và header hàng 1, không dùng số thứ tự cột cố định. Chỉ hàng có `recordStatus = active` và mã nội bộ `@CUS_MA_KH` mới được đưa vào kết quả.
+4. Bot loại trùng theo mã nội bộ ShinCRM. Mã nội bộ chỉ dùng để nối sang `Activity`, không thay cho mã FBM hiển thị.
 
-**Đầu vào:** `/help` ở bất kỳ trạng thái nào. Bot không đổi state hiện tại.
+### Không có kết quả
 
-**Phản hồi đề xuất:**
+```text
+Không tìm thấy khách với từ khóa: "abc".
+Thử .sdt, .mst, .ten hoặc .mkh để thu hẹp tìm kiếm.
+```
+
+State vẫn là `IDLE`; không đọc thêm và không ghi dữ liệu.
+
+### Có đúng một khách
+
+Bot tự mở khách ngay, không bắt người dùng gửi thêm `1`. Bot trả thông tin khách và tối đa 10 giao dịch mới nhất trong cùng phản hồi (có thể tách thành nhiều tin nếu vượt giới hạn Zalo):
+
+```text
+Khách hàng
+Mã khách FBM: ALT00490
+Tên công ty: Công ty ABC
+Mã số thuế: 0101234567
+Điện thoại: 0984333222
+Người liên hệ: Nguyễn Văn A
+
+10 giao dịch gần nhất:
+1. ACT-000901 | 09/09/2026 | Gọi điện
+   Đã trao đổi nhu cầu phần mềm.
+2. ACT-000877 | 05/09/2026 | Gửi báo giá
+   Đã gửi báo giá lần một.
+...
+10. ACT-000801 | 20/08/2026 | Chăm sóc
+   Đã xác nhận nhu cầu.
+
+Gửi 1 để xem 10 giao dịch cũ hơn.
+Gửi 2 để thêm giao dịch mới.
+Gửi 0 để tìm khách khác hoặc .huy để kết thúc.
+```
+
+State chuyển thành `VIEW_CUSTOMER`, lưu `selectedCustomerId` là mã nội bộ ShinCRM và điểm cuối của trang giao dịch hiện tại. Người dùng không cần biết hoặc nhập mã nội bộ này.
+
+Nếu khách có dưới 10 giao dịch, bot ghi rõ số thực tế. Nếu không có giao dịch:
+
+```text
+Khách này chưa có giao dịch nào.
+Gửi 2 để thêm giao dịch mới hoặc 0 để tìm khách khác.
+```
+
+### Có nhiều khách
+
+```text
+Tìm thấy 3 khách:
+
+1. ALT00490 - Công ty ABC - 0984333222
+2. ALT00491 - Công ty ABD - 0984333223
+3. ALT00502 - Công ty XYZ - 0912345678
+
+Gửi số thứ tự để mở khách. Gửi .mkh <mã FBM> để tìm chính xác hoặc .huy để hủy.
+```
+
+State chuyển thành `CHOOSE_CUSTOMER`, chỉ lưu danh sách mã nội bộ tương ứng và thời hạn. Tin `1` lúc này là chọn khách thứ nhất; sau khi chọn, bot trả thông tin khách và 10 giao dịch gần nhất như nhánh một kết quả.
+
+### Lựa chọn không hợp lệ
+
+```text
+Lựa chọn không hợp lệ. Hãy gửi số đang hiển thị hoặc mã khách FBM đầy đủ.
+```
+
+State không đổi. Nếu danh sách đã hết hạn hoặc khách vừa bị đánh dấu đã xóa, bot yêu cầu tìm lại từ đầu.
+
+## Pipeline 2: Xem tiếp lịch sử giao dịch
+
+### Đầu vào
+
+Ở trạng thái `VIEW_CUSTOMER`, sau khi đã hiện trang đầu, người dùng gửi `1`.
+
+### Cách bot xử lý
+
+1. Bot đọc lại các dòng `Activity` thuộc `selectedCustomerId`, chỉ lấy `recordStatus = active`.
+2. Các dòng được sắp xếp mới trước theo `workDate`, sau đó `createdAt` và mã giao dịch để thứ tự ổn định.
+3. Bot lấy 10 dòng cũ hơn giao dịch cuối trang trước. State lưu điểm cuối `(workDate, activityId)` thay vì lưu cả danh sách, nên tin nhắn thêm giao dịch mới không làm bot ghi đè dữ liệu cũ.
+
+### Phản hồi khi còn giao dịch
+
+```text
+10 giao dịch tiếp theo của ALT00490:
+
+11. ACT-000790 | 18/08/2026 | Tư vấn
+    Đã trao đổi phạm vi triển khai.
+...
+20. ACT-000650 | 01/07/2026 | Gọi điện
+    Chưa liên hệ được.
+
+Gửi 1 để xem tiếp 10 giao dịch cũ hơn.
+Gửi 2 để thêm giao dịch mới.
+Gửi 0 để quay lại tìm khách.
+```
+
+Số thứ tự hiển thị tiếp tục tăng theo trang để người dùng dễ theo dõi; mã `ACT-...` chỉ là mã giao dịch hiển thị, không phải số dòng sheet.
+
+### Phản hồi khi đã hết
+
+```text
+Đã hiển thị hết lịch sử giao dịch của ALT00490.
+Gửi 2 để thêm giao dịch mới hoặc 0 để tìm khách khác.
+```
+
+Bot không có luồng sửa hoặc xóa giao dịch từ màn hình này.
+
+## Pipeline 3: Thêm giao dịch mới
+
+### Bắt đầu
+
+Ở trạng thái `VIEW_CUSTOMER`, người dùng gửi `2`. Bot gắn giao dịch mới vào khách đang chọn; người dùng không được tự gửi mã khách khác trong bản nháp.
+
+```text
+Thêm giao dịch cho ALT00490 - Công ty ABC.
+Các trường có (*) là bắt buộc. Gửi số trường để nhập:
+
+1. Ngày làm việc (*)
+2. Công việc (*)
+3. Nội dung công việc (*)
+4. Sản phẩm (*)
+5. Người nhập liệu
+6. Giá trị hợp đồng
+7. Ưu tiên
+8. Hạn xử lý
+9. Cho phép đẩy FBM (*)
+0. Quay lại
+
+Gửi .huy để hủy thao tác.
+```
+
+### Nhập từng trường
+
+Bot chuyển sang `ADD_TRANSACTION`, hỏi giá trị theo trường người dùng chọn. Trường SELECT phải nhận một giá trị có trong danh mục `Category`; ngày nhận `dd/MM/yyyy` hoặc từ khóa `hôm nay`; số tiền nhận định dạng số theo cửa ghi. Trường không bắt buộc có thể gửi `-` để để trống. Trường bắt buộc không được bỏ qua.
+
+Ví dụ:
+
+```text
+Người dùng: 1
+Bot: Ngày làm việc hiện tại: 09/09/2026. Gửi ngày mới dạng dd/MM/yyyy hoặc - để dùng hôm nay.
+Người dùng: 09/09/2026
+Bot: Đã nhận ngày làm việc. Chọn trường tiếp theo: 1 ngày, 2 công việc, 3 nội dung, ...
+
+Người dùng: 2
+Bot: Chọn công việc: Gọi điện, Gửi báo giá, Họp, ...
+Người dùng: Gọi điện
+Bot: Đã nhận công việc. Chọn trường tiếp theo.
+```
+
+Sau mỗi trường, bot hiển thị danh sách trường và đánh dấu trường đã nhập. Người dùng có thể gửi lại số trường để thay đổi bản nháp trước khi lưu; đây chỉ là sửa bản nháp chưa ghi, không phải sửa giao dịch đã tồn tại.
+
+### Xem trước và xác nhận
+
+Khi đủ bốn trường bắt buộc, người dùng gửi `LƯU`. Bot chưa ghi ngay ở bước nhập cuối mà hiển thị bản xem trước:
+
+```text
+Xem trước giao dịch mới cho ALT00490:
+Ngày làm việc: 09/09/2026
+Công việc: Gọi điện
+Nội dung: Đã trao đổi nhu cầu phần mềm.
+Sản phẩm: Phần mềm
+Người nhập liệu: Nguyễn Văn A
+Giá trị hợp đồng: -
+Ưu tiên: Bình thường
+Hạn xử lý: -
+Cho phép đẩy FBM: Chưa cho phép
+
+Gửi LƯU lần nữa để ghi giao dịch.
+Gửi ĐỔI để quay lại chọn trường.
+Gửi .huy để bỏ bản nháp.
+```
+
+Hai lần xác nhận `LƯU` giúp tránh ghi nhầm khi đang chat nhanh. Nếu giá trị sai kiểu, thiếu bắt buộc hoặc không có trong danh mục, bot báo đúng trường lỗi và giữ nguyên bản nháp:
+
+```text
+Chưa nhận được giá trị. Trường "Ngày làm việc" cần dạng dd/MM/yyyy.
+Bản nháp vẫn còn, hãy gửi lại giá trị hoặc .huy để hủy.
+```
+
+### Ghi thành công
+
+Bot gọi cửa ghi chung của ShinCRM với `source = bot`. Cửa ghi tự cấp mã giao dịch, ngày nhập liệu, tình trạng bản ghi và kiểm tra toàn bộ luật required/SELECT/kiểu dữ liệu; bot không gọi `setValue` hoặc `appendRow` trực tiếp.
+
+```text
+Đã thêm giao dịch ACT-000901 cho ALT00490 - Công ty ABC.
+
+Gửi 1 để xem 10 giao dịch cũ hơn.
+Gửi 2 để thêm giao dịch tiếp theo.
+Gửi 0 để tìm khách khác.
+```
+
+State quay về `VIEW_CUSTOMER` và điểm đầu lịch sử được đọc lại để giao dịch vừa thêm xuất hiện trong trang mới nhất.
+
+### Ghi thất bại
+
+```text
+Chưa thêm được giao dịch: giá trị "Công việc" không có trong danh mục.
+Bản nháp vẫn còn, hãy gửi giá trị khác hoặc .huy để hủy.
+```
+
+Bot không báo stack trace, tên sheet, số dòng hay chi tiết quyền truy cập. Không có trường hợp ghi nửa chừng được coi là thành công.
+
+## Lệnh trợ giúp và hủy
+
+### `.help`
+
+`.help` có thể gửi ở bất kỳ trạng thái nào và không làm mất state hiện tại. Phản hồi đề xuất:
 
 ```text
 ShinCRM Bot
 
-TRA CỨU
-/sdt <số điện thoại>
-/mst <mã số thuế>
-/ten <tên công ty>
-/mkh <mã khách>
+TÌM KHÁCH
+.sdt <số điện thoại>
+.mst <mã số thuế>
+.ten <tên công ty>
+.mkh <mã khách FBM>
 Hoặc gửi trực tiếp từ khóa.
 
-THAO TÁC
-1  Chọn mục theo số bot hiển thị
-/them khach  Tạo khách mới
-/huy         Hủy thao tác hiện tại
-LƯU          Xác nhận ghi khi bot yêu cầu
+SAU KHI MỞ KHÁCH
+1  Xem 10 giao dịch cũ hơn
+2  Thêm giao dịch mới
+0  Tìm khách khác
+
+.huy  Hủy thao tác hiện tại
 ```
 
-**Đầu vào:** `/huy`.
+### `.huy`
 
-**Phản hồi:** `Đã hủy thao tác. Dữ liệu nháp chưa được ghi.` State chuyển về `IDLE`, không gọi cửa ghi.
-
-## Pipeline 3: Tìm khách
-
-**Đầu vào ở `IDLE`:** văn bản tự do, `/sdt ...`, `/mst ...`, `/ten ...` hoặc `/mkh ...`.
-
-1. Router tách tiền tố và từ khóa; từ khóa rỗng trả hướng dẫn, không đọc sheet.
-2. `BotQuery` đọc `Customer` theo `DATA_SCHEMA`, ánh xạ cột bằng hàng 1, chuẩn hóa bằng `normalizeText`, bỏ `recordStatus = deleted` và bỏ hàng không có `id`.
-3. Tìm chứa trong các trường được phép. Lệnh có tiền tố chỉ tìm đúng trường; tìm tự do dùng thứ tự ưu tiên theo loại từ khóa rồi loại trùng theo `id`.
-4. Giới hạn số ứng viên. Không tự động mở khách chỉ vì có đúng một kết quả; luôn yêu cầu người dùng gửi số `1`.
-
-**Không có kết quả:**
+`.huy` luôn có hiệu lực, kể cả khi đang nhập giao dịch hoặc đang chọn khách:
 
 ```text
-Không tìm thấy khách với từ khóa: "abc".
-Thử /sdt, /mst, /ten hoặc /mkh để thu hẹp tìm kiếm.
+Đã hủy thao tác. Không có dữ liệu nào được ghi.
 ```
 
-State vẫn là `IDLE`.
+State bị xóa và trở về `IDLE`.
 
-**Có đúng một kết quả:**
+## Luồng nền: Bot nhận tin nhắn (người dùng không phải thao tác)
+
+Pipeline này chỉ giải thích vì sao tin nhắn chat trực tiếp đến được bot; người dùng không gọi webhook và không nhìn thấy relay.
+
+1. Người dùng gửi văn bản trong cuộc trò chuyện cá nhân với Zalo Bot.
+2. Zalo Platform gửi sự kiện `message.text.received` tới địa chỉ webhook đã đăng ký.
+3. Lớp nhận tin kiểm tra secret header của Zalo, kích thước body và JSON; GAS kiểm tra thêm khóa nội bộ nếu có relay.
+4. Bot kiểm tra `chat_id`, chống xử lý lặp theo `message_id`, lấy state rồi chuyển tin cho router của ba pipeline nghiệp vụ.
+5. Ảnh, sticker, voice, nhóm chat hoặc event không hỗ trợ không được đọc/ghi sheet. Bot trả lời ngắn:
 
 ```text
-Tìm thấy 1 khách:
-
-1. KH000123 - Công ty ABC
-   MST: 0101234567 | SĐT: 0901234567
-
-Gửi 1 để mở khách này hoặc /huy để hủy.
+Bot hiện chỉ xử lý tin nhắn văn bản trong cuộc trò chuyện cá nhân.
 ```
 
-State chuyển thành `CHOOSE_CUSTOMER`, lưu `candidateIds = [KH000123]` và dấu vân tay bản ghi.
+6. Bot gọi Zalo Bot API `sendMessage` để trả kết quả. Nếu API lỗi, người dùng chỉ thấy thông báo thử lại; chi tiết lỗi nằm trong log kỹ thuật.
 
-**Có nhiều kết quả:**
+Google Apps Script không expose HTTP header trong `doPost(e)`. Vì vậy, nếu triển khai webhook bằng GAS, cần một relay HTTPS (Cloudflare Worker, Cloud Run hoặc dịch vụ tương đương) kiểm tra `X-Bot-Api-Secret-Token` rồi chuyển event vào GAS bằng khóa nội bộ. Đây là chi tiết hạ tầng, không làm thay đổi việc người dùng chat trực tiếp với Bot.
 
-```text
-Tìm thấy 8 khách, hiển thị 8:
+## Dữ liệu và ranh giới đọc/ghi
 
-1. KH000123 - Công ty ABC - 0901234567
-2. KH000124 - Công ty ABD - 0901234568
-...
-
-Gửi số thứ tự hoặc mã khách để mở. Gửi /huy để hủy.
-```
-
-State chuyển thành `CHOOSE_CUSTOMER`, chỉ lưu mã khách và thời hạn, không lưu cả hàng dữ liệu.
-
-## Pipeline 4: Chọn và xem khách
-
-**Đầu vào ở `CHOOSE_CUSTOMER`:** số thứ tự hoặc mã khách trong danh sách.
-
-- Hợp lệ: server kiểm tra mã vẫn tồn tại và `active`, đọc lại bản ghi theo mã, rồi chuyển `VIEW_CUSTOMER`.
-- Không hợp lệ: `Lựa chọn không hợp lệ. Hãy gửi số trong danh sách hoặc mã khách đầy đủ.` State không đổi.
-- State hết hạn hoặc mã đã bị xóa: `Danh sách đã hết hạn hoặc khách vừa thay đổi. Hãy tìm lại từ đầu.` rồi xóa state.
-
-**Phản hồi xem khách:**
-
-```text
-KH000123 - Công ty ABC
-Mã số thuế: 0101234567
-Điện thoại: 0901234567
-Email: abc@example.com
-Địa chỉ: Hà Nội
-Người liên hệ: Nguyễn Văn A
-Nhóm khách: Doanh nghiệp
-Sản phẩm: Phần mềm
-Nguồn khách: Giới thiệu
-Xác thực: Đã xác thực
-Ghi chú: ...
-
-Chọn thao tác:
-1. Sửa thông tin khách
-2. Thêm hoạt động
-3. Xem hoạt động
-4. Xóa khách
-0. Quay lại danh sách
-```
-
-State là `VIEW_CUSTOMER`, giữ `selectedId = KH000123` và dấu vân tay đọc lại.
-
-## Pipeline 5: Sửa khách
-
-**Đầu vào ở `VIEW_CUSTOMER`:** `1`.
-
-**Phản hồi:** bot hiển thị menu trường theo tên, không hiển thị mã `@...`:
-
-```text
-Sửa khách KH000123. Gửi số trường:
-1 Tên công ty (*)       2 Mã số thuế
-3 Điện thoại             4 Email
-5 Địa chỉ                6 Tỉnh thành
-7 Website                8 Người liên hệ
-9 Công ty mẹ             10 Nhóm khách
-11 Sản phẩm              12 Nguồn khách (*)
-13 Xác thực (*)          14 Ngày đóng thầu
-15 Ghi chú               16 Từ khóa tìm kiếm
-17 Cho phép đẩy FBM (*)  0 Quay lại
-```
-
-State chuyển thành `CHOOSE_FIELD`.
-
-**Đầu vào ở `CHOOSE_FIELD`:** ví dụ `3`.
-
-**Phản hồi:** `Điện thoại hiện tại: 0901234567. Gửi số điện thoại mới, hoặc /huy để bỏ.` State chuyển thành `ENTER_VALUE` với `field = phone`.
-
-**Đầu vào ở `ENTER_VALUE`:** giá trị mới.
-
-- Nếu sai kiểu ngày/số, thiếu giá trị bắt buộc hoặc SELECT không thuộc `Category`, bot trả lý do và giữ nguyên `ENTER_VALUE`.
-- Nếu hợp lệ, bot không ghi ngay mà chuyển `CONFIRM_SAVE`.
-
-**Phản hồi xem trước:**
-
-```text
-Xem trước thay đổi KH000123:
-Điện thoại: 0901234567 -> 0987654321
-
-Gửi LƯU để ghi, ĐỔI để chọn trường khác, hoặc HỦY để bỏ bản nháp.
-```
-
-**Đầu vào ở `CONFIRM_SAVE`:** `LƯU`.
-
-1. Bot đọc lại `selectedId`, kiểm tra bản ghi còn `active` và so sánh dấu vân tay. Nếu người khác vừa sửa cùng trường, bot dừng và yêu cầu tìm lại.
-2. `BotWriteService` gửi `{ id: 'KH000123', phone: '0987654321' }` tới `writeGateSave` với `source = 'bot'`.
-3. `WriteGate` khóa tài liệu, kiểm tra, ghi đúng cột, `flush`, đọc lại và trả bản ghi đầy đủ.
-
-**Phản hồi thành công:**
-
-```text
-Đã lưu khách KH000123.
-Điện thoại hiện tại: 0987654321
-Gửi 1 để sửa tiếp, 2 để thêm hoạt động, 3 để xem hoạt động, hoặc /huy.
-```
-
-State về `VIEW_CUSTOMER`; bản nháp bị xóa.
-
-**Phản hồi lỗi:** `Chưa lưu được: [lý do dễ hiểu]. Bản nháp vẫn còn, gửi giá trị khác hoặc HỦY.` Không báo stack trace và không ghi nửa chừng.
-
-## Pipeline 6: Thêm khách mới
-
-**Đầu vào ở `IDLE`:** `/them khach`.
-
-**Phản hồi:**
-
-```text
-Tạo khách mới. Các trường có (*) là bắt buộc.
-Gửi số trường để nhập:
-1 Tên công ty (*)  2 Mã số thuế  3 Điện thoại  4 Email
-5 Địa chỉ          6 Tỉnh thành  7 Website     8 Người liên hệ
-9 Công ty mẹ       10 Nhóm khách 11 Sản phẩm   12 Nguồn khách (*)
-13 Xác thực (*)     14 Ngày đóng thầu 15 Ghi chú 16 Từ khóa tìm kiếm
-17 Cho phép đẩy FBM (*)
-
-Khi đủ trường bắt buộc, gửi LƯU để xem trước và ghi. Gửi /huy để bỏ.
-```
-
-State là `CHOOSE_FIELD` với `entity = customer`, `isNew = true`, bản nháp có `id = ''`. Mỗi trường nhập xong quay lại menu và hiển thị dấu `đã nhập`. `-` nghĩa là để trống ở trường không bắt buộc; không cho bỏ qua trường bắt buộc.
-
-Khi nhận `LƯU`, bot gửi bản nháp qua `writeGateSave`. Cửa ghi tự cấp `id`, `createdAt`, `recordStatus = active`, kiểm tra required/unique/SELECT và trả dòng đọc lại.
-
-**Phản hồi thành công:**
-
-```text
-Đã tạo khách KH000456 - Công ty XYZ.
-Gửi 1 để xem/sửa khách, 2 để thêm hoạt động, hoặc /huy.
-```
-
-Nếu thiếu hoặc sai trường, bot liệt kê đúng trường cần sửa; không cấp mã trước khi mọi kiểm tra đạt.
-
-## Pipeline 7: Xem hoạt động của khách
-
-**Đầu vào ở `VIEW_CUSTOMER`:** `3`.
-
-Bot đọc `Activity`, lọc `customerId = selectedId` và `recordStatus = active`, sắp xếp `workDate`/`createdAt` mới trước, rồi trả:
-
-```text
-Hoạt động của KH000123 (3):
-
-1. ACT000901 | 09/09/2026 | Gọi điện
-   Đã trao đổi nhu cầu phần mềm...
-2. ACT000877 | 05/09/2026 | Gửi báo giá
-   ...
-3. ACT000860 | 01/09/2026 | Chăm sóc
-   ...
-
-Gửi số để mở hoạt động, 0 để quay lại khách.
-```
-
-State là `LIST_ACTIVITY`, lưu danh sách `activityIds`. Không tìm hoạt động theo số dòng sheet.
-
-**Không có hoạt động:** `Khách KH000123 chưa có hoạt động nào. Gửi 2 để thêm hoạt động hoặc 0 để quay lại.`
-
-## Pipeline 8: Thêm hoạt động
-
-**Đầu vào ở `VIEW_CUSTOMER`:** `2`.
-
-Bot tạo bản nháp `entity = activity`, gắn `customerId` từ state server và hiển thị:
-
-```text
-Thêm hoạt động cho KH000123. Chọn trường:
-1 Ngày làm việc (*)  2 Công việc (*)  3 Nội dung (*)
-4 Sản phẩm (*)       5 Người nhập liệu 6 Giá trị hợp đồng
-7 Ưu tiên            8 Hạn xử lý      9 Cho phép đẩy FBM (*)
-0 Quay lại
-```
-
-Mỗi trường đi qua `CHOOSE_FIELD` -> `ENTER_VALUE`. Ngày dùng dạng `dd/MM/yyyy` hoặc `dd/MM/yyyy HH:mm` theo precision; số dùng khuôn số của cửa ghi; SELECT chỉ nhận giá trị có trong `Category`.
-
-Khi đủ trường bắt buộc, bot trả xem trước:
-
-```text
-Hoạt động mới của KH000123:
-Ngày: 09/09/2026
-Công việc: Gọi điện
-Nội dung: Đã trao đổi nhu cầu phần mềm
-Sản phẩm: Phần mềm
-
-Gửi LƯU để ghi hoặc HỦY để bỏ.
-```
-
-`BotWriteService` gửi `customerId` do server gắn, không nhận mã khách mới từ tin nhắn. `WriteGate` tự cấp `id`, `createdAt`, đặt `recordStatus = active` và trả lại hoạt động đã ghi.
-
-**Phản hồi thành công:** `Đã lưu hoạt động ACT000901 cho KH000123.` State về `VIEW_CUSTOMER`.
-
-## Pipeline 9: Chọn và sửa hoạt động
-
-**Đầu vào ở `LIST_ACTIVITY`:** số thứ tự hoạt động.
-
-Bot đọc lại theo `activityId` và trả:
-
-```text
-ACT000901 - KH000123
-Ngày làm việc: 09/09/2026
-Công việc: Gọi điện
-Nội dung: Đã trao đổi nhu cầu phần mềm
-Sản phẩm: Phần mềm
-Người nhập liệu: Nguyễn Văn A
-
-1. Sửa hoạt động
-2. Xóa hoạt động
-0. Quay lại danh sách
-```
-
-**Đầu vào:** `1` chuyển sang menu trường của Activity (`workDate`, `taskType`, `content`, `product`, `enteredBy`, `contractValue`, `priority`, `dueAt`, `allowFbmPush`), sau đó dùng cùng chuỗi `CHOOSE_FIELD` -> `ENTER_VALUE` -> `CONFIRM_SAVE` như sửa khách. Bản ghi gửi tới cửa ghi chỉ gồm `id` và trường đã đổi; `customerId` không cho người dùng sửa.
-
-## Pipeline 10: Xóa có xác nhận
-
-**Đầu vào ở `VIEW_CUSTOMER`:** `4`. Bot cảnh báo trước:
-
-```text
-Bạn sắp xóa khách KH000123 - Công ty ABC.
-Hoạt động của khách không tự động bị xóa liên đới.
-Để tiếp tục, gõ chính xác: XÓA KH000123
-Gõ HỦY để bỏ.
-```
-
-Đúng câu xác nhận mới gọi `deleteRecords('customer', ['KH000123'])`/`DeleteGate`. Không hỗ trợ xóa hàng loạt từ Zalo. Phản hồi tùy kết quả cửa xóa:
-
-- Xóa được: `Đã xóa khách KH000123.`
-- Chỉ xóa mềm: `Khách KH000123 đã được đánh dấu đã xóa; không xóa hẳn vì còn ràng buộc.`
-- Mã biến mất hoặc lỗi khóa: `Chưa xóa được. Hãy tìm lại khách rồi thử lại.`
-
-**Đầu vào ở `VIEW_ACTIVITY`:** `2`. Bot yêu cầu `XÓA ACT000901`, rồi gọi `DeleteGate` cho đúng một hoạt động. Không có hoàn tác qua Zalo ở bản đầu; muốn phục hồi dùng công cụ quản trị đã có của ShinCRM.
-
-## Pipeline 11: Lỗi, hết hạn và gửi lặp
-
-| Tình huống | Bot trả về | Hành động dữ liệu |
-| --- | --- | --- |
-| Tin không hiểu trong menu | `Mình chưa hiểu lựa chọn. Gửi số đang hiển thị hoặc /huy.` | Không đọc/ghi thêm. |
-| State hết hạn | `Phiên thao tác đã hết hạn. Hãy tìm lại khách từ đầu.` | Xóa state. |
-| Bản ghi vừa bị người khác sửa | `Dữ liệu đã thay đổi trong lúc bạn nhập. Hãy tìm lại rồi sửa tiếp.` | Không ghi. |
-| WriteGate báo sai trường | `Chưa lưu được: ...` | Không ghi hoặc ghi nửa chừng; giữ bản nháp. |
-| Document lock bận | `ShinCRM đang có người lưu. Vui lòng thử lại sau.` | Không ghi. |
-| Zalo API lỗi `ok = false` | `Bot chưa gửi được phản hồi. Vui lòng thử lại.` | Log `description/error_code`, không lộ chi tiết. |
-| Cùng `message_id` gửi lại | Không gửi thêm tin và không chạy lại lệnh. | Idempotent (chống ghi lặp). |
+- Customer được đọc theo `DATA_SCHEMA` và header hàng 1; không giả định cột A/B/C.
+- Tìm `.mkh` đọc trường đồng bộ `fbmCustomerCode`/`@CUS_MA_KH_FBM`; bot không gọi FBM để tìm realtime. Nếu cột này rỗng, `.mkh` không thể tìm ra khách cho tới khi đồng bộ bổ sung dữ liệu.
+- Activity nối với khách bằng mã nội bộ `@ACT_MA_KH`, chỉ lấy dòng `active`, sắp xếp mới trước và phân trang 10 dòng.
+- Khi thêm Activity, `customerId` được server lấy từ khách đang mở; không tin mã khách do người dùng tự chèn trong nội dung chat.
+- Ghi mới đi qua `WriteGate` với nguồn `bot` và dùng toàn bộ kiểm tra giống nguồn người dùng. Bot không sửa cột đồng bộ FBM và không đẩy giao dịch sang FBM trong lúc ghi.
+- Allowlist đọc và allowlist ghi tách riêng. Người có quyền đọc nhưng không có quyền ghi vẫn xem được khách và lịch sử nhưng khi gửi `2` sẽ nhận thông báo không có quyền thêm giao dịch.
 
 ## Các điểm cần duyệt trước khi code
 
-| Điểm | Đề xuất an toàn hiện tại |
+| Điểm | Đề xuất trong bản này |
 | --- | --- |
-| Webhook | Dùng relay kiểm tra `X-Bot-Api-Secret-Token`, rồi chuyển envelope vào GAS. |
-| Quyền | Allowlist đọc và allowlist ghi tách nhau; ngoài danh sách ghi thì chỉ tra cứu. |
-| State | `PropertiesService` + `LockService`, lưu mã/bản nháp nhỏ, TTL 15 phút. |
-| Ghi khách | Cho sửa trường và thêm khách mới qua `WriteGate`, không ghi trực tiếp. |
-| Ghi hoạt động | Cho thêm/sửa một hoạt động đã gắn khách; mã khách chỉ do server lấy từ state. |
-| Xóa | Một bản ghi mỗi lần, xác nhận bằng câu `XÓA <loại> <mã>`, gọi `DeleteGate`; chưa có hoàn tác qua bot. |
-| Nhóm chat | Từ chối `GROUP` ở bản đầu để tránh lộ dữ liệu và nhầm người thao tác. |
-
-## Hành vi trả lời
-
-- `/help`: cú pháp bốn lệnh và ví dụ ngắn.
-- Không có kết quả: nêu từ khóa và gợi ý dùng lệnh theo trường cụ thể.
-- Một kết quả: mã khách, tên công ty, mã số thuế, điện thoại, người liên hệ; phía dưới là tối đa `BOT_MAX_ACTIVITIES` hoạt động gần đây.
-- Nhiều kết quả: hiển thị tối đa `BOT_MAX_RESULTS`, mỗi dòng phải có mã khách và tên; hướng dẫn nhập `/mkh <mã>` để thu hẹp.
-- Tin nhắn dài phải tách ở ranh giới khách/hoạt động. Nếu một mục đơn lẻ vượt giới hạn thì cắt phần ghi chú dài và ghi rõ đã rút gọn.
-
-## Kết nối Zalo theo tài liệu chính thức
-
-- Mọi API gọi tới `https://bot-api.zaloplatforms.com/bot${BOT_TOKEN}/${functionName}` qua HTTPS. `getMe` dùng kiểm tra token; tên phương thức phân biệt hoa thường.
-- API hỗ trợ GET và POST cùng các dạng tham số query string, form, JSON và multipart. Dùng GET cho truy xuất, POST cho gửi/cập nhật; bot của ta gửi `sendMessage` bằng POST JSON.
-- Mọi phản hồi là JSON gồm `ok`, `result`, `description`, `error_code`. `ok = false` phải được ghi log và chuyển thành câu lỗi chung.
-- Webhook là POST JSON với header `X-Bot-Api-Secret-Token`. Phải so sánh chính xác header này trước khi parse và xử lý `result`; thiếu hoặc sai trả HTTP 403.
-- Các sự kiện tối thiểu cần xử lý là `message.text.received`; các sự kiện ảnh/sticker/không hỗ trợ chỉ trả lời rằng bot nhận văn bản.
-
-## Điểm chặn khi dùng GAS làm webhook
-
-Event object của web app Google Apps Script có `postData`, `parameter` và `queryString`, nhưng không expose (công khai) HTTP request headers. Vì vậy `doPost(e)` không thể tự đọc `X-Bot-Api-Secret-Token` mà Zalo bắt buộc gửi; gọi Zalo thẳng vào URL `/exec` sẽ không đáp ứng được xác thực chính thức.
-
-Phương án an toàn tạm thời là một webhook relay (Cloudflare Worker, Cloud Run hoặc dịch vụ HTTPS tương đương):
-
-1. Relay nhận POST từ Zalo, kiểm tra chính xác `X-Bot-Api-Secret-Token`, sai thì trả 403.
-2. Relay chỉ chuyển tiếp JSON hợp lệ tới GAS trong một envelope (gói bọc) có khóa nội bộ mới ở body; khóa này được so sánh trước khi lấy event bên trong, không đưa lên URL.
-3. GAS kiểm tra khóa nội bộ, sau đó mới chạy state, query và WriteGate. URL GAS không đăng ký trực tiếp với Zalo.
-
-Không dùng secret Zalo trong query string và không coi URL khó đoán là thay thế cho header. Nền tảng relay là quyết định hạ tầng cần chốt trước khi viết `BotEntry`; phần nghiệp vụ bot vẫn chỉ đọc/ghi Google Sheet.
-
-## An toàn và quan sát
-
-- Không đặt bot token, secret webhook, allowlist hoặc dữ liệu xác thực trong tệp `.js` đã commit. Không ghi password, cookie, token hay toàn bộ payload tin nhắn vào `Log`.
-- `X-Bot-Api-Secret-Token` phải được kiểm tra trước khi xử lý theo đúng tài liệu Zalo. Nếu `doPost(e)` của GAS không đọc được header trong triển khai thực tế, phải chặn triển khai và dùng một lớp nhận webhook có thể kiểm tra header; không hạ xuống chỉ dựa vào URL `/exec`.
-- Dùng `LogGate` hiện tại; thêm nguồn `bot` vào danh mục `LOG_TRACE` khi triển khai. Mặc định tắt log chi tiết, chỉ bật tạm trên Sheet DEV.
-- Không trả stack trace, tên sheet, chỉ số hàng/cột hoặc thông tin quyền truy cập cho Zalo.
-- Giới hạn kích thước từ khóa và số dòng đọc để một tin nhắn không làm vượt thời gian chạy Apps Script. Khi vượt giới hạn, trả thông báo thu hẹp từ khóa thay vì đọc thêm vô hạn.
-
-## Ranh giới tệp dự kiến khi code
-
-- `server/bot/BotEntry.js`: `doPost`, router và handler; không chứa truy vấn sheet.
-- `server/bot/BotAccess.js`: đọc allowlist và kiểm tra request; fail closed.
-- `server/bot/BotState.js`: lưu trạng thái hội thoại theo `chat_id`, TTL, khóa và chống xử lý lặp.
-- `server/bot/BotQuery.js`: đọc schema, tìm khách, lấy hoạt động và đọc lại bản ghi; chỉ đọc.
-- `server/bot/BotFormat.js`: định dạng kết quả và tách tin nhắn; không gọi `SpreadsheetApp`.
-- `server/bot/BotWriteService.js`: chuyển bản nháp đã xác nhận sang `WriteGate`/`DeleteGate`.
-- `server/bot/ZaloApi.js`: gọi API Zalo và che lỗi; token lấy từ cấu hình bí mật.
-
-Tên tệp chỉ là đề xuất để chuẩn bị code; khi tạo thật phải cập nhật `0_Documentation/Phiên code/Cây thư mục code.md` trong cùng lượt.
+| Phạm vi nghiệp vụ | Chỉ tìm khách, xem lịch sử và thêm giao dịch; không sửa/xóa khách hoặc giao dịch. |
+| Cú pháp | Dùng `.sdt`, `.mst`, `.ten`, `.mkh`, `.help`, `.huy`; không dùng `/`. |
+| Mã `.mkh` | Tìm theo `ma_kh` FBM trong `@CUS_MA_KH_FBM`, không tìm theo mã nội bộ Google Sheet. |
+| Một kết quả | Tự mở khách và hiện tối đa 10 giao dịch mới nhất ngay. |
+| Xem tiếp | Gửi `1` để lấy 10 giao dịch cũ hơn; gửi lặp lại cho tới khi hết. |
+| Thêm giao dịch | Gửi `2`, nhập từng trường, xác nhận `LƯU` hai lần; ghi vào `Activity` qua `WriteGate`. |
+| Kênh webhook | Người dùng chat trực tiếp; relay chỉ là lớp nền để kiểm tra secret trước khi vào GAS. |
+| State | Lưu theo `chat_id`, TTL 15 phút, chống chạy lặp theo `message_id`. |
 
 ## Kiểm thử trước khi dùng thật
 
-- Offline: parser lệnh, state transition, hết hạn, `/huy`, tin số trong từng trạng thái, ứng viên cũ, tin gửi lặp, chuẩn hóa tìm kiếm và nhánh 0/1/n.
-- Offline cửa ghi: `bot` không bypass kiểm tra, bản ghi một phần không xóa trường khác, giá trị sai không ghi, và mã khách không thuộc state bị từ chối.
-- Google DEV: đổi thứ tự cột vẫn đọc/ghi đúng, khách `deleted` không xuất hiện, sheet rỗng không lỗi, ghi xong đọc lại đúng và chỉ có dữ liệu dự kiến cùng `Log` thay đổi.
-- Webhook: request thiếu trường, event không hỗ trợ, chat ngoài allowlist, không có quyền ghi, lỗi Zalo API và từ khóa chứa ký tự đặc biệt đều fail closed.
-- Chỉ đăng ký webhook và thử gửi tin sau khi thay token/secret mẫu bằng giá trị bí mật của môi trường DEV; không dùng dữ liệu khách thật trong giai đoạn này.
+- Tìm `.sdt`, `.mst`, `.ten`, `.mkh` với 0, 1 và nhiều kết quả; kiểm tra `.mkh` chỉ khớp `@CUS_MA_KH_FBM`.
+- Một khách có 0, 1, 10 và hơn 10 giao dịch; gửi `1` nhiều lần và kiểm tra không trùng hoặc bỏ sót trang.
+- Thêm giao dịch đủ/thiếu trường bắt buộc, sai ngày, sai số, sai SELECT và hủy bằng `.huy`.
+- Người chỉ có quyền đọc không thể thêm giao dịch; người có quyền ghi chỉ ghi được Activity cho khách đã chọn.
+- Đổi thứ tự cột Google Sheet vẫn tìm và ghi đúng theo header; khách hoặc giao dịch `deleted` không xuất hiện.
+- Webhook thiếu secret, event không phải văn bản, chat nhóm, tin gửi lặp và lỗi Zalo API đều fail closed (đóng an toàn).
+- Chỉ thử trên Sheet DEV hoặc tệp trắng; không dùng token thật trong tài liệu và không thử trên dữ liệu khách thật.
 
 ## Nguồn đã đối chiếu
 
-- Code cũ: `Main.txt`, `SearchLogic.txt`, `Formatter.txt`, `ZaloAPI.txt`, `LogService.txt`, `FBMAuth.txt`, `FBMQuery.txt`, `SessionManager.txt`.
-- Code hiện tại: `server/data/DataSchema.js`, `server/data/SheetLayout.js`, `server/sheet/EntityRead.js`, `server/sheet/SheetIo.js`, `server/gate/WriteGate.js`, `server/gate/DeleteGate.js`, `server/service/SaveService.js`, `server/util/TextNormalize.js`.
+- Code cũ trong thư mục này: `Main.txt`, `SearchLogic.txt`, `Formatter.txt`, `ZaloAPI.txt`, `LogService.txt`, `FBMAuth.txt`, `FBMQuery.txt`, `SessionManager.txt`, `Utils.txt`, `Config.txt`, `z_setWebhook.txt`.
+- Code hiện tại: `server/data/DataSchema.js`, `fbm_sync/SyncSchema.js`, `server/sheet/EntityRead.js`, `server/sheet/SheetIo.js`, `server/gate/WriteGate.js`, `server/gate/DeleteGate.js`, `server/service/SaveService.js`, `server/util/TextNormalize.js`.
+- Tài liệu Zalo Bot đã đọc: [Tài liệu zalobot do chính Zalo phát hành.md](Tài liệu zalobot do chính Zalo phát hành.md), cùng các mục `/docs/BOT`, `/docs/BOT/create_bot`, `/docs/BOT/authorize`, `/docs/BOT/call_api`, `/docs/BOT/apis/getMe`, `/docs/BOT/webhook`, `/docs/BOT/best-practices/build-personal-assistant-with-open-claw`, `/docs/BOT/error_code`.
