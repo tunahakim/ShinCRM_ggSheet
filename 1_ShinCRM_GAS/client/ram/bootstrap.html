@@ -52,7 +52,6 @@ async function sidebarBoot() {
     sheetLinkSetSpreadsheetId(core.spreadsheetId);
     if (typeof sheetLinkSetColumnHints === 'function') {
       sheetLinkSetColumnHints({
-        revision: core.schemaRevision || '',
         targets: [
           { sheetName: 'Customer', header: core.schema.customer.id.code },
           { sheetName: 'Activity', header: core.schema.activity.customerId.code },

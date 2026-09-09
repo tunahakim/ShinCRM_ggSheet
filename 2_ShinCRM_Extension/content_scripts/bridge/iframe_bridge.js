@@ -51,7 +51,6 @@ function acceptColumnHints(data) {
   if (!isColumnHints(data.columnHints)) { return; }
   if (data.spreadsheetId && typeof readSpreadsheetId === 'function' && String(data.spreadsheetId) !== String(readSpreadsheetId())) { return; }
   CRM_COLUMN_HINTS = {
-    revision: String(data.hintsRevision || ''),
     targets: data.columnHints.targets.map(function (target) {
       return {
         sheetName: typeof target.sheetName === 'string' ? target.sheetName : '',
