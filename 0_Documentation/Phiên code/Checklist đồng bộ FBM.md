@@ -70,7 +70,7 @@ Tài liệu này theo dõi phạm vi đồng bộ FBM/ShinCRM. Không thực hi�
 - [x] Hiển thị preview đọc-only có giới hạn của Customer/Activity để nghiệm thu live mà không ghi Sheet.
 - [x] Có mục menu `Mở đồng bộ FBM` để mở/đóng khu vực trạng thái.
 - [x] Chỉ lấy snapshot trạng thái khi mở màn hình và sau mỗi slice; không polling định kỳ tạo callback thừa.
-- [ ] Rà soát hiển thị tiến độ thực tế trong Sidebar.
+- [x] Rà soát hiển thị tiến độ thực tế trong Sidebar.
 - [x] Hoàn thiện heartbeat định kỳ 5 phút trong Extension bằng `chrome.alarms` và request đọc.
 - [ ] Hoàn thiện lịch quét Customer 60 phút và Activity 8 giờ.
 - [x] Có nút đồng bộ thủ công, dừng phiên và thông báo lỗi nhất quán.
@@ -90,7 +90,8 @@ Tài liệu này theo dõi phạm vi đồng bộ FBM/ShinCRM. Không thực hi�
 ## 9. Bàn giao
 
 - [ ] Cập nhật checklist và cây thư mục lần cuối.
-- [ ] Đẩy GAS/triển khai Extension sau khi test offline và GAS smoke test xanh.
+- [x] Đẩy GAS sau khi test offline và GAS smoke test xanh (revision `@103`).
+- [ ] Đóng gói và tải lại Extension sau khi bước live test được phép.
 - [x] Ghi rõ các bước người dùng cần thao tác và kết quả nghiệm thu.
 
 ## Điều kiện còn chờ người dùng
