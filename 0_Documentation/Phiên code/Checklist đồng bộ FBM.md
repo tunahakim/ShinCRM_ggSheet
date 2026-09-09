@@ -95,12 +95,12 @@
 
 - [x] Đọc thử đã preview đúng `ALT00010 · Test` mà không ghi hai hệ.
 - [x] Luồng đọc thủ công tạo state, thực thi từng request qua Extension, trả preview và kết thúc mà không ghi hai hệ.
-- [ ] Customer FBM chưa có `FBM_ID` được tạo dòng mới, cấp mã nội bộ, lưu ID/mã FBM, nội dung và baseline trong một khóa.
+- [x] Customer FBM chưa có `FBM_ID` được tạo dòng mới, cấp mã nội bộ, lưu ID/mã FBM, nội dung và baseline trong một khóa.
 - [x] Customer đã tồn tại ở FBM và ShinCRM nhưng chưa liên kết được nhận diện bằng MST chuẩn hóa; nếu chỉ có một dòng ShinCRM khớp thì nối vào dòng đó, nếu MST trùng nhiều dòng hoặc đã liên kết thì fail-closed, không tạo Customer trùng.
-- [ ] Bản ghi pull có đủ `id`, `@CUS_FBM_ID`, `@CUS_MA_KH_FBM`, nội dung, baseline và trạng thái.
-- [ ] Pull giữ `note`, `verifyStatus`, `allowFbmPush` và trường chỉ thuộc ShinCRM.
+- [x] Bản ghi pull có đủ `id`, `@CUS_FBM_ID`, `@CUS_MA_KH_FBM`, nội dung, baseline và trạng thái.
+- [x] Pull giữ `note`, `verifyStatus`, `allowFbmPush` và trường chỉ thuộc ShinCRM.
 - [ ] Bản ghi mới đặt đúng mã nội bộ, ngày tạo, `active`, khóa cha và quyền push.
-- [ ] Sau pull đánh dấu dirty đúng mã để Sidebar nạp lại.
+- [x] Sau pull đánh dấu dirty đúng mã để Sidebar nạp lại.
 - [ ] `FBM_ACTIVITY_SINCE` loại lịch sử cũ mà không làm sai baseline hoặc missing.
 
 ### Đối soát Customer

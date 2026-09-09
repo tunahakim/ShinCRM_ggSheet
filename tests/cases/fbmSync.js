@@ -126,6 +126,13 @@ async function chay(so) {
   builders.writeGateSave = (request) => { baselineWrite = request; return { ok: true }; };
   const baselineResult = builders.FbmSync.recalculateBaseline('customer');
   check(so, 'tinh lai baseline chi ghi cot sync noi bo', [baselineResult.ok, baselineResult.written, baselineWrite.records[0].fbmHash !== '', baselineWrite.source], [true, 1, true, 'pull']);
+  let newPullWrite, dirtyIds = [];
+  builders.FbmSync.stateRead = () => ({ metadata: { categoryGate: gate } });
+  builders.FbmSync.readLocal = () => [];
+  builders.dirtyStateMarkRecords = (ids) => { dirtyIds = ids; };
+  builders.writeGateSave = (request) => { newPullWrite = request; return { ok: true, fields: ['id'], rows: [['CUS-NEW']] }; };
+  const newPullResult = builders.FbmSync.pullWrite('customer', [builders.FbmSync.customerRecord({ stt_rec_kh: 'NEW-C', ma_kh: 'ALT00012', ten_kh: 'Khách mới', ma_so_thue: '001' }, gate)]);
+  check(so, 'Customer pull moi ghi ca dinh danh baseline va dirty marker', [newPullResult.written, newPullWrite.source, newPullWrite.schemas.length, newPullWrite.records[0].fbmId, newPullWrite.records[0].fbmHash !== '', dirtyIds[0]], [1, 'pull', 2, 'NEW-C', true, 'CUS-NEW']);
   let conflictState = { metadata: { categoryGate: gate, conflicts: [] }, counts: { conflict: 0 } }, conflictWrite;
   builders.FbmSync.stateRead = () => conflictState;
   builders.FbmSync.stateWrite = (next) => { conflictState = next; return next; };
