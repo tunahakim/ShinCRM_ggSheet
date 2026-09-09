@@ -46,7 +46,8 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 ├── server\                       Code chạy phía Google, không có DOM, không thấy trang web.
 │   ├── config\
 │   │   ├── Settings.js           Hằng số phía code (SETTINGS) và khối tham số hệ thống của sheet Config. Nơi duy nhất biết LOG_TRACE đang bật cho nguồn nào.
-│   │   └── ConfigParams.js       Danh mục núm vặn: có những tham số nào, mỗi tham số gõ giá trị gì là hợp lệ. Settings.js biết một tham số đang là bao nhiêu, tệp này biết có những tham số nào.
+│   │   ├── ConfigParams.js       Danh mục núm vặn: có những tham số nào, mỗi tham số gõ giá trị gì là hợp lệ. Settings.js biết một tham số đang là bao nhiêu, tệp này biết có những tham số nào.
+│   │   └── ConfigSheetSetup.js   Migration bộ đếm Config cũ, dựng hướng dẫn và validation, gieo tham số và khôi phục Config mặc định mà không chạm Customer/Activity.
 │   ├── data\
 │   │   ├── DataSchema.js         Khai 33 cột dữ liệu người dùng: mã cột, nhãn, kiểu, ràng buộc. Nguồn sự thật của hàng 1.
 │   │   ├── ColumnFormat.js       Khuôn hiển thị của từng cột, khai một chỗ cho cả SetupSheets và WriteGate dùng chung. Chống mất chữ số đầu của mã số thuế: `@` nghĩa là chữ, không phải số.
@@ -69,12 +70,14 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   ├── gate\                     Các cửa ghi có kỷ luật, cùng họ với LogGate: vào một chỗ, kiểm rồi mới ghi, một lượt một lệnh.
 │   │   ├── FieldLogic.js         Ba bảng chuẩn hóa - kiểm tra - bắt buộc của tài liệu 03 Phần 6, phía máy chủ. Cắt trắng và trần 50.000 ký tự là mặc định của bộ máy, không khai trong schema.
 │   │   ├── IdGate.js             Cấp mã bản ghi từ bộ đếm ở Config, chỉ chạy bên trong khóa của cửa ghi. Bộ đếm lạc hậu thì nhảy lên max+1 kèm dòng cảnh báo chứ không cấp mã đã có.
-│   │   ├── WriteGate.js          Cửa ghi duy nhất xuống sheet dữ liệu: khóa, cấp mã, ghi đúng cột đã khai bằng một hai lệnh, flush rồi nhả khóa. Không đạt một trường thì không ghi gì và không trả về số hàng.
+│   │   ├── WriteGate.js          Cửa ghi Customer và Activity: khóa, cấp mã, kiểm tra, ghi đúng cột đã khai, flush rồi nhả khóa.
+│   │   ├── SheetWriteGate.js     Cửa ghi các cột kho ngoài DATA_SCHEMA, hiện dùng cho Category; không thay thế WriteGate.
 │   │   └── DeleteGate.js         Một nút Xóa, hai kết cục: xóa hẳn khi không tầng nào cản, xóa mềm khi có. Xóa nhiều dòng thì xóa từ dưới lên và đọc lại bản ghi mềm.
 │   ├── service\
 │   │   ├── LoadService.js        Gom cả một lượt nạp: đo ngân sách ô, đọc tham số, danh mục, toàn bộ khách, rồi giao dịch theo gói.
 │   │   ├── SaveService.js        Vỏ bọc vào ra của hai cửa ghi: bọc lỗi, gắn khối trạng thái bẩn, đo mili giây. Luật ghi nằm ở gate\, không nằm đây.
-│   │   └── SelectionService.js   Vòng dò khi không có Extension: probeSelectionCheap trả tọa độ ô đang chọn, probeSelectionFull đọc trực tiếp cột mã của hàng đang chọn theo DATA_SCHEMA. Mở tệp bằng shinOpenBook chứ không lấy tệp đang hoạt động.
+│   │   ├── SelectionService.js   Vòng dò khi không có Extension: probeSelectionCheap trả tọa độ ô đang chọn, probeSelectionFull đọc trực tiếp cột mã của hàng đang chọn theo DATA_SCHEMA. Mở tệp bằng shinOpenBook chứ không lấy tệp đang hoạt động.
+│   │   └── FbmSyncService.js     Entry points ổn định cho Sidebar đồng bộ FBM.
 │   ├── log\
 │   │   ├── LogGate.js            Cửa ghi log: gom dòng trong RAM, ghi xuống sheet Log bằng đúng một lệnh, che bí mật, cắt log theo hai trần.
 │   │   └── ClientTiming.js       Cửa nhận bản đo thời gian ĐO Ở TRÌNH DUYỆT rồi đệm một dòng vết. Máy chủ không tự thấy tiền đi đường, nên số này phải do client gửi. Không tin số client: kẹp trần, bỏ khóa lạ.
@@ -82,6 +85,13 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── EntryPoint.js         Vỏ bọc runEntryPoint: ghi log kèm vết, báo cho người dùng, ném lại lỗi, và luôn xả bộ đệm log ở finally.
 │   │   ├── ErrorReport.js        Đưa lỗi tới mắt người theo bốn kênh. Lỗi ở onOpen thì để dành, hiện ở lần mở sidebar sau.
 │   │   └── Menu.js               onOpen, menu ShinCRM và lệnh mở sidebar. Mọi việc của nó đi qua getUi và HtmlService nên không kiểm offline được.
+│   ├── view\                     Dựng sheet quản lý: đọc bộ lọc, sắp xếp và vẽ lại vùng dữ liệu.
+│   │   ├── FilterMessages.js      Thông báo lỗi và trạng thái cho bộ lọc sheet quản lý.
+│   │   ├── FilterParser.js        Phân tích điều kiện lọc từ sheet quản lý.
+│   │   ├── SortSpec.js            Chuẩn hóa cấu hình sắp xếp của sheet quản lý.
+│   │   ├── ViewSheetRenderer.js   Vẽ lại vùng dữ liệu sheet quản lý theo bộ lọc và sắp xếp.
+│   │   └── ViewSheetSetup.js      Tạo sheet quản trị từ DATA_SCHEMA, bổ sung cột điều khiển, ghi chú và validation.
+│   ├── Triggers.js                Trigger đánh dấu dữ liệu bẩn và chuẩn bị sheet quản trị.
 │   └── dev\                      CHỈ DÙNG LÚC PHÁT TRIỂN — xóa cả thư mục này trước khi Sheet mang dữ liệu khách hàng thật.
 │       ├── DevRunner.js          Cửa web chạy một hàm trong danh sách trắng. Mở một địa chỉ chạy code dưới quyền chủ tệp.
 │       ├── ViewProbe.js          Probe DEV tạo/xóa sheet quản trị tạm để nghiệm thu renderer thật trên Google.
@@ -96,6 +106,8 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 ├── client\                       Code chạy trong sidebar. Tệp .html bọc thẻ <script>, hoặc bọc thẻ <style> nếu là tệp chỉ có CSS.
 │   │                             Thư mục con chia theo MỤC ĐÍCH, không chia theo đuôi thẻ.
 │   ├── Sidebar.html              Trang gốc của sidebar: nhúng mọi tệp client theo đúng thứ tự rồi gọi lượt nạp đầu tiên.
+│   ├── sync\\                    Màn hình đồng bộ FBM độc lập, tách khỏi các màn nghiệp vụ.
+│   │   └── fbmSync.html           Tiến độ đồng bộ và bridge request thô.
 │   ├── link\                     Cầu nối ô đang chọn: ưu tiên postMessage an toàn từ Extension, khi vắng mới mở đường dò máy chủ có nhịp và luật dừng.
 │   │   ├── sheetLink.html        Tai nghe CRM_CONTEXT từ Extension: kiểm tra customerId trực tiếp rồi bật followSelection. Bắt tay có tiếng đáp, đèn sống chết suy từ ACK chứ không suy từ im lặng.
 │   │   └── selectionPoll.html    Máy trạng thái dự phòng khi vắng Extension: nhịp dò 2/6 giây, bốn luật dừng, đèn sét bốn trạng thái và băng cảnh báo sau ba giây ân hạn.
@@ -144,7 +156,20 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │       └── textNormalize.html    Bản sinh đôi client của server\util\TextNormalize.js. [RÀNG BUỘC CỨNG] hai bản phải giống nhau.
 │
 └── fbm_sync\                     Module đồng bộ FBM. Đọc được DATA_SCHEMA; phần lõi TUYỆT ĐỐI không đọc ngược vào đây.
-    └── SyncSchema.js             Khai 8 cột thuần đồng bộ. Tám cột này không được xuất hiện trong DATA_SCHEMA.
+    ├── schema\FbmFields.js      Field map, controller và trạng thái FBM.
+    ├── SyncSchema.js             Khai 8 cột thuần đồng bộ. Tám cột này không được xuất hiện trong DATA_SCHEMA.
+    ├── protocol\Protocol.js     Envelope và parse response.
+    ├── transport\Transport.js   doPost và điều phối từng slice.
+    ├── state\State.js            DocumentProperties, cursor và progress.
+    ├── state\RecordLocks.js      Khóa bản ghi và kiểm tra revision.
+    ├── state\Scheduler.js        Lịch heartbeat/quét, không gọi FBM trực tiếp.
+    ├── read\GridRead.js          Grid metadata, phân trang và category request.
+    ├── write\RequestBuilders.js  Builder Customer/Activity create/edit.
+    ├── reconcile\Reconcile.js    Normalize, fingerprint và pull WriteGate.
+    ├── reconcile\CategoryGate.js Cửa ghi Category ngoài DATA_SCHEMA.
+    ├── reconcile\CategorySync.js Nhập lookup FBM vào Category, giữ nguyên giá trị cũ.
+    ├── report\Report.js          Trạng thái công khai cho Sidebar.
+    └── report\Probe.js           Dò ứng viên ghi của ALT00010 mà không gọi FBM.
 ```
 
 ## tests — bộ kiểm chạy trên máy
@@ -241,37 +266,10 @@ Bốn dòng `client/...js` lệch vì một lý do khác hẳn các dòng trên,
 
 Ba dòng cuối lệch vì thư mục: tài liệu 04 gom cả CSS vào `client/ui/`, còn code chia `client/style/` cho hình thức dùng chung, `client/ui/` cho bộ máy giao diện, `client/screen/` cho từng màn. Chủ dự án chốt cách chia này 05/09/2026 và tài liệu 04 Phần 10 đã sửa theo. Một `styles.html` của tài liệu thành ba tệp theo việc: `tokens.html` giữ biến, `frame.html` giữ năm vùng khung, `components.html` giữ các lớp mà renderEngine sinh ra.
 
-## Thư mục sẽ dựng ở các chặng tới
-
-Ghi ra đây để chỗ đặt tệp mới là điều đã quyết trước, không phải điều quyết lúc đang gấp.
-
-```
-server\view\                      Dựng sheet quản lý: đọc bộ lọc, sắp xếp, vẽ lại vùng dữ liệu.
-server\view\ViewSheetSetup.js     Tạo sheet quản trị mới từ DATA_SCHEMA, bổ sung hai cột điều khiển còn thiếu, ghi chú và validation 10 cấp sắp xếp.
-server\config\ConfigSheetSetup.js Migration bộ đếm Config cũ, dựng hướng dẫn/validation, gieo tham số và khôi phục Config về mặc định mà không chạm Customer/Activity.
-server\Triggers.js                 Trigger cài đặt đánh dấu dữ liệu bẩn và chuẩn bị sheet quản trị.
-```
-
 Biểu mẫu **không** có thư mục riêng: bộ máy dựng form là `client\ui\` (uiBuilder, renderEngine, actions, slots), bảng khai form là `client\schema\` (uiSchema, fieldLogic), và mỗi màn có form là một tệp trong `client\screen\`.
-2_ShinCRM_Extension/content_scripts/model/live_model_reader.js Đọc mã khách từ lưới live của Sheets trong MAIN world; mã cột do Sidebar truyền, lỗi thì đóng an toàn
-## Module đồng bộ FBM (giai đoạn 2)
+## 2_ShinCRM_Extension
 
 ```
-1_ShinCRM_GAS/fbm_sync/
-|- schema/FbmFields.js          Field map, controller, trạng thái
-|- protocol/Protocol.js         Envelope và parse response
-|- transport/Transport.js       doPost và điều phối từng slice
-|- state/State.js               DocumentProperties, cursor, progress
-|- state/RecordLocks.js         Khóa bản ghi và kiểm tra revision
-|- state/Scheduler.js           Lịch heartbeat/quét, không gọi FBM trực tiếp
-|- read/GridRead.js             Grid metadata, phân trang, category request
-|- write/RequestBuilders.js     Builder Customer/Activity create/edit
-|- reconcile/Reconcile.js       Normalize, fingerprint, pull WriteGate
-|- reconcile/CategorySync.js    Nhập lookup FBM vào Category, giữ nguyên giá trị cũ
-|- report/Report.js             Trạng thái công khai cho Sidebar
-|- report/Probe.js              Dò ứng viên ghi của ALT00010 mà không gọi FBM
-server/service/FbmSyncService.js Entry points ổn định cho Sidebar
-1_ShinCRM_GAS/client/sync/fbmSync.html UI màn hình đồng bộ độc lập, tiến độ và bridge request thô
-2_ShinCRM_Extension/content_scripts/model/live_model_reader.js Đọc mã khách từ lưới live của Sheets trong MAIN world; mã cột do Sidebar truyền, lỗi thì đóng an toàn
-2_ShinCRM_Extension/content_scripts/fbm_sync/executor.js Fetch trong tab FBM
+2_ShinCRM_Extension/content_scripts/model/live_model_reader.js Đọc mã khách từ lưới live của Sheets trong MAIN world; mã cột do Sidebar truyền, lỗi thì đóng an toàn.
+2_ShinCRM_Extension/content_scripts/fbm_sync/executor.js Fetch trong tab FBM.
 ```
