@@ -100,6 +100,19 @@ FbmSync.linkActivityCustomers = function (records, customers, categoryGate) {
   return { records: linked, orphaned: orphaned };
 };
 
+/** Giữ trường chỉ thuộc ShinCRM khi FBM trả lại bản ghi đã tồn tại. */
+FbmSync.preserveLocalFields = function (entity, current, incoming) {
+  var fields = entity === 'customer'
+    ? ['note', 'allowFbmPush', 'verifyStatus', 'customerGroup', 'searchAliases', 'bidClosingDate']
+    : ['allowFbmPush', 'enteredBy', 'contractValue', 'priority', 'dueAt'];
+  var merged = Object.assign({}, incoming);
+  fields.forEach(function (field) {
+    if (current && Object.prototype.hasOwnProperty.call(current, field)) { merged[field] = current[field]; }
+    else { delete merged[field]; }
+  });
+  return merged;
+};
+
 /** Đọc dữ liệu cục bộ kèm cột sync để phục vụ reconcile. */
 FbmSync.readLocal = function (entity) {
   var block = typeof entityReadAllCombined === 'function' ? entityReadAllCombined(entity, [DATA_SCHEMA, SYNC_SCHEMA]) : entityReadAll(entity);
@@ -127,6 +140,7 @@ FbmSync.pullWrite = function (entity, records) {
   records.forEach(function (incoming) {
     var key = String(incoming.fbmId || '').trim();
     var current = local[key];
+    var mergedIncoming = current ? FbmSync.preserveLocalFields(entity, current, incoming) : incoming;
     var categoryErrors = typeof FbmSync.validateIncomingCategories === 'function' ? FbmSync.validateIncomingCategories(incoming, entity, categoryGate) : [];
     if (entity === 'activity' && !String(incoming.workDate || '').trim()) {
       skipped += 1;
@@ -146,7 +160,7 @@ FbmSync.pullWrite = function (entity, records) {
     if (String(current.syncStatus || '') === FbmSync.SYNC_STATUS.pushed) {
       var pushedEqual = FbmSync.hash(current, entity, categoryGate) === FbmSync.hash(incoming, entity, categoryGate);
       if (pushedEqual) {
-        writes.push(Object.assign({}, incoming, { id: current.id, fbmHash: FbmSync.hash(incoming, entity, categoryGate), syncStatus: FbmSync.SYNC_STATUS.synced, syncedAt: new Date() }));
+        writes.push(Object.assign({}, mergedIncoming, { id: current.id, fbmHash: FbmSync.hash(incoming, entity, categoryGate), syncStatus: FbmSync.SYNC_STATUS.synced, syncedAt: new Date() }));
       } else {
         statusWrites.push({ id: current.id, syncStatus: FbmSync.SYNC_STATUS.conflict });
         conflicts += 1;
@@ -164,7 +178,7 @@ FbmSync.pullWrite = function (entity, records) {
       statusWrites.push({ id: current.id, syncStatus: FbmSync.SYNC_STATUS.pending });
       return;
     }
-    writes.push(Object.assign({}, incoming, { id: current.id, fbmHash: decision.hFBM, syncStatus: FbmSync.SYNC_STATUS.synced, syncedAt: new Date() }));
+    writes.push(Object.assign({}, mergedIncoming, { id: current.id, fbmHash: decision.hFBM, syncStatus: FbmSync.SYNC_STATUS.synced, syncedAt: new Date() }));
   });
   var result = { ok: true, written: 0, conflicts: conflicts, skipped: skipped + orphaned };
   var schemas = [DATA_SCHEMA, SYNC_SCHEMA];
