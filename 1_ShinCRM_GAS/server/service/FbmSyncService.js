@@ -7,6 +7,8 @@ function fbmContinueSync(response) { return runEntryPoint('fbmContinueSync', 'si
 function fbmCancelSync() { return runEntryPoint('fbmCancelSync', 'sidebar', 'throw', function () { var result = fbmSyncCancel(); if (result && result.status) { FbmSync.logStatus(result.status, 'cancel'); } return result; }); }
 /** Đọc snapshot tiến độ hiện tại; Sidebar chỉ polling khi đang chạy. */
 function fbmGetSyncStatus() { return runEntryPoint('fbmGetSyncStatus', 'sidebar', 'throw', function () { return fbmSyncStatus(); }); }
+/** Ghi lỗi cầu nối do Sidebar phát hiện trước khi có response FBM. */
+function fbmLogSyncError(message) { return runEntryPoint('fbmLogSyncError', 'sidebar', 'throw', function () { return FbmSync.logTransportError(message); }); }
 /** Đọc cờ cho phép ghi; mặc định tắt để không chạm dữ liệu FBM ngoài ý muốn. */
 function fbmGetWriteMode() { return runEntryPoint('fbmGetWriteMode', 'sidebar', 'throw', function () { return { enabled: FbmSync.writeAllowed() }; }); }
 /** Đổi cờ ghi thật theo thao tác chủ động của người dùng trên Sidebar. */

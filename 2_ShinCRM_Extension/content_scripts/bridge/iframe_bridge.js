@@ -59,7 +59,9 @@ window.addEventListener('message', function (event) {
   var data = event.data;
   if (data && data.action === 'CRM_FBM_REQUEST') {
     // Chuyển nguyên request qua service worker; bridge không phân tích response FBM.
-    if (!isAllowedSidebarOrigin(event.origin) || event.source !== sidebarWindow || String(data.nonce || '') !== sidebarNonce) { return; }
+    if (!isAllowedSidebarOrigin(event.origin) || String(data.nonce || '') !== sidebarNonce) { return; }
+    // Sheets có thể thay WindowProxy sau reload; nonce vẫn định danh đúng Sidebar.
+    if (event.source && event.source !== sidebarWindow) { sidebarWindow = event.source; sidebarOrigin = event.origin; }
     sendRequestToWorker({ type: 'FBM_EXECUTE_REQUEST', id: data.id, request: data.request }, function (error, reply) {
       try { event.source.postMessage({ action: 'CRM_FBM_RESPONSE', nonce: sidebarNonce, id: data.id, result: error ? null : (reply && reply.result), error: error ? error.message : (reply && reply.error) }, event.origin); } catch (err) { sidebarWindow = null; sidebarOrigin = ''; sidebarNonce = ''; }
     });

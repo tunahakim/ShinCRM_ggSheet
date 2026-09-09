@@ -1,6 +1,6 @@
 <script>
 /* Sidebar chỉ hiển thị tiến độ; GAS là nguồn state duy nhất. */
-var FBM_SYNC_CLIENT = { installed: false, waiting: {}, running: false, mode: 'read', writeAllowed: false };
+var FBM_SYNC_CLIENT = { installed: false, waiting: {}, running: false, mode: 'read', writeAllowed: false, openedAt: 0 };
 /** Timeout cho một request Extension để phiên không treo vô hạn khi tab FBM/bridge mất kết nối. */
 var FBM_SYNC_REQUEST_TIMEOUT_MS = 20000;
 
@@ -15,14 +15,19 @@ function syncPanelToggle() {
   var screen = document.getElementById('fbm-sync-screen');
   if (!screen) { throw new Error('Sidebar thieu man dong bo FBM.'); }
   screen.hidden = !screen.hidden;
-  return screen.hidden || typeof fbmSyncStatusOnce !== 'function' ? null : fbmSyncStatusOnce();
+  if (!screen.hidden) { FBM_SYNC_CLIENT.openedAt = Date.now(); }
+  return screen.hidden || typeof fbmSyncStatusOnce !== 'function' ? null : fbmSyncStatusOnce(true);
 }
 /** Vẽ snapshot status, không suy diễn nghiệp vụ ở client. */
-function fbmSyncPaint(status) {
+function fbmSyncPaint(status, freshOpen) {
   var panel = document.getElementById('fbm-sync-content');
   if (!panel || !status) { return; }
   // GAS orchestration returns { ok, request, status }; the panel only paints the inner snapshot.
   status = status.status || status;
+  // Do not replay a terminal error from an earlier sidebar session as the new screen's state.
+  if (freshOpen && status.phase === 'error' && Number(status.updatedAt || 0) < Number(FBM_SYNC_CLIENT.openedAt || 0)) {
+    status = Object.assign({}, status, { phase: 'idle', label: 'Sẵn sàng', message: '', lastError: '', counts: { total: 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 } });
+  }
   fbmSyncPaintHeaderState(status);
   if (status.writeAllowed !== undefined) { FBM_SYNC_CLIENT.writeAllowed = status.writeAllowed === true; }
   panel.hidden = false; panel.textContent = '';
@@ -131,12 +136,13 @@ function fbmSyncExtensionRequest(request) {
   return new Promise(function (resolve, reject) {
     var id = String(Date.now()) + '-' + Math.random().toString(36).slice(2);
     FBM_SYNC_CLIENT.waiting[id] = { resolve: resolve, reject: reject };
+    // Send through the parent Sheets window; event.source remains the Sidebar iframe.
     (window.top === window ? window : window.top).postMessage({ action: 'CRM_FBM_REQUEST', id: id, nonce: SHEET_LINK_NONCE, request: request }, 'https://docs.google.com');
     setTimeout(function () { if (FBM_SYNC_CLIENT.waiting[id]) { delete FBM_SYNC_CLIENT.waiting[id]; reject(new Error('Không nhận được phản hồi từ tab FBM sau 20 giây. Hãy kiểm tra tab FBM và Extension.')); } }, FBM_SYNC_REQUEST_TIMEOUT_MS);
   });
 }
 /** Lấy status một lần, không tạo vòng polling khi không chạy. */
-function fbmSyncStatusOnce() { return callServer('fbmGetSyncStatus').then(fbmSyncPaint); }
+function fbmSyncStatusOnce(freshOpen) { return callServer('fbmGetSyncStatus').then(function (status) { return fbmSyncPaint(status, freshOpen); }); }
 /** Đọc cờ ghi ở GAS và đồng bộ lại checkbox sau mỗi lần mở panel. */
 function fbmSyncSetWriteGate(enabled) {
   return callServer('fbmSetWriteMode', [enabled === true]).then(function (result) { FBM_SYNC_CLIENT.writeAllowed = !!(result && result.enabled); return fbmSyncStatusOnce(); });
@@ -174,8 +180,11 @@ function fbmSyncRun(mode) {
   });
   return work.then(function (value) { FBM_SYNC_CLIENT.running = false; return value; }, function (err) {
     FBM_SYNC_CLIENT.running = false;
-    return callServer('fbmCancelSync').catch(function () { return null; }).then(function () {
-      fbmSyncPaint({ label: 'Lỗi', phase: 'error', message: err && err.message ? err.message : String(err), counts: {} });
+    var reason = err && err.message ? err.message : String(err);
+    return callServer('fbmLogSyncError', [reason]).catch(function () { return null; }).then(function () {
+      return callServer('fbmCancelSync').catch(function () { return null; });
+    }).then(function () {
+      fbmSyncPaint({ label: 'Lỗi', phase: 'error', message: reason, lastError: reason, counts: {} });
       return null;
     });
   });

@@ -30,13 +30,20 @@ FbmSync.statusView = function () {
 FbmSync.logStatus = function (status, action) {
   if (!status || typeof logEvent !== 'function') { return; }
   var phase = String(status.phase || 'idle');
-  var outcome = phase === 'error' ? LOG_ERROR : (phase === 'conflict' ? LOG_CONFLICT : LOG_OK);
+  var outcome = phase === 'error' || status.lastError ? LOG_ERROR : (phase === 'conflict' ? LOG_CONFLICT : LOG_OK);
   logEvent({
     source: 'fbm_sync', action: action || 'slice', outcome: outcome,
     entity: status.entity || '', recordId: status.current || 'ALT00010',
     reason: status.message || status.label || phase,
     detail: { phase: phase, direction: status.direction || '', entityLabel: status.entityLabel || '', counts: status.counts || {}, lastError: status.lastError || '' }
   });
+};
+/** Ghi lỗi vận chuyển khi Sidebar không nhận được response từ Extension. */
+FbmSync.logTransportError = function (message, action) {
+  var status = FbmSync.statusView(), reason = String(message || 'Không nhận được phản hồi từ Extension.');
+  status.phase = 'error'; status.lastError = reason; status.message = reason;
+  FbmSync.logStatus(status, action || 'transport_error');
+  return status;
 };
 /** Keep a bounded read-only preview for live verification without writing Sheet data. */
 FbmSync.previewRecords = function (state, entity, records) {
