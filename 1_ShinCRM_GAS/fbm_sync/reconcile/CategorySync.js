@@ -61,7 +61,7 @@ FbmSync.importLookupCategories = function (state) {
     var keys = Object.keys(data), finalRows = 0;
     keys.forEach(function (code) { finalRows = Math.max(finalRows, data[code].length); });
     if (!finalRows) { return { written: 0, added: 0, warnings: warnings }; }
-    var written = typeof sheetWriteColumns === 'function' ? sheetWriteColumns(sheet, columns, firstRow, finalRows, data, changed) : { ok: false, written: 0, reason: 'Thiếu cổng ghi Category.' };
+    var written = typeof sheetWriteColumns === 'function' ? sheetWriteColumns(sheet, columns, firstRow, finalRows, data, changed) : { ok: false, written: 0, reason: 'Thiếu bộ ghi cột Category.' };
     if (!written.ok) { warnings.push(written.reason); return { written: 0, added: added, warnings: warnings }; }
     logItems.forEach(FbmSync.logCategoryImport);
     if (typeof flushLog === 'function') { flushLog(); }

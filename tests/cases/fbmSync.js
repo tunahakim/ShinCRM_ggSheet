@@ -41,7 +41,7 @@ async function chay(so) {
   check(so, 'danh mục FBM tạo đúng companion có dấu chính', builders.FbmSync.categoryCompanionText('HNI', 'Hà Nội', true), 'HNI. Hà Nội #');
 
   const sheetGate = taoHopCat({ SpreadsheetApp: { flush: () => {} } });
-  napServer(sheetGate, 'server/gate/SheetWriteGate.js');
+  napServer(sheetGate, 'server/sheet/SheetColumnWriter.js');
   const writtenColumns = {};
   sheetGate.sheetGridEnsureRoom = () => {};
   sheetGate.columnIndex = (columnMap, code) => columnMap.map[code];

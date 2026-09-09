@@ -1,4 +1,4 @@
-/** Ghi các cột kho không thuộc DATA_SCHEMA bằng một cổng dùng chung. */
+/** Ghi các cột ngoài DATA_SCHEMA; bên gọi phải giữ khóa và đã kiểm tra dữ liệu. */
 function sheetWriteColumns(sheet, columnMap, firstRow, finalRows, data, changed) {
   if (!sheet || !columnMap || !data || !changed) { return { ok: false, written: 0, reason: 'Thiếu ngữ cảnh ghi sheet.' }; }
   var codes = Object.keys(changed).filter(function (code) { return changed[code]; });
