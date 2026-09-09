@@ -17,7 +17,6 @@ FbmSync.prepareCategoryGate = function (state) {
   state.metadata.categoryBlocks = blocks;
   return blocks;
 };
-
 /** Ghi trạng thái kỹ thuật sau push; baseline chỉ cập nhật khi pull sau đó xác nhận bằng nhau. */
 FbmSync.markPushResult = function (candidate, response, operation) {
   var record = candidate.record || {}, values = FbmSync.extractInternalValues(response), data = FbmSync.protocol.parse(response) || {};
@@ -189,4 +188,3 @@ FbmSync.continuePush = function (state, response) {
   state.counts.succeeded += 1; FbmSync.releasePushLock(state, cursor.entity, candidate.id); state.cursor = { kind: 'push_scan', entity: cursor.entity, index: Number(cursor.index || 0) + 1 }; state.current = ''; FbmSync.stateWrite(state);
   return FbmSync.nextPushRequest(state);
 };
-

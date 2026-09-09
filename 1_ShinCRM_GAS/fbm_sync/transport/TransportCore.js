@@ -48,4 +48,3 @@ FbmSync.retryRead = function (state, failure) {
 };
 /** Cập nhật state dùng chung cho các bước orchestration. */
 FbmSync.saveStatus = function (patch) { return FbmSync.stateWrite(Object.assign(FbmSync.stateRead(), patch || {})); };
-

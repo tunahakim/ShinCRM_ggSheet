@@ -29,7 +29,6 @@ FbmSync.start = function (options) {
   FbmSync.stateWrite(state);
   return { ok: true, request: FbmSync.nextEnvelope(FbmSync.authorizeRequest('customer')), status: FbmSync.statusView() };
 };
-
 /** Xử lý một trang pull; read mode chỉ preview, write mode qua WriteGate. */
 FbmSync.pullRecords = function (entity, records, mode) {
   var state = FbmSync.stateRead(), count = (records || []).length;
@@ -240,4 +239,3 @@ FbmSync.continue = function (rawResponse) {
   state.phase = 'error'; state.lastError = 'Khong nhan dien duoc cursor dong bo.'; FbmSync.stateWrite(state);
   return { ok: false, status: FbmSync.statusView(), error: state.lastError };
 };
-

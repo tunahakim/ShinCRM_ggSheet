@@ -5,7 +5,6 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 FbmSync.customerTaxKey = function (value) {
   return FbmSync.normalize(value).replace(/[.,\s]/g, '');
 };
-
 /** Báo MST không thể dùng để nối an toàn vì trùng hoặc dòng đã liên kết. */
 FbmSync.customerTaxIdentityIssue = function (localByTaxNumber, incoming) {
   var tax = FbmSync.customerTaxKey(incoming && (incoming.taxNumber || incoming.ma_so_thue));
@@ -92,4 +91,3 @@ FbmSync.preserveLocalFields = function (entity, current, incoming) {
   });
   return merged;
 };
-

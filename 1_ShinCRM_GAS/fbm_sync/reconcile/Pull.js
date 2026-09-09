@@ -190,4 +190,3 @@ function beforeHardDelete(entity, id) {
   if (found && String(found.fbmId || '').trim()) { return { allowed: false, reason: 'Bản ghi đã có ID FBM nên chỉ được xóa mềm để giữ tombstone.' }; }
   return { allowed: true, reason: '' };
 }
-
