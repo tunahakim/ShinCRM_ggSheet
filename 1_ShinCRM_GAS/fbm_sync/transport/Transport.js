@@ -107,6 +107,9 @@ FbmSync.markPushError = function (state, candidate, reason) {
   if (typeof writeGateSave === 'function') {
     try { writeGateSave({ entity: candidate.entity, records: [{ id: candidate.id, syncStatus: FbmSync.SYNC_STATUS.error }], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] }); } catch (ignore) {}
   }
+  if (typeof logEvent === 'function') {
+    logEvent({ source: 'fbm_sync', action: 'push_record_error', outcome: LOG_ERROR, entity: candidate.entity, recordId: String(candidate.id || ''), reason: String(reason || 'Không thể đẩy bản ghi.') });
+  }
   FbmSync.releasePushLock(state, candidate.entity, candidate.id);
 };
 
@@ -117,6 +120,20 @@ FbmSync.markPushSkipped = function (state, candidate, status, reason) {
   if (typeof writeGateSave === 'function') {
     try { writeGateSave({ entity: candidate.entity, records: [{ id: candidate.id, syncStatus: status || FbmSync.SYNC_STATUS.skipped }], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] }); } catch (ignore) {}
   }
+};
+
+/** Bỏ qua một record push lỗi và tiếp tục candidate kế tiếp, không lặp request đã gửi. */
+FbmSync.continueAfterPushError = function (state, cursor, reason) {
+  var candidate = cursor && cursor.candidate;
+  if (candidate) { FbmSync.markPushError(state, candidate, reason); }
+  state.cursor = { kind: 'push_scan', entity: cursor.entity, index: Number(cursor.index || 0) + 1 };
+  state.current = '';
+  state.phase = 'push';
+  state.lastError = '';
+  state.message = 'Đã bỏ qua ' + String(cursor.entity || '') + ' lỗi; đang xử lý bản ghi tiếp theo.';
+  FbmSync.stateWrite(state);
+  var next = FbmSync.nextPushRequest(state);
+  return { ok: true, request: next ? FbmSync.nextEnvelope(next) : null, status: FbmSync.statusView(), continued: true };
 };
 
 /** Kiểm tra các núm an toàn trước khi phát request ghi đầu tiên. */
@@ -336,11 +353,10 @@ FbmSync.continue = function (rawResponse) {
     if (retryRequest) {
       return { ok: true, request: FbmSync.nextEnvelope(retryRequest), status: FbmSync.statusView(), retrying: true };
     }
-    if (cursor.kind === 'push_wait' && cursor.candidate && typeof writeGateSave === 'function') {
-      try { writeGateSave({ entity: cursor.entity, records: [{ id: cursor.candidate.id, syncStatus: FbmSync.SYNC_STATUS.error }], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] }); } catch (ignore) {}
-    }
-    if (cursor.kind === 'push_wait' && cursor.candidate) { FbmSync.releasePushLock(state, cursor.entity, cursor.candidate.id); }
     var failureReason = (success.bug && (success.bug.Message || success.bug.message)) || 'FBM tra ve loi nghiep vu';
+    if (cursor.kind === 'push_wait' && cursor.candidate) {
+      return FbmSync.continueAfterPushError(state, cursor, failureReason);
+    }
     state.lastFailureCode = String(success.code || 'FBM_ERROR');
     state.retryable = success.retryable === true;
     if (success.code === 'SESSION_EXPIRED') {
@@ -374,9 +390,7 @@ FbmSync.continue = function (rawResponse) {
       var pushRequest = FbmSync.continuePush(state, response);
       return { ok: true, request: FbmSync.nextEnvelope(pushRequest), status: FbmSync.statusView() };
     } catch (pushError) {
-      FbmSync.markPushError(state, cursor.candidate, pushError && pushError.message || pushError);
-      state.phase = 'error'; state.lastError = String(pushError && pushError.message || pushError); state.message = state.lastError; FbmSync.stateWrite(state);
-      return { ok: false, status: FbmSync.statusView(), error: { FieldName: '$PUSH', Message: state.lastError } };
+      return FbmSync.continueAfterPushError(state, cursor, pushError && pushError.message || pushError);
     }
   }
 

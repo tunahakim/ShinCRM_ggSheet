@@ -125,6 +125,9 @@ FbmSync.rememberConflict = function (state, entity, current, incoming, decision,
   state.locks = state.locks || {};
   state.locks[entity + ':' + String(current && current.id || '')] = { revision: String(decision.hSHIN || ''), owner: 'sync', reason: 'conflict', at: Date.now() };
   if (state.metadata.conflicts.length > 100) { state.metadata.conflicts = state.metadata.conflicts.slice(-100); }
+  if (typeof logEvent === 'function') {
+    logEvent({ source: 'fbm_sync', action: 'conflict', outcome: LOG_CONFLICT, entity: entity, recordId: String(current && current.id || ''), reason: 'Hai phía cùng thay đổi; chờ quyết định.', detail: { fbmId: String(incoming && incoming.fbmId || current && current.fbmId || ''), hBASE: decision.hBASE, hSHIN: decision.hSHIN, hFBM: decision.hFBM, fields: FbmSync.diff(entity, current, incoming, categoryGate) } });
+  }
 };
 
 /** Chốt conflict theo phía được chọn; baseline mới chỉ ghi sau quyết định rõ ràng. */

@@ -109,7 +109,7 @@
 - [x] Baseline rỗng hoặc tự lành → chỉ cập nhật baseline.
 - [x] Chỉ FBM đổi → pull nội dung và baseline, giữ trường nội bộ.
 - [x] Chỉ ShinCRM đổi → không pull đè, chuyển ứng viên push nếu được phép.
-- [ ] Hai phía đổi → conflict, khóa, log, không ghi nội dung/baseline.
+- [x] Hai phía đổi → conflict, khóa, log, không ghi nội dung/baseline.
 - [x] Customer vắng khỏi grid → `không thấy bên FBM`, không xóa và không đổi baseline.
 - [x] Tombstone local có FBM ID không bị kéo lại thành dòng mới.
 - [ ] Customer ngừng đồng bộ loại cả Customer và Activity con khỏi hai chiều.
@@ -151,9 +151,9 @@
 ## Slice 4 — Đối soát, khóa, conflict và phục hồi
 
 - [x] So ba chiều phân biệt không đổi, chỉ ShinCRM đổi, chỉ FBM đổi và hai phía đổi.
-- [ ] Conflict lưu trạng thái, khóa record, log diff và không ghi baseline.
+- [x] Conflict lưu trạng thái, khóa record, log diff và không ghi baseline.
 - [ ] `syncStatusSlot` hiển thị diff Customer/Activity mới lấy từ FBM.
-- [ ] Nút giải quyết hỗ trợ theo FBM, theo ShinCRM hoặc trộn tay; lấy `hFBM` đúng lúc bấm.
+- [x] Nút giải quyết hỗ trợ theo FBM, theo ShinCRM hoặc trộn tay; lấy `hFBM` đúng lúc bấm.
 - [x] Form Sidebar khóa user khi mở, nhả khi đóng và kiểm khóa sync trước Save.
 - [x] Pull/push hoãn record có khóa user và giữ nguyên bản nháp.
 - [ ] Khóa sync làm form chỉ xem, chặn Save và luôn được nhả sau khi xong/lỗi.

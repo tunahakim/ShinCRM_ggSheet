@@ -155,13 +155,16 @@ async function chay(so) {
   builders.FbmSync.readLocal = () => [shinChanged];
   const shinChangedResult = builders.FbmSync.pullWrite('customer', [reconcileIncoming]);
   check(so, 'chi ShinCRM doi thi khong pull de', [shinChangedResult.written, reconcileWrite.records[0].syncStatus], [0, builders.FbmSync.SYNC_STATUS.pending]);
-  let conflictState = { metadata: { categoryGate: gate, conflicts: [] }, counts: { conflict: 0 } }, conflictWrite;
+  let conflictState = { metadata: { categoryGate: gate, conflicts: [] }, counts: { conflict: 0 } }, conflictWrite, conflictLog = [];
+  builders.LOG_CONFLICT = 'conflict';
+  builders.logEvent = (event) => { conflictLog.push(event); };
   builders.FbmSync.stateRead = () => conflictState;
   builders.FbmSync.stateWrite = (next) => { conflictState = next; return next; };
   builders.FbmSync.readLocal = () => [{ id: 'CUS-2', fbmId: 'C-2', fbmCustomerCode: 'ALT99999', companyName: 'Shin', fbmHash: builders.FbmSync.hash({ stt_rec_kh: 'C-2', ma_kh: 'ALT99999', ten_kh: 'Base' }, 'customer', gate) }];
   builders.writeGateSave = (request) => { conflictWrite = request; return { ok: true }; };
   const conflictResult = builders.FbmSync.pullWrite('customer', [builders.FbmSync.customerRecord({ stt_rec_kh: 'C-2', ma_kh: 'ALT99999', ten_kh: 'FBM' }, gate)]);
   check(so, 'conflict luu diff va khong ghi noi dung', [conflictResult.conflicts, conflictState.metadata.conflicts.length, conflictWrite.records[0].syncStatus], [1, 1, builders.FbmSync.SYNC_STATUS.conflict]);
+  check(so, 'conflict ghi log diff co cau truc', [conflictLog.length, conflictLog[0].action, conflictLog[0].detail.fields.length > 0], [1, 'conflict', true]);
   check(so, 'conflict tao khoa sync', conflictState.locks['customer:CUS-2'].owner, 'sync');
   const resolved = builders.FbmSync.resolveConflict('customer', 'CUS-2', 'fbm');
   check(so, 'resolve conflict theo FBM cap nhat baseline va xoa hang doi', [resolved.ok, conflictState.metadata.conflicts.length, conflictWrite.records[0].fbmHash !== '', conflictState.locks['customer:CUS-2']], [true, 0, true, undefined]);
@@ -315,7 +318,7 @@ async function chay(so) {
   const pushProps = { data: {} };
   const pushPropertyApi = { getProperty: (key) => pushProps.data[key] || null, setProperty: (key, value) => { pushProps.data[key] = String(value); } };
   const push = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {}, PropertiesService: { getDocumentProperties: () => pushPropertyApi, getScriptProperties: () => pushPropertyApi }, writeGateSave: () => ({ ok: true }) });
-  napServer(push, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/RecordLocks.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Reconcile.js', 'fbm_sync/transport/Transport.js');
+  napServer(push, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/RecordLocks.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Reconcile.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/Transport.js');
   push.FbmSync.scriptSettings = () => ({ accountName: 'Lê Tuấn Anh', customerPrefix: 'ALT', customerCodeLength: 8 });
   push.FbmSync.pushCandidates = () => [{ kind: 'edit', id: 'C-1', record: { id: 'C-1', fbmId: 'A-1', fbmHash: 'h1' } }];
   push.FbmSync.validatePushCategories = () => [];
@@ -338,6 +341,16 @@ async function chay(so) {
   push.FbmSync.unlockRecord = () => ({ locks: {} });
   push.FbmSync.markPushError(errorState, { entity: 'customer', id: 'C-ERR', record: { id: 'C-ERR', companyName: 'Lỗi' } }, 'FBM từ chối');
   check(so, 'push loi luu hash local de chan lap lai', errorState.metadata.pushFailures['customer:C-ERR'], push.FbmSync.hash({ id: 'C-ERR', companyName: 'Lỗi' }, 'customer', {}));
+  push.FbmSync.pushCandidates = () => [
+    { kind: 'edit', id: 'C-ERR', record: { id: 'C-ERR', fbmId: 'A-ERR', fbmHash: 'h-err' } },
+    { kind: 'edit', id: 'C-NEXT', record: { id: 'C-NEXT', fbmId: 'A-NEXT', fbmHash: 'h-next' } }
+  ];
+  const pushErrorProps = push.FbmSync.stateStart('', 'push', 0);
+  pushErrorProps.metadata.categoryGate = {};
+  pushErrorProps.cursor = { kind: 'push_wait', entity: 'customer', index: 0, operation: 'customer_edit_save', candidate: { entity: 'customer', id: 'C-ERR', record: { id: 'C-ERR', fbmId: 'A-ERR', fbmHash: 'h-err' } } };
+  push.FbmSync.stateWrite(pushErrorProps);
+  const continuedPush = push.FbmSync.continueAfterPushError(push.FbmSync.stateRead(), push.FbmSync.stateRead().cursor, 'Owner sai');
+  check(so, 'push loi mot record van tiep tuc record ke', [continuedPush.continued, continuedPush.request.meta.kind, push.FbmSync.stateRead().cursor.index, push.FbmSync.stateRead().counts.error], [true, 'customer_edit_open', 1, 1]);
   pushedState.locks['customer:C-2'] = { owner: 'user', revision: 'h2' };
   push.FbmSync.stateWrite(pushedState);
   push.fbmSyncCancel();
