@@ -79,7 +79,7 @@ async function chay(so) {
   const pushProps = { data: {} };
   const pushPropertyApi = { getProperty: (key) => pushProps.data[key] || null, setProperty: (key, value) => { pushProps.data[key] = String(value); } };
   const push = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {}, PropertiesService: { getDocumentProperties: () => pushPropertyApi, getScriptProperties: () => pushPropertyApi }, writeGateSave: () => ({ ok: true }) });
-  napServer(push, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/RecordLocks.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/EntryPoints.js');
+  napServer(push, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/RecordLocks.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/EntryPoints.js');
   push.FbmSync.scriptSettings = () => ({ accountName: 'Lê Tuấn Anh', customerPrefix: 'ALT', customerCodeLength: 8 });
   push.FbmSync.pushCandidates = () => [{ kind: 'edit', id: 'C-1', record: { id: 'C-1', fbmId: 'A-1', fbmHash: 'h1' } }];
   push.FbmSync.validatePushCategories = () => [];
@@ -171,6 +171,25 @@ async function chay(so) {
   const skippedDetail = skippedLogs.filter((event) => event.action === 'push_record')[0];
   check(so, 'Push record bi hoan co log chi tiet', [!!skippedEntry, skippedEntry && skippedEntry.recordId, skippedDetail && skippedDetail.detail.direction, skippedDetail && skippedDetail.detail.syncStatus], [true, 'ACT-SKIP', 'ShinCRM → FBM', push.FbmSync.SYNC_STATUS.unknownCategory]);
 
+  const activityCandidate = { entity: 'activity', kind: 'create', id: 'ACT-NEW', record: { id: 'ACT-NEW', fbmId: '', customerFbmCode: 'ALT00010', stt_rec: 'A-CUS', taskType: 'Gọi', content: 'Nội dung', workDate: '2026-09-09', allowFbmPush: push.FbmSync.PUSH_ALLOW_VALUE } };
+  push.FbmSync.pushCandidates = () => [activityCandidate];
+  push.FbmSync.validatePushCategories = () => [];
+  push.FbmSync.pushEligibilityErrors = () => [];
+  push.FbmSync.scriptSettings = () => ({ accountName: 'Lê Tuấn Anh', baseUrl: 'https://fbm.test' });
+  const activityPushState = push.FbmSync.stateStart('', 'push', 0);
+  activityPushState.metadata.categoryGate = {};
+  activityPushState.cursor = { kind: 'push_scan', entity: 'activity', index: 0 };
+  push.FbmSync.stateWrite(activityPushState);
+  const activityCreate = push.FbmSync.nextPushRequest(activityPushState);
+  check(so, 'Activity moi dung request New va marker', [activityCreate.meta.kind, activityCreate.body.action, activityCreate.body.memvars.filter((item) => item.Name === 'details')[0].NewValue, push.FbmSync.stateRead().cursor.operation], ['activity_create', 'New', 'Nội dung #SC-ACT-NEW', 'activity_create']);
+  const activityResponse = push.FbmSync.continuePush(push.FbmSync.stateRead(), { d: { InternalValues: [{ Name: 'id', Value: 42 }] } });
+  check(so, 'Activity New nhan ID FBM va chuyen sang cho xac nhan', [activityResponse, push.FbmSync.stateRead().counts.succeeded, push.FbmSync.stateRead().phase], [null, 1, 'done']);
+  const lostState = push.FbmSync.stateStart('', 'push', 0);
+  lostState.metadata.categoryGate = {};
+  lostState.cursor = { kind: 'push_wait', entity: 'activity', index: 0, operation: 'activity_create', candidate: activityCandidate };
+  push.FbmSync.stateWrite(lostState);
+  const lost = push.FbmSync.continueAfterPushError(push.FbmSync.stateRead(), push.FbmSync.stateRead().cursor, 'Mất phản hồi');
+  check(so, 'Activity mat phan hoi khong lap request va ghi hash loi', [lost.continued, lost.request, push.FbmSync.stateRead().counts.error, !!push.FbmSync.stateRead().metadata.pushFailures['activity:ACT-NEW']], [true, null, 1, true]);
 }
 
 module.exports = { chay };

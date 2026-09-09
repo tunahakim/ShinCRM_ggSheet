@@ -8,7 +8,7 @@
 - `[ ]` là việc còn thiếu; mục không có nhãn **Cần kiểm chứng thực tế** là việc AI tự tiếp tục được.
 - Một slice chỉ đóng sau khi đủ code, test, log/báo cáo và checklist case của slice đó.
 - Sau khi đóng slice, ghi commit và revision GAS vào bảng bằng chứng cuối file.
-- Bộ kiểm offline gần nhất đạt `1047/1047`; phần đọc `ALT00010` và một Activity đã từng kiểm chứng, chiều ghi chưa có kết quả thành công được xác nhận.
+- Bộ kiểm offline gần nhất đạt `1050/1050`; phần đọc `ALT00010` và một Activity đã từng kiểm chứng, chiều ghi chưa có kết quả thành công được xác nhận.
 
 ## Slice 0 — Nền tảng, ranh giới và an toàn
 
@@ -206,7 +206,7 @@
 - [x] Builder Activity New gửi `ma_kh/stt_rec` Customer cha và marker `#SC-<mã ShinCRM>`.
 - [x] Fingerprint cắt marker trước khi so.
 - [x] Customer cha chưa Cho phép, Ngừng đồng bộ hoặc thiếu FBM ID/mã thì không push Activity.
-- [ ] Activity mới đủ khóa/ngày/danh mục → New, lưu FBM ID và chờ xác nhận.
+- [x] Activity mới đủ khóa/ngày/danh mục → New, lưu FBM ID và chờ xác nhận.
 - [ ] Create mất phản hồi giữ `đang đẩy`, không retry; pull dùng marker để vá hoặc báo trùng.
 - [x] Builder Activity Edit mở form lấy OldValue đúng fixture.
 - [x] Parser Row 45 ô giữ `end_time`, lấy `_ticket` từ Showing thành `fileticket`, hỗ trợ Row null và fallback.
