@@ -63,6 +63,10 @@ async function chay(so) {
   check(so, 'Customer ngừng đồng bộ chặn Activity con ở chiều pull', [stoppedActivity.records.length, stoppedActivity.blocked], [0, 1]);
   const activityWithParent = builders.FbmSync.activityRecord({ id: 7, details: 'Gọi', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi điện' }, gate, { maKh: 'ALT99999' });
   check(so, 'Activity giữ mã Customer cha khi grid không trả ma_kh', activityWithParent.customerFbmCode, 'ALT99999');
+  const originalScriptSettings = builders.FbmSync.scriptSettings;
+  builders.FbmSync.scriptSettings = () => Object.assign({}, originalScriptSettings(), { activitySince: '2026-01-01' });
+  check(so, 'FBM_ACTIVITY_SINCE bo Activity lich su nhung giu Activity moi', [builders.FbmSync.activitySinceAllows({ workDate: new Date('2025-12-31T00:00:00Z') }, {}), builders.FbmSync.activitySinceAllows({ workDate: new Date('2026-01-02T00:00:00Z') }, {})], [false, true]);
+  builders.FbmSync.scriptSettings = originalScriptSettings;
   check(so, 'Activity đọc dấu nhận diện để recovery', builders.FbmSync.activityMarkerId('Nội dung #SC-ACT-9'), 'ACT-9');
   check(so, 'Activity fingerprint không phụ thuộc khóa nối nội bộ', builders.FbmSync.hash(Object.assign({}, activityWithParent, { customerId: 'CUS-1' }), 'activity', gate), builders.FbmSync.hash(Object.assign({}, activityWithParent, { customerId: 'CUS-2' }), 'activity', gate));
   const form = builders.FbmSync.extractFormValues({ d: { Row: (function () { const row = []; row[3] = 'ALT00010'; row[4] = 'Tên cũ'; row[8] = '001'; row[11] = '0900'; return row; }()), Showing: "var _ticket = 'ticket-1';" } });
@@ -141,7 +145,13 @@ async function chay(so) {
   builders.dirtyStateMarkRecords = (ids) => { dirtyIds = ids; };
   builders.writeGateSave = (request) => { newPullWrite = request; return { ok: true, fields: ['id'], rows: [['CUS-NEW']] }; };
   const newPullResult = builders.FbmSync.pullWrite('customer', [builders.FbmSync.customerRecord({ stt_rec_kh: 'NEW-C', ma_kh: 'ALT00012', ten_kh: 'Khách mới', ma_so_thue: '001' }, gate)]);
-  check(so, 'Customer pull moi ghi ca dinh danh baseline va dirty marker', [newPullResult.written, newPullWrite.source, newPullWrite.schemas.length, newPullWrite.records[0].fbmId, newPullWrite.records[0].fbmHash !== '', dirtyIds[0]], [1, 'pull', 2, 'NEW-C', true, 'CUS-NEW']);
+  check(so, 'Customer pull moi ghi ca dinh danh baseline va dirty marker', [newPullResult.written, newPullWrite.source, newPullWrite.schemas.length, newPullWrite.records[0].fbmId, newPullWrite.records[0].fbmHash !== '', dirtyIds[0], newPullWrite.records[0].parentCompanyName], [1, 'pull', 2, 'NEW-C', true, 'CUS-NEW', '']);
+  const pullLogs = [];
+  builders.logEvent = (event) => pullLogs.push(event);
+  builders.FbmSync.readLocal = () => [];
+  builders.writeGateSave = () => ({ ok: true });
+  builders.FbmSync.pullWrite('customer', [builders.FbmSync.customerRecord({ stt_rec_kh: 'LOG-C', ma_kh: 'ALT00015', ten_kh: 'Có log', ma_so_thue: '002' }, gate)]);
+  check(so, 'Pull ghi log từng record co huong trang thai truoc sau va ly do', [pullLogs.length, pullLogs[0].action, pullLogs[0].detail.direction, pullLogs[0].detail.statusBefore, pullLogs[0].detail.statusAfter, !!pullLogs[0].reason], [1, 'pull_record', 'FBM → ShinCRM', 'chưa liên kết', builders.FbmSync.SYNC_STATUS.synced, true]);
   let reconcileWrite;
   const reconcileIncoming = builders.FbmSync.customerRecord({ stt_rec_kh: 'REC-1', ma_kh: 'ALT00013', ten_kh: 'Gốc' }, gate);
   const reconcileLocal = Object.assign({}, reconcileIncoming, { id: 'CUS-REC', syncStatus: builders.FbmSync.SYNC_STATUS.synced });
@@ -173,7 +183,8 @@ async function chay(so) {
   builders.writeGateSave = (request) => { conflictWrite = request; return { ok: true }; };
   const conflictResult = builders.FbmSync.pullWrite('customer', [builders.FbmSync.customerRecord({ stt_rec_kh: 'C-2', ma_kh: 'ALT99999', ten_kh: 'FBM' }, gate)]);
   check(so, 'conflict luu diff va khong ghi noi dung', [conflictResult.conflicts, conflictState.metadata.conflicts.length, conflictWrite.records[0].syncStatus], [1, 1, builders.FbmSync.SYNC_STATUS.conflict]);
-  check(so, 'conflict ghi log diff co cau truc', [conflictLog.length, conflictLog[0].action, conflictLog[0].detail.fields.length > 0], [1, 'conflict', true]);
+  const conflictEntries = conflictLog.filter((event) => event.action === 'conflict');
+  check(so, 'conflict ghi log diff co cau truc', [conflictEntries.length, conflictEntries[0].action, conflictEntries[0].detail.fields.length > 0], [1, 'conflict', true]);
   check(so, 'conflict tao khoa sync', conflictState.locks['customer:CUS-2'].owner, 'sync');
   const resolved = builders.FbmSync.resolveConflict('customer', 'CUS-2', 'fbm');
   check(so, 'resolve conflict theo FBM cap nhat baseline va xoa hang doi', [resolved.ok, conflictState.metadata.conflicts.length, conflictWrite.records[0].fbmHash !== '', conflictState.locks['customer:CUS-2']], [true, 0, true, undefined]);
@@ -427,7 +438,8 @@ async function chay(so) {
   const activityDecisionLogs = [];
   builders.logEvent = (event) => activityDecisionLogs.push(event);
   builders.FbmSync.linkActivityCustomers([{ fbmId: 'ACT-ORPHAN', customerFbmCode: 'ALT-MISSING' }], []);
-  check(so, 'Activity pull bo qua co log Customer cha va Activity ID', [activityDecisionLogs.length, activityDecisionLogs[0].recordId, activityDecisionLogs[0].detail.customerCode], [1, 'ACT-ORPHAN', 'ALT-MISSING']);
+  const orphanEntries = activityDecisionLogs.filter((event) => event.action === 'activity_pull_skipped');
+  check(so, 'Activity pull bo qua co log Customer cha va Activity ID', [orphanEntries.length, orphanEntries[0].recordId, orphanEntries[0].detail.customerCode], [1, 'ACT-ORPHAN', 'ALT-MISSING']);
 
   const audit = taoHopCat({ FbmSync: {}, LOG_OK: 'ok', LOG_ERROR: 'error', FbmSyncLog: [] });
   napServer(audit, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/report/Probe.js');

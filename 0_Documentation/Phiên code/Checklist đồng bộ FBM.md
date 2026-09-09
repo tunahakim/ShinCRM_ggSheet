@@ -99,9 +99,9 @@
 - [x] Customer đã tồn tại ở FBM và ShinCRM nhưng chưa liên kết được nhận diện bằng MST chuẩn hóa; nếu chỉ có một dòng ShinCRM khớp thì nối vào dòng đó, nếu MST trùng nhiều dòng hoặc đã liên kết thì fail-closed, không tạo Customer trùng.
 - [x] Bản ghi pull có đủ `id`, `@CUS_FBM_ID`, `@CUS_MA_KH_FBM`, nội dung, baseline và trạng thái.
 - [x] Pull giữ `note`, `verifyStatus`, `allowFbmPush` và trường chỉ thuộc ShinCRM.
-- [ ] Bản ghi mới đặt đúng mã nội bộ, ngày tạo, `active`, khóa cha và quyền push.
+- [x] Bản ghi mới đặt đúng mã nội bộ, ngày tạo, `active`, khóa cha và quyền push.
 - [x] Sau pull đánh dấu dirty đúng mã để Sidebar nạp lại.
-- [ ] `FBM_ACTIVITY_SINCE` loại lịch sử cũ mà không làm sai baseline hoặc missing.
+- [x] `FBM_ACTIVITY_SINCE` loại lịch sử cũ mà không làm sai baseline hoặc missing.
 
 ### Đối soát Customer
 
@@ -117,8 +117,8 @@
 
 ### Đóng slice
 
-- [ ] Test offline phủ đủ bảng hash, missing, tombstone và bảo toàn trường nội bộ.
-- [ ] Log có từng record, hướng FBM → ShinCRM, trạng thái trước/sau và lý do bỏ qua.
+- [x] Test offline phủ đủ bảng hash, missing, tombstone và bảo toàn trường nội bộ.
+- [x] Log có từng record, hướng FBM → ShinCRM, trạng thái trước/sau và lý do bỏ qua.
 - [ ] **Cần kiểm chứng thực tế:** pull `ALT00010`, xác nhận các cột định danh, baseline, trạng thái và `customerId` Activity là mã nội bộ.
 - [ ] **Cần kiểm chứng thực tế:** chạy pull lần hai, không tạo Customer/Activity trùng và không tăng conflict.
 

@@ -70,8 +70,18 @@ FbmSync.linkActivityCustomers = function (records, customers, categoryGate) {
   });
   var linked = (records || []).map(function (record) {
     var customerCode = String(record.customerFbmCode || record.customerId || '').trim(), customer = byFbm[customerCode];
-    if (!customer) { orphaned += 1; FbmSync.logActivityDecision('activity_pull_skipped', record, 'Khong tim thay Customer cha trong ShinCRM.'); return null; }
-    if (FbmSync.pushPermission && FbmSync.pushPermission(customer, 'customer').stop) { blocked += 1; FbmSync.logActivityDecision('activity_pull_skipped', record, 'Customer cha da ngung dong bo.'); return null; }
+    if (!customer) {
+      orphaned += 1;
+      FbmSync.logActivityDecision('activity_pull_skipped', record, 'Khong tim thay Customer cha trong ShinCRM.');
+      if (FbmSync.logPullRecord) { FbmSync.logPullRecord('activity', record, null, FbmSync.SYNC_STATUS.skipped, 'Không tìm thấy Customer cha trong ShinCRM.'); }
+      return null;
+    }
+    if (FbmSync.pushPermission && FbmSync.pushPermission(customer, 'customer').stop) {
+      blocked += 1;
+      FbmSync.logActivityDecision('activity_pull_skipped', record, 'Customer cha da ngung dong bo.');
+      if (FbmSync.logPullRecord) { FbmSync.logPullRecord('activity', record, customer, FbmSync.SYNC_STATUS.skipped, 'Customer cha đã ngừng đồng bộ.'); }
+      return null;
+    }
     var linkedRecord = Object.assign({}, record, { customerId: String(customer.id || '').trim(), customerFbmCode: customerCode });
     linkedRecord.fbmHash = FbmSync.hash(linkedRecord, 'activity', categoryGate);
     return linkedRecord;
