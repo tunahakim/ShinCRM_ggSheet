@@ -30,6 +30,7 @@ async function sidebarBoot() {
   callTimingReset(Date.now());
   var finishBusy = typeof sidebarBusyBegin === 'function' ? sidebarBusyBegin('Đang nạp dữ liệu ShinCRM…') : null;
   bootClearStartupWarning();
+  if (typeof sheetLinkSetRamReady === 'function') { sheetLinkSetRamReady(false); }
 
   try {
     // Bộ phát click gắn **trước** mọi thứ khác, vì nó không cần một hạt dữ liệu nào mà màn báo lỗi thì có nút Thử lại. Gắn ở cuối như trước thì lượt nạp đầu tiên mà vỡ sẽ vẽ ra một cái nút bấm không kêu. Hàm này chạy nhiều lần cũng chỉ gắn một tai nghe.
@@ -49,6 +50,7 @@ async function sidebarBoot() {
 
     var skipped = ingestCore(core);
     sheetLinkSetSpreadsheetId(core.spreadsheetId);
+    if (typeof sheetLinkSetRamReady === 'function') { sheetLinkSetRamReady(true); }
     selectionPollSetReady(true);
     statusInfoLine('Tra cứu khách đã chạy — đang nạp giao dịch ở chế độ nền…');
     callTimingFirstPaint(Date.now());
@@ -94,6 +96,7 @@ async function sidebarBoot() {
  */
 var BOOT_LAST_SUMMARY = null;
 var BOOT_WARNING_TIMER = null;
+var BOOT_WARNING_FINISH = null;
 
 /** Hiện rồi bỏ các lỗi mà cửa chạy nền đã gửi vào kho chờ; gói `loadCore` đã lấy và xóa chúng ở phía máy chủ. */
 function bootTellPendingMessages(messages) {
@@ -116,17 +119,14 @@ function bootShowSummary() {
 function bootClearStartupWarning() {
   if (BOOT_WARNING_TIMER !== null && typeof clearTimeout === 'function') { clearTimeout(BOOT_WARNING_TIMER); }
   BOOT_WARNING_TIMER = null;
-  var node = typeof document !== 'undefined' && document.getElementById ? document.getElementById('shin-startup-warning') : null;
-  if (node) { node.hidden = true; node.textContent = ''; }
-  if (typeof sidebarBusyPaint === 'function') { sidebarBusyPaint(); }
+  if (BOOT_WARNING_FINISH) { BOOT_WARNING_FINISH(); BOOT_WARNING_FINISH = null; }
 }
 
-/** Hiện cảnh báo tạm trong layout; fallback console chỉ dùng cho hộp cát không có DOM. */
+/** Đưa cảnh báo vào component thông báo chung, không khóa nội dung và tự dọn sau 8 giây. */
 function bootShowStartupWarning(text) {
-  var node = typeof document !== 'undefined' && document.getElementById ? document.getElementById('shin-startup-warning') : null;
-  if (node) {
-    node.textContent = String(text || ''); node.hidden = false;
-    if (typeof sidebarBusyPaint === 'function') { sidebarBusyPaint(); }
+  bootClearStartupWarning();
+  if (typeof sidebarBusyBegin === 'function') {
+    BOOT_WARNING_FINISH = sidebarBusyBegin(String(text || ''), { block: false });
     if (typeof window !== 'undefined' && typeof window.setTimeout === 'function') {
       BOOT_WARNING_TIMER = window.setTimeout(bootClearStartupWarning, 8000);
     }

@@ -24,6 +24,8 @@ var SHEET_LINK_LAST_ACK = 0;
 var SHEET_LINK_EXTENSION_SESSION = '';
 var SHEET_LINK_LAST_SHEET = '';
 var SHEET_LINK_LAST_CONTEXT = null;
+// sidebarBoot clears this synchronously before the first bridge message can be handled.
+var SHEET_LINK_RAM_READY = true;
 var SHEET_LINK_APPLY_TICKET = 0;
 var SHEET_LINK_VIEW_STATES = {};
 var SHEET_LINK_DATA_PENDING = null;
@@ -56,6 +58,9 @@ function sheetLinkInstall() {
 function sheetLinkSetSpreadsheetId(id) {
   SHEET_LINK_SPREADSHEET_ID = String(id || '');
 }
+
+/** Context chỉ được giải mã sau khi Customer và rowMap đã vào RAM. */
+function sheetLinkSetRamReady(ready) { SHEET_LINK_RAM_READY = ready === true; }
 
 /** Extension còn sống không: ACK về trong ngưỡng, tính từ nhịp ping gần nhất. */
 function sheetLinkExtensionAlive(now) {
@@ -262,6 +267,7 @@ function sheetLinkApplyContext(ctx) {
 
   SHEET_LINK_LAST_SHEET = ctx.sheetName || '';
   if (ctx.isEditing) { return; }
+  if (!SHEET_LINK_RAM_READY) { return; }
 
   var leavingDataSheet = changedSheet && (previousSheet === 'Customer' || previousSheet === 'Activity');
   var work = function () {
@@ -271,7 +277,11 @@ function sheetLinkApplyContext(ctx) {
     if (viewState && ctx.rowMaps) {
       sheetLinkViewApplyResult(ctx.sheetName, ctx);
     } else if (viewState && changedSheet) {
-      if (!previousSheet && !viewState.metaReady && !SHEET_LINK_DATA_PENDING) {
+      var rowMapReady = Store.rowMaps && Store.rowMaps[ctx.sheetName];
+      var controlCell = sheetLinkViewControlCell(viewState, ctx.row, ctx.col);
+      if (rowMapReady && !controlCell) {
+        // loadCore đã nạp rowMap của mọi sheet quản trị đang hiện; click dòng dữ liệu không cần gọi server.
+      } else if (!previousSheet && !viewState.metaReady && !SHEET_LINK_DATA_PENDING) {
         queue(function () { return sheetLinkSyncView(ctx.sheetName); });
       } else {
         if (SHEET_LINK_DATA_PENDING) { queue(function () { return SHEET_LINK_DATA_PENDING; }); }

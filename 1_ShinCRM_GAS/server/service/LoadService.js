@@ -178,7 +178,7 @@ function loadRowMaps(khach) {
   var book = shinOpenBook();
   book.getSheets().forEach(function (sheet) {
     var name = sheet.getName();
-    if (name.charAt(0) !== '!' || sheet.getLastColumn() < 1) { return; }
+    if (name.charAt(0) !== '!' || (typeof sheet.isSheetHidden === 'function' && sheet.isSheetHidden()) || sheet.getLastColumn() < 1) { return; }
     var lastColumn = sheet.getLastColumn();
     var header = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
     var idColumn = header.indexOf(DATA_SCHEMA.customer.id.code) + 1;
