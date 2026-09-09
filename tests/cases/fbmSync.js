@@ -6,7 +6,7 @@ async function chay(so) {
   // Fixture chỉ chạy offline; không gửi request hoặc ghi dữ liệu FBM thật.
   section('FBM sync - protocol, fingerprint va ba chieu');
   const hop = taoHopCat({ FbmSync: {} });
-  napServer(hop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/reconcile/Reconcile.js');
+  napServer(hop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Identity.js');
 
   const parsed = hop.FbmSync.protocol.parse('{"d":{"Bugs":{"FieldName":"x","Message":"bad"}}}');
   check(so, 'body Login.aspx voi HTTP 200 bi nhan la het phien', hop.FbmSync.protocol.isSessionExpired({ ok: true, status: 200, body: '<html><form action="Login.aspx"><input name="username"></form></html>' }), true);
@@ -36,7 +36,7 @@ async function chay(so) {
     FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {},
     PropertiesService: { getScriptProperties: () => ({ getProperty: (key) => ({ FBM_BASE_URL: 'https://fbm.test', FBM_COOKIE: '461020379855cFHN_CRM_App', FBM_AUTH_CUSTOMER: 'auth-c', FBM_AUTH_ACTIVITY: 'auth-a', FBM_SYNC_TEST_CUSTOMER_CODE: 'ALT00010' }[key] || '') }) }
   });
-  napServer(builders, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Reconcile.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategorySync.js', 'fbm_sync/write/RequestBuilders.js');
+  napServer(builders, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategorySync.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js');
   const gate = { map: { '@CAT_TINH_THANH\u001fHà Nội': 'HNI' }, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true, HNI: true } } };
   check(so, 'danh mục FBM tạo đúng companion có dấu chính', builders.FbmSync.categoryCompanionText('HNI', 'Hà Nội', true), 'HNI. Hà Nội #');
 
@@ -179,7 +179,7 @@ async function chay(so) {
   check(so, 'resolve conflict theo FBM cap nhat baseline va xoa hang doi', [resolved.ok, conflictState.metadata.conflicts.length, conflictWrite.records[0].fbmHash !== '', conflictState.locks['customer:CUS-2']], [true, 0, true, undefined]);
 
   const edges = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {} });
-  napServer(edges, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/reconcile/Reconcile.js', 'fbm_sync/reconcile/CategoryGate.js');
+  napServer(edges, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/reconcile/CategoryGate.js');
   check(so, 'normalize placeholder 1999 thanh rong', edges.FbmSync.normalize('/Date(915123600000)/'), '');
   check(so, 'normalize Date co offset chi dung timestamp chinh', edges.FbmSync.normalize('/Date(1757386800000+0700)/'), edges.FbmSync.normalize('/Date(1757386800000)/'));
   check(so, 'normalize Date khong hop le khong nem loi', edges.FbmSync.normalize(new Date(NaN)), '');
@@ -247,7 +247,7 @@ async function chay(so) {
   check(so, 'FBM khong doi sau push thanh notApplied va khoa record', [notApplied.skipped, notAppliedWrite.records[0].syncStatus, notAppliedState.locks['customer:C-PUSHED'].reason], [1, edges.FbmSync.SYNC_STATUS.notApplied, 'not_applied']);
 
   const pushed = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {} });
-  napServer(pushed, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/reconcile/Reconcile.js', 'fbm_sync/reconcile/CategoryGate.js');
+  napServer(pushed, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/reconcile/CategoryGate.js');
   pushed.FbmSync.readLocal = () => [{ id: 'CUS-1', fbmId: 'A1', fbmCustomerCode: 'ALT1', companyName: 'X', allowFbmPush: 'Cho phép', syncStatus: pushed.FbmSync.SYNC_STATUS.pushed, fbmHash: '' }];
   check(so, 'bản ghi đã đẩy chờ xác nhận không bị đẩy lặp', pushed.FbmSync.pushCandidates('customer').length, 0);
   pushed.FbmSync.readLocal = (entity) => entity === 'customer'
@@ -273,7 +273,7 @@ async function chay(so) {
     FbmSync: {},
     PropertiesService: { getDocumentProperties: () => propertyApi, getScriptProperties: () => propertyApi }
   });
-  napServer(orchestration, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Transport.js');
+  napServer(orchestration, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/EntryPoints.js');
   const started = orchestration.FbmSync.start({ mode: 'read' });
   check(so, 'start bat dau bang bootstrap Customer', started.request.meta.kind, 'authorize');
   check(so, 'bootstrap dung viewPage false', started.request.body.viewPage, false);
@@ -308,7 +308,7 @@ async function chay(so) {
   check(so, 'status noi ro dang dong bo giao dich', pushView.entityLabel, 'Giao dịch');
 
   const guards = taoHopCat({ FbmSync: {}, PropertiesService: { getScriptProperties: () => ({ getProperty: () => '' }), getDocumentProperties: () => ({ getProperty: () => null, setProperty: () => {} }) } });
-  napServer(guards, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/transport/Transport.js');
+  napServer(guards, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js');
   check(so, 'push config chan account rong', guards.FbmSync.pushConfigErrors({ entity: 'customer', kind: 'edit' }, { accountName: '' }), 'Thiếu FBM_ACCOUNT_NAME; chiều đẩy đã bị dừng.');
   check(so, 'push config chan prefix va do dai khi tao customer', guards.FbmSync.pushConfigErrors({ entity: 'customer', kind: 'create' }, { accountName: 'Lê Tuấn Anh', customerPrefix: '', customerCodeLength: 8 }), 'Thiếu FBM_MA_KH_PREFIX hoặc FBM_MA_KH_LENGTH; không tạo khách mới.');
   check(so, 'push config cho activity sua khi account co', guards.FbmSync.pushConfigErrors({ entity: 'activity', kind: 'edit' }, { accountName: 'Lê Tuấn Anh' }), '');
@@ -339,7 +339,7 @@ async function chay(so) {
   const pushProps = { data: {} };
   const pushPropertyApi = { getProperty: (key) => pushProps.data[key] || null, setProperty: (key, value) => { pushProps.data[key] = String(value); } };
   const push = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {}, PropertiesService: { getDocumentProperties: () => pushPropertyApi, getScriptProperties: () => pushPropertyApi }, writeGateSave: () => ({ ok: true }) });
-  napServer(push, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/RecordLocks.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Reconcile.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/Transport.js');
+  napServer(push, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/RecordLocks.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/EntryPoints.js');
   push.FbmSync.scriptSettings = () => ({ accountName: 'Lê Tuấn Anh', customerPrefix: 'ALT', customerCodeLength: 8 });
   push.FbmSync.pushCandidates = () => [{ kind: 'edit', id: 'C-1', record: { id: 'C-1', fbmId: 'A-1', fbmHash: 'h1' } }];
   push.FbmSync.validatePushCategories = () => [];

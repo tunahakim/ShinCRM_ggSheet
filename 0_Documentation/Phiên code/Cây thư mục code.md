@@ -159,13 +159,20 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── schema\FbmFields.js      Field map, controller và trạng thái FBM.
     ├── SyncSchema.js             Khai 8 cột thuần đồng bộ. Tám cột này không được xuất hiện trong DATA_SCHEMA.
     ├── protocol\Protocol.js     Envelope và parse response.
-    ├── transport\Transport.js   doPost và điều phối từng slice.
+    ├── transport\TransportCore.js Hợp đồng request và retry đọc an toàn.
+    ├── transport\PushFlow.js    Điều phối chiều đẩy và khóa an toàn trước khi ghi FBM.
+    ├── transport\PullFlow.js    Điều phối preflight, đọc Customer và đọc Activity.
+    ├── transport\EntryPoints.js Entry point cho Sidebar, DEV runner và Web App relay.
     ├── state\State.js            DocumentProperties, cursor và progress.
     ├── state\RecordLocks.js      Khóa bản ghi và kiểm tra revision.
     ├── state\Scheduler.js        Lịch heartbeat/quét, không gọi FBM trực tiếp.
     ├── read\GridRead.js          Grid metadata, phân trang và category request.
     ├── write\RequestBuilders.js  Builder Customer/Activity create/edit.
-    ├── reconcile\Reconcile.js    Normalize, fingerprint và pull WriteGate.
+    ├── write\PushCandidates.js   Chọn record local và kiểm điều kiện trước khi đẩy.
+    ├── reconcile\Fingerprint.js  Normalize, canonical và fingerprint ba chiều.
+    ├── reconcile\Conflict.js     Lưu, hiển thị và giải quyết conflict.
+    ├── reconcile\Identity.js     Nối định danh, ánh xạ bản ghi và liên kết Activity với Customer.
+    ├── reconcile\Pull.js         Đối soát chiều pull và ghi thay đổi an toàn.
     ├── reconcile\CategoryGate.js Đọc và đối chiếu Category với lookup FBM; không trực tiếp ghi Sheet.
     ├── reconcile\CategorySync.js Nhập lookup FBM vào Category, giữ nguyên giá trị cũ.
     ├── report\Report.js          Trạng thái công khai cho Sidebar.
