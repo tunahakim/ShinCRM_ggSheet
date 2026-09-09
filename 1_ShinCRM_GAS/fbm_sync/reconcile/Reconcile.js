@@ -207,13 +207,17 @@ FbmSync.extractAutoCustomerCode = function (response) {
 FbmSync.pushCandidates = function (entity) {
   var records = FbmSync.readLocal(entity), customers = {};
   var categoryGate = {};
+  var testCustomerCode = '';
   try { categoryGate = FbmSync.stateRead().metadata.categoryGate || (typeof FbmSync.readCategoryGate === 'function' ? FbmSync.readCategoryGate() : {}); } catch (ignore) {}
+  try { testCustomerCode = typeof FbmSync.scriptSettings === 'function' ? String(FbmSync.scriptSettings().testCustomerCode || '').trim() : ''; } catch (ignoreSettings) {}
   if (entity === 'activity') {
     FbmSync.readLocal('customer').forEach(function (customer) { customers[String(customer.id || '')] = customer; });
   }
   return records.filter(function (record) {
     if (String(record.recordStatus || 'active') === 'deleted') { return false; }
     var customer = entity === 'activity' ? customers[String(record.customerId || '')] : null;
+    // Keep live writes inside the configured test customer until the gate is cleared.
+    if (testCustomerCode && (entity === 'customer' ? String(record.fbmCustomerCode || '').trim() !== testCustomerCode : !customer || String(customer.fbmCustomerCode || '').trim() !== testCustomerCode)) { return false; }
     if (!FbmSync.pushPermission(record, entity, customer).push) { return false; }
     if (String(record.syncStatus || '') === FbmSync.SYNC_STATUS.pushed) { return false; }
     var currentHash = FbmSync.hash(record, entity, categoryGate);
