@@ -64,13 +64,27 @@ function acceptColumnHints(data) {
 
 /** Retry một lần khi worker vừa thức dậy nhưng chưa nhận listener kịp. */
 function sendRequestToWorker(message, done, attempt) {
-  chrome.runtime.sendMessage(message, function (reply) {
-    var error = chrome.runtime.lastError;
-    if (error && attempt < 1 && /Receiving end does not exist/i.test(error.message || '')) {
-      setTimeout(function () { sendRequestToWorker(message, done, attempt + 1); }, 150);
-      return;
-    }
-    done(error, reply);
+  attempt = Number(attempt || 0);
+  try {
+    chrome.runtime.sendMessage(message, function (reply) {
+      var error = chrome.runtime.lastError;
+      if (error && attempt < 1 && /Receiving end does not exist/i.test(error.message || '')) {
+        setTimeout(function () { sendRequestToWorker(message, done, attempt + 1); }, 150);
+        return;
+      }
+      done(error, reply);
+    });
+  } catch (error) {
+    done(error);
+  }
+}
+
+/** Cho worker xác nhận bridge còn sống trước khi quyết định nạp lại content script. */
+if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
+  chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
+    if (!message || message.type !== 'CRM_BRIDGE_PING') { return false; }
+    sendResponse({ ready: true, version: '21.7' });
+    return false;
   });
 }
 

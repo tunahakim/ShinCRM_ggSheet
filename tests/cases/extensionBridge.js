@@ -4,12 +4,16 @@ const vm = require('vm');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 
 const BRIDGE_FILE = path.join(__dirname, '..', '..', '2_ShinCRM_Extension', 'content_scripts', 'bridge', 'iframe_bridge.js');
+const WORKER_FILE = path.join(__dirname, '..', '..', '2_ShinCRM_Extension', 'background', 'service_worker.js');
+const EXECUTOR_FILE = path.join(__dirname, '..', '..', '2_ShinCRM_Extension', 'content_scripts', 'fbm_sync', 'executor.js');
 
-function napBridge() {
+function napBridge(runtime) {
   let onMessage = null;
   const hop = {
     console: { log() {} },
     Date,
+    chrome: runtime ? { runtime } : undefined,
+    setTimeout,
     window: {
       addEventListener(name, fn) {
         if (name === 'message') { onMessage = fn; }
@@ -100,6 +104,19 @@ function chay(so) {
     data: { action: 'CRM_HANDSHAKE', nonce: '' }
   });
   check(so, 'bắt tay thiếu nonce bị bỏ thay vì làm rơi kênh hợp lệ', rong.sent.length, 0);
+  let invalidated = '';
+  const invalidBridge = napBridge({
+    onMessage: { addListener() {} },
+    sendMessage() { throw new Error('Extension context invalidated.'); }
+  });
+  invalidBridge.sendRequestToWorker({ type: 'FBM_EXECUTE_REQUEST' }, function (error) { invalidated = error && error.message || ''; });
+  check(so, 'context Extension het hieu luc tra loi ngay', invalidated, 'Extension context invalidated.');
+
+  const workerSource = fs.readFileSync(WORKER_FILE, 'utf8');
+  const executorSource = fs.readFileSync(EXECUTOR_FILE, 'utf8');
+  check(so, 'worker ping executor truoc request FBM', workerSource.indexOf("ensureFbmExecutor(tabId).then") < workerSource.indexOf("sendTabMessage(tabId, { type: 'FBM_EXECUTE'"), true);
+  check(so, 'worker chi co mot diem gui request FBM', (workerSource.match(/sendTabMessage\(tabId, \{ type: 'FBM_EXECUTE', request: request \}/g) || []).length, 1);
+  check(so, 'executor co ping phien ban 21.7', /FBM_PING[\s\S]+version:\s*'21\.7'/.test(executorSource), true);
 }
 
 module.exports = { chay };

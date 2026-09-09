@@ -41,9 +41,15 @@
     }).finally(function () { clearTimeout(timer); });
   }
   /** Chỉ nhận message đúng loại, giữ channel mở cho Promise fetch. */
-  chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
+  function onFbmMessage(message, sender, sendResponse) {
+    if (message && message.type === 'FBM_PING') { sendResponse({ ready: true, version: '21.7' }); return false; }
     if (!message || message.type !== 'FBM_EXECUTE') { return false; }
     execute(message.request).then(function (result) { sendResponse({ result: result }); }, function (err) { sendResponse({ error: String(err && err.message || err) }); });
     return true;
-  });
+  }
+  try {
+    if (globalThis.__SHINCRM_FBM_LISTENER__) { chrome.runtime.onMessage.removeListener(globalThis.__SHINCRM_FBM_LISTENER__); }
+  } catch (ignore) {}
+  globalThis.__SHINCRM_FBM_LISTENER__ = onFbmMessage;
+  chrome.runtime.onMessage.addListener(onFbmMessage);
 })();

@@ -27,20 +27,62 @@ function scheduleHeartbeat() {
   }
 }
 
-/** Tự nạp executor khi tab FBM đã mở trước lúc Extension được tải lại. */
-function sendToFbmTab(tabId, request) {
+/** Gửi message có hạn chờ để worker không giữ kênh Sidebar vô thời hạn. */
+function sendTabMessage(tabId, message, timeoutMs) {
   return new Promise(function (resolve) {
-    chrome.tabs.sendMessage(tabId, { type: 'FBM_EXECUTE', request: request }, function (reply) {
+    var settled = false;
+    var timer = setTimeout(function () { if (!settled) { settled = true; resolve({ error: 'Tab FBM không trả lời cầu nối.' }); } }, timeoutMs);
+    chrome.tabs.sendMessage(tabId, message, function (reply) {
+      if (settled) { return; }
+      settled = true;
+      clearTimeout(timer);
       var error = chrome.runtime.lastError;
-      if (!error) { resolve(reply || { error: 'Tab FBM không trả kết quả.' }); return; }
-      if (!/Receiving end does not exist/i.test(error.message || '')) { resolve({ error: error.message }); return; }
-      chrome.scripting.executeScript({ target: { tabId: tabId }, files: ['content_scripts/fbm_sync/executor.js'] }).then(function () {
-        chrome.tabs.sendMessage(tabId, { type: 'FBM_EXECUTE', request: request }, function (retryReply) {
-          var retryError = chrome.runtime.lastError;
-          resolve(retryError ? { error: retryError.message } : (retryReply || { error: 'Tab FBM không trả kết quả.' }));
-        });
-      }).catch(function (injectError) { resolve({ error: 'Không nạp được cầu nối vào tab FBM: ' + String(injectError && injectError.message || injectError) }); });
+      resolve(error ? { error: error.message } : (reply || { error: 'Tab FBM không trả kết quả.' }));
     });
+  });
+}
+
+/** Ping trước, chỉ nạp executor khi chưa có đầu nhận. */
+function ensureFbmExecutor(tabId) {
+  return sendTabMessage(tabId, { type: 'FBM_PING' }, 1500).then(function (reply) {
+    if (reply && reply.ready) { return reply; }
+    return chrome.scripting.executeScript({ target: { tabId: tabId }, files: ['content_scripts/fbm_sync/executor.js'] }).then(function () {
+      return sendTabMessage(tabId, { type: 'FBM_PING' }, 1500);
+    }).then(function (injectedReply) {
+      if (!injectedReply || !injectedReply.ready) { throw new Error(injectedReply && injectedReply.error || 'Executor FBM không trả lời sau khi nạp.'); }
+      return injectedReply;
+    });
+  });
+}
+
+/** Khôi phục bridge trên các tab Sheets đã mở trước khi Extension được tải lại. */
+function ensureSheetsBridge(tabId) {
+  return sendTabMessage(tabId, { type: 'CRM_BRIDGE_PING' }, 1000).then(function (reply) {
+    if (reply && reply.ready) { return reply; }
+    return chrome.scripting.executeScript({ target: { tabId: tabId }, files: ['content_scripts/model/live_model_reader.js'], world: 'MAIN' }).then(function () {
+      return chrome.scripting.executeScript({ target: { tabId: tabId }, files: ['content_scripts/bridge/iframe_bridge.js', 'content_scripts/scout/sheet_scout.js'] });
+    }).then(function () {
+      return sendTabMessage(tabId, { type: 'CRM_BRIDGE_PING' }, 1500);
+    }).then(function (injectedReply) {
+      if (!injectedReply || !injectedReply.ready) { throw new Error(injectedReply && injectedReply.error || 'Bridge Google Sheet không trả lời sau khi nạp.'); }
+      return injectedReply;
+    });
+  });
+}
+
+/** Tự phục hồi các tab Sheets đang mở; lỗi một tab không làm worker ngừng nhận message. */
+function recoverSheetsBridges() {
+  return chrome.tabs.query({ url: ['https://docs.google.com/spreadsheets/*'] }).then(function (tabs) {
+    return Promise.all((tabs || []).map(function (tab) {
+      return ensureSheetsBridge(tab.id).catch(function (error) { console.warn('Không khôi phục được bridge Google Sheet:', error); });
+    }));
+  }).catch(function (error) { console.warn('Không dò được tab Google Sheet:', error); });
+}
+
+/** Kiểm tra đầu nhận rồi gửi request nghiệp vụ đúng một lần. */
+function sendToFbmTab(tabId, request) {
+  return ensureFbmExecutor(tabId).then(function () {
+    return sendTabMessage(tabId, { type: 'FBM_EXECUTE', request: request }, 15000);
   });
 }
 
@@ -58,6 +100,7 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
 chrome.runtime.onInstalled.addListener(scheduleHeartbeat);
 chrome.runtime.onStartup.addListener(scheduleHeartbeat);
 scheduleHeartbeat();
+recoverSheetsBridges();
 /** Gửi request đọc tối thiểu; không gửi thao tác ghi từ alarm. */
 chrome.alarms.onAlarm.addListener(function (alarm) {
   if (!alarm || alarm.name !== 'fbm-heartbeat') { return; }
