@@ -105,10 +105,10 @@
 
 ### Đối soát Customer
 
-- [ ] Ba hash bằng nhau → không ghi nội dung, đánh dấu đã đồng bộ.
-- [ ] Baseline rỗng hoặc tự lành → chỉ cập nhật baseline.
-- [ ] Chỉ FBM đổi → pull nội dung và baseline, giữ trường nội bộ.
-- [ ] Chỉ ShinCRM đổi → không pull đè, chuyển ứng viên push nếu được phép.
+- [x] Ba hash bằng nhau → không ghi nội dung, đánh dấu đã đồng bộ.
+- [x] Baseline rỗng hoặc tự lành → chỉ cập nhật baseline.
+- [x] Chỉ FBM đổi → pull nội dung và baseline, giữ trường nội bộ.
+- [x] Chỉ ShinCRM đổi → không pull đè, chuyển ứng viên push nếu được phép.
 - [ ] Hai phía đổi → conflict, khóa, log, không ghi nội dung/baseline.
 - [ ] Customer vắng khỏi grid → `không thấy bên FBM`, không xóa và không đổi baseline.
 - [ ] Tombstone local có FBM ID không bị kéo lại thành dòng mới.

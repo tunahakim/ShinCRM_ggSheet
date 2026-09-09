@@ -360,7 +360,18 @@ FbmSync.pullWrite = function (entity, records) {
       }
       return;
     }
+    var localHash = FbmSync.hash(current, entity, categoryGate), incomingHash = FbmSync.hash(incoming, entity, categoryGate);
+    if (!String(current.fbmHash || '').trim() && localHash === incomingHash) {
+      statusWrites.push({ id: current.id, fbmHash: incomingHash, syncStatus: FbmSync.SYNC_STATUS.synced, syncedAt: new Date() });
+      return;
+    }
     var decision = FbmSync.threeWay({ hBASE: current.fbmHash || '' }, current, incoming, entity, categoryGate);
+    if (decision.unchanged) {
+      if (String(current.syncStatus || '') !== FbmSync.SYNC_STATUS.synced || String(current.fbmHash || '') !== decision.hFBM) {
+        statusWrites.push({ id: current.id, fbmHash: decision.hFBM, syncStatus: FbmSync.SYNC_STATUS.synced, syncedAt: new Date() });
+      }
+      return;
+    }
     if (decision.conflict) {
       conflicts += 1;
       FbmSync.rememberConflict(state, entity, current, incoming, decision, categoryGate);
