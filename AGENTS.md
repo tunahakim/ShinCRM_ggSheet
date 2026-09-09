@@ -6,6 +6,7 @@
 - Đọc `CLAUDE.md`, checklist đồng bộ FBM và `0_Documentation/Phiên code/Câu hỏi đêm.md` ở đầu mỗi phiên; sau khi ngữ cảnh bị nén phải đọc lại ba tệp này.
 - Chỉ đọc tệp khi dòng code sắp viết cần đến nó; không quét cả codebase để chuẩn bị.
 - Tự thực hiện liên tục các mục chỉ cần code, test offline hoặc GAS DEV. Khi đến mục cần người dùng giữ tab FBM, đăng nhập, bấm ghi thật hoặc kiểm tra dữ liệu live thì dừng và ghi rõ thao tác cần người dùng làm.
+- Nếu đang làm phiên khác không phải phiên đồng bộ FBM thì bỏ qua các tài liệu liên quan đến FBM
 
 ## Làm việc với chủ dự án
 
@@ -37,7 +38,7 @@
 
 ## Git
 
-- Commit ngay khi hoàn thành một nhóm mục liên quan trong checklist; tách lõi GAS, Category, Extension/Sidebar, test và tài liệu thành các commit có chủ đề rõ ràng khi hợp lý.
-- Mỗi commit phải cập nhật checklist tương ứng; thêm tệp hoặc thư mục code thì cập nhật `0_Documentation/Phiên code/Cây thư mục code.md` trong cùng nhóm công việc.
+- Commit ngay khi hoàn thành một nhóm mục liên quan trong checklist (nếu có); tách lõi GAS, Category, Extension/Sidebar, test và tài liệu thành các commit có chủ đề rõ ràng khi hợp lý.
+- Mỗi commit phải cập nhật checklist tương ứng (nếu có); thêm tệp hoặc thư mục code thì cập nhật `0_Documentation/Phiên code/Cây thư mục code.md` trong cùng nhóm công việc.
 - Tiêu đề và mô tả commit viết tiếng Việt có dấu, ngắn gọn, không hard wrap.
 - Bảo toàn thay đổi có sẵn của chủ dự án; không đưa tệp không liên quan vào commit.
