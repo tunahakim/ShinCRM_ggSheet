@@ -59,6 +59,8 @@ async function chay(so) {
   check(so, 'Activity không đẩy product nội bộ lên FBM', activity.body.memvars.filter((item) => item.Name === 'ma_sp')[0].NewValue, '');
   const linkedActivity = builders.FbmSync.linkActivityCustomers([{ customerId: 'ALT99999', fbmHash: 'old' }], [{ id: 'KH-1', fbmCustomerCode: 'ALT99999' }]);
   check(so, 'Activity FBM nối về mã Customer nội bộ', [linkedActivity.records[0].customerId, linkedActivity.orphaned], ['KH-1', 0]);
+  const stoppedActivity = builders.FbmSync.linkActivityCustomers([{ customerId: 'ALT-STOP', fbmHash: 'old' }], [{ id: 'KH-STOP', fbmCustomerCode: 'ALT-STOP', allowFbmPush: 'Ngừng đồng bộ' }]);
+  check(so, 'Customer ngừng đồng bộ chặn Activity con ở chiều pull', [stoppedActivity.records.length, stoppedActivity.blocked], [0, 1]);
   const activityWithParent = builders.FbmSync.activityRecord({ id: 7, details: 'Gọi', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi điện' }, gate, { maKh: 'ALT99999' });
   check(so, 'Activity giữ mã Customer cha khi grid không trả ma_kh', activityWithParent.customerFbmCode, 'ALT99999');
   check(so, 'Activity đọc dấu nhận diện để recovery', builders.FbmSync.activityMarkerId('Nội dung #SC-ACT-9'), 'ACT-9');
@@ -87,6 +89,13 @@ async function chay(so) {
   builders.writeGateSave = (request) => { recoveryWrite = request; return { ok: true }; };
   const recovered = builders.FbmSync.pullWrite('activity', [builders.FbmSync.activityRecord({ id: 77, ma_kh: 'ALT99999', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi', details: 'Nội dung #SC-ACT-9' }, gate)], 'write');
   check(so, 'Activity marker recovery vá FBM ID không tạo dòng mới', [recovered.written, recoveryWrite.records[0].id, recoveryWrite.records[0].fbmId], [1, 'ACT-9', '77']);
+  let markerConflictWrite, markerState = { metadata: { categoryGate: gate, seen: { customer: {}, activity: {} }, conflicts: [] }, locks: {}, counts: { conflict: 0 } };
+  builders.FbmSync.stateRead = () => markerState;
+  builders.FbmSync.stateWrite = (next) => { markerState = next; return next; };
+  builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmCustomerCode: 'ALT99999' }] : [{ id: 'ACT-9', fbmId: 'OLD-FBM', customerId: 'KH-1', content: 'Nội dung cũ', taskType: 'Gọi', workDate: '/Date(1757386800000)/', fbmHash: 'old-hash' }];
+  builders.writeGateSave = (request) => { markerConflictWrite = request; return { ok: true }; };
+  const markerConflict = builders.FbmSync.pullWrite('activity', [builders.FbmSync.activityRecord({ id: 'NEW-FBM', ma_kh: 'ALT99999', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi', details: 'Nội dung mới #SC-ACT-9' }, gate)]);
+  check(so, 'Activity marker trỏ FBM ID khác tạo conflict và khóa', [markerConflict.conflicts, markerState.metadata.conflicts.length, markerConflictWrite.records[0].syncStatus, markerState.locks['activity:ACT-9'].owner], [1, 1, builders.FbmSync.SYNC_STATUS.conflict, 'sync']);
   const edit = builders.FbmSync.customerEditRequest({ fbmId: 'A1', companyName: 'Đổi tên' }, { stt_rec_kh: 'A1', ma_kh: 'ALT00010', ten_kh: 'Cũ', dien_thoai: '0123' }, gate);
   check(so, 'Customer sửa giữ OldValue field không đụng tới', edit.body.memvars.filter((item) => item.Name === 'dien_thoai')[0].NewValue, '0123');
   check(so, 'Customer grid gắn điều kiện phân quyền theo userId trong payload cookie', builders.FbmSync.customerGridRequest({ type: 0 }).body.externalKey[0].Name, "stt_rec_kh in (select stt_rec_kh from dbo.zcFastBusiness$Function$GetCustomerValidate('2037')) and 1");
@@ -241,6 +250,18 @@ async function chay(so) {
   napServer(pushed, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/reconcile/Reconcile.js', 'fbm_sync/reconcile/CategoryGate.js');
   pushed.FbmSync.readLocal = () => [{ id: 'CUS-1', fbmId: 'A1', fbmCustomerCode: 'ALT1', companyName: 'X', allowFbmPush: 'Cho phép', syncStatus: pushed.FbmSync.SYNC_STATUS.pushed, fbmHash: '' }];
   check(so, 'bản ghi đã đẩy chờ xác nhận không bị đẩy lặp', pushed.FbmSync.pushCandidates('customer').length, 0);
+  pushed.FbmSync.readLocal = (entity) => entity === 'customer'
+    ? [{ id: 'CUS-PARENT', fbmId: 'FBM-PARENT', fbmCustomerCode: 'ALT-PARENT', allowFbmPush: 'Ngừng đồng bộ' }]
+    : [{ id: 'ACT-STOP', customerId: 'CUS-PARENT', allowFbmPush: 'Cho phép', taskType: 'Gọi', content: 'Nội dung', workDate: '2026-09-09' }];
+  check(so, 'Customer ngừng đồng bộ chặn Activity push', pushed.FbmSync.pushCandidates('activity').length, 0);
+  pushed.FbmSync.readLocal = (entity) => entity === 'customer'
+    ? [{ id: 'CUS-PARENT', fbmId: 'FBM-PARENT', fbmCustomerCode: 'ALT-PARENT', allowFbmPush: 'Chưa cho phép' }]
+    : [{ id: 'ACT-NO-PERM', customerId: 'CUS-PARENT', allowFbmPush: 'Cho phép', taskType: 'Gọi', content: 'Nội dung', workDate: '2026-09-09' }];
+  check(so, 'Customer chưa cho phép chặn Activity push', pushed.FbmSync.pushCandidates('activity').length, 0);
+  pushed.FbmSync.readLocal = (entity) => entity === 'customer'
+    ? [{ id: 'CUS-PARENT', fbmId: '', fbmCustomerCode: 'ALT-PARENT', allowFbmPush: 'Cho phép' }]
+    : [{ id: 'ACT-NO-ID', customerId: 'CUS-PARENT', allowFbmPush: 'Cho phép', taskType: 'Gọi', content: 'Nội dung', workDate: '2026-09-09' }];
+  check(so, 'Customer thiếu FBM ID chặn Activity push', pushed.FbmSync.pushCandidates('activity').length, 0);
 
   pushed.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-KEEP', fbmId: 'FBM-1' }] : [];
   check(so, 'beforeHardDelete chan xoa cung record co FBM ID', pushed.beforeHardDelete('customer', 'CUS-KEEP').allowed, false);

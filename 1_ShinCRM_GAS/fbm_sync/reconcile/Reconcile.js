@@ -513,6 +513,7 @@ FbmSync.pushCandidates = function (entity) {
     var customer = entity === 'activity' ? customers[String(record.customerId || '')] : null;
     // Keep live writes inside the configured test customer until the gate is cleared.
     if (testCustomerCode && (entity === 'customer' ? String(record.fbmCustomerCode || '').trim() !== testCustomerCode : !customer || String(customer.fbmCustomerCode || '').trim() !== testCustomerCode)) { return false; }
+    if (entity === 'activity' && !FbmSync.activityParentReady(customer)) { return false; }
     if (!FbmSync.pushPermission(record, entity, customer).push) { return false; }
     var status = String(record.syncStatus || ''), failureKey = entity + ':' + String(record.id || '');
     if (status === FbmSync.SYNC_STATUS.pushed || status === FbmSync.SYNC_STATUS.notApplied) { return false; }

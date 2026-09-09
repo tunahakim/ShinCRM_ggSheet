@@ -119,6 +119,11 @@ FbmSync.pushPermission = function (record, entity, customer) {
   return { push: allow.toLowerCase() === String(FbmSync.PUSH_ALLOW_VALUE).toLowerCase(), reason: 'Chưa bật Cho phép đẩy FBM.' };
 };
 
+/** Activity chỉ được đẩy khi Customer cha đã liên kết đủ hai mã FBM. */
+FbmSync.activityParentReady = function (customer) {
+  return !!customer && !!String(customer.fbmId || '').trim() && !!String(customer.fbmCustomerCode || '').trim();
+};
+
 /** Kiểm các SELECT có ánh xạ FBM; chiều pull không gọi phép này. */
 FbmSync.validatePushCategories = function (record, entity, categoryGate) {
   var fields = entity === 'customer' ? [

@@ -112,7 +112,7 @@
 - [x] Hai phía đổi → conflict, khóa, log, không ghi nội dung/baseline.
 - [x] Customer vắng khỏi grid → `không thấy bên FBM`, không xóa và không đổi baseline.
 - [x] Tombstone local có FBM ID không bị kéo lại thành dòng mới.
-- [ ] Customer ngừng đồng bộ loại cả Customer và Activity con khỏi hai chiều.
+- [x] Customer ngừng đồng bộ loại cả Customer và Activity con khỏi hai chiều.
 - [x] Record đang được người dùng sửa được hoãn; missing scan bỏ qua và giữ nguyên bản nháp.
 
 ### Đóng slice
@@ -129,7 +129,7 @@
 - [x] Request Activity theo `externalKey stt_rec` nối đúng Customer nội bộ.
 - [x] Activity mới không marker tạo dòng ShinCRM, cấp mã nội bộ, lưu FBM ID và baseline.
 - [x] Marker trỏ dòng đang đẩy thì vá ID, không tạo trùng.
-- [ ] Marker trỏ dòng đã có FBM ID khác thì khóa và báo xử lý.
+- [x] Marker trỏ dòng đã có FBM ID khác thì khóa và báo xử lý.
 - [x] Marker mồ côi chỉ log, không tạo lại.
 - [x] Activity thiếu hoặc placeholder `workDate` bị chặn và log, không tự điền ngày.
 - [x] Hash Activity dùng cùng luật ba chiều như Customer.
@@ -205,7 +205,7 @@
 
 - [x] Builder Activity New gửi `ma_kh/stt_rec` Customer cha và marker `#SC-<mã ShinCRM>`.
 - [x] Fingerprint cắt marker trước khi so.
-- [ ] Customer cha chưa Cho phép, Ngừng đồng bộ hoặc thiếu FBM ID/mã thì không push Activity.
+- [x] Customer cha chưa Cho phép, Ngừng đồng bộ hoặc thiếu FBM ID/mã thì không push Activity.
 - [ ] Activity mới đủ khóa/ngày/danh mục → New, lưu FBM ID và chờ xác nhận.
 - [ ] Create mất phản hồi giữ `đang đẩy`, không retry; pull dùng marker để vá hoặc báo trùng.
 - [x] Builder Activity Edit mở form lấy OldValue đúng fixture.
