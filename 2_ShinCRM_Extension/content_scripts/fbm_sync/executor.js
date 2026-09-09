@@ -1,8 +1,7 @@
 /* Cầu nối FBM: nhận request, fetch trong tab đăng nhập, trả response thô. */
 (function () {
-  if (globalThis.__SHINCRM_FBM_EXECUTOR__) { return; }
-  globalThis.__SHINCRM_FBM_EXECUTOR__ = true;
   var HEARTBEAT_URL = 'https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage';
+  var FETCH_TIMEOUT_MS = 10000;
   /** Request đọc tối thiểu để giữ phiên và phát hiện logout. */
   function heartbeat() { return { url: HEARTBEAT_URL, method: 'POST', headers: { accept: '*/*', 'content-type': 'application/json; charset=UTF-8' }, body: { type: 1, count: 1, language: 'v', controller: 'zccrAccount', viewId: null, childObject: false, lastPageIndex: 0, firstPageItem: '', lastPageItem: '', lastRowCount: 0, memvars: [], externalKey: [], gridPageIndex: -1, gridPageValue: null, gridRefresh: true, filter: [], sortExpression: 'ngay_gd desc', cookie: '' } }; }
   /** Đọc cookie payload nếu request GAS không truyền cookie. */
@@ -32,9 +31,14 @@
   function execute(request) {
     var req = request || heartbeat();
     var sent = requestBody(req);
-    return fetch(req.url, { method: req.method || 'POST', headers: req.headers || { 'content-type': 'application/json; charset=UTF-8' }, body: sent && sent.text, credentials: 'include', cache: 'no-store' }).then(function (response) {
+    var controller = new AbortController();
+    var timer = setTimeout(function () { controller.abort(); }, FETCH_TIMEOUT_MS);
+    return fetch(req.url, { method: req.method || 'POST', headers: req.headers || { 'content-type': 'application/json; charset=UTF-8' }, body: sent && sent.text, credentials: 'include', cache: 'no-store', signal: controller.signal }).then(function (response) {
       return response.text().then(function (body) { return { ok: response.ok, status: response.status, headers: { contentType: response.headers.get('content-type') || '' }, body: body, transport: { payloadCookie: sent && sent.cookie || '' } }; });
-    });
+    }).catch(function (err) {
+      if (err && err.name === 'AbortError') { throw new Error('FBM không phản hồi sau 10 giây.'); }
+      throw err;
+    }).finally(function () { clearTimeout(timer); });
   }
   /** Chỉ nhận message đúng loại, giữ channel mở cho Promise fetch. */
   chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
