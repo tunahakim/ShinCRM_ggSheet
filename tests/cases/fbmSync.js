@@ -398,6 +398,19 @@ async function chay(so) {
   push.FbmSync.stateWrite(bugState);
   const bugResult = push.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"Bugs":{"Message":"Sai du lieu"}}}' });
   check(so, 'Bugs HTTP 200 danh dau loi record va khong retry request da gui', [bugResult.continued, push.FbmSync.stateRead().counts.error, push.FbmSync.stateRead().metadata.pushFailures['customer:C-ERR'] !== undefined], [true, 1, true]);
+  pushed.FbmSync.readLocal = (entity) => entity === 'customer'
+    ? [{ id: 'CUS-NEW', fbmId: '', fbmCustomerCode: '', allowFbmPush: 'Chưa cho phép' }]
+    : [];
+  check(so, 'Customer moi chua cho phep chi pull khong push', pushed.FbmSync.pushCandidates('customer').length, 0);
+  pushed.FbmSync.readLocal = (entity) => entity === 'customer'
+    ? [{ id: 'CUS-PARENT', fbmId: 'FBM-PARENT', fbmCustomerCode: 'ALT-PARENT', allowFbmPush: pushed.FbmSync.PUSH_ALLOW_VALUE }]
+    : [{ id: 'ACT-NEW', customerId: 'CUS-PARENT', fbmId: '', allowFbmPush: pushed.FbmSync.PUSH_ALLOW_VALUE, taskType: 'Goi', content: 'Noi dung', workDate: '2026-09-09' }];
+  check(so, 'Activity moi co Customer cha lien ket duoc dua vao queue', pushed.FbmSync.pushCandidates('activity').length, 1);
+  const transportState = push.FbmSync.stateStart('', 'read', 0);
+  transportState.phase = 'pull_customer'; transportState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 3, pageValue: ['x'] };
+  push.FbmSync.stateWrite(transportState);
+  const http500 = push.FbmSync.continue({ ok: false, status: 500, body: '{"Message":"server"}' });
+  check(so, 'HTTP 500 giu cursor doc hop le cho ky sau', [http500.ok, push.FbmSync.stateRead().phase, push.FbmSync.stateRead().cursor.kind], [false, 'error', 'customer_grid']);
 
   const audit = taoHopCat({ FbmSync: {}, LOG_OK: 'ok', LOG_ERROR: 'error', FbmSyncLog: [] });
   napServer(audit, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/report/Probe.js');
