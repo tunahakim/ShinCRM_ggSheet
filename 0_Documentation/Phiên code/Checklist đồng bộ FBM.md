@@ -6,7 +6,7 @@ Tệp này là bảng điều khiển duy nhất của phiên đồng bộ FBM/S
 
 - `[x]` chỉ có nghĩa là mục đó đã đạt đúng mức bằng chứng ghi trong dòng: code, test offline hoặc live test.
 - `[ ]` nghĩa là còn thiếu code, thiếu kiểm thử phù hợp hoặc chưa có bằng chứng live; có builder không đồng nghĩa pipeline đã dùng được.
-- Bộ kiểm offline hiện đạt `937/937`; live test đã đọc đúng `ALT00010` và một Activity, nhưng chưa có request ghi FBM nào được xác nhận thành công.
+- Bộ kiểm offline hiện đạt `938/938`; live test đã đọc đúng `ALT00010` và một Activity, nhưng chưa có request ghi FBM nào được xác nhận thành công.
 - Lần chạy Ghi thật gần nhất đã ghi được một bản ghi pull vào ShinCRM rồi tạm dừng trước chiều push vì cổng danh mục nhận nhầm `@CAT_NHOM_KH_FBM`. Bản sửa đã có ở local, chưa được đẩy lên GAS và chưa live test lại.
 
 ## A. Tất cả điều kiện để đồng bộ hoạt động thành công
@@ -179,7 +179,7 @@ Tệp này là bảng điều khiển duy nhất của phiên đồng bộ FBM/S
 
 ### A13. Kiểm thử, nạp lần đầu và bàn giao
 
-- [x] Bộ test offline hiện đạt `937/937`, gồm protocol, `Bugs`, builder, category, hash, lock, bridge, parent Activity, parser OldValue/ticket, trạng thái sync, hook chống xóa cứng và không có request xóa.
+- [x] Bộ test offline hiện đạt `938/938`, gồm protocol, `Bugs`, builder, category, hash, lock, bridge, parent Activity, parser OldValue/ticket, trạng thái sync, hook chống xóa cứng và retry đọc có giới hạn; không có request xóa.
 - [x] Live test Đọc thử `ALT00010` đã xác thực Customer/Activity và preview đúng một khách, một giao dịch ngày 09/09/2026.
 - [ ] Bổ sung test cho các khoảng trống còn lại: bảy normalize đầy đủ, lookup fail-open pull, missing, marker recovery đầy đủ, retry policy và scheduler.
 - [ ] Chạy `fbmProbeAltState --push` để biết chính xác record/candidate nào sẽ bị ghi trước live test tiếp theo.

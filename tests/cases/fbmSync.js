@@ -115,6 +115,8 @@ async function chay(so) {
   check(so, 'start bat dau bang bootstrap Customer', started.request.meta.kind, 'authorize');
   check(so, 'bootstrap dung viewPage false', started.request.body.viewPage, false);
   check(so, 'bootstrap khong gui authorized cu', started.request.body.authorized, null);
+  const retrySlice = orchestration.FbmSync.continue({ ok: false, status: 503, body: '' });
+  check(so, 'loi doc tam thoi duoc retry co gioi han', [retrySlice.ok, retrySlice.retrying, retrySlice.request.meta.kind, orchestration.FbmSync.stateRead().retryCount], [true, true, 'authorize', 1]);
   const resumed = orchestration.FbmSync.start({ mode: 'read' });
   check(so, 'start thu lai tiep tuc dung authorize Customer ban dau', [resumed.ok, resumed.resumed, resumed.request.meta.entity], [true, true, 'customer']);
   const staleState = JSON.parse(props.data[orchestration.FbmSync.STATE_KEY]);

@@ -14,6 +14,38 @@ FbmSync.writeAllowed = function () {
 FbmSync.nextEnvelope = function (request) {
   return request ? FbmSync.protocol.request(Date.now().toString(36), request.url, request.body, request.meta) : null;
 };
+/** Dựng lại request đọc từ cursor; không lưu payload/cookie để retry không làm lộ bí mật. */
+FbmSync.requestForCursor = function (state) {
+  var cursor = state && state.cursor || {}, lookup, customerId, pageType;
+  if (cursor.kind === 'authorize_customer') { return FbmSync.authorizeRequest('customer'); }
+  if (cursor.kind === 'authorize_activity') { return FbmSync.authorizeRequest('activity'); }
+  if (cursor.kind === 'lookup') {
+    lookup = FbmSync.SYNC_LOOKUPS[Number(cursor.index || 0)];
+    return lookup ? FbmSync.completionRequest(lookup.controller, lookup.key) : null;
+  }
+  if (cursor.kind === 'customer_grid') {
+    return FbmSync.customerGridRequest({ type: Number(cursor.type || 0), count: Number(cursor.count || 2000), gridPageIndex: cursor.pageIndex === undefined ? -1 : cursor.pageIndex, gridPageValue: cursor.pageValue === undefined ? null : cursor.pageValue, gridRefresh: false });
+  }
+  if (cursor.kind === 'activity_grid') {
+    customerId = (cursor.customerIds || [])[Number(cursor.customerIndex || 0)];
+    if (!customerId) { return null; }
+    pageType = Number(cursor.pageIndex || -1) < 0 ? 0 : 1;
+    return FbmSync.activityGridRequest(customerId, { type: pageType, count: Number(cursor.count || 100), gridPageIndex: cursor.pageIndex === undefined ? -1 : cursor.pageIndex, gridPageValue: cursor.pageValue === undefined ? null : cursor.pageValue, gridRefresh: false });
+  }
+  return null;
+};
+/** Chỉ retry request đọc; request ghi không được lặp vì phản hồi có thể đã tới FBM. */
+FbmSync.retryRead = function (state, failure) {
+  var safeKinds = ['authorize_customer', 'authorize_activity', 'lookup', 'customer_grid', 'activity_grid'], cursor = state && state.cursor || {}, limit = Number(state && state.retryLimit || 2), attempt = Number(state && state.retryCount || 0), request;
+  if (!failure || failure.retryable !== true || safeKinds.indexOf(cursor.kind) < 0 || attempt >= limit) { return null; }
+  request = FbmSync.requestForCursor(state);
+  if (!request) { return null; }
+  state.retryCount = attempt + 1;
+  state.retryable = true;
+  state.message = 'Lỗi tạm thời khi đọc FBM; đang thử lại lần ' + state.retryCount + '/' + limit + '...';
+  FbmSync.stateWrite(state);
+  return request;
+};
 /** Cập nhật state dùng chung cho các bước orchestration. */
 FbmSync.saveStatus = function (patch) { return FbmSync.stateWrite(Object.assign(FbmSync.stateRead(), patch || {})); };
 
@@ -285,8 +317,13 @@ FbmSync.continue = function (rawResponse) {
     if (!state.session.userId && compact.length > 9) { state.session.userId = compact.slice(4, -5); }
     FbmSync.stateWrite(state);
   }
-  var success = FbmSync.protocol.assertSuccess(response);
+  // Phân loại trên wrapper HTTP gốc; parse trước sẽ làm mất status và biến lỗi vận chuyển thành Bugs giả.
+  var success = FbmSync.protocol.assertSuccess(rawResponse);
   if (!success.ok) {
+    var retryRequest = FbmSync.retryRead(state, success);
+    if (retryRequest) {
+      return { ok: true, request: FbmSync.nextEnvelope(retryRequest), status: FbmSync.statusView(), retrying: true };
+    }
     if (cursor.kind === 'push_wait' && cursor.candidate && typeof writeGateSave === 'function') {
       try { writeGateSave({ entity: cursor.entity, records: [{ id: cursor.candidate.id, syncStatus: FbmSync.SYNC_STATUS.error }], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] }); } catch (ignore) {}
     }
@@ -315,6 +352,10 @@ FbmSync.continue = function (rawResponse) {
     state.phase = 'error'; state.lastError = failureReason; FbmSync.stateWrite(state);
     return { ok: false, status: FbmSync.statusView(), error: success.bug };
   }
+  state.retryCount = 0;
+  state.retryable = false;
+  state.lastFailureCode = '';
+  FbmSync.stateWrite(state);
 
   if (cursor.kind === 'push_wait') {
     try {

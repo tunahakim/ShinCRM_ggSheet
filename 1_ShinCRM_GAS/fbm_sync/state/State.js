@@ -5,7 +5,7 @@ FbmSync.LOCK_KEY = 'FBM_SYNC_RECORD_LOCKS_V1';
 
 /** Tạo state rỗng với đủ field để các phiên cũ vẫn đọc được. */
 FbmSync.stateDefault = function () {
-  return { version: 1, runId: '', mode: 'read', phase: 'idle', entity: '', cursor: {}, session: { customerAuthorized: '', activityAuthorized: '', cookie: '', userId: '', lookups: {}, expired: false, lastHeartbeatAt: 0 }, metadata: { categoryGate: null, categoryBlocks: [], seen: { customer: {}, activity: {} }, conflicts: [], preview: { customers: [], activities: [], truncated: false } }, counts: { total: 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 }, current: '', message: '', startedAt: 0, updatedAt: 0, lastError: '', lastFailureCode: '', retryable: false, locks: {} };
+  return { version: 1, runId: '', mode: 'read', phase: 'idle', entity: '', cursor: {}, session: { customerAuthorized: '', activityAuthorized: '', cookie: '', userId: '', lookups: {}, expired: false, lastHeartbeatAt: 0 }, metadata: { categoryGate: null, categoryBlocks: [], seen: { customer: {}, activity: {} }, conflicts: [], preview: { customers: [], activities: [], truncated: false } }, counts: { total: 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 }, current: '', message: '', startedAt: 0, updatedAt: 0, lastError: '', lastFailureCode: '', retryable: false, retryCount: 0, retryLimit: 2, locks: {} };
 };
 
 /** Lấy kho state cấp tài liệu, dùng chung giữa các lần gọi GAS. */
@@ -41,7 +41,7 @@ FbmSync.statePatch = function (patch) { return FbmSync.stateWrite(Object.assign(
 FbmSync.stateStart = function (entity, phase, total) {
   var now = Date.now(), previous = FbmSync.stateRead(), userLocks = {};
   Object.keys(previous.locks || {}).forEach(function (key) { if (previous.locks[key] && previous.locks[key].owner === 'user') { userLocks[key] = previous.locks[key]; } });
-  return FbmSync.stateWrite({ runId: now.toString(36), entity: entity || '', phase: phase || 'checking_session', cursor: {}, counts: { total: Number(total) || 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 }, current: '', message: '', startedAt: now, updatedAt: now, lastError: '', locks: userLocks });
+  return FbmSync.stateWrite({ runId: now.toString(36), entity: entity || '', phase: phase || 'checking_session', cursor: {}, counts: { total: Number(total) || 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 }, current: '', message: '', startedAt: now, updatedAt: now, lastError: '', lastFailureCode: '', retryable: false, retryCount: 0, retryLimit: 2, locks: userLocks });
 };
 /** Đóng hoặc chuyển phase với thông báo cuối. */
 FbmSync.stateFinish = function (phase, message) { return FbmSync.statePatch({ phase: phase || 'done', message: message || '', current: '' }); };
