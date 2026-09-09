@@ -27,15 +27,29 @@ function scheduleHeartbeat() {
   }
 }
 
+/** Tự nạp executor khi tab FBM đã mở trước lúc Extension được tải lại. */
+function sendToFbmTab(tabId, request) {
+  return new Promise(function (resolve) {
+    chrome.tabs.sendMessage(tabId, { type: 'FBM_EXECUTE', request: request }, function (reply) {
+      var error = chrome.runtime.lastError;
+      if (!error) { resolve(reply || { error: 'Tab FBM không trả kết quả.' }); return; }
+      if (!/Receiving end does not exist/i.test(error.message || '')) { resolve({ error: error.message }); return; }
+      chrome.scripting.executeScript({ target: { tabId: tabId }, files: ['content_scripts/fbm_sync/executor.js'] }).then(function () {
+        chrome.tabs.sendMessage(tabId, { type: 'FBM_EXECUTE', request: request }, function (retryReply) {
+          var retryError = chrome.runtime.lastError;
+          resolve(retryError ? { error: retryError.message } : (retryReply || { error: 'Tab FBM không trả kết quả.' }));
+        });
+      }).catch(function (injectError) { resolve({ error: 'Không nạp được cầu nối vào tab FBM: ' + String(injectError && injectError.message || injectError) }); });
+    });
+  });
+}
+
 /** Định tuyến request từ Sidebar tới đúng tab FBM, không xử lý dữ liệu nghiệp vụ. */
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   if (!message || message.type !== 'FBM_EXECUTE_REQUEST') { return false; }
   findFbmTab().then(function (tab) {
     if (!tab) { sendResponse({ error: 'Không tìm thấy tab FBM đang mở.' }); return; }
-    chrome.tabs.sendMessage(tab.id, { type: 'FBM_EXECUTE', request: message.request }, function (reply) {
-      var error = chrome.runtime.lastError;
-      sendResponse(error ? { error: error.message } : (reply || { error: 'Tab FBM không trả kết quả.' }));
-    });
+    return sendToFbmTab(tab.id, message.request).then(sendResponse);
   }).catch(function (err) { sendResponse({ error: String(err && err.message || err) }); });
   return true;
 });
@@ -47,6 +61,6 @@ scheduleHeartbeat();
 /** Gửi request đọc tối thiểu; không gửi thao tác ghi từ alarm. */
 chrome.alarms.onAlarm.addListener(function (alarm) {
   if (!alarm || alarm.name !== 'fbm-heartbeat') { return; }
-  findFbmTab().then(function (tab) { if (tab) { chrome.tabs.sendMessage(tab.id, { type: 'FBM_EXECUTE', request: null }, function () { void chrome.runtime.lastError; }); } });
+  findFbmTab().then(function (tab) { if (tab) { return sendToFbmTab(tab.id, null); } });
 });
 
