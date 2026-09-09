@@ -93,7 +93,7 @@ Tài liệu này theo dõi phạm vi đồng bộ FBM/ShinCRM. Không thực hi�
 ## 9. Bàn giao
 
 - [ ] Cập nhật checklist và cây thư mục lần cuối.
-- [x] Đẩy GAS sau khi test offline và GAS smoke test xanh (revision `@112`).
+- [x] Đẩy GAS sau khi test offline và GAS smoke test xanh (revision `@114`).
 - [ ] Đóng gói và tải lại Extension sau khi bước live test được phép.
 - [x] Ghi rõ các bước người dùng cần thao tác và kết quả nghiệm thu.
 
@@ -125,4 +125,5 @@ Các mục live test cần người dùng tải lại `2_ShinCRM_Extension`, m�
 - [ ] Conflict hai phía: thay đổi Sheet và FBM cùng trường, kết quả phải là conflict, không ghi đè im lặng.
 - [ ] Tranh chấp đang sửa: giữ form mở trong lúc sync, bản ghi phải hoãn và bản nháp không đổi.
 - [ ] Lỗi truyền tải: mô phỏng mất tab/HTTP 500, khóa được nhả và lỗi có trong `Log`.
+- [x] Ghi log trạng thái từng slice và lỗi transport Sidebar qua nguồn `fbm_sync`, không ghi cookie/payload.
 - [ ] An toàn: kiểm tra toàn bộ request, không có endpoint hoặc action xóa FBM.
