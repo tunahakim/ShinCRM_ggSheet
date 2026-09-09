@@ -159,7 +159,7 @@
 - [ ] Khóa sync làm form chỉ xem, chặn Save và luôn được nhả sau khi xong/lỗi.
 - [x] Record có `FBM_ID` chỉ được xóa mềm; không có đường gửi Delete FBM.
 - [ ] HTTP 500/401/403/Login.aspx giữ cursor hợp lệ và thử lại ở kỳ sau.
-- [ ] Bugs HTTP 200 gắn lỗi nghiệp vụ vào record và chỉ thử lại khi dữ liệu local đổi.
+- [x] Bugs HTTP 200 gắn lỗi nghiệp vụ vào record và chỉ thử lại khi dữ liệu local đổi.
 - [ ] Ghi báo thành công nhưng FBM không đổi → `đẩy không ăn`, khóa record, không lặp vô hạn.
 - [ ] Extension reload/service worker ngủ → state GAS không mất và pipeline đi tiếp đúng bước.
 - [ ] **Cần kiểm chứng thực tế:** mở conflict, xem diff và thử một cách giải quyết.
@@ -187,7 +187,7 @@
 - [x] Builder Customer Edit mở form lấy OldValue rồi gửi `Edit` đúng tập field.
 - [x] Parser Row 64 ô hỗ trợ Row mảng/object và fallback FieldValues/InternalValues.
 - [ ] Create mất phản hồi tra MST contains, verify exact, vá ID và không create lần hai.
-- [ ] Create có Bugs đặt `đẩy lỗi`, nhả khóa và không retry khi `hSHIN` chưa đổi.
+- [x] Create có Bugs đặt `đẩy lỗi`, nhả khóa và không retry khi `hSHIN` chưa đổi.
 - [ ] Edit chờ kỳ pull xác nhận; không đổi là `đẩy không ăn`, giá trị thứ ba là conflict.
 - [x] Sau response thành công, record chuyển sang `đã đẩy chờ xác nhận` và giữ baseline cũ cho kỳ pull sau.
 - [x] Nếu kỳ xác nhận thấy FBM không đổi, record chuyển sang `đẩy không ăn`, bị khóa và không tự gửi lại.
@@ -195,7 +195,7 @@
 
 ### Đóng slice
 
-- [ ] Test offline phủ cổng, OldValue, độ dài, Bugs, retry và không ghi chú nội bộ.
+- [x] Test offline phủ cổng, OldValue, độ dài, Bugs, retry và không ghi chú nội bộ.
 - [ ] Log có request kind, record, hướng, hash và kết quả đã che bí mật.
 - [ ] **Cần kiểm chứng thực tế:** sửa một field an toàn của `ALT00010`, pull xác nhận rồi khôi phục giá trị gốc.
 - [ ] **Cần kiểm chứng thực tế:** kiểm lỗi nghiệp vụ trùng/sai MST hoặc điện thoại.

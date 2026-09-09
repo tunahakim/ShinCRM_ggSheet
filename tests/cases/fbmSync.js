@@ -392,6 +392,12 @@ async function chay(so) {
     push.FbmSync.continuePush({ metadata: { categoryGate: {} }, cursor: { operation: 'activity_edit_open', entity: 'activity', candidate: { entity: 'activity', id: 'ACT-OWNER', record: { id: 'ACT-OWNER', fbmId: 'A-OWNER' } } } }, { d: { InternalValues: [{ Name: 'owner', NewValue: 'Chu tai khoan khac' }] } });
   } catch (error) { ownerMismatch = String(error && error.message || error); }
   check(so, 'Activity sai owner bi chan truoc request sua', ownerMismatch.indexOf('FBM') >= 0, true);
+  const bugState = push.FbmSync.stateStart('', 'push', 0);
+  bugState.metadata.categoryGate = {};
+  bugState.cursor = { kind: 'push_wait', operation: 'customer_edit_save', entity: 'customer', index: 0, candidate: { entity: 'customer', id: 'C-ERR', record: { id: 'C-ERR', fbmId: 'A-ERR', fbmHash: 'h-err' } } };
+  push.FbmSync.stateWrite(bugState);
+  const bugResult = push.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"Bugs":{"Message":"Sai du lieu"}}}' });
+  check(so, 'Bugs HTTP 200 danh dau loi record va khong retry request da gui', [bugResult.continued, push.FbmSync.stateRead().counts.error, push.FbmSync.stateRead().metadata.pushFailures['customer:C-ERR'] !== undefined], [true, 1, true]);
 
   const audit = taoHopCat({ FbmSync: {}, LOG_OK: 'ok', LOG_ERROR: 'error', FbmSyncLog: [] });
   napServer(audit, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/report/Probe.js');
