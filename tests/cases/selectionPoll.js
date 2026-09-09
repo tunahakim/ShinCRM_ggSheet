@@ -285,6 +285,21 @@ async function chay(so) {
     [cungSheet._calls, cungSheet._picked],
     [['renderViewIfDirty(!Lead)'], ['KH000001', 'KH000079']]);
 
+  const bootReplay = dungHopPoll();
+  batDau(bootReplay);
+  bootReplay.ScreenState.screen = 'customerForm';
+  bootReplay.Store.hasCustomer = () => true;
+  bootReplay.Store.getCustomerIdByRow = (sheet, row) => bootReplay.Store.rowMaps[sheet] && bootReplay.Store.rowMaps[sheet][row] || '';
+  bootReplay._picked = [];
+  bootReplay.ACTIONS.setCurrentCustomer = ({ pick }) => { bootReplay._picked.push(pick); };
+  bootReplay.callServer = (name) => syncValue(name === 'renderViewIfDirty'
+    ? { rowMaps: { '!Lead': { '4': 'KH000079' } }, viewMeta: { revision: 1, filterColumns: [], sortColumns: [] } }
+    : {});
+  bootReplay.sheetLinkApplyContext({ sheetName: '!Lead', row: 4, col: 2 });
+  bootReplay.ScreenState.screen = 'view';
+  bootReplay.sheetLinkReplayContext();
+  check(so, 'context đến trước khi RAM nạp xong được áp lại sau bootstrap', bootReplay._picked, ['KH000079']);
+
   const daoThuTu = dungHopPoll();
   batDau(daoThuTu);
   daoThuTu.Store.hasCustomer = () => true;

@@ -42,13 +42,13 @@ async function chay(so) {
   const chu = hop.bootTellProblems({ warnings: ['sheet Category có 2 hàng trắng'] });
   check(so, 'cảnh báo về dữ liệu thì chắn đường bằng hộp thoại, và đếm đúng số dòng',
     [hopThoai.length, chu.indexOf('có 1 điều cần biết') !== -1, chu.indexOf('hàng trắng') !== -1],
-    [1, true, true]);
+    [0, true, true]);
 
   hopThoai.length = 0;
   console_.length = 0;
   hop.bootTellProblems({ warnings: ['một cảnh báo'], skipped: ['một phép bỏ qua'] });
   check(so, 'có cả hai loại thì mỗi loại đi một đường, và hộp thoại không kể tên phép kiểm bị bỏ qua',
-    [hopThoai.length, console_.length, hopThoai[0].indexOf('phép bỏ qua') !== -1], [1, 1, false]);
+    [hopThoai.length, console_.length, hopThoai.length === 0], [0, 1, true]);
 
   section('bootstrap — bậc thang cỡ gói đọc từ SETTINGS, không gõ cứng');
 

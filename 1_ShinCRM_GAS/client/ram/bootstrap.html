@@ -29,6 +29,7 @@
 async function sidebarBoot() {
   callTimingReset(Date.now());
   var finishBusy = typeof sidebarBusyBegin === 'function' ? sidebarBusyBegin('Đang nạp dữ liệu ShinCRM…') : null;
+  bootClearStartupWarning();
 
   try {
     // Bộ phát click gắn **trước** mọi thứ khác, vì nó không cần một hạt dữ liệu nào mà màn báo lỗi thì có nút Thử lại. Gắn ở cuối như trước thì lượt nạp đầu tiên mà vỡ sẽ vẽ ra một cái nút bấm không kêu. Hàm này chạy nhiều lần cũng chỉ gắn một tai nghe.
@@ -74,6 +75,7 @@ async function sidebarBoot() {
 
     screenViewDropStale();
     screenViewGo();
+    if (typeof sheetLinkReplayContext === 'function') { await sheetLinkReplayContext(); }
     collapseScan();
     bootTellProblems(BOOT_LAST_SUMMARY);
 
@@ -109,10 +111,23 @@ function bootShowSummary() {
   return statusLoadSummary(BOOT_LAST_SUMMARY);
 }
 
+/** Xóa cảnh báo cũ trước khi bắt đầu một lượt bootstrap mới. */
+function bootClearStartupWarning() {
+  var node = typeof document !== 'undefined' && document.getElementById ? document.getElementById('shin-startup-warning') : null;
+  if (node) { node.hidden = true; node.textContent = ''; }
+}
+
+/** Hiện cảnh báo trong layout; fallback console chỉ dùng cho hộp cát không có DOM. */
+function bootShowStartupWarning(text) {
+  var node = typeof document !== 'undefined' && document.getElementById ? document.getElementById('shin-startup-warning') : null;
+  if (node) { node.textContent = String(text || ''); node.hidden = false; return; }
+  if (typeof console !== 'undefined' && console.warn) { console.warn(text); }
+}
+
 /**
  * Báo hai loại tin của lượt nạp, mỗi loại tới đúng người đọc của nó.
  *
- * `warnings` là **cảnh báo về dữ liệu** — máy chủ nói có gì đó lệch trong sheet — nên nó chắn đường bằng `alert`: người sửa được là chủ dự án, và họ phải biết ngay.
+ * `warnings` là **cảnh báo về dữ liệu** — máy chủ nói có gì đó lệch trong sheet — nên nó hiện trong dải cảnh báo của sidebar mà không chặn lượt nạp RAM.
  *
  * `skipped` là **phép kiểm không chạy được**, tức một câu nói về bộ kiểm chứ không phải về dữ liệu. Nó xuống console. Lý do: hai phép trong danh sách đó bỏ qua ở **mọi** lượt nạp và sẽ còn bỏ qua tới chặng 1.4, vì `NORMALIZERS` với `VALIDATORS` cố ý chỉ có một bản phía máy chủ nên sidebar không bao giờ nắm được chúng. Một hộp thoại nổ mỗi lần mở sidebar với đúng một câu mà người dùng không làm gì được là cách chắc chắn để tới tuần thứ hai họ bấm OK mà không đọc — rồi cái cảnh báo thật cũng chịu chung số phận đó.
  *
@@ -131,7 +146,7 @@ function bootTellProblems(info) {
 
   var chu = 'Lượt nạp xong nhưng có ' + dong.length + ' điều cần biết:\n\n• ' + dong.join('\n• ')
     + '\n\nMàn hình vẫn dùng được bình thường. Mở console rồi gọi bootShowSummary() để xem đầy đủ con số của lượt nạp.';
-  alert(chu);
+  bootShowStartupWarning(chu);
   return chu;
 }
 

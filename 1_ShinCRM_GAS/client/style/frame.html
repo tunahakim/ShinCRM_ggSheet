@@ -71,6 +71,18 @@ html, body {
   font-weight: 500;
 }
 
+/* Cảnh báo khởi động nằm trong luồng bố cục, không dùng alert nên không chặn bootstrap RAM. */
+.shin-startup-warning {
+  flex: 0 0 auto;
+  padding: var(--shin-gap-2);
+  border-bottom: 1px solid var(--shin-warn);
+  background: var(--shin-warn-soft);
+  color: var(--shin-warn);
+  font-size: var(--shin-text-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* Lớp bận nằm ngoài `sidebar-root`; cạnh trên được JavaScript đặt ngay dưới thông báo bận. */
 .shin-busy-overlay {
   position: fixed;

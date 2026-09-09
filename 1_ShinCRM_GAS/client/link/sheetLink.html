@@ -23,6 +23,7 @@ var SHEET_LINK_SPREADSHEET_ID = '';
 var SHEET_LINK_LAST_ACK = 0;
 var SHEET_LINK_EXTENSION_SESSION = '';
 var SHEET_LINK_LAST_SHEET = '';
+var SHEET_LINK_LAST_CONTEXT = null;
 var SHEET_LINK_APPLY_TICKET = 0;
 var SHEET_LINK_VIEW_STATES = {};
 var SHEET_LINK_DATA_PENDING = null;
@@ -240,6 +241,8 @@ function sheetLinkInspectView(sheetName) {
 }
 
 function sheetLinkApplyContext(ctx) {
+  if (!ctx) { return null; }
+  SHEET_LINK_LAST_CONTEXT = Object.assign({}, ctx);
   var ticket = ++SHEET_LINK_APPLY_TICKET;
   var previousSheet = SHEET_LINK_LAST_SHEET;
   var changedSheet = ctx.sheetName !== previousSheet;
@@ -295,6 +298,11 @@ function sheetLinkApplyContext(ctx) {
   };
 
   return work();
+}
+
+/** Áp lại context cuối sau bootstrap để tin đến quá sớm không bỏ mất mã khách. */
+function sheetLinkReplayContext() {
+  return SHEET_LINK_LAST_CONTEXT ? sheetLinkApplyContext(SHEET_LINK_LAST_CONTEXT) : null;
 }
 
 function sheetLinkApplyCustomerContext(ctx) {
