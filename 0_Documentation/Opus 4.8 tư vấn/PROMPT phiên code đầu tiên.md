@@ -22,7 +22,7 @@ Bốn tài liệu còn lại (04, 05, 06, 07, 08 cùng hợp đồng) là của 
 
 ## Phần 2 — Luật bắt buộc của phiên, không được vi phạm
 
-Đây là luật của cả dự án, ghi trong `CLAUDE.md` ở gốc repo, và nó **ghi đè** mọi mặc định:
+Đây là luật của cả dự án, ghi trong `AGENTS.md` ở gốc repo, và nó **ghi đè** mọi mặc định:
 
 1. **Việc quan trọng phải bàn với chủ dự án rồi mới viết.** Tuyệt đối cấm AI tự quyết mà chủ dự án không biết gì. Nếu trong lúc code thấy tài liệu thiếu hoặc mâu thuẫn thì **dừng lại hỏi**, đừng tự chọn một hướng rồi viết luôn.
 2. **Được phép và được khuyến khích phản biện**, kể cả phản biện chính tài liệu hoặc chính câu vừa nói của mình. Cái quan trọng là hiệu quả, không phải răm rắp nghe theo.

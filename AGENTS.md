@@ -4,8 +4,9 @@
 
 - Nếu đang làm phiên khác không phải phiên đồng bộ FBM thì bỏ qua các tài liệu liên quan đến FBM, cấm được đọc vì các file đó cực kỳ dài và tốn token.
 - Mục tiêu hiện tại của branch là hoàn thiện phiên đồng bộ FBM/ShinCRM theo `0_Documentation/Phiên code/Checklist đồng bộ FBM.md`. ShinCRM độc lập đã hoàn tất phần chính; không tự mở rộng sang bot tra cứu, Zalobot hoặc nạp 1.700 khách thật trước khi checklist cho phép.
-- Đọc `CLAUDE.md`, checklist đồng bộ FBM và `0_Documentation/Phiên code/Câu hỏi đêm.md` ở đầu mỗi phiên; sau khi ngữ cảnh bị nén phải đọc lại ba tệp này.
+- Chỉ đọc checklist đồng bộ FBM và `0_Documentation/Phiên code/Câu hỏi đêm.md` khi đang thực hiện luồng đồng bộ FBM, thay đổi hợp đồng FBM, hoặc tiếp tục công việc được ghi trong hai tài liệu đó; sau khi ngữ cảnh bị nén thì đọc lại các tài liệu thuộc đúng phạm vi đang làm.
 - Chỉ đọc tệp khi dòng code sắp viết cần đến nó; không quét cả codebase để chuẩn bị.
+- Nếu tài liệu bắt buộc trong phạm vi đang làm đã lỗi thời hoặc mâu thuẫn với quyết định mới của chủ dự án, được phép và phải cập nhật tài liệu đó trong cùng nhóm thay đổi; không giữ quy tắc cũ chỉ vì tài liệu đang tồn tại.
 - Tự thực hiện liên tục các mục chỉ cần code, test offline hoặc GAS DEV. Khi đến mục cần người dùng giữ tab FBM, đăng nhập, bấm ghi thật hoặc kiểm tra dữ liệu live thì dừng và ghi rõ thao tác cần người dùng làm.
 
 ## Làm việc với chủ dự án

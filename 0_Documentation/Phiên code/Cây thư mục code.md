@@ -18,7 +18,7 @@ Một tệp làm đúng một việc. Vượt quá khoảng 250 dòng thì đọ
 
 ```
 D:\ShinCRM_ggSheet\
-├── CLAUDE.md                     Luật làm việc giữa chủ dự án và AI. Đọc trước mọi thứ khác.
+├── AGENTS.md                     Luật làm việc giữa chủ dự án và AI, được đọc theo đúng phạm vi phiên.
 ├── README.md                     Giới thiệu dự án.
 ├── .claude\launch.json           Khai một lệnh cho công cụ mở bản xem sidebar tại máy: node tests/preview.js --serve, cổng 4173.
 ├── 0_Documentation\              Tài liệu thiết kế. Nguồn sự thật của mọi dòng code.
@@ -200,7 +200,7 @@ tests\
 │   ├── dung-client.js            Hộp cát RIÊNG cho tệp client. Riêng vì server và client có hàm sinh đôi cùng tên, chung hộp thì bản nạp sau đè bản nạp trước.
 │   ├── khung-gia.js              Khung sidebar giả cho bộ máy vẽ: bốn vùng, chỉ ba khả năng getElementById/innerHTML/hidden. Thay innerHTML một vùng thì phần tử con bị xóa nội dung, đúng như trình duyệt.
 │   └── strip-comments.js         Bỏ chú thích trước khi quét mã, để docstring được phép nhắc tên mà mã thì không.
-└── cases\
+    └── cases\
     ├── textNormalize.js          Hai bản sinh đôi server và client cho cùng kết quả trên một bảng ca dùng chung.
     ├── schemaCheck.js            Bảng khai cột tự nhất quán, và chiều phụ thuộc một hướng với SYNC_SCHEMA.
     ├── namespace.js              Không tên nào khai ở hai tệp. Bẫy số một của Apps Script.
@@ -238,6 +238,15 @@ tests\
     ├── extensionBridge.js        Nonce của cầu nối Extension phải đi trọn từ bắt tay tới CRM_CONTEXT; origin lạ không được chiếm kênh đang dùng.
     ├── selectionPoll.js          Đồng hồ giả khóa luật ACK loại trừ mọi vòng gọi, bốn điều kiện dừng, chống vòng chồng và thang nhịp 2/6 giây.
     ├── triggers.js               Trigger sửa sheet quản trị làm mới ngay; sửa kho đánh dấu mọi sheet quản trị cần làm mới.
+    ├── fbmSync.js                Điều phối các nhóm kiểm thử đồng bộ FBM; không chứa logic nghiệp vụ của từng nhóm.
+    ├── fbmSync\
+    │   ├── Protocol.js            Kiểm envelope, lỗi transport, fingerprint và đối soát ba chiều.
+    │   ├── Builders.js            Kiểm builder/parser request Customer và Activity.
+    │   ├── Pull.js                Kiểm pull Customer/Activity, marker, missing và bảo toàn trường nội bộ.
+    │   ├── Reconcile.js           Kiểm identity, MST, hash, conflict và trạng thái đồng bộ.
+    │   ├── Orchestration.js       Kiểm state, cursor, resume, preflight và luồng nhiều lát.
+    │   ├── Push.js                Kiểm cổng ghi, khóa, owner, builder ghi và xử lý lỗi push.
+    │   └── Audit.js               Kiểm log, báo cáo, fixture an toàn và các ranh giới không ghi/xóa.
     └── domUi.js                  DOM giả tối thiểu kiểm ba đường UI: phát click, menu nổi và thu gọn nội dung.
 ```
 
