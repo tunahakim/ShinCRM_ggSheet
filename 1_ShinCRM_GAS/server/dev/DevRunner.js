@@ -19,7 +19,7 @@
  */
 var DEV_RUNNER_ALLOWED = [
   'smokeTest', 'smokeDiag', 'setupSheets', 'verifySheets', 'measureDeleteRows', 'measureChunkRows', 'measureFirstPaint',
-  'seedFakeData', 'seedFakeCategory', 'wipeFakeData', 'fbmPrepareAltTest',
+  'seedFakeData', 'seedFakeCategory', 'wipeFakeData', 'fbmPrepareAltTest', 'fbmProbeAltState', 'fbmAuditAltState',
   'dumpColumnMap', 'dumpSettings', 'dumpSheetGrid',
   'devLogTraceOn', 'devLogTraceOff',
   'probeBadColumnCode', 'probeLogGate', 'probeDateText', 'probeSheetGrid', 'probeCellBudget',
@@ -27,7 +27,7 @@ var DEV_RUNNER_ALLOWED = [
   'probeErrorReport', 'probeEntryPoint', 'probeLoadAll', 'probeSidebarTemplate', 'probeClientTiming',
   'probeSaveGate', 'viewProbeSelection', 'viewProbeRenderCurrent', 'viewProbeCreateRender', 'viewProbeAutoRender',
   'probeTriggerState', 'shinInstallTriggers',
-  'fbmSyncStart', 'fbmSyncContinue', 'fbmSyncCancel', 'fbmSyncStatus', 'fbmInstallScheduler', 'fbmSyncSetWriteMode'
+  'fbmSyncStart', 'fbmSyncContinue', 'fbmSyncCancel', 'fbmSyncStatus', 'fbmInstallScheduler', 'fbmSyncSetWriteMode', 'fbmResolveConflict', 'fbmGetRelayConfig', 'fbmSyncHeartbeat'
 ];
 
 /**

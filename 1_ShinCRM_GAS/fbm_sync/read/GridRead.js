@@ -13,7 +13,8 @@ FbmSync.scriptSettings = function () {
     userId = compact.length > 9 ? compact.slice(4, -5) : '';
   }
   // Keep live reads narrow by default; set the property to an empty value for a full scan.
-  var testCustomerCode = props.getProperty('FBM_SYNC_TEST_CUSTOMER_CODE');
+  var testProps = PropertiesService.getDocumentProperties ? PropertiesService.getDocumentProperties() : props;
+  var testCustomerCode = testProps.getProperty('FBM_SYNC_TEST_CUSTOMER_CODE');
   testCustomerCode = testCustomerCode === null ? 'ALT00010' : String(testCustomerCode || '').trim();
   return {
     baseUrl: String(props.getProperty('FBM_BASE_URL') || 'https://fbo.com.vn:8888'),
@@ -82,10 +83,20 @@ FbmSync.gridRows = function (response) {
   if (typeof data === 'string') { data = FbmSync.protocol.parse(data) || {}; }
   return { rows: Array.isArray(data.Rows) ? data.Rows : [], total: Number(data.TotalRowCount || data.totalRowCount || 0), fields: FbmSync.gridFields(response) };
 };
+/** Kiểm metadata đủ để ghép rows; thiếu AliasName thì dừng thay vì đoán theo index. */
+FbmSync.validateGridFields = function (entity, fields) {
+  var required = entity === 'customer' ? ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ma_so_thue', 'ong_ba', 'dc_lh', 'dien_thoai', 'email', 'website', 'ten_dclh_tinh', 'ten_nguon_dm', 'ten_sp', 'ngay_gd', 'datetime0', 'xorder'] : ['id', 'ten_cv', 'details', 'end_date', 'owner', 'datetime0', 'line_nbr'];
+  var seen = {};
+  (fields || []).forEach(function (field) { if (seen[field]) { throw new Error('FBM trả AliasName trùng: ' + field); } seen[field] = true; });
+  var missing = required.filter(function (field) { return !seen[field]; });
+  if (missing.length) { throw new Error('FBM thiếu metadata AliasName: ' + missing.join(', ')); }
+  return true;
+};
 /** Ghép từng ô theo AliasName và chuẩn hóa ngày trước khi reconcile. */
-FbmSync.rowsToRecords = function (entity, response) {
+FbmSync.rowsToRecords = function (entity, response, knownFields) {
   var grid = FbmSync.gridRows(response);
-  var fields = grid.fields.length ? grid.fields : FbmSync.GRID_FIELDS[entity];
+  var fields = grid.fields.length ? grid.fields : (knownFields || []);
+  FbmSync.validateGridFields(entity, fields);
   return { entity: entity, total: grid.total, fields: fields, rows: grid.rows.map(function (row) {
     var record = {};
     fields.forEach(function (field, index) { record[field] = FbmSync.fbDate(row[index]); });

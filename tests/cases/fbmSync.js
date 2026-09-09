@@ -9,6 +9,9 @@ async function chay(so) {
   napServer(hop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/reconcile/Reconcile.js');
 
   const parsed = hop.FbmSync.protocol.parse('{"d":{"Bugs":{"FieldName":"x","Message":"bad"}}}');
+  check(so, 'body Login.aspx voi HTTP 200 bi nhan la het phien', hop.FbmSync.protocol.isSessionExpired({ ok: true, status: 200, body: '<html><form action="Login.aspx"><input name="username"></form></html>' }), true);
+  check(so, 'loi nghiep vu khong retry tu dong', hop.FbmSync.protocol.classifyFailure({ ok: true, status: 200, body: '{"d":{"Bugs":{"Message":"Sai du lieu"}}}' }).retryable, false);
+  check(so, 'loi HTTP co the retry', hop.FbmSync.protocol.classifyFailure({ ok: false, status: 503, body: '' }).retryable, true);
   check(so, 'parse response FBM va doc Bugs', parsed.d.Bugs.Message, 'bad');
   check(so, 'Bugs khong bi coi la thanh cong', hop.FbmSync.protocol.assertSuccess(parsed).ok, false);
   check(so, 'response hong JSON bi chan', hop.FbmSync.protocol.assertSuccess('{not-json}').ok, false);
@@ -28,7 +31,7 @@ async function chay(so) {
   check(so, 'parse malformed tra loi co cau truc', !!hop.FbmSync.protocol.parse('{').parseError, true);
 
   const builders = taoHopCat({
-    FbmSync: {},
+    FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {},
     PropertiesService: { getScriptProperties: () => ({ getProperty: (key) => ({ FBM_BASE_URL: 'https://fbm.test', FBM_COOKIE: '461020379855cFHN_CRM_App', FBM_AUTH_CUSTOMER: 'auth-c', FBM_AUTH_ACTIVITY: 'auth-a', FBM_SYNC_TEST_CUSTOMER_CODE: 'ALT00010' }[key] || '') }) }
   });
   napServer(builders, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Reconcile.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategorySync.js', 'fbm_sync/write/RequestBuilders.js');
@@ -42,8 +45,30 @@ async function chay(so) {
   check(so, 'SELECT Customer đổi sang mã FBM', newCustomer.body.memvars.filter((item) => item.Name === 'dc_lh_tinh')[0].NewValue, 'HNI');
   const activity = builders.FbmSync.activityCreateRequest({ id: 'ACT-9', customerFbmCode: 'ALT99999', taskType: 'Gọi', content: 'Nội dung' }, gate);
   check(so, 'Activity mới gắn dấu nhận diện', activity.body.memvars.filter((item) => item.Name === 'details')[0].NewValue, 'Nội dung #SC-ACT-9');
+  check(so, 'Activity không đẩy product nội bộ lên FBM', activity.body.memvars.filter((item) => item.Name === 'ma_sp')[0].NewValue, '');
   const linkedActivity = builders.FbmSync.linkActivityCustomers([{ customerId: 'ALT99999', fbmHash: 'old' }], [{ id: 'KH-1', fbmCustomerCode: 'ALT99999' }]);
   check(so, 'Activity FBM nối về mã Customer nội bộ', [linkedActivity.records[0].customerId, linkedActivity.orphaned], ['KH-1', 0]);
+  const activityWithParent = builders.FbmSync.activityRecord({ id: 7, details: 'Gọi', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi điện' }, gate, { maKh: 'ALT99999' });
+  check(so, 'Activity giữ mã Customer cha khi grid không trả ma_kh', activityWithParent.customerFbmCode, 'ALT99999');
+  check(so, 'Activity đọc dấu nhận diện để recovery', builders.FbmSync.activityMarkerId('Nội dung #SC-ACT-9'), 'ACT-9');
+  check(so, 'Activity fingerprint không phụ thuộc khóa nối nội bộ', builders.FbmSync.hash(Object.assign({}, activityWithParent, { customerId: 'CUS-1' }), 'activity', gate), builders.FbmSync.hash(Object.assign({}, activityWithParent, { customerId: 'CUS-2' }), 'activity', gate));
+  const form = builders.FbmSync.extractFormValues({ d: { Row: (function () { const row = []; row[3] = 'ALT00010'; row[4] = 'Tên cũ'; row[8] = '001'; row[11] = '0900'; return row; }()), Showing: "var _ticket = 'ticket-1';" } });
+  check(so, 'Customer edit lấy OldValue từ Row', [form.ma_kh, form.ten_kh, form.dien_thoai], ['ALT00010', 'Tên cũ', '0900']);
+  check(so, 'Activity edit lấy ticket từ script Showing', builders.FbmSync.extractFormValues({ d: { Row: [], Showing: "_ticket = \"ticket-2\";" } }).fileticket, 'ticket-2');
+  check(so, 'Customer fingerprint có mã sản phẩm', builders.FbmSync.FINGERPRINT_FIELDS.customer.indexOf('ma_sp') >= 0, true);
+  check(so, 'TMP- bị loại khỏi ứng viên push', builders.FbmSync.isTemporaryRecord('customer', { fbmCustomerCode: 'TMP-001' }), true);
+  check(so, 'thiếu field Customer bị chặn trước request', builders.FbmSync.pushEligibilityErrors({ companyName: 'X' }, 'customer').length > 0, true);
+  const blockedGate = { map: { '@CAT_CONG_VIEC\u001fGọi': 'CALL' }, valid: { '@CAT_CONG_VIEC': { Gọi: true } }, blocked: { '@CAT_CONG_VIEC\u001fCALL': 'Tên danh mục trên FBM khác Category.' } };
+  check(so, 'Category lệch chỉ chặn record dùng đúng mã', builders.FbmSync.validatePushCategories({ taskType: 'Gọi' }, 'activity', blockedGate).length, 1);
+  let metadataFailed = false;
+  try { builders.FbmSync.rowsToRecords('customer', { d: { Rows: [[]] } }); } catch (error) { metadataFailed = true; }
+  check(so, 'metadata Customer thiếu thì fail-closed', metadataFailed, true);
+  let recoveryWrite;
+  builders.FbmSync.stateRead = () => ({ metadata: { categoryGate: gate } });
+  builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmCustomerCode: 'ALT99999' }] : [{ id: 'ACT-9', fbmId: '', customerId: 'KH-1', syncStatus: builders.FbmSync.SYNC_STATUS.pushing }];
+  builders.writeGateSave = (request) => { recoveryWrite = request; return { ok: true }; };
+  const recovered = builders.FbmSync.pullWrite('activity', [builders.FbmSync.activityRecord({ id: 77, ma_kh: 'ALT99999', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi', details: 'Nội dung #SC-ACT-9' }, gate)], 'write');
+  check(so, 'Activity marker recovery vá FBM ID không tạo dòng mới', [recovered.written, recoveryWrite.records[0].id, recoveryWrite.records[0].fbmId], [1, 'ACT-9', '77']);
   const edit = builders.FbmSync.customerEditRequest({ fbmId: 'A1', companyName: 'Đổi tên' }, { stt_rec_kh: 'A1', ma_kh: 'ALT00010', ten_kh: 'Cũ', dien_thoai: '0123' }, gate);
   check(so, 'Customer sửa giữ OldValue field không đụng tới', edit.body.memvars.filter((item) => item.Name === 'dien_thoai')[0].NewValue, '0123');
   check(so, 'Customer grid gắn điều kiện phân quyền theo userId trong payload cookie', builders.FbmSync.customerGridRequest({ type: 0 }).body.externalKey[0].Name, "stt_rec_kh in (select stt_rec_kh from dbo.zcFastBusiness$Function$GetCustomerValidate('2037')) and 1");
@@ -52,6 +77,23 @@ async function chay(so) {
   const lookupGate = { namesBySource: { '@CAT_TINH_THANH': { HNI: 'Hà Nội' }, '@CAT_NGUON_KH': { HNI: 'Nguồn khác' }, '@CAT_CONG_VIEC': { HNI: 'Công việc khác' }, '@CAT_SAN_PHAM': { HNI: 'Sản phẩm khác' } } };
   check(so, 'lookup danh mục không lẫn mã trùng giữa các nguồn', builders.FbmSync.validateLookupGate(lookupState, lookupGate).length, 0);
 
+  let identityWrite;
+  builders.FbmSync.stateRead = () => ({ metadata: { categoryGate: gate } });
+  builders.FbmSync.stateWrite = () => {};
+  builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-1', fbmId: 'OLD-ID', fbmCustomerCode: 'ALT99999', companyName: 'Cũ' }] : [];
+  builders.writeGateSave = (request) => { identityWrite = request; return { ok: true }; };
+  const identityIncoming = builders.FbmSync.customerRecord({ stt_rec_kh: 'NEW-ID', ma_kh: 'ALT99999', ten_kh: 'Mới' }, gate);
+  const identityResult = builders.FbmSync.pullWrite('customer', [identityIncoming]);
+  check(so, 'Customer lech stt_rec_kh van cap nhat dung dong theo ma_kh', [identityResult.written, identityWrite.records[0].id, identityWrite.records[0].fbmId], [1, 'CUS-1', 'NEW-ID']);
+  let conflictState = { metadata: { categoryGate: gate, conflicts: [] }, counts: { conflict: 0 } }, conflictWrite;
+  builders.FbmSync.stateRead = () => conflictState;
+  builders.FbmSync.stateWrite = (next) => { conflictState = next; return next; };
+  builders.FbmSync.readLocal = () => [{ id: 'CUS-2', fbmId: 'C-2', fbmCustomerCode: 'ALT99999', companyName: 'Shin', fbmHash: builders.FbmSync.hash({ stt_rec_kh: 'C-2', ma_kh: 'ALT99999', ten_kh: 'Base' }, 'customer', gate) }];
+  builders.writeGateSave = (request) => { conflictWrite = request; return { ok: true }; };
+  const conflictResult = builders.FbmSync.pullWrite('customer', [builders.FbmSync.customerRecord({ stt_rec_kh: 'C-2', ma_kh: 'ALT99999', ten_kh: 'FBM' }, gate)]);
+  check(so, 'conflict luu diff va khong ghi noi dung', [conflictResult.conflicts, conflictState.metadata.conflicts.length, conflictWrite.records[0].syncStatus], [1, 1, builders.FbmSync.SYNC_STATUS.conflict]);
+  const resolved = builders.FbmSync.resolveConflict('customer', 'CUS-2', 'fbm');
+  check(so, 'resolve conflict theo FBM cap nhat baseline va xoa hang doi', [resolved.ok, conflictState.metadata.conflicts.length, conflictWrite.records[0].fbmHash !== ''], [true, 0, true]);
   const pushed = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {} });
   napServer(pushed, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/reconcile/Reconcile.js', 'fbm_sync/reconcile/CategoryGate.js');
   pushed.FbmSync.readLocal = () => [{ id: 'CUS-1', fbmId: 'A1', fbmCustomerCode: 'ALT1', companyName: 'X', allowFbmPush: 'Cho phép', syncStatus: pushed.FbmSync.SYNC_STATUS.pushed, fbmHash: '' }];
@@ -141,6 +183,16 @@ async function chay(so) {
   push.fbmSyncCancel();
   const cancelled = push.FbmSync.stateRead();
   check(so, 'dung phien nha khoa sync nhung giu khoa user', Object.keys(cancelled.locks).sort().join(','), 'customer:C-2');
+
+  const audit = taoHopCat({ FbmSync: {}, LOG_OK: 'ok', LOG_ERROR: 'error', FbmSyncLog: [] });
+  napServer(audit, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/report/Probe.js');
+  audit.FbmSync.stateRead = () => ({ mode: 'read', phase: 'done', runId: 'run-1' });
+  audit.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-1', fbmCustomerCode: 'ALT00010', fbmId: 'A1' }] : [{ id: 'ACT-1', fbmId: '7', customerId: 'CUS-1' }];
+  audit.logEvent = (event) => audit.FbmSyncLog.push(event);
+  audit.flushLog = () => {};
+  const auditResult = audit.fbmAuditAltState();
+  check(so, 'nghiệm thu ALT00010 có case PASS', auditResult.ok, true);
+  check(so, 'nghiệm thu ghi từng case vào Log', audit.FbmSyncLog.length >= 6, true);
 }
 
 module.exports = { chay };

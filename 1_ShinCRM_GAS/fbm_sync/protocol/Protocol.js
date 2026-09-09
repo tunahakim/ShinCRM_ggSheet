@@ -37,6 +37,25 @@ FbmSync.protocol = {
     }
     return 'HTTP ' + status + (detail ? ': ' + detail : '');
   },
+  /** FBM đôi khi trả trang đăng nhập với HTTP 200 thay vì 401/403. */
+  isSessionExpired: function (response) {
+    var parsed = FbmSync.protocol.parse(response) || {};
+    var body = parsed && parsed.raw !== undefined ? String(parsed.raw) : String((response && response.body) || '');
+    return /(?:Login\.aspx|name\s*=\s*["'](?:username|userName)["']|id\s*=\s*["'](?:login|loginForm)["'])/i.test(body);
+  },
+  /** Phân loại lỗi để orchestration biết khi nào được retry. */
+  classifyFailure: function (response) {
+    if (response && typeof response === 'object' && response.ok === false && Number(response.status) >= 500 && !String(response.body || '').trim()) {
+      return { code: 'TRANSPORT_ERROR', retryable: true, bug: { FieldName: '$HTTP', Message: FbmSync.protocol.httpErrorMessage(response.status, response.body) } };
+    }
+    var parsed = FbmSync.protocol.parse(response) || {};
+    var bug = FbmSync.protocol.fbmBug(parsed);
+    if (FbmSync.protocol.isSessionExpired(response)) { return { code: 'SESSION_EXPIRED', retryable: false, bug: { FieldName: '$SESSION', Message: 'Phiên FBM đã hết hạn; hãy đăng nhập lại.' } }; }
+    if (parsed.parseError) { return { code: 'PARSE_ERROR', retryable: true, bug: { FieldName: '$PARSE', Message: parsed.parseError } }; }
+    if (bug) { return { code: 'FBM_BUSINESS_ERROR', retryable: false, bug: bug }; }
+    if (response && response.ok === false) { return { code: 'TRANSPORT_ERROR', retryable: true, bug: { FieldName: '$HTTP', Message: FbmSync.protocol.httpErrorMessage(response.status, response.body) } }; }
+    return null;
+  },
   /** Lấy Bugs mà không buộc Extension hiểu nghiệp vụ FBM. */
   fbmBug: function (response) {
     var parsed = FbmSync.protocol.parse(response) || {};
@@ -45,10 +64,8 @@ FbmSync.protocol = {
   },
   /** Chuẩn hóa kết quả thành cặp ok/bug cho orchestration. */
   assertSuccess: function (response) {
-    response = FbmSync.protocol.parse(response) || {};
-    if (response && response.parseError) { return { ok: false, bug: { FieldName: '$PARSE', Message: response.parseError } }; }
-    var bug = FbmSync.protocol.fbmBug(response);
-    if (bug) { return { ok: false, bug: bug }; }
+    var failure = FbmSync.protocol.classifyFailure(response);
+    if (failure) { return { ok: false, code: failure.code, retryable: failure.retryable, bug: failure.bug }; }
     return { ok: true };
   }
 };
