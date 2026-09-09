@@ -2,30 +2,33 @@
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 /** Chuẩn hóa chuỗi, dòng mới và ngày .NET về cùng một dạng so sánh. */
+FbmSync.isDate = function (value) { return Object.prototype.toString.call(value) === '[object Date]'; };
 FbmSync.normalize = function (value) {
   if (value === null || value === undefined) { return ''; }
-  if (value instanceof Date) { return value.toISOString(); }
+  if (FbmSync.isDate(value)) { return isNaN(value.getTime()) ? '' : value.toISOString(); }
   var text = String(value).replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
-  if (/^\/Date\(-?\d+(?:[+-]\d+)?\)\/$/.test(text)) {
-    var ms = Number(text.replace(/[^\d-]/g, ''));
-    if (!isNaN(ms) && FbmSync.isEmptyFbmDate(new Date(ms))) { return ''; }
-    if (!isNaN(ms)) { return new Date(ms).toISOString(); }
+  var dateMatch = text.match(/^\/Date\((-?\d+)(?:[+-]\d+)?\)\/$/);
+  if (dateMatch) {
+    var ms = Number(dateMatch[1]), date = new Date(ms);
+    if (!isFinite(ms) || isNaN(date.getTime()) || FbmSync.isEmptyFbmDate(date)) { return ''; }
+    return date.toISOString();
   }
   return text;
 };
 
 /** FBM dùng hai mốc giả cho ô ngày chưa có giá trị. */
 FbmSync.isEmptyFbmDate = function (value) {
-  if (!(value instanceof Date) || isNaN(value.getTime())) { return false; }
-  var year = value.getUTCFullYear(), month = value.getUTCMonth(), day = value.getUTCDate();
+  if (!FbmSync.isDate(value) || isNaN(value.getTime())) { return false; }
+  // Mốc 1999 tính theo ngày Việt Nam, không theo nửa đêm UTC.
+  var localDate = new Date(value.getTime() + 7 * 60 * 60 * 1000), year = localDate.getUTCFullYear(), month = localDate.getUTCMonth(), day = localDate.getUTCDate();
   return year <= 1900 || (year === 1999 && month === 0 && day === 1);
 };
 
 /** Chuẩn hóa ngày làm việc theo ngày Việt Nam, không để giờ FBM gây lệch hash. */
 FbmSync.normalizeFingerprintValue = function (entity, field, value) {
   if (entity === 'activity' && field === 'end_date') {
-    var date = value instanceof Date ? value : (typeof FbmSync.fbDate === 'function' ? FbmSync.fbDate(value) : value);
-    if (date instanceof Date && !FbmSync.isEmptyFbmDate(date)) {
+    var date = FbmSync.isDate(value) ? value : (typeof FbmSync.fbDate === 'function' ? FbmSync.fbDate(value) : value);
+    if (FbmSync.isDate(date) && !FbmSync.isEmptyFbmDate(date)) {
       return typeof Utilities !== 'undefined' && Utilities.formatDate ? Utilities.formatDate(date, 'Asia/Ho_Chi_Minh', 'yyyy-MM-dd') : new Date(date.getTime() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
     }
   }
@@ -37,9 +40,9 @@ FbmSync.activitySinceAllows = function (record, state) {
   var since = '';
   try { since = String(FbmSync.scriptSettings().activitySince || '').trim(); } catch (ignore) {}
   if (!since) { return true; }
-  var date = record && record.workDate instanceof Date ? record.workDate : (typeof FbmSync.fbDate === 'function' ? FbmSync.fbDate(record && record.workDate) : record && record.workDate);
+  var date = record && FbmSync.isDate(record.workDate) ? record.workDate : (typeof FbmSync.fbDate === 'function' ? FbmSync.fbDate(record && record.workDate) : record && record.workDate);
   var floor = new Date(since);
-  if (!(date instanceof Date) || isNaN(date.getTime()) || isNaN(floor.getTime())) { return true; }
+  if (!FbmSync.isDate(date) || isNaN(date.getTime()) || isNaN(floor.getTime())) { return true; }
   return date.getTime() >= floor.getTime();
 };
 
@@ -74,6 +77,8 @@ FbmSync.canonical = function (entity, record, categoryGate) {
     if ((raw === '' || raw === null || raw === undefined) && entity === 'customer' && alias === 'dc_lh_tinh') { raw = FbmSync.value(record, 'ten_dclh_tinh', ''); }
     if ((raw === '' || raw === null || raw === undefined) && entity === 'customer' && alias === 'nguon_dm') { raw = FbmSync.value(record, 'ten_nguon_dm', ''); }
     if ((raw === '' || raw === null || raw === undefined) && entity === 'activity' && alias === 'ma_cv') { raw = FbmSync.value(record, 'ten_cv', ''); }
+    // FBM dùng id=0 cho Activity chưa lưu; đây không phải định danh ổn định.
+    if (entity === 'activity' && alias === 'id' && (raw === 0 || String(raw).trim() === '0')) { raw = ''; }
     // Fingerprint SELECT values in FBM-code space, never display-name space.
     var toFbmCode = typeof FbmSync.categoryCode === 'function' ? FbmSync.categoryCode : function (gate, source, value) { return value; };
     if (entity === 'customer' && alias === 'dc_lh_tinh') { raw = toFbmCode(categoryGate || {}, '@CAT_TINH_THANH', raw); }
@@ -117,6 +122,8 @@ FbmSync.rememberConflict = function (state, entity, current, incoming, decision,
   state.metadata = state.metadata || {};
   state.metadata.conflicts = Array.isArray(state.metadata.conflicts) ? state.metadata.conflicts : [];
   state.metadata.conflicts.push({ entity: entity, id: String(current && current.id || ''), fbmId: String(incoming && incoming.fbmId || current && current.fbmId || ''), hBASE: decision.hBASE, hSHIN: decision.hSHIN, hFBM: decision.hFBM, fields: FbmSync.diff(entity, current, incoming, categoryGate), shinRecord: Object.assign({}, current || {}), fbmRecord: Object.assign({}, incoming || {}), at: Date.now() });
+  state.locks = state.locks || {};
+  state.locks[entity + ':' + String(current && current.id || '')] = { revision: String(decision.hSHIN || ''), owner: 'sync', reason: 'conflict', at: Date.now() };
   if (state.metadata.conflicts.length > 100) { state.metadata.conflicts = state.metadata.conflicts.slice(-100); }
 };
 
@@ -136,6 +143,8 @@ FbmSync.resolveConflict = function (entity, id, choice, merged) {
   var saved = writeGateSave({ entity: entity, records: [record], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
   if (!saved || !saved.ok) { return { ok: false, code: 'CONFLICT_WRITE_FAILED', result: saved }; }
   state.metadata.conflicts = conflicts.filter(function (entry) { return entry !== item; });
+  var lockKey = entity + ':' + target;
+  if (state.locks && state.locks[lockKey] && state.locks[lockKey].owner === 'sync') { delete state.locks[lockKey]; }
   state.counts.conflict = Math.max(0, Number(state.counts.conflict || 0) - 1);
   state.phase = state.metadata.conflicts.length ? 'conflict' : (state.phase === 'conflict' ? 'done' : state.phase);
   state.message = 'Đã quyết conflict ' + entity + ' ' + target + ' theo ' + choice + '.';
@@ -158,7 +167,8 @@ FbmSync.markMissingAfterFullScan = function (entity, state) {
   var seen = state.metadata && state.metadata.seen && state.metadata.seen[entity] || {}, local = FbmSync.readLocal(entity), missing = [];
   local.forEach(function (record) {
     var fbmId = String(record.fbmId || '').trim();
-    if (!fbmId || seen[fbmId] || String(record.recordStatus || 'active') === 'deleted') { return; }
+    var lock = state.locks && state.locks[entity + ':' + String(record.id || '')];
+    if (!fbmId || seen[fbmId] || String(record.recordStatus || 'active') === 'deleted' || (lock && lock.owner === 'user')) { return; }
     missing.push({ id: record.id, syncStatus: FbmSync.SYNC_STATUS.missing });
   });
   if (!missing.length || typeof writeGateSave !== 'function') { return { written: 0 }; }
@@ -264,8 +274,11 @@ FbmSync.pullWrite = function (entity, records) {
     if (entity === 'activity' && !current) {
       var markerId = String(incoming.markerId || '').trim(), marked = markerId ? localById[markerId] : null;
       if (marked) {
+        var markedLock = state.locks && state.locks[entity + ':' + String(marked.id || '')];
+        if (markedLock && markedLock.owner === 'user') { skipped += 1; return; }
         if (String(marked.fbmId || '').trim() && String(marked.fbmId).trim() !== key) {
           conflicts += 1;
+          FbmSync.rememberConflict(state, entity, marked, incoming, { hBASE: String(marked.fbmHash || ''), hSHIN: FbmSync.hash(marked, entity, categoryGate), hFBM: FbmSync.hash(incoming, entity, categoryGate) }, categoryGate);
           statusWrites.push({ id: marked.id, syncStatus: FbmSync.SYNC_STATUS.conflict });
         } else {
           writes.push(Object.assign({}, incoming, { id: marked.id, fbmId: key, syncStatus: FbmSync.SYNC_STATUS.pushed, fbmHash: '' }));
@@ -274,6 +287,8 @@ FbmSync.pullWrite = function (entity, records) {
       }
       if (markerId) { skipped += 1; return; }
     }
+    var currentLock = current && state.locks && state.locks[entity + ':' + String(current.id || '')];
+    if (currentLock && currentLock.owner === 'user') { skipped += 1; return; }
     var mergedIncoming = current ? FbmSync.preserveLocalFields(entity, current, incoming) : incoming;
     if (current && FbmSync.pushPermission && FbmSync.pushPermission(current, entity).stop) {
       skipped += 1;
@@ -281,7 +296,7 @@ FbmSync.pullWrite = function (entity, records) {
       return;
     }
     var categoryErrors = typeof FbmSync.validateIncomingCategories === 'function' ? FbmSync.validateIncomingCategories(incoming, entity, categoryGate) : [];
-    if (entity === 'activity' && !String(incoming.workDate || '').trim()) {
+    if (entity === 'activity' && (!String(incoming.workDate || '').trim() || (FbmSync.isDate(incoming.workDate) && isNaN(incoming.workDate.getTime())))) {
       skipped += 1;
       if (current) { statusWrites.push({ id: current.id, syncStatus: FbmSync.SYNC_STATUS.error }); }
       return;
@@ -302,12 +317,18 @@ FbmSync.pullWrite = function (entity, records) {
       return;
     }
     if (String(current.syncStatus || '') === FbmSync.SYNC_STATUS.pushed) {
-      var pushedEqual = FbmSync.hash(current, entity, categoryGate) === FbmSync.hash(incoming, entity, categoryGate);
-      if (pushedEqual) {
-        writes.push(Object.assign({}, mergedIncoming, { id: current.id, fbmHash: FbmSync.hash(incoming, entity, categoryGate), syncStatus: FbmSync.SYNC_STATUS.synced, syncedAt: new Date() }));
+      var localHash = FbmSync.hash(current, entity, categoryGate), incomingHash = FbmSync.hash(incoming, entity, categoryGate), previousHash = String(current.fbmHash || '').trim();
+      if (incomingHash === localHash) {
+        writes.push(Object.assign({}, mergedIncoming, { id: current.id, fbmHash: incomingHash, syncStatus: FbmSync.SYNC_STATUS.synced, syncedAt: new Date() }));
+      } else if (previousHash && incomingHash === previousHash) {
+        skipped += 1;
+        statusWrites.push({ id: current.id, syncStatus: FbmSync.SYNC_STATUS.notApplied });
+        state.locks = state.locks || {};
+        state.locks[entity + ':' + String(current.id)] = { revision: localHash, owner: 'sync', reason: 'not_applied', at: Date.now() };
       } else {
-        statusWrites.push({ id: current.id, syncStatus: FbmSync.SYNC_STATUS.conflict });
         conflicts += 1;
+        FbmSync.rememberConflict(state, entity, current, incoming, { hBASE: previousHash, hSHIN: localHash, hFBM: incomingHash }, categoryGate);
+        statusWrites.push({ id: current.id, syncStatus: FbmSync.SYNC_STATUS.conflict });
       }
       return;
     }
@@ -410,10 +431,14 @@ FbmSync.extractAutoCustomerCode = function (response) {
 
 /** Đọc các bản ghi local cần đẩy; không bao giờ chọn bản ghi đã xóa hoặc bị cấm. */
 FbmSync.pushCandidates = function (entity) {
-  var records = FbmSync.readLocal(entity), customers = {};
+  var records = FbmSync.readLocal(entity), customers = {}, state = {}, pushFailures = {};
   var categoryGate = {};
   var testCustomerCode = '';
-  try { categoryGate = FbmSync.stateRead().metadata.categoryGate || (typeof FbmSync.readCategoryGate === 'function' ? FbmSync.readCategoryGate() : {}); } catch (ignore) {}
+  try {
+    state = FbmSync.stateRead();
+    categoryGate = state.metadata && state.metadata.categoryGate || (typeof FbmSync.readCategoryGate === 'function' ? FbmSync.readCategoryGate() : {});
+    pushFailures = state.metadata && state.metadata.pushFailures || {};
+  } catch (ignore) {}
   try { testCustomerCode = typeof FbmSync.scriptSettings === 'function' ? String(FbmSync.scriptSettings().testCustomerCode || '').trim() : ''; } catch (ignoreSettings) {}
   if (entity === 'activity') {
     FbmSync.readLocal('customer').forEach(function (customer) { customers[String(customer.id || '')] = customer; });
@@ -425,8 +450,10 @@ FbmSync.pushCandidates = function (entity) {
     // Keep live writes inside the configured test customer until the gate is cleared.
     if (testCustomerCode && (entity === 'customer' ? String(record.fbmCustomerCode || '').trim() !== testCustomerCode : !customer || String(customer.fbmCustomerCode || '').trim() !== testCustomerCode)) { return false; }
     if (!FbmSync.pushPermission(record, entity, customer).push) { return false; }
-    if (String(record.syncStatus || '') === FbmSync.SYNC_STATUS.pushed) { return false; }
+    var status = String(record.syncStatus || ''), failureKey = entity + ':' + String(record.id || '');
+    if (status === FbmSync.SYNC_STATUS.pushed || status === FbmSync.SYNC_STATUS.notApplied) { return false; }
     var currentHash = FbmSync.hash(record, entity, categoryGate);
+    if (status === FbmSync.SYNC_STATUS.error && String(pushFailures[failureKey] || '') === currentHash) { return false; }
     var hasFbm = String(record.fbmId || '').trim() !== '';
     var changed = !String(record.fbmHash || '').trim() || currentHash !== String(record.fbmHash || '').trim();
     return !hasFbm || changed || String(record.syncStatus || '') === FbmSync.SYNC_STATUS.pending;

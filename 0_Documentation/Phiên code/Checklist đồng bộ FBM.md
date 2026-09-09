@@ -6,7 +6,7 @@ Tệp này là bảng điều khiển duy nhất của phiên đồng bộ FBM/S
 
 - `[x]` chỉ có nghĩa là mục đó đã đạt đúng mức bằng chứng ghi trong dòng: code, test offline hoặc live test.
 - `[ ]` nghĩa là còn thiếu code, thiếu kiểm thử phù hợp hoặc chưa có bằng chứng live; có builder không đồng nghĩa pipeline đã dùng được.
-- Bộ kiểm offline hiện đạt `942/942`; live test đã đọc đúng `ALT00010` và một Activity, nhưng chưa có request ghi FBM nào được xác nhận thành công.
+- Bộ kiểm offline hiện đạt `954/954`; live test đã đọc đúng `ALT00010` và một Activity, nhưng chưa có request ghi FBM nào được xác nhận thành công.
 - Lần chạy Ghi thật gần nhất đã ghi được một bản ghi pull vào ShinCRM rồi tạm dừng trước chiều push vì cổng danh mục nhận nhầm `@CAT_NHOM_KH_FBM`. Bản sửa đã có ở local, chưa được đẩy lên GAS và chưa live test lại.
 
 ## A. Tất cả điều kiện để đồng bộ hoạt động thành công
@@ -49,7 +49,7 @@ Tệp này là bảng điều khiển duy nhất của phiên đồng bộ FBM/S
 - [x] Mất content script sau reload được thử ping rồi tiêm lại trước khi gửi request nghiệp vụ.
 - [x] Không tìm thấy tab, mất đầu nhận và timeout được báo rõ trên màn hình thay vì dừng im lặng.
 - [x] Nhận diện body HTML chứa `Login.aspx` là hết phiên ngay cả khi HTTP 200; đã có kiểm thử response HTTP 200 trả trang đăng nhập.
-- [ ] Phân biệt retry lỗi vận chuyển với không retry lỗi nghiệp vụ cho tới khi `hSHIN` đổi; code hiện có thể chọn lại bản ghi `đẩy lỗi` ở kỳ sau.
+- [x] Phân biệt retry lỗi vận chuyển với không retry lỗi nghiệp vụ cho tới khi `hSHIN` đổi; `metadata.pushFailures` giữ hash local của lần lỗi và chỉ cho thử lại khi hash đổi.
 - [ ] Khôi phục được mọi cursor giữa kỳ sau khi Sidebar/Chrome/GAS gián đoạn; hiện mới tự phục hồi chắc ở bước authorize Customer ban đầu.
 - [ ] Giữ khoảng nghỉ và trần request phù hợp FBM, tránh gửi dồn quá 60 request/phút trong luồng tự động.
 - [ ] Web App `doPost` xác thực khóa và Extension thật sự là bên gọi; hiện có `doPost` nhưng Extension chưa điều phối qua Web App.
@@ -65,8 +65,8 @@ Tệp này là bảng điều khiển duy nhất của phiên đồng bộ FBM/S
 - [x] Loại `product/ma_sp` khỏi builder và cổng danh mục Activity; Activity chỉ đồng bộ `taskType`, `content`, `workDate` theo tài liệu 09.
 - [x] `owner` Activity không nằm trong fingerprint và đã được đọc từ grid/mở form để kiểm quyền sửa.
 - [ ] Giữ `owner` đủ lâu để hiện trong diff và log của đúng bản ghi; UI/log chi tiết hiện chưa có.
-- [ ] Hoàn chỉnh đúng bảy phép chuẩn hóa fingerprint: hiện đã có xuống dòng, trim hai đầu, mã danh mục, ngày Việt Nam, placeholder 1899/1999 và cắt dấu `#SC-`; còn phải chốt riêng luật số 0/rỗng theo từng field.
-- [ ] Bổ sung ca placeholder năm 1999 và số `0` chỉ đại diện rỗng ở đúng field FBM; hàm hiện mới xử lý ngày tới năm 1900.
+- [x] Hoàn chỉnh đúng bảy phép chuẩn hóa fingerprint: xuống dòng, trim hai đầu, mã danh mục, ngày Việt Nam, placeholder 1899/1999, Date lỗi và cắt dấu `#SC-`.
+- [x] Placeholder năm 1999 và số `0` chỉ đại diện rỗng ở đúng field FBM; Activity `id=0` không tham gia fingerprint.
 - [x] Fingerprint không dùng `normalizeText`; test đã phủ không đổi, đổi ShinCRM, đổi FBM và conflict hai phía.
 - [ ] Lệch hai định danh Customer phải lấy định danh FBM xuống mà không coi là ShinCRM đổi; code chưa có nhánh riêng.
 - [x] Tập trạng thái `@CUS_SYNC_TT/@ACT_SYNC_TT` có đủ 11 giá trị của tài liệu, gồm `chưa đẩy` và `đẩy không ăn`.
@@ -98,7 +98,7 @@ Tệp này là bảng điều khiển duy nhất của phiên đồng bộ FBM/S
 - [ ] Pull hoạt động thiếu/placeholder `workDate` phải chặn và log; tuyệt đối không tự điền ngày hiện tại.
 - [ ] Áp `FBM_ACTIVITY_SINCE` để bỏ lịch sử trước mốc mà không làm sai baseline hoặc phát hiện vắng mặt.
 - [ ] Sau pull, đánh dấu dirty đúng mã để Sidebar nạp lại ở lần tương tác kế tiếp.
-- [ ] Nếu form người dùng đang mở đúng record thì hoãn pull record đó hoặc bảo toàn bản nháp theo hợp đồng đã chốt; code hiện chỉ kiểm khóa trước push.
+- [x] Nếu form người dùng đang mở đúng record thì pull hoãn record đó và missing scan bỏ qua, giữ nguyên bản nháp.
 - [ ] Đối soát record có `FBM_ID` nhưng vắng khỏi FBM thành `không thấy bên FBM`, không chạm `recordStatus` và không cập nhật baseline.
 - [ ] Dòng `deleted` có `FBM_ID` tiếp tục được đọc làm tombstone để không kéo lại thành dòng mới.
 
@@ -112,8 +112,8 @@ Tệp này là bảng điều khiển duy nhất của phiên đồng bộ FBM/S
 - [ ] Kiểm khóa liên kết Activity có Customer cha, `stt_rec`, `ma_kh` và `workDate` trước cửa ghi.
 - [ ] Kiểm mọi trần độ dài trước push; `details` phải trừ chỗ cho dấu ` #SC-<mã activity>`.
 - [ ] Chỉ chọn lại record `đẩy lỗi` khi `hSHIN` đã đổi; lỗi cũ không được spam FBM mỗi kỳ.
-- [ ] Sau FBM báo thành công, đặt `đã đẩy chờ xác nhận`, để baseline rỗng/giữ baseline cũ và chỉ xác nhận ở kỳ pull sau.
-- [ ] Nếu kỳ xác nhận thấy FBM không đổi thì đặt `đẩy không ăn`, khóa record và không tự gửi lại.
+- [x] Sau FBM báo thành công, đặt `đã đẩy chờ xác nhận`, giữ baseline cũ và chỉ xác nhận ở kỳ pull sau.
+- [x] Nếu kỳ xác nhận thấy FBM không đổi thì đặt `đẩy không ăn`, khóa record và không tự gửi lại.
 
 ### A8. Customer create/edit
 
@@ -143,11 +143,11 @@ Tệp này là bảng điều khiển duy nhất của phiên đồng bộ FBM/S
 ### A10. Conflict, khóa và xóa/vắng mặt
 
 - [x] Hàm so ba chiều đã phân biệt hai bên bằng nhau, chỉ ShinCRM đổi, chỉ FBM đổi và cả hai đổi.
-- [ ] Conflict phải lưu trạng thái, khóa record, log diff và không ghi baseline; hiện mới có trạng thái, chưa có pipeline trình bày/quyết.
+- [ ] Conflict phải lưu trạng thái, khóa record, log diff và không ghi baseline; state đã giữ khóa và diff, phần log/UI trình bày còn thiếu.
 - [ ] `syncStatusSlot` hiển thị diff Customer/Activity tính mới từ FBM lúc người dùng mở record.
 - [ ] Nút `Đã quyết xung đột` lấy `hFBM` mới đúng lúc bấm, ghi ngoại lệ baseline và mở khóa; hỗ trợ lấy FBM, giữ ShinCRM hoặc trộn tay.
 - [x] Form Sidebar gọi khóa user khi mở, nhả khi đóng và kiểm khóa sync trước Save; test offline đã phủ.
-- [ ] Pull và push đều phải hoãn record có khóa user, giữ nguyên bản nháp và tiếp tục record khác.
+- [x] Pull và push đều phải hoãn record có khóa user, giữ nguyên bản nháp và tiếp tục record khác.
 - [x] `beforeHardDelete` buộc record có `FBM_ID` chỉ được xóa mềm; hook đã được module đồng bộ triển khai.
 - [x] Không có đường tự gửi Delete lên FBM.
 - [ ] Khách/Activity vắng khỏi kết quả quét chỉ mang trạng thái `không thấy bên FBM`; tuyệt đối không suy ra xóa.
@@ -179,7 +179,7 @@ Tệp này là bảng điều khiển duy nhất của phiên đồng bộ FBM/S
 
 ### A13. Kiểm thử, nạp lần đầu và bàn giao
 
-- [x] Bộ test offline hiện đạt `942/942`, gồm protocol, `Bugs`, builder, category, hash, lock, bridge, parent Activity, parser OldValue/ticket, trạng thái sync, hook chống xóa cứng và retry đọc có giới hạn; không có request xóa.
+- [x] Bộ test offline hiện đạt `954/954`, gồm protocol, `Bugs`, builder, category, hash, lock, bridge, parent Activity, parser OldValue/ticket, trạng thái sync, hook chống xóa cứng, retry đọc có giới hạn, chuẩn hóa Date, khóa pull và xác nhận push; không có request xóa.
 - [x] Live test Đọc thử `ALT00010` đã xác thực Customer/Activity và preview đúng một khách, một giao dịch ngày 09/09/2026.
 - [ ] Bổ sung test cho các khoảng trống còn lại: bảy normalize đầy đủ, lookup fail-open pull, missing, marker recovery đầy đủ, retry policy và scheduler.
 - [ ] Chạy `fbmProbeAltState --push` để biết chính xác record/candidate nào sẽ bị ghi trước live test tiếp theo.

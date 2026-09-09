@@ -70,7 +70,8 @@ FbmSync.prepareCategoryGate = function (state) {
 FbmSync.markPushResult = function (candidate, response, operation) {
   var record = candidate.record || {}, values = FbmSync.extractInternalValues(response), data = FbmSync.protocol.parse(response) || {};
   data = data.d || data;
-  var patch = { id: record.id, syncStatus: FbmSync.SYNC_STATUS.pushed, fbmHash: '' };
+  // Giữ baseline cũ để kỳ pull sau phân biệt FBM không đổi với dữ liệu đã áp dụng.
+  var patch = { id: record.id, syncStatus: FbmSync.SYNC_STATUS.pushed, fbmHash: String(record.fbmHash || '').trim() };
   if (candidate.entity === 'customer') {
     patch.fbmId = String(values.stt_rec_kh || values.stt_rec_kh0 || record.fbmId || '').trim();
     patch.fbmCustomerCode = String(values.ma_kh || record.fbmCustomerCode || candidate.autoCode || '').trim();
@@ -99,6 +100,10 @@ FbmSync.releasePushLock = function (state, entity, id) {
 FbmSync.markPushError = function (state, candidate, reason) {
   state.counts.error += 1;
   state.message = String(reason || 'Không thể đẩy bản ghi.');
+  state.metadata = state.metadata || {};
+  state.metadata.pushFailures = state.metadata.pushFailures || {};
+  var gate = state.metadata.categoryGate || {}, localHash = typeof FbmSync.hash === 'function' ? FbmSync.hash(candidate.record || {}, candidate.entity, gate) : '';
+  state.metadata.pushFailures[candidate.entity + ':' + String(candidate.id || '')] = localHash;
   if (typeof writeGateSave === 'function') {
     try { writeGateSave({ entity: candidate.entity, records: [{ id: candidate.id, syncStatus: FbmSync.SYNC_STATUS.error }], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] }); } catch (ignore) {}
   }
@@ -206,6 +211,9 @@ FbmSync.continuePush = function (state, response) {
   } else {
     throw new Error('Không nhận diện được bước push: ' + cursor.operation);
   }
+  state.metadata = state.metadata || {};
+  state.metadata.pushFailures = state.metadata.pushFailures || {};
+  delete state.metadata.pushFailures[cursor.entity + ':' + String(candidate.id || '')];
   state.counts.succeeded += 1; FbmSync.releasePushLock(state, cursor.entity, candidate.id); state.cursor = { kind: 'push_scan', entity: cursor.entity, index: Number(cursor.index || 0) + 1 }; state.current = ''; FbmSync.stateWrite(state);
   return FbmSync.nextPushRequest(state);
 };
