@@ -20,6 +20,8 @@ FbmSync.start = function (options) {
   if (typeof fbmEnsureSyncColumns === 'function') { fbmEnsureSyncColumns(); }
   var opt = options || {}, state = FbmSync.stateStart('', 'checking_session', 0);
   state.mode = opt.mode === 'write' ? 'write' : 'read';
+  state.scan = opt.scan === 'activity_bulk' ? 'activity_bulk' : 'full';
+  if (state.scan === 'activity_bulk') { state.mode = 'read'; }
   if (state.mode === 'write' && !FbmSync.writeAllowed()) {
     state.phase = 'idle'; state.runId = ''; state.message = 'Chưa cho phép ghi thật lên FBM.'; FbmSync.stateWrite(state);
     return { ok: false, code: 'SYNC_WRITES_DISABLED', status: FbmSync.statusView() };
@@ -94,11 +96,45 @@ FbmSync.activityForCustomers = function (state, customerContexts, customerNext, 
 
 /** Chuyển từ lookup sang grid Customer, kể cả khi lookup chỉ đọc bị lỗi. */
 FbmSync.beginCustomerPull = function (state) {
+  if (state.scan === 'activity_bulk') { return FbmSync.beginActivityBulkPull(state); }
   FbmSync.prepareCategoryGate(state);
   state.cursor = { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 };
   state.phase = 'pull_customer'; state.entity = 'customer'; state.message = 'Dang doc khach hang tu FBM...';
   FbmSync.stateWrite(state);
   return FbmSync.customerGridRequest({ type: 0, count: 2000, gridPageIndex: -1, gridRefresh: false });
+};
+
+/** Khởi tạo quét bulk Activity; state giữ cursor và tập ID, không giữ trong Extension. */
+FbmSync.beginActivityBulkPull = function (state) {
+  state.phase = 'pull_activity'; state.entity = 'activity';
+  state.cursor = { kind: 'activity_bulk_grid', type: 0, pageIndex: -1, pageValue: null, count: 100, seen: 0, seenIds: {} };
+  state.message = 'Đang đọc bulk giao dịch từ FBM...';
+  FbmSync.stateWrite(state);
+  return FbmSync.activityBulkRequest({ type: 0, count: 100, gridPageIndex: -1, gridRefresh: false });
+};
+
+/** Chốt một trang bulk Activity hoặc dựng request trang kế tiếp từ composite key. */
+FbmSync.activityBulkNext = function (state, grid) {
+  var cursor = state.cursor || {}, rows = grid && grid.rows || [], count = Number(cursor.count || 100), total = Number(grid && grid.total || 0);
+  cursor.seenIds = cursor.seenIds || {};
+  rows.forEach(function (row) { var id = String(row && row.id || '').trim(); if (id) { cursor.seenIds[id] = true; } });
+  cursor.seen = Number(cursor.seen || 0) + rows.length;
+  if (rows.length && rows.length >= count && (!total || cursor.seen < total)) {
+    var last = rows[rows.length - 1];
+    cursor.type = 1; cursor.pageIndex = Number(cursor.pageIndex || -1) + 1;
+    cursor.pageValue = [last.end_date || '', last.datetime0 || '', last.id || '', last.line_nbr || 0];
+    state.cursor = cursor; FbmSync.stateWrite(state);
+    return FbmSync.activityBulkRequest({ type: 1, count: count, gridPageIndex: cursor.pageIndex, gridPageValue: cursor.pageValue, gridRefresh: false });
+  }
+  state.metadata = state.metadata || {};
+  state.metadata.activityBulkSeen = cursor.seenIds;
+  state.metadata.activityBulkMissing = typeof FbmSync.activityBulkMissing === 'function'
+    ? FbmSync.activityBulkMissing(FbmSync.readLocal('activity'), cursor.seenIds)
+    : [];
+  state.cursor = { kind: 'activity_bulk_done', seen: cursor.seen, seenIds: cursor.seenIds };
+  state.message = 'Đã đọc xong bulk giao dịch FBM.';
+  FbmSync.stateWrite(state);
+  return null;
 };
 
 /** Tiếp tục đúng một bước từ response Extension và lưu cursor trước khi trả về. */
@@ -235,6 +271,18 @@ FbmSync.continue = function (rawResponse) {
     if (state.mode === 'write') { FbmSync.markMissingAfterFullScan('customer', state); FbmSync.markMissingAfterFullScan('activity', state); }
     state.phase = 'done'; state.entity = ''; state.message = 'Dong bo hoan tat.'; FbmSync.stateWrite(state);
     return { ok: true, status: FbmSync.statusView(), imported: activityRecords.length };
+  }
+  if (cursor.kind === 'activity_bulk_grid') {
+    var bulkGrid = FbmSync.rowsToRecords('activity', response, state.metadata && state.metadata.activityFields), bulkGate = state.metadata && state.metadata.categoryGate || {}, bulkRecords = bulkGrid.rows.filter(function (row) { return !FbmSync.isTemporaryRecord('activity', row); }).map(function (row) { return FbmSync.activityRecord(row, bulkGate); });
+    state.metadata.activityFields = bulkGrid.fields;
+    FbmSync.stateWrite(state);
+    FbmSync.pullRecords('activity', bulkRecords, state.mode);
+    state = FbmSync.stateRead();
+    FbmSync.previewRecords(state, 'activity', bulkRecords);
+    var bulkRequest = FbmSync.activityBulkNext(state, bulkGrid);
+    if (bulkRequest) { return { ok: true, request: FbmSync.nextEnvelope(bulkRequest), status: FbmSync.statusView(), imported: bulkRecords.length }; }
+    state.phase = 'done'; state.entity = ''; state.message = 'Đã đọc xong bulk giao dịch FBM.'; FbmSync.stateWrite(state);
+    return { ok: true, status: FbmSync.statusView(), imported: bulkRecords.length, missing: state.metadata.activityBulkMissing || [] };
   }
   state.phase = 'error'; state.lastError = 'Khong nhan dien duoc cursor dong bo.'; FbmSync.stateWrite(state);
   return { ok: false, status: FbmSync.statusView(), error: state.lastError };
