@@ -72,13 +72,13 @@ FbmSync.threeWay = function (base, shin, fbm, entity, categoryGate) {
 
 /** Đổi record Customer FBM sang schema nội bộ của Sheet. */
 FbmSync.customerRecord = function (fbm, categoryGate) {
-  var record = { companyName: fbm.ten_kh || '', taxNumber: fbm.ma_so_thue || '', phone: fbm.dien_thoai || '', email: fbm.email || '', address: fbm.dc_lh || '', province: fbm.dc_lh_tinh || fbm.ten_dclh_tinh || '', website: fbm.website || '', contactPerson: fbm.ong_ba || '', leadSource: fbm.nguon_dm || fbm.ten_nguon_dm || '', product: fbm.ma_sp || fbm.ten_sp || '', verifyStatus: 'Chưa xác thực', allowFbmPush: 'Chưa cho phép', fbmCustomerCode: fbm.ma_kh || '', fbmId: fbm.stt_rec_kh || '', syncedAt: new Date(), syncStatus: FbmSync.SYNC_STATUS.synced };
+  var record = { companyName: fbm.ten_kh || '', taxNumber: fbm.ma_so_thue || '', phone: fbm.dien_thoai || '', email: fbm.email || '', address: fbm.dc_lh || '', province: fbm.ten_dclh_tinh || fbm.dc_lh_tinh || '', website: fbm.website || '', contactPerson: fbm.ong_ba || '', leadSource: fbm.ten_nguon_dm || fbm.nguon_dm || '', product: fbm.ten_sp || fbm.ma_sp || '', verifyStatus: 'Chưa xác thực', allowFbmPush: 'Chưa cho phép', fbmCustomerCode: fbm.ma_kh || '', fbmId: fbm.stt_rec_kh || '', syncedAt: new Date(), syncStatus: FbmSync.SYNC_STATUS.synced };
   record.fbmHash = FbmSync.hash(fbm, 'customer', categoryGate);
   return record;
 };
 /** Đổi record Activity FBM sang schema nội bộ của Sheet. */
 FbmSync.activityRecord = function (fbm, categoryGate) {
-  var record = { customerId: fbm.ma_kh || '', workDate: fbm.end_date || '', taskType: fbm.ma_cv || fbm.ten_cv || '', content: FbmSync.stripActivityMarker(fbm.details || ''), product: fbm.ma_sp || fbm.ten_sp || '', owner: fbm.owner || '', allowFbmPush: 'Chưa cho phép', fbmId: fbm.id || '', syncStatus: FbmSync.SYNC_STATUS.synced };
+  var record = { customerId: fbm.ma_kh || '', workDate: fbm.end_date || '', taskType: fbm.ten_cv || fbm.ma_cv || '', content: FbmSync.stripActivityMarker(fbm.details || ''), product: fbm.ten_sp || fbm.ma_sp || '', owner: fbm.owner || '', allowFbmPush: 'Chưa cho phép', fbmId: fbm.id || '', syncStatus: FbmSync.SYNC_STATUS.synced };
   record.fbmHash = FbmSync.hash(fbm, 'activity', categoryGate);
   return record;
 };
