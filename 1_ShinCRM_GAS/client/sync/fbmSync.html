@@ -23,6 +23,7 @@ function fbmSyncPaint(status) {
   if (!panel || !status) { return; }
   // GAS orchestration returns { ok, request, status }; the panel only paints the inner snapshot.
   status = status.status || status;
+  fbmSyncPaintHeaderState(status);
   if (status.writeAllowed !== undefined) { FBM_SYNC_CLIENT.writeAllowed = status.writeAllowed === true; }
   panel.hidden = false; panel.textContent = '';
   var title = document.createElement('div'); title.className = 'shin-sync-title'; title.textContent = 'Đồng bộ FBM'; panel.appendChild(title);
@@ -46,6 +47,16 @@ function fbmSyncPaint(status) {
   var gate = document.createElement('label'); gate.className = 'shin-sync-write-gate';
   var check = document.createElement('input'); check.type = 'checkbox'; check.id = 'fbm-sync-write-gate'; check.checked = FBM_SYNC_CLIENT.writeAllowed; check.disabled = active;
   gate.appendChild(check); gate.appendChild(document.createTextNode(' Cho phép ghi thật lên FBM')); panel.appendChild(gate);
+}
+/** Đồng bộ màu icon header với phase hiện tại của phiên GAS. */
+function fbmSyncPaintHeaderState(status) {
+  var button = document.getElementById('fbm-sync-menu');
+  if (!button || !status) { return; }
+  ['running', 'paused', 'error'].forEach(function (name) { button.classList.remove('shin-sync-status-' + name); });
+  var phase = String(status.phase || '');
+  var state = ['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(phase) >= 0 ? 'running' : (['paused', 'conflict'].indexOf(phase) >= 0 ? 'paused' : (phase === 'error' ? 'error' : ''));
+  if (state) { button.classList.add('shin-sync-status-' + state); }
+  button.setAttribute('aria-label', 'Đồng bộ FBM' + (state === 'running' ? ' — đang chạy' : state === 'paused' ? ' — tạm dừng' : state === 'error' ? ' — có lỗi' : ''));
 }
 /** Vẽ tiến trình riêng của phiên, không dùng chung dải loading của Sidebar. */
 function fbmSyncPaintProgress(panel, status, count) {

@@ -31,14 +31,17 @@ async function chay(so) {
     FbmSync: {},
     PropertiesService: { getScriptProperties: () => ({ getProperty: (key) => ({ FBM_BASE_URL: 'https://fbm.test', FBM_COOKIE: '461020379855cFHN_CRM_App', FBM_AUTH_CUSTOMER: 'auth-c', FBM_AUTH_ACTIVITY: 'auth-a', FBM_SYNC_TEST_CUSTOMER_CODE: 'ALT00010' }[key] || '') }) }
   });
-  napServer(builders, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Reconcile.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/RequestBuilders.js');
+  napServer(builders, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Reconcile.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategorySync.js', 'fbm_sync/write/RequestBuilders.js');
   const gate = { map: { '@CAT_TINH_THANH\u001fHà Nội': 'HNI' }, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true, HNI: true } } };
+  check(so, 'danh mục FBM tạo đúng companion có dấu chính', builders.FbmSync.categoryCompanionText('HNI', 'Hà Nội', true), 'HNI. Hà Nội #');
   const newCustomer = builders.FbmSync.customerCreateRequest({ companyName: 'Mới', province: 'Hà Nội', note: 'nội bộ' }, 'ALT99999', '', gate);
   check(so, 'mở form tạo Customer dùng type 0', builders.FbmSync.customerCreateOpenRequest().body.type, 0);
   check(so, 'ghi chú nội bộ không vào memvars FBM', newCustomer.body.memvars.some((item) => item.Name === 'ghi_chu'), false);
   check(so, 'SELECT Customer đổi sang mã FBM', newCustomer.body.memvars.filter((item) => item.Name === 'dc_lh_tinh')[0].NewValue, 'HNI');
   const activity = builders.FbmSync.activityCreateRequest({ id: 'ACT-9', customerFbmCode: 'ALT99999', taskType: 'Gọi', content: 'Nội dung' }, gate);
   check(so, 'Activity mới gắn dấu nhận diện', activity.body.memvars.filter((item) => item.Name === 'details')[0].NewValue, 'Nội dung #SC-ACT-9');
+  const linkedActivity = builders.FbmSync.linkActivityCustomers([{ customerId: 'ALT99999', fbmHash: 'old' }], [{ id: 'KH-1', fbmCustomerCode: 'ALT99999' }]);
+  check(so, 'Activity FBM nối về mã Customer nội bộ', [linkedActivity.records[0].customerId, linkedActivity.orphaned], ['KH-1', 0]);
   const edit = builders.FbmSync.customerEditRequest({ fbmId: 'A1', companyName: 'Đổi tên' }, { stt_rec_kh: 'A1', ma_kh: 'ALT00010', ten_kh: 'Cũ', dien_thoai: '0123' }, gate);
   check(so, 'Customer sửa giữ OldValue field không đụng tới', edit.body.memvars.filter((item) => item.Name === 'dien_thoai')[0].NewValue, '0123');
   check(so, 'Customer grid gắn điều kiện phân quyền theo userId trong payload cookie', builders.FbmSync.customerGridRequest({ type: 0 }).body.externalKey[0].Name, "stt_rec_kh in (select stt_rec_kh from dbo.zcFastBusiness$Function$GetCustomerValidate('2037')) and 1");

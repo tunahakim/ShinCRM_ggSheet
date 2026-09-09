@@ -158,27 +158,27 @@ function chay(so) {
     'màn "activityForm" · customer.note trỏ tới hàm "openNoteFormm"');
 
   batLoiUi('bắt được mục menu trỏ tới hàm không có trong bảng, và gọi tên mục menu chứ không gọi tên nút mẹ',
-    (u) => { u.view.header[4].menu[0].action = 'toggleAutoRenderViewx'; },
+    (u) => { u.view.header[5].menu[0].action = 'toggleAutoRenderViewx'; },
     'mục menu "Tự động làm mới sheet quản trị sau khi lưu" trỏ tới hàm "toggleAutoRenderViewx"');
 
   batLoiUi('bắt được mục menu thiếu `action` — bấm vào không có gì xảy ra là loại lỗi im lặng nhất',
-    (u) => { delete u.view.header[4].menu[0].action; },
+    (u) => { delete u.view.header[5].menu[0].action; },
     'mục menu "Tự động làm mới sheet quản trị sau khi lưu" thiếu `action`');
 
   batLoiUi('bắt được mục menu thiếu `label`, vì nó hiện ra một dòng trắng bấm được',
-    (u) => { delete u.view.header[4].menu[0].label; },
+    (u) => { delete u.view.header[5].menu[0].label; },
     'có mục menu thiếu `label`');
 
   batLoiUi('bắt được mục menu vừa là công tắc vừa mang `value`',
-    (u) => { u.view.header[4].menu[0].value = 'all'; },
+    (u) => { u.view.header[5].menu[0].value = 'all'; },
     'vừa là công tắc vừa mang `value`');
 
   batLoiUi('bắt được `menu` khai không phải mảng',
-    (u) => { u.view.header[4].menu = 'khong-phai-mang'; },
+    (u) => { u.view.header[5].menu = 'khong-phai-mang'; },
     'màn "view" · Khác có `menu` không phải mảng');
 
   batLoiUi('bắt được mục menu không phải object',
-    (u) => { u.view.header[4].menu[0] = 'Tự động cập nhật sheet sau khi lưu'; },
+    (u) => { u.view.header[5].menu[0] = 'Tự động cập nhật sheet sau khi lưu'; },
     'có mục menu không phải object');
 
   batLoiUi('bắt được tên slot gõ sai, và gọi tên card bằng tiêu đề người dùng đọc được',

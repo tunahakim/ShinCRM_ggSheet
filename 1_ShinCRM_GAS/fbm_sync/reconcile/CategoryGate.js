@@ -80,6 +80,7 @@ FbmSync.categoryValueAllowed = function (categoryGate, source, value) {
 FbmSync.lookupPairs = function (response) {
   var parsed = FbmSync.protocol.parse(response) || {}, data = parsed.d || parsed;
   if (typeof data === 'string') { data = FbmSync.protocol.parse(data) || []; }
+  if (data && !Array.isArray(data) && Array.isArray(data.Rows)) { data = data.Rows; }
   if (!Array.isArray(data)) { return {}; }
   var out = {};
   data.forEach(function (item) {
@@ -128,4 +129,20 @@ FbmSync.validatePushCategories = function (record, entity, categoryGate) {
     ['@CAT_SAN_PHAM', FbmSync.value(record, 'product', FbmSync.value(record, 'ma_sp', ''))]
   ];
   return fields.map(function (item) { return { source: item[0], result: FbmSync.categoryValueAllowed(categoryGate, item[0], item[1]) }; }).filter(function (item) { return !item.result.ok; });
+};
+
+/** Kiểm danh mục của record kéo về trước khi cho phép reconcile. */
+FbmSync.validateIncomingCategories = function (record, entity, categoryGate) {
+  var fields = entity === 'customer' ? [
+    ['@CAT_TINH_THANH', FbmSync.value(record, 'province', '')],
+    ['@CAT_NGUON_KH', FbmSync.value(record, 'leadSource', '')],
+    ['@CAT_SAN_PHAM', FbmSync.value(record, 'product', '')]
+  ] : [
+    ['@CAT_CONG_VIEC', FbmSync.value(record, 'taskType', '')],
+    ['@CAT_SAN_PHAM', FbmSync.value(record, 'product', '')]
+  ];
+  return fields.map(function (item) {
+    var value = String(item[1] === null || item[1] === undefined ? '' : item[1]).trim();
+    return { source: item[0], value: value, result: FbmSync.categoryValueAllowed(categoryGate, item[0], value) };
+  }).filter(function (item) { return item.value && !item.result.ok; });
 };

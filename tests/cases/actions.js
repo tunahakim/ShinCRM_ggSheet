@@ -78,7 +78,7 @@ function dungCanh() {
 }
 
 function chay(so) {
-  section('actions — bảng mười lăm tên, và ranh giới của tệp');
+  section('actions — bảng mười bảy tên, và ranh giới của tệp');
 
   let hop;
   try {

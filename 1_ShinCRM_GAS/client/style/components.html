@@ -413,6 +413,11 @@
 
 .shin-icon.shin-toggle.shin-extension-missing { position: relative; }
 .shin-icon.shin-toggle.shin-extension-missing[aria-pressed="true"] { color: var(--shin-warn); }
+.shin-icon.shin-sync-status-running { color: var(--shin-primary); background: var(--shin-primary-soft); }
+.shin-icon.shin-sync-status-running .shin-glyph { animation: shin-sync-icon-spin 1.2s linear infinite; }
+.shin-icon.shin-sync-status-paused { color: var(--shin-warn); background: var(--shin-warn-soft); }
+.shin-icon.shin-sync-status-error { color: var(--shin-danger); background: var(--shin-danger-soft); }
+@keyframes shin-sync-icon-spin { to { transform: rotate(360deg); } }
 .shin-icon.shin-toggle.shin-extension-missing::after {
   content: '';
   position: absolute;

@@ -30,12 +30,15 @@ Tài liệu này theo dõi phạm vi đồng bộ FBM/ShinCRM. Không thực hi�
 - [x] Giới hạn live test mặc định ở Customer `ALT00010`; đặt `FBM_SYNC_TEST_CUSTOMER_CODE` rỗng khi được phép quét toàn bộ.
 - [x] Giữ đúng cursor Customer khi trang không có Activity.
 - [x] Lấy danh mục động bằng `GetCompletionList`/lookup và kiểm tra theo từng nguồn.
+- [x] Kiểm tra danh mục trước cả chiều đọc; chiều ghi thật nhập mã/tên mới vào `Category` mà không xóa giá trị cũ.
 - [x] Chuẩn hóa ngày, số 0 đầu chuỗi, giá trị rỗng và dữ liệu response lỗi.
 - [x] Kiểm tra trạng thái đọc và panel tiến độ qua Sidebar.
 
 ## 4. Đối chiếu và ghi ShinCRM
 
 - [x] Chuẩn hóa fingerprint `hFBM`, `hSHIN`, `hBASE` và ba chiều đối chiếu.
+- [x] Fingerprint SELECT dùng mã FBM qua ánh xạ `Category`, không dùng nhãn hiển thị ShinCRM.
+- [x] Kéo Customer/Activity mới về Sheet, giữ ghi chú nội bộ riêng và chặn bản ghi có danh mục lạ hoặc thiếu ngày làm việc.
 - [x] Nhận diện không đổi, thay đổi một phía và conflict hai phía.
 - [x] Không đưa ghi chú nội bộ ShinCRM vào payload FBM.
 - [x] Khóa record khi đang đồng bộ ghi.
@@ -90,7 +93,7 @@ Tài liệu này theo dõi phạm vi đồng bộ FBM/ShinCRM. Không thực hi�
 ## 9. Bàn giao
 
 - [ ] Cập nhật checklist và cây thư mục lần cuối.
-- [x] Đẩy GAS sau khi test offline và GAS smoke test xanh (revision `@104`).
+- [x] Đẩy GAS sau khi test offline và GAS smoke test xanh (revision `@106`, chờ triển khai thay đổi danh mục/hash hiện tại).
 - [ ] Đóng gói và tải lại Extension sau khi bước live test được phép.
 - [x] Ghi rõ các bước người dùng cần thao tác và kết quả nghiệm thu.
 

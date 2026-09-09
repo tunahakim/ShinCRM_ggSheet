@@ -97,6 +97,13 @@ ACTIONS.toggleSyncPanel = function () {
   return syncPanelToggle();
 };
 
+/** Thông báo rõ ràng cho núm tự động đồng bộ chưa được nối vào lịch chạy. */
+ACTIONS.showFbmAutoSyncComingSoon = function () {
+  var finish = typeof sidebarBusyBegin === 'function' ? sidebarBusyBegin('Tự động đồng bộ FBM đang được phát triển.', { block: false }) : null;
+  if (finish && typeof window !== 'undefined' && window.setTimeout) { window.setTimeout(finish, 5000); }
+  return null;
+};
+
 /** Đổi nấc xem card lịch sử. Vẽ lại **riêng card đó** chứ không cả màn: khối thông tin chung và card ghi chú không đổi theo nấc. */
 ACTIONS.setActivityView = function (payload) {
   var kq = prefsSet('activityView', actionsValue(payload, 'Nấc xem lịch sử'));

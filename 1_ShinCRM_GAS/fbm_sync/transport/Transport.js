@@ -211,16 +211,11 @@ FbmSync.authContinue = function (entity, response) {
     FbmSync.stateWrite(state);
     return FbmSync.authorizeRequest('activity');
   }
-  if (state.mode === 'write') {
-    state.cursor = { kind: 'lookup', index: 0 };
-    state.message = 'Dang nap danh muc FBM truoc khi ghi...';
-    FbmSync.stateWrite(state);
-    return FbmSync.completionRequest(FbmSync.SYNC_LOOKUPS[0].controller, FbmSync.SYNC_LOOKUPS[0].key);
-  }
-  state.cursor = { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 };
-  state.phase = 'pull_customer'; state.entity = 'customer'; state.message = 'Dang doc khach hang tu FBM...';
+  // Lookup is read-only and runs in both modes; write mode additionally imports it into Category.
+  state.cursor = { kind: 'lookup', index: 0 };
+  state.message = 'Dang kiem tra danh muc FBM...';
   FbmSync.stateWrite(state);
-  return FbmSync.customerGridRequest({ type: 0, count: 2000, gridPageIndex: -1, gridRefresh: false });
+  return FbmSync.completionRequest(FbmSync.SYNC_LOOKUPS[0].controller, FbmSync.SYNC_LOOKUPS[0].key);
 };
 
 /** Tạo request trang Customer tiếp theo từ khóa cuối trang trước. */
@@ -293,13 +288,19 @@ FbmSync.continue = function (rawResponse) {
       state.cursor.index = lookupIndex; FbmSync.stateWrite(state);
       return { ok: true, request: FbmSync.nextEnvelope(FbmSync.completionRequest(FbmSync.SYNC_LOOKUPS[lookupIndex].controller, FbmSync.SYNC_LOOKUPS[lookupIndex].key)), status: FbmSync.statusView() };
     }
+    if (state.mode === 'write') {
+      var categoryImport = FbmSync.importLookupCategories(state);
+      state.metadata.categoryImport = categoryImport;
+      state.message = categoryImport.added ? 'Đã bổ sung ' + categoryImport.added + ' mã danh mục FBM; đang đọc khách hàng...' : 'Danh mục FBM đã sẵn sàng; đang đọc khách hàng...';
+      FbmSync.stateWrite(state);
+    }
     FbmSync.prepareCategoryGate(state);
     state.cursor = { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 }; state.phase = 'pull_customer'; state.entity = 'customer'; state.message = 'Dang doc khach hang tu FBM...'; FbmSync.stateWrite(state);
     return { ok: true, request: FbmSync.nextEnvelope(FbmSync.customerGridRequest({ type: 0, count: 2000, gridPageIndex: -1, gridRefresh: false })), status: FbmSync.statusView() };
   }
   // Customer là grid cha; mỗi trang xong sẽ mở Activity con của trang đó.
   if (cursor.kind === 'customer_grid') {
-    var customerGrid = FbmSync.rowsToRecords('customer', response), customerRecords = customerGrid.rows.map(FbmSync.customerRecord);
+    var customerGrid = FbmSync.rowsToRecords('customer', response), categoryGate = state.metadata && state.metadata.categoryGate || {}, customerRecords = customerGrid.rows.map(function (row) { return FbmSync.customerRecord(row, categoryGate); });
     state.metadata.customerFields = customerGrid.fields;
     FbmSync.stateWrite(state);
     FbmSync.pullRecords('customer', customerRecords, state.mode);
@@ -316,7 +317,7 @@ FbmSync.continue = function (rawResponse) {
   }
   // Activity được quét theo từng stt_rec, rồi mới quay lại trang Customer kế.
   if (cursor.kind === 'activity_grid') {
-    var activityGrid = FbmSync.rowsToRecords('activity', response), activityRecords = activityGrid.rows.map(FbmSync.activityRecord);
+    var activityGrid = FbmSync.rowsToRecords('activity', response), activityGate = state.metadata && state.metadata.categoryGate || {}, activityRecords = activityGrid.rows.map(function (row) { return FbmSync.activityRecord(row, activityGate); });
     state.metadata.activityFields = activityGrid.fields;
     FbmSync.stateWrite(state);
     FbmSync.pullRecords('activity', activityRecords, state.mode);

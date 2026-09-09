@@ -264,6 +264,7 @@ Biểu mẫu **không** có thư mục riêng: bộ máy dựng form là `client
 |- read/GridRead.js             Grid metadata, phân trang, category request
 |- write/RequestBuilders.js     Builder Customer/Activity create/edit
 |- reconcile/Reconcile.js       Normalize, fingerprint, pull WriteGate
+|- reconcile/CategorySync.js    Nhập lookup FBM vào Category, giữ nguyên giá trị cũ
 |- report/Report.js             Trạng thái công khai cho Sidebar
 server/service/FbmSyncService.js Entry points ổn định cho Sidebar
 1_ShinCRM_GAS/client/sync/fbmSync.html UI màn hình đồng bộ độc lập, tiến độ và bridge request thô
