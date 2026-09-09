@@ -41,9 +41,9 @@ function fbmInstallScheduler() {
   return FbmSync.schedule();
 }
 
-/** Nhận heartbeat từ Extension; không khởi động phiên nghiệp vụ ngoài ý muốn. */
+/** Nhận heartbeat và trả một request đọc tiếp nếu scheduler đang đến hạn. */
 function fbmSyncHeartbeat(rawResponse) {
-  var state = FbmSync.stateRead(), result = FbmSync.protocol.assertSuccess(rawResponse);
+  var state = FbmSync.stateRead(), result = FbmSync.protocol.assertSuccess(rawResponse), request = null, started = null;
   state.session = state.session || {};
   state.session.lastHeartbeatAt = Date.now();
   if (!result.ok && result.code === 'SESSION_EXPIRED') {
@@ -51,11 +51,38 @@ function fbmSyncHeartbeat(rawResponse) {
     state.lastFailureCode = result.code; state.retryable = false; state.lastError = result.bug.Message; state.message = result.bug.Message;
   } else if (result.ok) {
     state.session.expired = false;
-    if (state.phase === 'idle' && !state.lastError) { state.message = 'Heartbeat FBM OK.'; }
+    var total = FbmSync.heartbeatCustomerTotal(rawResponse);
+    var previousTotal = state.session.customerTotal;
+    if (total !== null) {
+      state.session.customerTotal = total;
+      if (previousTotal !== null && previousTotal !== undefined && Number(previousTotal) !== total && state.phase === 'idle') {
+        state.scheduledScan = 'customer';
+        state.message = 'Tổng số Customer FBM đã đổi; chuẩn bị quét lại Customer.';
+      }
+    }
+    if (state.phase === 'idle' && !state.lastError && state.scheduledScan === 'heartbeat') { state.scheduledScan = ''; state.message = 'Heartbeat FBM OK.'; }
   }
   FbmSync.stateWrite(state);
-  return FbmSync.statusView();
+  state = FbmSync.stateRead();
+  if (result.ok && state.runId && ['idle', 'done', 'error'].indexOf(state.phase) < 0) {
+    request = FbmSync.requestForCursor(state);
+  } else if (result.ok && state.phase === 'idle' && (state.scheduledScan === 'customer' || state.scheduledScan === 'activity') && typeof FbmSync.start === 'function') {
+    started = FbmSync.start({ mode: 'read', scan: state.scheduledScan === 'activity' ? 'activity_bulk' : 'full' });
+    request = started && started.request ? started.request : null;
+  }
+  var status = FbmSync.statusView();
+  return { ok: true, request: request ? (request.protocol ? request : FbmSync.nextEnvelope(request)) : null, status: status };
 }
+
+/** Đọc TotalRowCount của request heartbeat mà không phụ thuộc shape response. */
+FbmSync.heartbeatCustomerTotal = function (rawResponse) {
+  var parsed = FbmSync.protocol.parse(rawResponse) || {}, data = parsed.d || parsed;
+  if (typeof data === 'string') { data = FbmSync.protocol.parse(data) || {}; }
+  var value = data && (data.TotalRowCount !== undefined ? data.TotalRowCount : data.totalRowCount);
+  if (value === undefined || value === null || value === '') { return null; }
+  var number = Number(value);
+  return isFinite(number) && number >= 0 ? number : null;
+};
 
 function fbmHeartbeat(rawResponse) { return fbmSyncHeartbeat(rawResponse); }
 /** Trigger chỉ ghi marker; Extension mới là nơi gửi request heartbeat. */

@@ -41,8 +41,8 @@
 - [x] Body chứa `Login.aspx` được nhận là hết phiên kể cả HTTP 200.
 - [x] Retry transport được tách khỏi retry nghiệp vụ; lỗi nghiệp vụ chỉ thử lại khi `hSHIN` đổi.
 - [x] Khôi phục cursor đọc còn hạn sau khi Sidebar, Chrome hoặc GAS gián đoạn; request ghi dở không tự phát lại.
-- [ ] Giữ khoảng nghỉ và trần request phù hợp FBM, không dồn quá 60 request/phút.
-- [ ] Web App `doPost` xác thực khóa và Extension thực sự điều phối qua Web App.
+- [x] Giữ khoảng nghỉ và trần request phù hợp FBM, không dồn quá 60 request/phút.
+- [x] Web App `doPost` xác thực khóa và Extension thực sự điều phối qua Web App.
 
 ### Metadata, chuẩn hóa và trạng thái
 
@@ -220,16 +220,20 @@
 ## Slice 7 — Heartbeat, scheduler và chạy nền
 
 - [x] Extension có alarm heartbeat 5 phút, đọc `count:1`, không login và không write.
-- [ ] Heartbeat nộp kết quả cho GAS, cập nhật lần sống cuối và kích full Customer khi tổng số đổi.
-- [ ] Kỳ Customer 60 phút kéo full grid qua nhiều lát, lưu cursor từng lát.
-- [ ] Kỳ Activity 8 giờ chạy bulk ID, lớp `ngay_gd` và vòng xoay 30 Customer.
+- [x] Heartbeat nộp kết quả cho GAS, cập nhật lần sống cuối và kích full Customer khi tổng số đổi.
+- [x] Kỳ Customer 60 phút kéo full grid qua nhiều lát, lưu cursor từng lát.
+- [x] Kỳ Activity 8 giờ chạy bulk ID, lớp `ngay_gd` và vòng xoay 30 Customer.
 - [x] Scheduler không tạo hai kỳ, không giữ công việc trong RAM và tiếp tục từ lát đã chốt.
-- [ ] Web App dùng khóa theo spreadsheet để tiếp tục khi Sidebar đóng.
-- [ ] Mở lại Sidebar chỉ đọc state hiện có, không tạo kỳ thứ hai.
+- [x] Web App dùng khóa theo spreadsheet để tiếp tục khi Sidebar đóng.
+- [x] Mở lại Sidebar chỉ đọc state hiện có, không tạo kỳ thứ hai.
 - [ ] Nạp lần đầu Sheet trống theo thứ tự Category → Customer → Activity → baseline, không nhân bản.
 - [ ] Lệnh tính lại baseline không phát request write FBM.
 - [ ] **Cần kiểm chứng thực tế:** bắt đầu kỳ, đóng Sidebar, chờ Web App/Extension và mở lại xem state/log.
 - [ ] **Cần kiểm chứng thực tế:** reload hoặc để service worker ngủ rồi xác nhận kỳ tiếp tục.
+
+### Đóng slice
+
+- [x] Code, test offline, log và GAS DEV của heartbeat/scheduler hoàn tất.
 
 ## Slice 8 — Sidebar, log và probe nghiệm thu
 

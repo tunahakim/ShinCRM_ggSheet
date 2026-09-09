@@ -116,6 +116,8 @@ function chay(so) {
   const executorSource = fs.readFileSync(EXECUTOR_FILE, 'utf8');
   check(so, 'worker ping executor truoc request FBM', workerSource.indexOf("ensureFbmExecutor(tabId).then") < workerSource.indexOf("sendTabMessage(tabId, { type: 'FBM_EXECUTE'"), true);
   check(so, 'worker chi co mot diem gui request FBM', (workerSource.match(/sendTabMessage\(tabId, \{ type: 'FBM_EXECUTE', request: request \}/g) || []).length, 1);
+  check(so, 'heartbeat relay gui response thô cho GAS', workerSource.indexOf("postRelay(url, key, { kind: 'heartbeat', response: rawFbmReply(reply) })") >= 0, true);
+  check(so, 'heartbeat relay tiep tuc cursor voi ngan sach request', workerSource.indexOf('relayScheduledRequests(tabId') >= 0 && workerSource.indexOf('used >= 10') >= 0, true);
   check(so, 'executor co ping phien ban 21.7', /FBM_PING[\s\S]+version:\s*'21\.7'/.test(executorSource), true);
 }
 

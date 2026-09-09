@@ -88,6 +88,25 @@ async function chay(so) {
   schedulerData.FBM_SYNC_NEXT_ACTIVITY_SCAN = '1000';
   const busy = scheduler.FbmSync.schedulerClaim('activity', 1000);
   check(so, 'scheduler bo qua khi dang co phien', [busy.ok, busy.code], [false, 'SYNC_ALREADY_RUNNING']);
+
+  const heartbeatData = {};
+  const heartbeatPropertyApi = { getProperty: (key) => heartbeatData[key] || null, setProperty: (key, value) => { heartbeatData[key] = String(value); } };
+  const heartbeat = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => heartbeatPropertyApi, getScriptProperties: () => heartbeatPropertyApi } });
+  napServer(heartbeat, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/EntryPoints.js');
+  heartbeat.FbmSync.stateStart('', 'idle', 0);
+  const firstHeartbeat = heartbeat.fbmSyncHeartbeat({ d: { TotalRowCount: 2 } });
+  check(so, 'heartbeat luu lan song va tong Customer dau tien', [heartbeat.FbmSync.stateRead().session.lastHeartbeatAt > 0, heartbeat.FbmSync.stateRead().session.customerTotal, firstHeartbeat.request], [true, 2, null]);
+  heartbeat.FbmSync.statePatch({ session: { customerTotal: 2 }, scheduledScan: 'customer', phase: 'idle', runId: '' });
+  const scheduledHeartbeat = heartbeat.fbmSyncHeartbeat({ d: { TotalRowCount: 2 } });
+  check(so, 'heartbeat handoff bat dau full Customer khi scheduler den han', [scheduledHeartbeat.ok, scheduledHeartbeat.request.meta.kind, scheduledHeartbeat.status.phase], [true, 'authorize', 'checking_session']);
+  const activeState = heartbeat.FbmSync.stateRead();
+  activeState.phase = 'pull_customer'; activeState.runId = 'heartbeat-run'; activeState.cursor = { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 };
+  heartbeat.FbmSync.stateWrite(activeState);
+  const resumedHeartbeat = heartbeat.fbmSyncHeartbeat({ d: { TotalRowCount: 2 } });
+  check(so, 'heartbeat dang chay tiep tuc dung cursor GAS', [resumedHeartbeat.ok, resumedHeartbeat.request.meta.kind, resumedHeartbeat.request.body.type], [true, 'grid', 0]);
+  heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, session: { customerTotal: 2 }, scheduledScan: '' });
+  const changedHeartbeat = heartbeat.fbmSyncHeartbeat({ d: { TotalRowCount: 3 } });
+  check(so, 'heartbeat tong Customer thay doi kich full Customer', [changedHeartbeat.request.meta.kind, changedHeartbeat.status.phase], ['authorize', 'checking_session']);
 }
 
 module.exports = { chay };
