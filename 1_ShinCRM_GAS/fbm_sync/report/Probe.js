@@ -48,7 +48,8 @@ function fbmAuditAltState() {
       logEvent({ source: 'fbm_sync', action: 'audit_case', outcome: ok ? LOG_OK : LOG_ERROR, entity: 'customer', recordId: code, reason: name + ': ' + (ok ? 'PASS' : 'FAIL'), detail: { status: ok ? 'PASS' : 'FAIL', detail: detail || '' } });
     }
   };
-  add('Customer ALT00010 được đọc vào Sheet', selected.length > 0, 'Số dòng: ' + selected.length);
+  // Audit đọc trạng thái hiện có; nó không thể kết luận lượt Đọc thử vừa ghi Sheet.
+  add('Customer ALT00010 đang có bản ghi nội bộ', selected.length > 0, 'Số dòng: ' + selected.length);
   add('Activity của ALT00010 có liên kết Customer nội bộ', linked.every(function (record) { return ids[String(record.customerId || '').trim()]; }), 'Activity liên kết: ' + linked.length);
   selected.forEach(function (record) { var key = String(record.fbmId || '').trim(); if (key) { seenCustomer[key] = (seenCustomer[key] || 0) + 1; } });
   linked.forEach(function (record) { var key = String(record.fbmId || '').trim(); if (key) { seenActivity[key] = (seenActivity[key] || 0) + 1; } });
