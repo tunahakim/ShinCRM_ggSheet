@@ -12,6 +12,7 @@ async function chay(so) {
   check(so, 'body Login.aspx voi HTTP 200 bi nhan la het phien', hop.FbmSync.protocol.isSessionExpired({ ok: true, status: 200, body: '<html><form action="Login.aspx"><input name="username"></form></html>' }), true);
   check(so, 'loi nghiep vu khong retry tu dong', hop.FbmSync.protocol.classifyFailure({ ok: true, status: 200, body: '{"d":{"Bugs":{"Message":"Sai du lieu"}}}' }).retryable, false);
   check(so, 'loi HTTP co the retry', hop.FbmSync.protocol.classifyFailure({ ok: false, status: 503, body: '' }).retryable, true);
+  check(so, 'SYNC_STATUS co du 11 gia tri hop dong', Object.keys(hop.FbmSync.SYNC_STATUS).length, 11);
   check(so, 'parse response FBM va doc Bugs', parsed.d.Bugs.Message, 'bad');
   check(so, 'Bugs khong bi coi la thanh cong', hop.FbmSync.protocol.assertSuccess(parsed).ok, false);
   check(so, 'response hong JSON bi chan', hop.FbmSync.protocol.assertSuccess('{not-json}').ok, false);
@@ -98,6 +99,10 @@ async function chay(so) {
   napServer(pushed, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/reconcile/Reconcile.js', 'fbm_sync/reconcile/CategoryGate.js');
   pushed.FbmSync.readLocal = () => [{ id: 'CUS-1', fbmId: 'A1', fbmCustomerCode: 'ALT1', companyName: 'X', allowFbmPush: 'Cho phép', syncStatus: pushed.FbmSync.SYNC_STATUS.pushed, fbmHash: '' }];
   check(so, 'bản ghi đã đẩy chờ xác nhận không bị đẩy lặp', pushed.FbmSync.pushCandidates('customer').length, 0);
+
+  pushed.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-KEEP', fbmId: 'FBM-1' }] : [];
+  check(so, 'beforeHardDelete chan xoa cung record co FBM ID', pushed.beforeHardDelete('customer', 'CUS-KEEP').allowed, false);
+  check(so, 'beforeHardDelete cho xoa cung record chua co FBM ID', pushed.beforeHardDelete('customer', 'CUS-MISSING').allowed, true);
 
   const props = { data: {} };
   const propertyApi = { getProperty: (key) => props.data[key] || null, setProperty: (key, value) => { props.data[key] = String(value); } };
