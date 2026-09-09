@@ -73,7 +73,8 @@ FbmSync.categoryValueAllowed = function (categoryGate, source, value) {
   if (!text) { return { ok: true, code: '' }; }
   var valid = categoryGate && categoryGate.valid && categoryGate.valid[source];
   if (!valid || !valid[text]) { return { ok: false, code: '', reason: 'Giá trị danh mục "' + text + '" chưa có mã FBM trong Category.' }; }
-  return { ok: true, code: FbmSync.categoryCode(categoryGate, source, text) };
+  var code = FbmSync.categoryCode(categoryGate, source, text), blocked = categoryGate && categoryGate.blocked && categoryGate.blocked[source + '\u001f' + code];
+  return blocked ? { ok: false, code: code, reason: blocked } : { ok: true, code: code };
 };
 
 /** Chuẩn hóa response completion thành map mã -> tên. */
@@ -125,8 +126,7 @@ FbmSync.validatePushCategories = function (record, entity, categoryGate) {
     ['@CAT_NGUON_KH', FbmSync.value(record, 'leadSource', FbmSync.value(record, 'nguon_dm', ''))],
     ['@CAT_SAN_PHAM', FbmSync.value(record, 'product', FbmSync.value(record, 'ma_sp', ''))]
   ] : [
-    ['@CAT_CONG_VIEC', FbmSync.value(record, 'taskType', FbmSync.value(record, 'ma_cv', ''))],
-    ['@CAT_SAN_PHAM', FbmSync.value(record, 'product', FbmSync.value(record, 'ma_sp', ''))]
+    ['@CAT_CONG_VIEC', FbmSync.value(record, 'taskType', FbmSync.value(record, 'ma_cv', ''))]
   ];
   return fields.map(function (item) { return { source: item[0], result: FbmSync.categoryValueAllowed(categoryGate, item[0], item[1]) }; }).filter(function (item) { return !item.result.ok; });
 };
@@ -158,8 +158,7 @@ FbmSync.validateIncomingCategories = function (record, entity, categoryGate) {
     ['@CAT_NGUON_KH', FbmSync.value(record, 'leadSource', '')],
     ['@CAT_SAN_PHAM', FbmSync.value(record, 'product', '')]
   ] : [
-    ['@CAT_CONG_VIEC', FbmSync.value(record, 'taskType', '')],
-    ['@CAT_SAN_PHAM', FbmSync.value(record, 'product', '')]
+    ['@CAT_CONG_VIEC', FbmSync.value(record, 'taskType', '')]
   ];
   return fields.map(function (item) {
     var value = String(item[1] === null || item[1] === undefined ? '' : item[1]).trim();

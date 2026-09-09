@@ -20,7 +20,8 @@ function categoryIsCompanion(code) {
   if (code.length <= suffix.length || code.slice(-suffix.length) !== suffix) { return false; }
 
   var base = code.slice(0, code.length - suffix.length);
-  return CATEGORY_COLUMNS.some(function (pair) { return pair[0] === base; });
+  var declared = CATEGORY_COLUMNS.some(function (pair) { return pair[0] === code; });
+  return declared && CATEGORY_COLUMNS.some(function (pair) { return pair[0] === base; });
 }
 
 /** Danh sách mã của các danh mục thật, đã bỏ cột đi kèm. */

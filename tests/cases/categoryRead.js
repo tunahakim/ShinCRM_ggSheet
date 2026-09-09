@@ -32,6 +32,7 @@ function chay(so) {
   check(so, 'mã không có hậu tố thì không phải cột đi kèm', hop.categoryIsCompanion('@CAT_TINH_THANH'), false);
   check(so, 'đúng bằng hậu tố mà không có phần gốc thì không phải cột đi kèm', hop.categoryIsCompanion('_FBM'), false);
   check(so, 'hậu tố đúng nhưng phần gốc chưa khai thì vẫn là danh mục thật', hop.categoryIsCompanion('@CAT_LA_LUNG_FBM'), false);
+  check(so, 'companion không khai trong CATEGORY_COLUMNS phải bị bỏ qua', hop.categoryIsCompanion('@CAT_NHOM_KH_FBM'), false);
 
   const ma = hop.categoryCodes();
   check(so, '13 cột khai trừ 4 cột đi kèm còn 9 danh mục thật',
