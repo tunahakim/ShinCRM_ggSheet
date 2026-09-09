@@ -6,17 +6,18 @@ async function chay(so) {
   section("FBM sync — pull và identity");
   const builders = taoHopCat({
     FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {},
-    PropertiesService: { getScriptProperties: () => ({ getProperty: (key) => ({ FBM_BASE_URL: 'https://fbm.test', FBM_COOKIE: '461020379855cFHN_CRM_App', FBM_AUTH_CUSTOMER: 'auth-c', FBM_AUTH_ACTIVITY: 'auth-a', FBM_SYNC_TEST_CUSTOMER_CODE: 'ALT00010' }[key] || '') }) }
+    PropertiesService: { getDocumentProperties: () => ({ getProperty: (key) => ({ FBM_SYNC_TEST_CUSTOMER_CODE: 'ALT00010' }[key] || '') }) }
   });
   napServer(builders, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategorySync.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js');
+  builders.FbmSync.stateRead = () => ({ session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: 'auth-c', activityAuthorized: 'auth-a' } });
   const gate = { map: { '@CAT_TINH_THANH\u001fHà Nội': 'HNI' }, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true, HNI: true } } };
   let recoveryWrite;
-  builders.FbmSync.stateRead = () => ({ metadata: { categoryGate: gate } });
+  builders.FbmSync.stateRead = () => ({ session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: 'auth-c', activityAuthorized: 'auth-a' }, metadata: { categoryGate: gate } });
   builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmCustomerCode: 'ALT99999' }] : [{ id: 'ACT-9', fbmId: '', customerId: 'KH-1', syncStatus: builders.FbmSync.SYNC_STATUS.pushing }];
   builders.writeGateSave = (request) => { recoveryWrite = request; return { ok: true }; };
   const recovered = builders.FbmSync.pullWrite('activity', [builders.FbmSync.activityRecord({ id: 77, ma_kh: 'ALT99999', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi', details: 'Nội dung #SC-ACT-9' }, gate)], 'write');
   check(so, 'Activity marker recovery vá FBM ID không tạo dòng mới', [recovered.written, recoveryWrite.records[0].id, recoveryWrite.records[0].fbmId], [1, 'ACT-9', '77']);
-  let markerConflictWrite, markerState = { metadata: { categoryGate: gate, seen: { customer: {}, activity: {} }, conflicts: [] }, locks: {}, counts: { conflict: 0 } };
+  let markerConflictWrite, markerState = { session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: 'auth-c', activityAuthorized: 'auth-a' }, metadata: { categoryGate: gate, seen: { customer: {}, activity: {} }, conflicts: [] }, locks: {}, counts: { conflict: 0 } };
   builders.FbmSync.stateRead = () => markerState;
   builders.FbmSync.stateWrite = (next) => { markerState = next; return next; };
   builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmCustomerCode: 'ALT99999' }] : [{ id: 'ACT-9', fbmId: 'OLD-FBM', customerId: 'KH-1', content: 'Nội dung cũ', taskType: 'Gọi', workDate: '/Date(1757386800000)/', fbmHash: 'old-hash' }];
@@ -25,8 +26,10 @@ async function chay(so) {
   check(so, 'Activity marker trỏ FBM ID khác tạo conflict và khóa', [markerConflict.conflicts, markerState.metadata.conflicts.length, markerConflictWrite.records[0].syncStatus, markerState.locks['activity:ACT-9'].owner], [1, 1, builders.FbmSync.SYNC_STATUS.conflict, 'sync']);
   const edit = builders.FbmSync.customerEditRequest({ fbmId: 'A1', companyName: 'Đổi tên' }, { stt_rec_kh: 'A1', ma_kh: 'ALT00010', ten_kh: 'Cũ', dien_thoai: '0123' }, gate);
   check(so, 'Customer sửa giữ OldValue field không đụng tới', edit.body.memvars.filter((item) => item.Name === 'dien_thoai')[0].NewValue, '0123');
+  check(so, 'fixture session giữ cookie và userId', [builders.FbmSync.stateRead().session.cookie, builders.FbmSync.stateRead().session.userId], ['461020379855cFHN_CRM_App', '2037']);
   check(so, 'Customer grid gắn điều kiện phân quyền theo userId trong payload cookie', builders.FbmSync.customerGridRequest({ type: 0 }).body.externalKey[0].Name, "stt_rec_kh in (select stt_rec_kh from dbo.zcFastBusiness$Function$GetCustomerValidate('2037')) and 1");
-  check(so, 'Customer grid giới hạn đúng mã live test', builders.FbmSync.customerGridRequest({ type: 0 }).body.externalKey[1].Value, 'ALT00010');
+  const customerGridKeys = builders.FbmSync.customerGridRequest({ type: 0 }).body.externalKey;
+  check(so, 'Customer grid giới hạn đúng mã live test', [customerGridKeys.length, customerGridKeys[1] && customerGridKeys[1].Value], [2, 'ALT00010']);
   const settingsWithSince = builders.FbmSync.scriptSettings;
   builders.FbmSync.scriptSettings = () => Object.assign({}, settingsWithSince(), { activitySince: '2026-01-01' });
   const bulkActivity = builders.FbmSync.activityBulkRequest({ type: 0 });
@@ -71,13 +74,14 @@ async function chay(so) {
   builders.writeGateSave = (request) => { baselineWrite = request; return { ok: true }; };
   const baselineResult = builders.FbmSync.recalculateBaseline('customer');
   check(so, 'tinh lai baseline chi ghi cot sync noi bo', [baselineResult.ok, baselineResult.written, baselineWrite.records[0].fbmHash !== '', baselineWrite.source], [true, 1, true, 'pull']);
-  let newPullWrite, dirtyIds = [];
+  let newPullWrite, newPullCalls = 0, dirtyIds = [];
   builders.FbmSync.stateRead = () => ({ metadata: { categoryGate: gate } });
   builders.FbmSync.readLocal = () => [];
   builders.dirtyStateMarkRecords = (ids) => { dirtyIds = ids; };
-  builders.writeGateSave = (request) => { newPullWrite = request; return { ok: true, fields: ['id'], rows: [['CUS-NEW']] }; };
+  builders.writeGateSave = (request) => { newPullCalls += 1; newPullWrite = request; return { ok: true, fields: ['id'], rows: [['CUS-NEW']] }; };
   const newPullResult = builders.FbmSync.pullWrite('customer', [builders.FbmSync.customerRecord({ stt_rec_kh: 'NEW-C', ma_kh: 'ALT00012', ten_kh: 'Khách mới', ma_so_thue: '001' }, gate)]);
   check(so, 'Customer pull moi ghi ca dinh danh baseline va dirty marker', [newPullResult.written, newPullWrite.source, newPullWrite.schemas.length, newPullWrite.records[0].fbmId, newPullWrite.records[0].fbmHash !== '', dirtyIds[0], newPullWrite.records[0].parentCompanyName], [1, 'pull', 2, 'NEW-C', true, 'CUS-NEW', '']);
+  check(so, 'Pull gộp nội dung và trạng thái vào một lượt cửa ghi', newPullCalls, 1);
   const pullLogs = [];
   builders.logEvent = (event) => pullLogs.push(event);
   builders.FbmSync.readLocal = () => [];

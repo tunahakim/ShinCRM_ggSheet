@@ -95,7 +95,6 @@ FbmSync.configValue = function (name) {
   try {
     var value = typeof configGet === 'function' ? configGet(name, '') : '';
     if (value !== undefined && value !== null && String(value).trim()) { return String(value).trim(); }
-    if (typeof PropertiesService !== 'undefined' && PropertiesService.getScriptProperties) { return String(PropertiesService.getScriptProperties().getProperty(name) || '').trim(); }
     return '';
   } catch (ignore) { return ''; }
 };

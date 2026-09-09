@@ -8,7 +8,7 @@
 - `[ ]` là việc còn thiếu; mục không có nhãn **Cần kiểm chứng thực tế** là việc AI tự tiếp tục được.
 - Một slice chỉ đóng sau khi đủ code, test, log/báo cáo và checklist case của slice đó.
 - Sau khi đóng slice, ghi commit và revision GAS vào bảng bằng chứng cuối file.
-- Bộ kiểm offline gần nhất đạt `954/954`; phần đọc `ALT00010` và một Activity đã từng kiểm chứng, chiều ghi chưa có kết quả thành công được xác nhận.
+- Bộ kiểm offline gần nhất đạt `1043/1043`; phần đọc `ALT00010` và một Activity đã từng kiểm chứng, chiều ghi chưa có kết quả thành công được xác nhận.
 
 ## Slice 0 — Nền tảng, ranh giới và an toàn
 
@@ -22,9 +22,9 @@
 - [x] `note` Customer là ghi chú nội bộ ShinCRM và không xuất hiện trong memvars gửi FBM.
 - [x] Giới hạn live mặc định là `FBM_SYNC_TEST_CUSTOMER_CODE=ALT00010` ở đường đọc và đường chọn ứng viên push.
 - [x] Bản ghi mã `TMP-` bị loại khỏi mọi kỳ quét ở cả hai chiều.
-- [ ] Mỗi lát chỉ có một lời gọi cửa ghi và một khóa tài liệu; pull hiện còn có thể ghi nội dung và trạng thái thành hai lượt.
+- [x] Mỗi lát chỉ có một lời gọi cửa ghi và một khóa tài liệu; pull gộp nội dung và trạng thái vào cùng một lượt `writeGateSave`.
 - [x] `CategorySync.js` đi qua tầng ghi lõi thay vì tự gọi `getRange/setValues`.
-- [ ] `ScriptProperties` chỉ giữ khóa Web App; cờ ghi, giới hạn test và cấu hình phải chuyển về nơi đúng vòng đời.
+- [x] `ScriptProperties` chỉ giữ khóa Web App; cờ ghi, giới hạn test và cấu hình đã dùng `DocumentProperties`, Sheet Config hoặc state phiên đúng vòng đời.
 
 ### Extension, transport và khóa
 

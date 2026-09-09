@@ -3,24 +3,23 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 /** Đọc cấu hình runtime; token ưu tiên state của phiên hiện tại. */
 FbmSync.scriptSettings = function () {
-  var props = PropertiesService.getScriptProperties();
   var session = {};
   try { session = FbmSync.stateRead().session || {}; } catch (ignore) { session = {}; }
-  var cookie = String(props.getProperty('FBM_COOKIE') || session.cookie || '');
-  var userId = String(props.getProperty('FBM_USER_ID') || session.userId || '');
+  var cookie = String(session.cookie || '');
+  var userId = String(session.userId || '');
   if (!userId && cookie.indexOf('FHN_CRM_App') >= 0) {
     var compact = cookie.slice(0, cookie.indexOf('FHN_CRM_App'));
     userId = compact.length > 9 ? compact.slice(4, -5) : '';
   }
   // Keep live reads narrow by default; set the property to an empty value for a full scan.
-  var testProps = PropertiesService.getDocumentProperties ? PropertiesService.getDocumentProperties() : props;
+  var testProps = PropertiesService.getDocumentProperties ? PropertiesService.getDocumentProperties() : { getProperty: function () { return null; } };
   var testCustomerCode = testProps.getProperty('FBM_SYNC_TEST_CUSTOMER_CODE');
   testCustomerCode = testCustomerCode === null ? 'ALT00010' : String(testCustomerCode || '').trim();
   return {
-    baseUrl: String(props.getProperty('FBM_BASE_URL') || 'https://fbo.com.vn:8888'),
+    baseUrl: 'https://fbo.com.vn:8888',
     cookie: cookie,
-    customerAuthorized: String(session.customerAuthorized || props.getProperty('FBM_AUTH_CUSTOMER') || ''),
-    activityAuthorized: String(session.activityAuthorized || props.getProperty('FBM_AUTH_ACTIVITY') || ''),
+    customerAuthorized: String(session.customerAuthorized || ''),
+    activityAuthorized: String(session.activityAuthorized || ''),
     userId: userId,
     accountName: FbmSync.configValue('FBM_ACCOUNT_NAME'),
     customerPrefix: FbmSync.configValue('FBM_MA_KH_PREFIX'),
