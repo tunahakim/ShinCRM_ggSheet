@@ -273,6 +273,6 @@
 | Slice 4 — Đối soát + conflict |  |  |  |  |  |
 | Slice 5 — Push Customer |  |  |  |  |  |
 | Slice 6 — Push Activity |  |  |  |  |  |
-| Slice 7 — Scheduler + nền |  |  |  |  |  |
+| Slice 7 — Scheduler + nền | `7a324ee` | `1059/1059` | `@125` | GAS DEV `fbmSyncHeartbeat` trả `OK`; không phát request ghi | Handoff heartbeat giới hạn 10 request đọc mỗi lượt |
 | Slice 8 — UI + log + probe |  |  |  |  |  |
 | Slice 9 — Live acceptance + production |  |  |  |  |  |
