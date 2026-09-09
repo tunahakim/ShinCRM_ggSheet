@@ -6,7 +6,8 @@ Tài liệu này cô đọng kết quả đọc các tệp `.txt` trong thư m�
 
 ```text
 Zalo Platform
-    -> webhook GAS (doPost)
+    -> webhook relay (kiểm tra header secret)
+    -> GAS doPost (kiểm tra khóa nội bộ của relay)
     -> kiểm tra request, quyền và trạng thái hội thoại theo chat_id
     -> BotQuery đọc Customer/Activity từ Google Sheet
     -> BotFormatter tạo tin nhắn chữ, menu số hoặc bản xem trước
@@ -108,6 +109,18 @@ Số thứ tự chỉ có nghĩa trong state hiện tại. Tin `1` ở `IDLE` l�
 - Mọi phản hồi là JSON gồm `ok`, `result`, `description`, `error_code`. `ok = false` phải được ghi log và chuyển thành câu lỗi chung.
 - Webhook là POST JSON với header `X-Bot-Api-Secret-Token`. Phải so sánh chính xác header này trước khi parse và xử lý `result`; thiếu hoặc sai trả HTTP 403.
 - Các sự kiện tối thiểu cần xử lý là `message.text.received`; các sự kiện ảnh/sticker/không hỗ trợ chỉ trả lời rằng bot nhận văn bản.
+
+## Điểm chặn khi dùng GAS làm webhook
+
+Event object của web app Google Apps Script có `postData`, `parameter` và `queryString`, nhưng không expose (công khai) HTTP request headers. Vì vậy `doPost(e)` không thể tự đọc `X-Bot-Api-Secret-Token` mà Zalo bắt buộc gửi; gọi Zalo thẳng vào URL `/exec` sẽ không đáp ứng được xác thực chính thức.
+
+Phương án an toàn tạm thời là một webhook relay (Cloudflare Worker, Cloud Run hoặc dịch vụ HTTPS tương đương):
+
+1. Relay nhận POST từ Zalo, kiểm tra chính xác `X-Bot-Api-Secret-Token`, sai thì trả 403.
+2. Relay chỉ chuyển tiếp JSON hợp lệ tới GAS trong một envelope (gói bọc) có khóa nội bộ mới ở body; khóa này được so sánh trước khi lấy event bên trong, không đưa lên URL.
+3. GAS kiểm tra khóa nội bộ, sau đó mới chạy state, query và WriteGate. URL GAS không đăng ký trực tiếp với Zalo.
+
+Không dùng secret Zalo trong query string và không coi URL khó đoán là thay thế cho header. Nền tảng relay là quyết định hạ tầng cần chốt trước khi viết `BotEntry`; phần nghiệp vụ bot vẫn chỉ đọc/ghi Google Sheet.
 
 ## An toàn và quan sát
 
