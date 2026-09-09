@@ -44,6 +44,12 @@ async function chay(so) {
   check(so, 'status noi ro chieu ShinCRM sang FBM', pushView.direction, 'ShinCRM → FBM');
   check(so, 'status noi ro dang dong bo giao dich', pushView.entityLabel, 'Giao dịch');
 
+  const pausedState = orchestration.FbmSync.stateRead();
+  pausedState.runId = 'paused-run'; pausedState.phase = 'paused'; pausedState.cursor = {};
+  orchestration.FbmSync.stateWrite(pausedState);
+  const restartedPaused = orchestration.FbmSync.start({ mode: 'read' });
+  check(so, 'dong bo lai tu trang thai tam dung tao request FBM moi', [restartedPaused.ok, restartedPaused.request.meta.kind, restartedPaused.resumed], [true, 'authorize', undefined]);
+
   const guards = taoHopCat({ FbmSync: {}, PropertiesService: { getScriptProperties: () => ({ getProperty: () => '' }), getDocumentProperties: () => ({ getProperty: () => null, setProperty: () => {} }) } });
   napServer(guards, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js');
   check(so, 'push config chan account rong', guards.FbmSync.pushConfigErrors({ entity: 'customer', kind: 'edit' }, { accountName: '' }), 'Thiếu FBM_ACCOUNT_NAME; chiều đẩy đã bị dừng.');

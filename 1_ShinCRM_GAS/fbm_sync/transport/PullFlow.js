@@ -5,7 +5,9 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 FbmSync.start = function (options) {
   // Mỗi call chỉ trả một request; ngữ cảnh nhiều bước nằm trong DocumentProperties.
   var current = FbmSync.stateRead();
-  if (current.runId && ['idle', 'done', 'error'].indexOf(current.phase) < 0) {
+  // Tạm dừng là điểm dừng để người dùng chạy lại, không phải cursor đang chạy;
+  // lần bấm mới phải tạo request FBM mới, tránh vẽ lại preview cũ.
+  if (current.runId && ['idle', 'done', 'error', 'paused'].indexOf(current.phase) < 0) {
     var initialAuthorize = current.phase === 'checking_session' && current.cursor && current.cursor.kind === 'authorize_customer';
     var recent = Date.now() - Number(current.updatedAt || 0) <= 60000;
     var resumable = recent ? FbmSync.requestForCursor(current) : null;
