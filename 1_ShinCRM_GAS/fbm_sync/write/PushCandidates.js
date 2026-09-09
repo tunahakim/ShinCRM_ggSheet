@@ -90,7 +90,7 @@ FbmSync.pushCandidates = function (entity) {
     var status = String(record.syncStatus || ''), failureKey = entity + ':' + String(record.id || '');
     if (status === FbmSync.SYNC_STATUS.pushed || status === FbmSync.SYNC_STATUS.notApplied) { return false; }
     var currentHash = FbmSync.hash(record, entity, categoryGate);
-    if (status === FbmSync.SYNC_STATUS.error && String(pushFailures[failureKey] || '') === currentHash) { return false; }
+    if (String(pushFailures[failureKey] || '') === currentHash) { return false; }
     var hasFbm = String(record.fbmId || '').trim() !== '';
     var changed = !String(record.fbmHash || '').trim() || currentHash !== String(record.fbmHash || '').trim();
     return !hasFbm || changed || String(record.syncStatus || '') === FbmSync.SYNC_STATUS.pending;

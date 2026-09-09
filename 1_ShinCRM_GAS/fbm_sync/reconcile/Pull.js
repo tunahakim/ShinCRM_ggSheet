@@ -92,6 +92,7 @@ FbmSync.pullWrite = function (entity, records) {
           FbmSync.logPullRecord(entity, incoming, marked, FbmSync.SYNC_STATUS.conflict, 'Marker trỏ tới Activity đã liên kết với FBM ID khác.');
         } else {
           writes.push(Object.assign({}, incoming, { id: marked.id, fbmId: key, syncStatus: FbmSync.SYNC_STATUS.pushed, fbmHash: '' }));
+          if (state.locks) { delete state.locks[entity + ':' + String(marked.id || '')]; }
           FbmSync.logActivityDecision('activity_marker_recovery', incoming, 'Da va FBM ID tu marker noi bo.', typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', { shinId: String(marked.id || '') });
           FbmSync.logPullRecord(entity, incoming, marked, FbmSync.SYNC_STATUS.pushed, 'Khôi phục liên kết Activity từ marker nội bộ.');
         }

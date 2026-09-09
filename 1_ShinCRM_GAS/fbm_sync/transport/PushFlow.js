@@ -68,14 +68,15 @@ FbmSync.markPushError = function (state, candidate, reason) {
   state.metadata.pushFailures = state.metadata.pushFailures || {};
   var gate = state.metadata.categoryGate || {}, localHash = typeof FbmSync.hash === 'function' ? FbmSync.hash(candidate.record || {}, candidate.entity, gate) : '';
   state.metadata.pushFailures[candidate.entity + ':' + String(candidate.id || '')] = localHash;
+  var waitingForMarker = candidate.kind === 'create';
   if (typeof writeGateSave === 'function') {
-    try { writeGateSave({ entity: candidate.entity, records: [{ id: candidate.id, syncStatus: FbmSync.SYNC_STATUS.error }], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] }); } catch (ignore) {}
+    try { writeGateSave({ entity: candidate.entity, records: [{ id: candidate.id, syncStatus: waitingForMarker ? FbmSync.SYNC_STATUS.pushing : FbmSync.SYNC_STATUS.error }], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] }); } catch (ignore) {}
   }
   if (typeof logEvent === 'function') {
     logEvent({ source: 'fbm_sync', action: 'push_record_error', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', entity: candidate.entity, recordId: String(candidate.id || ''), reason: String(reason || 'Không thể đẩy bản ghi.') });
   }
   FbmSync.logPushRecord(candidate, candidate.kind, typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', reason, { syncStatus: FbmSync.SYNC_STATUS.error });
-  FbmSync.releasePushLock(state, candidate.entity, candidate.id);
+  if (!waitingForMarker) { FbmSync.releasePushLock(state, candidate.entity, candidate.id); }
 };
 
 /** Ghi lý do bản ghi bị bỏ qua mà không phát request ghi ra FBM. */

@@ -186,10 +186,13 @@ async function chay(so) {
   check(so, 'Activity New nhan ID FBM va chuyen sang cho xac nhan', [activityResponse, push.FbmSync.stateRead().counts.succeeded, push.FbmSync.stateRead().phase], [null, 1, 'done']);
   const lostState = push.FbmSync.stateStart('', 'push', 0);
   lostState.metadata.categoryGate = {};
+  lostState.locks['activity:ACT-NEW'] = { owner: 'sync', revision: 'h-create' };
   lostState.cursor = { kind: 'push_wait', entity: 'activity', index: 0, operation: 'activity_create', candidate: activityCandidate };
   push.FbmSync.stateWrite(lostState);
+  let lostPatch;
+  push.writeGateSave = (request) => { lostPatch = request.records[0]; return { ok: true }; };
   const lost = push.FbmSync.continueAfterPushError(push.FbmSync.stateRead(), push.FbmSync.stateRead().cursor, 'Mất phản hồi');
-  check(so, 'Activity mat phan hoi khong lap request va ghi hash loi', [lost.continued, lost.request, push.FbmSync.stateRead().counts.error, !!push.FbmSync.stateRead().metadata.pushFailures['activity:ACT-NEW']], [true, null, 1, true]);
+  check(so, 'Activity mat phan hoi giu dang day va khoa cho marker', [lost.continued, lost.request, lostPatch.syncStatus, push.FbmSync.stateRead().counts.error, !!push.FbmSync.stateRead().metadata.pushFailures['activity:ACT-NEW'], push.FbmSync.stateRead().locks['activity:ACT-NEW'].owner], [true, null, push.FbmSync.SYNC_STATUS.pushing, 1, true, 'sync']);
 }
 
 module.exports = { chay };

@@ -12,12 +12,14 @@ async function chay(so) {
   builders.FbmSync.stateRead = () => ({ session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: 'auth-c', activityAuthorized: 'auth-a' } });
   const gate = { map: { '@CAT_TINH_THANH\u001fHà Nội': 'HNI' }, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true, HNI: true } } };
   let recoveryWrite;
-  builders.FbmSync.stateRead = () => ({ session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: 'auth-c', activityAuthorized: 'auth-a' }, metadata: { categoryGate: gate } });
+  let recoveryState = { session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: 'auth-c', activityAuthorized: 'auth-a' }, metadata: { categoryGate: gate }, locks: { 'activity:ACT-9': { owner: 'sync' } } };
+  builders.FbmSync.stateRead = () => recoveryState;
+  builders.FbmSync.stateWrite = (next) => { recoveryState = next; return next; };
   builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmCustomerCode: 'ALT99999' }] : [{ id: 'ACT-9', fbmId: '', customerId: 'KH-1', syncStatus: builders.FbmSync.SYNC_STATUS.pushing }];
   builders.writeGateSave = (request) => { recoveryWrite = request; return { ok: true }; };
   const recovered = builders.FbmSync.pullWrite('activity', [builders.FbmSync.activityRecord({ id: 77, ma_kh: 'ALT99999', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi', details: 'Nội dung #SC-ACT-9' }, gate)], 'write');
-  check(so, 'Activity marker recovery vá FBM ID không tạo dòng mới', [recovered.written, recoveryWrite.records[0].id, recoveryWrite.records[0].fbmId], [1, 'ACT-9', '77']);
-  let markerConflictWrite, markerState = { session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: 'auth-c', activityAuthorized: 'auth-a' }, metadata: { categoryGate: gate, seen: { customer: {}, activity: {} }, conflicts: [] }, locks: {}, counts: { conflict: 0 } };
+  check(so, 'Activity marker recovery vá FBM ID không tạo dòng mới', [recovered.written, recoveryWrite.records[0].id, recoveryWrite.records[0].fbmId, recoveryState.locks['activity:ACT-9']], [1, 'ACT-9', '77', undefined]);
+  let markerConflictWrite, markerState = { session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: 'auth-c', activityAuthorized: 'auth-a' }, metadata: { categoryGate: gate, seen: { customer: {}, activity: {} }, conflicts: [] }, locks: { 'activity:ACT-9': { owner: 'sync' } }, counts: { conflict: 0 } };
   builders.FbmSync.stateRead = () => markerState;
   builders.FbmSync.stateWrite = (next) => { markerState = next; return next; };
   builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmCustomerCode: 'ALT99999' }] : [{ id: 'ACT-9', fbmId: 'OLD-FBM', customerId: 'KH-1', content: 'Nội dung cũ', taskType: 'Gọi', workDate: '/Date(1757386800000)/', fbmHash: 'old-hash' }];
