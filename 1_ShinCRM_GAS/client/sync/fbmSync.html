@@ -54,6 +54,7 @@ function fbmSyncPaint(status, freshOpen) {
   if (status.message) { var message = document.createElement('div'); message.className = 'shin-sync-message'; message.textContent = String(status.message); panel.appendChild(message); }
   fbmSyncPaintPreview(panel, status.metadata && status.metadata.preview);
   fbmSyncPaintAudit(panel, status.metadata && status.metadata.audit);
+  fbmSyncPaintRecordIssues(panel, status.metadata);
   var actions = document.createElement('div'); actions.className = 'shin-sync-actions';
   var active = ['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(status.phase) >= 0;
   var mode = document.createElement('select'); mode.id = 'fbm-sync-mode'; mode.className = 'shin-input'; mode.disabled = active;
@@ -108,6 +109,30 @@ function fbmSyncPaintPreview(panel, preview) {
     row.textContent = 'Giao dịch: ' + (item.date || '(không có ngày)') + ' · ' + (item.type || '(không có loại)') + ' · ' + (item.content || '(trống)'); list.appendChild(row);
   });
   if (preview.truncated) { var more = document.createElement('div'); more.className = 'shin-sync-preview-more'; more.textContent = 'Preview đã giới hạn số dòng.'; box.appendChild(more); }
+  panel.appendChild(box);
+}
+/** Hiển thị kết quả từng case nghiệm thu sau lượt Đọc thử. */
+function fbmSyncPaintRecordIssues(panel, metadata) {
+  metadata = metadata || {};
+  var conflicts = Array.isArray(metadata.conflicts) ? metadata.conflicts : [];
+  var identityBlocks = Array.isArray(metadata.identityBlocks) ? metadata.identityBlocks : [];
+  var pushFailures = metadata.pushFailures || {};
+  if (!conflicts.length && !identityBlocks.length && !Object.keys(pushFailures).length) { return; }
+  var box = document.createElement('div'); box.className = 'shin-sync-audit';
+  var title = document.createElement('div'); title.className = 'shin-sync-preview-title'; title.textContent = 'Chi tiết bản ghi'; box.appendChild(title);
+  conflicts.slice(-20).forEach(function (item) {
+    var row = document.createElement('div'); row.className = 'shin-sync-preview-row';
+    var fields = (item.fields || []).map(function (field) { return String(field.field || '') + ': ' + String(field.left || '') + ' ↔ ' + String(field.right || ''); }).join('; ');
+    row.textContent = 'Xung đột ' + String(item.entity || '') + ' ' + String(item.id || '') + (fields ? ' · ' + fields : ''); box.appendChild(row);
+  });
+  identityBlocks.slice(-20).forEach(function (item) {
+    var row = document.createElement('div'); row.className = 'shin-sync-preview-row';
+    row.textContent = 'Chặn nhận diện Customer ' + String(item.fbmCustomerCode || '') + ' · ' + String(item.reason || ''); box.appendChild(row);
+  });
+  Object.keys(pushFailures).slice(-20).forEach(function (key) {
+    var row = document.createElement('div'); row.className = 'shin-sync-preview-row';
+    row.textContent = 'Lỗi đẩy ' + String(key); box.appendChild(row);
+  });
   panel.appendChild(box);
 }
 /** Hiển thị kết quả từng case nghiệm thu sau lượt Đọc thử. */
