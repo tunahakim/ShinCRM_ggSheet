@@ -5,7 +5,8 @@
  *
  * Tệp này chỉ làm một việc: gọi từng nhóm ca rồi in tổng kết. Ca kiểm nằm ở `tests/cases/`, mỗi tệp một chủ đề; các phép so nằm ở `tests/lib/assert.js`. Thêm một chủ đề thì thêm một tệp vào `cases/` rồi thêm một dòng vào danh sách dưới đây — không sửa gì khác.
  *
- * Chạy: node tests/run.js
+ * Chạy tóm tắt: node tests/run.js
+ * Chạy đầy đủ khi dò lỗi: node tests/run.js --verbose
  * Đạt thì mã thoát 0, không đạt thì khác 0 — nên một phiên tự động biết mình vừa làm hỏng cái gì mà không cần hỏi ai.
  *
  * Hai bộ kiểm cần mạng nằm riêng, cố ý không gọi từ đây: `node tests/check-sheet.js` đối chiếu hàng 1 của sheet thật, `node tests/gas.js <tên hàm>` chạy một hàm thật trên Google. Trộn vào đây thì mất mạng là bộ kiểm đỏ, và một bộ kiểm đỏ vì lý do không liên quan tới code là bộ kiểm người ta sẽ thôi đọc.
@@ -80,7 +81,10 @@ async function main() {
   if (so.failed > 0) {
     console.log('');
     console.log('Các phép kiểm không đạt:');
-    so.failures.forEach((name) => console.log('  - ' + name));
+    so.failures.forEach((name, index) => {
+      console.log('  - ' + name);
+      (so.failureDetails && so.failureDetails[index] || []).forEach((detail) => console.log('     ' + detail));
+    });
     process.exit(1);
   }
 

@@ -4,29 +4,34 @@
  * Vì sao không dùng thư viện kiểm thử có sẵn: dự án này cố ý không có `node_modules`. Bốn hàm dưới đây là tất cả những gì bộ kiểm cần, và chúng đọc hết trong một phút — thứ mà một người tiếp nhận dự án cần hơn là một khung kiểm thử đầy đủ tính năng.
  */
 
-/** Sổ ghi kết quả. Một đối tượng dùng chung cho cả lượt chạy, các nhóm ca cùng ghi vào đây. */
+/** Sổ ghi kết quả; chi tiết lỗi giữ riêng để chế độ tóm tắt không in hàng nghìn ca đạt. */
 function taoSo() {
-  return { passed: 0, failed: 0, failures: [] };
+  return { passed: 0, failed: 0, failures: [], failureDetails: [] };
 }
 
-/** In tiêu đề một nhóm ca. */
+/** Chỉ in tiêu đề nhóm khi chạy `node tests/run.js --verbose`. */
 function section(title) {
-  console.log('');
-  console.log(title);
+  if (process.argv.includes('--verbose')) {
+    console.log('');
+    console.log(title);
+  }
 }
 
-/** Ghi một ca đạt. */
+/** Ghi một ca đạt; mặc định chỉ giữ bộ đếm. */
 function ghiDat(so, label) {
   so.passed += 1;
-  console.log('  ✅ ' + label);
+  if (process.argv.includes('--verbose')) { console.log('  ✅ ' + label); }
 }
 
-/** Ghi một ca không đạt, kèm các dòng giải thích thụt lề. */
+/** Ghi ca lỗi và giữ chi tiết để `run.js` in ở cuối lượt. */
 function ghiTruot(so, label, chiTiet) {
   so.failed += 1;
   so.failures.push(label);
-  console.log('  ❌ ' + label);
-  (chiTiet || []).forEach((dong) => console.log('     ' + dong));
+  so.failureDetails.push(chiTiet || []);
+  if (process.argv.includes('--verbose')) {
+    console.log('  ❌ ' + label);
+    (chiTiet || []).forEach((dong) => console.log('     ' + dong));
+  }
 }
 
 /**
