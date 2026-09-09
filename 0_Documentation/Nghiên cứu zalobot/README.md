@@ -1,19 +1,20 @@
 # Zalobot tra cứu ShinCRM (kiến trúc Google Sheet)
 
-Tài liệu này cô đọng kết quả đọc các tệp `.txt` trong thư mục nghiên cứu Zalobot cũ và chuyển chúng sang kiến trúc hiện tại. Bản cũ là một ứng dụng Termux + proxy + FBM; bản mới chỉ nhận câu hỏi từ Zalo và đọc dữ liệu đã có trong Google Sheet ShinCRM.
+Tài liệu này cô đọng kết quả đọc các tệp `.txt` trong thư mục nghiên cứu Zalobot cũ và chuyển chúng sang kiến trúc hiện tại. Bản cũ là một ứng dụng Termux + proxy + FBM; bản mới dùng Zalo làm giao diện văn bản và Google Sheet ShinCRM làm nguồn dữ liệu. Bot được phép đọc và ghi, nhưng không có mini app, nút inline hay callback như Telegram.
 
 ## Kết luận kiến trúc
 
 ```text
 Zalo Platform
     -> webhook GAS (doPost)
-    -> kiểm tra request, chat_id và lệnh
+    -> kiểm tra request, quyền và trạng thái hội thoại theo chat_id
     -> BotQuery đọc Customer/Activity từ Google Sheet
-    -> BotFormatter tạo một hoặc nhiều tin nhắn
+    -> BotFormatter tạo tin nhắn chữ, menu số hoặc bản xem trước
+    -> BotWrite gọi WriteGate/DeleteGate khi người dùng xác nhận
     -> Zalo Bot API (sendMessage)
 ```
 
-Bot là mặt đọc dữ liệu, không phải cửa ghi của ShinCRM. Bot không sửa `Customer`, `Activity`, `Category` hay `Config`; chỉ được ghi log qua cơ chế log dùng chung.
+Bot không ghi trực tiếp bằng `SpreadsheetApp`. Mọi thay đổi nghiệp vụ phải đi qua cửa ghi chung của ShinCRM để dùng cùng khóa, kiểm tra, cấp mã, định dạng và đọc lại sau khi ghi.
 
 ## Những gì giữ lại từ code cũ
 
@@ -53,6 +54,45 @@ Nguồn chuẩn là `1_ShinCRM_GAS/server/data/DataSchema.js`, không phải tê
 5. `BotFormatter` tạo tin nhắn thuần văn bản, giới hạn số khách/hoạt động theo cấu hình. Dữ liệu rỗng hiển thị bằng nhãn dễ hiểu; không đưa mã cột `@...` vào tin nhắn.
 6. Gửi từng tin qua Zalo API. Lỗi API không làm lộ chi tiết kỹ thuật cho người dùng; ghi `source = bot` và trả thông báo thử lại.
 
+## Hội thoại văn bản nhiều bước
+
+Webhook không giữ được biến giữa hai tin nhắn, nên cần `BotState` lưu theo `chat_id` trong `PropertiesService` (kèm `LockService`), hoặc một sheet trạng thái riêng nếu sau này cần xem thủ công. Không lưu cả bản sao khách; chỉ lưu mã và bản nháp nhỏ.
+
+Trạng thái tối thiểu:
+
+```text
+IDLE
+  -> CHOOSE_CUSTOMER      (đang có danh sách ứng viên)
+  -> VIEW_CUSTOMER        (đang xem một khách)
+  -> CHOOSE_FIELD         (đang chọn trường cần sửa)
+  -> ENTER_VALUE          (đang chờ giá trị mới)
+  -> CONFIRM_SAVE         (đang chờ LƯU hoặc HỦY)
+  -> IDLE
+```
+
+State gồm `chatId`, `mode`, danh sách `candidateIds`, `selectedId`, `entity`, `field`, `draft`, dấu vân tay bản ghi lúc mở, `updatedAt` và thời điểm hết hạn. TTL đề xuất 15 phút; hết hạn thì xóa state và yêu cầu tìm lại.
+
+Ví dụ luồng sửa khách:
+
+1. Người dùng gửi `Nguyễn Ánh`. Bot trả danh sách hoặc một khách, mỗi lựa chọn có số thứ tự và mã khách.
+2. Người dùng gửi `1`. Router hiểu đây là chọn ứng viên vì state đang là `CHOOSE_CUSTOMER`, không hiểu là một truy vấn số.
+3. Bot trả chi tiết và menu chữ: `Sửa: 1 Tên công ty, 2 MST, 3 Điện thoại, 0 Hủy`.
+4. Người dùng gửi `3`; bot chuyển sang `ENTER_VALUE` và chỉ rõ đang chờ số điện thoại mới.
+5. Người dùng gửi giá trị mới; bot hiển thị bản xem trước `cũ -> mới` và yêu cầu gõ chính xác `LƯU` hoặc `HỦY`.
+6. Khi nhận `LƯU`, bot đọc lại bản ghi theo `selectedId`, kiểm tra bản ghi chưa bị xóa và phát hiện nếu người khác vừa sửa. Sau đó gửi bản ghi một phần theo tên trường tới `writeGateSave` với nguồn `bot`.
+7. Chỉ khi cửa ghi trả `ok: true` và dòng đọc lại thành công thì bot mới báo đã lưu, xóa state và hiển thị dữ liệu mới. Lỗi kiểm tra giữ bản nháp để người dùng sửa lại.
+
+Số thứ tự chỉ có nghĩa trong state hiện tại. Tin `1` ở `IDLE` là từ khóa tìm kiếm; tin `1` ở `CHOOSE_FIELD` là tên trường. `/huy` luôn xóa state và không ghi gì. Không dùng Markdown button, `callback_query`, URL mini app hoặc giả định người dùng có thể gửi loại sự kiện khác văn bản.
+
+## Ghi qua cửa chung
+
+- Mở rộng `WRITE_GATE_SOURCES` thêm `bot`. Nguồn `bot` dùng đúng các kiểm tra của nguồn `user` (`required`, `unique`, `validate`, SELECT, kiểu dữ liệu), không được là đường tắt.
+- `writeGateBuild` phải coi `bot` là nguồn người dùng khi kiểm tra giá trị; log vẫn ghi nguồn thật là `bot`.
+- `BotWriteService` gọi `runEntryPoint(..., 'bot', ...)`, dựng `{ entity, records: [record], source: 'bot' }` và gọi `writeGateSave`. Không gọi `setValue`, `appendRow` hay sửa `recordStatus` trực tiếp.
+- Khi sửa, bản ghi gửi lên chỉ gồm `id` và trường người dùng vừa xác nhận. Cửa ghi đọc hàng hiện tại và giữ nguyên mọi trường không gửi.
+- Khi thêm hoạt động, `customerId` phải lấy từ `selectedId` đã xác minh ở server, không nhận mã khách tùy ý từ tin nhắn. Chức năng thêm mới nên làm sau khi luồng sửa đã ổn định.
+- Xóa chỉ triển khai sau; nếu có thì phải là lệnh riêng, xem trước, yêu cầu xác nhận lần hai và gọi `deleteRecords`/`DeleteGate`, không xóa dòng trực tiếp.
+
 ## Hành vi trả lời
 
 - `/help`: cú pháp bốn lệnh và ví dụ ngắn.
@@ -61,10 +101,18 @@ Nguồn chuẩn là `1_ShinCRM_GAS/server/data/DataSchema.js`, không phải tê
 - Nhiều kết quả: hiển thị tối đa `BOT_MAX_RESULTS`, mỗi dòng phải có mã khách và tên; hướng dẫn nhập `/mkh <mã>` để thu hẹp.
 - Tin nhắn dài phải tách ở ranh giới khách/hoạt động. Nếu một mục đơn lẻ vượt giới hạn thì cắt phần ghi chú dài và ghi rõ đã rút gọn.
 
+## Kết nối Zalo theo tài liệu chính thức
+
+- Mọi API gọi tới `https://bot-api.zaloplatforms.com/bot${BOT_TOKEN}/${functionName}` qua HTTPS. `getMe` dùng kiểm tra token; tên phương thức phân biệt hoa thường.
+- API hỗ trợ GET và POST cùng các dạng tham số query string, form, JSON và multipart. Dùng GET cho truy xuất, POST cho gửi/cập nhật; bot của ta gửi `sendMessage` bằng POST JSON.
+- Mọi phản hồi là JSON gồm `ok`, `result`, `description`, `error_code`. `ok = false` phải được ghi log và chuyển thành câu lỗi chung.
+- Webhook là POST JSON với header `X-Bot-Api-Secret-Token`. Phải so sánh chính xác header này trước khi parse và xử lý `result`; thiếu hoặc sai trả HTTP 403.
+- Các sự kiện tối thiểu cần xử lý là `message.text.received`; các sự kiện ảnh/sticker/không hỗ trợ chỉ trả lời rằng bot nhận văn bản.
+
 ## An toàn và quan sát
 
 - Không đặt bot token, secret webhook, allowlist hoặc dữ liệu xác thực trong tệp `.js` đã commit. Không ghi password, cookie, token hay toàn bộ payload tin nhắn vào `Log`.
-- `secret_token` khi đăng ký webhook phải được kiểm tra ở nơi GAS thực sự đọc được (header hoặc payload). Nếu môi trường GAS không cung cấp header đó, không coi việc đăng ký secret là đủ bảo vệ; allowlist vẫn bắt buộc.
+- `X-Bot-Api-Secret-Token` phải được kiểm tra trước khi xử lý theo đúng tài liệu Zalo. Nếu `doPost(e)` của GAS không đọc được header trong triển khai thực tế, phải chặn triển khai và dùng một lớp nhận webhook có thể kiểm tra header; không hạ xuống chỉ dựa vào URL `/exec`.
 - Dùng `LogGate` hiện tại; thêm nguồn `bot` vào danh mục `LOG_TRACE` khi triển khai. Mặc định tắt log chi tiết, chỉ bật tạm trên Sheet DEV.
 - Không trả stack trace, tên sheet, chỉ số hàng/cột hoặc thông tin quyền truy cập cho Zalo.
 - Giới hạn kích thước từ khóa và số dòng đọc để một tin nhắn không làm vượt thời gian chạy Apps Script. Khi vượt giới hạn, trả thông báo thu hẹp từ khóa thay vì đọc thêm vô hạn.
@@ -73,20 +121,23 @@ Nguồn chuẩn là `1_ShinCRM_GAS/server/data/DataSchema.js`, không phải tê
 
 - `server/bot/BotEntry.js`: `doPost`, router và handler; không chứa truy vấn sheet.
 - `server/bot/BotAccess.js`: đọc allowlist và kiểm tra request; fail closed.
-- `server/bot/BotQuery.js`: đọc schema, tìm khách, lấy hoạt động; chỉ đọc.
+- `server/bot/BotState.js`: lưu trạng thái hội thoại theo `chat_id`, TTL, khóa và chống xử lý lặp.
+- `server/bot/BotQuery.js`: đọc schema, tìm khách, lấy hoạt động và đọc lại bản ghi; chỉ đọc.
 - `server/bot/BotFormat.js`: định dạng kết quả và tách tin nhắn; không gọi `SpreadsheetApp`.
+- `server/bot/BotWriteService.js`: chuyển bản nháp đã xác nhận sang `WriteGate`/`DeleteGate`.
 - `server/bot/ZaloApi.js`: gọi API Zalo và che lỗi; token lấy từ cấu hình bí mật.
 
 Tên tệp chỉ là đề xuất để chuẩn bị code; khi tạo thật phải cập nhật `0_Documentation/Phiên code/Cây thư mục code.md` trong cùng lượt.
 
 ## Kiểm thử trước khi dùng thật
 
-- Offline: parser lệnh, chuẩn hóa tìm kiếm, lọc `deleted`, nối Activity, nhánh 0/1/n kết quả và tách tin nhắn 2.000 ký tự.
-- Google DEV: đọc đúng mã cột dù đổi thứ tự cột, không trả khách đã xóa, sheet rỗng không lỗi, và không ghi gì ngoài `Log`.
-- Webhook: request thiếu trường, event không hỗ trợ, chat ngoài allowlist, lỗi Zalo API và từ khóa chứa ký tự đặc biệt đều phải fail closed.
+- Offline: parser lệnh, state transition, hết hạn, `/huy`, tin số trong từng trạng thái, ứng viên cũ, tin gửi lặp, chuẩn hóa tìm kiếm và nhánh 0/1/n.
+- Offline cửa ghi: `bot` không bypass kiểm tra, bản ghi một phần không xóa trường khác, giá trị sai không ghi, và mã khách không thuộc state bị từ chối.
+- Google DEV: đổi thứ tự cột vẫn đọc/ghi đúng, khách `deleted` không xuất hiện, sheet rỗng không lỗi, ghi xong đọc lại đúng và chỉ có dữ liệu dự kiến cùng `Log` thay đổi.
+- Webhook: request thiếu trường, event không hỗ trợ, chat ngoài allowlist, không có quyền ghi, lỗi Zalo API và từ khóa chứa ký tự đặc biệt đều fail closed.
 - Chỉ đăng ký webhook và thử gửi tin sau khi thay token/secret mẫu bằng giá trị bí mật của môi trường DEV; không dùng dữ liệu khách thật trong giai đoạn này.
 
 ## Nguồn đã đối chiếu
 
 - Code cũ: `Main.txt`, `SearchLogic.txt`, `Formatter.txt`, `ZaloAPI.txt`, `LogService.txt`, `FBMAuth.txt`, `FBMQuery.txt`, `SessionManager.txt`.
-- Code hiện tại: `server/data/DataSchema.js`, `server/data/SheetLayout.js`, `server/sheet/EntityRead.js`, `server/sheet/SheetIo.js`, `server/util/TextNormalize.js`.
+- Code hiện tại: `server/data/DataSchema.js`, `server/data/SheetLayout.js`, `server/sheet/EntityRead.js`, `server/sheet/SheetIo.js`, `server/gate/WriteGate.js`, `server/gate/DeleteGate.js`, `server/service/SaveService.js`, `server/util/TextNormalize.js`.
