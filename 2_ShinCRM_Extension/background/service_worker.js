@@ -15,6 +15,18 @@ function findFbmTab() {
   return chrome.tabs.query({ url: ['https://fbo.com.vn:8888/*'] }).then(function (tabs) { return tabs && tabs.length ? tabs[0] : null; });
 }
 
+/** Đặt heartbeat sau khi worker đã đăng ký listener; tránh lỗi khởi động làm mất toàn bộ đầu nhận. */
+function scheduleHeartbeat() {
+  try {
+    if (chrome.alarms && chrome.alarms.create) {
+      var result = chrome.alarms.create('fbm-heartbeat', { periodInMinutes: 5 });
+      if (result && typeof result.catch === 'function') { result.catch(function (err) { console.warn('Không đặt được heartbeat FBM:', err); }); }
+    }
+  } catch (err) {
+    console.warn('Không đặt được heartbeat FBM:', err);
+  }
+}
+
 /** Định tuyến request từ Sidebar tới đúng tab FBM, không xử lý dữ liệu nghiệp vụ. */
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   if (!message || message.type !== 'FBM_EXECUTE_REQUEST') { return false; }
@@ -29,9 +41,9 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
 });
 
 /** Khởi tạo heartbeat khi Extension cài mới hoặc Chrome khởi động. */
-chrome.runtime.onInstalled.addListener(function () { chrome.alarms.create('fbm-heartbeat', { periodInMinutes: 5 }); });
-chrome.runtime.onStartup.addListener(function () { chrome.alarms.create('fbm-heartbeat', { periodInMinutes: 5 }); });
-chrome.alarms.create('fbm-heartbeat', { periodInMinutes: 5 });
+chrome.runtime.onInstalled.addListener(scheduleHeartbeat);
+chrome.runtime.onStartup.addListener(scheduleHeartbeat);
+scheduleHeartbeat();
 /** Gửi request đọc tối thiểu; không gửi thao tác ghi từ alarm. */
 chrome.alarms.onAlarm.addListener(function (alarm) {
   if (!alarm || alarm.name !== 'fbm-heartbeat') { return; }

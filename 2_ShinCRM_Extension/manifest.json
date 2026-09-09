@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "CRM Local Pro V21.2",
-  "version": "21.3",
+  "version": "21.4",
   "description": "CRM Google Sheet - Local Mode (No Server Lag)",
   "permissions": ["activeTab", "scripting", "tabs", "alarms", "storage"],
   "host_permissions": ["https://docs.google.com/spreadsheets/*", "https://fbo.com.vn:8888/*"],

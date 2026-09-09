@@ -35,6 +35,18 @@ var sidebarOrigin = '';
 var sidebarNonce = '';
 var extensionSessionId = Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 
+/** Retry một lần khi worker vừa thức dậy nhưng chưa nhận listener kịp. */
+function sendRequestToWorker(message, done, attempt) {
+  chrome.runtime.sendMessage(message, function (reply) {
+    var error = chrome.runtime.lastError;
+    if (error && attempt < 1 && /Receiving end does not exist/i.test(error.message || '')) {
+      setTimeout(function () { sendRequestToWorker(message, done, attempt + 1); }, 150);
+      return;
+    }
+    done(error, reply);
+  });
+}
+
 function isAllowedSidebarOrigin(origin) {
   for (var i = 0; i < SIDEBAR_ORIGIN_ALLOWLIST.length; i++) {
     if (SIDEBAR_ORIGIN_ALLOWLIST[i].test(origin)) { return true; }
@@ -48,8 +60,7 @@ window.addEventListener('message', function (event) {
   if (data && data.action === 'CRM_FBM_REQUEST') {
     // Chuyển nguyên request qua service worker; bridge không phân tích response FBM.
     if (!isAllowedSidebarOrigin(event.origin) || event.source !== sidebarWindow || String(data.nonce || '') !== sidebarNonce) { return; }
-    chrome.runtime.sendMessage({ type: 'FBM_EXECUTE_REQUEST', id: data.id, request: data.request }, function (reply) {
-      var error = chrome.runtime.lastError;
+    sendRequestToWorker({ type: 'FBM_EXECUTE_REQUEST', id: data.id, request: data.request }, function (error, reply) {
       try { event.source.postMessage({ action: 'CRM_FBM_RESPONSE', nonce: sidebarNonce, id: data.id, result: error ? null : (reply && reply.result), error: error ? error.message : (reply && reply.error) }, event.origin); } catch (err) { sidebarWindow = null; sidebarOrigin = ''; sidebarNonce = ''; }
     });
     return;
