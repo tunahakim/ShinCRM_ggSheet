@@ -64,6 +64,16 @@ async function chay(so) {
   const previewState = { metadata: {} };
   orchestration.FbmSync.previewRecords(previewState, 'customer', [{ fbmCustomerCode: 'ALT00010', companyName: 'Test', fbmId: 'A1' }]);
   check(so, 'preview luu ma va ten Customer doc tu FBM', previewState.metadata.preview.customers[0].code, 'ALT00010');
+  const pullStatus = orchestration.FbmSync.stateRead();
+  pullStatus.phase = 'pull_customer'; pullStatus.entity = 'customer'; pullStatus.mode = 'read'; orchestration.FbmSync.stateWrite(pullStatus);
+  const pullView = orchestration.FbmSync.statusView();
+  check(so, 'status noi ro chieu FBM ve ShinCRM', pullView.direction, 'FBM → ShinCRM');
+  check(so, 'status noi ro dang dong bo khach hang', pullView.entityLabel, 'Khách hàng');
+  const pushStatus = orchestration.FbmSync.stateRead();
+  pushStatus.phase = 'push'; pushStatus.entity = 'activity'; pushStatus.mode = 'write'; orchestration.FbmSync.stateWrite(pushStatus);
+  const pushView = orchestration.FbmSync.statusView();
+  check(so, 'status noi ro chieu ShinCRM sang FBM', pushView.direction, 'ShinCRM → FBM');
+  check(so, 'status noi ro dang dong bo giao dich', pushView.entityLabel, 'Giao dịch');
 
   const guards = taoHopCat({ FbmSync: {}, PropertiesService: { getScriptProperties: () => ({ getProperty: () => '' }), getDocumentProperties: () => ({ getProperty: () => null, setProperty: () => {} }) } });
   napServer(guards, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/transport/Transport.js');

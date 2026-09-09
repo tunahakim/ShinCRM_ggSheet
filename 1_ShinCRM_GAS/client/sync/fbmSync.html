@@ -1,6 +1,6 @@
 <script>
 /* Sidebar chỉ hiển thị tiến độ; GAS là nguồn state duy nhất. */
-var FBM_SYNC_CLIENT = { installed: false, waiting: {}, timer: null, running: false };
+var FBM_SYNC_CLIENT = { installed: false, waiting: {}, running: false };
 /** Timeout cho một request Extension để phiên không treo vô hạn khi tab FBM/bridge mất kết nối. */
 var FBM_SYNC_REQUEST_TIMEOUT_MS = 20000;
 
@@ -26,6 +26,7 @@ function fbmSyncPaint(status) {
   panel.hidden = false; panel.textContent = '';
   var title = document.createElement('div'); title.className = 'shin-sync-title'; title.textContent = 'Đồng bộ FBM'; panel.appendChild(title);
   var phase = document.createElement('div'); phase.className = 'shin-sync-phase'; phase.textContent = status.label || status.phase || ''; panel.appendChild(phase);
+  var operation = document.createElement('div'); operation.className = 'shin-sync-operation'; operation.textContent = 'Luồng: ' + String(status.direction || 'Chưa xác định') + ' · Đối tượng: ' + String(status.entityLabel || 'Tổng hợp'); panel.appendChild(operation);
   if (status.session) { var session = document.createElement('div'); session.className = 'shin-sync-session'; session.textContent = 'Phiên FBM: Customer ' + (status.session.customer ? 'OK' : 'chưa có') + ' · Activity ' + (status.session.activity ? 'OK' : 'chưa có'); panel.appendChild(session); }
   var count = status.counts || {};
   var counts = document.createElement('div'); counts.className = 'shin-sync-count'; counts.textContent = 'Đã xử lý ' + Number(count.completed || 0) + ' · thành công ' + Number(count.succeeded || 0) + ' · lỗi ' + Number(count.error || 0) + ' · xung đột ' + Number(count.conflict || 0) + ' · hoãn ' + Number(count.skipped || 0); panel.appendChild(counts);
@@ -33,9 +34,8 @@ function fbmSyncPaint(status) {
   if (status.message) { var message = document.createElement('div'); message.className = 'shin-sync-message'; message.textContent = String(status.message); panel.appendChild(message); }
   fbmSyncPaintPreview(panel, status.metadata && status.metadata.preview);
   var actions = document.createElement('div'); actions.className = 'shin-sync-actions';
-  actions.appendChild(fbmSyncMakeButton('fbm-sync-start', 'Đồng bộ ngay', true));
-  if (status.phase && ['idle', 'done', 'error'].indexOf(status.phase) === -1) { actions.appendChild(fbmSyncMakeButton('fbm-sync-cancel', 'Dừng đồng bộ', false)); }
-  actions.appendChild(fbmSyncMakeButton('fbm-sync-status', 'Cập nhật trạng thái', false));
+  var active = ['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(status.phase) >= 0;
+  actions.appendChild(fbmSyncMakeButton(active ? 'fbm-sync-cancel' : 'fbm-sync-start', active ? 'Dừng đồng bộ' : 'Đồng bộ ngay', !active));
   panel.appendChild(actions);
 }
 /** Render only bounded, read-only fields returned by the GAS preview snapshot. */
@@ -45,13 +45,14 @@ function fbmSyncPaintPreview(panel, preview) {
   if (!customers.length && !activities.length) { return; }
   var box = document.createElement('div'); box.className = 'shin-sync-preview';
   var title = document.createElement('div'); title.className = 'shin-sync-preview-title'; title.textContent = 'Dữ liệu đã đọc'; box.appendChild(title);
+  var list = document.createElement('div'); list.className = 'shin-sync-preview-list'; box.appendChild(list);
   customers.forEach(function (item) {
     var row = document.createElement('div'); row.className = 'shin-sync-preview-row';
-    row.textContent = 'Khách: ' + (item.code || '(không có mã)') + ' · ' + (item.name || '(không có tên)'); box.appendChild(row);
+    row.textContent = 'Khách: ' + (item.code || '(không có mã)') + ' · ' + (item.name || '(không có tên)'); list.appendChild(row);
   });
   activities.forEach(function (item) {
     var row = document.createElement('div'); row.className = 'shin-sync-preview-row';
-    row.textContent = 'Giao dịch: ' + (item.date || '(không có ngày)') + ' · ' + (item.type || '(không có loại)') + ' · ' + (item.content || '(trống)'); box.appendChild(row);
+    row.textContent = 'Giao dịch: ' + (item.date || '(không có ngày)') + ' · ' + (item.type || '(không có loại)') + ' · ' + (item.content || '(trống)'); list.appendChild(row);
   });
   if (preview.truncated) { var more = document.createElement('div'); more.className = 'shin-sync-preview-more'; more.textContent = 'Preview đã giới hạn số dòng.'; box.appendChild(more); }
   panel.appendChild(box);
@@ -69,13 +70,12 @@ function fbmSyncInstall() {
     if (data.error) { waiter.reject(new Error(data.error)); } else { waiter.resolve(data.result); }
   });
   document.addEventListener('click', function (event) {
-    var target = event.target && event.target.closest ? event.target.closest('#fbm-sync-back, #fbm-sync-start, #fbm-sync-cancel, #fbm-sync-status') : null;
+    var target = event.target && event.target.closest ? event.target.closest('#fbm-sync-back, #fbm-sync-start, #fbm-sync-cancel') : null;
     if (!target) { return; }
     event.preventDefault();
     if (target.id === 'fbm-sync-back') { syncScreenClose(); }
     else if (target.id === 'fbm-sync-start') { fbmSyncRun('read'); }
     else if (target.id === 'fbm-sync-cancel') { fbmSyncCancel(); }
-    else { fbmSyncStatusOnce(); }
   });
 }
 /** Close the screen while keeping orchestration alive. */
@@ -130,10 +130,5 @@ function fbmSyncRun(mode) {
       return null;
     });
   });
-}
-/** Poll status thưa chỉ trong lúc có phiên hoạt động. */
-function fbmSyncStartPolling() {
-  if (FBM_SYNC_CLIENT.timer) { return; }
-  FBM_SYNC_CLIENT.timer = setInterval(function () { if (FBM_SYNC_CLIENT.running) { fbmSyncStatusOnce(); } }, 3000);
 }
 </script>
