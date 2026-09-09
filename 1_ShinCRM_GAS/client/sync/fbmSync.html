@@ -147,6 +147,14 @@ function fbmSyncStatusOnce(freshOpen) { return callServer('fbmGetSyncStatus').th
 function fbmSyncSetWriteGate(enabled) {
   return callServer('fbmSetWriteMode', [enabled === true]).then(function (result) { FBM_SYNC_CLIENT.writeAllowed = !!(result && result.enabled); return fbmSyncStatusOnce(); });
 }
+/** Thử lại một lần khi chính hạ tầng Apps Script chưa đọc được mã dự án. */
+function fbmSyncStartServer(mode, attempt) {
+  return callServer('fbmStartSync', [mode]).catch(function (err) {
+    var message = String(err && err.message || err || '');
+    if (Number(attempt || 0) < 1 && /DEADLINE_EXCEEDED|đọc từ bộ nhớ/i.test(message)) { return fbmSyncStartServer(mode, Number(attempt || 0) + 1); }
+    throw err;
+  });
+}
 /** Dừng phiên ở GAS và hủy vòng chạy phía Sidebar. */
 function fbmSyncCancel() {
   FBM_SYNC_CLIENT.running = false;
@@ -171,7 +179,7 @@ function fbmSyncRun(mode) {
   }
   FBM_SYNC_CLIENT.running = true;
   fbmSyncPaint({ phase: 'checking_session', label: 'Đang chuẩn bị đồng bộ', direction: 'Kết nối FBM', entityLabel: 'Chuẩn bị phiên', message: 'Đang chuẩn bị phiên đồng bộ...', counts: {} });
-  var work = callServer('fbmStartSync', [mode || 'read']).then(function (started) {
+  var work = fbmSyncStartServer(mode || 'read', 0).then(function (started) {
     if (!started || !started.ok) {
       FBM_SYNC_CLIENT.running = false;
       if (started && started.status) { fbmSyncPaint(started.status); }

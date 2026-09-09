@@ -68,6 +68,9 @@ async function chay(so) {
   check(so, 'start bat dau bang bootstrap Customer', started.request.meta.kind, 'authorize');
   check(so, 'bootstrap dung viewPage false', started.request.body.viewPage, false);
   check(so, 'bootstrap khong gui authorized cu', started.request.body.authorized, null);
+  const resumed = orchestration.FbmSync.start({ mode: 'read' });
+  check(so, 'start thu lai tiep tuc dung authorize Customer ban dau', [resumed.ok, resumed.resumed, resumed.request.meta.entity], [true, true, 'customer']);
+  check(so, 'lookup san pham dung controller FBM that', orchestration.FbmSync.SYNC_LOOKUPS.filter((item) => item.key === '@CAT_SAN_PHAM')[0].controller, 'crdmsp');
   const previewState = { metadata: {} };
   orchestration.FbmSync.previewRecords(previewState, 'customer', [{ fbmCustomerCode: 'ALT00010', companyName: 'Test', fbmId: 'A1' }]);
   check(so, 'preview luu ma va ten Customer doc tu FBM', previewState.metadata.preview.customers[0].code, 'ALT00010');
