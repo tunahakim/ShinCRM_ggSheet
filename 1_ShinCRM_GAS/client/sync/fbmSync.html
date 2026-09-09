@@ -138,7 +138,11 @@ function fbmSyncRun(mode) {
   }
   FBM_SYNC_CLIENT.running = true;
   var work = callServer('fbmStartSync', [mode || 'read']).then(function (started) {
-    if (!started || !started.ok) { if (started && started.status) { fbmSyncPaint(started.status); } throw new Error((started && started.code) || 'Không thể bắt đầu đồng bộ.'); }
+    if (!started || !started.ok) {
+      FBM_SYNC_CLIENT.running = false;
+      if (started && started.status) { fbmSyncPaint(started.status); }
+      return started || { ok: false };
+    }
     return fbmSyncLoop(started);
   });
   return work.then(function (value) { FBM_SYNC_CLIENT.running = false; return value; }, function (err) {
