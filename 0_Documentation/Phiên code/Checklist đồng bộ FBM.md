@@ -1,328 +1,274 @@
 # Checklist phiên đồng bộ FBM
 
-Tệp này là bảng điều khiển duy nhất của phiên đồng bộ FBM/ShinCRM. Nguồn chuẩn là tài liệu 09, hợp đồng 09A và bộ `0_Documentation/Nghiên cứu FBM/`. Live test chỉ được chạm khách `ALT00010`, không gửi request xóa FBM và không đưa ghi chú nội bộ ShinCRM lên FBM. Cập nhật lần cuối 09/09/2026.
+Đây là checklist duy nhất của phiên đồng bộ FBM/ShinCRM. Công việc được thực hiện theo thứ tự từ trên xuống dưới; trong một slice, các mục độc lập có thể làm song song. Chỉ mục có nhãn **Cần kiểm chứng thực tế** mới cần chủ dự án giữ tab FBM, đăng nhập, bật ghi thật hoặc kiểm tra dữ liệu live. Live test chỉ được chạm `ALT00010`, tuyệt đối không gửi request xóa và không đưa `note` nội bộ ShinCRM lên FBM.
 
-## Cách đọc dấu tích
+## Quy ước tiến độ
 
-- `[x]` chỉ có nghĩa là mục đó đã đạt đúng mức bằng chứng ghi trong dòng: code, test offline hoặc live test.
-- `[ ]` nghĩa là còn thiếu code, thiếu kiểm thử phù hợp hoặc chưa có bằng chứng live; có builder không đồng nghĩa pipeline đã dùng được.
-- Bộ kiểm offline hiện đạt `954/954`; live test đã đọc đúng `ALT00010` và một Activity, nhưng chưa có request ghi FBM nào được xác nhận thành công.
-- Lần chạy Ghi thật gần nhất đã ghi được một bản ghi pull vào ShinCRM rồi tạm dừng trước chiều push vì cổng danh mục nhận nhầm `@CAT_NHOM_KH_FBM`. Bản sửa đã có ở local, chưa được đẩy lên GAS và chưa live test lại.
+- `[x]` chỉ đánh dấu khi có bằng chứng tương ứng: code, test offline, GAS DEV hoặc kiểm chứng thực tế.
+- `[ ]` là việc còn thiếu; mục không có nhãn **Cần kiểm chứng thực tế** là việc AI tự tiếp tục được.
+- Một slice chỉ đóng sau khi đủ code, test, log/báo cáo và checklist case của slice đó.
+- Sau khi đóng slice, ghi commit và revision GAS vào bảng bằng chứng cuối file.
+- Bộ kiểm offline gần nhất đạt `954/954`; phần đọc `ALT00010` và một Activity đã từng kiểm chứng, chiều ghi chưa có kết quả thành công được xác nhận.
 
-## A. Tất cả điều kiện để đồng bộ hoạt động thành công
+## Slice 0 — Nền tảng, ranh giới và an toàn
 
-### A1. Ranh giới và an toàn
+### Kiến trúc và dữ liệu nhạy cảm
 
-- [x] GAS giữ toàn bộ nghiệp vụ, cursor, hash và quyết định; Extension chỉ vận chuyển request/response thô; Sidebar chỉ khởi chạy và hiển thị.
-- [x] Mỗi lượt GAS–Extension trao đổi đúng một request; chuỗi tạo/sửa nhiều bước nằm trong `DocumentProperties`, không nằm trong Extension.
-- [x] `fetch` FBM chạy trong content script của tab `fbo.com.vn`, nên dùng đúng IP Việt Nam, cookie và `Referer` của tab.
-- [x] Cờ ghi thật mặc định tắt; chế độ Đọc thử không ghi Sheet và không ghi FBM.
-- [x] Không có builder, endpoint hoặc action xóa FBM; test offline canh ràng buộc này.
-- [x] `note` của Customer là ghi chú nội bộ ShinCRM và không xuất hiện trong memvars Customer gửi FBM.
-- [x] Có giới hạn live test mặc định `FBM_SYNC_TEST_CUSTOMER_CODE=ALT00010` ở đường đọc Customer và đường chọn ứng viên push.
-- [x] Loại bản ghi mang mã `TMP-` khỏi mọi kỳ quét ở cả hai chiều; đã có cổng fail-closed và kiểm offline.
-- [ ] Mọi lát chỉ dùng đúng một lời gọi cửa ghi và một khóa tài liệu; đường pull hiện có thể gọi riêng lượt ghi nội dung và lượt ghi trạng thái.
-- [ ] Module không mở/ghi sheet thô; `CategorySync.js` hiện vẫn tự gọi `getRange/setValues` thay vì đi qua tầng ghi lõi.
-- [ ] `ScriptProperties` chỉ giữ khóa Web App như hợp đồng 09A; code tạm hiện còn dùng nơi này cho cờ ghi, giới hạn test và fallback cấu hình.
+- [x] GAS giữ nghiệp vụ, cursor, hash, conflict và quyết định; Extension chỉ tìm tab FBM, gọi `fetch` và trả response thô; Sidebar chỉ khởi chạy và hiển thị.
+- [x] Mỗi lượt GAS–Extension trao đổi một request hoàn chỉnh; chuỗi nhiều bước nằm trong `DocumentProperties`, không nằm trong Extension.
+- [x] `fetch` FBM chạy trong content script của tab `fbo.com.vn`, dùng IP, cookie và `Referer` của tab.
+- [x] Cờ ghi thật mặc định tắt; Đọc thử không ghi Sheet và không ghi FBM.
+- [x] Không có builder, endpoint hoặc action xóa FBM; test offline chặn mọi đường Delete.
+- [x] `note` Customer là ghi chú nội bộ ShinCRM và không xuất hiện trong memvars gửi FBM.
+- [x] Giới hạn live mặc định là `FBM_SYNC_TEST_CUSTOMER_CODE=ALT00010` ở đường đọc và đường chọn ứng viên push.
+- [x] Bản ghi mã `TMP-` bị loại khỏi mọi kỳ quét ở cả hai chiều.
+- [ ] Mỗi lát chỉ có một lời gọi cửa ghi và một khóa tài liệu; pull hiện còn có thể ghi nội dung và trạng thái thành hai lượt.
+- [ ] `CategorySync.js` đi qua tầng ghi lõi thay vì tự gọi `getRange/setValues`.
+- [ ] `ScriptProperties` chỉ giữ khóa Web App; cờ ghi, giới hạn test và cấu hình phải chuyển về nơi đúng vòng đời.
 
-### A2. Môi trường chạy và triển khai
+### Extension, transport và khóa
 
-- [x] Extension repo có host permission `https://fbo.com.vn:8888/*`, content script FBM, service worker và cơ chế tự nạp lại executor khi mất đầu nhận.
-- [x] Live test đã chứng minh Sidebar → Extension → tab FBM → Sidebar đọc được response thật.
-- [x] Extension đang dùng có executor báo phiên bản `21.7`; ca reload Extension rồi tự phục hồi đầu nhận đã được kiểm.
-- [ ] Đẩy bản sửa cổng Category và `Probe.js` lên GAS bằng `--push`, rồi ghi revision mới vào checklist.
-- [ ] Tải lại Extension lần cuối sau khi toàn bộ code Extension của phiên đã chốt.
-- [ ] Trước mỗi live test, tab `zccrAccount.aspx` phải đang mở, đăng nhập đúng tài khoản và không có lần login mới từ thiết bị khác.
-- [ ] Xác nhận `Config` có đúng `FBM_ACCOUNT_NAME`, `FBM_MA_KH_PREFIX`, `FBM_MA_KH_LENGTH`, `FBM_ACTIVITY_SINCE` và không khai trùng.
-- [ ] Xác nhận `FBM_ACCOUNT_NAME` khớp owner mặc định mà form FBM thật trả về, không chỉ kiểm nó khác rỗng.
-- [ ] Tạo khóa dùng chung, Web App URL và cấu hình Extension theo từng spreadsheet để đồng bộ chạy khi Sidebar đóng.
-- [ ] Cài scheduler thật và kiểm tra không tạo trigger trùng.
-- [ ] Trước khi đưa dữ liệu thật vào: tắt `LOG_TRACE`, tắt chia sẻ bằng liên kết, xóa `server/dev/`, tệp `.dev-runner.json` và deployment DEV theo checklist Giai đoạn 1.
+- [x] Extension có host permission `https://fbo.com.vn:8888/*`, content script FBM, service worker và cơ chế nạp lại executor.
+- [x] Đã kiểm chứng đường Sidebar → Extension → tab FBM → Sidebar nhận response thật.
+- [x] Executor báo phiên bản `21.7`; reload Extension có thể phục hồi đầu nhận.
+- [x] Request authorized Customer dùng `viewPage:false`, `authorized:null`, `values:[]` và ba vars đúng hợp đồng.
+- [x] Request authorized Activity dùng controller riêng và hai vars đúng hợp đồng.
+- [x] Đã kiểm chứng thực tế việc nhận được authorized Customer và Activity của phiên FBM đang mở.
+- [x] Cookie payload và `userId` lấy từ tab/response, không tự đăng nhập bằng mật khẩu.
+- [x] HTTP status, body lỗi, `Bugs` và lỗi parse được chuyển thành lỗi có cấu trúc; log không ghi cookie/payload.
+- [x] Mất content script được ping rồi tiêm lại trước request nghiệp vụ.
+- [x] Không tìm thấy tab, mất đầu nhận và timeout được báo rõ trên Sidebar.
+- [x] Body chứa `Login.aspx` được nhận là hết phiên kể cả HTTP 200.
+- [x] Retry transport được tách khỏi retry nghiệp vụ; lỗi nghiệp vụ chỉ thử lại khi `hSHIN` đổi.
+- [ ] Khôi phục mọi cursor sau khi Sidebar, Chrome hoặc GAS gián đoạn.
+- [ ] Giữ khoảng nghỉ và trần request phù hợp FBM, không dồn quá 60 request/phút.
+- [ ] Web App `doPost` xác thực khóa và Extension thực sự điều phối qua Web App.
 
-### A3. Phiên FBM, transport và phục hồi
+### Metadata, chuẩn hóa và trạng thái
 
-- [x] Request lấy `authorized` Customer dùng `viewPage:false`, `authorized:null`, `values:[]` và đúng ba `vars`.
-- [x] Request lấy `authorized` Activity dùng controller riêng và đúng hai `vars`.
-- [x] Live test đã nhận được cả `authorized` Customer và Activity của phiên đang mở.
-- [x] Cookie payload và `userId` được lấy từ tab/response transport, không tự login bằng tài khoản mật khẩu.
-- [x] HTTP status, body lỗi, `Bugs` và lỗi parse được chuyển thành lỗi có cấu trúc; lỗi transport được ghi vào `Log` mà không ghi cookie/payload.
-- [x] Mất content script sau reload được thử ping rồi tiêm lại trước khi gửi request nghiệp vụ.
-- [x] Không tìm thấy tab, mất đầu nhận và timeout được báo rõ trên màn hình thay vì dừng im lặng.
-- [x] Nhận diện body HTML chứa `Login.aspx` là hết phiên ngay cả khi HTTP 200; đã có kiểm thử response HTTP 200 trả trang đăng nhập.
-- [x] Phân biệt retry lỗi vận chuyển với không retry lỗi nghiệp vụ cho tới khi `hSHIN` đổi; `metadata.pushFailures` giữ hash local của lần lỗi và chỉ cho thử lại khi hash đổi.
-- [ ] Khôi phục được mọi cursor giữa kỳ sau khi Sidebar/Chrome/GAS gián đoạn; hiện mới tự phục hồi chắc ở bước authorize Customer ban đầu.
-- [ ] Giữ khoảng nghỉ và trần request phù hợp FBM, tránh gửi dồn quá 60 request/phút trong luồng tự động.
-- [ ] Web App `doPost` xác thực khóa và Extension thật sự là bên gọi; hiện có `doPost` nhưng Extension chưa điều phối qua Web App.
+- [x] Trang đầu controller dùng `type:0` và `AliasName`; trang sau dùng `type:1` với metadata đã lưu.
+- [x] Cursor Customer và Activity dùng composite key theo tài liệu nghiên cứu.
+- [x] Metadata thiếu, trùng hoặc đổi trường thì fail-closed.
+- [x] Đã map các trường Customer: tên, MST, liên hệ, địa chỉ, điện thoại, email, website, tỉnh, nguồn và sản phẩm.
+- [x] `product/ma_sp` được chuẩn hóa vào fingerprint Customer và loại khỏi Activity.
+- [x] `owner` Activity không tham gia fingerprint và được đọc để kiểm quyền sửa.
+- [x] Fingerprint chuẩn hóa xuống dòng, trim, danh mục, ngày Việt Nam, placeholder 1899/1999, Date lỗi và dấu `#SC-`.
+- [x] Placeholder `1999`/`0` chỉ là rỗng ở field phù hợp; Activity `id=0` không làm đổi fingerprint.
+- [x] Fingerprint đã có test không đổi, một phía đổi và conflict hai phía.
+- [ ] Lệch `stt_rec_kh/ma_kh` phải lấy định danh FBM riêng, không coi là ShinCRM đổi.
+- [x] `@CUS_SYNC_TT/@ACT_SYNC_TT` có đủ 11 trạng thái, gồm `chưa đẩy` và `đẩy không ăn`.
+- [ ] Có lệnh tính lại baseline khi người dùng đổi tập field hoặc luật chuẩn hóa.
 
-### A4. Metadata, trường và chuẩn hóa
+## Slice 1 — Preflight phiên FBM và danh mục
 
-- [x] Trang đầu mỗi controller dùng `type:0`, lấy `ViewPage.Fields[].AliasName`; trang sau dùng `type:1`.
-- [x] Có cursor phân trang Customer và Activity theo composite key của tài liệu nghiên cứu.
-- [x] Nếu metadata thiếu, trùng hoặc đổi trường thì fail-closed và báo lỗi; trang đầu phải cung cấp AliasName, trang sau dùng metadata đã lưu.
-- [ ] Live test trang tiếp theo với dữ liệu vượt `count`, gồm ca `TotalRowCount` thay đổi trong lúc quét.
-- [x] Tập trường Customer đã map hai chiều cho tên, MST, người liên hệ, địa chỉ, điện thoại, email, website, tỉnh, nguồn và sản phẩm ở builder/record adapter.
-- [x] Thêm `product/ma_sp` vào fingerprint Customer; mã sản phẩm được đổi về không gian mã FBM trước khi băm.
-- [x] Loại `product/ma_sp` khỏi builder và cổng danh mục Activity; Activity chỉ đồng bộ `taskType`, `content`, `workDate` theo tài liệu 09.
-- [x] `owner` Activity không nằm trong fingerprint và đã được đọc từ grid/mở form để kiểm quyền sửa.
-- [ ] Giữ `owner` đủ lâu để hiện trong diff và log của đúng bản ghi; UI/log chi tiết hiện chưa có.
-- [x] Hoàn chỉnh đúng bảy phép chuẩn hóa fingerprint: xuống dòng, trim hai đầu, mã danh mục, ngày Việt Nam, placeholder 1899/1999, Date lỗi và cắt dấu `#SC-`.
-- [x] Placeholder năm 1999 và số `0` chỉ đại diện rỗng ở đúng field FBM; Activity `id=0` không tham gia fingerprint.
-- [x] Fingerprint không dùng `normalizeText`; test đã phủ không đổi, đổi ShinCRM, đổi FBM và conflict hai phía.
-- [ ] Lệch hai định danh Customer phải lấy định danh FBM xuống mà không coi là ShinCRM đổi; code chưa có nhánh riêng.
-- [x] Tập trạng thái `@CUS_SYNC_TT/@ACT_SYNC_TT` có đủ 11 giá trị của tài liệu, gồm `chưa đẩy` và `đẩy không ăn`.
-- [ ] Có công cụ tính lại baseline do người dùng chủ động bấm khi tập field hoặc luật chuẩn hóa thay đổi.
+### Preflight
 
-### A5. Danh mục động
+- [x] Tìm tab FBM, ping executor, fetch trong tab và nhận response thô.
+- [x] Khi mất executor, inject rồi ping lại; request nghiệp vụ chỉ gửi một lần.
+- [x] 401/403 hoặc `Login.aspx` dừng kỳ và yêu cầu đăng nhập lại, không tự login.
+- [x] Lấy authorized Customer rồi Activity; thiếu token thì dừng trước CRUD.
+- [ ] Kiểm owner mặc định FBM khớp `FBM_ACCOUNT_NAME`; sai thì dừng chiều push.
+- [ ] Xác nhận Config có `FBM_ACCOUNT_NAME`, `FBM_MA_KH_PREFIX`, `FBM_MA_KH_LENGTH`, `FBM_ACTIVITY_SINCE` và không khai trùng.
 
-- [x] Bốn nguồn duy nhất được lấy động: tỉnh `crProvinceCity`, nguồn khách `crLeadSource`, công việc `crJob`, sản phẩm `crdmsp`; không hardcode mã FBM từ tài liệu.
-- [x] Có builder `GetCompletionList`, parser cặp mã/tên, luật companion và dấu `#` cho quan hệ một-nhiều/nhiều-một.
-- [x] Có đường nhập lookup vào `Category` theo kiểu chỉ bổ sung, không xóa mã cũ và thay fixture `FBM-*` bằng mã thật.
-- [x] Đã sửa offline việc nhận nhầm `@CAT_NHOM_KH_FBM` là companion dù cột không tồn tại; test `914/914` xanh.
-- [ ] Đẩy bản sửa Category lên GAS và live test bốn lookup được ghi đúng vào sheet `Category` đã xóa trắng.
-- [x] Mã/tên Category lệch chỉ chặn những bản ghi dùng đúng mục đó; block theo mã được giữ trong `categoryGate`.
-- [x] Lookup không gọi được bỏ chiều push nhưng vẫn cho pull; state ghi rõ lý do và tiếp tục grid Customer.
-- [x] Mã lạ từ FBM chặn ghi bản ghi pull; người dùng bổ sung Category rồi chạy lại.
-- [ ] Live test mã trùng tên như hai mã Cao Bằng chọn đúng dấu `#` ở chiều push và nhận cả hai mã ở chiều pull.
-- [ ] Log danh mục phải nêu nguồn, mã, tên trên Sheet và tên FBM hiện tại đủ để người dùng sửa.
+### Danh mục
 
-### A6. Pull FBM → ShinCRM
+- [x] Đọc động bốn nguồn `crProvinceCity`, `crLeadSource`, `crJob`, `crdmsp`, không hardcode mã FBM.
+- [x] Builder `GetCompletionList` và parser cặp mã/tên đã có; companion dùng dấu `#` đúng quan hệ.
+- [x] Lookup vào Category theo kiểu chỉ bổ sung, không xóa mã cũ.
+- [x] Fixture `FBM-*` được thay bằng mã thật khi có lookup live.
+- [x] Cổng Category không nhận nhầm `@CAT_NHOM_KH_FBM` là companion giả.
+- [x] Category lệch chỉ chặn record dùng đúng mã lỗi; record khác vẫn pull.
+- [x] Lookup lỗi vẫn cho pull nhưng khóa toàn bộ chiều push của kỳ.
+- [x] Mã lạ từ FBM chặn ghi record và ghi lý do để bổ sung Category.
+- [ ] Log danh mục nêu nguồn, mã, tên trên Sheet và tên FBM hiện tại.
+- [ ] **Cần kiểm chứng thực tế:** đẩy bản sửa Category và `Probe.js` lên GAS, đọc đủ bốn lookup và kiểm tra Sheet `Category` đã xóa trắng.
+- [ ] **Cần kiểm chứng thực tế:** kiểm mã trùng tên, ví dụ hai mã Cao Bằng, phải giữ đúng dấu `#` ở cả hai chiều.
 
-- [x] Live Đọc thử đã preview đúng Customer `ALT00010 · Test` và một Activity `Gọi điện chăm sóc` mà không ghi hai hệ.
-- [ ] Xác minh bản ghi Customer đã pull thật có đủ `id` ShinCRM, `@CUS_FBM_ID`, `@CUS_MA_KH_FBM`, nội dung, baseline và trạng thái đúng.
-- [x] Truyền khóa Customer cha vào Activity lấy theo `externalKey`; record giữ `customerFbmCode` từ context cha và nối đúng `Customer.id` khi có dữ liệu cục bộ.
-- [ ] Live pull Activity vào sheet và xác nhận `customerId` là mã Customer nội bộ, không phải số dòng hoặc mã FBM.
-- [ ] Pull lại lần hai không tạo Customer/Activity trùng, không tăng conflict và tự cập nhật baseline nếu hai bên bằng nhau.
-- [ ] Pull bản ghi đã có chỉ ghi khi FBM đổi; nếu ShinCRM đổi thì để chờ push, nếu hai bên đổi thì đóng băng conflict.
-- [ ] Pull giữ nguyên `note`, `verifyStatus`, `allowFbmPush` và các trường chỉ thuộc ShinCRM trên dòng đã có.
-- [ ] Pull bản ghi mới đặt đúng mặc định lõi: mã nội bộ, ngày tạo, `active`, khóa cha; `allowFbmPush` của bản ghi vốn có trên FBM phải cho phép sửa ngược theo tài liệu 09.
-- [ ] Pull hoạt động thiếu/placeholder `workDate` phải chặn và log; tuyệt đối không tự điền ngày hiện tại.
-- [ ] Áp `FBM_ACTIVITY_SINCE` để bỏ lịch sử trước mốc mà không làm sai baseline hoặc phát hiện vắng mặt.
-- [ ] Sau pull, đánh dấu dirty đúng mã để Sidebar nạp lại ở lần tương tác kế tiếp.
-- [x] Nếu form người dùng đang mở đúng record thì pull hoãn record đó và missing scan bỏ qua, giữ nguyên bản nháp.
-- [ ] Đối soát record có `FBM_ID` nhưng vắng khỏi FBM thành `không thấy bên FBM`, không chạm `recordStatus` và không cập nhật baseline.
-- [ ] Dòng `deleted` có `FBM_ID` tiếp tục được đọc làm tombstone để không kéo lại thành dòng mới.
+### Đóng slice
 
-### A7. Push ShinCRM → FBM
+- [ ] Code, test offline, log và GAS DEV của preflight/category hoàn tất.
+- [ ] **Cần kiểm chứng thực tế:** xác nhận phiên, owner và Category trên tab FBM.
 
-- [x] Có hai cổng rõ ràng: chọn chế độ Ghi thật và bật `FBM_SYNC_ALLOW_WRITES`; thiếu một trong hai thì không phát request ghi.
-- [x] Có cổng `allowFbmPush` theo từng record và cổng kế thừa từ Customer xuống Activity.
-- [x] Có cổng danh mục, cổng record lock và cổng cấu hình không rỗng trước khi dựng request ghi.
-- [ ] Cổng đầu kỳ phải so owner mặc định FBM với `FBM_ACCOUNT_NAME`; code hiện chỉ kiểm tên cấu hình khác rỗng.
-- [ ] Kiểm đủ điều kiện tạo Customer theo đúng bảy trường bắt buộc FBM và báo từng trường thiếu.
-- [ ] Kiểm khóa liên kết Activity có Customer cha, `stt_rec`, `ma_kh` và `workDate` trước cửa ghi.
-- [ ] Kiểm mọi trần độ dài trước push; `details` phải trừ chỗ cho dấu ` #SC-<mã activity>`.
-- [ ] Chỉ chọn lại record `đẩy lỗi` khi `hSHIN` đã đổi; lỗi cũ không được spam FBM mỗi kỳ.
-- [x] Sau FBM báo thành công, đặt `đã đẩy chờ xác nhận`, giữ baseline cũ và chỉ xác nhận ở kỳ pull sau.
-- [x] Nếu kỳ xác nhận thấy FBM không đổi thì đặt `đẩy không ăn`, khóa record và không tự gửi lại.
+## Slice 2 — Pull Customer FBM → ShinCRM
 
-### A8. Customer create/edit
+### Đọc và ghi Customer
 
-- [x] Builder tạo Customer thực hiện mở form lấy `_ma_kh_auto` rồi gửi `New`; request khớp fixture nghiên cứu ở mức offline.
-- [x] Có cổng kiểm tiền tố và độ dài mã tự sinh trước bước lưu Customer mới.
-- [x] Builder không gửi `ghi_chu`; các memvar không đồng bộ lấy giá trị form cũ hoặc mặc định phù hợp.
-- [ ] Live test Customer create chưa thể làm khi ràng buộc tuyệt đối chỉ dùng mã đã tồn tại `ALT00010`; FBM sẽ tự cấp một mã khách khác.
-- [ ] Khi mất phản hồi sau create, tra MST bằng filter contains, verify exact rồi vá `stt_rec_kh/ma_kh`, không tạo lại; code chưa có pipeline phục hồi này.
-- [x] Có builder mở form Customer và builder tạo request `Edit` khi được truyền OldValue có tên ở mức offline.
-- [x] Parse `Row` 64 ô của response mở form Customer thành OldValue theo đúng tên memvar; code hỗ trợ Row mảng/object và fallback FieldValues/InternalValues.
-- [ ] Live sửa một trường an toàn của `ALT00010`, đọc xác nhận, kiểm baseline và khôi phục giá trị ban đầu.
-- [ ] Live lỗi nghiệp vụ trùng/sai MST hoặc điện thoại: nhận `Bugs`, đặt `đẩy lỗi`, không làm mất khóa và không retry cho tới khi dữ liệu đổi.
+- [x] Đọc thử đã preview đúng `ALT00010 · Test` mà không ghi hai hệ.
+- [x] Luồng đọc thủ công tạo state, thực thi từng request qua Extension, trả preview và kết thúc mà không ghi hai hệ.
+- [ ] Customer FBM chưa có `FBM_ID` được tạo dòng mới, cấp mã nội bộ, lưu ID/mã FBM, nội dung và baseline trong một khóa.
+- [x] Customer đã tồn tại ở FBM và ShinCRM nhưng chưa liên kết được nhận diện bằng MST chuẩn hóa; nếu chỉ có một dòng ShinCRM khớp thì nối vào dòng đó, nếu MST trùng nhiều dòng hoặc đã liên kết thì fail-closed, không tạo Customer trùng.
+- [ ] Bản ghi pull có đủ `id`, `@CUS_FBM_ID`, `@CUS_MA_KH_FBM`, nội dung, baseline và trạng thái.
+- [ ] Pull giữ `note`, `verifyStatus`, `allowFbmPush` và trường chỉ thuộc ShinCRM.
+- [ ] Bản ghi mới đặt đúng mã nội bộ, ngày tạo, `active`, khóa cha và quyền push.
+- [ ] Sau pull đánh dấu dirty đúng mã để Sidebar nạp lại.
+- [ ] `FBM_ACTIVITY_SINCE` loại lịch sử cũ mà không làm sai baseline hoặc missing.
 
-### A9. Activity create/edit
+### Đối soát Customer
 
-- [x] Builder tạo Activity gửi thẳng `New`, mang `ma_kh/stt_rec` của Customer cha và gắn dấu ` #SC-<mã ShinCRM>`.
-- [x] Fingerprint cắt dấu `#SC-` trước khi so để hai bên không xung đột vĩnh viễn.
-- [ ] Live tạo một Activity thử thuộc `ALT00010`, nhận `id` FBM, rồi pull xác nhận không tạo dòng trùng.
-- [ ] Phủ bốn nhánh marker khi gặp ID FBM lạ: vá dòng `đang đẩy`, báo đẩy trùng, báo dòng local đã mất, hoặc tạo dòng mới nếu không có marker.
-- [ ] Mất phản hồi Activity create phải giữ `đang đẩy` và không tự retry; code hiện chưa có pipeline phục hồi theo marker.
-- [x] Có builder mở form Activity và builder tạo request `Edit` khi được truyền OldValue có tên ở mức offline.
-- [x] Parse `Row` 45 ô thành OldValue, giữ `end_time`, và trích `_ticket` từ script `Showing` vào `fileticket`; parser nhận cả Row null, FieldValues/InternalValues và Showing dạng chuỗi/object.
-- [x] Cổng owner cho Activity edit đã có trong code sau bước mở form.
-- [ ] Live sửa Activity của `ALT00010`, xác nhận file ticket không mất, owner đúng và kỳ pull sau chốt baseline.
-- [ ] Owner khác tài khoản phải đặt `đẩy lỗi` riêng record và không chặn các record khác.
+- [ ] Ba hash bằng nhau → không ghi nội dung, đánh dấu đã đồng bộ.
+- [ ] Baseline rỗng hoặc tự lành → chỉ cập nhật baseline.
+- [ ] Chỉ FBM đổi → pull nội dung và baseline, giữ trường nội bộ.
+- [ ] Chỉ ShinCRM đổi → không pull đè, chuyển ứng viên push nếu được phép.
+- [ ] Hai phía đổi → conflict, khóa, log, không ghi nội dung/baseline.
+- [ ] Customer vắng khỏi grid → `không thấy bên FBM`, không xóa và không đổi baseline.
+- [ ] Tombstone local có FBM ID không bị kéo lại thành dòng mới.
+- [ ] Customer ngừng đồng bộ loại cả Customer và Activity con khỏi hai chiều.
+- [x] Record đang được người dùng sửa được hoãn; missing scan bỏ qua và giữ nguyên bản nháp.
 
-### A10. Conflict, khóa và xóa/vắng mặt
+### Đóng slice
 
-- [x] Hàm so ba chiều đã phân biệt hai bên bằng nhau, chỉ ShinCRM đổi, chỉ FBM đổi và cả hai đổi.
-- [ ] Conflict phải lưu trạng thái, khóa record, log diff và không ghi baseline; state đã giữ khóa và diff, phần log/UI trình bày còn thiếu.
-- [ ] `syncStatusSlot` hiển thị diff Customer/Activity tính mới từ FBM lúc người dùng mở record.
-- [ ] Nút `Đã quyết xung đột` lấy `hFBM` mới đúng lúc bấm, ghi ngoại lệ baseline và mở khóa; hỗ trợ lấy FBM, giữ ShinCRM hoặc trộn tay.
-- [x] Form Sidebar gọi khóa user khi mở, nhả khi đóng và kiểm khóa sync trước Save; test offline đã phủ.
-- [x] Pull và push đều phải hoãn record có khóa user, giữ nguyên bản nháp và tiếp tục record khác.
-- [x] `beforeHardDelete` buộc record có `FBM_ID` chỉ được xóa mềm; hook đã được module đồng bộ triển khai.
-- [x] Không có đường tự gửi Delete lên FBM.
-- [ ] Khách/Activity vắng khỏi kết quả quét chỉ mang trạng thái `không thấy bên FBM`; tuyệt đối không suy ra xóa.
-- [ ] `Ngừng đồng bộ` loại Customer và toàn bộ Activity con khỏi cả pull lẫn push; code hiện mới chặn push.
+- [ ] Test offline phủ đủ bảng hash, missing, tombstone và bảo toàn trường nội bộ.
+- [ ] Log có từng record, hướng FBM → ShinCRM, trạng thái trước/sau và lý do bỏ qua.
+- [ ] **Cần kiểm chứng thực tế:** pull `ALT00010`, xác nhận các cột định danh, baseline, trạng thái và `customerId` Activity là mã nội bộ.
+- [ ] **Cần kiểm chứng thực tế:** chạy pull lần hai, không tạo Customer/Activity trùng và không tăng conflict.
 
-### A11. Sidebar, log và quan sát
+## Slice 3 — Pull Activity FBM → ShinCRM
 
-- [x] Có màn hình đồng bộ độc lập, quay lại không chủ động hủy phiên, có phase, hướng, thực thể, session, counters, tiến trình và preview giới hạn.
-- [x] Khi chưa chạy chỉ hiện `Đồng bộ ngay`; khi đang chạy chỉ hiện `Dừng đồng bộ`.
-- [x] Icon menu phản ánh trạng thái đồng bộ; mục tự động có thể hiện là đang phát triển nhưng chưa cho bật.
-- [x] Live test đã thấy tiến trình request, lỗi transport và kết quả đọc trong màn hình đồng bộ.
-- [x] GAS ghi log phase/lỗi nguồn `fbm_sync`; live test đã có log khi `LOG_TRACE=all`, không ghi cookie/payload.
-- [ ] Có một dòng tổng kết mỗi kỳ và dòng chi tiết cho từng lỗi, conflict, hoãn, mã danh mục lạ và đẩy không ăn; log hiện chủ yếu ghi khi đổi phase.
-- [ ] Màn hình có danh sách record đã kéo/đẩy/lỗi/conflict đủ để kiểm mà không phải đọc JSON trong sheet Log.
-- [ ] Đóng Sidebar không làm dừng kỳ; Extension tiếp tục qua Web App và mở lại Sidebar thấy đúng state.
-- [ ] Công tắc đồng bộ tự động hoạt động thật; hiện chỉ được phép báo `Đang phát triển`.
+### Activity và marker
 
-### A12. Nhịp tự động và phát hiện thay đổi
+- [x] Request Activity theo `externalKey stt_rec` nối đúng Customer nội bộ.
+- [ ] Activity mới không marker tạo dòng ShinCRM, cấp mã nội bộ, lưu FBM ID và baseline.
+- [ ] Marker trỏ dòng đang đẩy thì vá ID, không tạo trùng.
+- [ ] Marker trỏ dòng đã có FBM ID khác thì khóa và báo xử lý.
+- [ ] Marker mồ côi chỉ log, không tạo lại.
+- [ ] Activity thiếu hoặc placeholder `workDate` bị chặn và log, không tự điền ngày.
+- [ ] Hash Activity dùng cùng luật ba chiều như Customer.
+- [ ] Activity vắng trong bulk chỉ mang trạng thái không thấy bên FBM, không suy hard-delete.
 
-- [x] Extension có alarm heartbeat 5 phút và request đọc `count:1`; không tự login và không gửi write từ alarm.
-- [ ] Heartbeat phải nộp kết quả cho GAS, cập nhật lần sống cuối và kích quét Customer khi tổng số thay đổi; hiện response heartbeat bị bỏ.
-- [ ] Kỳ Customer 60 phút kéo full grid, không dùng `ngay_gd/datetime0` làm incremental.
-- [ ] Lớp Activity 1 mỗi 8 giờ kéo bulk, Extension lọc theo tập ID Activity đã biết trước khi trả về GAS.
-- [ ] Lớp Activity 2 dùng `ngay_gd > max(workDate)` của các Activity đã có `@ACT_FBM_ID` để quét riêng Customer nghi phát sinh mới.
-- [ ] Lớp Activity 3 quét xoay 30 Customer mỗi kỳ để bắt Activity tạo lùi ngày.
-- [ ] Ba lớp Activity lưu cursor bền vững, không lớp nào bị hạ thành tùy chọn.
-- [ ] Scheduler không tạo hai kỳ song song, không giữ công việc trong RAM qua alarm và tiếp tục từ lát cuối đã chốt.
-- [ ] Nghiệm thu chạy khi Sidebar đóng và sau khi service worker bị Chrome dừng/đánh thức lại.
+### Ba lớp quét
 
-### A13. Kiểm thử, nạp lần đầu và bàn giao
+- [ ] Bulk 8 giờ lấy grid Activity, lọc theo tập ID đã biết và trả danh sách ID vắng.
+- [ ] `ngay_gd` mới hơn max Activity đã có ID thì quét externalKey riêng Customer đó.
+- [ ] Vòng xoay quét 30 Customer tiếp theo để bắt Activity tạo lùi ngày.
+- [ ] Ba lớp có cursor bền vững và không bị hạ thành tùy chọn.
 
-- [x] Bộ test offline hiện đạt `954/954`, gồm protocol, `Bugs`, builder, category, hash, lock, bridge, parent Activity, parser OldValue/ticket, trạng thái sync, hook chống xóa cứng, retry đọc có giới hạn, chuẩn hóa Date, khóa pull và xác nhận push; không có request xóa.
-- [x] Live test Đọc thử `ALT00010` đã xác thực Customer/Activity và preview đúng một khách, một giao dịch ngày 09/09/2026.
-- [ ] Bổ sung test cho các khoảng trống còn lại: bảy normalize đầy đủ, lookup fail-open pull, missing, marker recovery đầy đủ, retry policy và scheduler.
-- [ ] Chạy `fbmProbeAltState --push` để biết chính xác record/candidate nào sẽ bị ghi trước live test tiếp theo.
-- [ ] Hoàn thành bộ live test tối thiểu ở Phần C và đính bằng chứng vào từng case.
-- [ ] Nạp lần đầu khoảng 1.700 Customer và Activity từ `FBM_ACTIVITY_SINCE` theo lát, đo payload/thời gian và chốt baseline toàn bộ.
-- [ ] Gỡ giới hạn `ALT00010` chỉ sau khi live test được duyệt; chạy kỳ thật đầu tiên có giám sát và đối chiếu log.
-- [ ] Cập nhật cây thư mục, checklist, revision GAS, phiên bản Extension và commit tách chủ đề trước bàn giao.
+### Đóng slice
 
-## B. Tất cả pipeline và use case
+- [ ] Test offline phủ marker, missing, ngày lỗi, bulk và ba lớp phát hiện.
+- [ ] Log có Customer cha, Activity ID, hướng đọc và lý do bỏ qua/khôi phục.
+- [ ] **Cần kiểm chứng thực tế:** pull Activity của `ALT00010`, xác nhận `customerId` nội bộ và không tạo dòng trùng khi chạy lại.
 
-### B1. Điều phối phiên
+## Slice 4 — Đối soát, khóa, conflict và phục hồi
 
-- [x] `P01 Đọc thủ công`: Sidebar bấm Đồng bộ ngay → GAS tạo state → Extension thực thi từng request → GAS preview → hoàn tất, không ghi hai hệ; đã live với `ALT00010`.
-- [ ] `P02 Ghi hai chiều thủ công`: preflight → lookup → pull trước → push Customer trước → push Activity sau → chờ kỳ sau xác nhận; live mới tới cổng Category.
-- [x] `P03 Chặn ghi`: chọn Ghi thật nhưng cờ hệ thống tắt → dừng trước request FBM ghi và báo rõ.
-- [x] `P04 Chặn chạy song song`: đang có kỳ hoạt động → lần Start thứ hai không tạo kỳ mới.
-- [x] `P05 Dừng thủ công`: Dừng đồng bộ → xóa cursor kỳ, nhả khóa sync, giữ khóa form user và không gửi Delete.
-- [ ] `P06 Tiếp tục sau gián đoạn`: Sidebar/worker/GAS chết giữa bất kỳ cursor nào → đọc state và tiếp tục đúng request kế, không chạy lại việc đã chốt.
-- [ ] `P07 Chạy nền`: alarm Extension → gọi Web App → nộp response trước và nhận request sau → chạy tiếp dù Sidebar đóng.
+- [x] So ba chiều phân biệt không đổi, chỉ ShinCRM đổi, chỉ FBM đổi và hai phía đổi.
+- [ ] Conflict lưu trạng thái, khóa record, log diff và không ghi baseline.
+- [ ] `syncStatusSlot` hiển thị diff Customer/Activity mới lấy từ FBM.
+- [ ] Nút giải quyết hỗ trợ theo FBM, theo ShinCRM hoặc trộn tay; lấy `hFBM` đúng lúc bấm.
+- [x] Form Sidebar khóa user khi mở, nhả khi đóng và kiểm khóa sync trước Save.
+- [x] Pull/push hoãn record có khóa user và giữ nguyên bản nháp.
+- [ ] Khóa sync làm form chỉ xem, chặn Save và luôn được nhả sau khi xong/lỗi.
+- [x] Record có `FBM_ID` chỉ được xóa mềm; không có đường gửi Delete FBM.
+- [ ] HTTP 500/401/403/Login.aspx giữ cursor hợp lệ và thử lại ở kỳ sau.
+- [ ] Bugs HTTP 200 gắn lỗi nghiệp vụ vào record và chỉ thử lại khi dữ liệu local đổi.
+- [ ] Ghi báo thành công nhưng FBM không đổi → `đẩy không ăn`, khóa record, không lặp vô hạn.
+- [ ] Extension reload/service worker ngủ → state GAS không mất và pipeline đi tiếp đúng bước.
+- [ ] **Cần kiểm chứng thực tế:** mở conflict, xem diff và thử một cách giải quyết.
+- [ ] **Cần kiểm chứng thực tế:** sửa dở form trong lúc sync, xác nhận record bị hoãn và bản nháp không mất.
 
-### B2. Preflight và danh mục
+### Đóng slice
 
-- [x] `P10 Tab hợp lệ`: tìm tab FBM → ping executor → fetch trong tab → nhận response thô.
-- [x] `P11 Mất executor`: ping lỗi → inject executor → ping lại → chỉ gửi request nghiệp vụ một lần.
-- [x] `P12 Hết phiên`: HTTP 401/403 hoặc body `Login.aspx` → dừng kỳ, log và yêu cầu người dùng đăng nhập lại; không tự login.
-- [x] `P13 Authorized`: lấy riêng Customer rồi Activity; thiếu một token thì dừng trước CRUD.
-- [ ] `P14 Cổng tài khoản`: mở form đầu kỳ → owner mặc định khác `FBM_ACCOUNT_NAME` → dừng toàn bộ chiều push.
-- [ ] `P15 Lookup thành công`: lấy bốn danh mục → nhập add-only vào Category → đối soát mã/tên → cho phép các record hợp lệ đi tiếp.
-- [ ] `P16 Lookup lỗi`: không lấy được một danh mục → vẫn pull dữ liệu, bỏ toàn bộ push của kỳ.
-- [x] `P17 Mã/tên Category lỗi`: chỉ record dùng mục lỗi bị chặn và log; record khác tiếp tục.
-- [x] `P18 Mã FBM lạ chiều pull`: không ghi record đó, đặt lý do có mã/tên để người dùng bổ sung Category rồi chạy lại.
+- [ ] Code, test offline, log diff và UI conflict hoàn tất.
+- [ ] Bằng chứng phục hồi sau timeout, reload và lỗi nghiệp vụ đã có.
 
-### B3. Customer FBM → ShinCRM
+## Slice 5 — Push Customer ShinCRM → FBM
 
-- [ ] `P20 Customer mới`: FBM có, ShinCRM chưa có `FBM_ID` → tạo dòng mới, cấp mã ShinCRM, chép ID/mã FBM, nội dung và baseline trong một khóa.
-- [ ] `P21 Customer không đổi`: `hFBM == hSHIN == hBASE` → không ghi nội dung, trạng thái đã đồng bộ.
-- [ ] `P22 Baseline tự lành`: `hFBM == hSHIN != hBASE` hoặc baseline rỗng → chỉ cập nhật baseline.
-- [ ] `P23 Chỉ FBM đổi`: `hSHIN == hBASE`, `hFBM != hBASE` → pull nội dung và baseline cùng lượt, giữ trường nội bộ.
-- [ ] `P24 Chỉ ShinCRM đổi`: `hFBM == hBASE`, `hSHIN != hBASE` → không pull đè, chuyển ứng viên push nếu được phép.
-- [ ] `P25 Hai phía đổi`: cả ba hash khác nhau → conflict, khóa, log, không ghi nội dung/baseline.
-- [ ] `P26 Định danh lệch`: `stt_rec_kh/ma_kh` lệch → FBM thắng riêng phần định danh, không coi là ShinCRM đổi.
-- [ ] `P27 Customer vắng`: local active có FBM_ID nhưng không thấy trong grid → trạng thái không thấy bên FBM, không xóa/không baseline.
-- [ ] `P28 Customer tombstone`: local deleted có FBM_ID → giữ dòng làm bia mộ; FBM còn thì báo, FBM vắng thì coi đã khớp.
-- [ ] `P29 Ngừng đồng bộ`: Customer mang hằng ngừng → loại cả Customer và Activity con khỏi hai chiều.
+### Cổng và builder
 
-### B4. Activity FBM → ShinCRM và ba lớp phát hiện
+- [x] Phải đồng thời chọn Ghi thật và bật `FBM_SYNC_ALLOW_WRITES`; thiếu một thì không phát request ghi.
+- [x] Có cổng `allowFbmPush`, Category, record lock và cấu hình bắt buộc.
+- [x] Chế độ Ghi thật vẫn dừng trước request khi cờ hệ thống tắt.
+- [x] Khi đang có phiên hoạt động, lần bấm Đồng bộ ngay thứ hai không tạo phiên song song.
+- [x] Dừng đồng bộ xóa cursor kỳ, nhả khóa sync, giữ khóa form user và không gửi Delete.
+- [ ] Kiểm owner mặc định FBM với `FBM_ACCOUNT_NAME` trước toàn bộ chiều push.
+- [ ] Kiểm đủ bảy field bắt buộc và mọi trần độ dài trước khi dựng request.
+- [ ] Customer mới chưa Cho phép chỉ pull, không push.
+- [x] Customer thiếu field hoặc vượt trần không phát request, ghi trạng thái và lý do.
+- [x] Builder Customer New mở form lấy `_ma_kh_auto` rồi gửi request `New` đúng fixture.
+- [x] Builder Customer Edit mở form lấy OldValue rồi gửi `Edit` đúng tập field.
+- [x] Parser Row 64 ô hỗ trợ Row mảng/object và fallback FieldValues/InternalValues.
+- [ ] Create mất phản hồi tra MST contains, verify exact, vá ID và không create lần hai.
+- [ ] Create có Bugs đặt `đẩy lỗi`, nhả khóa và không retry khi `hSHIN` chưa đổi.
+- [ ] Edit chờ kỳ pull xác nhận; không đổi là `đẩy không ăn`, giá trị thứ ba là conflict.
+- [x] Sau response thành công, record chuyển sang `đã đẩy chờ xác nhận` và giữ baseline cũ cho kỳ pull sau.
+- [x] Nếu kỳ xác nhận thấy FBM không đổi, record chuyển sang `đẩy không ăn`, bị khóa và không tự gửi lại.
+- [x] Builder không gửi `ghi_chu`; không dùng `note` nội bộ ShinCRM.
 
-- [x] `P30 Activity theo Customer`: request externalKey `stt_rec` → gắn khóa cha vào mỗi row → nối đúng Customer.id nội bộ.
-- [ ] `P31 Activity mới không marker`: tạo dòng ShinCRM mới, cấp mã nội bộ, lưu FBM ID và baseline.
-- [ ] `P32 Marker khôi phục`: Activity FBM lạ có marker trỏ dòng đang đẩy → vá FBM ID vào dòng đó, không tạo trùng.
-- [ ] `P33 Marker trùng`: marker trỏ dòng đã có FBM ID khác → đóng băng và báo người dùng tự xử lý trên FBM.
-- [ ] `P34 Marker mồ côi`: marker không trỏ dòng ShinCRM nào → log và không tạo lại.
-- [ ] `P35 Activity thiếu ngày`: end_date rỗng/placeholder → chặn record và log.
-- [ ] `P36 Activity không đổi/chỉ một phía đổi/conflict`: áp cùng bảng hash ba chiều như Customer.
-- [ ] `P37 Activity vắng trong bulk`: đặt không thấy bên FBM, không xóa mềm và không suy hard-delete.
-- [ ] `P38 Bulk 8 giờ`: lấy toàn bộ grid Activity, Extension chỉ trả row có ID đã biết và danh sách ID không thấy.
-- [ ] `P39 ngay_gd`: Customer có ngày mới hơn max Activity đã có FBM ID → quét externalKey riêng Customer đó.
-- [ ] `P40 Vòng xoay`: mỗi kỳ quét 30 Customer tiếp theo để bắt Activity mới tạo lùi ngày.
+### Đóng slice
 
-### B5. Customer ShinCRM → FBM
+- [ ] Test offline phủ cổng, OldValue, độ dài, Bugs, retry và không ghi chú nội bộ.
+- [ ] Log có request kind, record, hướng, hash và kết quả đã che bí mật.
+- [ ] **Cần kiểm chứng thực tế:** sửa một field an toàn của `ALT00010`, pull xác nhận rồi khôi phục giá trị gốc.
+- [ ] **Cần kiểm chứng thực tế:** kiểm lỗi nghiệp vụ trùng/sai MST hoặc điện thoại.
+- [ ] Customer create chỉ kiểm chứng thực tế nếu chủ dự án cho phép một Customer thử mới; FBM tự cấp mã khác `ALT00010`.
 
-- [ ] `P50 Customer mới chưa cho phép`: FBM_ID rỗng nhưng allow khác Cho phép → chỉ pull, không push.
-- [ ] `P51 Customer mới đủ điều kiện`: cho phép + đủ bảy field + Category hợp lệ → mở New lấy mã → kiểm prefix/length → lưu → ghi ID/mã/trạng thái, baseline rỗng.
-- [x] `P52 Customer mới thiếu điều kiện`: thiếu field hoặc vượt trần → không request ghi, trạng thái không đủ điều kiện và log lý do.
-- [ ] `P53 Customer create mất phản hồi`: giữ đang đẩy → kỳ sau tra MST contains rồi verify exact → vá ID nếu đã tạo; không create lần hai.
-- [ ] `P54 Customer create Bugs`: đặt đẩy lỗi, nhả khóa, không retry tới khi hSHIN đổi.
-- [ ] `P55 Customer edit`: mở form lấy OldValue → thay đúng tập field đồng bộ → gửi Edit → trạng thái chờ xác nhận.
-- [ ] `P56 Customer edit xác nhận`: kỳ pull sau bằng nhau → ghi baseline/đã đồng bộ; FBM không đổi → đẩy không ăn; giá trị thứ ba → conflict.
-- [ ] `P57 Ghi chú nội bộ`: Customer edit/create luôn gửi `ghi_chu` rỗng/giữ FBM theo quyết định riêng, tuyệt đối không dùng `note` ShinCRM.
+## Slice 6 — Push Activity ShinCRM → FBM
 
-### B6. Activity ShinCRM → FBM
+- [x] Builder Activity New gửi `ma_kh/stt_rec` Customer cha và marker `#SC-<mã ShinCRM>`.
+- [x] Fingerprint cắt marker trước khi so.
+- [ ] Customer cha chưa Cho phép, Ngừng đồng bộ hoặc thiếu FBM ID/mã thì không push Activity.
+- [ ] Activity mới đủ khóa/ngày/danh mục → New, lưu FBM ID và chờ xác nhận.
+- [ ] Create mất phản hồi giữ `đang đẩy`, không retry; pull dùng marker để vá hoặc báo trùng.
+- [x] Builder Activity Edit mở form lấy OldValue đúng fixture.
+- [x] Parser Row 45 ô giữ `end_time`, lấy `_ticket` từ Showing thành `fileticket`, hỗ trợ Row null và fallback.
+- [x] Cổng owner Activity edit đã có sau bước mở form.
+- [ ] Edit sai owner chỉ lỗi record đó, không sửa owner FBM và không chặn record khác.
+- [ ] Kỳ pull sau edit xác nhận baseline, `đẩy không ăn` hoặc conflict.
+- [ ] **Cần kiểm chứng thực tế:** tạo đúng một Activity thử dưới `ALT00010`, marker cố định và không tạo trùng khi pull lại.
+- [ ] **Cần kiểm chứng thực tế:** sửa Activity thử, xác nhận owner, ticket, OldValue và baseline.
+- [ ] **Cần kiểm chứng thực tế:** mô phỏng mất phản hồi một lần và kiểm marker recovery.
 
-- [ ] `P60 Activity bị cổng cha chặn`: Customer cha chưa Cho phép, Ngừng đồng bộ hoặc thiếu FBM ID/mã → không push Activity.
-- [ ] `P61 Activity mới`: đủ khóa/ngày/danh mục → gắn marker → gửi New một bước → lưu FBM ID và chờ xác nhận.
-- [ ] `P62 Activity create mất phản hồi`: giữ đang đẩy, không retry; pull dùng marker để vá hoặc báo trùng.
-- [ ] `P63 Activity edit đúng owner`: mở form → giữ OldValue/end_time/ticket → kiểm owner → gửi Edit → chờ xác nhận.
-- [ ] `P64 Activity edit sai owner`: chỉ record đó đẩy lỗi, record khác tiếp tục; không sửa owner FBM.
-- [ ] `P65 Activity edit xác nhận`: kỳ pull sau chốt baseline, phát hiện đẩy không ăn hoặc conflict giống Customer.
+## Slice 7 — Heartbeat, scheduler và chạy nền
 
-### B7. Xung đột, người dùng đang sửa và lỗi
+- [x] Extension có alarm heartbeat 5 phút, đọc `count:1`, không login và không write.
+- [ ] Heartbeat nộp kết quả cho GAS, cập nhật lần sống cuối và kích full Customer khi tổng số đổi.
+- [ ] Kỳ Customer 60 phút kéo full grid qua nhiều lát, lưu cursor từng lát.
+- [ ] Kỳ Activity 8 giờ chạy bulk ID, lớp `ngay_gd` và vòng xoay 30 Customer.
+- [ ] Scheduler không tạo hai kỳ, không giữ công việc trong RAM và tiếp tục từ lát đã chốt.
+- [ ] Web App dùng khóa theo spreadsheet để tiếp tục khi Sidebar đóng.
+- [ ] Mở lại Sidebar chỉ đọc state hiện có, không tạo kỳ thứ hai.
+- [ ] Nạp lần đầu Sheet trống theo thứ tự Category → Customer → Activity → baseline, không nhân bản.
+- [ ] Lệnh tính lại baseline không phát request write FBM.
+- [ ] **Cần kiểm chứng thực tế:** bắt đầu kỳ, đóng Sidebar, chờ Web App/Extension và mở lại xem state/log.
+- [ ] **Cần kiểm chứng thực tế:** reload hoặc để service worker ngủ rồi xác nhận kỳ tiếp tục.
 
-- [ ] `P70 Mở diff`: record conflict → lấy FBM mới qua Extension → hiển thị từng field FBM/ShinCRM cùng owner Activity.
-- [ ] `P71 Quyết theo FBM`: người sửa Sheet bằng giá trị FBM → bấm Đã quyết → lấy hFBM mới → baseline mới → không push.
-- [ ] `P72 Quyết theo ShinCRM`: không sửa Sheet → bấm Đã quyết → baseline bằng FBM hiện tại → kỳ sau push ShinCRM.
-- [ ] `P73 Trộn tay`: sửa Sheet thành giá trị thứ ba → bấm Đã quyết → kỳ sau push giá trị trộn.
-- [ ] `P74 Form đang sửa`: khóa user tồn tại → sync hoãn đúng record, các record khác chạy; bản nháp không đổi.
-- [ ] `P75 Sync đang ghi`: khóa sync tồn tại → form chỉ xem/Save bị chặn; xong hoặc lỗi đều nhả khóa.
-- [x] `P76 Mất tab/đầu nhận/timeout`: kỳ lỗi có thông báo và log, không gửi lại write mù.
-- [ ] `P77 HTTP 500/401/403/Login.aspx`: phân loại transport, giữ cursor hợp lệ và thử lại ở kỳ sau.
-- [ ] `P78 Bugs HTTP 200`: phân loại nghiệp vụ, gắn record lỗi và chỉ thử lại sau khi dữ liệu local đổi.
-- [ ] `P79 Response ghi thành công nhưng FBM bỏ thay đổi`: kỳ xác nhận đặt đẩy không ăn, không lặp write vô hạn.
-- [ ] `P80 Extension reload/service worker ngủ`: tự phục hồi content script, state GAS không mất và pipeline đi tiếp đúng bước.
+## Slice 8 — Sidebar, log và probe nghiệm thu
 
-### B8. Lịch nền, nạp lần đầu và bảo trì baseline
+- [x] Có màn hình đồng bộ độc lập, không hủy phiên khi quay lại, hiển thị phase, hướng, thực thể, session, counters, tiến trình và preview giới hạn.
+- [x] Khi chưa chạy chỉ hiện `Đồng bộ ngay`; khi chạy chỉ hiện `Dừng đồng bộ`.
+- [x] Icon menu phản ánh trạng thái; tự động có thể báo đang phát triển.
+- [x] Đã thấy tiến trình request, lỗi transport và kết quả đọc trên màn hình.
+- [x] GAS ghi log phase/lỗi nguồn `fbm_sync`, không ghi cookie/payload.
+- [ ] Có dòng tổng kết mỗi kỳ và dòng chi tiết cho lỗi, conflict, hoãn, mã lạ và đẩy không ăn.
+- [ ] Màn hình có danh sách record kéo/đẩy/lỗi/conflict, không bắt người dùng đọc JSON trong Log.
+- [ ] Có lệnh `Nghiệm thu ALT00010` chạy preflight, lookup, pull, field/hash/link, idempotency và ghi báo cáo PASS/FAIL vào Log; không push FBM.
+- [ ] Báo cáo che cookie/authorized nhưng giữ record ID, phase, request kind và hash trước/sau.
+- [ ] `fbmProbeAltState` fail-closed nếu phát hiện candidate ngoài `ALT00010` và Activity con.
+- [ ] **Cần kiểm chứng thực tế:** chạy probe một nút và kiểm tra báo cáo trên Sidebar/Log.
 
-- [ ] `P90 Heartbeat bình thường`: mỗi 5 phút đọc một Customer, nộp kết quả cho GAS, cập nhật phiên còn sống và không mở kỳ thừa nếu tổng số không đổi.
-- [ ] `P91 Heartbeat thấy tổng Customer đổi`: kích kỳ full Customer sớm, nhưng không dùng tổng số để kết luận record nào đã sửa.
-- [ ] `P92 Kỳ Customer 60 phút`: kéo full Customer qua nhiều lát, pull trước, push sau và lưu cursor sau từng lát.
-- [ ] `P93 Kỳ Activity 8 giờ`: chạy bulk ID đã biết, lớp `ngay_gd` và vòng xoay 30 Customer theo cursor riêng.
-- [ ] `P94 Sidebar đóng`: Extension gọi Web App bằng khóa theo spreadsheet; mở lại Sidebar chỉ đọc state đang có, không khởi động kỳ thứ hai.
-- [ ] `P95 Nạp lần đầu`: Sheet trống → nhập bốn Category → kéo Customer → kéo Activity từ `FBM_ACTIVITY_SINCE` → ghi baseline → chạy lại không nhân bản.
-- [ ] `P96 Tính lại baseline`: khi đổi tập field/normalize, người dùng bấm lệnh một lần → tính lại theo luật mới → ghi log và không phát request write FBM.
-- [ ] `P97 Gỡ giới hạn test`: chỉ sau nghiệm thu `ALT00010`, xóa giá trị `FBM_SYNC_TEST_CUSTOMER_CODE` → chạy kỳ production đầu có giám sát → giữ giới hạn request và log tổng kết.
+## Slice 9 — Live acceptance và mở rộng production
 
-## C. Bộ live test tối thiểu với ALT00010
+- [ ] **Cần kiểm chứng thực tế:** chạy đủ lượt Đọc thử `ALT00010`, đối chiếu số dòng, field, hash, liên kết và idempotency.
+- [ ] **Cần kiểm chứng thực tế:** chạy Customer edit, Activity create/edit và xác nhận lại sau pull.
+- [ ] **Cần kiểm chứng thực tế:** kiểm conflict, khóa form, mất tab/phiên và phục hồi.
+- [ ] **Cần kiểm chứng thực tế:** kiểm lỗi transport/HTTP và xác nhận không gửi write mù.
+- [ ] Chốt bằng fixture offline các case không thể live: Customer vắng, Activity hard-delete/vắng, owner mismatch không phát sinh, marker mồ côi.
+- [ ] Không chạy Delete để dọn Activity thử; giữ marker nhận diện rõ dữ liệu nghiệm thu.
+- [ ] Chỉ sau khi toàn bộ live acceptance đạt mới gỡ giới hạn `ALT00010`.
+- [ ] Chỉ sau khi được duyệt mới nạp khoảng 1.700 Customer và Activity, đo payload/thời gian và chốt baseline.
+- [ ] Trước production: xóa `server/dev/`, deployment DEV và tệp cấu hình thử; tắt chia sẻ bằng liên kết, `LOG_TRACE` và cửa ghi thử.
+- [ ] Cập nhật cây thư mục, revision GAS, phiên bản Extension, commit tài liệu bàn giao và merge branch đồng bộ.
 
-### C1. Lượt tự động an toàn, mục tiêu một nút
+## Bằng chứng các slice
 
-- [ ] Tạo lệnh `Nghiệm thu ALT00010` chạy preflight, bốn lookup, pull Customer/Activity, kiểm field/hash/liên kết, chạy lại idempotency và xuất báo cáo case vào `Log`; lệnh này không push FBM.
-- [ ] Báo cáo phải liệt kê từng case `PASS/FAIL`, record ID, phase, request kind, hash trước/sau và tuyệt đối che cookie/authorized.
-- [ ] Trước khi chạy, `fbmProbeAltState` phải cho thấy chỉ Customer `ALT00010` và Activity con của nó; nếu có candidate ngoài phạm vi thì fail-closed.
-
-### C2. Lượt ghi thật có kiểm soát
-
-- [ ] Customer edit: lưu giá trị gốc của một field an toàn, đẩy một marker thử, pull xác nhận rồi khôi phục đúng giá trị gốc bằng cùng pipeline.
-- [ ] Activity create: tạo đúng một Activity thử dưới `ALT00010`, có marker cố định để lần chạy lại nhận ra và không tạo thêm.
-- [ ] Activity edit: sửa Activity thử vừa tạo, kiểm owner/ticket/OldValue, pull xác nhận baseline.
-- [ ] Mô phỏng mất phản hồi đúng một lần ở Activity thử để kiểm marker recovery mà không tạo record thứ hai.
-- [ ] Không có bước dọn bằng Delete; Activity thử được giữ lại với nội dung nhận diện rõ là dữ liệu nghiệm thu.
-
-### C3. Lượt cần người dùng thao tác
-
-- [ ] Conflict: người dùng đổi một field ở FBM và một giá trị khác ở ShinCRM trên record thử, chạy sync, xem diff rồi thử một trong ba cách quyết.
-- [ ] Form lock: người dùng mở form và sửa dở trong lúc chạy sync, xác nhận record bị hoãn và bản nháp không mất.
-- [ ] Mất tab/phiên: đóng tab hoặc đăng xuất, chạy một lát, xác nhận lỗi; mở/đăng nhập lại và tiếp tục.
-- [ ] Chạy nền: bắt đầu kỳ, đóng Sidebar, chờ Extension/Web App hoàn tất rồi mở lại xem state/log.
-
-### C4. Case không thể live chỉ với ALT00010 hoặc bị cấm
-
-- [ ] Customer create không thể live với mã `ALT00010` đã tồn tại vì FBM tự cấp mã mới; muốn kiểm thật phải cho phép một Customer thử mới hoặc chấp nhận chỉ kiểm builder/fixture offline.
-- [ ] Customer vắng do chuyển giao/xóa không nên tạo live vì sẽ đổi quyền hoặc xóa dữ liệu; phủ bằng test offline và chỉ quan sát nếu vận hành thật phát sinh.
-- [ ] Activity hard-delete/vắng không được tạo live vì quy tắc cấm xóa; phủ bằng fixture offline.
-- [ ] Owner mismatch chỉ live được nếu `ALT00010` có Activity của owner khác; nếu không thì phủ bằng fixture offline, không đổi owner FBM.
-- [ ] Bulk Activity 8 giờ buộc FBM trả grid toàn công ty trước khi Extension lọc ID; không thể gọi nó là live test chỉ chạm `ALT00010`, nên chỉ chạy khi chủ dự án duyệt kỳ production đầu tiên.
-- [ ] Nạp 1.700 Customer không thuộc giới hạn ALT00010; thực hiện sau khi bộ test hẹp đạt và chủ dự án gỡ cổng test.
-
-## D. Thứ tự hoàn tất phiên
-
-- [ ] Sửa các vi phạm hợp đồng đã audit ở A4–A10 và bổ sung test rủi ro cao tương ứng.
-- [ ] Hoàn thiện Web App/scheduler/ba lớp Activity để Sidebar đóng vẫn chạy.
-- [ ] Đẩy GAS, tải Extension, chạy probe và lượt C1.
-- [ ] Chạy C2 trên `ALT00010`, đọc báo cáo và sửa cho tới khi toàn bộ case tự động đạt.
-- [ ] Chạy C3 với thao tác tối thiểu của chủ dự án.
-- [ ] Chốt ngoại lệ Customer create và bulk Activity ở C4.
-- [ ] Gỡ cổng test, chạy nạp lần đầu và kỳ production có giám sát.
-- [ ] Tắt toàn bộ cửa DEV/bí mật/log trace, commit tài liệu bàn giao và merge branch đồng bộ sau nghiệm thu.
+| Slice | Commit code | Test/offline | Revision GAS | Bằng chứng thực tế | Ghi chú |
+| --- | --- | --- | --- | --- | --- |
+| Slice 0 — Nền tảng |  |  |  |  |  |
+| Slice 1 — Preflight + Category |  |  |  |  |  |
+| Slice 2 — Pull Customer |  |  |  |  |  |
+| Slice 3 — Pull Activity |  |  |  |  |  |
+| Slice 4 — Đối soát + conflict |  |  |  |  |  |
+| Slice 5 — Push Customer |  |  |  |  |  |
+| Slice 6 — Push Activity |  |  |  |  |  |
+| Slice 7 — Scheduler + nền |  |  |  |  |  |
+| Slice 8 — UI + log + probe |  |  |  |  |  |
+| Slice 9 — Live acceptance + production |  |  |  |  |  |

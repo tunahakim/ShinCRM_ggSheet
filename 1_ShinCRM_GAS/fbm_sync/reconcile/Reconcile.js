@@ -152,11 +152,29 @@ FbmSync.resolveConflict = function (entity, id, choice, merged) {
   return { ok: true, entity: entity, id: target, choice: choice, status: FbmSync.SYNC_STATUS.synced };
 };
 
-/** Hợp nhất định danh FBM theo mã khách, tránh tạo dòng trùng khi stt_rec_kh đổi. */
-FbmSync.findCustomerByIdentity = function (localById, localByCode, incoming) {
+/** Chuẩn hóa MST cho phép nối record; giữ dấu gạch chi nhánh nhưng bỏ dấu chấm, phẩy và khoảng trắng. */
+FbmSync.customerTaxKey = function (value) {
+  return FbmSync.normalize(value).replace(/[.,\s]/g, '');
+};
+
+/** Báo MST không thể dùng để nối an toàn vì trùng hoặc dòng đã liên kết. */
+FbmSync.customerTaxIdentityIssue = function (localByTaxNumber, incoming) {
+  var tax = FbmSync.customerTaxKey(incoming && (incoming.taxNumber || incoming.ma_so_thue));
+  var matches = tax && localByTaxNumber && localByTaxNumber[tax] || [];
+  if (!matches.length) { return null; }
+  if (matches.length !== 1) { return { tax: tax, reason: 'duplicate_tax_number', records: matches }; }
+  var record = matches[0];
+  if (String(record.fbmId || '').trim() || String(record.fbmCustomerCode || '').trim()) { return { tax: tax, reason: 'already_linked', records: matches }; }
+  return null;
+};
+
+/** Hợp nhất định danh FBM theo ID, mã khách hoặc MST duy nhất của dòng chưa liên kết. */
+FbmSync.findCustomerByIdentity = function (localById, localByCode, incoming, localByTaxNumber) {
   var key = String(incoming && incoming.fbmId || '').trim(), code = String(incoming && incoming.fbmCustomerCode || '').trim();
   if (key && localById[key]) { return localById[key]; }
   if (code && localByCode[code] && localByCode[code].length === 1) { return localByCode[code][0]; }
+  var tax = FbmSync.customerTaxKey(incoming && (incoming.taxNumber || incoming.ma_so_thue)), matches = tax && localByTaxNumber && localByTaxNumber[tax] || [];
+  if (matches.length === 1 && !String(matches[0].fbmId || '').trim() && !String(matches[0].fbmCustomerCode || '').trim()) { return matches[0]; }
   return null;
 };
 
@@ -250,11 +268,12 @@ FbmSync.pullWrite = function (entity, records) {
     records = linked.records;
     orphaned = linked.orphaned + Number(linked.blocked || 0);
   }
-  var local = {}, localById = {}, localByCode = {};
+  var local = {}, localById = {}, localByCode = {}, localByTaxNumber = {};
   FbmSync.readLocal(entity).forEach(function (record) {
     if (record.fbmId) { local[String(record.fbmId).trim()] = record; localById[String(record.fbmId).trim()] = record; }
     if (record.id) { localById[String(record.id).trim()] = record; }
     if (entity === 'customer' && record.fbmCustomerCode) { var code = String(record.fbmCustomerCode).trim(); (localByCode[code] || (localByCode[code] = [])).push(record); }
+    if (entity === 'customer') { var tax = FbmSync.customerTaxKey(record.taxNumber || record.ma_so_thue); if (tax) { (localByTaxNumber[tax] || (localByTaxNumber[tax] = [])).push(record); } }
   });
   var writes = [], statusWrites = [], conflicts = 0, skipped = 0;
   records.filter(function (incoming) { return !FbmSync.isTemporaryRecord(entity, incoming); }).forEach(function (incoming) {
@@ -262,7 +281,16 @@ FbmSync.pullWrite = function (entity, records) {
     var current = local[key];
     var identityMatched = false;
     if (entity === 'customer' && !current) {
-      current = FbmSync.findCustomerByIdentity(localById, localByCode, incoming);
+      var taxIssue = FbmSync.customerTaxIdentityIssue(localByTaxNumber, incoming);
+      if (taxIssue) {
+        skipped += 1;
+        state.metadata = state.metadata || {};
+        state.metadata.identityBlocks = Array.isArray(state.metadata.identityBlocks) ? state.metadata.identityBlocks : [];
+        state.metadata.identityBlocks.push({ entity: 'customer', taxNumber: taxIssue.tax, fbmCustomerCode: String(incoming.fbmCustomerCode || ''), reason: taxIssue.reason, at: Date.now() });
+        if (taxIssue.records.length === 1) { statusWrites.push({ id: taxIssue.records[0].id, syncStatus: FbmSync.SYNC_STATUS.error }); }
+        return;
+      }
+      current = FbmSync.findCustomerByIdentity(localById, localByCode, incoming, localByTaxNumber);
       if (current) { local[key] = current; identityMatched = String(current.fbmId || '').trim() !== key; }
     }
     if (key) {

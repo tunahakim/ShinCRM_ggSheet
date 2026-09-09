@@ -93,6 +93,23 @@ async function chay(so) {
   const identityIncoming = builders.FbmSync.customerRecord({ stt_rec_kh: 'NEW-ID', ma_kh: 'ALT99999', ten_kh: 'Mới' }, gate);
   const identityResult = builders.FbmSync.pullWrite('customer', [identityIncoming]);
   check(so, 'Customer lech stt_rec_kh van cap nhat dung dong theo ma_kh', [identityResult.written, identityWrite.records[0].id, identityWrite.records[0].fbmId], [1, 'CUS-1', 'NEW-ID']);
+
+  let taxWrite;
+  let taxState = { metadata: { categoryGate: gate } };
+  builders.FbmSync.stateRead = () => taxState;
+  builders.FbmSync.stateWrite = (next) => { taxState = next; };
+  builders.FbmSync.readLocal = () => [{ id: 'CUS-MST', taxNumber: '010.012 3456', fbmId: '', fbmCustomerCode: '', note: 'Nội bộ' }];
+  builders.writeGateSave = (request) => { taxWrite = request; return { ok: true }; };
+  const taxIncoming = builders.FbmSync.customerRecord({ stt_rec_kh: 'MST-ID', ma_kh: 'ALT00011', ma_so_thue: '0100123456', ten_kh: 'FBM cùng MST' }, gate);
+  const taxResult = builders.FbmSync.pullWrite('customer', [taxIncoming]);
+  check(so, 'Customer cùng MST nối vào dòng ShinCRM chưa liên kết', [taxResult.written, taxWrite.records[0].id, taxWrite.records[0].fbmId, taxWrite.records[0].note], [1, 'CUS-MST', 'MST-ID', 'Nội bộ']);
+
+  let ambiguousWrite = false;
+  taxState = { metadata: { categoryGate: gate } };
+  builders.FbmSync.readLocal = () => [{ id: 'CUS-MST-1', taxNumber: '0100123456' }, { id: 'CUS-MST-2', taxNumber: '0100123456' }];
+  builders.writeGateSave = () => { ambiguousWrite = true; return { ok: true }; };
+  const ambiguousResult = builders.FbmSync.pullWrite('customer', [taxIncoming]);
+  check(so, 'Customer trùng MST nhiều dòng thì fail-closed không tạo bản ghi', [ambiguousResult.written, ambiguousResult.skipped, ambiguousWrite, taxState.metadata.identityBlocks[0].reason], [0, 1, false, 'duplicate_tax_number']);
   let conflictState = { metadata: { categoryGate: gate, conflicts: [] }, counts: { conflict: 0 } }, conflictWrite;
   builders.FbmSync.stateRead = () => conflictState;
   builders.FbmSync.stateWrite = (next) => { conflictState = next; return next; };
