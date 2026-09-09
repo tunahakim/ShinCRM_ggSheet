@@ -8,6 +8,29 @@ FbmSync.schedule = function () {
   props.setProperty('FBM_SYNC_NEXT_ACTIVITY_SCAN', String(Date.now() + 8 * 60 * 60 * 1000));
   return { heartbeatMinutes: 5, customerMinutes: 60, activityHours: 8 };
 };
+/** Nhận quyền một lượt scheduler bằng khóa tài liệu; không giữ công việc trong RAM. */
+FbmSync.schedulerClaim = function (kind, now) {
+  var names = { heartbeat: ['FBM_SYNC_NEXT_HEARTBEAT', 5 * 60 * 1000], customer: ['FBM_SYNC_NEXT_CUSTOMER_SCAN', 60 * 60 * 1000], activity: ['FBM_SYNC_NEXT_ACTIVITY_SCAN', 8 * 60 * 60 * 1000] };
+  var item = names[String(kind || '')], props = PropertiesService.getDocumentProperties(), at = Number(now || Date.now());
+  if (!item) { return { ok: false, code: 'UNKNOWN_SCHEDULE' }; }
+  var due = Number(props.getProperty(item[0]) || 0);
+  if (due && due > at) { return { ok: false, code: 'NOT_DUE', nextRunAt: due }; }
+  var lock = LockService.getDocumentLock();
+  if (!lock.tryLock(SETTINGS.LOCK_WAIT_MS)) { return { ok: false, code: 'BUSY' }; }
+  try {
+    var state = FbmSync.stateRead();
+    if (state.runId && ['idle', 'done', 'error'].indexOf(state.phase) < 0) { return { ok: false, code: 'SYNC_ALREADY_RUNNING', nextRunAt: due }; }
+    due = Number(props.getProperty(item[0]) || 0);
+    if (due && due > at) { return { ok: false, code: 'NOT_DUE', nextRunAt: due }; }
+    var next = at + item[1];
+    props.setProperty(item[0], String(next));
+    state.scheduledScan = String(kind);
+    state.nextRunAt = next;
+    state.message = 'Đã nhận lượt scheduler ' + String(kind) + '; chờ Extension chuyển request.';
+    FbmSync.stateWrite(state);
+    return { ok: true, kind: String(kind), nextRunAt: next, status: FbmSync.statusView() };
+  } finally { lock.releaseLock(); }
+};
 /** Cài lại ba trigger sync, xóa bản cũ cùng handler trước. */
 function fbmInstallScheduler() {
   var names = ['fbmHeartbeatTrigger', 'fbmCustomerScanTrigger', 'fbmActivityScanTrigger'];
@@ -36,8 +59,8 @@ function fbmSyncHeartbeat(rawResponse) {
 
 function fbmHeartbeat(rawResponse) { return fbmSyncHeartbeat(rawResponse); }
 /** Trigger chỉ ghi marker; Extension mới là nơi gửi request heartbeat. */
-function fbmHeartbeatTrigger() { return FbmSync.statePatch({ message: 'Đến lịch heartbeat; chờ Extension chuyển request.' }); }
+function fbmHeartbeatTrigger() { return FbmSync.schedulerClaim('heartbeat'); }
 /** Đánh dấu đến lịch quét Customer để Sidebar/Extension tiếp tục. */
-function fbmCustomerScanTrigger() { return FbmSync.statePatch({ message: 'Đến lịch quét Customer; chờ Extension chuyển request.' }); }
+function fbmCustomerScanTrigger() { return FbmSync.schedulerClaim('customer'); }
 /** Đánh dấu đến lịch quét Activity để Sidebar/Extension tiếp tục. */
-function fbmActivityScanTrigger() { return FbmSync.statePatch({ message: 'Đến lịch quét Activity; chờ Extension chuyển request.' }); }
+function fbmActivityScanTrigger() { return FbmSync.schedulerClaim('activity'); }

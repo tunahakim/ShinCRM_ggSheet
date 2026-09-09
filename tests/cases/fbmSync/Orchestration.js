@@ -10,7 +10,7 @@ async function chay(so) {
     FbmSync: {},
     PropertiesService: { getDocumentProperties: () => propertyApi, getScriptProperties: () => propertyApi }
   });
-  napServer(orchestration, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/EntryPoints.js');
+  napServer(orchestration, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/EntryPoints.js');
   const started = orchestration.FbmSync.start({ mode: 'read' });
   check(so, 'start bat dau bang bootstrap Customer', started.request.meta.kind, 'authorize');
   check(so, 'bootstrap dung viewPage false', started.request.body.viewPage, false);
@@ -73,6 +73,21 @@ async function chay(so) {
   recordLocks.FbmSync.stateStart('', 'checking_session', 0);
   check(so, 'phien sync moi giu khoa cua form nguoi dung', recordLocks.FbmSync.stateRead().locks['customer:C-2'].owner, 'user');
 
+  const schedulerData = {};
+  const schedulerPropertyApi = { getProperty: (key) => schedulerData[key] || null, setProperty: (key, value) => { schedulerData[key] = String(value); } };
+  const scheduler = taoHopCat({ FbmSync: {}, SETTINGS: { LOCK_WAIT_MS: 1 }, PropertiesService: { getDocumentProperties: () => schedulerPropertyApi }, LockService: { getDocumentLock: () => ({ tryLock: () => true, releaseLock: () => {} }) } });
+  napServer(scheduler, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/state/State.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/state/Scheduler.js');
+  scheduler.FbmSync.schedule();
+  schedulerData.FBM_SYNC_NEXT_CUSTOMER_SCAN = '1000';
+  const claimed = scheduler.FbmSync.schedulerClaim('customer', 1000);
+  check(so, 'scheduler claim mot ky Customer va doi marker', [claimed.ok, claimed.kind, scheduler.FbmSync.stateRead().scheduledScan, Number(schedulerData.FBM_SYNC_NEXT_CUSTOMER_SCAN) > 1000], [true, 'customer', 'customer', true]);
+  const notDue = scheduler.FbmSync.schedulerClaim('customer', 1001);
+  check(so, 'scheduler khong tao ky Customer thu hai khi marker chua den', [notDue.ok, notDue.code], [false, 'NOT_DUE']);
+  const active = scheduler.FbmSync.stateRead();
+  active.phase = 'pull_customer'; active.runId = 'busy'; scheduler.FbmSync.stateWrite(active);
+  schedulerData.FBM_SYNC_NEXT_ACTIVITY_SCAN = '1000';
+  const busy = scheduler.FbmSync.schedulerClaim('activity', 1000);
+  check(so, 'scheduler bo qua khi dang co phien', [busy.ok, busy.code], [false, 'SYNC_ALREADY_RUNNING']);
 }
 
 module.exports = { chay };

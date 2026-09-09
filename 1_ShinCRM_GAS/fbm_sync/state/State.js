@@ -5,7 +5,7 @@ FbmSync.LOCK_KEY = 'FBM_SYNC_RECORD_LOCKS_V1';
 
 /** Tạo state rỗng với đủ field để các phiên cũ vẫn đọc được. */
 FbmSync.stateDefault = function () {
-  return { version: 1, runId: '', mode: 'read', phase: 'idle', entity: '', cursor: {}, session: { customerAuthorized: '', activityAuthorized: '', cookie: '', userId: '', lookups: {}, expired: false, lastHeartbeatAt: 0 }, metadata: { categoryGate: null, categoryBlocks: [], seen: { customer: {}, activity: {} }, conflicts: [], pushFailures: {}, preview: { customers: [], activities: [], truncated: false } }, counts: { total: 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 }, current: '', message: '', startedAt: 0, updatedAt: 0, lastError: '', lastFailureCode: '', retryable: false, retryCount: 0, retryLimit: 2, locks: {} };
+  return { version: 1, runId: '', mode: 'read', scan: 'full', scheduledScan: '', phase: 'idle', entity: '', cursor: {}, session: { customerAuthorized: '', activityAuthorized: '', cookie: '', userId: '', lookups: {}, expired: false, lastHeartbeatAt: 0 }, metadata: { categoryGate: null, categoryBlocks: [], seen: { customer: {}, activity: {} }, conflicts: [], pushFailures: {}, preview: { customers: [], activities: [], truncated: false } }, counts: { total: 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 }, current: '', message: '', startedAt: 0, updatedAt: 0, lastError: '', lastFailureCode: '', retryable: false, retryCount: 0, retryLimit: 2, locks: {} };
 };
 
 /** Lấy kho state cấp tài liệu, dùng chung giữa các lần gọi GAS. */
