@@ -18,7 +18,7 @@
 var SHEET_LINK_NONCE = '';
 var SHEET_LINK_SEQ = 0;
 var SHEET_LINK_SPREADSHEET_ID = '';
-var SHEET_LINK_SELECTION_SCHEMA = null;
+var SHEET_LINK_COLUMN_HINTS = null;
 var SHEET_LINK_LAST_ACK = 0;
 var SHEET_LINK_EXTENSION_SESSION = '';
 var SHEET_LINK_LAST_SHEET = '';
@@ -59,15 +59,15 @@ function sheetLinkSetSpreadsheetId(id) {
 }
 
 /** Gửi bảng mã cột do DATA_SCHEMA cung cấp; Extension không tự biết mã `@`. */
-function sheetLinkSetSelectionSchema(schema) {
-  if (!schema || !Array.isArray(schema.targets) || !schema.targets.length) {
-    SHEET_LINK_SELECTION_SCHEMA = null;
+function sheetLinkSetColumnHints(hints) {
+  if (!hints || !Array.isArray(hints.targets) || !hints.targets.length) {
+    SHEET_LINK_COLUMN_HINTS = null;
     return;
   }
 
-  SHEET_LINK_SELECTION_SCHEMA = {
-    revision: String(schema.revision || ''),
-    targets: schema.targets.map(function (target) {
+  SHEET_LINK_COLUMN_HINTS = {
+    revision: String(hints.revision || ''),
+    targets: hints.targets.map(function (target) {
       return {
         sheetName: typeof target.sheetName === 'string' ? target.sheetName : '',
         prefix: typeof target.prefix === 'string' ? target.prefix : '',
@@ -81,11 +81,11 @@ function sheetLinkSetSelectionSchema(schema) {
   if (window.top !== window) {
     try {
       window.top.postMessage({
-        action: 'CRM_SCHEMA',
+        action: 'CRM_COLUMN_HINTS',
         nonce: SHEET_LINK_NONCE,
         spreadsheetId: SHEET_LINK_SPREADSHEET_ID,
-        schemaRevision: SHEET_LINK_SELECTION_SCHEMA.revision,
-        schema: SHEET_LINK_SELECTION_SCHEMA
+        hintsRevision: SHEET_LINK_COLUMN_HINTS.revision,
+        columnHints: SHEET_LINK_COLUMN_HINTS
       }, SHEET_LINK_ORIGIN);
     } catch (err) {}
   }
@@ -107,8 +107,8 @@ function sheetLinkHandshakePing() {
         action: 'CRM_HANDSHAKE',
         nonce: SHEET_LINK_NONCE,
         spreadsheetId: SHEET_LINK_SPREADSHEET_ID,
-        schemaRevision: SHEET_LINK_SELECTION_SCHEMA && SHEET_LINK_SELECTION_SCHEMA.revision,
-        schema: SHEET_LINK_SELECTION_SCHEMA
+        hintsRevision: SHEET_LINK_COLUMN_HINTS && SHEET_LINK_COLUMN_HINTS.revision,
+        columnHints: SHEET_LINK_COLUMN_HINTS
       }, SHEET_LINK_ORIGIN);
     } catch (err) {
       // Extension chưa cài hoặc trang chưa sẵn sàng — không sao, ping lại ở nhịp sau.

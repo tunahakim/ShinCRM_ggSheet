@@ -34,9 +34,9 @@ var sidebarWindow = null;
 var sidebarOrigin = '';
 var sidebarNonce = '';
 var extensionSessionId = Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
-var CRM_SELECTION_SCHEMA = null;
+var CRM_COLUMN_HINTS = null;
 
-function isSelectionSchema(value) {
+function isColumnHints(value) {
   if (!value || typeof value !== 'object') { return false; }
   if (!Array.isArray(value.targets) || !value.targets.length) { return false; }
   return value.targets.every(function (target) {
@@ -47,12 +47,12 @@ function isSelectionSchema(value) {
   });
 }
 
-function acceptSelectionSchema(data) {
-  if (!isSelectionSchema(data.schema)) { return; }
+function acceptColumnHints(data) {
+  if (!isColumnHints(data.columnHints)) { return; }
   if (data.spreadsheetId && typeof readSpreadsheetId === 'function' && String(data.spreadsheetId) !== String(readSpreadsheetId())) { return; }
-  CRM_SELECTION_SCHEMA = {
-    revision: String(data.schemaRevision || ''),
-    targets: data.schema.targets.map(function (target) {
+  CRM_COLUMN_HINTS = {
+    revision: String(data.hintsRevision || ''),
+    targets: data.columnHints.targets.map(function (target) {
       return {
         sheetName: typeof target.sheetName === 'string' ? target.sheetName : '',
         prefix: typeof target.prefix === 'string' ? target.prefix : '',
@@ -95,9 +95,9 @@ window.addEventListener('message', function (event) {
     });
     return;
   }
-  if (data && data.action === 'CRM_SCHEMA') {
+  if (data && data.action === 'CRM_COLUMN_HINTS') {
     if (!isAllowedSidebarOrigin(event.origin) || event.source !== sidebarWindow || String(data.nonce || '') !== sidebarNonce) { return; }
-    acceptSelectionSchema(data);
+    acceptColumnHints(data);
     return;
   }
   if (!data || data.action !== 'CRM_HANDSHAKE') { return; }
@@ -110,7 +110,7 @@ window.addEventListener('message', function (event) {
   sidebarWindow = event.source;
   sidebarOrigin = event.origin;
   sidebarNonce = nonce;
-  acceptSelectionSchema(data);
+  acceptColumnHints(data);
   if (newChannel && typeof lastContextKey !== 'undefined') { lastContextKey = ''; }
 
   try {

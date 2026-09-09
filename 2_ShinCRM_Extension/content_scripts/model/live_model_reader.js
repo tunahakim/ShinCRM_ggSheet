@@ -1,5 +1,5 @@
 /* Đọc ô từ live model của Google Sheets trong MAIN world.
- * Header được Sidebar truyền vào theo schema hiện tại; Extension không hardcode mã cột.
+ * Header được Sidebar truyền vào dưới dạng column hint lấy từ DATA_SCHEMA; Extension không hardcode mã cột.
  * Khi model/header không đọc được, trả trạng thái lỗi thay vì đoán mã khách.
  */
 (function () {

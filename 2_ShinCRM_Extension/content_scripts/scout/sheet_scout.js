@@ -24,8 +24,8 @@ var LIVE_MODEL_TIMEOUT_MS = 800;
 var liveRetryAt = 0;
 
 function liveHeaderForSheet(sheetName) {
-  var schema = typeof CRM_SELECTION_SCHEMA !== 'undefined' ? CRM_SELECTION_SCHEMA : null;
-  var targets = schema && Array.isArray(schema.targets) ? schema.targets : [];
+  var hints = typeof CRM_COLUMN_HINTS !== 'undefined' ? CRM_COLUMN_HINTS : null;
+  var targets = hints && Array.isArray(hints.targets) ? hints.targets : [];
   var exact = targets.filter(function (target) {
     return target.sheetName && target.sheetName === sheetName && target.header;
   });

@@ -50,8 +50,8 @@ async function sidebarBoot() {
 
     var skipped = ingestCore(core);
     sheetLinkSetSpreadsheetId(core.spreadsheetId);
-    if (typeof sheetLinkSetSelectionSchema === 'function') {
-      sheetLinkSetSelectionSchema({
+    if (typeof sheetLinkSetColumnHints === 'function') {
+      sheetLinkSetColumnHints({
         revision: core.schemaRevision || '',
         targets: [
           { sheetName: 'Customer', header: core.schema.customer.id.code },
