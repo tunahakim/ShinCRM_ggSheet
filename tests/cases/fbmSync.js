@@ -382,9 +382,12 @@ async function chay(so) {
   check(so, 'push request luu dung cursor cho phan hoi tiep', pushedState.cursor.kind, 'push_wait');
   check(so, 'push request co envelope protocol', pushRequest.meta.kind, 'customer_edit_open');
   let pushPatch;
+  const pushLogs = [];
+  push.logEvent = (event) => pushLogs.push(event);
   push.writeGateSave = (request) => { pushPatch = request.records[0]; return { ok: true }; };
   push.FbmSync.markPushResult({ entity: 'customer', record: { id: 'C-OLD', fbmId: 'A-OLD', fbmCustomerCode: 'ALT00010', fbmHash: 'BASE' } }, { d: { InternalValues: [{ Name: 'stt_rec_kh', Value: 'A-OLD' }, { Name: 'ma_kh', Value: 'ALT00010' }] } }, 'customer_edit_save');
   check(so, 'push thanh cong giu baseline cu cho ky xac nhan', pushPatch.fbmHash, 'BASE');
+  check(so, 'push thanh cong ghi log request kind huong va hash', [pushLogs[0].action, pushLogs[0].detail.requestKind, pushLogs[0].detail.direction, pushLogs[0].detail.hBASE], ['push_record', 'customer_edit_save', 'ShinCRM → FBM', 'BASE']);
   const errorState = { counts: { error: 0 }, metadata: { categoryGate: {}, pushFailures: {} }, locks: {} };
   push.FbmSync.unlockRecord = () => ({ locks: {} });
   push.FbmSync.markPushError(errorState, { entity: 'customer', id: 'C-ERR', record: { id: 'C-ERR', companyName: 'Lỗi' } }, 'FBM từ chối');
@@ -449,7 +452,9 @@ async function chay(so) {
   push.logEvent = (event) => skippedLogs.push(event);
   const skippedState = { counts: { skipped: 0 }, metadata: {} };
   push.FbmSync.markPushSkipped(skippedState, { entity: 'activity', id: 'ACT-SKIP' }, push.FbmSync.SYNC_STATUS.unknownCategory, 'Category chua khop');
-  check(so, 'Push record bi hoan co log chi tiet', [skippedLogs.length, skippedLogs[0].action, skippedLogs[0].recordId], [1, 'push_record_skipped', 'ACT-SKIP']);
+  const skippedEntry = skippedLogs.filter((event) => event.action === 'push_record_skipped')[0];
+  const skippedDetail = skippedLogs.filter((event) => event.action === 'push_record')[0];
+  check(so, 'Push record bi hoan co log chi tiet', [!!skippedEntry, skippedEntry && skippedEntry.recordId, skippedDetail && skippedDetail.detail.direction, skippedDetail && skippedDetail.detail.syncStatus], [true, 'ACT-SKIP', 'ShinCRM → FBM', push.FbmSync.SYNC_STATUS.unknownCategory]);
 
   const activityDecisionLogs = [];
   builders.logEvent = (event) => activityDecisionLogs.push(event);

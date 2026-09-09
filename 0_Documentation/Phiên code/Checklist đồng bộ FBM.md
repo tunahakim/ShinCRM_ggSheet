@@ -196,7 +196,7 @@
 ### Đóng slice
 
 - [x] Test offline phủ cổng, OldValue, độ dài, Bugs, retry và không ghi chú nội bộ.
-- [ ] Log có request kind, record, hướng, hash và kết quả đã che bí mật.
+- [x] Log có request kind, record, hướng, hash và kết quả đã che bí mật.
 - [ ] **Cần kiểm chứng thực tế:** sửa một field an toàn của `ALT00010`, pull xác nhận rồi khôi phục giá trị gốc.
 - [ ] **Cần kiểm chứng thực tế:** kiểm lỗi nghiệp vụ trùng/sai MST hoặc điện thoại.
 - [ ] Customer create chỉ kiểm chứng thực tế nếu chủ dự án cho phép một Customer thử mới; FBM tự cấp mã khác `ALT00010`.

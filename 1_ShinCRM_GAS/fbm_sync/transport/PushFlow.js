@@ -17,6 +17,18 @@ FbmSync.prepareCategoryGate = function (state) {
   state.metadata.categoryBlocks = blocks;
   return blocks;
 };
+/** Ghi kết quả push theo record; chỉ giữ ID, request kind và hash, không giữ payload. */
+FbmSync.logPushRecord = function (candidate, operation, outcome, reason, detail) {
+  if (typeof logEvent !== 'function') { return; }
+  var record = candidate && candidate.record || {}, entity = String(candidate && candidate.entity || ''), id = String(candidate && candidate.id || record.id || '');
+  var gate = (candidate && candidate.categoryGate) || {};
+  var hShin = typeof FbmSync.hash === 'function' ? FbmSync.hash(record, entity, gate) : '';
+  logEvent({
+    source: 'fbm_sync', action: 'push_record', outcome: outcome || (typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok'), entity: entity, recordId: id,
+    reason: String(reason || ''),
+    detail: Object.assign({ direction: 'ShinCRM → FBM', requestKind: String(operation || candidate && candidate.kind || ''), hSHIN: hShin, hBASE: String(record.fbmHash || '') }, detail || {})
+  });
+};
 /** Ghi trạng thái kỹ thuật sau push; baseline chỉ cập nhật khi pull sau đó xác nhận bằng nhau. */
 FbmSync.markPushResult = function (candidate, response, operation) {
   var record = candidate.record || {}, values = FbmSync.extractInternalValues(response), data = FbmSync.protocol.parse(response) || {};
@@ -34,6 +46,7 @@ FbmSync.markPushResult = function (candidate, response, operation) {
   }
   var saved = writeGateSave({ entity: candidate.entity, records: [patch], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
   if (!saved || !saved.ok) { throw new Error('Không ghi được trạng thái chờ xác nhận sau push.'); }
+  FbmSync.logPushRecord(candidate, operation, typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', 'Đã gửi request ghi; chờ kỳ pull xác nhận.', { fbmId: patch.fbmId, fbmCustomerCode: patch.fbmCustomerCode || '' });
   return patch;
 };
 
@@ -59,8 +72,9 @@ FbmSync.markPushError = function (state, candidate, reason) {
     try { writeGateSave({ entity: candidate.entity, records: [{ id: candidate.id, syncStatus: FbmSync.SYNC_STATUS.error }], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] }); } catch (ignore) {}
   }
   if (typeof logEvent === 'function') {
-    logEvent({ source: 'fbm_sync', action: 'push_record_error', outcome: LOG_ERROR, entity: candidate.entity, recordId: String(candidate.id || ''), reason: String(reason || 'Không thể đẩy bản ghi.') });
+    logEvent({ source: 'fbm_sync', action: 'push_record_error', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', entity: candidate.entity, recordId: String(candidate.id || ''), reason: String(reason || 'Không thể đẩy bản ghi.') });
   }
+  FbmSync.logPushRecord(candidate, candidate.kind, typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', reason, { syncStatus: FbmSync.SYNC_STATUS.error });
   FbmSync.releasePushLock(state, candidate.entity, candidate.id);
 };
 
@@ -74,6 +88,7 @@ FbmSync.markPushSkipped = function (state, candidate, status, reason) {
   if (typeof logEvent === 'function') {
     logEvent({ source: 'fbm_sync', action: 'push_record_skipped', outcome: typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn', entity: candidate.entity, recordId: String(candidate.id || ''), reason: String(reason || 'Bo qua ban ghi chua du dieu kien day.') });
   }
+  FbmSync.logPushRecord(candidate, candidate.kind, typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn', reason, { syncStatus: status || FbmSync.SYNC_STATUS.skipped });
 };
 
 /** Bỏ qua một record push lỗi và tiếp tục candidate kế tiếp, không lặp request đã gửi. */
