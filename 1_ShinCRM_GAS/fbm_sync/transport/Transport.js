@@ -120,6 +120,9 @@ FbmSync.markPushSkipped = function (state, candidate, status, reason) {
   if (typeof writeGateSave === 'function') {
     try { writeGateSave({ entity: candidate.entity, records: [{ id: candidate.id, syncStatus: status || FbmSync.SYNC_STATUS.skipped }], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] }); } catch (ignore) {}
   }
+  if (typeof logEvent === 'function') {
+    logEvent({ source: 'fbm_sync', action: 'push_record_skipped', outcome: typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn', entity: candidate.entity, recordId: String(candidate.id || ''), reason: String(reason || 'Bo qua ban ghi chua du dieu kien day.') });
+  }
 };
 
 /** Bỏ qua một record push lỗi và tiếp tục candidate kế tiếp, không lặp request đã gửi. */

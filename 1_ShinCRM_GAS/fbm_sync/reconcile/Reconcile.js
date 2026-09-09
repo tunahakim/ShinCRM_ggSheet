@@ -363,6 +363,7 @@ FbmSync.pullWrite = function (entity, records) {
         statusWrites.push({ id: current.id, syncStatus: FbmSync.SYNC_STATUS.notApplied });
         state.locks = state.locks || {};
         state.locks[entity + ':' + String(current.id)] = { revision: localHash, owner: 'sync', reason: 'not_applied', at: Date.now() };
+        if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'push_not_applied', outcome: typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn', entity: entity, recordId: String(current.id || ''), reason: 'FBM khong thay doi sau khi ghi; da khoa de khong lap vo han.' }); }
       } else {
         conflicts += 1;
         FbmSync.rememberConflict(state, entity, current, incoming, { hBASE: previousHash, hSHIN: localHash, hFBM: incomingHash }, categoryGate);

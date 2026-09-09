@@ -416,8 +416,13 @@ async function chay(so) {
     sessionState.phase = 'pull_customer'; sessionState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 2, pageValue: ['x'] };
     push.FbmSync.stateWrite(sessionState);
     const sessionResult = push.FbmSync.continue({ ok: failure.status === 200, status: failure.status, body: failure.body });
-    check(so, 'Session error ' + failure.status + ' giu cursor de chay ky sau', [sessionResult.ok, push.FbmSync.stateRead().phase, push.FbmSync.stateRead().cursor.kind], [false, 'error', 'customer_grid']);
+  check(so, 'Session error ' + failure.status + ' giu cursor de chay ky sau', [sessionResult.ok, push.FbmSync.stateRead().phase, push.FbmSync.stateRead().cursor.kind], [false, 'error', 'customer_grid']);
   });
+  const skippedLogs = [];
+  push.logEvent = (event) => skippedLogs.push(event);
+  const skippedState = { counts: { skipped: 0 }, metadata: {} };
+  push.FbmSync.markPushSkipped(skippedState, { entity: 'activity', id: 'ACT-SKIP' }, push.FbmSync.SYNC_STATUS.unknownCategory, 'Category chua khop');
+  check(so, 'Push record bi hoan co log chi tiet', [skippedLogs.length, skippedLogs[0].action, skippedLogs[0].recordId], [1, 'push_record_skipped', 'ACT-SKIP']);
 
   const activityDecisionLogs = [];
   builders.logEvent = (event) => activityDecisionLogs.push(event);

@@ -238,7 +238,7 @@
 - [x] Icon menu phản ánh trạng thái; tự động có thể báo đang phát triển.
 - [x] Đã thấy tiến trình request, lỗi transport và kết quả đọc trên màn hình.
 - [x] GAS ghi log phase/lỗi nguồn `fbm_sync`, không ghi cookie/payload.
-- [ ] Có dòng tổng kết mỗi kỳ và dòng chi tiết cho lỗi, conflict, hoãn, mã lạ và đẩy không ăn.
+- [x] Có dòng tổng kết mỗi kỳ và dòng chi tiết cho lỗi, conflict, hoãn, mã lạ và đẩy không ăn.
 - [ ] Màn hình có danh sách record kéo/đẩy/lỗi/conflict, không bắt người dùng đọc JSON trong Log.
 - [ ] Có lệnh `Nghiệm thu ALT00010` chạy preflight, lookup, pull, field/hash/link, idempotency và ghi báo cáo PASS/FAIL vào Log; không push FBM.
 - [ ] Báo cáo che cookie/authorized nhưng giữ record ID, phase, request kind và hash trước/sau.
