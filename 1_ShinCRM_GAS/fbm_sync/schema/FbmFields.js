@@ -61,7 +61,7 @@ FbmSync.SYNC_LOOKUPS = [
   { key: '@CAT_TINH_THANH', controller: 'crProvinceCity' },
   { key: '@CAT_NGUON_KH', controller: 'crLeadSource' },
   { key: '@CAT_CONG_VIEC', controller: 'crJob' },
-  { key: '@CAT_SAN_PHAM', controller: 'crProduct' }
+  { key: '@CAT_SAN_PHAM', controller: 'crdmsp' }
 ];
 
 FbmSync.PUSH_ALLOW_VALUE = 'Cho phép';

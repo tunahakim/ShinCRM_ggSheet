@@ -256,7 +256,12 @@ FbmSync.continue = function (rawResponse) {
       try { writeGateSave({ entity: cursor.entity, records: [{ id: cursor.candidate.id, syncStatus: FbmSync.SYNC_STATUS.error }], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] }); } catch (ignore) {}
     }
     if (cursor.kind === 'push_wait' && cursor.candidate) { FbmSync.releasePushLock(state, cursor.entity, cursor.candidate.id); }
-    state.phase = 'error'; state.lastError = (success.bug && (success.bug.Message || success.bug.message)) || 'FBM tra ve loi nghiep vu'; state.message = state.lastError; FbmSync.stateWrite(state);
+    var failureReason = (success.bug && (success.bug.Message || success.bug.message)) || 'FBM tra ve loi nghiep vu';
+    if (cursor.kind === 'lookup') {
+      var failedLookup = FbmSync.SYNC_LOOKUPS[Number(cursor.index || 0)];
+      if (failedLookup) { failureReason = 'Không đọc được danh mục ' + failedLookup.key + ' (' + failedLookup.controller + '): ' + failureReason; }
+    }
+    state.phase = 'error'; state.lastError = failureReason; state.message = state.lastError; FbmSync.stateWrite(state);
     return { ok: false, status: FbmSync.statusView(), error: success.bug };
   }
 

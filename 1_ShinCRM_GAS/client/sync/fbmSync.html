@@ -170,6 +170,7 @@ function fbmSyncRun(mode) {
     return Promise.resolve(missing);
   }
   FBM_SYNC_CLIENT.running = true;
+  fbmSyncPaint({ phase: 'checking_session', label: 'Đang chuẩn bị đồng bộ', direction: 'Kết nối FBM', entityLabel: 'Chuẩn bị phiên', message: 'Đang chuẩn bị phiên đồng bộ...', counts: {} });
   var work = callServer('fbmStartSync', [mode || 'read']).then(function (started) {
     if (!started || !started.ok) {
       FBM_SYNC_CLIENT.running = false;

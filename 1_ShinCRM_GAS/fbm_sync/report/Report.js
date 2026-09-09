@@ -31,12 +31,19 @@ FbmSync.logStatus = function (status, action) {
   if (!status || typeof logEvent !== 'function') { return; }
   var phase = String(status.phase || 'idle');
   var outcome = phase === 'error' || status.lastError ? LOG_ERROR : (phase === 'conflict' ? LOG_CONFLICT : LOG_OK);
-  logEvent({
+  var writer = outcome === LOG_ERROR ? logEvent : logTrace;
+  writer({
     source: 'fbm_sync', action: action || 'slice', outcome: outcome,
     entity: status.entity || '', recordId: status.current || 'ALT00010',
     reason: status.message || status.label || phase,
     detail: { phase: phase, direction: status.direction || '', entityLabel: status.entityLabel || '', counts: status.counts || {}, lastError: status.lastError || '' }
   });
+};
+/** Chỉ ghi khi đổi giai đoạn hoặc kết thúc để không làm chậm từng request FBM. */
+FbmSync.shouldLogStatus = function (before, after) {
+  if (!after) { return false; }
+  var phase = String(after.phase || '');
+  return phase === 'error' || phase === 'done' || phase === 'paused' || phase === 'conflict' || !before || String(before.phase || '') !== phase || String(before.entity || '') !== String(after.entity || '');
 };
 /** Ghi lỗi vận chuyển khi Sidebar không nhận được response từ Extension. */
 FbmSync.logTransportError = function (message, action) {

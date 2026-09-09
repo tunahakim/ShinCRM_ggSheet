@@ -2,7 +2,7 @@
 /** Bắt đầu một phiên đọc/ghi theo mode được chọn. */
 function fbmStartSync(mode) { return runEntryPoint('fbmStartSync', 'sidebar', 'throw', function () { var result = fbmSyncStart(mode); if (result && result.status) { FbmSync.logStatus(result.status, 'start'); } return result; }); }
 /** Gửi response thô của Extension cho cursor hiện tại. */
-function fbmContinueSync(response) { return runEntryPoint('fbmContinueSync', 'sidebar', 'throw', function () { var result = fbmSyncContinue(response); if (result && result.status) { FbmSync.logStatus(result.status, 'slice'); } return result; }); }
+function fbmContinueSync(response) { return runEntryPoint('fbmContinueSync', 'sidebar', 'throw', function () { var before = FbmSync.statusView(), result = fbmSyncContinue(response); if (result && FbmSync.shouldLogStatus(before, result.status)) { FbmSync.logStatus(result.status, 'slice'); } return result; }); }
 /** Dừng phiên đồng bộ mà không đụng dữ liệu nghiệp vụ. */
 function fbmCancelSync() { return runEntryPoint('fbmCancelSync', 'sidebar', 'throw', function () { var result = fbmSyncCancel(); if (result && result.status) { FbmSync.logStatus(result.status, 'cancel'); } return result; }); }
 /** Đọc snapshot tiến độ hiện tại; Sidebar chỉ polling khi đang chạy. */
