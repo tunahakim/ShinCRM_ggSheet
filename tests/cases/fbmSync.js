@@ -220,6 +220,13 @@ async function chay(so) {
   edges.writeGateSave = (request) => { missingBatch = request; return { ok: true }; };
   const missingResult = edges.FbmSync.markMissingAfterFullScan('customer', fullScanState);
   check(so, 'Customer vang chi danh dau missing va bo qua tombstone', [missingResult.written, missingBatch.records.length, missingBatch.records[0].id, missingBatch.records[0].syncStatus], [1, 1, 'C-MISSING', edges.FbmSync.SYNC_STATUS.missing]);
+  let activityMissingBatch;
+  edges.FbmSync.readLocal = (entity) => entity === 'activity'
+    ? [{ id: 'A-MISSING', fbmId: 'ACT-MISSING', recordStatus: 'active' }, { id: 'A-TOMBSTONE', fbmId: 'ACT-TOMBSTONE', recordStatus: 'deleted' }]
+    : [];
+  edges.writeGateSave = (request) => { activityMissingBatch = request; return { ok: true }; };
+  const activityMissingResult = edges.FbmSync.markMissingAfterFullScan('activity', fullScanState);
+  check(so, 'Activity vang trong bulk chi danh dau missing khong xoa cung', [activityMissingResult.written, activityMissingBatch.records[0].id, activityMissingBatch.records[0].syncStatus, activityMissingBatch.records.length], [1, 'A-MISSING', edges.FbmSync.SYNC_STATUS.missing, 1]);
   let activityPullWrite;
   edges.FbmSync.stateRead = () => ({ metadata: { categoryGate: gate, seen: { customer: {}, activity: {} } }, locks: {} });
   edges.FbmSync.stateWrite = () => {};

@@ -133,7 +133,7 @@
 - [x] Marker mồ côi chỉ log, không tạo lại.
 - [x] Activity thiếu hoặc placeholder `workDate` bị chặn và log, không tự điền ngày.
 - [x] Hash Activity dùng cùng luật ba chiều như Customer.
-- [ ] Activity vắng trong bulk chỉ mang trạng thái không thấy bên FBM, không suy hard-delete.
+- [x] Activity vắng trong bulk chỉ mang trạng thái không thấy bên FBM, không suy hard-delete.
 
 ### Ba lớp quét
 

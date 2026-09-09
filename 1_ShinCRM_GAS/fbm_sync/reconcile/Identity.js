@@ -36,6 +36,7 @@ FbmSync.markMissingAfterFullScan = function (entity, state) {
     var lock = state.locks && state.locks[entity + ':' + String(record.id || '')];
     if (!fbmId || seen[fbmId] || String(record.recordStatus || 'active') === 'deleted' || (lock && lock.owner === 'user')) { return; }
     missing.push({ id: record.id, syncStatus: FbmSync.SYNC_STATUS.missing });
+    if (FbmSync.logPullRecord) { FbmSync.logPullRecord(entity, { fbmId: fbmId }, record, FbmSync.SYNC_STATUS.missing, 'Không thấy ID trong lượt quét FBM; không suy ra xóa.'); }
   });
   if (!missing.length || typeof writeGateSave !== 'function') { return { written: 0 }; }
   var saved = writeGateSave({ entity: entity, records: missing, source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
