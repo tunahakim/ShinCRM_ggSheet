@@ -77,12 +77,18 @@ FbmSync.categoryValueAllowed = function (categoryGate, source, value) {
   return blocked ? { ok: false, code: code, reason: blocked } : { ok: true, code: code };
 };
 
-/** Chuẩn hóa response completion thành map mã -> tên. */
-FbmSync.lookupPairs = function (response) {
+/** Giữ payload Rows của completion để CategorySync còn dữ liệu cần ghi. */
+FbmSync.lookupPayload = function (response) {
   var parsed = FbmSync.protocol.parse(response) || {}, data = parsed.d || parsed;
   if (typeof data === 'string') { data = FbmSync.protocol.parse(data) || []; }
+  if (Array.isArray(data) || (data && Array.isArray(data.Rows))) { return data; }
+  return [];
+};
+
+/** Chuẩn hóa response completion thành map mã -> tên. */
+FbmSync.lookupPairs = function (response) {
+  var data = FbmSync.lookupPayload(response);
   if (data && !Array.isArray(data) && Array.isArray(data.Rows)) { data = data.Rows; }
-  if (!Array.isArray(data)) { return {}; }
   var out = {};
   data.forEach(function (item) {
     if (Array.isArray(item)) { out[String(item[0] || '').trim()] = String(item[1] || '').trim(); }

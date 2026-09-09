@@ -206,9 +206,9 @@ FbmSync.continue = function (rawResponse) {
   }
   // Write mode phải nạp danh mục trước khi dựng payload ghi.
   if (cursor.kind === 'lookup') {
-    var lookup = FbmSync.SYNC_LOOKUPS[Number(cursor.index || 0)], parsedLookup = FbmSync.protocol.parse(response) || {}, lookupData = parsedLookup.d || parsedLookup;
-    if (typeof lookupData === 'string') { lookupData = FbmSync.protocol.parse(lookupData) || []; }
-    state.session.lookups[lookup.key] = Array.isArray(lookupData) ? lookupData : [];
+    var lookup = FbmSync.SYNC_LOOKUPS[Number(cursor.index || 0)], lookupData = FbmSync.lookupPayload(response);
+    // FBM trả `{TotalRowCount, Rows}`; giữ cả object để CategorySync đọc Rows.
+    state.session.lookups[lookup.key] = lookupData;
     var lookupIndex = Number(cursor.index || 0) + 1;
     if (lookupIndex < FbmSync.SYNC_LOOKUPS.length) {
       state.cursor.index = lookupIndex; FbmSync.stateWrite(state);

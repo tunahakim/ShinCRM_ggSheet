@@ -7,7 +7,7 @@ async function chay(so) {
   // Fixture chỉ chạy offline; không gửi request hoặc ghi dữ liệu FBM thật.
   section('FBM sync - protocol, fingerprint va ba chieu');
   const hop = taoHopCat({ FbmSync: {} });
-  napServer(hop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Identity.js');
+  napServer(hop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Identity.js');
 
   const parsed = hop.FbmSync.protocol.parse('{"d":{"Bugs":{"FieldName":"x","Message":"bad"}}}');
   check(so, 'body Login.aspx voi HTTP 200 bi nhan la het phien', hop.FbmSync.protocol.isSessionExpired({ ok: true, status: 200, body: '<html><form action="Login.aspx"><input name="username"></form></html>' }), true);
@@ -21,6 +21,8 @@ async function chay(so) {
   check(so, 'HTTP error van giu transport cookie', httpError._transport.payloadCookie, 'cookie-1');
   const httpBug = hop.FbmSync.protocol.parse({ ok: false, status: 500, body: '{"d":{"Bugs":{"Message":"Sai tham so"}}}' });
   check(so, 'HTTP error giu chi tiet Bugs tu FBM', httpBug.Bugs.Message, 'HTTP 500: Sai tham so');
+  const lookupPayload = hop.FbmSync.lookupPayload({ d: { TotalRowCount: 1, Rows: [['GD', 'Gọi điện chăm sóc']] } });
+  check(so, 'lookup giu object Rows de CategorySync co the ghi', [Array.isArray(lookupPayload.Rows), hop.FbmSync.lookupPairs({ d: lookupPayload }).GD], [true, 'Gọi điện chăm sóc']);
 
   const fbm = { stt_rec_kh: 'A1', ma_kh: 'ALT00010', ten_kh: 'Test', ma_so_thue: '001', ong_ba: 'A', dien_thoai: '0123', email: '', dc_lh: 'HN', dc_lh_tinh: 'HNI', nguon_dm: 'X', ghi_chu: 'a\r\nb' };
   const same = hop.FbmSync.customerRecord(fbm);
