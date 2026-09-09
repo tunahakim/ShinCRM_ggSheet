@@ -23,7 +23,7 @@
 - [x] Giới hạn live mặc định là `FBM_SYNC_TEST_CUSTOMER_CODE=ALT00010` ở đường đọc và đường chọn ứng viên push.
 - [x] Bản ghi mã `TMP-` bị loại khỏi mọi kỳ quét ở cả hai chiều.
 - [ ] Mỗi lát chỉ có một lời gọi cửa ghi và một khóa tài liệu; pull hiện còn có thể ghi nội dung và trạng thái thành hai lượt.
-- [ ] `CategorySync.js` đi qua tầng ghi lõi thay vì tự gọi `getRange/setValues`.
+- [x] `CategorySync.js` đi qua tầng ghi lõi thay vì tự gọi `getRange/setValues`.
 - [ ] `ScriptProperties` chỉ giữ khóa Web App; cờ ghi, giới hạn test và cấu hình phải chuyển về nơi đúng vòng đời.
 
 ### Extension, transport và khóa
@@ -40,7 +40,7 @@
 - [x] Không tìm thấy tab, mất đầu nhận và timeout được báo rõ trên Sidebar.
 - [x] Body chứa `Login.aspx` được nhận là hết phiên kể cả HTTP 200.
 - [x] Retry transport được tách khỏi retry nghiệp vụ; lỗi nghiệp vụ chỉ thử lại khi `hSHIN` đổi.
-- [ ] Khôi phục mọi cursor sau khi Sidebar, Chrome hoặc GAS gián đoạn.
+- [x] Khôi phục cursor đọc còn hạn sau khi Sidebar, Chrome hoặc GAS gián đoạn; request ghi dở không tự phát lại.
 - [ ] Giữ khoảng nghỉ và trần request phù hợp FBM, không dồn quá 60 request/phút.
 - [ ] Web App `doPost` xác thực khóa và Extension thực sự điều phối qua Web App.
 
@@ -55,9 +55,9 @@
 - [x] Fingerprint chuẩn hóa xuống dòng, trim, danh mục, ngày Việt Nam, placeholder 1899/1999, Date lỗi và dấu `#SC-`.
 - [x] Placeholder `1999`/`0` chỉ là rỗng ở field phù hợp; Activity `id=0` không làm đổi fingerprint.
 - [x] Fingerprint đã có test không đổi, một phía đổi và conflict hai phía.
-- [ ] Lệch `stt_rec_kh/ma_kh` phải lấy định danh FBM riêng, không coi là ShinCRM đổi.
+- [x] Lệch `stt_rec_kh/ma_kh` phải lấy định danh FBM riêng, không coi là ShinCRM đổi.
 - [x] `@CUS_SYNC_TT/@ACT_SYNC_TT` có đủ 11 trạng thái, gồm `chưa đẩy` và `đẩy không ăn`.
-- [ ] Có lệnh tính lại baseline khi người dùng đổi tập field hoặc luật chuẩn hóa.
+- [x] Có lệnh tính lại baseline khi người dùng đổi tập field hoặc luật chuẩn hóa.
 
 ## Slice 1 — Preflight phiên FBM và danh mục
 
@@ -80,7 +80,7 @@
 - [x] Category lệch chỉ chặn record dùng đúng mã lỗi; record khác vẫn pull.
 - [x] Lookup lỗi vẫn cho pull nhưng khóa toàn bộ chiều push của kỳ.
 - [x] Mã lạ từ FBM chặn ghi record và ghi lý do để bổ sung Category.
-- [ ] Log danh mục nêu nguồn, mã, tên trên Sheet và tên FBM hiện tại.
+- [x] Log danh mục nêu nguồn, mã, tên trên Sheet và tên FBM hiện tại.
 - [ ] **Cần kiểm chứng thực tế:** đẩy bản sửa Category và `Probe.js` lên GAS, đọc đủ bốn lookup và kiểm tra Sheet `Category` đã xóa trắng.
 - [ ] **Cần kiểm chứng thực tế:** kiểm mã trùng tên, ví dụ hai mã Cao Bằng, phải giữ đúng dấu `#` ở cả hai chiều.
 

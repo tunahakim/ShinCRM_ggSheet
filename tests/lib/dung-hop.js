@@ -41,6 +41,7 @@ const TEP_NEN = [
   'server/gate/FieldLogic.js',
   'server/gate/IdGate.js',
   'server/gate/WriteGate.js',
+  'server/gate/SheetWriteGate.js',
   'server/gate/DeleteGate.js',
   'server/service/SelectionService.js',
   'server/service/LoadService.js',

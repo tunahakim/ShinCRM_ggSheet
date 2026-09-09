@@ -11,6 +11,12 @@ FbmSync.categoryCellHasCode = function (cell, code) {
   return FbmSync.parseCategoryCell(cell).some(function (item) { return item.code === String(code || '').trim(); });
 };
 
+/** Ghi vết mã và tên lookup để kiểm tra Category sau mỗi lần nhập. */
+FbmSync.logCategoryImport = function (item) {
+  if (!item || typeof logEvent !== 'function') { return; }
+  logEvent({ source: 'fbm_sync', action: 'category_import', outcome: item.changed ? LOG_OK : LOG_TRACE, entity: 'category', recordId: item.code, reason: (item.changed ? 'Đã cập nhật' : 'Đã kiểm tra') + ' danh mục ' + item.source, detail: { source: item.source, code: item.code, fbmName: item.fbmName, sheetName: item.sheetName, sheetCompanion: item.sheetCompanion } });
+};
+
 /** Nhập lookup vào Category; chỉ bổ sung, không xóa hoặc đổi giá trị đã có. */
 FbmSync.importLookupCategories = function (state) {
   if (!state || state.mode !== 'write') { return { written: 0, added: 0, warnings: [] }; }
@@ -20,7 +26,7 @@ FbmSync.importLookupCategories = function (state) {
   if (!lock.tryLock(SETTINGS.LOCK_WAIT_MS)) { throw new Error('Hệ thống bận khi cập nhật Category. Vui lòng thử lại.'); }
   try {
     var sheet = shinOpenSheet('Category'), columns = readColumnMap('Category');
-    var firstRow = SHEET_FIRST_DATA_ROW, rowCount = sheetGridDataRowCount(sheet, firstRow), data = {}, changed = {}, warnings = [], added = 0;
+    var firstRow = SHEET_FIRST_DATA_ROW, rowCount = sheetGridDataRowCount(sheet, firstRow), data = {}, changed = {}, warnings = [], added = 0, logItems = [];
     var lookups = state.session && state.session.lookups || {};
 
     FbmSync.SYNC_LOOKUPS.forEach(function (lookup) {
@@ -39,6 +45,7 @@ FbmSync.importLookupCategories = function (state) {
           if (data[lookup.key][foundIndex] !== name) { data[lookup.key][foundIndex] = name; changed[lookup.key] = true; }
           var liveExisting = FbmSync.mergeLiveCategoryCell(data[companionCode][foundIndex] || '', code, name);
           if (liveExisting !== data[companionCode][foundIndex]) { data[companionCode][foundIndex] = liveExisting; changed[companionCode] = true; }
+          logItems.push({ source: lookup.key, code: code, fbmName: name, sheetName: data[lookup.key][foundIndex], sheetCompanion: data[companionCode][foundIndex], changed: true });
           return;
         }
         var target = sourceIndex >= 0 ? sourceIndex : data[lookup.key].length;
@@ -47,21 +54,18 @@ FbmSync.importLookupCategories = function (state) {
         var current = data[companionCode][target] || '';
         data[companionCode][target] = FbmSync.mergeLiveCategoryCell(current, code, name);
         if (data[companionCode][target] !== current) { changed[companionCode] = true; added += 1; }
+        logItems.push({ source: lookup.key, code: code, fbmName: name, sheetName: data[lookup.key][target], sheetCompanion: data[companionCode][target], changed: data[companionCode][target] !== current });
       });
     });
 
     var keys = Object.keys(data), finalRows = 0;
     keys.forEach(function (code) { finalRows = Math.max(finalRows, data[code].length); });
     if (!finalRows) { return { written: 0, added: 0, warnings: warnings }; }
-    sheetGridEnsureRoom(sheet, firstRow + finalRows - 1, 0);
-    Object.keys(changed).forEach(function (code) {
-      var col = columnIndex(columns, code), values = data[code].slice();
-      while (values.length < finalRows) { values.push(''); }
-      sheet.getRange(firstRow, col, finalRows, 1).setValues(values.map(function (value) { return [value]; }));
-      sheet.getRange(firstRow, col, finalRows, 1).setNumberFormat('@');
-    });
-    SpreadsheetApp.flush();
-    return { written: Object.keys(changed).length, added: added, warnings: warnings };
+    var written = typeof sheetWriteColumns === 'function' ? sheetWriteColumns(sheet, columns, firstRow, finalRows, data, changed) : { ok: false, written: 0, reason: 'Thiếu cổng ghi Category.' };
+    if (!written.ok) { warnings.push(written.reason); return { written: 0, added: added, warnings: warnings }; }
+    logItems.forEach(FbmSync.logCategoryImport);
+    if (typeof flushLog === 'function') { flushLog(); }
+    return { written: written.written, added: added, warnings: warnings, items: logItems };
   } finally {
     lock.releaseLock();
   }

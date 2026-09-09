@@ -385,6 +385,20 @@ FbmSync.pullWrite = function (entity, records) {
   return result;
 };
 
+/** Tính lại baseline theo luật hiện tại; chỉ ghi cột sync, không gọi FBM. */
+FbmSync.recalculateBaseline = function (entity) {
+  var state = FbmSync.stateRead(), gate = state.metadata && state.metadata.categoryGate || {};
+  var records = FbmSync.readLocal(entity), patches = records.filter(function (record) {
+    return !FbmSync.isTemporaryRecord(entity, record) && String(record.fbmId || '').trim();
+  }).map(function (record) {
+    return { id: record.id, fbmHash: FbmSync.hash(record, entity, gate), syncStatus: FbmSync.SYNC_STATUS.synced, syncedAt: new Date() };
+  });
+  if (!patches.length) { return { ok: true, written: 0, reason: 'Không có bản ghi đã liên kết để tính baseline.' }; }
+  if (typeof writeGateSave !== 'function') { return { ok: false, written: 0, reason: 'Thiếu cửa ghi nội bộ.' }; }
+  var saved = writeGateSave({ entity: entity, records: patches, source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
+  return { ok: !!(saved && saved.ok), written: saved && saved.ok ? patches.length : 0, result: saved };
+};
+
 /** Giữ tombstone có FBM ID; bản ghi chưa từng đẩy vẫn được xóa cứng bình thường. */
 function beforeHardDelete(entity, id) {
   var target = String(id || '').trim(), records = FbmSync.readLocal(entity);

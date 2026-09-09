@@ -49,7 +49,8 @@ FbmSync.FIELD_ALIASES = {
 
 /* Chỉ fingerprint field nghiệp vụ; alias hiển thị không tham gia. */
 FbmSync.FINGERPRINT_FIELDS = {
-  customer: ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ma_so_thue', 'ong_ba', 'dien_thoai', 'email', 'website', 'dc_lh', 'dc_lh_tinh', 'nguon_dm', 'ma_sp'],
+  // stt_rec_kh/ma_kh là định danh FBM riêng, không được biến thành thay đổi nội dung ShinCRM.
+  customer: ['ten_kh', 'ma_so_thue', 'ong_ba', 'dien_thoai', 'email', 'website', 'dc_lh', 'dc_lh_tinh', 'nguon_dm', 'ma_sp'],
   // Quan hệ với Customer là khóa nối, không phải nội dung của Activity.
   activity: ['id', 'ma_cv', 'details', 'end_date']
 };

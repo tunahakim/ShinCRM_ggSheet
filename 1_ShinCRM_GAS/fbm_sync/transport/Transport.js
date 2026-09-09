@@ -225,6 +225,10 @@ FbmSync.start = function (options) {
   if (current.runId && ['idle', 'done', 'error'].indexOf(current.phase) < 0) {
     var initialAuthorize = current.phase === 'checking_session' && current.cursor && current.cursor.kind === 'authorize_customer';
     var recent = Date.now() - Number(current.updatedAt || 0) <= 60000;
+    var resumable = recent ? FbmSync.requestForCursor(current) : null;
+    if (resumable && current.cursor && current.cursor.kind !== 'push_wait') {
+      return { ok: true, request: FbmSync.nextEnvelope(resumable), status: FbmSync.statusView(), resumed: true };
+    }
     if (initialAuthorize && recent) {
       return { ok: true, request: FbmSync.nextEnvelope(FbmSync.authorizeRequest('customer')), status: FbmSync.statusView(), resumed: true };
     }
@@ -461,6 +465,8 @@ FbmSync.continue = function (rawResponse) {
 function fbmSyncStart(mode) { return FbmSync.start({ mode: mode }); }
 /** API nhận response Extension và trả request kế tiếp. */
 function fbmSyncContinue(rawResponse) { return FbmSync.continue(rawResponse); }
+/** Tính lại baseline nội bộ mà không mở phiên hoặc gọi request FBM. */
+function fbmSyncRecalculateBaseline(entity) { return FbmSync.recalculateBaseline(entity || 'customer'); }
 /** Dừng phiên lỗi; chỉ nhả khóa sync, giữ khóa user đang sửa. */
 function fbmSyncCancel() {
   var state = FbmSync.stateRead(), locks = state.locks || {}, kept = {};
