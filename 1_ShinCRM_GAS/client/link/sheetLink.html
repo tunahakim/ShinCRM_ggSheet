@@ -7,10 +7,8 @@
  *   2. origin — chỉ nhận từ `docs.google.com`, bỏ tin từ iframe khác.
  *   3. seq — bỏ tin cũ (seq nhỏ hơn seq đã dùng), tránh tin đến muộn đè tin mới.
  *
- * Ba bước giải mã khách, đúng thứ tự, bước trước trượt thì bước sau:
- *   1. `cellText` khớp dạng mã khách (`CUS-000123` hoặc `KH000123`) và `Store.hasCustomer` xác nhận có thật.
- *   2. `Store.getCustomerIdByRow(sheetName, row)` — bản đồ dòng đã nạp từ máy chủ.
- *   3. Không có gì thì không làm gì.
+ * Extension gửi `customerId` đã đọc trực tiếp từ model live của Sheets. Sidebar chỉ
+ * kiểm tra mã đó có trong Store; không tra theo số hàng và không dùng rowMap cũ.
  *
  * Chỉ gọi `setCurrentCustomer` khi `Prefs.followSelection` bật và đang ở màn `view` (không giật màn khi đang mở form).
  *
@@ -20,6 +18,7 @@
 var SHEET_LINK_NONCE = '';
 var SHEET_LINK_SEQ = 0;
 var SHEET_LINK_SPREADSHEET_ID = '';
+var SHEET_LINK_SELECTION_SCHEMA = null;
 var SHEET_LINK_LAST_ACK = 0;
 var SHEET_LINK_EXTENSION_SESSION = '';
 var SHEET_LINK_LAST_SHEET = '';
@@ -59,7 +58,40 @@ function sheetLinkSetSpreadsheetId(id) {
   SHEET_LINK_SPREADSHEET_ID = String(id || '');
 }
 
-/** Context chỉ được giải mã sau khi Customer và rowMap đã vào RAM. */
+/** Gửi bảng mã cột do DATA_SCHEMA cung cấp; Extension không tự biết mã `@`. */
+function sheetLinkSetSelectionSchema(schema) {
+  if (!schema || !Array.isArray(schema.targets) || !schema.targets.length) {
+    SHEET_LINK_SELECTION_SCHEMA = null;
+    return;
+  }
+
+  SHEET_LINK_SELECTION_SCHEMA = {
+    revision: String(schema.revision || ''),
+    targets: schema.targets.map(function (target) {
+      return {
+        sheetName: typeof target.sheetName === 'string' ? target.sheetName : '',
+        prefix: typeof target.prefix === 'string' ? target.prefix : '',
+        header: String(target.header || '').trim()
+      };
+    }).filter(function (target) {
+      return target.header && (target.sheetName || target.prefix);
+    })
+  };
+
+  if (window.top !== window) {
+    try {
+      window.top.postMessage({
+        action: 'CRM_SCHEMA',
+        nonce: SHEET_LINK_NONCE,
+        spreadsheetId: SHEET_LINK_SPREADSHEET_ID,
+        schemaRevision: SHEET_LINK_SELECTION_SCHEMA.revision,
+        schema: SHEET_LINK_SELECTION_SCHEMA
+      }, SHEET_LINK_ORIGIN);
+    } catch (err) {}
+  }
+}
+
+/** Context chỉ được giải mã sau khi Customer đã vào RAM. */
 function sheetLinkSetRamReady(ready) { SHEET_LINK_RAM_READY = ready === true; }
 
 /** Extension còn sống không: ACK về trong ngưỡng, tính từ nhịp ping gần nhất. */
@@ -71,7 +103,13 @@ function sheetLinkExtensionAlive(now) {
 function sheetLinkHandshakePing() {
   if (window.top !== window) {
     try {
-      window.top.postMessage({ action: 'CRM_HANDSHAKE', nonce: SHEET_LINK_NONCE }, SHEET_LINK_ORIGIN);
+      window.top.postMessage({
+        action: 'CRM_HANDSHAKE',
+        nonce: SHEET_LINK_NONCE,
+        spreadsheetId: SHEET_LINK_SPREADSHEET_ID,
+        schemaRevision: SHEET_LINK_SELECTION_SCHEMA && SHEET_LINK_SELECTION_SCHEMA.revision,
+        schema: SHEET_LINK_SELECTION_SCHEMA
+      }, SHEET_LINK_ORIGIN);
     } catch (err) {
       // Extension chưa cài hoặc trang chưa sẵn sàng — không sao, ping lại ở nhịp sau.
     }
@@ -138,7 +176,6 @@ function sheetLinkViewControlCell(state, row, col) {
 
 function sheetLinkViewApplyResult(sheetName, result) {
   if (!result) { return result; }
-  if (result.rowMaps && typeof Store.applyRowMaps === 'function') { Store.applyRowMaps(result.rowMaps); }
   if (result.viewMeta) {
     var state = sheetLinkViewState(sheetName);
     state.needsSync = false;
@@ -193,7 +230,7 @@ function sheetLinkPositionKey(ctx) {
   return [ctx.sheetName || '', ctx.row || 0, ctx.col || 0, ctx.rowEnd || 0, ctx.colEnd || 0].join('|');
 }
 
-/** Một sheet chỉ có một lượt lấy rowMap đang bay; mọi lựa chọn đến trong lúc đó cùng chờ đúng lượt này. */
+/** Một sheet chỉ có một lượt làm mới đang bay; mọi lựa chọn đến trong lúc đó cùng chờ đúng lượt này. */
 function sheetLinkSyncView(sheetName) {
   var state = sheetLinkViewState(sheetName);
   if (state.pending) { return state.pending; }
@@ -211,7 +248,7 @@ function sheetLinkSyncView(sheetName) {
   return request;
 }
 
-/** Rời ô cấu hình chỉ hỏi trạng thái; chỉ thay đổi thật mới bật overlay và lấy rowMap. */
+/** Rời ô cấu hình chỉ hỏi trạng thái; chỉ thay đổi thật mới bật overlay và làm mới view. */
 function sheetLinkInspectView(sheetName) {
   var state = sheetLinkViewState(sheetName);
   if (state.pending) { return state.pending; }
@@ -263,7 +300,7 @@ function sheetLinkApplyContext(ctx) {
   if (viewState && sheetLinkViewControlCell(viewState, ctx.row, ctx.col)) {
     viewState.watch = { key: positionKey, row: ctx.row, col: ctx.col };
   }
-  if (viewState && changedSheet && !ctx.rowMaps && !viewState.metaReady) { viewState.needsSync = true; }
+  if (viewState && changedSheet && !viewState.metaReady) { viewState.needsSync = true; }
 
   SHEET_LINK_LAST_SHEET = ctx.sheetName || '';
   if (ctx.isEditing) { return; }
@@ -274,14 +311,8 @@ function sheetLinkApplyContext(ctx) {
     var pending = null;
     var queue = function (next) { pending = pending ? pending.then(next) : next(); };
 
-    if (viewState && ctx.rowMaps) {
-      sheetLinkViewApplyResult(ctx.sheetName, ctx);
-    } else if (viewState && changedSheet) {
-      var rowMapReady = Store.rowMaps && Store.rowMaps[ctx.sheetName];
-      var controlCell = sheetLinkViewControlCell(viewState, ctx.row, ctx.col);
-      if (rowMapReady && !controlCell) {
-        // loadCore đã nạp rowMap của mọi sheet quản trị đang hiện; click dòng dữ liệu không cần gọi server.
-      } else if (!previousSheet && !viewState.metaReady && !SHEET_LINK_DATA_PENDING) {
+    if (viewState && changedSheet) {
+      if (!previousSheet && !viewState.metaReady && !SHEET_LINK_DATA_PENDING) {
         queue(function () { return sheetLinkSyncView(ctx.sheetName); });
       } else {
         if (SHEET_LINK_DATA_PENDING) { queue(function () { return SHEET_LINK_DATA_PENDING; }); }
@@ -318,26 +349,19 @@ function sheetLinkReplayContext() {
 function sheetLinkApplyCustomerContext(ctx) {
   if (!Prefs.followSelection || ScreenState.screen !== SCREEN_VIEW) { return; }
 
-  // Trên sheet quản trị, mã máy chủ gửi kèm có thể được giải từ rowMap của lượt trước; sau đồng bộ phải tra lại từ RAM mới.
-  var isView = ctx.sheetName && ctx.sheetName.charAt(0) === '!';
-  var ma = ctx.customerId === undefined || isView ? sheetLinkCustomerIdFromContext(ctx) : String(ctx.customerId || '');
+  var ma = sheetLinkCustomerIdFromContext(ctx);
   if (!ma || ma === ScreenState.currentCustomerId) { return; }
 
   ACTIONS.setCurrentCustomer({ pick: ma });
 }
 
 function sheetLinkCustomerIdFromContext(ctx) {
-  // Bước 1: cellText khớp dạng mã khách
+  // Mã do live model là nguồn chính; mã ngay ô active là đường tắt an toàn.
+  var direct = String(ctx.customerId || '').trim().toUpperCase();
+  if (direct && Store.hasCustomer(direct)) { return direct; }
+
   var text = String(ctx.cellText || '').trim().toUpperCase();
   if (SHEET_LINK_CODE_PATTERN.test(text) && Store.hasCustomer(text)) { return text; }
-
-  // Bước 2: bản đồ dòng
-  if (ctx.row > 0 && ctx.sheetName) {
-    var candidate = Store.getCustomerIdByRow(ctx.sheetName, ctx.row) || '';
-    return candidate && Store.hasCustomer(candidate) ? candidate : '';
-  }
-
-  // Bước 3: không có gì
   return '';
 }
 </script>

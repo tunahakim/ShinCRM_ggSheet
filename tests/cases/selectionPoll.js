@@ -218,9 +218,9 @@ async function chay(so) {
     return syncValue({ ok: true, sheetName: '!Lead', rowMaps: { '!Lead': { '4': 'KH000001' } } });
   };
   khongExtension.selectionPollApplyResult({ spreadsheetId: 'sheet-1', sheetName: '!Lead', row: 4, col: 2, customerId: 'KH000001', rowMaps: { '!Lead': { '4': 'KH000001' } }, viewMeta: { revision: 1, filterColumns: [1, 2], sortColumns: [] } });
-  check(so, 'không có Extension thì kết quả full đã mang rowMap mới nên client không gọi trùng lần nữa',
+  check(so, 'không có Extension thì kết quả full chỉ làm mới metadata, không nạp rowMap vào RAM',
     [khongExtension._calls, khongExtension.Store.rowMaps],
-    [[], { '!Lead': { '4': 'KH000001' } }]);
+    [['renderViewIfDirty(!Lead)'], {}]);
 
   const tatSet = dungHopPoll();
   batDau(tatSet);
@@ -274,6 +274,9 @@ async function chay(so) {
   batDau(rowMapCu);
   rowMapCu.Store.hasCustomer = () => false;
   rowMapCu.Store.getCustomerIdByRow = () => 'KH000093';
+  rowMapCu.Store.hasCustomer = () => true;
+  check(so, 'mã customerId trực tiếp được dùng khi có trong Store',
+    rowMapCu.sheetLinkCustomerIdFromContext({ sheetName: '!Lead', row: 4, col: 2, customerId: 'KH000093' }), 'KH000093');
   check(so, 'rowMap cũ không chọn khách trước khi RAM có bản ghi tương ứng',
     rowMapCu.sheetLinkCustomerIdFromContext({ sheetName: '!Lead', row: 4, col: 2 }), '');
 
@@ -288,9 +291,9 @@ async function chay(so) {
   cungSheet.Store.getCustomerIdByRow = (sheet, row) => cungSheet.Store.rowMaps[sheet] && cungSheet.Store.rowMaps[sheet][row] || '';
   cungSheet._picked = [];
   cungSheet.ACTIONS.setCurrentCustomer = ({ pick }) => { cungSheet._picked.push(pick); };
-  cungSheet.sheetLinkApplyContext({ sheetName: '!Lead', row: 4, col: 2 });
-  cungSheet.sheetLinkApplyContext({ sheetName: '!Lead', row: 7, col: 2 });
-  check(so, 'sau lần vào sheet, các lựa chọn dữ liệu cùng sheet dùng RAM ngay và không gọi máy chủ',
+  cungSheet.sheetLinkApplyContext({ sheetName: '!Lead', row: 4, col: 2, customerId: 'KH000001' });
+  cungSheet.sheetLinkApplyContext({ sheetName: '!Lead', row: 7, col: 2, customerId: 'KH000079' });
+  check(so, 'sau lần vào sheet, mã do Extension gửi được dùng trực tiếp và không tra rowMap',
     [cungSheet._calls, cungSheet._picked],
     [['renderViewIfDirty(!Lead)'], ['KH000001', 'KH000079']]);
 
@@ -304,7 +307,7 @@ async function chay(so) {
   bootReplay.callServer = (name) => syncValue(name === 'renderViewIfDirty'
     ? { rowMaps: { '!Lead': { '4': 'KH000079' } }, viewMeta: { revision: 1, filterColumns: [], sortColumns: [] } }
     : {});
-  bootReplay.sheetLinkApplyContext({ sheetName: '!Lead', row: 4, col: 2 });
+  bootReplay.sheetLinkApplyContext({ sheetName: '!Lead', row: 4, col: 2, customerId: 'KH000079' });
   bootReplay.ScreenState.screen = 'view';
   bootReplay.sheetLinkReplayContext();
   check(so, 'context đến trước khi RAM nạp xong được áp lại sau bootstrap', bootReplay._picked, ['KH000079']);
@@ -317,15 +320,15 @@ async function chay(so) {
   daoThuTu.ACTIONS.setCurrentCustomer = ({ pick }) => { daoThuTu._picked.push(pick); };
   const replies = [];
   daoThuTu.callServer = () => new Promise((resolve) => { replies.push(resolve); });
-  daoThuTu.sheetLinkApplyContext({ sheetName: '!Lead', row: 4, col: 2 });
-  daoThuTu.sheetLinkApplyContext({ sheetName: '!Lead', row: 7, col: 2 });
+  daoThuTu.sheetLinkApplyContext({ sheetName: '!Lead', row: 4, col: 2, customerId: 'KH000094' });
+  daoThuTu.sheetLinkApplyContext({ sheetName: '!Lead', row: 7, col: 2, customerId: 'KH000079' });
   const soRequestDangBay = replies.length;
   replies[0]({ ok: true, rowMaps: { '!Lead': { '4': 'KH000094', '7': 'KH000079' } }, viewMeta: { revision: 1, filterColumns: [1, 2], sortColumns: [] } });
   await Promise.resolve();
   await Promise.resolve();
   check(so, 'hai lựa chọn trong lúc đồng bộ dùng chung một request và chỉ lựa chọn mới nhất được mở',
     [soRequestDangBay, daoThuTu.Store.rowMaps, daoThuTu._picked],
-    [1, { '!Lead': { '4': 'KH000094', '7': 'KH000079' } }, ['KH000079']]);
+    [1, {}, ['KH000079']]);
 
   const cauHinh = dungHopPoll();
   batDau(cauHinh);
@@ -382,8 +385,8 @@ async function chay(so) {
   };
   chuyenSheet.sheetLinkApplyContext({ sheetName: 'Customer', row: 4, col: 2 });
   chuyenSheet._calls = [];
-  chuyenSheet.sheetLinkApplyContext({ sheetName: '!Lead', row: 4, col: 2 });
-  chuyenSheet.sheetLinkApplyContext({ sheetName: '!Lead', row: 7, col: 2 });
+  chuyenSheet.sheetLinkApplyContext({ sheetName: '!Lead', row: 4, col: 2, customerId: 'KH000094' });
+  chuyenSheet.sheetLinkApplyContext({ sheetName: '!Lead', row: 7, col: 2, customerId: 'KH000079' });
   const callsBeforeDirtyReply = chuyenSheet._calls.slice();
   transitionReplies[0].resolve({
     ok: true,

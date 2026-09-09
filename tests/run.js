@@ -55,6 +55,7 @@ const NHOM_CA = [
   require('./cases/triggers'),
   require('./cases/refresh'),
   require('./cases/domUi'),
+  require('./cases/liveModelReader'),
   require('./cases/fbmSync')];
 
 console.log('ShinCRM — bộ kiểm thử offline');

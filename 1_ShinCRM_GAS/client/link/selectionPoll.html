@@ -81,8 +81,7 @@ function selectionPollFinish() {
 
 function selectionPollReadFull() {
   if (!selectionPollEligible()) { return Promise.resolve(null); }
-  var rowMaps = typeof Store !== 'undefined' && Store ? Store.rowMaps : null;
-  return callServer('probeSelectionFull', rowMaps ? [rowMaps] : []).then(function (full) {
+  return callServer('probeSelectionFull').then(function (full) {
     if (selectionPollEligible()) {
       SELECTION_POLL.lastPosition = selectionPollPositionKey(full);
       selectionPollApplyResult(full);

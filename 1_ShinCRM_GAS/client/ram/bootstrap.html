@@ -50,6 +50,16 @@ async function sidebarBoot() {
 
     var skipped = ingestCore(core);
     sheetLinkSetSpreadsheetId(core.spreadsheetId);
+    if (typeof sheetLinkSetSelectionSchema === 'function') {
+      sheetLinkSetSelectionSchema({
+        revision: core.schemaRevision || '',
+        targets: [
+          { sheetName: 'Customer', header: core.schema.customer.id.code },
+          { sheetName: 'Activity', header: core.schema.activity.customerId.code },
+          { prefix: '!', header: core.schema.customer.id.code }
+        ]
+      });
+    }
     if (typeof sheetLinkSetRamReady === 'function') { sheetLinkSetRamReady(true); }
     selectionPollSetReady(true);
     statusInfoLine('Tra cứu khách đã chạy — đang nạp giao dịch ở chế độ nền…');

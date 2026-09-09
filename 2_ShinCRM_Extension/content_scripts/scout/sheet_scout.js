@@ -18,11 +18,78 @@ var lastContextKey = "";   // dấu vết ảnh chụp cuối đã bắn (không
 var seqCounter = 0;
 var cachedNameBox = null;
 var cachedFormulaBar = null;
+var liveRequestCounter = 0;
+var livePendingRequest = null;
+var LIVE_MODEL_TIMEOUT_MS = 800;
+var liveRetryAt = 0;
+
+function liveHeaderForSheet(sheetName) {
+  var schema = typeof CRM_SELECTION_SCHEMA !== 'undefined' ? CRM_SELECTION_SCHEMA : null;
+  var targets = schema && Array.isArray(schema.targets) ? schema.targets : [];
+  var exact = targets.filter(function (target) {
+    return target.sheetName && target.sheetName === sheetName && target.header;
+  });
+  if (exact.length === 1) { return exact[0].header; }
+
+  var prefix = targets.filter(function (target) {
+    return target.prefix && String(sheetName || '').indexOf(target.prefix) === 0 && target.header;
+  });
+  return prefix.length === 1 ? prefix[0].header : '';
+}
+
+function sendResolvedContext(base, result, fallbackHeader, fallbackReason) {
+  var context = Object.assign({}, base);
+  context.customerId = result && result.status === 'ok' ? String(result.customerId || '').trim() : '';
+  context.customerIdHeader = result && result.header ? result.header : (fallbackHeader || '');
+  context.customerIdSource = 'live-model';
+  context.customerIdStatus = result && result.status ? result.status : 'unavailable';
+  context.customerIdReason = result && result.reason ? result.reason : (fallbackReason || '');
+  seqCounter += 1;
+  context.at = Date.now();
+  context.seq = seqCounter;
+  sendContextToSidebar(context);
+}
+
+function requestLiveCustomerId(base, header) {
+  var requestId = 'live-' + Date.now().toString(36) + '-' + (++liveRequestCounter);
+  if (livePendingRequest && livePendingRequest.timer) { clearTimeout(livePendingRequest.timer); }
+  livePendingRequest = { requestId: requestId, context: base, header: header };
+  livePendingRequest.timer = setTimeout(function () {
+    if (!livePendingRequest || livePendingRequest.requestId !== requestId) { return; }
+    var pending = livePendingRequest;
+    livePendingRequest = null;
+    lastContextKey = '';
+    liveRetryAt = Date.now() + 1000;
+    sendResolvedContext(pending.context, null, pending.header, 'LIVE_MODEL_TIMEOUT');
+  }, LIVE_MODEL_TIMEOUT_MS);
+  window.postMessage({
+    action: 'CRM_LIVE_MODEL_READ_REQUEST',
+    source: 'SHINCRM_EXTENSION',
+    requestId: requestId,
+    spreadsheetId: base.spreadsheetId,
+    gid: base.gid,
+    sheetName: base.sheetName,
+    row: base.row,
+    header: header
+  }, location.origin);
+}
+
+window.addEventListener('message', function (event) {
+  if (event.source !== window || event.origin !== location.origin) { return; }
+  var data = event.data;
+  if (!data || data.action !== 'CRM_LIVE_MODEL_READ_RESPONSE' || data.source !== 'SHINCRM_EXTENSION') { return; }
+  if (!livePendingRequest || String(data.requestId || '') !== livePendingRequest.requestId) { return; }
+
+  var pending = livePendingRequest;
+  livePendingRequest = null;
+  if (pending.timer) { clearTimeout(pending.timer); }
+  sendResolvedContext(pending.context, data, pending.header);
+});
 
 /*
  * NHỮNG THỨ KHÔNG ĐỌC ĐƯỢC TỪ EXTENSION — đừng đi tìm, đã tìm rồi.
  * Lưới của Sheets vẽ bằng <canvas>, nội dung ô không nằm trong DOM. Vì vậy:
- *   - Không đọc được giá trị của ô nào khác ô đang chọn (chỉ ô đang chọn, và chỉ qua thanh công thức).
+ *   - Các ô khác ô đang chọn được đọc qua live model trong MAIN world; DOM chỉ cung cấp tọa độ và trạng thái sửa.
  *   - Không đọc được hàng mã cột ở hàng 1, điều kiện lọc ở hàng 3, định dạng ô, ghi chú ô.
  *   - Không đọc được gid của tab chưa kích hoạt: gid chỉ hiện ở location.hash của tab đang mở.
  *   - Trạng thái đang sửa (isEditing) suy từ focus của thanh công thức, không phải từ canvas.
@@ -154,10 +221,17 @@ setInterval(function () {
   // Chỉ bắn khi có gì đổi, so trên toàn ảnh chụp (at/seq không tham gia so sánh).
   var key = JSON.stringify(context);
   if (key === lastContextKey) { return; }
+  if (Date.now() < liveRetryAt) { return; }
   lastContextKey = key;
 
-  seqCounter += 1;
-  context.at = Date.now();
-  context.seq = seqCounter;
-  sendContextToSidebar(context);
+  var header = liveHeaderForSheet(context.sheetName);
+  if (context.selectionKind !== 'cell') {
+    sendResolvedContext(context, null, header, 'UNSUPPORTED_SELECTION');
+  } else if (context.isEditing) {
+    sendResolvedContext(context, null, header, 'EDITING');
+  } else if (!header) {
+    sendResolvedContext(context, null, '', 'NO_SCHEMA_TARGET');
+  } else {
+    requestLiveCustomerId(context, header);
+  }
 }, 200);

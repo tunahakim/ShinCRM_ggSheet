@@ -50,6 +50,25 @@ function chay(so) {
     [dung.sent[0].data.action, dung.sent[0].data.nonce, Boolean(dung.sent[0].data.sessionId), dung.sent[0].targetOrigin, hop.lastContextKey],
     ['CRM_HANDSHAKE_ACK', 'nonce-kiem-thu', true, 'https://abc-123.googleusercontent.com', '']);
 
+  hop._onMessage({
+    origin: 'https://abc-123.googleusercontent.com',
+    source: dung.source,
+    data: {
+      action: 'CRM_SCHEMA',
+      nonce: 'nonce-kiem-thu',
+      schema: { targets: [{ sheetName: 'Customer', header: '@CUS_MA_KH' }, { prefix: '!', header: '@CUS_MA_KH' }] }
+    }
+  });
+  check(so, 'schema mã cột động đi qua đúng kênh đã bắt tay',
+    [hop.CRM_SELECTION_SCHEMA.targets.length, hop.CRM_SELECTION_SCHEMA.targets[0].header], [2, '@CUS_MA_KH']);
+
+  hop._onMessage({
+    origin: 'https://abc-123.googleusercontent.com',
+    source: dung.source,
+    data: { action: 'CRM_SCHEMA', nonce: 'nonce-sai', schema: { targets: [{ sheetName: 'Customer', header: '@SAI' }] } }
+  });
+  check(so, 'schema sai nonce không ghi đè schema đang dùng', hop.CRM_SELECTION_SCHEMA.targets[0].header, '@CUS_MA_KH');
+
   hop.lastContextKey = 'ảnh vừa gửi';
   hop._onMessage({
     origin: 'https://abc-123.googleusercontent.com',

@@ -253,6 +253,7 @@ server\Triggers.js                 Trigger cài đặt đánh dấu dữ liệu 
 ```
 
 Biểu mẫu **không** có thư mục riêng: bộ máy dựng form là `client\ui\` (uiBuilder, renderEngine, actions, slots), bảng khai form là `client\schema\` (uiSchema, fieldLogic), và mỗi màn có form là một tệp trong `client\screen\`.
+2_ShinCRM_Extension/content_scripts/model/live_model_reader.js Đọc mã khách từ lưới live của Sheets trong MAIN world; mã cột do Sidebar truyền, lỗi thì đóng an toàn
 ## Module đồng bộ FBM (giai đoạn 2)
 
 ```
