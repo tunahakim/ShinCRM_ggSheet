@@ -93,7 +93,7 @@ Tài liệu này theo dõi phạm vi đồng bộ FBM/ShinCRM. Không thực hi�
 ## 9. Bàn giao
 
 - [ ] Cập nhật checklist và cây thư mục lần cuối.
-- [x] Đẩy GAS sau khi test offline và GAS smoke test xanh (revision `@110`).
+- [x] Đẩy GAS sau khi test offline và GAS smoke test xanh (revision `@112`).
 - [ ] Đóng gói và tải lại Extension sau khi bước live test được phép.
 - [x] Ghi rõ các bước người dùng cần thao tác và kết quả nghiệm thu.
 
