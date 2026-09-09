@@ -56,6 +56,13 @@ async function chay(so) {
   const form = builders.FbmSync.extractFormValues({ d: { Row: (function () { const row = []; row[3] = 'ALT00010'; row[4] = 'Tên cũ'; row[8] = '001'; row[11] = '0900'; return row; }()), Showing: "var _ticket = 'ticket-1';" } });
   check(so, 'Customer edit lấy OldValue từ Row', [form.ma_kh, form.ten_kh, form.dien_thoai], ['ALT00010', 'Tên cũ', '0900']);
   check(so, 'Activity edit lấy ticket từ script Showing', builders.FbmSync.extractFormValues({ d: { Row: [], Showing: "_ticket = \"ticket-2\";" } }).fileticket, 'ticket-2');
+  const activityForm = builders.FbmSync.extractFormValues({ d: { controller: 'zccrAccountTask', Row: null, InternalValues: [{ name: 'end_time', Value: '01:00' }, { Name: 'owner', NewValue: 'Lê Tuấn Anh' }], FieldValues: [{ Name: 'fileticket', Value: 'ticket-3' }] } });
+  check(so, 'Activity form Row null vẫn lấy end_time và owner', [activityForm.end_time, activityForm.owner], ['01:00', 'Lê Tuấn Anh']);
+  check(so, 'Activity form lấy fileticket từ FieldValues', activityForm.fileticket, 'ticket-3');
+  const objectForm = builders.FbmSync.extractFormValues({ d: { Controller: 'zccrAccountTask', Row: { END_TIME: '02:00', owner: 'Lê Tuấn Anh' } } });
+  check(so, 'Activity form Row object không phụ thuộc hoa thường', [objectForm.end_time, objectForm.owner], ['02:00', 'Lê Tuấn Anh']);
+  const explicitActivity = builders.FbmSync.extractFormValues({ d: { Row: (function () { const row = []; row[11] = '03:00'; return row; }()) } }, 'activity');
+  check(so, 'Activity form Row thưa dùng entity từ cursor', explicitActivity.end_time, '03:00');
   check(so, 'Customer fingerprint có mã sản phẩm', builders.FbmSync.FINGERPRINT_FIELDS.customer.indexOf('ma_sp') >= 0, true);
   check(so, 'TMP- bị loại khỏi ứng viên push', builders.FbmSync.isTemporaryRecord('customer', { fbmCustomerCode: 'TMP-001' }), true);
   check(so, 'thiếu field Customer bị chặn trước request', builders.FbmSync.pushEligibilityErrors({ companyName: 'X' }, 'customer').length > 0, true);

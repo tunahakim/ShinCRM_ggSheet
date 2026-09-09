@@ -190,11 +190,11 @@ FbmSync.continuePush = function (state, response) {
     return FbmSync.customerCreateRequest(candidate.record, autoCode, '', gate);
   }
   if (cursor.operation === 'customer_edit_open') {
-    cursor.oldValues = FbmSync.extractFormValues(response); cursor.operation = 'customer_edit_save'; state.cursor = cursor; FbmSync.stateWrite(state);
+    cursor.oldValues = FbmSync.extractFormValues(response, 'customer'); cursor.operation = 'customer_edit_save'; state.cursor = cursor; FbmSync.stateWrite(state);
     return FbmSync.customerEditRequest(candidate.record, cursor.oldValues, gate);
   }
   if (cursor.operation === 'activity_edit_open') {
-    cursor.oldValues = FbmSync.extractFormValues(response); cursor.operation = 'activity_edit_save'; state.cursor = cursor; FbmSync.stateWrite(state);
+    cursor.oldValues = FbmSync.extractFormValues(response, 'activity'); cursor.operation = 'activity_edit_save'; state.cursor = cursor; FbmSync.stateWrite(state);
     var configuredOwner = String(FbmSync.scriptSettings().accountName || '').trim(), currentOwner = String(cursor.oldValues.owner || '').trim();
     if (!configuredOwner || (currentOwner && currentOwner.toLowerCase() !== configuredOwner.toLowerCase())) { throw new Error('Hoạt động thuộc owner FBM khác tài khoản đã cấu hình.'); }
     return FbmSync.activityEditRequest(candidate.record, cursor.oldValues, gate);
