@@ -8,7 +8,7 @@
 - `[ ]` là việc còn thiếu; mục không có nhãn **Cần kiểm chứng thực tế** là việc AI tự tiếp tục được.
 - Một slice chỉ đóng sau khi đủ code, test, log/báo cáo và checklist case của slice đó.
 - Sau khi đóng slice, ghi commit và revision GAS vào bảng bằng chứng cuối file.
-- Bộ kiểm offline gần nhất đạt `1043/1043`; phần đọc `ALT00010` và một Activity đã từng kiểm chứng, chiều ghi chưa có kết quả thành công được xác nhận.
+- Bộ kiểm offline gần nhất đạt `1044/1044`; phần đọc `ALT00010` và một Activity đã từng kiểm chứng, chiều ghi chưa có kết quả thành công được xác nhận.
 
 ## Slice 0 — Nền tảng, ranh giới và an toàn
 
@@ -242,7 +242,7 @@
 - [ ] Màn hình có danh sách record kéo/đẩy/lỗi/conflict, không bắt người dùng đọc JSON trong Log.
 - [ ] Có lệnh `Nghiệm thu ALT00010` chạy preflight, lookup, pull, field/hash/link, idempotency và ghi báo cáo PASS/FAIL vào Log; không push FBM.
 - [ ] Báo cáo che cookie/authorized nhưng giữ record ID, phase, request kind và hash trước/sau.
-- [ ] `fbmProbeAltState` fail-closed nếu phát hiện candidate ngoài `ALT00010` và Activity con.
+- [x] `fbmProbeAltState` fail-closed nếu phát hiện candidate ngoài `ALT00010` và Activity con.
 - [ ] **Cần kiểm chứng thực tế:** chạy probe một nút và kiểm tra báo cáo trên Sidebar/Log.
 
 ## Slice 9 — Live acceptance và mở rộng production

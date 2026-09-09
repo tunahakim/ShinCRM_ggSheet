@@ -19,9 +19,20 @@ function fbmProbeAltState() {
   };
   var candidates = [];
   ['customer', 'activity'].forEach(function (entity) {
-    FbmSync.pushCandidates(entity).forEach(function (item) { candidates.push({ entity: entity, kind: item.kind, id: item.id }); });
+    FbmSync.pushCandidates(entity).forEach(function (item) { candidates.push({ entity: entity, kind: item.kind, id: item.id, customerId: entity === 'activity' && item.record ? String(item.record.customerId || '') : '' }); });
   });
-  return { ok: true, customerCode: code, totalCustomers: customers.length, customers: selectedCustomers.map(summarizeCustomer), activities: selectedActivities.map(summarizeActivity), pushCandidates: candidates, writesToFbm: 0, deletesToFbm: 0 };
+  var selectedIds = {};
+  selectedCustomers.forEach(function (record) { selectedIds[String(record.id || '').trim()] = true; });
+  var violations = candidates.filter(function (candidate) {
+    if (candidate.entity === 'customer') {
+      return !selectedCustomers.some(function (record) { return String(record.id || '') === String(candidate.id || ''); });
+    }
+    return !selectedIds[String(candidate.customerId || '')];
+  });
+  if (violations.length) {
+    return { ok: false, customerCode: code, reason: 'Có ứng viên nằm ngoài phạm vi ALT00010; probe bị dừng an toàn.', totalCustomers: customers.length, customers: selectedCustomers.map(summarizeCustomer), activities: selectedActivities.map(summarizeActivity), pushCandidates: candidates, scopeViolations: violations, writesToFbm: 0, deletesToFbm: 0 };
+  }
+  return { ok: true, customerCode: code, totalCustomers: customers.length, customers: selectedCustomers.map(summarizeCustomer), activities: selectedActivities.map(summarizeActivity), pushCandidates: candidates, scopeViolations: [], writesToFbm: 0, deletesToFbm: 0 };
 }
 
 /** Chạy báo cáo nghiệm thu tự động cho ALT00010; không gọi FBM và không ghi dữ liệu. */

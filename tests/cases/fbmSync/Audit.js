@@ -25,6 +25,14 @@ async function chay(so) {
   const auditResult = audit.fbmAuditAltState();
   check(so, 'nghiệm thu ALT00010 có case PASS', auditResult.ok, true);
   check(so, 'nghiệm thu ghi từng case vào Log', audit.FbmSyncLog.length >= 6, true);
+  const probe = taoHopCat({ FbmSync: {} });
+  napServer(probe, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/report/Probe.js');
+  probe.FbmSync.readLocal = (entity) => entity === 'customer'
+    ? [{ id: 'CUS-ALT', fbmCustomerCode: 'ALT00010' }, { id: 'CUS-OTHER', fbmCustomerCode: 'ALT00011' }]
+    : [];
+  probe.FbmSync.pushCandidates = (entity) => entity === 'customer' ? [{ entity: 'customer', kind: 'edit', id: 'CUS-OTHER', record: { id: 'CUS-OTHER', fbmCustomerCode: 'ALT00011' } }] : [];
+  const blocked = probe.fbmProbeAltState();
+  check(so, 'probe ALT00010 fail-closed khi co ung vien ngoai pham vi', [blocked.ok, blocked.scopeViolations.length, blocked.writesToFbm, blocked.deletesToFbm], [false, 1, 0, 0]);
 }
 
 module.exports = { chay };
