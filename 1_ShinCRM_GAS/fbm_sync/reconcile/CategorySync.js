@@ -36,20 +36,17 @@ FbmSync.importLookupCategories = function (state) {
           return false;
         });
         if (foundIndex >= 0) {
-          if (!data[lookup.key][foundIndex]) { data[lookup.key][foundIndex] = name; changed[lookup.key] = true; }
+          if (data[lookup.key][foundIndex] !== name) { data[lookup.key][foundIndex] = name; changed[lookup.key] = true; }
+          var liveExisting = FbmSync.mergeLiveCategoryCell(data[companionCode][foundIndex] || '', code, name);
+          if (liveExisting !== data[companionCode][foundIndex]) { data[companionCode][foundIndex] = liveExisting; changed[companionCode] = true; }
           return;
         }
         var target = sourceIndex >= 0 ? sourceIndex : data[lookup.key].length;
         while (data[lookup.key].length <= target) { data[lookup.key].push(''); data[companionCode].push(''); }
         if (!data[lookup.key][target]) { data[lookup.key][target] = name; changed[lookup.key] = true; }
         var current = data[companionCode][target] || '';
-        if (current) {
-          data[companionCode][target] = current + ' | ' + FbmSync.categoryCompanionText(code, name, false);
-          changed[companionCode] = true; added += 1;
-          return;
-        }
-        data[companionCode][target] = FbmSync.categoryCompanionText(code, name, true);
-        changed[companionCode] = true; added += 1;
+        data[companionCode][target] = FbmSync.mergeLiveCategoryCell(current, code, name);
+        if (data[companionCode][target] !== current) { changed[companionCode] = true; added += 1; }
       });
     });
 

@@ -209,6 +209,8 @@ tests\
     └── domUi.js                  DOM giả tối thiểu kiểm ba đường UI: phát click, menu nổi và thu gọn nội dung.
 ```
 
+`server/dev/FbmSyncFixture.js` — Chuẩn bị live test ALT00010, ghi checklist vào Log, không xóa dữ liệu và không gửi request FBM.
+
 ## Bảng tra: tên trong tài liệu thiết kế → tệp thật
 
 Tài liệu thiết kế viết trước khi có thư mục con, nên chúng gọi tệp bằng tên phẳng: `server/Settings.gs`, `server/LogGate.gs`. Code thật đã chia thư mục. Bảng này để đi từ tài liệu sang code mà không phải dò.
@@ -268,5 +270,6 @@ Biểu mẫu **không** có thư mục riêng: bộ máy dựng form là `client
 |- report/Report.js             Trạng thái công khai cho Sidebar
 server/service/FbmSyncService.js Entry points ổn định cho Sidebar
 1_ShinCRM_GAS/client/sync/fbmSync.html UI màn hình đồng bộ độc lập, tiến độ và bridge request thô
+2_ShinCRM_Extension/content_scripts/model/live_model_reader.js Đọc mã khách từ lưới live của Sheets trong MAIN world; mã cột do Sidebar truyền, lỗi thì đóng an toàn
 2_ShinCRM_Extension/content_scripts/fbm_sync/executor.js Fetch trong tab FBM
 ```

@@ -34,6 +34,8 @@ async function chay(so) {
   napServer(builders, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Reconcile.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategorySync.js', 'fbm_sync/write/RequestBuilders.js');
   const gate = { map: { '@CAT_TINH_THANH\u001fHà Nội': 'HNI' }, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true, HNI: true } } };
   check(so, 'danh mục FBM tạo đúng companion có dấu chính', builders.FbmSync.categoryCompanionText('HNI', 'Hà Nội', true), 'HNI. Hà Nội #');
+  check(so, 'category live thay companion giả DEV bằng mã thật', builders.FbmSync.mergeLiveCategoryCell('FBM-1. Hà Nội #', 'HNI', 'Hà Nội'), 'HNI. Hà Nội #');
+  check(so, 'category live giữ mã khác nhưng chọn mã thật làm chính', builders.FbmSync.mergeLiveCategoryCell('CUS. Tùy chọn | FBM-2. Hệ giả #', 'HNI', 'Hà Nội'), 'CUS. Tùy chọn | HNI. Hà Nội #');
   const newCustomer = builders.FbmSync.customerCreateRequest({ companyName: 'Mới', province: 'Hà Nội', note: 'nội bộ' }, 'ALT99999', '', gate);
   check(so, 'mở form tạo Customer dùng type 0', builders.FbmSync.customerCreateOpenRequest().body.type, 0);
   check(so, 'ghi chú nội bộ không vào memvars FBM', newCustomer.body.memvars.some((item) => item.Name === 'ghi_chu'), false);

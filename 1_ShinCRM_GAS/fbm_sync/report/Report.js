@@ -25,6 +25,19 @@ FbmSync.statusView = function () {
   var state = FbmSync.stateRead();
   return { ok: true, runId: state.runId, mode: state.mode, writeAllowed: FbmSync.writeAllowed(), phase: state.phase, label: FbmSync.statusLabel(state.phase), direction: FbmSync.syncDirection(state), entity: state.entity, entityLabel: FbmSync.syncEntityLabel(state.entity, state.phase), cursor: state.cursor, session: { customer: !!state.session.customerAuthorized, activity: !!state.session.activityAuthorized }, metadata: state.metadata, counts: state.counts, current: state.current, message: state.message, startedAt: state.startedAt, updatedAt: state.updatedAt, nextRunAt: state.nextRunAt, lastError: state.lastError, locks: state.locks };
 };
+
+/** Ghi snapshot nghiệp vụ; payload/cookie không bao giờ đi vào Log. */
+FbmSync.logStatus = function (status, action) {
+  if (!status || typeof logEvent !== 'function') { return; }
+  var phase = String(status.phase || 'idle');
+  var outcome = phase === 'error' ? LOG_ERROR : (phase === 'conflict' ? LOG_CONFLICT : LOG_OK);
+  logEvent({
+    source: 'fbm_sync', action: action || 'slice', outcome: outcome,
+    entity: status.entity || '', recordId: status.current || 'ALT00010',
+    reason: status.message || status.label || phase,
+    detail: { phase: phase, direction: status.direction || '', entityLabel: status.entityLabel || '', counts: status.counts || {}, lastError: status.lastError || '' }
+  });
+};
 /** Keep a bounded read-only preview for live verification without writing Sheet data. */
 FbmSync.previewRecords = function (state, entity, records) {
   state.metadata = state.metadata || {};

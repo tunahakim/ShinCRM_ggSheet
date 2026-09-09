@@ -1,10 +1,10 @@
 /** Entry point ổn định cho Sidebar; mọi call đi qua runEntryPoint. */
 /** Bắt đầu một phiên đọc/ghi theo mode được chọn. */
-function fbmStartSync(mode) { return runEntryPoint('fbmStartSync', 'sidebar', 'throw', function () { return fbmSyncStart(mode); }); }
+function fbmStartSync(mode) { return runEntryPoint('fbmStartSync', 'sidebar', 'throw', function () { var result = fbmSyncStart(mode); if (result && result.status) { FbmSync.logStatus(result.status, 'start'); } return result; }); }
 /** Gửi response thô của Extension cho cursor hiện tại. */
-function fbmContinueSync(response) { return runEntryPoint('fbmContinueSync', 'sidebar', 'throw', function () { return fbmSyncContinue(response); }); }
+function fbmContinueSync(response) { return runEntryPoint('fbmContinueSync', 'sidebar', 'throw', function () { var result = fbmSyncContinue(response); if (result && result.status) { FbmSync.logStatus(result.status, 'slice'); } return result; }); }
 /** Dừng phiên đồng bộ mà không đụng dữ liệu nghiệp vụ. */
-function fbmCancelSync() { return runEntryPoint('fbmCancelSync', 'sidebar', 'throw', function () { return fbmSyncCancel(); }); }
+function fbmCancelSync() { return runEntryPoint('fbmCancelSync', 'sidebar', 'throw', function () { var result = fbmSyncCancel(); if (result && result.status) { FbmSync.logStatus(result.status, 'cancel'); } return result; }); }
 /** Đọc snapshot tiến độ hiện tại; Sidebar chỉ polling khi đang chạy. */
 function fbmGetSyncStatus() { return runEntryPoint('fbmGetSyncStatus', 'sidebar', 'throw', function () { return fbmSyncStatus(); }); }
 /** Đọc cờ cho phép ghi; mặc định tắt để không chạm dữ liệu FBM ngoài ý muốn. */

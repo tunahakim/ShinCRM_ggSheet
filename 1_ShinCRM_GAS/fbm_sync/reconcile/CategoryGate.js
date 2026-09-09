@@ -131,6 +131,26 @@ FbmSync.validatePushCategories = function (record, entity, categoryGate) {
   return fields.map(function (item) { return { source: item[0], result: FbmSync.categoryValueAllowed(categoryGate, item[0], item[1]) }; }).filter(function (item) { return !item.result.ok; });
 };
 
+/** Gộp mã live vào companion; mã FBM-* chỉ là dữ liệu giả của DEV. */
+FbmSync.mergeLiveCategoryCell = function (cell, code, name) {
+  var liveCode = String(code || '').trim();
+  if (!liveCode) { return String(cell || '').trim(); }
+  var liveName = String(name || liveCode).trim();
+  var items = FbmSync.parseCategoryCell(cell).filter(function (item) {
+    return !/^FBM-\d+$/i.test(String(item.code || '').trim());
+  });
+  var found = false;
+  items = items.map(function (item) {
+    if (item.code !== liveCode) { return { code: item.code, name: item.name, primary: false }; }
+    found = true;
+    return { code: liveCode, name: liveName, primary: true };
+  });
+  if (!found) { items.push({ code: liveCode, name: liveName, primary: true }); }
+  return items.map(function (item) {
+    return FbmSync.categoryCompanionText(item.code, item.name, item.primary);
+  }).join(' | ');
+};
+
 /** Kiểm danh mục của record kéo về trước khi cho phép reconcile. */
 FbmSync.validateIncomingCategories = function (record, entity, categoryGate) {
   var fields = entity === 'customer' ? [

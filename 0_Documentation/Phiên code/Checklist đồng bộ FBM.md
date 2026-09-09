@@ -109,3 +109,20 @@ Các mục live test cần người dùng tải lại `2_ShinCRM_Extension`, m�
 4. Chờ phase `Đang kiểm tra phiên FBM`, sau đó kiểm tra phase đọc Customer/Activity và các bộ đếm tiến độ.
 5. Đối chiếu riêng khách `ALT00010`; không bấm nút dừng giữa request trừ khi tab/Extension lỗi.
 6. Nếu phiên bị kẹt, bấm `Dừng đồng bộ`; nút này không ghi/xóa dữ liệu FBM.
+
+### Danh sách case live bắt buộc (chỉ ALT00010)
+
+- [x] Chuẩn bị: chạy `fbmPrepareAltTest`; kiểm tra `Log` có checklist và không có request FBM.
+- [ ] Phiên hợp lệ: Customer OK, Activity OK, heartbeat không mất kết nối.
+- [ ] Danh mục: bốn lookup được nhập vào `Category`, mã companion giả không còn làm chặn đối soát.
+- [ ] Pull Customer mới: mã `ALT00010`, mã FBM và hash được ghi vào `Customer`.
+- [ ] Pull Activity: giao dịch nối đúng `Customer.id` nội bộ, không nối bằng số dòng.
+- [ ] Trường riêng ShinCRM: ghi chú nội bộ và các cột nội bộ giữ nguyên sau pull.
+- [ ] Không thay đổi: chạy lại không tạo bản ghi mới và không tăng conflict.
+- [ ] Customer edit: đổi một trường an toàn, bật quyền bản ghi, kiểm tra request `Edit` và đọc xác nhận.
+- [ ] Activity create: tạo một giao dịch thử thuộc `ALT00010`, kiểm tra dấu `#SC-` và đọc xác nhận.
+- [ ] Activity edit: đổi một giao dịch đã có, kiểm tra bước mở form lấy `OldValue` rồi mới lưu.
+- [ ] Conflict hai phía: thay đổi Sheet và FBM cùng trường, kết quả phải là conflict, không ghi đè im lặng.
+- [ ] Tranh chấp đang sửa: giữ form mở trong lúc sync, bản ghi phải hoãn và bản nháp không đổi.
+- [ ] Lỗi truyền tải: mô phỏng mất tab/HTTP 500, khóa được nhả và lỗi có trong `Log`.
+- [ ] An toàn: kiểm tra toàn bộ request, không có endpoint hoặc action xóa FBM.

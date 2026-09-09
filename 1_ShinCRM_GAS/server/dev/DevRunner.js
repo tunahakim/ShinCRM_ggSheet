@@ -19,7 +19,7 @@
  */
 var DEV_RUNNER_ALLOWED = [
   'smokeTest', 'smokeDiag', 'setupSheets', 'verifySheets', 'measureDeleteRows', 'measureChunkRows', 'measureFirstPaint',
-  'seedFakeData', 'seedFakeCategory', 'wipeFakeData',
+  'seedFakeData', 'seedFakeCategory', 'wipeFakeData', 'fbmPrepareAltTest',
   'dumpColumnMap', 'dumpSettings', 'dumpSheetGrid',
   'devLogTraceOn', 'devLogTraceOff',
   'probeBadColumnCode', 'probeLogGate', 'probeDateText', 'probeSheetGrid', 'probeCellBudget',
