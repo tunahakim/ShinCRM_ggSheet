@@ -16,12 +16,26 @@ FbmSync.protocol = {
     if (raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'body') && Object.prototype.hasOwnProperty.call(raw, 'status')) {
       transport = raw.transport || null;
       if (raw.ok === false && Number(raw.status) >= 400) {
-        return { Bugs: { FieldName: '$HTTP', Message: 'HTTP ' + raw.status }, _transport: transport };
+        return { Bugs: { FieldName: '$HTTP', Message: FbmSync.protocol.httpErrorMessage(raw.status, raw.body) }, _transport: transport };
       }
       raw = raw.body;
     }
     if (typeof raw === 'object') { if (transport) { raw._transport = transport; } return raw; }
     try { var parsed = JSON.parse(String(raw)); if (transport && parsed && typeof parsed === 'object') { parsed._transport = transport; } return parsed; } catch (err) { return { raw: String(raw), parseError: err.message, _transport: transport }; }
+  },
+  /** Giữ lại lỗi FBM ngắn gọn để người dùng biết vì sao request ghi bị từ chối. */
+  httpErrorMessage: function (status, body) {
+    var detail = '';
+    try {
+      var parsed = JSON.parse(String(body || ''));
+      var data = parsed && (parsed.d || parsed);
+      var bug = data && data.Bugs;
+      detail = bug && (bug.Message || bug.message) || '';
+    } catch (ignore) {}
+    if (!detail) {
+      detail = String(body || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 240);
+    }
+    return 'HTTP ' + status + (detail ? ': ' + detail : '');
   },
   /** Lấy Bugs mà không buộc Extension hiểu nghiệp vụ FBM. */
   fbmBug: function (response) {

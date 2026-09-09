@@ -14,6 +14,8 @@ async function chay(so) {
   check(so, 'response hong JSON bi chan', hop.FbmSync.protocol.assertSuccess('{not-json}').ok, false);
   const httpError = hop.FbmSync.protocol.parse({ ok: false, status: 401, body: '', transport: { payloadCookie: 'cookie-1' } });
   check(so, 'HTTP error van giu transport cookie', httpError._transport.payloadCookie, 'cookie-1');
+  const httpBug = hop.FbmSync.protocol.parse({ ok: false, status: 500, body: '{"d":{"Bugs":{"Message":"Sai tham so"}}}' });
+  check(so, 'HTTP error giu chi tiet Bugs tu FBM', httpBug.Bugs.Message, 'HTTP 500: Sai tham so');
 
   const fbm = { stt_rec_kh: 'A1', ma_kh: 'ALT00010', ten_kh: 'Test', ma_so_thue: '001', ong_ba: 'A', dien_thoai: '0123', email: '', dc_lh: 'HN', dc_lh_tinh: 'HNI', nguon_dm: 'X', ghi_chu: 'a\r\nb' };
   const same = hop.FbmSync.customerRecord(fbm);

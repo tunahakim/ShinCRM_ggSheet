@@ -31,6 +31,7 @@ function fbmSyncPaint(status) {
   if (status.session) { var session = document.createElement('div'); session.className = 'shin-sync-session'; session.textContent = 'Phiên FBM: Customer ' + (status.session.customer ? 'OK' : 'chưa có') + ' · Activity ' + (status.session.activity ? 'OK' : 'chưa có'); panel.appendChild(session); }
   var count = status.counts || {};
   var counts = document.createElement('div'); counts.className = 'shin-sync-count'; counts.textContent = 'Đã xử lý ' + Number(count.completed || 0) + ' · thành công ' + Number(count.succeeded || 0) + ' · lỗi ' + Number(count.error || 0) + ' · xung đột ' + Number(count.conflict || 0) + ' · hoãn ' + Number(count.skipped || 0); panel.appendChild(counts);
+  fbmSyncPaintProgress(panel, status, count);
   if (status.current) { var current = document.createElement('div'); current.className = 'shin-sync-current'; current.textContent = String(status.current); panel.appendChild(current); }
   if (status.message) { var message = document.createElement('div'); message.className = 'shin-sync-message'; message.textContent = String(status.message); panel.appendChild(message); }
   fbmSyncPaintPreview(panel, status.metadata && status.metadata.preview);
@@ -45,6 +46,21 @@ function fbmSyncPaint(status) {
   var gate = document.createElement('label'); gate.className = 'shin-sync-write-gate';
   var check = document.createElement('input'); check.type = 'checkbox'; check.id = 'fbm-sync-write-gate'; check.checked = FBM_SYNC_CLIENT.writeAllowed; check.disabled = active;
   gate.appendChild(check); gate.appendChild(document.createTextNode(' Cho phép ghi thật lên FBM')); panel.appendChild(gate);
+}
+/** Vẽ tiến trình riêng của phiên, không dùng chung dải loading của Sidebar. */
+function fbmSyncPaintProgress(panel, status, count) {
+  var phase = String(status.phase || ''), active = ['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(phase) >= 0;
+  var total = Math.max(0, Number(count.total || 0)), completed = Math.max(0, Number(count.completed || 0));
+  var determinate = total > 0;
+  var percent = determinate ? Math.min(100, Math.round(completed * 100 / total)) : 0;
+  var box = document.createElement('div'); box.className = 'shin-sync-progress';
+  var label = document.createElement('div'); label.className = 'shin-sync-progress-label';
+  label.textContent = determinate ? 'Tiến trình: ' + completed + '/' + total + ' (' + percent + '%)' : (active ? 'Tiến trình: đang xử lý…' : 'Tiến trình: chưa có tổng số bản ghi');
+  box.appendChild(label);
+  var track = document.createElement('div'); track.className = 'shin-sync-progress-track'; track.setAttribute('role', 'progressbar'); track.setAttribute('aria-valuemin', '0'); track.setAttribute('aria-valuemax', '100');
+  if (determinate) { track.setAttribute('aria-valuenow', String(percent)); }
+  var fill = document.createElement('div'); fill.className = 'shin-sync-progress-fill' + (!determinate && active ? ' is-indeterminate' : ''); fill.style.width = determinate ? percent + '%' : '35%'; track.appendChild(fill); box.appendChild(track);
+  panel.appendChild(box);
 }
 /** Render only bounded, read-only fields returned by the GAS preview snapshot. */
 function fbmSyncPaintPreview(panel, preview) {
