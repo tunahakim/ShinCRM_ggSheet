@@ -212,6 +212,11 @@ FbmSync.activityRecord = function (fbm, categoryGate, parent) {
 };
 
 /** Nối Activity FBM vào mã Customer nội bộ và giữ hash ổn định sau khi đổi khóa ngoại. */
+FbmSync.logActivityDecision = function (action, record, reason, outcome, detail) {
+  if (typeof logEvent !== 'function') { return; }
+  logEvent({ source: 'fbm_sync', action: action || 'activity_pull', outcome: outcome || (typeof LOG_TRACE !== 'undefined' ? LOG_TRACE : 'trace'), entity: 'activity', recordId: String(record && (record.fbmId || record.id) || ''), reason: String(reason || ''), detail: Object.assign({ customerCode: String(record && (record.customerFbmCode || record.customerId) || '') }, detail || {}) });
+};
+
 FbmSync.linkActivityCustomers = function (records, customers, categoryGate) {
   var byFbm = {}, orphaned = 0, blocked = 0;
   (customers || []).forEach(function (customer) {
@@ -220,8 +225,8 @@ FbmSync.linkActivityCustomers = function (records, customers, categoryGate) {
   });
   var linked = (records || []).map(function (record) {
     var customerCode = String(record.customerFbmCode || record.customerId || '').trim(), customer = byFbm[customerCode];
-    if (!customer) { orphaned += 1; return null; }
-    if (FbmSync.pushPermission && FbmSync.pushPermission(customer, 'customer').stop) { blocked += 1; return null; }
+    if (!customer) { orphaned += 1; FbmSync.logActivityDecision('activity_pull_skipped', record, 'Khong tim thay Customer cha trong ShinCRM.'); return null; }
+    if (FbmSync.pushPermission && FbmSync.pushPermission(customer, 'customer').stop) { blocked += 1; FbmSync.logActivityDecision('activity_pull_skipped', record, 'Customer cha da ngung dong bo.'); return null; }
     var linkedRecord = Object.assign({}, record, { customerId: String(customer.id || '').trim(), customerFbmCode: customerCode });
     linkedRecord.fbmHash = FbmSync.hash(linkedRecord, 'activity', categoryGate);
     return linkedRecord;
@@ -306,17 +311,18 @@ FbmSync.pullWrite = function (entity, records) {
       var markerId = String(incoming.markerId || '').trim(), marked = markerId ? localById[markerId] : null;
       if (marked) {
         var markedLock = state.locks && state.locks[entity + ':' + String(marked.id || '')];
-        if (markedLock && markedLock.owner === 'user') { skipped += 1; return; }
+        if (markedLock && markedLock.owner === 'user') { skipped += 1; FbmSync.logActivityDecision('activity_pull_deferred', incoming, 'Activity dang duoc nguoi dung sua.'); return; }
         if (String(marked.fbmId || '').trim() && String(marked.fbmId).trim() !== key) {
           conflicts += 1;
           FbmSync.rememberConflict(state, entity, marked, incoming, { hBASE: String(marked.fbmHash || ''), hSHIN: FbmSync.hash(marked, entity, categoryGate), hFBM: FbmSync.hash(incoming, entity, categoryGate) }, categoryGate);
           statusWrites.push({ id: marked.id, syncStatus: FbmSync.SYNC_STATUS.conflict });
         } else {
           writes.push(Object.assign({}, incoming, { id: marked.id, fbmId: key, syncStatus: FbmSync.SYNC_STATUS.pushed, fbmHash: '' }));
+          FbmSync.logActivityDecision('activity_marker_recovery', incoming, 'Da va FBM ID tu marker noi bo.', typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', { shinId: String(marked.id || '') });
         }
         return;
       }
-      if (markerId) { skipped += 1; return; }
+      if (markerId) { skipped += 1; FbmSync.logActivityDecision('activity_pull_skipped', incoming, 'Marker khong tro toi Activity noi bo.'); return; }
     }
     var currentLock = current && state.locks && state.locks[entity + ':' + String(current.id || '')];
     if (currentLock && currentLock.owner === 'user') { skipped += 1; return; }
@@ -330,6 +336,7 @@ FbmSync.pullWrite = function (entity, records) {
     if (entity === 'activity' && (!String(incoming.workDate || '').trim() || (FbmSync.isDate(incoming.workDate) && isNaN(incoming.workDate.getTime())))) {
       skipped += 1;
       if (current) { statusWrites.push({ id: current.id, syncStatus: FbmSync.SYNC_STATUS.error }); }
+      FbmSync.logActivityDecision('activity_pull_skipped', incoming, 'Activity thieu ngay lam viec hop le.', typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error');
       return;
     }
     if (!current) {

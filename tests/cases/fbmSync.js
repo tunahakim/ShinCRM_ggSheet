@@ -419,6 +419,11 @@ async function chay(so) {
     check(so, 'Session error ' + failure.status + ' giu cursor de chay ky sau', [sessionResult.ok, push.FbmSync.stateRead().phase, push.FbmSync.stateRead().cursor.kind], [false, 'error', 'customer_grid']);
   });
 
+  const activityDecisionLogs = [];
+  builders.logEvent = (event) => activityDecisionLogs.push(event);
+  builders.FbmSync.linkActivityCustomers([{ fbmId: 'ACT-ORPHAN', customerFbmCode: 'ALT-MISSING' }], []);
+  check(so, 'Activity pull bo qua co log Customer cha va Activity ID', [activityDecisionLogs.length, activityDecisionLogs[0].recordId, activityDecisionLogs[0].detail.customerCode], [1, 'ACT-ORPHAN', 'ALT-MISSING']);
+
   const audit = taoHopCat({ FbmSync: {}, LOG_OK: 'ok', LOG_ERROR: 'error', FbmSyncLog: [] });
   napServer(audit, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/report/Probe.js');
   audit.FbmSync.stateRead = () => ({ mode: 'read', phase: 'done', runId: 'run-1' });

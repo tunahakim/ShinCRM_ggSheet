@@ -145,7 +145,7 @@
 ### Đóng slice
 
 - [ ] Test offline phủ marker, missing, ngày lỗi, bulk và ba lớp phát hiện.
-- [ ] Log có Customer cha, Activity ID, hướng đọc và lý do bỏ qua/khôi phục.
+- [x] Log có Customer cha, Activity ID, hướng đọc và lý do bỏ qua/khôi phục.
 - [ ] **Cần kiểm chứng thực tế:** pull Activity của `ALT00010`, xác nhận `customerId` nội bộ và không tạo dòng trùng khi chạy lại.
 
 ## Slice 4 — Đối soát, khóa, conflict và phục hồi
