@@ -258,6 +258,8 @@ async function chay(so) {
   const loiQuaCau = dungHopPoll();
   batDau(loiQuaCau);
   loiQuaCau._errors = [];
+  loiQuaCau._consoleErrors = [];
+  loiQuaCau.console = { error: (err) => { loiQuaCau._consoleErrors.push(err.message); } };
   loiQuaCau.dispatchError = (err) => { loiQuaCau._errors.push(err.message); };
   loiQuaCau.sheetLinkApplyContext = () => Promise.reject(new Error('không đồng bộ được context'));
   loiQuaCau.sheetLinkOnMessage({
@@ -265,8 +267,15 @@ async function chay(so) {
     data: { action: 'CRM_CONTEXT', nonce: loiQuaCau.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq: 1, sheetName: '!Lead', row: 4, col: 1 }
   });
   await new Promise((resolve) => setImmediate(resolve));
-  check(so, 'Promise xử lý CRM_CONTEXT bị từ chối chỉ đi qua dispatchError đúng một lần',
-    loiQuaCau._errors, ['không đồng bộ được context']);
+  check(so, 'Promise context từ Extension không bật hộp thoại khi bị từ chối',
+    [loiQuaCau._errors, loiQuaCau._consoleErrors], [[], ['không đồng bộ được context']]);
+
+  const rowMapCu = dungHopPoll();
+  batDau(rowMapCu);
+  rowMapCu.Store.hasCustomer = () => false;
+  rowMapCu.Store.getCustomerIdByRow = () => 'KH000093';
+  check(so, 'rowMap cũ không chọn khách trước khi RAM có bản ghi tương ứng',
+    rowMapCu.sheetLinkCustomerIdFromContext({ sheetName: '!Lead', row: 4, col: 2 }), '');
 
   const cungSheet = dungHopPoll();
   batDau(cungSheet);

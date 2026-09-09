@@ -93,6 +93,7 @@ async function sidebarBoot() {
  * Từ chặng này lượt vẽ cuối là màn xem, nên con số của lượt nạp không còn nằm trên màn hình nữa. Giữ ở đây để `bootShowSummary()` gọi được từ console lúc nghiệm thu, và để chỗ nào cần thì tra lại mà không phải nạp lại.
  */
 var BOOT_LAST_SUMMARY = null;
+var BOOT_WARNING_TIMER = null;
 
 /** Hiện rồi bỏ các lỗi mà cửa chạy nền đã gửi vào kho chờ; gói `loadCore` đã lấy và xóa chúng ở phía máy chủ. */
 function bootTellPendingMessages(messages) {
@@ -113,14 +114,24 @@ function bootShowSummary() {
 
 /** Xóa cảnh báo cũ trước khi bắt đầu một lượt bootstrap mới. */
 function bootClearStartupWarning() {
+  if (BOOT_WARNING_TIMER !== null && typeof clearTimeout === 'function') { clearTimeout(BOOT_WARNING_TIMER); }
+  BOOT_WARNING_TIMER = null;
   var node = typeof document !== 'undefined' && document.getElementById ? document.getElementById('shin-startup-warning') : null;
   if (node) { node.hidden = true; node.textContent = ''; }
+  if (typeof sidebarBusyPaint === 'function') { sidebarBusyPaint(); }
 }
 
-/** Hiện cảnh báo trong layout; fallback console chỉ dùng cho hộp cát không có DOM. */
+/** Hiện cảnh báo tạm trong layout; fallback console chỉ dùng cho hộp cát không có DOM. */
 function bootShowStartupWarning(text) {
   var node = typeof document !== 'undefined' && document.getElementById ? document.getElementById('shin-startup-warning') : null;
-  if (node) { node.textContent = String(text || ''); node.hidden = false; return; }
+  if (node) {
+    node.textContent = String(text || ''); node.hidden = false;
+    if (typeof sidebarBusyPaint === 'function') { sidebarBusyPaint(); }
+    if (typeof window !== 'undefined' && typeof window.setTimeout === 'function') {
+      BOOT_WARNING_TIMER = window.setTimeout(bootClearStartupWarning, 8000);
+    }
+    return;
+  }
   if (typeof console !== 'undefined' && console.warn) { console.warn(text); }
 }
 

@@ -111,8 +111,8 @@ function sheetLinkOnMessage(event) {
   var applied = sheetLinkApplyContext(data);
   if (applied && typeof applied.then === 'function') {
     applied.then(null, function (err) {
-      if (typeof dispatchError === 'function') { dispatchError(err); }
-      else if (typeof console !== 'undefined' && console.error) { console.error(err); }
+      // Context arrives from the background bridge; never interrupt the user with an alert.
+      if (typeof console !== 'undefined' && console.error) { console.error(err); }
     });
   }
 }
@@ -323,7 +323,8 @@ function sheetLinkCustomerIdFromContext(ctx) {
 
   // Bước 2: bản đồ dòng
   if (ctx.row > 0 && ctx.sheetName) {
-    return Store.getCustomerIdByRow(ctx.sheetName, ctx.row) || '';
+    var candidate = Store.getCustomerIdByRow(ctx.sheetName, ctx.row) || '';
+    return candidate && Store.hasCustomer(candidate) ? candidate : '';
   }
 
   // Bước 3: không có gì
