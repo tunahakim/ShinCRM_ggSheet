@@ -378,6 +378,21 @@ async function chay(so) {
   const cancelled = push.FbmSync.stateRead();
   check(so, 'dung phien nha khoa sync nhung giu khoa user', Object.keys(cancelled.locks).sort().join(','), 'customer:C-2');
 
+  const requiredCustomer = { companyName: 'Company', taxNumber: '0100123456', contactPerson: 'Contact', phone: '0900000000', leadSource: 'Source', address: 'Ha Noi', province: 'HNI' };
+  check(so, 'Customer du bay field FBM bat buoc', builders.FbmSync.pushEligibilityErrors(requiredCustomer, 'customer').length, 0);
+  ['companyName', 'taxNumber', 'contactPerson', 'phone', 'leadSource', 'address', 'province'].forEach((field) => {
+    const invalid = Object.assign({}, requiredCustomer); delete invalid[field];
+    check(so, 'Customer thieu field bat buoc ' + field, builders.FbmSync.pushEligibilityErrors(invalid, 'customer').some((message) => message.indexOf('Thi') === 0), true);
+  });
+  check(so, 'Customer vuot gioi han do dai bi chan', builders.FbmSync.pushEligibilityErrors(Object.assign({}, requiredCustomer, { companyName: 'x'.repeat(1001) }), 'customer').length > 0, true);
+  check(so, 'Activity vuot gioi han noi dung bi chan', builders.FbmSync.pushEligibilityErrors({ taskType: 'Goi', content: 'x'.repeat(4001), workDate: '2026-09-09' }, 'activity').length > 0, true);
+  push.FbmSync.scriptSettings = () => ({ accountName: 'Chu tai khoan dung' });
+  let ownerMismatch = '';
+  try {
+    push.FbmSync.continuePush({ metadata: { categoryGate: {} }, cursor: { operation: 'activity_edit_open', entity: 'activity', candidate: { entity: 'activity', id: 'ACT-OWNER', record: { id: 'ACT-OWNER', fbmId: 'A-OWNER' } } } }, { d: { InternalValues: [{ Name: 'owner', NewValue: 'Chu tai khoan khac' }] } });
+  } catch (error) { ownerMismatch = String(error && error.message || error); }
+  check(so, 'Activity sai owner bi chan truoc request sua', ownerMismatch.indexOf('FBM') >= 0, true);
+
   const audit = taoHopCat({ FbmSync: {}, LOG_OK: 'ok', LOG_ERROR: 'error', FbmSyncLog: [] });
   napServer(audit, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/report/Probe.js');
   audit.FbmSync.stateRead = () => ({ mode: 'read', phase: 'done', runId: 'run-1' });

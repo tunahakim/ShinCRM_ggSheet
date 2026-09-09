@@ -180,7 +180,7 @@
 - [x] Khi đang có phiên hoạt động, lần bấm Đồng bộ ngay thứ hai không tạo phiên song song.
 - [x] Dừng đồng bộ xóa cursor kỳ, nhả khóa sync, giữ khóa form user và không gửi Delete.
 - [ ] Kiểm owner mặc định FBM với `FBM_ACCOUNT_NAME` trước toàn bộ chiều push.
-- [ ] Kiểm đủ bảy field bắt buộc và mọi trần độ dài trước khi dựng request.
+- [x] Kiểm đủ bảy field bắt buộc và mọi trần độ dài trước khi dựng request.
 - [ ] Customer mới chưa Cho phép chỉ pull, không push.
 - [x] Customer thiếu field hoặc vượt trần không phát request, ghi trạng thái và lý do.
 - [x] Builder Customer New mở form lấy `_ma_kh_auto` rồi gửi request `New` đúng fixture.
@@ -211,7 +211,7 @@
 - [x] Builder Activity Edit mở form lấy OldValue đúng fixture.
 - [x] Parser Row 45 ô giữ `end_time`, lấy `_ticket` từ Showing thành `fileticket`, hỗ trợ Row null và fallback.
 - [x] Cổng owner Activity edit đã có sau bước mở form.
-- [ ] Edit sai owner chỉ lỗi record đó, không sửa owner FBM và không chặn record khác.
+- [x] Edit sai owner chỉ lỗi record đó, không sửa owner FBM và không chặn record khác.
 - [ ] Kỳ pull sau edit xác nhận baseline, `đẩy không ăn` hoặc conflict.
 - [ ] **Cần kiểm chứng thực tế:** tạo đúng một Activity thử dưới `ALT00010`, marker cố định và không tạo trùng khi pull lại.
 - [ ] **Cần kiểm chứng thực tế:** sửa Activity thử, xác nhận owner, ticket, OldValue và baseline.
