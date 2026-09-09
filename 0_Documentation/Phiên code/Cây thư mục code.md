@@ -269,6 +269,7 @@ Biểu mẫu **không** có thư mục riêng: bộ máy dựng form là `client
 |- reconcile/Reconcile.js       Normalize, fingerprint, pull WriteGate
 |- reconcile/CategorySync.js    Nhập lookup FBM vào Category, giữ nguyên giá trị cũ
 |- report/Report.js             Trạng thái công khai cho Sidebar
+|- report/Probe.js              Dò ứng viên ghi của ALT00010 mà không gọi FBM
 server/service/FbmSyncService.js Entry points ổn định cho Sidebar
 1_ShinCRM_GAS/client/sync/fbmSync.html UI màn hình đồng bộ độc lập, tiến độ và bridge request thô
 2_ShinCRM_Extension/content_scripts/model/live_model_reader.js Đọc mã khách từ lưới live của Sheets trong MAIN world; mã cột do Sidebar truyền, lỗi thì đóng an toàn
