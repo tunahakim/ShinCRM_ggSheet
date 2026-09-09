@@ -1,0 +1,26 @@
+fetch("https://fbo.com.vn:8888/FastBusiness.DataService.asmx/GetCompletionList", {
+  "headers": {
+    "accept": "*/*",
+    "accept-language": "vi,en;q=0.9",
+    "cache-control": "no-cache",
+    "content-type": "application/json; charset=UTF-8",
+    "pragma": "no-cache",
+    "priority": "u=1, i",
+    "sec-ch-ua": "\"Chromium\";v=\"152\", \"Not?A_Brand\";v=\"24\", \"Google Chrome\";v=\"152\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-origin"
+  },
+  "referrer": "https://fbo.com.vn:8888/Main/zccrAccount.aspx",
+  "body": "{\"type\":102,\"prefixText\":\"GD\",\"count\":10,\"language\":\"v\",\"controller\":\"crJob\",\"cookie\":\"498020375ae62FHN_CRM_App\",\"pageItemEnd\":\"\",\"variable\":null,\"valueField\":\"ma_cv\",\"textField\":\"ten_cv\",\"dataTable\":\"crdmcv\",\"keyFilter\":\"(status = '1')\",\"keyValid\":\"(status = 1)\",\"check\":false,\"orderField\":\"ma_cv\",\"lookupPageIndex\":-1,\"lookupRefresh\":false,\"filter\":[],\"sortExpression\":null,\"element\":null}",
+  "method": "POST",
+  "mode": "cors",
+  "credentials": "include"
+});
+
+
+=========
+
+{"d":{"TotalRowCount":12,"Rows":[["00","Chưa liên hệ được"],["01","Bàn giao, chuyển nguồn hợp đồng"],["BG","Gửi báo giá"],["DM","Demo \u0026 Khảo sát"],["DT","Gửi hợp đồng dự thảo"],["FA","Fail"],["GD","Gọi điện chăm sóc"],["HD","Ký hợp đồng"],["HG","Hẹn gặp"],["MK","Chuyển lại KH cho MKT"]],"LookupFields":null,"Script":null}}

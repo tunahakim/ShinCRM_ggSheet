@@ -1,0 +1,27 @@
+fetch("https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage", {
+  "headers": {
+    "accept": "*/*",
+    "accept-language": "vi,en;q=0.9",
+    "cache-control": "no-cache",
+    "content-type": "application/json; charset=UTF-8",
+    "pragma": "no-cache",
+    "priority": "u=1, i",
+    "sec-ch-ua": "\"Chromium\";v=\"152\", \"Not?A_Brand\";v=\"24\", \"Google Chrome\";v=\"152\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-origin"
+  },
+  "referrer": "https://fbo.com.vn:8888/Main/zccrAccount.aspx",
+  "body": "{\"type\":1,\"count\":10,\"language\":\"v\",\"controller\":\"zccrAccount\",\"viewId\":null,\"childObject\":false,\"lastPageIndex\":1,\"firstPageItem\":\"2026081920260819000000000345A000079388\",\"lastPageItem\":\"2026081420260814000000000450A000079281\",\"lastRowCount\":1299,\"memvars\":[{\"Name\":\"user_id\",\"OldValue\":null,\"NewValue\":\"\"}],\"externalKey\":[{\"Name\":\"stt_rec_kh in (select stt_rec_kh from dbo.zcFastBusiness$Function$GetCustomerValidate('2037')) and 1\",\"Opr\":\"=\",\"Value\":1,\"Type\":\"String\",\"Ignore\":false}],\"gridPageIndex\":0,\"gridPageValue\":[\"\\/Date(1787101200000)\\/\",\"\\/Date(1787156031523)\\/\",\"000000000345\",\"A000079388\"],\"gridRefresh\":false,\"filter\":[],\"sortExpression\":null,\"cookie\":\"498020375ae62FHN_CRM_App\",\"query\":null,\"parameter\":null,\"variable\":\"\"}",
+  "method": "POST",
+  "mode": "cors",
+  "credentials": "include"
+});
+
+
+
+======= response =======
+
+{"d":{"TotalRowCount":0,"Rows":[["A000050753","ALT00010","Test","00","Tên người liên hệ test","Địa chỉ liên hệ test 1","0000000000","Email test","Đang chăm sóc","Website test","Thực phẩm","Doanh nghiệp nhỏ","Hà Nội","07. Thực phẩm, nước giải khát","","","","Gọi điện chăm sóc","KD - Tự tìm","","",null,null,"\/Date(1788890400000)\/",null,"\/Date(1687773669997)\/",null,"000000027943"],["A000079678","TLP22440","CÔNG TY TNHH KINH DOANH VÀ THƯƠNG MẠI NGỌC DIỆP","0106161790","Nguyễn Anh Thư","Số 17 Đoàn Trần Nghiệp, Phường Hai Bà Trưng, TP Hà Nội, Việt Nam","0364801103","nguyenanhthu010494@gmail.com","Gửi báo giá","","",null,"Hà Nội","","","","","Gửi báo giá","CT - KH email đến","THAOLP","ANHLT",null,null,"\/Date(1788717600000)\/",null,"\/Date(1788765068177)\/","THAOLP","000000000058"],["A000079663","ALT00503","CÔNG TY TNHH HỆ THỐNG CÔNG NGHIỆP SAO VÀNG","2803202906","chị Cúc","Hà Nội","0941201886","","Gửi báo giá","","",null,"Hà Nội","","","","","Gửi báo giá","MKT - Tele","LINHBK","ANHLT",null,null,"\/Date(1788717600000)\/",null,"\/Date(1788744874233)\/",null,"000000000073"],["A000064486","LIB08601","CÔNG TY CỔ PHẦN TOYOTA TỪ SƠN","2301142467","Phạm Tình","Số 1 đường Lý Thánh Tông, Phường Tân Hồng, Thành phố Từ Sơn, Tỉnh Bắc Ninh, Việt Nam","0987969020","tinhpham132.ftu@gmail.com","Đang chăm sóc","","",null,"Bắc Ninh","","","","","Gọi điện chăm sóc","MKT - Tele","LINHBK","ANHLT",null,null,"\/Date(1788717600000)\/",null,"\/Date(1734338553867)\/",null,"000000014947"],["A000052474","HMA00593","CÔNG TY TNHH SAO MAI – BẮC HÀ","2801158881","chị Cúc","20 Phan Chu Trinh, Tỉnh Thanh Hoá, Việt Nam","0941201886","","Đang chăm sóc","","",null,"Thanh Hóa","","DAN","","","Gọi điện chăm sóc","MKT - Tele","LINHBK","ANHLT",null,null,"\/Date(1788717600000)\/",null,"\/Date(1691029507487)\/",null,"000000026349"],["A000079566","LIB11498","Oanh Phạm 0968126230","0968126230","Oanh Phạm","hà nội","0968126230","","Đang chăm sóc","","",null,"Hà Nội","","","","","Gọi điện chăm sóc","MKT - Tele","LINHBK","ANHLT",null,null,"\/Date(1787940000000)\/",null,"\/Date(1787902366090)\/",null,"000000000168"],["A000079038","TLP22289","CÔNG TY TNHH HOTX HOLDING GROUP","0318516773","Ms Mai Anh","Hà Nội","0814505980","","Đang chăm sóc","","",null,"Hà Nội","","DAN","","","Gọi điện chăm sóc","CT - KH gọi đến","THAOLP","ANHLT",null,null,"\/Date(1787853600000)\/",null,"\/Date(1785817653943)\/",null,"000000000691"],["A000074445","TLP20327","Mr Hiền 0868242333","0868242333","Mr Hiền","Hà Nội","0868242333","","Gửi báo giá","","",null,"Hà Nội","","","","","Gửi báo giá","CT - KH email đến","THAOLP","ANHLT",null,null,"\/Date(1787767200000)\/",null,"\/Date(1768784349363)\/",null,"000000005183"],["A000072826","LIB10880","Đặng Đức 0904176989","090417698","Đặng Đức","hà nội","090417698","","Đang chăm sóc","","",null,"Hà Nội","","","","","Gọi điện chăm sóc","MKT - Tele","LINHBK","ANHLT",null,null,"\/Date(1787680800000)\/",null,"\/Date(1763705618933)\/",null,"000000006774"],["A000072224","LIB10703","Trường Đại học Thương mại","0101811300","đấu thầu","Đường Hồ Tùng Mậu, Phường Từ Liêm, TP Hà Nội","2500268680","","Đang chăm sóc","","",null,"Hà Nội","","DAN","","KHDT","Gọi điện chăm sóc","MKT - Tele","LINHBK","ANHLT",null,null,"\/Date(1787680800000)\/",null,"\/Date(1761551029487)\/",null,"000000007368"]],"Repetition":null,"Aggregation":null,"ViewPage":null,"Authorized":true,"SuspendFilter":false,"LoadScript":null,"ScatterScript":null,"Showing":null,"CheckScript":null,"CloseScript":null,"Scripts":null,"Css":null}}

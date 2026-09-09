@@ -1,0 +1,47 @@
+fetch("https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage", {
+  "headers": {
+    "accept": "*/*",
+    "accept-language": "vi,en;q=0.9",
+    "cache-control": "no-cache",
+    "content-type": "application/json; charset=UTF-8",
+    "pragma": "no-cache",
+    "priority": "u=1, i",
+    "sec-ch-ua": "\"Chromium\";v=\"152\", \"Not?A_Brand\";v=\"24\", \"Google Chrome\";v=\"152\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-origin"
+  },
+  "referrer": "https://fbo.com.vn:8888/Main/zccrAccount.aspx",
+  "body": "{\"type\":1,\"count\":10,\"language\":\"v\",\"controller\":\"zccrAccountTask\",\"viewId\":null,\"childObject\":false,\"lastPageIndex\":0,\"firstPageItem\":\"20260909202609091748131\",\"lastPageItem\":\"20260909202609091748131\",\"lastRowCount\":1,\"memvars\":[],\"externalKey\":[{\"Name\":\"stt_rec\",\"Opr\":\"=\",\"Value\":\"A000050753\",\"Type\":\"String\",\"Ignore\":false}],\"gridPageIndex\":0,\"gridPageValue\":[\"\\/Date(1788915600000)\\/\",\"\\/Date(1788918003850)\\/\",\"174813\",1],\"gridRefresh\":true,\"filter\":[],\"sortExpression\":null,\"cookie\":\"498020375ae62FHN_CRM_App\",\"query\":null,\"parameter\":null,\"variable\":\"\"}",
+  "method": "POST",
+  "mode": "cors",
+  "credentials": "include"
+});
+
+
+========== response ============
+
+
+fetch("https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage", {
+  "headers": {
+    "accept": "*/*",
+    "accept-language": "vi,en;q=0.9",
+    "cache-control": "no-cache",
+    "content-type": "application/json; charset=UTF-8",
+    "pragma": "no-cache",
+    "priority": "u=1, i",
+    "sec-ch-ua": "\"Chromium\";v=\"152\", \"Not?A_Brand\";v=\"24\", \"Google Chrome\";v=\"152\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-origin"
+  },
+  "referrer": "https://fbo.com.vn:8888/Main/zccrAccount.aspx",
+  "body": "{\"type\":1,\"count\":10,\"language\":\"v\",\"controller\":\"zccrAccountTask\",\"viewId\":null,\"childObject\":false,\"lastPageIndex\":0,\"firstPageItem\":\"20260909202609091748131\",\"lastPageItem\":\"20260909202609091748131\",\"lastRowCount\":1,\"memvars\":[],\"externalKey\":[{\"Name\":\"stt_rec\",\"Opr\":\"=\",\"Value\":\"A000050753\",\"Type\":\"String\",\"Ignore\":false}],\"gridPageIndex\":0,\"gridPageValue\":[\"\\/Date(1788915600000)\\/\",\"\\/Date(1788918003850)\\/\",\"174813\",1],\"gridRefresh\":true,\"filter\":[],\"sortExpression\":null,\"cookie\":\"498020375ae62FHN_CRM_App\",\"query\":null,\"parameter\":null,\"variable\":\"\"}",
+  "method": "POST",
+  "mode": "cors",
+  "credentials": "include"
+});

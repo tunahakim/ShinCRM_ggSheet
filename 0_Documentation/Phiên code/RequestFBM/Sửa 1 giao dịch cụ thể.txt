@@ -1,0 +1,26 @@
+fetch("https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetDirViewPage", {
+  "headers": {
+    "accept": "*/*",
+    "accept-language": "vi,en;q=0.9",
+    "cache-control": "no-cache",
+    "content-type": "application/json; charset=UTF-8",
+    "pragma": "no-cache",
+    "priority": "u=1, i",
+    "sec-ch-ua": "\"Chromium\";v=\"152\", \"Not?A_Brand\";v=\"24\", \"Google Chrome\";v=\"152\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-origin"
+  },
+  "referrer": "https://fbo.com.vn:8888/Main/zccrAccount.aspx",
+  "body": "{\"type\":1,\"parentType\":\"Dir\",\"firstView\":false,\"searchMode\":false,\"viewPage\":true,\"authorized\":\"1.f65\",\"action\":\"Edit\",\"actionID\":null,\"values\":[\"174813\"],\"vars\":[{\"Name\":\"recordID\",\"Type\":\"String\",\"Value\":\"\"},{\"Name\":\"viewPageMode\",\"Type\":\"Boolean\",\"Value\":false}],\"memvars\":[{\"Name\":\"id\",\"OldValue\":174813,\"NewValue\":174813},{\"Name\":\"event_yn\",\"OldValue\":0,\"NewValue\":0},{\"Name\":\"text\",\"OldValue\":\"\",\"NewValue\":\"\"},{\"Name\":\"ma_cv\",\"OldValue\":\"GD\",\"NewValue\":\"GD\"},{\"Name\":\"assigned_name\",\"OldValue\":\"\",\"NewValue\":\"\"},{\"Name\":\"muc_do\",\"OldValue\":\"2\",\"NewValue\":\"2\"},{\"Name\":\"start_date\",\"OldValue\":\"\\/Date(1788912000000)\\/\",\"NewValue\":\"\\/Date(1788912000000)\\/\"},{\"Name\":\"start_time\",\"OldValue\":\"01:09\",\"NewValue\":\"01:09\"},{\"Name\":\"end_date\",\"OldValue\":\"\\/Date(1788912000000)\\/\",\"NewValue\":\"\\/Date(1788912000000)\\/\"},{\"Name\":\"end_time\",\"OldValue\":\"01:00\",\"NewValue\":\"01:00\"},{\"Name\":\"ngay_nhac\",\"OldValue\":null,\"NewValue\":null},{\"Name\":\"gio_nhac\",\"OldValue\":\"00:00\",\"NewValue\":\"00:00\"},{\"Name\":\"full_day\",\"OldValue\":false,\"NewValue\":false},{\"Name\":\"details\",\"OldValue\":\"- Gọi điện test\",\"NewValue\":\"- Gọi điện test\"},{\"Name\":\"private\",\"OldValue\":false,\"NewValue\":false},{\"Name\":\"share_user\",\"OldValue\":\"\",\"NewValue\":\"\"},{\"Name\":\"share_group\",\"OldValue\":0,\"NewValue\":0},{\"Name\":\"ma_nhom\",\"OldValue\":null,\"NewValue\":\"\"},{\"Name\":\"owner\",\"OldValue\":\"Lê Tuấn Anh\",\"NewValue\":\"Lê Tuấn Anh\"},{\"Name\":\"comment\",\"OldValue\":\"\",\"NewValue\":null},{\"Name\":\"nguoi_sua\",\"OldValue\":\"\",\"NewValue\":\"\"},{\"Name\":\"datetime0\",\"OldValue\":\"\\/Date(1788912000000)\\/\",\"NewValue\":\"\\/Date(1788915600000)\\/\"},{\"Name\":\"status\",\"OldValue\":\"2\",\"NewValue\":\"2\"},{\"Name\":\"gia_bao\",\"OldValue\":0,\"NewValue\":0},{\"Name\":\"gia_dt\",\"OldValue\":0,\"NewValue\":0},{\"Name\":\"ma_dt\",\"OldValue\":\"\",\"NewValue\":\"\"},{\"Name\":\"nd_chinh_sua\",\"OldValue\":\"\",\"NewValue\":\"\"},{\"Name\":\"ma_sp\",\"OldValue\":\"\",\"NewValue\":\"\"},{\"Name\":\"ma_module\",\"OldValue\":\"\",\"NewValue\":\"\"},{\"Name\":\"ma_kh\",\"OldValue\":\"\",\"NewValue\":\"ALT00010\"},{\"Name\":\"stt_rec\",\"OldValue\":\"A000050753\",\"NewValue\":\"A000050753\"},{\"Name\":\"type\",\"OldValue\":\"1\",\"NewValue\":\"1\"},{\"Name\":\"user_ref\",\"OldValue\":\"103003001003018003\",\"NewValue\":\"103003001003018003\"},{\"Name\":\"fileupload\",\"OldValue\":\"\",\"NewValue\":\"\"},{\"Name\":\"fileticket\",\"OldValue\":\"\",\"NewValue\":\"0131e38de697403f9cc799ba502d5133\"},{\"Name\":\"filekey\",\"OldValue\":\"\",\"NewValue\":\"\"}],\"language\":\"v\",\"controller\":\"zccrAccountTask\",\"viewId\":null,\"gridController\":\"zccrAccountTask\",\"gridViewId\":null,\"cookie\":\"498020375ae62FHN_CRM_App\"}",
+  "method": "POST",
+  "mode": "cors",
+  "credentials": "include"
+});
+
+
+======== response ========
+
+{"d":{"Row":null,"ExternalRow":null,"ViewPage":null,"FieldValues":[{"__type":"FastBusiness.ReportExtender.DataField.FieldValue","Name":"line_nbr","OldValue":null,"NewValue":1,"Modified":true,"Value":1,"Items":null}],"InternalValues":[{"__type":"FastBusiness.ReportExtender.DataField.FieldValue","Name":"id","OldValue":null,"NewValue":174813,"Modified":true,"Value":174813,"Items":null},{"__type":"FastBusiness.ReportExtender.DataField.FieldValue","Name":"start_date","OldValue":null,"NewValue":"\/Date(1788890940000)\/","Modified":true,"Value":"\/Date(1788890940000)\/","Items":null},{"__type":"FastBusiness.ReportExtender.DataField.FieldValue","Name":"end_date","OldValue":null,"NewValue":"\/Date(1788890400000)\/","Modified":true,"Value":"\/Date(1788890400000)\/","Items":null},{"__type":"FastBusiness.ReportExtender.DataField.FieldValue","Name":"nguoi_sua","OldValue":null,"NewValue":"ANHLT","Modified":true,"Value":"ANHLT","Items":null}],"ClientScript":null,"Initialize":null,"Created":null,"Showing":null,"Navigating":null,"Checking":null,"Closing":null,"Scripts":null,"Css":null,"Bugs":null,"Authorized":null}}
