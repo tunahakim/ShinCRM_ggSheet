@@ -5,7 +5,7 @@ Tài liệu này theo dõi phạm vi đồng bộ FBM/ShinCRM. Không thực hi�
 ## 1. Nền tảng và ranh giới
 
 - [x] Xác định GAS là bộ não, Extension chỉ làm cầu nối `fetch`, Sidebar hiển thị tiến độ.
-- [x] Giữ `RequestFBM` làm fixture tham khảo, không sửa nội dung nghiệp vụ và không đưa vào commit.
+- [x] Giữ `RequestFBM` làm fixture tham khảo, không sửa nội dung nghiệp vụ; các file `.txt` được commit ở commit đầu tiên của branch đồng bộ FBM.
 - [x] Chặn mặc định mọi request ghi bằng `FBM_SYNC_ALLOW_WRITES=false`.
 - [x] Không triển khai thao tác xóa FBM.
 - [x] Bổ sung docstring/comment ngắn cho các ranh giới và bẫy chính trong code mới.
