@@ -124,7 +124,7 @@ function chay(so) {
   check(so, 'relay config luu Spreadsheet ID', workerSource.indexOf('fbmSpreadsheetId: String(config.spreadsheetId || \'\')') >= 0, true);
   const sidebarSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'client', 'Sidebar.html'), 'utf8');
   const syncSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'client', 'sync', 'fbmSync.html'), 'utf8');
-  check(so, 'Sidebar giu waiter va thu lai mot lan khi bridge cu mat context', syncSource.indexOf('data.retryable && waiter.retryCount < 1') >= 0 && syncSource.indexOf('retryCount: 0') >= 0, true);
+  check(so, 'Sidebar giu waiter va thu lai mot lan khi bridge cu mat context', syncSource.indexOf('if (data.retryable)') >= 0 && syncSource.indexOf('waiter.retryCount < 1') >= 0 && syncSource.indexOf('retryCount: 0') >= 0, true);
   check(so, 'Sidebar bat tay relay khi khoi dong khong chan boot', sidebarSource.indexOf('fbmSyncConfigureRelay().catch(function () {})') >= 0 && sidebarSource.indexOf('fbmSyncConfigureRelay().catch(function () {})') < sidebarSource.indexOf('sidebarBoot();'), true);
   check(so, 'executor co ping phien ban 21.7', /FBM_PING[\s\S]+version:\s*'21\.7'/.test(executorSource), true);
   check(so, 'executor giai ma response gzip bat thuong cua FBM', executorSource.indexOf('DecompressionStream') >= 0 && executorSource.indexOf('response.arrayBuffer()') >= 0, true);

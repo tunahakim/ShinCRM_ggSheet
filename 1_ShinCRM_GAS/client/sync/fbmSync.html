@@ -140,12 +140,16 @@ function fbmSyncInstall() {
     if (!waiter) { return; }
     // Listener cũ sau khi Extension Reload không còn runtime context. Bridge mới sẽ được nạp lại;
     // giữ nguyên waiter và phát lại đúng một lần thay vì kết thúc phiên bằng lỗi giả.
-    if (data.retryable && waiter.retryCount < 1) {
-      waiter.retryCount += 1;
-      setTimeout(function () {
-        if (!FBM_SYNC_CLIENT.waiting[data.id]) { return; }
-        (window.top === window ? window : window.top).postMessage({ action: 'CRM_FBM_REQUEST', id: data.id, nonce: SHEET_LINK_NONCE, request: waiter.request }, 'https://docs.google.com');
-      }, 400);
+    if (data.retryable) {
+      if (waiter.retryCount < 1) {
+        waiter.retryCount += 1;
+        setTimeout(function () {
+          if (!FBM_SYNC_CLIENT.waiting[data.id]) { return; }
+          (window.top === window ? window : window.top).postMessage({ action: 'CRM_FBM_REQUEST', id: data.id, nonce: SHEET_LINK_NONCE, request: waiter.request }, 'https://docs.google.com');
+        }, 400);
+      }
+      // Bridge cũ có thể tiếp tục phát lỗi sau lần thử lại; chờ response thật
+      // hoặc timeout thay vì làm rơi response FBM đang chạy.
       return;
     }
     delete FBM_SYNC_CLIENT.waiting[data.id];
