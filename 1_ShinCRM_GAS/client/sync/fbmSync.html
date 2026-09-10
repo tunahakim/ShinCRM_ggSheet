@@ -138,6 +138,16 @@ function fbmSyncInstall() {
     if (data.action !== 'CRM_FBM_RESPONSE' || (typeof SHEET_LINK_NONCE !== 'undefined' && data.nonce !== SHEET_LINK_NONCE)) { return; }
     var waiter = FBM_SYNC_CLIENT.waiting[data.id];
     if (!waiter) { return; }
+    // Listener cũ sau khi Extension Reload không còn runtime context. Bridge mới sẽ được nạp lại;
+    // giữ nguyên waiter và phát lại đúng một lần thay vì kết thúc phiên bằng lỗi giả.
+    if (data.retryable && waiter.retryCount < 1) {
+      waiter.retryCount += 1;
+      setTimeout(function () {
+        if (!FBM_SYNC_CLIENT.waiting[data.id]) { return; }
+        (window.top === window ? window : window.top).postMessage({ action: 'CRM_FBM_REQUEST', id: data.id, nonce: SHEET_LINK_NONCE, request: waiter.request }, 'https://docs.google.com');
+      }, 400);
+      return;
+    }
     delete FBM_SYNC_CLIENT.waiting[data.id];
     if (data.error) { waiter.reject(new Error(data.error)); } else { waiter.resolve(data.result); }
   });
@@ -167,7 +177,7 @@ function fbmSyncExtensionRequest(request) {
   fbmSyncInstall();
   return new Promise(function (resolve, reject) {
     var id = String(Date.now()) + '-' + Math.random().toString(36).slice(2);
-    FBM_SYNC_CLIENT.waiting[id] = { resolve: resolve, reject: reject };
+    FBM_SYNC_CLIENT.waiting[id] = { resolve: resolve, reject: reject, request: request, retryCount: 0 };
     // Send through the parent Sheets window; event.source remains the Sidebar iframe.
     (window.top === window ? window : window.top).postMessage({ action: 'CRM_FBM_REQUEST', id: id, nonce: SHEET_LINK_NONCE, request: request }, 'https://docs.google.com');
     setTimeout(function () { if (FBM_SYNC_CLIENT.waiting[id]) { delete FBM_SYNC_CLIENT.waiting[id]; reject(new Error('Không nhận được phản hồi từ tab FBM sau 20 giây. Hãy kiểm tra tab FBM và Extension.')); } }, FBM_SYNC_REQUEST_TIMEOUT_MS);

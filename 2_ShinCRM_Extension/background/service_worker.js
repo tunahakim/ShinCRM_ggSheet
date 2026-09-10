@@ -140,6 +140,8 @@ function relayHeartbeatToGas(tabId, reply) {
 }
 
 /** Định tuyến request từ Sidebar tới đúng tab FBM, không xử lý dữ liệu nghiệp vụ. */
+var fbmRequestFlights = Object.create(null);
+
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   if (message && message.type === 'FBM_CONFIGURE_RELAY') {
     var config = message.config || {};
@@ -148,10 +150,21 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     return true;
   }
   if (!message || message.type !== 'FBM_EXECUTE_REQUEST') { return false; }
-  findFbmTab().then(function (tab) {
-    if (!tab) { sendResponse({ error: 'Không tìm thấy tab FBM đang mở.' }); return; }
-    return sendToFbmTab(tab.id, message.request).then(sendResponse);
-  }).catch(function (err) { sendResponse({ error: String(err && err.message || err) }); });
+  var requestId = String(message.id || '');
+  var existingFlight = requestId && fbmRequestFlights[requestId];
+  if (existingFlight) {
+    existingFlight.then(sendResponse, function (err) { sendResponse({ error: String(err && err.message || err) }); });
+    return true;
+  }
+  var flight = findFbmTab().then(function (tab) {
+    if (!tab) { return { error: 'Không tìm thấy tab FBM đang mở.' }; }
+    return sendToFbmTab(tab.id, message.request);
+  });
+  if (requestId) {
+    fbmRequestFlights[requestId] = flight;
+    flight.then(function () { delete fbmRequestFlights[requestId]; }, function () { delete fbmRequestFlights[requestId]; });
+  }
+  flight.then(sendResponse, function (err) { sendResponse({ error: String(err && err.message || err) }); });
   return true;
 });
 
