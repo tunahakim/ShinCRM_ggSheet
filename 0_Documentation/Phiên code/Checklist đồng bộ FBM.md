@@ -292,7 +292,7 @@
 | Slice 0 — Nền tảng |  |  |  |  |  |
 | Slice 1 — Preflight + Category | `fadcf33` | `1064/1064` trước sửa cancel scheduler | Chờ deploy | Chưa có | Category chỉ đọc/đối chiếu; không tự ghi Sheet |
 | Slice 2 — Pull Customer |  |  |  |  |  |
-| Slice 3 — Pull Activity | `2b81673` | `1074/1074` | Chờ deploy | Pull `ALT00010` đã xác nhận Activity liên kết và idempotency; bulk/catchup/rotation đã có test offline | Ba lớp quét Activity nền đã có cursor state/DocumentProperties |
+| Slice 3 — Pull Activity | `8fbb6a7` | `1074/1074` | `@133` | Pull `ALT00010` đã xác nhận Activity liên kết và idempotency; bulk/catchup/rotation đã có test offline; `fbmSyncStatus` trả `OK` | Ba lớp quét Activity nền đã có cursor state/DocumentProperties |
 | Slice 4 — Đối soát + conflict |  |  |  |  |  |
 | Slice 5 — Push Customer |  |  |  |  |  |
 | Slice 6 — Push Activity |  |  |  |  |  |
