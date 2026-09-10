@@ -10,6 +10,15 @@
 - Sau khi đóng slice, ghi commit và revision GAS vào bảng bằng chứng cuối file.
 - Bộ kiểm offline gần nhất đạt `1065/1065`; phần đọc `ALT00010` và một Activity đã từng kiểm chứng, chiều ghi chưa có kết quả thành công được xác nhận.
 
+## Hợp đồng nhận diện và đăng nhập FBM
+
+- `ANHLT` là một giá trị nhận diện duy nhất của user FBM; không tách thành trường `anhlt` và `ANHLT`.
+- Tên đầy đủ `Lê Tuấn Anh`, mã ngắn `ALT` và `FBM_SPREADSHEET_ID` đều phải khớp tuyệt đối với giá trị live/cấu hình; không tự bỏ khoảng trắng, đổi hoa thường hoặc chuẩn hóa ký tự.
+- `FBM_SPREADSHEET_ID` do người dùng nhập trong màn hình thiết lập để bản copy chưa đổi cấu hình bị chặn; GAS vẫn phải lấy ID thực tế của Spreadsheet trước khi so sánh.
+- Bản thiết lập đăng nhập gồm `ANHLT`, tên đầy đủ, `ALT`, `FBM_SPREADSHEET_ID` và mật khẩu; Extension mã hóa toàn bộ thành một envelope trước khi GAS lưu trong `DocumentProperties`.
+- Sidebar không nhận mật khẩu bản rõ; ô mật khẩu hiển thị `***` hoặc để trống. Khi xem lại, Extension chỉ giải mã nội bộ và trả các trường không nhạy cảm.
+- Tự động đăng nhập khi Chrome khởi động là tùy chọn, mặc định tắt. Khi tắt, luồng dùng cookie/đăng nhập thủ công hiện tại không thay đổi.
+
 ## Slice 0 — Nền tảng, ranh giới và an toàn
 
 ### Kiến trúc và dữ liệu nhạy cảm
@@ -34,7 +43,7 @@
 - [x] Request authorized Customer dùng `viewPage:false`, `authorized:null`, `values:[]` và ba vars đúng hợp đồng.
 - [x] Request authorized Activity dùng controller riêng và hai vars đúng hợp đồng.
 - [x] Đã kiểm chứng thực tế việc nhận được authorized Customer và Activity của phiên FBM đang mở.
-- [x] Cookie payload và `userId` lấy từ tab/response, không tự đăng nhập bằng mật khẩu.
+- [x] Cookie payload và `userId` lấy từ tab/response; mặc định không tự đăng nhập bằng mật khẩu.
 - [x] HTTP status, body lỗi, `Bugs` và lỗi parse được chuyển thành lỗi có cấu trúc; log không ghi cookie/payload.
 - [x] Mất content script được ping rồi tiêm lại trước request nghiệp vụ.
 - [x] Không tìm thấy tab, mất đầu nhận và timeout được báo rõ trên Sidebar.
@@ -65,7 +74,10 @@
 
 - [x] Tìm tab FBM, ping executor, fetch trong tab và nhận response thô.
 - [x] Khi mất executor, inject rồi ping lại; request nghiệp vụ chỉ gửi một lần.
-- [x] 401/403 hoặc `Login.aspx` dừng kỳ và yêu cầu đăng nhập lại, không tự login.
+- [x] 401/403 hoặc `Login.aspx` dừng kỳ và yêu cầu đăng nhập lại khi tùy chọn tự động đăng nhập tắt.
+- [ ] Tùy chọn tự động đăng nhập chỉ chạy khi session hết hạn/không có cookie; không ép login khi session hợp lệ đang tồn tại.
+- [ ] Form thiết lập đặt username và password cạnh nhau, hiển thị mật khẩu dạng `***`/trống, không ghi bản rõ vào Sheet hoặc Log.
+- [ ] Preflight đối chiếu tuyệt đối `ANHLT`, `Lê Tuấn Anh`, `ALT` và `FBM_SPREADSHEET_ID` trước request nghiệp vụ.
 - [x] Lấy authorized Customer rồi Activity; thiếu token thì dừng trước CRUD.
 - [ ] Kiểm owner mặc định FBM khớp `FBM_ACCOUNT_NAME`; sai thì dừng chiều push.
 - [ ] Xác nhận Config có `FBM_ACCOUNT_NAME`, `FBM_MA_KH_PREFIX`, `FBM_MA_KH_LENGTH`, `FBM_ACTIVITY_SINCE` và không khai trùng.
@@ -219,7 +231,7 @@
 
 ## Slice 7 — Heartbeat, scheduler và chạy nền
 
-- [x] Extension có alarm heartbeat 5 phút, đọc `count:1`, không login và không write.
+- [x] Extension có alarm heartbeat 5 phút, đọc `count:1`, mặc định không login và không write.
 - [x] Heartbeat nộp kết quả cho GAS, cập nhật lần sống cuối và kích full Customer khi tổng số đổi.
 - [x] Kỳ Customer 60 phút kéo full grid qua nhiều lát, lưu cursor từng lát.
 - [x] Kỳ Activity 8 giờ chạy bulk ID, lớp `ngay_gd` và vòng xoay 30 Customer.
