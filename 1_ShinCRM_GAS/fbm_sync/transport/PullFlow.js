@@ -65,7 +65,7 @@ FbmSync.authContinue = function (entity, response) {
     FbmSync.stateWrite(state);
     return FbmSync.authorizeRequest('activity');
   }
-  // Lookup is read-only and runs in both modes; write mode additionally imports it into Category.
+  // Lookup is read-only in both modes; Category remains user-owned configuration.
   state.cursor = { kind: 'lookup', index: 0 };
   state.message = 'Dang kiem tra danh muc FBM...';
   FbmSync.stateWrite(state);
@@ -207,7 +207,7 @@ FbmSync.continue = function (rawResponse) {
   // Write mode phải nạp danh mục trước khi dựng payload ghi.
   if (cursor.kind === 'lookup') {
     var lookup = FbmSync.SYNC_LOOKUPS[Number(cursor.index || 0)], lookupData = FbmSync.lookupPayload(response);
-    // FBM trả `{TotalRowCount, Rows}`; giữ cả object để CategorySync đọc Rows.
+    // FBM trả `{TotalRowCount, Rows}`; giữ cả object để đối chiếu Category.
     state.session.lookups[lookup.key] = lookupData;
     var lookupIndex = Number(cursor.index || 0) + 1;
     if (lookupIndex < FbmSync.SYNC_LOOKUPS.length) {
@@ -215,9 +215,8 @@ FbmSync.continue = function (rawResponse) {
       return { ok: true, request: FbmSync.nextEnvelope(FbmSync.completionRequest(FbmSync.SYNC_LOOKUPS[lookupIndex].controller, FbmSync.SYNC_LOOKUPS[lookupIndex].key)), status: FbmSync.statusView() };
     }
     if (state.mode === 'write') {
-      var categoryImport = FbmSync.importLookupCategories(state);
-      state.metadata.categoryImport = categoryImport;
-      state.message = categoryImport.added ? 'Đã bổ sung ' + categoryImport.added + ' mã danh mục FBM; đang đọc khách hàng...' : 'Danh mục FBM đã sẵn sàng; đang đọc khách hàng...';
+      // Category is user-owned configuration; sync only reads and validates it.
+      state.message = 'Đã đọc danh mục FBM; đang đối chiếu Category...';
       FbmSync.stateWrite(state);
     }
     return { ok: true, request: FbmSync.nextEnvelope(FbmSync.beginCustomerPull(state)), status: FbmSync.statusView() };

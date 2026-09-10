@@ -28,13 +28,25 @@
     return { text: JSON.stringify(body), cookie: body.cookie || '' };
   }
   /** Thực thi fetch và luôn trả body dạng text để GAS tự parse. */
+  /** Giai ma ca response gzip bi FBM tra tho, tranh GAS nhan chuoi 1F 8B. */
+  function readResponseText(response) {
+    return response.arrayBuffer().then(function (buffer) {
+      var bytes = new Uint8Array(buffer), gzip = bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b;
+      if (gzip && typeof DecompressionStream === 'function') {
+        var stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+        return new Response(stream).text();
+      }
+      if (typeof TextDecoder === 'function') { return new TextDecoder('utf-8').decode(bytes); }
+      return String.fromCharCode.apply(null, bytes);
+    });
+  }
   function execute(request) {
     var req = request || heartbeat();
     var sent = requestBody(req);
     var controller = new AbortController();
     var timer = setTimeout(function () { controller.abort(); }, FETCH_TIMEOUT_MS);
     return fetch(req.url, { method: req.method || 'POST', headers: req.headers || { 'content-type': 'application/json; charset=UTF-8' }, body: sent && sent.text, credentials: 'include', cache: 'no-store', signal: controller.signal }).then(function (response) {
-      return response.text().then(function (body) { return { ok: response.ok, status: response.status, headers: { contentType: response.headers.get('content-type') || '' }, body: body, transport: { payloadCookie: sent && sent.cookie || '' } }; });
+      return readResponseText(response).then(function (body) { return { ok: response.ok, status: response.status, headers: { contentType: response.headers.get('content-type') || '' }, body: body, transport: { payloadCookie: sent && sent.cookie || '' } }; });
     }).catch(function (err) {
       if (err && err.name === 'AbortError') { throw new Error('FBM không phản hồi sau 10 giây.'); }
       throw err;

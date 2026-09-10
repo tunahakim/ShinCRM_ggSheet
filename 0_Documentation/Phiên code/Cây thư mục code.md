@@ -174,7 +174,6 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── reconcile\Identity.js     Nối định danh, ánh xạ bản ghi và liên kết Activity với Customer.
     ├── reconcile\Pull.js         Đối soát chiều pull và ghi thay đổi an toàn.
     ├── reconcile\CategoryGate.js Đọc và đối chiếu Category với lookup FBM; không trực tiếp ghi Sheet.
-    ├── reconcile\CategorySync.js Nhập lookup FBM vào Category, giữ nguyên giá trị cũ.
     ├── report\Report.js          Trạng thái công khai cho Sidebar.
     └── report\Probe.js           Dò ứng viên ghi của ALT00010 mà không gọi FBM.
 ```

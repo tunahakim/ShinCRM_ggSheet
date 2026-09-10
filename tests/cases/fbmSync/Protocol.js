@@ -22,7 +22,16 @@ async function chay(so) {
   const httpBug = hop.FbmSync.protocol.parse({ ok: false, status: 500, body: '{"d":{"Bugs":{"Message":"Sai tham so"}}}' });
   check(so, 'HTTP error giu chi tiet Bugs tu FBM', httpBug.Bugs.Message, 'HTTP 500: Sai tham so');
   const lookupPayload = hop.FbmSync.lookupPayload({ d: { TotalRowCount: 1, Rows: [['GD', 'Gọi điện chăm sóc']] } });
-  check(so, 'lookup giu object Rows de CategorySync co the ghi', [Array.isArray(lookupPayload.Rows), hop.FbmSync.lookupPairs({ d: lookupPayload }).GD], [true, 'Gọi điện chăm sóc']);
+  check(so, 'lookup giu object Rows de doi chieu Category', [Array.isArray(lookupPayload.Rows), hop.FbmSync.lookupPairs({ d: lookupPayload }).GD], [true, 'Gọi điện chăm sóc']);
+  const mappings = taoHopCat({ FbmSync: {} });
+  napServer(mappings, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/reconcile/CategoryGate.js');
+  const rows = [
+    { source: '@CAT_TINH_THANH', value: 'Hà Nội', companion: 'HNI. Hà Nội # | HN. Hà Nội cũ' },
+    { source: '@CAT_TINH_THANH', value: 'Hà Nội văn phòng', companion: 'HNI. Hà Nội #' }
+  ];
+  const map = mappings.FbmSync.categoryMapFromRows(rows);
+  check(so, 'mot gia tri ShinCRM anh xa nhieu ma FBM giu ma chinh', [map['@CAT_TINH_THANH\u001fHà Nội'], mappings.FbmSync.parseCategoryCell(rows[0].companion).length], ['HNI', 2]);
+  check(so, 'nhieu gia tri ShinCRM cung anh xa mot ma FBM', map['@CAT_TINH_THANH\u001fHà Nội văn phòng'], 'HNI');
 
   const fbm = { stt_rec_kh: 'A1', ma_kh: 'ALT00010', ten_kh: 'Test', ma_so_thue: '001', ong_ba: 'A', dien_thoai: '0123', email: '', dc_lh: 'HN', dc_lh_tinh: 'HNI', nguon_dm: 'X', ghi_chu: 'a\r\nb' };
   const same = hop.FbmSync.customerRecord(fbm);

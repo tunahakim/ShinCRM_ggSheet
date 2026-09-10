@@ -8,7 +8,7 @@
 - `[ ]` là việc còn thiếu; mục không có nhãn **Cần kiểm chứng thực tế** là việc AI tự tiếp tục được.
 - Một slice chỉ đóng sau khi đủ code, test, log/báo cáo và checklist case của slice đó.
 - Sau khi đóng slice, ghi commit và revision GAS vào bảng bằng chứng cuối file.
-- Bộ kiểm offline gần nhất đạt `1053/1053`; phần đọc `ALT00010` và một Activity đã từng kiểm chứng, chiều ghi chưa có kết quả thành công được xác nhận.
+- Bộ kiểm offline gần nhất đạt `1064/1064`; phần đọc `ALT00010` và một Activity đã từng kiểm chứng, chiều ghi chưa có kết quả thành công được xác nhận.
 
 ## Slice 0 — Nền tảng, ranh giới và an toàn
 
@@ -23,7 +23,7 @@
 - [x] Giới hạn live mặc định là `FBM_SYNC_TEST_CUSTOMER_CODE=ALT00010` ở đường đọc và đường chọn ứng viên push.
 - [x] Bản ghi mã `TMP-` bị loại khỏi mọi kỳ quét ở cả hai chiều.
 - [x] Mỗi lát chỉ có một lời gọi cửa ghi và một khóa tài liệu; pull gộp nội dung và trạng thái vào cùng một lượt `writeGateSave`.
-- [x] `CategorySync.js` đi qua tầng ghi lõi thay vì tự gọi `getRange/setValues`.
+- [x] Category là cấu hình do người dùng sở hữu; đồng bộ chỉ đọc/đối chiếu, tuyệt đối không ghi hoặc xóa Sheet Category.
 - [x] `ScriptProperties` chỉ giữ khóa Web App; cờ ghi, giới hạn test và cấu hình đã dùng `DocumentProperties`, Sheet Config hoặc state phiên đúng vòng đời.
 
 ### Extension, transport và khóa
@@ -74,19 +74,19 @@
 
 - [x] Đọc động bốn nguồn `crProvinceCity`, `crLeadSource`, `crJob`, `crdmsp`, không hardcode mã FBM.
 - [x] Builder `GetCompletionList` và parser cặp mã/tên đã có; companion dùng dấu `#` đúng quan hệ.
-- [x] Lookup vào Category theo kiểu chỉ bổ sung, không xóa mã cũ.
-- [x] Fixture `FBM-*` được thay bằng mã thật khi có lookup live.
+- [x] Lookup FBM chỉ được giữ trong state để đối chiếu; mã lạ chặn record và yêu cầu người dùng bổ sung Category thủ công.
+- [x] Fixture ánh xạ một-nhiều và nhiều-một chỉ được tạo bằng lệnh DEV riêng, không chạy trong luồng đồng bộ.
 - [x] Cổng Category không nhận nhầm `@CAT_NHOM_KH_FBM` là companion giả.
 - [x] Category lệch chỉ chặn record dùng đúng mã lỗi; record khác vẫn pull.
 - [x] Lookup lỗi vẫn cho pull nhưng khóa toàn bộ chiều push của kỳ.
 - [x] Mã lạ từ FBM chặn ghi record và ghi lý do để bổ sung Category.
-- [x] Log danh mục nêu nguồn, mã, tên trên Sheet và tên FBM hiện tại.
-- [ ] **Cần kiểm chứng thực tế:** đẩy bản sửa Category và `Probe.js` lên GAS, đọc đủ bốn lookup và kiểm tra Sheet `Category` đã xóa trắng.
+- [x] Log danh mục nêu nguồn, mã, tên trên Sheet và tên FBM hiện tại; không ghi ngược vào Sheet Category.
+- [ ] **Cần kiểm chứng thực tế:** đẩy bản sửa Category và `Probe.js` lên GAS, đọc đủ bốn lookup và xác nhận luồng không ghi hoặc xóa Sheet `Category`.
 - [ ] **Cần kiểm chứng thực tế:** kiểm mã trùng tên, ví dụ hai mã Cao Bằng, phải giữ đúng dấu `#` ở cả hai chiều.
 
 ### Đóng slice
 
-- [ ] Code, test offline, log và GAS DEV của preflight/category hoàn tất.
+- [ ] Code và test offline của preflight/category hoàn tất; còn chờ GAS DEV triển khai bản không ghi Category để đóng slice.
 - [ ] **Cần kiểm chứng thực tế:** xác nhận phiên, owner và Category trên tab FBM.
 
 ## Slice 2 — Pull Customer FBM → ShinCRM

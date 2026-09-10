@@ -8,7 +8,7 @@ async function chay(so) {
     FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {},
     PropertiesService: { getDocumentProperties: () => ({ getProperty: (key) => ({ FBM_SYNC_TEST_CUSTOMER_CODE: 'ALT00010' }[key] || '') }) }
   });
-  napServer(auditPull, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategorySync.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js');
+  napServer(auditPull, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js');
   const gate = { map: { '@CAT_TINH_THANH\u001fHà Nội': 'HNI' }, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true, HNI: true } } };
   const activityDecisionLogs = [];
   auditPull.logEvent = (event) => activityDecisionLogs.push(event);

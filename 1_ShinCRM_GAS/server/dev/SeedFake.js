@@ -160,6 +160,25 @@ function seedFakeCategory() {
  *
  * **Chặn cứng:** sheet nào đã có hàng dữ liệu thì ném lỗi và không ghi gì. Muốn chạy lại thì gọi `wipeFakeData` trước — bắt gọi tay như vậy để không có đường nào một hàm sinh dữ liệu tự tay xóa dữ liệu đang có.
  */
+/** Tao fixture DEV cho quan he mot-nhieu va nhieu-mot; khong dung trong production. */
+function seedFakeCategoryMappings() {
+  var sheet = shinOpenSheet('Category'), columnMap = readColumnMap('Category'), rows = [
+    { '@CAT_TINH_THANH': 'Ha Noi', '@CAT_TINH_THANH_FBM': 'HNI. Ha Noi # | HN. Ha Noi cu' },
+    { '@CAT_TINH_THANH': 'Ha Noi van phong', '@CAT_TINH_THANH_FBM': 'HNI. Ha Noi #' },
+    { '@CAT_TINH_THANH': 'Hanoi Office', '@CAT_TINH_THANH_FBM': 'HNI. Ha Noi #' },
+    { '@CAT_CONG_VIEC': 'Goi dien', '@CAT_CONG_VIEC_FBM': 'GD. Goi dien cham soc #' }
+  ];
+  var grid = rows.map(function (item) {
+    var row = new Array(columnMap.lastColumn); for (var i = 0; i < row.length; i++) { row[i] = ''; }
+    Object.keys(item).forEach(function (code) { row[columnIndex(columnMap, code) - 1] = item[code]; });
+    return row;
+  });
+  var count = sheetGridDataRowCount(sheet, SHEET_FIRST_DATA_ROW);
+  if (count > 0) { sheet.deleteRows(SHEET_FIRST_DATA_ROW, count); }
+  seedFakeWrite(sheet, grid);
+  return 'Category: da tao fixture anh xa mot-nhieu va nhieu-mot (' + grid.length + ' dong), chi dung DEV.';
+}
+
 function seedFakeData() {
   var khach = entityReadContext('customer');
   var gd = entityReadContext('activity');

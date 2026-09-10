@@ -77,7 +77,7 @@ FbmSync.categoryValueAllowed = function (categoryGate, source, value) {
   return blocked ? { ok: false, code: code, reason: blocked } : { ok: true, code: code };
 };
 
-/** Giữ payload Rows của completion để CategorySync còn dữ liệu cần ghi. */
+/** Giữ payload Rows của completion để đối chiếu Category. */
 FbmSync.lookupPayload = function (response) {
   var parsed = FbmSync.protocol.parse(response) || {}, data = parsed.d || parsed;
   if (typeof data === 'string') { data = FbmSync.protocol.parse(data) || []; }
@@ -142,7 +142,10 @@ FbmSync.validatePushCategories = function (record, entity, categoryGate) {
   return fields.map(function (item) { return { source: item[0], result: FbmSync.categoryValueAllowed(categoryGate, item[0], item[1]) }; }).filter(function (item) { return !item.result.ok; });
 };
 
-/** Gộp mã live vào companion; mã FBM-* chỉ là dữ liệu giả của DEV. */
+/** Dựng companion và gộp mã live chỉ dùng cho fixture/đối chiếu, không ghi Sheet. */
+FbmSync.categoryCompanionText = function (code, name, primary) {
+  return String(code || '').trim() + '. ' + String(name || code || '').trim() + (primary ? ' #' : '');
+};
 FbmSync.mergeLiveCategoryCell = function (cell, code, name) {
   var liveCode = String(code || '').trim();
   if (!liveCode) { return String(cell || '').trim(); }
