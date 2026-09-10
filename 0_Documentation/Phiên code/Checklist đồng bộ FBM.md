@@ -12,12 +12,15 @@
 
 ## Hợp đồng nhận diện và đăng nhập FBM
 
-- `ANHLT` là một giá trị nhận diện duy nhất của user FBM; không tách thành trường `anhlt` và `ANHLT`.
-- Tên đầy đủ `Lê Tuấn Anh`, mã ngắn `ALT` và `FBM_SPREADSHEET_ID` đều phải khớp tuyệt đối với giá trị live/cấu hình; không tự bỏ khoảng trắng, đổi hoa thường hoặc chuẩn hóa ký tự.
+- Mã user FBM là một giá trị nhận diện duy nhất do người dùng nhập; không tách thành hai trường khác hoa thường.
+- Username/mã user, tên đầy đủ và `FBM_SPREADSHEET_ID` phải khớp tuyệt đối với giá trị live/cấu hình; không tự bỏ khoảng trắng, đổi hoa thường hoặc chuẩn hóa ký tự.
+- Mã ngắn hiển thị trong FBM không phải cổng nhận diện vì người dùng có thể sửa; không lưu, không đối chiếu và không dùng để quyết định tài khoản.
 - `FBM_SPREADSHEET_ID` do người dùng nhập trong màn hình thiết lập để bản copy chưa đổi cấu hình bị chặn; GAS vẫn phải lấy ID thực tế của Spreadsheet trước khi so sánh.
-- Bản thiết lập đăng nhập gồm `ANHLT`, tên đầy đủ, `ALT`, `FBM_SPREADSHEET_ID` và mật khẩu; Extension mã hóa toàn bộ thành một envelope trước khi GAS lưu trong `DocumentProperties`.
+- Bản thiết lập đăng nhập gồm username/mã user, tên đầy đủ, `FBM_SPREADSHEET_ID` và mật khẩu; Extension mã hóa toàn bộ thành một envelope trước khi GAS lưu trong `DocumentProperties`.
 - Sidebar không nhận mật khẩu bản rõ; ô mật khẩu hiển thị `***` hoặc để trống. Khi xem lại, Extension chỉ giải mã nội bộ và trả các trường không nhạy cảm.
 - Tự động đăng nhập khi Chrome khởi động là tùy chọn, mặc định tắt. Khi tắt, luồng dùng cookie/đăng nhập thủ công hiện tại không thay đổi.
+- Sidebar có nút `Đăng nhập thử`; thao tác này chủ động kết thúc phiên FBM hiện tại rồi thử đăng nhập bằng thông tin đã nhập, chỉ trả trạng thái thành công/lỗi và không ghi mật khẩu vào Sheet hoặc Log.
+- Màn hình đồng bộ là một màn hình độc lập gồm các màn hình con trạng thái, thiết lập đăng nhập và chi tiết/audit; mỗi màn hình con nằm trong tệp `.html` riêng cùng thư mục `client/sync/` và dùng block/component chuẩn của Sidebar.
 
 ## Slice 0 — Nền tảng, ranh giới và an toàn
 
@@ -77,7 +80,10 @@
 - [x] 401/403 hoặc `Login.aspx` dừng kỳ và yêu cầu đăng nhập lại khi tùy chọn tự động đăng nhập tắt.
 - [ ] Tùy chọn tự động đăng nhập chỉ chạy khi session hết hạn/không có cookie; không ép login khi session hợp lệ đang tồn tại.
 - [ ] Form thiết lập đặt username và password cạnh nhau, hiển thị mật khẩu dạng `***`/trống, không ghi bản rõ vào Sheet hoặc Log.
-- [ ] Preflight đối chiếu tuyệt đối `ANHLT`, `Lê Tuấn Anh`, `ALT` và `FBM_SPREADSHEET_ID` trước request nghiệp vụ.
+- [ ] Nút `Đăng nhập thử` kết thúc phiên cũ, thử thông tin người dùng nhập và hiển thị kết quả mà không ghi bí mật.
+- [ ] Preflight đối chiếu tuyệt đối username/mã user, tên đầy đủ và `FBM_SPREADSHEET_ID` trước request nghiệp vụ; không dùng mã ngắn.
+- [ ] Mỗi lần Sidebar mở hoặc bắt tay lại, Extension ghi đè relay config bằng GAS URL và khóa của Spreadsheet hiện tại; Extension chỉ giữ một config đang hoạt động và không gọi nhiều GAS trong cùng kỳ.
+- [ ] Tách màn hình trạng thái, thiết lập đăng nhập và audit thành các tệp giao diện riêng trong `client/sync/`, tái sử dụng block chuẩn.
 - [x] Lấy authorized Customer rồi Activity; thiếu token thì dừng trước CRUD.
 - [ ] Kiểm owner mặc định FBM khớp `FBM_ACCOUNT_NAME`; sai thì dừng chiều push.
 - [ ] Xác nhận Config có `FBM_ACCOUNT_NAME`, `FBM_MA_KH_PREFIX`, `FBM_MA_KH_LENGTH`, `FBM_ACTIVITY_SINCE` và không khai trùng.

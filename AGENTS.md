@@ -26,7 +26,7 @@
 - Tệp client phải có đuôi `.html`, bọc trong `<script>` hoặc `<style>`. Tên tệp trên Google Apps Script là cả đường dẫn, nên `include()` phải dùng đường dẫn đầy đủ.
 - Giao diện dùng CSS thuần, SVG nội tuyến, không framework (khung thư viện). `spatialConfig` giữ các quyết định khoảng cách. Vẻ ngoài trong `9_Code_cu_tham_chieu/src/ui/Styles.html` là đặc tả hình thức; chỉ đọc code cũ, không sửa nó.
 - GAS là nơi giữ state, cursor, hash, conflict và quyết định nghiệp vụ. Extension chỉ tìm tab FBM, gọi `fetch` và trả response thô; Sidebar chỉ khởi chạy và hiển thị.
-- Không sửa nội dung fixture trong `0_Documentation/Phiên code/RequestFBM/`; không đưa cookie, mật khẩu, `authorized` hoặc payload nhạy cảm vào log.
+- Không sửa nội dung fixture trong `0_Documentation/Nghiên cứu FBM/RequestFBM/`; không đưa cookie, mật khẩu, `authorized` hoặc payload nhạy cảm vào log.
 
 ## Kiểm thử và an toàn
 
