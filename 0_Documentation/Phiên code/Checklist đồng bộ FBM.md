@@ -262,6 +262,7 @@
 - [x] Khi chưa chạy chỉ hiện `Đồng bộ ngay`; khi chạy chỉ hiện `Dừng đồng bộ`.
 - [x] Icon menu phản ánh trạng thái; tự động có thể báo đang phát triển.
 - [x] Đã thấy tiến trình request, lỗi transport và kết quả đọc trên màn hình.
+- [x] Mở màn hình đồng bộ lấy relay config song song với snapshot trạng thái, không để cấu hình nền chặn giao diện.
 - [x] GAS ghi log phase/lỗi nguồn `fbm_sync`, không ghi cookie/payload.
 - [x] Có dòng tổng kết mỗi kỳ và dòng chi tiết cho lỗi, conflict, hoãn, mã lạ và đẩy không ăn.
 - [ ] Màn hình có danh sách record kéo/đẩy/lỗi/conflict, không bắt người dùng đọc JSON trong Log.

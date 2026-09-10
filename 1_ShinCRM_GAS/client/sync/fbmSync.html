@@ -17,7 +17,8 @@ function syncPanelToggle() {
   screen.hidden = !screen.hidden;
   if (!screen.hidden) { FBM_SYNC_CLIENT.openedAt = Date.now(); }
   if (screen.hidden || typeof fbmSyncStatusOnce !== 'function') { return null; }
-  return fbmSyncConfigureRelay().then(function () { return fbmSyncStatusOnce(true); });
+  // Relay config chỉ phục vụ các request FBM; không cần chặn snapshot trạng thái.
+  return Promise.all([fbmSyncConfigureRelay(), fbmSyncStatusOnce(true)]).then(function (results) { return results[1]; });
 }
 /** Đưa cấu hình Web App/khóa sang Extension; không gửi cookie hay payload FBM. */
 function fbmSyncConfigureRelay() {
