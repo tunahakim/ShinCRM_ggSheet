@@ -105,12 +105,25 @@ function postRelay(url, key, body) {
   });
 }
 
+/** Đọc một relay config duy nhất; thiếu config thì không được chạm tab FBM. */
+function getRelayConfig() {
+  if (!chrome.storage || !chrome.storage.local || !chrome.storage.local.get) { return Promise.resolve(null); }
+  return new Promise(function (resolve) {
+    chrome.storage.local.get(['fbmWebAppUrl', 'fbmSyncKey', 'fbmSpreadsheetId'], function (config) {
+      var url = config && String(config.fbmWebAppUrl || '').trim();
+      var key = config && String(config.fbmSyncKey || '').trim();
+      var spreadsheetId = config && String(config.fbmSpreadsheetId || '').trim();
+      resolve(url && key ? { url: url, key: key, spreadsheetId: spreadsheetId } : null);
+    });
+  });
+}
+
 /** Chạy một lượng request đọc giới hạn trong mỗi heartbeat để tiếp tục cursor GAS. */
 function relayScheduledRequests(tabId, config, gasReply, count) {
   var next = gasReply && gasReply.request, used = Number(count || 0);
   if (!next || used >= 10 || !config || !config.url || !config.key) { return Promise.resolve(gasReply); }
   return sendToFbmTab(tabId, next).then(function (reply) {
-    return postRelay(config.url, config.key, { response: rawFbmReply(reply) }).then(function (nextReply) {
+    return postRelay(config.url, config.key, { spreadsheetId: config.spreadsheetId, response: rawFbmReply(reply) }).then(function (nextReply) {
       return relayScheduledRequests(tabId, config, nextReply, used + 1);
     });
   });
@@ -118,16 +131,12 @@ function relayScheduledRequests(tabId, config, gasReply, count) {
 
 /** Nộp heartbeat cho GAS và chạy tiếp các request đọc scheduler trả về. */
 function relayHeartbeatToGas(tabId, reply) {
-  if (!chrome.storage || !chrome.storage.local || !chrome.storage.local.get) { return Promise.resolve(null); }
-  return new Promise(function (resolve) {
-    chrome.storage.local.get(['fbmWebAppUrl', 'fbmSyncKey'], function (config) {
-      var url = config && String(config.fbmWebAppUrl || '').trim(), key = config && String(config.fbmSyncKey || '').trim();
-      if (!url || !key) { resolve(null); return; }
-      postRelay(url, key, { kind: 'heartbeat', response: rawFbmReply(reply) }).then(function (gasReply) {
-        return relayScheduledRequests(tabId, { url: url, key: key }, gasReply, 0);
-      }).then(resolve, function (error) { console.warn('Không relay được heartbeat cho GAS:', error); resolve(null); });
+  return getRelayConfig().then(function (config) {
+    if (!config) { return null; }
+    return postRelay(config.url, config.key, { kind: 'heartbeat', spreadsheetId: config.spreadsheetId, response: rawFbmReply(reply) }).then(function (gasReply) {
+      return relayScheduledRequests(tabId, config, gasReply, 0);
     });
-  });
+  }).catch(function (error) { console.warn('Không relay được heartbeat cho GAS:', error); return null; });
 }
 
 /** Định tuyến request từ Sidebar tới đúng tab FBM, không xử lý dữ liệu nghiệp vụ. */
@@ -135,7 +144,7 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   if (message && message.type === 'FBM_CONFIGURE_RELAY') {
     var config = message.config || {};
     if (!chrome.storage || !chrome.storage.local) { sendResponse({ ok: false, error: 'Extension không có kho cấu hình.' }); return false; }
-    chrome.storage.local.set({ fbmWebAppUrl: String(config.url || ''), fbmSyncKey: String(config.key || '') }, function () { sendResponse({ ok: true }); });
+    chrome.storage.local.set({ fbmWebAppUrl: String(config.url || ''), fbmSyncKey: String(config.key || ''), fbmSpreadsheetId: String(config.spreadsheetId || '') }, function () { sendResponse({ ok: true }); });
     return true;
   }
   if (!message || message.type !== 'FBM_EXECUTE_REQUEST') { return false; }
@@ -154,6 +163,9 @@ recoverSheetsBridges();
 /** Gửi request đọc tối thiểu; không gửi thao tác ghi từ alarm. */
 chrome.alarms.onAlarm.addListener(function (alarm) {
   if (!alarm || alarm.name !== 'fbm-heartbeat') { return; }
-  findFbmTab().then(function (tab) { if (tab) { return sendToFbmTab(tab.id, null).then(function (reply) { return relayHeartbeatToGas(tab.id, reply); }); } return null; }).catch(function (error) { console.warn('Heartbeat FBM thất bại:', error); });
+  getRelayConfig().then(function (config) {
+    if (!config) { return null; }
+    return findFbmTab().then(function (tab) { if (tab) { return sendToFbmTab(tab.id, null).then(function (reply) { return relayHeartbeatToGas(tab.id, reply); }); } return null; });
+  }).catch(function (error) { console.warn('Heartbeat FBM thất bại:', error); });
 });
 

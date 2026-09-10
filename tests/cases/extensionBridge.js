@@ -116,7 +116,7 @@ function chay(so) {
   const executorSource = fs.readFileSync(EXECUTOR_FILE, 'utf8');
   check(so, 'worker ping executor truoc request FBM', workerSource.indexOf("ensureFbmExecutor(tabId).then") < workerSource.indexOf("sendTabMessage(tabId, { type: 'FBM_EXECUTE'"), true);
   check(so, 'worker chi co mot diem gui request FBM', (workerSource.match(/sendTabMessage\(tabId, \{ type: 'FBM_EXECUTE', request: request \}/g) || []).length, 1);
-  check(so, 'heartbeat relay gui response thô cho GAS', workerSource.indexOf("postRelay(url, key, { kind: 'heartbeat', response: rawFbmReply(reply) })") >= 0, true);
+  check(so, 'heartbeat relay gui response thô va spreadsheetId cho GAS', workerSource.indexOf("postRelay(config.url, config.key, { kind: 'heartbeat', spreadsheetId: config.spreadsheetId, response: rawFbmReply(reply) })") >= 0, true);
   check(so, 'heartbeat relay tiep tuc cursor voi ngan sach request', workerSource.indexOf('relayScheduledRequests(tabId') >= 0 && workerSource.indexOf('used >= 10') >= 0, true);
   check(so, 'executor co ping phien ban 21.7', /FBM_PING[\s\S]+version:\s*'21\.7'/.test(executorSource), true);
   check(so, 'executor giai ma response gzip bat thuong cua FBM', executorSource.indexOf('DecompressionStream') >= 0 && executorSource.indexOf('response.arrayBuffer()') >= 0, true);

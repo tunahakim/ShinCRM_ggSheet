@@ -82,7 +82,7 @@
 - [ ] Form thiết lập đặt username và password cạnh nhau, hiển thị mật khẩu dạng `***`/trống, không ghi bản rõ vào Sheet hoặc Log.
 - [ ] Nút `Đăng nhập thử` kết thúc phiên cũ, thử thông tin người dùng nhập và hiển thị kết quả mà không ghi bí mật.
 - [ ] Preflight đối chiếu tuyệt đối username/mã user, tên đầy đủ và `FBM_SPREADSHEET_ID` trước request nghiệp vụ; không dùng mã ngắn.
-- [ ] Mỗi lần Sidebar mở hoặc bắt tay lại, Extension ghi đè relay config bằng GAS URL và khóa của Spreadsheet hiện tại; Extension chỉ giữ một config đang hoạt động và không gọi nhiều GAS trong cùng kỳ.
+- [x] Mỗi lần Sidebar mở hoặc bắt tay lại, Extension ghi đè relay config bằng GAS URL, khóa và Spreadsheet ID hiện tại; Extension chỉ giữ một config đang hoạt động và alarm không gọi FBM khi chưa có config.
 - [ ] Tách màn hình trạng thái, thiết lập đăng nhập và audit thành các tệp giao diện riêng trong `client/sync/`, tái sử dụng block chuẩn.
 - [x] Lấy authorized Customer rồi Activity; thiếu token thì dừng trước CRUD.
 - [ ] Kiểm owner mặc định FBM khớp `FBM_ACCOUNT_NAME`; sai thì dừng chiều push.
@@ -292,6 +292,6 @@
 | Slice 4 — Đối soát + conflict |  |  |  |  |  |
 | Slice 5 — Push Customer |  |  |  |  |  |
 | Slice 6 — Push Activity |  |  |  |  |  |
-| Slice 7 — Scheduler + nền | `7a324ee`, `43233a5` | `1065/1065` | `@125` | GAS DEV `fbmSyncHeartbeat` trả `OK`; không phát request ghi | Handoff heartbeat giới hạn 10 request đọc mỗi lượt; Dừng đồng bộ xóa marker |
+| Slice 7 — Scheduler + nền | `7a324ee`, `43233a5` | `1065/1065` | `@125` | GAS DEV `fbmSyncHeartbeat` trả `OK`; không phát request ghi | Handoff heartbeat giới hạn 10 request đọc mỗi lượt; Dừng đồng bộ xóa marker; relay mới kèm Spreadsheet ID và không chạm FBM khi thiếu config |
 | Slice 8 — UI + log + probe |  |  |  |  |  |
 | Slice 9 — Live acceptance + production |  |  |  |  |  |

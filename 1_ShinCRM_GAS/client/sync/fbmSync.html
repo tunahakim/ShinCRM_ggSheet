@@ -25,7 +25,7 @@ function fbmSyncConfigureRelay() {
   return callServer('fbmGetRelayConfig').then(function (config) {
     FBM_SYNC_CLIENT.relayConfigured = true;
     if (window.top !== window && config && config.url && config.key) {
-      window.top.postMessage({ action: 'CRM_FBM_CONFIG', nonce: SHEET_LINK_NONCE, config: { url: config.url, key: config.key } }, 'https://docs.google.com');
+      window.top.postMessage({ action: 'CRM_FBM_CONFIG', nonce: SHEET_LINK_NONCE, config: { url: config.url, key: config.key, spreadsheetId: config.spreadsheetId || '' } }, 'https://docs.google.com');
     }
     return config;
   }).catch(function () { return null; });

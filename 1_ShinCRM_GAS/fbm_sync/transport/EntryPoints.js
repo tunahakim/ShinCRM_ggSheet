@@ -17,11 +17,13 @@ function fbmSyncCancel() {
 /** Bật/tắt ghi thật; mặc định luôn tắt để bảo vệ dữ liệu FBM. */
 function fbmSyncSetWriteMode(enabled) { PropertiesService.getDocumentProperties().setProperty('FBM_SYNC_ALLOW_WRITES', enabled ? 'true' : 'false'); return { enabled: !!enabled }; }
 
-/** Cấp URL/khóa relay cho Sidebar truyền sang Extension theo đúng spreadsheet. */
+/** Cấp relay config của đúng Spreadsheet hiện tại; không để Extension tự đoán địa chỉ GAS. */
 function fbmSyncRelayConfig() {
   var url = '';
   try { url = ScriptApp.getService().getUrl() || ''; } catch (ignore) {}
-  return { url: url, key: String(PropertiesService.getScriptProperties().getProperty('FBM_SYNC_KEY') || '') };
+  var spreadsheetId = '';
+  try { spreadsheetId = String(shinOpenBook().getId() || ''); } catch (ignoreId) {}
+  return { url: url, key: String(PropertiesService.getScriptProperties().getProperty('FBM_SYNC_KEY') || ''), spreadsheetId: spreadsheetId };
 }
 
 /** Cổng HTTP tùy chọn cho runner; bắt buộc khóa trước khi xử lý. */
@@ -29,6 +31,9 @@ function doPost(event) {
   try {
     var body = event && event.postData && event.postData.contents ? JSON.parse(event.postData.contents) : {}, expected = String(PropertiesService.getScriptProperties().getProperty('FBM_SYNC_KEY') || '');
     if (!expected || body.key !== expected) { return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'unauthorized' })).setMimeType(ContentService.MimeType.JSON); }
+    var actualSpreadsheetId = '';
+    try { actualSpreadsheetId = String(shinOpenBook().getId() || ''); } catch (ignoreId) {}
+    if (!body.spreadsheetId || !actualSpreadsheetId || String(body.spreadsheetId) !== actualSpreadsheetId) { return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'spreadsheet_mismatch' })).setMimeType(ContentService.MimeType.JSON); }
     var result = body.kind === 'heartbeat' ? fbmSyncHeartbeat(body.response) : (body.response === undefined ? fbmSyncStart(body.mode) : fbmSyncContinue(body.response));
     return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
   } catch (err) { return ContentService.createTextOutput(JSON.stringify({ ok: false, error: String(err && err.message || err) })).setMimeType(ContentService.MimeType.JSON); }
