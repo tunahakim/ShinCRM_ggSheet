@@ -107,7 +107,10 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │                             Thư mục con chia theo MỤC ĐÍCH, không chia theo đuôi thẻ.
 │   ├── Sidebar.html              Trang gốc của sidebar: nhúng mọi tệp client theo đúng thứ tự rồi gọi lượt nạp đầu tiên.
 │   ├── sync\\                    Màn hình đồng bộ FBM độc lập, tách khỏi các màn nghiệp vụ.
-│   │   └── fbmSync.html           Tiến độ đồng bộ và bridge request thô.
+│   │   ├── fbmSync.html           Điều phối phiên và bridge request thô.
+│   │   ├── fbmSyncStatusScreen.html Block trạng thái và tiến trình riêng của phiên.
+│   │   ├── fbmSyncSettingsScreen.html Block điều khiển mode/cờ ghi; mở rộng cho credential.
+│   │   └── fbmSyncAuditScreen.html Block preview, audit và chi tiết lỗi/xung đột.
 │   ├── link\                     Cầu nối ô đang chọn: ưu tiên postMessage an toàn từ Extension, khi vắng mới mở đường dò máy chủ có nhịp và luật dừng.
 │   │   ├── sheetLink.html        Tai nghe CRM_CONTEXT từ Extension: kiểm tra customerId trực tiếp rồi bật followSelection. Bắt tay có tiếng đáp, đèn sống chết suy từ ACK chứ không suy từ im lặng.
 │   │   └── selectionPoll.html    Máy trạng thái dự phòng khi vắng Extension: nhịp dò 2/6 giây, bốn luật dừng, đèn sét bốn trạng thái và băng cảnh báo sau ba giây ân hạn.

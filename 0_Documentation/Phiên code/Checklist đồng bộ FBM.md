@@ -83,6 +83,7 @@
 - [ ] Nút `Đăng nhập thử` kết thúc phiên cũ, thử thông tin người dùng nhập và hiển thị kết quả mà không ghi bí mật.
 - [ ] Preflight đối chiếu tuyệt đối username/mã user, tên đầy đủ và `FBM_SPREADSHEET_ID` trước request nghiệp vụ; không dùng mã ngắn.
 - [x] Mỗi lần Sidebar mở hoặc bắt tay lại, Extension ghi đè relay config bằng GAS URL, khóa và Spreadsheet ID hiện tại; Extension chỉ giữ một config đang hoạt động và alarm không gọi FBM khi chưa có config.
+- [x] Tách phần dựng block trạng thái, điều khiển và audit thành các tệp `.html` riêng trong `client/sync/`, vẫn dùng lớp component/block chuẩn của Sidebar.
 - [ ] Tách màn hình trạng thái, thiết lập đăng nhập và audit thành các tệp giao diện riêng trong `client/sync/`, tái sử dụng block chuẩn.
 - [x] Lấy authorized Customer rồi Activity; thiếu token thì dừng trước CRUD.
 - [ ] Kiểm owner mặc định FBM khớp `FBM_ACCOUNT_NAME`; sai thì dừng chiều push.

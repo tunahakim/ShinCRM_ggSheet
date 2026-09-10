@@ -1,0 +1,15 @@
+<script>
+/* Block hiển thị snapshot trạng thái; không tự đọc GAS và không quyết định nghiệp vụ. */
+function fbmSyncPaintStatusBlocks(panel, status, count) {
+  var title = document.createElement('div'); title.className = 'shin-sync-title'; title.textContent = 'Đồng bộ FBM'; panel.appendChild(title);
+  var phase = document.createElement('div'); phase.className = 'shin-sync-phase'; phase.textContent = status.label || status.phase || ''; panel.appendChild(phase);
+  var operation = document.createElement('div'); operation.className = 'shin-sync-operation'; operation.textContent = 'Luồng: ' + String(status.direction || 'Chưa xác định') + ' · Đối tượng: ' + String(status.entityLabel || 'Tổng hợp'); panel.appendChild(operation);
+  if (status.session) {
+    var session = document.createElement('div'); session.className = 'shin-sync-session'; session.textContent = 'Phiên FBM: Customer ' + (status.session.customer ? 'OK' : 'chưa có') + ' · Activity ' + (status.session.activity ? 'OK' : 'chưa có'); panel.appendChild(session);
+  }
+  var counts = document.createElement('div'); counts.className = 'shin-sync-count'; counts.textContent = 'Đã xử lý ' + Number(count.completed || 0) + ' · thành công ' + Number(count.succeeded || 0) + ' · lỗi ' + Number(count.error || 0) + ' · xung đột ' + Number(count.conflict || 0) + ' · hoãn ' + Number(count.skipped || 0); panel.appendChild(counts);
+  fbmSyncPaintProgress(panel, status, count);
+  if (status.current) { var current = document.createElement('div'); current.className = 'shin-sync-current'; current.textContent = String(status.current); panel.appendChild(current); }
+  if (status.message) { var message = document.createElement('div'); message.className = 'shin-sync-message'; message.textContent = String(status.message); panel.appendChild(message); }
+}
+</script>

@@ -43,29 +43,11 @@ function fbmSyncPaint(status, freshOpen) {
   fbmSyncPaintHeaderState(status);
   if (status.writeAllowed !== undefined) { FBM_SYNC_CLIENT.writeAllowed = status.writeAllowed === true; }
   panel.hidden = false; panel.textContent = '';
-  var title = document.createElement('div'); title.className = 'shin-sync-title'; title.textContent = 'Đồng bộ FBM'; panel.appendChild(title);
-  var phase = document.createElement('div'); phase.className = 'shin-sync-phase'; phase.textContent = status.label || status.phase || ''; panel.appendChild(phase);
-  var operation = document.createElement('div'); operation.className = 'shin-sync-operation'; operation.textContent = 'Luồng: ' + String(status.direction || 'Chưa xác định') + ' · Đối tượng: ' + String(status.entityLabel || 'Tổng hợp'); panel.appendChild(operation);
-  if (status.session) { var session = document.createElement('div'); session.className = 'shin-sync-session'; session.textContent = 'Phiên FBM: Customer ' + (status.session.customer ? 'OK' : 'chưa có') + ' · Activity ' + (status.session.activity ? 'OK' : 'chưa có'); panel.appendChild(session); }
   var count = status.counts || {};
-  var counts = document.createElement('div'); counts.className = 'shin-sync-count'; counts.textContent = 'Đã xử lý ' + Number(count.completed || 0) + ' · thành công ' + Number(count.succeeded || 0) + ' · lỗi ' + Number(count.error || 0) + ' · xung đột ' + Number(count.conflict || 0) + ' · hoãn ' + Number(count.skipped || 0); panel.appendChild(counts);
-  fbmSyncPaintProgress(panel, status, count);
-  if (status.current) { var current = document.createElement('div'); current.className = 'shin-sync-current'; current.textContent = String(status.current); panel.appendChild(current); }
-  if (status.message) { var message = document.createElement('div'); message.className = 'shin-sync-message'; message.textContent = String(status.message); panel.appendChild(message); }
-  fbmSyncPaintPreview(panel, status.metadata && status.metadata.preview);
-  fbmSyncPaintAudit(panel, status.metadata && status.metadata.audit);
-  fbmSyncPaintRecordIssues(panel, status.metadata);
-  var actions = document.createElement('div'); actions.className = 'shin-sync-actions';
   var active = ['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(status.phase) >= 0;
-  var mode = document.createElement('select'); mode.id = 'fbm-sync-mode'; mode.className = 'shin-input'; mode.disabled = active;
-  [['read', 'Đọc thử'], ['write', 'Ghi thật']].forEach(function (item) { var option = document.createElement('option'); option.value = item[0]; option.textContent = item[1]; mode.appendChild(option); });
-  mode.value = FBM_SYNC_CLIENT.mode; mode.title = 'Chọn chiều chạy của phiên đồng bộ';
-  actions.appendChild(mode);
-  actions.appendChild(fbmSyncMakeButton(active ? 'fbm-sync-cancel' : 'fbm-sync-start', active ? 'Dừng đồng bộ' : 'Đồng bộ ngay', !active));
-  panel.appendChild(actions);
-  var gate = document.createElement('label'); gate.className = 'shin-sync-write-gate';
-  var check = document.createElement('input'); check.type = 'checkbox'; check.id = 'fbm-sync-write-gate'; check.checked = FBM_SYNC_CLIENT.writeAllowed; check.disabled = active;
-  gate.appendChild(check); gate.appendChild(document.createTextNode(' Cho phép ghi thật lên FBM')); panel.appendChild(gate);
+  fbmSyncPaintStatusBlocks(panel, status, count);
+  fbmSyncPaintAuditBlocks(panel, status);
+  fbmSyncPaintSettingsBlock(panel, active);
 }
 /** Đồng bộ màu icon header với phase hiện tại của phiên GAS. */
 function fbmSyncPaintHeaderState(status) {

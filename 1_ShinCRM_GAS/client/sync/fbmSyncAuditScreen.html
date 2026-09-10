@@ -1,0 +1,9 @@
+<script>
+/* Các block preview/audit được gom ở một màn hình con; dữ liệu vẫn do snapshot GAS cấp. */
+function fbmSyncPaintAuditBlocks(panel, status) {
+  var metadata = status.metadata || {};
+  fbmSyncPaintPreview(panel, metadata.preview);
+  fbmSyncPaintAudit(panel, metadata.audit);
+  fbmSyncPaintRecordIssues(panel, metadata);
+}
+</script>
