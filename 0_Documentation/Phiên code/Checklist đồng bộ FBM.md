@@ -224,6 +224,7 @@
 - [x] Kỳ Customer 60 phút kéo full grid qua nhiều lát, lưu cursor từng lát.
 - [x] Kỳ Activity 8 giờ chạy bulk ID, lớp `ngay_gd` và vòng xoay 30 Customer.
 - [x] Scheduler không tạo hai kỳ, không giữ công việc trong RAM và tiếp tục từ lát đã chốt.
+- [x] Nút Dừng đồng bộ xóa marker `scheduledScan`, không để heartbeat tự khởi động lại kỳ vừa dừng.
 - [x] Web App dùng khóa theo spreadsheet để tiếp tục khi Sidebar đóng.
 - [x] Mở lại Sidebar chỉ đọc state hiện có, không tạo kỳ thứ hai.
 - [ ] Nạp lần đầu Sheet trống theo thứ tự Category → Customer → Activity → baseline, không nhân bản.
@@ -273,6 +274,6 @@
 | Slice 4 — Đối soát + conflict |  |  |  |  |  |
 | Slice 5 — Push Customer |  |  |  |  |  |
 | Slice 6 — Push Activity |  |  |  |  |  |
-| Slice 7 — Scheduler + nền | `7a324ee` | `1059/1059` | `@125` | GAS DEV `fbmSyncHeartbeat` trả `OK`; không phát request ghi | Handoff heartbeat giới hạn 10 request đọc mỗi lượt |
+| Slice 7 — Scheduler + nền | `7a324ee`, `43233a5` | `1065/1065` | `@125` | GAS DEV `fbmSyncHeartbeat` trả `OK`; không phát request ghi | Handoff heartbeat giới hạn 10 request đọc mỗi lượt; Dừng đồng bộ xóa marker |
 | Slice 8 — UI + log + probe |  |  |  |  |  |
 | Slice 9 — Live acceptance + production |  |  |  |  |  |
