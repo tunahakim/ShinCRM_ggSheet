@@ -158,16 +158,16 @@
 
 ### Ba lớp quét
 
-- [ ] Bulk 8 giờ lấy grid Activity, lọc theo tập ID đã biết và trả danh sách ID vắng.
-- [ ] `ngay_gd` mới hơn max Activity đã có ID thì quét externalKey riêng Customer đó.
-- [ ] Vòng xoay quét 30 Customer tiếp theo để bắt Activity tạo lùi ngày.
-- [ ] Ba lớp có cursor bền vững và không bị hạ thành tùy chọn.
+- [x] Bulk 8 giờ lấy grid Activity, lọc theo tập ID đã biết và trả danh sách ID vắng.
+- [x] `ngay_gd` mới hơn max Activity đã có ID thì quét externalKey riêng Customer đó.
+- [x] Vòng xoay quét 30 Customer tiếp theo để bắt Activity tạo lùi ngày.
+- [x] Ba lớp có cursor bền vững trong state và DocumentProperties, không bị hạ thành tùy chọn.
 
 ### Đóng slice
 
-- [ ] Test offline phủ marker, missing, ngày lỗi, bulk và ba lớp phát hiện.
+- [x] Test offline phủ marker, missing, ngày lỗi, bulk, catchup và rotation của ba lớp phát hiện.
 - [x] Log có Customer cha, Activity ID, hướng đọc và lý do bỏ qua/khôi phục.
-- [ ] **Cần kiểm chứng thực tế:** pull Activity của `ALT00010`, xác nhận `customerId` nội bộ và không tạo dòng trùng khi chạy lại.
+- [x] Pull Activity của `ALT00010` sau Reload Extension: `customerId` liên kết đúng Customer nội bộ và chạy lại không tạo dòng trùng.
 
 ## Slice 4 — Đối soát, khóa, conflict và phục hồi
 
@@ -292,7 +292,7 @@
 | Slice 0 — Nền tảng |  |  |  |  |  |
 | Slice 1 — Preflight + Category | `fadcf33` | `1064/1064` trước sửa cancel scheduler | Chờ deploy | Chưa có | Category chỉ đọc/đối chiếu; không tự ghi Sheet |
 | Slice 2 — Pull Customer |  |  |  |  |  |
-| Slice 3 — Pull Activity |  |  |  |  |  |
+| Slice 3 — Pull Activity | `2b81673` | `1074/1074` | Chờ deploy | Pull `ALT00010` đã xác nhận Activity liên kết và idempotency; bulk/catchup/rotation đã có test offline | Ba lớp quét Activity nền đã có cursor state/DocumentProperties |
 | Slice 4 — Đối soát + conflict |  |  |  |  |  |
 | Slice 5 — Push Customer |  |  |  |  |  |
 | Slice 6 — Push Activity |  |  |  |  |  |

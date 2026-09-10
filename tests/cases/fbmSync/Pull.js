@@ -55,7 +55,11 @@ async function chay(so) {
   const bulkNext = builders.FbmSync.activityBulkNext(bulkState, { rows: [{ id: 'F-1', end_date: '2026-09-09', datetime0: '2026-09-09T01:00:00', line_nbr: 1 }], total: 2 });
   check(so, 'Bulk Activity tiep tuc bang composite key va luu ID da thay', [bulkNext.meta.kind, bulkNext.body.type, bulkNext.body.gridPageValue, bulkState.cursor.seenIds['F-1']], ['activity_bulk_grid', 1, ['2026-09-09', '2026-09-09T01:00:00', 'F-1', 1], true]);
   const bulkDone = builders.FbmSync.activityBulkNext(bulkState, { rows: [{ id: 'F-2', end_date: '2026-09-10', datetime0: '2026-09-10T01:00:00', line_nbr: 1 }], total: 2 });
-  check(so, 'Bulk Activity ket thuc va tra ID local vang', [bulkDone, bulkState.cursor.kind, bulkState.metadata.activityBulkMissing.length, bulkState.metadata.activityBulkMissing[0].fbmId], [null, 'activity_bulk_done', 1, 'F-LOCAL']);
+  check(so, 'Bulk Activity ket thuc, luu ID local vang va chuyen sang vong xoay Customer', [bulkDone && bulkDone.meta.kind, bulkState.cursor.kind, bulkState.metadata.activityBulkMissing.length, bulkState.metadata.activityBulkMissing[0].fbmId], ['activity_rotation_customer_grid', 'activity_rotation_customer_grid', 1, 'F-LOCAL']);
+
+  builders.FbmSync.readLocal = (entity) => entity === 'activity' ? [{ id: 'A-NEW', fbmId: 'F-NEW', workDate: '2026-09-10' }] : [];
+  const catchup = builders.FbmSync.activityCatchupCustomerRequest();
+  check(so, 'Lop catchup tao Customer grid theo ngay_gd moi hon Activity local', [catchup.meta.kind, catchup.meta.activityMaxDate, catchup.body.externalKey.some((item) => item.Name === 'ngay_gd' && item.Opr === '>')], ['activity_catchup_customer_grid', '2026-09-10', true]);
 
   let identityWrite;
   builders.FbmSync.stateRead = () => ({ metadata: { categoryGate: gate } });

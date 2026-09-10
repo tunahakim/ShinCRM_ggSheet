@@ -89,6 +89,75 @@ FbmSync.activityBulkMissing = function (localRecords, seenFbmIds) {
   });
   return missing;
 };
+
+/** Chuẩn hóa ngày Activity để lập kế hoạch quét bù Customer. */
+FbmSync.activityDateKey = function (value) {
+  var date = typeof FbmSync.fbDate === 'function' ? FbmSync.fbDate(value) : value;
+  if (date instanceof Date && !isNaN(date.getTime())) {
+    if (typeof Utilities !== 'undefined' && typeof Session !== 'undefined' && Utilities.formatDate) {
+      return Utilities.formatDate(date, Session.getScriptTimeZone() || 'Asia/Ho_Chi_Minh', 'yyyy-MM-dd');
+    }
+    return date.getUTCFullYear() + '-' + ('0' + (date.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + date.getUTCDate()).slice(-2);
+  }
+  var text = String(date || '').trim();
+  var match = text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  return match ? match[1] + '-' + ('0' + match[2]).slice(-2) + '-' + ('0' + match[3]).slice(-2) : '';
+};
+
+/** Tìm mốc Activity local mới nhất; không có mốc thì bỏ qua lượt quét bù. */
+FbmSync.activityLocalMaxDate = function () {
+  var latest = '';
+  if (typeof FbmSync.readLocal !== 'function') { return latest; }
+  (FbmSync.readLocal('activity') || []).forEach(function (record) {
+    var key = FbmSync.activityDateKey(record && record.workDate);
+    if (key && key > latest) { latest = key; }
+  });
+  return latest;
+};
+
+/** Lớp 2: tìm Customer có ngày giao dịch mới hơn Activity local mới nhất. */
+FbmSync.activityCatchupCustomerRequest = function () {
+  var maxDate = FbmSync.activityLocalMaxDate();
+  if (!maxDate) { return null; }
+  var request = FbmSync.customerGridRequest({
+    type: 0, count: 30, gridPageIndex: -1, gridRefresh: false,
+    externalKey: [{ Name: 'ngay_gd', Opr: '>', Value: maxDate, Type: 'Date', Ignore: false }]
+  });
+  request.meta.kind = 'activity_catchup_customer_grid';
+  request.meta.activityMaxDate = maxDate;
+  return request;
+};
+
+/** Đọc cursor xoay Customer từ DocumentProperties, không giữ trong Extension. */
+FbmSync.activityRotationCursor = function () {
+  var props = PropertiesService.getDocumentProperties(), raw = props.getProperty('FBM_SYNC_ACTIVITY_ROTATION');
+  if (!raw) { return { pageIndex: -1, pageValue: null }; }
+  try {
+    var parsed = JSON.parse(raw);
+    return { pageIndex: Number(parsed.pageIndex || -1), pageValue: parsed.pageValue || null };
+  } catch (ignore) { return { pageIndex: -1, pageValue: null }; }
+};
+
+/** Lớp 3: lấy một trang 30 Customer theo cursor xoay đã lưu. */
+FbmSync.activityRotationCustomerRequest = function () {
+  var cursor = FbmSync.activityRotationCursor(), request = FbmSync.customerGridRequest({
+    type: cursor.pageIndex < 0 ? 0 : 1, count: 30, gridPageIndex: cursor.pageIndex,
+    gridPageValue: cursor.pageValue, gridRefresh: false
+  });
+  request.meta.kind = 'activity_rotation_customer_grid';
+  return request;
+};
+
+/** Lưu vị trí trang xoay tiếp theo; hết danh sách thì quay lại trang đầu. */
+FbmSync.activityRotationSave = function (rows) {
+  var props = PropertiesService.getDocumentProperties(), list = rows || [];
+  if (!list.length || list.length < 30) { props.setProperty('FBM_SYNC_ACTIVITY_ROTATION', JSON.stringify({ pageIndex: -1, pageValue: null })); return; }
+  var last = list[list.length - 1], pageIndex = FbmSync.activityRotationCursor().pageIndex;
+  props.setProperty('FBM_SYNC_ACTIVITY_ROTATION', JSON.stringify({
+    pageIndex: Number(pageIndex < 0 ? 0 : pageIndex + 1),
+    pageValue: [last.ngay_gd || '', last.datetime0 || '', last.xorder || '']
+  }));
+};
 /** Lấy AliasName metadata; fallback tên field để tránh hardcode schema. */
 FbmSync.gridFields = function (response) {
   var parsed = FbmSync.protocol.parse(response) || {};
