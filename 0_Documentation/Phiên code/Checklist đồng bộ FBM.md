@@ -8,7 +8,7 @@
 - `[ ]` là việc còn thiếu; mục không có nhãn **Cần kiểm chứng thực tế** là việc AI tự tiếp tục được.
 - Một slice chỉ đóng sau khi đủ code, test, log/báo cáo và checklist case của slice đó.
 - Sau khi đóng slice, ghi commit và revision GAS vào bảng bằng chứng cuối file.
-- Bộ kiểm offline gần nhất đạt `1064/1064`; phần đọc `ALT00010` và một Activity đã từng kiểm chứng, chiều ghi chưa có kết quả thành công được xác nhận.
+- Bộ kiểm offline gần nhất đạt `1065/1065`; phần đọc `ALT00010` và một Activity đã từng kiểm chứng, chiều ghi chưa có kết quả thành công được xác nhận.
 
 ## Slice 0 — Nền tảng, ranh giới và an toàn
 
@@ -267,7 +267,7 @@
 | Slice | Commit code | Test/offline | Revision GAS | Bằng chứng thực tế | Ghi chú |
 | --- | --- | --- | --- | --- | --- |
 | Slice 0 — Nền tảng |  |  |  |  |  |
-| Slice 1 — Preflight + Category |  |  |  |  |  |
+| Slice 1 — Preflight + Category | `fadcf33` | `1064/1064` trước sửa cancel scheduler | Chờ deploy | Chưa có | Category chỉ đọc/đối chiếu; không tự ghi Sheet |
 | Slice 2 — Pull Customer |  |  |  |  |  |
 | Slice 3 — Pull Activity |  |  |  |  |  |
 | Slice 4 — Đối soát + conflict |  |  |  |  |  |

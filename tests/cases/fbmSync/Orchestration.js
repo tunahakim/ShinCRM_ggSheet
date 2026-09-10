@@ -49,6 +49,9 @@ async function chay(so) {
   orchestration.FbmSync.stateWrite(pausedState);
   const restartedPaused = orchestration.FbmSync.start({ mode: 'read' });
   check(so, 'dong bo lai tu trang thai tam dung tao request FBM moi', [restartedPaused.ok, restartedPaused.request.meta.kind, restartedPaused.resumed], [true, 'authorize', undefined]);
+  orchestration.FbmSync.statePatch({ runId: 'scheduled-run', phase: 'pull_customer', scheduledScan: 'customer' });
+  orchestration.fbmSyncCancel();
+  check(so, 'dung dong bo xoa marker scheduler de khong tu chay lai', [orchestration.FbmSync.stateRead().phase, orchestration.FbmSync.stateRead().scheduledScan], ['idle', '']);
 
   const guards = taoHopCat({ FbmSync: {}, PropertiesService: { getScriptProperties: () => ({ getProperty: () => '' }), getDocumentProperties: () => ({ getProperty: () => null, setProperty: () => {} }) } });
   napServer(guards, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js');

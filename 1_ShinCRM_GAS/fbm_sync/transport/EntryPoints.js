@@ -11,7 +11,7 @@ function fbmSyncRecalculateBaseline(entity) { return FbmSync.recalculateBaseline
 function fbmSyncCancel() {
   var state = FbmSync.stateRead(), locks = state.locks || {}, kept = {};
   Object.keys(locks).forEach(function (key) { if (locks[key] && locks[key].owner === 'user') { kept[key] = locks[key]; } });
-  state.runId = ''; state.phase = 'idle'; state.entity = ''; state.cursor = {}; state.current = ''; state.locks = kept; state.message = 'Đã dừng phiên đồng bộ.'; state.lastError = '';
+  state.runId = ''; state.phase = 'idle'; state.entity = ''; state.cursor = {}; state.current = ''; state.scheduledScan = ''; state.locks = kept; state.message = 'Đã dừng phiên đồng bộ.'; state.lastError = '';
   return FbmSync.stateWrite(state);
 }
 /** Bật/tắt ghi thật; mặc định luôn tắt để bảo vệ dữ liệu FBM. */
