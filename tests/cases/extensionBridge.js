@@ -126,6 +126,7 @@ function chay(so) {
   const syncSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'client', 'sync', 'fbmSync.html'), 'utf8');
   check(so, 'Sidebar giu waiter va thu lai mot lan khi bridge cu mat context', syncSource.indexOf('if (data.retryable)') >= 0 && syncSource.indexOf('waiter.retryCount < 1') >= 0 && syncSource.indexOf('retryCount: 0') >= 0, true);
   check(so, 'mo man dong bo khong cho relay config chan status', syncSource.indexOf('Promise.all([fbmSyncConfigureRelay(), fbmSyncStatusOnce(true)])') >= 0, true);
+  check(so, 'man dong bo hien thi Category block va Activity missing', syncSource.indexOf('metadata.categoryBlocks') >= 0 && syncSource.indexOf('metadata.activityBulkMissing') >= 0, true);
   check(so, 'Sidebar bat tay relay khi khoi dong khong chan boot', sidebarSource.indexOf('fbmSyncConfigureRelay().catch(function () {})') >= 0 && sidebarSource.indexOf('fbmSyncConfigureRelay().catch(function () {})') < sidebarSource.indexOf('sidebarBoot();'), true);
   check(so, 'executor co ping phien ban 21.7', /FBM_PING[\s\S]+version:\s*'21\.7'/.test(executorSource), true);
   check(so, 'executor giai ma response gzip bat thuong cua FBM', executorSource.indexOf('DecompressionStream') >= 0 && executorSource.indexOf('response.arrayBuffer()') >= 0, true);

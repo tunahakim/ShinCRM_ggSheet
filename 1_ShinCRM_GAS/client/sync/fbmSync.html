@@ -100,7 +100,9 @@ function fbmSyncPaintRecordIssues(panel, metadata) {
   var conflicts = Array.isArray(metadata.conflicts) ? metadata.conflicts : [];
   var identityBlocks = Array.isArray(metadata.identityBlocks) ? metadata.identityBlocks : [];
   var pushFailures = metadata.pushFailures || {};
-  if (!conflicts.length && !identityBlocks.length && !Object.keys(pushFailures).length) { return; }
+  var categoryBlocks = Array.isArray(metadata.categoryBlocks) ? metadata.categoryBlocks : [];
+  var activityMissing = Array.isArray(metadata.activityBulkMissing) ? metadata.activityBulkMissing : [];
+  if (!conflicts.length && !identityBlocks.length && !Object.keys(pushFailures).length && !categoryBlocks.length && !activityMissing.length) { return; }
   var box = document.createElement('div'); box.className = 'shin-sync-audit';
   var title = document.createElement('div'); title.className = 'shin-sync-preview-title'; title.textContent = 'Chi tiết bản ghi'; box.appendChild(title);
   conflicts.slice(-20).forEach(function (item) {
@@ -115,6 +117,14 @@ function fbmSyncPaintRecordIssues(panel, metadata) {
   Object.keys(pushFailures).slice(-20).forEach(function (key) {
     var row = document.createElement('div'); row.className = 'shin-sync-preview-row';
     row.textContent = 'Lỗi đẩy ' + String(key); box.appendChild(row);
+  });
+  categoryBlocks.slice(-20).forEach(function (item) {
+    var row = document.createElement('div'); row.className = 'shin-sync-preview-row';
+    row.textContent = 'Chặn do Category ' + String(item.source || 'Category') + (item.code ? ' · ' + String(item.code) : '') + (item.reason ? ' · ' + String(item.reason) : ''); box.appendChild(row);
+  });
+  activityMissing.slice(-20).forEach(function (item) {
+    var row = document.createElement('div'); row.className = 'shin-sync-preview-row';
+    row.textContent = 'Activity không thấy trong FBM ' + String(item.id || '') + (item.fbmId ? ' · FBM ' + String(item.fbmId) : ''); box.appendChild(row);
   });
   panel.appendChild(box);
 }
