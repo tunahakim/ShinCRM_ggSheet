@@ -129,6 +129,8 @@
     // Chạy trình tự khởi động ngay khi trang nạp xong. Không chờ sự kiện nào khác: các thẻ script nằm cuối thân trang nên
     // tới đây năm vùng đã có mặt trong DOM.
     fbmSyncInstall();
+    // Relay config đi nền; không chặn nạp RAM hay hiện overlay khi GAS/Extension chưa sẵn sàng.
+    if (typeof fbmSyncConfigureRelay === 'function') { fbmSyncConfigureRelay().catch(function () {}); }
     sidebarBoot();
   </script>
 </body>

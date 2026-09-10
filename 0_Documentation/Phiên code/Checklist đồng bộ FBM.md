@@ -293,6 +293,6 @@
 | Slice 4 — Đối soát + conflict |  |  |  |  |  |
 | Slice 5 — Push Customer |  |  |  |  |  |
 | Slice 6 — Push Activity |  |  |  |  |  |
-| Slice 7 — Scheduler + nền | `7a324ee`, `43233a5` | `1065/1065` | `@125` | GAS DEV `fbmSyncHeartbeat` trả `OK`; không phát request ghi | Handoff heartbeat giới hạn 10 request đọc mỗi lượt; Dừng đồng bộ xóa marker; relay mới kèm Spreadsheet ID và không chạm FBM khi thiếu config |
+| Slice 7 — Scheduler + nền | `7a324ee`, `43233a5`, `0d46258`, `ba46b23`, `36d6f8f` | `1068/1068` | `@125` | GAS DEV `fbmSyncHeartbeat` trả `OK`; không phát request ghi | Handoff heartbeat giới hạn 10 request đọc mỗi lượt; relay kèm Spreadsheet ID; Sidebar gửi config khi mở; không chạm FBM khi thiếu config |
 | Slice 8 — UI + log + probe |  |  |  |  |  |
 | Slice 9 — Live acceptance + production |  |  |  |  |  |

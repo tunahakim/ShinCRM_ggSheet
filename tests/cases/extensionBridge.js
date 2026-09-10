@@ -120,6 +120,8 @@ function chay(so) {
   check(so, 'heartbeat relay tiep tuc cursor voi ngan sach request', workerSource.indexOf('relayScheduledRequests(tabId') >= 0 && workerSource.indexOf('used >= 10') >= 0, true);
   check(so, 'alarm chi tim tab FBM sau khi co relay config', workerSource.indexOf("getRelayConfig().then(function (config) {\n    if (!config) { return null; }\n    return findFbmTab()") >= 0, true);
   check(so, 'relay config luu Spreadsheet ID', workerSource.indexOf('fbmSpreadsheetId: String(config.spreadsheetId || \'\')') >= 0, true);
+  const sidebarSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'client', 'Sidebar.html'), 'utf8');
+  check(so, 'Sidebar bat tay relay khi khoi dong khong chan boot', sidebarSource.indexOf('fbmSyncConfigureRelay().catch(function () {})') >= 0 && sidebarSource.indexOf('fbmSyncConfigureRelay().catch(function () {})') < sidebarSource.indexOf('sidebarBoot();'), true);
   check(so, 'executor co ping phien ban 21.7', /FBM_PING[\s\S]+version:\s*'21\.7'/.test(executorSource), true);
   check(so, 'executor giai ma response gzip bat thuong cua FBM', executorSource.indexOf('DecompressionStream') >= 0 && executorSource.indexOf('response.arrayBuffer()') >= 0, true);
 }
