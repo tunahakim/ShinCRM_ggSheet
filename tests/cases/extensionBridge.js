@@ -111,7 +111,7 @@ function chay(so) {
   });
   invalidBridge.sendRequestToWorker({ type: 'FBM_EXECUTE_REQUEST' }, function (error) { invalidated = error && error.message || ''; });
   check(so, 'context Extension het hieu luc tra loi ngay', invalidated, 'Extension context invalidated.');
-  check(so, 'bridge danh dau context invalidated de Sidebar thu lai', /retryable:\s*isInvalidatedExtensionError\(error\)/.test(fs.readFileSync(BRIDGE_FILE, 'utf8')), true);
+  check(so, 'bridge cu khong phat response loi khi context invalidated', fs.readFileSync(BRIDGE_FILE, 'utf8').indexOf('if (isInvalidatedExtensionError(error)) { return; }') >= 0, true);
 
   const workerSource = fs.readFileSync(WORKER_FILE, 'utf8');
   const executorSource = fs.readFileSync(EXECUTOR_FILE, 'utf8');

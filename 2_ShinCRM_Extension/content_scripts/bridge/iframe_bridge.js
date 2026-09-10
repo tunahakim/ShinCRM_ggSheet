@@ -115,6 +115,9 @@ window.addEventListener('message', function (event) {
     // Sheets có thể thay WindowProxy sau reload; nonce vẫn định danh đúng Sidebar.
     if (event.source && event.source !== sidebarWindow) { sidebarWindow = event.source; sidebarOrigin = event.origin; }
     sendRequestToWorker({ type: 'FBM_EXECUTE_REQUEST', id: data.id, request: data.request }, function (error, reply) {
+      // Content script cũ sau Extension Reload không còn runtime context. Không phát
+      // response lỗi cạnh response thật của bridge mới vừa được worker nạp lại.
+      if (isInvalidatedExtensionError(error)) { return; }
       try {
         event.source.postMessage({
           action: 'CRM_FBM_RESPONSE',
@@ -122,7 +125,7 @@ window.addEventListener('message', function (event) {
           id: data.id,
           result: error ? null : (reply && reply.result),
           error: error ? error.message : (reply && reply.error),
-          retryable: isInvalidatedExtensionError(error)
+          retryable: false
         }, event.origin);
       } catch (err) { sidebarWindow = null; sidebarOrigin = ''; sidebarNonce = ''; }
     });

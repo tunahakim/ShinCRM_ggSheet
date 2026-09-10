@@ -44,6 +44,7 @@
 - [x] Đã kiểm chứng đường Sidebar → Extension → tab FBM → Sidebar nhận response thật.
 - [x] Executor báo phiên bản `21.7`; reload Extension có thể phục hồi đầu nhận.
 - [x] Bridge cũ sau Reload báo lỗi `Extension context invalidated` theo nhánh có thể thử lại; Sidebar phát lại đúng một request và Service Worker chống trùng theo `id`.
+- [x] Bridge cũ tự im lặng khi context mất, không làm rơi response thật từ bridge mới sau Reload.
 - [x] Request authorized Customer dùng `viewPage:false`, `authorized:null`, `values:[]` và ba vars đúng hợp đồng.
 - [x] Request authorized Activity dùng controller riêng và hai vars đúng hợp đồng.
 - [x] Đã kiểm chứng thực tế việc nhận được authorized Customer và Activity của phiên FBM đang mở.
