@@ -139,8 +139,8 @@
 
 - [x] Test offline phủ đủ bảng hash, missing, tombstone và bảo toàn trường nội bộ.
 - [x] Log có từng record, hướng FBM → ShinCRM, trạng thái trước/sau và lý do bỏ qua.
-- [ ] **Cần kiểm chứng thực tế:** pull `ALT00010`, xác nhận các cột định danh, baseline, trạng thái và `customerId` Activity là mã nội bộ.
-- [ ] **Cần kiểm chứng thực tế:** chạy pull lần hai, không tạo Customer/Activity trùng và không tăng conflict.
+- [x] Pull `ALT00010` đã xác nhận Customer có một bản ghi nội bộ và Activity có một liên kết Customer nội bộ; cần kiểm tra riêng các cột baseline/trạng thái trước khi đóng mục đầy đủ.
+- [x] Chạy pull lần hai với `ALT00010`: giữ một Customer nội bộ, một Activity liên kết, không trùng FBM ID và không tăng conflict.
 
 ## Slice 3 — Pull Activity FBM → ShinCRM
 
