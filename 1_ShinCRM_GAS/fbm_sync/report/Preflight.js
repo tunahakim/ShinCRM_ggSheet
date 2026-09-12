@@ -100,7 +100,7 @@ FbmSync.runPreflight = function (options) {
   if (!String(params.FBM_MA_KH_PREFIX || '').trim() || !String(params.FBM_MA_KH_LENGTH || '').trim()) { FbmSync.preflightIssue(issues, 'FBM_CUSTOMER_CODE_CONFIG_INCOMPLETE', 'warn', 'Config', 'Thiếu FBM_MA_KH_PREFIX hoặc FBM_MA_KH_LENGTH; chỉ ảnh hưởng khi tạo Customer mới.', false); }
   if (!String(params.FBM_ACTIVITY_SINCE || '').trim()) { FbmSync.preflightIssue(issues, 'FBM_ACTIVITY_SINCE_MISSING', 'warn', 'Config', 'Thiếu FBM_ACTIVITY_SINCE; hệ sẽ dùng phạm vi đọc mặc định hiện tại.', false); }
   FbmSync.preflightCategories(issues, core.category || {}, writeMode ? 'write' : mode);
-  var candidateReport = FbmSync.preflightCandidates(issues, mode);
+  var candidateReport = FbmSync.preflightCandidates(issues, writeMode ? 'write' : mode);
   FbmSync.preflightPushPermissions(issues, writeMode ? 'write' : mode, candidateReport.gate || {});
   var blocking = issues.filter(function (item) { return item.blocking; });
   return { ok: blocking.length === 0, mode: mode, issues: issues, blocking: blocking, warnings: issues.filter(function (item) { return !item.blocking; }), candidateCount: candidateReport.candidates.length };

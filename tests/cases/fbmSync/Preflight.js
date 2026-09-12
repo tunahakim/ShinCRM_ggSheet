@@ -24,6 +24,8 @@ async function chay(so) {
 
   const read = hop.FbmSync.runPreflight({ mode: 'read' });
   check(so, 'preflight read vẫn cho phép đọc nhưng giữ cảnh báo', [read.ok, read.warnings.some((item) => item.code === 'FBM_ACCOUNT_NAME_MISSING')], [true, true]);
+  const push = hop.FbmSync.runPreflight({ mode: 'push' });
+  check(so, 'preflight mode push vẫn fail-closed như mode write', [push.ok, push.blocking.some((item) => item.code === 'FBM_ACCOUNT_NAME_MISSING')], [false, true]);
 }
 
 module.exports = { chay };
