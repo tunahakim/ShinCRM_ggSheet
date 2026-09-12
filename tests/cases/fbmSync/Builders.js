@@ -29,6 +29,8 @@ async function chay(so) {
   check(so, 'SELECT Customer đổi sang mã FBM', newCustomer.body.memvars.filter((item) => item.Name === 'dc_lh_tinh')[0].NewValue, 'HNI');
   const activity = builders.FbmSync.activityCreateRequest({ id: 'ACT-9', customerFbmCode: 'ALT99999', taskType: 'Gọi', content: 'Nội dung' }, gate);
   check(so, 'Activity mới gắn dấu nhận diện', activity.body.memvars.filter((item) => item.Name === 'details')[0].NewValue, 'Nội dung #SC-ACT-9');
+  check(so, 'Activity tạo mới dùng type lưu form', activity.body.type, 1);
+  check(so, 'Activity sửa mở form dùng type đọc form', builders.FbmSync.activityEditOpenRequest('174813').body.type, 0);
   check(so, 'Activity không đẩy product nội bộ lên FBM', activity.body.memvars.filter((item) => item.Name === 'ma_sp')[0].NewValue, '');
   const linkedActivity = builders.FbmSync.linkActivityCustomers([{ customerId: 'ALT99999', fbmHash: 'old' }], [{ id: 'KH-1', fbmCustomerCode: 'ALT99999' }]);
   check(so, 'Activity FBM nối về mã Customer nội bộ', [linkedActivity.records[0].customerId, linkedActivity.orphaned], ['KH-1', 0]);

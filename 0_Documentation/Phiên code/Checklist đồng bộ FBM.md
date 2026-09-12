@@ -8,7 +8,7 @@
 - `[ ]` là việc còn thiếu; mục không có nhãn **Cần kiểm chứng thực tế** là việc AI tự tiếp tục được.
 - Một slice chỉ đóng sau khi đủ code, test, log/báo cáo và checklist case của slice đó.
 - Sau khi đóng slice, ghi commit và revision GAS vào bảng bằng chứng cuối file.
-- Bộ kiểm offline gần nhất đạt `1078/1078`; phần đọc `ALT00010` và một Activity đã từng kiểm chứng, chiều ghi chưa có kết quả thành công được xác nhận.
+- Bộ kiểm offline gần nhất đạt `1095/1095`; phần đọc `ALT00010` và một Activity đã từng kiểm chứng, chiều ghi chưa có kết quả thành công được xác nhận.
 
 ## Hợp đồng nhận diện và đăng nhập FBM
 
@@ -299,7 +299,7 @@
 | Slice 3 — Pull Activity | `8fbb6a7` + entrypoint DEV | `1075/1075` | `@136` | Pull `ALT00010` đã xác nhận Activity liên kết và idempotency; bulk/catchup/rotation đã có test offline; `fbmSyncStartActivityBulk` trả `OK`, request đầu `authorize`, state `scan=activity_bulk`; `fbmInstallScheduler` trả `OK` | Ba lớp quét Activity nền đã có cursor state/DocumentProperties |
 | Slice 4 — Đối soát + conflict |  |  |  |  |  |
 | Slice 5 — Push Customer |  |  |  |  |  |
-| Slice 6 — Push Activity |  |  |  |  |  |
+| Slice 6 — Push Activity | `e9ba3f1` | `1095/1095` | `@152` | Chưa chạy lại ghi thật sau khi sửa payload mở form | Activity Edit dùng `type: 0` khi mở form và `type: 1` khi lưu; chờ kiểm chứng HTTP 500 đã hết |
 | Slice 7 — Scheduler + nền | `7a324ee`, `43233a5`, `0d46258`, `ba46b23`, `36d6f8f`, `9923fac`, `119cea6` | `1078/1078` | `@137` | GAS DEV `fbmSyncHeartbeat` và `fbmSyncStatus` trả `OK`; không phát request ghi | Handoff heartbeat giới hạn 10 request đọc mỗi lượt; relay kèm Spreadsheet ID; Sidebar gửi config khi mở; không chạm FBM khi thiếu config; bridge cũ sau Reload được thử lại có kiểm soát; state active quá hạn được thu hồi |
 | Slice 8 — UI + log + probe |  |  |  |  |  |
 | Slice 9 — Live acceptance + production |  |  |  |  |  |

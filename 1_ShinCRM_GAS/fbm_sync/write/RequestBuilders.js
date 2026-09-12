@@ -28,11 +28,13 @@ FbmSync.categoryField = function (categoryGate, source, value) {
 FbmSync.formEnvelope = function (entity, action, values, memvars) {
   var cfg = FbmSync.scriptSettings();
   var controller = FbmSync.CONTROLLERS[entity];
+  // FBM phân biệt rõ mở form (type 0) và lưu form (type 1); gửi type 1 với memvars rỗng có thể trả HTTP 500.
+  var fields = memvars || [];
   return {
-    type: 1, parentType: 'Dir', firstView: false, searchMode: false, viewPage: true,
+    type: fields.length ? 1 : 0, parentType: 'Dir', firstView: false, searchMode: false, viewPage: true,
     authorized: entity === 'customer' ? cfg.customerAuthorized : cfg.activityAuthorized, action: action, actionID: null,
     values: values || [], vars: entity === 'customer' ? [{ Name: 'recordID', Type: 'String', Value: '' }, { Name: 'viewPageMode', Type: 'Boolean' }, { Name: 'viewParentController', Type: 'String', Value: '' }] : [{ Name: 'recordID', Type: 'String', Value: '' }, { Name: 'viewPageMode', Type: 'Boolean', Value: false }],
-    memvars: memvars || [], language: 'v', controller: controller, viewId: null, gridController: controller, gridViewId: null, cookie: cfg.cookie
+    memvars: fields, language: 'v', controller: controller, viewId: null, gridController: controller, gridViewId: null, cookie: cfg.cookie
   };
 };
 /** Bootstrap token cho controller bằng viewPage:false. */
