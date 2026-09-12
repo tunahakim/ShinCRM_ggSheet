@@ -13,6 +13,23 @@ FbmSync.stateDefault = function () {
 
 /** Lấy kho state cấp tài liệu, dùng chung giữa các lần gọi GAS. */
 FbmSync.props = function () { return PropertiesService.getDocumentProperties(); };
+/** Hash của lần ghi đang chờ xác nhận; không đưa metadata kỹ thuật vào Sheet. */
+FbmSync.pendingPushesRead = function () {
+  try {
+    var raw = FbmSync.props().getProperty('FBM_SYNC_PENDING_PUSHES_V1'), parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch (ignore) { return {}; }
+};
+FbmSync.pendingPushGet = function (entity, id) {
+  return FbmSync.pendingPushesRead()[String(entity || '') + ':' + String(id || '')] || null;
+};
+FbmSync.pendingPushSet = function (entity, id, value) {
+  var key = String(entity || '') + ':' + String(id || ''), all = FbmSync.pendingPushesRead();
+  if (value && typeof value === 'object') { all[key] = value; } else { delete all[key]; }
+  FbmSync.props().setProperty('FBM_SYNC_PENDING_PUSHES_V1', JSON.stringify(all));
+  return value || null;
+};
+FbmSync.pendingPushClear = function (entity, id) { return FbmSync.pendingPushSet(entity, id, null); };
 /** Đọc state và tự bù field thiếu từ mặc định. */
 FbmSync.stateRead = function () {
   var fallback = FbmSync.stateDefault();

@@ -29,11 +29,12 @@ FbmSync.logPushRecord = function (candidate, operation, outcome, reason, detail)
     detail: Object.assign({ direction: 'ShinCRM → FBM', requestKind: String(operation || candidate && candidate.kind || ''), hSHIN: hShin, hBASE: String(record.fbmHash || '') }, detail || {})
   });
 };
-/** Ghi trạng thái kỹ thuật sau push; baseline chỉ cập nhật khi pull sau đó xác nhận bằng nhau. */
+/** Ghi trạng thái kỹ thuật sau push; baseline chỉ cập nhật sau bước đọc xác nhận. */
 FbmSync.markPushResult = function (candidate, response, operation) {
-  var record = candidate.record || {}, values = FbmSync.extractInternalValues(response), data = FbmSync.protocol.parse(response) || {};
+  var record = candidate.record || {}, values = FbmSync.extractInternalValues(response), data = FbmSync.protocol.parse(response) || {}, gate = candidate.categoryGate || {};
   data = data.d || data;
-  // Giữ baseline cũ để kỳ pull sau phân biệt FBM không đổi với dữ liệu đã áp dụng.
+  // Giữ baseline cũ; hash payload gửi được lưu riêng để kỳ đọc nhận ra chính lần ghi này.
+  var sentHash = typeof FbmSync.hash === 'function' ? FbmSync.hash(record, candidate.entity, gate) : '';
   var patch = { id: record.id, syncStatus: FbmSync.SYNC_STATUS.pushed, fbmHash: String(record.fbmHash || '').trim() };
   if (candidate.entity === 'customer') {
     patch.fbmId = String(values.stt_rec_kh || values.stt_rec_kh0 || record.fbmId || '').trim();
@@ -46,8 +47,68 @@ FbmSync.markPushResult = function (candidate, response, operation) {
   }
   var saved = writeGateSave({ entity: candidate.entity, records: [patch], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
   if (!saved || !saved.ok) { throw new Error('Không ghi được trạng thái chờ xác nhận sau push.'); }
-  FbmSync.logPushRecord(candidate, operation, typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', 'Đã gửi request ghi; chờ kỳ pull xác nhận.', { fbmId: patch.fbmId, fbmCustomerCode: patch.fbmCustomerCode || '' });
+  // Hash chờ xác nhận chỉ lưu trong state server, không ghi vào Sheet.
+  try {
+    FbmSync.pendingPushSet(candidate.entity, record.id, { hSHIN: sentHash, sentAt: Date.now(), fbmId: patch.fbmId });
+  } catch (pendingError) {
+    throw new Error('Không ghi được hash đang chờ xác nhận sau push: ' + String(pendingError && pendingError.message || pendingError));
+  }
+  FbmSync.logPushRecord(candidate, operation, typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', 'Đã gửi request ghi; đang đọc xác nhận trực tiếp.', { fbmId: patch.fbmId, fbmCustomerCode: patch.fbmCustomerCode || '', hPUSH: sentHash });
   return patch;
+};
+
+/** Kiểm tra response mở form có đủ trường fingerprint trước khi xác nhận. */
+FbmSync.verifyFormValues = function (response, entity) {
+  var values = FbmSync.extractFormValues(response, entity), required = entity === 'activity' ? ['id', 'ma_cv', 'details', 'end_date'] : ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ma_so_thue', 'ong_ba', 'dien_thoai', 'email', 'dc_lh'];
+  var missing = required.filter(function (name) { return !Object.prototype.hasOwnProperty.call(values, name); });
+  if (missing.length) { throw new Error('FBM_VERIFY_INCOMPLETE: thiếu trường ' + missing.join(', ') + ' trong response đọc xác nhận.'); }
+  return values;
+};
+
+/** Hoàn tất ghi chỉ sau khi đọc lại đúng bản ghi và so hash với payload đã gửi. */
+FbmSync.finishPushVerification = function (state, response) {
+  var cursor = state.cursor || {}, candidate = cursor.candidate || {}, entity = String(cursor.entity || candidate.entity || ''), id = String(candidate.id || ''), locals = FbmSync.readLocal(entity) || [], local = locals.filter(function (item) { return String(item && item.id || '') === id; })[0], pending = FbmSync.pendingPushGet(entity, id), pendingHash = String(pending && (pending.hSHIN || pending.hash) || '').trim();
+  if (!pendingHash) { throw new Error('FBM_VERIFY_STATE_MISSING: không còn hash của lần ghi cần xác nhận.'); }
+  var values = FbmSync.verifyFormValues(response, entity), incomingHash = FbmSync.hash(values, entity, state.metadata && state.metadata.categoryGate || {}), sentHash = pendingHash;
+  if (!local) { FbmSync.pendingPushClear(entity, id); throw new Error('FBM_VERIFY_RECORD_MISSING: bản ghi không còn tồn tại trong ShinCRM.'); }
+  var localHash = FbmSync.hash(local, entity, state.metadata && state.metadata.categoryGate || {}), previousHash = String(local.fbmHash || '').trim();
+  if (incomingHash === sentHash) {
+    var status = localHash === sentHash ? FbmSync.SYNC_STATUS.synced : FbmSync.SYNC_STATUS.pending;
+    var saved = writeGateSave({ entity: entity, records: [{ id: local.id, fbmHash: incomingHash, syncStatus: status, syncedAt: new Date() }], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
+    if (!saved || !saved.ok) { throw new Error('Không ghi được baseline sau khi FBM xác nhận dữ liệu.'); }
+    FbmSync.pendingPushClear(entity, id);
+    FbmSync.logPushRecord(candidate, cursor.operation, typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', status === FbmSync.SYNC_STATUS.synced ? 'FBM đã xác nhận đúng dữ liệu vừa ghi.' : 'FBM đã xác nhận; ShinCRM đã sửa tiếp nên chờ lượt đẩy mới.', { hPUSH: sentHash, hFBM: incomingHash, syncStatus: status });
+    state.metadata.pushSucceeded = Number(state.metadata.pushSucceeded || 0) + 1;
+    state.counts.succeeded += 1;
+    FbmSync.releasePushLock(state, entity, id);
+    state.cursor = { kind: 'push_scan', entity: entity, index: Number(cursor.index || 0) + 1 }; state.current = ''; state.message = 'Đã xác nhận ' + entity + ' ' + id + '.'; FbmSync.stateWrite(state);
+    return FbmSync.nextPushRequest(state);
+  }
+  if (previousHash && incomingHash === previousHash) {
+    state.counts.skipped += 1;
+    state.locks = state.locks || {}; state.locks[entity + ':' + id] = { revision: localHash, owner: 'sync', reason: 'not_applied', at: Date.now() };
+    writeGateSave({ entity: entity, records: [{ id: local.id, syncStatus: FbmSync.SYNC_STATUS.notApplied }], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
+    FbmSync.pendingPushClear(entity, id);
+    FbmSync.logPullRecord(entity, values, local, FbmSync.SYNC_STATUS.notApplied, 'FBM không đổi sau lần ghi; đọc xác nhận trực tiếp.');
+    state.cursor = { kind: 'push_scan', entity: entity, index: Number(cursor.index || 0) + 1 }; state.current = ''; state.message = 'FBM chưa áp dụng ' + entity + ' ' + id + '.'; FbmSync.stateWrite(state);
+    return FbmSync.nextPushRequest(state);
+  }
+  var conflict = FbmSync.threeWay({ hBASE: previousHash }, local, values, entity, state.metadata && state.metadata.categoryGate || {});
+  FbmSync.rememberConflict(state, entity, local, values, conflict, state.metadata && state.metadata.categoryGate || {});
+  state.counts.conflict += 1; state.cursor = {}; state.current = ''; state.phase = 'conflict'; state.message = 'Đọc xác nhận khác dữ liệu vừa ghi; đã dừng để kiểm tra xung đột.'; FbmSync.stateWrite(state);
+  writeGateSave({ entity: entity, records: [{ id: local.id, syncStatus: FbmSync.SYNC_STATUS.conflict }], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
+  FbmSync.pendingPushClear(entity, id);
+  return null;
+};
+
+/** Xử lý lỗi đọc xác nhận mà không lặp lại request ghi. */
+FbmSync.continueAfterPushVerificationError = function (state, cursor, failure) {
+  var candidate = cursor && cursor.candidate, entity = String(cursor && cursor.entity || ''), id = String(candidate && candidate.id || '');
+  state.counts.error += 1; state.phase = 'error'; state.lastFailureCode = 'FBM_VERIFY_FAILED'; state.retryable = false;
+  state.message = 'Đã ghi FBM nhưng chưa xác nhận được ' + entity + ' ' + id + ': ' + String(failure && failure.message || failure || 'Lỗi đọc xác nhận.') + '. Không tự ghi lại.';
+  FbmSync.stateWrite(state);
+  if (typeof FbmSync.logPushRecord === 'function') { FbmSync.logPushRecord(candidate, cursor.operation, typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', state.message, { failureCode: 'FBM_VERIFY_FAILED' }); }
+  return { ok: false, status: FbmSync.statusView(), error: state.message };
 };
 
 /** Nhả khóa push và nhập lại các khóa mới nhất để caller không ghi đè khóa khác. */
@@ -173,6 +234,7 @@ FbmSync.nextPushRequest = function (state) {
       index += 1; state.cursor.index = index; FbmSync.stateWrite(state); continue;
     }
     candidate.entity = entity;
+    candidate.categoryGate = state.metadata.categoryGate || {};
     var request;
     if (entity === 'customer') {
       request = candidate.kind === 'create' ? FbmSync.customerCreateOpenRequest() : FbmSync.customerEditOpenRequest(candidate.record.fbmId);
@@ -195,7 +257,7 @@ FbmSync.nextPushRequest = function (state) {
   state.message = Number(state.counts.error || 0) > 0
     ? 'Đồng bộ hoàn tất nhưng có ' + Number(state.counts.error || 0) + ' lỗi đẩy; xem Chi tiết bản ghi.'
     : pushSucceeded > 0
-      ? 'Đồng bộ hoàn tất; bản ghi vừa đẩy đang chờ kỳ đọc xác nhận.'
+      ? 'Đồng bộ hoàn tất; bản ghi vừa đẩy đã được FBM xác nhận.'
       : state.mode === 'write'
         ? 'Đồng bộ hoàn tất; không có bản ghi nào được đẩy.'
         : 'Đồng bộ hoàn tất.';
@@ -205,6 +267,9 @@ FbmSync.nextPushRequest = function (state) {
 /** Xử lý bước mở form và bước lưu của một candidate push. */
 FbmSync.continuePush = function (state, response) {
   var cursor = state.cursor, candidate = cursor.candidate, gate = state.metadata.categoryGate || {};
+  if (cursor.operation === 'customer_verify' || cursor.operation === 'activity_verify') {
+    return FbmSync.finishPushVerification(state, response);
+  }
   if (cursor.operation === 'customer_create_open') {
     var autoCode = FbmSync.extractAutoCustomerCode(response);
     var codeCheck = FbmSync.validateAutoCustomerCode(autoCode);
@@ -231,17 +296,16 @@ FbmSync.continuePush = function (state, response) {
     state.cursor = cursor; FbmSync.stateWrite(state);
     return activitySaveRequest;
   }
-  if (cursor.operation === 'activity_create') {
-    FbmSync.markPushResult(candidate, response, cursor.operation);
-  } else if (cursor.operation === 'customer_create_save' || cursor.operation === 'customer_edit_save' || cursor.operation === 'activity_edit_save') {
-    FbmSync.markPushResult(candidate, response, cursor.operation);
+  if (cursor.operation === 'activity_create' || cursor.operation === 'customer_create_save' || cursor.operation === 'customer_edit_save' || cursor.operation === 'activity_edit_save') {
+    var pushed = FbmSync.markPushResult(candidate, response, cursor.operation);
   } else {
     throw new Error('Không nhận diện được bước push: ' + cursor.operation);
   }
+  state = FbmSync.stateRead();
   state.metadata = state.metadata || {};
   state.metadata.pushFailures = state.metadata.pushFailures || {};
   delete state.metadata.pushFailures[cursor.entity + ':' + String(candidate.id || '')];
-  state.metadata.pushSucceeded = Number(state.metadata.pushSucceeded || 0) + 1;
-  state.counts.succeeded += 1; FbmSync.releasePushLock(state, cursor.entity, candidate.id); state.cursor = { kind: 'push_scan', entity: cursor.entity, index: Number(cursor.index || 0) + 1 }; state.current = ''; FbmSync.stateWrite(state);
-  return FbmSync.nextPushRequest(state);
+  cursor.operation = cursor.entity === 'customer' ? 'customer_verify' : 'activity_verify';
+  state.cursor = cursor; state.message = 'ÄÃ£ ghi ' + cursor.entity + ' ' + candidate.id + '; Ä‘ang Ä‘á»c xÃ¡c nháº­n FBM...'; FbmSync.stateWrite(state);
+  return cursor.entity === 'customer' ? FbmSync.customerEditOpenRequest(pushed.fbmId) : FbmSync.activityEditOpenRequest(pushed.fbmId);
 };

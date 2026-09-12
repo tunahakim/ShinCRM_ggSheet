@@ -55,7 +55,7 @@ FbmSync.pullWrite = function (entity, records) {
     if (entity === 'customer' && record.fbmCustomerCode) { var code = String(record.fbmCustomerCode).trim(); (localByCode[code] || (localByCode[code] = [])).push(record); }
     if (entity === 'customer') { var tax = FbmSync.customerTaxKey(record.taxNumber || record.ma_so_thue); if (tax) { (localByTaxNumber[tax] || (localByTaxNumber[tax] = [])).push(record); } }
   });
-  var writes = [], statusWrites = [], conflicts = 0, skipped = 0;
+  var writes = [], statusWrites = [], pendingClears = [], conflicts = 0, skipped = 0;
   records.filter(function (incoming) { return !FbmSync.isTemporaryRecord(entity, incoming); }).forEach(function (incoming) {
     var key = String(incoming.fbmId || '').trim();
     var current = local[key];
@@ -137,11 +137,21 @@ FbmSync.pullWrite = function (entity, records) {
       return;
     }
     if (String(current.syncStatus || '') === FbmSync.SYNC_STATUS.pushed) {
-      var localHash = FbmSync.hash(current, entity, categoryGate), incomingHash = FbmSync.hash(incoming, entity, categoryGate), previousHash = String(current.fbmHash || '').trim();
-      if (incomingHash === localHash) {
+      var localHash = FbmSync.hash(current, entity, categoryGate), incomingHash = FbmSync.hash(incoming, entity, categoryGate), previousHash = String(current.fbmHash || '').trim(), pendingItem = typeof FbmSync.pendingPushGet === 'function' ? FbmSync.pendingPushGet(entity, current.id) : null, pendingHash = String(pendingItem && (pendingItem.hSHIN || pendingItem.hash) || '').trim();
+      if (pendingHash && incomingHash === pendingHash) {
+        pendingClears.push({ entity: entity, id: current.id });
+        var confirmedStatus = localHash === pendingHash ? FbmSync.SYNC_STATUS.synced : FbmSync.SYNC_STATUS.pending;
+        if (confirmedStatus === FbmSync.SYNC_STATUS.synced) {
+          writes.push(Object.assign({}, mergedIncoming, { id: current.id, fbmHash: incomingHash, syncStatus: confirmedStatus, syncedAt: new Date() }));
+        } else {
+          statusWrites.push({ id: current.id, fbmHash: incomingHash, syncStatus: confirmedStatus, syncedAt: new Date() });
+        }
+        FbmSync.logPullRecord(entity, incoming, current, confirmedStatus, confirmedStatus === FbmSync.SYNC_STATUS.synced ? 'Xac nhan ban ghi sau lan day truc tiep.' : 'Xac nhan lan day; ShinCRM da sua tiep nen cho luot day moi.');
+      } else if (incomingHash === localHash) {
         writes.push(Object.assign({}, mergedIncoming, { id: current.id, fbmHash: incomingHash, syncStatus: FbmSync.SYNC_STATUS.synced, syncedAt: new Date() }));
         FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.synced, 'Xác nhận bản ghi sau lần đẩy trước.');
       } else if (previousHash && incomingHash === previousHash) {
+        if (pendingHash) { pendingClears.push({ entity: entity, id: current.id }); }
         skipped += 1;
         statusWrites.push({ id: current.id, syncStatus: FbmSync.SYNC_STATUS.notApplied });
         state.locks = state.locks || {};
@@ -149,6 +159,7 @@ FbmSync.pullWrite = function (entity, records) {
         if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'push_not_applied', outcome: typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn', entity: entity, recordId: String(current.id || ''), reason: 'FBM khong thay doi sau khi ghi; da khoa de khong lap vo han.' }); }
         FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.notApplied, 'FBM không đổi sau khi ghi; khóa để tránh lặp vô hạn.');
       } else {
+        if (pendingHash) { pendingClears.push({ entity: entity, id: current.id }); }
         conflicts += 1;
         FbmSync.rememberConflict(state, entity, current, incoming, { hBASE: previousHash, hSHIN: localHash, hFBM: incomingHash }, categoryGate);
         statusWrites.push({ id: current.id, syncStatus: FbmSync.SYNC_STATUS.conflict });
@@ -192,6 +203,7 @@ FbmSync.pullWrite = function (entity, records) {
   if (allWrites.length) {
     var saved = writeGateSave({ entity: entity, records: allWrites, source: 'pull', schemas: schemas });
     result.ok = !!saved.ok; result.written = saved.ok ? writes.length : 0; result.writeResult = saved;
+    if (saved.ok && pendingClears.length && typeof FbmSync.pendingPushClear === 'function') { pendingClears.forEach(function (item) { FbmSync.pendingPushClear(item.entity, item.id); }); }
     if (saved.ok && typeof dirtyStateMarkRecords === 'function') {
       var ids = allWrites.map(function (record) { return record.id; }).filter(function (id) { return id !== undefined && id !== null && String(id).trim(); });
       if (saved.rows && saved.fields && saved.fields.indexOf('id') >= 0) {

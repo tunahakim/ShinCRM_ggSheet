@@ -215,9 +215,9 @@
 - [x] Parser Row 64 ô hỗ trợ Row mảng/object và fallback FieldValues/InternalValues.
 - [ ] Create mất phản hồi tra MST contains, verify exact, vá ID và không create lần hai.
 - [x] Create có Bugs đặt `đẩy lỗi`, nhả khóa và không retry khi `hSHIN` chưa đổi.
-- [x] Edit chờ kỳ pull xác nhận; không đổi là `đẩy không ăn`, giá trị thứ ba là conflict.
-- [x] Sau response thành công, record chuyển sang `đã đẩy chờ xác nhận` và giữ baseline cũ cho kỳ pull sau.
-- [x] Nếu kỳ xác nhận thấy FBM không đổi, record chuyển sang `đẩy không ăn`, bị khóa và không tự gửi lại.
+- [x] Edit đọc xác nhận trực tiếp ngay sau response ghi; chỉ khi hash FBM khớp hash payload mới tính là thành công.
+- [x] Sau response thành công, record chuyển sang `đã đẩy chờ xác nhận`, giữ baseline cũ và lưu `hPUSH` nhỏ theo `entity:id` trong `DocumentProperties` (không thêm cột Sheet).
+- [x] Nếu đọc xác nhận lỗi/thiếu trường/không khớp, giữ `hPUSH`, báo rõ và không tự gửi lại request ghi; kỳ sau phân biệt được lần đẩy của hệ thống với thay đổi ngoài.
 - [x] Builder không gửi `ghi_chu`; không dùng `note` nội bộ ShinCRM.
 
 ### Đóng slice

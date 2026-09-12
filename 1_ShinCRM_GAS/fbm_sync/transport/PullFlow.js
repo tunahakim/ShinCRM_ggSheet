@@ -221,6 +221,9 @@ FbmSync.continue = function (rawResponse) {
     }
     var failureReason = (success.bug && (success.bug.Message || success.bug.message)) || 'FBM tra ve loi nghiep vu';
     if (cursor.kind === 'push_wait' && cursor.candidate) {
+      if (cursor.operation === 'customer_verify' || cursor.operation === 'activity_verify') {
+        return FbmSync.continueAfterPushVerificationError(state, cursor, { code: success.code, status: success.status, fieldName: success.bug && success.bug.FieldName, reason: failureReason });
+      }
       return FbmSync.continueAfterPushError(state, cursor, { code: success.code, status: success.status, fieldName: success.bug && success.bug.FieldName, reason: failureReason });
     }
     state.lastFailureCode = String(success.code || 'FBM_ERROR');
@@ -256,6 +259,9 @@ FbmSync.continue = function (rawResponse) {
       var pushRequest = FbmSync.continuePush(state, response);
       return { ok: true, request: FbmSync.nextEnvelope(pushRequest), status: FbmSync.statusView() };
     } catch (pushError) {
+      if (cursor.operation === 'customer_verify' || cursor.operation === 'activity_verify') {
+        return FbmSync.continueAfterPushVerificationError(state, cursor, pushError && pushError.message || pushError);
+      }
       return FbmSync.continueAfterPushError(state, cursor, pushError && pushError.message || pushError);
     }
   }

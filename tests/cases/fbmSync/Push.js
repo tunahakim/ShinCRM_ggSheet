@@ -243,7 +243,17 @@ async function chay(so) {
   const activityCreate = push.FbmSync.nextPushRequest(activityPushState);
   check(so, 'Activity moi dung request New va marker', [activityCreate.meta.kind, activityCreate.body.action, activityCreate.body.memvars.filter((item) => item.Name === 'details')[0].NewValue, push.FbmSync.stateRead().cursor.operation], ['activity_create', 'New', 'Nội dung #SC-ACT-NEW', 'activity_create']);
   const activityResponse = push.FbmSync.continuePush(push.FbmSync.stateRead(), { d: { InternalValues: [{ Name: 'id', Value: 42 }] } });
-  check(so, 'Activity New nhan ID FBM va chuyen sang cho xac nhan', [activityResponse, push.FbmSync.stateRead().counts.succeeded, push.FbmSync.stateRead().phase], [null, 1, 'done']);
+  check(so, 'Activity New nhan ID FBM va tao request doc xac nhan', [activityResponse.meta.kind, activityResponse.meta.id, push.FbmSync.stateRead().counts.succeeded, push.FbmSync.stateRead().phase], ['activity_edit_open', '42', 0, 'push']);
+  const verifyRecord = { id: 'ACT-VERIFY', fbmId: '42', customerFbmCode: 'ALT00010', taskType: 'Goi', content: 'Noi dung', workDate: '2026-09-09', fbmHash: 'base', syncStatus: push.FbmSync.SYNC_STATUS.pushed };
+  push.FbmSync.pendingPushSet('activity', verifyRecord.id, { hSHIN: push.FbmSync.hash(verifyRecord, 'activity', {}), fbmId: '42' });
+  push.FbmSync.readLocal = () => [verifyRecord];
+  push.writeGateSave = () => ({ ok: true });
+  const verifyState = push.FbmSync.stateStart('', 'push', 0); verifyState.metadata.categoryGate = {};
+  verifyState.cursor = { kind: 'push_wait', entity: 'activity', index: 0, operation: 'activity_verify', candidate: { entity: 'activity', id: verifyRecord.id, record: verifyRecord } };
+  push.FbmSync.stateWrite(verifyState);
+  const verifyRow = []; verifyRow[0] = 42; verifyRow[3] = 'Goi'; verifyRow[10] = new Date('2026-09-09T00:00:00Z'); verifyRow[15] = 'Noi dung #SC-ACT-VERIFY';
+  push.FbmSync.continuePush(push.FbmSync.stateRead(), { d: { Controller: 'zccrAccountTask', Row: verifyRow } });
+  check(so, 'Activity chi tinh thanh cong sau khi doc xac nhan khop hash', [push.FbmSync.stateRead().counts.succeeded, push.FbmSync.pendingPushGet('activity', verifyRecord.id)], [1, null]);
   const lostState = push.FbmSync.stateStart('', 'push', 0);
   lostState.metadata.categoryGate = {};
   lostState.locks['activity:ACT-NEW'] = { owner: 'sync', revision: 'h-create' };
