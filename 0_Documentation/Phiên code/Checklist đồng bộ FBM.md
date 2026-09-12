@@ -40,6 +40,8 @@
 
 ### Extension, transport và khóa
 
+- [x] GAS dựng `bodyText` đã escape cho FBM; Extension chỉ chuyển nguyên văn qua `fetch`, không parse/serialize lại.
+
 - [x] Extension có host permission `https://fbo.com.vn:8888/*`, content script FBM, service worker và cơ chế nạp lại executor.
 - [x] Đã kiểm chứng đường Sidebar → Extension → tab FBM → Sidebar nhận response thật.
 - [x] Executor báo phiên bản `21.7`; reload Extension có thể phục hồi đầu nhận.

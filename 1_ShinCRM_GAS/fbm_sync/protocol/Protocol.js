@@ -5,10 +5,10 @@ FbmSync.protocol = {
   version: 1,
   /** Tạo envelope có id để ghép đúng response với request. */
   request: function (id, url, body, meta) {
-    return { protocol: 'shincrm-fbm', version: 1, id: String(id), url: url, method: 'POST', headers: { 'content-type': 'application/json; charset=UTF-8' }, body: body, meta: meta || {} };
+    return { protocol: 'shincrm-fbm', version: 1, id: String(id), url: url, method: 'POST', headers: { 'content-type': 'application/json; charset=UTF-8' }, body: body, bodyText: FbmSync.protocol.json(body), meta: meta || {} };
   },
-  /** Serialize body, dùng null khi không có giá trị. */
-  json: function (value) { return JSON.stringify(value === undefined ? null : value); },
+  /** Serialize đúng wire format FBM; Extension chỉ chuyển nguyên chuỗi này qua fetch. */
+  json: function (value) { return JSON.stringify(value === undefined ? null : value).replace(/\//g, '\\/'); },
   /** Parse response thô, envelope transport hoặc JSON lồng của FBM. */
   parse: function (raw) {
     if (raw === null || raw === undefined || raw === '') { return null; }
