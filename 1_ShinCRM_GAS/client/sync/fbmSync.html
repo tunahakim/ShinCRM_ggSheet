@@ -212,11 +212,12 @@ function fbmSyncExtensionRequest(request) {
 }
 /** Lấy status một lần, không tạo vòng polling khi không chạy. */
 function fbmSyncStatusOnce(freshOpen) {
-  var epoch = FBM_SYNC_CLIENT.viewEpoch, requestSeq = ++FBM_SYNC_CLIENT.statusRequestSeq;
+  var epoch = FBM_SYNC_CLIENT.viewEpoch, requestSeq = ++FBM_SYNC_CLIENT.statusRequestSeq, runningWhenRequested = FBM_SYNC_CLIENT.running;
   return callServer('fbmGetSyncStatus').then(function (status) {
     var snapshot = status && (status.status || status) || {}, updatedAt = Number(snapshot.updatedAt || 0);
     // Status của lượt mở/checkbox cũ không được phép vẽ đè loading của lượt mới.
     if (epoch !== FBM_SYNC_CLIENT.viewEpoch || requestSeq < FBM_SYNC_CLIENT.statusRequestSeq) { return status; }
+    if (FBM_SYNC_CLIENT.running && !runningWhenRequested) { return status; }
     if (updatedAt && updatedAt < FBM_SYNC_CLIENT.lastServerUpdatedAt) { return status; }
     if (updatedAt) { FBM_SYNC_CLIENT.lastServerUpdatedAt = updatedAt; }
     return fbmSyncPaint(status, freshOpen);
