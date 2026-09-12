@@ -29,6 +29,21 @@ FbmSync.start = function (options) {
     state.phase = 'idle'; state.runId = ''; state.message = 'Chưa cho phép ghi thật lên FBM.'; FbmSync.stateWrite(state);
     return { ok: false, code: 'SYNC_WRITES_DISABLED', status: FbmSync.statusView() };
   }
+  if (typeof FbmSync.runPreflight === 'function') {
+    var preflight = FbmSync.runPreflight({ mode: state.mode, scan: state.scan });
+    state.metadata = state.metadata || {};
+    state.metadata.preflight = preflight;
+    state.metadata.preflightIssues = preflight.issues || [];
+    if (typeof FbmSync.logPreflight === 'function') { FbmSync.logPreflight(preflight); }
+    if (!preflight.ok) {
+      var first = preflight.blocking[0] || {};
+      state.phase = 'error'; state.entity = ''; state.cursor = {}; state.lastFailureCode = 'SYNC_PREFLIGHT_FAILED';
+      state.lastError = 'Preflight thất bại: ' + String(first.message || 'Thiếu điều kiện trước phiên.');
+      state.message = state.lastError;
+      FbmSync.stateWrite(state);
+      return { ok: false, code: 'SYNC_PREFLIGHT_FAILED', status: FbmSync.statusView(), error: state.lastError };
+    }
+  }
   state.cursor = { kind: 'authorize_customer' };
   state.message = 'Dang kiem tra phien FBM...';
   FbmSync.stateWrite(state);
@@ -197,7 +212,7 @@ FbmSync.continue = function (rawResponse) {
     }
     var failureReason = (success.bug && (success.bug.Message || success.bug.message)) || 'FBM tra ve loi nghiep vu';
     if (cursor.kind === 'push_wait' && cursor.candidate) {
-      return FbmSync.continueAfterPushError(state, cursor, failureReason);
+      return FbmSync.continueAfterPushError(state, cursor, { code: success.code, status: success.status, fieldName: success.bug && success.bug.FieldName, reason: failureReason });
     }
     state.lastFailureCode = String(success.code || 'FBM_ERROR');
     state.retryable = success.retryable === true;

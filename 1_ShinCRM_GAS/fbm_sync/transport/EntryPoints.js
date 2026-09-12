@@ -5,6 +5,8 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 function fbmSyncStart(mode) { return FbmSync.start({ mode: mode }); }
 /** Khoi tao rieng pipeline bulk Activity de nghiem thu scheduler ma khong phai cho trigger 8 gio. */
 function fbmSyncStartActivityBulk() { return FbmSync.start({ mode: 'read', scan: 'activity_bulk' }); }
+/** Lệnh chẩn đoán chỉ đọc điều kiện local theo mode hiện đang lưu, không mở request FBM. */
+function fbmSyncPreflight() { var state = FbmSync.stateRead(); return typeof FbmSync.runPreflight === 'function' ? FbmSync.runPreflight({ mode: state.mode || 'read', scan: state.scan || 'full' }) : { ok: true, issues: [] }; }
 /** API nhận response Extension và trả request kế tiếp. */
 function fbmSyncContinue(rawResponse) { return FbmSync.continue(rawResponse); }
 /** Tính lại baseline nội bộ mà không mở phiên hoặc gọi request FBM. */

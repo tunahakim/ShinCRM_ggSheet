@@ -77,6 +77,7 @@
 
 ### Preflight
 
+- [x] Trước mỗi phiên chạy checker Core và checker riêng của `fbm_sync`; mọi lỗi có `scope`, `code`, `severity`, `blocking`, thông báo người dùng và dòng Log, không ẩn trong bước push.
 - [x] Tìm tab FBM, ping executor, fetch trong tab và nhận response thô.
 - [x] Khi mất executor, inject rồi ping lại; request nghiệp vụ chỉ gửi một lần.
 - [x] 401/403 hoặc `Login.aspx` dừng kỳ và yêu cầu đăng nhập lại khi tùy chọn tự động đăng nhập tắt.
@@ -107,7 +108,7 @@
 
 ### Đóng slice
 
-- [ ] Code và test offline của preflight/category hoàn tất; còn chờ GAS DEV triển khai bản không ghi Category để đóng slice.
+- [x] Code, test offline và GAS DEV của preflight/category hoàn tất; phiên chỉ đọc lookup và không ghi Sheet `Category`.
 - [ ] **Cần kiểm chứng thực tế:** xác nhận phiên, owner và Category trên tab FBM.
 
 ## Slice 2 — Pull Customer FBM → ShinCRM

@@ -48,6 +48,8 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── Settings.js           Hằng số phía code (SETTINGS) và khối tham số hệ thống của sheet Config. Nơi duy nhất biết LOG_TRACE đang bật cho nguồn nào.
 │   │   ├── ConfigParams.js       Danh mục núm vặn: có những tham số nào, mỗi tham số gõ giá trị gì là hợp lệ. Settings.js biết một tham số đang là bao nhiêu, tệp này biết có những tham số nào.
 │   │   └── ConfigSheetSetup.js   Migration bộ đếm Config cũ, dựng hướng dẫn và validation, gieo tham số và khôi phục Config mặc định mà không chạm Customer/Activity.
+│   ├── diagnostic\
+│   │   └── CorePreflight.js       Checker nền tảng dùng chung cho Config/Category; trả hợp đồng lỗi chuẩn cho các module, không biết nghiệp vụ FBM.
 │   ├── data\
 │   │   ├── DataSchema.js         Khai 33 cột dữ liệu người dùng: mã cột, nhãn, kiểu, ràng buộc. Nguồn sự thật của hàng 1.
 │   │   ├── ColumnFormat.js       Khuôn hiển thị của từng cột, khai một chỗ cho cả SetupSheets và WriteGate dùng chung. Chống mất chữ số đầu của mã số thuế: `@` nghĩa là chữ, không phải số.
@@ -178,6 +180,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── reconcile\Pull.js         Đối soát chiều pull và ghi thay đổi an toàn.
     ├── reconcile\CategoryGate.js Đọc và đối chiếu Category với lookup FBM; không trực tiếp ghi Sheet.
     ├── report\Report.js          Trạng thái công khai cho Sidebar.
+    ├── report\Preflight.js       Checker riêng của module FBM; gọi Core checker, kiểm owner/cấu hình/mapping/conflict trước khi push.
     └── report\Probe.js           Dò ứng viên ghi của ALT00010 mà không gọi FBM.
 ```
 

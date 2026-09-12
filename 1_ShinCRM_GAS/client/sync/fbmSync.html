@@ -100,10 +100,19 @@ function fbmSyncPaintRecordIssues(panel, metadata) {
   var conflicts = Array.isArray(metadata.conflicts) ? metadata.conflicts : [];
   var identityBlocks = Array.isArray(metadata.identityBlocks) ? metadata.identityBlocks : [];
   var pushFailures = metadata.pushFailures || {};
+  var pushFailureDetails = metadata.pushFailureDetails || {};
+  var preflightIssues = Array.isArray(metadata.preflightIssues) ? metadata.preflightIssues : [];
   var categoryBlocks = Array.isArray(metadata.categoryBlocks) ? metadata.categoryBlocks : [];
   var activityMissing = Array.isArray(metadata.activityBulkMissing) ? metadata.activityBulkMissing : [];
-  if (!conflicts.length && !identityBlocks.length && !Object.keys(pushFailures).length && !categoryBlocks.length && !activityMissing.length) { return; }
+  if (!preflightIssues.length && !conflicts.length && !identityBlocks.length && !Object.keys(pushFailures).length && !categoryBlocks.length && !activityMissing.length) { return; }
   var box = document.createElement('div'); box.className = 'shin-sync-audit';
+  if (preflightIssues.length) {
+    var preflightTitle = document.createElement('div'); preflightTitle.className = 'shin-sync-preview-title'; preflightTitle.textContent = 'Preflight'; box.appendChild(preflightTitle);
+    preflightIssues.slice(-30).forEach(function (item) {
+      var preflightRow = document.createElement('div'); preflightRow.className = 'shin-sync-preview-row';
+      preflightRow.textContent = (item.blocking ? 'Loi' : 'Canh bao') + ' [' + String(item.code || '') + '] ' + String(item.message || ''); box.appendChild(preflightRow);
+    });
+  }
   var title = document.createElement('div'); title.className = 'shin-sync-preview-title'; title.textContent = 'Chi tiết bản ghi'; box.appendChild(title);
   conflicts.slice(-20).forEach(function (item) {
     var row = document.createElement('div'); row.className = 'shin-sync-preview-row';
@@ -116,7 +125,10 @@ function fbmSyncPaintRecordIssues(panel, metadata) {
   });
   Object.keys(pushFailures).slice(-20).forEach(function (key) {
     var row = document.createElement('div'); row.className = 'shin-sync-preview-row';
-    row.textContent = 'Lỗi đẩy ' + String(key); box.appendChild(row);
+    var detail = pushFailureDetails[key] || {};
+    var suffix = detail.reason ? ' · ' + String(detail.reason) : '';
+    if (detail.code) { suffix += ' [' + String(detail.code) + (detail.status ? ' HTTP ' + String(detail.status) : '') + ']'; }
+    row.textContent = 'Lỗi đẩy ' + String(key) + suffix; box.appendChild(row);
   });
   categoryBlocks.slice(-20).forEach(function (item) {
     var row = document.createElement('div'); row.className = 'shin-sync-preview-row';

@@ -46,14 +46,14 @@ FbmSync.protocol = {
   /** Phân loại lỗi để orchestration biết khi nào được retry. */
   classifyFailure: function (response) {
     if (response && typeof response === 'object' && response.ok === false && Number(response.status) >= 500 && !String(response.body || '').trim()) {
-      return { code: 'TRANSPORT_ERROR', retryable: true, bug: { FieldName: '$HTTP', Message: FbmSync.protocol.httpErrorMessage(response.status, response.body) } };
+      return { code: 'TRANSPORT_ERROR', retryable: true, status: Number(response.status || 0), bug: { FieldName: '$HTTP', Message: FbmSync.protocol.httpErrorMessage(response.status, response.body) } };
     }
     var parsed = FbmSync.protocol.parse(response) || {};
     var bug = FbmSync.protocol.fbmBug(parsed);
-    if (FbmSync.protocol.isSessionExpired(response)) { return { code: 'SESSION_EXPIRED', retryable: false, bug: { FieldName: '$SESSION', Message: 'Phiên FBM đã hết hạn; hãy đăng nhập lại.' } }; }
-    if (parsed.parseError) { return { code: 'PARSE_ERROR', retryable: true, bug: { FieldName: '$PARSE', Message: parsed.parseError } }; }
-    if (bug) { return { code: 'FBM_BUSINESS_ERROR', retryable: false, bug: bug }; }
-    if (response && response.ok === false) { return { code: 'TRANSPORT_ERROR', retryable: true, bug: { FieldName: '$HTTP', Message: FbmSync.protocol.httpErrorMessage(response.status, response.body) } }; }
+    if (FbmSync.protocol.isSessionExpired(response)) { return { code: 'SESSION_EXPIRED', retryable: false, status: Number(response && response.status || 0), bug: { FieldName: '$SESSION', Message: 'Phiên FBM đã hết hạn; hãy đăng nhập lại.' } }; }
+    if (parsed.parseError) { return { code: 'PARSE_ERROR', retryable: true, status: Number(response && response.status || 0), bug: { FieldName: '$PARSE', Message: parsed.parseError } }; }
+    if (bug) { return { code: 'FBM_BUSINESS_ERROR', retryable: false, status: Number(response && response.status || 0), bug: bug }; }
+    if (response && response.ok === false) { return { code: 'TRANSPORT_ERROR', retryable: true, status: Number(response.status || 0), bug: { FieldName: '$HTTP', Message: FbmSync.protocol.httpErrorMessage(response.status, response.body) } }; }
     return null;
   },
   /** Lấy Bugs mà không buộc Extension hiểu nghiệp vụ FBM. */
@@ -65,7 +65,7 @@ FbmSync.protocol = {
   /** Chuẩn hóa kết quả thành cặp ok/bug cho orchestration. */
   assertSuccess: function (response) {
     var failure = FbmSync.protocol.classifyFailure(response);
-    if (failure) { return { ok: false, code: failure.code, retryable: failure.retryable, bug: failure.bug }; }
+    if (failure) { return { ok: false, code: failure.code, status: failure.status || 0, retryable: failure.retryable, bug: failure.bug }; }
     return { ok: true };
   }
 };

@@ -27,7 +27,7 @@ var DEV_RUNNER_ALLOWED = [
   'probeErrorReport', 'probeEntryPoint', 'probeLoadAll', 'probeSidebarTemplate', 'probeClientTiming',
   'probeSaveGate', 'viewProbeSelection', 'viewProbeRenderCurrent', 'viewProbeCreateRender', 'viewProbeAutoRender',
   'probeTriggerState', 'shinInstallTriggers',
-  'fbmSyncStart', 'fbmSyncStartActivityBulk', 'fbmSyncContinue', 'fbmSyncCancel', 'fbmSyncStatus', 'fbmInstallScheduler', 'fbmSyncSetWriteMode', 'fbmResolveConflict', 'fbmGetRelayConfig', 'fbmSyncHeartbeat'
+  'fbmSyncStart', 'fbmSyncStartActivityBulk', 'fbmSyncPreflight', 'fbmSyncContinue', 'fbmSyncCancel', 'fbmSyncStatus', 'fbmInstallScheduler', 'fbmSyncSetWriteMode', 'fbmResolveConflict', 'fbmGetRelayConfig', 'fbmSyncHeartbeat'
 ];
 
 /**

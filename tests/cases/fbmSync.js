@@ -5,6 +5,7 @@ const NHOM = [
   require("./fbmSync/Pull"),
   require("./fbmSync/Reconcile"),
   require("./fbmSync/Orchestration"),
+  require("./fbmSync/Preflight"),
   require("./fbmSync/Push"),
   require("./fbmSync/Audit")
 ];

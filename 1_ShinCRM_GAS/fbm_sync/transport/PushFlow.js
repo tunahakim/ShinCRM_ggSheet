@@ -60,22 +60,33 @@ FbmSync.releasePushLock = function (state, entity, id) {
   return state;
 };
 
+/** Chuẩn hóa lỗi để Sidebar/Log luôn giữ được mã và nguyên nhân, không giữ payload. */
+FbmSync.pushFailureDetail = function (failure) {
+  if (failure && typeof failure === 'object') {
+    return { code: String(failure.code || 'PUSH_ERROR'), status: Number(failure.status || 0) || 0, fieldName: String(failure.fieldName || failure.FieldName || ''), reason: String(failure.reason || failure.message || failure.Message || 'Không thể đẩy bản ghi.') };
+  }
+  return { code: 'PUSH_ERROR', status: 0, fieldName: '', reason: String(failure || 'Không thể đẩy bản ghi.') };
+};
+
 /** Ghi trạng thái kỹ thuật và giải phóng khóa khi một bản ghi không thể đẩy. */
-FbmSync.markPushError = function (state, candidate, reason) {
+FbmSync.markPushError = function (state, candidate, failure) {
+  var detail = FbmSync.pushFailureDetail(failure);
   state.counts.error += 1;
-  state.message = String(reason || 'Không thể đẩy bản ghi.');
+  state.message = 'Lỗi đẩy ' + String(candidate && candidate.entity || '') + ':' + String(candidate && candidate.id || '') + ': ' + detail.reason;
   state.metadata = state.metadata || {};
   state.metadata.pushFailures = state.metadata.pushFailures || {};
+  state.metadata.pushFailureDetails = state.metadata.pushFailureDetails || {};
   var gate = state.metadata.categoryGate || {}, localHash = typeof FbmSync.hash === 'function' ? FbmSync.hash(candidate.record || {}, candidate.entity, gate) : '';
   state.metadata.pushFailures[candidate.entity + ':' + String(candidate.id || '')] = localHash;
+  state.metadata.pushFailureDetails[candidate.entity + ':' + String(candidate.id || '')] = detail;
   var waitingForMarker = candidate.kind === 'create';
   if (typeof writeGateSave === 'function') {
     try { writeGateSave({ entity: candidate.entity, records: [{ id: candidate.id, syncStatus: waitingForMarker ? FbmSync.SYNC_STATUS.pushing : FbmSync.SYNC_STATUS.error }], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] }); } catch (ignore) {}
   }
   if (typeof logEvent === 'function') {
-    logEvent({ source: 'fbm_sync', action: 'push_record_error', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', entity: candidate.entity, recordId: String(candidate.id || ''), reason: String(reason || 'Không thể đẩy bản ghi.') });
+    logEvent({ source: 'fbm_sync', action: 'push_record_error', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', entity: candidate.entity, recordId: String(candidate.id || ''), reason: detail.reason, detail: { code: detail.code, status: detail.status, fieldName: detail.fieldName } });
   }
-  FbmSync.logPushRecord(candidate, candidate.kind, typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', reason, { syncStatus: FbmSync.SYNC_STATUS.error });
+  FbmSync.logPushRecord(candidate, candidate.kind, typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', detail.reason, { syncStatus: FbmSync.SYNC_STATUS.error, failureCode: detail.code, httpStatus: detail.status, fieldName: detail.fieldName });
   if (!waitingForMarker) { FbmSync.releasePushLock(state, candidate.entity, candidate.id); }
 };
 
@@ -93,14 +104,14 @@ FbmSync.markPushSkipped = function (state, candidate, status, reason) {
 };
 
 /** Bỏ qua một record push lỗi và tiếp tục candidate kế tiếp, không lặp request đã gửi. */
-FbmSync.continueAfterPushError = function (state, cursor, reason) {
+FbmSync.continueAfterPushError = function (state, cursor, failure) {
   var candidate = cursor && cursor.candidate;
-  if (candidate) { FbmSync.markPushError(state, candidate, reason); }
+  if (candidate) { FbmSync.markPushError(state, candidate, failure); }
   state.cursor = { kind: 'push_scan', entity: cursor.entity, index: Number(cursor.index || 0) + 1 };
   state.current = '';
   state.phase = 'push';
   state.lastError = '';
-  state.message = 'Đã bỏ qua ' + String(cursor.entity || '') + ' lỗi; đang xử lý bản ghi tiếp theo.';
+  state.message = 'Đã ghi nhận lỗi đẩy ' + String(cursor.entity || '') + ' ' + String(candidate && candidate.id || '') + '; đang xử lý bản ghi tiếp theo.';
   FbmSync.stateWrite(state);
   var next = FbmSync.nextPushRequest(state);
   return { ok: true, request: next ? FbmSync.nextEnvelope(next) : null, status: FbmSync.statusView(), continued: true };
@@ -167,7 +178,9 @@ FbmSync.nextPushRequest = function (state) {
   if (entity === 'customer') {
     state.cursor = { kind: 'push_scan', entity: 'activity', index: 0 }; state.entity = 'activity'; FbmSync.stateWrite(state); return FbmSync.nextPushRequest(state);
   }
-  state.phase = 'done'; state.entity = ''; state.current = ''; state.message = 'Đồng bộ hoàn tất; bản ghi vừa đẩy đang chờ kỳ đọc xác nhận.'; state.cursor = {}; FbmSync.stateWrite(state); return null;
+  state.phase = 'done'; state.entity = ''; state.current = ''; state.message = Number(state.counts.error || 0) > 0
+    ? 'Đồng bộ hoàn tất nhưng có ' + Number(state.counts.error || 0) + ' lỗi đẩy; xem Chi tiết bản ghi.'
+    : 'Đồng bộ hoàn tất; bản ghi vừa đẩy đang chờ kỳ đọc xác nhận.'; state.cursor = {}; FbmSync.stateWrite(state); return null;
 };
 
 /** Xử lý bước mở form và bước lưu của một candidate push. */
