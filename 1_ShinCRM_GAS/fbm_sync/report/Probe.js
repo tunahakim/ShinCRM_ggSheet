@@ -48,9 +48,13 @@ function fbmAuditAltState() {
       logEvent({ source: 'fbm_sync', action: 'audit_case', outcome: ok ? LOG_OK : LOG_ERROR, entity: 'customer', recordId: code, reason: name + ': ' + (ok ? 'PASS' : 'FAIL'), detail: { status: ok ? 'PASS' : 'FAIL', detail: detail || '' } });
     }
   };
+  var preflight = typeof FbmSync.runPreflight === 'function' ? FbmSync.runPreflight({ mode: 'read', scan: 'full' }) : { ok: false, issues: [{ message: 'Không có bộ kiểm preflight.' }] };
+  add('Preflight lượt đọc không bị chặn', preflight.ok === true, (preflight.issues || []).filter(function (item) { return item.blocking; }).map(function (item) { return item.code; }).join(', '));
   // Audit đọc trạng thái hiện có; nó không thể kết luận lượt Đọc thử vừa ghi Sheet.
   add('Customer ALT00010 đang có bản ghi nội bộ', selected.length > 0, 'Số dòng: ' + selected.length);
   add('Activity của ALT00010 có liên kết Customer nội bộ', linked.every(function (record) { return ids[String(record.customerId || '').trim()]; }), 'Activity liên kết: ' + linked.length);
+  add('Customer ALT00010 đủ field nhận diện và hash', selected.every(function (record) { return String(record.companyName || '').trim() && String(record.fbmCustomerCode || '').trim() && String(record.fbmId || '').trim() && String(record.fbmHash || '').trim(); }), 'Đã kiểm tra ' + selected.length + ' dòng');
+  add('Activity ALT00010 đủ khóa, ngày, nội dung và hash', linked.every(function (record) { return String(record.fbmId || '').trim() && String(record.customerId || '').trim() && String(record.workDate || '').trim() && String(record.fbmHash || '').trim(); }), 'Đã kiểm tra ' + linked.length + ' dòng');
   selected.forEach(function (record) { var key = String(record.fbmId || '').trim(); if (key) { seenCustomer[key] = (seenCustomer[key] || 0) + 1; } });
   linked.forEach(function (record) { var key = String(record.fbmId || '').trim(); if (key) { seenActivity[key] = (seenActivity[key] || 0) + 1; } });
   add('Không trùng FBM ID Customer', Object.keys(seenCustomer).every(function (key) { return seenCustomer[key] === 1; }), JSON.stringify(seenCustomer));

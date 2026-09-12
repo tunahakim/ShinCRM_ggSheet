@@ -295,8 +295,8 @@
 - [x] GAS ghi log phase/lỗi nguồn `fbm_sync`, không ghi cookie/payload.
 - [x] Có dòng tổng kết mỗi kỳ và dòng chi tiết cho lỗi, conflict, hoãn, mã lạ và đẩy không ăn.
 - [x] Màn hình có preview bản ghi kéo về và chi tiết conflict, lỗi đẩy, Category block, Activity vắng; không bắt người dùng đọc JSON trong Log.
-- [ ] Có lệnh `Nghiệm thu ALT00010` chạy preflight, lookup, pull, field/hash/link, idempotency và ghi báo cáo PASS/FAIL vào Log; không push FBM.
-- [ ] Báo cáo che cookie/authorized nhưng giữ record ID, phase, request kind và hash trước/sau.
+- [x] Có lệnh `Nghiệm thu ALT00010` chạy preflight, lookup, pull, field/hash/link, idempotency và ghi báo cáo PASS/FAIL vào Log; không push FBM.
+- [x] Báo cáo che cookie/authorized nhưng giữ record ID, phase, request kind và hash trước/sau.
 - [x] `fbmProbeAltState` fail-closed nếu phát hiện candidate ngoài `ALT00010` và Activity con.
 - [ ] **Cần kiểm chứng thực tế:** chạy probe một nút và kiểm tra báo cáo trên Sidebar/Log.
 

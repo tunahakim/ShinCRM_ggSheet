@@ -19,7 +19,8 @@ async function chay(so) {
   const audit = taoHopCat({ FbmSync: {}, LOG_OK: 'ok', LOG_ERROR: 'error', FbmSyncLog: [] });
   napServer(audit, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/report/Probe.js');
   audit.FbmSync.stateRead = () => ({ mode: 'read', phase: 'done', runId: 'run-1' });
-  audit.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-1', fbmCustomerCode: 'ALT00010', fbmId: 'A1' }] : [{ id: 'ACT-1', fbmId: '7', customerId: 'CUS-1' }];
+  audit.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-1', fbmCustomerCode: 'ALT00010', fbmId: 'A1', companyName: 'Test', fbmHash: 'h-cus' }] : [{ id: 'ACT-1', fbmId: '7', customerId: 'CUS-1', workDate: '2026-09-09', fbmHash: 'h-act' }];
+  audit.FbmSync.runPreflight = () => ({ ok: true, issues: [], blocking: [] });
   audit.logEvent = (event) => audit.FbmSyncLog.push(event);
   audit.flushLog = () => {};
   const auditResult = audit.fbmAuditAltState();
