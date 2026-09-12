@@ -29,7 +29,8 @@
     if (req.body === undefined) { return undefined; }
     var body = typeof req.body === 'string' ? JSON.parse(req.body) : JSON.parse(JSON.stringify(req.body));
     if (!body.cookie) { body.cookie = payloadCookieFromPage(); }
-    return { text: JSON.stringify(body), cookie: body.cookie || '' };
+    // FBM WebForms rejects unescaped slash characters in JSON date literals.
+    return { text: JSON.stringify(body).replace(/\//g, '\\/'), cookie: body.cookie || '' };
   }
   /** Thực thi fetch và luôn trả body dạng text để GAS tự parse. */
   /** Giai ma ca response gzip bi FBM tra tho, tranh GAS nhan chuoi 1F 8B. */

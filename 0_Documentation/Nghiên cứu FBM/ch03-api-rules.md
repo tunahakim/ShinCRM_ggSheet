@@ -55,7 +55,7 @@ Referer: https://fbo.com.vn:8888/Main/zccrAccount.aspx
 
 Header `Referer` rất quan trọng — FBM server kiểm tra Referer trong mọi request POST. Giá trị `https://fbo.com.vn:8888/Main/zccrAccount.aspx` hoạt động cho hầu hết các API. Khi gọi Login PageMethods, Referer là `https://fbo.com.vn:8888/Main/Login.aspx`.
 
-**BUG QUAN TRỌNG — Escape dấu gạch chéo:** FBM (ASP.NET WebForms) có một bug: nếu JSON body chứa ký tự `/` không được escape, server trả về HTTP 500. Giải pháp bắt buộc là thay thế tất cả `/` bằng `\/` trong chuỗi JSON body trước khi gửi. Trong kiến trúc ShinCRM, bước này nằm ở Supabase Edge Function / FBM request builder: `JSON.stringify(payload).replace(/\//g, "\\/")`. Worker Node.js nhận body đã là string hoàn chỉnh, không stringify lại và không escape lại.
+**BUG QUAN TRỌNG — Escape dấu gạch chéo:** FBM (ASP.NET WebForms) có một bug: nếu JSON body chứa ký tự `/` không được escape, server trả về HTTP 500. Giải pháp bắt buộc là thay thế tất cả `/` bằng `\/` trong chuỗi JSON body trước khi gửi. GAS chỉ dựng object nghiệp vụ; Extension `executor.js` là lớp giao vận serialize body đúng một lần bằng `JSON.stringify(payload).replace(/\//g, "\\/")`, rồi fetch sang FBM. Extension không được tự quyết định nghiệp vụ, sửa field hay retry request ghi.
 
 **Body rỗng phải là JSON object:** Ngay cả khi API không cần tham số (như `GetEntityData`), body vẫn phải gửi `{}`. Gửi body rỗng hoặc null sẽ gây lỗi parse.
 
