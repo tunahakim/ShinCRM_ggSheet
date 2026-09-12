@@ -271,7 +271,7 @@
 - [x] Kỳ Customer 60 phút kéo full grid qua nhiều lát, lưu cursor từng lát.
 - [x] Kỳ Activity 8 giờ chạy bulk ID, lớp `ngay_gd` và vòng xoay 30 Customer.
 - [x] Scheduler không tạo hai kỳ, không giữ công việc trong RAM và tiếp tục từ lát đã chốt.
-- [ ] Khi người dùng bấm `Đồng bộ ngay` trong lúc có phiên nền, GAS đánh dấu phiên nền dừng, chờ request FBM hiện tại kết thúc, không cấp request tiếp theo rồi ưu tiên phiên thủ công; không tạo hai phiên song song.
+- [x] Khi người dùng bấm `Đồng bộ ngay` trong lúc có phiên nền, GAS đánh dấu phiên nền dừng, chờ response FBM hiện tại kết thúc, không cấp request tiếp theo rồi Sidebar ưu tiên phiên thủ công; không tạo hai phiên song song. Test offline phủ handoff nền → thủ công.
 - [x] Nút Dừng đồng bộ xóa marker `scheduledScan`, không để heartbeat tự khởi động lại kỳ vừa dừng.
 - [x] Web App dùng khóa theo spreadsheet để tiếp tục khi Sidebar đóng.
 - [x] Mở lại Sidebar chỉ đọc state hiện có, không tạo kỳ thứ hai.

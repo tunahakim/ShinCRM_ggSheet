@@ -96,10 +96,10 @@ function fbmSyncHeartbeat(rawResponse) {
   }
   FbmSync.stateWrite(state);
   state = FbmSync.stateRead();
-  if (result.ok && state.runId && ['idle', 'done', 'error'].indexOf(state.phase) < 0) {
+  if (result.ok && state.runId && ['idle', 'done', 'error'].indexOf(state.phase) < 0 && !(state.metadata && state.metadata.manualPending)) {
     request = FbmSync.requestForCursor(state);
   } else if (result.ok && state.phase === 'idle' && (state.scheduledScan === 'customer' || state.scheduledScan === 'activity') && typeof FbmSync.start === 'function') {
-    started = FbmSync.start({ mode: 'read', scan: state.scheduledScan === 'activity' ? 'activity_bulk' : 'full' });
+    started = FbmSync.start({ mode: 'read', scan: state.scheduledScan === 'activity' ? 'activity_bulk' : 'full', origin: 'background' });
     request = started && started.request ? started.request : null;
   }
   var status = FbmSync.statusView();

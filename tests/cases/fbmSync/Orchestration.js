@@ -192,6 +192,13 @@ async function chay(so) {
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, session: { customerTotal: 2 }, scheduledScan: '' });
   const changedHeartbeat = heartbeat.fbmSyncHeartbeat({ d: { TotalRowCount: 3 } });
   check(so, 'heartbeat tong Customer thay doi kich full Customer', [changedHeartbeat.request.meta.kind, changedHeartbeat.status.phase], ['authorize', 'checking_session']);
+  const backgroundState = heartbeat.FbmSync.stateRead();
+  backgroundState.runId = 'background-run'; backgroundState.origin = 'background'; backgroundState.phase = 'pull_customer'; backgroundState.entity = 'customer'; backgroundState.cursor = { kind: 'customer_grid', type: 0, pageIndex: 0, pageValue: null, count: 2000 }; backgroundState.metadata.manualPending = null;
+  heartbeat.FbmSync.stateWrite(backgroundState);
+  const manualRequest = heartbeat.FbmSync.start({ mode: 'read', manual: true });
+  check(so, 'manual yeu cau dung phien nen sau response hien tai', [manualRequest.ok, manualRequest.code, heartbeat.FbmSync.stateRead().metadata.manualPending.mode], [false, 'SYNC_BACKGROUND_STOPPING', 'read']);
+  const stoppedBackground = heartbeat.FbmSync.continue({ d: { Rows: [] } });
+  check(so, 'phien nen dung va san sang cho manual sau khi nhan response', [stoppedBackground.manualReady, heartbeat.FbmSync.stateRead().phase, heartbeat.FbmSync.stateRead().runId], [true, 'idle', '']);
 }
 
 module.exports = { chay };

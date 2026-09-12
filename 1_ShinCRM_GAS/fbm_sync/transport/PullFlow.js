@@ -4,11 +4,19 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 /** Mở phiên, kiểm tra khóa phiên và trả về request đầu tiên. */
 FbmSync.start = function (options) {
   // Mỗi call chỉ trả một request; ngữ cảnh nhiều bước nằm trong DocumentProperties.
+  var opt = options || {};
   var current = FbmSync.stateRead();
   if (typeof FbmSync.recoverStaleRun === 'function') { current = FbmSync.recoverStaleRun(current).state; }
   // Tạm dừng là điểm dừng để người dùng chạy lại, không phải cursor đang chạy;
   // lần bấm mới phải tạo request FBM mới, tránh vẽ lại preview cũ.
   if (current.runId && ['idle', 'done', 'error', 'paused', 'conflict'].indexOf(current.phase) < 0) {
+    if (opt.manual === true && String(current.origin || '') === 'background') {
+      current.metadata = current.metadata || {};
+      current.metadata.manualPending = { mode: opt.mode || 'read', requestedAt: Date.now() };
+      current.message = 'Đã nhận yêu cầu thủ công; phiên nền sẽ dừng sau response FBM hiện tại.';
+      FbmSync.stateWrite(current);
+      return { ok: false, code: 'SYNC_BACKGROUND_STOPPING', status: FbmSync.statusView() };
+    }
     var initialAuthorize = current.phase === 'checking_session' && current.cursor && current.cursor.kind === 'authorize_customer';
     var recent = Date.now() - Number(current.updatedAt || 0) <= 60000;
     var resumable = recent ? FbmSync.requestForCursor(current) : null;
@@ -21,7 +29,8 @@ FbmSync.start = function (options) {
     if (!initialAuthorize) { return { ok: false, code: 'SYNC_ALREADY_RUNNING', status: FbmSync.statusView() }; }
   }
   if (typeof fbmEnsureSyncColumns === 'function') { fbmEnsureSyncColumns(); }
-  var opt = options || {}, state = FbmSync.stateStart('', 'checking_session', 0, { preserveConflicts: current.phase === 'conflict' });
+  var state = FbmSync.stateStart('', 'checking_session', 0, { preserveConflicts: current.phase === 'conflict' });
+  state.origin = opt.origin === 'background' ? 'background' : 'manual';
   state.mode = opt.mode === 'write' || opt.mode === 'push' ? opt.mode : opt.mode === 'check' ? 'check' : 'read';
   state.scan = opt.scan === 'activity_bulk' ? 'activity_bulk' : 'full';
   if (state.scan === 'activity_bulk') { state.mode = 'read'; }
@@ -226,6 +235,13 @@ FbmSync.continue = function (rawResponse) {
     FbmSync.traceEvent('fbm_response_received', { requestId: rawResponse && rawResponse.trace && rawResponse.trace.requestId || state.activeRequestId, httpStatus: responseMeta.httpStatus, responseLength: responseMeta.responseLength });
   }
   response = FbmSync.protocol.parse(rawResponse);
+  if (state.origin === 'background' && state.metadata && state.metadata.manualPending) {
+    state.runId = ''; state.origin = 'manual'; state.phase = 'idle'; state.entity = ''; state.cursor = {}; state.current = ''; state.scheduledScan = '';
+    state.message = 'Phiên nền đã dừng sau response hiện tại; có thể chạy phiên thủ công.';
+    state.metadata.manualPending = null;
+    FbmSync.stateWrite(state);
+    return { ok: true, request: null, status: FbmSync.statusView(), manualReady: true };
+  }
   if (response && response._transport && response._transport.payloadCookie) {
     state.session.cookie = String(response._transport.payloadCookie);
     var compact = state.session.cookie.indexOf('FHN_CRM_App') >= 0 ? state.session.cookie.slice(0, state.session.cookie.indexOf('FHN_CRM_App')) : '';

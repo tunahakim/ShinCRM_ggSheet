@@ -313,6 +313,22 @@ function fbmSyncCancel() {
   FBM_SYNC_CLIENT.running = false;
   return callServer('fbmCancelSync').then(fbmSyncPaint);
 }
+/** Chờ GAS thu hồi phiên nền sau response đang bay rồi mới mở phiên thủ công. */
+function fbmSyncWaitForBackgroundStop(mode, attempt) {
+  if (Number(attempt || 0) >= 60) { return Promise.reject(new Error('Phiên nền không dừng trong thời gian an toàn.')); }
+  return new Promise(function (resolve) { setTimeout(resolve, 1000); }).then(function () {
+    return fbmSyncStatusOnce();
+  }).then(function (status) {
+    var snapshot = status && (status.status || status) || {};
+    if (snapshot.phase === 'idle' && !snapshot.runId) {
+      return fbmSyncStartServer(mode, 0).then(function (started) {
+        if (!started || !started.ok) { throw new Error(started && (started.message || started.code) || 'Không mở được phiên thủ công sau khi dừng phiên nền.'); }
+        return fbmSyncLoop(started);
+      });
+    }
+    return fbmSyncWaitForBackgroundStop(mode, Number(attempt || 0) + 1);
+  });
+}
 /** Mô tả chặng đang chờ mà không ghi thêm tiến độ tạm vào GAS. */
 function fbmSyncWaitingStatus(status, message) {
   var snapshot = status && (status.status || status) || {};
@@ -423,6 +439,9 @@ function fbmSyncRun(mode) {
   FBM_SYNC_CLIENT.viewEpoch += 1;
   fbmSyncPaint({ phase: 'checking_session', label: 'Đang chuẩn bị đồng bộ', direction: 'Kết nối FBM', entityLabel: 'Chuẩn bị phiên', message: 'Đang chuẩn bị phiên đồng bộ...', counts: {} });
   var work = fbmSyncStartServer(mode || 'read', 0).then(function (started) {
+    if (started && started.code === 'SYNC_BACKGROUND_STOPPING') {
+      return fbmSyncWaitForBackgroundStop(mode || 'read', 0);
+    }
     if (!started || !started.ok) {
       FBM_SYNC_CLIENT.running = false;
       if (started && started.status) { fbmSyncPaint(started.status); }
