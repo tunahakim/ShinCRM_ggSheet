@@ -20,7 +20,13 @@ FbmSync.resolveConflict = function (entity, id, choice, merged) {
   var record;
   if (choice === 'fbm') { record = Object.assign({}, item.fbmRecord); }
   else if (choice === 'shin') { record = Object.assign({}, item.shinRecord); }
-  else if (choice === 'manual' && merged && typeof merged === 'object') { record = Object.assign({}, item.shinRecord, merged); }
+  else if (choice === 'manual' && merged && typeof merged === 'object') {
+    record = Object.assign({}, item.shinRecord);
+    Object.keys(merged).forEach(function (field) {
+      var localField = typeof FbmSync.conflictLocalField === 'function' ? FbmSync.conflictLocalField(entity, field) : field;
+      if (localField) { record[localField] = merged[field]; }
+    });
+  }
   else { return { ok: false, code: 'CONFLICT_CHOICE_INVALID', message: 'Cách xử lý conflict không hợp lệ.' }; }
   record.id = target;
   var categoryGate = state.metadata.categoryGate || {};

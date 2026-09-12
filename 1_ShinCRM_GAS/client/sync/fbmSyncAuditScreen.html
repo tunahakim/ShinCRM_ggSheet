@@ -19,6 +19,9 @@ function fbmSyncPaintConflictScreen(panel, status) {
     var name = document.createElement('div'); name.className = 'shin-sync-preview-title'; name.textContent = String(field.field || ''); group.appendChild(name);
     var shin = document.createElement('div'); shin.className = 'shin-sync-preview-row'; shin.textContent = 'ShinCRM: ' + String(field.left || '(trống)'); group.appendChild(shin);
     var fbm = document.createElement('div'); fbm.className = 'shin-sync-preview-row'; fbm.textContent = 'FBM: ' + String(field.right || '(trống)'); group.appendChild(fbm);
+    var pick = document.createElement('select'); pick.className = 'shin-input shin-sync-conflict-choice'; pick.setAttribute('data-fbm-conflict-field', String(field.field || ''));
+    [['shin', 'Dùng ShinCRM'], ['fbm', 'Dùng FBM']].forEach(function (option) { var itemOption = document.createElement('option'); itemOption.value = option[0]; itemOption.textContent = option[1]; pick.appendChild(itemOption); });
+    group.appendChild(pick);
     box.appendChild(group);
   });
   var actions = document.createElement('div'); actions.className = 'shin-sync-actions';
@@ -26,6 +29,7 @@ function fbmSyncPaintConflictScreen(panel, status) {
     var button = document.createElement('button'); button.type = 'button'; button.className = 'shin-button'; button.textContent = option[1];
     button.setAttribute('data-fbm-conflict-choice', option[0]); button.setAttribute('data-fbm-conflict-entity', String(item.entity || '')); button.setAttribute('data-fbm-conflict-id', String(item.id || '')); actions.appendChild(button);
   });
+  var merge = document.createElement('button'); merge.type = 'button'; merge.className = 'shin-button shin-primary'; merge.textContent = 'Lưu lựa chọn từng trường'; merge.setAttribute('data-fbm-conflict-merge', 'true'); merge.setAttribute('data-fbm-conflict-entity', String(item.entity || '')); merge.setAttribute('data-fbm-conflict-id', String(item.id || '')); actions.appendChild(merge);
   box.appendChild(actions); panel.appendChild(box);
 }
 </script>

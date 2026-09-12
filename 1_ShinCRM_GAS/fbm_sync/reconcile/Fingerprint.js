@@ -116,3 +116,15 @@ FbmSync.diff = function (entity, left, right, categoryGate) {
   Object.keys(a).sort().forEach(function (field) { if (a[field] !== b[field]) { fields.push({ field: field, left: a[field], right: b[field] }); } });
   return fields;
 };
+
+/** Đổi tên field fingerprint về tên field nội bộ trước khi cửa ghi nhận bản trộn conflict. */
+FbmSync.conflictLocalField = function (entity, field) {
+  var aliases = FbmSync.FIELD_ALIASES[entity] || {};
+  var wanted = String(field || '');
+  var found = '';
+  Object.keys(aliases).some(function (localName) {
+    if (aliases[localName] === wanted) { found = localName; return true; }
+    return false;
+  });
+  return found || wanted;
+};

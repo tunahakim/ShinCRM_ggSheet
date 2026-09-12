@@ -11,6 +11,18 @@ async function chay(so) {
   check(so, 'normalize Date co offset chi dung timestamp chinh', edges.FbmSync.normalize('/Date(1757386800000+0700)/'), edges.FbmSync.normalize('/Date(1757386800000)/'));
   check(so, 'normalize Date khong hop le khong nem loi', edges.FbmSync.normalize(new Date(NaN)), '');
   check(so, 'Activity id 0 khong lam thay fingerprint', edges.FbmSync.hash({ id: 0, ma_cv: 'CALL', details: 'Gọi', end_date: '/Date(1757386800000)/' }, 'activity'), edges.FbmSync.hash({ id: '', ma_cv: 'CALL', details: 'Gọi', end_date: '/Date(1757386800000)/' }, 'activity'));
+  check(so, 'conflict map Activity details ve content noi bo', edges.FbmSync.conflictLocalField('activity', 'details'), 'content');
+  check(so, 'conflict map Activity end_date ve workDate noi bo', edges.FbmSync.conflictLocalField('activity', 'end_date'), 'workDate');
+  check(so, 'conflict map Customer ten_kh ve companyName noi bo', edges.FbmSync.conflictLocalField('customer', 'ten_kh'), 'companyName');
+  let mergedSaved = null;
+  const mergedFbm = { id: 'FBM-1', fbmId: 'FBM-1', taskType: 'Gọi', content: 'Nội dung FBM', workDate: '/Date(1757386800000)/' };
+  const mergedShin = { id: 'ACT-1', fbmId: 'FBM-1', taskType: 'Gọi', content: 'Nội dung Shin', workDate: '/Date(1757386800000)/' };
+  const mergedState = { metadata: { conflicts: [{ entity: 'activity', id: 'ACT-1', fbmId: 'FBM-1', hFBM: edges.FbmSync.hash(mergedFbm, 'activity', {}), fields: [{ field: 'details', left: 'Nội dung Shin', right: 'Nội dung FBM' }], shinRecord: mergedShin, fbmRecord: mergedFbm }], categoryGate: {} }, counts: { conflict: 1 }, locks: { 'activity:ACT-1': { owner: 'sync' } }, phase: 'conflict' };
+  edges.FbmSync.stateRead = () => mergedState;
+  edges.FbmSync.stateWrite = (next) => { Object.assign(mergedState, next); return mergedState; };
+  edges.writeGateSave = (request) => { mergedSaved = request.records[0]; return { ok: true }; };
+  const mergedResult = edges.FbmSync.resolveConflict('activity', 'ACT-1', 'manual', { details: 'Nội dung FBM' });
+  check(so, 'trộn conflict đổi details về content nội bộ', [mergedResult.ok, mergedSaved && mergedSaved.content], [true, 'Nội dung FBM']);
 
   let lockedWrite = false;
   const lockedState = { mode: 'write', metadata: { categoryGate: {}, seen: { customer: {}, activity: {} } }, locks: { 'customer:C-LOCK': { owner: 'user', revision: 'r1' } } };
