@@ -248,6 +248,8 @@
 - [ ] **Cần kiểm chứng thực tế:** mô phỏng mất phản hồi một lần và kiểm marker recovery.
 
 - [x] Bien GAS chuan hoa de quy toan bo ket qua public cua fbmStartSync/fbmContinueSync, khong de Date trong status, metadata hoac cursor lam mat callback Sidebar; test offline 1121/1121.
+- [x] Activity Edit giu nguyen start_date/end_date tu form FBM khi workDate tren Sheet khong doi; chi dung ngay moi khi ngay nghiep vu that su thay doi.
+- [x] Chieu day dung lai khi counts.conflict > 0 ngay ca khi danh sach chi tiet conflict bi thieu.
 
 ## Slice 7 — Heartbeat, scheduler và chạy nền
 

@@ -137,9 +137,10 @@ FbmSync.validateAutoCustomerCode = function (code, settings) {
 /** Tạo request kế tiếp của queue push từ state, không giữ queue trong Extension. */
 FbmSync.stopPushOnConflicts = function (state) {
   var conflicts = state && state.metadata && state.metadata.conflicts || [];
-  if (!conflicts.length) { return false; }
+  var conflictCount = Math.max(conflicts.length, Number(state && state.counts && state.counts.conflict || 0));
+  if (!conflictCount) { return false; }
   state.phase = 'conflict'; state.entity = ''; state.current = ''; state.cursor = {};
-  state.message = 'Đã phát hiện ' + conflicts.length + ' xung đột; chiều đẩy tạm dừng để người dùng quyết định.';
+  state.message = 'Đã phát hiện ' + conflictCount + ' xung đột; chiều đẩy tạm dừng để người dùng quyết định.';
   FbmSync.stateWrite(state);
   return true;
 };

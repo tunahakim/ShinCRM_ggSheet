@@ -49,6 +49,26 @@ FbmSync.formDate = function (value, fallback) {
   return isFinite(parsed) ? '/Date(' + parsed + ')/' : (fallback || value);
 };
 
+/** Giữ nguyên mốc ngày FBM khi Sheet chỉ đổi nội dung; chỉ đổi mốc khi ngày nghiệp vụ thật sự đổi. */
+FbmSync.activityEditDate = function (record, oldValues, name, aliases, fallback) {
+  var hasOld = oldValues && Object.prototype.hasOwnProperty.call(oldValues, name), localValue = FbmSync.fieldValue(record, oldValues, name, aliases, ''), oldValue = hasOld ? oldValues[name] : '';
+  if (hasOld && record && Object.prototype.hasOwnProperty.call(record, 'workDate')) {
+    var dateKey = function (raw) {
+      var parsed = typeof FbmSync.fbDate === 'function' ? FbmSync.fbDate(raw) : raw;
+      if (typeof FbmSync.activityDateKey === 'function') {
+        var known = FbmSync.activityDateKey(parsed);
+        if (known) { return known; }
+      }
+      if (parsed && Object.prototype.toString.call(parsed) === '[object Date]' && isFinite(parsed.getTime())) { return parsed.toISOString().slice(0, 10); }
+      var match = String(parsed || '').match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+      return match ? match[1] + '-' + ('0' + match[2]).slice(-2) + '-' + ('0' + match[3]).slice(-2) : '';
+    };
+    var localKey = dateKey(record.workDate), oldKey = dateKey(oldValue);
+    if (localKey && oldKey && localKey === oldKey) { return FbmSync.formDate(oldValue, fallback); }
+  }
+  return FbmSync.formDate(localValue, fallback);
+};
+
 /** Đổi giá trị SELECT của ShinCRM thành mã FBM từ companion Category. */
 FbmSync.categoryField = function (categoryGate, source, value) {
   return FbmSync.categoryCode(categoryGate || { map: {} }, source, value);
@@ -92,7 +112,7 @@ FbmSync.activityValues = function (record, oldValues, categoryGate) {
   var values = {
     // Activity id là khóa FBM; mã nội bộ ACT-* chỉ được dùng làm marker, không được gửi vào memvars.
     id: Number(FbmSync.value(record, 'fbmId', value('id', [], 0))) || Number(oldValues && oldValues.id || 0) || 0, event_yn: value('event_yn', [], 0), text: value('text', [], ''), ma_cv: FbmSync.categoryField(categoryGate, '@CAT_CONG_VIEC', value('ma_cv', ['taskType'], '')), assigned_name: value('assigned_name', [], ''), muc_do: value('muc_do', [], '2'),
-    start_date: date(value('start_date', ['workDate'], '')), start_time: value('start_time', [], '00:00'), end_date: date(value('end_date', ['workDate'], '')), end_time: value('end_time', [], '01:00'), ngay_nhac: value('ngay_nhac', [], null), gio_nhac: value('gio_nhac', [], '00:00'), full_day: value('full_day', [], false),
+    start_date: FbmSync.activityEditDate(record, oldValues, 'start_date', ['workDate'], '/Date(' + now.getTime() + ')/'), start_time: value('start_time', [], '00:00'), end_date: FbmSync.activityEditDate(record, oldValues, 'end_date', ['workDate'], '/Date(' + now.getTime() + ')/'), end_time: value('end_time', [], '01:00'), ngay_nhac: value('ngay_nhac', [], null), gio_nhac: value('gio_nhac', [], '00:00'), full_day: value('full_day', [], false),
     details: details, private: value('private', [], false), share_user: value('share_user', [], ''), share_group: value('share_group', [], 0), ma_nhom: value('ma_nhom', [], ''), owner: value('owner', [], FbmSync.configValue('FBM_ACCOUNT_NAME')), comment: FbmSync.value(record, 'comment', null), nguoi_sua: value('nguoi_sua', [], ''), datetime0: date(now), status: value('status', [], '2'), gia_bao: value('gia_bao', [], 0), gia_dt: value('gia_dt', [], 0), ma_dt: value('ma_dt', [], ''), nd_chinh_sua: value('nd_chinh_sua', [], ''), ma_sp: value('ma_sp', [], ''), ma_module: value('ma_module', [], ''), ma_kh: value('ma_kh', ['customerFbmCode'], ''), stt_rec: value('stt_rec', [], ''), type: value('type', [], '1'), user_ref: value('user_ref', [], ''), fileupload: value('fileupload', [], ''), fileticket: value('fileticket', [], ''), filekey: value('filekey', [], '')
   };
   return { values: values, memvars: FbmSync.memvars(FbmSync.ACTIVITY_MEMVARS, values, oldValues) };
