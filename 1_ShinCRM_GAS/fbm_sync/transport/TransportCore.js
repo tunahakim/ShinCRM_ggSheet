@@ -12,7 +12,17 @@ FbmSync.writeAllowed = function () {
 };
 /** Bọc request nội bộ thành envelope gửi qua Extension. */
 FbmSync.nextEnvelope = function (request) {
-  return request ? FbmSync.protocol.request(Date.now().toString(36), request.url, request.body, request.meta) : null;
+  if (!request) { return null; }
+  var id = Date.now().toString(36), state = FbmSync.stateRead ? FbmSync.stateRead() : {}, meta = Object.assign({}, request.meta || {});
+  meta.trace = Object.assign({}, meta.trace || {}, { runId: String(state.runId || ''), requestId: id });
+  if (FbmSync.stateWrite) {
+    state.activeRequestId = id;
+    state.lastProgressAt = Date.now();
+    state.deadlineAt = Date.now() + 120000;
+    FbmSync.stateWrite(state);
+  }
+  if (FbmSync.traceEvent) { FbmSync.traceEvent('response_built', { requestId: id, operation: meta.kind, entity: meta.entity, recordId: meta.id || meta.shinId || meta.stt_rec_kh }); }
+  return FbmSync.protocol.request(id, request.url, request.body, meta);
 };
 /** Dựng lại request đọc từ cursor; không lưu payload/cookie để retry không làm lộ bí mật. */
 FbmSync.requestForCursor = function (state) {

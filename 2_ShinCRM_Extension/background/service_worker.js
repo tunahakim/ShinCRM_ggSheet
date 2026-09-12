@@ -15,6 +15,17 @@ function findFbmTab() {
   return chrome.tabs.query({ url: ['https://fbo.com.vn:8888/*'] }).then(function (tabs) { return tabs && tabs.length ? tabs[0] : null; });
 }
 
+function addWorkerTrace(reply, request, stage, extra) {
+  var meta = request && request.meta && request.meta.trace || {}, event = Object.assign({ at: Date.now(), stage: stage, runId: String(meta.runId || ''), requestId: String(meta.requestId || ''), operation: String(request && request.meta && request.meta.kind || ''), entity: String(request && request.meta && request.meta.entity || ''), recordId: String(request && request.meta && (request.meta.id || request.meta.shinId || request.meta.stt_rec_kh) || '') }, extra || {});
+  if (reply && reply.result && typeof reply.result === 'object') {
+    reply.result.transport = reply.result.transport || {};
+    reply.result.transport.trace = (reply.result.transport.trace || []).concat([event]);
+  } else if (reply && typeof reply === 'object') {
+    reply.trace = (reply.trace || []).concat([event]);
+  }
+  return reply;
+}
+
 /** Đặt heartbeat sau khi worker đã đăng ký listener; tránh lỗi khởi động làm mất toàn bộ đầu nhận. */
 function scheduleHeartbeat() {
   try {
@@ -89,7 +100,7 @@ function sendToFbmTab(tabId, request) {
 /** Bỏ wrapper message của Extension trước khi chuyển response thô cho GAS. */
 function rawFbmReply(reply) {
   if (reply && reply.result !== undefined) { return reply.result; }
-  if (reply && reply.error) { return { ok: false, status: 599, body: String(reply.error) }; }
+  if (reply && reply.error) { return { ok: false, status: 599, body: String(reply.error), transport: { trace: reply.trace || [] } }; }
   return reply;
 }
 
@@ -157,8 +168,8 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     return true;
   }
   var flight = findFbmTab().then(function (tab) {
-    if (!tab) { return { error: 'Không tìm thấy tab FBM đang mở.' }; }
-    return sendToFbmTab(tab.id, message.request);
+    if (!tab) { return addWorkerTrace({ error: 'Không tìm thấy tab FBM đang mở.' }, message.request, 'fbm_tab_not_found'); }
+    return sendToFbmTab(tab.id, message.request).then(function (reply) { return addWorkerTrace(addWorkerTrace(reply, message.request, 'worker_received'), message.request, 'fbm_tab_found'); });
   });
   if (requestId) {
     fbmRequestFlights[requestId] = flight;

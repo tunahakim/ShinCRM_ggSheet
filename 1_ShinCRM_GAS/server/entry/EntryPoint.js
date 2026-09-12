@@ -19,9 +19,15 @@
  * **Không tự lấy `LockService`.** Khóa lấy ở tầng nghiệp vụ, nơi biết mình sắp ghi gì; lấy khóa ở đây là lấy khóa cho cả những lượt chỉ đọc, và khóa của dự án không tái nhập nên một lượt đọc giữ khóa sẽ chặn đúng lượt ghi đang chờ nó.
  */
 function runEntryPoint(name, source, channel, fn) {
+  var trace = typeof fbmTraceBoundary === 'function' && /^fbm/i.test(String(name || ''));
+  var failed = false, result;
+  if (trace) { fbmTraceBoundary('gas_entered', name); }
   try {
-    return fn();
+    result = fn();
+    return result;
   } catch (err) {
+    failed = true;
+    if (trace) { fbmTraceBoundary('gas_failed', name, err); }
     logEvent({
       source: source,
       action: name,
@@ -33,7 +39,12 @@ function runEntryPoint(name, source, channel, fn) {
     reportError(err, channel);
     throw err;
   } finally {
-    flushLog();
+    if (trace) { fbmTraceBoundary('before_flush', name); }
+    try {
+      flushLog();
+    } finally {
+      if (trace) { fbmTraceBoundary('after_flush', name); if (!failed) { fbmTraceBoundary('gas_returned', name); } }
+    }
   }
 }
 

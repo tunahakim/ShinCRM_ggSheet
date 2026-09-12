@@ -17,18 +17,25 @@ function fbmTraceContinue(stage, error) {
       error: error ? String(error && error.message || error) : ''
     };
     FbmSync.stateWrite(state);
+    if (typeof FbmSync.traceEvent === 'function') {
+      FbmSync.traceEvent('gas_' + String(stage || ''), { operation: 'fbmContinueSync', error: error ? String(error && error.message || error) : '' });
+    }
   } catch (ignore) {}
 }
+function fbmTraceBoundary(stage, name, error) {
+  if (typeof FbmSync.traceEvent !== 'function') { return; }
+  FbmSync.traceEvent(stage, { operation: String(name || ''), error: error ? String(error && error.message || error) : '', stack: error && error.stack ? String(error.stack) : '' });
+}
 /** Bắt đầu một phiên đọc/ghi theo mode được chọn. */
-function fbmStartSync(mode) { return runEntryPoint('fbmStartSync', 'sidebar', 'throw', function () { var result = fbmSyncStart(mode); if (result && result.status) { FbmSync.logStatus(result.status, 'start'); } return result; }); }
+function fbmStartSync(mode, clientTrace) { return runEntryPoint('fbmStartSync', 'sidebar', 'throw', function () { fbmTraceBoundary('gas_entered', 'fbmStartSync'); if (FbmSync.traceImport) { FbmSync.traceImport(clientTrace); } fbmTraceBoundary('engine_before', 'fbmStartSync'); var result = fbmSyncStart(mode); fbmTraceBoundary('engine_after', 'fbmStartSync'); if (result && result.status) { fbmTraceBoundary('before_log', 'fbmStartSync'); FbmSync.logStatus(result.status, 'start'); fbmTraceBoundary('after_log', 'fbmStartSync'); } return result; }); }
 /** Gửi response thô của Extension cho cursor hiện tại. */
-function fbmContinueSync(response) { return runEntryPoint('fbmContinueSync', 'sidebar', 'throw', function () { fbmTraceContinue('entered'); try { var before = FbmSync.statusView(), result = fbmSyncContinue(response); fbmTraceContinue('returned'); if (result && FbmSync.shouldLogStatus(before, result.status)) { FbmSync.logStatus(result.status, 'slice'); } return result; } catch (err) { fbmTraceContinue('failed', err); throw err; } }); }
+function fbmContinueSync(response, clientTrace) { return runEntryPoint('fbmContinueSync', 'sidebar', 'throw', function () { if (FbmSync.traceImport) { FbmSync.traceImport(clientTrace); } fbmTraceContinue('entered'); try { var before = FbmSync.statusView(); fbmTraceBoundary('engine_before', 'fbmContinueSync', null); var result = fbmSyncContinue(response); fbmTraceBoundary('engine_after', 'fbmContinueSync', null); fbmTraceContinue('returned'); if (result && FbmSync.shouldLogStatus(before, result.status)) { fbmTraceBoundary('before_log', 'fbmContinueSync'); FbmSync.logStatus(result.status, 'slice'); fbmTraceBoundary('after_log', 'fbmContinueSync'); } return result; } catch (err) { fbmTraceContinue('failed', err); fbmTraceBoundary('gas_failed', 'fbmContinueSync', err); throw err; } }); }
 /** Dừng phiên đồng bộ mà không đụng dữ liệu nghiệp vụ. */
 function fbmCancelSync() { return runEntryPoint('fbmCancelSync', 'sidebar', 'throw', function () { var result = fbmSyncCancel(); if (result && result.status) { FbmSync.logStatus(result.status, 'cancel'); } return result; }); }
 /** Đọc snapshot tiến độ hiện tại; Sidebar chỉ polling khi đang chạy. */
 function fbmGetSyncStatus() { return runEntryPoint('fbmGetSyncStatus', 'sidebar', 'throw', function () { var before = FbmSync.stateRead(), result = fbmSyncStatus(); if (result && result.lastFailureCode === 'SYNC_STALE_RUN' && before.lastFailureCode !== result.lastFailureCode) { FbmSync.logStatus(result, 'stale_run'); } return result; }); }
 /** Ghi lỗi cầu nối do Sidebar phát hiện trước khi có response FBM. */
-function fbmLogSyncError(message) { return runEntryPoint('fbmLogSyncError', 'sidebar', 'throw', function () { return FbmSync.logTransportError(message); }); }
+function fbmLogSyncError(message, clientTrace) { return runEntryPoint('fbmLogSyncError', 'sidebar', 'throw', function () { if (FbmSync.traceImport) { FbmSync.traceImport(clientTrace); } fbmTraceBoundary('gas_entered', 'fbmLogSyncError'); return FbmSync.logTransportError(message); }); }
 /** Đọc cờ cho phép ghi; mặc định tắt để không chạm dữ liệu FBM ngoài ý muốn. */
 function fbmGetWriteMode() { return runEntryPoint('fbmGetWriteMode', 'sidebar', 'throw', function () { return { enabled: FbmSync.writeAllowed() }; }); }
 /** Đổi cờ ghi thật theo thao tác chủ động của người dùng trên Sidebar. */

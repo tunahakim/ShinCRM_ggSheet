@@ -1,12 +1,18 @@
 <script>
 /* Sidebar chỉ hiển thị tiến độ; GAS là nguồn state duy nhất. */
-var FBM_SYNC_CLIENT = { installed: false, waiting: {}, running: false, mode: 'read', writeAllowed: false, openedAt: 0, relayConfigured: false, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0 };
+var FBM_SYNC_CLIENT = { installed: false, waiting: {}, running: false, mode: 'read', writeAllowed: false, openedAt: 0, relayConfigured: false, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0, traceEvents: [] };
 /** Timeout cho một request Extension để phiên không treo vô hạn khi tab FBM/bridge mất kết nối. */
 var FBM_SYNC_REQUEST_TIMEOUT_MS = 20000;
 var FBM_SYNC_GAS_CONTINUE_WARN_MS = 5000;
-// Sau moc nay khong tiep tuc hien loading vo han; chi doc status de chan doan, khong tu gui lai request ghi.
+// Sau moc nay khong tiep tuc hien loading vo han; tu ket luan timeout, khong tu gui lai request ghi.
 var FBM_SYNC_GAS_CONTINUE_TIMEOUT_MS = 15000;
-var FBM_SYNC_GAS_DIAGNOSTIC_STATUS_TIMEOUT_MS = 3000;
+
+function fbmSyncClientTrace(stage, request, extra) {
+  var meta = request && request.meta && request.meta.trace || {}, event = Object.assign({ at: Date.now(), stage: stage, runId: String(meta.runId || ''), requestId: String(meta.requestId || ''), operation: String(request && request.meta && request.meta.kind || ''), entity: String(request && request.meta && request.meta.entity || ''), recordId: String(request && request.meta && (request.meta.id || request.meta.shinId || request.meta.stt_rec_kh) || '') }, extra || {});
+  FBM_SYNC_CLIENT.traceEvents.push(event);
+  if (FBM_SYNC_CLIENT.traceEvents.length > 20) { FBM_SYNC_CLIENT.traceEvents.shift(); }
+  return event;
+}
 
 /** Tạo nút điều khiển dùng chung cho panel tiến độ. */
 function fbmSyncMakeButton(id, label, primary) {
@@ -198,7 +204,9 @@ function fbmSyncInstall() {
       return;
     }
     delete FBM_SYNC_CLIENT.waiting[data.id];
-    if (data.error) { waiter.reject(new Error(data.error)); } else { waiter.resolve(data.result); }
+    fbmSyncClientTrace(data.error ? 'client_extension_failure' : 'client_extension_success', waiter.request, data.error ? { error: data.error } : {});
+    if (data.result && typeof data.result === 'object' && data.result.transport) { data.result.transport.trace = (data.result.transport.trace || []).concat(FBM_SYNC_CLIENT.traceEvents.slice()); }
+    if (data.error) { var bridgeError = new Error(data.error); bridgeError.trace = (data.trace || []).concat(FBM_SYNC_CLIENT.traceEvents.slice()); waiter.reject(bridgeError); } else { waiter.resolve(data.result); }
   });
   document.addEventListener('click', function (event) {
     var target = event.target && event.target.closest ? event.target.closest('#fbm-sync-back, #fbm-sync-start, #fbm-sync-cancel, [data-fbm-conflict-choice], [data-fbm-push-retry-all]') : null;
@@ -231,7 +239,8 @@ function syncScreenClose() {
 function fbmSyncExtensionRequest(request) {
   fbmSyncInstall();
   return new Promise(function (resolve, reject) {
-    var id = String(Date.now()) + '-' + Math.random().toString(36).slice(2);
+    var id = String(request && request.meta && request.meta.trace && request.meta.trace.requestId || (String(Date.now()) + '-' + Math.random().toString(36).slice(2)));
+    fbmSyncClientTrace('client_next_request_started', request);
     FBM_SYNC_CLIENT.waiting[id] = { resolve: resolve, reject: reject, request: request, retryCount: 0 };
     // Send through the parent Sheets window; event.source remains the Sidebar iframe.
     (window.top === window ? window : window.top).postMessage({ action: 'CRM_FBM_REQUEST', id: id, nonce: SHEET_LINK_NONCE, request: request }, 'https://docs.google.com');
@@ -276,7 +285,9 @@ function fbmSyncSetWriteGate(enabled) {
 }
 /** Thử lại một lần khi chính hạ tầng Apps Script chưa đọc được mã dự án. */
 function fbmSyncStartServer(mode, attempt) {
-  return callServer('fbmStartSync', [mode]).catch(function (err) {
+  fbmSyncClientTrace('client_gas_call_started', null, { operation: 'fbmStartSync' });
+  return callServer('fbmStartSync', [mode, FBM_SYNC_CLIENT.traceEvents.slice()]).then(function (result) { fbmSyncClientTrace('client_gas_success', null, { operation: 'fbmStartSync' }); return result; }).catch(function (err) {
+    fbmSyncClientTrace('client_gas_failure', null, { operation: 'fbmStartSync', error: String(err && err.message || err) });
     var message = String(err && err.message || err || '');
     if (Number(attempt || 0) < 1 && /DEADLINE_EXCEEDED|đọc từ bộ nhớ/i.test(message)) { return fbmSyncStartServer(mode, Number(attempt || 0) + 1); }
     throw err;
@@ -311,19 +322,18 @@ function fbmSyncContinueServer(status, response) {
     if (!FBM_SYNC_CLIENT.running) { return; }
     fbmSyncPaint(fbmSyncWaitingStatus(status, 'GAS đang xử lý phản hồi quá 5 giây. Có thể bấm Dừng đồng bộ; hệ sẽ không tự gửi lại lệnh ghi.'));
   }, FBM_SYNC_GAS_CONTINUE_WARN_MS);
-  var callback = callServer('fbmContinueSync', [response]);
+  fbmSyncClientTrace('client_gas_call_started', status && status.request);
+  var callback = callServer('fbmContinueSync', [response, FBM_SYNC_CLIENT.traceEvents.slice()]);
   // Race chi dung de hien chan doan; callback goc van duoc giu nguyen va khong bi gui lai.
   callback.catch(function () {});
   var timeoutId;
   var timeout = new Promise(function (resolve) {
     timeoutId = setTimeout(function () {
       if (!FBM_SYNC_CLIENT.running) { resolve({ cancelled: true, status: status }); return; }
-      var statusCall = callServer('fbmGetSyncStatus');
-      statusCall.catch(function () {});
-      var statusFallback = new Promise(function (statusResolve) { setTimeout(function () { statusResolve(status); }, FBM_SYNC_GAS_DIAGNOSTIC_STATUS_TIMEOUT_MS); });
-      Promise.race([statusCall, statusFallback]).then(function (snapshot) {
+      var snapshot = status;
+      Promise.resolve(snapshot).then(function (snapshot) {
         var diagnostic = snapshot && (snapshot.status || snapshot) || {};
-        var trace = diagnostic.metadata && diagnostic.metadata.callbackTrace || {};
+        var traceRows = diagnostic.metadata && diagnostic.metadata.traceTail || [], trace = traceRows.length ? traceRows[traceRows.length - 1] : (diagnostic.metadata && diagnostic.metadata.callbackTrace || {});
         var cursor = diagnostic.cursor || {};
         var message = 'GAS_CALLBACK_TIMEOUT: GAS không trả kết quả sau 15 giây; không tự gửi lại lệnh ghi.'
           + ' Bước cuối: ' + String(trace.stage || 'unknown')
@@ -341,14 +351,17 @@ function fbmSyncContinueServer(status, response) {
     clearTimeout(timer);
     clearTimeout(timeoutId);
     if (result && result.diagnosticTimeout) {
+      fbmSyncClientTrace('client_timeout', status && status.request, { error: result.message });
       var timeoutError = new Error(result.message);
       timeoutError.code = 'GAS_CALLBACK_TIMEOUT';
       timeoutError.diagnostic = result.status;
       throw timeoutError;
     }
     if (result && result.cancelled) { return result.status; }
+    fbmSyncClientTrace('client_gas_success', status && status.request);
     return result;
   }, function (error) {
+    fbmSyncClientTrace('client_gas_failure', status && status.request, { error: String(error && error.message || error) });
     clearTimeout(timer);
     clearTimeout(timeoutId);
     throw error;
@@ -387,6 +400,7 @@ function fbmSyncRun(mode) {
     return Promise.resolve(missing);
   }
   FBM_SYNC_CLIENT.running = true;
+  FBM_SYNC_CLIENT.traceEvents = [];
   FBM_SYNC_CLIENT.viewEpoch += 1;
   fbmSyncPaint({ phase: 'checking_session', label: 'Đang chuẩn bị đồng bộ', direction: 'Kết nối FBM', entityLabel: 'Chuẩn bị phiên', message: 'Đang chuẩn bị phiên đồng bộ...', counts: {} });
   var work = fbmSyncStartServer(mode || 'read', 0).then(function (started) {
@@ -403,12 +417,12 @@ function fbmSyncRun(mode) {
     if (err && err.code === 'GAS_CALLBACK_TIMEOUT') {
       var diagnostic = err.diagnostic || {};
       var timeoutStatus = Object.assign({}, diagnostic, { phase: 'error', label: 'Lỗi', message: reason, lastError: reason, lastFailureCode: err.code, counts: diagnostic.counts || {} });
-      return callServer('fbmLogSyncError', [reason]).catch(function () { return null; }).then(function () {
+      return callServer('fbmLogSyncError', [reason, FBM_SYNC_CLIENT.traceEvents.slice()]).catch(function () { return null; }).then(function () {
         fbmSyncPaint(timeoutStatus);
         return null;
       });
     }
-    return callServer('fbmLogSyncError', [reason]).catch(function () { return null; }).then(function () {
+    return callServer('fbmLogSyncError', [reason, FBM_SYNC_CLIENT.traceEvents.slice()]).catch(function () { return null; }).then(function () {
       return callServer('fbmCancelSync').catch(function () { return null; });
     }).then(function () {
       fbmSyncPaint({ label: 'Lỗi', phase: 'error', message: reason, lastError: reason, counts: {} });

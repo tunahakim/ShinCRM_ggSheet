@@ -196,7 +196,16 @@ FbmSync.continue = function (rawResponse) {
     if (recovered.recovered) { return { ok: false, status: FbmSync.statusView(), error: recovered.state.lastError, stale: true }; }
     state = recovered.state;
   }
-  var cursor = state.cursor || {}, response = FbmSync.protocol.parse(rawResponse);
+  var cursor = state.cursor || {}, response;
+  if (FbmSync.traceImport) {
+    var transportTrace = rawResponse && rawResponse.transport && rawResponse.transport.trace;
+    if (transportTrace) { FbmSync.traceImport(transportTrace, { runId: state.runId, requestId: state.activeRequestId, phase: state.phase, operation: cursor.operation, entity: state.entity, recordId: state.current }); }
+  }
+  if (FbmSync.traceEvent) {
+    var responseMeta = FbmSync.traceResponse ? FbmSync.traceResponse(rawResponse) : {};
+    FbmSync.traceEvent('fbm_response_received', { requestId: rawResponse && rawResponse.trace && rawResponse.trace.requestId || state.activeRequestId, httpStatus: responseMeta.httpStatus, responseLength: responseMeta.responseLength });
+  }
+  response = FbmSync.protocol.parse(rawResponse);
   if (response && response._transport && response._transport.payloadCookie) {
     state.session.cookie = String(response._transport.payloadCookie);
     var compact = state.session.cookie.indexOf('FHN_CRM_App') >= 0 ? state.session.cookie.slice(0, state.session.cookie.indexOf('FHN_CRM_App')) : '';

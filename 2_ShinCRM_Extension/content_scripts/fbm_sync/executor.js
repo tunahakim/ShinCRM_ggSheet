@@ -2,6 +2,10 @@
 (function () {
   var HEARTBEAT_URL = 'https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage';
   var FETCH_TIMEOUT_MS = 10000;
+  function traceEvent(trace, stage, request, extra) {
+    var meta = request && request.meta && request.meta.trace || {};
+    trace.push(Object.assign({ at: Date.now(), stage: stage, runId: String(meta.runId || ''), requestId: String(meta.requestId || ''), operation: String(request && request.meta && request.meta.kind || ''), entity: String(request && request.meta && request.meta.entity || ''), recordId: String(request && request.meta && (request.meta.id || request.meta.shinId || request.meta.stt_rec_kh) || '') }, extra || {}));
+  }
   /** Request đọc tối thiểu để giữ phiên và phát hiện logout. */
   function heartbeat() { return { url: HEARTBEAT_URL, method: 'POST', headers: { accept: '*/*', 'content-type': 'application/json; charset=UTF-8' }, body: { type: 1, count: 1, language: 'v', controller: 'zccrAccount', viewId: null, childObject: false, lastPageIndex: 0, firstPageItem: '', lastPageItem: '', lastRowCount: 0, memvars: [], externalKey: [], gridPageIndex: -1, gridPageValue: null, gridRefresh: true, filter: [], sortExpression: 'ngay_gd desc', cookie: '' } }; }
   /** Đọc cookie payload nếu request GAS không truyền cookie. */
@@ -41,13 +45,17 @@
     });
   }
   function execute(request) {
-    var req = request || heartbeat();
+    var req = request || heartbeat(), trace = [];
+    traceEvent(trace, 'executor_started', req);
     var sent = requestBody(req);
     var controller = new AbortController();
     var timer = setTimeout(function () { controller.abort(); }, FETCH_TIMEOUT_MS);
+    traceEvent(trace, 'fetch_started', req);
     return fetch(req.url, { method: req.method || 'POST', headers: req.headers || { 'content-type': 'application/json; charset=UTF-8' }, body: sent && sent.text, credentials: 'include', cache: 'no-store', signal: controller.signal }).then(function (response) {
-      return readResponseText(response).then(function (body) { return { ok: response.ok, status: response.status, headers: { contentType: response.headers.get('content-type') || '' }, body: body, transport: { payloadCookie: sent && sent.cookie || '' } }; });
+      return readResponseText(response).then(function (body) { traceEvent(trace, 'fetch_finished', req, { httpStatus: response.status, responseLength: body.length }); return { ok: response.ok, status: response.status, headers: { contentType: response.headers.get('content-type') || '' }, body: body, transport: { payloadCookie: sent && sent.cookie || '', trace: trace } }; });
     }).catch(function (err) {
+      traceEvent(trace, 'fetch_finished', req, { error: String(err && err.message || err) });
+      try { err.trace = trace; } catch (ignore) {}
       if (err && err.name === 'AbortError') { throw new Error('FBM không phản hồi sau 10 giây.'); }
       throw err;
     }).finally(function () { clearTimeout(timer); });
@@ -56,7 +64,7 @@
   function onFbmMessage(message, sender, sendResponse) {
     if (message && message.type === 'FBM_PING') { sendResponse({ ready: true, version: '21.7' }); return false; }
     if (!message || message.type !== 'FBM_EXECUTE') { return false; }
-    execute(message.request).then(function (result) { sendResponse({ result: result }); }, function (err) { sendResponse({ error: String(err && err.message || err) }); });
+    execute(message.request).then(function (result) { sendResponse({ result: result }); }, function (err) { sendResponse({ error: String(err && err.message || err), trace: err && err.trace || [] }); });
     return true;
   }
   try {

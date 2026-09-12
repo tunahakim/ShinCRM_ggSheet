@@ -114,17 +114,23 @@ window.addEventListener('message', function (event) {
     if (!isAllowedSidebarOrigin(event.origin) || String(data.nonce || '') !== sidebarNonce) { return; }
     // Sheets có thể thay WindowProxy sau reload; nonce vẫn định danh đúng Sidebar.
     if (event.source && event.source !== sidebarWindow) { sidebarWindow = event.source; sidebarOrigin = event.origin; }
+    var bridgeTrace = { at: Date.now(), stage: 'bridge_received', runId: String(data.request && data.request.meta && data.request.meta.trace && data.request.meta.trace.runId || ''), requestId: String(data.id || data.request && data.request.meta && data.request.meta.trace && data.request.meta.trace.requestId || ''), operation: String(data.request && data.request.meta && data.request.meta.kind || ''), entity: String(data.request && data.request.meta && data.request.meta.entity || ''), recordId: String(data.request && data.request.meta && (data.request.meta.id || data.request.meta.shinId || data.request.meta.stt_rec_kh) || '') };
     sendRequestToWorker({ type: 'FBM_EXECUTE_REQUEST', id: data.id, request: data.request }, function (error, reply) {
       // Content script cũ sau Extension Reload không còn runtime context. Không phát
       // response lỗi cạnh response thật của bridge mới vừa được worker nạp lại.
       if (isInvalidatedExtensionError(error)) { return; }
       try {
+        var trace = (reply && reply.result && reply.result.transport && reply.result.transport.trace) || (reply && reply.trace) || [];
+        var bridgeResponseTrace = Object.assign({}, bridgeTrace, { at: Date.now(), stage: 'bridge_response_sent' });
+        trace = [bridgeTrace].concat(trace, [bridgeResponseTrace]);
+        if (reply && reply.result && typeof reply.result === 'object') { reply.result.transport = reply.result.transport || {}; reply.result.transport.trace = trace; }
         event.source.postMessage({
           action: 'CRM_FBM_RESPONSE',
           nonce: sidebarNonce,
           id: data.id,
           result: error ? null : (reply && reply.result),
           error: error ? error.message : (reply && reply.error),
+          trace: trace,
           retryable: false
         }, event.origin);
       } catch (err) { sidebarWindow = null; sidebarOrigin = ''; sidebarNonce = ''; }

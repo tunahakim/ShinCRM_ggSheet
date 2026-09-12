@@ -181,6 +181,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── reconcile\Pull.js         Đối soát chiều pull và ghi thay đổi an toàn.
     ├── reconcile\CategoryGate.js Đọc và đối chiếu Category với lookup FBM; không trực tiếp ghi Sheet.
     ├── report\Report.js          Trạng thái công khai cho Sidebar.
+    ├── diagnostic\Trace.js       Trace hop độc lập, chỉ giữ metadata giới hạn trong DocumentProperties.
     ├── report\Preflight.js       Checker riêng của module FBM; gọi Core checker, kiểm owner/cấu hình/mapping/conflict trước khi push.
     └── report\Probe.js           Dò ứng viên ghi của ALT00010 mà không gọi FBM.
 ```

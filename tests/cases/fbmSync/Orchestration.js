@@ -10,7 +10,7 @@ async function chay(so) {
     FbmSync: {},
     PropertiesService: { getDocumentProperties: () => propertyApi, getScriptProperties: () => propertyApi }
   });
-  napServer(orchestration, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/EntryPoints.js');
+  napServer(orchestration, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/EntryPoints.js');
   const started = orchestration.FbmSync.start({ mode: 'read' });
   check(so, 'start bat dau bang bootstrap Customer', started.request.meta.kind, 'authorize');
   orchestration.FbmSync.stateWrite(orchestration.FbmSync.stateStart('', 'idle', 0));
@@ -18,6 +18,7 @@ async function chay(so) {
   check(so, 'start bulk Activity dung cursor authorize rieng', [bulkStarted.request.meta.kind, orchestration.FbmSync.stateRead().scan], ['authorize', 'activity_bulk']);
   check(so, 'bootstrap dung viewPage false', started.request.body.viewPage, false);
   check(so, 'bootstrap khong gui authorized cu', started.request.body.authorized, null);
+  check(so, 'envelope mang runId/requestId va GAS luu moc response', [Boolean(started.request.meta.trace.runId), Boolean(started.request.meta.trace.requestId), orchestration.FbmSync.stateRead().activeRequestId === bulkStarted.request.meta.trace.requestId, orchestration.FbmSync.traceRead(5).some((item) => item.stage === 'response_built')], [true, true, true, true]);
   const retrySlice = orchestration.FbmSync.continue({ ok: false, status: 503, body: '' });
   check(so, 'loi doc tam thoi duoc retry co gioi han', [retrySlice.ok, retrySlice.retrying, retrySlice.request.meta.kind, orchestration.FbmSync.stateRead().retryCount], [true, true, 'authorize', 1]);
   const resumed = orchestration.FbmSync.start({ mode: 'read' });
@@ -122,6 +123,11 @@ async function chay(so) {
   schedulerData.FBM_SYNC_NEXT_ACTIVITY_SCAN = String(Date.now() - 1);
   const staleClaim = scheduler.FbmSync.schedulerClaim('activity', Date.now());
   check(so, 'scheduler thu hoi phien cu va nhan ky moi', [staleClaim.ok, staleClaim.kind, scheduler.FbmSync.stateRead().lastFailureCode], [true, 'activity', 'SYNC_STALE_RUN']);
+  const supervised = scheduler.FbmSync.stateStart('activity', 'push', 1);
+  supervised.cursor = { kind: 'push_wait', operation: 'activity_edit_save' }; supervised.current = 'ACT-1'; supervised.lastProgressAt = Date.now() - scheduler.FbmSync.STALE_RUN_MS - 1;
+  scheduler.FbmSync.stateWrite(supervised);
+  const supervisorResult = scheduler.FbmSync.supervise(Date.now());
+  check(so, 'Supervisor danh dau phien ghi treo va khong tu retry', [supervisorResult.stale, scheduler.FbmSync.stateRead().phase, scheduler.FbmSync.stateRead().lastFailureCode], [true, 'error', 'SUPERVISOR_TIMEOUT_AT_PUSH']);
 
   const heartbeatData = {};
   const heartbeatPropertyApi = { getProperty: (key) => heartbeatData[key] || null, setProperty: (key, value) => { heartbeatData[key] = String(value); } };

@@ -34,13 +34,39 @@ FbmSync.schedulerClaim = function (kind, now) {
 };
 /** Cài lại ba trigger sync, xóa bản cũ cùng handler trước. */
 function fbmInstallScheduler() {
-  var names = ['fbmHeartbeatTrigger', 'fbmCustomerScanTrigger', 'fbmActivityScanTrigger'];
+  var names = ['fbmHeartbeatTrigger', 'fbmCustomerScanTrigger', 'fbmActivityScanTrigger', 'fbmSupervisorTrigger'];
   ScriptApp.getProjectTriggers().forEach(function (trigger) { if (names.indexOf(trigger.getHandlerFunction()) >= 0) { ScriptApp.deleteTrigger(trigger); } });
   ScriptApp.newTrigger('fbmHeartbeatTrigger').timeBased().everyMinutes(5).create();
   ScriptApp.newTrigger('fbmCustomerScanTrigger').timeBased().everyHours(1).create();
   ScriptApp.newTrigger('fbmActivityScanTrigger').timeBased().everyHours(8).create();
+  ScriptApp.newTrigger('fbmSupervisorTrigger').timeBased().everyMinutes(1).create();
   return FbmSync.schedule();
 }
+
+/** Giám sát độc lập state; chỉ kết luận phiên treo và fail-closed, không gửi lại request ghi. */
+FbmSync.supervise = function (now) {
+  var state = FbmSync.stateRead(), at = Number(now || Date.now()), active = FbmSync.ACTIVE_PHASES.indexOf(String(state.phase || '')) >= 0;
+  if (!active || !state.runId) { return { ok: true, monitored: false, status: FbmSync.statusView() }; }
+  var last = Number(state.lastProgressAt || state.updatedAt || state.startedAt || 0), age = last ? at - last : FbmSync.STALE_RUN_MS + 1;
+  if (age <= FbmSync.STALE_RUN_MS) { return { ok: true, monitored: true, stale: false, ageMs: Math.max(0, age), status: FbmSync.statusView() }; }
+  var current = state, waitingWrite = current.cursor && current.cursor.kind === 'push_wait';
+  current.phase = 'error';
+  current.lastFailureCode = waitingWrite ? 'SUPERVISOR_TIMEOUT_AT_PUSH' : 'SUPERVISOR_TIMEOUT_AT_' + String((current.cursor && current.cursor.kind) || current.phase || 'UNKNOWN').toUpperCase();
+  current.retryable = false;
+  current.lastError = waitingWrite
+    ? 'Phiên ghi FBM không nhận được phản hồi quá thời gian an toàn; Supervisor đã dừng và không tự ghi lại.'
+    : 'Phiên đồng bộ không nhận được phản hồi quá thời gian an toàn; Supervisor đã dừng phiên.';
+  current.message = current.lastError;
+  if (!waitingWrite) {
+    var kept = {};
+    Object.keys(current.locks || {}).forEach(function (key) { if (current.locks[key] && current.locks[key].owner === 'user') { kept[key] = current.locks[key]; } });
+    current.locks = kept;
+  }
+  FbmSync.stateWrite(current);
+  if (FbmSync.traceEvent) { FbmSync.traceEvent('supervisor_timeout', { runId: current.runId, requestId: current.activeRequestId, error: current.lastError }); }
+  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'supervisor_timeout', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', entity: current.entity || '', recordId: current.current || '', reason: current.lastError, detail: { code: current.lastFailureCode, ageMs: age, cursor: current.cursor && current.cursor.kind || '', operation: current.cursor && current.cursor.operation || '' } }); }
+  return { ok: false, monitored: true, stale: true, status: FbmSync.statusView() };
+};
 
 /** Nhận heartbeat và trả một request đọc tiếp nếu scheduler đang đến hạn. */
 function fbmSyncHeartbeat(rawResponse) {
@@ -92,3 +118,8 @@ function fbmHeartbeatTrigger() { return FbmSync.schedulerClaim('heartbeat'); }
 function fbmCustomerScanTrigger() { return FbmSync.schedulerClaim('customer'); }
 /** Đánh dấu đến lịch quét Activity để Sidebar/Extension tiếp tục. */
 function fbmActivityScanTrigger() { return FbmSync.schedulerClaim('activity'); }
+/** Trigger này không gọi FBM; chỉ kiểm tra execution trước đã bỏ rơi hay chưa. */
+function fbmSupervisorTrigger() {
+  var run = function () { return FbmSync.supervise(); };
+  return typeof runEntryPoint === 'function' ? runEntryPoint('fbmSupervisorTrigger', 'fbm_sync', 'throw', run) : run();
+}
