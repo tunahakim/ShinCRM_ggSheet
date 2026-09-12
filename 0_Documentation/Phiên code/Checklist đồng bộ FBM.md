@@ -232,6 +232,7 @@
 - [x] Customer cha chưa Cho phép, Ngừng đồng bộ hoặc thiếu FBM ID/mã thì không push Activity.
 - [x] Activity mới đủ khóa/ngày/danh mục → New, lưu FBM ID và chờ xác nhận.
 - [x] Create mất phản hồi giữ `đang đẩy`, không retry; pull dùng marker để vá hoặc báo trùng.
+- [x] Live `ALT00010`: xóa Activity khỏi Sheet rồi chạy lại, hệ thống khôi phục từ FBM, không phát sinh request xóa và không tạo trùng.
 - [x] Builder Activity Edit mở form lấy OldValue đúng fixture.
 - [x] Parser Row 45 ô giữ `end_time`, lấy `_ticket` từ Showing thành `fileticket`, hỗ trợ Row null và fallback.
 - [x] Cổng owner Activity edit đã có sau bước mở form.
