@@ -15,6 +15,7 @@ function fbmSyncPaintSettingsBlock(panel, active, status) {
   var gate = document.createElement('label'); gate.className = 'shin-sync-write-gate';
   var check = document.createElement('input'); check.type = 'checkbox'; check.id = 'fbm-sync-write-gate'; check.checked = FBM_SYNC_CLIENT.writeAllowed; check.disabled = active;
   gate.appendChild(check); gate.appendChild(document.createTextNode(' Cho phép ghi thật lên FBM')); body.appendChild(gate);
+  var relay = document.createElement('button'); relay.type = 'button'; relay.className = 'shin-button'; relay.id = 'fbm-sync-rotate-relay'; relay.disabled = active; relay.textContent = 'Đổi khóa relay'; body.appendChild(relay);
   block.appendChild(body); panel.appendChild(block);
 }
 </script>

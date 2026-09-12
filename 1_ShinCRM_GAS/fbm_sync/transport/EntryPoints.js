@@ -81,6 +81,20 @@ function fbmSyncRelayConfig() {
   }
   return { url: url, key: key, spreadsheetId: spreadsheetId };
 }
+/** Đổi khóa relay nguyên tử; Sidebar phải nhận ACK Extension trước khi coi là hoàn tất. */
+function fbmSyncRotateRelayKey() {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var key = Utilities.getUuid();
+    PropertiesService.getScriptProperties().setProperty('FBM_SYNC_KEY', key);
+    var url = '';
+    try { url = ScriptApp.getService().getUrl() || ''; } catch (ignoreUrl) {}
+    var spreadsheetId = '';
+    try { spreadsheetId = String(shinOpenBook().getId() || ''); } catch (ignoreId) {}
+    return { url: url, key: key, spreadsheetId: spreadsheetId };
+  } finally { lock.releaseLock(); }
+}
 
 /** ACK không đụng state, dùng để kiểm tra Extension gọi được GAS khi Sidebar đã đóng. */
 function fbmSyncRelayProbe() { return { ok: true, code: 'RELAY_PROBE_OK', serverAt: Date.now() }; }

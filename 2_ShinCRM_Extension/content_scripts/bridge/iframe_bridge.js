@@ -106,6 +106,9 @@ window.addEventListener('message', function (event) {
     if (!isAllowedSidebarOrigin(event.origin) || event.source !== sidebarWindow || String(data.nonce || '') !== sidebarNonce) { return; }
     sendRequestToWorker({ type: 'FBM_CONFIGURE_RELAY', config: data.config || {} }, function (error, reply) {
       if (error && console && console.warn) { console.warn('Không lưu được cấu hình relay FBM:', error); }
+      try {
+        event.source.postMessage({ action: 'CRM_FBM_CONFIG_ACK', nonce: sidebarNonce, id: String(data.id || ''), ok: !error && !(reply && reply.ok === false), error: error ? error.message : (reply && reply.error || '') }, event.origin);
+      } catch (ignoreAck) {}
     });
     return;
   }

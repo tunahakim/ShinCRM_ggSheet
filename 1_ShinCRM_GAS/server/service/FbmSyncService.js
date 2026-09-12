@@ -49,6 +49,7 @@ function fbmGetWriteMode() { return runEntryPoint('fbmGetWriteMode', 'sidebar', 
 function fbmSetWriteMode(enabled) { return runEntryPoint('fbmSetWriteMode', 'sidebar', 'throw', function () { return fbmSyncSetWriteMode(enabled === true); }); }
 function fbmRetryPushFailures() { return runEntryPoint('fbmRetryPushFailures', 'sidebar', 'throw', function () { return fbmSyncRetryPushFailures(); }); }
 function fbmGetRelayConfig() { return runEntryPoint('fbmGetRelayConfig', 'sidebar', 'throw', function () { return fbmSyncRelayConfig(); }); }
+function fbmRotateRelayKey() { return runEntryPoint('fbmRotateRelayKey', 'sidebar', 'throw', function () { return fbmSyncRotateRelayKey(); }); }
 /** Khóa record khi người dùng bắt đầu sửa. */
 function fbmBeginEdit(entity, id, revision) { return runEntryPoint('fbmBeginEdit', 'sidebar', 'throw', function () { return fbmSyncEditBegin(entity, id, revision); }); }
 /** Mở khóa record khi người dùng kết thúc sửa. */

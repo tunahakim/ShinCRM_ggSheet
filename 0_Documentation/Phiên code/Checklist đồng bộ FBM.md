@@ -38,7 +38,7 @@
 - [x] Category là cấu hình do người dùng sở hữu; đồng bộ chỉ đọc/đối chiếu, tuyệt đối không ghi hoặc xóa Sheet Category.
 - [x] `ScriptProperties` chỉ giữ khóa Web App; cờ ghi, giới hạn test và cấu hình đã dùng `DocumentProperties`, Sheet Config hoặc state phiên đúng vòng đời.
 - [x] GAS tự tạo `FBM_SYNC_KEY` đúng một lần khi Sidebar lần đầu yêu cầu relay, không cần thao tác menu; mở Sidebar sau đó chỉ lấy lại khóa cũ.
-- [ ] Màn hình đồng bộ có thao tác đổi khóa relay có xác nhận; GAS đổi nguyên tử, Extension xác nhận đã lưu, không hiển thị hoặc ghi khóa ra Sheet/Log.
+- [x] Màn hình đồng bộ có thao tác đổi khóa relay có xác nhận; GAS đổi nguyên tử, Extension xác nhận đã lưu, không hiển thị hoặc ghi khóa ra Sheet/Log.
 
 ### Extension, transport và khóa
 
@@ -95,7 +95,7 @@
 - [ ] Preflight đối chiếu tuyệt đối username/mã user, tên đầy đủ và `FBM_SPREADSHEET_ID` trước request nghiệp vụ; không dùng mã ngắn.
 - [x] Mỗi lần Sidebar mở hoặc bắt tay lại, Extension ghi đè relay config bằng GAS URL, khóa và Spreadsheet ID hiện tại; Extension chỉ giữ một config đang hoạt động và alarm không gọi FBM khi chưa có config.
 - [x] Tách phần dựng block trạng thái, điều khiển và audit thành các tệp `.html` riêng trong `client/sync/`, vẫn dùng lớp component/block chuẩn của Sidebar.
-- [ ] Tách màn hình trạng thái, thiết lập đăng nhập và audit thành các tệp giao diện riêng trong `client/sync/`, tái sử dụng block chuẩn.
+- [x] Tách màn hình trạng thái, thiết lập đăng nhập và audit thành các tệp giao diện riêng trong `client/sync/`, tái sử dụng block chuẩn.
 - [x] Lấy authorized Customer rồi Activity; thiếu token thì dừng trước CRUD.
 - [ ] Kiểm owner mặc định FBM khớp `FBM_ACCOUNT_NAME`; sai thì dừng chiều push.
 - [ ] Xác nhận Config có `FBM_ACCOUNT_NAME`, `FBM_MA_KH_PREFIX`, `FBM_MA_KH_LENGTH`, `FBM_ACTIVITY_SINCE` và không khai trùng.
