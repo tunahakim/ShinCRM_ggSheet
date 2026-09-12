@@ -115,6 +115,7 @@ function chay(so) {
 
   const workerSource = fs.readFileSync(WORKER_FILE, 'utf8');
   const executorSource = fs.readFileSync(EXECUTOR_FILE, 'utf8');
+  const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', '2_ShinCRM_Extension', 'manifest.json'), 'utf8'));
   check(so, 'worker ping executor truoc request FBM', workerSource.indexOf("ensureFbmExecutor(tabId).then") < workerSource.indexOf("sendTabMessage(tabId, { type: 'FBM_EXECUTE'"), true);
   check(so, 'worker chi co mot diem gui request FBM', (workerSource.match(/sendTabMessage\(tabId, \{ type: 'FBM_EXECUTE', request: request \}/g) || []).length, 1);
   check(so, 'worker khong tao hai request FBM khi Sidebar thu lai cung id', workerSource.indexOf('fbmRequestFlights') >= 0 && workerSource.indexOf('existingFlight') >= 0, true);
@@ -122,6 +123,8 @@ function chay(so) {
   check(so, 'heartbeat relay tiep tuc cursor voi ngan sach request', workerSource.indexOf('relayScheduledRequests(tabId') >= 0 && workerSource.indexOf('used >= 10') >= 0, true);
   check(so, 'alarm chi tim tab FBM sau khi co relay config', workerSource.indexOf("getRelayConfig().then(function (config) {\n    if (!config) { return null; }\n    return findFbmTab()") >= 0, true);
   check(so, 'relay config luu Spreadsheet ID', workerSource.indexOf('fbmSpreadsheetId: String(config.spreadsheetId || \'\')') >= 0, true);
+  check(so, 'service worker co quyen goi Web App GAS va mien redirect', manifest.host_permissions.includes('https://script.google.com/macros/*') && manifest.host_permissions.includes('https://script.googleusercontent.com/macros/*'), true);
+  check(so, 'relay GAS co timeout va luu chan doan toi thieu', workerSource.indexOf('GAS_RELAY_TIMEOUT_MS') >= 0 && workerSource.indexOf('RELAY_TIMEOUT') >= 0 && workerSource.indexOf('fbmRelayLastStatus') >= 0, true);
   const sidebarSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'client', 'Sidebar.html'), 'utf8');
   const syncSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'client', 'sync', 'fbmSync.html'), 'utf8');
   check(so, 'Sidebar giu waiter va thu lai mot lan khi bridge cu mat context', syncSource.indexOf('if (data.retryable)') >= 0 && syncSource.indexOf('waiter.retryCount < 1') >= 0 && syncSource.indexOf('retryCount: 0') >= 0, true);

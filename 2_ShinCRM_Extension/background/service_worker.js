@@ -105,15 +105,41 @@ function rawFbmReply(reply) {
 }
 
 /** Gọi Web App relay và đọc kết quả handoff mà không ghi payload vào log. */
+var GAS_RELAY_TIMEOUT_MS = 15000;
+
+/** Lưu dấu chẩn đoán relay tối thiểu để có thể kiểm tra khi không có Sidebar. */
+function noteRelayStatus(status) {
+  if (!chrome.storage || !chrome.storage.local || !chrome.storage.local.set) { return; }
+  var item = status || {};
+  try {
+    chrome.storage.local.set({ fbmRelayLastStatus: {
+      at: Date.now(),
+      ok: item.ok === true,
+      code: String(item.code || ''),
+      httpStatus: Number(item.httpStatus || 0),
+      responseLength: Number(item.responseLength || 0),
+      error: String(item.error || '').slice(0, 240)
+    } });
+  } catch (ignore) {}
+}
+
 function postRelay(url, key, body) {
-  return fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(Object.assign({ key: key }, body)) }).then(function (response) {
+  var controller = typeof AbortController === 'function' ? new AbortController() : null;
+  var timer = controller ? setTimeout(function () { controller.abort(); }, GAS_RELAY_TIMEOUT_MS) : null;
+  return fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'omit', redirect: 'follow', signal: controller && controller.signal, body: JSON.stringify(Object.assign({ key: key }, body)) }).then(function (response) {
     return response.text().then(function (text) {
       var parsed = null;
-      try { parsed = JSON.parse(text); } catch (ignore) { parsed = { ok: false, error: 'GAS relay trả về dữ liệu không hợp lệ.' }; }
+      try { parsed = JSON.parse(text); } catch (ignore) { parsed = { ok: false, code: 'RELAY_INVALID_JSON', error: 'GAS relay trả về dữ liệu không hợp lệ.' }; }
       if (!response.ok && parsed && !parsed.error) { parsed.error = 'GAS relay HTTP ' + response.status; }
+      noteRelayStatus({ ok: response.ok && parsed && parsed.ok !== false, code: parsed && parsed.code || (response.ok ? 'OK' : 'RELAY_HTTP_ERROR'), httpStatus: response.status, responseLength: text.length, error: parsed && parsed.error || '' });
       return parsed;
     });
-  });
+  }).catch(function (error) {
+    var timeout = error && error.name === 'AbortError';
+    var message = timeout ? 'GAS relay không trả lời sau ' + GAS_RELAY_TIMEOUT_MS + ' ms.' : String(error && error.message || error || 'Lỗi fetch GAS relay.');
+    noteRelayStatus({ ok: false, code: timeout ? 'RELAY_TIMEOUT' : 'RELAY_FETCH_FAILED', error: message });
+    throw new Error(message);
+  }).finally(function () { if (timer) { clearTimeout(timer); } });
 }
 
 /** Đọc một relay config duy nhất; thiếu config thì không được chạm tab FBM. */
@@ -143,11 +169,14 @@ function relayScheduledRequests(tabId, config, gasReply, count) {
 /** Nộp heartbeat cho GAS và chạy tiếp các request đọc scheduler trả về. */
 function relayHeartbeatToGas(tabId, reply) {
   return getRelayConfig().then(function (config) {
-    if (!config) { return null; }
+    if (!config) {
+      noteRelayStatus({ ok: false, code: 'RELAY_CONFIG_MISSING', error: 'Thiếu URL hoặc khóa Web App GAS.' });
+      return null;
+    }
     return postRelay(config.url, config.key, { kind: 'heartbeat', spreadsheetId: config.spreadsheetId, response: rawFbmReply(reply) }).then(function (gasReply) {
       return relayScheduledRequests(tabId, config, gasReply, 0);
     });
-  }).catch(function (error) { console.warn('Không relay được heartbeat cho GAS:', error); return null; });
+  }).catch(function (error) { console.warn('Không relay được heartbeat cho GAS:', String(error && error.message || error)); return null; });
 }
 
 /** Định tuyến request từ Sidebar tới đúng tab FBM, không xử lý dữ liệu nghiệp vụ. */

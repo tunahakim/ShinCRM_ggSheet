@@ -4,7 +4,12 @@
   "version": "21.7",
   "description": "CRM Google Sheet - Local Mode (No Server Lag)",
   "permissions": ["activeTab", "scripting", "tabs", "alarms", "storage"],
-  "host_permissions": ["https://docs.google.com/spreadsheets/*", "https://fbo.com.vn:8888/*"],
+  "host_permissions": [
+    "https://docs.google.com/spreadsheets/*",
+    "https://fbo.com.vn:8888/*",
+    "https://script.google.com/macros/*",
+    "https://script.googleusercontent.com/macros/*"
+  ],
   "background": {
     "service_worker": "background/service_worker.js"
   },

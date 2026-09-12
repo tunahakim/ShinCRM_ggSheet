@@ -58,7 +58,7 @@
 - [x] Retry transport được tách khỏi retry nghiệp vụ; lỗi nghiệp vụ chỉ thử lại khi `hSHIN` đổi.
 - [x] Khôi phục cursor đọc còn hạn sau khi Sidebar, Chrome hoặc GAS gián đoạn; request ghi dở không tự phát lại.
 - [x] Giữ khoảng nghỉ và trần request phù hợp FBM, không dồn quá 60 request/phút.
-- [x] Web App `doPost` xác thực khóa và Extension thực sự điều phối qua Web App.
+- [ ] Web App `doPost` xác thực khóa và Extension thực sự điều phối qua Web App.
 
 ### Metadata, chuẩn hóa và trạng thái
 
@@ -264,6 +264,7 @@
 - [x] Kỳ Customer 60 phút kéo full grid qua nhiều lát, lưu cursor từng lát.
 - [x] Kỳ Activity 8 giờ chạy bulk ID, lớp `ngay_gd` và vòng xoay 30 Customer.
 - [x] Scheduler không tạo hai kỳ, không giữ công việc trong RAM và tiếp tục từ lát đã chốt.
+- [ ] **Cần chốt trước khi code:** Khi người dùng bấm `Đồng bộ ngay` trong lúc đã có phiên nền đang hoạt động, GAS không được tạo phiên song song; phải quyết định rõ Sidebar sẽ hiển thị/tiếp nhận phiên hiện tại, báo đang chạy và giữ quyền Dừng, hay xếp yêu cầu thủ công chờ phiên hiện tại kết thúc.
 - [x] Nút Dừng đồng bộ xóa marker `scheduledScan`, không để heartbeat tự khởi động lại kỳ vừa dừng.
 - [x] Web App dùng khóa theo spreadsheet để tiếp tục khi Sidebar đóng.
 - [x] Mở lại Sidebar chỉ đọc state hiện có, không tạo kỳ thứ hai.
@@ -271,6 +272,7 @@
 - [ ] Lệnh tính lại baseline không phát request write FBM.
 - [ ] **Cần kiểm chứng thực tế:** bắt đầu kỳ, đóng Sidebar, chờ Web App/Extension và mở lại xem state/log.
 - [ ] **Cần kiểm chứng thực tế:** reload hoặc để service worker ngủ rồi xác nhận kỳ tiếp tục.
+- [ ] **Cần kiểm chứng thực tế:** reload Extension, kiểm tra `chrome.storage.local` có relay config, chạy một heartbeat đọc và xác nhận service worker không báo `RELAY_FETCH_FAILED`/`RELAY_TIMEOUT`, GAS nhận được handoff và state cập nhật khi Sidebar đóng.
 
 ### Đóng slice
 
