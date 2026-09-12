@@ -67,6 +67,7 @@ FbmSync.preflightCandidates = function (issues, mode) {
     if (typeof FbmSync.pushCandidates !== 'function') { return { candidates: candidates, gate: gate, settings: settings }; }
     ['customer', 'activity'].forEach(function (entity) {
       (FbmSync.pushCandidates(entity) || []).forEach(function (candidate) {
+        candidate.entity = entity;
         candidates.push(candidate);
         var record = candidate.record || {};
         var ownerError = typeof FbmSync.pushOwnerError === 'function' ? FbmSync.pushOwnerError(candidate, settings) : '';

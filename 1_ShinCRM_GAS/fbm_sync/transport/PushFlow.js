@@ -227,11 +227,11 @@ FbmSync.nextPushRequest = function (state) {
   var entity = state.cursor.entity || 'customer', index = Number(state.cursor.index || 0), candidates = FbmSync.pushCandidates(entity);
   while (index < candidates.length) {
     var candidate = candidates[index];
+    candidate.entity = entity;
     var configError = FbmSync.pushConfigErrors(candidate);
     if (configError) { state.phase = 'paused'; state.message = configError; FbmSync.stateWrite(state); return null; }
     var ownerError = FbmSync.pushOwnerError(candidate);
     if (ownerError) {
-      candidate.entity = entity;
       FbmSync.markPushSkipped(state, candidate, FbmSync.SYNC_STATUS.skipped, 'Bỏ qua ' + entity + ' ' + candidate.id + ': ' + ownerError);
       index += 1; state.cursor.index = index; FbmSync.stateWrite(state); continue;
     }
@@ -241,7 +241,6 @@ FbmSync.nextPushRequest = function (state) {
     }
     var categoryErrors = FbmSync.validatePushCategories(candidate.record, entity, state.metadata.categoryGate || {});
     if (categoryErrors.length) {
-      candidate.entity = entity;
       FbmSync.markPushSkipped(state, candidate, FbmSync.SYNC_STATUS.unknownCategory, 'Bỏ qua ' + entity + ' ' + candidate.id + ': ' + categoryErrors[0].result.reason);
       index += 1; state.cursor.index = index; FbmSync.stateWrite(state); continue;
     }
