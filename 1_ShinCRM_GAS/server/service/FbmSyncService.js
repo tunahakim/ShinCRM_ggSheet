@@ -6,7 +6,7 @@ function fbmContinueSync(response) { return runEntryPoint('fbmContinueSync', 'si
 /** Dừng phiên đồng bộ mà không đụng dữ liệu nghiệp vụ. */
 function fbmCancelSync() { return runEntryPoint('fbmCancelSync', 'sidebar', 'throw', function () { var result = fbmSyncCancel(); if (result && result.status) { FbmSync.logStatus(result.status, 'cancel'); } return result; }); }
 /** Đọc snapshot tiến độ hiện tại; Sidebar chỉ polling khi đang chạy. */
-function fbmGetSyncStatus() { return runEntryPoint('fbmGetSyncStatus', 'sidebar', 'throw', function () { return fbmSyncStatus(); }); }
+function fbmGetSyncStatus() { return runEntryPoint('fbmGetSyncStatus', 'sidebar', 'throw', function () { var before = FbmSync.stateRead(), result = fbmSyncStatus(); if (result && result.lastFailureCode === 'SYNC_STALE_RUN' && before.lastFailureCode !== result.lastFailureCode) { FbmSync.logStatus(result, 'stale_run'); } return result; }); }
 /** Ghi lỗi cầu nối do Sidebar phát hiện trước khi có response FBM. */
 function fbmLogSyncError(message) { return runEntryPoint('fbmLogSyncError', 'sidebar', 'throw', function () { return FbmSync.logTransportError(message); }); }
 /** Đọc cờ cho phép ghi; mặc định tắt để không chạm dữ liệu FBM ngoài ý muốn. */

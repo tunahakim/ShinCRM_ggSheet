@@ -27,6 +27,16 @@ async function chay(so) {
   props.data[orchestration.FbmSync.STATE_KEY] = JSON.stringify(staleState);
   const restarted = orchestration.FbmSync.start({ mode: 'read' });
   check(so, 'authorize cu qua mot phut duoc thay bang phien moi', [restarted.ok, restarted.resumed, orchestration.FbmSync.stateRead().runId === 'old-run'], [true, undefined, false]);
+  const abandoned = orchestration.FbmSync.stateRead();
+  abandoned.runId = 'abandoned-run'; abandoned.phase = 'pull_customer'; abandoned.updatedAt = Date.now() - orchestration.FbmSync.STALE_RUN_MS - 1;
+  props.data[orchestration.FbmSync.STATE_KEY] = JSON.stringify(abandoned);
+  const recoveredView = orchestration.FbmSync.statusView();
+  check(so, 'status tu thu hoi phien doc bi bo roi', [recoveredView.phase, recoveredView.lastFailureCode, !!recoveredView.message], ['error', 'SYNC_STALE_RUN', true]);
+  const uncertainWrite = orchestration.FbmSync.stateStart('customer', 'push', 1);
+  uncertainWrite.cursor = { kind: 'push_wait' }; uncertainWrite.locks = { 'customer:C-1': { owner: 'sync' } };
+  orchestration.FbmSync.stateWrite(uncertainWrite);
+  const recoveredWrite = orchestration.FbmSync.recoverStaleRun(orchestration.FbmSync.stateRead(), Date.now() + orchestration.FbmSync.STALE_RUN_MS + 1);
+  check(so, 'state ghi bi bo roi khong tu retry va giu khoa', [recoveredWrite.state.phase, recoveredWrite.state.lastFailureCode, !!recoveredWrite.state.locks['customer:C-1']], ['error', 'SYNC_STALE_WRITE', true]);
   check(so, 'lookup san pham dung controller FBM that', orchestration.FbmSync.SYNC_LOOKUPS.filter((item) => item.key === '@CAT_SAN_PHAM')[0].controller, 'crdmsp');
   const previewState = { metadata: {} };
   orchestration.FbmSync.previewRecords(previewState, 'customer', [{ fbmCustomerCode: 'ALT00010', companyName: 'Test', fbmId: 'A1' }]);
@@ -100,6 +110,11 @@ async function chay(so) {
   schedulerData.FBM_SYNC_NEXT_ACTIVITY_SCAN = '1000';
   const busy = scheduler.FbmSync.schedulerClaim('activity', 1000);
   check(so, 'scheduler bo qua khi dang co phien', [busy.ok, busy.code], [false, 'SYNC_ALREADY_RUNNING']);
+  active.updatedAt = Date.now() - scheduler.FbmSync.STALE_RUN_MS - 1;
+  schedulerData[scheduler.FbmSync.STATE_KEY] = JSON.stringify(active);
+  schedulerData.FBM_SYNC_NEXT_ACTIVITY_SCAN = String(Date.now() - 1);
+  const staleClaim = scheduler.FbmSync.schedulerClaim('activity', Date.now());
+  check(so, 'scheduler thu hoi phien cu va nhan ky moi', [staleClaim.ok, staleClaim.kind, scheduler.FbmSync.stateRead().lastFailureCode], [true, 'activity', 'SYNC_STALE_RUN']);
 
   const heartbeatData = {};
   const heartbeatPropertyApi = { getProperty: (key) => heartbeatData[key] || null, setProperty: (key, value) => { heartbeatData[key] = String(value); } };

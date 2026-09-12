@@ -19,6 +19,7 @@ FbmSync.schedulerClaim = function (kind, now) {
   if (!lock.tryLock(SETTINGS.LOCK_WAIT_MS)) { return { ok: false, code: 'BUSY' }; }
   try {
     var state = FbmSync.stateRead();
+    if (typeof FbmSync.recoverStaleRun === 'function') { state = FbmSync.recoverStaleRun(state).state; }
     if (state.runId && ['idle', 'done', 'error'].indexOf(state.phase) < 0) { return { ok: false, code: 'SYNC_ALREADY_RUNNING', nextRunAt: due }; }
     due = Number(props.getProperty(item[0]) || 0);
     if (due && due > at) { return { ok: false, code: 'NOT_DUE', nextRunAt: due }; }

@@ -8,7 +8,7 @@
 - `[ ]` là việc còn thiếu; mục không có nhãn **Cần kiểm chứng thực tế** là việc AI tự tiếp tục được.
 - Một slice chỉ đóng sau khi đủ code, test, log/báo cáo và checklist case của slice đó.
 - Sau khi đóng slice, ghi commit và revision GAS vào bảng bằng chứng cuối file.
-- Bộ kiểm offline gần nhất đạt `1071/1071`; phần đọc `ALT00010` và một Activity đã từng kiểm chứng, chiều ghi chưa có kết quả thành công được xác nhận.
+- Bộ kiểm offline gần nhất đạt `1078/1078`; phần đọc `ALT00010` và một Activity đã từng kiểm chứng, chiều ghi chưa có kết quả thành công được xác nhận.
 
 ## Hợp đồng nhận diện và đăng nhập FBM
 
@@ -191,6 +191,7 @@
 
 - [ ] Code, test offline, log diff và UI conflict hoàn tất.
 - [ ] Bằng chứng phục hồi sau timeout, reload và lỗi nghiệp vụ đã có.
+- [x] State active bị bỏ rơi quá 2 phút được tự thu hồi; phiên chờ ghi không tự retry; test offline đã đạt.
 
 ## Slice 5 — Push Customer ShinCRM → FBM
 
@@ -297,6 +298,6 @@
 | Slice 4 — Đối soát + conflict |  |  |  |  |  |
 | Slice 5 — Push Customer |  |  |  |  |  |
 | Slice 6 — Push Activity |  |  |  |  |  |
-| Slice 7 — Scheduler + nền | `7a324ee`, `43233a5`, `0d46258`, `ba46b23`, `36d6f8f`, `9923fac` | `1071/1071` | `@125` | GAS DEV `fbmSyncHeartbeat` trả `OK`; không phát request ghi | Handoff heartbeat giới hạn 10 request đọc mỗi lượt; relay kèm Spreadsheet ID; Sidebar gửi config khi mở; không chạm FBM khi thiếu config; bridge cũ sau Reload được thử lại có kiểm soát |
+| Slice 7 — Scheduler + nền | `7a324ee`, `43233a5`, `0d46258`, `ba46b23`, `36d6f8f`, `9923fac`, `119cea6` | `1078/1078` | `@137` | GAS DEV `fbmSyncHeartbeat` và `fbmSyncStatus` trả `OK`; không phát request ghi | Handoff heartbeat giới hạn 10 request đọc mỗi lượt; relay kèm Spreadsheet ID; Sidebar gửi config khi mở; không chạm FBM khi thiếu config; bridge cũ sau Reload được thử lại có kiểm soát; state active quá hạn được thu hồi |
 | Slice 8 — UI + log + probe |  |  |  |  |  |
 | Slice 9 — Live acceptance + production |  |  |  |  |  |

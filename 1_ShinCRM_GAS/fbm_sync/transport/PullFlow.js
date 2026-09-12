@@ -5,6 +5,7 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 FbmSync.start = function (options) {
   // Mỗi call chỉ trả một request; ngữ cảnh nhiều bước nằm trong DocumentProperties.
   var current = FbmSync.stateRead();
+  if (typeof FbmSync.recoverStaleRun === 'function') { current = FbmSync.recoverStaleRun(current).state; }
   // Tạm dừng là điểm dừng để người dùng chạy lại, không phải cursor đang chạy;
   // lần bấm mới phải tạo request FBM mới, tránh vẽ lại preview cũ.
   if (current.runId && ['idle', 'done', 'error', 'paused'].indexOf(current.phase) < 0) {
@@ -174,7 +175,13 @@ FbmSync.activityBulkNext = function (state, grid) {
 /** Tiếp tục đúng một bước từ response Extension và lưu cursor trước khi trả về. */
 FbmSync.continue = function (rawResponse) {
   // Tiến đúng một bước cursor và lưu state trước khi trả request kế tiếp.
-  var state = FbmSync.stateRead(), cursor = state.cursor || {}, response = FbmSync.protocol.parse(rawResponse);
+  var state = FbmSync.stateRead();
+  if (typeof FbmSync.recoverStaleRun === 'function') {
+    var recovered = FbmSync.recoverStaleRun(state);
+    if (recovered.recovered) { return { ok: false, status: FbmSync.statusView(), error: recovered.state.lastError, stale: true }; }
+    state = recovered.state;
+  }
+  var cursor = state.cursor || {}, response = FbmSync.protocol.parse(rawResponse);
   if (response && response._transport && response._transport.payloadCookie) {
     state.session.cookie = String(response._transport.payloadCookie);
     var compact = state.session.cookie.indexOf('FHN_CRM_App') >= 0 ? state.session.cookie.slice(0, state.session.cookie.indexOf('FHN_CRM_App')) : '';

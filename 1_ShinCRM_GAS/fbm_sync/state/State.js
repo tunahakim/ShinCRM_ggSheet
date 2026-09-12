@@ -2,6 +2,9 @@
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 FbmSync.STATE_KEY = 'FBM_SYNC_STATE_V1';
 FbmSync.LOCK_KEY = 'FBM_SYNC_RECORD_LOCKS_V1';
+// Request FBM thuong ket thuc trong vai giay; state im qua lau la phien bi bo roi.
+FbmSync.STALE_RUN_MS = 2 * 60 * 1000;
+FbmSync.ACTIVE_PHASES = ['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'];
 
 /** Tạo state rỗng với đủ field để các phiên cũ vẫn đọc được. */
 FbmSync.stateDefault = function () {
@@ -43,6 +46,28 @@ FbmSync.stateStart = function (entity, phase, total) {
   var now = Date.now(), previous = FbmSync.stateRead(), userLocks = {};
   Object.keys(previous.locks || {}).forEach(function (key) { if (previous.locks[key] && previous.locks[key].owner === 'user') { userLocks[key] = previous.locks[key]; } });
   return FbmSync.stateWrite({ runId: now.toString(36), entity: entity || '', phase: phase || 'checking_session', cursor: {}, counts: { total: Number(total) || 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 }, current: '', message: '', startedAt: now, updatedAt: now, lastError: '', lastFailureCode: '', retryable: false, retryCount: 0, retryLimit: 2, locks: userLocks });
+};
+/** Thu hoi state dang chay nhung khong con caller; khong retry lenh ghi dang mo. */
+FbmSync.recoverStaleRun = function (state, now) {
+  var current = state || FbmSync.stateRead(), at = Number(now || Date.now());
+  if (!current.runId || FbmSync.ACTIVE_PHASES.indexOf(String(current.phase || '')) < 0) { return { state: current, recovered: false }; }
+  var updated = Number(current.updatedAt || current.startedAt || 0), age = updated ? at - updated : FbmSync.STALE_RUN_MS + 1;
+  if (age <= FbmSync.STALE_RUN_MS) { return { state: current, recovered: false }; }
+  var cursor = current.cursor || {}, waitingWrite = cursor.kind === 'push_wait';
+  var message = waitingWrite
+    ? 'Phiên ghi FBM không nhận được phản hồi quá thời gian an toàn; không tự ghi lại để tránh trùng dữ liệu.'
+    : 'Phiên đồng bộ không nhận được phản hồi quá thời gian an toàn; đã tự dừng, có thể chạy lại.';
+  current.phase = 'error';
+  current.lastFailureCode = waitingWrite ? 'SYNC_STALE_WRITE' : 'SYNC_STALE_RUN';
+  current.retryable = false;
+  current.lastError = message;
+  current.message = message;
+  if (!waitingWrite) {
+    var kept = {};
+    Object.keys(current.locks || {}).forEach(function (key) { if (current.locks[key] && current.locks[key].owner === 'user') { kept[key] = current.locks[key]; } });
+    current.locks = kept;
+  }
+  return { state: FbmSync.stateWrite(current), recovered: true, waitingWrite: waitingWrite };
 };
 /** Đóng hoặc chuyển phase với thông báo cuối. */
 FbmSync.stateFinish = function (phase, message) { return FbmSync.statePatch({ phase: phase || 'done', message: message || '', current: '' }); };
