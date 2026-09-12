@@ -129,6 +129,7 @@ function chay(so) {
   check(so, 'man dong bo hien thi Category block va Activity missing', syncSource.indexOf('metadata.categoryBlocks') >= 0 && syncSource.indexOf('metadata.activityBulkMissing') >= 0, true);
   check(so, 'man dong bo hien thi ma va nguyen nhan preflight', syncSource.indexOf('preflightIssues') >= 0 && syncSource.indexOf('item.code') >= 0 && syncSource.indexOf('item.message') >= 0, true);
   check(so, 'man dong bo hien thi chi tiet loi day kem HTTP', syncSource.indexOf('pushFailureDetails') >= 0 && syncSource.indexOf('detail.reason') >= 0 && syncSource.indexOf('detail.status') >= 0, true);
+  check(so, 'Sidebar thu gon response form truoc callback GAS', syncSource.indexOf('fbmSyncProjectFormResponse') >= 0 && syncSource.indexOf('InternalValues') >= 0 && syncSource.indexOf('fbmSyncProjectFormResponse(status.request, response)') >= 0, true);
   check(so, 'status cu khong ve de ghi de loading cua luot moi', syncSource.indexOf('viewEpoch') >= 0 && syncSource.indexOf('epoch !== FBM_SYNC_CLIENT.viewEpoch') >= 0 && syncSource.indexOf('lastServerUpdatedAt') >= 0, true);
   check(so, 'status bat dau truoc phien khong ve de ghi de loading dang chay', syncSource.indexOf('runningWhenRequested') >= 0 && syncSource.indexOf('FBM_SYNC_CLIENT.running && !runningWhenRequested') >= 0, true);
   check(so, 'khong hien tieu de chi tiet khi chi co canh bao preflight', syncSource.indexOf('var hasRecordIssues') >= 0 && syncSource.indexOf('if (hasRecordIssues)') >= 0, true);

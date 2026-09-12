@@ -289,6 +289,19 @@ function fbmSyncWaitingStatus(status, message) {
   var snapshot = status && (status.status || status) || {};
   return Object.assign({}, snapshot, { message: message });
 }
+/** Giảm response form trước callback GAS; giữ đúng dữ liệu cần dựng OldValue và ticket. */
+function fbmSyncProjectFormResponse(request, response) {
+  var kind = request && request.meta && String(request.meta.kind || '');
+  if (!/(?:customer|activity)_edit_open$/.test(kind) || !response || typeof response !== 'object' || typeof response.body !== 'string') { return response; }
+  var parsed;
+  try { parsed = JSON.parse(response.body); } catch (ignore) { return response; }
+  var data = parsed && parsed.d;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) { return response; }
+  var keep = {}, names = ['Row', 'row', 'FieldValues', 'fieldValues', 'InternalValues', 'internalValues', 'Showing', 'showing', 'Controller', 'controller', 'GridController', 'gridController', 'Bugs', 'bugs', 'Authorized', 'authorized'];
+  names.forEach(function (name) { if (Object.prototype.hasOwnProperty.call(data, name)) { keep[name] = data[name]; } });
+  var projected = Object.assign({}, parsed, { d: keep }), body = JSON.stringify(projected);
+  return body.length < response.body.length ? Object.assign({}, response, { body: body }) : response;
+}
 /** Báo rõ callback GAS chậm nhưng không tự phát lại request ghi khi chưa biết FBM đã nhận hay chưa. */
 function fbmSyncContinueServer(status, response) {
   var timer = setTimeout(function () {
@@ -324,7 +337,7 @@ function fbmSyncLoop(status) {
   return fbmSyncExtensionRequest(status.request).then(function (response) {
     if (!FBM_SYNC_CLIENT.running) { return fbmSyncStatusOnce(); }
     fbmSyncPaint(fbmSyncWaitingStatus(status, 'Đã nhận phản hồi FBM; đang chờ GAS xử lý...'));
-    return fbmSyncContinueServer(status, response);
+    return fbmSyncContinueServer(status, fbmSyncProjectFormResponse(status.request, response));
   }).then(fbmSyncLoop);
 }
 /** Mở phiên mới; chặn click trùng khi phiên đang chạy. */

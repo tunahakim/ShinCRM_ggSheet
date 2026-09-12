@@ -213,14 +213,22 @@ FbmSync.continuePush = function (state, response) {
     return FbmSync.customerCreateRequest(candidate.record, autoCode, '', gate);
   }
   if (cursor.operation === 'customer_edit_open') {
-    cursor.oldValues = FbmSync.extractFormValues(response, 'customer'); cursor.operation = 'customer_edit_save'; state.cursor = cursor; FbmSync.stateWrite(state);
-    return FbmSync.customerEditRequest(candidate.record, cursor.oldValues, gate);
+    var customerOldValues = FbmSync.extractFormValues(response, 'customer');
+    var customerSaveRequest = FbmSync.customerEditRequest(candidate.record, customerOldValues, gate);
+    cursor.operation = 'customer_edit_save';
+    delete cursor.oldValues;
+    state.cursor = cursor; FbmSync.stateWrite(state);
+    return customerSaveRequest;
   }
   if (cursor.operation === 'activity_edit_open') {
-    cursor.oldValues = FbmSync.extractFormValues(response, 'activity'); cursor.operation = 'activity_edit_save'; state.cursor = cursor; FbmSync.stateWrite(state);
-    var configuredOwner = String(FbmSync.scriptSettings().accountName || '').trim(), currentOwner = String(cursor.oldValues.owner || '').trim();
+    var activityOldValues = FbmSync.extractFormValues(response, 'activity');
+    var configuredOwner = String(FbmSync.scriptSettings().accountName || '').trim(), currentOwner = String(activityOldValues.owner || '').trim();
     if (!configuredOwner || (currentOwner && currentOwner.toLowerCase() !== configuredOwner.toLowerCase())) { throw new Error('Hoạt động thuộc owner FBM khác tài khoản đã cấu hình.'); }
-    return FbmSync.activityEditRequest(candidate.record, cursor.oldValues, gate);
+    var activitySaveRequest = FbmSync.activityEditRequest(candidate.record, activityOldValues, gate);
+    cursor.operation = 'activity_edit_save';
+    delete cursor.oldValues;
+    state.cursor = cursor; FbmSync.stateWrite(state);
+    return activitySaveRequest;
   }
   if (cursor.operation === 'activity_create') {
     FbmSync.markPushResult(candidate, response, cursor.operation);

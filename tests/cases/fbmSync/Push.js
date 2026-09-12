@@ -203,6 +203,13 @@ async function chay(so) {
   check(so, 'Activity edit mo form dung type 0 va token activity', [activityEditOpen.body.type, activityEditOpen.body.viewPage, activityEditOpen.body.authorized, activityEditOpen.meta.kind], [0, true, '1.test', 'activity_edit_open']);
   const activityEdit = push.FbmSync.activityEditRequest({ id: 'ACT-008600', fbmId: '174813', content: 'Noi dung moi', taskType: 'Gọi', workDate: '2026-09-09' }, { id: 174813, ma_cv: 'GD', details: 'Noi dung cu', start_date: new Date('2026-09-09T00:00:00Z'), end_date: new Date('2026-09-09T00:00:00Z'), fileticket: 'ticket' }, {});
   check(so, 'Activity edit gui id FBM thay vi id noi bo', activityEdit.body.memvars.filter((item) => item.Name === 'id')[0].NewValue, 174813);
+  const activityEditState = push.FbmSync.stateStart('', 'push', 0);
+  push.FbmSync.scriptSettings = () => ({ accountName: 'Owner', baseUrl: 'https://fbm.test', activityAuthorized: '1.test' });
+  activityEditState.metadata.categoryGate = {};
+  activityEditState.cursor = { kind: 'push_wait', operation: 'activity_edit_open', entity: 'activity', index: 0, candidate: { entity: 'activity', id: 'ACT-008600', record: { id: 'ACT-008600', fbmId: '174813', content: 'Noi dung moi', taskType: 'GD', workDate: '2026-09-09' } } };
+  push.FbmSync.stateWrite(activityEditState);
+  const activitySave = push.FbmSync.continuePush(push.FbmSync.stateRead(), { d: { Controller: 'zccrAccountTask', Row: (function () { const row = []; row[0] = 174813; row[3] = 'GD'; row[15] = 'Noi dung cu'; row[21] = 'Owner'; return row; }()), Showing: "_ticket = 'ticket-1';" } });
+  check(so, 'Activity edit tu response mo form tao request type 1', [activitySave.body.type, activitySave.body.memvars.length, push.FbmSync.stateRead().cursor.operation, Object.prototype.hasOwnProperty.call(push.FbmSync.stateRead().cursor, 'oldValues')], [1, 36, 'activity_edit_save', false]);
   const activityPushState = push.FbmSync.stateStart('', 'push', 0);
   activityPushState.metadata.categoryGate = {};
   activityPushState.cursor = { kind: 'push_scan', entity: 'activity', index: 0 };

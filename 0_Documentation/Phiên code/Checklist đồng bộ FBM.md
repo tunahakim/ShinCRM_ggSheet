@@ -302,7 +302,7 @@
 | Slice 3 — Pull Activity | `8fbb6a7` + entrypoint DEV | `1075/1075` | `@136` | Pull `ALT00010` đã xác nhận Activity liên kết và idempotency; bulk/catchup/rotation đã có test offline; `fbmSyncStartActivityBulk` trả `OK`, request đầu `authorize`, state `scan=activity_bulk`; `fbmInstallScheduler` trả `OK` | Ba lớp quét Activity nền đã có cursor state/DocumentProperties |
 | Slice 4 — Đối soát + conflict |  |  |  |  |  |
 | Slice 5 — Push Customer |  |  |  |  |  |
-| Slice 6 — Push Activity | `e9ba3f1`, `01688d6`, `cd94601`, `b6d8b43` | `1101/1101` | `@155` | Chờ kiểm chứng ghi thật lại sau khi thu gọn callback GAS → Sidebar | Activity Edit dùng `type: 0` khi mở form, `type: 1` khi lưu, `memvars.id` là ID FBM; lỗi đẩy ghi đúng request kind và mở lại theo lô |
+| Slice 6 — Push Activity | `e9ba3f1`, `01688d6`, `cd94601`, `b6d8b43`, `1a67029` | `1103/1103` | `@156` | Chờ kiểm chứng ghi thật lại sau khi sửa callback Activity | Activity Edit dùng `type: 0` khi mở form, `type: 1` khi lưu, `memvars.id` là ID FBM; cursor sau bước mở form không giữ OldValue đầy đủ |
 | Slice 7 — Scheduler + nền | `7a324ee`, `43233a5`, `0d46258`, `ba46b23`, `36d6f8f`, `9923fac`, `119cea6` | `1078/1078` | `@137` | GAS DEV `fbmSyncHeartbeat` và `fbmSyncStatus` trả `OK`; không phát request ghi | Handoff heartbeat giới hạn 10 request đọc mỗi lượt; relay kèm Spreadsheet ID; Sidebar gửi config khi mở; không chạm FBM khi thiếu config; bridge cũ sau Reload được thử lại có kiểm soát; state active quá hạn được thu hồi |
 | Slice 8 — UI + log + probe |  |  |  |  |  |
 | Slice 9 — Live acceptance + production |  |  |  |  |  |
