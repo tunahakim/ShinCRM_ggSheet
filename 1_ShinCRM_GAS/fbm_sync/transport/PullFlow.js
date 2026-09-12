@@ -8,7 +8,7 @@ FbmSync.start = function (options) {
   if (typeof FbmSync.recoverStaleRun === 'function') { current = FbmSync.recoverStaleRun(current).state; }
   // Tạm dừng là điểm dừng để người dùng chạy lại, không phải cursor đang chạy;
   // lần bấm mới phải tạo request FBM mới, tránh vẽ lại preview cũ.
-  if (current.runId && ['idle', 'done', 'error', 'paused'].indexOf(current.phase) < 0) {
+  if (current.runId && ['idle', 'done', 'error', 'paused', 'conflict'].indexOf(current.phase) < 0) {
     var initialAuthorize = current.phase === 'checking_session' && current.cursor && current.cursor.kind === 'authorize_customer';
     var recent = Date.now() - Number(current.updatedAt || 0) <= 60000;
     var resumable = recent ? FbmSync.requestForCursor(current) : null;
