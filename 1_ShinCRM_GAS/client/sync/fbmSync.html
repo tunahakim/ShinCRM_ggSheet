@@ -3,7 +3,10 @@
 var FBM_SYNC_CLIENT = { installed: false, waiting: {}, running: false, mode: 'read', writeAllowed: false, openedAt: 0, relayConfigured: false, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0 };
 /** Timeout cho một request Extension để phiên không treo vô hạn khi tab FBM/bridge mất kết nối. */
 var FBM_SYNC_REQUEST_TIMEOUT_MS = 20000;
-var FBM_SYNC_GAS_CONTINUE_WARN_MS = 30000;
+var FBM_SYNC_GAS_CONTINUE_WARN_MS = 5000;
+// Sau moc nay khong tiep tuc hien loading vo han; chi doc status de chan doan, khong tu gui lai request ghi.
+var FBM_SYNC_GAS_CONTINUE_TIMEOUT_MS = 15000;
+var FBM_SYNC_GAS_DIAGNOSTIC_STATUS_TIMEOUT_MS = 3000;
 
 /** Tạo nút điều khiển dùng chung cho panel tiến độ. */
 function fbmSyncMakeButton(id, label, primary) {
@@ -306,13 +309,48 @@ function fbmSyncProjectFormResponse(request, response) {
 function fbmSyncContinueServer(status, response) {
   var timer = setTimeout(function () {
     if (!FBM_SYNC_CLIENT.running) { return; }
-    fbmSyncPaint(fbmSyncWaitingStatus(status, 'GAS đang xử lý phản hồi quá 30 giây. Có thể bấm Dừng đồng bộ; hệ sẽ không tự gửi lại lệnh ghi.'));
+    fbmSyncPaint(fbmSyncWaitingStatus(status, 'GAS đang xử lý phản hồi quá 5 giây. Có thể bấm Dừng đồng bộ; hệ sẽ không tự gửi lại lệnh ghi.'));
   }, FBM_SYNC_GAS_CONTINUE_WARN_MS);
-  return callServer('fbmContinueSync', [response]).then(function (result) {
+  var callback = callServer('fbmContinueSync', [response]);
+  // Race chi dung de hien chan doan; callback goc van duoc giu nguyen va khong bi gui lai.
+  callback.catch(function () {});
+  var timeoutId;
+  var timeout = new Promise(function (resolve) {
+    timeoutId = setTimeout(function () {
+      if (!FBM_SYNC_CLIENT.running) { resolve({ cancelled: true, status: status }); return; }
+      var statusCall = callServer('fbmGetSyncStatus');
+      statusCall.catch(function () {});
+      var statusFallback = new Promise(function (statusResolve) { setTimeout(function () { statusResolve(status); }, FBM_SYNC_GAS_DIAGNOSTIC_STATUS_TIMEOUT_MS); });
+      Promise.race([statusCall, statusFallback]).then(function (snapshot) {
+        var diagnostic = snapshot && (snapshot.status || snapshot) || {};
+        var trace = diagnostic.metadata && diagnostic.metadata.callbackTrace || {};
+        var cursor = diagnostic.cursor || {};
+        var message = 'GAS_CALLBACK_TIMEOUT: GAS không trả kết quả sau 15 giây; không tự gửi lại lệnh ghi.'
+          + ' Bước cuối: ' + String(trace.stage || 'unknown')
+          + '; phase=' + String(diagnostic.phase || '')
+          + '; cursor=' + String(cursor.kind || trace.cursorKind || '')
+          + '; operation=' + String(cursor.operation || trace.operation || '')
+          + '; record=' + String(diagnostic.current || trace.current || '') + '.';
+        resolve({ diagnosticTimeout: true, message: message, status: diagnostic });
+      }).catch(function (error) {
+        resolve({ diagnosticTimeout: true, message: 'GAS_CALLBACK_TIMEOUT: GAS không trả kết quả sau 15 giây; không đọc được status chẩn đoán (' + String(error && error.message || error) + ').', status: status });
+      });
+    }, FBM_SYNC_GAS_CONTINUE_TIMEOUT_MS);
+  });
+  return Promise.race([callback, timeout]).then(function (result) {
     clearTimeout(timer);
+    clearTimeout(timeoutId);
+    if (result && result.diagnosticTimeout) {
+      var timeoutError = new Error(result.message);
+      timeoutError.code = 'GAS_CALLBACK_TIMEOUT';
+      timeoutError.diagnostic = result.status;
+      throw timeoutError;
+    }
+    if (result && result.cancelled) { return result.status; }
     return result;
   }, function (error) {
     clearTimeout(timer);
+    clearTimeout(timeoutId);
     throw error;
   });
 }
@@ -362,6 +400,14 @@ function fbmSyncRun(mode) {
   return work.then(function (value) { FBM_SYNC_CLIENT.running = false; return value; }, function (err) {
     FBM_SYNC_CLIENT.running = false;
     var reason = err && err.message ? err.message : String(err);
+    if (err && err.code === 'GAS_CALLBACK_TIMEOUT') {
+      var diagnostic = err.diagnostic || {};
+      var timeoutStatus = Object.assign({}, diagnostic, { phase: 'error', label: 'Lỗi', message: reason, lastError: reason, lastFailureCode: err.code, counts: diagnostic.counts || {} });
+      return callServer('fbmLogSyncError', [reason]).catch(function () { return null; }).then(function () {
+        fbmSyncPaint(timeoutStatus);
+        return null;
+      });
+    }
     return callServer('fbmLogSyncError', [reason]).catch(function () { return null; }).then(function () {
       return callServer('fbmCancelSync').catch(function () { return null; });
     }).then(function () {

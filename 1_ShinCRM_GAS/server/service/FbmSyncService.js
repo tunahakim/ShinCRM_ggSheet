@@ -1,8 +1,28 @@
 /** Entry point ổn định cho Sidebar; mọi call đi qua runEntryPoint. */
+/** Ghi dấu vết tối giản của callback để phân biệt lỗi trả về với lượt chạy bị kẹt; không lưu response FBM. */
+function fbmTraceContinue(stage, error) {
+  try {
+    var state = FbmSync.stateRead(), cursor = state.cursor || {};
+    state.metadata = state.metadata || {};
+    state.metadata.callbackTrace = {
+      name: 'fbmContinueSync',
+      stage: String(stage || ''),
+      at: Date.now(),
+      runId: String(state.runId || ''),
+      phase: String(state.phase || ''),
+      entity: String(state.entity || ''),
+      current: String(state.current || ''),
+      cursorKind: String(cursor.kind || ''),
+      operation: String(cursor.operation || ''),
+      error: error ? String(error && error.message || error) : ''
+    };
+    FbmSync.stateWrite(state);
+  } catch (ignore) {}
+}
 /** Bắt đầu một phiên đọc/ghi theo mode được chọn. */
 function fbmStartSync(mode) { return runEntryPoint('fbmStartSync', 'sidebar', 'throw', function () { var result = fbmSyncStart(mode); if (result && result.status) { FbmSync.logStatus(result.status, 'start'); } return result; }); }
 /** Gửi response thô của Extension cho cursor hiện tại. */
-function fbmContinueSync(response) { return runEntryPoint('fbmContinueSync', 'sidebar', 'throw', function () { var before = FbmSync.statusView(), result = fbmSyncContinue(response); if (result && FbmSync.shouldLogStatus(before, result.status)) { FbmSync.logStatus(result.status, 'slice'); } return result; }); }
+function fbmContinueSync(response) { return runEntryPoint('fbmContinueSync', 'sidebar', 'throw', function () { fbmTraceContinue('entered'); try { var before = FbmSync.statusView(), result = fbmSyncContinue(response); fbmTraceContinue('returned'); if (result && FbmSync.shouldLogStatus(before, result.status)) { FbmSync.logStatus(result.status, 'slice'); } return result; } catch (err) { fbmTraceContinue('failed', err); throw err; } }); }
 /** Dừng phiên đồng bộ mà không đụng dữ liệu nghiệp vụ. */
 function fbmCancelSync() { return runEntryPoint('fbmCancelSync', 'sidebar', 'throw', function () { var result = fbmSyncCancel(); if (result && result.status) { FbmSync.logStatus(result.status, 'cancel'); } return result; }); }
 /** Đọc snapshot tiến độ hiện tại; Sidebar chỉ polling khi đang chạy. */

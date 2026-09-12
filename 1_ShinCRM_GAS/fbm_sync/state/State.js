@@ -8,7 +8,7 @@ FbmSync.ACTIVE_PHASES = ['checking_session', 'pull_customer', 'pull_activity', '
 
 /** Tạo state rỗng với đủ field để các phiên cũ vẫn đọc được. */
 FbmSync.stateDefault = function () {
-  return { version: 1, runId: '', mode: 'read', scan: 'full', scheduledScan: '', phase: 'idle', entity: '', cursor: {}, session: { customerAuthorized: '', activityAuthorized: '', cookie: '', userId: '', lookups: {}, expired: false, lastHeartbeatAt: 0, customerTotal: null }, metadata: { categoryGate: null, categoryBlocks: [], preflight: null, preflightIssues: [], seen: { customer: {}, activity: {} }, conflicts: [], pushSucceeded: 0, pushFailures: {}, pushFailureDetails: {}, preview: { customers: [], activities: [], truncated: false } }, counts: { total: 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 }, current: '', message: '', startedAt: 0, updatedAt: 0, lastError: '', lastFailureCode: '', retryable: false, retryCount: 0, retryLimit: 2, locks: {} };
+  return { version: 1, runId: '', mode: 'read', scan: 'full', scheduledScan: '', phase: 'idle', entity: '', cursor: {}, session: { customerAuthorized: '', activityAuthorized: '', cookie: '', userId: '', lookups: {}, expired: false, lastHeartbeatAt: 0, customerTotal: null }, metadata: { categoryGate: null, categoryBlocks: [], preflight: null, preflightIssues: [], seen: { customer: {}, activity: {} }, conflicts: [], pushSucceeded: 0, pushFailures: {}, pushFailureDetails: {}, callbackTrace: null, preview: { customers: [], activities: [], truncated: false } }, counts: { total: 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 }, current: '', message: '', startedAt: 0, updatedAt: 0, lastError: '', lastFailureCode: '', retryable: false, retryCount: 0, retryLimit: 2, locks: {} };
 };
 
 /** Lấy kho state cấp tài liệu, dùng chung giữa các lần gọi GAS. */
@@ -21,7 +21,7 @@ FbmSync.stateRead = function () {
     if (!raw) { return fallback; }
     var parsed = JSON.parse(raw);
     var metadata = parsed.metadata || {};
-    return Object.assign(fallback, parsed, { counts: Object.assign(fallback.counts, parsed.counts || {}), session: Object.assign(fallback.session, parsed.session || {}), metadata: Object.assign(fallback.metadata, metadata, { seen: Object.assign(fallback.metadata.seen, metadata.seen || {}), conflicts: Array.isArray(metadata.conflicts) ? metadata.conflicts : [], pushSucceeded: Number(metadata.pushSucceeded || 0), preflightIssues: Array.isArray(metadata.preflightIssues) ? metadata.preflightIssues : [], pushFailures: Object.assign(fallback.metadata.pushFailures, metadata.pushFailures || {}), pushFailureDetails: Object.assign(fallback.metadata.pushFailureDetails, metadata.pushFailureDetails || {}), preview: Object.assign(fallback.metadata.preview, metadata.preview || {}) }), locks: parsed.locks || {} });
+    return Object.assign(fallback, parsed, { counts: Object.assign(fallback.counts, parsed.counts || {}), session: Object.assign(fallback.session, parsed.session || {}), metadata: Object.assign(fallback.metadata, metadata, { seen: Object.assign(fallback.metadata.seen, metadata.seen || {}), conflicts: Array.isArray(metadata.conflicts) ? metadata.conflicts : [], pushSucceeded: Number(metadata.pushSucceeded || 0), preflightIssues: Array.isArray(metadata.preflightIssues) ? metadata.preflightIssues : [], pushFailures: Object.assign(fallback.metadata.pushFailures, metadata.pushFailures || {}), pushFailureDetails: Object.assign(fallback.metadata.pushFailureDetails, metadata.pushFailureDetails || {}), callbackTrace: metadata.callbackTrace || null, preview: Object.assign(fallback.metadata.preview, metadata.preview || {}) }), locks: parsed.locks || {} });
   } catch (err) { return fallback; }
 };
 /** Ghi state, cập nhật timestamp và giữ cấu trúc nhất quán. */
@@ -35,6 +35,7 @@ FbmSync.stateWrite = function (state) {
   next.metadata.conflicts = Array.isArray(next.metadata.conflicts) ? next.metadata.conflicts.slice(-100) : [];
   next.metadata.pushFailures = Object.assign({}, FbmSync.stateDefault().metadata.pushFailures, next.metadata.pushFailures || {});
   next.metadata.pushFailureDetails = Object.assign({}, FbmSync.stateDefault().metadata.pushFailureDetails, next.metadata.pushFailureDetails || {});
+  next.metadata.callbackTrace = next.metadata.callbackTrace || null;
   next.metadata.preview = Object.assign(FbmSync.stateDefault().metadata.preview, next.metadata.preview || {});
   next.counts = Object.assign(FbmSync.stateDefault().counts, next.counts || {});
   next.updatedAt = Date.now();
