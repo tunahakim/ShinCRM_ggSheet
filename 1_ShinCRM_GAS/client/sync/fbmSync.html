@@ -1,6 +1,6 @@
 <script>
 /* Sidebar chỉ hiển thị tiến độ; GAS là nguồn state duy nhất. */
-var FBM_SYNC_CLIENT = { installed: false, waiting: {}, running: false, mode: 'read', writeAllowed: false, openedAt: 0, relayConfigured: false };
+var FBM_SYNC_CLIENT = { installed: false, waiting: {}, running: false, mode: 'read', writeAllowed: false, openedAt: 0, relayConfigured: false, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0 };
 /** Timeout cho một request Extension để phiên không treo vô hạn khi tab FBM/bridge mất kết nối. */
 var FBM_SYNC_REQUEST_TIMEOUT_MS = 20000;
 
@@ -15,7 +15,7 @@ function syncPanelToggle() {
   var screen = document.getElementById('fbm-sync-screen');
   if (!screen) { throw new Error('Sidebar thieu man dong bo FBM.'); }
   screen.hidden = !screen.hidden;
-  if (!screen.hidden) { FBM_SYNC_CLIENT.openedAt = Date.now(); }
+  if (!screen.hidden) { FBM_SYNC_CLIENT.openedAt = Date.now(); FBM_SYNC_CLIENT.viewEpoch += 1; }
   if (screen.hidden || typeof fbmSyncStatusOnce !== 'function') { return null; }
   // Relay config chỉ phục vụ các request FBM; không cần chặn snapshot trạng thái.
   return Promise.all([fbmSyncConfigureRelay(), fbmSyncStatusOnce(true)]).then(function (results) { return results[1]; });
@@ -211,7 +211,17 @@ function fbmSyncExtensionRequest(request) {
   });
 }
 /** Lấy status một lần, không tạo vòng polling khi không chạy. */
-function fbmSyncStatusOnce(freshOpen) { return callServer('fbmGetSyncStatus').then(function (status) { return fbmSyncPaint(status, freshOpen); }); }
+function fbmSyncStatusOnce(freshOpen) {
+  var epoch = FBM_SYNC_CLIENT.viewEpoch, requestSeq = ++FBM_SYNC_CLIENT.statusRequestSeq;
+  return callServer('fbmGetSyncStatus').then(function (status) {
+    var snapshot = status && (status.status || status) || {}, updatedAt = Number(snapshot.updatedAt || 0);
+    // Status của lượt mở/checkbox cũ không được phép vẽ đè loading của lượt mới.
+    if (epoch !== FBM_SYNC_CLIENT.viewEpoch || requestSeq < FBM_SYNC_CLIENT.statusRequestSeq) { return status; }
+    if (updatedAt && updatedAt < FBM_SYNC_CLIENT.lastServerUpdatedAt) { return status; }
+    if (updatedAt) { FBM_SYNC_CLIENT.lastServerUpdatedAt = updatedAt; }
+    return fbmSyncPaint(status, freshOpen);
+  });
+}
 /** Đọc cờ ghi ở GAS và đồng bộ lại checkbox sau mỗi lần mở panel. */
 function fbmSyncSetWriteGate(enabled) {
   return callServer('fbmSetWriteMode', [enabled === true]).then(function (result) { FBM_SYNC_CLIENT.writeAllowed = !!(result && result.enabled); return fbmSyncStatusOnce(); });
@@ -266,6 +276,7 @@ function fbmSyncRun(mode) {
     return Promise.resolve(missing);
   }
   FBM_SYNC_CLIENT.running = true;
+  FBM_SYNC_CLIENT.viewEpoch += 1;
   fbmSyncPaint({ phase: 'checking_session', label: 'Đang chuẩn bị đồng bộ', direction: 'Kết nối FBM', entityLabel: 'Chuẩn bị phiên', message: 'Đang chuẩn bị phiên đồng bộ...', counts: {} });
   var work = fbmSyncStartServer(mode || 'read', 0).then(function (started) {
     if (!started || !started.ok) {

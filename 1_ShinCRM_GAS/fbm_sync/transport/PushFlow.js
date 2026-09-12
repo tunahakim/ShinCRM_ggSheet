@@ -134,11 +134,21 @@ FbmSync.validateAutoCustomerCode = function (code, settings) {
 };
 
 /** Tạo request kế tiếp của queue push từ state, không giữ queue trong Extension. */
+FbmSync.stopPushOnConflicts = function (state) {
+  var conflicts = state && state.metadata && state.metadata.conflicts || [];
+  if (!conflicts.length) { return false; }
+  state.phase = 'conflict'; state.entity = ''; state.current = ''; state.cursor = {};
+  state.message = 'Đã phát hiện ' + conflicts.length + ' xung đột; chiều đẩy tạm dừng để người dùng quyết định.';
+  FbmSync.stateWrite(state);
+  return true;
+};
+
 FbmSync.nextPushRequest = function (state) {
   var globalCategoryBlock = state.metadata && (state.metadata.categoryLookupFailed || (state.metadata.categoryBlocks || []).some(function (block) { return !block.code; }));
   if (globalCategoryBlock) {
     state.phase = 'paused'; state.message = 'Đã đọc xong nhưng tạm dừng chiều đẩy vì danh mục chưa khớp FBM.'; FbmSync.stateWrite(state); return null;
   }
+  if (FbmSync.stopPushOnConflicts(state)) { return null; }
   var entity = state.cursor.entity || 'customer', index = Number(state.cursor.index || 0), candidates = FbmSync.pushCandidates(entity);
   while (index < candidates.length) {
     var candidate = candidates[index];

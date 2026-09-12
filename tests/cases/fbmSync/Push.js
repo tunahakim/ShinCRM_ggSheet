@@ -95,6 +95,12 @@ async function chay(so) {
   check(so, 'push status danh dau dang day truoc request', pushedState.locks['customer:C-1'].owner, 'sync');
   check(so, 'push request luu dung cursor cho phan hoi tiep', pushedState.cursor.kind, 'push_wait');
   check(so, 'push request co envelope protocol', pushRequest.meta.kind, 'customer_edit_open');
+  const conflictPushState = push.FbmSync.stateStart('', 'push', 0);
+  conflictPushState.metadata.categoryGate = {};
+  conflictPushState.metadata.conflicts = [{ entity: 'activity', id: 'ACT-1' }];
+  conflictPushState.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
+  push.FbmSync.stateWrite(conflictPushState);
+  check(so, 'push dung lai khi pull da phat hien conflict', [push.FbmSync.nextPushRequest(conflictPushState), push.FbmSync.stateRead().phase, push.FbmSync.stateRead().cursor], [null, 'conflict', {}]);
   let pushPatch;
   const pushLogs = [];
   push.logEvent = (event) => pushLogs.push(event);
