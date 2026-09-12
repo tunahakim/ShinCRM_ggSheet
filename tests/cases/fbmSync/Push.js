@@ -117,6 +117,15 @@ async function chay(so) {
   push.FbmSync.markPushError(errorState, { entity: 'customer', id: 'C-ERR', record: { id: 'C-ERR', companyName: 'Lỗi' } }, 'FBM từ chối');
   check(so, 'push loi luu hash local de chan lap lai', errorState.metadata.pushFailures['customer:C-ERR'], push.FbmSync.hash({ id: 'C-ERR', companyName: 'Lỗi' }, 'customer', {}));
   check(so, 'push loi luu nguyen nhan hien thi rieng voi hash', errorState.metadata.pushFailureDetails['customer:C-ERR'].reason, 'FBM từ chối');
+  let retryPatch;
+  push.FbmSync.readLocal = () => [{ id: 'ACT-FAIL', fbmId: '174813', syncStatus: push.FbmSync.SYNC_STATUS.error, content: 'Nội dung cũ' }];
+  push.writeGateSave = (request) => { retryPatch = request.records[0]; return { ok: true }; };
+  const retryState = push.FbmSync.stateStart('', 'done', 0);
+  retryState.metadata.pushFailures = { 'activity:ACT-FAIL': 'failed-hash' };
+  retryState.metadata.pushFailureDetails = { 'activity:ACT-FAIL': { reason: 'HTTP 500' } };
+  push.FbmSync.stateWrite(retryState);
+  const retryEnabled = push.fbmSyncRetryPushFailure('activity', 'ACT-FAIL');
+  check(so, 'retry push chu dong mo lai cung payload khong doi du lieu', [retryEnabled.ok, retryPatch.syncStatus, push.FbmSync.stateRead().metadata.pushFailures['activity:ACT-FAIL']], [true, push.FbmSync.SYNC_STATUS.pending, undefined]);
   push.FbmSync.pushCandidates = () => [
     { kind: 'edit', id: 'C-ERR', record: { id: 'C-ERR', fbmId: 'A-ERR', fbmHash: 'h-err' } },
     { kind: 'edit', id: 'C-NEXT', record: { id: 'C-NEXT', fbmId: 'A-NEXT', fbmHash: 'h-next' } }

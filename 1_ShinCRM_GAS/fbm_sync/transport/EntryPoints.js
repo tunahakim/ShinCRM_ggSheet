@@ -21,6 +21,27 @@ function fbmSyncCancel() {
 /** Bật/tắt ghi thật; mặc định luôn tắt để bảo vệ dữ liệu FBM. */
 function fbmSyncSetWriteMode(enabled) { PropertiesService.getDocumentProperties().setProperty('FBM_SYNC_ALLOW_WRITES', enabled ? 'true' : 'false'); return { enabled: !!enabled }; }
 
+/** Cho phép người dùng chủ động thử lại bản ghi bị chặn sau lỗi đẩy; không tự động lặp request ghi. */
+function fbmSyncRetryPushFailure(entity, id) {
+  var targetEntity = String(entity || '').trim(), targetId = String(id || '').trim(), state = FbmSync.stateRead();
+  var key = targetEntity + ':' + targetId, failures = state.metadata && state.metadata.pushFailures || {};
+  if (['customer', 'activity'].indexOf(targetEntity) < 0 || !targetId) { return { ok: false, code: 'PUSH_RETRY_TARGET_INVALID', message: 'Bản ghi thử lại không hợp lệ.' }; }
+  if (!Object.prototype.hasOwnProperty.call(failures, key)) { return { ok: false, code: 'PUSH_FAILURE_NOT_FOUND', message: 'Không tìm thấy lỗi đẩy cần thử lại.' }; }
+  var record = (FbmSync.readLocal(targetEntity) || []).filter(function (item) { return String(item && item.id || '') === targetId; })[0];
+  if (!record) { return { ok: false, code: 'PUSH_RETRY_RECORD_NOT_FOUND', message: 'Không tìm thấy bản ghi local để thử lại.' }; }
+  if (typeof writeGateSave !== 'function') { return { ok: false, code: 'WRITE_GATE_UNAVAILABLE', message: 'Không có cửa ghi để đặt lại trạng thái thử lại.' }; }
+  var saved = writeGateSave({ entity: targetEntity, records: [{ id: targetId, syncStatus: FbmSync.SYNC_STATUS.pending }], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
+  if (!saved || !saved.ok) { return { ok: false, code: 'PUSH_RETRY_RESET_FAILED', message: 'Không đặt lại được trạng thái bản ghi.', result: saved }; }
+  state.metadata.pushFailures = state.metadata.pushFailures || {};
+  state.metadata.pushFailureDetails = state.metadata.pushFailureDetails || {};
+  delete state.metadata.pushFailures[key];
+  delete state.metadata.pushFailureDetails[key];
+  state.message = 'Đã mở lại quyền thử đẩy ' + key + '; hãy chạy đồng bộ Ghi thật để gửi lại.';
+  FbmSync.stateWrite(state);
+  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'push_retry_enabled', outcome: typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', entity: targetEntity, recordId: targetId, reason: 'Người dùng chủ động cho phép thử lại bản ghi sau lỗi đẩy.' }); }
+  return { ok: true, entity: targetEntity, id: targetId, status: FbmSync.SYNC_STATUS.pending };
+}
+
 /** Cấp relay config của đúng Spreadsheet hiện tại; không để Extension tự đoán địa chỉ GAS. */
 function fbmSyncRelayConfig() {
   var url = '';

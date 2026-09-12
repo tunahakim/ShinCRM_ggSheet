@@ -13,6 +13,7 @@ function fbmLogSyncError(message) { return runEntryPoint('fbmLogSyncError', 'sid
 function fbmGetWriteMode() { return runEntryPoint('fbmGetWriteMode', 'sidebar', 'throw', function () { return { enabled: FbmSync.writeAllowed() }; }); }
 /** Đổi cờ ghi thật theo thao tác chủ động của người dùng trên Sidebar. */
 function fbmSetWriteMode(enabled) { return runEntryPoint('fbmSetWriteMode', 'sidebar', 'throw', function () { return fbmSyncSetWriteMode(enabled === true); }); }
+function fbmRetryPushFailure(entity, id) { return runEntryPoint('fbmRetryPushFailure', 'sidebar', 'throw', function () { return fbmSyncRetryPushFailure(entity, id); }); }
 function fbmGetRelayConfig() { return runEntryPoint('fbmGetRelayConfig', 'sidebar', 'throw', function () { return fbmSyncRelayConfig(); }); }
 /** Khóa record khi người dùng bắt đầu sửa. */
 function fbmBeginEdit(entity, id, revision) { return runEntryPoint('fbmBeginEdit', 'sidebar', 'throw', function () { return fbmSyncEditBegin(entity, id, revision); }); }
