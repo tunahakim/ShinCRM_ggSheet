@@ -177,8 +177,12 @@
 
 - [x] So ba chiều phân biệt không đổi, chỉ ShinCRM đổi, chỉ FBM đổi và hai phía đổi.
 - [x] Conflict lưu trạng thái, khóa record, log diff và không ghi baseline.
-- [ ] `syncStatusSlot` hiển thị diff Customer/Activity mới lấy từ FBM.
-- [x] Nút giải quyết hỗ trợ theo FBM, theo ShinCRM hoặc trộn tay; lấy `hFBM` đúng lúc bấm.
+- [ ] Màn hình xử lý conflict là chế độ riêng, tách khỏi màn hình chạy phiên đồng bộ.
+- [ ] GAS giữ hàng đợi/cursor conflict; Sidebar chỉ nhận và xử lý một bản ghi mỗi lần, không tải cả danh sách về RAM.
+- [ ] Sidebar conflict hiển thị dọc, chỉ hiện các trường khác nhau; mỗi trường xếp giá trị ShinCRM và FBM để đối chiếu.
+- [ ] Người dùng có thể giữ toàn bộ FBM, giữ toàn bộ ShinCRM hoặc chọn giá trị từng trường để trộn thủ công.
+- [ ] Khi xác nhận, GAS đọc lại dòng ShinCRM và FBM; FBM đổi từ lúc mở thì không chốt và đưa bản ghi về hàng đợi xem lại.
+- [ ] Nút giải quyết hỗ trợ theo FBM, theo ShinCRM hoặc trộn tay; lấy `hFBM` mới đúng lúc xác nhận và cập nhật trạng thái theo lựa chọn.
 - [x] Form Sidebar khóa user khi mở, nhả khi đóng và kiểm khóa sync trước Save.
 - [x] Pull/push hoãn record có khóa user và giữ nguyên bản nháp.
 - [ ] Khóa sync làm form chỉ xem, chặn Save và luôn được nhả sau khi xong/lỗi.
