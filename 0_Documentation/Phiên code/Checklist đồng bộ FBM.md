@@ -37,6 +37,8 @@
 - [x] Mỗi lát chỉ có một lời gọi cửa ghi và một khóa tài liệu; pull gộp nội dung và trạng thái vào cùng một lượt `writeGateSave`.
 - [x] Category là cấu hình do người dùng sở hữu; đồng bộ chỉ đọc/đối chiếu, tuyệt đối không ghi hoặc xóa Sheet Category.
 - [x] `ScriptProperties` chỉ giữ khóa Web App; cờ ghi, giới hạn test và cấu hình đã dùng `DocumentProperties`, Sheet Config hoặc state phiên đúng vòng đời.
+- [ ] GAS tự tạo `FBM_SYNC_KEY` đúng một lần khi Sidebar lần đầu yêu cầu relay, không cần thao tác menu; mở Sidebar sau đó chỉ lấy lại khóa cũ.
+- [ ] Màn hình đồng bộ có thao tác đổi khóa relay có xác nhận; GAS đổi nguyên tử, Extension xác nhận đã lưu, không hiển thị hoặc ghi khóa ra Sheet/Log.
 
 ### Extension, transport và khóa
 
