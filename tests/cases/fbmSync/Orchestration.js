@@ -5,7 +5,8 @@ const { taoHopCat, napServer } = require("../../lib/load-gas");
 async function chay(so) {
   section("FBM sync — orchestration");
   const props = { data: {} };
-  const propertyApi = { getProperty: (key) => props.data[key] || null, setProperty: (key, value) => { props.data[key] = String(value); } };
+  let propertyWrites = 0;
+  const propertyApi = { getProperty: (key) => props.data[key] || null, setProperty: (key, value) => { propertyWrites += 1; props.data[key] = String(value); } };
   const orchestration = taoHopCat({
     FbmSync: {},
     PropertiesService: { getDocumentProperties: () => propertyApi, getScriptProperties: () => propertyApi }
@@ -19,6 +20,10 @@ async function chay(so) {
   check(so, 'bootstrap dung viewPage false', started.request.body.viewPage, false);
   check(so, 'bootstrap khong gui authorized cu', started.request.body.authorized, null);
   check(so, 'envelope mang runId/requestId va GAS luu moc response', [Boolean(started.request.meta.trace.runId), Boolean(started.request.meta.trace.requestId), orchestration.FbmSync.stateRead().activeRequestId === bulkStarted.request.meta.trace.requestId, orchestration.FbmSync.traceRead(5).some((item) => item.stage === 'response_built')], [true, true, true, true]);
+  const traceEvents = [{ stage: 'client_gas_call_started', requestId: 'trace-1', at: 1 }, { stage: 'client_gas_success', requestId: 'trace-1', at: 2 }];
+  const writesBeforeTraceImport = propertyWrites;
+  check(so, 'trace client ghi theo lo mot lan', [orchestration.FbmSync.traceImport(traceEvents), propertyWrites - writesBeforeTraceImport], [2, 1]);
+  check(so, 'trace client gui lai khong ghi lap', [orchestration.FbmSync.traceImport(traceEvents), propertyWrites - writesBeforeTraceImport], [0, 1]);
   const retrySlice = orchestration.FbmSync.continue({ ok: false, status: 503, body: '' });
   check(so, 'loi doc tam thoi duoc retry co gioi han', [retrySlice.ok, retrySlice.retrying, retrySlice.request.meta.kind, orchestration.FbmSync.stateRead().retryCount], [true, true, 'authorize', 1]);
   const resumed = orchestration.FbmSync.start({ mode: 'read' });

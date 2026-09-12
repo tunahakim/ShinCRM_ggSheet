@@ -330,20 +330,24 @@ function fbmSyncContinueServer(status, response) {
   var timeout = new Promise(function (resolve) {
     timeoutId = setTimeout(function () {
       if (!FBM_SYNC_CLIENT.running) { resolve({ cancelled: true, status: status }); return; }
-      var snapshot = status;
-      Promise.resolve(snapshot).then(function (snapshot) {
-        var diagnostic = snapshot && (snapshot.status || snapshot) || {};
-        var traceRows = diagnostic.metadata && diagnostic.metadata.traceTail || [], trace = traceRows.length ? traceRows[traceRows.length - 1] : (diagnostic.metadata && diagnostic.metadata.callbackTrace || {});
+      var fallback = status && (status.status || status) || {}, requestId = String(status && status.request && status.request.meta && status.request.meta.trace && status.request.meta.trace.requestId || '');
+      var traceCall = typeof callServer === 'function' ? callServer('fbmGetSyncTrace').catch(function () { return null; }) : Promise.resolve(null);
+      var traceTimeout = new Promise(function (done) { setTimeout(function () { done(null); }, 3000); });
+      Promise.race([traceCall, traceTimeout]).then(function (traceResult) {
+        var traceRows = traceResult && (traceResult.trace || traceResult) || [];
+        if (!Array.isArray(traceRows)) { traceRows = []; }
+        var matching = traceRows.filter(function (item) { return !requestId || String(item && item.requestId || '') === requestId; });
+        var trace = (matching.length ? matching : traceRows).slice(-1)[0] || (fallback.metadata && fallback.metadata.callbackTrace) || {};
+        var diagnostic = Object.assign({}, fallback, { traceRequestId: requestId, traceStage: String(trace.stage || 'unknown') });
         var cursor = diagnostic.cursor || {};
         var message = 'GAS_CALLBACK_TIMEOUT: GAS không trả kết quả sau 15 giây; không tự gửi lại lệnh ghi.'
           + ' Bước cuối: ' + String(trace.stage || 'unknown')
-          + '; phase=' + String(diagnostic.phase || '')
+          + '; requestId=' + requestId
+          + '; phase=' + String(diagnostic.phase || trace.phase || '')
           + '; cursor=' + String(cursor.kind || trace.cursorKind || '')
           + '; operation=' + String(cursor.operation || trace.operation || '')
           + '; record=' + String(diagnostic.current || trace.current || '') + '.';
         resolve({ diagnosticTimeout: true, message: message, status: diagnostic });
-      }).catch(function (error) {
-        resolve({ diagnosticTimeout: true, message: 'GAS_CALLBACK_TIMEOUT: GAS không trả kết quả sau 15 giây; không đọc được status chẩn đoán (' + String(error && error.message || error) + ').', status: status });
       });
     }, FBM_SYNC_GAS_CONTINUE_TIMEOUT_MS);
   });

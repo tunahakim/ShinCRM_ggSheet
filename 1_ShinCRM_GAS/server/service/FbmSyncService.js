@@ -36,6 +36,8 @@ function fbmCancelSync() { return runEntryPoint('fbmCancelSync', 'sidebar', 'thr
 function fbmGetSyncStatus() { return runEntryPoint('fbmGetSyncStatus', 'sidebar', 'throw', function () { var before = FbmSync.stateRead(), result = fbmSyncStatus(); if (result && result.lastFailureCode === 'SYNC_STALE_RUN' && before.lastFailureCode !== result.lastFailureCode) { FbmSync.logStatus(result, 'stale_run'); } return result; }); }
 /** Ghi lỗi cầu nối do Sidebar phát hiện trước khi có response FBM. */
 function fbmLogSyncError(message, clientTrace) { return runEntryPoint('fbmLogSyncError', 'sidebar', 'throw', function () { if (FbmSync.traceImport) { FbmSync.traceImport(clientTrace); } fbmTraceBoundary('gas_entered', 'fbmLogSyncError'); return FbmSync.logTransportError(message); }); }
+/** Đọc vết độc lập sau timeout; không tiếp tục cursor và không gửi request FBM. */
+function fbmGetSyncTrace() { return runEntryPoint('fbmGetSyncTrace', 'sidebar', 'throw', function () { return { ok: true, trace: FbmSync.traceRead(24) }; }); }
 /** Đọc cờ cho phép ghi; mặc định tắt để không chạm dữ liệu FBM ngoài ý muốn. */
 function fbmGetWriteMode() { return runEntryPoint('fbmGetWriteMode', 'sidebar', 'throw', function () { return { enabled: FbmSync.writeAllowed() }; }); }
 /** Đổi cờ ghi thật theo thao tác chủ động của người dùng trên Sidebar. */

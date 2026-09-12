@@ -25,7 +25,39 @@ FbmSync.traceContext = function (extra) {
   };
 };
 
+FbmSync.traceAppend = function (events) {
+  if (!Array.isArray(events) || !events.length) { return 0; }
+  try {
+    var props = PropertiesService.getDocumentProperties(), rows = JSON.parse(props.getProperty(FbmSync.TRACE_KEY) || '[]');
+    if (!Array.isArray(rows)) { rows = []; }
+    var seen = {};
+    rows.forEach(function (item) { if (item && item.stage) { seen[[item.stage, item.runId, item.requestId, item.at].join('|')] = true; } });
+    var added = 0;
+    events.forEach(function (event) {
+      if (!event || !event.stage) { return; }
+      var key = [event.stage, event.runId, event.requestId, event.at].join('|');
+      if (seen[key]) { return; }
+      seen[key] = true; rows.push(event); added += 1;
+    });
+    if (added) { props.setProperty(FbmSync.TRACE_KEY, JSON.stringify(rows.slice(-FbmSync.TRACE_LIMIT))); }
+    return added;
+  } catch (ignore) { return 0; }
+};
+
 FbmSync.traceEvent = function (stage, extra) {
+  var event = FbmSync.traceContext(extra);
+  event.at = Date.now();
+  event.stage = String(stage || '');
+  FbmSync.traceAppend([event]);
+  return event;
+};
+
+/*
+ * Legacy implementation intentionally replaced above. Keep this marker close to
+ * traceEvent so future edits do not reintroduce one PropertiesService write per
+ * imported client event.
+ */
+/* FbmSync.traceEvent = function (stage, extra) {
   var event = FbmSync.traceContext(extra), props, rows;
   event.at = Date.now();
   event.stage = String(stage || '');
@@ -40,7 +72,7 @@ FbmSync.traceEvent = function (stage, extra) {
     try { if (typeof console !== 'undefined' && console.warn) { console.warn('FBM trace write failed: ' + event.stage); } } catch (ignoreConsole) {}
   }
   return event;
-};
+}; */
 
 FbmSync.traceRead = function (limit) {
   var rows = [], take = Math.max(1, Math.min(Number(limit || 20), FbmSync.TRACE_LIMIT));
@@ -63,24 +95,25 @@ FbmSync.traceResponse = function (raw) {
 /** Nhận trace của client/Extension nhưng chỉ giữ các field an toàn và giới hạn số lượng. */
 FbmSync.traceImport = function (events, fallback) {
   if (!Array.isArray(events)) { return 0; }
-  var base = fallback || {}, accepted = 0;
+  var base = fallback || {}, context = FbmSync.traceContext(base), imported = [];
   events.slice(-20).forEach(function (item) {
     if (!item || !item.stage) { return; }
-    FbmSync.traceEvent(String(item.stage), {
-      runId: item.runId !== undefined ? item.runId : base.runId,
-      requestId: item.requestId !== undefined ? item.requestId : base.requestId,
-      phase: item.phase !== undefined ? item.phase : base.phase,
-      operation: item.operation !== undefined ? item.operation : base.operation,
-      entity: item.entity !== undefined ? item.entity : base.entity,
-      recordId: item.recordId !== undefined ? item.recordId : base.recordId,
-      httpStatus: item.httpStatus,
-      responseLength: item.responseLength,
-      error: item.error,
-      stack: item.stack
-    });
-    accepted += 1;
+    imported.push(Object.assign({}, context, {
+      runId: item.runId !== undefined ? FbmSync.traceClip(item.runId, 80) : context.runId,
+      requestId: item.requestId !== undefined ? FbmSync.traceClip(item.requestId, 100) : context.requestId,
+      phase: item.phase !== undefined ? FbmSync.traceClip(item.phase, 80) : context.phase,
+      operation: item.operation !== undefined ? FbmSync.traceClip(item.operation, 100) : context.operation,
+      entity: item.entity !== undefined ? FbmSync.traceClip(item.entity, 40) : context.entity,
+      recordId: item.recordId !== undefined ? FbmSync.traceClip(item.recordId, 120) : context.recordId,
+      httpStatus: Number(item.httpStatus || 0) || 0,
+      responseLength: Number(item.responseLength || 0) || 0,
+      error: FbmSync.traceClip(item.error || '', 500),
+      stack: FbmSync.traceClip(item.stack || '', 1200),
+      at: Number(item.at || 0) || Date.now(),
+      stage: String(item.stage)
+    }));
   });
-  return accepted;
+  return FbmSync.traceAppend(imported);
 };
 
 function fbmSyncTrace() { return FbmSync.traceRead(60); }
