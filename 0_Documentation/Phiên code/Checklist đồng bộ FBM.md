@@ -8,7 +8,7 @@
 - `[ ]` là việc còn thiếu; mục không có nhãn **Cần kiểm chứng thực tế** là việc AI tự tiếp tục được.
 - Một slice chỉ đóng sau khi đủ code, test, log/báo cáo và checklist case của slice đó.
 - Sau khi đóng slice, ghi commit và revision GAS vào bảng bằng chứng cuối file.
-- Bộ kiểm offline gần nhất đạt `1096/1096`; phần đọc `ALT00010` và một Activity đã từng kiểm chứng, chiều ghi chưa có kết quả thành công được xác nhận.
+- Bộ kiểm offline gần nhất đạt `1121/1121`; phần đọc `ALT00010` và một Activity đã từng kiểm chứng, chiều ghi chưa có kết quả thành công được xác nhận.
 
 ## Hợp đồng nhận diện và đăng nhập FBM
 
@@ -18,7 +18,7 @@
 - `FBM_SPREADSHEET_ID` do người dùng nhập trong màn hình thiết lập để bản copy chưa đổi cấu hình bị chặn; GAS vẫn phải lấy ID thực tế của Spreadsheet trước khi so sánh.
 - Bản thiết lập đăng nhập gồm username/mã user, tên đầy đủ, `FBM_SPREADSHEET_ID` và mật khẩu; Extension mã hóa toàn bộ thành một envelope trước khi GAS lưu trong `DocumentProperties`.
 - Sidebar không nhận mật khẩu bản rõ; ô mật khẩu hiển thị `***` hoặc để trống. Khi xem lại, Extension chỉ giải mã nội bộ và trả các trường không nhạy cảm.
-- Tự động đăng nhập khi Chrome khởi động là tùy chọn, mặc định tắt. Khi tắt, luồng dùng cookie/đăng nhập thủ công hiện tại không thay đổi.
+- Tự động đăng nhập là tính năng có sẵn nhưng công tắc mặc định tắt; khi bật, hệ tự chạy ngay khi session hết hạn hoặc không có cookie, không ép đăng nhập lại khi session còn hợp lệ. Khi tắt, luồng dùng cookie/đăng nhập thủ công hiện tại không thay đổi.
 - Sidebar có nút `Đăng nhập thử`; thao tác này chủ động kết thúc phiên FBM hiện tại rồi thử đăng nhập bằng thông tin đã nhập, chỉ trả trạng thái thành công/lỗi và không ghi mật khẩu vào Sheet hoặc Log.
 - Màn hình đồng bộ là một màn hình độc lập gồm các màn hình con trạng thái, thiết lập đăng nhập và chi tiết/audit; mỗi màn hình con nằm trong tệp `.html` riêng cùng thư mục `client/sync/` và dùng block/component chuẩn của Sidebar.
 
@@ -89,7 +89,7 @@
 - [x] Tìm tab FBM, ping executor, fetch trong tab và nhận response thô.
 - [x] Khi mất executor, inject rồi ping lại; request nghiệp vụ chỉ gửi một lần.
 - [x] 401/403 hoặc `Login.aspx` dừng kỳ và yêu cầu đăng nhập lại khi tùy chọn tự động đăng nhập tắt.
-- [ ] Tùy chọn tự động đăng nhập chỉ chạy khi session hết hạn/không có cookie; không ép login khi session hợp lệ đang tồn tại.
+- [ ] Tùy chọn tự động đăng nhập tự chạy khi session hết hạn/không có cookie; không ép login khi session hợp lệ đang tồn tại và không retry vô hạn.
 - [ ] Form thiết lập đặt username và password cạnh nhau, hiển thị mật khẩu dạng `***`/trống, không ghi bản rõ vào Sheet hoặc Log.
 - [ ] Nút `Đăng nhập thử` kết thúc phiên cũ, thử thông tin người dùng nhập và hiển thị kết quả mà không ghi bí mật.
 - [ ] Preflight đối chiếu tuyệt đối username/mã user, tên đầy đủ và `FBM_SPREADSHEET_ID` trước request nghiệp vụ; không dùng mã ngắn.
@@ -215,6 +215,7 @@
 - [x] Có cổng `allowFbmPush`, Category, record lock và cấu hình bắt buộc.
 - [x] Chế độ Ghi thật vẫn dừng trước request khi cờ hệ thống tắt.
 - [x] Khi đang có phiên hoạt động, lần bấm Đồng bộ ngay thứ hai không tạo phiên song song.
+- [ ] Nếu tổng số bản ghi đủ điều kiện thay đổi lớn hơn `10`, Sidebar phải preview và chờ người dùng chấp thuận trước request ghi; từ `10` trở xuống vẫn phải qua đủ cờ an toàn và cổng bản ghi.
 - [x] Dừng đồng bộ xóa cursor kỳ, nhả khóa sync, giữ khóa form user và không gửi Delete.
 - [ ] Kiểm owner mặc định FBM với `FBM_ACCOUNT_NAME` trước toàn bộ chiều push.
 - [x] Kiểm đủ bảy field bắt buộc và mọi trần độ dài trước khi dựng request.
@@ -270,7 +271,7 @@
 - [x] Kỳ Customer 60 phút kéo full grid qua nhiều lát, lưu cursor từng lát.
 - [x] Kỳ Activity 8 giờ chạy bulk ID, lớp `ngay_gd` và vòng xoay 30 Customer.
 - [x] Scheduler không tạo hai kỳ, không giữ công việc trong RAM và tiếp tục từ lát đã chốt.
-- [ ] **Cần chốt trước khi code:** Khi người dùng bấm `Đồng bộ ngay` trong lúc đã có phiên nền đang hoạt động, GAS không được tạo phiên song song; phải quyết định rõ Sidebar sẽ hiển thị/tiếp nhận phiên hiện tại, báo đang chạy và giữ quyền Dừng, hay xếp yêu cầu thủ công chờ phiên hiện tại kết thúc.
+- [ ] Khi người dùng bấm `Đồng bộ ngay` trong lúc có phiên nền, GAS đánh dấu phiên nền dừng, chờ request FBM hiện tại kết thúc, không cấp request tiếp theo rồi ưu tiên phiên thủ công; không tạo hai phiên song song.
 - [x] Nút Dừng đồng bộ xóa marker `scheduledScan`, không để heartbeat tự khởi động lại kỳ vừa dừng.
 - [x] Web App dùng khóa theo spreadsheet để tiếp tục khi Sidebar đóng.
 - [x] Mở lại Sidebar chỉ đọc state hiện có, không tạo kỳ thứ hai.
