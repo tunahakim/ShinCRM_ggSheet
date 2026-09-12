@@ -3,7 +3,7 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 /** Chỉ cho phép ghi khi caller chọn write và cờ an toàn đã bật. */
 FbmSync.writeEnabled = function (mode) {
-  if (mode !== 'write') { return false; }
+  if (mode !== 'write' && mode !== 'push') { return false; }
   return FbmSync.writeAllowed();
 };
 /** Cờ an toàn độc lập với mode; mặc định luôn tắt. */

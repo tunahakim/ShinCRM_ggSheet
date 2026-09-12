@@ -258,7 +258,7 @@ FbmSync.nextPushRequest = function (state) {
     ? 'Đồng bộ hoàn tất nhưng có ' + Number(state.counts.error || 0) + ' lỗi đẩy; xem Chi tiết bản ghi.'
     : pushSucceeded > 0
       ? 'Đồng bộ hoàn tất; bản ghi vừa đẩy đã được FBM xác nhận.'
-      : state.mode === 'write'
+      : (state.mode === 'write' || state.mode === 'push')
         ? 'Đồng bộ hoàn tất; không có bản ghi nào được đẩy.'
         : 'Đồng bộ hoàn tất.';
   state.cursor = {}; FbmSync.stateWrite(state); return null;

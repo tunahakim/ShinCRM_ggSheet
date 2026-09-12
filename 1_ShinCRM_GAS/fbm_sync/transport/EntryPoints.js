@@ -3,6 +3,21 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 /** API bắt đầu phiên cho Sidebar hoặc DEV runner. */
 function fbmSyncStart(mode) { return FbmSync.start({ mode: mode }); }
+/** Người dùng chấp thuận phiên push lớn; chỉ sau đó mới cấp request authorize đầu tiên. */
+function fbmSyncApprovePush() {
+  var state = FbmSync.stateRead();
+  if (String(state.phase || '') !== 'awaiting_approval' || !state.metadata || state.metadata.approvalRequired !== true) {
+    return { ok: false, code: 'PUSH_APPROVAL_NOT_REQUIRED', status: FbmSync.statusView() };
+  }
+  state.phase = 'checking_session';
+  state.entity = '';
+  state.cursor = { kind: 'authorize_customer' };
+  state.metadata.approvalGranted = true;
+  state.message = 'Đã chấp thuận; đang kiểm tra phiên FBM...';
+  FbmSync.stateWrite(state);
+  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'push_batch_approved', outcome: typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', reason: 'Người dùng chấp thuận phiên có hơn 10 bản ghi thay đổi.', detail: { candidateCount: Number(state.metadata.approvalCount || 0) } }); }
+  return { ok: true, request: FbmSync.nextEnvelope(FbmSync.authorizeRequest('customer')), status: FbmSync.statusView() };
+}
 /** Khoi tao rieng pipeline bulk Activity de nghiem thu scheduler ma khong phai cho trigger 8 gio. */
 function fbmSyncStartActivityBulk() { return FbmSync.start({ mode: 'read', scan: 'activity_bulk' }); }
 /** Lệnh chẩn đoán chỉ đọc điều kiện local theo mode hiện đang lưu, không mở request FBM. */

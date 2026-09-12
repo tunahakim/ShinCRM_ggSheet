@@ -14,6 +14,22 @@ async function chay(so) {
     PropertiesService: { getDocumentProperties: () => propertyApi, getScriptProperties: () => propertyApi }
   });
   napServer(orchestration, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/EntryPoints.js');
+  const approvalProps = { data: { FBM_SYNC_ALLOW_WRITES: 'true' } };
+  const approvalPropertyApi = { getProperty: (key) => approvalProps.data[key] || null, setProperty: (key, value) => { approvalProps.data[key] = String(value); } };
+  const approval = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => approvalPropertyApi, getScriptProperties: () => approvalPropertyApi } });
+  napServer(approval, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/EntryPoints.js');
+  approval.FbmSync.runPreflight = () => ({ ok: true, issues: [], blocking: [], candidateCount: 11 });
+  const awaiting = approval.FbmSync.start({ mode: 'write' });
+  check(so, 'push hon 10 ban ghi phai cho nguoi dung chap thuan', [awaiting.ok, awaiting.approvalRequired, awaiting.request, approval.FbmSync.stateRead().phase, approval.FbmSync.stateRead().metadata.approvalCount], [true, true, null, 'awaiting_approval', 11]);
+  const approved = approval.fbmSyncApprovePush();
+  check(so, 'chap thuan push cap request authorize dau tien', [approved.ok, approved.request.meta.kind, approval.FbmSync.stateRead().metadata.approvalGranted], [true, 'authorize', true]);
+  approval.FbmSync.stateWrite(approval.FbmSync.stateStart('', 'idle', 0));
+  approval.FbmSync.runPreflight = () => ({ ok: true, issues: [], blocking: [], candidateCount: 0 });
+  const pushOnly = approval.FbmSync.start({ mode: 'push' });
+  check(so, 'mode day rieng chi gui du lieu ShinCRM len FBM', [pushOnly.ok, pushOnly.request.meta.kind, approval.FbmSync.stateRead().mode], [true, 'authorize', 'push']);
+  approval.FbmSync.stateWrite(approval.FbmSync.stateStart('', 'idle', 0));
+  const checkOnly = approval.FbmSync.start({ mode: 'check' });
+  check(so, 'mode kiem tra khong bat cong ghi', [checkOnly.ok, approval.FbmSync.stateRead().mode, approval.FbmSync.writeEnabled('check')], [true, 'check', false]);
   const started = orchestration.FbmSync.start({ mode: 'read' });
   check(so, 'start bat dau bang bootstrap Customer', started.request.meta.kind, 'authorize');
   check(so, 'bootstrap dung viewPage false', started.request.body.viewPage, false);

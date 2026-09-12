@@ -1,15 +1,16 @@
 <script>
 /* Block điều khiển mode/cờ ghi; credential form sẽ nối vào cùng màn hình con ở slice đăng nhập. */
-function fbmSyncPaintSettingsBlock(panel, active) {
+function fbmSyncPaintSettingsBlock(panel, active, status) {
   var block = document.createElement('div'); block.className = 'shin-card shin-sync-settings-block';
   var head = document.createElement('div'); head.className = 'shin-card-head';
   var title = document.createElement('div'); title.className = 'shin-card-title'; title.textContent = 'ĐIỀU KHIỂN PHIÊN'; head.appendChild(title); block.appendChild(head);
   var body = document.createElement('div'); body.className = 'shin-card-body';
   var actions = document.createElement('div'); actions.className = 'shin-sync-actions';
   var mode = document.createElement('select'); mode.id = 'fbm-sync-mode'; mode.className = 'shin-input'; mode.disabled = active;
-  [['read', 'Đọc thử'], ['write', 'Ghi thật']].forEach(function (item) { var option = document.createElement('option'); option.value = item[0]; option.textContent = item[1]; mode.appendChild(option); });
+  [['check', 'Kiểm tra'], ['read', 'Đọc từ FBM'], ['push', 'Đẩy lên FBM'], ['write', 'Hai chiều']].forEach(function (item) { var option = document.createElement('option'); option.value = item[0]; option.textContent = item[1]; mode.appendChild(option); });
   mode.value = FBM_SYNC_CLIENT.mode; mode.title = 'Chọn chiều chạy của phiên đồng bộ'; actions.appendChild(mode);
-  actions.appendChild(fbmSyncMakeButton(active ? 'fbm-sync-cancel' : 'fbm-sync-start', active ? 'Dừng đồng bộ' : 'Đồng bộ ngay', !active));
+  var awaitingApproval = status && status.phase === 'awaiting_approval';
+  actions.appendChild(fbmSyncMakeButton(active ? 'fbm-sync-cancel' : awaitingApproval ? 'fbm-sync-approve' : 'fbm-sync-start', active ? 'Dừng đồng bộ' : awaitingApproval ? 'Chấp thuận và chạy' : 'Đồng bộ ngay', !active));
   body.appendChild(actions);
   var gate = document.createElement('label'); gate.className = 'shin-sync-write-gate';
   var check = document.createElement('input'); check.type = 'checkbox'; check.id = 'fbm-sync-write-gate'; check.checked = FBM_SYNC_CLIENT.writeAllowed; check.disabled = active;

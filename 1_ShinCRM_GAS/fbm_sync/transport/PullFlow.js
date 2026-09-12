@@ -22,10 +22,10 @@ FbmSync.start = function (options) {
   }
   if (typeof fbmEnsureSyncColumns === 'function') { fbmEnsureSyncColumns(); }
   var opt = options || {}, state = FbmSync.stateStart('', 'checking_session', 0, { preserveConflicts: current.phase === 'conflict' });
-  state.mode = opt.mode === 'write' ? 'write' : 'read';
+  state.mode = opt.mode === 'write' || opt.mode === 'push' ? opt.mode : opt.mode === 'check' ? 'check' : 'read';
   state.scan = opt.scan === 'activity_bulk' ? 'activity_bulk' : 'full';
   if (state.scan === 'activity_bulk') { state.mode = 'read'; }
-  if (state.mode === 'write' && !FbmSync.writeAllowed()) {
+  if ((state.mode === 'write' || state.mode === 'push') && !FbmSync.writeAllowed()) {
     state.phase = 'idle'; state.runId = ''; state.message = 'Chưa cho phép ghi thật lên FBM.'; FbmSync.stateWrite(state);
     return { ok: false, code: 'SYNC_WRITES_DISABLED', status: FbmSync.statusView() };
   }
@@ -42,6 +42,19 @@ FbmSync.start = function (options) {
       state.message = state.lastError;
       FbmSync.stateWrite(state);
       return { ok: false, code: 'SYNC_PREFLIGHT_FAILED', status: FbmSync.statusView(), error: state.lastError };
+    }
+    // A large push requires an explicit human approval before GAS gives out
+    // even the first FBM request. The candidate count comes from the same
+    // server-side preflight that will guard the actual push.
+    if ((state.mode === 'write' || state.mode === 'push') && Number(preflight.candidateCount || 0) > 10) {
+      state.phase = 'awaiting_approval';
+      state.entity = '';
+      state.cursor = { kind: 'push_approval', candidateCount: Number(preflight.candidateCount || 0) };
+      state.message = 'Có ' + Number(preflight.candidateCount || 0) + ' bản ghi thay đổi; cần người dùng chấp thuận trước khi ghi FBM.';
+      state.metadata.approvalRequired = true;
+      state.metadata.approvalCount = Number(preflight.candidateCount || 0);
+      FbmSync.stateWrite(state);
+      return { ok: true, request: null, status: FbmSync.statusView(), approvalRequired: true };
     }
   }
   state.cursor = { kind: 'authorize_customer' };
@@ -133,6 +146,13 @@ FbmSync.activitySupplementNext = function (state, afterActivity) {
 /** Chuyển từ lookup sang grid Customer, kể cả khi lookup chỉ đọc bị lỗi. */
 FbmSync.beginCustomerPull = function (state) {
   if (state.scan === 'activity_bulk') { return FbmSync.beginActivityBulkPull(state); }
+  if (state.mode === 'push') {
+    FbmSync.prepareCategoryGate(state);
+    state.phase = 'push'; state.entity = 'customer'; state.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
+    state.message = 'Đang chuẩn bị các bản ghi ShinCRM cần đẩy lên FBM...';
+    FbmSync.stateWrite(state);
+    return FbmSync.nextPushRequest(state);
+  }
   FbmSync.prepareCategoryGate(state);
   state.cursor = { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 };
   state.phase = 'pull_customer'; state.entity = 'customer'; state.message = 'Dang doc khach hang tu FBM...';
@@ -283,7 +303,7 @@ FbmSync.continue = function (rawResponse) {
       state.cursor.index = lookupIndex; FbmSync.stateWrite(state);
       return { ok: true, request: FbmSync.nextEnvelope(FbmSync.completionRequest(FbmSync.SYNC_LOOKUPS[lookupIndex].controller, FbmSync.SYNC_LOOKUPS[lookupIndex].key)), status: FbmSync.statusView() };
     }
-    if (state.mode === 'write') {
+    if (state.mode === 'write' || state.mode === 'push') {
       // Category is user-owned configuration; sync only reads and validates it.
       state.message = 'Đã đọc danh mục FBM; đang đối chiếu Category...';
       FbmSync.stateWrite(state);

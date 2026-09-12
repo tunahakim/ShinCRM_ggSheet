@@ -3,7 +3,7 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 /** Đổi phase nội bộ thành nhãn hiển thị ngắn. */
 FbmSync.statusLabel = function (phase) {
-  return ({ idle: 'Sẵn sàng', checking_session: 'Đang kiểm tra phiên FBM', pull_customer: 'Đang đọc khách hàng', pull_activity: 'Đang đọc giao dịch', reconcile: 'Đang đối chiếu', push: 'Đang ghi dữ liệu', paused: 'Tạm dừng', conflict: 'Có xung đột', error: 'Có lỗi', done: 'Hoàn tất' })[phase] || String(phase || '');
+  return ({ idle: 'Sẵn sàng', checking_session: 'Đang kiểm tra phiên FBM', pull_customer: 'Đang đọc khách hàng', pull_activity: 'Đang đọc giao dịch', reconcile: 'Đang đối chiếu', push: 'Đang ghi dữ liệu', awaiting_approval: 'Chờ người dùng chấp thuận', paused: 'Tạm dừng', conflict: 'Có xung đột', error: 'Có lỗi', done: 'Hoàn tất' })[phase] || String(phase || '');
 };
 /** Nhãn hướng dữ liệu để Sidebar không phải suy diễn từ cursor nội bộ. */
 FbmSync.syncDirection = function (state) {
@@ -11,6 +11,8 @@ FbmSync.syncDirection = function (state) {
   if (phase === 'checking_session') { return 'Kết nối FBM'; }
   if (phase === 'push') { return 'ShinCRM → FBM'; }
   if (phase === 'done' && mode === 'write') { return 'Hai chiều'; }
+  if (mode === 'push') { return 'ShinCRM → FBM'; }
+  if (mode === 'check') { return 'Kiểm tra'; }
   return 'FBM → ShinCRM';
 };
 /** Nhãn thực thể hiện tại; dùng "Chuẩn bị phiên" khi chưa có bản ghi. */

@@ -215,7 +215,7 @@
 - [x] Có cổng `allowFbmPush`, Category, record lock và cấu hình bắt buộc.
 - [x] Chế độ Ghi thật vẫn dừng trước request khi cờ hệ thống tắt.
 - [x] Khi đang có phiên hoạt động, lần bấm Đồng bộ ngay thứ hai không tạo phiên song song.
-- [ ] Nếu tổng số bản ghi đủ điều kiện thay đổi lớn hơn `10`, Sidebar phải preview và chờ người dùng chấp thuận trước request ghi; từ `10` trở xuống vẫn phải qua đủ cờ an toàn và cổng bản ghi.
+- [x] Nếu tổng số bản ghi đủ điều kiện thay đổi lớn hơn `10`, Sidebar preview và chờ người dùng chấp thuận trước request ghi; từ `10` trở xuống vẫn phải qua đủ cờ an toàn và cổng bản ghi. `fbmApprovePush` chỉ cấp request authorize sau khi chấp thuận; test offline đã phủ ngưỡng `11`.
 - [x] Dừng đồng bộ xóa cursor kỳ, nhả khóa sync, giữ khóa form user và không gửi Delete.
 - [ ] Kiểm owner mặc định FBM với `FBM_ACCOUNT_NAME` trước toàn bộ chiều push.
 - [x] Kiểm đủ bảy field bắt buộc và mọi trần độ dài trước khi dựng request.

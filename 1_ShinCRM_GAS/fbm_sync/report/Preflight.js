@@ -95,13 +95,13 @@ FbmSync.preflightCandidates = function (issues, mode) {
 
 /** Quét điều kiện local; lookup live/owner vẫn được đối chiếu sau response FBM. */
 FbmSync.runPreflight = function (options) {
-  var opt = options || {}, mode = opt.mode === 'write' ? 'write' : 'read', core = typeof shinCorePreflight === 'function' ? shinCorePreflight({ mode: mode }) : { issues: [], params: {}, category: { categories: {} } }, issues = (core.issues || []).slice(), params = core.params || {};
-  if (!String(params.FBM_ACCOUNT_NAME || '').trim()) { FbmSync.preflightIssue(issues, 'FBM_ACCOUNT_NAME_MISSING', 'error', 'Config', 'Thiếu FBM_ACCOUNT_NAME trong Config; chiều đẩy bị khóa.', mode === 'write'); }
+  var opt = options || {}, mode = opt.mode === 'write' || opt.mode === 'push' ? opt.mode : opt.mode === 'check' ? 'check' : 'read', writeMode = mode === 'write' || mode === 'push', core = typeof shinCorePreflight === 'function' ? shinCorePreflight({ mode: writeMode ? 'write' : mode }) : { issues: [], params: {}, category: { categories: {} } }, issues = (core.issues || []).slice(), params = core.params || {};
+  if (!String(params.FBM_ACCOUNT_NAME || '').trim()) { FbmSync.preflightIssue(issues, 'FBM_ACCOUNT_NAME_MISSING', 'error', 'Config', 'Thiếu FBM_ACCOUNT_NAME trong Config; chiều đẩy bị khóa.', writeMode); }
   if (!String(params.FBM_MA_KH_PREFIX || '').trim() || !String(params.FBM_MA_KH_LENGTH || '').trim()) { FbmSync.preflightIssue(issues, 'FBM_CUSTOMER_CODE_CONFIG_INCOMPLETE', 'warn', 'Config', 'Thiếu FBM_MA_KH_PREFIX hoặc FBM_MA_KH_LENGTH; chỉ ảnh hưởng khi tạo Customer mới.', false); }
   if (!String(params.FBM_ACTIVITY_SINCE || '').trim()) { FbmSync.preflightIssue(issues, 'FBM_ACTIVITY_SINCE_MISSING', 'warn', 'Config', 'Thiếu FBM_ACTIVITY_SINCE; hệ sẽ dùng phạm vi đọc mặc định hiện tại.', false); }
-  FbmSync.preflightCategories(issues, core.category || {}, mode);
+  FbmSync.preflightCategories(issues, core.category || {}, writeMode ? 'write' : mode);
   var candidateReport = FbmSync.preflightCandidates(issues, mode);
-  FbmSync.preflightPushPermissions(issues, mode, candidateReport.gate || {});
+  FbmSync.preflightPushPermissions(issues, writeMode ? 'write' : mode, candidateReport.gate || {});
   var blocking = issues.filter(function (item) { return item.blocking; });
   return { ok: blocking.length === 0, mode: mode, issues: issues, blocking: blocking, warnings: issues.filter(function (item) { return !item.blocking; }), candidateCount: candidateReport.candidates.length };
 };
