@@ -37,7 +37,7 @@
 - [x] Mỗi lát chỉ có một lời gọi cửa ghi và một khóa tài liệu; pull gộp nội dung và trạng thái vào cùng một lượt `writeGateSave`.
 - [x] Category là cấu hình do người dùng sở hữu; đồng bộ chỉ đọc/đối chiếu, tuyệt đối không ghi hoặc xóa Sheet Category.
 - [x] `ScriptProperties` chỉ giữ khóa Web App; cờ ghi, giới hạn test và cấu hình đã dùng `DocumentProperties`, Sheet Config hoặc state phiên đúng vòng đời.
-- [ ] GAS tự tạo `FBM_SYNC_KEY` đúng một lần khi Sidebar lần đầu yêu cầu relay, không cần thao tác menu; mở Sidebar sau đó chỉ lấy lại khóa cũ.
+- [x] GAS tự tạo `FBM_SYNC_KEY` đúng một lần khi Sidebar lần đầu yêu cầu relay, không cần thao tác menu; mở Sidebar sau đó chỉ lấy lại khóa cũ.
 - [ ] Màn hình đồng bộ có thao tác đổi khóa relay có xác nhận; GAS đổi nguyên tử, Extension xác nhận đã lưu, không hiển thị hoặc ghi khóa ra Sheet/Log.
 
 ### Extension, transport và khóa
@@ -45,6 +45,8 @@
 - [x] GAS dựng `bodyText` đã escape cho FBM; Extension chỉ chuyển nguyên văn qua `fetch`, không parse/serialize lại.
 
 - [x] Extension có host permission `https://fbo.com.vn:8888/*`, content script FBM, service worker và cơ chế nạp lại executor.
+- [x] Có probe relay chỉ đọc: Service Worker gọi Web App GAS trực tiếp, GAS trả `RELAY_PROBE_OK`, không cần Sidebar và không chạm tab FBM.
+- [x] Probe ghi `request_sent`, `response_received` và kết quả cuối vào `chrome.storage.local` để phân biệt lỗi gửi, lỗi nhận và lỗi xử lý response.
 - [x] Đã kiểm chứng đường Sidebar → Extension → tab FBM → Sidebar nhận response thật.
 - [x] Executor báo phiên bản `21.7`; reload Extension có thể phục hồi đầu nhận.
 - [x] Bridge cũ sau Reload báo lỗi `Extension context invalidated` theo nhánh có thể thử lại; Sidebar phát lại đúng một request và Service Worker chống trùng theo `id`.

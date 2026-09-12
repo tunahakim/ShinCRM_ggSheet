@@ -114,6 +114,9 @@ function noteRelayStatus(status) {
   try {
     chrome.storage.local.set({ fbmRelayLastStatus: {
       at: Date.now(),
+      stage: String(item.stage || ''),
+      requestSentAt: Number(item.requestSentAt || 0),
+      responseReceivedAt: Number(item.responseReceivedAt || 0),
       ok: item.ok === true,
       code: String(item.code || ''),
       httpStatus: Number(item.httpStatus || 0),
@@ -126,21 +129,41 @@ function noteRelayStatus(status) {
 function postRelay(url, key, body) {
   var controller = typeof AbortController === 'function' ? new AbortController() : null;
   var timer = controller ? setTimeout(function () { controller.abort(); }, GAS_RELAY_TIMEOUT_MS) : null;
+  var requestSentAt = Date.now();
+  noteRelayStatus({ stage: 'request_sent', requestSentAt: requestSentAt, code: 'RELAY_REQUEST_SENT' });
   return fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'omit', redirect: 'follow', signal: controller && controller.signal, body: JSON.stringify(Object.assign({ key: key }, body)) }).then(function (response) {
     return response.text().then(function (text) {
+      var responseReceivedAt = Date.now();
+      noteRelayStatus({ stage: 'response_received', requestSentAt: requestSentAt, responseReceivedAt: responseReceivedAt, httpStatus: response.status, responseLength: text.length, code: 'RELAY_RESPONSE_RECEIVED' });
       var parsed = null;
       try { parsed = JSON.parse(text); } catch (ignore) { parsed = { ok: false, code: 'RELAY_INVALID_JSON', error: 'GAS relay trả về dữ liệu không hợp lệ.' }; }
       if (!response.ok && parsed && !parsed.error) { parsed.error = 'GAS relay HTTP ' + response.status; }
-      noteRelayStatus({ ok: response.ok && parsed && parsed.ok !== false, code: parsed && parsed.code || (response.ok ? 'OK' : 'RELAY_HTTP_ERROR'), httpStatus: response.status, responseLength: text.length, error: parsed && parsed.error || '' });
+      noteRelayStatus({ stage: 'completed', requestSentAt: requestSentAt, responseReceivedAt: responseReceivedAt, ok: response.ok && parsed && parsed.ok !== false, code: parsed && parsed.code || (response.ok ? 'OK' : 'RELAY_HTTP_ERROR'), httpStatus: response.status, responseLength: text.length, error: parsed && parsed.error || '' });
       return parsed;
     });
   }).catch(function (error) {
     var timeout = error && error.name === 'AbortError';
     var message = timeout ? 'GAS relay không trả lời sau ' + GAS_RELAY_TIMEOUT_MS + ' ms.' : String(error && error.message || error || 'Lỗi fetch GAS relay.');
-    noteRelayStatus({ ok: false, code: timeout ? 'RELAY_TIMEOUT' : 'RELAY_FETCH_FAILED', error: message });
+    noteRelayStatus({ stage: 'failed', requestSentAt: requestSentAt, ok: false, code: timeout ? 'RELAY_TIMEOUT' : 'RELAY_FETCH_FAILED', error: message });
     throw new Error(message);
   }).finally(function () { if (timer) { clearTimeout(timer); } });
 }
+
+/** Probe chỉ gọi Web App GAS; không tìm tab FBM, không gửi request nghiệp vụ. */
+function fbmRelayProbe() {
+  return getRelayConfig().then(function (config) {
+    if (!config) {
+      var missing = { ok: false, code: 'RELAY_CONFIG_MISSING', error: 'Thiếu URL, khóa hoặc Spreadsheet ID relay.' };
+      noteRelayStatus(Object.assign({ stage: 'blocked' }, missing));
+      return missing;
+    }
+    return postRelay(config.url, config.key, { kind: 'probe', spreadsheetId: config.spreadsheetId }).then(function (reply) {
+      console.info('[ShinCRM] GAS relay probe', reply);
+      return reply;
+    });
+  });
+}
+if (typeof globalThis !== 'undefined') { globalThis.fbmRelayProbe = fbmRelayProbe; }
 
 /** Đọc một relay config duy nhất; thiếu config thì không được chạm tab FBM. */
 function getRelayConfig() {
@@ -187,6 +210,10 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     var config = message.config || {};
     if (!chrome.storage || !chrome.storage.local) { sendResponse({ ok: false, error: 'Extension không có kho cấu hình.' }); return false; }
     chrome.storage.local.set({ fbmWebAppUrl: String(config.url || ''), fbmSyncKey: String(config.key || ''), fbmSpreadsheetId: String(config.spreadsheetId || '') }, function () { sendResponse({ ok: true }); });
+    return true;
+  }
+  if (message && message.type === 'FBM_RELAY_PROBE') {
+    fbmRelayProbe().then(sendResponse, function (error) { sendResponse({ ok: false, code: 'RELAY_PROBE_FAILED', error: String(error && error.message || error) }); });
     return true;
   }
   if (!message || message.type !== 'FBM_EXECUTE_REQUEST') { return false; }

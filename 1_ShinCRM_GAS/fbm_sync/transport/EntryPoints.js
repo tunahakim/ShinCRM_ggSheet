@@ -55,8 +55,20 @@ function fbmSyncRelayConfig() {
   try { url = ScriptApp.getService().getUrl() || ''; } catch (ignore) {}
   var spreadsheetId = '';
   try { spreadsheetId = String(shinOpenBook().getId() || ''); } catch (ignoreId) {}
-  return { url: url, key: String(PropertiesService.getScriptProperties().getProperty('FBM_SYNC_KEY') || ''), spreadsheetId: spreadsheetId };
+  var props = PropertiesService.getScriptProperties(), key = String(props.getProperty('FBM_SYNC_KEY') || '');
+  if (!key) {
+    var lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try {
+      key = String(props.getProperty('FBM_SYNC_KEY') || '');
+      if (!key) { key = Utilities.getUuid(); props.setProperty('FBM_SYNC_KEY', key); }
+    } finally { lock.releaseLock(); }
+  }
+  return { url: url, key: key, spreadsheetId: spreadsheetId };
 }
+
+/** ACK không đụng state, dùng để kiểm tra Extension gọi được GAS khi Sidebar đã đóng. */
+function fbmSyncRelayProbe() { return { ok: true, code: 'RELAY_PROBE_OK', serverAt: Date.now() }; }
 
 /** Cổng HTTP tùy chọn cho runner; bắt buộc khóa trước khi xử lý. */
 function doPost(event) {
@@ -66,7 +78,7 @@ function doPost(event) {
     var actualSpreadsheetId = '';
     try { actualSpreadsheetId = String(shinOpenBook().getId() || ''); } catch (ignoreId) {}
     if (!body.spreadsheetId || !actualSpreadsheetId || String(body.spreadsheetId) !== actualSpreadsheetId) { return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'spreadsheet_mismatch' })).setMimeType(ContentService.MimeType.JSON); }
-    var result = body.kind === 'heartbeat' ? fbmSyncHeartbeat(body.response) : (body.response === undefined ? fbmSyncStart(body.mode) : fbmSyncContinue(body.response));
+    var result = body.kind === 'probe' ? fbmSyncRelayProbe() : (body.kind === 'heartbeat' ? fbmSyncHeartbeat(body.response) : (body.response === undefined ? fbmSyncStart(body.mode) : fbmSyncContinue(body.response)));
     return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
   } catch (err) { return ContentService.createTextOutput(JSON.stringify({ ok: false, error: String(err && err.message || err) })).setMimeType(ContentService.MimeType.JSON); }
 }

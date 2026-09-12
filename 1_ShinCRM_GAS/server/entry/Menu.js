@@ -22,26 +22,10 @@ function onOpen() {
     .addItem('Làm mới dữ liệu tất cả sheet quản trị', 'shinRenderAllViews')
     .addItem('Chuẩn bị sheet quản trị', 'shinPrepareCurrentView')
     .addItem('Bảng tra nhanh cú pháp lọc', 'shinShowFilterQuickReference')
-    .addItem('Tạo khóa relay đồng bộ FBM', 'fbmCreateSyncKey')
     .addSeparator()
     .addItem('Khôi phục toàn bộ Config về mặc định…', 'shinResetConfig')
     .addToUi();
 
-}
-
-/** Sinh khóa dùng chung cho Web App relay và Extension; không hiển thị hoặc ghi khóa ra Sheet/Log. */
-function fbmCreateSyncKey() {
-  return runEntryPoint('fbmCreateSyncKey', 'core', ERROR_CHANNEL_ALERT, function () {
-    var props = PropertiesService.getScriptProperties();
-    var existing = String(props.getProperty('FBM_SYNC_KEY') || '');
-    if (existing) {
-      SpreadsheetApp.getUi().alert('Khóa relay FBM đã tồn tại. Không thay đổi khóa hiện tại.');
-      return { ok: true, created: false };
-    }
-    props.setProperty('FBM_SYNC_KEY', Utilities.getUuid());
-    SpreadsheetApp.getUi().alert('Đã tạo khóa relay FBM. Hãy mở lại Sidebar để Extension nhận cấu hình mới.');
-    return { ok: true, created: true };
-  });
 }
 
 function shinRenderCurrentView(source) {
