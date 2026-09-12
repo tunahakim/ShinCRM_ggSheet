@@ -235,6 +235,7 @@
 - [x] Live `ALT00010`: xóa Activity khỏi Sheet rồi chạy lại, hệ thống khôi phục từ FBM, không phát sinh request xóa và không tạo trùng.
 - [x] Builder Activity Edit mở form lấy OldValue đúng fixture.
 - [x] Builder Activity Edit gửi `memvars.id` là ID FBM số, không gửi mã nội bộ `ACT-*`.
+- [x] Callback Activity Edit chỉ trả snapshot gọn cho Sidebar, không mang lookup Category, OldValue hoặc record nội bộ khiến GAS → Sidebar treo; quá 30 giây Sidebar báo rõ và không tự phát lại lệnh ghi.
 - [x] Parser Row 45 ô giữ `end_time`, lấy `_ticket` từ Showing thành `fileticket`, hỗ trợ Row null và fallback.
 - [x] Cổng owner Activity edit đã có sau bước mở form.
 - [x] Edit sai owner chỉ lỗi record đó, không sửa owner FBM và không chặn record khác.
@@ -301,7 +302,7 @@
 | Slice 3 — Pull Activity | `8fbb6a7` + entrypoint DEV | `1075/1075` | `@136` | Pull `ALT00010` đã xác nhận Activity liên kết và idempotency; bulk/catchup/rotation đã có test offline; `fbmSyncStartActivityBulk` trả `OK`, request đầu `authorize`, state `scan=activity_bulk`; `fbmInstallScheduler` trả `OK` | Ba lớp quét Activity nền đã có cursor state/DocumentProperties |
 | Slice 4 — Đối soát + conflict |  |  |  |  |  |
 | Slice 5 — Push Customer |  |  |  |  |  |
-| Slice 6 — Push Activity | `e9ba3f1`, `01688d6`, `cd94601` | `1099/1099` | `@154` | Chưa chạy lại ghi thật sau khi sửa payload mở form và ID FBM | Activity Edit dùng `type: 0` khi mở form, `type: 1` khi lưu, `memvars.id` là ID FBM; lỗi đẩy ghi đúng request kind và mở lại theo lô |
+| Slice 6 — Push Activity | `e9ba3f1`, `01688d6`, `cd94601`, `b6d8b43` | `1101/1101` | `@155` | Chờ kiểm chứng ghi thật lại sau khi thu gọn callback GAS → Sidebar | Activity Edit dùng `type: 0` khi mở form, `type: 1` khi lưu, `memvars.id` là ID FBM; lỗi đẩy ghi đúng request kind và mở lại theo lô |
 | Slice 7 — Scheduler + nền | `7a324ee`, `43233a5`, `0d46258`, `ba46b23`, `36d6f8f`, `9923fac`, `119cea6` | `1078/1078` | `@137` | GAS DEV `fbmSyncHeartbeat` và `fbmSyncStatus` trả `OK`; không phát request ghi | Handoff heartbeat giới hạn 10 request đọc mỗi lượt; relay kèm Spreadsheet ID; Sidebar gửi config khi mở; không chạm FBM khi thiếu config; bridge cũ sau Reload được thử lại có kiểm soát; state active quá hạn được thu hồi |
 | Slice 8 — UI + log + probe |  |  |  |  |  |
 | Slice 9 — Live acceptance + production |  |  |  |  |  |

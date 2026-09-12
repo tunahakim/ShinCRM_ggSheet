@@ -3,6 +3,7 @@
 var FBM_SYNC_CLIENT = { installed: false, waiting: {}, running: false, mode: 'read', writeAllowed: false, openedAt: 0, relayConfigured: false, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0 };
 /** Timeout cho một request Extension để phiên không treo vô hạn khi tab FBM/bridge mất kết nối. */
 var FBM_SYNC_REQUEST_TIMEOUT_MS = 20000;
+var FBM_SYNC_GAS_CONTINUE_WARN_MS = 30000;
 
 /** Tạo nút điều khiển dùng chung cho panel tiến độ. */
 function fbmSyncMakeButton(id, label, primary) {
@@ -288,8 +289,23 @@ function fbmSyncWaitingStatus(status, message) {
   var snapshot = status && (status.status || status) || {};
   return Object.assign({}, snapshot, { message: message });
 }
+/** Báo rõ callback GAS chậm nhưng không tự phát lại request ghi khi chưa biết FBM đã nhận hay chưa. */
+function fbmSyncContinueServer(status, response) {
+  var timer = setTimeout(function () {
+    if (!FBM_SYNC_CLIENT.running) { return; }
+    fbmSyncPaint(fbmSyncWaitingStatus(status, 'GAS đang xử lý phản hồi quá 30 giây. Có thể bấm Dừng đồng bộ; hệ sẽ không tự gửi lại lệnh ghi.'));
+  }, FBM_SYNC_GAS_CONTINUE_WARN_MS);
+  return callServer('fbmContinueSync', [response]).then(function (result) {
+    clearTimeout(timer);
+    return result;
+  }, function (error) {
+    clearTimeout(timer);
+    throw error;
+  });
+}
 /** Chạy chuỗi request GAS -> Extension cho tới khi hết cursor. */
 function fbmSyncLoop(status) {
+  if (!FBM_SYNC_CLIENT.running) { return fbmSyncStatusOnce(); }
   fbmSyncPaint(status);
   if (!status || !status.request) {
     FBM_SYNC_CLIENT.running = false;
@@ -308,7 +324,7 @@ function fbmSyncLoop(status) {
   return fbmSyncExtensionRequest(status.request).then(function (response) {
     if (!FBM_SYNC_CLIENT.running) { return fbmSyncStatusOnce(); }
     fbmSyncPaint(fbmSyncWaitingStatus(status, 'Đã nhận phản hồi FBM; đang chờ GAS xử lý...'));
-    return callServer('fbmContinueSync', [response]);
+    return fbmSyncContinueServer(status, response);
   }).then(fbmSyncLoop);
 }
 /** Mở phiên mới; chặn click trùng khi phiên đang chạy. */

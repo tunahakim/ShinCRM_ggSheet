@@ -20,11 +20,24 @@ FbmSync.syncEntityLabel = function (entity, phase) {
   if (phase === 'checking_session') { return 'Chuẩn bị phiên'; }
   return 'Tổng hợp';
 };
-/** Trả về snapshot đầy đủ để Sidebar render một lần. */
+/** Chỉ đưa dữ liệu render sang Sidebar; state nội bộ có lookup, cursor form và khóa vẫn ở GAS. */
+FbmSync.statusMetadata = function (metadata) {
+  var data = metadata || {}, keys = ['audit', 'categoryBlocks', 'conflicts', 'identityBlocks', 'activityBulkMissing', 'preflight', 'preflightIssues', 'preview', 'pushFailures', 'pushFailureDetails'];
+  return keys.reduce(function (out, key) {
+    if (data[key] !== undefined) { out[key] = data[key]; }
+    return out;
+  }, {});
+};
+/** Cursor công khai chỉ dùng để chẩn đoán trạng thái; không trả bản ghi, OldValue hay khóa về trình duyệt. */
+FbmSync.statusCursor = function (cursor) {
+  var value = cursor || {};
+  return { kind: String(value.kind || ''), operation: String(value.operation || ''), entity: String(value.entity || ''), index: Number(value.index || 0) };
+};
+/** Trả về snapshot gọn để Sidebar render một lần. */
 FbmSync.statusView = function () {
   var state = FbmSync.stateRead();
   if (typeof FbmSync.recoverStaleRun === 'function') { state = FbmSync.recoverStaleRun(state).state; }
-  return { ok: true, runId: state.runId, mode: state.mode, scan: state.scan || 'full', scheduledScan: state.scheduledScan || '', writeAllowed: FbmSync.writeAllowed(), phase: state.phase, label: FbmSync.statusLabel(state.phase), direction: FbmSync.syncDirection(state), entity: state.entity, entityLabel: FbmSync.syncEntityLabel(state.entity, state.phase), cursor: state.cursor, session: { customer: !!state.session.customerAuthorized, activity: !!state.session.activityAuthorized, expired: state.session.expired === true, lastHeartbeatAt: Number(state.session.lastHeartbeatAt || 0) }, metadata: state.metadata, counts: state.counts, current: state.current, message: state.message, startedAt: state.startedAt, updatedAt: state.updatedAt, nextRunAt: state.nextRunAt, lastError: state.lastError, lastFailureCode: state.lastFailureCode || '', retryable: state.retryable === true, locks: state.locks };
+  return { ok: true, runId: state.runId, mode: state.mode, scan: state.scan || 'full', scheduledScan: state.scheduledScan || '', writeAllowed: FbmSync.writeAllowed(), phase: state.phase, label: FbmSync.statusLabel(state.phase), direction: FbmSync.syncDirection(state), entity: state.entity, entityLabel: FbmSync.syncEntityLabel(state.entity, state.phase), cursor: FbmSync.statusCursor(state.cursor), session: { customer: !!state.session.customerAuthorized, activity: !!state.session.activityAuthorized, expired: state.session.expired === true, lastHeartbeatAt: Number(state.session.lastHeartbeatAt || 0) }, metadata: FbmSync.statusMetadata(state.metadata), counts: state.counts, current: state.current, message: state.message, startedAt: state.startedAt, updatedAt: state.updatedAt, nextRunAt: state.nextRunAt, lastError: state.lastError, lastFailureCode: state.lastFailureCode || '', retryable: state.retryable === true, locks: state.locks };
 };
 
 /** Ghi snapshot nghiệp vụ; payload/cookie không bao giờ đi vào Log. */

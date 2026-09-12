@@ -56,6 +56,13 @@ async function chay(so) {
   const pushView = orchestration.FbmSync.statusView();
   check(so, 'status noi ro chieu ShinCRM sang FBM', pushView.direction, 'ShinCRM → FBM');
   check(so, 'status noi ro dang dong bo giao dich', pushView.entityLabel, 'Giao dịch');
+  const compactState = orchestration.FbmSync.stateRead();
+  compactState.cursor = { kind: 'push_wait', operation: 'activity_edit_save', entity: 'activity', index: 0, candidate: { record: { payload: new Array(200).join('khong_duoc_gui_') } }, oldValues: { details: new Array(200).join('old_value_') } };
+  compactState.metadata.categoryGate = { map: { huge: new Array(500).join('category_') }, valid: { huge: true } };
+  orchestration.FbmSync.stateWrite(compactState);
+  const compactView = orchestration.FbmSync.statusView();
+  check(so, 'status Sidebar khong tra Category gate va OldValue noi bo', [compactView.metadata.categoryGate, compactView.cursor.candidate, compactView.cursor.operation], [undefined, undefined, 'activity_edit_save']);
+  check(so, 'status Sidebar giu response nho khi state noi bo lon', JSON.stringify(compactView).length < 5000, true);
 
   const pausedState = orchestration.FbmSync.stateRead();
   pausedState.runId = 'paused-run'; pausedState.phase = 'paused'; pausedState.cursor = {};
