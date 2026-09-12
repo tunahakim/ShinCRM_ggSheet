@@ -98,7 +98,7 @@ async function chay(so) {
   builders.dirtyStateMarkRecords = (ids) => { dirtyIds = ids; };
   builders.writeGateSave = (request) => { newPullCalls += 1; newPullWrite = request; return { ok: true, fields: ['id'], rows: [['CUS-NEW']] }; };
   const newPullResult = builders.FbmSync.pullWrite('customer', [builders.FbmSync.customerRecord({ stt_rec_kh: 'NEW-C', ma_kh: 'ALT00012', ten_kh: 'Khách mới', ma_so_thue: '001' }, gate)]);
-  check(so, 'Customer pull moi ghi ca dinh danh baseline va dirty marker', [newPullResult.written, newPullWrite.source, newPullWrite.schemas.length, newPullWrite.records[0].fbmId, newPullWrite.records[0].fbmHash !== '', dirtyIds[0], newPullWrite.records[0].parentCompanyName], [1, 'pull', 2, 'NEW-C', true, 'CUS-NEW', '']);
+  check(so, 'Customer pull moi ghi ca dinh danh baseline dirty marker va quyen day', [newPullResult.written, newPullWrite.source, newPullWrite.schemas.length, newPullWrite.records[0].fbmId, newPullWrite.records[0].fbmHash !== '', dirtyIds[0], newPullWrite.records[0].parentCompanyName, newPullWrite.records[0].allowFbmPush], [1, 'pull', 2, 'NEW-C', true, 'CUS-NEW', '', builders.FbmSync.PUSH_ALLOW_VALUE]);
   check(so, 'Pull gộp nội dung và trạng thái vào một lượt cửa ghi', newPullCalls, 1);
   const pullLogs = [];
   builders.logEvent = (event) => pullLogs.push(event);
@@ -194,7 +194,7 @@ async function chay(so) {
   edges.writeGateSave = (request) => { activityPullWrite = request; return { ok: true }; };
   const newActivity = edges.FbmSync.activityRecord({ id: 88, ma_kh: 'ALT00014', ten_cv: 'Gọi', details: 'Nội dung', end_date: '/Date(1757386800000)/' }, gate);
   const activityPull = edges.FbmSync.pullWrite('activity', [newActivity]);
-  check(so, 'Activity pull moi noi dung vao Customer noi bo', [activityPull.written, activityPullWrite.records[0].customerId, activityPullWrite.records[0].fbmId], [1, 'CUS-ACT', 88]);
+  check(so, 'Activity pull moi noi dung vao Customer noi bo va cho phep day', [activityPull.written, activityPullWrite.records[0].customerId, activityPullWrite.records[0].fbmId, activityPullWrite.records[0].allowFbmPush], [1, 'CUS-ACT', 88, edges.FbmSync.PUSH_ALLOW_VALUE]);
   edges.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-ACT', fbmCustomerCode: 'ALT00014' }] : [];
   const orphanActivity = edges.FbmSync.activityRecord({ id: 89, ma_kh: 'ALT00014', ten_cv: 'Gọi', details: 'Mồ côi #SC-ACT-UNKNOWN', end_date: '/Date(1757386800000)/' }, gate);
   const orphanActivityResult = edges.FbmSync.pullWrite('activity', [orphanActivity]);
