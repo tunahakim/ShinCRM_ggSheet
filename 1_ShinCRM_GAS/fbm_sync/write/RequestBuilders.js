@@ -22,7 +22,9 @@ FbmSync.memvars = function (names, values, oldValues) {
   return names.map(function (name) {
     var hasNew = values && Object.prototype.hasOwnProperty.call(values, name);
     var hasOld = oldValues && Object.prototype.hasOwnProperty.call(oldValues, name);
-    return { Name: name, OldValue: hasOld ? FbmSync.transportValue(oldValues[name]) : null, NewValue: hasNew ? FbmSync.transportValue(values[name]) : (hasOld ? FbmSync.transportValue(oldValues[name]) : '') };
+    var missingOld = oldValues ? '' : null;
+    if (['ngay_nhac', 'ma_nhom'].indexOf(name) >= 0) { missingOld = null; }
+    return { Name: name, OldValue: hasOld ? FbmSync.transportValue(oldValues[name]) : missingOld, NewValue: hasNew ? FbmSync.transportValue(values[name]) : (hasOld ? FbmSync.transportValue(oldValues[name]) : '') };
   });
 };
 
