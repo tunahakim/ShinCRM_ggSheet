@@ -37,6 +37,8 @@ async function sidebarBoot() {
     dispatchInstall();
     selectionPollInstall();
     sheetLinkInstall();
+    // Bắt tay phải được dựng trước khi gửi relay config; bridge sẽ bỏ tin chưa có nonce/kênh.
+    if (typeof fbmSyncConfigureRelay === 'function') { fbmSyncConfigureRelay().catch(function () {}); }
     selectionPollSetReady(false);
 
     statusInfoLine('Đang đo ngân sách ô và nạp lõi…');
