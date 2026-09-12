@@ -121,6 +121,8 @@ function noteRelayStatus(status) {
       code: String(item.code || ''),
       httpStatus: Number(item.httpStatus || 0),
       responseLength: Number(item.responseLength || 0),
+      contentType: String(item.contentType || '').slice(0, 120),
+      responsePrefix: String(item.responsePrefix || '').slice(0, 160),
       error: String(item.error || '').slice(0, 240)
     } });
   } catch (ignore) {}
@@ -134,11 +136,15 @@ function postRelay(url, key, body) {
   return fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'omit', redirect: 'follow', signal: controller && controller.signal, body: JSON.stringify(Object.assign({ key: key }, body)) }).then(function (response) {
     return response.text().then(function (text) {
       var responseReceivedAt = Date.now();
-      noteRelayStatus({ stage: 'response_received', requestSentAt: requestSentAt, responseReceivedAt: responseReceivedAt, httpStatus: response.status, responseLength: text.length, code: 'RELAY_RESPONSE_RECEIVED' });
+      var contentType = response.headers.get('content-type') || '';
+      var responsePrefix = text.replace(/[\r\n\t]+/g, ' ').slice(0, 160);
+      noteRelayStatus({ stage: 'response_received', requestSentAt: requestSentAt, responseReceivedAt: responseReceivedAt, httpStatus: response.status, responseLength: text.length, contentType: contentType, responsePrefix: responsePrefix, code: 'RELAY_RESPONSE_RECEIVED' });
       var parsed = null;
-      try { parsed = JSON.parse(text); } catch (ignore) { parsed = { ok: false, code: 'RELAY_INVALID_JSON', error: 'GAS relay trả về dữ liệu không hợp lệ.' }; }
+      try { parsed = JSON.parse(text); } catch (ignore) {
+        parsed = { ok: false, code: 'RELAY_INVALID_JSON', error: 'GAS relay trả về dữ liệu không hợp lệ.', contentType: contentType, responsePrefix: responsePrefix };
+      }
       if (!response.ok && parsed && !parsed.error) { parsed.error = 'GAS relay HTTP ' + response.status; }
-      noteRelayStatus({ stage: 'completed', requestSentAt: requestSentAt, responseReceivedAt: responseReceivedAt, ok: response.ok && parsed && parsed.ok !== false, code: parsed && parsed.code || (response.ok ? 'OK' : 'RELAY_HTTP_ERROR'), httpStatus: response.status, responseLength: text.length, error: parsed && parsed.error || '' });
+      noteRelayStatus({ stage: 'completed', requestSentAt: requestSentAt, responseReceivedAt: responseReceivedAt, ok: response.ok && parsed && parsed.ok !== false, code: parsed && parsed.code || (response.ok ? 'OK' : 'RELAY_HTTP_ERROR'), httpStatus: response.status, responseLength: text.length, contentType: contentType, responsePrefix: responsePrefix, error: parsed && parsed.error || '' });
       return parsed;
     });
   }).catch(function (error) {

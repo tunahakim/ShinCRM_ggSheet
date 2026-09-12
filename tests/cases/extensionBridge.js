@@ -147,6 +147,7 @@ function chay(so) {
   check(so, 'GAS tu cap khoa relay mot lan bang lock', entryPointsSource.indexOf('waitLock(10000)') >= 0 && entryPointsSource.indexOf('if (!key) { key = Utilities.getUuid()') >= 0 && entryPointsSource.indexOf('FBM_SYNC_KEY') >= 0, true);
   check(so, 'relay co probe read-only va worker co ham probe doc lap', entryPointsSource.indexOf("body.kind === 'probe'") >= 0 && entryPointsSource.indexOf("code: 'RELAY_PROBE_OK'") >= 0 && workerSource.indexOf('function fbmRelayProbe()') >= 0 && workerSource.indexOf("type === 'FBM_RELAY_PROBE'") >= 0, true);
   check(so, 'probe ghi du moc gui va nhan response', workerSource.indexOf("stage: 'request_sent'") >= 0 && workerSource.indexOf("stage: 'response_received'") >= 0 && workerSource.indexOf('requestSentAt') >= 0 && workerSource.indexOf('responseReceivedAt') >= 0, true);
+  check(so, 'probe ghi dau response khi GAS tra khong phai JSON', workerSource.indexOf('contentType') >= 0 && workerSource.indexOf('responsePrefix') >= 0 && workerSource.indexOf('RELAY_INVALID_JSON') >= 0, true);
   check(so, 'executor co ping phien ban 21.7', /FBM_PING[\s\S]+version:\s*'21\.7'/.test(executorSource), true);
   check(so, 'executor chi chuyen body wire GAS, khong escape nghiep vu', executorSource.indexOf('req.bodyText') >= 0 && executorSource.indexOf("JSON.stringify(body).replace(/\\//g") < 0, true);
   check(so, 'executor giai ma response gzip bat thuong cua FBM', executorSource.indexOf('DecompressionStream') >= 0 && executorSource.indexOf('response.arrayBuffer()') >= 0, true);
