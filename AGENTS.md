@@ -2,6 +2,8 @@
 
 ## Mục tiêu và phạm vi
 
+- Đọc `D:\ShinCRM_ggSheet\0_Documentation\Opus 4.8 tư vấn\01. Quy chuẩn nền ShinCRM.md` đầu mỗi phiên.
+
 - Nếu đang làm phiên khác không phải phiên đồng bộ FBM thì bỏ qua các tài liệu liên quan đến FBM, cấm được đọc vì các file đó cực kỳ dài và tốn token.
 - Mục tiêu hiện tại của branch là hoàn thiện phiên đồng bộ FBM/ShinCRM theo `0_Documentation/Phiên code/Checklist đồng bộ FBM.md`. ShinCRM độc lập đã hoàn tất phần chính; không tự mở rộng sang bot tra cứu, Zalobot hoặc nạp 1.700 khách thật trước khi checklist cho phép.
 - Chỉ đọc checklist đồng bộ FBM và `0_Documentation/Phiên code/Câu hỏi đêm.md` khi đang thực hiện luồng đồng bộ FBM, thay đổi hợp đồng FBM, hoặc tiếp tục công việc được ghi trong hai tài liệu đó; sau khi ngữ cảnh bị nén thì đọc lại các tài liệu thuộc đúng phạm vi đang làm.
@@ -43,3 +45,7 @@
 - Mỗi commit phải cập nhật checklist tương ứng (nếu có); thêm tệp hoặc thư mục code thì cập nhật `0_Documentation/Phiên code/Cây thư mục code.md` trong cùng nhóm công việc.
 - Tiêu đề và mô tả commit viết tiếng Việt có dấu, ngắn gọn, không hard wrap.
 - Bảo toàn thay đổi có sẵn của chủ dự án; không đưa tệp không liên quan vào commit.
+
+## Nghiêm cấm:
+
+- Cấm sửa tài liệu ở `D:\ShinCRM_ggSheet\0_Documentation\Nghiên cứu FBM`.
