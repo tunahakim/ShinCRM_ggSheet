@@ -14,6 +14,14 @@ async function chay(so) {
   napServer(orchestration, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/EntryPoints.js');
   const started = orchestration.FbmSync.start({ mode: 'read' });
   check(so, 'start bat dau bang bootstrap Customer', started.request.meta.kind, 'authorize');
+  const conflictCarry = orchestration.FbmSync.stateRead();
+  conflictCarry.metadata.conflicts = [{ entity: 'activity', id: 'ACT-KEEP' }];
+  conflictCarry.locks = { 'activity:ACT-KEEP': { owner: 'sync', reason: 'conflict' } };
+  orchestration.FbmSync.stateWrite(conflictCarry);
+  conflictCarry.phase = 'conflict';
+  orchestration.FbmSync.stateWrite(conflictCarry);
+  const carriedStart = orchestration.FbmSync.stateStart('', 'checking_session', 0, { preserveConflicts: true });
+  check(so, 'phien moi giu conflict chua giai quyet va khoa sync', [carriedStart.metadata.conflicts.length, carriedStart.counts.conflict, carriedStart.locks['activity:ACT-KEEP'].reason], [1, 1, 'conflict']);
   orchestration.FbmSync.stateWrite(orchestration.FbmSync.stateStart('', 'idle', 0));
   const bulkStarted = orchestration.FbmSync.start({ mode: 'read', scan: 'activity_bulk' });
   check(so, 'start bulk Activity dung cursor authorize rieng', [bulkStarted.request.meta.kind, orchestration.FbmSync.stateRead().scan], ['authorize', 'activity_bulk']);

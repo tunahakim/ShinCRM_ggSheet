@@ -21,7 +21,7 @@ FbmSync.start = function (options) {
     if (!initialAuthorize) { return { ok: false, code: 'SYNC_ALREADY_RUNNING', status: FbmSync.statusView() }; }
   }
   if (typeof fbmEnsureSyncColumns === 'function') { fbmEnsureSyncColumns(); }
-  var opt = options || {}, state = FbmSync.stateStart('', 'checking_session', 0);
+  var opt = options || {}, state = FbmSync.stateStart('', 'checking_session', 0, { preserveConflicts: current.phase === 'conflict' });
   state.mode = opt.mode === 'write' ? 'write' : 'read';
   state.scan = opt.scan === 'activity_bulk' ? 'activity_bulk' : 'full';
   if (state.scan === 'activity_bulk') { state.mode = 'read'; }

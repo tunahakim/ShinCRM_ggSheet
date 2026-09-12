@@ -46,9 +46,11 @@ FbmSync.stateWrite = function (state) {
 FbmSync.statePatch = function (patch) { return FbmSync.stateWrite(Object.assign(FbmSync.stateRead(), patch || {})); };
 /** Mở phiên mới và xóa cursor/đếm của phiên trước. */
 FbmSync.stateStart = function (entity, phase, total) {
-  var now = Date.now(), previous = FbmSync.stateRead(), userLocks = {};
+  var preserveConflicts = arguments[3] && arguments[3].preserveConflicts === true, now = Date.now(), previous = FbmSync.stateRead(), userLocks = {}, preservedConflicts = preserveConflicts && previous.phase === 'conflict' && previous.metadata && Array.isArray(previous.metadata.conflicts) ? previous.metadata.conflicts.slice(-100) : [], conflictKeys = {};
+  preservedConflicts.forEach(function (item) { conflictKeys[String(item.entity || '') + ':' + String(item.id || '')] = true; });
   Object.keys(previous.locks || {}).forEach(function (key) { if (previous.locks[key] && previous.locks[key].owner === 'user') { userLocks[key] = previous.locks[key]; } });
-  return FbmSync.stateWrite({ runId: now.toString(36), entity: entity || '', phase: phase || 'checking_session', cursor: {}, counts: { total: Number(total) || 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 }, current: '', message: '', startedAt: now, updatedAt: now, lastError: '', lastFailureCode: '', retryable: false, retryCount: 0, retryLimit: 2, locks: userLocks });
+  Object.keys(previous.locks || {}).forEach(function (key) { if (conflictKeys[key] && previous.locks[key] && previous.locks[key].owner === 'sync') { userLocks[key] = previous.locks[key]; } });
+  return FbmSync.stateWrite({ runId: now.toString(36), entity: entity || '', phase: phase || 'checking_session', cursor: {}, counts: { total: Number(total) || 0, completed: 0, succeeded: 0, error: 0, conflict: preservedConflicts.length, skipped: 0 }, metadata: { conflicts: preservedConflicts }, current: '', message: '', startedAt: now, updatedAt: now, lastError: '', lastFailureCode: '', retryable: false, retryCount: 0, retryLimit: 2, locks: userLocks });
 };
 /** Thu hoi state dang chay nhung khong con caller; khong retry lenh ghi dang mo. */
 FbmSync.recoverStaleRun = function (state, now) {
