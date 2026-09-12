@@ -73,16 +73,17 @@ function fbmSyncPaintHeaderState(status) {
 /** Vẽ tiến trình riêng của phiên, không dùng chung dải loading của Sidebar. */
 function fbmSyncPaintProgress(panel, status, count) {
   var phase = String(status.phase || ''), active = ['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(phase) >= 0;
+  var waitingForResponse = active && status.cursor && status.cursor.kind === 'push_wait';
   var total = Math.max(0, Number(count.total || 0)), completed = Math.max(0, Number(count.completed || 0));
   var determinate = total > 0;
   var percent = determinate ? Math.min(100, Math.round(completed * 100 / total)) : 0;
   var box = document.createElement('div'); box.className = 'shin-sync-progress';
   var label = document.createElement('div'); label.className = 'shin-sync-progress-label';
-  label.textContent = determinate ? 'Tiến trình: ' + completed + '/' + total + ' (' + percent + '%)' : (active ? 'Tiến trình: đang xử lý…' : 'Tiến trình: chưa có tổng số bản ghi');
+  label.textContent = determinate ? 'Tiến trình: ' + completed + '/' + total + ' (' + percent + '%)' + (waitingForResponse ? ' · đang chờ phản hồi' : '') : (active ? 'Tiến trình: đang xử lý…' : 'Tiến trình: chưa có tổng số bản ghi');
   box.appendChild(label);
   var track = document.createElement('div'); track.className = 'shin-sync-progress-track'; track.setAttribute('role', 'progressbar'); track.setAttribute('aria-valuemin', '0'); track.setAttribute('aria-valuemax', '100');
   if (determinate) { track.setAttribute('aria-valuenow', String(percent)); }
-  var fill = document.createElement('div'); fill.className = 'shin-sync-progress-fill' + (!determinate && active ? ' is-indeterminate' : ''); fill.style.width = determinate ? percent + '%' : '35%'; track.appendChild(fill); box.appendChild(track);
+  var fill = document.createElement('div'); fill.className = 'shin-sync-progress-fill' + (!determinate && active ? ' is-indeterminate' : '') + (waitingForResponse ? ' is-waiting' : ''); fill.style.width = determinate ? percent + '%' : '35%'; track.appendChild(fill); box.appendChild(track);
   panel.appendChild(box);
 }
 /** Render only bounded, read-only fields returned by the GAS preview snapshot. */

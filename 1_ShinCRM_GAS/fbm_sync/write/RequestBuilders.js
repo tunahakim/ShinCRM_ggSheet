@@ -1,12 +1,28 @@
 /** Builder payload theo từng entity; không gửi request xóa. */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
+/**
+ * Đổi giá trị nội bộ về kiểu mà google.script.run và FBM đều nhận được.
+ * `extractFormValues` dùng Date để tính fingerprint, nhưng Date không được
+ * phép xuất hiện trong object GAS trả về Sidebar; FBM lại cần dạng /Date(ms)/.
+ */
+FbmSync.transportValue = function (value) {
+  if (value && Object.prototype.toString.call(value) === '[object Date]') { return '/Date(' + value.getTime() + ')/'; }
+  if (Array.isArray(value)) { return value.map(function (item) { return FbmSync.transportValue(item); }); }
+  if (value && typeof value === 'object') {
+    var out = {};
+    Object.keys(value).forEach(function (key) { out[key] = FbmSync.transportValue(value[key]); });
+    return out;
+  }
+  return value;
+};
+
 /** Ghép memvars; field không có trong bản ghi sửa phải giữ giá trị FBM cũ. */
 FbmSync.memvars = function (names, values, oldValues) {
   return names.map(function (name) {
     var hasNew = values && Object.prototype.hasOwnProperty.call(values, name);
     var hasOld = oldValues && Object.prototype.hasOwnProperty.call(oldValues, name);
-    return { Name: name, OldValue: hasOld ? oldValues[name] : null, NewValue: hasNew ? values[name] : (hasOld ? oldValues[name] : '') };
+    return { Name: name, OldValue: hasOld ? FbmSync.transportValue(oldValues[name]) : null, NewValue: hasNew ? FbmSync.transportValue(values[name]) : (hasOld ? FbmSync.transportValue(oldValues[name]) : '') };
   });
 };
 

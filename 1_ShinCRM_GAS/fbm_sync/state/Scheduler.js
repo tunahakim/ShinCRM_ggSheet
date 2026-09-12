@@ -20,6 +20,11 @@ FbmSync.schedulerClaim = function (kind, now) {
   try {
     var state = FbmSync.stateRead();
     if (typeof FbmSync.recoverStaleRun === 'function') { state = FbmSync.recoverStaleRun(state).state; }
+    // Phiên lỗi, đặc biệt push_wait, phải giữ nguyên nguyên nhân để người dùng xử lý;
+    // scheduler không được ghi đè message hoặc biến nó thành một lượt đang chờ.
+    if (state.runId && String(state.phase || '') === 'error' && ['SYNC_STALE_WRITE', 'SUPERVISOR_TIMEOUT_AT_PUSH'].indexOf(String(state.lastFailureCode || '')) >= 0) {
+      return { ok: false, code: 'SYNC_ERROR_REQUIRES_MANUAL_RESTART', status: FbmSync.statusView() };
+    }
     if (state.runId && ['idle', 'done', 'error'].indexOf(state.phase) < 0) { return { ok: false, code: 'SYNC_ALREADY_RUNNING', nextRunAt: due }; }
     due = Number(props.getProperty(item[0]) || 0);
     if (due && due > at) { return { ok: false, code: 'NOT_DUE', nextRunAt: due }; }

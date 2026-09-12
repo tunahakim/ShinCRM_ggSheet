@@ -133,6 +133,9 @@ async function chay(so) {
   scheduler.FbmSync.stateWrite(supervised);
   const supervisorResult = scheduler.FbmSync.supervise(Date.now());
   check(so, 'Supervisor danh dau phien ghi treo va khong tu retry', [supervisorResult.stale, scheduler.FbmSync.stateRead().phase, scheduler.FbmSync.stateRead().lastFailureCode], [true, 'error', 'SUPERVISOR_TIMEOUT_AT_PUSH']);
+  schedulerData.FBM_SYNC_NEXT_HEARTBEAT = '0';
+  const errorClaim = scheduler.FbmSync.schedulerClaim('heartbeat', Date.now());
+  check(so, 'Scheduler khong ghi de loi phien push da treo', [errorClaim.ok, errorClaim.code, scheduler.FbmSync.stateRead().phase, scheduler.FbmSync.stateRead().lastFailureCode], [false, 'SYNC_ERROR_REQUIRES_MANUAL_RESTART', 'error', 'SUPERVISOR_TIMEOUT_AT_PUSH']);
 
   const heartbeatData = {};
   const heartbeatPropertyApi = { getProperty: (key) => heartbeatData[key] || null, setProperty: (key, value) => { heartbeatData[key] = String(value); } };
