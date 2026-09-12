@@ -69,7 +69,7 @@ FbmSync.pushFailureDetail = function (failure) {
 };
 
 /** Ghi trạng thái kỹ thuật và giải phóng khóa khi một bản ghi không thể đẩy. */
-FbmSync.markPushError = function (state, candidate, failure) {
+FbmSync.markPushError = function (state, candidate, failure, operation) {
   var detail = FbmSync.pushFailureDetail(failure);
   state.counts.error += 1;
   state.message = 'Lỗi đẩy ' + String(candidate && candidate.entity || '') + ':' + String(candidate && candidate.id || '') + ': ' + detail.reason;
@@ -86,7 +86,8 @@ FbmSync.markPushError = function (state, candidate, failure) {
   if (typeof logEvent === 'function') {
     logEvent({ source: 'fbm_sync', action: 'push_record_error', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', entity: candidate.entity, recordId: String(candidate.id || ''), reason: detail.reason, detail: { code: detail.code, status: detail.status, fieldName: detail.fieldName } });
   }
-  FbmSync.logPushRecord(candidate, candidate.kind, typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', detail.reason, { syncStatus: FbmSync.SYNC_STATUS.error, failureCode: detail.code, httpStatus: detail.status, fieldName: detail.fieldName });
+  FbmSync.logPushRecord(candidate, operation || candidate.kind, typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', detail.reason, { syncStatus: FbmSync.SYNC_STATUS.error, failureCode: detail.code, httpStatus: detail.status, fieldName: detail.fieldName });
+  state.metadata.pushFailureDetails[candidate.entity + ':' + String(candidate.id || '')].requestKind = String(operation || candidate.kind || '');
   if (!waitingForMarker) { FbmSync.releasePushLock(state, candidate.entity, candidate.id); }
 };
 
@@ -106,7 +107,7 @@ FbmSync.markPushSkipped = function (state, candidate, status, reason) {
 /** Bỏ qua một record push lỗi và tiếp tục candidate kế tiếp, không lặp request đã gửi. */
 FbmSync.continueAfterPushError = function (state, cursor, failure) {
   var candidate = cursor && cursor.candidate;
-  if (candidate) { FbmSync.markPushError(state, candidate, failure); }
+  if (candidate) { FbmSync.markPushError(state, candidate, failure, cursor.operation); }
   state.cursor = { kind: 'push_scan', entity: cursor.entity, index: Number(cursor.index || 0) + 1 };
   state.current = '';
   state.phase = 'push';

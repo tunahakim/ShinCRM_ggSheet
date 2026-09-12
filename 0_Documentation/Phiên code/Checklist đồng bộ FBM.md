@@ -234,10 +234,11 @@
 - [x] Create mất phản hồi giữ `đang đẩy`, không retry; pull dùng marker để vá hoặc báo trùng.
 - [x] Live `ALT00010`: xóa Activity khỏi Sheet rồi chạy lại, hệ thống khôi phục từ FBM, không phát sinh request xóa và không tạo trùng.
 - [x] Builder Activity Edit mở form lấy OldValue đúng fixture.
+- [x] Builder Activity Edit gửi `memvars.id` là ID FBM số, không gửi mã nội bộ `ACT-*`.
 - [x] Parser Row 45 ô giữ `end_time`, lấy `_ticket` từ Showing thành `fileticket`, hỗ trợ Row null và fallback.
 - [x] Cổng owner Activity edit đã có sau bước mở form.
 - [x] Edit sai owner chỉ lỗi record đó, không sửa owner FBM và không chặn record khác.
-- [x] Lỗi đẩy không tự lặp; Sidebar có nút `Thử lại` để người dùng chủ động mở lại đúng bản ghi mà không phải sửa dữ liệu nghiệp vụ.
+- [x] Lỗi đẩy không tự lặp; Sidebar chỉ có thao tác mở lại cả nhóm lỗi, không bắt sửa dữ liệu nghiệp vụ và không retry mù request đã ghi.
 - [ ] Kỳ pull sau edit xác nhận baseline, `đẩy không ăn` hoặc conflict.
 - [ ] **Cần kiểm chứng thực tế:** tạo đúng một Activity thử dưới `ALT00010`, marker cố định và không tạo trùng khi pull lại.
 - [ ] **Cần kiểm chứng thực tế:** sửa Activity thử, xác nhận owner, ticket, OldValue và baseline.
@@ -300,7 +301,7 @@
 | Slice 3 — Pull Activity | `8fbb6a7` + entrypoint DEV | `1075/1075` | `@136` | Pull `ALT00010` đã xác nhận Activity liên kết và idempotency; bulk/catchup/rotation đã có test offline; `fbmSyncStartActivityBulk` trả `OK`, request đầu `authorize`, state `scan=activity_bulk`; `fbmInstallScheduler` trả `OK` | Ba lớp quét Activity nền đã có cursor state/DocumentProperties |
 | Slice 4 — Đối soát + conflict |  |  |  |  |  |
 | Slice 5 — Push Customer |  |  |  |  |  |
-| Slice 6 — Push Activity | `e9ba3f1`, `01688d6` | `1096/1096` | `@153` | Chưa chạy lại ghi thật sau khi sửa payload mở form và thêm retry chủ động | Activity Edit dùng `type: 0` khi mở form và `type: 1` khi lưu; lỗi đẩy có nút `Thử lại` không đổi dữ liệu |
+| Slice 6 — Push Activity | `e9ba3f1`, `01688d6`, `cd94601` | `1099/1099` | `@154` | Chưa chạy lại ghi thật sau khi sửa payload mở form và ID FBM | Activity Edit dùng `type: 0` khi mở form, `type: 1` khi lưu, `memvars.id` là ID FBM; lỗi đẩy ghi đúng request kind và mở lại theo lô |
 | Slice 7 — Scheduler + nền | `7a324ee`, `43233a5`, `0d46258`, `ba46b23`, `36d6f8f`, `9923fac`, `119cea6` | `1078/1078` | `@137` | GAS DEV `fbmSyncHeartbeat` và `fbmSyncStatus` trả `OK`; không phát request ghi | Handoff heartbeat giới hạn 10 request đọc mỗi lượt; relay kèm Spreadsheet ID; Sidebar gửi config khi mở; không chạm FBM khi thiếu config; bridge cũ sau Reload được thử lại có kiểm soát; state active quá hạn được thu hồi |
 | Slice 8 — UI + log + probe |  |  |  |  |  |
 | Slice 9 — Live acceptance + production |  |  |  |  |  |

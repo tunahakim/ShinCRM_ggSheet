@@ -114,18 +114,21 @@ async function chay(so) {
   check(so, 'push thanh cong ghi log request kind huong va hash', [pushLogs[0].action, pushLogs[0].detail.requestKind, pushLogs[0].detail.direction, pushLogs[0].detail.hBASE], ['push_record', 'customer_edit_save', 'ShinCRM → FBM', 'BASE']);
   const errorState = { counts: { error: 0 }, metadata: { categoryGate: {}, pushFailures: {} }, locks: {} };
   push.FbmSync.unlockRecord = () => ({ locks: {} });
-  push.FbmSync.markPushError(errorState, { entity: 'customer', id: 'C-ERR', record: { id: 'C-ERR', companyName: 'Lỗi' } }, 'FBM từ chối');
+  push.FbmSync.markPushError(errorState, { entity: 'customer', id: 'C-ERR', record: { id: 'C-ERR', companyName: 'Lỗi' } }, 'FBM từ chối', 'customer_edit_save');
   check(so, 'push loi luu hash local de chan lap lai', errorState.metadata.pushFailures['customer:C-ERR'], push.FbmSync.hash({ id: 'C-ERR', companyName: 'Lỗi' }, 'customer', {}));
   check(so, 'push loi luu nguyen nhan hien thi rieng voi hash', errorState.metadata.pushFailureDetails['customer:C-ERR'].reason, 'FBM từ chối');
+  check(so, 'push loi luu dung buoc request gay loi', errorState.metadata.pushFailureDetails['customer:C-ERR'].requestKind, 'customer_edit_save');
   let retryPatch;
-  push.FbmSync.readLocal = () => [{ id: 'ACT-FAIL', fbmId: '174813', syncStatus: push.FbmSync.SYNC_STATUS.error, content: 'Nội dung cũ' }];
-  push.writeGateSave = (request) => { retryPatch = request.records[0]; return { ok: true }; };
+  push.FbmSync.readLocal = (entity) => entity === 'activity'
+    ? [{ id: 'ACT-FAIL', fbmId: '174813', syncStatus: push.FbmSync.SYNC_STATUS.error, content: 'Nội dung cũ' }]
+    : [];
+  push.writeGateSave = (request) => { retryPatch = request.records; return { ok: true }; };
   const retryState = push.FbmSync.stateStart('', 'done', 0);
   retryState.metadata.pushFailures = { 'activity:ACT-FAIL': 'failed-hash' };
   retryState.metadata.pushFailureDetails = { 'activity:ACT-FAIL': { reason: 'HTTP 500' } };
   push.FbmSync.stateWrite(retryState);
-  const retryEnabled = push.fbmSyncRetryPushFailure('activity', 'ACT-FAIL');
-  check(so, 'retry push chu dong mo lai cung payload khong doi du lieu', [retryEnabled.ok, retryPatch.syncStatus, push.FbmSync.stateRead().metadata.pushFailures['activity:ACT-FAIL']], [true, push.FbmSync.SYNC_STATUS.pending, undefined]);
+  const retryEnabled = push.fbmSyncRetryPushFailures();
+  check(so, 'retry push mo lai ca lo cung payload khong doi du lieu', [retryEnabled.ok, retryPatch[0].syncStatus, push.FbmSync.stateRead().metadata.pushFailures['activity:ACT-FAIL']], [true, push.FbmSync.SYNC_STATUS.pending, undefined]);
   push.FbmSync.pushCandidates = () => [
     { kind: 'edit', id: 'C-ERR', record: { id: 'C-ERR', fbmId: 'A-ERR', fbmHash: 'h-err' } },
     { kind: 'edit', id: 'C-NEXT', record: { id: 'C-NEXT', fbmId: 'A-NEXT', fbmHash: 'h-next' } }
@@ -195,7 +198,11 @@ async function chay(so) {
   push.FbmSync.pushCandidates = () => [activityCandidate];
   push.FbmSync.validatePushCategories = () => [];
   push.FbmSync.pushEligibilityErrors = () => [];
-  push.FbmSync.scriptSettings = () => ({ accountName: 'Lê Tuấn Anh', baseUrl: 'https://fbm.test' });
+  push.FbmSync.scriptSettings = () => ({ accountName: 'Lê Tuấn Anh', baseUrl: 'https://fbm.test', activityAuthorized: '1.test' });
+  const activityEditOpen = push.FbmSync.activityEditOpenRequest('174813');
+  check(so, 'Activity edit mo form dung type 0 va token activity', [activityEditOpen.body.type, activityEditOpen.body.viewPage, activityEditOpen.body.authorized, activityEditOpen.meta.kind], [0, true, '1.test', 'activity_edit_open']);
+  const activityEdit = push.FbmSync.activityEditRequest({ id: 'ACT-008600', fbmId: '174813', content: 'Noi dung moi', taskType: 'Gọi', workDate: '2026-09-09' }, { id: 174813, ma_cv: 'GD', details: 'Noi dung cu', start_date: new Date('2026-09-09T00:00:00Z'), end_date: new Date('2026-09-09T00:00:00Z'), fileticket: 'ticket' }, {});
+  check(so, 'Activity edit gui id FBM thay vi id noi bo', activityEdit.body.memvars.filter((item) => item.Name === 'id')[0].NewValue, 174813);
   const activityPushState = push.FbmSync.stateStart('', 'push', 0);
   activityPushState.metadata.categoryGate = {};
   activityPushState.cursor = { kind: 'push_scan', entity: 'activity', index: 0 };
