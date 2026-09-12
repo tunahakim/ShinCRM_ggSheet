@@ -142,6 +142,12 @@ async function chay(so) {
   check(so, 'conflict tao khoa sync', conflictState.locks['customer:CUS-2'].owner, 'sync');
   const resolved = builders.FbmSync.resolveConflict('customer', 'CUS-2', 'fbm');
   check(so, 'resolve conflict theo FBM cap nhat baseline va xoa hang doi', [resolved.ok, conflictState.metadata.conflicts.length, conflictWrite.records[0].fbmHash !== '', conflictState.locks['customer:CUS-2']], [true, 0, true, undefined]);
+  conflictState.metadata.conflicts = [{ entity: 'customer', id: 'CUS-3', hFBM: 'FBM-HASH', hSHIN: 'SHIN-HASH', fbmRecord: { id: 'CUS-3', companyName: 'FBM' }, shinRecord: { id: 'CUS-3', companyName: 'Shin' } }];
+  conflictState.metadata.pushFailures = { 'customer:CUS-3': 'SHIN-HASH' };
+  conflictState.metadata.pushFailureDetails = { 'customer:CUS-3': { reason: 'HTTP 500' } };
+  conflictState.counts.conflict = 1; conflictState.phase = 'conflict';
+  const resolvedShin = builders.FbmSync.resolveConflict('customer', 'CUS-3', 'shin');
+  check(so, 'resolve conflict theo ShinCRM dat baseline FBM va cho phep push', [resolvedShin.ok, resolvedShin.status, conflictWrite.records[0].fbmHash, conflictWrite.records[0].syncStatus, conflictState.metadata.pushFailures['customer:CUS-3']], [true, builders.FbmSync.SYNC_STATUS.pending, 'FBM-HASH', builders.FbmSync.SYNC_STATUS.pending, undefined]);
 
   const edges = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {} });
   napServer(edges, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/reconcile/CategoryGate.js');

@@ -132,6 +132,7 @@ function chay(so) {
   check(so, 'status cu khong ve de ghi de loading cua luot moi', syncSource.indexOf('viewEpoch') >= 0 && syncSource.indexOf('epoch !== FBM_SYNC_CLIENT.viewEpoch') >= 0 && syncSource.indexOf('lastServerUpdatedAt') >= 0, true);
   check(so, 'status bat dau truoc phien khong ve de ghi de loading dang chay', syncSource.indexOf('runningWhenRequested') >= 0 && syncSource.indexOf('FBM_SYNC_CLIENT.running && !runningWhenRequested') >= 0, true);
   check(so, 'khong hien tieu de chi tiet khi chi co canh bao preflight', syncSource.indexOf('var hasRecordIssues') >= 0 && syncSource.indexOf('if (hasRecordIssues)') >= 0, true);
+  check(so, 'Sidebar co nut giai quyet conflict theo hai phia', syncSource.indexOf('data-fbm-conflict-choice') >= 0 && syncSource.indexOf('fbmResolveConflict') >= 0 && syncSource.indexOf('Giữ ShinCRM') >= 0 && syncSource.indexOf('Giữ FBM') >= 0, true);
   check(so, 'Sidebar bat tay relay khi khoi dong khong chan boot', sidebarSource.indexOf('fbmSyncConfigureRelay().catch(function () {})') >= 0 && sidebarSource.indexOf('fbmSyncConfigureRelay().catch(function () {})') < sidebarSource.indexOf('sidebarBoot();'), true);
   check(so, 'executor co ping phien ban 21.7', /FBM_PING[\s\S]+version:\s*'21\.7'/.test(executorSource), true);
   check(so, 'executor giai ma response gzip bat thuong cua FBM', executorSource.indexOf('DecompressionStream') >= 0 && executorSource.indexOf('response.arrayBuffer()') >= 0, true);

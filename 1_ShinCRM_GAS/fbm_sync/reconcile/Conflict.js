@@ -23,17 +23,24 @@ FbmSync.resolveConflict = function (entity, id, choice, merged) {
   else if (choice === 'manual' && merged && typeof merged === 'object') { record = Object.assign({}, item.shinRecord, merged); }
   else { return { ok: false, code: 'CONFLICT_CHOICE_INVALID', message: 'Cách xử lý conflict không hợp lệ.' }; }
   record.id = target;
-  record.fbmHash = choice === 'fbm' ? item.hFBM : (choice === 'shin' ? item.hSHIN : FbmSync.hash(record, entity, state.metadata.categoryGate || {}));
-  record.syncStatus = FbmSync.SYNC_STATUS.synced;
+  var categoryGate = state.metadata.categoryGate || {};
+  record.fbmHash = item.hFBM;
+  record.syncStatus = FbmSync.hash(record, entity, categoryGate) === String(item.hFBM || '')
+    ? FbmSync.SYNC_STATUS.synced
+    : FbmSync.SYNC_STATUS.pending;
   if (typeof writeGateSave !== 'function') { return { ok: false, code: 'WRITE_GATE_UNAVAILABLE', message: 'Không có cửa ghi để chốt conflict.' }; }
   var saved = writeGateSave({ entity: entity, records: [record], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
   if (!saved || !saved.ok) { return { ok: false, code: 'CONFLICT_WRITE_FAILED', result: saved }; }
   state.metadata.conflicts = conflicts.filter(function (entry) { return entry !== item; });
   var lockKey = entity + ':' + target;
   if (state.locks && state.locks[lockKey] && state.locks[lockKey].owner === 'sync') { delete state.locks[lockKey]; }
+  state.metadata.pushFailures = state.metadata.pushFailures || {};
+  state.metadata.pushFailureDetails = state.metadata.pushFailureDetails || {};
+  delete state.metadata.pushFailures[entity + ':' + target];
+  delete state.metadata.pushFailureDetails[entity + ':' + target];
   state.counts.conflict = Math.max(0, Number(state.counts.conflict || 0) - 1);
   state.phase = state.metadata.conflicts.length ? 'conflict' : (state.phase === 'conflict' ? 'done' : state.phase);
   state.message = 'Đã quyết conflict ' + entity + ' ' + target + ' theo ' + choice + '.';
   FbmSync.stateWrite(state);
-  return { ok: true, entity: entity, id: target, choice: choice, status: FbmSync.SYNC_STATUS.synced };
+  return { ok: true, entity: entity, id: target, choice: choice, status: record.syncStatus };
 };

@@ -12,6 +12,27 @@ FbmSync.preflightCategories = function (issues, category, mode) {
   }
 };
 
+FbmSync.preflightPushPermissions = function (issues, mode, gate) {
+  var customers = {}, counts = { customer: 0, activity: 0 };
+  try { (FbmSync.readLocal('customer') || []).forEach(function (record) { customers[String(record.id || '')] = record; }); } catch (ignoreCustomers) {}
+  ['customer', 'activity'].forEach(function (entity) {
+    var records = [];
+    try { records = FbmSync.readLocal(entity) || []; } catch (ignoreRecords) { return; }
+    records.forEach(function (record) {
+      var parent = entity === 'activity' ? customers[String(record.customerId || '')] : null;
+      var permission = typeof FbmSync.pushPermission === 'function' ? FbmSync.pushPermission(record, entity, parent) : { push: true };
+      if (permission.push) { return; }
+      var currentHash = typeof FbmSync.hash === 'function' ? FbmSync.hash(record, entity, gate || {}) : '';
+      var changed = !String(record.fbmHash || '').trim() || currentHash !== String(record.fbmHash || '').trim() || String(record.syncStatus || '') === String(FbmSync.SYNC_STATUS && FbmSync.SYNC_STATUS.pending || 'chờ đối soát');
+      if (!changed) { return; }
+      counts[entity] += 1;
+    });
+  });
+  Object.keys(counts).forEach(function (entity) {
+    if (counts[entity]) { FbmSync.preflightIssue(issues, 'FBM_RECORD_PUSH_PERMISSION_MISSING', 'warn', entity, 'Có ' + counts[entity] + ' bản ghi ' + (entity === 'activity' ? 'Activity' : 'Customer') + ' đã thay đổi nhưng chưa bật "Cho phép đẩy FBM".', false); }
+  });
+};
+
 FbmSync.preflightCandidates = function (issues, mode) {
   var gate = { valid: {} }, candidates = [], settings = {};
   try { settings = typeof FbmSync.scriptSettings === 'function' ? FbmSync.scriptSettings() : {}; } catch (ignoreSettings) {}
@@ -80,6 +101,7 @@ FbmSync.runPreflight = function (options) {
   if (!String(params.FBM_ACTIVITY_SINCE || '').trim()) { FbmSync.preflightIssue(issues, 'FBM_ACTIVITY_SINCE_MISSING', 'warn', 'Config', 'Thiếu FBM_ACTIVITY_SINCE; hệ sẽ dùng phạm vi đọc mặc định hiện tại.', false); }
   FbmSync.preflightCategories(issues, core.category || {}, mode);
   var candidateReport = FbmSync.preflightCandidates(issues, mode);
+  FbmSync.preflightPushPermissions(issues, mode, candidateReport.gate || {});
   var blocking = issues.filter(function (item) { return item.blocking; });
   return { ok: blocking.length === 0, mode: mode, issues: issues, blocking: blocking, warnings: issues.filter(function (item) { return !item.blocking; }), candidateCount: candidateReport.candidates.length };
 };
