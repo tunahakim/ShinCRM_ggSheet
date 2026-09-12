@@ -2,11 +2,12 @@
 
 ## Mục tiêu và phạm vi
 
-- Đọc `D:\ShinCRM_ggSheet\0_Documentation\00. Tài liệu chính thức\01. Quy chuẩn nền ShinCRM.md` đầu mỗi phiên.
+- `D:\ShinCRM_ggSheet\0_Documentation\00. Tài liệu chính thức\01. Quy chuẩn nền ShinCRM.md` là nguồn chuẩn duy nhất của quy tắc nền. Đầu mỗi phiên chỉ đọc các phần liên quan đến công việc; chỉ đọc toàn bộ khi thay đổi kiến trúc lõi, Schema, ranh giới module hoặc xử lý mâu thuẫn tài liệu.
+- Không tạo bản tóm tắt lặp lại quy tắc nền ở nơi khác; tài liệu điều hướng (nếu có) chỉ được chỉ đến nguồn chuẩn và không được chứa quyết định nghiệp vụ.
 
 - Nếu đang làm phiên khác không phải phiên đồng bộ FBM thì bỏ qua các tài liệu liên quan đến FBM, cấm được đọc vì các file đó cực kỳ dài và tốn token.
 - Mục tiêu hiện tại của branch là hoàn thiện phiên đồng bộ FBM/ShinCRM theo `0_Documentation/Phiên code/Checklist đồng bộ FBM.md`. ShinCRM độc lập đã hoàn tất phần chính; không tự mở rộng sang bot tra cứu, Zalobot hoặc nạp 1.700 khách thật trước khi checklist cho phép.
-- Chỉ đọc checklist đồng bộ FBM và `0_Documentation/Phiên code/Câu hỏi đêm.md` khi đang thực hiện luồng đồng bộ FBM, thay đổi hợp đồng FBM, hoặc tiếp tục công việc được ghi trong hai tài liệu đó; sau khi ngữ cảnh bị nén thì đọc lại các tài liệu thuộc đúng phạm vi đang làm.
+- Khi làm đồng bộ FBM, đọc `0_Documentation/00. Tài liệu chính thức/09. Đồng bộ FBM/00. Mục lục và phạm vi.md`, các chuyên đề 09 liên quan trực tiếp, `0_Documentation/Phiên code/Checklist đồng bộ FBM.md` và `0_Documentation/Phiên code/Câu hỏi đêm.md`; không đọc toàn bộ 09 nếu công việc không cần. Sau khi ngữ cảnh bị nén thì đọc lại đúng các tài liệu thuộc phạm vi đang làm.
 - Chỉ đọc tệp khi dòng code sắp viết cần đến nó; không quét cả codebase để chuẩn bị.
 - Nếu tài liệu bắt buộc trong phạm vi đang làm đã lỗi thời hoặc mâu thuẫn với quyết định mới của chủ dự án, được phép và phải cập nhật tài liệu đó trong cùng nhóm thay đổi; không giữ quy tắc cũ chỉ vì tài liệu đang tồn tại.
 - Tự thực hiện liên tục các mục chỉ cần code, test offline hoặc GAS DEV. Khi đến mục cần người dùng giữ tab FBM, đăng nhập, bấm ghi thật hoặc kiểm tra dữ liệu live thì dừng và ghi rõ thao tác cần người dùng làm.
