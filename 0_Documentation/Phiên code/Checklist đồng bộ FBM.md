@@ -47,6 +47,7 @@
 - [x] Extension có host permission `https://fbo.com.vn:8888/*`, content script FBM, service worker và cơ chế nạp lại executor.
 - [x] Có probe relay chỉ đọc: Service Worker gọi Web App GAS trực tiếp, GAS trả `RELAY_PROBE_OK`, không cần Sidebar và không chạm tab FBM.
 - [x] Probe ghi `request_sent`, `response_received` và kết quả cuối vào `chrome.storage.local` để phân biệt lỗi gửi, lỗi nhận và lỗi xử lý response.
+- [x] Service Worker có lệnh kiểm tra vòng đọc `fbmRunBackgroundSync('read')`, chuyển request/response do GAS cấp qua tab FBM, giới hạn 100 request và không tự ghi FBM.
 - [x] Đã kiểm chứng đường Sidebar → Extension → tab FBM → Sidebar nhận response thật.
 - [x] Executor báo phiên bản `21.7`; reload Extension có thể phục hồi đầu nhận.
 - [x] Bridge cũ sau Reload báo lỗi `Extension context invalidated` theo nhánh có thể thử lại; Sidebar phát lại đúng một request và Service Worker chống trùng theo `id`.

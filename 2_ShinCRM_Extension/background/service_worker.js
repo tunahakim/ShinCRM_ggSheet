@@ -172,6 +172,53 @@ function fbmRelayProbe() {
 }
 if (typeof globalThis !== 'undefined') { globalThis.fbmRelayProbe = fbmRelayProbe; }
 
+var fbmBackgroundSyncFlight = null;
+var FBM_BACKGROUND_SYNC_MAX_REQUESTS = 100;
+
+function noteBackgroundSyncStatus(stage, extra) {
+  if (!chrome.storage || !chrome.storage.local || !chrome.storage.local.set) { return; }
+  var item = Object.assign({ at: Date.now(), stage: String(stage || '') }, extra || {});
+  try { chrome.storage.local.set({ fbmBackgroundSyncLastStatus: item }); } catch (ignore) {}
+}
+
+/** Chạy một phiên GAS trực tiếp từ Service Worker; mặc định chỉ đọc, không cần Sidebar. */
+function fbmRunBackgroundSync(mode) {
+  if (fbmBackgroundSyncFlight) { return fbmBackgroundSyncFlight; }
+  var selectedMode = String(mode || 'read').toLowerCase() === 'write' ? 'write' : 'read';
+  fbmBackgroundSyncFlight = getRelayConfig().then(function (config) {
+    if (!config) { throw new Error('Thiếu cấu hình relay; hãy mở Sidebar một lần để cấp URL và khóa.'); }
+    return findFbmTab().then(function (tab) {
+      if (!tab) { throw new Error('Không tìm thấy tab FBM đang mở.'); }
+      noteBackgroundSyncStatus('start_requested', { mode: selectedMode, requestCount: 0 });
+      return postRelay(config.url, config.key, { mode: selectedMode, spreadsheetId: config.spreadsheetId }).then(function (reply) {
+        return relayBackgroundSyncRequests(tab.id, config, reply, 0, selectedMode);
+      });
+    });
+  }).then(function (reply) {
+    noteBackgroundSyncStatus('completed', { mode: selectedMode, requestCount: Number(reply && reply.requestCount || 0), ok: !!(reply && reply.ok), code: String(reply && reply.code || '') });
+    console.info('[ShinCRM] GAS background sync completed', reply);
+    return reply;
+  }).catch(function (error) {
+    noteBackgroundSyncStatus('failed', { mode: selectedMode, error: String(error && error.message || error) });
+    console.error('[ShinCRM] GAS background sync failed', error);
+    throw error;
+  }).finally(function () { fbmBackgroundSyncFlight = null; });
+  return fbmBackgroundSyncFlight;
+}
+
+function relayBackgroundSyncRequests(tabId, config, gasReply, requestCount, mode) {
+  var count = Number(requestCount || 0), next = gasReply && gasReply.request;
+  if (!next) { return Promise.resolve(Object.assign({}, gasReply || {}, { requestCount: count, mode: mode })); }
+  if (count >= FBM_BACKGROUND_SYNC_MAX_REQUESTS) { throw new Error('Đồng bộ Service Worker vượt quá ' + FBM_BACKGROUND_SYNC_MAX_REQUESTS + ' request trong một lượt.'); }
+  noteBackgroundSyncStatus('fbm_request_sent', { mode: mode, requestCount: count + 1 });
+  console.info('[ShinCRM] FBM background request', count + 1, next.meta && next.meta.kind || 'request');
+  return sendToFbmTab(tabId, next).then(function (reply) {
+    noteBackgroundSyncStatus('fbm_response_received', { mode: mode, requestCount: count + 1 });
+    return postRelay(config.url, config.key, { spreadsheetId: config.spreadsheetId, response: rawFbmReply(reply) });
+  }).then(function (nextReply) { return relayBackgroundSyncRequests(tabId, config, nextReply, count + 1, mode); });
+}
+if (typeof globalThis !== 'undefined') { globalThis.fbmRunBackgroundSync = fbmRunBackgroundSync; }
+
 /** Đọc một relay config duy nhất; thiếu config thì không được chạm tab FBM. */
 function getRelayConfig() {
   if (!chrome.storage || !chrome.storage.local || !chrome.storage.local.get) { return Promise.resolve(null); }
@@ -221,6 +268,10 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   }
   if (message && message.type === 'FBM_RELAY_PROBE') {
     fbmRelayProbe().then(sendResponse, function (error) { sendResponse({ ok: false, code: 'RELAY_PROBE_FAILED', error: String(error && error.message || error) }); });
+    return true;
+  }
+  if (message && message.type === 'FBM_BACKGROUND_SYNC') {
+    fbmRunBackgroundSync(message.mode).then(sendResponse, function (error) { sendResponse({ ok: false, code: 'BACKGROUND_SYNC_FAILED', error: String(error && error.message || error) }); });
     return true;
   }
   if (!message || message.type !== 'FBM_EXECUTE_REQUEST') { return false; }
