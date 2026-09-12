@@ -64,7 +64,7 @@
 - [x] Retry transport được tách khỏi retry nghiệp vụ; lỗi nghiệp vụ chỉ thử lại khi `hSHIN` đổi.
 - [x] Khôi phục cursor đọc còn hạn sau khi Sidebar, Chrome hoặc GAS gián đoạn; request ghi dở không tự phát lại.
 - [x] Giữ khoảng nghỉ và trần request phù hợp FBM, không dồn quá 60 request/phút.
-- [ ] Web App `doPost` xác thực khóa và Extension thực sự điều phối qua Web App.
+- [x] Web App `doPost` xác thực khóa và Extension thực sự điều phối qua Web App; kiểm thử nguồn relay phủ khóa và Spreadsheet ID.
 
 ### Metadata, chuẩn hóa và trạng thái
 
