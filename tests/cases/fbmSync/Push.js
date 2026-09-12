@@ -101,6 +101,10 @@ async function chay(so) {
   conflictPushState.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
   push.FbmSync.stateWrite(conflictPushState);
   check(so, 'push dung lai khi pull da phat hien conflict', [push.FbmSync.nextPushRequest(conflictPushState), push.FbmSync.stateRead().phase, push.FbmSync.stateRead().cursor], [null, 'conflict', {}]);
+  push.FbmSync.pushCandidates = () => [];
+  const emptyWriteState = push.FbmSync.stateStart('', 'push', 0); emptyWriteState.mode = 'write'; emptyWriteState.metadata.categoryGate = {}; emptyWriteState.cursor = { kind: 'push_scan', entity: 'customer', index: 0 }; push.FbmSync.stateWrite(emptyWriteState);
+  push.FbmSync.nextPushRequest(emptyWriteState);
+  check(so, 'push khong co ung vien hien thong bao khong co ban ghi day', push.FbmSync.stateRead().message, 'Đồng bộ hoàn tất; không có bản ghi nào được đẩy.');
   let pushPatch;
   const pushLogs = [];
   push.logEvent = (event) => pushLogs.push(event);

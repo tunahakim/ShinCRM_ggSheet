@@ -188,9 +188,16 @@ FbmSync.nextPushRequest = function (state) {
   if (entity === 'customer') {
     state.cursor = { kind: 'push_scan', entity: 'activity', index: 0 }; state.entity = 'activity'; FbmSync.stateWrite(state); return FbmSync.nextPushRequest(state);
   }
-  state.phase = 'done'; state.entity = ''; state.current = ''; state.message = Number(state.counts.error || 0) > 0
+  state.phase = 'done'; state.entity = ''; state.current = '';
+  var pushSucceeded = Number(state.metadata && state.metadata.pushSucceeded || 0);
+  state.message = Number(state.counts.error || 0) > 0
     ? 'Đồng bộ hoàn tất nhưng có ' + Number(state.counts.error || 0) + ' lỗi đẩy; xem Chi tiết bản ghi.'
-    : 'Đồng bộ hoàn tất; bản ghi vừa đẩy đang chờ kỳ đọc xác nhận.'; state.cursor = {}; FbmSync.stateWrite(state); return null;
+    : pushSucceeded > 0
+      ? 'Đồng bộ hoàn tất; bản ghi vừa đẩy đang chờ kỳ đọc xác nhận.'
+      : state.mode === 'write'
+        ? 'Đồng bộ hoàn tất; không có bản ghi nào được đẩy.'
+        : 'Đồng bộ hoàn tất.';
+  state.cursor = {}; FbmSync.stateWrite(state); return null;
 };
 
 /** Xử lý bước mở form và bước lưu của một candidate push. */
@@ -224,6 +231,7 @@ FbmSync.continuePush = function (state, response) {
   state.metadata = state.metadata || {};
   state.metadata.pushFailures = state.metadata.pushFailures || {};
   delete state.metadata.pushFailures[cursor.entity + ':' + String(candidate.id || '')];
+  state.metadata.pushSucceeded = Number(state.metadata.pushSucceeded || 0) + 1;
   state.counts.succeeded += 1; FbmSync.releasePushLock(state, cursor.entity, candidate.id); state.cursor = { kind: 'push_scan', entity: cursor.entity, index: Number(cursor.index || 0) + 1 }; state.current = ''; FbmSync.stateWrite(state);
   return FbmSync.nextPushRequest(state);
 };
