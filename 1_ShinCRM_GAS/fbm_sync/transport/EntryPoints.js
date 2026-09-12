@@ -3,6 +3,8 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 /** API bắt đầu phiên cho Sidebar hoặc DEV runner. */
 function fbmSyncStart(mode) { return FbmSync.start({ mode: mode }); }
+/** Khoi tao rieng pipeline bulk Activity de nghiem thu scheduler ma khong phai cho trigger 8 gio. */
+function fbmSyncStartActivityBulk() { return FbmSync.start({ mode: 'read', scan: 'activity_bulk' }); }
 /** API nhận response Extension và trả request kế tiếp. */
 function fbmSyncContinue(rawResponse) { return FbmSync.continue(rawResponse); }
 /** Tính lại baseline nội bộ mà không mở phiên hoặc gọi request FBM. */

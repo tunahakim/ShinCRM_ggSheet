@@ -162,6 +162,7 @@
 - [x] `ngay_gd` mới hơn max Activity đã có ID thì quét externalKey riêng Customer đó.
 - [x] Vòng xoay quét 30 Customer tiếp theo để bắt Activity tạo lùi ngày.
 - [x] Ba lớp có cursor bền vững trong state và DocumentProperties, không bị hạ thành tùy chọn.
+- [x] Có entrypoint DEV `fbmSyncStartActivityBulk` để chạy riêng pipeline bulk Activity và kiểm thử không cần chờ trigger 8 giờ.
 
 ### Đóng slice
 
@@ -292,7 +293,7 @@
 | Slice 0 — Nền tảng |  |  |  |  |  |
 | Slice 1 — Preflight + Category | `fadcf33` | `1064/1064` trước sửa cancel scheduler | Chờ deploy | Chưa có | Category chỉ đọc/đối chiếu; không tự ghi Sheet |
 | Slice 2 — Pull Customer |  |  |  |  |  |
-| Slice 3 — Pull Activity | `8fbb6a7` | `1074/1074` | `@133` | Pull `ALT00010` đã xác nhận Activity liên kết và idempotency; bulk/catchup/rotation đã có test offline; `fbmSyncStatus` trả `OK` | Ba lớp quét Activity nền đã có cursor state/DocumentProperties |
+| Slice 3 — Pull Activity | `8fbb6a7` + entrypoint DEV | `1075/1075` | `@135` | Pull `ALT00010` đã xác nhận Activity liên kết và idempotency; bulk/catchup/rotation đã có test offline; `fbmSyncStartActivityBulk` trả `OK`, request đầu `authorize`, state `scan=activity_bulk` | Ba lớp quét Activity nền đã có cursor state/DocumentProperties |
 | Slice 4 — Đối soát + conflict |  |  |  |  |  |
 | Slice 5 — Push Customer |  |  |  |  |  |
 | Slice 6 — Push Activity |  |  |  |  |  |
