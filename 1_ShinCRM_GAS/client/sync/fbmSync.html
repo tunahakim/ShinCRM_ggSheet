@@ -104,7 +104,8 @@ function fbmSyncPaintRecordIssues(panel, metadata) {
   var preflightIssues = Array.isArray(metadata.preflightIssues) ? metadata.preflightIssues : [];
   var categoryBlocks = Array.isArray(metadata.categoryBlocks) ? metadata.categoryBlocks : [];
   var activityMissing = Array.isArray(metadata.activityBulkMissing) ? metadata.activityBulkMissing : [];
-  if (!preflightIssues.length && !conflicts.length && !identityBlocks.length && !Object.keys(pushFailures).length && !categoryBlocks.length && !activityMissing.length) { return; }
+  var hasRecordIssues = conflicts.length || identityBlocks.length || Object.keys(pushFailures).length || categoryBlocks.length || activityMissing.length;
+  if (!preflightIssues.length && !hasRecordIssues) { return; }
   var box = document.createElement('div'); box.className = 'shin-sync-audit';
   if (preflightIssues.length) {
     var preflightTitle = document.createElement('div'); preflightTitle.className = 'shin-sync-preview-title'; preflightTitle.textContent = 'Preflight'; box.appendChild(preflightTitle);
@@ -113,7 +114,9 @@ function fbmSyncPaintRecordIssues(panel, metadata) {
       preflightRow.textContent = (item.blocking ? 'Loi' : 'Canh bao') + ' [' + String(item.code || '') + '] ' + String(item.message || ''); box.appendChild(preflightRow);
     });
   }
-  var title = document.createElement('div'); title.className = 'shin-sync-preview-title'; title.textContent = 'Chi tiết bản ghi'; box.appendChild(title);
+  if (hasRecordIssues) {
+    var title = document.createElement('div'); title.className = 'shin-sync-preview-title'; title.textContent = 'Chi tiết bản ghi'; box.appendChild(title);
+  }
   conflicts.slice(-20).forEach(function (item) {
     var row = document.createElement('div'); row.className = 'shin-sync-preview-row';
     var fields = (item.fields || []).map(function (field) { return String(field.field || '') + ': ' + String(field.left || '') + ' ↔ ' + String(field.right || ''); }).join('; ');
