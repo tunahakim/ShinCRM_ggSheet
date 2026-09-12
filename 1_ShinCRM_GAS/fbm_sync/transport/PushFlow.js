@@ -187,6 +187,18 @@ FbmSync.pushConfigErrors = function (candidate, settings) {
   return '';
 };
 
+/** Owner của Activity phải khớp tài khoản đã cấu hình trước khi cấp bất kỳ request push nào. */
+FbmSync.pushOwnerError = function (candidate, settings) {
+  if (!candidate || candidate.entity !== 'activity') { return ''; }
+  var cfg = settings || FbmSync.scriptSettings(), configured = String(cfg.accountName || '').trim();
+  var owner = String(candidate.record && candidate.record.owner || '').trim();
+  if (!configured) { return ''; }
+  if (owner && owner.toLowerCase() !== configured.toLowerCase()) {
+    return 'Activity ' + String(candidate.id || '') + ' thuộc owner FBM "' + owner + '", khác FBM_ACCOUNT_NAME đã cấu hình "' + configured + '".';
+  }
+  return '';
+};
+
 /** Đảm bảo mã khách FBM tự sinh đúng cấu hình trước khi lưu Customer mới. */
 FbmSync.validateAutoCustomerCode = function (code, settings) {
   var cfg = settings || FbmSync.scriptSettings(), value = String(code || '').trim(), prefix = String(cfg.customerPrefix || '').trim(), length = Number(cfg.customerCodeLength || 0);
@@ -217,6 +229,12 @@ FbmSync.nextPushRequest = function (state) {
     var candidate = candidates[index];
     var configError = FbmSync.pushConfigErrors(candidate);
     if (configError) { state.phase = 'paused'; state.message = configError; FbmSync.stateWrite(state); return null; }
+    var ownerError = FbmSync.pushOwnerError(candidate);
+    if (ownerError) {
+      candidate.entity = entity;
+      FbmSync.markPushSkipped(state, candidate, FbmSync.SYNC_STATUS.skipped, 'Bỏ qua ' + entity + ' ' + candidate.id + ': ' + ownerError);
+      index += 1; state.cursor.index = index; FbmSync.stateWrite(state); continue;
+    }
     if (typeof FbmSync.isRecordLocked === 'function' && FbmSync.isRecordLocked(entity, candidate.id)) {
       state.counts.skipped += 1; state.message = 'Hoãn ' + entity + ' ' + candidate.id + ' vì đang được người dùng chỉnh sửa.';
       index += 1; state.cursor.index = index; FbmSync.stateWrite(state); continue;

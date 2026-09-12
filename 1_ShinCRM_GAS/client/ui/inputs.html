@@ -179,6 +179,27 @@ function inputsGrowAll() {
   return tat.length;
 }
 
+/** Chuyển form sang chỉ xem khi GAS xác nhận record đang bị phiên đồng bộ khóa. */
+function screenFormApplySyncLock(message) {
+  if (typeof document === 'undefined') { return false; }
+  var fields = document.querySelectorAll('#sidebar-body [data-field], #sidebar-body .shin-field-edit, #sidebar-footer .shin-save-wide');
+  for (var i = 0; i < fields.length; i += 1) {
+    var element = fields[i];
+    if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA' || element.tagName === 'SELECT') { element.readOnly = true; }
+    if (element.tagName === 'BUTTON') { element.disabled = true; }
+    element.setAttribute('aria-disabled', 'true');
+  }
+  var body = document.getElementById('sidebar-body');
+  if (body && !document.getElementById('shin-form-sync-lock-notice')) {
+    var notice = document.createElement('div');
+    notice.id = 'shin-form-sync-lock-notice';
+    notice.className = 'shin-sync-lock-notice';
+    notice.textContent = String(message || 'Bản ghi đang được đồng bộ; biểu mẫu tạm thời chỉ xem.');
+    body.insertBefore(notice, body.firstChild || null);
+  }
+  return true;
+}
+
 
 /* ─── Nối dây ─── */
 

@@ -69,6 +69,10 @@ FbmSync.preflightCandidates = function (issues, mode) {
       (FbmSync.pushCandidates(entity) || []).forEach(function (candidate) {
         candidates.push(candidate);
         var record = candidate.record || {};
+        var ownerError = typeof FbmSync.pushOwnerError === 'function' ? FbmSync.pushOwnerError(candidate, settings) : '';
+        if (ownerError) {
+          FbmSync.preflightIssue(issues, 'FBM_ACTIVITY_OWNER_MISMATCH', 'error', entity, ownerError, mode === 'write');
+        }
         if (String(record.syncStatus || '') === String(FbmSync.SYNC_STATUS && FbmSync.SYNC_STATUS.conflict || 'xung đột chờ quyết') && !reportedConflicts[entity + ':' + String(candidate.id || '')]) {
           FbmSync.preflightIssue(issues, 'FBM_RECORD_CONFLICT_PENDING', 'error', entity, 'Bản ghi ' + String(candidate.id || '') + ' đang xung đột chờ quyết; không được tự động ghi đè.', mode === 'write');
         }

@@ -14,7 +14,7 @@ async function chay(so) {
   hop.FbmSync.readCategoryGate = () => ({ valid: {} });
   hop.FbmSync.readLocal = (entity) => entity === 'activity' ? [{ id: 'ACT-NOPERM', customerId: 'CUS-1', fbmId: '174813', fbmHash: 'old', allowFbmPush: 'Chưa cho phép', syncStatus: 'chờ đối soát', taskType: 'Gọi điện chăm sóc', content: 'Nội dung mới' }] : [{ id: 'CUS-1', fbmCustomerCode: 'ALT00010', allowFbmPush: 'Cho phép' }];
   hop.FbmSync.pushPermission = (record) => ({ push: String(record.allowFbmPush || '') === 'Cho phép' });
-  hop.FbmSync.pushCandidates = (entity) => entity === 'activity' ? [{ kind: 'edit', id: 'ACT-1', record: { id: 'ACT-1', syncStatus: hop.FbmSync.SYNC_STATUS.conflict, taskType: 'Gọi điện chăm sóc' } }] : [];
+  hop.FbmSync.pushCandidates = (entity) => entity === 'activity' ? [{ entity: 'activity', kind: 'edit', id: 'ACT-1', record: { id: 'ACT-1', syncStatus: hop.FbmSync.SYNC_STATUS.conflict, taskType: 'Gọi điện chăm sóc', owner: 'Owner khác' } }] : [];
 
   const write = hop.FbmSync.runPreflight({ mode: 'write' });
   check(so, 'preflight write chặn Config tài khoản thiếu', [write.ok, write.blocking.some((item) => item.code === 'FBM_ACCOUNT_NAME_MISSING')], [false, true]);
@@ -26,6 +26,12 @@ async function chay(so) {
   check(so, 'preflight read vẫn cho phép đọc nhưng giữ cảnh báo', [read.ok, read.warnings.some((item) => item.code === 'FBM_ACCOUNT_NAME_MISSING')], [true, true]);
   const push = hop.FbmSync.runPreflight({ mode: 'push' });
   check(so, 'preflight mode push vẫn fail-closed như mode write', [push.ok, push.blocking.some((item) => item.code === 'FBM_ACCOUNT_NAME_MISSING')], [false, true]);
+
+  hop.FbmSync.pushOwnerError = (candidate, settings) => candidate.entity === 'activity' && candidate.record.owner && candidate.record.owner !== settings.accountName
+    ? 'Activity ' + candidate.id + ' thuộc owner FBM khác.' : '';
+  hop.FbmSync.scriptSettings = () => ({ accountName: 'Owner đúng', customerPrefix: '', customerCodeLength: '' });
+  const owner = hop.FbmSync.runPreflight({ mode: 'write' });
+  check(so, 'preflight chặn toàn bộ ứng viên Activity lệch owner trước khi cấp request', [owner.ok, owner.blocking.some((item) => item.code === 'FBM_ACTIVITY_OWNER_MISMATCH')], [false, true]);
 }
 
 module.exports = { chay };

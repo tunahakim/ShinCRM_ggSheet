@@ -97,7 +97,7 @@
 - [x] Tách phần dựng block trạng thái, điều khiển và audit thành các tệp `.html` riêng trong `client/sync/`, vẫn dùng lớp component/block chuẩn của Sidebar.
 - [x] Tách màn hình trạng thái, thiết lập đăng nhập và audit thành các tệp giao diện riêng trong `client/sync/`, tái sử dụng block chuẩn.
 - [x] Lấy authorized Customer rồi Activity; thiếu token thì dừng trước CRUD.
-- [ ] Kiểm owner mặc định FBM khớp `FBM_ACCOUNT_NAME`; sai thì dừng chiều push.
+- [x] Kiểm owner mặc định FBM khớp `FBM_ACCOUNT_NAME`; sai thì dừng chiều push.
 - [ ] Xác nhận Config có `FBM_ACCOUNT_NAME`, `FBM_MA_KH_PREFIX`, `FBM_MA_KH_LENGTH`, `FBM_ACTIVITY_SINCE` và không khai trùng.
 
 ### Danh mục
@@ -191,7 +191,7 @@
 - [x] Nút giải quyết hỗ trợ theo FBM, theo ShinCRM hoặc trộn tay; cập nhật `hFBM` và trạng thái theo lựa chọn.
 - [x] Form Sidebar khóa user khi mở, nhả khi đóng và kiểm khóa sync trước Save.
 - [x] Pull/push hoãn record có khóa user và giữ nguyên bản nháp.
-- [ ] Khóa sync làm form chỉ xem, chặn Save và luôn được nhả sau khi xong/lỗi.
+- [x] Khóa sync làm form chỉ xem, chặn Save và luôn được nhả sau khi xong/lỗi.
 - [x] Record có `FBM_ID` chỉ được xóa mềm; không có đường gửi Delete FBM.
 - [x] HTTP 500/401/403/Login.aspx giữ cursor hợp lệ và thử lại ở kỳ sau.
 - [x] Bugs HTTP 200 gắn lỗi nghiệp vụ vào record và chỉ thử lại khi dữ liệu local đổi.
@@ -217,7 +217,7 @@
 - [x] Khi đang có phiên hoạt động, lần bấm Đồng bộ ngay thứ hai không tạo phiên song song.
 - [x] Nếu tổng số bản ghi đủ điều kiện thay đổi lớn hơn `10`, Sidebar preview và chờ người dùng chấp thuận trước request ghi; từ `10` trở xuống vẫn phải qua đủ cờ an toàn và cổng bản ghi. `fbmApprovePush` chỉ cấp request authorize sau khi chấp thuận; test offline đã phủ ngưỡng `11`.
 - [x] Dừng đồng bộ xóa cursor kỳ, nhả khóa sync, giữ khóa form user và không gửi Delete.
-- [ ] Kiểm owner mặc định FBM với `FBM_ACCOUNT_NAME` trước toàn bộ chiều push.
+- [x] Kiểm owner mặc định FBM với `FBM_ACCOUNT_NAME` trước toàn bộ chiều push.
 - [x] Kiểm đủ bảy field bắt buộc và mọi trần độ dài trước khi dựng request.
 - [x] Customer mới chưa Cho phép chỉ pull, không push.
 - [x] Customer thiếu field hoặc vượt trần không phát request, ghi trạng thái và lý do.
