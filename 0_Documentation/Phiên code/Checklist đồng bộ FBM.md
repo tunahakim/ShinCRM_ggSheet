@@ -247,6 +247,8 @@
 - [ ] **Cần kiểm chứng thực tế:** sửa Activity thử, xác nhận owner, ticket, OldValue và baseline.
 - [ ] **Cần kiểm chứng thực tế:** mô phỏng mất phản hồi một lần và kiểm marker recovery.
 
+- [x] Bien GAS chuan hoa de quy toan bo ket qua public cua fbmStartSync/fbmContinueSync, khong de Date trong status, metadata hoac cursor lam mat callback Sidebar; test offline 1121/1121.
+
 ## Slice 7 — Heartbeat, scheduler và chạy nền
 
 - [x] Extension có alarm heartbeat 5 phút, đọc `count:1`, mặc định không login và không write.

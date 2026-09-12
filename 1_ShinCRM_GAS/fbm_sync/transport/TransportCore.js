@@ -10,6 +10,19 @@ FbmSync.writeEnabled = function (mode) {
 FbmSync.writeAllowed = function () {
   try { return PropertiesService.getDocumentProperties().getProperty('FBM_SYNC_ALLOW_WRITES') === 'true'; } catch (err) { return false; }
 };
+/** Chỉ trả dữ liệu JSON thuần qua google.script.run; Date phải về dạng .NET của FBM. */
+if (typeof FbmSync.transportValue !== 'function') {
+  FbmSync.transportValue = function (value) {
+    if (value && Object.prototype.toString.call(value) === '[object Date]') { return '/Date(' + value.getTime() + ')/'; }
+    if (Array.isArray(value)) { return value.map(function (item) { return FbmSync.transportValue(item); }); }
+    if (value && typeof value === 'object') {
+      var out = {};
+      Object.keys(value).forEach(function (key) { out[key] = FbmSync.transportValue(value[key]); });
+      return out;
+    }
+    return value;
+  };
+}
 /** Bọc request nội bộ thành envelope gửi qua Extension. */
 FbmSync.nextEnvelope = function (request) {
   if (!request) { return null; }
@@ -22,7 +35,7 @@ FbmSync.nextEnvelope = function (request) {
     FbmSync.stateWrite(state);
   }
   if (FbmSync.traceEvent) { FbmSync.traceEvent('response_built', { requestId: id, operation: meta.kind, entity: meta.entity, recordId: meta.id || meta.shinId || meta.stt_rec_kh }); }
-  return FbmSync.protocol.request(id, request.url, request.body, meta);
+  return FbmSync.protocol.request(id, request.url, FbmSync.transportValue(request.body), FbmSync.transportValue(meta));
 };
 /** Dựng lại request đọc từ cursor; không lưu payload/cookie để retry không làm lộ bí mật. */
 FbmSync.requestForCursor = function (state) {
