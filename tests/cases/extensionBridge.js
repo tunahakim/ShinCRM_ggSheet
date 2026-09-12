@@ -126,6 +126,7 @@ function chay(so) {
   check(so, 'service worker co quyen goi Web App GAS va mien redirect', manifest.host_permissions.includes('https://script.google.com/macros/*') && manifest.host_permissions.includes('https://script.googleusercontent.com/macros/*'), true);
   check(so, 'relay GAS co timeout va luu chan doan toi thieu', workerSource.indexOf('GAS_RELAY_TIMEOUT_MS') >= 0 && workerSource.indexOf('RELAY_TIMEOUT') >= 0 && workerSource.indexOf('fbmRelayLastStatus') >= 0, true);
   const sidebarSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'client', 'Sidebar.html'), 'utf8');
+  const menuSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'server', 'entry', 'Menu.js'), 'utf8');
   const syncSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'client', 'sync', 'fbmSync.html'), 'utf8');
   check(so, 'Sidebar giu waiter va thu lai mot lan khi bridge cu mat context', syncSource.indexOf('if (data.retryable)') >= 0 && syncSource.indexOf('waiter.retryCount < 1') >= 0 && syncSource.indexOf('retryCount: 0') >= 0, true);
   check(so, 'mo man dong bo khong cho relay config chan status', syncSource.indexOf('Promise.all([fbmSyncConfigureRelay(), fbmSyncStatusOnce(true)])') >= 0, true);
@@ -143,6 +144,7 @@ function chay(so) {
   check(so, 'Sidebar khong gui relay config truoc khi boot bat tay', sidebarSource.indexOf('fbmSyncConfigureRelay().catch(function () {})') < 0, true);
   const bootstrapSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'client', 'ram', 'bootstrap.html'), 'utf8');
   check(so, 'relay config chi gui sau khi sheetLink da bat tay', bootstrapSource.indexOf('sheetLinkInstall();') >= 0 && bootstrapSource.indexOf('fbmSyncConfigureRelay().catch(function () {})') > bootstrapSource.indexOf('sheetLinkInstall();'), true);
+  check(so, 'co lenh tao khoa relay mot lan va khong ghi de khoa cu', menuSource.indexOf("addItem('Tạo khóa relay đồng bộ FBM', 'fbmCreateSyncKey')") >= 0 && menuSource.indexOf("props.setProperty('FBM_SYNC_KEY', Utilities.getUuid())") >= 0 && menuSource.indexOf('if (existing)') >= 0, true);
   check(so, 'executor co ping phien ban 21.7', /FBM_PING[\s\S]+version:\s*'21\.7'/.test(executorSource), true);
   check(so, 'executor chi chuyen body wire GAS, khong escape nghiep vu', executorSource.indexOf('req.bodyText') >= 0 && executorSource.indexOf("JSON.stringify(body).replace(/\\//g") < 0, true);
   check(so, 'executor giai ma response gzip bat thuong cua FBM', executorSource.indexOf('DecompressionStream') >= 0 && executorSource.indexOf('response.arrayBuffer()') >= 0, true);
