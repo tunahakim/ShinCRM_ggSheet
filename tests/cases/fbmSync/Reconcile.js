@@ -6,7 +6,7 @@ async function chay(so) {
   section("FBM sync — reconcile và candidate");
   const gate = { map: { '@CAT_TINH_THANH\u001fHà Nội': 'HNI' }, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true, HNI: true } } };
   const edges = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {} });
-  napServer(edges, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/reconcile/CategoryGate.js');
+  napServer(edges, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/reconcile/CategoryGate.js');
   check(so, 'normalize placeholder 1999 thanh rong', edges.FbmSync.normalize('/Date(915123600000)/'), '');
   check(so, 'normalize Date co offset chi dung timestamp chinh', edges.FbmSync.normalize('/Date(1757386800000+0700)/'), edges.FbmSync.normalize('/Date(1757386800000)/'));
   check(so, 'normalize Date khong hop le khong nem loi', edges.FbmSync.normalize(new Date(NaN)), '');
@@ -23,6 +23,9 @@ async function chay(so) {
   edges.writeGateSave = (request) => { mergedSaved = request.records[0]; return { ok: true }; };
   const mergedResult = edges.FbmSync.resolveConflict('activity', 'ACT-1', 'manual', { details: 'Nội dung FBM' });
   check(so, 'trộn conflict đổi details về content nội bộ', [mergedResult.ok, mergedSaved && mergedSaved.content], [true, 'Nội dung FBM']);
+  edges.PropertiesService = { getDocumentProperties: () => ({ getProperty: () => '' }) };
+  const refresh = edges.FbmSync.conflictRefreshRequest('activity', { id: 'ACT-1', fbmId: '174813' });
+  check(so, 'conflict dựng request đọc lại đúng Activity FBM', [refresh.meta.kind, refresh.meta.entity, refresh.body.externalKey[0].Name, refresh.body.externalKey[0].Value], ['conflict_refresh_grid', 'activity', 'id', '174813']);
 
   let lockedWrite = false;
   const lockedState = { mode: 'write', metadata: { categoryGate: {}, seen: { customer: {}, activity: {} } }, locks: { 'customer:C-LOCK': { owner: 'user', revision: 'r1' } } };

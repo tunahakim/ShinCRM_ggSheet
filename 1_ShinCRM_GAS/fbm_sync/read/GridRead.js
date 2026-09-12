@@ -79,6 +79,20 @@ FbmSync.activityBulkRequest = function (options) {
   request.meta.scan = 'bulk_activity';
   return request;
 };
+
+/** Dựng request đọc lại đúng bản ghi đang xử lý conflict trước khi chốt. */
+FbmSync.conflictRefreshRequest = function (entity, item) {
+  var target = item || {}, fbmId = String(target.fbmId || '').trim();
+  if (!fbmId) { return null; }
+  if (entity === 'customer') {
+    var customerRequest = FbmSync.customerGridRequest({ type: 0, count: 20, gridPageIndex: -1, gridRefresh: false, externalKey: [{ Name: 'stt_rec_kh', Opr: '=', Value: fbmId, Type: 'String', Ignore: false }] });
+    customerRequest.meta.kind = 'conflict_refresh_grid'; customerRequest.meta.entity = 'customer'; customerRequest.meta.conflictId = String(target.id || '');
+    return customerRequest;
+  }
+  var activityRequest = FbmSync.gridRequest('activity', { type: 0, count: 20, gridPageIndex: -1, gridRefresh: false, externalKey: [{ Name: 'id', Opr: '=', Value: fbmId, Type: 'String', Ignore: false }] });
+  activityRequest.meta.kind = 'conflict_refresh_grid'; activityRequest.meta.entity = 'activity'; activityRequest.meta.conflictId = String(target.id || '');
+  return activityRequest;
+};
 /** Trả ID local vắng khỏi bulk FBM; tombstone và dòng tạm không bị chạm. */
 FbmSync.activityBulkMissing = function (localRecords, seenFbmIds) {
   var seen = seenFbmIds || {}, missing = [];

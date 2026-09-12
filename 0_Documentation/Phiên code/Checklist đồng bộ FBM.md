@@ -187,7 +187,7 @@
 - [x] GAS giữ hàng đợi/cursor conflict; Sidebar chỉ nhận và xử lý một bản ghi mỗi lần, không tải cả danh sách về RAM; DTO chỉ trả conflict đầu hàng đợi và `conflictCount`.
 - [x] Sidebar conflict hiển thị dọc, chỉ hiện các trường khác nhau; mỗi trường xếp giá trị ShinCRM và FBM để đối chiếu.
 - [x] Người dùng có thể giữ toàn bộ FBM, giữ toàn bộ ShinCRM hoặc chọn giá trị từng trường để trộn thủ công; GAS ánh xạ field fingerprint về field nội bộ trước khi ghi.
-- [ ] Khi xác nhận, GAS đọc lại dòng ShinCRM và FBM; FBM đổi từ lúc mở thì không chốt và đưa bản ghi về hàng đợi xem lại.
+- [x] Khi xác nhận, GAS yêu cầu đọc lại đúng dòng ShinCRM và FBM; nếu FBM đổi từ lúc mở thì cập nhật conflict và không chốt.
 - [x] Nút giải quyết hỗ trợ theo FBM, theo ShinCRM hoặc trộn tay; cập nhật `hFBM` và trạng thái theo lựa chọn.
 - [x] Form Sidebar khóa user khi mở, nhả khi đóng và kiểm khóa sync trước Save.
 - [x] Pull/push hoãn record có khóa user và giữ nguyên bản nháp.
@@ -202,7 +202,7 @@
 
 ### Đóng slice
 
-- [ ] Code, test offline, log diff và UI conflict hoàn tất.
+- [x] Code, test offline, log diff và UI conflict hoàn tất; test offline phủ ánh xạ field trộn và request đọc lại trước khi chốt.
 - [ ] Bằng chứng phục hồi sau timeout, reload và lỗi nghiệp vụ đã có.
 - [x] State active bị bỏ rơi quá 2 phút được tự thu hồi; phiên chờ ghi không tự retry; test offline đã đạt.
 - [x] Supervisor GAS chạy mỗi phút, phát hiện `lastProgressAt` quá hạn, đánh dấu `SUPERVISOR_TIMEOUT_AT_*` và fail-closed mà không tự retry lệnh ghi.

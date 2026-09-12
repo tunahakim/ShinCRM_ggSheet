@@ -298,7 +298,15 @@ function fbmSyncStatusOnce(freshOpen) {
   });
 }
 function fbmSyncResolveConflict(entity, id, choice) {
-  return callServer('fbmResolveConflict', [entity, id, choice]).then(function (result) {
+  var merged = arguments.length > 3 ? arguments[3] : undefined;
+  return callServer('fbmPrepareConflictResolution', [entity, id, choice, merged]).then(function (prepared) {
+    if (!prepared || prepared.ok === false || !prepared.request) { throw new Error(prepared && (prepared.message || prepared.code) || 'Không chuẩn bị được lượt đọc lại conflict.'); }
+    fbmSyncPaint(fbmSyncWaitingStatus(prepared.status, 'Đang đọc lại FBM để xác nhận conflict...'));
+    return fbmSyncExtensionRequest(prepared.request).then(function (response) {
+      return callServer('fbmConfirmConflict', [entity, id, choice, merged, fbmSyncProjectFormResponse(prepared.request, response)]);
+    });
+  }).then(function (result) {
+    if (result && result.code === 'CONFLICT_CHANGED_REVIEW') { fbmSyncPaint(result.status || FBM_SYNC_CLIENT.lastStatus); return result; }
     if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không giải quyết được conflict.'); }
     return fbmSyncStatusOnce();
   }).catch(function (error) {

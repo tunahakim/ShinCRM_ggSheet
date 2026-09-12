@@ -57,3 +57,5 @@ function fbmEndEdit(entity, id) { return runEntryPoint('fbmEndEdit', 'sidebar', 
 /** Kiểm tra revision trước khi lưu form. */
 function fbmCheckSave(entity, id, revision) { return runEntryPoint('fbmCheckSave', 'sidebar', 'throw', function () { return fbmSyncSaveAllowed(entity, id, revision); }); }
 function fbmResolveConflict(entity, id, choice, merged) { return runEntryPoint('fbmResolveConflict', 'sidebar', 'throw', function () { return FbmSync.resolveConflict(entity, id, choice, merged); }); }
+function fbmPrepareConflictResolution(entity, id, choice, merged) { return runEntryPoint('fbmPrepareConflictResolution', 'sidebar', 'throw', function () { return FbmSync.prepareConflictResolution(entity, id, choice, merged); }); }
+function fbmConfirmConflict(entity, id, choice, merged, response) { return runEntryPoint('fbmConfirmConflict', 'sidebar', 'throw', function () { return FbmSync.confirmConflict(entity, id, choice, merged, response); }); }
