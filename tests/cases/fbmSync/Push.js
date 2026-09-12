@@ -62,6 +62,11 @@ async function chay(so) {
   const pushView = orchestration.FbmSync.statusView();
   check(so, 'status noi ro chieu ShinCRM sang FBM', pushView.direction, 'ShinCRM → FBM');
   check(so, 'status noi ro dang dong bo giao dich', pushView.entityLabel, 'Giao dịch');
+  const queueState = orchestration.FbmSync.stateRead();
+  queueState.metadata.conflicts = [{ entity: 'activity', id: 'ACT-1' }, { entity: 'activity', id: 'ACT-2' }];
+  orchestration.FbmSync.stateWrite(queueState);
+  const queueMetadata = orchestration.FbmSync.statusView().metadata;
+  check(so, 'DTO Sidebar chi nhan mot conflict dau hang doi', [queueMetadata.conflicts.length, queueMetadata.conflictCount, queueMetadata.conflicts[0].id], [1, 2, 'ACT-1']);
 
   const guards = taoHopCat({ FbmSync: {}, PropertiesService: { getScriptProperties: () => ({ getProperty: () => '' }), getDocumentProperties: () => ({ getProperty: () => null, setProperty: () => {} }) } });
   napServer(guards, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js');

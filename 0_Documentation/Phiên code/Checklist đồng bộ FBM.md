@@ -183,8 +183,8 @@
 
 - [x] So ba chiều phân biệt không đổi, chỉ ShinCRM đổi, chỉ FBM đổi và hai phía đổi.
 - [x] Conflict lưu trạng thái, khóa record, log diff và không ghi baseline.
-- [ ] Màn hình xử lý conflict là chế độ riêng, tách khỏi màn hình chạy phiên đồng bộ.
-- [ ] GAS giữ hàng đợi/cursor conflict; Sidebar chỉ nhận và xử lý một bản ghi mỗi lần, không tải cả danh sách về RAM.
+- [x] Màn hình xử lý conflict là chế độ riêng, tách khỏi màn hình chạy phiên đồng bộ.
+- [x] GAS giữ hàng đợi/cursor conflict; Sidebar chỉ nhận và xử lý một bản ghi mỗi lần, không tải cả danh sách về RAM; DTO chỉ trả conflict đầu hàng đợi và `conflictCount`.
 - [ ] Sidebar conflict hiển thị dọc, chỉ hiện các trường khác nhau; mỗi trường xếp giá trị ShinCRM và FBM để đối chiếu.
 - [ ] Người dùng có thể giữ toàn bộ FBM, giữ toàn bộ ShinCRM hoặc chọn giá trị từng trường để trộn thủ công.
 - [ ] Khi xác nhận, GAS đọc lại dòng ShinCRM và FBM; FBM đổi từ lúc mở thì không chốt và đưa bản ghi về hàng đợi xem lại.

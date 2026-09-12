@@ -6,4 +6,26 @@ function fbmSyncPaintAuditBlocks(panel, status) {
   fbmSyncPaintAudit(panel, metadata.audit);
   fbmSyncPaintRecordIssues(panel, metadata);
 }
+/** Màn hình conflict riêng: chỉ render một record và các field khác nhau theo chiều dọc. */
+function fbmSyncPaintConflictScreen(panel, status) {
+  var metadata = status.metadata || {}, conflicts = Array.isArray(metadata.conflicts) ? metadata.conflicts : [], item = conflicts[0];
+  var box = document.createElement('div'); box.className = 'shin-sync-audit shin-sync-conflict-screen';
+  var back = document.createElement('button'); back.type = 'button'; back.className = 'shin-button'; back.id = 'fbm-sync-conflict-back'; back.textContent = 'Quay lại kết quả phiên'; box.appendChild(back);
+  var title = document.createElement('div'); title.className = 'shin-sync-preview-title'; title.textContent = 'Xử lý xung đột (' + Number(metadata.conflictCount || conflicts.length) + ' còn lại)'; box.appendChild(title);
+  if (!item) { var empty = document.createElement('div'); empty.className = 'shin-sync-preview-row'; empty.textContent = 'Không còn conflict chờ quyết định.'; box.appendChild(empty); panel.appendChild(box); return; }
+  var identity = document.createElement('div'); identity.className = 'shin-sync-preview-row'; identity.textContent = String(item.entity || '') + ' · ' + String(item.id || '') + (item.fbmId ? ' · FBM ' + String(item.fbmId) : ''); box.appendChild(identity);
+  (item.fields || []).forEach(function (field) {
+    var group = document.createElement('div'); group.className = 'shin-sync-conflict-field';
+    var name = document.createElement('div'); name.className = 'shin-sync-preview-title'; name.textContent = String(field.field || ''); group.appendChild(name);
+    var shin = document.createElement('div'); shin.className = 'shin-sync-preview-row'; shin.textContent = 'ShinCRM: ' + String(field.left || '(trống)'); group.appendChild(shin);
+    var fbm = document.createElement('div'); fbm.className = 'shin-sync-preview-row'; fbm.textContent = 'FBM: ' + String(field.right || '(trống)'); group.appendChild(fbm);
+    box.appendChild(group);
+  });
+  var actions = document.createElement('div'); actions.className = 'shin-sync-actions';
+  [['shin', 'Giữ toàn bộ ShinCRM'], ['fbm', 'Giữ toàn bộ FBM']].forEach(function (option) {
+    var button = document.createElement('button'); button.type = 'button'; button.className = 'shin-button'; button.textContent = option[1];
+    button.setAttribute('data-fbm-conflict-choice', option[0]); button.setAttribute('data-fbm-conflict-entity', String(item.entity || '')); button.setAttribute('data-fbm-conflict-id', String(item.id || '')); actions.appendChild(button);
+  });
+  box.appendChild(actions); panel.appendChild(box);
+}
 </script>

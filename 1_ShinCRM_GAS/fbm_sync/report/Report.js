@@ -24,11 +24,16 @@ FbmSync.syncEntityLabel = function (entity, phase) {
 };
 /** Chỉ đưa dữ liệu render sang Sidebar; state nội bộ có lookup, cursor form và khóa vẫn ở GAS. */
 FbmSync.statusMetadata = function (metadata) {
-  var data = metadata || {}, keys = ['audit', 'categoryBlocks', 'conflicts', 'identityBlocks', 'activityBulkMissing', 'preflight', 'preflightIssues', 'preview', 'pushFailures', 'pushFailureDetails', 'callbackTrace'];
-  return keys.reduce(function (out, key) {
-    if (data[key] !== undefined) { out[key] = data[key]; }
-    return out;
+  var data = metadata || {}, keys = ['audit', 'categoryBlocks', 'identityBlocks', 'activityBulkMissing', 'preflight', 'preflightIssues', 'preview', 'pushFailures', 'pushFailureDetails', 'callbackTrace'];
+  var out = keys.reduce(function (result, key) {
+    if (data[key] !== undefined) { result[key] = data[key]; }
+    return result;
   }, {});
+  // GAS giữ cả hàng đợi conflict; Sidebar chỉ cần một bản ghi để đối chiếu và quyết định.
+  var conflicts = Array.isArray(data.conflicts) ? data.conflicts : [];
+  out.conflictCount = conflicts.length;
+  out.conflicts = conflicts.length ? [conflicts[0]] : [];
+  return out;
 };
 /** Cursor công khai chỉ dùng để chẩn đoán trạng thái; không trả bản ghi, OldValue hay khóa về trình duyệt. */
 FbmSync.statusCursor = function (cursor) {
