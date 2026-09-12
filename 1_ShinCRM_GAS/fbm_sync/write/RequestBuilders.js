@@ -49,24 +49,41 @@ FbmSync.formDate = function (value, fallback) {
   return isFinite(parsed) ? '/Date(' + parsed + ')/' : (fallback || value);
 };
 
-/** Giữ nguyên mốc ngày FBM khi Sheet chỉ đổi nội dung; chỉ đổi mốc khi ngày nghiệp vụ thật sự đổi. */
-FbmSync.activityEditDate = function (record, oldValues, name, aliases, fallback) {
-  var hasOld = oldValues && Object.prototype.hasOwnProperty.call(oldValues, name), localValue = FbmSync.fieldValue(record, oldValues, name, aliases, ''), oldValue = hasOld ? oldValues[name] : '';
-  if (hasOld && record && Object.prototype.hasOwnProperty.call(record, 'workDate')) {
-    var dateKey = function (raw) {
-      var parsed = typeof FbmSync.fbDate === 'function' ? FbmSync.fbDate(raw) : raw;
-      if (typeof FbmSync.activityDateKey === 'function') {
-        var known = FbmSync.activityDateKey(parsed);
-        if (known) { return known; }
-      }
-      if (parsed && Object.prototype.toString.call(parsed) === '[object Date]' && isFinite(parsed.getTime())) { return parsed.toISOString().slice(0, 10); }
-      var match = String(parsed || '').match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
-      return match ? match[1] + '-' + ('0' + match[2]).slice(-2) + '-' + ('0' + match[3]).slice(-2) : '';
-    };
-    var localKey = dateKey(record.workDate), oldKey = dateKey(oldValue);
-    if (localKey && oldKey && localKey === oldKey) { return FbmSync.formDate(oldValue, fallback); }
+/** Đổi ngày nghiệp vụ của Sheet về dạng .NET; chỉ dùng cho end_date khi ngày phát sinh đổi. */
+FbmSync.activityFormDate = function (value, fallback) {
+  var parsed = typeof FbmSync.fbDate === 'function' ? FbmSync.fbDate(value) : value;
+  var key = typeof FbmSync.activityDateKey === 'function' ? FbmSync.activityDateKey(parsed) : '';
+  if (!key && parsed && Object.prototype.toString.call(parsed) === '[object Date]' && isFinite(parsed.getTime())) {
+    if (typeof Utilities !== 'undefined' && typeof Session !== 'undefined' && Utilities.formatDate) {
+      key = Utilities.formatDate(parsed, Session.getScriptTimeZone() || 'Asia/Ho_Chi_Minh', 'yyyy-MM-dd');
+    } else {
+      key = new Date(parsed.getTime() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    }
   }
-  return FbmSync.formDate(localValue, fallback);
+  return key ? FbmSync.formDate(key, fallback) : FbmSync.formDate(value, fallback);
+};
+/** Giữ nguyên mốc ngày/giờ mà form FBM đã trả; không làm tròn theo ngày hoặc múi giờ. */
+FbmSync.activityRawDate = function (value, fallback) {
+  if (value === null || value === undefined || value === '') { return fallback || ''; }
+  if (typeof value === 'string' && /^\/Date\(-?\d+(?:[+-]\d+)?\)\/$/.test(value)) { return value; }
+  if (value && Object.prototype.toString.call(value) === '[object Date]' && isFinite(value.getTime())) { return '/Date(' + value.getTime() + ')/'; }
+  return FbmSync.formDate(value, fallback);
+};
+FbmSync.activityEditDate = function (record, oldValues, name, aliases, fallback) {
+  var hasOld = oldValues && Object.prototype.hasOwnProperty.call(oldValues, name), localValue = FbmSync.fieldValue(record, oldValues, name, aliases, '');
+  if (hasOld && name === 'start_date') {
+    return FbmSync.activityRawDate(oldValues[name], fallback);
+  }
+  if (hasOld && name === 'end_date') {
+    if (!record || !Object.prototype.hasOwnProperty.call(record, 'workDate')) { return FbmSync.activityRawDate(oldValues[name], fallback); }
+    var localKey = FbmSync.activityDateKey(record.workDate), oldKey = FbmSync.activityDateKey(oldValues[name]);
+    if (localKey && oldKey && localKey === oldKey) { return FbmSync.activityRawDate(oldValues[name], fallback); }
+    return FbmSync.activityFormDate(record.workDate, FbmSync.activityRawDate(oldValues[name], fallback));
+  }
+  if (record && Object.prototype.hasOwnProperty.call(record, 'workDate')) {
+    return FbmSync.activityFormDate(record.workDate, fallback);
+  }
+  return FbmSync.activityRawDate(localValue, fallback);
 };
 
 /** Đổi giá trị SELECT của ShinCRM thành mã FBM từ companion Category. */
@@ -115,7 +132,15 @@ FbmSync.activityValues = function (record, oldValues, categoryGate) {
     start_date: FbmSync.activityEditDate(record, oldValues, 'start_date', ['workDate'], '/Date(' + now.getTime() + ')/'), start_time: value('start_time', [], '00:00'), end_date: FbmSync.activityEditDate(record, oldValues, 'end_date', ['workDate'], '/Date(' + now.getTime() + ')/'), end_time: value('end_time', [], '01:00'), ngay_nhac: value('ngay_nhac', [], null), gio_nhac: value('gio_nhac', [], '00:00'), full_day: value('full_day', [], false),
     details: details, private: value('private', [], false), share_user: value('share_user', [], ''), share_group: value('share_group', [], 0), ma_nhom: value('ma_nhom', [], ''), owner: value('owner', [], FbmSync.configValue('FBM_ACCOUNT_NAME')), comment: FbmSync.value(record, 'comment', null), nguoi_sua: value('nguoi_sua', [], ''), datetime0: date(now), status: value('status', [], '2'), gia_bao: value('gia_bao', [], 0), gia_dt: value('gia_dt', [], 0), ma_dt: value('ma_dt', [], ''), nd_chinh_sua: value('nd_chinh_sua', [], ''), ma_sp: value('ma_sp', [], ''), ma_module: value('ma_module', [], ''), ma_kh: value('ma_kh', ['customerFbmCode'], ''), stt_rec: value('stt_rec', [], ''), type: value('type', [], '1'), user_ref: value('user_ref', [], ''), fileupload: value('fileupload', [], ''), fileticket: value('fileticket', [], ''), filekey: value('filekey', [], '')
   };
-  return { values: values, memvars: FbmSync.memvars(FbmSync.ACTIVITY_MEMVARS, values, oldValues) };
+  var memvars = FbmSync.memvars(FbmSync.ACTIVITY_MEMVARS, values, oldValues);
+  if (oldValues) {
+    memvars.forEach(function (item) {
+      if (['start_date', 'end_date'].indexOf(item.Name) >= 0 && Object.prototype.hasOwnProperty.call(oldValues, item.Name)) {
+        item.OldValue = FbmSync.activityRawDate(oldValues[item.Name], item.OldValue);
+      }
+    });
+  }
+  return { values: values, memvars: memvars };
 };
 /** Tạo request New Activity. */
 FbmSync.activityCreateRequest = function (record, categoryGate) { var form = FbmSync.activityValues(record, null, categoryGate); return { url: FbmSync.scriptSettings().baseUrl + FbmSync.ENDPOINTS.dir, body: FbmSync.formEnvelope('activity', 'New', [], form.memvars), meta: { kind: 'activity_create', shinId: String(FbmSync.value(record, 'shinId', FbmSync.value(record, 'id', ''))) } }; };

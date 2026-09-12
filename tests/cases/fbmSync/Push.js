@@ -208,7 +208,21 @@ async function chay(so) {
   check(so, 'Activity edit khong tra Date trong ket qua GAS', JSON.stringify(activityEdit).indexOf('2026-09-09T00:00:00.000Z') < 0 && String(activityEdit.body.memvars.filter((item) => item.Name === 'start_date')[0].OldValue || '').indexOf('/Date(') === 0 && String(activityEdit.body.memvars.filter((item) => item.Name === 'start_date')[0].NewValue || '').indexOf('/Date(') === 0 && String(activityEdit.body.memvars.filter((item) => item.Name === 'end_date')[0].NewValue || '').indexOf('/Date(') === 0, true);
   check(so, 'Activity edit doi ngay Sheet thanh Date .NET dung fixture', [activityEdit.body.memvars.filter((item) => item.Name === 'start_date')[0].NewValue, activityEdit.body.memvars.filter((item) => item.Name === 'end_date')[0].NewValue], ['/Date(1788912000000)/', '/Date(1788912000000)/']);
   const unchangedDateEdit = push.FbmSync.activityEditRequest({ id: 'ACT-008600', fbmId: '174813', content: 'Noi dung moi', taskType: 'Gọi', workDate: '2026-09-09' }, { id: 174813, start_date: new Date('2026-09-09T00:00:00Z'), end_date: new Date('2026-09-09T23:59:59Z'), details: 'Noi dung cu', fileticket: 'ticket' }, {});
-  check(so, 'Activity edit giu moc ngay FBM khi Sheet khong doi ngay', [unchangedDateEdit.body.memvars.filter((item) => item.Name === 'start_date')[0].NewValue, unchangedDateEdit.body.memvars.filter((item) => item.Name === 'end_date')[0].NewValue], ['/Date(1788912000000)/', '/Date(1788998399000)/']);
+  check(so, 'Activity edit giu nguyen moc end_date cua form khi Sheet khong doi ngay', [unchangedDateEdit.body.memvars.filter((item) => item.Name === 'start_date')[0].NewValue, unchangedDateEdit.body.memvars.filter((item) => item.Name === 'end_date')[0].NewValue], ['/Date(1788912000000)/', '/Date(1788998399000)/']);
+  const formDateEdit = push.FbmSync.activityEditRequest({ id: 'ACT-008601', fbmId: '174813', content: 'Noi dung moi', taskType: 'GD', workDate: '2026-09-09' }, { id: 174813, start_date: new Date('2026-09-08T17:00:00Z'), end_date: new Date('2026-09-09T16:59:00Z'), details: 'Noi dung cu', fileticket: 'ticket' }, {});
+  check(so, 'Activity edit giu nguyen moc ngay gio cua form', [
+    formDateEdit.body.memvars.filter((item) => item.Name === 'start_date')[0].OldValue,
+    formDateEdit.body.memvars.filter((item) => item.Name === 'start_date')[0].NewValue,
+    formDateEdit.body.memvars.filter((item) => item.Name === 'end_date')[0].OldValue,
+    formDateEdit.body.memvars.filter((item) => item.Name === 'end_date')[0].NewValue
+  ], ['/Date(1788886800000)/', '/Date(1788886800000)/', '/Date(1788973140000)/', '/Date(1788973140000)/']);
+  const changedWorkDateEdit = push.FbmSync.activityEditRequest({ id: 'ACT-008601', fbmId: '174813', content: 'Noi dung moi', taskType: 'GD', workDate: '2026-10-11' }, { id: 174813, start_date: new Date('2026-09-08T17:00:00Z'), end_date: new Date('2026-09-09T16:59:00Z'), details: 'Noi dung cu', fileticket: 'ticket' }, {});
+  check(so, 'Activity edit doi ngay phat sinh nhung giu ngay bat dau', [
+    changedWorkDateEdit.body.memvars.filter((item) => item.Name === 'start_date')[0].OldValue,
+    changedWorkDateEdit.body.memvars.filter((item) => item.Name === 'start_date')[0].NewValue,
+    changedWorkDateEdit.body.memvars.filter((item) => item.Name === 'end_date')[0].OldValue,
+    changedWorkDateEdit.body.memvars.filter((item) => item.Name === 'end_date')[0].NewValue
+  ], ['/Date(1788886800000)/', '/Date(1788886800000)/', '/Date(1788973140000)/', '/Date(1791676800000)/']);
   check(so, 'Activity edit gui fileticket theo OldValue/NewValue cua fixture', [activityEdit.body.memvars.filter((item) => item.Name === 'fileticket')[0].OldValue, activityEdit.body.memvars.filter((item) => item.Name === 'fileticket')[0].NewValue], ['', 'ticket']);
   check(so, 'Activity edit cap nhat datetime0 moi', activityEdit.body.memvars.filter((item) => item.Name === 'datetime0')[0].NewValue !== activityEdit.body.memvars.filter((item) => item.Name === 'datetime0')[0].OldValue, true);
   check(so, 'Activity edit de comment rong thanh null', activityEdit.body.memvars.filter((item) => item.Name === 'comment')[0].NewValue, null);

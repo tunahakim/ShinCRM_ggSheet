@@ -93,7 +93,7 @@ FbmSync.activityBulkMissing = function (localRecords, seenFbmIds) {
 /** Chuẩn hóa ngày Activity để lập kế hoạch quét bù Customer. */
 FbmSync.activityDateKey = function (value) {
   var date = typeof FbmSync.fbDate === 'function' ? FbmSync.fbDate(value) : value;
-  if (date instanceof Date && !isNaN(date.getTime())) {
+  if (Object.prototype.toString.call(date) === '[object Date]' && !isNaN(date.getTime())) {
     if (typeof Utilities !== 'undefined' && typeof Session !== 'undefined' && Utilities.formatDate) {
       return Utilities.formatDate(date, Session.getScriptTimeZone() || 'Asia/Ho_Chi_Minh', 'yyyy-MM-dd');
     }

@@ -78,6 +78,16 @@ Khi mở form chi tiết hoạt động (GetDirViewPage action Edit), response t
 | `fileticket` | Ticket upload | — | Lấy từ Showing script khi sửa |
 | `filekey` | Key file | Không | |
 
+**Quy ước nghiệp vụ của các trường ngày giờ (bắt buộc):**
+
+- `start_date` + `start_time` là thời điểm tạo Activity. Khi sửa nội dung hoặc sửa ngày giao dịch, giữ nguyên cặp giá trị này theo form FBM; không lấy lại timestamp từ `InternalValues` của response lưu.
+- `end_date` + `end_time` là thời điểm/ngày giao dịch do người dùng nhập. Khi đổi ngày giao dịch, chỉ `end_date` được thay đổi; `start_date` không được thay đổi.
+- Khi không đổi ngày giao dịch, gửi `OldValue` và `NewValue` cùng một giá trị form FBM đã mở. Khi có thay đổi, `end_date.NewValue` dùng ngày mới theo định dạng `/Date(ms)/`.
+- `ngay_nhac` + `gio_nhac` là mốc nhắc riêng, không đồng nghĩa với ngày tạo hoặc ngày giao dịch.
+- `datetime0` là thời điểm cập nhật bản ghi; khi lưu, FBM có thể tự sinh mốc mới.
+
+Tóm tắt: `start_*` = mốc tạo, `end_*` = ngày/giờ giao dịch, `ngay_nhac/gio_nhac` = nhắc, `datetime0` = cập nhật.
+
 **Mapping Row index khi mở form sửa (45 giá trị):**
 
 | Index | Trường | Index | Trường |

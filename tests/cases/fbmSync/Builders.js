@@ -50,6 +50,10 @@ async function chay(so) {
   const activityForm = builders.FbmSync.extractFormValues({ d: { controller: 'zccrAccountTask', Row: null, InternalValues: [{ name: 'end_time', Value: '01:00' }, { Name: 'owner', NewValue: 'Lê Tuấn Anh' }], FieldValues: [{ Name: 'fileticket', Value: 'ticket-3' }] } });
   check(so, 'Activity form Row null vẫn lấy end_time và owner', [activityForm.end_time, activityForm.owner], ['01:00', 'Lê Tuấn Anh']);
   check(so, 'Activity form lấy fileticket từ FieldValues', activityForm.fileticket, 'ticket-3');
+  const formDateRow = [];
+  formDateRow[8] = '/Date(1788912000000)/'; formDateRow[10] = '/Date(1788912000000)/';
+  const formDateValues = builders.FbmSync.extractFormValues({ d: { controller: 'zccrAccountTask', Row: formDateRow, InternalValues: [{ Name: 'start_date', Value: '/Date(1788886800000)/' }, { Name: 'end_date', Value: '/Date(1788973140000)/' }] } }, 'activity');
+  check(so, 'Activity form uu tien ngay trong Row thay vi InternalValues', [formDateValues.start_date.getTime(), formDateValues.end_date.getTime()], [1788912000000, 1788912000000]);
   const objectForm = builders.FbmSync.extractFormValues({ d: { Controller: 'zccrAccountTask', Row: { END_TIME: '02:00', owner: 'Lê Tuấn Anh' } } });
   check(so, 'Activity form Row object không phụ thuộc hoa thường', [objectForm.end_time, objectForm.owner], ['02:00', 'Lê Tuấn Anh']);
   const explicitActivity = builders.FbmSync.extractFormValues({ d: { Row: (function () { const row = []; row[11] = '03:00'; return row; }()) } }, 'activity');
