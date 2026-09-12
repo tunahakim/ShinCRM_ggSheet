@@ -2,7 +2,7 @@
 
 ## Mục tiêu và phạm vi
 
-- Đọc `D:\ShinCRM_ggSheet\0_Documentation\Opus 4.8 tư vấn\01. Quy chuẩn nền ShinCRM.md` đầu mỗi phiên.
+- Đọc `D:\ShinCRM_ggSheet\0_Documentation\00. Tài liệu chính thức\01. Quy chuẩn nền ShinCRM.md` đầu mỗi phiên.
 
 - Nếu đang làm phiên khác không phải phiên đồng bộ FBM thì bỏ qua các tài liệu liên quan đến FBM, cấm được đọc vì các file đó cực kỳ dài và tốn token.
 - Mục tiêu hiện tại của branch là hoàn thiện phiên đồng bộ FBM/ShinCRM theo `0_Documentation/Phiên code/Checklist đồng bộ FBM.md`. ShinCRM độc lập đã hoàn tất phần chính; không tự mở rộng sang bot tra cứu, Zalobot hoặc nạp 1.700 khách thật trước khi checklist cho phép.

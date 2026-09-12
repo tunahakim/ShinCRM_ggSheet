@@ -4,7 +4,7 @@ Tệp này là **đề bài của một phiên duy nhất**, không phải tài 
 
 ## Phần 1 — Bối cảnh, đọc trước khi làm bất cứ gì
 
-ShinCRM mini là CRM cá nhân một người dùng, chạy trên Google Sheet cộng Google Apps Script (GAS) cộng một Chrome Extension. Bộ tài liệu thiết kế đã **đóng xong** sau nhiều phiên, nằm ở `0_Documentation/Opus 4.8 tư vấn/`, gồm tài liệu 01 tới 10 kèm năm hợp đồng (`02A`, `03A`, `05A`, `08A`, `09A`, `10A`). Không còn quyết định thiết kế nào phải chốt để bắt đầu code.
+ShinCRM mini là CRM cá nhân một người dùng, chạy trên Google Sheet cộng Google Apps Script (GAS) cộng một Chrome Extension. Bộ tài liệu thiết kế đã **đóng xong** sau nhiều phiên, nằm ở `0_Documentation/00. Tài liệu chính thức/`, gồm tài liệu 01 tới 10 kèm năm hợp đồng (`02A`, `03A`, `05A`, `08A`, `09A`, `10A`). Không còn quyết định thiết kế nào phải chốt để bắt đầu code.
 
 Phiên này là **phiên code đầu tiên**. Trước nó, số dòng code viết theo kiến trúc mới là **không**.
 

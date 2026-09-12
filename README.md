@@ -2,7 +2,7 @@
 
 CRM cá nhân một người dùng, dựng trên Google Sheet làm kho dữ liệu, Google Apps Script (GAS) làm phần chạy trên máy chủ, và một Chrome Extension làm phần chạy trên máy tại Việt Nam. Mục tiêu là một công cụ dùng được cho công việc bán hàng hằng ngày, không phải một sản phẩm hoàn hảo để bán, nên tiêu chí chọn giải pháp luôn là *đơn giản nhất mà đúng*, kèm yêu cầu gắt về code sạch (clean code) và trải nghiệm dùng (UI/UX).
 
-Repo này hiện là **repo tài liệu và code tham chiếu**. Bản đang chạy thật nằm ngoài repo (xem mục Nơi đặt bản chạy thật). Toàn bộ thiết kế mới nằm ở `0_Documentation/Opus 4.8 tư vấn/`; đó là nguồn sự thật duy nhất khi có tranh chấp giữa tài liệu và code.
+Repo này hiện là **repo tài liệu và code tham chiếu**. Bản đang chạy thật nằm ngoài repo (xem mục Nơi đặt bản chạy thật). Toàn bộ thiết kế mới nằm ở `0_Documentation/00. Tài liệu chính thức/`; đó là nguồn sự thật duy nhất khi có tranh chấp giữa tài liệu và code.
 
 ## Ba nơi chạy, không có nơi thứ tư
 
@@ -20,7 +20,7 @@ Luật chống rò rỉ quan trọng nhất là **phụ thuộc một chiều**:
 
 | Thư mục | Là gì | Trạng thái |
 |---|---|---|
-| `0_Documentation/Opus 4.8 tư vấn/` | Bộ tài liệu thiết kế chính thức của bản Google Sheet | Đang hoàn thiện tài liệu 09 |
+| `0_Documentation/00. Tài liệu chính thức/` | Bộ tài liệu thiết kế chính thức của bản Google Sheet | Đang hoàn thiện tài liệu 09 |
 | `0_Documentation/Nghiên cứu FBM/` | 15 chương nghiên cứu API của FBM, viết cho **một dự án khác** (ShinCRM trên Supabase) | Chỉ tra khi cần, phần lớn nội dung là thừa với bản Google Sheet |
 | `1_ShinCRM_GAS/` | Code GAS cũ (18 tệp, ~3.500 dòng) do AI viết chắp vá | **Đang chạy được**, nhưng rối, thêm một trường phải sửa hàng chục chỗ. Giữ để tham chiếu, sẽ refactor hoặc bỏ |
 | `2_ShinCRM_Extension/` | Bộ khung thư mục extension dự kiến | Gần như rỗng: hầu hết tệp chỉ có khối chú thích đầu tệp, chưa có logic |

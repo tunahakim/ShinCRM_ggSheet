@@ -6,7 +6,7 @@ Tệp này là bàn giao: liệt kê mọi việc còn phải làm để hết G
 
 - Bộ kiểm offline (the offline test suite): `node tests/run.js` — phải xanh toàn bộ trước mọi commit.
 - Trên Google thật: `node tests/gas.js <tên hàm> --push` — thiếu cờ `--push` thì Google im lặng chạy bản cũ, mọi kết luận thành vô nghĩa.
-- Nguồn chuẩn thiết kế: `0_Documentation/Opus 4.8 tư vấn/` tài liệu 00 tới 08 cùng bốn hợp đồng. Tiến độ và quyết định các phiên: thư mục `0_Documentation/Phiên code/`.
+- Nguồn chuẩn thiết kế: `0_Documentation/00. Tài liệu chính thức/` tài liệu 00 tới 08 cùng bốn hợp đồng. Tiến độ và quyết định các phiên: thư mục `0_Documentation/Phiên code/`.
 - Kế hoạch chi tiết của nhóm Việc 2 và Việc 3: bản plan `joyful-wobbling-honey` của phiên 06–07/09/2026, đọc nó trước khi bấm vào nhóm đó.
 
 ## Nhóm 0 — Chốt lượt làm việc 08/09/2026 --> Đã thực hiện xong
