@@ -253,6 +253,18 @@
   max-height: 180px;
 }
 
+/* Các cụm form dài vẫn là hai Card trong Schema để giữ ranh giới dữ liệu, nhưng nối liền về mặt thị giác. */
+#sidebar-body > .shin-form-card + .shin-form-card {
+  margin-top: calc(-1 * var(--shin-gap-2));
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+#sidebar-body > .shin-form-card:first-child {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
 /*
   Bung **lên trên** thay vì xuống dưới. Danh sách là `position: absolute` nên vùng thân cắt phần tràn của nó: một ô nằm
   sát đáy form mà bung xuống thì người dùng nhận được một khe trống cao ba pixel. `client/ui/combo.html` đo chỗ hở trên
