@@ -271,7 +271,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Heartbeat nộp kết quả cho GAS, cập nhật lần sống cuối và kích full Customer khi tổng số đổi.
 - [x] Kỳ Customer 60 phút kéo full grid qua nhiều lát, lưu cursor từng lát.
 - [x] Kỳ Activity 8 giờ chạy bulk ID và lớp `ngay_gd`.
-- [ ] Vòng xoay Activity chạy mỗi 30 phút, quét 30 Customer tiếp theo và tiếp tục đúng cursor sau khi service worker/GAS gián đoạn.
+- [x] Vòng xoay Activity chạy mỗi 30 phút, quét 30 Customer tiếp theo và tiếp tục đúng cursor sau khi service worker/GAS gián đoạn.
 - [x] Scheduler không tạo hai kỳ, không giữ công việc trong RAM và tiếp tục từ lát đã chốt.
 - [x] Khi người dùng bấm `Đồng bộ ngay` trong lúc có phiên nền, GAS đánh dấu phiên nền dừng, chờ response FBM hiện tại kết thúc, không cấp request tiếp theo rồi Sidebar ưu tiên phiên thủ công; không tạo hai phiên song song. Test offline phủ handoff nền → thủ công.
 - [x] Nút Dừng đồng bộ xóa marker `scheduledScan`, không để heartbeat tự khởi động lại kỳ vừa dừng.

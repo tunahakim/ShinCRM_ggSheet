@@ -5,12 +5,12 @@ FbmSync.schedule = function () {
   var props = PropertiesService.getDocumentProperties();
   props.setProperty('FBM_SYNC_NEXT_HEARTBEAT', String(Date.now() + 5 * 60 * 1000));
   props.setProperty('FBM_SYNC_NEXT_CUSTOMER_SCAN', String(Date.now() + 60 * 60 * 1000));
-  props.setProperty('FBM_SYNC_NEXT_ACTIVITY_SCAN', String(Date.now() + 8 * 60 * 60 * 1000));
-  return { heartbeatMinutes: 5, customerMinutes: 60, activityHours: 8 };
+  props.setProperty('FBM_SYNC_NEXT_ACTIVITY_SCAN', String(Date.now() + 30 * 60 * 1000));
+  return { heartbeatMinutes: 5, customerMinutes: 60, activityMinutes: 30 };
 };
 /** Nhận quyền một lượt scheduler bằng khóa tài liệu; không giữ công việc trong RAM. */
 FbmSync.schedulerClaim = function (kind, now) {
-  var names = { heartbeat: ['FBM_SYNC_NEXT_HEARTBEAT', 5 * 60 * 1000], customer: ['FBM_SYNC_NEXT_CUSTOMER_SCAN', 60 * 60 * 1000], activity: ['FBM_SYNC_NEXT_ACTIVITY_SCAN', 8 * 60 * 60 * 1000] };
+  var names = { heartbeat: ['FBM_SYNC_NEXT_HEARTBEAT', 5 * 60 * 1000], customer: ['FBM_SYNC_NEXT_CUSTOMER_SCAN', 60 * 60 * 1000], activity: ['FBM_SYNC_NEXT_ACTIVITY_SCAN', 30 * 60 * 1000] };
   var item = names[String(kind || '')], props = PropertiesService.getDocumentProperties(), at = Number(now || Date.now());
   if (!item) { return { ok: false, code: 'UNKNOWN_SCHEDULE' }; }
   var due = Number(props.getProperty(item[0]) || 0);
@@ -43,7 +43,7 @@ function fbmInstallScheduler() {
   ScriptApp.getProjectTriggers().forEach(function (trigger) { if (names.indexOf(trigger.getHandlerFunction()) >= 0) { ScriptApp.deleteTrigger(trigger); } });
   ScriptApp.newTrigger('fbmHeartbeatTrigger').timeBased().everyMinutes(5).create();
   ScriptApp.newTrigger('fbmCustomerScanTrigger').timeBased().everyHours(1).create();
-  ScriptApp.newTrigger('fbmActivityScanTrigger').timeBased().everyHours(8).create();
+  ScriptApp.newTrigger('fbmActivityScanTrigger').timeBased().everyMinutes(30).create();
   ScriptApp.newTrigger('fbmSupervisorTrigger').timeBased().everyMinutes(1).create();
   return FbmSync.schedule();
 }

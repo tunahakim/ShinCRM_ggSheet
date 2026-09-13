@@ -149,7 +149,8 @@ async function chay(so) {
   const schedulerPropertyApi = { getProperty: (key) => schedulerData[key] || null, setProperty: (key, value) => { schedulerData[key] = String(value); } };
   const scheduler = taoHopCat({ FbmSync: {}, SETTINGS: { LOCK_WAIT_MS: 1 }, PropertiesService: { getDocumentProperties: () => schedulerPropertyApi }, LockService: { getDocumentLock: () => ({ tryLock: () => true, releaseLock: () => {} }) } });
   napServer(scheduler, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/state/State.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/state/Scheduler.js');
-  scheduler.FbmSync.schedule();
+  const schedule = scheduler.FbmSync.schedule();
+  check(so, 'scheduler Activity dung chu ky 30 phut', [schedule.activityMinutes, Number(schedulerData.FBM_SYNC_NEXT_ACTIVITY_SCAN) - Date.now() <= 30 * 60 * 1000], [30, true]);
   schedulerData.FBM_SYNC_NEXT_CUSTOMER_SCAN = '1000';
   const claimed = scheduler.FbmSync.schedulerClaim('customer', 1000);
   check(so, 'scheduler claim mot ky Customer va doi marker', [claimed.ok, claimed.kind, scheduler.FbmSync.stateRead().scheduledScan, Number(schedulerData.FBM_SYNC_NEXT_CUSTOMER_SCAN) > 1000], [true, 'customer', 'customer', true]);
