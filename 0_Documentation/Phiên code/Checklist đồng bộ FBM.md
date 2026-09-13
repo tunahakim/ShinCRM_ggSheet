@@ -91,7 +91,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [ ] Khi đọc lại cấu hình, Extension chỉ giải mã nội bộ và trả trạng thái cùng các trường không nhạy cảm; Sidebar không nhận mật khẩu bản rõ.
 - [ ] Nút `Đăng nhập thử` thử login mềm bằng thông tin người dùng nhập, không logout phiên hợp lệ và không ghi bí mật.
 - [x] Preflight đối chiếu tuyệt đối username/mã user, tên đầy đủ và SpreadsheetId thực tế trước request nghiệp vụ; không trim, đổi hoa thường hoặc chuẩn hóa khi so sánh và không dùng mã ngắn.
-- [ ] Tự điền thông tin nhận diện từ Spreadsheet hiện tại và response `authorize`, chỉ cho xác nhận các giá trị hệ thống, không tự lưu hoặc tự chuyển tài khoản.
+- [x] Tự điền thông tin nhận diện từ Spreadsheet hiện tại và response `authorize`, chỉ cho xác nhận các giá trị hệ thống, không tự lưu hoặc tự chuyển tài khoản. Probe chỉ gọi authorize, không quét Customer; Sidebar chỉ lưu sau nút xác nhận.
 - [x] `Kiểm tra thông tin đồng bộ` quét đủ Customer FBM, đối chiếu chỉ các dòng local đã có FBM_ID, trả tổng hợp `n/N`, mẫu sai lệch và nút `Kiểm tra lại`; không ghi Sheet/FBM. Code, test offline và GAS DEV đã xác nhận entrypoint authorize Customer, full-scan không lọc mã test, cursor `stt_rec_kh` và kết thúc không ghi Sheet/FBM.
 - [x] Khi file là bản sao, đổi tài khoản hoặc chưa có liên kết nhưng đã có dữ liệu, chuyển `REBIND_REQUIRED`, khóa push/nền; sau khi người dùng xử lý dữ liệu cũ có thể chạy kiểm tra lại, không tự xóa dữ liệu.
 - [x] Mỗi lần Sidebar mở hoặc bắt tay lại, Extension ghi đè relay config bằng GAS URL, khóa và Spreadsheet ID hiện tại; Extension chỉ giữ một config đang hoạt động và alarm không gọi FBM khi chưa có config.

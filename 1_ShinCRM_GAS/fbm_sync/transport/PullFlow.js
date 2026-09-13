@@ -32,7 +32,7 @@ FbmSync.start = function (options) {
   var state = FbmSync.stateStart('', 'checking_session', 0, { preserveConflicts: current.phase === 'conflict' });
   state.origin = opt.origin === 'background' ? 'background' : 'manual';
   state.mode = opt.mode === 'write' || opt.mode === 'push' ? opt.mode : opt.mode === 'check' ? 'check' : 'read';
-  state.scan = opt.scan === 'activity_bulk' ? 'activity_bulk' : opt.scan === 'identity_check' ? 'identity_check' : 'full';
+  state.scan = opt.scan === 'activity_bulk' ? 'activity_bulk' : opt.scan === 'identity_check' ? 'identity_check' : opt.scan === 'identity_probe' ? 'identity_probe' : 'full';
   if (state.scan === 'activity_bulk') { state.mode = 'read'; }
   if ((state.mode === 'write' || state.mode === 'push') && !FbmSync.writeAllowed()) {
     state.phase = 'idle'; state.runId = ''; state.message = 'Chưa cho phép ghi thật lên FBM.'; FbmSync.stateWrite(state);
@@ -107,6 +107,18 @@ FbmSync.authContinue = function (entity, response) {
   }
   state.session[entity === 'customer' ? 'customerAuthorized' : 'activityAuthorized'] = auth;
   if (entity === 'customer') {
+    if (state.scan === 'identity_probe') {
+      state.metadata = state.metadata || {};
+      state.metadata.identityProbe = {
+        spreadsheetId: String(FbmSync.currentSpreadsheetId ? FbmSync.currentSpreadsheetId() : ''),
+        userId: String(state.session.userId || ''),
+        accountName: String(state.session.accountName || '')
+      };
+      state.cursor = {}; state.phase = 'done'; state.entity = '';
+      state.message = 'Đã đọc nhận diện phiên FBM; chờ người dùng xác nhận lưu.';
+      FbmSync.stateWrite(state);
+      return null;
+    }
     if (state.scan === 'identity_check') {
       FbmSync.identityCheckBegin(state);
       state.phase = 'pull_customer'; state.entity = 'customer'; state.cursor = { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 };

@@ -77,6 +77,9 @@ async function chay(so) {
   builders.FbmSync.extractSessionIdentity = () => ({ userId: '2037', accountName: 'ANHLT' });
   const identityStarted = builders.FbmSync.authContinue('customer', {});
   check(so, 'Identity check sau authorize chi mo Customer grid, khong mo Activity', [identityStarted.meta.kind, identityFlowState.scan, identityFlowState.phase, identityFlowState.metadata.identityCheck.total], ['grid', 'identity_check', 'pull_customer', 2]);
+  identityFlowState = { mode: 'check', scan: 'identity_probe', session: { cookie: '461020379855cFHN_CRM_App', userId: '2037' }, metadata: {} };
+  const identityProbeFinished = builders.FbmSync.authContinue('customer', {});
+  check(so, 'Identity probe chi doc authorize va cho xac nhan luu, khong quet Customer', [identityProbeFinished, identityFlowState.phase, identityFlowState.cursor, identityFlowState.metadata.identityProbe.userId, identityFlowState.metadata.identityProbe.accountName], [null, 'done', {}, '2037', 'ANHLT']);
 
   let identityWrite;
   builders.FbmSync.stateRead = () => ({ metadata: { categoryGate: gate } });

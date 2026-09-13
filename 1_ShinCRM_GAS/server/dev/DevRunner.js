@@ -27,7 +27,7 @@ var DEV_RUNNER_ALLOWED = [
   'probeErrorReport', 'probeEntryPoint', 'probeLoadAll', 'probeSidebarTemplate', 'probeClientTiming',
   'probeSaveGate', 'viewProbeSelection', 'viewProbeRenderCurrent', 'viewProbeCreateRender', 'viewProbeAutoRender',
   'probeTriggerState', 'shinInstallTriggers',
-  'fbmSyncStart', 'fbmStartIdentityCheck', 'fbmSyncStartActivityBulk', 'fbmSyncPreflight', 'fbmSyncContinue', 'fbmSyncCancel', 'fbmSyncStatus', 'fbmInstallScheduler', 'fbmSyncSetWriteMode', 'fbmRetryPushFailures', 'fbmResolveConflict', 'fbmPrepareConflictResolution', 'fbmConfirmConflict', 'fbmGetRelayConfig', 'fbmRotateRelayKey', 'fbmSyncRelayProbe', 'fbmSyncHeartbeat', 'fbmSyncTrace', 'fbmGetSyncTrace', 'fbmSupervisorTrigger'
+  'fbmSyncStart', 'fbmStartIdentityCheck', 'fbmStartIdentityProbe', 'fbmSyncStartActivityBulk', 'fbmSyncPreflight', 'fbmSyncContinue', 'fbmSyncCancel', 'fbmSyncStatus', 'fbmInstallScheduler', 'fbmSyncSetWriteMode', 'fbmRetryPushFailures', 'fbmResolveConflict', 'fbmPrepareConflictResolution', 'fbmConfirmConflict', 'fbmGetRelayConfig', 'fbmRotateRelayKey', 'fbmSyncRelayProbe', 'fbmSyncHeartbeat', 'fbmSyncTrace', 'fbmGetSyncTrace', 'fbmSupervisorTrigger'
 ];
 
 /**

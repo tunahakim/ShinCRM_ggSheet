@@ -32,12 +32,20 @@ function fbmSyncPaintIdentityBlock(panel, active, status) {
   if (identity.binding && identity.binding.accountName) {
     var account = document.createElement('div'); account.className = 'shin-sync-preview-row'; account.textContent = 'Tài khoản đã lưu: ' + String(identity.binding.accountName); body.appendChild(account);
   }
+  var probe = status && status.metadata && status.metadata.identityProbe;
+  if (probe) {
+    var probeTitle = document.createElement('div'); probeTitle.className = 'shin-sync-preview-row'; probeTitle.textContent = 'Thông tin đọc từ tab FBM (chưa lưu):'; body.appendChild(probeTitle);
+    [['Spreadsheet', probe.spreadsheetId], ['Mã user', probe.userId], ['Tên tài khoản', probe.accountName]].forEach(function (item) { var row = document.createElement('div'); row.className = 'shin-sync-preview-row'; row.textContent = item[0] + ': ' + (item[1] ? String(item[1]) : '(không có trong response authorize)'); body.appendChild(row); });
+    var complete = !!(probe.spreadsheetId && probe.userId && probe.accountName);
+    var confirm = fbmSyncMakeButton('fbm-sync-confirm-identity', complete ? 'Xác nhận và lưu liên kết' : 'Response chưa đủ thông tin để lưu', complete); confirm.disabled = !complete || !!active; body.appendChild(confirm);
+  }
   var result = status && status.metadata && status.metadata.identityCheck;
   if (result && (status.phase === 'done' || result.missing !== undefined)) {
     var summary = document.createElement('div'); summary.className = 'shin-sync-preview-row'; summary.textContent = 'Customer hợp lệ: ' + Number(result.matched || 0) + '/' + Number(result.total || 0) + (Number(result.missing || 0) ? ' · không tìm thấy: ' + Number(result.missing || 0) : ''); body.appendChild(summary);
     (result.missingSample || []).slice(0, 5).forEach(function (item) { var row = document.createElement('div'); row.className = 'shin-sync-preview-row'; row.textContent = 'Chưa thấy FBM ID ' + String(item.fbmId || '') + ' · ' + String(item.code || item.id || ''); body.appendChild(row); });
   }
   var button = fbmSyncMakeButton('fbm-sync-check-identity', active ? 'Đang kiểm tra liên kết...' : 'Kiểm tra thông tin đồng bộ', !active); button.disabled = !!active; body.appendChild(button);
+  var probeButton = fbmSyncMakeButton('fbm-sync-probe-identity', active ? 'Đang đọc nhận diện...' : 'Tự điền từ tab FBM', !active); probeButton.disabled = !!active; body.appendChild(probeButton);
   block.appendChild(body); panel.appendChild(block);
 }
 </script>

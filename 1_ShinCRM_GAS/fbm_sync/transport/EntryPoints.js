@@ -5,6 +5,8 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 function fbmSyncStart(mode) { return FbmSync.start({ mode: mode }); }
 /** Chá»‰ quÃ©t Customer FBM Ä‘á»ƒ kiá»ƒm tra liÃªn káº¿t, khÃ´ng ghi Sheet/FBM vÃ  khÃ´ng Ä‘á»c Activity. */
 function fbmSyncStartIdentityCheck() { return FbmSync.controlDispatch('start', { mode: 'check', scan: 'identity_check', origin: 'manual', manual: true }); }
+/** Chỉ lấy nhận diện từ authorize để Sidebar tự điền; không quét Customer và không ghi. */
+function fbmSyncStartIdentityProbe() { return FbmSync.controlDispatch('start', { mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true }); }
 /** Người dùng chấp thuận phiên push lớn; chỉ sau đó mới cấp request authorize đầu tiên. */
 function fbmSyncApprovePush() {
   var state = FbmSync.stateRead();
