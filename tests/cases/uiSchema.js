@@ -174,13 +174,13 @@ function chay(so) {
   if (dungLoi.length) { return ghiTruot(so, 'cả bốn màn dịch được qua screenBuild', dungLoi); }
   ghiDat(so, 'cả bốn màn dịch được qua screenBuild');
 
-  check(so, 'customerForm dựng thành hai cụm, mỗi cụm là một Card',
-    daDung.customerForm.body.map((c) => c.role), ['card', 'card']);
+  check(so, 'customerForm dựng thành một cụm liền mạch, là một Card',
+    daDung.customerForm.body.map((c) => c.role), ['card']);
   check(so, 'mỗi hàng khai thành một Row, và mỗi ô trong hàng thành một Field',
-    daDung.customerForm.body.map((c) => c.elements.map((r) => r.role + '/' + r.elements.length).join(' ')),
-    ['row/1 row/2 row/2 row/2 row/1', 'row/1 row/1 row/2 row/1 row/1 row/2 row/2 row/1']);
+    daDung.customerForm.body[0].elements.map((r) => r.role + '/' + r.elements.length).join(' '),
+    'row/1 row/2 row/2 row/2 row/1 row/1 row/1 row/2 row/1 row/1 row/2 row/2 row/1');
   check(so, 'khóa viết tắt width gộp vào spatialConfig lúc dựng',
-    daDung.customerForm.body[1].elements[2].elements[0].spatialConfig.width, '65%');
+    daDung.customerForm.body[0].elements[7].elements[0].spatialConfig.width, '65%');
   check(so, 'noteForm chỉ có một trường, và nó mang class riêng để ô gõ cao hơn',
     (() => { const f = daDung.noteForm.body[0].elements[0].elements[0]; return [f.field, f.control, f.className]; })(),
     ['note', 'textarea', 'shin-note-tall']);

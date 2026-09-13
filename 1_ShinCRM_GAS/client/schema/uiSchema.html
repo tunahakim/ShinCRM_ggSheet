@@ -67,14 +67,12 @@ UI_SCHEMA.customerForm = {
   header: UI_FORM_HEADER,
 
   body: [
-    { group: '', className: 'shin-form-card', rows: [
+    { group: '', rows: [
       ['companyName'],
       ['id', 'taxNumber'],
       ['contactPerson', 'phone'],
       ['product', 'customerGroup'],
-      [{ field: 'note', control: 'textarea' }]
-    ] },
-    { group: '', className: 'shin-form-card', rows: [
+      [{ field: 'note', control: 'textarea' }],
       ['email'],
       ['website'],
       [{ field: 'address', width: '65%' }, 'province'],
