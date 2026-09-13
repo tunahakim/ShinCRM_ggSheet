@@ -18,6 +18,7 @@
 - Được phép phản biện và phải nói rõ mâu thuẫn hoặc điểm chưa hợp lý. Quyết định quan trọng cần đưa ra để chủ dự án biết trước khi ghi vào code hoặc tài liệu.
 - Khi chủ dự án vắng mặt, ghi điểm mơ hồ vào `0_Documentation/Phiên code/Câu hỏi đêm.md`, chọn phương án an toàn nhất và ghi rõ đó là lựa chọn tạm để tiếp tục. Khi đã có câu trả lời, xóa hẳn mục hỏi; lịch sử nằm trong Git.
 - Mỗi kết quả chỉ báo cáo một lần; các lượt sau trỏ đến tài liệu hoặc commit đã ghi, không lặp lại bảng số liệu cũ.
+- Khi trả lời xong/ phải dừng lại vì cần người dùng hỗ trợ, phải phát ra tiếng chuông thông báo để người dùng nắm được
 
 ## Tài liệu và code
 
