@@ -30,12 +30,27 @@ function screenViewRecords() {
   return { customer: screenViewCustomer(), search: [] };
 }
 
+/** Nhãn ngắn của nấc lọc lịch sử, hiển thị ngay trên tiêu đề card. */
+function screenViewActivityLabel(value) {
+  return value === 'all' ? 'All' : value === 'deleted' ? 'Deleted' : 'Active';
+}
+
+function screenViewSyncActivityLabel() {
+  var body = UI_SCHEMA.view && UI_SCHEMA.view.body;
+  var history = body && body.filter(function (node) { return node && node.id === SCREEN_VIEW_HISTORY_ID; })[0];
+  var actions = history && history.titleActions;
+  if (!Array.isArray(actions)) { return; }
+  var filter = actions.filter(function (item) { return item && item.menu; })[0];
+  if (filter) { filter.label = screenViewActivityLabel(Prefs.activityView); }
+}
+
 /**
  * Vẽ cả màn xem, trả về bốn chuỗi engine vừa dựng.
  *
  * Đổi khách thì vẽ cả màn chứ không chỉ vẽ lại card lịch sử: khối thông tin chung và card ghi chú cũng đổi theo khách, vẽ lại một trong ba thì hai cái kia đứng ở dữ liệu của khách cũ.
  */
 function screenViewRender() {
+  screenViewSyncActivityLabel();
   return renderScreen(screenBuild(UI_SCHEMA.view, 'view'), { records: screenViewRecords() });
 }
 
@@ -68,6 +83,7 @@ function screenViewGo() {
  */
 function screenViewActivityCard() {
   if (ScreenState.screen !== SCREEN_VIEW) { return null; }
+  screenViewSyncActivityLabel();
   return renderTarget(SCREEN_VIEW_HISTORY_ID);
 }
 

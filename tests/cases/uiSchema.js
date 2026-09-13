@@ -140,6 +140,10 @@ function chay(so) {
       return [dangXem.menu.length, dangXem.menu.map((c) => c.action).join('|'), dangXem.menu.map((c) => c.value)];
     })(),
     [3, 'setActivityView|setActivityView|setActivityView', ['all', 'active', 'deleted']]);
+  check(so, 'bộ lọc nằm trước nút Thêm và dùng nhãn đúng giá trị trạng thái',
+    [cards[1].titleActions[0].label, cards[1].titleActions[1].label,
+      cards[1].titleActions[0].menu.map((c) => c.label).join('|')],
+    ['Active', 'Thêm', 'All|Active|Deleted']);
 
   check(so, 'card lịch sử có id để vẽ lại riêng khi đổi nấc xem', cards[1].id, 'shin-card-history');
   check(so, 'card lịch sử lấy nội dung từ slot activityList, không khai cây con', cards[1].elements, 'activityList');

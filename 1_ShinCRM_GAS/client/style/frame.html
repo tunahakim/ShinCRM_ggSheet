@@ -44,7 +44,7 @@ html, body {
   hết nhóm `::-webkit-scrollbar`, và `thin` của Chrome là khoảng 11 pixel — khai thêm cho Firefox thì mất luôn 6 pixel
   ở Chrome, mà sidebar này đi cùng một Extension của Chrome.
 */
-::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar { width: var(--shin-scrollbar-size); height: var(--shin-scrollbar-size); }
 
 ::-webkit-scrollbar-track { background: transparent; }
 
@@ -93,7 +93,7 @@ html, body {
   display: flex;
   align-items: center;
   gap: var(--shin-gap-1);
-  padding: 0 var(--shin-gap-2);
+  padding: 0 var(--shin-scrollbar-size);
   border-bottom: 1px solid var(--shin-border);
   background: var(--shin-bg);
 }
@@ -102,7 +102,8 @@ html, body {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: var(--shin-gap-2);
+  padding: 0;
+  scrollbar-gutter: stable;
 }
 .shin-sync-title { font-weight: 600; }
 .shin-sync-phase { margin-top: 2px; color: var(--shin-primary); }
@@ -172,7 +173,7 @@ html, body {
 /* Hộp tìm khách — món đồ cố định thứ sáu, không phải một trong năm vùng nên nó không có `flex` co giãn, chỉ cao theo nội dung. */
 #shin-search {
   flex: 0 0 auto;
-  padding: var(--shin-gap-1) var(--shin-gap-2);
+  padding: var(--shin-gap-1) var(--shin-scrollbar-size);
   border-bottom: 1px solid var(--shin-border);
   background: var(--shin-bg-sunken);
 }
@@ -206,7 +207,7 @@ html, body {
    `client/style/slots.html`, cùng chỗ với slot dựng ra nó. */
 #sidebar-info {
   flex: 0 0 auto;
-  padding: var(--shin-gap-2);
+  padding: var(--shin-gap-2) var(--shin-scrollbar-size);
   border-bottom: 1px solid var(--shin-border);
   background: var(--shin-bg);
 }
@@ -238,7 +239,8 @@ html, body {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: var(--shin-gap-2) 0;
+  padding: var(--shin-gap-2) 0 var(--shin-gap-4) var(--shin-scrollbar-size);
+  scrollbar-gutter: stable;
   background: var(--shin-bg-sunken);
 }
 
@@ -248,7 +250,7 @@ html, body {
   display: flex;
   align-items: center;
   gap: var(--shin-gap-2);
-  padding: var(--shin-gap-2);
+  padding: var(--shin-gap-2) var(--shin-scrollbar-size);
   border-top: 1px solid var(--shin-border);
   background: var(--shin-bg);
 }

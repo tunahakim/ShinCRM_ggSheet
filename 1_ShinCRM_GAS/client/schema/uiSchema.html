@@ -47,12 +47,12 @@ UI_SCHEMA.view = {
       id: 'shin-card-history',
       title: 'LỊCH SỬ LÀM VIỆC',
       titleActions: [
-        { icon: 'plus', label: 'Thêm', action: 'openActivityForm' },
-        { label: 'Đang xem', menu: [
-          { label: 'Tất cả', action: 'setActivityView', value: 'all' },
-          { label: 'Chỉ còn dùng', action: 'setActivityView', value: 'active' },
-          { label: 'Chỉ đã xóa', action: 'setActivityView', value: 'deleted' }
-        ] }
+        { label: 'Active', menu: [
+          { label: 'All', action: 'setActivityView', value: 'all' },
+          { label: 'Active', action: 'setActivityView', value: 'active' },
+          { label: 'Deleted', action: 'setActivityView', value: 'deleted' }
+        ] },
+        { icon: 'plus', label: 'Thêm', action: 'openActivityForm' }
       ],
       elements: 'activityList'
     })
