@@ -225,6 +225,45 @@ function noteBackgroundSyncStatus(stage, extra) {
   try { chrome.storage.local.set({ fbmBackgroundSyncLastStatus: item }); } catch (ignore) {}
 }
 
+/** Ghi chẩn đoán heartbeat tối thiểu; không lưu cookie hay payload FBM. */
+function noteHeartbeatStatus(stage, extra) {
+  if (!chrome.storage || !chrome.storage.local || !chrome.storage.local.set) { return; }
+  try { chrome.storage.local.set({ fbmHeartbeatLastStatus: Object.assign({ at: Date.now(), stage: String(stage || '') }, extra || {}) }); } catch (ignore) {}
+}
+
+/** Chạy ngay một heartbeat để nghiệm thu; alarm 5 phút chỉ gọi lại đúng luồng này. */
+function fbmHeartbeatNow(source) {
+  var origin = String(source || 'manual');
+  noteHeartbeatStatus('started', { source: origin });
+  return getRelayConfig().then(function (config) {
+    if (!config) {
+      noteHeartbeatStatus('blocked_config', { source: origin, code: 'RELAY_CONFIG_MISSING' });
+      return { ok: false, code: 'RELAY_CONFIG_MISSING', error: 'Thiếu cấu hình relay; hãy mở Sidebar một lần.' };
+    }
+    noteHeartbeatStatus('relay_configured', { source: origin });
+    return findFbmTab().then(function (tab) {
+      if (!tab) {
+        noteHeartbeatStatus('blocked_tab', { source: origin, code: 'FBM_TAB_NOT_FOUND' });
+        return { ok: false, code: 'FBM_TAB_NOT_FOUND', error: 'Không tìm thấy tab FBM đang mở.' };
+      }
+      noteHeartbeatStatus('fbm_request_sent', { source: origin, tabId: Number(tab.id || 0) });
+      return sendToFbmTab(tab.id, null).then(function (reply) {
+        var raw = rawFbmReply(reply) || {};
+        noteHeartbeatStatus('fbm_response_received', { source: origin, tabId: Number(tab.id || 0), ok: raw.ok === true, httpStatus: Number(raw.status || 0), responseLength: String(raw.body || '').length, error: String(raw.error || '').slice(0, 240) });
+        return relayHeartbeatToGas(tab.id, reply).then(function (gasReply) {
+          noteHeartbeatStatus('gas_response_received', { source: origin, ok: !!(gasReply && gasReply.ok), code: String(gasReply && gasReply.code || ''), requestKind: String(gasReply && gasReply.request && gasReply.request.meta && gasReply.request.meta.kind || '') });
+          return { ok: true, gas: gasReply || null };
+        });
+      });
+    });
+  }).catch(function (error) {
+    var message = String(error && error.message || error);
+    noteHeartbeatStatus('failed', { source: origin, code: 'HEARTBEAT_FAILED', error: message.slice(0, 240) });
+    return { ok: false, code: 'HEARTBEAT_FAILED', error: message };
+  });
+}
+if (typeof globalThis !== 'undefined') { globalThis.fbmHeartbeatNow = fbmHeartbeatNow; }
+
 /** Chạy một phiên GAS trực tiếp từ Service Worker; mặc định chỉ đọc, không cần Sidebar. */
 function fbmRunBackgroundSync(mode) {
   if (fbmBackgroundSyncFlight) { return fbmBackgroundSyncFlight; }
@@ -328,6 +367,10 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     fbmRunBackgroundSync(message.mode).then(sendResponse, function (error) { sendResponse({ ok: false, code: 'BACKGROUND_SYNC_FAILED', error: String(error && error.message || error) }); });
     return true;
   }
+  if (message && message.type === 'FBM_HEARTBEAT_NOW') {
+    fbmHeartbeatNow('manual').then(sendResponse);
+    return true;
+  }
   if (!message || message.type !== 'FBM_EXECUTE_REQUEST') { return false; }
   var requestId = String(message.id || '');
   var existingFlight = requestId && fbmRequestFlights[requestId];
@@ -355,9 +398,6 @@ recoverSheetsBridges();
 /** Gửi request đọc tối thiểu; không gửi thao tác ghi từ alarm. */
 chrome.alarms.onAlarm.addListener(function (alarm) {
   if (!alarm || alarm.name !== 'fbm-heartbeat') { return; }
-  getRelayConfig().then(function (config) {
-    if (!config) { return null; }
-    return findFbmTab().then(function (tab) { if (tab) { return sendToFbmTab(tab.id, null).then(function (reply) { return relayHeartbeatToGas(tab.id, reply); }); } return null; });
-  }).catch(function (error) { console.warn('Heartbeat FBM thất bại:', error); });
+  fbmHeartbeatNow('alarm').then(function (result) { if (!result || result.ok !== true) { console.warn('Heartbeat FBM không chạy:', result); } });
 });
 
