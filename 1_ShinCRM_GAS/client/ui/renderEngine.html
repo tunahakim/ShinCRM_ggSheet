@@ -220,14 +220,14 @@ function renderControlAttrs(o, lop) {
 /**
  * Hai thuộc tính tắt trợ giúp của trình duyệt, đặt trên mọi ô nhập.
  *
- * `autocomplete="off"`: Chrome tự nhớ những gì đã gõ vào ô cùng tên rồi bày ra một hộp gợi ý **của riêng nó**, vẽ đè lên
- * hộp gợi ý của sidebar và sắp theo thứ tự người dùng từng gõ chứ không theo dữ liệu thật. Bản cũ phải quét cả DOM sau
- * mỗi lần vẽ để dập nó; ở đây mọi ô đều đi qua một hàm nên đặt được ngay lúc dựng chuỗi, không cần quét gì.
+ * `autocomplete="new-password"`: Chrome coi `autocomplete="off"` là góp ý và vẫn có thể bật hộp autofill địa chỉ/email. Token này
+ * ngăn Chrome dựng popup đen đè lên popup của sidebar; nó không biến ô nhập thành ô mật khẩu.
  *
  * `spellcheck="false"`: tên riêng và mã khách gạch chân đỏ hết, mà không có chữ nào để sửa.
+ * `autocomplete="new-password"` được dùng vì Chrome có thể bỏ qua `off` và tự mở popup autofill địa chỉ/email.
  */
 function renderInputGuard() {
-  return ' autocomplete="off" spellcheck="false"';
+  return ' autocomplete="new-password" spellcheck="false"';
 }
 
 /**
