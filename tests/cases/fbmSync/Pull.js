@@ -63,6 +63,21 @@ async function chay(so) {
   const catchup = builders.FbmSync.activityCatchupCustomerRequest();
   check(so, 'Lop catchup tao Customer grid theo ngay_gd moi hon Activity local', [catchup.meta.kind, catchup.meta.activityMaxDate, catchup.body.externalKey.some((item) => item.Name === 'ngay_gd' && item.Opr === '>')], ['activity_catchup_customer_grid', '2026-09-10', true]);
 
+  const identityCheckState = { session: { userId: '2037', accountName: 'ANHLT' }, metadata: {} };
+  builders.FbmSync.readLocal = () => [{ id: 'CUS-1', fbmId: 'FBM-1', fbmCustomerCode: 'ALT00010' }, { id: 'CUS-2', fbmId: 'FBM-2', fbmCustomerCode: 'ALT00011' }];
+  builders.FbmSync.identityCheckBegin(identityCheckState);
+  builders.FbmSync.identityCheckPage(identityCheckState, [{ stt_rec_kh: 'FBM-1' }, { stt_rec_kh: 'FBM-OTHER' }]);
+  const identityCheckResult = builders.FbmSync.identityCheckFinish(identityCheckState);
+  const identityCheckRequest = builders.FbmSync.identityCheckCustomerRequest({ type: 0 });
+  check(so, 'Kiem tra lien ket Customer chi doc ID da lien ket va tra n/N', [identityCheckResult.total, identityCheckResult.matched, identityCheckResult.missing, identityCheckResult.missingSample[0].fbmId, identityCheckRequest.body.externalKey.some((item) => item.Name === 'ma_kh'), identityCheckRequest.body.sortExpression], [2, 1, 1, 'FBM-2', false, 'stt_rec_kh']);
+  let identityFlowState = { mode: 'check', scan: 'identity_check', session: { cookie: '461020379855cFHN_CRM_App', userId: '2037' }, metadata: {} };
+  builders.FbmSync.stateRead = () => identityFlowState;
+  builders.FbmSync.stateWrite = (next) => { identityFlowState = next; return next; };
+  builders.FbmSync.extractAuthorized = () => 'auth-customer';
+  builders.FbmSync.extractSessionIdentity = () => ({ userId: '2037', accountName: 'ANHLT' });
+  const identityStarted = builders.FbmSync.authContinue('customer', {});
+  check(so, 'Identity check sau authorize chi mo Customer grid, khong mo Activity', [identityStarted.meta.kind, identityFlowState.scan, identityFlowState.phase, identityFlowState.metadata.identityCheck.total], ['grid', 'identity_check', 'pull_customer', 2]);
+
   let identityWrite;
   builders.FbmSync.stateRead = () => ({ metadata: { categoryGate: gate } });
   builders.FbmSync.stateWrite = () => {};
@@ -160,7 +175,7 @@ async function chay(so) {
   identity.FbmSync.currentSpreadsheetId = () => 'sheet-a';
   identity.FbmSync.configValue = () => '';
   identity.FbmSync.readLocal = () => [{ id: 'CUS-LINKED', fbmId: 'FBM-A' }];
-  check(so, 'file co FBM ID nhung chua lien ket phai yeu cau REBIND', [identity.FbmSync.identityStatus().status, identity.FbmSync.identityPreflight('write').blocking, identity.FbmSync.identityPreflight('background').blocking], ['REBIND_REQUIRED', true, true]);
+  check(so, 'file co FBM ID nhung chua lien ket phai yeu cau REBIND', [identity.FbmSync.identityStatus().status, identity.FbmSync.identityPreflight('read').blocking, identity.FbmSync.identityPreflight('write').blocking, identity.FbmSync.identityPreflight('background').blocking, identity.FbmSync.identityPreflight('identity_check').blocking], ['REBIND_REQUIRED', true, true, true, false]);
   const savedBinding = identity.FbmSync.bindingWrite({ spreadsheetId: 'sheet-a', userId: 'user-a', accountName: 'Tai khoan A' });
   check(so, 'luu lien ket dung Spreadsheet va tai khoan', [savedBinding.ok, identity.FbmSync.identityStatus({ userId: 'user-a', accountName: 'Tai khoan A' }).status], [true, 'BOUND']);
   check(so, 'khong cho ghi de lien ket khi du lieu FBM cu van con', [identity.FbmSync.bindingWrite({ spreadsheetId: 'sheet-a', userId: 'user-b', accountName: 'Tai khoan B' }).ok, identity.FbmSync.bindingWrite({ spreadsheetId: 'sheet-a', userId: 'user-b', accountName: 'Tai khoan B' }).code], [false, 'REBIND_REQUIRED']);

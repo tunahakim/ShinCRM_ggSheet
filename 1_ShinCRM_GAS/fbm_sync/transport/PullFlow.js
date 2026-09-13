@@ -32,7 +32,7 @@ FbmSync.start = function (options) {
   var state = FbmSync.stateStart('', 'checking_session', 0, { preserveConflicts: current.phase === 'conflict' });
   state.origin = opt.origin === 'background' ? 'background' : 'manual';
   state.mode = opt.mode === 'write' || opt.mode === 'push' ? opt.mode : opt.mode === 'check' ? 'check' : 'read';
-  state.scan = opt.scan === 'activity_bulk' ? 'activity_bulk' : 'full';
+  state.scan = opt.scan === 'activity_bulk' ? 'activity_bulk' : opt.scan === 'identity_check' ? 'identity_check' : 'full';
   if (state.scan === 'activity_bulk') { state.mode = 'read'; }
   if ((state.mode === 'write' || state.mode === 'push') && !FbmSync.writeAllowed()) {
     state.phase = 'idle'; state.runId = ''; state.message = 'Chưa cho phép ghi thật lên FBM.'; FbmSync.stateWrite(state);
@@ -107,6 +107,13 @@ FbmSync.authContinue = function (entity, response) {
   }
   state.session[entity === 'customer' ? 'customerAuthorized' : 'activityAuthorized'] = auth;
   if (entity === 'customer') {
+    if (state.scan === 'identity_check') {
+      FbmSync.identityCheckBegin(state);
+      state.phase = 'pull_customer'; state.entity = 'customer'; state.cursor = { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 };
+      state.message = 'Dang kiem tra lien ket Customer FBM...';
+      FbmSync.stateWrite(state);
+      return FbmSync.identityCheckCustomerRequest({ type: 0, count: 2000, gridPageIndex: -1, gridPageValue: null, gridRefresh: false });
+    }
     state.cursor = { kind: 'authorize_activity' };
     state.message = 'Da xac thuc Customer; dang xac thuc Activity...';
     FbmSync.stateWrite(state);
@@ -125,11 +132,13 @@ FbmSync.customerNext = function (state, rows, total) {
   if (!rows.length || rows.length < count || (total && Number(cursor.seen || 0) + rows.length >= total)) { return null; }
   var last = rows[rows.length - 1];
   cursor.pageIndex = Number(cursor.pageIndex || -1) + 1;
-  cursor.pageValue = [last.ngay_gd || '', last.datetime0 || '', last.xorder || ''];
+  cursor.pageValue = state.scan === 'identity_check'
+    ? [last.stt_rec_kh || '']
+    : [last.ngay_gd || '', last.datetime0 || '', last.xorder || ''];
   cursor.seen = Number(cursor.seen || 0) + rows.length;
   state.cursor = cursor;
   FbmSync.stateWrite(state);
-  return FbmSync.customerGridRequest({ type: 1, count: count, gridPageIndex: cursor.pageIndex, gridPageValue: cursor.pageValue, gridRefresh: false });
+  return (state.scan === 'identity_check' ? FbmSync.identityCheckCustomerRequest : FbmSync.customerGridRequest)({ type: 1, count: count, gridPageIndex: cursor.pageIndex, gridPageValue: cursor.pageValue, gridRefresh: false });
 };
 
 /** Khởi tạo cursor Activity cho danh sách Customer vừa đọc. */
@@ -344,6 +353,18 @@ FbmSync.continue = function (rawResponse) {
     var customerGrid = FbmSync.rowsToRecords('customer', response, state.metadata && state.metadata.customerFields), categoryGate = state.metadata && state.metadata.categoryGate || {}, eligibleCustomerRows = customerGrid.rows.filter(function (row) { return !FbmSync.isTemporaryRecord('customer', row); }), customerRecords = eligibleCustomerRows.map(function (row) { return FbmSync.customerRecord(row, categoryGate); });
     state.metadata.customerFields = customerGrid.fields;
     FbmSync.stateWrite(state);
+    if (state.scan === 'identity_check') {
+      FbmSync.identityCheckPage(state, eligibleCustomerRows);
+      var identityNext = FbmSync.customerNext(state, customerGrid.rows, customerGrid.total);
+      if (identityNext) {
+        state.cursor = { kind: 'customer_grid', type: 1, pageIndex: identityNext.body.gridPageIndex, pageValue: identityNext.body.gridPageValue, count: identityNext.body.count, seen: Number(state.cursor.seen || 0) };
+        FbmSync.stateWrite(state);
+        return { ok: true, request: FbmSync.nextEnvelope(FbmSync.identityCheckCustomerRequest({ type: 1, count: identityNext.body.count, gridPageIndex: identityNext.body.gridPageIndex, gridPageValue: identityNext.body.gridPageValue, gridRefresh: false })), status: FbmSync.statusView(), imported: eligibleCustomerRows.length };
+      }
+      FbmSync.identityCheckFinish(state);
+      state.cursor = {}; state.phase = 'done'; state.entity = ''; state.message = 'Da kiem tra lien ket Customer FBM.'; FbmSync.stateWrite(state);
+      return { ok: true, status: FbmSync.statusView(), imported: eligibleCustomerRows.length };
+    }
     FbmSync.pullRecords('customer', customerRecords, state.mode);
     state = FbmSync.stateRead();
     FbmSync.previewRecords(state, 'customer', customerRecords);

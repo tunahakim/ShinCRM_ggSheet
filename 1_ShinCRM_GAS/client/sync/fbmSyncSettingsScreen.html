@@ -18,4 +18,26 @@ function fbmSyncPaintSettingsBlock(panel, active, status) {
   var relay = document.createElement('button'); relay.type = 'button'; relay.className = 'shin-button'; relay.id = 'fbm-sync-rotate-relay'; relay.disabled = active; relay.textContent = 'Đổi khóa relay'; body.appendChild(relay);
   block.appendChild(body); panel.appendChild(block);
 }
+
+/* Khối kiểm tra liên kết chỉ hiển thị kết quả tổng hợp từ GAS. */
+function fbmSyncPaintIdentityBlock(panel, active, status) {
+  var block = document.createElement('div'); block.className = 'shin-card shin-sync-identity-block';
+  var head = document.createElement('div'); head.className = 'shin-card-head';
+  var title = document.createElement('div'); title.className = 'shin-card-title'; title.textContent = 'LIÊN KẾT TÀI KHOẢN'; head.appendChild(title); block.appendChild(head);
+  var body = document.createElement('div'); body.className = 'shin-card-body';
+  var identity = FBM_SYNC_CLIENT.identityStatus || {};
+  var statusRow = document.createElement('div'); statusRow.className = 'shin-sync-preview-row';
+  statusRow.textContent = identity.status === 'BOUND' ? 'Đã liên kết Spreadsheet với tài khoản FBM đã xác nhận.' : identity.status === 'REBIND_REQUIRED' ? 'File cần kiểm tra lại liên kết; chiều ghi đang bị khóa.' : 'Chưa có liên kết tài khoản FBM cố định.';
+  body.appendChild(statusRow);
+  if (identity.binding && identity.binding.accountName) {
+    var account = document.createElement('div'); account.className = 'shin-sync-preview-row'; account.textContent = 'Tài khoản đã lưu: ' + String(identity.binding.accountName); body.appendChild(account);
+  }
+  var result = status && status.metadata && status.metadata.identityCheck;
+  if (result && (status.phase === 'done' || result.missing !== undefined)) {
+    var summary = document.createElement('div'); summary.className = 'shin-sync-preview-row'; summary.textContent = 'Customer hợp lệ: ' + Number(result.matched || 0) + '/' + Number(result.total || 0) + (Number(result.missing || 0) ? ' · không tìm thấy: ' + Number(result.missing || 0) : ''); body.appendChild(summary);
+    (result.missingSample || []).slice(0, 5).forEach(function (item) { var row = document.createElement('div'); row.className = 'shin-sync-preview-row'; row.textContent = 'Chưa thấy FBM ID ' + String(item.fbmId || '') + ' · ' + String(item.code || item.id || ''); body.appendChild(row); });
+  }
+  var button = fbmSyncMakeButton('fbm-sync-check-identity', active ? 'Đang kiểm tra liên kết...' : 'Kiểm tra thông tin đồng bộ', !active); button.disabled = !!active; body.appendChild(button);
+  block.appendChild(body); panel.appendChild(block);
+}
 </script>

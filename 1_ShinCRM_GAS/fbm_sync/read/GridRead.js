@@ -62,6 +62,11 @@ FbmSync.gridRequest = function (entity, options) {
 };
 /** Tạo request grid Customer theo cursor hiện tại. */
 FbmSync.customerGridRequest = function (options) { return FbmSync.gridRequest('customer', options); };
+/** Request Customer full-scan dùng riêng cho kiểm tra liên kết Spreadsheet/FBM. */
+FbmSync.identityCheckCustomerRequest = function (options) {
+  var opt = Object.assign({ includeTestCustomer: false, sortExpression: 'stt_rec_kh' }, options || {});
+  return FbmSync.customerGridRequest(opt);
+};
 /** Tạo request Activity luôn gắn với stt_rec của Customer. */
 FbmSync.activityGridRequest = function (sttRec, options) {
   var opt = Object.assign({}, options || {}, { externalKey: [{ Name: 'stt_rec', Opr: '=', Value: String(sttRec || ''), Type: 'String', Ignore: false }] });

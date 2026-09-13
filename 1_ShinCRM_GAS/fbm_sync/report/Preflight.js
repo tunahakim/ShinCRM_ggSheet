@@ -102,7 +102,8 @@ FbmSync.preflightCandidates = function (issues, mode) {
 FbmSync.runPreflight = function (options) {
   var opt = options || {}, mode = opt.mode === 'write' || opt.mode === 'push' ? opt.mode : opt.mode === 'check' ? 'check' : 'read', writeMode = mode === 'write' || mode === 'push', core = typeof shinCorePreflight === 'function' ? shinCorePreflight({ mode: writeMode ? 'write' : mode }) : { issues: [], params: {}, category: { categories: {} } }, issues = (core.issues || []).slice(), params = core.params || {};
   if (typeof FbmSync.identityPreflight === 'function') {
-    var identity = FbmSync.identityPreflight(opt.origin === 'background' ? 'background' : mode);
+    var identityMode = opt.scan === 'identity_check' ? 'identity_check' : (opt.origin === 'background' ? 'background' : mode);
+    var identity = FbmSync.identityPreflight(identityMode);
     if (identity.blocking) { FbmSync.preflightIssue(issues, 'REBIND_REQUIRED', 'error', 'Identity', identity.message, true); }
     else if (identity.status && identity.status.status === 'REBIND_REQUIRED') { FbmSync.preflightIssue(issues, 'REBIND_REQUIRED', 'warn', 'Identity', identity.message, false); }
     else if (identity.status && identity.status.status === 'UNBOUND') { FbmSync.preflightIssue(issues, 'FBM_IDENTITY_UNBOUND', 'warn', 'Identity', 'Chưa có liên kết tài khoản FBM cố định; chiều đọc vẫn được phép, chiều ghi sẽ cần kiểm tra liên kết.', false); }

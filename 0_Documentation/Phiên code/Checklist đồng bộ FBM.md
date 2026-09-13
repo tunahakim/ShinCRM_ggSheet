@@ -92,7 +92,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [ ] Nút `Đăng nhập thử` thử login mềm bằng thông tin người dùng nhập, không logout phiên hợp lệ và không ghi bí mật.
 - [x] Preflight đối chiếu tuyệt đối username/mã user, tên đầy đủ và SpreadsheetId thực tế trước request nghiệp vụ; không trim, đổi hoa thường hoặc chuẩn hóa khi so sánh và không dùng mã ngắn.
 - [ ] Tự điền thông tin nhận diện từ Spreadsheet hiện tại và response `authorize`, chỉ cho xác nhận các giá trị hệ thống, không tự lưu hoặc tự chuyển tài khoản.
-- [ ] `Kiểm tra thông tin đồng bộ` quét đủ Customer FBM, đối chiếu chỉ các dòng local đã có FBM_ID, trả tổng hợp `n/N`, mẫu sai lệch và nút `Kiểm tra lại`; không ghi Sheet/FBM.
+- [x] `Kiểm tra thông tin đồng bộ` quét đủ Customer FBM, đối chiếu chỉ các dòng local đã có FBM_ID, trả tổng hợp `n/N`, mẫu sai lệch và nút `Kiểm tra lại`; không ghi Sheet/FBM. Code, test offline và GAS DEV đã xác nhận entrypoint authorize Customer, full-scan không lọc mã test, cursor `stt_rec_kh` và kết thúc không ghi Sheet/FBM.
 - [x] Khi file là bản sao, đổi tài khoản hoặc chưa có liên kết nhưng đã có dữ liệu, chuyển `REBIND_REQUIRED`, khóa push/nền; sau khi người dùng xử lý dữ liệu cũ có thể chạy kiểm tra lại, không tự xóa dữ liệu.
 - [x] Mỗi lần Sidebar mở hoặc bắt tay lại, Extension ghi đè relay config bằng GAS URL, khóa và Spreadsheet ID hiện tại; Extension chỉ giữ một config đang hoạt động và alarm không gọi FBM khi chưa có config.
 - [x] Tách phần dựng block trạng thái, điều khiển và audit thành các tệp `.html` riêng trong `client/sync/`, vẫn dùng lớp component/block chuẩn của Sidebar.
@@ -277,7 +277,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Nút Dừng đồng bộ xóa marker `scheduledScan`, không để heartbeat tự khởi động lại kỳ vừa dừng.
 - [x] Web App dùng khóa theo spreadsheet để tiếp tục khi Sidebar đóng.
 - [x] Mở lại Sidebar chỉ đọc state hiện có, không tạo kỳ thứ hai.
-- [ ] Nạp lần đầu theo thứ tự Category → Customer → Activity → baseline; nếu Sheet đã có dữ liệu hoặc FBM_ID thì phải qua kiểm tra liên kết, xử lý `REBIND_REQUIRED` trước và không nhân bản.
+- [x] Nạp lần đầu theo thứ tự Category → Customer → Activity → baseline; nếu Sheet đã có dữ liệu hoặc FBM_ID thì phải qua kiểm tra liên kết, xử lý `REBIND_REQUIRED` trước và không nhân bản. Preflight chặn cả phiên đọc/ghi thường khi lệch liên kết; chỉ chế độ kiểm tra liên kết được phép chạy để xử lý.
 - [x] Lệnh tính lại baseline không phát request write FBM.
 - [ ] **Cần kiểm chứng thực tế:** bắt đầu kỳ, đóng Sidebar, chờ Web App/Extension và mở lại xem state/log.
 - [ ] **Cần kiểm chứng thực tế:** reload hoặc để service worker ngủ rồi xác nhận kỳ tiếp tục.

@@ -53,7 +53,60 @@ FbmSync.identityStatus = function (runtime) {
 };
 FbmSync.identityPreflight = function (mode) {
   var status = FbmSync.identityStatus(), write = mode === 'write' || mode === 'push' || mode === 'background';
-  return { status: status, blocking: write && status.status === 'REBIND_REQUIRED', message: status.status === 'REBIND_REQUIRED' ? 'Cần kiểm tra lại liên kết tài khoản FBM trước khi ghi hoặc chạy nền.' : '' };
+  var identityCheck = mode === 'identity_check';
+  return { status: status, blocking: !identityCheck && status.status === 'REBIND_REQUIRED', message: status.status === 'REBIND_REQUIRED' ? 'Cần kiểm tra lại liên kết tài khoản FBM trước khi chạy đồng bộ.' : '' };
+};
+
+/** Chuẩn bị bảng đối chiếu ID Customer mà không đưa danh sách lên Sidebar. */
+FbmSync.identityCheckBegin = function (state) {
+  var local = typeof FbmSync.readLocal === 'function' ? FbmSync.readLocal('customer') : [], sample = [];
+  (local || []).forEach(function (record) {
+    var fbmId = String(record && record.fbmId || '').trim();
+    if (!fbmId || String(record.recordStatus || 'active') === 'deleted' || FbmSync.isTemporaryRecord('customer', record)) { return; }
+    if (sample.length < 50) { sample.push({ id: String(record.id || ''), code: String(record.fbmCustomerCode || ''), fbmId: fbmId, seen: false }); }
+  });
+  state.metadata = state.metadata || {};
+  state.metadata.identityCheck = {
+    total: (local || []).filter(function (record) {
+      return String(record && record.fbmId || '').trim() && String(record.recordStatus || 'active') !== 'deleted' && !FbmSync.isTemporaryRecord('customer', record);
+    }).length,
+    matched: 0, scanned: 0, pages: 0, missing: 0, missingSample: [], sample: sample,
+    userId: String(state.session && state.session.userId || ''), accountName: String(state.session && state.session.accountName || '')
+  };
+  return state.metadata.identityCheck;
+};
+
+/** Ghi nhận một trang Customer cho luồng kiểm tra, không ghi Sheet/FBM. */
+FbmSync.identityCheckPage = function (state, rows) {
+  var result = state.metadata && state.metadata.identityCheck || {}, page = rows || [], local = typeof FbmSync.readLocal === 'function' ? FbmSync.readLocal('customer') : [], localById = {};
+  (local || []).forEach(function (record) {
+    var fbmId = String(record && record.fbmId || '').trim();
+    if (fbmId && String(record.recordStatus || 'active') !== 'deleted' && !FbmSync.isTemporaryRecord('customer', record)) { localById[fbmId] = record; }
+  });
+  page.forEach(function (row) {
+    var fbmId = String(row && row.stt_rec_kh || '').trim();
+    if (!fbmId) { return; }
+    result.scanned = Number(result.scanned || 0) + 1;
+    if (localById[fbmId]) { result.matched = Number(result.matched || 0) + 1; }
+    (result.sample || []).forEach(function (item) { if (item.fbmId === fbmId) { item.seen = true; } });
+  });
+  result.pages = Number(result.pages || 0) + 1;
+  state.metadata.identityCheck = result;
+  return result;
+};
+
+/** Chốt tổng hợp n/N và mẫu dòng local không còn thấy bên FBM. */
+FbmSync.identityCheckFinish = function (state) {
+  var result = state.metadata && state.metadata.identityCheck || {}, sample = result.sample || [];
+  result.total = Number(result.total || 0);
+  result.matched = Math.min(result.total, Number(result.matched || 0));
+  result.missing = Math.max(0, result.total - result.matched);
+  result.missingSample = sample.filter(function (item) { return !item.seen; }).slice(0, 20).map(function (item) {
+    return { id: item.id, code: item.code, fbmId: item.fbmId };
+  });
+  delete result.sample;
+  state.metadata.identityCheck = result;
+  return result;
 };
 
 /** Chuẩn hóa MST cho phép nối record; giữ dấu gạch chi nhánh nhưng bỏ dấu chấm, phẩy và khoảng trắng. */
