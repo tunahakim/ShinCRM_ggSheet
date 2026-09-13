@@ -1,6 +1,61 @@
 /** Noi dinh danh va anh xa ban ghi FBM sang schema noi bo. */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
+/** Khóa liên kết Spreadsheet ↔ tài khoản FBM; không lưu cookie hay mật khẩu. */
+FbmSync.BINDING_KEY = 'FBM_SYNC_BINDING_V1';
+FbmSync.currentSpreadsheetId = function () {
+  try { return String(shinOpenBook().getId() || ''); } catch (ignore) { return ''; }
+};
+FbmSync.bindingRead = function () {
+  try {
+    var raw = PropertiesService.getDocumentProperties().getProperty(FbmSync.BINDING_KEY);
+    var value = raw ? JSON.parse(raw) : {};
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  } catch (ignore) { return {}; }
+};
+FbmSync.bindingWrite = function (binding) {
+  var value = binding || {}, spreadsheetId = String(value.spreadsheetId || '').trim(), userId = String(value.userId || '').trim(), accountName = String(value.accountName || '');
+  if (!spreadsheetId || !userId || !accountName) { return { ok: false, code: 'IDENTITY_BINDING_INCOMPLETE', message: 'Thiếu SpreadsheetId, mã user hoặc tên tài khoản FBM.' }; }
+  var actual = FbmSync.currentSpreadsheetId();
+  if (actual && actual !== spreadsheetId) { return { ok: false, code: 'SPREADSHEET_MISMATCH', message: 'SpreadsheetId liên kết không khớp file đang chạy.' }; }
+  var previous = FbmSync.bindingRead();
+  if (previous.spreadsheetId && (previous.spreadsheetId !== spreadsheetId || previous.userId !== userId || previous.accountName !== accountName) && FbmSync.bindingHasLinkedData()) {
+    return { ok: false, code: 'REBIND_REQUIRED', message: 'Spreadsheet còn dữ liệu đã liên kết FBM; xử lý dữ liệu cũ rồi kiểm tra lại trước khi đổi tài khoản.' };
+  }
+  var saved = { spreadsheetId: spreadsheetId, userId: userId, accountName: accountName, updatedAt: Date.now() };
+  PropertiesService.getDocumentProperties().setProperty(FbmSync.BINDING_KEY, JSON.stringify(saved));
+  return { ok: true, binding: { spreadsheetId: saved.spreadsheetId, userId: saved.userId, accountName: saved.accountName, updatedAt: saved.updatedAt } };
+};
+FbmSync.bindingHasLinkedData = function () {
+  try {
+    return ['customer', 'activity'].some(function (entity) {
+      return (FbmSync.readLocal(entity) || []).some(function (record) {
+        return String(record && record.fbmId || '').trim() && String(record.recordStatus || 'active') !== 'deleted';
+      });
+    });
+  } catch (ignore) { return true; }
+};
+/** Đối chiếu nguyên văn nhận diện; không trim/đổi hoa thường khi so hai giá trị đã lưu. */
+FbmSync.identityStatus = function (runtime) {
+  var actual = String((runtime && runtime.spreadsheetId) || FbmSync.currentSpreadsheetId() || ''), current = FbmSync.bindingRead(), incoming = runtime || {}, expectedAccount = String(FbmSync.configValue('FBM_ACCOUNT_NAME') || '');
+  var hasData = FbmSync.bindingHasLinkedData(), reasons = [];
+  if (!current.spreadsheetId) { if (hasData) { reasons.push('missing_binding_with_linked_data'); } }
+  else {
+    if (actual && current.spreadsheetId !== actual) { reasons.push('spreadsheet_mismatch'); }
+    if (incoming.userId !== undefined && String(incoming.userId) !== current.userId) { reasons.push('user_mismatch'); }
+    if (incoming.accountName !== undefined && String(incoming.accountName) !== current.accountName) { reasons.push('account_mismatch'); }
+  }
+  if (incoming.accountName !== undefined && expectedAccount && String(incoming.accountName) !== expectedAccount) { reasons.push('configured_account_mismatch'); }
+  var expectedId = String(FbmSync.configValue('FBM_SPREADSHEET_ID') || '');
+  if (expectedId && actual && expectedId !== actual) { reasons.push('configured_spreadsheet_mismatch'); }
+  var status = reasons.length ? 'REBIND_REQUIRED' : (current.spreadsheetId ? 'BOUND' : 'UNBOUND');
+  return { ok: status !== 'REBIND_REQUIRED', status: status, code: status === 'REBIND_REQUIRED' ? 'REBIND_REQUIRED' : '', spreadsheetId: actual, hasLinkedData: hasData, binding: { spreadsheetId: current.spreadsheetId || '', userId: current.userId || '', accountName: current.accountName || '' }, reasons: reasons };
+};
+FbmSync.identityPreflight = function (mode) {
+  var status = FbmSync.identityStatus(), write = mode === 'write' || mode === 'push' || mode === 'background';
+  return { status: status, blocking: write && status.status === 'REBIND_REQUIRED', message: status.status === 'REBIND_REQUIRED' ? 'Cần kiểm tra lại liên kết tài khoản FBM trước khi ghi hoặc chạy nền.' : '' };
+};
+
 /** Chuẩn hóa MST cho phép nối record; giữ dấu gạch chi nhánh nhưng bỏ dấu chấm, phẩy và khoảng trắng. */
 FbmSync.customerTaxKey = function (value) {
   return FbmSync.normalize(value).replace(/[.,\s]/g, '');

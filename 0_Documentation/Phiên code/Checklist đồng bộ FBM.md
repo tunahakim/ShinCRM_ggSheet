@@ -90,16 +90,16 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [ ] Extension mã hóa username/mã user, SpreadsheetId và mật khẩu thành envelope trước khi gửi/lưu qua GAS; không lưu credential bản rõ ở Sheet, Log hoặc `Config`.
 - [ ] Khi đọc lại cấu hình, Extension chỉ giải mã nội bộ và trả trạng thái cùng các trường không nhạy cảm; Sidebar không nhận mật khẩu bản rõ.
 - [ ] Nút `Đăng nhập thử` thử login mềm bằng thông tin người dùng nhập, không logout phiên hợp lệ và không ghi bí mật.
-- [ ] Preflight đối chiếu tuyệt đối username/mã user, tên đầy đủ và SpreadsheetId thực tế trước request nghiệp vụ; không trim, đổi hoa thường hoặc chuẩn hóa khi so sánh và không dùng mã ngắn.
+- [x] Preflight đối chiếu tuyệt đối username/mã user, tên đầy đủ và SpreadsheetId thực tế trước request nghiệp vụ; không trim, đổi hoa thường hoặc chuẩn hóa khi so sánh và không dùng mã ngắn.
 - [ ] Tự điền thông tin nhận diện từ Spreadsheet hiện tại và response `authorize`, chỉ cho xác nhận các giá trị hệ thống, không tự lưu hoặc tự chuyển tài khoản.
 - [ ] `Kiểm tra thông tin đồng bộ` quét đủ Customer FBM, đối chiếu chỉ các dòng local đã có FBM_ID, trả tổng hợp `n/N`, mẫu sai lệch và nút `Kiểm tra lại`; không ghi Sheet/FBM.
-- [ ] Khi file là bản sao, đổi tài khoản hoặc chưa có liên kết nhưng đã có dữ liệu, chuyển `REBIND_REQUIRED`, khóa push/nền; sau khi người dùng xử lý dữ liệu cũ có thể chạy kiểm tra lại, không tự xóa dữ liệu.
+- [x] Khi file là bản sao, đổi tài khoản hoặc chưa có liên kết nhưng đã có dữ liệu, chuyển `REBIND_REQUIRED`, khóa push/nền; sau khi người dùng xử lý dữ liệu cũ có thể chạy kiểm tra lại, không tự xóa dữ liệu.
 - [x] Mỗi lần Sidebar mở hoặc bắt tay lại, Extension ghi đè relay config bằng GAS URL, khóa và Spreadsheet ID hiện tại; Extension chỉ giữ một config đang hoạt động và alarm không gọi FBM khi chưa có config.
 - [x] Tách phần dựng block trạng thái, điều khiển và audit thành các tệp `.html` riêng trong `client/sync/`, vẫn dùng lớp component/block chuẩn của Sidebar.
 - [x] Tách màn hình trạng thái, thiết lập đăng nhập và audit thành các tệp giao diện riêng trong `client/sync/`, tái sử dụng block chuẩn.
 - [x] Lấy authorized Customer rồi Activity; thiếu token thì dừng trước CRUD.
 - [x] Kiểm owner mặc định FBM khớp `FBM_ACCOUNT_NAME`; sai thì dừng chiều push.
-- [ ] Xác nhận Config có `FBM_ACCOUNT_NAME`, `FBM_MA_KH_PREFIX`, `FBM_MA_KH_LENGTH`, `FBM_ACTIVITY_SINCE` và không khai trùng.
+- [x] Xác nhận Config có `FBM_ACCOUNT_NAME`, `FBM_MA_KH_PREFIX`, `FBM_MA_KH_LENGTH`, `FBM_ACTIVITY_SINCE` và không khai trùng.
 
 ### Danh mục
 
@@ -256,7 +256,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Cổng owner Activity edit đã có sau bước mở form.
 - [x] Edit sai owner chỉ lỗi record đó, không sửa owner FBM và không chặn record khác.
 - [x] Lỗi đẩy không tự lặp; Sidebar chỉ có thao tác mở lại cả nhóm lỗi, không bắt sửa dữ liệu nghiệp vụ và không retry mù request đã ghi.
-- [ ] Kỳ pull sau edit xác nhận baseline, `đẩy không ăn` hoặc conflict.
+- [x] Kỳ pull sau edit xác nhận baseline, `đẩy không ăn` hoặc conflict.
 - [ ] **Cần kiểm chứng thực tế:** tạo đúng một Activity thử dưới `ALT00010`, marker cố định và không tạo trùng khi pull lại.
 - [ ] **Cần kiểm chứng thực tế:** sửa Activity thử, xác nhận owner, ticket, OldValue và baseline.
 - [ ] **Cần kiểm chứng thực tế:** mô phỏng mất phản hồi một lần và kiểm marker recovery.
@@ -278,7 +278,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Web App dùng khóa theo spreadsheet để tiếp tục khi Sidebar đóng.
 - [x] Mở lại Sidebar chỉ đọc state hiện có, không tạo kỳ thứ hai.
 - [ ] Nạp lần đầu theo thứ tự Category → Customer → Activity → baseline; nếu Sheet đã có dữ liệu hoặc FBM_ID thì phải qua kiểm tra liên kết, xử lý `REBIND_REQUIRED` trước và không nhân bản.
-- [ ] Lệnh tính lại baseline không phát request write FBM.
+- [x] Lệnh tính lại baseline không phát request write FBM.
 - [ ] **Cần kiểm chứng thực tế:** bắt đầu kỳ, đóng Sidebar, chờ Web App/Extension và mở lại xem state/log.
 - [ ] **Cần kiểm chứng thực tế:** reload hoặc để service worker ngủ rồi xác nhận kỳ tiếp tục.
 - [ ] **Cần kiểm chứng thực tế:** reload Extension, kiểm tra `chrome.storage.local` có relay config, chạy một heartbeat đọc và xác nhận service worker không báo `RELAY_FETCH_FAILED`/`RELAY_TIMEOUT`, GAS nhận được handoff và state cập nhật khi Sidebar đóng.

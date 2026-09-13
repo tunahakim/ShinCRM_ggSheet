@@ -26,6 +26,10 @@ function fbmSyncPreflight() { var state = FbmSync.stateRead(); return typeof Fbm
 function fbmSyncContinue(rawResponse) { return FbmSync.continue(rawResponse); }
 /** Tính lại baseline nội bộ mà không mở phiên hoặc gọi request FBM. */
 function fbmSyncRecalculateBaseline(entity) { return FbmSync.recalculateBaseline(entity || 'customer'); }
+/** Đọc trạng thái liên kết an toàn; không trả bí mật phiên FBM. */
+function fbmSyncIdentityStatus(runtime) { return FbmSync.identityStatus(runtime || {}); }
+/** Lưu liên kết sau khi Sidebar đã cho người dùng xác nhận nhận diện từ phiên FBM. */
+function fbmSyncSaveIdentityBinding(binding) { return FbmSync.bindingWrite(binding || {}); }
 /** Dừng phiên lỗi; chỉ nhả khóa sync, giữ khóa user đang sửa. */
 function fbmSyncCancel() {
   var state = FbmSync.stateRead(), locks = state.locks || {}, kept = {};

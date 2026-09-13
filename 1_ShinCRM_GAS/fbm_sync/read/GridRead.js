@@ -220,3 +220,13 @@ FbmSync.extractAuthorized = function (response) {
   if (typeof data === 'string') { data = FbmSync.protocol.parse(data) || {}; }
   return String(data.Authorized || data.authorized || '');
 };
+/** Lấy các trường nhận diện không nhạy cảm nếu response authorize có trả; không suy đoán từ payload. */
+FbmSync.extractSessionIdentity = function (response) {
+  var parsed = FbmSync.protocol.parse(response) || {}, data = parsed.d || parsed;
+  if (typeof data === 'string') { data = FbmSync.protocol.parse(data) || {}; }
+  var source = data && typeof data === 'object' ? data : {}, pick = function (names) {
+    for (var i = 0; i < names.length; i += 1) { if (source[names[i]] !== undefined && source[names[i]] !== null) { return String(source[names[i]]); } }
+    return '';
+  };
+  return { userId: pick(['FBM_USER_ID', 'UserId', 'userId', 'user_id', 'userid']), accountName: pick(['FBM_ACCOUNT_NAME', 'AccountName', 'accountName', 'UserName', 'userName', 'username', 'FullName', 'fullName']) };
+};

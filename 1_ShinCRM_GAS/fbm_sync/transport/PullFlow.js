@@ -39,7 +39,7 @@ FbmSync.start = function (options) {
     return { ok: false, code: 'SYNC_WRITES_DISABLED', status: FbmSync.statusView() };
   }
   if (typeof FbmSync.runPreflight === 'function') {
-    var preflight = FbmSync.runPreflight({ mode: state.mode, scan: state.scan });
+    var preflight = FbmSync.runPreflight({ mode: state.mode, origin: state.origin, scan: state.scan });
     state.metadata = state.metadata || {};
     state.metadata.preflight = preflight;
     state.metadata.preflightIssues = preflight.issues || [];
@@ -94,8 +94,17 @@ FbmSync.pullRecords = function (entity, records, mode) {
 /** Nhận token bootstrap và chuyển sang lookup hoặc đọc grid. */
 FbmSync.authContinue = function (entity, response) {
   // Token gắn với phiên và phải lưu trước mọi request ghi.
-  var auth = FbmSync.extractAuthorized(response), state = FbmSync.stateRead();
+  var auth = FbmSync.extractAuthorized(response), state = FbmSync.stateRead(), identity = typeof FbmSync.extractSessionIdentity === 'function' ? FbmSync.extractSessionIdentity(response) : {};
   if (!auth) { throw new Error('FBM khong tra ma authorized cho ' + entity + '.'); }
+  if (identity.userId) { state.session.userId = identity.userId; }
+  if (identity.accountName) { state.session.accountName = identity.accountName; }
+  if ((state.mode === 'write' || state.mode === 'push') && typeof FbmSync.identityPreflight === 'function') {
+    var identityCheck = FbmSync.identityStatus({ userId: state.session.userId, accountName: state.session.accountName });
+    if (identityCheck.status === 'REBIND_REQUIRED') {
+      state.phase = 'error'; state.lastFailureCode = 'REBIND_REQUIRED'; state.lastError = 'Liên kết tài khoản FBM không khớp; chiều ghi đã bị dừng.'; state.message = state.lastError; FbmSync.stateWrite(state);
+      return null;
+    }
+  }
   state.session[entity === 'customer' ? 'customerAuthorized' : 'activityAuthorized'] = auth;
   if (entity === 'customer') {
     state.cursor = { kind: 'authorize_activity' };

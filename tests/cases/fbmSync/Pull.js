@@ -149,6 +149,24 @@ async function chay(so) {
   const resolvedShin = builders.FbmSync.resolveConflict('customer', 'CUS-3', 'shin');
   check(so, 'resolve conflict theo ShinCRM dat baseline FBM va cho phep push', [resolvedShin.ok, resolvedShin.status, conflictWrite.records[0].fbmHash, conflictWrite.records[0].syncStatus, conflictState.metadata.pushFailures['customer:CUS-3']], [true, builders.FbmSync.SYNC_STATUS.pending, 'FBM-HASH', builders.FbmSync.SYNC_STATUS.pending, undefined]);
 
+  const bindingStore = {};
+  const identity = taoHopCat({
+    FbmSync: {},
+    PropertiesService: { getDocumentProperties: () => ({ getProperty: (key) => bindingStore[key] || null, setProperty: (key, value) => { bindingStore[key] = String(value); } }) }
+  });
+  napServer(identity, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Identity.js');
+  identity.FbmSync.currentSpreadsheetId = () => 'sheet-a';
+  identity.FbmSync.configValue = () => '';
+  identity.FbmSync.readLocal = () => [{ id: 'CUS-LINKED', fbmId: 'FBM-A' }];
+  check(so, 'file co FBM ID nhung chua lien ket phai yeu cau REBIND', [identity.FbmSync.identityStatus().status, identity.FbmSync.identityPreflight('write').blocking, identity.FbmSync.identityPreflight('background').blocking], ['REBIND_REQUIRED', true, true]);
+  const savedBinding = identity.FbmSync.bindingWrite({ spreadsheetId: 'sheet-a', userId: 'user-a', accountName: 'Tai khoan A' });
+  check(so, 'luu lien ket dung Spreadsheet va tai khoan', [savedBinding.ok, identity.FbmSync.identityStatus({ userId: 'user-a', accountName: 'Tai khoan A' }).status], [true, 'BOUND']);
+  check(so, 'khong cho ghi de lien ket khi du lieu FBM cu van con', [identity.FbmSync.bindingWrite({ spreadsheetId: 'sheet-a', userId: 'user-b', accountName: 'Tai khoan B' }).ok, identity.FbmSync.bindingWrite({ spreadsheetId: 'sheet-a', userId: 'user-b', accountName: 'Tai khoan B' }).code], [false, 'REBIND_REQUIRED']);
+  identity.FbmSync.readLocal = () => [];
+  check(so, 'sau khi xu ly du lieu cu moi cho doi lien ket', identity.FbmSync.bindingWrite({ spreadsheetId: 'sheet-a', userId: 'user-b', accountName: 'Tai khoan B' }).ok, true);
+  identity.FbmSync.readLocal = () => [{ id: 'CUS-LINKED-NEW', fbmId: 'FBM-B' }];
+  check(so, 'runtime tai khoan lech lien ket moi thi fail-closed', identity.FbmSync.identityStatus({ userId: 'user-a', accountName: 'Tai khoan A' }).status, 'REBIND_REQUIRED');
+
   const edges = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {} });
   napServer(edges, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/reconcile/CategoryGate.js');
   check(so, 'normalize placeholder 1999 thanh rong', edges.FbmSync.normalize('/Date(915123600000)/'), '');

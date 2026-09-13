@@ -8,6 +8,10 @@ Cách viết một mục: một đầu đề ngắn, rồi tối đa vài câu.
 
 ## Đang mở
 
+### FBM auto-login cần request đã kiểm chứng
+
+Phần tự động đăng nhập chưa thể code an toàn vì repo chưa có request đăng nhập FBM thành công và quy tắc mã hóa/response tương ứng. Tạm giữ công tắc tự động đăng nhập ở trạng thái chưa triển khai; để mở mục này cần cung cấp một request login mềm đã chạy thành công từ DevTools, không logout phiên hợp lệ.
+
 ### Thu hẹp bảng khóa Block: `elements` và `label` không còn là khóa chung
 
 Phép kiểm mới `tests/cases/blockKeys.js` bắt được bốn cặp vai–khóa mà bản khai nhận rồi bỏ đi: `label` trên `box`, `card`, `row`, `text`. Tự quyết: dời `elements` xuống ba vai chứa con và `label` xuống bốn vai có chữ, nên `Card({ label: 'GHI CHÚ' })` từ nay hét lên và chỉ dẫn sang `title`. Không dòng khai nào trong code hiện tại bị ảnh hưởng. Đã thêm một câu về luật phạm vi vào tài liệu 04 Phần 4.

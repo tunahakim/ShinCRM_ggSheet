@@ -27,6 +27,10 @@ FbmSync.controlDispatch = function (command, payload) {
       return fbmSyncSetWriteMode(input.enabled === true);
     case 'get_write_mode':
       return { enabled: FbmSync.writeAllowed() };
+    case 'identity_status':
+      return FbmSync.identityStatus(input.runtime || {});
+    case 'save_identity_binding':
+      return FbmSync.bindingWrite(input.binding || {});
     case 'resolve_conflict':
       return FbmSync.resolveConflict(input.entity, input.id, input.choice, input.merged);
     case 'prepare_conflict':
