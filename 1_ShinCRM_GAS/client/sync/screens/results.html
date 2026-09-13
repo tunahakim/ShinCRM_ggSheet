@@ -5,7 +5,7 @@ function fbmSyncRenderResults(panel, status) {
   fbmSyncAppendText(section, 'Kết quả & xử lý', 'shin-sync-section-title');
   var tabs = fbmSyncAppendBox(section, 'shin-sync-tab-row');
   ['summary', 'conflict', 'errors', 'log', 'audit'].forEach(function (tab) {
-    var label = tab === 'summary' ? 'Tổng hợp' : tab === 'conflict' ? 'Conflict' : tab === 'errors' ? 'Lỗi' : tab === 'log' ? 'Log' : 'Nghiệm thu phạm vi thử';
+    var label = tab === 'summary' ? 'Tổng hợp' : tab === 'conflict' ? 'Xung đột' : tab === 'errors' ? 'Lỗi' : tab === 'log' ? 'Log' : 'Nghiệm thu phạm vi thử';
     var button = fbmSyncAppendButton(tabs, '', label, false); button.setAttribute('data-sync-results-tab', tab); if (tab === (FBM_SYNC_CLIENT.resultsTab || 'summary')) { button.classList.add('is-active'); }
   });
   var tab = FBM_SYNC_CLIENT.resultsTab || 'summary';

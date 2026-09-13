@@ -4,13 +4,21 @@ function fbmSyncPaintIdentityBlock(panel, active, status) {
   var block = fbmSyncAppendCard(panel, 'Liên kết tài khoản');
   var body = block.querySelector('.shin-card-body');
   var identity = FBM_SYNC_CLIENT.identityStatus || {};
+  var binding = identity.binding || {};
   var message = identity.status === 'BOUND'
     ? 'Spreadsheet này đã được xác nhận với tài khoản FBM.'
     : identity.status === 'REBIND_REQUIRED'
       ? 'Spreadsheet chưa khớp tài khoản FBM đã lưu. Cần kiểm tra lại trước khi chạy bất kỳ chiều đồng bộ nào.'
       : 'Chưa có liên kết tài khoản FBM cố định.';
   fbmSyncAppendText(body, message, identity.status === 'REBIND_REQUIRED' ? 'shin-sync-warning' : 'shin-sync-preview-row');
-  if (identity.binding && identity.binding.accountName) { fbmSyncAppendText(body, 'Tài khoản đã lưu: ' + String(identity.binding.accountName), 'shin-sync-preview-row'); }
+  if (binding.accountName) { fbmSyncAppendText(body, 'Tài khoản đã lưu: ' + String(binding.accountName), 'shin-sync-preview-row'); }
+
+  var manual = fbmSyncAppendBox(body, 'shin-sync-identity-form');
+  fbmSyncAppendText(manual, 'Nhập hoặc chỉnh liên kết', 'shin-sync-inline-result-title');
+  [['spreadsheet', 'Spreadsheet ID', binding.spreadsheetId || FBM_SYNC_CLIENT.identityDraft.spreadsheetId, 'ID của file ShinCRM'], ['user', 'Mã user FBM', binding.userId || FBM_SYNC_CLIENT.identityDraft.userId, 'Mã user hiển thị trong FBM'], ['account', 'Tên tài khoản FBM', binding.accountName || FBM_SYNC_CLIENT.identityDraft.accountName, 'Tên tài khoản']].forEach(function (item) {
+    var field = fbmSyncAppendBox(manual, 'shin-sync-form-field'); fbmSyncAppendText(field, item[1], 'shin-sync-form-label'); fbmSyncAppendInput(field, 'fbm-identity-' + item[0], 'text', item[2], item[3]);
+  });
+  var saveManual = fbmSyncAppendButton(manual, 'fbm-sync-save-identity', 'Lưu liên kết', true); saveManual.disabled = !!active;
 
   var actions = fbmSyncAppendBox(body, 'shin-sync-identity-actions');
   var checkRunning = active && FBM_SYNC_CLIENT.identityAction === 'check';
@@ -21,7 +29,7 @@ function fbmSyncPaintIdentityBlock(panel, active, status) {
   if (probeRunning) { fbmSyncAppendText(body, 'Đang đọc thông tin tài khoản từ tab FBM đang mở.', 'shin-sync-action-status'); }
 
   var probeResult = status && status.metadata && status.metadata.identityProbe;
-  if (probeResult) {
+  if (probeResult && FBM_SYNC_CLIENT.identityLastAction === 'probe') {
     var preview = fbmSyncAppendBox(body, 'shin-sync-inline-result');
     fbmSyncAppendText(preview, 'Thông tin đọc từ tab FBM (chưa lưu)', 'shin-sync-inline-result-title');
     [['Spreadsheet', probeResult.spreadsheetId], ['Mã user', probeResult.userId], ['Tên tài khoản', probeResult.accountName]].forEach(function (item) { fbmSyncAppendText(preview, item[0] + ': ' + (item[1] ? String(item[1]) : '(không có)'), 'shin-sync-preview-row'); });
@@ -29,7 +37,7 @@ function fbmSyncPaintIdentityBlock(panel, active, status) {
     var confirm = fbmSyncAppendButton(preview, 'fbm-sync-confirm-identity', complete ? 'Xác nhận và lưu liên kết' : 'Chưa đủ thông tin để lưu', complete); confirm.disabled = !complete || !!active;
   }
   var result = status && status.metadata && status.metadata.identityCheck;
-  if (result && (status.phase === 'done' || result.missing !== undefined)) {
+  if (result && FBM_SYNC_CLIENT.identityLastAction === 'check' && (status.phase === 'done' || result.missing !== undefined)) {
     var checkResult = fbmSyncAppendBox(body, 'shin-sync-inline-result');
     fbmSyncAppendText(checkResult, 'Kết quả kiểm tra liên kết', 'shin-sync-inline-result-title');
     fbmSyncAppendText(checkResult, 'Customer hợp lệ: ' + Number(result.matched || 0) + '/' + Number(result.total || 0) + (Number(result.missing || 0) ? ' · không tìm thấy: ' + Number(result.missing || 0) : ''), 'shin-sync-preview-row');

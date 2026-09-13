@@ -5,9 +5,14 @@ function fbmSyncRenderOverview(panel, status) {
   fbmSyncAppendText(section, 'Tổng quan', 'shin-sync-section-title');
   fbmSyncAppendText(section, 'Theo dõi phiên, tài khoản và đồng bộ nền tại một nơi.', 'shin-sync-muted');
 
-  var grid = fbmSyncAppendBox(section, 'shin-sync-summary-grid');
   var count = status.counts || {};
-  [['Trạng thái', status.label || 'Sẵn sàng'], ['Hướng chạy', status.direction || 'Chưa chọn'], ['Đã xử lý', String(Number(count.completed || 0))], ['Lỗi / conflict', String(Number(count.error || 0) + Number(count.conflict || 0))]].forEach(function (item) {
+  var hero = fbmSyncAppendCard(section, 'Trạng thái phiên', 'shin-sync-overview-hero');
+  var heroBody = hero.querySelector('.shin-card-body');
+  fbmSyncAppendText(heroBody, status.label || 'Sẵn sàng', 'shin-sync-overview-state');
+  fbmSyncAppendText(heroBody, 'Hướng chạy: ' + (status.direction || 'Chưa chọn'), 'shin-sync-overview-direction');
+
+  var grid = fbmSyncAppendBox(section, 'shin-sync-summary-grid');
+  [['Đã xử lý', String(Number(count.completed || 0))], ['Thành công', String(Number(count.succeeded || 0))], ['Lỗi', String(Number(count.error || 0))], ['Xung đột', String(Number(count.conflict || 0))]].forEach(function (item) {
     var box = fbmSyncAppendBox(grid, 'shin-sync-summary-item');
     fbmSyncAppendText(box, item[0], 'shin-sync-summary-label');
     fbmSyncAppendText(box, item[1], 'shin-sync-summary-value');
