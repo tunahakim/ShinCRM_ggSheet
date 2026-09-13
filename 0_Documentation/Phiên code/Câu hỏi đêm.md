@@ -10,7 +10,7 @@ Cách viết một mục: một đầu đề ngắn, rồi tối đa vài câu.
 
 ### FBM auto-login cần request đã kiểm chứng
 
-Phần tự động đăng nhập chưa thể code an toàn vì repo chưa có request đăng nhập FBM thành công và quy tắc mã hóa/response tương ứng. Tạm giữ công tắc tự động đăng nhập ở trạng thái chưa triển khai; để mở mục này cần cung cấp một request login mềm đã chạy thành công từ DevTools, không logout phiên hợp lệ.
+Đã chốt: auto-login mặc định bật, chỉ chạy khi thiếu cookie hoặc session hết hạn, là login mềm không logout phiên hợp lệ và thử lại tối đa một lần mỗi 15 phút. Chưa thể code phần request vì repo chưa có request đăng nhập FBM thành công cùng quy tắc mã hóa/response; cần cung cấp một request login mềm đã chạy thành công từ DevTools.
 
 ### Thu hẹp bảng khóa Block: `elements` và `label` không còn là khóa chung
 
