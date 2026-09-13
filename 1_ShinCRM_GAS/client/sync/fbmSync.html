@@ -43,11 +43,13 @@ function fbmSyncLoadSettings() {
 }
 /** Đưa cấu hình Web App/khóa sang Extension; không gửi cookie hay payload FBM. */
 function fbmSyncConfigureRelay() {
-  if (FBM_SYNC_CLIENT.relayConfigured || typeof callServer !== 'function') { return Promise.resolve(null); }
+  if (typeof callServer !== 'function') { return Promise.resolve(null); }
   return callServer('fbmGetRelayConfig').then(function (config) {
-    FBM_SYNC_CLIENT.relayConfigured = true;
-    fbmSyncPostRelayConfig(config, false);
-    return config;
+    return fbmSyncPostRelayConfig(config, true).then(function (saved) {
+      if (!saved) { throw new Error('Extension không xác nhận đã cập nhật URL relay GAS.'); }
+      FBM_SYNC_CLIENT.relayConfigured = true;
+      return config;
+    });
   }).catch(function () { return null; });
 }
 /** Gửi relay config và tùy chọn chờ Extension xác nhận đã lưu. */
