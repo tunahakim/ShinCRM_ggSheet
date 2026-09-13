@@ -2,6 +2,12 @@
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 FbmSync.VERSION = '1.0.0';
+FbmSync.DEFAULT_APPROVAL_THRESHOLD = 10;
+FbmSync.approvalThreshold = function () {
+  var raw = FbmSync.configValue('FBM_SYNC_APPROVAL_THRESHOLD');
+  var value = Number(raw);
+  return isFinite(value) && value >= 0 ? Math.floor(value) : FbmSync.DEFAULT_APPROVAL_THRESHOLD;
+};
 FbmSync.CONTROLLERS = { customer: 'zccrAccount', activity: 'zccrAccountTask' };
 FbmSync.ENDPOINTS = {
   grid: '/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage',

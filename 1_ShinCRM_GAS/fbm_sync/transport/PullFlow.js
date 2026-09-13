@@ -58,7 +58,7 @@ FbmSync.start = function (options) {
     // A large push requires an explicit human approval before GAS gives out
     // even the first FBM request. The candidate count comes from the same
     // server-side preflight that will guard the actual push.
-    if ((state.mode === 'write' || state.mode === 'push') && Number(preflight.candidateCount || 0) > 10) {
+    if ((state.mode === 'write' || state.mode === 'push') && Number(preflight.candidateCount || 0) > FbmSync.approvalThreshold()) {
       state.phase = 'awaiting_approval';
       state.entity = '';
       state.cursor = { kind: 'push_approval', candidateCount: Number(preflight.candidateCount || 0) };

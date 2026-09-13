@@ -1,0 +1,21 @@
+<script>
+function fbmSyncRenderSettings(panel) {
+  var section = fbmSyncAppendBox(panel, 'shin-sync-section');
+  fbmSyncAppendText(section, 'Các kết nối và tham số này áp dụng cho toàn bộ phiên đồng bộ.', 'shin-sync-muted');
+
+  var relay = fbmSyncAppendCard(section, 'Kết nối Extension');
+  var relayBody = relay.querySelector('.shin-card-body');
+  fbmSyncAppendText(relayBody, FBM_SYNC_CLIENT.relayConfigured ? 'Extension đã nhận cấu hình relay của file này.' : 'Chưa xác nhận Extension đã nhận cấu hình relay.', FBM_SYNC_CLIENT.relayConfigured ? 'shin-sync-pass-row' : 'shin-sync-warning');
+  var rotate = fbmSyncAppendButton(relayBody, 'fbm-sync-rotate-relay', 'Đổi cấu hình kết nối', false); rotate.disabled = !!FBM_SYNC_CLIENT.running;
+
+  var settings = FBM_SYNC_CLIENT.syncSettings || {};
+  var config = fbmSyncAppendCard(section, 'Tham số phiên');
+  var body = config.querySelector('.shin-card-body');
+  [['Tài khoản FBM', settings.accountName || '(chưa khai báo)'], ['Tiền tố mã khách', settings.customerPrefix || '(chưa khai báo)'], ['Độ dài mã khách', settings.customerCodeLength || '(chưa khai báo)'], ['Mốc Activity', settings.activitySince || '(chưa khai báo)'], ['Ngưỡng yêu cầu chấp thuận', String(settings.approvalThreshold === undefined ? 10 : settings.approvalThreshold) + ' bản ghi']].forEach(function (item) {
+    var row = fbmSyncAppendBox(body, 'shin-sync-settings-row');
+    fbmSyncAppendText(row, item[0], 'shin-sync-settings-label');
+    fbmSyncAppendText(row, item[1], 'shin-sync-settings-value');
+  });
+  fbmSyncAppendText(body, 'Sửa các tham số vận hành trong khối tham số của sheet Config; màn này chỉ hiển thị giá trị GAS đang dùng.', 'shin-sync-muted');
+}
+</script>

@@ -1,0 +1,20 @@
+<script>
+/* Customer picker data adapter. It deliberately does not open a full option list on focus. */
+var CUSTOMER_PICKER_LIMIT = 11;
+
+function customerPickerIsInput(input) {
+  return !!input && input.getAttribute('data-picker') === 'customer';
+}
+
+function customerPickerMatches(query) {
+  var normalized = normalizeText(query);
+  if (!normalized) { return { rows: [], more: false }; }
+  var found = Store.searchCustomers(query, CUSTOMER_PICKER_LIMIT + 1);
+  return {
+    rows: found.slice(0, CUSTOMER_PICKER_LIMIT).map(function (customer) {
+      return { value: customer.companyName, meta: customer.id + (customer.province ? ' - ' + customer.province : '') };
+    }),
+    more: found.length > CUSTOMER_PICKER_LIMIT
+  };
+}
+</script>

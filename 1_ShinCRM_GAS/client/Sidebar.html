@@ -48,7 +48,7 @@
     <div id="shin-search" hidden>
       <div class="shin-search-wrap">
         <input type="text" id="shin-search-input" class="shin-input" autocomplete="off" spellcheck="false" placeholder="Tên, mã, số điện thoại, mã số thuế…" aria-label="Tìm khách hàng">
-        <div id="shin-search-list" class="shin-search-list" hidden></div>
+        <div id="shin-search-popup" class="shin-popup-list shin-popup-list--search" hidden></div>
       </div>
     </div>
 
@@ -106,6 +106,7 @@
   <?!= include('client/sync/screens/account') ?>
   <?!= include('client/sync/screens/run') ?>
   <?!= include('client/sync/screens/results') ?>
+  <?!= include('client/sync/screens/settings') ?>
   <?!= include('client/sync/fbmSyncStatusScreen') ?>
   <?!= include('client/sync/fbmSyncSettingsScreen') ?>
   <?!= include('client/sync/fbmSyncAuditScreen') ?>
@@ -119,7 +120,9 @@
   <?!= include('client/ui/actions') ?>
   <?!= include('client/ui/menu') ?>
   <?!= include('client/ui/collapse') ?>
+  <?!= include('client/ui/popupList') ?>
   <?!= include('client/ui/search') ?>
+  <?!= include('client/ui/customerPicker') ?>
   <?!= include('client/ui/combo') ?>
   <?!= include('client/ui/inputs') ?>
   <?!= include('client/ui/dispatch') ?>

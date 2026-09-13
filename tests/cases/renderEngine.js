@@ -190,7 +190,7 @@ function chay(so) {
   const combo = o({ field: 'province' });
   check(so, 'SELECT thành ô gõ-để-lọc, mang tên danh mục và một hộp danh sách đóng sẵn',
     [combo.indexOf('data-source="@CAT_TINH_THANH"') > 0, combo.indexOf('role="combobox"') > 0,
-      combo.indexOf('<div class="shin-combo-list" hidden></div>') > 0],
+      combo.indexOf('<div class="shin-popup-list shin-combo-list" hidden></div>') > 0],
     [true, true, true]);
 
   // Không có mũi tên thì chữ mờ trong ô là thứ **duy nhất** nói rằng ô này có danh sách, và nói luôn là có được gõ tay hay không.

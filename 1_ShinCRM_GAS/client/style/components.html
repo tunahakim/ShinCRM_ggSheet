@@ -248,20 +248,11 @@
   Con số ở đây chỉ là mức mặc định cho lúc chưa ai đo, giống cách `max-height` bên dưới hoạt động.
 */
 .shin-combo-list {
-  position: absolute;
   z-index: 5;
   top: calc(100% + 2px);
   left: 0;
   right: auto;
-  min-width: 100%;
-  width: max-content;
-  max-width: calc(100vw - 2 * var(--shin-gap-2));
   max-height: 180px;
-  overflow-y: auto;
-  border: 1px solid var(--shin-border-strong);
-  border-radius: var(--shin-radius-sm);
-  background: var(--shin-bg);
-  box-shadow: var(--shin-shadow);
 }
 
 /*
@@ -278,14 +269,15 @@
 }
 
 /* Một dòng của danh sách. Nội dung dòng do phần bàn phím đổ vào; hình thức thì thuộc về đây. */
-.shin-combo-item {
+.shin-popup-item {
   padding: var(--shin-gap-1) var(--shin-gap-2);
-  font-size: var(--shin-text-md);
   cursor: pointer;
 }
 
-.shin-combo-item:hover,
-.shin-combo-item.is-active { background: var(--shin-primary-soft); }
+.shin-popup-item:hover,
+.shin-popup-item.is-active { background: var(--shin-primary-soft); }
+
+.shin-combo-item { font-size: var(--shin-text-md); }
 
 /* Dòng phụ của ô tra khách: mã khách và tỉnh. Hai khách trùng tên là chuyện thường, và đây là chỗ phân biệt chúng. */
 .shin-combo-meta {

@@ -1,0 +1,37 @@
+<script>
+/* Shared popup primitive. Controllers own data and keyboard policy; this owns row state and visibility. */
+var PopupList = (function () {
+  function rows(box, selector) {
+    if (!box) { return []; }
+    return Array.prototype.slice.call(box.querySelectorAll(selector || '[role="option"]'));
+  }
+
+  function mark(box, index, selector) {
+    var list = rows(box, selector);
+    if (!list.length) { return -1; }
+    var next = Number(index);
+    if (next >= list.length) { next = 0; }
+    if (next < 0) { next = list.length - 1; }
+    list.forEach(function (row) { row.classList.remove('is-active'); row.setAttribute('aria-selected', 'false'); });
+    list[next].classList.add('is-active');
+    list[next].setAttribute('aria-selected', 'true');
+    if (list[next].scrollIntoView) { list[next].scrollIntoView({ block: 'nearest' }); }
+    return next;
+  }
+
+  function hide(box, selector) {
+    if (!box) { return null; }
+    box.hidden = true;
+    rows(box, selector).forEach(function (row) { row.classList.remove('is-active'); row.setAttribute('aria-selected', 'false'); });
+    return box;
+  }
+
+  function show(box) {
+    if (!box) { return null; }
+    box.hidden = false;
+    return box;
+  }
+
+  return { rows: rows, mark: mark, hide: hide, show: show };
+}());
+</script>

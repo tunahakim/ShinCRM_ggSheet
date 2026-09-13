@@ -165,7 +165,7 @@ function chay(so) {
   check(so, 'mỗi dòng gợi ý là một cửa gọi setCurrentCustomer, mang mã khách của dòng',
     goiY.map((n) => n.action), ['setCurrentCustomer', 'setCurrentCustomer']);
   check(so, 'dòng khách đã xóa mang class riêng để người dùng thấy trước khi bấm',
-    goiY.map((n) => n.className), ['shin-suggest', 'shin-suggest shin-suggest-deleted']);
+    goiY.map((n) => n.className), ['shin-popup-item shin-suggest', 'shin-popup-item shin-suggest shin-suggest-deleted']);
   check(so, 'dòng gợi ý hiện tên công ty, rồi mã khách • điện thoại • tỉnh thành',
     chuCua([goiY[0]]), ['Công ty Thép Hòa Phát', 'CUS-000001 • 0912345678 • Hà Nội']);
 

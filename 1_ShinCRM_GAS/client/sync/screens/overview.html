@@ -2,7 +2,6 @@
 function fbmSyncRenderOverview(panel, status) {
   status = status || {};
   var section = fbmSyncAppendBox(panel, 'shin-sync-section');
-  fbmSyncAppendText(section, 'Tổng quan', 'shin-sync-section-title');
   fbmSyncAppendText(section, 'Theo dõi phiên, tài khoản và đồng bộ nền tại một nơi.', 'shin-sync-muted');
 
   var count = status.counts || {};
@@ -35,9 +34,5 @@ function fbmSyncRenderOverview(panel, status) {
   var toggle = fbmSyncAppendButton(backgroundBody, '', status.backgroundEnabled === false ? 'Bật lịch đồng bộ nền' : 'Tắt lịch đồng bộ nền', false);
   toggle.setAttribute('data-sync-background', 'true'); toggle.disabled = status.masterEnabled === false;
 
-  var relay = fbmSyncAppendCard(section, 'Kết nối Extension');
-  var relayBody = relay.querySelector('.shin-card-body');
-  fbmSyncAppendText(relayBody, 'Chỉ dùng để chuyển request qua tab FBM; không chứa dữ liệu tài khoản.', 'shin-sync-muted');
-  var rotate = fbmSyncAppendButton(relayBody, 'fbm-sync-rotate-relay', 'Đổi cấu hình kết nối', false); rotate.disabled = !!FBM_SYNC_CLIENT.running;
 }
 </script>

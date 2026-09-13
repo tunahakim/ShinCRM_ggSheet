@@ -116,7 +116,8 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── screens\\overview.html  Màn Tổng quan, trạng thái phiên và cấu hình đồng bộ nền.
 │   │   ├── screens\\account.html   Màn Tài khoản FBM, nhận diện, auto-login và relay.
 │   │   ├── screens\\run.html       Màn Chạy đồng bộ, dropdown hướng dữ liệu và pipeline.
-│   │   ├── screens\\results.html   Màn Kết quả & xử lý, tab tổng hợp/conflict/nghiệm thu.
+│   │   ├── screens\\results.html   Màn Kết quả & xử lý, tab tổng hợp/xung đột/nghiệm thu.
+│   │   ├── screens\\settings.html  Màn Cài đặt phiên, kết nối Extension và tham số vận hành.
 │   │   ├── fbmSyncStatusScreen.html Block trạng thái và tiến trình riêng của phiên.
 │   │   ├── fbmSyncSettingsScreen.html Block nhận diện tài khoản được màn Tài khoản FBM tái sử dụng; không còn checkbox ghi.
 │   │   └── fbmSyncAuditScreen.html Block preview, audit và chi tiết lỗi/xung đột.
@@ -299,6 +300,10 @@ Bốn dòng `client/...js` lệch vì một lý do khác hẳn các dòng trên,
 Ba dòng cuối lệch vì thư mục: tài liệu 04 gom cả CSS vào `client/ui/`, còn code chia `client/style/` cho hình thức dùng chung, `client/ui/` cho bộ máy giao diện, `client/screen/` cho từng màn. Chủ dự án chốt cách chia này 05/09/2026 và tài liệu 04 Phần 10 đã sửa theo. Một `styles.html` của tài liệu thành ba tệp theo việc: `tokens.html` giữ biến, `frame.html` giữ năm vùng khung, `components.html` giữ các lớp mà renderEngine sinh ra.
 
 Biểu mẫu **không** có thư mục riêng: bộ máy dựng form là `client\ui\` (uiBuilder, renderEngine, actions, slots), bảng khai form là `client\schema\` (uiSchema, fieldLogic), và mỗi màn có form là một tệp trong `client\screen\`.
+## Shared popup UI
+
+The client UI uses `client/ui/popupList.html` as the shared popup primitive. `search.html`, `combo.html`, and `customerPicker.html` remain separate controllers so search, dropdown, and customer-picker behavior do not get coupled.
+
 ## 2_ShinCRM_Extension
 
 ```

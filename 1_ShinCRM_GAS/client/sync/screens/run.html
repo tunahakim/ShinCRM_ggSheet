@@ -17,7 +17,7 @@ function fbmSyncRenderPipeline(panel, status) {
 }
 function fbmSyncRenderRun(panel, status) {
   status = status || {};
-  var section = fbmSyncAppendBox(panel, 'shin-sync-section'); fbmSyncAppendText(section, 'Chạy đồng bộ', 'shin-sync-section-title');
+  var section = fbmSyncAppendBox(panel, 'shin-sync-section');
   var card = fbmSyncAppendCard(section, 'Chọn loại đồng bộ'); var body = card.querySelector('.shin-card-body');
   var label = fbmSyncAppendBox(body, 'shin-sync-form-field'); fbmSyncAppendText(label, 'Loại đồng bộ', 'shin-sync-form-label');
   var mode = fbmSyncAppendSelect(label, 'fbm-sync-mode', FBM_SYNC_UI_SCHEMA.modes, FBM_SYNC_CLIENT.mode); mode.disabled = !!FBM_SYNC_CLIENT.running;

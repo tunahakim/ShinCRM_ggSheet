@@ -18,15 +18,16 @@ function fbmSyncPaintAuditBlocks(panel, status) {
 function fbmSyncPaintConflictScreen(panel, status) {
   var metadata = status.metadata || {}, conflicts = Array.isArray(metadata.conflicts) ? metadata.conflicts : [], item = conflicts[0];
   var card = fbmSyncAppendCard(panel, 'Xử lý xung đột', 'shin-sync-conflict-screen'); var body = card.querySelector('.shin-card-body');
-  fbmSyncAppendButton(body, 'fbm-sync-conflict-back', 'Quay lại kết quả', false);
-  fbmSyncAppendText(body, Number(metadata.conflictCount || conflicts.length) + ' xung đột còn lại', 'shin-sync-inline-result-title');
-  if (!item) { fbmSyncAppendText(body, 'Không còn conflict chờ quyết định.', 'shin-sync-preview-row'); return; }
-  fbmSyncAppendText(body, String(item.entity || '') + ' · ' + String(item.id || '') + (item.fbmId ? ' · FBM ' + String(item.fbmId) : ''), 'shin-sync-preview-row');
+  var head = fbmSyncAppendBox(body, 'shin-sync-conflict-head');
+  fbmSyncAppendText(head, Number(metadata.conflictCount || conflicts.length) + ' xung đột còn lại', 'shin-sync-conflict-count');
+  fbmSyncAppendButton(head, 'fbm-sync-conflict-back', 'Quay lại kết quả', false);
+  if (!item) { fbmSyncAppendText(body, 'Không có xung đột cần xử lý.', 'shin-sync-empty-state'); return; }
+  fbmSyncAppendText(body, String(item.entity || '') + ' · ' + String(item.id || '') + (item.fbmId ? ' · FBM ' + String(item.fbmId) : ''), 'shin-sync-conflict-meta');
   (item.fields || []).forEach(function (field) {
     var group = fbmSyncAppendBox(body, 'shin-sync-conflict-field');
-    fbmSyncAppendText(group, String(field.field || ''), 'shin-sync-inline-result-title');
-    fbmSyncAppendText(group, 'ShinCRM: ' + String(field.left || '(trống)'), 'shin-sync-preview-row');
-    fbmSyncAppendText(group, 'FBM: ' + String(field.right || '(trống)'), 'shin-sync-preview-row');
+    fbmSyncAppendText(group, String(field.field || ''), 'shin-sync-conflict-field-name');
+    fbmSyncAppendText(group, 'ShinCRM: ' + String(field.left || '(trống)'), 'shin-sync-conflict-value shin-sync-conflict-value-shin');
+    fbmSyncAppendText(group, 'FBM: ' + String(field.right || '(trống)'), 'shin-sync-conflict-value shin-sync-conflict-value-fbm');
     var pick = fbmSyncAppendSelect(group, '', [{ value: 'shin', label: 'Giữ ShinCRM' }, { value: 'fbm', label: 'Giữ FBM' }, { value: 'manual', label: 'Tự nhập' }], 'shin', 'shin-input shin-sync-conflict-choice'); pick.setAttribute('data-fbm-conflict-field', String(field.field || ''));
     var manual = fbmSyncAppendInput(group, '', 'text', '', 'Giá trị kết hợp'); manual.hidden = true; manual.setAttribute('data-fbm-conflict-manual', String(field.field || ''));
   });

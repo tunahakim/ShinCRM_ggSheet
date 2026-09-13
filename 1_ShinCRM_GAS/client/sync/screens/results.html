@@ -2,7 +2,6 @@
 function fbmSyncRenderResults(panel, status) {
   status = status || {};
   var section = fbmSyncAppendBox(panel, 'shin-sync-section');
-  fbmSyncAppendText(section, 'Kết quả & xử lý', 'shin-sync-section-title');
   var tabs = fbmSyncAppendBox(section, 'shin-sync-tab-row');
   ['summary', 'conflict', 'errors', 'log', 'audit'].forEach(function (tab) {
     var label = tab === 'summary' ? 'Tổng hợp' : tab === 'conflict' ? 'Xung đột' : tab === 'errors' ? 'Lỗi' : tab === 'log' ? 'Log' : 'Nghiệm thu phạm vi thử';

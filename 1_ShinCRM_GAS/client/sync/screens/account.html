@@ -2,7 +2,6 @@
 function fbmSyncRenderAccount(panel, status) {
   status = status || {};
   var section = fbmSyncAppendBox(panel, 'shin-sync-section');
-  fbmSyncAppendText(section, 'Tài khoản FBM', 'shin-sync-section-title');
   fbmSyncAppendText(section, 'Xác nhận đúng file ShinCRM và tài khoản FBM trước khi chạy phiên.', 'shin-sync-muted');
   fbmSyncPaintIdentityBlock(section, !!FBM_SYNC_CLIENT.running, status);
 

@@ -58,6 +58,14 @@ function configParamCatalog() {
       defaultValue: 0,
       note: 'Bộ đếm cấp mã lần làm việc do ShinCRM tự quản lý.\n\n'
         + 'Giá trị là phần số lớn nhất đã cấp. Không sửa bằng tay; cửa cấp mã luôn đối chiếu với mã lớn nhất trong sheet Activity trước khi cấp mã mới.'
+    },
+    {
+      name: 'FBM_SYNC_APPROVAL_THRESHOLD',
+      owner: CONFIG_PARAM_OWNER_USER,
+      type: 'NUMBER',
+      minimum: 0,
+      defaultValue: 10,
+      note: 'Số bản ghi ghi lên FBM từ mức này trở lên sẽ yêu cầu người dùng chấp thuận trước khi phát request ghi đầu tiên. Giá trị 0 nghĩa là mọi lượt ghi đều yêu cầu chấp thuận.'
     }
   ];
 }

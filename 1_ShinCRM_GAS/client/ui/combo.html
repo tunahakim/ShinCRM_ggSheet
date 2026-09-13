@@ -18,8 +18,6 @@ var COMBO_SELECT_DELAY = 50;
 var COMBO_BLUR_DELAY = 200;
 
 /** Trần số dòng của ô tra khách. Bản cũ cũng 11: nguồn của nó là cả 1.700 khách, bung hết ra thì danh sách vô dụng. */
-var COMBO_PICKER_LIMIT = 11;
-
 /** Khoảng hở giữa danh sách và mép vùng thân, tính bằng pixel. */
 var COMBO_GAP = 8;
 
@@ -65,14 +63,13 @@ function comboIsOpen(inp) {
 
 /** Ô tra khách hay ô danh mục. Ô tra khách chỉ bung khi đã gõ, ô danh mục bung ngay để người dùng xem có những gì. */
 function comboIsPicker(inp) {
-  return inp.getAttribute('data-picker') === 'customer';
+  return customerPickerIsInput(inp);
 }
 
 /** Các dòng chọn được. Dòng chú thích không tính, nên `comboFocusAt` không bao giờ trỏ vào một dòng không điền được gì. */
 function comboRows(inp) {
   var box = comboListOf(inp);
-  if (!box) { return []; }
-  return Array.prototype.slice.call(box.querySelectorAll('.shin-combo-item'));
+  return PopupList.rows(box, '.shin-combo-item');
 }
 
 
@@ -109,14 +106,8 @@ function comboMatches(inp, chu) {
   var can = normalizeText(chu);
 
   if (comboIsPicker(inp)) {
-    if (!can) { return { rows: [], con: false }; }
-    var ket = Store.searchCustomers(chu, COMBO_PICKER_LIMIT + 1);
-    return {
-      rows: ket.slice(0, COMBO_PICKER_LIMIT).map(function (c) {
-        return { value: c.companyName, meta: c.id + (c.province ? ' • ' + c.province : '') };
-      }),
-      con: ket.length > COMBO_PICKER_LIMIT
-    };
+    var picker = customerPickerMatches(chu);
+    return { rows: picker.rows, con: picker.more };
   }
 
   var rows = [];
@@ -139,7 +130,7 @@ function comboMatches(inp, chu) {
 /** Một dòng chọn được. Dựng bằng DOM chứ không nối chuỗi HTML: giá trị là chữ người dùng gõ vào sheet `Category`, và `textContent` tự lo phần thoát ký tự. */
 function comboItemElement(o) {
   var d = document.createElement('div');
-  d.className = 'shin-combo-item';
+  d.className = 'shin-popup-item shin-combo-item';
   d.setAttribute('data-value', o.value);
   d.setAttribute('role', 'option');
 
@@ -228,11 +219,7 @@ function comboMark(inp, at) {
   if (i >= rows.length) { i = 0; }
   if (i < 0) { i = rows.length - 1; }
 
-  for (var k = 0; k < rows.length; k += 1) { rows[k].classList.remove('is-active'); }
-  rows[i].classList.add('is-active');
-  if (rows[i].scrollIntoView) { rows[i].scrollIntoView({ block: 'nearest' }); }
-
-  comboFocusAt = i;
+  comboFocusAt = PopupList.mark(comboListOf(inp), i, '.shin-combo-item');
   return i;
 }
 
@@ -241,7 +228,7 @@ function comboHide(inp) {
   var box = comboListOf(inp);
   if (!box) { return null; }
 
-  box.hidden = true;
+  PopupList.hide(box);
   box.classList.remove('is-up');
   inp.setAttribute('aria-expanded', 'false');
   comboFocusAt = -1;
@@ -288,7 +275,7 @@ function comboPaint(inp) {
   var do_ = comboFit(inp);
   if (do_.len) { box.classList.add('is-up'); } else { box.classList.remove('is-up'); }
   box.style.maxHeight = do_.cao + 'px';
-  box.hidden = false;
+  PopupList.show(box);
 
   // Đo bề ngang sau khi hộp đã hiện và đã có trần chiều cao: hộp còn `hidden` thì mọi phép đo trả về 0, và chưa có trần thì chưa biết nó có cuộn hay không.
   var be = comboSpread(inp, box);

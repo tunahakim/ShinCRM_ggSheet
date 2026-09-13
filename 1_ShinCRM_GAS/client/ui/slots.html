@@ -118,7 +118,7 @@ SLOTS.searchSuggestions = function (ctx) {
     if (c.province) { phu.push(c.province); }
 
     return Block({
-      className: 'shin-suggest' + ((c.recordStatus || STORE_ACTIVE) === STORE_DELETED ? ' shin-suggest-deleted' : ''),
+      className: 'shin-popup-item shin-suggest' + ((c.recordStatus || STORE_ACTIVE) === STORE_DELETED ? ' shin-suggest-deleted' : ''),
       action: 'setCurrentCustomer',
       pick: c.id,
       elements: [

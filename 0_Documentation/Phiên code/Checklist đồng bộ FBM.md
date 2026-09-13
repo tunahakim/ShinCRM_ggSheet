@@ -302,7 +302,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Báo cáo che cookie/authorized nhưng giữ record ID, phase, request kind và hash trước/sau.
 - [x] `fbmProbeAltState` fail-closed nếu phát hiện candidate ngoài `ALT00010` và Activity con.
 - [x] Click icon Đồng bộ ở menu chính mở thẳng màn hình `Tổng quan`, không hiện menu trung gian.
-- [x] Module có menu nội bộ và đúng bốn màn hình: `Tổng quan`, `Tài khoản FBM`, `Chạy đồng bộ`, `Kết quả & xử lý`.
+- [x] Module có menu nội bộ và năm màn hình: `Tổng quan`, `Tài khoản FBM`, `Chạy đồng bộ`, `Kết quả & xử lý`, `Cài đặt phiên`.
 - [x] Header có cụm phải `[ON/OFF] [☰]`; khi tắt, phiên thủ công, đồng bộ nền, auto-login và thao tác ghi/giải quyết conflict bị khóa, state/log vẫn xem được; menu con cuộn ở ngưỡng hai phần ba Sidebar.
 - [x] Menu con là hộp nổi dưới header, không làm nội dung màn hình dịch xuống khi mở.
 - [x] `Tài khoản FBM` gom nhận diện và đăng nhập tự động trong một màn hình; login thử phải đối chiếu user, tên tài khoản và Spreadsheet ID trước khi cho bật auto-login.
@@ -314,8 +314,16 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Bố cục module động dùng Block/schema và renderer chung; loading mở màn hình, trạng thái tĩnh và tiêu đề không dựng HTML riêng trong từng màn hình.
 - [x] Tên hiển thị `Nghiệm thu phạm vi thử`; `ALT00010` chỉ là phạm vi DEV/live acceptance, không đại diện cho phiên nhiều Customer.
 - [x] Tiêu đề header đổi theo màn hình; menu con nổi dưới header, cuộn nội bộ ở trần khoảng hai phần ba Sidebar; công tắc tổng và auto-login dùng pill nhỏ.
-- [x] Liên kết tài khoản có form nhập tay `Spreadsheet ID`, `Mã user FBM`, `Tên tài khoản FBM`; thao tác `Kiểm tra liên kết` và `Lấy nhận diện từ tab FBM` giữ kết quả riêng.
+- [x] Liên kết tài khoản có form nhập tay `Spreadsheet ID`, `Mã user FBM`, `Tên tài khoản FBM`; thao tác `Tự động điền - Kiểm tra` và `Lưu thông tin` báo lỗi tường minh, không tự lưu ngầm.
 - [ ] **Cần kiểm chứng thực tế:** chạy probe một nút và kiểm tra báo cáo trên Sidebar/Log.
+
+### Bổ sung UI dùng chung sau Slice 8
+
+- [x] Tách `PopupList` thành nền hiển thị dùng chung cho search, dropdown, customer picker và menu module; controller riêng giữ nguyên hành vi từng loại.
+- [x] Search giữ bề rộng đúng bằng ô nhập; dropdown giữ khả năng giãn theo nội dung và giới hạn theo Sidebar.
+- [x] Tách adapter `CustomerPicker` khỏi nguồn dữ liệu dropdown; giá trị dropdown hợp lệ được đưa lên đầu và bôi xanh khi focus.
+- [x] Cập nhật test offline sau khi renderer thêm class popup dùng chung: `1196/1196`.
+- [ ] Cần chủ dự án mở lại Sidebar để nghiệm thu trực quan ba kiểu popup và menu Đồng bộ.
 
 ## Slice 9 — Live acceptance và mở rộng production
 
@@ -342,5 +350,5 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 | Slice 5 — Push Customer | `5d74fd4` | `1175/1175` | `@200` | GAS DEV `fbmSyncStatus` đọc `ALT00010` thành công; preflight/relay probe PASS | Customer create mất phản hồi dò MST contains, verify exact + hash, vá ID/baseline và không phát lại request ghi |
 | Slice 6 — Push Activity | `e9ba3f1`, `01688d6`, `cd94601`, `b6d8b43`, `1a67029`, `c1ca43d`, `b9a989e`, `c49bc6c`, `284b5b9` | `1119/1119` | `@174` | Đã bắt được phiên treo: GAS ghi `gas_returned` nhưng callback Sidebar không serialize được Date trong memvars; builder sửa ngày Sheet sang `/Date(ms)/`, cập nhật `datetime0`, tách `fileticket` OldValue/NewValue và OldValue thiếu theo fixture | Callback Activity Edit có trace `entered/returned/failed`; trace hop độc lập nối GAS/Sidebar/Extension/FBM; quá 15 giây Sidebar tự kết luận timeout và không tự gửi lại lệnh ghi |
 | Slice 7 — Scheduler + nền | `7a324ee`, `43233a5`, `0d46258`, `ba46b23`, `36d6f8f`, `9923fac`, `119cea6` | `1078/1078` | `@137` | GAS DEV `fbmSyncHeartbeat` và `fbmSyncStatus` trả `OK`; không phát request ghi | Handoff heartbeat giới hạn 10 request đọc mỗi lượt; relay kèm Spreadsheet ID; Sidebar gửi config khi mở; không chạm FBM khi thiếu config; bridge cũ sau Reload được thử lại có kiểm soát; state active quá hạn được thu hồi |
-| Slice 8 — UI + log + probe | `e243432`, `3e60e88`, `e4c92c1`, `52c3fa9`, `81c4c58`, `778eed1` | `1196/1196` | `@217` (`fbmGetMasterSwitch` trả `OK`, `enabled: true`) | UI shell bốn màn hình, menu dọc phù hợp Sidebar hẹp, hộp menu nổi dưới header, pill `ON/OFF` nhỏ, tiêu đề đổi theo màn hình, form liên kết nhập tay, pipeline chỉ hiện khi phiên chạy, tab kết quả và phân trang đã hoàn tất; bố cục động dùng Block/schema và renderer chung; chưa nghiệm thu probe trên Sidebar | Cần chủ dự án đóng/mở lại Sidebar để tải deployment mới và kiểm tra hiển thị thực tế |
+| Slice 8 — UI + log + probe | `e243432`, `3e60e88`, `e4c92c1`, `52c3fa9`, `81c4c58`, `778eed1` | `1196/1196` | `@217` (`fbmGetMasterSwitch` trả `OK`, `enabled: true`) | UI shell năm màn hình, menu dọc phù hợp Sidebar hẹp, popup dùng chung cho search/dropdown/customer picker/menu, hộp menu nổi dưới header, pill `ON/OFF` nhỏ, tiêu đề đổi theo màn hình, form liên kết nhập tay, pipeline chỉ hiện khi phiên chạy, tab kết quả và phân trang đã hoàn tất; bố cục động dùng Block/schema và renderer chung; chưa nghiệm thu probe trên Sidebar | Cần chủ dự án đóng/mở lại Sidebar để tải deployment mới và kiểm tra hiển thị thực tế |
 | Slice 9 — Live acceptance + production |  |  |  |  |  |
