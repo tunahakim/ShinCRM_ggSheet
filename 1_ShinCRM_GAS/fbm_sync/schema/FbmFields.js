@@ -5,6 +5,8 @@ FbmSync.VERSION = '1.0.0';
 FbmSync.DEFAULT_APPROVAL_THRESHOLD = 10;
 FbmSync.approvalThreshold = function () {
   var raw = FbmSync.configValue('FBM_SYNC_APPROVAL_THRESHOLD');
+  // Ô cấu hình trống nghĩa là chưa đặt ngưỡng; 0 vẫn là một giá trị hợp lệ nếu người dùng chủ động chọn.
+  if (raw === undefined || raw === null || String(raw).trim() === '') { return FbmSync.DEFAULT_APPROVAL_THRESHOLD; }
   var value = Number(raw);
   return isFinite(value) && value >= 0 ? Math.floor(value) : FbmSync.DEFAULT_APPROVAL_THRESHOLD;
 };
