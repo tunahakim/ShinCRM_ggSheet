@@ -24,8 +24,11 @@ function fbmSyncRenderRun(panel, status) {
   var active = ['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(status.phase) >= 0, awaiting = status.phase === 'awaiting_approval';
   var action = fbmSyncAppendButton(body, active ? 'fbm-sync-cancel' : awaiting ? 'fbm-sync-approve' : 'fbm-sync-start', active ? 'Dừng đồng bộ' : awaiting ? 'Chấp thuận và chạy' : 'Bắt đầu đồng bộ', true); action.disabled = status.masterEnabled === false;
   if (awaiting) { fbmSyncAppendText(body, 'Phiên có nhiều thay đổi; hãy xem kết quả rồi chấp thuận để tiếp tục.', 'shin-sync-muted'); }
-  fbmSyncRenderPipeline(section, status);
-  fbmSyncPaintStatusBlocks(section, status, status.counts || {});
+  var hasRunSnapshot = !!status.phase && status.phase !== 'idle';
+  if (hasRunSnapshot) {
+    fbmSyncRenderPipeline(section, status);
+    fbmSyncPaintStatusBlocks(section, status, status.counts || {});
+  }
   panel.appendChild(section);
 }
 </script>
