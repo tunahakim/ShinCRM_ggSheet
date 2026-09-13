@@ -197,7 +197,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] HTTP 500/401/403/Login.aspx giữ cursor hợp lệ và thử lại ở kỳ sau.
 - [x] Bugs HTTP 200 gắn lỗi nghiệp vụ vào record và chỉ thử lại khi dữ liệu local đổi.
 - [x] Ghi báo thành công nhưng FBM không đổi → `đẩy không ăn`, khóa record, không lặp vô hạn.
-- [ ] Extension reload/service worker ngủ → state GAS không mất và pipeline đi tiếp đúng bước.
+- [x] Extension reload/service worker ngủ → state GAS không mất và pipeline đi tiếp đúng bước; test offline đã phủ resume cursor, stale run, heartbeat tiếp tục và bridge cũ tự im lặng sau reload.
 - [ ] **Cần kiểm chứng thực tế:** mở conflict, xem diff và thử một cách giải quyết.
 - [ ] **Cần kiểm chứng thực tế:** sửa dở form trong lúc sync, xác nhận record bị hoãn và bản nháp không mất.
 
