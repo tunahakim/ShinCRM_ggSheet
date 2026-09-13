@@ -98,6 +98,16 @@
 /* Không đổi nền — bản cũ để nguyên. Gạch chân là dấu duy nhất, đúng nếp một đường dẫn chữ. */
 .shin-card-head .shin-icon:hover { background: none; text-decoration: underline; }
 
+/* Nút có menu trong tiêu đề Card không dùng chiều cao nút menu của thanh Sidebar. */
+.shin-card-head .shin-icon.shin-has-menu:has(.shin-btn-label) {
+  width: auto;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border-radius: 0;
+  line-height: 1.2;
+}
+
 .shin-card-body { padding: 6px var(--shin-card-pad) var(--shin-card-pad); }
 
 /* Hai hàng liền nhau trong card cách nhau đúng một nhịp, không phải nhịp của hàng ngoài card. */
