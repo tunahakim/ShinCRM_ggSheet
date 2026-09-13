@@ -8,7 +8,7 @@
 - `[ ]` là việc còn thiếu; mục không có nhãn **Cần kiểm chứng thực tế** là việc AI tự tiếp tục được.
 - Một slice chỉ đóng sau khi đủ code, test, log/báo cáo và checklist case của slice đó.
 - Sau khi đóng slice, ghi commit và revision GAS vào bảng bằng chứng cuối file.
-- Bộ kiểm offline gần nhất đạt `1161/1161`; phần đọc `ALT00010` và một Activity đã từng kiểm chứng, chiều ghi chưa có kết quả thành công được xác nhận.
+- Bộ kiểm offline gần nhất đạt `1175/1175`; phần đọc `ALT00010` và một Activity đã từng kiểm chứng, chiều ghi live vẫn chờ nghiệm thu.
 
 ## Nguồn hợp đồng
 
@@ -204,7 +204,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 ### Đóng slice
 
 - [x] Code, test offline, log diff và UI conflict hoàn tất; test offline phủ ánh xạ field trộn và request đọc lại trước khi chốt.
-- [ ] Bằng chứng phục hồi sau timeout, reload và lỗi nghiệp vụ đã có.
+- [x] Bằng chứng phục hồi sau timeout, reload và lỗi nghiệp vụ đã có ở test offline; request ghi dở không tự phát lại.
 - [x] State active bị bỏ rơi quá 2 phút được tự thu hồi; phiên chờ ghi không tự retry; test offline đã đạt.
 - [x] Supervisor GAS chạy mỗi phút, phát hiện `lastProgressAt` quá hạn, đánh dấu `SUPERVISOR_TIMEOUT_AT_*` và fail-closed mà không tự retry lệnh ghi.
 
@@ -225,7 +225,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Builder Customer New mở form lấy `_ma_kh_auto` rồi gửi request `New` đúng fixture.
 - [x] Builder Customer Edit mở form lấy OldValue rồi gửi `Edit` đúng tập field.
 - [x] Parser Row 64 ô hỗ trợ Row mảng/object và fallback FieldValues/InternalValues.
-- [ ] Create mất phản hồi tra MST contains, verify exact, vá ID và không create lần hai.
+- [x] Create mất phản hồi tra MST contains (`filter` với `gridPageIndex: -2`), verify exact cả MST/mã khách và hash, vá ID/baseline và không create lần hai; test offline đã phủ cả request dò và kết quả xác nhận.
 - [x] Create có Bugs đặt `đẩy lỗi`, nhả khóa và không retry khi `hSHIN` chưa đổi.
 - [x] Edit đọc xác nhận trực tiếp ngay sau response ghi; chỉ khi hash FBM khớp hash payload mới tính là thành công.
 - [x] Sau response thành công, record chuyển sang `đã đẩy chờ xác nhận`, giữ baseline cũ và lưu `hPUSH` nhỏ theo `entity:id` trong `DocumentProperties` (không thêm cột Sheet).
@@ -261,7 +261,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [ ] **Cần kiểm chứng thực tế:** sửa Activity thử, xác nhận owner, ticket, OldValue và baseline.
 - [ ] **Cần kiểm chứng thực tế:** mô phỏng mất phản hồi một lần và kiểm marker recovery.
 
-- [x] Biên GAS chuẩn hóa đệ quy toàn bộ kết quả public của fbmStartSync/fbmContinueSync, không để Date trong status, metadata hoặc cursor làm mất callback Sidebar; test offline 1161/1161.
+- [x] Biên GAS chuẩn hóa đệ quy toàn bộ kết quả public của fbmStartSync/fbmContinueSync, không để Date trong status, metadata hoặc cursor làm mất callback Sidebar; test offline 1175/1175.
 - [x] Activity Edit dựng ngày theo đúng form FBM: giữ `start_date`, dùng `workDate` cho `end_date`, không lấy timestamp `InternalValues` nguyên dạng để gửi lại; giờ vẫn lấy riêng từ `start_time`/`end_time`.
 - [x] Chieu day dung lai khi counts.conflict > 0 ngay ca khi danh sach chi tiet conflict bi thieu.
 
@@ -308,7 +308,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [ ] **Cần kiểm chứng thực tế:** chạy Customer edit, Activity create/edit và xác nhận lại sau pull.
 - [ ] **Cần kiểm chứng thực tế:** kiểm conflict, khóa form, mất tab/phiên và phục hồi.
 - [ ] **Cần kiểm chứng thực tế:** kiểm lỗi transport/HTTP và xác nhận không gửi write mù.
-- [ ] Chốt bằng fixture offline các case không thể live: Customer vắng, Activity hard-delete/vắng, owner mismatch không phát sinh, marker mồ côi.
+- [x] Chốt bằng fixture offline các case không thể live: Customer vắng, Activity hard-delete/vắng, owner mismatch không phát sinh, marker mồ côi.
 - [ ] Không chạy Delete để dọn Activity thử; giữ marker nhận diện rõ dữ liệu nghiệm thu.
 - [ ] Chỉ sau khi toàn bộ live acceptance đạt mới gỡ giới hạn `ALT00010`.
 - [ ] Chỉ sau khi được duyệt mới nạp khoảng 1.700 Customer và Activity, đo payload/thời gian và chốt baseline.

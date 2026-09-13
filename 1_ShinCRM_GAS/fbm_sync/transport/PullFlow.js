@@ -269,6 +269,10 @@ FbmSync.continue = function (rawResponse) {
       if (cursor.operation === 'customer_verify' || cursor.operation === 'activity_verify') {
         return FbmSync.continueAfterPushVerificationError(state, cursor, { code: success.code, status: success.status, fieldName: success.bug && success.bug.FieldName, reason: failureReason });
       }
+      if (cursor.operation === 'customer_create_save' && cursor.candidate.kind === 'create' && typeof FbmSync.customerCreateRecoveryRequest === 'function') {
+        var recovery = FbmSync.customerCreateRecoveryRequest(state, cursor);
+        if (recovery) { return { ok: true, request: FbmSync.nextEnvelope(recovery), status: FbmSync.statusView(), recovering: true }; }
+      }
       return FbmSync.continueAfterPushError(state, cursor, { code: success.code, status: success.status, fieldName: success.bug && success.bug.FieldName, reason: failureReason });
     }
     state.lastFailureCode = String(success.code || 'FBM_ERROR');

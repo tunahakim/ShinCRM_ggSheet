@@ -52,7 +52,7 @@ FbmSync.gridRequest = function (entity, options) {
   if (entity === 'customer' && cfg.userId) {
     payload.externalKey.push({ Name: "stt_rec_kh in (select stt_rec_kh from dbo.zcFastBusiness$Function$GetCustomerValidate('" + cfg.userId + "')) and 1", Opr: '=', Value: 1, Type: 'String', Ignore: false });
   }
-  if (entity === 'customer' && cfg.testCustomerCode) {
+  if (entity === 'customer' && cfg.testCustomerCode && opt.includeTestCustomer !== false) {
     payload.externalKey.push({ Name: 'ma_kh', Opr: '=', Value: cfg.testCustomerCode, Type: 'String', Ignore: false });
   }
   if (entity === 'customer' && payload.type === 0 && cfg.userId) {

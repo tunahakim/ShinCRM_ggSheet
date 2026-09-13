@@ -57,6 +57,26 @@ FbmSync.markPushResult = function (candidate, response, operation) {
   return patch;
 };
 
+/** Khi New Customer mất response, chỉ đọc lại theo mã tự sinh để xác định có ghi thành công hay chưa. */
+FbmSync.customerCreateRecoveryRequest = function (state, cursor) {
+  var candidate = cursor && cursor.candidate || {}, record = candidate.record || {}, taxNumber = String(record.taxNumber || '').trim();
+  if (!taxNumber || typeof FbmSync.customerGridRequest !== 'function') { return null; }
+  state.cursor = { kind: 'push_wait', operation: 'customer_create_recover', entity: 'customer', index: Number(cursor.index || 0), candidate: candidate };
+  state.message = 'Đang kiểm tra Customer vừa tạo sau khi mất phản hồi; không gửi lại lệnh ghi.';
+  FbmSync.stateWrite(state);
+  return FbmSync.customerGridRequest({ type: 0, count: 20, gridPageIndex: -2, gridRefresh: false, includeTestCustomer: false, filter: ['ma_so_thue:**' + taxNumber] });
+};
+/** Đối chiếu đúng một dòng Customer sau create mất response rồi vá ID/baseline. */
+FbmSync.finishCustomerCreateRecovery = function (state, response) {
+  var cursor = state.cursor || {}, candidate = cursor.candidate || {}, record = candidate.record || {}, grid = FbmSync.rowsToRecords('customer', response, state.metadata && state.metadata.customerFields), taxNumber = String(record.taxNumber || '').trim(), autoCode = String(candidate.autoCode || '').trim(), rows = grid.rows.filter(function (row) { return String(row.ma_so_thue || '').trim() === taxNumber && String(row.ma_kh || '').trim() === autoCode; }), local = (FbmSync.readLocal('customer') || []).filter(function (item) { return String(item.id || '') === String(candidate.id || ''); })[0];
+  if (rows.length !== 1 || !local) { throw new Error('CREATE_RECOVERY_NOT_EXACT: không xác định duy nhất Customer vừa tạo; không gửi lại request ghi.'); }
+  var incoming = FbmSync.customerRecord(rows[0], state.metadata && state.metadata.categoryGate || {}), localHash = FbmSync.hash(local, 'customer', state.metadata && state.metadata.categoryGate || {}), incomingHash = FbmSync.hash(incoming, 'customer', state.metadata && state.metadata.categoryGate || {}), sentHash = FbmSync.hash(candidate.record || {}, 'customer', state.metadata && state.metadata.categoryGate || {});
+  if (incomingHash !== sentHash || localHash !== sentHash) { throw new Error('CREATE_RECOVERY_MISMATCH: Customer tìm thấy không khớp chính xác dữ liệu đã gửi.'); }
+  var patch = { id: local.id, fbmId: incoming.fbmId, fbmCustomerCode: incoming.fbmCustomerCode, fbmHash: incomingHash, syncStatus: FbmSync.SYNC_STATUS.synced, syncedAt: new Date() }, saved = writeGateSave({ entity: 'customer', records: [patch], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
+  if (!saved || !saved.ok) { throw new Error('CREATE_RECOVERY_SAVE_FAILED: không vá được ID Customer sau khi xác nhận.'); }
+  state.metadata.pushSucceeded = Number(state.metadata.pushSucceeded || 0) + 1; state.counts.succeeded += 1; FbmSync.releasePushLock(state, 'customer', local.id); state.cursor = { kind: 'push_scan', entity: 'customer', index: Number(cursor.index || 0) + 1 }; state.current = ''; state.message = 'Đã xác nhận Customer tạo thành công sau khi mất phản hồi.'; FbmSync.stateWrite(state); return FbmSync.nextPushRequest(state);
+};
+
 /** Kiểm tra response mở form có đủ trường fingerprint trước khi xác nhận. */
 FbmSync.verifyFormValues = function (response, entity) {
   var values = FbmSync.extractFormValues(response, entity), required = entity === 'activity' ? ['id', 'ma_cv', 'details', 'end_date'] : ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ma_so_thue', 'ong_ba', 'dien_thoai', 'email', 'dc_lh'];
@@ -284,6 +304,9 @@ FbmSync.nextPushRequest = function (state) {
 /** Xử lý bước mở form và bước lưu của một candidate push. */
 FbmSync.continuePush = function (state, response) {
   var cursor = state.cursor, candidate = cursor.candidate, gate = state.metadata.categoryGate || {};
+  if (cursor.operation === 'customer_create_recover') {
+    return FbmSync.finishCustomerCreateRecovery(state, response);
+  }
   if (cursor.operation === 'customer_verify' || cursor.operation === 'activity_verify') {
     return FbmSync.finishPushVerification(state, response);
   }
