@@ -39,6 +39,10 @@ function fbmSyncElement(tag, className, text) { var node = document.createElemen
 function fbmSyncCard(title) {
   // Khai card đi qua Block chuẩn; thân dữ liệu động được gắn vào body sau đó để không dựng lại cả màn.
   var blueprint = typeof Card === 'function' ? Card({ title: title || '', elements: [] }) : null;
+  if (blueprint && typeof renderNode === 'function' && document.createRange) {
+    var range = document.createRange(); var fragment = range.createContextualFragment(renderNode(blueprint, {})); var rendered = fragment.firstElementChild;
+    if (rendered) { return { card: rendered, body: rendered.querySelector('.shin-card-body') || rendered }; }
+  }
   var card = fbmSyncElement('section', 'shin-card'); if (blueprint) { card.setAttribute('data-block-role', blueprint.role); }
   if (title) { var head = fbmSyncElement('div', 'shin-card-head'); head.appendChild(fbmSyncElement('div', 'shin-card-title', title)); card.appendChild(head); } var body = fbmSyncElement('div', 'shin-card-body'); card.appendChild(body); return { card: card, body: body };
 }
