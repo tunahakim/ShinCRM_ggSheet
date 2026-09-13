@@ -82,8 +82,8 @@ function fbmSyncRenderShell(status) {
     header = fbmSyncElement('div', 'shin-sync-module-header'); header.id = 'fbm-sync-module-header';
     var back = fbmSyncElement('button', 'shin-sync-header-btn', '←'); back.id = 'fbm-sync-back'; back.setAttribute('aria-label', 'Quay lại'); header.appendChild(back);
     header.appendChild(fbmSyncElement('strong', 'shin-sync-module-title', 'Đồng bộ FBM'));
-    var menu = fbmSyncElement('button', 'shin-sync-header-btn', '☰'); menu.id = 'fbm-sync-module-menu'; menu.setAttribute('aria-label', 'Mở menu Đồng bộ'); header.appendChild(menu);
     var master = fbmSyncElement('button', 'shin-sync-master-switch'); master.id = 'fbm-sync-master-switch'; master.setAttribute('aria-label', 'Bật hoặc tắt đồng bộ'); master.setAttribute('aria-pressed', 'false'); master.appendChild(fbmSyncElement('span', 'shin-sync-switch-label')); master.appendChild(fbmSyncElement('span', 'shin-sync-switch-knob')); header.appendChild(master);
+    var menu = fbmSyncElement('button', 'shin-sync-header-btn', '☰'); menu.id = 'fbm-sync-module-menu'; menu.setAttribute('aria-label', 'Mở menu Đồng bộ'); header.appendChild(menu);
     screen.insertBefore(header, screen.firstChild);
   }
   var nav = document.getElementById('fbm-sync-nav');
