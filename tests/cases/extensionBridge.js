@@ -123,7 +123,7 @@ async function chay(so) {
   check(so, 'heartbeat relay tiep tuc cursor voi ngan sach request', workerSource.indexOf('relayScheduledRequests(tabId') >= 0 && workerSource.indexOf('used >= 10') >= 0, true);
   check(so, 'alarm chi tim tab FBM sau khi co relay config', workerSource.indexOf("fbmHeartbeatNow('alarm')") >= 0 && workerSource.indexOf("if (!config) {") >= 0 && workerSource.indexOf('findFbmTab()') >= 0, true);
   check(so, 'relay config luu Spreadsheet ID', workerSource.indexOf('fbmSpreadsheetId: String(config.spreadsheetId || \'\')') >= 0, true);
-  check(so, 'service worker co quyen goi Web App GAS va mien redirect', manifest.host_permissions.includes('https://script.google.com/macros/*') && manifest.host_permissions.includes('https://script.googleusercontent.com/macros/*'), true);
+  check(so, 'service worker co quyen goi Sheets va Web App GAS', manifest.host_permissions.includes('https://docs.google.com/*') && manifest.host_permissions.includes('https://script.google.com/macros/*') && manifest.host_permissions.includes('https://script.googleusercontent.com/macros/*'), true);
   check(so, 'relay GAS co timeout va luu chan doan toi thieu', workerSource.indexOf('GAS_RELAY_TIMEOUT_MS') >= 0 && workerSource.indexOf('RELAY_TIMEOUT') >= 0 && workerSource.indexOf('fbmRelayLastStatus') >= 0, true);
   const sidebarSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'client', 'Sidebar.html'), 'utf8');
   const entryPointsSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'transport', 'EntryPoints.js'), 'utf8');

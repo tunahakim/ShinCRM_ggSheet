@@ -84,8 +84,8 @@ function ensureSheetsBridge(tabId) {
 
 /** Tự phục hồi các tab Sheets đang mở; lỗi một tab không làm worker ngừng nhận message. */
 function recoverSheetsBridges() {
-  return chrome.tabs.query({ url: ['https://docs.google.com/spreadsheets/*'] }).then(function (tabs) {
-    return Promise.all((tabs || []).map(function (tab) {
+  return chrome.tabs.query({ url: ['https://docs.google.com/*'] }).then(function (tabs) {
+    return Promise.all((tabs || []).filter(function (tab) { return /https:\/\/docs\.google\.com\/spreadsheets\//i.test(String(tab && tab.url || '')); }).map(function (tab) {
       return ensureSheetsBridge(tab.id).catch(function (error) { console.warn('Không khôi phục được bridge Google Sheet:', error); });
     }));
   }).catch(function (error) { console.warn('Không dò được tab Google Sheet:', error); });
