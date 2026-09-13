@@ -317,6 +317,25 @@ function chay(so) {
   check(so, 'một vùng dựng lỗi thì không vùng nào bị gán, màn không có trạng thái nửa cũ nửa mới',
     [hop.document._els['sidebar-header'].innerHTML, hop.document._els['sidebar-body'].innerHTML], ['', '']);
 
+  const comboHop = taoHopCat({
+    Schema: { customer: { product: { source: '@CAT_SAN_PHAM' } } },
+    Store: { categories: { '@CAT_SAN_PHAM': ['Sản phẩm A', 'Sản phẩm B', 'Sản phẩm C'] } },
+    customerPickerIsInput: () => false
+  });
+  napClient(comboHop, 'client/util/textNormalize.html', 'client/ui/popupList.html', 'client/ui/combo.html');
+  const comboInput = (value) => ({
+    value: value,
+    getAttribute: (name) => name === 'data-field' ? 'customer.product' : null
+  });
+  const reopened = comboHop.comboMatches(comboInput('Sản phẩm B'), 'Sản phẩm B', 'open');
+  check(so, 'dropdown mở lại giá trị hợp lệ thì giữ đủ danh sách và đưa giá trị cũ lên đầu',
+    [reopened.rows.map((row) => row.value), reopened.hasExact],
+    [['Sản phẩm B', 'Sản phẩm A', 'Sản phẩm C'], true]);
+  const partial = comboHop.comboMatches(comboInput('Sản'), 'Sản', 'search');
+  check(so, 'dropdown đang gõ tiền tố thì lọc đủ các dòng khớp, không coi dòng đầu là giá trị đã chọn',
+    [partial.rows.map((row) => row.value), partial.hasExact],
+    [['Sản phẩm A', 'Sản phẩm B', 'Sản phẩm C'], false]);
+
   quetDuongGan(so);
 }
 

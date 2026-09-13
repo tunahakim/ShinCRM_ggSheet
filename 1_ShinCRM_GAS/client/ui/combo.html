@@ -102,7 +102,7 @@ function comboSource(inp) {
  *
  * Mục khớp **đúng** chữ đang có trong ô thì kéo lên đầu: mở lại một ô đã điền là thấy ngay giá trị hiện tại, không phải cuộn đi tìm.
  */
-function comboMatches(inp, chu) {
+function comboMatches(inp, chu, mode) {
   var can = normalizeText(chu);
 
   if (comboIsPicker(inp)) {
@@ -110,9 +110,14 @@ function comboMatches(inp, chu) {
     return { rows: picker.rows, con: picker.more };
   }
 
+  var source = comboSource(inp);
+  // Khi quay lại một giá trị hợp lệ, mở lại toàn bộ danh mục; chỉ khi giá trị đang gõ chưa hợp lệ mới lọc theo nó.
+  var hasExact = can && source.some(function (v) { return normalizeText(v) === can; });
+  var showAll = mode === 'open' && (!can || hasExact);
+  var query = showAll ? '' : can;
   var rows = [];
-  comboSource(inp).forEach(function (v) {
-    if (!can || normalizeText(v).indexOf(can) !== -1) { rows.push({ value: v, meta: '' }); }
+  source.forEach(function (v) {
+    if (!query || normalizeText(v).indexOf(query) !== -1) { rows.push({ value: v, meta: '' }); }
   });
 
   if (can) {
@@ -121,7 +126,7 @@ function comboMatches(inp, chu) {
     }
   }
 
-  return { rows: rows, con: false };
+  return { rows: rows, con: false, hasExact: hasExact };
 }
 
 
@@ -254,14 +259,14 @@ function comboHideAll(tru) {
  *
  * Gõ tới đâu tự sáng dòng đầu nên gõ xong bấm Enter là xong; còn ô rỗng thì không dòng nào sáng.
  */
-function comboPaint(inp) {
+function comboPaint(inp, mode) {
   var box = comboListOf(inp);
   if (!box) { return null; }
 
   var can = normalizeText(inp.value);
   if (comboIsPicker(inp) && !can) { comboHide(inp); return null; }
 
-  var ket = comboMatches(inp, inp.value);
+  var ket = comboMatches(inp, inp.value, mode || 'search');
   box.textContent = '';
   box.setAttribute('role', 'listbox');
 
@@ -284,7 +289,7 @@ function comboPaint(inp) {
 
   inp.setAttribute('aria-expanded', 'true');
 
-  if (can) { comboMark(inp, 0); } else { comboUnmark(inp); }
+  if (ket.hasExact) { comboMark(inp, 0); } else { comboUnmark(inp); }
   return ket;
 }
 
@@ -292,7 +297,7 @@ function comboPaint(inp) {
 function comboOpen(inp) {
   if (inp.readOnly || inp.disabled) { return null; }
   comboHideAll(inp);
-  comboPaint(inp);
+  comboPaint(inp, 'open');
 
   if (comboSelectTimer) { clearTimeout(comboSelectTimer); }
   comboSelectTimer = setTimeout(function () {
