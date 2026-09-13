@@ -8,7 +8,7 @@
 - `[ ]` là việc còn thiếu; mục không có nhãn **Cần kiểm chứng thực tế** là việc AI tự tiếp tục được.
 - Một slice chỉ đóng sau khi đủ code, test, log/báo cáo và checklist case của slice đó.
 - Sau khi đóng slice, ghi commit và revision GAS vào bảng bằng chứng cuối file.
-- Bộ kiểm offline gần nhất đạt `1184/1184`; phần đọc `ALT00010` và một Activity đã từng kiểm chứng, chiều ghi live vẫn chờ nghiệm thu.
+- Bộ kiểm offline gần nhất đạt `1195/1195`; phần đọc `ALT00010` và một Activity đã từng kiểm chứng, chiều ghi live vẫn chờ nghiệm thu.
 
 ## Nguồn hợp đồng
 
@@ -85,11 +85,11 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Tìm tab FBM, ping executor, fetch trong tab và nhận response thô.
 - [x] Khi mất executor, inject rồi ping lại; request nghiệp vụ chỉ gửi một lần.
 - [x] 401/403 hoặc `Login.aspx` dừng kỳ và yêu cầu đăng nhập lại khi tùy chọn tự động đăng nhập tắt.
-- [ ] Tùy chọn tự động đăng nhập mặc định bật, tự chạy khi session hết hạn/không có cookie, không ép login khi session hợp lệ đang tồn tại và chỉ thử lại nhiều nhất một lần mỗi 15 phút.
-- [ ] Form thiết lập đặt username và password cạnh nhau, hiển thị mật khẩu dạng `***`/trống, không ghi bản rõ vào Sheet hoặc Log.
-- [ ] Extension mã hóa username/mã user, SpreadsheetId và mật khẩu thành envelope trước khi gửi/lưu qua GAS; không lưu credential bản rõ ở Sheet, Log hoặc `Config`.
-- [ ] Khi đọc lại cấu hình, Extension chỉ giải mã nội bộ và trả trạng thái cùng các trường không nhạy cảm; Sidebar không nhận mật khẩu bản rõ.
-- [ ] Nút `Đăng nhập thử` thử login mềm bằng thông tin người dùng nhập, không logout phiên hợp lệ và không ghi bí mật.
+- [x] Tùy chọn tự động đăng nhập mặc định bật, tự chạy khi session hết hạn/không có cookie, không ép login khi session hợp lệ đang tồn tại và chỉ thử lại nhiều nhất một lần mỗi 15 phút. Code, test offline và GAS DEV `fbmGetLoginConfig` đã xác nhận trạng thái mặc định; nhánh hết phiên có throttle 15 phút.
+- [x] Form thiết lập đặt username và password cạnh nhau, hiển thị mật khẩu dạng `***`/trống, không ghi bản rõ vào Sheet hoặc Log. Sidebar xóa ô mật khẩu sau khi lưu/thử.
+- [x] Extension mã hóa username/mã user, SpreadsheetId và mật khẩu thành envelope trước khi gửi/lưu qua GAS; không lưu credential bản rõ ở Sheet, Log hoặc `Config`. Kho cục bộ dùng AES-GCM; GAS chỉ giữ ciphertext.
+- [x] Khi đọc lại cấu hình, Extension chỉ giải mã nội bộ và trả trạng thái cùng các trường không nhạy cảm; Sidebar không nhận mật khẩu bản rõ. DTO `fbmGetLoginConfig` loại envelope trước khi trả về.
+- [x] Nút `Đăng nhập thử` thử login mềm bằng thông tin người dùng nhập, không logout phiên hợp lệ và không ghi bí mật. Request dùng `force:false`, kết quả chỉ trả mã/trạng thái.
 - [x] Preflight đối chiếu tuyệt đối username/mã user, tên đầy đủ và SpreadsheetId thực tế trước request nghiệp vụ; không trim, đổi hoa thường hoặc chuẩn hóa khi so sánh và không dùng mã ngắn.
 - [x] Tự điền thông tin nhận diện từ Spreadsheet hiện tại và response `authorize`, chỉ cho xác nhận các giá trị hệ thống, không tự lưu hoặc tự chuyển tài khoản. Probe chỉ gọi authorize, không quét Customer; Sidebar chỉ lưu sau nút xác nhận.
 - [x] `Kiểm tra thông tin đồng bộ` quét đủ Customer FBM, đối chiếu chỉ các dòng local đã có FBM_ID, trả tổng hợp `n/N`, mẫu sai lệch và nút `Kiểm tra lại`; không ghi Sheet/FBM. Code, test offline và GAS DEV đã xác nhận entrypoint authorize Customer, full-scan không lọc mã test, cursor `stt_rec_kh` và kết thúc không ghi Sheet/FBM.
@@ -320,7 +320,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 | Slice | Commit code | Test/offline | Revision GAS | Bằng chứng thực tế | Ghi chú |
 | --- | --- | --- | --- | --- | --- |
 | Slice 0 — Nền tảng |  |  |  |  |  |
-| Slice 1 — Preflight + Category | `fadcf33`, `8bd57f0`, `de9b316`, `7da8cfd` | `1184/1184` | `@206` | GAS DEV `fbmStartIdentityProbe` trả request authorize khi file có dữ liệu lệch liên kết; không ghi Sheet/FBM | Category chỉ đọc/đối chiếu; probe/check được phép xử lý `REBIND_REQUIRED` |
+| Slice 1 — Preflight + Category | `fadcf33`, `8bd57f0`, `de9b316`, `7da8cfd` + auth/UI hiện tại | `1195/1195` | `@209` | GAS DEV `fbmStartIdentityProbe` trả request authorize khi file có dữ liệu lệch liên kết; `fbmProbeAutoLogin` trả endpoint Login, mặc định bật và request không chứa credential; không ghi Sheet/FBM | Category chỉ đọc/đối chiếu; auto-login giữ envelope mã hóa và throttle 15 phút |
 | Slice 2 — Pull Customer |  |  |  |  |  |
 | Slice 3 — Pull Activity | `8fbb6a7` + entrypoint DEV | `1075/1075` | `@136` | Pull `ALT00010` đã xác nhận Activity liên kết và idempotency; bulk/catchup/rotation đã có test offline; `fbmSyncStartActivityBulk` trả `OK`, request đầu `authorize`, state `scan=activity_bulk`; `fbmInstallScheduler` trả `OK` | Ba lớp quét Activity nền đã có cursor state/DocumentProperties |
 | Slice 4 — Đối soát + conflict |  |  |  |  |  |

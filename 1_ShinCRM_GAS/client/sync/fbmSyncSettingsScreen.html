@@ -1,5 +1,5 @@
 <script>
-/* Block điều khiển mode/cờ ghi; credential form sẽ nối vào cùng màn hình con ở slice đăng nhập. */
+/* Khối điều khiển nằm đầu màn hình để người dùng thấy ngay cờ an toàn trước khi chạy. */
 function fbmSyncPaintSettingsBlock(panel, active, status) {
   var block = document.createElement('div'); block.className = 'shin-card shin-sync-settings-block';
   var head = document.createElement('div'); head.className = 'shin-card-head';
@@ -16,6 +16,17 @@ function fbmSyncPaintSettingsBlock(panel, active, status) {
   var check = document.createElement('input'); check.type = 'checkbox'; check.id = 'fbm-sync-write-gate'; check.checked = FBM_SYNC_CLIENT.writeAllowed; check.disabled = active;
   gate.appendChild(check); gate.appendChild(document.createTextNode(' Cho phép ghi thật lên FBM')); body.appendChild(gate);
   var relay = document.createElement('button'); relay.type = 'button'; relay.className = 'shin-button'; relay.id = 'fbm-sync-rotate-relay'; relay.disabled = active; relay.textContent = 'Đổi khóa relay'; body.appendChild(relay);
+  var loginTitle = document.createElement('div'); loginTitle.className = 'shin-sync-preview-title shin-sync-login-title'; loginTitle.textContent = 'ĐĂNG NHẬP TỰ ĐỘNG'; body.appendChild(loginTitle);
+  var login = FBM_SYNC_CLIENT.loginStatus || status && status.login || {};
+  var auto = document.createElement('label'); auto.className = 'shin-sync-write-gate';
+  var autoCheck = document.createElement('input'); autoCheck.type = 'checkbox'; autoCheck.id = 'fbm-sync-auto-login'; autoCheck.checked = login.enabled !== false; autoCheck.disabled = active; auto.appendChild(autoCheck); auto.appendChild(document.createTextNode(' Tự đăng nhập khi phiên hết hạn')); body.appendChild(auto);
+  var loginState = document.createElement('div'); loginState.className = 'shin-sync-preview-row'; loginState.textContent = login.configured ? 'Đã có thông tin đăng nhập được mã hóa trên Extension và GAS.' : 'Chưa thiết lập thông tin đăng nhập tự động.'; body.appendChild(loginState);
+  var loginRow = document.createElement('div'); loginRow.className = 'shin-sync-login-row';
+  var username = document.createElement('input'); username.type = 'text'; username.id = 'fbm-login-username'; username.className = 'shin-input'; username.autocomplete = 'off'; username.value = String(FBM_SYNC_CLIENT.loginDraft && FBM_SYNC_CLIENT.loginDraft.username || ''); username.placeholder = 'Username FBM'; username.setAttribute('aria-label', 'Username FBM'); loginRow.appendChild(username);
+  var password = document.createElement('input'); password.type = 'password'; password.id = 'fbm-login-password'; password.className = 'shin-input'; password.autocomplete = 'new-password'; password.placeholder = 'Mật khẩu'; password.setAttribute('aria-label', 'Mật khẩu FBM'); loginRow.appendChild(password); body.appendChild(loginRow);
+  var loginActions = document.createElement('div'); loginActions.className = 'shin-sync-actions';
+  var saveLogin = fbmSyncMakeButton('fbm-sync-login-save', 'Lưu mã hóa', true); saveLogin.disabled = active; loginActions.appendChild(saveLogin);
+  var testLogin = fbmSyncMakeButton('fbm-sync-login-test', 'Đăng nhập thử', false); testLogin.disabled = active; loginActions.appendChild(testLogin); body.appendChild(loginActions);
   block.appendChild(body); panel.appendChild(block);
 }
 

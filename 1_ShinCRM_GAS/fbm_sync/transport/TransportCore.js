@@ -40,6 +40,7 @@ FbmSync.nextEnvelope = function (request) {
 /** Dựng lại request đọc từ cursor; không lưu payload/cookie để retry không làm lộ bí mật. */
 FbmSync.requestForCursor = function (state) {
   var cursor = state && state.cursor || {}, lookup, customerId, pageType;
+  if (cursor.kind === 'login') { return FbmSync.loginRequest(cursor.credentialRef, false); }
   if (cursor.kind === 'authorize_customer') { return FbmSync.authorizeRequest('customer'); }
   if (cursor.kind === 'authorize_activity') { return FbmSync.authorizeRequest('activity'); }
   if (cursor.kind === 'lookup') {

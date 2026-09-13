@@ -162,6 +162,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │       └── textNormalize.html    Bản sinh đôi client của server\util\TextNormalize.js. [RÀNG BUỘC CỨNG] hai bản phải giống nhau.
 │
 └── fbm_sync\                     Module đồng bộ FBM. Đọc được DATA_SCHEMA; phần lõi TUYỆT ĐỐI không đọc ngược vào đây.
+    ├── auth\AutoLogin.js       Điều phối cấu hình envelope đăng nhập và phục hồi phiên hết hạn.
     ├── schema\FbmFields.js      Field map, controller và trạng thái FBM.
     ├── SyncSchema.js             Khai 8 cột thuần đồng bộ. Tám cột này không được xuất hiện trong DATA_SCHEMA.
     ├── protocol\Protocol.js     Envelope và parse response.
@@ -247,6 +248,7 @@ tests\
     ├── selectionPoll.js          Đồng hồ giả khóa luật ACK loại trừ mọi vòng gọi, bốn điều kiện dừng, chống vòng chồng và thang nhịp 2/6 giây.
     ├── triggers.js               Trigger sửa sheet quản trị làm mới ngay; sửa kho đánh dấu mọi sheet quản trị cần làm mới.
     ├── fbmSync.js                Điều phối các nhóm kiểm thử đồng bộ FBM; không chứa logic nghiệp vụ của từng nhóm.
+    ├── fbmSync\AutoLogin.js     Kiểm envelope đăng nhập, throttle và phục hồi cursor.
     ├── fbmSync\
     │   ├── Protocol.js            Kiểm envelope, lỗi transport, fingerprint và đối soát ba chiều.
     │   ├── Builders.js            Kiểm builder/parser request Customer và Activity.
@@ -258,7 +260,7 @@ tests\
     └── domUi.js                  DOM giả tối thiểu kiểm ba đường UI: phát click, menu nổi và thu gọn nội dung.
 ```
 
-`server/dev/FbmSyncFixture.js` — Chuẩn bị live test ALT00010, ghi checklist vào Log, không xóa dữ liệu và không gửi request FBM.
+`server/dev/FbmSyncFixture.js` — Chuẩn bị live test ALT00010 và probe auth, ghi checklist vào Log, không xóa dữ liệu và không gửi request FBM.
 
 ## Bảng tra: tên trong tài liệu thiết kế → tệp thật
 

@@ -43,6 +43,11 @@ function fbmSyncCancel() {
 }
 /** Bật/tắt ghi thật; mặc định luôn tắt để bảo vệ dữ liệu FBM. */
 function fbmSyncSetWriteMode(enabled) { PropertiesService.getDocumentProperties().setProperty('FBM_SYNC_ALLOW_WRITES', enabled ? 'true' : 'false'); return { enabled: !!enabled }; }
+function fbmGetLoginConfig() { return FbmSync.loginConfigPublic(); }
+function fbmSaveLoginConfig(config) { return FbmSync.loginConfigSave(config || {}); }
+function fbmSetAutoLogin(enabled) { return FbmSync.loginConfigSetEnabled(enabled === true); }
+function fbmStartLoginTest(credentialRef) { return FbmSync.loginTestRequest(credentialRef); }
+function fbmLoginTestResult(response) { return FbmSync.loginTestResult(response); }
 
 /** Mở lại toàn bộ nhóm lỗi sau khi người dùng đã sửa nguyên nhân; không lặp request FBM tại đây. */
 function fbmSyncRetryPushFailures() {

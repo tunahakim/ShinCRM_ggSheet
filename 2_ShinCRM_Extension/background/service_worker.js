@@ -93,7 +93,50 @@ function recoverSheetsBridges() {
 /** Kiểm tra đầu nhận rồi gửi request nghiệp vụ đúng một lần. */
 function sendToFbmTab(tabId, request) {
   return ensureFbmExecutor(tabId).then(function () {
-    return sendTabMessage(tabId, { type: 'FBM_EXECUTE', request: request }, 15000);
+    return hydrateLoginRequest(request).then(function (readyRequest) {
+      request = readyRequest;
+      return sendTabMessage(tabId, { type: 'FBM_EXECUTE', request: request }, 15000);
+    });
+  });
+}
+
+var CREDENTIAL_VAULT_PREFIX = 'fbmCredentialVault:';
+function bytesToBase64(bytes) { var text = ''; for (var i = 0; i < bytes.length; i += 1) { text += String.fromCharCode(bytes[i]); } return btoa(text); }
+function base64ToBytes(value) { var text = atob(String(value || '')), bytes = new Uint8Array(text.length); for (var i = 0; i < text.length; i += 1) { bytes[i] = text.charCodeAt(i); } return bytes; }
+function credentialRef() { var bytes = new Uint8Array(12); crypto.getRandomValues(bytes); return 'cred-' + bytesToBase64(bytes).replace(/[+/=]/g, '').slice(0, 16); }
+function storageGet(key) { return new Promise(function (resolve) { chrome.storage.local.get([key], function (result) { resolve(result && result[key] || null); }); }); }
+function storageSet(value) { return new Promise(function (resolve, reject) { chrome.storage.local.set(value, function () { var error = chrome.runtime.lastError; if (error) { reject(new Error(error.message)); } else { resolve(true); } }); }); }
+
+/** Mã hóa ngay trên Extension; GAS chỉ nhận ciphertext và metadata đã che. */
+function saveCredentialEnvelope(input) {
+  var value = input || {}, ref = String(value.credentialRef || '').trim() || credentialRef(), username = String(value.username || ''), password = String(value.password || '');
+  if (!username || !password) { return Promise.resolve({ ok: false, code: 'LOGIN_FIELDS_REQUIRED', error: 'Cần nhập username và mật khẩu FBM.' }); }
+  var payload = JSON.stringify({ username: username, password: password, userId: String(value.userId || ''), spreadsheetId: String(value.spreadsheetId || ''), database: String(value.database || ''), unit: String(value.unit || ''), language: String(value.language || 'v') });
+  var iv = crypto.getRandomValues(new Uint8Array(12));
+  return crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']).then(function (key) {
+    return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, new TextEncoder().encode(payload)).then(function (cipher) {
+      return crypto.subtle.exportKey('jwk', key).then(function (jwk) {
+        var envelope = { version: 1, alg: 'AES-GCM', iv: bytesToBase64(iv), ciphertext: bytesToBase64(new Uint8Array(cipher)) };
+        return storageSet({ [CREDENTIAL_VAULT_PREFIX + ref]: { ref: ref, key: jwk, envelope: envelope } }).then(function () {
+          return { ok: true, credentialRef: ref, envelope: envelope, public: { usernameHint: username.length > 2 ? username.slice(0, 2) + '***' : '***', database: String(value.database || ''), unit: String(value.unit || ''), language: String(value.language || 'v') } };
+        });
+      });
+    });
+  }).catch(function (error) { return { ok: false, code: 'LOGIN_ENCRYPT_FAILED', error: String(error && error.message || error) }; });
+}
+function readCredential(ref) {
+  return storageGet(CREDENTIAL_VAULT_PREFIX + String(ref || '')).then(function (saved) {
+    if (!saved || !saved.key || !saved.envelope) { throw new Error('Không tìm thấy thông tin đăng nhập đã mã hóa trên Extension.'); }
+    return crypto.subtle.importKey('jwk', saved.key, { name: 'AES-GCM' }, false, ['decrypt']).then(function (key) {
+      return crypto.subtle.decrypt({ name: 'AES-GCM', iv: base64ToBytes(saved.envelope.iv) }, key, base64ToBytes(saved.envelope.ciphertext)).then(function (plain) { return JSON.parse(new TextDecoder().decode(plain)); });
+    });
+  });
+}
+function hydrateLoginRequest(request) {
+  var value = request || {}, meta = value.meta || {};
+  if (String(meta.kind || '') !== 'login') { return Promise.resolve(value); }
+  return readCredential(meta.credentialRef).then(function (credentials) {
+    return Object.assign({}, value, { body: {}, meta: Object.assign({}, meta, { loginCredentials: credentials }) });
   });
 }
 
@@ -261,6 +304,15 @@ function relayHeartbeatToGas(tabId, reply) {
 var fbmRequestFlights = Object.create(null);
 
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
+  if (message && message.type === 'FBM_ENCRYPT_CREDENTIALS') {
+    saveCredentialEnvelope(message.credentials || {}).then(sendResponse);
+    return true;
+  }
+  if (message && message.type === 'FBM_CLEAR_CREDENTIALS') {
+    var clearKey = CREDENTIAL_VAULT_PREFIX + String(message.credentialRef || '');
+    chrome.storage.local.remove([clearKey], function () { sendResponse({ ok: !chrome.runtime.lastError }); });
+    return true;
+  }
   if (message && message.type === 'FBM_CONFIGURE_RELAY') {
     var config = message.config || {};
     if (!chrome.storage || !chrome.storage.local) { sendResponse({ ok: false, error: 'Extension không có kho cấu hình.' }); return false; }

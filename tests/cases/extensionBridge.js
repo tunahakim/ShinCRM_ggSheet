@@ -129,6 +129,9 @@ function chay(so) {
   const entryPointsSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'transport', 'EntryPoints.js'), 'utf8');
   const syncSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'client', 'sync', 'fbmSync.html'), 'utf8');
   const syncAuditSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'client', 'sync', 'fbmSyncAuditScreen.html'), 'utf8');
+  check(so, 'Extension ma hoa credential bang AES-GCM truoc khi luu', workerSource.indexOf('crypto.subtle.generateKey') >= 0 && workerSource.indexOf('CREDENTIAL_VAULT_PREFIX') >= 0 && workerSource.indexOf('FBM_ENCRYPT_CREDENTIALS') >= 0, true);
+  check(so, 'bridge credential chi tra envelope va khong tra password ve Sidebar', fs.readFileSync(BRIDGE_FILE, 'utf8').indexOf('CRM_FBM_CREDENTIALS_RESULT') >= 0 && syncSource.indexOf('fbmSyncEncryptCredentials') >= 0 && syncSource.indexOf('fbm-login-password') >= 0, true);
+  check(so, 'executor login dung force false va khong logout phien hop le', executorSource.indexOf("force: false") >= 0 && executorSource.indexOf("credentials: 'include'") >= 0 && executorSource.indexOf("meta.kind === 'login'") >= 0, true);
   check(so, 'Sidebar giu waiter va thu lai mot lan khi bridge cu mat context', syncSource.indexOf('if (data.retryable)') >= 0 && syncSource.indexOf('waiter.retryCount < 1') >= 0 && syncSource.indexOf('retryCount: 0') >= 0, true);
   check(so, 'mo man dong bo khong cho relay config chan status', syncSource.indexOf('Promise.all([fbmSyncConfigureRelay(), fbmSyncStatusOnce(true), fbmSyncLoadIdentityStatus()])') >= 0, true);
   check(so, 'kiem tra lien ket dung chung guard Extension va huy cursor khi loi', syncSource.indexOf('function fbmSyncCheckIdentity()') >= 0 && syncSource.indexOf("sheetLinkExtensionAlive()") >= 0 && syncSource.indexOf("callServer('fbmCancelSync')") >= 0, true);

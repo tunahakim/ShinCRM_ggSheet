@@ -27,6 +27,12 @@ FbmSync.controlDispatch = function (command, payload) {
       return fbmSyncSetWriteMode(input.enabled === true);
     case 'get_write_mode':
       return { enabled: FbmSync.writeAllowed() };
+    case 'login_config':
+      return FbmSync.loginConfigPublic();
+    case 'save_login_config':
+      return FbmSync.loginConfigSave(input.config || {});
+    case 'set_auto_login':
+      return FbmSync.loginConfigSetEnabled(input.enabled === true);
     case 'identity_status':
       return FbmSync.identityStatus(input.runtime || {});
     case 'save_identity_binding':

@@ -20,3 +20,11 @@ function fbmPrepareAltTest() {
   }
   return { ok: true, customerCode: 'ALT00010', deleted: false, writesToFbm: 0, cases: cases };
 }
+
+/** Probe thuần cho auth: không lưu credential và không gọi FBM. */
+function fbmProbeAutoLogin() {
+  var sync = (typeof globalThis !== 'undefined' ? globalThis : this)['Fbm' + 'Sync'];
+  var config = sync && typeof sync.loginConfigPublic === 'function' ? sync.loginConfigPublic() : {};
+  var request = sync && typeof sync.loginRequest === 'function' ? sync.loginRequest('probe-ref', true) : {};
+  return { ok: true, defaultEnabled: config.enabled !== false, configured: config.configured === true, loginEndpoint: String(request.url || ''), requestHasCredentials: !!(request.body && (request.body.password || request.body.username)) };
+}

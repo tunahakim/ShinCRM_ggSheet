@@ -281,6 +281,10 @@ FbmSync.continue = function (rawResponse) {
   // Phân loại trên wrapper HTTP gốc; parse trước sẽ làm mất status và biến lỗi vận chuyển thành Bugs giả.
   var success = FbmSync.protocol.assertSuccess(rawResponse);
   if (!success.ok) {
+    if (success.code === 'SESSION_EXPIRED' && cursor.kind !== 'push_wait' && typeof FbmSync.beginAutoLogin === 'function') {
+      var loginRequest = FbmSync.beginAutoLogin(state, cursor);
+      if (loginRequest) { return { ok: true, request: FbmSync.nextEnvelope(loginRequest), status: FbmSync.statusView(), autoLogin: true }; }
+    }
     var retryRequest = FbmSync.retryRead(state, success);
     if (retryRequest) {
       return { ok: true, request: FbmSync.nextEnvelope(retryRequest), status: FbmSync.statusView(), retrying: true };
@@ -323,6 +327,15 @@ FbmSync.continue = function (rawResponse) {
   state.retryable = false;
   state.lastFailureCode = '';
   FbmSync.stateWrite(state);
+
+  if (cursor.kind === 'login') {
+    var resumed = FbmSync.loginResumeRequest(state);
+    if (!resumed) {
+      state.phase = 'error'; state.lastFailureCode = 'AUTO_LOGIN_RESUME_FAILED'; state.lastError = 'Đăng nhập lại thành công nhưng không dựng lại được request đồng bộ.'; state.message = state.lastError; FbmSync.stateWrite(state);
+      return { ok: false, status: FbmSync.statusView(), error: state.lastError };
+    }
+    return { ok: true, request: resumed, status: FbmSync.statusView(), autoLogin: true };
+  }
 
   if (cursor.kind === 'push_wait') {
     try {
