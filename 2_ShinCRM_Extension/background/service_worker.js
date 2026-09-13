@@ -248,7 +248,7 @@ function fbmHeartbeatNow(source) {
         noteHeartbeatStatus('blocked_relay', { source: origin, code: probeCode, error: String(probe && (probe.error || probe.message) || 'GAS relay chưa sẵn sàng.').slice(0, 240) });
         return { ok: false, code: probeCode, error: String(probe && (probe.error || probe.message) || 'GAS relay chưa sẵn sàng.') };
       }
-      if (probe.masterEnabled === false || probe.backgroundEnabled === false) {
+      if (probe.masterEnabled === false || (origin === 'alarm' && probe.backgroundEnabled === false)) {
         var switchCode = probe.masterEnabled === false ? 'SYNC_DISABLED' : 'BACKGROUND_DISABLED';
         noteHeartbeatStatus('blocked_switch', { source: origin, code: switchCode });
         return { ok: false, code: switchCode, error: switchCode === 'SYNC_DISABLED' ? 'Đồng bộ đang tắt.' : 'Đồng bộ nền đang tắt.' };
