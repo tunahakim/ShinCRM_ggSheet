@@ -8,7 +8,7 @@
 - `[ ]` là việc còn thiếu; mục không có nhãn **Cần kiểm chứng thực tế** là việc AI tự tiếp tục được.
 - Một slice chỉ đóng sau khi đủ code, test, log/báo cáo và checklist case của slice đó.
 - Sau khi đóng slice, ghi commit và revision GAS vào bảng bằng chứng cuối file.
-- Bộ kiểm offline gần nhất đạt `1121/1121`; phần đọc `ALT00010` và một Activity đã từng kiểm chứng, chiều ghi chưa có kết quả thành công được xác nhận.
+- Bộ kiểm offline gần nhất đạt `1161/1161`; phần đọc `ALT00010` và một Activity đã từng kiểm chứng, chiều ghi chưa có kết quả thành công được xác nhận.
 
 ## Nguồn hợp đồng
 
@@ -48,7 +48,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Request authorized Customer dùng `viewPage:false`, `authorized:null`, `values:[]` và ba vars đúng hợp đồng.
 - [x] Request authorized Activity dùng controller riêng và hai vars đúng hợp đồng.
 - [x] Đã kiểm chứng thực tế việc nhận được authorized Customer và Activity của phiên FBM đang mở.
-- [x] Cookie payload và `userId` lấy từ tab/response; mặc định không tự đăng nhập bằng mật khẩu.
+- [x] Cookie payload và `userId` lấy từ tab/response; heartbeat không tự đăng nhập hoặc ghi, còn login tự động chỉ chạy qua cổng phiên khi thiếu cookie hoặc session hết hạn.
 - [x] HTTP status, body lỗi, `Bugs` và lỗi parse được chuyển thành lỗi có cấu trúc; log không ghi cookie/payload.
 - [x] Mất content script được ping rồi tiêm lại trước request nghiệp vụ.
 - [x] Không tìm thấy tab, mất đầu nhận và timeout được báo rõ trên Sidebar.
@@ -66,10 +66,12 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Đã map các trường Customer: tên, MST, liên hệ, địa chỉ, điện thoại, email, website, tỉnh, nguồn và sản phẩm.
 - [x] `product/ma_sp` được chuẩn hóa vào fingerprint Customer và loại khỏi Activity.
 - [x] `owner` Activity không tham gia fingerprint và được đọc để kiểm quyền sửa.
-- [x] Fingerprint chuẩn hóa xuống dòng, trim, danh mục, ngày Việt Nam, placeholder 1899/1999, Date lỗi và dấu `#SC-`.
+- [x] Fingerprint chuẩn hóa xuống dòng, trim, danh mục, ngày Việt Nam, placeholder 1899/1999, Date lỗi và dấu `#SC-`, nhưng không dùng `normalizeText`.
 - [x] Placeholder `1999`/`0` chỉ là rỗng ở field phù hợp; Activity `id=0` không làm đổi fingerprint.
 - [x] Fingerprint đã có test không đổi, một phía đổi và conflict hai phía.
 - [x] Lệch `stt_rec_kh/ma_kh` phải lấy định danh FBM riêng, không coi là ShinCRM đổi.
+- [x] Khi `ma_kh` lệch, FBM là nguồn thắng cho định danh; không đưa lệch định danh vào ứng viên push.
+- [x] `SYNC_SCHEMA` chỉ khai field đồng bộ theo tên, `AliasName`, trần độ dài và tám cột kỹ thuật; lõi không đọc ngược bảng khai, bộ tự kiểm bắt vi phạm.
 - [x] `@CUS_SYNC_TT/@ACT_SYNC_TT` có đủ 11 trạng thái, gồm `chưa đẩy` và `đẩy không ăn`.
 - [x] Có lệnh tính lại baseline khi người dùng đổi tập field hoặc luật chuẩn hóa.
 
@@ -81,11 +83,13 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Tìm tab FBM, ping executor, fetch trong tab và nhận response thô.
 - [x] Khi mất executor, inject rồi ping lại; request nghiệp vụ chỉ gửi một lần.
 - [x] 401/403 hoặc `Login.aspx` dừng kỳ và yêu cầu đăng nhập lại khi tùy chọn tự động đăng nhập tắt.
-- [ ] Tùy chọn tự động đăng nhập tự chạy khi session hết hạn/không có cookie; không ép login khi session hợp lệ đang tồn tại và không retry vô hạn.
+- [ ] Tùy chọn tự động đăng nhập mặc định bật, tự chạy khi session hết hạn/không có cookie, không ép login khi session hợp lệ đang tồn tại và chỉ thử lại nhiều nhất một lần mỗi 15 phút.
 - [ ] Form thiết lập đặt username và password cạnh nhau, hiển thị mật khẩu dạng `***`/trống, không ghi bản rõ vào Sheet hoặc Log.
+- [ ] Extension mã hóa username/mã user, SpreadsheetId và mật khẩu thành envelope trước khi gửi/lưu qua GAS; không lưu credential bản rõ ở Sheet, Log hoặc `Config`.
+- [ ] Khi đọc lại cấu hình, Extension chỉ giải mã nội bộ và trả trạng thái cùng các trường không nhạy cảm; Sidebar không nhận mật khẩu bản rõ.
 - [ ] Nút `Đăng nhập thử` thử login mềm bằng thông tin người dùng nhập, không logout phiên hợp lệ và không ghi bí mật.
-- [ ] Preflight đối chiếu tuyệt đối username/mã user, tên đầy đủ và SpreadsheetId thực tế trước request nghiệp vụ; không dùng mã ngắn.
-- [ ] Tự điền thông tin nhận diện từ Spreadsheet hiện tại và response `authorize`, hiển thị xem trước, cho người dùng xác nhận rồi mới lưu liên kết.
+- [ ] Preflight đối chiếu tuyệt đối username/mã user, tên đầy đủ và SpreadsheetId thực tế trước request nghiệp vụ; không trim, đổi hoa thường hoặc chuẩn hóa khi so sánh và không dùng mã ngắn.
+- [ ] Tự điền thông tin nhận diện từ Spreadsheet hiện tại và response `authorize`, chỉ cho xác nhận các giá trị hệ thống, không tự lưu hoặc tự chuyển tài khoản.
 - [ ] `Kiểm tra thông tin đồng bộ` quét đủ Customer FBM, đối chiếu chỉ các dòng local đã có FBM_ID, trả tổng hợp `n/N`, mẫu sai lệch và nút `Kiểm tra lại`; không ghi Sheet/FBM.
 - [ ] Khi file là bản sao, đổi tài khoản hoặc chưa có liên kết nhưng đã có dữ liệu, chuyển `REBIND_REQUIRED`, khóa push/nền; sau khi người dùng xử lý dữ liệu cũ có thể chạy kiểm tra lại, không tự xóa dữ liệu.
 - [x] Mỗi lần Sidebar mở hoặc bắt tay lại, Extension ghi đè relay config bằng GAS URL, khóa và Spreadsheet ID hiện tại; Extension chỉ giữ một config đang hoạt động và alarm không gọi FBM khi chưa có config.
@@ -255,22 +259,23 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [ ] **Cần kiểm chứng thực tế:** sửa Activity thử, xác nhận owner, ticket, OldValue và baseline.
 - [ ] **Cần kiểm chứng thực tế:** mô phỏng mất phản hồi một lần và kiểm marker recovery.
 
-- [x] Bien GAS chuan hoa de quy toan bo ket qua public cua fbmStartSync/fbmContinueSync, khong de Date trong status, metadata hoac cursor lam mat callback Sidebar; test offline 1121/1121.
+- [x] Biên GAS chuẩn hóa đệ quy toàn bộ kết quả public của fbmStartSync/fbmContinueSync, không để Date trong status, metadata hoặc cursor làm mất callback Sidebar; test offline 1161/1161.
 - [x] Activity Edit dựng ngày theo đúng form FBM: giữ `start_date`, dùng `workDate` cho `end_date`, không lấy timestamp `InternalValues` nguyên dạng để gửi lại; giờ vẫn lấy riêng từ `start_time`/`end_time`.
 - [x] Chieu day dung lai khi counts.conflict > 0 ngay ca khi danh sach chi tiet conflict bi thieu.
 
 ## Slice 7 — Heartbeat, scheduler và chạy nền
 
-- [x] Extension có alarm heartbeat 5 phút, đọc `count:1`, mặc định không login và không write.
+- [x] Extension có alarm heartbeat 5 phút, đọc `count:1`, không tự login hoặc write; login chỉ do cổng phiên của request nghiệp vụ điều phối.
 - [x] Heartbeat nộp kết quả cho GAS, cập nhật lần sống cuối và kích full Customer khi tổng số đổi.
 - [x] Kỳ Customer 60 phút kéo full grid qua nhiều lát, lưu cursor từng lát.
-- [x] Kỳ Activity 8 giờ chạy bulk ID, lớp `ngay_gd` và vòng xoay 30 Customer.
+- [x] Kỳ Activity 8 giờ chạy bulk ID và lớp `ngay_gd`.
+- [ ] Vòng xoay Activity chạy mỗi 30 phút, quét 30 Customer tiếp theo và tiếp tục đúng cursor sau khi service worker/GAS gián đoạn.
 - [x] Scheduler không tạo hai kỳ, không giữ công việc trong RAM và tiếp tục từ lát đã chốt.
 - [x] Khi người dùng bấm `Đồng bộ ngay` trong lúc có phiên nền, GAS đánh dấu phiên nền dừng, chờ response FBM hiện tại kết thúc, không cấp request tiếp theo rồi Sidebar ưu tiên phiên thủ công; không tạo hai phiên song song. Test offline phủ handoff nền → thủ công.
 - [x] Nút Dừng đồng bộ xóa marker `scheduledScan`, không để heartbeat tự khởi động lại kỳ vừa dừng.
 - [x] Web App dùng khóa theo spreadsheet để tiếp tục khi Sidebar đóng.
 - [x] Mở lại Sidebar chỉ đọc state hiện có, không tạo kỳ thứ hai.
-- [ ] Nạp lần đầu Sheet trống theo thứ tự Category → Customer → Activity → baseline, không nhân bản.
+- [ ] Nạp lần đầu theo thứ tự Category → Customer → Activity → baseline; nếu Sheet đã có dữ liệu hoặc FBM_ID thì phải qua kiểm tra liên kết, xử lý `REBIND_REQUIRED` trước và không nhân bản.
 - [ ] Lệnh tính lại baseline không phát request write FBM.
 - [ ] **Cần kiểm chứng thực tế:** bắt đầu kỳ, đóng Sidebar, chờ Web App/Extension và mở lại xem state/log.
 - [ ] **Cần kiểm chứng thực tế:** reload hoặc để service worker ngủ rồi xác nhận kỳ tiếp tục.
