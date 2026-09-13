@@ -10,17 +10,9 @@
 - Sau khi đóng slice, ghi commit và revision GAS vào bảng bằng chứng cuối file.
 - Bộ kiểm offline gần nhất đạt `1121/1121`; phần đọc `ALT00010` và một Activity đã từng kiểm chứng, chiều ghi chưa có kết quả thành công được xác nhận.
 
-## Hợp đồng nhận diện và đăng nhập FBM
+## Nguồn hợp đồng
 
-- Mã user FBM là một giá trị nhận diện duy nhất do người dùng nhập; không tách thành hai trường khác hoa thường.
-- Username/mã user, tên đầy đủ và `FBM_SPREADSHEET_ID` phải khớp tuyệt đối với giá trị live/cấu hình; không tự bỏ khoảng trắng, đổi hoa thường hoặc chuẩn hóa ký tự.
-- Mã ngắn hiển thị trong FBM không phải cổng nhận diện vì người dùng có thể sửa; không lưu, không đối chiếu và không dùng để quyết định tài khoản.
-- `FBM_SPREADSHEET_ID` do người dùng nhập trong màn hình thiết lập để bản copy chưa đổi cấu hình bị chặn; GAS vẫn phải lấy ID thực tế của Spreadsheet trước khi so sánh.
-- Bản thiết lập đăng nhập gồm username/mã user, tên đầy đủ, `FBM_SPREADSHEET_ID` và mật khẩu; Extension mã hóa toàn bộ thành một envelope trước khi GAS lưu trong `DocumentProperties`.
-- Sidebar không nhận mật khẩu bản rõ; ô mật khẩu hiển thị `***` hoặc để trống. Khi xem lại, Extension chỉ giải mã nội bộ và trả các trường không nhạy cảm.
-- Tự động đăng nhập là tính năng có sẵn nhưng công tắc mặc định tắt; khi bật, hệ tự chạy ngay khi session hết hạn hoặc không có cookie, không ép đăng nhập lại khi session còn hợp lệ. Khi tắt, luồng dùng cookie/đăng nhập thủ công hiện tại không thay đổi.
-- Sidebar có nút `Đăng nhập thử`; thao tác này chủ động kết thúc phiên FBM hiện tại rồi thử đăng nhập bằng thông tin đã nhập, chỉ trả trạng thái thành công/lỗi và không ghi mật khẩu vào Sheet hoặc Log.
-- Màn hình đồng bộ là một màn hình độc lập gồm các màn hình con trạng thái, thiết lập đăng nhập và chi tiết/audit; mỗi màn hình con nằm trong tệp `.html` riêng cùng thư mục `client/sync/` và dùng block/component chuẩn của Sidebar.
+Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở `[NEO → Tài liệu 09.06]`; hợp đồng màn hình và luồng kiểm tra liên kết nằm ở `[NEO → Tài liệu 09.08]`. Checklist chỉ ghi công việc triển khai và tiêu chí nghiệm thu, không chép lại hợp đồng.
 
 ## Slice 0 — Nền tảng, ranh giới và an toàn
 
@@ -91,8 +83,11 @@
 - [x] 401/403 hoặc `Login.aspx` dừng kỳ và yêu cầu đăng nhập lại khi tùy chọn tự động đăng nhập tắt.
 - [ ] Tùy chọn tự động đăng nhập tự chạy khi session hết hạn/không có cookie; không ép login khi session hợp lệ đang tồn tại và không retry vô hạn.
 - [ ] Form thiết lập đặt username và password cạnh nhau, hiển thị mật khẩu dạng `***`/trống, không ghi bản rõ vào Sheet hoặc Log.
-- [ ] Nút `Đăng nhập thử` kết thúc phiên cũ, thử thông tin người dùng nhập và hiển thị kết quả mà không ghi bí mật.
-- [ ] Preflight đối chiếu tuyệt đối username/mã user, tên đầy đủ và `FBM_SPREADSHEET_ID` trước request nghiệp vụ; không dùng mã ngắn.
+- [ ] Nút `Đăng nhập thử` thử login mềm bằng thông tin người dùng nhập, không logout phiên hợp lệ và không ghi bí mật.
+- [ ] Preflight đối chiếu tuyệt đối username/mã user, tên đầy đủ và SpreadsheetId thực tế trước request nghiệp vụ; không dùng mã ngắn.
+- [ ] Tự điền thông tin nhận diện từ Spreadsheet hiện tại và response `authorize`, hiển thị xem trước, cho người dùng xác nhận rồi mới lưu liên kết.
+- [ ] `Kiểm tra thông tin đồng bộ` quét đủ Customer FBM, đối chiếu chỉ các dòng local đã có FBM_ID, trả tổng hợp `n/N`, mẫu sai lệch và nút `Kiểm tra lại`; không ghi Sheet/FBM.
+- [ ] Khi file là bản sao, đổi tài khoản hoặc chưa có liên kết nhưng đã có dữ liệu, chuyển `REBIND_REQUIRED`, khóa push/nền; sau khi người dùng xử lý dữ liệu cũ có thể chạy kiểm tra lại, không tự xóa dữ liệu.
 - [x] Mỗi lần Sidebar mở hoặc bắt tay lại, Extension ghi đè relay config bằng GAS URL, khóa và Spreadsheet ID hiện tại; Extension chỉ giữ một config đang hoạt động và alarm không gọi FBM khi chưa có config.
 - [x] Tách phần dựng block trạng thái, điều khiển và audit thành các tệp `.html` riêng trong `client/sync/`, vẫn dùng lớp component/block chuẩn của Sidebar.
 - [x] Tách màn hình trạng thái, thiết lập đăng nhập và audit thành các tệp giao diện riêng trong `client/sync/`, tái sử dụng block chuẩn.
