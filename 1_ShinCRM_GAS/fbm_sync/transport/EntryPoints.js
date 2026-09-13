@@ -132,7 +132,12 @@ function doPost(event) {
     var actualSpreadsheetId = '';
     try { actualSpreadsheetId = String(shinOpenBook().getId() || ''); } catch (ignoreId) {}
     if (!body.spreadsheetId || !actualSpreadsheetId || String(body.spreadsheetId) !== actualSpreadsheetId) { return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'spreadsheet_mismatch' })).setMimeType(ContentService.MimeType.JSON); }
-    var result = body.kind === 'probe' ? fbmSyncRelayProbe() : (body.kind === 'heartbeat' ? fbmSyncHeartbeat(body.response) : (body.response === undefined ? fbmSyncStart(body.mode) : fbmSyncContinue(body.response)));
+    var result;
+    if (body.command) {
+      result = FbmSync.controlDispatch(String(body.command), body.payload || {});
+    } else {
+      result = body.kind === 'probe' ? fbmSyncRelayProbe() : (body.kind === 'heartbeat' ? fbmSyncHeartbeat(body.response) : (body.response === undefined ? fbmSyncStart(body.mode) : fbmSyncContinue(body.response)));
+    }
     if (body.kind === 'heartbeat' || body.kind === 'background_sync') { result = fbmSyncRelayCompactResult(result); }
     return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
   } catch (err) { return ContentService.createTextOutput(JSON.stringify({ ok: false, error: String(err && err.message || err) })).setMimeType(ContentService.MimeType.JSON); }

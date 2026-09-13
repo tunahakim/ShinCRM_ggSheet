@@ -19,6 +19,8 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 ### Kiến trúc và dữ liệu nhạy cảm
 
 - [x] GAS giữ nghiệp vụ, cursor, hash, conflict và quyết định; Extension chỉ tìm tab FBM, gọi `fetch` và trả response thô; Sidebar chỉ khởi chạy và hiển thị.
+- [x] Có `FbmSync.controlDispatch(command, payload)` làm cổng điều khiển trung lập; adapter Sidebar/relay chỉ chuyển lệnh và hiển thị DTO, không sao chép nghiệp vụ.
+- [x] Có DTO `sync_approval_required` với action ID ổn định; kênh tương lai (ví dụ Zalo) được phép đổi action thành phím tắt như `Gửi 1`, nhưng core không biết số thứ tự hay giao diện kênh.
 - [x] Mỗi lượt GAS–Extension trao đổi một request hoàn chỉnh; chuỗi nhiều bước nằm trong `DocumentProperties`, không nằm trong Extension.
 - [x] `fetch` FBM chạy trong content script của tab `fbo.com.vn`, dùng IP, cookie và `Referer` của tab.
 - [x] Cờ ghi thật mặc định tắt; Đọc thử không ghi Sheet và không ghi FBM.

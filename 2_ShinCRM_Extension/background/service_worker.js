@@ -190,7 +190,7 @@ function fbmRunBackgroundSync(mode) {
     return findFbmTab().then(function (tab) {
       if (!tab) { throw new Error('Không tìm thấy tab FBM đang mở.'); }
       noteBackgroundSyncStatus('start_requested', { mode: selectedMode, requestCount: 0 });
-      return postRelay(config.url, config.key, { kind: 'background_sync', mode: selectedMode, spreadsheetId: config.spreadsheetId }).then(function (reply) {
+      return postRelay(config.url, config.key, { kind: 'background_sync', command: 'start', payload: { mode: selectedMode, origin: 'background', manual: false }, mode: selectedMode, spreadsheetId: config.spreadsheetId }).then(function (reply) {
         return relayBackgroundSyncRequests(tab.id, config, reply, 0, selectedMode);
       });
     });
@@ -214,7 +214,8 @@ function relayBackgroundSyncRequests(tabId, config, gasReply, requestCount, mode
   console.info('[ShinCRM] FBM background request', count + 1, next.meta && next.meta.kind || 'request');
   return sendToFbmTab(tabId, next).then(function (reply) {
     noteBackgroundSyncStatus('fbm_response_received', { mode: mode, requestCount: count + 1 });
-    return postRelay(config.url, config.key, { kind: 'background_sync', spreadsheetId: config.spreadsheetId, response: rawFbmReply(reply) });
+    var rawResponse = rawFbmReply(reply);
+    return postRelay(config.url, config.key, { kind: 'background_sync', command: 'continue', payload: { response: rawResponse }, spreadsheetId: config.spreadsheetId, response: rawResponse });
   }).then(function (nextReply) { return relayBackgroundSyncRequests(tabId, config, nextReply, count + 1, mode); });
 }
 if (typeof globalThis !== 'undefined') { globalThis.fbmRunBackgroundSync = fbmRunBackgroundSync; }

@@ -169,6 +169,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── transport\PushFlow.js    Điều phối chiều đẩy và khóa an toàn trước khi ghi FBM.
     ├── transport\PullFlow.js    Điều phối preflight, đọc Customer và đọc Activity.
     ├── transport\EntryPoints.js Entry point cho Sidebar, DEV runner và Web App relay.
+    ├── control\ControlPort.js  Cổng lệnh trung lập và DTO thông báo; adapter kênh không chứa nghiệp vụ.
     ├── state\State.js            DocumentProperties, cursor và progress.
     ├── state\RecordLocks.js      Khóa bản ghi và kiểm tra revision.
     ├── state\Scheduler.js        Lịch heartbeat/quét, không gọi FBM trực tiếp.
