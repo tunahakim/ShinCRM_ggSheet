@@ -8,7 +8,7 @@
 - `[ ]` là việc còn thiếu; mục không có nhãn **Cần kiểm chứng thực tế** là việc AI tự tiếp tục được.
 - Một slice chỉ đóng sau khi đủ code, test, log/báo cáo và checklist case của slice đó.
 - Sau khi đóng slice, ghi commit và revision GAS vào bảng bằng chứng cuối file.
-- Bộ kiểm offline gần nhất đạt `1175/1175`; phần đọc `ALT00010` và một Activity đã từng kiểm chứng, chiều ghi live vẫn chờ nghiệm thu.
+- Bộ kiểm offline gần nhất đạt `1184/1184`; phần đọc `ALT00010` và một Activity đã từng kiểm chứng, chiều ghi live vẫn chờ nghiệm thu.
 
 ## Nguồn hợp đồng
 
@@ -320,7 +320,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 | Slice | Commit code | Test/offline | Revision GAS | Bằng chứng thực tế | Ghi chú |
 | --- | --- | --- | --- | --- | --- |
 | Slice 0 — Nền tảng |  |  |  |  |  |
-| Slice 1 — Preflight + Category | `fadcf33` | `1064/1064` trước sửa cancel scheduler | Chờ deploy | Chưa có | Category chỉ đọc/đối chiếu; không tự ghi Sheet |
+| Slice 1 — Preflight + Category | `fadcf33`, `8bd57f0`, `de9b316`, `7da8cfd` | `1184/1184` | `@206` | GAS DEV `fbmStartIdentityProbe` trả request authorize khi file có dữ liệu lệch liên kết; không ghi Sheet/FBM | Category chỉ đọc/đối chiếu; probe/check được phép xử lý `REBIND_REQUIRED` |
 | Slice 2 — Pull Customer |  |  |  |  |  |
 | Slice 3 — Pull Activity | `8fbb6a7` + entrypoint DEV | `1075/1075` | `@136` | Pull `ALT00010` đã xác nhận Activity liên kết và idempotency; bulk/catchup/rotation đã có test offline; `fbmSyncStartActivityBulk` trả `OK`, request đầu `authorize`, state `scan=activity_bulk`; `fbmInstallScheduler` trả `OK` | Ba lớp quét Activity nền đã có cursor state/DocumentProperties |
 | Slice 4 — Đối soát + conflict |  |  |  |  |  |
