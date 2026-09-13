@@ -25,7 +25,7 @@ function fbmSyncRenderResultPage(panel, status, kind) {
   var card = fbmSyncAppendCard(panel, kind === 'errors' ? 'Lỗi phiên' : 'Log phiên'); var body = card.querySelector('.shin-card-body');
   fbmSyncAppendText(body, 'Trang ' + (Math.min(page, totalPages - 1) + 1) + '/' + totalPages + ' · tối đa 20 dòng mỗi trang.', 'shin-sync-muted');
   rows.slice(start, start + size).forEach(function (row) { fbmSyncAppendText(body, row, 'shin-sync-preview-row'); });
-  var actions = fbmSyncAppendBox(body, 'shin-sync-form-actions');
+  var actions = fbmSyncAppendBox(body, 'shin-sync-form-actions shin-sync-pagination');
   var prev = fbmSyncAppendButton(actions, '', 'Trang trước', false); prev.disabled = page <= 0; prev.setAttribute('data-sync-page', kind + ':-1');
   var next = fbmSyncAppendButton(actions, '', 'Trang sau', false); next.disabled = page >= totalPages - 1; next.setAttribute('data-sync-page', kind + ':1');
 }

@@ -35,6 +35,9 @@
 .shin-sync-form-field { display:flex; flex-direction:column; gap:4px; margin-bottom:var(--shin-gap-2); }
 .shin-sync-form-field label { color:var(--shin-text-soft); font-size:var(--shin-text-xs); }
 .shin-sync-form-actions { display:flex; flex-wrap:wrap; gap:var(--shin-gap-2); }
+.shin-sync-pagination { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--shin-gap-2); margin-top:var(--shin-gap-2); }
+.shin-sync-pagination .shin-button { width:100%; min-height:32px; padding:var(--shin-gap-1) var(--shin-gap-2); }
+.shin-sync-pagination .shin-button:disabled { border-color:var(--shin-border-strong); background:var(--shin-bg-sunken); color:var(--shin-text-soft); cursor:not-allowed; opacity:1; }
 @media (max-width:340px) { .shin-sync-summary-grid { grid-template-columns:1fr; } .shin-sync-module-header { padding-left:var(--shin-gap-2); padding-right:var(--shin-gap-2); } }
 </style>
 <style>
