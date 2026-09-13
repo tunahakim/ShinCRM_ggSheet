@@ -242,7 +242,22 @@ function fbmHeartbeatNow(source) {
       return { ok: false, code: 'RELAY_CONFIG_MISSING', error: 'Thiếu cấu hình relay; hãy mở Sidebar một lần.' };
     }
     noteHeartbeatStatus('relay_configured', { source: origin });
-    return findFbmTab().then(function (tab) {
+    return postRelay(config.url, config.key, { kind: 'probe', spreadsheetId: config.spreadsheetId }).then(function (probe) {
+      if (!probe || probe.ok !== true) {
+        var probeCode = String(probe && probe.code || 'RELAY_PROBE_FAILED');
+        noteHeartbeatStatus('blocked_relay', { source: origin, code: probeCode, error: String(probe && (probe.error || probe.message) || 'GAS relay chưa sẵn sàng.').slice(0, 240) });
+        return { ok: false, code: probeCode, error: String(probe && (probe.error || probe.message) || 'GAS relay chưa sẵn sàng.') };
+      }
+      if (probe.masterEnabled === false || probe.backgroundEnabled === false) {
+        var switchCode = probe.masterEnabled === false ? 'SYNC_DISABLED' : 'BACKGROUND_DISABLED';
+        noteHeartbeatStatus('blocked_switch', { source: origin, code: switchCode });
+        return { ok: false, code: switchCode, error: switchCode === 'SYNC_DISABLED' ? 'Đồng bộ đang tắt.' : 'Đồng bộ nền đang tắt.' };
+      }
+      if (origin === 'alarm' && probe.sessionExpired === true) {
+        noteHeartbeatStatus('blocked_session', { source: origin, code: 'SESSION_EXPIRED_WAITING_LOGIN' });
+        return { ok: false, code: 'SESSION_EXPIRED_WAITING_LOGIN', error: 'Phiên FBM đã hết hạn; alarm nền tạm dừng cho tới khi đăng nhập lại.' };
+      }
+      return findFbmTab().then(function (tab) {
       if (!tab) {
         noteHeartbeatStatus('blocked_tab', { source: origin, code: 'FBM_TAB_NOT_FOUND' });
         return { ok: false, code: 'FBM_TAB_NOT_FOUND', error: 'Không tìm thấy tab FBM đang mở.' };
@@ -253,8 +268,9 @@ function fbmHeartbeatNow(source) {
         noteHeartbeatStatus('fbm_response_received', { source: origin, tabId: Number(tab.id || 0), ok: raw.ok === true, httpStatus: Number(raw.status || 0), responseLength: String(raw.body || '').length, error: String(raw.error || '').slice(0, 240) });
         return relayHeartbeatToGas(tab.id, reply).then(function (gasReply) {
           noteHeartbeatStatus('gas_response_received', { source: origin, ok: !!(gasReply && gasReply.ok), code: String(gasReply && gasReply.code || ''), requestKind: String(gasReply && gasReply.request && gasReply.request.meta && gasReply.request.meta.kind || '') });
-          return { ok: true, gas: gasReply || null };
+          return gasReply && gasReply.ok === false ? Object.assign({ ok: false }, gasReply) : { ok: true, gas: gasReply || null };
         });
+      });
       });
     });
   }).catch(function (error) {
@@ -336,9 +352,10 @@ function relayHeartbeatToGas(tabId, reply) {
       return null;
     }
     return postRelay(config.url, config.key, { kind: 'heartbeat', spreadsheetId: config.spreadsheetId, response: rawFbmReply(reply) }).then(function (gasReply) {
+      if (!gasReply || gasReply.ok === false) { return gasReply || { ok: false, code: 'GAS_HEARTBEAT_FAILED' }; }
       return relayScheduledRequests(tabId, config, gasReply, 0);
     });
-  }).catch(function (error) { console.warn('Không relay được heartbeat cho GAS:', String(error && error.message || error)); return null; });
+  }).catch(function (error) { var message = String(error && error.message || error); console.warn('Không relay được heartbeat cho GAS:', message); return { ok: false, code: 'GAS_RELAY_FAILED', error: message }; });
 }
 
 /** Định tuyến request từ Sidebar tới đúng tab FBM, không xử lý dữ liệu nghiệp vụ. */

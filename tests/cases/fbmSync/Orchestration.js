@@ -182,6 +182,11 @@ async function chay(so) {
   const heartbeatPropertyApi = { getProperty: (key) => heartbeatData[key] || null, setProperty: (key, value) => { heartbeatData[key] = String(value); } };
   const heartbeat = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => heartbeatPropertyApi, getScriptProperties: () => heartbeatPropertyApi } });
   napServer(heartbeat, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/EntryPoints.js');
+  const heartbeatStateRead = heartbeat.FbmSync.stateRead;
+  heartbeat.FbmSync.stateRead = () => ({ session: { expired: true } });
+  const relayProbe = heartbeat.fbmSyncRelayProbe();
+  check(so, 'relay probe tra co trang thai cong tac va phien', [relayProbe.ok, relayProbe.code, relayProbe.sessionExpired], [true, 'RELAY_PROBE_OK', true]);
+  heartbeat.FbmSync.stateRead = heartbeatStateRead;
   heartbeat.FbmSync.stateStart('', 'idle', 0);
   const firstHeartbeat = heartbeat.fbmSyncHeartbeat({ d: { TotalRowCount: 2 } });
   check(so, 'heartbeat luu lan song va tong Customer dau tien', [heartbeat.FbmSync.stateRead().session.lastHeartbeatAt > 0, heartbeat.FbmSync.stateRead().session.customerTotal, firstHeartbeat.request], [true, 2, null]);
@@ -196,6 +201,9 @@ async function chay(so) {
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, session: { customerTotal: 2 }, scheduledScan: '' });
   const changedHeartbeat = heartbeat.fbmSyncHeartbeat({ d: { TotalRowCount: 3 } });
   check(so, 'heartbeat tong Customer thay doi kich full Customer', [changedHeartbeat.request.meta.kind, changedHeartbeat.status.phase], ['authorize', 'checking_session']);
+  heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, scheduledScan: '' });
+  const failedHeartbeat = heartbeat.fbmSyncHeartbeat({ ok: false, status: 500, body: '{"Message":"There was an error processing the request."}' });
+  check(so, 'heartbeat HTTP 500 dung phien va tra loi ro rang', [failedHeartbeat.ok, failedHeartbeat.code, heartbeat.FbmSync.stateRead().lastFailureCode], [false, 'FBM_BUSINESS_ERROR', 'FBM_BUSINESS_ERROR']);
   const backgroundState = heartbeat.FbmSync.stateRead();
   backgroundState.runId = 'background-run'; backgroundState.origin = 'background'; backgroundState.phase = 'pull_customer'; backgroundState.entity = 'customer'; backgroundState.cursor = { kind: 'customer_grid', type: 0, pageIndex: 0, pageValue: null, count: 2000 }; backgroundState.metadata.manualPending = null;
   heartbeat.FbmSync.stateWrite(backgroundState);

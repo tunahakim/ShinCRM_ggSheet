@@ -110,7 +110,17 @@ function fbmSyncRotateRelayKey() {
 }
 
 /** ACK không đụng state, dùng để kiểm tra Extension gọi được GAS khi Sidebar đã đóng. */
-function fbmSyncRelayProbe() { return { ok: true, code: 'RELAY_PROBE_OK', serverAt: Date.now() }; }
+function fbmSyncRelayProbe() {
+  var state = FbmSync.stateRead ? FbmSync.stateRead() : {}, session = state.session || {};
+  return {
+    ok: true,
+    code: 'RELAY_PROBE_OK',
+    serverAt: Date.now(),
+    masterEnabled: typeof FbmSync.masterEnabled !== 'function' || FbmSync.masterEnabled(),
+    backgroundEnabled: typeof FbmSync.backgroundEnabled !== 'function' || FbmSync.backgroundEnabled(),
+    sessionExpired: session.expired === true
+  };
+}
 
 /** DTO gọn cho relay nền; Sidebar vẫn nhận statusView đầy đủ qua google.script.run. */
 function fbmSyncRelayCompactResult(result) {

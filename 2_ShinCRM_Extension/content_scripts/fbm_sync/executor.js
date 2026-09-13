@@ -41,11 +41,14 @@
     return '';
   }
   /** Dùng chuỗi wire GAS đã dựng; chỉ serialize request nội bộ của heartbeat khi không có envelope GAS. */
+  function currentPayloadCookie(fallback) {
+    return payloadCookieFromPage() || String(fallback || '');
+  }
   function requestBody(req) {
     if (req.body === undefined) { return undefined; }
-    if (typeof req.bodyText === 'string') { return { text: req.bodyText, cookie: req.body && req.body.cookie || '' }; }
+    if (typeof req.bodyText === 'string') { return { text: req.bodyText, cookie: currentPayloadCookie(req.body && req.body.cookie) }; }
     var body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
-    return { text: body, cookie: req.body && req.body.cookie || payloadCookieFromPage() };
+    return { text: body, cookie: currentPayloadCookie(req.body && req.body.cookie) };
   }
   function jsonValue(text) { try { var value = JSON.parse(String(text || '')); return value && value.d !== undefined ? value.d : value; } catch (ignore) { return null; } }
   function loginValueFromPage() {

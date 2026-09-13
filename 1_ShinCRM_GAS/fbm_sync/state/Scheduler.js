@@ -87,6 +87,12 @@ function fbmSyncHeartbeat(rawResponse) {
   if (!result.ok && result.code === 'SESSION_EXPIRED') {
     state.session.expired = true; state.session.customerAuthorized = ''; state.session.activityAuthorized = '';
     state.lastFailureCode = result.code; state.retryable = false; state.lastError = result.bug.Message; state.message = result.bug.Message;
+  } else if (!result.ok) {
+    state.lastFailureCode = result.code || 'HEARTBEAT_FAILED';
+    state.retryable = result.retryable === true;
+    state.lastError = result.bug && result.bug.Message || ('Heartbeat FBM thất bại: HTTP ' + String(result.status || 'không xác định') + '.');
+    state.message = state.lastError;
+    state.scheduledScan = '';
   } else if (result.ok) {
     state.session.expired = false;
     var total = FbmSync.heartbeatCustomerTotal(rawResponse);
@@ -109,6 +115,7 @@ function fbmSyncHeartbeat(rawResponse) {
     request = started && started.request ? started.request : null;
   }
   var status = FbmSync.statusView();
+  if (!result.ok) { return { ok: false, code: result.code || 'HEARTBEAT_FAILED', status: result.status || 0, error: result.bug && result.bug.Message || state.lastError, request: null, statusView: status }; }
   return { ok: true, request: request ? (request.protocol ? request : FbmSync.nextEnvelope(request)) : null, status: status };
 }
 
