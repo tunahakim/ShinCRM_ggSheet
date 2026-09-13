@@ -1,161 +1,8 @@
-# Ghi chú tạm — Module thông báo dùng chung
+# Ghi chú tạm — Kiến trúc module và các khoản nợ phải trả
 
 Tài liệu nháp để xử lý sau khi nghiệm thu xong phiên đồng bộ FBM. Chưa phải hợp đồng kiến trúc chính thức.
 
-## Mục tiêu
-
-- Cho phép mọi module của ShinCRM phát thông báo qua một service dùng chung.
-- FBM, Scheduler, Bot và các module sau này không tự gọi trực tiếp Zalo/Telegram hay kênh cụ thể.
-- Lỗi gửi thông báo không được làm hỏng nghiệp vụ chính.
-
-## Kiến trúc dự kiến
-
-```text
-Module nghiệp vụ
-      |
-      v
-NotificationService
-      |
-      +--> NotificationOutbox
-      |
-      v
-NotificationPort
-      |
-  +---+---+
-  |       |
-Null   Adapter kênh thật
-Adapter  (ví dụ Zalo Bot)
-```
-
-## Hợp đồng sơ bộ
-
-Caller truyền một object gồm:
-
-- `type`
-- `level`
-- `title`
-- `message`
-- `channel`
-- `recipient`
-- `dedupeKey`
-
-`NotificationService` không để lỗi adapter ném ngược vào caller. Khi chưa có kênh hoặc chưa có cấu hình, service trả trạng thái không gửi được nhưng luồng nghiệp vụ vẫn tiếp tục.
-
-## Outbox dự kiến
-
-Chỉ lưu các thông báo cần theo dõi hoặc thử lại. Trường tối thiểu:
-
-`notificationId`, `type`, `level`, `channel`, `recipient`, `message`, `dedupeKey`, `status`, `attempts`, `lastError`, `createdAt`, `nextAttemptAt`.
-
-Thông báo `info` có thể bỏ qua khi chưa có kênh. Thông báo `warn`/`error` có thể ghi Log hoặc đưa vào hàng chờ giới hạn. Không retry vô hạn.
-
-## Ranh giới
-
-- Log là bằng chứng việc đã xảy ra; Notification là yêu cầu gửi thông tin.
-- UI notification, Log và thông báo ra kênh ngoài là ba cơ chế riêng.
-- Không gọi NotificationService ngược từ lỗi của chính NotificationService.
-- Không ghi bí mật, cookie, mật khẩu hoặc payload nhạy cảm vào thông báo.
-
-## Việc cần làm sau phiên FBM
-
-- Chuyển nội dung này thành `11. Thông báo và kênh nhận.md` và `11A. Hợp đồng thông báo và kênh nhận.md` trong bộ tài liệu kiến trúc.
-- Cập nhật bản đồ tài liệu và lộ trình chung.
-- Viết `NotificationService` cùng `NullNotificationAdapter`.
-- Viết test khi chưa có kênh nhận và khi adapter ném lỗi.
-- Chọn kênh thật rồi mới viết adapter tương ứng.
-
-## Việc refactor Tài liệu 09 — Đồng bộ FBM
-
-Tài liệu hiện tại dài và đang chứa nhiều loại nội dung trong cùng một file. Sau khi nghiệm thu FBM, tách thành folder nhưng giữ nguyên các quyết định nghiệp vụ trước; đây là refactor cấu trúc, không tự ý đổi hợp đồng.
-
-Folder dự kiến:
-
-```text
-0_Documentation/Opus 4.8 tư vấn/09. Đồng bộ FBM/
-├── 00. Mục lục và luật bất biến.md
-├── 01. Tab FBM và phiên đăng nhập.md
-├── 02. Kiến trúc GAS Extension Sidebar.md
-├── 03. Scheduler và các pipeline.md
-├── 04. Schema và Category.md
-├── 05. Hash baseline và conflict.md
-├── 06. Pull Customer.md
-├── 07. Pull Activity.md
-├── 08. Push Customer.md
-├── 09. Push Activity.md
-├── 10. Xóa vắng mặt và tombstone.md
-├── 11. Log cấu hình và bảo mật.md
-├── 12. Runbook vận hành và nghiệm thu.md
-├── 13. Câu hỏi chưa kiểm chứng.md
-└── Phụ lục/
-```
-
-File `09. Đồng bộ FBM.md` hiện tại sẽ trở thành mục lục/bản đồ quyết định hoặc được chuyển đổi có lưu vết Git. Mục lục phải có bảng tóm tắt toàn bộ pipeline và sơ đồ ASCII xử lý tab FBM:
-
-```text
-Sidebar hoặc Scheduler
-        -> GAS tạo request
-        -> Extension kiểm tra relay config
-        -> tìm tab FBM
-             -> không có tab: dừng, không gọi FBM
-             -> có tab: ping/nạp executor
-        -> fetch trong tab FBM
-             -> Login.aspx/401/403: báo hết phiên, không push
-             -> response hợp lệ: trả thô về GAS
-        -> GAS tiếp cursor hoặc kết thúc/log
-```
-
-Phần đăng nhập phải tách rõ ba trạng thái: tab đã mở và đăng nhập, tab mở nhưng hết phiên, và chưa mở tab. Tự động đăng nhập là tùy chọn riêng, không được mô tả như điều kiện bắt buộc nếu chưa triển khai.
-
-## Cơ chế an toàn chống đẩy nhầm lên FBM
-
-Mục tiêu là nếu người dùng xóa/sửa nhầm cột hoặc làm thay đổi hàng loạt dữ liệu thì chiều push phải dừng an toàn.
-
-Thứ tự đề xuất:
-
-1. **Schema guard:** kiểm tra thiếu/trùng/sửa mã cột bắt buộc trước mỗi kỳ; sai thì chỉ cho đọc và báo `PUSH_PAUSED_SCHEMA_CHANGED` hoặc mã cụ thể hơn.
-2. **Mass-change circuit breaker:** phát hiện một cột bị xóa trắng hoặc quá nhiều bản ghi đổi trong một kỳ; tạm dừng toàn bộ chiều push.
-3. **Preview và xác nhận một lần:** hiển thị số bản ghi và các trường sắp đẩy; chỉ phát request ghi sau khi người dùng xác nhận. Vẫn giữ cả hai khóa `Ghi thật` và `Cho phép ghi thật lên FBM`. Cần chốt 1 con số làm ngưỡng an toàn, nếu trong ngưỡng thì vẫn tự chạy. vượt ngưỡng thì phải để người dùng duyệt.
-4. **Snapshot phục hồi:** cân nhắc lưu giá trị cũ của các bản ghi sắp push vào vùng backup riêng; hash hiện tại chỉ phát hiện lệch, không tự khôi phục được nội dung cũ.   --> ý kiến người dùng: bỏ qua backup.
-
-GAS phải thực hiện các cổng an toàn này. Extension chỉ relay/fetch, không tự phán đoán thay đổi là đúng hay nhầm.
-
-## Thứ tự xử lý sau nghiệm thu FBM
-
-1. Chốt và refactor Tài liệu 09 thành folder.
-2. Cập nhật bản đồ tài liệu và lộ trình chung.
-3. Viết test schema guard và mass-change breaker.
-4. Implement các cổng an toàn trong GAS.
-5. Thêm preview/xác nhận push ở Sidebar.
-6. Sau đó mới triển khai Module thông báo dùng chung.
-
-===
-
-Về phần tiến trình khi đồng bộ FBM, mình nghĩ nên hiển thị như sau: hiện hết tất cả các bước khi đồng bộ, chia theo nhóm, ví dụ: kiểm tra, hay đang chờ gas, đang đẩy request lên FBM - ghi rõ là đang làm gì.
-
-1. Công việc 1
-2. Công việc 2
-...
-7. Công việc 7
-..
-10. Công việc 10.
-
---> Cái nào thực hiện xong thì màu xanh dương, cái nào đang chạy thì in đậm màu đen, cáo nào lỗi thì màu đỏ, cái nào chưa chạy thì màu xám nhạt...
-
-Kiểu như vậy. Nó có nhiều giai đoạn lớn nhé, Ví dụ khi mới chạy đồng bộ là kiểm tra danh mục hay gì đó 1 lượt, xong thì báo xong. Bắt đầu vào phần đồng bộ khách hàng, Đồng bộ xong thì đến đồng bộ giao dịch,...
-
-Về việc đồng bộ từng khách hàng, nếu xong thì xóa log cũ hiện tiến trình với khách đang chạy.
-
-Đưa có vào component nào có chế độ mở rộng ý, kiểu chạy các bước đồng bộ khách hàng (nếu có) xong thì thu gọn lại để hiển thị các bước đồng bộ giao dịch (nếu có). Cái nào xong đang chạy thì hiện chi tiết, cái nào xong rồi thì thu gọn lại trừ khi người dùng chủ động mở ra -->
-
-Bạn nghĩ có nên thế không, hay là nó quá phức tạp và mình đang over engineering?
-
-===
-
-Phần `ĐIỀU KHIỂN PHIÊN` trong màn hình Đồng bộ ở sidebar mình nghĩ nên để lên đầu thay vì để ở cuối như hiện tại.
-
-Cần thiết thì làm nó gọn lại và ghim lên đầu cũng được. Phần cho phép đồng bộ FBM tự động hay không mình nghĩ nên làm thành công tắc bên trong màn hình đồng bộ, ấn vào biểu tượng menu đồng bộ thì tự động vào màn hình đồng bộ luôn chứ không hiển thị 2 tùy chọn như bây giờ nữa.
-
-===
+Các heading `# 1` đến `# 12` là các đầu mục chính vì chúng là những dự định/lộ trình cần thực hiện. Nội dung cũ được giữ trong đúng đầu mục liên quan; phần audit code mới được bổ sung tại `# 7` và `# 9`. Không xóa các phần về ZaloBot, Notification, nhắc việc, FBM, branch/worktree hoặc deployment.
 
 Hiện tại mình đang làm việc với bạn về phiên đồng bộ FBM, nhưng mình đang muốn refactor 1 số thứ, và muốn phát triển đồng thời vài module tương đối độc lập khác. Bạn đọc và tư vấn lộ trình các bước hợp lý giúp mình nhé.
 
@@ -277,6 +124,70 @@ Sau này thêm Telegram hoặc email chỉ cần thêm adapter, không sửa log
 
 # 5. Module thông báo
 
+Tài liệu nháp để xử lý sau khi nghiệm thu xong phiên đồng bộ FBM. Chưa phải hợp đồng kiến trúc chính thức.
+
+## Mục tiêu
+
+- Cho phép mọi module của ShinCRM phát thông báo qua một service dùng chung.
+- FBM, Scheduler, Bot và các module sau này không tự gọi trực tiếp Zalo/Telegram hay kênh cụ thể.
+- Lỗi gửi thông báo không được làm hỏng nghiệp vụ chính.
+
+## Kiến trúc dự kiến
+
+```text
+Module nghiệp vụ
+      |
+      v
+NotificationService
+      |
+      +--> NotificationOutbox
+      |
+      v
+NotificationPort
+      |
+  +---+---+
+  |       |
+Null   Adapter kênh thật
+Adapter  (ví dụ Zalo Bot)
+```
+
+## Hợp đồng sơ bộ
+
+Caller truyền một object gồm:
+
+- `type`
+- `level`
+- `title`
+- `message`
+- `channel`
+- `recipient`
+- `dedupeKey`
+
+`NotificationService` không để lỗi adapter ném ngược vào caller. Khi chưa có kênh hoặc chưa có cấu hình, service trả trạng thái không gửi được nhưng luồng nghiệp vụ vẫn tiếp tục.
+
+## Outbox dự kiến
+
+Chỉ lưu các thông báo cần theo dõi hoặc thử lại. Trường tối thiểu:
+
+`notificationId`, `type`, `level`, `channel`, `recipient`, `message`, `dedupeKey`, `status`, `attempts`, `lastError`, `createdAt`, `nextAttemptAt`.
+
+Thông báo `info` có thể bỏ qua khi chưa có kênh. Thông báo `warn`/`error` có thể ghi Log hoặc đưa vào hàng chờ giới hạn. Không retry vô hạn.
+
+## Ranh giới
+
+- Log là bằng chứng việc đã xảy ra; Notification là yêu cầu gửi thông tin.
+- UI notification, Log và thông báo ra kênh ngoài là ba cơ chế riêng.
+- Không gọi NotificationService ngược từ lỗi của chính NotificationService.
+- Không ghi bí mật, cookie, mật khẩu hoặc payload nhạy cảm vào thông báo.
+
+## Việc cần làm sau phiên FBM
+
+- Chuyển nội dung này thành `11. Thông báo và kênh nhận.md` và `11A. Hợp đồng thông báo và kênh nhận.md` trong bộ tài liệu kiến trúc.
+- Cập nhật bản đồ tài liệu và lộ trình chung.
+- Viết `NotificationService` cùng `NullNotificationAdapter`.
+- Viết test khi chưa có kênh nhận và khi adapter ném lỗi.
+- Chọn kênh thật rồi mới viết adapter tương ứng.
+
 **Yêu cầu của người dùng**
 
 Có một module thông báo độc lập. Bất kỳ module nào, chẳng hạn FBM, cũng có thể gửi nội dung tới kênh nhận thông báo.
@@ -340,6 +251,44 @@ Không nên tạo một trigger cho mỗi giao dịch. Nên dùng một trigger 
 Realtime tuyệt đối không đáng tin cậy với Google Sheet. Có thể kiểm tra thêm khi mở Sidebar, nhưng trigger định kỳ vẫn là cơ chế chính.
 
 # 7. Config
+
+## Yêu cầu của chủ dự án
+
+- Config không lưu trên Sheet nữa; giá trị runtime lưu ở `DocumentProperties`.
+- Config được nhập và chỉnh sửa từ UI Sidebar.
+- UI không phụ thuộc nơi lưu; GAS phải đứng giữa qua port-adapter.
+- Mã cột không lưu trong Config/Properties; khi cần dùng, GAS đọc từ schema hoặc tra hàng 1 đúng thời điểm.
+
+## Audit code hiện tại
+
+Config hiện đang đọc và ghi trực tiếp trên sheet, chưa có port-adapter.
+
+- `server/config/Settings.js`: `configParams()` và `configGet()` đọc khối tham số từ sheet `Config`.
+- `server/sheet/ConfigRead.js`: đọc `sheetSchema`, `defaults`, `sort`; bộ đếm cũng lấy từ sheet.
+- `server/config/ConfigParams.js`: catalog tên, kiểu, mặc định, quyền và validation nằm trong code.
+- `server/config/ConfigSheetSetup.js`: gieo dữ liệu, validation và migration trên sheet.
+- `server/gate/IdGate.js`: đọc/ghi bộ đếm trực tiếp trên sheet.
+- Sidebar chỉ nhận `payload.config` từ `loadCore`; chưa có UI/action sửa Config.
+
+Hiện chưa có `CONFIG_SCHEMA` runtime hoàn chỉnh, `ConfigRepository`, adapter `DocumentProperties`, `ConfigService` hay `ConfigWriteGate`.
+
+## Yêu cầu phải đạt
+
+- Giá trị Config runtime lưu ở `DocumentProperties`, không lưu trên Sheet.
+- Sidebar chỉ gọi GAS; không gọi trực tiếp `PropertiesService` hoặc `SpreadsheetApp`.
+- Caller chỉ gọi `ConfigService`; adapter lưu trữ bị che phía sau `ConfigRepository`.
+- `CONFIG_SCHEMA` mô tả khóa, kiểu, mặc định, quyền, phạm vi, validation và version.
+- Bộ đếm chuyển sau cùng, có document lock và không cho UI sửa tự do.
+- Không lưu chỉ số cột trong Properties; mã cột lấy từ schema hoặc đọc map hàng 1 đúng thời điểm.
+
+## Việc cần làm
+
+- [ ] Chốt `sheetSchema`, `defaults`, `sort` là schema hay runtime Config.
+- [ ] Dựng `ConfigRepository`, adapter đọc Sheet để migration và adapter `DocumentProperties`.
+- [ ] Đổi `configGet()`, `configReadAll()`, `IdGate` và các caller sang `ConfigService`.
+- [ ] Dựng `ConfigWriteGate` và màn hình Cài đặt Sidebar.
+- [ ] Migration có version, kiểm thử lock, đọc lại và tương thích dữ liệu cũ.
+- [ ] Chỉ xóa Config cũ trên Sheet sau khi nghiệm thu xong.
 
 **Yêu cầu của người dùng**
 
@@ -405,6 +354,37 @@ Hai cửa này dùng chung nguyên tắc với `WriteGate`:
 Không mở rộng `writeGateSave()` thành cửa ghi mọi loại Sheet.
 
 # 9. Category và ánh xạ FBM
+
+## Yêu cầu của chủ dự án
+
+- Category vẫn lưu trên Sheet vì liên quan đến ánh xạ FBM.
+- Category có thể thêm/sửa từ Sidebar, gồm cả mapping.
+- Không lưu chỉ số cột; đọc mã cột từ schema hoặc map hàng 1 khi cần.
+- Sidebar không tự ghi Sheet và không tự ghép chuỗi companion.
+
+## Audit code hiện tại
+
+- Category vẫn lưu trên sheet.
+- `CATEGORY_COLUMNS` và `CONFIG_COLUMNS` khai trong `server/data/SheetLayout.js`.
+- Mã cột Customer/Activity và `source` SELECT nằm trong `server/data/DataSchema.js`.
+- Vị trí cột thật được tra theo hàng 1 bằng `readColumnMap()`/`columnIndex()`, không hard-code số cột.
+- `CategoryRead.js` hiện chỉ đọc; `writeGateSave()` không ghi Category.
+- `fbm_sync/reconcile/CategoryGate.js` đọc Category trực tiếp và tự suy companion bằng hậu tố `_FBM`.
+
+## Yêu cầu phải đạt
+
+- Category tiếp tục lưu trên Sheet vì liên quan ánh xạ FBM.
+- Sidebar được thêm/sửa một mục và dán bulk.
+- Mọi ghi Category đi qua `CategoryWriteGate`: kiểm tra toàn bộ, khóa, ghi một lần, đọc lại.
+- Mapping companion dùng codec/service chung; Sidebar không tự ghép chuỗi.
+- Không lưu chỉ số cột; khi cần dùng, GAS đọc schema hoặc map hàng 1 tại thời điểm đó.
+
+## Việc cần làm
+
+- [ ] Dựng `CategoryWriteGate` và `CategoryService`.
+- [ ] Dựng codec mapping dùng chung.
+- [ ] Thêm GAS entry point và màn hình quản lý Category.
+- [ ] Test trùng, thiếu mapping, bulk, lock, đọc lại và không ghi nửa chừng.
 
 **Yêu cầu của người dùng**
 
@@ -483,6 +463,33 @@ vẽ lại trạng thái
 
 Cần có quy tắc khi đang có bản nháp Customer/Activity mà người dùng chuyển sang màn hình quản trị: cảnh báo, đóng form hoặc giữ bản nháp an toàn.
 
+## Ý tưởng tiến trình đồng bộ
+
+Về phần tiến trình khi đồng bộ FBM, mình nghĩ nên hiển thị như sau: hiện hết tất cả các bước khi đồng bộ, chia theo nhóm, ví dụ: kiểm tra, hay đang chờ gas, đang đẩy request lên FBM - ghi rõ là đang làm gì.
+
+1. Công việc 1
+2. Công việc 2
+...
+7. Công việc 7
+..
+10. Công việc 10.
+
+--> Cái nào thực hiện xong thì màu xanh dương, cái nào đang chạy thì in đậm màu đen, cáo nào lỗi thì màu đỏ, cái nào chưa chạy thì màu xám nhạt...
+
+Kiểu như vậy. Nó có nhiều giai đoạn lớn nhé, Ví dụ khi mới chạy đồng bộ là kiểm tra danh mục hay gì đó 1 lượt, xong thì báo xong. Bắt đầu vào phần đồng bộ khách hàng, Đồng bộ xong thì đến đồng bộ giao dịch,...
+
+Về việc đồng bộ từng khách hàng, nếu xong thì xóa log cũ hiện tiến trình với khách đang chạy.
+
+Đưa có vào component nào có chế độ mở rộng ý, kiểu chạy các bước đồng bộ khách hàng (nếu có) xong thì thu gọn lại để hiển thị các bước đồng bộ giao dịch (nếu có). Cái nào xong đang chạy thì hiện chi tiết, cái nào xong rồi thì thu gọn lại trừ khi người dùng chủ động mở ra -->
+
+Bạn nghĩ có nên thế không, hay là nó quá phức tạp và mình đang over engineering?
+
+## Điều khiển phiên
+
+Phần `ĐIỀU KHIỂN PHIÊN` trong màn hình Đồng bộ ở sidebar mình nghĩ nên để lên đầu thay vì để ở cuối như hiện tại.
+
+Cần thiết thì làm nó gọn lại và ghim lên đầu cũng được. Phần cho phép đồng bộ FBM tự động hay không mình nghĩ nên làm thành công tắc bên trong màn hình đồng bộ, ấn vào biểu tượng menu đồng bộ thì tự động vào màn hình đồng bộ luôn chứ không hiển thị 2 tùy chọn như bây giờ nữa.
+
 # 12. Những điểm phiên FBM cần đánh giá và chốt
 
 1. Mapping trống có làm ShinCRM độc lập tiếp tục chạy không?
@@ -506,3 +513,69 @@ Nhắc việc PA1
 Config chỉnh qua Sidebar, lưu dần trong Properties
 Mỗi module có worktree, branch và DEV deployment riêng
 ```
+
+## Việc refactor tài liệu, an toàn và lộ trình sau nghiệm thu
+
+## Việc refactor Tài liệu 09 — Đồng bộ FBM
+
+Tài liệu hiện tại dài và đang chứa nhiều loại nội dung trong cùng một file. Sau khi nghiệm thu FBM, tách thành folder nhưng giữ nguyên các quyết định nghiệp vụ trước; đây là refactor cấu trúc, không tự ý đổi hợp đồng.
+
+Folder dự kiến:
+
+```text
+0_Documentation/Opus 4.8 tư vấn/09. Đồng bộ FBM/
+├── 00. Mục lục và luật bất biến.md
+├── 01. Tab FBM và phiên đăng nhập.md
+├── 02. Kiến trúc GAS Extension Sidebar.md
+├── 03. Scheduler và các pipeline.md
+├── 04. Schema và Category.md
+├── 05. Hash baseline và conflict.md
+├── 06. Pull Customer.md
+├── 07. Pull Activity.md
+├── 08. Push Customer.md
+├── 09. Push Activity.md
+├── 10. Xóa vắng mặt và tombstone.md
+├── 11. Log cấu hình và bảo mật.md
+├── 12. Runbook vận hành và nghiệm thu.md
+├── 13. Câu hỏi chưa kiểm chứng.md
+└── Phụ lục/
+```
+
+File `09. Đồng bộ FBM.md` hiện tại sẽ trở thành mục lục/bản đồ quyết định hoặc được chuyển đổi có lưu vết Git. Mục lục phải có bảng tóm tắt toàn bộ pipeline và sơ đồ ASCII xử lý tab FBM:
+
+```text
+Sidebar hoặc Scheduler
+        -> GAS tạo request
+        -> Extension kiểm tra relay config
+        -> tìm tab FBM
+             -> không có tab: dừng, không gọi FBM
+             -> có tab: ping/nạp executor
+        -> fetch trong tab FBM
+             -> Login.aspx/401/403: báo hết phiên, không push
+             -> response hợp lệ: trả thô về GAS
+        -> GAS tiếp cursor hoặc kết thúc/log
+```
+
+Phần đăng nhập phải tách rõ ba trạng thái: tab đã mở và đăng nhập, tab mở nhưng hết phiên, và chưa mở tab. Tự động đăng nhập là tùy chọn riêng, không được mô tả như điều kiện bắt buộc nếu chưa triển khai.
+
+## Cơ chế an toàn chống đẩy nhầm lên FBM
+
+Mục tiêu là nếu người dùng xóa/sửa nhầm cột hoặc làm thay đổi hàng loạt dữ liệu thì chiều push phải dừng an toàn.
+
+Thứ tự đề xuất:
+
+1. **Schema guard:** kiểm tra thiếu/trùng/sửa mã cột bắt buộc trước mỗi kỳ; sai thì chỉ cho đọc và báo `PUSH_PAUSED_SCHEMA_CHANGED` hoặc mã cụ thể hơn.
+2. **Mass-change circuit breaker:** phát hiện một cột bị xóa trắng hoặc quá nhiều bản ghi đổi trong một kỳ; tạm dừng toàn bộ chiều push.
+3. **Preview và xác nhận một lần:** hiển thị số bản ghi và các trường sắp đẩy; chỉ phát request ghi sau khi người dùng xác nhận. Vẫn giữ cả hai khóa `Ghi thật` và `Cho phép ghi thật lên FBM`. Cần chốt 1 con số làm ngưỡng an toàn, nếu trong ngưỡng thì vẫn tự chạy. vượt ngưỡng thì phải để người dùng duyệt.
+4. **Snapshot phục hồi:** cân nhắc lưu giá trị cũ của các bản ghi sắp push vào vùng backup riêng; hash hiện tại chỉ phát hiện lệch, không tự khôi phục được nội dung cũ.   --> ý kiến người dùng: bỏ qua backup.
+
+GAS phải thực hiện các cổng an toàn này. Extension chỉ relay/fetch, không tự phán đoán thay đổi là đúng hay nhầm.
+
+## Thứ tự xử lý sau nghiệm thu FBM
+
+1. Chốt và refactor Tài liệu 09 thành folder.
+2. Cập nhật bản đồ tài liệu và lộ trình chung.
+3. Viết test schema guard và mass-change breaker.
+4. Implement các cổng an toàn trong GAS.
+5. Thêm preview/xác nhận push ở Sidebar.
+6. Sau đó mới triển khai Module thông báo dùng chung.
