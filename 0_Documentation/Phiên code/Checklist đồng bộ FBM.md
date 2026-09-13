@@ -320,7 +320,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 | Slice | Commit code | Test/offline | Revision GAS | Bằng chứng thực tế | Ghi chú |
 | --- | --- | --- | --- | --- | --- |
 | Slice 0 — Nền tảng |  |  |  |  |  |
-| Slice 1 — Preflight + Category | `fadcf33`, `8bd57f0`, `de9b316`, `7da8cfd`, `3a33422` | `1195/1195` | `@209` | GAS DEV `fbmStartIdentityProbe` trả request authorize khi file có dữ liệu lệch liên kết; `fbmProbeAutoLogin` trả endpoint Login, mặc định bật và request không chứa credential; không ghi Sheet/FBM | Category chỉ đọc/đối chiếu; auto-login giữ envelope mã hóa và throttle 15 phút |
+| Slice 1 — Preflight + Category | `fadcf33`, `8bd57f0`, `de9b316`, `7da8cfd`, `3a33422` | `1195/1195` | `@210` | GAS DEV `fbmStartIdentityProbe` trả request authorize khi file có dữ liệu lệch liên kết; `fbmProbeAutoLogin` trả endpoint Login, mặc định bật và request không chứa credential; không ghi Sheet/FBM | Category chỉ đọc/đối chiếu; auto-login giữ envelope mã hóa và throttle 15 phút |
 | Slice 2 — Pull Customer |  |  |  |  |  |
 | Slice 3 — Pull Activity | `8fbb6a7` + entrypoint DEV | `1075/1075` | `@136` | Pull `ALT00010` đã xác nhận Activity liên kết và idempotency; bulk/catchup/rotation đã có test offline; `fbmSyncStartActivityBulk` trả `OK`, request đầu `authorize`, state `scan=activity_bulk`; `fbmInstallScheduler` trả `OK` | Ba lớp quét Activity nền đã có cursor state/DocumentProperties |
 | Slice 4 — Đối soát + conflict |  |  |  |  |  |
