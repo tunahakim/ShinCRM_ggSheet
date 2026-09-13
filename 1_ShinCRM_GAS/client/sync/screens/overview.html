@@ -1,0 +1,13 @@
+<script>
+function fbmSyncRenderOverview(panel, status) {
+  var section = fbmSyncElement('div', 'shin-sync-section'); section.appendChild(fbmSyncElement('h2', 'shin-sync-section-title', 'Tổng quan'));
+  section.appendChild(fbmSyncElement('div', 'shin-sync-muted', 'Theo dõi trạng thái phiên, kết nối tài khoản và đồng bộ nền tại một nơi.'));
+  var grid = fbmSyncElement('div', 'shin-sync-summary-grid'); var count = status.counts || {};
+  [['Trạng thái', status.label || 'Sẵn sàng'], ['Hướng chạy', status.direction || 'Chưa chọn'], ['Đã xử lý', String(Number(count.completed || 0))], ['Lỗi / conflict', String(Number(count.error || 0) + Number(count.conflict || 0))]].forEach(function (item) { var box = fbmSyncElement('div', 'shin-sync-summary-item'); box.appendChild(fbmSyncElement('div', 'shin-sync-summary-label', item[0])); box.appendChild(fbmSyncElement('div', 'shin-sync-summary-value', item[1])); grid.appendChild(box); });
+  section.appendChild(grid);
+  var session = fbmSyncCard('Kết nối phiên'); session.body.appendChild(fbmSyncElement('div', 'shin-sync-preview-row', 'Customer: ' + (status.session && status.session.customer ? 'Đã sẵn sàng' : 'Chưa xác nhận'))); session.body.appendChild(fbmSyncElement('div', 'shin-sync-preview-row', 'Giao dịch: ' + (status.session && status.session.activity ? 'Đã sẵn sàng' : 'Chưa xác nhận'))); section.appendChild(session.card);
+  var actions = fbmSyncElement('div', 'shin-sync-action-row'); [['account', 'Tài khoản FBM'], ['run', 'Chạy đồng bộ'], ['results', 'Kết quả & xử lý']].forEach(function (item) { var b = fbmSyncMakeButton('', item[1], false); b.setAttribute('data-sync-screen', item[0]); actions.appendChild(b); }); section.appendChild(actions);
+  var background = fbmSyncCard('Đồng bộ nền'); background.body.appendChild(fbmSyncElement('div', 'shin-sync-muted', 'Chỉ đọc FBM; luôn tuân theo công tắc tổng.')); var toggle = fbmSyncElement('button', 'shin-button', status.backgroundEnabled === false ? 'Bật lịch đồng bộ nền' : 'Tắt lịch đồng bộ nền'); toggle.type = 'button'; toggle.disabled = !(status.masterEnabled !== false); toggle.setAttribute('data-sync-background', 'true'); background.body.appendChild(toggle); section.appendChild(background.card);
+  panel.appendChild(section);
+}
+</script>

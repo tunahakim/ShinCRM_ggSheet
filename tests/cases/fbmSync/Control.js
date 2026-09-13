@@ -10,6 +10,10 @@ async function chay(so) {
       start: (input) => { calls.push(['start', input]); return { ok: true, request: null }; },
       continue: (response) => { calls.push(['continue', response]); return { ok: true }; },
       statusView: () => ({ phase: 'idle', counts: {} }),
+      masterEnabled: () => true,
+      setMasterEnabled: (enabled) => { calls.push(['master', enabled]); return { ok: true, enabled }; },
+      backgroundEnabled: () => true,
+      setBackgroundEnabled: (enabled) => { calls.push(['background', enabled]); return { ok: true, enabled }; },
       writeAllowed: () => false,
       resolveConflict: (...args) => { calls.push(['resolve', args]); return { ok: true }; },
       prepareConflictResolution: (...args) => { calls.push(['prepare', args]); return { ok: true }; },
@@ -31,6 +35,9 @@ async function chay(so) {
     ['continue', { status: 200 }],
     ['write', true]
   ]);
+  hop.FbmSync.controlDispatch('set_master_switch', { enabled: false });
+  hop.FbmSync.controlDispatch('set_background_switch', { enabled: false });
+  check(so, 'control port chuyển đúng công tắc tổng và lịch nền', calls.slice(3), [['master', false], ['background', false]]);
 
   const warning = hop.FbmSync.controlNotification({
     runId: 'r1', phase: 'awaiting_approval', message: 'old',

@@ -167,7 +167,8 @@ function renderChildren(node, ctx) {
 
 /** Mũi tên sổ xuống của Block có `menu`. Lớp nổi và việc mở đóng là của tệp menu. */
 function renderMenuCaret(node) {
-  return node.menu ? '<span class="shin-caret" aria-hidden="true">▾</span>' : '';
+  // Icon đồng bộ có action trực tiếp; giữ menu cũ trong schema để tương thích dữ liệu nhưng không vẽ menu trung gian.
+  return node.menu && !node.action ? '<span class="shin-caret" aria-hidden="true">▾</span>' : '';
 }
 
 /** Ruột một card: hàng tiêu đề rồi thẻ ruột. `titleActions` là mảng khai thô nên đi qua `screenBar` để thành Block, cùng đường với mục header. */

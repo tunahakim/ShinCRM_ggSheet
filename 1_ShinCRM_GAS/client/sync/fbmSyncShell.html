@@ -1,0 +1,72 @@
+<style>
+.shin-sync-module { display:flex; flex-direction:column; min-height:0; height:100%; background:var(--shin-bg); }
+.shin-sync-module-header { display:flex; align-items:center; gap:var(--shin-gap-1); padding:var(--shin-gap-2) var(--shin-gap-3); border-bottom:1px solid var(--shin-border); background:var(--shin-surface); }
+.shin-sync-module-title { flex:1; min-width:0; font-size:var(--shin-text-md); font-weight:700; color:var(--shin-text); }
+.shin-sync-header-btn { width:30px; height:30px; padding:0; border:1px solid var(--shin-border); border-radius:var(--shin-radius-sm); background:var(--shin-surface); color:var(--shin-text); cursor:pointer; }
+.shin-sync-header-btn:hover { background:var(--shin-bg-hover); }
+.shin-sync-header-btn.is-on { border-color:var(--shin-ok); color:var(--shin-ok); background:#e6f4ea; }
+.shin-sync-header-btn.is-off { border-color:var(--shin-error); color:var(--shin-error); background:var(--shin-error-soft); }
+.shin-sync-nav { display:flex; gap:var(--shin-gap-1); padding:var(--shin-gap-1) var(--shin-gap-3); border-bottom:1px solid var(--shin-border-faint); background:var(--shin-surface); overflow-x:auto; }
+.shin-sync-nav button { flex:0 0 auto; border:0; border-bottom:2px solid transparent; padding:var(--shin-gap-1) var(--shin-gap-2); background:none; color:var(--shin-text-soft); font:inherit; font-size:var(--shin-text-xs); cursor:pointer; }
+.shin-sync-nav button.is-active { border-color:var(--shin-primary); color:var(--shin-primary); font-weight:700; }
+.shin-sync-disabled-banner { margin:var(--shin-gap-2) var(--shin-gap-3) 0; padding:var(--shin-gap-2); border-left:3px solid var(--shin-error); background:var(--shin-error-soft); color:var(--shin-error); font-size:var(--shin-text-sm); }
+.shin-sync-content-disabled { opacity:.58; }
+.shin-sync-content-disabled button:not(#fbm-sync-master-switch), .shin-sync-content-disabled select, .shin-sync-content-disabled input, .shin-sync-content-disabled textarea { pointer-events:none; }
+.shin-sync-section { padding:var(--shin-gap-3); }
+.shin-sync-section-title { margin:0 0 var(--shin-gap-2); color:var(--shin-text); font-size:var(--shin-text-lg); }
+.shin-sync-muted { color:var(--shin-text-soft); font-size:var(--shin-text-sm); }
+.shin-sync-summary-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--shin-gap-2); }
+.shin-sync-summary-item { padding:var(--shin-gap-2); border:1px solid var(--shin-border-faint); border-radius:var(--shin-radius-sm); background:var(--shin-surface); }
+.shin-sync-summary-label { color:var(--shin-text-soft); font-size:var(--shin-text-xs); }
+.shin-sync-summary-value { margin-top:2px; color:var(--shin-text); font-weight:700; }
+.shin-sync-action-row { display:flex; flex-wrap:wrap; gap:var(--shin-gap-2); margin-top:var(--shin-gap-3); }
+.shin-sync-pipeline { margin-top:var(--shin-gap-3); padding:var(--shin-gap-2); border:1px solid var(--shin-border-faint); border-radius:var(--shin-radius-sm); background:var(--shin-surface); }
+.shin-sync-pipeline-title { margin-bottom:var(--shin-gap-1); font-weight:700; color:var(--shin-text); }
+.shin-sync-pipeline-step { display:flex; align-items:center; gap:var(--shin-gap-1); padding:4px 0; color:var(--shin-text-soft); font-size:var(--shin-text-sm); }
+.shin-sync-pipeline-step.is-current { color:var(--shin-primary); font-weight:700; }
+.shin-sync-pipeline-step.is-done { color:var(--shin-ok); }
+.shin-sync-pipeline-step.is-error { color:var(--shin-error); }
+.shin-sync-tab-row { display:flex; gap:var(--shin-gap-1); margin-bottom:var(--shin-gap-2); border-bottom:1px solid var(--shin-border-faint); }
+.shin-sync-tab-row button { border:0; border-bottom:2px solid transparent; padding:var(--shin-gap-1) var(--shin-gap-2); background:none; color:var(--shin-text-soft); font:inherit; cursor:pointer; }
+.shin-sync-tab-row button.is-active { border-color:var(--shin-primary); color:var(--shin-primary); font-weight:700; }
+.shin-sync-form-field { display:flex; flex-direction:column; gap:4px; margin-bottom:var(--shin-gap-2); }
+.shin-sync-form-field label { color:var(--shin-text-soft); font-size:var(--shin-text-xs); }
+.shin-sync-form-actions { display:flex; flex-wrap:wrap; gap:var(--shin-gap-2); }
+@media (max-width:340px) { .shin-sync-summary-grid { grid-template-columns:1fr; } .shin-sync-module-header { padding-left:var(--shin-gap-2); padding-right:var(--shin-gap-2); } }
+</style>
+<script>
+function fbmSyncElement(tag, className, text) { var node = document.createElement(tag); if (className) { node.className = className; } if (text !== undefined) { node.textContent = text; } return node; }
+function fbmSyncCard(title) {
+  // Khai card đi qua Block chuẩn; thân dữ liệu động được gắn vào body sau đó để không dựng lại cả màn.
+  var blueprint = typeof Card === 'function' ? Card({ title: title || '', elements: [] }) : null;
+  var card = fbmSyncElement('section', 'shin-card'); if (blueprint) { card.setAttribute('data-block-role', blueprint.role); }
+  if (title) { var head = fbmSyncElement('div', 'shin-card-head'); head.appendChild(fbmSyncElement('div', 'shin-card-title', title)); card.appendChild(head); } var body = fbmSyncElement('div', 'shin-card-body'); card.appendChild(body); return { card: card, body: body };
+}
+function fbmSyncRenderShell(status) {
+  var screen = document.getElementById('fbm-sync-screen'); if (!screen) { return; }
+  screen.className = 'shin-sync-screen shin-sync-module';
+  var header = document.getElementById('fbm-sync-module-header');
+  if (!header) {
+    header = fbmSyncElement('div', 'shin-sync-module-header'); header.id = 'fbm-sync-module-header';
+    var back = fbmSyncElement('button', 'shin-sync-header-btn', '←'); back.id = 'fbm-sync-back'; back.setAttribute('aria-label', 'Quay lại'); header.appendChild(back);
+    header.appendChild(fbmSyncElement('strong', 'shin-sync-module-title', 'Đồng bộ FBM'));
+    var menu = fbmSyncElement('button', 'shin-sync-header-btn', '☰'); menu.id = 'fbm-sync-module-menu'; menu.setAttribute('aria-label', 'Mở menu Đồng bộ'); header.appendChild(menu);
+    var master = fbmSyncElement('button', 'shin-sync-header-btn', '⏻'); master.id = 'fbm-sync-master-switch'; master.setAttribute('aria-label', 'Bật hoặc tắt đồng bộ'); header.appendChild(master);
+    screen.insertBefore(header, screen.firstChild);
+  }
+  var nav = document.getElementById('fbm-sync-nav');
+  if (!nav) { nav = fbmSyncElement('nav', 'shin-sync-nav'); nav.id = 'fbm-sync-nav'; nav.hidden = true; screen.insertBefore(nav, document.getElementById('fbm-sync-content')); }
+  nav.textContent = '';
+  FBM_SYNC_UI_SCHEMA.screens.forEach(function (item) { var b = fbmSyncElement('button', item.id === FBM_SYNC_CLIENT.subscreen ? 'is-active' : '', item.label); b.type = 'button'; b.setAttribute('data-sync-screen', item.id); nav.appendChild(b); });
+  var enabled = !(status && (status.masterEnabled === false || status.enabled === false));
+  var masterButton = document.getElementById('fbm-sync-master-switch');
+  if (masterButton) { masterButton.classList.toggle('is-on', enabled); masterButton.classList.toggle('is-off', !enabled); masterButton.textContent = enabled ? '⏻' : '○'; masterButton.setAttribute('aria-pressed', enabled ? 'true' : 'false'); masterButton.title = enabled ? 'Đồng bộ đang bật' : 'Đồng bộ đang tắt'; }
+  var content = document.getElementById('fbm-sync-content');
+  if (content) { content.classList.toggle('shin-sync-content-disabled', !enabled); }
+  var old = document.getElementById('fbm-sync-disabled-banner'); if (old) { old.remove(); }
+  if (!enabled && content) { var banner = fbmSyncElement('div', 'shin-sync-disabled-banner', 'Đồng bộ đang tắt. Các màn hình chỉ xem được trạng thái; không chạy, ghi, đăng nhập tự động hoặc xử lý conflict.'); banner.id = 'fbm-sync-disabled-banner'; content.parentNode.insertBefore(banner, content); }
+}
+function fbmSyncSetScreen(screenId) { var ids = FBM_SYNC_UI_SCHEMA.screens.map(function (item) { return item.id; }); FBM_SYNC_CLIENT.subscreen = ids.indexOf(screenId) >= 0 ? screenId : 'overview'; if (FBM_SYNC_CLIENT.lastStatus) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); } }
+function fbmSyncToggleMaster() { var current = FBM_SYNC_CLIENT.lastStatus || {}; var enabled = !(current.masterEnabled === false || current.enabled === false); return callServer('fbmSetMasterSwitch', [!enabled]).then(function (result) { return fbmSyncStatusOnce(); }).catch(function (error) { var status = FBM_SYNC_CLIENT.lastStatus || {}; status.message = String(error && error.message || error); fbmSyncPaint(status); return null; }); }
+function fbmSyncApplyMasterDisabled(status) { var disabled = !!(status && (status.masterEnabled === false || status.enabled === false)), content = document.getElementById('fbm-sync-content'); if (!content) { return; } content.querySelectorAll('button, select, input, textarea').forEach(function (control) { if (disabled) { control.disabled = true; } }); }
+</script>

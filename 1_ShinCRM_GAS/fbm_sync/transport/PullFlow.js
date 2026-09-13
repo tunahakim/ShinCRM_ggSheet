@@ -5,6 +5,9 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 FbmSync.start = function (options) {
   // Mỗi call chỉ trả một request; ngữ cảnh nhiều bước nằm trong DocumentProperties.
   var opt = options || {};
+  if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) {
+    return { ok: false, code: 'SYNC_DISABLED', message: 'Đồng bộ đang tắt; hãy bật công tắc tổng trước khi chạy.', status: FbmSync.statusView() };
+  }
   var current = FbmSync.stateRead();
   if (typeof FbmSync.recoverStaleRun === 'function') { current = FbmSync.recoverStaleRun(current).state; }
   // Tạm dừng là điểm dừng để người dùng chạy lại, không phải cursor đang chạy;
@@ -250,6 +253,12 @@ FbmSync.activityBulkNext = function (state, grid) {
 FbmSync.continue = function (rawResponse) {
   // Tiến đúng một bước cursor và lưu state trước khi trả request kế tiếp.
   var state = FbmSync.stateRead();
+  if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) {
+    state.runId = ''; state.phase = 'paused'; state.cursor = {}; state.activeRequestId = '';
+    state.message = 'Đồng bộ đang tắt; đã dừng cấp request tiếp theo.'; state.lastError = '';
+    FbmSync.stateWrite(state);
+    return { ok: false, code: 'SYNC_DISABLED', status: FbmSync.statusView() };
+  }
   if (typeof FbmSync.recoverStaleRun === 'function') {
     var recovered = FbmSync.recoverStaleRun(state);
     if (recovered.recovered) { return { ok: false, status: FbmSync.statusView(), error: recovered.state.lastError, stale: true }; }

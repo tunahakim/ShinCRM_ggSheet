@@ -1,6 +1,18 @@
 /** Hop dong request va retry an toan cho transport FBM. */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
+/** Khóa tổng của module, lưu theo Spreadsheet hiện tại và mặc định tắt để fail-closed. */
+FbmSync.MASTER_SWITCH_KEY = 'FBM_SYNC_ENABLED';
+FbmSync.masterEnabled = function () {
+  // Không phá hành vi các Spreadsheet đã có trước khi công tắc được thêm; chỉ giá trị false rõ ràng mới khóa module.
+  try { return FbmSync.props().getProperty(FbmSync.MASTER_SWITCH_KEY) !== 'false'; } catch (err) { return true; }
+};
+FbmSync.setMasterEnabled = function (enabled) {
+  var value = enabled === true;
+  FbmSync.props().setProperty(FbmSync.MASTER_SWITCH_KEY, value ? 'true' : 'false');
+  return { ok: true, enabled: value };
+};
+
 /** Chỉ cho phép ghi khi caller chọn write và cờ an toàn đã bật. */
 FbmSync.writeEnabled = function (mode) {
   if (mode !== 'write' && mode !== 'push') { return false; }
@@ -26,6 +38,15 @@ if (typeof FbmSync.transportValue !== 'function') {
 /** Bọc request nội bộ thành envelope gửi qua Extension. */
 FbmSync.nextEnvelope = function (request) {
   if (!request) { return null; }
+  // Đang tắt thì không cấp request kế tiếp. Request đã gửi trước đó không thể thu hồi;
+  // state được chuyển sang paused để người dùng xem và chủ động tiếp tục sau khi bật lại.
+  if (!FbmSync.masterEnabled()) {
+    var stopped = FbmSync.stateRead ? FbmSync.stateRead() : {};
+    stopped.phase = 'paused'; stopped.runId = ''; stopped.cursor = {}; stopped.activeRequestId = '';
+    stopped.message = 'Đồng bộ đang tắt; không cấp request FBM mới.'; stopped.lastError = '';
+    if (FbmSync.stateWrite) { FbmSync.stateWrite(stopped); }
+    return null;
+  }
   var id = Date.now().toString(36), state = FbmSync.stateRead ? FbmSync.stateRead() : {}, meta = Object.assign({}, request.meta || {});
   meta.trace = Object.assign({}, meta.trace || {}, { runId: String(state.runId || ''), requestId: id });
   if (FbmSync.stateWrite) {

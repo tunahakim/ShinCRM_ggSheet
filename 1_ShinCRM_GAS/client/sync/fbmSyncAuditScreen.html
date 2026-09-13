@@ -20,8 +20,9 @@ function fbmSyncPaintConflictScreen(panel, status) {
     var shin = document.createElement('div'); shin.className = 'shin-sync-preview-row'; shin.textContent = 'ShinCRM: ' + String(field.left || '(trống)'); group.appendChild(shin);
     var fbm = document.createElement('div'); fbm.className = 'shin-sync-preview-row'; fbm.textContent = 'FBM: ' + String(field.right || '(trống)'); group.appendChild(fbm);
     var pick = document.createElement('select'); pick.className = 'shin-input shin-sync-conflict-choice'; pick.setAttribute('data-fbm-conflict-field', String(field.field || ''));
-    [['shin', 'Dùng ShinCRM'], ['fbm', 'Dùng FBM']].forEach(function (option) { var itemOption = document.createElement('option'); itemOption.value = option[0]; itemOption.textContent = option[1]; pick.appendChild(itemOption); });
+    [['shin', 'Giữ ShinCRM'], ['fbm', 'Giữ FBM'], ['manual', 'Tự nhập']].forEach(function (option) { var itemOption = document.createElement('option'); itemOption.value = option[0]; itemOption.textContent = option[1]; pick.appendChild(itemOption); });
     group.appendChild(pick);
+    var manual = document.createElement('input'); manual.type = 'text'; manual.className = 'shin-input'; manual.hidden = true; manual.placeholder = 'Giá trị kết hợp cho trường này'; manual.setAttribute('data-fbm-conflict-manual', String(field.field || '')); group.appendChild(manual);
     box.appendChild(group);
   });
   var actions = document.createElement('div'); actions.className = 'shin-sync-actions';

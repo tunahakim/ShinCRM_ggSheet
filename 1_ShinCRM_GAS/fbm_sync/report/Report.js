@@ -33,6 +33,11 @@ FbmSync.statusMetadata = function (metadata) {
   var conflicts = Array.isArray(data.conflicts) ? data.conflicts : [];
   out.conflictCount = conflicts.length;
   out.conflicts = conflicts.length ? [conflicts[0]] : [];
+  var failures = data.pushFailures && typeof data.pushFailures === 'object' ? data.pushFailures : {}, failureKeys = Object.keys(failures), details = data.pushFailureDetails && typeof data.pushFailureDetails === 'object' ? data.pushFailureDetails : {};
+  out.pushFailureCount = failureKeys.length;
+  out.pushFailures = {};
+  out.pushFailureDetails = {};
+  failureKeys.slice(0, 20).forEach(function (key) { out.pushFailures[key] = failures[key]; if (details[key] !== undefined) { out.pushFailureDetails[key] = details[key]; } });
   return out;
 };
 /** Cursor công khai chỉ dùng để chẩn đoán trạng thái; không trả bản ghi, OldValue hay khóa về trình duyệt. */
@@ -46,7 +51,9 @@ FbmSync.statusView = function () {
   if (typeof FbmSync.recoverStaleRun === 'function') { state = FbmSync.recoverStaleRun(state).state; }
   var metadata = FbmSync.statusMetadata(state.metadata);
   if (typeof FbmSync.traceRead === 'function') { metadata.traceTail = FbmSync.traceRead(20); }
-  return { ok: true, runId: state.runId, mode: state.mode, scan: state.scan || 'full', scheduledScan: state.scheduledScan || '', writeAllowed: FbmSync.writeAllowed(), login: typeof FbmSync.loginConfigPublic === 'function' ? FbmSync.loginConfigPublic() : null, phase: state.phase, label: FbmSync.statusLabel(state.phase), direction: FbmSync.syncDirection(state), entity: state.entity, entityLabel: FbmSync.syncEntityLabel(state.entity, state.phase), cursor: FbmSync.statusCursor(state.cursor), session: { customer: !!state.session.customerAuthorized, activity: !!state.session.activityAuthorized, expired: state.session.expired === true, lastHeartbeatAt: Number(state.session.lastHeartbeatAt || 0) }, metadata: metadata, counts: state.counts, current: state.current, message: state.message, startedAt: state.startedAt, updatedAt: state.updatedAt, nextRunAt: state.nextRunAt, lastError: state.lastError, lastFailureCode: state.lastFailureCode || '', retryable: state.retryable === true, locks: state.locks };
+  var enabled = typeof FbmSync.masterEnabled === 'function' ? FbmSync.masterEnabled() : true;
+  var background = typeof FbmSync.backgroundEnabled === 'function' ? FbmSync.backgroundEnabled() : true;
+  return { ok: true, enabled: enabled, masterEnabled: enabled, backgroundEnabled: background, runId: state.runId, mode: state.mode, scan: state.scan || 'full', scheduledScan: state.scheduledScan ? state.scheduledScan : '', writeAllowed: typeof FbmSync.writeAllowed === 'function' ? FbmSync.writeAllowed() : false, login: typeof FbmSync.loginConfigPublic === 'function' ? FbmSync.loginConfigPublic() : null, phase: state.phase, label: FbmSync.statusLabel(state.phase), direction: FbmSync.syncDirection(state), entity: state.entity, entityLabel: FbmSync.syncEntityLabel(state.entity, state.phase), cursor: FbmSync.statusCursor(state.cursor), session: { customer: !!state.session.customerAuthorized, activity: !!state.session.activityAuthorized, expired: state.session.expired === true, lastHeartbeatAt: Number(state.session.lastHeartbeatAt || 0) }, metadata: metadata, counts: state.counts, current: state.current, message: state.message, startedAt: state.startedAt, updatedAt: state.updatedAt, nextRunAt: state.nextRunAt, lastError: state.lastError, lastFailureCode: state.lastFailureCode || '', retryable: state.retryable === true, locks: state.locks };
 };
 
 /** Ghi snapshot nghiệp vụ; payload/cookie không bao giờ đi vào Log. */

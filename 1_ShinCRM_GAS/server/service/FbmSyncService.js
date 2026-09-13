@@ -47,10 +47,14 @@ function fbmLogSyncError(message, clientTrace) { return runEntryPoint('fbmLogSyn
 function fbmGetSyncTrace() { return runEntryPoint('fbmGetSyncTrace', 'sidebar', 'throw', function () { return { ok: true, trace: FbmSync.traceRead(24) }; }); }
 /** Đọc cờ cho phép ghi; mặc định tắt để không chạm dữ liệu FBM ngoài ý muốn. */
 function fbmGetWriteMode() { return runEntryPoint('fbmGetWriteMode', 'sidebar', 'throw', function () { return FbmSync.controlDispatch('get_write_mode', {}); }); }
+function fbmGetMasterSwitch() { return runEntryPoint('fbmGetMasterSwitch', 'sidebar', 'throw', function () { return FbmSync.controlDispatch('get_master_switch', {}); }); }
+function fbmGetBackgroundSwitch() { return runEntryPoint('fbmGetBackgroundSwitch', 'sidebar', 'throw', function () { return FbmSync.controlDispatch('get_background_switch', {}); }); }
 function fbmGetIdentityStatus(runtime) { return runEntryPoint('fbmGetIdentityStatus', 'sidebar', 'throw', function () { return FbmSync.controlDispatch('identity_status', { runtime: runtime || {} }); }); }
 function fbmSaveIdentityBinding(binding) { return runEntryPoint('fbmSaveIdentityBinding', 'sidebar', 'throw', function () { return FbmSync.controlDispatch('save_identity_binding', { binding: binding || {} }); }); }
 /** Đổi cờ ghi thật theo thao tác chủ động của người dùng trên Sidebar. */
 function fbmSetWriteMode(enabled) { return runEntryPoint('fbmSetWriteMode', 'sidebar', 'throw', function () { return FbmSync.controlDispatch('set_write_mode', { enabled: enabled === true }); }); }
+function fbmSetMasterSwitch(enabled) { return runEntryPoint('fbmSetMasterSwitch', 'sidebar', 'throw', function () { return FbmSync.controlDispatch('set_master_switch', { enabled: enabled === true }); }); }
+function fbmSetBackgroundSwitch(enabled) { return runEntryPoint('fbmSetBackgroundSwitch', 'sidebar', 'throw', function () { return FbmSync.controlDispatch('set_background_switch', { enabled: enabled === true }); }); }
 function fbmRetryPushFailures() { return runEntryPoint('fbmRetryPushFailures', 'sidebar', 'throw', function () { return FbmSync.controlDispatch('retry_push_failures', {}); }); }
 function fbmGetRelayConfig() { return runEntryPoint('fbmGetRelayConfig', 'sidebar', 'throw', function () { return fbmSyncRelayConfig(); }); }
 function fbmRotateRelayKey() { return runEntryPoint('fbmRotateRelayKey', 'sidebar', 'throw', function () { return fbmSyncRotateRelayKey(); }); }

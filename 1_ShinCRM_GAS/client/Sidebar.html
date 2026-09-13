@@ -57,10 +57,6 @@
 
     <!-- Sync is a separate full-sidebar screen; hiding it never cancels the GAS session. -->
     <div id="fbm-sync-screen" class="shin-sync-screen" hidden>
-      <div class="shin-sync-screen-header">
-        <button type="button" id="fbm-sync-back" class="shin-icon" aria-label="Quay lại">&#8592;</button>
-        <strong>Đồng bộ FBM</strong>
-      </div>
       <div id="fbm-sync-content" class="shin-sync-screen-content"></div>
     </div>
 
@@ -104,6 +100,12 @@
   <?!= include('client/schema/fieldLogic') ?>
   <?!= include('client/schema/uiSchema') ?>
   <?!= include('client/ui/progress') ?>
+  <?!= include('client/sync/fbmSyncUiSchema') ?>
+  <?!= include('client/sync/fbmSyncShell') ?>
+  <?!= include('client/sync/screens/overview') ?>
+  <?!= include('client/sync/screens/account') ?>
+  <?!= include('client/sync/screens/run') ?>
+  <?!= include('client/sync/screens/results') ?>
   <?!= include('client/sync/fbmSyncStatusScreen') ?>
   <?!= include('client/sync/fbmSyncSettingsScreen') ?>
   <?!= include('client/sync/fbmSyncAuditScreen') ?>

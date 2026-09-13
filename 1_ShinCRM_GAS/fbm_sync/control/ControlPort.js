@@ -15,6 +15,14 @@ FbmSync.controlDispatch = function (command, payload) {
       return FbmSync.continue(input.response);
     case 'status':
       return FbmSync.statusView();
+    case 'set_master_switch':
+      return FbmSync.setMasterEnabled(input.enabled === true);
+    case 'get_master_switch':
+      return { ok: true, enabled: FbmSync.masterEnabled() };
+    case 'set_background_switch':
+      return FbmSync.setBackgroundEnabled(input.enabled === true);
+    case 'get_background_switch':
+      return { ok: true, enabled: FbmSync.backgroundEnabled() };
     case 'notification':
       return FbmSync.controlNotification(input.status || FbmSync.statusView());
     case 'approve_push':

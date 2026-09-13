@@ -15,6 +15,7 @@ FbmSync.rememberConflict = function (state, entity, current, incoming, decision,
 };
 /** Chốt conflict theo phía được chọn; baseline mới chỉ ghi sau quyết định rõ ràng. */
 FbmSync.resolveConflict = function (entity, id, choice, merged) {
+  if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED', message: 'Đồng bộ đang tắt; chưa thể chốt conflict.' }; }
   var state = FbmSync.stateRead(), conflicts = state.metadata && state.metadata.conflicts || [], target = String(id || '').trim(), item = conflicts.filter(function (entry) { return entry.entity === entity && String(entry.id) === target; })[0];
   if (!item) { return { ok: false, code: 'CONFLICT_NOT_FOUND', message: 'Không tìm thấy conflict cần xử lý.' }; }
   var record;
@@ -53,6 +54,7 @@ FbmSync.resolveConflict = function (entity, id, choice, merged) {
 
 /** Chuẩn bị một lượt đọc lại FBM; chỉ Sidebar chuyển request qua Extension, GAS vẫn quyết định nghiệp vụ. */
 FbmSync.prepareConflictResolution = function (entity, id, choice, merged) {
+  if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED', message: 'Đồng bộ đang tắt; chưa thể xử lý conflict.' }; }
   var state = FbmSync.stateRead(), conflicts = state.metadata && state.metadata.conflicts || [], target = String(id || '').trim();
   var item = conflicts.filter(function (entry) { return entry.entity === entity && String(entry.id) === target; })[0];
   if (!item) { return { ok: false, code: 'CONFLICT_NOT_FOUND', message: 'Không tìm thấy conflict cần xử lý.' }; }
@@ -69,6 +71,7 @@ FbmSync.prepareConflictResolution = function (entity, id, choice, merged) {
 
 /** Nhận response đọc lại và chỉ chốt khi hash FBM vẫn đúng snapshot lúc mở conflict. */
 FbmSync.confirmConflict = function (entity, id, choice, merged, rawResponse) {
+  if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED', message: 'Đồng bộ đang tắt; chưa thể chốt conflict.' }; }
   var state = FbmSync.stateRead(), refresh = state.metadata && state.metadata.conflictRefresh || {}, target = String(id || '').trim();
   if (refresh.entity !== entity || String(refresh.id || '') !== target) { return { ok: false, code: 'CONFLICT_REFRESH_NOT_FOUND', message: 'Không còn lượt đọc lại conflict tương ứng.' }; }
   var success = FbmSync.protocol.assertSuccess(rawResponse);

@@ -1,0 +1,17 @@
+<script>
+/* Khai báo tĩnh cho module Đồng bộ; renderer chỉ đọc các màn hình này, không chứa nghiệp vụ. */
+var FBM_SYNC_UI_SCHEMA = {
+  screens: [
+    { id: 'overview', label: 'Tổng quan' },
+    { id: 'account', label: 'Tài khoản FBM' },
+    { id: 'run', label: 'Chạy đồng bộ' },
+    { id: 'results', label: 'Kết quả & xử lý' }
+  ],
+  modes: [
+    { value: 'check', label: 'Kiểm tra an toàn' },
+    { value: 'read', label: 'Lấy từ FBM → ShinCRM' },
+    { value: 'push', label: 'Đẩy từ ShinCRM → FBM' },
+    { value: 'write', label: 'Đồng bộ hai chiều' }
+  ]
+};
+</script>

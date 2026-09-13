@@ -1,5 +1,8 @@
 /** Lập lịch và ghi marker; trigger không gọi FBM trực tiếp. */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
+FbmSync.BACKGROUND_SWITCH_KEY = 'FBM_SYNC_BACKGROUND_ENABLED';
+FbmSync.backgroundEnabled = function () { try { return FbmSync.props().getProperty(FbmSync.BACKGROUND_SWITCH_KEY) !== 'false'; } catch (err) { return true; } };
+FbmSync.setBackgroundEnabled = function (enabled) { var value = enabled === true; FbmSync.props().setProperty(FbmSync.BACKGROUND_SWITCH_KEY, value ? 'true' : 'false'); return { ok: true, enabled: value }; };
 /** Ghi thời điểm dự kiến cho heartbeat và hai đợt quét. */
 FbmSync.schedule = function () {
   var props = PropertiesService.getDocumentProperties();
@@ -13,6 +16,8 @@ FbmSync.schedulerClaim = function (kind, now) {
   var names = { heartbeat: ['FBM_SYNC_NEXT_HEARTBEAT', 5 * 60 * 1000], customer: ['FBM_SYNC_NEXT_CUSTOMER_SCAN', 60 * 60 * 1000], activity: ['FBM_SYNC_NEXT_ACTIVITY_SCAN', 30 * 60 * 1000] };
   var item = names[String(kind || '')], props = PropertiesService.getDocumentProperties(), at = Number(now || Date.now());
   if (!item) { return { ok: false, code: 'UNKNOWN_SCHEDULE' }; }
+  if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED', message: 'Đồng bộ đang tắt; scheduler không mở kỳ mới.', status: FbmSync.statusView() }; }
+  if (!FbmSync.backgroundEnabled()) { return { ok: false, code: 'BACKGROUND_DISABLED', message: 'Đồng bộ nền đang tắt.', status: FbmSync.statusView() }; }
   var due = Number(props.getProperty(item[0]) || 0);
   if (due && due > at) { return { ok: false, code: 'NOT_DUE', nextRunAt: due }; }
   var lock = LockService.getDocumentLock();
@@ -75,6 +80,7 @@ FbmSync.supervise = function (now) {
 
 /** Nhận heartbeat và trả một request đọc tiếp nếu scheduler đang đến hạn. */
 function fbmSyncHeartbeat(rawResponse) {
+  if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED', status: FbmSync.statusView() }; }
   var state = FbmSync.stateRead(), result = FbmSync.protocol.assertSuccess(rawResponse), request = null, started = null;
   state.session = state.session || {};
   state.session.lastHeartbeatAt = Date.now();

@@ -1,6 +1,6 @@
 <script>
 /* Sidebar chỉ hiển thị tiến độ; GAS là nguồn state duy nhất. */
-var FBM_SYNC_CLIENT = { installed: false, waiting: {}, relayWaiters: {}, credentialWaiters: {}, running: false, mode: 'read', writeAllowed: false, openedAt: 0, relayConfigured: false, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0, traceEvents: [], subscreen: 'status', lastStatus: null, identityStatus: null, loginStatus: null, loginDraft: { username: '' } };
+var FBM_SYNC_CLIENT = { installed: false, waiting: {}, relayWaiters: {}, credentialWaiters: {}, running: false, mode: 'read', writeAllowed: false, openedAt: 0, relayConfigured: false, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0, traceEvents: [], subscreen: 'overview', resultsTab: 'summary', resultPages: {}, lastStatus: null, identityStatus: null, loginStatus: null, loginDraft: { username: '' } };
 /** Timeout cho một request Extension để phiên không treo vô hạn khi tab FBM/bridge mất kết nối. */
 var FBM_SYNC_REQUEST_TIMEOUT_MS = 20000;
 var FBM_SYNC_GAS_CONTINUE_WARN_MS = 5000;
@@ -24,8 +24,8 @@ function fbmSyncMakeButton(id, label, primary) {
 function syncPanelToggle() {
   var screen = document.getElementById('fbm-sync-screen');
   if (!screen) { throw new Error('Sidebar thieu man dong bo FBM.'); }
-  screen.hidden = !screen.hidden;
-  if (!screen.hidden) { FBM_SYNC_CLIENT.openedAt = Date.now(); FBM_SYNC_CLIENT.viewEpoch += 1; }
+  screen.hidden = false;
+  FBM_SYNC_CLIENT.subscreen = 'overview'; FBM_SYNC_CLIENT.openedAt = Date.now(); FBM_SYNC_CLIENT.viewEpoch += 1;
   if (screen.hidden || typeof fbmSyncStatusOnce !== 'function') { return null; }
   // Relay config chỉ phục vụ các request FBM; không cần chặn snapshot trạng thái.
   return Promise.all([fbmSyncConfigureRelay(), fbmSyncStatusOnce(true), fbmSyncLoadIdentityStatus()]).then(function (results) { return fbmSyncLoadLoginStatus().then(function () { return results[1]; }); });
@@ -82,11 +82,13 @@ function fbmSyncPaint(status, freshOpen) {
   panel.hidden = false; panel.textContent = '';
   var count = status.counts || {};
   var active = ['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(status.phase) >= 0;
-  fbmSyncPaintSettingsBlock(panel, active, status);
-  fbmSyncPaintIdentityBlock(panel, active, status);
-  fbmSyncPaintStatusBlocks(panel, status, count);
-  if (FBM_SYNC_CLIENT.subscreen === 'conflict') { fbmSyncPaintConflictScreen(panel, status); }
-  else { fbmSyncPaintAuditBlocks(panel, status); }
+  if (typeof fbmSyncRenderShell === 'function') { fbmSyncRenderShell(status); }
+  if (FBM_SYNC_CLIENT.subscreen === 'account' && typeof fbmSyncRenderAccount === 'function') { fbmSyncRenderAccount(panel, status); }
+  else if (FBM_SYNC_CLIENT.subscreen === 'run' && typeof fbmSyncRenderRun === 'function') { fbmSyncRenderRun(panel, status); }
+  else if (FBM_SYNC_CLIENT.subscreen === 'results' && typeof fbmSyncRenderResults === 'function') { fbmSyncRenderResults(panel, status); }
+  else if (typeof fbmSyncRenderOverview === 'function') { fbmSyncRenderOverview(panel, status); }
+  if (typeof fbmSyncRenderShell === 'function') { fbmSyncRenderShell(status); }
+  if (typeof fbmSyncApplyMasterDisabled === 'function') { fbmSyncApplyMasterDisabled(status); }
 }
 /** Đồng bộ màu icon header với phase hiện tại của phiên GAS. */
 function fbmSyncPaintHeaderState(status) {
@@ -248,17 +250,23 @@ function fbmSyncInstall() {
     if (data.error) { var bridgeError = new Error(data.error); bridgeError.trace = (data.trace || []).concat(FBM_SYNC_CLIENT.traceEvents.slice()); waiter.reject(bridgeError); } else { waiter.resolve(data.result); }
   });
   document.addEventListener('click', function (event) {
-    var target = event.target && event.target.closest ? event.target.closest('#fbm-sync-back, #fbm-sync-start, #fbm-sync-approve, #fbm-sync-rotate-relay, #fbm-sync-cancel, #fbm-sync-open-conflicts, #fbm-sync-conflict-back, #fbm-sync-check-identity, #fbm-sync-probe-identity, #fbm-sync-confirm-identity, #fbm-sync-login-save, #fbm-sync-login-test, [data-fbm-conflict-choice], [data-fbm-conflict-merge], [data-fbm-push-retry-all]') : null;
+    var target = event.target && event.target.closest ? event.target.closest('#fbm-sync-back, #fbm-sync-module-menu, #fbm-sync-master-switch, #fbm-sync-start, #fbm-sync-approve, #fbm-sync-rotate-relay, #fbm-sync-cancel, #fbm-sync-open-conflicts, #fbm-sync-conflict-back, #fbm-sync-check-identity, #fbm-sync-probe-identity, #fbm-sync-confirm-identity, #fbm-sync-login-save, #fbm-sync-login-test, [data-sync-screen], [data-sync-results-tab], [data-sync-background], [data-sync-page], [data-fbm-conflict-choice], [data-fbm-conflict-merge], [data-fbm-push-retry-all]') : null;
     if (!target) { return; }
     event.preventDefault();
-    if (target.hasAttribute('data-fbm-push-retry-all')) {
+    if (target.id === 'fbm-sync-master-switch') { fbmSyncToggleMaster();
+    } else if (target.id === 'fbm-sync-module-menu') { var nav = document.getElementById('fbm-sync-nav'); if (nav) { nav.hidden = !nav.hidden; }
+    } else if (target.hasAttribute('data-sync-background')) { var bg = FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.lastStatus.backgroundEnabled !== false; callServer('fbmSetBackgroundSwitch', [!bg]).then(fbmSyncStatusOnce);
+    } else if (target.hasAttribute('data-sync-page')) { var pageSpec = String(target.getAttribute('data-sync-page') || '').split(':'); FBM_SYNC_CLIENT.resultPages[pageSpec[0]] = Math.max(0, Number(FBM_SYNC_CLIENT.resultPages[pageSpec[0]] || 0) + Number(pageSpec[1] || 0)); fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus);
+    } else if (target.hasAttribute('data-sync-results-tab')) { FBM_SYNC_CLIENT.resultsTab = target.getAttribute('data-sync-results-tab'); fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus);
+    } else if (target.hasAttribute('data-sync-screen')) { fbmSyncSetScreen(target.getAttribute('data-sync-screen')); var nav = document.getElementById('fbm-sync-nav'); if (nav) { nav.hidden = true; }
+    } else if (target.hasAttribute('data-fbm-push-retry-all')) {
       target.disabled = true;
       fbmSyncRetryPushFailures().catch(function () { target.disabled = false; });
     } else if (target.id === 'fbm-sync-open-conflicts') {
-      FBM_SYNC_CLIENT.subscreen = 'conflict';
+      FBM_SYNC_CLIENT.subscreen = 'results'; FBM_SYNC_CLIENT.resultsTab = 'conflict';
       fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus);
     } else if (target.id === 'fbm-sync-conflict-back') {
-      FBM_SYNC_CLIENT.subscreen = 'status';
+      FBM_SYNC_CLIENT.subscreen = 'results'; FBM_SYNC_CLIENT.resultsTab = 'summary';
       fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus);
     } else if (target.id === 'fbm-sync-rotate-relay') { fbmSyncRotateRelay();
     } else if (target.id === 'fbm-sync-check-identity') { fbmSyncCheckIdentity();
@@ -272,8 +280,10 @@ function fbmSyncInstall() {
       document.querySelectorAll('[data-fbm-conflict-field]').forEach(function (select) {
         var field = select.getAttribute('data-fbm-conflict-field');
         var item = (FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.lastStatus.metadata && FBM_SYNC_CLIENT.lastStatus.metadata.conflicts || [])[0] || {};
+        var manualInput = document.querySelector('[data-fbm-conflict-manual="' + field + '"]');
         var source = select.value === 'fbm' ? item.fbmRecord : item.shinRecord;
         var value = source && source[field];
+        if (select.value === 'manual') { value = manualInput ? manualInput.value : ''; }
         if (value === undefined && item.fields) { var diff = item.fields.filter(function (entry) { return String(entry.field) === field; })[0]; value = diff ? (select.value === 'fbm' ? diff.right : diff.left) : ''; }
         merged[field] = value === undefined || value === null ? '' : value;
       });
@@ -290,7 +300,7 @@ function fbmSyncInstall() {
     var target = event.target;
     if (!target) { return; }
     if (target.id === 'fbm-sync-mode') { FBM_SYNC_CLIENT.mode = target.value; }
-    if (target.id === 'fbm-sync-write-gate') { fbmSyncSetWriteGate(target.checked); }
+    if (target.hasAttribute('data-fbm-conflict-field')) { var manualInput = document.querySelector('[data-fbm-conflict-manual="' + target.getAttribute('data-fbm-conflict-field') + '"]'); if (manualInput) { manualInput.hidden = target.value !== 'manual'; } }
     if (target.id === 'fbm-sync-auto-login') { fbmSyncSetAutoLogin(target.checked); }
   });
 }

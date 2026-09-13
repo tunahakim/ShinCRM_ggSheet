@@ -111,6 +111,12 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   ├── Sidebar.html              Trang gốc của sidebar: nhúng mọi tệp client theo đúng thứ tự rồi gọi lượt nạp đầu tiên.
 │   ├── sync\\                    Màn hình đồng bộ FBM độc lập, tách khỏi các màn nghiệp vụ.
 │   │   ├── fbmSync.html           Điều phối phiên và bridge request thô.
+│   │   ├── fbmSyncUiSchema.html   Khai tĩnh bốn màn hình nội bộ và các nhãn loại đồng bộ.
+│   │   ├── fbmSyncShell.html      Shell header, menu nội bộ, công tắc tổng và kiểu bố cục module.
+│   │   ├── screens\\overview.html  Màn Tổng quan, trạng thái phiên và cấu hình đồng bộ nền.
+│   │   ├── screens\\account.html   Màn Tài khoản FBM, nhận diện, auto-login và relay.
+│   │   ├── screens\\run.html       Màn Chạy đồng bộ, dropdown hướng dữ liệu và pipeline.
+│   │   ├── screens\\results.html   Màn Kết quả & xử lý, tab tổng hợp/conflict/nghiệm thu.
 │   │   ├── fbmSyncStatusScreen.html Block trạng thái và tiến trình riêng của phiên.
 │   │   ├── fbmSyncSettingsScreen.html Block điều khiển mode/cờ ghi; mở rộng cho credential.
 │   │   └── fbmSyncAuditScreen.html Block preview, audit và chi tiết lỗi/xung đột.

@@ -54,6 +54,7 @@ FbmSync.loginConfigSetEnabled = function (enabled) {
 
 FbmSync.autoLoginCanAttempt = function (now) {
   var at = Number(now || Date.now()), value = FbmSync.loginConfigRead();
+  if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED' }; }
   if (!value.enabled || !value.configured) { return { ok: false, code: 'AUTO_LOGIN_NOT_CONFIGURED' }; }
   var last = Number(value.lastAttemptAt || 0);
   if (last && at - last < FbmSync.AUTO_LOGIN_RETRY_MS) { return { ok: false, code: 'AUTO_LOGIN_THROTTLED', retryAt: last + FbmSync.AUTO_LOGIN_RETRY_MS }; }
