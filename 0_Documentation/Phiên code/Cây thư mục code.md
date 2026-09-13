@@ -118,7 +118,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── screens\\run.html       Màn Chạy đồng bộ, dropdown hướng dữ liệu và pipeline.
 │   │   ├── screens\\results.html   Màn Kết quả & xử lý, tab tổng hợp/conflict/nghiệm thu.
 │   │   ├── fbmSyncStatusScreen.html Block trạng thái và tiến trình riêng của phiên.
-│   │   ├── fbmSyncSettingsScreen.html Block điều khiển mode/cờ ghi; mở rộng cho credential.
+│   │   ├── fbmSyncSettingsScreen.html Block nhận diện tài khoản được màn Tài khoản FBM tái sử dụng; không còn checkbox ghi.
 │   │   └── fbmSyncAuditScreen.html Block preview, audit và chi tiết lỗi/xung đột.
 │   ├── link\                     Cầu nối ô đang chọn: ưu tiên postMessage an toàn từ Extension, khi vắng mới mở đường dò máy chủ có nhịp và luật dừng.
 │   │   ├── sheetLink.html        Tai nghe CRM_CONTEXT từ Extension: kiểm tra customerId trực tiếp rồi bật followSelection. Bắt tay có tiếng đáp, đèn sống chết suy từ ACK chứ không suy từ im lặng.
