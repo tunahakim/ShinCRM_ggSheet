@@ -24,7 +24,10 @@ function fbmSyncRenderRun(panel, status) {
   var active = ['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(status.phase) >= 0, awaiting = status.phase === 'awaiting_approval';
   var action = fbmSyncAppendButton(body, active ? 'fbm-sync-cancel' : awaiting ? 'fbm-sync-approve' : 'fbm-sync-start', active ? 'Dừng đồng bộ' : awaiting ? 'Chấp thuận và chạy' : 'Bắt đầu đồng bộ', true); action.disabled = status.masterEnabled === false;
   if (awaiting) { fbmSyncAppendText(body, 'Phiên có nhiều thay đổi; hãy xem kết quả rồi chấp thuận để tiếp tục.', 'shin-sync-muted'); }
-  var hasRunSnapshot = !!status.phase && status.phase !== 'idle';
+  // Preflight lỗi tạo state có runId để giữ chẩn đoán, nhưng chưa hề có request FBM;
+  // chỉ dựng pipeline khi đã chạy thật, đang chờ duyệt hoặc còn cursor của một bước.
+  var hasRunSnapshot = active || awaiting || status.phase === 'done' ||
+    (status.phase === 'error' && status.runId && status.cursor && status.cursor.kind);
   if (hasRunSnapshot) {
     fbmSyncRenderPipeline(section, status);
     fbmSyncPaintStatusBlocks(section, status, status.counts || {});

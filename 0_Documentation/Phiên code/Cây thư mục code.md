@@ -256,6 +256,7 @@ tests\
     ├── triggers.js               Trigger sửa sheet quản trị làm mới ngay; sửa kho đánh dấu mọi sheet quản trị cần làm mới.
     ├── fbmSync.js                Điều phối các nhóm kiểm thử đồng bộ FBM; không chứa logic nghiệp vụ của từng nhóm.
     ├── fbmSync\AutoLogin.js     Kiểm envelope đăng nhập, throttle và phục hồi cursor.
+    ├── fbmSync\Sidebar.js       Smoke test renderer và thao tác chính của Sidebar Đồng bộ FBM.
     ├── fbmSync\
     │   ├── Protocol.js            Kiểm envelope, lỗi transport, fingerprint và đối soát ba chiều.
     │   ├── Builders.js            Kiểm builder/parser request Customer và Activity.

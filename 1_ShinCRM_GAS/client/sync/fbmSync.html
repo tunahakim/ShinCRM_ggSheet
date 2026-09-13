@@ -257,13 +257,21 @@ function fbmSyncInstall() {
     event.preventDefault();
     if (target.id === 'fbm-sync-master-switch') { fbmSyncToggleMaster();
     } else if (target.id === 'fbm-sync-module-menu') { var nav = document.getElementById('fbm-sync-nav'); if (nav) { nav.hidden = !nav.hidden; }
-    } else if (target.hasAttribute('data-sync-background')) { var bg = FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.lastStatus.backgroundEnabled !== false; callServer('fbmSetBackgroundSwitch', [!bg]).then(fbmSyncStatusOnce);
+    } else if (target.hasAttribute('data-sync-background')) {
+      var bg = FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.lastStatus.backgroundEnabled !== false;
+      target.disabled = true;
+      callServer('fbmSetBackgroundSwitch', [!bg]).then(fbmSyncStatusOnce).catch(function (error) {
+        fbmSyncPaintError(error, 'Không đổi được chế độ đồng bộ nền.');
+      }).finally(function () { target.disabled = false; });
     } else if (target.hasAttribute('data-sync-page')) { var pageSpec = String(target.getAttribute('data-sync-page') || '').split(':'); FBM_SYNC_CLIENT.resultPages[pageSpec[0]] = Math.max(0, Number(FBM_SYNC_CLIENT.resultPages[pageSpec[0]] || 0) + Number(pageSpec[1] || 0)); fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus);
     } else if (target.hasAttribute('data-sync-results-tab')) { FBM_SYNC_CLIENT.resultsTab = target.getAttribute('data-sync-results-tab'); fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus);
     } else if (target.hasAttribute('data-sync-screen')) { fbmSyncSetScreen(target.getAttribute('data-sync-screen')); var nav = document.getElementById('fbm-sync-nav'); if (nav) { nav.hidden = true; }
     } else if (target.hasAttribute('data-fbm-push-retry-all')) {
       target.disabled = true;
-      fbmSyncRetryPushFailures().catch(function () { target.disabled = false; });
+      fbmSyncRetryPushFailures().catch(function (error) {
+        target.disabled = false;
+        fbmSyncPaintError(error, 'Không mở lại được nhóm bản ghi lỗi.');
+      });
     } else if (target.id === 'fbm-sync-open-conflicts') {
       FBM_SYNC_CLIENT.subscreen = 'results'; FBM_SYNC_CLIENT.resultsTab = 'conflict';
       fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus);
@@ -291,10 +299,16 @@ function fbmSyncInstall() {
         if (value === undefined && item.fields) { var diff = item.fields.filter(function (entry) { return String(entry.field) === field; })[0]; value = diff ? (select.value === 'fbm' ? diff.right : diff.left) : ''; }
         merged[field] = value === undefined || value === null ? '' : value;
       });
-      fbmSyncResolveConflict(target.getAttribute('data-fbm-conflict-entity'), target.getAttribute('data-fbm-conflict-id'), 'manual', merged).catch(function () { target.disabled = false; });
+      fbmSyncResolveConflict(target.getAttribute('data-fbm-conflict-entity'), target.getAttribute('data-fbm-conflict-id'), 'manual', merged).catch(function (error) {
+        target.disabled = false;
+        fbmSyncPaintError(error, 'Không xử lý được xung đột.');
+      });
     } else if (target.hasAttribute('data-fbm-conflict-choice')) {
       target.disabled = true;
-      fbmSyncResolveConflict(target.getAttribute('data-fbm-conflict-entity'), target.getAttribute('data-fbm-conflict-id'), target.getAttribute('data-fbm-conflict-choice')).catch(function () { target.disabled = false; });
+      fbmSyncResolveConflict(target.getAttribute('data-fbm-conflict-entity'), target.getAttribute('data-fbm-conflict-id'), target.getAttribute('data-fbm-conflict-choice')).catch(function (error) {
+        target.disabled = false;
+        fbmSyncPaintError(error, 'Không xử lý được xung đột.');
+      });
     } else if (target.id === 'fbm-sync-back') { syncScreenClose(); }
     else if (target.id === 'fbm-sync-approve') { fbmSyncApprovePush(); }
     else if (target.id === 'fbm-sync-start') { fbmSyncRun(FBM_SYNC_CLIENT.mode); }
@@ -365,6 +379,14 @@ function fbmSyncRetryPushFailures() {
     if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không mở lại được bản ghi lỗi.'); }
     return fbmSyncStatusOnce();
   });
+}
+/** Hiển thị lỗi thao tác ngay trong màn hình hiện tại, không để Promise bị từ chối im lặng. */
+function fbmSyncPaintError(error, fallback) {
+  var reason = String(error && error.message || error || fallback || 'Thao tác đồng bộ thất bại.');
+  var current = FBM_SYNC_CLIENT.lastStatus || {};
+  var status = Object.assign({}, current, { phase: 'error', label: 'Có lỗi', message: reason, lastError: reason });
+  fbmSyncPaint(status);
+  return status;
 }
 function fbmSyncCheckIdentity() {
   if (FBM_SYNC_CLIENT.running) { return Promise.resolve(null); }
@@ -488,7 +510,11 @@ function fbmSyncEncryptCredentials(credentials) {
 function fbmSyncSaveLoginConfig(button) {
   if (button) { button.disabled = true; }
   var credentials = fbmSyncLoginCredentialsFromForm();
-  if (!credentials.username || !credentials.password) { if (button) { button.disabled = false; } return Promise.resolve(null); }
+  if (!credentials.username || !credentials.password) {
+    fbmSyncPaintError(null, 'Cần nhập username và mật khẩu FBM trước khi lưu.');
+    if (button) { button.disabled = false; }
+    return Promise.resolve(null);
+  }
   return fbmSyncEncryptCredentials(credentials).then(function (encrypted) {
     return callServer('fbmSaveLoginConfig', [{ enabled: (FBM_SYNC_CLIENT.loginStatus || {}).enabled !== false, credentialRef: encrypted.credentialRef, envelope: encrypted.envelope, public: encrypted.public }]);
   }).then(function (saved) {
@@ -500,6 +526,11 @@ function fbmSyncSaveLoginConfig(button) {
 function fbmSyncTestLogin(button) {
   if (button) { button.disabled = true; }
   var credentials = fbmSyncLoginCredentialsFromForm();
+  if (!credentials.username || !credentials.password) {
+    fbmSyncPaintError(null, 'Cần nhập username và mật khẩu FBM trước khi đăng nhập thử.');
+    if (button) { button.disabled = false; }
+    return Promise.resolve(null);
+  }
   return fbmSyncEncryptCredentials(credentials).then(function (encrypted) {
     return callServer('fbmStartLoginTest', [encrypted.credentialRef]).then(function (started) {
       if (!started || !started.ok || !started.request) { throw new Error(started && (started.message || started.code) || 'Không tạo được lượt đăng nhập thử.'); }
@@ -547,7 +578,9 @@ function fbmSyncStartServer(mode, attempt) {
 /** Dừng phiên ở GAS và hủy vòng chạy phía Sidebar. */
 function fbmSyncCancel() {
   FBM_SYNC_CLIENT.running = false;
-  return callServer('fbmCancelSync').then(fbmSyncPaint);
+  return callServer('fbmCancelSync').then(fbmSyncPaint).catch(function (error) {
+    return fbmSyncPaintError(error, 'Không dừng được phiên đồng bộ trên GAS.');
+  });
 }
 /** Chờ GAS thu hồi phiên nền sau response đang bay rồi mới mở phiên thủ công. */
 function fbmSyncWaitForBackgroundStop(mode, attempt) {
