@@ -213,7 +213,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 ### Cổng và builder
 
 - [x] GAS vẫn chặn mọi request ghi khi công tắc bảo vệ tổng đang tắt; mode hướng dữ liệu không tự mở khóa ghi.
-- [ ] UI thay checkbox `Cho phép ghi thật lên FBM` bằng icon công tắc tổng `on/off` trên header; khi tắt khóa phiên thủ công, nền, auto-login và giải quyết conflict.
+- [x] UI thay checkbox `Cho phép ghi thật lên FBM` bằng công tắc tổng dạng pill `ON/OFF` trên header; khi tắt khóa phiên thủ công, nền, auto-login và giải quyết conflict.
 - [x] Có cổng `allowFbmPush`, Category, record lock và cấu hình bắt buộc.
 - [x] Hướng có ghi vẫn dừng trước request khi cổng bảo vệ tổng phía GAS tắt.
 - [x] Khi đang có phiên hoạt động, lần bấm Đồng bộ ngay thứ hai không tạo phiên song song.

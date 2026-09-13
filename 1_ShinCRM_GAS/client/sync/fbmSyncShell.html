@@ -34,6 +34,34 @@
 .shin-sync-form-actions { display:flex; flex-wrap:wrap; gap:var(--shin-gap-2); }
 @media (max-width:340px) { .shin-sync-summary-grid { grid-template-columns:1fr; } .shin-sync-module-header { padding-left:var(--shin-gap-2); padding-right:var(--shin-gap-2); } }
 </style>
+<style>
+/* Module dong bo uu tien doc doc de vua sidebar hep van de doc va bam duoc. */
+.shin-sync-module { background:var(--shin-bg-sunken); }
+.shin-sync-module-header { flex:0 0 var(--shin-header-height); padding:0 var(--shin-gap-2); background:var(--shin-bg); }
+.shin-sync-header-btn { width:var(--shin-icon-btn); height:var(--shin-icon-btn); background:var(--shin-bg); font:inherit; }
+.shin-sync-header-btn:focus-visible, .shin-sync-master-switch:focus-visible { outline:2px solid var(--shin-primary); outline-offset:1px; }
+.shin-sync-nav { display:flex; flex-direction:column; gap:2px; padding:var(--shin-gap-2); border-bottom:1px solid var(--shin-border); background:var(--shin-bg); box-shadow:0 2px 5px rgba(60,64,67,.12); }
+.shin-sync-nav button { width:100%; min-height:34px; border:0; border-radius:var(--shin-radius-sm); padding:var(--shin-gap-2) var(--shin-gap-3); background:transparent; color:var(--shin-text-soft); text-align:left; font:500 var(--shin-text-sm)/1.2 var(--shin-font); }
+.shin-sync-nav button:hover { background:var(--shin-bg-hover); }
+.shin-sync-nav button.is-active { background:var(--shin-primary-soft); color:var(--shin-primary-dark); font-weight:700; }
+.shin-sync-master-switch { position:relative; display:inline-flex; align-items:center; justify-content:flex-start; flex:0 0 68px; width:68px; height:30px; padding:2px; border:1px solid #9aa0a6; border-radius:999px; background:#9aa0a6; color:#fff; cursor:pointer; font:700 11px/1 var(--shin-font); transition:background .18s ease,border-color .18s ease; }
+.shin-sync-master-switch .shin-sync-switch-label { position:absolute; inset:0; display:flex; align-items:center; justify-content:flex-end; padding-right:5px; letter-spacing:.02em; }
+.shin-sync-master-switch .shin-sync-switch-knob { position:absolute; top:2px; left:2px; width:24px; height:24px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(60,64,67,.25); transition:transform .18s ease; }
+.shin-sync-master-switch.is-on { border-color:#34a853; background:#34a853; justify-content:flex-end; }
+.shin-sync-master-switch.is-on .shin-sync-switch-label { justify-content:flex-start; padding-left:5px; padding-right:0; }
+.shin-sync-master-switch.is-on .shin-sync-switch-knob { transform:translateX(38px); }
+.shin-sync-master-switch.is-off { border-color:#9aa0a6; background:#9aa0a6; }
+.shin-sync-disabled-banner { margin:var(--shin-gap-2); padding:var(--shin-gap-2) var(--shin-gap-3); border-left:3px solid var(--shin-error); border-radius:var(--shin-radius-sm); line-height:1.35; }
+.shin-sync-section { padding:var(--shin-gap-3) var(--shin-gap-2) var(--shin-gap-4); }
+.shin-sync-summary-grid { grid-template-columns:minmax(0,1fr); }
+.shin-sync-action-row { flex-direction:column; }
+.shin-sync-action-row .shin-button { width:100%; justify-content:flex-start; text-align:left; }
+.shin-sync-tab-row { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:0; }
+.shin-sync-tab-row button { min-height:36px; padding:var(--shin-gap-1) 3px; text-align:center; line-height:1.2; overflow-wrap:anywhere; }
+.shin-sync-tab-row button:last-child { grid-column:1 / -1; }
+.shin-sync-form-actions .shin-button { min-width:0; }
+@media (max-width:340px) { .shin-sync-module-header { padding-left:var(--shin-gap-1); padding-right:var(--shin-gap-1); } .shin-sync-master-switch { flex-basis:64px; width:64px; } .shin-sync-master-switch.is-on .shin-sync-switch-knob { transform:translateX(34px); } }
+</style>
 <script>
 function fbmSyncElement(tag, className, text) { var node = document.createElement(tag); if (className) { node.className = className; } if (text !== undefined) { node.textContent = text; } return node; }
 function fbmSyncCard(title) {
@@ -55,7 +83,7 @@ function fbmSyncRenderShell(status) {
     var back = fbmSyncElement('button', 'shin-sync-header-btn', '←'); back.id = 'fbm-sync-back'; back.setAttribute('aria-label', 'Quay lại'); header.appendChild(back);
     header.appendChild(fbmSyncElement('strong', 'shin-sync-module-title', 'Đồng bộ FBM'));
     var menu = fbmSyncElement('button', 'shin-sync-header-btn', '☰'); menu.id = 'fbm-sync-module-menu'; menu.setAttribute('aria-label', 'Mở menu Đồng bộ'); header.appendChild(menu);
-    var master = fbmSyncElement('button', 'shin-sync-header-btn', '⏻'); master.id = 'fbm-sync-master-switch'; master.setAttribute('aria-label', 'Bật hoặc tắt đồng bộ'); header.appendChild(master);
+    var master = fbmSyncElement('button', 'shin-sync-master-switch'); master.id = 'fbm-sync-master-switch'; master.setAttribute('aria-label', 'Bật hoặc tắt đồng bộ'); master.setAttribute('aria-pressed', 'false'); master.appendChild(fbmSyncElement('span', 'shin-sync-switch-label')); master.appendChild(fbmSyncElement('span', 'shin-sync-switch-knob')); header.appendChild(master);
     screen.insertBefore(header, screen.firstChild);
   }
   var nav = document.getElementById('fbm-sync-nav');
@@ -64,7 +92,7 @@ function fbmSyncRenderShell(status) {
   FBM_SYNC_UI_SCHEMA.screens.forEach(function (item) { var b = fbmSyncElement('button', item.id === FBM_SYNC_CLIENT.subscreen ? 'is-active' : '', item.label); b.type = 'button'; b.setAttribute('data-sync-screen', item.id); nav.appendChild(b); });
   var enabled = !(status && (status.masterEnabled === false || status.enabled === false));
   var masterButton = document.getElementById('fbm-sync-master-switch');
-  if (masterButton) { masterButton.classList.toggle('is-on', enabled); masterButton.classList.toggle('is-off', !enabled); masterButton.textContent = enabled ? '⏻' : '○'; masterButton.setAttribute('aria-pressed', enabled ? 'true' : 'false'); masterButton.title = enabled ? 'Đồng bộ đang bật' : 'Đồng bộ đang tắt'; }
+  if (masterButton) { masterButton.classList.toggle('is-on', enabled); masterButton.classList.toggle('is-off', !enabled); var switchLabel = masterButton.querySelector('.shin-sync-switch-label'); if (switchLabel) { switchLabel.textContent = enabled ? 'ON' : 'OFF'; } masterButton.setAttribute('aria-pressed', enabled ? 'true' : 'false'); masterButton.title = enabled ? 'Đồng bộ đang bật' : 'Đồng bộ đang tắt'; }
   var content = document.getElementById('fbm-sync-content');
   if (content) { content.classList.toggle('shin-sync-content-disabled', !enabled); }
   var old = document.getElementById('fbm-sync-disabled-banner'); if (old) { old.remove(); }
