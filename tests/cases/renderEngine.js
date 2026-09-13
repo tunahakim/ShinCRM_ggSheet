@@ -338,6 +338,18 @@ function chay(so) {
   check(so, 'dropdown đang tìm thì bôi xanh dòng đầu để Tab hoặc Enter chọn',
     [comboHop.comboShouldMarkFirst(partial, 'search', 'sản'), comboHop.comboShouldMarkFirst(partial, 'open', 'sản'), comboHop.comboShouldMarkFirst({ rows: [], hasExact: false }, 'search', 'sản')],
     [true, false, false]);
+  const pickerHop = taoHopCat({
+    Store: { searchCustomers: () => [
+      { companyName: 'Công ty A', id: 'CUS-1', province: 'HN' },
+      { companyName: 'Công ty B', id: 'CUS-2', province: 'HCM' }
+    ] }
+  });
+  napClient(pickerHop, 'client/util/textNormalize.html', 'client/ui/popupList.html', 'client/ui/customerPicker.html', 'client/ui/combo.html');
+  const pickerInput = { value: 'Công ty', getAttribute: (name) => name === 'data-picker' ? 'customer' : null };
+  const pickerResult = pickerHop.comboMatches(pickerInput, pickerInput.value, 'search');
+  check(so, 'Công ty mẹ dùng luồng tìm khách và bôi xanh khách đầu tiên',
+    [pickerResult.rows.map((row) => row.value), pickerHop.comboShouldMarkFirst(pickerResult, 'search', 'công ty')],
+    [['Công ty A', 'Công ty B'], true]);
 
   quetDuongGan(so);
 }
