@@ -335,6 +335,9 @@ function chay(so) {
   check(so, 'dropdown đang gõ tiền tố thì lọc đủ các dòng khớp, không coi dòng đầu là giá trị đã chọn',
     [partial.rows.map((row) => row.value), partial.hasExact],
     [['Sản phẩm A', 'Sản phẩm B', 'Sản phẩm C'], false]);
+  check(so, 'dropdown đang tìm thì bôi xanh dòng đầu để Tab hoặc Enter chọn',
+    [comboHop.comboShouldMarkFirst(partial, 'search', 'sản'), comboHop.comboShouldMarkFirst(partial, 'open', 'sản'), comboHop.comboShouldMarkFirst({ rows: [], hasExact: false }, 'search', 'sản')],
+    [true, false, false]);
 
   quetDuongGan(so);
 }

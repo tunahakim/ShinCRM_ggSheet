@@ -228,6 +228,11 @@ function comboMark(inp, at) {
   return i;
 }
 
+/** Dòng đầu là lựa chọn tạm khi đang lọc; danh sách mở lại chỉ sáng giá trị đã hợp lệ. */
+function comboShouldMarkFirst(ket, mode, can) {
+  return !!(ket && ket.rows && ket.rows.length) && (ket.hasExact || (mode === 'search' && !!can));
+}
+
 /** Ẩn danh sách. Gọi lúc đã ẩn cũng không sao — hẹn giờ rời ô gọi hàm này mà không hỏi trước. */
 function comboHide(inp) {
   var box = comboListOf(inp);
@@ -289,7 +294,7 @@ function comboPaint(inp, mode) {
 
   inp.setAttribute('aria-expanded', 'true');
 
-  if (ket.hasExact) { comboMark(inp, 0); } else { comboUnmark(inp); }
+  if (comboShouldMarkFirst(ket, mode || 'search', can)) { comboMark(inp, 0); } else { comboUnmark(inp); }
   return ket;
 }
 
