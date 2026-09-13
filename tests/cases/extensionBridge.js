@@ -38,7 +38,7 @@ function nguonTin() {
   };
 }
 
-function chay(so) {
+async function chay(so) {
   section('Extension bridge — nonce đi trọn từ bắt tay tới CRM_CONTEXT');
   let hop;
   try { hop = napBridge(); } catch (err) { return ghiLoiNap(so, 'nạp iframe_bridge.js', err); }
@@ -116,8 +116,8 @@ function chay(so) {
   const workerSource = fs.readFileSync(WORKER_FILE, 'utf8');
   const executorSource = fs.readFileSync(EXECUTOR_FILE, 'utf8');
   const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', '2_ShinCRM_Extension', 'manifest.json'), 'utf8'));
-  check(so, 'worker ping executor truoc request FBM', workerSource.indexOf("ensureFbmExecutor(tabId).then") < workerSource.indexOf("sendTabMessage(tabId, { type: 'FBM_EXECUTE'"), true);
-  check(so, 'worker chi co mot diem gui request FBM', (workerSource.match(/sendTabMessage\(tabId, \{ type: 'FBM_EXECUTE', request: request \}/g) || []).length, 1);
+  check(so, 'worker ping dung executor phien ban truoc request FBM', workerSource.indexOf("FBM_PING_V2") >= 0 && workerSource.indexOf("FBM_EXECUTOR_VERSION") >= 0 && workerSource.indexOf("sendTabMessage(tabId, { type: 'FBM_EXECUTE_V2'") >= 0, true);
+  check(so, 'worker chi co mot diem gui request FBM', (workerSource.match(/sendTabMessage\(tabId, \{ type: 'FBM_EXECUTE_V2', request: request \}/g) || []).length, 1);
   check(so, 'worker khong tao hai request FBM khi Sidebar thu lai cung id', workerSource.indexOf('fbmRequestFlights') >= 0 && workerSource.indexOf('existingFlight') >= 0, true);
   check(so, 'heartbeat relay gui response thô va spreadsheetId cho GAS', workerSource.indexOf("postRelay(config.url, config.key, { kind: 'heartbeat', spreadsheetId: config.spreadsheetId, response: rawFbmReply(reply) })") >= 0, true);
   check(so, 'heartbeat relay tiep tuc cursor voi ngan sach request', workerSource.indexOf('relayScheduledRequests(tabId') >= 0 && workerSource.indexOf('used >= 10') >= 0, true);
@@ -160,11 +160,44 @@ function chay(so) {
   check(so, 'background sync chi chuyen request va response thô qua GAS', workerSource.indexOf('relayBackgroundSyncRequests') >= 0 && workerSource.indexOf('sendToFbmTab(tabId, next)') >= 0 && workerSource.indexOf('rawFbmReply(reply)') >= 0, true);
   check(so, 'background relay dung DTO gon, khong gui traceTail/metadata Sidebar', workerSource.indexOf("kind: 'background_sync'") >= 0 && entryPointsSource.indexOf('fbmSyncRelayCompactResult') >= 0 && entryPointsSource.indexOf("body.kind === 'background_sync'") >= 0, true);
   check(so, 'background relay dung command port thay vi tu lap nghiep vu', workerSource.indexOf("command: 'start'") >= 0 && workerSource.indexOf("command: 'continue'") >= 0 && entryPointsSource.indexOf('FbmSync.controlDispatch') >= 0, true);
-  check(so, 'executor co ping phien ban 21.7', /FBM_PING[\s\S]+version:\s*'21\.7'/.test(executorSource), true);
+  check(so, 'executor co ping phien ban 21.8 va kenh execute moi', /EXECUTOR_VERSION\s*=\s*'21\.8'/.test(executorSource) && executorSource.indexOf('FBM_PING_V2') >= 0 && executorSource.indexOf('FBM_EXECUTE_V2') >= 0, true);
+  check(so, 'executor chan endpoint thieu truoc fetch', executorSource.indexOf('FBM_ENDPOINT_MISSING') >= 0 && executorSource.indexOf('fetch_blocked') >= 0 && executorSource.indexOf('validateEndpoint(req.url)') >= 0, true);
+  check(so, 'GAS chan endpoint thieu truoc cap envelope', fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'protocol', 'Protocol.js'), 'utf8').indexOf('validateEndpoint: function') >= 0 && fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'transport', 'TransportCore.js'), 'utf8').indexOf('validateEndpoint(request.url)') >= 0, true);
   check(so, 'executor chi chuyen body wire GAS, khong escape nghiep vu', executorSource.indexOf('req.bodyText') >= 0 && executorSource.indexOf("JSON.stringify(body).replace(/\\//g") < 0, true);
   check(so, 'executor giai ma response gzip bat thuong cua FBM', executorSource.indexOf('DecompressionStream') >= 0 && executorSource.indexOf('response.arrayBuffer()') >= 0, true);
   check(so, 'trace Extension co du cac moc bridge worker executor fetch', ['bridge_received', 'worker_received', 'fbm_tab_found', 'executor_started', 'fetch_started', 'fetch_finished', 'bridge_response_sent'].every((stage) => workerSource.indexOf(stage) >= 0 || executorSource.indexOf(stage) >= 0 || fs.readFileSync(BRIDGE_FILE, 'utf8').indexOf(stage) >= 0), true);
-  check(so, 'response FBM giu trace trong transport va loi cung giu trace', executorSource.indexOf('transport: { payloadCookie') >= 0 && executorSource.indexOf('trace: trace') >= 0 && workerSource.indexOf('transport: { trace: reply.trace') >= 0, true);
+  check(so, 'response FBM giu trace trong transport va loi cung giu trace', executorSource.indexOf('transport: { payloadCookie') >= 0 && executorSource.indexOf('trace: trace') >= 0 && executorSource.indexOf('fetch_blocked') >= 0 && workerSource.indexOf('transport: { trace: reply.trace') >= 0, true);
+
+  await new Promise((resolve) => {
+    let listener = null;
+    let fetchCalls = 0;
+    let invalidReply = null;
+    let validReply = null;
+    const response = {
+      ok: true,
+      status: 200,
+      headers: { get() { return 'application/json'; } },
+      arrayBuffer() { return Promise.resolve(new TextEncoder().encode('{"d":{}}').buffer); }
+    };
+    const context = {
+      console: { log() {}, warn() {} }, Date, URL, Promise, Error, AbortController, setTimeout, clearTimeout,
+      Blob, Response, TextDecoder, TextEncoder, DecompressionStream: undefined,
+      document: { documentElement: { innerHTML: '', textContent: '' } },
+      fetch() { fetchCalls += 1; return Promise.resolve(response); },
+      chrome: { runtime: { onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
+    };
+    vm.createContext(context);
+    vm.runInContext(executorSource, context, { filename: EXECUTOR_FILE });
+    listener({ type: 'FBM_EXECUTE_V2', request: { url: 'https://fbo.com.vn:8888/Main/undefined', method: 'POST', body: {} } }, null, (reply) => { invalidReply = reply; });
+    setTimeout(() => {
+      check(so, 'executor khong fetch endpoint undefined', [fetchCalls, invalidReply && invalidReply.error, invalidReply && invalidReply.trace && invalidReply.trace[1].code], [0, 'Request FBM thiếu endpoint; đã chặn trước khi gửi.', 'FBM_ENDPOINT_MISSING']);
+      listener({ type: 'FBM_EXECUTE_V2', request: { url: 'https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage', method: 'POST', body: { type: 1 } } }, null, (reply) => { validReply = reply; });
+      setTimeout(() => {
+        check(so, 'executor cho request grid hop le di qua mot fetch', [fetchCalls, validReply && validReply.result && validReply.result.status], [1, 200]);
+        resolve();
+      }, 20);
+    }, 20);
+  });
 }
 
 module.exports = { chay };

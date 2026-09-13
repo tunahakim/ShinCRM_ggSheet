@@ -3,6 +3,14 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 FbmSync.protocol = {
   version: 1,
+  /** Chặn request bị ghép thiếu endpoint trước khi nó tới Extension/FBM. */
+  validateEndpoint: function (url) {
+    var value = String(url === null || url === undefined ? '' : url).trim();
+    var allowed = /^https:\/\/(?:fbo\.com\.vn:8888|fbm\.test)\/\S+$/i;
+    if (!value || /(?:undefined|null|NaN)/i.test(value)) { return { ok: false, code: 'FBM_ENDPOINT_MISSING', message: 'Request FBM thiếu endpoint; đã dừng trước khi gửi.' }; }
+    if (!allowed.test(value)) { return { ok: false, code: 'FBM_ENDPOINT_UNALLOWED', message: 'Endpoint FBM không nằm trong danh sách cho phép; đã dừng trước khi gửi.' }; }
+    return { ok: true };
+  },
   /** Tạo envelope có id để ghép đúng response với request. */
   request: function (id, url, body, meta) {
     return { protocol: 'shincrm-fbm', version: 1, id: String(id), url: url, method: 'POST', headers: { 'content-type': 'application/json; charset=UTF-8' }, body: body, bodyText: FbmSync.protocol.json(body), meta: meta || {} };

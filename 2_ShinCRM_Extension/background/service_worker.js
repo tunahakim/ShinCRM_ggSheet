@@ -14,6 +14,7 @@
 function findFbmTab() {
   return chrome.tabs.query({ url: ['https://fbo.com.vn:8888/*'] }).then(function (tabs) { return tabs && tabs.length ? tabs[0] : null; });
 }
+var FBM_EXECUTOR_VERSION = '21.8';
 
 function addWorkerTrace(reply, request, stage, extra) {
   var meta = request && request.meta && request.meta.trace || {}, event = Object.assign({ at: Date.now(), stage: stage, runId: String(meta.runId || ''), requestId: String(meta.requestId || ''), operation: String(request && request.meta && request.meta.kind || ''), entity: String(request && request.meta && request.meta.entity || ''), recordId: String(request && request.meta && (request.meta.id || request.meta.shinId || request.meta.stt_rec_kh) || '') }, extra || {});
@@ -55,10 +56,10 @@ function sendTabMessage(tabId, message, timeoutMs) {
 
 /** Ping trước, chỉ nạp executor khi chưa có đầu nhận. */
 function ensureFbmExecutor(tabId) {
-  return sendTabMessage(tabId, { type: 'FBM_PING' }, 1500).then(function (reply) {
-    if (reply && reply.ready) { return reply; }
+  return sendTabMessage(tabId, { type: 'FBM_PING_V2' }, 1500).then(function (reply) {
+    if (reply && reply.ready && String(reply.version || '') === FBM_EXECUTOR_VERSION) { return reply; }
     return chrome.scripting.executeScript({ target: { tabId: tabId }, files: ['content_scripts/fbm_sync/executor.js'] }).then(function () {
-      return sendTabMessage(tabId, { type: 'FBM_PING' }, 1500);
+      return sendTabMessage(tabId, { type: 'FBM_PING_V2' }, 1500);
     }).then(function (injectedReply) {
       if (!injectedReply || !injectedReply.ready) { throw new Error(injectedReply && injectedReply.error || 'Executor FBM không trả lời sau khi nạp.'); }
       return injectedReply;
@@ -95,7 +96,7 @@ function sendToFbmTab(tabId, request) {
   return ensureFbmExecutor(tabId).then(function () {
     return hydrateLoginRequest(request).then(function (readyRequest) {
       request = readyRequest;
-      return sendTabMessage(tabId, { type: 'FBM_EXECUTE', request: request }, 15000);
+    return sendTabMessage(tabId, { type: 'FBM_EXECUTE_V2', request: request }, 15000);
     });
   });
 }

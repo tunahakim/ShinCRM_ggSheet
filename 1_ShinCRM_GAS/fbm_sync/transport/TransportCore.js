@@ -47,6 +47,11 @@ FbmSync.nextEnvelope = function (request) {
     if (FbmSync.stateWrite) { FbmSync.stateWrite(stopped); }
     return null;
   }
+  var endpoint = FbmSync.protocol.validateEndpoint(request.url);
+  if (!endpoint.ok) {
+    if (FbmSync.traceEvent) { FbmSync.traceEvent('request_blocked', { operation: request.meta && request.meta.kind || '', endpoint: request.url, code: endpoint.code }); }
+    throw new Error(endpoint.message + ' (' + endpoint.code + ')');
+  }
   var id = Date.now().toString(36), state = FbmSync.stateRead ? FbmSync.stateRead() : {}, meta = Object.assign({}, request.meta || {});
   meta.trace = Object.assign({}, meta.trace || {}, { runId: String(state.runId || ''), requestId: id });
   if (FbmSync.stateWrite) {

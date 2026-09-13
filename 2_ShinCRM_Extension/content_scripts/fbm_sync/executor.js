@@ -1,10 +1,26 @@
 /* Cầu nối FBM: nhận request, fetch trong tab đăng nhập, trả response thô. */
 (function () {
+  var EXECUTOR_VERSION = '21.8';
   var HEARTBEAT_URL = 'https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage';
   var FETCH_TIMEOUT_MS = 10000;
+  var FBM_ORIGIN = 'https://fbo.com.vn:8888';
+  var FBM_PATHS = ['/AppService/', '/FastBusiness.DataService.asmx/', '/Main/Login.aspx/'];
+  function endpointPath(url) {
+    try { return new URL(String(url || ''), FBM_ORIGIN).pathname; } catch (ignore) { return ''; }
+  }
+  function validateEndpoint(url) {
+    var value = String(url || '').trim(), parsed, path;
+    if (!value || /(?:undefined|null|NaN)/i.test(value)) { return { ok: false, code: 'FBM_ENDPOINT_MISSING', message: 'Request FBM thiếu endpoint; đã chặn trước khi gửi.' }; }
+    try { parsed = new URL(value, FBM_ORIGIN); } catch (ignoreUrl) { return { ok: false, code: 'FBM_ENDPOINT_INVALID', message: 'Endpoint FBM không hợp lệ; đã chặn trước khi gửi.' }; }
+    path = parsed.pathname;
+    if (parsed.origin !== FBM_ORIGIN || !FBM_PATHS.some(function (prefix) { return path.indexOf(prefix) === 0; })) {
+      return { ok: false, code: 'FBM_ENDPOINT_UNALLOWED', message: 'Endpoint FBM nằm ngoài danh sách cho phép; đã chặn trước khi gửi.' };
+    }
+    return { ok: true, url: parsed.toString(), path: path };
+  }
   function traceEvent(trace, stage, request, extra) {
     var meta = request && request.meta && request.meta.trace || {};
-    trace.push(Object.assign({ at: Date.now(), stage: stage, runId: String(meta.runId || ''), requestId: String(meta.requestId || ''), operation: String(request && request.meta && request.meta.kind || ''), entity: String(request && request.meta && request.meta.entity || ''), recordId: String(request && request.meta && (request.meta.id || request.meta.shinId || request.meta.stt_rec_kh) || '') }, extra || {}));
+    trace.push(Object.assign({ at: Date.now(), stage: stage, runId: String(meta.runId || ''), requestId: String(meta.requestId || ''), operation: String(request && request.meta && request.meta.kind || ''), entity: String(request && request.meta && request.meta.entity || ''), recordId: String(request && request.meta && (request.meta.id || request.meta.shinId || request.meta.stt_rec_kh) || ''), endpoint: endpointPath(request && request.url) }, extra || {}));
   }
   /** Request đọc tối thiểu để giữ phiên và phát hiện logout. */
   function heartbeat() { return { url: HEARTBEAT_URL, method: 'POST', headers: { accept: '*/*', 'content-type': 'application/json; charset=UTF-8' }, body: { type: 1, count: 1, language: 'v', controller: 'zccrAccount', viewId: null, childObject: false, lastPageIndex: 0, firstPageItem: '', lastPageItem: '', lastRowCount: 0, memvars: [], externalKey: [], gridPageIndex: -1, gridPageValue: null, gridRefresh: true, filter: [], sortExpression: 'ngay_gd desc', cookie: '' } }; }
@@ -119,11 +135,19 @@
     var req = request || heartbeat(), trace = [];
     traceEvent(trace, 'executor_started', req);
     if (req.meta && req.meta.kind === 'login') { return executeLogin(req, trace); }
+    var endpoint = validateEndpoint(req.url);
+    if (!endpoint.ok) {
+      traceEvent(trace, 'fetch_blocked', req, { code: endpoint.code, error: endpoint.message });
+      var endpointError = new Error(endpoint.message);
+      endpointError.code = endpoint.code;
+      endpointError.trace = trace;
+      return Promise.reject(endpointError);
+    }
     var sent = requestBody(req);
     var controller = new AbortController();
     var timer = setTimeout(function () { controller.abort(); }, FETCH_TIMEOUT_MS);
     traceEvent(trace, 'fetch_started', req);
-    return fetch(req.url, { method: req.method || 'POST', headers: req.headers || { 'content-type': 'application/json; charset=UTF-8' }, body: sent && sent.text, credentials: 'include', cache: 'no-store', signal: controller.signal }).then(function (response) {
+    return fetch(endpoint.url, { method: req.method || 'POST', headers: req.headers || { 'content-type': 'application/json; charset=UTF-8' }, body: sent && sent.text, credentials: 'include', cache: 'no-store', signal: controller.signal }).then(function (response) {
       return readResponseText(response).then(function (body) { traceEvent(trace, 'fetch_finished', req, { httpStatus: response.status, responseLength: body.length }); return { ok: response.ok, status: response.status, headers: { contentType: response.headers.get('content-type') || '' }, body: body, transport: { payloadCookie: sent && sent.cookie || '', trace: trace } }; });
     }).catch(function (err) {
       traceEvent(trace, 'fetch_finished', req, { error: String(err && err.message || err) });
@@ -134,8 +158,8 @@
   }
   /** Chỉ nhận message đúng loại, giữ channel mở cho Promise fetch. */
   function onFbmMessage(message, sender, sendResponse) {
-    if (message && message.type === 'FBM_PING') { sendResponse({ ready: true, version: '21.7' }); return false; }
-    if (!message || message.type !== 'FBM_EXECUTE') { return false; }
+    if (message && (message.type === 'FBM_PING_V2' || message.type === 'FBM_PING')) { sendResponse({ ready: true, version: EXECUTOR_VERSION }); return false; }
+    if (!message || (message.type !== 'FBM_EXECUTE_V2' && message.type !== 'FBM_EXECUTE')) { return false; }
     execute(message.request).then(function (result) { sendResponse({ result: result }); }, function (err) { sendResponse({ error: String(err && err.message || err), trace: err && err.trace || [] }); });
     return true;
   }

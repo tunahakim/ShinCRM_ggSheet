@@ -84,6 +84,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Trước mỗi phiên chạy checker Core và checker riêng của `fbm_sync`; mọi lỗi có `scope`, `code`, `severity`, `blocking`, thông báo người dùng và dòng Log, không ẩn trong bước push.
 - [x] Tìm tab FBM, ping executor, fetch trong tab và nhận response thô.
 - [x] Khi mất executor, inject rồi ping lại; request nghiệp vụ chỉ gửi một lần.
+- [x] Executor có phiên bản giao thức riêng; worker tự nạp lại bản mới và dùng kênh request V2 để bản cũ không xử lý heartbeat song song. Endpoint rỗng, `undefined` hoặc ngoài allowlist bị chặn trước `fetch`, trace chỉ giữ metadata an toàn.
 - [x] 401/403 hoặc `Login.aspx` dừng kỳ và yêu cầu đăng nhập lại khi tùy chọn tự động đăng nhập tắt.
 - [x] Tùy chọn tự động đăng nhập mặc định bật, tự chạy khi session hết hạn/không có cookie, không ép login khi session hợp lệ đang tồn tại và chỉ thử lại nhiều nhất một lần mỗi 15 phút. Code, test offline và GAS DEV `fbmGetLoginConfig` đã xác nhận trạng thái mặc định; nhánh hết phiên có throttle 15 phút.
 - [x] Form thiết lập đặt username và password cạnh nhau, hiển thị mật khẩu dạng `***`/trống, không ghi bản rõ vào Sheet hoặc Log. Sidebar xóa ô mật khẩu sau khi lưu/thử.

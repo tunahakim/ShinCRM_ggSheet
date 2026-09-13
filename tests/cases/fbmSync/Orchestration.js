@@ -54,8 +54,11 @@ async function chay(so) {
   check(so, 'bootstrap dung viewPage false', started.request.body.viewPage, false);
   check(so, 'bootstrap khong gui authorized cu', started.request.body.authorized, null);
   check(so, 'envelope mang runId/requestId va GAS luu moc response', [Boolean(started.request.meta.trace.runId), Boolean(started.request.meta.trace.requestId), orchestration.FbmSync.stateRead().activeRequestId === bulkStarted.request.meta.trace.requestId, orchestration.FbmSync.traceRead(5).some((item) => item.stage === 'response_built')], [true, true, true, true]);
-  const dateEnvelope = orchestration.FbmSync.nextEnvelope({ url: 'https://fbm.test', body: { gridPageValue: [new Date('2026-09-09T00:00:00Z'), { nested: new Date('2026-09-10T00:00:00Z') }] }, meta: { kind: 'grid' } });
+  const dateEnvelope = orchestration.FbmSync.nextEnvelope({ url: 'https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage', body: { gridPageValue: [new Date('2026-09-09T00:00:00Z'), { nested: new Date('2026-09-10T00:00:00Z') }] }, meta: { kind: 'grid' } });
   check(so, 'envelope khong tra Date o cursor phan trang Activity', [dateEnvelope.body.gridPageValue[0], dateEnvelope.body.gridPageValue[1].nested], ['/Date(1788912000000)/', '/Date(1788998400000)/']);
+  let blockedEndpoint = '';
+  try { orchestration.FbmSync.nextEnvelope({ url: 'https://fbo.com.vn:8888/Main/undefined', body: {}, meta: { kind: 'legacy' } }); } catch (err) { blockedEndpoint = String(err && err.message || err); }
+  check(so, 'endpoint legacy undefined bi chan truoc khi cap envelope', blockedEndpoint.indexOf('FBM_ENDPOINT_MISSING') >= 0, true);
   check(so, 'GAS tao body wire escaped cho FBM', [dateEnvelope.bodyText.indexOf('\\/Date(1788912000000)\\/') >= 0, dateEnvelope.bodyText.indexOf('/Date(1788912000000)/') >= 0], [true, false]);
   const traceEvents = [{ stage: 'client_gas_call_started', requestId: 'trace-1', at: 1 }, { stage: 'client_gas_success', requestId: 'trace-1', at: 2 }];
   const writesBeforeTraceImport = propertyWrites;
