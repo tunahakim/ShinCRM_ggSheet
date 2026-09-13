@@ -14,4 +14,23 @@ var FBM_SYNC_UI_SCHEMA = {
     { value: 'write', label: 'Đồng bộ hai chiều' }
   ]
 };
+
+/* Các màn hình động vẫn khai bằng Block; DOM chỉ được chạm qua cổng renderer chung. */
+function fbmSyncAppendBlock(parent, node, ctx) { return renderBlockInto(parent, node, ctx || {}); }
+function fbmSyncAppendText(parent, text, className, id) { return fbmSyncAppendBlock(parent, Text({ id: id || null, className: className || '', text: String(text === undefined || text === null ? '' : text) })); }
+function fbmSyncAppendBox(parent, className, id) { return fbmSyncAppendBlock(parent, Box({ id: id || null, className: className || '', elements: [] })); }
+function fbmSyncAppendCard(parent, title, className, id) { return fbmSyncAppendBlock(parent, Card({ id: id || null, className: className || '', title: title || '', elements: [] })); }
+function fbmSyncAppendButton(parent, id, label, primary, className) { return fbmSyncAppendBlock(parent, Button({ id: id || null, className: (className || '') + (primary ? ' shin-primary' : ''), label: label })); }
+function fbmSyncAppendInput(parent, id, type, value, placeholder) {
+  var input = document.createElement('input'); input.id = id; input.type = type || 'text'; input.className = 'shin-input'; input.value = value || ''; if (placeholder) { input.placeholder = placeholder; } return parent.appendChild(input);
+}
+function fbmSyncAppendSelect(parent, id, options, value, className) {
+  var select = document.createElement('select'); select.id = id; select.className = className || 'shin-input';
+  (options || []).forEach(function (item) { var option = document.createElement('option'); option.value = item.value; option.textContent = item.label; select.appendChild(option); });
+  select.value = value; return parent.appendChild(select);
+}
+function fbmSyncMakeToggleButton(id, enabled, label) {
+  var button = document.createElement('button'); button.type = 'button'; button.id = id; button.className = 'shin-sync-toggle' + (enabled ? ' is-on' : ' is-off'); button.setAttribute('aria-pressed', enabled ? 'true' : 'false'); button.setAttribute('aria-label', label || 'Bật hoặc tắt');
+  var text = document.createElement('span'); text.className = 'shin-sync-toggle-label'; text.textContent = enabled ? 'ON' : 'OFF'; button.appendChild(text); var knob = document.createElement('span'); knob.className = 'shin-sync-toggle-knob'; button.appendChild(knob); return button;
+}
 </script>

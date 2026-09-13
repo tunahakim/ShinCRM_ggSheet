@@ -37,19 +37,22 @@
 <style>
 /* Module dong bo uu tien doc doc de vua sidebar hep van de doc va bam duoc. */
 .shin-sync-module { background:var(--shin-bg-sunken); }
+.shin-sync-module .shin-card-title { color:var(--shin-text); font-size:var(--shin-text-sm); text-transform:none; letter-spacing:0; }
+.shin-sync-module .shin-card { background:var(--shin-bg); }
+.shin-sync-module .shin-sync-summary-item { background:var(--shin-bg); }
 .shin-sync-module-header { flex:0 0 var(--shin-header-height); padding:0 var(--shin-gap-2); background:var(--shin-bg); }
 .shin-sync-header-btn { width:var(--shin-icon-btn); height:var(--shin-icon-btn); background:var(--shin-bg); font:inherit; }
 .shin-sync-header-btn:focus-visible, .shin-sync-master-switch:focus-visible { outline:2px solid var(--shin-primary); outline-offset:1px; }
-.shin-sync-nav { display:flex; flex-direction:column; gap:2px; padding:var(--shin-gap-2); border-bottom:1px solid var(--shin-border); background:var(--shin-bg); box-shadow:0 2px 5px rgba(60,64,67,.12); }
+.shin-sync-nav { display:flex; flex-direction:column; gap:2px; max-height:66.666vh; overflow-y:auto; padding:var(--shin-gap-2); border-bottom:1px solid var(--shin-border); background:var(--shin-bg); box-shadow:0 2px 5px rgba(60,64,67,.12); }
 .shin-sync-nav button { width:100%; min-height:34px; border:0; border-radius:var(--shin-radius-sm); padding:var(--shin-gap-2) var(--shin-gap-3); background:transparent; color:var(--shin-text-soft); text-align:left; font:500 var(--shin-text-sm)/1.2 var(--shin-font); }
 .shin-sync-nav button:hover { background:var(--shin-bg-hover); }
 .shin-sync-nav button.is-active { background:var(--shin-primary-soft); color:var(--shin-primary-dark); font-weight:700; }
-.shin-sync-master-switch { position:relative; display:inline-flex; align-items:center; justify-content:flex-start; flex:0 0 68px; width:68px; height:30px; padding:2px; border:1px solid #9aa0a6; border-radius:999px; background:#9aa0a6; color:#fff; cursor:pointer; font:700 11px/1 var(--shin-font); transition:background .18s ease,border-color .18s ease; }
+.shin-sync-master-switch { position:relative; display:inline-flex; align-items:center; justify-content:flex-start; flex:0 0 54px; width:54px; height:26px; padding:2px; border:1px solid #9aa0a6; border-radius:999px; background:#9aa0a6; color:#fff; cursor:pointer; font:700 10px/1 var(--shin-font); transition:background .18s ease,border-color .18s ease; }
 .shin-sync-master-switch .shin-sync-switch-label { position:absolute; inset:0; display:flex; align-items:center; justify-content:flex-end; padding-right:5px; letter-spacing:.02em; }
-.shin-sync-master-switch .shin-sync-switch-knob { position:absolute; top:2px; left:2px; width:24px; height:24px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(60,64,67,.25); transition:transform .18s ease; }
+.shin-sync-master-switch .shin-sync-switch-knob { position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(60,64,67,.25); transition:transform .18s ease; }
 .shin-sync-master-switch.is-on { border-color:#34a853; background:#34a853; justify-content:flex-end; }
 .shin-sync-master-switch.is-on .shin-sync-switch-label { justify-content:flex-start; padding-left:5px; padding-right:0; }
-.shin-sync-master-switch.is-on .shin-sync-switch-knob { transform:translateX(38px); }
+.shin-sync-master-switch.is-on .shin-sync-switch-knob { transform:translateX(28px); }
 .shin-sync-master-switch.is-off { border-color:#9aa0a6; background:#9aa0a6; }
 .shin-sync-disabled-banner { margin:var(--shin-gap-2); padding:var(--shin-gap-2) var(--shin-gap-3); border-left:3px solid var(--shin-error); border-radius:var(--shin-radius-sm); line-height:1.35; }
 .shin-sync-section { padding:var(--shin-gap-3) var(--shin-gap-2) var(--shin-gap-4); }
@@ -60,20 +63,33 @@
 .shin-sync-tab-row button { min-height:36px; padding:var(--shin-gap-1) 3px; text-align:center; line-height:1.2; overflow-wrap:anywhere; }
 .shin-sync-tab-row button:last-child { grid-column:1 / -1; }
 .shin-sync-form-actions .shin-button { min-width:0; }
-@media (max-width:340px) { .shin-sync-module-header { padding-left:var(--shin-gap-1); padding-right:var(--shin-gap-1); } .shin-sync-master-switch { flex-basis:64px; width:64px; } .shin-sync-master-switch.is-on .shin-sync-switch-knob { transform:translateX(34px); } }
+.shin-sync-form-label { display:block; margin-bottom:var(--shin-gap-1); color:var(--shin-text); font-size:var(--shin-text-sm); font-weight:600; }
+.shin-sync-summary-label { color:var(--shin-text); font-size:var(--shin-text-sm); font-weight:600; }
+.shin-sync-toggle-row { display:flex; align-items:center; justify-content:space-between; gap:var(--shin-gap-2); margin:var(--shin-gap-2) 0; }
+.shin-sync-toggle-copy { flex:1 1 auto; color:var(--shin-text); font-size:var(--shin-text-sm); }
+.shin-sync-toggle { position:relative; display:inline-flex; flex:0 0 54px; align-items:center; justify-content:flex-start; width:54px; height:26px; padding:2px; border:1px solid #9aa0a6; border-radius:999px; background:#9aa0a6; color:#fff; cursor:pointer; font:700 10px/1 var(--shin-font); }
+.shin-sync-toggle .shin-sync-toggle-label { position:absolute; inset:0; display:flex; align-items:center; justify-content:flex-end; padding-right:4px; }
+.shin-sync-toggle .shin-sync-toggle-knob { position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(60,64,67,.25); transition:transform .18s ease; }
+.shin-sync-toggle.is-on { border-color:#34a853; background:#34a853; }
+.shin-sync-toggle.is-on .shin-sync-toggle-label { justify-content:flex-start; padding-left:4px; padding-right:0; }
+.shin-sync-toggle.is-on .shin-sync-toggle-knob { transform:translateX(28px); }
+.shin-sync-toggle:disabled, .shin-sync-master-switch:disabled { opacity:.55; cursor:progress; }
+.shin-sync-warning { padding:var(--shin-gap-2); border-left:3px solid var(--shin-warn); background:var(--shin-warn-soft); color:var(--shin-warn); font-size:var(--shin-text-sm); }
+.shin-sync-identity-actions { display:flex; flex-direction:column; gap:var(--shin-gap-2); margin-top:var(--shin-gap-2); }
+.shin-sync-action-status { margin-top:var(--shin-gap-2); color:var(--shin-primary-dark); font-size:var(--shin-text-sm); }
+.shin-sync-inline-result { margin-top:var(--shin-gap-2); padding:var(--shin-gap-2); border:1px solid var(--shin-border-faint); border-radius:var(--shin-radius-sm); background:var(--shin-bg-sunken); }
+.shin-sync-inline-result-title { color:var(--shin-text); font-size:var(--shin-text-sm); font-weight:700; }
+.shin-sync-pipeline-marker { flex:0 0 14px; }
+.shin-sync-pipeline-label { min-width:0; }
+.shin-sync-error-message { margin-top:var(--shin-gap-2); color:var(--shin-error); font-size:var(--shin-text-sm); }
+.shin-sync-pass-row { margin-top:var(--shin-gap-1); color:var(--shin-ok); font-size:var(--shin-text-sm); }
+.shin-sync-loading { display:flex; align-items:center; gap:var(--shin-gap-2); padding:var(--shin-gap-4) var(--shin-gap-2); color:var(--shin-text-soft); font-size:var(--shin-text-sm); }
+.shin-sync-loading::before { content:''; width:14px; height:14px; border:2px solid var(--shin-primary-soft); border-top-color:var(--shin-primary); border-radius:50%; animation:shin-sync-spin .8s linear infinite; }
+@keyframes shin-sync-spin { to { transform:rotate(360deg); } }
+@media (max-width:340px) { .shin-sync-module-header { padding-left:var(--shin-gap-1); padding-right:var(--shin-gap-1); } }
 </style>
 <script>
 function fbmSyncElement(tag, className, text) { var node = document.createElement(tag); if (className) { node.className = className; } if (text !== undefined) { node.textContent = text; } return node; }
-function fbmSyncCard(title) {
-  // Khai card đi qua Block chuẩn; thân dữ liệu động được gắn vào body sau đó để không dựng lại cả màn.
-  var blueprint = typeof Card === 'function' ? Card({ title: title || '', elements: [] }) : null;
-  if (blueprint && typeof renderNode === 'function' && document.createRange) {
-    var range = document.createRange(); var fragment = range.createContextualFragment(renderNode(blueprint, {})); var rendered = fragment.firstElementChild;
-    if (rendered) { return { card: rendered, body: rendered.querySelector('.shin-card-body') || rendered }; }
-  }
-  var card = fbmSyncElement('section', 'shin-card'); if (blueprint) { card.setAttribute('data-block-role', blueprint.role); }
-  if (title) { var head = fbmSyncElement('div', 'shin-card-head'); head.appendChild(fbmSyncElement('div', 'shin-card-title', title)); card.appendChild(head); } var body = fbmSyncElement('div', 'shin-card-body'); card.appendChild(body); return { card: card, body: body };
-}
 function fbmSyncRenderShell(status) {
   var screen = document.getElementById('fbm-sync-screen'); if (!screen) { return; }
   screen.className = 'shin-sync-screen shin-sync-module';
@@ -98,7 +114,21 @@ function fbmSyncRenderShell(status) {
   var old = document.getElementById('fbm-sync-disabled-banner'); if (old) { old.remove(); }
   if (!enabled && content) { var banner = fbmSyncElement('div', 'shin-sync-disabled-banner', 'Đồng bộ đang tắt. Các màn hình chỉ xem được trạng thái; không chạy, ghi, đăng nhập tự động hoặc xử lý conflict.'); banner.id = 'fbm-sync-disabled-banner'; content.parentNode.insertBefore(banner, content); }
 }
+function fbmSyncRenderLoading() {
+  var panel = document.getElementById('fbm-sync-content'); if (!panel) { return; }
+  fbmSyncRenderShell(FBM_SYNC_CLIENT.lastStatus || {});
+  panel.textContent = '';
+  var section = fbmSyncAppendBox(panel, 'shin-sync-section');
+  fbmSyncAppendText(section, 'Đồng bộ FBM', 'shin-sync-section-title');
+  fbmSyncAppendText(section, 'Đang tải trạng thái phiên...', 'shin-sync-loading');
+}
 function fbmSyncSetScreen(screenId) { var ids = FBM_SYNC_UI_SCHEMA.screens.map(function (item) { return item.id; }); FBM_SYNC_CLIENT.subscreen = ids.indexOf(screenId) >= 0 ? screenId : 'overview'; if (FBM_SYNC_CLIENT.lastStatus) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); } }
-function fbmSyncToggleMaster() { var current = FBM_SYNC_CLIENT.lastStatus || {}; var enabled = !(current.masterEnabled === false || current.enabled === false); return callServer('fbmSetMasterSwitch', [!enabled]).then(function (result) { return fbmSyncStatusOnce(); }).catch(function (error) { var status = FBM_SYNC_CLIENT.lastStatus || {}; status.message = String(error && error.message || error); fbmSyncPaint(status); return null; }); }
+function fbmSyncToggleMaster() {
+  var current = FBM_SYNC_CLIENT.lastStatus || {}, enabled = !(current.masterEnabled === false || current.enabled === false), next = Object.assign({}, current, { masterEnabled: !enabled, enabled: !enabled });
+  fbmSyncPaint(next);
+  return callServer('fbmSetMasterSwitch', [!enabled]).then(function () { return fbmSyncStatusOnce(); }).catch(function (error) {
+    var rollback = Object.assign({}, FBM_SYNC_CLIENT.lastStatus || current, { masterEnabled: enabled, enabled: enabled, message: String(error && error.message || error) }); fbmSyncPaint(rollback); return null;
+  });
+}
 function fbmSyncApplyMasterDisabled(status) { var disabled = !!(status && (status.masterEnabled === false || status.enabled === false)), content = document.getElementById('fbm-sync-content'); if (!content) { return; } content.querySelectorAll('button, select, input, textarea').forEach(function (control) { if (disabled) { control.disabled = true; } }); }
 </script>

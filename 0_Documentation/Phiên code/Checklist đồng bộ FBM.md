@@ -303,13 +303,14 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] `fbmProbeAltState` fail-closed nếu phát hiện candidate ngoài `ALT00010` và Activity con.
 - [x] Click icon Đồng bộ ở menu chính mở thẳng màn hình `Tổng quan`, không hiện menu trung gian.
 - [x] Module có menu nội bộ và đúng bốn màn hình: `Tổng quan`, `Tài khoản FBM`, `Chạy đồng bộ`, `Kết quả & xử lý`.
-- [x] Header có icon công tắc tổng `on/off`; khi tắt, phiên thủ công, đồng bộ nền, auto-login và thao tác ghi/giải quyết conflict bị khóa, state/log vẫn xem được.
+- [x] Header có cụm phải `[ON/OFF] [☰]`; khi tắt, phiên thủ công, đồng bộ nền, auto-login và thao tác ghi/giải quyết conflict bị khóa, state/log vẫn xem được; menu con cuộn ở ngưỡng hai phần ba Sidebar.
 - [x] `Tài khoản FBM` gom nhận diện và đăng nhập tự động trong một màn hình; login thử phải đối chiếu user, tên tài khoản và Spreadsheet ID trước khi cho bật auto-login.
 - [x] `Chạy đồng bộ` dùng dropdown diễn giải rõ `Kiểm tra an toàn`, `Lấy từ FBM → ShinCRM`, `Đẩy từ ShinCRM → FBM`, `Đồng bộ hai chiều`; không có checkbox ghi trùng ý nghĩa.
 - [x] Mọi phiên đang chạy hiển thị pipeline theo thực thể với trạng thái chưa chạy/đang chạy/hoàn tất/lỗi.
 - [x] Đồng bộ nền nằm trong Tổng quan/cài đặt nền, chỉ đọc FBM và tôn trọng công tắc tổng.
 - [x] Conflict cho phép chọn `Giữ FBM`, `Giữ ShinCRM` hoặc `Tự nhập` theo từng field, có kiểm tra kiểu và trần độ dài.
 - [x] Kết quả phiên lớn dùng tổng hợp và phân trang; Sidebar không tải toàn bộ conflict/lỗi/log về RAM.
+- [x] Bố cục module động dùng Block/schema và renderer chung; loading mở màn hình, trạng thái tĩnh và tiêu đề không dựng HTML riêng trong từng màn hình.
 - [x] Tên hiển thị `Nghiệm thu phạm vi thử`; `ALT00010` chỉ là phạm vi DEV/live acceptance, không đại diện cho phiên nhiều Customer.
 - [ ] **Cần kiểm chứng thực tế:** chạy probe một nút và kiểm tra báo cáo trên Sidebar/Log.
 

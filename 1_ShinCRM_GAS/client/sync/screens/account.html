@@ -1,12 +1,29 @@
 <script>
 function fbmSyncRenderAccount(panel, status) {
-  var section = fbmSyncElement('div', 'shin-sync-section'); section.appendChild(fbmSyncElement('h2', 'shin-sync-section-title', 'Tài khoản FBM')); section.appendChild(fbmSyncElement('div', 'shin-sync-muted', 'Nhận diện Spreadsheet, kiểm tra tài khoản và lưu thông tin đăng nhập mã hóa trong cùng một quy trình.'));
+  status = status || {};
+  var section = fbmSyncAppendBox(panel, 'shin-sync-section');
+  fbmSyncAppendText(section, 'Tài khoản FBM', 'shin-sync-section-title');
+  fbmSyncAppendText(section, 'Xác nhận đúng file ShinCRM và tài khoản FBM trước khi chạy phiên.', 'shin-sync-muted');
   fbmSyncPaintIdentityBlock(section, !!FBM_SYNC_CLIENT.running, status);
-  var login = FBM_SYNC_CLIENT.loginStatus || status.login || {}, card = fbmSyncCard('Đăng nhập tự động');
-  var state = fbmSyncElement('div', 'shin-sync-preview-row', login.configured ? 'Đã lưu thông tin đăng nhập dạng mã hóa.' : 'Chưa thiết lập thông tin đăng nhập.'); card.body.appendChild(state);
-  var auto = fbmSyncElement('label', 'shin-sync-form-field'); auto.textContent = 'Tự đăng nhập khi phiên hết hạn'; var check = document.createElement('input'); check.type = 'checkbox'; check.id = 'fbm-sync-auto-login'; check.checked = login.enabled !== false; check.disabled = !!FBM_SYNC_CLIENT.running; auto.appendChild(check); card.body.appendChild(auto);
-  [['fbm-login-username', 'Username FBM', 'text'], ['fbm-login-password', 'Mật khẩu FBM', 'password']].forEach(function (item) { var field = fbmSyncElement('label', 'shin-sync-form-field', item[1]); var input = document.createElement('input'); input.id = item[0]; input.type = item[2]; input.className = 'shin-input'; input.autocomplete = item[2] === 'password' ? 'new-password' : 'off'; input.value = item[2] === 'text' ? String(FBM_SYNC_CLIENT.loginDraft.username || '') : ''; field.appendChild(input); card.body.appendChild(field); });
-  var actions = fbmSyncElement('div', 'shin-sync-form-actions'); var test = fbmSyncMakeButton('fbm-sync-login-test', 'Đăng nhập thử', true); var save = fbmSyncMakeButton('fbm-sync-login-save', 'Lưu mã hóa', false); test.disabled = save.disabled = !!FBM_SYNC_CLIENT.running; actions.appendChild(test); actions.appendChild(save); card.body.appendChild(actions); section.appendChild(card.card);
-  var relay = fbmSyncCard('Relay Extension'); relay.body.appendChild(fbmSyncElement('div', 'shin-sync-muted', 'Khóa relay chỉ hiển thị dưới dạng trạng thái, không đưa vào Sheet hoặc Log.')); var rotate = fbmSyncMakeButton('fbm-sync-rotate-relay', 'Đổi khóa relay', false); rotate.disabled = !!FBM_SYNC_CLIENT.running; relay.body.appendChild(rotate); section.appendChild(relay.card); panel.appendChild(section);
+
+  var login = FBM_SYNC_CLIENT.loginStatus || status.login || {};
+  var card = fbmSyncAppendCard(section, 'Đăng nhập tự động');
+  var body = card.querySelector('.shin-card-body');
+  fbmSyncAppendText(body, login.configured ? 'Đã lưu thông tin đăng nhập được mã hóa.' : 'Chưa thiết lập thông tin đăng nhập.', 'shin-sync-preview-row');
+
+  var autoRow = fbmSyncAppendBox(body, 'shin-sync-toggle-row');
+  fbmSyncAppendText(autoRow, 'Tự đăng nhập khi phiên hết hạn', 'shin-sync-toggle-copy');
+  var auto = fbmSyncMakeToggleButton('fbm-sync-auto-login', login.enabled !== false, 'Tự đăng nhập khi phiên hết hạn'); auto.disabled = !!FBM_SYNC_CLIENT.running; autoRow.appendChild(auto);
+
+  var userField = fbmSyncAppendBox(body, 'shin-sync-form-field');
+  fbmSyncAppendText(userField, 'Username FBM', 'shin-sync-form-label');
+  fbmSyncAppendInput(userField, 'fbm-login-username', 'text', FBM_SYNC_CLIENT.loginDraft.username, 'Nhập username FBM');
+  var passwordField = fbmSyncAppendBox(body, 'shin-sync-form-field');
+  fbmSyncAppendText(passwordField, 'Mật khẩu FBM', 'shin-sync-form-label');
+  fbmSyncAppendInput(passwordField, 'fbm-login-password', 'password', '', 'Nhập mật khẩu FBM');
+
+  var actions = fbmSyncAppendBox(body, 'shin-sync-form-actions');
+  var test = fbmSyncAppendButton(actions, 'fbm-sync-login-test', 'Đăng nhập thử', true); test.disabled = !!FBM_SYNC_CLIENT.running;
+  var save = fbmSyncAppendButton(actions, 'fbm-sync-login-save', 'Lưu mã hóa', false); save.disabled = !!FBM_SYNC_CLIENT.running;
 }
 </script>

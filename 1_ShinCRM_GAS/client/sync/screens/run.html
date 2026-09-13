@@ -3,11 +3,29 @@ function fbmSyncRenderPipeline(panel, status) {
   var phase = String(status.phase || ''), current = status.entity === 'activity' ? ['Kiểm tra phiên', 'Category', 'Customer cha', 'Activity', 'Đối soát', 'Liên kết Customer'] : ['Kiểm tra phiên', 'Category', 'Customer', 'Đối soát', 'Cập nhật Sheet'];
   if (status.mode === 'push') { current = ['Kiểm tra phiên', 'Category', 'Quyền bản ghi', 'Mở form FBM', 'Ghi', 'Đọc xác nhận', 'Baseline']; }
   var currentIndex = phase === 'idle' ? -1 : phase === 'done' ? current.length : phase === 'checking_session' ? 0 : phase === 'reconcile' ? (status.mode === 'push' ? 2 : 3) : phase === 'push' ? 4 : phase === 'pull_activity' ? 3 : phase === 'pull_customer' ? 2 : 1;
-  var box = fbmSyncElement('div', 'shin-sync-pipeline'); box.appendChild(fbmSyncElement('div', 'shin-sync-pipeline-title', 'Pipeline đang chạy')); current.forEach(function (label, index) { var step = fbmSyncElement('div', 'shin-sync-pipeline-step'), marker = index < currentIndex ? '✓' : index === currentIndex ? (phase === 'error' ? '!' : '●') : '○'; step.appendChild(fbmSyncElement('span', '', marker)); step.appendChild(fbmSyncElement('span', '', label)); if (marker === '✓') { step.classList.add('is-done'); } if (marker === '●') { step.classList.add('is-current'); } if (marker === '!') { step.classList.add('is-error'); } box.appendChild(step); }); panel.appendChild(box);
+  var box = fbmSyncAppendBox(panel, 'shin-sync-pipeline');
+  fbmSyncAppendText(box, phase === 'idle' ? 'Pipeline sẽ chạy' : 'Pipeline đang chạy', 'shin-sync-pipeline-title');
+  current.forEach(function (label, index) {
+    var marker = index < currentIndex ? '✓' : index === currentIndex ? (phase === 'error' ? '!' : '●') : '○';
+    var step = fbmSyncAppendBox(box, 'shin-sync-pipeline-step');
+    if (marker === '✓') { step.classList.add('is-done'); }
+    if (marker === '●') { step.classList.add('is-current'); }
+    if (marker === '!') { step.classList.add('is-error'); }
+    fbmSyncAppendText(step, marker, 'shin-sync-pipeline-marker');
+    fbmSyncAppendText(step, label, 'shin-sync-pipeline-label');
+  });
 }
 function fbmSyncRenderRun(panel, status) {
-  var section = fbmSyncElement('div', 'shin-sync-section'); section.appendChild(fbmSyncElement('h2', 'shin-sync-section-title', 'Chạy đồng bộ'));
-  var card = fbmSyncCard('Chọn loại đồng bộ'); var label = fbmSyncElement('label', 'shin-sync-form-field', 'Loại đồng bộ'); var mode = document.createElement('select'); mode.id = 'fbm-sync-mode'; mode.className = 'shin-input'; mode.disabled = !!FBM_SYNC_CLIENT.running; FBM_SYNC_UI_SCHEMA.modes.forEach(function (item) { var option = document.createElement('option'); option.value = item.value; option.textContent = item.label; mode.appendChild(option); }); mode.value = FBM_SYNC_CLIENT.mode; label.appendChild(mode); card.body.appendChild(label);
-  var active = ['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(status.phase) >= 0, awaiting = status.phase === 'awaiting_approval'; var action = fbmSyncMakeButton(active ? 'fbm-sync-cancel' : awaiting ? 'fbm-sync-approve' : 'fbm-sync-start', active ? 'Dừng đồng bộ' : awaiting ? 'Chấp thuận và chạy' : 'Bắt đầu đồng bộ', true); action.disabled = !((status.masterEnabled !== false) && !(!active && false)); card.body.appendChild(action); if (awaiting) { card.body.appendChild(fbmSyncElement('div', 'shin-sync-muted', 'Phiên có nhiều thay đổi; hãy xem preview rồi chấp thuận để tiếp tục.')); } section.appendChild(card.card); fbmSyncPaintStatusBlocks(section, status, status.counts || {}); fbmSyncRenderPipeline(section, status); panel.appendChild(section);
+  status = status || {};
+  var section = fbmSyncAppendBox(panel, 'shin-sync-section'); fbmSyncAppendText(section, 'Chạy đồng bộ', 'shin-sync-section-title');
+  var card = fbmSyncAppendCard(section, 'Chọn loại đồng bộ'); var body = card.querySelector('.shin-card-body');
+  var label = fbmSyncAppendBox(body, 'shin-sync-form-field'); fbmSyncAppendText(label, 'Loại đồng bộ', 'shin-sync-form-label');
+  var mode = fbmSyncAppendSelect(label, 'fbm-sync-mode', FBM_SYNC_UI_SCHEMA.modes, FBM_SYNC_CLIENT.mode); mode.disabled = !!FBM_SYNC_CLIENT.running;
+  var active = ['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(status.phase) >= 0, awaiting = status.phase === 'awaiting_approval';
+  var action = fbmSyncAppendButton(body, active ? 'fbm-sync-cancel' : awaiting ? 'fbm-sync-approve' : 'fbm-sync-start', active ? 'Dừng đồng bộ' : awaiting ? 'Chấp thuận và chạy' : 'Bắt đầu đồng bộ', true); action.disabled = status.masterEnabled === false;
+  if (awaiting) { fbmSyncAppendText(body, 'Phiên có nhiều thay đổi; hãy xem kết quả rồi chấp thuận để tiếp tục.', 'shin-sync-muted'); }
+  fbmSyncRenderPipeline(section, status);
+  fbmSyncPaintStatusBlocks(section, status, status.counts || {});
+  panel.appendChild(section);
 }
 </script>

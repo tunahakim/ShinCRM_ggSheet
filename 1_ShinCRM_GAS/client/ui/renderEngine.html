@@ -397,6 +397,16 @@ function renderNodes(nodes, ctx) {
   return out;
 }
 
+/** Gắn một cây Block vào vùng động; mọi module ngoài màn chính dùng cổng này thay vì tự dựng HTML/DOM. */
+function renderBlockInto(parent, node, ctx) {
+  if (!parent || !node) { throw new Error('renderBlockInto cần vùng đích và Block.'); }
+  var range = document.createRange();
+  var fragment = range.createContextualFragment(renderNode(node, ctx || {}));
+  var first = fragment.firstElementChild;
+  parent.appendChild(fragment);
+  return first;
+}
+
 /* ─── Việc 4: gán chuỗi vào khung. Từ đây trở xuống mới có `document`. ─── */
 
 /** Bốn vùng engine được phép vẽ. Dải tiến trình không có trong bảng: nó bật tắt theo lượt gọi máy chủ, không thuộc màn nào. */

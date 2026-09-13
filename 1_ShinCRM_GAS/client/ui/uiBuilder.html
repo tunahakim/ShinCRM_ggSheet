@@ -120,6 +120,9 @@ function Block(spec, role) {
   };
 }
 
+/** Hộp chứa Block con; vai đã có trong hợp đồng renderer nhưng trước đây thiếu hàm dựng công khai. */
+function Box(spec) { return Block(spec, 'box'); }
+
 /** Khối có khung và có tiêu đề, `titleActions` là hàng hành động trên tiêu đề — và nó là **mảng** kể cả khi có đúng một mục, tài liệu 04 Phần 4B. */
 function Card(spec) { return Block(spec, 'card'); }
 
