@@ -212,11 +212,12 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 
 ### Cổng và builder
 
-- [x] Phải đồng thời chọn Ghi thật và bật `FBM_SYNC_ALLOW_WRITES`; thiếu một thì không phát request ghi.
+- [x] GAS vẫn chặn mọi request ghi khi công tắc bảo vệ tổng đang tắt; mode hướng dữ liệu không tự mở khóa ghi.
+- [ ] UI thay checkbox `Cho phép ghi thật lên FBM` bằng icon công tắc tổng `on/off` trên header; khi tắt khóa phiên thủ công, nền, auto-login và giải quyết conflict.
 - [x] Có cổng `allowFbmPush`, Category, record lock và cấu hình bắt buộc.
-- [x] Chế độ Ghi thật vẫn dừng trước request khi cờ hệ thống tắt.
+- [x] Hướng có ghi vẫn dừng trước request khi cổng bảo vệ tổng phía GAS tắt.
 - [x] Khi đang có phiên hoạt động, lần bấm Đồng bộ ngay thứ hai không tạo phiên song song.
-- [x] Nếu tổng số bản ghi đủ điều kiện thay đổi lớn hơn `10`, Sidebar preview và chờ người dùng chấp thuận trước request ghi; từ `10` trở xuống vẫn phải qua đủ cờ an toàn và cổng bản ghi. `fbmApprovePush` chỉ cấp request authorize sau khi chấp thuận; test offline đã phủ ngưỡng `11`.
+- [x] Nếu tổng số bản ghi đủ điều kiện thay đổi lớn hơn `10`, Sidebar preview và chờ người dùng chấp thuận trước request ghi; từ `10` trở xuống vẫn phải qua công tắc tổng, cổng phiên và cổng bản ghi. `fbmApprovePush` chỉ cấp request authorize sau khi chấp thuận; test offline đã phủ ngưỡng `11`.
 - [x] Dừng đồng bộ xóa cursor kỳ, nhả khóa sync, giữ khóa form user và không gửi Delete.
 - [x] Kiểm owner mặc định FBM với `FBM_ACCOUNT_NAME` trước toàn bộ chiều push.
 - [x] Kiểm đủ bảy field bắt buộc và mọi trần độ dài trước khi dựng request.
@@ -290,16 +291,26 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 ## Slice 8 — Sidebar, log và probe nghiệm thu
 
 - [x] Có màn hình đồng bộ độc lập, không hủy phiên khi quay lại, hiển thị phase, hướng, thực thể, session, counters, tiến trình và preview giới hạn.
-- [x] Khi chưa chạy chỉ hiện `Đồng bộ ngay`; khi chạy chỉ hiện `Dừng đồng bộ`.
+- [ ] Màn hình `Chạy đồng bộ` khi chưa chạy chỉ hiện hành động bắt đầu phù hợp với mode; khi chạy chỉ hiện `Dừng đồng bộ`.
 - [x] Icon menu phản ánh trạng thái; tự động có thể báo đang phát triển.
 - [x] Đã thấy tiến trình request, lỗi transport và kết quả đọc trên màn hình.
 - [x] Mở màn hình đồng bộ lấy relay config song song với snapshot trạng thái, không để cấu hình nền chặn giao diện.
 - [x] GAS ghi log phase/lỗi nguồn `fbm_sync`, không ghi cookie/payload.
 - [x] Có dòng tổng kết mỗi kỳ và dòng chi tiết cho lỗi, conflict, hoãn, mã lạ và đẩy không ăn.
 - [x] Màn hình có preview bản ghi kéo về và chi tiết conflict, lỗi đẩy, Category block, Activity vắng; không bắt người dùng đọc JSON trong Log.
-- [x] Có lệnh `Nghiệm thu ALT00010` chạy preflight, lookup, pull, field/hash/link, idempotency và ghi báo cáo PASS/FAIL vào Log; không push FBM.
+- [x] Có lệnh nghiệm thu phạm vi thử chạy preflight, lookup, pull, field/hash/link, idempotency và ghi báo cáo PASS/FAIL vào Log; hiện phạm vi DEV là `ALT00010`, không push FBM.
 - [x] Báo cáo che cookie/authorized nhưng giữ record ID, phase, request kind và hash trước/sau.
 - [x] `fbmProbeAltState` fail-closed nếu phát hiện candidate ngoài `ALT00010` và Activity con.
+- [ ] Click icon Đồng bộ ở menu chính mở thẳng màn hình `Tổng quan`, không hiện menu trung gian.
+- [ ] Module có menu nội bộ và đúng bốn màn hình: `Tổng quan`, `Tài khoản FBM`, `Chạy đồng bộ`, `Kết quả & xử lý`.
+- [ ] Header có icon công tắc tổng `on/off`; khi tắt, phiên thủ công, đồng bộ nền, auto-login và thao tác ghi/giải quyết conflict bị khóa, state/log vẫn xem được.
+- [ ] `Tài khoản FBM` gom nhận diện và đăng nhập tự động trong một màn hình; login thử phải đối chiếu user, tên tài khoản và Spreadsheet ID trước khi cho bật auto-login.
+- [ ] `Chạy đồng bộ` dùng dropdown diễn giải rõ `Kiểm tra an toàn`, `Lấy từ FBM → ShinCRM`, `Đẩy từ ShinCRM → FBM`, `Đồng bộ hai chiều`; không có checkbox ghi trùng ý nghĩa.
+- [ ] Mọi phiên đang chạy hiển thị pipeline theo thực thể với trạng thái chưa chạy/đang chạy/hoàn tất/lỗi.
+- [ ] Đồng bộ nền nằm trong Tổng quan/cài đặt nền, chỉ đọc FBM và tôn trọng công tắc tổng.
+- [ ] Conflict cho phép chọn `Giữ FBM`, `Giữ ShinCRM` hoặc `Tự nhập` theo từng field, có kiểm tra kiểu và trần độ dài.
+- [ ] Kết quả phiên lớn dùng tổng hợp và phân trang; Sidebar không tải toàn bộ conflict/lỗi/log về RAM.
+- [ ] Tên hiển thị `Nghiệm thu phạm vi thử`; `ALT00010` chỉ là phạm vi DEV/live acceptance, không đại diện cho phiên nhiều Customer.
 - [ ] **Cần kiểm chứng thực tế:** chạy probe một nút và kiểm tra báo cáo trên Sidebar/Log.
 
 ## Slice 9 — Live acceptance và mở rộng production
