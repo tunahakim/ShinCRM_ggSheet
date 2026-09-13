@@ -1,0 +1,33 @@
+fetch("https://fbo.com.vn:8888/Main/Login.aspx/Login", {
+  "headers": {
+    "accept": "*/*",
+    "accept-language": "vi,en;q=0.9",
+    "cache-control": "no-cache",
+    "content-type": "application/json; charset=UTF-8",
+    "pragma": "no-cache",
+    "priority": "u=1, i"
+  },
+  "referrer": "https://fbo.com.vn:8888/Main/Login.aspx",
+  "body": "{\"user\":\"anhlt\",\"password\":\"3c62beaa8b849706525a4006aedd76ed\",\"database\":\"FHN_CRM_App\",\"unit\":\"CTY\",\"language\":\"v\",\"value\":\"a5f68e05ea4a\",\"force\":false,\"storage\":true}",
+  "method": "POST",
+  "mode": "cors",
+  "credentials": "include"
+});
+
+======== response =========
+
+fetch("https://fbo.com.vn:8888/Main/Login.aspx/Login", {
+  "headers": {
+    "accept": "*/*",
+    "accept-language": "vi,en;q=0.9",
+    "cache-control": "no-cache",
+    "content-type": "application/json; charset=UTF-8",
+    "pragma": "no-cache",
+    "priority": "u=1, i"
+  },
+  "referrer": "https://fbo.com.vn:8888/Main/Login.aspx",
+  "body": "{\"user\":\"anhlt\",\"password\":\"3c62beaa8b849706525a4006aedd76ed\",\"database\":\"FHN_CRM_App\",\"unit\":\"CTY\",\"language\":\"v\",\"value\":\"a5f68e05ea4a\",\"force\":false,\"storage\":true}",
+  "method": "POST",
+  "mode": "cors",
+  "credentials": "include"
+});

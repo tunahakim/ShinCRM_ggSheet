@@ -1,0 +1,20 @@
+fetch("https://fbo.com.vn:8888/Main/Login.aspx/GetUnitData", {
+  "headers": {
+    "accept": "*/*",
+    "accept-language": "vi,en;q=0.9",
+    "cache-control": "no-cache",
+    "content-type": "application/json; charset=UTF-8",
+    "pragma": "no-cache",
+    "priority": "u=1, i"
+  },
+  "referrer": "https://fbo.com.vn:8888/Main/Login.aspx",
+  "body": "{\"u\":\"anhlt\",\"d\":\"FHN_CRM_App\"}",
+  "method": "POST",
+  "mode": "cors",
+  "credentials": "include"
+});
+
+
+========= response ======
+
+{"d":[["CTY","Công ty","Company"]]}

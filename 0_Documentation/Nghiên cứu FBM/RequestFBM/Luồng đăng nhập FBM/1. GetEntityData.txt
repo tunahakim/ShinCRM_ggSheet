@@ -1,0 +1,20 @@
+fetch("https://fbo.com.vn:8888/Main/Login.aspx/GetEntityData", {
+  "headers": {
+    "accept": "*/*",
+    "accept-language": "vi,en;q=0.9",
+    "cache-control": "no-cache",
+    "content-type": "application/json; charset=UTF-8",
+    "pragma": "no-cache",
+    "priority": "u=1, i"
+  },
+  "referrer": "https://fbo.com.vn:8888/Main/Login.aspx",
+  "body": "",
+  "method": "POST",
+  "mode": "cors",
+  "credentials": "include"
+});
+
+======= Response ========
+
+{"d":[["01","Fast FBM Online","FHN_CRM_App"]]}
+
