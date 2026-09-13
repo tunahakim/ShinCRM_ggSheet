@@ -134,6 +134,7 @@ function readCredential(ref) {
   });
 }
 function hydrateLoginRequest(request) {
+  if (!request) { return Promise.resolve(request); }
   var value = request || {}, meta = value.meta || {};
   if (String(meta.kind || '') !== 'login') { return Promise.resolve(value); }
   return readCredential(meta.credentialRef).then(function (credentials) {
