@@ -156,7 +156,7 @@ FbmSync.activitySupplementNext = function (state, afterActivity) {
     }
   }
   if (after.kind === 'done') { FbmSync.activityRotationSave(after.rows || []); }
-  state.cursor = { kind: 'activity_supplement_done' };
+  state.cursor = {};
   state.phase = 'done'; state.entity = ''; state.message = 'Dong bo hoan tat.'; FbmSync.stateWrite(state);
   return null;
 };
@@ -355,7 +355,7 @@ FbmSync.continue = function (rawResponse) {
     if (nextCustomer) { state.cursor = { kind: 'customer_grid', type: 1, pageIndex: nextCustomer.body.gridPageIndex, pageValue: nextCustomer.body.gridPageValue, count: nextCustomer.body.count, seen: Number(state.cursor.customerSeen || 0) }; FbmSync.stateWrite(state); return { ok: true, request: FbmSync.nextEnvelope(nextCustomer), status: FbmSync.statusView() }; }
     if (state.mode === 'write' && FbmSync.writeEnabled(state.mode)) { if (FbmSync.stopPushOnConflicts && FbmSync.stopPushOnConflicts(state)) { return { ok: true, request: null, status: FbmSync.statusView() }; } state.cursor = { kind: 'push_scan', entity: 'customer', index: 0 }; state.phase = 'push'; FbmSync.stateWrite(state); return { ok: true, request: FbmSync.nextEnvelope(FbmSync.nextPushRequest(state)), status: FbmSync.statusView() }; }
     if (state.mode === 'write') { FbmSync.markMissingAfterFullScan('customer', state); FbmSync.markMissingAfterFullScan('activity', state); }
-    state.phase = 'done'; state.message = 'Dong bo hoan tat.'; FbmSync.stateWrite(state); return { ok: true, status: FbmSync.statusView() };
+    state.cursor = {}; state.phase = 'done'; state.message = 'Dong bo hoan tat.'; FbmSync.stateWrite(state); return { ok: true, status: FbmSync.statusView() };
   }
   // Activity được quét theo từng stt_rec, rồi mới quay lại trang Customer kế.
   if (cursor.kind === 'activity_grid') {
@@ -394,7 +394,7 @@ FbmSync.continue = function (rawResponse) {
       return { ok: true, request: FbmSync.nextEnvelope(FbmSync.nextPushRequest(state)), status: FbmSync.statusView(), imported: activityRecords.length };
     }
     if (state.mode === 'write') { FbmSync.markMissingAfterFullScan('customer', state); FbmSync.markMissingAfterFullScan('activity', state); }
-    state.phase = 'done'; state.entity = ''; state.message = 'Dong bo hoan tat.'; FbmSync.stateWrite(state);
+    state.cursor = {}; state.phase = 'done'; state.entity = ''; state.message = 'Dong bo hoan tat.'; FbmSync.stateWrite(state);
     return { ok: true, status: FbmSync.statusView(), imported: activityRecords.length };
   }
   if (cursor.kind === 'activity_bulk_grid') {
@@ -406,7 +406,7 @@ FbmSync.continue = function (rawResponse) {
     FbmSync.previewRecords(state, 'activity', bulkRecords);
     var bulkRequest = FbmSync.activityBulkNext(state, bulkGrid);
     if (bulkRequest) { return { ok: true, request: FbmSync.nextEnvelope(bulkRequest), status: FbmSync.statusView(), imported: bulkRecords.length }; }
-    state.phase = 'done'; state.entity = ''; state.message = 'Đã đọc xong bulk giao dịch FBM.'; FbmSync.stateWrite(state);
+    state.cursor = {}; state.phase = 'done'; state.entity = ''; state.message = 'Đã đọc xong bulk giao dịch FBM.'; FbmSync.stateWrite(state);
     return { ok: true, status: FbmSync.statusView(), imported: bulkRecords.length, missing: state.metadata.activityBulkMissing || [] };
   }
   if (cursor.kind === 'activity_catchup_customer_grid' || cursor.kind === 'activity_rotation_customer_grid') {

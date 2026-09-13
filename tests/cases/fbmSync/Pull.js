@@ -6,7 +6,7 @@ async function chay(so) {
   section("FBM sync — pull và identity");
   const builders = taoHopCat({
     FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {},
-    PropertiesService: { getDocumentProperties: () => ({ getProperty: (key) => ({ FBM_SYNC_TEST_CUSTOMER_CODE: 'ALT00010' }[key] || '') }) }
+    PropertiesService: { getDocumentProperties: () => ({ getProperty: (key) => ({ FBM_SYNC_TEST_CUSTOMER_CODE: 'ALT00010' }[key] || ''), setProperty: () => {} }) }
   });
   napServer(builders, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PullFlow.js');
   builders.FbmSync.stateRead = () => ({ session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: 'auth-c', activityAuthorized: 'auth-a' } });
@@ -56,6 +56,8 @@ async function chay(so) {
   check(so, 'Bulk Activity tiep tuc bang composite key va luu ID da thay', [bulkNext.meta.kind, bulkNext.body.type, bulkNext.body.gridPageValue, bulkState.cursor.seenIds['F-1']], ['activity_bulk_grid', 1, ['2026-09-09', '2026-09-09T01:00:00', 'F-1', 1], true]);
   const bulkDone = builders.FbmSync.activityBulkNext(bulkState, { rows: [{ id: 'F-2', end_date: '2026-09-10', datetime0: '2026-09-10T01:00:00', line_nbr: 1 }], total: 2 });
   check(so, 'Bulk Activity ket thuc, luu ID local vang va chuyen sang vong xoay Customer', [bulkDone && bulkDone.meta.kind, bulkState.cursor.kind, bulkState.metadata.activityBulkMissing.length, bulkState.metadata.activityBulkMissing[0].fbmId], ['activity_rotation_customer_grid', 'activity_rotation_customer_grid', 1, 'F-LOCAL']);
+  const finishedSupplementState = { cursor: { kind: 'activity_grid' }, phase: 'pull_activity', entity: 'activity', metadata: {}, session: {} };
+  check(so, 'Trang thai done xoa cursor Activity da ket thuc', [builders.FbmSync.activitySupplementNext(finishedSupplementState, { kind: 'done', rows: [] }), finishedSupplementState.phase, finishedSupplementState.cursor], [null, 'done', {}]);
 
   builders.FbmSync.readLocal = (entity) => entity === 'activity' ? [{ id: 'A-NEW', fbmId: 'F-NEW', workDate: '2026-09-10' }] : [];
   const catchup = builders.FbmSync.activityCatchupCustomerRequest();
