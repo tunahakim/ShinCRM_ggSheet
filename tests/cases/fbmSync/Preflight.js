@@ -33,6 +33,8 @@ async function chay(so) {
   check(so, 'preflight read chặn khi file có FBM ID nhưng chưa kiểm tra liên kết', [rebindRead.ok, rebindRead.blocking.some((item) => item.code === 'REBIND_REQUIRED')], [false, true]);
   const identityCheck = hop.FbmSync.runPreflight({ mode: 'check', scan: 'identity_check' });
   check(so, 'preflight identity check được phép chạy để xử lý REBIND', [identityCheck.ok, identityCheck.blocking.some((item) => item.code === 'REBIND_REQUIRED')], [true, false]);
+  const identityProbe = hop.FbmSync.runPreflight({ mode: 'check', scan: 'identity_probe' });
+  check(so, 'preflight identity probe được phép chạy để tự điền liên kết', [identityProbe.ok, identityProbe.blocking.some((item) => item.code === 'REBIND_REQUIRED')], [true, false]);
 
   const push = hop.FbmSync.runPreflight({ mode: 'push' });
   check(so, 'preflight mode push vẫn fail-closed như mode write', [push.ok, push.blocking.some((item) => item.code === 'FBM_ACCOUNT_NAME_MISSING')], [false, true]);

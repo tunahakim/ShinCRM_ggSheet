@@ -102,7 +102,10 @@ FbmSync.preflightCandidates = function (issues, mode) {
 FbmSync.runPreflight = function (options) {
   var opt = options || {}, mode = opt.mode === 'write' || opt.mode === 'push' ? opt.mode : opt.mode === 'check' ? 'check' : 'read', writeMode = mode === 'write' || mode === 'push', core = typeof shinCorePreflight === 'function' ? shinCorePreflight({ mode: writeMode ? 'write' : mode }) : { issues: [], params: {}, category: { categories: {} } }, issues = (core.issues || []).slice(), params = core.params || {};
   if (typeof FbmSync.identityPreflight === 'function') {
-    var identityMode = opt.scan === 'identity_check' ? 'identity_check' : (opt.origin === 'background' ? 'background' : mode);
+    // Both identity actions are recovery tools: they must remain usable when
+    // existing FBM IDs require a rebind. Ordinary read/write/background runs
+    // stay fail-closed until the binding has been checked.
+    var identityMode = (opt.scan === 'identity_check' || opt.scan === 'identity_probe') ? 'identity_check' : (opt.origin === 'background' ? 'background' : mode);
     var identity = FbmSync.identityPreflight(identityMode);
     if (identity.blocking) { FbmSync.preflightIssue(issues, 'REBIND_REQUIRED', 'error', 'Identity', identity.message, true); }
     else if (identity.status && identity.status.status === 'REBIND_REQUIRED') { FbmSync.preflightIssue(issues, 'REBIND_REQUIRED', 'warn', 'Identity', identity.message, false); }
