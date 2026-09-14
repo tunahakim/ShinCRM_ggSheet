@@ -511,7 +511,7 @@ Không được yêu cầu người dùng lặp thử mù. Lượt chẩn đoán
 
 ## Đợt đối chiếu toàn pipeline sau khi sửa bridge
 
-Phần này là snapshot có hiệu lực sau các revision GAS DEV `@268` đến `@273`; các kết luận cũ ở trên chỉ giữ để truy vết phát hiện và không dùng để đánh giá code hiện tại.
+Phần này là snapshot có hiệu lực sau các revision GAS DEV `@268` đến `@274`; các kết luận cũ ở trên chỉ giữ để truy vết phát hiện và không dùng để đánh giá code hiện tại.
 
 ### Pipeline chuẩn và đối chiếu code
 
@@ -547,8 +547,8 @@ Request `GetDirViewPage/zccrAccount` là bước authorize đúng. Trước khi 
 
 ### Snapshot kiểm thử
 
-- `node tests/run.js`: `1294/1294` đạt.
-- `node tests/gas.js fbmStartIdentityProbe --push`: revision `@268` dựng request authorize đúng endpoint/controller; các entrypoint heartbeat/continue/transport-failure/status đã được đẩy và chạy lần lượt tới `@273`.
+- `node tests/run.js`: `1295/1295` đạt.
+- `node tests/gas.js fbmStartIdentityProbe --push`: revision `@268` dựng request authorize đúng endpoint/controller; các entrypoint heartbeat/continue/transport-failure/status đã được đẩy tới `@273`, lớp phòng vệ stale-response mới nhất đã lên `@274`.
 - Chưa đánh dấu live identity hoàn tất: còn phải quan sát request `GetGridViewPage` controller `User` sau response authorize.
 
 ### Việc còn lại trước khi yêu cầu chủ dự án test live

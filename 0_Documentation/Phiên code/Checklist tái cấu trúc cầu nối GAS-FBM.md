@@ -49,10 +49,10 @@ Credential là ngoại lệ bảo mật duy nhất của cầu nối: Extension 
 
 ## Kiểm thử và triển khai
 
-- [x] Test offline sau đợt refactor hiện tại đạt `1294/1294`.
+- [x] Test offline sau đợt refactor hiện tại đạt `1295/1295`.
 - [x] Cập nhật test offline sau khi loại bỏ toàn bộ kiến thức FBM khỏi Extension.
 - [x] Chạy `node tests/run.js` đạt toàn bộ.
-- [~] Đã chạy `fbmStartIdentityProbe`, `fbmSyncHeartbeatRequest`, `fbmSyncHeartbeat`, `fbmSyncContinue`, `fbmSyncHeartbeatTransportFailure` và `fbmSyncStatus` với `--push` tới revision `@273`; còn cần reset state DEV và hoàn tất các case continuation có reservation thật.
+- [~] Đã chạy `fbmStartIdentityProbe`, `fbmSyncHeartbeatRequest`, `fbmSyncHeartbeat`, `fbmSyncContinue`, `fbmSyncHeartbeatTransportFailure` và `fbmSyncStatus` với `--push` tới revision `@274`; còn cần reset state DEV và hoàn tất các case continuation có reservation thật.
 - [x] Tạo/cập nhật deployment DEV `@268`; Sidebar lấy URL tự động, không cập nhật `chrome.storage` thủ công.
 - [ ] Tải lại Extension và tab FBM; kiểm tra logged-in, logged-out, GAS timeout, không có tab, response lớn.
 - [!] Live test chỉ thực hiện sau khi chủ dự án giữ tab FBM đăng nhập và xác nhận không ghi thật.
@@ -76,7 +76,7 @@ Nguồn đối chiếu chi tiết: `0_Documentation/Phiên code/Audit pipeline �
 - [ ] P0: giữ ngữ cảnh request đang bay khi cancel/master off, đặc biệt `push_wait`; response cũ không được tiếp tục pipeline.
 - [x] P1: giữ và đối chiếu username trong identity binding/login test cùng userId, tên đầy đủ và Spreadsheet ID.
 - [ ] P1: phân biệt state chưa biết cookie với phiên đã xác nhận logout; không auto-login chỉ vì GAS chưa capture cookie.
-- [~] P1: giảm response authorize và test tích hợp response thật từ Sidebar qua GAS đến request `controller:User`; đã sửa lỗi trace bridge làm response bị `STALE_RESPONSE`, còn chờ live xác nhận request User.
+- [~] P1: giảm response authorize và test tích hợp response thật từ Sidebar qua GAS đến request `controller:User`; đã sửa lỗi trace bridge và thêm lớp bỏ qua trace `bridge_*`, còn chờ live xác nhận request User.
 - [x] P1: Activity catch-up chỉ lấy mốc từ Activity đã có FBM ID.
 - [ ] P1: bỏ `ALT00010` khỏi recordId log tổng hợp và không tự chạy audit DEV sau mọi phiên check/read.
 - [ ] P1: bổ sung phân trang server-side thật cho conflict/lỗi/log và loại locks khỏi DTO Sidebar.
@@ -115,7 +115,7 @@ Nguồn đối chiếu chi tiết: `0_Documentation/Phiên code/Audit pipeline �
 #### P2 — Bằng chứng và bàn giao trước live
 
 - [ ] `P2-01` Sau mỗi nhóm thay đổi, chạy test liên quan rồi chạy `node tests/run.js`; ghi số test thật và commit tương ứng vào checklist.
-- [~] `P2-02` Đã chạy các entrypoint GAS DEV relay/identity/heartbeat/status bằng `--push` tới `@273`; còn thiếu case continuation nền có reservation, resume hop limit và conflict stale response trên state DEV sạch.
+- [~] `P2-02` Đã chạy các entrypoint GAS DEV relay/identity/heartbeat/status bằng `--push` tới `@274`; còn thiếu case continuation nền có reservation, resume hop limit và conflict stale response trên state DEV sạch.
 - [ ] `P2-03` Tạo/cập nhật deployment DEV và chứng minh Sidebar tự chuyển relay config sang Extension; không yêu cầu cập nhật `chrome.storage` thủ công.
 - [ ] `P2-04` Cập nhật tài liệu chính thức/checklist bị code mới làm lỗi thời, cây thư mục nếu có thêm tệp, rồi commit theo nhóm GAS, Extension, test và tài liệu.
 - [!] `P2-05` Chỉ yêu cầu chủ dự án giữ tab FBM để nghiệm thu logged-in, logged-out, mất tab, timeout, response lớn và live `ALT00010` sau khi toàn bộ `P0-*`, `P1-*` và bằng chứng tự động tương ứng đã đạt.

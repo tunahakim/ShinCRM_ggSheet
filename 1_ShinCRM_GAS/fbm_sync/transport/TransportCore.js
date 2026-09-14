@@ -86,7 +86,10 @@ FbmSync.responseRequestId = function (rawResponse) {
   if (!Array.isArray(trace)) { return ''; }
   for (var i = trace.length - 1; i >= 0; i -= 1) {
     item = trace[i];
-    if (item && item.requestId) { return String(item.requestId); }
+    // Older bridges used their local Sidebar waiter id in `requestId` on
+    // bridge_* trace entries. Those ids are not GAS reservations and must
+    // never win stale-response validation.
+    if (item && item.requestId && !/^bridge_/.test(String(item.stage || ''))) { return String(item.requestId); }
   }
   return '';
 };

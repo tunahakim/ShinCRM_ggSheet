@@ -57,6 +57,7 @@ async function chay(so) {
   const dateEnvelope = orchestration.FbmSync.nextEnvelope({ url: 'https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage', body: { gridPageValue: [new Date('2026-09-09T00:00:00Z'), { nested: new Date('2026-09-10T00:00:00Z') }] }, meta: { kind: 'grid' } });
   check(so, 'envelope khong tra Date o cursor phan trang Activity', [dateEnvelope.body.gridPageValue[0], dateEnvelope.body.gridPageValue[1].nested], ['/Date(1788912000000)/', '/Date(1788998400000)/']);
   check(so, 'response co trace bridge client van nhan dung reservation GAS', orchestration.FbmSync.responseRequestId({ transport: { trace: [{ requestId: 'gas-request-1' }, { stage: 'bridge_response_sent', clientRequestId: 'sidebar-waiter-1' }] } }), 'gas-request-1');
+  check(so, 'response co trace bridge cu van bo qua waiter id va nhan reservation GAS', orchestration.FbmSync.responseRequestId({ transport: { trace: [{ requestId: 'gas-request-2' }, { stage: 'bridge_response_sent', requestId: 'sidebar-waiter-2' }] } }), 'gas-request-2');
   let blockedEndpoint = '';
   try { orchestration.FbmSync.nextEnvelope({ url: 'https://fbo.com.vn:8888/Main/undefined', body: {}, meta: { kind: 'legacy' } }); } catch (err) { blockedEndpoint = String(err && err.message || err); }
   check(so, 'endpoint legacy undefined bi chan truoc khi cap envelope', blockedEndpoint.indexOf('FBM_ENDPOINT_MISSING') >= 0, true);
