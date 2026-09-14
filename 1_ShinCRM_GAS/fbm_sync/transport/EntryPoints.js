@@ -121,19 +121,6 @@ function fbmSyncRotateRelayKey() {
   } finally { lock.releaseLock(); }
 }
 
-/** ACK không đụng state, dùng để kiểm tra Extension gọi được GAS khi Sidebar đã đóng. */
-function fbmSyncRelayProbe() {
-  var state = FbmSync.stateRead ? FbmSync.stateRead() : {}, session = state.session || {};
-  return {
-    ok: true,
-    code: 'RELAY_PROBE_OK',
-    serverAt: Date.now(),
-    masterEnabled: typeof FbmSync.masterEnabled !== 'function' || FbmSync.masterEnabled(),
-    backgroundEnabled: typeof FbmSync.backgroundEnabled !== 'function' || FbmSync.backgroundEnabled(),
-    sessionExpired: session.expired === true
-  };
-}
-
 /** DTO gọn cho relay nền; Sidebar vẫn nhận statusView đầy đủ qua google.script.run. */
 function fbmSyncRelayCompactResult(result) {
   var value = result || {}, status = value.status || {};
@@ -187,8 +174,6 @@ function doPost(event) {
       var commandPayload = body.payload || {};
       if (body.hop !== undefined && commandPayload.hop === undefined) { commandPayload = Object.assign({}, commandPayload, { hop: Number(body.hop || 0) }); }
       result = FbmSync.controlDispatchLocked(String(body.command), commandPayload);
-    } else if (body.kind === 'probe') {
-      result = fbmSyncRelayProbe();
     } else if (body.kind === 'heartbeat_request') {
       result = fbmSyncHeartbeatRequest({ source: body.source || 'alarm', hop: Number(body.hop || 0) });
     } else if (body.kind === 'heartbeat_transport_failure') {
@@ -196,9 +181,7 @@ function doPost(event) {
     } else if (body.kind === 'heartbeat') {
       result = fbmSyncHeartbeat(body.response, { hop: Number(body.hop || 0) });
     } else {
-      result = body.response === undefined
-        ? FbmSync.controlDispatchLocked('start', { mode: body.mode || 'read', origin: 'background', manual: false })
-        : FbmSync.controlDispatchLocked('continue', { response: body.response, hop: Number(body.hop || 0) });
+      result = { ok: false, code: 'RELAY_KIND_UNSUPPORTED', error: 'Relay chỉ nhận các nhịp nền do GAS quy định.', request: null };
     }
     if (body.kind === 'heartbeat_request' || body.kind === 'heartbeat' || body.kind === 'heartbeat_transport_failure' || body.kind === 'background_sync') { result = fbmSyncRelayCompactResult(result); result = fbmSyncRelayCap(result, body.hop); }
     return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);

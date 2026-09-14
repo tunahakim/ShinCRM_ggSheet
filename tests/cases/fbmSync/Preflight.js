@@ -27,7 +27,7 @@ async function chay(so) {
 
   hop.FbmSync.readLocal = (entity) => entity === 'activity' ? [{ id: 'ACT-NOPERM', customerId: 'CUS-1', fbmId: '' }] : [{ id: 'CUS-1', fbmCustomerCode: 'ALT00010', allowFbmPush: 'Cho phép' }];
   const read = hop.FbmSync.runPreflight({ mode: 'read' });
-  check(so, 'preflight read vẫn cho phép đọc nhưng giữ cảnh báo', [read.ok, read.warnings.some((item) => item.code === 'FBM_ACCOUNT_NAME_MISSING')], [true, true]);
+  check(so, 'preflight read chặn trước khi liên kết tài khoản FBM', [read.ok, read.blocking.some((item) => item.code === 'FBM_IDENTITY_UNBOUND'), read.warnings.some((item) => item.code === 'FBM_ACCOUNT_NAME_MISSING')], [false, true, true]);
   hop.FbmSync.readLocal = (entity) => entity === 'activity' ? [{ id: 'ACT-NOPERM', customerId: 'CUS-1', fbmId: '174813' }] : [{ id: 'CUS-1', fbmId: 'FBM-CU', fbmCustomerCode: 'ALT00010' }];
   const rebindRead = hop.FbmSync.runPreflight({ mode: 'read' });
   check(so, 'preflight read chặn khi file có FBM ID nhưng chưa kiểm tra liên kết', [rebindRead.ok, rebindRead.blocking.some((item) => item.code === 'REBIND_REQUIRED')], [false, true]);

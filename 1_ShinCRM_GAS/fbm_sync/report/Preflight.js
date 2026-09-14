@@ -107,9 +107,8 @@ FbmSync.runPreflight = function (options) {
     // stay fail-closed until the binding has been checked.
     var identityMode = (opt.scan === 'identity_check' || opt.scan === 'identity_probe') ? 'identity_check' : (opt.origin === 'background' ? 'background' : mode);
     var identity = FbmSync.identityPreflight(identityMode);
-    if (identity.blocking) { FbmSync.preflightIssue(issues, 'REBIND_REQUIRED', 'error', 'Identity', identity.message, true); }
+    if (identity.blocking) { FbmSync.preflightIssue(issues, identity.status && identity.status.status === 'UNBOUND' ? 'FBM_IDENTITY_UNBOUND' : 'REBIND_REQUIRED', 'error', 'Identity', identity.message, true); }
     else if (identity.status && identity.status.status === 'REBIND_REQUIRED') { FbmSync.preflightIssue(issues, 'REBIND_REQUIRED', 'warn', 'Identity', identity.message, false); }
-    else if (identity.status && identity.status.status === 'UNBOUND') { FbmSync.preflightIssue(issues, 'FBM_IDENTITY_UNBOUND', 'warn', 'Identity', 'Chưa có liên kết tài khoản FBM cố định; chiều đọc vẫn được phép, chiều ghi sẽ cần kiểm tra liên kết.', false); }
   }
   if (!String(params.FBM_ACCOUNT_NAME || '').trim()) { FbmSync.preflightIssue(issues, 'FBM_ACCOUNT_NAME_MISSING', 'error', 'Config', 'Thiếu FBM_ACCOUNT_NAME trong Config; chiều đẩy bị khóa.', writeMode); }
   if (!String(params.FBM_MA_KH_PREFIX || '').trim() || !String(params.FBM_MA_KH_LENGTH || '').trim()) { FbmSync.preflightIssue(issues, 'FBM_CUSTOMER_CODE_CONFIG_INCOMPLETE', 'warn', 'Config', 'Thiếu FBM_MA_KH_PREFIX hoặc FBM_MA_KH_LENGTH; chỉ ảnh hưởng khi tạo Customer mới.', false); }

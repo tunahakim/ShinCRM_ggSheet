@@ -3,6 +3,7 @@ function fbmSyncRenderAccount(panel, status) {
   status = status || {};
   var section = fbmSyncAppendBox(panel, 'shin-sync-section');
   fbmSyncAppendText(section, 'Xác nhận đúng file ShinCRM và tài khoản FBM trước khi chạy phiên.', 'shin-sync-muted');
+  if (status.message) { fbmSyncAppendText(section, String(status.message), status.phase === 'error' ? 'shin-sync-error-message' : 'shin-sync-message'); }
   fbmSyncPaintIdentityBlock(section, !!FBM_SYNC_CLIENT.running, status);
 
   var login = FBM_SYNC_CLIENT.loginStatus || status.login || {};
@@ -19,7 +20,7 @@ function fbmSyncRenderAccount(panel, status) {
   fbmSyncAppendInput(userField, 'fbm-login-username', 'text', FBM_SYNC_CLIENT.loginDraft.username, 'Nhập username FBM');
   var passwordField = fbmSyncAppendBox(body, 'shin-sync-form-field');
   fbmSyncAppendText(passwordField, 'Mật khẩu FBM', 'shin-sync-form-label');
-  // Mật khẩu vừa gõ hiện rõ để người dùng tự đối chiếu; sau lưu/thử hoặc khi mở lại luôn là ô trống.
+  // Mật khẩu chỉ sống trong DOM của lượt mở hiện tại; đăng nhập thử không được làm rơi bản nháp.
   fbmSyncAppendInput(passwordField, 'fbm-login-password', 'text', '', 'Nhập mật khẩu FBM');
 
   var actions = fbmSyncAppendBox(body, 'shin-sync-form-actions');

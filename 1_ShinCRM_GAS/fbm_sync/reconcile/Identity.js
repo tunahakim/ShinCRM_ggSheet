@@ -20,8 +20,18 @@ FbmSync.bindingCanUpgradeUsername = function (previous, next) {
     String(oldValue.userId || '') === String(newValue.userId || '') &&
     String(oldValue.accountName || '') === String(newValue.accountName || '');
 };
+/** Hủy liên kết không đụng dữ liệu Sheet; cấm khi một request FBM đang bay để không đổi danh tính giữa phiên. */
+FbmSync.bindingClear = function () {
+  var state = typeof FbmSync.stateRead === 'function' ? FbmSync.stateRead() : {}, phase = String(state && state.phase || '');
+  var active = !!(state && state.activeRequestId) || (!!(state && state.runId) && ['idle', 'done', 'error', 'paused', 'conflict'].indexOf(phase) < 0);
+  if (active) { return { ok: false, code: 'SYNC_ALREADY_RUNNING', message: 'Đang có phiên đồng bộ; hãy dừng phiên trước khi hủy liên kết tài khoản.' }; }
+  PropertiesService.getDocumentProperties().deleteProperty(FbmSync.BINDING_KEY);
+  var status = FbmSync.identityStatus();
+  return { ok: true, code: 'IDENTITY_BINDING_CLEARED', binding: {}, identityStatus: status, message: 'Đã hủy liên kết tài khoản. Đồng bộ bị khóa cho đến khi liên kết lại.' };
+};
 FbmSync.bindingWrite = function (binding) {
   var value = binding || {}, spreadsheetId = String(value.spreadsheetId || '').trim(), userId = String(value.userId || '').trim(), username = String(value.username || '').trim(), accountName = String(value.accountName || '');
+  if (!spreadsheetId && !userId && !username && !accountName) { return FbmSync.bindingClear(); }
   if (!spreadsheetId || !userId || !username || !accountName) { return { ok: false, code: 'IDENTITY_BINDING_INCOMPLETE', message: 'Thiếu SpreadsheetId, mã số user, tên đăng nhập hoặc tên đầy đủ FBM.' }; }
   var actual = FbmSync.currentSpreadsheetId();
   if (actual && actual !== spreadsheetId) { return { ok: false, code: 'SPREADSHEET_MISMATCH', message: 'SpreadsheetId liên kết không khớp file đang chạy.' }; }
@@ -61,9 +71,14 @@ FbmSync.identityStatus = function (runtime) {
   return { ok: status !== 'REBIND_REQUIRED', status: status, code: status === 'REBIND_REQUIRED' ? 'REBIND_REQUIRED' : '', spreadsheetId: actual, hasLinkedData: hasData, binding: { spreadsheetId: current.spreadsheetId || '', userId: current.userId || '', username: current.username || '', accountName: current.accountName || '' }, reasons: reasons };
 };
 FbmSync.identityPreflight = function (mode) {
-  var status = FbmSync.identityStatus(), write = mode === 'write' || mode === 'push' || mode === 'background';
-  var identityCheck = mode === 'identity_check';
-  return { status: status, blocking: !identityCheck && status.status === 'REBIND_REQUIRED', message: status.status === 'REBIND_REQUIRED' ? 'Cần kiểm tra lại liên kết tài khoản FBM trước khi chạy đồng bộ.' : '' };
+  var status = FbmSync.identityStatus(), identityRecovery = mode === 'identity_check' || mode === 'identity_probe';
+  var blocking = !identityRecovery && status.status !== 'BOUND';
+  var message = status.status === 'UNBOUND'
+    ? 'Chưa có liên kết tài khoản FBM. Hãy tự động điền hoặc nhập thông tin rồi lưu liên kết trước khi chạy đồng bộ.'
+    : status.status === 'REBIND_REQUIRED'
+      ? 'Cần kiểm tra lại liên kết tài khoản FBM trước khi chạy đồng bộ.'
+      : '';
+  return { status: status, blocking: blocking, message: message };
 };
 
 /** Chuẩn bị bảng đối chiếu ID Customer mà không đưa danh sách lên Sidebar. */

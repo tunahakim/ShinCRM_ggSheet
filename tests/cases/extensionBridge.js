@@ -111,7 +111,15 @@ async function chay(so) {
   });
   invalidBridge.sendRequestToWorker({ type: 'FBM_EXECUTE_REQUEST' }, function (error) { invalidated = error && error.message || ''; });
   check(so, 'context Extension het hieu luc tra loi ngay', invalidated, 'Extension context invalidated.');
-  check(so, 'bridge cu khong phat response loi khi context invalidated', fs.readFileSync(BRIDGE_FILE, 'utf8').indexOf('if (isInvalidatedExtensionError(error)) { return; }') >= 0, true);
+  check(so, 'bridge bao ro context Extension het hieu luc thay vi im lang', fs.readFileSync(BRIDGE_FILE, 'utf8').indexOf('EXTENSION_CONTEXT_INVALIDATED') >= 0 && fs.readFileSync(BRIDGE_FILE, 'utf8').indexOf('bridgeErrorMessage') >= 0, true);
+  const unavailable = nguonTin();
+  invalidBridge._onMessage({ origin: 'https://abc-123.googleusercontent.com', source: unavailable.source, data: { action: 'CRM_HANDSHAKE', nonce: 'nonce-loi' } });
+  const unavailableSession = unavailable.sent[0].data.sessionId;
+  invalidBridge._onMessage({ origin: 'https://abc-123.googleusercontent.com', source: unavailable.source, data: { action: 'CRM_FBM_CONFIG', nonce: 'nonce-loi', sessionId: unavailableSession, id: 'config-loi', config: { url: 'https://script.google.com/macros/s/test/exec', key: 'k', spreadsheetId: 'sheet' } } });
+  check(so, 'bridge tra ACK loi ro rang khi context Extension het hieu luc', [unavailable.sent[1].data.action, unavailable.sent[1].data.ok, unavailable.sent[1].data.code], ['CRM_FBM_CONFIG_ACK', false, 'EXTENSION_CONTEXT_INVALIDATED']);
+  const ignoredBefore = unavailable.sent.length;
+  invalidBridge._onMessage({ origin: 'https://abc-123.googleusercontent.com', source: unavailable.source, data: { action: 'CRM_FBM_CONFIG', nonce: 'nonce-loi', sessionId: 'phien-cu', id: 'config-cu', config: {} } });
+  check(so, 'bridge cu bo qua message khac session thay vi chen ACK', unavailable.sent.length, ignoredBefore);
 
   const workerSource = fs.readFileSync(WORKER_FILE, 'utf8');
   const executorSource = fs.readFileSync(EXECUTOR_FILE, 'utf8');
@@ -137,8 +145,8 @@ async function chay(so) {
   check(so, 'executor login tai Login.aspx de lay salt truoc khi goi Login', executorSource.indexOf("fetch(base.slice(0, -1)") >= 0 && executorSource.indexOf('login_page_loaded') >= 0 && executorSource.indexOf('Không đọc được mã phiên đăng nhập từ trang FBM.') >= 0, true);
   check(so, 'executor login nhan du lieu database va don vi theo cac shape FBM', executorSource.indexOf('function loginListValue') >= 0 && executorSource.indexOf("'FHN_CRM_App'") >= 0 && executorSource.indexOf("'CTY'") >= 0, true);
   check(so, 'executor login doc lai trang tai khoan de lay payload cookie', executorSource.indexOf("/Main/zccrAccount.aspx") >= 0 && executorSource.indexOf('payload_cookie_page_read') >= 0, true);
-  check(so, 'Sidebar giu waiter va thu lai mot lan khi bridge cu mat context', syncSource.indexOf('if (data.retryable)') >= 0 && syncSource.indexOf('waiter.retryCount < 1') >= 0 && syncSource.indexOf('retryCount: 0') >= 0, true);
-  check(so, 'mo man dong bo khong cho relay config chan status', syncSource.indexOf('Promise.all([fbmSyncConfigureRelay(), fbmSyncStatusOnce(true), fbmSyncLoadIdentityStatus(), fbmSyncLoadSettings()])') >= 0, true);
+  check(so, 'Sidebar ket thuc waiter bang loi bridge ro rang, khong gui lai request FBM', syncSource.indexOf('if (data.retryable)') < 0 && syncSource.indexOf('retryCount: 0') < 0 && syncSource.indexOf('client_extension_failure') >= 0, true);
+  check(so, 'mo man dong bo gui cau hinh local nhung khong chan status', syncSource.indexOf('fbmSyncConfigureRelay();') >= 0 && syncSource.indexOf('Promise.all([fbmSyncStatusOnce(true), fbmSyncLoadIdentityStatus(), fbmSyncLoadSettings()])') >= 0, true);
   check(so, 'kiem tra lien ket dung chung guard Extension va huy cursor khi loi', syncSource.indexOf('function fbmSyncCheckIdentity()') >= 0 && syncSource.indexOf("sheetLinkExtensionAlive()") >= 0 && syncSource.indexOf("callServer('fbmCancelSync')") >= 0, true);
   check(so, 'tu dien nhan dien FBM co doi chieu va giu ban nhap de nguoi dung xac nhan', syncSource.indexOf('function fbmSyncProbeIdentity()') >= 0 && syncSource.indexOf('function fbmSyncAutoFillAndCheck()') >= 0 && syncSource.indexOf("callServer('fbmStartIdentityProbe')") >= 0 && syncSource.indexOf("callServer('fbmSaveIdentityBinding'") >= 0 && syncSource.indexOf('IDENTITY_DRAFT_READY') >= 0, true);
   check(so, 'render status khong lam roi form tai khoan dang go', syncSource.indexOf('function fbmSyncCaptureActiveAccountDraft()') >= 0 && syncSource.indexOf('function fbmSyncRestoreActiveAccountDraft(snapshot)') >= 0 && syncSource.indexOf('active.setSelectionRange') >= 0, true);
@@ -155,24 +163,24 @@ async function chay(so) {
   check(so, 'Sidebar co man hinh giai quyet conflict theo hai phia', syncSource.indexOf('data-fbm-conflict-choice') >= 0 && syncSource.indexOf('fbmPrepareConflictResolution') >= 0 && syncSource.indexOf('fbmConfirmConflict') >= 0 && syncAuditSource.indexOf('Giữ toàn bộ ShinCRM') >= 0 && syncAuditSource.indexOf('Giữ toàn bộ FBM') >= 0 && syncAuditSource.indexOf('fbmSyncPaintConflictScreen') >= 0, true);
   check(so, 'Sidebar khong gui relay config truoc khi boot bat tay', sidebarSource.indexOf('fbmSyncConfigureRelay().catch(function () {})') < 0, true);
   const bootstrapSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'client', 'ram', 'bootstrap.html'), 'utf8');
-  check(so, 'mo Sidebar chi gui relay config sau bat tay, khong tu phat heartbeat', bootstrapSource.indexOf('sheetLinkInstall();') >= 0 && bootstrapSource.indexOf('fbmSyncAutoConfigureRelay()') > bootstrapSource.indexOf('sheetLinkInstall();') && syncSource.indexOf('CRM_FBM_HEARTBEAT_NOW') < 0 && syncSource.indexOf('fbmSyncNotifyBridgeReady') >= 0, true);
+  check(so, 'mo Sidebar gui relay mot lan sau bat tay local, khong doi mo man Dong bo', bootstrapSource.indexOf('sheetLinkInstall();') >= 0 && bootstrapSource.indexOf('fbmSyncPrepareRelayForSidebarOpen();') >= 0 && syncSource.indexOf('function fbmSyncPrepareRelayForSidebarOpen()') >= 0 && syncSource.indexOf('FBM_SYNC_RELAY_OPEN_PREPARED') >= 0 && syncSource.indexOf('CRM_FBM_HEARTBEAT_NOW') < 0, true);
   check(so, 'GAS tu cap khoa relay mot lan bang lock', entryPointsSource.indexOf('waitLock(10000)') >= 0 && entryPointsSource.indexOf('if (!key) { key = Utilities.getUuid()') >= 0 && entryPointsSource.indexOf('FBM_SYNC_KEY') >= 0, true);
   check(so, 'doi khoa relay co ACK tu Extension', entryPointsSource.indexOf('function fbmSyncRotateRelayKey') >= 0 && syncSource.indexOf('fbmSyncPostRelayConfig(config, true)') >= 0 && fs.readFileSync(BRIDGE_FILE, 'utf8').indexOf('CRM_FBM_CONFIG_ACK') >= 0, true);
-  check(so, 'relay co probe read-only va worker co ham probe doc lap', entryPointsSource.indexOf("body.kind === 'probe'") >= 0 && entryPointsSource.indexOf("code: 'RELAY_PROBE_OK'") >= 0 && workerSource.indexOf('function fbmRelayProbe()') >= 0 && workerSource.indexOf("type === 'FBM_RELAY_PROBE'") >= 0, true);
+  check(so, 'relay tu choi probe ngoai nhip nen; Extension khong con ham probe rieng', entryPointsSource.indexOf("body.kind === 'probe'") < 0 && entryPointsSource.indexOf('RELAY_KIND_UNSUPPORTED') >= 0 && workerSource.indexOf('function fbmRelayProbe()') < 0 && workerSource.indexOf("type === 'FBM_RELAY_PROBE'") < 0, true);
   check(so, 'Web App relay kiem tra khoa va Spreadsheet ID truoc khi xu ly', entryPointsSource.indexOf("getProperty('FBM_SYNC_KEY')") >= 0 && entryPointsSource.indexOf("body.key !== expected") >= 0 && entryPointsSource.indexOf("String(body.spreadsheetId) !== actualSpreadsheetId") >= 0, true);
-  check(so, 'probe ghi du moc gui va nhan response', workerSource.indexOf("stage: 'request_sent'") >= 0 && workerSource.indexOf("stage: 'response_received'") >= 0 && workerSource.indexOf('requestSentAt') >= 0 && workerSource.indexOf('responseReceivedAt') >= 0, true);
-  check(so, 'probe ghi dau response khi GAS tra khong phai JSON', workerSource.indexOf('contentType') >= 0 && workerSource.indexOf('responsePrefix') >= 0 && workerSource.indexOf('RELAY_INVALID_JSON') >= 0 && workerSource.indexOf('RELAY_ENDPOINT_NOT_FOUND') >= 0, true);
+  check(so, 'relay nền ghi du moc gui va nhan response', workerSource.indexOf("stage: 'request_sent'") >= 0 && workerSource.indexOf("stage: 'response_received'") >= 0 && workerSource.indexOf('requestSentAt') >= 0 && workerSource.indexOf('responseReceivedAt') >= 0, true);
+  check(so, 'relay nền ghi dau response khi GAS tra khong phai JSON', workerSource.indexOf('contentType') >= 0 && workerSource.indexOf('responsePrefix') >= 0 && workerSource.indexOf('RELAY_INVALID_JSON') >= 0 && workerSource.indexOf('RELAY_ENDPOINT_NOT_FOUND') >= 0, true);
   check(so, 'heartbeat co lenh chay ngay va ghi ly do bo qua', workerSource.indexOf('function fbmHeartbeatNow') >= 0 && workerSource.indexOf('FBM_HEARTBEAT_NOW') >= 0 && workerSource.indexOf('fbmHeartbeatLastStatus') >= 0 && workerSource.indexOf("fbmHeartbeatNow('alarm')") >= 0, true);
   check(so, 'heartbeat chi duoc chuyen sau khi GAS cap envelope', workerSource.indexOf("kind: 'heartbeat_request'") >= 0 && workerSource.indexOf('if (!gasRequest || gasRequest.ok !== true)') >= 0 && workerSource.indexOf('if (!gasRequest.request)') >= 0 && workerSource.indexOf('sendToFbmTab(tab.id, gasRequest.request)') >= 0, true);
   check(so, 'executor khong tu dung request heartbeat khi GAS khong cap', executorSource.indexOf('FBM_REQUEST_MISSING') >= 0 && executorSource.indexOf('HEARTBEAT_URL') < 0 && executorSource.indexOf('function heartbeat()') < 0, true);
   check(so, 'heartbeat chi chay sau khi GAS cap request va dung khi phien het han', workerSource.indexOf("kind: 'heartbeat_request'") >= 0 && workerSource.indexOf('blocked_gas_request') >= 0 && fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'state', 'Scheduler.js'), 'utf8').indexOf('SESSION_EXPIRED_WAITING_LOGIN') >= 0, true);
   check(so, 'executor ap dung bo loc response do GAS chi dinh', executorSource.indexOf('function captureTransport') >= 0 && executorSource.indexOf('request.meta && request.meta.transport') >= 0, true);
-  check(so, 'Sidebar luon dong bo relay va doi Extension xac nhan', syncSource.indexOf('fbmSyncPostRelayConfig(config, true)') >= 0 && syncSource.indexOf('Extension không xác nhận đã cập nhật URL relay GAS.') >= 0, true);
+  check(so, 'Sidebar gui relay mot lan va doi Extension ACK local', syncSource.indexOf('fbmSyncPostRelayConfig(config, true)') >= 0 && syncSource.indexOf('Extension không xác nhận đã lưu cấu hình kết nối.') >= 0 && syncSource.indexOf('sessionId: FBM_SYNC_RELAY_SESSION') >= 0, true);
   check(so, 'Sidebar khong ve lai form Tai khoan khi dang go', syncSource.indexOf('function fbmSyncAccountIsEditing') >= 0 && syncSource.indexOf('if (fbmSyncAccountIsEditing())') >= 0, true);
-  check(so, 'Extension reload thi Sidebar dong bo lai relay config theo session bridge', syncSource.indexOf('FBM_SYNC_RELAY_SESSION') >= 0 && syncSource.indexOf('FBM_SYNC_CLIENT.relayConfigured = false') >= 0 && syncSource.indexOf('SHEET_LINK_EXTENSION_SESSION') >= 0, true);
-  check(so, 'Extension probe relay truoc khi ghi cau hinh moi', workerSource.indexOf('function configureRelay(config)') >= 0 && workerSource.indexOf("code: 'RELAY_CONFIG_REJECTED'") >= 0 && workerSource.indexOf('configureRelay(config).then(sendResponse)') >= 0, true);
-  check(so, 'relay 404 yeu cau Sidebar tu lam moi URL', workerSource.indexOf('function requestRelayRefresh') >= 0 && workerSource.indexOf('requestRelayRefresh(String(parsed.code))') >= 0 && fs.readFileSync(BRIDGE_FILE, 'utf8').indexOf('CRM_REFRESH_RELAY') >= 0 && syncSource.indexOf('CRM_FBM_RELAY_REFRESH') >= 0, true);
-  check(so, 'GAS cap co alarm nen qua relay config va relay HTML loi thi dung alarm', entryPointsSource.indexOf('backgroundEnabled: typeof FbmSync.backgroundEnabled') >= 0 && workerSource.indexOf('function applyRelaySchedule') >= 0 && workerSource.indexOf('function restoreHeartbeatSchedule') >= 0 && workerSource.indexOf('fbmRelayBackgroundEnabled') >= 0 && workerSource.indexOf("parsed.code === 'RELAY_INVALID_JSON'") >= 0 && workerSource.indexOf('stopHeartbeat();') >= 0, true);
+  check(so, 'Extension doi phien khong lam Sidebar gui lai relay trong cung luot mo', syncSource.indexOf('FBM_SYNC_RELAY_SESSION') >= 0 && syncSource.indexOf('FBM_SYNC_CLIENT.relayConfigured = false') >= 0 && syncSource.indexOf('SHEET_LINK_EXTENSION_SESSION') >= 0 && syncSource.indexOf('FBM_SYNC_RELAY_OPEN_PREPARED') >= 0 && syncSource.indexOf('fbmSyncConfigureRelay();\n  return Promise.all') < 0, true);
+  check(so, 'Extension chi kiem tra cau truc roi luu relay local, khong probe Web App', workerSource.indexOf('function configureRelay(config)') >= 0 && workerSource.indexOf('normalizeRelayUrl(value.url)') >= 0 && workerSource.indexOf("kind: 'probe'") < 0 && workerSource.indexOf('configureRelay(config).then(sendResponse)') >= 0, true);
+  check(so, 'relay loi khong yeu cau Sidebar tu lam moi hoac tao retry ngoai lich', workerSource.indexOf('function requestRelayRefresh') < 0 && fs.readFileSync(BRIDGE_FILE, 'utf8').indexOf('CRM_REFRESH_RELAY') < 0 && syncSource.indexOf('CRM_FBM_RELAY_REFRESH') < 0, true);
+  check(so, 'alarm la nhip ky thuat; GAS moi quyet dinh co viec nen', workerSource.indexOf('function restoreHeartbeatSchedule') >= 0 && workerSource.indexOf('getRelayConfig().then(function (config)') >= 0 && workerSource.indexOf('fbmRelayBackgroundEnabled') < 0 && workerSource.indexOf('function applyRelaySchedule') < 0, true);
   check(so, 'relay config trung khop da xac nhan khong probe lai GAS', workerSource.indexOf('function relayConfigAlreadyConfirmed') >= 0 && workerSource.indexOf("code: 'RELAY_CONFIG_UNCHANGED'") >= 0 && workerSource.indexOf('if (relayConfigureFlight)') >= 0, true);
   check(so, 'service worker chi giu mot pipeline nen qua heartbeat', workerSource.indexOf('function fbmRunBackgroundSync()') < 0 && workerSource.indexOf("type === 'FBM_BACKGROUND_SYNC'") < 0 && workerSource.indexOf('relayBackgroundSyncRequests') < 0, true);
   check(so, 'heartbeat coi GAS noop hop le la thanh cong va khong tim tab FBM', workerSource.indexOf("noteHeartbeatStatus('gas_noop'") >= 0 && workerSource.indexOf('if (!gasRequest.request)') >= 0, true);
@@ -188,6 +196,30 @@ async function chay(so) {
   check(so, 'response FBM giu trace trong transport va loi cung giu trace', executorSource.indexOf('transport: Object.assign') >= 0 && executorSource.indexOf('trace: trace') >= 0 && workerSource.indexOf('transport: { trace: reply.trace') >= 0, true);
   const bridgeSource = fs.readFileSync(BRIDGE_FILE, 'utf8');
   check(so, 'bridge khong ghi de requestId GAS bang id waiter Sidebar', bridgeSource.indexOf("stage: 'bridge_received', clientRequestId") >= 0 && bridgeSource.indexOf("stage: 'bridge_received', requestId") < 0, true);
+
+  let relayFetches = 0;
+  let relayAlarms = 0;
+  let workerMessageListener = null;
+  const relayStorage = {};
+  const workerContext = {
+    console: { log() {}, warn() {}, info() {} }, Date, URL, Promise, Error, AbortController, setTimeout, clearTimeout,
+    chrome: {
+      tabs: { query: () => Promise.resolve([]), sendMessage() {} },
+      scripting: { executeScript: () => Promise.resolve() },
+      runtime: { lastError: null, onMessage: { addListener(fn) { workerMessageListener = fn; } }, onInstalled: { addListener() {} }, onStartup: { addListener() {} } },
+      alarms: { create() { relayAlarms += 1; }, clear: () => Promise.resolve(true), onAlarm: { addListener() {} } },
+      storage: { local: {
+        get(keys, done) { const value = {}; (Array.isArray(keys) ? keys : [keys]).forEach((key) => { value[key] = relayStorage[key]; }); done(value); },
+        set(value, done) { Object.assign(relayStorage, value); done(); }
+      } }
+    },
+    fetch() { relayFetches += 1; return Promise.reject(new Error('configureRelay không được fetch')); }
+  };
+  vm.createContext(workerContext);
+  vm.runInContext(workerSource, workerContext, { filename: WORKER_FILE });
+  const localRelay = await workerContext.configureRelay({ url: 'https://script.google.com/macros/s/relay-test/exec', key: 'relay-key', spreadsheetId: 'sheet-test' });
+  const unchangedRelay = await workerContext.configureRelay({ url: 'https://script.google.com/macros/s/relay-test/exec', key: 'relay-key', spreadsheetId: 'sheet-test' });
+  check(so, 'cau hinh relay chi luu local va khong phat sinh /exec probe', [localRelay.code, unchangedRelay.code, relayFetches, relayStorage.fbmWebAppUrl, relayAlarms > 0, typeof workerMessageListener], ['RELAY_CONFIG_SAVED', 'RELAY_CONFIG_UNCHANGED', 0, 'https://script.google.com/macros/s/relay-test/exec', true, 'function']);
 
   await new Promise((resolve) => {
     let listener = null;

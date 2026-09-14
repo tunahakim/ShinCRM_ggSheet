@@ -157,7 +157,7 @@ function fbmSyncSetScreen(screenId) { var ids = FBM_SYNC_UI_SCHEMA.screens.map(f
 function fbmSyncToggleMaster() {
   var current = FBM_SYNC_CLIENT.lastStatus || {}, enabled = !(current.masterEnabled === false || current.enabled === false), next = Object.assign({}, current, { masterEnabled: !enabled, enabled: !enabled });
   fbmSyncPaint(next);
-  return callServer('fbmSetMasterSwitch', [!enabled]).then(function () { return fbmSyncConfigureRelay(); }).then(fbmSyncStatusOnce).catch(function (error) {
+  return callServer('fbmSetMasterSwitch', [!enabled]).then(fbmSyncStatusOnce).catch(function (error) {
     var rollback = Object.assign({}, FBM_SYNC_CLIENT.lastStatus || current, { masterEnabled: enabled, enabled: enabled, message: String(error && error.message || error) }); fbmSyncPaint(rollback); return null;
   });
 }

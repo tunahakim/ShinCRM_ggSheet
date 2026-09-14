@@ -39,7 +39,7 @@ function scheduleHeartbeat() {
   }
 }
 
-/** Alarm là tài nguyên vận chuyển; GAS cấp cờ cho phép, Extension chỉ chấp hành. */
+/** Alarm là nhịp kỹ thuật; GAS quyết định mỗi nhịp có cấp việc hay không. */
 function stopHeartbeat() {
   try {
     if (chrome.alarms && chrome.alarms.clear) { return chrome.alarms.clear('fbm-heartbeat'); }
@@ -49,15 +49,9 @@ function stopHeartbeat() {
   return undefined;
 }
 
-function applyRelaySchedule(config) {
-  var allowed = !!(config && config.masterEnabled === true && config.backgroundEnabled === true);
-  if (allowed) { scheduleHeartbeat(); } else { stopHeartbeat(); }
-  return allowed;
-}
-
 function restoreHeartbeatSchedule() {
-  chrome.storage.local.get(['fbmRelayMasterEnabled', 'fbmRelayBackgroundEnabled'], function (config) {
-    applyRelaySchedule({ masterEnabled: config && config.fbmRelayMasterEnabled === true, backgroundEnabled: config && config.fbmRelayBackgroundEnabled === true });
+  getRelayConfig().then(function (config) {
+    if (config) { scheduleHeartbeat(); } else { stopHeartbeat(); }
   });
 }
 
@@ -176,9 +170,6 @@ function rawFbmReply(reply) {
 // GAS Web App có thể mất hơn 15 giây khi cold start hoặc đang chờ Spreadsheet lock.
 // Giữ giới hạn hữu hạn để alarm không treo vô hạn, nhưng đủ rộng cho redirect /exec.
 var GAS_RELAY_TIMEOUT_MS = 30000;
-var GAS_RELAY_REFRESH_COOLDOWN_MS = 30000;
-var relayRefreshFlight = null;
-var relayRefreshLastAt = 0;
 var relayConfigureFlight = null;
 
 /** Lưu dấu chẩn đoán relay tối thiểu để có thể kiểm tra khi không có Sidebar. */
@@ -220,10 +211,6 @@ function postRelay(url, key, body) {
       }
       if (!response.ok && parsed && !parsed.error) { parsed.error = 'GAS relay HTTP ' + response.status; }
       noteRelayStatus({ stage: 'completed', requestSentAt: requestSentAt, responseReceivedAt: responseReceivedAt, ok: response.ok && parsed && parsed.ok !== false, code: parsed && parsed.code || (response.ok ? 'OK' : 'RELAY_HTTP_ERROR'), httpStatus: response.status, responseLength: text.length, contentType: contentType, responsePrefix: responsePrefix, error: parsed && parsed.error || '' });
-      if (parsed && (parsed.code === 'RELAY_ENDPOINT_NOT_FOUND' || parsed.code === 'RELAY_INVALID_JSON')) {
-        stopHeartbeat();
-        requestRelayRefresh(String(parsed.code));
-      }
       return parsed;
     });
   }).catch(function (error) {
@@ -233,37 +220,6 @@ function postRelay(url, key, body) {
     throw new Error(message);
   }).finally(function () { if (timer) { clearTimeout(timer); } });
 }
-
-/** Yêu cầu Sidebar đang mở lấy lại URL deployment hiện tại từ GAS. */
-function requestRelayRefresh(reason) {
-  var now = Date.now();
-  if (relayRefreshFlight) { return relayRefreshFlight; }
-  if (now - relayRefreshLastAt < GAS_RELAY_REFRESH_COOLDOWN_MS) { return Promise.resolve([]); }
-  relayRefreshLastAt = now;
-  relayRefreshFlight = chrome.tabs.query({ url: ['https://docs.google.com/*'] }).then(function (tabs) {
-    var targets = (tabs || []).filter(function (tab) { return /https:\/\/docs\.google\.com\/spreadsheets\//i.test(String(tab && tab.url || '')); });
-    return Promise.all(targets.map(function (tab) {
-      return sendTabMessage(tab.id, { type: 'CRM_REFRESH_RELAY', reason: String(reason || '') }, 1500).catch(function () { return null; });
-    }));
-  }).catch(function () { return []; }).finally(function () { relayRefreshFlight = null; });
-  return relayRefreshFlight;
-}
-
-/** Probe chỉ gọi Web App GAS; không tìm tab FBM, không gửi request nghiệp vụ. */
-function fbmRelayProbe() {
-  return getRelayConfig().then(function (config) {
-    if (!config) {
-      var missing = { ok: false, code: 'RELAY_CONFIG_MISSING', error: 'Thiếu URL, khóa hoặc Spreadsheet ID relay.' };
-      noteRelayStatus(Object.assign({ stage: 'blocked' }, missing));
-      return missing;
-    }
-    return postRelay(config.url, config.key, { kind: 'probe', spreadsheetId: config.spreadsheetId }).then(function (reply) {
-      console.info('[ShinCRM] GAS relay probe', reply);
-      return reply;
-    });
-  });
-}
-if (typeof globalThis !== 'undefined') { globalThis.fbmRelayProbe = fbmRelayProbe; }
 
 var fbmHeartbeatFlight = null;
 
@@ -368,43 +324,39 @@ function normalizeRelayUrl(value) {
   return parsed.toString().replace(/\/$/, '');
 }
 
-/** Chỉ probe khi config đổi hoặc Extension chưa từng xác nhận config này. */
+/** So cấu hình kỹ thuật đã lưu; không gọi Web App khi Sidebar mở. */
 function relayConfigAlreadyConfirmed(config) {
   return new Promise(function (resolve) {
-    chrome.storage.local.get(['fbmWebAppUrl', 'fbmSyncKey', 'fbmSpreadsheetId', 'fbmRelayMasterEnabled', 'fbmRelayBackgroundEnabled'], function (saved) {
+    chrome.storage.local.get(['fbmWebAppUrl', 'fbmSyncKey', 'fbmSpreadsheetId'], function (saved) {
       resolve(
         normalizeRelayUrl(saved && saved.fbmWebAppUrl) === normalizeRelayUrl(config && config.url) &&
         String(saved && saved.fbmSyncKey || '') === String(config && config.key || '') &&
-        String(saved && saved.fbmSpreadsheetId || '') === String(config && config.spreadsheetId || '') &&
-        typeof (saved && saved.fbmRelayMasterEnabled) === 'boolean' &&
-        typeof (saved && saved.fbmRelayBackgroundEnabled) === 'boolean'
+        String(saved && saved.fbmSpreadsheetId || '') === String(config && config.spreadsheetId || '')
       );
     });
   });
 }
 
-/** Chỉ ghi relay sau khi endpoint mới đã trả lời; URL hỏng không được ghi đè URL đang dùng. */
+/** Sidebar chỉ truyền địa chỉ relay một lần; Extension chỉ kiểm tra cấu trúc rồi lưu local. */
 function configureRelay(config) {
-  var value = config || {}, url = String(value.url || '').trim(), key = String(value.key || '').trim(), spreadsheetId = String(value.spreadsheetId || '').trim();
-  if (!url || !key || !spreadsheetId) { return Promise.resolve({ ok: false, code: 'RELAY_CONFIG_INVALID', error: 'Cấu hình relay thiếu URL, khóa hoặc Spreadsheet ID.' }); }
+  var value = config || {}, url = normalizeRelayUrl(value.url), key = String(value.key || '').trim(), spreadsheetId = String(value.spreadsheetId || '').trim();
+  if (!url || !key || !spreadsheetId) { return Promise.resolve({ ok: false, code: 'RELAY_CONFIG_INVALID', error: 'Cấu hình relay thiếu URL Web App hợp lệ, khóa hoặc Spreadsheet ID.' }); }
   if (relayConfigureFlight) { return relayConfigureFlight; }
-  relayConfigureFlight = relayConfigAlreadyConfirmed(value).then(function (confirmed) {
+  var normalized = { url: url, key: key, spreadsheetId: spreadsheetId };
+  relayConfigureFlight = relayConfigAlreadyConfirmed(normalized).then(function (confirmed) {
     if (confirmed) {
-      applyRelaySchedule({ masterEnabled: value.masterEnabled === true, backgroundEnabled: value.backgroundEnabled === true });
+      scheduleHeartbeat();
       return { ok: true, code: 'RELAY_CONFIG_UNCHANGED' };
     }
-    return postRelay(url, key, { kind: 'probe', spreadsheetId: spreadsheetId }).then(function (probe) {
-      if (!probe || probe.ok !== true) { return Object.assign({ ok: false, code: 'RELAY_CONFIG_REJECTED' }, probe || { error: 'Relay mới không trả lời hợp lệ.' }); }
-      return new Promise(function (resolve) {
-        chrome.storage.local.set({ fbmWebAppUrl: url, fbmSyncKey: key, fbmSpreadsheetId: spreadsheetId, fbmRelayMasterEnabled: value.masterEnabled !== false && probe.masterEnabled !== false, fbmRelayBackgroundEnabled: value.backgroundEnabled !== false && probe.backgroundEnabled !== false }, function () {
-          var error = chrome.runtime.lastError;
-          if (error) { resolve({ ok: false, code: 'RELAY_CONFIG_SAVE_FAILED', error: error.message }); return; }
-          applyRelaySchedule({ masterEnabled: value.masterEnabled !== false && probe.masterEnabled !== false, backgroundEnabled: value.backgroundEnabled !== false && probe.backgroundEnabled !== false });
-          resolve({ ok: true, code: 'RELAY_CONFIG_SAVED' });
-        });
+    return new Promise(function (resolve) {
+      chrome.storage.local.set({ fbmWebAppUrl: url, fbmSyncKey: key, fbmSpreadsheetId: spreadsheetId }, function () {
+        var error = chrome.runtime.lastError;
+        if (error) { resolve({ ok: false, code: 'RELAY_CONFIG_SAVE_FAILED', error: error.message }); return; }
+        scheduleHeartbeat();
+        resolve({ ok: true, code: 'RELAY_CONFIG_SAVED' });
       });
     });
-  }).catch(function (error) { return { ok: false, code: 'RELAY_CONFIG_REJECTED', error: String(error && error.message || error) }; }).finally(function () { relayConfigureFlight = null; });
+  }).catch(function (error) { return { ok: false, code: 'RELAY_CONFIG_SAVE_FAILED', error: String(error && error.message || error) }; }).finally(function () { relayConfigureFlight = null; });
   return relayConfigureFlight;
 }
 
@@ -478,10 +430,6 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     var config = message.config || {};
     if (!chrome.storage || !chrome.storage.local) { sendResponse({ ok: false, error: 'Extension không có kho cấu hình.' }); return false; }
     configureRelay(config).then(sendResponse);
-    return true;
-  }
-  if (message && message.type === 'FBM_RELAY_PROBE') {
-    fbmRelayProbe().then(sendResponse, function (error) { sendResponse({ ok: false, code: 'RELAY_PROBE_FAILED', error: String(error && error.message || error) }); });
     return true;
   }
   if (message && message.type === 'FBM_HEARTBEAT_NOW') {

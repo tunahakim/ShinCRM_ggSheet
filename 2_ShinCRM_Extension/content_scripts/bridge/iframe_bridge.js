@@ -90,14 +90,6 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
     sendResponse({ ready: true, version: '21.7' });
     return false;
   });
-  chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
-    if (!message || message.type !== 'CRM_REFRESH_RELAY') { return false; }
-    if (sidebarWindow && sidebarOrigin && sidebarNonce) {
-      try { sidebarWindow.postMessage({ action: 'CRM_FBM_RELAY_REFRESH', nonce: sidebarNonce, reason: String(message.reason || '') }, sidebarOrigin); } catch (ignore) {}
-    }
-    sendResponse({ ok: true, forwarded: !!sidebarWindow });
-    return false;
-  });
 }
 
 function isAllowedSidebarOrigin(origin) {
@@ -107,35 +99,45 @@ function isAllowedSidebarOrigin(origin) {
   return false;
 }
 
+/** Tin có việc phải thuộc đúng phiên Extension vừa ACK để bridge cũ không trả lời chen vào bridge mới. */
+function isCurrentExtensionSession(data) {
+  return String(data && data.sessionId || '') === extensionSessionId;
+}
+
+function bridgeErrorCode(error) {
+  return isInvalidatedExtensionError(error) ? 'EXTENSION_CONTEXT_INVALIDATED' : 'FBM_TRANSPORT_UNAVAILABLE';
+}
+
+function bridgeErrorMessage(error) {
+  if (isInvalidatedExtensionError(error)) { return 'Extension vừa được tải lại. Hãy mở lại Sidebar để gửi lại cấu hình kết nối.'; }
+  return String(error && error.message || error || 'Extension không xử lý được yêu cầu.');
+}
+
 // 1. Bắt tay: kiểm origin, ghi nhớ đích, đáp tiếng kèm đúng nonce.
 window.addEventListener('message', function (event) {
   var data = event.data;
   if (data && data.action === 'CRM_FBM_CONFIG') {
-    if (!isAllowedSidebarOrigin(event.origin) || event.source !== sidebarWindow || String(data.nonce || '') !== sidebarNonce) { return; }
+    if (!isAllowedSidebarOrigin(event.origin) || event.source !== sidebarWindow || String(data.nonce || '') !== sidebarNonce || !isCurrentExtensionSession(data)) { return; }
     sendRequestToWorker({ type: 'FBM_CONFIGURE_RELAY', config: data.config || {} }, function (error, reply) {
-      // Content script cũ còn sống vài nhịp sau khi Extension reload. Khi đó
-      // runtime đã bị vô hiệu hóa; không biến lỗi nội bộ thành cảnh báo nghiệp vụ.
-      if (isInvalidatedExtensionError(error)) { return; }
       if (error && console && console.warn) { console.warn('Không lưu được cấu hình relay FBM:', error); }
       try {
-        event.source.postMessage({ action: 'CRM_FBM_CONFIG_ACK', nonce: sidebarNonce, id: String(data.id || ''), ok: !error && !(reply && reply.ok === false), error: error ? error.message : (reply && reply.error || '') }, event.origin);
+        event.source.postMessage({ action: 'CRM_FBM_CONFIG_ACK', nonce: sidebarNonce, sessionId: extensionSessionId, id: String(data.id || ''), ok: !error && !(reply && reply.ok === false), code: error ? bridgeErrorCode(error) : (reply && reply.code || ''), error: error ? bridgeErrorMessage(error) : (reply && reply.error || '') }, event.origin);
       } catch (ignoreAck) {}
     });
     return;
   }
   if (data && data.action === 'CRM_FBM_CREDENTIALS') {
-    if (!isAllowedSidebarOrigin(event.origin) || event.source !== sidebarWindow || String(data.nonce || '') !== sidebarNonce) { return; }
+    if (!isAllowedSidebarOrigin(event.origin) || event.source !== sidebarWindow || String(data.nonce || '') !== sidebarNonce || !isCurrentExtensionSession(data)) { return; }
     sendRequestToWorker({ type: 'FBM_ENCRYPT_CREDENTIALS', credentials: data.credentials || {} }, function (error, reply) {
-      if (isInvalidatedExtensionError(error)) { return; }
       try {
-        event.source.postMessage({ action: 'CRM_FBM_CREDENTIALS_RESULT', nonce: sidebarNonce, id: String(data.id || ''), result: error ? null : reply, error: error ? error.message : (reply && reply.error || '') }, event.origin);
+        event.source.postMessage({ action: 'CRM_FBM_CREDENTIALS_RESULT', nonce: sidebarNonce, sessionId: extensionSessionId, id: String(data.id || ''), result: error ? null : reply, code: error ? bridgeErrorCode(error) : (reply && reply.code || ''), error: error ? bridgeErrorMessage(error) : (reply && reply.error || '') }, event.origin);
       } catch (ignoreCredentialsAck) {}
     });
     return;
   }
   if (data && data.action === 'CRM_FBM_REQUEST') {
     // Chuyển nguyên request qua service worker; bridge không phân tích response FBM.
-    if (!isAllowedSidebarOrigin(event.origin) || String(data.nonce || '') !== sidebarNonce) { return; }
+    if (!isAllowedSidebarOrigin(event.origin) || String(data.nonce || '') !== sidebarNonce || !isCurrentExtensionSession(data)) { return; }
     // Sheets có thể thay WindowProxy sau reload; nonce vẫn định danh đúng Sidebar.
     if (event.source && event.source !== sidebarWindow) { sidebarWindow = event.source; sidebarOrigin = event.origin; }
     // `data.id` is only the Sidebar waiter id. The GAS reservation id lives in
@@ -143,9 +145,6 @@ window.addEventListener('message', function (event) {
     // GAS stale-response validation.
     var bridgeTrace = { at: Date.now(), stage: 'bridge_received', clientRequestId: String(data.id || '') };
     sendRequestToWorker({ type: 'FBM_EXECUTE_REQUEST', id: data.id, request: data.request }, function (error, reply) {
-      // Content script cũ sau Extension Reload không còn runtime context. Không phát
-      // response lỗi cạnh response thật của bridge mới vừa được worker nạp lại.
-      if (isInvalidatedExtensionError(error)) { return; }
       try {
         var trace = (reply && reply.result && reply.result.transport && reply.result.transport.trace) || (reply && reply.trace) || [];
         var bridgeResponseTrace = Object.assign({}, bridgeTrace, { at: Date.now(), stage: 'bridge_response_sent' });
@@ -156,8 +155,8 @@ window.addEventListener('message', function (event) {
           nonce: sidebarNonce,
           id: data.id,
           result: error ? null : (reply && reply.result),
-          error: error ? error.message : (reply && reply.error),
-          code: error ? 'FBM_TRANSPORT_UNAVAILABLE' : (reply && reply.code),
+          error: error ? bridgeErrorMessage(error) : (reply && reply.error),
+          code: error ? bridgeErrorCode(error) : (reply && reply.code),
           trace: trace,
           retryable: false
         }, event.origin);

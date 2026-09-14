@@ -4,6 +4,38 @@ const { taoHopCat, napServer } = require("../../lib/load-gas");
 
 async function chay(so) {
   section("FBM sync — orchestration");
+  const bindingData = {};
+  const bindingProperties = {
+    getProperty: (key) => bindingData[key] || null,
+    setProperty: (key, value) => { bindingData[key] = String(value); },
+    deleteProperty: (key) => { delete bindingData[key]; }
+  };
+  const identity = taoHopCat({
+    FbmSync: {},
+    PropertiesService: { getDocumentProperties: () => bindingProperties },
+    shinOpenBook: () => ({ getId: () => 'sheet-binding-test' })
+  });
+  napServer(identity, 'fbm_sync/reconcile/Identity.js');
+  identity.FbmSync.configValue = () => '';
+  identity.FbmSync.readLocal = () => [];
+  bindingData[identity.FbmSync.BINDING_KEY] = JSON.stringify({ spreadsheetId: 'sheet-binding-test', userId: '2037', username: 'anhlt', accountName: 'Le Tuan Anh' });
+  const clearedBinding = identity.FbmSync.bindingWrite({});
+  check(so, 'lưu liên kết rỗng xóa binding và khóa mọi đồng bộ thường', [clearedBinding.ok, clearedBinding.code, bindingData[identity.FbmSync.BINDING_KEY], clearedBinding.identityStatus.status], [true, 'IDENTITY_BINDING_CLEARED', undefined, 'UNBOUND']);
+  bindingData[identity.FbmSync.BINDING_KEY] = JSON.stringify({ spreadsheetId: 'sheet-binding-test', userId: '2037', username: 'anhlt', accountName: 'Le Tuan Anh' });
+  identity.FbmSync.stateRead = () => ({ runId: 'running-binding-test', phase: 'pull_customer', activeRequestId: 'request-binding-test' });
+  const blockedBindingClear = identity.FbmSync.bindingWrite({});
+  check(so, 'không hủy liên kết khi request FBM đang bay', [blockedBindingClear.ok, blockedBindingClear.code, Boolean(bindingData[identity.FbmSync.BINDING_KEY])], [false, 'SYNC_ALREADY_RUNNING', true]);
+
+  const relay = taoHopCat({
+    FbmSync: {},
+    PropertiesService: { getDocumentProperties: () => ({ getProperty: () => 'relay-test-key' }), getScriptProperties: () => ({ getProperty: () => 'relay-test-key' }) },
+    shinOpenBook: () => ({ getId: () => 'sheet-relay-test' }),
+    ContentService: { MimeType: { JSON: 'application/json' }, createTextOutput: (text) => ({ text: text, setMimeType() { return this; } }) }
+  });
+  napServer(relay, 'fbm_sync/transport/EntryPoints.js');
+  const rejectedProbe = JSON.parse(relay.doPost({ postData: { contents: JSON.stringify({ key: 'relay-test-key', spreadsheetId: 'sheet-relay-test', kind: 'probe' }) } }).text);
+  check(so, 'Web App từ chối probe ngoài nhịp nền', [rejectedProbe.ok, rejectedProbe.code, rejectedProbe.request], [false, 'RELAY_KIND_UNSUPPORTED', null]);
+
   const props = { data: {} };
   let propertyWrites = 0;
   const propertyApi = { getProperty: (key) => props.data[key] || null, setProperty: (key, value) => { propertyWrites += 1; props.data[key] = String(value); } };
@@ -191,13 +223,12 @@ async function chay(so) {
   const heartbeatPropertyApi = { getProperty: (key) => heartbeatData[key] || null, setProperty: (key, value) => { heartbeatData[key] = String(value); } };
   const heartbeat = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => heartbeatPropertyApi, getScriptProperties: () => heartbeatPropertyApi }, LockService: { getDocumentLock: () => ({ tryLock: () => true, releaseLock: () => {} }) } });
   napServer(heartbeat, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/EntryPoints.js');
-  const heartbeatStateRead = heartbeat.FbmSync.stateRead;
-  heartbeat.FbmSync.stateRead = () => ({ session: { expired: true } });
-  const relayProbe = heartbeat.fbmSyncRelayProbe();
-  check(so, 'relay probe tra co trang thai cong tac va phien', [relayProbe.ok, relayProbe.code, relayProbe.sessionExpired], [true, 'RELAY_PROBE_OK', true]);
-  heartbeat.FbmSync.stateRead = heartbeatStateRead;
   heartbeat.FbmSync.stateStart('', 'idle', 0);
   heartbeat.FbmSync.statePatch({ session: { cookie: '', expired: false } });
+  heartbeat.FbmSync.identityPreflight = () => ({ blocking: true, status: { status: 'UNBOUND' }, message: 'Chưa có liên kết tài khoản FBM.' });
+  const unboundHeartbeat = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+  check(so, 'heartbeat không cấp envelope FBM khi chưa liên kết tài khoản', [unboundHeartbeat.ok, unboundHeartbeat.code, unboundHeartbeat.request], [true, 'FBM_IDENTITY_UNBOUND', null]);
+  heartbeat.FbmSync.identityPreflight = () => ({ blocking: false, status: { status: 'BOUND' }, message: '' });
   const heartbeatRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   check(so, 'GAS cap heartbeat de capture generic khi chua biet cookie', [heartbeatRequest.ok, heartbeatRequest.code, heartbeatRequest.request.meta.kind, heartbeatRequest.request.body.type, heartbeatRequest.request.body.count, heartbeatRequest.request.body.sortExpression, heartbeatRequest.request.bodyText.indexOf('{{FBM_PAYLOAD_COOKIE}}') >= 0], [true, 'HEARTBEAT_REQUEST_READY', 'heartbeat', 0, 1, null, true]);
   const overlappingHeartbeat = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });

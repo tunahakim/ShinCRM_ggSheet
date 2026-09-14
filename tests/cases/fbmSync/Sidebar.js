@@ -123,6 +123,28 @@ async function chay(so) {
   hop.fbmSyncApplyIdentityProbeDraft({ metadata: { identityProbe: { spreadsheetId: 'sheet-probe', userId: '2037', accountName: 'ANHLT' } } });
   render(hop, content, hop.fbmSyncRenderAccount, idle);
   check(so, 'Identity probe tự điền bản nháp vào đủ ba ô mà chưa tự lưu', [dom.document.getElementById('fbm-identity-spreadsheet').value, dom.document.getElementById('fbm-identity-user').value, dom.document.getElementById('fbm-identity-account').value, hop.FBM_SYNC_CLIENT.identityStatus.status], ['sheet-probe', '2037', 'ANHLT', 'REBIND_REQUIRED']);
+  render(hop, content, hop.fbmSyncRenderAccount, { phase: 'error', message: 'Extension không trả lời yêu cầu FBM.', counts: {} });
+  check(so, 'Account hiện lỗi cầu nối tường minh', content.textContent.indexOf('Extension không trả lời yêu cầu FBM.') >= 0, true);
+
+  let relayConfigurations = 0;
+  hop.fbmSyncConfigureRelay = () => { relayConfigurations += 1; return Promise.resolve(null); };
+  await hop.fbmSyncPrepareRelayForSidebarOpen();
+  await hop.fbmSyncPrepareRelayForSidebarOpen();
+  check(so, 'một vòng đời Sidebar chỉ gửi relay config một lần', relayConfigurations, 1);
+
+  hop.FBM_SYNC_CLIENT.subscreen = 'account';
+  const accountPassword = dom.document.getElementById('fbm-login-password');
+  accountPassword.value = 'mat-khau-dang-go';
+  const clickedLoginTest = dom.document.createElement('button');
+  dom.document.activeElement = clickedLoginTest;
+  hop.fbmSyncPaint(idle);
+  check(so, 'repaint sau khi bấm nút vẫn giữ mật khẩu chưa lưu', dom.document.getElementById('fbm-login-password').value, 'mat-khau-dang-go');
+
+  hop.FBM_SYNC_CLIENT.subscreen = 'run';
+  hop.fbmSyncPaint(active);
+  const runFirstNode = content.children[0];
+  const patchedLiveStatus = hop.fbmSyncPatchLiveStatus(content, Object.assign({}, active, { label: 'Đang đối soát', counts: { completed: 4, succeeded: 3 } }), 'run');
+  check(so, 'trạng thái đang chạy được cập nhật tại chỗ, không dựng lại màn hình', [patchedLiveStatus, content.children[0] === runFirstNode, content.textContent.indexOf('Đang đối soát') >= 0], [true, true, true]);
 
   hop.FBM_SYNC_CLIENT.resultsTab = 'summary';
   const conflictStatus = { phase: 'conflict', counts: { conflict: 1 }, metadata: { conflictCount: 1, conflicts: [{ entity: 'customer', id: 'CUS-1', fbmId: 'ALT00010', fields: [{ field: 'phone', left: '0901', right: '0902' }] }] } };

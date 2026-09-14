@@ -65,8 +65,8 @@ class GiaElement {
     if (selector === '[data-collapse-btn]') return this.hasAttribute('data-collapse-btn');
     const cls = /^\.([^\[]+)$/.exec(selector);
     if (cls) return this.className.split(/\s+/).indexOf(cls[1]) >= 0;
-    const menu = /^\[data-menu="([^"]+)"\]$/.exec(selector);
-    return !!menu && this.getAttribute('data-menu') === menu[1];
+    const attribute = /^\[([^\]=]+)(?:="([^"]*)")?\]$/.exec(selector);
+    return !!attribute && this.hasAttribute(attribute[1]) && (attribute[2] === undefined || this.getAttribute(attribute[1]) === attribute[2]);
   }
   closest(selector) {
     let node = this;

@@ -39,14 +39,14 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] GAS dựng `bodyText` đã escape cho FBM; Extension chỉ chuyển nguyên văn qua `fetch`, không parse/serialize lại.
 
 - [x] Extension có host permission `https://fbo.com.vn:8888/*`, content script FBM, service worker và cơ chế nạp lại executor.
-- [x] Có probe relay chỉ đọc: Service Worker gọi Web App GAS trực tiếp, GAS trả `RELAY_PROBE_OK`, không cần Sidebar và không chạm tab FBM.
-- [x] Probe ghi `request_sent`, `response_received` và kết quả cuối vào `chrome.storage.local` để phân biệt lỗi gửi, lỗi nhận và lỗi xử lý response.
-- [x] Service Worker có lệnh kiểm tra vòng đọc `fbmRunBackgroundSync()`, chuyển request/response do GAS cấp qua tab FBM; không tự đặt giới hạn số request, dừng theo `request: null` hoặc mã dừng do GAS trả về và không tự ghi FBM.
+- [x] Mỗi lần Sidebar mở, sau bắt tay local, Sidebar gửi đúng một relay config do GAS cấp; Extension chỉ kiểm tra cấu trúc rồi lưu local/ACK, không probe `/exec` hoặc retry theo session bridge.
+- [x] Relay nền ghi `request_sent`, `response_received` và kết quả cuối vào `chrome.storage.local` để phân biệt lỗi gửi, lỗi nhận và lỗi xử lý response; cấu hình relay không tạo request Web App.
+- [x] Service Worker chỉ hỏi GAS ở nhịp alarm, chuyển request/response do GAS cấp qua tab FBM và nộp response thô lại; `request: null` thì không tìm tab, không gọi FBM và chờ nhịp sau.
 - [x] Relay nền dùng DTO gọn, không chuyển `metadata`/`traceTail` của Sidebar qua Extension.
 - [x] Đã kiểm chứng đường Sidebar → Extension → tab FBM → Sidebar nhận response thật.
 - [x] Executor báo phiên bản `21.7`; reload Extension có thể phục hồi đầu nhận.
-- [x] Bridge cũ sau Reload báo lỗi `Extension context invalidated` theo nhánh có thể thử lại; Sidebar phát lại đúng một request và Service Worker chống trùng theo `id`.
-- [x] Bridge cũ tự im lặng khi context mất, không làm rơi response thật từ bridge mới sau Reload.
+- [x] Bridge mất context trả lỗi `EXTENSION_CONTEXT_INVALIDATED` tường minh; Sidebar không tự phát lại request FBM, Service Worker vẫn chống trùng theo `id`.
+- [x] Bridge khác `sessionId` bị bỏ qua để không làm rơi response thật từ bridge hiện tại.
 - [x] Request authorized Customer dùng `viewPage:false`, `authorized:null`, `values:[]` và ba vars đúng hợp đồng.
 - [x] Request authorized Activity dùng controller riêng và hai vars đúng hợp đồng.
 - [x] Đã kiểm chứng thực tế việc nhận được authorized Customer và Activity của phiên FBM đang mở.
@@ -84,7 +84,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Trước mỗi phiên chạy checker Core và checker riêng của `fbm_sync`; mọi lỗi có `scope`, `code`, `severity`, `blocking`, thông báo người dùng và dòng Log, không ẩn trong bước push.
 - [x] Tìm tab FBM, ping executor, fetch trong tab và nhận response thô.
 - [x] Khi mất executor, inject rồi ping lại; request nghiệp vụ chỉ gửi một lần.
-- [x] Executor có phiên bản giao thức riêng; worker tự nạp lại bản mới và dùng kênh request V2 để bản cũ không xử lý heartbeat song song. Request thiếu envelope bị chặn trước `fetch`, trace chỉ giữ metadata transport tối thiểu. Có lệnh `fbmHeartbeatNow()` và `fbmHeartbeatLastStatus` để nghiệm thu ngay, không phải chờ alarm 5 phút; heartbeat phải nhận envelope do GAS cấp trước khi chạm FBM, không còn request mặc định trong executor; alarm dừng khi relay/công tắc lỗi hoặc GAS báo phiên hết hạn.
+- [x] Executor có phiên bản giao thức riêng; worker tự nạp lại bản mới và dùng kênh request V2 để bản cũ không xử lý heartbeat song song. Request thiếu envelope bị chặn trước `fetch`, trace chỉ giữ metadata transport tối thiểu. Có lệnh `fbmHeartbeatNow()` và `fbmHeartbeatLastStatus` để nghiệm thu ngay, không phải chờ alarm 5 phút; heartbeat phải nhận envelope do GAS cấp trước khi chạm FBM, không còn request mặc định trong executor; alarm chỉ là nhịp hỏi GAS, không tự dừng/tạo retry theo lỗi relay hoặc cờ nghiệp vụ.
 - [x] 401/403 hoặc `Login.aspx` dừng kỳ và yêu cầu đăng nhập lại khi tùy chọn tự động đăng nhập tắt.
 - [x] Tùy chọn tự động đăng nhập mặc định bật, tự chạy khi session hết hạn/không có cookie, không ép login khi session hợp lệ đang tồn tại và chỉ thử lại nhiều nhất một lần mỗi 30 phút. Code, test offline và GAS DEV `fbmGetLoginConfig` đã xác nhận trạng thái mặc định; nhánh hết phiên có throttle 30 phút.
 - [x] Form thiết lập đặt username và password cạnh nhau, hiển thị mật khẩu dạng bản rõ chỉ trong lượt đang gõ, không ghi bản rõ vào Sheet hoặc Log. Sidebar chỉ xóa ô sau `Lưu mã hóa` thành công, không xóa sau `Đăng nhập thử`.
@@ -94,8 +94,8 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Preflight đối chiếu tuyệt đối username/mã user, tên đầy đủ và SpreadsheetId thực tế trước request nghiệp vụ; không trim, đổi hoa thường hoặc chuẩn hóa khi so sánh và không dùng mã ngắn.
 - [x] Tự điền thông tin nhận diện từ Spreadsheet hiện tại và response `authorize`, chỉ cho xác nhận các giá trị hệ thống, không tự lưu hoặc tự chuyển tài khoản. Probe chỉ gọi authorize, không quét Customer; Sidebar chỉ lưu sau nút xác nhận.
 - [x] `Kiểm tra thông tin đồng bộ` quét đủ Customer FBM, đối chiếu chỉ các dòng local đã có FBM_ID, trả tổng hợp `n/N`, mẫu sai lệch và nút `Kiểm tra lại`; không ghi Sheet/FBM. Code, test offline và GAS DEV đã xác nhận entrypoint authorize Customer, full-scan không lọc mã test, cursor `stt_rec_kh` và kết thúc không ghi Sheet/FBM.
-- [x] Khi file là bản sao, đổi tài khoản hoặc chưa có liên kết nhưng đã có dữ liệu, chuyển `REBIND_REQUIRED`, khóa push/nền; sau khi người dùng xử lý dữ liệu cũ có thể chạy kiểm tra lại, không tự xóa dữ liệu.
-- [x] Mỗi lần Sidebar mở hoặc bắt tay lại, Extension ghi đè relay config bằng GAS URL, khóa và Spreadsheet ID hiện tại; Extension chỉ giữ một config đang hoạt động và alarm không gọi FBM khi chưa có config.
+- [x] Khi chưa có liên kết, file là bản sao hoặc đổi tài khoản khi còn dữ liệu, chuyển `UNBOUND`/`REBIND_REQUIRED`, khóa mọi đồng bộ thường trước khi cấp request FBM; sau khi người dùng xử lý dữ liệu cũ có thể chạy kiểm tra lại, không tự xóa dữ liệu.
+- [x] Mỗi lần Sidebar mở, Extension nhận đúng một relay config gồm GAS URL, khóa và Spreadsheet ID hiện tại; Extension chỉ giữ một config đang hoạt động và alarm không gọi FBM khi chưa có config.
 - [x] Tách phần dựng block trạng thái, điều khiển và audit thành các tệp `.html` riêng trong `client/sync/`, vẫn dùng lớp component/block chuẩn của Sidebar.
 - [x] Tách màn hình trạng thái, thiết lập đăng nhập và audit thành các tệp giao diện riêng trong `client/sync/`, tái sử dụng block chuẩn.
 - [x] Lấy authorized Customer rồi Activity; thiếu token thì dừng trước CRUD.
@@ -321,7 +321,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 ### Bổ sung UI dùng chung sau Slice 8
 
 - [x] Identity probe chạy đủ chuỗi GAS cấp `authorize` rồi `GetGridViewPage` controller `User`, giữ dữ liệu trong DTO GAS và cập nhật bản nháp `Spreadsheet ID`, `Mã user FBM` và `Tên tài khoản FBM` vào Sidebar, không tự lưu liên kết; smoke test đạt `1264/1264`, relay deployment `@259`, DEV runner `@258`.
-- [x] Khi Extension bắt tay bằng `sessionId` mới, Sidebar tự gửi lại relay config hiện tại và chờ ACK; không yêu cầu cập nhật `chrome.storage` thủ công. Smoke test đạt `1265/1265`, relay deployment `@260`, DEV runner `@261`.
+- [x] Khi Extension bắt tay bằng `sessionId` mới, bridge mới được nhận nhưng Sidebar không tự gửi lại relay config trong cùng lượt mở; mở Sidebar lần sau sẽ gửi một lần. Không yêu cầu cập nhật `chrome.storage` thủ công.
 - [x] Tách `PopupList` thành nền hiển thị dùng chung cho search, dropdown, customer picker và menu module; controller riêng giữ nguyên hành vi từng loại.
 - [x] Search giữ bề rộng đúng bằng ô nhập; dropdown giữ khả năng giãn theo nội dung và giới hạn theo Sidebar.
 - [x] Tách adapter `CustomerPicker` khỏi nguồn dữ liệu dropdown; giá trị dropdown hợp lệ được đưa lên đầu và bôi xanh khi focus.
@@ -333,8 +333,8 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Adapter đăng nhập lấy salt mới từ `Login.aspx` trước `GetEntityData` → `GetUnitData` → `Login`; đọc đúng `ChallengeScript` HTML FBM thực tế, giữ `force:false`, không gửi mật khẩu bản rõ và có test mô phỏng đủ năm request.
 - [x] Tự điền nhận diện trên file chưa có binding điền form và chờ `Lưu thông tin`; chỉ đối chiếu/kiểm tra Customer khi đã có binding.
 - [x] Render status hoãn dựng lại màn hình Tài khoản khi người dùng đang gõ, không giữ mật khẩu vào client state/GAS/Sheet/Log; popup combo giữ focus qua thao tác chuột.
-- [x] Mở Sidebar chỉ bắt tay/cập nhật relay, không tự phát heartbeat hoặc request FBM. Relay cùng URL, khóa và Spreadsheet đã xác nhận ACK ngay trong Extension, không probe GAS lặp; relay trả HTML lỗi thì dừng alarm và yêu cầu Sidebar làm mới relay.
-- [x] Màn hình Chạy đồng bộ giữ pipeline và chẩn đoán sau khi hoàn tất hoặc lỗi, không rơi về thân trống; kiểm thử offline đạt `1301/1301`.
+- [x] Mở Sidebar chỉ bắt tay và gửi một relay config local, không tự phát heartbeat hoặc request FBM. Relay cùng URL, khóa và Spreadsheet đã xác nhận ACK ngay trong Extension, không probe GAS lặp hay yêu cầu Sidebar tự làm mới.
+- [x] Màn hình Chạy đồng bộ giữ pipeline và chẩn đoán sau khi hoàn tất hoặc lỗi; khi đang chạy chỉ vá node trạng thái tại chỗ, không xóa/dựng lại thân màn hình.
 - [ ] **Cần kiểm chứng thực tế:** reload Extension, tự điền nhận diện, đăng nhập thử và chạy một lượt `Kiểm tra an toàn`; đối chiếu Network và trạng thái Sidebar theo hướng dẫn bàn giao.
 
 ## Đợt sửa bắt buộc — Scheduler GAS quyết định, Extension chỉ cầu nối
@@ -350,7 +350,7 @@ Các mục dưới đây là phần đang phải hoàn thiện trước khi báo
 - [x] Chốt trạng thái không có cookie ban đầu: GAS không cấp heartbeat FBM rỗng; chỉ cấp login envelope hoặc trả trạng thái chờ rõ ràng.
 - [x] Bảo đảm công tắc tổng tắt/dừng phiên không xóa thông tin request đang bay; response cũ sau cancel/stop không được tiếp tục pipeline.
 - [x] Sửa continuation nền: heartbeat chỉ xử lý response của đúng request heartbeat; nếu GAS cấp request tiếp theo thuộc cursor phiên nền thì Extension nộp qua `kind: background_sync`, command `continue` và `FbmSync.continue`; kiểm thử offline đạt `1304/1304`.
-- [x] Bổ sung test offline cho mọi nhánh trên và cập nhật số tổng kiểm thử: `1260/1260`.
+- [x] Bổ sung test offline cho mọi nhánh trên, gồm relay local không fetch `/exec`, Web App từ chối probe, `UNBOUND` không được cấp envelope và bridge mất context báo lỗi rõ; tổng hiện tại `1315/1315`.
 - [x] Executor áp dụng đúng `source` trong chỉ dẫn capture/replacement generic do GAS cấp, không ép mọi replacement về HTML trang; commit `b91790d`, test offline vẫn `1260/1260`.
 - [x] Nghiệm thu GAS DEV bằng `node tests/gas.js ... --push` cho heartbeat request/response, transport failure, reservation và auto-login. `fbmSyncHeartbeatRequest` đạt ở revision `@252` với trạng thái fail-closed `AUTO_LOGIN_NOT_CONFIGURED`, `phase: paused`; `fbmSyncHeartbeat` trả `STALE_RESPONSE` khi không có reservation; `fbmSyncHeartbeatTransportFailure` trả `STALE_RESPONSE` khi request không còn hiệu lực; `fbmGetLoginConfig` đạt ở `@248`; `fbmProbeAutoLogin` đạt ở `@249`.
 - Bằng chứng bổ sung: các entrypoint DEV đã được chạy lại sau khi sửa trạng thái chờ đăng nhập; kết quả đầy đủ được ghi ngay tại mục nghiệm thu GAS DEV bên trên.
