@@ -359,3 +359,4 @@ Ghi chú cập nhật triển khai: GAS DEV revision `@237` trả relay URL `AKf
 Ghi chú cập nhật triển khai tiếp theo: GAS DEV revision `@238` sửa thứ tự khởi tạo, Sidebar chờ `CRM_HANDSHAKE_ACK` trước khi gửi relay config nên URL mới được Extension tự lưu sau khi mở Sidebar.
 Triển khai xác nhận: deployment Sidebar đang dùng `AKfycbx0ueI_gR2zz...` đã được cập nhật revision `@240`; DEV runner dùng `AKfycbxWM4...` revision `@241`. URL cũ vẫn là URL ổn định của Sidebar và probe thành công, không cần đổi storage mỗi lần cập nhật revision.
 Ghi chú chẩn đoán relay: deployment Sidebar đã cập nhật revision `@243`; relay compact giữ lại `code`, `error` và HTTP status để không làm rỗng nguyên nhân lỗi heartbeat.
+Ghi chú executor: commit `4560e42` sửa heartbeat Customer về request trang đầu hợp lệ; commit `dad9f02` nâng executor lên `21.9` để tab FBM đang mở tự nạp bản sửa sau khi Extension reload. Test offline đạt `1236/1236`.
