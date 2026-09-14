@@ -43,6 +43,7 @@ function fbmSyncLoadSettings() {
 }
 /** Đưa cấu hình Web App/khóa sang Extension; không gửi cookie hay payload FBM. */
 var FBM_SYNC_RELAY_CONFIGURE_FLIGHT = null;
+var FBM_SYNC_RELAY_AUTO_LAST_AT = 0;
 var FBM_SYNC_OPEN_HEARTBEAT_SENT = false;
 var FBM_SYNC_BRIDGE_WAITERS = [];
 var FBM_SYNC_BRIDGE_WAIT_TIMER = null;
@@ -51,6 +52,7 @@ function fbmSyncNotifyBridgeReady() {
   var waiters = FBM_SYNC_BRIDGE_WAITERS.splice(0, FBM_SYNC_BRIDGE_WAITERS.length);
   if (FBM_SYNC_BRIDGE_WAIT_TIMER) { clearTimeout(FBM_SYNC_BRIDGE_WAIT_TIMER); FBM_SYNC_BRIDGE_WAIT_TIMER = null; }
   waiters.forEach(function (resolve) { resolve(true); });
+  if (!FBM_SYNC_CLIENT.relayConfigured && typeof fbmSyncAutoConfigureRelay === 'function') { fbmSyncAutoConfigureRelay(); }
 }
 function fbmSyncWaitForBridge() {
   if (typeof sheetLinkExtensionAlive !== 'function' || sheetLinkExtensionAlive()) { return Promise.resolve(true); }
@@ -91,6 +93,15 @@ function fbmSyncConfigureRelay() {
     FBM_SYNC_RELAY_CONFIGURE_FLIGHT = null;
     fbmSyncPaintError(error, 'Không cập nhật được URL relay GAS hiện tại.');
     return null;
+  });
+}
+function fbmSyncAutoConfigureRelay() {
+  var now = Date.now();
+  if (now - FBM_SYNC_RELAY_AUTO_LAST_AT < 10000) { return Promise.resolve(null); }
+  FBM_SYNC_RELAY_AUTO_LAST_AT = now;
+  return fbmSyncConfigureRelay().then(function (config) {
+    if (config && typeof fbmSyncHeartbeatOnSidebarOpen === 'function') { fbmSyncHeartbeatOnSidebarOpen(); }
+    return config;
   });
 }
 /** Gửi relay config và tùy chọn chờ Extension xác nhận đã lưu. */

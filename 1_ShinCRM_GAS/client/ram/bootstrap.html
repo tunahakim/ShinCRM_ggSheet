@@ -39,9 +39,7 @@ async function sidebarBoot() {
     sheetLinkInstall();
     // Bắt tay phải được dựng trước khi gửi relay config; bridge sẽ bỏ tin chưa có nonce/kênh.
     if (typeof fbmSyncConfigureRelay === 'function') {
-      fbmSyncConfigureRelay().then(function () {
-        if (typeof fbmSyncHeartbeatOnSidebarOpen === 'function') { fbmSyncHeartbeatOnSidebarOpen(); }
-      }).catch(function () {});
+      fbmSyncAutoConfigureRelay().catch(function () {});
     }
     selectionPollSetReady(false);
 
