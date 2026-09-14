@@ -112,6 +112,20 @@ async function chay(so) {
   check(so, 'Run render giữ pipeline khi preflight thất bại để người dùng thấy chặng dừng', !!render(hop, content, hop.fbmSyncRenderRun, preflightError).querySelector('.shin-sync-pipeline'), true);
   check(so, 'Run render hiện pipeline khi đang xử lý', !!render(hop, content, hop.fbmSyncRenderRun, active).querySelector('.shin-sync-pipeline'), true);
   check(so, 'Run render giữ pipeline để chẩn đoán lỗi sau request', !!render(hop, content, hop.fbmSyncRenderRun, pushError).querySelector('.shin-sync-pipeline'), true);
+  const pausedTransport = { phase: 'paused', runId: 'r4', lastError: 'Cầu nối FBM không phản hồi.', label: 'Tạm dừng', counts: {} };
+  const pausedRun = render(hop, content, hop.fbmSyncRenderRun, pausedTransport);
+  check(so, 'Run render giữ pipeline và lỗi khi phiên tạm dừng', [!!pausedRun.querySelector('.shin-sync-pipeline'), pausedRun.textContent.indexOf('Pipeline đã tạm dừng') >= 0], [true, true]);
+
+  const statusButton = dom.document.createElement('button');
+  statusButton.id = 'fbm-sync-menu';
+  statusButton.className = 'shin-sync-status-running';
+  statusButton.classList = {
+    add: (name) => { statusButton.className = (statusButton.className + ' ' + name).trim(); },
+    remove: (name) => { statusButton.className = statusButton.className.split(/\s+/).filter((item) => item && item !== name).join(' '); }
+  };
+  dom.root.appendChild(statusButton);
+  hop.fbmSyncPaintHeaderState({ phase: 'checking_session', masterEnabled: false });
+  check(so, 'icon Đồng bộ không quay khi công tắc tổng tắt', [statusButton.className.indexOf('shin-sync-status-running') >= 0, statusButton.getAttribute('aria-label')], [false, 'Đồng bộ FBM']);
 
   hop.FBM_SYNC_CLIENT.identityStatus = { status: 'REBIND_REQUIRED', binding: { spreadsheetId: 'sheet', userId: 'u', accountName: 'A' } };
   hop.FBM_SYNC_CLIENT.loginStatus = { configured: false, enabled: true };

@@ -334,7 +334,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Tự điền nhận diện trên file chưa có binding điền form và chờ `Lưu thông tin`; chỉ đối chiếu/kiểm tra Customer khi đã có binding.
 - [x] Render status hoãn dựng lại màn hình Tài khoản khi người dùng đang gõ, không giữ mật khẩu vào client state/GAS/Sheet/Log; popup combo giữ focus qua thao tác chuột.
 - [x] Mở Sidebar chỉ bắt tay và gửi một relay config local, không tự phát heartbeat hoặc request FBM. Relay cùng URL, khóa và Spreadsheet đã xác nhận ACK ngay trong Extension, không probe GAS lặp hay yêu cầu Sidebar tự làm mới.
-- [x] Màn hình Chạy đồng bộ giữ pipeline và chẩn đoán sau khi hoàn tất hoặc lỗi; khi đang chạy chỉ vá node trạng thái tại chỗ, không xóa/dựng lại thân màn hình.
+- [x] Màn hình Chạy đồng bộ giữ pipeline và chẩn đoán sau khi hoàn tất, lỗi hoặc tạm dừng; khi đang chạy chỉ vá node trạng thái tại chỗ, không xóa/dựng lại thân màn hình.
 - [ ] **Cần kiểm chứng thực tế:** reload Extension, tự điền nhận diện, đăng nhập thử và chạy một lượt `Kiểm tra an toàn`; đối chiếu Network và trạng thái Sidebar theo hướng dẫn bàn giao.
 
 ## Đợt sửa bắt buộc — Scheduler GAS quyết định, Extension chỉ cầu nối
@@ -350,9 +350,12 @@ Các mục dưới đây là phần đang phải hoàn thiện trước khi báo
 - [x] Chốt trạng thái không có cookie ban đầu: GAS không cấp heartbeat FBM rỗng; chỉ cấp login envelope hoặc trả trạng thái chờ rõ ràng.
 - [x] Bảo đảm công tắc tổng tắt/dừng phiên không xóa thông tin request đang bay; response cũ sau cancel/stop không được tiếp tục pipeline.
 - [x] Sửa continuation nền: heartbeat chỉ xử lý response của đúng request heartbeat; nếu GAS cấp request tiếp theo thuộc cursor phiên nền thì Extension nộp qua `kind: background_sync`, command `continue` và `FbmSync.continue`; kiểm thử offline đạt `1304/1304`.
-- [x] Bổ sung test offline cho mọi nhánh trên, gồm relay local không fetch `/exec`, Web App từ chối probe, `UNBOUND` không được cấp envelope và bridge mất context báo lỗi rõ; tổng hiện tại `1315/1315`.
+- [x] Capture generic của Extension đọc cả HTML và text của trang theo chỉ dẫn GAS; token transport chỉ có trong text vẫn được thay trước khi gửi FBM.
+- [x] Transport failure kết thúc phase `error`, giữ chẩn đoán nhưng không giữ reservation/cursor; hủy liên kết sau lỗi được phép, còn công tắc tổng OFF chuyển ngay sang `paused` nếu không có request FBM đang bay.
+- [x] Bổ sung test offline cho mọi nhánh trên, gồm relay local không fetch `/exec`, Web App từ chối probe, `UNBOUND` không được cấp envelope, bridge mất context báo lỗi rõ, capture từ text, pause và công tắc tổng; tổng hiện tại `1319/1319`.
 - [x] Executor áp dụng đúng `source` trong chỉ dẫn capture/replacement generic do GAS cấp, không ép mọi replacement về HTML trang; commit `b91790d`, test offline vẫn `1260/1260`.
 - [x] Nghiệm thu GAS DEV bằng `node tests/gas.js ... --push` cho heartbeat request/response, transport failure, reservation và auto-login. `fbmSyncHeartbeatRequest` đạt ở revision `@252` với trạng thái fail-closed `AUTO_LOGIN_NOT_CONFIGURED`, `phase: paused`; `fbmSyncHeartbeat` trả `STALE_RESPONSE` khi không có reservation; `fbmSyncHeartbeatTransportFailure` trả `STALE_RESPONSE` khi request không còn hiệu lực; `fbmGetLoginConfig` đạt ở `@248`; `fbmProbeAutoLogin` đạt ở `@249`.
+- [x] GAS DEV relay `AKfycbxWM4...` đã nâng revision `@285`; entrypoint transport failure giữ fail-closed với reservation cũ, trạng thái DEV đã được hủy an toàn về `idle`.
 - Bằng chứng bổ sung: các entrypoint DEV đã được chạy lại sau khi sửa trạng thái chờ đăng nhập; kết quả đầy đủ được ghi ngay tại mục nghiệm thu GAS DEV bên trên.
 - [ ] Deployment Sidebar `AKfycbx0...` đã nâng lên revision `@280`; cần tải lại Extension rồi kiểm tra logged-in, logged-out, timeout, không có tab và response lớn.
 - [!] **Cần chủ dự án kiểm chứng thực tế:** giữ tab FBM đăng nhập, sau đó đăng xuất/đăng nhập lại để xác nhận không đá phiên máy khác và alarm tự khôi phục đúng chính sách.

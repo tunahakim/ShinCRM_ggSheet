@@ -25,6 +25,9 @@ async function chay(so) {
   identity.FbmSync.stateRead = () => ({ runId: 'running-binding-test', phase: 'pull_customer', activeRequestId: 'request-binding-test' });
   const blockedBindingClear = identity.FbmSync.bindingWrite({});
   check(so, 'không hủy liên kết khi request FBM đang bay', [blockedBindingClear.ok, blockedBindingClear.code, Boolean(bindingData[identity.FbmSync.BINDING_KEY])], [false, 'SYNC_ALREADY_RUNNING', true]);
+  identity.FbmSync.stateRead = () => ({ runId: 'failed-binding-test', phase: 'error', activeRequestId: '' });
+  const clearedFailedBinding = identity.FbmSync.bindingWrite({});
+  check(so, 'lỗi cầu nối đã kết thúc vẫn cho phép hủy liên kết', [clearedFailedBinding.ok, clearedFailedBinding.code, bindingData[identity.FbmSync.BINDING_KEY]], [true, 'IDENTITY_BINDING_CLEARED', undefined]);
 
   const relay = taoHopCat({
     FbmSync: {},
@@ -228,13 +231,18 @@ async function chay(so) {
   heartbeat.FbmSync.identityPreflight = () => ({ blocking: true, status: { status: 'UNBOUND' }, message: 'Chưa có liên kết tài khoản FBM.' });
   const unboundHeartbeat = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   check(so, 'heartbeat không cấp envelope FBM khi chưa liên kết tài khoản', [unboundHeartbeat.ok, unboundHeartbeat.code, unboundHeartbeat.request], [true, 'FBM_IDENTITY_UNBOUND', null]);
+  heartbeat.FbmSync.statePatch({ runId: 'master-off-run', phase: 'checking_session', cursor: { kind: 'authorize_customer' }, activeRequestId: '' });
+  const masterOff = heartbeat.FbmSync.setMasterEnabled(false);
+  check(so, 'tắt công tắc tổng dừng ngay state khi không có request FBM đang bay', [masterOff.enabled, heartbeat.FbmSync.stateRead().phase, heartbeat.FbmSync.stateRead().activeRequestId], [false, 'paused', '']);
+  heartbeat.FbmSync.setMasterEnabled(true);
+  heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0 });
   heartbeat.FbmSync.identityPreflight = () => ({ blocking: false, status: { status: 'BOUND' }, message: '' });
   const heartbeatRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   check(so, 'GAS cap heartbeat de capture generic khi chua biet cookie', [heartbeatRequest.ok, heartbeatRequest.code, heartbeatRequest.request.meta.kind, heartbeatRequest.request.body.type, heartbeatRequest.request.body.count, heartbeatRequest.request.body.sortExpression, heartbeatRequest.request.bodyText.indexOf('{{FBM_PAYLOAD_COOKIE}}') >= 0], [true, 'HEARTBEAT_REQUEST_READY', 'heartbeat', 0, 1, null, true]);
   const overlappingHeartbeat = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   check(so, 'heartbeat không cấp request chồng khi reservation còn hiệu lực', [overlappingHeartbeat.ok, overlappingHeartbeat.code, overlappingHeartbeat.request], [false, 'REQUEST_IN_FLIGHT', null]);
   const transportFailure = heartbeat.FbmSync.heartbeatTransportFailure({ requestId: heartbeatRequest.request.id, code: 'FBM_TAB_NOT_FOUND', message: 'Không tìm thấy tab FBM đang mở.' });
-  check(so, 'GAS thu hồi reservation khi Extension không có tab FBM', [transportFailure.ok, transportFailure.code, heartbeat.FbmSync.stateRead().activeRequestId], [false, 'FBM_TAB_NOT_FOUND', '']);
+  check(so, 'GAS thu hồi reservation và kết thúc phiên khi Extension không có tab FBM', [transportFailure.ok, transportFailure.code, heartbeat.FbmSync.stateRead().activeRequestId, heartbeat.FbmSync.stateRead().phase], [false, 'FBM_TAB_NOT_FOUND', '', 'error']);
   const staleTransportFailure = heartbeat.FbmSync.heartbeatTransportFailure({ requestId: heartbeatRequest.request.id, code: 'FBM_TAB_NOT_FOUND' });
   check(so, 'transport failure cũ không đụng reservation mới', [staleTransportFailure.ok, staleTransportFailure.code], [false, 'STALE_RESPONSE']);
   const firstHeartbeatRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });

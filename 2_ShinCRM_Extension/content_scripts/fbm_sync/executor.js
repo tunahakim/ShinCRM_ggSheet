@@ -1,6 +1,6 @@
 /* Cầu nối FBM: nhận request, fetch trong tab đăng nhập, trả response thô. */
 (function () {
-  var EXECUTOR_VERSION = '21.13';
+  var EXECUTOR_VERSION = '21.14';
   var FETCH_TIMEOUT_MS = 10000;
   function traceEvent(trace, stage, request, extra) {
     trace.push(Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {}));
@@ -30,10 +30,18 @@
   function captureTransportValues(request, responseBody, sourceName) {
     var transport = request && request.transport || request && request.meta && request.meta.transport || {}, captures = Array.isArray(transport.captures) ? transport.captures : [], values = {};
     captures.forEach(function (capture) {
-      var item = capture || {}, source = (sourceName || item.source) === 'page_html' ? (document.documentElement ? document.documentElement.innerHTML : '') : String(responseBody || ''), pattern = String(item.pattern || ''), flags = String(item.flags || ''), match;
-      if (!pattern || !source) { return; }
-      try { match = source.match(new RegExp(pattern, flags)); } catch (ignore) { return; }
-      if (match) { values[String(item.name || 'value')] = match[Number(item.group || 1)]; }
+      var item = capture || {}, kind = sourceName || item.source, sources = kind === 'page_html'
+        ? [document.documentElement ? document.documentElement.innerHTML : '', document.documentElement ? document.documentElement.textContent || '' : '']
+        : [String(responseBody || '')], pattern = String(item.pattern || ''), flags = String(item.flags || ''), match;
+      if (!pattern) { return; }
+      for (var index = 0; index < sources.length; index += 1) {
+        if (!sources[index]) { continue; }
+        try { match = String(sources[index]).match(new RegExp(pattern, flags)); } catch (ignore) { return; }
+        if (match) {
+          values[String(item.name || 'value')] = match[Number(item.group || 1)];
+          return;
+        }
+      }
     });
     return values;
   }

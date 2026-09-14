@@ -10,7 +10,15 @@ FbmSync.masterEnabled = function () {
 FbmSync.setMasterEnabled = function (enabled) {
   var value = enabled === true;
   FbmSync.props().setProperty(FbmSync.MASTER_SWITCH_KEY, value ? 'true' : 'false');
-  return { ok: true, enabled: value };
+  if (!value && typeof FbmSync.stateRead === 'function' && typeof FbmSync.stateWrite === 'function') {
+    var state = FbmSync.stateRead();
+    if (!state.activeRequestId) {
+      state.phase = 'paused';
+      state.message = 'Đồng bộ đang tắt; không cấp request FBM mới.';
+      FbmSync.stateWrite(state);
+    }
+  }
+  return { ok: true, enabled: value, status: typeof FbmSync.statusView === 'function' ? FbmSync.statusView() : null };
 };
 
 /** Quyền ghi được tách theo đích; mode không được kiêm thêm một cờ ẩn ngoài UI. */

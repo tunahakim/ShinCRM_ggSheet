@@ -223,11 +223,8 @@ function fbmSyncHeartbeatTransportFailure(payload) {
     state.retryable = false;
     state.lastError = String(value.message || 'Extension không gửi được request tới tab FBM.').slice(0, 240);
     state.message = state.lastError;
-    if (state.cursor && state.cursor.kind === 'heartbeat' && state.lastFailureCode === 'FBM_TRANSPORT_CAPTURE_MISSING') {
-      state.session = state.session || {};
-      state.session.expired = true;
-    }
-    if (state.cursor && state.cursor.kind === 'login') { state.phase = 'paused'; }
+    state.cursor = {};
+    state.phase = 'error';
     FbmSync.stateWrite(state);
     return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError };
   } finally { lock.releaseLock(); }

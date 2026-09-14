@@ -220,7 +220,8 @@ function fbmSyncPaintHeaderState(status) {
   if (!button || !status) { return; }
   ['running', 'paused', 'error'].forEach(function (name) { button.classList.remove('shin-sync-status-' + name); });
   var phase = String(status.phase || '');
-  var state = ['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(phase) >= 0 ? 'running' : (['paused', 'conflict'].indexOf(phase) >= 0 ? 'paused' : (phase === 'error' ? 'error' : ''));
+  var enabled = status.masterEnabled !== false && status.enabled !== false;
+  var state = !enabled ? '' : (['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(phase) >= 0 ? 'running' : (['paused', 'conflict'].indexOf(phase) >= 0 ? 'paused' : (phase === 'error' ? 'error' : '')));
   if (state) { button.classList.add('shin-sync-status-' + state); }
   button.setAttribute('aria-label', 'Đồng bộ FBM' + (state === 'running' ? ' — đang chạy' : state === 'paused' ? ' — tạm dừng' : state === 'error' ? ' — có lỗi' : ''));
 }
@@ -636,11 +637,18 @@ function fbmSyncLoginCredentialsFromForm() {
 }
 function fbmSyncEncryptCredentials(credentials) {
   if (window.top === window) { return Promise.reject(new Error('Không tìm thấy Extension để mã hóa thông tin đăng nhập.')); }
-  var id = String(Date.now()) + '-' + Math.random().toString(36).slice(2), source = window.top;
-  return new Promise(function (resolve, reject) {
-    var timer = setTimeout(function () { delete FBM_SYNC_CLIENT.credentialWaiters[id]; reject(new Error('Extension không trả lời yêu cầu mã hóa sau 5 giây.')); }, 5000);
-    FBM_SYNC_CLIENT.credentialWaiters[id] = { resolve: resolve, reject: reject, timer: timer };
-    source.postMessage({ action: 'CRM_FBM_CREDENTIALS', id: id, nonce: SHEET_LINK_NONCE, sessionId: FBM_SYNC_RELAY_SESSION, credentials: credentials }, 'https://docs.google.com');
+  return fbmSyncWaitForBridge().then(function (ready) {
+    var sessionId = String(typeof SHEET_LINK_EXTENSION_SESSION === 'undefined' ? '' : SHEET_LINK_EXTENSION_SESSION || '');
+    if (sessionId && sessionId !== FBM_SYNC_RELAY_SESSION) { fbmSyncNotifyBridgeReady(); }
+    if (!ready || !sessionId || sessionId !== FBM_SYNC_RELAY_SESSION) {
+      throw new Error('Kênh Extension chưa sẵn sàng để mã hóa thông tin đăng nhập. Hãy tải lại Extension rồi mở lại Sidebar.');
+    }
+    var id = String(Date.now()) + '-' + Math.random().toString(36).slice(2), source = window.top;
+    return new Promise(function (resolve, reject) {
+      var timer = setTimeout(function () { delete FBM_SYNC_CLIENT.credentialWaiters[id]; reject(new Error('Extension không trả lời yêu cầu mã hóa sau 5 giây.')); }, 5000);
+      FBM_SYNC_CLIENT.credentialWaiters[id] = { resolve: resolve, reject: reject, timer: timer };
+      source.postMessage({ action: 'CRM_FBM_CREDENTIALS', id: id, nonce: SHEET_LINK_NONCE, sessionId: FBM_SYNC_RELAY_SESSION, credentials: credentials }, 'https://docs.google.com');
+    });
   });
 }
 function fbmSyncSaveLoginConfig(button) {

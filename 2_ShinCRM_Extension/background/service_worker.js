@@ -14,7 +14,7 @@
 function findFbmTab() {
   return chrome.tabs.query({ url: ['https://fbo.com.vn:8888/*'] }).then(function (tabs) { return tabs && tabs.length ? tabs[0] : null; });
 }
-var FBM_EXECUTOR_VERSION = '21.13';
+var FBM_EXECUTOR_VERSION = '21.14';
 
 function addWorkerTrace(reply, request, stage, extra) {
   var event = Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {});

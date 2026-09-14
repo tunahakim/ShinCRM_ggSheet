@@ -186,7 +186,7 @@ async function chay(so) {
   check(so, 'heartbeat coi GAS noop hop le la thanh cong va khong tim tab FBM', workerSource.indexOf("noteHeartbeatStatus('gas_noop'") >= 0 && workerSource.indexOf('if (!gasRequest.request)') >= 0, true);
   check(so, 'background relay dung DTO gon, khong gui traceTail/metadata Sidebar', workerSource.indexOf("kind: 'background_sync'") >= 0 && entryPointsSource.indexOf('fbmSyncRelayCompactResult') >= 0 && entryPointsSource.indexOf("body.kind === 'background_sync'") >= 0, true);
   check(so, 'background relay chi tiep tuc command GAS da cap tu heartbeat', workerSource.indexOf("command: 'start'") < 0 && workerSource.indexOf("command: 'continue'") >= 0 && entryPointsSource.indexOf('FbmSync.controlDispatch') >= 0, true);
-  check(so, 'executor co ping phien ban 21.13 va kenh execute moi', /EXECUTOR_VERSION\s*=\s*'21\.13'/.test(executorSource) && workerSource.indexOf("FBM_EXECUTOR_VERSION = '21.13'") >= 0 && executorSource.indexOf('FBM_PING_V2') >= 0 && executorSource.indexOf('FBM_EXECUTE_V2') >= 0, true);
+  check(so, 'executor co ping phien ban 21.14 va kenh execute moi', /EXECUTOR_VERSION\s*=\s*'21\.14'/.test(executorSource) && workerSource.indexOf("FBM_EXECUTOR_VERSION = '21.14'") >= 0 && executorSource.indexOf('FBM_PING_V2') >= 0 && executorSource.indexOf('FBM_EXECUTE_V2') >= 0, true);
   check(so, 'GAS la noi duy nhat kiem tra endpoint FBM', executorSource.indexOf('validateEndpoint(req.url)') < 0 && executorSource.indexOf('FBM_ENDPOINT_UNALLOWED') < 0, true);
   check(so, 'GAS chan endpoint thieu truoc cap envelope', fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'protocol', 'Protocol.js'), 'utf8').indexOf('validateEndpoint: function') >= 0 && fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'transport', 'TransportCore.js'), 'utf8').indexOf('validateEndpoint(request.url)') >= 0, true);
   check(so, 'GAS tu dung envelope heartbeat va relay co cong cap request', entryPointsSource.indexOf("body.kind === 'heartbeat_request'") >= 0 && fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'state', 'Scheduler.js'), 'utf8').indexOf('function fbmSyncHeartbeatRequest') >= 0 && fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'read', 'GridRead.js'), 'utf8').indexOf('FbmSync.heartbeatCustomerRequest') >= 0, true);
@@ -237,7 +237,7 @@ async function chay(so) {
     const context = {
       console: { log() {}, warn() {} }, Date, URL, Promise, Error, AbortController, setTimeout, clearTimeout,
       Blob, Response, TextDecoder, TextEncoder, DecompressionStream: undefined,
-      document: { documentElement: { innerHTML: '<script>var payload={"cookie":"461020379855cFHN_CRM_App"};</script>', textContent: '' } },
+      document: { documentElement: { innerHTML: '', textContent: 'var payload={"cookie":"461020379855cFHN_CRM_App"};' } },
       fetch(url, options) { fetchCalls += 1; sentBody = options && options.body; return Promise.resolve(response); },
       chrome: { runtime: { onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
     };
@@ -251,7 +251,7 @@ async function chay(so) {
         check(so, 'executor chuyen nguyen body GAS ma khong hieu endpoint', [fetchCalls, sentBody, validReply && validReply.result && validReply.result.status], [1, '{"gas":true}', 200]);
         listener({ type: 'FBM_EXECUTE_V2', request: { url: 'https://fbo.com.vn:8888/Main/customer', method: 'POST', bodyText: '{"cookie":"{{FBM_PAYLOAD_COOKIE}}"}', meta: { transport: { captures: [{ name: 'payloadCookie', source: 'page_html', pattern: '([A-Za-z0-9]+FHN_CRM_App)', flags: 'i', group: 1 }], replacements: [{ token: '{{FBM_PAYLOAD_COOKIE}}', capture: 'payloadCookie', source: 'page_html' }] } } } }, null, (reply) => {
           setTimeout(() => {
-            check(so, 'executor thay token theo chi dan GAS ma khong hieu field FBM', [fetchCalls, sentBody, reply && reply.result && reply.result.status], [2, '{"cookie":"461020379855cFHN_CRM_App"}', 200]);
+            check(so, 'executor lay capture generic tu text trang theo chi dan GAS', [fetchCalls, sentBody, reply && reply.result && reply.result.status], [2, '{"cookie":"461020379855cFHN_CRM_App"}', 200]);
             responseText = JSON.stringify({ d: { Authorized: 'auth-c', UserId: '2037', UserName: 'ANHLT', AccountName: 'Le Tuan Anh', Huge: 'x'.repeat(5000) } });
             listener({ type: 'FBM_EXECUTE_V2', request: { url: 'https://fbo.com.vn:8888/Main/authorize', method: 'POST', bodyText: '{}', meta: { transport: { jsonPaths: ['d.Authorized', 'd.UserId', 'd.UserName', 'd.AccountName'] } } } }, null, (projectedReply) => {
               setTimeout(() => {
