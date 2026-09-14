@@ -23,7 +23,7 @@
     trace.push(Object.assign({ at: Date.now(), stage: stage, runId: String(meta.runId || ''), requestId: String(meta.requestId || ''), operation: String(request && request.meta && request.meta.kind || ''), entity: String(request && request.meta && request.meta.entity || ''), recordId: String(request && request.meta && (request.meta.id || request.meta.shinId || request.meta.stt_rec_kh) || ''), endpoint: endpointPath(request && request.url) }, extra || {}));
   }
   /** Request đọc tối thiểu để giữ phiên và phát hiện logout. */
-  function heartbeat() { return { url: HEARTBEAT_URL, method: 'POST', headers: { accept: '*/*', 'content-type': 'application/json; charset=UTF-8' }, body: { type: 1, count: 1, language: 'v', controller: 'zccrAccount', viewId: null, childObject: false, lastPageIndex: 0, firstPageItem: '', lastPageItem: '', lastRowCount: 0, memvars: [], externalKey: [], gridPageIndex: -1, gridPageValue: null, gridRefresh: true, filter: [], sortExpression: 'ngay_gd desc', cookie: '' } }; }
+  function heartbeat() { return { url: HEARTBEAT_URL, method: 'POST', headers: { accept: '*/*', 'content-type': 'application/json; charset=UTF-8' }, body: { type: 0, count: 10, language: 'v', controller: 'zccrAccount', viewId: null, childObject: false, lastPageIndex: -1, firstPageItem: '', lastPageItem: '', lastRowCount: 0, memvars: [], externalKey: [], gridPageIndex: -1, gridPageValue: null, gridRefresh: false, filter: [], sortExpression: null, cookie: '', query: null, parameter: null, variable: '' } }; }
   /** Đọc cookie payload nếu request GAS không truyền cookie. */
   function payloadCookieFromPage() {
     var html = document.documentElement ? document.documentElement.innerHTML : '';
