@@ -150,7 +150,9 @@ function rawFbmReply(reply) {
 }
 
 /** Gọi Web App relay và đọc kết quả handoff mà không ghi payload vào log. */
-var GAS_RELAY_TIMEOUT_MS = 15000;
+// GAS Web App có thể mất hơn 15 giây khi cold start hoặc đang chờ Spreadsheet lock.
+// Giữ giới hạn hữu hạn để alarm không treo vô hạn, nhưng đủ rộng cho redirect /exec.
+var GAS_RELAY_TIMEOUT_MS = 30000;
 var GAS_RELAY_REFRESH_COOLDOWN_MS = 30000;
 var relayRefreshFlight = null;
 var relayRefreshLastAt = 0;
