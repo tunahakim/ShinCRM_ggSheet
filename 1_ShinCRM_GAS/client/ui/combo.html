@@ -385,8 +385,18 @@ function comboInstall() {
   goc.addEventListener('focusout', function (e) {
     var inp = e.target;
     if (!comboWrap(inp)) { return; }
+    // Di chuyển focus trong chính popup không phải là rời control; nếu ẩn ở đây,
+    // click/Tab vào một dòng sẽ bị mất trước khi handler chọn giá trị chạy.
+    if (e.relatedTarget && comboWrap(e.relatedTarget) === comboWrap(inp)) { return; }
     if (inp._comboBlur) { clearTimeout(inp._comboBlur); }
     inp._comboBlur = setTimeout(function () { comboHide(inp); }, COMBO_BLUR_DELAY);
+  });
+
+  // Giữ focus ở ô đến khi click chọn dòng hoàn tất. Trình duyệt có thể phát
+  // focusout trước click, khiến timer ẩn popup thắng thao tác chuột trên máy chậm.
+  goc.addEventListener('mousedown', function (e) {
+    var row = e.target && e.target.closest ? e.target.closest('.shin-combo-item') : null;
+    if (row) { e.preventDefault(); }
   });
 
   goc.setAttribute(COMBO_MARK, '1');

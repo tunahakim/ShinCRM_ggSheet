@@ -134,11 +134,14 @@ async function chay(so) {
   check(so, 'Extension ma hoa credential bang AES-GCM truoc khi luu', workerSource.indexOf('crypto.subtle.generateKey') >= 0 && workerSource.indexOf('CREDENTIAL_VAULT_PREFIX') >= 0 && workerSource.indexOf('FBM_ENCRYPT_CREDENTIALS') >= 0, true);
   check(so, 'bridge credential chi tra envelope va khong tra password ve Sidebar', fs.readFileSync(BRIDGE_FILE, 'utf8').indexOf('CRM_FBM_CREDENTIALS_RESULT') >= 0 && syncSource.indexOf('fbmSyncEncryptCredentials') >= 0 && syncSource.indexOf('fbm-login-password') >= 0, true);
   check(so, 'executor login dung force false va khong logout phien hop le', executorSource.indexOf("force: false") >= 0 && executorSource.indexOf("credentials: 'include'") >= 0 && executorSource.indexOf("meta.kind === 'login'") >= 0, true);
+  check(so, 'executor login tai Login.aspx de lay salt truoc khi goi Login', executorSource.indexOf("fetch(base.slice(0, -1)") >= 0 && executorSource.indexOf('login_page_loaded') >= 0 && executorSource.indexOf('Không đọc được mã phiên đăng nhập từ trang FBM.') >= 0, true);
+  check(so, 'executor login nhan du lieu database va don vi theo cac shape FBM', executorSource.indexOf('function loginListValue') >= 0 && executorSource.indexOf("'FHN_CRM_App'") >= 0 && executorSource.indexOf("'CTY'") >= 0, true);
   check(so, 'executor login doc lai trang tai khoan de lay payload cookie', executorSource.indexOf("/Main/zccrAccount.aspx") >= 0 && executorSource.indexOf('payload_cookie_page_read') >= 0, true);
   check(so, 'Sidebar giu waiter va thu lai mot lan khi bridge cu mat context', syncSource.indexOf('if (data.retryable)') >= 0 && syncSource.indexOf('waiter.retryCount < 1') >= 0 && syncSource.indexOf('retryCount: 0') >= 0, true);
   check(so, 'mo man dong bo khong cho relay config chan status', syncSource.indexOf('Promise.all([fbmSyncConfigureRelay(), fbmSyncStatusOnce(true), fbmSyncLoadIdentityStatus(), fbmSyncLoadSettings()])') >= 0, true);
   check(so, 'kiem tra lien ket dung chung guard Extension va huy cursor khi loi', syncSource.indexOf('function fbmSyncCheckIdentity()') >= 0 && syncSource.indexOf("sheetLinkExtensionAlive()") >= 0 && syncSource.indexOf("callServer('fbmCancelSync')") >= 0, true);
-  check(so, 'tu dien nhan dien FBM co doi chieu va bao loi minh bach', syncSource.indexOf('function fbmSyncProbeIdentity()') >= 0 && syncSource.indexOf('function fbmSyncAutoFillAndCheck()') >= 0 && syncSource.indexOf("callServer('fbmStartIdentityProbe')") >= 0 && syncSource.indexOf("callServer('fbmSaveIdentityBinding'") >= 0 && syncSource.indexOf('Chưa có liên kết đã lưu để đối chiếu') >= 0, true);
+  check(so, 'tu dien nhan dien FBM co doi chieu va giu ban nhap de nguoi dung xac nhan', syncSource.indexOf('function fbmSyncProbeIdentity()') >= 0 && syncSource.indexOf('function fbmSyncAutoFillAndCheck()') >= 0 && syncSource.indexOf("callServer('fbmStartIdentityProbe')") >= 0 && syncSource.indexOf("callServer('fbmSaveIdentityBinding'") >= 0 && syncSource.indexOf('IDENTITY_DRAFT_READY') >= 0, true);
+  check(so, 'render status khong lam roi form tai khoan dang go', syncSource.indexOf('function fbmSyncCaptureActiveAccountDraft()') >= 0 && syncSource.indexOf('function fbmSyncRestoreActiveAccountDraft(snapshot)') >= 0 && syncSource.indexOf('active.setSelectionRange') >= 0, true);
   check(so, 'man dong bo hien thi Category block va Activity missing', syncSource.indexOf('metadata.categoryBlocks') >= 0 && syncSource.indexOf('metadata.activityBulkMissing') >= 0, true);
   check(so, 'man dong bo hien thi ma va nguyen nhan preflight', syncSource.indexOf('preflightIssues') >= 0 && syncSource.indexOf('item.code') >= 0 && syncSource.indexOf('item.message') >= 0, true);
   check(so, 'man dong bo hien thi chi tiet loi day kem HTTP', syncSource.indexOf('pushFailureDetails') >= 0 && syncSource.indexOf('detail.reason') >= 0 && syncSource.indexOf('detail.status') >= 0, true);
@@ -232,6 +235,44 @@ async function chay(so) {
         });
       }, 20);
     }, 20);
+  });
+
+  await new Promise((resolve) => {
+    let listener = null;
+    const calls = [];
+    function response(text) {
+      return {
+        ok: true,
+        status: 200,
+        headers: { get() { return 'application/json'; } },
+        arrayBuffer() { return Promise.resolve(new TextEncoder().encode(text).buffer); }
+      };
+    }
+    const context = {
+      console: { log() {}, warn() {} }, Date, URL, Promise, Error, AbortController, setTimeout, clearTimeout,
+      Blob, Response, TextDecoder, TextEncoder, DecompressionStream: undefined,
+      document: { documentElement: { innerHTML: '', textContent: '' } },
+      fetch(url, options) {
+        calls.push({ url: String(url), method: options && options.method || 'GET', body: options && options.body });
+        if (String(url).endsWith('/Main/Login.aspx')) { return Promise.resolve(response("<script>var salt = 'a5f68e' + '05ea4a';</script>")); }
+        if (String(url).endsWith('/GetEntityData')) { return Promise.resolve(response('{"d":[["01","Fast FBM Online","FHN_CRM_App"]]}')); }
+        if (String(url).endsWith('/GetUnitData')) { return Promise.resolve(response('{"d":[["CTY","Công ty","Company"]]}')); }
+        if (String(url).endsWith('/Login')) { return Promise.resolve(response('{"d":true}')); }
+        if (String(url).endsWith('/zccrAccount.aspx')) { return Promise.resolve(response('<script>var payload={"cookie":"461020379855cFHN_CRM_App"};</script>')); }
+        return Promise.resolve(response('{}'));
+      },
+      chrome: { runtime: { onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
+    };
+    vm.createContext(context);
+    vm.runInContext(executorSource, context, { filename: EXECUTOR_FILE });
+    listener({ type: 'FBM_EXECUTE_V2', request: { meta: { kind: 'login', loginCredentials: { username: 'anhlt', password: 'mat-khau', language: 'v' } } } }, null, (reply) => {
+      setTimeout(() => {
+        const loginBody = calls[3] && JSON.parse(calls[3].body);
+        check(so, 'executor login chay du trang salt, database, don vi, Login va trang tai khoan', [calls.map((item) => item.url.replace('https://fbo.com.vn:8888/Main/', '')).join('|'), reply && reply.result && reply.result.ok], ['Login.aspx|Login.aspx/GetEntityData|Login.aspx/GetUnitData|Login.aspx/Login|zccrAccount.aspx', true]);
+        check(so, 'executor login gui salt moi va force false, khong dua mat khau goc len FBM', [loginBody.value, loginBody.force, loginBody.password === 'mat-khau', loginBody.database, loginBody.unit], ['a5f68e05ea4a', false, false, 'FHN_CRM_App', 'CTY']);
+        resolve();
+      }, 20);
+    });
   });
 }
 

@@ -328,6 +328,14 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Cập nhật test offline sau khi renderer thêm class popup dùng chung và sửa mặc định ngưỡng chấp thuận khi Config rỗng: `1198/1198`.
 - [ ] Cần chủ dự án mở lại Sidebar để nghiệm thu trực quan ba kiểu popup và menu Đồng bộ.
 
+### Đợt ổn định Tài khoản FBM và trạng thái UI
+
+- [x] Adapter đăng nhập lấy salt mới từ `Login.aspx` trước `GetEntityData` → `GetUnitData` → `Login`; giữ `force:false`, không gửi mật khẩu bản rõ, có test mô phỏng đủ năm request.
+- [x] Tự điền nhận diện trên file chưa có binding điền form và chờ `Lưu thông tin`; chỉ đối chiếu/kiểm tra Customer khi đã có binding.
+- [x] Render status giữ nội dung form tài khoản đang được gõ trong đúng lượt vẽ, không giữ mật khẩu vào client state/GAS/Sheet/Log; popup combo giữ focus qua thao tác chuột.
+- [x] Màn hình Chạy đồng bộ giữ pipeline và chẩn đoán sau khi hoàn tất hoặc lỗi, không rơi về thân trống; kiểm thử offline đạt `1301/1301`.
+- [ ] **Cần kiểm chứng thực tế:** reload Extension, tự điền nhận diện, đăng nhập thử và chạy một lượt `Kiểm tra an toàn`; đối chiếu Network và trạng thái Sidebar theo hướng dẫn bàn giao.
+
 ## Đợt sửa bắt buộc — Scheduler GAS quyết định, Extension chỉ cầu nối
 
 Các mục dưới đây là phần đang phải hoàn thiện trước khi báo chủ dự án chạy live. Chỉ đánh dấu `[x]` sau khi có test offline hoặc bằng chứng GAS DEV tương ứng.

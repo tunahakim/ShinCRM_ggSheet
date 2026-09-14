@@ -82,13 +82,42 @@
     return output;
   }
   function jsonValue(text) { try { var value = JSON.parse(String(text || '')); return value && value.d !== undefined ? value.d : value; } catch (ignore) { return null; } }
-  function loginValueFromPage() {
-    var html = document.documentElement ? document.documentElement.innerHTML : '', patterns = [
+  /** Salt chỉ có trên Login.aspx. Không suy diễn từ tab đang mở vì tab đó thường là zccrAccount.aspx. */
+  function loginValueFromPage(html) {
+    var source = String(html || document.documentElement && document.documentElement.innerHTML || ''), patterns = [
+      /\\u0027([a-f0-9]{4,})\\u0027\s*\+\s*\\u0027([a-f0-9]{4,})\\u0027/i,
+      /u0027([a-f0-9]{4,})u0027\s*\+\s*u0027([a-f0-9]{4,})u0027/i,
+      /'([a-f0-9]{4,})'\s*\+\s*'([a-f0-9]{4,})'/i,
       /(?:loginValue|encryptSalt|encrypt_salt|passwordSalt|loginSalt)\s*[=:]\s*["']([^"']+)["']/i,
       /["']value["']\s*:\s*["']([^"']+)["']/i
     ];
-    for (var i = 0; i < patterns.length; i += 1) { var match = html.match(patterns[i]); if (match) { return match[1]; } }
+    for (var i = 0; i < patterns.length; i += 1) {
+      var match = source.match(patterns[i]);
+      if (match) { return match[2] ? String(match[1]) + String(match[2]) : match[1]; }
+    }
     return '';
+  }
+  function loginListValue(value, keys, fallback) {
+    var data = value && value.d !== undefined ? value.d : value, found = '';
+    function walk(item) {
+      if (found || item === undefined || item === null) { return; }
+      if (typeof item === 'string') {
+        if (item && (item.indexOf('_') >= 0 || !fallback)) { found = item; }
+        return;
+      }
+      if (Array.isArray(item)) {
+        for (var i = item.length - 1; i >= 0 && !found; i -= 1) { walk(item[i]); }
+        return;
+      }
+      if (typeof item === 'object') {
+        for (var j = 0; j < keys.length && !found; j += 1) {
+          if (item[keys[j]] !== undefined) { found = String(item[keys[j]] || ''); }
+        }
+        Object.keys(item).some(function (key) { if (!found) { walk(item[key]); } return !!found; });
+      }
+    }
+    walk(data);
+    return found || String(fallback || '');
   }
   function payloadCookieFromText(text) {
     var source = String(text || ''), patterns = [
@@ -138,12 +167,22 @@
   function executeLogin(request, trace) {
     var credentials = request && request.meta && request.meta.loginCredentials || {}, base = 'https://fbo.com.vn:8888/Main/Login.aspx/', headers = { accept: '*/*', 'content-type': 'application/json; charset=UTF-8' };
     function post(url, body) { return fetch(base + url, { method: 'POST', headers: headers, body: body, credentials: 'include', cache: 'no-store' }).then(function (response) { return readResponseText(response).then(function (text) { return { response: response, text: text }; }); }); }
-    return post('GetEntityData', '').then(function (entity) {
+    // FBM đổi salt theo lần tải Login.aspx. Đây là bước bắt buộc trước ba POST đăng nhập.
+    return fetch(base.slice(0, -1), { method: 'GET', credentials: 'include', cache: 'no-store' }).then(function (response) {
+      return readResponseText(response).then(function (html) {
+        if (!response.ok) { throw new Error('FBM không cho mở trang đăng nhập để lấy mã phiên.'); }
+        var salt = loginValueFromPage(html);
+        if (!salt) { throw new Error('Không đọc được mã phiên đăng nhập từ trang FBM.'); }
+        traceEvent(trace, 'login_page_loaded', request, { httpStatus: response.status });
+        return salt;
+      });
+    }).then(function (salt) { return post('GetEntityData', '').then(function (entity) { return { salt: salt, entity: entity }; }); }).then(function (prepared) {
+      var entity = prepared.entity;
       if (!entity.response.ok) { throw new Error('FBM không cho đọc danh sách database.'); }
-      var data = jsonValue(entity.text), database = String(credentials.database || (Array.isArray(data) && data[0] && data[0][2]) || '');
+      var data = jsonValue(entity.text), database = String(credentials.database || loginListValue(data, ['Ma_DL', 'ma_dl', 'database', 'Database'], 'FHN_CRM_App'));
       return post('GetUnitData', JSON.stringify({ u: String(credentials.username || ''), d: database })).then(function (unit) {
         if (!unit.response.ok) { throw new Error('FBM không cho đọc danh sách đơn vị.'); }
-        var units = jsonValue(unit.text), selectedUnit = String(credentials.unit || (Array.isArray(units) && units[0] && units[0][0]) || ''), salt = String(credentials.value || loginValueFromPage() || '');
+        var units = jsonValue(unit.text), selectedUnit = String(credentials.unit || loginListValue(units, ['Ma_Dvcs', 'ma_dvcs', 'unit', 'Unit'], 'CTY')), salt = String(credentials.value || prepared.salt || '');
         if (!database || !selectedUnit || !salt) { throw new Error('Không lấy đủ database, đơn vị hoặc mã phiên để đăng nhập FBM.'); }
         var firstHash = /^[a-f0-9]{32}$/i.test(String(credentials.password || '')) ? String(credentials.password) : md5(salt + md5(String(credentials.password || '')));
         var body = JSON.stringify({ user: String(credentials.username || ''), password: firstHash, database: database, unit: selectedUnit, language: String(credentials.language || 'v'), value: salt, force: false, storage: true });

@@ -109,7 +109,7 @@ async function chay(so) {
 
   check(so, 'Overview render được trạng thái rỗng', !!render(hop, content, hop.fbmSyncRenderOverview, idle).querySelector('.shin-sync-overview-state'), true);
   check(so, 'Run render không hiện pipeline khi chưa chạy', render(hop, content, hop.fbmSyncRenderRun, idle).querySelector('.shin-sync-pipeline'), null);
-  check(so, 'Run render không hiện pipeline khi preflight thất bại trước request FBM', render(hop, content, hop.fbmSyncRenderRun, preflightError).querySelector('.shin-sync-pipeline'), null);
+  check(so, 'Run render giữ pipeline khi preflight thất bại để người dùng thấy chặng dừng', !!render(hop, content, hop.fbmSyncRenderRun, preflightError).querySelector('.shin-sync-pipeline'), true);
   check(so, 'Run render hiện pipeline khi đang xử lý', !!render(hop, content, hop.fbmSyncRenderRun, active).querySelector('.shin-sync-pipeline'), true);
   check(so, 'Run render giữ pipeline để chẩn đoán lỗi sau request', !!render(hop, content, hop.fbmSyncRenderRun, pushError).querySelector('.shin-sync-pipeline'), true);
 
@@ -117,6 +117,7 @@ async function chay(so) {
   hop.FBM_SYNC_CLIENT.loginStatus = { configured: false, enabled: true };
   render(hop, content, hop.fbmSyncRenderAccount, idle);
   check(so, 'Account render đủ ba ô nhập liên kết và nút thao tác', [dom.document.getElementById('fbm-identity-spreadsheet') !== null, dom.document.getElementById('fbm-identity-user') !== null, dom.document.getElementById('fbm-identity-account') !== null, dom.document.getElementById('fbm-sync-probe-identity') !== null], [true, true, true, true]);
+  check(so, 'Account hien ro mat khau trong luc nhap va khong co gia tri luu san', [dom.document.getElementById('fbm-login-password').type, dom.document.getElementById('fbm-login-password').value], ['text', '']);
 
   hop.FBM_SYNC_CLIENT.identityLastAction = 'probe';
   hop.fbmSyncApplyIdentityProbeDraft({ metadata: { identityProbe: { spreadsheetId: 'sheet-probe', userId: '2037', accountName: 'ANHLT' } } });

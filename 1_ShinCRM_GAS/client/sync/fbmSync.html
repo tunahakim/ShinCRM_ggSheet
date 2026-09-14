@@ -146,6 +146,33 @@ function fbmSyncPostRelayConfig(config, requireAck) {
     window.top.postMessage({ action: 'CRM_FBM_CONFIG', id: id, nonce: SHEET_LINK_NONCE, config: { url: config.url, key: config.key, spreadsheetId: config.spreadsheetId || '' } }, 'https://docs.google.com');
   });
 }
+/**
+ * Renderer thay toàn bộ thân màn hình, nhưng không được làm rơi chữ người dùng
+ * đang gõ. Mật khẩu chỉ sống trong biến cục bộ của đúng lượt vẽ này, không đi
+ * vào client state, GAS, Sheet hay Log.
+ */
+function fbmSyncCaptureActiveAccountDraft() {
+  var active = document.activeElement;
+  if (!active || !/^fbm-(?:identity|login)-/.test(String(active.id || ''))) { return null; }
+  var snapshot = { values: {}, activeId: active.id, selectionStart: Number(active.selectionStart || 0), selectionEnd: Number(active.selectionEnd || 0) };
+  ['fbm-identity-spreadsheet', 'fbm-identity-user', 'fbm-identity-username', 'fbm-identity-account', 'fbm-login-username', 'fbm-login-password'].forEach(function (id) {
+    var input = document.getElementById(id);
+    if (input) { snapshot.values[id] = String(input.value || ''); }
+  });
+  return snapshot;
+}
+function fbmSyncRestoreActiveAccountDraft(snapshot) {
+  if (!snapshot) { return; }
+  Object.keys(snapshot.values).forEach(function (id) {
+    var input = document.getElementById(id);
+    if (input) { input.value = snapshot.values[id]; }
+  });
+  var active = document.getElementById(snapshot.activeId);
+  if (active && !active.disabled && typeof active.focus === 'function') {
+    active.focus();
+    if (typeof active.setSelectionRange === 'function') { active.setSelectionRange(snapshot.selectionStart, snapshot.selectionEnd); }
+  }
+}
 /** Vẽ snapshot status, không suy diễn nghiệp vụ ở client. */
 function fbmSyncPaint(status, freshOpen) {
   var panel = document.getElementById('fbm-sync-content');
@@ -157,6 +184,7 @@ function fbmSyncPaint(status, freshOpen) {
     status = Object.assign({}, status, { phase: 'idle', label: 'Sẵn sàng', message: '', lastError: '', counts: { total: 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 } });
   }
   FBM_SYNC_CLIENT.lastStatus = status;
+  var activeAccountDraft = fbmSyncCaptureActiveAccountDraft();
   fbmSyncPaintHeaderState(status);
   var draftUsername = document.getElementById('fbm-login-username'); if (draftUsername) { FBM_SYNC_CLIENT.loginDraft.username = String(draftUsername.value || ''); }
   ['spreadsheet', 'user', 'username', 'account'].forEach(function (name) { var draft = document.getElementById('fbm-identity-' + name); if (draft) { FBM_SYNC_CLIENT.identityDraft[name === 'spreadsheet' ? 'spreadsheetId' : name === 'user' ? 'userId' : name === 'username' ? 'username' : 'accountName'] = String(draft.value || ''); } });
@@ -171,6 +199,7 @@ function fbmSyncPaint(status, freshOpen) {
   else if (FBM_SYNC_CLIENT.subscreen === 'settings' && typeof fbmSyncRenderSettings === 'function') { fbmSyncRenderSettings(panel, status); }
   else if (typeof fbmSyncRenderOverview === 'function') { fbmSyncRenderOverview(panel, status); }
   if (typeof fbmSyncRenderShell === 'function') { fbmSyncRenderShell(status); }
+  fbmSyncRestoreActiveAccountDraft(activeAccountDraft);
   if (typeof fbmSyncApplyMasterDisabled === 'function') { fbmSyncApplyMasterDisabled(status); }
 }
 /** Đồng bộ màu icon header với phase hiện tại của phiên GAS. */
@@ -555,7 +584,7 @@ function fbmSyncAutoFillAndCheck() {
       status.phase = 'error'; status.label = 'Không thể kiểm tra'; status.message = 'Không đọc đủ Spreadsheet ID, mã user hoặc tên tài khoản từ tab FBM. Thông tin đã đọc được giữ lại để bạn kiểm tra.'; fbmSyncPaint(status); return null;
     }
     if (!binding.spreadsheetId || !binding.userId || !binding.accountName) {
-      status.phase = 'error'; status.label = 'Chưa có liên kết'; status.message = 'Chưa có liên kết đã lưu để đối chiếu. Hãy bấm Lưu thông tin rồi chạy lại Tự động điền - Kiểm tra.'; fbmSyncPaint(status); return null;
+      status.phase = 'done'; status.label = 'Đã tự động điền'; status.message = 'Đã đọc và điền thông tin từ tab FBM. Đây là liên kết mới, hãy kiểm tra rồi bấm Lưu thông tin để xác nhận.'; fbmSyncPaint(status); return { ok: true, code: 'IDENTITY_DRAFT_READY', status: status };
     }
     var same = String(binding.spreadsheetId) === String(probe.spreadsheetId) && String(binding.userId) === String(probe.userId) && String(binding.username) === String(probe.username) && String(binding.accountName) === String(probe.accountName);
     if (!same) {

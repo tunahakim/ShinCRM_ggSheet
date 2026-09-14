@@ -19,7 +19,8 @@ function fbmSyncRenderAccount(panel, status) {
   fbmSyncAppendInput(userField, 'fbm-login-username', 'text', FBM_SYNC_CLIENT.loginDraft.username, 'Nhập username FBM');
   var passwordField = fbmSyncAppendBox(body, 'shin-sync-form-field');
   fbmSyncAppendText(passwordField, 'Mật khẩu FBM', 'shin-sync-form-label');
-  fbmSyncAppendInput(passwordField, 'fbm-login-password', 'password', '', 'Nhập mật khẩu FBM');
+  // Mật khẩu vừa gõ hiện rõ để người dùng tự đối chiếu; sau lưu/thử hoặc khi mở lại luôn là ô trống.
+  fbmSyncAppendInput(passwordField, 'fbm-login-password', 'text', '', 'Nhập mật khẩu FBM');
 
   var actions = fbmSyncAppendBox(body, 'shin-sync-form-actions');
   var test = fbmSyncAppendButton(actions, 'fbm-sync-login-test', 'Đăng nhập thử', true); test.disabled = !!FBM_SYNC_CLIENT.running;
