@@ -44,6 +44,26 @@ function fbmSyncLoadSettings() {
 /** Đưa cấu hình Web App/khóa sang Extension; không gửi cookie hay payload FBM. */
 var FBM_SYNC_RELAY_CONFIGURE_FLIGHT = null;
 var FBM_SYNC_OPEN_HEARTBEAT_SENT = false;
+var FBM_SYNC_BRIDGE_WAITERS = [];
+var FBM_SYNC_BRIDGE_WAIT_TIMER = null;
+function fbmSyncNotifyBridgeReady() {
+  if (!FBM_SYNC_BRIDGE_WAITERS.length) { return; }
+  var waiters = FBM_SYNC_BRIDGE_WAITERS.splice(0, FBM_SYNC_BRIDGE_WAITERS.length);
+  if (FBM_SYNC_BRIDGE_WAIT_TIMER) { clearTimeout(FBM_SYNC_BRIDGE_WAIT_TIMER); FBM_SYNC_BRIDGE_WAIT_TIMER = null; }
+  waiters.forEach(function (resolve) { resolve(true); });
+}
+function fbmSyncWaitForBridge() {
+  if (typeof sheetLinkExtensionAlive !== 'function' || sheetLinkExtensionAlive()) { return Promise.resolve(true); }
+  return new Promise(function (resolve) {
+    FBM_SYNC_BRIDGE_WAITERS.push(resolve);
+    if (FBM_SYNC_BRIDGE_WAIT_TIMER) { return; }
+    FBM_SYNC_BRIDGE_WAIT_TIMER = setTimeout(function () {
+      var waiters = FBM_SYNC_BRIDGE_WAITERS.splice(0, FBM_SYNC_BRIDGE_WAITERS.length);
+      FBM_SYNC_BRIDGE_WAIT_TIMER = null;
+      waiters.forEach(function (waiter) { waiter(false); });
+    }, 5000);
+  });
+}
 function fbmSyncHeartbeatOnSidebarOpen() {
   if (FBM_SYNC_OPEN_HEARTBEAT_SENT || window.top === window || !SHEET_LINK_NONCE) { return false; }
   FBM_SYNC_OPEN_HEARTBEAT_SENT = true;
@@ -55,6 +75,9 @@ function fbmSyncHeartbeatOnSidebarOpen() {
   }
 }
 function fbmSyncConfigureRelay() {
+  if (typeof sheetLinkExtensionAlive === 'function' && !sheetLinkExtensionAlive()) {
+    return fbmSyncWaitForBridge().then(function (ready) { return ready ? fbmSyncConfigureRelay() : null; });
+  }
   if (FBM_SYNC_RELAY_CONFIGURE_FLIGHT) { return FBM_SYNC_RELAY_CONFIGURE_FLIGHT; }
   if (typeof callServer !== 'function') { return Promise.resolve(null); }
   return FBM_SYNC_RELAY_CONFIGURE_FLIGHT = callServer('fbmGetRelayConfig').then(function (config) {

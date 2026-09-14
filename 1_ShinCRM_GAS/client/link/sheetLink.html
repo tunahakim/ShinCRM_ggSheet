@@ -129,6 +129,7 @@ function sheetLinkOnMessage(event) {
       SHEET_LINK_SEQ = 0;
     }
     SHEET_LINK_LAST_ACK = Date.now();
+    if (typeof fbmSyncNotifyBridgeReady === 'function') { fbmSyncNotifyBridgeReady(); }
     if (typeof selectionPollOnAck === 'function') { selectionPollOnAck(); }
     return;
   }
