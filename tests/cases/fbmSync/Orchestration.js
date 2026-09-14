@@ -105,9 +105,11 @@ async function chay(so) {
   const compactState = orchestration.FbmSync.stateRead();
   compactState.cursor = { kind: 'push_wait', operation: 'activity_edit_save', entity: 'activity', index: 0, candidate: { record: { payload: new Array(200).join('khong_duoc_gui_') } }, oldValues: { details: new Array(200).join('old_value_') } };
   compactState.metadata.categoryGate = { map: { huge: new Array(500).join('category_') }, valid: { huge: true } };
+  compactState.metadata.identityProbe = { spreadsheetId: 'sheet-probe', userId: '2037', accountName: 'ANHLT' };
   orchestration.FbmSync.stateWrite(compactState);
   const compactView = orchestration.FbmSync.statusView();
   check(so, 'status Sidebar khong tra Category gate va OldValue noi bo', [compactView.metadata.categoryGate, compactView.cursor.candidate, compactView.cursor.operation], [undefined, undefined, 'activity_edit_save']);
+  check(so, 'status Sidebar giu identity probe de tu dien tai khoan', compactView.metadata.identityProbe, { spreadsheetId: 'sheet-probe', userId: '2037', accountName: 'ANHLT' });
   check(so, 'status Sidebar giu response nho khi state noi bo lon', JSON.stringify(compactView).length < 5000, true);
 
   const pausedState = orchestration.FbmSync.stateRead();
