@@ -18,7 +18,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 
 ### Kiến trúc và dữ liệu nhạy cảm
 
-- [~] GAS giữ nghiệp vụ, cursor, hash, conflict và quyết định; Extension chỉ tìm tab FBM, gọi `fetch` và trả response thô. Luồng sync thường đã theo hợp đồng này; adapter login cũ còn là ngoại lệ bảo mật đang chờ phương án chuyển hoàn toàn về GAS.
+- [x] GAS giữ nghiệp vụ, cursor, hash, conflict và quyết định; Extension chỉ tìm tab FBM, gọi `fetch` và trả response thô. Adapter login/vault là ngoại lệ bảo mật duy nhất được 09.06 quy định; không mở rộng ngoại lệ này sang nghiệp vụ đồng bộ.
 - [x] Có `FbmSync.controlDispatch(command, payload)` làm cổng điều khiển trung lập; adapter Sidebar/relay chỉ chuyển lệnh và hiển thị DTO, không sao chép nghiệp vụ.
 - [x] Có DTO `sync_approval_required` với action ID ổn định; kênh tương lai (ví dụ Zalo) được phép đổi action thành phím tắt như `Gửi 1`, nhưng core không biết số thứ tự hay giao diện kênh.
 - [x] Mỗi lượt GAS–Extension trao đổi một request hoàn chỉnh; chuỗi nhiều bước nằm trong `DocumentProperties`, không nằm trong Extension.
