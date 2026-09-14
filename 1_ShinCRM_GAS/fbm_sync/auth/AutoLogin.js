@@ -3,7 +3,8 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 FbmSync.LOGIN_CONFIG_KEY = 'FBM_LOGIN_CONFIG_V1';
 FbmSync.AUTO_LOGIN_LAST_ATTEMPT_KEY = 'FBM_AUTO_LOGIN_LAST_ATTEMPT_V1';
-FbmSync.AUTO_LOGIN_RETRY_MS = 15 * 60 * 1000;
+// Không thử dồn dập và tuyệt đối không ép logout phiên đang dùng ở máy khác.
+FbmSync.AUTO_LOGIN_RETRY_MS = 30 * 60 * 1000;
 
 FbmSync.loginConfigDefault = function () {
   return { enabled: true, configured: false, credentialRef: '', envelope: null, public: {}, lastAttemptAt: 0, lastLoginAt: 0, lastError: '' };
@@ -69,6 +70,32 @@ FbmSync.autoLoginMarkAttempt = function (now) {
   return at;
 };
 
+FbmSync.autoLoginMarkSuccess = function (now) {
+  var at = Number(now || Date.now()), value = FbmSync.loginConfigRead();
+  value.lastLoginAt = at;
+  value.lastError = '';
+  FbmSync.props().setProperty(FbmSync.LOGIN_CONFIG_KEY, JSON.stringify(value));
+  return at;
+};
+
+FbmSync.autoLoginMarkFailure = function (message) {
+  var value = FbmSync.loginConfigRead();
+  value.lastError = String(message || 'Tự đăng nhập FBM thất bại.').slice(0, 240);
+  FbmSync.props().setProperty(FbmSync.LOGIN_CONFIG_KEY, JSON.stringify(value));
+  return FbmSync.loginConfigPublic();
+};
+
+/** Nhận payload cookie do adapter login/capture trả về; không dựng request FBM. */
+FbmSync.applyTransportSession = function (state, response) {
+  var parsed = FbmSync.protocol.parse(response) || {}, transport = parsed._transport || {}, captured = transport.payloadCookie || transport.captures && transport.captures.payloadCookie;
+  if (!captured) { return false; }
+  state.session = state.session || {};
+  state.session.cookie = String(captured);
+  var compact = state.session.cookie.indexOf('FHN_CRM_App') >= 0 ? state.session.cookie.slice(0, state.session.cookie.indexOf('FHN_CRM_App')) : '';
+  if (!state.session.userId && compact.length > 9) { state.session.userId = compact.slice(4, -5); }
+  return true;
+};
+
 FbmSync.loginRequest = function (credentialRef, testOnly) {
   var cfg = FbmSync.scriptSettings();
   return { url: cfg.baseUrl + '/Main/Login.aspx/Login', body: {}, meta: { kind: 'login', credentialRef: String(credentialRef || ''), testOnly: testOnly === true } };
@@ -87,11 +114,12 @@ FbmSync.loginTestResult = function (response) {
 };
 
 /** Đặt cursor login trước request đọc thất bại; request ghi không được tự lặp. */
-FbmSync.beginAutoLogin = function (state, failedCursor) {
+FbmSync.beginAutoLogin = function (state, failedCursor, options) {
   var allowed = FbmSync.autoLoginCanAttempt();
   if (!allowed.ok) { return null; }
+  var opt = options || {};
   FbmSync.autoLoginMarkAttempt();
-  state.cursor = { kind: 'login', credentialRef: allowed.credentialRef, resumeCursor: Object.assign({}, failedCursor || {}), resumePhase: String(state.phase || ''), resumeEntity: String(state.entity || '') };
+  state.cursor = { kind: 'login', credentialRef: allowed.credentialRef, resumeCursor: Object.assign({}, failedCursor || {}), resumePhase: String(state.phase || ''), resumeEntity: String(state.entity || ''), resumeHeartbeat: opt.heartbeat === true };
   state.phase = 'checking_session'; state.entity = ''; state.session.expired = true; state.message = 'Phiên FBM hết hạn; đang thử đăng nhập lại tự động...'; state.lastFailureCode = 'AUTO_LOGIN_STARTED';
   FbmSync.stateWrite(state);
   return FbmSync.loginRequest(allowed.credentialRef, false);

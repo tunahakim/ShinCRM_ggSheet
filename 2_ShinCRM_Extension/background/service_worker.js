@@ -14,10 +14,10 @@
 function findFbmTab() {
   return chrome.tabs.query({ url: ['https://fbo.com.vn:8888/*'] }).then(function (tabs) { return tabs && tabs.length ? tabs[0] : null; });
 }
-var FBM_EXECUTOR_VERSION = '21.9';
+var FBM_EXECUTOR_VERSION = '21.11';
 
 function addWorkerTrace(reply, request, stage, extra) {
-  var meta = request && request.meta && request.meta.trace || {}, event = Object.assign({ at: Date.now(), stage: stage, runId: String(meta.runId || ''), requestId: String(meta.requestId || ''), operation: String(request && request.meta && request.meta.kind || ''), entity: String(request && request.meta && request.meta.entity || ''), recordId: String(request && request.meta && (request.meta.id || request.meta.shinId || request.meta.stt_rec_kh) || '') }, extra || {});
+  var event = Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {});
   if (reply && reply.result && typeof reply.result === 'object') {
     reply.result.transport = reply.result.transport || {};
     reply.result.transport.trace = (reply.result.transport.trace || []).concat([event]);
@@ -93,6 +93,7 @@ function recoverSheetsBridges() {
 
 /** Kiểm tra đầu nhận rồi gửi request nghiệp vụ đúng một lần. */
 function sendToFbmTab(tabId, request) {
+  if (!request || typeof request !== 'object') { return Promise.resolve({ error: 'GAS chưa cấp request FBM; đã chặn trước khi tìm tab.' }); }
   return ensureFbmExecutor(tabId).then(function () {
     return hydrateLoginRequest(request).then(function (readyRequest) {
       request = readyRequest;
@@ -240,7 +241,6 @@ if (typeof globalThis !== 'undefined') { globalThis.fbmRelayProbe = fbmRelayProb
 
 var fbmBackgroundSyncFlight = null;
 var fbmHeartbeatFlight = null;
-var FBM_BACKGROUND_SYNC_MAX_REQUESTS = 100;
 
 function noteBackgroundSyncStatus(stage, extra) {
   if (!chrome.storage || !chrome.storage.local || !chrome.storage.local.set) { return; }
@@ -254,6 +254,20 @@ function noteHeartbeatStatus(stage, extra) {
   try { chrome.storage.local.set({ fbmHeartbeatLastStatus: Object.assign({ at: Date.now(), stage: String(stage || '') }, extra || {}) }); } catch (ignore) {}
 }
 
+/** Báo transport failure về GAS theo reservation; không biến lỗi cầu nối thành lỗi nghiệp vụ FBM. */
+function relayHeartbeatTransportFailure(config, request, code, message) {
+  if (!config || !config.url || !config.key || !request || !request.id) {
+    return Promise.resolve({ ok: false, code: 'HEARTBEAT_RESERVATION_MISSING', request: null });
+  }
+  return postRelay(config.url, config.key, {
+    kind: 'heartbeat_transport_failure',
+    spreadsheetId: config.spreadsheetId,
+    requestId: String(request.id),
+    code: String(code || 'FBM_TRANSPORT_UNAVAILABLE'),
+    error: String(message || 'Extension không gửi được request tới tab FBM.').slice(0, 240)
+  });
+}
+
 /** Chạy ngay một heartbeat để nghiệm thu; alarm 5 phút chỉ gọi lại đúng luồng này. */
 function fbmHeartbeatNow(source) {
   if (fbmHeartbeatFlight) { return fbmHeartbeatFlight; }
@@ -265,35 +279,38 @@ function fbmHeartbeatNow(source) {
       return { ok: false, code: 'RELAY_CONFIG_MISSING', error: 'Thiếu cấu hình relay; hãy mở Sidebar một lần.' };
     }
     noteHeartbeatStatus('relay_configured', { source: origin });
-    return postRelay(config.url, config.key, { kind: 'probe', spreadsheetId: config.spreadsheetId }).then(function (probe) {
-      if (!probe || probe.ok !== true) {
-        var probeCode = String(probe && probe.code || 'RELAY_PROBE_FAILED');
-        noteHeartbeatStatus('blocked_relay', { source: origin, code: probeCode, error: String(probe && (probe.error || probe.message) || 'GAS relay chưa sẵn sàng.').slice(0, 240) });
-        return { ok: false, code: probeCode, error: String(probe && (probe.error || probe.message) || 'GAS relay chưa sẵn sàng.') };
-      }
-      if (probe.masterEnabled === false || ((origin === 'alarm' || origin === 'sidebar_open') && probe.backgroundEnabled === false)) {
-        var switchCode = probe.masterEnabled === false ? 'SYNC_DISABLED' : 'BACKGROUND_DISABLED';
-        noteHeartbeatStatus('blocked_switch', { source: origin, code: switchCode });
-        return { ok: false, code: switchCode, error: switchCode === 'SYNC_DISABLED' ? 'Đồng bộ đang tắt.' : 'Đồng bộ nền đang tắt.' };
-      }
-      if (origin === 'alarm' && probe.sessionExpired === true) {
-        noteHeartbeatStatus('blocked_session', { source: origin, code: 'SESSION_EXPIRED_WAITING_LOGIN' });
-        return { ok: false, code: 'SESSION_EXPIRED_WAITING_LOGIN', error: 'Phiên FBM đã hết hạn; alarm nền tạm dừng cho tới khi đăng nhập lại.' };
+    // GAS phải cấp envelope trước; không có envelope thì tuyệt đối không chạm tab FBM.
+    return postRelay(config.url, config.key, { kind: 'heartbeat_request', source: origin, spreadsheetId: config.spreadsheetId }).then(function (gasRequest) {
+      if (!gasRequest || gasRequest.ok !== true || !gasRequest.request) {
+        var requestCode = String(gasRequest && gasRequest.code || 'HEARTBEAT_REQUEST_NOT_READY');
+        noteHeartbeatStatus('blocked_gas_request', { source: origin, code: requestCode, error: String(gasRequest && (gasRequest.error || gasRequest.message) || 'GAS chưa cấp request heartbeat.').slice(0, 240) });
+        return Object.assign({}, gasRequest || {}, { ok: false, code: requestCode, error: String(gasRequest && (gasRequest.error || gasRequest.message) || 'GAS chưa cấp request heartbeat.') });
       }
       return findFbmTab().then(function (tab) {
-      if (!tab) {
-        noteHeartbeatStatus('blocked_tab', { source: origin, code: 'FBM_TAB_NOT_FOUND' });
-        return { ok: false, code: 'FBM_TAB_NOT_FOUND', error: 'Không tìm thấy tab FBM đang mở.' };
-      }
-      noteHeartbeatStatus('fbm_request_sent', { source: origin, tabId: Number(tab.id || 0) });
-      return sendToFbmTab(tab.id, null).then(function (reply) {
-        var raw = rawFbmReply(reply) || {};
-        noteHeartbeatStatus('fbm_response_received', { source: origin, tabId: Number(tab.id || 0), ok: raw.ok === true, httpStatus: Number(raw.status || 0), responseLength: String(raw.body || '').length, error: String(raw.error || '').slice(0, 240) });
-        return relayHeartbeatToGas(tab.id, reply).then(function (gasReply) {
-          noteHeartbeatStatus('gas_response_received', { source: origin, ok: !!(gasReply && gasReply.ok), code: String(gasReply && gasReply.code || ''), requestKind: String(gasReply && gasReply.request && gasReply.request.meta && gasReply.request.meta.kind || '') });
-          return gasReply && gasReply.ok === false ? Object.assign({ ok: false }, gasReply) : { ok: true, gas: gasReply || null };
+        if (!tab) {
+          noteHeartbeatStatus('blocked_tab', { source: origin, code: 'FBM_TAB_NOT_FOUND' });
+          return relayHeartbeatTransportFailure(config, gasRequest.request, 'FBM_TAB_NOT_FOUND', 'Không tìm thấy tab FBM đang mở.').then(function (gasReply) {
+            return Object.assign({}, gasReply || {}, { ok: false, code: 'FBM_TAB_NOT_FOUND', error: 'Không tìm thấy tab FBM đang mở.' });
+          });
+        }
+        noteHeartbeatStatus('fbm_request_sent', { source: origin, tabId: Number(tab.id || 0) });
+        return sendToFbmTab(tab.id, gasRequest.request).then(function (reply) {
+          if (reply && reply.error) {
+            return relayHeartbeatTransportFailure(config, gasRequest.request, 'FBM_TRANSPORT_UNAVAILABLE', reply.error).then(function (gasReply) {
+              return Object.assign({}, gasReply || {}, { ok: false, code: 'FBM_TRANSPORT_UNAVAILABLE', error: String(reply.error) });
+            });
+          }
+          var raw = rawFbmReply(reply) || {};
+          noteHeartbeatStatus('fbm_response_received', { source: origin, tabId: Number(tab.id || 0), ok: raw.ok === true, httpStatus: Number(raw.status || 0), responseLength: String(raw.body || '').length, error: String(raw.error || '').slice(0, 240) });
+          return relayHeartbeatToGas(tab.id, reply, 1).then(function (gasReply) {
+            noteHeartbeatStatus('gas_response_received', { source: origin, ok: !!(gasReply && gasReply.ok), code: String(gasReply && gasReply.code || '') });
+            return gasReply && gasReply.ok === false ? Object.assign({ ok: false }, gasReply) : { ok: true, gas: gasReply || null };
+          });
+        }).catch(function (error) {
+          return relayHeartbeatTransportFailure(config, gasRequest.request, 'FBM_TRANSPORT_UNAVAILABLE', error && error.message || error).then(function (gasReply) {
+            return Object.assign({}, gasReply || {}, { ok: false, code: 'FBM_TRANSPORT_UNAVAILABLE', error: String(error && error.message || error) });
+          });
         });
-      });
       });
     });
   }).catch(function (error) {
@@ -306,16 +323,17 @@ function fbmHeartbeatNow(source) {
 if (typeof globalThis !== 'undefined') { globalThis.fbmHeartbeatNow = fbmHeartbeatNow; }
 
 /** Chạy một phiên GAS trực tiếp từ Service Worker; mặc định chỉ đọc, không cần Sidebar. */
-function fbmRunBackgroundSync(mode) {
+function fbmRunBackgroundSync() {
   if (fbmBackgroundSyncFlight) { return fbmBackgroundSyncFlight; }
-  var selectedMode = String(mode || 'read').toLowerCase() === 'write' ? 'write' : 'read';
+  var selectedMode = 'gas_decides';
   fbmBackgroundSyncFlight = getRelayConfig().then(function (config) {
     if (!config) { throw new Error('Thiếu cấu hình relay; hãy mở Sidebar một lần để cấp URL và khóa.'); }
-    return findFbmTab().then(function (tab) {
-      if (!tab) { throw new Error('Không tìm thấy tab FBM đang mở.'); }
-      noteBackgroundSyncStatus('start_requested', { mode: selectedMode, requestCount: 0 });
-      return postRelay(config.url, config.key, { kind: 'background_sync', command: 'start', payload: { mode: selectedMode, origin: 'background', manual: false }, mode: selectedMode, spreadsheetId: config.spreadsheetId }).then(function (reply) {
-        return relayBackgroundSyncRequests(tab.id, config, reply, 0, selectedMode);
+    noteBackgroundSyncStatus('start_requested', { mode: selectedMode, requestCount: 0 });
+    return postRelay(config.url, config.key, { kind: 'background_sync', command: 'start', payload: { origin: 'background', manual: false }, spreadsheetId: config.spreadsheetId }).then(function (reply) {
+      if (!reply || !reply.request) { return reply; }
+      return findFbmTab().then(function (tab) {
+        if (tab) { return relayBackgroundSyncRequests(tab.id, config, reply, 0, selectedMode); }
+        return postRelay(config.url, config.key, { kind: 'background_sync', command: 'transport_failure', payload: { requestId: reply.request.id, code: 'FBM_TAB_NOT_FOUND', message: 'Không tìm thấy tab FBM đang mở.' }, spreadsheetId: config.spreadsheetId, hop: 1 });
       });
     });
   }).then(function (reply) {
@@ -333,14 +351,18 @@ function fbmRunBackgroundSync(mode) {
 function relayBackgroundSyncRequests(tabId, config, gasReply, requestCount, mode) {
   var count = Number(requestCount || 0), next = gasReply && gasReply.request;
   if (!next) { return Promise.resolve(Object.assign({}, gasReply || {}, { requestCount: count, mode: mode })); }
-  if (count >= FBM_BACKGROUND_SYNC_MAX_REQUESTS) { throw new Error('Đồng bộ Service Worker vượt quá ' + FBM_BACKGROUND_SYNC_MAX_REQUESTS + ' request trong một lượt.'); }
   noteBackgroundSyncStatus('fbm_request_sent', { mode: mode, requestCount: count + 1 });
-  console.info('[ShinCRM] FBM background request', count + 1, next.meta && next.meta.kind || 'request');
+  console.info('[ShinCRM] FBM background request', count + 1);
   return sendToFbmTab(tabId, next).then(function (reply) {
+    if (reply && reply.error) {
+      return postRelay(config.url, config.key, { kind: 'background_sync', command: 'transport_failure', payload: { requestId: next.id, code: 'FBM_TRANSPORT_UNAVAILABLE', message: reply.error }, spreadsheetId: config.spreadsheetId, hop: count + 1 });
+    }
     noteBackgroundSyncStatus('fbm_response_received', { mode: mode, requestCount: count + 1 });
     var rawResponse = rawFbmReply(reply);
-    return postRelay(config.url, config.key, { kind: 'background_sync', command: 'continue', payload: { response: rawResponse }, spreadsheetId: config.spreadsheetId, response: rawResponse });
-  }).then(function (nextReply) { return relayBackgroundSyncRequests(tabId, config, nextReply, count + 1, mode); });
+    return postRelay(config.url, config.key, { kind: 'background_sync', command: 'continue', payload: { response: rawResponse }, spreadsheetId: config.spreadsheetId, response: rawResponse, hop: count + 1 });
+  }).then(function (nextReply) { return relayBackgroundSyncRequests(tabId, config, nextReply, count + 1, mode); }).catch(function (error) {
+    return postRelay(config.url, config.key, { kind: 'background_sync', command: 'transport_failure', payload: { requestId: next.id, code: 'FBM_TRANSPORT_UNAVAILABLE', message: String(error && error.message || error) }, spreadsheetId: config.spreadsheetId, hop: count + 1 });
+  });
 }
 if (typeof globalThis !== 'undefined') { globalThis.fbmRunBackgroundSync = fbmRunBackgroundSync; }
 
@@ -382,25 +404,27 @@ function configureRelay(config) {
   }).catch(function (error) { return { ok: false, code: 'RELAY_CONFIG_REJECTED', error: String(error && error.message || error) }; });
 }
 
-/** Chạy một lượng request đọc giới hạn trong mỗi heartbeat để tiếp tục cursor GAS. */
+/** Chuyển từng request tiếp theo do GAS cấp trong cùng heartbeat; GAS quyết định điểm dừng. */
 function relayScheduledRequests(tabId, config, gasReply, count) {
   var next = gasReply && gasReply.request, used = Number(count || 0);
-  if (!next || used >= 10 || !config || !config.url || !config.key) { return Promise.resolve(gasReply); }
-    return sendToFbmTab(tabId, next).then(function (reply) {
-    return postRelay(config.url, config.key, { kind: 'heartbeat', spreadsheetId: config.spreadsheetId, response: rawFbmReply(reply) }).then(function (nextReply) {
+  if (!next || !config || !config.url || !config.key) { return Promise.resolve(gasReply); }
+  return sendToFbmTab(tabId, next).then(function (reply) {
+      if (reply && reply.error) { return relayHeartbeatTransportFailure(config, next, 'FBM_TRANSPORT_UNAVAILABLE', reply.error); }
+      var raw = rawFbmReply(reply);
+      return postRelay(config.url, config.key, { kind: 'heartbeat', spreadsheetId: config.spreadsheetId, response: raw, hop: used + 1 }).then(function (nextReply) {
       return relayScheduledRequests(tabId, config, nextReply, used + 1);
     });
-  });
+  }).catch(function (error) { return relayHeartbeatTransportFailure(config, next, 'FBM_TRANSPORT_UNAVAILABLE', error && error.message || error); });
 }
 
 /** Nộp heartbeat cho GAS và chạy tiếp các request đọc scheduler trả về. */
-function relayHeartbeatToGas(tabId, reply) {
+function relayHeartbeatToGas(tabId, reply, hop) {
   return getRelayConfig().then(function (config) {
     if (!config) {
       noteRelayStatus({ ok: false, code: 'RELAY_CONFIG_MISSING', error: 'Thiếu URL hoặc khóa Web App GAS.' });
       return null;
     }
-    return postRelay(config.url, config.key, { kind: 'heartbeat', spreadsheetId: config.spreadsheetId, response: rawFbmReply(reply) }).then(function (gasReply) {
+    return postRelay(config.url, config.key, { kind: 'heartbeat', spreadsheetId: config.spreadsheetId, response: rawFbmReply(reply), hop: Number(hop || 1) }).then(function (gasReply) {
       if (!gasReply || gasReply.ok === false) { return gasReply || { ok: false, code: 'GAS_HEARTBEAT_FAILED' }; }
       return relayScheduledRequests(tabId, config, gasReply, 0);
     });
@@ -431,7 +455,7 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     return true;
   }
   if (message && message.type === 'FBM_BACKGROUND_SYNC') {
-    fbmRunBackgroundSync(message.mode).then(sendResponse, function (error) { sendResponse({ ok: false, code: 'BACKGROUND_SYNC_FAILED', error: String(error && error.message || error) }); });
+    fbmRunBackgroundSync().then(sendResponse, function (error) { sendResponse({ ok: false, code: 'BACKGROUND_SYNC_FAILED', error: String(error && error.message || error) }); });
     return true;
   }
   if (message && message.type === 'FBM_HEARTBEAT_NOW') {

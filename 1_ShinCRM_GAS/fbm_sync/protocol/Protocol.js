@@ -51,6 +51,11 @@ FbmSync.protocol = {
     var body = parsed && parsed.raw !== undefined ? String(parsed.raw) : String((response && response.body) || '');
     return /(?:Login\.aspx|name\s*=\s*["'](?:username|userName)["']|id\s*=\s*["'](?:login|loginForm)["'])/i.test(body);
   },
+  /** Heartbeat Customer phải trả đúng shape dữ liệu; response rỗng không được coi là phiên khỏe. */
+  hasHeartbeatData: function (response) {
+    var parsed = FbmSync.protocol.parse(response) || {}, data = parsed.d || parsed;
+    return !!(data && typeof data === 'object' && (Object.prototype.hasOwnProperty.call(data, 'TotalRowCount') || Array.isArray(data.Rows)));
+  },
   /** Phân loại lỗi để orchestration biết khi nào được retry. */
   classifyFailure: function (response) {
     if (response && typeof response === 'object' && response.ok === false && Number(response.status) >= 500 && !String(response.body || '').trim()) {

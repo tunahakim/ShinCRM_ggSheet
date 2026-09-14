@@ -42,8 +42,9 @@ FbmSync.nextEnvelope = function (request) {
   // state được chuyển sang paused để người dùng xem và chủ động tiếp tục sau khi bật lại.
   if (!FbmSync.masterEnabled()) {
     var stopped = FbmSync.stateRead ? FbmSync.stateRead() : {};
-    stopped.phase = 'paused'; stopped.runId = ''; stopped.cursor = {}; stopped.activeRequestId = '';
-    stopped.message = 'Đồng bộ đang tắt; không cấp request FBM mới.'; stopped.lastError = '';
+    stopped.phase = 'paused';
+    stopped.message = 'Đồng bộ đang tắt; không cấp request FBM mới. Request đang bay vẫn được giữ để không mất cursor.';
+    stopped.lastError = '';
     if (FbmSync.stateWrite) { FbmSync.stateWrite(stopped); }
     return null;
   }
@@ -54,6 +55,11 @@ FbmSync.nextEnvelope = function (request) {
   }
   var id = Date.now().toString(36), state = FbmSync.stateRead ? FbmSync.stateRead() : {}, meta = Object.assign({}, request.meta || {});
   meta.trace = Object.assign({}, meta.trace || {}, { runId: String(state.runId || ''), requestId: id });
+  // Extension chỉ có bộ lọc generic; GAS quyết định rõ dữ liệu phụ trợ cần lấy từ tab.
+  meta.transport = Object.assign({
+    captures: [{ name: 'payloadCookie', source: 'page_html', pattern: '\\\\?["\\\']cookie\\\\?\\s*[:=]\\s*\\\\?["\\\']([^\\\"\\\'\\\\]+FHN_CRM_App)["\\\']', flags: 'i', group: 1 }],
+    replacements: [{ token: '{{FBM_PAYLOAD_COOKIE}}', capture: 'payloadCookie', source: 'page_html' }]
+  }, meta.transport || {});
   if (FbmSync.stateWrite) {
     state.activeRequestId = id;
     state.lastProgressAt = Date.now();
@@ -62,6 +68,28 @@ FbmSync.nextEnvelope = function (request) {
   }
   if (FbmSync.traceEvent) { FbmSync.traceEvent('response_built', { requestId: id, operation: meta.kind, entity: meta.entity, recordId: meta.id || meta.shinId || meta.stt_rec_kh }); }
   return FbmSync.protocol.request(id, request.url, FbmSync.transportValue(request.body), FbmSync.transportValue(meta));
+};
+/** Lấy requestId từ trace transport mà GAS đã yêu cầu Extension giữ lại. */
+FbmSync.responseRequestId = function (rawResponse) {
+  var value = rawResponse || {}, trace = value.trace || value.transport && value.transport.trace || value.result && value.result.transport && value.result.transport.trace || [], item;
+  if (!Array.isArray(trace)) { return ''; }
+  for (var i = trace.length - 1; i >= 0; i -= 1) {
+    item = trace[i];
+    if (item && item.requestId) { return String(item.requestId); }
+  }
+  return '';
+};
+/** Khi đạt giới hạn một lát relay, giữ cursor nhưng thu hồi reservation request chưa gửi. */
+FbmSync.limitRelayResult = function (result, hop) {
+  var limit = Number(FbmSync.RELAY_HOP_LIMIT || 20), value = result || {};
+  if (Number(hop || 0) < limit || !value.request) { return value; }
+  var state = FbmSync.stateRead();
+  state.activeRequestId = '';
+  state.deadlineAt = 0;
+  state.relayHop = 0;
+  state.message = 'Đã hết lát xử lý an toàn; lượt sau sẽ tiếp tục từ cursor đã lưu.';
+  FbmSync.stateWrite(state);
+  return Object.assign({}, value, { ok: true, code: 'RELAY_SLICE_COMPLETE', request: null, status: value.status || FbmSync.statusView() });
 };
 /** Dựng lại request đọc từ cursor; không lưu payload/cookie để retry không làm lộ bí mật. */
 FbmSync.requestForCursor = function (state) {

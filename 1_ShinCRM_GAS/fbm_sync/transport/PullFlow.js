@@ -37,6 +37,10 @@ FbmSync.start = function (options) {
   state.mode = opt.mode === 'write' || opt.mode === 'push' ? opt.mode : opt.mode === 'check' ? 'check' : 'read';
   state.scan = opt.scan === 'activity_bulk' ? 'activity_bulk' : opt.scan === 'identity_check' ? 'identity_check' : opt.scan === 'identity_probe' ? 'identity_probe' : 'full';
   if (state.scan === 'activity_bulk') { state.mode = 'read'; }
+  if (state.origin === 'background' && (state.mode === 'write' || state.mode === 'push')) {
+    state.phase = 'idle'; state.runId = ''; state.cursor = {}; state.message = 'Phiên nền chỉ được phép đọc FBM.'; state.lastFailureCode = 'BACKGROUND_READ_ONLY'; FbmSync.stateWrite(state);
+    return { ok: false, code: 'BACKGROUND_READ_ONLY', status: FbmSync.statusView(), error: state.message };
+  }
   if ((state.mode === 'write' || state.mode === 'push') && !FbmSync.writeAllowed()) {
     state.phase = 'idle'; state.runId = ''; state.message = 'Chưa cho phép ghi thật lên FBM.'; FbmSync.stateWrite(state);
     return { ok: false, code: 'SYNC_WRITES_DISABLED', status: FbmSync.statusView() };
@@ -264,7 +268,14 @@ FbmSync.continue = function (rawResponse) {
     if (recovered.recovered) { return { ok: false, status: FbmSync.statusView(), error: recovered.state.lastError, stale: true }; }
     state = recovered.state;
   }
-  var cursor = state.cursor || {}, response;
+  var cursor = state.cursor || {}, response, responseRequestId = FbmSync.responseRequestId ? FbmSync.responseRequestId(rawResponse) : '';
+  if (!state.activeRequestId || (responseRequestId && responseRequestId !== String(state.activeRequestId))) {
+    return { ok: false, code: 'STALE_RESPONSE', request: null, status: FbmSync.statusView(), error: 'Response FBM đã cũ hoặc phiên đã bị dừng; không tiếp tục cursor.' };
+  }
+  state.activeRequestId = '';
+  state.deadlineAt = 0;
+  state.lastProgressAt = Date.now();
+  FbmSync.stateWrite(state);
   if (FbmSync.traceImport) {
     var transportTrace = rawResponse && rawResponse.transport && rawResponse.transport.trace;
     if (transportTrace) { FbmSync.traceImport(transportTrace, { runId: state.runId, requestId: state.activeRequestId, phase: state.phase, operation: cursor.operation, entity: state.entity, recordId: state.current }); }
@@ -273,6 +284,9 @@ FbmSync.continue = function (rawResponse) {
     var responseMeta = FbmSync.traceResponse ? FbmSync.traceResponse(rawResponse) : {};
     FbmSync.traceEvent('fbm_response_received', { requestId: rawResponse && rawResponse.trace && rawResponse.trace.requestId || state.activeRequestId, httpStatus: responseMeta.httpStatus, responseLength: responseMeta.responseLength });
   }
+  state.activeRequestId = '';
+  state.lastProgressAt = Date.now();
+  FbmSync.stateWrite(state);
   response = FbmSync.protocol.parse(rawResponse);
   if (state.origin === 'background' && state.metadata && state.metadata.manualPending) {
     state.runId = ''; state.origin = 'manual'; state.phase = 'idle'; state.entity = ''; state.cursor = {}; state.current = ''; state.scheduledScan = '';
@@ -281,11 +295,25 @@ FbmSync.continue = function (rawResponse) {
     FbmSync.stateWrite(state);
     return { ok: true, request: null, status: FbmSync.statusView(), manualReady: true };
   }
-  if (response && response._transport && response._transport.payloadCookie) {
-    state.session.cookie = String(response._transport.payloadCookie);
-    var compact = state.session.cookie.indexOf('FHN_CRM_App') >= 0 ? state.session.cookie.slice(0, state.session.cookie.indexOf('FHN_CRM_App')) : '';
-    if (!state.session.userId && compact.length > 9) { state.session.userId = compact.slice(4, -5); }
-    FbmSync.stateWrite(state);
+  if (FbmSync.applyTransportSession && FbmSync.applyTransportSession(state, rawResponse)) { FbmSync.stateWrite(state); }
+  if (cursor.kind === 'login') {
+    var loginSuccess = FbmSync.protocol.assertSuccess(rawResponse);
+    var loginParsed = FbmSync.protocol.parse(rawResponse) || {}, loginData = loginParsed && loginParsed.d !== undefined ? loginParsed.d : loginParsed;
+    if (!loginSuccess.ok || loginData === false || FbmSync.protocol.isSessionExpired(rawResponse)) {
+      var loginFailure = loginSuccess.bug && (loginSuccess.bug.Message || loginSuccess.bug.message) || 'Tự đăng nhập FBM thất bại.';
+      if (FbmSync.autoLoginMarkFailure) { FbmSync.autoLoginMarkFailure(loginFailure); }
+      state.phase = 'paused'; state.lastFailureCode = 'AUTO_LOGIN_FAILED'; state.retryable = false; state.lastError = loginFailure; state.message = 'Tự đăng nhập thất bại; sẽ thử lại sau 30 phút.';
+      FbmSync.stateWrite(state);
+      return { ok: false, code: 'AUTO_LOGIN_FAILED', status: FbmSync.statusView(), error: state.message };
+    }
+    if (FbmSync.autoLoginMarkSuccess) { FbmSync.autoLoginMarkSuccess(); }
+    state.session.expired = false; state.lastFailureCode = ''; state.lastError = ''; state.retryable = false; FbmSync.stateWrite(state);
+    var resumedAfterLogin = FbmSync.loginResumeRequest(state);
+    if (!resumedAfterLogin) {
+      state.phase = 'error'; state.lastFailureCode = 'AUTO_LOGIN_RESUME_FAILED'; state.lastError = 'Đăng nhập lại thành công nhưng không dựng lại được request đồng bộ.'; state.message = state.lastError; FbmSync.stateWrite(state);
+      return { ok: false, status: FbmSync.statusView(), error: state.lastError };
+    }
+    return { ok: true, request: resumedAfterLogin, status: FbmSync.statusView(), autoLogin: true };
   }
   // Phân loại trên wrapper HTTP gốc; parse trước sẽ làm mất status và biến lỗi vận chuyển thành Bugs giả.
   var success = FbmSync.protocol.assertSuccess(rawResponse);
@@ -336,15 +364,6 @@ FbmSync.continue = function (rawResponse) {
   state.retryable = false;
   state.lastFailureCode = '';
   FbmSync.stateWrite(state);
-
-  if (cursor.kind === 'login') {
-    var resumed = FbmSync.loginResumeRequest(state);
-    if (!resumed) {
-      state.phase = 'error'; state.lastFailureCode = 'AUTO_LOGIN_RESUME_FAILED'; state.lastError = 'Đăng nhập lại thành công nhưng không dựng lại được request đồng bộ.'; state.message = state.lastError; FbmSync.stateWrite(state);
-      return { ok: false, status: FbmSync.statusView(), error: state.lastError };
-    }
-    return { ok: true, request: resumed, status: FbmSync.statusView(), autoLogin: true };
-  }
 
   if (cursor.kind === 'push_wait') {
     try {

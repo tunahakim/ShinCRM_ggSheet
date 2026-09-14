@@ -119,8 +119,9 @@ async function chay(so) {
   check(so, 'worker ping dung executor phien ban truoc request FBM', workerSource.indexOf("FBM_PING_V2") >= 0 && workerSource.indexOf("FBM_EXECUTOR_VERSION") >= 0 && workerSource.indexOf("sendTabMessage(tabId, { type: 'FBM_EXECUTE_V2'") >= 0, true);
   check(so, 'worker chi co mot diem gui request FBM', (workerSource.match(/sendTabMessage\(tabId, \{ type: 'FBM_EXECUTE_V2', request: request \}/g) || []).length, 1);
   check(so, 'worker khong tao hai request FBM khi Sidebar thu lai cung id', workerSource.indexOf('fbmRequestFlights') >= 0 && workerSource.indexOf('existingFlight') >= 0, true);
-  check(so, 'heartbeat relay gui response thô va spreadsheetId cho GAS', workerSource.indexOf("postRelay(config.url, config.key, { kind: 'heartbeat', spreadsheetId: config.spreadsheetId, response: rawFbmReply(reply) })") >= 0, true);
-  check(so, 'heartbeat relay tiep tuc cursor voi ngan sach request', workerSource.indexOf('relayScheduledRequests(tabId') >= 0 && workerSource.indexOf('used >= 10') >= 0, true);
+  check(so, 'heartbeat relay gui response thô, Spreadsheet ID va hop cho GAS', workerSource.indexOf("kind: 'heartbeat'") >= 0 && workerSource.indexOf('spreadsheetId: config.spreadsheetId') >= 0 && workerSource.indexOf('response: rawFbmReply(reply)') >= 0 && workerSource.indexOf('hop: used + 1') >= 0, true);
+  check(so, 'heartbeat relay tiep tuc cursor do GAS quyet dinh diem dung', workerSource.indexOf('relayScheduledRequests(tabId') >= 0 && workerSource.indexOf('used >= 10') < 0, true);
+  check(so, 'heartbeat relay request tiep theo qua cong heartbeat GAS', workerSource.indexOf("kind: 'heartbeat', spreadsheetId: config.spreadsheetId, response: raw") >= 0 && workerSource.indexOf("relayScheduledRequests(tabId") >= 0, true);
   check(so, 'alarm chi tim tab FBM sau khi co relay config', workerSource.indexOf("fbmHeartbeatNow('alarm')") >= 0 && workerSource.indexOf("if (!config) {") >= 0 && workerSource.indexOf('findFbmTab()') >= 0, true);
   check(so, 'relay config luu Spreadsheet ID', workerSource.indexOf('fbmSpreadsheetId: spreadsheetId') >= 0, true);
   check(so, 'service worker co quyen goi Sheets va Web App GAS', manifest.host_permissions.includes('https://docs.google.com/*') && manifest.host_permissions.includes('https://script.google.com/macros/*') && manifest.host_permissions.includes('https://script.googleusercontent.com/macros/*'), true);
@@ -132,6 +133,7 @@ async function chay(so) {
   check(so, 'Extension ma hoa credential bang AES-GCM truoc khi luu', workerSource.indexOf('crypto.subtle.generateKey') >= 0 && workerSource.indexOf('CREDENTIAL_VAULT_PREFIX') >= 0 && workerSource.indexOf('FBM_ENCRYPT_CREDENTIALS') >= 0, true);
   check(so, 'bridge credential chi tra envelope va khong tra password ve Sidebar', fs.readFileSync(BRIDGE_FILE, 'utf8').indexOf('CRM_FBM_CREDENTIALS_RESULT') >= 0 && syncSource.indexOf('fbmSyncEncryptCredentials') >= 0 && syncSource.indexOf('fbm-login-password') >= 0, true);
   check(so, 'executor login dung force false va khong logout phien hop le', executorSource.indexOf("force: false") >= 0 && executorSource.indexOf("credentials: 'include'") >= 0 && executorSource.indexOf("meta.kind === 'login'") >= 0, true);
+  check(so, 'executor login doc lai trang tai khoan de lay payload cookie', executorSource.indexOf("/Main/zccrAccount.aspx") >= 0 && executorSource.indexOf('payload_cookie_page_read') >= 0, true);
   check(so, 'Sidebar giu waiter va thu lai mot lan khi bridge cu mat context', syncSource.indexOf('if (data.retryable)') >= 0 && syncSource.indexOf('waiter.retryCount < 1') >= 0 && syncSource.indexOf('retryCount: 0') >= 0, true);
   check(so, 'mo man dong bo khong cho relay config chan status', syncSource.indexOf('Promise.all([fbmSyncConfigureRelay(), fbmSyncStatusOnce(true), fbmSyncLoadIdentityStatus(), fbmSyncLoadSettings()])') >= 0, true);
   check(so, 'kiem tra lien ket dung chung guard Extension va huy cursor khi loi', syncSource.indexOf('function fbmSyncCheckIdentity()') >= 0 && syncSource.indexOf("sheetLinkExtensionAlive()") >= 0 && syncSource.indexOf("callServer('fbmCancelSync')") >= 0, true);
@@ -157,30 +159,32 @@ async function chay(so) {
   check(so, 'probe ghi du moc gui va nhan response', workerSource.indexOf("stage: 'request_sent'") >= 0 && workerSource.indexOf("stage: 'response_received'") >= 0 && workerSource.indexOf('requestSentAt') >= 0 && workerSource.indexOf('responseReceivedAt') >= 0, true);
   check(so, 'probe ghi dau response khi GAS tra khong phai JSON', workerSource.indexOf('contentType') >= 0 && workerSource.indexOf('responsePrefix') >= 0 && workerSource.indexOf('RELAY_INVALID_JSON') >= 0 && workerSource.indexOf('RELAY_ENDPOINT_NOT_FOUND') >= 0, true);
   check(so, 'heartbeat co lenh chay ngay va ghi ly do bo qua', workerSource.indexOf('function fbmHeartbeatNow') >= 0 && workerSource.indexOf('FBM_HEARTBEAT_NOW') >= 0 && workerSource.indexOf('fbmHeartbeatLastStatus') >= 0 && workerSource.indexOf("fbmHeartbeatNow('alarm')") >= 0, true);
-  check(so, 'heartbeat null duoc giu nguyen de executor dung request mac dinh', workerSource.indexOf('function hydrateLoginRequest(request) {\n  if (!request) { return Promise.resolve(request); }') >= 0, true);
-  check(so, 'heartbeat mac dinh la request Customer trang dau hop le', executorSource.indexOf('type: 0, count: 10') >= 0 && executorSource.indexOf('gridRefresh: false') >= 0 && executorSource.indexOf('sortExpression: null') >= 0 && executorSource.indexOf('query: null, parameter: null, variable:') >= 0, true);
-  check(so, 'heartbeat kiem tra relay truoc khi cham FBM va dung khi phien het han', workerSource.indexOf("kind: 'probe'") >= 0 && workerSource.indexOf("blocked_relay") >= 0 && workerSource.indexOf('SESSION_EXPIRED_WAITING_LOGIN') >= 0, true);
-  check(so, 'executor uu tien cookie payload dang co tren tab', executorSource.indexOf('function currentPayloadCookie') >= 0 && executorSource.indexOf('currentPayloadCookie(req.body && req.body.cookie)') >= 0, true);
+  check(so, 'heartbeat chi duoc chuyen sau khi GAS cap envelope', workerSource.indexOf("kind: 'heartbeat_request'") >= 0 && workerSource.indexOf('if (!gasRequest || gasRequest.ok !== true || !gasRequest.request)') >= 0 && workerSource.indexOf('sendToFbmTab(tab.id, gasRequest.request)') >= 0, true);
+  check(so, 'executor khong tu dung request heartbeat khi GAS khong cap', executorSource.indexOf('FBM_REQUEST_MISSING') >= 0 && executorSource.indexOf('HEARTBEAT_URL') < 0 && executorSource.indexOf('function heartbeat()') < 0, true);
+  check(so, 'heartbeat chi chay sau khi GAS cap request va dung khi phien het han', workerSource.indexOf("kind: 'heartbeat_request'") >= 0 && workerSource.indexOf('blocked_gas_request') >= 0 && fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'state', 'Scheduler.js'), 'utf8').indexOf('SESSION_EXPIRED_WAITING_LOGIN') >= 0, true);
+  check(so, 'executor ap dung bo loc response do GAS chi dinh', executorSource.indexOf('function captureTransport') >= 0 && executorSource.indexOf('request.meta && request.meta.transport') >= 0, true);
   check(so, 'Sidebar luon dong bo relay va doi Extension xac nhan', syncSource.indexOf('fbmSyncPostRelayConfig(config, true)') >= 0 && syncSource.indexOf('Extension không xác nhận đã cập nhật URL relay GAS.') >= 0, true);
   check(so, 'Extension probe relay truoc khi ghi cau hinh moi', workerSource.indexOf('function configureRelay(config)') >= 0 && workerSource.indexOf("code: 'RELAY_CONFIG_REJECTED'") >= 0 && workerSource.indexOf('configureRelay(config).then(sendResponse)') >= 0, true);
   check(so, 'relay 404 yeu cau Sidebar tu lam moi URL', workerSource.indexOf('function requestRelayRefresh') >= 0 && workerSource.indexOf("requestRelayRefresh('RELAY_ENDPOINT_NOT_FOUND')") >= 0 && fs.readFileSync(BRIDGE_FILE, 'utf8').indexOf('CRM_REFRESH_RELAY') >= 0 && syncSource.indexOf('CRM_FBM_RELAY_REFRESH') >= 0, true);
-  check(so, 'service worker co lenh chay sync GAS doc lap, mac dinh read', workerSource.indexOf('function fbmRunBackgroundSync(mode)') >= 0 && workerSource.indexOf("String(mode || 'read').toLowerCase() === 'write'") >= 0 && workerSource.indexOf('FBM_BACKGROUND_SYNC_MAX_REQUESTS') >= 0 && workerSource.indexOf("type === 'FBM_BACKGROUND_SYNC'") >= 0, true);
+  check(so, 'service worker khong tu chon mode nghiep vu cho background', workerSource.indexOf('function fbmRunBackgroundSync()') >= 0 && workerSource.indexOf("payload: { origin: 'background', manual: false }") >= 0 && workerSource.indexOf('FBM_BACKGROUND_SYNC_MAX_REQUESTS') < 0 && workerSource.indexOf("type === 'FBM_BACKGROUND_SYNC'") >= 0, true);
   check(so, 'background sync chi chuyen request va response thô qua GAS', workerSource.indexOf('relayBackgroundSyncRequests') >= 0 && workerSource.indexOf('sendToFbmTab(tabId, next)') >= 0 && workerSource.indexOf('rawFbmReply(reply)') >= 0, true);
   check(so, 'background relay dung DTO gon, khong gui traceTail/metadata Sidebar', workerSource.indexOf("kind: 'background_sync'") >= 0 && entryPointsSource.indexOf('fbmSyncRelayCompactResult') >= 0 && entryPointsSource.indexOf("body.kind === 'background_sync'") >= 0, true);
   check(so, 'background relay dung command port thay vi tu lap nghiep vu', workerSource.indexOf("command: 'start'") >= 0 && workerSource.indexOf("command: 'continue'") >= 0 && entryPointsSource.indexOf('FbmSync.controlDispatch') >= 0, true);
-  check(so, 'executor co ping phien ban 21.9 va kenh execute moi', /EXECUTOR_VERSION\s*=\s*'21\.9'/.test(executorSource) && executorSource.indexOf('FBM_PING_V2') >= 0 && executorSource.indexOf('FBM_EXECUTE_V2') >= 0, true);
-  check(so, 'executor chan endpoint thieu truoc fetch', executorSource.indexOf('FBM_ENDPOINT_MISSING') >= 0 && executorSource.indexOf('fetch_blocked') >= 0 && executorSource.indexOf('validateEndpoint(req.url)') >= 0, true);
+  check(so, 'executor co ping phien ban 21.11 va kenh execute moi', /EXECUTOR_VERSION\s*=\s*'21\.11'/.test(executorSource) && workerSource.indexOf("FBM_EXECUTOR_VERSION = '21.11'") >= 0 && executorSource.indexOf('FBM_PING_V2') >= 0 && executorSource.indexOf('FBM_EXECUTE_V2') >= 0, true);
+  check(so, 'GAS la noi duy nhat kiem tra endpoint FBM', executorSource.indexOf('validateEndpoint(req.url)') < 0 && executorSource.indexOf('FBM_ENDPOINT_UNALLOWED') < 0, true);
   check(so, 'GAS chan endpoint thieu truoc cap envelope', fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'protocol', 'Protocol.js'), 'utf8').indexOf('validateEndpoint: function') >= 0 && fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'transport', 'TransportCore.js'), 'utf8').indexOf('validateEndpoint(request.url)') >= 0, true);
+  check(so, 'GAS tu dung envelope heartbeat va relay co cong cap request', entryPointsSource.indexOf("body.kind === 'heartbeat_request'") >= 0 && fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'state', 'Scheduler.js'), 'utf8').indexOf('function fbmSyncHeartbeatRequest') >= 0 && fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'read', 'GridRead.js'), 'utf8').indexOf('FbmSync.heartbeatCustomerRequest') >= 0, true);
   check(so, 'executor chi chuyen body wire GAS, khong escape nghiep vu', executorSource.indexOf('req.bodyText') >= 0 && executorSource.indexOf("JSON.stringify(body).replace(/\\//g") < 0, true);
   check(so, 'executor giai ma response gzip bat thuong cua FBM', executorSource.indexOf('DecompressionStream') >= 0 && executorSource.indexOf('response.arrayBuffer()') >= 0, true);
   check(so, 'trace Extension co du cac moc bridge worker executor fetch', ['bridge_received', 'worker_received', 'fbm_tab_found', 'executor_started', 'fetch_started', 'fetch_finished', 'bridge_response_sent'].every((stage) => workerSource.indexOf(stage) >= 0 || executorSource.indexOf(stage) >= 0 || fs.readFileSync(BRIDGE_FILE, 'utf8').indexOf(stage) >= 0), true);
-  check(so, 'response FBM giu trace trong transport va loi cung giu trace', executorSource.indexOf('transport: { payloadCookie') >= 0 && executorSource.indexOf('trace: trace') >= 0 && executorSource.indexOf('fetch_blocked') >= 0 && workerSource.indexOf('transport: { trace: reply.trace') >= 0, true);
+  check(so, 'response FBM giu trace trong transport va loi cung giu trace', executorSource.indexOf('transport: Object.assign') >= 0 && executorSource.indexOf('trace: trace') >= 0 && workerSource.indexOf('transport: { trace: reply.trace') >= 0, true);
 
   await new Promise((resolve) => {
     let listener = null;
     let fetchCalls = 0;
     let invalidReply = null;
     let validReply = null;
+    let sentBody = null;
     const response = {
       ok: true,
       status: 200,
@@ -190,19 +194,24 @@ async function chay(so) {
     const context = {
       console: { log() {}, warn() {} }, Date, URL, Promise, Error, AbortController, setTimeout, clearTimeout,
       Blob, Response, TextDecoder, TextEncoder, DecompressionStream: undefined,
-      document: { documentElement: { innerHTML: '', textContent: '' } },
-      fetch() { fetchCalls += 1; return Promise.resolve(response); },
+      document: { documentElement: { innerHTML: '<script>var payload={"cookie":"461020379855cFHN_CRM_App"};</script>', textContent: '' } },
+      fetch(url, options) { fetchCalls += 1; sentBody = options && options.body; return Promise.resolve(response); },
       chrome: { runtime: { onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
     };
     vm.createContext(context);
     vm.runInContext(executorSource, context, { filename: EXECUTOR_FILE });
-    listener({ type: 'FBM_EXECUTE_V2', request: { url: 'https://fbo.com.vn:8888/Main/undefined', method: 'POST', body: {} } }, null, (reply) => { invalidReply = reply; });
+    listener({ type: 'FBM_EXECUTE_V2', request: null }, null, (reply) => { invalidReply = reply; });
     setTimeout(() => {
-      check(so, 'executor khong fetch endpoint undefined', [fetchCalls, invalidReply && invalidReply.error, invalidReply && invalidReply.trace && invalidReply.trace[1].code], [0, 'Request FBM thiếu endpoint; đã chặn trước khi gửi.', 'FBM_ENDPOINT_MISSING']);
-      listener({ type: 'FBM_EXECUTE_V2', request: { url: 'https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage', method: 'POST', body: { type: 1 } } }, null, (reply) => { validReply = reply; });
+      check(so, 'executor khong fetch khi GAS khong cap envelope', [fetchCalls, invalidReply && invalidReply.error, invalidReply && invalidReply.trace && invalidReply.trace.length], [0, 'GAS chưa cấp request FBM; executor chỉ là cầu nối.', 0]);
+      listener({ type: 'FBM_EXECUTE_V2', request: { url: 'https://fbo.com.vn:8888/Main/undefined', method: 'POST', bodyText: '{"gas":true}' } }, null, (reply) => { validReply = reply; });
       setTimeout(() => {
-        check(so, 'executor cho request grid hop le di qua mot fetch', [fetchCalls, validReply && validReply.result && validReply.result.status], [1, 200]);
-        resolve();
+        check(so, 'executor chuyen nguyen body GAS ma khong hieu endpoint', [fetchCalls, sentBody, validReply && validReply.result && validReply.result.status], [1, '{"gas":true}', 200]);
+        listener({ type: 'FBM_EXECUTE_V2', request: { url: 'https://fbo.com.vn:8888/Main/customer', method: 'POST', bodyText: '{"cookie":"{{FBM_PAYLOAD_COOKIE}}"}', meta: { transport: { captures: [{ name: 'payloadCookie', source: 'page_html', pattern: '([A-Za-z0-9]+FHN_CRM_App)', flags: 'i', group: 1 }], replacements: [{ token: '{{FBM_PAYLOAD_COOKIE}}', capture: 'payloadCookie', source: 'page_html' }] } } } }, null, (reply) => {
+          setTimeout(() => {
+            check(so, 'executor thay token theo chi dan GAS ma khong hieu field FBM', [fetchCalls, sentBody, reply && reply.result && reply.result.status], [2, '{"cookie":"461020379855cFHN_CRM_App"}', 200]);
+            resolve();
+          }, 20);
+        });
       }, 20);
     }, 20);
   });

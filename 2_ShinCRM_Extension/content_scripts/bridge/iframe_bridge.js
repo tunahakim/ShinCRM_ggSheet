@@ -148,7 +148,7 @@ window.addEventListener('message', function (event) {
     if (!isAllowedSidebarOrigin(event.origin) || String(data.nonce || '') !== sidebarNonce) { return; }
     // Sheets có thể thay WindowProxy sau reload; nonce vẫn định danh đúng Sidebar.
     if (event.source && event.source !== sidebarWindow) { sidebarWindow = event.source; sidebarOrigin = event.origin; }
-    var bridgeTrace = { at: Date.now(), stage: 'bridge_received', runId: String(data.request && data.request.meta && data.request.meta.trace && data.request.meta.trace.runId || ''), requestId: String(data.id || data.request && data.request.meta && data.request.meta.trace && data.request.meta.trace.requestId || ''), operation: String(data.request && data.request.meta && data.request.meta.kind || ''), entity: String(data.request && data.request.meta && data.request.meta.entity || ''), recordId: String(data.request && data.request.meta && (data.request.meta.id || data.request.meta.shinId || data.request.meta.stt_rec_kh) || '') };
+    var bridgeTrace = { at: Date.now(), stage: 'bridge_received', requestId: String(data.id || '') };
     sendRequestToWorker({ type: 'FBM_EXECUTE_REQUEST', id: data.id, request: data.request }, function (error, reply) {
       // Content script cũ sau Extension Reload không còn runtime context. Không phát
       // response lỗi cạnh response thật của bridge mới vừa được worker nạp lại.

@@ -47,7 +47,8 @@ FbmSync.gridRequest = function (entity, options) {
     externalKey: opt.externalKey || [], gridPageIndex: opt.gridPageIndex === undefined ? -1 : opt.gridPageIndex,
     gridPageValue: opt.gridPageValue === undefined ? null : opt.gridPageValue, gridRefresh: !!opt.gridRefresh, filter: opt.filter || [],
     sortExpression: opt.sortExpression || (entity === 'customer' ? 'ngay_gd desc' : 'end_date desc, datetime0 desc, id, line_nbr'),
-    cookie: cfg.cookie, query: null, parameter: null, variable: ''
+    // Khi GAS chưa có payload cookie, để transport generic của Extension lấy từ trang FBM theo chỉ dẫn envelope.
+    cookie: cfg.cookie || '{{FBM_PAYLOAD_COOKIE}}', query: null, parameter: null, variable: ''
   };
   if (entity === 'customer' && cfg.userId) {
     payload.externalKey.push({ Name: "stt_rec_kh in (select stt_rec_kh from dbo.zcFastBusiness$Function$GetCustomerValidate('" + cfg.userId + "')) and 1", Opr: '=', Value: 1, Type: 'String', Ignore: false });
@@ -62,6 +63,17 @@ FbmSync.gridRequest = function (entity, options) {
 };
 /** Tạo request grid Customer theo cursor hiện tại. */
 FbmSync.customerGridRequest = function (options) { return FbmSync.gridRequest('customer', options); };
+/** Request Customer tối thiểu do GAS cấp để kiểm tra phiên nền; Extension không được tự dựng request này. */
+FbmSync.heartbeatCustomerRequest = function () {
+  var request = FbmSync.customerGridRequest({ type: 0, count: 1, gridPageIndex: -1, gridPageValue: null, gridRefresh: false, includeTestCustomer: false });
+  // Heartbeat chỉ kiểm tra phiên, không lọc dữ liệu theo cấu hình quét/test và không giữ cursor quét.
+  request.body.externalKey = [];
+  request.body.memvars = [];
+  request.body.sortExpression = null;
+  request.meta.kind = 'heartbeat';
+  request.meta.entity = 'customer';
+  return request;
+};
 /** Request Customer full-scan dùng riêng cho kiểm tra liên kết Spreadsheet/FBM. */
 FbmSync.identityCheckCustomerRequest = function (options) {
   var opt = Object.assign({ includeTestCustomer: false, sortExpression: 'stt_rec_kh' }, options || {});

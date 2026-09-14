@@ -305,6 +305,8 @@ Biểu mẫu **không** có thư mục riêng: bộ máy dựng form là `client
 
 The client UI uses `client/ui/popupList.html` as the shared popup primitive. `search.html`, `combo.html`, and `customerPicker.html` remain separate controllers so search, dropdown, and customer-picker behavior do not get coupled.
 
+`Checklist tái cấu trúc cầu nối GAS-FBM.md` ghi tiến độ chuyển toàn bộ quyết định FBM về GAS và giữ Extension ở vai trò transport bridge.
+
 ## 2_ShinCRM_Extension
 
 ```

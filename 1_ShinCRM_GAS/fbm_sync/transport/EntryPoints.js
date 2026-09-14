@@ -38,7 +38,7 @@ function fbmSyncSaveIdentityBinding(binding) { return FbmSync.bindingWrite(bindi
 function fbmSyncCancel() {
   var state = FbmSync.stateRead(), locks = state.locks || {}, kept = {};
   Object.keys(locks).forEach(function (key) { if (locks[key] && locks[key].owner === 'user') { kept[key] = locks[key]; } });
-  state.runId = ''; state.phase = 'idle'; state.entity = ''; state.cursor = {}; state.current = ''; state.scheduledScan = ''; state.locks = kept; state.message = 'Đã dừng phiên đồng bộ.'; state.lastError = '';
+  state.runId = ''; state.phase = 'idle'; state.entity = ''; state.cursor = {}; state.current = ''; state.scheduledScan = ''; state.activeRequestId = ''; state.deadlineAt = 0; state.locks = kept; state.message = 'Đã dừng phiên đồng bộ.'; state.lastError = '';
   return FbmSync.stateWrite(state);
 }
 /** Bật/tắt ghi thật; mặc định luôn tắt để bảo vệ dữ liệu FBM. */
@@ -150,6 +150,18 @@ function fbmSyncRelayCompactResult(result) {
   };
 }
 
+/** Giới hạn số round-trip trong một lượt relay; cursor vẫn nằm ở GAS để lượt sau tiếp tục. */
+function fbmSyncRelayCap(result, hop) {
+  var limit = Number(FbmSync.RELAY_HOP_LIMIT || 20), value = result || {};
+  if (Number(hop || 0) >= limit && value.request) {
+    if (typeof FbmSync.limitRelayResult === 'function') { return FbmSync.limitRelayResult(value, hop); }
+    value.request = null;
+    value.code = 'RELAY_HOP_LIMIT';
+    value.message = 'Đã tạm dừng sau ' + limit + ' request; cursor vẫn được giữ ở GAS.';
+  }
+  return value;
+}
+
 /** Cổng HTTP tùy chọn cho runner; bắt buộc khóa trước khi xử lý. */
 function doPost(event) {
   try {
@@ -160,11 +172,21 @@ function doPost(event) {
     if (!body.spreadsheetId || !actualSpreadsheetId || String(body.spreadsheetId) !== actualSpreadsheetId) { return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'spreadsheet_mismatch' })).setMimeType(ContentService.MimeType.JSON); }
     var result;
     if (body.command) {
-      result = FbmSync.controlDispatch(String(body.command), body.payload || {});
+      var commandPayload = body.payload || {};
+      if (body.hop !== undefined && commandPayload.hop === undefined) { commandPayload = Object.assign({}, commandPayload, { hop: Number(body.hop || 0) }); }
+      result = FbmSync.controlDispatch(String(body.command), commandPayload);
+    } else if (body.kind === 'probe') {
+      result = fbmSyncRelayProbe();
+    } else if (body.kind === 'heartbeat_request') {
+      result = fbmSyncHeartbeatRequest({ source: body.source || 'alarm', hop: Number(body.hop || 0) });
+    } else if (body.kind === 'heartbeat_transport_failure') {
+      result = fbmSyncHeartbeatTransportFailure({ requestId: body.requestId, code: body.code, message: body.error || body.message });
+    } else if (body.kind === 'heartbeat') {
+      result = fbmSyncHeartbeat(body.response, { hop: Number(body.hop || 0) });
     } else {
-      result = body.kind === 'probe' ? fbmSyncRelayProbe() : (body.kind === 'heartbeat' ? fbmSyncHeartbeat(body.response) : (body.response === undefined ? fbmSyncStart(body.mode) : fbmSyncContinue(body.response)));
+      result = body.response === undefined ? fbmSyncStart(body.mode) : fbmSyncContinue(body.response);
     }
-    if (body.kind === 'heartbeat' || body.kind === 'background_sync') { result = fbmSyncRelayCompactResult(result); }
+    if (body.kind === 'heartbeat_request' || body.kind === 'heartbeat' || body.kind === 'heartbeat_transport_failure' || body.kind === 'background_sync') { result = fbmSyncRelayCompactResult(result); result = fbmSyncRelayCap(result, body.hop); }
     return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
   } catch (err) { return ContentService.createTextOutput(JSON.stringify({ ok: false, error: String(err && err.message || err) })).setMimeType(ContentService.MimeType.JSON); }
 }

@@ -18,10 +18,31 @@ async function chay(so) {
   state.entity = 'customer'; state.cursor = { kind: 'customer_grid', type: 1, pageIndex: 2, pageValue: ['x'], count: 2000 }; hop.FbmSync.stateWrite(state);
   const login = hop.FbmSync.beginAutoLogin(hop.FbmSync.stateRead(), state.cursor);
   check(so, 'hết phiên tạo request login và giữ cursor cũ', [login.meta.kind, hop.FbmSync.stateRead().cursor.kind, hop.FbmSync.stateRead().cursor.resumeCursor.pageIndex], ['login', 'login', 2]);
-  check(so, 'auto-login chỉ thử lại một lần trong 15 phút', hop.FbmSync.autoLoginCanAttempt(Date.now() + 1000).code, 'AUTO_LOGIN_THROTTLED');
+  check(so, 'auto-login chỉ thử lại một lần trong 30 phút', hop.FbmSync.autoLoginCanAttempt(Date.now() + 1000).code, 'AUTO_LOGIN_THROTTLED');
   const resumed = hop.FbmSync.loginResumeRequest(hop.FbmSync.stateRead());
   check(so, 'login thành công dựng lại request grid theo cursor', [resumed.meta.kind, resumed.body.gridPageIndex, hop.FbmSync.stateRead().session.expired], ['grid', 2, false]);
   check(so, 'login test không coi Login.aspx là thành công', hop.FbmSync.loginTestResult({ ok: true, status: 200, body: '<form action="Login.aspx"></form>' }).ok, false);
+  const heartbeatData = {};
+  const heartbeatProps = { getProperty: (key) => heartbeatData[key] || null, setProperty: (key, value) => { heartbeatData[key] = String(value); } };
+  const heartbeat = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => heartbeatProps, getScriptProperties: () => heartbeatProps }, LockService: { getDocumentLock: () => ({ tryLock: () => true, releaseLock: () => {} }) } });
+  napServer(heartbeat, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/auth/AutoLogin.js');
+  heartbeat.FbmSync.loginConfigSave({ credentialRef: 'cred-heartbeat-123', enabled: true, envelope: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'an***', database: 'FHN_CRM_App', unit: 'CTY' } });
+  heartbeat.FbmSync.stateStart('', 'idle', 0);
+  heartbeat.FbmSync.statePatch({ session: { expired: true } });
+  const autoLoginRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+  check(so, 'heartbeat het phien cap login request mot lan', [autoLoginRequest.ok, autoLoginRequest.code, autoLoginRequest.request.meta.kind, autoLoginRequest.request.meta.testOnly], [true, 'AUTO_LOGIN_REQUEST_READY', 'login', false]);
+  const loginResponse = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":true}', transport: { payloadCookie: '461020379855cFHN_CRM_App', trace: [{ requestId: autoLoginRequest.request.id }] } });
+  check(so, 'login heartbeat thanh cong luu cookie va cap lai heartbeat', [loginResponse.ok, loginResponse.code, loginResponse.request.meta.kind, heartbeat.FbmSync.stateRead().session.cookie, heartbeat.FbmSync.stateRead().session.expired], [true, 'AUTO_LOGIN_OK', 'heartbeat', '461020379855cFHN_CRM_App', false]);
+
+  const savedConfig = JSON.parse(heartbeatData.FBM_LOGIN_CONFIG_V1);
+  savedConfig.lastAttemptAt = Date.now() - 31 * 60 * 1000;
+  heartbeatData.FBM_LOGIN_CONFIG_V1 = JSON.stringify(savedConfig);
+  heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: true, cookie: '' } });
+  const failedLoginRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+  const failedLogin = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":false}', trace: [{ requestId: failedLoginRequest.request.id }] });
+  check(so, 'login heartbeat that bai tam dung va khong lap ngay', [failedLogin.ok, failedLogin.code, failedLogin.request, heartbeat.FbmSync.stateRead().phase], [false, 'AUTO_LOGIN_FAILED', null, 'paused']);
+  const throttledAfterFailure = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+  check(so, 'login that bai bi throttle toi da mot lan moi 30 phut', [throttledAfterFailure.ok, throttledAfterFailure.code, throttledAfterFailure.request], [false, 'AUTO_LOGIN_THROTTLED', null]);
 }
 
 module.exports = { chay };

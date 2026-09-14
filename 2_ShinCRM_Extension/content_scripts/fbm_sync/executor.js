@@ -1,29 +1,10 @@
 /* Cầu nối FBM: nhận request, fetch trong tab đăng nhập, trả response thô. */
 (function () {
-  var EXECUTOR_VERSION = '21.9';
-  var HEARTBEAT_URL = 'https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage';
+  var EXECUTOR_VERSION = '21.11';
   var FETCH_TIMEOUT_MS = 10000;
-  var FBM_ORIGIN = 'https://fbo.com.vn:8888';
-  var FBM_PATHS = ['/AppService/', '/FastBusiness.DataService.asmx/', '/Main/Login.aspx/'];
-  function endpointPath(url) {
-    try { return new URL(String(url || ''), FBM_ORIGIN).pathname; } catch (ignore) { return ''; }
-  }
-  function validateEndpoint(url) {
-    var value = String(url || '').trim(), parsed, path;
-    if (!value || /(?:undefined|null|NaN)/i.test(value)) { return { ok: false, code: 'FBM_ENDPOINT_MISSING', message: 'Request FBM thiếu endpoint; đã chặn trước khi gửi.' }; }
-    try { parsed = new URL(value, FBM_ORIGIN); } catch (ignoreUrl) { return { ok: false, code: 'FBM_ENDPOINT_INVALID', message: 'Endpoint FBM không hợp lệ; đã chặn trước khi gửi.' }; }
-    path = parsed.pathname;
-    if (parsed.origin !== FBM_ORIGIN || !FBM_PATHS.some(function (prefix) { return path.indexOf(prefix) === 0; })) {
-      return { ok: false, code: 'FBM_ENDPOINT_UNALLOWED', message: 'Endpoint FBM nằm ngoài danh sách cho phép; đã chặn trước khi gửi.' };
-    }
-    return { ok: true, url: parsed.toString(), path: path };
-  }
   function traceEvent(trace, stage, request, extra) {
-    var meta = request && request.meta && request.meta.trace || {};
-    trace.push(Object.assign({ at: Date.now(), stage: stage, runId: String(meta.runId || ''), requestId: String(meta.requestId || ''), operation: String(request && request.meta && request.meta.kind || ''), entity: String(request && request.meta && request.meta.entity || ''), recordId: String(request && request.meta && (request.meta.id || request.meta.shinId || request.meta.stt_rec_kh) || ''), endpoint: endpointPath(request && request.url) }, extra || {}));
+    trace.push(Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {}));
   }
-  /** Request đọc tối thiểu để giữ phiên và phát hiện logout. */
-  function heartbeat() { return { url: HEARTBEAT_URL, method: 'POST', headers: { accept: '*/*', 'content-type': 'application/json; charset=UTF-8' }, body: { type: 0, count: 10, language: 'v', controller: 'zccrAccount', viewId: null, childObject: false, lastPageIndex: -1, firstPageItem: '', lastPageItem: '', lastRowCount: 0, memvars: [], externalKey: [], gridPageIndex: -1, gridPageValue: null, gridRefresh: false, filter: [], sortExpression: null, cookie: '', query: null, parameter: null, variable: '' } }; }
   /** Đọc cookie payload nếu request GAS không truyền cookie. */
   function payloadCookieFromPage() {
     var html = document.documentElement ? document.documentElement.innerHTML : '';
@@ -40,15 +21,35 @@
     }
     return '';
   }
-  /** Dùng chuỗi wire GAS đã dựng; chỉ serialize request nội bộ của heartbeat khi không có envelope GAS. */
-  function currentPayloadCookie(fallback) {
-    return payloadCookieFromPage() || String(fallback || '');
-  }
   function requestBody(req) {
+    if (typeof req.bodyText === 'string') { return req.bodyText; }
     if (req.body === undefined) { return undefined; }
-    if (typeof req.bodyText === 'string') { return { text: req.bodyText, cookie: currentPayloadCookie(req.body && req.body.cookie) }; }
-    var body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
-    return { text: body, cookie: currentPayloadCookie(req.body && req.body.cookie) };
+    return typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+  }
+  /** Lọc response theo chỉ dẫn transport do GAS cấp; không có chỉ dẫn thì trả nguyên văn. */
+  function captureTransportValues(request, responseBody, sourceName) {
+    var transport = request && request.transport || request && request.meta && request.meta.transport || {}, captures = Array.isArray(transport.captures) ? transport.captures : [], values = {};
+    captures.forEach(function (capture) {
+      var item = capture || {}, source = (sourceName || item.source) === 'page_html' ? (document.documentElement ? document.documentElement.innerHTML : '') : String(responseBody || ''), pattern = String(item.pattern || ''), flags = String(item.flags || ''), match;
+      if (!pattern || !source) { return; }
+      try { match = source.match(new RegExp(pattern, flags)); } catch (ignore) { return; }
+      if (match) { values[String(item.name || 'value')] = match[Number(item.group || 1)]; }
+    });
+    return values;
+  }
+  function captureTransport(request, responseBody) {
+    var values = captureTransportValues(request, responseBody);
+    return Object.keys(values).length ? { captures: values } : {};
+  }
+  /** Thay token theo chỉ dẫn GAS mà không parse hoặc dựng lại JSON nghiệp vụ. */
+  function applyTransportReplacements(request, bodyText) {
+    var transport = request && request.transport || request && request.meta && request.meta.transport || {}, replacements = Array.isArray(transport.replacements) ? transport.replacements : [], values = captureTransportValues(request, '', 'page_html'), output = bodyText;
+    replacements.forEach(function (replacement) {
+      var item = replacement || {}, token = String(item.token || ''), value = values[String(item.capture || '')];
+      if (!token || value === undefined || value === null) { return; }
+      output = String(output).split(token).join(String(value));
+    });
+    return output;
   }
   function jsonValue(text) { try { var value = JSON.parse(String(text || '')); return value && value.d !== undefined ? value.d : value; } catch (ignore) { return null; } }
   function loginValueFromPage() {
@@ -117,7 +118,16 @@
         var firstHash = /^[a-f0-9]{32}$/i.test(String(credentials.password || '')) ? String(credentials.password) : md5(salt + md5(String(credentials.password || '')));
         var body = JSON.stringify({ user: String(credentials.username || ''), password: firstHash, database: database, unit: selectedUnit, language: String(credentials.language || 'v'), value: salt, force: false, storage: true });
         traceEvent(trace, 'login_request_built', request, { database: database, unit: selectedUnit });
-        return post('Login', body).then(function (login) { return { ok: login.response.ok, status: login.response.status, headers: { contentType: login.response.headers.get('content-type') || '' }, body: login.text, transport: { payloadCookie: payloadCookieFromText(login.text) || payloadCookieFromPage(), trace: trace } }; });
+        return post('Login', body).then(function (login) {
+          if (!login.response.ok) { return { ok: false, status: login.response.status, headers: { contentType: login.response.headers.get('content-type') || '' }, body: login.text, transport: { trace: trace } }; }
+          traceEvent(trace, 'login_successful', request, { httpStatus: login.response.status });
+          return fetch('https://fbo.com.vn:8888/Main/zccrAccount.aspx', { method: 'GET', credentials: 'include', cache: 'no-store' }).then(function (account) {
+            return readResponseText(account).then(function (accountHtml) {
+              traceEvent(trace, 'payload_cookie_page_read', request, { httpStatus: account.status, responseLength: accountHtml.length });
+              return { ok: login.response.ok, status: login.response.status, headers: { contentType: login.response.headers.get('content-type') || '' }, body: login.text, transport: { payloadCookie: payloadCookieFromText(accountHtml) || payloadCookieFromText(login.text) || payloadCookieFromPage(), trace: trace } };
+            });
+          });
+        });
       });
     });
   }
@@ -135,23 +145,30 @@
     });
   }
   function execute(request) {
-    var req = request || heartbeat(), trace = [];
+    if (!request || typeof request !== 'object') {
+      var missing = new Error('GAS chưa cấp request FBM; executor chỉ là cầu nối.');
+      missing.code = 'FBM_REQUEST_MISSING';
+      missing.trace = [];
+      return Promise.reject(missing);
+    }
+    var req = request, trace = [];
     traceEvent(trace, 'executor_started', req);
     if (req.meta && req.meta.kind === 'login') { return executeLogin(req, trace); }
-    var endpoint = validateEndpoint(req.url);
-    if (!endpoint.ok) {
-      traceEvent(trace, 'fetch_blocked', req, { code: endpoint.code, error: endpoint.message });
-      var endpointError = new Error(endpoint.message);
-      endpointError.code = endpoint.code;
-      endpointError.trace = trace;
-      return Promise.reject(endpointError);
+    var sent = applyTransportReplacements(req, requestBody(req));
+    var transportInstructions = req.transport || req.meta && req.meta.transport || {};
+    var replacements = Array.isArray(transportInstructions.replacements) ? transportInstructions.replacements : [];
+    if (replacements.some(function (replacement) { return String(sent || '').indexOf(String(replacement && replacement.token || '')) >= 0; })) {
+      var captureError = new Error('Không lấy được giá trị transport do GAS yêu cầu; đã chặn trước khi gửi FBM.');
+      captureError.code = 'FBM_TRANSPORT_CAPTURE_MISSING';
+      traceEvent(trace, 'transport_capture_missing', req, { code: captureError.code });
+      captureError.trace = trace;
+      return Promise.reject(captureError);
     }
-    var sent = requestBody(req);
     var controller = new AbortController();
     var timer = setTimeout(function () { controller.abort(); }, FETCH_TIMEOUT_MS);
     traceEvent(trace, 'fetch_started', req);
-    return fetch(endpoint.url, { method: req.method || 'POST', headers: req.headers || { 'content-type': 'application/json; charset=UTF-8' }, body: sent && sent.text, credentials: 'include', cache: 'no-store', signal: controller.signal }).then(function (response) {
-      return readResponseText(response).then(function (body) { traceEvent(trace, 'fetch_finished', req, { httpStatus: response.status, responseLength: body.length }); return { ok: response.ok, status: response.status, headers: { contentType: response.headers.get('content-type') || '' }, body: body, transport: { payloadCookie: sent && sent.cookie || '', trace: trace } }; });
+    return fetch(String(req.url || ''), { method: req.method || 'POST', headers: req.headers || { 'content-type': 'application/json; charset=UTF-8' }, body: sent, credentials: 'include', cache: 'no-store', signal: controller.signal }).then(function (response) {
+      return readResponseText(response).then(function (body) { var captured = captureTransport(req, body); traceEvent(trace, 'fetch_finished', req, { httpStatus: response.status, responseLength: body.length }); return { ok: response.ok, status: response.status, headers: { contentType: response.headers.get('content-type') || '' }, body: body, transport: Object.assign({}, captured, { trace: trace }) }; });
     }).catch(function (err) {
       traceEvent(trace, 'fetch_finished', req, { error: String(err && err.message || err) });
       try { err.trace = trace; } catch (ignore) {}

@@ -12,7 +12,9 @@ FbmSync.controlDispatch = function (command, payload) {
     case 'start':
       return FbmSync.start({ mode: input.mode || 'read', scan: input.scan, origin: input.origin || 'manual', manual: input.manual !== false });
     case 'continue':
-      return FbmSync.continue(input.response);
+      return FbmSync.limitRelayResult ? FbmSync.limitRelayResult(FbmSync.continue(input.response), input.hop) : FbmSync.continue(input.response);
+    case 'transport_failure':
+      return FbmSync.heartbeatTransportFailure ? FbmSync.heartbeatTransportFailure(input) : { ok: false, code: 'TRANSPORT_FAILURE_UNAVAILABLE', request: null, status: FbmSync.statusView() };
     case 'status':
       return FbmSync.statusView();
     case 'set_master_switch':
