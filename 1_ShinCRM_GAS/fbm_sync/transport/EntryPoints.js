@@ -127,6 +127,9 @@ function fbmSyncRelayCompactResult(result) {
   var value = result || {}, status = value.status || {};
   return {
     ok: value.ok !== false,
+    code: String(value.code || ''),
+    error: String(value.error || value.message || ''),
+    httpStatus: Number(value.status || 0),
     request: value.request || null,
     imported: Number(value.imported || 0),
     missing: value.missing,
