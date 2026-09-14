@@ -115,16 +115,10 @@ FbmSync.authContinue = function (entity, response) {
   state.session[entity === 'customer' ? 'customerAuthorized' : 'activityAuthorized'] = auth;
   if (entity === 'customer') {
     if (state.scan === 'identity_probe') {
-      state.metadata = state.metadata || {};
-      state.metadata.identityProbe = {
-        spreadsheetId: String(FbmSync.currentSpreadsheetId ? FbmSync.currentSpreadsheetId() : ''),
-        userId: String(state.session.userId || ''),
-        accountName: String(state.session.accountName || '')
-      };
-      state.cursor = {}; state.phase = 'done'; state.entity = '';
-      state.message = 'Đã đọc nhận diện phiên FBM; chờ người dùng xác nhận lưu.';
+      state.cursor = { kind: 'identity_user_grid' }; state.phase = 'checking_session'; state.entity = '';
+      state.message = 'Đã xác thực phiên; đang đọc thông tin tài khoản FBM...';
       FbmSync.stateWrite(state);
-      return null;
+      return FbmSync.identityUserRequest();
     }
     if (state.scan === 'identity_check') {
       FbmSync.identityCheckBegin(state);
@@ -383,6 +377,27 @@ FbmSync.continue = function (rawResponse) {
   }
   if (cursor.kind === 'authorize_activity') {
     return { ok: true, request: FbmSync.nextEnvelope(FbmSync.authContinue('activity', response)), status: FbmSync.statusView() };
+  }
+  if (cursor.kind === 'identity_user_grid') {
+    var identityUser = FbmSync.identityUser(response);
+    if (!identityUser.ok) {
+      state.phase = 'error'; state.entity = ''; state.cursor = {}; state.lastFailureCode = identityUser.code;
+      state.lastError = identityUser.message; state.message = identityUser.message; FbmSync.stateWrite(state);
+      return { ok: false, code: identityUser.code, status: FbmSync.statusView(), error: identityUser.message };
+    }
+    state.session.userId = identityUser.userId;
+    state.session.accountName = identityUser.accountName;
+    state.session.accountUsername = identityUser.username;
+    state.metadata = state.metadata || {};
+    state.metadata.identityProbe = {
+      spreadsheetId: String(FbmSync.currentSpreadsheetId ? FbmSync.currentSpreadsheetId() : ''),
+      userId: identityUser.userId,
+      accountName: identityUser.accountName
+    };
+    state.cursor = {}; state.phase = 'done'; state.entity = '';
+    state.message = 'Đã đọc nhận diện phiên FBM; chờ người dùng xác nhận lưu.';
+    FbmSync.stateWrite(state);
+    return { ok: true, status: FbmSync.statusView() };
   }
   // Write mode phải nạp danh mục trước khi dựng payload ghi.
   if (cursor.kind === 'lookup') {

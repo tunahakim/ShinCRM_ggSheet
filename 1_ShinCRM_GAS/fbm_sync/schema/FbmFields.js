@@ -10,7 +10,7 @@ FbmSync.approvalThreshold = function () {
   var value = Number(raw);
   return isFinite(value) && value >= 0 ? Math.floor(value) : FbmSync.DEFAULT_APPROVAL_THRESHOLD;
 };
-FbmSync.CONTROLLERS = { customer: 'zccrAccount', activity: 'zccrAccountTask' };
+FbmSync.CONTROLLERS = { customer: 'zccrAccount', activity: 'zccrAccountTask', user: 'User' };
 FbmSync.ENDPOINTS = {
   grid: '/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage',
   dir: '/AppService/FastBusiness.ReportExtenderService.asmx/GetDirViewPage',

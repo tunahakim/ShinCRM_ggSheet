@@ -320,7 +320,8 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 
 ### Bổ sung UI dùng chung sau Slice 8
 
-- [x] Identity probe giữ dữ liệu trong DTO GAS rồi cập nhật bản nháp `Spreadsheet ID`, `Mã user FBM` và `Tên tài khoản FBM` vào Sidebar, không tự lưu liên kết; smoke test đạt `1262/1262`, commit `595e302` (UI `99b6828`), deployment Sidebar `@257`, DEV runner `@256`.
+- [x] Identity probe chạy đủ chuỗi GAS cấp `authorize` rồi `GetGridViewPage` controller `User`, giữ dữ liệu trong DTO GAS và cập nhật bản nháp `Spreadsheet ID`, `Mã user FBM` và `Tên tài khoản FBM` vào Sidebar, không tự lưu liên kết; smoke test đạt `1264/1264`, relay deployment `@259`, DEV runner `@258`.
+- [x] Khi Extension bắt tay bằng `sessionId` mới, Sidebar tự gửi lại relay config hiện tại và chờ ACK; không yêu cầu cập nhật `chrome.storage` thủ công. Smoke test đạt `1265/1265`, relay deployment `@260`, DEV runner `@261`.
 - [x] Tách `PopupList` thành nền hiển thị dùng chung cho search, dropdown, customer picker và menu module; controller riêng giữ nguyên hành vi từng loại.
 - [x] Search giữ bề rộng đúng bằng ô nhập; dropdown giữ khả năng giãn theo nội dung và giới hạn theo Sidebar.
 - [x] Tách adapter `CustomerPicker` khỏi nguồn dữ liệu dropdown; giá trị dropdown hợp lệ được đưa lên đầu và bôi xanh khi focus.

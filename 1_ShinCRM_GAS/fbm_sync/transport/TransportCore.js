@@ -97,6 +97,7 @@ FbmSync.requestForCursor = function (state) {
   if (cursor.kind === 'login') { return FbmSync.loginRequest(cursor.credentialRef, false); }
   if (cursor.kind === 'authorize_customer') { return FbmSync.authorizeRequest('customer'); }
   if (cursor.kind === 'authorize_activity') { return FbmSync.authorizeRequest('activity'); }
+  if (cursor.kind === 'identity_user_grid') { return FbmSync.identityUserRequest(); }
   if (cursor.kind === 'lookup') {
     lookup = FbmSync.SYNC_LOOKUPS[Number(cursor.index || 0)];
     return lookup ? FbmSync.completionRequest(lookup.controller, lookup.key) : null;
@@ -117,7 +118,7 @@ FbmSync.requestForCursor = function (state) {
 };
 /** Chỉ retry request đọc; request ghi không được lặp vì phản hồi có thể đã tới FBM. */
 FbmSync.retryRead = function (state, failure) {
-  var safeKinds = ['authorize_customer', 'authorize_activity', 'lookup', 'customer_grid', 'activity_grid', 'activity_bulk_grid'], cursor = state && state.cursor || {}, limit = Number(state && state.retryLimit || 2), attempt = Number(state && state.retryCount || 0), request;
+  var safeKinds = ['authorize_customer', 'authorize_activity', 'identity_user_grid', 'lookup', 'customer_grid', 'activity_grid', 'activity_bulk_grid'], cursor = state && state.cursor || {}, limit = Number(state && state.retryLimit || 2), attempt = Number(state && state.retryCount || 0), request;
   if (!failure || failure.retryable !== true || safeKinds.indexOf(cursor.kind) < 0 || attempt >= limit) { return null; }
   request = FbmSync.requestForCursor(state);
   if (!request) { return null; }

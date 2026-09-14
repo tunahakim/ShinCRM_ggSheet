@@ -63,6 +63,20 @@ FbmSync.gridRequest = function (entity, options) {
 };
 /** Tạo request grid Customer theo cursor hiện tại. */
 FbmSync.customerGridRequest = function (options) { return FbmSync.gridRequest('customer', options); };
+/** Request User do GAS cấp để đọc định danh phiên; Extension chỉ chuyển envelope và response thô. */
+FbmSync.identityUserRequest = function () {
+  var cfg = FbmSync.scriptSettings();
+  return {
+    url: cfg.baseUrl + FbmSync.ENDPOINTS.grid,
+    body: {
+      type: 0, count: 10, language: 'v', controller: FbmSync.CONTROLLERS.user, viewId: null, childObject: false,
+      lastPageIndex: -1, firstPageItem: '', lastPageItem: '', lastRowCount: 0, memvars: [], externalKey: [],
+      gridPageIndex: -1, gridPageValue: null, gridRefresh: false, filter: [], sortExpression: null,
+      cookie: cfg.cookie || '{{FBM_PAYLOAD_COOKIE}}', query: null, parameter: null, variable: ''
+    },
+    meta: { kind: 'identity_user_grid', entity: 'user' }
+  };
+};
 /** Request Customer tối thiểu do GAS cấp để kiểm tra phiên nền; Extension không được tự dựng request này. */
 FbmSync.heartbeatCustomerRequest = function () {
   var request = FbmSync.customerGridRequest({ type: 0, count: 1, gridPageIndex: -1, gridPageValue: null, gridRefresh: false, includeTestCustomer: false });
@@ -212,6 +226,22 @@ FbmSync.validateGridFields = function (entity, fields) {
   var missing = required.filter(function (field) { return !seen[field]; });
   if (missing.length) { throw new Error('FBM thiếu metadata AliasName: ' + missing.join(', ')); }
   return true;
+};
+/** Đọc định danh từ dòng User theo AliasName; thiếu metadata/dòng thì fail-closed. */
+FbmSync.identityUser = function (response) {
+  var grid = FbmSync.gridRows(response), fields = grid.fields || [], row = grid.rows && grid.rows[0], index = {};
+  fields.forEach(function (field, position) { index[String(field).toLowerCase()] = position; });
+  if (!row || !fields.length) { return { ok: false, code: 'IDENTITY_PROBE_INCOMPLETE', message: 'FBM không trả metadata hoặc dòng User để nhận diện tài khoản.' }; }
+  var read = function (names) {
+    for (var i = 0; i < names.length; i += 1) {
+      var position = index[String(names[i]).toLowerCase()];
+      if (position !== undefined && row[position] !== null && row[position] !== undefined && String(row[position]).trim() !== '') { return String(FbmSync.fbDate(row[position])).trim(); }
+    }
+    return '';
+  };
+  var userId = read(['id', 'user_id', 'userid']), username = read(['name', 'user_name', 'username']), fullName = read(['ten', 'full_name', 'fullname', 'account_name']);
+  if (!userId || !username || !fullName) { return { ok: false, code: 'IDENTITY_PROBE_INCOMPLETE', message: 'FBM trả dòng User nhưng thiếu mã số, mã đăng nhập hoặc tên đầy đủ.' }; }
+  return { ok: true, userId: userId, username: username, accountName: fullName };
 };
 /** Ghép từng ô theo AliasName và chuẩn hóa ngày trước khi reconcile. */
 FbmSync.rowsToRecords = function (entity, response, knownFields) {

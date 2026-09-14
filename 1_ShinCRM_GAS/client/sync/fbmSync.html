@@ -63,14 +63,21 @@ function fbmSyncLoadSettings() {
 /** Đưa cấu hình Web App/khóa sang Extension; không gửi cookie hay payload FBM. */
 var FBM_SYNC_RELAY_CONFIGURE_FLIGHT = null;
 var FBM_SYNC_RELAY_AUTO_LAST_AT = 0;
+var FBM_SYNC_RELAY_SESSION = '';
 var FBM_SYNC_OPEN_HEARTBEAT_SENT = false;
 var FBM_SYNC_BRIDGE_WAITERS = [];
 var FBM_SYNC_BRIDGE_WAIT_TIMER = null;
 function fbmSyncNotifyBridgeReady() {
-  if (!FBM_SYNC_BRIDGE_WAITERS.length) { return; }
-  var waiters = FBM_SYNC_BRIDGE_WAITERS.splice(0, FBM_SYNC_BRIDGE_WAITERS.length);
-  if (FBM_SYNC_BRIDGE_WAIT_TIMER) { clearTimeout(FBM_SYNC_BRIDGE_WAIT_TIMER); FBM_SYNC_BRIDGE_WAIT_TIMER = null; }
-  waiters.forEach(function (resolve) { resolve(true); });
+  var sessionId = String(typeof SHEET_LINK_EXTENSION_SESSION === 'undefined' ? '' : SHEET_LINK_EXTENSION_SESSION || '');
+  if (sessionId && sessionId !== FBM_SYNC_RELAY_SESSION) {
+    FBM_SYNC_RELAY_SESSION = sessionId;
+    FBM_SYNC_CLIENT.relayConfigured = false;
+  }
+  if (FBM_SYNC_BRIDGE_WAITERS.length) {
+    var waiters = FBM_SYNC_BRIDGE_WAITERS.splice(0, FBM_SYNC_BRIDGE_WAITERS.length);
+    if (FBM_SYNC_BRIDGE_WAIT_TIMER) { clearTimeout(FBM_SYNC_BRIDGE_WAIT_TIMER); FBM_SYNC_BRIDGE_WAIT_TIMER = null; }
+    waiters.forEach(function (resolve) { resolve(true); });
+  }
   if (!FBM_SYNC_CLIENT.relayConfigured && typeof fbmSyncAutoConfigureRelay === 'function') { fbmSyncAutoConfigureRelay(); }
 }
 function fbmSyncWaitForBridge() {
