@@ -8,10 +8,6 @@ Cách viết một mục: một đầu đề ngắn, rồi tối đa vài câu.
 
 ## Đang mở
 
-### Ranh giới credential khi Extension phải mù tuyệt đối
-
-Yêu cầu mới của chủ dự án là mọi xử lý FBM, gồm auto-login, nằm ở GAS; Extension chỉ là cầu nối HTTP. Tài liệu 09.06/09A hiện lại quy định Extension giữ vault và giải mã credential, nên hai quy tắc mâu thuẫn. Cần chọn một: (A) giữ vault nhưng chỉ cho phép primitive generic `secretBinding`/transform do GAS chỉ dẫn, không giữ kiến thức endpoint/nghiệp vụ; (B) chuyển khóa giải mã và orchestration login sang GAS, chấp nhận GAS có thể thấy bí mật trong thời gian xử lý; hoặc (C) bỏ auto-login, chỉ yêu cầu người dùng đăng nhập thủ công. Tạm thời không xóa adapter hiện tại để tránh làm hỏng auto-login trước khi có quyết định.
-
 ### Hợp đồng projection/capture
 
 09.01 cho phép GAS gửi chỉ dẫn projection/capture generic để giảm response lớn, còn 09A diễn đạt Extension chỉ chuyển response nguyên văn. Tạm thời giữ nguyên văn khi không có chỉ dẫn; chỉ dùng primitive generic do GAS cấp và không hardcode tên field/nghiệp vụ trong Extension.

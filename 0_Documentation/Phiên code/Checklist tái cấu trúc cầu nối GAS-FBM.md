@@ -16,7 +16,7 @@ Quy ước trạng thái: `[ ]` chưa làm, `[~]` đang làm, `[x]` đã kiểm 
 - [x] Capture response generic nhận chỉ dẫn từ GAS qua `meta.transport`, không hardcode tên trường trong bộ lọc generic.
 - [ ] Rà và loại bỏ mọi endpoint/path/operation/entity/record nghiệp vụ còn sót trong Extension.
 - [ ] Rà và loại bỏ mọi quyết định mode, scan, cursor, retry, session, conflict và auto-login khỏi Extension.
-- [ ] Thiết kế lại luồng credential/login để vẫn giữ bí mật nhưng Extension không dựng request FBM; đây là điểm cần chốt phương án bảo mật trước khi phá cơ chế hiện tại.
+- [x] Giữ đúng ngoại lệ bảo mật đã chốt ở 09.06: Extension mã hóa/giải mã credential nội bộ và thực hiện adapter login; GAS chỉ giữ envelope, điều phối trạng thái và quyết định khi nào được thử.
 
 ### Ràng buộc đã xác nhận sau khi rà tài liệu
 
@@ -25,9 +25,9 @@ Quy ước trạng thái: `[ ]` chưa làm, `[~]` đang làm, `[x]` đã kiểm 
 - [x] Không tự suy diễn heartbeat từ `Default.aspx`; request heartbeat phải do GAS dựng theo hợp đồng module Customer hiện hành.
 - [ ] Thống nhất lại hợp đồng projection/capture generic giữa 09.01 và 09A; trong thời gian chờ, response không có chỉ dẫn phải được chuyển nguyên văn.
 
-### Điểm cần chủ dự án chốt
+### Ranh giới credential đã chốt theo tài liệu 09.06
 
-Tài liệu 09.06 hiện quy định Extension giữ khóa giải mã credential, còn yêu cầu mới quy định Extension mù tuyệt đối. Hai điều này không thể cùng đúng nếu GAS không có cách giải mã credential. Chỉ được tiếp tục sau khi chọn một phương án: (A) giữ vault nhưng chỉ cho phép primitive generic `secretBinding`/transform do GAS chỉ dẫn, không giữ kiến thức endpoint/nghiệp vụ; (B) chuyển khóa giải mã và toàn bộ login orchestration sang GAS, chấp nhận GAS thấy bí mật trong thời gian xử lý; hoặc (C) bỏ auto-login, chỉ yêu cầu người dùng đăng nhập thủ công. Không được âm thầm chọn thay chủ dự án.
+Credential là ngoại lệ bảo mật duy nhất của cầu nối: Extension giữ vault và giải mã nội bộ để adapter login hoạt động; GAS không nhận password bản rõ, chỉ giữ envelope và điều phối thời điểm thử. Không được mở rộng ngoại lệ này sang nghiệp vụ đồng bộ, cursor, hash, conflict hoặc quyết định request.
 
 ## GAS và relay
 
@@ -41,8 +41,8 @@ Tài liệu 09.06 hiện quy định Extension giữ khóa giải mã credential
 
 - [x] Worker không gửi FBM khi GAS timeout, lỗi hoặc không cấp request.
 - [x] Executor chuyển `bodyText` nguyên văn do GAS dựng.
-- [~] Executor xử lý transport chung: timeout, gzip/text response, capture theo chỉ dẫn; nhánh login đặc biệt vẫn còn và phải chốt cách chuyển về GAS.
-- [ ] Xóa login adapter khỏi executor hoặc chuyển thành giao thức generic do GAS điều khiển sau khi chốt bảo mật.
+- [x] Executor xử lý transport chung: timeout, gzip/text response, capture theo chỉ dẫn; adapter login là ngoại lệ bảo mật được 09.06 chốt.
+- [x] Không chuyển password hoặc khóa giải mã lên GAS; login adapter không được mở rộng thành nơi giữ state/cursor/quyết định nghiệp vụ.
 - [ ] Bridge không log/trace operation, entity, recordId, endpoint hoặc payload nghiệp vụ.
 - [ ] Bridge chỉ lưu chẩn đoán transport tối thiểu, không lưu cookie/mật khẩu/payload.
 - [ ] Test worker/executor với request thiếu, envelope hợp lệ, capture do GAS chỉ dẫn và response lớn.
