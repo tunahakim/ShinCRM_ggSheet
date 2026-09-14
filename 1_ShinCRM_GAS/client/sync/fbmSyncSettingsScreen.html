@@ -14,7 +14,7 @@ function fbmSyncPaintIdentityBlock(panel, active, status) {
   if (binding.accountName) { fbmSyncAppendText(body, 'Tài khoản đã lưu: ' + String(binding.accountName), 'shin-sync-preview-row'); }
 
   var manual = fbmSyncAppendBox(body, 'shin-sync-identity-form');
-  [['spreadsheet', 'Spreadsheet ID', binding.spreadsheetId || FBM_SYNC_CLIENT.identityDraft.spreadsheetId, 'ID của file ShinCRM'], ['user', 'Mã user FBM', binding.userId || FBM_SYNC_CLIENT.identityDraft.userId, 'Mã user hiển thị trong FBM'], ['account', 'Tên tài khoản FBM', binding.accountName || FBM_SYNC_CLIENT.identityDraft.accountName, 'Tên tài khoản']].forEach(function (item) {
+  [['spreadsheet', 'Spreadsheet ID', FBM_SYNC_CLIENT.identityDraft.spreadsheetId || binding.spreadsheetId, 'ID của file ShinCRM'], ['user', 'Mã user FBM', FBM_SYNC_CLIENT.identityDraft.userId || binding.userId, 'Mã user hiển thị trong FBM'], ['account', 'Tên tài khoản FBM', FBM_SYNC_CLIENT.identityDraft.accountName || binding.accountName, 'Tên tài khoản']].forEach(function (item) {
     var field = fbmSyncAppendBox(manual, 'shin-sync-form-field'); fbmSyncAppendText(field, item[1], 'shin-sync-form-label'); fbmSyncAppendInput(field, 'fbm-identity-' + item[0], 'text', item[2], item[3]);
   });
   var actions = fbmSyncAppendBox(body, 'shin-sync-identity-actions');

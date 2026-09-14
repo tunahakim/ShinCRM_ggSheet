@@ -1,6 +1,6 @@
 <script>
 /* Sidebar chỉ hiển thị tiến độ; GAS là nguồn state duy nhất. */
-var FBM_SYNC_CLIENT = { installed: false, waiting: {}, relayWaiters: {}, credentialWaiters: {}, running: false, mode: 'read', writeAllowed: false, openedAt: 0, relayConfigured: false, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0, traceEvents: [], subscreen: 'overview', resultsTab: 'summary', resultPages: {}, lastStatus: null, identityStatus: null, identityAction: '', identityLastAction: '', identityDraft: { spreadsheetId: '', userId: '', accountName: '' }, loginStatus: null, loginDraft: { username: '' }, syncSettings: null };
+var FBM_SYNC_CLIENT = { installed: false, waiting: {}, relayWaiters: {}, credentialWaiters: {}, running: false, mode: 'read', writeAllowed: false, openedAt: 0, relayConfigured: false, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0, traceEvents: [], subscreen: 'overview', resultsTab: 'summary', resultPages: {}, lastStatus: null, identityStatus: null, identityAction: '', identityLastAction: '', identityProbeSignature: '', identityDraft: { spreadsheetId: '', userId: '', accountName: '' }, loginStatus: null, loginDraft: { username: '' }, syncSettings: null };
 /** Timeout cho một request Extension để phiên không treo vô hạn khi tab FBM/bridge mất kết nối. */
 var FBM_SYNC_REQUEST_TIMEOUT_MS = 20000;
 var FBM_SYNC_GAS_CONTINUE_WARN_MS = 5000;
@@ -32,6 +32,25 @@ function fbmSyncLoadIdentityStatus() {
     if (FBM_SYNC_CLIENT.lastStatus) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); }
     return identity;
   }).catch(function () { return null; });
+}
+/** Copy a newly probed identity into the editable draft without saving the binding. */
+function fbmSyncApplyIdentityProbeDraft(status) {
+  if (!status || FBM_SYNC_CLIENT.identityLastAction !== 'probe') { return false; }
+  var probe = status.metadata && status.metadata.identityProbe;
+  if (!probe) { return false; }
+  var values = {
+    spreadsheetId: String(probe.spreadsheetId || '').trim(),
+    userId: String(probe.userId || '').trim(),
+    accountName: String(probe.accountName || '').trim()
+  };
+  var signature = [values.spreadsheetId, values.userId, values.accountName].join('|');
+  if (!signature.replace(/\|/g, '')) { return false; }
+  if (signature === String(FBM_SYNC_CLIENT.identityProbeSignature || '')) { return false; }
+  FBM_SYNC_CLIENT.identityProbeSignature = signature;
+  if (values.spreadsheetId) { FBM_SYNC_CLIENT.identityDraft.spreadsheetId = values.spreadsheetId; }
+  if (values.userId) { FBM_SYNC_CLIENT.identityDraft.userId = values.userId; }
+  if (values.accountName) { FBM_SYNC_CLIENT.identityDraft.accountName = values.accountName; }
+  return true;
 }
 function fbmSyncLoadLoginStatus() {
   if (typeof callServer !== 'function') { return Promise.resolve(null); }
@@ -133,6 +152,7 @@ function fbmSyncPaint(status, freshOpen) {
   if (status.writeAllowed !== undefined) { FBM_SYNC_CLIENT.writeAllowed = status.writeAllowed === true; }
   var draftUsername = document.getElementById('fbm-login-username'); if (draftUsername) { FBM_SYNC_CLIENT.loginDraft.username = String(draftUsername.value || ''); }
   ['spreadsheet', 'user', 'account'].forEach(function (name) { var draft = document.getElementById('fbm-identity-' + name); if (draft) { FBM_SYNC_CLIENT.identityDraft[name === 'spreadsheet' ? 'spreadsheetId' : name === 'user' ? 'userId' : 'accountName'] = String(draft.value || ''); } });
+  fbmSyncApplyIdentityProbeDraft(status);
   panel.hidden = false; panel.textContent = '';
   var count = status.counts || {};
   var active = ['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(status.phase) >= 0;
@@ -486,6 +506,7 @@ function fbmSyncProbeIdentity() {
   FBM_SYNC_CLIENT.running = true;
   FBM_SYNC_CLIENT.identityAction = 'probe';
   FBM_SYNC_CLIENT.identityLastAction = 'probe';
+  FBM_SYNC_CLIENT.identityProbeSignature = '';
   FBM_SYNC_CLIENT.mode = 'check';
   FBM_SYNC_CLIENT.traceEvents = [];
   FBM_SYNC_CLIENT.viewEpoch += 1;

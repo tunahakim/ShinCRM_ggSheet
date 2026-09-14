@@ -118,6 +118,11 @@ async function chay(so) {
   render(hop, content, hop.fbmSyncRenderAccount, idle);
   check(so, 'Account render đủ ba ô nhập liên kết và nút thao tác', [dom.document.getElementById('fbm-identity-spreadsheet') !== null, dom.document.getElementById('fbm-identity-user') !== null, dom.document.getElementById('fbm-identity-account') !== null, dom.document.getElementById('fbm-sync-probe-identity') !== null], [true, true, true, true]);
 
+  hop.FBM_SYNC_CLIENT.identityLastAction = 'probe';
+  hop.fbmSyncApplyIdentityProbeDraft({ metadata: { identityProbe: { spreadsheetId: 'sheet-probe', userId: '2037', accountName: 'ANHLT' } } });
+  render(hop, content, hop.fbmSyncRenderAccount, idle);
+  check(so, 'Identity probe tự điền bản nháp vào đủ ba ô mà chưa tự lưu', [dom.document.getElementById('fbm-identity-spreadsheet').value, dom.document.getElementById('fbm-identity-user').value, dom.document.getElementById('fbm-identity-account').value, hop.FBM_SYNC_CLIENT.identityStatus.status], ['sheet-probe', '2037', 'ANHLT', 'REBIND_REQUIRED']);
+
   hop.FBM_SYNC_CLIENT.resultsTab = 'summary';
   const conflictStatus = { phase: 'conflict', counts: { conflict: 1 }, metadata: { conflictCount: 1, conflicts: [{ entity: 'customer', id: 'CUS-1', fbmId: 'ALT00010', fields: [{ field: 'phone', left: '0901', right: '0902' }] }] } };
   render(hop, content, hop.fbmSyncRenderResults, conflictStatus);
