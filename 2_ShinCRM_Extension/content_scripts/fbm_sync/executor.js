@@ -1,6 +1,6 @@
 /* Cầu nối FBM: nhận request, fetch trong tab đăng nhập, trả response thô. */
 (function () {
-  var EXECUTOR_VERSION = '21.8';
+  var EXECUTOR_VERSION = '21.9';
   var HEARTBEAT_URL = 'https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage';
   var FETCH_TIMEOUT_MS = 10000;
   var FBM_ORIGIN = 'https://fbo.com.vn:8888';
