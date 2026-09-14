@@ -340,6 +340,7 @@ Các mục dưới đây là phần đang phải hoàn thiện trước khi báo
 - [x] Bảo đảm công tắc tổng tắt/dừng phiên không xóa thông tin request đang bay; response cũ sau cancel/stop không được tiếp tục pipeline.
 - [x] Chuỗi heartbeat tiếp theo gửi lại `kind: heartbeat` để GAS tiếp tục qua `fbmSyncHeartbeat`; không dùng cổng `background_sync`/`continue` của phiên quét nền.
 - [x] Bổ sung test offline cho mọi nhánh trên và cập nhật số tổng kiểm thử: `1260/1260`.
+- [x] Executor áp dụng đúng `source` trong chỉ dẫn capture/replacement generic do GAS cấp, không ép mọi replacement về HTML trang; commit `b91790d`, test offline vẫn `1260/1260`.
 - [x] Nghiệm thu GAS DEV bằng `node tests/gas.js ... --push` cho heartbeat request/response, transport failure, reservation và auto-login. `fbmSyncHeartbeatRequest` đạt ở revision `@252` với trạng thái fail-closed `AUTO_LOGIN_NOT_CONFIGURED`, `phase: paused`; `fbmSyncHeartbeat` trả `STALE_RESPONSE` khi không có reservation; `fbmSyncHeartbeatTransportFailure` trả `STALE_RESPONSE` khi request không còn hiệu lực; `fbmGetLoginConfig` đạt ở `@248`; `fbmProbeAutoLogin` đạt ở `@249`.
 - Bằng chứng bổ sung: các entrypoint DEV đã được chạy lại sau khi sửa trạng thái chờ đăng nhập; kết quả đầy đủ được ghi ngay tại mục nghiệm thu GAS DEV bên trên.
 - [ ] Tạo deployment DEV mới, Sidebar tự lấy URL; tải lại Extension rồi kiểm tra logged-in, logged-out, timeout, không có tab và response lớn.
