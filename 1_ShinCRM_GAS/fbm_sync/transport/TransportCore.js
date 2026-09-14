@@ -1,7 +1,7 @@
 /** Hop dong request va retry an toan cho transport FBM. */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
-/** Khóa tổng của module, lưu theo Spreadsheet hiện tại và mặc định tắt để fail-closed. */
+/** Khóa tổng của module; Spreadsheet cũ chưa có thuộc tính được coi là bật. */
 FbmSync.MASTER_SWITCH_KEY = 'FBM_SYNC_ENABLED';
 FbmSync.masterEnabled = function () {
   // Không phá hành vi các Spreadsheet đã có trước khi công tắc được thêm; chỉ giá trị false rõ ràng mới khóa module.
@@ -13,15 +13,11 @@ FbmSync.setMasterEnabled = function (enabled) {
   return { ok: true, enabled: value };
 };
 
-/** Chỉ cho phép ghi khi caller chọn write và cờ an toàn đã bật. */
-FbmSync.writeEnabled = function (mode) {
-  if (mode !== 'write' && mode !== 'push') { return false; }
-  return FbmSync.writeAllowed();
-};
-/** Cờ an toàn độc lập với mode; mặc định luôn tắt. */
-FbmSync.writeAllowed = function () {
-  try { return PropertiesService.getDocumentProperties().getProperty('FBM_SYNC_ALLOW_WRITES') === 'true'; } catch (err) { return false; }
-};
+/** Quyền ghi được tách theo đích; mode không được kiêm thêm một cờ ẩn ngoài UI. */
+FbmSync.canWriteSheet = function (mode) { return mode === 'read' || mode === 'write'; };
+FbmSync.canWriteFbm = function (mode) { return mode === 'push' || mode === 'write'; };
+// Alias tạm cho caller cũ trong module push; ý nghĩa duy nhất là quyền ghi FBM.
+FbmSync.writeEnabled = function (mode) { return FbmSync.canWriteFbm(mode); };
 /** Chỉ trả dữ liệu JSON thuần qua google.script.run; Date phải về dạng .NET của FBM. */
 if (typeof FbmSync.transportValue !== 'function') {
   FbmSync.transportValue = function (value) {
@@ -48,6 +44,16 @@ FbmSync.nextEnvelope = function (request) {
     if (FbmSync.stateWrite) { FbmSync.stateWrite(stopped); }
     return null;
   }
+  var pendingState = FbmSync.stateRead ? FbmSync.stateRead() : {};
+  if (pendingState.metadata && pendingState.metadata.cancelPending === true) {
+    pendingState.phase = 'paused';
+    pendingState.activeRequestId = '';
+    pendingState.deadlineAt = 0;
+    pendingState.message = 'Đã nhận xong response đang bay và dừng phiên; không cấp request FBM kế tiếp.';
+    pendingState.metadata.cancelPending = false;
+    if (FbmSync.stateWrite) { FbmSync.stateWrite(pendingState); }
+    return null;
+  }
   var endpoint = FbmSync.protocol.validateEndpoint(request.url);
   if (!endpoint.ok) {
     if (FbmSync.traceEvent) { FbmSync.traceEvent('request_blocked', { operation: request.meta && request.meta.kind || '', endpoint: request.url, code: endpoint.code }); }
@@ -60,6 +66,11 @@ FbmSync.nextEnvelope = function (request) {
     captures: [{ name: 'payloadCookie', source: 'page_html', pattern: '\\\\?["\\\']cookie\\\\?\\s*[:=]\\s*\\\\?["\\\']([^\\\"\\\'\\\\]+FHN_CRM_App)["\\\']', flags: 'i', group: 1 }],
     replacements: [{ token: '{{FBM_PAYLOAD_COOKIE}}', capture: 'payloadCookie', source: 'page_html' }]
   }, meta.transport || {});
+  if (meta.kind === 'authorize') {
+    meta.transport.jsonPaths = ['d.Authorized', 'd.authorized', 'd.FBM_USER_ID', 'd.UserId', 'd.userId', 'd.AccountName', 'd.accountName', 'd.UserName', 'd.userName'];
+  } else if (/(?:customer|activity)_edit_open$/.test(String(meta.kind || ''))) {
+    meta.transport.jsonPaths = ['d.Row', 'd.row', 'd.FieldValues', 'd.fieldValues', 'd.InternalValues', 'd.internalValues', 'd.Showing', 'd.showing', 'd.Controller', 'd.controller', 'd.GridController', 'd.gridController', 'd.Bugs', 'd.bugs', 'd.Authorized', 'd.authorized'];
+  }
   if (FbmSync.stateWrite) {
     state.activeRequestId = id;
     state.lastProgressAt = Date.now();
@@ -94,7 +105,10 @@ FbmSync.limitRelayResult = function (result, hop) {
 /** Dựng lại request đọc từ cursor; không lưu payload/cookie để retry không làm lộ bí mật. */
 FbmSync.requestForCursor = function (state) {
   var cursor = state && state.cursor || {}, lookup, customerId, pageType;
+  if (cursor.kind === 'heartbeat') { return FbmSync.heartbeatCustomerRequest(); }
   if (cursor.kind === 'login') { return FbmSync.loginRequest(cursor.credentialRef, false); }
+  if (cursor.kind === 'login_identity_authorize') { return FbmSync.authorizeRequest('customer'); }
+  if (cursor.kind === 'login_identity_user') { return FbmSync.identityUserRequest(); }
   if (cursor.kind === 'authorize_customer') { return FbmSync.authorizeRequest('customer'); }
   if (cursor.kind === 'authorize_activity') { return FbmSync.authorizeRequest('activity'); }
   if (cursor.kind === 'identity_user_grid') { return FbmSync.identityUserRequest(); }
@@ -118,7 +132,7 @@ FbmSync.requestForCursor = function (state) {
 };
 /** Chỉ retry request đọc; request ghi không được lặp vì phản hồi có thể đã tới FBM. */
 FbmSync.retryRead = function (state, failure) {
-  var safeKinds = ['authorize_customer', 'authorize_activity', 'identity_user_grid', 'lookup', 'customer_grid', 'activity_grid', 'activity_bulk_grid'], cursor = state && state.cursor || {}, limit = Number(state && state.retryLimit || 2), attempt = Number(state && state.retryCount || 0), request;
+  var safeKinds = ['authorize_customer', 'authorize_activity', 'identity_user_grid', 'login_identity_authorize', 'login_identity_user', 'lookup', 'customer_grid', 'activity_grid', 'activity_bulk_grid'], cursor = state && state.cursor || {}, limit = Number(state && state.retryLimit || 2), attempt = Number(state && state.retryCount || 0), request;
   if (!failure || failure.retryable !== true || safeKinds.indexOf(cursor.kind) < 0 || attempt >= limit) { return null; }
   request = FbmSync.requestForCursor(state);
   if (!request) { return null; }

@@ -148,7 +148,10 @@ window.addEventListener('message', function (event) {
     if (!isAllowedSidebarOrigin(event.origin) || String(data.nonce || '') !== sidebarNonce) { return; }
     // Sheets có thể thay WindowProxy sau reload; nonce vẫn định danh đúng Sidebar.
     if (event.source && event.source !== sidebarWindow) { sidebarWindow = event.source; sidebarOrigin = event.origin; }
-    var bridgeTrace = { at: Date.now(), stage: 'bridge_received', requestId: String(data.id || '') };
+    // `data.id` is only the Sidebar waiter id. The GAS reservation id lives in
+    // request.meta.trace.requestId and must remain the sole `requestId` used by
+    // GAS stale-response validation.
+    var bridgeTrace = { at: Date.now(), stage: 'bridge_received', clientRequestId: String(data.id || '') };
     sendRequestToWorker({ type: 'FBM_EXECUTE_REQUEST', id: data.id, request: data.request }, function (error, reply) {
       // Content script cũ sau Extension Reload không còn runtime context. Không phát
       // response lỗi cạnh response thật của bridge mới vừa được worker nạp lại.
@@ -164,6 +167,7 @@ window.addEventListener('message', function (event) {
           id: data.id,
           result: error ? null : (reply && reply.result),
           error: error ? error.message : (reply && reply.error),
+          code: error ? 'FBM_TRANSPORT_UNAVAILABLE' : (reply && reply.code),
           trace: trace,
           retryable: false
         }, event.origin);

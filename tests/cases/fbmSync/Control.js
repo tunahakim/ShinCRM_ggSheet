@@ -14,30 +14,33 @@ async function chay(so) {
       setMasterEnabled: (enabled) => { calls.push(['master', enabled]); return { ok: true, enabled }; },
       backgroundEnabled: () => true,
       setBackgroundEnabled: (enabled) => { calls.push(['background', enabled]); return { ok: true, enabled }; },
-      writeAllowed: () => false,
       resolveConflict: (...args) => { calls.push(['resolve', args]); return { ok: true }; },
       prepareConflictResolution: (...args) => { calls.push(['prepare', args]); return { ok: true }; },
       confirmConflict: (...args) => { calls.push(['confirm', args]); return { ok: true }; },
+      heartbeatTransportFailure: (input) => { calls.push(['transport_failure', input]); return { ok: false, code: input.code }; },
+      withOrchestrationLock: (callback) => { calls.push(['lock']); return callback(); },
       logTransportError: (message) => ({ phase: 'error', message })
     },
     fbmSyncApprovePush: () => { calls.push(['approve']); return { ok: true }; },
     fbmSyncCancel: () => { calls.push(['cancel']); return { ok: true }; },
-    fbmSyncRetryPushFailures: () => { calls.push(['retry']); return { ok: true }; },
-    fbmSyncSetWriteMode: (enabled) => { calls.push(['write', enabled]); return { enabled }; }
+    fbmSyncRetryPushFailures: () => { calls.push(['retry']); return { ok: true }; }
   });
   napServer(hop, 'fbm_sync/control/ControlPort.js');
 
   hop.FbmSync.controlDispatch('start', { mode: 'read', origin: 'background' });
   hop.FbmSync.controlDispatch('continue', { response: { status: 200 } });
-  hop.FbmSync.controlDispatch('set_write_mode', { enabled: true });
-  check(so, 'adapter chuyen command thanh payload nghiep vu chuan', calls.slice(0, 3), [
+  check(so, 'adapter chuyen command thanh payload nghiep vu chuan', calls.slice(0, 2), [
     ['start', { mode: 'read', scan: undefined, origin: 'background', manual: true }],
-    ['continue', { status: 200 }],
-    ['write', true]
+    ['continue', { status: 200 }]
   ]);
   hop.FbmSync.controlDispatch('set_master_switch', { enabled: false });
   hop.FbmSync.controlDispatch('set_background_switch', { enabled: false });
-  check(so, 'control port chuyển đúng công tắc tổng và lịch nền', calls.slice(3), [['master', false], ['background', false]]);
+  check(so, 'control port chuyển đúng công tắc tổng và lịch nền', calls.slice(2), [['master', false], ['background', false]]);
+
+  const beforeTransport = calls.length;
+  const transportFailure = hop.FbmSync.controlDispatchLocked('transport_failure', { requestId: 'req-1', code: 'FBM_TRANSPORT_UNAVAILABLE' });
+  check(so, 'transport failure không bị bọc lock lần hai', calls.slice(beforeTransport), [['transport_failure', { requestId: 'req-1', code: 'FBM_TRANSPORT_UNAVAILABLE' }]]);
+  check(so, 'transport failure giữ nguyên mã lỗi từ handler tự khóa', transportFailure.code, 'FBM_TRANSPORT_UNAVAILABLE');
 
   const warning = hop.FbmSync.controlNotification({
     runId: 'r1', phase: 'awaiting_approval', message: 'old',

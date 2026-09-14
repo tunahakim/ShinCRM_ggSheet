@@ -33,10 +33,15 @@ FbmSync.pullWrite = function (entity, records) {
   var orphaned = 0;
   var categoryGate = state.metadata && state.metadata.categoryGate || {};
   var sourceRecords = records;
+  var localRecords = FbmSync.readLocal(entity);
+  state.metadata = state.metadata || {};
+  state.metadata.seen = state.metadata.seen || { customer: {}, activity: {} };
+  if (!state.metadata.seen[entity] || state.metadata.seen[entity].initialized !== true) {
+    FbmSync.seenStoreBegin(entity, localRecords);
+    state.metadata.seen[entity] = { initialized: true };
+  }
+  FbmSync.seenStoreMark(entity, localRecords, sourceRecords);
   if (entity === 'activity') {
-    state.metadata = state.metadata || {};
-    state.metadata.seen = state.metadata.seen || { customer: {}, activity: {} };
-    (sourceRecords || []).forEach(function (incoming) { var sourceId = String(incoming && incoming.fbmId || '').trim(); if (sourceId) { state.metadata.seen.activity[sourceId] = true; } });
     records = (sourceRecords || []).filter(function (incoming) {
       var allowed = FbmSync.activitySinceAllows(incoming, state);
       if (!allowed) { FbmSync.logPullRecord(entity, incoming, null, FbmSync.SYNC_STATUS.skipped, 'Activity nằm trước mốc FBM_ACTIVITY_SINCE.'); }
@@ -49,7 +54,7 @@ FbmSync.pullWrite = function (entity, records) {
     orphaned = linked.orphaned + Number(linked.blocked || 0);
   }
   var local = {}, localById = {}, localByCode = {}, localByTaxNumber = {};
-  FbmSync.readLocal(entity).forEach(function (record) {
+  localRecords.forEach(function (record) {
     if (record.fbmId) { local[String(record.fbmId).trim()] = record; localById[String(record.fbmId).trim()] = record; }
     if (record.id) { localById[String(record.id).trim()] = record; }
     if (entity === 'customer' && record.fbmCustomerCode) { var code = String(record.fbmCustomerCode).trim(); (localByCode[code] || (localByCode[code] = [])).push(record); }
@@ -73,12 +78,6 @@ FbmSync.pullWrite = function (entity, records) {
       }
       current = FbmSync.findCustomerByIdentity(localById, localByCode, incoming, localByTaxNumber);
       if (current) { local[key] = current; identityMatched = String(current.fbmId || '').trim() !== key; }
-    }
-    if (key) {
-      state.metadata = state.metadata || {};
-      state.metadata.seen = state.metadata.seen || { customer: {}, activity: {} };
-      state.metadata.seen[entity] = state.metadata.seen[entity] || {};
-      state.metadata.seen[entity][key] = true;
     }
     if (entity === 'activity' && !current) {
       var markerId = String(incoming.markerId || '').trim(), marked = markerId ? localById[markerId] : null;
@@ -203,6 +202,15 @@ FbmSync.pullWrite = function (entity, records) {
   if (allWrites.length) {
     var saved = writeGateSave({ entity: entity, records: allWrites, source: 'pull', schemas: schemas });
     result.ok = !!saved.ok; result.written = saved.ok ? writes.length : 0; result.writeResult = saved;
+    if (saved.ok && saved.rows && saved.fields) {
+      var savedRecords = saved.rows.map(function (row) {
+        var record = {};
+        saved.fields.forEach(function (field, index) { record[field] = row[index]; });
+        return record;
+      });
+      FbmSync.seenStoreMark(entity, savedRecords, sourceRecords);
+      if (state.cursor && state.cursor.kind === 'activity_bulk_grid') { FbmSync.seenStoreMark('activity_bulk', savedRecords, sourceRecords); }
+    }
     if (saved.ok && pendingClears.length && typeof FbmSync.pendingPushClear === 'function') { pendingClears.forEach(function (item) { FbmSync.pendingPushClear(item.entity, item.id); }); }
     if (saved.ok && typeof dirtyStateMarkRecords === 'function') {
       var ids = allWrites.map(function (record) { return record.id; }).filter(function (id) { return id !== undefined && id !== null && String(id).trim(); });

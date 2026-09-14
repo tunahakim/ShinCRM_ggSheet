@@ -21,7 +21,7 @@ FbmSync.schedulerClaim = function (kind, now) {
   if (!FbmSync.backgroundEnabled()) { return { ok: false, code: 'BACKGROUND_DISABLED', message: 'Đồng bộ nền đang tắt.', status: FbmSync.statusView() }; }
   var due = Number(props.getProperty(item[0]) || 0);
   if (due && due > at) { return { ok: false, code: 'NOT_DUE', nextRunAt: due }; }
-  var lock = LockService.getDocumentLock();
+  var lock = FbmSync.orchestrationLock();
   if (!lock.tryLock(SETTINGS.LOCK_WAIT_MS)) { return { ok: false, code: 'BUSY' }; }
   try {
     var state = FbmSync.stateRead();
@@ -86,9 +86,9 @@ function fbmSyncLockResult(code, message) {
 /** GAS cấp request heartbeat; Extension chỉ chuyển nguyên envelope này tới tab FBM. */
 function fbmSyncHeartbeatRequest(options) {
   var opt = options || {}, source = String(opt.source || 'alarm');
-  if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED', request: null, status: FbmSync.statusView() }; }
-  if (['alarm', 'sidebar_open'].indexOf(source) >= 0 && !FbmSync.backgroundEnabled()) { return { ok: false, code: 'BACKGROUND_DISABLED', request: null, status: FbmSync.statusView() }; }
-  var lock = typeof LockService !== 'undefined' && LockService.getDocumentLock ? LockService.getDocumentLock() : { tryLock: function () { return true; }, releaseLock: function () {} }, waitMs = typeof SETTINGS !== 'undefined' && SETTINGS && SETTINGS.LOCK_WAIT_MS ? SETTINGS.LOCK_WAIT_MS : 10000;
+  if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) { return { ok: true, noop: true, code: 'SYNC_DISABLED', request: null, status: FbmSync.statusView() }; }
+  if (['alarm', 'sidebar_open'].indexOf(source) >= 0 && !FbmSync.backgroundEnabled()) { return { ok: true, noop: true, code: 'BACKGROUND_DISABLED', request: null, status: FbmSync.statusView() }; }
+  var lock = FbmSync.orchestrationLock(), waitMs = typeof SETTINGS !== 'undefined' && SETTINGS && SETTINGS.LOCK_WAIT_MS ? SETTINGS.LOCK_WAIT_MS : 10000;
   if (!lock.tryLock(waitMs)) { return fbmSyncLockResult('BUSY', 'GAS đang bận; chưa cấp request heartbeat mới.'); }
   try {
     var state = FbmSync.stateRead(), session = state.session || {}, cursor = state.cursor || {}, now = Date.now();
@@ -97,17 +97,22 @@ function fbmSyncHeartbeatRequest(options) {
       return fbmSyncLockResult('REQUEST_IN_FLIGHT', 'Đã có request FBM đang chờ response; không cấp request heartbeat chồng.');
     }
     if (state.runId && activePhase && cursor.kind !== 'login') {
-      return fbmSyncLockResult('SYNC_ALREADY_RUNNING', 'Phiên đồng bộ đang chạy; heartbeat không được ghi đè cursor.');
+      var resumed = FbmSync.requestForCursor(state);
+      if (!resumed) { return fbmSyncLockResult('SYNC_RESUME_UNAVAILABLE', 'Phiên đồng bộ đang chạy nhưng GAS không dựng lại được request từ cursor.'); }
+      return { ok: true, code: 'SYNC_RESUME_REQUEST_READY', request: FbmSync.nextEnvelope(resumed), status: FbmSync.statusView(), resumed: true };
     }
     if (Number(options && options.hop || 0) >= Number(FbmSync.RELAY_HOP_LIMIT || 20)) {
       return { ok: true, code: 'RELAY_SLICE_COMPLETE', request: null, status: FbmSync.statusView() };
     }
-    var missingSession = session.expired === true || !String(session.cookie || '');
+    // State chưa có cookie không đồng nghĩa tab FBM đã logout: request heartbeat
+    // vẫn có thể lấy cookie qua capture generic do GAS chỉ dẫn.
+    var missingSession = session.expired === true;
     if (cursor.kind === 'login' && state.activeRequestId && Number(state.lastProgressAt || 0) && now - Number(state.lastProgressAt) < 120000) {
       return fbmSyncLockResult('AUTO_LOGIN_IN_PROGRESS', 'Đang chờ response đăng nhập tự động; không gửi thêm request.');
     }
     if (missingSession) {
-      var loginRequest = typeof FbmSync.beginAutoLogin === 'function' ? FbmSync.beginAutoLogin(state, cursor.kind === 'login' ? cursor.resumeCursor : cursor, { heartbeat: true }) : null;
+      var resumeCursor = cursor.kind === 'login' ? cursor.resumeCursor : (cursor.kind ? cursor : { kind: 'heartbeat' });
+      var loginRequest = typeof FbmSync.beginAutoLogin === 'function' ? FbmSync.beginAutoLogin(state, resumeCursor, { heartbeat: true }) : null;
       if (loginRequest) { return { ok: true, code: 'AUTO_LOGIN_REQUEST_READY', request: FbmSync.nextEnvelope(loginRequest), status: FbmSync.statusView(), autoLogin: true }; }
       var loginConfig = typeof FbmSync.autoLoginCanAttempt === 'function' ? FbmSync.autoLoginCanAttempt() : { code: 'AUTO_LOGIN_NOT_CONFIGURED' }, waitingCode = loginConfig.code || 'SESSION_EXPIRED_WAITING_LOGIN';
       state.phase = 'paused';
@@ -119,9 +124,10 @@ function fbmSyncHeartbeatRequest(options) {
       state.message = state.lastError;
       state.scheduledScan = '';
       FbmSync.stateWrite(state);
-      return { ok: false, code: waitingCode, request: null, retryAt: loginConfig.retryAt || 0, status: FbmSync.statusView() };
+      return { ok: true, noop: true, code: waitingCode, request: null, retryAt: loginConfig.retryAt || 0, status: FbmSync.statusView() };
     }
     if (typeof FbmSync.heartbeatCustomerRequest !== 'function') { return { ok: false, code: 'HEARTBEAT_REQUEST_UNAVAILABLE', request: null, status: FbmSync.statusView() }; }
+    state.cursor = { kind: 'heartbeat' };
     state.relayHop = 0;
     FbmSync.stateWrite(state);
     return { ok: true, code: 'HEARTBEAT_REQUEST_READY', request: FbmSync.nextEnvelope(FbmSync.heartbeatCustomerRequest()), status: FbmSync.statusView() };
@@ -132,14 +138,17 @@ FbmSync.heartbeatRequest = fbmSyncHeartbeatRequest;
 /** Nhận response heartbeat và trả một request đọc tiếp nếu scheduler đang đến hạn. */
 function fbmSyncHeartbeat(rawResponse, options) {
   if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED', status: FbmSync.statusView() }; }
-  var lock = typeof LockService !== 'undefined' && LockService.getDocumentLock ? LockService.getDocumentLock() : { tryLock: function () { return true; }, releaseLock: function () {} }, waitMs = typeof SETTINGS !== 'undefined' && SETTINGS && SETTINGS.LOCK_WAIT_MS ? SETTINGS.LOCK_WAIT_MS : 10000;
+  var lock = FbmSync.orchestrationLock(), waitMs = typeof SETTINGS !== 'undefined' && SETTINGS && SETTINGS.LOCK_WAIT_MS ? SETTINGS.LOCK_WAIT_MS : 10000;
   if (!lock.tryLock(waitMs)) { return fbmSyncLockResult('BUSY', 'GAS đang bận; chưa nhận response heartbeat.'); }
   try { return fbmSyncHeartbeatLocked(rawResponse, options || {}); } finally { lock.releaseLock(); }
 }
 
 function fbmSyncHeartbeatLocked(rawResponse, options) {
   var state = FbmSync.stateRead(), cursor = state.cursor || {}, responseRequestId = FbmSync.responseRequestId ? FbmSync.responseRequestId(rawResponse) : '', result = FbmSync.protocol.assertSuccess(rawResponse), request = null, started = null;
-  if (!state.activeRequestId || (responseRequestId && responseRequestId !== String(state.activeRequestId))) {
+  // Sau heartbeat, mọi request của phiên nền dùng đúng bộ xử lý continuation chung.
+  // Worker chỉ chuyển envelope nên không cần và không được biết cursor nào đang chạy.
+  if (cursor.kind !== 'heartbeat') { return FbmSync.continue(rawResponse); }
+  if (!state.activeRequestId || !responseRequestId || responseRequestId !== String(state.activeRequestId)) {
     return { ok: false, code: 'STALE_RESPONSE', request: null, status: FbmSync.statusView(), error: 'Response heartbeat không còn thuộc request đang chờ.' };
   }
   state.activeRequestId = '';
@@ -147,22 +156,6 @@ function fbmSyncHeartbeatLocked(rawResponse, options) {
   state.lastProgressAt = Date.now();
   state.relayHop = Number(options && options.hop || 0) + 1;
   FbmSync.stateWrite(state);
-  if (cursor.kind === 'login') {
-    var loginParsed = FbmSync.protocol.parse(rawResponse) || {}, loginData = loginParsed && loginParsed.d !== undefined ? loginParsed.d : loginParsed;
-    var loginSuccess = result.ok && loginData !== false && !FbmSync.protocol.isSessionExpired(rawResponse);
-    if (!loginSuccess) {
-      var loginFailure = result.bug && (result.bug.Message || result.bug.message) || 'Tự đăng nhập FBM thất bại.';
-      if (FbmSync.autoLoginMarkFailure) { FbmSync.autoLoginMarkFailure(loginFailure); }
-      state.session = state.session || {}; state.session.expired = true; state.phase = 'paused'; state.lastFailureCode = 'AUTO_LOGIN_FAILED'; state.retryable = false; state.lastError = loginFailure; state.message = 'Tự đăng nhập thất bại; sẽ thử lại sau 30 phút.'; state.scheduledScan = ''; FbmSync.stateWrite(state);
-      return { ok: false, code: 'AUTO_LOGIN_FAILED', status: result.status || 0, error: state.message, request: null, statusView: FbmSync.statusView() };
-    }
-    if (FbmSync.applyTransportSession) { FbmSync.applyTransportSession(state, rawResponse); }
-    if (FbmSync.autoLoginMarkSuccess) { FbmSync.autoLoginMarkSuccess(); }
-    state.session = state.session || {}; state.session.expired = false; state.lastFailureCode = ''; state.lastError = ''; state.retryable = false; state.phase = 'idle'; state.runId = ''; state.entity = ''; state.cursor = {}; state.activeRequestId = ''; state.message = 'Đăng nhập lại thành công; đang kiểm tra heartbeat...'; FbmSync.stateWrite(state);
-    if (typeof FbmSync.heartbeatCustomerRequest !== 'function') { return { ok: false, code: 'HEARTBEAT_REQUEST_UNAVAILABLE', request: null, statusView: FbmSync.statusView() }; }
-    request = FbmSync.nextEnvelope(FbmSync.heartbeatCustomerRequest());
-    return { ok: true, code: 'AUTO_LOGIN_OK', request: request, status: FbmSync.statusView(), autoLogin: true };
-  }
   if (result.ok && FbmSync.protocol.hasHeartbeatData && !FbmSync.protocol.hasHeartbeatData(rawResponse)) {
     result = { ok: false, code: 'SESSION_EXPIRED', status: Number(rawResponse && rawResponse.status || 0), retryable: false, bug: { FieldName: '$SESSION', Message: 'FBM không trả dữ liệu Customer hợp lệ; phiên có thể đã hết hạn.' } };
   }
@@ -190,6 +183,7 @@ function fbmSyncHeartbeatLocked(rawResponse, options) {
     }
     if (state.phase === 'idle' && !state.lastError && state.scheduledScan === 'heartbeat') { state.scheduledScan = ''; state.message = 'Heartbeat FBM OK.'; }
   }
+  state.cursor = {};
   FbmSync.stateWrite(state);
   state = FbmSync.stateRead();
   if (result.ok && Number(options && options.hop || 0) >= Number(FbmSync.RELAY_HOP_LIMIT || 20)) {
@@ -211,7 +205,7 @@ function fbmSyncHeartbeatLocked(rawResponse, options) {
 
 /** Thu hồi reservation khi Extension không thể gửi envelope tới tab FBM. */
 function fbmSyncHeartbeatTransportFailure(payload) {
-  var value = payload || {}, requestId = String(value.requestId || ''), lock = typeof LockService !== 'undefined' && LockService.getDocumentLock ? LockService.getDocumentLock() : { tryLock: function () { return true; }, releaseLock: function () {} }, waitMs = typeof SETTINGS !== 'undefined' && SETTINGS && SETTINGS.LOCK_WAIT_MS ? SETTINGS.LOCK_WAIT_MS : 10000;
+  var value = payload || {}, requestId = String(value.requestId || ''), lock = FbmSync.orchestrationLock(), waitMs = typeof SETTINGS !== 'undefined' && SETTINGS && SETTINGS.LOCK_WAIT_MS ? SETTINGS.LOCK_WAIT_MS : 10000;
   if (!lock.tryLock(waitMs)) { return fbmSyncLockResult('BUSY', 'GAS đang bận; chưa ghi nhận lỗi cầu nối.'); }
   try {
     var state = FbmSync.stateRead();
@@ -225,6 +219,10 @@ function fbmSyncHeartbeatTransportFailure(payload) {
     state.retryable = false;
     state.lastError = String(value.message || 'Extension không gửi được request tới tab FBM.').slice(0, 240);
     state.message = state.lastError;
+    if (state.cursor && state.cursor.kind === 'heartbeat' && state.lastFailureCode === 'FBM_TRANSPORT_CAPTURE_MISSING') {
+      state.session = state.session || {};
+      state.session.expired = true;
+    }
     if (state.cursor && state.cursor.kind === 'login') { state.phase = 'paused'; }
     FbmSync.stateWrite(state);
     return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError };

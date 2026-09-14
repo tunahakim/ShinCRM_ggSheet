@@ -135,6 +135,28 @@ FbmSync.activityBulkMissing = function (localRecords, seenFbmIds) {
   return missing;
 };
 
+/** Ghi trạng thái Activity vắng theo lô; state chỉ giữ tổng và mẫu nhỏ, không giữ toàn bộ danh sách. */
+FbmSync.writeActivityBulkMissing = function (localRecords) {
+  var local = localRecords || [], hasSeen = FbmSync.seenStoreReader('activity_bulk'), batchSize = typeof SETTINGS !== 'undefined' && SETTINGS.CHUNK_ROWS ? Number(SETTINGS.CHUNK_ROWS) : 2000;
+  var batch = [], sample = [], total = 0, written = 0;
+  function flush() {
+    if (!batch.length || typeof writeGateSave !== 'function') { batch = []; return; }
+    var saved = writeGateSave({ entity: 'activity', records: batch, source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
+    if (!saved || !saved.ok) { throw new Error('Không ghi được trạng thái Activity vắng sau lượt bulk.'); }
+    written += batch.length; batch = [];
+  }
+  local.forEach(function (record) {
+    var fbmId = String(record && record.fbmId || '').trim();
+    if (!fbmId || hasSeen(record) || String(record.recordStatus || 'active') === 'deleted' || FbmSync.isTemporaryRecord('activity', record)) { return; }
+    var item = { id: record.id, fbmId: fbmId, syncStatus: FbmSync.SYNC_STATUS.missing };
+    total += 1; if (sample.length < 20) { sample.push(item); }
+    batch.push({ id: record.id, syncStatus: FbmSync.SYNC_STATUS.missing });
+    if (batch.length >= batchSize) { flush(); }
+  });
+  flush();
+  return { total: total, written: written, sample: sample };
+};
+
 /** Chuẩn hóa ngày Activity để lập kế hoạch quét bù Customer. */
 FbmSync.activityDateKey = function (value) {
   var date = typeof FbmSync.fbDate === 'function' ? FbmSync.fbDate(value) : value;
@@ -154,6 +176,7 @@ FbmSync.activityLocalMaxDate = function () {
   var latest = '';
   if (typeof FbmSync.readLocal !== 'function') { return latest; }
   (FbmSync.readLocal('activity') || []).forEach(function (record) {
+    if (!String(record && record.fbmId || '').trim()) { return; }
     var key = FbmSync.activityDateKey(record && record.workDate);
     if (key && key > latest) { latest = key; }
   });

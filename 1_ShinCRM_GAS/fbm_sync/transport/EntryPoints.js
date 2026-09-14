@@ -37,12 +37,18 @@ function fbmSyncSaveIdentityBinding(binding) { return FbmSync.bindingWrite(bindi
 /** Dừng phiên lỗi; chỉ nhả khóa sync, giữ khóa user đang sửa. */
 function fbmSyncCancel() {
   var state = FbmSync.stateRead(), locks = state.locks || {}, kept = {};
+  if (state.activeRequestId) {
+    state.metadata = state.metadata || {};
+    state.metadata.cancelPending = true;
+    state.message = 'Đang chờ response FBM hiện tại để dừng an toàn; sẽ không cấp request kế tiếp.';
+    state.lastError = '';
+    FbmSync.stateWrite(state);
+    return { ok: true, code: 'SYNC_CANCEL_PENDING', pending: true, status: FbmSync.statusView() };
+  }
   Object.keys(locks).forEach(function (key) { if (locks[key] && locks[key].owner === 'user') { kept[key] = locks[key]; } });
   state.runId = ''; state.phase = 'idle'; state.entity = ''; state.cursor = {}; state.current = ''; state.scheduledScan = ''; state.activeRequestId = ''; state.deadlineAt = 0; state.locks = kept; state.message = 'Đã dừng phiên đồng bộ.'; state.lastError = '';
   return FbmSync.stateWrite(state);
 }
-/** Bật/tắt ghi thật; mặc định luôn tắt để bảo vệ dữ liệu FBM. */
-function fbmSyncSetWriteMode(enabled) { PropertiesService.getDocumentProperties().setProperty('FBM_SYNC_ALLOW_WRITES', enabled ? 'true' : 'false'); return { enabled: !!enabled }; }
 function fbmGetLoginConfig() { return FbmSync.loginConfigPublic(); }
 function fbmSaveLoginConfig(config) { return FbmSync.loginConfigSave(config || {}); }
 function fbmSetAutoLogin(enabled) { return FbmSync.loginConfigSetEnabled(enabled === true); }
@@ -174,7 +180,7 @@ function doPost(event) {
     if (body.command) {
       var commandPayload = body.payload || {};
       if (body.hop !== undefined && commandPayload.hop === undefined) { commandPayload = Object.assign({}, commandPayload, { hop: Number(body.hop || 0) }); }
-      result = FbmSync.controlDispatch(String(body.command), commandPayload);
+      result = FbmSync.controlDispatchLocked(String(body.command), commandPayload);
     } else if (body.kind === 'probe') {
       result = fbmSyncRelayProbe();
     } else if (body.kind === 'heartbeat_request') {
@@ -184,7 +190,9 @@ function doPost(event) {
     } else if (body.kind === 'heartbeat') {
       result = fbmSyncHeartbeat(body.response, { hop: Number(body.hop || 0) });
     } else {
-      result = body.response === undefined ? fbmSyncStart(body.mode) : fbmSyncContinue(body.response);
+      result = body.response === undefined
+        ? FbmSync.controlDispatchLocked('start', { mode: body.mode || 'read', origin: 'background', manual: false })
+        : FbmSync.controlDispatchLocked('continue', { response: body.response, hop: Number(body.hop || 0) });
     }
     if (body.kind === 'heartbeat_request' || body.kind === 'heartbeat' || body.kind === 'heartbeat_transport_failure' || body.kind === 'background_sync') { result = fbmSyncRelayCompactResult(result); result = fbmSyncRelayCap(result, body.hop); }
     return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);

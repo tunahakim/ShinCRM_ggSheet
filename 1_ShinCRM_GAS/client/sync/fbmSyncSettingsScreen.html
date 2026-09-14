@@ -14,7 +14,7 @@ function fbmSyncPaintIdentityBlock(panel, active, status) {
   if (binding.accountName) { fbmSyncAppendText(body, 'Tài khoản đã lưu: ' + String(binding.accountName), 'shin-sync-preview-row'); }
 
   var manual = fbmSyncAppendBox(body, 'shin-sync-identity-form');
-  [['spreadsheet', 'Spreadsheet ID', FBM_SYNC_CLIENT.identityDraft.spreadsheetId || binding.spreadsheetId, 'ID của file ShinCRM'], ['user', 'Mã user FBM', FBM_SYNC_CLIENT.identityDraft.userId || binding.userId, 'Mã user hiển thị trong FBM'], ['account', 'Tên tài khoản FBM', FBM_SYNC_CLIENT.identityDraft.accountName || binding.accountName, 'Tên tài khoản']].forEach(function (item) {
+  [['spreadsheet', 'Spreadsheet ID', FBM_SYNC_CLIENT.identityDraft.spreadsheetId || binding.spreadsheetId, 'ID của file ShinCRM'], ['user', 'Mã số user FBM', FBM_SYNC_CLIENT.identityDraft.userId || binding.userId, 'Mã số nội bộ của user'], ['username', 'Tên đăng nhập FBM', FBM_SYNC_CLIENT.identityDraft.username || binding.username, 'Tên dùng để đăng nhập'], ['account', 'Tên đầy đủ', FBM_SYNC_CLIENT.identityDraft.accountName || binding.accountName, 'Tên người dùng trên FBM']].forEach(function (item) {
     var field = fbmSyncAppendBox(manual, 'shin-sync-form-field'); fbmSyncAppendText(field, item[1], 'shin-sync-form-label'); fbmSyncAppendInput(field, 'fbm-identity-' + item[0], 'text', item[2], item[3]);
   });
   var actions = fbmSyncAppendBox(body, 'shin-sync-identity-actions');
@@ -30,8 +30,8 @@ function fbmSyncPaintIdentityBlock(panel, active, status) {
   if (probeResult && FBM_SYNC_CLIENT.identityLastAction === 'probe') {
     var preview = fbmSyncAppendBox(body, 'shin-sync-inline-result');
     fbmSyncAppendText(preview, 'Thông tin đọc từ tab FBM (chưa lưu)', 'shin-sync-inline-result-title');
-    [['Spreadsheet', probeResult.spreadsheetId], ['Mã user', probeResult.userId], ['Tên tài khoản', probeResult.accountName]].forEach(function (item) { fbmSyncAppendText(preview, item[0] + ': ' + (item[1] ? String(item[1]) : '(không có)'), 'shin-sync-preview-row'); });
-    var complete = !!(probeResult.spreadsheetId && probeResult.userId && probeResult.accountName);
+    [['Spreadsheet', probeResult.spreadsheetId], ['Mã số user', probeResult.userId], ['Tên đăng nhập', probeResult.username], ['Tên đầy đủ', probeResult.accountName]].forEach(function (item) { fbmSyncAppendText(preview, item[0] + ': ' + (item[1] ? String(item[1]) : '(không có)'), 'shin-sync-preview-row'); });
+    var complete = !!(probeResult.spreadsheetId && probeResult.userId && probeResult.username && probeResult.accountName);
     fbmSyncAppendText(preview, complete ? 'Đã điền đủ thông tin. Bấm Lưu thông tin để lưu liên kết.' : 'Không đọc đủ nhận diện từ tab FBM; hãy nhập tay rồi bấm Lưu thông tin.', complete ? 'shin-sync-pass-row' : 'shin-sync-error-message');
   }
   var result = status && status.metadata && status.metadata.identityCheck;

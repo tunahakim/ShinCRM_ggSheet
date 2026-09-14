@@ -113,7 +113,8 @@ FbmSync.authorizeRequest = function (entity) {
     body: {
       type: 0, parentType: 'Dir', firstView: false, searchMode: false, viewPage: false,
       authorized: null, action: 'New', actionID: null, values: [], vars: FbmSync.AUTH_VARS[entity], memvars: [],
-      language: 'v', controller: controller, viewId: null, gridController: controller, gridViewId: null, cookie: cfg.cookie
+      language: 'v', controller: controller, viewId: null, gridController: controller, gridViewId: null,
+      cookie: cfg.cookie || '{{FBM_PAYLOAD_COOKIE}}'
     },
     meta: { kind: 'authorize', entity: entity }
   };

@@ -1,6 +1,8 @@
 /** Kiểm tra pull Customer/Activity, identity, hash và missing. */
 const { section, check } = require("../../lib/assert");
 const { taoHopCat, napServer } = require("../../lib/load-gas");
+const fs = require("fs");
+const path = require("path");
 
 async function chay(so) {
   section("FBM sync — pull và identity");
@@ -8,7 +10,52 @@ async function chay(so) {
     FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {},
     PropertiesService: { getDocumentProperties: () => ({ getProperty: (key) => ({ FBM_SYNC_TEST_CUSTOMER_CODE: 'ALT00010' }[key] || ''), setProperty: () => {} }) }
   });
-  napServer(builders, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/PullFlow.js');
+  napServer(builders, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/PullFlow.js');
+  check(so, 'mode tach quyen ghi Sheet khoi quyen ghi FBM', [
+    builders.FbmSync.canWriteSheet('check'), builders.FbmSync.canWriteFbm('check'),
+    builders.FbmSync.canWriteSheet('read'), builders.FbmSync.canWriteFbm('read'),
+    builders.FbmSync.canWriteSheet('push'), builders.FbmSync.canWriteFbm('push'),
+    builders.FbmSync.canWriteSheet('write'), builders.FbmSync.canWriteFbm('write')
+  ], [false, false, true, false, false, true, true, true]);
+  let readModeState = { mode: 'read', counts: { total: 0, completed: 0, succeeded: 0, conflict: 0, skipped: 0, error: 0 } };
+  let readModeSheetWrites = 0;
+  const realPullWrite = builders.FbmSync.pullWrite;
+  builders.FbmSync.stateRead = () => readModeState;
+  builders.FbmSync.stateWrite = (next) => { readModeState = next; return next; };
+  builders.FbmSync.pullWrite = (entity, records) => { readModeSheetWrites += 1; return { ok: true, written: records.length, conflicts: 0, skipped: 0 }; };
+  const readModeResult = builders.FbmSync.pullRecords('customer', [{ id: 'CUS-000001' }], 'read');
+  check(so, 'mode read ghi ket qua pull vao ShinCRM nhung khong co quyen ghi FBM', [readModeResult.written, readModeSheetWrites, readModeState.counts.succeeded, builders.FbmSync.canWriteFbm('read')], [1, 1, 1, false]);
+  builders.FbmSync.pullWrite = realPullWrite;
+  const transportSource = fs.readFileSync(path.join(__dirname, '..', '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'transport', 'TransportCore.js'), 'utf8');
+  check(so, 'khong con co ghi FBM an ngoai mode va cac cong an theo co cu', transportSource.indexOf('FBM_SYNC_ALLOW_WRITES') < 0 && transportSource.indexOf('writeAllowed') < 0, true);
+
+  let readFinishState = {
+    runId: 'read-run', origin: 'manual', mode: 'read', scan: 'full', phase: 'pull_customer', entity: 'customer',
+    cursor: { kind: 'customer_grid' }, activeRequestId: 'read-request', deadlineAt: Date.now() + 60000,
+    lastProgressAt: Date.now(), session: {}, metadata: { categoryGate: {} },
+    counts: { total: 0, completed: 0, succeeded: 0, conflict: 0, skipped: 0, error: 0 }
+  };
+  let readFinishMissing = 0;
+  let readFinishPushRequests = 0;
+  const readFinish = taoHopCat({
+    FbmSync: {
+      stateRead: () => readFinishState,
+      stateWrite: (next) => { readFinishState = next; return next; },
+      recoverStaleRun: (state) => ({ state, recovered: false }),
+      responseRequestId: () => 'read-request',
+      protocol: { parse: (value) => value, assertSuccess: () => ({ ok: true }) },
+      traceImport: () => {}, traceEvent: () => {}, traceResponse: () => ({}), applyTransportSession: () => false,
+      rowsToRecords: () => ({ rows: [], fields: [], total: 0 }), isTemporaryRecord: () => false,
+      pullWrite: () => ({ ok: true, written: 0, conflicts: 0, skipped: 0 }), previewRecords: () => {}, customerNext: () => null, activityForCustomers: () => null,
+      canWriteSheet: (mode) => mode === 'read' || mode === 'write', canWriteFbm: (mode) => mode === 'push' || mode === 'write',
+      markMissingAfterFullScan: () => { readFinishMissing += 1; return { written: 0 }; },
+      stopPushOnConflicts: () => false, nextPushRequest: () => { readFinishPushRequests += 1; return {}; },
+      statusView: () => ({ phase: readFinishState.phase, mode: readFinishState.mode })
+    }
+  });
+  napServer(readFinish, 'fbm_sync/transport/PullFlow.js');
+  const readFinished = readFinish.FbmSync.continue({ transport: { trace: [{ requestId: 'read-request' }] } });
+  check(so, 'mode read ket thuc pull thi ghi missing vao Sheet va khong mo chieu push FBM', [readFinished.ok, readFinishState.phase, readFinishMissing, readFinishPushRequests], [true, 'done', 2, 0]);
   builders.FbmSync.stateRead = () => ({ session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: 'auth-c', activityAuthorized: 'auth-a' } });
   const gate = { map: { '@CAT_TINH_THANH\u001fHà Nội': 'HNI' }, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true, HNI: true } } };
   let recoveryWrite;
@@ -48,12 +95,12 @@ async function chay(so) {
   let bulkState = { mode: 'read', scan: 'activity_bulk', phase: 'pull_activity', entity: 'activity', metadata: {}, cursor: {} };
   builders.FbmSync.stateRead = () => bulkState;
   builders.FbmSync.stateWrite = (next) => { bulkState = next; return next; };
-  builders.FbmSync.readLocal = () => [{ id: 'A-LOCAL', fbmId: 'F-LOCAL', recordStatus: 'active' }];
+  builders.FbmSync.readLocal = () => [{ id: 'ACT-000001', fbmId: 'F-LOCAL', recordStatus: 'active' }];
   const bulkStart = builders.FbmSync.beginActivityBulkPull(bulkState);
   bulkState.cursor.count = 1;
   check(so, 'Bulk Activity khoi tao cursor ben vung va request khong gan Customer', [bulkState.cursor.kind, bulkStart.meta.kind, bulkStart.body.externalKey.some((item) => item.Name === 'stt_rec')], ['activity_bulk_grid', 'activity_bulk_grid', false]);
   const bulkNext = builders.FbmSync.activityBulkNext(bulkState, { rows: [{ id: 'F-1', end_date: '2026-09-09', datetime0: '2026-09-09T01:00:00', line_nbr: 1 }], total: 2 });
-  check(so, 'Bulk Activity tiep tuc bang composite key va luu ID da thay', [bulkNext.meta.kind, bulkNext.body.type, bulkNext.body.gridPageValue, bulkState.cursor.seenIds['F-1']], ['activity_bulk_grid', 1, ['2026-09-09', '2026-09-09T01:00:00', 'F-1', 1], true]);
+  check(so, 'Bulk Activity tiep tuc bang composite key ma khong nhet ID vao cursor', [bulkNext.meta.kind, bulkNext.body.type, bulkNext.body.gridPageValue, bulkState.cursor.seenIds], ['activity_bulk_grid', 1, ['2026-09-09', '2026-09-09T01:00:00', 'F-1', 1], undefined]);
   const bulkDone = builders.FbmSync.activityBulkNext(bulkState, { rows: [{ id: 'F-2', end_date: '2026-09-10', datetime0: '2026-09-10T01:00:00', line_nbr: 1 }], total: 2 });
   check(so, 'Bulk Activity ket thuc, luu ID local vang va chuyen sang vong xoay Customer', [bulkDone && bulkDone.meta.kind, bulkState.cursor.kind, bulkState.metadata.activityBulkMissing.length, bulkState.metadata.activityBulkMissing[0].fbmId], ['activity_rotation_customer_grid', 'activity_rotation_customer_grid', 1, 'F-LOCAL']);
   const finishedSupplementState = { cursor: { kind: 'activity_grid' }, phase: 'pull_activity', entity: 'activity', metadata: {}, session: {} };
@@ -80,7 +127,7 @@ async function chay(so) {
   identityFlowState = { mode: 'check', scan: 'identity_probe', session: { cookie: '461020379855cFHN_CRM_App', userId: '2037' }, metadata: {} };
   const identityUserRequest = builders.FbmSync.nextEnvelope(builders.FbmSync.authContinue('customer', {}));
   check(so, 'Identity probe sau authorize doc User grid do GAS cap', [identityUserRequest.meta.kind, identityFlowState.phase, identityFlowState.cursor.kind, identityUserRequest.body.controller], ['identity_user_grid', 'checking_session', 'identity_user_grid', 'User']);
-  const identityProbeFinished = builders.FbmSync.continue({ d: { TotalRowCount: 1, Rows: [[2037, 'ANHLT', 'Le Tuan Anh']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] }, Authorized: true } });
+  const identityProbeFinished = builders.FbmSync.continue({ d: { TotalRowCount: 1, Rows: [[2037, 'ANHLT', 'Le Tuan Anh']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] }, Authorized: true }, transport: { trace: [{ requestId: identityUserRequest.id }] } });
   check(so, 'Identity probe nhan dien du ma so va ten day du, cho xac nhan luu', [identityProbeFinished.ok, identityFlowState.phase, identityFlowState.cursor, identityFlowState.metadata.identityProbe.userId, identityFlowState.metadata.identityProbe.accountName], [true, 'done', {}, '2037', 'Le Tuan Anh']);
   check(so, 'Identity probe thieu dong User thi fail ro rang', builders.FbmSync.identityUser({ d: { Rows: [], ViewPage: { Fields: [{ AliasName: 'id' }] } } }).code, 'IDENTITY_PROBE_INCOMPLETE');
 
@@ -163,13 +210,16 @@ async function chay(so) {
   const conflictEntries = conflictLog.filter((event) => event.action === 'conflict');
   check(so, 'conflict ghi log diff co cau truc', [conflictEntries.length, conflictEntries[0].action, conflictEntries[0].detail.fields.length > 0], [1, 'conflict', true]);
   check(so, 'conflict tao khoa sync', conflictState.locks['customer:CUS-2'].owner, 'sync');
-  const resolved = builders.FbmSync.resolveConflict('customer', 'CUS-2', 'fbm');
+  check(so, 'khong cho chot conflict neu chua doc lai', builders.FbmSync.resolveConflict('customer', 'CUS-2', 'fbm').code, 'CONFLICT_REREAD_REQUIRED');
+  conflictState.metadata.conflicts[0].shinRecord = builders.FbmSync.readLocal('customer')[0];
+  conflictState.metadata.conflicts[0].fbmRecord = builders.FbmSync.customerRecord({ stt_rec_kh: 'C-2', ma_kh: 'ALT99999', ten_kh: 'FBM' }, gate);
+  const resolved = builders.FbmSync.resolveConflict('customer', 'CUS-2', 'fbm', null, true);
   check(so, 'resolve conflict theo FBM cap nhat baseline va xoa hang doi', [resolved.ok, conflictState.metadata.conflicts.length, conflictWrite.records[0].fbmHash !== '', conflictState.locks['customer:CUS-2']], [true, 0, true, undefined]);
   conflictState.metadata.conflicts = [{ entity: 'customer', id: 'CUS-3', hFBM: 'FBM-HASH', hSHIN: 'SHIN-HASH', fbmRecord: { id: 'CUS-3', companyName: 'FBM' }, shinRecord: { id: 'CUS-3', companyName: 'Shin' } }];
   conflictState.metadata.pushFailures = { 'customer:CUS-3': 'SHIN-HASH' };
   conflictState.metadata.pushFailureDetails = { 'customer:CUS-3': { reason: 'HTTP 500' } };
   conflictState.counts.conflict = 1; conflictState.phase = 'conflict';
-  const resolvedShin = builders.FbmSync.resolveConflict('customer', 'CUS-3', 'shin');
+  const resolvedShin = builders.FbmSync.resolveConflict('customer', 'CUS-3', 'shin', null, true);
   check(so, 'resolve conflict theo ShinCRM dat baseline FBM va cho phep push', [resolvedShin.ok, resolvedShin.status, conflictWrite.records[0].fbmHash, conflictWrite.records[0].syncStatus, conflictState.metadata.pushFailures['customer:CUS-3']], [true, builders.FbmSync.SYNC_STATUS.pending, 'FBM-HASH', builders.FbmSync.SYNC_STATUS.pending, undefined]);
 
   const bindingStore = {};
@@ -182,52 +232,85 @@ async function chay(so) {
   identity.FbmSync.configValue = () => '';
   identity.FbmSync.readLocal = () => [{ id: 'CUS-LINKED', fbmId: 'FBM-A' }];
   check(so, 'file co FBM ID nhung chua lien ket phai yeu cau REBIND', [identity.FbmSync.identityStatus().status, identity.FbmSync.identityPreflight('read').blocking, identity.FbmSync.identityPreflight('write').blocking, identity.FbmSync.identityPreflight('background').blocking, identity.FbmSync.identityPreflight('identity_check').blocking], ['REBIND_REQUIRED', true, true, true, false]);
-  const savedBinding = identity.FbmSync.bindingWrite({ spreadsheetId: 'sheet-a', userId: 'user-a', accountName: 'Tai khoan A' });
-  check(so, 'luu lien ket dung Spreadsheet va tai khoan', [savedBinding.ok, identity.FbmSync.identityStatus({ userId: 'user-a', accountName: 'Tai khoan A' }).status], [true, 'BOUND']);
-  check(so, 'khong cho ghi de lien ket khi du lieu FBM cu van con', [identity.FbmSync.bindingWrite({ spreadsheetId: 'sheet-a', userId: 'user-b', accountName: 'Tai khoan B' }).ok, identity.FbmSync.bindingWrite({ spreadsheetId: 'sheet-a', userId: 'user-b', accountName: 'Tai khoan B' }).code], [false, 'REBIND_REQUIRED']);
+  const savedBinding = identity.FbmSync.bindingWrite({ spreadsheetId: 'sheet-a', userId: 'user-a', username: 'ANHLT', accountName: 'Tai khoan A' });
+  check(so, 'luu lien ket dung Spreadsheet va tai khoan', [savedBinding.ok, identity.FbmSync.identityStatus({ userId: 'user-a', username: 'ANHLT', accountName: 'Tai khoan A' }).status], [true, 'BOUND']);
+  bindingStore[identity.FbmSync.BINDING_KEY] = JSON.stringify({ spreadsheetId: 'sheet-a', userId: 'user-a', accountName: 'Tai khoan A' });
+  const legacyBeforeRead = bindingStore[identity.FbmSync.BINDING_KEY];
+  const legacyStatus = identity.FbmSync.identityStatus({ userId: 'user-a', username: 'ANHLT', accountName: 'Tai khoan A' });
+  check(so, 'doc binding cu thieu username khong tu ghi nang cap', [legacyStatus.status, bindingStore[identity.FbmSync.BINDING_KEY]], ['REBIND_REQUIRED', legacyBeforeRead]);
+  const upgradedLegacyBinding = identity.FbmSync.bindingWrite({ spreadsheetId: 'sheet-a', userId: 'user-a', username: 'ANHLT', accountName: 'Tai khoan A' });
+  check(so, 'chi thao tac luu ro rang moi nang cap username cho binding cu', [upgradedLegacyBinding.ok, JSON.parse(bindingStore[identity.FbmSync.BINDING_KEY]).username], [true, 'ANHLT']);
+  check(so, 'khong cho ghi de lien ket khi du lieu FBM cu van con', [identity.FbmSync.bindingWrite({ spreadsheetId: 'sheet-a', userId: 'user-b', username: 'USERB', accountName: 'Tai khoan B' }).ok, identity.FbmSync.bindingWrite({ spreadsheetId: 'sheet-a', userId: 'user-b', username: 'USERB', accountName: 'Tai khoan B' }).code], [false, 'REBIND_REQUIRED']);
   identity.FbmSync.readLocal = () => [];
-  check(so, 'sau khi xu ly du lieu cu moi cho doi lien ket', identity.FbmSync.bindingWrite({ spreadsheetId: 'sheet-a', userId: 'user-b', accountName: 'Tai khoan B' }).ok, true);
+  check(so, 'sau khi xu ly du lieu cu moi cho doi lien ket', identity.FbmSync.bindingWrite({ spreadsheetId: 'sheet-a', userId: 'user-b', username: 'USERB', accountName: 'Tai khoan B' }).ok, true);
   identity.FbmSync.readLocal = () => [{ id: 'CUS-LINKED-NEW', fbmId: 'FBM-B' }];
-  check(so, 'runtime tai khoan lech lien ket moi thi fail-closed', identity.FbmSync.identityStatus({ userId: 'user-a', accountName: 'Tai khoan A' }).status, 'REBIND_REQUIRED');
+  check(so, 'runtime tai khoan lech lien ket moi thi fail-closed', identity.FbmSync.identityStatus({ userId: 'user-a', username: 'ANHLT', accountName: 'Tai khoan A' }).status, 'REBIND_REQUIRED');
 
-  const edges = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {} });
-  napServer(edges, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/reconcile/CategoryGate.js');
+  const edgeProperties = {};
+  const edges = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {}, PropertiesService: { getDocumentProperties: () => ({ getProperty: (key) => edgeProperties[key] || null, setProperty: (key, value) => { edgeProperties[key] = String(value); }, deleteProperty: (key) => { delete edgeProperties[key]; } }) } });
+  napServer(edges, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/transport/TransportCore.js');
   check(so, 'normalize placeholder 1999 thanh rong', edges.FbmSync.normalize('/Date(915123600000)/'), '');
   check(so, 'normalize Date co offset chi dung timestamp chinh', edges.FbmSync.normalize('/Date(1757386800000+0700)/'), edges.FbmSync.normalize('/Date(1757386800000)/'));
   check(so, 'normalize Date khong hop le khong nem loi', edges.FbmSync.normalize(new Date(NaN)), '');
   check(so, 'Activity id 0 khong lam thay fingerprint', edges.FbmSync.hash({ id: 0, ma_cv: 'CALL', details: 'Gọi', end_date: '/Date(1757386800000)/' }, 'activity'), edges.FbmSync.hash({ id: '', ma_cv: 'CALL', details: 'Gọi', end_date: '/Date(1757386800000)/' }, 'activity'));
+  edges.FbmSync.seenStoreBegin('customer', [{ id: 'CUS-000320' }, { id: 'CUS-000321' }]);
+  edges.FbmSync.seenStoreMark('customer', [{ id: 'CUS-000321', fbmId: 'FBM-SEEN' }], [{ fbmId: 'FBM-SEEN' }]);
+  check(so, 'bitmap seen bam theo ma noi bo nen sap xep lai dong khong lam mat dau', edges.FbmSync.seenStoreHas('customer', { id: 'CUS-000321', fbmId: 'FBM-SEEN' }), true);
+  check(so, 'bitmap fail closed voi ID cu, sai khuon hoac sai namespace', [edges.FbmSync.seenStoreHas('customer', { id: 'KH000321', fbmId: 'FBM-OLD' }), edges.FbmSync.seenStoreHas('customer', { id: 'khach-cu', fbmId: 'FBM-UNKNOWN' }), edges.FbmSync.seenStoreHas('customer', { id: 'CUS-1', fbmId: 'FBM-SHORT' }), edges.FbmSync.seenStoreHas('customer', { id: 'ACT-000321', fbmId: 'FBM-WRONG-SCOPE' })], [true, true, true, true]);
+  edges.FbmSync.seenStoreClear('customer');
+  edges.FbmSync.seenStoreBegin('customer', [{ id: 'CUS-000019' }, { id: 'CUS-000020' }]);
+  edges.FbmSync.seenStoreMark('customer', [{ id: 'CUS-000019', fbmId: 'FBM-19' }, { id: 'CUS-000020', fbmId: 'FBM-20' }], [{ fbmId: 'FBM-20' }]);
+  check(so, 'pham vi missing co dinh tai dau ky va bo qua record tao sau high-water', [edges.FbmSync.seenStoreHas('customer', { id: 'CUS-000019' }), edges.FbmSync.seenStoreHas('customer', { id: 'CUS-000020' }), edges.FbmSync.seenStoreHas('customer', { id: 'CUS-000021' })], [false, true, true]);
+  edges.FbmSync.seenStoreClear('customer');
+  edges.FbmSync.seenStoreBegin('customer', []);
+  check(so, 'pham vi rong dau ky bo qua moi record tao trong khi request dang bay', edges.FbmSync.seenStoreHas('customer', { id: 'CUS-000001' }), true);
 
   let lockedWrite = false;
-  const lockedState = { mode: 'write', metadata: { categoryGate: {}, seen: { customer: {}, activity: {} } }, locks: { 'customer:C-LOCK': { owner: 'user', revision: 'r1' } } };
+  const lockedState = { mode: 'write', metadata: { categoryGate: {}, seen: { customer: {}, activity: {} } }, locks: { 'customer:CUS-000010': { owner: 'user', revision: 'r1' } } };
   edges.FbmSync.stateRead = () => lockedState;
   edges.FbmSync.stateWrite = () => {};
   edges.FbmSync.validateIncomingCategories = () => [];
-  edges.FbmSync.readLocal = () => [{ id: 'C-LOCK', fbmId: 'FBM-LOCK', fbmCustomerCode: 'ALT00010', companyName: 'Cũ', fbmHash: '' }];
+  edges.FbmSync.readLocal = () => [{ id: 'CUS-000010', fbmId: 'FBM-LOCK', fbmCustomerCode: 'ALT00010', companyName: 'Cũ', fbmHash: '' }];
   edges.writeGateSave = () => { lockedWrite = true; return { ok: true }; };
   const lockedPull = edges.FbmSync.pullWrite('customer', [edges.FbmSync.customerRecord({ stt_rec_kh: 'FBM-LOCK', ma_kh: 'ALT00010', ten_kh: 'Mới' }, {})]);
   check(so, 'pull khong ghi record dang bi user khoa', [lockedPull.written, lockedPull.skipped, lockedWrite], [0, 1, false]);
 
   let missingWrite = false;
-  const missingState = { mode: 'write', metadata: { seen: { customer: {} } }, locks: { 'customer:C-MISSING': { owner: 'user' } } };
+  const missingState = { mode: 'write', metadata: { seen: { customer: {} } }, locks: { 'customer:CUS-000011': { owner: 'user' } } };
   edges.FbmSync.stateRead = () => missingState;
-  edges.FbmSync.readLocal = () => [{ id: 'C-MISSING', fbmId: 'FBM-MISSING', recordStatus: 'active' }];
+  edges.FbmSync.readLocal = () => [{ id: 'CUS-000011', fbmId: 'FBM-MISSING', recordStatus: 'active' }];
   edges.writeGateSave = () => { missingWrite = true; return { ok: true }; };
   check(so, 'missing scan bo qua record dang user sua', [edges.FbmSync.markMissingAfterFullScan('customer', missingState).written, missingWrite], [0, false]);
   let missingBatch;
   const fullScanState = { mode: 'write', metadata: { seen: { customer: {} } }, locks: {} };
   edges.FbmSync.scriptSettings = () => ({ testCustomerCode: '' });
   edges.FbmSync.stateRead = () => fullScanState;
-  edges.FbmSync.readLocal = () => [{ id: 'C-MISSING', fbmId: 'FBM-MISSING', recordStatus: 'active' }, { id: 'C-TOMBSTONE', fbmId: 'FBM-TOMBSTONE', recordStatus: 'deleted' }];
+  edges.FbmSync.readLocal = () => [{ id: 'CUS-000011', fbmId: 'FBM-MISSING', recordStatus: 'active' }, { id: 'CUS-000012', fbmId: 'FBM-TOMBSTONE', recordStatus: 'deleted' }];
   edges.writeGateSave = (request) => { missingBatch = request; return { ok: true }; };
   const missingResult = edges.FbmSync.markMissingAfterFullScan('customer', fullScanState);
-  check(so, 'Customer vang chi danh dau missing va bo qua tombstone', [missingResult.written, missingBatch.records.length, missingBatch.records[0].id, missingBatch.records[0].syncStatus], [1, 1, 'C-MISSING', edges.FbmSync.SYNC_STATUS.missing]);
+  check(so, 'Customer vang chi danh dau missing va bo qua tombstone', [missingResult.written, missingBatch.records.length, missingBatch.records[0].id, missingBatch.records[0].syncStatus], [1, 1, 'CUS-000011', edges.FbmSync.SYNC_STATUS.missing]);
+  edges.FbmSync.seenStoreClear('customer');
+  const newRecordState = { mode: 'read', cursor: { kind: 'customer_grid' }, metadata: { categoryGate: {}, seen: { customer: { initialized: true }, activity: {} } }, locks: {} };
+  let newLocalRecords = [];
+  let newRecordWrites = 0;
+  edges.FbmSync.stateRead = () => newRecordState;
+  edges.FbmSync.stateWrite = () => newRecordState;
+  edges.FbmSync.readLocal = () => newLocalRecords;
+  edges.writeGateSave = () => {
+    newRecordWrites += 1;
+    newLocalRecords = [{ id: 'CUS-000777', fbmId: 'FBM-NEW', recordStatus: 'active' }];
+    return { ok: true, fields: ['id', 'fbmId', 'recordStatus'], rows: [['CUS-000777', 'FBM-NEW', 'active']] };
+  };
+  edges.FbmSync.pullWrite('customer', [edges.FbmSync.customerRecord({ stt_rec_kh: 'FBM-NEW', ma_kh: 'ALT00777', ten_kh: 'Mới' }, {})]);
+  const newRecordMissing = edges.FbmSync.markMissingAfterFullScan('customer', newRecordState);
+  check(so, 'record vua pull duoc danh dau seen sau khi cua ghi cap ma', [newRecordMissing.written, newRecordWrites], [0, 1]);
   let activityMissingBatch;
   edges.FbmSync.readLocal = (entity) => entity === 'activity'
-    ? [{ id: 'A-MISSING', fbmId: 'ACT-MISSING', recordStatus: 'active' }, { id: 'A-TOMBSTONE', fbmId: 'ACT-TOMBSTONE', recordStatus: 'deleted' }]
+    ? [{ id: 'ACT-000021', fbmId: 'ACT-MISSING', recordStatus: 'active' }, { id: 'ACT-000022', fbmId: 'ACT-TOMBSTONE', recordStatus: 'deleted' }]
     : [];
   edges.writeGateSave = (request) => { activityMissingBatch = request; return { ok: true }; };
   const activityMissingResult = edges.FbmSync.markMissingAfterFullScan('activity', fullScanState);
-  check(so, 'Activity vang trong bulk chi danh dau missing khong xoa cung', [activityMissingResult.written, activityMissingBatch.records[0].id, activityMissingBatch.records[0].syncStatus, activityMissingBatch.records.length], [1, 'A-MISSING', edges.FbmSync.SYNC_STATUS.missing, 1]);
+  check(so, 'Activity vang trong bulk chi danh dau missing khong xoa cung', [activityMissingResult.written, activityMissingBatch.records[0].id, activityMissingBatch.records[0].syncStatus, activityMissingBatch.records.length], [1, 'ACT-000021', edges.FbmSync.SYNC_STATUS.missing, 1]);
   let activityPullWrite;
   edges.FbmSync.stateRead = () => ({ metadata: { categoryGate: gate, seen: { customer: {}, activity: {} } }, locks: {} });
   edges.FbmSync.stateWrite = () => {};

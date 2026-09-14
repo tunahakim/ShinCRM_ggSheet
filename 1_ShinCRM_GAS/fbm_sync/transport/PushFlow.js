@@ -210,10 +210,10 @@ FbmSync.pushConfigErrors = function (candidate, settings) {
 /** Owner của Activity phải khớp tài khoản đã cấu hình trước khi cấp bất kỳ request push nào. */
 FbmSync.pushOwnerError = function (candidate, settings) {
   if (!candidate || candidate.entity !== 'activity') { return ''; }
-  var cfg = settings || FbmSync.scriptSettings(), configured = String(cfg.accountName || '').trim();
-  var owner = String(candidate.record && candidate.record.owner || '').trim();
+  var cfg = settings || FbmSync.scriptSettings(), configured = String(cfg.accountName || '');
+  var owner = String(candidate.record && candidate.record.owner || '');
   if (!configured) { return ''; }
-  if (owner && owner.toLowerCase() !== configured.toLowerCase()) {
+  if (owner && owner !== configured) {
     return 'Activity ' + String(candidate.id || '') + ' thuộc owner FBM "' + owner + '", khác FBM_ACCOUNT_NAME đã cấu hình "' + configured + '".';
   }
   return '';
@@ -328,8 +328,8 @@ FbmSync.continuePush = function (state, response) {
   }
   if (cursor.operation === 'activity_edit_open') {
     var activityOldValues = FbmSync.extractFormValues(response, 'activity');
-    var configuredOwner = String(FbmSync.scriptSettings().accountName || '').trim(), currentOwner = String(activityOldValues.owner || '').trim();
-    if (!configuredOwner || (currentOwner && currentOwner.toLowerCase() !== configuredOwner.toLowerCase())) { throw new Error('Hoạt động thuộc owner FBM khác tài khoản đã cấu hình.'); }
+    var configuredOwner = String(FbmSync.scriptSettings().accountName || ''), currentOwner = String(activityOldValues.owner || '');
+    if (!configuredOwner || (currentOwner && currentOwner !== configuredOwner)) { throw new Error('Hoạt động thuộc owner FBM khác tài khoản đã cấu hình.'); }
     var activitySaveRequest = FbmSync.activityEditRequest(candidate.record, activityOldValues, gate);
     cursor.operation = 'activity_edit_save';
     delete cursor.oldValues;

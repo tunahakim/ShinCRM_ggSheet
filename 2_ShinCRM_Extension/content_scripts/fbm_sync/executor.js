@@ -1,6 +1,6 @@
 /* Cầu nối FBM: nhận request, fetch trong tab đăng nhập, trả response thô. */
 (function () {
-  var EXECUTOR_VERSION = '21.11';
+  var EXECUTOR_VERSION = '21.13';
   var FETCH_TIMEOUT_MS = 10000;
   function traceEvent(trace, stage, request, extra) {
     trace.push(Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {}));
@@ -40,6 +40,36 @@
   function captureTransport(request, responseBody) {
     var values = captureTransportValues(request, responseBody);
     return Object.keys(values).length ? { captures: values } : {};
+  }
+  /** Chiếu JSON theo danh sách path GAS cấp; bridge không biết ý nghĩa của field. */
+  function projectResponseBody(request, responseBody) {
+    var transport = request && request.transport || request && request.meta && request.meta.transport || {}, paths = Array.isArray(transport.jsonPaths) ? transport.jsonPaths : [];
+    if (!paths.length) { return responseBody; }
+    var source;
+    try { source = JSON.parse(String(responseBody || '')); } catch (ignore) {
+      var parseError = new Error('Response FBM không phải JSON nên không thể áp dụng projection do GAS yêu cầu.');
+      parseError.code = 'FBM_TRANSPORT_PROJECTION_INVALID_JSON';
+      throw parseError;
+    }
+    if (source && typeof source.d === 'string') { try { source.d = JSON.parse(source.d); } catch (ignoreD) {} }
+    var target = {}, matched = 0;
+    paths.forEach(function (path) {
+      var parts = String(path || '').split('.').filter(Boolean), from = source, to = target;
+      for (var i = 0; i < parts.length; i += 1) {
+        if (!from || !Object.prototype.hasOwnProperty.call(from, parts[i])) { return; }
+        if (i === parts.length - 1) { to[parts[i]] = from[parts[i]]; matched += 1; return; }
+        from = from[parts[i]];
+        to[parts[i]] = to[parts[i]] || {};
+        to = to[parts[i]];
+      }
+    });
+    if (!matched) {
+      var pathError = new Error('Response FBM không chứa path projection nào do GAS yêu cầu.');
+      pathError.code = 'FBM_TRANSPORT_PROJECTION_MISSING';
+      throw pathError;
+    }
+    var projected = JSON.stringify(target);
+    return projected.length && projected.length < String(responseBody || '').length ? projected : responseBody;
   }
   /** Thay token theo chỉ dẫn GAS mà không parse hoặc dựng lại JSON nghiệp vụ. */
   function applyTransportReplacements(request, bodyText) {
@@ -168,7 +198,7 @@
     var timer = setTimeout(function () { controller.abort(); }, FETCH_TIMEOUT_MS);
     traceEvent(trace, 'fetch_started', req);
     return fetch(String(req.url || ''), { method: req.method || 'POST', headers: req.headers || { 'content-type': 'application/json; charset=UTF-8' }, body: sent, credentials: 'include', cache: 'no-store', signal: controller.signal }).then(function (response) {
-      return readResponseText(response).then(function (body) { var captured = captureTransport(req, body); traceEvent(trace, 'fetch_finished', req, { httpStatus: response.status, responseLength: body.length }); return { ok: response.ok, status: response.status, headers: { contentType: response.headers.get('content-type') || '' }, body: body, transport: Object.assign({}, captured, { trace: trace }) }; });
+      return readResponseText(response).then(function (body) { var captured = captureTransport(req, body), projectedBody = projectResponseBody(req, body); traceEvent(trace, 'fetch_finished', req, { httpStatus: response.status, responseLength: body.length, projectedLength: projectedBody.length }); return { ok: response.ok, status: response.status, headers: { contentType: response.headers.get('content-type') || '' }, body: projectedBody, transport: Object.assign({}, captured, { trace: trace }) }; });
     }).catch(function (err) {
       traceEvent(trace, 'fetch_finished', req, { error: String(err && err.message || err) });
       try { err.trace = trace; } catch (ignore) {}
@@ -180,7 +210,7 @@
   function onFbmMessage(message, sender, sendResponse) {
     if (message && (message.type === 'FBM_PING_V2' || message.type === 'FBM_PING')) { sendResponse({ ready: true, version: EXECUTOR_VERSION }); return false; }
     if (!message || (message.type !== 'FBM_EXECUTE_V2' && message.type !== 'FBM_EXECUTE')) { return false; }
-    execute(message.request).then(function (result) { sendResponse({ result: result }); }, function (err) { sendResponse({ error: String(err && err.message || err), trace: err && err.trace || [] }); });
+    execute(message.request).then(function (result) { sendResponse({ result: result }); }, function (err) { sendResponse({ error: String(err && err.message || err), code: String(err && err.code || 'FBM_TRANSPORT_UNAVAILABLE'), trace: err && err.trace || [] }); });
     return true;
   }
   try {

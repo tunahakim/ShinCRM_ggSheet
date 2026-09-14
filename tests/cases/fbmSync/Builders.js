@@ -25,6 +25,9 @@ async function chay(so) {
   check(so, 'category live giữ mã khác nhưng chọn mã thật làm chính', builders.FbmSync.mergeLiveCategoryCell('CUS. Tùy chọn | FBM-2. Hệ giả #', 'HNI', 'Hà Nội'), 'CUS. Tùy chọn | HNI. Hà Nội #');
   const newCustomer = builders.FbmSync.customerCreateRequest({ companyName: 'Mới', province: 'Hà Nội', note: 'nội bộ' }, 'ALT99999', '', gate);
   check(so, 'mở form tạo Customer dùng type 0', builders.FbmSync.customerCreateOpenRequest().body.type, 0);
+  builders.FbmSync.stateRead = () => ({ session: { cookie: '', userId: '', customerAuthorized: '', activityAuthorized: '' } });
+  check(so, 'authorize chưa có session dùng placeholder do GAS chỉ dẫn', builders.FbmSync.authorizeRequest('customer').body.cookie, '{{FBM_PAYLOAD_COOKIE}}');
+  builders.FbmSync.stateRead = () => ({ session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: 'auth-c', activityAuthorized: 'auth-a' } });
   check(so, 'ghi chú nội bộ không vào memvars FBM', newCustomer.body.memvars.some((item) => item.Name === 'ghi_chu'), false);
   check(so, 'SELECT Customer đổi sang mã FBM', newCustomer.body.memvars.filter((item) => item.Name === 'dc_lh_tinh')[0].NewValue, 'HNI');
   const activity = builders.FbmSync.activityCreateRequest({ id: 'ACT-9', customerFbmCode: 'ALT99999', taskType: 'Gọi', content: 'Nội dung' }, gate);

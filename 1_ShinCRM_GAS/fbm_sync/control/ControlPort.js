@@ -33,10 +33,6 @@ FbmSync.controlDispatch = function (command, payload) {
       return fbmSyncCancel();
     case 'retry_push_failures':
       return fbmSyncRetryPushFailures();
-    case 'set_write_mode':
-      return fbmSyncSetWriteMode(input.enabled === true);
-    case 'get_write_mode':
-      return { enabled: FbmSync.writeAllowed() };
     case 'login_config':
       return FbmSync.loginConfigPublic();
     case 'save_login_config':
@@ -47,8 +43,6 @@ FbmSync.controlDispatch = function (command, payload) {
       return FbmSync.identityStatus(input.runtime || {});
     case 'save_identity_binding':
       return FbmSync.bindingWrite(input.binding || {});
-    case 'resolve_conflict':
-      return FbmSync.resolveConflict(input.entity, input.id, input.choice, input.merged);
     case 'prepare_conflict':
       return FbmSync.prepareConflictResolution(input.entity, input.id, input.choice, input.merged);
     case 'confirm_conflict':
@@ -58,6 +52,15 @@ FbmSync.controlDispatch = function (command, payload) {
     default:
       throw new Error('SYNC_COMMAND_UNKNOWN: ' + name);
   }
+};
+
+/** Tuần tự hóa các command thay đổi state với heartbeat/alarm; command tự giữ khóa không đi qua đây. */
+FbmSync.controlDispatchLocked = function (command, payload) {
+  // transport_failure tự giữ orchestration lock để cả Sidebar và relay nền dùng chung
+  // một handler; không bọc thêm ở đây vì Apps Script Lock không tái nhập.
+  var name = String(command || ''), mutating = ['start', 'continue', 'approve_push', 'cancel', 'retry_push_failures', 'set_master_switch', 'set_background_switch', 'save_login_config', 'set_auto_login', 'identity_status', 'save_identity_binding', 'prepare_conflict', 'confirm_conflict'];
+  if (mutating.indexOf(name) < 0) { return FbmSync.controlDispatch(name, payload); }
+  return FbmSync.withOrchestrationLock(function () { return FbmSync.controlDispatch(name, payload); });
 };
 
 /** DTO thông báo dùng chung; adapter Sidebar/Zalo tự chọn cách trình bày và phím tắt. */

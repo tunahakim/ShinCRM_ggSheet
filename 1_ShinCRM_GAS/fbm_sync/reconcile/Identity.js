@@ -13,18 +13,26 @@ FbmSync.bindingRead = function () {
     return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   } catch (ignore) { return {}; }
 };
+FbmSync.bindingCanUpgradeUsername = function (previous, next) {
+  var oldValue = previous || {}, newValue = next || {};
+  return !!oldValue.spreadsheetId && !String(oldValue.username || '') && !!String(newValue.username || '') &&
+    String(oldValue.spreadsheetId) === String(newValue.spreadsheetId || '') &&
+    String(oldValue.userId || '') === String(newValue.userId || '') &&
+    String(oldValue.accountName || '') === String(newValue.accountName || '');
+};
 FbmSync.bindingWrite = function (binding) {
-  var value = binding || {}, spreadsheetId = String(value.spreadsheetId || '').trim(), userId = String(value.userId || '').trim(), accountName = String(value.accountName || '');
-  if (!spreadsheetId || !userId || !accountName) { return { ok: false, code: 'IDENTITY_BINDING_INCOMPLETE', message: 'Thiếu SpreadsheetId, mã user hoặc tên tài khoản FBM.' }; }
+  var value = binding || {}, spreadsheetId = String(value.spreadsheetId || '').trim(), userId = String(value.userId || '').trim(), username = String(value.username || '').trim(), accountName = String(value.accountName || '');
+  if (!spreadsheetId || !userId || !username || !accountName) { return { ok: false, code: 'IDENTITY_BINDING_INCOMPLETE', message: 'Thiếu SpreadsheetId, mã số user, tên đăng nhập hoặc tên đầy đủ FBM.' }; }
   var actual = FbmSync.currentSpreadsheetId();
   if (actual && actual !== spreadsheetId) { return { ok: false, code: 'SPREADSHEET_MISMATCH', message: 'SpreadsheetId liên kết không khớp file đang chạy.' }; }
   var previous = FbmSync.bindingRead();
-  if (previous.spreadsheetId && (previous.spreadsheetId !== spreadsheetId || previous.userId !== userId || previous.accountName !== accountName) && FbmSync.bindingHasLinkedData()) {
+  var nextIdentity = { spreadsheetId: spreadsheetId, userId: userId, username: username, accountName: accountName };
+  if (previous.spreadsheetId && (previous.spreadsheetId !== spreadsheetId || previous.userId !== userId || String(previous.username || '') !== username || previous.accountName !== accountName) && !FbmSync.bindingCanUpgradeUsername(previous, nextIdentity) && FbmSync.bindingHasLinkedData()) {
     return { ok: false, code: 'REBIND_REQUIRED', message: 'Spreadsheet còn dữ liệu đã liên kết FBM; xử lý dữ liệu cũ rồi kiểm tra lại trước khi đổi tài khoản.' };
   }
-  var saved = { spreadsheetId: spreadsheetId, userId: userId, accountName: accountName, updatedAt: Date.now() };
+  var saved = { spreadsheetId: spreadsheetId, userId: userId, username: username, accountName: accountName, updatedAt: Date.now() };
   PropertiesService.getDocumentProperties().setProperty(FbmSync.BINDING_KEY, JSON.stringify(saved));
-  return { ok: true, binding: { spreadsheetId: saved.spreadsheetId, userId: saved.userId, accountName: saved.accountName, updatedAt: saved.updatedAt } };
+  return { ok: true, binding: { spreadsheetId: saved.spreadsheetId, userId: saved.userId, username: saved.username, accountName: saved.accountName, updatedAt: saved.updatedAt } };
 };
 FbmSync.bindingHasLinkedData = function () {
   try {
@@ -43,13 +51,14 @@ FbmSync.identityStatus = function (runtime) {
   else {
     if (actual && current.spreadsheetId !== actual) { reasons.push('spreadsheet_mismatch'); }
     if (incoming.userId !== undefined && String(incoming.userId) !== current.userId) { reasons.push('user_mismatch'); }
+    if (incoming.username !== undefined && String(incoming.username) !== String(current.username || '')) { reasons.push('username_mismatch'); }
     if (incoming.accountName !== undefined && String(incoming.accountName) !== current.accountName) { reasons.push('account_mismatch'); }
   }
   if (incoming.accountName !== undefined && expectedAccount && String(incoming.accountName) !== expectedAccount) { reasons.push('configured_account_mismatch'); }
   var expectedId = String(FbmSync.configValue('FBM_SPREADSHEET_ID') || '');
   if (expectedId && actual && expectedId !== actual) { reasons.push('configured_spreadsheet_mismatch'); }
   var status = reasons.length ? 'REBIND_REQUIRED' : (current.spreadsheetId ? 'BOUND' : 'UNBOUND');
-  return { ok: status !== 'REBIND_REQUIRED', status: status, code: status === 'REBIND_REQUIRED' ? 'REBIND_REQUIRED' : '', spreadsheetId: actual, hasLinkedData: hasData, binding: { spreadsheetId: current.spreadsheetId || '', userId: current.userId || '', accountName: current.accountName || '' }, reasons: reasons };
+  return { ok: status !== 'REBIND_REQUIRED', status: status, code: status === 'REBIND_REQUIRED' ? 'REBIND_REQUIRED' : '', spreadsheetId: actual, hasLinkedData: hasData, binding: { spreadsheetId: current.spreadsheetId || '', userId: current.userId || '', username: current.username || '', accountName: current.accountName || '' }, reasons: reasons };
 };
 FbmSync.identityPreflight = function (mode) {
   var status = FbmSync.identityStatus(), write = mode === 'write' || mode === 'push' || mode === 'background';
@@ -137,17 +146,20 @@ FbmSync.findCustomerByIdentity = function (localById, localByCode, incoming, loc
 /** Đánh dấu bản ghi local vắng khỏi một lượt quét full; không suy ra xóa FBM. */
 FbmSync.markMissingAfterFullScan = function (entity, state) {
   var settings = typeof FbmSync.scriptSettings === 'function' ? FbmSync.scriptSettings() : {};
-  if (!state || state.mode !== 'write' || String(settings.testCustomerCode || '').trim()) { return { written: 0, skipped: true }; }
-  var seen = state.metadata && state.metadata.seen && state.metadata.seen[entity] || {}, local = FbmSync.readLocal(entity), missing = [];
+  var canWriteSheet = state && (typeof FbmSync.canWriteSheet === 'function' ? FbmSync.canWriteSheet(state.mode) : state.mode === 'read' || state.mode === 'write');
+  if (!state || !canWriteSheet || String(settings.testCustomerCode || '').trim()) { return { written: 0, skipped: true }; }
+  var local = FbmSync.readLocal(entity), missing = [];
   local.forEach(function (record) {
     var fbmId = String(record.fbmId || '').trim();
     var lock = state.locks && state.locks[entity + ':' + String(record.id || '')];
-    if (!fbmId || seen[fbmId] || String(record.recordStatus || 'active') === 'deleted' || (lock && lock.owner === 'user')) { return; }
+    if (!fbmId || FbmSync.seenStoreHas(entity, record) || String(record.recordStatus || 'active') === 'deleted' || (lock && lock.owner === 'user')) { return; }
     missing.push({ id: record.id, syncStatus: FbmSync.SYNC_STATUS.missing });
     if (FbmSync.logPullRecord) { FbmSync.logPullRecord(entity, { fbmId: fbmId }, record, FbmSync.SYNC_STATUS.missing, 'Không thấy ID trong lượt quét FBM; không suy ra xóa.'); }
   });
-  if (!missing.length || typeof writeGateSave !== 'function') { return { written: 0 }; }
+  if (!missing.length) { FbmSync.seenStoreClear(entity); return { written: 0 }; }
+  if (typeof writeGateSave !== 'function') { return { written: 0 }; }
   var saved = writeGateSave({ entity: entity, records: missing, source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
+  if (saved && saved.ok) { FbmSync.seenStoreClear(entity); }
   return { written: saved && saved.ok ? missing.length : 0, result: saved };
 };
 

@@ -14,7 +14,7 @@ async function chay(so) {
     PropertiesService: { getDocumentProperties: () => propertyApi, getScriptProperties: () => propertyApi }
   });
   napServer(orchestration, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/EntryPoints.js');
-  const approvalProps = { data: { FBM_SYNC_ALLOW_WRITES: 'true' } };
+  const approvalProps = { data: {} };
   const approvalPropertyApi = { getProperty: (key) => approvalProps.data[key] || null, setProperty: (key, value) => { approvalProps.data[key] = String(value); } };
   const approval = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => approvalPropertyApi, getScriptProperties: () => approvalPropertyApi } });
   napServer(approval, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/EntryPoints.js');
@@ -29,20 +29,35 @@ async function chay(so) {
   check(so, 'mode day rieng chi gui du lieu ShinCRM len FBM', [pushOnly.ok, pushOnly.request.meta.kind, approval.FbmSync.stateRead().mode], [true, 'authorize', 'push']);
   approval.FbmSync.stateWrite(approval.FbmSync.stateStart('', 'idle', 0));
   const checkOnly = approval.FbmSync.start({ mode: 'check' });
-  check(so, 'mode kiem tra khong bat cong ghi', [checkOnly.ok, approval.FbmSync.stateRead().mode, approval.FbmSync.writeEnabled('check')], [true, 'check', false]);
+  check(so, 'bon mode tach dung quyen ghi Sheet va FBM', [
+    checkOnly.ok,
+    approval.FbmSync.canWriteSheet('check'), approval.FbmSync.canWriteFbm('check'),
+    approval.FbmSync.canWriteSheet('read'), approval.FbmSync.canWriteFbm('read'),
+    approval.FbmSync.canWriteSheet('push'), approval.FbmSync.canWriteFbm('push'),
+    approval.FbmSync.canWriteSheet('write'), approval.FbmSync.canWriteFbm('write')
+  ], [true, false, false, true, false, false, true, true, true]);
+  let pullWriteCalls = 0;
+  approval.FbmSync.pullWrite = (_entity, records) => { pullWriteCalls += 1; return { ok: true, written: records.length, conflicts: 0, skipped: 0 }; };
+  approval.FbmSync.statePatch({ counts: { total: 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 } });
+  const readPull = approval.FbmSync.pullRecords('customer', [{ id: 'C-1' }], 'read');
+  const checkPull = approval.FbmSync.pullRecords('customer', [{ id: 'C-2' }], 'check');
+  check(so, 'read ghi Sheet con check chi preview', [readPull.written, checkPull.preview, pullWriteCalls], [1, true, 1]);
   const started = orchestration.FbmSync.start({ mode: 'read' });
   check(so, 'start bat dau bang bootstrap Customer', started.request.meta.kind, 'authorize');
   check(so, 'bootstrap dung viewPage false', started.request.body.viewPage, false);
   check(so, 'bootstrap khong gui authorized cu', started.request.body.authorized, null);
-  const retrySlice = orchestration.FbmSync.continue({ ok: false, status: 503, body: '' });
+  const retrySlice = orchestration.FbmSync.continue({ ok: false, status: 503, body: '', transport: { trace: [{ requestId: started.request.id }] } });
   check(so, 'loi doc tam thoi duoc retry co gioi han', [retrySlice.ok, retrySlice.retrying, retrySlice.request.meta.kind, orchestration.FbmSync.stateRead().retryCount], [true, true, 'authorize', 1]);
+  const blockedDuplicate = orchestration.FbmSync.start({ mode: 'read' });
+  check(so, 'start khong cap request chong khi retry dang cho response', [blockedDuplicate.ok, blockedDuplicate.code, blockedDuplicate.request], [false, 'REQUEST_IN_FLIGHT', null]);
+  orchestration.FbmSync.statePatch({ activeRequestId: '', deadlineAt: 0 });
   const resumed = orchestration.FbmSync.start({ mode: 'read' });
-  check(so, 'start thu lai tiep tuc dung authorize Customer ban dau', [resumed.ok, resumed.resumed, resumed.request.meta.entity], [true, true, 'customer']);
+  check(so, 'start tiep tuc cursor sau khi reservation cu da thu hoi', [resumed.ok, resumed.resumed, resumed.request.meta.entity], [true, true, 'customer']);
   const staleState = JSON.parse(props.data[orchestration.FbmSync.STATE_KEY]);
-  staleState.runId = 'old-run'; staleState.updatedAt = Date.now() - 120000;
+  staleState.runId = 'old-run'; staleState.updatedAt = Date.now() - orchestration.FbmSync.STALE_RUN_MS - 1; staleState.lastProgressAt = staleState.updatedAt;
   props.data[orchestration.FbmSync.STATE_KEY] = JSON.stringify(staleState);
   const restarted = orchestration.FbmSync.start({ mode: 'read' });
-  check(so, 'authorize cu qua mot phut duoc thay bang phien moi', [restarted.ok, restarted.resumed, orchestration.FbmSync.stateRead().runId === 'old-run'], [true, undefined, false]);
+  check(so, 'authorize cu qua thoi gian stale duoc thay bang phien moi', [restarted.ok, restarted.resumed, orchestration.FbmSync.stateRead().runId === 'old-run'], [true, undefined, false]);
   check(so, 'lookup san pham dung controller FBM that', orchestration.FbmSync.SYNC_LOOKUPS.filter((item) => item.key === '@CAT_SAN_PHAM')[0].controller, 'crdmsp');
   const previewState = { metadata: {} };
   orchestration.FbmSync.previewRecords(previewState, 'customer', [{ fbmCustomerCode: 'ALT00010', companyName: 'Test', fbmId: 'A1' }]);
@@ -53,7 +68,7 @@ async function chay(so) {
   check(so, 'status noi ro chieu FBM ve ShinCRM', pullView.direction, 'FBM → ShinCRM');
   check(so, 'status noi ro dang dong bo khach hang', pullView.entityLabel, 'Khách hàng');
   const resumeState = orchestration.FbmSync.stateRead();
-  resumeState.runId = 'resume-run'; resumeState.phase = 'pull_customer'; resumeState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 2, pageValue: ['d', 't', 'x'], count: 2000 };
+  resumeState.runId = 'resume-run'; resumeState.phase = 'pull_customer'; resumeState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 2, pageValue: ['d', 't', 'x'], count: 2000 }; resumeState.activeRequestId = ''; resumeState.deadlineAt = 0;
   orchestration.FbmSync.stateWrite(resumeState);
   const resumedGrid = orchestration.FbmSync.start({ mode: 'read' });
   check(so, 'Sidebar mo lai tiep tuc cursor doc Customer dang do', [resumedGrid.ok, resumedGrid.resumed, resumedGrid.request.meta.kind, resumedGrid.request.body.type], [true, true, 'grid', 1]);
@@ -187,7 +202,7 @@ async function chay(so) {
   bugState.metadata.categoryGate = {};
   bugState.activeRequestId = 'test-bug-request'; bugState.cursor = { kind: 'push_wait', operation: 'customer_edit_save', entity: 'customer', index: 0, candidate: { entity: 'customer', id: 'C-ERR', record: { id: 'C-ERR', fbmId: 'A-ERR', fbmHash: 'h-err' } } };
   push.FbmSync.stateWrite(bugState);
-  const bugResult = push.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"Bugs":{"Message":"Sai du lieu"}}}' });
+  const bugResult = push.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"Bugs":{"Message":"Sai du lieu"}}}', transport: { trace: [{ requestId: 'test-bug-request' }] } });
   check(so, 'Bugs HTTP 200 danh dau loi record va khong retry request da gui', [bugResult.continued, push.FbmSync.stateRead().counts.error, push.FbmSync.stateRead().metadata.pushFailures['customer:C-ERR'] !== undefined], [true, 1, true]);
   pushed.FbmSync.readLocal = (entity) => entity === 'customer'
     ? [{ id: 'CUS-NEW', fbmId: '', fbmCustomerCode: '', allowFbmPush: 'Chưa cho phép' }]
@@ -200,13 +215,13 @@ async function chay(so) {
   const transportState = push.FbmSync.stateStart('', 'read', 0);
   transportState.phase = 'pull_customer'; transportState.activeRequestId = 'test-transport-request'; transportState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 3, pageValue: ['x'] };
   push.FbmSync.stateWrite(transportState);
-  const http500 = push.FbmSync.continue({ ok: false, status: 500, body: '{"Message":"server"}' });
+  const http500 = push.FbmSync.continue({ ok: false, status: 500, body: '{"Message":"server"}', transport: { trace: [{ requestId: 'test-transport-request' }] } });
   check(so, 'HTTP 500 giu cursor doc hop le cho ky sau', [http500.ok, push.FbmSync.stateRead().phase, push.FbmSync.stateRead().cursor.kind], [false, 'error', 'customer_grid']);
   [{ status: 401, body: '' }, { status: 403, body: '' }, { status: 200, body: '<form action="Login.aspx"></form>' }].forEach((failure) => {
     const sessionState = push.FbmSync.stateStart('', 'read', 0);
     sessionState.phase = 'pull_customer'; sessionState.activeRequestId = 'test-session-request'; sessionState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 2, pageValue: ['x'] };
     push.FbmSync.stateWrite(sessionState);
-    const sessionResult = push.FbmSync.continue({ ok: failure.status === 200, status: failure.status, body: failure.body });
+    const sessionResult = push.FbmSync.continue({ ok: failure.status === 200, status: failure.status, body: failure.body, transport: { trace: [{ requestId: 'test-session-request' }] } });
   check(so, 'Session error ' + failure.status + ' giu cursor de chay ky sau', [sessionResult.ok, push.FbmSync.stateRead().phase, push.FbmSync.stateRead().cursor.kind], [false, 'error', 'customer_grid']);
   });
   const skippedLogs = [];
@@ -283,7 +298,7 @@ async function chay(so) {
   push.FbmSync.pushCandidates = pushCandidatesImpl;
   push.FbmSync.scriptSettings = () => ({ accountName: 'Owner', baseUrl: 'https://fbm.test', cookie: 'cookie', customerAuthorized: '1.test', testCustomerCode: 'ALT00010' });
   const createState = push.FbmSync.stateStart('', 'push', 0); createState.metadata.categoryGate = {}; createState.activeRequestId = 'test-create-request'; createState.cursor = { kind: 'push_wait', entity: 'customer', index: 0, operation: 'customer_create_save', candidate: createCandidate }; push.FbmSync.stateWrite(createState);
-  const recoveryStart = push.FbmSync.continue({ ok: false, status: 500, body: '{"Message":"timeout"}' });
+  const recoveryStart = push.FbmSync.continue({ ok: false, status: 500, body: '{"Message":"timeout"}', transport: { trace: [{ requestId: 'test-create-request' }] } });
   check(so, 'Customer create mat response chuyen sang request doc MST contains, khong ghi lai', [recoveryStart.recovering, recoveryStart.request.meta.kind, recoveryStart.request.body.gridPageIndex, recoveryStart.request.body.filter, recoveryStart.request.body.externalKey.some((item) => item.Name === 'ma_kh' && item.Value === 'ALT00010'), push.FbmSync.stateRead().cursor.operation], [true, 'grid', -2, ['ma_so_thue:**0100123456'], false, 'customer_create_recover']);
   const customerFields = push.FbmSync.GRID_FIELDS.customer.slice();
   const customerRow = []; customerRow[0] = 'FBM-CREATE'; customerRow[1] = 'ALT00020'; customerRow[2] = 'Khach tao lai'; customerRow[3] = '0100123456'; customerRow[4] = 'Nguoi lien he'; customerRow[5] = 'Ha Noi'; customerRow[6] = '0900000000'; customerRow[7] = 'a@example.com'; customerRow[9] = ''; customerRow[12] = 'HNI'; customerRow[18] = 'Source'; customerRow[21] = '';

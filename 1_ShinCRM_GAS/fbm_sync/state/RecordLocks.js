@@ -1,7 +1,13 @@
 /** Cầu nối khóa record giữa Sidebar và cửa ghi đồng bộ. */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
+FbmSync.recordHasConflict = function (entity, id) {
+  if (typeof FbmSync.readLocal !== 'function') { return false; }
+  var target = String(id || '');
+  return (FbmSync.readLocal(entity) || []).some(function (record) { return String(record && record.id || '') === target && String(record && record.syncStatus || '') === FbmSync.SYNC_STATUS.conflict; });
+};
 /** Đánh dấu record bắt đầu được người dùng chỉnh sửa, không ghi đè khóa sync khác revision. */
 FbmSync.editBegin = function (entity, id, revision) {
+  if (FbmSync.recordHasConflict(entity, id)) { return { ok: false, code: 'RECORD_CONFLICT', message: 'Bản ghi đang có xung đột; hãy xử lý ở màn hình Kết quả & xử lý.' }; }
   var state = FbmSync.stateRead(), key = String(entity) + ':' + String(id), current = state.locks[key];
   if (current && current.owner === 'sync') { return { ok: false, code: 'RECORD_BUSY', message: 'Bản ghi đang được đồng bộ; bản nháp được giữ nguyên.' }; }
   if (current && String(current.revision || '') !== String(revision || '')) { return { ok: false, code: 'RECORD_BUSY', message: 'Bản ghi đang được đồng bộ; bản nháp được giữ nguyên.' }; }
@@ -15,6 +21,7 @@ FbmSync.editEnd = function (entity, id) {
 };
 /** Chặn lưu mù nếu revision đã khác lúc form được mở. */
 FbmSync.saveAllowed = function (entity, id, revision) {
+  if (FbmSync.recordHasConflict(entity, id)) { return { ok: false, code: 'RECORD_CONFLICT', message: 'Bản ghi đang có xung đột; chưa thể lưu từ form thường.' }; }
   var state = FbmSync.stateRead();
   var lock = state.locks[String(entity) + ':' + String(id)];
   if (lock && lock.owner === 'sync') { return { ok: false, code: 'RECORD_BUSY', message: 'Bản ghi đang được đồng bộ; hãy lưu lại sau khi đồng bộ xong.' }; }

@@ -24,7 +24,7 @@ FbmSync.syncEntityLabel = function (entity, phase) {
 };
 /** Chỉ đưa dữ liệu render sang Sidebar; state nội bộ có lookup, cursor form và khóa vẫn ở GAS. */
 FbmSync.statusMetadata = function (metadata) {
-  var data = metadata || {}, keys = ['audit', 'categoryBlocks', 'identityBlocks', 'identityProbe', 'activityBulkMissing', 'preflight', 'preflightIssues', 'preview', 'pushFailures', 'pushFailureDetails', 'callbackTrace'];
+  var data = metadata || {}, keys = ['audit', 'categoryBlocks', 'identityBlocks', 'identityProbe', 'activityBulkMissing', 'activityBulkMissingCount', 'preflight', 'preflightIssues', 'preview', 'pushFailures', 'pushFailureDetails', 'callbackTrace'];
   var out = keys.reduce(function (result, key) {
     if (data[key] !== undefined) { result[key] = data[key]; }
     return result;
@@ -48,12 +48,11 @@ FbmSync.statusCursor = function (cursor) {
 /** Trả về snapshot gọn để Sidebar render một lần. */
 FbmSync.statusView = function () {
   var state = FbmSync.stateRead();
-  if (typeof FbmSync.recoverStaleRun === 'function') { state = FbmSync.recoverStaleRun(state).state; }
   var metadata = FbmSync.statusMetadata(state.metadata);
   if (typeof FbmSync.traceRead === 'function') { metadata.traceTail = FbmSync.traceRead(20); }
   var enabled = typeof FbmSync.masterEnabled === 'function' ? FbmSync.masterEnabled() : true;
   var background = typeof FbmSync.backgroundEnabled === 'function' ? FbmSync.backgroundEnabled() : true;
-  return { ok: true, enabled: enabled, masterEnabled: enabled, backgroundEnabled: background, runId: state.runId, mode: state.mode, scan: state.scan || 'full', scheduledScan: state.scheduledScan ? state.scheduledScan : '', writeAllowed: typeof FbmSync.writeAllowed === 'function' ? FbmSync.writeAllowed() : false, login: typeof FbmSync.loginConfigPublic === 'function' ? FbmSync.loginConfigPublic() : null, phase: state.phase, label: FbmSync.statusLabel(state.phase), direction: FbmSync.syncDirection(state), entity: state.entity, entityLabel: FbmSync.syncEntityLabel(state.entity, state.phase), cursor: FbmSync.statusCursor(state.cursor), session: { customer: !!state.session.customerAuthorized, activity: !!state.session.activityAuthorized, expired: state.session.expired === true, lastHeartbeatAt: Number(state.session.lastHeartbeatAt || 0) }, metadata: metadata, counts: state.counts, current: state.current, message: state.message, startedAt: state.startedAt, updatedAt: state.updatedAt, nextRunAt: state.nextRunAt, lastError: state.lastError, lastFailureCode: state.lastFailureCode || '', retryable: state.retryable === true, locks: state.locks };
+  return { ok: true, enabled: enabled, masterEnabled: enabled, backgroundEnabled: background, runId: state.runId, mode: state.mode, scan: state.scan || 'full', scheduledScan: state.scheduledScan ? state.scheduledScan : '', login: typeof FbmSync.loginConfigPublic === 'function' ? FbmSync.loginConfigPublic() : null, phase: state.phase, label: FbmSync.statusLabel(state.phase), direction: FbmSync.syncDirection(state), entity: state.entity, entityLabel: FbmSync.syncEntityLabel(state.entity, state.phase), cursor: FbmSync.statusCursor(state.cursor), session: { customer: !!state.session.customerAuthorized, activity: !!state.session.activityAuthorized, expired: state.session.expired === true, lastHeartbeatAt: Number(state.session.lastHeartbeatAt || 0) }, metadata: metadata, counts: state.counts, current: state.current, message: state.message, startedAt: state.startedAt, updatedAt: state.updatedAt, nextRunAt: state.nextRunAt, lastError: state.lastError, lastFailureCode: state.lastFailureCode || '', retryable: state.retryable === true };
 };
 
 /** Ghi snapshot nghiệp vụ; payload/cookie không bao giờ đi vào Log. */
@@ -64,7 +63,7 @@ FbmSync.logStatus = function (status, action) {
   var writer = outcome === LOG_ERROR ? logEvent : logTrace;
   writer({
     source: 'fbm_sync', action: action || 'slice', outcome: outcome,
-    entity: status.entity || '', recordId: status.current || 'ALT00010',
+    entity: status.entity || '', recordId: status.current || '',
     reason: status.message || status.label || phase,
     detail: { phase: phase, direction: status.direction || '', entityLabel: status.entityLabel || '', counts: status.counts || {}, lastError: status.lastError || '' }
   });

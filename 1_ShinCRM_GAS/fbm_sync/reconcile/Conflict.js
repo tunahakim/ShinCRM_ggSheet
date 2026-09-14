@@ -1,21 +1,29 @@
 /** Luu va giai quyet conflict sau doi soat ba chieu. */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
-/** Ghi conflict có giới hạn vào state để người dùng xem và quyết định sau. */
+/** Ghi descriptor conflict có giới hạn; bản sao record được đọc lại khi người dùng xử lý. */
 FbmSync.rememberConflict = function (state, entity, current, incoming, decision, categoryGate) {
   state.metadata = state.metadata || {};
   state.metadata.conflicts = Array.isArray(state.metadata.conflicts) ? state.metadata.conflicts : [];
-  state.metadata.conflicts.push({ entity: entity, id: String(current && current.id || ''), fbmId: String(incoming && incoming.fbmId || current && current.fbmId || ''), hBASE: decision.hBASE, hSHIN: decision.hSHIN, hFBM: decision.hFBM, fields: FbmSync.diff(entity, current, incoming, categoryGate), shinRecord: Object.assign({}, current || {}), fbmRecord: Object.assign({}, incoming || {}), at: Date.now() });
+  state.metadata.conflicts.push({ entity: entity, id: String(current && current.id || ''), fbmId: String(incoming && incoming.fbmId || current && current.fbmId || ''), hBASE: decision.hBASE, hSHIN: decision.hSHIN, hFBM: decision.hFBM, fields: FbmSync.diff(entity, current, incoming, categoryGate), at: Date.now() });
   state.locks = state.locks || {};
   state.locks[entity + ':' + String(current && current.id || '')] = { revision: String(decision.hSHIN || ''), owner: 'sync', reason: 'conflict', at: Date.now() };
-  if (state.metadata.conflicts.length > 100) { state.metadata.conflicts = state.metadata.conflicts.slice(-100); }
+  if (state.metadata.conflicts.length > 100) {
+    var dropped = state.metadata.conflicts.slice(0, state.metadata.conflicts.length - 100);
+    state.metadata.conflicts = state.metadata.conflicts.slice(-100);
+    dropped.forEach(function (entry) {
+      var key = String(entry.entity || '') + ':' + String(entry.id || '');
+      if (state.locks[key] && state.locks[key].owner === 'sync' && state.locks[key].reason === 'conflict') { delete state.locks[key]; }
+    });
+  }
   if (typeof logEvent === 'function') {
     logEvent({ source: 'fbm_sync', action: 'conflict', outcome: LOG_CONFLICT, entity: entity, recordId: String(current && current.id || ''), reason: 'Hai phía cùng thay đổi; chờ quyết định.', detail: { fbmId: String(incoming && incoming.fbmId || current && current.fbmId || ''), hBASE: decision.hBASE, hSHIN: decision.hSHIN, hFBM: decision.hFBM, fields: FbmSync.diff(entity, current, incoming, categoryGate) } });
   }
 };
 /** Chốt conflict theo phía được chọn; baseline mới chỉ ghi sau quyết định rõ ràng. */
-FbmSync.resolveConflict = function (entity, id, choice, merged) {
+FbmSync.resolveConflict = function (entity, id, choice, merged, verified) {
   if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED', message: 'Đồng bộ đang tắt; chưa thể chốt conflict.' }; }
+  if (verified !== true) { return { ok: false, code: 'CONFLICT_REREAD_REQUIRED', message: 'Phải đọc lại FBM và ShinCRM ngay trước khi chốt xung đột.' }; }
   var state = FbmSync.stateRead(), conflicts = state.metadata && state.metadata.conflicts || [], target = String(id || '').trim(), item = conflicts.filter(function (entry) { return entry.entity === entity && String(entry.id) === target; })[0];
   if (!item) { return { ok: false, code: 'CONFLICT_NOT_FOUND', message: 'Không tìm thấy conflict cần xử lý.' }; }
   var record;
@@ -72,8 +80,12 @@ FbmSync.prepareConflictResolution = function (entity, id, choice, merged) {
 /** Nhận response đọc lại và chỉ chốt khi hash FBM vẫn đúng snapshot lúc mở conflict. */
 FbmSync.confirmConflict = function (entity, id, choice, merged, rawResponse) {
   if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED', message: 'Đồng bộ đang tắt; chưa thể chốt conflict.' }; }
-  var state = FbmSync.stateRead(), refresh = state.metadata && state.metadata.conflictRefresh || {}, target = String(id || '').trim();
+  var state = FbmSync.stateRead(), refresh = state.metadata && state.metadata.conflictRefresh || {}, target = String(id || '').trim(), responseRequestId = FbmSync.responseRequestId ? FbmSync.responseRequestId(rawResponse) : '';
   if (refresh.entity !== entity || String(refresh.id || '') !== target) { return { ok: false, code: 'CONFLICT_REFRESH_NOT_FOUND', message: 'Không còn lượt đọc lại conflict tương ứng.' }; }
+  if (!state.activeRequestId || !responseRequestId || responseRequestId !== String(state.activeRequestId) || !state.cursor || state.cursor.kind !== 'conflict_refresh') {
+    return { ok: false, code: 'STALE_RESPONSE', message: 'Response đọc lại xung đột đã cũ hoặc không thuộc request đang chờ.' };
+  }
+  state.activeRequestId = ''; state.deadlineAt = 0; state.lastProgressAt = Date.now(); FbmSync.stateWrite(state);
   var success = FbmSync.protocol.assertSuccess(rawResponse);
   if (!success.ok) {
     state.cursor = {}; state.metadata.conflictRefresh = null; state.message = 'Không đọc lại được FBM; conflict vẫn giữ nguyên để thử lại.'; FbmSync.stateWrite(state);
@@ -87,13 +99,18 @@ FbmSync.confirmConflict = function (entity, id, choice, merged, rawResponse) {
     return { ok: false, code: 'CONFLICT_REFRESH_MISSING', message: 'FBM không còn trả bản ghi này; conflict chưa được chốt.', status: FbmSync.statusView() };
   }
   var gate = state.metadata.categoryGate || {}, latestRecord = entity === 'customer' ? FbmSync.customerRecord(latest, gate) : FbmSync.activityRecord(latest, gate), latestHash = String(latestRecord.fbmHash || '');
+  item.fbmRecord = latestRecord;
   if (latestHash !== String(refresh.openedHash || '')) {
     item.fbmRecord = latestRecord; item.hFBM = latestHash; item.fields = FbmSync.diff(entity, item.shinRecord, latestRecord, gate); item.at = Date.now();
     state.cursor = {}; state.metadata.conflictRefresh = null; state.message = 'FBM đã thay đổi trong lúc xử lý; conflict đã được cập nhật, hãy xem lại.'; FbmSync.stateWrite(state);
     return { ok: false, code: 'CONFLICT_CHANGED_REVIEW', message: state.message, status: FbmSync.statusView() };
   }
   var local = (FbmSync.readLocal(entity) || []).filter(function (record) { return String(record && record.id || '') === target; })[0];
-  if (local) { item.shinRecord = local; item.hSHIN = FbmSync.hash(local, entity, gate); }
+  if (!local) {
+    state.cursor = {}; state.metadata.conflictRefresh = null; state.message = 'Bản ghi ShinCRM không còn tồn tại; conflict vẫn được giữ để kiểm tra.'; FbmSync.stateWrite(state);
+    return { ok: false, code: 'CONFLICT_LOCAL_MISSING', message: state.message, status: FbmSync.statusView() };
+  }
+  item.shinRecord = local; item.hSHIN = FbmSync.hash(local, entity, gate);
   state.cursor = {}; state.metadata.conflictRefresh = null; FbmSync.stateWrite(state);
-  return FbmSync.resolveConflict(entity, target, choice, merged);
+  return FbmSync.resolveConflict(entity, target, refresh.choice, refresh.merged, true);
 };
