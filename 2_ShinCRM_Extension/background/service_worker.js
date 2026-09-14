@@ -191,6 +191,7 @@ function postRelay(url, key, body) {
       }
       if (!response.ok && parsed && !parsed.error) { parsed.error = 'GAS relay HTTP ' + response.status; }
       noteRelayStatus({ stage: 'completed', requestSentAt: requestSentAt, responseReceivedAt: responseReceivedAt, ok: response.ok && parsed && parsed.ok !== false, code: parsed && parsed.code || (response.ok ? 'OK' : 'RELAY_HTTP_ERROR'), httpStatus: response.status, responseLength: text.length, contentType: contentType, responsePrefix: responsePrefix, error: parsed && parsed.error || '' });
+      if (parsed && parsed.code === 'RELAY_ENDPOINT_NOT_FOUND') { requestRelayRefresh('RELAY_ENDPOINT_NOT_FOUND'); }
       return parsed;
     });
   }).catch(function (error) {
@@ -199,6 +200,16 @@ function postRelay(url, key, body) {
     noteRelayStatus({ stage: 'failed', requestSentAt: requestSentAt, ok: false, code: timeout ? 'RELAY_TIMEOUT' : 'RELAY_FETCH_FAILED', error: message });
     throw new Error(message);
   }).finally(function () { if (timer) { clearTimeout(timer); } });
+}
+
+/** Yêu cầu Sidebar đang mở lấy lại URL deployment hiện tại từ GAS. */
+function requestRelayRefresh(reason) {
+  return chrome.tabs.query({ url: ['https://docs.google.com/*'] }).then(function (tabs) {
+    var targets = (tabs || []).filter(function (tab) { return /https:\/\/docs\.google\.com\/spreadsheets\//i.test(String(tab && tab.url || '')); });
+    return Promise.all(targets.map(function (tab) {
+      return sendTabMessage(tab.id, { type: 'CRM_REFRESH_RELAY', reason: String(reason || '') }, 1500).catch(function () { return null; });
+    }));
+  }).catch(function () { return []; });
 }
 
 /** Probe chỉ gọi Web App GAS; không tìm tab FBM, không gửi request nghiệp vụ. */
@@ -325,12 +336,37 @@ function getRelayConfig() {
   if (!chrome.storage || !chrome.storage.local || !chrome.storage.local.get) { return Promise.resolve(null); }
   return new Promise(function (resolve) {
     chrome.storage.local.get(['fbmWebAppUrl', 'fbmSyncKey', 'fbmSpreadsheetId'], function (config) {
-      var url = config && String(config.fbmWebAppUrl || '').trim();
+      var url = normalizeRelayUrl(config && config.fbmWebAppUrl);
       var key = config && String(config.fbmSyncKey || '').trim();
       var spreadsheetId = config && String(config.fbmSpreadsheetId || '').trim();
       resolve(url && key ? { url: url, key: key, spreadsheetId: spreadsheetId } : null);
     });
   });
+}
+
+/** Chỉ nhận URL Web App thuần; loại bỏ dạng Markdown thường xuất hiện khi copy từ tài liệu. */
+function normalizeRelayUrl(value) {
+  var raw = String(value || '').trim(), markdown = raw.match(/^\[[^\]]+\]\((https:\/\/[^)]+)\)$/i), parsed;
+  if (markdown) { raw = markdown[1]; }
+  try { parsed = new URL(raw); } catch (ignore) { return ''; }
+  if (!/^https:\/\/(?:script\.google\.com|script\.googleusercontent\.com)$/i.test(parsed.origin)) { return ''; }
+  if (!/^\/macros\/s\/[^/]+\/exec\/?$/i.test(parsed.pathname)) { return ''; }
+  return parsed.toString().replace(/\/$/, '');
+}
+
+/** Chỉ ghi relay sau khi endpoint mới đã trả lời; URL hỏng không được ghi đè URL đang dùng. */
+function configureRelay(config) {
+  var value = config || {}, url = String(value.url || '').trim(), key = String(value.key || '').trim(), spreadsheetId = String(value.spreadsheetId || '').trim();
+  if (!url || !key || !spreadsheetId) { return Promise.resolve({ ok: false, code: 'RELAY_CONFIG_INVALID', error: 'Cấu hình relay thiếu URL, khóa hoặc Spreadsheet ID.' }); }
+  return postRelay(url, key, { kind: 'probe', spreadsheetId: spreadsheetId }).then(function (probe) {
+    if (!probe || probe.ok !== true) { return Object.assign({ ok: false, code: 'RELAY_CONFIG_REJECTED' }, probe || { error: 'Relay mới không trả lời hợp lệ.' }); }
+    return new Promise(function (resolve) {
+      chrome.storage.local.set({ fbmWebAppUrl: url, fbmSyncKey: key, fbmSpreadsheetId: spreadsheetId }, function () {
+        var error = chrome.runtime.lastError;
+        resolve(error ? { ok: false, code: 'RELAY_CONFIG_SAVE_FAILED', error: error.message } : { ok: true, code: 'RELAY_CONFIG_SAVED' });
+      });
+    });
+  }).catch(function (error) { return { ok: false, code: 'RELAY_CONFIG_REJECTED', error: String(error && error.message || error) }; });
 }
 
 /** Chạy một lượng request đọc giới hạn trong mỗi heartbeat để tiếp tục cursor GAS. */
@@ -374,7 +410,7 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   if (message && message.type === 'FBM_CONFIGURE_RELAY') {
     var config = message.config || {};
     if (!chrome.storage || !chrome.storage.local) { sendResponse({ ok: false, error: 'Extension không có kho cấu hình.' }); return false; }
-    chrome.storage.local.set({ fbmWebAppUrl: String(config.url || ''), fbmSyncKey: String(config.key || ''), fbmSpreadsheetId: String(config.spreadsheetId || '') }, function () { sendResponse({ ok: true }); });
+    configureRelay(config).then(sendResponse);
     return true;
   }
   if (message && message.type === 'FBM_RELAY_PROBE') {

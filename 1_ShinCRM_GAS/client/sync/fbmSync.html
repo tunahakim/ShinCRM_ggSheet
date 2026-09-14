@@ -50,7 +50,10 @@ function fbmSyncConfigureRelay() {
       FBM_SYNC_CLIENT.relayConfigured = true;
       return config;
     });
-  }).catch(function () { return null; });
+  }).catch(function (error) {
+    fbmSyncPaintError(error, 'Không cập nhật được URL relay GAS hiện tại.');
+    return null;
+  });
 }
 /** Gửi relay config và tùy chọn chờ Extension xác nhận đã lưu. */
 function fbmSyncPostRelayConfig(config, requireAck) {
@@ -217,6 +220,10 @@ function fbmSyncInstall() {
       delete FBM_SYNC_CLIENT.relayWaiters[String(data.id || '')];
       clearTimeout(relayWaiter.timer);
       if (data.ok) { relayWaiter.resolve(true); } else { relayWaiter.reject(new Error(String(data.error || 'Extension không lưu được cấu hình relay.'))); }
+      return;
+    }
+    if (data.action === 'CRM_FBM_RELAY_REFRESH' && data.nonce === SHEET_LINK_NONCE) {
+      fbmSyncConfigureRelay();
       return;
     }
     if (data.action === 'CRM_FBM_CREDENTIALS_RESULT' && data.nonce === SHEET_LINK_NONCE) {

@@ -90,6 +90,14 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
     sendResponse({ ready: true, version: '21.7' });
     return false;
   });
+  chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
+    if (!message || message.type !== 'CRM_REFRESH_RELAY') { return false; }
+    if (sidebarWindow && sidebarOrigin && sidebarNonce) {
+      try { sidebarWindow.postMessage({ action: 'CRM_FBM_RELAY_REFRESH', nonce: sidebarNonce, reason: String(message.reason || '') }, sidebarOrigin); } catch (ignore) {}
+    }
+    sendResponse({ ok: true, forwarded: !!sidebarWindow });
+    return false;
+  });
 }
 
 function isAllowedSidebarOrigin(origin) {
