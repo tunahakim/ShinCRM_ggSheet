@@ -339,8 +339,8 @@ Các mục dưới đây là phần đang phải hoàn thiện trước khi báo
 - [x] Chốt trạng thái không có cookie ban đầu: GAS không cấp heartbeat FBM rỗng; chỉ cấp login envelope hoặc trả trạng thái chờ rõ ràng.
 - [x] Bảo đảm công tắc tổng tắt/dừng phiên không xóa thông tin request đang bay; response cũ sau cancel/stop không được tiếp tục pipeline.
 - [x] Chuỗi heartbeat tiếp theo gửi lại `kind: heartbeat` để GAS tiếp tục qua `fbmSyncHeartbeat`; không dùng cổng `background_sync`/`continue` của phiên quét nền.
-- [x] Bổ sung test offline cho mọi nhánh trên và cập nhật số tổng kiểm thử: `1257/1257`.
-- [ ] Nghiệm thu GAS DEV bằng `node tests/gas.js ... --push` cho heartbeat request/response, transport failure, reservation và auto-login.
+- [x] Bổ sung test offline cho mọi nhánh trên và cập nhật số tổng kiểm thử: `1260/1260`.
+- [x] Nghiệm thu GAS DEV bằng `node tests/gas.js ... --push` cho heartbeat request/response, transport failure, reservation và auto-login. `fbmSyncHeartbeatRequest` đạt ở revision `@252` với trạng thái fail-closed `AUTO_LOGIN_NOT_CONFIGURED`, `phase: paused`; `fbmSyncHeartbeat` trả `STALE_RESPONSE` khi không có reservation; `fbmSyncHeartbeatTransportFailure` trả `STALE_RESPONSE` khi request không còn hiệu lực; `fbmGetLoginConfig` đạt ở `@248`; `fbmProbeAutoLogin` đạt ở `@249`.
 - Bằng chứng tạm thời: `fbmSyncHeartbeatRequest --push` chạy thành công ở revision `@245`; `fbmGetLoginConfig --push` trả `enabled: true`, `configured: false` ở `@253`; transport failure gọi không có reservation trả `STALE_RESPONSE` đúng fail-closed. Chưa đóng mục cho tới khi có kịch bản DEV dựng reservation rồi nộp failure.
 - [ ] Tạo deployment DEV mới, Sidebar tự lấy URL; tải lại Extension rồi kiểm tra logged-in, logged-out, timeout, không có tab và response lớn.
 - [!] **Cần chủ dự án kiểm chứng thực tế:** giữ tab FBM đăng nhập, sau đó đăng xuất/đăng nhập lại để xác nhận không đá phiên máy khác và alarm tự khôi phục đúng chính sách.
