@@ -160,6 +160,14 @@ async function chay(so) {
   await hop.fbmSyncTestLogin(testButton);
   check(so, 'Đăng nhập thử thiếu thông tin báo lỗi rõ ràng', paints.some((item) => String(item.message).indexOf('username') >= 0), true);
 
+  const loginPassword = dom.document.getElementById('fbm-login-password');
+  const loginUsername = dom.document.getElementById('fbm-login-username');
+  loginUsername.value = 'anhlt'; loginPassword.value = 'mat-khau-can-giu';
+  hop.fbmSyncEncryptCredentials = () => Promise.resolve({ credentialRef: 'test-ref' });
+  hop.callServer = (name) => name === 'fbmStartLoginTest' ? Promise.resolve({ ok: true, request: null, message: 'Đã kiểm tra.' }) : Promise.resolve({});
+  await hop.fbmSyncTestLogin(testButton);
+  check(so, 'Đăng nhập thử không xóa mật khẩu chưa lưu', loginPassword.value, 'mat-khau-can-giu');
+
   const nav = dom.document.createElement('nav'); nav.id = 'fbm-sync-nav'; nav.hidden = false; dom.root.appendChild(nav);
   hop.fbmSyncInstall();
   const outside = { closest: () => null };

@@ -98,7 +98,13 @@ function fbmSyncRelayConfig() {
       if (!key) { key = Utilities.getUuid(); props.setProperty('FBM_SYNC_KEY', key); }
     } finally { lock.releaseLock(); }
   }
-  return { url: url, key: key, spreadsheetId: spreadsheetId };
+  return {
+    url: url,
+    key: key,
+    spreadsheetId: spreadsheetId,
+    masterEnabled: typeof FbmSync.masterEnabled !== 'function' || FbmSync.masterEnabled(),
+    backgroundEnabled: typeof FbmSync.backgroundEnabled !== 'function' || FbmSync.backgroundEnabled()
+  };
 }
 /** Đổi khóa relay nguyên tử; Sidebar phải nhận ACK Extension trước khi coi là hoàn tất. */
 function fbmSyncRotateRelayKey() {

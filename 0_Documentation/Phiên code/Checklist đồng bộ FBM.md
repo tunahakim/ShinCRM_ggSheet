@@ -87,7 +87,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Executor có phiên bản giao thức riêng; worker tự nạp lại bản mới và dùng kênh request V2 để bản cũ không xử lý heartbeat song song. Request thiếu envelope bị chặn trước `fetch`, trace chỉ giữ metadata transport tối thiểu. Có lệnh `fbmHeartbeatNow()` và `fbmHeartbeatLastStatus` để nghiệm thu ngay, không phải chờ alarm 5 phút; heartbeat phải nhận envelope do GAS cấp trước khi chạm FBM, không còn request mặc định trong executor; alarm dừng khi relay/công tắc lỗi hoặc GAS báo phiên hết hạn.
 - [x] 401/403 hoặc `Login.aspx` dừng kỳ và yêu cầu đăng nhập lại khi tùy chọn tự động đăng nhập tắt.
 - [x] Tùy chọn tự động đăng nhập mặc định bật, tự chạy khi session hết hạn/không có cookie, không ép login khi session hợp lệ đang tồn tại và chỉ thử lại nhiều nhất một lần mỗi 30 phút. Code, test offline và GAS DEV `fbmGetLoginConfig` đã xác nhận trạng thái mặc định; nhánh hết phiên có throttle 30 phút.
-- [x] Form thiết lập đặt username và password cạnh nhau, hiển thị mật khẩu dạng `***`/trống, không ghi bản rõ vào Sheet hoặc Log. Sidebar xóa ô mật khẩu sau khi lưu/thử.
+- [x] Form thiết lập đặt username và password cạnh nhau, hiển thị mật khẩu dạng bản rõ chỉ trong lượt đang gõ, không ghi bản rõ vào Sheet hoặc Log. Sidebar chỉ xóa ô sau `Lưu mã hóa` thành công, không xóa sau `Đăng nhập thử`.
 - [x] Extension mã hóa username/mã user, SpreadsheetId và mật khẩu thành envelope trước khi gửi/lưu qua GAS; không lưu credential bản rõ ở Sheet, Log hoặc `Config`. Kho cục bộ dùng AES-GCM; GAS chỉ giữ ciphertext.
 - [x] Khi đọc lại cấu hình, Extension chỉ giải mã nội bộ và trả trạng thái cùng các trường không nhạy cảm; Sidebar không nhận mật khẩu bản rõ. DTO `fbmGetLoginConfig` loại envelope trước khi trả về.
 - [x] Nút `Đăng nhập thử` thử login mềm bằng thông tin người dùng nhập, không logout phiên hợp lệ và không ghi bí mật. Request dùng `force:false`, kết quả chỉ trả mã/trạng thái.
@@ -330,9 +330,10 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 
 ### Đợt ổn định Tài khoản FBM và trạng thái UI
 
-- [x] Adapter đăng nhập lấy salt mới từ `Login.aspx` trước `GetEntityData` → `GetUnitData` → `Login`; giữ `force:false`, không gửi mật khẩu bản rõ, có test mô phỏng đủ năm request.
+- [x] Adapter đăng nhập lấy salt mới từ `Login.aspx` trước `GetEntityData` → `GetUnitData` → `Login`; đọc đúng `ChallengeScript` HTML FBM thực tế, giữ `force:false`, không gửi mật khẩu bản rõ và có test mô phỏng đủ năm request.
 - [x] Tự điền nhận diện trên file chưa có binding điền form và chờ `Lưu thông tin`; chỉ đối chiếu/kiểm tra Customer khi đã có binding.
-- [x] Render status giữ nội dung form tài khoản đang được gõ trong đúng lượt vẽ, không giữ mật khẩu vào client state/GAS/Sheet/Log; popup combo giữ focus qua thao tác chuột.
+- [x] Render status hoãn dựng lại màn hình Tài khoản khi người dùng đang gõ, không giữ mật khẩu vào client state/GAS/Sheet/Log; popup combo giữ focus qua thao tác chuột.
+- [x] Mở Sidebar chỉ bắt tay/cập nhật relay, không tự phát heartbeat hoặc request FBM. Relay cùng URL, khóa và Spreadsheet đã xác nhận ACK ngay trong Extension, không probe GAS lặp; relay trả HTML lỗi thì dừng alarm và yêu cầu Sidebar làm mới relay.
 - [x] Màn hình Chạy đồng bộ giữ pipeline và chẩn đoán sau khi hoàn tất hoặc lỗi, không rơi về thân trống; kiểm thử offline đạt `1301/1301`.
 - [ ] **Cần kiểm chứng thực tế:** reload Extension, tự điền nhận diện, đăng nhập thử và chạy một lượt `Kiểm tra an toàn`; đối chiếu Network và trạng thái Sidebar theo hướng dẫn bàn giao.
 
@@ -348,7 +349,7 @@ Các mục dưới đây là phần đang phải hoàn thiện trước khi báo
 - [x] Hoàn thiện auto-login nền: chỉ khi GAS xác định session hết hạn/thiếu cookie; thử tối đa một lần mỗi 30 phút, `force:false`, phiên đang được dùng thì chuyển sang chờ và không thử dồn.
 - [x] Chốt trạng thái không có cookie ban đầu: GAS không cấp heartbeat FBM rỗng; chỉ cấp login envelope hoặc trả trạng thái chờ rõ ràng.
 - [x] Bảo đảm công tắc tổng tắt/dừng phiên không xóa thông tin request đang bay; response cũ sau cancel/stop không được tiếp tục pipeline.
-- [ ] Sửa lại continuation nền đã triển khai sai: heartbeat chỉ xử lý response của đúng request heartbeat; nếu GAS cấp request tiếp theo thuộc cursor phiên nền thì Extension nộp qua `kind: background_sync`, command `continue` và `FbmSync.continue`.
+- [x] Sửa continuation nền: heartbeat chỉ xử lý response của đúng request heartbeat; nếu GAS cấp request tiếp theo thuộc cursor phiên nền thì Extension nộp qua `kind: background_sync`, command `continue` và `FbmSync.continue`; kiểm thử offline đạt `1304/1304`.
 - [x] Bổ sung test offline cho mọi nhánh trên và cập nhật số tổng kiểm thử: `1260/1260`.
 - [x] Executor áp dụng đúng `source` trong chỉ dẫn capture/replacement generic do GAS cấp, không ép mọi replacement về HTML trang; commit `b91790d`, test offline vẫn `1260/1260`.
 - [x] Nghiệm thu GAS DEV bằng `node tests/gas.js ... --push` cho heartbeat request/response, transport failure, reservation và auto-login. `fbmSyncHeartbeatRequest` đạt ở revision `@252` với trạng thái fail-closed `AUTO_LOGIN_NOT_CONFIGURED`, `phase: paused`; `fbmSyncHeartbeat` trả `STALE_RESPONSE` khi không có reservation; `fbmSyncHeartbeatTransportFailure` trả `STALE_RESPONSE` khi request không còn hiệu lực; `fbmGetLoginConfig` đạt ở `@248`; `fbmProbeAutoLogin` đạt ở `@249`.

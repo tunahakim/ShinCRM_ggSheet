@@ -66,7 +66,6 @@ function fbmSyncLoadSettings() {
 var FBM_SYNC_RELAY_CONFIGURE_FLIGHT = null;
 var FBM_SYNC_RELAY_AUTO_LAST_AT = 0;
 var FBM_SYNC_RELAY_SESSION = '';
-var FBM_SYNC_OPEN_HEARTBEAT_SENT = false;
 var FBM_SYNC_BRIDGE_WAITERS = [];
 var FBM_SYNC_BRIDGE_WAIT_TIMER = null;
 function fbmSyncNotifyBridgeReady() {
@@ -94,16 +93,6 @@ function fbmSyncWaitForBridge() {
     }, 5000);
   });
 }
-function fbmSyncHeartbeatOnSidebarOpen() {
-  if (FBM_SYNC_OPEN_HEARTBEAT_SENT || window.top === window || !SHEET_LINK_NONCE) { return false; }
-  FBM_SYNC_OPEN_HEARTBEAT_SENT = true;
-  try {
-    window.top.postMessage({ action: 'CRM_FBM_HEARTBEAT_NOW', nonce: SHEET_LINK_NONCE }, 'https://docs.google.com');
-    return true;
-  } catch (ignore) {
-    return false;
-  }
-}
 function fbmSyncConfigureRelay() {
   if (typeof sheetLinkExtensionAlive === 'function' && !sheetLinkExtensionAlive()) {
     return fbmSyncWaitForBridge().then(function (ready) { return ready ? fbmSyncConfigureRelay() : null; });
@@ -127,23 +116,21 @@ function fbmSyncAutoConfigureRelay() {
   var now = Date.now();
   if (now - FBM_SYNC_RELAY_AUTO_LAST_AT < 10000) { return Promise.resolve(null); }
   FBM_SYNC_RELAY_AUTO_LAST_AT = now;
-  return fbmSyncConfigureRelay().then(function (config) {
-    if (config && typeof fbmSyncHeartbeatOnSidebarOpen === 'function') { fbmSyncHeartbeatOnSidebarOpen(); }
-    return config;
-  });
+  // Mở Sidebar chỉ bắt tay và cập nhật relay; chỉ alarm/nút lệnh mới được yêu cầu GAS cấp request FBM.
+  return fbmSyncConfigureRelay();
 }
 /** Gửi relay config và tùy chọn chờ Extension xác nhận đã lưu. */
 function fbmSyncPostRelayConfig(config, requireAck) {
   if (window.top === window || !config || !config.url || !config.key) { return Promise.resolve(false); }
   var id = String(Date.now()) + '-' + Math.random().toString(36).slice(2);
   if (!requireAck) {
-    window.top.postMessage({ action: 'CRM_FBM_CONFIG', id: id, nonce: SHEET_LINK_NONCE, config: { url: config.url, key: config.key, spreadsheetId: config.spreadsheetId || '' } }, 'https://docs.google.com');
+    window.top.postMessage({ action: 'CRM_FBM_CONFIG', id: id, nonce: SHEET_LINK_NONCE, config: { url: config.url, key: config.key, spreadsheetId: config.spreadsheetId || '', masterEnabled: config.masterEnabled === true, backgroundEnabled: config.backgroundEnabled === true } }, 'https://docs.google.com');
     return Promise.resolve(true);
   }
   return new Promise(function (resolve, reject) {
     var timer = setTimeout(function () { delete FBM_SYNC_CLIENT.relayWaiters[id]; reject(new Error('Extension không xác nhận đã lưu khóa relay mới.')); }, 5000);
     FBM_SYNC_CLIENT.relayWaiters[id] = { resolve: resolve, reject: reject, timer: timer };
-    window.top.postMessage({ action: 'CRM_FBM_CONFIG', id: id, nonce: SHEET_LINK_NONCE, config: { url: config.url, key: config.key, spreadsheetId: config.spreadsheetId || '' } }, 'https://docs.google.com');
+    window.top.postMessage({ action: 'CRM_FBM_CONFIG', id: id, nonce: SHEET_LINK_NONCE, config: { url: config.url, key: config.key, spreadsheetId: config.spreadsheetId || '', masterEnabled: config.masterEnabled === true, backgroundEnabled: config.backgroundEnabled === true } }, 'https://docs.google.com');
   });
 }
 /**
@@ -173,6 +160,11 @@ function fbmSyncRestoreActiveAccountDraft(snapshot) {
     if (typeof active.setSelectionRange === 'function') { active.setSelectionRange(snapshot.selectionStart, snapshot.selectionEnd); }
   }
 }
+/** Tránh phá DOM input khi callback nền trả status trong lúc người dùng đang gõ. */
+function fbmSyncAccountIsEditing() {
+  var active = document.activeElement;
+  return FBM_SYNC_CLIENT.subscreen === 'account' && !!active && /^fbm-(?:identity|login)-/.test(String(active.id || ''));
+}
 /** Vẽ snapshot status, không suy diễn nghiệp vụ ở client. */
 function fbmSyncPaint(status, freshOpen) {
   var panel = document.getElementById('fbm-sync-content');
@@ -184,6 +176,10 @@ function fbmSyncPaint(status, freshOpen) {
     status = Object.assign({}, status, { phase: 'idle', label: 'Sẵn sàng', message: '', lastError: '', counts: { total: 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 } });
   }
   FBM_SYNC_CLIENT.lastStatus = status;
+  if (fbmSyncAccountIsEditing()) {
+    fbmSyncPaintHeaderState(status);
+    return;
+  }
   var activeAccountDraft = fbmSyncCaptureActiveAccountDraft();
   fbmSyncPaintHeaderState(status);
   var draftUsername = document.getElementById('fbm-login-username'); if (draftUsername) { FBM_SYNC_CLIENT.loginDraft.username = String(draftUsername.value || ''); }
@@ -378,7 +374,7 @@ function fbmSyncInstall() {
     } else if (target.hasAttribute('data-sync-background')) {
       var bg = FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.lastStatus.backgroundEnabled !== false;
       target.disabled = true;
-      callServer('fbmSetBackgroundSwitch', [!bg]).then(fbmSyncStatusOnce).catch(function (error) {
+      callServer('fbmSetBackgroundSwitch', [!bg]).then(function () { return fbmSyncConfigureRelay(); }).then(fbmSyncStatusOnce).catch(function (error) {
         fbmSyncPaintError(error, 'Không đổi được chế độ đồng bộ nền.');
       }).finally(function () { target.disabled = false; });
     } else if (target.hasAttribute('data-sync-page')) { var pageSpec = String(target.getAttribute('data-sync-page') || '').split(':'); FBM_SYNC_CLIENT.resultPages[pageSpec[0]] = Math.max(0, Number(FBM_SYNC_CLIENT.resultPages[pageSpec[0]] || 0) + Number(pageSpec[1] || 0)); fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus);
@@ -668,7 +664,7 @@ function fbmSyncTestLogin(button) {
     });
   }).then(function (result) { var status = FBM_SYNC_CLIENT.lastStatus || {}; status.message = result && result.message || 'Đã kiểm tra đăng nhập thử.'; fbmSyncPaint(status); return result;
   }).catch(function (error) { var status = FBM_SYNC_CLIENT.lastStatus || {}; status.message = String(error && error.message || error); fbmSyncPaint(status); return null;
-  }).finally(function () { var password = document.getElementById('fbm-login-password'); if (password) { password.value = ''; } if (button) { button.disabled = false; } });
+  }).finally(function () { if (button) { button.disabled = false; } });
 }
 function fbmSyncLoginTestLoop(result) {
   if (!result || result.ok === false || !result.request) {

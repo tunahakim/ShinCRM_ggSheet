@@ -84,13 +84,18 @@
   function jsonValue(text) { try { var value = JSON.parse(String(text || '')); return value && value.d !== undefined ? value.d : value; } catch (ignore) { return null; } }
   /** Salt chỉ có trên Login.aspx. Không suy diễn từ tab đang mở vì tab đó thường là zccrAccount.aspx. */
   function loginValueFromPage(html) {
-    var source = String(html || document.documentElement && document.documentElement.innerHTML || ''), patterns = [
+    var source = String(html || document.documentElement && document.documentElement.innerHTML || ''), challenge = source.match(/"ChallengeScript"\s*:\s*"([^"]+)"/i), pieces, patterns = [
       /\\u0027([a-f0-9]{4,})\\u0027\s*\+\s*\\u0027([a-f0-9]{4,})\\u0027/i,
       /u0027([a-f0-9]{4,})u0027\s*\+\s*u0027([a-f0-9]{4,})u0027/i,
       /'([a-f0-9]{4,})'\s*\+\s*'([a-f0-9]{4,})'/i,
       /(?:loginValue|encryptSalt|encrypt_salt|passwordSalt|loginSalt)\s*[=:]\s*["']([^"']+)["']/i,
       /["']value["']\s*:\s*["']([^"']+)["']/i
     ];
+    // HTML FBM thực tế escape dấu nháy nhiều lớp: eval(\u0027\\\u0027a2838e...). Chỉ ghép hai đoạn hex trong ChallengeScript.
+    if (challenge) {
+      pieces = (challenge[1].replace(/\\+u0027/gi, '|').match(/[a-f0-9]{4,}/gi) || []);
+      if (pieces.length >= 2) { return String(pieces[0]) + String(pieces[1]); }
+    }
     for (var i = 0; i < patterns.length; i += 1) {
       var match = source.match(patterns[i]);
       if (match) { return match[2] ? String(match[1]) + String(match[2]) : match[1]; }

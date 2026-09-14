@@ -123,16 +123,6 @@ window.addEventListener('message', function (event) {
     });
     return;
   }
-  if (data && data.action === 'CRM_FBM_HEARTBEAT_NOW') {
-    if (!isAllowedSidebarOrigin(event.origin) || event.source !== sidebarWindow || String(data.nonce || '') !== sidebarNonce) { return; }
-    sendRequestToWorker({ type: 'FBM_HEARTBEAT_NOW', source: 'sidebar_open' }, function (error, reply) {
-      if (isInvalidatedExtensionError(error)) { return; }
-      try {
-        event.source.postMessage({ action: 'CRM_FBM_HEARTBEAT_RESULT', nonce: sidebarNonce, ok: !error && !(reply && reply.ok === false), code: error ? 'EXTENSION_ERROR' : (reply && reply.code || '') }, event.origin);
-      } catch (ignoreHeartbeatAck) {}
-    });
-    return;
-  }
   if (data && data.action === 'CRM_FBM_CREDENTIALS') {
     if (!isAllowedSidebarOrigin(event.origin) || event.source !== sidebarWindow || String(data.nonce || '') !== sidebarNonce) { return; }
     sendRequestToWorker({ type: 'FBM_ENCRYPT_CREDENTIALS', credentials: data.credentials || {} }, function (error, reply) {
