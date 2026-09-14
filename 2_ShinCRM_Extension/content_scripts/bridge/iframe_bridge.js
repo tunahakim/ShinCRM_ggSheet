@@ -113,6 +113,9 @@ window.addEventListener('message', function (event) {
   if (data && data.action === 'CRM_FBM_CONFIG') {
     if (!isAllowedSidebarOrigin(event.origin) || event.source !== sidebarWindow || String(data.nonce || '') !== sidebarNonce) { return; }
     sendRequestToWorker({ type: 'FBM_CONFIGURE_RELAY', config: data.config || {} }, function (error, reply) {
+      // Content script cũ còn sống vài nhịp sau khi Extension reload. Khi đó
+      // runtime đã bị vô hiệu hóa; không biến lỗi nội bộ thành cảnh báo nghiệp vụ.
+      if (isInvalidatedExtensionError(error)) { return; }
       if (error && console && console.warn) { console.warn('Không lưu được cấu hình relay FBM:', error); }
       try {
         event.source.postMessage({ action: 'CRM_FBM_CONFIG_ACK', nonce: sidebarNonce, id: String(data.id || ''), ok: !error && !(reply && reply.ok === false), error: error ? error.message : (reply && reply.error || '') }, event.origin);
@@ -120,9 +123,20 @@ window.addEventListener('message', function (event) {
     });
     return;
   }
+  if (data && data.action === 'CRM_FBM_HEARTBEAT_NOW') {
+    if (!isAllowedSidebarOrigin(event.origin) || event.source !== sidebarWindow || String(data.nonce || '') !== sidebarNonce) { return; }
+    sendRequestToWorker({ type: 'FBM_HEARTBEAT_NOW', source: 'sidebar_open' }, function (error, reply) {
+      if (isInvalidatedExtensionError(error)) { return; }
+      try {
+        event.source.postMessage({ action: 'CRM_FBM_HEARTBEAT_RESULT', nonce: sidebarNonce, ok: !error && !(reply && reply.ok === false), code: error ? 'EXTENSION_ERROR' : (reply && reply.code || '') }, event.origin);
+      } catch (ignoreHeartbeatAck) {}
+    });
+    return;
+  }
   if (data && data.action === 'CRM_FBM_CREDENTIALS') {
     if (!isAllowedSidebarOrigin(event.origin) || event.source !== sidebarWindow || String(data.nonce || '') !== sidebarNonce) { return; }
     sendRequestToWorker({ type: 'FBM_ENCRYPT_CREDENTIALS', credentials: data.credentials || {} }, function (error, reply) {
+      if (isInvalidatedExtensionError(error)) { return; }
       try {
         event.source.postMessage({ action: 'CRM_FBM_CREDENTIALS_RESULT', nonce: sidebarNonce, id: String(data.id || ''), result: error ? null : reply, error: error ? error.message : (reply && reply.error || '') }, event.origin);
       } catch (ignoreCredentialsAck) {}

@@ -38,7 +38,11 @@ async function sidebarBoot() {
     selectionPollInstall();
     sheetLinkInstall();
     // Bắt tay phải được dựng trước khi gửi relay config; bridge sẽ bỏ tin chưa có nonce/kênh.
-    if (typeof fbmSyncConfigureRelay === 'function') { fbmSyncConfigureRelay().catch(function () {}); }
+    if (typeof fbmSyncConfigureRelay === 'function') {
+      fbmSyncConfigureRelay().then(function () {
+        if (typeof fbmSyncHeartbeatOnSidebarOpen === 'function') { fbmSyncHeartbeatOnSidebarOpen(); }
+      }).catch(function () {});
+    }
     selectionPollSetReady(false);
 
     statusInfoLine('Đang đo ngân sách ô và nạp lõi…');

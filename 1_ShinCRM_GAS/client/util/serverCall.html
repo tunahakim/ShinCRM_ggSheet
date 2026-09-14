@@ -23,18 +23,33 @@
  * Ném lỗi khi máy chủ ném — theo bảng ở tài liệu 10 Phần 8, hàm sidebar ném lại lỗi để `withFailureHandler` hiện, và đây
  * chính là chỗ nhận nó.
  */
+var CALL_SERVER_TIMEOUT_MS = 30000;
 function callServer(name, args) {
   return new Promise(function (resolve, reject) {
     progressBegin();
     var batDau = Date.now();
+    var settled = false;
+    var timeout = setTimeout(function () {
+      if (settled) { return; }
+      settled = true;
+      progressEnd();
+      callTimingRecord(name, Date.now() - batDau, null);
+      reject(new Error('Máy chủ không phản hồi hàm ' + name + ' sau ' + CALL_SERVER_TIMEOUT_MS + ' ms.'));
+    }, CALL_SERVER_TIMEOUT_MS);
 
     var runner = google.script.run
       .withSuccessHandler(function (result) {
+        if (settled) { return; }
+        settled = true;
+        clearTimeout(timeout);
         progressEnd();
         callTimingRecord(name, Date.now() - batDau, result && result.ms);
         resolve(result);
       })
       .withFailureHandler(function (err) {
+        if (settled) { return; }
+        settled = true;
+        clearTimeout(timeout);
         progressEnd();
         callTimingRecord(name, Date.now() - batDau, null);
         reject(err);

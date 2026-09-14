@@ -151,6 +151,9 @@ function rawFbmReply(reply) {
 
 /** Gọi Web App relay và đọc kết quả handoff mà không ghi payload vào log. */
 var GAS_RELAY_TIMEOUT_MS = 15000;
+var GAS_RELAY_REFRESH_COOLDOWN_MS = 30000;
+var relayRefreshFlight = null;
+var relayRefreshLastAt = 0;
 
 /** Lưu dấu chẩn đoán relay tối thiểu để có thể kiểm tra khi không có Sidebar. */
 function noteRelayStatus(status) {
@@ -204,12 +207,17 @@ function postRelay(url, key, body) {
 
 /** Yêu cầu Sidebar đang mở lấy lại URL deployment hiện tại từ GAS. */
 function requestRelayRefresh(reason) {
-  return chrome.tabs.query({ url: ['https://docs.google.com/*'] }).then(function (tabs) {
+  var now = Date.now();
+  if (relayRefreshFlight) { return relayRefreshFlight; }
+  if (now - relayRefreshLastAt < GAS_RELAY_REFRESH_COOLDOWN_MS) { return Promise.resolve([]); }
+  relayRefreshLastAt = now;
+  relayRefreshFlight = chrome.tabs.query({ url: ['https://docs.google.com/*'] }).then(function (tabs) {
     var targets = (tabs || []).filter(function (tab) { return /https:\/\/docs\.google\.com\/spreadsheets\//i.test(String(tab && tab.url || '')); });
     return Promise.all(targets.map(function (tab) {
       return sendTabMessage(tab.id, { type: 'CRM_REFRESH_RELAY', reason: String(reason || '') }, 1500).catch(function () { return null; });
     }));
-  }).catch(function () { return []; });
+  }).catch(function () { return []; }).finally(function () { relayRefreshFlight = null; });
+  return relayRefreshFlight;
 }
 
 /** Probe chỉ gọi Web App GAS; không tìm tab FBM, không gửi request nghiệp vụ. */
@@ -229,6 +237,7 @@ function fbmRelayProbe() {
 if (typeof globalThis !== 'undefined') { globalThis.fbmRelayProbe = fbmRelayProbe; }
 
 var fbmBackgroundSyncFlight = null;
+var fbmHeartbeatFlight = null;
 var FBM_BACKGROUND_SYNC_MAX_REQUESTS = 100;
 
 function noteBackgroundSyncStatus(stage, extra) {
@@ -245,9 +254,10 @@ function noteHeartbeatStatus(stage, extra) {
 
 /** Chạy ngay một heartbeat để nghiệm thu; alarm 5 phút chỉ gọi lại đúng luồng này. */
 function fbmHeartbeatNow(source) {
+  if (fbmHeartbeatFlight) { return fbmHeartbeatFlight; }
   var origin = String(source || 'manual');
   noteHeartbeatStatus('started', { source: origin });
-  return getRelayConfig().then(function (config) {
+  fbmHeartbeatFlight = getRelayConfig().then(function (config) {
     if (!config) {
       noteHeartbeatStatus('blocked_config', { source: origin, code: 'RELAY_CONFIG_MISSING' });
       return { ok: false, code: 'RELAY_CONFIG_MISSING', error: 'Thiếu cấu hình relay; hãy mở Sidebar một lần.' };
@@ -259,7 +269,7 @@ function fbmHeartbeatNow(source) {
         noteHeartbeatStatus('blocked_relay', { source: origin, code: probeCode, error: String(probe && (probe.error || probe.message) || 'GAS relay chưa sẵn sàng.').slice(0, 240) });
         return { ok: false, code: probeCode, error: String(probe && (probe.error || probe.message) || 'GAS relay chưa sẵn sàng.') };
       }
-      if (probe.masterEnabled === false || (origin === 'alarm' && probe.backgroundEnabled === false)) {
+      if (probe.masterEnabled === false || ((origin === 'alarm' || origin === 'sidebar_open') && probe.backgroundEnabled === false)) {
         var switchCode = probe.masterEnabled === false ? 'SYNC_DISABLED' : 'BACKGROUND_DISABLED';
         noteHeartbeatStatus('blocked_switch', { source: origin, code: switchCode });
         return { ok: false, code: switchCode, error: switchCode === 'SYNC_DISABLED' ? 'Đồng bộ đang tắt.' : 'Đồng bộ nền đang tắt.' };
@@ -288,7 +298,8 @@ function fbmHeartbeatNow(source) {
     var message = String(error && error.message || error);
     noteHeartbeatStatus('failed', { source: origin, code: 'HEARTBEAT_FAILED', error: message.slice(0, 240) });
     return { ok: false, code: 'HEARTBEAT_FAILED', error: message };
-  });
+  }).finally(function () { fbmHeartbeatFlight = null; });
+  return fbmHeartbeatFlight;
 }
 if (typeof globalThis !== 'undefined') { globalThis.fbmHeartbeatNow = fbmHeartbeatNow; }
 
@@ -422,7 +433,7 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     return true;
   }
   if (message && message.type === 'FBM_HEARTBEAT_NOW') {
-    fbmHeartbeatNow('manual').then(sendResponse);
+    fbmHeartbeatNow(message.source || 'manual').then(sendResponse);
     return true;
   }
   if (!message || message.type !== 'FBM_EXECUTE_REQUEST') { return false; }

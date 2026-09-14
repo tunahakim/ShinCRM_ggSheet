@@ -42,15 +42,30 @@ function fbmSyncLoadSettings() {
   return callServer('fbmGetSyncSettings').then(function (result) { FBM_SYNC_CLIENT.syncSettings = result && result.settings || {}; if (FBM_SYNC_CLIENT.lastStatus) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); } return FBM_SYNC_CLIENT.syncSettings; }).catch(function () { FBM_SYNC_CLIENT.syncSettings = {}; return null; });
 }
 /** Đưa cấu hình Web App/khóa sang Extension; không gửi cookie hay payload FBM. */
+var FBM_SYNC_RELAY_CONFIGURE_FLIGHT = null;
+var FBM_SYNC_OPEN_HEARTBEAT_SENT = false;
+function fbmSyncHeartbeatOnSidebarOpen() {
+  if (FBM_SYNC_OPEN_HEARTBEAT_SENT || window.top === window || !SHEET_LINK_NONCE) { return false; }
+  FBM_SYNC_OPEN_HEARTBEAT_SENT = true;
+  try {
+    window.top.postMessage({ action: 'CRM_FBM_HEARTBEAT_NOW', nonce: SHEET_LINK_NONCE }, 'https://docs.google.com');
+    return true;
+  } catch (ignore) {
+    return false;
+  }
+}
 function fbmSyncConfigureRelay() {
+  if (FBM_SYNC_RELAY_CONFIGURE_FLIGHT) { return FBM_SYNC_RELAY_CONFIGURE_FLIGHT; }
   if (typeof callServer !== 'function') { return Promise.resolve(null); }
-  return callServer('fbmGetRelayConfig').then(function (config) {
+  return FBM_SYNC_RELAY_CONFIGURE_FLIGHT = callServer('fbmGetRelayConfig').then(function (config) {
     return fbmSyncPostRelayConfig(config, true).then(function (saved) {
       if (!saved) { throw new Error('Extension không xác nhận đã cập nhật URL relay GAS.'); }
       FBM_SYNC_CLIENT.relayConfigured = true;
+      FBM_SYNC_RELAY_CONFIGURE_FLIGHT = null;
       return config;
     });
   }).catch(function (error) {
+    FBM_SYNC_RELAY_CONFIGURE_FLIGHT = null;
     fbmSyncPaintError(error, 'Không cập nhật được URL relay GAS hiện tại.');
     return null;
   });
