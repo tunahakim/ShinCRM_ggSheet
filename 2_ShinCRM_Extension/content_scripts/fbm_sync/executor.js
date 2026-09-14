@@ -43,7 +43,7 @@
   }
   /** Thay token theo chỉ dẫn GAS mà không parse hoặc dựng lại JSON nghiệp vụ. */
   function applyTransportReplacements(request, bodyText) {
-    var transport = request && request.transport || request && request.meta && request.meta.transport || {}, replacements = Array.isArray(transport.replacements) ? transport.replacements : [], values = captureTransportValues(request, '', 'page_html'), output = bodyText;
+    var transport = request && request.transport || request && request.meta && request.meta.transport || {}, replacements = Array.isArray(transport.replacements) ? transport.replacements : [], values = captureTransportValues(request, '', ''), output = bodyText;
     replacements.forEach(function (replacement) {
       var item = replacement || {}, token = String(item.token || ''), value = values[String(item.capture || '')];
       if (!token || value === undefined || value === null) { return; }
