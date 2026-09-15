@@ -6,7 +6,6 @@
 .shin-sync-nav { display:flex; gap:var(--shin-gap-2); padding:var(--shin-gap-1) var(--shin-gap-3); border-bottom:1px solid var(--shin-border-faint); background:var(--shin-bg); overflow-x:auto; }
 .shin-sync-nav button { flex:0 0 auto; border:0; border-bottom:2px solid transparent; padding:var(--shin-gap-1) var(--shin-gap-2); background:none; color:var(--shin-text-soft); font:inherit; font-size:var(--shin-text-xs); cursor:pointer; }
 .shin-sync-nav button.is-active { border-color:var(--shin-primary); color:var(--shin-primary); font-weight:700; }
-.shin-sync-disabled-banner { margin:var(--shin-gap-2) var(--shin-gap-3) 0; padding:var(--shin-gap-2); border-left:3px solid var(--shin-error); background:var(--shin-error-soft); color:var(--shin-error); font-size:var(--shin-text-sm); }
 .shin-sync-content-disabled { opacity:.58; }
 .shin-sync-content-disabled button:not(#fbm-sync-master-switch), .shin-sync-content-disabled select, .shin-sync-content-disabled input, .shin-sync-content-disabled textarea { pointer-events:none; }
 .shin-sync-section { display:flex; flex-direction:column; gap:var(--shin-gap-2); padding:var(--shin-gap-1) 0 var(--shin-gap-4) var(--shin-scrollbar-size); }
@@ -32,6 +31,7 @@
 .shin-sync-form-field { display:flex; flex-direction:column; gap:4px; margin-bottom:var(--shin-gap-2); }
 .shin-sync-form-field label { color:var(--shin-text-soft); font-size:var(--shin-text-xs); }
 .shin-sync-form-actions { display:flex; flex-wrap:wrap; gap:var(--shin-gap-2); }
+.shin-sync-form-actions > .shin-row { flex:1 1 100%; width:100%; }
 .shin-sync-pagination { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--shin-gap-2); margin-top:var(--shin-gap-2); }
 .shin-sync-pagination .shin-button { width:100%; min-height:32px; padding:var(--shin-gap-1) var(--shin-gap-2); }
 .shin-sync-pagination .shin-button:disabled { border-color:var(--shin-border-strong); background:var(--shin-bg-sunken); color:var(--shin-text-soft); cursor:not-allowed; opacity:1; }
@@ -57,7 +57,6 @@
 .shin-sync-master-switch.is-on .shin-sync-switch-label { justify-content:flex-start; padding-left:4px; padding-right:0; }
 .shin-sync-master-switch.is-on .shin-sync-switch-knob { transform:translateX(21px); }
 .shin-sync-master-switch.is-off { border-color:#9aa0a6; background:#9aa0a6; }
-.shin-sync-disabled-banner { margin:var(--shin-gap-2) 0 0 var(--shin-scrollbar-size); padding:var(--shin-gap-2) var(--shin-gap-3); border-left:3px solid var(--shin-error); border-radius:var(--shin-radius-sm); line-height:1.35; }
 .shin-sync-section { padding:var(--shin-gap-1) 0 var(--shin-gap-4) var(--shin-scrollbar-size); }
 .shin-sync-section > .shin-card + .shin-card,
 .shin-sync-section > .shin-sync-summary-grid + .shin-card { margin-top:0; }
@@ -122,54 +121,18 @@
 @keyframes shin-sync-spin { to { transform:rotate(360deg); } }
 </style>
 <script>
-/*
-function fbmSyncElement(tag, className, text) { var node = document.createElement(tag); if (className) { node.className = className; } if (text !== undefined) { node.textContent = text; } return node; }
-function fbmSyncRenderShellLegacy(status) {
-  var screen = document.getElementById('fbm-sync-screen'); if (!screen) { return; }
-  screen.className = 'shin-sync-screen shin-sync-module';
-  var header = document.getElementById('fbm-sync-module-header');
-  if (!header) {
-    header = fbmSyncElement('div', 'shin-sync-module-header'); header.id = 'fbm-sync-module-header';
-    var back = fbmSyncElement('button', 'shin-sync-header-btn', '←'); back.id = 'fbm-sync-back'; back.setAttribute('aria-label', 'Quay lại'); header.appendChild(back);
-    header.appendChild(fbmSyncElement('strong', 'shin-sync-module-title', 'Đồng bộ FBM'));
-    var master = fbmSyncElement('button', 'shin-sync-master-switch'); master.id = 'fbm-sync-master-switch'; master.setAttribute('aria-label', 'Bật hoặc tắt đồng bộ'); master.setAttribute('aria-pressed', 'false'); master.appendChild(fbmSyncElement('span', 'shin-sync-switch-label')); master.appendChild(fbmSyncElement('span', 'shin-sync-switch-knob')); header.appendChild(master);
-    var menu = fbmSyncElement('button', 'shin-sync-header-btn', '☰'); menu.id = 'fbm-sync-module-menu'; menu.setAttribute('aria-label', 'Mở menu Đồng bộ'); header.appendChild(menu);
-    screen.insertBefore(header, screen.firstChild);
-  }
-  var title = header.querySelector('.shin-sync-module-title');
-  var screenInfo = (FBM_SYNC_UI_SCHEMA.screens || []).filter(function (item) { return item.id === FBM_SYNC_CLIENT.subscreen; })[0];
-  if (title) { title.textContent = screenInfo ? screenInfo.label : 'Đồng bộ FBM'; }
-  var nav = document.getElementById('fbm-sync-nav');
-  if (!nav) { nav = fbmSyncElement('nav', 'shin-popup-list shin-sync-nav'); nav.id = 'fbm-sync-nav'; nav.hidden = true; screen.insertBefore(nav, document.getElementById('fbm-sync-content')); }
-  var navItems = nav.querySelectorAll('[data-sync-screen]');
-  if (navItems.length !== FBM_SYNC_UI_SCHEMA.screens.length) {
-    nav.textContent = '';
-    FBM_SYNC_UI_SCHEMA.screens.forEach(function (item) { var b = fbmSyncElement('button', item.id === FBM_SYNC_CLIENT.subscreen ? 'is-active' : '', item.label); b.type = 'button'; b.setAttribute('data-sync-screen', item.id); nav.appendChild(b); });
-    navItems = nav.querySelectorAll('[data-sync-screen]');
-  }
-  navItems.forEach(function (button) { button.classList.toggle('is-active', button.getAttribute('data-sync-screen') === FBM_SYNC_CLIENT.subscreen); });
-  var enabled = !(status && (status.masterEnabled === false || status.enabled === false));
-  var masterButton = document.getElementById('fbm-sync-master-switch');
-  if (masterButton) { masterButton.classList.toggle('is-on', enabled); masterButton.classList.toggle('is-off', !enabled); var switchLabel = masterButton.querySelector('.shin-sync-switch-label'); if (switchLabel) { switchLabel.textContent = enabled ? 'ON' : 'OFF'; } masterButton.setAttribute('aria-pressed', enabled ? 'true' : 'false'); masterButton.title = enabled ? 'Đồng bộ đang bật' : 'Đồng bộ đang tắt'; }
-  var content = document.getElementById('fbm-sync-content');
-  if (content) { content.classList.toggle('shin-sync-content-disabled', !enabled); }
-  var banner = document.getElementById('fbm-sync-disabled-banner');
-  if (!banner && content) { banner = fbmSyncElement('div', 'shin-sync-disabled-banner', 'Đồng bộ đang tắt. Các màn hình chỉ xem được trạng thái; không chạy, ghi, đăng nhập tự động hoặc xử lý xung đột.'); banner.id = 'fbm-sync-disabled-banner'; content.parentNode.insertBefore(banner, content); }
-  if (banner) { banner.hidden = enabled; }
-}
-*/
 function fbmSyncShellEnabled(status) { return !(status && (status.masterEnabled === false || status.enabled === false)); }
 function fbmSyncShellTitle() {
   var item = (FBM_SYNC_UI_SCHEMA.screens || []).filter(function (screen) { return screen.id === FBM_SYNC_CLIENT.subscreen; })[0];
-  return item ? item.label : '\u0110\u1ed3ng b\u1ed9 FBM';
+  return item ? item.label : 'Đồng bộ FBM';
 }
 function fbmSyncShellHeaderBlock(status) {
   var enabled = fbmSyncShellEnabled(status);
   return Box({ id: 'fbm-sync-module-header', className: 'shin-sync-module-header', elements: [
-    Icon({ id: 'fbm-sync-back', icon: 'back', tooltip: 'Quay l\u1ea1i' }),
+    Icon({ id: 'fbm-sync-back', icon: 'back', tooltip: 'Quay lại' }),
     Text({ id: 'fbm-sync-module-title', className: 'shin-sync-module-title', text: fbmSyncShellTitle() }),
-    StandaloneControl({ id: 'fbm-sync-master-switch', kind: 'toggle', pressed: enabled, className: 'shin-sync-master-switch ' + (enabled ? 'is-on' : 'is-off'), ariaLabel: 'B\u1eadt ho\u1eb7c t\u1eaft \u0111\u1ed3ng b\u1ed9' }),
-    Icon({ id: 'fbm-sync-module-menu', icon: 'more', tooltip: 'M\u1edf menu \u0111\u1ed3ng b\u1ed9' })
+    StandaloneControl({ id: 'fbm-sync-master-switch', kind: 'toggle', pressed: enabled, className: 'shin-sync-master-switch ' + (enabled ? 'is-on' : 'is-off'), ariaLabel: 'Bật hoặc tắt đồng bộ' }),
+    Icon({ id: 'fbm-sync-module-menu', icon: 'more', tooltip: 'Mở menu đồng bộ' })
   ] });
 }
 function fbmSyncShellNavBlock() {
@@ -177,22 +140,17 @@ function fbmSyncShellNavBlock() {
     return Button({ label: item.label, className: item.id === FBM_SYNC_CLIENT.subscreen ? 'is-active' : '', data: { 'sync-screen': item.id } });
   }) });
 }
-function fbmSyncShellBannerBlock(status) {
-  return Box({ id: 'fbm-sync-disabled-banner', className: 'shin-sync-disabled-banner', hidden: fbmSyncShellEnabled(status), elements: [Text({ text: '\u0110\u1ed3ng b\u1ed9 \u0111ang t\u1eaft. C\u00e1c m\u00e0n h\u00ecnh ch\u1ec9 xem \u0111\u01b0\u1ee3c tr\u1ea1ng th\u00e1i; kh\u00f4ng ch\u1ea1y, ghi, \u0111\u0103ng nh\u1eadp t\u1ef1 \u0111\u1ed9ng ho\u1eb7c x\u1eed l\u00fd xung \u0111\u1ed9t.' })] });
-}
 function fbmSyncRenderShell(status) {
-  var screen = document.getElementById('fbm-sync-screen'), headerMount = document.getElementById('fbm-sync-shell-header-region'), navMount = document.getElementById('fbm-sync-shell-nav-region'), bannerMount = document.getElementById('fbm-sync-shell-banner-region');
-  if (!screen || !headerMount || !navMount || !bannerMount || typeof RENDER_INDEX === 'undefined') { return; }
+  var screen = document.getElementById('fbm-sync-screen'), headerMount = document.getElementById('fbm-sync-shell-header-region'), navMount = document.getElementById('fbm-sync-shell-nav-region');
+  if (!screen || !headerMount || !navMount || typeof RENDER_INDEX === 'undefined') { return; }
   if (!RENDER_INDEX.nodes['fbm-sync-module-header'] || !document.getElementById('fbm-sync-module-header')) { fbmSyncReplaceBlocks(headerMount, [fbmSyncShellHeaderBlock(status)]); }
   else {
     fbmSyncSetTargetState('fbm-sync-module-title', { text: fbmSyncShellTitle() });
     var enabled = fbmSyncShellEnabled(status);
-    fbmSyncSetTargetState('fbm-sync-master-switch', { ariaPressed: enabled, addClass: [enabled ? 'is-on' : 'is-off'], removeClass: [enabled ? 'is-off' : 'is-on'], childText: { '.shin-sync-switch-label': enabled ? 'ON' : 'OFF' }, title: enabled ? '\u0110\u1ed3ng b\u1ed9 \u0111ang b\u1eadt' : '\u0110\u1ed3ng b\u1ed9 \u0111ang t\u1eaft' });
+    fbmSyncSetTargetState('fbm-sync-master-switch', { ariaPressed: enabled, addClass: [enabled ? 'is-on' : 'is-off'], removeClass: [enabled ? 'is-off' : 'is-on'], childText: { '.shin-sync-switch-label': enabled ? 'ON' : 'OFF' }, title: enabled ? 'Đồng bộ đang bật' : 'Đồng bộ đang tắt' });
   }
   if (!RENDER_INDEX.nodes['fbm-sync-nav'] || !document.getElementById('fbm-sync-nav')) { fbmSyncReplaceBlocks(navMount, [fbmSyncShellNavBlock()]); }
   else { fbmSyncRenderTarget('fbm-sync-nav', fbmSyncShellNavBlock().elements); }
-  if (!RENDER_INDEX.nodes['fbm-sync-disabled-banner'] || !document.getElementById('fbm-sync-disabled-banner')) { fbmSyncReplaceBlocks(bannerMount, [fbmSyncShellBannerBlock(status)]); }
-  else { fbmSyncSetTargetState('fbm-sync-disabled-banner', { hidden: fbmSyncShellEnabled(status) }); }
   fbmSyncSetTargetState('fbm-sync-nav', { hidden: FBM_SYNC_CLIENT.navOpen !== true });
   fbmSyncSetTargetState('fbm-sync-content', { addClass: fbmSyncShellEnabled(status) ? [] : ['shin-sync-content-disabled'], removeClass: fbmSyncShellEnabled(status) ? ['shin-sync-content-disabled'] : [] });
 }
@@ -203,7 +161,7 @@ function fbmSyncRenderLoading() {
   if (typeof RENDER_INDEX !== 'undefined' && RENDER_INDEX.nodes) {
     ['fbm-sync-overview-root', 'fbm-sync-account-root', 'fbm-sync-run-root', 'fbm-sync-results-root', 'fbm-sync-settings-root'].forEach(function (id) { delete RENDER_INDEX.nodes[id]; });
   }
-  fbmSyncReplaceBlocks(panel, [Box({ className: 'shin-sync-section', elements: [Text({ className: 'shin-sync-section-title', text: '\u0110\u1ed3ng b\u1ed9 FBM' }), Text({ className: 'shin-sync-loading', text: '\u0110ang t\u1ea3i tr\u1ea1ng th\u00e1i phi\u00ean...' })] })]);
+  fbmSyncReplaceBlocks(panel, [Box({ className: 'shin-sync-section', elements: [Text({ className: 'shin-sync-section-title', text: 'Đồng bộ FBM' }), Text({ className: 'shin-sync-loading', text: 'Đang tải trạng thái phiên...' })] })]);
 }
 function fbmSyncSetScreen(screenId) {
   var ids = FBM_SYNC_UI_SCHEMA.screens.map(function (item) { return item.id; });

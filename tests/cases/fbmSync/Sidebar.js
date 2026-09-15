@@ -7,7 +7,7 @@ function taoBoTest() {
   const dom = domGia();
   const screen = dom.document.createElement('div');
   screen.id = 'fbm-sync-screen';
-  ['fbm-sync-shell-header-region', 'fbm-sync-shell-nav-region', 'fbm-sync-shell-banner-region'].forEach((id) => {
+  ['fbm-sync-shell-header-region', 'fbm-sync-shell-nav-region'].forEach((id) => {
     const mount = dom.document.createElement('div'); mount.id = id; screen.appendChild(mount);
   });
   const content = dom.document.createElement('div');
@@ -122,9 +122,10 @@ async function chay(so) {
   const pushError = { phase: 'error', runId: 'r3', cursor: { kind: 'push_wait' }, lastFailureCode: 'FBM_VERIFY_FAILED', label: 'Có lỗi', counts: {} };
 
   const shellHeader = hop.fbmSyncShellHeaderBlock(idle);
-  check(so, 'header Đồng bộ dùng Icon chung, không gắn nút hình chữ nhật riêng', [shellHeader.elements[0].role, shellHeader.elements[0].className, shellHeader.elements[3].role, shellHeader.elements[3].className], ['icon', '', 'icon', '']);
+  check(so, 'header Đồng bộ dùng Icon chung, không gắn nút hình chữ nhật riêng', [shellHeader.elements[0].role, shellHeader.elements[0].className, shellHeader.elements[3].role, shellHeader.elements[3].className, hop.fbmSyncShellTitle()], ['icon', '', 'icon', '', 'Tổng quan']);
 
   check(so, 'Overview render được trạng thái rỗng', !!render(hop, content, hop.fbmSyncRenderOverview, idle).querySelector('.shin-sync-overview-state'), true);
+  check(so, 'Overview không đặt dòng hướng dẫn chung ngay dưới header', hop.fbmSyncOverviewBlocks(idle)[0].role, 'card');
   hop.FBM_SYNC_CLIENT.subscreen = 'overview';
   hop.fbmSyncRenderLoading();
   check(so, 'loading xóa dấu màn cũ để snapshot đầu tiên dựng lại Tổng quan', [content.getAttribute('data-fbm-sync-screen'), !!hop.RENDER_INDEX.nodes['fbm-sync-overview-root']], [null, false]);
@@ -154,6 +155,8 @@ async function chay(so) {
   render(hop, content, hop.fbmSyncRenderAccount, idle);
   check(so, 'Account render đủ ba ô nhập liên kết và nút thao tác', [dom.document.getElementById('fbm-identity-spreadsheet') !== null, dom.document.getElementById('fbm-identity-user') !== null, dom.document.getElementById('fbm-identity-account') !== null, dom.document.getElementById('fbm-sync-probe-identity') !== null], [true, true, true, true]);
   check(so, 'Account dùng ô mật khẩu và không có giá trị lưu sẵn', [dom.document.getElementById('fbm-login-password').type, dom.document.getElementById('fbm-login-password').value], ['password', '']);
+  const loginActionRow = hop.fbmSyncLoginActionBlocks()[0];
+  check(so, 'Hai nút đăng nhập dùng Row chung để chia đều hai cột', [loginActionRow.role, loginActionRow.elements.length, loginActionRow.elements[0].role, loginActionRow.elements[1].role], ['row', 2, 'button', 'button']);
 
   hop.FBM_SYNC_CLIENT.identityLastAction = 'probe';
   hop.fbmSyncApplyIdentityProbeDraft({ metadata: { identityProbe: { spreadsheetId: 'sheet-probe', userId: '2037', username: 'anhlt', accountName: 'ANHLT' } } });
@@ -164,8 +167,9 @@ async function chay(so) {
   dom.document.activeElement = dom.document.getElementById('fbm-identity-user');
   hop.fbmSyncPaint({ phase: 'done', counts: {}, metadata: { identityProbe: { spreadsheetId: 'sheet-focused', userId: '3001', username: 'focused-user', accountName: 'Focused Account' } } });
   check(so, 'Identity probe vẫn hiện kết quả khi ô liên kết còn focus', [dom.document.getElementById('fbm-identity-spreadsheet').value, dom.document.getElementById('fbm-identity-user').value, dom.document.getElementById('fbm-identity-username').value, dom.document.getElementById('fbm-identity-account').value], ['sheet-focused', '3001', 'focused-user', 'Focused Account']);
+  hop.FBM_SYNC_CLIENT.accountNotices = { login: { kind: 'error', message: 'Extension không trả lời yêu cầu FBM.' } };
   render(hop, content, hop.fbmSyncRenderAccount, { phase: 'error', message: 'Extension không trả lời yêu cầu FBM.', counts: {} });
-  check(so, 'Account hiện lỗi cầu nối tường minh', content.textContent.indexOf('Extension không trả lời yêu cầu FBM.') >= 0, true);
+  check(so, 'Account hiện lỗi cầu nối trong đúng card đăng nhập', [content.textContent.indexOf('Extension không trả lời yêu cầu FBM.') >= 0, content.textContent.indexOf('Đăng nhập tự động') < content.textContent.indexOf('Extension không trả lời yêu cầu FBM.')], [true, true]);
   hop.FBM_SYNC_CLIENT.accountNotices = {
     identity: { kind: 'success', message: 'Kiểm tra liên kết hoàn tất: 2/2 Customer hợp lệ.' },
     login: { kind: 'success', message: 'Đăng nhập thử thành công và đúng tài khoản FBM đã liên kết.' }

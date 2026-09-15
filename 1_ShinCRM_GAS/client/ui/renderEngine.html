@@ -547,6 +547,16 @@ function renderTargetState(id, state) {
  * duy nhất mà Sync được dùng khi chuyển màn hình hoặc khởi tạo lần đầu. */
 function renderReplaceChildren(parent, nodes, ctx) {
   if (!parent || !Array.isArray(nodes)) { throw new Error('renderReplaceChildren cần vùng đích và mảng Block.'); }
+  /* Một vùng động có thể được thay sau khi callback nền đã đăng ký các Block con. Xóa dấu tra của chính vùng đó trước khi
+     dựng cây mới; nếu giữ lại, lượt callback kế tiếp sẽ tìm thấy node cũ trong RENDER_INDEX nhưng không tìm thấy phần tử DOM. */
+  if (typeof RENDER_INDEX !== 'undefined' && RENDER_INDEX && RENDER_INDEX.nodes && typeof document !== 'undefined') {
+    Object.keys(RENDER_INDEX.nodes).forEach(function (id) {
+      var element = document.getElementById(id);
+      if (!element || element === parent || (typeof parent.contains === 'function' && parent.contains(element))) {
+        delete RENDER_INDEX.nodes[id];
+      }
+    });
+  }
   var range = document.createRange();
   var fragment = range.createContextualFragment(renderNodes(nodes, ctx || RENDER_INDEX.ctx || {}));
   parent.innerHTML = '';

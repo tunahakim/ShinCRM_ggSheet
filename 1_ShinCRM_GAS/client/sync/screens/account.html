@@ -1,21 +1,18 @@
 <script>
-function fbmSyncAccountMessageBlocks(status) {
-  status = status || {};
-  return status.message ? [Text({ className: status.phase === 'error' ? 'shin-sync-error-message' : 'shin-sync-message', text: String(status.message) })] : [];
-}
 function fbmSyncLoginConfiguredBlocks() {
   var login = FBM_SYNC_CLIENT.loginStatus || {};
   return [Text({ className: 'shin-sync-preview-row', text: login.configured ? 'Đã lưu thông tin đăng nhập được mã hóa.' : 'Chưa thiết lập thông tin đăng nhập.' })];
 }
 function fbmSyncLoginActionBlocks() {
   var active = !!FBM_SYNC_CLIENT.running;
-  return [Button({ id: 'fbm-sync-login-test', label: 'Đăng nhập thử', className: 'shin-primary', disabled: active }), Button({ id: 'fbm-sync-login-save', label: 'Lưu mã hóa', disabled: active })];
+  return [Row([
+    Button({ id: 'fbm-sync-login-test', label: 'Đăng nhập thử', className: 'shin-primary', disabled: active }),
+    Button({ id: 'fbm-sync-login-save', label: 'Lưu mã hóa', disabled: active })
+  ])];
 }
 function fbmSyncRenderAccount(panel, status) {
   status = status || {};
   return fbmSyncAppendBox(panel, 'shin-sync-section', 'fbm-sync-account-root', [
-    Text({ className: 'shin-sync-muted', text: 'Xác nhận đúng file ShinCRM và tài khoản FBM trước khi chạy phiên.' }),
-    Box({ id: 'fbm-sync-account-message-region', elements: fbmSyncAccountMessageBlocks(status) }),
     fbmSyncIdentityBlock(status),
     Card({ title: 'Đăng nhập tự động', elements: [
       Box({ id: 'fbm-sync-login-configured-region', elements: fbmSyncLoginConfiguredBlocks() }),
@@ -29,7 +26,6 @@ function fbmSyncRenderAccount(panel, status) {
 }
 function fbmSyncPatchAccount(panel, status) {
   if (!panel || !RENDER_INDEX.nodes['fbm-sync-account-root']) { return false; }
-  fbmSyncRenderTarget('fbm-sync-account-message-region', fbmSyncAccountMessageBlocks(status));
   fbmSyncPatchIdentityBlock(panel, !!FBM_SYNC_CLIENT.running, status);
   fbmSyncRenderTarget('fbm-sync-login-configured-region', fbmSyncLoginConfiguredBlocks());
   fbmSyncRenderTarget('fbm-sync-login-actions-region', fbmSyncLoginActionBlocks());

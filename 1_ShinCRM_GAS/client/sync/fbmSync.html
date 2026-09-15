@@ -278,7 +278,7 @@ function fbmSyncPaintHeaderState(status) {
   if (!button || !status) { return; }
   var phaseNow = String(status.phase || ''), enabledNow = status.masterEnabled !== false && status.enabled !== false;
   var stateNow = !enabledNow ? '' : (['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(phaseNow) >= 0 ? 'running' : (['paused', 'conflict'].indexOf(phaseNow) >= 0 ? 'paused' : (phaseNow === 'error' ? 'error' : '')));
-  fbmSyncSetTargetState('fbm-sync-module-menu', { removeClass: ['shin-sync-status-running', 'shin-sync-status-paused', 'shin-sync-status-error'], addClass: stateNow ? ['shin-sync-status-' + stateNow] : [], ariaLabel: '\u0110\u1ed3ng b\u1ed9 FBM' + (stateNow === 'running' ? ' — \u0111ang ch\u1ea1y' : stateNow === 'paused' ? ' — t\u1ea1m d\u1eebng' : stateNow === 'error' ? ' — c\u00f3 l\u1ed7i' : '') });
+  fbmSyncSetTargetState('fbm-sync-module-menu', { removeClass: ['shin-sync-status-running', 'shin-sync-status-paused', 'shin-sync-status-error'], addClass: stateNow ? ['shin-sync-status-' + stateNow] : [], ariaLabel: 'Đồng bộ FBM' + (stateNow === 'running' ? ' — đang chạy' : stateNow === 'paused' ? ' — tạm dừng' : stateNow === 'error' ? ' — có lỗi' : '') });
 }
 /** Vẽ tiến trình riêng của phiên, không dùng chung dải loading của Sidebar. */
 function fbmSyncProgressData(status, count) {
@@ -623,6 +623,9 @@ function fbmSyncRetryPushFailures() {
 function fbmSyncPaintError(error, fallback) {
   var reason = String(error && error.message || error || fallback || 'Thao tác đồng bộ thất bại.');
   var current = FBM_SYNC_CLIENT.lastStatus || {};
+  if (FBM_SYNC_CLIENT.subscreen === 'account' && typeof fbmSyncSetAccountNotice === 'function') {
+    fbmSyncSetAccountNotice(FBM_SYNC_CLIENT.identityAction ? 'identity' : 'login', 'error', reason);
+  }
   var status = Object.assign({}, current, { phase: 'error', label: 'Có lỗi', message: reason, lastError: reason });
   fbmSyncPaint(status);
   return status;
@@ -823,7 +826,7 @@ function fbmSyncSaveLoginConfig(button) {
   }).then(function (saved) {
     var password = document.getElementById('fbm-login-password'); if (password) { password.value = ''; }
     FBM_SYNC_CLIENT.loginStatus = saved || FBM_SYNC_CLIENT.loginStatus; return fbmSyncStatusOnce();
-  }).catch(function (error) { var status = FBM_SYNC_CLIENT.lastStatus || {}; status.message = String(error && error.message || error); fbmSyncPaint(status); return null;
+  }).catch(function (error) { var reason = String(error && error.message || error); fbmSyncSetAccountNotice('login', 'error', reason); var status = FBM_SYNC_CLIENT.lastStatus || {}; status.message = reason; fbmSyncPaint(status); return null;
   }).finally(function () { if (button) { button.disabled = false; } });
 }
 function fbmSyncTestLogin(button) {
