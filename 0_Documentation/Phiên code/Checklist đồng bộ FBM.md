@@ -310,7 +310,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] `Tài khoản FBM` gom nhận diện và trạng thái đăng nhập trong một màn hình; login thử phải đối chiếu user, tên tài khoản và Spreadsheet ID. Công tắc auto-login nằm duy nhất trong `Cài đặt phiên`.
 - [x] `Chạy đồng bộ` dùng dropdown diễn giải rõ `Kiểm tra an toàn`, `Lấy từ FBM → ShinCRM`, `Đẩy từ ShinCRM → FBM`, `Đồng bộ hai chiều`; không có checkbox ghi trùng ý nghĩa.
 - [x] Mọi phiên đang chạy hiển thị pipeline theo thực thể với trạng thái chưa chạy/đang chạy/hoàn tất/lỗi.
-- [x] Đồng bộ nền nằm trong `Cài đặt phiên`, `Tổng quan` chỉ hiển thị tóm tắt; lịch nền chỉ đọc FBM và tôn trọng công tắc tổng.
+- [x] Đồng bộ nền nằm trong `Cài đặt phiên`, `Tổng quan` chỉ hiển thị tóm tắt; lịch nền chạy theo chiều đã chọn và tôn trọng công tắc tổng.
 - [x] Conflict cho phép chọn `Giữ FBM`, `Giữ ShinCRM` hoặc `Tự nhập` theo từng field, có kiểm tra kiểu và trần độ dài.
 - [x] Kết quả phiên lớn dùng tổng hợp và phân trang; Sidebar không tải toàn bộ conflict/lỗi/log về RAM.
 - [x] Bố cục module động dùng Block/schema và renderer chung; loading mở màn hình, trạng thái tĩnh và tiêu đề không dựng HTML riêng trong từng màn hình.
@@ -396,6 +396,9 @@ Các ràng buộc thiết kế của slice này nằm ở Tài liệu 09.01, 09.
 - [x] Marker quá hạn sau sleep được hợp nhất thành một lượt, không phát lại hàng loạt.
 - [x] Supervisor chỉ thu hồi phiên treo, không phát lại request ghi và không xóa state cần chẩn đoán.
 - [x] API đọc/ghi lịch nền, công tắc từng tiến trình và DTO `nextRunAt` có kiểm tra giới hạn.
+- [x] Shape lịch nền versioned có công tắc tổng, ba chiều (`read`/`push`/`write`), bốn tiến trình và mặc định chu kỳ đã chốt.
+- [x] Tiến trình detail lưu cursor trang qua `DocumentProperties`, giới hạn Customer mỗi lượt và không đánh dấu missing của full scan.
+- [x] Delay detail tối thiểu/tối đa được GAS cấp thành `waitMs` trên envelope; Extension chỉ chờ rồi hỏi lại, không chứa logic nghiệp vụ.
 
 ### Extension service worker
 
@@ -418,15 +421,25 @@ Các ràng buộc thiết kế của slice này nằm ở Tài liệu 09.01, 09.
 ### Sidebar và cấu hình phiên
 
 - [x] Chuyển toàn bộ block đồng bộ nền khỏi `Tổng quan` sang `Cài đặt phiên`.
-- [x] Hiển thị block `Kết nối Extension`, nhịp `gas_poll` mặc định 5 phút, startup poll, trạng thái relay và Spreadsheet ID kỹ thuật chỉ đọc.
+- [x] Hiển thị block `Kết nối Extension`, nhịp `gas_poll` mặc định 5 phút, startup poll và trạng thái relay; Spreadsheet ID kỹ thuật không hiển thị trong Sidebar.
 - [x] Gom auto-login, tự mở tab và retry vào một nguồn cấu hình; `Tài khoản FBM` chỉ hiển thị trạng thái và nút đăng nhập thử.
 - [x] Khi lưu cấu hình, tiến trình đang chạy, lỗi relay, `request:null` và retry đều có thông báo rõ; không mất log hoặc bản nháp.
+- [x] Công tắc module trong Header và Card `Bật tắt module đồng bộ FBM` dùng cùng lệnh GAS, cập nhật lạc quan và rollback đồng thời.
+- [x] Bốn tham số phiên được migration một lần khỏi Config vào `FBM_SYNC_SETTINGS_V1`, có API đọc/ghi và validation; ngưỡng `0` được chấp nhận.
 
 ### Workflow pipeline
 
 - [x] Bổ sung workflow test dựa trên tài liệu cho startup, wake, restart, một alarm, không có việc, overlap, ưu tiên, auto-open, retry và response lớn.
 - [ ] Ma trận 44 pipeline có ít nhất một bằng chứng chạy thật qua GAS → Extension → FBM giả lập → GAS/UI cho mỗi nhánh liên quan.
-- [x] Chạy `node tests/run.js`; bộ offline hiện đạt `1420/1420`. Ma trận live/GAS DEV còn chờ các mục được đánh dấu riêng.
+- [x] Chạy `node tests/run.js`; bộ offline hiện đạt `1457/1457`. Ma trận live/GAS DEV còn chờ các mục được đánh dấu riêng.
+
+### Đợt sửa Sidebar FBM ngày 16/09/2026
+
+- [x] Dashboard Tổng quan có trạng thái liên kết, phiên gần nhất, việc cần xử lý và lịch nền; trạng thái rỗng không dựng pipeline/progress giả.
+- [x] Tài khoản FBM rút gọn thông báo liên kết, tô đỏ đúng ô thiếu, tự điền thành công chỉ báo một dòng, credential đã lưu hiển thị chỉ xem với icon sửa.
+- [x] Chạy đồng bộ và Kết quả & xử lý dùng popup/tab/action-row chuẩn, progress rỗi rỗng, năm tab đều cột, Summary có khoảng đệm và Conflict có nút quay lại một hàng riêng.
+- [x] Cài đặt phiên có công tắc module đồng bộ, lịch nền hai chiều/bốn tiến trình, batch và delay detail, tham số phiên chỉnh được trong Sidebar.
+- [x] Commit triển khai: `4370b08`, `80cb723`, `a10bba3`, `9d38fac`, `8822e72`, `801f391`, `40936a7`, `5c3acf9`.
 
 ## Slice 9 — Live acceptance và mở rộng production
 

@@ -53,8 +53,8 @@ FbmSync.backgroundScheduleDefault = function () {
     enabled: true,
     direction: 'read',
     heartbeat: { enabled: true, minutes: 5, priority: 100 },
-    customerFull: { enabled: true, minutes: 60, priority: 10 },
-    activityFull: { enabled: true, minutes: 30, priority: 20 },
+    customerFull: { enabled: true, minutes: 8 * 60, priority: 10 },
+    activityFull: { enabled: false, minutes: 24 * 60, priority: 20 },
     detail: { enabled: false, minutes: 60, priority: 30, customersPerRun: 50, minDelaySeconds: 0.5, maxDelaySeconds: 2 }
   };
 };
