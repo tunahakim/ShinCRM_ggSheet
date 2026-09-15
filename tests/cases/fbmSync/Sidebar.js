@@ -98,6 +98,13 @@ async function chay(so) {
   hop.fbmSyncPaint(Object.assign({}, idle, { label: 'Tổng quan sau loading' }));
   check(so, 'Tổng quan dựng lại được sau loading mà không dùng node cũ', [content.getAttribute('data-fbm-sync-screen'), content.textContent.indexOf('Tổng quan sau loading') >= 0], ['overview', true]);
   check(so, 'Run render không hiện pipeline khi chưa chạy', render(hop, content, hop.fbmSyncRenderRun, idle).querySelector('.shin-sync-pipeline'), null);
+  const appendRun = hop.fbmSyncAppendBox;
+  let runBlocks;
+  hop.fbmSyncAppendBox = (_panel, _className, _id, elements) => { runBlocks = elements; return content; };
+  hop.fbmSyncRenderRun(content, idle);
+  hop.fbmSyncAppendBox = appendRun;
+  const runCard = runBlocks[0], runActionRegion = runCard.elements.filter((node) => node && node.id === 'fbm-sync-run-action-region')[0];
+  check(so, 'Nút bắt đầu đồng bộ đứng trong hàng action dùng chung để căn giữa', [runActionRegion.elements[0].role, runActionRegion.elements[0].className, runActionRegion.elements[0].elements.length], ['row', 'shin-single-action-row', 1]);
   check(so, 'Run render giữ pipeline khi preflight thất bại để người dùng thấy chặng dừng', !!render(hop, content, hop.fbmSyncRenderRun, preflightError).querySelector('.shin-sync-pipeline'), true);
   check(so, 'Run render hiện pipeline khi đang xử lý', !!render(hop, content, hop.fbmSyncRenderRun, active).querySelector('.shin-sync-pipeline'), true);
   check(so, 'Run render giữ pipeline để chẩn đoán lỗi sau request', !!render(hop, content, hop.fbmSyncRenderRun, pushError).querySelector('.shin-sync-pipeline'), true);
