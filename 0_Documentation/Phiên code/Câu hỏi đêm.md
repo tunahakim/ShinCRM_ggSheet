@@ -8,10 +8,6 @@ Cách viết một mục: một đầu đề ngắn, rồi tối đa vài câu.
 
 ## Đang mở
 
-### Hợp đồng projection/capture
-
-09.01 cho phép GAS gửi chỉ dẫn projection/capture generic để giảm response lớn, còn 09A diễn đạt Extension chỉ chuyển response nguyên văn. Tạm thời giữ nguyên văn khi không có chỉ dẫn; chỉ dùng primitive generic do GAS cấp và không hardcode tên field/nghiệp vụ trong Extension.
-
 ### Thu hẹp bảng khóa Block: `elements` và `label` không còn là khóa chung
 
 Phép kiểm mới `tests/cases/blockKeys.js` bắt được bốn cặp vai–khóa mà bản khai nhận rồi bỏ đi: `label` trên `box`, `card`, `row`, `text`. Tự quyết: dời `elements` xuống ba vai chứa con và `label` xuống bốn vai có chữ, nên `Card({ label: 'GHI CHÚ' })` từ nay hét lên và chỉ dẫn sang `title`. Không dòng khai nào trong code hiện tại bị ảnh hưởng. Đã thêm một câu về luật phạm vi vào tài liệu 04 Phần 4.

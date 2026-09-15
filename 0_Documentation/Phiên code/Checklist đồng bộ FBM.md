@@ -8,7 +8,7 @@
 - `[ ]` là việc còn thiếu; mục không có nhãn **Cần kiểm chứng thực tế** là việc AI tự tiếp tục được.
 - Một slice chỉ đóng sau khi đủ code, test, log/báo cáo và checklist case của slice đó.
 - Sau khi đóng slice, ghi commit và revision GAS vào bảng bằng chứng cuối file.
-- Bộ kiểm offline gần nhất đạt `1221/1221`; phần đọc `ALT00010` và một Activity đã từng kiểm chứng, chiều ghi live vẫn chờ nghiệm thu.
+- Bộ kiểm offline gần nhất đạt `1395/1395`; các mục live vẫn được đánh dấu riêng và không được suy ra từ test offline.
 
 ## Nguồn hợp đồng
 
@@ -269,7 +269,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 
 ## Slice 7 — Heartbeat, scheduler và chạy nền
 
-- [x] Extension có alarm heartbeat 5 phút, đọc `count:1`, không tự login hoặc write; login chỉ do cổng phiên của request nghiệp vụ điều phối.
+- [x] Extension chỉ có một alarm kỹ thuật `gas_poll` mặc định 5 phút, đọc `count:1` khi GAS cấp envelope; không có alarm theo tiến trình và không tự login hoặc write.
 - [x] Heartbeat nộp kết quả cho GAS, cập nhật lần sống cuối và kích full Customer khi tổng số đổi.
 - [x] Kỳ Customer 60 phút kéo full grid qua nhiều lát, lưu cursor từng lát.
 - [x] Kỳ Activity 8 giờ chạy bulk ID và lớp `ngay_gd`.
@@ -278,7 +278,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Khi người dùng bấm `Đồng bộ ngay` trong lúc có phiên nền, GAS đánh dấu phiên nền dừng, chờ response FBM hiện tại kết thúc, không cấp request tiếp theo rồi Sidebar ưu tiên phiên thủ công; không tạo hai phiên song song. Test offline phủ handoff nền → thủ công.
 - [x] Nút Dừng đồng bộ xóa marker `scheduledScan`, không để heartbeat tự khởi động lại kỳ vừa dừng.
 - [x] Web App dùng khóa theo spreadsheet để tiếp tục khi Sidebar đóng.
-- [x] Mở lại Sidebar chỉ đọc state hiện có, không tạo kỳ thứ hai.
+- [x] Mở lại Sidebar chỉ đọc state hiện có, không tạo kỳ thứ hai; cấu hình kỹ thuật chỉ được chuyển một lần sau bắt tay local.
 - [x] Nạp lần đầu theo thứ tự Category → Customer → Activity → baseline; nếu Sheet đã có dữ liệu hoặc FBM_ID thì phải qua kiểm tra liên kết, xử lý `REBIND_REQUIRED` trước và không nhân bản. Preflight chặn cả phiên đọc/ghi thường khi lệch liên kết; chỉ chế độ kiểm tra liên kết được phép chạy để xử lý.
 - [x] Lệnh tính lại baseline không phát request write FBM.
 - [ ] **Cần kiểm chứng thực tế:** bắt đầu kỳ, đóng Sidebar, chờ Web App/Extension và mở lại xem state/log.
@@ -307,10 +307,10 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Module có menu nội bộ và năm màn hình: `Tổng quan`, `Tài khoản FBM`, `Chạy đồng bộ`, `Kết quả & xử lý`, `Cài đặt phiên`.
 - [x] Header có cụm phải `[ON/OFF] [☰]`; khi tắt, phiên thủ công, đồng bộ nền, auto-login và thao tác ghi/giải quyết conflict bị khóa, state/log vẫn xem được; menu con cuộn ở ngưỡng hai phần ba Sidebar.
 - [x] Menu con là hộp nổi dưới header, không làm nội dung màn hình dịch xuống khi mở.
-- [x] `Tài khoản FBM` gom nhận diện và đăng nhập tự động trong một màn hình; login thử phải đối chiếu user, tên tài khoản và Spreadsheet ID trước khi cho bật auto-login.
+- [x] `Tài khoản FBM` gom nhận diện và trạng thái đăng nhập trong một màn hình; login thử phải đối chiếu user, tên tài khoản và Spreadsheet ID. Công tắc auto-login nằm duy nhất trong `Cài đặt phiên`.
 - [x] `Chạy đồng bộ` dùng dropdown diễn giải rõ `Kiểm tra an toàn`, `Lấy từ FBM → ShinCRM`, `Đẩy từ ShinCRM → FBM`, `Đồng bộ hai chiều`; không có checkbox ghi trùng ý nghĩa.
 - [x] Mọi phiên đang chạy hiển thị pipeline theo thực thể với trạng thái chưa chạy/đang chạy/hoàn tất/lỗi.
-- [x] Đồng bộ nền nằm trong Tổng quan/cài đặt nền, chỉ đọc FBM và tôn trọng công tắc tổng.
+- [x] Đồng bộ nền nằm trong `Cài đặt phiên`, `Tổng quan` chỉ hiển thị tóm tắt; lịch nền chỉ đọc FBM và tôn trọng công tắc tổng.
 - [x] Conflict cho phép chọn `Giữ FBM`, `Giữ ShinCRM` hoặc `Tự nhập` theo từng field, có kiểm tra kiểu và trần độ dài.
 - [x] Kết quả phiên lớn dùng tổng hợp và phân trang; Sidebar không tải toàn bộ conflict/lỗi/log về RAM.
 - [x] Bố cục module động dùng Block/schema và renderer chung; loading mở màn hình, trạng thái tĩnh và tiêu đề không dựng HTML riêng trong từng màn hình.
@@ -370,6 +370,52 @@ Các mục dưới đây là phần đang phải hoàn thiện trước khi báo
 - [ ] Mở rộng từng use case còn lại của charter thành trace chạy được đầy đủ qua các lớp; không đánh dấu hoàn tất chỉ vì các unit test thành phần đạt.
 - [ ] Chỉ sau khi workflow offline của use case đạt mới đưa use case đó vào checklist nghiệm thu live tương ứng.
 
+## Slice 9A — Một nhịp Extension và cấu hình nền theo pipeline
+
+Các ràng buộc thiết kế của slice này nằm ở Tài liệu 09.01, 09.02, 09.06, 09.08 và 09A. Checklist dưới đây chỉ theo dõi việc triển khai và bằng chứng, không lặp lại hợp đồng.
+
+### GAS scheduler
+
+- [x] Tách hoàn toàn nhịp hỏi GAS của Extension khỏi lịch nghiệp vụ Customer, Activity và giữ phiên.
+- [x] `fbmSyncHeartbeatRequest` kiểm công tắc, phiên đang chạy, tiến trình đến hạn và reservation trước khi dựng request; không có việc thì trả `request:null`.
+- [x] Khi nhiều tiến trình cùng đến hạn, chọn đúng một theo ưu tiên rồi ghi `nextRunAt`; không tạo request FBM song song.
+- [x] Khi tiến trình A đang chạy, request hỏi tiếp chỉ dựng continuation từ cursor A; tiến trình B chờ ở GAS.
+- [x] Giữ phiên có ưu tiên thấp nhất và bị bỏ qua khi tiến trình khác đang chạy.
+- [x] Marker quá hạn sau sleep được hợp nhất thành một lượt, không phát lại hàng loạt.
+- [x] Supervisor chỉ thu hồi phiên treo, không phát lại request ghi và không xóa state cần chẩn đoán.
+- [x] API đọc/ghi lịch nền, công tắc từng tiến trình và DTO `nextRunAt` có kiểm tra giới hạn.
+
+### Extension service worker
+
+- [x] Chỉ duy trì một alarm kỹ thuật tên `gas_poll`, mặc định 5 phút; không có alarm theo phiên hoặc tiến trình.
+- [x] Alarm chỉ POST `heartbeat_request` một lần; `request:null` không dò tab, không gọi FBM và không retry ngoài lịch.
+- [x] Cấu hình `pollMinutes`, `runOnStartup`, URL GAS, khóa relay và Spreadsheet ID kỹ thuật được lưu nguyên tử; lịch nghiệp vụ không nằm trong Extension.
+- [x] Chrome startup có thể hỏi GAS ngay một lượt; Service Worker reload/wake chỉ khôi phục listener/alarm, không tự gửi request.
+- [x] Có một flight chống request hỏi GAS trùng; alarm quá hạn sau sleep không tạo nhiều lượt bù.
+- [x] Khi GAS cấp lệnh mở tab, Extension chỉ mở đúng URL được cấp, không tự chọn nghiệp vụ và không tự focus tab; tab mới phải tải xong trước khi chạy executor.
+- [x] Không có tab khi tự mở bị tắt phải trả mã lỗi/chờ rõ ràng và nộp transport failure đúng reservation.
+
+### Transport response lớn
+
+- [x] Response không có chỉ dẫn được trả nguyên văn; Extension không tự hiểu Customer, Activity hoặc ý nghĩa field.
+- [x] Bổ sung primitive generic lọc mảng/projection theo chỉ dẫn GAS, có fail-closed khi JSON/path không hợp lệ.
+- [x] GAS cấp chỉ dẫn projection cột generic cho các trang bulk Activity sau khi đọc AliasName trang đầu; Extension chỉ áp dụng chỉ dẫn.
+- [ ] **Cần kiểm chứng thực tế:** đo kích thước trước/sau trên response bulk FBM thật để xác nhận không chuyển nguyên body 35–40 MB qua relay.
+- [x] Test đủ projection, lọc mảng, path thiếu, JSON lỗi, mảng rỗng, không có chỉ dẫn và không lọc nhầm dữ liệu.
+
+### Sidebar và cấu hình phiên
+
+- [x] Chuyển toàn bộ block đồng bộ nền khỏi `Tổng quan` sang `Cài đặt phiên`.
+- [x] Hiển thị block `Kết nối Extension`, nhịp `gas_poll` mặc định 5 phút, startup poll, trạng thái relay và Spreadsheet ID kỹ thuật chỉ đọc.
+- [x] Gom auto-login, tự mở tab và retry vào một nguồn cấu hình; `Tài khoản FBM` chỉ hiển thị trạng thái và nút đăng nhập thử.
+- [x] Khi lưu cấu hình, tiến trình đang chạy, lỗi relay, `request:null` và retry đều có thông báo rõ; không mất log hoặc bản nháp.
+
+### Workflow pipeline
+
+- [x] Bổ sung workflow test dựa trên tài liệu cho startup, wake, restart, một alarm, không có việc, overlap, ưu tiên, auto-open, retry và response lớn.
+- [ ] Ma trận 44 pipeline có ít nhất một bằng chứng chạy thật qua GAS → Extension → FBM giả lập → GAS/UI cho mỗi nhánh liên quan.
+- [x] Chạy `node tests/run.js`; bộ offline hiện đạt `1394/1394`. Ma trận live/GAS DEV còn chờ các mục được đánh dấu riêng.
+
 ## Slice 9 — Live acceptance và mở rộng production
 
 - [ ] **Cần kiểm chứng thực tế:** chạy đủ lượt Đọc thử `ALT00010`, đối chiếu số dòng, field, hash, liên kết và idempotency.
@@ -396,6 +442,7 @@ Các mục dưới đây là phần đang phải hoàn thiện trước khi báo
 | Slice 6 — Push Activity | `e9ba3f1`, `01688d6`, `cd94601`, `b6d8b43`, `1a67029`, `c1ca43d`, `b9a989e`, `c49bc6c`, `284b5b9` | `1119/1119` | `@174` | Đã bắt được phiên treo: GAS ghi `gas_returned` nhưng callback Sidebar không serialize được Date trong memvars; builder sửa ngày Sheet sang `/Date(ms)/`, cập nhật `datetime0`, tách `fileticket` OldValue/NewValue và OldValue thiếu theo fixture | Callback Activity Edit có trace `entered/returned/failed`; trace hop độc lập nối GAS/Sidebar/Extension/FBM; quá 15 giây Sidebar tự kết luận timeout và không tự gửi lại lệnh ghi |
 | Slice 7 — Scheduler + nền | `7a324ee`, `43233a5`, `0d46258`, `ba46b23`, `36d6f8f`, `9923fac`, `119cea6` | `1078/1078` | `@252` | GAS DEV heartbeat request/response, reservation và transport failure fail-closed; không phát request ghi khi thiếu phiên/cấu hình | GAS giữ hop/slice và cursor; relay kèm Spreadsheet ID; Sidebar gửi config khi mở; không chạm FBM khi GAS chưa cấp envelope; bridge cũ sau Reload được thử lại có kiểm soát; state active quá hạn được thu hồi |
 | Slice 8 — UI + log + probe | `e243432`, `3e60e88`, `e4c92c1`, `52c3fa9`, `81c4c58`, `778eed1`, `54056ef`, `4493ec5`, `23d1a49`, `1f7be3e`, `030b059`, `e928e4a`, `8438eed`, `d428a6e`, `697ddd0`, `860c83b`, `23c9111`, `2e50efc`, `4ec7688`, `638c5f4`, `cb81f07` | `1228/1228` (gồm smoke test DOM Sidebar, test executor chặn endpoint lỗi và heartbeat thủ công) | `@232` (`fbmGetSyncSettings` trả `OK`, `approvalThreshold: 10`; `fbmGetMasterSwitch` trả `OK`, `enabled: true`; `fbmSyncStatus`/`fbmSyncPreflight` fail-closed đúng khi chưa liên kết FBM; `fbmGetSyncTrace` trả `OK`) | UI shell năm màn hình, menu dọc phù hợp Sidebar hẹp, popup dùng chung cho search/dropdown/customer picker/menu, hộp menu nổi dưới header có nền đặc và cuộn nội bộ, pill `ON/OFF` nhỏ, tiêu đề đổi theo màn hình, form liên kết nhập tay; lớp Đồng bộ phủ toàn Sidebar, không bị đẩy xuống sau thông tin khách; form khách hàng khai một cụm Schema và hiển thị liền mạch; mép view/form/Sync dùng token scrollbar 4px, tiêu đề card đồng nhất 28px và nút có menu không làm header phình cao, nhãn form tương phản hơn; bộ lọc lịch sử hiển thị `All/Active/Deleted`, nấc đang chọn nằm trước nút `Thêm`; pipeline chỉ hiện khi phiên chạy, tab kết quả và phân trang đã hoàn tất; nút Trang trước/Trang sau dùng hai cột bằng nhau, chữ đủ tương phản khi bị khóa; mở lại dropdown hợp lệ hiện toàn bộ danh sách và bôi xanh giá trị cũ, đang gõ chỉ lọc các dòng khớp và bôi xanh dòng đầu để Tab/Enter chọn, Công ty mẹ dùng cùng luồng tìm kiếm và chọn dòng đầu; mọi ô nhập dùng token chặn autofill của Chrome, không còn popup đen chồng lên popup ứng dụng; khoảng cách giữa các khối trên toàn Sidebar dùng một nhịp gap chung; bố cục động dùng Block/schema và renderer chung; smoke test UI phủ trạng thái rỗng/đang chạy/lỗi, pipeline, liên kết, conflict, phân trang, cấu hình và lỗi async; worker tự nạp executor `21.10`, kênh V2 không để executor cũ gọi song song, endpoint `undefined` bị chặn trước `fetch`, trace giữ metadata an toàn, GAS cấp envelope heartbeat trước khi worker gửi FBM; chưa nghiệm thu probe trên Sidebar | Cần chủ dự án đóng/mở lại Sidebar và tải lại Extension để kiểm tra hiển thị/thực tế |
+| Slice 9A — Một nhịp Extension + scheduler GAS | `a1b8e0c` | `1395/1395` | `@298` | GAS DEV `fbmGetSyncSettings`, `fbmSaveExtensionConfig`, `fbmSaveBackgroundSchedule`, `fbmSaveLoginPolicy` trả `OK`; offline đã kiểm một alarm `gas_poll`, startup/no-op/overlap/ưu tiên/auto-open, continuation nền và projection response lớn | Còn cần đo response bulk thật, live kiểm tab/Sidebar và nghiệm thu 44 pipeline theo các mục riêng |
 | Slice 9 — Live acceptance + production |  |  |  |  |  |
 
 Ghi chú triển khai sau Slice 8: commit `770dc8c` và `21434f9` làm heartbeat kiểm tra relay/công tắc/phiên trước khi gửi FBM; deployment GAS cũ hoặc phiên hết hạn sẽ không làm alarm tiếp tục bắn request FBM, còn `fbmHeartbeatNow()` thủ công vẫn chạy khi chỉ tắt đồng bộ nền. Commit `b42db8b` buộc Sidebar lấy URL relay hiện tại và chờ Extension ACK, tránh giữ URL deployment cũ. Commit mới bổ sung quyền truy cập Sheets và nâng Extension lên `21.9` để khôi phục bridge sau khi reload; khi relay gặp 404, Service Worker yêu cầu Sidebar đang mở tự lấy lại URL hiện tại. Executor ưu tiên cookie payload hiện có trên tab thay cho cookie cũ từ GAS. Test offline đạt `1235/1235`; GAS DEV đã tạo deployment mới `https://script.google.com/macros/s/AKfycbxWM4kaJmtGZnWQ6cHQbW8Y87qvOHTmAIkxlkVTGVjamlFxe5zUzNJ2Wxr3AQ7t03rV/exec` ở revision `@236`; đang chờ xác nhận Extension tự đổi URL trong storage.
@@ -404,3 +451,4 @@ Ghi chú cập nhật triển khai tiếp theo: GAS DEV revision `@238` sửa th
 Triển khai xác nhận: deployment Sidebar đang dùng `AKfycbx0ueI_gR2zz...` đã được cập nhật revision `@240`; DEV runner dùng `AKfycbxWM4...` revision `@241`. URL cũ vẫn là URL ổn định của Sidebar và probe thành công, không cần đổi storage mỗi lần cập nhật revision.
 Ghi chú chẩn đoán relay: deployment Sidebar đã cập nhật revision `@243`; relay compact giữ lại `code`, `error` và HTTP status để không làm rỗng nguyên nhân lỗi heartbeat.
 Ghi chú executor: commit `4560e42` sửa heartbeat Customer về request trang đầu hợp lệ; commit `dad9f02` nâng executor lên `21.9` để tab FBM đang mở tự nạp bản sửa sau khi Extension reload. Test offline đạt `1236/1236`.
+Ghi chú Slice 9A: commit `a1b8e0c` gom lịch nghiệp vụ về GAS, giữ Extension một alarm `gas_poll`, thêm cấu hình `Cài đặt phiên`, auto-open theo lệnh GAS và primitive projection/lọc generic. GAS DEV hiện ở revision `@298`; test offline mới nhất `1395/1395`. Chưa coi đo bulk thật hoặc live acceptance là hoàn tất.

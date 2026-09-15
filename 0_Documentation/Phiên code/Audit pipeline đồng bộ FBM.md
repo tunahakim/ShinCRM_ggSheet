@@ -1,10 +1,22 @@
 # Audit pipeline đồng bộ FBM
 
-Ngày rà: 2026-09-14.
+Ngày rà ban đầu: 2026-09-14. Cập nhật kiến trúc/scheduler/Extension lần cuối: 2026-09-15.
 
 Phạm vi: toàn bộ pipeline thuộc module đồng bộ FBM đi qua Sidebar, GAS Web App relay, Extension và tab FBM. Tài liệu này là hồ sơ đối chiếu trong phiên code, không thay thế các quyết định nghiệp vụ ở `00. Tài liệu chính thức/09. Đồng bộ FBM/`.
 
-Quy ước kết luận: `ĐÚNG` là code hiện tại khớp tài liệu và có test phù hợp; `SAI` là có mâu thuẫn xác định được; `THIẾU BẰNG CHỨNG` là hình dạng code hợp lý nhưng chưa được fixture, GAS DEV hoặc live chứng minh; `KHÔNG HOÀN CHỈNH` là có một phần đúng và một phần còn hở.
+Bộ kiểm offline sau đợt rà này: `node tests/run.js` đạt `1395/1395`; bằng chứng đó không thay thế nghiệm thu GAS DEV hoặc live FBM.
+
+Quy ước kết luận: `ĐÚNG` là code hiện tại khớp tài liệu và có test phù hợp; `SAI` là có mâu thuẫn xác định được; `THIẾU BẰNG CHỨNG` là hình dạng code hợp lý nhưng chưa được fixture, GAS DEV hoặc live chứng minh; `KHÔNG HOÀN CHỈNH` là có một phần đúng và một phần còn hở. Các kết luận ghi `SAI` trong phần lịch sử phải được đọc cùng bảng cập nhật bên dưới; không dùng chúng làm mô tả code hiện tại.
+
+## Bảng cập nhật sau Slice 9A
+
+| Nhóm | Trạng thái hiện tại | Bằng chứng |
+|---|---|---|
+| Một alarm Extension | `ĐÚNG` | `gas_poll` là alarm kỹ thuật duy nhất; startup chỉ hỏi GAS một lượt; `request:null` không dò tab và không gọi FBM |
+| Scheduler GAS | `ĐÚNG` | GAS giữ lịch, ưu tiên, reservation, cursor; continuation nền đi qua `FbmSync.continue`; overlap trả `SYNC_ALREADY_RUNNING` |
+| Auto-open FBM | `ĐÚNG` về ranh giới | Chỉ mở URL trong envelope GAS cấp và chờ tab `complete`; live vẫn cần người dùng kiểm tra |
+| Response lớn | `KHÔNG HOÀN CHỈNH` | Có primitive projection/lọc generic và test fail-closed; chưa đo response bulk FBM thật và chưa được phép kết luận đã xử lý 35–40 MB |
+| UI/cấu hình phiên | `ĐÚNG` offline | Lịch nền ở `Cài đặt phiên`, auto-login một nguồn cấu hình, trạng thái lỗi hiển thị; live UI còn chờ nghiệm thu |
 
 ## Hợp đồng chung của mọi pipeline
 
@@ -70,23 +82,16 @@ Trigger: nút `Tự động điền - Kiểm tra`.
 Pipeline chuẩn theo fixture hiện có:
 
 1. Sidebar gọi `fbmStartIdentityProbe` với `mode:check`, `scan:identity_probe`.
-2. GAS chạy preflight chỉ đọc, tạo state `checking_session`, cursor `authorize_customer`.
-3. GAS cấp `GetDirViewPage`, controller `zccrAccount`, `viewPage:false`, `authorized:null`.
-4. Extension lấy payload cookie từ HTML theo chỉ dẫn GAS, gửi request trong tab FBM và trả response thô.
-5. Sidebar phải gọi `fbmContinueSync`; GAS lấy `Authorized`, lưu payload cookie/userId nếu có và chuyển cursor sang `identity_user_grid`.
-6. GAS cấp `GetGridViewPage`, controller `User`, `type:0`, `count:10`.
-7. GAS nối cột theo AliasName, lấy `id`, `name`, `ten`, ghi `metadata.identityProbe` và kết thúc.
-8. Sidebar chỉ điền bản nháp Spreadsheet ID, mã user, tên tài khoản; không tự lưu.
+2. GAS chạy preflight chỉ đọc và cấp request `User` cho nhận diện.
+3. Extension lấy payload cookie từ HTML theo chỉ dẫn GAS, gửi request trong tab FBM và trả response thô.
+4. GAS nối cột theo AliasName, lấy `id`, `name`, `ten`, ghi `metadata.identityProbe` và kết thúc.
+5. Sidebar chỉ điền bản nháp Spreadsheet ID, mã user, tên tài khoản; không tự lưu.
 
 Đối chiếu code: `PullFlow.js:5-79`, `PullFlow.js:101-139`, `PullFlow.js:250-400`, `GridRead.js:66-78`, `GridRead.js:230-245`, `client/sync/fbmSync.html:506-540`.
 
 Fixture: `Nghiên cứu FBM/RequestFBM/Lấy thông tin người dùng FBM.txt` chứng minh controller `User` trả đúng ba trường, nhưng fixture được bắt từ `Main/user.aspx` trong khi executor hiện chạy ở tab `Main/zccrAccount.aspx`. Tài liệu kiến trúc nói FBM kiểm Referer ở mọi POST; khác biệt này chưa được live chứng minh.
 
-Hiện tượng 2026-09-14: FBM chỉ nhận request ở bước 3, không có request bước 6. Vì vậy pipeline thực tế đang đứt trong đoạn bước 4 -> 5 -> 6. Code Sidebar đáng ra luôn gọi `fbmContinueSync` sau response, nên chưa được phép kết luận “đã đọc xong”.
-
-Khoảng hở chẩn đoán: `fbmSyncProjectFormResponse` chỉ giảm response cho `customer_edit_open`/`activity_edit_open`, không giảm response `authorize`; response form lớn được đưa nguyên qua `google.script.run`. Chưa có test tích hợp chứng minh response authorize thật đi trọn Sidebar -> GAS -> request User.
-
-Kết luận: `KHÔNG HOÀN CHỈNH`; request đầu đúng, request User có fixture, nhưng toàn vòng thật chưa đạt và trace hiện chưa đủ chỉ ra chính xác response mất ở bridge, callback GAS hay parser.
+Kết luận hiện tại: `ĐÚNG` offline; workflow test chạy envelope GAS -> executor -> GAS và xác nhận draft chưa lưu. Live vẫn cần kiểm tra Network của request User và hiển thị Sidebar.
 
 ### A4. Kiểm tra liên kết tài khoản với dữ liệu Customer đã có
 
@@ -106,7 +111,7 @@ Pipeline chuẩn: Sidebar gửi ba giá trị -> GAS kiểm đủ, kiểm Spread
 
 Đối chiếu code: `Identity.js:16-28`, `FbmSyncService.js:52-53`, `client/sync/fbmSync.html:550-573`.
 
-Kết luận: `KHÔNG HOÀN CHỈNH`. GAS lưu `userId` và `accountName` nhưng không lưu username `name`; pipeline probe có đọc username rồi bỏ khỏi DTO/binding. Vì vậy chưa thể đối chiếu username credential với username phiên như yêu cầu bảo mật.
+Kết luận hiện tại: `ĐÚNG` offline. Binding lưu đủ Spreadsheet ID, userId, username và accountName; workflow kiểm tra lưu/xóa liên kết rỗng và trạng thái `UNBOUND`. Live đổi tài khoản vẫn cần nghiệm thu.
 
 ### A6. Lưu credential mã hóa
 
@@ -126,7 +131,7 @@ Pipeline chuẩn: GAS cấp login envelope test-only khi công tắc bật và c
 
 Đối chiếu code: `AutoLogin.js:99-116`, `executor.js:108-133`, `service_worker.js:137-143`, phần UI login trong `client/sync/fbmSync.html`.
 
-Kết luận: `SAI`. `loginTestResult` mới kiểm response login/session, chưa chạy chuỗi authorize/User để đối chiếu đầy đủ nhận diện đã lưu; username do probe đọc cũng chưa được giữ trong binding.
+Kết luận hiện tại: `ĐÚNG` offline. `loginTestResult` tiếp tục qua authorize và User grid, đối chiếu đủ identity với binding; workflow đúng/sai identity đều có. Live request Login/User và thông báo Sidebar vẫn chờ nghiệm thu.
 
 ### A8. Auto-login khi hết phiên
 
@@ -136,7 +141,7 @@ Pipeline chuẩn: GAS kiểm công tắc tổng, auto-login enabled/configured v
 
 Đối chiếu code: `AutoLogin.js:56-139`, `PullFlow.js:293-318`, `Scheduler.js:105-122`, `executor.js:108-133`.
 
-Kết luận: `KHÔNG HOÀN CHỈNH`. Throttle và `force:false` đúng. Trạng thái khởi đầu `session.cookie` rỗng chưa phân biệt “GAS chưa từng biết cookie nhưng tab đang đăng nhập” với “đã xác nhận logout”; heartbeat có thể chọn auto-login trước khi thử capture phiên hợp lệ trên tab, trái mục tiêu không làm gián đoạn phiên đang dùng nơi khác.
+Kết luận hiện tại: `KHÔNG HOÀN CHỈNH`. Throttle, `force:false`, auto-open và retry policy đã có; state ban đầu chỉ auto-login khi GAS xác nhận `session.expired`, còn heartbeat bình thường được phép capture cookie từ tab. Live hết phiên/thử lại vẫn chờ nghiệm thu.
 
 ## Nhóm B - Phiên thủ công và chiều đọc
 
@@ -158,7 +163,7 @@ Pipeline chuẩn: preflight -> authorize hai controller -> lookup Category -> pu
 
 Đối chiếu code: `PullFlow.js:81-98` gọi `writeEnabled(mode)`; `TransportCore.js:16-24` chỉ trả true cho `write/push` và còn phụ thuộc cờ `FBM_SYNC_ALLOW_WRITES`.
 
-Kết luận: `SAI P0`. `mode:read` hiện chỉ preview và tăng `skipped`, không ghi ShinCRM. Đây là mâu thuẫn trực tiếp với tên UI và tài liệu 09.08.
+Kết luận hiện tại: `ĐÚNG` offline. `mode:read` được phép ghi Sheet qua `pullRecords`/WriteGate nhưng không được ghi FBM; workflow rỗng đã chạy hết authorize, lookup và Customer grid. Live paging vẫn chờ.
 
 ### B3. Pull Customer full
 
@@ -168,7 +173,7 @@ Pipeline chuẩn: request đầu `type:0` để lấy AliasName, count đủ l�
 
 Đối chiếu code: `GridRead.js:38-65`, `PullFlow.js:142-155`, `PullFlow.js:420-447`, `Pull.js`, `Identity.js:128-151`.
 
-Kết luận: `KHÔNG HOÀN CHỈNH`. Ghép cột theo tên và logic identity đúng; tác động ghi Sheet bị vô hiệu trong mode read. `metadata.seen` của toàn kỳ còn được giữ chung trong một property lớn, có nguy cơ vượt giới hạn khi mở rộng khỏi ALT00010.
+Kết luận hiện tại: `KHÔNG HOÀN CHỈNH`; ghép cột và ghi Sheet theo mode read đã được bật, nhưng quy mô state seen và live paging ngoài `ALT00010` chưa được đo.
 
 ### B4. Pull Activity theo từng Customer
 
@@ -178,7 +183,7 @@ Pipeline chuẩn: với từng `stt_rec_kh`, gọi Activity grid `externalKey st
 
 Đối chiếu code: `GridRead.js:96-100`, `PullFlow.js:157-165`, `PullFlow.js:449-485`, `Identity.js:160-199`.
 
-Kết luận: `KHÔNG HOÀN CHỈNH`; orchestration đúng ở mức code, nhưng mode read không ghi Sheet và chưa có live paging nhiều Customer.
+Kết luận hiện tại: `KHÔNG HOÀN CHỈNH`; orchestration và mode read đã được sửa, chưa có live paging nhiều Customer.
 
 ### B5. Nạp lần đầu và baseline
 
@@ -198,19 +203,19 @@ Pipeline chuẩn: bản ghi active có FBM ID nhưng vắng -> ghi `không thấ
 
 Đối chiếu code: `Identity.markMissingAfterFullScan`, `GridRead.activityBulkMissing`, `PushCandidates`, không có Delete builder.
 
-Kết luận: `KHÔNG HOÀN CHỈNH`. Luật không xóa đúng, nhưng `markMissingAfterFullScan` chỉ chạy khi `state.mode === 'write'`; mode read chuẩn lẽ ra mới là chiều ghi trạng thái về Sheet. Vì vậy cờ vắng mặt không được ghi trong phiên lấy về.
+Kết luận hiện tại: `ĐÚNG` về luật không xóa và ghi trạng thái vắng qua chiều pull; vẫn cần live kiểm tra dữ liệu sau full scan.
 
 ## Nhóm C - Scheduler và phiên nền
 
 ### C1. Trigger GAS chỉ ghi lịch
 
-Trigger: `fbmHeartbeatTrigger` 5 phút, `fbmCustomerScanTrigger` 60 phút, `fbmActivityScanTrigger` 30 phút và supervisor 1 phút.
+Trigger lịch sử: trước Slice 9A từng có `fbmHeartbeatTrigger`, `fbmCustomerScanTrigger`, `fbmActivityScanTrigger` và supervisor. Hiện chỉ còn supervisor GAS để thu hồi phiên treo; Extension hỏi GAS bằng một alarm `gas_poll` duy nhất.
 
 Pipeline chuẩn: trigger kiểm công tắc/due/lock -> chỉ ghi `scheduledScan` và mốc tiếp theo -> không gọi FBM; Extension alarm là phía chủ động hỏi relay.
 
 Đối chiếu code: `Scheduler.js:8-55`, `Scheduler.js:246-255`, `service_worker.js:484-493`.
 
-Kết luận: `ĐÚNG` về ranh giới. Cần rà lại việc có cả GAS trigger heartbeat và Chrome alarm 5 phút để bảo đảm chúng không tạo hai nguồn trạng thái khó hiểu; reservation hiện chặn request chồng.
+Kết luận hiện tại: `ĐÚNG`. Không còn hai nguồn trigger nghiệp vụ; supervisor không gọi FBM và `gas_poll` chỉ hỏi GAS.
 
 ### C2. Heartbeat 5 phút
 
@@ -220,9 +225,7 @@ Pipeline chuẩn: Extension POST `heartbeat_request` trước -> GAS kiểm mast
 
 Đối chiếu code: `service_worker.js:271-324`, `Scheduler.js:86-209`, `GridRead.js:80-89`.
 
-Kết luận: `SAI P0`. Khi heartbeat mở một phiên quét và cấp request `authorize`, response kế tiếp vẫn đi vào `fbmSyncHeartbeatLocked`; hàm này không gọi `FbmSync.continue(rawResponse)` cho cursor của pipeline. Nó chỉ gọi `requestForCursor(state)`, vì vậy cursor `authorize_customer` không tiến và có thể cấp lại authorize cho tới hop limit.
-
-Sai lệch phụ: GAS chặn ngay khi `session.cookie` rỗng, nên tab FBM đang đăng nhập nhưng GAS chưa capture cookie có thể không được gửi heartbeat để xác nhận; hệ chuyển sang auto-login/chờ login quá sớm.
+Kết luận hiện tại: `ĐÚNG` về continuation. Khi heartbeat đã cấp request thuộc phiên nền, response tiếp theo đi qua `FbmSync.continue`; cursor `authorize_customer`/`authorize_activity` được tiến đúng một bước. GAS không chặn chỉ vì `session.cookie` rỗng; envelope có capture generic để lấy cookie từ tab. Live vẫn cần kiểm tra phiên thật.
 
 ### C3. Kỳ Customer 60 phút
 
@@ -232,7 +235,7 @@ Pipeline chuẩn: heartbeat kết thúc -> GAS start read background -> authoriz
 
 Đối chiếu code: `Scheduler.js:180-209`, `PullFlow.start`, `PullFlow.continue`, `TransportCore.limitRelayResult`.
 
-Kết luận: `SAI P0`. Ngoài lỗi heartbeat không gọi continue, khi đạt hop limit GAS thu hồi activeRequestId nhưng giữ phase/run active. Lượt `heartbeat_request` sau trả `SYNC_ALREADY_RUNNING` thay vì dựng request từ cursor, nên phiên dài không có đường tiếp tục tin cậy.
+Kết luận hiện tại: `ĐÚNG` về resume. Khi đạt hop limit, GAS thu hồi reservation nhưng giữ cursor; lượt hỏi sau dựng lại request từ cursor và không tạo phiên song song. Cần live kiểm tra kỳ nhiều lát.
 
 ### C4. Activity bulk 8 giờ
 
@@ -242,7 +245,7 @@ Pipeline chuẩn: authorize -> grid Activity không externalKey -> nhiều lát,
 
 Đối chiếu code: `PullFlow.beginActivityBulkPull`, `PullFlow.activityBulkNext`, `GridRead.activityBulkRequest`.
 
-Kết luận: `SAI P0` khi chạy thật. Count hiện là 100 với khoảng 171 nghìn dòng, cần hơn 1.700 request; pipeline chắc chắn chạm hop limit nhưng cơ chế resume nền hiện bị chặn như C3. `seenIds` của toàn bộ Activity được nhét vào state JSON duy nhất, không phù hợp giới hạn `DocumentProperties`.
+Kết luận hiện tại: `KHÔNG HOÀN CHỈNH`. Cursor bulk/resume đã có; GAS cấp projection cột generic cho các trang sau để giảm payload. Chưa đo response FBM thật và chưa được kết luận an toàn cho 35–40 MB; trạng thái seen/bộ nhớ vẫn cần kiểm tra với quy mô production.
 
 ### C5. Activity catch-up theo ngay_gd
 
@@ -252,7 +255,7 @@ Pipeline chuẩn: tính max workDate chỉ từ Activity đã có FBM ID -> đ�
 
 Đối chiếu code: `GridRead.js:138-173`, các cursor `activity_catchup_customer_grid` trong `PullFlow.js`.
 
-Kết luận: `SAI`. `activityLocalMaxDate()` hiện lấy mọi Activity local, không lọc điều kiện “đã có FBM ID”; một Activity nội bộ ngày tương lai có thể che toàn bộ phát sinh thật. Ngoài ra pipeline chịu lỗi resume/state như C3.
+Kết luận hiện tại: `ĐÚNG` về điều kiện mốc: `activityLocalMaxDate()` chỉ lấy Activity có FBM ID. Phần resume nền dùng cursor GAS; live nhiều lát vẫn chưa nghiệm thu.
 
 ### C6. Activity rotation 30 Customer mỗi 30 phút
 
@@ -262,7 +265,7 @@ Pipeline chuẩn: đọc 30 Customer theo cursor bền -> quét Activity từng 
 
 Đối chiếu code: `GridRead.js:176-205`, cursor rotation trong `PullFlow.js`.
 
-Kết luận: `KHÔNG HOÀN CHỈNH`; logic cursor tồn tại nhưng phụ thuộc cơ chế resume nền đang sai và chưa có live chứng minh vòng qua cuối danh sách.
+Kết luận hiện tại: `KHÔNG HOÀN CHỈNH`; logic cursor và resume đã được sửa, nhưng chưa có live chứng minh vòng qua cuối danh sách và chưa đo tải thật.
 
 ### C7. Chuyển quyền phiên nền -> thủ công
 
