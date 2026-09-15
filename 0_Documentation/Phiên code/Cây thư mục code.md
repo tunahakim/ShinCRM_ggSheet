@@ -179,6 +179,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── transport\EntryPoints.js Entry point cho Sidebar, DEV runner và Web App relay.
     ├── control\ControlPort.js  Cổng lệnh trung lập và DTO thông báo; adapter kênh không chứa nghiệp vụ.
     ├── state\State.js            DocumentProperties, cursor và progress.
+    ├── state\SyncSettings.js     Tham số vận hành FBM trong DocumentProperties, migration Config một lần.
     ├── state\RecordLocks.js      Khóa bản ghi và kiểm tra revision.
     ├── state\Scheduler.js        Lịch heartbeat/quét, không gọi FBM trực tiếp.
     ├── read\GridRead.js          Grid metadata, phân trang và category request.

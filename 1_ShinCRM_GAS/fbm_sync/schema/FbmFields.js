@@ -4,7 +4,8 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 FbmSync.VERSION = '1.0.0';
 FbmSync.DEFAULT_APPROVAL_THRESHOLD = 10;
 FbmSync.approvalThreshold = function () {
-  var raw = FbmSync.configValue('FBM_SYNC_APPROVAL_THRESHOLD');
+  var raw = '';
+  try { raw = typeof FbmSync.syncSettingsRead === 'function' ? FbmSync.syncSettingsRead().approvalThreshold : FbmSync.configValue('FBM_SYNC_APPROVAL_THRESHOLD'); } catch (ignore) { raw = FbmSync.configValue('FBM_SYNC_APPROVAL_THRESHOLD'); }
   // Ô cấu hình trống nghĩa là chưa đặt ngưỡng; 0 vẫn là một giá trị hợp lệ nếu người dùng chủ động chọn.
   if (raw === undefined || raw === null || String(raw).trim() === '') { return FbmSync.DEFAULT_APPROVAL_THRESHOLD; }
   var value = Number(raw);
@@ -100,6 +101,13 @@ FbmSync.isTemporaryRecord = function (entity, record) {
 
 /** Đọc tham số FBM an toàn; thiếu Config thì chiều đọc vẫn hoạt động, chiều ghi tự chặn. */
 FbmSync.configValue = function (name) {
+  var mapped = { FBM_MA_KH_PREFIX: 'customerPrefix', FBM_MA_KH_LENGTH: 'customerCodeLength', FBM_ACTIVITY_SINCE: 'activitySince', FBM_SYNC_APPROVAL_THRESHOLD: 'approvalThreshold' }[String(name || '')];
+  if (mapped && typeof FbmSync.syncSettingsRead === 'function') {
+    try {
+      var settings = FbmSync.syncSettingsRead(), stored = settings && settings[mapped];
+      if (stored !== undefined && stored !== null) { return String(stored).trim(); }
+    } catch (ignoreSettings) {}
+  }
   try {
     var value = typeof configGet === 'function' ? configGet(name, '') : '';
     if (value !== undefined && value !== null && String(value).trim()) { return String(value).trim(); }
