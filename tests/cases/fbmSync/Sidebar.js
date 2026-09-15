@@ -127,6 +127,14 @@ async function chay(so) {
   const identityActions = identityBlock.elements.filter((node) => node && node.id === 'fbm-sync-identity-actions-region')[0];
   check(so, 'Ba nút liên kết tài khoản dùng Row chung thay vì layout riêng của Sync', [identityActions.elements.length, identityActions.elements[0].role, identityActions.elements[0].elements.length], [1, 'row', 3]);
 
+  hop.FBM_SYNC_CLIENT.identityDraft = { spreadsheetId: 'sheet', userId: '', username: 'anhlt', accountName: '' };
+  hop.FBM_SYNC_CLIENT.identityInvalid = { spreadsheet: false, user: true, username: false, account: true };
+  const invalidIdentityFields = hop.fbmSyncIdentityFormBlocks();
+  hop.FBM_SYNC_CLIENT.accountNotices.identity = { kind: 'error', message: 'Vui lòng bổ sung các ô màu đỏ hoặc xóa cả bốn ô để hủy liên kết.' };
+  const invalidIdentityNotice = hop.fbmSyncAccountNoticeBlocks('identity');
+  check(so, 'Liên kết thiếu trường chỉ tô đỏ đúng các ô thiếu bằng StandaloneField chuẩn', [invalidIdentityFields[0].className, invalidIdentityFields[1].className, invalidIdentityFields[2].className, invalidIdentityFields[3].className], ['shin-form-field', 'shin-form-field is-invalid', 'shin-form-field', 'shin-form-field is-invalid']);
+  check(so, 'Thông báo liên kết thiếu trường ngắn gọn và hướng vào ô màu đỏ', invalidIdentityNotice[0].text, 'Vui lòng bổ sung các ô màu đỏ hoặc xóa cả bốn ô để hủy liên kết.');
+
   hop.FBM_SYNC_CLIENT.identityLastAction = 'probe';
   hop.fbmSyncApplyIdentityProbeDraft({ metadata: { identityProbe: { spreadsheetId: 'sheet-probe', userId: '2037', username: 'anhlt', accountName: 'ANHLT' } } });
   render(hop, content, hop.fbmSyncRenderAccount, idle);
