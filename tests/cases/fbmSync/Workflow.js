@@ -158,6 +158,16 @@ async function chay(so) {
   check(so, 'catalog gom du 44 pipeline A-F cua module va khong trung ma', [PIPELINE_CATALOG.length, new Set(PIPELINE_CATALOG.map((item) => item.id)).size], [44, 44]);
   check(so, 'moi pipeline co nguon, trigger, ket qua quan sat va bang chung bat buoc', PIPELINE_CATALOG.every((item) => item.source && item.trigger && item.expect && item.requiredProof.length === 2), true);
   check(so, 'ma tran 44 pipeline deu tro den module test dang chay va khong co pipeline khong co chu so huu kiem thu', PIPELINE_CATALOG.every((item) => item.testModules.length > 0 && item.testModules.every((file) => fs.existsSync(path.join(ROOT, file)))), true);
+  check(so, 'ma tran 44 pipeline co trace offline theo hanh vi va phan biet bang chung live', PIPELINE_CATALOG.every((item) => item.offlineScenario && item.layers && item.layers.gas && item.layers.extension && item.layers.ui && item.layers.log && item.requiredProof.indexOf('offline') >= 0 && item.requiredProof.some((proof) => /GAS DEV|live/.test(proof))), true);
+
+  const legacyAccount = workflowGas();
+  legacyAccount.hop.FbmSync.configValue = (name) => name === 'FBM_ACCOUNT_NAME' ? 'Tên còn sót trong Config' : '';
+  legacyAccount.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Lê Tuấn Anh' });
+  check(so, 'ten tai khoan cua binding la nguon owner duy nhat, Config cu khong the rebind hay khoa phien', [
+    legacyAccount.hop.FbmSync.scriptSettings().accountName,
+    legacyAccount.hop.FbmSync.identityStatus({ userId: '2037', username: 'ANHLT', accountName: 'Lê Tuấn Anh' }).status,
+    legacyAccount.hop.FbmSync.identityStatus({ userId: '2037', username: 'ANHLT', accountName: 'Tên còn sót trong Config' }).status
+  ], ['Lê Tuấn Anh', 'BOUND', 'REBIND_REQUIRED']);
 
   const engine = workflowGas();
   const started = engine.hop.FbmSync.start({ mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true });

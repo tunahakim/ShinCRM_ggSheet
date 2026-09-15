@@ -110,7 +110,6 @@ FbmSync.runPreflight = function (options) {
     if (identity.blocking) { FbmSync.preflightIssue(issues, identity.status && identity.status.status === 'UNBOUND' ? 'FBM_IDENTITY_UNBOUND' : 'REBIND_REQUIRED', 'error', 'Identity', identity.message, true); }
     else if (identity.status && identity.status.status === 'REBIND_REQUIRED') { FbmSync.preflightIssue(issues, 'REBIND_REQUIRED', 'warn', 'Identity', identity.message, false); }
   }
-  if (!String(params.FBM_ACCOUNT_NAME || '').trim()) { FbmSync.preflightIssue(issues, 'FBM_ACCOUNT_NAME_MISSING', 'error', 'Config', 'Thiếu FBM_ACCOUNT_NAME trong Config; chiều đẩy bị khóa.', writeMode); }
   if (!String(params.FBM_MA_KH_PREFIX || '').trim() || !String(params.FBM_MA_KH_LENGTH || '').trim()) { FbmSync.preflightIssue(issues, 'FBM_CUSTOMER_CODE_CONFIG_INCOMPLETE', 'warn', 'Config', 'Thiếu FBM_MA_KH_PREFIX hoặc FBM_MA_KH_LENGTH; chỉ ảnh hưởng khi tạo Customer mới.', false); }
   if (!String(params.FBM_ACTIVITY_SINCE || '').trim()) { FbmSync.preflightIssue(issues, 'FBM_ACTIVITY_SINCE_MISSING', 'warn', 'Config', 'Thiếu FBM_ACTIVITY_SINCE; hệ sẽ dùng phạm vi đọc mặc định hiện tại.', false); }
   FbmSync.preflightCategories(issues, core.category || {}, writeMode ? 'write' : mode);

@@ -13,6 +13,10 @@ FbmSync.bindingRead = function () {
     return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   } catch (ignore) { return {}; }
 };
+/** Tên đầy đủ trong binding là nguồn duy nhất cho cổng owner; không nhân bản vào Config. */
+FbmSync.bindingAccountName = function () {
+  return String(FbmSync.bindingRead().accountName || '');
+};
 FbmSync.bindingCanUpgradeUsername = function (previous, next) {
   var oldValue = previous || {}, newValue = next || {};
   return !!oldValue.spreadsheetId && !String(oldValue.username || '') && !!String(newValue.username || '') &&
@@ -55,7 +59,7 @@ FbmSync.bindingHasLinkedData = function () {
 };
 /** Đối chiếu nguyên văn nhận diện; không trim/đổi hoa thường khi so hai giá trị đã lưu. */
 FbmSync.identityStatus = function (runtime) {
-  var actual = String((runtime && runtime.spreadsheetId) || FbmSync.currentSpreadsheetId() || ''), current = FbmSync.bindingRead(), incoming = runtime || {}, expectedAccount = String(FbmSync.configValue('FBM_ACCOUNT_NAME') || '');
+  var actual = String((runtime && runtime.spreadsheetId) || FbmSync.currentSpreadsheetId() || ''), current = FbmSync.bindingRead(), incoming = runtime || {};
   var hasData = FbmSync.bindingHasLinkedData(), reasons = [];
   if (!current.spreadsheetId) { if (hasData) { reasons.push('missing_binding_with_linked_data'); } }
   else {
@@ -64,7 +68,6 @@ FbmSync.identityStatus = function (runtime) {
     if (incoming.username !== undefined && String(incoming.username) !== String(current.username || '')) { reasons.push('username_mismatch'); }
     if (incoming.accountName !== undefined && String(incoming.accountName) !== current.accountName) { reasons.push('account_mismatch'); }
   }
-  if (incoming.accountName !== undefined && expectedAccount && String(incoming.accountName) !== expectedAccount) { reasons.push('configured_account_mismatch'); }
   var expectedId = String(FbmSync.configValue('FBM_SPREADSHEET_ID') || '');
   if (expectedId && actual && expectedId !== actual) { reasons.push('configured_spreadsheet_mismatch'); }
   var status = reasons.length ? 'REBIND_REQUIRED' : (current.spreadsheetId ? 'BOUND' : 'UNBOUND');

@@ -14,6 +14,7 @@ FbmSync.scriptSettings = function () {
   // Keep live reads narrow by default; set the property to an empty value for a full scan.
   var testProps = PropertiesService.getDocumentProperties ? PropertiesService.getDocumentProperties() : { getProperty: function () { return null; } };
   var testCustomerCode = testProps.getProperty('FBM_SYNC_TEST_CUSTOMER_CODE');
+  var accountName = typeof FbmSync.bindingAccountName === 'function' ? FbmSync.bindingAccountName() : '';
   testCustomerCode = testCustomerCode === null ? 'ALT00010' : String(testCustomerCode || '').trim();
   return {
     baseUrl: 'https://fbo.com.vn:8888',
@@ -21,7 +22,7 @@ FbmSync.scriptSettings = function () {
     customerAuthorized: String(session.customerAuthorized || ''),
     activityAuthorized: String(session.activityAuthorized || ''),
     userId: userId,
-    accountName: FbmSync.configValue('FBM_ACCOUNT_NAME'),
+    accountName: accountName,
     customerPrefix: FbmSync.configValue('FBM_MA_KH_PREFIX'),
     customerCodeLength: FbmSync.configValue('FBM_MA_KH_LENGTH'),
     activitySince: FbmSync.configValue('FBM_ACTIVITY_SINCE'),
@@ -312,5 +313,6 @@ FbmSync.extractSessionIdentity = function (response) {
     for (var i = 0; i < names.length; i += 1) { if (source[names[i]] !== undefined && source[names[i]] !== null) { return String(source[names[i]]); } }
     return '';
   };
+  // `FBM_ACCOUNT_NAME` below is a possible field alias returned by FBM, never a Config parameter.
   return { userId: pick(['FBM_USER_ID', 'UserId', 'userId', 'user_id', 'userid']), accountName: pick(['FBM_ACCOUNT_NAME', 'AccountName', 'accountName', 'UserName', 'userName', 'username', 'FullName', 'fullName']) };
 };

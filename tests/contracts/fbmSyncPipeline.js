@@ -94,7 +94,7 @@ const WORKFLOWS = [
  * theo code: A-F bám theo audit đối chiếu với Tài liệu 09. */
 const PIPELINE_CATALOG = [
   ['A1', 'Bắt tay relay', 'Mở Sidebar', 'Một cấu hình local và ACK; không /exec hoặc FBM'],
-  ['A2', 'Probe relay', 'Kiểm tra kết nối', 'Chỉ GAS relay, không tìm tab FBM'],
+  ['A2', 'Từ chối cấu hình relay lỗi', 'Sidebar nhận ACK lỗi', 'Giữ cấu hình cũ; báo lỗi rõ, không gọi FBM'],
   ['A3', 'Tự điền nhận diện', 'Tự động điền', 'Grid User -> draft, không tự lưu'],
   ['A4', 'Kiểm tra liên kết', 'Kiểm tra thông tin đồng bộ', 'Chỉ Customer; trả n/N, không ghi'],
   ['A5', 'Lưu liên kết', 'Lưu thông tin', 'Đủ bốn định danh hoặc xóa binding rỗng'],
@@ -140,14 +140,21 @@ const PIPELINE_CATALOG = [
 ].map(function (item) {
   var group = item[0].charAt(0);
   var testModules = {
-    A: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/AutoLogin.js', 'tests/cases/fbmSync/Orchestration.js', 'tests/cases/fbmSync/Sidebar.js', 'tests/cases/extensionBridge.js'],
-    B: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/Pull.js', 'tests/cases/fbmSync/Reconcile.js'],
+    A: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/AutoLogin.js', 'tests/cases/fbmSync/Orchestration.js', 'tests/cases/fbmSync/Sidebar.js', 'tests/cases/fbmSync/UserJourneys.js', 'tests/cases/extensionBridge.js'],
+    B: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/UserJourneys.js', 'tests/cases/fbmSync/Pull.js', 'tests/cases/fbmSync/Reconcile.js'],
     C: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/Orchestration.js', 'tests/cases/extensionBridge.js'],
-    D: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/Push.js', 'tests/cases/fbmSync/Builders.js'],
-    E: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/Orchestration.js', 'tests/cases/fbmSync/Push.js', 'tests/cases/fbmSync/Reconcile.js'],
-    F: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/Sidebar.js', 'tests/cases/fbmSync/Audit.js']
+    D: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/UserJourneys.js', 'tests/cases/fbmSync/Push.js', 'tests/cases/fbmSync/Builders.js'],
+    E: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/UserJourneys.js', 'tests/cases/fbmSync/Orchestration.js', 'tests/cases/fbmSync/Push.js', 'tests/cases/fbmSync/Reconcile.js'],
+    F: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/UserJourneys.js', 'tests/cases/fbmSync/Sidebar.js', 'tests/cases/fbmSync/Audit.js']
   }[group] || [];
-  return { id: item[0], name: item[1], trigger: item[2], expect: item[3], source: 'Tài liệu 09 và hợp đồng log', testModules: testModules, requiredProof: ['offline', 'GAS DEV hoặc live khi kênh thật không mô phỏng được'] };
+  return {
+    id: item[0], name: item[1], trigger: item[2], expect: item[3], source: 'Tài liệu 09 và hợp đồng log', testModules: testModules,
+    // Đây là hợp đồng quan sát, không gọi tên hàm sản phẩm: mỗi pipeline phải
+    // chứng minh đường đi qua các lớp có liên quan trước khi được coi là xanh.
+    offlineScenario: 'Kịch bản ' + item[0] + ': điều kiện đầu -> kích hoạt -> request được phép/cấm -> trạng thái -> hiển thị.',
+    layers: { ui: 'DTO, control hoặc trigger đúng theo pipeline', gas: 'Quyết định/state/reservation đúng', extension: 'Chỉ chuyển tiếp hoặc dừng đúng lúc', log: 'GAS ghi tổng kết/lỗi không lộ bí mật' },
+    requiredProof: ['offline', 'GAS DEV hoặc live khi kênh thật không mô phỏng được']
+  };
 });
 
 module.exports = { WORKFLOWS, PIPELINE_CATALOG };

@@ -9,6 +9,7 @@ const NHOM = [
   require("./fbmSync/Preflight"),
   require("./fbmSync/Push"),
   require("./fbmSync/Audit"),
+  require("./fbmSync/UserJourneys"),
   require("./fbmSync/Workflow")
 ];
 

@@ -10,14 +10,14 @@
  *
  * Đây **không** phải khóa `tag` mà tài liệu 04 Phần 4 cấm. `tag` là để người khai schema gõ thẳng tên thẻ HTML; còn `role` do chính bảy hàm dựng đặt, người khai schema không bao giờ gõ tới nó. Có vai thì phần lá là một lựa chọn duy nhất và tra được; nếu suy theo tổ hợp khóa nào đang có mặt thì một Block mang cả `field` lẫn `icon` là một ca không ai định nghĩa.
  */
-var BLOCK_ROLES = ['box', 'card', 'row', 'text', 'field', 'button', 'icon', 'check'];
+var BLOCK_ROLES = ['box', 'card', 'row', 'text', 'field', 'button', 'icon', 'check', 'control'];
 
 /**
  * Khóa dùng được ở mọi vai: năm khóa của bảng trong tài liệu 04 Phần 4 mà `renderEngine` xử lý theo cùng một đường cho tám vai, cộng `pick` vì dòng nào do slot sinh ra cũng phải mang mã bản ghi của nó.
  *
  * `elements` và `label` từng nằm ở đây rồi bị dời xuống bảng dưới, vì "mọi vai nhận được" mà chỉ vài vai vẽ ra là một cái bẫy: `Card({ label: 'GHI CHÚ' })` đi qua mọi phép kiểm, dựng được, vẽ được, và chữ không bao giờ hiện — chỗ khai đúng tên phải là `title`. Đó đúng là loại lỗi "sửa schema mà hình thức không đổi" mà `blockCheckKeys` bên dưới ra đời để chặn, nên để nó ở lại là tự bịt mắt mình.
  */
-var BLOCK_KEYS_COMMON = ['id', 'className', 'spatialConfig', 'action', 'menu', 'pick'];
+var BLOCK_KEYS_COMMON = ['id', 'className', 'spatialConfig', 'action', 'menu', 'pick', 'data', 'ariaValueNow', 'hidden'];
 
 /**
  * Khóa riêng của từng vai.
@@ -32,9 +32,10 @@ var BLOCK_KEYS_BY_ROLE = {
   row: ['elements'],
   text: ['text'],
   field: ['field', 'control', 'readonly', 'width', 'label'],
-  button: ['align', 'label'],
-  icon: ['icon', 'tooltip', 'align', 'label', 'toggle'],
-  check: ['label']
+  button: ['align', 'label', 'disabled'],
+  icon: ['icon', 'tooltip', 'align', 'label', 'toggle', 'disabled'],
+  check: ['label'],
+  control: ['kind', 'inputType', 'label', 'value', 'placeholder', 'options', 'disabled', 'pressed', 'ariaLabel', 'hidden']
 };
 
 /**
@@ -82,6 +83,18 @@ function blockElements(elements) {
   });
 }
 
+/** Dữ liệu định danh cho adapter đi cùng Block thay vì được màn tự gắn vào DOM sau lúc vẽ. */
+function blockData(data) {
+  if (data === undefined || data === null) { return null; }
+  if (typeof data !== 'object' || Array.isArray(data)) { throw new Error('`data` phải là object chứa các thuộc tính data-*, không phải ' + typeof data + '.'); }
+  Object.keys(data).forEach(function (key) {
+    if (!/^[a-z][a-z0-9-]*$/.test(key)) { throw new Error('Khóa `data` phải viết kebab-case, đang nhận "' + key + '".'); }
+    var value = data[key];
+    if (value !== null && value !== undefined && ['string', 'number', 'boolean'].indexOf(typeof value) < 0) { throw new Error('Giá trị `data.' + key + '` chỉ nhận string, number hoặc boolean.'); }
+  });
+  return data;
+}
+
 /**
  * Dựng một node đã chuẩn hóa. Mọi hàm dựng khác đều đi qua đây, nên đây là chỗ duy nhất biết hình dạng một node.
  *
@@ -104,6 +117,8 @@ function Block(spec, role) {
     spatialConfig: blockSpatial(y),
     action: y.action || null,
     menu: y.menu || null,
+    data: blockData(y.data),
+    ariaValueNow: y.ariaValueNow === undefined ? null : y.ariaValueNow,
     elements: blockElements(y.elements),
     label: y.label === undefined ? null : y.label,
     title: y.title === undefined ? null : y.title,
@@ -116,7 +131,16 @@ function Block(spec, role) {
     tooltip: y.tooltip || null,
     align: y.align || 'left',
     pick: y.pick === undefined ? null : y.pick,
-    toggle: y.toggle || null
+    toggle: y.toggle || null,
+    kind: y.kind || null,
+    inputType: y.inputType || null,
+    value: y.value === undefined ? null : y.value,
+    placeholder: y.placeholder || null,
+    options: y.options || null,
+    disabled: y.disabled === true,
+    pressed: y.pressed === true,
+    ariaLabel: y.ariaLabel || null,
+  hidden: y.hidden === true
   };
 }
 
@@ -151,4 +175,7 @@ function Icon(spec) { return Block(typeof spec === 'string' ? { icon: spec } : s
  * Vai thứ tám, thêm vào vì tài liệu 03 Phần 8 đòi "dòng lịch sử có ô đánh dấu, chọn được nhiều dòng" mà bảy vai cũ không vai nào vẽ được ô đánh dấu. Nó **không** mang `data-field` nên bộ thu thập lúc lưu không bao giờ thấy nó; danh sách đang chọn đọc từ DOM ngay lúc bấm xóa, nên không sinh thêm một chỗ giữ trạng thái.
  */
 function Check(spec) { return Block(typeof spec === 'string' ? { pick: spec } : spec, 'check'); }
+
+/** Control HTML trung tính cho các adapter không thuộc DATA_SCHEMA (input, select, công tắc). */
+function Control(spec) { return Block(spec, 'control'); }
 </script>

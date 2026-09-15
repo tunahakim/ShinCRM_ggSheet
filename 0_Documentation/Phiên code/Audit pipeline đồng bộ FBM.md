@@ -45,7 +45,7 @@ Ranh giới bắt buộc:
 
 Code nền của vòng này nằm ở `FbmSync.controlDispatch`, `FbmSync.nextEnvelope`, `fbmSyncLoop`, `service_worker.sendToFbmTab`, `executor.execute` và `FbmSync.continue`.
 
-Kết luận chung: ranh giới tổng thể đã được dựng đúng, nhưng chưa thể coi module ổn định vì các nhánh tiếp tục pipeline không dùng cùng một bộ xử lý response. Phiên thủ công đi qua `FbmSync.continue`; heartbeat nền lại có bộ xử lý riêng và hiện không chuyển response của phiên quét vào `FbmSync.continue`.
+Kết luận chung: request nghiệp vụ đều đi qua GAS -> Extension -> FBM -> GAS; Sidebar chỉ điều khiển/hiển thị. Mức độ hoàn tất của từng pipeline nằm tại các nhóm A-F và checklist, không suy diễn từ các snapshot lịch sử cũ trong tài liệu này.
 
 ## Nhóm A - Kết nối và nhận diện
 
@@ -58,22 +58,22 @@ Pipeline chuẩn:
 1. Sidebar bắt tay với bridge bằng nonce và Spreadsheet ID.
 2. Bridge trả ACK có `sessionId`.
 3. Sidebar gọi `fbmGetRelayConfig`; GAS lấy URL deployment hiện tại, khóa relay và Spreadsheet ID thực tế.
-4. Sidebar gửi `CRM_FBM_CONFIG`; Extension probe URL mới trước khi lưu.
-5. Probe đạt thì Extension ghi đè nguyên tử `fbmWebAppUrl`, `fbmSyncKey`, `fbmSpreadsheetId`; URL hỏng không được ghi đè URL đang dùng.
+4. Sidebar gửi `CRM_FBM_CONFIG`; Extension kiểm cấu trúc config và ACK local.
+5. ACK thành công thì Extension ghi đè nguyên tử `fbmWebAppUrl`, `fbmSyncKey`, `fbmSpreadsheetId`; ACK lỗi không được ghi đè config đang dùng.
 
 Đối chiếu code: `client/link/sheetLink.html:101-133`, `client/sync/fbmSync.html:70-145`, `fbm_sync/transport/EntryPoints.js:80-108`, `content_scripts/bridge/iframe_bridge.js:110-124`, `background/service_worker.js:392-405`.
 
-Kết luận: `ĐÚNG` về thiết kế. Còn cần live chứng minh việc Sidebar deployment trả đúng URL sau mỗi lần đổi deployment; nâng revision trên cùng deployment thì URL phải giữ nguyên, đây không phải lỗi.
+Kết luận: `ĐÚNG` offline. Cần live kiểm ACK khi Extension vừa tải lại; không có relay probe `/exec` trong pipeline này.
 
-### A2. Probe riêng Extension -> GAS
+### A2. Từ chối cấu hình relay lỗi
 
-Trigger: `fbmRelayProbe()` hoặc thao tác kiểm tra kết nối.
+Trigger: Extension trả ACK lỗi hoặc hết thời gian xác nhận sau khi Sidebar gửi cấu hình kỹ thuật.
 
-Pipeline chuẩn: Extension đọc relay config -> POST `kind: probe` -> GAS xác thực key và Spreadsheet ID -> trả DTO `RELAY_PROBE_OK` -> Extension lưu chẩn đoán tối thiểu, không tìm tab FBM.
+Pipeline chuẩn: Sidebar hiển thị lỗi kết nối rõ ràng; Extension giữ cấu hình cũ nguyên vẹn, không thử gọi `/exec`, không tìm tab FBM và không retry ngoài alarm kỹ thuật tiếp theo. Chỉ GAS cấp config mới khi người dùng mở Sidebar hoặc chủ động đổi cấu hình.
 
-Đối chiếu code: `service_worker.js:227-249`, `EntryPoints.js:112-123`, `EntryPoints.js:165-191`.
+Đối chiếu code: `client/sync/fbmSync.html`, `content_scripts/bridge/iframe_bridge.js`, `background/service_worker.js`.
 
-Kết luận: `ĐÚNG`; đã có bằng chứng live probe thành công.
+Kết luận: `ĐÚNG` offline; cần live kiểm ACK khi Extension vừa được tải lại.
 
 ### A3. Tự động điền nhận diện tài khoản
 
@@ -445,11 +445,11 @@ Kết luận: `KHÔNG HOÀN CHỈNH`. Cổng đầu vào có đủ; xử lý req
 
 Trigger: người dùng xác nhận đổi kết nối.
 
-Pipeline chuẩn: GAS đổi key dưới ScriptLock -> Sidebar chuyển config mới -> Extension probe và ACK -> chỉ sau ACK UI báo thành công.
+Pipeline chuẩn: GAS đổi key dưới ScriptLock -> Sidebar chuyển config mới -> Extension kiểm cấu trúc và ACK local -> chỉ sau ACK UI báo thành công.
 
 Đối chiếu code: `EntryPoints.fbmSyncRotateRelayKey`, `client/sync/fbmSync.html`, `service_worker.configureRelay`.
 
-Kết luận: `ĐÚNG` về code; cần live xác nhận trường hợp probe URL mới thất bại không làm mất config cũ.
+Kết luận: `ĐÚNG` về code; cần live xác nhận ACK lỗi không làm mất config cũ.
 
 ## Nhóm F - State, DTO, UI và log dùng chung
 
@@ -520,8 +520,8 @@ Phần này là snapshot có hiệu lực sau các revision GAS DEV `@268` đế
 
 | Pipeline | Chuỗi người dùng/trigger nhìn thấy | Các bước GAS | Vai trò Extension | Trạng thái hiện tại |
 | --- | --- | --- | --- | --- |
-| Bắt tay relay | Mở Sidebar -> nhận cấu hình -> probe | Lấy URL, key, Spreadsheet ID thực tế; kiểm key/ID | Lưu config nguyên tử sau probe thành công | Đúng; probe live đã đạt |
-| Probe relay | `fbmRelayProbe()` | Trả DTO `RELAY_PROBE_OK`; không state/FBM | POST relay, ghi chẩn đoán tối thiểu | Đúng |
+| Bắt tay relay | Mở Sidebar -> nhận cấu hình local -> ACK | Lấy URL, key, Spreadsheet ID thực tế | Lưu config nguyên tử; không gọi `/exec` hoặc FBM | Đúng offline; cần live kiểm ACK sau tải lại Extension |
+| Cấu hình relay lỗi | ACK lỗi/timeout | Trả lỗi tường minh, không cấp phiên nghiệp vụ | Giữ config cũ, không retry/probe | Đúng offline |
 | Tự điền nhận diện | Tài khoản FBM -> Tự động điền - Kiểm tra | Preflight -> authorize Customer -> đọc Authorized -> cấp User grid -> trả draft DTO | Chuyển request/response thô | Đã sửa lỗi P0 trace; cần live xác nhận User grid |
 | Kiểm tra liên kết | Bấm Kiểm tra sau khi có binding | Authorize -> quét Customer -> đối chiếu dòng có FBM ID -> trả n/N và mẫu | Chuyển grid request/response | Code offline đúng; live paging chưa có bằng chứng |
 | Lưu binding | Bấm Lưu thông tin | Kiểm Spreadsheet ID, userId, username, accountName -> ghi binding | Gửi giá trị người dùng xác nhận | Đúng với username đã đưa vào |

@@ -1,57 +1,38 @@
 <script>
-function fbmSyncRenderSettings(panel) {
-  var section = fbmSyncAppendBox(panel, 'shin-sync-section');
-  fbmSyncAppendText(section, 'Các kết nối và lịch nền được GAS điều phối; Extension chỉ biết nhịp hỏi GAS.', 'shin-sync-muted');
-
-  var relay = fbmSyncAppendCard(section, 'Kết nối Extension');
-  var relayBody = relay.querySelector('.shin-card-body');
-  fbmSyncAppendText(relayBody, FBM_SYNC_CLIENT.relayConfigured ? 'Extension đã nhận cấu hình relay của file này.' : 'Chưa xác nhận Extension đã nhận cấu hình relay.', FBM_SYNC_CLIENT.relayConfigured ? 'shin-sync-pass-row' : 'shin-sync-warning');
-  var rotate = fbmSyncAppendButton(relayBody, 'fbm-sync-rotate-relay', 'Đổi cấu hình kết nối', false); rotate.disabled = !!FBM_SYNC_CLIENT.running;
-
-  var settings = FBM_SYNC_CLIENT.syncSettings || {};
+function fbmSyncSettingsMessageBlocks(status) {
+  return status && status.message ? [Text({ className: status.phase === 'error' ? 'shin-sync-error-message' : 'shin-sync-message', text: String(status.message) })] : [];
+}
+function fbmSyncRelayStateBlocks() {
+  return [Text({ className: FBM_SYNC_CLIENT.relayConfigured ? 'shin-sync-pass-row' : 'shin-sync-warning', text: FBM_SYNC_CLIENT.relayConfigured ? 'Extension đã nhận cấu hình relay của file này.' : 'Chưa xác nhận Extension đã nhận cấu hình relay.' })];
+}
+function fbmSyncSettingsExtensionBlocks(settings) {
   var extension = settings.extension || { pollMinutes: 5, runOnStartup: true };
-  var extensionCard = fbmSyncAppendCard(section, 'Nhịp hỏi GAS của Extension');
-  var extensionBody = extensionCard.querySelector('.shin-card-body');
-  var extensionRow = fbmSyncAppendBox(extensionBody, 'shin-sync-form-field');
-  fbmSyncAppendText(extensionRow, 'Chu kỳ hỏi GAS (phút)', 'shin-sync-form-label');
-  fbmSyncAppendInput(extensionRow, 'fbm-extension-poll-minutes', 'number', extension.pollMinutes || 5, '1–60');
-  var startupRow = fbmSyncAppendBox(extensionBody, 'shin-sync-toggle-row');
-  fbmSyncAppendText(startupRow, 'Hỏi GAS ngay khi Chrome khởi động', 'shin-sync-toggle-copy');
-  var startup = fbmSyncMakeToggleButton('fbm-sync-run-on-startup', extension.runOnStartup !== false, 'Hỏi GAS ngay khi Chrome khởi động'); startup.setAttribute('data-sync-extension-startup', 'true'); startupRow.appendChild(startup);
-  var extensionSave = fbmSyncAppendButton(extensionBody, 'fbm-sync-save-extension', 'Lưu nhịp Extension', true); extensionSave.disabled = !!FBM_SYNC_CLIENT.running;
-  fbmSyncAppendText(extensionBody, 'Spreadsheet ID kỹ thuật: ' + String(FBM_SYNC_CLIENT.syncSettings && FBM_SYNC_CLIENT.syncSettings.spreadsheetId || '(được GAS xác định)'), 'shin-sync-muted');
-
-  var background = settings.background || {};
-  var backgroundCard = fbmSyncAppendCard(section, 'Lịch đồng bộ nền');
-  var backgroundBody = backgroundCard.querySelector('.shin-card-body');
-  fbmSyncAppendText(backgroundBody, 'Chỉ đọc FBM; mỗi lượt đến hạn được GAS chọn một tiến trình theo ưu tiên.', 'shin-sync-muted');
-  var bgSwitchRow = fbmSyncAppendBox(backgroundBody, 'shin-sync-toggle-row');
-  fbmSyncAppendText(bgSwitchRow, 'Bật lịch đồng bộ nền', 'shin-sync-toggle-copy');
-  var bgSwitch = fbmSyncMakeToggleButton('fbm-sync-background-switch', FBM_SYNC_CLIENT.lastStatus ? FBM_SYNC_CLIENT.lastStatus.backgroundEnabled !== false : true, 'Bật lịch đồng bộ nền'); bgSwitch.setAttribute('data-sync-background', 'true'); bgSwitch.disabled = FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.lastStatus.masterEnabled === false; bgSwitchRow.appendChild(bgSwitch);
-  [['heartbeat', 'Giữ phiên FBM', '5'], ['customer', 'Quét Customer', '60'], ['activity', 'Quét Activity', '30']].forEach(function (item) {
+  return [Box({ className: 'shin-sync-form-field', elements: [Text({ className: 'shin-sync-form-label', text: 'Chu kỳ hỏi GAS (phút)' }), Control({ id: 'fbm-extension-poll-minutes', kind: 'input', inputType: 'number', value: extension.pollMinutes || 5, placeholder: '1–60', ariaLabel: 'Chu kỳ hỏi GAS' })] }), Box({ className: 'shin-sync-toggle-row', elements: [Text({ className: 'shin-sync-toggle-copy', text: 'Hỏi GAS ngay khi Chrome khởi động' }), Control({ id: 'fbm-sync-run-on-startup', kind: 'toggle', pressed: extension.runOnStartup !== false, className: 'shin-sync-toggle ' + (extension.runOnStartup !== false ? 'is-on' : 'is-off'), data: { 'sync-extension-startup': true }, ariaLabel: 'Hỏi GAS ngay khi Chrome khởi động' })] }), Button({ id: 'fbm-sync-save-extension', label: 'Lưu nhịp Extension', className: 'shin-primary', disabled: !!FBM_SYNC_CLIENT.running }), Text({ className: 'shin-sync-muted', text: 'Spreadsheet ID kỹ thuật: ' + String(settings.spreadsheetId || '(được GAS xác định)') })];
+}
+function fbmSyncSettingsBackgroundBlocks(settings) {
+  var background = settings.background || {}, masterOff = FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.lastStatus.masterEnabled === false;
+  var process = [['heartbeat', 'Giữ phiên FBM', '5'], ['customer', 'Quét Customer', '60'], ['activity', 'Quét Activity', '30']];
+  return [Text({ className: 'shin-sync-muted', text: 'Chỉ đọc FBM; mỗi lượt đến hạn được GAS chọn một tiến trình theo ưu tiên.' }), Box({ className: 'shin-sync-toggle-row', elements: [Text({ className: 'shin-sync-toggle-copy', text: 'Bật lịch đồng bộ nền' }), Control({ id: 'fbm-sync-background-switch', kind: 'toggle', pressed: !(FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.lastStatus.backgroundEnabled === false), className: 'shin-sync-toggle ' + (!(FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.lastStatus.backgroundEnabled === false) ? 'is-on' : 'is-off'), data: { 'sync-background': true }, disabled: masterOff, ariaLabel: 'Bật lịch đồng bộ nền' })] })].concat(process.map(function (item) {
     var spec = background[item[0]] || { enabled: true, minutes: Number(item[2]) };
-    var row = fbmSyncAppendBox(backgroundBody, 'shin-sync-schedule-row');
-    var toggle = fbmSyncMakeToggleButton('fbm-sync-process-' + item[0], spec.enabled !== false, 'Bật ' + item[1]); toggle.setAttribute('data-sync-process-toggle', item[0]); toggle.disabled = FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.lastStatus.masterEnabled === false; row.appendChild(toggle);
-    fbmSyncAppendText(row, item[1], 'shin-sync-settings-label');
-    var minutes = fbmSyncAppendInput(row, 'fbm-sync-process-' + item[0] + '-minutes', 'number', spec.minutes || item[2], 'phút'); minutes.setAttribute('data-sync-process-minutes', item[0]); minutes.disabled = spec.enabled === false;
-  });
-  var bgSave = fbmSyncAppendButton(backgroundBody, 'fbm-sync-save-background', 'Lưu lịch nền', true); bgSave.disabled = !!FBM_SYNC_CLIENT.running;
-
-  var loginPolicy = FBM_SYNC_CLIENT.loginStatus || {};
-  var loginCard = fbmSyncAppendCard(section, 'Chính sách tự đăng nhập');
-  var loginBody = loginCard.querySelector('.shin-card-body');
-  [['fbm-sync-policy-auto-login', 'Cho phép tự đăng nhập khi phiên hết hạn', loginPolicy.enabled !== false, 'auto-login'], ['fbm-sync-policy-auto-open', 'Cho phép tự mở tab FBM khi GAS yêu cầu', loginPolicy.autoOpenTab === true, 'auto-open'], ['fbm-sync-policy-retry', 'Cho phép tự đăng nhập lại khi lần trước thất bại', loginPolicy.retryEnabled !== false, 'retry']].forEach(function (item) {
-    var row = fbmSyncAppendBox(loginBody, 'shin-sync-toggle-row'); fbmSyncAppendText(row, item[1], 'shin-sync-toggle-copy'); var toggle = fbmSyncMakeToggleButton(item[0], item[2], item[1]); toggle.setAttribute('data-sync-login-policy', item[3]); row.appendChild(toggle);
-  });
-  var retryRow = fbmSyncAppendBox(loginBody, 'shin-sync-form-field'); fbmSyncAppendText(retryRow, 'Chu kỳ thử lại (phút)', 'shin-sync-form-label'); fbmSyncAppendInput(retryRow, 'fbm-sync-login-retry-minutes', 'number', loginPolicy.retryMinutes || 30, '1–1.440');
-  var loginSave = fbmSyncAppendButton(loginBody, 'fbm-sync-save-login-policy', 'Lưu chính sách đăng nhập', true); loginSave.disabled = !!FBM_SYNC_CLIENT.running;
-  var config = fbmSyncAppendCard(section, 'Tham số phiên');
-  var body = config.querySelector('.shin-card-body');
-  [['Tài khoản FBM', settings.accountName || '(chưa khai báo)'], ['Tiền tố mã khách', settings.customerPrefix || '(chưa khai báo)'], ['Độ dài mã khách', settings.customerCodeLength || '(chưa khai báo)'], ['Mốc Activity', settings.activitySince || '(chưa khai báo)'], ['Ngưỡng yêu cầu chấp thuận', String(settings.approvalThreshold === undefined ? 10 : settings.approvalThreshold) + ' bản ghi']].forEach(function (item) {
-    var row = fbmSyncAppendBox(body, 'shin-sync-settings-row');
-    fbmSyncAppendText(row, item[0], 'shin-sync-settings-label');
-    fbmSyncAppendText(row, item[1], 'shin-sync-settings-value');
-  });
-  fbmSyncAppendText(body, 'Sửa các tham số nghiệp vụ trong khối Config của Sheet; lịch và chính sách trên được lưu qua GAS.', 'shin-sync-muted');
+    return Box({ className: 'shin-sync-schedule-row', elements: [Control({ id: 'fbm-sync-process-' + item[0], kind: 'toggle', pressed: spec.enabled !== false, className: 'shin-sync-toggle ' + (spec.enabled !== false ? 'is-on' : 'is-off'), data: { 'sync-process-toggle': item[0] }, disabled: masterOff, ariaLabel: 'Bật ' + item[1] }), Text({ className: 'shin-sync-settings-label', text: item[1] }), Control({ id: 'fbm-sync-process-' + item[0] + '-minutes', kind: 'input', inputType: 'number', value: spec.minutes || item[2], placeholder: 'phút', data: { 'sync-process-minutes': item[0] }, disabled: spec.enabled === false || masterOff, ariaLabel: 'Chu kỳ ' + item[1] })] });
+  }), [Button({ id: 'fbm-sync-save-background', label: 'Lưu lịch nền', className: 'shin-primary', disabled: !!FBM_SYNC_CLIENT.running })]);
+}
+function fbmSyncSettingsLoginBlocks(loginPolicy) {
+  loginPolicy = loginPolicy || {};
+  var items = [['auto-login', 'Cho phép tự đăng nhập khi phiên hết hạn', loginPolicy.enabled !== false], ['auto-open', 'Cho phép tự mở tab FBM khi GAS yêu cầu', loginPolicy.autoOpenTab === true], ['retry', 'Cho phép tự đăng nhập lại khi lần trước thất bại', loginPolicy.retryEnabled !== false]];
+  return items.map(function (item) { return Box({ className: 'shin-sync-toggle-row', elements: [Text({ className: 'shin-sync-toggle-copy', text: item[1] }), Control({ id: 'fbm-sync-policy-' + item[0], kind: 'toggle', pressed: item[2], className: 'shin-sync-toggle ' + (item[2] ? 'is-on' : 'is-off'), data: { 'sync-login-policy': item[0] }, ariaLabel: item[1] })] }); }).concat([Box({ className: 'shin-sync-form-field', elements: [Text({ className: 'shin-sync-form-label', text: 'Chu kỳ thử lại (phút)' }), Control({ id: 'fbm-sync-login-retry-minutes', kind: 'input', inputType: 'number', value: loginPolicy.retryMinutes || 30, placeholder: '1–1.440', ariaLabel: 'Chu kỳ thử lại' })] }), Button({ id: 'fbm-sync-save-login-policy', label: 'Lưu chính sách đăng nhập', className: 'shin-primary', disabled: !!FBM_SYNC_CLIENT.running })]);
+}
+function fbmSyncSettingsConfigBlocks(settings) {
+  return [['Tiền tố mã khách', settings.customerPrefix || '(chưa khai báo)'], ['Độ dài mã khách', settings.customerCodeLength || '(chưa khai báo)'], ['Mốc Activity', settings.activitySince || '(chưa khai báo)'], ['Ngưỡng yêu cầu chấp thuận', String(settings.approvalThreshold === undefined ? 10 : settings.approvalThreshold) + ' bản ghi']].map(function (item) { return Box({ className: 'shin-sync-settings-row', elements: [Text({ className: 'shin-sync-settings-label', text: item[0] }), Text({ className: 'shin-sync-settings-value', text: item[1] })] }); }).concat([Text({ className: 'shin-sync-muted', text: 'Sửa các tham số nghiệp vụ trong khối Config của Sheet; lịch và chính sách trên được lưu qua GAS.' })]);
+}
+function fbmSyncRenderSettings(panel, status) {
+  var settings = FBM_SYNC_CLIENT.syncSettings || {}, loginPolicy = FBM_SYNC_CLIENT.loginStatus || {};
+  return fbmSyncAppendBox(panel, 'shin-sync-section', 'fbm-sync-settings-root', [Text({ className: 'shin-sync-muted', text: 'Các kết nối và lịch nền được GAS điều phối; Extension chỉ biết nhịp hỏi GAS.' }), Box({ id: 'fbm-sync-settings-message-region', elements: fbmSyncSettingsMessageBlocks(status) }), Card({ title: 'Kết nối Extension', elements: [Box({ id: 'fbm-sync-relay-state-region', elements: fbmSyncRelayStateBlocks() }), Button({ id: 'fbm-sync-rotate-relay', label: 'Đổi cấu hình kết nối', disabled: !!FBM_SYNC_CLIENT.running })] }), Card({ title: 'Nhịp hỏi GAS của Extension', elements: fbmSyncSettingsExtensionBlocks(settings) }), Card({ title: 'Lịch đồng bộ nền', elements: fbmSyncSettingsBackgroundBlocks(settings) }), Card({ title: 'Chính sách tự đăng nhập', elements: fbmSyncSettingsLoginBlocks(loginPolicy) }), Card({ title: 'Tham số phiên', elements: fbmSyncSettingsConfigBlocks(settings) })]);
+}
+function fbmSyncPatchSettings(panel, status) {
+  if (!panel || !RENDER_INDEX.nodes['fbm-sync-settings-root']) { return false; }
+  fbmSyncRenderTarget('fbm-sync-settings-message-region', fbmSyncSettingsMessageBlocks(status));
+  fbmSyncRenderTarget('fbm-sync-relay-state-region', fbmSyncRelayStateBlocks());
+  return true;
 }
 </script>

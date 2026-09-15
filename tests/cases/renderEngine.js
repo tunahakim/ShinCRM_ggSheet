@@ -361,7 +361,7 @@ function chay(so) {
  *
  * Ba tệp trong danh sách, mỗi tệp một lý do đứng riêng, và cả ba đều không phải đường tắt: engine là chính chủ; hộp gợi ý tìm kiếm là đồ đạc cố định nằm ngoài bốn vùng, và ruột nó vẫn do `SLOTS.searchSuggestions` sinh Block rồi `renderNodes` đổi thành chuỗi, chứ không ai ghép HTML bằng tay; màn chặn vẽ **trước khi** engine có dữ liệu để chạy, nên nó không thể đi qua engine.
  *
- * Chốt cả con số cho `renderEngine.html`: đúng hai lời gán — một của `renderScreen` gán trọn bốn vùng một lượt, một của `renderTarget` gán ruột một Block. Lời gán thứ ba trong chính engine nghĩa là có thêm một đường đổi màn hình mà tài liệu chưa biết.
+ * Chốt cả con số cho `renderEngine.html`: ba lời gán — `renderScreen`, `renderTarget` và cổng thay toàn bộ con của một vùng động khi chuyển màn. Các đường này đều nằm trong renderer, không để module tự sửa DOM.
  */
 function quetDuongGan(so) {
   section('renderEngine — chỉ ba tệp được gán innerHTML, không ai mở đường tắt vào DOM');
@@ -383,9 +383,9 @@ function quetDuongGan(so) {
   });
 
   const thay = Object.keys(dem).sort().map((tep) => tep + ':' + dem[tep]);
-  check(so, 'đúng ba tệp gán innerHTML, và engine chỉ có hai lời gán — thêm một lời nữa là thêm một đường đổi màn hình',
+  check(so, 'đúng ba tệp gán innerHTML, và engine chỉ có ba lời gán được quy định',
     thay,
-    ['client/screen/statusScreen.html:1', 'client/ui/renderEngine.html:2', 'client/ui/search.html:3']);
+    ['client/screen/statusScreen.html:1', 'client/ui/renderEngine.html:3', 'client/ui/search.html:3']);
 
   // Hai luật đi kèm của cùng điều khoản: không ai được đặt giá trị, ẩn hiện hay đổi lớp CSS của một phần tử từ bên ngoài bộ máy. Quét ba tệp `screen/` vì đó là chỗ dễ ngứa tay nhất — một màn muốn tự sửa một chữ trên chính nó.
   const tepMan = liet('client/screen', '.html').filter((t) => t.indexOf('statusScreen') === -1);

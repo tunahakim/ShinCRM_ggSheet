@@ -99,8 +99,8 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Tách phần dựng block trạng thái, điều khiển và audit thành các tệp `.html` riêng trong `client/sync/`, vẫn dùng lớp component/block chuẩn của Sidebar.
 - [x] Tách màn hình trạng thái, thiết lập đăng nhập và audit thành các tệp giao diện riêng trong `client/sync/`, tái sử dụng block chuẩn.
 - [x] Lấy authorized Customer rồi Activity; thiếu token thì dừng trước CRUD.
-- [x] Kiểm owner mặc định FBM khớp `FBM_ACCOUNT_NAME`; sai thì dừng chiều push.
-- [x] Xác nhận Config có `FBM_ACCOUNT_NAME`, `FBM_MA_KH_PREFIX`, `FBM_MA_KH_LENGTH`, `FBM_ACTIVITY_SINCE` và không khai trùng.
+- [x] Kiểm owner mặc định FBM khớp tên đầy đủ trong binding đã xác nhận; sai thì dừng chiều push.
+- [x] Xác nhận Config chỉ giữ `FBM_MA_KH_PREFIX`, `FBM_MA_KH_LENGTH`, `FBM_ACTIVITY_SINCE`; tên tài khoản không được nhân bản vào Config.
 
 ### Danh mục
 
@@ -220,7 +220,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Khi đang có phiên hoạt động, lần bấm Đồng bộ ngay thứ hai không tạo phiên song song.
 - [x] Nếu tổng số bản ghi đủ điều kiện thay đổi lớn hơn `10`, Sidebar preview và chờ người dùng chấp thuận trước request ghi; từ `10` trở xuống vẫn phải qua công tắc tổng, cổng phiên và cổng bản ghi. `fbmApprovePush` chỉ cấp request authorize sau khi chấp thuận; test offline đã phủ ngưỡng `11`.
 - [x] Dừng đồng bộ xóa cursor kỳ, nhả khóa sync, giữ khóa form user và không gửi Delete.
-- [x] Kiểm owner mặc định FBM với `FBM_ACCOUNT_NAME` trước toàn bộ chiều push.
+- [x] Kiểm owner mặc định FBM với tên đầy đủ trong binding trước toàn bộ chiều push.
 - [x] Kiểm đủ bảy field bắt buộc và mọi trần độ dài trước khi dựng request.
 - [x] Customer mới chưa Cho phép chỉ pull, không push.
 - [x] Customer thiếu field hoặc vượt trần không phát request, ghi trạng thái và lý do.
@@ -289,7 +289,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 
 - [x] Code, test offline, log và GAS DEV của heartbeat/scheduler hoàn tất.
 
-## Slice 8 — Sidebar, log và probe nghiệm thu
+## Slice 8 — Sidebar, log và nghiệm thu kết nối
 
 - [x] Có màn hình đồng bộ độc lập, không hủy phiên khi quay lại, hiển thị phase, hướng, thực thể, session, counters, tiến trình và preview giới hạn.
 - [x] Màn hình `Chạy đồng bộ` khi chưa chạy chỉ hiện hành động bắt đầu phù hợp với mode; khi chạy chỉ hiện `Dừng đồng bộ`.
@@ -317,7 +317,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Tên hiển thị `Nghiệm thu phạm vi thử`; `ALT00010` chỉ là phạm vi DEV/live acceptance, không đại diện cho phiên nhiều Customer.
 - [x] Tiêu đề header đổi theo màn hình; menu con nổi dưới header, cuộn nội bộ ở trần khoảng hai phần ba Sidebar; công tắc tổng và auto-login dùng pill nhỏ; các nút có menu trong tiêu đề Card dùng cùng chiều cao compact với tiêu đề Card.
 - [x] Liên kết tài khoản có form nhập tay `Spreadsheet ID`, `Mã user FBM`, `Username FBM`, `Tên tài khoản FBM`; thao tác `Tự động điền - Kiểm tra` và `Lưu thông tin` báo lỗi tường minh, không tự lưu ngầm.
-- [ ] **Cần kiểm chứng thực tế:** chạy probe một nút và kiểm tra báo cáo trên Sidebar/Log.
+- [ ] **Cần kiểm chứng thực tế:** tải lại Extension, mở Sidebar và kiểm tra ACK cấu hình relay cùng trạng thái báo trên Sidebar/Log.
 
 ### Bổ sung UI dùng chung sau Slice 8
 
@@ -354,7 +354,7 @@ Các mục dưới đây là phần đang phải hoàn thiện trước khi báo
 - [x] Sửa continuation nền: heartbeat chỉ xử lý response của đúng request heartbeat; nếu GAS cấp request tiếp theo thuộc cursor phiên nền thì Extension nộp qua `kind: background_sync`, command `continue` và `FbmSync.continue`; kiểm thử offline đạt `1304/1304`.
 - [x] Capture generic của Extension đọc cả HTML và text của trang theo chỉ dẫn GAS; pattern cookie do GAS cấp nhận cả dấu nháy thường và escaped, token transport chỉ có trong text vẫn được thay trước khi gửi FBM.
 - [x] Transport failure kết thúc phase `error`, giữ chẩn đoán nhưng không giữ reservation/cursor; hủy liên kết sau lỗi được phép, còn công tắc tổng OFF chuyển ngay sang `paused` nếu không có request FBM đang bay.
-- [x] Bổ sung test offline cho mọi nhánh trên, gồm relay local không fetch `/exec`, Web App từ chối probe, `UNBOUND` không được cấp envelope, bridge mất context báo lỗi rõ, capture từ text, pause và công tắc tổng; tổng hiện tại `1325/1325`.
+- [x] Bổ sung test offline cho mọi nhánh trên, gồm relay local không fetch `/exec`, ACK cấu hình lỗi giữ config cũ, `UNBOUND` không được cấp envelope, bridge mất context báo lỗi rõ, capture từ text, pause và công tắc tổng; tổng hiện tại `1325/1325`.
 - [x] Executor áp dụng đúng `source` trong chỉ dẫn capture/replacement generic do GAS cấp, không ép mọi replacement về HTML trang; commit `b91790d`, test offline vẫn `1260/1260`.
 - [x] Nghiệm thu GAS DEV bằng `node tests/gas.js ... --push` cho heartbeat request/response, transport failure, reservation và auto-login. `fbmSyncHeartbeatRequest` đạt ở revision `@252` với trạng thái fail-closed `AUTO_LOGIN_NOT_CONFIGURED`, `phase: paused`; `fbmSyncHeartbeat` trả `STALE_RESPONSE` khi không có reservation; `fbmSyncHeartbeatTransportFailure` trả `STALE_RESPONSE` khi request không còn hiệu lực; `fbmGetLoginConfig` đạt ở `@248`; `fbmProbeAutoLogin` đạt ở `@249`.
 - [x] GAS DEV relay `AKfycbxWM4...` đã nâng revision `@288`; entrypoint transport failure giữ fail-closed với reservation cũ và xác nhận lỗi capture kết thúc tại `error`, không giữ cursor/reservation; executor test dùng trực tiếp pattern GAS cấp để chặn tái diễn lỗi dấu nháy cookie.
@@ -367,6 +367,11 @@ Các mục dưới đây là phần đang phải hoàn thiện trước khi báo
 - [x] Tạo charter độc lập `tests/contracts/fbmSyncPipeline.js` từ Tài liệu 09.01, 09.02, 09.06, 09.08 và hợp đồng log; catalog cố định đủ 44 pipeline A-F, mỗi pipeline nêu trigger, kết quả quan sát được ở Sidebar, Extension, GAS, Sheet/Log khi có liên quan và loại bằng chứng bắt buộc.
 - [x] Ma trận 44 pipeline có cổng kiểm: mỗi dòng phải trỏ tới ít nhất một module test offline đang chạy và điều kiện bằng chứng live/GAS DEV; thiếu chủ sở hữu test hoặc tệp test sẽ làm `node tests/run.js` đỏ.
 - [x] Tạo harness `tests/cases/fbmSync/Workflow.js` chạy envelope thật qua GAS -> executor Extension -> GAS với fixture FBM, không dùng request FBM thật; đã kiểm tự điền/kiểm tra liên kết, đăng nhập thử đúng/sai identity, response thiếu identity, xóa binding rỗng, cổng mode, full read rỗng, alarm noop/no tab/có tab, approval, lỗi bridge thủ công, master OFF, stale response, cancel khi request đang bay, DTO không lộ state nội bộ và log tổng hợp.
+- [x] Bổ sung `tests/cases/fbmSync/UserJourneys.js`: dựng Sidebar rồi phát click/change như người dùng cho năm màn hình, header, công tắc tổng, bốn loại đồng bộ, chấp thuận/dừng, liên kết/credential/login, cài đặt phiên, tab kết quả, phân trang, retry và conflict.
+- [x] Chuyển Sidebar sang vá component theo snapshot: chỉ dựng toàn thân lúc mở/đổi màn hình; Tổng quan, Tài khoản, Chạy đồng bộ, Kết quả và Cài đặt giữ node control/bản nháp khi snapshot GAS tới. Vùng log/lỗi/conflict chỉ thay component dữ liệu của chính nó. Hồi quy kiểm node/focus dropdown, mật khẩu, nhịp Extension, hàng tab và cập nhật progress tại chỗ; `node tests/run.js` đạt `1424/1424`.
+- [x] Bổ sung `Control` như một Block chuẩn cho input/select/toggle; renderer có `renderControlValue`, `renderTargetState` và `renderReplaceChildren`. Sync shell, banner, menu, progress, preview và audit đều đi qua cây Block; không tạo HTML/DOM riêng cho callback trạng thái.
+- [x] Tách các mount header/menu/banner của Sync khỏi vùng nội dung; snapshot chỉ vá target động, còn thay toàn vùng chỉ dùng lúc mở hoặc chuyển màn. Kiểm thử hồi quy giữ nguyên node/focus và đạt `1424/1424` sau khi thêm shell Block.
+- [x] Bỏ `FBM_ACCOUNT_NAME` khỏi Config/API/preflight; cổng owner và giá trị fallback request lấy tên đầy đủ từ binding bốn định danh. Test mô phỏng Config cũ xác nhận nó không thể gây khóa hoặc đổi binding.
 - [ ] Mở rộng từng use case còn lại của charter thành trace chạy được đầy đủ qua các lớp; không đánh dấu hoàn tất chỉ vì các unit test thành phần đạt.
 - [ ] Chỉ sau khi workflow offline của use case đạt mới đưa use case đó vào checklist nghiệm thu live tương ứng.
 
@@ -414,7 +419,7 @@ Các ràng buộc thiết kế của slice này nằm ở Tài liệu 09.01, 09.
 
 - [x] Bổ sung workflow test dựa trên tài liệu cho startup, wake, restart, một alarm, không có việc, overlap, ưu tiên, auto-open, retry và response lớn.
 - [ ] Ma trận 44 pipeline có ít nhất một bằng chứng chạy thật qua GAS → Extension → FBM giả lập → GAS/UI cho mỗi nhánh liên quan.
-- [x] Chạy `node tests/run.js`; bộ offline hiện đạt `1394/1394`. Ma trận live/GAS DEV còn chờ các mục được đánh dấu riêng.
+- [x] Chạy `node tests/run.js`; bộ offline hiện đạt `1420/1420`. Ma trận live/GAS DEV còn chờ các mục được đánh dấu riêng.
 
 ## Slice 9 — Live acceptance và mở rộng production
 
@@ -438,17 +443,17 @@ Các ràng buộc thiết kế của slice này nằm ở Tài liệu 09.01, 09.
 | Slice 2 — Pull Customer |  |  |  |  |  |
 | Slice 3 — Pull Activity | `8fbb6a7` + entrypoint DEV | `1075/1075` | `@136` | Pull `ALT00010` đã xác nhận Activity liên kết và idempotency; bulk/catchup/rotation đã có test offline; `fbmSyncStartActivityBulk` trả `OK`, request đầu `authorize`, state `scan=activity_bulk`; `fbmInstallScheduler` trả `OK` | Ba lớp quét Activity nền đã có cursor state/DocumentProperties |
 | Slice 4 — Đối soát + conflict |  |  |  |  |  |
-| Slice 5 — Push Customer | `5d74fd4` | `1175/1175` | `@200` | GAS DEV `fbmSyncStatus` đọc `ALT00010` thành công; preflight/relay probe PASS | Customer create mất phản hồi dò MST contains, verify exact + hash, vá ID/baseline và không phát lại request ghi |
+| Slice 5 — Push Customer | `5d74fd4` | `1175/1175` | `@200` | GAS DEV `fbmSyncStatus` đọc `ALT00010` thành công; preflight đạt | Customer create mất phản hồi dò MST contains, verify exact + hash, vá ID/baseline và không phát lại request ghi |
 | Slice 6 — Push Activity | `e9ba3f1`, `01688d6`, `cd94601`, `b6d8b43`, `1a67029`, `c1ca43d`, `b9a989e`, `c49bc6c`, `284b5b9` | `1119/1119` | `@174` | Đã bắt được phiên treo: GAS ghi `gas_returned` nhưng callback Sidebar không serialize được Date trong memvars; builder sửa ngày Sheet sang `/Date(ms)/`, cập nhật `datetime0`, tách `fileticket` OldValue/NewValue và OldValue thiếu theo fixture | Callback Activity Edit có trace `entered/returned/failed`; trace hop độc lập nối GAS/Sidebar/Extension/FBM; quá 15 giây Sidebar tự kết luận timeout và không tự gửi lại lệnh ghi |
 | Slice 7 — Scheduler + nền | `7a324ee`, `43233a5`, `0d46258`, `ba46b23`, `36d6f8f`, `9923fac`, `119cea6` | `1078/1078` | `@252` | GAS DEV heartbeat request/response, reservation và transport failure fail-closed; không phát request ghi khi thiếu phiên/cấu hình | GAS giữ hop/slice và cursor; relay kèm Spreadsheet ID; Sidebar gửi config khi mở; không chạm FBM khi GAS chưa cấp envelope; bridge cũ sau Reload được thử lại có kiểm soát; state active quá hạn được thu hồi |
 | Slice 8 — UI + log + probe | `e243432`, `3e60e88`, `e4c92c1`, `52c3fa9`, `81c4c58`, `778eed1`, `54056ef`, `4493ec5`, `23d1a49`, `1f7be3e`, `030b059`, `e928e4a`, `8438eed`, `d428a6e`, `697ddd0`, `860c83b`, `23c9111`, `2e50efc`, `4ec7688`, `638c5f4`, `cb81f07` | `1228/1228` (gồm smoke test DOM Sidebar, test executor chặn endpoint lỗi và heartbeat thủ công) | `@232` (`fbmGetSyncSettings` trả `OK`, `approvalThreshold: 10`; `fbmGetMasterSwitch` trả `OK`, `enabled: true`; `fbmSyncStatus`/`fbmSyncPreflight` fail-closed đúng khi chưa liên kết FBM; `fbmGetSyncTrace` trả `OK`) | UI shell năm màn hình, menu dọc phù hợp Sidebar hẹp, popup dùng chung cho search/dropdown/customer picker/menu, hộp menu nổi dưới header có nền đặc và cuộn nội bộ, pill `ON/OFF` nhỏ, tiêu đề đổi theo màn hình, form liên kết nhập tay; lớp Đồng bộ phủ toàn Sidebar, không bị đẩy xuống sau thông tin khách; form khách hàng khai một cụm Schema và hiển thị liền mạch; mép view/form/Sync dùng token scrollbar 4px, tiêu đề card đồng nhất 28px và nút có menu không làm header phình cao, nhãn form tương phản hơn; bộ lọc lịch sử hiển thị `All/Active/Deleted`, nấc đang chọn nằm trước nút `Thêm`; pipeline chỉ hiện khi phiên chạy, tab kết quả và phân trang đã hoàn tất; nút Trang trước/Trang sau dùng hai cột bằng nhau, chữ đủ tương phản khi bị khóa; mở lại dropdown hợp lệ hiện toàn bộ danh sách và bôi xanh giá trị cũ, đang gõ chỉ lọc các dòng khớp và bôi xanh dòng đầu để Tab/Enter chọn, Công ty mẹ dùng cùng luồng tìm kiếm và chọn dòng đầu; mọi ô nhập dùng token chặn autofill của Chrome, không còn popup đen chồng lên popup ứng dụng; khoảng cách giữa các khối trên toàn Sidebar dùng một nhịp gap chung; bố cục động dùng Block/schema và renderer chung; smoke test UI phủ trạng thái rỗng/đang chạy/lỗi, pipeline, liên kết, conflict, phân trang, cấu hình và lỗi async; worker tự nạp executor `21.10`, kênh V2 không để executor cũ gọi song song, endpoint `undefined` bị chặn trước `fetch`, trace giữ metadata an toàn, GAS cấp envelope heartbeat trước khi worker gửi FBM; chưa nghiệm thu probe trên Sidebar | Cần chủ dự án đóng/mở lại Sidebar và tải lại Extension để kiểm tra hiển thị/thực tế |
-| Slice 9A — Một nhịp Extension + scheduler GAS | `a1b8e0c` + bản phát hành Extension | `1396/1396` | `@298` | GAS DEV `fbmGetSyncSettings`, `fbmSaveExtensionConfig`, `fbmSaveBackgroundSchedule`, `fbmSaveLoginPolicy` trả `OK`; offline đã kiểm một alarm `gas_poll`, startup/no-op/overlap/ưu tiên/auto-open, continuation nền và projection response lớn | Còn cần đo response bulk thật, live kiểm tab/Sidebar và nghiệm thu 44 pipeline theo các mục riêng |
+| Slice 9A — Một nhịp Extension + scheduler GAS | `a1b8e0c` + bản phát hành Extension | `1424/1424` | `@299` | GAS DEV `fbmGetSyncSettings`, `fbmSaveExtensionConfig`, `fbmSaveBackgroundSchedule`, `fbmSaveLoginPolicy` trả `OK`; offline đã kiểm một alarm `gas_poll`, startup/no-op/overlap/ưu tiên/auto-open, continuation nền và projection response lớn | Còn cần đo response bulk thật, live kiểm tab/Sidebar và nghiệm thu 44 pipeline theo các mục riêng |
 | Slice 9 — Live acceptance + production |  |  |  |  |  |
 
 Ghi chú triển khai sau Slice 8: commit `770dc8c` và `21434f9` làm heartbeat kiểm tra relay/công tắc/phiên trước khi gửi FBM; deployment GAS cũ hoặc phiên hết hạn sẽ không làm alarm tiếp tục bắn request FBM, còn `fbmHeartbeatNow()` thủ công vẫn chạy khi chỉ tắt đồng bộ nền. Commit `b42db8b` buộc Sidebar lấy URL relay hiện tại và chờ Extension ACK, tránh giữ URL deployment cũ. Commit mới bổ sung quyền truy cập Sheets và nâng Extension lên `21.9` để khôi phục bridge sau khi reload; khi relay gặp 404, Service Worker yêu cầu Sidebar đang mở tự lấy lại URL hiện tại. Executor ưu tiên cookie payload hiện có trên tab thay cho cookie cũ từ GAS. Test offline đạt `1235/1235`; GAS DEV đã tạo deployment mới `https://script.google.com/macros/s/AKfycbxWM4kaJmtGZnWQ6cHQbW8Y87qvOHTmAIkxlkVTGVjamlFxe5zUzNJ2Wxr3AQ7t03rV/exec` ở revision `@236`; đang chờ xác nhận Extension tự đổi URL trong storage.
 Ghi chú cập nhật triển khai: GAS DEV revision `@237` trả relay URL `AKfycbxWM4...`; Extension `21.10` chống lặp refresh khi relay lỗi, bridge cũ bỏ qua `Extension context invalidated`, Sidebar timeout request sau 30 giây và gửi một heartbeat khi mở Sidebar theo công tắc đồng bộ nền.
 Ghi chú cập nhật triển khai tiếp theo: GAS DEV revision `@238` sửa thứ tự khởi tạo, Sidebar chờ `CRM_HANDSHAKE_ACK` trước khi gửi relay config nên URL mới được Extension tự lưu sau khi mở Sidebar.
-Triển khai xác nhận: deployment Sidebar đang dùng `AKfycbx0ueI_gR2zz...` đã được cập nhật revision `@240`; DEV runner dùng `AKfycbxWM4...` revision `@241`. URL cũ vẫn là URL ổn định của Sidebar và probe thành công, không cần đổi storage mỗi lần cập nhật revision.
+Triển khai xác nhận: deployment Sidebar đang dùng `AKfycbx0ueI_gR2zz...` đã được cập nhật revision `@240`; DEV runner dùng `AKfycbxWM4...` revision `@241`. URL deployment ổn định qua revision; Extension chỉ nhận lại config local/ACK khi Sidebar mở, không tự probe URL.
 Ghi chú chẩn đoán relay: deployment Sidebar đã cập nhật revision `@243`; relay compact giữ lại `code`, `error` và HTTP status để không làm rỗng nguyên nhân lỗi heartbeat.
 Ghi chú executor: commit `4560e42` sửa heartbeat Customer về request trang đầu hợp lệ; commit `dad9f02` nâng executor lên `21.9` để tab FBM đang mở tự nạp bản sửa sau khi Extension reload. Test offline đạt `1236/1236`.
-Ghi chú Slice 9A: commit `a1b8e0c` gom lịch nghiệp vụ về GAS, giữ Extension một alarm `gas_poll`, thêm cấu hình `Cài đặt phiên`, auto-open theo lệnh GAS và primitive projection/lọc generic; Extension phát hành `21.15`. GAS DEV hiện ở revision `@298`; test offline mới nhất `1396/1396`. Chưa coi đo bulk thật hoặc live acceptance là hoàn tất.
+Ghi chú Slice 9A: commit `a1b8e0c` gom lịch nghiệp vụ về GAS, giữ Extension một alarm `gas_poll`, thêm cấu hình `Cài đặt phiên`, auto-open theo lệnh GAS và primitive projection/lọc generic; Extension phát hành `21.15`. GAS DEV hiện ở revision `@299`; test offline mới nhất `1424/1424`. Chưa coi đo bulk thật hoặc live acceptance là hoàn tất.

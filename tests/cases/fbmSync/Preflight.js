@@ -20,14 +20,14 @@ async function chay(so) {
   hop.FbmSync.pushCandidates = (entity) => entity === 'activity' ? [{ entity: 'activity', kind: 'edit', id: 'ACT-1', record: { id: 'ACT-1', syncStatus: hop.FbmSync.SYNC_STATUS.conflict, taskType: 'Gọi điện chăm sóc', owner: 'Owner khác' } }] : [];
 
   const write = hop.FbmSync.runPreflight({ mode: 'write' });
-  check(so, 'preflight write chặn Config tài khoản thiếu', [write.ok, write.blocking.some((item) => item.code === 'FBM_ACCOUNT_NAME_MISSING')], [false, true]);
+  check(so, 'preflight write khong dung Config ten tai khoan cu lam cong chan', write.issues.some((item) => item.code === 'FBM_ACCOUNT_NAME_MISSING'), false);
   check(so, 'preflight write báo conflict và mapping theo mã riêng', [write.issues.some((item) => item.code === 'FBM_RECORD_CONFLICT_PENDING'), write.issues.some((item) => item.code === 'FBM_CATEGORY_MAPPING_MISSING')], [true, true]);
   check(so, 'preflight báo Activity đổi nhưng chưa bật quyền đẩy', write.issues.some((item) => item.code === 'FBM_RECORD_PUSH_PERMISSION_MISSING'), true);
   check(so, 'preflight gộp cảnh báo quyền đẩy theo tổng số', write.issues.filter((item) => item.code === 'FBM_RECORD_PUSH_PERMISSION_MISSING').length, 1);
 
   hop.FbmSync.readLocal = (entity) => entity === 'activity' ? [{ id: 'ACT-NOPERM', customerId: 'CUS-1', fbmId: '' }] : [{ id: 'CUS-1', fbmCustomerCode: 'ALT00010', allowFbmPush: 'Cho phép' }];
   const read = hop.FbmSync.runPreflight({ mode: 'read' });
-  check(so, 'preflight read chặn trước khi liên kết tài khoản FBM', [read.ok, read.blocking.some((item) => item.code === 'FBM_IDENTITY_UNBOUND'), read.warnings.some((item) => item.code === 'FBM_ACCOUNT_NAME_MISSING')], [false, true, true]);
+  check(so, 'preflight read chan truoc khi lien ket tai khoan FBM nhung khong can Config ten tai khoan', [read.ok, read.blocking.some((item) => item.code === 'FBM_IDENTITY_UNBOUND'), read.warnings.some((item) => item.code === 'FBM_ACCOUNT_NAME_MISSING')], [false, true, false]);
   hop.FbmSync.readLocal = (entity) => entity === 'activity' ? [{ id: 'ACT-NOPERM', customerId: 'CUS-1', fbmId: '174813' }] : [{ id: 'CUS-1', fbmId: 'FBM-CU', fbmCustomerCode: 'ALT00010' }];
   const rebindRead = hop.FbmSync.runPreflight({ mode: 'read' });
   check(so, 'preflight read chặn khi file có FBM ID nhưng chưa kiểm tra liên kết', [rebindRead.ok, rebindRead.blocking.some((item) => item.code === 'REBIND_REQUIRED')], [false, true]);
@@ -37,7 +37,7 @@ async function chay(so) {
   check(so, 'preflight identity probe được phép chạy để tự điền liên kết', [identityProbe.ok, identityProbe.blocking.some((item) => item.code === 'REBIND_REQUIRED')], [true, false]);
 
   const push = hop.FbmSync.runPreflight({ mode: 'push' });
-  check(so, 'preflight mode push vẫn fail-closed như mode write', [push.ok, push.blocking.some((item) => item.code === 'FBM_ACCOUNT_NAME_MISSING')], [false, true]);
+  check(so, 'preflight mode push van fail-closed theo binding va cac cong thuc te', [push.ok, push.blocking.some((item) => item.code === 'FBM_ACCOUNT_NAME_MISSING')], [false, false]);
 
   hop.FbmSync.pushOwnerError = (candidate, settings) => candidate.entity === 'activity' && candidate.record.owner && candidate.record.owner !== settings.accountName
     ? 'Activity ' + candidate.id + ' thuộc owner FBM khác.' : '';

@@ -1,5 +1,5 @@
 <script>
-/* Snapshot trạng thái dùng các Block chung; phần đang chạy có thể cập nhật tại chỗ để không làm chớp màn hình. */
+/* Snapshot trạng thái dùng các Block chung; chỉ thay vùng đọc để không làm chớp control. */
 function fbmSyncLiveStatusValue(status, count, field) {
   status = status || {}; count = count || {};
   if (field === 'phase') { return status.label || status.phase || 'Sẵn sàng'; }
@@ -9,52 +9,51 @@ function fbmSyncLiveStatusValue(status, count, field) {
   if (field === 'current') { return String(status.current || ''); }
   return String(status.message || '');
 }
-function fbmSyncLiveStatusNode(body, status, count, field, className) {
-  var node = fbmSyncAppendText(body, fbmSyncLiveStatusValue(status, count, field), className);
-  node.setAttribute('data-fbm-sync-live-status', field);
-  node.hidden = !node.textContent;
-  return node;
+function fbmSyncProgressBlocks(status, count) {
+  var data = fbmSyncProgressData(status || {}, count || {});
+  return Box({ className: 'shin-sync-progress', elements: [
+    Text({ id: 'fbm-sync-progress-label', className: 'shin-sync-progress-label', text: data.label }),
+    Box({ id: 'fbm-sync-progress-track', className: 'shin-sync-progress-track', ariaValueNow: data.determinate ? String(data.percent) : null, elements: [Box({ id: 'fbm-sync-progress-fill', className: 'shin-sync-progress-fill' + (!data.determinate && data.active ? ' is-indeterminate' : '') + (data.waitingForResponse ? ' is-waiting' : ''), spatialConfig: { width: data.determinate ? data.percent + '%' : '35%' }, elements: [] })] })
+  ] });
 }
-function fbmSyncPaintStatusBlocks(panel, status, count) {
+function fbmSyncStatusBlocks(status, count) {
   status = status || {}; count = count || {};
-  var box = fbmSyncAppendCard(panel, 'Trạng thái phiên', 'shin-sync-status-card');
-  var body = box.querySelector('.shin-card-body');
-  fbmSyncLiveStatusNode(body, status, count, 'phase', 'shin-sync-phase');
-  fbmSyncLiveStatusNode(body, status, count, 'operation', 'shin-sync-operation');
-  fbmSyncLiveStatusNode(body, status, count, 'session', 'shin-sync-session');
-  fbmSyncLiveStatusNode(body, status, count, 'count', 'shin-sync-count');
-  fbmSyncPaintProgress(body, status, count);
-  fbmSyncLiveStatusNode(body, status, count, 'current', 'shin-sync-current');
-  fbmSyncLiveStatusNode(body, status, count, 'message', status.phase === 'error' ? 'shin-sync-error-message' : 'shin-sync-message');
+  var fields = [['phase', 'shin-sync-phase'], ['operation', 'shin-sync-operation'], ['session', 'shin-sync-session'], ['count', 'shin-sync-count'], ['current', 'shin-sync-current'], ['message', status.phase === 'error' ? 'shin-sync-error-message' : 'shin-sync-message']];
+  var elements = fields.map(function (item) {
+    var value = fbmSyncLiveStatusValue(status, count, item[0]);
+    return value ? Text({ className: item[1], text: value }) : null;
+  }).filter(function (node) { return !!node; });
+  elements.splice(4, 0, fbmSyncProgressBlocks(status, count));
+  return [Card({ title: 'Trạng thái phiên', className: 'shin-sync-status-card', elements: elements })];
+}
+function fbmSyncPaintStatusBlocks(panel, status, count, targetId) {
+  return fbmSyncAppendBox(panel, '', targetId || 'fbm-sync-live-status-region', fbmSyncStatusBlocks(status, count));
+}
+function fbmSyncPatchStatusBlocks(panel, status, targetId) {
+  var id = targetId || 'fbm-sync-live-status-region';
+  if (!panel || !RENDER_INDEX.nodes[id]) { return false; }
+  fbmSyncRenderTarget(id, fbmSyncStatusBlocks(status, status && status.counts || {}));
+  return true;
 }
 function fbmSyncPatchLiveStatus(panel, status, screen) {
   if (!panel || String(panel.getAttribute('data-fbm-sync-screen') || '') !== String(screen || '') || (screen !== 'run' && screen !== 'results')) { return false; }
-  var nodes = panel.querySelectorAll('[data-fbm-sync-live-status]');
-  if (!nodes.length) { return false; }
   if (screen === 'run' && typeof fbmSyncPatchLivePipeline === 'function' && !fbmSyncPatchLivePipeline(panel, status)) { return false; }
-  var count = status && status.counts || {};
-  if (typeof fbmSyncPatchLiveProgress === 'function' && !fbmSyncPatchLiveProgress(panel, status, count)) { return false; }
-  nodes.forEach(function (node) {
-    var field = node.getAttribute('data-fbm-sync-live-status'), value = fbmSyncLiveStatusValue(status, count, field);
-    node.textContent = value;
-    node.hidden = !value;
-    if (field === 'message') { node.className = status && status.phase === 'error' ? 'shin-sync-error-message' : 'shin-sync-message'; }
-  });
-  return true;
+  return fbmSyncPatchStatusBlocks(panel, status);
 }
 </script>
 <script>
-function fbmSyncPaintRecordIssues(panel, metadata) {
+function fbmSyncRecordIssueBlocks(metadata) {
   metadata = metadata || {};
   var conflicts = Array.isArray(metadata.conflicts) ? metadata.conflicts : [];
   var preflight = Array.isArray(metadata.preflightIssues) ? metadata.preflightIssues : [];
   var failures = Object.keys(metadata.pushFailures || {});
   var categories = Array.isArray(metadata.categoryBlocks) ? metadata.categoryBlocks : [];
-  if (!preflight.length && !conflicts.length && !failures.length && !categories.length) { return; }
-  var card = fbmSyncAppendCard(panel, 'Cần xử lý', 'shin-sync-issues-card'); var body = card.querySelector('.shin-card-body');
-  if (preflight.length) { fbmSyncAppendText(body, 'Preflight có ' + preflight.length + ' vấn đề; mở tab Lỗi để xem chi tiết.', 'shin-sync-error-message'); }
-  if (conflicts.length) { fbmSyncAppendText(body, 'Có ' + Number(metadata.conflictCount || conflicts.length) + ' xung đột đang chờ quyết định.', 'shin-sync-preview-row'); var open = fbmSyncAppendButton(body, 'fbm-sync-open-conflicts', 'Mở xử lý xung đột', false); }
-  if (failures.length) { fbmSyncAppendText(body, 'Có ' + failures.length + ' bản ghi lỗi đẩy; mở tab Lỗi để tra từng mã.', 'shin-sync-preview-row'); }
-  if (categories.length) { fbmSyncAppendText(body, 'Có ' + categories.length + ' bản ghi bị chặn do Category.', 'shin-sync-preview-row'); }
+  if (!preflight.length && !conflicts.length && !failures.length && !categories.length) { return []; }
+  var elements = [];
+  if (preflight.length) { elements.push(Text({ className: 'shin-sync-error-message', text: 'Preflight có ' + preflight.length + ' vấn đề; mở tab Lỗi để xem chi tiết.' })); }
+  if (conflicts.length) { elements.push(Text({ className: 'shin-sync-preview-row', text: 'Có ' + Number(metadata.conflictCount || conflicts.length) + ' xung đột đang chờ quyết định.' }), Button({ id: 'fbm-sync-open-conflicts', label: 'Mở xử lý xung đột' })); }
+  if (failures.length) { elements.push(Text({ className: 'shin-sync-preview-row', text: 'Có ' + failures.length + ' bản ghi lỗi đẩy; mở tab Lỗi để tra từng mã.' })); }
+  if (categories.length) { elements.push(Text({ className: 'shin-sync-preview-row', text: 'Có ' + categories.length + ' bản ghi bị chặn do Category.' })); }
+  return [Card({ title: 'Cần xử lý', className: 'shin-sync-issues-card', elements: elements })];
 }
 </script>

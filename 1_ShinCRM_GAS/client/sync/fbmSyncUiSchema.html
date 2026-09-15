@@ -18,20 +18,31 @@ var FBM_SYNC_UI_SCHEMA = {
 
 /* Các màn hình động vẫn khai bằng Block; DOM chỉ được chạm qua cổng renderer chung. */
 function fbmSyncAppendBlock(parent, node, ctx) { return renderBlockInto(parent, node, ctx || {}); }
-function fbmSyncAppendText(parent, text, className, id) { return fbmSyncAppendBlock(parent, Text({ id: id || null, className: className || '', text: String(text === undefined || text === null ? '' : text) })); }
-function fbmSyncAppendBox(parent, className, id) { return fbmSyncAppendBlock(parent, Box({ id: id || null, className: className || '', elements: [] })); }
-function fbmSyncAppendCard(parent, title, className, id) { return fbmSyncAppendBlock(parent, Card({ id: id || null, className: className || '', title: title || '', elements: [] })); }
-function fbmSyncAppendButton(parent, id, label, primary, className) { return fbmSyncAppendBlock(parent, Button({ id: id || null, className: (className || '') + (primary ? ' shin-primary' : ''), label: label })); }
-function fbmSyncAppendInput(parent, id, type, value, placeholder) {
-  var input = document.createElement('input'); input.id = id; input.type = type || 'text'; input.className = 'shin-input'; input.value = value || ''; if (placeholder) { input.placeholder = placeholder; } return parent.appendChild(input);
+function fbmSyncReplaceBlocks(parent, nodes, ctx) { return renderReplaceChildren(parent, nodes || [], ctx || {}); }
+function fbmSyncRenderTarget(id, elements) {
+  var target = RENDER_INDEX.nodes[id];
+  if (!target) { throw new Error('Vùng Đồng bộ FBM "' + id + '" chưa được khai bằng Block.'); }
+  target.elements = Array.isArray(elements) ? elements : [];
+  return renderTarget(id);
 }
-function fbmSyncAppendSelect(parent, id, options, value, className) {
-  var select = document.createElement('select'); select.id = id; select.className = className || 'shin-input';
-  (options || []).forEach(function (item) { var option = document.createElement('option'); option.value = item.value; option.textContent = item.label; select.appendChild(option); });
-  select.value = value; return parent.appendChild(select);
+function fbmSyncSetTargetState(id, state) { return renderTargetState(id, state || {}); }
+function fbmSyncAppendText(parent, text, className, id, data) { return fbmSyncAppendBlock(parent, Text({ id: id || null, className: className || '', text: String(text === undefined || text === null ? '' : text), data: data || null })); }
+function fbmSyncAppendBox(parent, className, id, elements, data) { return fbmSyncAppendBlock(parent, Box({ id: id || null, className: className || '', elements: elements || [], data: data || null })); }
+function fbmSyncAppendCard(parent, title, className, id, elements, data) { return fbmSyncAppendBlock(parent, Card({ id: id || null, className: className || '', title: title || '', elements: elements || [], data: data || null })); }
+function fbmSyncAppendButton(parent, id, label, primary, className, options) {
+  options = options || {};
+  return fbmSyncAppendBlock(parent, Button({ id: id || null, className: (className || '') + (primary ? ' shin-primary' : ''), label: label, data: options.data || null, disabled: options.disabled === true }));
 }
-function fbmSyncMakeToggleButton(id, enabled, label) {
-  var button = document.createElement('button'); button.type = 'button'; button.id = id; button.className = 'shin-sync-toggle' + (enabled ? ' is-on' : ' is-off'); button.setAttribute('aria-pressed', enabled ? 'true' : 'false'); button.setAttribute('aria-label', label || 'Bật hoặc tắt');
-  var text = document.createElement('span'); text.className = 'shin-sync-toggle-label'; text.textContent = enabled ? 'ON' : 'OFF'; button.appendChild(text); var knob = document.createElement('span'); knob.className = 'shin-sync-toggle-knob'; button.appendChild(knob); return button;
+function fbmSyncAppendInput(parent, id, type, value, placeholder, options) {
+  options = options || {};
+  return fbmSyncAppendBlock(parent, Control({ id: id, kind: 'input', inputType: type || 'text', value: value === undefined || value === null ? '' : value, placeholder: placeholder || '', className: options.className || '', data: options.data || null, disabled: options.disabled === true, ariaLabel: options.ariaLabel || '' })).querySelector('#' + id);
+}
+function fbmSyncAppendSelect(parent, id, options, value, className, controlOptions) {
+  controlOptions = controlOptions || {};
+  return fbmSyncAppendBlock(parent, Control({ id: id, kind: 'select', options: options || [], value: value, className: className || '', data: controlOptions.data || null, disabled: controlOptions.disabled === true, ariaLabel: controlOptions.ariaLabel || '' })).querySelector('#' + id);
+}
+function fbmSyncMakeToggleButton(parent, id, enabled, label, options) {
+  options = options || {};
+  return fbmSyncAppendBlock(parent, Control({ id: id, kind: 'toggle', pressed: enabled === true, className: 'shin-sync-toggle ' + (enabled ? 'is-on' : 'is-off'), ariaLabel: label || 'Bật hoặc tắt', data: options.data || null, disabled: options.disabled === true })).querySelector('#' + id);
 }
 </script>

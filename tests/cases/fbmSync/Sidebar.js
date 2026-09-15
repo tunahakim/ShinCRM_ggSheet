@@ -7,6 +7,9 @@ function taoBoTest() {
   const dom = domGia();
   const screen = dom.document.createElement('div');
   screen.id = 'fbm-sync-screen';
+  ['fbm-sync-shell-header-region', 'fbm-sync-shell-nav-region', 'fbm-sync-shell-banner-region'].forEach((id) => {
+    const mount = dom.document.createElement('div'); mount.id = id; screen.appendChild(mount);
+  });
   const content = dom.document.createElement('div');
   content.id = 'fbm-sync-content';
   screen.appendChild(content);
@@ -56,8 +59,7 @@ function taoBoTest() {
   };
   hop.fbmSyncAppendButton = (parent, id, label, primary) => {
     const button = dom.document.createElement('button'); button.id = id || ''; button.textContent = label || ''; button.disabled = false;
-    if (primary) { button.className = 'shin-primary'; }
-    button.classList = { add: (name) => { button.className = (button.className + ' ' + name).trim(); } };
+    if (primary) { button.classList.add('shin-primary'); }
     return parent.appendChild(button);
   };
   hop.fbmSyncAppendInput = (parent, id, type, value, placeholder) => {
@@ -71,17 +73,30 @@ function taoBoTest() {
   hop.fbmSyncMakeToggleButton = (id, enabled, label) => {
     const button = dom.document.createElement('button'); button.id = id; button.className = enabled ? 'shin-sync-toggle is-on' : 'shin-sync-toggle is-off'; button.setAttribute('aria-pressed', enabled ? 'true' : 'false'); button.setAttribute('aria-label', label); return button;
   };
+  // Tương đương helper UI của module: harness nạp riêng các màn để kiểm DOM nhỏ,
+  // nên cài các primitive patch tại đây thay vì biến test thành bản sao renderer.
+  hop.fbmSyncFind = (root, selector) => root && root.querySelector ? root.querySelector(selector) : null;
+  hop.fbmSyncSetHidden = (root, selector, hidden) => { const node = hop.fbmSyncFind(root, selector); if (!node) return false; node.hidden = !!hidden; return true; };
+  hop.fbmSyncSetToggle = (button, enabled) => {
+    if (!button) return false;
+    button.classList.toggle('is-on', !!enabled); button.classList.toggle('is-off', !enabled); button.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+    const label = button.querySelector('.shin-sync-toggle-label'); if (label) label.textContent = enabled ? 'ON' : 'OFF';
+    return true;
+  };
+  hop.fbmSyncReplaceRegion = (region, renderRegion) => { if (!region) return false; region.textContent = ''; renderRegion(region); return true; };
   hop.fbmSyncPaintError = null;
   napClient(hop,
+    'client/ui/icons.html', 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html', 'client/ui/renderEngine.html', 'client/sync/fbmSyncUiSchema.html',
     'client/sync/screens/overview.html', 'client/sync/screens/account.html',
     'client/sync/screens/run.html', 'client/sync/screens/results.html',
     'client/sync/screens/settings.html', 'client/sync/fbmSyncSettingsScreen.html',
-    'client/sync/fbmSyncStatusScreen.html', 'client/sync/fbmSyncAuditScreen.html', 'client/sync/fbmSync.html');
+    'client/sync/fbmSyncStatusScreen.html', 'client/sync/fbmSyncAuditScreen.html', 'client/sync/fbmSyncShell.html', 'client/sync/fbmSync.html');
   return { hop, dom, screen, content };
 }
 
 function render(hop, content, fn, status) {
   content.textContent = '';
+  hop.RENDER_INDEX = { nodes: {}, menus: {}, ctx: null, dem: 0 };
   fn(content, status || {});
   return content;
 }
@@ -130,7 +145,7 @@ async function chay(so) {
   hop.FBM_SYNC_CLIENT.loginStatus = { configured: false, enabled: true };
   render(hop, content, hop.fbmSyncRenderAccount, idle);
   check(so, 'Account render đủ ba ô nhập liên kết và nút thao tác', [dom.document.getElementById('fbm-identity-spreadsheet') !== null, dom.document.getElementById('fbm-identity-user') !== null, dom.document.getElementById('fbm-identity-account') !== null, dom.document.getElementById('fbm-sync-probe-identity') !== null], [true, true, true, true]);
-  check(so, 'Account hien ro mat khau trong luc nhap va khong co gia tri luu san', [dom.document.getElementById('fbm-login-password').type, dom.document.getElementById('fbm-login-password').value], ['text', '']);
+  check(so, 'Account dùng ô mật khẩu và không có giá trị lưu sẵn', [dom.document.getElementById('fbm-login-password').type, dom.document.getElementById('fbm-login-password').value], ['password', '']);
 
   hop.FBM_SYNC_CLIENT.identityLastAction = 'probe';
   hop.fbmSyncApplyIdentityProbeDraft({ metadata: { identityProbe: { spreadsheetId: 'sheet-probe', userId: '2037', username: 'anhlt', accountName: 'ANHLT' } } });
@@ -166,6 +181,15 @@ async function chay(so) {
   check(so, 'repaint sau khi bấm nút vẫn giữ mật khẩu chưa lưu', dom.document.getElementById('fbm-login-password').value, 'mat-khau-dang-go');
 
   hop.FBM_SYNC_CLIENT.subscreen = 'run';
+  hop.FBM_SYNC_CLIENT.running = false;
+  hop.fbmSyncPaint(idle);
+  const modeSelect = dom.document.getElementById('fbm-sync-mode');
+  modeSelect.focus();
+  hop.fbmSyncPaint(Object.assign({}, idle, { label: 'Snapshot nền đến trong lúc chọn loại đồng bộ' }));
+  check(so, 'dropdown loai dong bo giu nguyen node va focus khi snapshot nen den, khong can hoan ve ca man', [dom.document.getElementById('fbm-sync-mode') === modeSelect, dom.document.activeElement === modeSelect, hop.FBM_SYNC_CLIENT.deferredPaint, hop.FBM_SYNC_CLIENT.lastStatus.label], [true, true, null, 'Snapshot nền đến trong lúc chọn loại đồng bộ']);
+  modeSelect.blur();
+  hop.fbmSyncFlushDeferredPaint();
+  check(so, 'snapshot nen khong doi trang thai moi sau khi dropdown dong', [hop.FBM_SYNC_CLIENT.deferredPaint, hop.FBM_SYNC_CLIENT.lastStatus.label], [null, 'Snapshot nền đến trong lúc chọn loại đồng bộ']);
   hop.fbmSyncPaint(active);
   const runFirstNode = content.children[0];
   const patchedLiveStatus = hop.fbmSyncPatchLiveStatus(content, Object.assign({}, active, { label: 'Đang đối soát', counts: { completed: 4, succeeded: 3 } }), 'run');
@@ -259,4 +283,4 @@ async function chay(so) {
   check(so, 'Lỗi xử lý xung đột hiện rõ và không khóa nút', [conflictButton.disabled, paints.some((item) => String(item.message).indexOf('CONFLICT_FAILURE') >= 0)], [false, true]);
 }
 
-module.exports = { chay };
+module.exports = { chay, taoBoTest };

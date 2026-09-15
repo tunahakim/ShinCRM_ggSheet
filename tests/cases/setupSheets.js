@@ -54,9 +54,9 @@ function chay(so) {
     nen.hop.configParamCatalog().filter((item) => !item.note || !item.note.trim()).map((item) => item.name),
     []);
 
-  // Bốn tham số đồng bộ cố ý chưa gieo: với hai tham số đang có, ô trống nghĩa là dùng mặc định; với bốn tham số kia, ô trống nghĩa là kỳ đồng bộ dừng. Gieo chung là dựng sẵn một chỗ hiểu sai.
-  check(so, 'chưa gieo bốn tham số của module đồng bộ, vì ô trống ở đó mang nghĩa khác',
-    ['FBM_ACCOUNT_NAME', 'FBM_MA_KH_PREFIX', 'FBM_MA_KH_LENGTH', 'FBM_ACTIVITY_SINCE'].filter((ten) => nen.hop.configParamNames().indexOf(ten) !== -1),
+  // Ba tham số đồng bộ cố ý chưa gieo: ô trống có ý nghĩa riêng theo từng pipeline, không được biến thành cấu hình mặc định ngầm.
+  check(so, 'chưa gieo ba tham số của module đồng bộ, vì ô trống ở đó mang nghĩa khác',
+    ['FBM_MA_KH_PREFIX', 'FBM_MA_KH_LENGTH', 'FBM_ACTIVITY_SINCE'].filter((ten) => nen.hop.configParamNames().indexOf(ten) !== -1),
     []);
 
   nen.dem.setValues = 0;
