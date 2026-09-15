@@ -25,6 +25,7 @@ function fbmSyncPaintIdentityBlock(panel, active, status) {
   var saveManual = fbmSyncAppendButton(actions, 'fbm-sync-save-identity', 'Lưu thông tin', false); saveManual.disabled = !!active;
   if (checkRunning) { fbmSyncAppendText(body, 'Đang đối chiếu các Customer đã có FBM_ID với file hiện tại.', 'shin-sync-action-status'); }
   if (probeRunning) { fbmSyncAppendText(body, 'Đang đọc thông tin tài khoản từ tab FBM đang mở.', 'shin-sync-action-status'); }
+  fbmSyncRenderAccountNotice(body, 'identity');
 
   var probeResult = status && status.metadata && status.metadata.identityProbe;
   if (probeResult && FBM_SYNC_CLIENT.identityLastAction === 'probe') {
@@ -37,7 +38,7 @@ function fbmSyncPaintIdentityBlock(panel, active, status) {
   var result = status && status.metadata && status.metadata.identityCheck;
   if (result && FBM_SYNC_CLIENT.identityLastAction === 'check' && (status.phase === 'done' || result.missing !== undefined)) {
     var checkResult = fbmSyncAppendBox(body, 'shin-sync-inline-result');
-    fbmSyncAppendText(checkResult, 'Kết quả kiểm tra liên kết', 'shin-sync-inline-result-title');
+    fbmSyncAppendText(checkResult, 'Kiểm tra liên kết hoàn tất', 'shin-sync-inline-result-title');
     fbmSyncAppendText(checkResult, 'Customer hợp lệ: ' + Number(result.matched || 0) + '/' + Number(result.total || 0) + (Number(result.missing || 0) ? ' · không tìm thấy: ' + Number(result.missing || 0) : ''), 'shin-sync-preview-row');
     (result.missingSample || []).slice(0, 5).forEach(function (item) { fbmSyncAppendText(checkResult, 'Chưa thấy FBM ID ' + String(item.fbmId || '') + ' · ' + String(item.code || item.id || ''), 'shin-sync-preview-row'); });
   }

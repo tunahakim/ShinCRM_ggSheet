@@ -24,7 +24,7 @@ FbmSync.syncEntityLabel = function (entity, phase) {
 };
 /** Chỉ đưa dữ liệu render sang Sidebar; state nội bộ có lookup, cursor form và khóa vẫn ở GAS. */
 FbmSync.statusMetadata = function (metadata) {
-  var data = metadata || {}, keys = ['audit', 'categoryBlocks', 'identityBlocks', 'identityProbe', 'activityBulkMissing', 'activityBulkMissingCount', 'preflight', 'preflightIssues', 'preview', 'pushFailures', 'pushFailureDetails', 'callbackTrace'];
+  var data = metadata || {}, keys = ['audit', 'categoryBlocks', 'identityBlocks', 'identityProbe', 'identityCheck', 'activityBulkMissing', 'activityBulkMissingCount', 'preflight', 'preflightIssues', 'preview', 'pushFailures', 'pushFailureDetails', 'callbackTrace'];
   var out = keys.reduce(function (result, key) {
     if (data[key] !== undefined) { result[key] = data[key]; }
     return result;

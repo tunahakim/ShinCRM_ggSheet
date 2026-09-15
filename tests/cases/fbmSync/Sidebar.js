@@ -144,6 +144,13 @@ async function chay(so) {
   check(so, 'Identity probe vẫn hiện kết quả khi ô liên kết còn focus', [dom.document.getElementById('fbm-identity-spreadsheet').value, dom.document.getElementById('fbm-identity-user').value, dom.document.getElementById('fbm-identity-username').value, dom.document.getElementById('fbm-identity-account').value], ['sheet-focused', '3001', 'focused-user', 'Focused Account']);
   render(hop, content, hop.fbmSyncRenderAccount, { phase: 'error', message: 'Extension không trả lời yêu cầu FBM.', counts: {} });
   check(so, 'Account hiện lỗi cầu nối tường minh', content.textContent.indexOf('Extension không trả lời yêu cầu FBM.') >= 0, true);
+  hop.FBM_SYNC_CLIENT.accountNotices = {
+    identity: { kind: 'success', message: 'Kiểm tra liên kết hoàn tất: 2/2 Customer hợp lệ.' },
+    login: { kind: 'success', message: 'Đăng nhập thử thành công và đúng tài khoản FBM đã liên kết.' }
+  };
+  hop.FBM_SYNC_CLIENT.identityLastAction = 'check';
+  render(hop, content, hop.fbmSyncRenderAccount, { phase: 'done', counts: {}, metadata: { identityCheck: { total: 2, matched: 2, missing: 0 } } });
+  check(so, 'Account giữ thông báo thành công của đăng nhập thử và kiểm tra liên kết', [content.textContent.indexOf('Đăng nhập thử thành công') >= 0, content.textContent.indexOf('Kiểm tra liên kết hoàn tất: 2/2') >= 0, content.textContent.indexOf('Customer hợp lệ: 2/2') >= 0], [true, true, true]);
 
   let relayConfigurations = 0;
   hop.fbmSyncConfigureRelay = () => { relayConfigurations += 1; return Promise.resolve(null); };
@@ -205,9 +212,17 @@ async function chay(so) {
   const loginUsername = dom.document.getElementById('fbm-login-username');
   loginUsername.value = 'anhlt'; loginPassword.value = 'mat-khau-can-giu';
   hop.fbmSyncEncryptCredentials = () => Promise.resolve({ credentialRef: 'test-ref' });
-  hop.callServer = (name) => name === 'fbmStartLoginTest' ? Promise.resolve({ ok: true, request: null, message: 'Đã kiểm tra.' }) : Promise.resolve({});
+  hop.fbmSyncLoginTestLoop = () => Promise.resolve({ ok: true, status: { phase: 'done', message: 'Đã kiểm tra.' } });
+  hop.callServer = (name) => name === 'fbmStartLoginTest' ? Promise.resolve({ ok: true, request: {} }) : Promise.resolve({});
   await hop.fbmSyncTestLogin(testButton);
-  check(so, 'Đăng nhập thử không xóa mật khẩu chưa lưu', loginPassword.value, 'mat-khau-can-giu');
+  check(so, 'Đăng nhập thử không xóa mật khẩu chưa lưu và báo kết quả thành công', [loginPassword.value, hop.FBM_SYNC_CLIENT.accountNotices.login.kind, hop.FBM_SYNC_CLIENT.accountNotices.login.message], ['mat-khau-can-giu', 'success', 'Đã kiểm tra.']);
+
+  hop.FBM_SYNC_CLIENT.running = false;
+  hop.sheetLinkExtensionAlive = () => true;
+  hop.fbmSyncLoop = () => Promise.resolve({ ok: true, status: { phase: 'done', metadata: { identityCheck: { total: 3, matched: 2, missing: 1 } } } });
+  hop.callServer = (name) => name === 'fbmStartIdentityCheck' ? Promise.resolve({ ok: true, request: {} }) : Promise.resolve({});
+  await hop.fbmSyncCheckIdentity();
+  check(so, 'Kiểm tra liên kết báo n/N và số không tìm thấy ngay khi hoàn tất', [hop.FBM_SYNC_CLIENT.accountNotices.identity.kind, hop.FBM_SYNC_CLIENT.accountNotices.identity.message], ['warning', 'Kiểm tra liên kết hoàn tất: 2/3 Customer hợp lệ; không tìm thấy: 1.']);
 
   const nav = dom.document.createElement('nav'); nav.id = 'fbm-sync-nav'; nav.hidden = false; dom.root.appendChild(nav);
   hop.fbmSyncInstall();

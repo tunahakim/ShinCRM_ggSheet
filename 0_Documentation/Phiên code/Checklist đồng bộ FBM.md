@@ -90,7 +90,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Form thiết lập đặt username và password cạnh nhau, hiển thị mật khẩu dạng bản rõ chỉ trong lượt đang gõ, không ghi bản rõ vào Sheet hoặc Log. Sidebar chỉ xóa ô sau `Lưu mã hóa` thành công, không xóa sau `Đăng nhập thử`.
 - [x] Extension mã hóa username/mã user, SpreadsheetId và mật khẩu thành envelope trước khi gửi/lưu qua GAS; không lưu credential bản rõ ở Sheet, Log hoặc `Config`. Kho cục bộ dùng AES-GCM; GAS chỉ giữ ciphertext.
 - [x] Khi đọc lại cấu hình, Extension chỉ giải mã nội bộ và trả trạng thái cùng các trường không nhạy cảm; Sidebar không nhận mật khẩu bản rõ. DTO `fbmGetLoginConfig` loại envelope trước khi trả về.
-- [x] Nút `Đăng nhập thử` thử login mềm bằng thông tin người dùng nhập, không logout phiên hợp lệ và không ghi bí mật. Request dùng `force:false`, kết quả chỉ trả mã/trạng thái.
+- [x] Nút `Đăng nhập thử` thử login mềm bằng thông tin người dùng nhập, không logout phiên hợp lệ và không ghi bí mật. Request dùng `force:false`; Sidebar giữ rõ kết quả thành công hoặc lỗi ngay dưới thao tác.
 - [x] Preflight đối chiếu tuyệt đối username/mã user, tên đầy đủ và SpreadsheetId thực tế trước request nghiệp vụ; không trim, đổi hoa thường hoặc chuẩn hóa khi so sánh và không dùng mã ngắn.
 - [x] Tự điền thông tin nhận diện từ Spreadsheet hiện tại và response `authorize`, chỉ cho xác nhận các giá trị hệ thống, không tự lưu hoặc tự chuyển tài khoản. Probe chỉ gọi authorize, không quét Customer; Sidebar chỉ lưu sau nút xác nhận.
 - [x] `Kiểm tra thông tin đồng bộ` quét đủ Customer FBM, đối chiếu chỉ các dòng local đã có FBM_ID, trả tổng hợp `n/N`, mẫu sai lệch và nút `Kiểm tra lại`; không ghi Sheet/FBM. Code, test offline và GAS DEV đã xác nhận entrypoint authorize Customer, full-scan không lọc mã test, cursor `stt_rec_kh` và kết thúc không ghi Sheet/FBM.
@@ -320,7 +320,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 
 ### Bổ sung UI dùng chung sau Slice 8
 
-- [x] Identity probe chỉ chạy `GetGridViewPage` controller `User`, không lấy `authorize` thừa; GAS giữ dữ liệu trong DTO và Sidebar cập nhật bản nháp đủ bốn ô ngay cả khi form còn focus, không tự lưu liên kết. Test offline đạt `1322/1322`; relay deployment `@290`, DEV runner `@289`.
+- [x] Identity probe chỉ chạy `GetGridViewPage` controller `User`, không lấy `authorize` thừa; GAS giữ dữ liệu trong DTO và Sidebar cập nhật bản nháp đủ bốn ô ngay cả khi form còn focus, không tự lưu liên kết. Test offline đạt `1325/1325`; relay deployment `@292`, DEV runner `@291`.
 - [x] Khi Extension bắt tay bằng `sessionId` mới, bridge mới được nhận nhưng Sidebar không tự gửi lại relay config trong cùng lượt mở; mở Sidebar lần sau sẽ gửi một lần. Không yêu cầu cập nhật `chrome.storage` thủ công.
 - [x] Tách `PopupList` thành nền hiển thị dùng chung cho search, dropdown, customer picker và menu module; controller riêng giữ nguyên hành vi từng loại.
 - [x] Search giữ bề rộng đúng bằng ô nhập; dropdown giữ khả năng giãn theo nội dung và giới hạn theo Sidebar.
@@ -335,6 +335,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Render status hoãn dựng lại màn hình Tài khoản khi người dùng đang gõ, không giữ mật khẩu vào client state/GAS/Sheet/Log; popup combo giữ focus qua thao tác chuột.
 - [x] Mở Sidebar chỉ bắt tay và gửi một relay config local, không tự phát heartbeat hoặc request FBM. Relay cùng URL, khóa và Spreadsheet đã xác nhận ACK ngay trong Extension, không probe GAS lặp hay yêu cầu Sidebar tự làm mới.
 - [x] Màn hình Chạy đồng bộ giữ pipeline và chẩn đoán sau khi hoàn tất, lỗi hoặc tạm dừng; khi đang chạy chỉ vá node trạng thái tại chỗ, không xóa/dựng lại thân màn hình.
+- [x] Kết quả `Đăng nhập thử` và `Kiểm tra liên kết` luôn hiện ngay dưới nút thao tác, gồm đang chạy, thành công, cảnh báo có Customer thiếu và lỗi; DTO cho phép Sidebar nhận tổng hợp `n/N` từ GAS.
 - [ ] **Cần kiểm chứng thực tế:** reload Extension, tự điền nhận diện, đăng nhập thử và chạy một lượt `Kiểm tra an toàn`; đối chiếu Network và trạng thái Sidebar theo hướng dẫn bàn giao.
 
 ## Đợt sửa bắt buộc — Scheduler GAS quyết định, Extension chỉ cầu nối
@@ -352,12 +353,12 @@ Các mục dưới đây là phần đang phải hoàn thiện trước khi báo
 - [x] Sửa continuation nền: heartbeat chỉ xử lý response của đúng request heartbeat; nếu GAS cấp request tiếp theo thuộc cursor phiên nền thì Extension nộp qua `kind: background_sync`, command `continue` và `FbmSync.continue`; kiểm thử offline đạt `1304/1304`.
 - [x] Capture generic của Extension đọc cả HTML và text của trang theo chỉ dẫn GAS; pattern cookie do GAS cấp nhận cả dấu nháy thường và escaped, token transport chỉ có trong text vẫn được thay trước khi gửi FBM.
 - [x] Transport failure kết thúc phase `error`, giữ chẩn đoán nhưng không giữ reservation/cursor; hủy liên kết sau lỗi được phép, còn công tắc tổng OFF chuyển ngay sang `paused` nếu không có request FBM đang bay.
-- [x] Bổ sung test offline cho mọi nhánh trên, gồm relay local không fetch `/exec`, Web App từ chối probe, `UNBOUND` không được cấp envelope, bridge mất context báo lỗi rõ, capture từ text, pause và công tắc tổng; tổng hiện tại `1322/1322`.
+- [x] Bổ sung test offline cho mọi nhánh trên, gồm relay local không fetch `/exec`, Web App từ chối probe, `UNBOUND` không được cấp envelope, bridge mất context báo lỗi rõ, capture từ text, pause và công tắc tổng; tổng hiện tại `1325/1325`.
 - [x] Executor áp dụng đúng `source` trong chỉ dẫn capture/replacement generic do GAS cấp, không ép mọi replacement về HTML trang; commit `b91790d`, test offline vẫn `1260/1260`.
 - [x] Nghiệm thu GAS DEV bằng `node tests/gas.js ... --push` cho heartbeat request/response, transport failure, reservation và auto-login. `fbmSyncHeartbeatRequest` đạt ở revision `@252` với trạng thái fail-closed `AUTO_LOGIN_NOT_CONFIGURED`, `phase: paused`; `fbmSyncHeartbeat` trả `STALE_RESPONSE` khi không có reservation; `fbmSyncHeartbeatTransportFailure` trả `STALE_RESPONSE` khi request không còn hiệu lực; `fbmGetLoginConfig` đạt ở `@248`; `fbmProbeAutoLogin` đạt ở `@249`.
 - [x] GAS DEV relay `AKfycbxWM4...` đã nâng revision `@288`; entrypoint transport failure giữ fail-closed với reservation cũ và xác nhận lỗi capture kết thúc tại `error`, không giữ cursor/reservation; executor test dùng trực tiếp pattern GAS cấp để chặn tái diễn lỗi dấu nháy cookie.
 - Bằng chứng bổ sung: các entrypoint DEV đã được chạy lại sau khi sửa trạng thái chờ đăng nhập; kết quả đầy đủ được ghi ngay tại mục nghiệm thu GAS DEV bên trên.
-- [x] Deployment Sidebar `AKfycbx0...` đã nâng lên revision `@290`; POST không khóa trả JSON `unauthorized`, xác nhận đây là Web App relay thật thay vì trang HTML Drive.
+- [x] Deployment Sidebar `AKfycbx0...` đã nâng lên revision `@292`; POST không khóa trả JSON `unauthorized`, xác nhận đây là Web App relay thật thay vì trang HTML Drive.
 - [!] **Cần chủ dự án kiểm chứng thực tế:** giữ tab FBM đăng nhập, sau đó đăng xuất/đăng nhập lại để xác nhận không đá phiên máy khác và alarm tự khôi phục đúng chính sách.
 
 ## Slice 9 — Live acceptance và mở rộng production

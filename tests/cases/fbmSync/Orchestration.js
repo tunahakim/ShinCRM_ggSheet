@@ -52,6 +52,8 @@ async function chay(so) {
   napServer(orchestration, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/EntryPoints.js');
   const started = orchestration.FbmSync.start({ mode: 'read' });
   check(so, 'start bat dau bang bootstrap Customer', started.request.meta.kind, 'authorize');
+  const identityCheckStatus = orchestration.FbmSync.statusMetadata({ identityCheck: { total: 3, matched: 2, missing: 1, missingSample: [{ fbmId: 'FBM-3' }] } });
+  check(so, 'DTO Sidebar giữ tổng hợp kiểm tra liên kết n/N', [identityCheckStatus.identityCheck.total, identityCheckStatus.identityCheck.matched, identityCheckStatus.identityCheck.missing, identityCheckStatus.identityCheck.missingSample[0].fbmId], [3, 2, 1, 'FBM-3']);
   const conflictCarry = orchestration.FbmSync.stateRead();
   conflictCarry.metadata.conflicts = [{ entity: 'activity', id: 'ACT-KEEP' }];
   conflictCarry.locks = { 'activity:ACT-KEEP': { owner: 'sync', reason: 'conflict' } };

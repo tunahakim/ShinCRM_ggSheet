@@ -26,5 +26,6 @@ function fbmSyncRenderAccount(panel, status) {
   var actions = fbmSyncAppendBox(body, 'shin-sync-form-actions');
   var test = fbmSyncAppendButton(actions, 'fbm-sync-login-test', 'Đăng nhập thử', true); test.disabled = !!FBM_SYNC_CLIENT.running;
   var save = fbmSyncAppendButton(actions, 'fbm-sync-login-save', 'Lưu mã hóa', false); save.disabled = !!FBM_SYNC_CLIENT.running;
+  fbmSyncRenderAccountNotice(body, 'login');
 }
 </script>
