@@ -121,6 +121,9 @@ async function chay(so) {
   const preflightError = { phase: 'error', runId: 'r2', cursor: {}, lastFailureCode: 'SYNC_PREFLIGHT_FAILED', label: 'Có lỗi', counts: {} };
   const pushError = { phase: 'error', runId: 'r3', cursor: { kind: 'push_wait' }, lastFailureCode: 'FBM_VERIFY_FAILED', label: 'Có lỗi', counts: {} };
 
+  const shellHeader = hop.fbmSyncShellHeaderBlock(idle);
+  check(so, 'header Đồng bộ dùng Icon chung, không gắn nút hình chữ nhật riêng', [shellHeader.elements[0].role, shellHeader.elements[0].className, shellHeader.elements[3].role, shellHeader.elements[3].className], ['icon', '', 'icon', '']);
+
   check(so, 'Overview render được trạng thái rỗng', !!render(hop, content, hop.fbmSyncRenderOverview, idle).querySelector('.shin-sync-overview-state'), true);
   hop.FBM_SYNC_CLIENT.subscreen = 'overview';
   hop.fbmSyncRenderLoading();
