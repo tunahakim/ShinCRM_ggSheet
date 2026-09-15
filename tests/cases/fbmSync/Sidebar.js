@@ -98,6 +98,8 @@ async function chay(so) {
   hop.fbmSyncPaint(Object.assign({}, idle, { label: 'Tổng quan sau loading' }));
   check(so, 'Tổng quan dựng lại được sau loading mà không dùng node cũ', [content.getAttribute('data-fbm-sync-screen'), content.textContent.indexOf('Tổng quan sau loading') >= 0], ['overview', true]);
   check(so, 'Run render không hiện pipeline khi chưa chạy', render(hop, content, hop.fbmSyncRenderRun, idle).querySelector('.shin-sync-pipeline'), null);
+  const idleProgress = hop.fbmSyncProgressBlocks(idle, {}).elements[1].elements[0];
+  check(so, 'Progress idle rỗng hoàn toàn, không tô fill giả', [hop.fbmSyncProgressData(idle, {}).active, idleProgress.spatialConfig.width, idleProgress.className], [false, '0%', 'shin-sync-progress-fill']);
   const appendRun = hop.fbmSyncAppendBox;
   let runBlocks;
   hop.fbmSyncAppendBox = (_panel, _className, _id, elements) => { runBlocks = elements; return content; };
