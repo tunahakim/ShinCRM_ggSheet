@@ -45,6 +45,60 @@ FbmSync.statusCursor = function (cursor) {
   var value = cursor || {};
   return { kind: String(value.kind || ''), operation: String(value.operation || ''), entity: String(value.entity || ''), index: Number(value.index || 0) };
 };
+/** Chuyển state GAS thành các chặng hiển thị cố định; Sidebar không tự đoán từ cursor. */
+FbmSync.pipelineDefinition = function (state) {
+  var value = state || {}, scan = String(value.scan || 'full'), mode = String(value.mode || 'read'), cursor = value.cursor || {};
+  if (scan === 'identity_probe') { return { kind: 'identity_probe', steps: [{ id: 'session', label: 'Kiểm tra phiên FBM' }, { id: 'identity', label: 'Đọc nhận diện tài khoản' }] }; }
+  if (scan === 'identity_check') { return { kind: 'identity_check', steps: [{ id: 'session', label: 'Kiểm tra phiên FBM' }, { id: 'customer', label: 'Quét Customer' }, { id: 'reconcile', label: 'Đối chiếu liên kết' }] }; }
+  if (String(cursor.kind || '') === 'login' || /^login_identity_/.test(String(cursor.kind || ''))) {
+    return { kind: 'login_test', steps: [{ id: 'login', label: 'Đăng nhập FBM' }, { id: 'session', label: 'Kiểm tra phiên' }, { id: 'identity', label: 'Xác minh tài khoản' }] };
+  }
+  if (scan === 'activity_bulk') { return { kind: 'activity_bulk', steps: [{ id: 'session', label: 'Kiểm tra phiên FBM' }, { id: 'category', label: 'Category' }, { id: 'activity', label: 'Đọc Activity' }, { id: 'reconcile', label: 'Đối soát' }, { id: 'sheet', label: 'Cập nhật Sheet' }] }; }
+  if (mode === 'push') { return { kind: 'push', steps: [{ id: 'session', label: 'Kiểm tra phiên FBM' }, { id: 'category', label: 'Category' }, { id: 'record', label: 'Kiểm tra bản ghi' }, { id: 'form', label: 'Mở form FBM' }, { id: 'write', label: 'Ghi FBM' }, { id: 'verify', label: 'Đọc xác nhận' }, { id: 'baseline', label: 'Cập nhật baseline' }] }; }
+  var pull = [{ id: 'session', label: 'Kiểm tra phiên FBM' }, { id: 'category', label: 'Category' }, { id: 'customer', label: 'Đọc Customer' }, { id: 'activity', label: 'Đọc Activity' }, { id: 'reconcile', label: 'Đối soát' }];
+  if (mode !== 'check') { pull.push({ id: 'sheet', label: 'Cập nhật Sheet' }); }
+  if (mode === 'write') {
+    pull = pull.concat([{ id: 'record', label: 'Kiểm tra bản ghi' }, { id: 'form', label: 'Mở form FBM' }, { id: 'write', label: 'Ghi FBM' }, { id: 'verify', label: 'Đọc xác nhận' }, { id: 'baseline', label: 'Cập nhật baseline' }]);
+  }
+  return { kind: mode === 'check' ? 'check' : mode === 'write' ? 'write' : 'read', steps: pull };
+};
+/** Xác định duy nhất một chặng đang chờ/xử lý từ state đã có trên GAS. */
+FbmSync.pipelineCurrentStep = function (state, definition) {
+  var value = state || {}, phase = String(value.phase || ''), cursor = value.cursor || {}, kind = String(cursor.kind || ''), operation = String(cursor.operation || ''), available = {};
+  (definition.steps || []).forEach(function (step) { available[step.id] = true; });
+  if (phase === 'done' || phase === 'idle') { return ''; }
+  if (kind === 'lookup') { return available.category ? 'category' : ''; }
+  if (kind === 'login_identity_authorize') { return available.session ? 'session' : 'login'; }
+  if (kind === 'identity_user_grid' || kind === 'login_identity_user') { return available.identity ? 'identity' : 'session'; }
+  if (kind === 'customer_grid' || kind === 'activity_rotation_customer_grid') { return available.customer ? 'customer' : ''; }
+  if (kind === 'activity_grid' || kind === 'activity_bulk_grid') { return available.activity ? 'activity' : ''; }
+  if (kind === 'push_scan') { return available.record ? 'record' : ''; }
+  if (/(?:customer|activity)_(?:create|edit)_open$/.test(kind)) { return available.form ? 'form' : ''; }
+  if (kind === 'push_wait') {
+    if (/verify/.test(operation)) { return available.verify ? 'verify' : 'write'; }
+    return available.write ? 'write' : '';
+  }
+  if (phase === 'pull_customer') { return available.customer ? 'customer' : ''; }
+  if (phase === 'pull_activity') { return available.activity ? 'activity' : ''; }
+  if (phase === 'reconcile' || phase === 'conflict') { return available.reconcile ? 'reconcile' : ''; }
+  if (phase === 'push') { return available.record ? 'record' : ''; }
+  if (phase === 'checking_session') { return available.login && (kind === 'login' || /^login_/.test(kind)) ? 'login' : 'session'; }
+  return '';
+};
+/** DTO tiến độ chỉ dùng để vẽ; marker hoàn tất luôn xuất phát từ state GAS cùng lượt. */
+FbmSync.pipelineView = function (state) {
+  var value = state || {}, phase = String(value.phase || 'idle'), definition = FbmSync.pipelineDefinition(value), current = FbmSync.pipelineCurrentStep(value, definition), currentIndex = -1;
+  (definition.steps || []).forEach(function (step, index) { if (step.id === current) { currentIndex = index; } });
+  var title = phase === 'idle' ? 'Pipeline sẽ chạy' : phase === 'done' ? 'Pipeline đã hoàn tất' : phase === 'error' ? 'Pipeline dừng vì lỗi' : phase === 'paused' ? 'Pipeline đã tạm dừng' : phase === 'conflict' ? 'Pipeline dừng để xử lý xung đột' : phase === 'awaiting_approval' ? 'Pipeline chờ người dùng chấp thuận' : 'Pipeline đang chạy';
+  return {
+    kind: definition.kind,
+    title: title,
+    steps: (definition.steps || []).map(function (step, index) {
+      var stepState = phase === 'done' ? 'done' : index < currentIndex ? 'done' : index === currentIndex ? (phase === 'error' || phase === 'conflict' ? 'error' : phase === 'paused' ? 'paused' : 'current') : 'pending';
+      return { id: step.id, label: step.label, state: stepState };
+    })
+  };
+};
 /** Trả về snapshot gọn để Sidebar render một lần. */
 FbmSync.statusView = function () {
   var state = FbmSync.stateRead();
@@ -52,7 +106,7 @@ FbmSync.statusView = function () {
   if (typeof FbmSync.traceRead === 'function') { metadata.traceTail = FbmSync.traceRead(20); }
   var enabled = typeof FbmSync.masterEnabled === 'function' ? FbmSync.masterEnabled() : true;
   var background = typeof FbmSync.backgroundEnabled === 'function' ? FbmSync.backgroundEnabled() : true;
-  return { ok: true, enabled: enabled, masterEnabled: enabled, backgroundEnabled: background, runId: state.runId, mode: state.mode, scan: state.scan || 'full', scheduledScan: state.scheduledScan ? state.scheduledScan : '', login: typeof FbmSync.loginConfigPublic === 'function' ? FbmSync.loginConfigPublic() : null, phase: state.phase, label: FbmSync.statusLabel(state.phase), direction: FbmSync.syncDirection(state), entity: state.entity, entityLabel: FbmSync.syncEntityLabel(state.entity, state.phase), cursor: FbmSync.statusCursor(state.cursor), session: { customer: !!state.session.customerAuthorized, activity: !!state.session.activityAuthorized, expired: state.session.expired === true, lastHeartbeatAt: Number(state.session.lastHeartbeatAt || 0) }, metadata: metadata, counts: state.counts, current: state.current, message: state.message, startedAt: state.startedAt, updatedAt: state.updatedAt, nextRunAt: state.nextRunAt, lastError: state.lastError, lastFailureCode: state.lastFailureCode || '', retryable: state.retryable === true };
+  return { ok: true, enabled: enabled, masterEnabled: enabled, backgroundEnabled: background, runId: state.runId, mode: state.mode, scan: state.scan || 'full', scheduledScan: state.scheduledScan ? state.scheduledScan : '', login: typeof FbmSync.loginConfigPublic === 'function' ? FbmSync.loginConfigPublic() : null, phase: state.phase, label: FbmSync.statusLabel(state.phase), direction: FbmSync.syncDirection(state), entity: state.entity, entityLabel: FbmSync.syncEntityLabel(state.entity, state.phase), pipeline: FbmSync.pipelineView(state), cursor: FbmSync.statusCursor(state.cursor), session: { customer: !!state.session.customerAuthorized, activity: !!state.session.activityAuthorized, expired: state.session.expired === true, lastHeartbeatAt: Number(state.session.lastHeartbeatAt || 0) }, metadata: metadata, counts: state.counts, current: state.current, message: state.message, startedAt: state.startedAt, updatedAt: state.updatedAt, nextRunAt: state.nextRunAt, lastError: state.lastError, lastFailureCode: state.lastFailureCode || '', retryable: state.retryable === true };
 };
 
 /** Ghi snapshot nghiệp vụ; payload/cookie không bao giờ đi vào Log. */

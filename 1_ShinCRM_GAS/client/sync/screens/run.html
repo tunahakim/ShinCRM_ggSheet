@@ -1,19 +1,52 @@
 <script>
+function fbmSyncPipelineFallback(status) {
+  var phase = String(status && status.phase || ''), mode = String(status && status.mode || FBM_SYNC_CLIENT.mode || 'read');
+  var steps = mode === 'push'
+    ? [{ id: 'session', label: 'Kiểm tra phiên FBM' }, { id: 'category', label: 'Category' }, { id: 'record', label: 'Kiểm tra bản ghi' }, { id: 'form', label: 'Mở form FBM' }, { id: 'write', label: 'Ghi FBM' }, { id: 'verify', label: 'Đọc xác nhận' }, { id: 'baseline', label: 'Cập nhật baseline' }]
+    : [{ id: 'session', label: 'Kiểm tra phiên FBM' }, { id: 'category', label: 'Category' }, { id: 'customer', label: 'Đọc Customer' }, { id: 'activity', label: 'Đọc Activity' }, { id: 'reconcile', label: 'Đối soát' }];
+  if (mode !== 'check' && mode !== 'push') { steps.push({ id: 'sheet', label: 'Cập nhật Sheet' }); }
+  var current = phase === 'pull_activity' ? 'activity' : phase === 'pull_customer' ? 'customer' : phase === 'reconcile' ? 'reconcile' : phase === 'push' ? 'write' : 'session', currentIndex = steps.map(function (step) { return step.id; }).indexOf(current);
+  return { title: phase === 'done' ? 'Pipeline đã hoàn tất' : phase === 'error' ? 'Pipeline dừng vì lỗi' : phase === 'paused' ? 'Pipeline đã tạm dừng' : 'Pipeline đang chạy', steps: steps.map(function (step, index) { return { id: step.id, label: step.label, state: phase === 'done' ? 'done' : index < currentIndex ? 'done' : index === currentIndex ? (phase === 'error' ? 'error' : 'current') : 'pending' }; }) };
+}
+function fbmSyncPipelineData(status) {
+  var pipeline = status && status.pipeline;
+  return pipeline && Array.isArray(pipeline.steps) ? pipeline : fbmSyncPipelineFallback(status);
+}
+function fbmSyncPaintPipelineStep(step, item) {
+  var state = String(item && item.state || 'pending'), marker = state === 'done' ? '✓' : state === 'error' ? '!' : state === 'current' || state === 'paused' ? '●' : '○';
+  step.className = 'shin-sync-pipeline-step';
+  if (state === 'done') { step.classList.add('is-done'); }
+  if (state === 'current' || state === 'paused') { step.classList.add('is-current'); }
+  if (state === 'error') { step.classList.add('is-error'); }
+  var markerNode = step.querySelector('.shin-sync-pipeline-marker'), labelNode = step.querySelector('.shin-sync-pipeline-label');
+  if (markerNode) { markerNode.textContent = marker; }
+  if (labelNode) { labelNode.textContent = String(item && item.label || ''); }
+}
 function fbmSyncRenderPipeline(panel, status) {
-  var phase = String(status.phase || ''), current = status.entity === 'activity' ? ['Kiểm tra phiên', 'Category', 'Customer cha', 'Activity', 'Đối soát', 'Liên kết Customer'] : ['Kiểm tra phiên', 'Category', 'Customer', 'Đối soát', 'Cập nhật Sheet'];
-  if (status.mode === 'push') { current = ['Kiểm tra phiên', 'Category', 'Quyền bản ghi', 'Mở form FBM', 'Ghi', 'Đọc xác nhận', 'Baseline']; }
-  var currentIndex = phase === 'idle' || phase === 'paused' ? -1 : phase === 'done' ? current.length : phase === 'checking_session' ? 0 : phase === 'reconcile' ? (status.mode === 'push' ? 2 : 3) : phase === 'push' ? 4 : phase === 'pull_activity' ? 3 : phase === 'pull_customer' ? 2 : 1;
+  var pipeline = fbmSyncPipelineData(status);
   var box = fbmSyncAppendBox(panel, 'shin-sync-pipeline');
-  fbmSyncAppendText(box, phase === 'idle' ? 'Pipeline sẽ chạy' : phase === 'done' ? 'Pipeline đã hoàn tất' : phase === 'error' ? 'Pipeline dừng vì lỗi' : phase === 'paused' ? 'Pipeline đã tạm dừng' : 'Pipeline đang chạy', 'shin-sync-pipeline-title');
-  current.forEach(function (label, index) {
-    var marker = index < currentIndex ? '✓' : index === currentIndex ? (phase === 'error' ? '!' : '●') : '○';
+  box.setAttribute('data-fbm-sync-pipeline-kind', String(pipeline.kind || ''));
+  fbmSyncAppendText(box, String(pipeline.title || 'Pipeline đang chạy'), 'shin-sync-pipeline-title');
+  (pipeline.steps || []).forEach(function (item) {
     var step = fbmSyncAppendBox(box, 'shin-sync-pipeline-step');
-    if (marker === '✓') { step.classList.add('is-done'); }
-    if (marker === '●') { step.classList.add('is-current'); }
-    if (marker === '!') { step.classList.add('is-error'); }
-    fbmSyncAppendText(step, marker, 'shin-sync-pipeline-marker');
-    fbmSyncAppendText(step, label, 'shin-sync-pipeline-label');
+    step.setAttribute('data-fbm-sync-pipeline-step', String(item.id || ''));
+    fbmSyncAppendText(step, '', 'shin-sync-pipeline-marker');
+    fbmSyncAppendText(step, '', 'shin-sync-pipeline-label');
+    fbmSyncPaintPipelineStep(step, item);
   });
+}
+function fbmSyncPatchLivePipeline(panel, status) {
+  var pipeline = fbmSyncPipelineData(status), box = panel && panel.querySelector('.shin-sync-pipeline');
+  if (!box || !pipeline || !Array.isArray(pipeline.steps)) { return false; }
+  var steps = box.querySelectorAll('[data-fbm-sync-pipeline-step]');
+  if (steps.length !== pipeline.steps.length || String(box.getAttribute('data-fbm-sync-pipeline-kind') || '') !== String(pipeline.kind || '')) { return false; }
+  var title = box.querySelector('.shin-sync-pipeline-title');
+  if (title) { title.textContent = String(pipeline.title || 'Pipeline đang chạy'); }
+  for (var index = 0; index < pipeline.steps.length; index += 1) {
+    if (String(steps[index].getAttribute('data-fbm-sync-pipeline-step') || '') !== String(pipeline.steps[index].id || '')) { return false; }
+    fbmSyncPaintPipelineStep(steps[index], pipeline.steps[index]);
+  }
+  return true;
 }
 function fbmSyncRenderRun(panel, status) {
   status = status || {};

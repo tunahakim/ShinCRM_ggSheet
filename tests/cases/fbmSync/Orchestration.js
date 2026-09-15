@@ -52,6 +52,28 @@ async function chay(so) {
   napServer(orchestration, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/EntryPoints.js');
   const started = orchestration.FbmSync.start({ mode: 'read' });
   check(so, 'start bat dau bang bootstrap Customer', started.request.meta.kind, 'authorize');
+  check(so, 'DTO pipeline tu GAS chi danh dau buoc kiem tra phien o dau luot', [started.status.pipeline.kind, started.status.pipeline.title, started.status.pipeline.steps.map((step) => step.state)], ['read', 'Pipeline đang chạy', ['current', 'pending', 'pending', 'pending', 'pending', 'pending']]);
+  const pipelineActivityState = orchestration.FbmSync.stateRead();
+  pipelineActivityState.phase = 'pull_activity'; pipelineActivityState.entity = 'activity'; pipelineActivityState.cursor = { kind: 'activity_grid' }; orchestration.FbmSync.stateWrite(pipelineActivityState);
+  check(so, 'DTO pipeline chuyen dung sang Activity ma khong danh dau doi soat va Sheet', orchestration.FbmSync.statusView().pipeline.steps.map((step) => step.state), ['done', 'done', 'done', 'current', 'pending', 'pending']);
+  const pipelineErrorState = orchestration.FbmSync.stateRead();
+  pipelineErrorState.phase = 'error'; pipelineErrorState.cursor = { kind: 'activity_grid' }; orchestration.FbmSync.stateWrite(pipelineErrorState);
+  check(so, 'DTO pipeline dung tai Activity khi loi, khong bao hoan tat gia', [orchestration.FbmSync.statusView().pipeline.title, orchestration.FbmSync.statusView().pipeline.steps.map((step) => step.state)], ['Pipeline dừng vì lỗi', ['done', 'done', 'done', 'error', 'pending', 'pending']]);
+  [
+    ['check khong bao gio hien buoc ghi Sheet', { mode: 'check', scan: 'full', phase: 'done', cursor: {} }, 'check', ['done', 'done', 'done', 'done', 'done']],
+    ['push dang mo form chi hoan tat session Category va gate', { mode: 'push', scan: 'full', phase: 'push', cursor: { kind: 'customer_edit_open' } }, 'push', ['done', 'done', 'done', 'current', 'pending', 'pending', 'pending']],
+    ['push dang doc xac nhan khong danh dau baseline', { mode: 'push', scan: 'full', phase: 'push', cursor: { kind: 'push_wait', operation: 'customer_verify' } }, 'push', ['done', 'done', 'done', 'done', 'done', 'current', 'pending']],
+    ['write chi sang ghi FBM sau khi cap nhat Sheet', { mode: 'write', scan: 'full', phase: 'push', cursor: { kind: 'push_wait', operation: 'activity_verify' } }, 'write', ['done', 'done', 'done', 'done', 'done', 'done', 'done', 'done', 'done', 'current', 'pending']],
+    ['identity probe dang doc User hoan tat session truoc nhan dien', { mode: 'check', scan: 'identity_probe', phase: 'checking_session', cursor: { kind: 'identity_user_grid' } }, 'identity_probe', ['done', 'current']],
+    ['identity check chi quet Customer va doi soat lien ket', { mode: 'check', scan: 'identity_check', phase: 'pull_customer', cursor: { kind: 'customer_grid' } }, 'identity_check', ['done', 'current', 'pending']],
+    ['login test sau login chuyen sang kiem tra phien', { mode: 'read', scan: 'full', phase: 'checking_session', cursor: { kind: 'login_identity_authorize' } }, 'login_test', ['done', 'current', 'pending']],
+    ['preflight loi khong tu nhan bat ky buoc FBM nao da xong', { mode: 'read', scan: 'full', phase: 'error', cursor: {} }, 'read', ['pending', 'pending', 'pending', 'pending', 'pending', 'pending']],
+    ['tam dung o Activity giu dung cac buoc da xong', { mode: 'read', scan: 'full', phase: 'paused', cursor: { kind: 'activity_grid' } }, 'read', ['done', 'done', 'done', 'paused', 'pending', 'pending']],
+    ['xung dot dung tai doi soat va khong hoan tat Sheet', { mode: 'read', scan: 'full', phase: 'conflict', cursor: {} }, 'read', ['done', 'done', 'done', 'done', 'error', 'pending']]
+  ].forEach((item) => {
+    const pipeline = orchestration.FbmSync.pipelineView(item[1]);
+    check(so, 'ma tran pipeline ' + item[0], [pipeline.kind, pipeline.steps.map((step) => step.state)], [item[2], item[3]]);
+  });
   const identityCheckStatus = orchestration.FbmSync.statusMetadata({ identityCheck: { total: 3, matched: 2, missing: 1, missingSample: [{ fbmId: 'FBM-3' }] } });
   check(so, 'DTO Sidebar giữ tổng hợp kiểm tra liên kết n/N', [identityCheckStatus.identityCheck.total, identityCheckStatus.identityCheck.matched, identityCheckStatus.identityCheck.missing, identityCheckStatus.identityCheck.missingSample[0].fbmId], [3, 2, 1, 'FBM-3']);
   const conflictCarry = orchestration.FbmSync.stateRead();
@@ -166,7 +188,7 @@ async function chay(so) {
   check(so, 'dong bo lai tu trang thai tam dung tao request FBM moi', [restartedPaused.ok, restartedPaused.request.meta.kind, restartedPaused.resumed], [true, 'authorize', undefined]);
   orchestration.FbmSync.statePatch({ runId: 'scheduled-run', phase: 'pull_customer', scheduledScan: 'customer', activeRequestId: '', deadlineAt: 0 });
   orchestration.fbmSyncCancel();
-  check(so, 'dung dong bo xoa marker scheduler de khong tu chay lai', [orchestration.FbmSync.stateRead().phase, orchestration.FbmSync.stateRead().scheduledScan], ['idle', '']);
+  check(so, 'dung dong bo xoa marker scheduler va giu ket qua o trang thai tam dung', [orchestration.FbmSync.stateRead().phase, orchestration.FbmSync.stateRead().scheduledScan], ['paused', '']);
 
   const guards = taoHopCat({ FbmSync: {}, PropertiesService: { getScriptProperties: () => ({ getProperty: () => '' }), getDocumentProperties: () => ({ getProperty: () => null, setProperty: () => {} }) } });
   napServer(guards, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js');
@@ -226,6 +248,10 @@ async function chay(so) {
   schedulerData.FBM_SYNC_NEXT_HEARTBEAT = '0';
   const errorClaim = scheduler.FbmSync.schedulerClaim('heartbeat', Date.now());
   check(so, 'Scheduler khong ghi de loi phien push da treo', [errorClaim.ok, errorClaim.code, scheduler.FbmSync.stateRead().phase, scheduler.FbmSync.stateRead().lastFailureCode], [false, 'SYNC_ERROR_REQUIRES_MANUAL_RESTART', 'error', 'SUPERVISOR_TIMEOUT_AT_PUSH']);
+  scheduler.FbmSync.statePatch({ runId: '', phase: 'paused', cursor: {}, activeRequestId: '', scheduledScan: '' });
+  schedulerData.FBM_SYNC_NEXT_CUSTOMER_SCAN = '0';
+  const claimAfterManualCancel = scheduler.FbmSync.schedulerClaim('customer', Date.now());
+  check(so, 'phien da dung khong tu tiep tuc nhung khong khoa lich nen cua ky sau', [claimAfterManualCancel.ok, claimAfterManualCancel.kind, scheduler.FbmSync.stateRead().scheduledScan], [true, 'customer', 'customer']);
 
   const heartbeatData = {};
   const heartbeatPropertyApi = { getProperty: (key) => heartbeatData[key] || null, setProperty: (key, value) => { heartbeatData[key] = String(value); } };
@@ -314,6 +340,8 @@ async function chay(so) {
   check(so, 'dung phien khi request dang bay giu reservation', [pendingCancel.code, heartbeat.FbmSync.stateRead().activeRequestId, heartbeat.FbmSync.stateRead().metadata.cancelPending], ['SYNC_CANCEL_PENDING', 'cancel-request', true]);
   const stoppedAfterResponse = heartbeat.FbmSync.continue({ d: { Authorized: 'auth-customer' }, transport: { trace: [{ requestId: 'cancel-request' }] } });
   check(so, 'response hien tai duoc dong nhung khong cap request tiep', [stoppedAfterResponse.ok, stoppedAfterResponse.request, heartbeat.FbmSync.stateRead().phase, heartbeat.FbmSync.stateRead().activeRequestId], [true, null, 'paused', '']);
+  const cancelWithoutFlight = heartbeat.fbmSyncCancel();
+  check(so, 'dung phien khi khong con request bay giu man ket qua o trang thai tam dung ma khong khoa lich nen sau do', [cancelWithoutFlight.phase, cancelWithoutFlight.runId, cancelWithoutFlight.message.indexOf('kết quả và log') >= 0], ['paused', '', true]);
 }
 
 module.exports = { chay };

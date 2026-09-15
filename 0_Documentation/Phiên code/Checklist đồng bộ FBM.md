@@ -335,7 +335,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Tự điền nhận diện trên file chưa có binding điền form và chờ `Lưu thông tin`; chỉ đối chiếu/kiểm tra Customer khi đã có binding.
 - [x] Render status hoãn dựng lại màn hình Tài khoản khi người dùng đang gõ, không giữ mật khẩu vào client state/GAS/Sheet/Log; popup combo giữ focus qua thao tác chuột.
 - [x] Mở Sidebar chỉ bắt tay và gửi một relay config local, không tự phát heartbeat hoặc request FBM. Relay cùng URL, khóa và Spreadsheet đã xác nhận ACK ngay trong Extension, không probe GAS lặp hay yêu cầu Sidebar tự làm mới.
-- [x] Màn hình Chạy đồng bộ giữ pipeline và chẩn đoán sau khi hoàn tất, lỗi hoặc tạm dừng; khi đang chạy chỉ vá node trạng thái tại chỗ, không xóa/dựng lại thân màn hình.
+- [x] Màn hình Chạy đồng bộ giữ pipeline và chẩn đoán sau khi hoàn tất, lỗi hoặc tạm dừng; GAS trả DTO pipeline theo phase/cursor, Sidebar vá cùng lúc từng node, trạng thái và thanh tiến độ tại chỗ, nên không giữ dấu hoàn tất/số đếm của lượt cũ và không xóa/dựng lại thân màn hình. Test workflow offline đạt `1344/1344`; `fbmSyncStatus --push` xác nhận DTO ở GAS DEV revision `@295`.
 - [x] Kết quả `Đăng nhập thử` và `Kiểm tra liên kết` luôn hiện ngay dưới nút thao tác, gồm đang chạy, thành công, cảnh báo có Customer thiếu và lỗi; DTO cho phép Sidebar nhận tổng hợp `n/N` từ GAS.
 - [ ] **Cần kiểm chứng thực tế:** reload Extension, tự điền nhận diện, đăng nhập thử và chạy một lượt `Kiểm tra an toàn`; đối chiếu Network và trạng thái Sidebar theo hướng dẫn bàn giao.
 

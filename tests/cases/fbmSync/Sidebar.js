@@ -71,7 +71,6 @@ function taoBoTest() {
   hop.fbmSyncMakeToggleButton = (id, enabled, label) => {
     const button = dom.document.createElement('button'); button.id = id; button.className = enabled ? 'shin-sync-toggle is-on' : 'shin-sync-toggle is-off'; button.setAttribute('aria-pressed', enabled ? 'true' : 'false'); button.setAttribute('aria-label', label); return button;
   };
-  hop.fbmSyncPaintProgress = () => {};
   hop.fbmSyncPaintError = null;
   napClient(hop,
     'client/sync/screens/overview.html', 'client/sync/screens/account.html',
@@ -171,6 +170,16 @@ async function chay(so) {
   const runFirstNode = content.children[0];
   const patchedLiveStatus = hop.fbmSyncPatchLiveStatus(content, Object.assign({}, active, { label: 'Đang đối soát', counts: { completed: 4, succeeded: 3 } }), 'run');
   check(so, 'trạng thái đang chạy được cập nhật tại chỗ, không dựng lại màn hình', [patchedLiveStatus, content.children[0] === runFirstNode, content.textContent.indexOf('Đang đối soát') >= 0], [true, true, true]);
+  const previousFinished = { phase: 'done', mode: 'read', counts: {}, pipeline: { kind: 'read', title: 'Pipeline đã hoàn tất', steps: [{ id: 'session', label: 'Kiểm tra phiên FBM', state: 'done' }, { id: 'category', label: 'Category', state: 'done' }, { id: 'customer', label: 'Đọc Customer', state: 'done' }, { id: 'activity', label: 'Đọc Activity', state: 'done' }, { id: 'reconcile', label: 'Đối soát', state: 'done' }, { id: 'sheet', label: 'Cập nhật Sheet', state: 'done' }] } };
+  const nextRunChecking = { phase: 'checking_session', mode: 'read', counts: {}, pipeline: { kind: 'read', title: 'Pipeline đang chạy', steps: [{ id: 'session', label: 'Kiểm tra phiên FBM', state: 'current' }, { id: 'category', label: 'Category', state: 'pending' }, { id: 'customer', label: 'Đọc Customer', state: 'pending' }, { id: 'activity', label: 'Đọc Activity', state: 'pending' }, { id: 'reconcile', label: 'Đối soát', state: 'pending' }, { id: 'sheet', label: 'Cập nhật Sheet', state: 'pending' }] } };
+  render(hop, content, hop.fbmSyncRenderRun, previousFinished);
+  const previousPipeline = content.querySelector('.shin-sync-pipeline');
+  const nextRunPatched = hop.fbmSyncPatchLiveStatus(content, nextRunChecking, 'run');
+  const nextMarkers = Array.from(content.querySelectorAll('.shin-sync-pipeline-marker')).map((node) => node.textContent);
+  check(so, 'lượt mới vá lại cả pipeline cũ đã hoàn tất, không để trạng thái kiểm tra đi với sáu dấu hoàn tất', [nextRunPatched, content.querySelector('.shin-sync-pipeline') === previousPipeline, content.querySelector('.shin-sync-pipeline-title').textContent, nextMarkers], [true, true, 'Pipeline đang chạy', ['●', '○', '○', '○', '○', '○']]);
+  render(hop, content, hop.fbmSyncRenderRun, Object.assign({}, nextRunChecking, { counts: { total: 10, completed: 2 } }));
+  const progressPatched = hop.fbmSyncPatchLiveStatus(content, Object.assign({}, nextRunChecking, { counts: { total: 10, completed: 7 } }), 'run');
+  check(so, 'vá trạng thái đang chạy cũng cập nhật thanh tiến độ, không giữ số đếm của snapshot cũ', [progressPatched, content.querySelector('.shin-sync-progress-label').textContent, content.querySelector('.shin-sync-progress-track').getAttribute('aria-valuenow'), content.querySelector('.shin-sync-progress-fill').style.width], [true, 'Tiến trình: 7/10 (70%)', '70', '70%']);
 
   hop.FBM_SYNC_CLIENT.resultsTab = 'summary';
   const conflictStatus = { phase: 'conflict', counts: { conflict: 1 }, metadata: { conflictCount: 1, conflicts: [{ entity: 'customer', id: 'CUS-1', fbmId: 'ALT00010', fields: [{ field: 'phone', left: '0901', right: '0902' }] }] } };

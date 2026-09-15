@@ -31,7 +31,9 @@ function fbmSyncPatchLiveStatus(panel, status, screen) {
   if (!panel || String(panel.getAttribute('data-fbm-sync-screen') || '') !== String(screen || '') || (screen !== 'run' && screen !== 'results')) { return false; }
   var nodes = panel.querySelectorAll('[data-fbm-sync-live-status]');
   if (!nodes.length) { return false; }
+  if (screen === 'run' && typeof fbmSyncPatchLivePipeline === 'function' && !fbmSyncPatchLivePipeline(panel, status)) { return false; }
   var count = status && status.counts || {};
+  if (typeof fbmSyncPatchLiveProgress === 'function' && !fbmSyncPatchLiveProgress(panel, status, count)) { return false; }
   nodes.forEach(function (node) {
     var field = node.getAttribute('data-fbm-sync-live-status'), value = fbmSyncLiveStatusValue(status, count, field);
     node.textContent = value;
