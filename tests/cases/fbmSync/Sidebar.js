@@ -123,12 +123,14 @@ async function chay(so) {
 
   const shellHeader = hop.fbmSyncShellHeaderBlock(idle);
   check(so, 'header Đồng bộ dùng Icon chung, không gắn nút hình chữ nhật riêng', [shellHeader.elements[0].role, shellHeader.elements[0].className, shellHeader.elements[3].role, shellHeader.elements[3].className, hop.fbmSyncShellTitle()], ['icon', '', 'icon', '', 'Tổng quan']);
+  check(so, 'header Đồng bộ dùng cùng khung và tiêu đề với header Sidebar/form', [shellHeader.className.indexOf('shin-shell-header') >= 0, shellHeader.elements[1].className.indexOf('shin-header-title') >= 0], [true, true]);
 
   check(so, 'Overview render được trạng thái rỗng', !!render(hop, content, hop.fbmSyncRenderOverview, idle).querySelector('.shin-sync-overview-state'), true);
   check(so, 'Overview không đặt dòng hướng dẫn chung ngay dưới header', hop.fbmSyncOverviewBlocks(idle)[0].role, 'card');
   hop.FBM_SYNC_CLIENT.subscreen = 'overview';
   hop.fbmSyncRenderLoading();
   check(so, 'loading xóa dấu màn cũ để snapshot đầu tiên dựng lại Tổng quan', [content.getAttribute('data-fbm-sync-screen'), !!hop.RENDER_INDEX.nodes['fbm-sync-overview-root']], [null, false]);
+  check(so, 'loading chỉ có một dòng và gộp đúng tên module', [content.querySelectorAll('.shin-sync-section-title').length, content.querySelector('.shin-sync-loading').textContent], [0, 'Đang tải trạng thái phiên đồng bộ FBM']);
   hop.fbmSyncPaint(Object.assign({}, idle, { label: 'Tổng quan sau loading' }));
   check(so, 'Tổng quan dựng lại được sau loading mà không dùng node cũ', [content.getAttribute('data-fbm-sync-screen'), content.textContent.indexOf('Tổng quan sau loading') >= 0], ['overview', true]);
   check(so, 'Run render không hiện pipeline khi chưa chạy', render(hop, content, hop.fbmSyncRenderRun, idle).querySelector('.shin-sync-pipeline'), null);

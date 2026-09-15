@@ -1,8 +1,8 @@
 <style>
 .shin-sync-module { display:flex; flex-direction:column; min-height:0; height:100%; background:var(--shin-bg); }
 .shin-sync-screen.shin-sync-module { position:fixed; inset:0; }
-.shin-sync-module-header { display:flex; align-items:center; gap:var(--shin-gap-1); padding:0 var(--shin-gap-2); border-bottom:1px solid var(--shin-border); background:var(--shin-bg); }
-.shin-sync-module-title { flex:1; min-width:0; font-size:var(--shin-text-md); font-weight:700; color:var(--shin-text); }
+.shin-sync-module-header { background:var(--shin-bg); }
+.shin-sync-module-title { color:var(--shin-text); }
 .shin-sync-nav { display:flex; gap:var(--shin-gap-2); padding:var(--shin-gap-1) var(--shin-gap-3); border-bottom:1px solid var(--shin-border-faint); background:var(--shin-bg); overflow-x:auto; }
 .shin-sync-nav button { flex:0 0 auto; border:0; border-bottom:2px solid transparent; padding:var(--shin-gap-1) var(--shin-gap-2); background:none; color:var(--shin-text-soft); font:inherit; font-size:var(--shin-text-xs); cursor:pointer; }
 .shin-sync-nav button.is-active { border-color:var(--shin-primary); color:var(--shin-primary); font-weight:700; }
@@ -43,7 +43,6 @@
 .shin-sync-module .shin-card-title { color:var(--shin-text); font-size:var(--shin-text-sm); text-transform:none; letter-spacing:0; }
 .shin-sync-module .shin-card { background:var(--shin-bg); }
 .shin-sync-module .shin-sync-summary-item { background:var(--shin-bg); }
-.shin-sync-module-header { flex:0 0 var(--shin-header-height); background:var(--shin-bg); }
 .shin-sync-master-switch:focus-visible { outline:2px solid var(--shin-primary); outline-offset:1px; }
 .shin-sync-nav { position:absolute; z-index:20; top:var(--shin-header-height); left:var(--shin-scrollbar-size); right:var(--shin-scrollbar-size); display:flex; flex-direction:column; gap:2px; width:auto; min-width:0; max-width:none; max-height:66.666%; overflow-y:auto; overscroll-behavior:contain; }
 .shin-sync-nav { background:var(--shin-bg); border:1px solid var(--shin-border-strong); border-radius:var(--shin-radius-sm); box-shadow:var(--shin-shadow); padding:var(--shin-gap-1); opacity:1; }
@@ -113,7 +112,7 @@
 .shin-sync-pipeline-label { min-width:0; }
 .shin-sync-error-message { margin-top:var(--shin-gap-2); color:var(--shin-error); font-size:var(--shin-text-sm); }
 .shin-sync-pass-row { margin-top:var(--shin-gap-1); color:var(--shin-ok); font-size:var(--shin-text-sm); }
-.shin-sync-loading { display:flex; align-items:center; gap:var(--shin-gap-2); padding:var(--shin-gap-4) var(--shin-gap-2); color:var(--shin-text-soft); font-size:var(--shin-text-sm); }
+.shin-sync-loading { display:flex; align-items:center; justify-content:center; gap:var(--shin-gap-2); padding:var(--shin-gap-4) var(--shin-gap-2); color:var(--shin-text-soft); font-size:var(--shin-text-sm); text-align:center; white-space:nowrap; }
 .shin-sync-loading::before { content:''; width:14px; height:14px; border:2px solid var(--shin-primary-soft); border-top-color:var(--shin-primary); border-radius:50%; animation:shin-sync-spin .8s linear infinite; }
 .shin-sync-overview-hero { border-color:var(--shin-primary); box-shadow:0 1px 3px rgba(26,115,232,.14); }
 .shin-sync-overview-state { color:var(--shin-primary-dark); font-size:var(--shin-text-md); font-weight:700; }
@@ -128,9 +127,9 @@ function fbmSyncShellTitle() {
 }
 function fbmSyncShellHeaderBlock(status) {
   var enabled = fbmSyncShellEnabled(status);
-  return Box({ id: 'fbm-sync-module-header', className: 'shin-sync-module-header', elements: [
+  return Box({ id: 'fbm-sync-module-header', className: 'shin-shell-header shin-sync-module-header', elements: [
     Icon({ id: 'fbm-sync-back', icon: 'back', tooltip: 'Quay lại' }),
-    Text({ id: 'fbm-sync-module-title', className: 'shin-sync-module-title', text: fbmSyncShellTitle() }),
+    Text({ id: 'fbm-sync-module-title', className: 'shin-header-title shin-sync-module-title', text: fbmSyncShellTitle() }),
     StandaloneControl({ id: 'fbm-sync-master-switch', kind: 'toggle', pressed: enabled, className: 'shin-sync-master-switch ' + (enabled ? 'is-on' : 'is-off'), ariaLabel: 'Bật hoặc tắt đồng bộ' }),
     Icon({ id: 'fbm-sync-module-menu', icon: 'more', tooltip: 'Mở menu đồng bộ' })
   ] });
@@ -161,7 +160,7 @@ function fbmSyncRenderLoading() {
   if (typeof RENDER_INDEX !== 'undefined' && RENDER_INDEX.nodes) {
     ['fbm-sync-overview-root', 'fbm-sync-account-root', 'fbm-sync-run-root', 'fbm-sync-results-root', 'fbm-sync-settings-root'].forEach(function (id) { delete RENDER_INDEX.nodes[id]; });
   }
-  fbmSyncReplaceBlocks(panel, [Box({ className: 'shin-sync-section', elements: [Text({ className: 'shin-sync-section-title', text: 'Đồng bộ FBM' }), Text({ className: 'shin-sync-loading', text: 'Đang tải trạng thái phiên...' })] })]);
+  fbmSyncReplaceBlocks(panel, [Box({ className: 'shin-sync-section', elements: [Text({ className: 'shin-sync-loading', text: 'Đang tải trạng thái phiên đồng bộ FBM' })] })]);
 }
 function fbmSyncSetScreen(screenId) {
   var ids = FBM_SYNC_UI_SCHEMA.screens.map(function (item) { return item.id; });

@@ -131,7 +131,7 @@ html, body {
 
 /* Vùng 1 — Header. Cao cố định, ghim đỉnh, hàng icon xếp ngang. Khe 4 pixel đúng như bản cũ: nút icon đã tròn 32 pixel nên
    mắt tự tách chúng ra, khe rộng thêm chỉ ăn chỗ của cái nút thứ bảy sau này. */
-#sidebar-header {
+.shin-shell-header {
   flex: 0 0 var(--shin-header-height);
   display: flex;
   align-items: center;
@@ -142,7 +142,7 @@ html, body {
 }
 
 /* Thuộc tính `align: "right"` của Block dịch ra lớp này: nó đẩy chính nó và mọi thứ sau nó sang phải. */
-#sidebar-header .shin-align-right { margin-left: auto; }
+.shin-shell-header .shin-align-right { margin-left: auto; }
 
 /* Vùng 2 — Dải tiến trình. Đường ray luôn chiếm đúng chiều cao của nó, kể cả lúc rỗng, nên lúc dải chạy hiện lên thì không
    có gì bị đẩy xuống. Ẩn bằng cách bỏ `is-running` chứ không bằng `display: none`, vì `display: none` làm nội dung nhảy 3px. */

@@ -23,6 +23,18 @@
 /* `align: "right"` đẩy chính nó và mọi thứ sau nó sang phải, ở bất cứ vùng nào chứ không riêng header. */
 .shin-align-right { margin-left: auto; }
 
+/* Tiêu đề trong thanh header dùng chung cho màn form và shell Đồng bộ. Chỉ màu sắc là do từng màn chọn. */
+.shin-header-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--shin-text-lg);
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 /* --- Card -------------------------------------------------------- */
 
 .shin-card {

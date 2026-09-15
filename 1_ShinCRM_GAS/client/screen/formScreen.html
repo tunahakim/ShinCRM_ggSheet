@@ -1,16 +1,9 @@
 <style>
 /* Ba lớp mà `UI_SCHEMA` gọi tên ở riêng ba màn form, cộng dấu ô kế tục do engine đánh. Ở đây chứ không ở `components.html` vì chúng chết cùng form — tài liệu 03 Phần 8. */
 
-/* Tiêu đề nằm bên trái vùng header, ✕ và ✓ ở hai đầu. `flex: 1 1 auto` để nó ăn hết chỗ trống, nhờ đó `margin-left: auto` của nút ✓ không phải làm gì thêm. */
+/* Tiêu đề form dùng cùng kích thước/căn hàng với shell Đồng bộ; form chỉ chọn màu nhấn riêng. */
 .shin-form-title {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
   color: var(--shin-primary);
-  font-size: var(--shin-text-lg);
-  font-weight: 700;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
 /* Nút lưu ở vùng footer: rộng hết dải, cao hơn nút thường vì đây là nút bấm nhiều nhất cả ngày. */
@@ -77,7 +70,7 @@ function screenFormHeader(header, tieuDe) {
   var out = header.slice();
   var i = 0;
   while (i < out.length && out[i].align !== 'right') { i += 1; }
-  out.splice(i, 0, Text({ text: tieuDe, className: 'shin-form-title' }));
+  out.splice(i, 0, Text({ text: tieuDe, className: 'shin-header-title shin-form-title' }));
   return out;
 }
 
