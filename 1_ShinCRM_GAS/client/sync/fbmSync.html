@@ -649,7 +649,7 @@ function fbmSyncSaveIdentityManual(button) {
   if (!empty && (!binding.spreadsheetId || !binding.userId || !binding.username || !binding.accountName)) {
     FBM_SYNC_CLIENT.identityInvalid = { spreadsheet: !binding.spreadsheetId, user: !binding.userId, username: !binding.username, account: !binding.accountName };
     if (typeof RENDER_INDEX !== 'undefined' && RENDER_INDEX.nodes['fbm-sync-identity-form-region']) { fbmSyncRenderTarget('fbm-sync-identity-form-region', fbmSyncIdentityFormBlocks()); }
-    fbmSyncSetAccountNotice('identity', 'error', 'Hãy nhập đủ cả bốn thông tin liên kết, hoặc xóa cả bốn ô để hủy liên kết.');
+    fbmSyncSetAccountNotice('identity', 'error', 'Vui lòng bổ sung các ô màu đỏ hoặc xóa cả bốn ô để hủy liên kết.');
     if (button) { button.disabled = false; }
     return Promise.resolve(null);
   }
