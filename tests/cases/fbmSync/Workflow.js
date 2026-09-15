@@ -33,12 +33,14 @@ function workflowGas() {
     'fbm_sync/schema/FbmFields.js',
     'fbm_sync/protocol/Protocol.js',
     'fbm_sync/state/State.js',
+    'fbm_sync/state/Scheduler.js',
     'fbm_sync/reconcile/Identity.js',
     'fbm_sync/reconcile/CategoryGate.js',
     'fbm_sync/reconcile/Fingerprint.js',
     'fbm_sync/report/Report.js',
     'fbm_sync/read/GridRead.js',
     'fbm_sync/write/RequestBuilders.js',
+    'fbm_sync/auth/AutoLogin.js',
     'fbm_sync/transport/TransportCore.js',
     'fbm_sync/transport/PullFlow.js',
     'fbm_sync/transport/EntryPoints.js'
@@ -200,6 +202,36 @@ async function chay(so) {
     identityCheck.documentProperties.getProperty('FBM_SYNC_BINDING_V1')
   ], ['customer', null, 'done', 1, 1, 0, null]);
 
+  const loginFlow = workflowGas();
+  loginFlow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
+  const loginStarted = loginFlow.hop.FbmSync.loginTestRequest('workflow-credential-ref');
+  const afterLogin = loginFlow.hop.FbmSync.loginTestResult({
+    ok: true, status: 200, body: JSON.stringify({ d: true }),
+    transport: { trace: [{ stage: 'executor_response_sent', requestId: loginStarted.request.id }] }
+  });
+  const loginAuthorize = await sendThroughExecutor(afterLogin.request, JSON.stringify({ d: { Authorized: 'login-auth' } }));
+  const afterAuthorize = loginFlow.hop.FbmSync.loginTestResult(executorRaw(loginAuthorize.reply, afterLogin.request.id));
+  const loginUser = await sendThroughExecutor(afterAuthorize.request, userResponse);
+  const loginDone = loginFlow.hop.FbmSync.loginTestResult(executorRaw(loginUser.reply, afterAuthorize.request.id));
+  check(so, 'dang nhap thu: Login thanh cong phai qua authorize va User grid khop binding moi duoc bao thanh cong', [
+    loginStarted.request.meta.kind, afterLogin.request.meta.kind, afterAuthorize.request.meta.kind,
+    loginDone.ok, loginDone.code, loginDone.status.phase, loginDone.status.message
+  ], ['login', 'authorize', 'identity_user_grid', true, 'LOGIN_OK', 'done', 'Đăng nhập thử thành công và đúng tài khoản FBM đã liên kết.']);
+
+  const wrongLogin = workflowGas();
+  wrongLogin.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
+  const wrongStart = wrongLogin.hop.FbmSync.loginTestRequest('workflow-credential-ref');
+  const wrongAfterLogin = wrongLogin.hop.FbmSync.loginTestResult({ ok: true, status: 200, body: JSON.stringify({ d: true }), transport: { trace: [{ stage: 'executor_response_sent', requestId: wrongStart.request.id }] } });
+  const wrongAuthorize = wrongLogin.hop.FbmSync.loginTestResult({ ok: true, status: 200, body: JSON.stringify({ d: { Authorized: 'wrong-auth' } }), transport: { trace: [{ stage: 'executor_response_sent', requestId: wrongAfterLogin.request.id }] } });
+  const wrongDone = wrongLogin.hop.FbmSync.loginTestResult({
+    ok: true, status: 200,
+    body: JSON.stringify({ d: { TotalRowCount: 1, Rows: [[2038, 'OTHER', 'Tai khoan khac']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] } } }),
+    transport: { trace: [{ stage: 'executor_response_sent', requestId: wrongAuthorize.request.id }] }
+  });
+  check(so, 'dang nhap thu sai identity: khong coi la thanh cong va khong thay binding', [
+    wrongDone.ok, wrongDone.code, wrongDone.status.phase, wrongLogin.hop.FbmSync.bindingRead().userId
+  ], [false, 'LOGIN_IDENTITY_MISMATCH', 'paused', '2037']);
+
   const binding = workflowGas();
   const bindingSaved = binding.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
   const bindingCleared = binding.hop.FbmSync.bindingWrite({});
@@ -343,6 +375,14 @@ async function chay(so) {
   check(so, 'response cu khong duoc phep mo bat ky buoc pipeline nao', [
     staleResult.ok, staleResult.code, stale.hop.FbmSync.stateRead().activeRequestId === staleStarted.request.id
   ], [false, 'STALE_RESPONSE', true]);
+
+  const manualTransport = workflowGas();
+  const manualStarted = manualTransport.hop.FbmSync.start({ mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true });
+  const transportFailure = manualTransport.hop.FbmSync.heartbeatTransportFailure({ requestId: manualStarted.request.id, code: 'FBM_TAB_NOT_FOUND', message: 'Không tìm thấy tab FBM đang mở.' });
+  check(so, 'loi bridge thu cong: GAS chi ghi nhan loi dung reservation, ket thuc ro rang va khong cap request moi', [
+    transportFailure.ok, transportFailure.code, transportFailure.request || null, transportFailure.status.phase,
+    transportFailure.status.lastError, manualTransport.hop.FbmSync.stateRead().activeRequestId
+  ], [false, 'FBM_TAB_NOT_FOUND', null, 'error', 'Không tìm thấy tab FBM đang mở.', '']);
 
   const cancelling = workflowGas();
   const cancellingStarted = cancelling.hop.FbmSync.start({ mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true });
