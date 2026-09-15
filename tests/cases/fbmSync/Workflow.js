@@ -270,6 +270,22 @@ async function chay(so) {
   check(so, 'cau hinh Extension cho phep doi nhip nhung khong doi lich nghiep vu', [savedExtension.ok, savedExtension.pollMinutes, savedExtension.runOnStartup, scheduleFlow.hop.FbmSync.backgroundSchedulePublic().heartbeat.minutes], [true, 15, false, 5]);
   const savedSchedule = scheduleFlow.hop.FbmSync.backgroundScheduleSave({ heartbeat: { enabled: false, minutes: 10 }, customer: { enabled: true, minutes: 60 }, activity: { enabled: false, minutes: 30 } });
   check(so, 'GAS luu cong tac va chu ky tung tien trinh nen', [savedSchedule.ok, savedSchedule.schedule.heartbeat.enabled, savedSchedule.schedule.heartbeat.minutes, savedSchedule.schedule.activity.enabled], [true, false, 10, false]);
+  const directionSchedule = scheduleFlow.hop.FbmSync.backgroundScheduleSave({
+    enabled: true, direction: 'write',
+    heartbeat: { enabled: true, minutes: 5 },
+    customerFull: { enabled: true, minutes: 480 },
+    activityFull: { enabled: false, minutes: 1440 },
+    detail: { enabled: true, minutes: 60, customersPerRun: 50, minDelaySeconds: 0.5, maxDelaySeconds: 2 }
+  });
+  check(so, 'Lịch nền lưu chiều hai chiều và batch detail cùng khoảng delay', [directionSchedule.schedule.direction, directionSchedule.schedule.detail.enabled, directionSchedule.schedule.detail.customersPerRun, directionSchedule.schedule.detail.minDelaySeconds, directionSchedule.schedule.detail.maxDelaySeconds], ['write', true, 50, 0.5, 2]);
+  const detailCursor = scheduleFlow.hop.FbmSync.detailCursorWrite({ pageIndex: 1, pageValue: ['2026-09-16', '2026-09-16T10:00:00', 'CUS-50'] });
+  check(so, 'Cursor detail được lưu bền vững chỉ với khóa trang', [detailCursor.pageIndex, scheduleFlow.hop.FbmSync.detailCursorRead().pageValue.join('|')], [1, '2026-09-16|2026-09-16T10:00:00|CUS-50']);
+  const detailState = { scan: 'detail', detailCustomerLimit: 50, cursor: { pageIndex: 1, count: 50, seen: 0 } };
+  const detailRows = Array.from({ length: 50 }, (_, index) => ({ ngay_gd: '2026-09-16', datetime0: String(index), xorder: String(index), stt_rec_kh: 'CUS-' + (index + 1) }));
+  const detailNext = scheduleFlow.hop.FbmSync.customerNext(detailState, detailRows, 120);
+  check(so, 'Trang detail đủ batch không đánh dấu hết danh sách và lưu trang kế tiếp', [detailNext, scheduleFlow.hop.FbmSync.detailCursorRead().pageIndex, scheduleFlow.hop.FbmSync.detailCursorRead().pageValue[2]], [null, 2, '49']);
+  scheduleFlow.hop.FbmSync.customerNext({ scan: 'detail', detailCustomerLimit: 50, cursor: { pageIndex: 2, count: 50, seen: 0 } }, [], 120);
+  check(so, 'Trang detail rỗng xóa cursor để lượt sau bắt đầu lại an toàn', scheduleFlow.hop.FbmSync.detailCursorRead(), null);
   scheduleFlow.hop.FbmSync.identityPreflight = () => ({ blocking: false, status: { status: 'BOUND' }, message: '' });
   const now = Date.now();
   scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_CUSTOMER_SCAN', String(now - 1));
@@ -303,6 +319,10 @@ async function chay(so) {
   const bulkProjection = scheduleFlow.hop.FbmSync.activityBulkProjection(['id', 'ma_kh', 'ma_cv', 'ten_cv', 'details', 'end_date', 'owner', 'datetime0', 'line_nbr']);
   const bulkProjectionRequest = scheduleFlow.hop.FbmSync.activityBulkRequest({ type: 1, count: 100, gridPageIndex: 1, gridPageValue: ['2026-01-01'], transport: bulkProjection });
   check(so, 'GAS cap chi dan loc cot generic cho bulk Activity, khong hardcode o Extension', [bulkProjection.arrayProjections[0].indices.join(','), bulkProjectionRequest.meta.transport.arrayProjections[0].paths.join('|')], ['0,3,4,5,6,7,8,1,2', 'd.Rows|d.ViewPage.Fields']);
+  const waitFlow = workflowGas();
+  waitFlow.hop.FbmSync.statePatch({ scan: 'detail', backgroundDetail: { minDelaySeconds: 0.5, maxDelaySeconds: 2 }, phase: 'pull_customer', cursor: { kind: 'customer_grid' } });
+  const delayed = waitFlow.hop.FbmSync.nextEnvelope(waitFlow.hop.FbmSync.customerGridRequest({ type: 0, count: 50, gridPageIndex: -1, gridRefresh: false }));
+  check(so, 'GAS cấp waitMs transport cho lượt detail trong đúng khoảng cấu hình', [delayed.meta.waitMs >= 500, delayed.meta.waitMs <= 2000], [true, true]);
 
   const noopWorker = workerHarness([{ ok: true, code: 'HEARTBEAT_NOOP', request: null }], []);
   const noopResult = await noopWorker.context.fbmHeartbeatNow('workflow');

@@ -146,7 +146,21 @@ FbmSync.authContinue = function (entity, response) {
 /** Tạo request trang Customer tiếp theo từ khóa cuối trang trước. */
 FbmSync.customerNext = function (state, rows, total) {
   var cursor = state.cursor || {}, count = Number(cursor.count || 2000);
-  if (state.scan === 'detail' && Number(cursor.seen || 0) + rows.length >= Number(state.detailCustomerLimit || 50)) { return null; }
+  var seenAfterPage = Number(cursor.seen || 0) + rows.length;
+  if (state.scan === 'detail' && !rows.length && typeof FbmSync.detailCursorClear === 'function') { FbmSync.detailCursorClear(); }
+  if (state.scan === 'detail' && seenAfterPage >= Number(state.detailCustomerLimit || 50)) {
+    var exhausted = !rows.length || rows.length < count || (total && seenAfterPage >= total);
+    if (exhausted) {
+      if (typeof FbmSync.detailCursorClear === 'function') { FbmSync.detailCursorClear(); }
+    } else if (typeof FbmSync.detailCursorWrite === 'function') {
+      var detailLast = rows[rows.length - 1];
+      FbmSync.detailCursorWrite({
+        pageIndex: Number(cursor.pageIndex || -1) + 1,
+        pageValue: [detailLast.ngay_gd || '', detailLast.datetime0 || '', detailLast.xorder || '']
+      });
+    }
+    return null;
+  }
   if (!rows.length || rows.length < count || (total && Number(cursor.seen || 0) + rows.length >= total)) { return null; }
   var last = rows[rows.length - 1];
   cursor.pageIndex = Number(cursor.pageIndex || -1) + 1;
@@ -208,7 +222,10 @@ FbmSync.beginCustomerPull = function (state) {
     state.metadata.seen.activity = { initialized: true };
   }
   var customerCount = state.scan === 'detail' ? Math.max(1, Math.min(50, Number(state.detailCustomerLimit || 50))) : 2000;
-  state.cursor = { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: customerCount };
+  var detailCursor = state.scan === 'detail' && typeof FbmSync.detailCursorRead === 'function' ? FbmSync.detailCursorRead() : null;
+  var detailPageIndex = detailCursor ? Number(detailCursor.pageIndex || 0) : -1;
+  var detailPageValue = detailCursor && Array.isArray(detailCursor.pageValue) ? detailCursor.pageValue : null;
+  state.cursor = { kind: 'customer_grid', type: detailPageIndex >= 0 ? 1 : 0, pageIndex: detailPageIndex, pageValue: detailPageValue, count: customerCount };
   state.phase = 'pull_customer'; state.entity = 'customer'; state.message = 'Dang doc khach hang tu FBM...';
   FbmSync.stateWrite(state);
   return FbmSync.customerGridRequest({ type: 0, count: customerCount, gridPageIndex: -1, gridRefresh: false });

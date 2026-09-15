@@ -4,6 +4,29 @@ FbmSync.BACKGROUND_SWITCH_KEY = 'FBM_SYNC_BACKGROUND_ENABLED';
 FbmSync.RELAY_HOP_LIMIT = 20;
 FbmSync.EXTENSION_CONFIG_KEY = 'FBM_SYNC_EXTENSION_CONFIG_V1';
 FbmSync.BACKGROUND_SCHEDULE_KEY = 'FBM_SYNC_BACKGROUND_SCHEDULE_V1';
+FbmSync.DETAIL_CURSOR_KEY = 'FBM_SYNC_DETAIL_CURSOR_V1';
+/** Cursor detail phải sống qua nhiều lượt scheduler, nhưng chỉ chứa khóa trang FBM, không chứa dữ liệu bản ghi. */
+FbmSync.detailCursorRead = function () {
+  try {
+    var raw = FbmSync.props().getProperty(FbmSync.DETAIL_CURSOR_KEY), parsed = raw ? JSON.parse(raw) : null;
+    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.pageValue) || parsed.pageValue.length < 3) { return null; }
+    var pageIndex = Number(parsed.pageIndex);
+    if (!isFinite(pageIndex) || pageIndex < 0) { return null; }
+    return { pageIndex: Math.floor(pageIndex), pageValue: parsed.pageValue.slice(0, 3).map(function (value) { return String(value === null || value === undefined ? '' : value); }) };
+  } catch (ignore) { return null; }
+};
+FbmSync.detailCursorWrite = function (cursor) {
+  var value = cursor || {}, pageIndex = Number(value.pageIndex), pageValue = Array.isArray(value.pageValue) ? value.pageValue.slice(0, 3) : [];
+  if (!isFinite(pageIndex) || pageIndex < 0 || pageValue.length < 3) { return null; }
+  var saved = { pageIndex: Math.floor(pageIndex), pageValue: pageValue.map(function (item) { return String(item === null || item === undefined ? '' : item); }) };
+  FbmSync.props().setProperty(FbmSync.DETAIL_CURSOR_KEY, JSON.stringify(saved));
+  return saved;
+};
+FbmSync.detailCursorClear = function () {
+  var props = FbmSync.props();
+  if (props && typeof props.deleteProperty === 'function') { props.deleteProperty(FbmSync.DETAIL_CURSOR_KEY); }
+  else if (props) { props.setProperty(FbmSync.DETAIL_CURSOR_KEY, ''); }
+};
 FbmSync.backgroundEnabled = function () { try { return FbmSync.props().getProperty(FbmSync.BACKGROUND_SWITCH_KEY) !== 'false'; } catch (err) { return true; } };
 FbmSync.setBackgroundEnabled = function (enabled) { var value = enabled === true; FbmSync.props().setProperty(FbmSync.BACKGROUND_SWITCH_KEY, value ? 'true' : 'false'); return { ok: true, enabled: value }; };
 FbmSync.extensionConfigDefault = function () { return { pollMinutes: 5, runOnStartup: true }; };
