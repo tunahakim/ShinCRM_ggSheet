@@ -8,7 +8,7 @@
 - `[ ]` là việc còn thiếu; mục không có nhãn **Cần kiểm chứng thực tế** là việc AI tự tiếp tục được.
 - Một slice chỉ đóng sau khi đủ code, test, log/báo cáo và checklist case của slice đó.
 - Sau khi đóng slice, ghi commit và revision GAS vào bảng bằng chứng cuối file.
-- Bộ kiểm offline gần nhất đạt `1396/1396`; các mục live vẫn được đánh dấu riêng và không được suy ra từ test offline.
+- Bộ kiểm offline gần nhất đạt `1449/1449`; các mục live vẫn được đánh dấu riêng và không được suy ra từ test offline.
 
 ## Nguồn hợp đồng
 
@@ -370,6 +370,7 @@ Các mục dưới đây là phần đang phải hoàn thiện trước khi báo
 - [x] Bổ sung `tests/cases/fbmSync/UserJourneys.js`: dựng Sidebar rồi phát click/change như người dùng cho năm màn hình, header, công tắc tổng, bốn loại đồng bộ, chấp thuận/dừng, liên kết/credential/login, cài đặt phiên, tab kết quả, phân trang, retry và conflict.
 - [x] Chuyển Sidebar sang vá component theo snapshot: chỉ dựng toàn thân lúc mở/đổi màn hình; Tổng quan, Tài khoản, Chạy đồng bộ, Kết quả và Cài đặt giữ node control/bản nháp khi snapshot GAS tới. Vùng log/lỗi/conflict chỉ thay component dữ liệu của chính nó. Hồi quy kiểm node/focus dropdown, mật khẩu, nhịp Extension, hàng tab và cập nhật progress tại chỗ; `node tests/run.js` đạt `1428/1428`.
 - [x] Bổ sung `StandaloneControl` như một Block độc lập cho input/select/toggle không thuộc DATA_SCHEMA; renderer có `renderControlValue`, `renderTargetState` và `renderReplaceChildren`. Sync shell, banner, menu, progress, preview và audit đều đi qua cây Block; không tạo HTML/DOM riêng cho callback trạng thái. `field.control` vẫn là khóa chọn renderer của trường dữ liệu, không phải component này.
+- [x] Rà soát component toàn Sidebar: Sync dùng lại `Box/Card/Row/Text/Button/Icon/Field` và lớp `.shin-*` chung; bổ sung `StandaloneField` cho control ngoài DATA_SCHEMA; thay toàn bộ hàng nút, field, notice, toggle, key/value, pagination, section, vùng khóa và loading tương tự bằng component/lớp của ShinCRM độc lập; xóa helper Sync bọc lại control không còn nơi gọi; dọn style Sync generic legacy khỏi `frame.html` và `fbmSyncShell.html`; thêm kiểm hợp đồng `tests/cases/fbmSync/Components.js` cùng hồi quy chi tiết lỗi Category/Activity/preflight/HTTP, bộ kiểm đạt `1449/1449`.
 - [x] Sửa lỗi loading giữ sổ node cũ: khi mở lại module, vùng nội dung hủy dấu màn trước và xóa target cũ; snapshot đầu tiên dựng lại Tổng quan thay vì vá vào node không còn trên DOM.
 - [x] Sửa bố cục hàng lịch nền bằng grid dùng chung; toggle, nhãn và ô chu kỳ có cột/gap ổn định, không dính vào nhau trên Sidebar hẹp.
 - [x] Đưa thông báo Cài đặt phiên về đúng card: relay, nhịp Extension, lịch nền/scheduler và chính sách tự đăng nhập có vùng thông báo riêng; bỏ mô tả và message chung ở đầu màn hình.

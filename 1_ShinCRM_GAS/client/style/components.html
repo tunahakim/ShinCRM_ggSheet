@@ -20,8 +20,77 @@
 
 .shin-box { display: block; }
 
+/* Khối xếp dọc dùng cho các màn hình có nhiều Card; module chỉ chọn nội dung, không tự định nghĩa layout mới. */
+.shin-section { display: flex; flex-direction: column; gap: var(--shin-gap-2); min-width: 0; padding: var(--shin-gap-1) 0 var(--shin-gap-4) var(--shin-scrollbar-size); }
+.shin-section > * { min-width: 0; }
+.shin-section > .shin-card { margin: 0; }
+
+/* Trạng thái khóa của một vùng thao tác. Control tổng nằm ngoài vùng nên không cần ngoại lệ theo id module. */
+.shin-content-disabled { opacity: .58; }
+.shin-content-disabled button,
+.shin-content-disabled select,
+.shin-content-disabled input,
+.shin-content-disabled textarea { pointer-events: none; }
+
+/* Trạng thái chờ dùng chung, không gắn với pipeline riêng của FBM. */
+.shin-loading { display: flex; align-items: center; justify-content: center; gap: var(--shin-gap-2); padding: var(--shin-gap-4) var(--shin-gap-2); color: var(--shin-text-soft); font-size: var(--shin-text-sm); text-align: center; white-space: nowrap; }
+.shin-loading::before { content: ''; width: 14px; height: 14px; border: 2px solid var(--shin-primary-soft); border-top-color: var(--shin-primary); border-radius: 50%; animation: shin-spin .8s linear infinite; }
+@keyframes shin-spin { to { transform: rotate(360deg); } }
+
 /* `align: "right"` đẩy chính nó và mọi thứ sau nó sang phải, ở bất cứ vùng nào chứ không riêng header. */
 .shin-align-right { margin-left: auto; }
+
+/* Ô nhập không thuộc DATA_SCHEMA, dùng chung cho các màn hình có trạng thái riêng. */
+.shin-form-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: var(--shin-gap-2); }
+.shin-form-label { color: var(--shin-text-soft); font-size: var(--shin-text-xs); }
+
+/* Hàng bật/tắt dùng cho cấu hình và các màn hình trạng thái. */
+.shin-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: var(--shin-gap-2); margin: var(--shin-gap-2) 0; }
+.shin-toggle-copy { flex: 1 1 auto; min-width: 0; color: var(--shin-text); font-size: var(--shin-text-sm); }
+.shin-toggle-control {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 42px;
+  align-items: center;
+  justify-content: flex-start;
+  width: 42px;
+  height: 21px;
+  padding: 2px;
+  border: 1px solid var(--shin-border-strong);
+  border-radius: 999px;
+  background: var(--shin-border-strong);
+  color: var(--shin-bg);
+  cursor: pointer;
+  font: 700 8px/1 var(--shin-font);
+  transition: background .18s ease, border-color .18s ease;
+}
+.shin-toggle-control .shin-toggle-label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: flex-end; padding-right: 4px; letter-spacing: .02em; }
+.shin-toggle-control .shin-toggle-knob { position: absolute; top: 2px; left: 2px; width: 15px; height: 15px; border-radius: 50%; background: var(--shin-bg); box-shadow: 0 1px 2px rgba(60,64,67,.25); transition: transform .18s ease; }
+.shin-toggle-control.is-on { border-color: var(--shin-ok); background: var(--shin-ok); justify-content: flex-end; }
+.shin-toggle-control.is-on .shin-toggle-label { justify-content: flex-start; padding-left: 4px; padding-right: 0; }
+.shin-toggle-control.is-on .shin-toggle-knob { transform: translateX(21px); }
+.shin-toggle-control.is-off { border-color: var(--shin-border-strong); background: var(--shin-border-strong); }
+.shin-toggle-control:disabled { opacity: .55; cursor: progress; }
+
+/* Các thông báo ngắn đều là một dạng khối trạng thái, không thuộc riêng một module. */
+.shin-notice { margin-top: var(--shin-gap-2); padding: var(--shin-gap-2); border-left: 3px solid var(--shin-primary); background: var(--shin-primary-soft); color: var(--shin-primary-dark); font-size: var(--shin-text-sm); }
+.shin-notice-info, .shin-notice-pending { border-left-color: var(--shin-primary); background: var(--shin-primary-soft); color: var(--shin-primary-dark); }
+.shin-notice-success { border-left-color: var(--shin-ok); background: var(--shin-ok-soft); color: var(--shin-ok); }
+.shin-notice-warning { border-left-color: var(--shin-warn); background: var(--shin-warn-soft); color: var(--shin-warn); }
+.shin-notice-error { border-left-color: var(--shin-error); background: var(--shin-error-soft); color: var(--shin-error); }
+.shin-muted { color: var(--shin-text-soft); font-size: var(--shin-text-sm); }
+.shin-preview-row { margin-top: 3px; font-size: var(--shin-text-sm); overflow-wrap: anywhere; }
+.shin-error-message { margin-top: var(--shin-gap-2); color: var(--shin-error); font-size: var(--shin-text-sm); }
+.shin-pass-row { margin-top: var(--shin-gap-1); color: var(--shin-ok); font-size: var(--shin-text-sm); }
+.shin-action-status { margin-top: var(--shin-gap-2); color: var(--shin-primary-dark); font-size: var(--shin-text-sm); }
+.shin-empty-state { padding: var(--shin-gap-3) 0; color: var(--shin-text-soft); font-size: var(--shin-text-sm); }
+.shin-kv-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--shin-gap-2); padding: var(--shin-gap-2) 0; border-bottom: 1px solid var(--shin-border-faint); }
+.shin-kv-row:last-of-type { border-bottom: 0; }
+.shin-kv-label { color: var(--shin-text-soft); font-size: var(--shin-text-sm); }
+.shin-kv-value { color: var(--shin-text); font-size: var(--shin-text-sm); font-weight: 700; text-align: right; overflow-wrap: anywhere; }
+.shin-pagination { margin-top: var(--shin-gap-2); }
+.shin-pagination .shin-button { width: 100%; min-height: 32px; padding: var(--shin-gap-1) var(--shin-gap-2); }
+.shin-pagination .shin-button:disabled { border-color: var(--shin-border-strong); background: var(--shin-bg-sunken); color: var(--shin-text-soft); cursor: not-allowed; opacity: 1; }
 
 /* Tiêu đề trong thanh header dùng chung cho màn form và shell Đồng bộ. Chỉ màu sắc là do từng màn chọn. */
 .shin-header-title {
@@ -461,7 +530,8 @@
 
 .shin-button:focus-visible,
 .shin-icon:focus-visible,
-.shin-field-edit:focus-visible { outline: 2px solid var(--shin-primary); outline-offset: 1px; }
+.shin-field-edit:focus-visible,
+.shin-toggle-control:focus-visible { outline: 2px solid var(--shin-primary); outline-offset: 1px; }
 
 .shin-text { min-width: 0; overflow-wrap: break-word; }
 

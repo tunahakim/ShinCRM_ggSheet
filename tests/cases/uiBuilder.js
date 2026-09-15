@@ -34,6 +34,11 @@ function chay(so) {
 
   check(so, 'Row nhận thẳng mảng con', hop.Row([hop.Text('a')]).elements.length, 1);
 
+  const standAloneField = hop.StandaloneField('Mật khẩu', { id: 'password', kind: 'input', inputType: 'password' });
+  check(so, 'StandaloneField dùng Block chung để ghép nhãn và ô trạng thái',
+    [standAloneField.role, standAloneField.className, standAloneField.elements[0].role, standAloneField.elements[1].role, standAloneField.elements[1].kind],
+    ['box', 'shin-form-field', 'text', 'standaloneControl', 'input']);
+
   // Đây là luật "không có khóa `style` tự do" của tài liệu 04 Phần 4, và nó chỉ có thật khi khóa lạ bị chặn.
   checkThrows(so, 'khóa `style` tự do bị chặn',
     () => hop.Block({ style: 'color:red' }), 'không có khóa "style"');

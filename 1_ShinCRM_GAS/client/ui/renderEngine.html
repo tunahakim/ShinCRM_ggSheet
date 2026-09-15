@@ -378,7 +378,7 @@ function renderStandaloneControlInner(node) {
   }
   if (kind === 'toggle') {
     return '<button type="button"' + renderAttr('class', 'shin-toggle-control' + (className ? ' ' + className : '')) + common + renderAttr('aria-pressed', node.pressed ? 'true' : 'false') + '>'
-      + '<span class="shin-toggle-label shin-sync-toggle-label shin-sync-switch-label">' + (node.pressed ? 'ON' : 'OFF') + '</span><span class="shin-sync-toggle-knob shin-sync-switch-knob"></span></button>';
+      + '<span class="shin-toggle-label">' + (node.pressed ? 'ON' : 'OFF') + '</span><span class="shin-toggle-knob"></span></button>';
   }
   throw new Error('StandaloneControl có `kind` không hợp lệ: "' + kind + '".');
 }

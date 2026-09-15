@@ -13,10 +13,9 @@ function fbmSyncResultsBodyBlocks(status) {
   if (tab === 'log') { return fbmSyncResultPageBlocks(status, 'log'); }
   return fbmSyncStatusBlocks(status, status.counts || {}).concat(fbmSyncRecordIssueBlocks(status.metadata || {}));
 }
-function fbmSyncRenderResultsBody(panel, status) { return fbmSyncAppendBox(panel, '', 'fbm-sync-results-body-region', fbmSyncResultsBodyBlocks(status)); }
 function fbmSyncRenderResults(panel, status) {
   status = status || {};
-  return fbmSyncAppendBox(panel, 'shin-sync-section', 'fbm-sync-results-root', [Box({ className: 'shin-sync-tab-row', id: 'fbm-sync-results-tabs-region', elements: fbmSyncResultsTabBlocks() }), Box({ className: 'shin-sync-results-body', id: 'fbm-sync-results-body-region', elements: fbmSyncResultsBodyBlocks(status) })]);
+  return fbmSyncAppendBox(panel, 'shin-section', 'fbm-sync-results-root', [Box({ className: 'shin-sync-tab-row', id: 'fbm-sync-results-tabs-region', elements: fbmSyncResultsTabBlocks() }), Box({ id: 'fbm-sync-results-body-region', elements: fbmSyncResultsBodyBlocks(status) })]);
 }
 function fbmSyncResultsSignature(status) {
   var metadata = status && status.metadata || {}, tab = FBM_SYNC_CLIENT.resultsTab || 'summary';
@@ -34,7 +33,7 @@ function fbmSyncResultPageBlocks(status, kind) {
     (metadata.categoryBlocks || []).forEach(function (item) { rows.push('Category · ' + String(item.reason || item.code || '')); });
   } else { rows = (metadata.traceTail || []).map(function (item) { return String(item.stage || item.action || 'Log') + ' · ' + String(item.operation || item.reason || ''); }); }
   var page = Number(FBM_SYNC_CLIENT.resultPages && FBM_SYNC_CLIENT.resultPages[kind] || 0), size = 20, totalPages = Math.max(1, Math.ceil(rows.length / size)), current = Math.min(page, totalPages - 1);
-  return [Card({ title: kind === 'errors' ? 'Lỗi phiên' : 'Log phiên', elements: [Text({ className: 'shin-sync-muted', text: 'Trang ' + (current + 1) + '/' + totalPages + ' · tối đa 20 dòng mỗi trang.' })].concat(rows.slice(current * size, current * size + size).map(function (row) { return Text({ className: 'shin-sync-preview-row', text: row }); }), [Box({ className: 'shin-sync-form-actions shin-sync-pagination', elements: [Button({ label: 'Trang trước', disabled: page <= 0, data: { 'sync-page': kind + ':-1' } }), Button({ label: 'Trang sau', disabled: page >= totalPages - 1, data: { 'sync-page': kind + ':1' } })] })]) })];
+  return [Card({ title: kind === 'errors' ? 'Lỗi phiên' : 'Log phiên', elements: [Text({ className: 'shin-muted', text: 'Trang ' + (current + 1) + '/' + totalPages + ' · tối đa 20 dòng mỗi trang.' })].concat(rows.slice(current * size, current * size + size).map(function (row) { return Text({ className: 'shin-preview-row', text: row }); }), [Row({ className: 'shin-pagination', elements: [Button({ label: 'Trang trước', disabled: page <= 0, data: { 'sync-page': kind + ':-1' } }), Button({ label: 'Trang sau', disabled: page >= totalPages - 1, data: { 'sync-page': kind + ':1' } })] })]) })];
 }
 function fbmSyncPatchResults(panel, status) {
   if (!panel || !RENDER_INDEX.nodes['fbm-sync-results-root']) { return false; }
@@ -43,5 +42,4 @@ function fbmSyncPatchResults(panel, status) {
   fbmSyncRenderTarget('fbm-sync-results-body-region', fbmSyncResultsBodyBlocks(status));
   return true;
 }
-function fbmSyncRenderResultPage(panel, status, kind) { return fbmSyncAppendBox(panel, '', 'fbm-sync-result-page-region', fbmSyncResultPageBlocks(status, kind)); }
 </script>

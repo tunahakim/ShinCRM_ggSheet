@@ -4,18 +4,18 @@ function fbmSyncAuditContentBlocks(status) {
   var customers = Array.isArray(preview.customers) ? preview.customers : [], activities = Array.isArray(preview.activities) ? preview.activities : [];
   var blocks = [];
   if (customers.length || activities.length) {
-    blocks.push(Card({ title: 'Bản ghi đã đọc', elements: customers.slice(0, 10).map(function (item) { return Text({ className: 'shin-sync-preview-row', text: 'Khách: ' + String(item.code || '') + ' · ' + String(item.name || '') }); }).concat(activities.slice(0, 10).map(function (item) { return Text({ className: 'shin-sync-preview-row', text: 'Giao dịch: ' + String(item.date || '') + ' · ' + String(item.type || '') + ' · ' + String(item.content || '') }); }), preview.truncated ? [Text({ className: 'shin-sync-muted', text: 'Bản xem trước đã giới hạn số dòng.' })] : []) }));
+    blocks.push(Card({ title: 'Bản ghi đã đọc', elements: customers.slice(0, 10).map(function (item) { return Text({ className: 'shin-preview-row', text: 'Khách: ' + String(item.code || '') + ' · ' + String(item.name || '') }); }).concat(activities.slice(0, 10).map(function (item) { return Text({ className: 'shin-preview-row', text: 'Giao dịch: ' + String(item.date || '') + ' · ' + String(item.type || '') + ' · ' + String(item.content || '') }); }), preview.truncated ? [Text({ className: 'shin-muted', text: 'Bản xem trước đã giới hạn số dòng.' })] : []) }));
   }
   if (Array.isArray(audit.cases) && audit.cases.length) {
-    blocks.push(Card({ title: 'Nghiệm thu phạm vi thử', elements: audit.cases.map(function (item) { return Text({ className: item.status === 'PASS' ? 'shin-sync-pass-row' : 'shin-sync-error-message', text: (item.status === 'PASS' ? '✓ ' : '✕ ') + String(item.name || '') + (item.detail ? ' · ' + String(item.detail) : '') }); }) }));
+    blocks.push(Card({ title: 'Nghiệm thu phạm vi thử', elements: audit.cases.map(function (item) { return Text({ className: item.status === 'PASS' ? 'shin-pass-row' : 'shin-error-message', text: (item.status === 'PASS' ? '✓ ' : '✕ ') + String(item.name || '') + (item.detail ? ' · ' + String(item.detail) : '') }); }) }));
   }
   return blocks.concat(fbmSyncRecordIssueBlocks(metadata));
 }
 
 function fbmSyncConflictContentBlocks(status) {
   var metadata = status.metadata || {}, conflicts = Array.isArray(metadata.conflicts) ? metadata.conflicts : [], item = conflicts[0];
-  var head = Box({ className: 'shin-sync-conflict-head', elements: [Text({ className: 'shin-sync-conflict-count', text: Number(metadata.conflictCount || conflicts.length) + ' xung đột còn lại' }), Button({ id: 'fbm-sync-conflict-back', label: 'Quay lại kết quả' })] });
-  if (!item) { return [Card({ title: 'Xử lý xung đột', className: 'shin-sync-conflict-screen', elements: [head, Text({ className: 'shin-sync-empty-state', text: 'Không có xung đột cần xử lý.' })] })]; }
+  var head = Row({ className: 'shin-sync-conflict-head', elements: [Text({ className: 'shin-sync-conflict-count', text: Number(metadata.conflictCount || conflicts.length) + ' xung đột còn lại' }), Button({ id: 'fbm-sync-conflict-back', label: 'Quay lại kết quả' })] });
+  if (!item) { return [Card({ title: 'Xử lý xung đột', elements: [head, Text({ className: 'shin-empty-state', text: 'Không có xung đột cần xử lý.' })] })]; }
   FBM_SYNC_CLIENT.conflictChoices = FBM_SYNC_CLIENT.conflictChoices || {};
   var fields = (item.fields || []).map(function (field, index) {
     var name = String(field.field || ''), choice = FBM_SYNC_CLIENT.conflictChoices[name] || 'shin', controlId = 'fbm-sync-conflict-choice-' + index;
@@ -23,10 +23,8 @@ function fbmSyncConflictContentBlocks(status) {
   elements.push(StandaloneControl({ id: 'fbm-sync-conflict-manual-' + index, kind: 'input', inputType: 'text', value: (FBM_SYNC_CLIENT.conflictDraft || {})[name] || '', placeholder: 'Giá trị kết hợp', hidden: choice !== 'manual', data: { 'fbm-conflict-manual': name }, ariaLabel: 'Giá trị kết hợp cho ' + name }));
     return Box({ className: 'shin-sync-conflict-field', elements: elements });
   });
-  var actions = Box({ className: 'shin-sync-form-actions', elements: [Button({ label: 'Giữ toàn bộ ShinCRM', data: { 'fbm-conflict-choice': 'shin', 'fbm-conflict-entity': String(item.entity || ''), 'fbm-conflict-id': String(item.id || '') } }), Button({ label: 'Giữ toàn bộ FBM', data: { 'fbm-conflict-choice': 'fbm', 'fbm-conflict-entity': String(item.entity || ''), 'fbm-conflict-id': String(item.id || '') } }), Button({ label: 'Lưu lựa chọn từng trường', className: 'shin-primary', data: { 'fbm-conflict-merge': true, 'fbm-conflict-entity': String(item.entity || ''), 'fbm-conflict-id': String(item.id || '') } })] });
-  return [Card({ title: 'Xử lý xung đột', className: 'shin-sync-conflict-screen', elements: [head, Text({ className: 'shin-sync-conflict-meta', text: String(item.entity || '') + ' · ' + String(item.id || '') + (item.fbmId ? ' · FBM ' + String(item.fbmId) : '') })].concat(fields, [actions]) })];
+  var actions = Row([Button({ label: 'Giữ toàn bộ ShinCRM', data: { 'fbm-conflict-choice': 'shin', 'fbm-conflict-entity': String(item.entity || ''), 'fbm-conflict-id': String(item.id || '') } }), Button({ label: 'Giữ toàn bộ FBM', data: { 'fbm-conflict-choice': 'fbm', 'fbm-conflict-entity': String(item.entity || ''), 'fbm-conflict-id': String(item.id || '') } }), Button({ label: 'Lưu lựa chọn từng trường', className: 'shin-primary', data: { 'fbm-conflict-merge': true, 'fbm-conflict-entity': String(item.entity || ''), 'fbm-conflict-id': String(item.id || '') } })]);
+  return [Card({ title: 'Xử lý xung đột', elements: [head, Text({ className: 'shin-sync-conflict-meta', text: String(item.entity || '') + ' · ' + String(item.id || '') + (item.fbmId ? ' · FBM ' + String(item.fbmId) : '') })].concat(fields, [actions]) })];
 }
 
-function fbmSyncPaintAuditBlocks(panel, status) { return fbmSyncAppendBox(panel, '', 'fbm-sync-audit-region', fbmSyncAuditContentBlocks(status)); }
-function fbmSyncPaintConflictScreen(panel, status) { return fbmSyncAppendBox(panel, '', 'fbm-sync-conflict-region', fbmSyncConflictContentBlocks(status)); }
 </script>

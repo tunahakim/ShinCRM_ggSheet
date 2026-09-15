@@ -48,42 +48,6 @@ function taoBoTest() {
     box.classList = { add: (name) => { box.className = (box.className + ' ' + name).trim(); } };
     return parent.appendChild(box);
   };
-  hop.fbmSyncAppendText = (parent, text, className) => {
-    const node = dom.document.createElement('span'); node.className = className || ''; node.textContent = String(text || ''); return parent.appendChild(node);
-  };
-  hop.fbmSyncAppendCard = (parent, title, className) => {
-    const card = hop.fbmSyncAppendBox(parent, ('shin-card ' + (className || '')).trim());
-    hop.fbmSyncAppendText(card, title, 'shin-card-title');
-    hop.fbmSyncAppendBox(card, 'shin-card-body');
-    return card;
-  };
-  hop.fbmSyncAppendButton = (parent, id, label, primary) => {
-    const button = dom.document.createElement('button'); button.id = id || ''; button.textContent = label || ''; button.disabled = false;
-    if (primary) { button.classList.add('shin-primary'); }
-    return parent.appendChild(button);
-  };
-  hop.fbmSyncAppendInput = (parent, id, type, value, placeholder) => {
-    const input = dom.document.createElement('input'); input.id = id || ''; input.type = type || 'text'; input.value = value || ''; input.placeholder = placeholder || ''; return parent.appendChild(input);
-  };
-  hop.fbmSyncAppendSelect = (parent, id, options, value) => {
-    const select = dom.document.createElement('select'); select.id = id || ''; select.value = value;
-    (options || []).forEach((item) => { const option = dom.document.createElement('option'); option.value = item.value; option.textContent = item.label; select.appendChild(option); });
-    return parent.appendChild(select);
-  };
-  hop.fbmSyncMakeToggleButton = (id, enabled, label) => {
-    const button = dom.document.createElement('button'); button.id = id; button.className = enabled ? 'shin-sync-toggle is-on' : 'shin-sync-toggle is-off'; button.setAttribute('aria-pressed', enabled ? 'true' : 'false'); button.setAttribute('aria-label', label); return button;
-  };
-  // Tương đương helper UI của module: harness nạp riêng các màn để kiểm DOM nhỏ,
-  // nên cài các primitive patch tại đây thay vì biến test thành bản sao renderer.
-  hop.fbmSyncFind = (root, selector) => root && root.querySelector ? root.querySelector(selector) : null;
-  hop.fbmSyncSetHidden = (root, selector, hidden) => { const node = hop.fbmSyncFind(root, selector); if (!node) return false; node.hidden = !!hidden; return true; };
-  hop.fbmSyncSetToggle = (button, enabled) => {
-    if (!button) return false;
-    button.classList.toggle('is-on', !!enabled); button.classList.toggle('is-off', !enabled); button.setAttribute('aria-pressed', enabled ? 'true' : 'false');
-    const label = button.querySelector('.shin-sync-toggle-label'); if (label) label.textContent = enabled ? 'ON' : 'OFF';
-    return true;
-  };
-  hop.fbmSyncReplaceRegion = (region, renderRegion) => { if (!region) return false; region.textContent = ''; renderRegion(region); return true; };
   hop.fbmSyncPaintError = null;
   napClient(hop,
     'client/ui/icons.html', 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html', 'client/ui/renderEngine.html', 'client/sync/fbmSyncUiSchema.html',
@@ -130,7 +94,7 @@ async function chay(so) {
   hop.FBM_SYNC_CLIENT.subscreen = 'overview';
   hop.fbmSyncRenderLoading();
   check(so, 'loading xóa dấu màn cũ để snapshot đầu tiên dựng lại Tổng quan', [content.getAttribute('data-fbm-sync-screen'), !!hop.RENDER_INDEX.nodes['fbm-sync-overview-root']], [null, false]);
-  check(so, 'loading chỉ có một dòng và gộp đúng tên module', [content.querySelectorAll('.shin-sync-section-title').length, content.querySelector('.shin-sync-loading').textContent], [0, 'Đang tải trạng thái phiên đồng bộ FBM']);
+  check(so, 'loading chỉ có một dòng và gộp đúng tên module', [content.querySelectorAll('.shin-section-title').length, content.querySelector('.shin-loading').textContent], [0, 'Đang tải trạng thái phiên đồng bộ FBM']);
   hop.fbmSyncPaint(Object.assign({}, idle, { label: 'Tổng quan sau loading' }));
   check(so, 'Tổng quan dựng lại được sau loading mà không dùng node cũ', [content.getAttribute('data-fbm-sync-screen'), content.textContent.indexOf('Tổng quan sau loading') >= 0], ['overview', true]);
   check(so, 'Run render không hiện pipeline khi chưa chạy', render(hop, content, hop.fbmSyncRenderRun, idle).querySelector('.shin-sync-pipeline'), null);
@@ -159,6 +123,9 @@ async function chay(so) {
   check(so, 'Account dùng ô mật khẩu và không có giá trị lưu sẵn', [dom.document.getElementById('fbm-login-password').type, dom.document.getElementById('fbm-login-password').value], ['password', '']);
   const loginActionRow = hop.fbmSyncLoginActionBlocks()[0];
   check(so, 'Hai nút đăng nhập dùng Row chung để chia đều hai cột', [loginActionRow.role, loginActionRow.elements.length, loginActionRow.elements[0].role, loginActionRow.elements[1].role], ['row', 2, 'button', 'button']);
+  const identityBlock = hop.fbmSyncIdentityBlock(idle);
+  const identityActions = identityBlock.elements.filter((node) => node && node.id === 'fbm-sync-identity-actions-region')[0];
+  check(so, 'Ba nút liên kết tài khoản dùng Row chung thay vì layout riêng của Sync', [identityActions.elements.length, identityActions.elements[0].role, identityActions.elements[0].elements.length], [1, 'row', 3]);
 
   hop.FBM_SYNC_CLIENT.identityLastAction = 'probe';
   hop.fbmSyncApplyIdentityProbeDraft({ metadata: { identityProbe: { spreadsheetId: 'sheet-probe', userId: '2037', username: 'anhlt', accountName: 'ANHLT' } } });
@@ -234,6 +201,17 @@ async function chay(so) {
   hop.FBM_SYNC_CLIENT.resultsTab = 'errors';
   render(hop, content, hop.fbmSyncRenderResults, { phase: 'error', metadata: { pushFailureDetails: { 'customer:C1': { reason: 'FBM lỗi' } } }, counts: {} });
   check(so, 'Results Lỗi hiển thị chi tiết bản ghi lỗi', content.textContent.indexOf('customer:C1') >= 0, true);
+  hop.FBM_SYNC_CLIENT.resultsTab = 'summary';
+  const issueResult = render(hop, content, hop.fbmSyncRenderResults, { phase: 'error', metadata: {
+    preflightIssues: [{ blocking: true, code: 'PREFLIGHT_X', message: 'Thiếu liên kết' }],
+    categoryBlocks: [{ source: 'Customer', code: 'CAT_MISSING', reason: 'Thiếu mapping' }],
+    activityBulkMissing: [{ id: 'ACT-1', fbmId: 'F-1' }],
+    pushFailures: { 'customer:C1': true },
+    pushFailureDetails: { 'customer:C1': { reason: 'FBM lỗi', code: 'HTTP_ERROR', status: 500 } }
+  }, counts: {} });
+  check(so, 'Results Tổng hợp hiển thị đầy đủ Category, Activity missing, preflight và HTTP', [issueResult.textContent.indexOf('CAT_MISSING') >= 0, issueResult.textContent.indexOf('ACT-1') >= 0, issueResult.textContent.indexOf('PREFLIGHT_X') >= 0, issueResult.textContent.indexOf('HTTP 500') >= 0], [true, true, true, true]);
+  const preflightOnly = render(hop, content, hop.fbmSyncRenderResults, { phase: 'error', metadata: { preflightIssues: [{ blocking: false, code: 'WARN_ONLY', message: 'Cảnh báo' }] }, counts: {} });
+  check(so, 'Results không hiện tiêu đề chi tiết bản ghi khi chỉ có cảnh báo preflight', preflightOnly.textContent.indexOf('Chi tiết bản ghi') >= 0, false);
 
   hop.FBM_SYNC_CLIENT.syncSettings = { accountName: 'A', approvalThreshold: 10 };
   render(hop, content, hop.fbmSyncRenderSettings, idle);

@@ -2,17 +2,18 @@
 function fbmSyncAccountNoticeBlocks(scope) {
   var notice = (FBM_SYNC_CLIENT.accountNotices || {})[scope], message = notice && notice.message;
   var noticeClass = { pending: 'is-pending', success: 'is-success', warning: 'is-warning', error: 'is-error' }[notice && notice.kind] || 'is-pending';
-  return message ? [Text({ className: 'shin-sync-action-notice ' + noticeClass, text: String(message) })] : [];
+  var noticeClasses = { 'is-pending': 'shin-notice shin-notice-pending', 'is-success': 'shin-notice shin-notice-success', 'is-warning': 'shin-notice shin-notice-warning', 'is-error': 'shin-notice shin-notice-error' };
+  return message ? [Text({ className: noticeClasses[noticeClass] || 'shin-notice shin-notice-pending', text: String(message) })] : [];
 }
 function fbmSyncIdentitySummaryBlocks() {
   var identity = FBM_SYNC_CLIENT.identityStatus || {}, binding = identity.binding || {};
   var message = identity.status === 'BOUND' ? 'Spreadsheet này đã được xác nhận với tài khoản FBM.' : identity.status === 'REBIND_REQUIRED' ? 'Spreadsheet chưa khớp tài khoản FBM đã lưu. Cần kiểm tra lại trước khi chạy bất kỳ chiều đồng bộ nào.' : 'Chưa có liên kết tài khoản FBM cố định.';
-  return [Text({ className: identity.status === 'REBIND_REQUIRED' ? 'shin-sync-warning' : 'shin-sync-preview-row', text: message }), binding.accountName ? Text({ className: 'shin-sync-preview-row', text: 'Tài khoản đã lưu: ' + String(binding.accountName) }) : null].filter(function (node) { return !!node; });
+  return [Text({ className: identity.status === 'REBIND_REQUIRED' ? 'shin-notice shin-notice-warning' : 'shin-preview-row', text: message }), binding.accountName ? Text({ className: 'shin-preview-row', text: 'Tài khoản đã lưu: ' + String(binding.accountName) }) : null].filter(function (node) { return !!node; });
 }
 function fbmSyncIdentityFormBlocks() {
   var identity = FBM_SYNC_CLIENT.identityStatus || {}, binding = identity.binding || {}, draft = FBM_SYNC_CLIENT.identityDraft || {};
   return [['spreadsheet', 'Spreadsheet ID', draft.spreadsheetId || binding.spreadsheetId, 'ID của file ShinCRM'], ['user', 'Mã số user FBM', draft.userId || binding.userId, 'Mã số nội bộ của user'], ['username', 'Tên đăng nhập FBM', draft.username || binding.username, 'Tên dùng để đăng nhập'], ['account', 'Tên đầy đủ', draft.accountName || binding.accountName, 'Tên người dùng trên FBM']].map(function (item) {
-    return Box({ className: 'shin-sync-form-field', elements: [Text({ className: 'shin-sync-form-label', text: item[1] }), StandaloneControl({ id: 'fbm-identity-' + item[0], kind: 'input', inputType: 'text', value: item[2] || '', placeholder: item[3], ariaLabel: item[1] })] });
+    return StandaloneField(item[1], { id: 'fbm-identity-' + item[0], kind: 'input', inputType: 'text', value: item[2] || '', placeholder: item[3], ariaLabel: item[1] });
   });
 }
 function fbmSyncIdentityActionBlocks() {
@@ -23,16 +24,16 @@ function fbmSyncIdentityResultBlocks(status) {
   var blocks = [], probeResult = status && status.metadata && status.metadata.identityProbe, result = status && status.metadata && status.metadata.identityCheck;
   if (probeResult && FBM_SYNC_CLIENT.identityLastAction === 'probe') {
     var complete = !!(probeResult.spreadsheetId && probeResult.userId && probeResult.username && probeResult.accountName);
-    blocks.push(Card({ title: 'Thông tin đọc từ tab FBM (chưa lưu)', elements: [Text({ className: 'shin-sync-preview-row', text: 'Spreadsheet: ' + String(probeResult.spreadsheetId || '(không có)') }), Text({ className: 'shin-sync-preview-row', text: 'Mã số user: ' + String(probeResult.userId || '(không có)') }), Text({ className: 'shin-sync-preview-row', text: 'Tên đăng nhập: ' + String(probeResult.username || '(không có)') }), Text({ className: 'shin-sync-preview-row', text: 'Tên đầy đủ: ' + String(probeResult.accountName || '(không có)') }), Text({ className: complete ? 'shin-sync-pass-row' : 'shin-sync-error-message', text: complete ? 'Đã điền đủ thông tin. Bấm Lưu thông tin để lưu liên kết.' : 'Không đọc đủ nhận diện từ tab FBM; hãy nhập tay rồi bấm Lưu thông tin.' })] }));
+    blocks.push(Card({ title: 'Thông tin đọc từ tab FBM (chưa lưu)', elements: [Text({ className: 'shin-preview-row', text: 'Spreadsheet: ' + String(probeResult.spreadsheetId || '(không có)') }), Text({ className: 'shin-preview-row', text: 'Mã số user: ' + String(probeResult.userId || '(không có)') }), Text({ className: 'shin-preview-row', text: 'Tên đăng nhập: ' + String(probeResult.username || '(không có)') }), Text({ className: 'shin-preview-row', text: 'Tên đầy đủ: ' + String(probeResult.accountName || '(không có)') }), Text({ className: complete ? 'shin-pass-row' : 'shin-error-message', text: complete ? 'Đã điền đủ thông tin. Bấm Lưu thông tin để lưu liên kết.' : 'Không đọc đủ nhận diện từ tab FBM; hãy nhập tay rồi bấm Lưu thông tin.' })] }));
   }
   if (result && FBM_SYNC_CLIENT.identityLastAction === 'check' && (status.phase === 'done' || result.missing !== undefined)) {
-    blocks.push(Card({ title: 'Kiểm tra liên kết hoàn tất', elements: [Text({ className: 'shin-sync-preview-row', text: 'Customer hợp lệ: ' + Number(result.matched || 0) + '/' + Number(result.total || 0) + (Number(result.missing || 0) ? ' · không tìm thấy: ' + Number(result.missing || 0) : '') })].concat((result.missingSample || []).slice(0, 5).map(function (item) { return Text({ className: 'shin-sync-preview-row', text: 'Chưa thấy FBM ID ' + String(item.fbmId || '') + ' · ' + String(item.code || item.id || '') }); })) }));
+    blocks.push(Card({ title: 'Kiểm tra liên kết hoàn tất', elements: [Text({ className: 'shin-preview-row', text: 'Customer hợp lệ: ' + Number(result.matched || 0) + '/' + Number(result.total || 0) + (Number(result.missing || 0) ? ' · không tìm thấy: ' + Number(result.missing || 0) : '') })].concat((result.missingSample || []).slice(0, 5).map(function (item) { return Text({ className: 'shin-preview-row', text: 'Chưa thấy FBM ID ' + String(item.fbmId || '') + ' · ' + String(item.code || item.id || '') }); })) }));
   }
   return blocks;
 }
 function fbmSyncIdentityBlock(status) {
   var active = !!FBM_SYNC_CLIENT.running;
-  return Card({ title: 'Liên kết tài khoản', elements: [Box({ id: 'fbm-sync-identity-summary-region', elements: fbmSyncIdentitySummaryBlocks() }), Box({ className: 'shin-sync-identity-form', id: 'fbm-sync-identity-form-region', elements: fbmSyncIdentityFormBlocks() }), Box({ className: 'shin-sync-identity-actions', id: 'fbm-sync-identity-actions-region', elements: fbmSyncIdentityActionBlocks() }), Box({ id: 'fbm-sync-identity-action-status-region', elements: FBM_SYNC_CLIENT.identityAction ? [Text({ className: 'shin-sync-action-status', text: FBM_SYNC_CLIENT.identityAction === 'check' ? 'Đang đối chiếu các Customer đã có FBM_ID với file hiện tại.' : 'Đang đọc thông tin tài khoản từ tab FBM đang mở.' })] : [] }), Box({ id: 'fbm-sync-identity-notice-region', elements: fbmSyncAccountNoticeBlocks('identity') }), Box({ id: 'fbm-sync-identity-result-region', elements: fbmSyncIdentityResultBlocks(status) })] });
+  return Card({ title: 'Liên kết tài khoản', elements: [Box({ id: 'fbm-sync-identity-summary-region', elements: fbmSyncIdentitySummaryBlocks() }), Box({ id: 'fbm-sync-identity-form-region', elements: fbmSyncIdentityFormBlocks() }), Box({ id: 'fbm-sync-identity-actions-region', elements: [Row(fbmSyncIdentityActionBlocks())] }), Box({ id: 'fbm-sync-identity-action-status-region', elements: FBM_SYNC_CLIENT.identityAction ? [Text({ className: 'shin-action-status', text: FBM_SYNC_CLIENT.identityAction === 'check' ? 'Đang đối chiếu các Customer đã có FBM_ID với file hiện tại.' : 'Đang đọc thông tin tài khoản từ tab FBM đang mở.' })] : [] }), Box({ id: 'fbm-sync-identity-notice-region', elements: fbmSyncAccountNoticeBlocks('identity') }), Box({ id: 'fbm-sync-identity-result-region', elements: fbmSyncIdentityResultBlocks(status) })] });
 }
 function fbmSyncPaintIdentityBlock(panel, active, status) { return fbmSyncAppendBlock(panel, fbmSyncIdentityBlock(status)); }
 function fbmSyncPatchIdentityBlock(panel, active, status) {
@@ -40,8 +41,8 @@ function fbmSyncPatchIdentityBlock(panel, active, status) {
   fbmSyncRenderTarget('fbm-sync-identity-summary-region', fbmSyncIdentitySummaryBlocks());
   var form = document.getElementById('fbm-sync-identity-form-region');
   if (!fbmSyncInteractiveControlIsEditing(form)) { fbmSyncRenderTarget('fbm-sync-identity-form-region', fbmSyncIdentityFormBlocks()); }
-  fbmSyncRenderTarget('fbm-sync-identity-actions-region', fbmSyncIdentityActionBlocks());
-  fbmSyncRenderTarget('fbm-sync-identity-action-status-region', FBM_SYNC_CLIENT.identityAction ? [Text({ className: 'shin-sync-action-status', text: FBM_SYNC_CLIENT.identityAction === 'check' ? 'Đang đối chiếu các Customer đã có FBM_ID với file hiện tại.' : 'Đang đọc thông tin tài khoản từ tab FBM đang mở.' })] : []);
+  fbmSyncRenderTarget('fbm-sync-identity-actions-region', [Row(fbmSyncIdentityActionBlocks())]);
+  fbmSyncRenderTarget('fbm-sync-identity-action-status-region', FBM_SYNC_CLIENT.identityAction ? [Text({ className: 'shin-action-status', text: FBM_SYNC_CLIENT.identityAction === 'check' ? 'Đang đối chiếu các Customer đã có FBM_ID với file hiện tại.' : 'Đang đọc thông tin tài khoản từ tab FBM đang mở.' })] : []);
   fbmSyncRenderTarget('fbm-sync-identity-notice-region', fbmSyncAccountNoticeBlocks('identity'));
   fbmSyncRenderTarget('fbm-sync-identity-result-region', fbmSyncIdentityResultBlocks(status));
   return true;

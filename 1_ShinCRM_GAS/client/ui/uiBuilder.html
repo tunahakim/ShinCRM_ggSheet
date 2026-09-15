@@ -178,4 +178,17 @@ function Check(spec) { return Block(typeof spec === 'string' ? { pick: spec } : 
 
 /** Control độc lập cho giá trị giao diện không thuộc DATA_SCHEMA (input, select, công tắc). */
 function StandaloneControl(spec) { return Block(spec, 'standaloneControl'); }
+
+/* Ô trạng thái của màn hình (không thuộc DATA_SCHEMA) có nhãn dùng chung. */
+function StandaloneField(label, controlSpec, options) {
+  var o = options || {}, spec = controlSpec || {};
+  return Box({
+    id: o.id || null,
+    className: 'shin-form-field' + (o.className ? ' ' + o.className : ''),
+    elements: [
+      Text({ className: 'shin-form-label', text: String(label === undefined || label === null ? '' : label) }),
+      StandaloneControl(spec)
+    ]
+  });
+}
 </script>

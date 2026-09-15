@@ -18,16 +18,13 @@ function fbmSyncProgressBlocks(status, count) {
 }
 function fbmSyncStatusBlocks(status, count) {
   status = status || {}; count = count || {};
-  var fields = [['phase', 'shin-sync-phase'], ['operation', 'shin-sync-operation'], ['session', 'shin-sync-session'], ['count', 'shin-sync-count'], ['current', 'shin-sync-current'], ['message', status.phase === 'error' ? 'shin-sync-error-message' : 'shin-sync-message']];
+  var fields = [['phase', 'shin-sync-phase'], ['operation', 'shin-sync-operation'], ['session', 'shin-sync-session'], ['count', 'shin-sync-count'], ['current', 'shin-sync-current'], ['message', status.phase === 'error' ? 'shin-error-message' : 'shin-sync-message']];
   var elements = fields.map(function (item) {
     var value = fbmSyncLiveStatusValue(status, count, item[0]);
     return value ? Text({ className: item[1], text: value }) : null;
   }).filter(function (node) { return !!node; });
   elements.splice(4, 0, fbmSyncProgressBlocks(status, count));
-  return [Card({ title: 'Trạng thái phiên', className: 'shin-sync-status-card', elements: elements })];
-}
-function fbmSyncPaintStatusBlocks(panel, status, count, targetId) {
-  return fbmSyncAppendBox(panel, '', targetId || 'fbm-sync-live-status-region', fbmSyncStatusBlocks(status, count));
+  return [Card({ title: 'Trạng thái phiên', elements: elements })];
 }
 function fbmSyncPatchStatusBlocks(panel, status, targetId) {
   var id = targetId || 'fbm-sync-live-status-region';
@@ -46,14 +43,37 @@ function fbmSyncRecordIssueBlocks(metadata) {
   metadata = metadata || {};
   var conflicts = Array.isArray(metadata.conflicts) ? metadata.conflicts : [];
   var preflight = Array.isArray(metadata.preflightIssues) ? metadata.preflightIssues : [];
-  var failures = Object.keys(metadata.pushFailures || {});
+  var identityBlocks = Array.isArray(metadata.identityBlocks) ? metadata.identityBlocks : [];
+  var pushFailures = metadata.pushFailures || {};
+  var pushFailureDetails = metadata.pushFailureDetails || {};
+  var failures = Object.keys(pushFailures);
+  Object.keys(pushFailureDetails).forEach(function (key) { if (failures.indexOf(key) < 0) { failures.push(key); } });
   var categories = Array.isArray(metadata.categoryBlocks) ? metadata.categoryBlocks : [];
-  if (!preflight.length && !conflicts.length && !failures.length && !categories.length) { return []; }
+  var activityMissing = Array.isArray(metadata.activityBulkMissing) ? metadata.activityBulkMissing : [];
+  var hasRecordIssues = conflicts.length || identityBlocks.length || failures.length || categories.length || activityMissing.length;
+  var blocks = [];
+  if (preflight.length) {
+    blocks.push(Card({ title: 'Preflight', elements: preflight.slice(-30).map(function (item) {
+      var severity = item && item.blocking ? 'shin-error-message' : 'shin-preview-row';
+      return Text({ className: severity, text: (item && item.blocking ? 'Lỗi' : 'Cảnh báo') + ' [' + String(item && item.code || '') + '] ' + String(item && item.message || '') });
+    }) }));
+  }
+  if (!hasRecordIssues) { return blocks; }
   var elements = [];
-  if (preflight.length) { elements.push(Text({ className: 'shin-sync-error-message', text: 'Preflight có ' + preflight.length + ' vấn đề; mở tab Lỗi để xem chi tiết.' })); }
-  if (conflicts.length) { elements.push(Text({ className: 'shin-sync-preview-row', text: 'Có ' + Number(metadata.conflictCount || conflicts.length) + ' xung đột đang chờ quyết định.' }), Button({ id: 'fbm-sync-open-conflicts', label: 'Mở xử lý xung đột' })); }
-  if (failures.length) { elements.push(Text({ className: 'shin-sync-preview-row', text: 'Có ' + failures.length + ' bản ghi lỗi đẩy; mở tab Lỗi để tra từng mã.' })); }
-  if (categories.length) { elements.push(Text({ className: 'shin-sync-preview-row', text: 'Có ' + categories.length + ' bản ghi bị chặn do Category.' })); }
-  return [Card({ title: 'Cần xử lý', className: 'shin-sync-issues-card', elements: elements })];
+  if (conflicts.length) { elements.push(Text({ className: 'shin-preview-row', text: 'Có ' + Number(metadata.conflictCount || conflicts.length) + ' xung đột đang chờ quyết định.' }), Button({ id: 'fbm-sync-open-conflicts', label: 'Mở xử lý xung đột' })); }
+  identityBlocks.slice(-20).forEach(function (item) { elements.push(Text({ className: 'shin-preview-row', text: 'Chặn nhận diện Customer ' + String(item && item.fbmCustomerCode || '') + ' · ' + String(item && item.reason || '') })); });
+  if (failures.length) {
+    elements.push(Text({ className: 'shin-preview-row', text: 'Có ' + failures.length + ' bản ghi lỗi đẩy; mở tab Lỗi để tra từng mã.' }), Button({ label: 'Mở lại ' + failures.length + ' bản ghi lỗi', data: { 'fbm-push-retry-all': true } }));
+    failures.slice(-5).forEach(function (key) {
+      var detail = pushFailureDetails[key] || {}, suffix = detail.reason ? ' · ' + String(detail.reason) : '';
+      if (detail.code) { suffix += ' [' + String(detail.code) + (detail.status ? ' HTTP ' + String(detail.status) : '') + ']'; }
+      if (detail.requestKind) { suffix += ' · bước ' + String(detail.requestKind); }
+      elements.push(Text({ className: 'shin-preview-row', text: 'Lỗi đẩy ' + String(key) + suffix }));
+    });
+  }
+  categories.slice(-20).forEach(function (item) { elements.push(Text({ className: 'shin-preview-row', text: 'Chặn do Category ' + String(item && item.source || 'Category') + (item && item.code ? ' · ' + String(item.code) : '') + (item && item.reason ? ' · ' + String(item.reason) : '') })); });
+  activityMissing.slice(-20).forEach(function (item) { elements.push(Text({ className: 'shin-preview-row', text: 'Activity không thấy trong FBM ' + String(item && item.id || '') + (item && item.fbmId ? ' · FBM ' + String(item.fbmId) : '') })); });
+  blocks.push(Card({ title: 'Chi tiết bản ghi', elements: elements }));
+  return blocks;
 }
 </script>

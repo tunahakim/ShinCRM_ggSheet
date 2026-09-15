@@ -27,10 +27,7 @@ function fbmSyncRunActionBlock(status) {
 function fbmSyncRunDetailsBlocks(status) {
   if (!fbmSyncRunHasSnapshot(status)) { return []; }
   var awaiting = status.phase === 'awaiting_approval';
-  return (awaiting ? [Text({ className: 'shin-sync-muted', text: 'Phiên có nhiều thay đổi; hãy xem kết quả rồi chấp thuận để tiếp tục.' })] : []).concat([fbmSyncPipelineBlock(status, 'fbm-sync-pipeline-region'), Box({ id: 'fbm-sync-live-status-region', elements: fbmSyncStatusBlocks(status, status.counts || {}) })]);
-}
-function fbmSyncRenderPipeline(panel, status) {
-  return fbmSyncAppendBlock(panel, fbmSyncPipelineBlock(status));
+  return (awaiting ? [Text({ className: 'shin-muted', text: 'Phiên có nhiều thay đổi; hãy xem kết quả rồi chấp thuận để tiếp tục.' })] : []).concat([fbmSyncPipelineBlock(status, 'fbm-sync-pipeline-region'), Box({ id: 'fbm-sync-live-status-region', elements: fbmSyncStatusBlocks(status, status.counts || {}) })]);
 }
 function fbmSyncPatchLivePipeline(panel, status) {
   if (!panel || !RENDER_INDEX.nodes['fbm-sync-pipeline-region']) { return false; }
@@ -40,12 +37,12 @@ function fbmSyncPatchLivePipeline(panel, status) {
 }
 function fbmSyncRenderRun(panel, status) {
   status = status || {};
-  return fbmSyncAppendBox(panel, 'shin-sync-section', 'fbm-sync-run-root', [
+  return fbmSyncAppendBox(panel, 'shin-section', 'fbm-sync-run-root', [
     Card({ title: 'Chọn loại đồng bộ', elements: [
-      Box({ className: 'shin-sync-form-field', elements: [Text({ className: 'shin-sync-form-label', text: 'Loại đồng bộ' }), StandaloneControl({ id: 'fbm-sync-mode', kind: 'select', options: FBM_SYNC_UI_SCHEMA.modes, value: FBM_SYNC_CLIENT.mode, disabled: !!FBM_SYNC_CLIENT.running, ariaLabel: 'Loại đồng bộ' })] }),
+      StandaloneField('Loại đồng bộ', { id: 'fbm-sync-mode', kind: 'select', options: FBM_SYNC_UI_SCHEMA.modes, value: FBM_SYNC_CLIENT.mode, disabled: !!FBM_SYNC_CLIENT.running, ariaLabel: 'Loại đồng bộ' }),
       Box({ id: 'fbm-sync-run-action-region', elements: [fbmSyncRunActionBlock(status)] })
     ] }),
-    Box({ className: 'shin-sync-run-details', id: 'fbm-sync-run-details-region', elements: fbmSyncRunDetailsBlocks(status) })
+    Box({ id: 'fbm-sync-run-details-region', elements: fbmSyncRunDetailsBlocks(status) })
   ]);
 }
 function fbmSyncPatchRun(panel, status) {

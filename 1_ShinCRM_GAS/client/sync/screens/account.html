@@ -1,7 +1,7 @@
 <script>
 function fbmSyncLoginConfiguredBlocks() {
   var login = FBM_SYNC_CLIENT.loginStatus || {};
-  return [Text({ className: 'shin-sync-preview-row', text: login.configured ? 'Đã lưu thông tin đăng nhập được mã hóa.' : 'Chưa thiết lập thông tin đăng nhập.' })];
+  return [Text({ className: 'shin-preview-row', text: login.configured ? 'Đã lưu thông tin đăng nhập được mã hóa.' : 'Chưa thiết lập thông tin đăng nhập.' })];
 }
 function fbmSyncLoginActionBlocks() {
   var active = !!FBM_SYNC_CLIENT.running;
@@ -12,14 +12,14 @@ function fbmSyncLoginActionBlocks() {
 }
 function fbmSyncRenderAccount(panel, status) {
   status = status || {};
-  return fbmSyncAppendBox(panel, 'shin-sync-section', 'fbm-sync-account-root', [
+  return fbmSyncAppendBox(panel, 'shin-section', 'fbm-sync-account-root', [
     fbmSyncIdentityBlock(status),
     Card({ title: 'Đăng nhập tự động', elements: [
       Box({ id: 'fbm-sync-login-configured-region', elements: fbmSyncLoginConfiguredBlocks() }),
-      Text({ className: 'shin-sync-muted', text: 'Chính sách tự đăng nhập, tự mở tab và thử lại được chỉnh trong Cài đặt phiên.' }),
-      Box({ className: 'shin-sync-form-field', elements: [Text({ className: 'shin-sync-form-label', text: 'Username FBM' }), StandaloneControl({ id: 'fbm-login-username', kind: 'input', inputType: 'text', value: FBM_SYNC_CLIENT.loginDraft.username, placeholder: 'Nhập username FBM', ariaLabel: 'Username FBM' })] }),
-      Box({ className: 'shin-sync-form-field', elements: [Text({ className: 'shin-sync-form-label', text: 'Mật khẩu FBM' }), StandaloneControl({ id: 'fbm-login-password', kind: 'input', inputType: 'password', value: '', placeholder: 'Nhập mật khẩu FBM', ariaLabel: 'Mật khẩu FBM' })] }),
-      Box({ id: 'fbm-sync-login-actions-region', className: 'shin-sync-form-actions', elements: fbmSyncLoginActionBlocks() }),
+      Text({ className: 'shin-muted', text: 'Chính sách tự đăng nhập, tự mở tab và thử lại được chỉnh trong Cài đặt phiên.' }),
+      StandaloneField('Username FBM', { id: 'fbm-login-username', kind: 'input', inputType: 'text', value: FBM_SYNC_CLIENT.loginDraft.username, placeholder: 'Nhập username FBM', ariaLabel: 'Username FBM' }),
+      StandaloneField('Mật khẩu FBM', { id: 'fbm-login-password', kind: 'input', inputType: 'password', value: '', placeholder: 'Nhập mật khẩu FBM', ariaLabel: 'Mật khẩu FBM' }),
+      Box({ id: 'fbm-sync-login-actions-region', elements: fbmSyncLoginActionBlocks() }),
       Box({ id: 'fbm-sync-login-notice-region', elements: fbmSyncAccountNoticeBlocks('login') })
     ] })
   ]);

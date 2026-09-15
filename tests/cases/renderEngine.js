@@ -85,6 +85,11 @@ function chay(so) {
   checkThrows(so, 'tên glyph lạ thì nổ kèm danh sách tên đúng, chứ không vẽ nút trống',
     () => hop.renderNode(hop.Icon('bánh-xe'), null), 'Các tên hiện có');
 
+  const toggleHtml = hop.renderNode(hop.StandaloneControl({ id: 'sync-switch', kind: 'toggle', pressed: true, className: 'is-on', ariaLabel: 'Bật lịch' }), null);
+  check(so, 'công tắc StandaloneControl dùng lớp generic, không phụ thuộc Sync',
+    [toggleHtml.indexOf('class="shin-toggle-control is-on"') > 0, toggleHtml.indexOf('shin-toggle-label') > 0, toggleHtml.indexOf('shin-sync-') === -1],
+    [true, true, true]);
+
   hop.Prefs = { followSelection: true };
   const nutSetBat = hop.renderNode(hop.Icon({ icon: 'bolt', action: 'toggleFollowSelection', toggle: 'followSelection' }), null);
   hop.Prefs.followSelection = false;

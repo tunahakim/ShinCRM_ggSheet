@@ -307,119 +307,6 @@ function fbmSyncPatchLiveProgress(panel, status, count) {
   var box = panel && panel.querySelector('.shin-sync-progress');
   return box ? fbmSyncApplyProgress(box, status, count) : false;
 }
-/** Render only bounded, read-only fields returned by the GAS preview snapshot. */
-function fbmSyncPaintPreviewLegacy(panel, preview) {
-  if (!preview) { return; }
-  var customers = preview.customers || [], activities = preview.activities || [];
-  if (!customers.length && !activities.length) { return; }
-  var box = document.createElement('div'); box.className = 'shin-sync-preview';
-  var title = document.createElement('div'); title.className = 'shin-sync-preview-title'; title.textContent = 'Dữ liệu đã đọc'; box.appendChild(title);
-  var list = document.createElement('div'); list.className = 'shin-sync-preview-list'; box.appendChild(list);
-  customers.forEach(function (item) {
-    var row = document.createElement('div'); row.className = 'shin-sync-preview-row';
-    row.textContent = 'Khách: ' + (item.code || '(không có mã)') + ' · ' + (item.name || '(không có tên)'); list.appendChild(row);
-  });
-  activities.forEach(function (item) {
-    var row = document.createElement('div'); row.className = 'shin-sync-preview-row';
-    row.textContent = 'Giao dịch: ' + (item.date || '(không có ngày)') + ' · ' + (item.type || '(không có loại)') + ' · ' + (item.content || '(trống)'); list.appendChild(row);
-  });
-  if (preview.truncated) { var more = document.createElement('div'); more.className = 'shin-sync-preview-more'; more.textContent = 'Preview đã giới hạn số dòng.'; box.appendChild(more); }
-  panel.appendChild(box);
-}
-/** Hiển thị kết quả từng case nghiệm thu sau lượt Đọc thử. */
-function fbmSyncPaintRecordIssuesLegacyDom(panel, metadata) {
-  metadata = metadata || {};
-  var conflicts = Array.isArray(metadata.conflicts) ? metadata.conflicts : [];
-  var identityBlocks = Array.isArray(metadata.identityBlocks) ? metadata.identityBlocks : [];
-  var pushFailures = metadata.pushFailures || {};
-  var pushFailureDetails = metadata.pushFailureDetails || {};
-  var preflightIssues = Array.isArray(metadata.preflightIssues) ? metadata.preflightIssues : [];
-  var categoryBlocks = Array.isArray(metadata.categoryBlocks) ? metadata.categoryBlocks : [];
-  var activityMissing = Array.isArray(metadata.activityBulkMissing) ? metadata.activityBulkMissing : [];
-  var hasRecordIssues = conflicts.length || identityBlocks.length || Object.keys(pushFailures).length || categoryBlocks.length || activityMissing.length;
-  if (!preflightIssues.length && !hasRecordIssues) { return; }
-  var box = document.createElement('div'); box.className = 'shin-sync-audit';
-  if (preflightIssues.length) {
-    var preflightTitle = document.createElement('div'); preflightTitle.className = 'shin-sync-preview-title'; preflightTitle.textContent = 'Preflight'; box.appendChild(preflightTitle);
-    preflightIssues.slice(-30).forEach(function (item) {
-      var preflightRow = document.createElement('div'); preflightRow.className = 'shin-sync-preview-row';
-      preflightRow.textContent = (item.blocking ? 'Loi' : 'Canh bao') + ' [' + String(item.code || '') + '] ' + String(item.message || ''); box.appendChild(preflightRow);
-    });
-  }
-  if (hasRecordIssues) {
-    var title = document.createElement('div'); title.className = 'shin-sync-preview-title'; title.textContent = 'Chi tiết bản ghi'; box.appendChild(title);
-  }
-  if (conflicts.length) {
-    var conflictSummary = document.createElement('div'); conflictSummary.className = 'shin-sync-preview-row';
-    conflictSummary.textContent = 'Có ' + Number(metadata.conflictCount || conflicts.length) + ' xung đột đang chờ quyết định.';
-    box.appendChild(conflictSummary);
-    var conflictButton = document.createElement('button'); conflictButton.type = 'button'; conflictButton.className = 'shin-button'; conflictButton.id = 'fbm-sync-open-conflicts'; conflictButton.textContent = 'Mở màn hình xử lý xung đột'; box.appendChild(conflictButton);
-  }
-  identityBlocks.slice(-20).forEach(function (item) {
-    var row = document.createElement('div'); row.className = 'shin-sync-preview-row';
-    row.textContent = 'Chặn nhận diện Customer ' + String(item.fbmCustomerCode || '') + ' · ' + String(item.reason || ''); box.appendChild(row);
-  });
-  var failureKeys = Object.keys(pushFailures);
-  if (failureKeys.length) {
-    var failureSummary = document.createElement('div'); failureSummary.className = 'shin-sync-preview-row'; failureSummary.textContent = 'Có ' + failureKeys.length + ' bản ghi lỗi đẩy; xem Log để tra từng mã.'; box.appendChild(failureSummary);
-    var retryAll = document.createElement('button'); retryAll.type = 'button'; retryAll.className = 'shin-button'; retryAll.textContent = 'Mở lại ' + failureKeys.length + ' bản ghi lỗi';
-    retryAll.setAttribute('data-fbm-push-retry-all', 'true'); box.appendChild(retryAll);
-  }
-  failureKeys.slice(-5).forEach(function (key) {
-    var row = document.createElement('div'); row.className = 'shin-sync-preview-row';
-    var detail = pushFailureDetails[key] || {};
-    var suffix = detail.reason ? ' · ' + String(detail.reason) : '';
-    if (detail.code) { suffix += ' [' + String(detail.code) + (detail.status ? ' HTTP ' + String(detail.status) : '') + ']'; }
-    if (detail.requestKind) { suffix += ' · bước ' + String(detail.requestKind); }
-    var label = document.createElement('span'); label.textContent = 'Lỗi đẩy ' + String(key) + suffix; row.appendChild(label);
-    box.appendChild(row);
-  });
-  categoryBlocks.slice(-20).forEach(function (item) {
-    var row = document.createElement('div'); row.className = 'shin-sync-preview-row';
-    row.textContent = 'Chặn do Category ' + String(item.source || 'Category') + (item.code ? ' · ' + String(item.code) : '') + (item.reason ? ' · ' + String(item.reason) : ''); box.appendChild(row);
-  });
-  activityMissing.slice(-20).forEach(function (item) {
-    var row = document.createElement('div'); row.className = 'shin-sync-preview-row';
-    row.textContent = 'Activity không thấy trong FBM ' + String(item.id || '') + (item.fbmId ? ' · FBM ' + String(item.fbmId) : ''); box.appendChild(row);
-  });
-  panel.appendChild(box);
-}
-/** Hiển thị kết quả từng case nghiệm thu sau lượt Đọc thử. */
-function fbmSyncPaintAuditLegacy(panel, audit) {
-  if (!audit || !Array.isArray(audit.cases) || !audit.cases.length) { return; }
-  var box = document.createElement('div'); box.className = 'shin-sync-audit';
-  var title = document.createElement('div'); title.className = 'shin-sync-preview-title'; title.textContent = 'Kiểm tra ALT00010'; box.appendChild(title);
-  audit.cases.forEach(function (item) {
-    var row = document.createElement('div'); row.className = 'shin-sync-preview-row';
-    row.textContent = (item.status === 'PASS' ? '✓ ' : '✕ ') + String(item.name || '') + (item.detail ? ' · ' + String(item.detail) : '');
-    box.appendChild(row);
-  });
-  panel.appendChild(box);
-}
-/** Đăng ký listener một lần cho response và các nút đồng bộ. */
-function fbmSyncPaintPreview(panel, preview) {
-  if (!preview) { return null; }
-  var customers = Array.isArray(preview.customers) ? preview.customers : [], activities = Array.isArray(preview.activities) ? preview.activities : [];
-  if (!customers.length && !activities.length) { return null; }
-  var rows = customers.map(function (item) { return Text({ className: 'shin-sync-preview-row', text: 'Khách: ' + String(item.code || '(không có mã)') + ' · ' + String(item.name || '(không có tên)') }); });
-  rows = rows.concat(activities.map(function (item) { return Text({ className: 'shin-sync-preview-row', text: 'Giao dịch: ' + String(item.date || '(không có ngày)') + ' · ' + String(item.type || '(không có loại)') + ' · ' + String(item.content || '(trống)') }); }));
-  if (preview.truncated) { rows.push(Text({ className: 'shin-sync-preview-more', text: 'Preview đã giới hạn số dòng.' })); }
-  return fbmSyncAppendBlock(panel, Card({ title: 'Dữ liệu đã đọc', className: 'shin-sync-preview', elements: rows }));
-}
-function fbmSyncPaintRecordIssuesLegacy(panel, metadata) {
-  metadata = metadata || {};
-  var conflicts = Array.isArray(metadata.conflicts) ? metadata.conflicts : [], categories = Array.isArray(metadata.categoryBlocks) ? metadata.categoryBlocks : [], missing = Array.isArray(metadata.activityBulkMissing) ? metadata.activityBulkMissing : [], failures = Object.keys(metadata.pushFailures || {}), blocks = [];
-  if (metadata.preflightIssues && metadata.preflightIssues.length) { blocks.push(Text({ className: 'shin-sync-error-message', text: 'Preflight có ' + metadata.preflightIssues.length + ' vấn đề.' })); }
-  if (conflicts.length) { blocks.push(Text({ className: 'shin-sync-preview-row', text: 'Có ' + Number(metadata.conflictCount || conflicts.length) + ' xung đột đang chờ quyết định.' }), Button({ id: 'fbm-sync-open-conflicts', label: 'Mở xử lý xung đột' })); }
-  if (failures.length) { blocks.push(Text({ className: 'shin-sync-preview-row', text: 'Có ' + failures.length + ' bản ghi lỗi đẩy.' }), Button({ label: 'Mở lại bản ghi lỗi', data: { 'fbm-push-retry-all': true } })); }
-  categories.forEach(function (item) { blocks.push(Text({ className: 'shin-sync-preview-row', text: 'Chặn do Category ' + String(item.source || 'Category') + (item.reason ? ' · ' + String(item.reason) : '') })); });
-  missing.forEach(function (item) { blocks.push(Text({ className: 'shin-sync-preview-row', text: 'Activity không thấy trong FBM ' + String(item.id || '') })); });
-  return blocks.length ? fbmSyncAppendBlock(panel, Card({ title: 'Chi tiết bản ghi', className: 'shin-sync-audit', elements: blocks })) : null;
-}
-function fbmSyncPaintAudit(panel, audit) {
-  if (!audit || !Array.isArray(audit.cases) || !audit.cases.length) { return null; }
-  return fbmSyncAppendBlock(panel, Card({ title: 'Kiểm tra ALT00010', className: 'shin-sync-audit', elements: audit.cases.map(function (item) { return Text({ className: item.status === 'PASS' ? 'shin-sync-pass-row' : 'shin-sync-error-message', text: (item.status === 'PASS' ? '✓ ' : '✕ ') + String(item.name || '') + (item.detail ? ' · ' + String(item.detail) : '') }); }) }));
-}
 function fbmSyncInstall() {
   if (FBM_SYNC_CLIENT.installed) { return; }
   FBM_SYNC_CLIENT.installed = true;
@@ -506,7 +393,7 @@ function fbmSyncInstall() {
     } else if (target.id === 'fbm-sync-save-extension') { fbmSyncSaveExtensionSettings(target);
     } else if (target.id === 'fbm-sync-save-background') { fbmSyncSaveBackgroundSettings(target);
     } else if (target.id === 'fbm-sync-save-login-policy') { fbmSyncSaveLoginPolicy(target);
-    } else if (target.id === 'fbm-sync-auto-login') { var autoEnabled = target.getAttribute('aria-pressed') !== 'true'; fbmSyncSetTargetState(target.id, { addClass: [autoEnabled ? 'is-on' : 'is-off'], removeClass: [autoEnabled ? 'is-off' : 'is-on'], ariaPressed: autoEnabled, childText: { '.shin-sync-toggle-label': autoEnabled ? 'ON' : 'OFF' }, disabled: true }); fbmSyncSetAutoLogin(autoEnabled).finally(function () { fbmSyncSetTargetState(target.id, { disabled: false }); });
+    } else if (target.id === 'fbm-sync-auto-login') { var autoEnabled = target.getAttribute('aria-pressed') !== 'true'; fbmSyncSetTargetState(target.id, { addClass: [autoEnabled ? 'is-on' : 'is-off'], removeClass: [autoEnabled ? 'is-off' : 'is-on'], ariaPressed: autoEnabled, childText: { '.shin-toggle-label': autoEnabled ? 'ON' : 'OFF' }, disabled: true }); fbmSyncSetAutoLogin(autoEnabled).finally(function () { fbmSyncSetTargetState(target.id, { disabled: false }); });
     } else if (target.id === 'fbm-sync-rotate-relay') { fbmSyncRotateRelay();
     } else if (target.id === 'fbm-sync-check-identity') { fbmSyncCheckIdentity();
     } else if (target.id === 'fbm-sync-probe-identity') { fbmSyncAutoFillAndCheck();
@@ -771,7 +658,7 @@ function fbmSyncSetBackgroundSwitchState(enabled, disabled) {
     state.addClass = [enabled ? 'is-on' : 'is-off'];
     state.removeClass = [enabled ? 'is-off' : 'is-on'];
     state.ariaPressed = enabled;
-    state.childText = { '.shin-sync-toggle-label': enabled ? 'ON' : 'OFF' };
+    state.childText = { '.shin-toggle-label': enabled ? 'ON' : 'OFF' };
   }
   if (disabled !== undefined) { state.disabled = disabled; }
   return fbmSyncSetTargetState('fbm-sync-background-switch', state);
