@@ -431,7 +431,7 @@ Các ràng buộc thiết kế của slice này nằm ở Tài liệu 09.01, 09.
 
 - [x] Bổ sung workflow test dựa trên tài liệu cho startup, wake, restart, một alarm, không có việc, overlap, ưu tiên, auto-open, retry và response lớn.
 - [ ] Ma trận 44 pipeline có ít nhất một bằng chứng chạy thật qua GAS → Extension → FBM giả lập → GAS/UI cho mỗi nhánh liên quan.
-- [x] Chạy `node tests/run.js`; bộ offline hiện đạt `1457/1457`. Ma trận live/GAS DEV còn chờ các mục được đánh dấu riêng.
+- [x] Chạy `node tests/run.js`; bộ offline hiện đạt `1461/1461`. Ma trận live/GAS DEV còn chờ các mục được đánh dấu riêng.
 
 ### Đợt sửa Sidebar FBM ngày 16/09/2026
 
@@ -439,7 +439,7 @@ Các ràng buộc thiết kế của slice này nằm ở Tài liệu 09.01, 09.
 - [x] Tài khoản FBM rút gọn thông báo liên kết, tô đỏ đúng ô thiếu, tự điền thành công chỉ báo một dòng, credential đã lưu hiển thị chỉ xem với icon sửa.
 - [x] Chạy đồng bộ và Kết quả & xử lý dùng popup/tab/action-row chuẩn, progress rỗi rỗng, năm tab đều cột, Summary có khoảng đệm và Conflict có nút quay lại một hàng riêng.
 - [x] Cài đặt phiên có công tắc module đồng bộ, lịch nền hai chiều/bốn tiến trình, batch và delay detail, tham số phiên chỉnh được trong Sidebar.
-- [x] Commit triển khai: `4370b08`, `80cb723`, `a10bba3`, `9d38fac`, `8822e72`, `801f391`, `40936a7`, `5c3acf9`.
+- [x] Commit triển khai: `4370b08`, `80cb723`, `a10bba3`, `9d38fac`, `8822e72`, `801f391`, `40936a7`, `5c3acf9`, `ab208da`, `5feb4b6`, `2991b29`, `a8856a9`.
 
 ## Slice 9 — Live acceptance và mở rộng production
 
