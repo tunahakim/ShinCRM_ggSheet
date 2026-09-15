@@ -216,7 +216,7 @@ function fbmSyncPaint(status, freshOpen) {
 }
 /** Đồng bộ màu icon header với phase hiện tại của phiên GAS. */
 function fbmSyncPaintHeaderState(status) {
-  var button = document.getElementById('fbm-sync-menu');
+  var button = document.getElementById('fbm-sync-module-menu');
   if (!button || !status) { return; }
   ['running', 'paused', 'error'].forEach(function (name) { button.classList.remove('shin-sync-status-' + name); });
   var phase = String(status.phase || '');

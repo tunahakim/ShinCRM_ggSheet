@@ -117,7 +117,7 @@ async function chay(so) {
   check(so, 'Run render giữ pipeline và lỗi khi phiên tạm dừng', [!!pausedRun.querySelector('.shin-sync-pipeline'), pausedRun.textContent.indexOf('Pipeline đã tạm dừng') >= 0], [true, true]);
 
   const statusButton = dom.document.createElement('button');
-  statusButton.id = 'fbm-sync-menu';
+  statusButton.id = 'fbm-sync-module-menu';
   statusButton.className = 'shin-sync-status-running';
   statusButton.classList = {
     add: (name) => { statusButton.className = (statusButton.className + ' ' + name).trim(); },
