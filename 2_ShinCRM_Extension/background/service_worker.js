@@ -151,6 +151,12 @@ function ensureSheetsBridge(tabId) {
   });
 }
 
+function waitForGenericRequestDelay(request) {
+  var value = request || {}, meta = value.meta || {}, waitMs = Number(meta.waitMs !== undefined ? meta.waitMs : value.waitMs || 0);
+  if (!isFinite(waitMs) || waitMs <= 0) { return Promise.resolve(); }
+  return new Promise(function (resolve) { setTimeout(resolve, Math.min(60000, Math.round(waitMs))); });
+}
+
 /** Tự phục hồi các tab Sheets đang mở; lỗi một tab không làm worker ngừng nhận message. */
 function recoverSheetsBridges() {
   return chrome.tabs.query({ url: ['https://docs.google.com/*'] }).then(function (tabs) {
@@ -166,7 +172,9 @@ function sendToFbmTab(tabId, request) {
   return ensureFbmExecutor(tabId).then(function () {
     return hydrateLoginRequest(request).then(function (readyRequest) {
       request = readyRequest;
-    return sendTabMessage(tabId, { type: 'FBM_EXECUTE_V2', request: request }, 15000);
+      return waitForGenericRequestDelay(request).then(function () {
+        return sendTabMessage(tabId, { type: 'FBM_EXECUTE_V2', request: request }, 15000);
+      });
     });
   });
 }

@@ -82,6 +82,10 @@ FbmSync.nextEnvelope = function (request) {
   } else if (/(?:customer|activity)_edit_open$/.test(String(meta.kind || ''))) {
     meta.transport.jsonPaths = ['d.Row', 'd.row', 'd.FieldValues', 'd.fieldValues', 'd.InternalValues', 'd.internalValues', 'd.Showing', 'd.showing', 'd.Controller', 'd.controller', 'd.GridController', 'd.gridController', 'd.Bugs', 'd.bugs', 'd.Authorized', 'd.authorized'];
   }
+  if (state.scan === 'detail' && state.backgroundDetail) {
+    var detail = state.backgroundDetail, minDelay = Math.max(0, Number(detail.minDelaySeconds || 0)), maxDelay = Math.max(minDelay, Number(detail.maxDelaySeconds === undefined ? minDelay : detail.maxDelaySeconds));
+    if (isFinite(minDelay) && isFinite(maxDelay) && maxDelay > 0) { meta.waitMs = Math.round((minDelay + Math.random() * (maxDelay - minDelay)) * 1000); }
+  }
   if (FbmSync.stateWrite) {
     state.activeRequestId = id;
     state.lastProgressAt = Date.now();
