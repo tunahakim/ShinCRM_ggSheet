@@ -11,9 +11,7 @@ function fbmSyncRenderAccount(panel, status) {
   var body = card.querySelector('.shin-card-body');
   fbmSyncAppendText(body, login.configured ? 'Đã lưu thông tin đăng nhập được mã hóa.' : 'Chưa thiết lập thông tin đăng nhập.', 'shin-sync-preview-row');
 
-  var autoRow = fbmSyncAppendBox(body, 'shin-sync-toggle-row');
-  fbmSyncAppendText(autoRow, 'Tự đăng nhập khi phiên hết hạn', 'shin-sync-toggle-copy');
-  var auto = fbmSyncMakeToggleButton('fbm-sync-auto-login', login.enabled !== false, 'Tự đăng nhập khi phiên hết hạn'); auto.disabled = !!FBM_SYNC_CLIENT.running; autoRow.appendChild(auto);
+  fbmSyncAppendText(body, 'Chính sách tự đăng nhập, tự mở tab và thử lại được chỉnh trong Cài đặt phiên.', 'shin-sync-muted');
 
   var userField = fbmSyncAppendBox(body, 'shin-sync-form-field');
   fbmSyncAppendText(userField, 'Username FBM', 'shin-sync-form-label');

@@ -30,9 +30,9 @@ function fbmSyncRenderOverview(panel, status) {
 
   var background = fbmSyncAppendCard(section, 'Đồng bộ nền');
   var backgroundBody = background.querySelector('.shin-card-body');
-  fbmSyncAppendText(backgroundBody, 'Chỉ đọc FBM và luôn tuân theo công tắc tổng.', 'shin-sync-muted');
-  var toggle = fbmSyncAppendButton(backgroundBody, '', status.backgroundEnabled === false ? 'Bật lịch đồng bộ nền' : 'Tắt lịch đồng bộ nền', false);
-  toggle.setAttribute('data-sync-background', 'true'); toggle.disabled = status.masterEnabled === false;
+  fbmSyncAppendText(backgroundBody, status.backgroundEnabled === false ? 'Lịch nền đang tắt.' : 'Lịch nền được cấu hình trong Cài đặt phiên.', 'shin-sync-muted');
+  var settings = fbmSyncAppendButton(backgroundBody, '', 'Mở Cài đặt phiên', false);
+  settings.setAttribute('data-sync-screen', 'settings');
 
 }
 </script>

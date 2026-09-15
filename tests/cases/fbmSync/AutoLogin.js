@@ -32,6 +32,7 @@ async function chay(so) {
   heartbeat.FbmSync.loginConfigSave({ credentialRef: 'cred-heartbeat-123', enabled: true, envelope: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'an***', database: 'FHN_CRM_App', unit: 'CTY' } });
   heartbeat.FbmSync.stateStart('', 'idle', 0);
   heartbeat.FbmSync.statePatch({ session: { expired: true } });
+  heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
   const autoLoginRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   check(so, 'heartbeat het phien cap login request mot lan', [autoLoginRequest.ok, autoLoginRequest.code, autoLoginRequest.request.meta.kind, autoLoginRequest.request.meta.testOnly], [true, 'AUTO_LOGIN_REQUEST_READY', 'login', false]);
   const loginResponse = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":true}', transport: { payloadCookie: '461020379855cFHN_CRM_App', trace: [{ requestId: autoLoginRequest.request.id }] } });
@@ -45,11 +46,16 @@ async function chay(so) {
   savedConfig.lastAttemptAt = Date.now() - 31 * 60 * 1000;
   heartbeatData.FBM_LOGIN_CONFIG_V1 = JSON.stringify(savedConfig);
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: true, cookie: '' } });
+  heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
   const failedLoginRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   const failedLogin = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":false}', trace: [{ requestId: failedLoginRequest.request.id }] });
   check(so, 'login heartbeat that bai tam dung va khong lap ngay', [failedLogin.ok, failedLogin.code, failedLogin.request, heartbeat.FbmSync.stateRead().phase], [false, 'AUTO_LOGIN_FAILED', null, 'paused']);
   const throttledAfterFailure = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
-  check(so, 'login that bai bi throttle toi da mot lan moi 30 phut', [throttledAfterFailure.ok, throttledAfterFailure.code, throttledAfterFailure.request], [true, 'AUTO_LOGIN_THROTTLED', null]);
+  check(so, 'login that bai khong tu chay khi chua den lich', [throttledAfterFailure.ok, throttledAfterFailure.code, throttledAfterFailure.request], [true, 'NO_PROCESS_DUE', null]);
+  heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
+  heartbeat.FbmSync.statePatch({ scheduledScan: 'heartbeat' });
+  const throttledDue = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+  check(so, 'login that bai bi throttle toi da mot lan moi 30 phut khi den lich', [throttledDue.ok, throttledDue.code, throttledDue.request], [true, 'AUTO_LOGIN_THROTTLED', null]);
 
   const beforeTestConfig = heartbeat.FbmSync.loginConfigRead();
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: false, cookie: '' } });
@@ -64,6 +70,8 @@ async function chay(so) {
   const mismatchAuthorize = heartbeat.FbmSync.loginTestResult({ ok: true, status: 200, body: '{"d":{"Authorized":"auth-customer"}}', transport: { trace: [{ requestId: mismatchLogin.request.id }] } });
   const mismatchIdentity = heartbeat.FbmSync.loginTestResult({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[9999,"OTHER","Other User"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { trace: [{ requestId: mismatchAuthorize.request.id }] } });
   check(so, 'dang nhap thu sai identity bao loi nhung khong tu tat auto-login', [mismatchIdentity.code, heartbeat.FbmSync.loginConfigPublic().enabled], ['LOGIN_IDENTITY_MISMATCH', true]);
+  const policy = heartbeat.FbmSync.loginConfigPolicySave({ enabled: true, autoOpenTab: true, retryEnabled: false, retryMinutes: 45 });
+  check(so, 'chinh sach auto-login chi luu mot noi va cong khai dung metadata', [policy.ok, policy.autoOpenTab, policy.retryEnabled, policy.retryMinutes, heartbeat.FbmSync.loginConfigRead().envelope.ciphertext], [true, true, false, 45, 'ciphertext-long-enough']);
 }
 
 module.exports = { chay };

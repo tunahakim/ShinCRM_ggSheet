@@ -14,6 +14,46 @@
 function findFbmTab() {
   return chrome.tabs.query({ url: ['https://fbo.com.vn:8888/*'] }).then(function (tabs) { return tabs && tabs.length ? tabs[0] : null; });
 }
+/** Đợi trang FBM sẵn sàng trước khi tiêm executor; không tự đổi URL hoặc quyết định nghiệp vụ. */
+function waitForFbmTabReady(tab) {
+  var target = tab || {}, tabId = Number(target.id || 0);
+  if (!tabId || String(target.status || 'complete') === 'complete' || !chrome.tabs || !chrome.tabs.onUpdated || typeof chrome.tabs.onUpdated.addListener !== 'function') {
+    return Promise.resolve(target);
+  }
+  return new Promise(function (resolve, reject) {
+    var settled = false;
+    var remove = typeof chrome.tabs.onUpdated.removeListener === 'function' ? function (listener) { chrome.tabs.onUpdated.removeListener(listener); } : function () {};
+    var timer = setTimeout(function () {
+      if (settled) { return; }
+      settled = true;
+      remove(onUpdated);
+      var error = new Error('Tab FBM chưa tải xong trong thời gian an toàn.');
+      error.code = 'FBM_TAB_NOT_READY';
+      reject(error);
+    }, 15000);
+    function finish(value) {
+      if (settled) { return; }
+      settled = true;
+      clearTimeout(timer);
+      remove(onUpdated);
+      resolve(value || target);
+    }
+    function onUpdated(updatedTabId, changeInfo, updatedTab) {
+      if (Number(updatedTabId) === tabId && (!changeInfo || changeInfo.status === 'complete')) { finish(updatedTab || target); }
+    }
+    chrome.tabs.onUpdated.addListener(onUpdated);
+  });
+}
+/** GAS may explicitly request a background FBM tab; Extension only opens the supplied URL. */
+function ensureFbmTab(request) {
+  return findFbmTab().then(function (tab) {
+    if (tab) { return waitForFbmTabReady(tab); }
+    var instruction = request && request.meta && request.meta.openFbmContext;
+    if (!instruction || !instruction.url || !chrome.tabs || typeof chrome.tabs.create !== 'function') { return null; }
+    var created = chrome.tabs.create({ url: String(instruction.url), active: instruction.active === true });
+    return Promise.resolve(created).then(function (newTab) { return newTab ? waitForFbmTabReady(newTab) : null; });
+  });
+}
 var FBM_EXECUTOR_VERSION = '21.14';
 
 function addWorkerTrace(reply, request, stage, extra) {
@@ -27,31 +67,44 @@ function addWorkerTrace(reply, request, stage, extra) {
   return reply;
 }
 
-/** Đặt heartbeat sau khi worker đã đăng ký listener; tránh lỗi khởi động làm mất toàn bộ đầu nhận. */
-function scheduleHeartbeat() {
+/** Đặt đúng một alarm kỹ thuật; GAS mới biết lịch nghiệp vụ nào đến hạn. */
+var GAS_POLL_ALARM = 'gas_poll';
+var gasPollAlarmKnown = false;
+var gasPollAlarmMinutes = 0;
+function scheduleGasPoll(extensionConfig) {
   try {
     if (chrome.alarms && chrome.alarms.create) {
-      var result = chrome.alarms.create('fbm-heartbeat', { periodInMinutes: 5 });
-      if (result && typeof result.catch === 'function') { result.catch(function (err) { console.warn('Không đặt được heartbeat FBM:', err); }); }
+      var minutes = Math.max(1, Math.min(60, Math.round(Number(extensionConfig && extensionConfig.pollMinutes || 5))));
+      if (gasPollAlarmKnown && gasPollAlarmMinutes === minutes) { return; }
+      var create = function () {
+        gasPollAlarmKnown = true;
+        gasPollAlarmMinutes = minutes;
+        var result = chrome.alarms.create(GAS_POLL_ALARM, { periodInMinutes: minutes });
+        if (result && typeof result.catch === 'function') { result.catch(function (err) { console.warn('Không đặt được nhịp hỏi GAS:', err); }); }
+      };
+      if (typeof chrome.alarms.get !== 'function') { create(); return; }
+      chrome.alarms.get(GAS_POLL_ALARM, function (alarm) { if (!alarm || Number(alarm.periodInMinutes || 0) !== minutes) { create(); } else { gasPollAlarmKnown = true; gasPollAlarmMinutes = minutes; } });
     }
   } catch (err) {
-    console.warn('Không đặt được heartbeat FBM:', err);
+    console.warn('Không đặt được nhịp hỏi GAS:', err);
   }
 }
 
 /** Alarm là nhịp kỹ thuật; GAS quyết định mỗi nhịp có cấp việc hay không. */
-function stopHeartbeat() {
+function stopGasPoll() {
   try {
-    if (chrome.alarms && chrome.alarms.clear) { return chrome.alarms.clear('fbm-heartbeat'); }
+    gasPollAlarmKnown = false;
+    gasPollAlarmMinutes = 0;
+    if (chrome.alarms && chrome.alarms.clear) { return chrome.alarms.clear(GAS_POLL_ALARM); }
   } catch (err) {
-    console.warn('Không dừng được heartbeat FBM:', err);
+    console.warn('Không dừng được nhịp hỏi GAS:', err);
   }
   return undefined;
 }
 
 function restoreHeartbeatSchedule() {
   getRelayConfig().then(function (config) {
-    if (config) { scheduleHeartbeat(); } else { stopHeartbeat(); }
+    if (config) { scheduleGasPoll(config.extension); } else { stopGasPoll(); }
   });
 }
 
@@ -265,7 +318,7 @@ function fbmHeartbeatNow(source) {
         noteHeartbeatStatus('gas_noop', { source: origin, code: String(gasRequest.code || 'HEARTBEAT_NOOP') });
         return gasRequest;
       }
-      return findFbmTab().then(function (tab) {
+      return ensureFbmTab(gasRequest.request).then(function (tab) {
         if (!tab) {
           noteHeartbeatStatus('blocked_tab', { source: origin, code: 'FBM_TAB_NOT_FOUND' });
           return relayHeartbeatTransportFailure(config, gasRequest.request, 'FBM_TAB_NOT_FOUND', 'Không tìm thấy tab FBM đang mở.').then(function (gasReply) {
@@ -305,11 +358,12 @@ if (typeof globalThis !== 'undefined') { globalThis.fbmHeartbeatNow = fbmHeartbe
 function getRelayConfig() {
   if (!chrome.storage || !chrome.storage.local || !chrome.storage.local.get) { return Promise.resolve(null); }
   return new Promise(function (resolve) {
-    chrome.storage.local.get(['fbmWebAppUrl', 'fbmSyncKey', 'fbmSpreadsheetId'], function (config) {
+    chrome.storage.local.get(['fbmWebAppUrl', 'fbmSyncKey', 'fbmSpreadsheetId', 'fbmPollMinutes', 'fbmRunOnStartup'], function (config) {
       var url = normalizeRelayUrl(config && config.fbmWebAppUrl);
       var key = config && String(config.fbmSyncKey || '').trim();
       var spreadsheetId = config && String(config.fbmSpreadsheetId || '').trim();
-      resolve(url && key ? { url: url, key: key, spreadsheetId: spreadsheetId } : null);
+      var extension = { pollMinutes: Math.max(1, Math.min(60, Math.round(Number(config && config.fbmPollMinutes || 5)))), runOnStartup: config && config.fbmRunOnStartup !== false };
+      resolve(url && key ? { url: url, key: key, spreadsheetId: spreadsheetId, extension: extension } : null);
     });
   });
 }
@@ -327,11 +381,13 @@ function normalizeRelayUrl(value) {
 /** So cấu hình kỹ thuật đã lưu; không gọi Web App khi Sidebar mở. */
 function relayConfigAlreadyConfirmed(config) {
   return new Promise(function (resolve) {
-    chrome.storage.local.get(['fbmWebAppUrl', 'fbmSyncKey', 'fbmSpreadsheetId'], function (saved) {
+    chrome.storage.local.get(['fbmWebAppUrl', 'fbmSyncKey', 'fbmSpreadsheetId', 'fbmPollMinutes', 'fbmRunOnStartup'], function (saved) {
       resolve(
         normalizeRelayUrl(saved && saved.fbmWebAppUrl) === normalizeRelayUrl(config && config.url) &&
         String(saved && saved.fbmSyncKey || '') === String(config && config.key || '') &&
-        String(saved && saved.fbmSpreadsheetId || '') === String(config && config.spreadsheetId || '')
+        String(saved && saved.fbmSpreadsheetId || '') === String(config && config.spreadsheetId || '') &&
+        Number(saved && saved.fbmPollMinutes || 5) === Number(config && config.extension && config.extension.pollMinutes || 5) &&
+        (saved && saved.fbmRunOnStartup !== false) === (config && config.extension && config.extension.runOnStartup !== false)
       );
     });
   });
@@ -342,17 +398,18 @@ function configureRelay(config) {
   var value = config || {}, url = normalizeRelayUrl(value.url), key = String(value.key || '').trim(), spreadsheetId = String(value.spreadsheetId || '').trim();
   if (!url || !key || !spreadsheetId) { return Promise.resolve({ ok: false, code: 'RELAY_CONFIG_INVALID', error: 'Cấu hình relay thiếu URL Web App hợp lệ, khóa hoặc Spreadsheet ID.' }); }
   if (relayConfigureFlight) { return relayConfigureFlight; }
-  var normalized = { url: url, key: key, spreadsheetId: spreadsheetId };
+  var extension = value.extension && typeof value.extension === 'object' ? value.extension : {};
+  var normalized = { url: url, key: key, spreadsheetId: spreadsheetId, extension: { pollMinutes: Math.max(1, Math.min(60, Math.round(Number(extension.pollMinutes || 5)))), runOnStartup: extension.runOnStartup !== false } };
   relayConfigureFlight = relayConfigAlreadyConfirmed(normalized).then(function (confirmed) {
     if (confirmed) {
-      scheduleHeartbeat();
+      scheduleGasPoll(normalized.extension);
       return { ok: true, code: 'RELAY_CONFIG_UNCHANGED' };
     }
     return new Promise(function (resolve) {
-      chrome.storage.local.set({ fbmWebAppUrl: url, fbmSyncKey: key, fbmSpreadsheetId: spreadsheetId }, function () {
+      chrome.storage.local.set({ fbmWebAppUrl: url, fbmSyncKey: key, fbmSpreadsheetId: spreadsheetId, fbmPollMinutes: normalized.extension.pollMinutes, fbmRunOnStartup: normalized.extension.runOnStartup }, function () {
         var error = chrome.runtime.lastError;
         if (error) { resolve({ ok: false, code: 'RELAY_CONFIG_SAVE_FAILED', error: error.message }); return; }
-        scheduleHeartbeat();
+        scheduleGasPoll(normalized.extension);
         resolve({ ok: true, code: 'RELAY_CONFIG_SAVED' });
       });
     });
@@ -443,7 +500,7 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     existingFlight.then(sendResponse, function (err) { sendResponse({ error: String(err && err.message || err), code: String(err && err.code || 'FBM_TRANSPORT_UNAVAILABLE') }); });
     return true;
   }
-  var flight = findFbmTab().then(function (tab) {
+  var flight = ensureFbmTab(message.request).then(function (tab) {
     if (!tab) { return addWorkerTrace({ error: 'Không tìm thấy tab FBM đang mở.' }, message.request, 'fbm_tab_not_found'); }
     return sendToFbmTab(tab.id, message.request).then(function (reply) { return addWorkerTrace(addWorkerTrace(reply, message.request, 'worker_received'), message.request, 'fbm_tab_found'); });
   });
@@ -455,14 +512,20 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   return true;
 });
 
-/** Khởi tạo heartbeat khi Extension cài mới hoặc Chrome khởi động. */
+/** Khôi phục alarm khi Extension cài mới; Chrome startup có thể hỏi GAS một lượt. */
 chrome.runtime.onInstalled.addListener(restoreHeartbeatSchedule);
-chrome.runtime.onStartup.addListener(restoreHeartbeatSchedule);
+chrome.runtime.onStartup.addListener(function () {
+  restoreHeartbeatSchedule();
+  getRelayConfig().then(function (config) {
+    if (config && config.extension && config.extension.runOnStartup === true) { return fbmHeartbeatNow('startup'); }
+    return null;
+  }).catch(function (error) { console.warn('Không hỏi GAS được ở startup:', error); });
+});
 restoreHeartbeatSchedule();
 recoverSheetsBridges();
 /** Gửi request đọc tối thiểu; không gửi thao tác ghi từ alarm. */
 chrome.alarms.onAlarm.addListener(function (alarm) {
-  if (!alarm || alarm.name !== 'fbm-heartbeat') { return; }
+  if (!alarm || alarm.name !== GAS_POLL_ALARM) { return; }
   fbmHeartbeatNow('alarm').then(function (result) { if (!result || result.ok !== true) { console.warn('Heartbeat FBM không chạy:', result); } });
 });
 

@@ -1,7 +1,7 @@
 <script>
 function fbmSyncRenderSettings(panel) {
   var section = fbmSyncAppendBox(panel, 'shin-sync-section');
-  fbmSyncAppendText(section, 'Các kết nối và tham số này áp dụng cho toàn bộ phiên đồng bộ.', 'shin-sync-muted');
+  fbmSyncAppendText(section, 'Các kết nối và lịch nền được GAS điều phối; Extension chỉ biết nhịp hỏi GAS.', 'shin-sync-muted');
 
   var relay = fbmSyncAppendCard(section, 'Kết nối Extension');
   var relayBody = relay.querySelector('.shin-card-body');
@@ -9,6 +9,42 @@ function fbmSyncRenderSettings(panel) {
   var rotate = fbmSyncAppendButton(relayBody, 'fbm-sync-rotate-relay', 'Đổi cấu hình kết nối', false); rotate.disabled = !!FBM_SYNC_CLIENT.running;
 
   var settings = FBM_SYNC_CLIENT.syncSettings || {};
+  var extension = settings.extension || { pollMinutes: 5, runOnStartup: true };
+  var extensionCard = fbmSyncAppendCard(section, 'Nhịp hỏi GAS của Extension');
+  var extensionBody = extensionCard.querySelector('.shin-card-body');
+  var extensionRow = fbmSyncAppendBox(extensionBody, 'shin-sync-form-field');
+  fbmSyncAppendText(extensionRow, 'Chu kỳ hỏi GAS (phút)', 'shin-sync-form-label');
+  fbmSyncAppendInput(extensionRow, 'fbm-extension-poll-minutes', 'number', extension.pollMinutes || 5, '1–60');
+  var startupRow = fbmSyncAppendBox(extensionBody, 'shin-sync-toggle-row');
+  fbmSyncAppendText(startupRow, 'Hỏi GAS ngay khi Chrome khởi động', 'shin-sync-toggle-copy');
+  var startup = fbmSyncMakeToggleButton('fbm-sync-run-on-startup', extension.runOnStartup !== false, 'Hỏi GAS ngay khi Chrome khởi động'); startup.setAttribute('data-sync-extension-startup', 'true'); startupRow.appendChild(startup);
+  var extensionSave = fbmSyncAppendButton(extensionBody, 'fbm-sync-save-extension', 'Lưu nhịp Extension', true); extensionSave.disabled = !!FBM_SYNC_CLIENT.running;
+  fbmSyncAppendText(extensionBody, 'Spreadsheet ID kỹ thuật: ' + String(FBM_SYNC_CLIENT.syncSettings && FBM_SYNC_CLIENT.syncSettings.spreadsheetId || '(được GAS xác định)'), 'shin-sync-muted');
+
+  var background = settings.background || {};
+  var backgroundCard = fbmSyncAppendCard(section, 'Lịch đồng bộ nền');
+  var backgroundBody = backgroundCard.querySelector('.shin-card-body');
+  fbmSyncAppendText(backgroundBody, 'Chỉ đọc FBM; mỗi lượt đến hạn được GAS chọn một tiến trình theo ưu tiên.', 'shin-sync-muted');
+  var bgSwitchRow = fbmSyncAppendBox(backgroundBody, 'shin-sync-toggle-row');
+  fbmSyncAppendText(bgSwitchRow, 'Bật lịch đồng bộ nền', 'shin-sync-toggle-copy');
+  var bgSwitch = fbmSyncMakeToggleButton('fbm-sync-background-switch', FBM_SYNC_CLIENT.lastStatus ? FBM_SYNC_CLIENT.lastStatus.backgroundEnabled !== false : true, 'Bật lịch đồng bộ nền'); bgSwitch.setAttribute('data-sync-background', 'true'); bgSwitch.disabled = FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.lastStatus.masterEnabled === false; bgSwitchRow.appendChild(bgSwitch);
+  [['heartbeat', 'Giữ phiên FBM', '5'], ['customer', 'Quét Customer', '60'], ['activity', 'Quét Activity', '30']].forEach(function (item) {
+    var spec = background[item[0]] || { enabled: true, minutes: Number(item[2]) };
+    var row = fbmSyncAppendBox(backgroundBody, 'shin-sync-schedule-row');
+    var toggle = fbmSyncMakeToggleButton('fbm-sync-process-' + item[0], spec.enabled !== false, 'Bật ' + item[1]); toggle.setAttribute('data-sync-process-toggle', item[0]); toggle.disabled = FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.lastStatus.masterEnabled === false; row.appendChild(toggle);
+    fbmSyncAppendText(row, item[1], 'shin-sync-settings-label');
+    var minutes = fbmSyncAppendInput(row, 'fbm-sync-process-' + item[0] + '-minutes', 'number', spec.minutes || item[2], 'phút'); minutes.setAttribute('data-sync-process-minutes', item[0]); minutes.disabled = spec.enabled === false;
+  });
+  var bgSave = fbmSyncAppendButton(backgroundBody, 'fbm-sync-save-background', 'Lưu lịch nền', true); bgSave.disabled = !!FBM_SYNC_CLIENT.running;
+
+  var loginPolicy = FBM_SYNC_CLIENT.loginStatus || {};
+  var loginCard = fbmSyncAppendCard(section, 'Chính sách tự đăng nhập');
+  var loginBody = loginCard.querySelector('.shin-card-body');
+  [['fbm-sync-policy-auto-login', 'Cho phép tự đăng nhập khi phiên hết hạn', loginPolicy.enabled !== false, 'auto-login'], ['fbm-sync-policy-auto-open', 'Cho phép tự mở tab FBM khi GAS yêu cầu', loginPolicy.autoOpenTab === true, 'auto-open'], ['fbm-sync-policy-retry', 'Cho phép tự đăng nhập lại khi lần trước thất bại', loginPolicy.retryEnabled !== false, 'retry']].forEach(function (item) {
+    var row = fbmSyncAppendBox(loginBody, 'shin-sync-toggle-row'); fbmSyncAppendText(row, item[1], 'shin-sync-toggle-copy'); var toggle = fbmSyncMakeToggleButton(item[0], item[2], item[1]); toggle.setAttribute('data-sync-login-policy', item[3]); row.appendChild(toggle);
+  });
+  var retryRow = fbmSyncAppendBox(loginBody, 'shin-sync-form-field'); fbmSyncAppendText(retryRow, 'Chu kỳ thử lại (phút)', 'shin-sync-form-label'); fbmSyncAppendInput(retryRow, 'fbm-sync-login-retry-minutes', 'number', loginPolicy.retryMinutes || 30, '1–1.440');
+  var loginSave = fbmSyncAppendButton(loginBody, 'fbm-sync-save-login-policy', 'Lưu chính sách đăng nhập', true); loginSave.disabled = !!FBM_SYNC_CLIENT.running;
   var config = fbmSyncAppendCard(section, 'Tham số phiên');
   var body = config.querySelector('.shin-card-body');
   [['Tài khoản FBM', settings.accountName || '(chưa khai báo)'], ['Tiền tố mã khách', settings.customerPrefix || '(chưa khai báo)'], ['Độ dài mã khách', settings.customerCodeLength || '(chưa khai báo)'], ['Mốc Activity', settings.activitySince || '(chưa khai báo)'], ['Ngưỡng yêu cầu chấp thuận', String(settings.approvalThreshold === undefined ? 10 : settings.approvalThreshold) + ' bản ghi']].forEach(function (item) {
@@ -16,6 +52,6 @@ function fbmSyncRenderSettings(panel) {
     fbmSyncAppendText(row, item[0], 'shin-sync-settings-label');
     fbmSyncAppendText(row, item[1], 'shin-sync-settings-value');
   });
-  fbmSyncAppendText(body, 'Sửa các tham số vận hành trong khối tham số của sheet Config; màn này chỉ hiển thị giá trị GAS đang dùng.', 'shin-sync-muted');
+  fbmSyncAppendText(body, 'Sửa các tham số nghiệp vụ trong khối Config của Sheet; lịch và chính sách trên được lưu qua GAS.', 'shin-sync-muted');
 }
 </script>

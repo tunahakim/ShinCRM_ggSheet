@@ -7,7 +7,7 @@ FbmSync.AUTO_LOGIN_LAST_ATTEMPT_KEY = 'FBM_AUTO_LOGIN_LAST_ATTEMPT_V1';
 FbmSync.AUTO_LOGIN_RETRY_MS = 30 * 60 * 1000;
 
 FbmSync.loginConfigDefault = function () {
-  return { enabled: true, configured: false, credentialRef: '', envelope: null, public: {}, lastAttemptAt: 0, lastLoginAt: 0, lastError: '' };
+  return { enabled: true, autoOpenTab: false, retryEnabled: true, retryMinutes: 30, configured: false, credentialRef: '', envelope: null, public: {}, lastAttemptAt: 0, lastLoginAt: 0, nextRetryAt: 0, lastError: '' };
 };
 
 /** Chỉ đọc cấu hình đã mã hóa và loại envelope trước khi trả ra Sidebar. */
@@ -16,7 +16,9 @@ FbmSync.loginConfigRead = function () {
   try {
     var raw = FbmSync.props().getProperty(FbmSync.LOGIN_CONFIG_KEY), parsed = raw ? JSON.parse(raw) : {};
     if (!parsed || typeof parsed !== 'object') { return fallback; }
-    return Object.assign(fallback, parsed, { public: parsed.public && typeof parsed.public === 'object' ? parsed.public : {}, envelope: parsed.envelope && typeof parsed.envelope === 'object' ? parsed.envelope : null, enabled: parsed.enabled !== false, configured: !!parsed.credentialRef && !!parsed.envelope });
+    var retryMinutes = Number(parsed.retryMinutes);
+    fallback = Object.assign(fallback, parsed, { public: parsed.public && typeof parsed.public === 'object' ? parsed.public : {}, envelope: parsed.envelope && typeof parsed.envelope === 'object' ? parsed.envelope : null, enabled: parsed.enabled !== false, autoOpenTab: parsed.autoOpenTab === true, retryEnabled: parsed.retryEnabled !== false, retryMinutes: isFinite(retryMinutes) ? Math.max(1, Math.min(1440, Math.round(retryMinutes))) : fallback.retryMinutes, configured: !!parsed.credentialRef && !!parsed.envelope });
+    return fallback;
   } catch (ignore) { return fallback; }
 };
 
@@ -35,15 +37,16 @@ FbmSync.loginConfigSave = function (input) {
     unit: String(publicMeta.unit || '').slice(0, 40),
     language: String(publicMeta.language || 'v').slice(0, 8)
   };
-  var current = FbmSync.loginConfigRead();
-  var saved = { enabled: value.enabled !== false, credentialRef: ref, envelope: { version: Number(envelope.version || 1), alg: String(envelope.alg || 'AES-GCM'), iv: String(envelope.iv), ciphertext: String(envelope.ciphertext) }, public: safePublic, lastAttemptAt: Number(current.lastAttemptAt || 0), lastLoginAt: Number(current.lastLoginAt || 0), lastError: '' };
+  var current = FbmSync.loginConfigRead(), retryMinutes = Number(value.retryMinutes === undefined ? current.retryMinutes : value.retryMinutes);
+  if (!isFinite(retryMinutes) || retryMinutes < 1 || retryMinutes > 1440) { return { ok: false, code: 'AUTO_LOGIN_RETRY_INVALID', message: 'Chu kỳ tự đăng nhập lại phải từ 1 đến 1.440 phút.' }; }
+  var saved = { enabled: value.enabled !== false, autoOpenTab: value.autoOpenTab === true, retryEnabled: value.retryEnabled !== false, retryMinutes: Math.round(retryMinutes), credentialRef: ref, envelope: { version: Number(envelope.version || 1), alg: String(envelope.alg || 'AES-GCM'), iv: String(envelope.iv), ciphertext: String(envelope.ciphertext) }, public: safePublic, lastAttemptAt: Number(current.lastAttemptAt || 0), lastLoginAt: Number(current.lastLoginAt || 0), nextRetryAt: Number(current.nextRetryAt || 0), lastError: '' };
   FbmSync.props().setProperty(FbmSync.LOGIN_CONFIG_KEY, JSON.stringify(saved));
   return { ok: true, configured: true, enabled: saved.enabled, credentialRef: ref, public: safePublic };
 };
 
 FbmSync.loginConfigPublic = function () {
   var value = FbmSync.loginConfigRead();
-  return { ok: true, enabled: value.enabled !== false, configured: value.configured === true, public: value.public || {}, lastAttemptAt: Number(value.lastAttemptAt || 0), lastLoginAt: Number(value.lastLoginAt || 0), lastError: String(value.lastError || '') };
+  return { ok: true, enabled: value.enabled !== false, autoOpenTab: value.autoOpenTab === true, retryEnabled: value.retryEnabled !== false, retryMinutes: Number(value.retryMinutes || 30), configured: value.configured === true, public: value.public || {}, lastAttemptAt: Number(value.lastAttemptAt || 0), lastLoginAt: Number(value.lastLoginAt || 0), nextRetryAt: Number(value.nextRetryAt || 0), lastError: String(value.lastError || '') };
 };
 
 FbmSync.loginConfigSetEnabled = function (enabled) {
@@ -52,19 +55,32 @@ FbmSync.loginConfigSetEnabled = function (enabled) {
   FbmSync.props().setProperty(FbmSync.LOGIN_CONFIG_KEY, JSON.stringify(value));
   return FbmSync.loginConfigPublic();
 };
+FbmSync.loginConfigPolicySave = function (input) {
+  var value = input || {}, current = FbmSync.loginConfigRead(), retryMinutes = Number(value.retryMinutes === undefined ? current.retryMinutes : value.retryMinutes);
+  if (!isFinite(retryMinutes) || retryMinutes < 1 || retryMinutes > 1440) { return { ok: false, code: 'AUTO_LOGIN_RETRY_INVALID', message: 'Chu kỳ tự đăng nhập lại phải từ 1 đến 1.440 phút.' }; }
+  current.enabled = value.enabled === true;
+  current.autoOpenTab = value.autoOpenTab === true;
+  current.retryEnabled = value.retryEnabled !== false;
+  current.retryMinutes = Math.round(retryMinutes);
+  FbmSync.props().setProperty(FbmSync.LOGIN_CONFIG_KEY, JSON.stringify(current));
+  return FbmSync.loginConfigPublic();
+};
 
 FbmSync.autoLoginCanAttempt = function (now) {
   var at = Number(now || Date.now()), value = FbmSync.loginConfigRead();
   if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED' }; }
   if (!value.enabled || !value.configured) { return { ok: false, code: 'AUTO_LOGIN_NOT_CONFIGURED' }; }
+  if (!value.retryEnabled && value.lastAttemptAt) { return { ok: false, code: 'AUTO_LOGIN_RETRY_DISABLED' }; }
   var last = Number(value.lastAttemptAt || 0);
-  if (last && at - last < FbmSync.AUTO_LOGIN_RETRY_MS) { return { ok: false, code: 'AUTO_LOGIN_THROTTLED', retryAt: last + FbmSync.AUTO_LOGIN_RETRY_MS }; }
+  var retryMs = Math.max(1, Number(value.retryMinutes || 30)) * 60 * 1000;
+  if (last && at - last < retryMs) { return { ok: false, code: 'AUTO_LOGIN_THROTTLED', retryAt: last + retryMs }; }
   return { ok: true, credentialRef: value.credentialRef };
 };
 
 FbmSync.autoLoginMarkAttempt = function (now) {
   var at = Number(now || Date.now()), value = FbmSync.loginConfigRead();
   value.lastAttemptAt = at;
+  value.nextRetryAt = at + Math.max(1, Number(value.retryMinutes || 30)) * 60 * 1000;
   FbmSync.props().setProperty(FbmSync.AUTO_LOGIN_LAST_ATTEMPT_KEY, String(at));
   FbmSync.props().setProperty(FbmSync.LOGIN_CONFIG_KEY, JSON.stringify(value));
   return at;
@@ -73,6 +89,7 @@ FbmSync.autoLoginMarkAttempt = function (now) {
 FbmSync.autoLoginMarkSuccess = function (now) {
   var at = Number(now || Date.now()), value = FbmSync.loginConfigRead();
   value.lastLoginAt = at;
+  value.nextRetryAt = 0;
   value.lastError = '';
   FbmSync.props().setProperty(FbmSync.LOGIN_CONFIG_KEY, JSON.stringify(value));
   return at;
@@ -81,6 +98,7 @@ FbmSync.autoLoginMarkSuccess = function (now) {
 FbmSync.autoLoginMarkFailure = function (message) {
   var value = FbmSync.loginConfigRead();
   value.lastError = String(message || 'Tự đăng nhập FBM thất bại.').slice(0, 240);
+  value.nextRetryAt = Number(value.lastAttemptAt || Date.now()) + Math.max(1, Number(value.retryMinutes || 30)) * 60 * 1000;
   FbmSync.props().setProperty(FbmSync.LOGIN_CONFIG_KEY, JSON.stringify(value));
   return FbmSync.loginConfigPublic();
 };
@@ -98,7 +116,10 @@ FbmSync.applyTransportSession = function (state, response) {
 
 FbmSync.loginRequest = function (credentialRef, testOnly) {
   var cfg = FbmSync.scriptSettings();
-  return { url: cfg.baseUrl + '/Main/Login.aspx/Login', body: {}, meta: { kind: 'login', credentialRef: String(credentialRef || ''), testOnly: testOnly === true } };
+  var login = { url: cfg.baseUrl + '/Main/Login.aspx/Login', body: {}, meta: { kind: 'login', credentialRef: String(credentialRef || ''), testOnly: testOnly === true } };
+  var policy = FbmSync.loginConfigRead();
+  if (policy.autoOpenTab === true) { login.meta.openFbmContext = { url: cfg.baseUrl + '/Main/zccrAccount.aspx', active: false }; }
+  return login;
 };
 
 FbmSync.loginTestRequest = function (credentialRef) {

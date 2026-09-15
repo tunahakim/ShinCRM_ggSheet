@@ -105,6 +105,7 @@ function fbmSyncRelayConfig() {
     url: url,
     key: key,
     spreadsheetId: spreadsheetId,
+    extension: typeof FbmSync.extensionConfigPublic === 'function' ? FbmSync.extensionConfigPublic() : { pollMinutes: 5, runOnStartup: true },
     masterEnabled: typeof FbmSync.masterEnabled !== 'function' || FbmSync.masterEnabled(),
     backgroundEnabled: typeof FbmSync.backgroundEnabled !== 'function' || FbmSync.backgroundEnabled()
   };

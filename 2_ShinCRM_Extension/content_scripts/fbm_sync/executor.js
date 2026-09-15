@@ -53,13 +53,13 @@
   function projectResponseBody(request, responseBody) {
     var transport = request && request.transport || request && request.meta && request.meta.transport || {}, paths = Array.isArray(transport.jsonPaths) ? transport.jsonPaths : [];
     if (!paths.length) { return responseBody; }
-    var source;
+    var source, dWasString = false;
     try { source = JSON.parse(String(responseBody || '')); } catch (ignore) {
       var parseError = new Error('Response FBM không phải JSON nên không thể áp dụng projection do GAS yêu cầu.');
       parseError.code = 'FBM_TRANSPORT_PROJECTION_INVALID_JSON';
       throw parseError;
     }
-    if (source && typeof source.d === 'string') { try { source.d = JSON.parse(source.d); } catch (ignoreD) {} }
+    if (source && typeof source.d === 'string') { try { source.d = JSON.parse(source.d); dWasString = true; } catch (ignoreD) {} }
     var target = {}, matched = 0;
     paths.forEach(function (path) {
       var parts = String(path || '').split('.').filter(Boolean), from = source, to = target;
@@ -78,6 +78,67 @@
     }
     var projected = JSON.stringify(target);
     return projected.length && projected.length < String(responseBody || '').length ? projected : responseBody;
+  }
+  /** Lọc mảng theo chỉ dẫn generic của GAS; không biết đó là Customer hay Activity. */
+  function filterResponseBody(request, responseBody) {
+    var transport = request && request.transport || request && request.meta && request.meta.transport || {}, filters = Array.isArray(transport.arrayFilters) ? transport.arrayFilters : [];
+    if (!filters.length) { return responseBody; }
+    var source, dWasString = false;
+    try { source = JSON.parse(String(responseBody || '')); } catch (ignore) {
+      var parseError = new Error('Response FBM không phải JSON nên không thể áp dụng bộ lọc do GAS yêu cầu.');
+      parseError.code = 'FBM_TRANSPORT_FILTER_INVALID_JSON';
+      throw parseError;
+    }
+    if (source && typeof source.d === 'string') { try { source.d = JSON.parse(source.d); dWasString = true; } catch (ignoreD) {} }
+    filters.forEach(function (filter) {
+      var item = filter || {}, parts = String(item.path || '').split('.').filter(Boolean), parent = source;
+      for (var i = 0; i < parts.length - 1; i += 1) {
+        if (!parent || !Object.prototype.hasOwnProperty.call(parent, parts[i])) { var missing = new Error('Response FBM không chứa path bộ lọc do GAS yêu cầu.'); missing.code = 'FBM_TRANSPORT_FILTER_PATH_MISSING'; throw missing; }
+        parent = parent[parts[i]];
+      }
+      var leaf = parts.length ? parts[parts.length - 1] : '', rows = parent && leaf ? parent[leaf] : null;
+      if (!Array.isArray(rows)) { var arrayError = new Error('Path bộ lọc do GAS yêu cầu không trỏ tới mảng.'); arrayError.code = 'FBM_TRANSPORT_FILTER_NOT_ARRAY'; throw arrayError; }
+      var values = Array.isArray(item.values) ? item.values.map(function (value) { return String(value); }) : [];
+      var allowed = Object.create(null); values.forEach(function (value) { allowed[value] = true; });
+      var keyField = item.keyField === undefined ? null : String(item.keyField), keyIndex = item.keyIndex === undefined ? null : Number(item.keyIndex);
+      parent[leaf] = rows.filter(function (row) {
+        var key = keyField !== null && row && typeof row === 'object' && !Array.isArray(row) ? row[keyField] : keyIndex !== null && Array.isArray(row) ? row[keyIndex] : row;
+        return Object.prototype.hasOwnProperty.call(allowed, String(key));
+      });
+    });
+    if (dWasString && source && source.d && typeof source.d === 'object') { source.d = JSON.stringify(source.d); }
+    var filtered = JSON.stringify(source);
+    return filtered.length < String(responseBody || '').length ? filtered : responseBody;
+  }
+  /** Giữ các cột GAS đã chọn theo vị trí; Extension không biết tên bảng hay ý nghĩa cột. */
+  function projectArrayColumns(request, responseBody) {
+    var transport = request && request.transport || request && request.meta && request.meta.transport || {}, projections = Array.isArray(transport.arrayProjections) ? transport.arrayProjections : [];
+    if (!projections.length) { return responseBody; }
+    var source, dWasString = false;
+    try { source = JSON.parse(String(responseBody || '')); } catch (ignore) {
+      var parseError = new Error('Response FBM không phải JSON nên không thể áp dụng bộ chiếu cột do GAS yêu cầu.');
+      parseError.code = 'FBM_TRANSPORT_PROJECTION_INVALID_JSON';
+      throw parseError;
+    }
+    if (source && typeof source.d === 'string') { try { source.d = JSON.parse(source.d); } catch (ignoreD) {} }
+    projections.forEach(function (projection) {
+      var item = projection || {}, indices = Array.isArray(item.indices) ? item.indices.map(function (value) { return Number(value); }) : [], paths = Array.isArray(item.paths) ? item.paths : [];
+      if (!indices.length || !paths.length) { var invalid = new Error('Chỉ dẫn chiếu cột của GAS không hợp lệ.'); invalid.code = 'FBM_TRANSPORT_PROJECTION_INVALID'; throw invalid; }
+      paths.forEach(function (path) {
+        var parts = String(path || '').split('.').filter(Boolean), parent = source;
+        for (var i = 0; i < parts.length - 1; i += 1) {
+          if (!parent || !Object.prototype.hasOwnProperty.call(parent, parts[i])) { var missing = new Error('Response FBM không chứa path chiếu cột do GAS yêu cầu.'); missing.code = 'FBM_TRANSPORT_PROJECTION_PATH_MISSING'; throw missing; }
+          parent = parent[parts[i]];
+        }
+        var leaf = parts[parts.length - 1], rows = parent && parent[leaf];
+        if (!Array.isArray(rows)) { var arrayError = new Error('Path chiếu cột của GAS không trỏ tới mảng.'); arrayError.code = 'FBM_TRANSPORT_PROJECTION_NOT_ARRAY'; throw arrayError; }
+        parent[leaf] = !rows.length ? [] : Array.isArray(rows[0])
+          ? rows.map(function (row) { return indices.map(function (index) { return row[index]; }); })
+          : indices.map(function (index) { return rows[index]; });
+      });
+    });
+    if (dWasString && source && source.d && typeof source.d === 'object') { source.d = JSON.stringify(source.d); }
+    return JSON.stringify(source);
   }
   /** Thay token theo chỉ dẫn GAS mà không parse hoặc dựng lại JSON nghiệp vụ. */
   function applyTransportReplacements(request, bodyText) {
@@ -250,7 +311,7 @@
     var timer = setTimeout(function () { controller.abort(); }, FETCH_TIMEOUT_MS);
     traceEvent(trace, 'fetch_started', req);
     return fetch(String(req.url || ''), { method: req.method || 'POST', headers: req.headers || { 'content-type': 'application/json; charset=UTF-8' }, body: sent, credentials: 'include', cache: 'no-store', signal: controller.signal }).then(function (response) {
-      return readResponseText(response).then(function (body) { var captured = captureTransport(req, body), projectedBody = projectResponseBody(req, body); traceEvent(trace, 'fetch_finished', req, { httpStatus: response.status, responseLength: body.length, projectedLength: projectedBody.length }); return { ok: response.ok, status: response.status, headers: { contentType: response.headers.get('content-type') || '' }, body: projectedBody, transport: Object.assign({}, captured, { trace: trace }) }; });
+      return readResponseText(response).then(function (body) { var captured = captureTransport(req, body), filteredBody = filterResponseBody(req, body), columnBody = projectArrayColumns(req, filteredBody), projectedBody = projectResponseBody(req, columnBody); traceEvent(trace, 'fetch_finished', req, { httpStatus: response.status, responseLength: body.length, projectedLength: projectedBody.length }); return { ok: response.ok, status: response.status, headers: { contentType: response.headers.get('content-type') || '' }, body: projectedBody, transport: Object.assign({}, captured, { trace: trace }) }; });
     }).catch(function (err) {
       traceEvent(trace, 'fetch_finished', req, { error: String(err && err.message || err) });
       try { err.trace = trace; } catch (ignore) {}

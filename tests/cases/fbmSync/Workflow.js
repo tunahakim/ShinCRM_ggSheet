@@ -105,6 +105,7 @@ function workerHarness(relayReplies, fbmTabs, tabReply) {
   };
   const relayCalls = [];
   let fbmTabQueries = 0;
+  let fbmTabCreates = 0;
   let fbmMessages = 0;
   const context = {
     console: { log() {}, warn() {}, info() {} }, Date, URL, Promise, Error, AbortController, setTimeout, clearTimeout,
@@ -117,6 +118,7 @@ function workerHarness(relayReplies, fbmTabs, tabReply) {
           if (isFbm) { fbmTabQueries += 1; return Promise.resolve(fbmTabs || []); }
           return Promise.resolve([]);
         },
+        create(options) { fbmTabCreates += 1; return Promise.resolve({ id: 99, url: options && options.url, status: 'complete' }); },
         sendMessage(tabId, message, done) {
           fbmMessages += 1;
           if (done) { done(tabReply ? tabReply(tabId, message) : null); }
@@ -142,7 +144,7 @@ function workerHarness(relayReplies, fbmTabs, tabReply) {
   };
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(WORKER, 'utf8'), context, { filename: WORKER });
-  return { context, relayCalls, storage, metrics: () => ({ fbmTabQueries, fbmMessages }) };
+  return { context, relayCalls, storage, metrics: () => ({ fbmTabQueries, fbmTabCreates, fbmMessages }) };
 }
 
 async function chay(so) {
@@ -252,6 +254,46 @@ async function chay(so) {
     ['check', 'read', 'push', 'write'].map((mode) => gates.canWriteFbm(mode))
   ], [[false, true, false, true], [false, false, true, true]]);
 
+  const scheduleFlow = workflowGas();
+  check(so, 'cau hinh Extension mac dinh mot nhip 5 phut va startup bat', [scheduleFlow.hop.FbmSync.extensionConfigPublic().pollMinutes, scheduleFlow.hop.FbmSync.extensionConfigPublic().runOnStartup], [5, true]);
+  const savedExtension = scheduleFlow.hop.FbmSync.extensionConfigSave({ pollMinutes: 15, runOnStartup: false });
+  check(so, 'cau hinh Extension cho phep doi nhip nhung khong doi lich nghiep vu', [savedExtension.ok, savedExtension.pollMinutes, savedExtension.runOnStartup, scheduleFlow.hop.FbmSync.backgroundSchedulePublic().heartbeat.minutes], [true, 15, false, 5]);
+  const savedSchedule = scheduleFlow.hop.FbmSync.backgroundScheduleSave({ heartbeat: { enabled: false, minutes: 10 }, customer: { enabled: true, minutes: 60 }, activity: { enabled: false, minutes: 30 } });
+  check(so, 'GAS luu cong tac va chu ky tung tien trinh nen', [savedSchedule.ok, savedSchedule.schedule.heartbeat.enabled, savedSchedule.schedule.heartbeat.minutes, savedSchedule.schedule.activity.enabled], [true, false, 10, false]);
+  scheduleFlow.hop.FbmSync.identityPreflight = () => ({ blocking: false, status: { status: 'BOUND' }, message: '' });
+  const now = Date.now();
+  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_CUSTOMER_SCAN', String(now - 1));
+  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_ACTIVITY_SCAN', String(now - 1));
+  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_HEARTBEAT', String(now - 1));
+  const pickedCustomer = scheduleFlow.hop.FbmSync.schedulerPickDue(now);
+  check(so, 'scheduler GAS uu tien Customer khi Customer va Activity cung den han', [pickedCustomer.ok, pickedCustomer.kind, scheduleFlow.hop.FbmSync.stateRead().scheduledScan], [true, 'customer', 'customer']);
+  const duplicateReservation = scheduleFlow.hop.FbmSync.schedulerPickDue(now + 1);
+  check(so, 'scheduler GAS lap lai cung nhat khong tao reservation thu hai', [duplicateReservation.ok, duplicateReservation.kind, duplicateReservation.existing], [true, 'customer', true]);
+  scheduleFlow.hop.FbmSync.statePatch({ runId: 'running-a', phase: 'pull_customer', cursor: { kind: 'customer_grid' }, activeRequestId: '' });
+  const blockedOverlap = scheduleFlow.hop.FbmSync.schedulerPickDue(now + 1);
+  check(so, 'scheduler GAS khong cap tien trinh song song khi A dang chay', [blockedOverlap.ok, blockedOverlap.code], [false, 'SYNC_ALREADY_RUNNING']);
+  scheduleFlow.hop.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', scheduledScan: '' });
+  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_CUSTOMER_SCAN', String(now + 60000));
+  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_ACTIVITY_SCAN', String(now + 60000));
+  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_HEARTBEAT', String(now + 60000));
+  const noDue = scheduleFlow.hop.FbmSync.heartbeatRequest({ source: 'alarm' });
+  check(so, 'scheduler GAS khong cap heartbeat khi khong co lich den han', [noDue.ok, noDue.code, noDue.request], [true, 'NO_PROCESS_DUE', null]);
+  scheduleFlow.hop.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, scheduledScan: '' });
+  scheduleFlow.hop.FbmSync.backgroundScheduleSave({ heartbeat: { enabled: true, minutes: 5 }, customer: { enabled: true, minutes: 60 }, activity: { enabled: true, minutes: 30 } });
+  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_CUSTOMER_SCAN', String(now + 60000));
+  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_ACTIVITY_SCAN', String(now + 60000));
+  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_HEARTBEAT', String(now - 1));
+  const heartbeatLowest = scheduleFlow.hop.FbmSync.schedulerPickDue(now);
+  check(so, 'scheduler GAS chi chon giu phien khi khong co tien trinh du lieu den han', [heartbeatLowest.ok, heartbeatLowest.kind], [true, 'heartbeat']);
+  check(so, 'cau hinh scheduler tu choi chu ky ngoai gioi han', [scheduleFlow.hop.FbmSync.extensionConfigSave({ pollMinutes: 0 }).ok, (() => { try { scheduleFlow.hop.FbmSync.backgroundScheduleSave({ customer: { minutes: 0 } }); return false; } catch (ignore) { return true; } })()], [false, true]);
+  scheduleFlow.hop.FbmSync.extensionConfigSave({ pollMinutes: 15, runOnStartup: true });
+  scheduleFlow.hop.FbmSync.backgroundScheduleSave({ heartbeat: { enabled: true, minutes: 5 }, customer: { enabled: true, minutes: 60 }, activity: { enabled: true, minutes: 30 } });
+  const startup = scheduleFlow.hop.FbmSync.heartbeatRequest({ source: 'startup' });
+  check(so, 'Chrome startup co the hoi GAS ngay mot luot theo cau hinh', [startup.ok, startup.code, startup.request && startup.request.meta.kind], [true, 'HEARTBEAT_REQUEST_READY', 'heartbeat']);
+  const bulkProjection = scheduleFlow.hop.FbmSync.activityBulkProjection(['id', 'ma_kh', 'ma_cv', 'ten_cv', 'details', 'end_date', 'owner', 'datetime0', 'line_nbr']);
+  const bulkProjectionRequest = scheduleFlow.hop.FbmSync.activityBulkRequest({ type: 1, count: 100, gridPageIndex: 1, gridPageValue: ['2026-01-01'], transport: bulkProjection });
+  check(so, 'GAS cap chi dan loc cot generic cho bulk Activity, khong hardcode o Extension', [bulkProjection.arrayProjections[0].indices.join(','), bulkProjectionRequest.meta.transport.arrayProjections[0].paths.join('|')], ['0,3,4,5,6,7,8,1,2', 'd.Rows|d.ViewPage.Fields']);
+
   const noopWorker = workerHarness([{ ok: true, code: 'HEARTBEAT_NOOP', request: null }], []);
   const noopResult = await noopWorker.context.fbmHeartbeatNow('workflow');
   check(so, 'alarm noop: Extension hoi GAS mot lan, khong tim tab va khong fetch FBM', [
@@ -266,6 +308,17 @@ async function chay(so) {
   check(so, 'alarm khong co tab: Extension nop transport failure dung reservation va khong tu fetch FBM', [
     noTabResult.code, noTabWorker.relayCalls.map((item) => [item.body.kind, item.body.requestId || '', item.body.code || '']), noTabWorker.metrics().fbmMessages
   ], ['FBM_TAB_NOT_FOUND', [['heartbeat_request', '', ''], ['heartbeat_transport_failure', 'reserved-heartbeat', 'FBM_TAB_NOT_FOUND']], 0]);
+
+  const autoOpenWorker = workerHarness([
+    { ok: true, request: { id: 'open-heartbeat', url: 'https://fbo.com.vn:8888/service', method: 'POST', bodyText: '{}', meta: { openFbmContext: { url: 'https://fbo.com.vn:8888/Main/zccrAccount.aspx', active: false } } } },
+    { ok: true, code: 'HEARTBEAT_COMPLETE', request: null }
+  ], [], (tabId, message) => {
+    if (message.type === 'FBM_PING_V2') { return { ready: true, version: '21.14' }; }
+    if (message.type === 'FBM_EXECUTE_V2') { return { result: { ok: true, status: 200, body: '{"d":{"TotalRowCount":12,"Rows":[]}}', transport: { trace: [{ stage: 'executor_response_sent', requestId: message.request.id }] } } }; }
+    return null;
+  });
+  const autoOpenResult = await autoOpenWorker.context.fbmHeartbeatNow('workflow');
+  check(so, 'GAS cap lenh mo tab: Extension chi mo dung URL duoc cap va moi gui request', [autoOpenResult.ok, autoOpenWorker.metrics().fbmTabQueries, autoOpenWorker.metrics().fbmTabCreates, autoOpenWorker.metrics().fbmMessages], [true, 1, 1, 2]);
 
   const rawHeartbeat = '{"d":{"TotalRowCount":12,"Rows":[]}}';
   const completeWorker = workerHarness([

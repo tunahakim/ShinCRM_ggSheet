@@ -233,10 +233,11 @@ FbmSync.activityBulkNext = function (state, grid) {
   cursor.seen = Number(cursor.seen || 0) + rows.length;
   if (rows.length && rows.length >= count && (!total || cursor.seen < total)) {
     var last = rows[rows.length - 1];
+    if (!cursor.transport && typeof FbmSync.activityBulkProjection === 'function') { cursor.transport = FbmSync.activityBulkProjection(grid.fields); }
     cursor.type = 1; cursor.pageIndex = Number(cursor.pageIndex || -1) + 1;
     cursor.pageValue = [last.end_date || '', last.datetime0 || '', last.id || '', last.line_nbr || 0];
     state.cursor = cursor; FbmSync.stateWrite(state);
-    return FbmSync.activityBulkRequest({ type: 1, count: count, gridPageIndex: cursor.pageIndex, gridPageValue: cursor.pageValue, gridRefresh: false });
+    return FbmSync.activityBulkRequest({ type: 1, count: count, gridPageIndex: cursor.pageIndex, gridPageValue: cursor.pageValue, gridRefresh: false, transport: cursor.transport });
   }
   state.metadata = state.metadata || {};
   var missingResult = typeof FbmSync.writeActivityBulkMissing === 'function' ? FbmSync.writeActivityBulkMissing(localActivities) : { total: 0, written: 0, sample: [] };

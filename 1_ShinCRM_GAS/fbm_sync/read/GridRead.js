@@ -104,11 +104,25 @@ FbmSync.activityBulkRequest = function (options) {
   try { since = String(FbmSync.scriptSettings().activitySince || '').trim(); } catch (ignore) { since = ''; }
   if (since && !opt.includeHistory) { keys.push({ Name: 'end_date', Opr: '>=', Value: since, Type: 'Date', Ignore: false }); }
   delete opt.includeHistory;
+  var transport = opt.transport;
+  delete opt.transport;
   opt.externalKey = keys;
   var request = FbmSync.gridRequest('activity', opt);
   request.meta.kind = 'activity_bulk_grid';
   request.meta.scan = 'bulk_activity';
+  if (transport && Array.isArray(transport.arrayProjections)) { request.meta.transport = transport; }
   return request;
+};
+
+/** Dựng chỉ dẫn cột generic sau khi GAS đã đọc AliasName của trang đầu. */
+FbmSync.activityBulkProjection = function (fields) {
+  var required = ['id', 'ten_cv', 'details', 'end_date', 'owner', 'datetime0', 'line_nbr'], optional = ['ma_kh', 'ma_cv'], names = required.concat(optional), positions = [], requiredFound = 0, source = fields || [];
+  names.forEach(function (name) {
+    var index = source.map(function (field) { return String(field || '').toLowerCase(); }).indexOf(name);
+    if (index >= 0) { positions.push(index); if (required.indexOf(name) >= 0) { requiredFound += 1; } }
+  });
+  if (requiredFound < required.length) { return null; }
+  return { arrayProjections: [{ paths: ['d.Rows', 'd.ViewPage.Fields'], indices: positions }] };
 };
 
 /** Dựng request đọc lại đúng bản ghi đang xử lý conflict trước khi chốt. */

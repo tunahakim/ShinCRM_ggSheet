@@ -25,6 +25,14 @@ FbmSync.controlDispatch = function (command, payload) {
       return FbmSync.setBackgroundEnabled(input.enabled === true);
     case 'get_background_switch':
       return { ok: true, enabled: FbmSync.backgroundEnabled() };
+    case 'get_extension_config':
+      return { ok: true, config: FbmSync.extensionConfigPublic ? FbmSync.extensionConfigPublic() : { pollMinutes: 5, runOnStartup: true } };
+    case 'save_extension_config':
+      return FbmSync.extensionConfigSave(input.config || {});
+    case 'get_background_schedule':
+      return { ok: true, schedule: FbmSync.backgroundSchedulePublic ? FbmSync.backgroundSchedulePublic() : {} };
+    case 'save_background_schedule':
+      return FbmSync.backgroundScheduleSave(input.schedule || {});
     case 'notification':
       return FbmSync.controlNotification(input.status || FbmSync.statusView());
     case 'approve_push':
@@ -58,7 +66,7 @@ FbmSync.controlDispatch = function (command, payload) {
 FbmSync.controlDispatchLocked = function (command, payload) {
   // transport_failure tự giữ orchestration lock để cả Sidebar và relay nền dùng chung
   // một handler; không bọc thêm ở đây vì Apps Script Lock không tái nhập.
-  var name = String(command || ''), mutating = ['start', 'continue', 'approve_push', 'cancel', 'retry_push_failures', 'set_master_switch', 'set_background_switch', 'save_login_config', 'set_auto_login', 'identity_status', 'save_identity_binding', 'prepare_conflict', 'confirm_conflict'];
+  var name = String(command || ''), mutating = ['start', 'continue', 'approve_push', 'cancel', 'retry_push_failures', 'set_master_switch', 'set_background_switch', 'save_extension_config', 'save_background_schedule', 'save_login_config', 'set_auto_login', 'identity_status', 'save_identity_binding', 'prepare_conflict', 'confirm_conflict'];
   if (mutating.indexOf(name) < 0) { return FbmSync.controlDispatch(name, payload); }
   return FbmSync.withOrchestrationLock(function () { return FbmSync.controlDispatch(name, payload); });
 };

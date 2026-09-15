@@ -2,21 +2,111 @@
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 FbmSync.BACKGROUND_SWITCH_KEY = 'FBM_SYNC_BACKGROUND_ENABLED';
 FbmSync.RELAY_HOP_LIMIT = 20;
+FbmSync.EXTENSION_CONFIG_KEY = 'FBM_SYNC_EXTENSION_CONFIG_V1';
+FbmSync.BACKGROUND_SCHEDULE_KEY = 'FBM_SYNC_BACKGROUND_SCHEDULE_V1';
 FbmSync.backgroundEnabled = function () { try { return FbmSync.props().getProperty(FbmSync.BACKGROUND_SWITCH_KEY) !== 'false'; } catch (err) { return true; } };
 FbmSync.setBackgroundEnabled = function (enabled) { var value = enabled === true; FbmSync.props().setProperty(FbmSync.BACKGROUND_SWITCH_KEY, value ? 'true' : 'false'); return { ok: true, enabled: value }; };
-/** Ghi thời điểm dự kiến cho heartbeat và hai đợt quét. */
+FbmSync.extensionConfigDefault = function () { return { pollMinutes: 5, runOnStartup: true }; };
+FbmSync.extensionConfigRead = function () {
+  var fallback = FbmSync.extensionConfigDefault();
+  try {
+    var raw = FbmSync.props().getProperty(FbmSync.EXTENSION_CONFIG_KEY), parsed = raw ? JSON.parse(raw) : {};
+    if (!parsed || typeof parsed !== 'object') { return fallback; }
+    var minutes = Number(parsed.pollMinutes);
+    fallback.pollMinutes = isFinite(minutes) ? Math.max(1, Math.min(60, Math.round(minutes))) : fallback.pollMinutes;
+    fallback.runOnStartup = parsed.runOnStartup !== false;
+  } catch (ignore) {}
+  return fallback;
+};
+FbmSync.extensionConfigSave = function (input) {
+  var value = input || {}, minutes = Number(value.pollMinutes), current = FbmSync.extensionConfigRead();
+  if (!isFinite(minutes) || minutes < 1 || minutes > 60) { return { ok: false, code: 'EXTENSION_POLL_INVALID', message: 'Nhịp hỏi GAS phải từ 1 đến 60 phút.' }; }
+  var saved = { pollMinutes: Math.round(minutes), runOnStartup: value.runOnStartup !== false };
+  FbmSync.props().setProperty(FbmSync.EXTENSION_CONFIG_KEY, JSON.stringify(saved));
+  return { ok: true, pollMinutes: saved.pollMinutes, runOnStartup: saved.runOnStartup, previous: current };
+};
+FbmSync.backgroundScheduleDefault = function () {
+  return {
+    customer: { enabled: true, minutes: 60, priority: 10 },
+    activity: { enabled: true, minutes: 30, priority: 20 },
+    heartbeat: { enabled: true, minutes: 5, priority: 100 }
+  };
+};
+FbmSync.backgroundScheduleRead = function () {
+  var fallback = FbmSync.backgroundScheduleDefault();
+  try {
+    var raw = FbmSync.props().getProperty(FbmSync.BACKGROUND_SCHEDULE_KEY), parsed = raw ? JSON.parse(raw) : {};
+    ['customer', 'activity', 'heartbeat'].forEach(function (kind) {
+      var item = parsed && parsed[kind] || {}, minutes = Number(item.minutes);
+      fallback[kind].enabled = item.enabled !== false;
+      fallback[kind].minutes = isFinite(minutes) ? Math.max(1, Math.min(7 * 24 * 60, Math.round(minutes))) : fallback[kind].minutes;
+    });
+  } catch (ignore) {}
+  return fallback;
+};
+FbmSync.backgroundScheduleSave = function (input) {
+  var current = FbmSync.backgroundScheduleRead(), value = input || {}, saved = {};
+  ['customer', 'activity', 'heartbeat'].forEach(function (kind) {
+    var item = value[kind] || {}, minutes = item.minutes === undefined ? current[kind].minutes : Number(item.minutes);
+    if (!isFinite(minutes) || minutes < 1 || minutes > 7 * 24 * 60) { throw new Error('Chu kỳ ' + kind + ' phải từ 1 phút đến 7 ngày.'); }
+    saved[kind] = { enabled: item.enabled === undefined ? current[kind].enabled : item.enabled === true, minutes: Math.round(minutes), priority: current[kind].priority };
+  });
+  FbmSync.props().setProperty(FbmSync.BACKGROUND_SCHEDULE_KEY, JSON.stringify(saved));
+  return { ok: true, schedule: saved };
+};
+FbmSync.extensionConfigPublic = function () {
+  var value = FbmSync.extensionConfigRead();
+  return { pollMinutes: value.pollMinutes, runOnStartup: value.runOnStartup === true };
+};
+FbmSync.backgroundSchedulePublic = function () {
+  var value = FbmSync.backgroundScheduleRead();
+  return { customer: value.customer, activity: value.activity, heartbeat: value.heartbeat };
+};
+/** Ghi thời điểm dự kiến cho các tiến trình nghiệp vụ. */
 FbmSync.schedule = function () {
-  var props = PropertiesService.getDocumentProperties();
-  props.setProperty('FBM_SYNC_NEXT_HEARTBEAT', String(Date.now() + 5 * 60 * 1000));
-  props.setProperty('FBM_SYNC_NEXT_CUSTOMER_SCAN', String(Date.now() + 60 * 60 * 1000));
-  props.setProperty('FBM_SYNC_NEXT_ACTIVITY_SCAN', String(Date.now() + 30 * 60 * 1000));
-  return { heartbeatMinutes: 5, customerMinutes: 60, activityMinutes: 30 };
+  var props = PropertiesService.getDocumentProperties(), at = Date.now(), schedule = FbmSync.backgroundScheduleRead();
+  props.setProperty('FBM_SYNC_NEXT_HEARTBEAT', String(at + schedule.heartbeat.minutes * 60 * 1000));
+  props.setProperty('FBM_SYNC_NEXT_CUSTOMER_SCAN', String(at + schedule.customer.minutes * 60 * 1000));
+  props.setProperty('FBM_SYNC_NEXT_ACTIVITY_SCAN', String(at + schedule.activity.minutes * 60 * 1000));
+  return { heartbeatMinutes: schedule.heartbeat.minutes, customerMinutes: schedule.customer.minutes, activityMinutes: schedule.activity.minutes };
+};
+FbmSync.ensureScheduleMarkers = function (now) {
+  var props = PropertiesService.getDocumentProperties(), at = Number(now || Date.now()), schedule = FbmSync.backgroundScheduleRead();
+  if (!Number(props.getProperty('FBM_SYNC_NEXT_CUSTOMER_SCAN') || 0)) { props.setProperty('FBM_SYNC_NEXT_CUSTOMER_SCAN', String(at + schedule.customer.minutes * 60 * 1000)); }
+  if (!Number(props.getProperty('FBM_SYNC_NEXT_ACTIVITY_SCAN') || 0)) { props.setProperty('FBM_SYNC_NEXT_ACTIVITY_SCAN', String(at + schedule.activity.minutes * 60 * 1000)); }
+  if (!Number(props.getProperty('FBM_SYNC_NEXT_HEARTBEAT') || 0)) { props.setProperty('FBM_SYNC_NEXT_HEARTBEAT', String(at + schedule.heartbeat.minutes * 60 * 1000)); }
+};
+/** Chọn một tiến trình đến hạn sau khi Extension đã hỏi GAS; không tạo request song song. */
+FbmSync.schedulerPickDue = function (now, options) {
+  var at = Number(now || Date.now()), opt = options || {}, props = PropertiesService.getDocumentProperties(), schedule = FbmSync.backgroundScheduleRead(), state = FbmSync.stateRead();
+  FbmSync.ensureScheduleMarkers(at);
+  if (!FbmSync.masterEnabled() || !FbmSync.backgroundEnabled()) { return { ok: false, code: 'BACKGROUND_DISABLED' }; }
+  if (state.runId && ['idle', 'done', 'error'].indexOf(String(state.phase || '')) < 0) { return { ok: false, code: 'SYNC_ALREADY_RUNNING' }; }
+  if (state.scheduledScan) { return { ok: true, kind: String(state.scheduledScan), existing: true }; }
+  var candidates = ['customer', 'activity', 'heartbeat'].map(function (kind) {
+    var item = schedule[kind], key = kind === 'customer' ? 'FBM_SYNC_NEXT_CUSTOMER_SCAN' : kind === 'activity' ? 'FBM_SYNC_NEXT_ACTIVITY_SCAN' : 'FBM_SYNC_NEXT_HEARTBEAT';
+    return { kind: kind, key: key, due: Number(props.getProperty(key) || 0), enabled: item.enabled, priority: item.priority, minutes: item.minutes };
+  }).filter(function (item) { return item.enabled && item.due <= at; }).sort(function (a, b) { return a.priority - b.priority || a.due - b.due; });
+  // Chrome startup is an explicit user-visible option. It may cause one immediate
+  // session check, but never creates a second timer or a burst of catch-up work.
+  if (!candidates.length && opt.startup === true && FbmSync.extensionConfigRead().runOnStartup !== false && schedule.heartbeat.enabled) {
+    candidates.push({ kind: 'heartbeat', key: 'FBM_SYNC_NEXT_HEARTBEAT', due: at, priority: schedule.heartbeat.priority, minutes: schedule.heartbeat.minutes });
+  }
+  if (!candidates.length) { return { ok: false, code: 'NO_PROCESS_DUE' }; }
+  var chosen = candidates[0], next = at + chosen.minutes * 60 * 1000;
+  props.setProperty(chosen.key, String(next));
+  state.scheduledScan = chosen.kind;
+  state.nextRunAt = next;
+  state.message = 'Đã chọn tiến trình nền ' + chosen.kind + '; chờ request heartbeat hiện tại hoàn tất.';
+  FbmSync.stateWrite(state);
+  return { ok: true, kind: chosen.kind, nextRunAt: next };
 };
 /** Nhận quyền một lượt scheduler bằng khóa tài liệu; không giữ công việc trong RAM. */
 FbmSync.schedulerClaim = function (kind, now) {
-  var names = { heartbeat: ['FBM_SYNC_NEXT_HEARTBEAT', 5 * 60 * 1000], customer: ['FBM_SYNC_NEXT_CUSTOMER_SCAN', 60 * 60 * 1000], activity: ['FBM_SYNC_NEXT_ACTIVITY_SCAN', 30 * 60 * 1000] };
+  var configured = FbmSync.backgroundScheduleRead(), names = { heartbeat: ['FBM_SYNC_NEXT_HEARTBEAT', 5 * 60 * 1000], customer: ['FBM_SYNC_NEXT_CUSTOMER_SCAN', configured.customer.minutes * 60 * 1000], activity: ['FBM_SYNC_NEXT_ACTIVITY_SCAN', configured.activity.minutes * 60 * 1000] };
   var item = names[String(kind || '')], props = PropertiesService.getDocumentProperties(), at = Number(now || Date.now());
   if (!item) { return { ok: false, code: 'UNKNOWN_SCHEDULE' }; }
+  if (String(kind) !== 'heartbeat' && configured[String(kind)] && configured[String(kind)].enabled === false) { return { ok: false, code: 'PROCESS_DISABLED', message: 'Tiến trình nền ' + String(kind) + ' đang tắt.' }; }
   if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED', message: 'Đồng bộ đang tắt; scheduler không mở kỳ mới.', status: FbmSync.statusView() }; }
   if (!FbmSync.backgroundEnabled()) { return { ok: false, code: 'BACKGROUND_DISABLED', message: 'Đồng bộ nền đang tắt.', status: FbmSync.statusView() }; }
   var due = Number(props.getProperty(item[0]) || 0);
@@ -47,9 +137,8 @@ FbmSync.schedulerClaim = function (kind, now) {
 function fbmInstallScheduler() {
   var names = ['fbmHeartbeatTrigger', 'fbmCustomerScanTrigger', 'fbmActivityScanTrigger', 'fbmSupervisorTrigger'];
   ScriptApp.getProjectTriggers().forEach(function (trigger) { if (names.indexOf(trigger.getHandlerFunction()) >= 0) { ScriptApp.deleteTrigger(trigger); } });
-  ScriptApp.newTrigger('fbmHeartbeatTrigger').timeBased().everyMinutes(5).create();
-  ScriptApp.newTrigger('fbmCustomerScanTrigger').timeBased().everyHours(1).create();
-  ScriptApp.newTrigger('fbmActivityScanTrigger').timeBased().everyMinutes(30).create();
+  // GAS không tự gọi FBM và không cần một trigger cho từng tiến trình.
+  // Extension chỉ hỏi GAS bằng một alarm; trigger này chỉ thu hồi phiên bị treo.
   ScriptApp.newTrigger('fbmSupervisorTrigger').timeBased().everyMinutes(1).create();
   return FbmSync.schedule();
 }
@@ -108,6 +197,12 @@ function fbmSyncHeartbeatRequest(options) {
     if (Number(options && options.hop || 0) >= Number(FbmSync.RELAY_HOP_LIMIT || 20)) {
       return { ok: true, code: 'RELAY_SLICE_COMPLETE', request: null, status: FbmSync.statusView() };
     }
+    // Select and reserve one due business process before checking the session.
+    // This prevents auto-login from running on every technical poll.
+    var picked = FbmSync.schedulerPickDue(now, { startup: source === 'startup' });
+    if (!picked.ok) {
+      return { ok: true, noop: true, code: picked.code || 'NO_PROCESS_DUE', request: null, status: FbmSync.statusView() };
+    }
     // State chưa có cookie không đồng nghĩa tab FBM đã logout: request heartbeat
     // vẫn có thể lấy cookie qua capture generic do GAS chỉ dẫn.
     var missingSession = session.expired === true;
@@ -126,15 +221,21 @@ function fbmSyncHeartbeatRequest(options) {
         ? 'Đang chờ đủ 30 phút trước khi thử đăng nhập FBM lại.'
         : 'Chưa có điều kiện tự đăng nhập FBM; đang chờ người dùng đăng nhập thủ công hoặc cấu hình auto-login.';
       state.message = state.lastError;
-      state.scheduledScan = '';
       FbmSync.stateWrite(state);
       return { ok: true, noop: true, code: waitingCode, request: null, retryAt: loginConfig.retryAt || 0, status: FbmSync.statusView() };
     }
-    if (typeof FbmSync.heartbeatCustomerRequest !== 'function') { return { ok: false, code: 'HEARTBEAT_REQUEST_UNAVAILABLE', request: null, status: FbmSync.statusView() }; }
+    // Customer/Activity runs start only after this one session heartbeat.
     state.cursor = { kind: 'heartbeat' };
     state.relayHop = 0;
     FbmSync.stateWrite(state);
-    return { ok: true, code: 'HEARTBEAT_REQUEST_READY', request: FbmSync.nextEnvelope(FbmSync.heartbeatCustomerRequest()), status: FbmSync.statusView() };
+    if (typeof FbmSync.heartbeatCustomerRequest !== 'function') { return { ok: false, code: 'HEARTBEAT_REQUEST_UNAVAILABLE', request: null, status: FbmSync.statusView() }; }
+    var heartbeatRequest = FbmSync.heartbeatCustomerRequest();
+    var loginPolicy = typeof FbmSync.loginConfigRead === 'function' ? FbmSync.loginConfigRead() : {};
+    if (loginPolicy.autoOpenTab === true) {
+      heartbeatRequest.meta = heartbeatRequest.meta || {};
+      heartbeatRequest.meta.openFbmContext = { url: 'https://fbo.com.vn:8888/Main/zccrAccount.aspx', active: false };
+    }
+    return { ok: true, code: 'HEARTBEAT_REQUEST_READY', request: FbmSync.nextEnvelope(heartbeatRequest), status: FbmSync.statusView() };
   } finally { lock.releaseLock(); }
 }
 FbmSync.heartbeatRequest = fbmSyncHeartbeatRequest;

@@ -134,6 +134,7 @@ async function chay(so) {
   const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', '2_ShinCRM_Extension', 'manifest.json'), 'utf8'));
   check(so, 'worker ping dung executor phien ban truoc request FBM', workerSource.indexOf("FBM_PING_V2") >= 0 && workerSource.indexOf("FBM_EXECUTOR_VERSION") >= 0 && workerSource.indexOf("sendTabMessage(tabId, { type: 'FBM_EXECUTE_V2'") >= 0, true);
   check(so, 'worker chi co mot diem gui request FBM', (workerSource.match(/sendTabMessage\(tabId, \{ type: 'FBM_EXECUTE_V2', request: request \}/g) || []).length, 1);
+  check(so, 'Extension chi co mot alarm ky thuat gas_poll va khong co alarm theo tien trinh', [workerSource.indexOf("var GAS_POLL_ALARM = 'gas_poll'") >= 0, workerSource.indexOf("'fbm-heartbeat'") < 0, workerSource.indexOf("periodInMinutes: minutes") >= 0, workerSource.indexOf("fbmHeartbeatNow('startup')") >= 0], [true, true, true, true]);
   check(so, 'worker khong tao hai request FBM khi Sidebar thu lai cung id', workerSource.indexOf('fbmRequestFlights') >= 0 && workerSource.indexOf('existingFlight') >= 0, true);
   check(so, 'heartbeat relay gui response thô, Spreadsheet ID va hop cho GAS', workerSource.indexOf("kind: 'heartbeat'") >= 0 && workerSource.indexOf('spreadsheetId: config.spreadsheetId') >= 0 && workerSource.indexOf('response: rawFbmReply(reply)') >= 0 && workerSource.indexOf('hop: used + 1') >= 0, true);
   check(so, 'heartbeat relay tiep tuc cursor do GAS quyet dinh diem dung', workerSource.indexOf('relayScheduledRequests(tabId') >= 0 && workerSource.indexOf('used >= 10') < 0, true);
@@ -141,6 +142,7 @@ async function chay(so) {
   check(so, 'heartbeat relay request tiep theo qua cong background_sync chung', workerSource.indexOf("kind: 'background_sync'") >= 0 && workerSource.indexOf("command: 'continue'") >= 0 && workerSource.indexOf('payload: { response: raw }') >= 0, true);
   check(so, 'alarm chi tim tab FBM sau khi co relay config', workerSource.indexOf("fbmHeartbeatNow('alarm')") >= 0 && workerSource.indexOf("if (!config) {") >= 0 && workerSource.indexOf('findFbmTab()') >= 0, true);
   check(so, 'relay config luu Spreadsheet ID', workerSource.indexOf('fbmSpreadsheetId: spreadsheetId') >= 0, true);
+  check(so, 'relay config luu nhịp gas_poll va tuy chon startup', workerSource.indexOf('fbmPollMinutes') >= 0 && workerSource.indexOf('fbmRunOnStartup') >= 0 && workerSource.indexOf('config.extension') >= 0, true);
   check(so, 'service worker co quyen goi Sheets va Web App GAS', manifest.host_permissions.includes('https://docs.google.com/*') && manifest.host_permissions.includes('https://script.google.com/macros/*') && manifest.host_permissions.includes('https://script.googleusercontent.com/macros/*'), true);
   check(so, 'relay GAS co timeout va luu chan doan toi thieu', workerSource.indexOf('GAS_RELAY_TIMEOUT_MS') >= 0 && workerSource.indexOf('RELAY_TIMEOUT') >= 0 && workerSource.indexOf('fbmRelayLastStatus') >= 0, true);
   const sidebarSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'client', 'Sidebar.html'), 'utf8');
@@ -208,6 +210,7 @@ async function chay(so) {
 
   let relayFetches = 0;
   let relayAlarms = 0;
+  let relayAlarm = null;
   let workerMessageListener = null;
   const relayStorage = {};
   const workerContext = {
@@ -216,7 +219,12 @@ async function chay(so) {
       tabs: { query: () => Promise.resolve([]), sendMessage() {} },
       scripting: { executeScript: () => Promise.resolve() },
       runtime: { lastError: null, onMessage: { addListener(fn) { workerMessageListener = fn; } }, onInstalled: { addListener() {} }, onStartup: { addListener() {} } },
-      alarms: { create() { relayAlarms += 1; }, clear: () => Promise.resolve(true), onAlarm: { addListener() {} } },
+      alarms: {
+        create(name, info) { relayAlarms += 1; relayAlarm = { name, periodInMinutes: info && info.periodInMinutes }; },
+        get(name, done) { done(relayAlarm && relayAlarm.name === name ? relayAlarm : null); },
+        clear: () => Promise.resolve(true),
+        onAlarm: { addListener() {} }
+      },
       storage: { local: {
         get(keys, done) { const value = {}; (Array.isArray(keys) ? keys : [keys]).forEach((key) => { value[key] = relayStorage[key]; }); done(value); },
         set(value, done) { Object.assign(relayStorage, value); done(); }
@@ -228,7 +236,25 @@ async function chay(so) {
   vm.runInContext(workerSource, workerContext, { filename: WORKER_FILE });
   const localRelay = await workerContext.configureRelay({ url: 'https://script.google.com/macros/s/relay-test/exec', key: 'relay-key', spreadsheetId: 'sheet-test' });
   const unchangedRelay = await workerContext.configureRelay({ url: 'https://script.google.com/macros/s/relay-test/exec', key: 'relay-key', spreadsheetId: 'sheet-test' });
-  check(so, 'cau hinh relay chi luu local va khong phat sinh /exec probe', [localRelay.code, unchangedRelay.code, relayFetches, relayStorage.fbmWebAppUrl, relayAlarms > 0, typeof workerMessageListener], ['RELAY_CONFIG_SAVED', 'RELAY_CONFIG_UNCHANGED', 0, 'https://script.google.com/macros/s/relay-test/exec', true, 'function']);
+  const changedRelay = await workerContext.configureRelay({ url: 'https://script.google.com/macros/s/relay-test/exec', key: 'relay-key', spreadsheetId: 'sheet-test', extension: { pollMinutes: 6, runOnStartup: true } });
+  check(so, 'cau hinh relay chi luu local va khong phat sinh /exec probe', [localRelay.code, unchangedRelay.code, changedRelay.code, relayFetches, relayStorage.fbmWebAppUrl, relayAlarms, relayAlarm.periodInMinutes, typeof workerMessageListener], ['RELAY_CONFIG_SAVED', 'RELAY_CONFIG_UNCHANGED', 'RELAY_CONFIG_SAVED', 0, 'https://script.google.com/macros/s/relay-test/exec', 2, 6, 'function']);
+
+  let updatedListener = null;
+  let updatedRemoved = false;
+  let createdUrl = '';
+  workerContext.chrome.tabs.query = () => Promise.resolve([]);
+  workerContext.chrome.tabs.create = (options) => { createdUrl = options.url; return Promise.resolve({ id: 77, status: 'loading' }); };
+  workerContext.chrome.tabs.onUpdated = {
+    addListener(fn) { updatedListener = fn; },
+    removeListener() { updatedRemoved = true; }
+  };
+  let openedTab = null;
+  const pendingTab = workerContext.ensureFbmTab({ meta: { openFbmContext: { url: 'https://fbo.com.vn:8888/Main/zccrAccount.aspx', active: false } } }).then((tab) => { openedTab = tab; return tab; });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  check(so, 'auto-open chi mo URL GAS cap va doi trang FBM tai xong', [openedTab, createdUrl, typeof updatedListener], [null, 'https://fbo.com.vn:8888/Main/zccrAccount.aspx', 'function']);
+  updatedListener(77, { status: 'complete' }, { id: 77, status: 'complete' });
+  await pendingTab;
+  check(so, 'auto-open tiep tuc sau khi tab FBM ready va thao listener', [openedTab && openedTab.id, openedTab && openedTab.status, updatedRemoved], [77, 'complete', true]);
 
   await new Promise((resolve) => {
     let listener = null;
@@ -279,6 +305,47 @@ async function chay(so) {
         });
       }, 20);
     }, 20);
+  });
+
+  await new Promise((resolve) => {
+    let listener = null;
+    let responseText = JSON.stringify({ d: { Rows: [[1, 'keep'], [2, 'drop'], [3, 'keep']] } });
+    const context = {
+      console: { log() {}, warn() {} }, Date, URL, Promise, Error, AbortController, setTimeout, clearTimeout,
+      Blob, Response, TextDecoder, TextEncoder, DecompressionStream: undefined,
+      document: { documentElement: { innerHTML: '', textContent: '' } },
+      fetch() { return Promise.resolve({ ok: true, status: 200, headers: { get() { return 'application/json'; } }, arrayBuffer() { return Promise.resolve(new TextEncoder().encode(responseText).buffer); } }); },
+      chrome: { runtime: { onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
+    };
+    vm.createContext(context);
+    vm.runInContext(executorSource, context, { filename: EXECUTOR_FILE });
+    listener({ type: 'FBM_EXECUTE_V2', request: { url: 'https://fbo.com.vn:8888/Main/activity', method: 'POST', bodyText: '{}', meta: { transport: { arrayFilters: [{ path: 'd.Rows', keyIndex: 0, values: ['1', '3'] }] } } } }, null, (reply) => {
+      setTimeout(() => {
+        const body = JSON.parse(reply.result.body);
+        check(so, 'executor loc mang generic theo tap khoa GAS cap', [body.d.Rows.length, body.d.Rows.map((row) => row[0]).join(','), reply.result.transport.trace.some((item) => item.stage === 'fetch_finished')], [2, '1,3', true]);
+        responseText = 'not-json';
+        listener({ type: 'FBM_EXECUTE_V2', request: { url: 'https://fbo.com.vn:8888/Main/activity', method: 'POST', bodyText: '{}', meta: { transport: { arrayFilters: [{ path: 'd.Rows', keyIndex: 0, values: ['1'] }] } } } }, null, (invalid) => {
+          setTimeout(() => {
+            check(so, 'executor loc JSON loi theo chi dan phai fail closed', [invalid.code, invalid.result], ['FBM_TRANSPORT_FILTER_INVALID_JSON', undefined]);
+            responseText = JSON.stringify({ d: { Rows: [[1, 'A', 'drop'], [2, 'B', 'drop']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'ma_kh' }, { AliasName: 'details' }] } } });
+            listener({ type: 'FBM_EXECUTE_V2', request: { url: 'https://fbo.com.vn:8888/Main/activity', method: 'POST', bodyText: '{}', meta: { transport: { arrayProjections: [{ paths: ['d.Rows', 'd.ViewPage.Fields'], indices: [0, 2] }] } } } }, null, (projectionReply) => {
+              setTimeout(() => {
+                const projected = projectionReply && projectionReply.result ? JSON.parse(projectionReply.result.body) : null;
+                check(so, 'executor chieu cot generic theo vi tri GAS cap cho ca rows va metadata', [projected && projected.d.Rows[0].join(','), projected && projected.d.ViewPage.Fields.map((field) => field.AliasName).join(','), projectionReply && projectionReply.result && projectionReply.result.transport.trace.some((item) => item.stage === 'fetch_finished'), projectionReply && projectionReply.code, projectionReply && projectionReply.error], ['1,drop', 'id,details', true, undefined, undefined]);
+                responseText = JSON.stringify({ d: { Rows: [], ViewPage: { Fields: [] } } });
+                listener({ type: 'FBM_EXECUTE_V2', request: { url: 'https://fbo.com.vn:8888/Main/activity', method: 'POST', bodyText: '{}', meta: { transport: { arrayProjections: [{ paths: ['d.Rows', 'd.ViewPage.Fields'], indices: [0, 2] }] } } } }, null, (emptyReply) => {
+                  setTimeout(() => {
+                    const empty = emptyReply && emptyReply.result ? JSON.parse(emptyReply.result.body) : null;
+                    check(so, 'executor chieu cot khong tao dong gia khi mang FBM rong', [empty && empty.d.Rows.length, empty && empty.d.ViewPage.Fields.length], [0, 0]);
+                    resolve();
+                  }, 20);
+                });
+              }, 20);
+            });
+          }, 20);
+        });
+      }, 20);
+    });
   });
 
   await new Promise((resolve) => {
