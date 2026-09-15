@@ -315,6 +315,7 @@ The client UI uses `client/ui/popupList.html` as the shared popup primitive. `se
 
 ## 2_ShinCRM_Extension
 
+    tests/cases/fbmSync/Settings.js  Kiểm migration và validation tham số phiên trong DocumentProperties.
 ```
 2_ShinCRM_Extension/content_scripts/model/live_model_reader.js Đọc mã khách từ lưới live của Sheets trong MAIN world; mã cột do Sidebar truyền, lỗi thì đóng an toàn.
 2_ShinCRM_Extension/content_scripts/fbm_sync/executor.js Fetch trong tab FBM.
