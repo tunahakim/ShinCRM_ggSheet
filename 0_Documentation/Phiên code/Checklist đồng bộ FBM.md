@@ -302,6 +302,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Có lệnh nghiệm thu phạm vi thử chạy preflight, lookup, pull, field/hash/link, idempotency và ghi báo cáo PASS/FAIL vào Log; hiện phạm vi DEV là `ALT00010`, không push FBM.
 - [x] Báo cáo che cookie/authorized nhưng giữ record ID, phase, request kind và hash trước/sau.
 - [x] `fbmProbeAltState` fail-closed nếu phát hiện candidate ngoài `ALT00010` và Activity con.
+- [x] Mỗi lần mở Spreadsheet, `onOpen` dựng menu rồi tự mở Sidebar qua cùng hàm dựng khung; lượt mở tự động không bật alert nếu dựng khung lỗi và không tự phát request FBM.
 - [x] Click icon Đồng bộ ở menu chính mở thẳng màn hình `Tổng quan`, không hiện menu trung gian.
 - [x] Module có menu nội bộ và năm màn hình: `Tổng quan`, `Tài khoản FBM`, `Chạy đồng bộ`, `Kết quả & xử lý`, `Cài đặt phiên`.
 - [x] Header có cụm phải `[ON/OFF] [☰]`; khi tắt, phiên thủ công, đồng bộ nền, auto-login và thao tác ghi/giải quyết conflict bị khóa, state/log vẫn xem được; menu con cuộn ở ngưỡng hai phần ba Sidebar.

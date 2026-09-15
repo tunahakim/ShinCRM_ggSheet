@@ -16,7 +16,7 @@ const { taoStubsGas } = require('./gas-stubs');
  *
  * Ba tệp cố ý **không** có trong danh sách này, và lý do thuộc về từng tệp chứ không phải một luật chung:
  *   - `server/sheet/SetupSheets.js` — dựng khung sheet, chỉ ca kiểm nói về việc dựng sheet mới cần, và nó tự nạp thêm.
- *   - `server/entry/Menu.js` — mọi việc của nó đều đi qua `SpreadsheetApp.getUi()` và `HtmlService`, hai thứ hộp cát không có. Nạp vào thì chỉ có thêm mấy cái tên, không thêm điều gì chứng minh được; phép nghiệm thu của nó là `probeSidebarTemplate` trên Google.
+ *   - `server/entry/Menu.js` — có hộp cát UI riêng trong `tests/cases/menu.js`; hộp cát sheet này không cần nạp nó.
  *   - cả thư mục `server/dev/` — cửa chạy hàm lúc phát triển, không thuộc đường chạy thật.
  */
 const TEP_NEN = [
