@@ -3,6 +3,7 @@
 ## Mục tiêu và phạm vi
 
 - `D:\ShinCRM_ggSheet\0_Documentation\00. Tài liệu chính thức\01. Quy chuẩn nền ShinCRM.md` là nguồn chuẩn duy nhất của quy tắc nền. Đầu mỗi phiên chỉ đọc các phần liên quan đến công việc; chỉ đọc toàn bộ khi thay đổi kiến trúc lõi, Schema, ranh giới module hoặc xử lý mâu thuẫn tài liệu.
+- Trước khi đọc code, viết test hoặc sửa tệp, phải xác định và đọc các tài liệu chính thức, checklist và hợp đồng liên quan trực tiếp đến nhiệm vụ; không được suy ra yêu cầu từ code. Nếu chưa biết cần đọc tài liệu nào, phải tìm mục lục trước.
 - Không tạo bản tóm tắt lặp lại quy tắc nền ở nơi khác; tài liệu điều hướng (nếu có) chỉ được chỉ đến nguồn chuẩn và không được chứa quyết định nghiệp vụ.
 
 - Nếu đang làm phiên khác không phải phiên đồng bộ FBM thì bỏ qua các tài liệu liên quan đến FBM, cấm được đọc vì các file đó cực kỳ dài và tốn token.
