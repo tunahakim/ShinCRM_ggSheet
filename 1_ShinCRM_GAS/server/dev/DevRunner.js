@@ -26,7 +26,7 @@ var DEV_RUNNER_ALLOWED = [
   'probeEntityRead', 'probeCategoryRead', 'probeConfigRead', 'probeDirtyState',
   'probeErrorReport', 'probeEntryPoint', 'probeLoadAll', 'probeSidebarTemplate', 'probeClientTiming',
   'probeSaveGate', 'viewProbeSelection', 'viewProbeRenderCurrent', 'viewProbeCreateRender', 'viewProbeAutoRender',
-  'probeTriggerState', 'shinInstallTriggers',
+  'probeTriggerState', 'shinInstallTriggers', 'shinInstallSidebarOpenTrigger',
   'fbmSyncStart', 'fbmStartIdentityCheck', 'fbmStartIdentityProbe', 'fbmSyncStartActivityBulk', 'fbmSyncPreflight', 'fbmSyncContinue', 'fbmSyncCancel', 'fbmSyncStatus', 'fbmInstallScheduler', 'fbmSyncSetWriteMode', 'fbmGetMasterSwitch', 'fbmSetMasterSwitch', 'fbmGetBackgroundSwitch', 'fbmSetBackgroundSwitch', 'fbmRetryPushFailures', 'fbmResolveConflict', 'fbmPrepareConflictResolution', 'fbmConfirmConflict', 'fbmGetRelayConfig', 'fbmRotateRelayKey', 'fbmSyncHeartbeatRequest', 'fbmSyncHeartbeat', 'fbmSyncHeartbeatTransportFailure', 'fbmSyncTrace', 'fbmGetSyncTrace', 'fbmSupervisorTrigger', 'fbmGetLoginConfig', 'fbmSetAutoLogin', 'fbmStartLoginTest', 'fbmProbeAutoLogin', 'fbmGetSyncSettings'
 ];
 

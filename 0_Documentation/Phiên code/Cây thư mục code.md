@@ -86,7 +86,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   ├── entry\                    Cửa vào hệ thống, và nửa đưa lỗi tới mắt người.
 │   │   ├── EntryPoint.js         Vỏ bọc runEntryPoint: ghi log kèm vết, báo cho người dùng, ném lại lỗi, và luôn xả bộ đệm log ở finally.
 │   │   ├── ErrorReport.js        Đưa lỗi tới mắt người theo bốn kênh. Lỗi ở onOpen thì để dành, hiện ở lần mở sidebar sau.
-│   │   └── Menu.js               onOpen dựng menu và tự mở sidebar; lệnh menu dùng cùng hàm dựng khung nhưng có kênh báo lỗi riêng.
+│   │   └── Menu.js               onOpen dựng menu; trigger cài đặt mở Sidebar, còn lệnh menu tự cài lại trigger này khi cần.
 │   ├── view\                     Dựng sheet quản lý: đọc bộ lọc, sắp xếp và vẽ lại vùng dữ liệu.
 │   │   ├── FilterMessages.js      Thông báo lỗi và trạng thái cho bộ lọc sheet quản lý.
 │   │   ├── FilterParser.js        Phân tích điều kiện lọc từ sheet quản lý.
@@ -254,7 +254,7 @@ tests\
     ├── extensionBridge.js        Nonce của cầu nối Extension phải đi trọn từ bắt tay tới CRM_CONTEXT; origin lạ không được chiếm kênh đang dùng.
     ├── selectionPoll.js          Đồng hồ giả khóa luật ACK loại trừ mọi vòng gọi, bốn điều kiện dừng, chống vòng chồng và thang nhịp 2/6 giây.
     ├── triggers.js               Trigger sửa sheet quản trị làm mới ngay; sửa kho đánh dấu mọi sheet quản trị cần làm mới.
-    ├── menu.js                   onOpen dựng menu trước khi tự mở sidebar, và đường mở tự động không bật alert khi lỗi.
+    ├── menu.js                   Trigger đơn chỉ dựng menu; trigger cài đặt mở Sidebar, không tạo trùng và không bật alert khi lỗi.
     ├── fbmSync.js                Điều phối các nhóm kiểm thử đồng bộ FBM; không chứa logic nghiệp vụ của từng nhóm.
     ├── fbmSync\AutoLogin.js     Kiểm envelope đăng nhập, throttle và phục hồi cursor.
     ├── fbmSync\Sidebar.js       Smoke test renderer và thao tác chính của Sidebar Đồng bộ FBM.

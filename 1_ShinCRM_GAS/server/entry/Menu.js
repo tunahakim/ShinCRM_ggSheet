@@ -3,14 +3,14 @@
  *
  * **Tên tệp khi đẩy lên Google là cả đường dẫn.** `client/Sidebar.html` ở máy trở thành tệp tên `client/Sidebar` trên Google, nên mọi lời gọi `createTemplateFromFile` và `include` phải ghi đủ đường dẫn, không được ghi tên cụt. Ghi tên cụt là lỗi đã từng xảy ra ở dự án cũ, và nó chỉ lộ ra lúc chạy thật chứ không lộ lúc đẩy code.
  *
- * **`onOpen` chỉ dựng giao diện.** Đây là trigger đơn (simple trigger — trigger Google tự gọi, chạy với quyền hạn hẹp), nên nó dựng thực đơn và mở sidebar, nhưng không ghép việc phụ như nhả kho lỗi vào đây. Kho lỗi được đưa qua `loadCore` khi sidebar đã có kênh hộp thoại lớn để hiển thị.
+ * **Luồng mở tệp dựng menu và mở sidebar.** `onOpen` là trigger đơn (simple trigger — trigger Google tự gọi, chạy với quyền hạn hẹp) nên chỉ dựng thực đơn; `shinAutoShowSidebar` là trigger cài đặt có quyền UI để mở sidebar. Cả hai không ghép việc phụ như nhả kho lỗi vào đây. Kho lỗi được đưa qua `loadCore` khi sidebar đã có kênh hộp thoại lớn để hiển thị.
  */
 
 /** Tên thực đơn trên thanh menu. */
 var MENU_TITLE = 'ShinCRM';
 
 /**
- * Trigger đơn Google gọi mỗi lần tệp được mở. Dựng menu rồi mở sidebar; lỗi ở lượt tự động không bật thông báo nhỏ của Google Sheets.
+ * Trigger đơn Google gọi mỗi lần tệp được mở. Chỉ dựng menu vì trigger đơn không có quyền `Ui.showSidebar`.
  */
 function onOpen() {
   SpreadsheetApp.getUi()
@@ -26,7 +26,22 @@ function onOpen() {
     .addItem('Khôi phục toàn bộ Config về mặc định…', 'shinResetConfig')
     .addToUi();
 
-  shinShowSidebar(ERROR_CHANNEL_THROW);
+}
+
+/** Trigger cài đặt mở sidebar khi tệp được mở. Không báo alert vì đây không phải lệnh người dùng vừa bấm. */
+function shinAutoShowSidebar() {
+  return shinShowSidebar(ERROR_CHANNEL_THROW);
+}
+
+/** Cài một trigger mở sidebar duy nhất trên Spreadsheet hiện tại. `false` nghĩa là trigger đã có. */
+function shinInstallSidebarOpenTrigger() {
+  var book = SpreadsheetApp.getActiveSpreadsheet();
+  var exists = ScriptApp.getProjectTriggers().some(function (trigger) {
+    return trigger.getHandlerFunction() === 'shinAutoShowSidebar';
+  });
+  if (exists) { return false; }
+  ScriptApp.newTrigger('shinAutoShowSidebar').forSpreadsheet(book).onOpen().create();
+  return true;
 }
 
 function shinRenderCurrentView(source) {
@@ -88,6 +103,7 @@ function shinShowFilterQuickReference() {
  */
 function shinShowSidebar(errorChannel) {
   return runEntryPoint('shinShowSidebar', 'core', errorChannel || ERROR_CHANNEL_ALERT, function () {
+    if (!errorChannel) { shinInstallSidebarOpenTrigger(); }
     var html = HtmlService.createTemplateFromFile('client/Sidebar')
       .evaluate()
       .setTitle(MENU_TITLE);
