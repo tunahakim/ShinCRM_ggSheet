@@ -148,6 +148,8 @@ async function chay(so) {
   hop.fbmSyncApplyIdentityProbeDraft({ metadata: { identityProbe: { spreadsheetId: 'sheet-probe', userId: '2037', username: 'anhlt', accountName: 'ANHLT' } } });
   render(hop, content, hop.fbmSyncRenderAccount, idle);
   check(so, 'Identity probe tự điền bản nháp vào đủ bốn ô mà chưa tự lưu', [dom.document.getElementById('fbm-identity-spreadsheet').value, dom.document.getElementById('fbm-identity-user').value, dom.document.getElementById('fbm-identity-username').value, dom.document.getElementById('fbm-identity-account').value, hop.FBM_SYNC_CLIENT.identityStatus.status], ['sheet-probe', '2037', 'anhlt', 'ANHLT', 'REBIND_REQUIRED']);
+  hop.FBM_SYNC_CLIENT.accountNotices.identity = { kind: 'success', message: 'Đã lấy thông tin thành công và điền vào form.' };
+  check(so, 'Tự điền thành công chỉ hiện một notice, không lặp dòng kết quả bên dưới', hop.fbmSyncIdentityResultBlocks({ phase: 'done', metadata: { identityProbe: { spreadsheetId: 'sheet-probe' } } }).length, 0);
   hop.FBM_SYNC_CLIENT.identityProbeSignature = '';
   hop.FBM_SYNC_CLIENT.subscreen = 'account';
   dom.document.activeElement = dom.document.getElementById('fbm-identity-user');
