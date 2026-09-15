@@ -376,6 +376,7 @@ Các mục dưới đây là phần đang phải hoàn thiện trước khi báo
 - [x] Tách các mount header/menu/banner của Sync khỏi vùng nội dung; snapshot chỉ vá target động, còn thay toàn vùng chỉ dùng lúc mở hoặc chuyển màn. Kiểm thử hồi quy giữ nguyên node/focus và đạt `1428/1428` sau khi thêm shell Block.
 - [x] Chuẩn hóa shell Sync theo khung header chung của Sidebar/form (chiều cao, lề, khoảng cách, tiêu đề và Icon); gộp loading thành một Text căn giữa `Đang tải trạng thái phiên đồng bộ FBM`; bổ sung hồi quy header/loading, bộ test đạt `1433/1433`.
 - [x] Bỏ wrapper `Box` riêng của header Sync; render trực tiếp cùng dãy `Icon → Text → thao tác bên phải` như header form vào mount dùng chung, tránh xung đột `.shin-box { display: block; }`; test đạt `1434/1434`.
+- [x] Sửa công tắc `Bật lịch đồng bộ nền`: phản hồi ngay khi click, vá theo kết quả GAS tại chỗ, mở khóa sau callback và rollback khi lỗi; bổ sung kiểm hành trình UI, test đạt `1435/1435`.
 - [x] Bỏ `FBM_ACCOUNT_NAME` khỏi Config/API/preflight; cổng owner và giá trị fallback request lấy tên đầy đủ từ binding bốn định danh. Test mô phỏng Config cũ xác nhận nó không thể gây khóa hoặc đổi binding.
 - [ ] Mở rộng từng use case còn lại của charter thành trace chạy được đầy đủ qua các lớp; không đánh dấu hoàn tất chỉ vì các unit test thành phần đạt.
 - [ ] Chỉ sau khi workflow offline của use case đạt mới đưa use case đó vào checklist nghiệm thu live tương ứng.

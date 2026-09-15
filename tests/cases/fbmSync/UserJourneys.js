@@ -28,10 +28,12 @@ async function chay(so) {
   const { hop, dom, content } = taoBoTest();
   const calls = [];
   let masterEnabled = true;
+  let backgroundEnabled = true;
   hop.callServer = (name, args) => {
     calls.push({ name, args: args || [] });
-    if (name === 'fbmGetSyncStatus') return Promise.resolve(Object.assign(idle(), { masterEnabled }));
+    if (name === 'fbmGetSyncStatus') return Promise.resolve(Object.assign(idle(), { masterEnabled, backgroundEnabled }));
     if (name === 'fbmSetMasterSwitch') { masterEnabled = args && args[0] === true; return Promise.resolve(Object.assign(idle(), { masterEnabled })); }
+    if (name === 'fbmSetBackgroundSwitch') { backgroundEnabled = args && args[0] === true; return Promise.resolve({ ok: true, enabled: backgroundEnabled }); }
     return Promise.resolve({ ok: true, settings: {}, status: idle() });
   };
   hop.fbmSyncInstall();
@@ -131,8 +133,9 @@ async function chay(so) {
   check(so, 'cai dat phien doi dung tung cong tac va gui tung lenh luu theo nut bam', [settingsActions, toggles.map((id) => dom.document.getElementById(id).getAttribute('aria-pressed'))], [['extension', 'background', 'login-policy', 'rotate-relay'], ['false', 'false', 'false', 'false', 'false', 'true', 'false']]);
   const background = dom.document.getElementById('fbm-sync-background-switch');
   click(dom, background);
+  check(so, 'công tắc lịch nền phản hồi ngay khi click trước khi GAS trả về', [background.getAttribute('aria-pressed'), background.className.indexOf('is-off') >= 0, background.disabled], ['false', true, true]);
   await tick();
-  check(so, 'cai dat phien bat tat lich nen gui lenh GAS doc lap voi phien thu cong', calls.filter((item) => item.name === 'fbmSetBackgroundSwitch').map((item) => item.args[0]), [false]);
+  check(so, 'cai dat phien bat tat lich nen gui lenh GAS doc lap voi phien thu cong', [calls.filter((item) => item.name === 'fbmSetBackgroundSwitch').map((item) => item.args[0]), background.getAttribute('aria-pressed'), background.className.indexOf('is-off') >= 0, background.disabled], [[false], 'false', true, false]);
 
   hop.FBM_SYNC_CLIENT.subscreen = 'results';
   hop.FBM_SYNC_CLIENT.resultsTab = 'summary';

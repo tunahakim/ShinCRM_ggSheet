@@ -50,6 +50,8 @@ function fbmSyncPatchSettings(panel, status) {
   if (!panel || !RENDER_INDEX.nodes['fbm-sync-settings-root']) { return false; }
   var schedulerNotice = fbmSyncSettingsSchedulerNotice(status);
   if (schedulerNotice) { FBM_SYNC_CLIENT.settingsNotices = FBM_SYNC_CLIENT.settingsNotices || {}; FBM_SYNC_CLIENT.settingsNotices.background = schedulerNotice; }
+  var backgroundEnabled = !(status && status.backgroundEnabled === false);
+  fbmSyncSetBackgroundSwitchState(backgroundEnabled);
   fbmSyncRenderTarget('fbm-sync-settings-relay-notice-region', fbmSyncSettingsNoticeBlocks('relay'));
   fbmSyncRenderTarget('fbm-sync-settings-extension-notice-region', fbmSyncSettingsNoticeBlocks('extension'));
   fbmSyncRenderTarget('fbm-sync-settings-background-notice-region', fbmSyncSettingsNoticeBlocks('background', schedulerNotice));
