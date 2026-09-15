@@ -362,6 +362,13 @@ Các mục dưới đây là phần đang phải hoàn thiện trước khi báo
 - [x] Deployment Sidebar `AKfycbx0...` đã nâng lên revision `@292`; POST không khóa trả JSON `unauthorized`, xác nhận đây là Web App relay thật thay vì trang HTML Drive.
 - [!] **Cần chủ dự án kiểm chứng thực tế:** giữ tab FBM đăng nhập, sau đó đăng xuất/đăng nhập lại để xác nhận không đá phiên máy khác và alarm tự khôi phục đúng chính sách.
 
+## Bộ kiểm workflow theo use case
+
+- [x] Tạo charter độc lập `tests/contracts/fbmSyncPipeline.js` từ Tài liệu 09.01, 09.02, 09.06, 09.08 và hợp đồng log; mỗi use case nêu trigger cùng kết quả quan sát được ở Sidebar, Extension, GAS, Sheet và Log khi có liên quan.
+- [x] Tạo harness `tests/cases/fbmSync/Workflow.js` chạy envelope thật qua GAS -> executor Extension -> GAS với fixture FBM, không dùng request FBM thật; đã kiểm tự điền nhận diện, response thiếu identity, xóa binding rỗng, cổng mode, master OFF, stale response và cancel khi request đang bay.
+- [ ] Mở rộng từng use case còn lại của charter thành trace chạy được đầy đủ qua các lớp; không đánh dấu hoàn tất chỉ vì các unit test thành phần đạt.
+- [ ] Chỉ sau khi workflow offline của use case đạt mới đưa use case đó vào checklist nghiệm thu live tương ứng.
+
 ## Slice 9 — Live acceptance và mở rộng production
 
 - [ ] **Cần kiểm chứng thực tế:** chạy đủ lượt Đọc thử `ALT00010`, đối chiếu số dòng, field, hash, liên kết và idempotency.

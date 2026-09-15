@@ -216,6 +216,8 @@ tests\
 │   ├── dung-client.js            Hộp cát RIÊNG cho tệp client. Riêng vì server và client có hàm sinh đôi cùng tên, chung hộp thì bản nạp sau đè bản nạp trước.
 │   ├── khung-gia.js              Khung sidebar giả cho bộ máy vẽ: bốn vùng, chỉ ba khả năng getElementById/innerHTML/hidden. Thay innerHTML một vùng thì phần tử con bị xóa nội dung, đúng như trình duyệt.
 │   └── strip-comments.js         Bỏ chú thích trước khi quét mã, để docstring được phép nhắc tên mà mã thì không.
+├── contracts\
+│   └── fbmSyncPipeline.js         Charter use case đồng bộ FBM độc lập với code: trigger và kết quả quan sát được theo tài liệu 09.
     └── cases\
     ├── textNormalize.js          Hai bản sinh đôi server và client cho cùng kết quả trên một bảng ca dùng chung.
     ├── schemaCheck.js            Bảng khai cột tự nhất quán, và chiều phụ thuộc một hướng với SYNC_SCHEMA.
@@ -264,6 +266,7 @@ tests\
     │   ├── Pull.js                Kiểm pull Customer/Activity, marker, missing và bảo toàn trường nội bộ.
     │   ├── Reconcile.js           Kiểm identity, MST, hash, conflict và trạng thái đồng bộ.
     │   ├── Orchestration.js       Kiểm state, cursor, resume, preflight và luồng nhiều lát.
+    │   ├── Workflow.js             Chạy contract xuyên GAS -> executor Extension -> GAS với fixture FBM, cùng các cổng fail-closed cấp pipeline.
     │   ├── Push.js                Kiểm cổng ghi, khóa, owner, builder ghi và xử lý lỗi push.
     │   └── Audit.js               Kiểm log, báo cáo, fixture an toàn và các ranh giới không ghi/xóa.
     └── domUi.js                  DOM giả tối thiểu kiểm ba đường UI: phát click, menu nổi và thu gọn nội dung.

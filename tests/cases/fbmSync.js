@@ -8,7 +8,8 @@ const NHOM = [
   require("./fbmSync/Orchestration"),
   require("./fbmSync/Preflight"),
   require("./fbmSync/Push"),
-  require("./fbmSync/Audit")
+  require("./fbmSync/Audit"),
+  require("./fbmSync/Workflow")
 ];
 
 async function chay(so) { for (const nhom of NHOM) { await nhom.chay(so); } }
