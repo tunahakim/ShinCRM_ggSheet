@@ -4,10 +4,11 @@ const path = require('path');
 const vm = require('vm');
 const { section, check } = require('../../lib/assert');
 const { taoHopCat, napServer } = require('../../lib/load-gas');
-const { WORKFLOWS } = require('../../contracts/fbmSyncPipeline');
+const { WORKFLOWS, PIPELINE_CATALOG } = require('../../contracts/fbmSyncPipeline');
 
 const ROOT = path.join(__dirname, '..', '..', '..');
 const EXECUTOR = path.join(ROOT, '2_ShinCRM_Extension', 'content_scripts', 'fbm_sync', 'executor.js');
+const WORKER = path.join(ROOT, '2_ShinCRM_Extension', 'background', 'service_worker.js');
 
 function properties() {
   const data = {};
@@ -33,6 +34,8 @@ function workflowGas() {
     'fbm_sync/protocol/Protocol.js',
     'fbm_sync/state/State.js',
     'fbm_sync/reconcile/Identity.js',
+    'fbm_sync/reconcile/CategoryGate.js',
+    'fbm_sync/reconcile/Fingerprint.js',
     'fbm_sync/report/Report.js',
     'fbm_sync/read/GridRead.js',
     'fbm_sync/write/RequestBuilders.js',
@@ -87,6 +90,59 @@ function executorRaw(reply, requestId) {
   };
 }
 
+function relayResponse(value) {
+  const body = JSON.stringify(value);
+  return { ok: true, status: 200, headers: { get: () => 'application/json' }, text: () => Promise.resolve(body) };
+}
+
+function workerHarness(relayReplies, fbmTabs, tabReply) {
+  const storage = {
+    fbmWebAppUrl: 'https://script.google.com/macros/s/workflow-relay/exec',
+    fbmSyncKey: 'workflow-key',
+    fbmSpreadsheetId: 'sheet-workflow'
+  };
+  const relayCalls = [];
+  let fbmTabQueries = 0;
+  let fbmMessages = 0;
+  const context = {
+    console: { log() {}, warn() {}, info() {} }, Date, URL, Promise, Error, AbortController, setTimeout, clearTimeout,
+    TextEncoder, TextDecoder, Uint8Array, btoa: (value) => Buffer.from(value, 'binary').toString('base64'), atob: (value) => Buffer.from(value, 'base64').toString('binary'),
+    chrome: {
+      tabs: {
+        query(query) {
+          const urls = query && query.url || [];
+          const isFbm = urls.some((value) => String(value).indexOf('fbo.com.vn') >= 0);
+          if (isFbm) { fbmTabQueries += 1; return Promise.resolve(fbmTabs || []); }
+          return Promise.resolve([]);
+        },
+        sendMessage(tabId, message, done) {
+          fbmMessages += 1;
+          if (done) { done(tabReply ? tabReply(tabId, message) : null); }
+        }
+      },
+      scripting: { executeScript: () => Promise.resolve() },
+      runtime: { lastError: null, onMessage: { addListener() {} }, onInstalled: { addListener() {} }, onStartup: { addListener() {} } },
+      alarms: { create() {}, clear: () => Promise.resolve(true), onAlarm: { addListener() {} } },
+      storage: { local: {
+        get(keys, done) {
+          const value = {};
+          (Array.isArray(keys) ? keys : [keys]).forEach((key) => { value[key] = storage[key]; });
+          done(value);
+        },
+        set(value, done) { Object.assign(storage, value); if (done) { done(); } },
+        remove(keys, done) { (Array.isArray(keys) ? keys : [keys]).forEach((key) => delete storage[key]); if (done) { done(); } }
+      } }
+    },
+    fetch(url, options) {
+      relayCalls.push({ url: String(url), body: JSON.parse(options.body) });
+      return Promise.resolve(relayResponse(relayReplies.shift() || { ok: false, code: 'RELAY_REPLY_MISSING' }));
+    }
+  };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync(WORKER, 'utf8'), context, { filename: WORKER });
+  return { context, relayCalls, storage, metrics: () => ({ fbmTabQueries, fbmMessages }) };
+}
+
 async function chay(so) {
   section('FBM sync — workflow theo tài liệu');
   const ids = WORKFLOWS.map((item) => item.id);
@@ -95,6 +151,8 @@ async function chay(so) {
     'relay-sidebar-open', 'identity-autofill', 'identity-clear-binding', 'background-noop', 'manual-transport-failure',
     'identity-login-test', 'background-transport-failure', 'master-off-in-flight', 'read-vs-check-write-gate', 'push-write-safety', 'stale-response-and-cancel', 'ui-status-and-log', 'conflict-resolution', 'full-pull-missing'
   ].sort());
+  check(so, 'catalog gom du 44 pipeline A-F cua module va khong trung ma', [PIPELINE_CATALOG.length, new Set(PIPELINE_CATALOG.map((item) => item.id)).size], [44, 44]);
+  check(so, 'moi pipeline co nguon, trigger, ket qua quan sat va bang chung bat buoc', PIPELINE_CATALOG.every((item) => item.source && item.trigger && item.expect && item.requiredProof.length === 2), true);
 
   const engine = workflowGas();
   const started = engine.hop.FbmSync.start({ mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true });
@@ -127,6 +185,21 @@ async function chay(so) {
     incompleteResult.ok, incompleteResult.code, incompleteResult.status.phase, incomplete.documentProperties.getProperty('FBM_SYNC_BINDING_V1')
   ], [false, 'IDENTITY_PROBE_INCOMPLETE', 'error', null]);
 
+  const identityCheck = workflowGas();
+  identityCheck.hop.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-000001', fbmId: 'FBM-1', fbmCustomerCode: 'ALT00010' }] : [];
+  const identityStarted = identityCheck.hop.FbmSync.start({ mode: 'check', scan: 'identity_check', origin: 'manual', manual: true });
+  const identityAuthorized = await sendThroughExecutor(identityStarted.request, JSON.stringify({ d: { Authorized: 'identity-auth' } }));
+  const identityGridStep = identityCheck.hop.FbmSync.continue(executorRaw(identityAuthorized.reply, identityStarted.request.id));
+  const customerFields = ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ma_so_thue', 'ong_ba', 'dc_lh', 'dien_thoai', 'email', 'website', 'ten_dclh_tinh', 'ten_nguon_dm', 'ten_sp', 'ngay_gd', 'datetime0', 'xorder'];
+  const customerRow = customerFields.map((field) => field === 'stt_rec_kh' ? 'FBM-1' : field === 'ma_kh' ? 'ALT00010' : '');
+  const identityGrid = await sendThroughExecutor(identityGridStep.request, JSON.stringify({ d: { TotalRowCount: 1, Rows: [customerRow], ViewPage: { Fields: customerFields.map((AliasName) => ({ AliasName })) } } }));
+  const identityDone = identityCheck.hop.FbmSync.continue(executorRaw(identityGrid.reply, identityGridStep.request.id));
+  check(so, 'kiem tra lien ket: chi quet Customer va tra tong hop n/N, khong cap Activity hoac ghi binding', [
+    identityGridStep.request.meta.entity, identityDone.request || null, identityDone.status.phase,
+    identityDone.status.metadata.identityCheck.total, identityDone.status.metadata.identityCheck.matched, identityDone.status.metadata.identityCheck.missing,
+    identityCheck.documentProperties.getProperty('FBM_SYNC_BINDING_V1')
+  ], ['customer', null, 'done', 1, 1, 0, null]);
+
   const binding = workflowGas();
   const bindingSaved = binding.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
   const bindingCleared = binding.hop.FbmSync.bindingWrite({});
@@ -145,6 +218,119 @@ async function chay(so) {
     ['check', 'read', 'push', 'write'].map((mode) => gates.canWriteSheet(mode)),
     ['check', 'read', 'push', 'write'].map((mode) => gates.canWriteFbm(mode))
   ], [[false, true, false, true], [false, false, true, true]]);
+
+  const noopWorker = workerHarness([{ ok: true, code: 'HEARTBEAT_NOOP', request: null }], []);
+  const noopResult = await noopWorker.context.fbmHeartbeatNow('workflow');
+  check(so, 'alarm noop: Extension hoi GAS mot lan, khong tim tab va khong fetch FBM', [
+    noopResult.code, noopWorker.relayCalls.map((item) => item.body.kind), noopWorker.metrics().fbmTabQueries, noopWorker.metrics().fbmMessages
+  ], ['HEARTBEAT_NOOP', ['heartbeat_request'], 0, 0]);
+
+  const noTabWorker = workerHarness([
+    { ok: true, request: { id: 'reserved-heartbeat', url: 'https://fbo.com.vn:8888/service', method: 'POST', bodyText: '{}' } },
+    { ok: true, code: 'TRANSPORT_RECORDED', request: null }
+  ], []);
+  const noTabResult = await noTabWorker.context.fbmHeartbeatNow('workflow');
+  check(so, 'alarm khong co tab: Extension nop transport failure dung reservation va khong tu fetch FBM', [
+    noTabResult.code, noTabWorker.relayCalls.map((item) => [item.body.kind, item.body.requestId || '', item.body.code || '']), noTabWorker.metrics().fbmMessages
+  ], ['FBM_TAB_NOT_FOUND', [['heartbeat_request', '', ''], ['heartbeat_transport_failure', 'reserved-heartbeat', 'FBM_TAB_NOT_FOUND']], 0]);
+
+  const rawHeartbeat = '{"d":{"TotalRowCount":12,"Rows":[]}}';
+  const completeWorker = workerHarness([
+    { ok: true, request: { id: 'heartbeat-envelope', url: 'https://fbo.com.vn:8888/service', method: 'POST', bodyText: '{"from":"gas"}' } },
+    { ok: true, code: 'HEARTBEAT_COMPLETE', request: null }
+  ], [{ id: 17 }], (tabId, message) => {
+    if (message.type === 'FBM_PING_V2') { return { ready: true, version: '21.14' }; }
+    if (message.type === 'FBM_EXECUTE_V2') {
+      return { result: { ok: true, status: 200, body: rawHeartbeat, transport: { trace: [{ stage: 'executor_response_sent', requestId: message.request.id }] } } };
+    }
+    return null;
+  });
+  const completeResult = await completeWorker.context.fbmHeartbeatNow('workflow');
+  check(so, 'alarm co tab: GAS cap envelope truoc, Extension chuyen response tho ve GAS va dung khi request null', [
+    completeResult.ok, completeWorker.relayCalls.map((item) => item.body.kind), completeWorker.relayCalls[1].body.response.body,
+    completeWorker.metrics().fbmTabQueries, completeWorker.metrics().fbmMessages
+  ], [true, ['heartbeat_request', 'heartbeat'], rawHeartbeat, 1, 2]);
+
+  const readFlow = workflowGas();
+  readFlow.hop.FbmSync.prepareCategoryGate = () => ({ map: {} });
+  readFlow.hop.FbmSync.pullWrite = () => ({ ok: true, written: 0, conflicts: 0, skipped: 0 });
+  readFlow.hop.FbmSync.markMissingAfterFullScan = () => ({ total: 0, written: 0 });
+  let readStep = readFlow.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true });
+  const readKinds = [];
+  for (let hop = 0; readStep && readStep.request && hop < 12; hop += 1) {
+    const request = readStep.request;
+    readKinds.push(request.meta.kind + ':' + String(request.meta.entity || request.meta.field || ''));
+    let body;
+    if (request.meta.kind === 'authorize') { body = JSON.stringify({ d: { Authorized: 'auth-' + request.meta.entity } }); }
+    else if (request.meta.kind === 'completion') { body = JSON.stringify({ d: [['CODE', 'Tên danh mục']] }); }
+    else {
+      body = JSON.stringify({ d: {
+        TotalRowCount: 0, Rows: [],
+        ViewPage: { Fields: ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ma_so_thue', 'ong_ba', 'dc_lh', 'dien_thoai', 'email', 'website', 'ten_dclh_tinh', 'ten_nguon_dm', 'ten_sp', 'ngay_gd', 'datetime0', 'xorder'].map((AliasName) => ({ AliasName })) }
+      } });
+    }
+    const throughExtension = await sendThroughExecutor(request, body);
+    readStep = readFlow.hop.FbmSync.continue(executorRaw(throughExtension.reply, request.id));
+  }
+  check(so, 'read rong: pipeline di het session, lookup va Customer grid qua Extension roi ket thuc', [
+    readKinds, readStep.ok, readStep.request || null, readStep.status.phase, readFlow.hop.FbmSync.stateRead().counts.succeeded
+  ], [[
+    'authorize:customer', 'authorize:activity', 'completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH',
+    'completion:@CAT_CONG_VIEC', 'completion:@CAT_SAN_PHAM', 'grid:customer'
+  ], true, null, 'done', 0]);
+
+  const approval = workflowGas();
+  approval.hop.FbmSync.runPreflight = () => ({ ok: true, issues: [], blocking: [], candidateCount: 11 });
+  const awaitingApproval = approval.hop.FbmSync.start({ mode: 'push', origin: 'manual', manual: true });
+  const approved = approval.hop.fbmSyncApprovePush();
+  check(so, 'push lon: GAS khong cap request truoc chap thuan, sau chap thuan moi cap authorize', [
+    awaitingApproval.approvalRequired, awaitingApproval.request || null, awaitingApproval.status.phase,
+    approved.ok, approved.request.meta.kind, approved.status.phase
+  ], [true, null, 'awaiting_approval', true, 'authorize', 'checking_session']);
+
+  const stopAfterResponse = workflowGas();
+  const stopStarted = stopAfterResponse.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true });
+  const stopPending = stopAfterResponse.hop.fbmSyncCancel();
+  const stopped = stopAfterResponse.hop.FbmSync.continue({
+    ok: true, status: 200, body: JSON.stringify({ d: { Authorized: 'auth-customer' } }),
+    transport: { trace: [{ stage: 'executor_response_sent', requestId: stopStarted.request.id }] }
+  });
+  check(so, 'cancel request doc dang bay: nhan response de dong lat roi dung, khong cap authorize Activity', [
+    stopPending.code, stopped.ok, stopped.request || null, stopped.status.phase, stopAfterResponse.hop.FbmSync.stateRead().cursor.kind
+  ], ['SYNC_CANCEL_PENDING', true, null, 'paused', 'authorize_activity']);
+
+  const masterOff = workflowGas();
+  const masterStarted = masterOff.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true });
+  masterOff.hop.FbmSync.setMasterEnabled(false);
+  const masterStopped = masterOff.hop.FbmSync.continue({
+    ok: true, status: 200, body: JSON.stringify({ d: { Authorized: 'auth-customer' } }),
+    transport: { trace: [{ stage: 'executor_response_sent', requestId: masterStarted.request.id }] }
+  });
+  check(so, 'master OFF request dang bay: chi chan envelope tiep theo va giu cursor de chan doan', [
+    masterStopped.ok, masterStopped.request || null, masterStopped.status.phase, masterOff.hop.FbmSync.stateRead().cursor.kind
+  ], [true, null, 'paused', 'authorize_activity']);
+
+  const dto = workflowGas();
+  const privateState = dto.hop.FbmSync.stateRead();
+  privateState.session.cookie = 'private-cookie-FHN_CRM_App';
+  privateState.session.customerAuthorized = 'private-authorized';
+  privateState.metadata.lookups = { hidden: 'private-lookup' };
+  privateState.locks = { 'customer:CUS-1': { owner: 'sync', oldValues: { hidden: 'private-old-value' } } };
+  dto.hop.FbmSync.stateWrite(privateState);
+  const publicStatus = dto.hop.FbmSync.statusView();
+  check(so, 'DTO Sidebar: khong lo cookie, Authorized, lookup noi bo hay lock qua bien gioi UI', [
+    JSON.stringify(publicStatus).indexOf('private-cookie') < 0,
+    JSON.stringify(publicStatus).indexOf('private-authorized') < 0,
+    JSON.stringify(publicStatus).indexOf('private-lookup') < 0,
+    JSON.stringify(publicStatus).indexOf('private-old-value') < 0
+  ], [true, true, true, true]);
+  const logged = [];
+  dto.hop.LOG_OK = 'ok'; dto.hop.LOG_ERROR = 'error'; dto.hop.LOG_CONFLICT = 'conflict';
+  dto.hop.logEvent = (event) => logged.push(event); dto.hop.logTrace = (event) => logged.push(event);
+  dto.hop.FbmSync.logStatus(Object.assign({}, publicStatus, { current: '', message: 'Lượt tổng hợp' }), 'workflow_summary');
+  check(so, 'log tong hop: recordId rong va khong dua session noi bo vao detail', [
+    logged.length, logged[0].recordId, JSON.stringify(logged[0]).indexOf('private-cookie') < 0, JSON.stringify(logged[0]).indexOf('private-authorized') < 0
+  ], [1, '', true, true]);
 
   const disabled = workflowGas();
   disabled.hop.FbmSync.masterEnabled = () => false;

@@ -90,4 +90,55 @@ const WORKFLOWS = [
   }
 ];
 
-module.exports = { WORKFLOWS };
+/* Mọi pipeline của module. Đây là phạm vi bắt buộc của suite, không phải backlog
+ * theo code: A-F bám theo audit đối chiếu với Tài liệu 09. */
+const PIPELINE_CATALOG = [
+  ['A1', 'Bắt tay relay', 'Mở Sidebar', 'Một cấu hình local và ACK; không /exec hoặc FBM'],
+  ['A2', 'Probe relay', 'Kiểm tra kết nối', 'Chỉ GAS relay, không tìm tab FBM'],
+  ['A3', 'Tự điền nhận diện', 'Tự động điền', 'Grid User -> draft, không tự lưu'],
+  ['A4', 'Kiểm tra liên kết', 'Kiểm tra thông tin đồng bộ', 'Chỉ Customer; trả n/N, không ghi'],
+  ['A5', 'Lưu liên kết', 'Lưu thông tin', 'Đủ bốn định danh hoặc xóa binding rỗng'],
+  ['A6', 'Lưu credential', 'Lưu mã hóa', 'Extension mã hóa, GAS không nhận password rõ'],
+  ['A7', 'Đăng nhập thử', 'Đăng nhập thử', 'Login mềm, đối chiếu identity, báo kết quả'],
+  ['A8', 'Auto-login', 'Session hết hạn', 'Throttle 30 phút, resume cursor an toàn'],
+  ['B1', 'Kiểm tra an toàn', 'Chọn check', 'Đọc/preview, không ghi Sheet hay FBM'],
+  ['B2', 'Lấy về', 'Chọn read', 'Pull ghi Sheet, không ghi FBM'],
+  ['B3', 'Pull Customer', 'Full Customer', 'AliasName, cursor, vắng mặt không phải xóa'],
+  ['B4', 'Pull Activity', 'Sau Customer', 'Activity theo Customer, nối parent'],
+  ['B5', 'Nạp lần đầu', 'File trắng', 'Baseline chỉ khi đã xác nhận hai phía'],
+  ['B6', 'Vắng mặt/tombstone', 'Kết thúc full scan', 'Đánh dấu vắng; không Delete FBM'],
+  ['C1', 'Trigger GAS', 'Trigger theo lịch', 'Chỉ ghi lịch, không gọi FBM'],
+  ['C2', 'Heartbeat', 'Alarm 5 phút', 'Hỏi GAS trước, request:null không chạm tab'],
+  ['C3', 'Kỳ Customer nền', 'Đến hạn hoặc count đổi', 'GAS quyết định full Customer'],
+  ['C4', 'Activity bulk', 'Đến hạn 8 giờ', 'Cursor bền, từng lát'],
+  ['C5', 'Activity catch-up', 'Mốc ngay_gd', 'Chỉ Activity có FBM ID làm mốc'],
+  ['C6', 'Activity rotation', 'Alarm 30 phút', '30 Customer theo cursor GAS'],
+  ['C7', 'Nền sang thủ công', 'Bấm đồng bộ khi nền chạy', 'Dừng sau response hiện tại'],
+  ['D1', 'Đẩy ShinCRM -> FBM', 'Chọn push', 'Preflight/gate trước envelope ghi'],
+  ['D2', 'Hai chiều', 'Chọn write', 'Pull/đối soát trước push'],
+  ['D3', 'Chấp thuận push lớn', 'Ứng viên vượt ngưỡng', 'Không request ghi trước approval'],
+  ['D4', 'Customer create', 'Ứng viên Customer mới', 'Tạo, đọc xác nhận, rồi baseline'],
+  ['D5', 'Customer edit', 'Ứng viên Customer sửa', 'Mở form, ghi, đọc xác nhận'],
+  ['D6', 'Activity create', 'Ứng viên Activity mới', 'Owner/parent gate, marker, xác nhận'],
+  ['D7', 'Activity edit', 'Ứng viên Activity sửa', 'Đọc OldValue, ghi, xác nhận'],
+  ['D8', 'Xác nhận sau push', 'FBM đã trả success', 'Hash khớp mới đổi baseline'],
+  ['D9', 'Khôi phục Customer create', 'Mất response ghi', 'Đọc MST exact; không gửi New lại'],
+  ['D10', 'Mở lại lỗi push', 'Người dùng retry', 'Chỉ đặt pending; không gửi ngay'],
+  ['E1', 'Ghi nhận conflict', 'So ba chiều conflict', 'Khóa record, không đổi baseline'],
+  ['E2', 'Giải quyết conflict', 'Người dùng xác nhận', 'Đọc lại FBM + reservation trước ghi'],
+  ['E3', 'Khóa form/sync', 'Sửa form đồng thời', 'Chỉ đúng owner nhả lock'],
+  ['E4', 'Transport thủ công', 'Bridge/HTTP lỗi', 'Báo rõ, retry read giới hạn, không retry write'],
+  ['E5', 'Transport nền', 'Tab/executor lỗi', 'Nộp failure đúng reservation'],
+  ['E6', 'Response cũ/cancel/master', 'Dừng hoặc response cũ', 'Đóng lát, không cấp bước mới'],
+  ['E7', 'Supervisor', 'Run quá hạn', 'Chuyển lỗi, không phát lại request'],
+  ['E8', 'Công tắc', 'Tắt master/background', 'Chặn request mới, giữ state'],
+  ['E9', 'Xoay relay key', 'Người dùng xác nhận', 'GAS đổi nguyên tử rồi Extension ACK'],
+  ['F1', 'State/cursor', 'Qua nhiều lát', 'State bền, không giữ ở Extension'],
+  ['F2', 'DTO Sidebar', 'Đọc trạng thái', 'Chỉ DTO giới hạn, không state/bí mật'],
+  ['F3', 'Log', 'Kết thúc/lỗi', 'GAS ghi, che bí mật, recordId tổng hợp rỗng'],
+  ['F4', 'UI orchestration', 'Chạy/lỗi/xong', 'UI vẽ DTO, báo lỗi, không nhấp nháy']
+].map(function (item) {
+  return { id: item[0], name: item[1], trigger: item[2], expect: item[3], source: 'Tài liệu 09 và hợp đồng log', requiredProof: ['offline', 'GAS DEV hoặc live khi kênh thật không mô phỏng được'] };
+});
+
+module.exports = { WORKFLOWS, PIPELINE_CATALOG };
