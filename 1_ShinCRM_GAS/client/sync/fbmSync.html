@@ -1,6 +1,6 @@
 <script>
 /* Sidebar chỉ hiển thị tiến độ; GAS là nguồn state duy nhất. */
-var FBM_SYNC_CLIENT = { installed: false, waiting: {}, relayWaiters: {}, credentialWaiters: {}, running: false, mode: 'read', openedAt: 0, relayConfigured: false, relayOpenId: 0, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0, traceEvents: [], subscreen: 'overview', navOpen: false, resultsTab: 'summary', resultPages: {}, lastStatus: null, deferredPaint: null, identityStatus: null, identityAction: '', identityLastAction: '', identityProbeSignature: '', identityDraft: { spreadsheetId: '', userId: '', username: '', accountName: '' }, loginStatus: null, loginDraft: { username: '' }, accountNotices: { identity: null, login: null }, settingsNotices: { relay: null, extension: null, background: null, login: null }, syncSettings: null };
+var FBM_SYNC_CLIENT = { installed: false, waiting: {}, relayWaiters: {}, credentialWaiters: {}, running: false, mode: 'read', openedAt: 0, relayConfigured: false, relayOpenId: 0, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0, traceEvents: [], subscreen: 'overview', navOpen: false, resultsTab: 'summary', resultPages: {}, lastStatus: null, deferredPaint: null, identityStatus: null, identityAction: '', identityLastAction: '', identityProbeSignature: '', identityInvalid: {}, identityDraft: { spreadsheetId: '', userId: '', username: '', accountName: '' }, loginStatus: null, loginEditMode: false, loginDraft: { username: '' }, accountNotices: { identity: null, login: null }, settingsNotices: { relay: null, extension: null, background: null, login: null }, syncSettings: null };
 /** Timeout cho một request Extension để phiên không treo vô hạn khi tab FBM/bridge mất kết nối. */
 var FBM_SYNC_REQUEST_TIMEOUT_MS = 20000;
 var FBM_SYNC_GAS_CONTINUE_WARN_MS = 5000;
@@ -28,6 +28,10 @@ function fbmSyncLoadIdentityStatus() {
   if (typeof callServer !== 'function') { return Promise.resolve(null); }
   return callServer('fbmGetIdentityStatus').then(function (identity) {
     FBM_SYNC_CLIENT.identityStatus = identity || {};
+    var binding = identity && identity.binding || {};
+    if (!fbmSyncAccountIsEditing()) {
+      FBM_SYNC_CLIENT.identityDraft = { spreadsheetId: String(binding.spreadsheetId || ''), userId: String(binding.userId || ''), username: String(binding.username || ''), accountName: String(binding.accountName || '') };
+    }
     if (FBM_SYNC_CLIENT.lastStatus) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); }
     return identity;
   }).catch(function () { return null; });
@@ -287,7 +291,7 @@ function fbmSyncProgressData(status, count) {
   var total = Math.max(0, Number(count.total || 0)), completed = Math.max(0, Number(count.completed || 0));
   var determinate = total > 0;
   var percent = determinate ? Math.min(100, Math.round(completed * 100 / total)) : 0;
-  return { active: active, waitingForResponse: waitingForResponse, determinate: determinate, percent: percent, label: determinate ? 'Tiến trình: ' + completed + '/' + total + ' (' + percent + '%)' + (waitingForResponse ? ' · đang chờ phản hồi' : '') : (active ? 'Tiến trình: đang xử lý…' : 'Tiến trình: chưa có tổng số bản ghi') };
+  return { active: active, waitingForResponse: waitingForResponse, determinate: determinate, percent: percent, label: determinate ? 'Tiến trình: ' + completed + '/' + total + ' (' + percent + '%)' + (waitingForResponse ? ' · đang chờ phản hồi' : '') : (active ? 'Tiến trình: đang xử lý…' : '') };
 }
 function fbmSyncApplyProgress(box, status, count) {
   var data = fbmSyncProgressData(status || {}, count || {});
@@ -342,14 +346,14 @@ function fbmSyncInstall() {
     } else { waiter.resolve(data.result); }
   });
   document.addEventListener('click', function (event) {
-  var target = event.target && event.target.closest ? event.target.closest('#fbm-sync-back, #fbm-sync-module-menu, #fbm-sync-master-switch, #fbm-sync-start, #fbm-sync-approve, #fbm-sync-rotate-relay, #fbm-sync-cancel, #fbm-sync-open-conflicts, #fbm-sync-conflict-back, #fbm-sync-check-identity, #fbm-sync-probe-identity, #fbm-sync-confirm-identity, #fbm-sync-save-identity, #fbm-sync-auto-login, #fbm-sync-login-save, #fbm-sync-login-test, #fbm-sync-save-extension, #fbm-sync-save-background, #fbm-sync-save-login-policy, [data-sync-screen], [data-sync-results-tab], [data-sync-background], [data-sync-extension-startup], [data-sync-process-toggle], [data-sync-login-policy], [data-sync-page], [data-fbm-conflict-choice], [data-fbm-conflict-merge], [data-fbm-push-retry-all]') : null;
+  var target = event.target && event.target.closest ? event.target.closest('#fbm-sync-back, #fbm-sync-module-menu, #fbm-sync-master-switch, #fbm-sync-settings-master-switch, #fbm-sync-start, #fbm-sync-approve, #fbm-sync-rotate-relay, #fbm-sync-cancel, #fbm-sync-open-conflicts, #fbm-sync-conflict-back, #fbm-sync-check-identity, #fbm-sync-probe-identity, #fbm-sync-confirm-identity, #fbm-sync-save-identity, #fbm-sync-auto-login, #fbm-sync-login-edit, #fbm-sync-login-save, #fbm-sync-login-test, #fbm-sync-save-extension, #fbm-sync-save-background, #fbm-sync-save-login-policy, #fbm-sync-save-settings, [data-sync-screen], [data-sync-results-tab], [data-sync-background], [data-sync-master], [data-sync-extension-startup], [data-sync-process-toggle], [data-sync-login-policy], [data-sync-page], [data-fbm-conflict-choice], [data-fbm-conflict-merge], [data-fbm-push-retry-all]') : null;
     if (!target) {
       var openNav = document.getElementById('fbm-sync-nav');
       if (openNav && !openNav.hidden && !(event.target && event.target.closest && event.target.closest('#fbm-sync-nav'))) { openNav.hidden = true; }
       return;
     }
     event.preventDefault();
-    if (target.id === 'fbm-sync-master-switch') { fbmSyncToggleMaster();
+    if (target.id === 'fbm-sync-master-switch' || target.id === 'fbm-sync-settings-master-switch') { fbmSyncToggleMaster();
     } else if (target.id === 'fbm-sync-module-menu') { FBM_SYNC_CLIENT.navOpen = FBM_SYNC_CLIENT.navOpen !== true; fbmSyncRenderShell(FBM_SYNC_CLIENT.lastStatus || {});
     } else if (target.hasAttribute('data-sync-background')) {
       var bg = FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.lastStatus.backgroundEnabled !== false, nextBg = !bg;
@@ -390,9 +394,11 @@ function fbmSyncInstall() {
     } else if (target.id === 'fbm-sync-conflict-back') {
       FBM_SYNC_CLIENT.subscreen = 'results'; FBM_SYNC_CLIENT.resultsTab = 'summary';
       fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus);
+    } else if (target.id === 'fbm-sync-login-edit') { FBM_SYNC_CLIENT.loginDraft.username = String((FBM_SYNC_CLIENT.loginStatus && FBM_SYNC_CLIENT.loginStatus.public && FBM_SYNC_CLIENT.loginStatus.public.usernameHint) || ''); FBM_SYNC_CLIENT.loginEditMode = true; var loginPasswordInput = document.getElementById('fbm-login-password'); if (loginPasswordInput) { loginPasswordInput.value = ''; } fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus || {});
     } else if (target.id === 'fbm-sync-save-extension') { fbmSyncSaveExtensionSettings(target);
     } else if (target.id === 'fbm-sync-save-background') { fbmSyncSaveBackgroundSettings(target);
     } else if (target.id === 'fbm-sync-save-login-policy') { fbmSyncSaveLoginPolicy(target);
+    } else if (target.id === 'fbm-sync-save-settings') { fbmSyncSaveSyncSettings(target);
     } else if (target.id === 'fbm-sync-auto-login') { var autoEnabled = target.getAttribute('aria-pressed') !== 'true'; fbmSyncSetTargetState(target.id, { addClass: [autoEnabled ? 'is-on' : 'is-off'], removeClass: [autoEnabled ? 'is-off' : 'is-on'], ariaPressed: autoEnabled, childText: { '.shin-toggle-label': autoEnabled ? 'ON' : 'OFF' }, disabled: true }); fbmSyncSetAutoLogin(autoEnabled).finally(function () { fbmSyncSetTargetState(target.id, { disabled: false }); });
     } else if (target.id === 'fbm-sync-rotate-relay') { fbmSyncRotateRelay();
     } else if (target.id === 'fbm-sync-check-identity') { fbmSyncCheckIdentity();
@@ -432,14 +438,23 @@ function fbmSyncInstall() {
   document.addEventListener('change', function (event) {
     var target = event.target;
     if (!target) { return; }
-    if (target.id === 'fbm-sync-mode') { FBM_SYNC_CLIENT.mode = target.value; }
+    if (target.getAttribute && target.getAttribute('data-standalone-select') === '1') {
+      var rawValue = target.value, standaloneOptions = typeof renderStandaloneOptions === 'function' ? renderStandaloneOptions(target) : [];
+      if (!standaloneOptions.some(function (option) { return option && String(option.value) === String(rawValue); })) {
+        var byLabel = standaloneOptions.filter(function (option) { return option && String(option.label) === String(rawValue); })[0];
+        rawValue = byLabel ? byLabel.value : (target.getAttribute('data-value') || rawValue);
+      }
+      target.setAttribute('data-value', rawValue === null || rawValue === undefined ? '' : String(rawValue));
+    }
+    if (target.id === 'fbm-sync-mode') { FBM_SYNC_CLIENT.mode = target.getAttribute('data-value') || target.value; }
+    if (target.id === 'fbm-sync-background-direction') { FBM_SYNC_CLIENT.backgroundDirection = target.getAttribute('data-value') || target.value; }
     if (target.hasAttribute('data-fbm-conflict-field')) { var manualInput = document.querySelector('[data-fbm-conflict-manual="' + target.getAttribute('data-fbm-conflict-field') + '"]'); if (manualInput) { fbmSyncSetTargetState(manualInput.id, { hidden: target.value !== 'manual' }); } }
     if (target.id === 'fbm-sync-auto-login-input') { fbmSyncSetAutoLogin(target.checked); }
   });
   document.addEventListener('input', function (event) {
     var target = event.target, id = String(target && target.id || '');
     var identity = { 'fbm-identity-spreadsheet': 'spreadsheetId', 'fbm-identity-user': 'userId', 'fbm-identity-username': 'username', 'fbm-identity-account': 'accountName' };
-    if (identity[id]) { FBM_SYNC_CLIENT.identityDraft[identity[id]] = String(target.value || ''); }
+    if (identity[id]) { FBM_SYNC_CLIENT.identityDraft[identity[id]] = String(target.value || ''); var invalidKey = id.replace('fbm-identity-', ''); if (FBM_SYNC_CLIENT.identityInvalid) { delete FBM_SYNC_CLIENT.identityInvalid[invalidKey]; if (typeof RENDER_INDEX !== 'undefined' && RENDER_INDEX.nodes['fbm-sync-identity-form-region']) { fbmSyncRenderTarget('fbm-sync-identity-form-region', fbmSyncIdentityFormBlocks()); } } }
     if (id === 'fbm-login-username') { FBM_SYNC_CLIENT.loginDraft.username = String(target.value || ''); }
   });
   document.addEventListener('focusout', function () { setTimeout(fbmSyncFlushDeferredPaint, 0); });
@@ -600,14 +615,14 @@ function fbmSyncAutoFillAndCheck() {
   return fbmSyncProbeIdentity().then(function () {
     var status = FBM_SYNC_CLIENT.lastStatus || {}, probe = status.metadata && status.metadata.identityProbe || {}, binding = FBM_SYNC_CLIENT.identityStatus && FBM_SYNC_CLIENT.identityStatus.binding || {};
     if (!probe.spreadsheetId || !probe.userId || !probe.username || !probe.accountName) {
-      status.phase = 'error'; status.label = 'Không thể kiểm tra'; status.message = 'Không đọc đủ Spreadsheet ID, mã user hoặc tên tài khoản từ tab FBM. Thông tin đã đọc được giữ lại để bạn kiểm tra.'; fbmSyncPaint(status); return null;
+      status.phase = 'error'; status.label = 'Không thể kiểm tra'; status.message = 'Không đọc đủ Spreadsheet ID, mã user hoặc tên tài khoản từ tab FBM.'; fbmSyncSetAccountNotice('identity', 'error', status.message); fbmSyncPaint(status); return null;
     }
     if (!binding.spreadsheetId || !binding.userId || !binding.accountName) {
-      status.phase = 'done'; status.label = 'Đã tự động điền'; status.message = 'Đã đọc và điền thông tin từ tab FBM. Đây là liên kết mới, hãy kiểm tra rồi bấm Lưu thông tin để xác nhận.'; fbmSyncPaint(status); return { ok: true, code: 'IDENTITY_DRAFT_READY', status: status };
+      status.phase = 'done'; status.label = 'Đã tự động điền'; status.message = 'Đã lấy thông tin thành công và điền vào form.'; fbmSyncSetAccountNotice('identity', 'success', status.message); fbmSyncPaint(status); return { ok: true, code: 'IDENTITY_DRAFT_READY', status: status };
     }
     var same = String(binding.spreadsheetId) === String(probe.spreadsheetId) && String(binding.userId) === String(probe.userId) && String(binding.username) === String(probe.username) && String(binding.accountName) === String(probe.accountName);
     if (!same) {
-      status.phase = 'error'; status.label = 'Liên kết không khớp'; status.message = 'Nhận diện từ tab FBM không khớp thông tin đã lưu. Không được chạy đồng bộ; hãy kiểm tra lại rồi bấm Lưu thông tin.'; fbmSyncPaint(status); return null;
+      status.phase = 'error'; status.label = 'Liên kết không khớp'; status.message = 'Nhận diện từ tab FBM không khớp thông tin đã lưu.'; fbmSyncSetAccountNotice('identity', 'error', status.message); fbmSyncPaint(status); return null;
     }
     return fbmSyncCheckIdentity();
   });
@@ -632,22 +647,27 @@ function fbmSyncSaveIdentityManual(button) {
   var binding = { spreadsheetId: String(spreadsheet && spreadsheet.value || '').trim(), userId: String(user && user.value || '').trim(), username: String(username && username.value || '').trim(), accountName: String(account && account.value || '').trim() };
   var empty = !binding.spreadsheetId && !binding.userId && !binding.username && !binding.accountName;
   if (!empty && (!binding.spreadsheetId || !binding.userId || !binding.username || !binding.accountName)) {
-    fbmSyncPaintError(null, 'Hãy nhập đủ cả bốn thông tin liên kết, hoặc xóa cả bốn ô để hủy liên kết.');
+    FBM_SYNC_CLIENT.identityInvalid = { spreadsheet: !binding.spreadsheetId, user: !binding.userId, username: !binding.username, account: !binding.accountName };
+    if (typeof RENDER_INDEX !== 'undefined' && RENDER_INDEX.nodes['fbm-sync-identity-form-region']) { fbmSyncRenderTarget('fbm-sync-identity-form-region', fbmSyncIdentityFormBlocks()); }
+    fbmSyncSetAccountNotice('identity', 'error', 'Hãy nhập đủ cả bốn thông tin liên kết, hoặc xóa cả bốn ô để hủy liên kết.');
     if (button) { button.disabled = false; }
     return Promise.resolve(null);
   }
+  FBM_SYNC_CLIENT.identityInvalid = {};
   return callServer('fbmSaveIdentityBinding', [binding]).then(function (result) {
     if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không lưu được liên kết tài khoản.'); }
     if (result.code === 'IDENTITY_BINDING_CLEARED') {
       FBM_SYNC_CLIENT.identityDraft = { spreadsheetId: '', userId: '', username: '', accountName: '' };
+      FBM_SYNC_CLIENT.identityInvalid = {};
       FBM_SYNC_CLIENT.identityLastAction = '';
       FBM_SYNC_CLIENT.identityStatus = result.identityStatus || { status: 'UNBOUND', binding: {} };
       fbmSyncPaint(Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { phase: 'idle', label: 'Chưa liên kết', message: result.message || 'Đã hủy liên kết tài khoản.' }));
       return result;
     }
+    FBM_SYNC_CLIENT.identityDraft = { spreadsheetId: String(binding.spreadsheetId || ''), userId: String(binding.userId || ''), username: String(binding.username || ''), accountName: String(binding.accountName || '') };
     FBM_SYNC_CLIENT.identityStatus = result.binding ? Object.assign({}, FBM_SYNC_CLIENT.identityStatus || {}, { status: 'BOUND', binding: result.binding, spreadsheetId: result.binding.spreadsheetId }) : FBM_SYNC_CLIENT.identityStatus;
     var status = FBM_SYNC_CLIENT.lastStatus || {}; status.message = 'Đã lưu liên kết tài khoản.'; fbmSyncPaint(status); return result;
-  }).catch(function (error) { var status = FBM_SYNC_CLIENT.lastStatus || {}; status.message = String(error && error.message || error); fbmSyncPaint(status); return null; }).finally(function () { if (button) { button.disabled = false; } });
+  }).catch(function (error) { var status = FBM_SYNC_CLIENT.lastStatus || {}; status.message = String(error && error.message || error); fbmSyncSetAccountNotice('identity', 'error', status.message); fbmSyncPaint(status); return null; }).finally(function () { if (button) { button.disabled = false; } });
 }
 function fbmSyncSetAutoLogin(enabled) {
   return callServer('fbmSetAutoLogin', [enabled === true]).then(function (result) { FBM_SYNC_CLIENT.loginStatus = result || FBM_SYNC_CLIENT.loginStatus; return fbmSyncStatusOnce(); }).catch(function (error) { var status = FBM_SYNC_CLIENT.lastStatus || {}; status.message = String(error && error.message || error); fbmSyncPaint(status); return null; });
@@ -667,6 +687,11 @@ function fbmSyncToggleValue(id) {
   var node = document.getElementById(id);
   return !!node && node.getAttribute('aria-pressed') === 'true';
 }
+function fbmSyncControlValue(id) {
+  var node = document.getElementById(id);
+  if (!node) { return ''; }
+  return node.getAttribute('data-standalone-select') === '1' ? (node.getAttribute('data-value') || '') : String(node.value || '');
+}
 function fbmSyncSaveExtensionSettings(button) {
   if (button) { button.disabled = true; }
   var input = document.getElementById('fbm-extension-poll-minutes');
@@ -680,13 +705,20 @@ function fbmSyncSaveExtensionSettings(button) {
 function fbmSyncSaveBackgroundSettings(button) {
   if (button) { button.disabled = true; }
   var schedule = {};
-  ['heartbeat', 'customer', 'activity'].forEach(function (kind) { var input = document.getElementById('fbm-sync-process-' + kind + '-minutes'); var toggle = document.getElementById('fbm-sync-process-' + kind); schedule[kind] = { minutes: Number(input && input.value || 1), enabled: !!toggle && toggle.getAttribute('aria-pressed') === 'true' }; });
+  ['heartbeat', 'customerFull', 'activityFull', 'detail'].forEach(function (kind) { var input = document.getElementById('fbm-sync-process-' + kind + '-minutes'); var toggle = document.getElementById('fbm-sync-process-' + kind); schedule[kind] = { minutes: Number(input && input.value || 1), enabled: !!toggle && toggle.getAttribute('aria-pressed') === 'true' }; });
+  schedule.direction = fbmSyncControlValue('fbm-sync-background-direction') || 'read';
+  schedule.detail = { enabled: schedule.detail.enabled, minutes: schedule.detail.minutes, customersPerRun: Number(document.getElementById('fbm-sync-detail-count') && document.getElementById('fbm-sync-detail-count').value || 50), minDelaySeconds: Number(document.getElementById('fbm-sync-detail-delay-min') && document.getElementById('fbm-sync-detail-delay-min').value || 0.5), maxDelaySeconds: Number(document.getElementById('fbm-sync-detail-delay-max') && document.getElementById('fbm-sync-detail-delay-max').value || 2) };
   return callServer('fbmSaveBackgroundSchedule', [schedule]).then(function (result) {
     if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không lưu được lịch đồng bộ nền.'); }
     FBM_SYNC_CLIENT.syncSettings = FBM_SYNC_CLIENT.syncSettings || {}; FBM_SYNC_CLIENT.syncSettings.background = result.schedule || schedule;
     if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('background', 'success', 'Đã lưu lịch đồng bộ nền.'); }
     return fbmSyncPaint(Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { message: 'Đã lưu lịch đồng bộ nền.' }));
   }).catch(function (error) { if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('background', 'error', 'Không lưu được lịch đồng bộ nền: ' + String(error && error.message || error)); } fbmSyncPaintError(error, 'Không lưu được lịch đồng bộ nền.'); return null; }).finally(function () { if (button) { button.disabled = false; } });
+}
+function fbmSyncSaveSyncSettings(button) {
+  if (button) { button.disabled = true; }
+  var payload = { customerPrefix: String(document.getElementById('fbm-sync-setting-customer-prefix') && document.getElementById('fbm-sync-setting-customer-prefix').value || '').trim(), customerCodeLength: Number(document.getElementById('fbm-sync-setting-customer-length') && document.getElementById('fbm-sync-setting-customer-length').value || 0), activitySince: String(document.getElementById('fbm-sync-setting-activity-since') && document.getElementById('fbm-sync-setting-activity-since').value || '').trim(), approvalThreshold: Number(document.getElementById('fbm-sync-setting-approval-threshold') && document.getElementById('fbm-sync-setting-approval-threshold').value || 0) };
+  return callServer('fbmSaveSyncSettings', [payload]).then(function (result) { if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không lưu được tham số phiên.'); } FBM_SYNC_CLIENT.syncSettings = Object.assign({}, FBM_SYNC_CLIENT.syncSettings || {}, result.settings || payload); if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('background', 'success', 'Đã lưu tham số phiên.'); } return fbmSyncPaint(Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { message: 'Đã lưu tham số phiên.' })); }).catch(function (error) { if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('background', 'error', 'Không lưu được tham số phiên: ' + String(error && error.message || error)); } fbmSyncPaintError(error, 'Không lưu được tham số phiên.'); return null; }).finally(function () { if (button) { button.disabled = false; } });
 }
 function fbmSyncSaveLoginPolicy(button) {
   if (button) { button.disabled = true; }
@@ -731,7 +763,7 @@ function fbmSyncSaveLoginConfig(button) {
     return callServer('fbmSaveLoginConfig', [{ enabled: (FBM_SYNC_CLIENT.loginStatus || {}).enabled !== false, credentialRef: encrypted.credentialRef, envelope: encrypted.envelope, public: encrypted.public }]);
   }).then(function (saved) {
     var password = document.getElementById('fbm-login-password'); if (password) { password.value = ''; }
-    FBM_SYNC_CLIENT.loginStatus = saved || FBM_SYNC_CLIENT.loginStatus; return fbmSyncStatusOnce();
+    FBM_SYNC_CLIENT.loginStatus = saved || FBM_SYNC_CLIENT.loginStatus; FBM_SYNC_CLIENT.loginEditMode = false; FBM_SYNC_CLIENT.loginDraft.username = ''; return fbmSyncStatusOnce();
   }).catch(function (error) { var reason = String(error && error.message || error); fbmSyncSetAccountNotice('login', 'error', reason); var status = FBM_SYNC_CLIENT.lastStatus || {}; status.message = reason; fbmSyncPaint(status); return null;
   }).finally(function () { if (button) { button.disabled = false; } });
 }

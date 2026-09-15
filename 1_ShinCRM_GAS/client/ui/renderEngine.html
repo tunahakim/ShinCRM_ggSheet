@@ -371,10 +371,24 @@ function renderStandaloneControlInner(node) {
   }
   if (kind === 'select') {
     if (!Array.isArray(node.options)) { throw new Error('StandaloneControl select cần `options` là mảng.'); }
-    return '<select' + renderAttr('class', 'shin-input' + (className ? ' ' + className : '')) + common + '>' + node.options.map(function (option) {
+    node.options.forEach(function (option) {
       if (!option || typeof option !== 'object' || option.value === undefined || option.label === undefined) { throw new Error('Mỗi option của StandaloneControl select cần `value` và `label`.'); }
-      return '<option' + renderAttr('value', option.value) + (String(option.value) === String(node.value) ? ' selected' : '') + '>' + renderEscape(option.label) + '</option>';
-    }).join('') + '</select>';
+    });
+    var selected = node.options.filter(function (option) { return String(option.value) === String(node.value); })[0] || null;
+    var selectedValue = selected ? selected.value : (node.options[0] ? node.options[0].value : '');
+    var selectedLabel = selected ? selected.label : (node.options[0] ? node.options[0].label : '');
+    var attrs = renderAttr('class', 'shin-input shin-combo-select' + (className ? ' ' + className : ''))
+      + renderAttr('id', node.id) + renderDataAttrs(node.data)
+      + renderAttr('aria-label', node.ariaLabel || node.label)
+      + renderAttr('aria-expanded', 'false') + renderAttr('data-standalone-select', '1')
+      + renderAttr('data-value', selectedValue) + renderAttr('data-standalone-options', JSON.stringify(node.options))
+      + (node.disabled ? ' disabled' : '') + (node.hidden ? ' hidden' : '')
+      + renderAttr('value', selectedLabel) + renderAttr('placeholder', node.placeholder || '--Chọn--')
+      + renderInputGuard() + ' readonly';
+    return '<div class="shin-combo shin-combo-standalone">'
+      + '<input type="text" role="combobox"' + attrs + '>'
+      + '<div class="shin-popup-list shin-combo-list" hidden></div>'
+      + '</div>';
   }
   if (kind === 'toggle') {
     return '<button type="button"' + renderAttr('class', 'shin-toggle-control' + (className ? ' ' + className : '')) + common + renderAttr('aria-pressed', node.pressed ? 'true' : 'false') + '>'
@@ -445,8 +459,21 @@ function renderBlockInto(parent, node, ctx) {
 function renderControlValue(id, value) {
   var control = document.getElementById(id);
   if (!control || ['INPUT', 'SELECT', 'TEXTAREA'].indexOf(control.tagName) < 0) { return false; }
+  if (control.getAttribute && control.getAttribute('data-standalone-select') === '1') {
+    var options = renderStandaloneOptions(control);
+    var selected = options.filter(function (option) { return option && String(option.value) === String(value); })[0];
+    control.setAttribute('data-value', value === null || value === undefined ? '' : String(value));
+    control.value = selected ? String(selected.label) : (value === null || value === undefined ? '' : String(value));
+    return true;
+  }
   control.value = value === undefined || value === null ? '' : String(value);
   return true;
+}
+
+function renderStandaloneOptions(control) {
+  if (!control || !control.getAttribute) { return []; }
+  var raw = control.getAttribute('data-standalone-options') || '[]';
+  try { return JSON.parse(String(raw).replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')); } catch (ignore) { return []; }
 }
 
 /* ─── Việc 4: gán chuỗi vào khung. Từ đây trở xuống mới có `document`. ─── */
@@ -518,6 +545,10 @@ function renderTargetState(id, state) {
   if (state.ariaLabel !== undefined) { el.setAttribute('aria-label', String(state.ariaLabel || '')); }
   if (state.title !== undefined) { el.title = String(state.title || ''); }
   if (state.text !== undefined) { el.textContent = String(state.text === null || state.text === undefined ? '' : state.text); }
+  if (state.value !== undefined && 'value' in el) {
+    if (el.getAttribute && el.getAttribute('data-standalone-select') === '1') { renderControlValue(id, state.value); }
+    else { el.value = state.value === null || state.value === undefined ? '' : String(state.value); }
+  }
   if (state.childText && typeof state.childText === 'object') {
     Object.keys(state.childText).forEach(function (selector) { var child = el.querySelector(selector); if (child) { child.textContent = String(state.childText[selector] === null || state.childText[selector] === undefined ? '' : state.childText[selector]); } });
   }

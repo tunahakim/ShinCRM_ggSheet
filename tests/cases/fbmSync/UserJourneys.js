@@ -111,7 +111,7 @@ async function chay(so) {
 
   hop.FBM_SYNC_CLIENT.subscreen = 'settings';
   hop.FBM_SYNC_CLIENT.loginStatus = { enabled: true, autoOpenTab: false, retryEnabled: true, retryMinutes: 30 };
-  hop.FBM_SYNC_CLIENT.syncSettings = { extension: { pollMinutes: 5, runOnStartup: true }, background: { heartbeat: { enabled: true, minutes: 5 }, customer: { enabled: true, minutes: 60 }, activity: { enabled: true, minutes: 30 } } };
+  hop.FBM_SYNC_CLIENT.syncSettings = { extension: { pollMinutes: 5, runOnStartup: true }, background: { direction: 'read', heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: true, minutes: 30 }, detail: { enabled: false, minutes: 60, customersPerRun: 50, minDelaySeconds: 0.5, maxDelaySeconds: 2 } } };
   hop.FBM_SYNC_CLIENT.lastStatus = idle();
   hop.fbmSyncPaint(idle());
   const settingsRoot = content.children[0];
@@ -127,10 +127,10 @@ async function chay(so) {
   hop.fbmSyncSaveBackgroundSettings = () => { settingsActions.push('background'); return Promise.resolve(null); };
   hop.fbmSyncSaveLoginPolicy = () => { settingsActions.push('login-policy'); return Promise.resolve(null); };
   hop.fbmSyncRotateRelay = () => { settingsActions.push('rotate-relay'); return Promise.resolve(null); };
-  const toggles = ['fbm-sync-run-on-startup', 'fbm-sync-process-heartbeat', 'fbm-sync-process-customer', 'fbm-sync-process-activity', 'fbm-sync-policy-auto-login', 'fbm-sync-policy-auto-open', 'fbm-sync-policy-retry'];
+  const toggles = ['fbm-sync-run-on-startup', 'fbm-sync-process-heartbeat', 'fbm-sync-process-customerFull', 'fbm-sync-process-activityFull', 'fbm-sync-process-detail', 'fbm-sync-policy-auto-login', 'fbm-sync-policy-auto-open', 'fbm-sync-policy-retry'];
   toggles.forEach((id) => click(dom, dom.document.getElementById(id)));
   ['fbm-sync-save-extension', 'fbm-sync-save-background', 'fbm-sync-save-login-policy', 'fbm-sync-rotate-relay'].forEach((id) => click(dom, dom.document.getElementById(id)));
-  check(so, 'cai dat phien doi dung tung cong tac va gui tung lenh luu theo nut bam', [settingsActions, toggles.map((id) => dom.document.getElementById(id).getAttribute('aria-pressed'))], [['extension', 'background', 'login-policy', 'rotate-relay'], ['false', 'false', 'false', 'false', 'false', 'true', 'false']]);
+  check(so, 'cai dat phien doi dung tung cong tac va gui tung lenh luu theo nut bam', [settingsActions, toggles.map((id) => dom.document.getElementById(id).getAttribute('aria-pressed'))], [['extension', 'background', 'login-policy', 'rotate-relay'], ['false', 'false', 'false', 'false', 'true', 'false', 'true', 'false']]);
   const background = dom.document.getElementById('fbm-sync-background-switch');
   click(dom, background);
   check(so, 'công tắc lịch nền phản hồi ngay khi click trước khi GAS trả về', [background.getAttribute('aria-pressed'), background.className.indexOf('is-off') >= 0, background.disabled], ['false', true, true]);

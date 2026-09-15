@@ -82,12 +82,23 @@ function comboDecl(inp) {
   return Schema[duong[0]][duong[1]] || null;
 }
 
+function comboStandaloneOptions(inp) {
+  if (!inp || inp.getAttribute('data-standalone-select') !== '1') { return []; }
+  if (typeof renderStandaloneOptions === 'function') { return renderStandaloneOptions(inp); }
+  try {
+    var parsed = JSON.parse(inp.getAttribute('data-standalone-options') || '[]');
+    return Array.isArray(parsed) ? parsed.filter(function (item) { return item && item.value !== undefined && item.label !== undefined; }) : [];
+  } catch (ignore) { return []; }
+}
+
 /**
  * Nguồn giá trị của một ô danh mục: hoặc `options` khai thẳng trong bảng khai trường, hoặc danh mục trong `Store`.
  *
  * Hỏi bảng khai chứ không hỏi `data-source` trên thẻ, vì `data-source` chỉ có ở ca danh mục — trường khai `options` thì thẻ không mang gì và một ô như thế sẽ bung ra danh sách rỗng mà không ai biết vì sao.
  */
 function comboSource(inp) {
+  var standalone = comboStandaloneOptions(inp);
+  if (standalone.length) { return standalone; }
   var khai = comboDecl(inp);
   if (!khai) { return []; }
   if (khai.options) { return khai.options; }
@@ -110,7 +121,12 @@ function comboMatches(inp, chu, mode) {
     return { rows: picker.rows, con: picker.more };
   }
 
-  var source = comboSource(inp);
+  var source = comboSource(inp), standalone = comboStandaloneOptions(inp);
+  if (standalone.length) {
+    var selected = standalone.filter(function (item) { return String(item.value) === String(inp.getAttribute('data-value') || ''); })[0];
+    var queryStandalone = mode === 'open' ? '' : can;
+    return { rows: standalone.filter(function (item) { return !queryStandalone || normalizeText(item.label).indexOf(queryStandalone) !== -1; }).map(function (item) { return { value: item.value, label: item.label, meta: '' }; }), con: false, hasExact: !!selected };
+  }
   // Khi quay lại một giá trị hợp lệ, mở lại toàn bộ danh mục; chỉ khi giá trị đang gõ chưa hợp lệ mới lọc theo nó.
   var hasExact = can && source.some(function (v) { return normalizeText(v) === can; });
   var showAll = mode === 'open' && (!can || hasExact);
@@ -140,7 +156,7 @@ function comboItemElement(o) {
   d.setAttribute('role', 'option');
 
   var chu = document.createElement('div');
-  chu.textContent = o.value;
+  chu.textContent = o.label === undefined ? o.value : o.label;
   d.appendChild(chu);
 
   if (o.meta) {
@@ -300,7 +316,7 @@ function comboPaint(inp, mode) {
 
 /** Mở danh sách và hẹn giờ bôi đen chữ có sẵn. Ô chỉ đọc thì không mở gì: nó không nhận chữ nên một danh sách bung ra là một lời hứa hão. */
 function comboOpen(inp) {
-  if (inp.readOnly || inp.disabled) { return null; }
+  if ((inp.readOnly && inp.getAttribute('data-standalone-select') !== '1') || inp.disabled) { return null; }
   comboHideAll(inp);
   comboPaint(inp, 'open');
 
@@ -314,9 +330,12 @@ function comboOpen(inp) {
 
 /** Chọn một mục: điền, ẩn danh sách, rồi **nhảy luôn sang ô kế tiếp**. Một mục là một lần bấm, không có bước xác nhận. */
 function comboPick(inp, giaTri) {
-  inp.value = giaTri;
+  var standalone = comboStandaloneOptions(inp), option = standalone.filter(function (item) { return String(item.value) === String(giaTri); })[0];
+  inp.setAttribute('data-value', giaTri);
+  inp.value = option ? String(option.label) : giaTri;
   inp.classList.remove('is-filled');
   comboHide(inp);
+  if (typeof inp.dispatchEvent === 'function' && typeof Event === 'function') { inp.dispatchEvent(new Event('change', { bubbles: true })); }
   if (typeof inputsFocusNext === 'function') { inputsFocusNext(inp); }
   return giaTri;
 }

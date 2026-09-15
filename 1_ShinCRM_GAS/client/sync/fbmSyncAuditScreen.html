@@ -14,7 +14,7 @@ function fbmSyncAuditContentBlocks(status) {
 
 function fbmSyncConflictContentBlocks(status) {
   var metadata = status.metadata || {}, conflicts = Array.isArray(metadata.conflicts) ? metadata.conflicts : [], item = conflicts[0];
-  var head = Row({ className: 'shin-sync-conflict-head', elements: [Text({ className: 'shin-sync-conflict-count', text: Number(metadata.conflictCount || conflicts.length) + ' xung đột còn lại' }), Button({ id: 'fbm-sync-conflict-back', label: 'Quay lại kết quả' })] });
+  var head = Row({ className: 'shin-sync-conflict-head', elements: [Text({ className: 'shin-sync-conflict-count', text: Number(metadata.conflictCount || conflicts.length) + ' xung đột còn lại' })] });
   if (!item) { return [Card({ title: 'Xử lý xung đột', elements: [head, Text({ className: 'shin-empty-state', text: 'Không có xung đột cần xử lý.' })] })]; }
   FBM_SYNC_CLIENT.conflictChoices = FBM_SYNC_CLIENT.conflictChoices || {};
   var fields = (item.fields || []).map(function (field, index) {
@@ -24,7 +24,7 @@ function fbmSyncConflictContentBlocks(status) {
     return Box({ className: 'shin-sync-conflict-field', elements: elements });
   });
   var actions = Row([Button({ label: 'Giữ toàn bộ ShinCRM', data: { 'fbm-conflict-choice': 'shin', 'fbm-conflict-entity': String(item.entity || ''), 'fbm-conflict-id': String(item.id || '') } }), Button({ label: 'Giữ toàn bộ FBM', data: { 'fbm-conflict-choice': 'fbm', 'fbm-conflict-entity': String(item.entity || ''), 'fbm-conflict-id': String(item.id || '') } }), Button({ label: 'Lưu lựa chọn từng trường', className: 'shin-primary', data: { 'fbm-conflict-merge': true, 'fbm-conflict-entity': String(item.entity || ''), 'fbm-conflict-id': String(item.id || '') } })]);
-  return [Card({ title: 'Xử lý xung đột', elements: [head, Text({ className: 'shin-sync-conflict-meta', text: String(item.entity || '') + ' · ' + String(item.id || '') + (item.fbmId ? ' · FBM ' + String(item.fbmId) : '') })].concat(fields, [actions]) })];
+  return [Card({ title: 'Xử lý xung đột', elements: [head, Text({ className: 'shin-sync-conflict-meta', text: String(item.entity || '') + ' · ' + String(item.id || '') + (item.fbmId ? ' · FBM ' + String(item.fbmId) : '') })].concat(fields, [actions, Row({ className: 'shin-single-action-row', elements: [Button({ id: 'fbm-sync-conflict-back', label: 'Quay lại kết quả' })] })]) })];
 }
 
 </script>

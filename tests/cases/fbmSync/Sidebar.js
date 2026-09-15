@@ -215,7 +215,7 @@ async function chay(so) {
 
   hop.FBM_SYNC_CLIENT.syncSettings = { accountName: 'A', approvalThreshold: 10 };
   render(hop, content, hop.fbmSyncRenderSettings, idle);
-  check(so, 'Settings render được relay và tham số phiên', content.textContent.indexOf('10') >= 0 && content.textContent.indexOf('Kết nối Extension') >= 0, true);
+  check(so, 'Settings render được relay và tham số phiên', dom.document.getElementById('fbm-sync-setting-approval-threshold').value === '10' && content.textContent.indexOf('Kết nối Extension') >= 0, true);
 
   const paints = [];
   hop.fbmSyncPaint = (status) => paints.push(status);

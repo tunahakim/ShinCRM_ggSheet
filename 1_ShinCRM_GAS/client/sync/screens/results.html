@@ -11,7 +11,7 @@ function fbmSyncResultsBodyBlocks(status) {
   if (tab === 'audit') { return fbmSyncAuditContentBlocks(status); }
   if (tab === 'errors') { return fbmSyncResultPageBlocks(status, 'errors'); }
   if (tab === 'log') { return fbmSyncResultPageBlocks(status, 'log'); }
-  return fbmSyncStatusBlocks(status, status.counts || {}).concat(fbmSyncRecordIssueBlocks(status.metadata || {}));
+  return [Box({ className: 'shin-section', elements: fbmSyncStatusBlocks(status, status.counts || {}).concat(fbmSyncRecordIssueBlocks(status.metadata || {})) })];
 }
 function fbmSyncRenderResults(panel, status) {
   status = status || {};

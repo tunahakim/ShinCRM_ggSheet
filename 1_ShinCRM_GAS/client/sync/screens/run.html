@@ -54,6 +54,7 @@ function fbmSyncPatchRun(panel, status) {
 function fbmSyncRunHasSnapshot(status) {
   status = status || {};
   var active = ['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(status.phase) >= 0, awaiting = status.phase === 'awaiting_approval';
-  return active || awaiting || status.phase === 'done' || ((status.phase === 'error' || status.phase === 'paused') && (status.runId || status.lastError || status.message || status.metadata && status.metadata.traceTail));
+  var explicitPipeline = status.pipeline && Array.isArray(status.pipeline.steps);
+  return active || awaiting || !!explicitPipeline || ((status.phase === 'done' || status.phase === 'error' || status.phase === 'paused') && !!status.runId);
 }
 </script>
