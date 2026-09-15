@@ -23,7 +23,8 @@ function fbmSyncIdentityActionBlocks() {
 }
 function fbmSyncIdentityResultBlocks(status) {
   var blocks = [], probeResult = status && status.metadata && status.metadata.identityProbe, result = status && status.metadata && status.metadata.identityCheck;
-  if (probeResult && FBM_SYNC_CLIENT.identityLastAction === 'probe' && !(status && status.phase === 'error')) { blocks.push(Text({ className: 'shin-pass-row', text: 'Đã lấy thông tin thành công và điền vào form.' })); }
+  var identityNotice = FBM_SYNC_CLIENT.accountNotices && FBM_SYNC_CLIENT.accountNotices.identity;
+  if (probeResult && FBM_SYNC_CLIENT.identityLastAction === 'probe' && !(status && status.phase === 'error') && !(identityNotice && identityNotice.message)) { blocks.push(Text({ className: 'shin-pass-row', text: 'Đã lấy thông tin thành công và điền vào form.' })); }
   if (probeResult && FBM_SYNC_CLIENT.identityLastAction === 'probe' && status && status.phase === 'error') { blocks.push(Text({ className: 'shin-error-message', text: String(status.message || 'Không lấy được thông tin tài khoản FBM.') })); }
   if (result && FBM_SYNC_CLIENT.identityLastAction === 'check' && (status.phase === 'done' || result.missing !== undefined)) {
     blocks.push(Card({ title: 'Kiểm tra liên kết hoàn tất', elements: [Text({ className: 'shin-preview-row', text: 'Customer hợp lệ: ' + Number(result.matched || 0) + '/' + Number(result.total || 0) + (Number(result.missing || 0) ? ' · không tìm thấy: ' + Number(result.missing || 0) : '') })].concat((result.missingSample || []).slice(0, 5).map(function (item) { return Text({ className: 'shin-preview-row', text: 'Chưa thấy FBM ID ' + String(item.fbmId || '') + ' · ' + String(item.code || item.id || '') }); })) }));
