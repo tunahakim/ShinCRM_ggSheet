@@ -23,16 +23,16 @@ FbmSync.start = function (options) {
     if (current.activeRequestId) {
       return { ok: false, code: 'REQUEST_IN_FLIGHT', request: null, message: 'Đã có request FBM đang chờ response; không cấp request chồng.', status: FbmSync.statusView() };
     }
-    var initialAuthorize = current.phase === 'checking_session' && current.cursor && current.cursor.kind === 'authorize_customer';
+    var initialRequest = current.phase === 'checking_session' && current.cursor && ['authorize_customer', 'identity_user_grid'].indexOf(current.cursor.kind) >= 0;
     var recent = Date.now() - Number(current.updatedAt || 0) <= 60000;
     var resumable = recent ? FbmSync.requestForCursor(current) : null;
     if (resumable && current.cursor && current.cursor.kind !== 'push_wait') {
       return { ok: true, request: FbmSync.nextEnvelope(resumable), status: FbmSync.statusView(), resumed: true };
     }
-    if (initialAuthorize && recent) {
+    if (initialRequest && recent && current.cursor.kind === 'authorize_customer') {
       return { ok: true, request: FbmSync.nextEnvelope(FbmSync.authorizeRequest('customer')), status: FbmSync.statusView(), resumed: true };
     }
-    if (!initialAuthorize) { return { ok: false, code: 'SYNC_ALREADY_RUNNING', status: FbmSync.statusView() }; }
+    if (!initialRequest) { return { ok: false, code: 'SYNC_ALREADY_RUNNING', status: FbmSync.statusView() }; }
   }
   if (typeof fbmEnsureSyncColumns === 'function') { fbmEnsureSyncColumns(); }
   var state = FbmSync.stateStart('', 'checking_session', 0, { preserveConflicts: current.phase === 'conflict' });
@@ -71,6 +71,14 @@ FbmSync.start = function (options) {
       FbmSync.stateWrite(state);
       return { ok: true, request: null, status: FbmSync.statusView(), approvalRequired: true };
     }
+  }
+  if (state.scan === 'identity_probe') {
+    // User grid đã tự chứng minh cookie/session đọc được. Không lấy Authorized
+    // chỉ để tự động điền, vì token này không được probe sử dụng.
+    state.cursor = { kind: 'identity_user_grid' };
+    state.message = 'Dang doc thong tin tai khoan FBM...';
+    FbmSync.stateWrite(state);
+    return { ok: true, request: FbmSync.nextEnvelope(FbmSync.identityUserRequest()), status: FbmSync.statusView() };
   }
   state.cursor = { kind: 'authorize_customer' };
   state.message = 'Dang kiem tra phien FBM...';

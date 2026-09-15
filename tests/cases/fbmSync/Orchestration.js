@@ -32,10 +32,13 @@ async function chay(so) {
   const relay = taoHopCat({
     FbmSync: {},
     PropertiesService: { getDocumentProperties: () => ({ getProperty: () => 'relay-test-key' }), getScriptProperties: () => ({ getProperty: () => 'relay-test-key' }) },
+    ScriptApp: { getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/head-only/exec' }) },
     shinOpenBook: () => ({ getId: () => 'sheet-relay-test' }),
     ContentService: { MimeType: { JSON: 'application/json' }, createTextOutput: (text) => ({ text: text, setMimeType() { return this; } }) }
   });
   napServer(relay, 'fbm_sync/transport/EntryPoints.js');
+  const stableRelayConfig = relay.fbmSyncRelayConfig();
+  check(so, 'relay cap URL deployment co dinh, khong lay URL @HEAD theo context Sidebar', [stableRelayConfig.url, stableRelayConfig.url.indexOf('head-only') >= 0], ['https://script.google.com/macros/s/AKfycbx0ueI_gR2zzkTUGV5lTAXty0zotK2owAd5zPy0Z0SzJkJjRa0dIvbMREAoVJm3iFrX/exec', false]);
   const rejectedProbe = JSON.parse(relay.doPost({ postData: { contents: JSON.stringify({ key: 'relay-test-key', spreadsheetId: 'sheet-relay-test', kind: 'probe' }) } }).text);
   check(so, 'Web App từ chối probe ngoài nhịp nền', [rejectedProbe.ok, rejectedProbe.code, rejectedProbe.request], [false, 'RELAY_KIND_UNSUPPORTED', null]);
 

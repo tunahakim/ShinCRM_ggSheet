@@ -83,10 +83,13 @@ function fbmSyncRetryPushFailures() {
   return { ok: true, total: keys.length, reset: reset.length, missing: missing.length, status: FbmSync.statusView() };
 }
 
+// ID deployment ổn định qua mỗi lần nâng revision. Không dùng getService().getUrl(),
+// vì khi chạy từ Sidebar nó có thể trả URL @HEAD không phải Web App công khai.
+var FBM_SYNC_RELAY_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbx0ueI_gR2zzkTUGV5lTAXty0zotK2owAd5zPy0Z0SzJkJjRa0dIvbMREAoVJm3iFrX/exec';
+
 /** Cấp relay config của đúng Spreadsheet hiện tại; không để Extension tự đoán địa chỉ GAS. */
 function fbmSyncRelayConfig() {
-  var url = '';
-  try { url = ScriptApp.getService().getUrl() || ''; } catch (ignore) {}
+  var url = FBM_SYNC_RELAY_WEB_APP_URL;
   var spreadsheetId = '';
   try { spreadsheetId = String(shinOpenBook().getId() || ''); } catch (ignoreId) {}
   var props = PropertiesService.getScriptProperties(), key = String(props.getProperty('FBM_SYNC_KEY') || '');
@@ -113,8 +116,7 @@ function fbmSyncRotateRelayKey() {
   try {
     var key = Utilities.getUuid();
     PropertiesService.getScriptProperties().setProperty('FBM_SYNC_KEY', key);
-    var url = '';
-    try { url = ScriptApp.getService().getUrl() || ''; } catch (ignoreUrl) {}
+    var url = FBM_SYNC_RELAY_WEB_APP_URL;
     var spreadsheetId = '';
     try { spreadsheetId = String(shinOpenBook().getId() || ''); } catch (ignoreId) {}
     return { url: url, key: key, spreadsheetId: spreadsheetId };

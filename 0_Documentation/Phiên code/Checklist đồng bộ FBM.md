@@ -315,12 +315,12 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Bố cục module động dùng Block/schema và renderer chung; loading mở màn hình, trạng thái tĩnh và tiêu đề không dựng HTML riêng trong từng màn hình.
 - [x] Tên hiển thị `Nghiệm thu phạm vi thử`; `ALT00010` chỉ là phạm vi DEV/live acceptance, không đại diện cho phiên nhiều Customer.
 - [x] Tiêu đề header đổi theo màn hình; menu con nổi dưới header, cuộn nội bộ ở trần khoảng hai phần ba Sidebar; công tắc tổng và auto-login dùng pill nhỏ; các nút có menu trong tiêu đề Card dùng cùng chiều cao compact với tiêu đề Card.
-- [x] Liên kết tài khoản có form nhập tay `Spreadsheet ID`, `Mã user FBM`, `Tên tài khoản FBM`; thao tác `Tự động điền - Kiểm tra` và `Lưu thông tin` báo lỗi tường minh, không tự lưu ngầm.
+- [x] Liên kết tài khoản có form nhập tay `Spreadsheet ID`, `Mã user FBM`, `Username FBM`, `Tên tài khoản FBM`; thao tác `Tự động điền - Kiểm tra` và `Lưu thông tin` báo lỗi tường minh, không tự lưu ngầm.
 - [ ] **Cần kiểm chứng thực tế:** chạy probe một nút và kiểm tra báo cáo trên Sidebar/Log.
 
 ### Bổ sung UI dùng chung sau Slice 8
 
-- [x] Identity probe chạy đủ chuỗi GAS cấp `authorize` rồi `GetGridViewPage` controller `User`, giữ dữ liệu trong DTO GAS và cập nhật bản nháp `Spreadsheet ID`, `Mã user FBM` và `Tên tài khoản FBM` vào Sidebar, không tự lưu liên kết; smoke test đạt `1264/1264`, relay deployment `@259`, DEV runner `@258`.
+- [x] Identity probe chỉ chạy `GetGridViewPage` controller `User`, không lấy `authorize` thừa; GAS giữ dữ liệu trong DTO và Sidebar cập nhật bản nháp đủ bốn ô ngay cả khi form còn focus, không tự lưu liên kết. Test offline đạt `1322/1322`; relay deployment `@290`, DEV runner `@289`.
 - [x] Khi Extension bắt tay bằng `sessionId` mới, bridge mới được nhận nhưng Sidebar không tự gửi lại relay config trong cùng lượt mở; mở Sidebar lần sau sẽ gửi một lần. Không yêu cầu cập nhật `chrome.storage` thủ công.
 - [x] Tách `PopupList` thành nền hiển thị dùng chung cho search, dropdown, customer picker và menu module; controller riêng giữ nguyên hành vi từng loại.
 - [x] Search giữ bề rộng đúng bằng ô nhập; dropdown giữ khả năng giãn theo nội dung và giới hạn theo Sidebar.
@@ -352,12 +352,12 @@ Các mục dưới đây là phần đang phải hoàn thiện trước khi báo
 - [x] Sửa continuation nền: heartbeat chỉ xử lý response của đúng request heartbeat; nếu GAS cấp request tiếp theo thuộc cursor phiên nền thì Extension nộp qua `kind: background_sync`, command `continue` và `FbmSync.continue`; kiểm thử offline đạt `1304/1304`.
 - [x] Capture generic của Extension đọc cả HTML và text của trang theo chỉ dẫn GAS; pattern cookie do GAS cấp nhận cả dấu nháy thường và escaped, token transport chỉ có trong text vẫn được thay trước khi gửi FBM.
 - [x] Transport failure kết thúc phase `error`, giữ chẩn đoán nhưng không giữ reservation/cursor; hủy liên kết sau lỗi được phép, còn công tắc tổng OFF chuyển ngay sang `paused` nếu không có request FBM đang bay.
-- [x] Bổ sung test offline cho mọi nhánh trên, gồm relay local không fetch `/exec`, Web App từ chối probe, `UNBOUND` không được cấp envelope, bridge mất context báo lỗi rõ, capture từ text, pause và công tắc tổng; tổng hiện tại `1319/1319`.
+- [x] Bổ sung test offline cho mọi nhánh trên, gồm relay local không fetch `/exec`, Web App từ chối probe, `UNBOUND` không được cấp envelope, bridge mất context báo lỗi rõ, capture từ text, pause và công tắc tổng; tổng hiện tại `1322/1322`.
 - [x] Executor áp dụng đúng `source` trong chỉ dẫn capture/replacement generic do GAS cấp, không ép mọi replacement về HTML trang; commit `b91790d`, test offline vẫn `1260/1260`.
 - [x] Nghiệm thu GAS DEV bằng `node tests/gas.js ... --push` cho heartbeat request/response, transport failure, reservation và auto-login. `fbmSyncHeartbeatRequest` đạt ở revision `@252` với trạng thái fail-closed `AUTO_LOGIN_NOT_CONFIGURED`, `phase: paused`; `fbmSyncHeartbeat` trả `STALE_RESPONSE` khi không có reservation; `fbmSyncHeartbeatTransportFailure` trả `STALE_RESPONSE` khi request không còn hiệu lực; `fbmGetLoginConfig` đạt ở `@248`; `fbmProbeAutoLogin` đạt ở `@249`.
 - [x] GAS DEV relay `AKfycbxWM4...` đã nâng revision `@288`; entrypoint transport failure giữ fail-closed với reservation cũ và xác nhận lỗi capture kết thúc tại `error`, không giữ cursor/reservation; executor test dùng trực tiếp pattern GAS cấp để chặn tái diễn lỗi dấu nháy cookie.
 - Bằng chứng bổ sung: các entrypoint DEV đã được chạy lại sau khi sửa trạng thái chờ đăng nhập; kết quả đầy đủ được ghi ngay tại mục nghiệm thu GAS DEV bên trên.
-- [ ] Deployment Sidebar `AKfycbx0...` đã nâng lên revision `@280`; cần tải lại Extension rồi kiểm tra logged-in, logged-out, timeout, không có tab và response lớn.
+- [x] Deployment Sidebar `AKfycbx0...` đã nâng lên revision `@290`; POST không khóa trả JSON `unauthorized`, xác nhận đây là Web App relay thật thay vì trang HTML Drive.
 - [!] **Cần chủ dự án kiểm chứng thực tế:** giữ tab FBM đăng nhập, sau đó đăng xuất/đăng nhập lại để xác nhận không đá phiên máy khác và alarm tự khôi phục đúng chính sách.
 
 ## Slice 9 — Live acceptance và mở rộng production

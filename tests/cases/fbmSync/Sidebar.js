@@ -134,9 +134,14 @@ async function chay(so) {
   check(so, 'Account hien ro mat khau trong luc nhap va khong co gia tri luu san', [dom.document.getElementById('fbm-login-password').type, dom.document.getElementById('fbm-login-password').value], ['text', '']);
 
   hop.FBM_SYNC_CLIENT.identityLastAction = 'probe';
-  hop.fbmSyncApplyIdentityProbeDraft({ metadata: { identityProbe: { spreadsheetId: 'sheet-probe', userId: '2037', accountName: 'ANHLT' } } });
+  hop.fbmSyncApplyIdentityProbeDraft({ metadata: { identityProbe: { spreadsheetId: 'sheet-probe', userId: '2037', username: 'anhlt', accountName: 'ANHLT' } } });
   render(hop, content, hop.fbmSyncRenderAccount, idle);
-  check(so, 'Identity probe tự điền bản nháp vào đủ ba ô mà chưa tự lưu', [dom.document.getElementById('fbm-identity-spreadsheet').value, dom.document.getElementById('fbm-identity-user').value, dom.document.getElementById('fbm-identity-account').value, hop.FBM_SYNC_CLIENT.identityStatus.status], ['sheet-probe', '2037', 'ANHLT', 'REBIND_REQUIRED']);
+  check(so, 'Identity probe tự điền bản nháp vào đủ bốn ô mà chưa tự lưu', [dom.document.getElementById('fbm-identity-spreadsheet').value, dom.document.getElementById('fbm-identity-user').value, dom.document.getElementById('fbm-identity-username').value, dom.document.getElementById('fbm-identity-account').value, hop.FBM_SYNC_CLIENT.identityStatus.status], ['sheet-probe', '2037', 'anhlt', 'ANHLT', 'REBIND_REQUIRED']);
+  hop.FBM_SYNC_CLIENT.identityProbeSignature = '';
+  hop.FBM_SYNC_CLIENT.subscreen = 'account';
+  dom.document.activeElement = dom.document.getElementById('fbm-identity-user');
+  hop.fbmSyncPaint({ phase: 'done', counts: {}, metadata: { identityProbe: { spreadsheetId: 'sheet-focused', userId: '3001', username: 'focused-user', accountName: 'Focused Account' } } });
+  check(so, 'Identity probe vẫn hiện kết quả khi ô liên kết còn focus', [dom.document.getElementById('fbm-identity-spreadsheet').value, dom.document.getElementById('fbm-identity-user').value, dom.document.getElementById('fbm-identity-username').value, dom.document.getElementById('fbm-identity-account').value], ['sheet-focused', '3001', 'focused-user', 'Focused Account']);
   render(hop, content, hop.fbmSyncRenderAccount, { phase: 'error', message: 'Extension không trả lời yêu cầu FBM.', counts: {} });
   check(so, 'Account hiện lỗi cầu nối tường minh', content.textContent.indexOf('Extension không trả lời yêu cầu FBM.') >= 0, true);
 

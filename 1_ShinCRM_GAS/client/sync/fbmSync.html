@@ -51,6 +51,12 @@ function fbmSyncApplyIdentityProbeDraft(status) {
   if (values.userId) { FBM_SYNC_CLIENT.identityDraft.userId = values.userId; }
   if (values.username) { FBM_SYNC_CLIENT.identityDraft.username = values.username; }
   if (values.accountName) { FBM_SYNC_CLIENT.identityDraft.accountName = values.accountName; }
+  // Một số cách bấm không chuyển focus khỏi input. Khi đó fbmSyncPaint chủ động
+  // không dựng lại form để giữ mật khẩu, nên cập nhật trực tiếp các ô nhận diện.
+  [['spreadsheet', values.spreadsheetId], ['user', values.userId], ['username', values.username], ['account', values.accountName]].forEach(function (item) {
+    var input = document.getElementById('fbm-identity-' + item[0]);
+    if (input && item[1]) { input.value = item[1]; }
+  });
   return true;
 }
 function fbmSyncLoadLoginStatus() {
@@ -187,6 +193,7 @@ function fbmSyncPaint(status, freshOpen) {
     status = Object.assign({}, status, { phase: 'idle', label: 'Sẵn sàng', message: '', lastError: '', counts: { total: 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 } });
   }
   FBM_SYNC_CLIENT.lastStatus = status;
+  fbmSyncApplyIdentityProbeDraft(status);
   if (FBM_SYNC_CLIENT.running && typeof fbmSyncPatchLiveStatus === 'function' && fbmSyncPatchLiveStatus(panel, status, FBM_SYNC_CLIENT.subscreen)) {
     fbmSyncPaintHeaderState(status);
     return;
@@ -199,7 +206,6 @@ function fbmSyncPaint(status, freshOpen) {
   fbmSyncPaintHeaderState(status);
   var draftUsername = document.getElementById('fbm-login-username'); if (draftUsername) { FBM_SYNC_CLIENT.loginDraft.username = String(draftUsername.value || ''); }
   ['spreadsheet', 'user', 'username', 'account'].forEach(function (name) { var draft = document.getElementById('fbm-identity-' + name); if (draft) { FBM_SYNC_CLIENT.identityDraft[name === 'spreadsheet' ? 'spreadsheetId' : name === 'user' ? 'userId' : name === 'username' ? 'username' : 'accountName'] = String(draft.value || ''); } });
-  fbmSyncApplyIdentityProbeDraft(status);
   panel.hidden = false; panel.textContent = '';
   var count = status.counts || {};
   var active = ['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(status.phase) >= 0;
