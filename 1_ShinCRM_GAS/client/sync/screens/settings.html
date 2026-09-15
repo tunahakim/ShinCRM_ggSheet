@@ -52,8 +52,41 @@ function fbmSyncPatchSettings(panel, status) {
   if (!panel || !RENDER_INDEX.nodes['fbm-sync-settings-root']) { return false; }
   var schedulerNotice = fbmSyncSettingsSchedulerNotice(status);
   if (schedulerNotice) { FBM_SYNC_CLIENT.settingsNotices = FBM_SYNC_CLIENT.settingsNotices || {}; FBM_SYNC_CLIENT.settingsNotices.background = schedulerNotice; }
+  var masterEnabled = !(status && (status.masterEnabled === false || status.enabled === false));
   var backgroundEnabled = !(status && status.backgroundEnabled === false);
-  fbmSyncSetBackgroundSwitchState(backgroundEnabled);
+  fbmSyncSetToggleState('fbm-sync-settings-master-switch', masterEnabled, false);
+  fbmSyncSetBackgroundSwitchState(backgroundEnabled, !masterEnabled);
+  var settings = FBM_SYNC_CLIENT.syncSettings || {}, background = settings.background || {}, activeId = String(document.activeElement && document.activeElement.id || '');
+  function patchValue(id, value) {
+    var node = document.getElementById(id);
+    if (activeId === id || value === undefined || value === null || !node) { return; }
+    // Giá trị khác snapshot hiện tại là bản nháp chưa lưu; không để callback nền ghi đè.
+    if (String(node.value || '') !== String(value)) { return; }
+    fbmSyncSetTargetState(id, { value: value });
+  }
+  function patchToggle(id, enabled, disabled) {
+    if (activeId !== id) { fbmSyncSetToggleState(id, enabled, disabled); }
+  }
+  if (background.direction !== undefined) { patchValue('fbm-sync-background-direction', background.direction); }
+  ['heartbeat', 'customerFull', 'activityFull', 'detail'].forEach(function (kind) {
+    var item = background[kind] || {}, enabled = item.enabled !== false;
+    patchToggle('fbm-sync-process-' + kind, enabled, !masterEnabled);
+    patchValue('fbm-sync-process-' + kind + '-minutes', item.minutes);
+    var minutes = document.getElementById('fbm-sync-process-' + kind + '-minutes');
+    if (minutes && activeId !== minutes.id) { minutes.disabled = !masterEnabled || !enabled; }
+  });
+  patchValue('fbm-sync-detail-count', background.detail && background.detail.customersPerRun);
+  patchValue('fbm-sync-detail-delay-min', background.detail && background.detail.minDelaySeconds);
+  patchValue('fbm-sync-detail-delay-max', background.detail && background.detail.maxDelaySeconds);
+  var extension = settings.extension || {};
+  patchValue('fbm-extension-poll-minutes', extension.pollMinutes);
+  patchToggle('fbm-sync-run-on-startup', extension.runOnStartup !== false, false);
+  var login = FBM_SYNC_CLIENT.loginStatus || {};
+  patchToggle('fbm-sync-policy-auto-login', login.enabled !== false, false);
+  patchToggle('fbm-sync-policy-auto-open', login.autoOpenTab === true, false);
+  patchToggle('fbm-sync-policy-retry', login.retryEnabled !== false, false);
+  patchValue('fbm-sync-login-retry-minutes', login.retryMinutes);
+  if (masterEnabled) { fbmSyncSetTargetState('fbm-sync-content', { disabledDescendants: false, except: ['fbm-sync-settings-master-switch'] }); }
   fbmSyncRenderTarget('fbm-sync-settings-relay-notice-region', fbmSyncSettingsNoticeBlocks('relay'));
   fbmSyncRenderTarget('fbm-sync-settings-extension-notice-region', fbmSyncSettingsNoticeBlocks('extension'));
   fbmSyncRenderTarget('fbm-sync-settings-background-notice-region', fbmSyncSettingsNoticeBlocks('background', schedulerNotice));
