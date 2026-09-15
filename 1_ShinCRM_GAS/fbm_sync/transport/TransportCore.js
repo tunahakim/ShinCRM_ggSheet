@@ -26,6 +26,9 @@ FbmSync.canWriteSheet = function (mode) { return mode === 'read' || mode === 'wr
 FbmSync.canWriteFbm = function (mode) { return mode === 'push' || mode === 'write'; };
 // Alias tạm cho caller cũ trong module push; ý nghĩa duy nhất là quyền ghi FBM.
 FbmSync.writeEnabled = function (mode) { return FbmSync.canWriteFbm(mode); };
+// FBM có thể đặt dấu nháy trong script trang dưới dạng \" hoặc ". GAS cấp pattern,
+// Extension chỉ áp dụng nguyên trạng nên không được để hai nơi tự giữ pattern riêng.
+FbmSync.PAYLOAD_COOKIE_CAPTURE_PATTERN = String.raw`\\?['"]cookie\\?['"]\s*[:=]\s*\\?['"]([^'"\\]+FHN_CRM_App)\\?['"]`;
 /** Chỉ trả dữ liệu JSON thuần qua google.script.run; Date phải về dạng .NET của FBM. */
 if (typeof FbmSync.transportValue !== 'function') {
   FbmSync.transportValue = function (value) {
@@ -71,7 +74,7 @@ FbmSync.nextEnvelope = function (request) {
   meta.trace = Object.assign({}, meta.trace || {}, { runId: String(state.runId || ''), requestId: id });
   // Extension chỉ có bộ lọc generic; GAS quyết định rõ dữ liệu phụ trợ cần lấy từ tab.
   meta.transport = Object.assign({
-    captures: [{ name: 'payloadCookie', source: 'page_html', pattern: '\\\\?["\\\']cookie\\\\?\\s*[:=]\\s*\\\\?["\\\']([^\\\"\\\'\\\\]+FHN_CRM_App)["\\\']', flags: 'i', group: 1 }],
+    captures: [{ name: 'payloadCookie', source: 'page_html', pattern: FbmSync.PAYLOAD_COOKIE_CAPTURE_PATTERN, flags: 'i', group: 1 }],
     replacements: [{ token: '{{FBM_PAYLOAD_COOKIE}}', capture: 'payloadCookie', source: 'page_html' }]
   }, meta.transport || {});
   if (meta.kind === 'authorize') {

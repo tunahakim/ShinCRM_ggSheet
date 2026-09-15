@@ -6,6 +6,14 @@ const { section, check, ghiLoiNap } = require('../lib/assert');
 const BRIDGE_FILE = path.join(__dirname, '..', '..', '2_ShinCRM_Extension', 'content_scripts', 'bridge', 'iframe_bridge.js');
 const WORKER_FILE = path.join(__dirname, '..', '..', '2_ShinCRM_Extension', 'background', 'service_worker.js');
 const EXECUTOR_FILE = path.join(__dirname, '..', '..', '2_ShinCRM_Extension', 'content_scripts', 'fbm_sync', 'executor.js');
+const TRANSPORT_CORE_FILE = path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'transport', 'TransportCore.js');
+
+function payloadCookieCapturePattern() {
+  const hop = { FbmSync: {} };
+  vm.createContext(hop);
+  vm.runInContext(fs.readFileSync(TRANSPORT_CORE_FILE, 'utf8'), hop, { filename: TRANSPORT_CORE_FILE });
+  return hop.FbmSync.PAYLOAD_COOKIE_CAPTURE_PATTERN;
+}
 
 function napBridge(runtime) {
   let onMessage = null;
@@ -237,7 +245,7 @@ async function chay(so) {
     const context = {
       console: { log() {}, warn() {} }, Date, URL, Promise, Error, AbortController, setTimeout, clearTimeout,
       Blob, Response, TextDecoder, TextEncoder, DecompressionStream: undefined,
-      document: { documentElement: { innerHTML: '', textContent: 'var payload={"cookie":"461020379855cFHN_CRM_App"};' } },
+      document: { documentElement: { innerHTML: '', textContent: String.raw`var payload={\"cookie\":\"461020379855cFHN_CRM_App\"};` } },
       fetch(url, options) { fetchCalls += 1; sentBody = options && options.body; return Promise.resolve(response); },
       chrome: { runtime: { onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
     };
@@ -249,9 +257,9 @@ async function chay(so) {
       listener({ type: 'FBM_EXECUTE_V2', request: { url: 'https://fbo.com.vn:8888/Main/undefined', method: 'POST', bodyText: '{"gas":true}' } }, null, (reply) => { validReply = reply; });
       setTimeout(() => {
         check(so, 'executor chuyen nguyen body GAS ma khong hieu endpoint', [fetchCalls, sentBody, validReply && validReply.result && validReply.result.status], [1, '{"gas":true}', 200]);
-        listener({ type: 'FBM_EXECUTE_V2', request: { url: 'https://fbo.com.vn:8888/Main/customer', method: 'POST', bodyText: '{"cookie":"{{FBM_PAYLOAD_COOKIE}}"}', meta: { transport: { captures: [{ name: 'payloadCookie', source: 'page_html', pattern: '([A-Za-z0-9]+FHN_CRM_App)', flags: 'i', group: 1 }], replacements: [{ token: '{{FBM_PAYLOAD_COOKIE}}', capture: 'payloadCookie', source: 'page_html' }] } } } }, null, (reply) => {
+        listener({ type: 'FBM_EXECUTE_V2', request: { url: 'https://fbo.com.vn:8888/Main/customer', method: 'POST', bodyText: '{"cookie":"{{FBM_PAYLOAD_COOKIE}}"}', meta: { transport: { captures: [{ name: 'payloadCookie', source: 'page_html', pattern: payloadCookieCapturePattern(), flags: 'i', group: 1 }], replacements: [{ token: '{{FBM_PAYLOAD_COOKIE}}', capture: 'payloadCookie', source: 'page_html' }] } } } }, null, (reply) => {
           setTimeout(() => {
-            check(so, 'executor lay capture generic tu text trang theo chi dan GAS', [fetchCalls, sentBody, reply && reply.result && reply.result.status], [2, '{"cookie":"461020379855cFHN_CRM_App"}', 200]);
+            check(so, 'executor lay capture generic do GAS cap tu text trang co dau nhay escape', [fetchCalls, sentBody, reply && reply.result && reply.result.status], [2, '{"cookie":"461020379855cFHN_CRM_App"}', 200]);
             responseText = JSON.stringify({ d: { Authorized: 'auth-c', UserId: '2037', UserName: 'ANHLT', AccountName: 'Le Tuan Anh', Huge: 'x'.repeat(5000) } });
             listener({ type: 'FBM_EXECUTE_V2', request: { url: 'https://fbo.com.vn:8888/Main/authorize', method: 'POST', bodyText: '{}', meta: { transport: { jsonPaths: ['d.Authorized', 'd.UserId', 'd.UserName', 'd.AccountName'] } } } }, null, (projectedReply) => {
               setTimeout(() => {
