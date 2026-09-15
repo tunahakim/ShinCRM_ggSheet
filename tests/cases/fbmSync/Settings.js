@@ -16,6 +16,8 @@ function chay(so) {
   check(so, 'tham so sai bi tu choi truoc khi ghi DocumentProperties', [invalid.ok, invalid.code, data.FBM_SYNC_SETTINGS_V1.indexOf('CHANGED-') >= 0], [false, 'FBM_CUSTOMER_CODE_LENGTH_INVALID', false]);
   const saved = hop.FbmSync.syncSettingsSave({ customerPrefix: 'CRM-', customerCodeLength: 10, activitySince: '', approvalThreshold: 0 });
   check(so, 'luu tham so hop le va cho phep nguong 0', [saved.ok, saved.settings.customerPrefix, saved.settings.customerCodeLength, saved.settings.approvalThreshold, hop.FbmSync.syncSettingsRead().approvalThreshold], [true, 'CRM-', '10', 0, 0]);
+  const blankLength = hop.FbmSync.syncSettingsSave({ customerPrefix: '', customerCodeLength: '', activitySince: '', approvalThreshold: 10 });
+  check(so, 'de trong do dai ma khach van la tham so hop le de chan tao Customer moi', [blankLength.ok, blankLength.settings.customerCodeLength], [true, '']);
 }
 
 module.exports = { chay };
