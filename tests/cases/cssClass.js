@@ -168,6 +168,9 @@ function tuKiemPhepQuet(so) {
   check(so, 'phép cắt lấy được cả <style> của tệp màn — tệp có cả hai thẻ là loại tệp gây ra lỗi ban đầu',
     catRuotStyle(docTep('client/screen/statusScreen.html')).includes('.shin-status-box'), true);
 
+  check(so, 'header Sync là Box nhưng vẫn giữ display flex sau luật .shin-box dùng chung',
+    catRuotStyle(docTep('client/style/frame.html')).includes('.shin-box.shin-shell-header'), true);
+
   checkContains(so, 'thông báo trượt nói rõ hai tệp nào đang tranh nhau một tên lớp',
     timTrung({ 'a.html': '.shin-box { display: block; }', 'b.html': '.shin-box { padding: 12px; }' }), 'a.html');
 }

@@ -1,7 +1,6 @@
 <style>
 .shin-sync-module { display:flex; flex-direction:column; min-height:0; height:100%; background:var(--shin-bg); }
 .shin-sync-screen.shin-sync-module { position:fixed; inset:0; }
-.shin-sync-module-header { background:var(--shin-bg); }
 .shin-sync-module-title { color:var(--shin-text); }
 .shin-sync-nav { display:flex; gap:var(--shin-gap-2); padding:var(--shin-gap-1) var(--shin-gap-3); border-bottom:1px solid var(--shin-border-faint); background:var(--shin-bg); overflow-x:auto; }
 .shin-sync-nav button { flex:0 0 auto; border:0; border-bottom:2px solid transparent; padding:var(--shin-gap-1) var(--shin-gap-2); background:none; color:var(--shin-text-soft); font:inherit; font-size:var(--shin-text-xs); cursor:pointer; }
@@ -125,14 +124,14 @@ function fbmSyncShellTitle() {
   var item = (FBM_SYNC_UI_SCHEMA.screens || []).filter(function (screen) { return screen.id === FBM_SYNC_CLIENT.subscreen; })[0];
   return item ? item.label : 'Đồng bộ FBM';
 }
-function fbmSyncShellHeaderBlock(status) {
+function fbmSyncShellHeaderBlocks(status) {
   var enabled = fbmSyncShellEnabled(status);
-  return Box({ id: 'fbm-sync-module-header', className: 'shin-shell-header shin-sync-module-header', elements: [
+  return [
     Icon({ id: 'fbm-sync-back', icon: 'back', tooltip: 'Quay lại' }),
     Text({ id: 'fbm-sync-module-title', className: 'shin-header-title shin-sync-module-title', text: fbmSyncShellTitle() }),
     StandaloneControl({ id: 'fbm-sync-master-switch', kind: 'toggle', pressed: enabled, className: 'shin-sync-master-switch ' + (enabled ? 'is-on' : 'is-off'), ariaLabel: 'Bật hoặc tắt đồng bộ' }),
     Icon({ id: 'fbm-sync-module-menu', icon: 'more', tooltip: 'Mở menu đồng bộ' })
-  ] });
+  ];
 }
 function fbmSyncShellNavBlock() {
   return Box({ id: 'fbm-sync-nav', className: 'shin-popup-list shin-sync-nav', hidden: FBM_SYNC_CLIENT.navOpen !== true, elements: (FBM_SYNC_UI_SCHEMA.screens || []).map(function (item) {
@@ -142,7 +141,7 @@ function fbmSyncShellNavBlock() {
 function fbmSyncRenderShell(status) {
   var screen = document.getElementById('fbm-sync-screen'), headerMount = document.getElementById('fbm-sync-shell-header-region'), navMount = document.getElementById('fbm-sync-shell-nav-region');
   if (!screen || !headerMount || !navMount || typeof RENDER_INDEX === 'undefined') { return; }
-  if (!RENDER_INDEX.nodes['fbm-sync-module-header'] || !document.getElementById('fbm-sync-module-header')) { fbmSyncReplaceBlocks(headerMount, [fbmSyncShellHeaderBlock(status)]); }
+  if (!document.getElementById('fbm-sync-module-title')) { fbmSyncReplaceBlocks(headerMount, fbmSyncShellHeaderBlocks(status)); }
   else {
     fbmSyncSetTargetState('fbm-sync-module-title', { text: fbmSyncShellTitle() });
     var enabled = fbmSyncShellEnabled(status);

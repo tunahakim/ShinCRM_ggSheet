@@ -121,9 +121,9 @@ async function chay(so) {
   const preflightError = { phase: 'error', runId: 'r2', cursor: {}, lastFailureCode: 'SYNC_PREFLIGHT_FAILED', label: 'Có lỗi', counts: {} };
   const pushError = { phase: 'error', runId: 'r3', cursor: { kind: 'push_wait' }, lastFailureCode: 'FBM_VERIFY_FAILED', label: 'Có lỗi', counts: {} };
 
-  const shellHeader = hop.fbmSyncShellHeaderBlock(idle);
-  check(so, 'header Đồng bộ dùng Icon chung, không gắn nút hình chữ nhật riêng', [shellHeader.elements[0].role, shellHeader.elements[0].className, shellHeader.elements[3].role, shellHeader.elements[3].className, hop.fbmSyncShellTitle()], ['icon', '', 'icon', '', 'Tổng quan']);
-  check(so, 'header Đồng bộ dùng cùng khung và tiêu đề với header Sidebar/form', [shellHeader.className.indexOf('shin-shell-header') >= 0, shellHeader.elements[1].className.indexOf('shin-header-title') >= 0], [true, true]);
+  const shellHeader = hop.fbmSyncShellHeaderBlocks(idle);
+  check(so, 'header Đồng bộ dùng đúng dãy Block như header Sidebar/form', [shellHeader.length, shellHeader[0].role, shellHeader[0].className, shellHeader[3].role, shellHeader[3].className, hop.fbmSyncShellTitle()], [4, 'icon', '', 'icon', '', 'Tổng quan']);
+  check(so, 'header Đồng bộ dùng cùng khung và tiêu đề với header Sidebar/form', [shellHeader[1].className.indexOf('shin-header-title') >= 0], [true]);
 
   check(so, 'Overview render được trạng thái rỗng', !!render(hop, content, hop.fbmSyncRenderOverview, idle).querySelector('.shin-sync-overview-state'), true);
   check(so, 'Overview không đặt dòng hướng dẫn chung ngay dưới header', hop.fbmSyncOverviewBlocks(idle)[0].role, 'card');
