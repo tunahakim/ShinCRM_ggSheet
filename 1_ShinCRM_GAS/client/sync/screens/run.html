@@ -40,14 +40,14 @@ function fbmSyncRenderRun(panel, status) {
   return fbmSyncAppendBox(panel, 'shin-section', 'fbm-sync-run-root', [
     Card({ title: 'Chọn loại đồng bộ', elements: [
       StandaloneField('Loại đồng bộ', { id: 'fbm-sync-mode', kind: 'select', options: FBM_SYNC_UI_SCHEMA.modes, value: FBM_SYNC_CLIENT.mode, disabled: !!FBM_SYNC_CLIENT.running, ariaLabel: 'Loại đồng bộ' }),
-      Box({ id: 'fbm-sync-run-action-region', elements: [fbmSyncRunActionBlock(status)] })
+      Box({ id: 'fbm-sync-run-action-region', elements: [Row({ className: 'shin-single-action-row', elements: [fbmSyncRunActionBlock(status)] })] })
     ] }),
     Box({ id: 'fbm-sync-run-details-region', elements: fbmSyncRunDetailsBlocks(status) })
   ]);
 }
 function fbmSyncPatchRun(panel, status) {
   if (!panel || !RENDER_INDEX.nodes['fbm-sync-run-root']) { return false; }
-  fbmSyncRenderTarget('fbm-sync-run-action-region', [fbmSyncRunActionBlock(status)]);
+  fbmSyncRenderTarget('fbm-sync-run-action-region', [Row({ className: 'shin-single-action-row', elements: [fbmSyncRunActionBlock(status)] })]);
   fbmSyncRenderTarget('fbm-sync-run-details-region', fbmSyncRunDetailsBlocks(status));
   return true;
 }
