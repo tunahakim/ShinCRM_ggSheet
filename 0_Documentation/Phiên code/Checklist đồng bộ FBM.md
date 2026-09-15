@@ -365,6 +365,7 @@ Các mục dưới đây là phần đang phải hoàn thiện trước khi báo
 ## Bộ kiểm workflow theo use case
 
 - [x] Tạo charter độc lập `tests/contracts/fbmSyncPipeline.js` từ Tài liệu 09.01, 09.02, 09.06, 09.08 và hợp đồng log; catalog cố định đủ 44 pipeline A-F, mỗi pipeline nêu trigger, kết quả quan sát được ở Sidebar, Extension, GAS, Sheet/Log khi có liên quan và loại bằng chứng bắt buộc.
+- [x] Ma trận 44 pipeline có cổng kiểm: mỗi dòng phải trỏ tới ít nhất một module test offline đang chạy và điều kiện bằng chứng live/GAS DEV; thiếu chủ sở hữu test hoặc tệp test sẽ làm `node tests/run.js` đỏ.
 - [x] Tạo harness `tests/cases/fbmSync/Workflow.js` chạy envelope thật qua GAS -> executor Extension -> GAS với fixture FBM, không dùng request FBM thật; đã kiểm tự điền/kiểm tra liên kết, đăng nhập thử đúng/sai identity, response thiếu identity, xóa binding rỗng, cổng mode, full read rỗng, alarm noop/no tab/có tab, approval, lỗi bridge thủ công, master OFF, stale response, cancel khi request đang bay, DTO không lộ state nội bộ và log tổng hợp.
 - [ ] Mở rộng từng use case còn lại của charter thành trace chạy được đầy đủ qua các lớp; không đánh dấu hoàn tất chỉ vì các unit test thành phần đạt.
 - [ ] Chỉ sau khi workflow offline của use case đạt mới đưa use case đó vào checklist nghiệm thu live tương ứng.

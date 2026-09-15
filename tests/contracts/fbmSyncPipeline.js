@@ -138,7 +138,16 @@ const PIPELINE_CATALOG = [
   ['F3', 'Log', 'Kết thúc/lỗi', 'GAS ghi, che bí mật, recordId tổng hợp rỗng'],
   ['F4', 'UI orchestration', 'Chạy/lỗi/xong', 'UI vẽ DTO, báo lỗi, không nhấp nháy']
 ].map(function (item) {
-  return { id: item[0], name: item[1], trigger: item[2], expect: item[3], source: 'Tài liệu 09 và hợp đồng log', requiredProof: ['offline', 'GAS DEV hoặc live khi kênh thật không mô phỏng được'] };
+  var group = item[0].charAt(0);
+  var testModules = {
+    A: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/AutoLogin.js', 'tests/cases/fbmSync/Orchestration.js', 'tests/cases/fbmSync/Sidebar.js', 'tests/cases/extensionBridge.js'],
+    B: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/Pull.js', 'tests/cases/fbmSync/Reconcile.js'],
+    C: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/Orchestration.js', 'tests/cases/extensionBridge.js'],
+    D: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/Push.js', 'tests/cases/fbmSync/Builders.js'],
+    E: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/Orchestration.js', 'tests/cases/fbmSync/Push.js', 'tests/cases/fbmSync/Reconcile.js'],
+    F: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/Sidebar.js', 'tests/cases/fbmSync/Audit.js']
+  }[group] || [];
+  return { id: item[0], name: item[1], trigger: item[2], expect: item[3], source: 'Tài liệu 09 và hợp đồng log', testModules: testModules, requiredProof: ['offline', 'GAS DEV hoặc live khi kênh thật không mô phỏng được'] };
 });
 
 module.exports = { WORKFLOWS, PIPELINE_CATALOG };

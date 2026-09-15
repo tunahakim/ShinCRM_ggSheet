@@ -155,6 +155,7 @@ async function chay(so) {
   ].sort());
   check(so, 'catalog gom du 44 pipeline A-F cua module va khong trung ma', [PIPELINE_CATALOG.length, new Set(PIPELINE_CATALOG.map((item) => item.id)).size], [44, 44]);
   check(so, 'moi pipeline co nguon, trigger, ket qua quan sat va bang chung bat buoc', PIPELINE_CATALOG.every((item) => item.source && item.trigger && item.expect && item.requiredProof.length === 2), true);
+  check(so, 'ma tran 44 pipeline deu tro den module test dang chay va khong co pipeline khong co chu so huu kiem thu', PIPELINE_CATALOG.every((item) => item.testModules.length > 0 && item.testModules.every((file) => fs.existsSync(path.join(ROOT, file)))), true);
 
   const engine = workflowGas();
   const started = engine.hop.FbmSync.start({ mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true });
