@@ -27,31 +27,57 @@ FbmSync.extensionConfigSave = function (input) {
 };
 FbmSync.backgroundScheduleDefault = function () {
   return {
-    customer: { enabled: true, minutes: 60, priority: 10 },
-    activity: { enabled: true, minutes: 30, priority: 20 },
-    heartbeat: { enabled: true, minutes: 5, priority: 100 }
+    enabled: true,
+    direction: 'read',
+    heartbeat: { enabled: true, minutes: 5, priority: 100 },
+    customerFull: { enabled: true, minutes: 60, priority: 10 },
+    activityFull: { enabled: true, minutes: 30, priority: 20 },
+    detail: { enabled: false, minutes: 60, priority: 30, customersPerRun: 50, minDelaySeconds: 0.5, maxDelaySeconds: 2 }
   };
 };
 FbmSync.backgroundScheduleRead = function () {
   var fallback = FbmSync.backgroundScheduleDefault();
   try {
     var raw = FbmSync.props().getProperty(FbmSync.BACKGROUND_SCHEDULE_KEY), parsed = raw ? JSON.parse(raw) : {};
-    ['customer', 'activity', 'heartbeat'].forEach(function (kind) {
-      var item = parsed && parsed[kind] || {}, minutes = Number(item.minutes);
+    fallback.enabled = parsed && parsed.enabled !== false;
+    fallback.direction = ['read', 'push', 'write'].indexOf(String(parsed && parsed.direction || '')) >= 0 ? String(parsed.direction) : fallback.direction;
+    var source = function (kind, legacy) { return parsed && (parsed[kind] || parsed[legacy]) || {}; };
+    [['customerFull', 'customer'], ['activityFull', 'activity'], ['heartbeat', null], ['detail', null]].forEach(function (pair) {
+      var kind = pair[0], item = source(kind, pair[1]), minutes = Number(item.minutes);
       fallback[kind].enabled = item.enabled !== false;
       fallback[kind].minutes = isFinite(minutes) ? Math.max(1, Math.min(7 * 24 * 60, Math.round(minutes))) : fallback[kind].minutes;
+      if (kind === 'detail') {
+        var batch = Number(item.customersPerRun), minDelay = Number(item.minDelaySeconds), maxDelay = Number(item.maxDelaySeconds);
+        fallback.detail.customersPerRun = isFinite(batch) ? Math.max(1, Math.min(50, Math.floor(batch))) : fallback.detail.customersPerRun;
+        fallback.detail.minDelaySeconds = isFinite(minDelay) ? Math.max(0, Math.min(60, minDelay)) : fallback.detail.minDelaySeconds;
+        fallback.detail.maxDelaySeconds = isFinite(maxDelay) ? Math.max(fallback.detail.minDelaySeconds, Math.min(60, maxDelay)) : fallback.detail.maxDelaySeconds;
+      }
     });
   } catch (ignore) {}
+  fallback.customer = fallback.customerFull;
+  fallback.activity = fallback.activityFull;
   return fallback;
 };
 FbmSync.backgroundScheduleSave = function (input) {
   var current = FbmSync.backgroundScheduleRead(), value = input || {}, saved = {};
-  ['customer', 'activity', 'heartbeat'].forEach(function (kind) {
-    var item = value[kind] || {}, minutes = item.minutes === undefined ? current[kind].minutes : Number(item.minutes);
+  var direction = value.direction === undefined ? current.direction : String(value.direction || '');
+  if (['read', 'push', 'write'].indexOf(direction) < 0) { throw new Error('Invalid background sync direction.'); }
+  var enabled = value.enabled === undefined ? current.enabled !== false : value.enabled === true;
+  [['customerFull', 'customer'], ['activityFull', 'activity'], ['heartbeat', null], ['detail', null]].forEach(function (pair) {
+    var kind = pair[0], legacy = pair[1], item = value[kind] || (legacy && value[legacy]) || {}, minutes = item.minutes === undefined ? current[kind].minutes : Number(item.minutes);
     if (!isFinite(minutes) || minutes < 1 || minutes > 7 * 24 * 60) { throw new Error('Chu kỳ ' + kind + ' phải từ 1 phút đến 7 ngày.'); }
     saved[kind] = { enabled: item.enabled === undefined ? current[kind].enabled : item.enabled === true, minutes: Math.round(minutes), priority: current[kind].priority };
+    if (kind === 'detail') {
+      var batch = item.customersPerRun === undefined ? current.detail.customersPerRun : Number(item.customersPerRun), minDelay = item.minDelaySeconds === undefined ? current.detail.minDelaySeconds : Number(item.minDelaySeconds), maxDelay = item.maxDelaySeconds === undefined ? current.detail.maxDelaySeconds : Number(item.maxDelaySeconds);
+      if (!isFinite(batch) || batch < 1 || batch > 50 || Math.floor(batch) !== batch) { throw new Error('Detail batch must be an integer from 1 to 50.'); }
+      if (!isFinite(minDelay) || minDelay < 0 || minDelay > 60 || !isFinite(maxDelay) || maxDelay < minDelay || maxDelay > 60) { throw new Error('Request delay must be between 0 and 60 seconds.'); }
+      saved.detail.customersPerRun = Math.floor(batch); saved.detail.minDelaySeconds = minDelay; saved.detail.maxDelaySeconds = maxDelay;
+    }
   });
+  saved.enabled = enabled; saved.direction = direction;
   FbmSync.props().setProperty(FbmSync.BACKGROUND_SCHEDULE_KEY, JSON.stringify(saved));
+  if (typeof FbmSync.schedule === 'function') { FbmSync.schedule(); }
+  saved.customer = saved.customerFull; saved.activity = saved.activityFull;
   return { ok: true, schedule: saved };
 };
 FbmSync.extensionConfigPublic = function () {
@@ -60,32 +86,40 @@ FbmSync.extensionConfigPublic = function () {
 };
 FbmSync.backgroundSchedulePublic = function () {
   var value = FbmSync.backgroundScheduleRead();
-  return { customer: value.customer, activity: value.activity, heartbeat: value.heartbeat };
+  return { enabled: value.enabled !== false, direction: value.direction, heartbeat: value.heartbeat, customerFull: value.customerFull, activityFull: value.activityFull, detail: value.detail, customer: value.customer, activity: value.activity };
 };
 /** Ghi thời điểm dự kiến cho các tiến trình nghiệp vụ. */
 FbmSync.schedule = function () {
   var props = PropertiesService.getDocumentProperties(), at = Date.now(), schedule = FbmSync.backgroundScheduleRead();
   props.setProperty('FBM_SYNC_NEXT_HEARTBEAT', String(at + schedule.heartbeat.minutes * 60 * 1000));
-  props.setProperty('FBM_SYNC_NEXT_CUSTOMER_SCAN', String(at + schedule.customer.minutes * 60 * 1000));
-  props.setProperty('FBM_SYNC_NEXT_ACTIVITY_SCAN', String(at + schedule.activity.minutes * 60 * 1000));
-  return { heartbeatMinutes: schedule.heartbeat.minutes, customerMinutes: schedule.customer.minutes, activityMinutes: schedule.activity.minutes };
+  props.setProperty('FBM_SYNC_NEXT_CUSTOMER_FULL_SCAN', String(at + schedule.customerFull.minutes * 60 * 1000));
+  props.setProperty('FBM_SYNC_NEXT_ACTIVITY_FULL_SCAN', String(at + schedule.activityFull.minutes * 60 * 1000));
+  props.setProperty('FBM_SYNC_NEXT_DETAIL_SCAN', String(at + schedule.detail.minutes * 60 * 1000));
+  props.setProperty('FBM_SYNC_NEXT_CUSTOMER_SCAN', String(at + schedule.customerFull.minutes * 60 * 1000));
+  props.setProperty('FBM_SYNC_NEXT_ACTIVITY_SCAN', String(at + schedule.activityFull.minutes * 60 * 1000));
+  return { heartbeatMinutes: schedule.heartbeat.minutes, customerMinutes: schedule.customerFull.minutes, activityMinutes: schedule.activityFull.minutes, detailMinutes: schedule.detail.minutes, direction: schedule.direction };
 };
 FbmSync.ensureScheduleMarkers = function (now) {
   var props = PropertiesService.getDocumentProperties(), at = Number(now || Date.now()), schedule = FbmSync.backgroundScheduleRead();
-  if (!Number(props.getProperty('FBM_SYNC_NEXT_CUSTOMER_SCAN') || 0)) { props.setProperty('FBM_SYNC_NEXT_CUSTOMER_SCAN', String(at + schedule.customer.minutes * 60 * 1000)); }
-  if (!Number(props.getProperty('FBM_SYNC_NEXT_ACTIVITY_SCAN') || 0)) { props.setProperty('FBM_SYNC_NEXT_ACTIVITY_SCAN', String(at + schedule.activity.minutes * 60 * 1000)); }
+  var oldCustomer = Number(props.getProperty('FBM_SYNC_NEXT_CUSTOMER_SCAN') || 0), oldActivity = Number(props.getProperty('FBM_SYNC_NEXT_ACTIVITY_SCAN') || 0);
+  if (!Number(props.getProperty('FBM_SYNC_NEXT_CUSTOMER_FULL_SCAN') || 0)) { props.setProperty('FBM_SYNC_NEXT_CUSTOMER_FULL_SCAN', String(oldCustomer || (at + schedule.customerFull.minutes * 60 * 1000))); }
+  if (!Number(props.getProperty('FBM_SYNC_NEXT_ACTIVITY_FULL_SCAN') || 0)) { props.setProperty('FBM_SYNC_NEXT_ACTIVITY_FULL_SCAN', String(oldActivity || (at + schedule.activityFull.minutes * 60 * 1000))); }
+  if (!Number(props.getProperty('FBM_SYNC_NEXT_DETAIL_SCAN') || 0)) { props.setProperty('FBM_SYNC_NEXT_DETAIL_SCAN', String(at + schedule.detail.minutes * 60 * 1000)); }
+  if (!Number(props.getProperty('FBM_SYNC_NEXT_CUSTOMER_SCAN') || 0)) { props.setProperty('FBM_SYNC_NEXT_CUSTOMER_SCAN', String(at + schedule.customerFull.minutes * 60 * 1000)); }
+  if (!Number(props.getProperty('FBM_SYNC_NEXT_ACTIVITY_SCAN') || 0)) { props.setProperty('FBM_SYNC_NEXT_ACTIVITY_SCAN', String(at + schedule.activityFull.minutes * 60 * 1000)); }
   if (!Number(props.getProperty('FBM_SYNC_NEXT_HEARTBEAT') || 0)) { props.setProperty('FBM_SYNC_NEXT_HEARTBEAT', String(at + schedule.heartbeat.minutes * 60 * 1000)); }
 };
 /** Chọn một tiến trình đến hạn sau khi Extension đã hỏi GAS; không tạo request song song. */
 FbmSync.schedulerPickDue = function (now, options) {
   var at = Number(now || Date.now()), opt = options || {}, props = PropertiesService.getDocumentProperties(), schedule = FbmSync.backgroundScheduleRead(), state = FbmSync.stateRead();
   FbmSync.ensureScheduleMarkers(at);
-  if (!FbmSync.masterEnabled() || !FbmSync.backgroundEnabled()) { return { ok: false, code: 'BACKGROUND_DISABLED' }; }
+  if (!FbmSync.masterEnabled() || !FbmSync.backgroundEnabled() || schedule.enabled === false) { return { ok: false, code: 'BACKGROUND_DISABLED' }; }
   if (state.runId && ['idle', 'done', 'error'].indexOf(String(state.phase || '')) < 0) { return { ok: false, code: 'SYNC_ALREADY_RUNNING' }; }
   if (state.scheduledScan) { return { ok: true, kind: String(state.scheduledScan), existing: true }; }
-  var candidates = ['customer', 'activity', 'heartbeat'].map(function (kind) {
-    var item = schedule[kind], key = kind === 'customer' ? 'FBM_SYNC_NEXT_CUSTOMER_SCAN' : kind === 'activity' ? 'FBM_SYNC_NEXT_ACTIVITY_SCAN' : 'FBM_SYNC_NEXT_HEARTBEAT';
-    return { kind: kind, key: key, due: Number(props.getProperty(key) || 0), enabled: item.enabled, priority: item.priority, minutes: item.minutes };
+  var candidates = ['customerFull', 'activityFull', 'detail', 'heartbeat'].map(function (kind) {
+    var item = schedule[kind], key = kind === 'customerFull' ? 'FBM_SYNC_NEXT_CUSTOMER_FULL_SCAN' : kind === 'activityFull' ? 'FBM_SYNC_NEXT_ACTIVITY_FULL_SCAN' : kind === 'detail' ? 'FBM_SYNC_NEXT_DETAIL_SCAN' : 'FBM_SYNC_NEXT_HEARTBEAT', legacyKey = kind === 'customerFull' ? 'FBM_SYNC_NEXT_CUSTOMER_SCAN' : kind === 'activityFull' ? 'FBM_SYNC_NEXT_ACTIVITY_SCAN' : '';
+    var canonicalDue = Number(props.getProperty(key) || 0), legacyDue = legacyKey ? Number(props.getProperty(legacyKey) || 0) : 0, due = canonicalDue && legacyDue ? Math.min(canonicalDue, legacyDue) : (canonicalDue || legacyDue);
+    return { kind: kind, key: key, legacyKey: legacyKey, due: due, enabled: item.enabled, priority: item.priority, minutes: item.minutes };
   }).filter(function (item) { return item.enabled && item.due <= at; }).sort(function (a, b) { return a.priority - b.priority || a.due - b.due; });
   // Chrome startup is an explicit user-visible option. It may cause one immediate
   // session check, but never creates a second timer or a burst of catch-up work.
@@ -95,20 +129,23 @@ FbmSync.schedulerPickDue = function (now, options) {
   if (!candidates.length) { return { ok: false, code: 'NO_PROCESS_DUE' }; }
   var chosen = candidates[0], next = at + chosen.minutes * 60 * 1000;
   props.setProperty(chosen.key, String(next));
+  if (chosen.legacyKey) { props.setProperty(chosen.legacyKey, String(next)); }
   state.scheduledScan = chosen.kind;
   state.nextRunAt = next;
+  state.scheduledDirection = schedule.direction;
   state.message = 'Đã chọn tiến trình nền ' + chosen.kind + '; chờ request heartbeat hiện tại hoàn tất.';
   FbmSync.stateWrite(state);
   return { ok: true, kind: chosen.kind, nextRunAt: next };
 };
 /** Nhận quyền một lượt scheduler bằng khóa tài liệu; không giữ công việc trong RAM. */
 FbmSync.schedulerClaim = function (kind, now) {
-  var configured = FbmSync.backgroundScheduleRead(), names = { heartbeat: ['FBM_SYNC_NEXT_HEARTBEAT', 5 * 60 * 1000], customer: ['FBM_SYNC_NEXT_CUSTOMER_SCAN', configured.customer.minutes * 60 * 1000], activity: ['FBM_SYNC_NEXT_ACTIVITY_SCAN', configured.activity.minutes * 60 * 1000] };
+  var configured = FbmSync.backgroundScheduleRead(), names = { heartbeat: ['FBM_SYNC_NEXT_HEARTBEAT', configured.heartbeat.minutes * 60 * 1000], customerFull: ['FBM_SYNC_NEXT_CUSTOMER_FULL_SCAN', configured.customerFull.minutes * 60 * 1000], activityFull: ['FBM_SYNC_NEXT_ACTIVITY_FULL_SCAN', configured.activityFull.minutes * 60 * 1000], detail: ['FBM_SYNC_NEXT_DETAIL_SCAN', configured.detail.minutes * 60 * 1000], customer: ['FBM_SYNC_NEXT_CUSTOMER_SCAN', configured.customerFull.minutes * 60 * 1000], activity: ['FBM_SYNC_NEXT_ACTIVITY_SCAN', configured.activityFull.minutes * 60 * 1000] };
   var item = names[String(kind || '')], props = PropertiesService.getDocumentProperties(), at = Number(now || Date.now());
   if (!item) { return { ok: false, code: 'UNKNOWN_SCHEDULE' }; }
-  if (String(kind) !== 'heartbeat' && configured[String(kind)] && configured[String(kind)].enabled === false) { return { ok: false, code: 'PROCESS_DISABLED', message: 'Tiến trình nền ' + String(kind) + ' đang tắt.' }; }
+    var configuredKind = String(kind) === 'customer' ? 'customerFull' : String(kind) === 'activity' ? 'activityFull' : String(kind);
+    if (configuredKind !== 'heartbeat' && configured[configuredKind] && configured[configuredKind].enabled === false) { return { ok: false, code: 'PROCESS_DISABLED', message: 'Tiến trình nền ' + String(kind) + ' đang tắt.' }; }
   if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED', message: 'Đồng bộ đang tắt; scheduler không mở kỳ mới.', status: FbmSync.statusView() }; }
-  if (!FbmSync.backgroundEnabled()) { return { ok: false, code: 'BACKGROUND_DISABLED', message: 'Đồng bộ nền đang tắt.', status: FbmSync.statusView() }; }
+   if (!FbmSync.backgroundEnabled() || configured.enabled === false) { return { ok: false, code: 'BACKGROUND_DISABLED', message: 'Đồng bộ nền đang tắt.', status: FbmSync.statusView() }; }
   var due = Number(props.getProperty(item[0]) || 0);
   if (due && due > at) { return { ok: false, code: 'NOT_DUE', nextRunAt: due }; }
   var lock = FbmSync.orchestrationLock();
@@ -127,6 +164,7 @@ FbmSync.schedulerClaim = function (kind, now) {
     var next = at + item[1];
     props.setProperty(item[0], String(next));
     state.scheduledScan = String(kind);
+    state.scheduledDirection = configured.direction;
     state.nextRunAt = next;
     state.message = 'Đã nhận lượt scheduler ' + String(kind) + '; chờ Extension chuyển request.';
     FbmSync.stateWrite(state);
@@ -282,7 +320,7 @@ function fbmSyncHeartbeatLocked(rawResponse, options) {
     if (total !== null) {
       state.session.customerTotal = total;
       if (previousTotal !== null && previousTotal !== undefined && Number(previousTotal) !== total && state.phase === 'idle') {
-        state.scheduledScan = 'customer';
+        state.scheduledScan = 'customerFull';
         state.message = 'Tổng số Customer FBM đã đổi; chuẩn bị quét lại Customer.';
       }
     }
@@ -299,8 +337,11 @@ function fbmSyncHeartbeatLocked(rawResponse, options) {
   }
   if (result.ok && state.runId && ['idle', 'done', 'error'].indexOf(state.phase) < 0 && !(state.metadata && state.metadata.manualPending)) {
     request = FbmSync.requestForCursor(state);
-  } else if (result.ok && state.phase === 'idle' && (state.scheduledScan === 'customer' || state.scheduledScan === 'activity') && typeof FbmSync.start === 'function') {
-    started = FbmSync.start({ mode: 'read', scan: state.scheduledScan === 'activity' ? 'activity_bulk' : 'full', origin: 'background' });
+  } else if (result.ok && state.phase === 'idle' && ['customer', 'activity', 'customerFull', 'activityFull', 'detail'].indexOf(state.scheduledScan) >= 0 && typeof FbmSync.start === 'function') {
+    var schedule = FbmSync.backgroundScheduleRead(), scan = state.scheduledScan === 'activity' || state.scheduledScan === 'activityFull' ? 'activity_bulk' : state.scheduledScan === 'detail' ? 'detail' : 'full';
+    var backgroundStart = { mode: state.scheduledDirection || schedule.direction || 'read', scan: scan, origin: 'background' };
+    if (scan === 'detail') { backgroundStart.detail = schedule.detail; }
+    started = FbmSync.start(backgroundStart);
     request = started && started.request ? started.request : null;
   }
   var status = FbmSync.statusView();

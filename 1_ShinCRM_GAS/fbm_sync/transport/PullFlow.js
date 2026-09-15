@@ -38,12 +38,9 @@ FbmSync.start = function (options) {
   var state = FbmSync.stateStart('', 'checking_session', 0, { preserveConflicts: current.phase === 'conflict' });
   state.origin = opt.origin === 'background' ? 'background' : 'manual';
   state.mode = opt.mode === 'write' || opt.mode === 'push' ? opt.mode : opt.mode === 'check' ? 'check' : 'read';
-  state.scan = opt.scan === 'activity_bulk' ? 'activity_bulk' : opt.scan === 'identity_check' ? 'identity_check' : opt.scan === 'identity_probe' ? 'identity_probe' : 'full';
+  state.scan = opt.scan === 'activity_bulk' ? 'activity_bulk' : opt.scan === 'identity_check' ? 'identity_check' : opt.scan === 'identity_probe' ? 'identity_probe' : opt.scan === 'detail' ? 'detail' : 'full';
   if (state.scan === 'activity_bulk') { state.mode = 'read'; }
-  if (state.origin === 'background' && (state.mode === 'write' || state.mode === 'push')) {
-    state.phase = 'idle'; state.runId = ''; state.cursor = {}; state.message = 'Phiên nền chỉ được phép đọc FBM.'; state.lastFailureCode = 'BACKGROUND_READ_ONLY'; FbmSync.stateWrite(state);
-    return { ok: false, code: 'BACKGROUND_READ_ONLY', status: FbmSync.statusView(), error: state.message };
-  }
+  if (state.origin === 'background') { state.backgroundDetail = opt.detail || null; state.detailCustomerLimit = state.scan === 'detail' ? Math.max(1, Math.min(50, Math.floor(Number(opt.detail && opt.detail.customersPerRun || 50)))) : 0; }
   if (typeof FbmSync.runPreflight === 'function') {
     var preflight = FbmSync.runPreflight({ mode: state.mode, origin: state.origin, scan: state.scan });
     state.metadata = state.metadata || {};
@@ -61,7 +58,7 @@ FbmSync.start = function (options) {
     // A large push requires an explicit human approval before GAS gives out
     // even the first FBM request. The candidate count comes from the same
     // server-side preflight that will guard the actual push.
-    if ((state.mode === 'write' || state.mode === 'push') && Number(preflight.candidateCount || 0) > FbmSync.approvalThreshold()) {
+    if ((state.mode === 'write' || state.mode === 'push') && Number(preflight.candidateCount || 0) > 0 && Number(preflight.candidateCount || 0) >= FbmSync.approvalThreshold()) {
       state.phase = 'awaiting_approval';
       state.entity = '';
       state.cursor = { kind: 'push_approval', candidateCount: Number(preflight.candidateCount || 0) };
@@ -149,6 +146,7 @@ FbmSync.authContinue = function (entity, response) {
 /** Tạo request trang Customer tiếp theo từ khóa cuối trang trước. */
 FbmSync.customerNext = function (state, rows, total) {
   var cursor = state.cursor || {}, count = Number(cursor.count || 2000);
+  if (state.scan === 'detail' && Number(cursor.seen || 0) + rows.length >= Number(state.detailCustomerLimit || 50)) { return null; }
   if (!rows.length || rows.length < count || (total && Number(cursor.seen || 0) + rows.length >= total)) { return null; }
   var last = rows[rows.length - 1];
   cursor.pageIndex = Number(cursor.pageIndex || -1) + 1;
@@ -209,10 +207,11 @@ FbmSync.beginCustomerPull = function (state) {
     state.metadata.seen.customer = { initialized: true };
     state.metadata.seen.activity = { initialized: true };
   }
-  state.cursor = { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 };
+  var customerCount = state.scan === 'detail' ? Math.max(1, Math.min(50, Number(state.detailCustomerLimit || 50))) : 2000;
+  state.cursor = { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: customerCount };
   state.phase = 'pull_customer'; state.entity = 'customer'; state.message = 'Dang doc khach hang tu FBM...';
   FbmSync.stateWrite(state);
-  return FbmSync.customerGridRequest({ type: 0, count: 2000, gridPageIndex: -1, gridRefresh: false });
+  return FbmSync.customerGridRequest({ type: 0, count: customerCount, gridPageIndex: -1, gridRefresh: false });
 };
 
 /** Khởi tạo quét bulk Activity; tập đã thấy nằm trong bitmap phân mảnh của GAS. */
@@ -443,7 +442,7 @@ FbmSync.continue = function (rawResponse) {
     if (activityRequest) { return { ok: true, request: FbmSync.nextEnvelope(activityRequest), status: FbmSync.statusView(), imported: customerRecords.length }; }
     if (nextCustomer) { state.cursor = { kind: 'customer_grid', type: 1, pageIndex: nextCustomer.body.gridPageIndex, pageValue: nextCustomer.body.gridPageValue, count: nextCustomer.body.count, seen: Number(state.cursor.customerSeen || 0) }; FbmSync.stateWrite(state); return { ok: true, request: FbmSync.nextEnvelope(nextCustomer), status: FbmSync.statusView() }; }
     if (state.mode === 'write' && FbmSync.canWriteFbm(state.mode)) { if (FbmSync.stopPushOnConflicts && FbmSync.stopPushOnConflicts(state)) { return { ok: true, request: null, status: FbmSync.statusView() }; } state.cursor = { kind: 'push_scan', entity: 'customer', index: 0 }; state.phase = 'push'; FbmSync.stateWrite(state); return { ok: true, request: FbmSync.nextEnvelope(FbmSync.nextPushRequest(state)), status: FbmSync.statusView() }; }
-    if (FbmSync.canWriteSheet(state.mode)) { FbmSync.markMissingAfterFullScan('customer', state); FbmSync.markMissingAfterFullScan('activity', state); }
+    if (FbmSync.canWriteSheet(state.mode) && state.scan !== 'detail') { FbmSync.markMissingAfterFullScan('customer', state); FbmSync.markMissingAfterFullScan('activity', state); }
     state.cursor = {}; state.phase = 'done'; state.message = 'Dong bo hoan tat.'; FbmSync.stateWrite(state); return { ok: true, status: FbmSync.statusView() };
   }
   // Activity được quét theo từng stt_rec, rồi mới quay lại trang Customer kế.
@@ -482,7 +481,7 @@ FbmSync.continue = function (rawResponse) {
       state.cursor = { kind: 'push_scan', entity: 'customer', index: 0 }; state.phase = 'push'; state.entity = 'customer'; FbmSync.stateWrite(state);
       return { ok: true, request: FbmSync.nextEnvelope(FbmSync.nextPushRequest(state)), status: FbmSync.statusView(), imported: activityRecords.length };
     }
-    if (FbmSync.canWriteSheet(state.mode)) { FbmSync.markMissingAfterFullScan('customer', state); FbmSync.markMissingAfterFullScan('activity', state); }
+    if (FbmSync.canWriteSheet(state.mode) && state.scan !== 'detail') { FbmSync.markMissingAfterFullScan('customer', state); FbmSync.markMissingAfterFullScan('activity', state); }
     state.cursor = {}; state.phase = 'done'; state.entity = ''; state.message = 'Dong bo hoan tat.'; FbmSync.stateWrite(state);
     return { ok: true, status: FbmSync.statusView(), imported: activityRecords.length };
   }
