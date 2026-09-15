@@ -1,19 +1,19 @@
 <script>
 /*
- * Viên gạch duy nhất của giao diện: `Block`, cộng bảy hàm điền sẵn tham số cho nó. Tài liệu 04 Phần 4.
+ * Viên gạch duy nhất của giao diện: `Block`, cộng các hàm điền sẵn tham số cho nó. Tài liệu 04 Phần 4.
  *
  * Tệp này **không vẽ gì và không chạm DOM**. Nó nhận một object khai, chặn mọi khóa không có tên, rồi trả về một node đã chuẩn hóa; việc dịch node thành HTML là của `renderEngine`. Tách hai việc vì phép kiểm khai báo phải chạy được không cần DOM — nhờ vậy bộ kiểm offline gọi được đúng hàm thật, còn nếu trộn vào chỗ dựng HTML thì cả cụm chỉ nghiệm thu được bằng cách mở sidebar thật trên Google.
  */
 
 /**
- * Tám vai của một Block. Vai quyết định phần lá mà `renderEngine` vẽ.
+ * Chín vai của một Block. Vai quyết định phần lá mà `renderEngine` vẽ.
  *
- * Đây **không** phải khóa `tag` mà tài liệu 04 Phần 4 cấm. `tag` là để người khai schema gõ thẳng tên thẻ HTML; còn `role` do chính bảy hàm dựng đặt, người khai schema không bao giờ gõ tới nó. Có vai thì phần lá là một lựa chọn duy nhất và tra được; nếu suy theo tổ hợp khóa nào đang có mặt thì một Block mang cả `field` lẫn `icon` là một ca không ai định nghĩa.
+ * Đây **không** phải khóa `tag` mà tài liệu 04 Phần 4 cấm. `tag` là để người khai schema gõ thẳng tên thẻ HTML; còn `role` do chính các hàm dựng đặt, người khai schema không bao giờ gõ tới nó. Có vai thì phần lá là một lựa chọn duy nhất và tra được; nếu suy theo tổ hợp khóa nào đang có mặt thì một Block mang cả `field` lẫn `icon` là một ca không ai định nghĩa.
  */
-var BLOCK_ROLES = ['box', 'card', 'row', 'text', 'field', 'button', 'icon', 'check', 'control'];
+var BLOCK_ROLES = ['box', 'card', 'row', 'text', 'field', 'button', 'icon', 'check', 'standaloneControl'];
 
 /**
- * Khóa dùng được ở mọi vai: năm khóa của bảng trong tài liệu 04 Phần 4 mà `renderEngine` xử lý theo cùng một đường cho tám vai, cộng `pick` vì dòng nào do slot sinh ra cũng phải mang mã bản ghi của nó.
+ * Khóa dùng được ở mọi vai: các khóa của bảng trong tài liệu 04 Phần 4 mà `renderEngine` xử lý theo cùng một đường cho các vai, cộng `pick` vì dòng nào do slot sinh ra cũng phải mang mã bản ghi của nó.
  *
  * `elements` và `label` từng nằm ở đây rồi bị dời xuống bảng dưới, vì "mọi vai nhận được" mà chỉ vài vai vẽ ra là một cái bẫy: `Card({ label: 'GHI CHÚ' })` đi qua mọi phép kiểm, dựng được, vẽ được, và chữ không bao giờ hiện — chỗ khai đúng tên phải là `title`. Đó đúng là loại lỗi "sửa schema mà hình thức không đổi" mà `blockCheckKeys` bên dưới ra đời để chặn, nên để nó ở lại là tự bịt mắt mình.
  */
@@ -35,7 +35,7 @@ var BLOCK_KEYS_BY_ROLE = {
   button: ['align', 'label', 'disabled'],
   icon: ['icon', 'tooltip', 'align', 'label', 'toggle', 'disabled'],
   check: ['label'],
-  control: ['kind', 'inputType', 'label', 'value', 'placeholder', 'options', 'disabled', 'pressed', 'ariaLabel', 'hidden']
+  standaloneControl: ['kind', 'inputType', 'label', 'value', 'placeholder', 'options', 'disabled', 'pressed', 'ariaLabel', 'hidden']
 };
 
 /**
@@ -77,7 +77,7 @@ function blockElements(elements) {
   }
   return elements.map(function (con, i) {
     if (!con || typeof con !== 'object' || BLOCK_ROLES.indexOf(con.role) === -1) {
-      throw new Error('Phần tử thứ ' + (i + 1) + ' trong `elements` không phải Block. Dựng nó bằng Card, Row, Text, Field, Button, Icon hoặc Check; chuỗi trần chỉ dùng được khi cả `elements` là tên slot.');
+      throw new Error('Phần tử thứ ' + (i + 1) + ' trong `elements` không phải Block. Dựng nó bằng Card, Row, Text, Field, Button, Icon, Check hoặc StandaloneControl; chuỗi trần chỉ dùng được khi cả `elements` là tên slot.');
     }
     return con;
   });
@@ -172,10 +172,10 @@ function Icon(spec) { return Block(typeof spec === 'string' ? { icon: spec } : s
 /**
  * Ô đánh dấu chọn dòng. `pick` là mã bản ghi mà dòng này mang.
  *
- * Vai thứ tám, thêm vào vì tài liệu 03 Phần 8 đòi "dòng lịch sử có ô đánh dấu, chọn được nhiều dòng" mà bảy vai cũ không vai nào vẽ được ô đánh dấu. Nó **không** mang `data-field` nên bộ thu thập lúc lưu không bao giờ thấy nó; danh sách đang chọn đọc từ DOM ngay lúc bấm xóa, nên không sinh thêm một chỗ giữ trạng thái.
+ * Vai `check`, thêm vào vì tài liệu 03 Phần 8 đòi "dòng lịch sử có ô đánh dấu, chọn được nhiều dòng" mà các vai cũ không vai nào vẽ được ô đánh dấu. Nó **không** mang `data-field` nên bộ thu thập lúc lưu không bao giờ thấy nó; danh sách đang chọn đọc từ DOM ngay lúc bấm xóa, nên không sinh thêm một chỗ giữ trạng thái.
  */
 function Check(spec) { return Block(typeof spec === 'string' ? { pick: spec } : spec, 'check'); }
 
-/** Control HTML trung tính cho các adapter không thuộc DATA_SCHEMA (input, select, công tắc). */
-function Control(spec) { return Block(spec, 'control'); }
+/** Control độc lập cho giá trị giao diện không thuộc DATA_SCHEMA (input, select, công tắc). */
+function StandaloneControl(spec) { return Block(spec, 'standaloneControl'); }
 </script>

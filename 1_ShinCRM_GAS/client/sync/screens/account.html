@@ -20,8 +20,8 @@ function fbmSyncRenderAccount(panel, status) {
     Card({ title: 'Đăng nhập tự động', elements: [
       Box({ id: 'fbm-sync-login-configured-region', elements: fbmSyncLoginConfiguredBlocks() }),
       Text({ className: 'shin-sync-muted', text: 'Chính sách tự đăng nhập, tự mở tab và thử lại được chỉnh trong Cài đặt phiên.' }),
-      Box({ className: 'shin-sync-form-field', elements: [Text({ className: 'shin-sync-form-label', text: 'Username FBM' }), Control({ id: 'fbm-login-username', kind: 'input', inputType: 'text', value: FBM_SYNC_CLIENT.loginDraft.username, placeholder: 'Nhập username FBM', ariaLabel: 'Username FBM' })] }),
-      Box({ className: 'shin-sync-form-field', elements: [Text({ className: 'shin-sync-form-label', text: 'Mật khẩu FBM' }), Control({ id: 'fbm-login-password', kind: 'input', inputType: 'password', value: '', placeholder: 'Nhập mật khẩu FBM', ariaLabel: 'Mật khẩu FBM' })] }),
+      Box({ className: 'shin-sync-form-field', elements: [Text({ className: 'shin-sync-form-label', text: 'Username FBM' }), StandaloneControl({ id: 'fbm-login-username', kind: 'input', inputType: 'text', value: FBM_SYNC_CLIENT.loginDraft.username, placeholder: 'Nhập username FBM', ariaLabel: 'Username FBM' })] }),
+      Box({ className: 'shin-sync-form-field', elements: [Text({ className: 'shin-sync-form-label', text: 'Mật khẩu FBM' }), StandaloneControl({ id: 'fbm-login-password', kind: 'input', inputType: 'password', value: '', placeholder: 'Nhập mật khẩu FBM', ariaLabel: 'Mật khẩu FBM' })] }),
       Box({ id: 'fbm-sync-login-actions-region', className: 'shin-sync-form-actions', elements: fbmSyncLoginActionBlocks() }),
       Box({ id: 'fbm-sync-login-notice-region', elements: fbmSyncAccountNoticeBlocks('login') })
     ] })

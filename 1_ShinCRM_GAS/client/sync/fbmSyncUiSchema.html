@@ -35,14 +35,14 @@ function fbmSyncAppendButton(parent, id, label, primary, className, options) {
 }
 function fbmSyncAppendInput(parent, id, type, value, placeholder, options) {
   options = options || {};
-  return fbmSyncAppendBlock(parent, Control({ id: id, kind: 'input', inputType: type || 'text', value: value === undefined || value === null ? '' : value, placeholder: placeholder || '', className: options.className || '', data: options.data || null, disabled: options.disabled === true, ariaLabel: options.ariaLabel || '' })).querySelector('#' + id);
+  return fbmSyncAppendBlock(parent, StandaloneControl({ id: id, kind: 'input', inputType: type || 'text', value: value === undefined || value === null ? '' : value, placeholder: placeholder || '', className: options.className || '', data: options.data || null, disabled: options.disabled === true, ariaLabel: options.ariaLabel || '' })).querySelector('#' + id);
 }
 function fbmSyncAppendSelect(parent, id, options, value, className, controlOptions) {
   controlOptions = controlOptions || {};
-  return fbmSyncAppendBlock(parent, Control({ id: id, kind: 'select', options: options || [], value: value, className: className || '', data: controlOptions.data || null, disabled: controlOptions.disabled === true, ariaLabel: controlOptions.ariaLabel || '' })).querySelector('#' + id);
+  return fbmSyncAppendBlock(parent, StandaloneControl({ id: id, kind: 'select', options: options || [], value: value, className: className || '', data: controlOptions.data || null, disabled: controlOptions.disabled === true, ariaLabel: controlOptions.ariaLabel || '' })).querySelector('#' + id);
 }
 function fbmSyncMakeToggleButton(parent, id, enabled, label, options) {
   options = options || {};
-  return fbmSyncAppendBlock(parent, Control({ id: id, kind: 'toggle', pressed: enabled === true, className: 'shin-sync-toggle ' + (enabled ? 'is-on' : 'is-off'), ariaLabel: label || 'Bật hoặc tắt', data: options.data || null, disabled: options.disabled === true })).querySelector('#' + id);
+  return fbmSyncAppendBlock(parent, StandaloneControl({ id: id, kind: 'toggle', pressed: enabled === true, className: 'shin-sync-toggle ' + (enabled ? 'is-on' : 'is-off'), ariaLabel: label || 'Bật hoặc tắt', data: options.data || null, disabled: options.disabled === true })).querySelector('#' + id);
 }
 </script>

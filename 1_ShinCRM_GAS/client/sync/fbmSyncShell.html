@@ -1,13 +1,13 @@
 <style>
 .shin-sync-module { display:flex; flex-direction:column; min-height:0; height:100%; background:var(--shin-bg); }
 .shin-sync-screen.shin-sync-module { position:fixed; inset:0; }
-.shin-sync-module-header { display:flex; align-items:center; gap:var(--shin-gap-1); padding:var(--shin-gap-1) var(--shin-scrollbar-size); border-bottom:1px solid var(--shin-border); background:var(--shin-bg); }
+.shin-sync-module-header { display:flex; align-items:center; gap:var(--shin-gap-2); padding:var(--shin-gap-1) var(--shin-scrollbar-size); border-bottom:1px solid var(--shin-border); background:var(--shin-bg); }
 .shin-sync-module-title { flex:1; min-width:0; font-size:var(--shin-text-md); font-weight:700; color:var(--shin-text); }
 .shin-sync-header-btn { width:30px; height:30px; padding:0; border:1px solid var(--shin-border); border-radius:var(--shin-radius-sm); background:var(--shin-bg); color:var(--shin-text); cursor:pointer; }
 .shin-sync-header-btn:hover { background:var(--shin-bg-hover); }
 .shin-sync-header-btn.is-on { border-color:var(--shin-ok); color:var(--shin-ok); background:#e6f4ea; }
 .shin-sync-header-btn.is-off { border-color:var(--shin-error); color:var(--shin-error); background:var(--shin-error-soft); }
-.shin-sync-nav { display:flex; gap:var(--shin-gap-1); padding:var(--shin-gap-1) var(--shin-gap-3); border-bottom:1px solid var(--shin-border-faint); background:var(--shin-bg); overflow-x:auto; }
+.shin-sync-nav { display:flex; gap:var(--shin-gap-2); padding:var(--shin-gap-1) var(--shin-gap-3); border-bottom:1px solid var(--shin-border-faint); background:var(--shin-bg); overflow-x:auto; }
 .shin-sync-nav button { flex:0 0 auto; border:0; border-bottom:2px solid transparent; padding:var(--shin-gap-1) var(--shin-gap-2); background:none; color:var(--shin-text-soft); font:inherit; font-size:var(--shin-text-xs); cursor:pointer; }
 .shin-sync-nav button.is-active { border-color:var(--shin-primary); color:var(--shin-primary); font-weight:700; }
 .shin-sync-disabled-banner { margin:var(--shin-gap-2) var(--shin-gap-3) 0; padding:var(--shin-gap-2); border-left:3px solid var(--shin-error); background:var(--shin-error-soft); color:var(--shin-error); font-size:var(--shin-text-sm); }
@@ -75,6 +75,9 @@
 .shin-sync-form-actions .shin-button { min-width:0; }
 .shin-sync-pipeline { margin-top:0; }
 .shin-sync-status-card, .shin-sync-issues-card, .shin-sync-results-body, .shin-sync-run-details, .shin-sync-schedule-row, .shin-sync-conflict-screen { min-width:0; }
+.shin-sync-schedule-row { display:grid; grid-template-columns:42px minmax(0,1fr) minmax(92px,112px); align-items:center; gap:var(--shin-gap-2); padding:var(--shin-gap-1) 0; }
+.shin-sync-schedule-row > .shin-standalone-control { min-width:0; }
+.shin-sync-schedule-row > .shin-standalone-control:last-child .shin-input { width:100%; box-sizing:border-box; }
 .shin-sync-conflict-choice { width:100%; }
 .shin-sync-form-label { display:block; margin-bottom:var(--shin-gap-1); color:var(--shin-text); font-size:var(--shin-text-sm); font-weight:600; }
 .shin-sync-summary-label { color:var(--shin-text); font-size:var(--shin-text-sm); font-weight:600; }
@@ -171,7 +174,7 @@ function fbmSyncShellHeaderBlock(status) {
   return Box({ id: 'fbm-sync-module-header', className: 'shin-sync-module-header', elements: [
     Icon({ id: 'fbm-sync-back', className: 'shin-sync-header-btn', icon: 'back', tooltip: 'Quay l\u1ea1i' }),
     Text({ id: 'fbm-sync-module-title', className: 'shin-sync-module-title', text: fbmSyncShellTitle() }),
-    Control({ id: 'fbm-sync-master-switch', kind: 'toggle', pressed: enabled, className: 'shin-sync-master-switch ' + (enabled ? 'is-on' : 'is-off'), ariaLabel: 'B\u1eadt ho\u1eb7c t\u1eaft \u0111\u1ed3ng b\u1ed9' }),
+    StandaloneControl({ id: 'fbm-sync-master-switch', kind: 'toggle', pressed: enabled, className: 'shin-sync-master-switch ' + (enabled ? 'is-on' : 'is-off'), ariaLabel: 'B\u1eadt ho\u1eb7c t\u1eaft \u0111\u1ed3ng b\u1ed9' }),
     Icon({ id: 'fbm-sync-module-menu', className: 'shin-sync-header-btn', icon: 'more', tooltip: 'M\u1edf menu \u0111\u1ed3ng b\u1ed9' })
   ] });
 }
@@ -202,11 +205,11 @@ function fbmSyncRenderShell(status) {
 function fbmSyncRenderLoading() {
   var panel = document.getElementById('fbm-sync-content'); if (!panel) { return; }
   fbmSyncRenderShell(FBM_SYNC_CLIENT.lastStatus || {});
+  panel.removeAttribute('data-fbm-sync-screen');
+  if (typeof RENDER_INDEX !== 'undefined' && RENDER_INDEX.nodes) {
+    ['fbm-sync-overview-root', 'fbm-sync-account-root', 'fbm-sync-run-root', 'fbm-sync-results-root', 'fbm-sync-settings-root'].forEach(function (id) { delete RENDER_INDEX.nodes[id]; });
+  }
   fbmSyncReplaceBlocks(panel, [Box({ className: 'shin-sync-section', elements: [Text({ className: 'shin-sync-section-title', text: '\u0110\u1ed3ng b\u1ed9 FBM' }), Text({ className: 'shin-sync-loading', text: '\u0110ang t\u1ea3i tr\u1ea1ng th\u00e1i phi\u00ean...' })] })]);
-  return;
-  var section = fbmSyncAppendBox(panel, 'shin-sync-section');
-  fbmSyncAppendText(section, 'Đồng bộ FBM', 'shin-sync-section-title');
-  fbmSyncAppendText(section, 'Đang tải trạng thái phiên...', 'shin-sync-loading');
 }
 function fbmSyncSetScreen(screenId) {
   var ids = FBM_SYNC_UI_SCHEMA.screens.map(function (item) { return item.id; });

@@ -59,16 +59,16 @@ const DAU_DO = [
   { vai: 'button', khoa: 'disabled', nen: { label: 'LƯU' }, gia: true },
   { vai: 'icon', khoa: 'disabled', nen: { icon: 'pencil' }, gia: true },
   { vai: 'check', khoa: 'label', nen: { pick: 'GD-001' }, gia: 'Chọn dòng này' }
-  ,{ vai: 'control', khoa: 'kind', nen: { id: 'probe-control', kind: 'input', inputType: 'text', value: 'x' }, gia: 'toggle' }
-  ,{ vai: 'control', khoa: 'label', nen: { id: 'probe-control', kind: 'toggle' }, gia: 'Nhãn' }
-  ,{ vai: 'control', khoa: 'inputType', nen: { id: 'probe-control', kind: 'input', inputType: 'text', value: 'x' }, gia: 'password' }
-  ,{ vai: 'control', khoa: 'value', nen: { id: 'probe-control', kind: 'input', inputType: 'text', value: 'x' }, gia: 'y' }
-  ,{ vai: 'control', khoa: 'placeholder', nen: { id: 'probe-control', kind: 'input', inputType: 'text', value: 'x' }, gia: 'gợi ý' }
-  ,{ vai: 'control', khoa: 'options', nen: { id: 'probe-control', kind: 'select', options: [{ value: 'a', label: 'A' }], value: 'a' }, gia: [{ value: 'b', label: 'B' }] }
-  ,{ vai: 'control', khoa: 'disabled', nen: { id: 'probe-control', kind: 'input', inputType: 'text', value: 'x' }, gia: true }
-  ,{ vai: 'control', khoa: 'pressed', nen: { id: 'probe-control', kind: 'toggle' }, gia: true }
-  ,{ vai: 'control', khoa: 'ariaLabel', nen: { id: 'probe-control', kind: 'input', inputType: 'text', value: 'x' }, gia: 'Ô thử' }
-  ,{ vai: 'control', khoa: 'hidden', nen: { id: 'probe-control', kind: 'input', inputType: 'text', value: 'x' }, gia: true }
+  ,{ vai: 'standaloneControl', khoa: 'kind', nen: { id: 'probe-control', kind: 'input', inputType: 'text', value: 'x' }, gia: 'toggle' }
+  ,{ vai: 'standaloneControl', khoa: 'label', nen: { id: 'probe-control', kind: 'toggle' }, gia: 'Nhãn' }
+  ,{ vai: 'standaloneControl', khoa: 'inputType', nen: { id: 'probe-control', kind: 'input', inputType: 'text', value: 'x' }, gia: 'password' }
+  ,{ vai: 'standaloneControl', khoa: 'value', nen: { id: 'probe-control', kind: 'input', inputType: 'text', value: 'x' }, gia: 'y' }
+  ,{ vai: 'standaloneControl', khoa: 'placeholder', nen: { id: 'probe-control', kind: 'input', inputType: 'text', value: 'x' }, gia: 'gợi ý' }
+  ,{ vai: 'standaloneControl', khoa: 'options', nen: { id: 'probe-control', kind: 'select', options: [{ value: 'a', label: 'A' }], value: 'a' }, gia: [{ value: 'b', label: 'B' }] }
+  ,{ vai: 'standaloneControl', khoa: 'disabled', nen: { id: 'probe-control', kind: 'input', inputType: 'text', value: 'x' }, gia: true }
+  ,{ vai: 'standaloneControl', khoa: 'pressed', nen: { id: 'probe-control', kind: 'toggle' }, gia: true }
+  ,{ vai: 'standaloneControl', khoa: 'ariaLabel', nen: { id: 'probe-control', kind: 'input', inputType: 'text', value: 'x' }, gia: 'Ô thử' }
+  ,{ vai: 'standaloneControl', khoa: 'hidden', nen: { id: 'probe-control', kind: 'input', inputType: 'text', value: 'x' }, gia: true }
 ];
 
 /** Ngữ cảnh vẽ tối thiểu: một khách để trường có giá trị mà đổ ra. */

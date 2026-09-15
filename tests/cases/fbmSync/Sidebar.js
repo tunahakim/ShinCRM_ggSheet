@@ -122,6 +122,11 @@ async function chay(so) {
   const pushError = { phase: 'error', runId: 'r3', cursor: { kind: 'push_wait' }, lastFailureCode: 'FBM_VERIFY_FAILED', label: 'Có lỗi', counts: {} };
 
   check(so, 'Overview render được trạng thái rỗng', !!render(hop, content, hop.fbmSyncRenderOverview, idle).querySelector('.shin-sync-overview-state'), true);
+  hop.FBM_SYNC_CLIENT.subscreen = 'overview';
+  hop.fbmSyncRenderLoading();
+  check(so, 'loading xóa dấu màn cũ để snapshot đầu tiên dựng lại Tổng quan', [content.getAttribute('data-fbm-sync-screen'), !!hop.RENDER_INDEX.nodes['fbm-sync-overview-root']], [null, false]);
+  hop.fbmSyncPaint(Object.assign({}, idle, { label: 'Tổng quan sau loading' }));
+  check(so, 'Tổng quan dựng lại được sau loading mà không dùng node cũ', [content.getAttribute('data-fbm-sync-screen'), content.textContent.indexOf('Tổng quan sau loading') >= 0], ['overview', true]);
   check(so, 'Run render không hiện pipeline khi chưa chạy', render(hop, content, hop.fbmSyncRenderRun, idle).querySelector('.shin-sync-pipeline'), null);
   check(so, 'Run render giữ pipeline khi preflight thất bại để người dùng thấy chặng dừng', !!render(hop, content, hop.fbmSyncRenderRun, preflightError).querySelector('.shin-sync-pipeline'), true);
   check(so, 'Run render hiện pipeline khi đang xử lý', !!render(hop, content, hop.fbmSyncRenderRun, active).querySelector('.shin-sync-pipeline'), true);

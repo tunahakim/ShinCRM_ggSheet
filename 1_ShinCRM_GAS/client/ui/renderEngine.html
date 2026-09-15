@@ -96,7 +96,7 @@ function renderSpatialAttrs(kg) {
 var RENDER_INDEX = { nodes: {}, menus: {}, ctx: null, dem: 0 };
 
 /** Thẻ HTML của từng vai. */
-var RENDER_TAG_BY_ROLE = { box: 'div', card: 'section', row: 'div', text: 'div', field: 'div', button: 'button', icon: 'button', check: 'label', control: 'div' };
+var RENDER_TAG_BY_ROLE = { box: 'div', card: 'section', row: 'div', text: 'div', field: 'div', button: 'button', icon: 'button', check: 'label', standaloneControl: 'div' };
 
 /** Control suy từ `type` khi `UI_SCHEMA` không khai. Tài liệu 03 Phần 7. */
 var RENDER_CONTROL_BY_TYPE = { TEXT: 'text', NUMBER: 'number', DATE: 'date', SELECT: 'select' };
@@ -139,11 +139,11 @@ function renderActionAttrs(node) {
  */
 function renderNodeAttrs(node) {
   var ra = (node.role === 'button' || node.role === 'icon') ? ' type="button"' : '';
-  ra += (node.role === 'control' ? renderAttr('class', 'shin-control') : renderAttr('id', node.id) + renderAttr('class', renderClassList(node)));
+  ra += (node.role === 'standaloneControl' ? renderAttr('class', 'shin-standalone-control') : renderAttr('id', node.id) + renderAttr('class', renderClassList(node)));
 
   if (node.role !== 'card') { ra += renderSpatialAttrs(node.spatialConfig); }
   if (node.role !== 'field') { ra += renderActionAttrs(node); }
-  if (node.role !== 'control') { ra += renderDataAttrs(node.data); }
+  if (node.role !== 'standaloneControl') { ra += renderDataAttrs(node.data); }
   if (node.ariaValueNow !== null && node.ariaValueNow !== undefined) { ra += renderAttr('aria-valuenow', node.ariaValueNow); }
   if (node.role === 'icon') { ra += renderAttr('title', node.tooltip) + renderAttr('aria-label', node.tooltip || node.label); }
   if ((node.role === 'button' || node.role === 'icon') && node.disabled) { ra += ' disabled'; }
@@ -360,19 +360,19 @@ function renderFieldInner(node, ctx) {
     + RENDER_CONTROLS[control](o);
 }
 
-/** Control trung tính không mang `data-field`, nên không bao giờ đi vào luồng lưu dữ liệu nghiệp vụ. */
-function renderAdapterControlInner(node) {
+/** StandaloneControl không mang `data-field`, nên không bao giờ đi vào luồng lưu dữ liệu nghiệp vụ. */
+function renderStandaloneControlInner(node) {
   var kind = String(node.kind || 'input'), className = String(node.className || ''), common = renderAttr('id', node.id) + renderDataAttrs(node.data) + renderAttr('aria-label', node.ariaLabel || node.label) + (node.disabled ? ' disabled' : '') + (node.hidden ? ' hidden' : '');
-  if (!node.id) { throw new Error('Block vai "control" cần `id` để thao tác và giữ node ổn định.'); }
+  if (!node.id) { throw new Error('Block vai "standaloneControl" cần `id` để thao tác và giữ node ổn định.'); }
   if (kind === 'input') {
     var inputType = String(node.inputType || 'text');
-    if (['text', 'password', 'number'].indexOf(inputType) < 0) { throw new Error('Control input chỉ nhận inputType text, password hoặc number.'); }
+    if (['text', 'password', 'number'].indexOf(inputType) < 0) { throw new Error('StandaloneControl input chỉ nhận inputType text, password hoặc number.'); }
     return '<input' + renderAttr('type', inputType) + renderAttr('class', 'shin-input' + (className ? ' ' + className : '')) + common + ' value="' + renderEscape(node.value === null || node.value === undefined ? '' : node.value) + '"' + renderAttr('placeholder', node.placeholder) + '>';
   }
   if (kind === 'select') {
-    if (!Array.isArray(node.options)) { throw new Error('Control select cần `options` là mảng.'); }
+    if (!Array.isArray(node.options)) { throw new Error('StandaloneControl select cần `options` là mảng.'); }
     return '<select' + renderAttr('class', 'shin-input' + (className ? ' ' + className : '')) + common + '>' + node.options.map(function (option) {
-      if (!option || typeof option !== 'object' || option.value === undefined || option.label === undefined) { throw new Error('Mỗi option của Control select cần `value` và `label`.'); }
+      if (!option || typeof option !== 'object' || option.value === undefined || option.label === undefined) { throw new Error('Mỗi option của StandaloneControl select cần `value` và `label`.'); }
       return '<option' + renderAttr('value', option.value) + (String(option.value) === String(node.value) ? ' selected' : '') + '>' + renderEscape(option.label) + '</option>';
     }).join('') + '</select>';
   }
@@ -380,7 +380,7 @@ function renderAdapterControlInner(node) {
     return '<button type="button"' + renderAttr('class', 'shin-toggle-control' + (className ? ' ' + className : '')) + common + renderAttr('aria-pressed', node.pressed ? 'true' : 'false') + '>'
       + '<span class="shin-toggle-label shin-sync-toggle-label shin-sync-switch-label">' + (node.pressed ? 'ON' : 'OFF') + '</span><span class="shin-sync-toggle-knob shin-sync-switch-knob"></span></button>';
   }
-  throw new Error('Control có `kind` không hợp lệ: "' + kind + '".');
+  throw new Error('StandaloneControl có `kind` không hợp lệ: "' + kind + '".');
 }
 
 /** Ruột từng vai. Nút và icon tự thêm mũi nhọn khi có menu, còn hộp và hàng thì chỉ có con. */
@@ -390,7 +390,7 @@ var RENDER_INNER_BY_ROLE = {
   row: renderChildren,
   text: function (node) { return renderEscape(node.text); },
   field: renderFieldInner,
-  control: renderAdapterControlInner,
+  standaloneControl: renderStandaloneControlInner,
   button: function (node) { return '<span class="shin-btn-label">' + renderEscape(node.label) + '</span>' + renderMenuCaret(node); },
   /**
    * Glyph **và** chữ, cả hai khi cả hai được khai — chứ không phải chọn một.
@@ -419,7 +419,7 @@ function renderNode(node, ctx) {
   if (!node || BLOCK_ROLES.indexOf(node.role) === -1) {
     throw new Error('Block phải có `role` thuộc: ' + BLOCK_ROLES.join(', ') + '. Đang nhận "' + (node && node.role) + '".');
   }
-  if (node.id && node.role !== 'control') { RENDER_INDEX.nodes[node.id] = node; }
+  if (node.id && node.role !== 'standaloneControl') { RENDER_INDEX.nodes[node.id] = node; }
 
   var the = RENDER_TAG_BY_ROLE[node.role];
   return '<' + the + renderNodeAttrs(node) + '>' + RENDER_INNER_BY_ROLE[node.role](node, ctx) + '</' + the + '>';

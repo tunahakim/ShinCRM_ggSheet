@@ -23,8 +23,8 @@ function chay(so) {
     [hop1.role, Object.keys(hop1).length], ['box', 30]);
 
   check(so, 'các hàm dựng chỉ điền vai, không sinh loại node mới',
-    [hop.Card({}).role, hop.Row([]).role, hop.Text('x').role, hop.Field({ field: 'a' }).role, hop.Button('L').role, hop.Icon('close').role, hop.Check('ACT-000001').role, hop.Control({ id: 'c', kind: 'input' }).role],
-    ['card', 'row', 'text', 'field', 'button', 'icon', 'check', 'control']);
+    [hop.Card({}).role, hop.Row([]).role, hop.Text('x').role, hop.Field({ field: 'a' }).role, hop.Button('L').role, hop.Icon('close').role, hop.Check('ACT-000001').role, hop.StandaloneControl({ id: 'c', kind: 'input' }).role],
+    ['card', 'row', 'text', 'field', 'button', 'icon', 'check', 'standaloneControl']);
 
   check(so, 'Text, Button, Icon, Check nhận thẳng chuỗi cho gọn',
     [hop.Text('chữ').text, hop.Button('LƯU').label, hop.Icon('pencil').icon, hop.Check('ACT-000009').pick], ['chữ', 'LƯU', 'pencil', 'ACT-000009']);

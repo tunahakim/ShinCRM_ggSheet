@@ -117,6 +117,9 @@ async function chay(so) {
   pollMinutes.value = '17';
   hop.fbmSyncPaint(Object.assign(idle(), { message: 'Snapshot Cài đặt mới' }));
   check(so, 'snapshot GAS vá Cài đặt mà không ghi đè nhịp Extension người dùng đang sửa', [content.children[0] === settingsRoot, dom.document.getElementById('fbm-extension-poll-minutes') === pollMinutes, pollMinutes.value], [true, true, '17']);
+  check(so, 'Cài đặt phiên không còn vùng thông báo chung trên đầu màn', [dom.document.getElementById('fbm-sync-settings-message-region'), !!dom.document.getElementById('fbm-sync-settings-extension-notice-region'), !!dom.document.getElementById('fbm-sync-settings-background-notice-region'), !!dom.document.getElementById('fbm-sync-settings-login-notice-region')], [null, true, true, true]);
+  hop.fbmSyncSetSettingsNotice('background', 'success', 'Đã nhận lượt scheduler customer; chờ Extension chuyển request.');
+  check(so, 'Thông báo scheduler nằm trong đúng khối Lịch đồng bộ nền', [dom.document.getElementById('fbm-sync-settings-background-notice-region').textContent, content.textContent.indexOf('Đã nhận lượt scheduler customer; chờ Extension chuyển request.') >= 0], ['Đã nhận lượt scheduler customer; chờ Extension chuyển request.', true]);
   const settingsActions = [];
   hop.fbmSyncSaveExtensionSettings = () => { settingsActions.push('extension'); return Promise.resolve(null); };
   hop.fbmSyncSaveBackgroundSettings = () => { settingsActions.push('background'); return Promise.resolve(null); };

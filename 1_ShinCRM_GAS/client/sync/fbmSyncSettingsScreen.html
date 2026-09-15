@@ -12,7 +12,7 @@ function fbmSyncIdentitySummaryBlocks() {
 function fbmSyncIdentityFormBlocks() {
   var identity = FBM_SYNC_CLIENT.identityStatus || {}, binding = identity.binding || {}, draft = FBM_SYNC_CLIENT.identityDraft || {};
   return [['spreadsheet', 'Spreadsheet ID', draft.spreadsheetId || binding.spreadsheetId, 'ID của file ShinCRM'], ['user', 'Mã số user FBM', draft.userId || binding.userId, 'Mã số nội bộ của user'], ['username', 'Tên đăng nhập FBM', draft.username || binding.username, 'Tên dùng để đăng nhập'], ['account', 'Tên đầy đủ', draft.accountName || binding.accountName, 'Tên người dùng trên FBM']].map(function (item) {
-    return Box({ className: 'shin-sync-form-field', elements: [Text({ className: 'shin-sync-form-label', text: item[1] }), Control({ id: 'fbm-identity-' + item[0], kind: 'input', inputType: 'text', value: item[2] || '', placeholder: item[3], ariaLabel: item[1] })] });
+    return Box({ className: 'shin-sync-form-field', elements: [Text({ className: 'shin-sync-form-label', text: item[1] }), StandaloneControl({ id: 'fbm-identity-' + item[0], kind: 'input', inputType: 'text', value: item[2] || '', placeholder: item[3], ariaLabel: item[1] })] });
   });
 }
 function fbmSyncIdentityActionBlocks() {

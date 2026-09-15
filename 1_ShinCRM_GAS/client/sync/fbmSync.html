@@ -1,6 +1,6 @@
 <script>
 /* Sidebar chỉ hiển thị tiến độ; GAS là nguồn state duy nhất. */
-var FBM_SYNC_CLIENT = { installed: false, waiting: {}, relayWaiters: {}, credentialWaiters: {}, running: false, mode: 'read', openedAt: 0, relayConfigured: false, relayOpenId: 0, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0, traceEvents: [], subscreen: 'overview', navOpen: false, resultsTab: 'summary', resultPages: {}, lastStatus: null, deferredPaint: null, identityStatus: null, identityAction: '', identityLastAction: '', identityProbeSignature: '', identityDraft: { spreadsheetId: '', userId: '', username: '', accountName: '' }, loginStatus: null, loginDraft: { username: '' }, accountNotices: { identity: null, login: null }, syncSettings: null };
+var FBM_SYNC_CLIENT = { installed: false, waiting: {}, relayWaiters: {}, credentialWaiters: {}, running: false, mode: 'read', openedAt: 0, relayConfigured: false, relayOpenId: 0, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0, traceEvents: [], subscreen: 'overview', navOpen: false, resultsTab: 'summary', resultPages: {}, lastStatus: null, deferredPaint: null, identityStatus: null, identityAction: '', identityLastAction: '', identityProbeSignature: '', identityDraft: { spreadsheetId: '', userId: '', username: '', accountName: '' }, loginStatus: null, loginDraft: { username: '' }, accountNotices: { identity: null, login: null }, settingsNotices: { relay: null, extension: null, background: null, login: null }, syncSettings: null };
 /** Timeout cho một request Extension để phiên không treo vô hạn khi tab FBM/bridge mất kết nối. */
 var FBM_SYNC_REQUEST_TIMEOUT_MS = 20000;
 var FBM_SYNC_GAS_CONTINUE_WARN_MS = 5000;
@@ -19,7 +19,7 @@ function syncPanelToggle() {
   var screen = document.getElementById('fbm-sync-screen');
   if (!screen) { throw new Error('Sidebar thieu man dong bo FBM.'); }
   renderTargetState('fbm-sync-screen', { hidden: false });
-  FBM_SYNC_CLIENT.subscreen = 'overview'; FBM_SYNC_CLIENT.openedAt = Date.now(); FBM_SYNC_CLIENT.viewEpoch += 1; FBM_SYNC_CLIENT.accountNotices = { identity: null, login: null };
+  FBM_SYNC_CLIENT.subscreen = 'overview'; FBM_SYNC_CLIENT.openedAt = Date.now(); FBM_SYNC_CLIENT.viewEpoch += 1; FBM_SYNC_CLIENT.accountNotices = { identity: null, login: null }; FBM_SYNC_CLIENT.settingsNotices = { relay: null, extension: null, background: null, login: null };
   if (typeof fbmSyncRenderLoading === 'function') { fbmSyncRenderLoading(); }
   if (screen.hidden || typeof fbmSyncStatusOnce !== 'function') { return null; }
   return Promise.all([fbmSyncStatusOnce(true), fbmSyncLoadIdentityStatus(), fbmSyncLoadSettings()]).then(function (results) { return fbmSyncLoadLoginStatus().then(function () { return results[0]; }); });
@@ -120,6 +120,7 @@ function fbmSyncConfigureRelay() {
       if (!ready) { throw new Error('Chưa nhận được Extension để gửi cấu hình kết nối. Hãy tải lại Extension rồi mở lại Sidebar.'); }
       return fbmSyncConfigureRelay();
     }).catch(function (error) {
+      if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('relay', 'error', 'Không gửi được cấu hình kết nối tới Extension: ' + String(error && error.message || error)); }
       fbmSyncPaintError(error, 'Không gửi được cấu hình kết nối tới Extension.');
       return null;
     });
@@ -136,6 +137,7 @@ function fbmSyncConfigureRelay() {
       return config;
     });
   }).catch(function (error) {
+    if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('relay', 'error', 'Không gửi được cấu hình kết nối tới Extension: ' + String(error && error.message || error)); }
     fbmSyncPaintError(error, 'Không gửi được cấu hình kết nối tới Extension.');
     return null;
   }).finally(function () {
@@ -277,13 +279,6 @@ function fbmSyncPaintHeaderState(status) {
   var phaseNow = String(status.phase || ''), enabledNow = status.masterEnabled !== false && status.enabled !== false;
   var stateNow = !enabledNow ? '' : (['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(phaseNow) >= 0 ? 'running' : (['paused', 'conflict'].indexOf(phaseNow) >= 0 ? 'paused' : (phaseNow === 'error' ? 'error' : '')));
   fbmSyncSetTargetState('fbm-sync-module-menu', { removeClass: ['shin-sync-status-running', 'shin-sync-status-paused', 'shin-sync-status-error'], addClass: stateNow ? ['shin-sync-status-' + stateNow] : [], ariaLabel: '\u0110\u1ed3ng b\u1ed9 FBM' + (stateNow === 'running' ? ' — \u0111ang ch\u1ea1y' : stateNow === 'paused' ? ' — t\u1ea1m d\u1eebng' : stateNow === 'error' ? ' — c\u00f3 l\u1ed7i' : '') });
-  return;
-  ['running', 'paused', 'error'].forEach(function (name) { button.classList.remove('shin-sync-status-' + name); });
-  var phase = String(status.phase || '');
-  var enabled = status.masterEnabled !== false && status.enabled !== false;
-  var state = !enabled ? '' : (['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(phase) >= 0 ? 'running' : (['paused', 'conflict'].indexOf(phase) >= 0 ? 'paused' : (phase === 'error' ? 'error' : '')));
-  if (state) { button.classList.add('shin-sync-status-' + state); }
-  button.setAttribute('aria-label', 'Đồng bộ FBM' + (state === 'running' ? ' — đang chạy' : state === 'paused' ? ' — tạm dừng' : state === 'error' ? ' — có lỗi' : ''));
 }
 /** Vẽ tiến trình riêng của phiên, không dùng chung dải loading của Sidebar. */
 function fbmSyncProgressData(status, count) {
@@ -769,8 +764,9 @@ function fbmSyncSaveExtensionSettings(button) {
   return callServer('fbmSaveExtensionConfig', [{ pollMinutes: Number(input && input.value || 5), runOnStartup: fbmSyncToggleValue('fbm-sync-run-on-startup') }]).then(function (result) {
     if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không lưu được nhịp hỏi GAS.'); }
     FBM_SYNC_CLIENT.syncSettings = FBM_SYNC_CLIENT.syncSettings || {}; FBM_SYNC_CLIENT.syncSettings.extension = { pollMinutes: result.pollMinutes, runOnStartup: result.runOnStartup };
+    if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('extension', 'success', 'Đã lưu nhịp hỏi GAS của Extension.'); }
     return fbmSyncPaint(Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { message: 'Đã lưu nhịp hỏi GAS của Extension.' }));
-  }).catch(function (error) { fbmSyncPaintError(error, 'Không lưu được nhịp hỏi GAS của Extension.'); return null; }).finally(function () { if (button) { button.disabled = false; } });
+  }).catch(function (error) { if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('extension', 'error', 'Không lưu được nhịp hỏi GAS của Extension: ' + String(error && error.message || error)); } fbmSyncPaintError(error, 'Không lưu được nhịp hỏi GAS của Extension.'); return null; }).finally(function () { if (button) { button.disabled = false; } });
 }
 function fbmSyncSaveBackgroundSettings(button) {
   if (button) { button.disabled = true; }
@@ -779,8 +775,9 @@ function fbmSyncSaveBackgroundSettings(button) {
   return callServer('fbmSaveBackgroundSchedule', [schedule]).then(function (result) {
     if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không lưu được lịch đồng bộ nền.'); }
     FBM_SYNC_CLIENT.syncSettings = FBM_SYNC_CLIENT.syncSettings || {}; FBM_SYNC_CLIENT.syncSettings.background = result.schedule || schedule;
+    if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('background', 'success', 'Đã lưu lịch đồng bộ nền.'); }
     return fbmSyncPaint(Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { message: 'Đã lưu lịch đồng bộ nền.' }));
-  }).catch(function (error) { fbmSyncPaintError(error, 'Không lưu được lịch đồng bộ nền.'); return null; }).finally(function () { if (button) { button.disabled = false; } });
+  }).catch(function (error) { if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('background', 'error', 'Không lưu được lịch đồng bộ nền: ' + String(error && error.message || error)); } fbmSyncPaintError(error, 'Không lưu được lịch đồng bộ nền.'); return null; }).finally(function () { if (button) { button.disabled = false; } });
 }
 function fbmSyncSaveLoginPolicy(button) {
   if (button) { button.disabled = true; }
@@ -788,8 +785,9 @@ function fbmSyncSaveLoginPolicy(button) {
   return callServer('fbmSaveLoginPolicy', [{ enabled: fbmSyncToggleValue('fbm-sync-policy-auto-login'), autoOpenTab: fbmSyncToggleValue('fbm-sync-policy-auto-open'), retryEnabled: fbmSyncToggleValue('fbm-sync-policy-retry'), retryMinutes: Number(retry && retry.value || 30) }]).then(function (result) {
     if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không lưu được chính sách tự đăng nhập.'); }
     FBM_SYNC_CLIENT.loginStatus = result;
+    if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('login', 'success', 'Đã lưu chính sách tự đăng nhập.'); }
     return fbmSyncPaint(Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { message: 'Đã lưu chính sách tự đăng nhập.' }));
-  }).catch(function (error) { fbmSyncPaintError(error, 'Không lưu được chính sách tự đăng nhập.'); return null; }).finally(function () { if (button) { button.disabled = false; } });
+  }).catch(function (error) { if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('login', 'error', 'Không lưu được chính sách tự đăng nhập: ' + String(error && error.message || error)); } fbmSyncPaintError(error, 'Không lưu được chính sách tự đăng nhập.'); return null; }).finally(function () { if (button) { button.disabled = false; } });
 }
 function fbmSyncLoginCredentialsFromForm() {
   var username = document.getElementById('fbm-login-username'), password = document.getElementById('fbm-login-password');
@@ -869,11 +867,13 @@ function fbmSyncRotateRelay() {
   return callServer('fbmRotateRelayKey').then(function (config) {
     return fbmSyncPostRelayConfig(config, true).then(function () {
       FBM_SYNC_CLIENT.relayConfigured = true;
+      if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('relay', 'success', 'Đã đổi cấu hình kết nối và Extension đã xác nhận lưu khóa mới.'); }
       var status = FBM_SYNC_CLIENT.lastStatus || {};
       return fbmSyncPaint(Object.assign({}, status, { message: 'Đã đổi khóa relay và Extension đã xác nhận lưu khóa mới.' }));
     });
   }).catch(function (error) {
     var status = FBM_SYNC_CLIENT.lastStatus || {};
+    if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('relay', 'error', 'Không đổi được cấu hình kết nối: ' + String(error && error.message || error)); }
     fbmSyncPaint(Object.assign({}, status, { message: String(error && error.message || error), phase: 'error', label: 'Có lỗi' }));
     return null;
   });
