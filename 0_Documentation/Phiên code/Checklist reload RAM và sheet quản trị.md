@@ -212,38 +212,38 @@
 
 ### Theo dõi revision
 
-- [ ] Sidebar đăng ký listener event reload sau khi core nạp xong.
-- [ ] Sidebar kiểm tra ReloadState lúc mở lại.
-- [ ] Sidebar kiểm tra sau mỗi lời gọi máy chủ.
-- [ ] Sidebar kiểm tra khi lấy focus nếu kênh event vừa được phục hồi.
-- [ ] Không có timer polling ReloadState trong luồng bình thường.
-- [ ] Event reload không tạo vòng chồng khi request trước chưa xong.
-- [ ] Event lỗi không làm Sidebar treo; lần event sau hoặc điểm kiểm tra tự nhiên vẫn xử lý.
-- [ ] `lastSeenRevision` chỉ sống trong Sidebar, không ghi đè DocumentProperties.
+- [x] Sidebar đăng ký listener event reload trước khi nạp core để không bỏ event sớm, chỉ kích hoạt xử lý sau khi `SHEET_LINK_RAM_READY=true` (test `selectionPoll.js`).
+- [x] Sidebar kiểm tra ReloadState lúc mở lại qua gói `loadCore` (test `loadService.js`: mọi gói core mang `reload`).
+- [x] Sidebar kiểm tra sau mỗi lời gọi máy chủ qua `sheetLinkObserveReloadPayload` (không áp dụng đệ quy cho `getReloadState`/`reloadRecords`).
+- [x] Sidebar kiểm tra khi lấy focus/tab hiện lại qua các điểm đánh thức tự nhiên của `selectionPoll` (test `selectionPoll.js`).
+- [x] Không có timer polling ReloadState trong luồng bình thường; chỉ có debounce một lần sau edit và kiểm tra tại điểm tự nhiên (test `selectionPoll.js`).
+- [x] Event reload không tạo vòng chồng khi request trước chưa xong (guard `SHEET_LINK_DATA_PENDING`/`SHEET_LINK_RELOAD_CHECKING`, test `selectionPoll.js`).
+- [x] Event lỗi không làm Sidebar treo; lỗi chỉ cảnh báo và lần event/điểm kiểm tra sau vẫn chạy (handler `CRM_RELOAD`, test `selectionPoll.js`).
+- [x] `lastSeenRevision` chỉ sống trong Sidebar, không ghi đè DocumentProperties.
 
 ### Debounce sửa tay
 
-- [ ] `onEdit` đầu tiên không reload ngay nếu người dùng còn ở Customer/Activity.
-- [ ] Mỗi edit mới reset mốc chờ ba giây.
-- [ ] Hết ba giây từ edit cuối gọi một lượt reload.
-- [ ] Nhiều mã trong khoảng chờ được hợp nhất.
-- [ ] Request đang bay không bị gọi trùng.
-- [ ] Rời Customer/Activity trước ba giây gọi reload ngay.
-- [ ] Rời sheet khi không có dirty không gọi reload thừa.
-- [ ] Sửa cột không hợp lệ không khởi động debounce.
+- [x] `onEdit` đầu tiên không reload ngay nếu người dùng còn ở Customer/Activity; chỉ đặt timer khi context kết thúc edit.
+- [x] Mỗi edit mới reset mốc chờ ba giây (`sheetLinkScheduleDirtyCheck` hủy timer cũ trước khi đặt timer mới).
+- [x] Hết ba giây từ edit cuối gọi một lượt kiểm tra/reload.
+- [x] Nhiều mã trong khoảng chờ được hợp nhất ở `ReloadState`/`reloadRecords` trước khi đọc.
+- [x] Request đang bay không bị gọi trùng (`SHEET_LINK_DATA_PENDING` và `SHEET_LINK_RELOAD_CHECKING`).
+- [x] Rời Customer/Activity trước ba giây gọi reload ngay và hủy timer debounce còn lại.
+- [x] Rời sheet khi không có dirty không gọi reload dữ liệu thừa sau lượt kiểm tra (API trả `null`).
+- [ ] Sửa cột không hợp lệ không khởi động debounce (Extension không được tự phân loại cột; GAS sẽ trả scope rỗng, cần nghiệm thu/điểm giao tiếp riêng).
 
 ### Cập nhật RAM
 
-- [ ] Customer còn tồn tại được upsert bằng bản ghi máy chủ trả về.
-- [ ] Customer biến mất được remove.
-- [ ] Activity còn tồn tại được upsert.
-- [ ] Activity biến mất được remove.
-- [ ] Activity của Customer bị ảnh hưởng được tính lại danh sách.
-- [ ] Search index được cập nhật sau upsert/remove.
-- [ ] Màn hiện tại được vẽ lại sau reload.
-- [ ] Full core dựng lại Schema, Category, Config và search index từ đầu.
-- [ ] Reload Category cập nhật danh mục SELECT đang dùng.
-- [ ] Config đổi làm client dùng cấu hình mới, không giữ bản cũ.
+- [x] Customer còn tồn tại được upsert bằng bản ghi máy chủ trả về (test `refresh.js`).
+- [x] Customer biến mất được remove (test `refresh.js`).
+- [x] Activity còn tồn tại được upsert (test `refresh.js`).
+- [x] Activity biến mất được remove (test `refresh.js`).
+- [x] Activity của Customer bị ảnh hưởng được tính lại danh sách (server trả trọn Activity của Customer, test `loadService.js`).
+- [x] Search index được cập nhật sau upsert/remove (đường `Store.upsertRecord`/`removeRecord`, test `refresh.js` và `ramStore.js`).
+- [x] Màn hiện tại được vẽ lại sau reload (test `refresh.js`).
+- [x] Full core dựng lại Schema, Category, Config và search index từ đầu (đường `refreshFullCore`, test bootstrap/load).
+- [x] Reload Category cập nhật danh mục SELECT đang dùng (test `refresh.js`).
+- [x] Config đổi làm client dùng cấu hình mới, không giữ bản cũ (Config luôn chuyển `fullCore`, test `loadService.js`).
 
 ### Kiểm thử offline R5
 
