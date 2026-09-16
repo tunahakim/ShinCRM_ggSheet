@@ -100,7 +100,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Tách màn hình trạng thái, thiết lập đăng nhập và audit thành các tệp giao diện riêng trong `client/sync/`, tái sử dụng block chuẩn.
 - [x] Lấy authorized Customer rồi Activity; thiếu token thì dừng trước CRUD.
 - [x] Kiểm owner mặc định FBM khớp tên đầy đủ trong binding đã xác nhận; sai thì dừng chiều push.
-- [x] Xác nhận Config chỉ giữ `FBM_MA_KH_PREFIX`, `FBM_MA_KH_LENGTH`, `FBM_ACTIVITY_SINCE`; tên tài khoản không được nhân bản vào Config.
+- [x] Xác nhận tham số đồng bộ cấp hệ thống không còn nằm trong Config; `FBM_SYNC_SETTINGS_V1` chỉ giữ `approvalThreshold`, tên tài khoản không được nhân bản vào Config.
 
 ### Danh mục
 
@@ -133,7 +133,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Pull giữ `note`, `verifyStatus`, `allowFbmPush` và trường chỉ thuộc ShinCRM.
 - [x] Bản ghi mới đặt đúng mã nội bộ, ngày tạo, `active`, khóa cha và quyền push.
 - [x] Sau pull đánh dấu dirty đúng mã để Sidebar nạp lại.
-- [x] `FBM_ACTIVITY_SINCE` loại lịch sử cũ mà không làm sai baseline hoặc missing.
+- [x] Không còn lọc Activity theo `FBM_ACTIVITY_SINCE`; mọi Activity hợp lệ đi qua cùng pipeline baseline/missing.
 
 ### Đối soát Customer
 

@@ -10,7 +10,7 @@ async function chay(so) {
     issues: []
   }) });
   napServer(hop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/report/Preflight.js');
-  hop.FbmSync.scriptSettings = () => ({ accountName: '', customerPrefix: '', customerCodeLength: '' });
+  hop.FbmSync.scriptSettings = () => ({ accountName: '' });
   hop.FbmSync.readCategoryGate = () => ({ valid: {} });
   hop.FbmSync.currentSpreadsheetId = () => 'sheet-a';
   hop.FbmSync.configValue = () => '';
@@ -41,7 +41,7 @@ async function chay(so) {
 
   hop.FbmSync.pushOwnerError = (candidate, settings) => candidate.entity === 'activity' && candidate.record.owner && candidate.record.owner !== settings.accountName
     ? 'Activity ' + candidate.id + ' thuộc owner FBM khác.' : '';
-  hop.FbmSync.scriptSettings = () => ({ accountName: 'Owner đúng', customerPrefix: '', customerCodeLength: '' });
+  hop.FbmSync.scriptSettings = () => ({ accountName: 'Owner đúng' });
   const owner = hop.FbmSync.runPreflight({ mode: 'write' });
   check(so, 'preflight chặn toàn bộ ứng viên Activity lệch owner trước khi cấp request', [owner.ok, owner.blocking.some((item) => item.code === 'FBM_ACTIVITY_OWNER_MISMATCH')], [false, true]);
 }

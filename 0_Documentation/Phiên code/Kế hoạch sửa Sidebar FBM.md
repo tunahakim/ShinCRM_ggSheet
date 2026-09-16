@@ -19,7 +19,7 @@
 - Pipeline có fallback suy diễn bước từ `phase`. Khi một snapshot không được phân biệt chặt với phiên thực sự, fallback có thể vẽ nội dung trông như pipeline đã chạy. Progress cũng nhận giá trị không đủ nghĩa ở trạng thái rỗi nên tạo fill màu không có ý nghĩa.
 - Các input vận hành Sync có lúc dùng cấu trúc/render riêng thay vì `StandaloneField`; select loại đồng bộ không dùng cùng controller `PopupList` với popup chuẩn.
 - Scheduler hiện chỉ có `heartbeat`, `customer`, `activity`; lịch luôn khởi động mode `read`, chưa có chiều cấu hình, quét chi tiết, giới hạn Customer/lượt, hoặc delay giữa request.
-- `FBM_SYNC_APPROVAL_THRESHOLD` còn ở catalog Config. `FBM_MA_KH_PREFIX`, `FBM_MA_KH_LENGTH` và `FBM_ACTIVITY_SINCE` đang được code đọc thật: hai tham số mã khách chặn tạo Customer mới trên FBM khi thiếu; mốc Activity giới hạn lịch sử Activity module quan tâm. Không được xóa chúng như dữ liệu vô dụng.
+- `FBM_SYNC_APPROVAL_THRESHOLD` đã được đưa vào kho `FBM_SYNC_SETTINGS_V1`; ba trường `FBM_MA_KH_PREFIX`, `FBM_MA_KH_LENGTH`, `FBM_ACTIVITY_SINCE` là tham số cũ bị chủ dự án xác nhận vô dụng/sai nghiệp vụ và phải loại bỏ hoàn toàn khỏi runtime, UI, test và tài liệu quyết định mới.
 
 ## 3. Quyết định đã chốt với chủ dự án
 
@@ -63,13 +63,10 @@
 | Quét chi tiết Customer và Activity của Customer | Tắt | 1 giờ |
 
 - Tiến trình quét chi tiết có thêm `Số lượng Customer quét mỗi lần` mặc định `50` và `Delay tối thiểu/tối đa (giây)` mặc định `0,5` / `2`.
-- Card `Tham số phiên` là form lưu được, không còn chỉ đọc. Nội dung hiển thị và mô tả rõ:
+- Card `Bật tắt module đồng bộ FBM` chứa công tắc tổng và `Ngưỡng yêu cầu chấp thuận`; ngưỡng được lưu trong `DocumentProperties`, không còn Card `Tham số phiên` riêng.
 
 | Tham số | Ý nghĩa và hành vi |
 | --- | --- |
-| Tiền tố mã khách | Phần đầu mã Customer tạo mới trên FBM từ ShinCRM; thiếu thì không tạo Customer mới trên FBM. |
-| Độ dài mã khách | Độ dài mã Customer FBM khi tạo mới; thiếu thì không tạo Customer mới trên FBM. |
-| Mốc Activity | Ngày sớm nhất module đưa vào các lượt quét Activity; nới về trước chỉ làm tăng khối lượng quét. |
 | Ngưỡng yêu cầu chấp thuận | Số bản ghi ghi lên FBM từ mức này trở lên phải chờ duyệt trước request ghi đầu tiên. `0` nghĩa mọi lượt ghi đều cần duyệt. |
 
 ### 3.5. Lịch nền, cổng ghi và `waitMs`
@@ -85,9 +82,9 @@
 
 ### 4.1. Lưu tham số phiên và migration Config
 
-- Tạo kho `FBM_SYNC_SETTINGS_V1` trong `DocumentProperties`, chứa `{ customerPrefix, customerCodeLength, activitySince, approvalThreshold }` đã chuẩn hóa.
-- Khi kho chưa tồn tại, GAS chỉ một lần đọc các key Config cũ, kiểm hợp lệ, ghi record mới và dùng record đó. Nếu Config cũ thiếu, dùng ngầm định hiện có: `approvalThreshold: 10`, ba tham số còn lại rỗng. Sau khi kho đã tồn tại, tuyệt đối không đọc lại Config cho bốn key này.
-- Xóa `FBM_SYNC_APPROVAL_THRESHOLD` khỏi catalog Config; thay mọi call `FbmSync.configValue` cho bốn key FBM bằng reader mới. Những check/Preflight hiện có tiếp tục dùng cùng ý nghĩa: tiền tố/độ dài trống cảnh báo và chặn riêng đường tạo Customer FBM mới; mốc Activity trống dùng phạm vi đọc hiện hành có cảnh báo.
+- Tạo kho `FBM_SYNC_SETTINGS_V1` trong `DocumentProperties`, chỉ chứa `{ approvalThreshold }` đã chuẩn hóa.
+- Khi kho chưa tồn tại, GAS chỉ một lần đọc `FBM_SYNC_APPROVAL_THRESHOLD` cũ, ghi record mới và dùng record đó. Sau khi kho đã tồn tại, tuyệt đối không đọc lại Config; nếu kho cũ còn các key đã bị loại bỏ thì đọc vào sẽ ghi lại JSON tối giản.
+- Xóa các key `FBM_MA_KH_PREFIX`, `FBM_MA_KH_LENGTH`, `FBM_ACTIVITY_SINCE` khỏi catalog/runtime; không còn check, Preflight, lọc Activity hay chặn tạo Customer dựa trên chúng.
 - Thêm `FbmSync.syncSettingsRead()` và `FbmSync.syncSettingsSave(input)`; server entrypoint công khai là `fbmGetSyncSettings()` và `fbmSaveSyncSettings(settings)`. GAS kiểm số nguyên không âm cho ngưỡng, số nguyên dương/hoặc rỗng cho độ dài, ngày hợp lệ/hoặc rỗng cho mốc Activity, rồi trả DTO đã lưu để Sidebar vá lại.
 
 ### 4.2. Shape cấu hình lịch nền
