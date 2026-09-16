@@ -19,7 +19,6 @@ const RUNTIME_WRITERS = {
   'server/gate/IdGate.js': 'record/id-helper',
   'server/gate/WriteGate.js': 'record/write',
   'server/log/LogGate.js': 'infrastructure/log',
-  'server/sheet/SheetColumnWriter.js': 'helper/column-writer',
   'server/sheet/SheetGrid.js': 'helper/grid',
   'server/sheet/SetupSheets.js': 'infrastructure/setup',
   'server/view/ViewSheetRenderer.js': 'view/renderer',
@@ -29,12 +28,26 @@ const RUNTIME_WRITERS = {
 
 const MUTATOR_NAMES = [
   'setValue', 'setValues', 'clear', 'clearContent', 'clearDataValidations',
-  'clearFormat', 'clearNote', 'setNote', 'setFormula', 'setFormulas',
-  'setNumberFormat', 'setDataValidation', 'setFontWeight', 'setBackground',
-  'setFrozenRows', 'setHorizontalAlignment', 'setVerticalAlignment',
+  'clearContents', 'clearFormats', 'clearNotes', 'clearFormat', 'clearNote',
+  'setNote', 'setNotes', 'setFormula', 'setFormulas', 'setFormulaR1C1', 'setFormulasR1C1',
+  'setNumberFormat', 'setNumberFormats', 'setDataValidation', 'setDataValidations',
+  'setRichTextValue', 'setRichTextValues', 'setFontWeight', 'setFontWeights',
+  'setFontColor', 'setFontColors', 'setFontFamily', 'setFontFamilies',
+  'setFontLine', 'setFontLines', 'setFontSize', 'setFontSizes',
+  'setFontStyle', 'setFontStyles', 'setBackground', 'setBackgrounds',
+  'setBorder', 'setHorizontalAlignment', 'setHorizontalAlignments',
+  'setVerticalAlignment', 'setVerticalAlignments', 'setTextDirection', 'setTextDirections',
+  'setTextRotation', 'setTextRotations', 'setWrap', 'setWraps',
+  'setWrapStrategy', 'setWrapStrategies', 'setShowHyperlink', 'setShowHyperlinks',
+  'setFrozenRows', 'setFrozenColumns', 'setHiddenGridlines', 'setTabColor',
+  'setRowHeight', 'setRowHeights', 'setColumnWidth', 'setColumnWidths',
+  'autoResizeColumn', 'autoResizeColumns', 'insertCheckboxes', 'removeCheckboxes',
+  'setConditionalFormatRules', 'setName', 'setActiveSheet', 'setActiveRange',
+  'setActiveSelection', 'copyTo',
   'insertSheet', 'deleteSheet', 'insertRows', 'insertRowsAfter',
   'insertRowsBefore', 'deleteRows', 'insertColumns', 'insertColumnsAfter',
-  'insertColumnsBefore', 'deleteColumn', 'deleteColumns', 'appendRow'
+  'insertColumnsBefore', 'deleteColumn', 'deleteColumns', 'moveRows', 'moveColumns',
+  'appendRow', 'hideSheet', 'showSheet'
 ];
 
 const MUTATOR_RE = new RegExp('\\.(' + MUTATOR_NAMES.join('|') + ')\\s*\\(', 'g');
@@ -121,7 +134,14 @@ function chay(so) {
   requiredCommit.forEach((file) => {
     const source = fs.readFileSync(path.join(GAS_DIR, file), 'utf8');
     check(so, file + ' gọi hậu xử lý WriteCommit', source.indexOf('writeCommitAfterSuccess') >= 0, true);
+    check(so, file + ' chặn ghi khi thiếu hậu xử lý reload', source.indexOf('writeCommitAssertAvailable') >= 0, true);
   });
+
+  check(so, 'không còn file SheetColumnWriter mồ côi', fs.existsSync(path.join(GAS_DIR, 'server/sheet/SheetColumnWriter.js')), false);
+  check(so, 'không còn caller runtime của SheetColumnWriter', files.filter((file) => {
+    if (file.startsWith('server/dev/')) { return false; }
+    return fs.readFileSync(path.join(GAS_DIR, file), 'utf8').indexOf('sheetWriteColumns') >= 0;
+  }), []);
 
   const noDirectReload = ['server/gate/WriteGate.js', 'server/gate/DeleteGate.js', 'server/config/ConfigSheetSetup.js', 'fbm_sync/SyncSchema.js'];
   noDirectReload.forEach((file) => {
@@ -132,6 +152,9 @@ function chay(so) {
       /renderAllManagedViewsIfAllowed\s*\(/.test(source)
     ], [false, false, false]);
   });
+
+  const pullSource = stripNonCode(fs.readFileSync(path.join(GAS_DIR, 'fbm_sync/reconcile/Pull.js'), 'utf8'));
+  check(so, 'Pull không tự đánh dấu dirty sau khi WriteGate đã commit', /dirtyStateMark(?:Records|Decision|Signal)\s*\(/.test(pullSource), false);
 }
 
 module.exports = { chay };

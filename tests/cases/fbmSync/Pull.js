@@ -178,13 +178,13 @@ async function chay(so) {
   builders.writeGateSave = (request) => { baselineWrite = request; return { ok: true }; };
   const baselineResult = builders.FbmSync.recalculateBaseline('customer');
   check(so, 'tinh lai baseline chi ghi cot sync noi bo', [baselineResult.ok, baselineResult.written, baselineWrite.records[0].fbmHash !== '', baselineWrite.source], [true, 1, true, 'pull']);
-  let newPullWrite, newPullCalls = 0, dirtyIds = [];
+  let newPullWrite, newPullCalls = 0, dirtyMarkCalls = 0;
   builders.FbmSync.stateRead = () => ({ metadata: { categoryGate: gate } });
   builders.FbmSync.readLocal = () => [];
-  builders.dirtyStateMarkRecords = (ids) => { dirtyIds = ids; };
+  builders.dirtyStateMarkRecords = () => { dirtyMarkCalls += 1; };
   builders.writeGateSave = (request) => { newPullCalls += 1; newPullWrite = request; return { ok: true, fields: ['id'], rows: [['CUS-NEW']] }; };
   const newPullResult = builders.FbmSync.pullWrite('customer', [builders.FbmSync.customerRecord({ stt_rec_kh: 'NEW-C', ma_kh: 'ALT00012', ten_kh: 'Khách mới', ma_so_thue: '001' }, gate)]);
-  check(so, 'Customer pull moi ghi ca dinh danh baseline dirty marker va quyen day', [newPullResult.written, newPullWrite.source, newPullWrite.schemas.length, newPullWrite.records[0].fbmId, newPullWrite.records[0].fbmHash !== '', dirtyIds[0], newPullWrite.records[0].parentCompanyName, newPullWrite.records[0].allowFbmPush], [1, 'pull', 2, 'NEW-C', true, 'CUS-NEW', '', builders.FbmSync.PUSH_ALLOW_VALUE]);
+  check(so, 'Customer pull mới ghi cả định danh baseline và quyền đẩy qua cửa ghi', [newPullResult.written, newPullWrite.source, newPullWrite.schemas.length, newPullWrite.records[0].fbmId, newPullWrite.records[0].fbmHash !== '', newPullWrite.records[0].parentCompanyName, newPullWrite.records[0].allowFbmPush, dirtyMarkCalls], [1, 'pull', 2, 'NEW-C', true, '', builders.FbmSync.PUSH_ALLOW_VALUE, 0]);
   check(so, 'Pull gộp nội dung và trạng thái vào một lượt cửa ghi', newPullCalls, 1);
   const pullLogs = [];
   builders.logEvent = (event) => pullLogs.push(event);

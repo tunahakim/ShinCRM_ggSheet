@@ -161,6 +161,20 @@ function chay(so) {
     revision.hop.dirtyStateClearRecords(['KH0001'], 7).records,
     []);
 
+  check(so, 'clear view/allViews sai revision không được xóa signal mới',
+    (function () {
+      const hop = dungHop({ sheets: ['Config', 'Log'], props: { reloadRevision: '7', dirtyViewSheets: '["!Lead"]', dirtyAllViews: 'true' } }).hop;
+      return hop.dirtyStateClear({ viewSheets: true, allViews: true, expectedRevision: 6 });
+    }()),
+    { viewSheets: ['!Lead'], records: [], config: false, all: false });
+
+  check(so, 'clear view/allViews đúng revision mới xóa được signal',
+    (function () {
+      const hop = dungHop({ sheets: ['Config', 'Log'], props: { reloadRevision: '7', dirtyViewSheets: '["!Lead"]', dirtyAllViews: 'true' } }).hop;
+      return hop.dirtyStateClear({ viewSheets: true, allViews: true, expectedRevision: 7 });
+    }()),
+    { viewSheets: [], records: [], config: false, all: false });
+
   return so;
 }
 

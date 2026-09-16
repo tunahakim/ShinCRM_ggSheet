@@ -35,8 +35,13 @@ function syncColumnsForSheet(sheetName) {
 
 /** Tự bổ sung cột sync còn thiếu; không đụng dữ liệu hoặc thứ tự cột lõi. */
 function fbmEnsureSyncColumns(source) {
+  if (typeof writeCommitAssertAvailable !== 'function') {
+    throw new Error('Thiếu WriteCommit; không ghi schema để tránh mất signal reload.');
+  }
+  writeCommitAssertAvailable();
   var book = shinOpenBook(), report = [], changed = false;
   var lock = null;
+  var commit = null;
   if (typeof LockService !== 'undefined' && LockService.getDocumentLock) {
     lock = LockService.getDocumentLock();
     if (!lock.tryLock(SETTINGS.LOCK_WAIT_MS)) { throw new Error('Hệ thống bận. Vui lòng thử lại!'); }
@@ -59,21 +64,20 @@ function fbmEnsureSyncColumns(source) {
       report.push(sheetName + ': thêm ' + missing.length + ' cột sync');
     });
     if (typeof SpreadsheetApp !== 'undefined' && SpreadsheetApp.flush) { SpreadsheetApp.flush(); }
+    if (changed) {
+      commit = writeCommitAfterSuccess({
+        source: source === 'background' ? 'background' : (source || 'pull'),
+        surface: 'schema',
+        schema: true,
+        viewSheetNames: typeof shinViewSheetNames === 'function' ? shinViewSheetNames(book) : [],
+        render: false
+      });
+    }
   } finally {
     if (lock) { lock.releaseLock(); }
   }
 
-  var reload = null;
-  var commit = null;
-  if (changed && typeof writeCommitAfterSuccess === 'function') {
-    commit = writeCommitAfterSuccess({
-      source: source === 'background' ? 'background' : (source || 'pull'),
-      surface: 'schema',
-      schema: true,
-      viewSheetNames: typeof shinViewSheetNames === 'function' ? shinViewSheetNames(book) : []
-    });
-    reload = commit.reloadDecision;
-    if (reload && commit.viewRender) { reload.viewRender = commit.viewRender; }
-  }
-  return { ok: true, changed: changed, report: report, reload: reload, viewRender: commit && commit.viewRender, dirty: commit && commit.dirty };
+  var reload = commit && commit.reloadDecision;
+  var viewRender = commit ? writeCommitRender(commit) : null;
+  return { ok: true, changed: changed, report: report, reload: reload, viewRender: viewRender, dirty: commit && commit.dirty };
 }

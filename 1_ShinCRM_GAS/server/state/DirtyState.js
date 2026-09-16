@@ -225,7 +225,11 @@ function dirtyStateMarkAll() {
 function dirtyStateClear(options) {
   var props = PropertiesService.getDocumentProperties();
   var opts = options || {};
-  if (!Object.keys(opts).length) {
+  if (opts.expectedRevision !== undefined && reloadStateRead().revision !== Number(opts.expectedRevision)) {
+    return dirtyStateRead();
+  }
+  var clearOptions = Object.keys(opts).filter(function (key) { return key !== 'expectedRevision'; });
+  if (!clearOptions.length) {
     [DIRTY_KEYS.viewSheets, DIRTY_KEYS.records, DIRTY_KEYS.category, DIRTY_KEYS.config, DIRTY_KEYS.schema, DIRTY_KEYS.allCore, DIRTY_KEYS.allViews, DIRTY_KEYS.all].forEach(function (key) { props.deleteProperty(key); });
   } else {
     if (opts.viewSheets) { props.deleteProperty(DIRTY_KEYS.viewSheets); }
@@ -239,8 +243,9 @@ function dirtyStateClear(options) {
   return dirtyStateRead();
 }
 
-function dirtyStateClearViewSheet(sheetName) {
+function dirtyStateClearViewSheet(sheetName, expectedRevision) {
   var target = String(sheetName === null || sheetName === undefined ? '' : sheetName).trim();
+  if (expectedRevision !== undefined && reloadStateRead().revision !== Number(expectedRevision)) { return dirtyStateRead(); }
   var props = PropertiesService.getDocumentProperties();
   var remaining = dirtyStateRead().viewSheets.filter(function (name) { return name !== target; });
   dirtyStateWriteList(props, DIRTY_KEYS.viewSheets, remaining);

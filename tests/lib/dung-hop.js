@@ -43,7 +43,6 @@ const TEP_NEN = [
   'server/gate/IdGate.js',
   'server/gate/WriteCommit.js',
   'server/gate/WriteGate.js',
-  'server/sheet/SheetColumnWriter.js',
   'server/gate/DeleteGate.js',
   'server/service/SelectionService.js',
   'server/service/LoadService.js',

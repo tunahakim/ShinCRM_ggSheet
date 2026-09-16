@@ -212,14 +212,6 @@ FbmSync.pullWrite = function (entity, records) {
       if (state.cursor && state.cursor.kind === 'activity_bulk_grid') { FbmSync.seenStoreMark('activity_bulk', savedRecords, sourceRecords); }
     }
     if (saved.ok && pendingClears.length && typeof FbmSync.pendingPushClear === 'function') { pendingClears.forEach(function (item) { FbmSync.pendingPushClear(item.entity, item.id); }); }
-    if (saved.ok && typeof dirtyStateMarkRecords === 'function') {
-      var ids = allWrites.map(function (record) { return record.id; }).filter(function (id) { return id !== undefined && id !== null && String(id).trim(); });
-      if (saved.rows && saved.fields && saved.fields.indexOf('id') >= 0) {
-        var idAt = saved.fields.indexOf('id');
-        saved.rows.forEach(function (row) { if (row[idAt] !== undefined && row[idAt] !== null && String(row[idAt]).trim()) { ids.push(row[idAt]); } });
-      }
-      dirtyStateMarkRecords(ids);
-    }
   }
   if (typeof FbmSync.stateWrite === 'function') { FbmSync.stateWrite(state); }
   return result;

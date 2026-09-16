@@ -56,9 +56,9 @@
 - [ ] Danh sách vượt ngưỡng chuyển sang `allCore`, xóa danh sách mã và không phình thuộc tính.
 - [ ] Đọc thuộc tính hỏng trả về trạng thái an toàn, không làm sập phản hồi Sidebar.
 - [ ] Lượt reload ghi nhớ revision bắt đầu.
-- [ ] Nếu revision đổi trong lúc reload, lượt cũ không xóa cờ của lượt mới.
-- [ ] Xóa cờ chỉ xảy ra sau khi đọc/vẽ thành công.
-- [ ] Lỗi ghi không xóa dirty state cũ.
+- [x] Nếu revision đổi trong lúc reload, lượt cũ không xóa cờ của lượt mới (test `dirtyState.js`, revision-guard renderer).
+- [x] Xóa cờ chỉ xảy ra sau khi đọc/vẽ thành công (renderer giữ cờ khi lỗi).
+- [x] Lỗi ghi không xóa dirty state cũ (test `reloadGates.js`).
 - [ ] Có hàm nghiệm thu in revision, changedAt và từng scope.
 
 ### Kiểm thử offline R1
@@ -71,7 +71,7 @@
 - [ ] Đánh dấu Schema luôn bật full core và allViews.
 - [ ] Đọc ReloadState không xóa dữ liệu thuộc tính.
 - [ ] Hai hộp cát đọc cùng một revision không làm hộp thứ hai mất tín hiệu.
-- [ ] Revision mới phát sinh trong lúc clear không bị xóa.
+- [x] Revision mới phát sinh trong lúc clear không bị xóa (test `dirtyState.js`).
 
 ## Slice R2 — GAS phân loại onEdit
 
@@ -117,56 +117,58 @@
 
 ### `writeGateSave`
 
-- [ ] Sau `flush` và đọc lại thành công, phát signal cho mọi id trong batch.
-- [ ] Signal chạy cho `source: user`.
-- [ ] Signal chạy cho `source: pull`.
+- [x] Sau `flush` và đọc lại thành công, phát signal cho mọi id trong batch; signal được ghi trong document lock và renderer chạy sau khi nhả khóa.
+- [x] Signal chạy cho `source: user`.
+- [x] Signal chạy cho `source: pull`.
 - [x] Signal chạy cho `source: push`; các call site trong `PushFlow` không còn gắn nhãn `pull`.
 - [x] Signal chạy cho `source: background` không có Sidebar (test cửa ghi offline).
-- [ ] Batch Customer mới phát tín hiệu bằng mã vừa cấp.
-- [ ] Batch Activity mới phát tín hiệu bằng mã vừa cấp.
-- [ ] Batch chỉ ghi baseline phát tín hiệu.
-- [ ] Batch chỉ ghi sync status phát tín hiệu.
-- [ ] Batch chỉ ghi conflict/missing/retry/error phát tín hiệu.
-- [ ] Batch lỗi validation không phát tín hiệu thành công.
+- [x] Batch Customer mới phát tín hiệu bằng mã vừa cấp.
+- [x] Batch Activity mới phát tín hiệu bằng mã vừa cấp.
+- [x] Batch chỉ ghi baseline phát tín hiệu.
+- [x] Batch chỉ ghi sync status phát tín hiệu.
+- [x] Batch chỉ ghi conflict/missing/retry/error phát tín hiệu.
+- [x] Batch lỗi validation không phát tín hiệu thành công (test `reloadGates.js`).
 - [ ] Lỗi hạ tầng không xóa signal cũ.
-- [ ] Batch cấp mã làm đổi Config không để Config trong RAM giữ counter cũ mà không có đường xử lý.
+- [x] Batch cấp mã làm đổi Config phát `config + allCore + allViews`, RAM dùng `fullCore` và không giữ counter cũ (test `reloadGates.js`).
 - [x] `fbmEnsureSyncColumns` ghi thêm mã cột bằng GAS phải khóa, flush và phát `schema` + `allCore` + `allViews`, kể cả khi Sidebar đóng.
 
 ### Cửa xóa và đường ghi đặc biệt
 
-- [ ] Xóa mềm phát signal cho mã bị đổi trạng thái.
-- [ ] Xóa hẳn phát signal cho mã đã biến mất để client xóa khỏi Store.
-- [ ] Không có đường `setValue` Customer/Activity ngoài cổng ghi hoặc cửa xóa đã phát signal.
-- [ ] Pull dùng signal chung, không tự thao tác JSON dirty riêng.
+- [x] Xóa mềm phát signal cho mã bị đổi trạng thái.
+- [x] Xóa hẳn phát signal cho mã đã biến mất để client xóa khỏi Store.
+- [x] Không có đường mutator Customer/Activity ngoài cổng ghi hoặc cửa xóa đã phát signal (audit tĩnh quét cả ghi giá trị/công thức/ghi chú/định dạng và thao tác cấu trúc).
+- [x] Pull dùng signal chung, không tự thao tác JSON dirty riêng (đã bỏ đánh dấu lặp sau `writeGateSave`).
 - [x] Push dùng signal chung, không bỏ qua vì chỉ đổi trạng thái.
 - [x] Background dùng signal chung dù Sidebar đóng.
 
 ### Kiểm kê mọi đường ghi xuống Sheet
 
-- [ ] Đối chiếu toàn bộ lệnh ghi `setValue`, `setValues`, `clearContent`, `deleteRows`, `insertRows`, `insertColumns`, `deleteColumn`, `insertSheet` và `deleteSheet` trong `1_ShinCRM_GAS` với bảng phân loại ở Tài liệu 06 Phần 8.
-- [ ] Xác nhận `WriteGate.js` và `DeleteGate.js` là hai cửa public duy nhất cho dữ liệu bản ghi `Customer` và `Activity`.
-- [ ] Xác nhận `IdGate.js` chỉ được gọi từ `WriteGate` trong cùng document lock; không có entry point runtime độc lập cấp mã hoặc ghi bộ đếm.
-- [ ] Xác nhận mọi hậu xử lý sau ghi bản ghi, xóa, Config và schema đều đi qua `WriteCommit.js`; không còn đoạn lặp trực tiếp `ReloadDecision` → `DirtyState` → renderer ở cửa khác.
-- [ ] Xác nhận `ConfigSheetSetup.js` có ranh giới riêng cho setup/migration và đường runtime reset Config; đường runtime phát signal Config sau flush thành công.
-- [ ] Xác nhận `fbm_sync/SyncSchema.js` là cửa schema riêng, không bị nhầm là cửa ghi bản ghi; thêm cột sync phát `schema + allCore + allViews`.
-- [ ] Xác nhận `ViewSheetRenderer.js` là writer đầu ra có kiểm soát; chỉ xóa cờ view sau khi ghi và flush thành công, không tạo dirty bản ghi nguồn.
-- [ ] Xác nhận `ViewSheetSetup.js` và `SetupSheets.js` chỉ phục vụ cấu trúc/khởi tạo, không được gọi để ghi dữ liệu nghiệp vụ trong runtime.
-- [ ] Xác nhận `SheetColumnWriter.js` chỉ là helper tầng thấp; không có caller runtime nào gọi nó ngoài cửa đã giữ khóa và kiểm tra.
-- [ ] Xác nhận `LogGate.js` là cửa hạ tầng độc lập; ghi `Log` không làm tăng revision dữ liệu nghiệp vụ và không gọi vòng lại `WriteCommit`.
-- [ ] Xác nhận `SheetIo.js` chỉ đọc; `SheetIoProbe.js` và toàn bộ `server/dev/*` chỉ chứa probe/DEV, có allowlist rõ và không được coi là đường runtime production.
-- [ ] Thêm kiểm thử tĩnh quét writer runtime, báo đỏ khi xuất hiện thao tác ghi ngoài allowlist hoặc thêm file writer chưa được phân loại.
-- [ ] Ghi kết quả audit (danh sách file, hàm, sheet bị chạm và lý do ngoại lệ) vào commit cùng nhóm thay đổi.
+- [x] Đối chiếu toàn bộ lệnh ghi trong `1_ShinCRM_GAS` với bảng phân loại ở Tài liệu 06 Phần 8 (test tĩnh `writeGateAudit.js`).
+- [x] Xác nhận `WriteGate.js` và `DeleteGate.js` là hai cửa public duy nhất cho dữ liệu bản ghi `Customer` và `Activity`.
+- [x] Xác nhận `IdGate.js` chỉ được gọi từ `WriteGate` trong cùng document lock; không có entry point runtime độc lập cấp mã hoặc ghi bộ đếm.
+- [x] Xác nhận mọi hậu xử lý sau ghi bản ghi, xóa, Config và schema đều đi qua `WriteCommit.js` (test tĩnh + commit `c01b277`).
+- [x] Xác nhận `ConfigSheetSetup.js` có ranh giới riêng cho setup/migration và đường runtime reset Config; đường runtime phát signal Config sau flush thành công.
+- [x] Xác nhận `fbm_sync/SyncSchema.js` là cửa schema riêng, không bị nhầm là cửa ghi bản ghi; thêm cột sync phát `schema + allCore + allViews`.
+- [x] Xác nhận `ViewSheetRenderer.js` là writer đầu ra có kiểm soát; chỉ xóa cờ view sau khi ghi và flush thành công, không tạo dirty bản ghi nguồn.
+- [x] Xác nhận `ViewSheetSetup.js` và `SetupSheets.js` chỉ phục vụ cấu trúc/khởi tạo, không được gọi để ghi dữ liệu nghiệp vụ trong runtime.
+- [x] Xác nhận `LogGate.js` là cửa hạ tầng độc lập; ghi `Log` không làm tăng revision dữ liệu nghiệp vụ và không gọi vòng lại `WriteCommit`.
+- [x] Xác nhận `SheetIo.js` chỉ đọc; `SheetIoProbe.js` và toàn bộ `server/dev/*` chỉ chứa probe/DEV, có allowlist rõ và không được coi là đường runtime production.
+- [x] Thêm kiểm thử tĩnh quét writer runtime, báo đỏ khi xuất hiện thao tác ghi ngoài allowlist hoặc thêm file writer chưa được phân loại.
+- [x] Allowlist không còn bỏ sót biến thể mutator phổ biến (`setValues`, `clearContents`, `setNotes`, định dạng, nới/co lưới, tạo/xóa sheet); thêm writer hoặc biến thể mới phải làm bộ kiểm đỏ cho tới khi được phân loại.
+- [x] Các cửa ghi nguồn, Config và schema fail-fast trước khi ghi nếu thiếu `WriteCommit`/`ReloadDecision`/`DirtyState`; không chấp nhận ghi thành công nhưng không phát signal.
+- [x] Xác nhận `SheetColumnWriter.js` không còn tồn tại và không còn caller runtime; đây là helper mồ côi của CategorySync cũ, không phải một cửa cần gom vào `WriteGate`.
+- [x] Ghi kết quả audit (danh sách file, hàm, sheet bị chạm và lý do ngoại lệ) vào commit `a3dd857`.
 
 ### Kiểm thử offline R3
 
-- [ ] Save user cập nhật dirty records và allViews.
-- [ ] Delete soft cập nhật dirty records và allViews.
-- [ ] Delete hard cập nhật dirty records và allViews.
-- [ ] Pull nội dung cập nhật dirty records.
-- [ ] Push success cập nhật dirty records.
+- [x] Save user cập nhật dirty records và allViews (test `reloadGates.js`).
+- [x] Delete soft cập nhật dirty records và allViews (test `reloadGates.js`).
+- [x] Delete hard cập nhật dirty records và allViews (test `reloadGates.js`).
+- [x] Pull nội dung cập nhật dirty records (test `reloadGates.js`).
+- [x] Push success cập nhật dirty records (test `reloadGates.js`).
 - [ ] Push verify/error/conflict/missing cập nhật dirty records.
-- [ ] Ghi thất bại giữ nguyên dirty state trước đó.
-- [ ] Kiểm một batch nhiều mã chỉ tăng revision theo hợp đồng đã chốt và không trùng mã.
+- [x] Ghi thất bại giữ nguyên dirty state trước đó (test `reloadGates.js`).
+- [x] Kiểm một batch nhiều mã chỉ tăng một revision, hợp nhất mã và không trùng mã (test `reloadGates.js`).
 
 ## Slice R4 — API reload theo scope
 

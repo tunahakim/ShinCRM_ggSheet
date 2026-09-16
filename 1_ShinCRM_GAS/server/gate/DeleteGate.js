@@ -57,29 +57,37 @@ function deleteGateRemove(yeuCau) {
     return { ok: true, entity: entity, hard: [], soft: { fields: entityReadFields(entity), rows: [] }, reasons: {}, ms: Date.now() - batDau };
   }
 
+  if (typeof writeCommitAssertAvailable !== 'function') {
+    throw new Error('Thiếu WriteCommit; không xóa dữ liệu để tránh mất signal reload.');
+  }
+  writeCommitAssertAvailable();
+
   var khoa = LockService.getDocumentLock();
   if (!khoa.tryLock(SETTINGS.LOCK_WAIT_MS)) {
     throw new Error('Hệ thống bận. Vui lòng thử lại!');
   }
 
   var result;
+  var commit = null;
   try {
     result = deleteGateRun(entity, ids, batDau);
+    if (result && result.ok && result.recordIds && result.recordIds.length) {
+      // Phát signal trước khi nhả khóa; renderer chỉ chạy sau khi khóa đã được trả.
+      commit = writeCommitAfterSuccess({
+        source: 'delete',
+        surface: 'record',
+        entity: entity,
+        recordIds: result.recordIds,
+        render: false
+      });
+      result.reloadDecision = commit.reloadDecision;
+      result.dirty = commit.dirty;
+    }
   } finally {
     try { SpreadsheetApp.flush(); } finally { khoa.releaseLock(); }
   }
 
-  if (result && result.ok && result.recordIds && result.recordIds.length && typeof writeCommitAfterSuccess === 'function') {
-    var commit = writeCommitAfterSuccess({
-      source: 'delete',
-      surface: 'record',
-      entity: entity,
-      recordIds: result.recordIds
-    });
-    result.reloadDecision = commit.reloadDecision;
-    result.viewRender = commit.viewRender;
-    result.dirty = commit.dirty;
-  }
+  if (commit && result) { result.viewRender = writeCommitRender(commit); }
   return result;
 }
 

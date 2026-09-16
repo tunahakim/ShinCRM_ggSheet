@@ -233,6 +233,7 @@ function viewColumnSpans(columns) {
 }
 
 function viewRenderSheetLocked(book, sheet, name) {
+  var expectedReloadRevision = typeof reloadStateRead === 'function' ? reloadStateRead().revision : undefined;
   var config = configReadAll();
   var customerContext = entityReadContext('customer');
   var activityContext = entityReadContext('activity');
@@ -241,7 +242,7 @@ function viewRenderSheetLocked(book, sheet, name) {
   var sourceFieldByCode = viewSourceFieldMaps(fieldByCode, sourceHeaders);
   var lastColumn = sheet.getLastColumn();
   if (lastColumn < 1) {
-    dirtyStateClearViewSheet(name);
+    dirtyStateClearViewSheet(name, expectedReloadRevision);
     viewInputSignatureWrite(sheet);
     var emptyRevision = viewRevisionBump(sheet);
     return { ok: true, sheetName: name, viewMeta: viewInputMetaFromHeader([], emptyRevision), rows: 0 };
@@ -313,7 +314,7 @@ function viewRenderSheetLocked(book, sheet, name) {
   }
   viewClearErrorNotes(sheet, writable);
   SpreadsheetApp.flush();
-  dirtyStateClearViewSheet(name);
+  dirtyStateClearViewSheet(name, expectedReloadRevision);
   viewInputSignatureWrite(sheet);
   var revision = viewRevisionBump(sheet);
   return { ok: true, sheetName: name, viewMeta: viewInputMetaFromHeader(header, revision), rows: rows.length };
@@ -348,8 +349,9 @@ function renderAllManagedViews() {
 function renderAllManagedViewsIfAllowed() {
   var prefs = typeof userPrefsRead === 'function' ? userPrefsRead() : { autoRenderView: true };
   if (prefs.autoRenderView === false) { return { ok: true, skipped: true, reason: 'autoRenderView=false', dirty: reloadStateRead() }; }
+  var expectedReloadRevision = typeof reloadStateRead === 'function' ? reloadStateRead().revision : undefined;
   var results = renderAllManagedViews();
-  dirtyStateClear({ allViews: true, viewSheets: true });
+  dirtyStateClear({ allViews: true, viewSheets: true, expectedRevision: expectedReloadRevision });
   return { ok: true, rendered: results, dirty: reloadStateRead() };
 }
 

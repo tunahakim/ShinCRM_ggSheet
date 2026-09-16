@@ -225,29 +225,33 @@ function prepareConfigSheet(file, options) {
 
 /** Khôi phục chỉ Config; hai kho dữ liệu được đọc để tính bộ đếm nhưng không bị ghi. */
 function resetConfigToDefaults() {
+  if (typeof writeCommitAssertAvailable !== 'function') {
+    throw new Error('Thiếu WriteCommit; không ghi Config để tránh mất signal reload.');
+  }
+  writeCommitAssertAvailable();
   var lock = LockService.getDocumentLock();
   if (!lock.tryLock(SETTINGS.LOCK_WAIT_MS)) { throw new Error('Hệ thống bận. Vui lòng thử lại!'); }
   var file;
   var result;
   var views = [];
+  var commit = null;
   try {
     file = shinOpenBook();
     result = prepareConfigSheet(file, { reset: true });
     views = file.getSheets().map(function (sheet) { return sheet.getName(); }).filter(function (name) { return name.charAt(0) === '!'; });
     SpreadsheetApp.flush();
-  } finally {
-    try { SpreadsheetApp.flush(); } finally { lock.releaseLock(); }
-  }
-
-  var commit = null;
-  if (typeof writeCommitAfterSuccess === 'function') {
     commit = writeCommitAfterSuccess({
       source: 'user',
       surface: 'config',
       entity: 'config',
-      viewSheetNames: views
+      viewSheetNames: views,
+      render: false
     });
+  } finally {
+    try { SpreadsheetApp.flush(); } finally { lock.releaseLock(); }
   }
+
+  var viewRender = commit ? writeCommitRender(commit) : null;
 
   return {
     ok: true,
@@ -255,7 +259,7 @@ function resetConfigToDefaults() {
     viewSheets: views,
     params: configUserParams(configParams()),
     reload: commit && commit.reloadDecision,
-    viewRender: commit && commit.viewRender,
+    viewRender: viewRender,
     dirty: commit && commit.dirty
   };
 }

@@ -135,6 +135,8 @@ function reloadDecisionForChange(input) {
     reloadDecisionWithRam(decision, 'records', ids, change, 'Customer/Activity đổi.');
     if (change.configChanged === true) {
       decision.signal.config = true;
+      decision.signal.allCore = true;
+      decision.signal.allViews = true;
       reloadDecisionWithRam(decision, 'fullCore', [], change, 'Cấp mã mới đã làm đổi bộ đếm trong Config.');
     }
     if (source !== 'edit' && change.appliedByCaller === true && !decision.ram.deferredRecordIds.length) {

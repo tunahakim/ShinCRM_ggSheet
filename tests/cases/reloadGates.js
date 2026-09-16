@@ -8,7 +8,8 @@ function taoHop() {
   ghiO(nen, 'Customer', 4, '@CUS_MA_KH', 'KH000001');
   hop.shinViewSheetNames = () => ['!Lead', '!Chăm sóc'];
   hop.rendered = 0;
-  hop.renderAllManagedViewsIfAllowed = () => { hop.rendered += 1; return { ok: true, rendered: 2 }; };
+  hop.renderedWhileLocked = false;
+  hop.renderAllManagedViewsIfAllowed = () => { hop.rendered += 1; hop.renderedWhileLocked = nen.stubs._khoa.dangGiu; return { ok: true, rendered: 2 }; };
   return { nen, hop };
 }
 
@@ -22,6 +23,31 @@ function chay(so) {
   check(so, 'writeGateSave pull phát signal bản ghi + allViews và render sau lock',
     [saved.ok, saved.recordIds, saved.reloadDecision.kind, saved.dirty.records, saved.dirty.allViews, env.hop.rendered],
     [true, ['KH000001'], 'records', ['KH000001'], true, 1]);
+  check(so, 'signal tăng một revision và renderer chạy sau khi nhả document lock',
+    [env.hop.reloadStateRead().revision, env.hop.renderedWhileLocked, env.nen.stubs._khoa.dangGiu],
+    [1, false, false]);
+
+  const userEnv = taoHop();
+  const userSaved = userEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000112' }], source: 'user' });
+  check(so, 'writeGateSave user cũng dùng signal chung',
+    [userSaved.ok, userSaved.reloadDecision.kind, userSaved.dirty.records, userSaved.dirty.allViews],
+    [true, 'records', ['KH000001'], true]);
+
+  const batchEnv = taoHop();
+  ghiO(batchEnv.nen, 'Customer', 5, '@CUS_MA_KH', 'KH000002');
+  const batchSaved = batchEnv.hop.writeGateSave({ entity: 'customer', records: [
+    { id: 'KH000001', phone: '0987000113' },
+    { id: 'KH000002', phone: '0987000114' }
+  ], source: 'pull' });
+  check(so, 'batch nhiều mã hợp nhất thành một signal và một revision',
+    [batchSaved.recordIds, batchSaved.dirty.records, batchEnv.hop.reloadStateRead().revision],
+    [['KH000001', 'KH000002'], ['KH000001', 'KH000002'], 1]);
+
+  const newEnv = taoHop();
+  const newSaved = newEnv.hop.writeGateSave({ entity: 'customer', records: [{ companyName: 'Khách mới', phone: '0987000115' }], source: 'pull' });
+  check(so, 'cấp mã mới phát cả signal Config và fallback full core',
+    [newSaved.configChanged, newSaved.reloadDecision.ram.mode, newSaved.dirty.config, newSaved.dirty.records.length],
+    [true, 'fullCore', true, 0]);
 
   const pushedEnv = taoHop();
   const pushed = pushedEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000222' }], source: 'push' });
@@ -51,6 +77,13 @@ function chay(so) {
     [deleted.ok, deleted.hard, deleted.recordIds, deleted.reloadDecision.kind, deleted.dirty.records, deleted.dirty.allViews, deletedEnv.hop.rendered],
     [true, ['KH000001'], ['KH000001'], 'records', ['KH000001'], true, 1]);
 
+  const softEnv = taoHop();
+  softEnv.hop.beforeHardDelete = () => ({ allowed: false, reason: 'FBM còn giữ bản ghi' });
+  const softDeleted = softEnv.hop.deleteGateRemove({ entity: 'customer', ids: ['KH000001'] });
+  check(so, 'DeleteGate soft delete cũng phát signal cho mã bị đổi trạng thái',
+    [softDeleted.ok, softDeleted.soft.rows.length, softDeleted.recordIds, softDeleted.reloadDecision.kind, softDeleted.dirty.records, softDeleted.dirty.allViews],
+    [true, 1, ['KH000001'], 'records', ['KH000001'], true]);
+
   const failedEnv = taoHop();
   let invalid;
   try {
@@ -61,6 +94,26 @@ function chay(so) {
   check(so, 'ghi thất bại không phát signal thành công và không render',
     [invalid.ok, invalid.reloadDecision, invalid.dirty, failedEnv.hop.rendered],
     [false, undefined, undefined, 0]);
+
+  const renderErrorEnv = taoHop();
+  renderErrorEnv.hop.renderAllManagedViewsIfAllowed = () => { throw new Error('view tạm thời không ghi được'); };
+  const renderError = renderErrorEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000444' }], source: 'background' });
+  check(so, 'renderer lỗi không làm lần ghi nguồn thành thất bại và vẫn giữ cờ view',
+    [renderError.ok, renderError.viewRender.ok, renderError.dirty.allViews, renderError.dirty.records],
+    [true, false, true, ['KH000001']]);
+
+  const missingCommitEnv = taoHop();
+  missingCommitEnv.hop.reloadDecisionForChange = undefined;
+  check(so, 'thiếu hậu xử lý reload thì cửa ghi dừng trước khi chạm Sheet',
+    (function () {
+      try {
+        missingCommitEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000555' }], source: 'background' });
+        return { threw: false, value: missingCommitEnv.nen.Customer.sheet.getRange(4, 5).getValue(), locked: missingCommitEnv.nen.stubs._khoa.dangGiu };
+      } catch (error) {
+        return { threw: true, value: missingCommitEnv.nen.Customer.sheet.getRange(4, 5).getValue(), locked: missingCommitEnv.nen.stubs._khoa.dangGiu };
+      }
+    }()),
+    { threw: true, value: '', locked: false });
 }
 
 module.exports = { chay };
