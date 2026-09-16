@@ -406,5 +406,7 @@
 - [x] Sidebar giữ wake kế tiếp như tín hiệu vận chuyển, gửi follow-up để GAS tự đọc `ReloadState` mới nhất; không tự gom mã hoặc tự quyết định scope.
 - [x] Response selection GAS chỉ được áp dụng nếu context generation còn hiện hành; context mới từ Extension không bị response cũ ghi đè (`tests/cases/selectionPoll.js`).
 - [x] Hint bàn phím có `keydown`, `beforeinput` và dự phòng `keyup` cho Delete/Backspace; Extension vẫn không kết luận ô đã sửa (`tests/cases/extensionBridge.js`).
+- [x] Offline regression sau nhóm latest-wins đạt `1588/1588` (`node tests/run.js`).
+- [x] GAS DEV deployment `@381`: `reloadMatrixProbe` đã đạt trên `@380`; sau guard revision đầu vào, `probeSelectionAndReload --push` vẫn trả đúng selection/ReloadState/decision.
 
 ---

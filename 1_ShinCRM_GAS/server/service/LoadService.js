@@ -58,8 +58,9 @@ function reloadRecords(recordIds, expectedRevision) {
   return runEntryPoint('reloadRecords', LOAD_SOURCE, 'throw', function () {
     var started = Date.now();
     var ids = loadNormalizeRecordIds(recordIds);
-    var requestedRevision = expectedRevision === undefined || expectedRevision === null || expectedRevision === ''
+    var requestedRevisionValue = expectedRevision === undefined || expectedRevision === null || expectedRevision === ''
       ? null : Number(expectedRevision);
+    var requestedRevision = requestedRevisionValue !== null && isFinite(requestedRevisionValue) ? requestedRevisionValue : null;
     var observed = typeof reloadStateRead === 'function' ? reloadStateRead() : null;
     var requestWasSuperseded = requestedRevision !== null && observed && observed.revision !== requestedRevision;
 
