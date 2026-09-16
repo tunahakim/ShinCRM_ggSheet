@@ -78,6 +78,24 @@ function chay(so) {
   const snapshot = hop.selectionSnapshot();
   check(so, 'snapshot dùng gắn vào phản hồi không tự mang dirty, ms hay ok', Object.keys(snapshot).sort(), ['cellRef', 'col', 'colEnd', 'gid', 'row', 'rowEnd', 'selectionKind', 'sheetName', 'spreadsheetId'].sort());
 
+  // Probe sau khi kết thúc edit phải để GAS, không phải Extension, quyết định
+  // cột nào khởi động debounce. Probe chỉ đọc và không phát thêm revision.
+  hop.dirtyStateClear();
+  const validEdit = hop.inspectEditReload('Customer', 4, 2, 4, 2);
+  check(so, 'probe edit hợp lệ trả quyết định records và đúng mã bản ghi',
+    [validEdit.eligible, validEdit.decision.ram.mode, validEdit.decision.ram.recordIds, validEdit.reloadObservation, hop.reloadStateRead().revision],
+    [true, 'records', ['CUS-000004'], false, 0]);
+
+  const invalidEdit = hop.inspectEditReload('Customer', 4, nen.Customer.codes.length + 1, 4, nen.Customer.codes.length + 1);
+  check(so, 'probe edit cột thường trả ram none và không tự tạo dirty',
+    [invalidEdit.eligible, invalidEdit.decision.ram.action, invalidEdit.decision.signal.records, hop.reloadStateRead().revision],
+    [false, 'none', [], 0]);
+
+  const activityEdit = hop.inspectEditReload('Activity', 4, 3, 4, 3);
+  check(so, 'probe edit Activity dùng schema Activity và đọc mã giao dịch đúng hàng',
+    [activityEdit.eligible, activityEdit.decision.ram.recordIds],
+    [true, ['ACT-000004']]);
+
   const calls = [];
   hop.runEntryPoint = function (name, source, channel, fn) {
     calls.push([name, source, channel]);

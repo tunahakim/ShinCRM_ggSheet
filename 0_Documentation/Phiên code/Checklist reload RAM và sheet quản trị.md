@@ -230,7 +230,7 @@
 - [x] Request đang bay không bị gọi trùng (`SHEET_LINK_DATA_PENDING` và `SHEET_LINK_RELOAD_CHECKING`).
 - [x] Rời Customer/Activity trước ba giây gọi reload ngay và hủy timer debounce còn lại.
 - [x] Rời sheet khi không có dirty không gọi reload dữ liệu thừa sau lượt kiểm tra (API trả `null`).
-- [ ] Sửa cột không hợp lệ không khởi động debounce (Extension không được tự phân loại cột; GAS sẽ trả scope rỗng, cần nghiệm thu/điểm giao tiếp riêng).
+- [x] Sửa cột không hợp lệ không khởi động debounce: Sidebar gọi `inspectEditReload`, GAS trả `ram.action: none`; lỗi API mới dùng timer bảo thủ để không bỏ sót (test `selectionPoll.js`, `selectionService.js`).
 
 ### Cập nhật RAM
 
@@ -319,8 +319,9 @@
 - [x] Thêm ca test vào `tests/cases/triggers.js` (bốn sheet mặc định, vùng hợp lệ/không hợp lệ, thêm/đổi/xóa mã hàng 1 và toàn bộ view).
 - [x] Thêm ca test vào `tests/cases/refresh.js` (entity và Config full core).
 - [x] Thêm ca test cho cổng ghi/pull/push/background (gồm status push trong `reloadGates.js`).
-- [x] Chạy `node tests/run.js`: `1569` đạt, `0` không đạt.
-- [x] Chạy test GAS DEV cho `getReloadState`, `reloadRecords`, `renderAllManagedViews` với `--push`: `getReloadState` đạt ở `@326`, `reloadRecords` đạt ở `@327` với fallback `fullCore` khi scope rỗng, `renderAllManagedViews` đạt ở `@328` với tất cả view DEV trả `ok` và không có sheet lỗi; đường runtime `renderAllManagedViewsIfAllowed` được kiểm tra tiếp ở revision mới và dọn cờ view stale theo đúng revision guard.
+- [x] Thêm API `inspectEditReload` và kiểm tra GAS là nơi duy nhất quyết định timer sau edit; phản hồi gắn `reloadObservation=false` để không reload sớm (test `selectionService.js`, `selectionPoll.js`).
+- [x] Chạy `node tests/run.js`: `1575` đạt, `0` không đạt.
+- [x] Chạy test GAS DEV cho `getReloadState`, `reloadRecords`, `renderAllManagedViews` với `--push`: `getReloadState` đạt ở `@326`, `reloadRecords` đạt ở `@327` với fallback `fullCore` khi scope rỗng, `renderAllManagedViews` đạt ở `@328` với tất cả view DEV trả `ok` và không có sheet lỗi; đường runtime `renderAllManagedViewsIfAllowed` được kiểm tra tiếp ở revision mới và dọn cờ view stale theo đúng revision guard. `inspectEditReload` đạt ở `@334`, trả `eligible:false`, `ram.action:none`, `reloadObservation:false` trên vùng DEV không hợp lệ.
 - [x] GAS DEV cài trigger installable ở `@331`; `probeTriggerState` xác nhận `shinOnEdit: true`, `shinOnChange: true` và không làm mất các trigger FBM đang có.
 - [ ] Chạy test GAS DEV khi không mở Sidebar và xác nhận view vẫn đổi sau ghi Customer/Activity.
 - [x] Kiểm tra log không chứa cookie, mật khẩu, token hoặc payload nhạy cảm bằng `tests/cases/logMask.js` và các ca DTO/log FBM; bộ offline đạt `1569/1569`.

@@ -441,10 +441,44 @@ async function chay(so) {
 
   const debounce = dungHopPoll();
   batDau(debounce);
+  debounce.callServer = (name) => {
+    debounce._calls.push(name);
+    if (name === 'inspectEditReload') {
+      return syncValue({ ok: true, eligible: true, decision: { ram: { action: 'reload', waitMs: 3000 } }, waitMs: 3000 });
+    }
+    return syncValue({ ok: true });
+  };
   debounce.sheetLinkScheduleEditReload({ sheetName: 'Customer', isEditing: false }, true);
   const debounceTimer = Array.from(debounce._timers.values())[0];
   check(so, 'kết thúc edit Customer đặt đúng một timer 3 giây tính từ edit cuối',
     [debounceTimer && debounceTimer.delay, debounce._timers.size], [3000, 1]);
+
+  const invalidColumn = dungHopPoll();
+  batDau(invalidColumn);
+  invalidColumn._calls = [];
+  invalidColumn.callServer = (name) => {
+    invalidColumn._calls.push(name);
+    if (name === 'inspectEditReload') {
+      return syncValue({ ok: true, eligible: false, decision: { ram: { action: 'none', waitMs: 0 } }, waitMs: 0 });
+    }
+    return syncValue({ ok: true });
+  };
+  invalidColumn.sheetLinkScheduleEditReload({ sheetName: 'Customer', row: 4, col: 9, rowEnd: 4, colEnd: 9, isEditing: false }, true);
+  check(so, 'cột không hợp lệ do GAS xác nhận không khởi động debounce',
+    [invalidColumn._calls, invalidColumn._timers.size], [['inspectEditReload'], 0]);
+
+  const expiredDebounce = dungHopPoll();
+  batDau(expiredDebounce);
+  expiredDebounce.callServer = (name) => {
+    if (name === 'inspectEditReload') {
+      return syncValue({ ok: true, eligible: true, decision: { ram: { action: 'reload', waitMs: 3000 } }, waitMs: 0 });
+    }
+    return syncValue({ ok: true });
+  };
+  expiredDebounce.sheetLinkScheduleEditReload({ sheetName: 'Activity', row: 4, col: 3, rowEnd: 4, colEnd: 3, isEditing: false }, true);
+  const expiredTimer = Array.from(expiredDebounce._timers.values())[0];
+  check(so, 'GAS trả waitMs bằng không thì client thực thi ngay, không tự đổi ngược thành ba giây',
+    expiredTimer && expiredTimer.delay, 0);
 
   const categoryEdit = dungHopPoll();
   batDau(categoryEdit);
@@ -459,6 +493,9 @@ async function chay(so) {
   manyEdits.refreshRecordsApply = () => {};
   manyEdits.callServer = (name) => {
     manyEdits._calls.push(name);
+    if (name === 'inspectEditReload') {
+      return syncValue({ ok: true, eligible: true, decision: { ram: { action: 'reload', waitMs: 3000 } }, waitMs: 3000 });
+    }
     if (name === 'getReloadState') { return syncValue({ reload: { revision: 4, records: ['KH1'] } }); }
     return syncValue({ ok: true, reloadMode: 'records', revisionMatched: true, reload: { revision: 4, records: [] } });
   };
@@ -476,6 +513,9 @@ async function chay(so) {
   leaveEarly.refreshRecordsApply = () => {};
   leaveEarly.callServer = (name) => {
     leaveEarly._calls.push(name);
+    if (name === 'inspectEditReload') {
+      return syncValue({ ok: true, eligible: true, decision: { ram: { action: 'reload', waitMs: 3000 } }, waitMs: 3000 });
+    }
     if (name === 'getReloadState') { return syncValue({ reload: { revision: 5, records: ['KH2'] } }); }
     return syncValue({ ok: true, reloadMode: 'records', revisionMatched: true, reload: { revision: 5, records: [] } });
   };
