@@ -193,9 +193,9 @@
 - [x] Config reload không làm Schema/Config defaults trong RAM lệch nhau (Config luôn yêu cầu full core, test `loadService.js`).
 - [x] Đổi schema luôn fallback full core (test `reloadDecision.js`: schema có `ram.mode: 'fullCore'`; test `reloadGates.js`: signal `allCore`).
 - [x] Có API `getReloadState` dùng khi nhận event, lúc mở Sidebar và tại các điểm kiểm tra tự nhiên (test `loadService.js`, `selectionPoll.js`).
-- [ ] Thiết kế và triển khai API một request `probeSelectionAndReload(input)`: trả context hiện tại, mã khách khi vị trí đổi, `ReloadState` và quyết định RAM; không bắt buộc chuỗi `probeSelectionCheap` → `probeSelectionFull` qua mạng.
-- [ ] GAS tự so `selectionContext` với `previousSelectionContext`; vị trí không đổi thì trả mã khách cũ và không đọc lại ô mã; vị trí đổi thì mới tra cột mã theo schema.
-- [ ] Response selection/reload chạy im lặng và luôn kèm `ReloadState`; không dùng producer `CRM_RELOAD` làm đường bắt buộc.
+- [x] Thiết kế và triển khai API một request `probeSelectionAndReload(input)`: trả context hiện tại, mã khách khi vị trí đổi, `ReloadState` và quyết định RAM; không bắt buộc chuỗi `probeSelectionCheap` → `probeSelectionFull` qua mạng (server `SelectionService.js`, test `selectionService.js`).
+- [x] GAS tự so `selectionContext` với `previousSelectionContext`; vị trí không đổi thì trả mã khách cũ và không đọc lại ô mã; vị trí đổi thì mới tra cột mã theo schema (test `selectionService.js`).
+- [x] Response selection/reload chạy im lặng và luôn kèm `ReloadState`; không dùng producer `CRM_RELOAD` làm đường bắt buộc (server `SelectionService.js`, client request `silent`).
 - [x] Có API render toàn bộ managed views và trả kết quả từng sheet (test `viewRenderer.js`).
 
 ### Nút thủ công
@@ -214,33 +214,33 @@
 
 ### Theo dõi revision và wake request
 
-- [ ] Sidebar giữ `previousSelectionContext`, `previousCustomerId`, `lastSeenRevision`, `localDraft` và các timer trong state của chính trang đó.
-- [ ] Extension chỉ gửi context selection và hint `position`/`keydown`; bỏ hoàn toàn suy đoán `isEditing`, đọc thanh công thức và đường `true -> false`.
-- [ ] Sau một giây yên lặng kể từ hint cuối, Sidebar gọi một request kiểm tra im lặng; không bật progress bar cho request không reload.
-- [ ] Sidebar không tự đọc hàng 1/hàng 3, không tự phân loại cột `@`, không tự chọn API reload.
-- [ ] Request đang bay có guard, hint mới được giữ lại để xử lý sau và không tạo Promise chồng.
-- [ ] Lỗi wake request không làm Sidebar treo; lần hint/safety poll kế tiếp vẫn có thể chạy.
-- [ ] `lastSeenRevision` và context selection chỉ sống trong Sidebar, không ghi đè `DocumentProperties` dùng chung.
-- [ ] Safety polling thưa theo `SETTINGS` được reset sau mọi request hỏi GAS thành công; không tạo request riêng khi fallback selection probe vừa chạy.
+- [x] Sidebar giữ `previousSelectionContext`, `previousCustomerId`, `lastSeenRevision`, `localDraft` và các timer trong state của chính trang đó (client `sheetLink.html`).
+- [x] Extension chỉ gửi context selection và hint `position`/`keydown`; bỏ hoàn toàn suy đoán `isEditing`, đọc thanh công thức và đường `true -> false` (Extension `sheet_scout.js`, test `extensionBridge.js`).
+- [x] Sau một giây yên lặng kể từ hint cuối, Sidebar gọi một request kiểm tra im lặng; không bật progress bar cho request không reload (client `sheetLink.html`, test `selectionPoll.js`).
+- [x] Sidebar không tự đọc hàng 1/hàng 3, không tự phân loại cột `@`, không tự chọn API reload (GAS `SelectionService`/`ReloadDecision`, test `selectionService.js`, `triggers.js`).
+- [x] Request đang bay có guard, hint mới được giữ lại để xử lý sau và không tạo Promise chồng (test `selectionPoll.js`).
+- [x] Lỗi wake request không làm Sidebar treo; lần hint/safety poll kế tiếp vẫn có thể chạy (client `sheetLink.html`/`selectionPoll.html`, test `selectionPoll.js`).
+- [x] `lastSeenRevision` và context selection chỉ sống trong Sidebar, không ghi đè `DocumentProperties` dùng chung (client `sheetLink.html`, test `selectionPoll.js`).
+- [x] Safety polling thưa theo `SETTINGS` được reset sau mọi request hỏi GAS thành công; không tạo request riêng khi fallback selection probe vừa chạy (client `selectionPoll.html`, test `selectionPoll.js`).
 
 ### Debounce sửa tay
 
-- [ ] GAS `onEdit` là nguồn sự thật duy nhất cho sửa tay; không cần Extension báo “kết thúc edit”.
-- [ ] Mỗi signal Customer/Activity ghi `changedAt`; Sidebar chỉ reload RAM khi đủ ba giây từ `onEdit` cuối.
-- [ ] Nhiều mã trong khoảng ba giây được hợp nhất ở `ReloadState`/`reloadRecords`, chỉ một lượt reload.
-- [ ] Rời Customer/Activity trước ba giây gọi reload ngay và hủy timer còn lại.
-- [ ] Sửa cột không hợp lệ không tạo signal và không đặt timer reload RAM.
-- [ ] `waitMs` do GAS trả được dùng để chờ đúng phần thời gian còn thiếu, không tự tính lại từ suy đoán của Extension.
-- [ ] Không nhầm debounce wake một giây với debounce dữ liệu ba giây.
+- [x] GAS `onEdit` là nguồn sự thật duy nhất cho sửa tay; không cần Extension báo “kết thúc edit” (server `Triggers.js`, test `triggers.js`).
+- [x] Mỗi signal Customer/Activity ghi `changedAt`; Sidebar chỉ reload RAM khi đủ ba giây từ `onEdit` cuối (server `DirtyState`/`ReloadDecision`, test `dirtyState.js`, `selectionPoll.js`).
+- [x] Nhiều mã trong khoảng ba giây được hợp nhất ở `ReloadState`/`reloadRecords`, chỉ một lượt reload (test `dirtyState.js`, `selectionPoll.js`).
+- [x] Rời Customer/Activity trước ba giây gọi reload ngay và hủy timer còn lại (test `selectionPoll.js`).
+- [x] Sửa cột không hợp lệ không tạo signal và không đặt timer reload RAM (test `triggers.js`).
+- [x] `waitMs` do GAS trả được dùng để chờ đúng phần thời gian còn thiếu, không tự tính lại từ suy đoán của Extension (server `ReloadDecision`, client `sheetLink.html`, test `selectionPoll.js`).
+- [x] Không nhầm debounce wake một giây với debounce dữ liệu ba giây (tài liệu 05/05A/07, test `selectionPoll.js`).
 
 ### Cập nhật RAM
 
-- [ ] Có một request `probeSelectionAndReload` bên ngoài thay cho chuỗi RPC `probeSelectionCheap` → `probeSelectionFull`.
-- [ ] Khi selection không đổi, GAS trả context/mã khách cũ và không đọc lại ô mã khách.
-- [ ] Khi selection đổi, GAS tự tra schema và đọc mã khách trong cùng request; Extension vẫn giữ đường live model cũ khi nó đang hoạt động.
-- [ ] Response selection/reload luôn kèm `ReloadState`, `ram` và trạng thái selection; Sidebar không tự quyết định scope.
-- [ ] Fallback polling vị trí 2 giây rồi 6 giây gộp luôn kiểm tra reload, không tạo request kiểm tra thứ hai.
-- [ ] Safety polling theo phút chạy im lặng, chỉ phục vụ RAM và không kích hoạt renderer view.
+- [x] Có một request `probeSelectionAndReload` bên ngoài thay cho chuỗi RPC `probeSelectionCheap` → `probeSelectionFull` (client/server, test `selectionPoll.js`, `selectionService.js`).
+- [x] Khi selection không đổi, GAS trả context/mã khách cũ và không đọc lại ô mã khách (test `selectionService.js`).
+- [x] Khi selection đổi, GAS tự tra schema và đọc mã khách trong cùng request; Extension vẫn giữ đường live model cũ khi nó đang hoạt động (test `selectionService.js`, `extensionBridge.js`).
+- [x] Response selection/reload luôn kèm `ReloadState`, `ram` và trạng thái selection; Sidebar không tự quyết định scope (server `SelectionService.js`, test `selectionService.js`).
+- [x] Fallback polling vị trí 2 giây rồi 6 giây gộp luôn kiểm tra reload, không tạo request kiểm tra thứ hai (test `selectionPoll.js`).
+- [x] Safety polling theo phút chạy im lặng, chỉ phục vụ RAM và không kích hoạt renderer view (client `selectionPoll.html`, test `selectionPoll.js`).
 - [x] Customer còn tồn tại được upsert bằng bản ghi máy chủ trả về (test `refresh.js`).
 - [x] Customer biến mất được remove (test `refresh.js`).
 - [x] Activity còn tồn tại được upsert (test `refresh.js`).
@@ -271,8 +271,11 @@
 
 ### Đường chạy độc lập với Sidebar
 
-- [ ] `onEdit`, `onChange`, `WriteGate` và `DeleteGate` đều gọi `ReloadDecision` với input đầy đủ trước khi ghi signal/render.
-- [ ] GAS gọi renderer ngay sau signal khi `autoRenderView=true`, kể cả Sidebar đóng, Extension mất kết nối hoặc Spreadsheet đang ở sheet khác.
+- [x] `onEdit`, `onChange`, `WriteGate` và `DeleteGate` đều gọi `ReloadDecision` với input đầy đủ trước khi ghi signal/render (test `triggers.js`, `reloadGates.js`, audit cửa ghi).
+- [x] GAS gọi renderer ngay sau signal khi `autoRenderView=true`, kể cả Sidebar đóng, Extension mất kết nối hoặc Spreadsheet đang ở sheet khác (test `triggers.js`, `reloadGates.js`, `viewRenderer.js`).
+- [x] Khi `autoRenderView=false`, GAS giữ cờ view bền vững; khi bật lại, chính GAS đối chiếu cờ và vẽ toàn bộ ngay, không chờ Sidebar (test `viewRenderer.js`).
+- [x] Không dùng safety polling của Sidebar làm điều kiện hoặc đường chính để vẽ sheet quản trị (server renderer/trigger, test `viewRenderer.js`).
+- [x] `onChange` xử lý thêm/xóa hàng/cột/sheet theo scope bảo thủ và không thay thế `onEdit` cho sửa giá trị ô (server `Triggers.js`, test `triggers.js`).
 - [ ] Khi `autoRenderView=false`, GAS giữ cờ view bền vững; khi bật lại, chính GAS đối chiếu cờ và vẽ toàn bộ ngay, không chờ Sidebar.
 - [ ] Không dùng safety polling của Sidebar làm điều kiện hoặc đường chính để vẽ sheet quản trị.
 - [ ] `onChange` xử lý thêm/xóa hàng/cột/sheet theo scope bảo thủ và không thay thế `onEdit` cho sửa giá trị ô.
@@ -332,18 +335,18 @@
 - [x] Thêm ca test vào `tests/cases/triggers.js` (bốn sheet mặc định, vùng hợp lệ/không hợp lệ, thêm/đổi/xóa mã hàng 1 và toàn bộ view).
 - [x] Thêm ca test vào `tests/cases/refresh.js` (entity và Config full core).
 - [x] Thêm ca test cho cổng ghi/pull/push/background (gồm status push trong `reloadGates.js`).
-- [ ] Loại bỏ hợp đồng và caller của `inspectEditReload`; thay bằng `probeSelectionAndReload` một request và `waitMs` do GAS quyết định.
-- [ ] Bổ sung test offline cho selection không đổi/đổi, request im lặng, wake debounce một giây, safety polling và debounce dữ liệu ba giây.
-- [ ] Chạy `node tests/run.js` sau khi sửa code; ghi số đạt thực tế, không dùng kết quả của thiết kế cũ.
+- [x] Loại bỏ hợp đồng và caller của `inspectEditReload`; thay bằng `probeSelectionAndReload` một request và `waitMs` do GAS quyết định (server/client/Extension, test `selectionService.js`, `selectionPoll.js`).
+- [x] Bổ sung test offline cho selection không đổi/đổi, request im lặng, wake debounce một giây, safety polling và debounce dữ liệu ba giây (test `selectionService.js`, `selectionPoll.js`).
+- [x] Chạy `node tests/run.js` sau khi sửa code; lần chạy hiện tại đạt `1578/1579`, còn một lỗi CSS ở `client/sync/fbmSyncConfigEditor.html` là thay đổi ngoài phạm vi reload.
 - [x] Các probe GAS DEV cũ cho `getReloadState`, `reloadRecords`, `renderAllManagedViews` vẫn còn làm bằng chứng nền cho DirtyState/renderer; bằng chứng `inspectEditReload` không còn được coi là bằng chứng của thiết kế mới.
 - [x] GAS DEV cài trigger installable ở `@331`; `probeTriggerState` xác nhận `shinOnEdit: true`, `shinOnChange: true` và không làm mất các trigger FBM đang có.
 - [x] Chạy test GAS DEV khi không mở Sidebar và xác nhận view vẫn đổi sau ghi Customer/Activity: `viewProbeWriteRenderWithoutSidebar` đạt ở `@337`; view tạm nhận đúng mã Customer và ngày Activity sau từng lần `WriteGate`, rồi probe dọn sạch bản ghi và sheet tạm.
 - [x] Bổ sung và chạy probe GAS DEV `reloadMatrixProbe` ở deployment `@341`: fixture nối sau dữ liệu DEV hiện có (5 Customer + 5 Activity), mô phỏng onEdit ở Customer/Activity/Category/Config và sheet quản trị, kiểm signal/debounce/view; tất cả ca đạt, 3/3 view được vẽ sau các thay đổi hợp lệ. Probe tự dọn fixture, khôi phục ô/thuộc tính; hậu kiểm `probeDirtyState` rỗng và `dumpSheetGrid` còn đúng 1 Customer + 1 Activity ban đầu.
-- [x] Kiểm tra log không chứa cookie, mật khẩu, token hoặc payload nhạy cảm bằng `tests/cases/logMask.js` và các ca DTO/log FBM; bộ offline hiện tại đạt `1582/1582`.
+- [x] Kiểm tra log không chứa cookie, mật khẩu, token hoặc payload nhạy cảm bằng `tests/cases/logMask.js` và các ca DTO/log FBM; lần chạy offline hiện tại đạt `1578/1579`, một lỗi còn lại là CSS ngoài phạm vi reload.
 - [x] Chỉ thử dữ liệu ở Spreadsheet DEV `2026.09.05 - ShinCRM DEV` qua cổng DEV có token; không chạm Spreadsheet production.
 - [x] Không sửa fixture trong `0_Documentation/Nghiên cứu FBM/`; `git diff` không có đường dẫn thuộc thư mục này.
 - [x] Commit riêng tài liệu/checklist trước core code: `31a74ef`, `e1e98e2`.
-- [x] Commit riêng core GAS, client Sidebar và test khi hợp lý: `a73edec`, `d62427e`, `4cbcd6a`; cổng DEV bổ sung ở `fec22e1`.
+- [x] Commit riêng core GAS, client Sidebar và test khi hợp lý: các commit nền `a73edec`, `d62427e`, `4cbcd6a`, cổng DEV `fec22e1`, nhóm lõi reload hiện tại `933f308`.
 
 ## Slice R8 — Nghiệm thu trên Sheet DEV
 
