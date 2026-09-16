@@ -133,7 +133,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 - [x] Pull giữ `note`, `verifyStatus`, `allowFbmPush` và trường chỉ thuộc ShinCRM.
 - [x] Bản ghi mới đặt đúng mã nội bộ, ngày tạo, `active`, khóa cha và quyền push.
 - [x] Sau pull đánh dấu dirty đúng mã để Sidebar nạp lại.
-- [x] Không còn lọc Activity theo `FBM_ACTIVITY_SINCE`; mọi Activity hợp lệ đi qua cùng pipeline baseline/missing.
+- [x] `activitySince` trong `FBM_ACCOUNT_SETTINGS_V1` lọc Activity trước mốc; bản ghi bị bỏ qua vẫn được đánh dấu đã thấy để không bị coi là bản ghi mất.
 
 ### Đối soát Customer
 

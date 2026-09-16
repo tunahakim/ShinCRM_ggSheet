@@ -19,7 +19,7 @@
 - Pipeline có fallback suy diễn bước từ `phase`. Khi một snapshot không được phân biệt chặt với phiên thực sự, fallback có thể vẽ nội dung trông như pipeline đã chạy. Progress cũng nhận giá trị không đủ nghĩa ở trạng thái rỗi nên tạo fill màu không có ý nghĩa.
 - Các input vận hành Sync có lúc dùng cấu trúc/render riêng thay vì `StandaloneField`; select loại đồng bộ không dùng cùng controller `PopupList` với popup chuẩn.
 - Scheduler hiện chỉ có `heartbeat`, `customer`, `activity`; lịch luôn khởi động mode `read`, chưa có chiều cấu hình, quét chi tiết, giới hạn Customer/lượt, hoặc delay giữa request.
-- `FBM_SYNC_APPROVAL_THRESHOLD` đã được đưa vào kho `FBM_SYNC_SETTINGS_V1`; ba trường `FBM_MA_KH_PREFIX`, `FBM_MA_KH_LENGTH`, `FBM_ACTIVITY_SINCE` là tham số cũ bị chủ dự án xác nhận vô dụng/sai nghiệp vụ và phải loại bỏ hoàn toàn khỏi runtime, UI, test và tài liệu quyết định mới.
+- `FBM_SYNC_APPROVAL_THRESHOLD` được đưa vào kho `FBM_SYNC_SETTINGS_V1`. Ba giá trị gắn tài khoản FBM được khôi phục theo quyết định mới: `customerPrefix` và `customerCodeLength` kiểm tra `ma_kh` FBM tự sinh khi tạo Customer mới; `activitySince` giới hạn phạm vi quét Activity. Chúng nằm ở `FBM_ACCOUNT_SETTINGS_V1` và màn hình `Tài khoản FBM`, không nằm trong tham số phiên.
 
 ## 3. Quyết định đã chốt với chủ dự án
 
@@ -82,10 +82,10 @@
 
 ### 4.1. Lưu tham số phiên và migration Config
 
-- Tạo kho `FBM_SYNC_SETTINGS_V1` trong `DocumentProperties`, chỉ chứa `{ approvalThreshold }` đã chuẩn hóa.
-- Khi kho chưa tồn tại, GAS chỉ một lần đọc `FBM_SYNC_APPROVAL_THRESHOLD` cũ, ghi record mới và dùng record đó. Sau khi kho đã tồn tại, tuyệt đối không đọc lại Config; nếu kho cũ còn các key đã bị loại bỏ thì đọc vào sẽ ghi lại JSON tối giản.
-- Xóa các key `FBM_MA_KH_PREFIX`, `FBM_MA_KH_LENGTH`, `FBM_ACTIVITY_SINCE` khỏi catalog/runtime; không còn check, Preflight, lọc Activity hay chặn tạo Customer dựa trên chúng.
-- Thêm `FbmSync.syncSettingsRead()` và `FbmSync.syncSettingsSave(input)`; server entrypoint công khai là `fbmGetSyncSettings()` và `fbmSaveSyncSettings(settings)`. GAS kiểm số nguyên không âm cho ngưỡng, số nguyên dương/hoặc rỗng cho độ dài, ngày hợp lệ/hoặc rỗng cho mốc Activity, rồi trả DTO đã lưu để Sidebar vá lại.
+- Tạo kho `FBM_SYNC_SETTINGS_V1` trong `DocumentProperties`, chỉ chứa `{ approvalThreshold }` đã chuẩn hóa. Tạo kho `FBM_ACCOUNT_SETTINGS_V1` cho `{ customerPrefix, customerCodeLength, activitySince }`, có migration một lần từ các key Config cũ tương ứng.
+- Khi kho chưa tồn tại, GAS chỉ một lần đọc `FBM_SYNC_APPROVAL_THRESHOLD` cũ cho tham số phiên và các key `FBM_MA_KH_PREFIX`, `FBM_MA_KH_LENGTH`, `FBM_ACTIVITY_SINCE` cũ cho cấu hình tài khoản, ghi record chuẩn rồi dùng record đó. Sau khi kho tương ứng đã tồn tại, tuyệt đối không đọc lại Config.
+- `customerPrefix` và `customerCodeLength` phải nhập đủ cả hai hoặc để trống cả hai. Khi tạo Customer mới, Preflight chặn nếu thiếu cấu hình; sau bước mở form, mã `ma_kh` FBM tự sinh phải khớp tiền tố và độ dài trước khi gửi request lưu. `activitySince` là ngày hợp lệ hoặc để trống; Activity trước mốc bị bỏ qua nhưng không bị coi là bản ghi mất.
+- Thêm `FbmSync.syncSettingsRead()`/`syncSettingsSave(input)` và `FbmSync.accountSettingsRead()`/`accountSettingsSave(input)`; server entrypoint công khai tương ứng là `fbmGetSyncSettings()`, `fbmSaveSyncSettings(settings)`, `fbmSaveAccountSettings(settings)`. GAS kiểm tra DTO rồi trả bản đã lưu để Sidebar vá lại.
 
 ### 4.2. Shape cấu hình lịch nền
 
@@ -201,7 +201,7 @@ Các cài đặt có trong "Lịch đồng bộ nền":
 
 5.4. Khối Tham số phiên
 - Kích hoạt phần Tham số phiên đi, đặc biệt là "Ngưỡng yêu cầu chấp thuận". Sắp tới tôi sẽ bỏ hẳn sheet config, trước tiên thì sẽ bỏ các tham số phiên đồng bộ khỏi sheet config, cấu hình toàn bộ ở sidebar và lưu vào document properties.
-- Các mục "Tiền tố mã khách", "Độ dài mã khách", "Mốc Activity" là cái gì thế, đã có code logic xử lý nó chưa? Tôi chưa hiểu mấy cái này có ý nghĩa gì cả, nếu nó vô dụng thì bỏ đi
+- Tiền tố mã khách, độ dài mã khách và mốc Activity đã được xác định là cấu hình gắn với tài khoản FBM, không phải tham số phiên: đưa sang màn hình `Tài khoản FBM`. Tiền tố/độ dài dùng kiểm tra `ma_kh` FBM tự sinh khi tạo Customer mới; mốc Activity bỏ qua Activity có ngày làm việc trước mốc và không coi chúng là bản ghi mất.
 - Ngưỡng yêu cầu chấp thuận: cần note ý nghĩa chi tiết, đọc chẳng hiểu gì cả.
 
 6. Tôi đã dày công thiết kế các component rất đẹp rồi, nhưng code lại cứ đi vẽ ra mấy cái component khác thì phải cái đâu đâu thế:
