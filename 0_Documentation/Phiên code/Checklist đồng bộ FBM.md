@@ -499,6 +499,7 @@ Ghi chú Slice 9A: commit `a1b8e0c` gom lịch nghiệp vụ về GAS, giữ Ext
 - [x] Tách menu chọn cố định khỏi combo input: thêm `StandaloneControl(kind: 'menu')` dùng popup chung nhưng trigger là button, chuyển Loại đồng bộ/Chiều đồng bộ/Conflict; khóa callback đến muộn khi popup đang mở; test offline `1589/1589`, commit `3b297e7`, `2ee3aa7`, GAS DEV revision `@343`.
 - [x] Màn FBM vẽ ngay shell và khung `Chạy đồng bộ` trước snapshot GAS; trạng thái chưa sẵn sàng khóa control qua renderer chung, snapshot về sau hydrate tại chỗ; test offline `1589/1589`, commit `88d88e7`, GAS DEV revision `@344`.
 - [x] Tab `Kết quả & xử lý` hiển thị năm tab chỉ có nhãn; mô tả nằm ở một vùng riêng bên dưới hàng tab và được vá theo tab đang chọn, giữ mã tab và vá tại chỗ; body dùng `Stack` chung thay vì lồng `shin-section`, chữ phụ 13px, Nghiệm thu tối đa hai dòng; test offline `1589/1589`, commit `3e84f0a`, GAS DEV revision `@350`.
+- [x] Chuẩn hóa `PopupList` làm component popup duy nhất cho search, dropdown, customer picker, menu chọn và menu module; controller chỉ giữ dữ liệu/phím tắt, popup dùng chung tự neo, giãn theo nội dung, giới hạn Sidebar, lật chiều và đóng khi click ngoài; test offline `1583/1583`, commit `d255abd`, GAS DEV revision `@376`.
 
 ### Cập nhật reload RAM và sheet quản trị ngày 16/09/2026
 
