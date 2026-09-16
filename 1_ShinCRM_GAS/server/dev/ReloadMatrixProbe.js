@@ -302,7 +302,9 @@ function reloadMatrixProbe() {
     var viewValidHeaderColumn = viewSheet.getRange(1, 1, 1, viewSheet.getLastColumn()).getValues()[0].indexOf(DATA_SCHEMA.customer.id.code) + 1;
     var viewValidHeaderCell = viewSheet.getRange(1, viewValidHeaderColumn);
     var viewValidHeaderSnapshot = reloadMatrixProbeSnapshotCell(viewValidHeaderCell);
-    var viewValidHeaderTarget = DATA_SCHEMA.customer.companyName ? DATA_SCHEMA.customer.companyName.code : DATA_SCHEMA.customer.id.code;
+    // Giữ nguyên mã hợp lệ để phép thử chỉ kiểm nhánh phân loại hàng 1, không
+    // làm thay đổi cấu hình dữ liệu của view tạm trong lúc renderer chạy.
+    var viewValidHeaderTarget = viewValidHeaderSnapshot.value || DATA_SCHEMA.customer.id.code;
     var viewValidRow1Before = reloadStateRead();
     viewValidHeaderCell.setValue(viewValidHeaderTarget);
     SpreadsheetApp.flush();
@@ -311,7 +313,7 @@ function reloadMatrixProbe() {
     var viewValidRow1After = reloadStateRead();
     reloadMatrixProbeRestoreCell(viewValidHeaderCell, viewValidHeaderSnapshot);
     SpreadsheetApp.flush();
-    reloadMatrixProbeAssert(report, 'Sheet quản trị hàng 1 mã cột hợp lệ vẽ toàn bộ view', reloadMatrixProbeRenderedAll(viewValidRow1Result, expectedViews), JSON.stringify({ revisionBefore: viewValidRow1Before.revision, revisionAfter: viewValidRow1After.revision, rendered: viewValidRow1Result && viewValidRow1Result.rendered && viewValidRow1Result.rendered.length }));
+    reloadMatrixProbeAssert(report, 'Sheet quản trị hàng 1 mã cột hợp lệ vẽ toàn bộ view', reloadMatrixProbeRenderedAll(viewValidRow1Result, expectedViews), JSON.stringify({ revisionBefore: viewValidRow1Before.revision, revisionAfter: viewValidRow1After.revision, rendered: viewValidRow1Result && viewValidRow1Result.rendered && viewValidRow1Result.rendered.length, failed: viewValidRow1Result && viewValidRow1Result.failed }));
 
     var viewValidColumn = viewSheet.getRange(1, 1, 1, viewSheet.getLastColumn()).getValues()[0].indexOf(DATA_SCHEMA.customer.id.code) + 1;
     var viewRow3Before = reloadStateRead();
