@@ -30,8 +30,11 @@ var SHEET_LINK_VIEW_STATES = {};
 var SHEET_LINK_DATA_PENDING = null;
 var SHEET_LINK_RELOAD_TIMER = null;
 var SHEET_LINK_RELOAD_CHECKING = null;
-var SHEET_LINK_EDIT_PROBE = null;
-var SHEET_LINK_EDIT_TICKET = 0;
+var SHEET_LINK_WAKE_TIMER = null;
+var SHEET_LINK_WAKE_REASON = '';
+var SHEET_LINK_SELECTION_CONTEXT = null;
+var SHEET_LINK_PREVIOUS_CUSTOMER_ID = '';
+var SHEET_LINK_SELECTION_PENDING = null;
 var SHEET_LINK_LAST_SEEN_REVISION = 0;
 var SHEET_LINK_PING_TIMER = null;
 var sheetLinkInstalled = false;
@@ -148,7 +151,6 @@ function sheetLinkOnMessage(event) {
     if (!SHEET_LINK_RAM_READY) { return; }
     var revision = Number(data.revision || 0);
     if (revision && revision <= SHEET_LINK_LAST_SEEN_REVISION) { return; }
-    if (revision) { SHEET_LINK_LAST_SEEN_REVISION = revision; }
     var wake = sheetLinkSyncDirtyData();
     if (wake && typeof wake.then === 'function') {
       wake.then(null, function (err) { if (typeof console !== 'undefined' && console.warn) { console.warn(err); } });
@@ -171,9 +173,11 @@ function sheetLinkOnMessage(event) {
   if (data.seq <= SHEET_LINK_SEQ) { return; }
   SHEET_LINK_SEQ = data.seq;
 
-  var wasEditing = !!(SHEET_LINK_LAST_CONTEXT && SHEET_LINK_LAST_CONTEXT.isEditing);
+  var previousPosition = sheetLinkPositionKey(SHEET_LINK_LAST_CONTEXT || {});
   var applied = sheetLinkApplyContext(data);
-  sheetLinkScheduleEditReload(data, wasEditing);
+  if (data.hint === 'keydown' || previousPosition !== sheetLinkPositionKey(data)) {
+    sheetLinkScheduleWake(data.hint === 'keydown' ? 'keydown' : 'position');
+  }
   if (applied && typeof applied.then === 'function') {
     applied.then(null, function (err) {
       // Context arrives from the background bridge; never interrupt the user with an alert.
@@ -216,19 +220,20 @@ function sheetLinkReloadState(payload) {
 }
 
 function sheetLinkDirtyNeedsData(dirty) {
-  return !!(dirty && (dirty.allCore || dirty.all || dirty.config || dirty.category || (dirty.records && dirty.records.length)));
+  return !!(dirty && (dirty.allCore || dirty.all || dirty.schema || dirty.config || dirty.category || (dirty.records && dirty.records.length)));
 }
 
 function sheetLinkDirtyNeedsView(dirty, sheetName) {
   return !!(dirty && dirty.viewSheets && dirty.viewSheets.indexOf(sheetName) >= 0);
 }
 
-function sheetLinkApplyDirtyData(dirty) {
+function sheetLinkApplyDirtyData(dirty, decision) {
   if (!sheetLinkDirtyNeedsData(dirty)) { return null; }
   var localDraftIds = typeof refreshLocalDraftIds === 'function' ? refreshLocalDraftIds() : [];
   var draft = {};
   localDraftIds.forEach(function (id) { draft[id] = true; });
-  if ((dirty.allCore || dirty.all || dirty.config) && typeof sidebarBoot === 'function') {
+  var mode = decision && decision.ram ? decision.ram.mode : '';
+  if ((dirty.allCore || dirty.all || dirty.schema || dirty.config || mode === 'fullCore') && typeof sidebarBoot === 'function') {
     if (localDraftIds.length) { return { deferred: true, reason: 'Sidebar đang giữ bản nháp, chưa nạp lại full core.' }; }
     return sidebarBoot();
   }
@@ -249,13 +254,13 @@ function sheetLinkApplyDirtyData(dirty) {
   return null;
 }
 
-function sheetLinkScheduleDirtyCheck(delayMs) {
+function sheetLinkScheduleDirtyCheck(delayMs, forceImmediate) {
   if (SHEET_LINK_RELOAD_TIMER !== null && typeof clearTimeout === 'function') { clearTimeout(SHEET_LINK_RELOAD_TIMER); }
   SHEET_LINK_RELOAD_TIMER = null;
   if (typeof setTimeout !== 'function' || !SHEET_LINK_RAM_READY) { return null; }
   SHEET_LINK_RELOAD_TIMER = setTimeout(function () {
     SHEET_LINK_RELOAD_TIMER = null;
-    sheetLinkSyncDirtyData();
+    sheetLinkSyncDirtyData({ forceImmediate: forceImmediate === true });
   }, Math.max(0, Number(delayMs) || 0));
   return SHEET_LINK_RELOAD_TIMER;
 }
@@ -265,59 +270,115 @@ function sheetLinkCancelDirtyCheck() {
   SHEET_LINK_RELOAD_TIMER = null;
 }
 
-/**
- * Hỏi GAS phân loại vùng vừa sửa trước khi đặt debounce. Extension không đọc
- * hàng 1 và không tự đoán cột `@`; cột không hợp lệ trả `ram.action: none`.
- * Nếu phép hỏi lỗi, đặt timer bảo thủ để không bỏ sót một bản ghi hợp lệ.
- */
-function sheetLinkProbeEditReload(ctx) {
-  if (!ctx || typeof callServer !== 'function' || !SHEET_LINK_RAM_READY) { return null; }
-
-  var ticket = ++SHEET_LINK_EDIT_TICKET;
-  var request = callServer('inspectEditReload', [ctx.sheetName, ctx.row, ctx.col, ctx.rowEnd, ctx.colEnd]);
-  SHEET_LINK_EDIT_PROBE = request;
-  request.then(function (result) {
-    if (ticket !== SHEET_LINK_EDIT_TICKET || !SHEET_LINK_RAM_READY) { return result; }
-    var decision = result && result.decision;
-    var ram = decision && decision.ram;
-    if (!ram || ram.action === 'none') { return result; }
-    var waitMs = Number(result.waitMs);
-    if (!isFinite(waitMs) || waitMs < 0) { waitMs = Number(ram.waitMs); }
-    if (!isFinite(waitMs) || waitMs < 0) { waitMs = 3000; }
-    sheetLinkScheduleDirtyCheck(waitMs);
-    return result;
-  }, function (err) {
-    if (ticket === SHEET_LINK_EDIT_TICKET && SHEET_LINK_RAM_READY) {
-      sheetLinkScheduleDirtyCheck(sheetLinkMs('RELOAD_DEBOUNCE_MS', 3000));
-    }
-    if (typeof console !== 'undefined' && console.warn) { console.warn(err); }
-    return null;
-  });
-  return request;
+/** Một request đánh thức GAS sau khi hint cuối đã yên một giây. */
+function sheetLinkScheduleWake(reason) {
+  if (!SHEET_LINK_RAM_READY || typeof setTimeout !== 'function') { return null; }
+  SHEET_LINK_WAKE_REASON = reason || 'hint';
+  if (SHEET_LINK_WAKE_TIMER !== null && typeof clearTimeout === 'function') { clearTimeout(SHEET_LINK_WAKE_TIMER); }
+  SHEET_LINK_WAKE_TIMER = setTimeout(function () {
+    SHEET_LINK_WAKE_TIMER = null;
+    sheetLinkProbeSelectionAndReload(SHEET_LINK_WAKE_REASON);
+  }, sheetLinkMs('SELECTION_WAKE_DEBOUNCE_MS', 1000));
+  return SHEET_LINK_WAKE_TIMER;
 }
 
-function sheetLinkScheduleEditReload(ctx, wasEditing) {
-  if (!ctx || ctx.isEditing || !wasEditing || !SHEET_LINK_RAM_READY) { return; }
-  if (ctx.sheetName === 'Customer' || ctx.sheetName === 'Activity') {
-    sheetLinkCancelDirtyCheck();
-    sheetLinkProbeEditReload(ctx);
-  } else if (ctx.sheetName === 'Category' || ctx.sheetName === 'Config') {
-    // Hai sheet cấu hình không gom 3 giây: lần kết thúc edit là điểm chạm
-    // tự nhiên gần nhất, và reload riêng Category phải phản hồi ngay.
-    sheetLinkScheduleDirtyCheck(0);
+function sheetLinkLocalDraftInput() {
+  var ids = typeof refreshLocalDraftIds === 'function' ? refreshLocalDraftIds() : [];
+  return { recordIds: ids };
+}
+
+/** Chỉ coi revision đã xử lý sau khi công việc nạp thực sự thành công. */
+function sheetLinkReloadWorkSucceeded(value) {
+  return !!value && value.deferred !== true && value.reloadFailed !== true && value.ok !== false;
+}
+
+function sheetLinkApplyDecisionResult(result, options) {
+  if (!result) { return null; }
+  var state = sheetLinkReloadState(result);
+  var decision = result.decision || (typeof reloadDecisionForState === 'function' ? reloadDecisionForState({ reloadState: state }) : null);
+  if (!decision || !decision.ram || decision.ram.action === 'none') {
+    return result;
   }
+  var opts = options || {};
+  var waitMs = Number(decision.ram.waitMs);
+  if (!isFinite(waitMs) || waitMs < 0) { waitMs = 0; }
+  if (decision.ram.action === 'defer' && waitMs === 0 && opts.forceImmediate !== true) {
+    return { deferred: true, reason: decision.ram.reason, reload: state, decision: decision };
+  }
+  if (waitMs > 0 && opts.forceImmediate !== true) {
+    sheetLinkScheduleDirtyCheck(waitMs, false);
+    return { deferred: true, waitMs: waitMs, reload: state, decision: decision };
+  }
+  var refresh = function () { return sheetLinkApplyDirtyData(state, decision); };
+  var work = typeof sidebarBusyRun === 'function' ? sidebarBusyRun('Đang đồng bộ dữ liệu vừa thay đổi…', refresh) : refresh();
+  if (!work || typeof work.then !== 'function') {
+    if (sheetLinkReloadWorkSucceeded(work) && state && state.revision) {
+      SHEET_LINK_LAST_SEEN_REVISION = Math.max(SHEET_LINK_LAST_SEEN_REVISION, Number(state.revision) || 0);
+    }
+    return work;
+  }
+  return work.then(function (value) {
+    // Chỉ ghi nhận revision sau khi Store đã nhận dữ liệu. Nếu reload thất bại
+    // hoặc bị hoãn vì bản nháp, lần hỏi sau vẫn phải thấy signal cũ.
+    if (sheetLinkReloadWorkSucceeded(value) && state && state.revision) {
+      SHEET_LINK_LAST_SEEN_REVISION = Math.max(SHEET_LINK_LAST_SEEN_REVISION, Number(state.revision) || 0);
+    }
+    return value;
+  });
+}
+
+/** Hỏi selection + ReloadState trong đúng một round-trip; GAS tự quyết định đọc mã và scope RAM. */
+function sheetLinkProbeSelectionAndReload(reason, options) {
+  if (!SHEET_LINK_RAM_READY || typeof callServer !== 'function') { return null; }
+  if (SHEET_LINK_SELECTION_PENDING) { return SHEET_LINK_SELECTION_PENDING; }
+  var opts = options || {};
+  var input = {
+    previousSelectionContext: SHEET_LINK_SELECTION_CONTEXT,
+    previousCustomerId: SHEET_LINK_PREVIOUS_CUSTOMER_ID,
+    lastSeenRevision: SHEET_LINK_LAST_SEEN_REVISION,
+    localDraft: sheetLinkLocalDraftInput(),
+    reason: reason || 'wake',
+    forceImmediate: opts.forceImmediate === true
+  };
+  var request = callServer('probeSelectionAndReload', [input], { silent: true });
+  var settled = request.then(function (result) {
+    if (result && result.selection) {
+      SHEET_LINK_SELECTION_CONTEXT = Object.assign({}, result.selection);
+      SHEET_LINK_PREVIOUS_CUSTOMER_ID = String(result.selection.customerId || '').trim();
+      sheetLinkApplyContext(Object.assign({}, result.selection));
+    }
+    var applied = sheetLinkApplyDecisionResult(result, opts);
+    return applied && typeof applied.then === 'function' ? applied.then(function () { return result; }) : result;
+  }, function (error) {
+    if (typeof console !== 'undefined' && console.warn) { console.warn('Không kiểm tra được selection/reload; sẽ thử lại ở nhịp sau.', error); }
+    return null;
+  });
+  SHEET_LINK_SELECTION_PENDING = settled.then(function (result) {
+    SHEET_LINK_SELECTION_PENDING = null;
+    if (typeof selectionPollResetSafety === 'function') { selectionPollResetSafety(); }
+    return result;
+  }, function (error) {
+    SHEET_LINK_SELECTION_PENDING = null;
+    if (typeof selectionPollResetSafety === 'function') { selectionPollResetSafety(); }
+    throw error;
+  });
+  return SHEET_LINK_SELECTION_PENDING;
 }
 
 /** Đồng bộ dữ liệu kho cũng chỉ có một lượt đang bay; chỉ khóa sidebar sau khi máy chủ xác nhận có dữ liệu bẩn. */
-function sheetLinkSyncDirtyData() {
+function sheetLinkSyncDirtyData(options) {
   if (SHEET_LINK_DATA_PENDING) { return SHEET_LINK_DATA_PENDING; }
   if (SHEET_LINK_RELOAD_CHECKING) { return SHEET_LINK_RELOAD_CHECKING; }
+  var opts = options || {};
   var settled = false;
-  var work = callServer('getReloadState').then(function (state) {
+  var work = callServer('getReloadState', [], { silent: true }).then(function (state) {
     var dirty = sheetLinkReloadState(state);
     if (!sheetLinkDirtyNeedsData(dirty)) { return null; }
-    var refresh = function () { return sheetLinkApplyDirtyData(dirty); };
-    return typeof sidebarBusyRun === 'function' ? sidebarBusyRun('Đang đồng bộ dữ liệu vừa thay đổi…', refresh) : refresh();
+    var decision = null;
+    if (typeof reloadDecisionForState === 'function') {
+      decision = reloadDecisionForState({ reloadState: dirty, lastSeenRevision: opts.forceImmediate ? 0 : SHEET_LINK_LAST_SEEN_REVISION, localDraft: sheetLinkLocalDraftInput(), forceImmediate: opts.forceImmediate === true });
+    }
+    return sheetLinkApplyDecisionResult({ reload: dirty, decision: decision }, opts);
   });
   var request = work.then(function (result) {
     settled = true;
@@ -334,11 +395,10 @@ function sheetLinkSyncDirtyData() {
 
 /** Được gọi sau một lời gọi máy chủ tự nhiên; không chạy theo nhịp riêng và không gọi lại chính getReloadState. */
 function sheetLinkObserveReloadPayload(payload, serverName) {
-  if (!payload || payload.reloadObservation === false || !SHEET_LINK_RAM_READY || serverName === 'getReloadState' || serverName === 'reloadRecords') { return null; }
+  if (!payload || payload.reloadObservation === false || !SHEET_LINK_RAM_READY || serverName === 'getReloadState' || serverName === 'reloadRecords' || serverName === 'probeSelectionAndReload') { return null; }
   var state = sheetLinkReloadState(payload);
   var revision = Number(state && state.revision || 0);
   if (!revision || revision <= SHEET_LINK_LAST_SEEN_REVISION) { return null; }
-  SHEET_LINK_LAST_SEEN_REVISION = revision;
   if (!sheetLinkDirtyNeedsData(state)) { return null; }
   if (SHEET_LINK_RELOAD_CHECKING) { return SHEET_LINK_RELOAD_CHECKING; }
   var check = sheetLinkSyncDirtyData();
@@ -375,7 +435,7 @@ function sheetLinkInspectView(sheetName) {
   if (state.pending) { return state.pending; }
   if (state.inspecting) { return state.inspecting; }
   var settled = false;
-  var work = callServer('inspectViewState', [sheetName, state.revision]).then(function (result) {
+  var work = callServer('inspectViewState', [sheetName, state.revision], { silent: true }).then(function (result) {
     if (!result) { return result; }
     var dirty = sheetLinkReloadState(result);
     var refreshData = sheetLinkDirtyNeedsData(dirty);
@@ -406,6 +466,10 @@ function sheetLinkInspectView(sheetName) {
 function sheetLinkApplyContext(ctx) {
   if (!ctx) { return null; }
   SHEET_LINK_LAST_CONTEXT = Object.assign({}, ctx);
+  SHEET_LINK_SELECTION_CONTEXT = Object.assign({}, ctx);
+  if (Object.prototype.hasOwnProperty.call(ctx, 'customerId')) {
+    SHEET_LINK_PREVIOUS_CUSTOMER_ID = String(ctx.customerId || '').trim();
+  }
   var ticket = ++SHEET_LINK_APPLY_TICKET;
   var previousSheet = SHEET_LINK_LAST_SHEET;
   var changedSheet = ctx.sheetName !== previousSheet;
@@ -424,7 +488,6 @@ function sheetLinkApplyContext(ctx) {
   if (viewState && changedSheet && !viewState.metaReady) { viewState.needsSync = true; }
 
   SHEET_LINK_LAST_SHEET = ctx.sheetName || '';
-  if (ctx.isEditing) { return; }
   if (!SHEET_LINK_RAM_READY) { return; }
 
   var leavingDataSheet = changedSheet && (previousSheet === 'Customer' || previousSheet === 'Activity');
@@ -444,7 +507,7 @@ function sheetLinkApplyContext(ctx) {
         // Rời sheet thắng debounce: hủy timer còn lại để không tạo thêm một
         // lượt hỏi sau khi lượt reload tức thời đã hoàn tất.
         sheetLinkCancelDirtyCheck();
-        queue(sheetLinkSyncDirtyData);
+        queue(function () { return sheetLinkSyncDirtyData({ forceImmediate: true }); });
       }
       else if (SHEET_LINK_DATA_PENDING) { queue(function () { return SHEET_LINK_DATA_PENDING; }); }
 

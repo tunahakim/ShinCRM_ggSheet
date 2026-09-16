@@ -17,11 +17,12 @@ var CONTEXT_VERSION = 1;
 var lastContextKey = "";   // dấu vết ảnh chụp cuối đã bắn (không gồm at/seq)
 var seqCounter = 0;
 var cachedNameBox = null;
-var cachedFormulaBar = null;
 var liveRequestCounter = 0;
 var livePendingRequest = null;
 var LIVE_MODEL_TIMEOUT_MS = 800;
 var liveRetryAt = 0;
+var pendingKeydownHint = false;
+var lastResolvedCustomerId = '';
 
 function liveHeaderForSheet(sheetName) {
   var hints = typeof CRM_COLUMN_HINTS !== 'undefined' ? CRM_COLUMN_HINTS : null;
@@ -39,11 +40,27 @@ function liveHeaderForSheet(sheetName) {
 
 function sendResolvedContext(base, result, fallbackHeader, fallbackReason) {
   var context = Object.assign({}, base);
-  context.customerId = result && result.status === 'ok' ? String(result.customerId || '').trim() : '';
+  if (result && result.status === 'ok') { lastResolvedCustomerId = String(result.customerId || '').trim(); }
+  // Kết quả live thất bại không được mượn mã cũ cho vị trí mới; cache chỉ phục vụ hint keydown.
+  context.customerId = result && result.status === 'ok' ? lastResolvedCustomerId : '';
   context.customerIdHeader = result && result.header ? result.header : (fallbackHeader || '');
   context.customerIdSource = 'live-model';
   context.customerIdStatus = result && result.status ? result.status : 'unavailable';
   context.customerIdReason = result && result.reason ? result.reason : (fallbackReason || '');
+  seqCounter += 1;
+  context.at = Date.now();
+  context.seq = seqCounter;
+  sendContextToSidebar(context);
+}
+
+function sendKeydownHint(base) {
+  var context = Object.assign({}, base, {
+    hint: 'keydown',
+    customerId: lastResolvedCustomerId,
+    customerIdSource: 'live-model-cache',
+    customerIdStatus: lastResolvedCustomerId ? 'ok' : 'unavailable',
+    customerIdReason: 'KEYDOWN_HINT'
+  });
   seqCounter += 1;
   context.at = Date.now();
   context.seq = seqCounter;
@@ -92,8 +109,8 @@ window.addEventListener('message', function (event) {
  *   - Các ô khác ô đang chọn được đọc qua live model trong MAIN world; DOM chỉ cung cấp tọa độ và trạng thái sửa.
  *   - Không đọc được hàng mã cột ở hàng 1, điều kiện lọc ở hàng 3, định dạng ô, ghi chú ô.
  *   - Không đọc được gid của tab chưa kích hoạt: gid chỉ hiện ở location.hash của tab đang mở.
- *   - Trạng thái đang sửa (isEditing) suy từ focus của thanh công thức, không phải từ canvas.
- * Sidebar bù phần thiếu bằng cách tự hỏi máy chủ (SelectionService), không phải bằng cách đọc DOM.
+ *   - Extension không kết luận ô vừa được sửa; việc này thuộc trigger onEdit của GAS.
+ * Sidebar hỏi máy chủ (SelectionService) sau hint để quyết định reload, không dựa vào DOM.
  */
 
 function colLettersToNumber(colStr) {
@@ -162,15 +179,6 @@ function readCellRef() {
   return String(cachedNameBox.value || cachedNameBox.innerText || "");
 }
 
-function readFormulaBar() {
-  if (!cachedFormulaBar || !cachedFormulaBar.isConnected) {
-    cachedFormulaBar = document.getElementById('t-formula-bar-input') || document.querySelector('.cell-input');
-  }
-  if (!cachedFormulaBar) { return { cellText: "", isEditing: false }; }
-  var cellText = cachedFormulaBar.value !== undefined ? String(cachedFormulaBar.value) : String(cachedFormulaBar.textContent || "");
-  return { cellText: cellText, isEditing: document.activeElement === cachedFormulaBar };
-}
-
 function readSheetTabs() {
   var gidHienTai = readGid();
   var tabs = [];
@@ -190,11 +198,10 @@ function readActiveSheetName() {
   return tabNameEl ? String(tabNameEl.innerText || tabNameEl.textContent || "").trim() : "";
 }
 
-/** Dựng một ảnh chụp trạng thái. Mọi trường đều là thứ đọc được từ DOM, sidebar tự quyết dùng gì. */
+/** Dựng ảnh chụp selection. Không đọc nội dung ô hay trạng thái edit từ DOM. */
 function buildContext() {
   var cellRef = readCellRef();
   var toaDo = parseRangeRef(cellRef);
-  var thanhCongThuc = readFormulaBar();
 
   return {
     v: CONTEXT_VERSION,
@@ -207,28 +214,36 @@ function buildContext() {
     rowEnd: toaDo ? toaDo.rowEnd : 0,
     colEnd: toaDo ? toaDo.colEnd : 0,
     selectionKind: toaDo ? toaDo.selectionKind : (cellRef ? 'named' : 'none'),
-    cellText: thanhCongThuc.cellText,
-    isEditing: thanhCongThuc.isEditing,
     sheetTabs: readSheetTabs()
   };
 }
+
+document.addEventListener('keydown', function () {
+  pendingKeydownHint = true;
+}, true);
 
 setInterval(function () {
   if (document.hidden || !sidebarWindow) { return; }
 
   var context = buildContext();
 
-  // Chỉ bắn khi có gì đổi, so trên toàn ảnh chụp (at/seq không tham gia so sánh).
+  // Chỉ bắn khi selection đổi hoặc có phím gõ. Phím gõ ở cùng một ô chỉ là
+  // hint cho Sidebar, không khởi động live-model đọc mã khách lần nữa.
   var key = JSON.stringify(context);
-  if (key === lastContextKey) { return; }
+  var hasKeydownHint = pendingKeydownHint;
+  if (key === lastContextKey && !hasKeydownHint) { return; }
   if (Date.now() < liveRetryAt) { return; }
+  if (key === lastContextKey && hasKeydownHint) {
+    pendingKeydownHint = false;
+    sendKeydownHint(context);
+    return;
+  }
+  pendingKeydownHint = false;
   lastContextKey = key;
 
   var header = liveHeaderForSheet(context.sheetName);
   if (context.selectionKind !== 'cell') {
     sendResolvedContext(context, null, header, 'UNSUPPORTED_SELECTION');
-  } else if (context.isEditing) {
-    sendResolvedContext(context, null, header, 'EDITING');
   } else if (!header) {
     sendResolvedContext(context, null, '', 'NO_SCHEMA_TARGET');
   } else {

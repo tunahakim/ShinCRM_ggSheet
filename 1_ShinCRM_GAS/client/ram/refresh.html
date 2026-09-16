@@ -81,7 +81,13 @@ function refreshManualSheetApply(result) {
 
 function refreshFullCore(result) {
   if (typeof screenStateGoView === 'function') { screenStateGoView(); }
-  return typeof sidebarBoot === 'function' ? sidebarBoot().then(function () { return result; }) : result;
+  if (typeof sidebarBoot !== 'function') { return result; }
+  return sidebarBoot().then(function (bootResult) {
+    if (!bootResult || bootResult.ok !== true) {
+      return { ok: false, reloadFailed: true, reload: result, boot: bootResult || null };
+    }
+    return result;
+  });
 }
 
 function refreshDirtyRecords(ids, expectedRevision, retryDepth) {

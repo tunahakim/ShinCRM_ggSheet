@@ -46,10 +46,13 @@ async function sidebarBoot() {
 
     if (core.blocked) {
       statusBudgetBlocked(core.budget);
-      return;
+      return { ok: false, blocked: core.blocked, budget: core.budget };
     }
 
     var skipped = ingestCore(core);
+    if (typeof SHEET_LINK_LAST_SEEN_REVISION !== 'undefined' && core.processedRevision !== undefined) {
+      SHEET_LINK_LAST_SEEN_REVISION = Math.max(SHEET_LINK_LAST_SEEN_REVISION, Number(core.processedRevision) || 0);
+    }
     sheetLinkSetSpreadsheetId(core.spreadsheetId);
     if (typeof sheetLinkSetColumnHints === 'function') {
       sheetLinkSetColumnHints({
@@ -92,9 +95,17 @@ async function sidebarBoot() {
     collapseScan();
     bootTellProblems(BOOT_LAST_SUMMARY);
 
-    await callServer('logClientTiming', [timing]);
+    // Ghi timing là quan sát không bắt buộc; không để một lỗi log khiến lượt nạp dữ liệu đã thành công bị coi là thất bại.
+    try {
+      await callServer('logClientTiming', [timing]);
+    } catch (timingError) {
+      if (typeof console !== 'undefined' && console.warn) { console.warn('Không ghi được timing lượt nạp.', timingError); }
+    }
+    return { ok: true, core: core, summary: BOOT_LAST_SUMMARY };
   } catch (err) {
-    statusLoadError(err && err.message ? err.message : String(err));
+    var message = err && err.message ? err.message : String(err);
+    statusLoadError(message);
+    return { ok: false, error: message };
   } finally {
     if (finishBusy) { finishBusy(); }
   }

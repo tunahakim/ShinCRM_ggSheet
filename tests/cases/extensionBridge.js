@@ -4,6 +4,7 @@ const vm = require('vm');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 
 const BRIDGE_FILE = path.join(__dirname, '..', '..', '2_ShinCRM_Extension', 'content_scripts', 'bridge', 'iframe_bridge.js');
+const SCOUT_FILE = path.join(__dirname, '..', '..', '2_ShinCRM_Extension', 'content_scripts', 'scout', 'sheet_scout.js');
 const WORKER_FILE = path.join(__dirname, '..', '..', '2_ShinCRM_Extension', 'background', 'service_worker.js');
 const EXECUTOR_FILE = path.join(__dirname, '..', '..', '2_ShinCRM_Extension', 'content_scripts', 'fbm_sync', 'executor.js');
 const TRANSPORT_CORE_FILE = path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'transport', 'TransportCore.js');
@@ -48,6 +49,10 @@ function nguonTin() {
 
 async function chay(so) {
   section('Extension bridge — nonce đi trọn từ bắt tay tới CRM_CONTEXT');
+  const scoutSource = fs.readFileSync(SCOUT_FILE, 'utf8');
+  check(so, 'Extension chỉ quan sát selection, không đọc formula bar hoặc suy isEditing',
+    [scoutSource.indexOf('readFormulaBar') < 0, scoutSource.indexOf('cachedFormulaBar') < 0, scoutSource.indexOf('isEditing') < 0, scoutSource.indexOf("addEventListener('keydown'") >= 0, scoutSource.indexOf('sendKeydownHint') >= 0],
+    [true, true, true, true, true]);
   let hop;
   try { hop = napBridge(); } catch (err) { return ghiLoiNap(so, 'nạp iframe_bridge.js', err); }
 

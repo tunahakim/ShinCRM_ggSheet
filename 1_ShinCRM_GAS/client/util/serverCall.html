@@ -8,7 +8,7 @@
  * Bọc một lần ở đây thì `await` đọc như code chạy tuần tự, và không có đường nào quên bắt lỗi.
  *
  * Cặp `progressBegin` / `progressEnd` cũng nằm ở đây vì cùng lý do: một lời gọi nào đó quên bật dải thì dải sai, mà không
- * ai đọc code thấy nó sai. Bật ở cửa duy nhất thì không có gì phải nhớ.
+ * ai đọc code thấy nó sai. Các phép hỏi trạng thái có thể truyền `{ silent: true }` để không làm nhấp nháy loading.
  *
  * **Không tự hiện lỗi.** Việc hiện thuộc bên gọi, vì cùng một lỗi thì đường nạp lõi phải vẽ màn chặn cả khung, còn đường
  * nạp gói nền chỉ nên ghi một dòng trong khối thông tin. Một hàm hiện lỗi chung ở đây sẽ hiện sai ở một trong hai ca.
@@ -24,15 +24,17 @@
  * chính là chỗ nhận nó.
  */
 var CALL_SERVER_TIMEOUT_MS = 30000;
-function callServer(name, args) {
+function callServer(name, args, options) {
+  var opts = options || {};
+  var showProgress = opts.silent !== true && opts.progress !== false;
   return new Promise(function (resolve, reject) {
-    progressBegin();
+    if (showProgress) { progressBegin(); }
     var batDau = Date.now();
     var settled = false;
     var timeout = setTimeout(function () {
       if (settled) { return; }
       settled = true;
-      progressEnd();
+      if (showProgress) { progressEnd(); }
       callTimingRecord(name, Date.now() - batDau, null);
       reject(new Error('Máy chủ không phản hồi hàm ' + name + ' sau ' + CALL_SERVER_TIMEOUT_MS + ' ms.'));
     }, CALL_SERVER_TIMEOUT_MS);
@@ -42,7 +44,7 @@ function callServer(name, args) {
         if (settled) { return; }
         settled = true;
         clearTimeout(timeout);
-        progressEnd();
+        if (showProgress) { progressEnd(); }
         callTimingRecord(name, Date.now() - batDau, result && result.ms);
         if (typeof sheetLinkObserveReloadPayload === 'function') { sheetLinkObserveReloadPayload(result, name); }
         resolve(result);
@@ -51,7 +53,7 @@ function callServer(name, args) {
         if (settled) { return; }
         settled = true;
         clearTimeout(timeout);
-        progressEnd();
+        if (showProgress) { progressEnd(); }
         callTimingRecord(name, Date.now() - batDau, null);
         reject(err);
       });

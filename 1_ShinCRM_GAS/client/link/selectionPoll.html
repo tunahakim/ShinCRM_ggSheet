@@ -1,6 +1,7 @@
 <script>
 /**
- * Đường dự phòng khi không có Extension: hỏi vị trí ô theo nhịp 2/6 giây, và giữ cùng một sự thật cho bộ đếm, icon sét, băng cảnh báo.
+ * Đường dự phòng khi không có Extension: hỏi selection theo nhịp 2/6 giây.
+ * Mỗi request cũng hỏi ReloadState; GAS quyết định có đọc mã khách và nạp RAM.
  *
  * `CRM_CONTEXT` không tham gia quyết định Extension sống hay chết. Chỉ ACK của bắt tay được quyền đổi trạng thái đó; nếu sheet ngồi im hai phút thì ACK vẫn đủ để nhịp dò không gọi máy chủ lần nào.
  */
@@ -13,6 +14,7 @@ var SELECTION_POLL = {
   bootAt: 0,
   timer: null,
   inFlight: false,
+  safetyTimer: null,
   lastPosition: '',
   stableCount: 0,
   intervalMs: 2000
@@ -79,32 +81,24 @@ function selectionPollFinish() {
   else { selectionPollClearTimer(); }
 }
 
-function selectionPollReadFull() {
-  if (!selectionPollEligible()) { return Promise.resolve(null); }
-  return callServer('probeSelectionFull').then(function (full) {
-    if (selectionPollEligible()) {
-      SELECTION_POLL.lastPosition = selectionPollPositionKey(full);
-      selectionPollApplyResult(full);
-    }
-    return full;
-  });
-}
-
-/** Một nhịp giữ cờ cho cả lượt cheap rồi full; gọi lại khi lời gọi trước chưa về chỉ bỏ nhịp, không dựng vòng thứ hai. */
+/** Một nhịp chỉ có một request selection + reload; không còn chuỗi cheap/full qua mạng. */
 function selectionPollTick() {
   SELECTION_POLL.timer = null;
   if (!selectionPollEligible() || SELECTION_POLL.inFlight) { return null; }
 
   SELECTION_POLL.inFlight = true;
-  return callServer('probeSelectionCheap').then(function (cheap) {
+  var request = typeof sheetLinkProbeSelectionAndReload === 'function'
+    ? sheetLinkProbeSelectionAndReload('selection-poll')
+    : null;
+  return Promise.resolve(request).then(function (result) {
     if (!selectionPollEligible()) { return null; }
-
-    var key = selectionPollPositionKey(cheap);
+    var selection = result && result.selection ? result.selection : result;
+    var key = selectionPollPositionKey(selection);
     if (key !== SELECTION_POLL.lastPosition) {
       SELECTION_POLL.lastPosition = key;
       SELECTION_POLL.stableCount = 0;
       SELECTION_POLL.intervalMs = selectionPollMs('SELECTION_POLL_MS', 2000);
-      return selectionPollReadFull();
+      return result;
     }
 
     SELECTION_POLL.stableCount += 1;
@@ -128,6 +122,35 @@ function selectionPollWake() {
   SELECTION_POLL.intervalMs = selectionPollMs('SELECTION_POLL_MS', 2000);
   if (selectionPollEligible() && !SELECTION_POLL.inFlight) { selectionPollSchedule(SELECTION_POLL.intervalMs); }
   if (typeof sheetLinkSyncDirtyData === 'function' && typeof SHEET_LINK_RAM_READY !== 'undefined' && SHEET_LINK_RAM_READY) { sheetLinkSyncDirtyData(); }
+}
+
+function selectionPollClearSafety() {
+  if (SELECTION_POLL.safetyTimer !== null) {
+    clearTimeout(SELECTION_POLL.safetyTimer);
+    SELECTION_POLL.safetyTimer = null;
+  }
+}
+
+function selectionPollSafetyMs() {
+  return selectionPollMs('RELOAD_SAFETY_POLL_MS', 60000);
+}
+
+function selectionPollScheduleSafety() {
+  selectionPollClearSafety();
+  if (!SELECTION_POLL.ready || (typeof document !== 'undefined' && document.hidden) || typeof setTimeout !== 'function') { return; }
+  SELECTION_POLL.safetyTimer = setTimeout(function () {
+    SELECTION_POLL.safetyTimer = null;
+    if (!SELECTION_POLL.ready || (typeof document !== 'undefined' && document.hidden) || selectionPollSaving()) {
+      selectionPollScheduleSafety();
+      return;
+    }
+    var work = typeof sheetLinkProbeSelectionAndReload === 'function' ? sheetLinkProbeSelectionAndReload('safety-poll') : null;
+    Promise.resolve(work).then(selectionPollScheduleSafety, selectionPollScheduleSafety);
+  }, selectionPollSafetyMs());
+}
+
+function selectionPollResetSafety() {
+  if (SELECTION_POLL.ready) { selectionPollScheduleSafety(); }
 }
 
 function selectionPollPaint() {
@@ -173,6 +196,8 @@ function selectionPollEvaluate() {
 
 function selectionPollSetReady(ready) {
   SELECTION_POLL.ready = ready === true;
+  if (SELECTION_POLL.ready) { selectionPollScheduleSafety(); }
+  else { selectionPollClearSafety(); }
   selectionPollEvaluate();
 }
 
@@ -183,10 +208,12 @@ function selectionPollPreferenceChanged() {
 
 function selectionPollVisibilityChanged() {
   if (document.hidden) {
+    selectionPollClearSafety();
     selectionPollEvaluate();
     return;
   }
   selectionPollWake();
+  selectionPollScheduleSafety();
   if (typeof sheetLinkSyncDirtyData === 'function' && typeof SHEET_LINK_RAM_READY !== 'undefined' && SHEET_LINK_RAM_READY) { sheetLinkSyncDirtyData(); }
 }
 
