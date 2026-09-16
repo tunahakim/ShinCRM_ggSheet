@@ -52,7 +52,7 @@ function chay(so) {
   const styles = docTep('client/style/components.html');
 
   check(so, 'core khai đủ Block helper dùng chung cho Sync',
-    ['Box', 'Card', 'Row', 'Text', 'Field', 'Button', 'Icon', 'Check', 'StandaloneControl', 'StandaloneField'].every((name) => common.indexOf('function ' + name + '(') >= 0),
+    ['Box', 'Stack', 'Card', 'Row', 'Text', 'Field', 'Button', 'Icon', 'Check', 'StandaloneControl', 'StandaloneField'].every((name) => common.indexOf('function ' + name + '(') >= 0),
     true);
   check(so, 'renderer StandaloneControl dùng lớp input/toggle chung, không có lớp Sync riêng',
     [engine.indexOf("'shin-input'") >= 0, engine.indexOf("'shin-toggle-control'") >= 0, engine.indexOf('shin-sync-') === -1],
@@ -84,6 +84,10 @@ function chay(so) {
   check(so, 'Card dùng một nhịp gap chung cho các Block con và không cộng margin cho field trực tiếp',
     [styles.indexOf('.shin-card-body {') >= 0, styles.indexOf('flex-direction: column;') >= 0, styles.indexOf('gap: var(--shin-gap-2);') >= 0, styles.indexOf('.shin-card-body > * { margin-top: 0; margin-bottom: 0; }') >= 0],
     [true, true, true, true]);
+  check(so, 'Nhóm action chỉ chọn biến thể, không tự sở hữu layout dọc',
+    [styles.indexOf('.shin-stack { display: flex; flex-direction: column; gap: var(--shin-gap-2); min-width: 0; }') >= 0,
+      styles.indexOf('.shin-action-stack { display: flex;') >= 0],
+    [true, false]);
   check(so, 'Sync dùng Notice lõi thay vì tự lặp bảng ánh xạ lớp thông báo',
     [common.indexOf('function Notice(') >= 0, all.indexOf('noticeClasses') >= 0, all.indexOf('noticeClass =') >= 0],
     [true, false, false]);

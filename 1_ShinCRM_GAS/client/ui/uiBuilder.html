@@ -147,6 +147,13 @@ function Block(spec, role) {
 /** Hộp chứa Block con; vai đã có trong hợp đồng renderer nhưng trước đây thiếu hàm dựng công khai. */
 function Box(spec) { return Block(spec, 'box'); }
 
+/** Nhóm Block theo cột; nhịp dọc do component lõi quyết định, màn chỉ chọn biến thể hình thức. */
+function Stack(spec) {
+  var o = Array.isArray(spec) ? { elements: spec } : (spec || {});
+  var className = ('shin-stack ' + String(o.className || '')).trim();
+  return Box(Object.assign({}, o, { className: className }));
+}
+
 /** Khối có khung và có tiêu đề, `titleActions` là hàng hành động trên tiêu đề — và nó là **mảng** kể cả khi có đúng một mục, tài liệu 04 Phần 4B. */
 function Card(spec) { return Block(spec, 'card'); }
 

@@ -161,7 +161,7 @@ async function chay(so) {
   hop.FBM_SYNC_CLIENT.accountSettingsInvalid = {};
   const identityBlock = hop.fbmSyncIdentityBlock(idle);
   const identityActions = identityBlock.elements.filter((node) => node && node.id === 'fbm-sync-identity-actions-region')[0];
-  check(so, 'Ba nút liên kết tài khoản dùng nhóm action dọc dùng chung', [identityActions.className, identityActions.elements.length, identityActions.elements[0].role], ['shin-action-stack', 3, 'button']);
+  check(so, 'Ba nút liên kết tài khoản dùng Stack lõi và biến thể action dọc', [identityActions.className, identityActions.elements.length, identityActions.elements[0].role], ['shin-stack shin-action-stack', 3, 'button']);
 
   hop.FBM_SYNC_CLIENT.identityDraft = { spreadsheetId: 'sheet', userId: '', username: 'anhlt', accountName: '' };
   hop.FBM_SYNC_CLIENT.identityInvalid = { spreadsheet: false, user: true, username: false, account: true };
