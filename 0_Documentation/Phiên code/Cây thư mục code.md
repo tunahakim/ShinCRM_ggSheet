@@ -68,6 +68,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── DateText.js           Biên giới duy nhất giữa Date và hai dạng chuỗi thời gian của dự án. google.script.run không mang Date qua được, nên mọi mốc thời gian đi đường chuỗi.
 │   │   └── TextNormalize.js      Chuẩn hóa văn bản trước khi so sánh. Có một bản sinh đôi ở client\util\ — hai bản phải giống nhau từng dòng.
 │   ├── state\
+│   │   ├── ReloadDecision.js    Hàm thuần nhận thay đổi, ReloadState, chính sách và localDraft tùy chọn rồi trả quyết định signal, reload RAM và render view.
 │   │   ├── DirtyState.js         Cờ "sheet đã lệch so với RAM", giữ ở DocumentProperties. Đọc không bao giờ ném lỗi, vì nó đi kèm mọi lượt trả về.
 │   │   └── UserPrefs.js          Ba núm chọn của sidebar, giữ ở UserProperties. Chiều đọc không bao giờ ném vì nó nằm trên đường nạp lõi; chiều ghi ném ngay vì giá trị lạ ở đó là code gọi sai.
 │   ├── gate\                     Các cửa ghi có kỷ luật, cùng họ với LogGate: vào một chỗ, kiểm rồi mới ghi, một lượt một lệnh.
@@ -235,6 +236,7 @@ tests\
     ├── categoryRead.js           Cái bẫy @CAT_CHO_PHEP_FBM, và mọi trường SELECT đều tìm được danh mục của mình.
     ├── configRead.js             Khóa trùng thì chặn, còn khối sắp xếp thì thứ tự hàng là nghĩa.
     ├── dirtyState.js             Khối trạng thái bẩn KHÔNG BAO GIỜ được ném, kể cả khi tệp thuộc tính hỏng hoặc đọc dở dang.
+    ├── reloadDecision.js         Bảng luật thuần dùng chung cho signal, reload RAM, localDraft và render toàn bộ view.
     ├── userPrefs.js              Ba núm chọn phía máy chủ: giá trị lạ đều rơi về ngầm định, và ghi một núm KHÔNG được để lại dấu vết nào ở DocumentProperties.
     ├── schemaAccess.js           Cửa đọc bảng khai: tên gõ sai nổ ngay kèm gợi ý, còn tên máy như toJSON thì phải đi qua.
     ├── fieldLogic.js             Sáu hàm ngầm định: mã kế tiếp lấy từ bộ đếm dạng chuỗi, và giá trị mang theo từ giao dịch gần nhất CÒN SỐNG.

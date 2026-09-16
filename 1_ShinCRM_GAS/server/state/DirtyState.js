@@ -17,6 +17,14 @@ var DIRTY_KEYS = {
   config: 'dirtyConfig',
   all: 'dirtyAll'
 };
+Object.defineProperties(DIRTY_KEYS, {
+  category: { value: 'dirtyCategory', enumerable: false },
+  schema: { value: 'dirtySchema', enumerable: false },
+  allCore: { value: 'dirtyAllCore', enumerable: false },
+  allViews: { value: 'dirtyAllViews', enumerable: false },
+  revision: { value: 'reloadRevision', enumerable: false },
+  changedAt: { value: 'reloadChangedAt', enumerable: false }
+});
 
 /** Một khóa dạng danh sách. Rỗng, thiếu, hay hỏng đều trả về mảng rỗng. */
 function dirtyStateList(props, key) {
@@ -43,15 +51,114 @@ function dirtyStateRead() {
 
   try {
     var props = PropertiesService.getDocumentProperties();
+    var category = props.getProperty(DIRTY_KEYS.category) === 'true';
+    var config = props.getProperty(DIRTY_KEYS.config) === 'true';
     return {
       viewSheets: dirtyStateList(props, DIRTY_KEYS.viewSheets),
       records: dirtyStateList(props, DIRTY_KEYS.records),
-      config: props.getProperty(DIRTY_KEYS.config) === 'true',
-      all: props.getProperty(DIRTY_KEYS.all) === 'true'
+      config: config || category,
+      all: props.getProperty(DIRTY_KEYS.allCore) === 'true' || props.getProperty(DIRTY_KEYS.all) === 'true'
     };
   } catch (khongDocDuocProps) {
     return empty;
   }
+}
+
+/**
+ * Hình dạng đầy đủ của trạng thái reload. `dirtyStateRead` giữ hợp đồng cũ cho các hàm render, còn client mới dùng khối này để
+ * biết phiên bản thay đổi và chọn đúng scope. Một lần ghi làm tăng revision; vì vậy hai Sidebar không được xóa tín hiệu của nhau.
+ */
+function reloadStateRead() {
+  var empty = {
+    revision: 0, changedAt: 0, viewSheets: [], records: [], category: false, config: false, schema: false,
+    allCore: false, allViews: false, all: false
+  };
+  try {
+    var props = PropertiesService.getDocumentProperties();
+    var allCore = props.getProperty(DIRTY_KEYS.allCore) === 'true' || props.getProperty(DIRTY_KEYS.all) === 'true';
+    var category = props.getProperty(DIRTY_KEYS.category) === 'true';
+    var config = props.getProperty(DIRTY_KEYS.config) === 'true';
+    var schema = props.getProperty(DIRTY_KEYS.schema) === 'true';
+    var allViews = props.getProperty(DIRTY_KEYS.allViews) === 'true';
+    var revision = Number(props.getProperty(DIRTY_KEYS.revision) || 0);
+    return {
+      revision: isFinite(revision) && revision >= 0 ? revision : 0,
+      changedAt: Number(props.getProperty(DIRTY_KEYS.changedAt) || 0) || 0,
+      viewSheets: dirtyStateList(props, DIRTY_KEYS.viewSheets),
+      records: dirtyStateList(props, DIRTY_KEYS.records),
+      category: category,
+      config: config,
+      schema: schema,
+      allCore: allCore,
+      allViews: allViews,
+      all: allCore
+    };
+  } catch (khongDocDuocProps) {
+    return empty;
+  }
+}
+
+function dirtyStateBumpRevision(props) {
+  var state = reloadStateRead();
+  props.setProperty(DIRTY_KEYS.revision, String(state.revision + 1));
+  props.setProperty(DIRTY_KEYS.changedAt, String(Date.now()));
+}
+
+function dirtyStateMarkSignal(mark) {
+  var props = PropertiesService.getDocumentProperties();
+  var state = reloadStateRead();
+  if (mark.records && mark.records.length) {
+    dirtyStateWriteList(props, DIRTY_KEYS.records, state.records.concat(mark.records));
+  }
+  if (mark.category) { props.setProperty(DIRTY_KEYS.category, 'true'); }
+  if (mark.config) { props.setProperty(DIRTY_KEYS.config, 'true'); }
+  if (mark.schema) { props.setProperty(DIRTY_KEYS.schema, 'true'); }
+  if (mark.allCore) {
+    props.setProperty(DIRTY_KEYS.allCore, 'true');
+    props.setProperty(DIRTY_KEYS.all, 'true');
+    props.deleteProperty(DIRTY_KEYS.records);
+  }
+  if (mark.allViews) { props.setProperty(DIRTY_KEYS.allViews, 'true'); }
+  if (mark.viewSheets && mark.viewSheets.length) {
+    dirtyStateWriteList(props, DIRTY_KEYS.viewSheets, state.viewSheets.concat(mark.viewSheets));
+  }
+  dirtyStateBumpRevision(props);
+  var next = reloadStateRead();
+  var limit = Number(SETTINGS.DIRTY_RECORD_LIMIT) || 500;
+  if (!next.allCore && next.records.length > limit) {
+    props.deleteProperty(DIRTY_KEYS.records);
+    props.setProperty(DIRTY_KEYS.allCore, 'true');
+    props.setProperty(DIRTY_KEYS.all, 'true');
+  }
+  return reloadStateRead();
+}
+
+/** Ghi phần signal do ReloadDecision trả về; không để từng trigger/cửa ghi tự dựng mark riêng. */
+function dirtyStateMarkDecision(decision) {
+  var signal = decision && decision.signal;
+  if (!signal) { return reloadStateRead(); }
+  var records = Array.isArray(signal.records) ? signal.records : [];
+  var hasSignal = records.length || signal.category || signal.config || signal.schema || signal.allCore || signal.allViews;
+  if (!hasSignal) { return reloadStateRead(); }
+  return dirtyStateMarkSignal({
+    records: records,
+    category: signal.category === true,
+    config: signal.config === true,
+    schema: signal.schema === true,
+    allCore: signal.allCore === true,
+    allViews: signal.allViews === true,
+    viewSheets: signal.viewSheets || []
+  });
+}
+
+/** Một cổng tín hiệu dùng chung cho mọi nguồn ghi thành công xuống Customer/Activity. */
+function dirtyStateMarkRecordChange(entity, recordIds) {
+  if (entity !== 'customer' && entity !== 'activity') { return reloadStateRead(); }
+  return dirtyStateMarkSignal({ records: recordIds || [], allViews: true });
+}
+
+function dirtyStateMarkAllViews(sheetNames) {
+  return dirtyStateMarkSignal({ allViews: true, viewSheets: sheetNames || [] });
 }
 
 function dirtyStateWriteList(props, key, values) {
@@ -72,50 +179,45 @@ function dirtyStateWriteList(props, key, values) {
 function dirtyStateMarkViewSheet(sheetName) {
   var name = String(sheetName === null || sheetName === undefined ? '' : sheetName).trim();
   if (!name) { return dirtyStateRead(); }
-  var props = PropertiesService.getDocumentProperties();
-  var state = dirtyStateRead();
-  dirtyStateWriteList(props, DIRTY_KEYS.viewSheets, state.viewSheets.concat([name]));
+  dirtyStateMarkSignal({ viewSheets: [name] });
   return dirtyStateRead();
 }
 
 function dirtyStateMarkViewSheets(sheetNames) {
-  var props = PropertiesService.getDocumentProperties();
-  var state = dirtyStateRead();
-  dirtyStateWriteList(props, DIRTY_KEYS.viewSheets, state.viewSheets.concat(sheetNames || []));
+  dirtyStateMarkSignal({ viewSheets: sheetNames || [] });
   return dirtyStateRead();
 }
 
 /** Đánh dấu các mã bản ghi; vượt ngưỡng thì bỏ danh sách và bật cờ toàn bộ. */
 function dirtyStateMarkRecords(recordIds) {
-  var state = dirtyStateRead();
-  if (state.all) { return state; }
-  var props = PropertiesService.getDocumentProperties();
-  var existing = state.records.slice();
-  var incoming = Array.isArray(recordIds) ? recordIds : [recordIds];
-  var merged = dirtyStateWriteList({
-    setProperty: function (key, value) { props.setProperty(key, value); },
-    deleteProperty: function (key) { props.deleteProperty(key); }
-  }, DIRTY_KEYS.records, existing.concat(incoming));
-  var limit = Number(SETTINGS.DIRTY_RECORD_LIMIT) || 500;
-  if (merged.length > limit) {
-    props.deleteProperty(DIRTY_KEYS.records);
-    props.setProperty(DIRTY_KEYS.all, 'true');
-  }
+  dirtyStateMarkSignal({ records: Array.isArray(recordIds) ? recordIds : [recordIds] });
   return dirtyStateRead();
 }
 
-/** Đánh dấu Config/Category đã đổi. */
+/** Đánh dấu Config đã đổi. */
 function dirtyStateMarkConfig() {
-  var props = PropertiesService.getDocumentProperties();
-  props.setProperty(DIRTY_KEYS.config, 'true');
+  dirtyStateMarkSignal({ config: true, allViews: true });
+  return dirtyStateRead();
+}
+
+function dirtyStateMarkCategory() {
+  dirtyStateMarkSignal({ category: true, allViews: true });
+  return dirtyStateRead();
+}
+
+function dirtyStateMarkSchema() {
+  dirtyStateMarkSignal({ schema: true, allCore: true, allViews: true });
+  return dirtyStateRead();
+}
+
+function dirtyStateMarkAllViewsOnly(sheetNames) {
+  dirtyStateMarkSignal({ allViews: true, viewSheets: sheetNames || [] });
   return dirtyStateRead();
 }
 
 /** Đánh dấu mọi dữ liệu cần nạp lại. */
 function dirtyStateMarkAll() {
-  var props = PropertiesService.getDocumentProperties();
-  props.setProperty(DIRTY_KEYS.all, 'true');
-  props.deleteProperty(DIRTY_KEYS.records);
+  dirtyStateMarkSignal({ allCore: true, allViews: true });
   return dirtyStateRead();
 }
 
@@ -124,12 +226,15 @@ function dirtyStateClear(options) {
   var props = PropertiesService.getDocumentProperties();
   var opts = options || {};
   if (!Object.keys(opts).length) {
-    Object.keys(DIRTY_KEYS).forEach(function (name) { props.deleteProperty(DIRTY_KEYS[name]); });
+    [DIRTY_KEYS.viewSheets, DIRTY_KEYS.records, DIRTY_KEYS.category, DIRTY_KEYS.config, DIRTY_KEYS.schema, DIRTY_KEYS.allCore, DIRTY_KEYS.allViews, DIRTY_KEYS.all].forEach(function (key) { props.deleteProperty(key); });
   } else {
     if (opts.viewSheets) { props.deleteProperty(DIRTY_KEYS.viewSheets); }
     if (opts.records) { props.deleteProperty(DIRTY_KEYS.records); }
     if (opts.config) { props.deleteProperty(DIRTY_KEYS.config); }
-    if (opts.all) { props.deleteProperty(DIRTY_KEYS.all); }
+    if (opts.category) { props.deleteProperty(DIRTY_KEYS.category); }
+    if (opts.schema) { props.deleteProperty(DIRTY_KEYS.schema); }
+    if (opts.allCore || opts.all) { props.deleteProperty(DIRTY_KEYS.allCore); props.deleteProperty(DIRTY_KEYS.all); }
+    if (opts.allViews) { props.deleteProperty(DIRTY_KEYS.allViews); }
   }
   return dirtyStateRead();
 }
@@ -142,7 +247,8 @@ function dirtyStateClearViewSheet(sheetName) {
   return dirtyStateRead();
 }
 
-function dirtyStateClearRecords(recordIds) {
+function dirtyStateClearRecords(recordIds, expectedRevision) {
+  if (expectedRevision !== undefined && reloadStateRead().revision !== Number(expectedRevision)) { return dirtyStateRead(); }
   var remove = {};
   (Array.isArray(recordIds) ? recordIds : [recordIds]).forEach(function (id) { remove[String(id || '').trim()] = true; });
   var props = PropertiesService.getDocumentProperties();
@@ -159,15 +265,23 @@ function dirtyStateClearConfig() {
 
 /** Nhận phần trạng thái mà một lượt nạp toàn bộ sắp xử lý; cờ phát sinh sau thời điểm này vẫn được giữ lại. */
 function dirtyStateTakeFullReload() {
-  var state = dirtyStateRead();
-  dirtyStateClear({ records: true, config: true, all: true });
-  return { records: state.records, config: state.config, all: state.all };
+  var state = reloadStateRead();
+  dirtyStateClear({ records: true, category: true, config: true, schema: true, allCore: true, all: true });
+  var consumed = { records: state.records, config: state.config || state.category, all: state.allCore };
+  Object.defineProperties(consumed, {
+    category: { value: state.category, enumerable: false },
+    schema: { value: state.schema, enumerable: false },
+    revision: { value: state.revision, enumerable: false }
+  });
+  return consumed;
 }
 
 /** Trả lại phần đã nhận nếu lượt nạp lõi thất bại trước khi bàn giao dữ liệu cho client. */
 function dirtyStateRestoreFullReload(state) {
   var consumed = state || {};
-  if (consumed.config) { dirtyStateMarkConfig(); }
+  if (consumed.category) { dirtyStateMarkCategory(); }
+  if (consumed.config && !consumed.category) { dirtyStateMarkConfig(); }
+  if (consumed.schema) { dirtyStateMarkSchema(); }
   if (consumed.all) { dirtyStateMarkAll(); }
   else if (consumed.records && consumed.records.length) { dirtyStateMarkRecords(consumed.records); }
   return dirtyStateRead();

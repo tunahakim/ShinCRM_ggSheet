@@ -30,6 +30,7 @@ const NHOM_CA = [
   require('./cases/categoryRead'),
   require('./cases/configRead'),
   require('./cases/dirtyState'),
+  require('./cases/reloadDecision'),
   require('./cases/userPrefs'),
   require('./cases/schemaAccess'),
   require('./cases/fieldLogic'),

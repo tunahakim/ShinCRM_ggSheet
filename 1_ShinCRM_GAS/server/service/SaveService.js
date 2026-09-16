@@ -23,10 +23,6 @@ function saveRecord(entity, record) {
     var batDau = Date.now();
     var ra = writeGateSave({ entity: entity, records: [record], source: 'user' });
 
-    if (ra.ok && ra.fields && ra.rows) {
-      var idAt = ra.fields.indexOf('id');
-      if (idAt >= 0) { dirtyStateMarkRecords(ra.rows.map(function (row) { return row[idAt]; })); }
-    }
     if (ra.ok) { saveMarkViewsAndMaybeRender(); }
     ra.dirty = dirtyStateRead();
     ra.selection = selectionSnapshot();
@@ -47,10 +43,6 @@ function deleteRecords(entity, ids) {
     var batDau = Date.now();
     var ra = deleteGateRemove({ entity: entity, ids: ids });
 
-    if (ra.ok) {
-      var changed = (ra.hard || []).concat(Object.keys(ra.reasons || {}));
-      if (changed.length) { dirtyStateMarkRecords(changed); }
-    }
     if (ra.ok) { saveMarkViewsAndMaybeRender(); }
     ra.dirty = dirtyStateRead();
     ra.selection = selectionSnapshot();
@@ -63,10 +55,10 @@ function saveMarkViewsAndMaybeRender() {
   var book = shinOpenBook();
   var views = book.getSheets().map(function (sheet) { return sheet.getName(); }).filter(function (name) { return name.charAt(0) === '!'; });
   if (!views.length) { return; }
-  dirtyStateMarkViewSheets(views);
-  var prefs = userPrefsRead();
+  dirtyStateMarkAllViewsOnly(views);
+  if (typeof renderAllManagedViewsIfAllowed === 'function') { return renderAllManagedViewsIfAllowed(); }
   var active = book.getActiveSheet();
-  if (prefs.autoRenderView && active && views.indexOf(active.getName()) >= 0) { renderViewSheet(active.getName()); }
+  if (active && views.indexOf(active.getName()) >= 0) { return renderViewSheet(active.getName()); }
 }
 
 /**

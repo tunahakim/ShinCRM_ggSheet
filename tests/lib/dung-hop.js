@@ -36,6 +36,7 @@ const TEP_NEN = [
   'server/sheet/EntityRead.js',
   'server/sheet/CategoryRead.js',
   'server/sheet/ConfigRead.js',
+  'server/state/ReloadDecision.js',
   'server/state/DirtyState.js',
   'server/state/UserPrefs.js',
   'server/gate/FieldLogic.js',

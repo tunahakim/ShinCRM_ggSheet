@@ -339,6 +339,20 @@ function renderAllViewSheets() {
   return book.getSheets().filter(function (sheet) { return sheet.getName().charAt(0) === '!'; }).map(function (sheet) { return renderViewSheet(sheet.getName()); });
 }
 
+/** Đường vẽ độc lập với Sidebar: dùng cho trigger, pull, push và đồng bộ nền. */
+function renderAllManagedViews() {
+  return renderAllViewSheets();
+}
+
+/** Vẽ toàn bộ view khi chính sách cho phép; nếu tắt thì giữ cờ bẩn để lần bật sau xử lý. */
+function renderAllManagedViewsIfAllowed() {
+  var prefs = typeof userPrefsRead === 'function' ? userPrefsRead() : { autoRenderView: true };
+  if (prefs.autoRenderView === false) { return { ok: true, skipped: true, reason: 'autoRenderView=false', dirty: reloadStateRead() }; }
+  var results = renderAllManagedViews();
+  dirtyStateClear({ allViews: true, viewSheets: true });
+  return { ok: true, rendered: results, dirty: reloadStateRead() };
+}
+
 function viewProbeRenderCurrent() {
   var sheet = shinOpenBook().getActiveSheet();
   var result = renderViewSheet(sheet.getName());
@@ -357,7 +371,8 @@ function renderViewIfDirty(sheetName) {
   try {
     var state = dirtyStateRead();
     var inputChanged = viewInputSignatureRead(sheet) !== viewInputSignature(sheet);
-    if (state.all || state.config || state.viewSheets.indexOf(name) >= 0 || inputChanged) {
+    var reload = typeof reloadStateRead === 'function' ? reloadStateRead() : state;
+    if (reload.allViews || reload.all || reload.config || reload.viewSheets.indexOf(name) >= 0 || inputChanged) {
       return viewRenderSheetLocked(book, sheet, name);
     }
     return { ok: true, skipped: true, sheetName: name, viewMeta: viewInputMeta(sheet) };
@@ -378,13 +393,14 @@ function inspectViewState(sheetName, knownRevision) {
     if (!lock.tryLock(SETTINGS.LOCK_WAIT_MS)) { throw new Error('Hệ thống bận. Vui lòng thử lại!'); }
     try {
       var state = dirtyStateRead();
+      var reload = typeof reloadStateRead === 'function' ? reloadStateRead() : state;
       var revision = viewRevisionRead(sheet);
       return {
         ok: true,
         sheetName: name,
         changed: revision !== (Number(knownRevision) || 0),
-        needsRender: state.all || state.config || state.viewSheets.indexOf(name) >= 0 || viewInputSignatureRead(sheet) !== viewInputSignature(sheet),
-        dirty: state,
+        needsRender: reload.allViews || reload.all || reload.config || reload.viewSheets.indexOf(name) >= 0 || viewInputSignatureRead(sheet) !== viewInputSignature(sheet),
+        dirty: reload,
         revision: revision,
         ms: Date.now() - started
       };

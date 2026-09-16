@@ -36,7 +36,7 @@ function chay(so) {
   hop.shinOnEdit({ range: eventRange(lead, 4, 3) });
   hop.shinOnEdit({ range: eventRange(lead, 4, 2) });
   hop.shinOnEdit({ range: eventRange(lead, 3, 5) });
-  check(so, 'hàng lọc dưới mã @ và cột sắp xếp làm mới; ô dữ liệu cùng hàng 3 dưới cột thường thì không', rendered, ['!Lead', '!Lead']);
+  check(so, 'hàng lọc dưới mã @ và cột sắp xếp làm mới toàn bộ view; ô dữ liệu cùng hàng 3 dưới cột thường thì không', rendered, ['!Lead', '!Chăm sóc', '!Lead', '!Chăm sóc']);
 
   ghiO(nen, 'Customer', 4, '@CUS_MA_KH', 'KH000001');
   hop.shinOnEdit({ range: eventRange(nen.sheet('Customer'), 4, 2) });
@@ -54,9 +54,9 @@ function chay(so) {
 
   hop.dirtyStateClear();
   hop.shinOnEdit({ range: eventRange(nen.sheet('Category'), 4, 2) });
-  check(so, 'sửa Category chỉ đánh dấu nạp lại cấu hình, không làm bẩn sheet quản trị',
+  check(so, 'sửa Category đánh dấu nạp lại danh mục và toàn bộ sheet quản trị',
     hop.dirtyStateRead(),
-    { viewSheets: [], records: [], config: true, all: false });
+    { viewSheets: ['!Lead', '!Chăm sóc'], records: [], config: true, all: false });
 }
 
 module.exports = { chay };
