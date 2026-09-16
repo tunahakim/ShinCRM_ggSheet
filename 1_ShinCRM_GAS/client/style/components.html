@@ -36,6 +36,10 @@
 
 .shin-box { display: block; }
 
+/* Vùng đích có id có thể phải tồn tại trước callback, nhưng vùng rỗng không được ăn nhịp của Card. Khi renderer bơm Block vào,
+   pseudo-class này tự mất và vùng hiện lại mà không cần JS biết về layout. */
+.shin-box:empty { display: none; }
+
 /* Khối xếp dọc dùng cho các màn hình có nhiều Card; module chỉ chọn nội dung, không tự định nghĩa layout mới. */
 .shin-section { display: flex; flex-direction: column; gap: 0; min-width: 0; padding: var(--shin-gap-1) 0 var(--shin-gap-4) var(--shin-scrollbar-size); }
 .shin-section > * { min-width: 0; }

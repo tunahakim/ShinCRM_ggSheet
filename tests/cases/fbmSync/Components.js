@@ -97,6 +97,9 @@ function chay(so) {
     [styles.indexOf('.shin-box.shin-action-stack { align-items: center; }') >= 0,
       !/(^|\n)\.shin-action-stack \{ align-items: center; \}/.test(styles)],
     [true, true]);
+  check(so, 'Box rỗng giữ vùng callback nhưng không tạo khoảng cách giả trong Card',
+    styles.indexOf('.shin-box:empty { display: none; }') >= 0,
+    true);
   check(so, 'reset Card không xóa khoảng giữa các Card trong section',
     [styles.indexOf('.shin-section > * + * { margin-top: var(--shin-gap-2); }') > styles.indexOf('.shin-card {'),
       styles.indexOf('.shin-section > .shin-card { margin: 0; }') >= 0],
