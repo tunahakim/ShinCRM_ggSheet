@@ -356,12 +356,12 @@
 ## Slice R9 — Điều kiện đóng
 
 - [ ] Không còn mục bắt buộc chưa có bằng chứng.
-- [ ] Tài liệu ghi rõ không polling định kỳ trong luồng bình thường; chỉ có kiểm tra dự phòng khi mất kênh event.
-- [ ] Không còn đường ghi Customer/Activity thành công nào không đi qua signal chung.
-- [ ] Không còn client tự phân loại cột `@`.
-- [ ] Không còn renderer chỉ vẽ view active sau signal dữ liệu.
-- [ ] Không còn thao tác clear dirty không kiểm revision.
-- [ ] Tổng kết test offline và GAS DEV được ghi vào commit bàn giao.
+- [x] Tài liệu ghi rõ không polling `ReloadState` định kỳ trong luồng bình thường; kiểm tra chỉ xảy ra sau event, lời gọi máy chủ tự nhiên hoặc điểm chuyển trạng thái (test `selectionPoll.js`, `07A`).
+- [x] Không còn đường ghi Customer/Activity thành công nào không đi qua signal chung (test tĩnh `writeGateAudit.js`, test hành vi `reloadGates.js`).
+- [x] Không còn client tự phân loại cột `@`; phân loại nằm ở GAS `Triggers`/`ReloadDecision` (test `triggers.js`, `reloadDecision.js`).
+- [x] Không còn renderer chỉ vẽ view active sau signal dữ liệu; renderer duyệt toàn bộ sheet `!` (test `viewRenderer.js`, `triggers.js`).
+- [x] Không còn thao tác clear dirty không kiểm revision (test `dirtyState.js`, `loadService.js`, `viewRenderer.js`).
+- [x] Tổng kết test offline và GAS DEV đã được ghi vào checklist và các commit `18c319a`, `7ed2338`, `654e6ad`, `9c44734`.
 - [ ] Chủ dự án xác nhận nghiệm thu Sheet DEV cho các ca cần giữ tab hoặc đăng nhập.
 
 ---
