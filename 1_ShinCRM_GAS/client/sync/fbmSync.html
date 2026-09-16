@@ -1,6 +1,6 @@
 <script>
 /* Sidebar chỉ hiển thị tiến độ; GAS là nguồn state duy nhất. */
-var FBM_SYNC_CLIENT = { installed: false, active: false, waiting: {}, relayWaiters: {}, credentialWaiters: {}, running: false, statusReady: false, mode: 'read', openedAt: 0, returnScreen: 'view', returnUi: null, relayConfigured: false, relayOpenId: 0, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0, traceEvents: [], subscreen: 'run', navOpen: false, resultsTab: 'summary', resultPages: {}, lastStatus: null, deferredPaint: null, identityStatus: null, identityAction: '', identityLastAction: '', identityProbeSignature: '', identityInvalid: {}, identityDraft: { spreadsheetId: '', userId: '', username: '', accountName: '' }, accountSettingsDraft: {}, accountSettingsInvalid: {}, loginStatus: null, loginEditMode: false, loginDraft: { username: '' }, accountNotices: { identity: null, accountSettings: null, login: null }, settingsNotices: { module: null, relay: null, extension: null, background: null, login: null }, syncSettings: null };
+var FBM_SYNC_CLIENT = { installed: false, active: false, waiting: {}, relayWaiters: {}, credentialWaiters: {}, running: false, statusReady: false, mode: 'read', openedAt: 0, returnScreen: 'view', returnUi: null, relayConfigured: false, relayOpenId: 0, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0, traceEvents: [], subscreen: 'run', navOpen: false, resultsTab: 'summary', resultPages: {}, lastStatus: null, deferredPaint: null, identityStatus: null, identityAction: '', identityLastAction: '', identityProbeSignature: '', identityInvalid: {}, identityDraft: { spreadsheetId: '', userId: '', username: '', accountName: '' }, accountSettingsDraft: {}, accountSettingsInvalid: {}, loginStatus: null, loginEditMode: false, loginDraft: { username: '' }, configEdits: {}, accountNotices: { identity: null, accountSettings: null, login: null }, settingsNotices: { module: null, relay: null, extension: null, background: null, login: null }, syncSettings: null };
 /** Timeout cho một request Extension để phiên không treo vô hạn khi tab FBM/bridge mất kết nối. */
 var FBM_SYNC_REQUEST_TIMEOUT_MS = 20000;
 var FBM_SYNC_GAS_CONTINUE_WARN_MS = 5000;
@@ -31,7 +31,7 @@ function syncPanelToggle() {
   fbmSyncCaptureReturnScreen();
   FBM_SYNC_CLIENT.active = true;
   FBM_SYNC_CLIENT.statusReady = false;
-  FBM_SYNC_CLIENT.subscreen = 'run'; FBM_SYNC_CLIENT.openedAt = Date.now(); FBM_SYNC_CLIENT.viewEpoch += 1; FBM_SYNC_CLIENT.accountNotices = { identity: null, accountSettings: null, login: null }; FBM_SYNC_CLIENT.accountSettingsDraft = {}; FBM_SYNC_CLIENT.accountSettingsInvalid = {}; FBM_SYNC_CLIENT.settingsNotices = { module: null, relay: null, extension: null, background: null, login: null };
+  FBM_SYNC_CLIENT.subscreen = 'run'; FBM_SYNC_CLIENT.openedAt = Date.now(); FBM_SYNC_CLIENT.viewEpoch += 1; FBM_SYNC_CLIENT.configEdits = {}; FBM_SYNC_CLIENT.accountNotices = { identity: null, accountSettings: null, login: null }; FBM_SYNC_CLIENT.accountSettingsDraft = {}; FBM_SYNC_CLIENT.accountSettingsInvalid = {}; FBM_SYNC_CLIENT.settingsNotices = { module: null, relay: null, extension: null, background: null, login: null };
   if (typeof fbmSyncRenderInitial === 'function') { fbmSyncRenderInitial(); }
   if (typeof fbmSyncStatusOnce !== 'function') { return null; }
   return Promise.all([fbmSyncStatusOnce(true), fbmSyncLoadIdentityStatus(), fbmSyncLoadSettings()]).then(function (results) { return fbmSyncLoadLoginStatus().then(function () { return results[0]; }); });
@@ -150,6 +150,7 @@ function fbmSyncConfigureRelay() {
     return fbmSyncPostRelayConfig(config, true).then(function (saved) {
       if (!saved) { throw new Error('Extension không xác nhận đã lưu cấu hình kết nối.'); }
       FBM_SYNC_CLIENT.relayConfigured = true;
+      if (typeof fbmSyncConfigFinishEdit === 'function') { fbmSyncConfigFinishEdit('relay'); }
       return config;
     });
   }).catch(function (error) {
@@ -363,13 +364,14 @@ function fbmSyncInstall() {
     } else { waiter.resolve(data.result); }
   });
   document.addEventListener('click', function (event) {
-  var target = event.target && event.target.closest ? event.target.closest('#fbm-sync-back, #fbm-sync-module-menu, #fbm-sync-master-switch, #fbm-sync-settings-master-switch, #fbm-sync-start, #fbm-sync-approve, #fbm-sync-rotate-relay, #fbm-sync-cancel, #fbm-sync-open-conflicts, #fbm-sync-conflict-back, #fbm-sync-check-identity, #fbm-sync-probe-identity, #fbm-sync-confirm-identity, #fbm-sync-save-identity, #fbm-sync-auto-login, #fbm-sync-login-edit, #fbm-sync-login-save, #fbm-sync-login-test, #fbm-sync-save-extension, #fbm-sync-save-background, #fbm-sync-save-login-policy, #fbm-sync-save-settings, [data-sync-screen], [data-sync-results-tab], [data-sync-background], [data-sync-master], [data-sync-extension-startup], [data-sync-process-toggle], [data-sync-login-policy], [data-sync-page], [data-fbm-conflict-choice], [data-fbm-conflict-merge], [data-fbm-push-retry-all]') : null;
+  var target = event.target && event.target.closest ? event.target.closest('#fbm-sync-back, #fbm-sync-module-menu, #fbm-sync-master-switch, #fbm-sync-settings-master-switch, #fbm-sync-start, #fbm-sync-approve, #fbm-sync-rotate-relay, #fbm-sync-cancel, #fbm-sync-open-conflicts, #fbm-sync-conflict-back, #fbm-sync-check-identity, #fbm-sync-probe-identity, #fbm-sync-confirm-identity, #fbm-sync-save-identity, #fbm-sync-auto-login, #fbm-sync-login-edit, #fbm-sync-login-save, #fbm-sync-login-test, #fbm-sync-save-extension, #fbm-sync-save-background, #fbm-sync-save-login-policy, #fbm-sync-save-settings, [data-sync-config-action], [data-sync-screen], [data-sync-results-tab], [data-sync-background], [data-sync-master], [data-sync-extension-startup], [data-sync-process-toggle], [data-sync-login-policy], [data-sync-page], [data-fbm-conflict-choice], [data-fbm-conflict-merge], [data-fbm-push-retry-all]') : null;
     if (!target) {
       var openNav = document.getElementById('fbm-sync-nav');
       if (openNav && !openNav.hidden && !(event.target && event.target.closest && event.target.closest('#fbm-sync-nav'))) { openNav.hidden = true; }
       return;
     }
     event.preventDefault();
+    if (fbmSyncConfigHandleAction(target)) { return; }
     if (target.id === 'fbm-sync-master-switch' || target.id === 'fbm-sync-settings-master-switch') { fbmSyncToggleMaster();
     } else if (target.id === 'fbm-sync-module-menu') { FBM_SYNC_CLIENT.navOpen = FBM_SYNC_CLIENT.navOpen !== true; fbmSyncRenderShell(FBM_SYNC_CLIENT.lastStatus || {});
     } else if (target.hasAttribute('data-sync-background')) {
@@ -389,13 +391,16 @@ function fbmSyncInstall() {
     } else if (target.hasAttribute('data-sync-extension-startup')) {
       var startupEnabled = target.getAttribute('aria-pressed') !== 'true';
       fbmSyncSetTargetState(target.id, { addClass: [startupEnabled ? 'is-on' : 'is-off'], removeClass: [startupEnabled ? 'is-off' : 'is-on'], ariaPressed: startupEnabled });
+      fbmSyncConfigSetDraftValue('extension', 'runOnStartup', startupEnabled);
     } else if (target.hasAttribute('data-sync-process-toggle')) {
       var processKind = String(target.getAttribute('data-sync-process-toggle') || ''), processEnabled = target.getAttribute('aria-pressed') !== 'true';
       fbmSyncSetTargetState(target.id, { addClass: [processEnabled ? 'is-on' : 'is-off'], removeClass: [processEnabled ? 'is-off' : 'is-on'], ariaPressed: processEnabled });
       var processInput = document.getElementById('fbm-sync-process-' + processKind + '-minutes'); if (processInput) { fbmSyncSetTargetState(processInput.id, { disabled: !processEnabled }); }
+      fbmSyncConfigSetDraftValue('background', processKind + '.enabled', processEnabled);
     } else if (target.hasAttribute('data-sync-login-policy')) {
       var policy = String(target.getAttribute('data-sync-login-policy') || ''), policyEnabled = target.getAttribute('aria-pressed') !== 'true';
       fbmSyncSetTargetState(target.id, { addClass: [policyEnabled ? 'is-on' : 'is-off'], removeClass: [policyEnabled ? 'is-off' : 'is-on'], ariaPressed: policyEnabled });
+      fbmSyncConfigSetDraftValue('loginPolicy', policy === 'auto-login' ? 'enabled' : policy === 'auto-open' ? 'autoOpenTab' : 'retryEnabled', policyEnabled);
     } else if (target.hasAttribute('data-sync-page')) { var pageSpec = String(target.getAttribute('data-sync-page') || '').split(':'); FBM_SYNC_CLIENT.resultPages[pageSpec[0]] = Math.max(0, Number(FBM_SYNC_CLIENT.resultPages[pageSpec[0]] || 0) + Number(pageSpec[1] || 0)); fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus);
     } else if (target.hasAttribute('data-sync-results-tab')) { FBM_SYNC_CLIENT.resultsTab = target.getAttribute('data-sync-results-tab'); fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus);
     } else if (target.hasAttribute('data-sync-screen')) { FBM_SYNC_CLIENT.navOpen = false; fbmSyncSetScreen(target.getAttribute('data-sync-screen')); fbmSyncRenderShell(FBM_SYNC_CLIENT.lastStatus || {});
@@ -468,7 +473,7 @@ function fbmSyncInstall() {
       target.setAttribute('data-value', rawValue === null || rawValue === undefined ? '' : String(rawValue));
     }
     if (target.id === 'fbm-sync-mode') { FBM_SYNC_CLIENT.mode = target.getAttribute('data-value') || target.value; }
-    if (target.id === 'fbm-sync-background-direction') { FBM_SYNC_CLIENT.backgroundDirection = target.getAttribute('data-value') || target.value; }
+    if (target.id === 'fbm-sync-background-direction') { FBM_SYNC_CLIENT.backgroundDirection = target.getAttribute('data-value') || target.value; fbmSyncConfigSetDraftValue('background', 'direction', target.getAttribute('data-value') || target.value); }
     if (target.hasAttribute('data-fbm-conflict-field')) { var manualInput = document.querySelector('[data-fbm-conflict-manual="' + target.getAttribute('data-fbm-conflict-field') + '"]'); if (manualInput) { fbmSyncSetTargetState(manualInput.id, { hidden: fbmSyncControlValue(target.id) !== 'manual' }); } }
     if (target.id === 'fbm-sync-auto-login-input') { fbmSyncSetAutoLogin(target.checked); }
   });
@@ -477,7 +482,12 @@ function fbmSyncInstall() {
     var identity = { 'fbm-identity-spreadsheet': 'spreadsheetId', 'fbm-identity-user': 'userId', 'fbm-identity-username': 'username', 'fbm-identity-account': 'accountName' };
     if (identity[id]) { FBM_SYNC_CLIENT.identityDraft[identity[id]] = String(target.value || ''); var invalidKey = id.replace('fbm-identity-', ''); if (FBM_SYNC_CLIENT.identityInvalid) { delete FBM_SYNC_CLIENT.identityInvalid[invalidKey]; if (typeof RENDER_INDEX !== 'undefined' && RENDER_INDEX.nodes['fbm-sync-identity-form-region']) { fbmSyncRenderTarget('fbm-sync-identity-form-region', fbmSyncIdentityFormBlocks()); } } }
     var accountSettings = { 'fbm-account-customer-prefix': 'customerPrefix', 'fbm-account-customer-length': 'customerCodeLength', 'fbm-account-activity-since': 'activitySince' };
-    if (accountSettings[id]) { FBM_SYNC_CLIENT.accountSettingsDraft[accountSettings[id]] = String(target.value || ''); if (FBM_SYNC_CLIENT.accountSettingsInvalid) { delete FBM_SYNC_CLIENT.accountSettingsInvalid[accountSettings[id]]; } }
+    if (accountSettings[id]) { FBM_SYNC_CLIENT.accountSettingsDraft[accountSettings[id]] = String(target.value || ''); fbmSyncConfigSetDraftValue('accountSettings', accountSettings[id], String(target.value || '')); if (FBM_SYNC_CLIENT.accountSettingsInvalid) { delete FBM_SYNC_CLIENT.accountSettingsInvalid[accountSettings[id]]; } }
+    var settingsInput = { 'fbm-extension-poll-minutes': 'extension.pollMinutes', 'fbm-sync-detail-count': 'background.detail.customersPerRun', 'fbm-sync-detail-delay-min': 'background.detail.minDelaySeconds', 'fbm-sync-detail-delay-max': 'background.detail.maxDelaySeconds', 'fbm-sync-login-retry-minutes': 'loginPolicy.retryMinutes', 'fbm-sync-setting-approval-threshold': 'module.approvalThreshold' };
+    if (settingsInput[id]) {
+      var configKey = settingsInput[id].split('.')[0] === 'module' ? 'module' : settingsInput[id].split('.')[0] === 'loginPolicy' ? 'loginPolicy' : settingsInput[id].split('.')[0];
+      fbmSyncConfigSetDraftValue(configKey, settingsInput[id].split('.').slice(1).join('.'), String(target.value || ''));
+    }
     if (id === 'fbm-login-username') { FBM_SYNC_CLIENT.loginDraft.username = String(target.value || ''); }
   });
   document.addEventListener('focusout', function () { setTimeout(fbmSyncFlushDeferredPaint, 0); });
@@ -705,11 +715,13 @@ function fbmSyncSaveIdentityManual(button) {
       FBM_SYNC_CLIENT.identityInvalid = {};
       FBM_SYNC_CLIENT.identityLastAction = '';
       FBM_SYNC_CLIENT.identityStatus = result.identityStatus || { status: 'UNBOUND', binding: {} };
+      if (typeof fbmSyncConfigFinishEdit === 'function') { fbmSyncConfigFinishEdit('identity'); }
       fbmSyncPaint(Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { phase: 'idle', label: 'Chưa liên kết', message: result.message || 'Đã hủy liên kết tài khoản.' }));
       return result;
     }
     FBM_SYNC_CLIENT.identityDraft = { spreadsheetId: String(binding.spreadsheetId || ''), userId: String(binding.userId || ''), username: String(binding.username || ''), accountName: String(binding.accountName || '') };
     FBM_SYNC_CLIENT.identityStatus = result.binding ? Object.assign({}, FBM_SYNC_CLIENT.identityStatus || {}, { status: 'BOUND', binding: result.binding, spreadsheetId: result.binding.spreadsheetId }) : FBM_SYNC_CLIENT.identityStatus;
+    if (typeof fbmSyncConfigFinishEdit === 'function') { fbmSyncConfigFinishEdit('identity'); }
     var status = FBM_SYNC_CLIENT.lastStatus || {}; status.message = 'Đã lưu liên kết tài khoản.'; fbmSyncPaint(status); return result;
   }).catch(function (error) { var status = FBM_SYNC_CLIENT.lastStatus || {}; status.message = String(error && error.message || error); fbmSyncSetAccountNotice('identity', 'error', status.message); fbmSyncPaint(status); return null; }).finally(function () { if (button) { button.disabled = false; } });
 }
@@ -730,6 +742,7 @@ function fbmSyncSaveAccountSettings(button) {
     FBM_SYNC_CLIENT.accountSettingsInvalid = {};
     FBM_SYNC_CLIENT.accountSettingsDraft = {};
     FBM_SYNC_CLIENT.syncSettings = Object.assign({}, FBM_SYNC_CLIENT.syncSettings || {}, { account: result.settings || payload });
+    if (typeof fbmSyncConfigFinishEdit === 'function') { fbmSyncConfigFinishEdit('accountSettings'); }
     fbmSyncSetAccountNotice('accountSettings', 'success', 'Đã lưu cấu hình tài khoản FBM.');
     return fbmSyncPaint(Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { message: 'Đã lưu cấu hình tài khoản FBM.' }));
   }).catch(function (error) {
@@ -771,6 +784,7 @@ function fbmSyncSaveExtensionSettings(button) {
   return callServer('fbmSaveExtensionConfig', [{ pollMinutes: Number(input && input.value || 5), runOnStartup: fbmSyncToggleValue('fbm-sync-run-on-startup') }]).then(function (result) {
     if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không lưu được nhịp hỏi GAS.'); }
     FBM_SYNC_CLIENT.syncSettings = FBM_SYNC_CLIENT.syncSettings || {}; FBM_SYNC_CLIENT.syncSettings.extension = { pollMinutes: result.pollMinutes, runOnStartup: result.runOnStartup };
+    if (typeof fbmSyncConfigFinishEdit === 'function') { fbmSyncConfigFinishEdit('extension'); }
     if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('extension', 'success', 'Đã lưu nhịp hỏi GAS của Extension.'); }
     return fbmSyncPaint(Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { message: 'Đã lưu nhịp hỏi GAS của Extension.' }));
   }).catch(function (error) { if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('extension', 'error', 'Không lưu được nhịp hỏi GAS của Extension: ' + String(error && error.message || error)); } fbmSyncPaintError(error, 'Không lưu được nhịp hỏi GAS của Extension.'); return null; }).finally(function () { if (button) { button.disabled = false; } });
@@ -780,10 +794,12 @@ function fbmSyncSaveBackgroundSettings(button) {
   var schedule = {};
   ['heartbeat', 'customerFull', 'activityFull', 'detail'].forEach(function (kind) { var input = document.getElementById('fbm-sync-process-' + kind + '-minutes'); var toggle = document.getElementById('fbm-sync-process-' + kind); schedule[kind] = { minutes: Number(input && input.value || 1), enabled: !!toggle && toggle.getAttribute('aria-pressed') === 'true' }; });
   schedule.direction = fbmSyncControlValue('fbm-sync-background-direction') || 'read';
+  schedule.enabled = fbmSyncToggleValue('fbm-sync-background-switch');
   schedule.detail = { enabled: schedule.detail.enabled, minutes: schedule.detail.minutes, customersPerRun: Number(document.getElementById('fbm-sync-detail-count') && document.getElementById('fbm-sync-detail-count').value || 50), minDelaySeconds: Number(document.getElementById('fbm-sync-detail-delay-min') && document.getElementById('fbm-sync-detail-delay-min').value || 0.5), maxDelaySeconds: Number(document.getElementById('fbm-sync-detail-delay-max') && document.getElementById('fbm-sync-detail-delay-max').value || 2) };
   return callServer('fbmSaveBackgroundSchedule', [schedule]).then(function (result) {
     if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không lưu được lịch đồng bộ nền.'); }
     FBM_SYNC_CLIENT.syncSettings = FBM_SYNC_CLIENT.syncSettings || {}; FBM_SYNC_CLIENT.syncSettings.background = result.schedule || schedule;
+    if (typeof fbmSyncConfigFinishEdit === 'function') { fbmSyncConfigFinishEdit('background'); }
     if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('background', 'success', 'Đã lưu lịch đồng bộ nền.'); }
     return fbmSyncPaint(Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { message: 'Đã lưu lịch đồng bộ nền.' }));
   }).catch(function (error) { if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('background', 'error', 'Không lưu được lịch đồng bộ nền: ' + String(error && error.message || error)); } fbmSyncPaintError(error, 'Không lưu được lịch đồng bộ nền.'); return null; }).finally(function () { if (button) { button.disabled = false; } });
@@ -793,7 +809,7 @@ function fbmSyncSaveSyncSettings(button) {
   var thresholdInput = document.getElementById('fbm-sync-setting-approval-threshold');
   var thresholdValue = thresholdInput ? String(thresholdInput.value || '').trim() : '';
   var payload = { approvalThreshold: thresholdValue === '' ? '' : Number(thresholdValue) };
-  return callServer('fbmSaveSyncSettings', [payload]).then(function (result) { if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không lưu được cài đặt chung.'); } FBM_SYNC_CLIENT.syncSettings = Object.assign({}, FBM_SYNC_CLIENT.syncSettings || {}, result.settings || payload); if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('module', 'success', 'Đã lưu cài đặt chung.'); } return fbmSyncPaint(Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { message: 'Đã lưu cài đặt chung.' })); }).catch(function (error) { if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('module', 'error', 'Không lưu được cài đặt chung: ' + String(error && error.message || error)); } fbmSyncPaintError(error, 'Không lưu được cài đặt chung.'); return null; }).finally(function () { if (button) { button.disabled = false; } });
+  return callServer('fbmSaveSyncSettings', [payload]).then(function (result) { if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không lưu được cài đặt chung.'); } FBM_SYNC_CLIENT.syncSettings = Object.assign({}, FBM_SYNC_CLIENT.syncSettings || {}, result.settings || payload); if (typeof fbmSyncConfigFinishEdit === 'function') { fbmSyncConfigFinishEdit('module'); } if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('module', 'success', 'Đã lưu cài đặt chung.'); } return fbmSyncPaint(Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { message: 'Đã lưu cài đặt chung.' })); }).catch(function (error) { if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('module', 'error', 'Không lưu được cài đặt chung: ' + String(error && error.message || error)); } fbmSyncPaintError(error, 'Không lưu được cài đặt chung.'); return null; }).finally(function () { if (button) { button.disabled = false; } });
 }
 function fbmSyncSaveLoginPolicy(button) {
   if (button) { button.disabled = true; }
@@ -801,6 +817,7 @@ function fbmSyncSaveLoginPolicy(button) {
   return callServer('fbmSaveLoginPolicy', [{ enabled: fbmSyncToggleValue('fbm-sync-policy-auto-login'), autoOpenTab: fbmSyncToggleValue('fbm-sync-policy-auto-open'), retryEnabled: fbmSyncToggleValue('fbm-sync-policy-retry'), retryMinutes: Number(retry && retry.value || 30) }]).then(function (result) {
     if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không lưu được chính sách tự đăng nhập.'); }
     FBM_SYNC_CLIENT.loginStatus = result;
+    if (typeof fbmSyncConfigFinishEdit === 'function') { fbmSyncConfigFinishEdit('loginPolicy'); }
     if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('login', 'success', 'Đã lưu chính sách tự đăng nhập.'); }
     return fbmSyncPaint(Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { message: 'Đã lưu chính sách tự đăng nhập.' }));
   }).catch(function (error) { if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('login', 'error', 'Không lưu được chính sách tự đăng nhập: ' + String(error && error.message || error)); } fbmSyncPaintError(error, 'Không lưu được chính sách tự đăng nhập.'); return null; }).finally(function () { if (button) { button.disabled = false; } });
@@ -838,7 +855,7 @@ function fbmSyncSaveLoginConfig(button) {
     return callServer('fbmSaveLoginConfig', [{ enabled: (FBM_SYNC_CLIENT.loginStatus || {}).enabled !== false, credentialRef: encrypted.credentialRef, envelope: encrypted.envelope, public: encrypted.public }]);
   }).then(function (saved) {
     var password = document.getElementById('fbm-login-password'); if (password) { password.value = ''; }
-    FBM_SYNC_CLIENT.loginStatus = saved || FBM_SYNC_CLIENT.loginStatus; FBM_SYNC_CLIENT.loginEditMode = false; FBM_SYNC_CLIENT.loginDraft.username = ''; return fbmSyncStatusOnce();
+    FBM_SYNC_CLIENT.loginStatus = saved || FBM_SYNC_CLIENT.loginStatus; if (typeof fbmSyncConfigFinishEdit === 'function') { fbmSyncConfigFinishEdit('login'); } return fbmSyncStatusOnce();
   }).catch(function (error) { var reason = String(error && error.message || error); fbmSyncSetAccountNotice('login', 'error', reason); var status = FBM_SYNC_CLIENT.lastStatus || {}; status.message = reason; fbmSyncPaint(status); return null;
   }).finally(function () { if (button) { button.disabled = false; } });
 }

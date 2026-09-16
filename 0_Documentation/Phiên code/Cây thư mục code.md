@@ -115,6 +115,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   ├── sync\\                    Màn hình đồng bộ FBM độc lập, tách khỏi các màn nghiệp vụ.
 │   │   ├── fbmSync.html           Điều phối phiên và bridge request thô.
 │   │   ├── fbmSyncUiSchema.html   Khai tĩnh bốn màn hình nội bộ và các nhãn loại đồng bộ.
+│   │   ├── fbmSyncConfigEditor.html Điều phối trạng thái xem/sửa, bản nháp và action dùng chung cho card cấu hình FBM.
 │   │   ├── fbmSyncShell.html      Shell header, menu nội bộ, công tắc tổng và kiểu bố cục module.
 │   │   ├── screens\\account.html   Màn Tài khoản FBM, nhận diện, auto-login và relay.
 │   │   ├── screens\\run.html       Màn Chạy đồng bộ, dropdown hướng dữ liệu và pipeline.

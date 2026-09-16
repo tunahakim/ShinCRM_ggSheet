@@ -4,6 +4,7 @@ const { section, check } = require('../../lib/assert');
 
 const SYNC_FILES = [
   'client/sync/fbmSyncUiSchema.html',
+  'client/sync/fbmSyncConfigEditor.html',
   'client/sync/fbmSyncShell.html',
   'client/sync/fbmSyncStatusScreen.html',
   'client/sync/fbmSyncSettingsScreen.html',

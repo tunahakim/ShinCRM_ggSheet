@@ -46,7 +46,7 @@ function taoBoTest() {
   };
   hop.fbmSyncPaintError = null;
   napClient(hop,
-    'client/ui/icons.html', 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html', 'client/ui/renderEngine.html', 'client/sync/fbmSyncUiSchema.html',
+    'client/ui/icons.html', 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html', 'client/ui/renderEngine.html', 'client/sync/fbmSyncUiSchema.html', 'client/sync/fbmSyncConfigEditor.html',
     'client/sync/screens/account.html',
     'client/sync/screens/run.html', 'client/sync/screens/results.html',
     'client/sync/screens/settings.html', 'client/sync/fbmSyncSettingsScreen.html',
@@ -194,8 +194,9 @@ async function chay(so) {
   hop.FBM_SYNC_CLIENT.identityStatus = { status: 'REBIND_REQUIRED', binding: { spreadsheetId: 'sheet', userId: 'u', accountName: 'A' } };
   hop.FBM_SYNC_CLIENT.loginStatus = { configured: false, enabled: true };
   render(hop, content, hop.fbmSyncRenderAccount, idle);
-  check(so, 'Account render đủ ba ô nhập liên kết và nút thao tác', [dom.document.getElementById('fbm-identity-spreadsheet') !== null, dom.document.getElementById('fbm-identity-user') !== null, dom.document.getElementById('fbm-identity-account') !== null, dom.document.getElementById('fbm-sync-probe-identity') !== null], [true, true, true, true]);
-  check(so, 'Account dùng ô mật khẩu và không có giá trị lưu sẵn', [dom.document.getElementById('fbm-login-password').type, dom.document.getElementById('fbm-login-password').value], ['password', '']);
+  const identityCard = content.querySelector('#fbm-sync-identity-card-region');
+  check(so, 'Account render đủ ô liên kết, có bút sửa và khóa ô nhập khi đang xem', [dom.document.getElementById('fbm-identity-spreadsheet') !== null, dom.document.getElementById('fbm-identity-user') !== null, dom.document.getElementById('fbm-identity-account') !== null, identityCard.querySelector('[data-sync-config-action="edit"]') !== null, dom.document.getElementById('fbm-identity-spreadsheet').disabled], [true, true, true, true, true]);
+  check(so, 'Account dùng ô mật khẩu và khóa khi chưa bấm sửa', [dom.document.getElementById('fbm-login-password').type, dom.document.getElementById('fbm-login-password').value, dom.document.getElementById('fbm-login-password').disabled], ['password', '', true]);
   const appendAccount = hop.fbmSyncAppendBox;
   let accountBlocks;
   hop.FBM_SYNC_CLIENT.loginStatus = { configured: true, public: { usernameHint: 'anhlt' } };
@@ -203,7 +204,7 @@ async function chay(so) {
   hop.fbmSyncAppendBox = (_panel, _className, _id, elements) => { accountBlocks = elements; return content; };
   hop.fbmSyncRenderAccount(content, idle);
   hop.fbmSyncAppendBox = appendAccount;
-  const savedLoginCard = accountBlocks[1];
+  const savedLoginCard = accountBlocks[1].elements[0];
   const savedLoginFields = savedLoginCard.elements.filter((node) => node && node.role === 'box' && node.className === 'shin-form-field');
   check(so, 'Credential đã lưu hiện username, mật khẩu **** và hai ô chỉ xem', [savedLoginCard.titleActions[0].icon, savedLoginFields[0].elements[1].disabled, savedLoginFields[0].elements[1].value, savedLoginFields[1].elements[1].disabled, savedLoginFields[1].elements[1].value], ['pencil', true, 'anhlt', true, '****']);
   hop.FBM_SYNC_CLIENT.loginEditMode = true;
@@ -211,11 +212,12 @@ async function chay(so) {
   hop.fbmSyncAppendBox = (_panel, _className, _id, elements) => { accountBlocks = elements; return content; };
   hop.fbmSyncRenderAccount(content, idle);
   hop.fbmSyncAppendBox = appendAccount;
-  const editLoginCard = accountBlocks[1];
+  const editLoginCard = accountBlocks[1].elements[0];
   const editLoginFields = editLoginCard.elements.filter((node) => node && node.role === 'box' && node.className === 'shin-form-field');
-  check(so, 'Bấm sửa mở lại username và để trống ô mật khẩu', [editLoginCard.titleActions[0].hidden, editLoginFields[0].elements[1].disabled, editLoginFields[0].elements[1].value, editLoginFields[1].elements[1].disabled, editLoginFields[1].elements[1].value], [true, false, 'anhlt', false, '']);
+  check(so, 'Bấm sửa mở lại username và để trống ô mật khẩu', [editLoginCard.titleActions[0].icon, editLoginCard.titleActions[1].icon, editLoginFields[0].elements[1].disabled, editLoginFields[0].elements[1].value, editLoginFields[1].elements[1].disabled, editLoginFields[1].elements[1].value], ['close', 'check', false, 'anhlt', false, '']);
   hop.FBM_SYNC_CLIENT.loginEditMode = false;
   hop.FBM_SYNC_CLIENT.loginStatus = { configured: false, enabled: true };
+  hop.fbmSyncConfigStartEdit('login');
   const loginActionRow = hop.fbmSyncLoginActionBlocks()[0];
   check(so, 'Hai nút đăng nhập dùng Row chung để chia đều hai cột', [loginActionRow.role, loginActionRow.elements.length, loginActionRow.elements[0].role, loginActionRow.elements[1].role], ['row', 2, 'button', 'button']);
   hop.FBM_SYNC_CLIENT.syncSettings = { account: { customerPrefix: 'ALT', customerCodeLength: '8', activitySince: '2026-01-01' } };
@@ -225,6 +227,7 @@ async function chay(so) {
   const invalidAccountFields = hop.fbmSyncAccountSettingsBlocks().filter((node) => node && node.role === 'box' && node.className.indexOf('shin-form-field') >= 0);
   check(so, 'Cau hinh ma khach FBM dung StandaloneField va to do o thieu', [invalidAccountFields.length, invalidAccountFields[0].className, invalidAccountFields[1].className, invalidAccountFields[2].className], [3, 'shin-form-field', 'shin-form-field is-invalid', 'shin-form-field']);
   hop.FBM_SYNC_CLIENT.accountSettingsInvalid = {};
+  hop.fbmSyncConfigStartEdit('identity');
   const identityBlock = hop.fbmSyncIdentityBlock(idle);
   const identityActions = identityBlock.elements.filter((node) => node && node.id === 'fbm-sync-identity-actions-region')[0];
   check(so, 'Ba nút liên kết tài khoản dùng Stack lõi và biến thể action dọc', [identityActions.className, identityActions.elements.length, identityActions.elements[0].role], ['shin-stack shin-action-stack', 3, 'button']);
