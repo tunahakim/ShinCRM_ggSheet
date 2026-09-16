@@ -70,7 +70,7 @@
 - [x] Đánh dấu Category không bật nhầm Config khi DTO mới cần phân biệt (test `loadService.js`).
 - [x] Đánh dấu Schema luôn bật full core và allViews (test `reloadDecision.js`, `triggers.js`).
 - [x] Đọc ReloadState không xóa dữ liệu thuộc tính (test `dirtyState.js`).
-- [ ] Hai hộp cát đọc cùng một revision không làm hộp thứ hai mất tín hiệu.
+- [x] Hai hộp cát đọc cùng một revision không làm hộp thứ hai mất tín hiệu (test `loadService.js`: hai sandbox dùng chung `DocumentProperties`, sandbox thứ hai vẫn nhận bản ghi sau lượt clear thứ nhất).
 - [x] Revision mới phát sinh trong lúc clear không bị xóa (test `dirtyState.js`).
 
 ## Slice R2 — GAS phân loại onEdit
@@ -102,8 +102,8 @@
 - [x] Sửa hàng 4 trở xuống không đọc ngược và không tự vẽ (test `viewRenderer.js`).
 - [x] Ngoại lệ được kiểm: hàng 4 trở xuống của `@VIEW_SORT_COL`/`@VIEW_SORT_LEVEL` là cấu hình sắp xếp nên vẫn vẽ toàn bộ view; cột dữ liệu CRM từ hàng 4 trở xuống không vẽ (test `triggers.js`, `viewRenderer.js`).
 - [x] Mã `@VIEW_` hoặc mã không hợp lệ không bị coi là cột dữ liệu để reload RAM (test `reloadDecision.js`, `triggers.js`).
-- [ ] Trigger installable được cài và không tạo bản sao khi chạy lại hàm cài.
-- [ ] Trigger script ghi view không tự tạo vòng lặp onEdit.
+- [x] Trigger installable được cài và không tạo bản sao khi chạy lại hàm cài (test `triggers.js`: cài hai lần vẫn chỉ có `shinOnEdit` và `shinOnChange`, trigger khác được giữ nguyên).
+- [x] Trigger script ghi view không tự tạo vòng lặp onEdit (test `triggers.js`: renderer không gọi ngược `shinOnEdit`).
 
 ### Kiểm thử offline R2
 
@@ -298,7 +298,7 @@
 - [x] Bật lại auto render lập tức đối chiếu dirty và vẽ toàn bộ view (test `viewRenderer.js`).
 - [x] Tắt auto render không làm RAM giữ bản ghi cũ (test `reloadGates.js`, `refresh.js`).
 - [x] Lệnh thủ công vẫn vẽ dù auto render tắt (đường `policyBypass`, test `viewRenderer.js`, `triggers.js`).
-- [ ] Hai user/sidebar có prefs khác nhau không xóa dirty dùng chung sai cách.
+- [x] Hai user/sidebar có prefs khác nhau không xóa dirty dùng chung sai cách (test `viewRenderer.js`: user tắt auto-render giữ cờ, user bật auto-render render và clear đúng sau khi thành công).
 
 ### Kiểm thử offline R6
 
@@ -319,10 +319,10 @@
 - [x] Thêm ca test vào `tests/cases/triggers.js` (bốn sheet mặc định, vùng hợp lệ/không hợp lệ và toàn bộ view).
 - [x] Thêm ca test vào `tests/cases/refresh.js` (entity và Config full core).
 - [x] Thêm ca test cho cổng ghi/pull/push/background (gồm status push trong `reloadGates.js`).
-- [x] Chạy `node tests/run.js`: `1560` đạt, `0` không đạt.
+- [x] Chạy `node tests/run.js`: `1565` đạt, `0` không đạt.
 - [x] Chạy test GAS DEV cho `getReloadState`, `reloadRecords`, `renderAllManagedViews` với `--push`: `getReloadState` đạt ở `@326`, `reloadRecords` đạt ở `@327` với fallback `fullCore` khi scope rỗng, `renderAllManagedViews` đạt ở `@328` với tất cả view DEV trả `ok` và không có sheet lỗi; đường runtime `renderAllManagedViewsIfAllowed` được kiểm tra tiếp ở revision mới và dọn cờ view stale theo đúng revision guard.
 - [ ] Chạy test GAS DEV khi không mở Sidebar và xác nhận view vẫn đổi sau ghi Customer/Activity.
-- [x] Kiểm tra log không chứa cookie, mật khẩu, token hoặc payload nhạy cảm bằng `tests/cases/logMask.js` và các ca DTO/log FBM; bộ offline đạt `1560/1560`.
+- [x] Kiểm tra log không chứa cookie, mật khẩu, token hoặc payload nhạy cảm bằng `tests/cases/logMask.js` và các ca DTO/log FBM; bộ offline đạt `1565/1565`.
 - [x] Chỉ thử dữ liệu ở Spreadsheet DEV `2026.09.05 - ShinCRM DEV` qua cổng DEV có token; không chạm Spreadsheet production.
 - [x] Không sửa fixture trong `0_Documentation/Nghiên cứu FBM/`; `git diff` không có đường dẫn thuộc thư mục này.
 - [x] Commit riêng tài liệu/checklist trước core code: `31a74ef`, `e1e98e2`.

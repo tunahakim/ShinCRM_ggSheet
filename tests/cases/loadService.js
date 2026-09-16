@@ -137,6 +137,27 @@ function chay(so) {
     [staleReload.revisionMatched, staleReload.reload.revision, staleReload.dirty.records],
     [false, 9, ['KH-SCOPE-1']]);
 
+  // Two independent sandboxes share document dirty state but must both be able
+  // to consume the same revision; the first clear cannot erase the second reply.
+  const sharedA = dungNap();
+  const sharedB = dungNap();
+  ghiKhach(sharedA, sharedA.hop.SHEET_FIRST_DATA_ROW, 'KH-SHARED', 'Shared A');
+  ghiKhach(sharedB, sharedB.hop.SHEET_FIRST_DATA_ROW, 'KH-SHARED', 'Shared B');
+  const sharedDocumentProperties = sharedA.hop.PropertiesService.getDocumentProperties();
+  const sharedUserPropertiesB = sharedB.hop.PropertiesService.getUserProperties();
+  sharedB.hop.PropertiesService = {
+    getDocumentProperties: () => sharedDocumentProperties,
+    getUserProperties: () => sharedUserPropertiesB
+  };
+  sharedA.hop.dirtyStateMarkRecords(['KH-SHARED']);
+  const sharedRevision = sharedA.hop.reloadStateRead().revision;
+  const sharedFirst = sharedA.hop.reloadRecords(['KH-SHARED'], sharedRevision);
+  const sharedSecond = sharedB.hop.reloadRecords(['KH-SHARED'], sharedRevision);
+  check(so, 'hai sandbox doc cung revision khong lam sandbox thu hai mat tin hieu',
+    [sharedFirst.revisionMatched, sharedSecond.revisionMatched,
+      sharedFirst.customer.rows[0][0], sharedSecond.customer.rows[0][0], sharedA.hop.reloadStateRead().records],
+    [true, true, 'KH-SHARED', 'KH-SHARED', []]);
+
   const category = dungNap();
   category.Category.sheet.getRange(category.hop.SHEET_FIRST_DATA_ROW, 1).setValue('Giá trị thử');
   category.hop.dirtyStateMarkCategory();

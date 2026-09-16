@@ -84,6 +84,23 @@ function chay(so) {
     [complete.ok, complete.failed.length, allViews.nen.hop.reloadStateRead().viewSheets, allViews.nen.hop.reloadStateRead().allViews],
     [true, 0, [], false]);
 
+  const userA = taoNen(['@CUS_MA_KH']);
+  const userB = taoNen(['@CUS_MA_KH']);
+  const userBDocument = userA.nen.stubs.PropertiesService.getDocumentProperties();
+  const userBProperties = userB.nen.stubs.PropertiesService.getUserProperties();
+  userB.nen.hop.PropertiesService = {
+    getDocumentProperties: () => userBDocument,
+    getUserProperties: () => userBProperties
+  };
+  userA.nen.hop.userPrefsWrite('autoRenderView', false);
+  userA.nen.hop.dirtyStateMarkAllViews(['!Lead']);
+  const userASkipped = userA.nen.hop.renderAllManagedViewsIfAllowed();
+  const userBRendered = userB.nen.hop.renderAllManagedViewsIfAllowed();
+  check(so, 'hai user co prefs auto render khac nhau khong xoa dirty dung chung sai cach',
+    [userASkipped.skipped, userASkipped.dirty.allViews, userB.nen.hop.userPrefsRead().autoRenderView,
+      userBRendered.ok, userA.nen.hop.reloadStateRead().allViews],
+    [true, true, true, true, false]);
+
   const policy = taoNen(['@CUS_MA_KH']);
   policy.nen.hop.userPrefsWrite('autoRenderView', false);
   policy.nen.hop.dirtyStateMarkAllViews(['!Lead']);

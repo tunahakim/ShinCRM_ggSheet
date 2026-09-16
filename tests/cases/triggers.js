@@ -1,5 +1,7 @@
 const { dungHop, ghiO, TEP_NEN } = require('../lib/dung-hop');
 const { section, check, ghiLoiNap } = require('../lib/assert');
+const fs = require('fs');
+const path = require('path');
 
 function eventRange(sheet, row, column, rows, columns) {
   return {
@@ -98,6 +100,40 @@ function chay(so) {
   check(so, 'sửa Category đánh dấu nạp lại danh mục và toàn bộ sheet quản trị',
     hop.dirtyStateRead(),
     { viewSheets: ['!Lead', '!Chăm sóc'], records: [], config: true, all: false });
+
+  const triggerList = [
+    { getHandlerFunction: () => 'shinOnEdit' },
+    { getHandlerFunction: () => 'shinOnChange' },
+    { getHandlerFunction: () => 'unrelatedTrigger' }
+  ];
+  const deletedTriggers = [];
+  const createdTriggers = [];
+  const makeTrigger = (handler) => ({ getHandlerFunction: () => handler });
+  hop.ScriptApp = {
+    getProjectTriggers: () => triggerList.slice(),
+    deleteTrigger: (trigger) => {
+      deletedTriggers.push(trigger.getHandlerFunction());
+      const index = triggerList.indexOf(trigger);
+      if (index >= 0) { triggerList.splice(index, 1); }
+    },
+    newTrigger: (handler) => {
+      const builder = {
+        forSpreadsheet: () => builder,
+        onEdit: () => builder,
+        onChange: () => builder,
+        create: () => { createdTriggers.push(handler); triggerList.push(makeTrigger(handler)); }
+      };
+      return builder;
+    }
+  };
+  const installOnce = hop.shinInstallTriggers();
+  const installTwice = hop.shinInstallTriggers();
+  check(so, 'cai trigger installable hai lan khong sinh ban sao va luon giu dung hai handler',
+    [installOnce, installTwice, triggerList.map((trigger) => trigger.getHandlerFunction()).sort(), deletedTriggers.length, createdTriggers.length],
+    [['shinOnEdit', 'shinOnChange'], ['shinOnEdit', 'shinOnChange'], ['shinOnChange', 'shinOnEdit', 'unrelatedTrigger'], 4, 4]);
+
+  const rendererSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'server', 'view', 'ViewSheetRenderer.js'), 'utf8');
+  check(so, 'renderer ghi view khong goi nguoc trigger shinOnEdit', /\bshinOnEdit\s*\(/.test(rendererSource), false);
 
   let renderNen;
   try {
