@@ -45,10 +45,48 @@ function loadNormalizeRecordIds(recordIds) {
   return out;
 }
 
+/** Hợp nhất scope caller với dirty state mới hơn để một request không đọc hụt mã vừa phát sinh. */
+function loadMergeRecordIds(left, right) {
+  return loadNormalizeRecordIds((left || []).concat(right || []));
+}
+
+function loadStateNeedsFullCore(state) {
+  return !!(state && (state.allCore || state.all || state.schema || state.config));
+}
+
 function reloadRecords(recordIds, expectedRevision) {
   return runEntryPoint('reloadRecords', LOAD_SOURCE, 'throw', function () {
     var started = Date.now();
     var ids = loadNormalizeRecordIds(recordIds);
+    var requestedRevision = expectedRevision === undefined || expectedRevision === null || expectedRevision === ''
+      ? null : Number(expectedRevision);
+    var observed = typeof reloadStateRead === 'function' ? reloadStateRead() : null;
+    var requestWasSuperseded = requestedRevision !== null && observed && observed.revision !== requestedRevision;
+
+    // The Sidebar may have sent this request just before another onEdit/write
+    // advanced ReloadState. The server owns the dirty scope, so include the
+    // newer records here instead of making the client reconstruct the union.
+    if (requestWasSuperseded && observed) {
+      if (loadStateNeedsFullCore(observed)) {
+        return {
+          ok: true,
+          reloadMode: 'fullCore',
+          reason: 'ReloadState mới hơn yêu cầu nạp full core.',
+          supersededRevision: requestedRevision,
+          processedRevision: observed.revision,
+          revisionMatched: false,
+          reload: observed,
+          dirty: dirtyStateRead(),
+          selection: selectionSnapshot(),
+          ms: Date.now() - started
+        };
+      }
+      ids = loadMergeRecordIds(ids, observed.records);
+      // Clear only against the revision whose complete dirty scope is now read.
+      // `revisionMatched` below still reports that the caller's revision was old.
+      expectedRevision = observed.revision;
+    }
+
     if (!ids.length || ids.length > SETTINGS.DIRTY_RECORD_LIMIT) {
       var fullState = typeof reloadStateRead === 'function' ? reloadStateRead() : null;
       return {
@@ -56,6 +94,8 @@ function reloadRecords(recordIds, expectedRevision) {
         reloadMode: 'fullCore',
         reason: !ids.length ? 'Không có mã hợp lệ để xác định scope reload.' : 'Scope reload vượt ngưỡng an toàn.',
         processedRevision: fullState ? fullState.revision : 0,
+        supersededRevision: requestWasSuperseded ? requestedRevision : undefined,
+        revisionMatched: requestWasSuperseded ? false : true,
         reload: fullState,
         dirty: dirtyStateRead(),
         selection: selectionSnapshot(),
@@ -124,7 +164,8 @@ function reloadRecords(recordIds, expectedRevision) {
       affectedCustomerIds: Object.keys(customerIds),
       removedRecordIds: removedRecordIds,
       processedRevision: latest ? latest.revision : 0,
-      revisionMatched: revisionMatches,
+      revisionMatched: requestWasSuperseded ? false : revisionMatches,
+      supersededRevision: requestWasSuperseded ? requestedRevision : undefined,
       reload: latest,
       dirty: dirtyStateRead(),
       selection: selectionSnapshot(),

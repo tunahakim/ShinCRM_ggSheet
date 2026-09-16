@@ -130,12 +130,13 @@ function chay(so) {
     ['records', ['KH-SCOPE-1'], ['GD-SCOPE-1', 'GD-SCOPE-2'], ['KH-MISSING'], ['KH-MISSING', 'KH-SCOPE-1']]);
   check(so, 'reloadRecords chuẩn hóa chuỗi và loại mã trùng trước khi đọc', scoped.removedRecordIds, ['KH-MISSING']);
 
-  const stale = dungNap(null, { reloadRevision: '9', dirtyRecords: '["KH-SCOPE-1"]' });
-  ghiKhach(stale, stale.hop.SHEET_FIRST_DATA_ROW, 'KH-SCOPE-1', 'Khách stale');
+  const stale = dungNap(null, { reloadRevision: '9', dirtyRecords: '["KH-SCOPE-1","KH-SCOPE-2"]' });
+  ghiKhach(stale, stale.hop.SHEET_FIRST_DATA_ROW, 'KH-SCOPE-1', 'Khách stale 1');
+  ghiKhach(stale, stale.hop.SHEET_FIRST_DATA_ROW + 1, 'KH-SCOPE-2', 'Khách stale 2');
   const staleReload = stale.hop.reloadRecords(['KH-SCOPE-1'], 8);
-  check(so, 'reloadRecords không xóa cờ khi revision đã đổi',
-    [staleReload.revisionMatched, staleReload.reload.revision, staleReload.dirty.records],
-    [false, 9, ['KH-SCOPE-1']]);
+  check(so, 'reloadRecords tự hợp nhất scope dirty mới hơn thay vì đọc hụt mã thứ hai',
+    [staleReload.revisionMatched, staleReload.customer.rows.map((row) => row[0]).sort(), staleReload.processedRevision, staleReload.dirty.records],
+    [false, ['KH-SCOPE-1', 'KH-SCOPE-2'], 9, []]);
 
   // Two independent sandboxes share document dirty state but must both be able
   // to consume the same revision; the first clear cannot erase the second reply.

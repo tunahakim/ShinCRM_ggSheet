@@ -396,4 +396,14 @@
 - [x] Tổng kết test offline và GAS DEV đã được ghi vào checklist và các commit `18c319a`, `7ed2338`, `654e6ad`, `9c44734`.
 - [ ] Chủ dự án xác nhận nghiệm thu Sheet DEV cho các ca cần giữ tab hoặc đăng nhập.
 
+## Slice R10 — GAS latest-wins cho reload records
+
+- [x] `reloadRecords` nhận biết `expectedRevision` đã cũ và hợp nhất danh sách `records` mới nhất từ `ReloadState` trước khi đọc Sheet.
+- [x] Khi scope mới hơn yêu cầu full core, GAS trả `reloadMode=fullCore`, `processedRevision` và không để client tự suy ra scope.
+- [x] Response ghi rõ `revisionMatched=false`/`supersededRevision` khi request cũ bị thay thế, nhưng dữ liệu trả về vẫn là scope mới nhất đã đọc.
+- [x] Chỉ xóa dirty records khi revision dùng để đọc còn khớp; revision phát sinh trong lúc đọc vẫn được giữ lại cho lượt tiếp theo.
+- [x] Test offline phủ ca request revision cũ nhưng dirty state có thêm mã mới (`tests/cases/loadService.js`).
+- [ ] Bổ sung điều phối wake tối thiểu ở Sidebar và kiểm tra response selection cũ không ghi đè context mới.
+- [ ] Bổ sung hint bàn phím dự phòng cho Delete/Backspace và nghiệm thu trên Sheet DEV.
+
 ---
