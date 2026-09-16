@@ -494,4 +494,4 @@ Ghi chú Slice 9A: commit `a1b8e0c` gom lịch nghiệp vụ về GAS, giữ Ext
 ### Cập nhật refactor shell Sidebar ngày 16/09/2026
 
 - [x] Refactor FBM dùng chung shell `header/info/body/footer` của Sidebar; bỏ overlay và vùng cuộn riêng, phục hồi form/footer khi đóng, khóa callback đến muộn; test offline `1582/1582`, commit `2827107`, `222f7be`, GAS DEV revision `@340`.
-- [x] Tách menu chọn cố định khỏi combo input: thêm `StandaloneControl(kind: 'menu')` dùng popup chung nhưng trigger là button, chuyển Loại đồng bộ/Chiều đồng bộ/Conflict; test offline `1588/1588`.
+- [x] Tách menu chọn cố định khỏi combo input: thêm `StandaloneControl(kind: 'menu')` dùng popup chung nhưng trigger là button, chuyển Loại đồng bộ/Chiều đồng bộ/Conflict; test offline `1588/1588`, commit `3b297e7`, GAS DEV revision `@342`.
