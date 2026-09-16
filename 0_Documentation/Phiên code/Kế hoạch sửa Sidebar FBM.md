@@ -8,7 +8,7 @@
 
 - Làm Sidebar Đồng bộ FBM nhất quán với các component chuẩn của ShinCRM, không còn control/popup/spacing riêng mang hình thức khác form Khách hàng và Giao dịch.
 - Sửa trạng thái rỗng để lần đầu mở màn hình không hiện pipeline đã hoàn tất, trạng thái phiên cũ, hoặc progress xanh/đỏ khi không có phiên đang chạy.
-- Giữ màn `Tổng quan`, nhưng thay thành dashboard gọn và có ích: trạng thái liên kết FBM, phiên gần nhất, việc cần xử lý và tình trạng lịch nền. Không giữ số liệu rỗng hay các nút điều hướng trùng chức năng của menu.
+- Bỏ hẳn màn `Tổng quan` vì nội dung trùng với các màn chuyên trách; đặt `Chạy đồng bộ` làm màn hình mặc định và đưa nó lên đầu menu chọn màn hình.
 - Đưa toàn bộ cấu hình vận hành FBM mà người dùng chỉnh vào Sidebar và `DocumentProperties`; không còn phụ thuộc sheet `Config` cho nhóm tham số này.
 - Mở rộng lịch nền để chạy theo chiều người dùng chọn, vẫn để GAS giữ toàn bộ state, cursor, cổng an toàn và quyết định nghiệp vụ.
 
@@ -23,9 +23,10 @@
 
 ## 3. Quyết định đã chốt với chủ dự án
 
-### 3.1. Tổng quan và component
+### 3.1. Màn hình mặc định và component
 
-- Giữ `Tổng quan` dưới dạng dashboard có ích như Mục 1; nếu nghiệm thu UI vẫn cho thấy nó chỉ lặp lại các màn chuyên trách thì xóa bằng một thay đổi riêng, không để màn nửa vời.
+- Xóa file/màn `Tổng quan`, không để route hoặc fallback render tới màn đã xóa.
+- Click icon Đồng bộ và mở Sidebar phải vào `Chạy đồng bộ`; schema menu đặt `run` ở phần tử đầu tiên.
 - Tất cả input/select/toggle ngoài `DATA_SCHEMA` dùng `StandaloneField` hoặc `StandaloneControl`; không tạo nhãn/ô nhập HTML đặc thù cho FBM.
 - Bổ sung một pattern dùng chung cho hàng chỉ có một nút hành động: `Row` mang class CSS chung căn giữa. Toàn bộ nút đứng riêng một hàng trong Sync dùng pattern đó. Đổi sang căn trái/phải về sau chỉ sửa class dùng chung, không sửa từng màn.
 - Select `Loại đồng bộ` và select vận hành Sync dùng adapter select chung dựa trên `PopupList`, cùng hình thức, vị trí, keyboard và trạng thái dòng chọn với popup chuẩn. Không dùng popup/native select riêng cho từng màn.

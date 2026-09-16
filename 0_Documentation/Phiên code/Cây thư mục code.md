@@ -113,7 +113,6 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── fbmSync.html           Điều phối phiên và bridge request thô.
 │   │   ├── fbmSyncUiSchema.html   Khai tĩnh bốn màn hình nội bộ và các nhãn loại đồng bộ.
 │   │   ├── fbmSyncShell.html      Shell header, menu nội bộ, công tắc tổng và kiểu bố cục module.
-│   │   ├── screens\\overview.html  Màn Tổng quan, trạng thái phiên và cấu hình đồng bộ nền.
 │   │   ├── screens\\account.html   Màn Tài khoản FBM, nhận diện, auto-login và relay.
 │   │   ├── screens\\run.html       Màn Chạy đồng bộ, dropdown hướng dữ liệu và pipeline.
 │   │   ├── screens\\results.html   Màn Kết quả & xử lý, tab tổng hợp/xung đột/nghiệm thu.
