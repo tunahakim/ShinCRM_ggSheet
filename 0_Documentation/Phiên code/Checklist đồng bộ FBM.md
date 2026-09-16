@@ -8,7 +8,7 @@
 - `[ ]` là việc còn thiếu; mục không có nhãn **Cần kiểm chứng thực tế** là việc AI tự tiếp tục được.
 - Một slice chỉ đóng sau khi đủ code, test, log/báo cáo và checklist case của slice đó.
 - Sau khi đóng slice, ghi commit và revision GAS vào bảng bằng chứng cuối file.
-- Bộ kiểm offline gần nhất đạt `1582/1582`; các mục live vẫn được đánh dấu riêng và không được suy ra từ test offline.
+- Bộ kiểm offline gần nhất đạt `1578/1579`; một lỗi còn lại là thiếu luật CSS cho lớp `.shin-config-action-row` trong tệp cấu hình FBM đang có thay đổi ngoài phạm vi reload. Các mục live vẫn được đánh dấu riêng và không được suy ra từ test offline.
 
 ## Nguồn hợp đồng
 
@@ -455,7 +455,7 @@ Các ràng buộc thiết kế của slice này nằm ở Tài liệu 09.01, 09.
 - [x] Tám khối cấu hình dùng component điều phối chung cho trạng thái xem/sửa, snapshot hủy, draft và action lưu; view khóa input, edit hiện X + dấu tích ở tiêu đề, nút body dùng cùng lệnh lưu/hủy. Test UI FBM đạt 106/106.
 - [x] Nút sửa cấu hình dùng hàng action chung nên đồng nhất chiều rộng; trạng thái sửa dùng nền xám trung tính, dấu tích xanh, dấu X đỏ và khoảng cách icon 8px. Test UI FBM đạt 108/108.
 - [x] Chuẩn hóa mép các khối lớn: `.shin-scroll-region` giữ gutter 4px ở cả hai phía, section không tự cộng padding trái nên card của màn thường và bốn màn Sync cùng trục dù có scrollbar hay không.
-- [x] Commit triển khai: `4370b08`, `80cb723`, `a10bba3`, `9d38fac`, `8822e72`, `801f391`, `40936a7`, `5c3acf9`, `ab208da`, `5feb4b6`, `2991b29`, `a8856a9`, `3dac581`, `6158962`, `550a738`, `3367e34`, `da6ec7e`, `e58da21`, `d2c6cf8`, `dc9460c`, `3b32296`, `afb119a`, `58e8d5b`, `9cf3b43`; GAS DEV `fbmGetSyncSettings` đạt `OK` ở revision `@352`.
+- [x] Commit triển khai: `4370b08`, `80cb723`, `a10bba3`, `9d38fac`, `8822e72`, `801f391`, `40936a7`, `5c3acf9`, `ab208da`, `5feb4b6`, `2991b29`, `a8856a9`, `3dac581`, `6158962`, `550a738`, `3367e34`, `da6ec7e`, `e58da21`, `d2c6cf8`, `dc9460c`, `3b32296`, `afb119a`, `58e8d5b`, `9cf3b43`, `4ff29fa`; GAS DEV `fbmGetSyncSettings` đạt `OK` ở revision `@353`.
 
 ## Slice 9 — Live acceptance và mở rộng production
 
@@ -499,3 +499,9 @@ Ghi chú Slice 9A: commit `a1b8e0c` gom lịch nghiệp vụ về GAS, giữ Ext
 - [x] Tách menu chọn cố định khỏi combo input: thêm `StandaloneControl(kind: 'menu')` dùng popup chung nhưng trigger là button, chuyển Loại đồng bộ/Chiều đồng bộ/Conflict; khóa callback đến muộn khi popup đang mở; test offline `1589/1589`, commit `3b297e7`, `2ee3aa7`, GAS DEV revision `@343`.
 - [x] Màn FBM vẽ ngay shell và khung `Chạy đồng bộ` trước snapshot GAS; trạng thái chưa sẵn sàng khóa control qua renderer chung, snapshot về sau hydrate tại chỗ; test offline `1589/1589`, commit `88d88e7`, GAS DEV revision `@344`.
 - [x] Tab `Kết quả & xử lý` hiển thị năm tab chỉ có nhãn; mô tả nằm ở một vùng riêng bên dưới hàng tab và được vá theo tab đang chọn, giữ mã tab và vá tại chỗ; body dùng `Stack` chung thay vì lồng `shin-section`, chữ phụ 13px, Nghiệm thu tối đa hai dòng; test offline `1589/1589`, commit `3e84f0a`, GAS DEV revision `@350`.
+
+### Cập nhật reload RAM và sheet quản trị ngày 16/09/2026
+
+- [x] Lõi GAS quyết định scope reload từ `ReloadState`, trigger/cửa ghi phát signal, API `probeSelectionAndReload` gộp selection và reload trong một request; commit `933f308`.
+- [x] Sidebar/Extension dùng wake debounce một giây, reload dữ liệu ba giây, fallback selection probe một request và safety polling thưa chỉ cho RAM; revision chỉ được ghi nhận sau khi áp dụng dữ liệu thành công; commit `ab464fe`.
+- [x] Checklist chi tiết và hợp đồng triển khai đã được cập nhật; các ca live trong Sheet DEV còn chờ chủ dự án nghiệm thu.

@@ -346,7 +346,7 @@
 - [x] Chỉ thử dữ liệu ở Spreadsheet DEV `2026.09.05 - ShinCRM DEV` qua cổng DEV có token; không chạm Spreadsheet production.
 - [x] Không sửa fixture trong `0_Documentation/Nghiên cứu FBM/`; `git diff` không có đường dẫn thuộc thư mục này.
 - [x] Commit riêng tài liệu/checklist trước core code: `31a74ef`, `e1e98e2`.
-- [x] Commit riêng core GAS, client Sidebar và test khi hợp lý: các commit nền `a73edec`, `d62427e`, `4cbcd6a`, cổng DEV `fec22e1`, nhóm lõi reload hiện tại `933f308`.
+- [x] Commit riêng core GAS, client Sidebar và test khi hợp lý: các commit nền `a73edec`, `d62427e`, `4cbcd6a`, cổng DEV `fec22e1`, nhóm lõi reload `933f308` và nhóm Sidebar/Extension `ab464fe`.
 
 ## Slice R8 — Nghiệm thu trên Sheet DEV
 
