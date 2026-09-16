@@ -34,18 +34,38 @@ function shinViewCodeIsValid(code) {
   }
 }
 
-function shinDefaultCodeIsValid(sheet, entity, firstColumn, lastColumn) {
+function shinDefaultCodeMap(sheet, entity) {
   var valid = {};
   if (DATA_SCHEMA[entity]) {
     Object.keys(DATA_SCHEMA[entity]).forEach(function (name) { valid[DATA_SCHEMA[entity][name].code] = true; });
   } else if (entity === 'category' || entity === 'config') {
     sheetCoreColumns(entity === 'category' ? 'Category' : 'Config').forEach(function (pair) { valid[pair[0]] = true; });
   } else {
-    return false;
+    return null;
   }
+  return valid;
+}
+
+function shinDefaultCodeIsValid(sheet, entity, firstColumn, lastColumn) {
+  var valid = shinDefaultCodeMap(sheet, entity);
+  if (!valid) { return false; }
   return sheet.getRange(1, firstColumn, 1, lastColumn - firstColumn + 1).getValues()[0].some(function (value) {
     return !!valid[String(value === null || value === undefined ? '' : value).trim()];
   });
+}
+
+function shinSchemaEditNeedsReload(sheet, range, event) {
+  if (!shinRangeTouchesRow(range, 1)) { return false; }
+  var cells = (range.getLastRow() - range.getRow() + 1) * (range.getLastColumn() - range.getColumn() + 1);
+  if (cells !== 1) { return true; }
+  var hasOldValue = Object.prototype.hasOwnProperty.call(event || {}, 'oldValue');
+  var hasNewValue = Object.prototype.hasOwnProperty.call(event || {}, 'value');
+  if (!hasOldValue && !hasNewValue) { return true; }
+  var valid = shinDefaultCodeMap(sheet, sheet.getName().toLowerCase()) || {};
+  var isValid = function (value) {
+    return !!valid[String(value === null || value === undefined ? '' : value).trim()];
+  };
+  return isValid(event && event.oldValue) || isValid(event && event.value);
 }
 
 function shinReloadDecision(input) {
@@ -85,7 +105,7 @@ function shinOnEdit(event) {
       }
       return;
     }
-    if (shinRangeTouchesRow(range, 1)) {
+    if (shinSchemaEditNeedsReload(sheet, range, event)) {
       var schemaDecision = shinReloadDecision({ source: 'edit', surface: 'schema', schema: true });
       if (schemaDecision.views.action === 'render') { return shinRenderAllViewsAfterSignal(); }
       return schemaDecision;

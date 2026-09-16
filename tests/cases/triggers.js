@@ -55,6 +55,35 @@ function chay(so) {
     hop.shinOnEdit({ range: eventRange(nen.sheet(name), 2, 1) });
     hop.shinOnEdit({ range: eventRange(nen.sheet(name), 3, 1) });
   });
+  const ordinarySchemaColumn = Object.keys(hop.DATA_SCHEMA.customer).length + 1;
+  nen.sheet('Customer').getRange(1, ordinarySchemaColumn).setValue('Ghi chu');
+  hop.dirtyStateClear();
+  hop.shinOnEdit({ range: eventRange(nen.sheet('Customer'), 1, ordinarySchemaColumn), oldValue: 'Ghi chu', value: 'Khac' });
+  const ordinarySchemaState = hop.reloadStateRead();
+  check(so, 'sua mot o hang 1 thuong khong phat schema khi oldValue va value deu khong hop le',
+    [ordinarySchemaState.viewSheets, ordinarySchemaState.records, ordinarySchemaState.category, ordinarySchemaState.config,
+      ordinarySchemaState.schema, ordinarySchemaState.allCore, ordinarySchemaState.allViews, ordinarySchemaState.all],
+    [[], [], false, false, false, false, false, false]);
+
+  const schemaCell = nen.sheet('Customer').getRange(1, 1);
+  const schemaCode = schemaCell.getValue();
+  schemaCell.setValue('Ma khach');
+  hop.dirtyStateClear();
+  hop.shinOnEdit({ range: eventRange(nen.sheet('Customer'), 1, 1), oldValue: schemaCode, value: 'Ma khach' });
+  check(so, 'doi ma @ hop le thanh gia tri thuong van phat schema',
+    [hop.reloadStateRead().schema, hop.reloadStateRead().allCore, hop.reloadStateRead().allViews],
+    [true, true, true]);
+  schemaCell.setValue(schemaCode);
+  hop.dirtyStateClear();
+  hop.shinOnEdit({ range: eventRange(nen.sheet('Customer'), 1, 1), oldValue: '', value: schemaCode });
+  check(so, 'them ma @ hop le vao hang 1 van phat schema', hop.reloadStateRead().schema, true);
+  schemaCell.setValue('');
+  hop.dirtyStateClear();
+  hop.shinOnEdit({ range: eventRange(nen.sheet('Customer'), 1, 1), oldValue: schemaCode });
+  check(so, 'xoa ma @ hop le o hang 1 van phat schema', hop.reloadStateRead().schema, true);
+  schemaCell.setValue(schemaCode);
+  hop.dirtyStateClear();
+
   const defaultNoopState = hop.reloadStateRead();
   check(so, 'hàng 2 và hàng 3 của bốn sheet mặc định chỉ là nhãn/ghi chú nên không tạo dirty',
     [defaultNoopState.viewSheets, defaultNoopState.records, defaultNoopState.category, defaultNoopState.config,
