@@ -203,7 +203,16 @@ FbmSync.continueAfterPushError = function (state, cursor, failure) {
 FbmSync.pushConfigErrors = function (candidate, settings) {
   var cfg = settings || FbmSync.scriptSettings();
   if (!String(cfg.accountName || '').trim()) { return 'Thiếu tên đầy đủ trong liên kết tài khoản FBM; chiều đẩy đã bị dừng.'; }
+  if (candidate.kind === 'create' && candidate.entity === 'customer' && (!String(cfg.customerPrefix || '').trim() || !String(cfg.customerCodeLength || '').trim())) { return 'Thiếu tiền tố hoặc độ dài mã khách FBM; không tạo Customer mới.'; }
   return '';
+};
+
+/** Kiểm tra mã ma_kh FBM tự sinh trước khi gửi lệnh lưu Customer mới. */
+FbmSync.validateAutoCustomerCode = function (code, settings) {
+  var cfg = settings || FbmSync.scriptSettings(), value = String(code || '').trim(), prefix = String(cfg.customerPrefix || '').trim(), length = Number(cfg.customerCodeLength || 0);
+  if (!prefix || !length) { return { ok: false, reason: 'Thiếu tiền tố hoặc độ dài mã khách FBM.' }; }
+  if (value.indexOf(prefix) !== 0 || value.length !== length) { return { ok: false, reason: 'Mã khách FBM tự sinh không khớp tiền tố/độ dài đã cấu hình: ' + value }; }
+  return { ok: true };
 };
 
 /** Owner của Activity phải khớp binding đã xác nhận trước khi cấp bất kỳ request push nào. */
@@ -303,6 +312,8 @@ FbmSync.continuePush = function (state, response) {
   }
   if (cursor.operation === 'customer_create_open') {
     var autoCode = FbmSync.extractAutoCustomerCode(response);
+    var codeCheck = FbmSync.validateAutoCustomerCode(autoCode);
+    if (!codeCheck.ok) { throw new Error(codeCheck.reason); }
     if (!autoCode) { throw new Error('Không lấy được _ma_kh_auto từ form tạo Customer.'); }
     candidate.autoCode = autoCode; cursor.operation = 'customer_create_save'; state.cursor = cursor; FbmSync.stateWrite(state);
     return FbmSync.customerCreateRequest(candidate.record, autoCode, '', gate);

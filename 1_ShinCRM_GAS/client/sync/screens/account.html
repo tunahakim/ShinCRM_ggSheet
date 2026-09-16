@@ -9,6 +9,23 @@ function fbmSyncLoginActionBlocks() {
     Button({ id: 'fbm-sync-login-save', label: 'Lưu mã hóa', disabled: active })
   ])];
 }
+function fbmSyncAccountSettingsBlocks() {
+  var settings = (FBM_SYNC_CLIENT.syncSettings || {}).account || {}, draft = FBM_SYNC_CLIENT.accountSettingsDraft || {}, invalid = FBM_SYNC_CLIENT.accountSettingsInvalid || {}, active = !!FBM_SYNC_CLIENT.running;
+  var value = function (name) { return draft[name] !== undefined ? draft[name] : settings[name] || ''; };
+  return [
+    Box({ id: 'fbm-sync-account-settings-notice-region', elements: fbmSyncAccountNoticeBlocks('accountSettings') }),
+    StandaloneField('Tiền tố mã khách FBM', { id: 'fbm-account-customer-prefix', kind: 'input', inputType: 'text', value: value('customerPrefix'), placeholder: 'Ví dụ: ALT', ariaLabel: 'Tiền tố mã khách FBM' }, { className: invalid.customerPrefix ? 'is-invalid' : '' }),
+    Text({ className: 'shin-muted', text: 'Tiền tố của ma_kh do FBM tự sinh khi tạo Customer mới; chỉ kiểm tra mã FBM trả về, không phải mã CUS- của ShinCRM.' }),
+    StandaloneField('Độ dài mã khách FBM', { id: 'fbm-account-customer-length', kind: 'input', inputType: 'number', value: value('customerCodeLength'), placeholder: 'Ví dụ: 8', ariaLabel: 'Độ dài mã khách FBM' }, { className: invalid.customerCodeLength ? 'is-invalid' : '' }),
+    Text({ className: 'shin-muted', text: 'Độ dài đầy đủ của ma_kh FBM tự sinh. Nhập cùng tiền tố; để trống cả hai nếu không tạo Customer mới trên FBM.' }),
+    StandaloneField('Mốc Activity', { id: 'fbm-account-activity-since', kind: 'input', inputType: 'text', value: value('activitySince'), placeholder: 'YYYY-MM-DD', ariaLabel: 'Mốc Activity' }, { className: invalid.activitySince ? 'is-invalid' : '' }),
+    Text({ className: 'shin-muted', text: 'Khi quét, mọi Activity có ngày làm việc trước mốc này sẽ bị bỏ qua và không bị coi là bản ghi mất. Để trống để quét toàn bộ Activity.' }),
+    Row({ className: 'shin-single-action-row', elements: [Button({ id: 'fbm-sync-save-account-settings', label: 'Lưu cấu hình FBM', className: 'shin-primary', disabled: active })] })
+  ];
+}
+function fbmSyncAccountSettingsCard() {
+  return Card({ title: 'Cấu hình tài khoản FBM', elements: fbmSyncAccountSettingsBlocks() });
+}
 function fbmSyncRenderAccount(panel, status) {
   status = status || {};
   var login = FBM_SYNC_CLIENT.loginStatus || {}, configured = login.configured === true, editing = FBM_SYNC_CLIENT.loginEditMode === true || !configured;
@@ -20,12 +37,15 @@ function fbmSyncRenderAccount(panel, status) {
       StandaloneField('Mật khẩu FBM', { id: 'fbm-login-password', kind: 'input', inputType: 'password', value: configured && !editing ? '****' : '', placeholder: 'Nhập mật khẩu FBM', ariaLabel: 'Mật khẩu FBM', disabled: !editing }),
       Box({ id: 'fbm-sync-login-actions-region', elements: fbmSyncLoginActionBlocks() }),
       Box({ id: 'fbm-sync-login-notice-region', elements: fbmSyncAccountNoticeBlocks('login') })
-    ] })
+    ] }),
+    Box({ id: 'fbm-sync-account-settings-region', elements: [fbmSyncAccountSettingsCard()] })
   ]);
 }
 function fbmSyncPatchAccount(panel, status) {
   if (!panel || !RENDER_INDEX.nodes['fbm-sync-account-root']) { return false; }
   fbmSyncPatchIdentityBlock(panel, !!FBM_SYNC_CLIENT.running, status);
+  var accountSettingsRegion = document.getElementById('fbm-sync-account-settings-region');
+  if (!fbmSyncInteractiveControlIsEditing(accountSettingsRegion)) { fbmSyncRenderTarget('fbm-sync-account-settings-region', [fbmSyncAccountSettingsCard()]); }
   var login = FBM_SYNC_CLIENT.loginStatus || {}, configured = login.configured === true, editing = FBM_SYNC_CLIENT.loginEditMode === true || !configured;
   if (typeof RENDER_INDEX !== 'undefined' && RENDER_INDEX.nodes['fbm-sync-login-edit']) { fbmSyncSetTargetState('fbm-sync-login-edit', { hidden: !(configured && !editing) }); }
   fbmSyncRenderTarget('fbm-sync-login-configured-region', fbmSyncLoginConfiguredBlocks());

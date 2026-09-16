@@ -42,6 +42,13 @@ FbmSync.pullWrite = function (entity, records) {
   }
   FbmSync.seenStoreMark(entity, localRecords, sourceRecords);
   if (entity === 'activity') {
+    records = (sourceRecords || []).filter(function (incoming) {
+      var allowed = FbmSync.activitySinceAllows(incoming);
+      if (!allowed) { FbmSync.logPullRecord(entity, incoming, null, FbmSync.SYNC_STATUS.skipped, 'Bỏ qua vì ngày làm việc của Activity nằm trước mốc đã cấu hình; không coi là bản ghi bị mất.'); }
+      return allowed;
+    });
+  }
+  if (entity === 'activity') {
     var linked = FbmSync.linkActivityCustomers(records, FbmSync.readLocal('customer'), categoryGate);
     records = linked.records;
     orphaned = linked.orphaned + Number(linked.blocked || 0);

@@ -15,6 +15,7 @@ FbmSync.scriptSettings = function () {
   var testProps = PropertiesService.getDocumentProperties ? PropertiesService.getDocumentProperties() : { getProperty: function () { return null; } };
   var testCustomerCode = testProps.getProperty('FBM_SYNC_TEST_CUSTOMER_CODE');
   var accountName = typeof FbmSync.bindingAccountName === 'function' ? FbmSync.bindingAccountName() : '';
+  var accountSettings = typeof FbmSync.accountSettingsRead === 'function' ? FbmSync.accountSettingsRead() : {};
   testCustomerCode = testCustomerCode === null ? 'ALT00010' : String(testCustomerCode || '').trim();
   return {
     baseUrl: 'https://fbo.com.vn:8888',
@@ -23,6 +24,9 @@ FbmSync.scriptSettings = function () {
     activityAuthorized: String(session.activityAuthorized || ''),
     userId: userId,
     accountName: accountName,
+    customerPrefix: String(accountSettings.customerPrefix || ''),
+    customerCodeLength: String(accountSettings.customerCodeLength || ''),
+    activitySince: String(accountSettings.activitySince || ''),
     testCustomerCode: testCustomerCode
   };
 };
@@ -98,7 +102,11 @@ FbmSync.activityGridRequest = function (sttRec, options) {
 };
 /** Dựng request bulk Activity theo mốc thời gian; không gắn một Customer cụ thể. */
 FbmSync.activityBulkRequest = function (options) {
-  var opt = Object.assign({}, options || {}), keys = Array.isArray(opt.externalKey) ? opt.externalKey.slice() : [];
+  var opt = Object.assign({}, options || {}), keys = Array.isArray(opt.externalKey) ? opt.externalKey.slice() : [], cfg = FbmSync.scriptSettings();
+  var since = String(cfg.activitySince || '').trim();
+  if (since && opt.includeHistory !== true && !keys.some(function (item) { return item && item.Name === 'end_date'; })) {
+    keys.push({ Name: 'end_date', Opr: '>=', Value: since, Type: 'Date', Ignore: false });
+  }
   delete opt.includeHistory;
   var transport = opt.transport;
   delete opt.transport;

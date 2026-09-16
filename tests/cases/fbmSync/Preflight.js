@@ -39,6 +39,15 @@ async function chay(so) {
   const push = hop.FbmSync.runPreflight({ mode: 'push' });
   check(so, 'preflight mode push van fail-closed theo binding va cac cong thuc te', [push.ok, push.blocking.some((item) => item.code === 'FBM_ACCOUNT_NAME_MISSING')], [false, false]);
 
+  hop.FbmSync.scriptSettings = () => ({ accountName: 'Lê Tuấn Anh', customerPrefix: '', customerCodeLength: '' });
+  hop.FbmSync.pushCandidates = (entity) => entity === 'customer' ? [{ entity: 'customer', kind: 'create', id: 'CUS-NEW', record: { id: 'CUS-NEW', allowFbmPush: 'Cho phép' } }] : [];
+  const missingCustomerCode = hop.FbmSync.runPreflight({ mode: 'write' });
+  check(so, 'preflight chan Customer moi khi thieu prefix va do dai ma khach FBM', missingCustomerCode.blocking.some((item) => item.code === 'FBM_CUSTOMER_CODE_CONFIG_MISSING'), true);
+  hop.FbmSync.scriptSettings = () => ({ accountName: 'Lê Tuấn Anh', customerPrefix: 'ALT', customerCodeLength: '8' });
+  const configuredCustomerCode = hop.FbmSync.runPreflight({ mode: 'write' });
+  check(so, 'preflight cho Customer moi khi du cau hinh ma khach FBM', configuredCustomerCode.blocking.some((item) => item.code === 'FBM_CUSTOMER_CODE_CONFIG_MISSING'), false);
+
+  hop.FbmSync.pushCandidates = (entity) => entity === 'activity' ? [{ entity: 'activity', kind: 'edit', id: 'ACT-1', record: { id: 'ACT-1', syncStatus: hop.FbmSync.SYNC_STATUS.conflict, taskType: 'Gọi điện chăm sóc', owner: 'Owner khác' } }] : [];
   hop.FbmSync.pushOwnerError = (candidate, settings) => candidate.entity === 'activity' && candidate.record.owner && candidate.record.owner !== settings.accountName
     ? 'Activity ' + candidate.id + ' thuộc owner FBM khác.' : '';
   hop.FbmSync.scriptSettings = () => ({ accountName: 'Owner đúng' });

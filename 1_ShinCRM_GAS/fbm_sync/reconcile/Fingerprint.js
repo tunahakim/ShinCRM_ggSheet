@@ -35,6 +35,20 @@ FbmSync.normalizeFingerprintValue = function (entity, field, value) {
   return FbmSync.normalize(value);
 };
 
+/** Bỏ qua Activity trước mốc cấu hình; chúng không được coi là bản ghi bị mất. */
+FbmSync.activitySinceAllows = function (record) {
+  var since = '';
+  try { since = String((FbmSync.accountSettingsRead ? FbmSync.accountSettingsRead() : {}).activitySince || '').trim(); } catch (ignore) {}
+  if (!since) { return true; }
+  var rawDate = record && record.workDate;
+  var dateKey = typeof FbmSync.activityDateKey === 'function' ? FbmSync.activityDateKey(rawDate) : '';
+  if (dateKey) { return dateKey >= since; }
+  var date = FbmSync.isDate(rawDate) ? rawDate : (typeof FbmSync.fbDate === 'function' ? FbmSync.fbDate(rawDate) : rawDate);
+  var floor = new Date(since);
+  if (!FbmSync.isDate(date) || isNaN(date.getTime()) || isNaN(floor.getTime())) { return true; }
+  return date.getTime() >= floor.getTime();
+};
+
 /** Bỏ dấu nhận diện do ShinCRM gắn vào Activity trước khi so fingerprint. */
 FbmSync.stripActivityMarker = function (value) {
   return String(value === null || value === undefined ? '' : value).replace(FbmSync.ACTIVITY_MARKER_RE, '').trim();

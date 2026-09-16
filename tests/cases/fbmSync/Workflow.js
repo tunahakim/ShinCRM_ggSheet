@@ -33,6 +33,7 @@ function workflowGas() {
     'fbm_sync/schema/FbmFields.js',
     'fbm_sync/protocol/Protocol.js',
     'fbm_sync/state/State.js',
+    'fbm_sync/state/AccountSettings.js',
     'fbm_sync/state/Scheduler.js',
     'fbm_sync/reconcile/Identity.js',
     'fbm_sync/reconcile/CategoryGate.js',
@@ -319,8 +320,9 @@ async function chay(so) {
   const startup = scheduleFlow.hop.FbmSync.heartbeatRequest({ source: 'startup' });
   check(so, 'Chrome startup co the hoi GAS ngay mot luot theo cau hinh', [startup.ok, startup.code, startup.request && startup.request.meta.kind], [true, 'HEARTBEAT_REQUEST_READY', 'heartbeat']);
   const bulkProjection = scheduleFlow.hop.FbmSync.activityBulkProjection(['id', 'ma_kh', 'ma_cv', 'ten_cv', 'details', 'end_date', 'owner', 'datetime0', 'line_nbr']);
+  scheduleFlow.hop.FbmSync.accountSettingsSave({ customerPrefix: 'ALT', customerCodeLength: '8', activitySince: '2026-01-01' });
   const bulkProjectionRequest = scheduleFlow.hop.FbmSync.activityBulkRequest({ type: 1, count: 100, gridPageIndex: 1, gridPageValue: ['2026-01-01'], transport: bulkProjection });
-  check(so, 'GAS cap chi dan loc cot generic cho bulk Activity, khong hardcode o Extension', [bulkProjection.arrayProjections[0].indices.join(','), bulkProjectionRequest.meta.transport.arrayProjections[0].paths.join('|')], ['0,3,4,5,6,7,8,1,2', 'd.Rows|d.ViewPage.Fields']);
+  check(so, 'GAS cap chi dan loc cot generic cho bulk Activity, khong hardcode o Extension', [bulkProjection.arrayProjections[0].indices.join(','), bulkProjectionRequest.meta.transport.arrayProjections[0].paths.join('|'), bulkProjectionRequest.body.externalKey.some((item) => item.Name === 'end_date' && item.Opr === '>=' && item.Value === '2026-01-01')], ['0,3,4,5,6,7,8,1,2', 'd.Rows|d.ViewPage.Fields', true]);
   const waitFlow = workflowGas();
   waitFlow.hop.FbmSync.statePatch({ scan: 'detail', backgroundDetail: { minDelaySeconds: 0.5, maxDelaySeconds: 2 }, phase: 'pull_customer', cursor: { kind: 'customer_grid' } });
   const delayed = waitFlow.hop.FbmSync.nextEnvelope(waitFlow.hop.FbmSync.customerGridRequest({ type: 0, count: 50, gridPageIndex: -1, gridRefresh: false }));
