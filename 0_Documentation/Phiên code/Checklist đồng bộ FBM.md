@@ -493,4 +493,4 @@ Ghi chú executor: commit `4560e42` sửa heartbeat Customer về request trang 
 Ghi chú Slice 9A: commit `a1b8e0c` gom lịch nghiệp vụ về GAS, giữ Extension một alarm `gas_poll`, thêm cấu hình `Cài đặt phiên`, auto-open theo lệnh GAS và primitive projection/lọc generic; Extension phát hành `21.15`. GAS DEV hiện ở revision `@299`; test offline mới nhất `1428/1428`. Chưa coi đo bulk thật hoặc live acceptance là hoàn tất.
 ### Cập nhật refactor shell Sidebar ngày 16/09/2026
 
-- [x] Refactor FBM dùng chung shell `header/info/body/footer` của Sidebar; bỏ overlay và vùng cuộn riêng, phục hồi form/footer khi đóng, khóa callback đến muộn; test offline `1582/1582`, commit `2827107`, GAS DEV revision `@338`.
+- [x] Refactor FBM dùng chung shell `header/info/body/footer` của Sidebar; bỏ overlay và vùng cuộn riêng, phục hồi form/footer khi đóng, khóa callback đến muộn; test offline `1582/1582`, commit `2827107`, `222f7be`, GAS DEV revision `@340`.
