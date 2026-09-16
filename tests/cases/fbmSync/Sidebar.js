@@ -152,6 +152,13 @@ async function chay(so) {
   hop.FBM_SYNC_CLIENT.loginStatus = { configured: false, enabled: true };
   const loginActionRow = hop.fbmSyncLoginActionBlocks()[0];
   check(so, 'Hai nút đăng nhập dùng Row chung để chia đều hai cột', [loginActionRow.role, loginActionRow.elements.length, loginActionRow.elements[0].role, loginActionRow.elements[1].role], ['row', 2, 'button', 'button']);
+  hop.FBM_SYNC_CLIENT.syncSettings = { account: { customerPrefix: 'ALT', customerCodeLength: '8', activitySince: '2026-01-01' } };
+  render(hop, content, hop.fbmSyncRenderAccount, idle);
+  check(so, 'Account hien cau hinh ma khach FBM va moc Activity tu GAS', [dom.document.getElementById('fbm-account-customer-prefix').value, dom.document.getElementById('fbm-account-customer-length').value, dom.document.getElementById('fbm-account-activity-since').value, content.textContent.indexOf('không bị coi là bản ghi mất') >= 0], ['ALT', '8', '2026-01-01', true]);
+  hop.FBM_SYNC_CLIENT.accountSettingsInvalid = { customerPrefix: false, customerCodeLength: true, activitySince: false };
+  const invalidAccountFields = hop.fbmSyncAccountSettingsBlocks().filter((node) => node && node.role === 'box' && node.className.indexOf('shin-form-field') >= 0);
+  check(so, 'Cau hinh ma khach FBM dung StandaloneField va to do o thieu', [invalidAccountFields.length, invalidAccountFields[0].className, invalidAccountFields[1].className, invalidAccountFields[2].className], [3, 'shin-form-field', 'shin-form-field is-invalid', 'shin-form-field']);
+  hop.FBM_SYNC_CLIENT.accountSettingsInvalid = {};
   const identityBlock = hop.fbmSyncIdentityBlock(idle);
   const identityActions = identityBlock.elements.filter((node) => node && node.id === 'fbm-sync-identity-actions-region')[0];
   check(so, 'Ba nút liên kết tài khoản dùng nhóm action dọc dùng chung', [identityActions.className, identityActions.elements.length, identityActions.elements[0].role], ['shin-action-stack', 3, 'button']);
