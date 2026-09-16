@@ -90,9 +90,13 @@ function chay(so) {
     [true, true, true, true, true, true]);
   check(so, 'Nhóm action dùng Stack lõi và vẫn tương thích class cũ',
     [styles.indexOf('align-items: stretch;') >= 0, styles.indexOf('align-self: stretch;') >= 0, styles.indexOf('width: 100%;') >= 0,
-      styles.indexOf('.shin-box.shin-action-stack { display: flex;') >= 0,
+      styles.indexOf('.shin-box.shin-action-stack') >= 0,
       styles.indexOf('.shin-action-stack > * + * { margin-top: var(--shin-gap-2); }') >= 0],
     [true, true, true, true, true]);
+  check(so, 'action Stack căn giữa ở đúng độ ưu tiên của component lõi',
+    [styles.indexOf('.shin-box.shin-action-stack { align-items: center; }') >= 0,
+      !/(^|\n)\.shin-action-stack \{ align-items: center; \}/.test(styles)],
+    [true, true]);
   check(so, 'reset Card không xóa khoảng giữa các Card trong section',
     [styles.indexOf('.shin-section > * + * { margin-top: var(--shin-gap-2); }') > styles.indexOf('.shin-card {'),
       styles.indexOf('.shin-section > .shin-card { margin: 0; }') >= 0],
