@@ -23,7 +23,14 @@ UI_SCHEMA.view = {
     { icon: 'search', tooltip: 'Tìm khách', action: 'toggleSearchPanel' },
     { icon: 'bolt', tooltip: 'Bám theo ô đang chọn', action: 'toggleFollowSelection', toggle: 'followSelection' },
     { icon: 'table', tooltip: 'Làm mới dữ liệu sheet quản trị đang mở', action: 'renderActiveViewSheet' },
-    { icon: 'refresh', tooltip: 'Nạp lại', action: 'reloadAll' },
+    { icon: 'refresh', tooltip: 'Nạp lại', menu: [
+      { label: 'Nạp lại toàn bộ', action: 'reloadAll' },
+      { label: 'Nạp lại sheet hiện tại', action: 'reloadCurrentSheet' },
+      { label: 'Nạp lại Customer', action: 'reloadCustomerSheet' },
+      { label: 'Nạp lại Activity', action: 'reloadActivitySheet' },
+      { label: 'Nạp lại Category', action: 'reloadCategorySheet' },
+      { label: 'Nạp lại Config', action: 'reloadConfigSheet' }
+    ] },
     { icon: 'sync', id: 'fbm-sync-menu', tooltip: 'Đồng bộ FBM', action: 'toggleSyncPanel', menu: [
       { label: 'Mở màn hình đồng bộ FBM', action: 'toggleSyncPanel' },
       { label: 'Tự động đồng bộ FBM — đang phát triển', action: 'showFbmAutoSyncComingSoon' }

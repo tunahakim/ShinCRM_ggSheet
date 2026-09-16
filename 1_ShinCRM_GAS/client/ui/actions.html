@@ -128,6 +128,38 @@ ACTIONS.reloadAll = function () {
   return sidebarBoot();
 };
 
+function actionsManualReload(serverName, message) {
+  var work = function () {
+    return callServer(serverName).then(function (result) {
+      if (result && result.ok === false) {
+        throw new Error(result.reason || result.message || 'Không nạp lại được dữ liệu.');
+      }
+      return typeof refreshManualSheetApply === 'function' ? refreshManualSheetApply(result) : result;
+    });
+  };
+  return typeof sidebarBusyRun === 'function' ? sidebarBusyRun(message, work) : work();
+}
+
+ACTIONS.reloadCurrentSheet = function () {
+  return actionsManualReload('reloadCurrentSheet', 'Đang nạp lại sheet hiện tại…');
+};
+
+ACTIONS.reloadCustomerSheet = function () {
+  return actionsManualReload('reloadCustomer', 'Đang nạp lại Customer…');
+};
+
+ACTIONS.reloadActivitySheet = function () {
+  return actionsManualReload('reloadActivity', 'Đang nạp lại Activity…');
+};
+
+ACTIONS.reloadCategorySheet = function () {
+  return actionsManualReload('reloadCategory', 'Đang nạp lại Category…');
+};
+
+ACTIONS.reloadConfigSheet = function () {
+  return actionsManualReload('reloadConfig', 'Đang nạp lại Config…');
+};
+
 
 /* ─── Bốn cửa mở form ─── */
 

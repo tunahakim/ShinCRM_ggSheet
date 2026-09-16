@@ -150,6 +150,39 @@ function chay(so) {
     [configReload.reloadMode, configReload.reason.indexOf('full core') >= 0, !!configReload.reload],
     ['fullCore', true, true]);
 
+  const manual = dungNap();
+  ghiKhach(manual, manual.hop.SHEET_FIRST_DATA_ROW, 'KH-MANUAL', 'Khách thủ công');
+  ghiGiaoDich(manual, manual.hop.SHEET_FIRST_DATA_ROW, 'GD-MANUAL', 'KH-MANUAL', '2026-09-10');
+  manual.hop.dirtyStateMarkRecords(['KH-MANUAL', 'GD-MANUAL']);
+  const manualCustomer = manual.hop.reloadCustomer(manual.hop.reloadStateRead().revision);
+  const manualActivity = manual.hop.reloadActivity(manual.hop.reloadStateRead().revision);
+  check(so, 'nạp thủ công Customer và Activity trả đúng scope riêng, không fallback full core',
+    [manualCustomer.reloadMode, manualCustomer.customer.rows.length, manualActivity.reloadMode, manualActivity.activity.rows.length],
+    ['customer', 1, 'activity', 1]);
+  manual.book.setActiveSheet(manual.sheet('Category'));
+  const manualCurrent = manual.hop.reloadCurrentSheet();
+  check(so, 'reloadCurrentSheet để GAS xác định sheet active và chọn đúng API Category',
+    [manualCurrent.target, manualCurrent.reloadMode, manualCurrent.categories !== undefined],
+    ['category', 'category', true]);
+
+  const managed = dungHop({
+    sheets: NAM_SHEET,
+    tep: TEP_RENDER
+  });
+  const managedLead = managed.book.insertSheet('!Lead');
+  const managedCare = managed.book.insertSheet('!Chăm sóc');
+  [managedLead, managedCare].forEach((sheet) => {
+    sheet.getRange(1, 1, 1, 2).setValues([['@CUS_MA_KH', '@CUS_TEN_CTY']]);
+  });
+  ghiKhach(managed, managed.hop.SHEET_FIRST_DATA_ROW, 'KH-MANAGED', 'Khách quản trị');
+  managed.hop.dirtyStateMarkAllViews(['!Lead', '!Chăm sóc']);
+  managed.book.setActiveSheet(managedLead);
+  const managedCurrent = managed.hop.reloadCurrentSheet();
+  check(so, 'reloadCurrentSheet ở view quản trị vẽ view active rồi đối chiếu allViews để vẽ toàn bộ view',
+    [managedCurrent.target, managedCurrent.viewRender.rendered.map((item) => item.sheetName).sort(), managed.hop.reloadStateRead().allViews,
+      managedLead.getRange(4, 1).getValue(), managedCare.getRange(4, 1).getValue()],
+    ['view', ['!Chăm sóc', '!Lead'], false, 'KH-MANAGED', 'KH-MANAGED']);
+
   const emptyScope = scopeHop.reloadRecords([]);
   check(so, 'reloadRecords scope rỗng trả quyết định fullCore rõ ràng', emptyScope.reloadMode, 'fullCore');
   scopeHop.SETTINGS.DIRTY_RECORD_LIMIT = 1;
@@ -227,5 +260,41 @@ function chayGoi(so, nen, hop, hangDau) {
   hop.SETTINGS.CHUNK_ROWS = 2000;
   return so;
 }
+
+const TEP_RENDER = [
+  'server/sheet/Book.js',
+  'server/data/DataSchema.js',
+  'server/data/SheetLayout.js',
+  'server/data/ColumnFormat.js',
+  'server/sheet/SheetIo.js',
+  'server/sheet/SheetGrid.js',
+  'server/config/Settings.js',
+  'server/log/LogGate.js',
+  'server/util/DateText.js',
+  'server/util/TextNormalize.js',
+  'server/sheet/CellBudget.js',
+  'server/config/ConfigParams.js',
+  'server/config/ConfigSheetSetup.js',
+  'server/sheet/EntityRead.js',
+  'server/sheet/CategoryRead.js',
+  'server/sheet/ConfigRead.js',
+  'server/state/ReloadDecision.js',
+  'server/state/DirtyState.js',
+  'server/state/UserPrefs.js',
+  'server/gate/FieldLogic.js',
+  'server/gate/IdGate.js',
+  'server/gate/WriteCommit.js',
+  'server/gate/WriteGate.js',
+  'server/gate/DeleteGate.js',
+  'server/service/SelectionService.js',
+  'server/service/LoadService.js',
+  'server/entry/ErrorReport.js',
+  'server/entry/EntryPoint.js',
+  'server/view/FilterMessages.js',
+  'server/view/FilterParser.js',
+  'server/view/SortSpec.js',
+  'server/view/ViewSheetSetup.js',
+  'server/view/ViewSheetRenderer.js'
+];
 
 module.exports = { chay };

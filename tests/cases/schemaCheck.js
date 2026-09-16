@@ -146,8 +146,8 @@ function chay(so) {
     'LƯU DỮ LIỆU trỏ tới hàm "saveFormNow"');
 
   batLoiUi('bắt được nút glyph trỏ tới hàm không có trong bảng, và gọi tên bằng lời chỉ dẫn của nút',
-    (u) => { u.view.header[3].action = 'reloadAllNow'; },
-    'Nạp lại trỏ tới hàm "reloadAllNow"');
+    (u) => { u.view.header[3].menu[0].action = 'reloadAllNow'; },
+    'mục menu "Nạp lại toàn bộ" trỏ tới hàm "reloadAllNow"');
 
   batLoiUi('bắt được mục trong `titleActions` của card — vùng này đi qua `screenBar` đúng đường engine dùng nên cũng phải được soi',
     (u) => { u.view.body[1].titleActions[0].action = 'openActivityFormm'; },

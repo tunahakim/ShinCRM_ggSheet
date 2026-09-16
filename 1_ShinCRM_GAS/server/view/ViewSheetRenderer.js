@@ -245,7 +245,7 @@ function viewRenderSheetLocked(book, sheet, name) {
     dirtyStateClearViewSheet(name, expectedReloadRevision);
     viewInputSignatureWrite(sheet);
     var emptyRevision = viewRevisionBump(sheet);
-    return { ok: true, sheetName: name, viewMeta: viewInputMetaFromHeader([], emptyRevision), rows: 0 };
+    return { ok: true, sheetName: name, viewMeta: viewInputMetaFromHeader([], emptyRevision), rows: 0, reload: reloadStateRead() };
   }
   var header = sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(function (value) { return String(value || '').trim(); });
   var filterRow = sheet.getRange(3, 1, 1, lastColumn).getValues()[0];
@@ -317,7 +317,7 @@ function viewRenderSheetLocked(book, sheet, name) {
   dirtyStateClearViewSheet(name, expectedReloadRevision);
   viewInputSignatureWrite(sheet);
   var revision = viewRevisionBump(sheet);
-  return { ok: true, sheetName: name, viewMeta: viewInputMetaFromHeader(header, revision), rows: rows.length };
+  return { ok: true, sheetName: name, viewMeta: viewInputMetaFromHeader(header, revision), rows: rows.length, reload: reloadStateRead() };
 }
 
 function renderViewSheet(sheetName) {
@@ -348,7 +348,7 @@ function renderAllManagedViews() {
     try {
       return renderViewSheet(name);
     } catch (error) {
-      return { ok: false, sheetName: name, error: String(error && error.message || error) };
+      return { ok: false, sheetName: name, error: String(error && error.message || error), reload: reloadStateRead() };
     }
   });
   var failed = results.filter(function (result) { return result.ok !== true; });
@@ -356,7 +356,8 @@ function renderAllManagedViews() {
     ok: failed.length === 0,
     results: results,
     failed: failed,
-    rendered: results.filter(function (result) { return result.ok === true; })
+    rendered: results.filter(function (result) { return result.ok === true; }),
+    reload: reloadStateRead()
   };
 }
 
@@ -375,7 +376,8 @@ function renderAllManagedViewsIfAllowed(options) {
     skipped: false,
     rendered: result.results,
     failed: result.failed,
-    dirty: reloadStateRead()
+    dirty: reloadStateRead(),
+    reload: reloadStateRead()
   };
 }
 
@@ -401,7 +403,7 @@ function renderViewIfDirty(sheetName) {
     if (reload.allViews || reload.all || reload.config || reload.viewSheets.indexOf(name) >= 0 || inputChanged) {
       return viewRenderSheetLocked(book, sheet, name);
     }
-    return { ok: true, skipped: true, sheetName: name, viewMeta: viewInputMeta(sheet) };
+    return { ok: true, skipped: true, sheetName: name, viewMeta: viewInputMeta(sheet), reload: reloadStateRead() };
   } finally {
     lock.releaseLock();
   }
@@ -427,6 +429,7 @@ function inspectViewState(sheetName, knownRevision) {
         changed: revision !== (Number(knownRevision) || 0),
         needsRender: reload.allViews || reload.all || reload.config || reload.viewSheets.indexOf(name) >= 0 || viewInputSignatureRead(sheet) !== viewInputSignature(sheet),
         dirty: reload,
+        reload: reload,
         revision: revision,
         ms: Date.now() - started
       };

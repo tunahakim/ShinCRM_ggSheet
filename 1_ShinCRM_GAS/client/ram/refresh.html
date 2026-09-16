@@ -41,17 +41,64 @@ function refreshCategoryApply(result) {
   renderScreen();
 }
 
+/** Thay toàn bộ một thực thể theo payload máy chủ; mọi thay đổi Store vẫn đi qua hai cửa Store. */
+function refreshEntityApply(entity, result) {
+  if (!result || !result.ok) { return result; }
+  var block = result[entity];
+  if (!block) { return result; }
+  var records = ingestUnpack(block.fields, block.rows);
+  var seen = {};
+  records.forEach(function (record) {
+    var id = String(record.id || '').trim();
+    if (!id) { return; }
+    seen[id] = true;
+    Store.upsertRecord(entity, record);
+  });
+
+  if (entity === 'customer') {
+    Object.keys(Store.customers).forEach(function (id) {
+      if (!seen[id]) { Store.removeRecord('customer', id); }
+    });
+  } else if (entity === 'activity') {
+    Object.keys(Store.activitiesByCustomer).forEach(function (customerId) {
+      (Store.activitiesByCustomer[customerId] || []).slice().forEach(function (record) {
+        if (!seen[record.id]) { Store.removeRecord('activity', record.id); }
+      });
+    });
+  }
+  renderScreen();
+  return result;
+}
+
+function refreshManualSheetApply(result) {
+  if (!result || result.ok === false) { return result; }
+  var target = result.target || result.reloadMode;
+  if (result.reloadMode === 'fullCore' || target === 'config') { return refreshFullCore(result); }
+  if (target === 'category') { refreshCategoryApply(result); return result; }
+  if (target === 'customer' || target === 'activity') { return refreshEntityApply(target, result); }
+  return result;
+}
+
 function refreshFullCore(result) {
   if (typeof screenStateGoView === 'function') { screenStateGoView(); }
   return typeof sidebarBoot === 'function' ? sidebarBoot().then(function () { return result; }) : result;
 }
 
-function refreshDirtyRecords(ids, expectedRevision) {
+function refreshDirtyRecords(ids, expectedRevision, retryDepth) {
   return callServer('reloadRecords', [ids, expectedRevision]).then(function (result) {
     if (result && result.reloadMode === 'fullCore') {
       return refreshFullCore(result);
     }
     refreshRecordsApply(result, ids);
+    // The server keeps a newer signal when the revision changed during the read.
+    // Follow that signal immediately a bounded number of times so a concurrent
+    // write is not stranded, without introducing a periodic ReloadState poll.
+    var state = typeof sheetLinkReloadState === 'function' ? sheetLinkReloadState(result) : null;
+    var nextIds = state && Array.isArray(state.records) ? state.records : [];
+    var depth = Number(retryDepth) || 0;
+    if (result && result.revisionMatched === false && nextIds.length && depth < 2) {
+      return refreshDirtyRecords(nextIds, state.revision, depth + 1);
+    }
     return result;
   });
 }

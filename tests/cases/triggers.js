@@ -38,6 +38,47 @@ function chay(so) {
   hop.shinOnEdit({ range: eventRange(lead, 3, 5) });
   check(so, 'hàng lọc dưới mã @ và cột sắp xếp làm mới toàn bộ view; ô dữ liệu cùng hàng 3 dưới cột thường thì không', rendered, ['!Lead', '!Chăm sóc', '!Lead', '!Chăm sóc']);
 
+  const defaultSheets = ['Customer', 'Activity', 'Category', 'Config'];
+  const schemaResults = defaultSheets.map((name) => {
+    hop.dirtyStateClear();
+    hop.shinOnEdit({ range: eventRange(nen.sheet(name), 1, 1) });
+    const state = hop.reloadStateRead();
+    return [name, state.schema, state.allCore, state.allViews];
+  });
+  check(so, 'sửa hàng 1 ở đủ bốn sheet mặc định luôn phát schema, full core và toàn bộ view', schemaResults,
+    defaultSheets.map((name) => [name, true, true, true]));
+
+  hop.dirtyStateClear();
+  defaultSheets.forEach((name) => {
+    hop.shinOnEdit({ range: eventRange(nen.sheet(name), 2, 1) });
+    hop.shinOnEdit({ range: eventRange(nen.sheet(name), 3, 1) });
+  });
+  const defaultNoopState = hop.reloadStateRead();
+  check(so, 'hàng 2 và hàng 3 của bốn sheet mặc định chỉ là nhãn/ghi chú nên không tạo dirty',
+    [defaultNoopState.viewSheets, defaultNoopState.records, defaultNoopState.category, defaultNoopState.config,
+      defaultNoopState.schema, defaultNoopState.allCore, defaultNoopState.allViews],
+    [[], [], false, false, false, false, false]);
+
+  hop.dirtyStateClear();
+  const invalidColumn = Object.keys(hop.DATA_SCHEMA.customer).length + 1;
+  nen.sheet('Customer').getRange(1, invalidColumn).setValue('Cột thường');
+  hop.shinOnEdit({ range: eventRange(nen.sheet('Customer'), 4, invalidColumn) });
+  const invalidDataState = hop.reloadStateRead();
+  check(so, 'sửa dữ liệu Customer dưới cột không có mã hợp lệ không phát dirty',
+    [invalidDataState.viewSheets, invalidDataState.records, invalidDataState.category, invalidDataState.config,
+      invalidDataState.schema, invalidDataState.allCore, invalidDataState.allViews],
+    [[], [], false, false, false, false, false]);
+
+  hop.dirtyStateClear();
+  ghiO(nen, 'Activity', 4, '@ACT_MA_GD', 'GD000001');
+  hop.shinOnEdit({ range: eventRange(nen.sheet('Activity'), 4, 1) });
+  check(so, 'sửa dữ liệu Activity dưới cột mã hợp lệ đánh dấu đúng mã giao dịch', hop.dirtyStateRead().records, ['GD000001']);
+
+  rendered.length = 0;
+  hop.shinOnEdit({ range: eventRange(lead, 1, 1) });
+  check(so, 'sửa hàng 1 view, kể cả thêm/đổi/xóa mã @, gọi vẽ toàn bộ view', rendered, ['!Lead', '!Chăm sóc']);
+
+  hop.dirtyStateClear();
   ghiO(nen, 'Customer', 4, '@CUS_MA_KH', 'KH000001');
   hop.shinOnEdit({ range: eventRange(nen.sheet('Customer'), 4, 2) });
   const dirty = hop.dirtyStateRead();

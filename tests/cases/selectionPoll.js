@@ -100,7 +100,7 @@ function dungHopPoll() {
     return syncValue({ spreadsheetId: 'sheet-1', gid: '1', sheetName: 'Customer', row: 4, col: 1, rowEnd: 4, colEnd: 1, customerId: '' });
   };
 
-  napClient(hop, 'client/link/sheetLink.html', 'client/link/selectionPoll.html');
+  napClient(hop, 'client/ram/refresh.html', 'client/link/sheetLink.html', 'client/link/selectionPoll.html');
   return hop;
 }
 
@@ -452,6 +452,58 @@ async function chay(so) {
   const categoryTimer = Array.from(categoryEdit._timers.values())[0];
   check(so, 'kết thúc edit Category chạm API riêng ngay ở điểm tự nhiên kế tiếp',
     categoryTimer && categoryTimer.delay, 0);
+
+  const manyEdits = dungHopPoll();
+  batDau(manyEdits);
+  manyEdits._calls = [];
+  manyEdits.refreshRecordsApply = () => {};
+  manyEdits.callServer = (name) => {
+    manyEdits._calls.push(name);
+    if (name === 'getReloadState') { return syncValue({ reload: { revision: 4, records: ['KH1'] } }); }
+    return syncValue({ ok: true, reloadMode: 'records', revisionMatched: true, reload: { revision: 4, records: [] } });
+  };
+  manyEdits.sheetLinkScheduleEditReload({ sheetName: 'Customer', isEditing: false }, true);
+  const firstTimerId = Array.from(manyEdits._timers.keys())[0];
+  manyEdits.sheetLinkScheduleEditReload({ sheetName: 'Customer', isEditing: false }, true);
+  const secondTimerId = Array.from(manyEdits._timers.keys())[0];
+  check(so, 'nhiều edit liên tiếp chỉ giữ một timer và một lượt reload sau edit cuối',
+    [manyEdits._timers.size, firstTimerId !== secondTimerId, timerDau(manyEdits), manyEdits._calls.filter((name) => name === 'reloadRecords').length],
+    [1, true, 3000, 1]);
+
+  const leaveEarly = dungHopPoll();
+  batDau(leaveEarly);
+  leaveEarly._calls = [];
+  leaveEarly.refreshRecordsApply = () => {};
+  leaveEarly.callServer = (name) => {
+    leaveEarly._calls.push(name);
+    if (name === 'getReloadState') { return syncValue({ reload: { revision: 5, records: ['KH2'] } }); }
+    return syncValue({ ok: true, reloadMode: 'records', revisionMatched: true, reload: { revision: 5, records: [] } });
+  };
+  leaveEarly.SHEET_LINK_LAST_SHEET = 'Customer';
+  leaveEarly.SHEET_LINK_LAST_CONTEXT = { sheetName: 'Customer', isEditing: false };
+  leaveEarly.sheetLinkScheduleEditReload({ sheetName: 'Customer', isEditing: false }, true);
+  leaveEarly.sheetLinkApplyContext({ sheetName: 'Activity', row: 4, col: 1, isEditing: false });
+  check(so, 'rời Customer trước đủ ba giây hủy timer và reload ngay một lượt',
+    [leaveEarly._timers.size, leaveEarly._calls.filter((name) => name === 'reloadRecords').length], [0, 1]);
+
+  const revisionRace = dungHopPoll();
+  batDau(revisionRace);
+  revisionRace._calls = [];
+  revisionRace._applied = [];
+  revisionRace.refreshRecordsApply = (_result, ids) => { revisionRace._applied.push(ids.slice()); };
+  let raceRound = 0;
+  revisionRace.callServer = (name, args) => {
+    revisionRace._calls.push([name, args]);
+    if (name !== 'reloadRecords') { return syncValue({ ok: true }); }
+    raceRound += 1;
+    return raceRound === 1
+      ? syncValue({ ok: true, reloadMode: 'records', revisionMatched: false, reload: { revision: 6, records: ['KH1', 'KH2'] } })
+      : syncValue({ ok: true, reloadMode: 'records', revisionMatched: true, reload: { revision: 6, records: [] } });
+  };
+  revisionRace.refreshDirtyRecords(['KH1'], 5);
+  check(so, 'revision đổi trong lúc request bay thì lượt kế tiếp gom cả mã mới, không mất tín hiệu',
+    [revisionRace._calls.filter((item) => item[0] === 'reloadRecords').length, revisionRace._calls.filter((item) => item[0] === 'reloadRecords').map((item) => item[1][0]), revisionRace._applied],
+    [2, [['KH1'], ['KH1', 'KH2']], [['KH1'], ['KH1', 'KH2']]]);
 }
 
 module.exports = { chay };

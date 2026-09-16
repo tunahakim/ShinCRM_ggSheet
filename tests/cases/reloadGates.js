@@ -61,6 +61,24 @@ function chay(so) {
     [background.ok, background.reloadDecision.kind, background.dirty.records, background.dirty.allViews, backgroundEnv.hop.rendered],
     [true, 'records', ['KH000001'], true, 1]);
 
+  const statusEnv = taoHop();
+  napServer(statusEnv.hop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/SyncSchema.js');
+  statusEnv.hop.fbmEnsureSyncColumns('background');
+  statusEnv.hop.dirtyStateClear();
+  const statusNames = ['pending', 'notApplied', 'conflict', 'missing', 'error'];
+  const statusResults = statusNames.map((statusName) => {
+    const savedStatus = statusEnv.hop.writeGateSave({
+      entity: 'customer',
+      records: [{ id: 'KH000001', syncStatus: statusEnv.hop.FbmSync.SYNC_STATUS[statusName] }],
+      source: 'push',
+      schemas: [statusEnv.hop.DATA_SCHEMA, statusEnv.hop.SYNC_SCHEMA]
+    });
+    return [statusName, savedStatus.reloadDecision.kind, savedStatus.dirty.records, savedStatus.dirty.allViews, savedStatus.viewRender.ok];
+  });
+  check(so, 'push chỉ đổi trạng thái pending/notApplied/conflict/missing/error vẫn phát dirty record và render view',
+    statusResults,
+    statusNames.map((statusName) => [statusName, 'records', ['KH000001'], true, true]));
+
   const schemaEnv = taoHop();
   napServer(schemaEnv.hop, 'fbm_sync/SyncSchema.js');
   schemaEnv.hop.shinViewSheetNames = () => ['!Lead'];

@@ -212,6 +212,17 @@ function chay(so) {
     [hop3._daNapLai, hop3.ScreenState.screen, hop3.ScreenState.formStack.length, raNapLai],
     [['view:0'], 'view', 0, 'đã nạp lại']);
 
+  hop3._manualReloads = [];
+  hop3.callServer = (name) => { hop3._manualReloads.push(name); return loiHua({ ok: true }); };
+  hop3.ACTIONS.reloadCurrentSheet();
+  hop3.ACTIONS.reloadCustomerSheet();
+  hop3.ACTIONS.reloadActivitySheet();
+  hop3.ACTIONS.reloadCategorySheet();
+  hop3.ACTIONS.reloadConfigSheet();
+  check(so, 'menu nạp lại gọi đúng API GAS cho sheet hiện tại và bốn sheet mặc định',
+    hop3._manualReloads,
+    ['reloadCurrentSheet', 'reloadCustomer', 'reloadActivity', 'reloadCategory', 'reloadConfig']);
+
   checkThrows(so, 'không có form nào mà bấm Hủy thì hét lên — đó là dấu hiệu màn và ngăn xếp đã lệch nhau',
     () => hop3.ACTIONS.cancelForm(), 'Không có form nào');
 

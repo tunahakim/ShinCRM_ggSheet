@@ -175,6 +175,89 @@ function reloadConfig(expectedRevision) {
   });
 }
 
+/** Nạp trọn một sheet dữ liệu theo yêu cầu thủ công; không suy diễn từ trạng thái màn hình của Sidebar. */
+function reloadEntityAll(entity, expectedRevision) {
+  var started = Date.now();
+  if (entity !== 'customer' && entity !== 'activity') {
+    throw new Error('Chỉ nạp thủ công được Customer hoặc Activity, nhận được: ' + entity + '.');
+  }
+
+  var result = entityReadAll(entity);
+  var current = reloadStateRead();
+  var revisionMatched = expectedRevision === undefined || expectedRevision === null || expectedRevision === ''
+    || current.revision === Number(expectedRevision);
+  var idAt = result.fields.indexOf('id');
+  var ids = result.rows.map(function (row) { return String(idAt >= 0 ? row[idAt] || '' : '').trim(); }).filter(function (id) { return !!id; });
+  if (revisionMatched && ids.length) { dirtyStateClearRecords(ids, expectedRevision); }
+  var latest = reloadStateRead();
+  return {
+    ok: true,
+    reloadMode: entity,
+    entity: entity,
+    customer: entity === 'customer' ? result : undefined,
+    activity: entity === 'activity' ? result : undefined,
+    processedRevision: latest.revision,
+    revisionMatched: revisionMatched,
+    reload: latest,
+    dirty: dirtyStateRead(),
+    selection: selectionSnapshot(),
+    ms: Date.now() - started
+  };
+}
+
+function reloadCustomer(expectedRevision) {
+  return runEntryPoint('reloadCustomer', LOAD_SOURCE, 'throw', function () {
+    return reloadEntityAll('customer', expectedRevision);
+  });
+}
+
+function reloadActivity(expectedRevision) {
+  return runEntryPoint('reloadActivity', LOAD_SOURCE, 'throw', function () {
+    return reloadEntityAll('activity', expectedRevision);
+  });
+}
+
+/** Xác định sheet hiện tại ở GAS rồi chọn đúng API; client không được tự đoán theo màn đang mở. */
+function reloadCurrentSheet(expectedRevision) {
+  return runEntryPoint('reloadCurrentSheet', LOAD_SOURCE, 'throw', function () {
+    var sheet = shinOpenBook().getActiveSheet();
+    var name = sheet && typeof sheet.getName === 'function' ? sheet.getName() : '';
+    var result;
+    if (name === ENTITY_SHEETS.customer) {
+      result = reloadEntityAll('customer', expectedRevision);
+      result.target = 'customer';
+      return result;
+    }
+    if (name === ENTITY_SHEETS.activity) {
+      result = reloadEntityAll('activity', expectedRevision);
+      result.target = 'activity';
+      return result;
+    }
+    if (name === 'Category') {
+      result = reloadCategory(expectedRevision);
+      result.target = 'category';
+      return result;
+    }
+    if (name === 'Config') {
+      result = reloadConfig(expectedRevision);
+      result.target = 'config';
+      return result;
+    }
+    if (name && name.charAt(0) === '!' && typeof renderViewSheet === 'function') {
+      result = renderViewSheet(name);
+      var remaining = reloadStateRead();
+      var otherViews = null;
+      if (remaining.allViews || remaining.viewSheets.length) {
+        otherViews = typeof renderAllManagedViewsIfAllowed === 'function'
+          ? renderAllManagedViewsIfAllowed()
+          : null;
+      }
+      return { ok: true, target: 'view', sheetName: name, view: result, viewRender: otherViews, reload: reloadStateRead(), dirty: dirtyStateRead() };
+    }
+    throw new Error('Sheet hiện tại "' + name + '" không thuộc Customer, Activity, Category, Config hoặc sheet quản trị.');
+  });
+}
+
 /**
  * Nạp phần lõi. Đây là lời gọi đầu tiên của mỗi lượt mở sidebar.
  *

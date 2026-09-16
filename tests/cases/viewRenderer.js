@@ -56,6 +56,10 @@ function chay(so) {
   check(so, 'khách chưa có giao dịch vẫn có thể hiện thành dòng',
     [result.rows, [base.view.getRange(4, 1).getValue(), base.view.getRange(5, 1).getValue()].sort()],
     [2, ['KH0001', 'KH0002']]);
+  base.view.getRange(4, 1, 2, 2).setValues([['Dữ liệu sửa tay', 'Không phải nguồn'], ['Dòng cũ', 'Cũng không phải nguồn']]);
+  base.nen.hop.renderViewSheet('!Lead');
+  check(so, 'lượt vẽ không đọc ngược hàng 4 trở xuống làm nguồn sự thật',
+    [base.view.getRange(4, 1).getValue(), base.view.getRange(5, 1).getValue()].sort(), ['KH0001', 'KH0002']);
   check(so, 'lượt vẽ không bật toast nhỏ ở Sheet và luôn nhả khóa', [base.nen.dem.toast, base.nen.stubs._khoa.dangGiu], [0, false]);
 
   const allViews = taoNen(['@CUS_MA_KH', '@CUS_TEN_CTY']);
@@ -101,12 +105,14 @@ function chay(so) {
 
   check(so, 'đầu vào không đổi thì chỉ đọc metadata, không vẽ thừa', base.nen.hop.renderViewIfDirty('!Lead').skipped, true);
   base.view.getRange(3, 2).setValue('Hai');
-  const beforeRender = base.nen.hop.inspectViewState('!Lead', result.viewMeta.revision);
+  const beforeRender = base.nen.hop.inspectViewState('!Lead', base.nen.hop.viewInputMeta(base.view).revision);
   check(so, 'cửa kiểm nhẹ nhận ra đầu vào đổi nhưng chưa tự vẽ', [beforeRender.changed, beforeRender.needsRender], [false, true]);
   const afterFilter = base.nen.hop.renderViewIfDirty('!Lead');
   check(so, 'hàng lọc đổi trước khi trigger chạy vẫn bị dấu vân tay phát hiện và dựng view mới',
     [afterFilter.rows, base.view.getRange(4, 1).getValue()],
     [1, 'KH0002']);
+  check(so, 'lượt vẽ phủ lại cả dòng dữ liệu cũ thừa sau khi filter thu hẹp',
+    base.view.getRange(5, 1, 1, 5).getValues()[0], ['', '', '', '', '']);
   check(so, 'vẽ xong tăng phiên bản để sidebar biết view đã đổi', afterFilter.viewMeta.revision > result.viewMeta.revision, true);
   base.view.getRange(3, 2).setValue('');
   base.nen.hop.renderViewIfDirty('!Lead');
