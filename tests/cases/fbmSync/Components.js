@@ -82,7 +82,7 @@ function chay(so) {
     ['shin-form-field', 'shin-toggle-row', 'shin-toggle-control', 'shin-notice', 'shin-kv-row', 'shin-pagination', 'shin-section', 'shin-content-disabled', 'shin-loading'].every((name) => styles.indexOf(name) >= 0),
     true);
   check(so, 'Card và Stack dùng spacing dọc theo token, tương thích môi trường không hỗ trợ flex gap',
-    [styles.indexOf('.shin-card-body {') >= 0, styles.indexOf('.shin-stack,') >= 0,
+    [styles.indexOf('.shin-card-body {') >= 0, styles.indexOf('.shin-box.shin-stack,') >= 0,
       styles.indexOf('.shin-card-body > * + * { margin-top: var(--shin-gap-2); }') >= 0,
       styles.indexOf('.shin-stack > * + *') >= 0,
       styles.indexOf('.shin-form-field > * + * { margin-top: var(--shin-gap-1); }') >= 0,
@@ -90,7 +90,7 @@ function chay(so) {
     [true, true, true, true, true, true]);
   check(so, 'Nhóm action dùng Stack lõi và vẫn tương thích class cũ',
     [styles.indexOf('align-items: stretch;') >= 0, styles.indexOf('align-self: stretch;') >= 0, styles.indexOf('width: 100%;') >= 0,
-      styles.indexOf('.shin-action-stack { display: flex;') >= 0,
+      styles.indexOf('.shin-box.shin-action-stack { display: flex;') >= 0,
       styles.indexOf('.shin-action-stack > * + * { margin-top: var(--shin-gap-2); }') >= 0],
     [true, true, true, true, true]);
   check(so, 'reset Card không xóa khoảng giữa các Card trong section',
