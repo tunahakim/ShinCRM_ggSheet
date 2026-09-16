@@ -38,12 +38,13 @@ async function chay(so) {
   };
   hop.fbmSyncInstall();
   hop.FBM_SYNC_CLIENT.lastStatus = idle();
+  hop.FBM_SYNC_CLIENT.subscreen = 'run';
   hop.fbmSyncPaint(idle());
-  const overviewNode = content.children[0];
-  hop.fbmSyncPaint(Object.assign(idle(), { label: 'Snapshot Tổng quan mới', counts: { completed: 3, succeeded: 2 } }));
-  check(so, 'snapshot GAS vá Tổng quan tại chỗ, không thay node màn hình', [content.children[0] === overviewNode, content.textContent.indexOf('Snapshot Tổng quan mới') >= 0], [true, true]);
+  const runNode = content.children[0];
+  hop.fbmSyncPaint(Object.assign(idle(), { phase: 'pull_customer', runId: 'run-snapshot', cursor: { kind: 'customer_grid' }, label: 'Snapshot Chạy đồng bộ mới', counts: { completed: 3, succeeded: 2 } }));
+  check(so, 'snapshot GAS vá Chạy đồng bộ tại chỗ, không thay node màn hình', [content.children[0] === runNode, content.textContent.indexOf('Pipeline đang chạy') >= 0], [true, true]);
 
-  ['overview', 'account', 'run', 'results', 'settings'].forEach((screen) => {
+  ['run', 'account', 'results', 'settings'].forEach((screen) => {
     const button = dom.document.createElement('button');
     button.setAttribute('data-sync-screen', screen);
     click(dom, button);

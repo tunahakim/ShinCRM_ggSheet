@@ -9,7 +9,6 @@ const SYNC_FILES = [
   'client/sync/fbmSyncSettingsScreen.html',
   'client/sync/fbmSyncAuditScreen.html',
   'client/sync/fbmSync.html',
-  'client/sync/screens/overview.html',
   'client/sync/screens/account.html',
   'client/sync/screens/run.html',
   'client/sync/screens/results.html',

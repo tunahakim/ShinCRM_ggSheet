@@ -18,14 +18,15 @@ function taoBoTest() {
   const hop = taoHopCat({ document: dom.document, window: { top: null, confirm: () => true, addEventListener: () => {} } });
   hop.FBM_SYNC_CLIENT = {
     running: false, mode: 'read', resultPages: {}, resultsTab: 'summary', identityStatus: {},
+    subscreen: 'run',
     identityDraft: { spreadsheetId: '', userId: '', accountName: '' }, loginDraft: { username: '' },
     identityAction: '', identityLastAction: '', loginStatus: null, syncSettings: null, lastStatus: null,
     traceEvents: [], installed: false, waiting: {}, relayWaiters: {}, credentialWaiters: {}
   };
   hop.FBM_SYNC_UI_SCHEMA = {
     screens: [
-      { id: 'overview', label: 'Tổng quan' }, { id: 'account', label: 'Tài khoản FBM' },
-      { id: 'run', label: 'Chạy đồng bộ' }, { id: 'results', label: 'Kết quả & xử lý' },
+      { id: 'run', label: 'Chạy đồng bộ' }, { id: 'account', label: 'Tài khoản FBM' },
+      { id: 'results', label: 'Kết quả & xử lý' },
       { id: 'settings', label: 'Cài đặt phiên' }
     ],
     modes: [
@@ -51,7 +52,7 @@ function taoBoTest() {
   hop.fbmSyncPaintError = null;
   napClient(hop,
     'client/ui/icons.html', 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html', 'client/ui/renderEngine.html', 'client/sync/fbmSyncUiSchema.html',
-    'client/sync/screens/overview.html', 'client/sync/screens/account.html',
+    'client/sync/screens/account.html',
     'client/sync/screens/run.html', 'client/sync/screens/results.html',
     'client/sync/screens/settings.html', 'client/sync/fbmSyncSettingsScreen.html',
     'client/sync/fbmSyncStatusScreen.html', 'client/sync/fbmSyncAuditScreen.html', 'client/sync/fbmSyncShell.html', 'client/sync/fbmSync.html');
@@ -86,17 +87,16 @@ async function chay(so) {
   const pushError = { phase: 'error', runId: 'r3', cursor: { kind: 'push_wait' }, lastFailureCode: 'FBM_VERIFY_FAILED', label: 'Có lỗi', counts: {} };
 
   const shellHeader = hop.fbmSyncShellHeaderBlocks(idle);
-  check(so, 'header Đồng bộ dùng đúng dãy Block như header Sidebar/form', [shellHeader.length, shellHeader[0].role, shellHeader[0].className, shellHeader[3].role, shellHeader[3].className, hop.fbmSyncShellTitle()], [4, 'icon', '', 'icon', '', 'Tổng quan']);
+  check(so, 'menu nội bộ bỏ Tổng quan và đặt Chạy đồng bộ lên đầu', [hop.FBM_SYNC_UI_SCHEMA.screens.map((item) => item.id), hop.FBM_SYNC_UI_SCHEMA.screens.some((item) => item.id === 'overview')], [['run', 'account', 'results', 'settings'], false]);
+  check(so, 'header Đồng bộ dùng đúng dãy Block như header Sidebar/form', [shellHeader.length, shellHeader[0].role, shellHeader[0].className, shellHeader[3].role, shellHeader[3].className, hop.fbmSyncShellTitle()], [4, 'icon', '', 'icon', '', 'Chạy đồng bộ']);
   check(so, 'header Đồng bộ dùng cùng khung và tiêu đề với header Sidebar/form', [shellHeader[1].className.indexOf('shin-header-title') >= 0], [true]);
 
-  check(so, 'Overview render được trạng thái rỗng', !!render(hop, content, hop.fbmSyncRenderOverview, idle).querySelector('.shin-sync-overview-state'), true);
-  check(so, 'Overview không đặt dòng hướng dẫn chung ngay dưới header', hop.fbmSyncOverviewBlocks(idle)[0].role, 'card');
-  hop.FBM_SYNC_CLIENT.subscreen = 'overview';
+  hop.FBM_SYNC_CLIENT.subscreen = 'run';
   hop.fbmSyncRenderLoading();
-  check(so, 'loading xóa dấu màn cũ để snapshot đầu tiên dựng lại Tổng quan', [content.getAttribute('data-fbm-sync-screen'), !!hop.RENDER_INDEX.nodes['fbm-sync-overview-root']], [null, false]);
+  check(so, 'loading xóa dấu màn cũ để snapshot đầu tiên dựng lại Chạy đồng bộ', [content.getAttribute('data-fbm-sync-screen'), !!hop.RENDER_INDEX.nodes['fbm-sync-run-root']], [null, false]);
   check(so, 'loading chỉ có một dòng và gộp đúng tên module', [content.querySelectorAll('.shin-section-title').length, content.querySelector('.shin-loading').textContent], [0, 'Đang tải trạng thái phiên đồng bộ FBM']);
-  hop.fbmSyncPaint(Object.assign({}, idle, { label: 'Tổng quan sau loading' }));
-  check(so, 'Tổng quan dựng lại được sau loading mà không dùng node cũ', [content.getAttribute('data-fbm-sync-screen'), content.textContent.indexOf('Tổng quan sau loading') >= 0], ['overview', true]);
+  hop.fbmSyncPaint(Object.assign({}, idle, { label: 'Chạy đồng bộ sau loading' }));
+  check(so, 'Chạy đồng bộ dựng lại được sau loading mà không dùng node cũ', [content.getAttribute('data-fbm-sync-screen'), content.textContent.indexOf('Chọn loại đồng bộ') >= 0], ['run', true]);
   check(so, 'Run render không hiện pipeline khi chưa chạy', render(hop, content, hop.fbmSyncRenderRun, idle).querySelector('.shin-sync-pipeline'), null);
   const idleProgress = hop.fbmSyncProgressBlocks(idle, {}).elements[1].elements[0];
   check(so, 'Progress idle rỗng hoàn toàn, không tô fill giả', [hop.fbmSyncProgressData(idle, {}).active, idleProgress.spatialConfig.width, idleProgress.className], [false, '0%', 'shin-sync-progress-fill']);

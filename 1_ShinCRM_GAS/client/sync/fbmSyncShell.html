@@ -52,9 +52,6 @@
 .shin-sync-conflict-value-fbm { color:var(--shin-warn); }
 .shin-sync-pipeline-marker { flex:0 0 14px; }
 .shin-sync-pipeline-label { min-width:0; }
-.shin-sync-overview-hero { border-color:var(--shin-primary); box-shadow:0 1px 3px rgba(26,115,232,.14); }
-.shin-sync-overview-state { color:var(--shin-primary-dark); font-size:var(--shin-text-md); font-weight:700; }
-.shin-sync-overview-direction { margin-top:2px; color:var(--shin-text-soft); font-size:var(--shin-text-sm); }
 </style>
 <script>
 function fbmSyncShellEnabled(status) { return !(status && (status.masterEnabled === false || status.enabled === false)); }
@@ -95,14 +92,14 @@ function fbmSyncRenderLoading() {
   fbmSyncRenderShell(FBM_SYNC_CLIENT.lastStatus || {});
   panel.removeAttribute('data-fbm-sync-screen');
   if (typeof RENDER_INDEX !== 'undefined' && RENDER_INDEX.nodes) {
-    ['fbm-sync-overview-root', 'fbm-sync-account-root', 'fbm-sync-run-root', 'fbm-sync-results-root', 'fbm-sync-settings-root'].forEach(function (id) { delete RENDER_INDEX.nodes[id]; });
+    ['fbm-sync-account-root', 'fbm-sync-run-root', 'fbm-sync-results-root', 'fbm-sync-settings-root'].forEach(function (id) { delete RENDER_INDEX.nodes[id]; });
   }
   fbmSyncReplaceBlocks(panel, [Box({ className: 'shin-section', elements: [Text({ className: 'shin-loading', text: 'Đang tải trạng thái phiên đồng bộ FBM' })] })]);
 }
 function fbmSyncSetScreen(screenId) {
   var ids = FBM_SYNC_UI_SCHEMA.screens.map(function (item) { return item.id; });
   if (typeof fbmSyncCaptureAccountDraft === 'function') { fbmSyncCaptureAccountDraft(); }
-  FBM_SYNC_CLIENT.subscreen = ids.indexOf(screenId) >= 0 ? screenId : 'overview';
+  FBM_SYNC_CLIENT.subscreen = ids.indexOf(screenId) >= 0 ? screenId : 'run';
   if (FBM_SYNC_CLIENT.lastStatus) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); }
 }
 function fbmSyncToggleMaster() {
