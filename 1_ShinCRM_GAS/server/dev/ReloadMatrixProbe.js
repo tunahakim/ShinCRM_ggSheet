@@ -297,7 +297,21 @@ function reloadMatrixProbe() {
     var viewRow1Before = reloadStateRead();
     var viewRow1Result = reloadMatrixProbeWriteEvent(viewSheet, 1, viewOrdinaryColumn, 'DEV_RELOAD_ORDINARY_2');
     var viewRow1After = reloadStateRead();
-    reloadMatrixProbeAssert(report, 'Sheet quản trị hàng 1 vẽ toàn bộ view', viewRow1After.revision > viewRow1Before.revision && reloadMatrixProbeRenderedAll(viewRow1Result, expectedViews), JSON.stringify({ revision: viewRow1After.revision, rendered: viewRow1Result && viewRow1Result.rendered && viewRow1Result.rendered.length }));
+    reloadMatrixProbeAssert(report, 'Sheet quản trị hàng 1 cột thường không vẽ', viewRow1After.revision === viewRow1Before.revision, JSON.stringify({ revision: viewRow1After.revision, rendered: viewRow1Result && viewRow1Result.rendered && viewRow1Result.rendered.length }));
+
+    var viewValidHeaderColumn = viewSheet.getRange(1, 1, 1, viewSheet.getLastColumn()).getValues()[0].indexOf(DATA_SCHEMA.customer.id.code) + 1;
+    var viewValidHeaderCell = viewSheet.getRange(1, viewValidHeaderColumn);
+    var viewValidHeaderSnapshot = reloadMatrixProbeSnapshotCell(viewValidHeaderCell);
+    var viewValidHeaderTarget = DATA_SCHEMA.customer.companyName ? DATA_SCHEMA.customer.companyName.code : DATA_SCHEMA.customer.id.code;
+    var viewValidRow1Before = reloadStateRead();
+    viewValidHeaderCell.setValue(viewValidHeaderTarget);
+    SpreadsheetApp.flush();
+    var viewValidRow1Result = shinOnEdit({ range: viewValidHeaderCell, oldValue: viewValidHeaderSnapshot.value, value: viewValidHeaderTarget });
+    SpreadsheetApp.flush();
+    var viewValidRow1After = reloadStateRead();
+    reloadMatrixProbeRestoreCell(viewValidHeaderCell, viewValidHeaderSnapshot);
+    SpreadsheetApp.flush();
+    reloadMatrixProbeAssert(report, 'Sheet quản trị hàng 1 mã cột hợp lệ vẽ toàn bộ view', viewValidRow1After.revision > viewValidRow1Before.revision && reloadMatrixProbeRenderedAll(viewValidRow1Result, expectedViews), JSON.stringify({ revision: viewValidRow1After.revision, rendered: viewValidRow1Result && viewValidRow1Result.rendered && viewValidRow1Result.rendered.length }));
 
     var viewValidColumn = viewSheet.getRange(1, 1, 1, viewSheet.getLastColumn()).getValues()[0].indexOf(DATA_SCHEMA.customer.id.code) + 1;
     var viewRow3Before = reloadStateRead();
