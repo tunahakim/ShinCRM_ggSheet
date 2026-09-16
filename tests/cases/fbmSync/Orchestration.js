@@ -111,8 +111,12 @@ async function chay(so) {
   const retainedOnReadError = orchestration.FbmSync.stateStart('', 'checking_session', 0, { preserveConflicts: true });
   check(so, 'loi doc Sheet thi giu conflict de an toan', [retainedOnReadError.metadata.conflicts.length, retainedOnReadError.counts.conflict, retainedOnReadError.locks['activity:ACT-KEEP-ON-ERROR'].reason], [1, 1, 'conflict']);
   orchestration.FbmSync.stateWrite(orchestration.FbmSync.stateStart('', 'idle', 0));
+  orchestration.FbmSync.accountSettingsRead = () => ({ activitySince: '2024-10-07' });
   const bulkStarted = orchestration.FbmSync.start({ mode: 'read', scan: 'activity_bulk' });
-  check(so, 'start bulk Activity dung cursor authorize rieng', [bulkStarted.request.meta.kind, orchestration.FbmSync.stateRead().scan], ['authorize', 'activity_bulk']);
+  orchestration.FbmSync.accountSettingsRead = () => ({ activitySince: '2025-01-01' });
+  const bulkSnapshotState = orchestration.FbmSync.stateRead();
+  const bulkSnapshotRequest = orchestration.FbmSync.activityBulkRequest({ type: 0 });
+  check(so, 'start bulk Activity dung cursor authorize rieng va chup moc theo phien', [bulkStarted.request.meta.kind, bulkSnapshotState.scan, bulkSnapshotState.activitySince, bulkSnapshotRequest.body.filter], ['authorize', 'activity_bulk', '2024-10-07', ['end_date:>=07/10/2024']]);
   check(so, 'bootstrap dung viewPage false', started.request.body.viewPage, false);
   check(so, 'bootstrap khong gui authorized cu', started.request.body.authorized, null);
   check(so, 'envelope mang runId/requestId va GAS luu moc response', [Boolean(started.request.meta.trace.runId), Boolean(started.request.meta.trace.requestId), orchestration.FbmSync.stateRead().activeRequestId === bulkStarted.request.meta.trace.requestId, orchestration.FbmSync.traceRead(5).some((item) => item.stage === 'response_built')], [true, true, true, true]);

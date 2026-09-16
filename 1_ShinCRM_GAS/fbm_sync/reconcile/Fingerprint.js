@@ -38,7 +38,10 @@ FbmSync.normalizeFingerprintValue = function (entity, field, value) {
 /** Bỏ qua Activity trước mốc cấu hình; chúng không được coi là bản ghi bị mất. */
 FbmSync.activitySinceAllows = function (record) {
   var since = '';
-  try { since = String((FbmSync.accountSettingsRead ? FbmSync.accountSettingsRead() : {}).activitySince || '').trim(); } catch (ignore) {}
+  try {
+    var state = FbmSync.stateRead ? FbmSync.stateRead() : {}, accountSettings = FbmSync.accountSettingsRead ? FbmSync.accountSettingsRead() : {};
+    since = String(state && state.runId && state.activitySince !== undefined ? state.activitySince : accountSettings.activitySince || '').trim();
+  } catch (ignore) {}
   if (!since) { return true; }
   var rawDate = record && record.workDate;
   var dateKey = typeof FbmSync.activityDateKey === 'function' ? FbmSync.activityDateKey(rawDate) : '';

@@ -16,6 +16,18 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 
 ## Slice 0 — Nền tảng, ranh giới và an toàn
 
+### Reload RAM và sheet quản trị
+
+Hợp đồng chi tiết và checklist triển khai riêng nằm ở `07A. Hợp đồng Reload RAM và Sheet quản trị.md` và `Checklist reload RAM và sheet quản trị.md`. Các mục dưới đây là cổng bắt buộc để mọi slice FBM không làm Sidebar hoặc view giữ dữ liệu cũ:
+
+- [ ] Mọi lần ghi thành công từ pull, push, verify, baseline, conflict, missing, retry và background phát signal ReloadState chung.
+- [ ] Signal có mã Customer/Activity khi xác định được; không xác định được thì bật full core.
+- [ ] Signal luôn đặt `allViews`; không chỉ đánh dấu view đang mở.
+- [ ] Sidebar đóng vẫn giữ signal trong DocumentProperties và Sidebar mở lại đọc được revision mới.
+- [ ] Ghi trạng thái đồng bộ dù không đổi nội dung chính vẫn reload RAM và vẽ view khi chính sách cho phép.
+- [ ] Ghi thất bại không xóa dirty state cũ.
+- [ ] Chạy toàn bộ ca R3 và R8 trong `Checklist reload RAM và sheet quản trị.md` trước khi đóng slice FBM có ghi dữ liệu.
+
 ### Kiến trúc và dữ liệu nhạy cảm
 
 - [x] GAS giữ nghiệp vụ, cursor, hash, conflict và quyết định; Extension chỉ tìm tab FBM, gọi `fetch` và trả response thô. Adapter login/vault là ngoại lệ bảo mật duy nhất được 09.06 quy định; không mở rộng ngoại lệ này sang nghiệp vụ đồng bộ.
@@ -159,6 +171,7 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 ### Activity và marker
 
 - [x] Request Activity theo `externalKey stt_rec` nối đúng Customer nội bộ; khi có `activitySince`, bulk và request theo Customer cùng thêm `filter` `end_date:>=DD/MM/YYYY`.
+- [x] Mỗi lượt chụp `activitySince` vào state; đổi cấu hình giữa chừng không trộn phạm vi giữa các trang/cursor của lượt đang chạy.
 - [x] Activity mới không marker tạo dòng ShinCRM, cấp mã nội bộ, lưu FBM ID và baseline.
 - [x] Marker trỏ dòng đang đẩy thì vá ID, không tạo trùng.
 - [x] Marker trỏ dòng đã có FBM ID khác thì khóa và báo xử lý.

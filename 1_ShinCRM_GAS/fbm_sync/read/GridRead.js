@@ -3,8 +3,8 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 /** Đọc cấu hình runtime; token ưu tiên state của phiên hiện tại. */
 FbmSync.scriptSettings = function () {
-  var session = {};
-  try { session = FbmSync.stateRead().session || {}; } catch (ignore) { session = {}; }
+  var currentState = {}, session = {};
+  try { currentState = FbmSync.stateRead() || {}; session = currentState.session || {}; } catch (ignore) { currentState = {}; session = {}; }
   var cookie = String(session.cookie || '');
   var userId = String(session.userId || '');
   if (!userId && cookie.indexOf('FHN_CRM_App') >= 0) {
@@ -17,6 +17,7 @@ FbmSync.scriptSettings = function () {
   var accountName = typeof FbmSync.bindingAccountName === 'function' ? FbmSync.bindingAccountName() : '';
   var accountSettings = typeof FbmSync.accountSettingsRead === 'function' ? FbmSync.accountSettingsRead() : {};
   testCustomerCode = testCustomerCode === null ? 'ALT00010' : String(testCustomerCode || '').trim();
+  var activitySince = currentState.runId && currentState.activitySince !== undefined ? currentState.activitySince : accountSettings.activitySince;
   return {
     baseUrl: 'https://fbo.com.vn:8888',
     cookie: cookie,
@@ -26,7 +27,7 @@ FbmSync.scriptSettings = function () {
     accountName: accountName,
     customerPrefix: String(accountSettings.customerPrefix || ''),
     customerCodeLength: String(accountSettings.customerCodeLength || ''),
-    activitySince: String(accountSettings.activitySince || ''),
+    activitySince: String(activitySince || ''),
     testCustomerCode: testCustomerCode
   };
 };
