@@ -194,6 +194,7 @@
 - [x] Đổi schema luôn fallback full core (test `reloadDecision.js`: schema có `ram.mode: 'fullCore'`; test `reloadGates.js`: signal `allCore`).
 - [x] Có API `getReloadState` dùng khi nhận event, lúc mở Sidebar và tại các điểm kiểm tra tự nhiên (test `loadService.js`, `selectionPoll.js`).
 - [x] Thiết kế và triển khai API một request `probeSelectionAndReload(input)`: trả context hiện tại, mã khách khi vị trí đổi, `ReloadState` và quyết định RAM; không bắt buộc chuỗi `probeSelectionCheap` → `probeSelectionFull` qua mạng (server `SelectionService.js`, test `selectionService.js`).
+- [ ] Nâng `probeSelectionAndReload` thành cổng quyết định + thực thi reload: khi `defer` chỉ trả `waitMs`/`readyAt`; khi đủ thời gian phải trả payload reload trong chính response, không để Sidebar gọi API reload thứ hai.
 - [x] GAS tự so `selectionContext` với `previousSelectionContext`; vị trí không đổi thì trả mã khách cũ và không đọc lại ô mã; vị trí đổi thì mới tra cột mã theo schema (test `selectionService.js`).
 - [x] Response selection/reload chạy im lặng và luôn kèm `ReloadState`; không dùng producer `CRM_RELOAD` làm đường bắt buộc (server `SelectionService.js`, client request `silent`).
 - [x] Có API render toàn bộ managed views và trả kết quả từng sheet (test `viewRenderer.js`).
@@ -238,7 +239,7 @@
 - [x] Có một request `probeSelectionAndReload` bên ngoài thay cho chuỗi RPC `probeSelectionCheap` → `probeSelectionFull` (client/server, test `selectionPoll.js`, `selectionService.js`).
 - [x] Khi selection không đổi, GAS trả context/mã khách cũ và không đọc lại ô mã khách (test `selectionService.js`).
 - [x] Khi selection đổi, GAS tự tra schema và đọc mã khách trong cùng request; Extension vẫn giữ đường live model cũ khi nó đang hoạt động (test `selectionService.js`, `extensionBridge.js`).
-- [x] Response selection/reload luôn kèm `ReloadState`, `ram` và trạng thái selection; Sidebar không tự quyết định scope (server `SelectionService.js`, test `selectionService.js`).
+- [ ] Response selection/reload luôn kèm `ReloadState`, `decision`, `payload`, `observedRevision`, `processedRevision` và trạng thái còn bẩn; Sidebar không tự quyết định scope và chỉ áp dụng payload (server `SelectionService.js`, test `selectionService.js`).
 - [x] Context Extension có `customerId` hợp lệ được áp dụng ngay cho màn hình chính trước các RPC kiểm tra dirty; RPC chạy nền không chặn nguồn-chọn cục bộ (client `sheetLink.html`, test `selectionPoll.js`).
 - [x] Fallback polling vị trí 2 giây rồi 6 giây gộp luôn kiểm tra reload, không tạo request kiểm tra thứ hai (test `selectionPoll.js`).
 - [x] Safety polling theo phút chạy im lặng, chỉ phục vụ RAM và không kích hoạt renderer view (client `selectionPoll.html`, test `selectionPoll.js`).
@@ -255,7 +256,7 @@
 
 ### Kiểm thử offline R5
 
-- [x] Ca nhiều edit chỉ gọi `reloadRecords` một lần (test `selectionPoll.js`).
+- [ ] Ca nhiều edit chỉ có một payload reload do GAS trả trong request sẵn sàng; không có chuỗi `probeSelectionAndReload` → `reloadRecords` từ Sidebar (test `selectionPoll.js`, `selectionService.js`).
 - [x] Ca rời sheet trước đủ ba giây gọi reload ngay (test `selectionPoll.js`).
 - [x] Ca revision đổi trong lúc request bay không mất mã mới (bounded follow-up trong `refresh.html`, test `selectionPoll.js`).
 - [x] Ca event đang bay không tạo Promise thứ hai (test `selectionPoll.js`).
@@ -408,5 +409,21 @@
 - [x] Hint bàn phím có `keydown`, `beforeinput` và dự phòng `keyup` cho Delete/Backspace; Extension vẫn không kết luận ô đã sửa (`tests/cases/extensionBridge.js`).
 - [x] Offline regression sau nhóm latest-wins đạt `1588/1588` (`node tests/run.js`).
 - [x] GAS DEV deployment `@381`: `reloadMatrixProbe` đã đạt trên `@380`; sau guard revision đầu vào, `probeSelectionAndReload --push` vẫn trả đúng selection/ReloadState/decision.
+
+## Slice R11 — GAS trả payload reload trong chính response Sidebar
+
+- [ ] Tách logic đọc record/category/full core thành hàm nội bộ có thể được gọi trong `probeSelectionAndReload` mà không tạo RPC thứ hai.
+- [ ] Khi `reloadDecisionForState` trả `defer`, `probeSelectionAndReload` trả `waitMs`/`readyAt`, không đọc dữ liệu và không xóa dirty.
+- [ ] Khi đã đủ thời gian, `probeSelectionAndReload` tự nạp đúng scope và trả `payload` trong cùng response; Sidebar không gọi `reloadRecords`, `reloadCategory` hoặc `loadCore` để hoàn tất lượt đó.
+- [ ] Payload records bao phủ Customer, Activity liên quan, bản ghi biến mất và search index; payload full core bao phủ Schema, Config, Category, Customer và thông tin chunk Activity.
+- [ ] Response luôn có `requestId`, `observedRevision`, `processedRevision`, `remainingRevision`, `revisionMatched`, `reload` và `decision`.
+- [ ] Dirty chỉ xóa sau khi GAS đã đọc payload thành công và revision khớp; signal phát sinh trong lúc đọc vẫn còn trong `remainingRevision`.
+- [ ] Sidebar chỉ áp dụng payload có revision không thấp hơn revision đã nạp; response `defer` hoặc response cũ không được làm lùi timer/context/Store.
+- [ ] Sidebar chỉ giữ một timer `readyAt` và một wake đang chờ; nhiều response `defer` không tạo nhiều lượt reload hoặc timer chồng.
+- [ ] Test offline phủ năm lần sửa A–E cách nhau một giây: các response đầu không có payload, request sau `readyAt` trả một payload chứa toàn bộ A–E.
+- [ ] Test offline phủ sửa F sau khi A–E đã xử lý: F tạo revision mới và được trả ở lượt riêng sau debounce của F.
+- [ ] Test offline phủ F phát sinh trong lúc payload A–E đang được đọc: GAS không xóa F, response ghi `remainingRevision`, request kế tiếp nhận F.
+- [ ] Test offline phủ response lệch thứ tự: response cũ không ghi đè payload/revision mới.
+- [ ] GAS DEV probe xác nhận `probeSelectionAndReload` trả payload khi state đã sẵn sàng và trả `defer` khi chưa đến `readyAt`.
 
 ---

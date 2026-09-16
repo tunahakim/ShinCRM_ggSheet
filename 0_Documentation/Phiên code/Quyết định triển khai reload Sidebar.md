@@ -103,7 +103,27 @@ Trong một lượt chạy GAS:
 3. Nếu vị trí/vùng/sheet đổi, đọc cột mã theo schema và lấy mã khách mới.
 4. Nếu vị trí không đổi, trả lại mã khách cũ hoặc không gửi lại mã; không đọc ô mã khách vô ích.
 5. Đọc `ReloadState` và gọi `ReloadDecision` với input Sidebar đầy đủ.
-6. Trả một response gồm context hiện tại, mã khách khi cần, quyết định RAM và state mới.
+6. Gọi quyết định và thực thi reload ngay trong cùng lượt GAS. Nếu chưa đủ thời gian debounce, trả `defer` cùng `readyAt`/`waitMs`; nếu đã đủ, GAS tự nạp dữ liệu và trả payload trong chính response này.
+
+`probeSelectionAndReload` là cổng request-response duy nhất của Sidebar cho selection và RAM. Sidebar không được nhận một `decision` rồi gọi tiếp `reloadRecords`, `reloadCategory` hoặc `loadCore` để hoàn tất cùng một lượt reload. Sidebar chỉ áp dụng payload mà GAS trả về.
+
+Response tối thiểu:
+
+```text
+{
+  requestId,
+  selection,
+  decision,
+  reload: ReloadState,
+  payload: { mode: 'none' | 'records' | 'category' | 'fullCore', ... },
+  observedRevision,
+  processedRevision,
+  remainingRevision,
+  revisionMatched
+}
+```
+
+GAS không tự đẩy response ở `readyAt`: Apps Script không có kênh push và request đã kết thúc sau khi trả `defer`. Sidebar chỉ làm nhiệm vụ vận chuyển, đặt một timer theo `waitMs`, rồi gửi request kế tiếp. Request đầu tiên đến sau `readyAt` sẽ nhận payload.
 
 Nếu GAS gọi helper tương đương `probeSelectionFull` bên trong cùng lượt chạy thì đó không phải request mạng thứ hai. Không lưu context selection dùng chung trong `DocumentProperties`: nhiều Sidebar hoặc nhiều người dùng có thể đứng ở các vị trí khác nhau. Context lần trước do Sidebar truyền vào là nguồn tối ưu an toàn hơn.
 
@@ -117,7 +137,9 @@ Sau mỗi `ContextHint` do đổi vị trí hoặc `keydown`, Sidebar hủy time
 
 Mục đích là giảm số request khi người dùng di chuyển nhanh giữa các ô hoặc gõ liên tục. Mốc này chỉ điều khiển thời điểm hỏi GAS; nó không quyết định thời điểm reload dữ liệu.
 
-Nếu wake mới đến trong lúc request trước còn chạy, Sidebar chỉ giữ một cờ wake đang chờ ở tầng vận chuyển rồi gửi một request tiếp theo. Cờ này không chứa mã, không chứa scope và không quyết định nghiệp vụ. GAS phải đọc `ReloadState` mới nhất và trả toàn bộ scope hiện hành theo nguyên tắc latest-wins; `reloadRecords` hợp nhất các mã dirty khi `expectedRevision` đã cũ và trả `processedRevision`/`supersededRevision` để response cũ không được coi là state cuối.
+Nếu wake mới đến trong lúc request trước còn chạy, Sidebar chỉ giữ một cờ wake đang chờ ở tầng vận chuyển rồi gửi một request tiếp theo. Cờ này không chứa mã, không chứa scope và không quyết định nghiệp vụ. GAS phải đọc `ReloadState` mới nhất và tự thực thi hoặc trả `defer` theo scope đó. Không có request con `reloadRecords` từ Sidebar trong cùng chuỗi.
+
+Ví dụ năm lần sửa A–E cách nhau một giây: các request trong năm giây đầu chỉ trả `defer`; request kế tiếp tại mốc dữ liệu sẵn sàng trả một payload duy nhất chứa A–E. Mỗi response trước đó không có payload. Nếu F phát sinh sau khi A–E đã được xử lý, F tạo revision mới và được trả trong một request riêng sau mốc debounce của F.
 
 Apps Script không có cơ chế hủy chắc chắn một invocation đang chạy. Vì vậy thiết kế không dựa vào hủy tiến trình: request cũ có thể hoàn tất nhưng chỉ được áp dụng nếu revision của nó không thấp hơn revision đã nạp. Nếu signal đổi trong lúc đọc, GAS giữ signal mới hoặc trả chỉ thị để request kế tiếp xử lý, không xóa nhầm dirty state.
 
