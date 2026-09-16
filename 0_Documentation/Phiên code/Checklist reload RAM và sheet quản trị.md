@@ -321,6 +321,7 @@
 - [x] Thêm ca test cho cổng ghi/pull/push/background (gồm status push trong `reloadGates.js`).
 - [x] Chạy `node tests/run.js`: `1569` đạt, `0` không đạt.
 - [x] Chạy test GAS DEV cho `getReloadState`, `reloadRecords`, `renderAllManagedViews` với `--push`: `getReloadState` đạt ở `@326`, `reloadRecords` đạt ở `@327` với fallback `fullCore` khi scope rỗng, `renderAllManagedViews` đạt ở `@328` với tất cả view DEV trả `ok` và không có sheet lỗi; đường runtime `renderAllManagedViewsIfAllowed` được kiểm tra tiếp ở revision mới và dọn cờ view stale theo đúng revision guard.
+- [x] GAS DEV cài trigger installable ở `@331`; `probeTriggerState` xác nhận `shinOnEdit: true`, `shinOnChange: true` và không làm mất các trigger FBM đang có.
 - [ ] Chạy test GAS DEV khi không mở Sidebar và xác nhận view vẫn đổi sau ghi Customer/Activity.
 - [x] Kiểm tra log không chứa cookie, mật khẩu, token hoặc payload nhạy cảm bằng `tests/cases/logMask.js` và các ca DTO/log FBM; bộ offline đạt `1569/1569`.
 - [x] Chỉ thử dữ liệu ở Spreadsheet DEV `2026.09.05 - ShinCRM DEV` qua cổng DEV có token; không chạm Spreadsheet production.
