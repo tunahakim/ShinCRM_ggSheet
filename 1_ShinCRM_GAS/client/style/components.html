@@ -19,9 +19,12 @@
 .shin-row > * { flex: 1 1 0; min-width: 0; }
 .shin-single-action-row { justify-content: center; }
 .shin-single-action-row > * { flex: 0 1 auto; min-width: min(220px, 100%); }
+.shin-action-stack { display: flex; flex-direction: column; align-items: center; gap: var(--shin-gap-2); }
+.shin-action-stack > * { width: min(100%, 220px); }
 .shin-inline-field-row { align-items: center; }
-.shin-inline-field-row > .shin-form-label { flex: 1 1 auto; }
-.shin-inline-field-row > .shin-standalone-control { flex: 0 1 132px; }
+.shin-inline-field-row > .shin-form-label { flex: 1 1 auto; min-width: 0; }
+.shin-inline-field-row > .shin-standalone-control { flex: 0 0 20%; max-width: 20%; min-width: 0; }
+.shin-inline-field-row > .shin-standalone-control + .shin-standalone-control { flex-basis: 20%; }
 .shin-form-field.is-invalid .shin-input { border-color: var(--shin-error); box-shadow: 0 0 0 1px var(--shin-error); }
 .shin-form-field.is-invalid .shin-form-label { color: var(--shin-error); }
 
@@ -49,7 +52,7 @@
 
 /* Ô nhập không thuộc DATA_SCHEMA, dùng chung cho các màn hình có trạng thái riêng. */
 .shin-form-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: var(--shin-gap-2); }
-.shin-form-label { color: var(--shin-text-soft); font-size: var(--shin-text-xs); }
+.shin-form-label { min-width: 0; color: var(--shin-text-soft); font-size: calc(var(--shin-text-xs) + 1px); font-weight: 500; line-height: 1.2; }
 
 /* Hàng bật/tắt dùng cho cấu hình và các màn hình trạng thái. */
 .shin-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: var(--shin-gap-2); margin: var(--shin-gap-2) 0; }
@@ -334,6 +337,9 @@
  * `position: relative` là mốc cho hộp danh sách bên dưới neo vào.
  */
 .shin-combo { position: relative; }
+.shin-combo-standalone { cursor: pointer; }
+.shin-combo-standalone::after { content: '▾'; position: absolute; top: 50%; right: var(--shin-gap-2); transform: translateY(-50%); color: var(--shin-text-soft); font-size: var(--shin-text-xs); pointer-events: none; }
+.shin-combo-standalone .shin-input { padding-right: 24px; cursor: pointer; }
 
 /*
   Hộp danh sách bung ra bằng `position: absolute` nên nó không đẩy hàng dưới xuống lúc mở.

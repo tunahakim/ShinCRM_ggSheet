@@ -66,7 +66,7 @@ function chay(so) {
     [true, true, true, true]);
   check(so, 'các hàng thao tác dùng Row chung để tự chia đều',
     [source['client/sync/screens/account.html'].indexOf('Row([') >= 0,
-      source['client/sync/fbmSyncSettingsScreen.html'].indexOf('Row(fbmSyncIdentityActionBlocks())') >= 0,
+      source['client/sync/fbmSyncSettingsScreen.html'].indexOf("className: 'shin-action-stack'") >= 0,
       source['client/sync/fbmSyncAuditScreen.html'].indexOf('Row([') >= 0,
       source['client/sync/screens/results.html'].indexOf('Row({ className: \'shin-pagination\'') >= 0],
     [true, true, true, true]);

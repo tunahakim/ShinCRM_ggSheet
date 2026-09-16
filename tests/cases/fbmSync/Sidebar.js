@@ -154,7 +154,7 @@ async function chay(so) {
   check(so, 'Hai nút đăng nhập dùng Row chung để chia đều hai cột', [loginActionRow.role, loginActionRow.elements.length, loginActionRow.elements[0].role, loginActionRow.elements[1].role], ['row', 2, 'button', 'button']);
   const identityBlock = hop.fbmSyncIdentityBlock(idle);
   const identityActions = identityBlock.elements.filter((node) => node && node.id === 'fbm-sync-identity-actions-region')[0];
-  check(so, 'Ba nút liên kết tài khoản dùng Row chung thay vì layout riêng của Sync', [identityActions.elements.length, identityActions.elements[0].role, identityActions.elements[0].elements.length], [1, 'row', 3]);
+  check(so, 'Ba nút liên kết tài khoản dùng nhóm action dọc dùng chung', [identityActions.className, identityActions.elements.length, identityActions.elements[0].role], ['shin-action-stack', 3, 'button']);
 
   hop.FBM_SYNC_CLIENT.identityDraft = { spreadsheetId: 'sheet', userId: '', username: 'anhlt', accountName: '' };
   hop.FBM_SYNC_CLIENT.identityInvalid = { spreadsheet: false, user: true, username: false, account: true };

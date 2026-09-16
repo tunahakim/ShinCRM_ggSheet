@@ -21,7 +21,8 @@
 .shin-sync-pipeline-step.is-done { color:var(--shin-ok); }
 .shin-sync-pipeline-step.is-error { color:var(--shin-error); }
 .shin-sync-tab-row { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:0; margin-bottom:var(--shin-gap-2); border-bottom:1px solid var(--shin-border-faint); }
-.shin-sync-tab-row button { min-height:36px; border:0; border-bottom:2px solid transparent; padding:var(--shin-gap-1) 3px; background:none; color:var(--shin-text-soft); text-align:center; font:inherit; line-height:1.2; cursor:pointer; overflow-wrap:anywhere; }
+.shin-sync-tab-row button { min-width:0; min-height:40px; border:0; border-bottom:2px solid transparent; padding:var(--shin-gap-1) 3px; background:none; color:var(--shin-text-soft); text-align:center; font:inherit; line-height:1.2; cursor:pointer; white-space:normal; overflow-wrap:break-word; }
+.shin-sync-tab-row button .shin-btn-label { display:block; white-space:normal; overflow-wrap:break-word; }
 .shin-sync-tab-row button.is-active { border-color:var(--shin-primary); color:var(--shin-primary); font-weight:700; }
 @media (max-width:340px) { .shin-sync-summary-grid { grid-template-columns:1fr; } }
 </style>
@@ -35,9 +36,10 @@
 .shin-sync-nav button:hover { background:var(--shin-bg-hover); }
 .shin-sync-nav button.is-active { background:var(--shin-primary-soft); color:var(--shin-primary-dark); font-weight:700; }
 .shin-sync-schedule-row, .shin-sync-conflict-field { min-width:0; }
-.shin-sync-schedule-row { display:grid; grid-template-columns:42px minmax(0,1fr) minmax(92px,112px); align-items:center; gap:var(--shin-gap-2); padding:var(--shin-gap-1) 0; }
+.shin-sync-schedule-row { display:grid; grid-template-columns:42px minmax(0,1fr) 20%; align-items:center; gap:var(--shin-gap-2); padding:var(--shin-gap-1) 0; }
 .shin-sync-schedule-row > .shin-standalone-control { min-width:0; }
 .shin-sync-schedule-row > .shin-standalone-control:last-child .shin-input { width:100%; box-sizing:border-box; }
+.shin-sync-detail-controls { margin-left:44px; padding-left:var(--shin-gap-2); border-left:2px solid var(--shin-border-faint); }
 .shin-sync-conflict-choice { width:100%; }
 .shin-sync-summary-label { color:var(--shin-text); font-size:var(--shin-text-sm); font-weight:600; }
 .shin-sync-conflict-head { display:flex; align-items:center; justify-content:space-between; gap:var(--shin-gap-2); margin-bottom:var(--shin-gap-2); }
