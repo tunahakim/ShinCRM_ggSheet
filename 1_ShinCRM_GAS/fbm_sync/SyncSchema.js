@@ -64,21 +64,16 @@ function fbmEnsureSyncColumns(source) {
   }
 
   var reload = null;
-  if (changed && typeof reloadDecisionForChange === 'function') {
-    var prefs = typeof userPrefsRead === 'function' ? userPrefsRead() : { autoRenderView: true };
-    var viewNames = typeof shinViewSheetNames === 'function' ? shinViewSheetNames(book) : [];
-    reload = reloadDecisionForChange({
-      source: source === 'background' ? 'background' : 'pull',
+  var commit = null;
+  if (changed && typeof writeCommitAfterSuccess === 'function') {
+    commit = writeCommitAfterSuccess({
+      source: source === 'background' ? 'background' : (source || 'pull'),
       surface: 'schema',
       schema: true,
-      viewSheetNames: viewNames,
-      autoRenderView: prefs.autoRenderView !== false,
-      writeSucceeded: true
+      viewSheetNames: typeof shinViewSheetNames === 'function' ? shinViewSheetNames(book) : []
     });
-    if (typeof dirtyStateMarkDecision === 'function') { dirtyStateMarkDecision(reload); }
-    if (reload.views.action === 'render' && typeof renderAllManagedViewsIfAllowed === 'function') {
-      reload.viewRender = renderAllManagedViewsIfAllowed();
-    }
+    reload = commit.reloadDecision;
+    if (reload && commit.viewRender) { reload.viewRender = commit.viewRender; }
   }
-  return { ok: true, changed: changed, report: report, reload: reload };
+  return { ok: true, changed: changed, report: report, reload: reload, viewRender: commit && commit.viewRender, dirty: commit && commit.dirty };
 }

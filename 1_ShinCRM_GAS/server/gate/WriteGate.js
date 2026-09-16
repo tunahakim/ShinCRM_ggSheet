@@ -523,25 +523,17 @@ function writeGateSave(yeuCau) {
     try { SpreadsheetApp.flush(); } finally { khoa.releaseLock(); }
   }
 
-  if (result && result.ok && result.recordIds && result.recordIds.length && typeof reloadDecisionForChange === 'function') {
-    var prefs = typeof userPrefsRead === 'function' ? userPrefsRead() : { autoRenderView: true };
-    var viewNames = typeof shinViewSheetNames === 'function' ? shinViewSheetNames(shinOpenBook()) : [];
-    var decision = reloadDecisionForChange({
-      source: source === 'pull' ? 'pull' : 'write',
+  if (result && result.ok && result.recordIds && result.recordIds.length && typeof writeCommitAfterSuccess === 'function') {
+    var commit = writeCommitAfterSuccess({
+      source: source,
       surface: 'record',
       entity: entity,
       recordIds: result.recordIds,
-      configChanged: result.configChanged,
-      viewSheetNames: viewNames,
-      autoRenderView: prefs.autoRenderView !== false,
-      writeSucceeded: true
+      configChanged: result.configChanged
     });
-    if (typeof dirtyStateMarkDecision === 'function') { dirtyStateMarkDecision(decision); }
-    result.reloadDecision = decision;
-    if (decision.views.action === 'render' && typeof renderAllManagedViewsIfAllowed === 'function') {
-      result.viewRender = renderAllManagedViewsIfAllowed();
-    }
-    if (typeof reloadStateRead === 'function') { result.dirty = reloadStateRead(); }
+    result.reloadDecision = commit.reloadDecision;
+    result.viewRender = commit.viewRender;
+    result.dirty = commit.dirty;
   }
   return result;
 }

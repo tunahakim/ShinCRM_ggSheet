@@ -41,6 +41,7 @@ const TEP_NEN = [
   'server/state/UserPrefs.js',
   'server/gate/FieldLogic.js',
   'server/gate/IdGate.js',
+  'server/gate/WriteCommit.js',
   'server/gate/WriteGate.js',
   'server/sheet/SheetColumnWriter.js',
   'server/gate/DeleteGate.js',

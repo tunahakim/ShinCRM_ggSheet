@@ -58,7 +58,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── Book.js               Mở đúng tệp Sheet. Tách riêng vì đường mở khi có người ngồi trước máy khác đường mở lúc chạy tự động.
 │   │   ├── SheetIo.js            Đọc hàng 1 thành bảng tra "mã cột → số cột". Mọi thao tác cột đi qua đây, không ai được đếm cột bằng tay.
 │   │   ├── SheetGrid.js          Sự thật về lưới: đếm hàng dữ liệu, đọc một khối ô, nới lưới trước khi ghi. Ra đời từ lỗi thật làm sheet Log co xuống 7 hàng rồi tắt log trong im lặng.
-│   │   ├── SheetColumnWriter.js  Ghi các cột ngoài DATA_SCHEMA sau khi bên gọi đã giữ khóa và kiểm tra; không tự khóa, không chứa luật nghiệp vụ.
+│   │   ├── SheetColumnWriter.js  Helper ghi cột ngoài DATA_SCHEMA; chỉ được gọi từ cửa đã giữ khóa và kiểm tra, không phải cửa public.
 │   │   ├── CellBudget.js         Đo tổng số ô cả tệp và so với trần ở Config. Vượt trần thì chặn hẳn lượt nạp, kèm bảng chỉ mặt sheet nào phình to.
 │   │   ├── EntityRead.js         Đọc bản ghi Customer và Activity ra dạng { fields, rows } truyền được sang client. Bỏ hàng không có mã và đếm số hàng đã bỏ.
 │   │   ├── CategoryRead.js       Đọc sheet Category thành "mã danh mục → danh sách giá trị". Biết loại cột đi kèm _FBM mà không loại nhầm @CAT_CHO_PHEP_FBM.
@@ -74,6 +74,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   ├── gate\                     Các cửa ghi có kỷ luật, cùng họ với LogGate: vào một chỗ, kiểm rồi mới ghi, một lượt một lệnh.
 │   │   ├── FieldLogic.js         Ba bảng chuẩn hóa - kiểm tra - bắt buộc của tài liệu 03 Phần 6, phía máy chủ. Cắt trắng và trần 50.000 ký tự là mặc định của bộ máy, không khai trong schema.
 │   │   ├── IdGate.js             Cấp mã bản ghi từ bộ đếm ở Config, chỉ chạy bên trong khóa của cửa ghi. Bộ đếm lạc hậu thì nhảy lên max+1 kèm dòng cảnh báo chứ không cấp mã đã có.
+│   │   ├── WriteCommit.js        Hậu xử lý chung sau ghi thành công: gọi ReloadDecision, ghi DirtyState và gọi renderer; không tự lấy khóa hoặc ghi dữ liệu nguồn.
 │   │   ├── WriteGate.js          Cửa ghi nghiệp vụ duy nhất của Customer và Activity: khóa, cấp mã, kiểm tra, ghi đúng cột đã khai, flush rồi nhả khóa.
 │   │   └── DeleteGate.js         Một nút Xóa, hai kết cục: xóa hẳn khi không tầng nào cản, xóa mềm khi có. Xóa nhiều dòng thì xóa từ dưới lên và đọc lại bản ghi mềm.
 │   ├── service\

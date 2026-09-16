@@ -227,14 +227,35 @@ function prepareConfigSheet(file, options) {
 function resetConfigToDefaults() {
   var lock = LockService.getDocumentLock();
   if (!lock.tryLock(SETTINGS.LOCK_WAIT_MS)) { throw new Error('Hệ thống bận. Vui lòng thử lại!'); }
+  var file;
+  var result;
+  var views = [];
   try {
-    var file = shinOpenBook();
-    var result = prepareConfigSheet(file, { reset: true });
-    var views = file.getSheets().map(function (sheet) { return sheet.getName(); }).filter(function (name) { return name.charAt(0) === '!'; });
-    dirtyStateMarkConfig();
-    dirtyStateMarkViewSheets(views);
-    return { ok: true, counters: result.counters, viewSheets: views, params: configUserParams(configParams()) };
+    file = shinOpenBook();
+    result = prepareConfigSheet(file, { reset: true });
+    views = file.getSheets().map(function (sheet) { return sheet.getName(); }).filter(function (name) { return name.charAt(0) === '!'; });
+    SpreadsheetApp.flush();
   } finally {
-    lock.releaseLock();
+    try { SpreadsheetApp.flush(); } finally { lock.releaseLock(); }
   }
+
+  var commit = null;
+  if (typeof writeCommitAfterSuccess === 'function') {
+    commit = writeCommitAfterSuccess({
+      source: 'user',
+      surface: 'config',
+      entity: 'config',
+      viewSheetNames: views
+    });
+  }
+
+  return {
+    ok: true,
+    counters: result.counters,
+    viewSheets: views,
+    params: configUserParams(configParams()),
+    reload: commit && commit.reloadDecision,
+    viewRender: commit && commit.viewRender,
+    dirty: commit && commit.dirty
+  };
 }

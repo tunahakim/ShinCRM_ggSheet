@@ -141,6 +141,22 @@
 - [x] Push dùng signal chung, không bỏ qua vì chỉ đổi trạng thái.
 - [x] Background dùng signal chung dù Sidebar đóng.
 
+### Kiểm kê mọi đường ghi xuống Sheet
+
+- [ ] Đối chiếu toàn bộ lệnh ghi `setValue`, `setValues`, `clearContent`, `deleteRows`, `insertRows`, `insertColumns`, `deleteColumn`, `insertSheet` và `deleteSheet` trong `1_ShinCRM_GAS` với bảng phân loại ở Tài liệu 06 Phần 8.
+- [ ] Xác nhận `WriteGate.js` và `DeleteGate.js` là hai cửa public duy nhất cho dữ liệu bản ghi `Customer` và `Activity`.
+- [ ] Xác nhận `IdGate.js` chỉ được gọi từ `WriteGate` trong cùng document lock; không có entry point runtime độc lập cấp mã hoặc ghi bộ đếm.
+- [ ] Xác nhận mọi hậu xử lý sau ghi bản ghi, xóa, Config và schema đều đi qua `WriteCommit.js`; không còn đoạn lặp trực tiếp `ReloadDecision` → `DirtyState` → renderer ở cửa khác.
+- [ ] Xác nhận `ConfigSheetSetup.js` có ranh giới riêng cho setup/migration và đường runtime reset Config; đường runtime phát signal Config sau flush thành công.
+- [ ] Xác nhận `fbm_sync/SyncSchema.js` là cửa schema riêng, không bị nhầm là cửa ghi bản ghi; thêm cột sync phát `schema + allCore + allViews`.
+- [ ] Xác nhận `ViewSheetRenderer.js` là writer đầu ra có kiểm soát; chỉ xóa cờ view sau khi ghi và flush thành công, không tạo dirty bản ghi nguồn.
+- [ ] Xác nhận `ViewSheetSetup.js` và `SetupSheets.js` chỉ phục vụ cấu trúc/khởi tạo, không được gọi để ghi dữ liệu nghiệp vụ trong runtime.
+- [ ] Xác nhận `SheetColumnWriter.js` chỉ là helper tầng thấp; không có caller runtime nào gọi nó ngoài cửa đã giữ khóa và kiểm tra.
+- [ ] Xác nhận `LogGate.js` là cửa hạ tầng độc lập; ghi `Log` không làm tăng revision dữ liệu nghiệp vụ và không gọi vòng lại `WriteCommit`.
+- [ ] Xác nhận `SheetIo.js` và toàn bộ `server/dev/*` chỉ chứa probe/DEV, có allowlist rõ và không được coi là đường runtime production.
+- [ ] Thêm kiểm thử tĩnh quét writer runtime, báo đỏ khi xuất hiện thao tác ghi ngoài allowlist hoặc thêm file writer chưa được phân loại.
+- [ ] Ghi kết quả audit (danh sách file, hàm, sheet bị chạm và lý do ngoại lệ) vào commit cùng nhóm thay đổi.
+
 ### Kiểm thử offline R3
 
 - [ ] Save user cập nhật dirty records và allViews.
