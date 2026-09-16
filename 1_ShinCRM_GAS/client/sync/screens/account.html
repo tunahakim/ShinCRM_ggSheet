@@ -56,3 +56,29 @@ function fbmSyncPatchAccount(panel, status) {
   return true;
 }
 </script>
+
+<style>
+/* Các khối trong màn tài khoản dùng cùng một nhịp dọc. Không áp dụng lên màn khác vì mỗi màn có cấu trúc Card riêng. */
+#fbm-sync-account-root .shin-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--shin-gap-2);
+}
+
+#fbm-sync-account-root .shin-card-body > .shin-box {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+#fbm-sync-account-root .shin-form-field {
+  margin-bottom: 0;
+}
+
+#fbm-sync-account-root .shin-form-field + .shin-form-field {
+  margin-top: var(--shin-gap-2);
+}
+
+#fbm-sync-account-root .shin-action-stack {
+  row-gap: var(--shin-gap-2);
+}
+</style>
