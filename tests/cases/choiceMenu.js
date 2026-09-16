@@ -40,6 +40,10 @@ function chay(so) {
   check(so, 'mũi tên bàn phím mở lại menu dùng chung', [list.hidden, trigger.getAttribute('aria-expanded')], [false, 'true']);
   dom.root.listeners.keydown({ target: trigger, key: 'Escape', keyCode: 27, preventDefault() {} });
   check(so, 'Escape đóng menu mà không làm đổi lựa chọn', [list.hidden, trigger.getAttribute('data-value')], [true, 'push']);
+  dom.root.listeners.click({ target: trigger, preventDefault() {} });
+  const outside = dom.document.createElement('div');
+  dom.document.listeners.click({ target: outside });
+  check(so, 'PopupList tu dong dong popup khi click ra ngoai', [list.hidden, trigger.getAttribute('aria-expanded')], [true, 'false']);
 }
 
 module.exports = { chay };

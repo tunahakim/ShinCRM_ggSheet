@@ -20,7 +20,7 @@ function dungCanh() {
   dom.root.appendChild(notice);
   dom.document.body.appendChild(overlay);
   const hop = napClient(taoHopCat({ document: dom.document, window: dom.window }),
-    'client/ui/progress.html', 'client/ui/dispatch.html', 'client/ui/menu.html', 'client/ui/collapse.html');
+    'client/ui/progress.html', 'client/ui/popupList.html', 'client/ui/dispatch.html', 'client/ui/menu.html', 'client/ui/collapse.html');
   hop._alerts = [];
   hop.alert = (message) => { hop._alerts.push(String(message)); };
   hop.console = { error: () => {} };

@@ -363,7 +363,7 @@
 /*
  * **Không có mũi tên sổ xuống.** Sidebar rộng khoảng 300 pixel, một mũi tên cộng khoảng chừa cho nó ăn 24 pixel bề ngang — bằng ba bốn chữ, mà ba bốn chữ cuối của tên công ty mới là thứ phân biệt hai khách trùng đầu tên. Bản cũ không vẽ mũi tên và bù lại bằng việc **chọn vào ô là tự bung danh sách**, nên người dùng không mất đường mở nào.
  *
- * `position: relative` là mốc cho hộp danh sách bên dưới neo vào.
+ * PopupList tự tính vị trí nổi; lớp này chỉ giữ mốc bố cục của trigger.
  */
 .shin-combo { position: relative; }
 .shin-combo-standalone { cursor: pointer; }
@@ -396,8 +396,6 @@
 .shin-choice-trigger:disabled { background: var(--shin-bg-sunken); color: var(--shin-text-soft); cursor: not-allowed; opacity: .7; }
 .shin-choice-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .shin-choice-caret { flex: 0 0 auto; margin-left: var(--shin-gap-2); color: var(--shin-text-soft); font-size: var(--shin-text-xs); }
-.shin-choice-list { z-index: 6; left: 0; right: 0; width: auto; max-width: none; }
-.shin-choice-list.is-up { top: auto; bottom: calc(100% + 2px); }
 .shin-choice-item {
   display: block;
   width: 100%;
@@ -412,37 +410,11 @@
 .shin-choice-item.is-active { background: var(--shin-primary-soft); }
 
 /*
-  Hộp danh sách bung ra bằng `position: absolute` nên nó không đẩy hàng dưới xuống lúc mở.
-
-  **Bề ngang không dính theo bề ngang của ô.** Trường `Tỉnh thành` nằm ở cột phải của một hàng hai cột thì chỉ rộng chừng
-  130 pixel, mà "Thành phố Hồ Chí Minh" cần hơn thế — danh sách bó đúng bề ngang ô thì mọi mục dài đều bị ngắt dòng hoặc
-  cắt cụt. `min-width: 100%` giữ sàn là bề ngang ô, `width: max-content` cho nó nở theo mục dài nhất, và trần thì bằng bề
-  ngang sidebar trừ hai lề. Phần **kéo lại vào trong khung** — vì vùng thân là một hộp `overflow: hidden` nên nó cắt mất
-  phần tràn — do `client/ui/combo.html` tính lúc chạy: nó đặt thẳng `width` và `left` lên thẻ.
-
-  Con số ở đây chỉ là mức mặc định cho lúc chưa ai đo, giống cách `max-height` bên dưới hoạt động.
+  PopupList giữ hộp nổi ngoài luồng bố cục, neo tối thiểu bằng trigger và cho phép giãn theo nội dung trong trần Sidebar.
 */
-.shin-combo-list {
-  z-index: 5;
-  top: calc(100% + 2px);
-  left: 0;
-  right: auto;
-  max-height: 180px;
-}
-
 /*
-  Bung **lên trên** thay vì xuống dưới. Danh sách là `position: absolute` nên vùng thân cắt phần tràn của nó: một ô nằm
-  sát đáy form mà bung xuống thì người dùng nhận được một khe trống cao ba pixel. `client/ui/combo.html` đo chỗ hở trên
-  và dưới lúc chạy rồi đặt lớp này, đồng thời đặt `max-height` thẳng trên thẻ — nên số `180px` ở trên chỉ là mức mặc định
-  cho lúc chưa ai đo.
-
-  Bản cũ luôn bung xuống và chịu cảnh bị cắt.
+  PopupList tự lật lên khi phía dưới không đủ chỗ và tự giới hạn chiều cao để phần danh sách cuộn bên trong.
 */
-.shin-combo-list.is-up {
-  top: auto;
-  bottom: calc(100% + 2px);
-}
-
 /* Một dòng của danh sách. Nội dung dòng do phần bàn phím đổ vào; hình thức thì thuộc về đây. */
 .shin-popup-item {
   padding: var(--shin-gap-1) var(--shin-gap-2);
@@ -637,18 +609,9 @@
 
 /* --- Lớp menu nổi ------------------------------------------------ */
 
-/* `fixed` chứ không `absolute`: khung sidebar là một cột `overflow: hidden`, nên một lớp `absolute` sẽ bị cắt mất phần
-   tràn ra ngoài vùng. Tọa độ do `menu.html` tính từ `getBoundingClientRect` của nút mở. */
+/* PopupList đặt menu fixed để không bị cắt bởi vùng sidebar đang cuộn. */
 .shin-menu {
-  position: fixed;
-  z-index: 20;
-  min-width: 160px;
-  max-width: calc(100% - 8px);
   padding: var(--shin-gap-1) 0;
-  border: 1px solid var(--shin-border-strong);
-  border-radius: var(--shin-radius);
-  background: var(--shin-bg);
-  box-shadow: var(--shin-shadow);
 }
 
 .shin-menu-item {

@@ -1,6 +1,44 @@
 <script>
-/* Shared popup primitive. Controllers own data and keyboard policy; this owns row state and visibility. */
+/* Shared popup component. Controllers own data and keyboard policy; this owns shell, geometry and dismissal. */
 var PopupList = (function () {
+  var POPUP_MARK = 'data-popup-list';
+  var POPUP_SELECTOR = '.shin-popup-list';
+  var DEFAULT_GAP = 4;
+  var DEFAULT_MIN_HEIGHT = 96;
+  var DEFAULT_MAX_HEIGHT = 220;
+
+  function viewport() {
+    return {
+      left: 0,
+      top: 0,
+      right: typeof window !== 'undefined' && Number(window.innerWidth) ? Number(window.innerWidth) : 0,
+      bottom: typeof window !== 'undefined' && Number(window.innerHeight) ? Number(window.innerHeight) : 0
+    };
+  }
+
+  function rectOf(node, fallback) {
+    if (node && typeof node.getBoundingClientRect === 'function') {
+      var rect = node.getBoundingClientRect();
+      if (rect && Number.isFinite(Number(rect.left)) && Number.isFinite(Number(rect.right))) { return rect; }
+    }
+    return fallback || viewport();
+  }
+
+  function popupRegion(options) {
+    if (options && options.region && options.region !== 'viewport' && typeof options.region.getBoundingClientRect === 'function') {
+      return rectOf(options.region, viewport());
+    }
+    if (options && options.region === 'viewport') { return viewport(); }
+    var body = typeof document !== 'undefined' && document.getElementById ? document.getElementById('sidebar-body') : null;
+    return body ? rectOf(body, viewport()) : viewport();
+  }
+
+  function clearGeometry(box) {
+    if (!box || !box.style) { return; }
+    ['top', 'left', 'width', 'minWidth', 'maxWidth', 'maxHeight'].forEach(function (key) { box.style[key] = ''; });
+    if (box.classList) { box.classList.remove('is-up'); }
+  }
+
   function rows(box, selector) {
     if (!box) { return []; }
     return Array.prototype.slice.call(box.querySelectorAll(selector || '[role="option"]'));
@@ -19,19 +57,132 @@ var PopupList = (function () {
     return next;
   }
 
-  function hide(box, selector) {
+  function hideRaw(box, selector) {
     if (!box) { return null; }
     box.hidden = true;
     rows(box, selector).forEach(function (row) { row.classList.remove('is-active'); row.setAttribute('aria-selected', 'false'); });
+    clearGeometry(box);
     return box;
   }
 
-  function show(box) {
+  function closeOne(box) {
     if (!box) { return null; }
-    box.hidden = false;
+    var onClose = box._popupOnClose;
+    box._popupOnClose = null;
+    box._popupAnchor = null;
+    try {
+      if (typeof onClose === 'function') { onClose(box); }
+    } finally {
+      // Controller callback chỉ đồng bộ state; popup vẫn phải đóng kể cả callback gặp lỗi.
+      hideRaw(box);
+    }
     return box;
   }
 
-  return { rows: rows, mark: mark, hide: hide, show: show };
+  function closeAll(except) {
+    if (typeof document === 'undefined' || !document.querySelectorAll) { return 0; }
+    var open = document.querySelectorAll(POPUP_SELECTOR), count = 0;
+    for (var i = 0; i < open.length; i += 1) {
+      if (open[i] === except || open[i].hidden) { continue; }
+      closeOne(open[i]);
+      count += 1;
+    }
+    return count;
+  }
+
+  function isInside(box, target) {
+    if (!target || !box) { return false; }
+    if (box.contains && box.contains(target)) { return true; }
+    return !!(box._popupAnchor && box._popupAnchor.contains && box._popupAnchor.contains(target));
+  }
+
+  function install() {
+    if (typeof document === 'undefined' || !document.body || !document.addEventListener) { return false; }
+    if (document.body.getAttribute(POPUP_MARK) === '1') { return false; }
+    document.addEventListener('click', function (event) {
+      var target = event && event.target;
+      var open = document.querySelectorAll ? document.querySelectorAll(POPUP_SELECTOR) : [];
+      for (var i = 0; i < open.length; i += 1) {
+        if (!open[i].hidden && !isInside(open[i], target)) { closeOne(open[i]); }
+      }
+    });
+    document.body.setAttribute(POPUP_MARK, '1');
+    return true;
+  }
+
+  function place(box, anchor, options) {
+    var opts = options || {}, anchorRect = rectOf(anchor, viewport()), region = popupRegion(opts);
+    var gap = Number(opts.gap);
+    if (!Number.isFinite(gap) || gap < 0) { gap = DEFAULT_GAP; }
+    var maxWidth = Math.max(1, Number(region.right) - Number(region.left) - gap * 2);
+    var anchorWidth = Math.max(0, Number(anchorRect.right) - Number(anchorRect.left));
+    // Khi trigger rộng hơn vùng hiển thị, ưu tiên không tràn Sidebar; min/max CSS không được mâu thuẫn nhau.
+    var minWidth = Math.min(maxWidth, Math.max(anchorWidth, Number(opts.minWidth) || 0));
+    var widthMode = opts.width || 'content', width;
+
+    box.style.position = 'fixed';
+    box.style.maxWidth = maxWidth + 'px';
+    box.style.minWidth = minWidth + 'px';
+    if (widthMode === 'region') {
+      width = maxWidth;
+    } else if (widthMode === 'anchor') {
+      width = anchorWidth;
+    } else {
+      box.style.width = 'max-content';
+      var measuredRect = rectOf(box, { left: 0, right: anchorWidth });
+      var measured = Number(measuredRect.right) - Number(measuredRect.left);
+      if (!Number.isFinite(measured) || measured <= 0) { measured = Number(box.offsetWidth) || anchorWidth; }
+      width = Math.min(maxWidth, Math.max(minWidth, measured));
+    }
+    width = Math.min(maxWidth, Math.max(anchorWidth, Number(width) || anchorWidth));
+    box.style.width = width + 'px';
+
+    var minHeight = Number(opts.minHeight);
+    if (!Number.isFinite(minHeight) || minHeight < 0) { minHeight = DEFAULT_MIN_HEIGHT; }
+    var maxHeight = Number(opts.maxHeight);
+    if (!Number.isFinite(maxHeight) || maxHeight <= 0) { maxHeight = DEFAULT_MAX_HEIGHT; }
+    var below = Number(region.bottom) - Number(anchorRect.bottom) - gap;
+    var above = Number(anchorRect.top) - Number(region.top) - gap;
+    var up = opts.placement === 'up' || (opts.placement !== 'down' && below < minHeight && above > below);
+    var available = Math.max(40, up ? above : below);
+    var heightLimit = Math.min(maxHeight, available);
+    box.style.maxHeight = heightLimit + 'px';
+    if (box.classList) { box.classList.toggle('is-up', up); }
+
+    var measuredHeight = Number(box.offsetHeight) || Number(box.scrollHeight) || 0;
+    if (!measuredHeight) {
+      var boxRect = rectOf(box, { top: 0, bottom: minHeight });
+      measuredHeight = Math.max(0, Number(boxRect.bottom) - Number(boxRect.top));
+    }
+    var height = Math.min(heightLimit, measuredHeight || Math.min(heightLimit, minHeight));
+    var left = widthMode === 'region' ? Number(region.left) + gap : Number(anchorRect.left);
+    left = Math.max(Number(region.left) + gap, Math.min(left, Number(region.right) - gap - width));
+    var top = up ? Number(anchorRect.top) - height - gap : Number(anchorRect.bottom) + gap;
+    top = Math.max(Number(region.top) + gap, Math.min(top, Number(region.bottom) - gap - height));
+    box.style.left = left + 'px';
+    box.style.top = top + 'px';
+    return { left: left, top: top, width: width, height: height, up: up, maxHeight: heightLimit };
+  }
+
+  function hide(box, selector) {
+    if (!box) { return null; }
+    box._popupOnClose = null;
+    box._popupAnchor = null;
+    return hideRaw(box, selector);
+  }
+
+  function show(box, anchor, options) {
+    if (!box) { return null; }
+    var opts = options || {};
+    install();
+    closeAll(box);
+    box._popupAnchor = anchor || null;
+    box._popupOnClose = typeof opts.onClose === 'function' ? opts.onClose : null;
+    box.hidden = false;
+    place(box, anchor, opts);
+    return box;
+  }
+
+  return { rows: rows, mark: mark, hide: hide, show: show, closeAll: closeAll, place: place, install: install };
 }());
 </script>

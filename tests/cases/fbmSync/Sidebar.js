@@ -10,7 +10,7 @@ function taoBoTest() {
   const content = dom.document.createElement('div'); content.id = 'sidebar-body'; dom.root.appendChild(content);
   const footer = dom.document.createElement('div'); footer.id = 'sidebar-footer'; footer.hidden = true; dom.root.appendChild(footer);
 
-  const hop = taoHopCat({ document: dom.document, window: { top: null, confirm: () => true, addEventListener: () => {} } });
+  const hop = taoHopCat({ document: dom.document, window: { top: null, innerWidth: 300, innerHeight: 800, confirm: () => true, addEventListener: () => {} } });
   hop.FBM_SYNC_CLIENT = {
     active: true, running: false, statusReady: true, mode: 'read', resultPages: {}, resultsTab: 'summary', identityStatus: {},
     subscreen: 'run',
@@ -50,7 +50,7 @@ function taoBoTest() {
     'client/sync/screens/account.html',
     'client/sync/screens/run.html', 'client/sync/screens/results.html',
     'client/sync/screens/settings.html', 'client/sync/fbmSyncSettingsScreen.html',
-    'client/sync/fbmSyncStatusScreen.html', 'client/sync/fbmSyncAuditScreen.html', 'client/sync/fbmSyncShell.html', 'client/sync/fbmSync.html');
+    'client/sync/fbmSyncStatusScreen.html', 'client/sync/fbmSyncAuditScreen.html', 'client/sync/fbmSyncShell.html', 'client/ui/popupList.html', 'client/sync/fbmSync.html');
   hop.FBM_SYNC_CLIENT.active = true;
   return { hop, dom, screen: dom.root, content };
 }
@@ -379,7 +379,7 @@ async function chay(so) {
   await hop.fbmSyncCheckIdentity();
   check(so, 'Kiểm tra liên kết báo n/N và số không tìm thấy ngay khi hoàn tất', [hop.FBM_SYNC_CLIENT.accountNotices.identity.kind, hop.FBM_SYNC_CLIENT.accountNotices.identity.message], ['warning', 'Kiểm tra liên kết hoàn tất: 2/3 Customer hợp lệ; không tìm thấy: 1.']);
 
-  const nav = dom.document.createElement('nav'); nav.id = 'fbm-sync-nav'; nav.hidden = false; dom.root.appendChild(nav);
+  const nav = dom.document.createElement('nav'); nav.id = 'fbm-sync-nav'; nav.className = 'shin-popup-list'; nav.hidden = false; dom.root.appendChild(nav);
   hop.fbmSyncInstall();
   const outside = { closest: () => null };
   dom.document.listeners.click({ target: outside, preventDefault: () => {} });

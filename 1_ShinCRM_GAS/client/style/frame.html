@@ -140,12 +140,9 @@ html, body {
 
 /* Popup dùng chung cho tìm kiếm, dropdown, customer picker và menu module. Mỗi controller chỉ chọn kiểu neo/rộng riêng. */
 .shin-popup-list {
-  position: absolute;
+  position: fixed;
   z-index: 20;
-  top: calc(100% + 2px);
-  left: 0;
-  min-width: 100%;
-  width: max-content;
+  min-width: 0;
   max-width: calc(100vw - 2 * var(--shin-gap-2));
   max-height: 60vh;
   overflow-y: auto;
@@ -156,8 +153,7 @@ html, body {
   box-shadow: var(--shin-shadow);
 }
 
-/* Search is intentionally the same width as its input; it must not grow with a long result. */
-.shin-popup-list--search { right: 0; min-width: 0; width: auto; max-width: none; }
+/* Popup width and position are set by PopupList after the anchor is measured. */
 
 /* Vùng 3 — Khối thông tin chung. Cao theo nội dung, **nền trắng như một card**: đây là khối chữ to nhất và quan trọng nhất
    của cả sidebar, nên nó đứng cùng hạng với card chứ không phải một dải phụ màu xám. Cỡ chữ và màu chữ của ruột khối thì ở

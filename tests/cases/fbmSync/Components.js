@@ -61,6 +61,11 @@ function chay(so) {
   const frame = docTep('client/style/frame.html');
   const styles = docTep('client/style/components.html');
   const sidebar = docTep('client/Sidebar.html');
+  const popup = docTep('client/ui/popupList.html');
+  const combo = docTep('client/ui/combo.html');
+  const choiceMenu = docTep('client/ui/choiceMenu.html');
+  const search = docTep('client/ui/search.html');
+  const menu = docTep('client/ui/menu.html');
 
   check(so, 'FBM dung shell bon vung chung, khong con overlay hoac vung cuon rieng',
     [REMOVED_SYNC_SHELL_PATTERNS.filter((pattern) => pattern.test(all + '\n' + sidebar)).map((pattern) => pattern.source),
@@ -69,10 +74,24 @@ function chay(so) {
       sidebar.indexOf('id="sidebar-body"') >= 0,
       sidebar.indexOf('id="sidebar-footer"') >= 0],
     [[], true, true, true, true]);
-  check(so, 'menu FBM neo duoi header nhung gioi han chieu cao theo viewport, khong theo header',
-    [source['client/sync/fbmSyncShell.html'].indexOf('top:var(--shin-header-height)') >= 0,
-      source['client/sync/fbmSyncShell.html'].indexOf('max-height:min(66.666vh, calc(100vh - var(--shin-header-height) - var(--shin-gap-2)))') >= 0],
-    [true, true]);
+  check(so, 'menu FBM dung PopupList de neo va gioi han theo viewport',
+    [source['client/sync/fbmSyncShell.html'].indexOf('PopupList.show(nav, navTrigger') >= 0,
+      source['client/sync/fbmSyncShell.html'].indexOf('top:var(--shin-header-height)') === -1,
+      source['client/sync/fbmSyncShell.html'].indexOf('max-height:min(66.666vh, calc(100vh - var(--shin-header-height) - var(--shin-gap-2)))') === -1],
+    [true, true, true]);
+  check(so, 'PopupList la component duy nhat quan ly vo popup, kich thuoc va click ra ngoai',
+    [popup.indexOf('function closeAll(') >= 0,
+      popup.indexOf('function place(') >= 0,
+      popup.indexOf("document.addEventListener('click'") >= 0,
+      frame.indexOf('.shin-popup-list {\n  position: fixed;') >= 0],
+    [true, true, true, true]);
+  check(so, 'cac controller popup dung API PopupList chung',
+    [combo.indexOf('PopupList.show(box, inp') >= 0,
+      choiceMenu.indexOf('PopupList.show(list, trigger') >= 0,
+      search.indexOf('PopupList.show(box, inp') >= 0,
+      menu.indexOf('PopupList.show(lop, nut') >= 0,
+      (combo + choiceMenu + search + menu).indexOf('box.style.left =') === -1],
+    [true, true, true, true, true]);
 
   check(so, 'core khai đủ Block helper dùng chung cho Sync',
     ['Box', 'Stack', 'Card', 'Row', 'Text', 'Field', 'Button', 'Icon', 'Check', 'StandaloneControl', 'StandaloneField'].every((name) => common.indexOf('function ' + name + '(') >= 0),

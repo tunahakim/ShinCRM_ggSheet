@@ -77,7 +77,7 @@ function menuLayer() {
 
   lop = document.createElement('div');
   lop.id = MENU_LAYER_ID;
-  lop.className = 'shin-menu';
+  lop.className = 'shin-popup-list shin-menu';
   lop.setAttribute('role', 'menu');
   lop.hidden = true;
   khung.appendChild(lop);
@@ -95,35 +95,16 @@ function menuClose() {
     if (nut) { nut.setAttribute('aria-expanded', 'false'); }
   }
 
-  lop.hidden = true;
+  if (typeof PopupList !== 'undefined') { PopupList.hide(lop); } else { lop.hidden = true; }
   lop.removeAttribute('data-of');
   lop.textContent = '';
   return lop;
 }
 
 /**
- * Đặt lớp nổi ngay dưới nút mở. `position: fixed` nên tọa độ lấy từ `getBoundingClientRect` là dùng được luôn, không phải trừ đi vị trí của tổ tiên nào.
- *
- * Hai lần ép về trong khung: mép phải không được vượt bề rộng sidebar, và menu dài quá thì bật lên phía trên nút thay vì tràn xuống dưới đáy. Sidebar chỉ rộng khoảng 300px và cao bằng cả cửa sổ Sheet, nên cả hai ca đều gặp thật.
- */
-function menuPlace(lop, nut) {
-  var o = nut.getBoundingClientRect();
-  var rongLop = Math.max(lop.offsetWidth, 160);
-  var caoLop = lop.offsetHeight;
-
-  var trai = Math.max(4, Math.min(o.left, window.innerWidth - rongLop - 4));
-  var tren = o.bottom + 2;
-  if (tren + caoLop > window.innerHeight - 4) { tren = Math.max(4, o.top - caoLop - 2); }
-
-  lop.style.left = trai + 'px';
-  lop.style.top = tren + 'px';
-  return { left: trai, top: tren };
-}
-
-/**
  * Mở menu của một nút.
  *
- * Đo được kích thước rồi mới đặt chỗ, nên phải hiện lớp trước khi gọi `menuPlace` — lớp còn `hidden` thì `offsetHeight` bằng 0 và menu nào cũng tưởng mình vừa đủ chỗ.
+ * PopupList hiện lớp trước khi đo và tự neo/lật theo vùng nhìn thấy.
  */
 function menuOpen(nut) {
   var khoa = nut.getAttribute('data-menu');
@@ -136,9 +117,21 @@ function menuOpen(nut) {
   for (var i = 0; i < muc.length; i += 1) { lop.appendChild(menuItemElement(muc[i])); }
 
   lop.setAttribute('data-of', khoa);
-  lop.hidden = false;
   nut.setAttribute('aria-expanded', 'true');
-  menuPlace(lop, nut);
+  PopupList.show(lop, nut, {
+    region: 'viewport',
+    gap: 4,
+    minWidth: 160,
+    minHeight: 0,
+    maxHeight: 220,
+    onClose: function () {
+      var active = lop.getAttribute('data-of');
+      var trigger = active ? document.querySelector('[data-menu="' + active + '"]') : null;
+      if (trigger) { trigger.setAttribute('aria-expanded', 'false'); }
+      lop.removeAttribute('data-of');
+      lop.textContent = '';
+    }
+  });
   return lop;
 }
 
