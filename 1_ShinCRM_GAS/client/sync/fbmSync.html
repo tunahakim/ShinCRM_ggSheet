@@ -430,10 +430,11 @@ function fbmSyncInstall() {
         var field = select.getAttribute('data-fbm-conflict-field');
         var item = (FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.lastStatus.metadata && FBM_SYNC_CLIENT.lastStatus.metadata.conflicts || [])[0] || {};
         var manualInput = document.querySelector('[data-fbm-conflict-manual="' + field + '"]');
-        var source = select.value === 'fbm' ? item.fbmRecord : item.shinRecord;
+        var selectedChoice = fbmSyncControlValue(select.id);
+        var source = selectedChoice === 'fbm' ? item.fbmRecord : item.shinRecord;
         var value = source && source[field];
-        if (select.value === 'manual') { value = manualInput ? manualInput.value : ''; }
-        if (value === undefined && item.fields) { var diff = item.fields.filter(function (entry) { return String(entry.field) === field; })[0]; value = diff ? (select.value === 'fbm' ? diff.right : diff.left) : ''; }
+        if (selectedChoice === 'manual') { value = manualInput ? manualInput.value : ''; }
+        if (value === undefined && item.fields) { var diff = item.fields.filter(function (entry) { return String(entry.field) === field; })[0]; value = diff ? (selectedChoice === 'fbm' ? diff.right : diff.left) : ''; }
         merged[field] = value === undefined || value === null ? '' : value;
       });
       fbmSyncResolveConflict(target.getAttribute('data-fbm-conflict-entity'), target.getAttribute('data-fbm-conflict-id'), 'manual', merged).catch(function (error) {
@@ -454,8 +455,10 @@ function fbmSyncInstall() {
   document.addEventListener('change', function (event) {
     var target = event.target;
     if (!target) { return; }
-    if (target.getAttribute && target.getAttribute('data-standalone-select') === '1') {
-      var rawValue = target.value, standaloneOptions = typeof renderStandaloneOptions === 'function' ? renderStandaloneOptions(target) : [];
+    var standaloneKind = target.getAttribute && (target.getAttribute('data-standalone-select') === '1' || target.getAttribute('data-standalone-menu') === '1');
+    if (standaloneKind) {
+      var rawValue = target.getAttribute('data-standalone-menu') === '1' ? (target.value || target.getAttribute('data-value') || '') : target.value;
+      var standaloneOptions = typeof renderStandaloneOptions === 'function' ? renderStandaloneOptions(target) : [];
       if (!standaloneOptions.some(function (option) { return option && String(option.value) === String(rawValue); })) {
         var byLabel = standaloneOptions.filter(function (option) { return option && String(option.label) === String(rawValue); })[0];
         rawValue = byLabel ? byLabel.value : (target.getAttribute('data-value') || rawValue);
@@ -464,7 +467,7 @@ function fbmSyncInstall() {
     }
     if (target.id === 'fbm-sync-mode') { FBM_SYNC_CLIENT.mode = target.getAttribute('data-value') || target.value; }
     if (target.id === 'fbm-sync-background-direction') { FBM_SYNC_CLIENT.backgroundDirection = target.getAttribute('data-value') || target.value; }
-    if (target.hasAttribute('data-fbm-conflict-field')) { var manualInput = document.querySelector('[data-fbm-conflict-manual="' + target.getAttribute('data-fbm-conflict-field') + '"]'); if (manualInput) { fbmSyncSetTargetState(manualInput.id, { hidden: target.value !== 'manual' }); } }
+    if (target.hasAttribute('data-fbm-conflict-field')) { var manualInput = document.querySelector('[data-fbm-conflict-manual="' + target.getAttribute('data-fbm-conflict-field') + '"]'); if (manualInput) { fbmSyncSetTargetState(manualInput.id, { hidden: fbmSyncControlValue(target.id) !== 'manual' }); } }
     if (target.id === 'fbm-sync-auto-login-input') { fbmSyncSetAutoLogin(target.checked); }
   });
   document.addEventListener('input', function (event) {
@@ -755,7 +758,8 @@ function fbmSyncToggleValue(id) {
 function fbmSyncControlValue(id) {
   var node = document.getElementById(id);
   if (!node) { return ''; }
-  return node.getAttribute('data-standalone-select') === '1' ? (node.getAttribute('data-value') || '') : String(node.value || '');
+  return node.getAttribute('data-standalone-select') === '1' || node.getAttribute('data-standalone-menu') === '1'
+    ? (node.getAttribute('data-value') || '') : String(node.value || '');
 }
 function fbmSyncSaveExtensionSettings(button) {
   if (button) { button.disabled = true; }

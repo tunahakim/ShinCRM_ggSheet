@@ -360,7 +360,7 @@ function renderFieldInner(node, ctx) {
     + RENDER_CONTROLS[control](o);
 }
 
-/** StandaloneControl không mang `data-field`, nên không bao giờ đi vào luồng lưu dữ liệu nghiệp vụ. */
+/** StandaloneControl không mang `data-field`, nên không bao giờ đi vào luồng lưu dữ liệu nghiệp vụ. `menu` là trigger button; `select` mới là combo input. */
 function renderStandaloneControlInner(node) {
   var kind = String(node.kind || 'input'), className = String(node.className || ''), common = renderAttr('id', node.id) + renderDataAttrs(node.data) + renderAttr('aria-label', node.ariaLabel || node.label) + (node.disabled ? ' disabled' : '') + (node.hidden ? ' hidden' : '');
   if (!node.id) { throw new Error('Block vai "standaloneControl" cần `id` để thao tác và giữ node ổn định.'); }
@@ -388,6 +388,26 @@ function renderStandaloneControlInner(node) {
     return '<div class="shin-combo shin-combo-standalone">'
       + '<input type="text" role="combobox"' + attrs + '>'
       + '<div class="shin-popup-list shin-combo-list" hidden></div>'
+      + '</div>';
+  }
+  if (kind === 'menu') {
+    if (!Array.isArray(node.options)) { throw new Error('StandaloneControl menu cần `options` là mảng.'); }
+    node.options.forEach(function (option) {
+      if (!option || typeof option !== 'object' || option.value === undefined || option.label === undefined) { throw new Error('Mỗi option của StandaloneControl menu cần `value` và `label`.'); }
+    });
+    var selectedMenu = node.options.filter(function (option) { return String(option.value) === String(node.value); })[0] || null;
+    var selectedMenuValue = selectedMenu ? selectedMenu.value : (node.options[0] ? node.options[0].value : '');
+    var selectedMenuLabel = selectedMenu ? selectedMenu.label : (node.options[0] ? node.options[0].label : (node.placeholder || '--Chọn--'));
+    var menuAttrs = renderAttr('class', 'shin-choice-trigger' + (className ? ' ' + className : ''))
+      + renderAttr('id', node.id) + renderDataAttrs(node.data)
+      + renderAttr('aria-label', node.ariaLabel || node.label)
+      + renderAttr('aria-haspopup', 'listbox') + renderAttr('aria-expanded', 'false')
+      + renderAttr('data-standalone-menu', '1') + renderAttr('data-value', selectedMenuValue)
+      + renderAttr('data-standalone-options', JSON.stringify(node.options))
+      + (node.disabled ? ' disabled' : '') + (node.hidden ? ' hidden' : '');
+    return '<div class="shin-choice shin-choice-standalone">'
+      + '<button type="button"' + menuAttrs + '><span class="shin-choice-label">' + renderEscape(selectedMenuLabel) + '</span><span class="shin-choice-caret" aria-hidden="true">&#9662;</span></button>'
+      + '<div class="shin-popup-list shin-choice-list" hidden></div>'
       + '</div>';
   }
   if (kind === 'toggle') {
@@ -458,7 +478,17 @@ function renderBlockInto(parent, node, ctx) {
 /** Đặt giá trị điều khiển qua renderer, dùng cho dữ liệu tự điền mà không được dựng lại form. */
 function renderControlValue(id, value) {
   var control = document.getElementById(id);
-  if (!control || ['INPUT', 'SELECT', 'TEXTAREA'].indexOf(control.tagName) < 0) { return false; }
+  if (!control || (['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].indexOf(control.tagName) < 0)) { return false; }
+  if (control.getAttribute && control.getAttribute('data-standalone-menu') === '1') {
+    var menuOptions = renderStandaloneOptions(control);
+    var selectedMenu = menuOptions.filter(function (option) { return option && String(option.value) === String(value); })[0];
+    var menuValue = value === null || value === undefined ? '' : String(value);
+    control.setAttribute('data-value', menuValue);
+    control.value = menuValue;
+    var menuLabel = control.querySelector ? control.querySelector('.shin-choice-label') : null;
+    if (menuLabel) { menuLabel.textContent = selectedMenu ? String(selectedMenu.label) : menuValue; }
+    return true;
+  }
   if (control.getAttribute && control.getAttribute('data-standalone-select') === '1') {
     var options = renderStandaloneOptions(control);
     var selected = options.filter(function (option) { return option && String(option.value) === String(value); })[0];
@@ -545,8 +575,8 @@ function renderTargetState(id, state) {
   if (state.ariaLabel !== undefined) { el.setAttribute('aria-label', String(state.ariaLabel || '')); }
   if (state.title !== undefined) { el.title = String(state.title || ''); }
   if (state.text !== undefined) { el.textContent = String(state.text === null || state.text === undefined ? '' : state.text); }
-  if (state.value !== undefined && 'value' in el) {
-    if (el.getAttribute && el.getAttribute('data-standalone-select') === '1') { renderControlValue(id, state.value); }
+  if (state.value !== undefined && (('value' in el) || (el.getAttribute && el.getAttribute('data-standalone-menu') === '1'))) {
+    if (el.getAttribute && (el.getAttribute('data-standalone-select') === '1' || el.getAttribute('data-standalone-menu') === '1')) { renderControlValue(id, state.value); }
     else { el.value = state.value === null || state.value === undefined ? '' : String(state.value); }
   }
   if (state.childText && typeof state.childText === 'object') {

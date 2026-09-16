@@ -79,6 +79,12 @@ function chay(so) {
   check(so, 'renderer StandaloneControl dùng lớp input/toggle chung, không có lớp Sync riêng',
     [engine.indexOf("'shin-input'") >= 0, engine.indexOf("'shin-toggle-control'") >= 0, engine.indexOf('shin-sync-') === -1],
     [true, true, true]);
+  check(so, 'các lựa chọn cố định dùng menu trigger, không dùng nhầm combo input',
+    [engine.indexOf("kind === 'menu'") >= 0,
+      source['client/sync/screens/run.html'].indexOf("id: 'fbm-sync-mode', kind: 'menu'") >= 0,
+      source['client/sync/screens/settings.html'].indexOf("id: 'fbm-sync-background-direction', kind: 'menu'") >= 0,
+      source['client/sync/fbmSyncAuditScreen.html'].indexOf("controlId, kind: 'menu'") >= 0],
+    [true, true, true, true]);
   check(so, 'mọi màn Sync dùng field độc lập chung cho control ngoài DATA_SCHEMA',
     [source['client/sync/screens/account.html'].indexOf('StandaloneField(') >= 0,
       source['client/sync/screens/settings.html'].indexOf('StandaloneField(') >= 0,

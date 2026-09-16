@@ -192,7 +192,7 @@ function Icon(spec) { return Block(typeof spec === 'string' ? { icon: spec } : s
  */
 function Check(spec) { return Block(typeof spec === 'string' ? { pick: spec } : spec, 'check'); }
 
-/** Control độc lập cho giá trị giao diện không thuộc DATA_SCHEMA (input, select, công tắc). */
+/** Control độc lập cho giá trị giao diện không thuộc DATA_SCHEMA (input, combo, menu chọn, công tắc). */
 function StandaloneControl(spec) { return Block(spec, 'standaloneControl'); }
 
 /* Ô trạng thái của màn hình (không thuộc DATA_SCHEMA) có nhãn dùng chung. */

@@ -1,0 +1,168 @@
+<script>
+/* Menu lua chon cho StandaloneControl: dung popup chung nhung hien thi bang button, khong phai input go-loc. */
+var CHOICE_MENU_MARK = 'data-choice-menu';
+var CHOICE_MENU_GAP = 2;
+var CHOICE_MENU_MIN_HEIGHT = 96;
+var CHOICE_MENU_MAX_HEIGHT = 220;
+var choiceMenuFocusAt = -1;
+
+function choiceMenuTriggerOf(el) {
+  if (!el || !el.closest) { return null; }
+  var trigger = el.closest('[data-standalone-menu="1"]');
+  return trigger && trigger.getAttribute('data-standalone-menu') === '1' ? trigger : null;
+}
+
+function choiceMenuListOf(trigger) {
+  var wrap = trigger && trigger.closest ? trigger.closest('.shin-choice') : null;
+  return wrap ? wrap.querySelector('.shin-choice-list') : null;
+}
+
+function choiceMenuOptions(trigger) {
+  return typeof renderStandaloneOptions === 'function' ? renderStandaloneOptions(trigger) : [];
+}
+
+function choiceMenuRows(trigger) {
+  return PopupList.rows(choiceMenuListOf(trigger), '.shin-choice-item');
+}
+
+function choiceMenuHide(trigger) {
+  var list = choiceMenuListOf(trigger);
+  if (!list) { return null; }
+  PopupList.hide(list, '.shin-choice-item');
+  list.classList.remove('is-up');
+  trigger.setAttribute('aria-expanded', 'false');
+  choiceMenuFocusAt = -1;
+  return list;
+}
+
+function choiceMenuHideAll(except) {
+  var lists = document.querySelectorAll('.shin-choice-list');
+  for (var i = 0; i < lists.length; i += 1) {
+    if (lists[i].hidden) { continue; }
+    var trigger = lists[i].parentNode.querySelector('[data-standalone-menu="1"]');
+    if (trigger && trigger !== except) { choiceMenuHide(trigger); }
+  }
+  return lists.length;
+}
+
+function choiceMenuMark(trigger, index) {
+  var rows = choiceMenuRows(trigger);
+  if (!rows.length) { choiceMenuFocusAt = -1; return -1; }
+  var next = Number(index);
+  if (next >= rows.length) { next = 0; }
+  if (next < 0) { next = rows.length - 1; }
+  choiceMenuFocusAt = PopupList.mark(choiceMenuListOf(trigger), next, '.shin-choice-item');
+  return choiceMenuFocusAt;
+}
+
+function choiceMenuItemElement(option, selected) {
+  var row = document.createElement('button');
+  row.type = 'button';
+  row.className = 'shin-popup-item shin-choice-item' + (selected ? ' is-selected' : '');
+  row.setAttribute('role', 'option');
+  row.setAttribute('aria-selected', selected ? 'true' : 'false');
+  row.setAttribute('data-value', option.value);
+  row.textContent = String(option.label);
+  return row;
+}
+
+function choiceMenuFit(trigger) {
+  var body = document.getElementById(RENDER_REGIONS.body);
+  var region = body ? body.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
+  var rect = trigger.getBoundingClientRect();
+  var below = region.bottom - rect.bottom - CHOICE_MENU_GAP;
+  var above = rect.top - region.top - CHOICE_MENU_GAP;
+  var up = below < CHOICE_MENU_MIN_HEIGHT && above > below;
+  return { up: up, height: Math.max(CHOICE_MENU_MIN_HEIGHT, Math.min(up ? above : below, CHOICE_MENU_MAX_HEIGHT)) };
+}
+
+function choiceMenuPaint(trigger) {
+  var list = choiceMenuListOf(trigger);
+  if (!list) { return null; }
+  var options = choiceMenuOptions(trigger);
+  var value = trigger.getAttribute('data-value') || '';
+  list.textContent = '';
+  list.setAttribute('role', 'listbox');
+  var selectedIndex = -1;
+  options.forEach(function (option, index) {
+    var selected = String(option.value) === String(value);
+    if (selected) { selectedIndex = index; }
+    list.appendChild(choiceMenuItemElement(option, selected));
+  });
+  var fit = choiceMenuFit(trigger);
+  list.classList.toggle('is-up', fit.up);
+  list.style.maxHeight = fit.height + 'px';
+  PopupList.show(list);
+  trigger.setAttribute('aria-expanded', 'true');
+  choiceMenuMark(trigger, selectedIndex < 0 ? 0 : selectedIndex);
+  return list;
+}
+
+function choiceMenuOpen(trigger) {
+  if (!trigger || trigger.disabled) { return null; }
+  if (typeof comboHideAll === 'function') { comboHideAll(null); }
+  choiceMenuHideAll(trigger);
+  choiceMenuPaint(trigger);
+  return trigger;
+}
+
+function choiceMenuPick(trigger, value) {
+  var option = choiceMenuOptions(trigger).filter(function (item) { return String(item.value) === String(value); })[0];
+  if (!option) { return false; }
+  trigger.setAttribute('data-value', option.value);
+  trigger.value = String(option.value);
+  var label = trigger.querySelector('.shin-choice-label');
+  if (label) { label.textContent = String(option.label); }
+  choiceMenuHide(trigger);
+  if (typeof trigger.dispatchEvent === 'function' && typeof Event === 'function') { trigger.dispatchEvent(new Event('change', { bubbles: true })); }
+  return option.value;
+}
+
+function choiceMenuKeydown(event) {
+  var trigger = choiceMenuTriggerOf(event.target);
+  if (!trigger) { return; }
+  var list = choiceMenuListOf(trigger);
+  var open = list && !list.hidden;
+  if (event.key === 'Escape' || event.keyCode === 27) { event.preventDefault(); choiceMenuHide(trigger); return; }
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    if (!open) { choiceMenuOpen(trigger); }
+    choiceMenuMark(trigger, choiceMenuFocusAt + (event.key === 'ArrowDown' ? 1 : -1));
+    return;
+  }
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    if (!open) { choiceMenuOpen(trigger); return; }
+    var rows = choiceMenuRows(trigger);
+    if (rows[choiceMenuFocusAt]) { choiceMenuPick(trigger, rows[choiceMenuFocusAt].getAttribute('data-value')); }
+    return;
+  }
+  if (event.key === 'Tab' && open) { choiceMenuHide(trigger); }
+}
+
+function choiceMenuClick(event) {
+  var target = event.target;
+  if (!target || !target.closest) { return; }
+  var row = target.closest('.shin-choice-item');
+  if (row) {
+    var wrap = row.closest('.shin-choice');
+    var trigger = wrap && wrap.querySelector('[data-standalone-menu="1"]');
+    if (trigger) { event.preventDefault(); choiceMenuPick(trigger, row.getAttribute('data-value')); }
+    return;
+  }
+  var trigger = choiceMenuTriggerOf(target);
+  if (trigger) { event.preventDefault(); if (choiceMenuListOf(trigger).hidden) { choiceMenuOpen(trigger); } else { choiceMenuHide(trigger); } return; }
+  if (!target.closest('.shin-choice')) { choiceMenuHideAll(null); }
+}
+
+function choiceMenuInstall() {
+  var rootId = typeof DISPATCH_ROOT_ID === 'undefined' ? 'sidebar-root' : DISPATCH_ROOT_ID;
+  var root = document.getElementById(rootId);
+  if (!root) { throw new Error('Khung sidebar thieu phan tu "' + rootId + '" nen menu lua chon khong hoat dong.'); }
+  if (root.getAttribute(CHOICE_MENU_MARK) === '1') { return false; }
+  root.addEventListener('click', choiceMenuClick);
+  root.addEventListener('keydown', choiceMenuKeydown);
+  root.setAttribute(CHOICE_MENU_MARK, '1');
+  return true;
+}
+</script>

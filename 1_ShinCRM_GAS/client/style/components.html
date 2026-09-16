@@ -361,6 +361,47 @@
 .shin-combo-standalone::after { content: '▾'; position: absolute; top: 50%; right: var(--shin-gap-2); transform: translateY(-50%); color: var(--shin-text-soft); font-size: var(--shin-text-xs); pointer-events: none; }
 .shin-combo-standalone .shin-input { padding-right: 24px; cursor: pointer; }
 
+/* Lựa chọn ít mục dùng hình thức menu: trigger là nút hiển thị, không phải input nên không bôi đen nhãn khi mở popup. */
+.shin-choice { position: relative; width: 100%; }
+.shin-choice-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-width: 0;
+  padding: var(--shin-gap-1) var(--shin-gap-2);
+  border: 1px solid var(--shin-border-strong);
+  border-radius: var(--shin-radius-sm);
+  background: var(--shin-bg);
+  color: var(--shin-text);
+  font: inherit;
+  line-height: var(--shin-line-height);
+  text-align: left;
+  cursor: pointer;
+}
+.shin-choice-trigger:focus {
+  outline: none;
+  border-color: var(--shin-primary);
+  box-shadow: 0 0 0 2px var(--shin-primary-soft);
+}
+.shin-choice-trigger:disabled { background: var(--shin-bg-sunken); color: var(--shin-text-soft); cursor: not-allowed; opacity: .7; }
+.shin-choice-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shin-choice-caret { flex: 0 0 auto; margin-left: var(--shin-gap-2); color: var(--shin-text-soft); font-size: var(--shin-text-xs); }
+.shin-choice-list { z-index: 6; left: 0; right: 0; width: auto; max-width: none; }
+.shin-choice-list.is-up { top: auto; bottom: calc(100% + 2px); }
+.shin-choice-item {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--shin-text);
+  font: inherit;
+  text-align: left;
+}
+.shin-choice-item.is-selected { background: var(--shin-bg-hover); font-weight: 600; }
+.shin-choice-item:hover,
+.shin-choice-item.is-active { background: var(--shin-primary-soft); }
+
 /*
   Hộp danh sách bung ra bằng `position: absolute` nên nó không đẩy hàng dưới xuống lúc mở.
 

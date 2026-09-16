@@ -267,6 +267,7 @@ function comboHide(inp) {
  * **Nhiều nhất một danh sách mở tại một lúc.** Hai hộp cùng bung trông như sidebar hỏng, và `comboFocusAt` chỉ có một chỗ nhớ nên phím mũi tên sẽ chạy trên hộp này mà sáng dòng ở hộp kia.
  */
 function comboHideAll(tru) {
+  if (typeof choiceMenuHideAll === 'function') { choiceMenuHideAll(null); }
   var mo = document.querySelectorAll('.shin-combo-list:not([hidden])');
   for (var i = 0; i < mo.length; i += 1) {
     var inp = mo[i].parentNode.querySelector('.shin-input');

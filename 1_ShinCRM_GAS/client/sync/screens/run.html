@@ -39,7 +39,7 @@ function fbmSyncRenderRun(panel, status) {
   status = status || {};
   return fbmSyncAppendBox(panel, 'shin-section', 'fbm-sync-run-root', [
     Card({ title: 'Chọn loại đồng bộ', elements: [
-      StandaloneField('Loại đồng bộ', { id: 'fbm-sync-mode', kind: 'select', options: FBM_SYNC_UI_SCHEMA.modes, value: FBM_SYNC_CLIENT.mode, disabled: !!FBM_SYNC_CLIENT.running, ariaLabel: 'Loại đồng bộ' }),
+      StandaloneField('Loại đồng bộ', { id: 'fbm-sync-mode', kind: 'menu', options: FBM_SYNC_UI_SCHEMA.modes, value: FBM_SYNC_CLIENT.mode, disabled: !!FBM_SYNC_CLIENT.running, ariaLabel: 'Loại đồng bộ' }),
       Box({ id: 'fbm-sync-run-action-region', elements: [Row({ className: 'shin-single-action-row', elements: [fbmSyncRunActionBlock(status)] })] })
     ] }),
     Stack({ id: 'fbm-sync-run-details-region', elements: fbmSyncRunDetailsBlocks(status) })
