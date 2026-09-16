@@ -8,7 +8,7 @@
 - `[ ]` là việc còn thiếu; mục không có nhãn **Cần kiểm chứng thực tế** là việc AI tự tiếp tục được.
 - Một slice chỉ đóng sau khi đủ code, test, log/báo cáo và checklist case của slice đó.
 - Sau khi đóng slice, ghi commit và revision GAS vào bảng bằng chứng cuối file.
-- Bộ kiểm offline chốt đạt `1583/1583`. Các mục live vẫn được đánh dấu riêng và không được suy ra từ test offline.
+- Bộ kiểm offline chốt đạt `1585/1585`. Các mục live vẫn được đánh dấu riêng và không được suy ra từ test offline.
 
 ## Nguồn hợp đồng
 
