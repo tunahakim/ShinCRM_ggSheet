@@ -116,6 +116,53 @@ async function chay(so) {
   wakeTimer.fn();
   check(so, 'hết debounce chỉ hỏi GAS một request và request silent', [wake._calls.length, wake._calls[0].name, wake._calls[0].options.silent], [1, 'probeSelectionAndReload', true]);
 
+  const queuedWake = dungHopPoll(); batDau(queuedWake);
+  let releaseFirstProbe;
+  let probeCalls = 0;
+  const firstProbe = new Promise((resolve) => { releaseFirstProbe = resolve; });
+  queuedWake.callServer = () => {
+    probeCalls += 1;
+    return probeCalls === 1 ? firstProbe : Promise.resolve({
+      ok: true,
+      reload: { revision: 2 },
+      selection: { spreadsheetId: 'sheet-1', gid: '1', sheetName: 'Customer', row: 4, col: 1, rowEnd: 4, colEnd: 1, customerId: '' },
+      decision: { ram: { action: 'none' } }
+    });
+  };
+  queuedWake.sheetLinkProbeSelectionAndReload('first-wake');
+  queuedWake.sheetLinkProbeSelectionAndReload('second-wake');
+  check(so, 'wake thứ hai trong lúc request bay chỉ được giữ như tín hiệu vận chuyển', [probeCalls, queuedWake.SHEET_LINK_SELECTION_WAKE_QUEUED], [1, true]);
+  releaseFirstProbe({
+    ok: true,
+    reload: { revision: 1 },
+    selection: { spreadsheetId: 'sheet-1', gid: '1', sheetName: 'Customer', row: 4, col: 1, rowEnd: 4, colEnd: 1, customerId: '' },
+    decision: { ram: { action: 'none' } }
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+  check(so, 'wake thứ hai được gửi thành request mới để GAS đọc ReloadState mới nhất', [probeCalls, queuedWake.SHEET_LINK_SELECTION_WAKE_QUEUED], [2, false]);
+
+  const staleSelection = dungHopPoll(); batDau(staleSelection);
+  staleSelection.Store.hasCustomer = () => true;
+  staleSelection._picked = [];
+  staleSelection.ACTIONS.setCurrentCustomer = ({ pick }) => { staleSelection._picked.push(pick); };
+  staleSelection.SHEET_LINK_LAST_ACK = Date.now();
+  let releaseStaleProbe;
+  staleSelection.callServer = () => new Promise((resolve) => { releaseStaleProbe = resolve; });
+  const context108 = { action: 'CRM_CONTEXT', nonce: staleSelection.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq: 1, sheetName: 'Customer', row: 4, col: 1, rowEnd: 4, colEnd: 1, customerId: 'CUS-108' };
+  const context113 = Object.assign({}, context108, { seq: 2, row: 5, customerId: 'CUS-113' });
+  staleSelection.sheetLinkOnMessage({ origin: staleSelection.SHEET_LINK_ORIGIN, data: context108 });
+  staleSelection.sheetLinkProbeSelectionAndReload('old-selection');
+  staleSelection.sheetLinkOnMessage({ origin: staleSelection.SHEET_LINK_ORIGIN, data: context113 });
+  releaseStaleProbe({
+    ok: true,
+    reload: { revision: 0 },
+    selection: { spreadsheetId: 'sheet-1', gid: '1', sheetName: 'Customer', row: 4, col: 1, rowEnd: 4, colEnd: 1, customerId: 'CUS-108' },
+    decision: { ram: { action: 'none' } }
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  check(so, 'response GAS cũ không ghi đè context Extension mới', staleSelection._picked, ['CUS-108', 'CUS-113']);
+
   const direct = dungHopPoll(); batDau(direct); direct.Store.hasCustomer = () => true; direct._picked = [];
   direct.ACTIONS.setCurrentCustomer = ({ pick }) => { direct._picked.push(pick); };
   direct.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: '!Lead', row: 4, col: 2, customerId: 'KH000001' });

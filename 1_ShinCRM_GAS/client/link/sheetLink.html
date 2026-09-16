@@ -35,6 +35,8 @@ var SHEET_LINK_WAKE_REASON = '';
 var SHEET_LINK_SELECTION_CONTEXT = null;
 var SHEET_LINK_PREVIOUS_CUSTOMER_ID = '';
 var SHEET_LINK_SELECTION_PENDING = null;
+var SHEET_LINK_SELECTION_WAKE_QUEUED = false;
+var SHEET_LINK_CONTEXT_GENERATION = 0;
 var SHEET_LINK_LAST_SEEN_REVISION = 0;
 var SHEET_LINK_PING_TIMER = null;
 var sheetLinkInstalled = false;
@@ -174,6 +176,7 @@ function sheetLinkOnMessage(event) {
   SHEET_LINK_SEQ = data.seq;
 
   var previousPosition = sheetLinkPositionKey(SHEET_LINK_LAST_CONTEXT || {});
+  SHEET_LINK_CONTEXT_GENERATION += 1;
   var applied = sheetLinkApplyContext(data);
   if (data.hint === 'keydown' || previousPosition !== sheetLinkPositionKey(data)) {
     sheetLinkScheduleWake(data.hint === 'keydown' ? 'keydown' : 'position');
@@ -292,14 +295,30 @@ function sheetLinkReloadWorkSucceeded(value) {
   return !!value && value.deferred !== true && value.reloadFailed !== true && value.ok !== false;
 }
 
+function sheetLinkWorkRevision(value, fallbackState) {
+  var candidates = [
+    value && value.processedRevision,
+    value && value.reload && value.reload.revision,
+    fallbackState && fallbackState.revision
+  ];
+  return candidates.reduce(function (highest, candidate) {
+    var revision = Number(candidate || 0);
+    return isFinite(revision) && revision > highest ? revision : highest;
+  }, 0);
+}
+
 function sheetLinkApplyDecisionResult(result, options) {
   if (!result) { return null; }
   var state = sheetLinkReloadState(result);
+  var stateRevision = Number(state && state.revision || 0);
+  var opts = options || {};
+  if (stateRevision && stateRevision <= SHEET_LINK_LAST_SEEN_REVISION && opts.forceReload !== true) {
+    return result;
+  }
   var decision = result.decision || (typeof reloadDecisionForState === 'function' ? reloadDecisionForState({ reloadState: state }) : null);
   if (!decision || !decision.ram || decision.ram.action === 'none') {
     return result;
   }
-  var opts = options || {};
   var waitMs = Number(decision.ram.waitMs);
   if (!isFinite(waitMs) || waitMs < 0) { waitMs = 0; }
   if (decision.ram.action === 'defer' && waitMs === 0 && opts.forceImmediate !== true) {
@@ -313,7 +332,7 @@ function sheetLinkApplyDecisionResult(result, options) {
   var work = typeof sidebarBusyRun === 'function' ? sidebarBusyRun('Đang đồng bộ dữ liệu vừa thay đổi…', refresh) : refresh();
   if (!work || typeof work.then !== 'function') {
     if (sheetLinkReloadWorkSucceeded(work) && state && state.revision) {
-      SHEET_LINK_LAST_SEEN_REVISION = Math.max(SHEET_LINK_LAST_SEEN_REVISION, Number(state.revision) || 0);
+      SHEET_LINK_LAST_SEEN_REVISION = Math.max(SHEET_LINK_LAST_SEEN_REVISION, sheetLinkWorkRevision(work, state));
     }
     return work;
   }
@@ -321,7 +340,7 @@ function sheetLinkApplyDecisionResult(result, options) {
     // Chỉ ghi nhận revision sau khi Store đã nhận dữ liệu. Nếu reload thất bại
     // hoặc bị hoãn vì bản nháp, lần hỏi sau vẫn phải thấy signal cũ.
     if (sheetLinkReloadWorkSucceeded(value) && state && state.revision) {
-      SHEET_LINK_LAST_SEEN_REVISION = Math.max(SHEET_LINK_LAST_SEEN_REVISION, Number(state.revision) || 0);
+      SHEET_LINK_LAST_SEEN_REVISION = Math.max(SHEET_LINK_LAST_SEEN_REVISION, sheetLinkWorkRevision(value, state));
     }
     return value;
   });
@@ -330,8 +349,13 @@ function sheetLinkApplyDecisionResult(result, options) {
 /** Hỏi selection + ReloadState trong đúng một round-trip; GAS tự quyết định đọc mã và scope RAM. */
 function sheetLinkProbeSelectionAndReload(reason, options) {
   if (!SHEET_LINK_RAM_READY || typeof callServer !== 'function') { return null; }
-  if (SHEET_LINK_SELECTION_PENDING) { return SHEET_LINK_SELECTION_PENDING; }
+  if (SHEET_LINK_SELECTION_PENDING) {
+    // Chỉ giữ tín hiệu đánh thức; GAS vẫn tự đọc ReloadState mới nhất.
+    SHEET_LINK_SELECTION_WAKE_QUEUED = true;
+    return SHEET_LINK_SELECTION_PENDING;
+  }
   var opts = options || {};
+  var contextGeneration = SHEET_LINK_CONTEXT_GENERATION;
   var input = {
     previousSelectionContext: SHEET_LINK_SELECTION_CONTEXT,
     previousCustomerId: SHEET_LINK_PREVIOUS_CUSTOMER_ID,
@@ -342,7 +366,9 @@ function sheetLinkProbeSelectionAndReload(reason, options) {
   };
   var request = callServer('probeSelectionAndReload', [input], { silent: true });
   var settled = request.then(function (result) {
-    if (result && result.selection) {
+    var extensionOwnsContext = sheetLinkExtensionAlive() && !!SHEET_LINK_LAST_CONTEXT;
+    var contextIsCurrent = contextGeneration === SHEET_LINK_CONTEXT_GENERATION;
+    if (result && result.selection && contextIsCurrent && !extensionOwnsContext) {
       SHEET_LINK_SELECTION_CONTEXT = Object.assign({}, result.selection);
       SHEET_LINK_PREVIOUS_CUSTOMER_ID = String(result.selection.customerId || '').trim();
       sheetLinkApplyContext(Object.assign({}, result.selection));
@@ -353,15 +379,27 @@ function sheetLinkProbeSelectionAndReload(reason, options) {
     if (typeof console !== 'undefined' && console.warn) { console.warn('Không kiểm tra được selection/reload; sẽ thử lại ở nhịp sau.', error); }
     return null;
   });
-  SHEET_LINK_SELECTION_PENDING = settled.then(function (result) {
+  var completion = settled.then(function (result) {
     SHEET_LINK_SELECTION_PENDING = null;
+    if (SHEET_LINK_SELECTION_WAKE_QUEUED) {
+      SHEET_LINK_SELECTION_WAKE_QUEUED = false;
+      var followUp = sheetLinkProbeSelectionAndReload('queued-wake');
+      if (followUp && typeof followUp.then === 'function') {
+        return followUp.then(function () { return result; });
+      }
+    }
     if (typeof selectionPollResetSafety === 'function') { selectionPollResetSafety(); }
     return result;
   }, function (error) {
     SHEET_LINK_SELECTION_PENDING = null;
+    if (SHEET_LINK_SELECTION_WAKE_QUEUED) {
+      SHEET_LINK_SELECTION_WAKE_QUEUED = false;
+      sheetLinkProbeSelectionAndReload('queued-wake');
+    }
     if (typeof selectionPollResetSafety === 'function') { selectionPollResetSafety(); }
     throw error;
   });
+  SHEET_LINK_SELECTION_PENDING = completion;
   return SHEET_LINK_SELECTION_PENDING;
 }
 

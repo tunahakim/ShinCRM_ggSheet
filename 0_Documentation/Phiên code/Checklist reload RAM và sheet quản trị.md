@@ -403,7 +403,8 @@
 - [x] Response ghi rõ `revisionMatched=false`/`supersededRevision` khi request cũ bị thay thế, nhưng dữ liệu trả về vẫn là scope mới nhất đã đọc.
 - [x] Chỉ xóa dirty records khi revision dùng để đọc còn khớp; revision phát sinh trong lúc đọc vẫn được giữ lại cho lượt tiếp theo.
 - [x] Test offline phủ ca request revision cũ nhưng dirty state có thêm mã mới (`tests/cases/loadService.js`).
-- [ ] Bổ sung điều phối wake tối thiểu ở Sidebar và kiểm tra response selection cũ không ghi đè context mới.
-- [ ] Bổ sung hint bàn phím dự phòng cho Delete/Backspace và nghiệm thu trên Sheet DEV.
+- [x] Sidebar giữ wake kế tiếp như tín hiệu vận chuyển, gửi follow-up để GAS tự đọc `ReloadState` mới nhất; không tự gom mã hoặc tự quyết định scope.
+- [x] Response selection GAS chỉ được áp dụng nếu context generation còn hiện hành; context mới từ Extension không bị response cũ ghi đè (`tests/cases/selectionPoll.js`).
+- [x] Hint bàn phím có `keydown`, `beforeinput` và dự phòng `keyup` cho Delete/Backspace; Extension vẫn không kết luận ô đã sửa (`tests/cases/extensionBridge.js`).
 
 ---

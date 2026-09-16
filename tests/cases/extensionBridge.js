@@ -51,8 +51,8 @@ async function chay(so) {
   section('Extension bridge — nonce đi trọn từ bắt tay tới CRM_CONTEXT');
   const scoutSource = fs.readFileSync(SCOUT_FILE, 'utf8');
   check(so, 'Extension chỉ quan sát selection, không đọc formula bar hoặc suy isEditing',
-    [scoutSource.indexOf('readFormulaBar') < 0, scoutSource.indexOf('cachedFormulaBar') < 0, scoutSource.indexOf('isEditing') < 0, scoutSource.indexOf("addEventListener('keydown'") >= 0, scoutSource.indexOf('sendKeydownHint') >= 0],
-    [true, true, true, true, true]);
+    [scoutSource.indexOf('readFormulaBar') < 0, scoutSource.indexOf('cachedFormulaBar') < 0, scoutSource.indexOf('isEditing') < 0, scoutSource.indexOf("addEventListener('keydown'") >= 0, scoutSource.indexOf("addEventListener('beforeinput'") >= 0, scoutSource.indexOf("key === 'Delete'") >= 0, scoutSource.indexOf('sendKeydownHint') >= 0],
+    [true, true, true, true, true, true, true]);
   let hop;
   try { hop = napBridge(); } catch (err) { return ghiLoiNap(so, 'nạp iframe_bridge.js', err); }
 

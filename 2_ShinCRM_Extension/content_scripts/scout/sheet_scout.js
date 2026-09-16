@@ -23,6 +23,7 @@ var LIVE_MODEL_TIMEOUT_MS = 800;
 var liveRetryAt = 0;
 var pendingKeydownHint = false;
 var lastResolvedCustomerId = '';
+var lastPositionKey = '';
 
 function liveHeaderForSheet(sheetName) {
   var hints = typeof CRM_COLUMN_HINTS !== 'undefined' ? CRM_COLUMN_HINTS : null;
@@ -38,7 +39,7 @@ function liveHeaderForSheet(sheetName) {
   return prefix.length === 1 ? prefix[0].header : '';
 }
 
-function sendResolvedContext(base, result, fallbackHeader, fallbackReason) {
+function sendResolvedContext(base, result, fallbackHeader, fallbackReason, hint) {
   var context = Object.assign({}, base);
   if (result && result.status === 'ok') { lastResolvedCustomerId = String(result.customerId || '').trim(); }
   // Kết quả live thất bại không được mượn mã cũ cho vị trí mới; cache chỉ phục vụ hint keydown.
@@ -47,6 +48,7 @@ function sendResolvedContext(base, result, fallbackHeader, fallbackReason) {
   context.customerIdSource = 'live-model';
   context.customerIdStatus = result && result.status ? result.status : 'unavailable';
   context.customerIdReason = result && result.reason ? result.reason : (fallbackReason || '');
+  if (hint) { context.hint = hint; }
   seqCounter += 1;
   context.at = Date.now();
   context.seq = seqCounter;
@@ -67,17 +69,17 @@ function sendKeydownHint(base) {
   sendContextToSidebar(context);
 }
 
-function requestLiveCustomerId(base, header) {
+function requestLiveCustomerId(base, header, hint) {
   var requestId = 'live-' + Date.now().toString(36) + '-' + (++liveRequestCounter);
   if (livePendingRequest && livePendingRequest.timer) { clearTimeout(livePendingRequest.timer); }
-  livePendingRequest = { requestId: requestId, context: base, header: header };
+  livePendingRequest = { requestId: requestId, context: base, header: header, hint: hint || '' };
   livePendingRequest.timer = setTimeout(function () {
     if (!livePendingRequest || livePendingRequest.requestId !== requestId) { return; }
     var pending = livePendingRequest;
     livePendingRequest = null;
     lastContextKey = '';
     liveRetryAt = Date.now() + 1000;
-    sendResolvedContext(pending.context, null, pending.header, 'LIVE_MODEL_TIMEOUT');
+    sendResolvedContext(pending.context, null, pending.header, 'LIVE_MODEL_TIMEOUT', pending.hint);
   }, LIVE_MODEL_TIMEOUT_MS);
   window.postMessage({
     action: 'CRM_LIVE_MODEL_READ_REQUEST',
@@ -100,7 +102,7 @@ window.addEventListener('message', function (event) {
   var pending = livePendingRequest;
   livePendingRequest = null;
   if (pending.timer) { clearTimeout(pending.timer); }
-  sendResolvedContext(pending.context, data, pending.header);
+  sendResolvedContext(pending.context, data, pending.header, '', pending.hint);
 });
 
 /*
@@ -218,9 +220,20 @@ function buildContext() {
   };
 }
 
-document.addEventListener('keydown', function () {
+function markInputHint() {
   pendingKeydownHint = true;
+}
+
+document.addEventListener('keydown', markInputHint, true);
+document.addEventListener('beforeinput', markInputHint, true);
+document.addEventListener('keyup', function (event) {
+  var key = event && event.key;
+  if (key === 'Delete' || key === 'Backspace') { markInputHint(); }
 }, true);
+
+function contextPositionKey(context) {
+  return [context.sheetName || '', context.row || 0, context.col || 0, context.rowEnd || 0, context.colEnd || 0].join('|');
+}
 
 setInterval(function () {
   if (document.hidden || !sidebarWindow) { return; }
@@ -233,20 +246,30 @@ setInterval(function () {
   var hasKeydownHint = pendingKeydownHint;
   if (key === lastContextKey && !hasKeydownHint) { return; }
   if (Date.now() < liveRetryAt) { return; }
+  var positionKey = contextPositionKey(context);
+  var positionChanged = positionKey !== lastPositionKey;
   if (key === lastContextKey && hasKeydownHint) {
     pendingKeydownHint = false;
     sendKeydownHint(context);
     return;
   }
+  if (key !== lastContextKey && hasKeydownHint && !positionChanged) {
+    pendingKeydownHint = false;
+    lastContextKey = key;
+    lastPositionKey = positionKey;
+    sendKeydownHint(context);
+    return;
+  }
   pendingKeydownHint = false;
   lastContextKey = key;
+  lastPositionKey = positionKey;
 
   var header = liveHeaderForSheet(context.sheetName);
   if (context.selectionKind !== 'cell') {
-    sendResolvedContext(context, null, header, 'UNSUPPORTED_SELECTION');
+    sendResolvedContext(context, null, header, 'UNSUPPORTED_SELECTION', hasKeydownHint ? 'keydown' : '');
   } else if (!header) {
-    sendResolvedContext(context, null, '', 'NO_SCHEMA_TARGET');
+    sendResolvedContext(context, null, '', 'NO_SCHEMA_TARGET', hasKeydownHint ? 'keydown' : '');
   } else {
-    requestLiveCustomerId(context, header);
+    requestLiveCustomerId(context, header, hasKeydownHint ? 'keydown' : '');
   }
 }, 200);
