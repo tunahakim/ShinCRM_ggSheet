@@ -452,7 +452,7 @@ Các ràng buộc thiết kế của slice này nằm ở Tài liệu 09.01, 09.
 - [x] Tài khoản FBM rút gọn thông báo liên kết, tô đỏ đúng ô thiếu, tự điền thành công chỉ báo một dòng, credential đã lưu hiển thị chỉ xem với icon sửa.
 - [x] Chạy đồng bộ và Kết quả & xử lý dùng popup/tab/action-row chuẩn, progress rỗi rỗng, năm tab đều cột, Summary có khoảng đệm và Conflict có nút quay lại một hàng riêng.
 - [x] Cài đặt phiên có công tắc module đồng bộ, lịch nền hai chiều/bốn tiến trình, batch và delay detail, tham số phiên chỉnh được trong Sidebar.
-- [x] Commit triển khai: `4370b08`, `80cb723`, `a10bba3`, `9d38fac`, `8822e72`, `801f391`, `40936a7`, `5c3acf9`, `ab208da`, `5feb4b6`, `2991b29`, `a8856a9`, `3dac581`, `6158962`, `550a738`, `3367e34`, `da6ec7e`, `e58da21`, `d2c6cf8`.
+- [x] Commit triển khai: `4370b08`, `80cb723`, `a10bba3`, `9d38fac`, `8822e72`, `801f391`, `40936a7`, `5c3acf9`, `ab208da`, `5feb4b6`, `2991b29`, `a8856a9`, `3dac581`, `6158962`, `550a738`, `3367e34`, `da6ec7e`, `e58da21`, `d2c6cf8`, `dc9460c`.
 
 ## Slice 9 — Live acceptance và mở rộng production
 
