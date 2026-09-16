@@ -1,8 +1,22 @@
 <script>
+var FBM_SYNC_RESULT_TABS = [
+  { id: 'summary', label: 'Tổng quan', description: 'Tóm tắt phiên' },
+  { id: 'conflict', label: 'Xung đột', description: 'Cần bạn xử lý' },
+  { id: 'errors', label: 'Lỗi', description: 'Cần xem lại' },
+  { id: 'log', label: 'Log', description: 'Dấu vết chạy' },
+  { id: 'audit', label: 'Nghiệm thu', description: 'Phạm vi thử' }
+];
 function fbmSyncResultsTabBlocks() {
-  return ['summary', 'conflict', 'errors', 'log', 'audit'].map(function (tab) {
-    var label = tab === 'summary' ? 'Tổng hợp' : tab === 'conflict' ? 'Xung đột' : tab === 'errors' ? 'Lỗi' : tab === 'log' ? 'Log' : 'Nghiệm thu phạm vi thử';
-    return Button({ label: label, className: tab === (FBM_SYNC_CLIENT.resultsTab || 'summary') ? 'is-active' : '', data: { 'sync-results-tab': tab } });
+  var activeTab = FBM_SYNC_CLIENT.resultsTab || 'summary';
+  return FBM_SYNC_RESULT_TABS.map(function (tab) {
+    var active = tab.id === activeTab;
+    return Box({
+      className: 'shin-sync-tab-item' + (active ? ' is-active' : ''),
+      elements: [
+        Button({ label: tab.label, className: 'shin-sync-tab-trigger' + (active ? ' is-active' : ''), data: { 'sync-results-tab': tab.id } }),
+        Text({ className: 'shin-sync-tab-description', text: tab.description })
+      ]
+    });
   });
 }
 function fbmSyncResultsBodyBlocks(status) {
