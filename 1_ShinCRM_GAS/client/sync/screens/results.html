@@ -10,14 +10,13 @@ function fbmSyncResultsTabBlocks() {
   var activeTab = FBM_SYNC_CLIENT.resultsTab || 'summary';
   return FBM_SYNC_RESULT_TABS.map(function (tab) {
     var active = tab.id === activeTab;
-    return Box({
-      className: 'shin-sync-tab-item' + (active ? ' is-active' : ''),
-      elements: [
-        Button({ label: tab.label, className: 'shin-sync-tab-trigger' + (active ? ' is-active' : ''), data: { 'sync-results-tab': tab.id } }),
-        Text({ className: 'shin-sync-tab-description', text: tab.description })
-      ]
-    });
+    return Button({ label: tab.label, className: 'shin-sync-tab-trigger' + (active ? ' is-active' : ''), data: { 'sync-results-tab': tab.id } });
   });
+}
+function fbmSyncResultsTabDescriptionBlock() {
+  var activeTab = FBM_SYNC_CLIENT.resultsTab || 'summary';
+  var tab = FBM_SYNC_RESULT_TABS.filter(function (item) { return item.id === activeTab; })[0] || FBM_SYNC_RESULT_TABS[0];
+  return Box({ id: 'fbm-sync-results-tab-description-region', className: 'shin-sync-tab-description-region', elements: [Text({ className: 'shin-sync-tab-description', text: tab.description })] });
 }
 function fbmSyncResultsBodyBlocks(status) {
   var tab = FBM_SYNC_CLIENT.resultsTab || 'summary';
@@ -29,7 +28,7 @@ function fbmSyncResultsBodyBlocks(status) {
 }
 function fbmSyncRenderResults(panel, status) {
   status = status || {};
-  return fbmSyncAppendBox(panel, 'shin-section', 'fbm-sync-results-root', [Box({ className: 'shin-sync-tab-row', id: 'fbm-sync-results-tabs-region', elements: fbmSyncResultsTabBlocks() }), Box({ id: 'fbm-sync-results-body-region', elements: fbmSyncResultsBodyBlocks(status) })]);
+  return fbmSyncAppendBox(panel, 'shin-section', 'fbm-sync-results-root', [Box({ className: 'shin-sync-tab-row', id: 'fbm-sync-results-tabs-region', elements: fbmSyncResultsTabBlocks() }), fbmSyncResultsTabDescriptionBlock(), Box({ id: 'fbm-sync-results-body-region', elements: fbmSyncResultsBodyBlocks(status) })]);
 }
 function fbmSyncResultsSignature(status) {
   var metadata = status && status.metadata || {}, tab = FBM_SYNC_CLIENT.resultsTab || 'summary';
@@ -53,6 +52,7 @@ function fbmSyncPatchResults(panel, status) {
   if (!panel || !RENDER_INDEX.nodes['fbm-sync-results-root']) { return false; }
   if (FBM_SYNC_CLIENT.resultsTab === 'conflict' && fbmSyncInteractiveControlIsEditing(panel)) { FBM_SYNC_CLIENT.deferredPaint = status; return true; }
   fbmSyncRenderTarget('fbm-sync-results-tabs-region', fbmSyncResultsTabBlocks());
+  fbmSyncRenderTarget('fbm-sync-results-tab-description-region', fbmSyncResultsTabDescriptionBlock().elements);
   fbmSyncRenderTarget('fbm-sync-results-body-region', fbmSyncResultsBodyBlocks(status));
   return true;
 }

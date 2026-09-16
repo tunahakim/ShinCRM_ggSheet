@@ -147,11 +147,12 @@ async function chay(so) {
   hop.fbmSyncPaint(Object.assign(idle(), { counts: { completed: 9, succeeded: 8 }, metadata: { traceTail: Array.from({ length: 21 }, (_, index) => ({ stage: String(index) })) } }));
   check(so, 'snapshot GAS vá Kết quả tại chỗ, giữ nguyên hàng tab', [content.querySelector('.shin-sync-tab-row') === resultTabsNode, content.textContent.indexOf('Đã xử lý 9') >= 0], [true, true]);
   const resultTabs = ['summary', 'conflict', 'errors', 'log', 'audit'];
+  const resultTabDescriptions = { summary: 'Tóm tắt phiên', conflict: 'Cần bạn xử lý', errors: 'Cần xem lại', log: 'Dấu vết chạy', audit: 'Phạm vi thử' };
   resultTabs.forEach((tab) => {
     const button = dom.document.createElement('button');
     button.setAttribute('data-sync-results-tab', tab);
     click(dom, button);
-    check(so, 'ket qua chuyen dung tab ' + tab, hop.FBM_SYNC_CLIENT.resultsTab, tab);
+    check(so, 'kết quả chuyển đúng tab và đổi mô tả body ' + tab, [hop.FBM_SYNC_CLIENT.resultsTab, content.querySelector('#fbm-sync-results-tab-description-region').textContent, content.querySelector('.shin-sync-tab-row') === resultTabsNode], [tab, resultTabDescriptions[tab], true]);
   });
   const page = dom.document.createElement('button');
   page.setAttribute('data-sync-page', 'log:1');
