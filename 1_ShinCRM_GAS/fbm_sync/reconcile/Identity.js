@@ -170,7 +170,7 @@ FbmSync.markMissingAfterFullScan = function (entity, state) {
   local.forEach(function (record) {
     var fbmId = String(record.fbmId || '').trim();
     var lock = state.locks && state.locks[entity + ':' + String(record.id || '')];
-    if (!fbmId || FbmSync.seenStoreHas(entity, record) || String(record.recordStatus || 'active') === 'deleted' || (lock && lock.owner === 'user')) { return; }
+    if (!fbmId || FbmSync.seenStoreHas(entity, record) || String(record.recordStatus || 'active') === 'deleted' || (lock && lock.owner === 'user') || (entity === 'activity' && typeof FbmSync.activitySinceAllows === 'function' && !FbmSync.activitySinceAllows(record))) { return; }
     missing.push({ id: record.id, syncStatus: FbmSync.SYNC_STATUS.missing });
     if (FbmSync.logPullRecord) { FbmSync.logPullRecord(entity, { fbmId: fbmId }, record, FbmSync.SYNC_STATUS.missing, 'Không thấy ID trong lượt quét FBM; không suy ra xóa.'); }
   });

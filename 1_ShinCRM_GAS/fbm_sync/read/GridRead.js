@@ -95,22 +95,36 @@ FbmSync.identityCheckCustomerRequest = function (options) {
   var opt = Object.assign({ includeTestCustomer: false, sortExpression: 'stt_rec_kh' }, options || {});
   return FbmSync.customerGridRequest(opt);
 };
+/** Đổi mốc YYYY-MM-DD sang định dạng filter ngày mà grid FBM nhận. */
+FbmSync.activitySinceFilterDate = function (value) {
+  var match = String(value || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) { return ''; }
+  var date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  if (date.getUTCFullYear() !== Number(match[1]) || date.getUTCMonth() !== Number(match[2]) - 1 || date.getUTCDate() !== Number(match[3])) { return ''; }
+  return match[3] + '/' + match[2] + '/' + match[1];
+};
+/** Gắn bộ lọc mốc Activity vào mọi request đọc grid, trừ request chủ động lấy lịch sử. */
+FbmSync.activitySinceFilters = function (options) {
+  var opt = options || {}, filters = Array.isArray(opt.filter) ? opt.filter.slice() : [], cfg = FbmSync.scriptSettings();
+  var since = String(cfg.activitySince || '').trim(), filterDate = FbmSync.activitySinceFilterDate(since);
+  var hasEndDateFilter = filters.some(function (item) { return /^end_date\s*:/i.test(String(item || '').trim()); });
+  if (filterDate && opt.includeHistory !== true && !hasEndDateFilter) { filters.push('end_date:>=' + filterDate); }
+  return filters;
+};
 /** Tạo request Activity luôn gắn với stt_rec của Customer. */
 FbmSync.activityGridRequest = function (sttRec, options) {
   var opt = Object.assign({}, options || {}, { externalKey: [{ Name: 'stt_rec', Opr: '=', Value: String(sttRec || ''), Type: 'String', Ignore: false }] });
+  opt.filter = FbmSync.activitySinceFilters(opt);
+  delete opt.includeHistory;
   return FbmSync.gridRequest('activity', opt);
 };
 /** Dựng request bulk Activity theo mốc thời gian; không gắn một Customer cụ thể. */
 FbmSync.activityBulkRequest = function (options) {
-  var opt = Object.assign({}, options || {}), keys = Array.isArray(opt.externalKey) ? opt.externalKey.slice() : [], cfg = FbmSync.scriptSettings();
-  var since = String(cfg.activitySince || '').trim();
-  if (since && opt.includeHistory !== true && !keys.some(function (item) { return item && item.Name === 'end_date'; })) {
-    keys.push({ Name: 'end_date', Opr: '>=', Value: since, Type: 'Date', Ignore: false });
-  }
+  var opt = Object.assign({}, options || {});
+  opt.filter = FbmSync.activitySinceFilters(opt);
   delete opt.includeHistory;
   var transport = opt.transport;
   delete opt.transport;
-  opt.externalKey = keys;
   var request = FbmSync.gridRequest('activity', opt);
   request.meta.kind = 'activity_bulk_grid';
   request.meta.scan = 'bulk_activity';
@@ -147,7 +161,7 @@ FbmSync.activityBulkMissing = function (localRecords, seenFbmIds) {
   var seen = seenFbmIds || {}, missing = [];
   (localRecords || []).forEach(function (record) {
     var id = String(record && record.fbmId || '').trim();
-    if (!id || seen[id] || String(record.recordStatus || 'active') === 'deleted' || FbmSync.isTemporaryRecord('activity', record)) { return; }
+    if (!id || seen[id] || String(record.recordStatus || 'active') === 'deleted' || FbmSync.isTemporaryRecord('activity', record) || (typeof FbmSync.activitySinceAllows === 'function' && !FbmSync.activitySinceAllows(record))) { return; }
     missing.push({ id: record.id, fbmId: id, syncStatus: FbmSync.SYNC_STATUS.missing });
   });
   return missing;
@@ -165,7 +179,7 @@ FbmSync.writeActivityBulkMissing = function (localRecords) {
   }
   local.forEach(function (record) {
     var fbmId = String(record && record.fbmId || '').trim();
-    if (!fbmId || hasSeen(record) || String(record.recordStatus || 'active') === 'deleted' || FbmSync.isTemporaryRecord('activity', record)) { return; }
+    if (!fbmId || hasSeen(record) || String(record.recordStatus || 'active') === 'deleted' || FbmSync.isTemporaryRecord('activity', record) || (typeof FbmSync.activitySinceAllows === 'function' && !FbmSync.activitySinceAllows(record))) { return; }
     var item = { id: record.id, fbmId: fbmId, syncStatus: FbmSync.SYNC_STATUS.missing };
     total += 1; if (sample.length < 20) { sample.push(item); }
     batch.push({ id: record.id, syncStatus: FbmSync.SYNC_STATUS.missing });

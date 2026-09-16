@@ -158,14 +158,14 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 
 ### Activity và marker
 
-- [x] Request Activity theo `externalKey stt_rec` nối đúng Customer nội bộ.
+- [x] Request Activity theo `externalKey stt_rec` nối đúng Customer nội bộ; khi có `activitySince`, bulk và request theo Customer cùng thêm `filter` `end_date:>=DD/MM/YYYY`.
 - [x] Activity mới không marker tạo dòng ShinCRM, cấp mã nội bộ, lưu FBM ID và baseline.
 - [x] Marker trỏ dòng đang đẩy thì vá ID, không tạo trùng.
 - [x] Marker trỏ dòng đã có FBM ID khác thì khóa và báo xử lý.
 - [x] Marker mồ côi chỉ log, không tạo lại.
 - [x] Activity thiếu hoặc placeholder `workDate` bị chặn và log, không tự điền ngày.
 - [x] Hash Activity dùng cùng luật ba chiều như Customer.
-- [x] Activity vắng trong bulk chỉ mang trạng thái không thấy bên FBM, không suy hard-delete.
+- [x] Activity vắng trong bulk chỉ mang trạng thái không thấy bên FBM, không suy hard-delete; Activity trước `activitySince` không bị đưa vào missing scan.
 
 ### Ba lớp quét
 

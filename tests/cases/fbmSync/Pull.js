@@ -82,10 +82,18 @@ async function chay(so) {
 
   const bulkActivity = builders.FbmSync.activityBulkRequest({ type: 0 });
   check(so, 'Bulk Activity không gắn mốc thời gian hay Customer đơn lẻ', [bulkActivity.meta.kind, bulkActivity.body.externalKey.some((item) => item.Name === 'end_date' && item.Opr === '>='), bulkActivity.body.externalKey.some((item) => item.Name === 'stt_rec')], ['activity_bulk_grid', false, false]);
+  builders.FbmSync.accountSettingsRead = () => ({ activitySince: '2024-10-07' });
+  const activitySinceBulk = builders.FbmSync.activityBulkRequest({ type: 0 });
+  const activitySinceCustomer = builders.FbmSync.activityGridRequest('CUS-FBM-1', { type: 0 });
+  const activityHistory = builders.FbmSync.activityBulkRequest({ type: 0, includeHistory: true });
+  check(so, 'Mốc Activity dùng filter FBM đúng định dạng cho bulk và từng Customer', [activitySinceBulk.body.filter, activitySinceCustomer.body.filter, activitySinceCustomer.body.externalKey[0].Name, activityHistory.body.filter], [['end_date:>=07/10/2024'], ['end_date:>=07/10/2024'], 'stt_rec', []]);
+  check(so, 'Mốc Activity đổi ngày không hợp lệ thì không tự gắn filter', builders.FbmSync.activitySinceFilterDate('2024-02-31'), '');
   const activityMissing = builders.FbmSync.activityBulkMissing([{ id: 'A-1', fbmId: 'F-1', recordStatus: 'active' }, { id: 'A-2', fbmId: 'F-2', recordStatus: 'deleted' }, { id: 'TMP-3', fbmId: 'F-3', recordStatus: 'active' }], { 'F-1': true });
   check(so, 'Bulk Activity chỉ trả dòng active vắng ID FBM', [activityMissing.length, activityMissing[0] && activityMissing[0].id, activityMissing[0] && activityMissing[0].syncStatus], [0, undefined, undefined]);
   const activityMissingOnly = builders.FbmSync.activityBulkMissing([{ id: 'A-1', fbmId: 'F-1', recordStatus: 'active' }, { id: 'A-2', fbmId: 'F-2', recordStatus: 'deleted' }, { id: 'A-4', fbmId: 'F-4', recordStatus: 'active' }, { id: 'TMP-3', fbmId: 'TMP-F-3', recordStatus: 'active' }], { 'F-1': true });
   check(so, 'Bulk Activity vắng được đánh dấu missing khi ID không xuất hiện', [activityMissingOnly.length, activityMissingOnly[0].id, activityMissingOnly[0].syncStatus], [1, 'A-4', builders.FbmSync.SYNC_STATUS.missing]);
+  const activityMissingBeforeSince = builders.FbmSync.activityBulkMissing([{ id: 'A-OLD', fbmId: 'F-OLD', workDate: '2024-10-06', recordStatus: 'active' }, { id: 'A-SINCE', fbmId: 'F-SINCE', workDate: '2024-10-07', recordStatus: 'active' }], {});
+  check(so, 'Activity trước mốc không bị đánh dấu missing còn đúng ngày mốc thì vẫn kiểm tra', [activityMissingBeforeSince.length, activityMissingBeforeSince[0] && activityMissingBeforeSince[0].id], [1, 'A-SINCE']);
   const lookupState = { session: { lookups: { '@CAT_TINH_THANH': [['HNI', 'Hà Nội']], '@CAT_NGUON_KH': [['HNI', 'Nguồn khác']], '@CAT_CONG_VIEC': [['HNI', 'Công việc khác']], '@CAT_SAN_PHAM': [['HNI', 'Sản phẩm khác']] } } };
   const lookupGate = { namesBySource: { '@CAT_TINH_THANH': { HNI: 'Hà Nội' }, '@CAT_NGUON_KH': { HNI: 'Nguồn khác' }, '@CAT_CONG_VIEC': { HNI: 'Công việc khác' }, '@CAT_SAN_PHAM': { HNI: 'Sản phẩm khác' } } };
   check(so, 'lookup danh mục không lẫn mã trùng giữa các nguồn', builders.FbmSync.validateLookupGate(lookupState, lookupGate).length, 0);
@@ -313,12 +321,18 @@ async function chay(so) {
   const newRecordMissing = edges.FbmSync.markMissingAfterFullScan('customer', newRecordState);
   check(so, 'record vua pull duoc danh dau seen sau khi cua ghi cap ma', [newRecordMissing.written, newRecordWrites], [0, 1]);
   let activityMissingBatch;
+  edges.FbmSync.accountSettingsRead = () => ({ activitySince: '2024-10-07' });
+  edges.FbmSync.activityDateKey = (value) => {
+    const text = String(value || '');
+    const match = text.match(/^\/Date\((-?\d+)/);
+    return match ? new Date(Number(match[1])).toISOString().slice(0, 10) : text.slice(0, 10);
+  };
   edges.FbmSync.readLocal = (entity) => entity === 'activity'
-    ? [{ id: 'ACT-000021', fbmId: 'ACT-MISSING', recordStatus: 'active' }, { id: 'ACT-000022', fbmId: 'ACT-TOMBSTONE', recordStatus: 'deleted' }]
+    ? [{ id: 'ACT-000020', fbmId: 'ACT-OLD', workDate: '2024-10-06', recordStatus: 'active' }, { id: 'ACT-000021', fbmId: 'ACT-MISSING', workDate: '2024-10-07', recordStatus: 'active' }, { id: 'ACT-000022', fbmId: 'ACT-TOMBSTONE', workDate: '2024-10-08', recordStatus: 'deleted' }]
     : [];
   edges.writeGateSave = (request) => { activityMissingBatch = request; return { ok: true }; };
   const activityMissingResult = edges.FbmSync.markMissingAfterFullScan('activity', fullScanState);
-  check(so, 'Activity vang trong bulk chi danh dau missing khong xoa cung', [activityMissingResult.written, activityMissingBatch.records[0].id, activityMissingBatch.records[0].syncStatus, activityMissingBatch.records.length], [1, 'ACT-000021', edges.FbmSync.SYNC_STATUS.missing, 1]);
+  check(so, 'Activity truoc moc khong bi danh dau missing trong full scan', [activityMissingResult.written, activityMissingBatch.records[0].id, activityMissingBatch.records[0].syncStatus, activityMissingBatch.records.length], [1, 'ACT-000021', edges.FbmSync.SYNC_STATUS.missing, 1]);
   let activityPullWrite;
   edges.FbmSync.stateRead = () => ({ metadata: { categoryGate: gate, seen: { customer: {}, activity: {} } }, locks: {} });
   edges.FbmSync.stateWrite = () => {};
