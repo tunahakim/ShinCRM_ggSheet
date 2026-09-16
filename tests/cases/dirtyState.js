@@ -161,6 +161,12 @@ function chay(so) {
     revision.hop.dirtyStateClearRecords(['KH0001'], 7).records,
     []);
 
+  const debounce = dungHop({ sheets: ['Config', 'Log'] }).hop;
+  const debounceState = debounce.dirtyStateMarkDecision({ signal: { records: ['CUS-DEBOUNCE'], recordsDebounceMs: 3000 } });
+  check(so, 'mốc reload bản ghi được tính đúng ba giây từ changedAt của signal',
+    debounceState.recordsReadyAt >= debounceState.changedAt + 3000,
+    true);
+
   check(so, 'clear view/allViews sai revision không được xóa signal mới',
     (function () {
       const hop = dungHop({ sheets: ['Config', 'Log'], props: { reloadRevision: '7', dirtyViewSheets: '["!Lead"]', dirtyAllViews: 'true' } }).hop;

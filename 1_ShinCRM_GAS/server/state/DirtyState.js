@@ -109,17 +109,12 @@ function dirtyStateBumpRevision(props) {
 function dirtyStateMarkSignal(mark) {
   var props = PropertiesService.getDocumentProperties();
   var state = reloadStateRead();
-  if (mark.records && mark.records.length) {
+  var hasRecords = !!(mark.records && mark.records.length);
+  var explicitReadyAt = mark.recordsReadyAt !== undefined && mark.recordsReadyAt !== null;
+  var readyAt = explicitReadyAt ? Number(mark.recordsReadyAt) || 0 : 0;
+  var debounceMs = Number(mark.recordsDebounceMs) || 0;
+  if (hasRecords) {
     dirtyStateWriteList(props, DIRTY_KEYS.records, state.records.concat(mark.records));
-    if (mark.recordsReadyAt !== undefined && mark.recordsReadyAt !== null) {
-      var readyAt = Number(mark.recordsReadyAt) || 0;
-      if (readyAt > 0) { props.setProperty(DIRTY_KEYS.recordsReadyAt, String(readyAt)); }
-      else { props.deleteProperty(DIRTY_KEYS.recordsReadyAt); }
-    } else if (Number(mark.recordsDebounceMs) > 0) {
-      props.setProperty(DIRTY_KEYS.recordsReadyAt, String(Date.now() + Number(mark.recordsDebounceMs)));
-    } else {
-      props.deleteProperty(DIRTY_KEYS.recordsReadyAt);
-    }
   }
   if (mark.category) { props.setProperty(DIRTY_KEYS.category, 'true'); }
   if (mark.config) { props.setProperty(DIRTY_KEYS.config, 'true'); }
@@ -135,6 +130,19 @@ function dirtyStateMarkSignal(mark) {
     dirtyStateWriteList(props, DIRTY_KEYS.viewSheets, state.viewSheets.concat(mark.viewSheets));
   }
   dirtyStateBumpRevision(props);
+  // Tính mốc debounce sau cùng một mốc changedAt của signal. Nếu một lần ghi
+  // ô phát thêm onEdit trong lúc xử lý, signal cuối vẫn có đủ ba giây trọn vẹn.
+  if (hasRecords && !mark.allCore) {
+    var changedAt = reloadStateRead().changedAt;
+    if (explicitReadyAt) {
+      if (readyAt > 0) { props.setProperty(DIRTY_KEYS.recordsReadyAt, String(readyAt)); }
+      else { props.deleteProperty(DIRTY_KEYS.recordsReadyAt); }
+    } else if (debounceMs > 0) {
+      props.setProperty(DIRTY_KEYS.recordsReadyAt, String(changedAt + debounceMs));
+    } else {
+      props.deleteProperty(DIRTY_KEYS.recordsReadyAt);
+    }
+  }
   var next = reloadStateRead();
   var limit = Number(SETTINGS.DIRTY_RECORD_LIMIT) || 500;
   if (!next.allCore && next.records.length > limit) {
