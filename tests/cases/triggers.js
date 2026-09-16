@@ -109,6 +109,10 @@ function chay(so) {
   hop.shinOnEdit({ range: eventRange(lead, 1, 1) });
   check(so, 'sửa hàng 1 view, kể cả thêm/đổi/xóa mã @, gọi vẽ toàn bộ view', rendered, ['!Lead', '!Chăm sóc']);
 
+  rendered.length = 0;
+  hop.shinOnEdit({ range: eventRange(lead, 1, 5), oldValue: 'Ghi chú thường', value: 'Nhãn thường' });
+  check(so, 'sửa tiêu đề thường ở hàng 1 view không liên quan mã hợp lệ thì không vẽ', rendered, []);
+
   hop.dirtyStateClear();
   ghiO(nen, 'Customer', 4, '@CUS_MA_KH', 'KH000001');
   hop.shinOnEdit({ range: eventRange(nen.sheet('Customer'), 4, 2) });

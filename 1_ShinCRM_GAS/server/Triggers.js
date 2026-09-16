@@ -86,8 +86,21 @@ function shinRenderAllViewsAfterSignal(options) {
 }
 
 /** Chỉ ba vùng cấu hình của sheet quản trị được phép kích hoạt một lượt làm mới tự động. */
-function shinViewEditNeedsRender(sheet, range) {
-  if (shinRangeTouchesRow(range, 1) || shinRangeTouchesCodedFilter(sheet, range)) { return true; }
+function shinViewHeaderCodeIsValid(code) {
+  var value = String(code === null || code === undefined ? '' : code).trim();
+  return shinViewCodeIsValid(value) || value === '@VIEW_SORT_COL' || value === '@VIEW_SORT_LEVEL';
+}
+
+function shinViewEditNeedsRender(sheet, range, event) {
+  if (shinRangeTouchesRow(range, 1)) {
+    var cells = (range.getLastRow() - range.getRow() + 1) * (range.getLastColumn() - range.getColumn() + 1);
+    if (cells !== 1) { return true; }
+    var hasOldValue = Object.prototype.hasOwnProperty.call(event || {}, 'oldValue');
+    var hasNewValue = Object.prototype.hasOwnProperty.call(event || {}, 'value');
+    if (!hasOldValue && !hasNewValue) { return true; }
+    return shinViewHeaderCodeIsValid(event && event.oldValue) || shinViewHeaderCodeIsValid(event && event.value);
+  }
+  if (shinRangeTouchesCodedFilter(sheet, range)) { return true; }
   return shinRangeTouchesColumn(range, selectionColumnIndex(sheet, '@VIEW_SORT_COL'))
     || shinRangeTouchesColumn(range, selectionColumnIndex(sheet, '@VIEW_SORT_LEVEL'));
 }
@@ -99,7 +112,7 @@ function shinOnEdit(event) {
     var sheet = range.getSheet();
     var name = sheet.getName();
     if (name.charAt(0) === '!') {
-      if (shinViewEditNeedsRender(sheet, range)) {
+      if (shinViewEditNeedsRender(sheet, range, event)) {
         var viewDecision = shinReloadDecision({ source: 'edit', surface: 'view-control', viewControl: true });
         if (viewDecision.views.action === 'render') { return shinRenderAllViewsAfterSignal({ policyBypass: viewDecision.views.policyBypass === true }); }
       }
@@ -131,10 +144,43 @@ function shinOnEdit(event) {
 }
 
 function shinOnChange(event) {
-  if (event && event.changeType === 'INSERT_GRID') {
+  return runEntryPoint('shinOnChange', 'core', ERROR_CHANNEL_THROW, function () {
+    var type = String(event && event.changeType || '').toUpperCase();
     var book = shinOpenBook();
-    book.getSheets().filter(function (sheet) { return sheet.getName().charAt(0) === '!'; }).forEach(function (sheet) { prepareViewSheet(sheet.getName()); });
-  }
+    var active = book.getActiveSheet();
+    var name = active && typeof active.getName === 'function' ? active.getName() : '';
+
+    if (type === 'INSERT_GRID') {
+      book.getSheets().filter(function (sheet) { return sheet.getName().charAt(0) === '!'; }).forEach(function (sheet) { prepareViewSheet(sheet.getName()); });
+      var inserted = shinReloadDecision({ source: 'change', surface: 'view-control', viewControl: true });
+      return inserted.views.action === 'render' ? shinRenderAllViewsAfterSignal({ policyBypass: inserted.views.policyBypass === true }) : inserted;
+    }
+
+    if (type === 'REMOVE_GRID') {
+      var removed = shinReloadDecision({ source: 'change', surface: 'view-control', viewControl: true });
+      return removed.views.action === 'render' ? shinRenderAllViewsAfterSignal({ policyBypass: removed.views.policyBypass === true }) : removed;
+    }
+
+    // onChange không có range đáng tin cậy. Với thêm/xóa hàng/cột, đánh dấu
+    // bảo thủ theo sheet đang active; nếu không xác định được thì dùng full core.
+    if (['INSERT_ROW', 'REMOVE_ROW', 'INSERT_COLUMN', 'REMOVE_COLUMN'].indexOf(type) >= 0) {
+      var structural;
+      if (name === ENTITY_SHEETS.customer || name === ENTITY_SHEETS.activity) {
+        structural = shinReloadDecision({ source: 'change', surface: 'structure', structure: true, allCore: true });
+      } else if (name === 'Category') {
+        structural = shinReloadDecision({ source: 'change', surface: 'category', entity: 'category' });
+      } else if (name === 'Config') {
+        structural = shinReloadDecision({ source: 'change', surface: 'config', entity: 'config' });
+      } else if (name && name.charAt(0) === '!') {
+        structural = shinReloadDecision({ source: 'change', surface: 'view-control', viewControl: true });
+      } else {
+        structural = shinReloadDecision({ source: 'change', surface: 'structure', structure: true, allCore: true });
+      }
+      return structural.views.action === 'render' ? shinRenderAllViewsAfterSignal({ policyBypass: structural.views.policyBypass === true }) : structural;
+    }
+
+    return null;
+  });
 }
 
 function shinInstallTriggers() {

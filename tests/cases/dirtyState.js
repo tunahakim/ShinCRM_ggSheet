@@ -153,7 +153,7 @@ function chay(so) {
   const revision = dungHop({ sheets: ['Config', 'Log'], props: { reloadRevision: '7', reloadChangedAt: '1234', dirtyRecords: '["KH0001"]' } });
   check(so, 'reloadStateRead giữ revision, changedAt và scope records',
     revision.hop.reloadStateRead(),
-    { revision: 7, changedAt: 1234, viewSheets: [], records: ['KH0001'], category: false, config: false, schema: false, allCore: false, allViews: false, all: false });
+    { revision: 7, changedAt: 1234, recordsReadyAt: 0, viewSheets: [], records: ['KH0001'], category: false, config: false, schema: false, allCore: false, allViews: false, all: false });
   check(so, 'clear records sai revision không được xóa signal',
     revision.hop.dirtyStateClearRecords(['KH0001'], 6).records,
     ['KH0001']);

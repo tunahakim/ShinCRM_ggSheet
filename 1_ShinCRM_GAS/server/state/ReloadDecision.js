@@ -51,16 +51,20 @@ function reloadDecisionWithRam(decision, mode, ids, input, reason) {
   var draft = {};
   draftIds.forEach(function (id) { draft[id] = true; });
   var deferred = normalized.filter(function (id) { return draft[id]; });
-  var action = deferred.length ? 'defer' : 'reload';
+  var fullCoreBlocked = mode === 'fullCore' && draftIds.length > 0;
+  var action = deferred.length || fullCoreBlocked ? 'defer' : 'reload';
   decision.ram = {
     action: action,
     mode: mode,
     recordIds: normalized,
-    deferredRecordIds: deferred,
-    waitMs: input && input.source === 'edit' && (mode === 'records') ? RELOAD_DECISION_DEBOUNCE_MS : 0,
+    deferredRecordIds: fullCoreBlocked ? draftIds : deferred,
+    waitMs: input && input.source === 'edit' && mode === 'records' && input.forceImmediate !== true ? RELOAD_DECISION_DEBOUNCE_MS : 0,
     flushOnLeave: !!(input && input.source === 'edit' && mode === 'records'),
-    reason: deferred.length ? 'Bảo vệ bản nháp Sidebar của mã đang sửa.' : reason
+    reason: fullCoreBlocked ? 'Bảo vệ bản nháp Sidebar trước khi nạp full core.' : (deferred.length ? 'Bảo vệ bản nháp Sidebar của mã đang sửa.' : reason)
   };
+  if (mode === 'records' && normalized.length && input && input.source === 'edit') {
+    decision.signal.recordsDebounceMs = input.forceImmediate === true ? 0 : RELOAD_DECISION_DEBOUNCE_MS;
+  }
 }
 
 function reloadDecisionForChange(input) {
@@ -88,6 +92,18 @@ function reloadDecisionForChange(input) {
 
   if (surface === 'view-data' || change.viewData === true) {
     return reloadDecisionBlank('Dữ liệu sinh ở sheet quản trị không phải nguồn sự thật.');
+  }
+
+  if (change.allCore === true || change.structure === true) {
+    decision.kind = 'structure';
+    decision.signal.allCore = true;
+    decision.signal.allViews = true;
+    reloadDecisionWithRam(decision, 'fullCore', [], change, 'Thay đổi cấu trúc cần nạp lại full core.');
+    decision.views = { action: autoRender ? 'render' : 'defer', mode: 'all', immediate: autoRender, policyBypass: false, reason: 'Thay đổi cấu trúc có thể làm lệch schema hoặc dữ liệu.' };
+    reloadDecisionViewSheets(decision, change);
+    decision.notifySidebar = true;
+    decision.reason = 'Thay đổi cấu trúc.';
+    return decision;
   }
 
   if (surface === 'schema' || change.schema === true) {
@@ -147,6 +163,56 @@ function reloadDecisionForChange(input) {
     reloadDecisionViewSheets(decision, change);
     decision.notifySidebar = true;
     decision.reason = 'Customer/Activity đổi.';
+    return decision;
+  }
+
+  return decision;
+}
+
+/**
+ * Tính phần quyết định dành cho Sidebar từ ReloadState đã có sẵn. Hàm này chỉ
+ * đọc input, không ghi lại signal; signal chỉ được phát bởi trigger/cửa ghi.
+ * `lastSeenRevision` ngăn một wake request lặp lại nạp cùng một revision.
+ */
+function reloadDecisionForState(input) {
+  var change = input || {};
+  var state = change.reloadState || change.state || {};
+  var revision = Number(state.revision || 0);
+  var lastSeen = Number(change.lastSeenRevision || 0);
+  var decision = reloadDecisionBlank('Không có signal mới cho Sidebar.');
+  if (revision && lastSeen >= revision && change.forceReload !== true) { return decision; }
+
+  var common = {
+    source: 'sidebar',
+    localDraft: change.localDraft,
+    forceImmediate: change.forceImmediate === true
+  };
+
+  if (state.allCore || state.all || state.schema || state.config) {
+    decision.kind = 'state-full-core';
+    reloadDecisionWithRam(decision, 'fullCore', [], common, 'ReloadState yêu cầu nạp full core.');
+    decision.notifySidebar = true;
+    decision.reason = 'ReloadState yêu cầu nạp full core.';
+    return decision;
+  }
+
+  if (state.category) {
+    decision.kind = 'state-category';
+    reloadDecisionWithRam(decision, 'category', [], common, 'ReloadState yêu cầu nạp Category.');
+    decision.notifySidebar = true;
+    decision.reason = 'ReloadState yêu cầu nạp Category.';
+    return decision;
+  }
+
+  var ids = reloadDecisionIds(state.records);
+  if (ids.length) {
+    decision.kind = 'state-records';
+    reloadDecisionWithRam(decision, 'records', ids, common, 'ReloadState có mã Customer/Activity cần nạp.');
+    var readyAt = Number(state.recordsReadyAt || 0);
+    decision.ram.waitMs = common.forceImmediate ? 0 : Math.max(0, readyAt - Date.now());
+    decision.ram.flushOnLeave = false;
+    decision.notifySidebar = true;
+    decision.reason = 'ReloadState có mã Customer/Activity cần nạp.';
     return decision;
   }
 

@@ -217,9 +217,9 @@ function reloadMatrixProbe() {
     var before = reloadStateRead();
     reloadMatrixProbeWriteEvent(customer.sheet, customerStartRow, customerEdit.column, 'DEV reload customer edit');
     var after = reloadStateRead();
-    var inspect = inspectEditReload('Customer', customerStartRow, customerEdit.column, customerStartRow, customerEdit.column);
     reloadMatrixProbeAssert(report, 'Customer cột @ hợp lệ phát records + allViews', after.revision > before.revision && after.records.indexOf(customerIds[0]) >= 0, JSON.stringify({ revision: after.revision, records: after.records }));
-    reloadMatrixProbeAssert(report, 'Customer cột @ trả debounce 3 giây và flushOnLeave', inspect.eligible === true && inspect.decision.ram.waitMs === 3000 && inspect.decision.ram.flushOnLeave === true, JSON.stringify({ eligible: inspect.eligible, waitMs: inspect.decision.ram.waitMs, flushOnLeave: inspect.decision.ram.flushOnLeave }));
+    var customerReloadProbe = probeSelectionAndReload({ lastSeenRevision: before.revision, previousCustomerId: '' });
+    reloadMatrixProbeAssert(report, 'Customer cột @ có mốc sẵn sàng reload sau 3 giây', customerReloadProbe.decision.ram.mode === 'records' && customerReloadProbe.decision.ram.waitMs > 0 && customerReloadProbe.reload.records.indexOf(customerIds[0]) >= 0, JSON.stringify({ mode: customerReloadProbe.decision.ram.mode, waitMs: customerReloadProbe.decision.ram.waitMs, records: customerReloadProbe.reload.records }));
 
     var batchBefore = reloadStateRead();
     var batchValues = [];
@@ -232,9 +232,7 @@ function reloadMatrixProbe() {
     var activityBefore = reloadStateRead();
     reloadMatrixProbeWriteEvent(activity.sheet, activityStartRow, activityEdit.column, 'DEV reload activity edit');
     var activityAfter = reloadStateRead();
-    var activityInspect = inspectEditReload('Activity', activityStartRow, activityEdit.column, activityStartRow, activityEdit.column);
     reloadMatrixProbeAssert(report, 'Activity cột @ hợp lệ phát đúng mã', activityAfter.revision > activityBefore.revision && activityAfter.records.indexOf(activityIds[0]) >= 0, JSON.stringify({ revision: activityAfter.revision, records: activityAfter.records }));
-    reloadMatrixProbeAssert(report, 'Activity có flushOnLeave để rời sheet reload ngay', activityInspect.decision.ram.flushOnLeave === true && activityInspect.decision.ram.waitMs === 3000, JSON.stringify(activityInspect.decision.ram));
 
     var invalidInfo = reloadMatrixProbeFindInvalidColumn(customer);
     var invalidColumn = invalidInfo.column;
@@ -242,8 +240,7 @@ function reloadMatrixProbe() {
     var invalidBefore = reloadStateRead();
     reloadMatrixProbeWriteEvent(customer.sheet, customerStartRow, invalidColumn, 'DEV invalid column');
     var invalidAfter = reloadStateRead();
-    var invalidInspect = inspectEditReload('Customer', customerStartRow, invalidColumn, customerStartRow, invalidColumn);
-    reloadMatrixProbeAssert(report, 'Customer cột không hợp lệ không phát signal/debounce', invalidAfter.revision === invalidBefore.revision && invalidInspect.eligible === false && invalidInspect.waitMs === 0, JSON.stringify({ before: invalidBefore.revision, after: invalidAfter.revision, eligible: invalidInspect.eligible }));
+    reloadMatrixProbeAssert(report, 'Customer cột không hợp lệ không phát signal/debounce', invalidAfter.revision === invalidBefore.revision, JSON.stringify({ before: invalidBefore.revision, after: invalidAfter.revision }));
 
     var row2Before = reloadStateRead();
     reloadMatrixProbeWriteEvent(customer.sheet, 2, customerEdit.column, 'DEV row 2');

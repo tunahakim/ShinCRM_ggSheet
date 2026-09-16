@@ -18,14 +18,16 @@ var LOAD_SOURCE = 'sidebar';
 function getDirtyState() {
   return runEntryPoint('getDirtyState', LOAD_SOURCE, 'throw', function () {
     var started = Date.now();
-    return { ok: true, reload: reloadStateRead(), dirty: dirtyStateRead(), selection: selectionSnapshot(), ms: Date.now() - started };
+    var state = reloadStateRead();
+    return { ok: true, reload: state, dirty: dirtyStateRead(), decision: reloadDecisionForState({ reloadState: state }), selection: selectionSnapshot(), ms: Date.now() - started };
   });
 }
 
 function getReloadState() {
   return runEntryPoint('getReloadState', LOAD_SOURCE, 'throw', function () {
     var started = Date.now();
-    return { ok: true, reload: reloadStateRead(), dirty: dirtyStateRead(), selection: selectionSnapshot(), ms: Date.now() - started };
+    var state = reloadStateRead();
+    return { ok: true, reload: state, dirty: dirtyStateRead(), decision: reloadDecisionForState({ reloadState: state }), selection: selectionSnapshot(), ms: Date.now() - started };
   });
 }
 
@@ -335,6 +337,7 @@ function loadCore() {
       categories: danhMuc.categories,
       customer: { fields: khach.fields, rows: khach.rows, blankRows: khach.blankRows },
       activity: { total: soGiaoDich, chunkRows: SETTINGS.CHUNK_ROWS },
+      processedRevision: consumedDirty.revision,
       prefs: userPrefsRead(),
       budget: budget,
       reload: reloadStateRead(),

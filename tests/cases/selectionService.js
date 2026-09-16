@@ -78,23 +78,36 @@ function chay(so) {
   const snapshot = hop.selectionSnapshot();
   check(so, 'snapshot dùng gắn vào phản hồi không tự mang dirty, ms hay ok', Object.keys(snapshot).sort(), ['cellRef', 'col', 'colEnd', 'gid', 'row', 'rowEnd', 'selectionKind', 'sheetName', 'spreadsheetId'].sort());
 
-  // Probe sau khi kết thúc edit phải để GAS, không phải Extension, quyết định
-  // cột nào khởi động debounce. Probe chỉ đọc và không phát thêm revision.
+  // Một request duy nhất trả selection + ReloadState + quyết định. GAS chỉ
+  // đọc mã khách khi vị trí thay đổi; Sidebar truyền lại context trước đó.
   hop.dirtyStateClear();
-  const validEdit = hop.inspectEditReload('Customer', 4, 2, 4, 2);
-  check(so, 'probe edit hợp lệ trả quyết định records và đúng mã bản ghi',
-    [validEdit.eligible, validEdit.decision.ram.mode, validEdit.decision.ram.recordIds, validEdit.reloadObservation, hop.reloadStateRead().revision],
-    [true, 'records', ['CUS-000004'], false, 0]);
+  let customerReads = 0;
+  const readCustomerId = hop.selectionCustomerId;
+  hop.selectionCustomerId = function (context, snapshot) {
+    customerReads += 1;
+    return readCustomerId(context, snapshot);
+  };
+  state.sheetName = 'Customer';
+  state.row = 4;
+  state.col = 2;
+  state.rowEnd = 4;
+  state.colEnd = 2;
+  const firstProbe = hop.probeSelectionAndReload({ previousSelectionContext: null, previousCustomerId: '' });
+  check(so, 'một request đầu đọc mã khách khi chưa có context trước',
+    [firstProbe.selection.positionChanged, firstProbe.customerId, customerReads],
+    [true, 'CUS-000004', 1]);
 
-  const invalidEdit = hop.inspectEditReload('Customer', 4, nen.Customer.codes.length + 1, 4, nen.Customer.codes.length + 1);
-  check(so, 'probe edit cột thường trả ram none và không tự tạo dirty',
-    [invalidEdit.eligible, invalidEdit.decision.ram.action, invalidEdit.decision.signal.records, hop.reloadStateRead().revision],
-    [false, 'none', [], 0]);
+  const readsBeforeStable = customerReads;
+  const stableProbe = hop.probeSelectionAndReload({ previousSelectionContext: firstProbe.selection, previousCustomerId: firstProbe.customerId });
+  check(so, 'vị trí không đổi trả mã cũ và không đọc lại ô mã khách',
+    [stableProbe.selection.positionChanged, stableProbe.customerId, customerReads],
+    [false, 'CUS-000004', readsBeforeStable]);
 
-  const activityEdit = hop.inspectEditReload('Activity', 4, 3, 4, 3);
-  check(so, 'probe edit Activity dùng schema Activity và đọc mã giao dịch đúng hàng',
-    [activityEdit.eligible, activityEdit.decision.ram.recordIds],
-    [true, ['ACT-000004']]);
+  state.row = 6;
+  const movedProbe = hop.probeSelectionAndReload({ previousSelectionContext: firstProbe.selection, previousCustomerId: firstProbe.customerId });
+  check(so, 'vị trí đổi đọc lại đúng mã khách trong cùng request',
+    [movedProbe.selection.positionChanged, movedProbe.customerId, customerReads],
+    [true, 'CUS-000006', readsBeforeStable + 1]);
 
   const calls = [];
   hop.runEntryPoint = function (name, source, channel, fn) {
@@ -104,7 +117,7 @@ function chay(so) {
   const full = hop.probeSelectionFull();
   hop.probeSelectionCheap();
   hop.viewProbeSelection();
-  check(so, 'ba cửa mỗi cửa chỉ mở một runEntryPoint và phản hồi đầy đủ báo ms bằng số', [calls, typeof full.ms], [[['probeSelectionFull', 'sidebar', 'throw'], ['probeSelectionCheap', 'sidebar', 'throw'], ['viewProbeSelection', 'sidebar', 'throw']], 'number']);
+  check(so, 'các cửa selection chỉ mở một runEntryPoint và phản hồi đầy đủ báo ms bằng số', [calls, typeof full.ms], [[['probeSelectionFull', 'sidebar', 'throw'], ['probeSelectionCheap', 'sidebar', 'throw'], ['viewProbeSelection', 'sidebar', 'throw']], 'number']);
 
   return so;
 }

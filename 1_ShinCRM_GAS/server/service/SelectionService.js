@@ -70,75 +70,55 @@ function selectionColumnIndex(sheet, code) {
   return found;
 }
 
-/**
- * Kiểm tra cột dữ liệu bằng đúng DATA_SCHEMA phía GAS. Hàm này chỉ phục vụ
- * điểm giao tiếp sau khi Extension báo vừa kết thúc sửa; nó không phát signal
- * và không thay thế phân loại của trigger `shinOnEdit`.
- */
-function selectionEditCodeIsValid(sheet, entity, firstColumn, lastColumn) {
-  var schema = typeof DATA_SCHEMA === 'object' && DATA_SCHEMA ? DATA_SCHEMA[entity] : null;
-  if (!schema) { return false; }
+function selectionContextPositionKey(context) {
+  var value = context || {};
+  return [value.spreadsheetId || '', value.gid || '', value.sheetName || '', value.row || 0, value.col || 0, value.rowEnd || 0, value.colEnd || 0, value.selectionKind || 'none'].join('|');
+}
 
-  var valid = {};
-  Object.keys(schema).forEach(function (name) {
-    var field = schema[name];
-    if (field && field.code) { valid[String(field.code).trim()] = true; }
-  });
-
-  var first = Math.max(1, Number(firstColumn) || 1);
-  var last = Math.max(first, Number(lastColumn) || first);
-  return sheet.getRange(1, first, 1, last - first + 1).getValues()[0].some(function (value) {
-    return !!valid[String(value === null || value === undefined ? '' : value).trim()];
-  });
+function selectionContextPositionChanged(previous, current) {
+  if (!previous) { return true; }
+  return selectionContextPositionKey(previous) !== selectionContextPositionKey(current);
 }
 
 /**
- * Hỏi GAS xem một vùng vừa kết thúc sửa có phải vùng dữ liệu cần debounce
- * không. Đây là phép hỏi do client khởi động, không phải một nguồn dirty mới:
- * trigger onEdit vẫn chịu trách nhiệm duy nhất phát signal và ghi revision.
- * Phản hồi vẫn mang ReloadState theo hợp đồng chung, nhưng gắn cờ
- * `reloadObservation: false` để client không reload sớm trước đủ ba giây.
+ * Một request bên ngoài cho cả selection và reload. GAS là nơi duy nhất quyết
+ * định có cần đọc cột mã khách và có cần nạp RAM hay không; Sidebar chỉ truyền
+ * context lần trước rồi thực thi output.
  */
-function inspectEditReload(sheetName, row, col, rowEnd, colEnd) {
-  return runEntryPoint('inspectEditReload', 'sidebar', 'throw', function () {
+function probeSelectionAndReload(input) {
+  return runEntryPoint('probeSelectionAndReload', 'sidebar', 'throw', function () {
     var started = Date.now();
-    var name = String(sheetName || '').trim();
-    var entity = name === ENTITY_SHEETS.customer ? 'customer' : name === ENTITY_SHEETS.activity ? 'activity' : '';
-    var book = shinOpenBook();
-    var sheet = book.getSheetByName(name);
-    var firstRow = Math.max(1, Number(row) || 0);
-    var lastRow = Math.max(firstRow, Number(rowEnd) || firstRow);
-    var firstColumn = Math.max(1, Number(col) || 0);
-    var lastColumn = Math.max(firstColumn, Number(colEnd) || firstColumn);
-
-    var reply = function (decision, eligible, waitMs) {
-      var result = {
-        ok: true,
-        eligible: eligible === true,
-        decision: decision,
-        waitMs: Number(waitMs) || 0,
-        reload: reloadStateRead(),
-        dirty: dirtyStateRead(),
-        reloadObservation: false,
-        ms: Date.now() - started
-      };
-      return result;
-    };
-
-    if (!entity || !sheet || firstRow < SHEET_FIRST_DATA_ROW || !selectionEditCodeIsValid(sheet, entity, firstColumn, lastColumn)) {
-      return reply(reloadDecisionForChange({ source: 'edit', surface: 'record', entity: entity, recordIds: [] }), false, 0);
-    }
-
-    var idColumn = selectionColumnIndex(sheet, DATA_SCHEMA[entity].id.code);
-    if (!idColumn) {
-      return reply(reloadDecisionForChange({ source: 'edit', surface: 'record', entity: entity, recordIds: [] }), false, 0);
-    }
-
-    var ids = sheet.getRange(firstRow, idColumn, lastRow - firstRow + 1, 1).getValues().map(function (value) { return value[0]; });
-    var decision = reloadDecisionForChange({ source: 'edit', surface: 'record', entity: entity, recordIds: ids });
+    var request = input || {};
+    var context = selectionProbeContext();
+    var snapshot = selectionSnapshotFromContext(context);
+    var previous = request.previousSelectionContext || request.selectionContext || null;
+    var positionChanged = selectionContextPositionChanged(previous, snapshot);
+    var previousCustomerId = String(request.previousCustomerId || (previous && previous.customerId) || '').trim();
+    var customerId = positionChanged ? selectionCustomerId(context, snapshot) : previousCustomerId;
     var state = reloadStateRead();
-    var waitMs = decision.ram.action === 'none' ? 0 : Math.max(0, Number(decision.ram.waitMs) - Math.max(0, Date.now() - Number(state.changedAt || 0)));
-    return reply(decision, decision.ram.action !== 'none', waitMs);
+    var decision = typeof reloadDecisionForState === 'function'
+      ? reloadDecisionForState({
+        reloadState: state,
+        lastSeenRevision: request.lastSeenRevision,
+        localDraft: request.localDraft,
+        reason: request.reason,
+        forceImmediate: request.forceImmediate === true
+      })
+      : reloadDecisionBlank('Chưa có bộ quyết định reload.');
+    var selection = Object.assign({}, snapshot, {
+      positionChanged: positionChanged,
+      customerId: customerId,
+      customerIdChanged: positionChanged && customerId !== previousCustomerId
+    });
+    return {
+      ok: true,
+      selection: selection,
+      customerId: customerId,
+      reload: state,
+      dirty: dirtyStateRead(),
+      decision: decision,
+      ms: Date.now() - started
+    };
   });
 }
 
