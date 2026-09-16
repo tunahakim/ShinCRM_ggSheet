@@ -83,8 +83,22 @@ function chay(so) {
     [popup.indexOf('function closeAll(') >= 0,
       popup.indexOf('function place(') >= 0,
       popup.indexOf("document.addEventListener('click'") >= 0,
-      frame.indexOf('.shin-popup-list {\n  position: fixed;') >= 0],
+      popup.indexOf('.shin-popup-list {\n  position: fixed;') >= 0],
     [true, true, true, true]);
+
+  check(so, 'mọi popup dùng hợp đồng PopupList duy nhất, không còn style popup riêng',
+    [popup.indexOf('font: 500 var(--shin-text-sm)/1.2 var(--shin-font);') >= 0,
+      popup.indexOf('color: var(--shin-text-soft);') >= 0,
+      popup.indexOf('.shin-popup-item:hover { background: var(--shin-bg-hover); }') >= 0,
+      popup.indexOf('.shin-popup-item.is-active') >= 0,
+      popup.indexOf('background: var(--shin-primary-soft); color: var(--shin-primary-dark);') >= 0,
+      frame.indexOf('.shin-popup-list {') === -1,
+      styles.indexOf('.shin-menu-item') === -1,
+      styles.indexOf('.shin-choice-item.is-selected') === -1,
+      source['client/sync/fbmSyncShell.html'].indexOf('shin-sync-nav') === -1,
+      menu.indexOf('shin-menu-item') === -1,
+      menu.indexOf("className = 'shin-popup-item'") >= 0],
+    [true, true, true, true, true, true, true, true, true, true, true]);
   check(so, 'cac controller popup dung API PopupList chung',
     [combo.indexOf('PopupList.show(box, inp') >= 0,
       choiceMenu.indexOf('PopupList.show(list, trigger') >= 0,
@@ -170,7 +184,7 @@ function chay(so) {
   check(so, 'các vùng cột chung không phụ thuộc flex gap để tạo khoảng cách',
     [frame.indexOf('#sidebar-body > * + * { margin-top: var(--shin-gap-2); }') >= 0,
       styles.indexOf('.shin-section > * + * { margin-top: var(--shin-gap-2); }') >= 0,
-      source['client/sync/fbmSyncShell.html'].indexOf('shin-popup-item shin-popup-option shin-sync-nav-item') >= 0],
+      source['client/sync/fbmSyncShell.html'].indexOf("className: 'shin-popup-item'") >= 0],
     [true, true, true]);
   check(so, 'các vùng cuộn giữ trục hai mép bằng gutter ổn định, section không cộng lề lệch',
     [frame.indexOf('.shin-scroll-region {') >= 0 && frame.indexOf('overflow-y: auto;') >= 0 && frame.indexOf('scrollbar-gutter: stable both-edges;') >= 0,

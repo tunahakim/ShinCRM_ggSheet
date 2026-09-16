@@ -1,5 +1,54 @@
+<style>
+/* PopupList is the single visual contract for every floating option list. */
+.shin-popup-list {
+  position: fixed;
+  z-index: 20;
+  min-width: 0;
+  max-width: calc(100vw - 2 * var(--shin-gap-2));
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: var(--shin-gap-1);
+  border: 1px solid var(--shin-border-strong);
+  border-radius: var(--shin-radius-sm);
+  background: var(--shin-bg);
+  box-shadow: var(--shin-shadow);
+}
+
+/* Base row: spacing comes from the input popup; text and state colors come from the old module menu. */
+.shin-popup-item {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: var(--shin-gap-1) var(--shin-gap-2);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--shin-text-soft);
+  font: 500 var(--shin-text-sm)/1.2 var(--shin-font);
+  text-align: left;
+  cursor: pointer;
+}
+
+.shin-popup-item:hover { background: var(--shin-bg-hover); }
+.shin-popup-item.is-active,
+.shin-popup-item.is-selected { background: var(--shin-primary-soft); color: var(--shin-primary-dark); font-weight: 700; }
+.shin-popup-item:focus-visible { outline: 2px solid var(--shin-primary); outline-offset: -2px; }
+
+.shin-popup-mark {
+  display: inline-block;
+  width: 12px;
+  margin-right: var(--shin-gap-2);
+  color: var(--shin-primary);
+  font-size: var(--shin-text-sm);
+  line-height: 1;
+  text-align: center;
+}
+
+.shin-popup-label { display: inline; }
+</style>
 <script>
-/* Shared popup component. Controllers own data and keyboard policy; this owns shell, geometry and dismissal. */
+/* Shared popup component. Controllers own data and keyboard policy; this owns shell, row contract, geometry and dismissal. */
 var PopupList = (function () {
   var POPUP_MARK = 'data-popup-list';
   var POPUP_SELECTOR = '.shin-popup-list';

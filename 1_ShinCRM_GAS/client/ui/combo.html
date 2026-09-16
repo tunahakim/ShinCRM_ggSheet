@@ -2,7 +2,7 @@
 /*
  * Ô gõ-để-lọc — phần hành vi của hai control `select` và `customerPicker`.
  *
- * Engine chỉ để lại cái vỏ: một `<input role="combobox">` và một `<div class="shin-combo-list" hidden>` rỗng. Tệp này là phần đổ nội dung vào cái vỏ đó, đúng cách `client/ui/menu.html` đổ nội dung vào lớp menu nổi.
+ * Engine chỉ để lại cái vỏ: một `<input role="combobox">` và một `<div class="shin-popup-list" hidden>` rỗng. Tệp này là phần đổ nội dung vào cái vỏ đó, đúng cách `client/ui/menu.html` đổ nội dung vào lớp menu nổi.
  *
  * **Không có mũi tên sổ xuống.** Sidebar rộng khoảng 300 pixel; một mũi tên cộng khoảng chừa cho nó ăn 24 pixel, bằng ba bốn chữ — mà mấy chữ cuối của tên công ty mới là thứ phân biệt hai khách trùng đầu tên. Bù lại: **con trỏ vào ô là danh sách tự bung**, nên không mất đường mở nào. Nếp này lấy nguyên của bản cũ `9_Code_cu_tham_chieu/src/ui/UI_Logic.html`.
  *
@@ -19,9 +19,6 @@ var COMBO_BLUR_DELAY = 200;
 
 /** Trần số dòng của ô tra khách. Bản cũ cũng 11: nguồn của nó là cả 1.700 khách, bung hết ra thì danh sách vô dụng. */
 /** Trần và sàn chiều cao danh sách. Sàn 96 pixel là khoảng ba dòng — thấp hơn thì cuộn trong một khe hẹp còn mệt hơn gõ thêm chữ. */
-var COMBO_LIST_MIN = 96;
-var COMBO_LIST_MAX = 220;
-
 /** Dòng đang sáng, `-1` là không dòng nào. Chỉ một danh sách mở tại một lúc nên một biến là đủ. */
 var comboFocusAt = -1;
 
@@ -46,7 +43,7 @@ function comboWrap(el) {
 
 function comboListOf(inp) {
   var khung = comboWrap(inp);
-  return khung ? khung.querySelector('.shin-combo-list') : null;
+  return khung ? khung.querySelector('.shin-popup-list') : null;
 }
 
 /** Đọc từ chính DOM chứ không giữ thêm một biến cờ — hai chỗ nhớ một việc thì có ngày lệch. */
@@ -63,7 +60,7 @@ function comboIsPicker(inp) {
 /** Các dòng chọn được. Dòng chú thích không tính, nên `comboFocusAt` không bao giờ trỏ vào một dòng không điền được gì. */
 function comboRows(inp) {
   var box = comboListOf(inp);
-  return PopupList.rows(box, '.shin-combo-item');
+  return PopupList.rows(box, '[role="option"]');
 }
 
 
@@ -145,7 +142,7 @@ function comboMatches(inp, chu, mode) {
 /** Một dòng chọn được. Dựng bằng DOM chứ không nối chuỗi HTML: giá trị là chữ người dùng gõ vào sheet `Category`, và `textContent` tự lo phần thoát ký tự. */
 function comboItemElement(o) {
   var d = document.createElement('div');
-  d.className = 'shin-popup-item shin-combo-item';
+  d.className = 'shin-popup-item';
   d.setAttribute('data-value', o.value);
   d.setAttribute('role', 'option');
 
@@ -186,7 +183,7 @@ function comboMark(inp, at) {
   if (i >= rows.length) { i = 0; }
   if (i < 0) { i = rows.length - 1; }
 
-  comboFocusAt = PopupList.mark(comboListOf(inp), i, '.shin-combo-item');
+  comboFocusAt = PopupList.mark(comboListOf(inp), i, '[role="option"]');
   return i;
 }
 
@@ -241,8 +238,6 @@ function comboPaint(inp, mode) {
 
   PopupList.show(box, inp, {
     region: document.getElementById(RENDER_REGIONS.body),
-    minHeight: COMBO_LIST_MIN,
-    maxHeight: COMBO_LIST_MAX,
     onClose: function () {
       inp.setAttribute('aria-expanded', 'false');
       comboFocusAt = -1;
@@ -319,7 +314,7 @@ function comboClick(e) {
   var goc = e.target;
   if (!goc || !goc.closest) { return; }
 
-  var dong = goc.closest('.shin-combo-item');
+  var dong = goc.closest('.shin-popup-item');
   if (dong) {
     var inp = dong.closest('.shin-combo').querySelector('.shin-input');
     if (inp) { comboPick(inp, dong.getAttribute('data-value')); }
@@ -355,7 +350,7 @@ function comboInstall() {
   // Giữ focus ở ô đến khi click chọn dòng hoàn tất. Trình duyệt có thể phát
   // focusout trước click, khiến timer ẩn popup thắng thao tác chuột trên máy chậm.
   goc.addEventListener('mousedown', function (e) {
-    var row = e.target && e.target.closest ? e.target.closest('.shin-combo-item') : null;
+    var row = e.target && e.target.closest ? e.target.closest('.shin-popup-item') : null;
     if (row) { e.preventDefault(); }
   });
 

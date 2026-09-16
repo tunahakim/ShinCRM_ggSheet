@@ -21,11 +21,11 @@ function chay(so) {
     value: 'read',
     ariaLabel: 'Loại đồng bộ'
   }), null);
-  check(so, 'menu chọn render thành button, không phải input combo', [html.indexOf('data-standalone-menu="1"') > 0, html.indexOf('class="shin-choice-trigger"') > 0, html.indexOf('<input') === -1, html.indexOf('shin-popup-list shin-choice-list') > 0], [true, true, true, true]);
+  check(so, 'menu chọn render thành button, không phải input combo', [html.indexOf('data-standalone-menu="1"') > 0, html.indexOf('class="shin-choice-trigger"') > 0, html.indexOf('<input') === -1, html.indexOf('class="shin-popup-list"') > 0], [true, true, true, true]);
 
   body.innerHTML = html;
   const trigger = dom.document.getElementById('choice-mode');
-  const list = dom.root.querySelector('.shin-choice-list');
+  const list = dom.root.querySelector('.shin-popup-list');
   list.hidden = true;
   hop.choiceMenuInstall();
   hop.root = dom.root;

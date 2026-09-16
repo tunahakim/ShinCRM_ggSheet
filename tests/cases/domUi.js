@@ -103,7 +103,7 @@ async function chay(so) {
   const lop = hop.menuOpen(nutMenu);
   check(so, 'menuOpen dựng đúng hai mục, đánh dấu công tắc và ép menu vào cửa sổ',
     [lop.hidden, lop.children.length, lop.children[0].textContent, lop.children[0].getAttribute('aria-checked'), nutMenu.getAttribute('aria-expanded'), lop.style.left],
-    [false, 2, '✓Tự động', 'true', 'true', '136px']);
+    [false, 2, '✓Tự động', 'true', 'true', '196px']);
   hop.menuToggle(nutMenu);
   check(so, 'bấm lại nút menu đang mở thì đóng và dọn mục con', [lop.hidden, lop.children.length, nutMenu.getAttribute('aria-expanded')], [true, 0, 'false']);
   check(so, 'menuInstall chỉ gắn một tai nghe Escape', [hop.menuInstall(), hop.menuInstall()], [true, false]);

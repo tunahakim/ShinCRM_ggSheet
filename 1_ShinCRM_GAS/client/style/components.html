@@ -396,21 +396,6 @@
 .shin-choice-trigger:disabled { background: var(--shin-bg-sunken); color: var(--shin-text-soft); cursor: not-allowed; opacity: .7; }
 .shin-choice-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .shin-choice-caret { flex: 0 0 auto; margin-left: var(--shin-gap-2); color: var(--shin-text-soft); font-size: var(--shin-text-xs); }
-.shin-popup-option {
-  display: block;
-  width: 100%;
-  min-width: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--shin-text);
-  font: inherit;
-  text-align: left;
-}
-.shin-choice-item.is-selected { background: var(--shin-bg-hover); font-weight: 600; }
-.shin-choice-item:hover,
-.shin-choice-item.is-active { background: var(--shin-primary-soft); }
-
 /*
   PopupList giữ hộp nổi ngoài luồng bố cục, neo tối thiểu bằng trigger và cho phép giãn theo nội dung trong trần Sidebar.
 */
@@ -418,16 +403,6 @@
   PopupList tự lật lên khi phía dưới không đủ chỗ và tự giới hạn chiều cao để phần danh sách cuộn bên trong.
 */
 /* Một dòng của danh sách. Nội dung dòng do phần bàn phím đổ vào; hình thức thì thuộc về đây. */
-.shin-popup-item {
-  padding: var(--shin-gap-1) var(--shin-gap-2);
-  cursor: pointer;
-}
-
-.shin-popup-item:hover,
-.shin-popup-item.is-active { background: var(--shin-primary-soft); }
-
-.shin-combo-item { font-size: var(--shin-text-md); }
-
 /* Dòng phụ của ô tra khách: mã khách và tỉnh. Hai khách trùng tên là chuyện thường, và đây là chỗ phân biệt chúng. */
 .shin-combo-meta {
   color: var(--shin-text-faint);
@@ -612,40 +587,7 @@
 /* --- Lớp menu nổi ------------------------------------------------ */
 
 /* PopupList đặt menu fixed để không bị cắt bởi vùng sidebar đang cuộn. */
-.shin-menu {
-  padding: var(--shin-gap-1) 0;
-}
-
-.shin-menu-item {
-  display: flex;
-  align-items: center;
-  gap: var(--shin-gap-2);
-  width: 100%;
-  padding: var(--shin-gap-2) var(--shin-gap-3);
-  border: 0;
-  background: none;
-  color: var(--shin-text);
-  font-family: inherit;
-  font-size: var(--shin-text-sm);
-  text-align: left;
-  cursor: pointer;
-}
-
-.shin-menu-item:hover { background: var(--shin-bg-hover); }
-
-.shin-menu-item:focus-visible { outline: 2px solid var(--shin-primary); outline-offset: -2px; }
-
 /* Ô đánh dấu rộng cố định kể cả lúc rỗng, nên nhãn của mọi mục thẳng một cột dù mục nào đang được tích. */
-.shin-menu-mark {
-  flex: 0 0 12px;
-  color: var(--shin-primary);
-  font-size: var(--shin-text-sm);
-  line-height: 1;
-  text-align: center;
-}
-
-.shin-menu-label { flex: 1 1 auto; min-width: 0; }
-
 /* --- Nút thu gọn và mở ------------------------------------------- */
 
 /* Cả hàng vẫn bấm được — đây là mép của một khối chữ bị cắt, và một dải rộng suốt bề ngang là đích dễ bấm nhất — nhưng

@@ -1,8 +1,6 @@
 <script>
 /* Menu lua chon cho StandaloneControl: dung popup chung nhung hien thi bang button, khong phai input go-loc. */
 var CHOICE_MENU_MARK = 'data-choice-menu';
-var CHOICE_MENU_MIN_HEIGHT = 96;
-var CHOICE_MENU_MAX_HEIGHT = 220;
 var choiceMenuFocusAt = -1;
 
 function choiceMenuTriggerOf(el) {
@@ -13,7 +11,7 @@ function choiceMenuTriggerOf(el) {
 
 function choiceMenuListOf(trigger) {
   var wrap = trigger && trigger.closest ? trigger.closest('.shin-choice') : null;
-  return wrap ? wrap.querySelector('.shin-choice-list') : null;
+  return wrap ? wrap.querySelector('.shin-popup-list') : null;
 }
 
 function choiceMenuOptions(trigger) {
@@ -21,13 +19,13 @@ function choiceMenuOptions(trigger) {
 }
 
 function choiceMenuRows(trigger) {
-  return PopupList.rows(choiceMenuListOf(trigger), '.shin-choice-item');
+  return PopupList.rows(choiceMenuListOf(trigger), '[role="option"]');
 }
 
 function choiceMenuHide(trigger) {
   var list = choiceMenuListOf(trigger);
   if (!list) { return null; }
-  PopupList.hide(list, '.shin-choice-item');
+  PopupList.hide(list, '[role="option"]');
   trigger.setAttribute('aria-expanded', 'false');
   choiceMenuFocusAt = -1;
   return list;
@@ -39,14 +37,14 @@ function choiceMenuMark(trigger, index) {
   var next = Number(index);
   if (next >= rows.length) { next = 0; }
   if (next < 0) { next = rows.length - 1; }
-  choiceMenuFocusAt = PopupList.mark(choiceMenuListOf(trigger), next, '.shin-choice-item');
+  choiceMenuFocusAt = PopupList.mark(choiceMenuListOf(trigger), next, '[role="option"]');
   return choiceMenuFocusAt;
 }
 
 function choiceMenuItemElement(option, selected) {
   var row = document.createElement('button');
   row.type = 'button';
-  row.className = 'shin-popup-item shin-popup-option shin-choice-item' + (selected ? ' is-selected' : '');
+  row.className = 'shin-popup-item' + (selected ? ' is-selected' : '');
   row.setAttribute('role', 'option');
   row.setAttribute('aria-selected', selected ? 'true' : 'false');
   row.setAttribute('data-value', option.value);
@@ -69,8 +67,6 @@ function choiceMenuPaint(trigger) {
   });
   PopupList.show(list, trigger, {
     region: document.getElementById(RENDER_REGIONS.body),
-    minHeight: CHOICE_MENU_MIN_HEIGHT,
-    maxHeight: CHOICE_MENU_MAX_HEIGHT,
     onClose: function () {
       trigger.setAttribute('aria-expanded', 'false');
       choiceMenuFocusAt = -1;
@@ -125,7 +121,7 @@ function choiceMenuKeydown(event) {
 function choiceMenuClick(event) {
   var target = event.target;
   if (!target || !target.closest) { return; }
-  var row = target.closest('.shin-choice-item');
+  var row = target.closest('.shin-popup-item');
   if (row) {
     var wrap = row.closest('.shin-choice');
     var trigger = wrap && wrap.querySelector('[data-standalone-menu="1"]');

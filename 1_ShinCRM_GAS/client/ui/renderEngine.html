@@ -251,7 +251,7 @@ function renderCombo(o, lop, goi, them) {
     + renderControlAttrs(o, 'shin-input') + renderAttr('value', o.value) + renderAttr('placeholder', goi)
     + renderInputGuard() + them
     + (o.readonly ? ' readonly' : '') + '>'
-    + '<div class="shin-popup-list shin-combo-list" hidden></div>'
+    + '<div class="shin-popup-list" hidden></div>'
     + '</div>';
 }
 
@@ -387,7 +387,7 @@ function renderStandaloneControlInner(node) {
       + renderInputGuard() + ' readonly';
     return '<div class="shin-combo shin-combo-standalone">'
       + '<input type="text" role="combobox"' + attrs + '>'
-      + '<div class="shin-popup-list shin-combo-list" hidden></div>'
+      + '<div class="shin-popup-list" hidden></div>'
       + '</div>';
   }
   if (kind === 'menu') {
@@ -407,7 +407,7 @@ function renderStandaloneControlInner(node) {
       + (node.disabled ? ' disabled' : '') + (node.hidden ? ' hidden' : '');
     return '<div class="shin-choice shin-choice-standalone">'
       + '<button type="button"' + menuAttrs + '><span class="shin-choice-label">' + renderEscape(selectedMenuLabel) + '</span><span class="shin-choice-caret" aria-hidden="true">&#9662;</span></button>'
-      + '<div class="shin-popup-list shin-choice-list" hidden></div>'
+      + '<div class="shin-popup-list" hidden></div>'
       + '</div>';
   }
   if (kind === 'toggle') {

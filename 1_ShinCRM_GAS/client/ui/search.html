@@ -59,7 +59,7 @@ function searchIsOpen() {
 /** Các dòng bấm được. Mảng thật chứ không phải `NodeList`, để `length` và chỉ số dùng thẳng. */
 function searchRows() {
   var box = searchListEl();
-  return PopupList.rows(box, '.shin-suggest');
+  return PopupList.rows(box, '[role="option"]');
 }
 
 /**
@@ -75,7 +75,7 @@ function searchMark(at) {
   if (i >= rows.length) { i = 0; }
   if (i < 0) { i = rows.length - 1; }
 
-  searchFocusAt = PopupList.mark(searchListEl(), i, '.shin-suggest');
+  searchFocusAt = PopupList.mark(searchListEl(), i, '[role="option"]');
   return i;
 }
 
@@ -84,7 +84,7 @@ function searchHideList() {
   var box = searchListEl();
   if (!box) { return null; }
 
-  PopupList.hide(box, '.shin-suggest');
+  PopupList.hide(box, '[role="option"]');
   searchFocusAt = -1;
   return box;
 }
@@ -105,7 +105,7 @@ function searchPaint() {
 
   if (!storeSearchTokens(inp.value).length) {
     box.innerHTML = '';
-    PopupList.hide(box, '.shin-suggest');
+    PopupList.hide(box, '[role="option"]');
     searchFocusAt = -1;
     return null;
   }

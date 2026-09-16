@@ -44,19 +44,19 @@ function menuMark(muc) {
 function menuItemElement(muc) {
   var b = document.createElement('button');
   b.type = 'button';
-  b.className = 'shin-menu-item';
+  b.className = 'shin-popup-item';
   b.setAttribute('data-action', muc.action || '');
   if (muc.value !== undefined) { b.setAttribute('data-value', muc.value); }
 
   var dau = menuMark(muc);
   var o = document.createElement('span');
-  o.className = 'shin-menu-mark';
+  o.className = 'shin-popup-mark';
   o.setAttribute('aria-hidden', 'true');
   o.textContent = dau && dau.bat ? (dau.hinh === 'check' ? '✓' : '●') : '';
   b.appendChild(o);
 
   var chu = document.createElement('span');
-  chu.className = 'shin-menu-label';
+  chu.className = 'shin-popup-label';
   chu.textContent = muc.label || '';
   b.appendChild(chu);
 
@@ -77,7 +77,7 @@ function menuLayer() {
 
   lop = document.createElement('div');
   lop.id = MENU_LAYER_ID;
-  lop.className = 'shin-popup-list shin-menu';
+  lop.className = 'shin-popup-list';
   lop.setAttribute('role', 'menu');
   lop.hidden = true;
   khung.appendChild(lop);
@@ -119,11 +119,7 @@ function menuOpen(nut) {
   lop.setAttribute('data-of', khoa);
   nut.setAttribute('aria-expanded', 'true');
   PopupList.show(lop, nut, {
-    region: 'viewport',
-    gap: 4,
-    minWidth: 160,
-    minHeight: 0,
-    maxHeight: 220,
+    region: document.getElementById(typeof RENDER_REGIONS !== 'undefined' && RENDER_REGIONS.body ? RENDER_REGIONS.body : 'sidebar-body'),
     onClose: function () {
       var active = lop.getAttribute('data-of');
       var trigger = active ? document.querySelector('[data-menu="' + active + '"]') : null;
