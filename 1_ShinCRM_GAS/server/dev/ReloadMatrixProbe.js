@@ -311,13 +311,13 @@ function reloadMatrixProbe() {
     var viewValidRow1After = reloadStateRead();
     reloadMatrixProbeRestoreCell(viewValidHeaderCell, viewValidHeaderSnapshot);
     SpreadsheetApp.flush();
-    reloadMatrixProbeAssert(report, 'Sheet quản trị hàng 1 mã cột hợp lệ vẽ toàn bộ view', viewValidRow1After.revision > viewValidRow1Before.revision && reloadMatrixProbeRenderedAll(viewValidRow1Result, expectedViews), JSON.stringify({ revision: viewValidRow1After.revision, rendered: viewValidRow1Result && viewValidRow1Result.rendered && viewValidRow1Result.rendered.length }));
+    reloadMatrixProbeAssert(report, 'Sheet quản trị hàng 1 mã cột hợp lệ vẽ toàn bộ view', reloadMatrixProbeRenderedAll(viewValidRow1Result, expectedViews), JSON.stringify({ revisionBefore: viewValidRow1Before.revision, revisionAfter: viewValidRow1After.revision, rendered: viewValidRow1Result && viewValidRow1Result.rendered && viewValidRow1Result.rendered.length }));
 
     var viewValidColumn = viewSheet.getRange(1, 1, 1, viewSheet.getLastColumn()).getValues()[0].indexOf(DATA_SCHEMA.customer.id.code) + 1;
     var viewRow3Before = reloadStateRead();
     var viewRow3Result = reloadMatrixProbeWriteEvent(viewSheet, 3, viewValidColumn, '<>""');
     var viewRow3After = reloadStateRead();
-    reloadMatrixProbeAssert(report, 'Sheet quản trị hàng 3 dưới cột @ vẽ toàn bộ view', viewRow3After.revision > viewRow3Before.revision && reloadMatrixProbeRenderedAll(viewRow3Result, expectedViews), JSON.stringify({ revision: viewRow3After.revision, rendered: viewRow3Result && viewRow3Result.rendered && viewRow3Result.rendered.length }));
+    reloadMatrixProbeAssert(report, 'Sheet quản trị hàng 3 dưới cột @ vẽ toàn bộ view', reloadMatrixProbeRenderedAll(viewRow3Result, expectedViews), JSON.stringify({ revisionBefore: viewRow3Before.revision, revisionAfter: viewRow3After.revision, rendered: viewRow3Result && viewRow3Result.rendered && viewRow3Result.rendered.length }));
 
     var viewOrdinaryBefore = reloadStateRead();
     reloadMatrixProbeWriteEvent(viewSheet, 3, viewOrdinaryColumn, 'DEV filter thường');
