@@ -12,7 +12,7 @@ function taoBoTest() {
 
   const hop = taoHopCat({ document: dom.document, window: { top: null, confirm: () => true, addEventListener: () => {} } });
   hop.FBM_SYNC_CLIENT = {
-    active: true, running: false, mode: 'read', resultPages: {}, resultsTab: 'summary', identityStatus: {},
+    active: true, running: false, statusReady: true, mode: 'read', resultPages: {}, resultsTab: 'summary', identityStatus: {},
     subscreen: 'run',
     identityDraft: { spreadsheetId: '', userId: '', accountName: '' }, loginDraft: { username: '' },
     identityAction: '', identityLastAction: '', loginStatus: null, syncSettings: null, lastStatus: null,
@@ -39,8 +39,8 @@ function taoBoTest() {
     if (node && node.text !== undefined) { element.textContent = node.text; }
     return parent.appendChild(element);
   };
-  hop.fbmSyncAppendBox = (parent, className) => {
-    const box = dom.document.createElement('div'); box.className = className || '';
+  hop.fbmSyncAppendBox = (parent, className, id) => {
+    const box = dom.document.createElement('div'); box.className = className || ''; if (id) { box.id = id; }
     box.classList = { add: (name) => { box.className = (box.className + ' ' + name).trim(); } };
     return parent.appendChild(box);
   };
@@ -154,9 +154,11 @@ async function chay(so) {
   check(so, 'header Đồng bộ dùng cùng khung và tiêu đề với header Sidebar/form', [shellHeader[1].className.indexOf('shin-header-title') >= 0], [true]);
 
   hop.FBM_SYNC_CLIENT.subscreen = 'run';
-  hop.fbmSyncRenderLoading();
-  check(so, 'loading xóa dấu màn cũ để snapshot đầu tiên dựng lại Chạy đồng bộ', [content.getAttribute('data-fbm-sync-screen'), !!hop.RENDER_INDEX.nodes['fbm-sync-run-root']], [null, false]);
-  check(so, 'loading chỉ có một dòng và gộp đúng tên module', [content.querySelectorAll('.shin-section-title').length, content.querySelector('.shin-loading').textContent], [0, 'Đang tải trạng thái phiên đồng bộ FBM']);
+  hop.FBM_SYNC_CLIENT.statusReady = false;
+  hop.fbmSyncRenderInitial();
+  check(so, 'mở FBM vẽ ngay khung Chạy đồng bộ trước snapshot GAS', [content.getAttribute('data-fbm-sync-screen'), content.textContent.indexOf('Chọn loại đồng bộ') >= 0, !!hop.RENDER_INDEX.nodes['fbm-sync-run-root']], ['run', true, true]);
+  check(so, 'khung ban đầu khóa nút chạy để không dùng trạng thái cũ', [hop.fbmSyncRunActionBlock({}).disabled, hop.fbmSyncRunActionBlock({}).label], [true, 'Đang tải trạng thái...']);
+  hop.FBM_SYNC_CLIENT.statusReady = true;
   hop.fbmSyncPaint(Object.assign({}, idle, { label: 'Chạy đồng bộ sau loading' }));
   check(so, 'Chạy đồng bộ dựng lại được sau loading mà không dùng node cũ', [content.getAttribute('data-fbm-sync-screen'), content.textContent.indexOf('Chọn loại đồng bộ') >= 0], ['run', true]);
   check(so, 'Run render không hiện pipeline khi chưa chạy', render(hop, content, hop.fbmSyncRenderRun, idle).querySelector('.shin-sync-pipeline'), null);

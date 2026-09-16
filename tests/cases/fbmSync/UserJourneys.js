@@ -59,6 +59,7 @@ async function chay(so) {
   click(dom, dom.document.getElementById('fbm-sync-back'));
   check(so, 'header mo dong menu va nut quay lai dong man dong bo', [menuOpened, menuClosed, hop.FBM_SYNC_CLIENT.active, dom.document.getElementById('sidebar-root').classList.contains('shin-sync-active')], [true, true, false, false]);
   hop.FBM_SYNC_CLIENT.active = true;
+  hop.FBM_SYNC_CLIENT.statusReady = true;
 
   const master = dom.document.createElement('button');
   master.id = 'fbm-sync-master-switch';
