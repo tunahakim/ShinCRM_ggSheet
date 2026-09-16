@@ -34,12 +34,10 @@
 /* Module dong bo uu tien doc doc de vua sidebar hep van de doc va bam duoc. */
 .shin-sync-active .shin-card-title { color:var(--shin-text); font-size:var(--shin-text-sm); text-transform:none; letter-spacing:0; }
 .shin-sync-active .shin-card { background:var(--shin-bg); }
-.shin-sync-nav { display:flex; flex-direction:column; gap:0; overflow-y:auto; overscroll-behavior:contain; }
-.shin-sync-nav button + button { margin-top: 2px; }
-.shin-sync-nav { opacity:1; }
-.shin-sync-nav button { width:100%; min-height:34px; border:0; border-radius:var(--shin-radius-sm); padding:var(--shin-gap-2) var(--shin-gap-3); background:transparent; color:var(--shin-text-soft); text-align:left; font:500 var(--shin-text-sm)/1.2 var(--shin-font); }
-.shin-sync-nav button:hover { background:var(--shin-bg-hover); }
-.shin-sync-nav button.is-active { background:var(--shin-primary-soft); color:var(--shin-primary-dark); font-weight:700; }
+.shin-sync-nav { display:flex; flex-direction:column; gap:0; overscroll-behavior:contain; }
+.shin-sync-nav-item { color:var(--shin-text-soft); text-align:left; font:500 var(--shin-text-sm)/1.2 var(--shin-font); }
+.shin-sync-nav-item:hover { background:var(--shin-bg-hover); }
+.shin-sync-nav-item.is-active { background:var(--shin-primary-soft); color:var(--shin-primary-dark); font-weight:700; }
 .shin-sync-schedule-row, .shin-sync-conflict-field { min-width:0; }
 .shin-sync-schedule-row { display:grid; grid-template-columns:42px minmax(0,1fr) 20%; align-items:center; gap:var(--shin-gap-2); padding:var(--shin-gap-1) 0; }
 .shin-sync-schedule-row > .shin-standalone-control { min-width:0; }
@@ -76,7 +74,7 @@ function fbmSyncShellHeaderBlocks(status) {
 }
 function fbmSyncShellNavBlock() {
   return Box({ id: 'fbm-sync-nav', className: 'shin-popup-list shin-sync-nav', hidden: FBM_SYNC_CLIENT.navOpen !== true, elements: (FBM_SYNC_UI_SCHEMA.screens || []).map(function (item) {
-    return Button({ label: item.label, className: item.id === FBM_SYNC_CLIENT.subscreen ? 'is-active' : '', data: { 'sync-screen': item.id } });
+    return Button({ label: item.label, className: 'shin-popup-item shin-popup-option shin-sync-nav-item' + (item.id === FBM_SYNC_CLIENT.subscreen ? ' is-active' : ''), data: { 'sync-screen': item.id } });
   }) });
 }
 function fbmSyncRenderShell(status) {
@@ -98,11 +96,9 @@ function fbmSyncRenderShell(status) {
   var nav = document.getElementById('fbm-sync-nav'), navTrigger = document.getElementById('fbm-sync-module-menu');
   if (nav && navTrigger && FBM_SYNC_CLIENT.navOpen === true && typeof PopupList !== 'undefined') {
     PopupList.show(nav, navTrigger, {
-      width: 'region',
-      region: document.getElementById('sidebar-root'),
-      gap: 4,
-      minHeight: 0,
-      maxHeight: Math.min(window.innerHeight * 0.666, Math.max(40, window.innerHeight - 48 - 8)),
+      region: panel,
+      minHeight: 96,
+      maxHeight: 220,
       onClose: function () { FBM_SYNC_CLIENT.navOpen = false; }
     });
   } else if (nav && typeof PopupList !== 'undefined') {

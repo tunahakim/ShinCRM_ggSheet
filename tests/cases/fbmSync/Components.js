@@ -170,7 +170,7 @@ function chay(so) {
   check(so, 'các vùng cột chung không phụ thuộc flex gap để tạo khoảng cách',
     [frame.indexOf('#sidebar-body > * + * { margin-top: var(--shin-gap-2); }') >= 0,
       styles.indexOf('.shin-section > * + * { margin-top: var(--shin-gap-2); }') >= 0,
-      source['client/sync/fbmSyncShell.html'].indexOf('.shin-sync-nav button + button { margin-top: 2px; }') >= 0],
+      source['client/sync/fbmSyncShell.html'].indexOf('shin-popup-item shin-popup-option shin-sync-nav-item') >= 0],
     [true, true, true]);
   check(so, 'các vùng cuộn giữ trục hai mép bằng gutter ổn định, section không cộng lề lệch',
     [frame.indexOf('.shin-scroll-region {') >= 0 && frame.indexOf('overflow-y: auto;') >= 0 && frame.indexOf('scrollbar-gutter: stable both-edges;') >= 0,

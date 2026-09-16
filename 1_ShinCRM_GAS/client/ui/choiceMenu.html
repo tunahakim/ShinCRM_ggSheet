@@ -46,7 +46,7 @@ function choiceMenuMark(trigger, index) {
 function choiceMenuItemElement(option, selected) {
   var row = document.createElement('button');
   row.type = 'button';
-  row.className = 'shin-popup-item shin-choice-item' + (selected ? ' is-selected' : '');
+  row.className = 'shin-popup-item shin-popup-option shin-choice-item' + (selected ? ' is-selected' : '');
   row.setAttribute('role', 'option');
   row.setAttribute('aria-selected', selected ? 'true' : 'false');
   row.setAttribute('data-value', option.value);
