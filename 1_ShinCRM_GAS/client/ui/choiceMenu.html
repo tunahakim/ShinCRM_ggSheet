@@ -115,6 +115,7 @@ function choiceMenuPick(trigger, value) {
   if (label) { label.textContent = String(option.label); }
   choiceMenuHide(trigger);
   if (typeof trigger.dispatchEvent === 'function' && typeof Event === 'function') { trigger.dispatchEvent(new Event('change', { bubbles: true })); }
+  if (typeof fbmSyncFlushDeferredPaint === 'function') { fbmSyncFlushDeferredPaint(); }
   return option.value;
 }
 

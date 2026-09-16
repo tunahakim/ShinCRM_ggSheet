@@ -224,7 +224,8 @@ function fbmSyncAccountIsEditing() {
 /** Không thay DOM của control đang mở; dropdown native sẽ tự đóng nếu node bị dựng lại. */
 function fbmSyncInteractiveControlIsEditing(panel) {
   var active = document.activeElement, tag = String(active && active.tagName || '').toUpperCase();
-  if (!active || active.disabled || ['INPUT', 'SELECT', 'TEXTAREA'].indexOf(tag) < 0) { return false; }
+  var openChoiceMenu = tag === 'BUTTON' && active.getAttribute && active.getAttribute('data-standalone-menu') === '1' && active.getAttribute('aria-expanded') === 'true';
+  if (!active || active.disabled || (['INPUT', 'SELECT', 'TEXTAREA'].indexOf(tag) < 0 && !openChoiceMenu)) { return false; }
   return !!(panel && typeof panel.contains === 'function' && panel.contains(active));
 }
 function fbmSyncFlushDeferredPaint() {

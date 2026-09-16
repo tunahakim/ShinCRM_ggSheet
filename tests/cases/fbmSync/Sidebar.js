@@ -278,6 +278,9 @@ async function chay(so) {
   modeSelect.focus();
   hop.fbmSyncPaint(Object.assign({}, idle, { label: 'Snapshot nền đến trong lúc chọn loại đồng bộ' }));
   check(so, 'dropdown loai dong bo giu nguyen node va focus khi snapshot nen den, khong can hoan ve ca man', [dom.document.getElementById('fbm-sync-mode') === modeSelect, dom.document.activeElement === modeSelect, hop.FBM_SYNC_CLIENT.deferredPaint, hop.FBM_SYNC_CLIENT.lastStatus.label], [true, true, null, 'Snapshot nền đến trong lúc chọn loại đồng bộ']);
+  modeSelect.setAttribute('aria-expanded', 'true');
+  check(so, 'popup menu dang mo cung duoc coi la control dang thao tac de tri hoan snapshot', hop.fbmSyncInteractiveControlIsEditing(content), true);
+  modeSelect.setAttribute('aria-expanded', 'false');
   modeSelect.blur();
   hop.fbmSyncFlushDeferredPaint();
   check(so, 'snapshot nen khong doi trang thai moi sau khi dropdown dong', [hop.FBM_SYNC_CLIENT.deferredPaint, hop.FBM_SYNC_CLIENT.lastStatus.label], [null, 'Snapshot nền đến trong lúc chọn loại đồng bộ']);
