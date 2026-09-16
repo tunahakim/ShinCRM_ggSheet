@@ -8,7 +8,7 @@
 - `[ ]` là việc còn thiếu; mục không có nhãn **Cần kiểm chứng thực tế** là việc AI tự tiếp tục được.
 - Một slice chỉ đóng sau khi đủ code, test, log/báo cáo và checklist case của slice đó.
 - Sau khi đóng slice, ghi commit và revision GAS vào bảng bằng chứng cuối file.
-- Bộ kiểm offline gần nhất đạt `1578/1579`; một lỗi còn lại là thiếu luật CSS cho lớp `.shin-config-action-row` trong tệp cấu hình FBM đang có thay đổi ngoài phạm vi reload. Các mục live vẫn được đánh dấu riêng và không được suy ra từ test offline.
+- Bộ kiểm offline chốt đạt `1583/1583`. Các mục live vẫn được đánh dấu riêng và không được suy ra từ test offline.
 
 ## Nguồn hợp đồng
 

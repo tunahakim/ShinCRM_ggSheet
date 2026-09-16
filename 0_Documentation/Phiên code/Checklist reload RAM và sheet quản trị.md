@@ -276,9 +276,6 @@
 - [x] Khi `autoRenderView=false`, GAS giữ cờ view bền vững; khi bật lại, chính GAS đối chiếu cờ và vẽ toàn bộ ngay, không chờ Sidebar (test `viewRenderer.js`).
 - [x] Không dùng safety polling của Sidebar làm điều kiện hoặc đường chính để vẽ sheet quản trị (server renderer/trigger, test `viewRenderer.js`).
 - [x] `onChange` xử lý thêm/xóa hàng/cột/sheet theo scope bảo thủ và không thay thế `onEdit` cho sửa giá trị ô (server `Triggers.js`, test `triggers.js`).
-- [ ] Khi `autoRenderView=false`, GAS giữ cờ view bền vững; khi bật lại, chính GAS đối chiếu cờ và vẽ toàn bộ ngay, không chờ Sidebar.
-- [ ] Không dùng safety polling của Sidebar làm điều kiện hoặc đường chính để vẽ sheet quản trị.
-- [ ] `onChange` xử lý thêm/xóa hàng/cột/sheet theo scope bảo thủ và không thay thế `onEdit` cho sửa giá trị ô.
 - [x] `onEdit` hợp lệ ở Customer/Activity đánh dấu allViews và gọi render server-side khi chính sách cho phép (test `triggers.js`).
 - [x] Module `ReloadDecision` được gọi với input đầy đủ trước khi trigger/cửa ghi thực thi signal hoặc render (test `reloadDecision.js`, `writeGateAudit.js`).
 - [x] Lượt render không nhận Sidebar state vẫn trả quyết định render toàn bộ view bình thường (test `viewRenderer.js`).
@@ -337,12 +334,14 @@
 - [x] Thêm ca test cho cổng ghi/pull/push/background (gồm status push trong `reloadGates.js`).
 - [x] Loại bỏ hợp đồng và caller của `inspectEditReload`; thay bằng `probeSelectionAndReload` một request và `waitMs` do GAS quyết định (server/client/Extension, test `selectionService.js`, `selectionPoll.js`).
 - [x] Bổ sung test offline cho selection không đổi/đổi, request im lặng, wake debounce một giây, safety polling và debounce dữ liệu ba giây (test `selectionService.js`, `selectionPoll.js`).
-- [x] Chạy `node tests/run.js` sau khi sửa code; lần chạy hiện tại đạt `1578/1579`, còn một lỗi CSS ở `client/sync/fbmSyncConfigEditor.html` là thay đổi ngoài phạm vi reload.
+- [x] Chạy `node tests/run.js` sau khi sửa code; lần chạy chốt đạt `1583/1583`. Các tài liệu reload không còn trạng thái test thất bại.
 - [x] Các probe GAS DEV cũ cho `getReloadState`, `reloadRecords`, `renderAllManagedViews` vẫn còn làm bằng chứng nền cho DirtyState/renderer; bằng chứng `inspectEditReload` không còn được coi là bằng chứng của thiết kế mới.
-- [x] GAS DEV cài trigger installable ở `@331`; `probeTriggerState` xác nhận `shinOnEdit: true`, `shinOnChange: true` và không làm mất các trigger FBM đang có.
+- [x] GAS DEV cài trigger installable ở `@374`; `probeTriggerState` xác nhận `shinOnEdit: true`, `shinOnChange: true` và không làm mất các trigger FBM đang có.
 - [x] Chạy test GAS DEV khi không mở Sidebar và xác nhận view vẫn đổi sau ghi Customer/Activity: `viewProbeWriteRenderWithoutSidebar` đạt ở `@337`; view tạm nhận đúng mã Customer và ngày Activity sau từng lần `WriteGate`, rồi probe dọn sạch bản ghi và sheet tạm.
-- [x] Bổ sung và chạy probe GAS DEV `reloadMatrixProbe` ở deployment `@341`: fixture nối sau dữ liệu DEV hiện có (5 Customer + 5 Activity), mô phỏng onEdit ở Customer/Activity/Category/Config và sheet quản trị, kiểm signal/debounce/view; tất cả ca đạt, 3/3 view được vẽ sau các thay đổi hợp lệ. Probe tự dọn fixture, khôi phục ô/thuộc tính; hậu kiểm `probeDirtyState` rỗng và `dumpSheetGrid` còn đúng 1 Customer + 1 Activity ban đầu.
-- [x] Kiểm tra log không chứa cookie, mật khẩu, token hoặc payload nhạy cảm bằng `tests/cases/logMask.js` và các ca DTO/log FBM; lần chạy offline hiện tại đạt `1578/1579`, một lỗi còn lại là CSS ngoài phạm vi reload.
+- [x] Bổ sung và chạy probe GAS DEV `reloadMatrixProbe` ở deployment `@370`: fixture nối sau dữ liệu DEV hiện có (5 Customer + 5 Activity), mô phỏng onEdit ở Customer/Activity/Category/Config và sheet quản trị, kiểm signal/debounce/view; tất cả ca đạt, 3/3 view được vẽ sau các thay đổi hợp lệ. Probe tự dọn fixture và khôi phục ô/thuộc tính; hậu kiểm dirty state được kiểm tra riêng sau probe.
+- [x] Hậu kiểm `probeDirtyState` đạt ở deployment `@372`: `dirtyViewSheets` rỗng, `dirtyRecords` rỗng, `dirtyConfig=false`, `dirtyAll=false`.
+- [x] `probeSelectionAndReload` đạt ở deployment `@373`: selection và ReloadState trả trong một request, không có signal mới thì decision `none`.
+- [x] Kiểm tra log không chứa cookie, mật khẩu, token hoặc payload nhạy cảm bằng `tests/cases/logMask.js` và các ca DTO/log FBM; bộ kiểm chốt đạt `1583/1583`.
 - [x] Chỉ thử dữ liệu ở Spreadsheet DEV `2026.09.05 - ShinCRM DEV` qua cổng DEV có token; không chạm Spreadsheet production.
 - [x] Không sửa fixture trong `0_Documentation/Nghiên cứu FBM/`; `git diff` không có đường dẫn thuộc thư mục này.
 - [x] Commit riêng tài liệu/checklist trước core code: `31a74ef`, `e1e98e2`.
