@@ -9,10 +9,9 @@
  * chia không gian, cộng màu nền của từng vùng vì nền là thuộc tính của cái khung chứ không của cái nằm trong khung. Mọi
  * con số ở đây lấy từ biến trong `client/style/tokens.html`.
  *
- * **Lề ngang là 8 pixel ở mọi vùng trừ vùng thân, nơi nó bằng không.** Sidebar rộng khoảng 300 pixel, mà một card còn một
- * lớp lề riêng bên trong nữa: 12 cộng 12 là 24 pixel mỗi bên, tức một phần sáu bề ngang tiêu cho khoảng trắng. Bản cũ đặt 8
- * và đó là con số đúng — chủ dự án nhìn bản mới liền nói "lề 2 bên còn khá rộng". Riêng vùng thân thì chủ dự án chốt tiếp
- * ngày 06/09/2026 là card ăn hết bề ngang, nên ở đó lề ngang về không; lý do đầy đủ ghi tại chính `#sidebar-body` bên dưới.
+ * Các vùng cố định dùng lề ngang theo token. Hai vùng cuộn giữ `scrollbar-gutter: stable both-edges`, nên phần nội dung
+ * luôn có cùng một khoảng 4 pixel ở hai mép, bất kể scrollbar đang hiện hay chưa. Section bên trong không tự cộng thêm lề
+ * ngang; nếu không, scrollbar sẽ làm nội dung lệch trục.
  *
  * Ẩn một vùng thì đặt thuộc tính `hidden` lên chính thẻ đó, không đổi `class`. Dùng thuộc tính có sẵn của HTML thì trình
  * đọc màn hình cũng hiểu là vùng đó không còn, còn một lớp CSS tự đặt thì chỉ mắt người thấy.
@@ -37,11 +36,10 @@ html, body {
   Thanh cuộn mảnh, dùng cho mọi vùng cuộn được: vùng thân, danh sách gợi ý, lớp menu, ô nhập nhiều dòng.
 
   Thanh cuộn mặc định của Chrome rộng 15 pixel. Trên một sidebar rộng 300, đó là 5% bề ngang tiêu cho một cái máng
-  trượt. Bản cũ đặt 4 pixel; ở đây 6, vì 4 pixel thì khó bấm đúng vào con trượt bằng chuột — đổi 2 pixel bề ngang lấy
-  một con trượt kéo được là đáng.
+  trượt. Bản dùng chung đặt 4 pixel để ưu tiên bề ngang nội dung trong Sidebar hẹp.
 
   **Không** khai `scrollbar-width: thin` cạnh đây: từ Chrome 121, hễ có mặt thuộc tính chuẩn đó thì trình duyệt bỏ qua
-  hết nhóm `::-webkit-scrollbar`, và `thin` của Chrome là khoảng 11 pixel — khai thêm cho Firefox thì mất luôn 6 pixel
+  hết nhóm `::-webkit-scrollbar`, và `thin` của Chrome là khoảng 11 pixel — khai thêm cho Firefox thì mất luôn 4 pixel
   ở Chrome, mà sidebar này đi cùng một Extension của Chrome.
 */
 ::-webkit-scrollbar { width: var(--shin-scrollbar-size); height: var(--shin-scrollbar-size); }
@@ -93,7 +91,7 @@ html, body {
   min-height: 0;
   overflow-y: auto;
   padding: 0;
-  scrollbar-gutter: stable;
+  scrollbar-gutter: stable both-edges;
 }
 
 /* Vùng 1 — Header. Cao cố định, ghim đỉnh, hàng icon xếp ngang. Khe 4 pixel đúng như bản cũ: nút icon đã tròn 32 pixel nên
@@ -191,15 +189,8 @@ html, body {
    Nền **lõm** chứ không trắng: mọi thứ trong thân đều nằm trong card trắng, nên một nền lõm là cách làm mép card hiện ra mà
    không phải kẻ thêm một đường viền nào. Đúng nếp bản cũ — trang màu #f8f9fa, card màu trắng.
 
-   **Lề chỉ có trên và dưới, hai bên bằng không**: card ăn hết bề ngang sidebar. Chủ dự án chốt vậy ngày 06/09/2026 — "cho nó
-   rộng hết, rồi bo góc cũng được". Sidebar chỉ rộng chừng 300 pixel nên tám pixel mỗi bên là mười sáu pixel bề ngang chữ,
-   đủ để một tên công ty dài xuống thêm một dòng. Card vẫn bo góc nên mắt vẫn thấy đó là một khối riêng dù nó chạm hai mép.
-
-   Bỏ lề hai bên là an toàn vì **mọi thứ trong vùng thân đều nằm trong card**: `screenBody` gói từng cụm của form vào một
-   `Card`, còn màn xem thì bản khai đã là hai `Card`. Không có mẩu chữ trần nào để chạm mép.
-
-   Đổi lại, thanh cuộn đứng chiếm sáu pixel bên phải nên khe phải hở hơn khe trái sáu pixel khi danh sách dài. Chấp nhận:
-   đổi lấy mười sáu pixel chữ thì hơn. */
+   Các card giữ cùng trục trái/phải nhờ `scrollbar-gutter: stable both-edges` ở chính vùng cuộn. Không đặt padding ngang
+   riêng ở đây, vì một lớp lề nữa sẽ cộng dồn với gutter và làm card lệch hoặc mất bề ngang cần thiết. */
 #sidebar-body {
   flex: 1 1 auto;
   display: flex;
@@ -208,8 +199,8 @@ html, body {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: var(--shin-gap-2) 0 var(--shin-gap-4) var(--shin-scrollbar-size);
-  scrollbar-gutter: stable;
+  padding: var(--shin-gap-2) 0 var(--shin-gap-4);
+  scrollbar-gutter: stable both-edges;
   background: var(--shin-bg-sunken);
 }
 #sidebar-body > * + * { margin-top: var(--shin-gap-2); }

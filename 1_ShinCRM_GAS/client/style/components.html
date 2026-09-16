@@ -41,7 +41,8 @@
 .shin-box:empty { display: none; }
 
 /* Khối xếp dọc dùng cho các màn hình có nhiều Card; module chỉ chọn nội dung, không tự định nghĩa layout mới. */
-.shin-section { display: flex; flex-direction: column; gap: 0; min-width: 0; padding: var(--shin-gap-1) 0 var(--shin-gap-4) var(--shin-scrollbar-size); }
+/* Section không tự bù scrollbar: vùng cuộn cha đã giữ gutter ổn định ở cả hai mép. */
+.shin-section { display: flex; flex-direction: column; gap: 0; min-width: 0; padding: var(--shin-gap-1) 0 var(--shin-gap-4); }
 .shin-section > * { min-width: 0; }
 
 /* Trạng thái khóa của một vùng thao tác. Control tổng nằm ngoài vùng nên không cần ngoại lệ theo id module. */

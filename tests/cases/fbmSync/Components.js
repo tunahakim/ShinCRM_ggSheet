@@ -109,6 +109,12 @@ function chay(so) {
       styles.indexOf('.shin-section > * + * { margin-top: var(--shin-gap-2); }') >= 0,
       source['client/sync/fbmSyncShell.html'].indexOf('.shin-sync-nav button + button { margin-top: 2px; }') >= 0],
     [true, true, true]);
+  check(so, 'các vùng cuộn giữ trục hai mép bằng gutter ổn định, section không cộng lề lệch',
+    [frame.indexOf('.shin-sync-screen-content {') >= 0 && frame.indexOf('scrollbar-gutter: stable both-edges;') >= 0,
+      frame.indexOf('#sidebar-body {') >= 0 && frame.indexOf('padding: var(--shin-gap-2) 0 var(--shin-gap-4);') >= 0,
+      frame.indexOf('#sidebar-body {') >= 0 && frame.indexOf('scrollbar-gutter: stable both-edges;') >= 0,
+      styles.indexOf('.shin-section { display: flex; flex-direction: column; gap: 0; min-width: 0; padding: var(--shin-gap-1) 0 var(--shin-gap-4); }') >= 0],
+    [true, true, true, true]);
   check(so, 'Sync dùng Notice lõi thay vì tự lặp bảng ánh xạ lớp thông báo',
     [common.indexOf('function Notice(') >= 0, all.indexOf('noticeClasses') >= 0, all.indexOf('noticeClass =') >= 0],
     [true, false, false]);
