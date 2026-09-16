@@ -392,6 +392,10 @@ function quetDuongGan(so) {
     thay,
     ['client/screen/statusScreen.html:1', 'client/ui/renderEngine.html:3', 'client/ui/search.html:3']);
 
+  check(so, 'thông báo khóa form dùng lớp Notice chung, không tạo lớp Sync generic riêng',
+    [docTep('client/ui/inputs.html').indexOf('shin-sync-lock-notice') >= 0, docTep('client/ui/inputs.html').indexOf('shin-notice-warning') >= 0, docTep('client/screen/formScreen.html').indexOf('shin-sync-lock-notice') >= 0],
+    [false, true, false]);
+
   // Hai luật đi kèm của cùng điều khoản: không ai được đặt giá trị, ẩn hiện hay đổi lớp CSS của một phần tử từ bên ngoài bộ máy. Quét ba tệp `screen/` vì đó là chỗ dễ ngứa tay nhất — một màn muốn tự sửa một chữ trên chính nó.
   const tepMan = liet('client/screen', '.html').filter((t) => t.indexOf('statusScreen') === -1);
   const chamDom = tepMan.filter((tep) => /\.(innerHTML|textContent|className|hidden)\s*=[^=]|classList|getElementById/.test(docMa(tep)));

@@ -29,6 +29,10 @@ function chay(so) {
   check(so, 'Text, Button, Icon, Check nhận thẳng chuỗi cho gọn',
     [hop.Text('chữ').text, hop.Button('LƯU').label, hop.Icon('pencil').icon, hop.Check('ACT-000009').pick], ['chữ', 'LƯU', 'pencil', 'ACT-000009']);
 
+  check(so, 'Notice dùng Text và ánh xạ sắc thái ở component lõi',
+    [hop.Notice({ kind: 'success', text: 'Đã xong' }).role, hop.Notice({ kind: 'success', text: 'Đã xong' }).className, hop.Notice({ kind: 'lạ', text: 'Đang chờ' }).className],
+    ['text', 'shin-notice shin-notice-success', 'shin-notice shin-notice-pending']);
+
   check(so, 'nút glyph giữ tên núm toggle để engine đọc trạng thái trong Prefs',
     hop.Icon({ icon: 'bolt', toggle: 'followSelection' }).toggle, 'followSelection');
 

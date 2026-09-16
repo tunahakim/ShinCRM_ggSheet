@@ -2,8 +2,7 @@
 function fbmSyncSettingsNoticeBlocks(scope, fallback) {
   var notice = (FBM_SYNC_CLIENT.settingsNotices || {})[scope] || fallback, message = notice && notice.message;
   if (!message) { return []; }
-  var noticeClass = { pending: 'shin-notice shin-notice-pending', success: 'shin-notice shin-notice-success', warning: 'shin-notice shin-notice-warning', error: 'shin-notice shin-notice-error' }[notice.kind] || 'shin-notice shin-notice-pending';
-  return [Text({ className: noticeClass, text: String(message) })];
+  return [Notice({ kind: notice.kind, text: String(message) })];
 }
 function fbmSyncSetSettingsNotice(scope, kind, message) {
   var allowed = ['module', 'relay', 'extension', 'background', 'login'];
@@ -20,7 +19,7 @@ function fbmSyncSettingsSchedulerNotice(status) {
   return { kind: status.phase === 'error' ? 'error' : 'info', message: String(status.message) };
 }
 function fbmSyncRelayStateBlocks() {
-  return [Text({ className: FBM_SYNC_CLIENT.relayConfigured ? 'shin-pass-row' : 'shin-notice shin-notice-warning', text: FBM_SYNC_CLIENT.relayConfigured ? 'Extension đã nhận cấu hình relay của file này.' : 'Chưa xác nhận Extension đã nhận cấu hình relay.' })];
+  return [FBM_SYNC_CLIENT.relayConfigured ? Text({ className: 'shin-pass-row', text: 'Extension đã nhận cấu hình relay của file này.' }) : Notice({ kind: 'warning', text: 'Chưa xác nhận Extension đã nhận cấu hình relay.' })];
 }
 function fbmSyncSettingsExtensionBlocks(settings) {
   var extension = settings.extension || { pollMinutes: 5, runOnStartup: true };

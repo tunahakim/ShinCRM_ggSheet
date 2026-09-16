@@ -1,14 +1,12 @@
 <script>
 function fbmSyncAccountNoticeBlocks(scope) {
   var notice = (FBM_SYNC_CLIENT.accountNotices || {})[scope], message = notice && notice.message;
-  var noticeClass = { pending: 'is-pending', success: 'is-success', warning: 'is-warning', error: 'is-error' }[notice && notice.kind] || 'is-pending';
-  var noticeClasses = { 'is-pending': 'shin-notice shin-notice-pending', 'is-success': 'shin-notice shin-notice-success', 'is-warning': 'shin-notice shin-notice-warning', 'is-error': 'shin-notice shin-notice-error' };
-  return message ? [Text({ className: noticeClasses[noticeClass] || 'shin-notice shin-notice-pending', text: String(message) })] : [];
+  return message ? [Notice({ kind: notice && notice.kind, text: String(message) })] : [];
 }
 function fbmSyncIdentitySummaryBlocks() {
   var identity = FBM_SYNC_CLIENT.identityStatus || {}, binding = identity.binding || {};
   var message = identity.status === 'BOUND' ? 'Đã kết nối với tài khoản FBM: ' + String(binding.accountName || '') : 'Chưa kết nối với tài khoản FBM nào';
-  return [Text({ className: identity.status === 'REBIND_REQUIRED' ? 'shin-notice shin-notice-warning' : 'shin-preview-row', text: message })];
+  return [identity.status === 'REBIND_REQUIRED' ? Notice({ kind: 'warning', text: message }) : Text({ className: 'shin-preview-row', text: message })];
 }
 function fbmSyncIdentityFormBlocks() {
   var identity = FBM_SYNC_CLIENT.identityStatus || {}, binding = identity.binding || {}, draft = FBM_SYNC_CLIENT.identityDraft || {};

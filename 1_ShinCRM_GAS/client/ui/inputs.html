@@ -193,7 +193,7 @@ function screenFormApplySyncLock(message) {
   if (body && !document.getElementById('shin-form-sync-lock-notice')) {
     var notice = document.createElement('div');
     notice.id = 'shin-form-sync-lock-notice';
-    notice.className = 'shin-sync-lock-notice';
+    notice.className = 'shin-notice shin-notice-warning';
     notice.textContent = String(message || 'Bản ghi đang được đồng bộ; biểu mẫu tạm thời chỉ xem.');
     body.insertBefore(notice, body.firstChild || null);
   }

@@ -160,6 +160,15 @@ function Row(spec) { return Block(Array.isArray(spec) ? { elements: spec } : spe
  */
 function Text(spec) { return Block(typeof spec === 'string' ? { text: spec } : spec, 'text'); }
 
+/** Thông báo trạng thái dùng chung; giữ ánh xạ màu ở lõi để các màn không tự ghép lớp `shin-notice-*`. */
+function Notice(spec) {
+  var o = typeof spec === 'string' ? { text: spec } : (spec || {});
+  var kind = String(o.kind || 'pending');
+  var tone = { info: 'pending', pending: 'pending', success: 'success', warning: 'warning', error: 'error' }[kind] || 'pending';
+  var classes = { pending: 'shin-notice shin-notice-pending', success: 'shin-notice shin-notice-success', warning: 'shin-notice shin-notice-warning', error: 'shin-notice shin-notice-error' };
+  return Text({ className: classes[tone], text: o.text });
+}
+
 /** Một trường dữ liệu. `field` ghi đủ đường dẫn khi trường không thuộc `entity` của màn, ví dụ `customer.note` trên form giao dịch. */
 function Field(spec) { return Block(spec, 'field'); }
 

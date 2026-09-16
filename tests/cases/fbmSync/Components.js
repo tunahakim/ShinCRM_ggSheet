@@ -82,8 +82,11 @@ function chay(so) {
     ['shin-form-field', 'shin-toggle-row', 'shin-toggle-control', 'shin-notice', 'shin-kv-row', 'shin-pagination', 'shin-section', 'shin-content-disabled', 'shin-loading'].every((name) => styles.indexOf(name) >= 0),
     true);
   check(so, 'Card dùng một nhịp gap chung cho các Block con và không cộng margin cho field trực tiếp',
-    [styles.indexOf('.shin-card-body {') >= 0, styles.indexOf('flex-direction: column;') >= 0, styles.indexOf('gap: var(--shin-gap-2);') >= 0, styles.indexOf('.shin-card-body > .shin-form-field { margin-bottom: 0; }') >= 0],
+    [styles.indexOf('.shin-card-body {') >= 0, styles.indexOf('flex-direction: column;') >= 0, styles.indexOf('gap: var(--shin-gap-2);') >= 0, styles.indexOf('.shin-card-body > * { margin-top: 0; margin-bottom: 0; }') >= 0],
     [true, true, true, true]);
+  check(so, 'Sync dùng Notice lõi thay vì tự lặp bảng ánh xạ lớp thông báo',
+    [common.indexOf('function Notice(') >= 0, all.indexOf('noticeClasses') >= 0, all.indexOf('noticeClass =') >= 0],
+    [true, false, false]);
   check(so, 'frame chung không còn chứa style component Sync legacy',
     ['shin-sync-form-field', 'shin-sync-form-actions', 'shin-sync-muted', 'shin-sync-preview-row', 'shin-sync-login-row'].filter((name) => frame.indexOf(name) >= 0),
     []);

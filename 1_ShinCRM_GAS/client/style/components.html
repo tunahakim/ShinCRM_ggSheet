@@ -206,9 +206,8 @@
   padding: 6px var(--shin-card-pad) var(--shin-card-pad);
 }
 
-/* Card đã tự tạo khoảng cách giữa các Block con; field trực tiếp không cộng thêm margin đáy. */
-.shin-card-body > .shin-form-field { margin-bottom: 0; }
-.shin-card-body > .shin-row + .shin-row { margin-top: 0; }
+/* Card là nơi duy nhất quyết định nhịp giữa các Block con; component con không được cộng margin dọc lần nữa. */
+.shin-card-body > * { margin-top: 0; margin-bottom: 0; }
 
 /* --- Trường và nhãn ---------------------------------------------- */
 
