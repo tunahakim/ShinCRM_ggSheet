@@ -89,10 +89,14 @@ function chay(so) {
       styles.indexOf('.shin-card-body > * { margin-top: 0; margin-bottom: 0; }') >= 0],
     [true, true, true, true, true, true]);
   check(so, 'Nhóm action dùng Stack lõi và vẫn tương thích class cũ',
-    [styles.indexOf('.shin-stack,') >= 0,
+    [styles.indexOf('align-items: stretch;') >= 0, styles.indexOf('width: 100%;') >= 0,
       styles.indexOf('.shin-action-stack { display: flex;') >= 0,
       styles.indexOf('.shin-action-stack > * + * { margin-top: var(--shin-gap-2); }') >= 0],
-    [true, true, true]);
+    [true, true, true, true]);
+  check(so, 'reset Card không xóa khoảng giữa các Card trong section',
+    [styles.indexOf('.shin-section > .shin-card { margin-bottom: 0; }') >= 0,
+      styles.indexOf('.shin-section > .shin-card { margin: 0; }') >= 0],
+    [true, false]);
   check(so, 'các vùng cột chung không phụ thuộc flex gap để tạo khoảng cách',
     [frame.indexOf('#sidebar-body > * + * { margin-top: var(--shin-gap-2); }') >= 0,
       styles.indexOf('.shin-section > * + * { margin-top: var(--shin-gap-2); }') >= 0,

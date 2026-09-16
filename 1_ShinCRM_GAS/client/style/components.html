@@ -21,7 +21,7 @@
 .shin-single-action-row { justify-content: center; }
 .shin-single-action-row > * { flex: 0 1 auto; min-width: min(220px, 100%); }
 .shin-stack,
-.shin-action-stack { display: flex; flex-direction: column; gap: 0; min-width: 0; }
+.shin-action-stack { display: flex; flex-direction: column; align-items: stretch; gap: 0; width: 100%; min-width: 0; }
 .shin-stack > * + *,
 .shin-action-stack > * + * { margin-top: var(--shin-gap-2); }
 .shin-action-stack { align-items: center; }
@@ -39,7 +39,7 @@
 .shin-section { display: flex; flex-direction: column; gap: 0; min-width: 0; padding: var(--shin-gap-1) 0 var(--shin-gap-4) var(--shin-scrollbar-size); }
 .shin-section > * + * { margin-top: var(--shin-gap-2); }
 .shin-section > * { min-width: 0; }
-.shin-section > .shin-card { margin: 0; }
+.shin-section > .shin-card { margin-bottom: 0; }
 
 /* Trạng thái khóa của một vùng thao tác. Control tổng nằm ngoài vùng nên không cần ngoại lệ theo id module. */
 .shin-content-disabled { opacity: .58; }
