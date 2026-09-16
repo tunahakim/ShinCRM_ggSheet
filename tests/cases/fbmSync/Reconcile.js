@@ -24,8 +24,9 @@ async function chay(so) {
   const mergedResult = edges.FbmSync.resolveConflict('activity', 'ACT-1', 'manual', { details: 'Nội dung FBM' }, true);
   check(so, 'trộn conflict đổi details về content nội bộ', [mergedResult.ok, mergedSaved && mergedSaved.content], [true, 'Nội dung FBM']);
   edges.PropertiesService = { getDocumentProperties: () => ({ getProperty: () => '' }) };
+  edges.FbmSync.accountSettingsRead = () => ({ activitySince: '2024-10-07' });
   const refresh = edges.FbmSync.conflictRefreshRequest('activity', { id: 'ACT-1', fbmId: '174813' });
-  check(so, 'conflict dựng request đọc lại đúng Activity FBM', [refresh.meta.kind, refresh.meta.entity, refresh.body.externalKey[0].Name, refresh.body.externalKey[0].Value], ['conflict_refresh_grid', 'activity', 'id', '174813']);
+  check(so, 'conflict dựng request đọc lại đúng Activity FBM, không bị giới hạn bởi mốc', [refresh.meta.kind, refresh.meta.entity, refresh.body.externalKey[0].Name, refresh.body.externalKey[0].Value, refresh.body.filter], ['conflict_refresh_grid', 'activity', 'id', '174813', []]);
 
   let lockedWrite = false;
   const lockedState = { mode: 'write', metadata: { categoryGate: {}, seen: { customer: {}, activity: {} } }, locks: { 'customer:CUS-000010': { owner: 'user', revision: 'r1' } } };
