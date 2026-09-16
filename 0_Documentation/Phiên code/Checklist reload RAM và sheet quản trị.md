@@ -314,7 +314,7 @@
 - [x] Cập nhật `07A` khi có thay đổi hợp đồng, không ghi quyết định mới rải ở tài liệu khác (bảng API reload thủ công và đường view hiện tại).
 - [x] Cập nhật tài liệu 05, 05A và 07 khi đổi tên API hoặc bất biến (API scope, hậu xử lý reload, renderer toàn bộ view).
 - [x] Cập nhật mục liên quan trong `Checklist đồng bộ FBM.md` (Slice 0, tín hiệu sau ghi).
-- [x] Đối chiếu `Cây thư mục code.md`: nhóm này không thêm tệp code; các module `ReloadDecision.js` và `DirtyState.js` đã có trong cây.
+- [x] Đối chiếu `Cây thư mục code.md`: thêm `server/dev/ReloadMatrixProbe.js`; các module `ReloadDecision.js` và `DirtyState.js` đã có trong cây.
 - [x] Thêm ca test vào `tests/cases/dirtyState.js` (revision, scope, JSON hỏng và guard clear đã có).
 - [x] Thêm ca test vào `tests/cases/triggers.js` (bốn sheet mặc định, vùng hợp lệ/không hợp lệ, thêm/đổi/xóa mã hàng 1 và toàn bộ view).
 - [x] Thêm ca test vào `tests/cases/refresh.js` (entity và Config full core).
@@ -324,6 +324,7 @@
 - [x] Chạy test GAS DEV cho `getReloadState`, `reloadRecords`, `renderAllManagedViews` với `--push`: `getReloadState` đạt ở `@326`, `reloadRecords` đạt ở `@327` với fallback `fullCore` khi scope rỗng, `renderAllManagedViews` đạt ở `@328` với tất cả view DEV trả `ok` và không có sheet lỗi; đường runtime `renderAllManagedViewsIfAllowed` được kiểm tra tiếp ở revision mới và dọn cờ view stale theo đúng revision guard. `inspectEditReload` đạt ở `@334`, trả `eligible:false`, `ram.action:none`, `reloadObservation:false` trên vùng DEV không hợp lệ.
 - [x] GAS DEV cài trigger installable ở `@331`; `probeTriggerState` xác nhận `shinOnEdit: true`, `shinOnChange: true` và không làm mất các trigger FBM đang có.
 - [x] Chạy test GAS DEV khi không mở Sidebar và xác nhận view vẫn đổi sau ghi Customer/Activity: `viewProbeWriteRenderWithoutSidebar` đạt ở `@337`; view tạm nhận đúng mã Customer và ngày Activity sau từng lần `WriteGate`, rồi probe dọn sạch bản ghi và sheet tạm.
+- [x] Bổ sung và chạy probe GAS DEV `reloadMatrixProbe` ở deployment `@341`: fixture nối sau dữ liệu DEV hiện có (5 Customer + 5 Activity), mô phỏng onEdit ở Customer/Activity/Category/Config và sheet quản trị, kiểm signal/debounce/view; tất cả ca đạt, 3/3 view được vẽ sau các thay đổi hợp lệ. Probe tự dọn fixture, khôi phục ô/thuộc tính; hậu kiểm `probeDirtyState` rỗng và `dumpSheetGrid` còn đúng 1 Customer + 1 Activity ban đầu.
 - [x] Kiểm tra log không chứa cookie, mật khẩu, token hoặc payload nhạy cảm bằng `tests/cases/logMask.js` và các ca DTO/log FBM; bộ offline đạt `1569/1569`.
 - [x] Chỉ thử dữ liệu ở Spreadsheet DEV `2026.09.05 - ShinCRM DEV` qua cổng DEV có token; không chạm Spreadsheet production.
 - [x] Không sửa fixture trong `0_Documentation/Nghiên cứu FBM/`; `git diff` không có đường dẫn thuộc thư mục này.
