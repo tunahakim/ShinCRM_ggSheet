@@ -319,8 +319,8 @@
 - [x] Thêm ca test vào `tests/cases/triggers.js` (bốn sheet mặc định, vùng hợp lệ/không hợp lệ và toàn bộ view).
 - [x] Thêm ca test vào `tests/cases/refresh.js` (entity và Config full core).
 - [x] Thêm ca test cho cổng ghi/pull/push/background (gồm status push trong `reloadGates.js`).
-- [x] Chạy `node tests/run.js`: `1556` đạt, `0` không đạt.
-- [ ] Chạy test GAS DEV cho `getReloadState`, `reloadRecords`, `renderAllManagedViews` với `--push`.
+- [x] Chạy `node tests/run.js`: `1560` đạt, `0` không đạt.
+- [x] Chạy test GAS DEV cho `getReloadState`, `reloadRecords`, `renderAllManagedViews` với `--push`: `getReloadState` đạt ở `@326`, `reloadRecords` đạt ở `@327` với fallback `fullCore` khi scope rỗng, `renderAllManagedViews` đạt ở `@328` với tất cả view DEV trả `ok` và không có sheet lỗi.
 - [ ] Chạy test GAS DEV khi không mở Sidebar và xác nhận view vẫn đổi sau ghi Customer/Activity.
 - [ ] Kiểm tra log không chứa cookie, mật khẩu, token hoặc payload nhạy cảm.
 - [ ] Chỉ thử dữ liệu thật ở Sheet DEV theo cờ an toàn đã chốt.
