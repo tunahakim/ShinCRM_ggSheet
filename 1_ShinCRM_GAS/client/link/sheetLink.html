@@ -490,6 +490,12 @@ function sheetLinkApplyContext(ctx) {
   SHEET_LINK_LAST_SHEET = ctx.sheetName || '';
   if (!SHEET_LINK_RAM_READY) { return; }
 
+  // Đổi khách từ context Extension là đường cục bộ và không được chờ RPC
+  // kiểm tra dirty khi người dùng vừa chuyển sheet. Lượt server phía dưới vẫn
+  // chạy nền để xử lý reload/view; nếu Store chưa có mã, applyLatest sẽ thử lại
+  // sau khi lượt nạp hoàn tất.
+  var immediateCustomerApplied = sheetLinkApplyCustomerContext(ctx);
+
   var leavingDataSheet = changedSheet && (previousSheet === 'Customer' || previousSheet === 'Activity');
   var work = function () {
     var pending = null;
@@ -522,6 +528,7 @@ function sheetLinkApplyContext(ctx) {
 
     var applyLatest = function () {
       if (ticket !== SHEET_LINK_APPLY_TICKET) { return null; }
+      if (immediateCustomerApplied) { return null; }
       return sheetLinkApplyCustomerContext(ctx);
     };
     return pending ? pending.then(applyLatest) : applyLatest();
@@ -536,12 +543,13 @@ function sheetLinkReplayContext() {
 }
 
 function sheetLinkApplyCustomerContext(ctx) {
-  if (!Prefs.followSelection || ScreenState.screen !== SCREEN_VIEW) { return; }
+  if (!Prefs.followSelection || ScreenState.screen !== SCREEN_VIEW) { return false; }
 
   var ma = sheetLinkCustomerIdFromContext(ctx);
-  if (!ma || ma === ScreenState.currentCustomerId) { return; }
+  if (!ma || ma === ScreenState.currentCustomerId) { return false; }
 
   ACTIONS.setCurrentCustomer({ pick: ma });
+  return true;
 }
 
 function sheetLinkCustomerIdFromContext(ctx) {

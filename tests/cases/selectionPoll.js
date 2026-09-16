@@ -122,6 +122,13 @@ async function chay(so) {
   check(so, 'context Extension gửi mã khách được dùng trực tiếp, không suy từ tọa độ', direct._picked, ['KH000001']);
   check(so, 'thiếu customerId thì không đoán khách từ tọa độ', direct.sheetLinkCustomerIdFromContext({ sheetName: '!Lead', row: 4, col: 2 }), '');
 
+  const immediate = dungHopPoll(); batDau(immediate); immediate.SHEET_LINK_LAST_SHEET = 'Customer';
+  immediate.Store.hasCustomer = () => true; immediate._picked = [];
+  immediate.ACTIONS.setCurrentCustomer = ({ pick }) => { immediate._picked.push(pick); };
+  immediate.callServer = () => new Promise(() => {});
+  immediate.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: 'Activity', row: 4, col: 2, customerId: 'KH000002' });
+  check(so, 'đổi sheet áp dụng khách ngay dù RPC kiểm tra dirty chưa trả', immediate._picked, ['KH000002']);
+
   const taiLai = dungHopPoll(); batDau(taiLai); taiLai.SHEET_LINK_SEQ = 99;
   taiLai.sheetLinkOnMessage({ origin: taiLai.SHEET_LINK_ORIGIN, data: { action: 'CRM_HANDSHAKE_ACK', nonce: taiLai.SHEET_LINK_NONCE, sessionId: 'extension-moi' } });
   taiLai.sheetLinkOnMessage({ origin: taiLai.SHEET_LINK_ORIGIN, data: { action: 'CRM_CONTEXT', nonce: taiLai.SHEET_LINK_NONCE, sessionId: 'extension-moi', spreadsheetId: 'sheet-1', seq: 1, sheetName: 'Customer', row: 4, col: 1 } });

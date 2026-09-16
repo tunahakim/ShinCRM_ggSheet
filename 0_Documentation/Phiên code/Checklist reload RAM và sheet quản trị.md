@@ -239,6 +239,7 @@
 - [x] Khi selection không đổi, GAS trả context/mã khách cũ và không đọc lại ô mã khách (test `selectionService.js`).
 - [x] Khi selection đổi, GAS tự tra schema và đọc mã khách trong cùng request; Extension vẫn giữ đường live model cũ khi nó đang hoạt động (test `selectionService.js`, `extensionBridge.js`).
 - [x] Response selection/reload luôn kèm `ReloadState`, `ram` và trạng thái selection; Sidebar không tự quyết định scope (server `SelectionService.js`, test `selectionService.js`).
+- [x] Context Extension có `customerId` hợp lệ được áp dụng ngay cho màn hình chính trước các RPC kiểm tra dirty; RPC chạy nền không chặn nguồn-chọn cục bộ (client `sheetLink.html`, test `selectionPoll.js`).
 - [x] Fallback polling vị trí 2 giây rồi 6 giây gộp luôn kiểm tra reload, không tạo request kiểm tra thứ hai (test `selectionPoll.js`).
 - [x] Safety polling theo phút chạy im lặng, chỉ phục vụ RAM và không kích hoạt renderer view (client `selectionPoll.html`, test `selectionPoll.js`).
 - [x] Customer còn tồn tại được upsert bằng bản ghi máy chủ trả về (test `refresh.js`).

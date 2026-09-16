@@ -74,6 +74,8 @@ Sidebar giữ state riêng của trang đó:
 
 Sidebar chỉ gửi context và state cho GAS. Sidebar không tự suy luận “ô nào có mã”, “có phải dữ liệu vừa đổi” hoặc “nên gọi `reloadRecords` hay `loadCore`”.
 
+Khi Extension gửi `CRM_CONTEXT` có `customerId` hợp lệ và mã đã có trong Store, Sidebar phải gọi đường nguồn-chọn cục bộ ngay trong lượt nhận tin để màn hình chính đổi khách không phụ thuộc độ trễ RPC. Các lượt kiểm tra dirty, reload RAM hoặc đồng bộ sheet quản trị có thể chạy nối tiếp ở nền; nếu mã chưa có trong Store thì được thử lại sau khi lượt nạp hoàn tất.
+
 ## 4. Một request selection duy nhất
 
 Khi không có Extension, không dùng chuỗi hai request từ Sidebar:
