@@ -174,24 +174,24 @@
 
 ### `reloadRecords`
 
-- [ ] API nhận mảng mã và chuẩn hóa chuỗi.
-- [ ] API đọc đúng Customer được yêu cầu.
-- [ ] API đọc Activity được yêu cầu.
-- [ ] API kéo theo mọi Activity của Customer bị ảnh hưởng.
-- [ ] API trả danh sách mã Customer bị ảnh hưởng.
-- [ ] API trả dấu hiệu record đã biến mất để client remove.
-- [ ] API không trả dữ liệu thừa của toàn bộ kho khi scope nhỏ.
-- [ ] API nhận expected revision và không clear nếu revision đã đổi.
-- [ ] API fallback full core khi mã không xác định, scope lỗi hoặc vượt ngưỡng.
-- [ ] API trả ReloadState mới nhất trong mọi nhánh thành công.
+- [x] API nhận mảng mã và chuẩn hóa chuỗi, loại mã trùng (test `loadService.js`: scope có khoảng trắng/mã lặp).
+- [x] API đọc đúng Customer được yêu cầu (test `loadService.js`: chỉ trả `KH-SCOPE-1`).
+- [x] API đọc Activity được yêu cầu (test `loadService.js`: trả `GD-SCOPE-2`).
+- [x] API kéo theo mọi Activity của Customer bị ảnh hưởng (test `loadService.js`: kéo cả `GD-SCOPE-1` và `GD-SCOPE-2`).
+- [x] API trả danh sách mã Customer bị ảnh hưởng (test `loadService.js`: `affectedCustomerIds`).
+- [x] API trả dấu hiệu record đã biến mất để client remove (test `loadService.js`: `KH-MISSING`).
+- [x] API không trả dữ liệu thừa của toàn bộ kho khi scope nhỏ (test `loadService.js`: không có `KH-SCOPE-2`/`GD-OTHER`).
+- [x] API nhận expected revision và không clear nếu revision đã đổi (test `loadService.js`: revision 9, expected 8 giữ `dirtyRecords`).
+- [x] API fallback full core khi mã không xác định, scope lỗi hoặc vượt ngưỡng (test `loadService.js`: scope rỗng/vượt trần).
+- [x] API trả ReloadState mới nhất trong mọi nhánh thành công (test `loadService.js`: scope, stale và fullCore đều có `reload`).
 
 ### Category và Config
 
-- [ ] Có API reload Category riêng.
-- [ ] Category reload thành công xóa đúng dirtyCategory, không xóa cờ mới.
-- [ ] Có API reload Config hoặc trả yêu cầu full core rõ ràng.
-- [ ] Config reload không làm Schema/Config defaults trong RAM lệch nhau.
-- [ ] Đổi schema luôn fallback full core.
+- [x] Có API reload Category riêng (entrypoint `reloadCategory`, test `loadService.js`).
+- [x] Category reload thành công xóa đúng dirtyCategory, không xóa cờ mới (test `loadService.js`: `category=false`, `config=false`).
+- [x] Có API reload Config hoặc trả yêu cầu full core rõ ràng (entrypoint `reloadConfig`, trả `reloadMode: 'fullCore'`, test `loadService.js`).
+- [x] Config reload không làm Schema/Config defaults trong RAM lệch nhau (Config luôn yêu cầu full core, test `loadService.js`).
+- [x] Đổi schema luôn fallback full core (test `reloadDecision.js`: schema có `ram.mode: 'fullCore'`; test `reloadGates.js`: signal `allCore`).
 - [ ] Có API `getReloadState` dùng khi nhận event, lúc mở Sidebar và tại các điểm kiểm tra tự nhiên.
 - [ ] Có event reload tức thời qua kênh Extension/Sidebar; event chỉ là tín hiệu đánh thức, không phải nguồn dữ liệu.
 - [ ] Có API render toàn bộ managed views và trả kết quả từng sheet.
