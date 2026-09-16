@@ -230,9 +230,9 @@ function reloadMatrixProbe() {
     report.push('Ghi chú: debounce một lượt sau edit cuối là hành vi Sidebar; probe GAS xác nhận mỗi vùng trả waitMs=3000, không giả vờ đo số lượt reload client.');
 
     var activityBefore = reloadStateRead();
-    reloadMatrixProbeWriteEvent(activity.sheet, activityStartRow, activityEdit.column, 'DEV reload activity edit');
+    var activityResult = reloadMatrixProbeWriteEvent(activity.sheet, activityStartRow, activityEdit.column, 'DEV reload activity edit');
     var activityAfter = reloadStateRead();
-    reloadMatrixProbeAssert(report, 'Activity cột @ hợp lệ phát đúng mã', activityAfter.revision > activityBefore.revision && activityAfter.records.indexOf(activityIds[0]) >= 0, JSON.stringify({ revision: activityAfter.revision, records: activityAfter.records }));
+    reloadMatrixProbeAssert(report, 'Activity cột @ hợp lệ phát đúng mã', activityAfter.revision > activityBefore.revision && activityAfter.records.indexOf(activityIds[0]) >= 0, JSON.stringify({ column: activityEdit.column, code: activityEdit.name, expectedId: activityIds[0], revisionBefore: activityBefore.revision, revisionAfter: activityAfter.revision, records: activityAfter.records, decision: activityResult && activityResult.kind, ram: activityResult && activityResult.ram }));
 
     var invalidInfo = reloadMatrixProbeFindInvalidColumn(customer);
     var invalidColumn = invalidInfo.column;
