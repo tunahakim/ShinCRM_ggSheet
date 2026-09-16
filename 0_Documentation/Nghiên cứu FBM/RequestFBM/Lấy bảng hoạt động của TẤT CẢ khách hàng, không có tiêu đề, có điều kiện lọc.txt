@@ -1,0 +1,101 @@
+Lấy bảng hoạt động của TẤT CẢ khách hàng, không có tiêu đề, có điều kiện lọc
+
+1. Lấy giao dịch, không có tiêu đề, không lọc
+
+=========== Request ============
+
+fetch("https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage", {
+  "headers": {
+    "accept": "*/*",
+    "accept-language": "vi,en;q=0.9",
+    "cache-control": "no-cache",
+    "content-type": "application/json; charset=UTF-8",
+    "pragma": "no-cache",
+    "priority": "u=1, i"
+  },
+  "referrer": "https://fbo.com.vn:8888/Main/zccrAccount.aspx",
+  "body": "{\"type\":1,\"count\":1,\"language\":\"v\",\"controller\":\"zccrAccountTask\",\"viewId\":null,\"childObject\":false,\"lastPageIndex\":0,\"firstPageItem\":\"202504222025042214595813\",\"lastPageItem\":\"20240716202407161315271\",\"lastRowCount\":13,\"memvars\":[],\"externalKey\":[],\"gridPageIndex\":-2,\"gridPageValue\":null,\"gridRefresh\":false,\"filter\":[],\"sortExpression\":\"end_date desc\",\"cookie\":\"500020377ad81FHN_CRM_App\",\"query\":null,\"parameter\":null,\"variable\":\"\"}",
+  "method": "POST",
+  "mode": "cors",
+  "credentials": "include"
+});
+
+========== response ============
+
+{"d":{"TotalRowCount":173169,"Rows":[["175671","Công việc","Gọi điện chăm sóc","kh nhu cầu tham khảo bản dùng thử","\/Date(1789538940000)\/","\/Date(1789495200000)\/","Hoàn thành","Bùi Khánh Linh","LINHBK","\/Date(1789541976770)\/",1]],"Repetition":null,"Aggregation":null,"ViewPage":null,"Authorized":true,"SuspendFilter":false,"LoadScript":null,"ScatterScript":null,"Showing":null,"CheckScript":null,"CloseScript":null,"Scripts":null,"Css":null}}
+
+2. Lọc giá trị lớn hơn hoặc bằng
+
+=========== Request ============
+
+fetch("https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage", {
+  "headers": {
+    "accept": "*/*",
+    "accept-language": "vi,en;q=0.9",
+    "cache-control": "no-cache",
+    "content-type": "application/json; charset=UTF-8",
+    "pragma": "no-cache",
+    "priority": "u=1, i"
+  },
+  "referrer": "https://fbo.com.vn:8888/Main/zccrAccount.aspx",
+  "body": "{\"type\":1,\"count\":1,\"language\":\"v\",\"controller\":\"zccrAccountTask\",\"viewId\":null,\"childObject\":false,\"lastPageIndex\":0,\"firstPageItem\":\"202609162026091617561615\",\"lastPageItem\":\"20241007202410071356365\",\"lastRowCount\":12,\"memvars\":[],\"externalKey\":[],\"gridPageIndex\":-2,\"gridPageValue\":null,\"gridRefresh\":false,\"filter\":[\"end_date:>=07/10/2024\"],\"sortExpression\":\"end_date desc\",\"cookie\":\"500020377ad81FHN_CRM_App\",\"query\":null,\"parameter\":null,\"variable\":\"\"}",
+  "method": "POST",
+  "mode": "cors",
+  "credentials": "include"
+});
+
+========== response ============
+
+{"d":{"TotalRowCount":39513,"Rows":[["175672","Công việc","Gọi điện chăm sóc","Kh đang bận. đã nhắn qua zalo.","\/Date(1789542540000)\/","\/Date(1789495200000)\/","Hoàn thành","Phạm Đức Thản","THANPD","\/Date(1789542241573)\/",5]],"Repetition":null,"Aggregation":null,"ViewPage":null,"Authorized":true,"SuspendFilter":false,"LoadScript":null,"ScatterScript":null,"Showing":null,"CheckScript":null,"CloseScript":null,"Scripts":null,"Css":null}}
+
+3. Lọc giá trị nhỏ hơn hoặc bằng
+
+=========== Request ============
+
+fetch("https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage", {
+  "headers": {
+    "accept": "*/*",
+    "accept-language": "vi,en;q=0.9",
+    "cache-control": "no-cache",
+    "content-type": "application/json; charset=UTF-8",
+    "pragma": "no-cache",
+    "priority": "u=1, i"
+  },
+  "referrer": "https://fbo.com.vn:8888/Main/zccrAccount.aspx",
+  "body": "{\"type\":1,\"count\":1,\"language\":\"v\",\"controller\":\"zccrAccountTask\",\"viewId\":null,\"childObject\":false,\"lastPageIndex\":0,\"firstPageItem\":\"202609162026091617561615\",\"lastPageItem\":\"20241007202410071356365\",\"lastRowCount\":12,\"memvars\":[],\"externalKey\":[],\"gridPageIndex\":-2,\"gridPageValue\":null,\"gridRefresh\":false,\"filter\":[\"end_date:<=07/10/2024\"],\"sortExpression\":\"end_date desc\",\"cookie\":\"500020377ad81FHN_CRM_App\",\"query\":null,\"parameter\":null,\"variable\":\"\"}",
+  "method": "POST",
+  "mode": "cors",
+  "credentials": "include"
+});
+
+========== response ============
+
+{"d":{"TotalRowCount":133657,"Rows":[["135581","Công việc","Gọi điện chăm sóc","gia công cơ khí 1 kế toán , em đang gt bản fao. cty nhỏ , có tính giá thành","\/Date(1728180600000)\/","\/Date(1728151200000)\/","Hoàn thành","Nguyễn Diệu Linh","LINHND","\/Date(1728183311560)\/",1]],"Repetition":null,"Aggregation":null,"ViewPage":null,"Authorized":true,"SuspendFilter":false,"LoadScript":null,"ScatterScript":null,"Showing":null,"CheckScript":null,"CloseScript":null,"Scripts":null,"Css":null}}
+
+
+4. Lọc theo khoảng từ ngày đến ngày
+
+=========== Request ============
+
+fetch("https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage", {
+  "headers": {
+    "accept": "*/*",
+    "accept-language": "vi,en;q=0.9",
+    "cache-control": "no-cache",
+    "content-type": "application/json; charset=UTF-8",
+    "pragma": "no-cache",
+    "priority": "u=1, i"
+  },
+  "referrer": "https://fbo.com.vn:8888/Main/zccrAccount.aspx",
+  "body": "{\"type\":1,\"count\":1,\"language\":\"v\",\"controller\":\"zccrAccountTask\",\"viewId\":null,\"childObject\":false,\"lastPageIndex\":0,\"firstPageItem\":\"202609162026091617561615\",\"lastPageItem\":\"20240716202407161315271\",\"lastRowCount\":16,\"memvars\":[],\"externalKey\":[],\"gridPageIndex\":-2,\"gridPageValue\":null,\"gridRefresh\":false,\"filter\":[\"end_date:>=01/07/2024\\u0000<=30/09/2025\\u0000\"],\"sortExpression\":\"end_date desc\",\"cookie\":\"500020377ad81FHN_CRM_App\",\"query\":null,\"parameter\":null,\"variable\":\"\"}",
+  "method": "POST",
+  "mode": "cors",
+  "credentials": "include"
+});
+
+========== response ============
+
+{"d":{"TotalRowCount":24087,"Rows":[["155500","Công việc","Gọi điện chăm sóc","báo FAO","\/Date(1759547400000)\/","\/Date(1759082400000)\/","Hoàn thành","Nguyễn Hải Yến","YENNH","\/Date(1759550453370)\/",3]],"Repetition":null,"Aggregation":null,"ViewPage":null,"Authorized":true,"SuspendFilter":false,"LoadScript":null,"ScatterScript":null,"Showing":null,"CheckScript":null,"CloseScript":null,"Scripts":null,"Css":null}}
+
+5. Các loại lọc khác
+- Lọc chính xác, lọc khác, lọc lớn hơn, lọc nhỏ hơn: tất cả các loại trên đều chưa kiểm chứng và không ổn định, tuyệt đối không dùng!
