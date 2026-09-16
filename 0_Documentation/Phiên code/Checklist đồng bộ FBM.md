@@ -8,7 +8,7 @@
 - `[ ]` là việc còn thiếu; mục không có nhãn **Cần kiểm chứng thực tế** là việc AI tự tiếp tục được.
 - Một slice chỉ đóng sau khi đủ code, test, log/báo cáo và checklist case của slice đó.
 - Sau khi đóng slice, ghi commit và revision GAS vào bảng bằng chứng cuối file.
-- Bộ kiểm offline gần nhất đạt `1556/1556`; các mục live vẫn được đánh dấu riêng và không được suy ra từ test offline.
+- Bộ kiểm offline gần nhất đạt `1582/1582`; các mục live vẫn được đánh dấu riêng và không được suy ra từ test offline.
 
 ## Nguồn hợp đồng
 
@@ -444,7 +444,7 @@ Các ràng buộc thiết kế của slice này nằm ở Tài liệu 09.01, 09.
 
 - [x] Bổ sung workflow test dựa trên tài liệu cho startup, wake, restart, một alarm, không có việc, overlap, ưu tiên, auto-open, retry và response lớn.
 - [ ] Ma trận 44 pipeline có ít nhất một bằng chứng chạy thật qua GAS → Extension → FBM giả lập → GAS/UI cho mỗi nhánh liên quan.
-- [x] Chạy `node tests/run.js`; bộ offline hiện đạt `1467/1467`. Ma trận live/GAS DEV còn chờ các mục được đánh dấu riêng.
+- [x] Chạy `node tests/run.js`; bộ offline hiện đạt `1582/1582`. Ma trận live/GAS DEV còn chờ các mục được đánh dấu riêng.
 
 ### Đợt sửa Sidebar FBM ngày 16/09/2026
 
@@ -491,3 +491,6 @@ Triển khai xác nhận: deployment Sidebar đang dùng `AKfycbx0ueI_gR2zz...` 
 Ghi chú chẩn đoán relay: deployment Sidebar đã cập nhật revision `@243`; relay compact giữ lại `code`, `error` và HTTP status để không làm rỗng nguyên nhân lỗi heartbeat.
 Ghi chú executor: commit `4560e42` sửa heartbeat Customer về request trang đầu hợp lệ; commit `dad9f02` nâng executor lên `21.9` để tab FBM đang mở tự nạp bản sửa sau khi Extension reload. Test offline đạt `1236/1236`.
 Ghi chú Slice 9A: commit `a1b8e0c` gom lịch nghiệp vụ về GAS, giữ Extension một alarm `gas_poll`, thêm cấu hình `Cài đặt phiên`, auto-open theo lệnh GAS và primitive projection/lọc generic; Extension phát hành `21.15`. GAS DEV hiện ở revision `@299`; test offline mới nhất `1428/1428`. Chưa coi đo bulk thật hoặc live acceptance là hoàn tất.
+### Cập nhật refactor shell Sidebar ngày 16/09/2026
+
+- [x] Refactor FBM dùng chung shell `header/info/body/footer` của Sidebar; bỏ overlay và vùng cuộn riêng, phục hồi form/footer khi đóng, khóa callback đến muộn; test offline `1582/1582`, commit `2827107`, GAS DEV revision `@338`.
