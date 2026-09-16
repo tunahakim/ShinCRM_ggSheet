@@ -5,19 +5,14 @@ const { section, check, ghiLoiNap } = require('../../lib/assert');
 
 function taoBoTest() {
   const dom = domGia();
-  const screen = dom.document.createElement('div');
-  screen.id = 'fbm-sync-screen';
-  ['fbm-sync-shell-header-region', 'fbm-sync-shell-nav-region'].forEach((id) => {
-    const mount = dom.document.createElement('div'); mount.id = id; screen.appendChild(mount);
-  });
-  const content = dom.document.createElement('div');
-  content.id = 'fbm-sync-content';
-  screen.appendChild(content);
-  dom.root.appendChild(screen);
+  const header = dom.document.createElement('div'); header.id = 'sidebar-header'; dom.root.appendChild(header);
+  const info = dom.document.createElement('div'); info.id = 'sidebar-info'; info.hidden = true; dom.root.appendChild(info);
+  const content = dom.document.createElement('div'); content.id = 'sidebar-body'; dom.root.appendChild(content);
+  const footer = dom.document.createElement('div'); footer.id = 'sidebar-footer'; footer.hidden = true; dom.root.appendChild(footer);
 
   const hop = taoHopCat({ document: dom.document, window: { top: null, confirm: () => true, addEventListener: () => {} } });
   hop.FBM_SYNC_CLIENT = {
-    running: false, mode: 'read', resultPages: {}, resultsTab: 'summary', identityStatus: {},
+    active: true, running: false, mode: 'read', resultPages: {}, resultsTab: 'summary', identityStatus: {},
     subscreen: 'run',
     identityDraft: { spreadsheetId: '', userId: '', accountName: '' }, loginDraft: { username: '' },
     identityAction: '', identityLastAction: '', loginStatus: null, syncSettings: null, lastStatus: null,
@@ -56,7 +51,8 @@ function taoBoTest() {
     'client/sync/screens/run.html', 'client/sync/screens/results.html',
     'client/sync/screens/settings.html', 'client/sync/fbmSyncSettingsScreen.html',
     'client/sync/fbmSyncStatusScreen.html', 'client/sync/fbmSyncAuditScreen.html', 'client/sync/fbmSyncShell.html', 'client/sync/fbmSync.html');
-  return { hop, dom, screen, content };
+  hop.FBM_SYNC_CLIENT.active = true;
+  return { hop, dom, screen: dom.root, content };
 }
 
 function render(hop, content, fn, status) {
@@ -75,7 +71,73 @@ function demTheoThuocTinh(node, attribute) {
   return count;
 }
 
+async function testSharedShellLifecycle(so) {
+  const { hop, dom, content } = taoBoTest();
+  const header = dom.document.getElementById('sidebar-header');
+  const info = dom.document.getElementById('sidebar-info');
+  const footer = dom.document.getElementById('sidebar-footer');
+  const search = dom.document.createElement('div'); search.id = 'shin-search'; search.hidden = false; dom.root.appendChild(search);
+  const undo = dom.document.createElement('div'); undo.id = 'shin-undo'; undo.hidden = true; dom.root.appendChild(undo);
+  const warning = dom.document.createElement('div'); warning.id = 'shin-extension-warning'; warning.hidden = false; dom.root.appendChild(warning);
+  const lifecycleCalls = [];
+  hop.ScreenState = { screen: 'activityForm', formStack: [{ screen: 'activityForm' }] };
+  hop.screenStateTop = () => hop.ScreenState.formStack[hop.ScreenState.formStack.length - 1] || null;
+  hop.screenFormStash = () => { lifecycleCalls.push('stash'); return true; };
+  hop.screenFormRender = () => {
+    lifecycleCalls.push('form-render');
+    header.textContent = 'Man form da phuc hoi';
+    content.textContent = 'Noi dung form da phuc hoi';
+    info.hidden = false;
+    footer.hidden = false;
+    return 'form-rendered';
+  };
+  hop.screenViewRender = () => { lifecycleCalls.push('view-render'); return 'view-rendered'; };
+  hop.FBM_SYNC_CLIENT.active = false;
+  hop.FBM_SYNC_CLIENT.viewEpoch = 0;
+  hop.FBM_SYNC_CLIENT.statusRequestSeq = 0;
+  hop.FBM_SYNC_CLIENT.lastServerUpdatedAt = 0;
+  hop.callServer = (name) => {
+    if (name === 'fbmGetSyncStatus') { return Promise.resolve({ phase: 'idle', masterEnabled: true, counts: {} }); }
+    if (name === 'fbmGetIdentityStatus') { return Promise.resolve({ status: 'UNBOUND', binding: {} }); }
+    if (name === 'fbmGetSyncSettings') { return Promise.resolve({ settings: {} }); }
+    if (name === 'fbmGetLoginConfig') { return Promise.resolve({ configured: false }); }
+    return Promise.resolve({ ok: true });
+  };
+
+  await hop.syncPanelToggle();
+  check(so, 'mo FBM dung chung header body va an info footer cua man truoc',
+    [hop.FBM_SYNC_CLIENT.active,
+      dom.document.getElementById('sidebar-root').classList.contains('shin-sync-active'),
+      !!dom.document.getElementById('fbm-sync-module-title'),
+      info.hidden,
+      footer.hidden,
+      content.getAttribute('data-fbm-sync-screen'),
+      lifecycleCalls],
+    [true, true, true, true, true, 'run', ['stash']]);
+  check(so, 'mo FBM cat cac dai ngoai shell de khong chong len man dong bo',
+    [search.hidden, undo.hidden, warning.hidden], [true, true, true]);
+
+  const closeResult = hop.syncScreenClose();
+  check(so, 'dong FBM phuc hoi dung form va footer, khong con class man dong bo',
+    [closeResult,
+      hop.FBM_SYNC_CLIENT.active,
+      dom.document.getElementById('sidebar-root').classList.contains('shin-sync-active'),
+      header.textContent,
+      content.textContent,
+      info.hidden,
+      footer.hidden,
+      lifecycleCalls],
+    ['form-rendered', false, false, 'Man form da phuc hoi', 'Noi dung form da phuc hoi', false, false, ['stash', 'form-render']]);
+  check(so, 'dong FBM phuc hoi trang thai an hien ban dau cua cac dai ngoai shell',
+    [search.hidden, undo.hidden, warning.hidden], [false, true, false]);
+
+  const restoredBody = content.textContent;
+  hop.fbmSyncPaint({ phase: 'pull_customer', counts: { completed: 1 } });
+  check(so, 'status den muon sau khi dong khong ve de len man form da phuc hoi', content.textContent, restoredBody);
+}
+
 async function chay(so) {
+  await testSharedShellLifecycle(so);
   section('FBM sync — Sidebar UI smoke');
   let bo;
   try { bo = taoBoTest(); } catch (error) { return ghiLoiNap(so, 'nạp renderer Sidebar Đồng bộ FBM', error); }

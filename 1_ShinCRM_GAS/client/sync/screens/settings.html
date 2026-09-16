@@ -88,7 +88,7 @@ function fbmSyncPatchSettings(panel, status) {
   patchValue('fbm-sync-setting-approval-threshold', settings.approvalThreshold);
   fbmSyncSetTargetState('fbm-sync-setting-approval-threshold', { disabled: !masterEnabled });
   fbmSyncSetTargetState('fbm-sync-save-settings', { disabled: !masterEnabled || !!FBM_SYNC_CLIENT.running });
-  if (masterEnabled) { fbmSyncSetTargetState('fbm-sync-content', { disabledDescendants: false, except: ['fbm-sync-settings-master-switch'] }); }
+  if (masterEnabled) { fbmSyncSetTargetState('sidebar-body', { disabledDescendants: false, except: ['fbm-sync-settings-master-switch'] }); }
   fbmSyncRenderTarget('fbm-sync-settings-relay-notice-region', fbmSyncSettingsNoticeBlocks('relay'));
   fbmSyncRenderTarget('fbm-sync-settings-extension-notice-region', fbmSyncSettingsNoticeBlocks('extension'));
   fbmSyncRenderTarget('fbm-sync-settings-module-notice-region', fbmSyncSettingsNoticeBlocks('module'));

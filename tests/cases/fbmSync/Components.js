@@ -42,6 +42,15 @@ const REMOVED_DUPLICATE_LAYOUT_CLASSES = [
   'shin-sync-conflict-screen'
 ];
 
+const REMOVED_SYNC_SHELL_PATTERNS = [
+  /id=["']fbm-sync-screen["']/,
+  /id=["']fbm-sync-content["']/,
+  /id=["']fbm-sync-shell-header-region["']/,
+  /id=["']fbm-sync-shell-nav-region["']/,
+  /\.shin-sync-screen(?:[ {,.]|$)/,
+  /\.shin-sync-screen-content(?:[ {,.]|$)/
+];
+
 function chay(so) {
   section('FBM sync — component dùng chung');
   const source = Object.fromEntries(SYNC_FILES.map((file) => [file, docTep(file)]));
@@ -51,6 +60,18 @@ function chay(so) {
   const frame = docTep('client/style/frame.html');
   const styles = docTep('client/style/components.html');
   const sidebar = docTep('client/Sidebar.html');
+
+  check(so, 'FBM dung shell bon vung chung, khong con overlay hoac vung cuon rieng',
+    [REMOVED_SYNC_SHELL_PATTERNS.filter((pattern) => pattern.test(all + '\n' + sidebar)).map((pattern) => pattern.source),
+      sidebar.indexOf('id="sidebar-header"') >= 0,
+      sidebar.indexOf('id="sidebar-info"') >= 0,
+      sidebar.indexOf('id="sidebar-body"') >= 0,
+      sidebar.indexOf('id="sidebar-footer"') >= 0],
+    [[], true, true, true, true]);
+  check(so, 'menu FBM neo duoi header nhung gioi han chieu cao theo viewport, khong theo header',
+    [source['client/sync/fbmSyncShell.html'].indexOf('top:var(--shin-header-height)') >= 0,
+      source['client/sync/fbmSyncShell.html'].indexOf('max-height:min(66.666vh, calc(100vh - var(--shin-header-height) - var(--shin-gap-2)))') >= 0],
+    [true, true]);
 
   check(so, 'core khai đủ Block helper dùng chung cho Sync',
     ['Box', 'Stack', 'Card', 'Row', 'Text', 'Field', 'Button', 'Icon', 'Check', 'StandaloneControl', 'StandaloneField'].every((name) => common.indexOf('function ' + name + '(') >= 0),
@@ -113,7 +134,7 @@ function chay(so) {
   check(so, 'các vùng cuộn giữ trục hai mép bằng gutter ổn định, section không cộng lề lệch',
     [frame.indexOf('.shin-scroll-region {') >= 0 && frame.indexOf('overflow-y: auto;') >= 0 && frame.indexOf('scrollbar-gutter: stable both-edges;') >= 0,
       sidebar.indexOf('id="sidebar-body" class="shin-scroll-region"') >= 0,
-      sidebar.indexOf('id="fbm-sync-content" class="shin-scroll-region shin-sync-screen-content"') >= 0,
+      sidebar.indexOf('id="sidebar-body" class="shin-scroll-region"') >= 0,
       frame.indexOf('#sidebar-body {') >= 0 && frame.indexOf('padding: var(--shin-gap-2) 0 var(--shin-gap-4);') >= 0,
       styles.indexOf('.shin-section { display: flex; flex-direction: column; gap: 0; min-width: 0; padding: var(--shin-gap-1) 0 var(--shin-gap-4); }') >= 0],
     [true, true, true, true, true]);
