@@ -199,10 +199,16 @@
   line-height: 1.2;
 }
 
-.shin-card-body { padding: 6px var(--shin-card-pad) var(--shin-card-pad); }
+.shin-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--shin-gap-2);
+  padding: 6px var(--shin-card-pad) var(--shin-card-pad);
+}
 
-/* Hai hàng liền nhau trong card cách nhau đúng một nhịp, không phải nhịp của hàng ngoài card. */
-.shin-card-body > .shin-row + .shin-row { margin-top: var(--shin-gap-2); }
+/* Card đã tự tạo khoảng cách giữa các Block con; field trực tiếp không cộng thêm margin đáy. */
+.shin-card-body > .shin-form-field { margin-bottom: 0; }
+.shin-card-body > .shin-row + .shin-row { margin-top: 0; }
 
 /* --- Trường và nhãn ---------------------------------------------- */
 
