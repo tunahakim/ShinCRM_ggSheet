@@ -92,13 +92,14 @@ function chay(so) {
       popup.indexOf('.shin-popup-item:hover { background: var(--shin-bg-hover); }') >= 0,
       popup.indexOf('.shin-popup-item.is-active') >= 0,
       popup.indexOf('background: var(--shin-primary-soft); color: var(--shin-primary-dark);') >= 0,
+      popup.indexOf('background: var(--shin-primary-soft); color: var(--shin-primary-dark); font-weight: 700;') === -1,
       frame.indexOf('.shin-popup-list {') === -1,
       styles.indexOf('.shin-menu-item') === -1,
       styles.indexOf('.shin-choice-item.is-selected') === -1,
       source['client/sync/fbmSyncShell.html'].indexOf('shin-sync-nav') === -1,
       menu.indexOf('shin-menu-item') === -1,
       menu.indexOf("className = 'shin-popup-item'") >= 0],
-    [true, true, true, true, true, true, true, true, true, true, true]);
+    [true, true, true, true, true, true, true, true, true, true, true, true]);
   check(so, 'cac controller popup dung API PopupList chung',
     [combo.indexOf('PopupList.show(box, inp') >= 0,
       choiceMenu.indexOf('PopupList.show(list, trigger') >= 0,

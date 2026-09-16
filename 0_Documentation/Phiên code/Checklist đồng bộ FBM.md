@@ -501,7 +501,7 @@ Ghi chú Slice 9A: commit `a1b8e0c` gom lịch nghiệp vụ về GAS, giữ Ext
 - [x] Tab `Kết quả & xử lý` hiển thị năm tab chỉ có nhãn; mô tả nằm ở một vùng riêng bên dưới hàng tab và được vá theo tab đang chọn, giữ mã tab và vá tại chỗ; body dùng `Stack` chung thay vì lồng `shin-section`, chữ phụ 13px, Nghiệm thu tối đa hai dòng; test offline `1589/1589`, commit `3e84f0a`, GAS DEV revision `@350`.
 - [x] Chuẩn hóa `PopupList` làm component popup duy nhất cho search, dropdown, customer picker, menu chọn và menu module; controller chỉ giữ dữ liệu/phím tắt, popup dùng chung tự neo, giãn theo nội dung, giới hạn Sidebar, lật chiều và đóng khi click ngoài; test offline `1583/1583`, commit `d255abd`, GAS DEV revision `@376`.
 - [x] Loại bỏ listener đóng popup trùng trong FBM/choice menu; PopupList là nơi duy nhất xử lý click ngoài và bộ DOM test mô phỏng đúng nhiều listener; test offline `1584/1584`, commit `14cc9f6`, GAS DEV revision `@377`.
-- [x] Hợp nhất hoàn toàn menu ba chấm, popup `Sản phẩm`, `Chiều đồng bộ`, tìm kiếm và customer picker vào một `PopupList`: khung/kích thước/bố cục dùng chuẩn popup `Sản phẩm`; font, màu chữ, màu active và màu hover dùng bộ cũ của menu ba chấm; không còn CSS popup riêng; test offline `1589/1589`, commit `8279d40`, GAS DEV revision `@382`.
+- [x] Hợp nhất hoàn toàn menu ba chấm, popup `Sản phẩm`, `Chiều đồng bộ`, tìm kiếm và customer picker vào một `PopupList`: khung/kích thước/bố cục dùng chuẩn popup `Sản phẩm`; font, màu chữ, màu active và màu hover dùng bộ cũ của menu ba chấm; dòng active/selected không in đậm; không còn CSS popup riêng; test offline `1589/1589`, commit `8279d40`, GAS DEV revision `@382`.
 
 ### Cập nhật reload RAM và sheet quản trị ngày 16/09/2026
 
