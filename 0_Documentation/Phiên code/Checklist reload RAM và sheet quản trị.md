@@ -47,7 +47,7 @@
 - [x] Có cờ `allCore` để bắt buộc full core (test `dirtyState.js`, `reloadDecision.js`).
 - [x] Có cờ `allViews` để bắt buộc vẽ toàn bộ view (test `viewRenderer.js`, `reloadGates.js`).
 - [x] Có danh sách view bẩn để tương thích và chẩn đoán từng sheet (test `dirtyState.js`, `viewRenderer.js`).
-- [ ] Giữ alias cũ trong giai đoạn chuyển tiếp nhưng không để alias làm mất scope mới.
+- [x] Giữ alias cũ trong giai đoạn chuyển tiếp nhưng không để alias làm mất scope mới (DTO vẫn trả `reload` đầy đủ; test `loadService.js`).
 
 ### Tính nguyên tử và phục hồi
 
