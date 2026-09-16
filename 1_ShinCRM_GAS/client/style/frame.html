@@ -204,7 +204,7 @@ html, body {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  gap: var(--shin-gap-2);
+  gap: 0;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
@@ -212,6 +212,7 @@ html, body {
   scrollbar-gutter: stable;
   background: var(--shin-bg-sunken);
 }
+#sidebar-body > * + * { margin-top: var(--shin-gap-2); }
 
 /* Vùng 5 — Chân. Ghim đáy. */
 #sidebar-footer {

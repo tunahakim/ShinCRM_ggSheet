@@ -81,13 +81,23 @@ function chay(so) {
   check(so, 'lớp generic notice/form/toggle/value/pagination nằm ở components chung',
     ['shin-form-field', 'shin-toggle-row', 'shin-toggle-control', 'shin-notice', 'shin-kv-row', 'shin-pagination', 'shin-section', 'shin-content-disabled', 'shin-loading'].every((name) => styles.indexOf(name) >= 0),
     true);
-  check(so, 'Card dùng một nhịp gap chung cho các Block con và không cộng margin cho field trực tiếp',
-    [styles.indexOf('.shin-card-body {') >= 0, styles.indexOf('flex-direction: column;') >= 0, styles.indexOf('gap: var(--shin-gap-2);') >= 0, styles.indexOf('.shin-card-body > * { margin-top: 0; margin-bottom: 0; }') >= 0],
-    [true, true, true, true]);
-  check(so, 'Nhóm action chỉ chọn biến thể, không tự sở hữu layout dọc',
-    [styles.indexOf('.shin-stack { display: flex; flex-direction: column; gap: var(--shin-gap-2); min-width: 0; }') >= 0,
-      styles.indexOf('.shin-action-stack { display: flex;') >= 0],
-    [true, false]);
+  check(so, 'Card và Stack dùng spacing dọc theo token, tương thích môi trường không hỗ trợ flex gap',
+    [styles.indexOf('.shin-card-body {') >= 0, styles.indexOf('.shin-stack,') >= 0,
+      styles.indexOf('.shin-card-body > * + * { margin-top: var(--shin-gap-2); }') >= 0,
+      styles.indexOf('.shin-stack > * + *') >= 0,
+      styles.indexOf('.shin-form-field > * + * { margin-top: var(--shin-gap-1); }') >= 0,
+      styles.indexOf('.shin-card-body > * { margin-top: 0; margin-bottom: 0; }') >= 0],
+    [true, true, true, true, true, true]);
+  check(so, 'Nhóm action dùng Stack lõi và vẫn tương thích class cũ',
+    [styles.indexOf('.shin-stack,') >= 0,
+      styles.indexOf('.shin-action-stack { display: flex;') >= 0,
+      styles.indexOf('.shin-action-stack > * + * { margin-top: var(--shin-gap-2); }') >= 0],
+    [true, true, true]);
+  check(so, 'các vùng cột chung không phụ thuộc flex gap để tạo khoảng cách',
+    [frame.indexOf('#sidebar-body > * + * { margin-top: var(--shin-gap-2); }') >= 0,
+      styles.indexOf('.shin-section > * + * { margin-top: var(--shin-gap-2); }') >= 0,
+      source['client/sync/fbmSyncShell.html'].indexOf('.shin-sync-nav button + button { margin-top: 2px; }') >= 0],
+    [true, true, true]);
   check(so, 'Sync dùng Notice lõi thay vì tự lặp bảng ánh xạ lớp thông báo',
     [common.indexOf('function Notice(') >= 0, all.indexOf('noticeClasses') >= 0, all.indexOf('noticeClass =') >= 0],
     [true, false, false]);

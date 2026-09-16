@@ -12,14 +12,18 @@
 .shin-row {
   display: flex;
   align-items: flex-start;
-  gap: var(--shin-gap-2);
+  gap: 0;
 }
 
 /* `width: "auto"` nghĩa là chia đều phần dư. `min-width: 0` là điều kiện để một ô nhập dài không nong hàng rộng ra quá khung. */
 .shin-row > * { flex: 1 1 0; min-width: 0; }
+.shin-row > * + * { margin-left: var(--shin-gap-2); }
 .shin-single-action-row { justify-content: center; }
 .shin-single-action-row > * { flex: 0 1 auto; min-width: min(220px, 100%); }
-.shin-stack { display: flex; flex-direction: column; gap: var(--shin-gap-2); min-width: 0; }
+.shin-stack,
+.shin-action-stack { display: flex; flex-direction: column; gap: 0; min-width: 0; }
+.shin-stack > * + *,
+.shin-action-stack > * + * { margin-top: var(--shin-gap-2); }
 .shin-action-stack { align-items: center; }
 .shin-action-stack > * { width: min(100%, 220px); }
 .shin-inline-field-row { align-items: center; }
@@ -32,7 +36,8 @@
 .shin-box { display: block; }
 
 /* Khối xếp dọc dùng cho các màn hình có nhiều Card; module chỉ chọn nội dung, không tự định nghĩa layout mới. */
-.shin-section { display: flex; flex-direction: column; gap: var(--shin-gap-2); min-width: 0; padding: var(--shin-gap-1) 0 var(--shin-gap-4) var(--shin-scrollbar-size); }
+.shin-section { display: flex; flex-direction: column; gap: 0; min-width: 0; padding: var(--shin-gap-1) 0 var(--shin-gap-4) var(--shin-scrollbar-size); }
+.shin-section > * + * { margin-top: var(--shin-gap-2); }
 .shin-section > * { min-width: 0; }
 .shin-section > .shin-card { margin: 0; }
 
@@ -52,7 +57,8 @@
 .shin-align-right { margin-left: auto; }
 
 /* Ô nhập không thuộc DATA_SCHEMA, dùng chung cho các màn hình có trạng thái riêng. */
-.shin-form-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: var(--shin-gap-2); }
+.shin-form-field { display: flex; flex-direction: column; gap: 0; margin-bottom: var(--shin-gap-2); }
+.shin-form-field > * + * { margin-top: var(--shin-gap-1); }
 .shin-form-label { min-width: 0; color: var(--shin-text-soft); font-size: calc(var(--shin-text-xs) + 1px); font-weight: 500; line-height: 1.2; }
 
 /* Hàng bật/tắt dùng cho cấu hình và các màn hình trạng thái. */
@@ -203,12 +209,13 @@
 .shin-card-body {
   display: flex;
   flex-direction: column;
-  gap: var(--shin-gap-2);
+  gap: 0;
   padding: 6px var(--shin-card-pad) var(--shin-card-pad);
 }
 
 /* Card là nơi duy nhất quyết định nhịp giữa các Block con; component con không được cộng margin dọc lần nữa. */
 .shin-card-body > * { margin-top: 0; margin-bottom: 0; }
+.shin-card-body > * + * { margin-top: var(--shin-gap-2); }
 
 /* --- Trường và nhãn ---------------------------------------------- */
 
