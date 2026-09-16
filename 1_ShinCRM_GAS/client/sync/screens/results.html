@@ -1,10 +1,10 @@
 <script>
 var FBM_SYNC_RESULT_TABS = [
-  { id: 'summary', label: 'Tổng quan', description: 'Tóm tắt phiên' },
-  { id: 'conflict', label: 'Xung đột', description: 'Cần bạn xử lý' },
-  { id: 'errors', label: 'Lỗi', description: 'Cần xem lại' },
-  { id: 'log', label: 'Log', description: 'Dấu vết chạy' },
-  { id: 'audit', label: 'Nghiệm thu', description: 'Phạm vi thử' }
+  { id: 'summary', label: 'Tổng quan', description: 'Tóm tắt kết quả phiên' },
+  { id: 'conflict', label: 'Xung đột', description: 'Các thay đổi chờ xử lý' },
+  { id: 'errors', label: 'Lỗi', description: 'Bản ghi cần xem lại' },
+  { id: 'log', label: 'Log', description: 'Nhật ký hoạt động' },
+  { id: 'audit', label: 'Nghiệm thu', description: 'Báo cáo phạm vi thử' }
 ];
 function fbmSyncResultsTabBlocks() {
   var activeTab = FBM_SYNC_CLIENT.resultsTab || 'summary';

@@ -147,7 +147,7 @@ async function chay(so) {
   hop.fbmSyncPaint(Object.assign(idle(), { counts: { completed: 9, succeeded: 8 }, metadata: { traceTail: Array.from({ length: 21 }, (_, index) => ({ stage: String(index) })) } }));
   check(so, 'snapshot GAS vá Kết quả tại chỗ, giữ nguyên hàng tab', [content.querySelector('.shin-sync-tab-row') === resultTabsNode, content.textContent.indexOf('Đã xử lý 9') >= 0], [true, true]);
   const resultTabs = ['summary', 'conflict', 'errors', 'log', 'audit'];
-  const resultTabDescriptions = { summary: 'Tóm tắt phiên', conflict: 'Cần bạn xử lý', errors: 'Cần xem lại', log: 'Dấu vết chạy', audit: 'Phạm vi thử' };
+  const resultTabDescriptions = { summary: 'Tóm tắt kết quả phiên', conflict: 'Các thay đổi chờ xử lý', errors: 'Bản ghi cần xem lại', log: 'Nhật ký hoạt động', audit: 'Báo cáo phạm vi thử' };
   resultTabs.forEach((tab) => {
     const button = dom.document.createElement('button');
     button.setAttribute('data-sync-results-tab', tab);
