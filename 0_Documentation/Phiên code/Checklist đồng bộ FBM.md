@@ -8,7 +8,7 @@
 - `[ ]` là việc còn thiếu; mục không có nhãn **Cần kiểm chứng thực tế** là việc AI tự tiếp tục được.
 - Một slice chỉ đóng sau khi đủ code, test, log/báo cáo và checklist case của slice đó.
 - Sau khi đóng slice, ghi commit và revision GAS vào bảng bằng chứng cuối file.
-- Bộ kiểm offline gần nhất đạt `1449/1449`; các mục live vẫn được đánh dấu riêng và không được suy ra từ test offline.
+- Bộ kiểm offline gần nhất đạt `1556/1556`; các mục live vẫn được đánh dấu riêng và không được suy ra từ test offline.
 
 ## Nguồn hợp đồng
 
@@ -20,12 +20,12 @@ Hợp đồng nhận diện, đăng nhập và cấu hình kết nối nằm ở
 
 Hợp đồng chi tiết và checklist triển khai riêng nằm ở `07A. Hợp đồng Reload RAM và Sheet quản trị.md` và `Checklist reload RAM và sheet quản trị.md`. Các mục dưới đây là cổng bắt buộc để mọi slice FBM không làm Sidebar hoặc view giữ dữ liệu cũ:
 
-- [ ] Mọi lần ghi thành công từ pull, push, verify, baseline, conflict, missing, retry và background phát signal ReloadState chung.
-- [ ] Signal có mã Customer/Activity khi xác định được; không xác định được thì bật full core.
-- [ ] Signal luôn đặt `allViews`; không chỉ đánh dấu view đang mở.
-- [ ] Sidebar đóng vẫn giữ signal trong DocumentProperties và Sidebar mở lại đọc được revision mới.
-- [ ] Ghi trạng thái đồng bộ dù không đổi nội dung chính vẫn reload RAM và vẽ view khi chính sách cho phép.
-- [ ] Ghi thất bại không xóa dirty state cũ.
+- [x] Mọi lần ghi thành công từ pull, push, verify, baseline, conflict, missing, retry và background phát signal ReloadState chung (cổng `WriteGate`/`DeleteGate`, test `reloadGates.js`).
+- [x] Signal có mã Customer/Activity khi xác định được; không xác định được thì bật full core (test `reloadGates.js`, `loadService.js`).
+- [x] Signal luôn đặt `allViews`; không chỉ đánh dấu view đang mở (test `reloadGates.js`, `triggers.js`).
+- [x] Sidebar đóng vẫn giữ signal trong DocumentProperties và Sidebar mở lại đọc được revision mới (đường `background`, test `reloadGates.js`, `selectionPoll.js`).
+- [x] Ghi trạng thái đồng bộ dù không đổi nội dung chính vẫn reload RAM và vẽ view khi chính sách cho phép (test status `pending/notApplied/conflict/missing/error` trong `reloadGates.js`).
+- [x] Ghi thất bại không xóa dirty state cũ (test `reloadGates.js`).
 - [ ] Chạy toàn bộ ca R3 và R8 trong `Checklist reload RAM và sheet quản trị.md` trước khi đóng slice FBM có ghi dữ liệu.
 
 ### Kiến trúc và dữ liệu nhạy cảm

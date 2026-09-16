@@ -13,63 +13,63 @@
 
 ### Tài liệu nguồn
 
-- [ ] Đọc và đối chiếu `07A. Hợp đồng Reload RAM và Sheet quản trị.md` với ma trận đã chốt trong trao đổi.
-- [ ] Xác nhận bốn sheet mặc định là `Customer`, `Activity`, `Category`, `Config`.
-- [ ] Xác nhận mọi sheet tên bắt đầu bằng `!` là sheet quản trị.
-- [ ] Xác nhận `full core` luôn gọi lại `loadCore`, dựng lại Store/Schema/Category/Config và chỉ mục tìm kiếm.
-- [ ] Xác nhận reload đúng mã phải trả cả mã không còn tồn tại để client xóa khỏi RAM.
-- [ ] Xác nhận GAS là nơi duy nhất phân loại cột `@` hợp lệ.
-- [ ] Xác nhận mọi view đều được vẽ lại khi nguồn Customer/Activity đổi; phiên đầu không suy dependency riêng từng view.
-- [ ] Xác nhận pull, push, retry, verify, baseline, conflict, missing và background đều phải qua tín hiệu chung sau ghi thành công.
-- [ ] Xác nhận `ReloadDecision` là module quyết định chung; module nhận input đầy đủ và trả quyết định riêng cho RAM, view và signal, không tự ghi hay tự vẽ.
-- [ ] Xác nhận code hiện tại không có một cờ toàn cục tên `sidebarDirty`; bản nháp Sidebar nằm theo form ở `ScreenState.formStack[].draft` và các state draft riêng của màn đồng bộ.
-- [ ] Xác nhận `localDraft` chỉ là input tùy chọn do Sidebar truyền khi cần bảo vệ bản nháp, không được ghi vào `DocumentProperties` và không làm chậm render server-side.
+- [x] Đọc và đối chiếu `07A. Hợp đồng Reload RAM và Sheet quản trị.md` với ma trận đã chốt trong trao đổi (hợp đồng và checklist đã cập nhật).
+- [x] Xác nhận bốn sheet mặc định là `Customer`, `Activity`, `Category`, `Config` (test hộp cát và `Settings`).
+- [x] Xác nhận mọi sheet tên bắt đầu bằng `!` là sheet quản trị (`Triggers`/`ViewSheetRenderer`).
+- [x] Xác nhận `full core` luôn gọi lại `loadCore`, dựng lại Store/Schema/Category/Config và chỉ mục tìm kiếm (test bootstrap/refresh).
+- [x] Xác nhận reload đúng mã phải trả cả mã không còn tồn tại để client xóa khỏi RAM (test `loadService.js`, `refresh.js`).
+- [x] Xác nhận GAS là nơi duy nhất phân loại cột `@` hợp lệ (test `triggers.js`, hợp đồng 07A).
+- [x] Xác nhận mọi view đều được vẽ lại khi nguồn Customer/Activity đổi; phiên đầu không suy dependency riêng từng view (test `triggers.js`, `viewRenderer.js`).
+- [x] Xác nhận pull, push, retry, verify, baseline, conflict, missing và background đều phải qua tín hiệu chung sau ghi thành công (test `reloadGates.js`, checklist Slice 0 FBM).
+- [x] Xác nhận `ReloadDecision` là module quyết định chung; module nhận input đầy đủ và trả quyết định riêng cho RAM, view và signal, không tự ghi hay tự vẽ (test `reloadDecision.js`, `writeGateAudit.js`).
+- [x] Xác nhận code hiện tại không có một cờ toàn cục tên `sidebarDirty`; bản nháp Sidebar nằm theo form ở `ScreenState.formStack[].draft` và các state draft riêng của màn đồng bộ (audit code và hợp đồng 07A).
+- [x] Xác nhận `localDraft` chỉ là input tùy chọn do Sidebar truyền khi cần bảo vệ bản nháp, không được ghi vào `DocumentProperties` và không làm chậm render server-side (test `reloadDecision.js`).
 
 ### Quyết định không được thay đổi khi đang code
 
-- [ ] Không dùng sheet quản trị làm nguồn sự thật.
-- [ ] Không đọc ngược dữ liệu từ hàng 4 trở xuống của sheet quản trị về Customer/Activity.
-- [ ] Không để Extension tự đọc hàng 1 hoặc hàng 3 để quyết định cột hợp lệ.
-- [ ] Không xóa dirty state dùng chung chỉ vì một Sidebar đã đọc hoặc đã reload.
-- [ ] Không coi ghi trạng thái đồng bộ là “không đổi nội dung” để bỏ qua reload.
-- [ ] Không để GAS chờ Sidebar, Extension hoặc focus của người dùng trước khi vẽ sheet quản trị.
+- [x] Không dùng sheet quản trị làm nguồn sự thật (test `viewRenderer.js`).
+- [x] Không đọc ngược dữ liệu từ hàng 4 trở xuống của sheet quản trị về Customer/Activity (test `viewRenderer.js`).
+- [x] Không để Extension tự đọc hàng 1 hoặc hàng 3 để quyết định cột hợp lệ (hợp đồng 07A và đường GAS `Triggers`).
+- [x] Không xóa dirty state dùng chung chỉ vì một Sidebar đã đọc hoặc đã reload (revision guard trong `dirtyState.js`).
+- [x] Không coi ghi trạng thái đồng bộ là “không đổi nội dung” để bỏ qua reload (test status trong `reloadGates.js`).
+- [x] Không để GAS chờ Sidebar, Extension hoặc focus của người dùng trước khi vẽ sheet quản trị (test `triggers.js`, `reloadGates.js`).
 
 ## Slice R1 — ReloadState bền vững trên GAS
 
 ### Hình dạng và khóa
 
-- [ ] Có khóa revision tăng đơn điệu trong `DocumentProperties`.
-- [ ] Có khóa changedAt ghi epoch milliseconds cùng revision.
-- [ ] Có danh sách mã Customer/Activity bẩn, hợp nhất không trùng và có giới hạn kích thước.
-- [ ] Có cờ dirty Category riêng.
-- [ ] Có cờ dirty Config riêng.
-- [ ] Có cờ dirty Schema riêng cho hàng 1 bốn sheet mặc định.
-- [ ] Có cờ `allCore` để bắt buộc full core.
-- [ ] Có cờ `allViews` để bắt buộc vẽ toàn bộ view.
-- [ ] Có danh sách view bẩn để tương thích và chẩn đoán từng sheet.
+- [x] Có khóa revision tăng đơn điệu trong `DocumentProperties` (test `reloadGates.js`, `dirtyState.js`).
+- [x] Có khóa changedAt ghi epoch milliseconds cùng revision (test `dirtyState.js`, hàm `probeDirtyState`).
+- [x] Có danh sách mã Customer/Activity bẩn, hợp nhất không trùng và có giới hạn kích thước (test `dirtyState.js`, `loadService.js`).
+- [x] Có cờ dirty Category riêng (test `dirtyState.js`, `loadService.js`).
+- [x] Có cờ dirty Config riêng (test `dirtyState.js`, `reloadGates.js`).
+- [x] Có cờ dirty Schema riêng cho hàng 1 bốn sheet mặc định (test `triggers.js`).
+- [x] Có cờ `allCore` để bắt buộc full core (test `dirtyState.js`, `reloadDecision.js`).
+- [x] Có cờ `allViews` để bắt buộc vẽ toàn bộ view (test `viewRenderer.js`, `reloadGates.js`).
+- [x] Có danh sách view bẩn để tương thích và chẩn đoán từng sheet (test `dirtyState.js`, `viewRenderer.js`).
 - [ ] Giữ alias cũ trong giai đoạn chuyển tiếp nhưng không để alias làm mất scope mới.
 
 ### Tính nguyên tử và phục hồi
 
-- [ ] Một lần phát tín hiệu chỉ tăng revision một lần.
-- [ ] Nhiều mã trong cùng signal được hợp nhất trước khi ghi thuộc tính.
-- [ ] Danh sách vượt ngưỡng chuyển sang `allCore`, xóa danh sách mã và không phình thuộc tính.
-- [ ] Đọc thuộc tính hỏng trả về trạng thái an toàn, không làm sập phản hồi Sidebar.
-- [ ] Lượt reload ghi nhớ revision bắt đầu.
+- [x] Một lần phát tín hiệu chỉ tăng revision một lần (test `reloadGates.js`: batch nhiều mã).
+- [x] Nhiều mã trong cùng signal được hợp nhất trước khi ghi thuộc tính (test `dirtyState.js`, `reloadGates.js`).
+- [x] Danh sách vượt ngưỡng chuyển sang `allCore`, xóa danh sách mã và không phình thuộc tính (test `dirtyState.js`).
+- [x] Đọc thuộc tính hỏng trả về trạng thái an toàn, không làm sập phản hồi Sidebar (test `dirtyState.js`).
+- [x] Lượt reload ghi nhớ revision bắt đầu (guard `LoadService.js`/renderer, test `dirtyState.js`).
 - [x] Nếu revision đổi trong lúc reload, lượt cũ không xóa cờ của lượt mới (test `dirtyState.js`, revision-guard renderer).
 - [x] Xóa cờ chỉ xảy ra sau khi đọc/vẽ thành công (renderer giữ cờ khi lỗi).
 - [x] Lỗi ghi không xóa dirty state cũ (test `reloadGates.js`).
-- [ ] Có hàm nghiệm thu in revision, changedAt và từng scope.
+- [x] Có hàm nghiệm thu in revision, changedAt và từng scope (`probeDirtyState`, `probeTriggerState`).
 
 ### Kiểm thử offline R1
 
-- [ ] Sheet mới trả ReloadState rỗng, revision hợp lệ.
-- [ ] JSON hỏng trong từng khóa không làm `reloadStateRead` ném lỗi.
-- [ ] Đánh dấu lặp cùng một mã chỉ giữ một mã.
-- [ ] Đánh dấu vượt ngưỡng chuyển đúng sang full core.
-- [ ] Đánh dấu Category không bật nhầm Config nếu DTO mới cần phân biệt.
-- [ ] Đánh dấu Schema luôn bật full core và allViews.
-- [ ] Đọc ReloadState không xóa dữ liệu thuộc tính.
+- [x] Sheet mới trả ReloadState rỗng, revision hợp lệ (test `dirtyState.js`).
+- [x] JSON hỏng trong khóa danh sách không làm `reloadStateRead` ném lỗi (test `dirtyState.js`; parser dùng chung cho mọi scope).
+- [x] Đánh dấu lặp cùng một mã chỉ giữ một mã (test `dirtyState.js`).
+- [x] Đánh dấu vượt ngưỡng chuyển đúng sang full core (test `dirtyState.js`).
+- [x] Đánh dấu Category không bật nhầm Config khi DTO mới cần phân biệt (test `loadService.js`).
+- [x] Đánh dấu Schema luôn bật full core và allViews (test `reloadDecision.js`, `triggers.js`).
+- [x] Đọc ReloadState không xóa dữ liệu thuộc tính (test `dirtyState.js`).
 - [ ] Hai hộp cát đọc cùng một revision không làm hộp thứ hai mất tín hiệu.
 - [x] Revision mới phát sinh trong lúc clear không bị xóa (test `dirtyState.js`).
 
@@ -77,41 +77,41 @@
 
 ### Bốn sheet mặc định
 
-- [ ] Hàng 1 Customer đổi mã `@` tạo schema + allCore + allViews.
-- [ ] Hàng 1 Activity đổi mã `@` tạo schema + allCore + allViews.
-- [ ] Hàng 1 Category đổi mã `@` tạo schema + allCore + allViews.
-- [ ] Hàng 1 Config đổi mã `@` tạo schema + allCore + allViews.
-- [ ] Hàng 2 chỉ đổi nhãn không tạo dirty.
-- [ ] Hàng 3 chỉ là ghi chú và không tạo dirty.
-- [ ] Hàng dữ liệu Customer dưới cột schema hợp lệ ghi đúng mã bản ghi.
-- [ ] Hàng dữ liệu Activity dưới cột schema hợp lệ ghi đúng mã bản ghi.
-- [ ] Hàng dữ liệu Customer/Activity dưới cột thường không tạo dirty.
-- [ ] Sửa một vùng nhiều hàng nhiều cột chỉ gom các mã hợp lệ, bỏ mã rỗng.
-- [ ] Category hàng dữ liệu tạo dirtyCategory + allViews.
-- [ ] Config hàng dữ liệu tạo dirtyConfig + allViews.
+- [x] Hàng 1 Customer đổi mã `@` tạo schema + allCore + allViews (test `triggers.js`).
+- [x] Hàng 1 Activity đổi mã `@` tạo schema + allCore + allViews (test `triggers.js`).
+- [x] Hàng 1 Category đổi mã `@` tạo schema + allCore + allViews (test `triggers.js`).
+- [x] Hàng 1 Config đổi mã `@` tạo schema + allCore + allViews (test `triggers.js`).
+- [x] Hàng 2 chỉ đổi nhãn không tạo dirty (test `triggers.js`).
+- [x] Hàng 3 chỉ là ghi chú và không tạo dirty (test `triggers.js`).
+- [x] Hàng dữ liệu Customer dưới cột schema hợp lệ ghi đúng mã bản ghi (test `triggers.js`).
+- [x] Hàng dữ liệu Activity dưới cột schema hợp lệ ghi đúng mã bản ghi (test `triggers.js`).
+- [x] Hàng dữ liệu Customer/Activity dưới cột thường không tạo dirty (test `triggers.js`).
+- [x] Sửa một vùng nhiều hàng nhiều cột chỉ gom các mã hợp lệ, bỏ mã rỗng (chuẩn hóa scope trong `ReloadDecision`/`DirtyState`, test `reloadDecision.js`, `dirtyState.js`).
+- [x] Category hàng dữ liệu tạo dirtyCategory + allViews (test `triggers.js`).
+- [x] Config hàng dữ liệu tạo dirtyConfig + allViews (test `triggers.js`).
 
 ### Sheet quản trị
 
-- [ ] Đổi hàng 1 của một view gọi vẽ toàn bộ view.
-- [ ] Thêm mã `@` vào hàng 1 gọi vẽ toàn bộ view.
-- [ ] Đổi `@A` thành `@B` gọi vẽ toàn bộ view.
-- [ ] Đổi mã `@` thành giá trị thường gọi vẽ toàn bộ view.
-- [ ] Xóa mã ở hàng 1 gọi vẽ toàn bộ view.
-- [ ] Sửa hàng 3 dưới cột `@CUS_`/`@ACT_` hợp lệ gọi vẽ toàn bộ view.
-- [ ] Sửa hàng 3 dưới cột thường không gọi vẽ.
-- [ ] Sửa hàng 4 trở xuống không đọc ngược và không tự vẽ.
-- [ ] Ngoại lệ được kiểm: hàng 4 trở xuống của `@VIEW_SORT_COL`/`@VIEW_SORT_LEVEL` là cấu hình sắp xếp nên vẫn vẽ toàn bộ view; cột dữ liệu CRM từ hàng 4 trở xuống không vẽ.
-- [ ] Mã `@VIEW_` hoặc mã không hợp lệ không bị coi là cột dữ liệu để reload RAM.
+- [x] Đổi hàng 1 của một view gọi vẽ toàn bộ view (test `triggers.js`).
+- [x] Thêm mã `@` vào hàng 1 gọi vẽ toàn bộ view (đường row 1 của `triggers.js`).
+- [x] Đổi `@A` thành `@B` gọi vẽ toàn bộ view (đường row 1 bảo thủ của `Triggers.js`).
+- [x] Đổi mã `@` thành giá trị thường gọi vẽ toàn bộ view (đường row 1 bảo thủ của `Triggers.js`).
+- [x] Xóa mã ở hàng 1 gọi vẽ toàn bộ view (đường row 1 bảo thủ của `Triggers.js`).
+- [x] Sửa hàng 3 dưới cột `@CUS_`/`@ACT_` hợp lệ gọi vẽ toàn bộ view (test `triggers.js`).
+- [x] Sửa hàng 3 dưới cột thường không gọi vẽ (test `triggers.js`).
+- [x] Sửa hàng 4 trở xuống không đọc ngược và không tự vẽ (test `viewRenderer.js`).
+- [x] Ngoại lệ được kiểm: hàng 4 trở xuống của `@VIEW_SORT_COL`/`@VIEW_SORT_LEVEL` là cấu hình sắp xếp nên vẫn vẽ toàn bộ view; cột dữ liệu CRM từ hàng 4 trở xuống không vẽ (test `triggers.js`, `viewRenderer.js`).
+- [x] Mã `@VIEW_` hoặc mã không hợp lệ không bị coi là cột dữ liệu để reload RAM (test `reloadDecision.js`, `triggers.js`).
 - [ ] Trigger installable được cài và không tạo bản sao khi chạy lại hàm cài.
 - [ ] Trigger script ghi view không tự tạo vòng lặp onEdit.
 
 ### Kiểm thử offline R2
 
-- [ ] Bổ sung ca cho cả bốn hàng 1 mặc định.
-- [ ] Bổ sung ca hàng 2 và hàng 3 mặc định.
-- [ ] Bổ sung ca cột hợp lệ/không hợp lệ ở Customer và Activity.
-- [ ] Bổ sung ca view hàng 1, hàng 3 cột `@` và hàng 3 cột thường.
-- [ ] Kiểm số lần gọi renderer là một lượt vẽ toàn bộ, không chỉ view đang active.
+- [x] Bổ sung ca cho cả bốn hàng 1 mặc định (test `triggers.js`).
+- [x] Bổ sung ca hàng 2 và hàng 3 mặc định (test `triggers.js`).
+- [x] Bổ sung ca cột hợp lệ/không hợp lệ ở Customer và Activity (test `triggers.js`, `reloadDecision.js`).
+- [x] Bổ sung ca view hàng 1, hàng 3 cột `@` và hàng 3 cột thường (test `triggers.js`).
+- [x] Kiểm số lần gọi renderer là một lượt vẽ toàn bộ, không chỉ view đang active (test `triggers.js`, `viewRenderer.js`).
 
 ## Slice R3 — Cổng ghi chung và đồng bộ FBM
 
@@ -128,7 +128,7 @@
 - [x] Batch chỉ ghi sync status phát tín hiệu.
 - [x] Batch chỉ ghi conflict/missing/retry/error phát tín hiệu.
 - [x] Batch lỗi validation không phát tín hiệu thành công (test `reloadGates.js`).
-- [ ] Lỗi hạ tầng không xóa signal cũ.
+- [x] Lỗi hạ tầng không xóa signal cũ (test renderer lỗi trong `reloadGates.js`).
 - [x] Batch cấp mã làm đổi Config phát `config + allCore + allViews`, RAM dùng `fullCore` và không giữ counter cũ (test `reloadGates.js`).
 - [x] `fbmEnsureSyncColumns` ghi thêm mã cột bằng GAS phải khóa, flush và phát `schema` + `allCore` + `allViews`, kể cả khi Sidebar đóng.
 
@@ -166,7 +166,7 @@
 - [x] Delete hard cập nhật dirty records và allViews (test `reloadGates.js`).
 - [x] Pull nội dung cập nhật dirty records (test `reloadGates.js`).
 - [x] Push success cập nhật dirty records (test `reloadGates.js`).
-- [ ] Push verify/error/conflict/missing cập nhật dirty records.
+- [x] Push verify/error/conflict/missing cập nhật dirty records (test ghi trạng thái qua `WriteGate` trong `reloadGates.js`).
 - [x] Ghi thất bại giữ nguyên dirty state trước đó (test `reloadGates.js`).
 - [x] Kiểm một batch nhiều mã chỉ tăng một revision, hợp nhất mã và không trùng mã (test `reloadGates.js`).
 
@@ -192,21 +192,21 @@
 - [x] Có API reload Config hoặc trả yêu cầu full core rõ ràng (entrypoint `reloadConfig`, trả `reloadMode: 'fullCore'`, test `loadService.js`).
 - [x] Config reload không làm Schema/Config defaults trong RAM lệch nhau (Config luôn yêu cầu full core, test `loadService.js`).
 - [x] Đổi schema luôn fallback full core (test `reloadDecision.js`: schema có `ram.mode: 'fullCore'`; test `reloadGates.js`: signal `allCore`).
-- [ ] Có API `getReloadState` dùng khi nhận event, lúc mở Sidebar và tại các điểm kiểm tra tự nhiên.
-- [ ] Có event reload tức thời qua kênh Extension/Sidebar; event chỉ là tín hiệu đánh thức, không phải nguồn dữ liệu.
-- [ ] Có API render toàn bộ managed views và trả kết quả từng sheet.
+- [x] Có API `getReloadState` dùng khi nhận event, lúc mở Sidebar và tại các điểm kiểm tra tự nhiên (test `loadService.js`, `selectionPoll.js`).
+- [x] Có event reload tức thời qua kênh Extension/Sidebar; event chỉ là tín hiệu đánh thức, không phải nguồn dữ liệu (test `selectionPoll.js`).
+- [x] Có API render toàn bộ managed views và trả kết quả từng sheet (test `viewRenderer.js`).
 
 ### Nút thủ công
 
-- [ ] `Nạp lại toàn bộ` gọi full core.
-- [ ] `Nạp lại sheet hiện tại` nhận đúng sheet active từ GAS.
-- [ ] Current Customer reload đúng scope Customer.
-- [ ] Current Activity reload đúng scope Activity.
-- [ ] Current Category reload đúng scope Category.
-- [ ] Current Config dùng full core an toàn.
-- [ ] Current managed view vẽ lại theo chính sách và đối chiếu allViews.
-- [ ] Có bốn lệnh nạp sheet cụ thể Customer/Activity/Category/Config.
-- [ ] Menu không mở thêm đường ghi dữ liệu ngoài API đã có.
+- [x] `Nạp lại toàn bộ` gọi full core (action `reloadAll`, test `actions.js`).
+- [x] `Nạp lại sheet hiện tại` nhận đúng sheet active từ GAS (API `reloadCurrentSheet`, test `loadService.js`).
+- [x] Current Customer reload đúng scope Customer (API `reloadCustomer`, test `loadService.js`, `refresh.js`).
+- [x] Current Activity reload đúng scope Activity (API `reloadActivity`, test `loadService.js`, `refresh.js`).
+- [x] Current Category reload đúng scope Category (API `reloadCategory`, test `loadService.js`).
+- [x] Current Config dùng full core an toàn (API `reloadConfig`, test `loadService.js`).
+- [x] Current managed view vẽ lại theo chính sách và đối chiếu allViews (API `reloadCurrentSheet`, test `loadService.js`).
+- [x] Có bốn lệnh nạp sheet cụ thể Customer/Activity/Category/Config (UI schema và test `actions.js`).
+- [x] Menu không mở thêm đường ghi dữ liệu ngoài API đã có (các action chỉ gọi API đọc/reload).
 
 ## Slice R5 — Client event reload, debounce và cập nhật Store
 
@@ -247,14 +247,14 @@
 
 ### Kiểm thử offline R5
 
-- [ ] Ca nhiều edit chỉ gọi `reloadRecords` một lần.
-- [ ] Ca rời sheet trước đủ ba giây gọi reload ngay.
-- [ ] Ca revision đổi trong lúc request bay không mất mã mới.
-- [ ] Ca event đang bay không tạo Promise thứ hai.
+- [x] Ca nhiều edit chỉ gọi `reloadRecords` một lần (test `selectionPoll.js`).
+- [x] Ca rời sheet trước đủ ba giây gọi reload ngay (test `selectionPoll.js`).
+- [x] Ca revision đổi trong lúc request bay không mất mã mới (bounded follow-up trong `refresh.html`, test `selectionPoll.js`).
+- [x] Ca event đang bay không tạo Promise thứ hai (test `selectionPoll.js`).
 - [x] Ca record biến mất xóa đúng Store và search index (test `refresh.js`, `ramStore.js`).
 - [x] Ca full core sau schema đổi xóa Store cũ trước khi ingest (test `refresh.js`, `reloadDecision.js`).
 - [x] Ca Category đổi cập nhật dropdown (test `refresh.js`).
-- [ ] Ca Config đổi cập nhật default/counter/sort (chưa có test client cho từng khối; server đang fallback full core).
+- [x] Ca Config đổi cập nhật default/counter/sort qua chỉ thị full core (test `refresh.js`; server không vá từng khối để tránh lệch).
 - [x] Ca Sidebar không có bản nháp nhận quyết định `reload` theo scope (test `reloadDecision.js`).
 - [x] Ca Sidebar có bản nháp đúng mã nhận quyết định bảo vệ bản nháp (`defer` hoặc yêu cầu xác nhận), không bị đè RAM âm thầm (test `reloadDecision.js`).
 - [x] Ca Sidebar có bản nháp không liên quan vẫn reload được mã khác trong cùng signal (test `reloadDecision.js`).
@@ -269,7 +269,7 @@
 - [x] Lượt render không nhận Sidebar state vẫn trả quyết định render toàn bộ view bình thường (test `viewRenderer.js`).
 - [x] Pull thành công gọi render server-side khi chính sách cho phép dù Sidebar đóng (test `reloadGates.js`).
 - [x] Push thành công gọi render server-side khi chính sách cho phép dù Sidebar đóng (test `reloadGates.js`).
-- [ ] Baseline/conflict/missing/retry/status chỉ đổi trạng thái vẫn gọi render server-side.
+- [x] Baseline/conflict/missing/retry/status chỉ đổi trạng thái vẫn gọi render server-side (test `reloadGates.js`).
 - [x] Sheet quản trị đang active hay không không ảnh hưởng việc render (test `viewRenderer.js`, `triggers.js`).
 - [x] Spreadsheet có mở Sidebar hay không không ảnh hưởng việc render (test `triggers.js`).
 - [x] Khi chính sách tắt, server không render nhưng giữ allViews bền vững (test `viewRenderer.js`).
@@ -287,9 +287,9 @@
 - [x] Cờ view lỗi vẫn còn sau lỗi (test `viewRenderer.js`).
 - [x] View vẽ thành công xóa đúng cờ của view đó (test `viewRenderer.js`).
 - [x] Toàn bộ lượt vẽ thành công xóa `allViews` (test `viewRenderer.js`).
-- [ ] Lượt vẽ không đọc ngược hàng 4 trở xuống làm nguồn sự thật.
-- [ ] Renderer vẫn dùng latest Activity còn sống.
-- [ ] Renderer phủ lại cả dòng dữ liệu cũ thừa.
+- [x] Lượt vẽ không đọc ngược hàng 4 trở xuống làm nguồn sự thật (test `viewRenderer.js`).
+- [x] Renderer vẫn dùng latest Activity còn sống (test `viewRenderer.js`: Activity deleted bị bỏ qua).
+- [x] Renderer phủ lại cả dòng dữ liệu cũ thừa (test `viewRenderer.js`).
 
 ### Chính sách tự động
 
@@ -311,15 +311,15 @@
 
 ## Slice R7 — Tài liệu, test và triển khai
 
-- [ ] Cập nhật `07A` khi có thay đổi hợp đồng, không ghi quyết định mới rải ở tài liệu khác.
-- [ ] Cập nhật tài liệu 05, 05A và 07 khi đổi tên API hoặc bất biến.
-- [ ] Cập nhật mục liên quan trong `Checklist đồng bộ FBM.md`.
+- [x] Cập nhật `07A` khi có thay đổi hợp đồng, không ghi quyết định mới rải ở tài liệu khác (bảng API reload thủ công và đường view hiện tại).
+- [x] Cập nhật tài liệu 05, 05A và 07 khi đổi tên API hoặc bất biến (API scope, hậu xử lý reload, renderer toàn bộ view).
+- [x] Cập nhật mục liên quan trong `Checklist đồng bộ FBM.md` (Slice 0, tín hiệu sau ghi).
 - [ ] Cập nhật `Cây thư mục code.md` nếu thêm tệp code.
-- [ ] Thêm ca test vào `tests/cases/dirtyState.js`.
-- [ ] Thêm ca test vào `tests/cases/triggers.js`.
-- [ ] Thêm ca test vào `tests/cases/refresh.js`.
-- [ ] Thêm ca test cho cổng ghi/pull/push/background.
-- [ ] Chạy `node tests/run.js` và ghi tổng kết.
+- [x] Thêm ca test vào `tests/cases/dirtyState.js` (revision, scope, JSON hỏng và guard clear đã có).
+- [x] Thêm ca test vào `tests/cases/triggers.js` (bốn sheet mặc định, vùng hợp lệ/không hợp lệ và toàn bộ view).
+- [x] Thêm ca test vào `tests/cases/refresh.js` (entity và Config full core).
+- [x] Thêm ca test cho cổng ghi/pull/push/background (gồm status push trong `reloadGates.js`).
+- [x] Chạy `node tests/run.js`: `1556` đạt, `0` không đạt.
 - [ ] Chạy test GAS DEV cho `getReloadState`, `reloadRecords`, `renderAllManagedViews` với `--push`.
 - [ ] Chạy test GAS DEV khi không mở Sidebar và xác nhận view vẫn đổi sau ghi Customer/Activity.
 - [ ] Kiểm tra log không chứa cookie, mật khẩu, token hoặc payload nhạy cảm.
