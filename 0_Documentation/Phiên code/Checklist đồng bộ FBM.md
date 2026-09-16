@@ -453,6 +453,7 @@ Các ràng buộc thiết kế của slice này nằm ở Tài liệu 09.01, 09.
 - [x] Chạy đồng bộ và Kết quả & xử lý dùng popup/tab/action-row chuẩn, progress rỗi rỗng, năm tab đều cột, Summary có khoảng đệm và Conflict có nút quay lại một hàng riêng.
 - [x] Cài đặt phiên có công tắc module đồng bộ, lịch nền hai chiều/bốn tiến trình, batch và delay detail, tham số phiên chỉnh được trong Sidebar.
 - [x] Tám khối cấu hình dùng component điều phối chung cho trạng thái xem/sửa, snapshot hủy, draft và action lưu; view khóa input, edit hiện X + dấu tích ở tiêu đề, nút body dùng cùng lệnh lưu/hủy. Test UI FBM đạt 106/106.
+- [x] Nút sửa cấu hình dùng hàng action chung nên đồng nhất chiều rộng; trạng thái sửa dùng nền xám trung tính, dấu tích xanh, dấu X đỏ và khoảng cách icon 8px. Test UI FBM đạt 108/108.
 - [x] Chuẩn hóa mép các khối lớn: `.shin-scroll-region` giữ gutter 4px ở cả hai phía, section không tự cộng padding trái nên card của màn thường và bốn màn Sync cùng trục dù có scrollbar hay không.
 - [x] Commit triển khai: `4370b08`, `80cb723`, `a10bba3`, `9d38fac`, `8822e72`, `801f391`, `40936a7`, `5c3acf9`, `ab208da`, `5feb4b6`, `2991b29`, `a8856a9`, `3dac581`, `6158962`, `550a738`, `3367e34`, `da6ec7e`, `e58da21`, `d2c6cf8`, `dc9460c`, `3b32296`, `afb119a`, `58e8d5b`; GAS DEV `fbmGetSyncSettings` đạt `OK` ở revision `@351`.
 

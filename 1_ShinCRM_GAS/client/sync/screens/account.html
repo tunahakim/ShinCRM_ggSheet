@@ -4,7 +4,7 @@ function fbmSyncLoginConfiguredBlocks() {
 }
 function fbmSyncLoginActionBlocks() {
   var active = !!FBM_SYNC_CLIENT.running, editing = fbmSyncConfigIsEditing('login');
-  if (!editing) { return [Row([fbmSyncConfigButton('login', { edit: 'Sửa thông tin', save: 'Lưu thông tin' }, { primary: false })])]; }
+  if (!editing) { return [fbmSyncConfigButtonRow('login', { edit: 'Sửa thông tin', save: 'Lưu thông tin' }, { primary: false })]; }
   return [Row([Button({ id: 'fbm-sync-login-test', label: 'Đăng nhập thử', className: 'shin-primary', disabled: active }), Button({ id: 'fbm-sync-login-save', label: 'Lưu thông tin', className: 'shin-primary', disabled: active, data: { 'sync-config-action': 'save', 'sync-config-key': 'login' } })])];
 }
 function fbmSyncAccountSettingsBlocks() {
@@ -18,7 +18,7 @@ function fbmSyncAccountSettingsBlocks() {
     Text({ className: 'shin-muted', text: 'Độ dài đầy đủ của ma_kh FBM tự sinh. Nhập cùng tiền tố; để trống cả hai nếu không tạo Customer mới trên FBM.' }),
     StandaloneField('Mốc ngày Activity trên FBM', { id: 'fbm-account-activity-since', kind: 'input', inputType: 'text', value: value('activitySince'), placeholder: 'YYYY-MM-DD', disabled: disabled, ariaLabel: 'Mốc ngày Activity trên FBM' }, { className: invalid.activitySince ? 'is-invalid' : '' }),
     Text({ className: 'shin-muted', text: 'Khi quét FBM, Activity có ngày làm việc (end_date) trước mốc này sẽ bị bỏ qua và không bị coi là bản ghi mất. Để trống để quét toàn bộ Activity.' }),
-    Row({ className: 'shin-single-action-row', elements: [Button({ id: 'fbm-sync-save-account-settings', label: editing ? 'Lưu cấu hình FBM' : 'Sửa cấu hình FBM', className: editing ? 'shin-primary' : '', disabled: active, data: { 'sync-config-action': editing ? 'save' : 'edit', 'sync-config-key': 'accountSettings' } })] })
+    fbmSyncConfigButtonRow('accountSettings', { edit: 'Sửa cấu hình FBM', save: 'Lưu cấu hình FBM' }, { id: 'fbm-sync-save-account-settings', disabled: active })
   ];
 }
 function fbmSyncAccountSettingsCard() {

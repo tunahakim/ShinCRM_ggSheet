@@ -173,7 +173,7 @@
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: var(--shin-gap-1);
+  gap: var(--shin-gap-2);
 }
 
 /*
@@ -199,6 +199,15 @@
 }
 
 .shin-card-head .shin-icon .shin-glyph { width: 14px; height: 14px; }
+
+/* Action cua card cau hinh: nut sua la secondary trung tinh, khong nham voi nut luu primary. */
+.shin-button.shin-config-edit { border-color: var(--shin-border-strong); background: var(--shin-bg-hover); color: var(--shin-text); font-weight: 600; }
+.shin-button.shin-config-edit:hover { border-color: var(--shin-text-soft); background: var(--shin-border-faint); }
+.shin-card-head .shin-icon.shin-config-edit-icon { color: var(--shin-primary); }
+.shin-card-head .shin-icon.shin-config-save { color: var(--shin-ok); }
+.shin-card-head .shin-icon.shin-config-cancel { color: var(--shin-error); }
+.shin-card-head .shin-icon.shin-config-save:hover { color: var(--shin-ok); }
+.shin-card-head .shin-icon.shin-config-cancel:hover { color: var(--shin-error); }
 
 /* Không đổi nền — bản cũ để nguyên. Gạch chân là dấu duy nhất, đúng nếp một đường dẫn chữ. */
 .shin-card-head .shin-icon:hover { background: none; text-decoration: underline; }

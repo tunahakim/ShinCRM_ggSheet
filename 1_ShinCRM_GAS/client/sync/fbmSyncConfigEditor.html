@@ -41,24 +41,29 @@ function fbmSyncConfigActionId(key, action) { return 'fbm-sync-config-' + key + 
 function fbmSyncConfigTitleActions(key) {
   var state = fbmSyncConfigState(key), editing = fbmSyncConfigIsEditing(key), actions = [];
   if (editing && (state.editing || (key === 'login' && FBM_SYNC_CLIENT.loginEditMode === true))) {
-    actions.push({ id: fbmSyncConfigActionId(key, 'cancel'), icon: 'close', tooltip: 'Hủy thay đổi', data: { 'sync-config-action': 'cancel', 'sync-config-key': key } });
-    actions.push({ id: fbmSyncConfigActionId(key, 'save'), icon: 'check', tooltip: 'Lưu thay đổi', data: { 'sync-config-action': 'save', 'sync-config-key': key } });
+    actions.push({ id: fbmSyncConfigActionId(key, 'cancel'), icon: 'close', className: 'shin-config-cancel', tooltip: 'Hủy thay đổi', data: { 'sync-config-action': 'cancel', 'sync-config-key': key } });
+    actions.push({ id: fbmSyncConfigActionId(key, 'save'), icon: 'check', className: 'shin-config-save', tooltip: 'Lưu thay đổi', data: { 'sync-config-action': 'save', 'sync-config-key': key } });
   } else if (!editing) {
-    actions.push({ id: fbmSyncConfigActionId(key, 'edit'), icon: 'pencil', tooltip: 'Sửa cấu hình', data: { 'sync-config-action': 'edit', 'sync-config-key': key } });
+    actions.push({ id: fbmSyncConfigActionId(key, 'edit'), icon: 'pencil', className: 'shin-config-edit-icon', tooltip: 'Sửa cấu hình', data: { 'sync-config-action': 'edit', 'sync-config-key': key } });
   }
   return actions;
 }
 
 function fbmSyncConfigButton(key, labels, options) {
-  var opts = options || {}, editing = fbmSyncConfigIsEditing(key), state = fbmSyncConfigState(key);
+  var opts = options || {}, editing = fbmSyncConfigIsEditing(key);
   var label = editing ? labels.save : labels.edit;
+  var className = editing && opts.primary !== false ? 'shin-primary' : (!editing ? 'shin-config-edit' : (opts.className || ''));
   return Button({
     id: opts.id || fbmSyncConfigActionId(key, 'button'),
     label: label,
-    className: editing && opts.primary !== false ? 'shin-primary' : (opts.className || ''),
+    className: className,
     disabled: !!opts.disabled || (!!FBM_SYNC_CLIENT.running && key !== 'relay'),
     data: { 'sync-config-action': editing ? 'save' : 'edit', 'sync-config-key': key }
   });
+}
+
+function fbmSyncConfigButtonRow(key, labels, options) {
+  return Row({ className: 'shin-single-action-row shin-config-action-row', elements: [fbmSyncConfigButton(key, labels, options)] });
 }
 
 function fbmSyncConfigBeginEdit(key, draft) {

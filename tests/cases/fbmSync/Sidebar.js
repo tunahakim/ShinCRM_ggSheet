@@ -195,7 +195,11 @@ async function chay(so) {
   hop.FBM_SYNC_CLIENT.loginStatus = { configured: false, enabled: true };
   render(hop, content, hop.fbmSyncRenderAccount, idle);
   const identityCard = content.querySelector('#fbm-sync-identity-card-region');
+  const loginCard = content.querySelector('#fbm-sync-login-card-region');
+  const identityEditButton = identityCard.querySelector('.shin-config-edit');
+  const loginEditButton = loginCard.querySelector('.shin-config-edit');
   check(so, 'Account render đủ ô liên kết, có bút sửa và khóa ô nhập khi đang xem', [dom.document.getElementById('fbm-identity-spreadsheet') !== null, dom.document.getElementById('fbm-identity-user') !== null, dom.document.getElementById('fbm-identity-account') !== null, identityCard.querySelector('[data-sync-config-action="edit"]') !== null, dom.document.getElementById('fbm-identity-spreadsheet').disabled], [true, true, true, true, true]);
+  check(so, 'Nút Sửa thông tin của Liên kết và Đăng nhập dùng cùng chiều rộng/style', [identityCard.querySelector('.shin-config-action-row').className, loginCard.querySelector('.shin-config-action-row').className, identityEditButton.className, loginEditButton.className, identityEditButton.getAttribute('data-sync-config-key'), loginEditButton.getAttribute('data-sync-config-key')], ['shin-row shin-single-action-row shin-config-action-row', 'shin-row shin-single-action-row shin-config-action-row', 'shin-button shin-config-edit', 'shin-button shin-config-edit', 'identity', 'login']);
   check(so, 'Account dùng ô mật khẩu và khóa khi chưa bấm sửa', [dom.document.getElementById('fbm-login-password').type, dom.document.getElementById('fbm-login-password').value, dom.document.getElementById('fbm-login-password').disabled], ['password', '', true]);
   const appendAccount = hop.fbmSyncAppendBox;
   let accountBlocks;
@@ -214,7 +218,7 @@ async function chay(so) {
   hop.fbmSyncAppendBox = appendAccount;
   const editLoginCard = accountBlocks[1].elements[0];
   const editLoginFields = editLoginCard.elements.filter((node) => node && node.role === 'box' && node.className === 'shin-form-field');
-  check(so, 'Bấm sửa mở lại username và để trống ô mật khẩu', [editLoginCard.titleActions[0].icon, editLoginCard.titleActions[1].icon, editLoginFields[0].elements[1].disabled, editLoginFields[0].elements[1].value, editLoginFields[1].elements[1].disabled, editLoginFields[1].elements[1].value], ['close', 'check', false, 'anhlt', false, '']);
+  check(so, 'Bấm sửa mở lại username, để trống ô mật khẩu và tách màu hai icon', [editLoginCard.titleActions[0].icon, editLoginCard.titleActions[0].className, editLoginCard.titleActions[1].icon, editLoginCard.titleActions[1].className, editLoginFields[0].elements[1].disabled, editLoginFields[0].elements[1].value, editLoginFields[1].elements[1].disabled, editLoginFields[1].elements[1].value], ['close', 'shin-config-cancel', 'check', 'shin-config-save', false, 'anhlt', false, '']);
   hop.FBM_SYNC_CLIENT.loginEditMode = false;
   hop.FBM_SYNC_CLIENT.loginStatus = { configured: false, enabled: true };
   hop.fbmSyncConfigStartEdit('login');

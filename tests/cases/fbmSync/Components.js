@@ -98,6 +98,15 @@ function chay(so) {
       source['client/sync/fbmSyncAuditScreen.html'].indexOf('Row([') >= 0,
       source['client/sync/screens/results.html'].indexOf('Row({ className: \'shin-pagination\'') >= 0],
     [true, true, true, true]);
+  check(so, 'card cấu hình dùng hàng action và style sửa chung, không tự đặt kích thước từng màn',
+    [source['client/sync/fbmSyncConfigEditor.html'].indexOf('function fbmSyncConfigButtonRow(') >= 0,
+      source['client/sync/screens/account.html'].indexOf('fbmSyncConfigButtonRow(\'login\'') >= 0,
+      source['client/sync/fbmSyncSettingsScreen.html'].indexOf('fbmSyncConfigButtonRow(\'identity\'') >= 0,
+      styles.slice(styles.indexOf('.shin-card-actions {'), styles.indexOf('.shin-card-actions {') + 220).indexOf('gap: var(--shin-gap-2);') >= 0,
+      styles.indexOf('.shin-button.shin-config-edit') >= 0,
+      styles.indexOf('.shin-card-head .shin-icon.shin-config-save') >= 0,
+      styles.indexOf('.shin-card-head .shin-icon.shin-config-cancel') >= 0],
+    [true, true, true, true, true, true, true]);
   check(so, 'Sync không tạo DOM trực tiếp trong renderer component',
     [all.indexOf('document.createElement') === -1, all.indexOf('.innerHTML') === -1, all.indexOf('.appendChild') === -1],
     [true, true, true]);

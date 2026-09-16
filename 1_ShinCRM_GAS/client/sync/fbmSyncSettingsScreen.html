@@ -17,7 +17,7 @@ function fbmSyncIdentityFormBlocks() {
 }
 function fbmSyncIdentityActionBlocks() {
   var active = !!FBM_SYNC_CLIENT.running, action = FBM_SYNC_CLIENT.identityAction, editing = fbmSyncConfigIsEditing('identity');
-  if (!editing) { return [Row({ elements: [fbmSyncConfigButton('identity', { edit: 'Sửa thông tin', save: 'Lưu thông tin' }, { primary: false })] })]; }
+  if (!editing) { return [fbmSyncConfigButtonRow('identity', { edit: 'Sửa thông tin', save: 'Lưu thông tin' }, { primary: false })]; }
   return [Button({ id: 'fbm-sync-check-identity', label: action === 'check' ? 'Đang kiểm tra liên kết...' : 'Kiểm tra liên kết', className: 'shin-primary', disabled: active }), Button({ id: 'fbm-sync-probe-identity', label: action === 'probe' ? 'Đang tự động điền và kiểm tra...' : 'Tự động điền - Kiểm tra', className: 'shin-primary', disabled: active }), Button({ id: 'fbm-sync-save-identity', label: 'Lưu thông tin', className: 'shin-primary', disabled: active, data: { 'sync-config-action': 'save', 'sync-config-key': 'identity' } })];
 }
 function fbmSyncIdentityResultBlocks(status) {
