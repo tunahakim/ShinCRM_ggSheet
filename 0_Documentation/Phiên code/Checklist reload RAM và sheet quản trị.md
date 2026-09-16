@@ -314,19 +314,19 @@
 - [x] Cập nhật `07A` khi có thay đổi hợp đồng, không ghi quyết định mới rải ở tài liệu khác (bảng API reload thủ công và đường view hiện tại).
 - [x] Cập nhật tài liệu 05, 05A và 07 khi đổi tên API hoặc bất biến (API scope, hậu xử lý reload, renderer toàn bộ view).
 - [x] Cập nhật mục liên quan trong `Checklist đồng bộ FBM.md` (Slice 0, tín hiệu sau ghi).
-- [ ] Cập nhật `Cây thư mục code.md` nếu thêm tệp code.
+- [x] Đối chiếu `Cây thư mục code.md`: nhóm này không thêm tệp code; các module `ReloadDecision.js` và `DirtyState.js` đã có trong cây.
 - [x] Thêm ca test vào `tests/cases/dirtyState.js` (revision, scope, JSON hỏng và guard clear đã có).
 - [x] Thêm ca test vào `tests/cases/triggers.js` (bốn sheet mặc định, vùng hợp lệ/không hợp lệ và toàn bộ view).
 - [x] Thêm ca test vào `tests/cases/refresh.js` (entity và Config full core).
 - [x] Thêm ca test cho cổng ghi/pull/push/background (gồm status push trong `reloadGates.js`).
 - [x] Chạy `node tests/run.js`: `1560` đạt, `0` không đạt.
-- [x] Chạy test GAS DEV cho `getReloadState`, `reloadRecords`, `renderAllManagedViews` với `--push`: `getReloadState` đạt ở `@326`, `reloadRecords` đạt ở `@327` với fallback `fullCore` khi scope rỗng, `renderAllManagedViews` đạt ở `@328` với tất cả view DEV trả `ok` và không có sheet lỗi.
+- [x] Chạy test GAS DEV cho `getReloadState`, `reloadRecords`, `renderAllManagedViews` với `--push`: `getReloadState` đạt ở `@326`, `reloadRecords` đạt ở `@327` với fallback `fullCore` khi scope rỗng, `renderAllManagedViews` đạt ở `@328` với tất cả view DEV trả `ok` và không có sheet lỗi; đường runtime `renderAllManagedViewsIfAllowed` được kiểm tra tiếp ở revision mới và dọn cờ view stale theo đúng revision guard.
 - [ ] Chạy test GAS DEV khi không mở Sidebar và xác nhận view vẫn đổi sau ghi Customer/Activity.
-- [ ] Kiểm tra log không chứa cookie, mật khẩu, token hoặc payload nhạy cảm.
-- [ ] Chỉ thử dữ liệu thật ở Sheet DEV theo cờ an toàn đã chốt.
-- [ ] Không sửa fixture trong `0_Documentation/Nghiên cứu FBM/`.
-- [ ] Commit riêng tài liệu/checklist trước khi commit core code.
-- [ ] Commit riêng core GAS, client Sidebar và test khi hợp lý.
+- [x] Kiểm tra log không chứa cookie, mật khẩu, token hoặc payload nhạy cảm bằng `tests/cases/logMask.js` và các ca DTO/log FBM; bộ offline đạt `1560/1560`.
+- [x] Chỉ thử dữ liệu ở Spreadsheet DEV `2026.09.05 - ShinCRM DEV` qua cổng DEV có token; không chạm Spreadsheet production.
+- [x] Không sửa fixture trong `0_Documentation/Nghiên cứu FBM/`; `git diff` không có đường dẫn thuộc thư mục này.
+- [x] Commit riêng tài liệu/checklist trước core code: `31a74ef`, `e1e98e2`.
+- [x] Commit riêng core GAS, client Sidebar và test khi hợp lý: `a73edec`, `d62427e`, `4cbcd6a`; cổng DEV bổ sung ở `fec22e1`.
 
 ## Slice R8 — Nghiệm thu trên Sheet DEV
 
