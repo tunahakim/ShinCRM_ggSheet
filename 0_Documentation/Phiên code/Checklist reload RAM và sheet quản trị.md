@@ -120,8 +120,8 @@
 - [ ] Sau `flush` và đọc lại thành công, phát signal cho mọi id trong batch.
 - [ ] Signal chạy cho `source: user`.
 - [ ] Signal chạy cho `source: pull`.
-- [ ] Signal chạy cho `source: push` hoặc nguồn tương đương đã chốt.
-- [ ] Signal chạy cho background không có Sidebar.
+- [x] Signal chạy cho `source: push`; các call site trong `PushFlow` không còn gắn nhãn `pull`.
+- [x] Signal chạy cho `source: background` không có Sidebar (test cửa ghi offline).
 - [ ] Batch Customer mới phát tín hiệu bằng mã vừa cấp.
 - [ ] Batch Activity mới phát tín hiệu bằng mã vừa cấp.
 - [ ] Batch chỉ ghi baseline phát tín hiệu.
@@ -137,8 +137,8 @@
 - [ ] Xóa hẳn phát signal cho mã đã biến mất để client xóa khỏi Store.
 - [ ] Không có đường `setValue` Customer/Activity ngoài cổng ghi hoặc cửa xóa đã phát signal.
 - [ ] Pull dùng signal chung, không tự thao tác JSON dirty riêng.
-- [ ] Push dùng signal chung, không bỏ qua vì chỉ đổi trạng thái.
-- [ ] Background dùng signal chung dù Sidebar đóng.
+- [x] Push dùng signal chung, không bỏ qua vì chỉ đổi trạng thái.
+- [x] Background dùng signal chung dù Sidebar đóng.
 
 ### Kiểm thử offline R3
 

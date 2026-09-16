@@ -28,6 +28,12 @@ function chay(so) {
     [pushed.ok, pushed.reloadDecision.kind, pushed.dirty.records, pushed.dirty.allViews, pushedEnv.hop.rendered],
     [true, 'records', ['KH000001'], true, 1]);
 
+  const backgroundEnv = taoHop();
+  const background = backgroundEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000333' }], source: 'background' });
+  check(so, 'writeGateSave background không cần Sidebar vẫn phát signal và render',
+    [background.ok, background.reloadDecision.kind, background.dirty.records, background.dirty.allViews, backgroundEnv.hop.rendered],
+    [true, 'records', ['KH000001'], true, 1]);
+
   const deletedEnv = taoHop();
   const deleted = deletedEnv.hop.deleteGateRemove({ entity: 'customer', ids: ['KH000001'] });
   check(so, 'DeleteGate hard delete cũng phát signal cho mã biến mất và render',

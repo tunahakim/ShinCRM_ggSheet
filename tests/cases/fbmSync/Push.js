@@ -142,12 +142,12 @@ async function chay(so) {
   const emptyWriteState = push.FbmSync.stateStart('', 'push', 0); emptyWriteState.mode = 'write'; emptyWriteState.metadata.categoryGate = {}; emptyWriteState.cursor = { kind: 'push_scan', entity: 'customer', index: 0 }; push.FbmSync.stateWrite(emptyWriteState);
   push.FbmSync.nextPushRequest(emptyWriteState);
   check(so, 'push khong co ung vien hien thong bao khong co ban ghi day', push.FbmSync.stateRead().message, 'Đồng bộ hoàn tất; không có bản ghi nào được đẩy.');
-  let pushPatch;
+  let pushPatch, pushWriteRequest;
   const pushLogs = [];
   push.logEvent = (event) => pushLogs.push(event);
-  push.writeGateSave = (request) => { pushPatch = request.records[0]; return { ok: true }; };
+  push.writeGateSave = (request) => { pushWriteRequest = request; pushPatch = request.records[0]; return { ok: true }; };
   push.FbmSync.markPushResult({ entity: 'customer', record: { id: 'C-OLD', fbmId: 'A-OLD', fbmCustomerCode: 'ALT00010', fbmHash: 'BASE' } }, { d: { InternalValues: [{ Name: 'stt_rec_kh', Value: 'A-OLD' }, { Name: 'ma_kh', Value: 'ALT00010' }] } }, 'customer_edit_save');
-  check(so, 'push thanh cong giu baseline cu cho ky xac nhan', pushPatch.fbmHash, 'BASE');
+  check(so, 'push thanh cong giu baseline cu cho ky xac nhan va dung source push', [pushPatch.fbmHash, pushWriteRequest.source], ['BASE', 'push']);
   check(so, 'push thanh cong ghi log request kind huong va hash', [pushLogs[0].action, pushLogs[0].detail.requestKind, pushLogs[0].detail.direction, pushLogs[0].detail.hBASE], ['push_record', 'customer_edit_save', 'ShinCRM → FBM', 'BASE']);
   const errorState = { counts: { error: 0 }, metadata: { categoryGate: {}, pushFailures: {} }, locks: {} };
   push.FbmSync.unlockRecord = () => ({ locks: {} });

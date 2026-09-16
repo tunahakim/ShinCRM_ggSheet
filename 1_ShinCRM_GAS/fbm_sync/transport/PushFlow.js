@@ -45,7 +45,7 @@ FbmSync.markPushResult = function (candidate, response, operation) {
     patch.fbmId = String(activityId).trim();
     if (!patch.fbmId) { throw new Error('FBM không trả id sau khi ghi Activity.'); }
   }
-  var saved = writeGateSave({ entity: candidate.entity, records: [patch], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
+  var saved = writeGateSave({ entity: candidate.entity, records: [patch], source: 'push', schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
   if (!saved || !saved.ok) { throw new Error('Không ghi được trạng thái chờ xác nhận sau push.'); }
   // Hash chờ xác nhận chỉ lưu trong state server, không ghi vào Sheet.
   try {
@@ -72,7 +72,7 @@ FbmSync.finishCustomerCreateRecovery = function (state, response) {
   if (rows.length !== 1 || !local) { throw new Error('CREATE_RECOVERY_NOT_EXACT: không xác định duy nhất Customer vừa tạo; không gửi lại request ghi.'); }
   var incoming = FbmSync.customerRecord(rows[0], state.metadata && state.metadata.categoryGate || {}), localHash = FbmSync.hash(local, 'customer', state.metadata && state.metadata.categoryGate || {}), incomingHash = FbmSync.hash(incoming, 'customer', state.metadata && state.metadata.categoryGate || {}), sentHash = FbmSync.hash(candidate.record || {}, 'customer', state.metadata && state.metadata.categoryGate || {});
   if (incomingHash !== sentHash || localHash !== sentHash) { throw new Error('CREATE_RECOVERY_MISMATCH: Customer tìm thấy không khớp chính xác dữ liệu đã gửi.'); }
-  var patch = { id: local.id, fbmId: incoming.fbmId, fbmCustomerCode: incoming.fbmCustomerCode, fbmHash: incomingHash, syncStatus: FbmSync.SYNC_STATUS.synced, syncedAt: new Date() }, saved = writeGateSave({ entity: 'customer', records: [patch], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
+  var patch = { id: local.id, fbmId: incoming.fbmId, fbmCustomerCode: incoming.fbmCustomerCode, fbmHash: incomingHash, syncStatus: FbmSync.SYNC_STATUS.synced, syncedAt: new Date() }, saved = writeGateSave({ entity: 'customer', records: [patch], source: 'push', schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
   if (!saved || !saved.ok) { throw new Error('CREATE_RECOVERY_SAVE_FAILED: không vá được ID Customer sau khi xác nhận.'); }
   state.metadata.pushSucceeded = Number(state.metadata.pushSucceeded || 0) + 1; state.counts.succeeded += 1; FbmSync.releasePushLock(state, 'customer', local.id); state.cursor = { kind: 'push_scan', entity: 'customer', index: Number(cursor.index || 0) + 1 }; state.current = ''; state.message = 'Đã xác nhận Customer tạo thành công sau khi mất phản hồi.'; FbmSync.stateWrite(state); return FbmSync.nextPushRequest(state);
 };
@@ -94,7 +94,7 @@ FbmSync.finishPushVerification = function (state, response) {
   var localHash = FbmSync.hash(local, entity, state.metadata && state.metadata.categoryGate || {}), previousHash = String(local.fbmHash || '').trim();
   if (incomingHash === sentHash) {
     var status = localHash === sentHash ? FbmSync.SYNC_STATUS.synced : FbmSync.SYNC_STATUS.pending;
-    var saved = writeGateSave({ entity: entity, records: [{ id: local.id, fbmHash: incomingHash, syncStatus: status, syncedAt: new Date() }], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
+    var saved = writeGateSave({ entity: entity, records: [{ id: local.id, fbmHash: incomingHash, syncStatus: status, syncedAt: new Date() }], source: 'push', schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
     if (!saved || !saved.ok) { throw new Error('Không ghi được baseline sau khi FBM xác nhận dữ liệu.'); }
     FbmSync.pendingPushClear(entity, id);
     FbmSync.logPushRecord(candidate, cursor.operation, typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', status === FbmSync.SYNC_STATUS.synced ? 'FBM đã xác nhận đúng dữ liệu vừa ghi.' : 'FBM đã xác nhận; ShinCRM đã sửa tiếp nên chờ lượt đẩy mới.', { hPUSH: sentHash, hFBM: incomingHash, syncStatus: status });
@@ -107,7 +107,7 @@ FbmSync.finishPushVerification = function (state, response) {
   if (previousHash && incomingHash === previousHash) {
     state.counts.skipped += 1;
     state.locks = state.locks || {}; state.locks[entity + ':' + id] = { revision: localHash, owner: 'sync', reason: 'not_applied', at: Date.now() };
-    writeGateSave({ entity: entity, records: [{ id: local.id, syncStatus: FbmSync.SYNC_STATUS.notApplied }], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
+    writeGateSave({ entity: entity, records: [{ id: local.id, syncStatus: FbmSync.SYNC_STATUS.notApplied }], source: 'push', schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
     FbmSync.pendingPushClear(entity, id);
     FbmSync.logPullRecord(entity, values, local, FbmSync.SYNC_STATUS.notApplied, 'FBM không đổi sau lần ghi; đọc xác nhận trực tiếp.');
     state.cursor = { kind: 'push_scan', entity: entity, index: Number(cursor.index || 0) + 1 }; state.current = ''; state.message = 'FBM chưa áp dụng ' + entity + ' ' + id + '.'; FbmSync.stateWrite(state);
@@ -116,7 +116,7 @@ FbmSync.finishPushVerification = function (state, response) {
   var conflict = FbmSync.threeWay({ hBASE: previousHash }, local, values, entity, state.metadata && state.metadata.categoryGate || {});
   FbmSync.rememberConflict(state, entity, local, values, conflict, state.metadata && state.metadata.categoryGate || {});
   state.counts.conflict += 1; state.cursor = {}; state.current = ''; state.phase = 'conflict'; state.message = 'Đọc xác nhận khác dữ liệu vừa ghi; đã dừng để kiểm tra xung đột.'; FbmSync.stateWrite(state);
-  writeGateSave({ entity: entity, records: [{ id: local.id, syncStatus: FbmSync.SYNC_STATUS.conflict }], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
+  writeGateSave({ entity: entity, records: [{ id: local.id, syncStatus: FbmSync.SYNC_STATUS.conflict }], source: 'push', schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
   FbmSync.pendingPushClear(entity, id);
   return null;
 };
@@ -162,7 +162,7 @@ FbmSync.markPushError = function (state, candidate, failure, operation) {
   state.metadata.pushFailureDetails[candidate.entity + ':' + String(candidate.id || '')] = detail;
   var waitingForMarker = candidate.kind === 'create';
   if (typeof writeGateSave === 'function') {
-    try { writeGateSave({ entity: candidate.entity, records: [{ id: candidate.id, syncStatus: waitingForMarker ? FbmSync.SYNC_STATUS.pushing : FbmSync.SYNC_STATUS.error }], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] }); } catch (ignore) {}
+    try { writeGateSave({ entity: candidate.entity, records: [{ id: candidate.id, syncStatus: waitingForMarker ? FbmSync.SYNC_STATUS.pushing : FbmSync.SYNC_STATUS.error }], source: 'push', schemas: [DATA_SCHEMA, SYNC_SCHEMA] }); } catch (ignore) {}
   }
   if (typeof logEvent === 'function') {
     logEvent({ source: 'fbm_sync', action: 'push_record_error', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', entity: candidate.entity, recordId: String(candidate.id || ''), reason: detail.reason, detail: { code: detail.code, status: detail.status, fieldName: detail.fieldName } });
@@ -177,7 +177,7 @@ FbmSync.markPushSkipped = function (state, candidate, status, reason) {
   state.counts.skipped += 1;
   state.message = String(reason || 'Bản ghi chưa đủ điều kiện đẩy.');
   if (typeof writeGateSave === 'function') {
-    try { writeGateSave({ entity: candidate.entity, records: [{ id: candidate.id, syncStatus: status || FbmSync.SYNC_STATUS.skipped }], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] }); } catch (ignore) {}
+    try { writeGateSave({ entity: candidate.entity, records: [{ id: candidate.id, syncStatus: status || FbmSync.SYNC_STATUS.skipped }], source: 'push', schemas: [DATA_SCHEMA, SYNC_SCHEMA] }); } catch (ignore) {}
   }
   if (typeof logEvent === 'function') {
     logEvent({ source: 'fbm_sync', action: 'push_record_skipped', outcome: typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn', entity: candidate.entity, recordId: String(candidate.id || ''), reason: String(reason || 'Bo qua ban ghi chua du dieu kien day.') });
@@ -280,7 +280,7 @@ FbmSync.nextPushRequest = function (state) {
     }
     if (typeof FbmSync.lockRecord === 'function') { state = FbmSync.lockRecord(entity, candidate.id, candidate.record.fbmHash || '', 'sync'); }
     if (typeof writeGateSave === 'function') {
-      try { writeGateSave({ entity: entity, records: [{ id: candidate.id, syncStatus: FbmSync.SYNC_STATUS.pushing }], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] }); } catch (ignore) {}
+      try { writeGateSave({ entity: entity, records: [{ id: candidate.id, syncStatus: FbmSync.SYNC_STATUS.pushing }], source: 'push', schemas: [DATA_SCHEMA, SYNC_SCHEMA] }); } catch (ignore) {}
     }
     state.phase = 'push'; state.entity = entity; state.current = candidate.id; state.cursor = { kind: 'push_wait', operation: request.meta.kind, entity: entity, index: index, candidate: candidate };
     state.message = 'Đang đẩy ' + (entity === 'customer' ? 'khách hàng' : 'giao dịch') + ' ' + candidate.id + '...'; FbmSync.stateWrite(state);
