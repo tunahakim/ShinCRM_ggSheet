@@ -4,7 +4,7 @@ var FBM_SYNC_RESULT_TABS = [
   { id: 'conflict', label: 'Xung đột', description: 'Các thay đổi chờ xử lý' },
   { id: 'errors', label: 'Lỗi', description: 'Bản ghi cần xem lại' },
   { id: 'log', label: 'Log', description: 'Nhật ký hoạt động' },
-  { id: 'audit', label: 'Nghiệm thu', description: 'Báo cáo phạm vi thử' }
+  { id: 'audit', label: 'Nghiệm thu', description: 'Kết quả kiểm tra dữ liệu thử nghiệm', multiline: true }
 ];
 function fbmSyncResultsTabBlocks() {
   var activeTab = FBM_SYNC_CLIENT.resultsTab || 'summary';
@@ -16,7 +16,7 @@ function fbmSyncResultsTabBlocks() {
 function fbmSyncResultsTabDescriptionBlock() {
   var activeTab = FBM_SYNC_CLIENT.resultsTab || 'summary';
   var tab = FBM_SYNC_RESULT_TABS.filter(function (item) { return item.id === activeTab; })[0] || FBM_SYNC_RESULT_TABS[0];
-  return Box({ id: 'fbm-sync-results-tab-description-region', className: 'shin-sync-tab-description-region', elements: [Text({ className: 'shin-sync-tab-description', text: tab.description })] });
+  return Box({ id: 'fbm-sync-results-tab-description-region', className: 'shin-sync-tab-description-region' + (tab.multiline ? ' is-multiline' : ''), elements: [Text({ className: 'shin-sync-tab-description', text: tab.description })] });
 }
 function fbmSyncResultsBodyBlocks(status) {
   var tab = FBM_SYNC_CLIENT.resultsTab || 'summary';
@@ -24,11 +24,11 @@ function fbmSyncResultsBodyBlocks(status) {
   if (tab === 'audit') { return fbmSyncAuditContentBlocks(status); }
   if (tab === 'errors') { return fbmSyncResultPageBlocks(status, 'errors'); }
   if (tab === 'log') { return fbmSyncResultPageBlocks(status, 'log'); }
-  return [Box({ className: 'shin-section', elements: fbmSyncStatusBlocks(status, status.counts || {}).concat(fbmSyncRecordIssueBlocks(status.metadata || {})) })];
+  return fbmSyncStatusBlocks(status, status.counts || {}).concat(fbmSyncRecordIssueBlocks(status.metadata || {}));
 }
 function fbmSyncRenderResults(panel, status) {
   status = status || {};
-  return fbmSyncAppendBox(panel, 'shin-section', 'fbm-sync-results-root', [Box({ className: 'shin-sync-tab-row', id: 'fbm-sync-results-tabs-region', elements: fbmSyncResultsTabBlocks() }), fbmSyncResultsTabDescriptionBlock(), Box({ id: 'fbm-sync-results-body-region', elements: fbmSyncResultsBodyBlocks(status) })]);
+  return fbmSyncAppendBox(panel, 'shin-section', 'fbm-sync-results-root', [Box({ className: 'shin-sync-tab-row', id: 'fbm-sync-results-tabs-region', elements: fbmSyncResultsTabBlocks() }), fbmSyncResultsTabDescriptionBlock(), Box({ id: 'fbm-sync-results-body-region', className: 'shin-section', elements: fbmSyncResultsBodyBlocks(status) })]);
 }
 function fbmSyncResultsSignature(status) {
   var metadata = status && status.metadata || {}, tab = FBM_SYNC_CLIENT.resultsTab || 'summary';

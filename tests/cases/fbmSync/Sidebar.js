@@ -306,7 +306,8 @@ async function chay(so) {
   render(hop, content, hop.fbmSyncRenderResults, conflictStatus);
   const resultTabButtons = Array.from(content.querySelectorAll('.shin-sync-tab-trigger'));
   const resultTabLabels = resultTabButtons.map((node) => node.querySelector('.shin-btn-label').textContent);
-  check(so, 'Results summary render năm tab chỉ có tên và mô tả nằm riêng bên dưới', [demTheoThuocTinh(content, 'data-sync-results-tab'), resultTabLabels, content.querySelectorAll('.shin-sync-tab-description').length, content.querySelector('#fbm-sync-results-tab-description-region').textContent, dom.document.getElementById('fbm-sync-open-conflicts') !== null], [5, ['Tổng quan', 'Xung đột', 'Lỗi', 'Log', 'Nghiệm thu'], 1, 'Tóm tắt kết quả phiên', true]);
+  const resultBody = content.querySelector('#fbm-sync-results-body-region');
+  check(so, 'Results summary render năm tab chỉ có tên và mô tả nằm riêng bên dưới', [demTheoThuocTinh(content, 'data-sync-results-tab'), resultTabLabels, content.querySelectorAll('.shin-sync-tab-description').length, content.querySelector('#fbm-sync-results-tab-description-region').textContent, resultBody.className.indexOf('shin-section') >= 0, resultBody.querySelectorAll('.shin-section').length, dom.document.getElementById('fbm-sync-open-conflicts') !== null], [5, ['Tổng quan', 'Xung đột', 'Lỗi', 'Log', 'Nghiệm thu'], 1, 'Tóm tắt kết quả phiên', true, 0, true]);
   hop.FBM_SYNC_CLIENT.resultsTab = 'conflict';
   render(hop, content, hop.fbmSyncRenderResults, conflictStatus);
   check(so, 'Màn hình xung đột có hai phía và ô tự nhập', [demTheoThuocTinh(content, 'data-fbm-conflict-choice'), demTheoThuocTinh(content, 'data-fbm-conflict-manual')], [2, 1]);
