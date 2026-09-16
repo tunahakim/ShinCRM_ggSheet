@@ -444,7 +444,7 @@ Các ràng buộc thiết kế của slice này nằm ở Tài liệu 09.01, 09.
 
 - [x] Bổ sung workflow test dựa trên tài liệu cho startup, wake, restart, một alarm, không có việc, overlap, ưu tiên, auto-open, retry và response lớn.
 - [ ] Ma trận 44 pipeline có ít nhất một bằng chứng chạy thật qua GAS → Extension → FBM giả lập → GAS/UI cho mỗi nhánh liên quan.
-- [x] Chạy `node tests/run.js`; bộ offline hiện đạt `1582/1582`. Ma trận live/GAS DEV còn chờ các mục được đánh dấu riêng.
+- [x] Chạy `node tests/run.js`; bộ offline hiện đạt `1589/1589`. Ma trận live/GAS DEV còn chờ các mục được đánh dấu riêng.
 
 ### Đợt sửa Sidebar FBM ngày 16/09/2026
 
@@ -495,4 +495,4 @@ Ghi chú Slice 9A: commit `a1b8e0c` gom lịch nghiệp vụ về GAS, giữ Ext
 
 - [x] Refactor FBM dùng chung shell `header/info/body/footer` của Sidebar; bỏ overlay và vùng cuộn riêng, phục hồi form/footer khi đóng, khóa callback đến muộn; test offline `1582/1582`, commit `2827107`, `222f7be`, GAS DEV revision `@340`.
 - [x] Tách menu chọn cố định khỏi combo input: thêm `StandaloneControl(kind: 'menu')` dùng popup chung nhưng trigger là button, chuyển Loại đồng bộ/Chiều đồng bộ/Conflict; khóa callback đến muộn khi popup đang mở; test offline `1589/1589`, commit `3b297e7`, `2ee3aa7`, GAS DEV revision `@343`.
-- [x] Màn FBM vẽ ngay shell và khung `Chạy đồng bộ` trước snapshot GAS; trạng thái chưa sẵn sàng khóa control qua renderer chung, snapshot về sau hydrate tại chỗ; test offline `1589/1589`.
+- [x] Màn FBM vẽ ngay shell và khung `Chạy đồng bộ` trước snapshot GAS; trạng thái chưa sẵn sàng khóa control qua renderer chung, snapshot về sau hydrate tại chỗ; test offline `1589/1589`, commit `88d88e7`, GAS DEV revision `@344`.
