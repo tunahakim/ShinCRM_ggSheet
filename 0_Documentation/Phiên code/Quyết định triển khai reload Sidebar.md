@@ -62,6 +62,8 @@ Extension không quyết định có reload, không quyết định cột `@` h�
 
 Extension có thể bắt `keydown` ở tầng DOM để đánh thức Sidebar. Đây chỉ là tín hiệu gợi ý; các phím Enter, Esc, phím điều hướng, phím lặp, bộ gõ và thao tác không phát keydown không được coi là nguồn sự thật. Không cần bắt click riêng cho reload vì thay đổi vị trí đã được theo dõi qua địa chỉ ô; việc lấy mã khách khi click vẫn phải giữ.
 
+Để giảm khả năng bỏ sót Delete/Backspace, Extension có thể gộp thêm `beforeinput` và `keyup` của hai phím này vào cùng `pendingKeydownHint`. Các event này vẫn chỉ là hint; Extension không kết luận có `onEdit`, không đọc mã cột và không tạo dirty signal.
+
 ### 3.3. Sidebar
 
 Sidebar giữ state riêng của trang đó:
@@ -114,6 +116,10 @@ Nếu GAS gọi helper tương đương `probeSelectionFull` bên trong cùng l�
 Sau mỗi `ContextHint` do đổi vị trí hoặc `keydown`, Sidebar hủy timer cũ và đặt một timer mới 1 giây. Hết 1 giây không có hint mới, Sidebar gửi một wake request.
 
 Mục đích là giảm số request khi người dùng di chuyển nhanh giữa các ô hoặc gõ liên tục. Mốc này chỉ điều khiển thời điểm hỏi GAS; nó không quyết định thời điểm reload dữ liệu.
+
+Nếu wake mới đến trong lúc request trước còn chạy, Sidebar chỉ giữ một cờ wake đang chờ ở tầng vận chuyển rồi gửi một request tiếp theo. Cờ này không chứa mã, không chứa scope và không quyết định nghiệp vụ. GAS phải đọc `ReloadState` mới nhất và trả toàn bộ scope hiện hành theo nguyên tắc latest-wins; `reloadRecords` hợp nhất các mã dirty khi `expectedRevision` đã cũ và trả `processedRevision`/`supersededRevision` để response cũ không được coi là state cuối.
+
+Apps Script không có cơ chế hủy chắc chắn một invocation đang chạy. Vì vậy thiết kế không dựa vào hủy tiến trình: request cũ có thể hoàn tất nhưng chỉ được áp dụng nếu revision của nó không thấp hơn revision đã nạp. Nếu signal đổi trong lúc đọc, GAS giữ signal mới hoặc trả chỉ thị để request kế tiếp xử lý, không xóa nhầm dirty state.
 
 ### 5.2. Debounce dữ liệu 3 giây
 
