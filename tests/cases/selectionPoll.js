@@ -412,6 +412,46 @@ async function chay(so) {
   check(so, 'tải lại Extension đặt lại seq đúng một lần và bỏ context sót từ phiên cũ',
     [seqSauAckMoi, seqSauContextMoi, taiLai.SHEET_LINK_SEQ],
     [0, 1, 1]);
+
+  const reloadEvent = dungHopPoll();
+  batDau(reloadEvent);
+  reloadEvent._calls = [];
+  reloadEvent.callServer = (name, args) => {
+    reloadEvent._calls.push([name, args]);
+    if (name === 'getReloadState') {
+      return syncValue({ ok: true, reload: { revision: 8, records: ['KH1'], category: false, config: false, allCore: false, allViews: true, viewSheets: [] } });
+    }
+    return syncValue({ ok: true });
+  };
+  reloadEvent.refreshDirtyRecords = (ids, revision) => {
+    reloadEvent._calls.push(['refreshDirtyRecords', [ids, revision]]);
+    return syncValue({ ok: true });
+  };
+  reloadEvent.sheetLinkOnMessage({
+    origin: reloadEvent.SHEET_LINK_ORIGIN,
+    data: { action: 'CRM_RELOAD', nonce: reloadEvent.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', revision: 8 }
+  });
+  reloadEvent.sheetLinkOnMessage({
+    origin: reloadEvent.SHEET_LINK_ORIGIN,
+    data: { action: 'CRM_RELOAD', nonce: reloadEvent.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', revision: 8 }
+  });
+  check(so, 'event reload chỉ đánh thức một lượt getReloadState và không tạo request chồng',
+    reloadEvent._calls,
+    [['getReloadState', undefined], ['refreshDirtyRecords', [['KH1'], 8]]]);
+
+  const debounce = dungHopPoll();
+  batDau(debounce);
+  debounce.sheetLinkScheduleEditReload({ sheetName: 'Customer', isEditing: false }, true);
+  const debounceTimer = Array.from(debounce._timers.values())[0];
+  check(so, 'kết thúc edit Customer đặt đúng một timer 3 giây tính từ edit cuối',
+    [debounceTimer && debounceTimer.delay, debounce._timers.size], [3000, 1]);
+
+  const categoryEdit = dungHopPoll();
+  batDau(categoryEdit);
+  categoryEdit.sheetLinkScheduleEditReload({ sheetName: 'Category', isEditing: false }, true);
+  const categoryTimer = Array.from(categoryEdit._timers.values())[0];
+  check(so, 'kết thúc edit Category chạm API riêng ngay ở điểm tự nhiên kế tiếp',
+    categoryTimer && categoryTimer.delay, 0);
 }
 
 module.exports = { chay };

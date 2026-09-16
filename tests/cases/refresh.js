@@ -26,6 +26,11 @@ function chay(so) {
   check(so, 'bản ghi customer còn trên máy chủ được upsert, bản ghi biến mất bị bỏ', [Object.keys(hop.Store.customers), hop.Store.customers.KH1.id, hop.Store.customers.KH2], [['KH1'], 'KH1', undefined]);
   check(so, 'activity mới được upsert và màn hình được vẽ lại cùng lượt', [hop.Store.activitiesByCustomer.KH1.length, hop.rendered], [1, true]);
 
+  hop.Store.categories = { leadSource: ['Cũ'] };
+  hop.refreshCategoryApply({ ok: true, categories: { leadSource: ['Mới'] } });
+  check(so, 'Category reload thay nguyên bảng danh mục và vẽ lại màn hiện tại',
+    [hop.Store.categories, hop.rendered], [{ leadSource: ['Mới'] }, true]);
+
   hop.Store.customers.KH3 = { id: 'KH3' };
   hop.Store.activitiesByCustomer.KH1.push({ id: 'GD3', customerId: 'KH1' });
   hop.refreshRecordsApply({

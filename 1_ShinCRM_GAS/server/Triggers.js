@@ -56,8 +56,8 @@ function shinReloadDecision(input) {
   return decision;
 }
 
-function shinRenderAllViewsAfterSignal() {
-  if (typeof renderAllManagedViewsIfAllowed === 'function') { return renderAllManagedViewsIfAllowed(); }
+function shinRenderAllViewsAfterSignal(options) {
+  if (typeof renderAllManagedViewsIfAllowed === 'function') { return renderAllManagedViewsIfAllowed(options); }
   if (typeof renderAllViewSheets === 'function') { return renderAllViewSheets(); }
   if (typeof renderViewIfDirty === 'function') {
     return shinViewSheetNames(shinOpenBook()).map(function (name) { return renderViewIfDirty(name); });
@@ -81,7 +81,7 @@ function shinOnEdit(event) {
     if (name.charAt(0) === '!') {
       if (shinViewEditNeedsRender(sheet, range)) {
         var viewDecision = shinReloadDecision({ source: 'edit', surface: 'view-control', viewControl: true });
-        if (viewDecision.views.action === 'render') { return shinRenderAllViewsAfterSignal(); }
+        if (viewDecision.views.action === 'render') { return shinRenderAllViewsAfterSignal({ policyBypass: viewDecision.views.policyBypass === true }); }
       }
       return;
     }

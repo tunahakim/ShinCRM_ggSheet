@@ -342,17 +342,41 @@ function renderAllViewSheets() {
 
 /** Đường vẽ độc lập với Sidebar: dùng cho trigger, pull, push và đồng bộ nền. */
 function renderAllManagedViews() {
-  return renderAllViewSheets();
+  var book = shinOpenBook();
+  var names = book.getSheets().map(function (sheet) { return sheet.getName(); }).filter(function (name) { return name.charAt(0) === '!'; });
+  var results = names.map(function (name) {
+    try {
+      return renderViewSheet(name);
+    } catch (error) {
+      return { ok: false, sheetName: name, error: String(error && error.message || error) };
+    }
+  });
+  var failed = results.filter(function (result) { return result.ok !== true; });
+  return {
+    ok: failed.length === 0,
+    results: results,
+    failed: failed,
+    rendered: results.filter(function (result) { return result.ok === true; })
+  };
 }
 
 /** Vẽ toàn bộ view khi chính sách cho phép; nếu tắt thì giữ cờ bẩn để lần bật sau xử lý. */
-function renderAllManagedViewsIfAllowed() {
+function renderAllManagedViewsIfAllowed(options) {
+  var opts = options || {};
   var prefs = typeof userPrefsRead === 'function' ? userPrefsRead() : { autoRenderView: true };
-  if (prefs.autoRenderView === false) { return { ok: true, skipped: true, reason: 'autoRenderView=false', dirty: reloadStateRead() }; }
+  if (prefs.autoRenderView === false && opts.policyBypass !== true) { return { ok: true, skipped: true, reason: 'autoRenderView=false', dirty: reloadStateRead() }; }
   var expectedReloadRevision = typeof reloadStateRead === 'function' ? reloadStateRead().revision : undefined;
-  var results = renderAllManagedViews();
-  dirtyStateClear({ allViews: true, viewSheets: true, expectedRevision: expectedReloadRevision });
-  return { ok: true, rendered: results, dirty: reloadStateRead() };
+  var result = renderAllManagedViews();
+  if (result.ok === true) {
+    dirtyStateClear({ allViews: true, viewSheets: true, expectedRevision: expectedReloadRevision });
+  }
+  return {
+    ok: result.ok === true,
+    skipped: false,
+    rendered: result.results,
+    failed: result.failed,
+    dirty: reloadStateRead()
+  };
 }
 
 function viewProbeRenderCurrent() {

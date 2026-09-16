@@ -41,10 +41,15 @@ function refreshCategoryApply(result) {
   renderScreen();
 }
 
+function refreshFullCore(result) {
+  if (typeof screenStateGoView === 'function') { screenStateGoView(); }
+  return typeof sidebarBoot === 'function' ? sidebarBoot().then(function () { return result; }) : result;
+}
+
 function refreshDirtyRecords(ids, expectedRevision) {
   return callServer('reloadRecords', [ids, expectedRevision]).then(function (result) {
     if (result && result.reloadMode === 'fullCore') {
-      return typeof sidebarBoot === 'function' ? sidebarBoot().then(function () { return result; }) : result;
+      return refreshFullCore(result);
     }
     refreshRecordsApply(result, ids);
     return result;
@@ -54,7 +59,7 @@ function refreshDirtyRecords(ids, expectedRevision) {
 function refreshCategory(expectedRevision) {
   return callServer('reloadCategory', [expectedRevision]).then(function (result) {
     if (result && result.reloadMode === 'fullCore') {
-      return typeof sidebarBoot === 'function' ? sidebarBoot().then(function () { return result; }) : result;
+      return refreshFullCore(result);
     }
     refreshCategoryApply(result);
     return result;
@@ -64,7 +69,7 @@ function refreshCategory(expectedRevision) {
 function refreshConfig(expectedRevision) {
   return callServer('reloadConfig', [expectedRevision]).then(function (result) {
     if (result && result.reloadMode === 'fullCore') {
-      return typeof sidebarBoot === 'function' ? sidebarBoot().then(function () { return result; }) : result;
+      return refreshFullCore(result);
     }
     return result;
   });

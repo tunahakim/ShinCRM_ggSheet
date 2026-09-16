@@ -57,7 +57,7 @@ function writeCommitRender(commit) {
   }
 
   try {
-    return renderAllManagedViewsIfAllowed();
+    return renderAllManagedViewsIfAllowed({ policyBypass: decision.views.policyBypass === true });
   } catch (error) {
     return { ok: false, error: String(error && error.message || error), dirty: typeof reloadStateRead === 'function' ? reloadStateRead() : prepared.dirty };
   }

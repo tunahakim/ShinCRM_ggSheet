@@ -57,6 +57,52 @@ function chay(so) {
   check(so, 'sửa Category đánh dấu nạp lại danh mục và toàn bộ sheet quản trị',
     hop.dirtyStateRead(),
     { viewSheets: ['!Lead', '!Chăm sóc'], records: [], config: true, all: false });
+
+  let renderNen;
+  try {
+    renderNen = dungHop({
+      sheets: ['Customer', 'Activity', 'Category', 'Config', 'Log'],
+      tep: TEP_RENDER
+    });
+  } catch (err) { return ghiLoiNap(so, 'nạp trigger cùng renderer', err); }
+  const renderLead = renderNen.book.insertSheet('!Lead');
+  const renderCare = renderNen.book.insertSheet('!Chăm sóc');
+  [renderLead, renderCare].forEach((sheet) => {
+    sheet.getRange(1, 1, 1, 2).setValues([['@CUS_MA_KH', '@CUS_TEN_CTY']]);
+  });
+  ghiO(renderNen, 'Customer', 4, '@CUS_MA_KH', 'KH000001');
+  ghiO(renderNen, 'Customer', 4, '@CUS_TEN_CTY', 'Mot');
+  renderNen.hop.shinOnEdit({ range: eventRange(renderNen.sheet('Customer'), 4, 2) });
+  check(so, 'onEdit Customer vẽ cả view active và view không active',
+    [renderLead.getRange(4, 1).getValue(), renderCare.getRange(4, 1).getValue(), renderNen.hop.reloadStateRead().allViews],
+    ['KH000001', 'KH000001', false]);
+
+  let controlNen;
+  try {
+    controlNen = dungHop({
+      sheets: ['Customer', 'Activity', 'Category', 'Config', 'Log'],
+      userProps: { prefAutoRenderView: 'false' },
+      tep: TEP_RENDER
+    });
+  } catch (err) { return ghiLoiNap(so, 'nạp trigger view-control', err); }
+  const controlLead = controlNen.book.insertSheet('!Lead');
+  controlLead.getRange(1, 1, 1, 2).setValues([['@CUS_MA_KH', '@CUS_TEN_CTY']]);
+  ghiO(controlNen, 'Customer', 4, '@CUS_MA_KH', 'KH000002');
+  ghiO(controlNen, 'Customer', 4, '@CUS_TEN_CTY', 'Hai');
+  controlLead.getRange(3, 2).setValue('Hai');
+  const controlResult = controlNen.hop.shinOnEdit({ range: eventRange(controlLead, 3, 2) });
+  check(so, 'onEdit điều khiển view bypass autoRenderView=false và vẫn vẽ ngay',
+    [controlResult.ok, controlLead.getRange(4, 1).getValue(), controlNen.hop.reloadStateRead().allViews],
+    [true, 'KH000002', false]);
 }
+
+const TEP_RENDER = TEP_NEN.concat([
+  'server/view/FilterMessages.js',
+  'server/view/FilterParser.js',
+  'server/view/SortSpec.js',
+  'server/view/ViewSheetSetup.js',
+  'server/view/ViewSheetRenderer.js',
+  'server/Triggers.js'
+]);
 
 module.exports = { chay };

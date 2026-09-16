@@ -137,6 +137,23 @@ function sheetLinkOnMessage(event) {
     return;
   }
 
+  // GAS/Extension chỉ dùng event này để đánh thức Sidebar; dữ liệu thật vẫn
+  // phải đọc lại qua getReloadState và API reload có guard revision.
+  if (data.action === 'CRM_RELOAD') {
+    if (data.nonce !== SHEET_LINK_NONCE) { return; }
+    if (SHEET_LINK_EXTENSION_SESSION && String(data.sessionId || '') !== SHEET_LINK_EXTENSION_SESSION) { return; }
+    if (SHEET_LINK_SPREADSHEET_ID && data.spreadsheetId && data.spreadsheetId !== SHEET_LINK_SPREADSHEET_ID) { return; }
+    if (!SHEET_LINK_RAM_READY) { return; }
+    var revision = Number(data.revision || 0);
+    if (revision && revision <= SHEET_LINK_LAST_SEEN_REVISION) { return; }
+    if (revision) { SHEET_LINK_LAST_SEEN_REVISION = revision; }
+    var wake = sheetLinkSyncDirtyData();
+    if (wake && typeof wake.then === 'function') {
+      wake.then(null, function (err) { if (typeof console !== 'undefined' && console.warn) { console.warn(err); } });
+    }
+    return;
+  }
+
   if (data.action !== 'CRM_CONTEXT') { return; }
 
   // Tầng 1: nonce
@@ -214,7 +231,13 @@ function sheetLinkApplyDirtyData(dirty) {
     return sidebarBoot();
   }
   if (dirty.category && typeof refreshCategory === 'function') {
-    return refreshCategory(dirty.revision);
+    var categoryWork = refreshCategory(dirty.revision);
+    if (dirty.records && dirty.records.length && typeof refreshDirtyRecords === 'function') {
+      var categoryRecords = dirty.records.filter(function (id) { return !draft[String(id || '').trim()]; });
+      if (!categoryRecords.length) { return categoryWork; }
+      return categoryWork.then(function () { return refreshDirtyRecords(categoryRecords, dirty.revision); });
+    }
+    return categoryWork;
   }
   if (dirty.records && dirty.records.length && typeof refreshDirtyRecords === 'function') {
     var ready = dirty.records.filter(function (id) { return !draft[String(id || '').trim()]; });
@@ -235,10 +258,19 @@ function sheetLinkScheduleDirtyCheck(delayMs) {
   return SHEET_LINK_RELOAD_TIMER;
 }
 
+function sheetLinkCancelDirtyCheck() {
+  if (SHEET_LINK_RELOAD_TIMER !== null && typeof clearTimeout === 'function') { clearTimeout(SHEET_LINK_RELOAD_TIMER); }
+  SHEET_LINK_RELOAD_TIMER = null;
+}
+
 function sheetLinkScheduleEditReload(ctx, wasEditing) {
   if (!ctx || ctx.isEditing || !wasEditing || !SHEET_LINK_RAM_READY) { return; }
   if (ctx.sheetName === 'Customer' || ctx.sheetName === 'Activity') {
     sheetLinkScheduleDirtyCheck(sheetLinkMs('RELOAD_DEBOUNCE_MS', 3000));
+  } else if (ctx.sheetName === 'Category' || ctx.sheetName === 'Config') {
+    // Hai sheet cấu hình không gom 3 giây: lần kết thúc edit là điểm chạm
+    // tự nhiên gần nhất, và reload riêng Category phải phản hồi ngay.
+    sheetLinkScheduleDirtyCheck(0);
   }
 }
 
@@ -374,7 +406,12 @@ function sheetLinkApplyContext(ctx) {
         queue(function () { return sheetLinkInspectView(ctx.sheetName); });
       }
     } else {
-      if (leavingDataSheet && typeof callServer === 'function') { queue(sheetLinkSyncDirtyData); }
+      if (leavingDataSheet && typeof callServer === 'function') {
+        // Rời sheet thắng debounce: hủy timer còn lại để không tạo thêm một
+        // lượt hỏi sau khi lượt reload tức thời đã hoàn tất.
+        sheetLinkCancelDirtyCheck();
+        queue(sheetLinkSyncDirtyData);
+      }
       else if (SHEET_LINK_DATA_PENDING) { queue(function () { return SHEET_LINK_DATA_PENDING; }); }
 
       if (viewState && (viewState.pending || viewState.inspecting)) {

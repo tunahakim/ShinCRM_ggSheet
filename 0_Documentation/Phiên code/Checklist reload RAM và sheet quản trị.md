@@ -251,63 +251,63 @@
 - [ ] Ca rời sheet trước đủ ba giây gọi reload ngay.
 - [ ] Ca revision đổi trong lúc request bay không mất mã mới.
 - [ ] Ca event đang bay không tạo Promise thứ hai.
-- [ ] Ca record biến mất xóa đúng Store và search index.
-- [ ] Ca full core sau schema đổi xóa Store cũ trước khi ingest.
-- [ ] Ca Category đổi cập nhật dropdown.
-- [ ] Ca Config đổi cập nhật default/counter/sort.
-- [ ] Ca Sidebar không có bản nháp nhận quyết định `reload` theo scope.
-- [ ] Ca Sidebar có bản nháp đúng mã nhận quyết định bảo vệ bản nháp (`defer` hoặc yêu cầu xác nhận), không bị đè RAM âm thầm.
-- [ ] Ca Sidebar có bản nháp không liên quan vẫn reload được mã khác trong cùng signal.
-- [ ] Ca `localDraft` không ảnh hưởng quyết định GAS render toàn bộ view.
+- [x] Ca record biến mất xóa đúng Store và search index (test `refresh.js`, `ramStore.js`).
+- [x] Ca full core sau schema đổi xóa Store cũ trước khi ingest (test `refresh.js`, `reloadDecision.js`).
+- [x] Ca Category đổi cập nhật dropdown (test `refresh.js`).
+- [ ] Ca Config đổi cập nhật default/counter/sort (chưa có test client cho từng khối; server đang fallback full core).
+- [x] Ca Sidebar không có bản nháp nhận quyết định `reload` theo scope (test `reloadDecision.js`).
+- [x] Ca Sidebar có bản nháp đúng mã nhận quyết định bảo vệ bản nháp (`defer` hoặc yêu cầu xác nhận), không bị đè RAM âm thầm (test `reloadDecision.js`).
+- [x] Ca Sidebar có bản nháp không liên quan vẫn reload được mã khác trong cùng signal (test `reloadDecision.js`).
+- [x] Ca `localDraft` không ảnh hưởng quyết định GAS render toàn bộ view (test `reloadDecision.js`).
 
 ## Slice R6 — Vẽ toàn bộ sheet quản trị
 
 ### Đường chạy độc lập với Sidebar
 
-- [ ] `onEdit` hợp lệ ở Customer/Activity đánh dấu allViews và gọi render server-side khi chính sách cho phép.
-- [ ] Module `ReloadDecision` được gọi với input đầy đủ trước khi trigger/cửa ghi thực thi signal hoặc render.
-- [ ] Lượt render không nhận Sidebar state vẫn trả quyết định render toàn bộ view bình thường.
-- [ ] Pull thành công gọi render server-side khi chính sách cho phép dù Sidebar đóng.
-- [ ] Push thành công gọi render server-side khi chính sách cho phép dù Sidebar đóng.
+- [x] `onEdit` hợp lệ ở Customer/Activity đánh dấu allViews và gọi render server-side khi chính sách cho phép (test `triggers.js`).
+- [x] Module `ReloadDecision` được gọi với input đầy đủ trước khi trigger/cửa ghi thực thi signal hoặc render (test `reloadDecision.js`, `writeGateAudit.js`).
+- [x] Lượt render không nhận Sidebar state vẫn trả quyết định render toàn bộ view bình thường (test `viewRenderer.js`).
+- [x] Pull thành công gọi render server-side khi chính sách cho phép dù Sidebar đóng (test `reloadGates.js`).
+- [x] Push thành công gọi render server-side khi chính sách cho phép dù Sidebar đóng (test `reloadGates.js`).
 - [ ] Baseline/conflict/missing/retry/status chỉ đổi trạng thái vẫn gọi render server-side.
-- [ ] Sheet quản trị đang active hay không không ảnh hưởng việc render.
-- [ ] Spreadsheet có mở Sidebar hay không không ảnh hưởng việc render.
-- [ ] Khi chính sách tắt, server không render nhưng giữ allViews bền vững.
-- [ ] Khi chính sách bật lại, một lệnh server-side render toàn bộ view được gọi ngay, không chờ Sidebar.
-- [ ] Lỗi một view giữ cờ của view lỗi và không xóa allViews khi chưa hoàn tất.
+- [x] Sheet quản trị đang active hay không không ảnh hưởng việc render (test `viewRenderer.js`, `triggers.js`).
+- [x] Spreadsheet có mở Sidebar hay không không ảnh hưởng việc render (test `triggers.js`).
+- [x] Khi chính sách tắt, server không render nhưng giữ allViews bền vững (test `viewRenderer.js`).
+- [x] Khi chính sách bật lại, một lệnh server-side render toàn bộ view được gọi ngay, không chờ Sidebar (test `viewRenderer.js`).
+- [x] Lỗi một view giữ cờ của view lỗi và không xóa allViews khi chưa hoàn tất (test `viewRenderer.js`).
 
 ### Renderer
 
-- [ ] Có hàm `renderAllManagedViews` duyệt mọi sheet `!`.
-- [ ] Nguồn Customer/Activity đổi thì renderer không chỉ vẽ sheet active.
-- [ ] Hàng 1 view đổi thì renderer vẽ toàn bộ view.
-- [ ] Hàng 3 hợp lệ đổi thì renderer vẽ toàn bộ view.
-- [ ] Hàng 3 cột thường không vẽ.
-- [ ] View lỗi filter/sort giữ dữ liệu cũ của chính view lỗi.
-- [ ] Cờ view lỗi vẫn còn sau lỗi.
-- [ ] View vẽ thành công xóa đúng cờ của view đó.
-- [ ] Toàn bộ lượt vẽ thành công xóa `allViews`.
+- [x] Có hàm `renderAllManagedViews` duyệt mọi sheet `!` và trả kết quả từng sheet (test `viewRenderer.js`).
+- [x] Nguồn Customer/Activity đổi thì renderer không chỉ vẽ sheet active (test `triggers.js`).
+- [x] Hàng 1 view đổi thì renderer vẽ toàn bộ view (test `triggers.js`).
+- [x] Hàng 3 hợp lệ đổi thì renderer vẽ toàn bộ view (test `triggers.js`).
+- [x] Hàng 3 cột thường không vẽ (test `triggers.js`, `selectionPoll.js`).
+- [x] View lỗi filter/sort giữ dữ liệu cũ của chính view lỗi (test `viewRenderer.js`).
+- [x] Cờ view lỗi vẫn còn sau lỗi (test `viewRenderer.js`).
+- [x] View vẽ thành công xóa đúng cờ của view đó (test `viewRenderer.js`).
+- [x] Toàn bộ lượt vẽ thành công xóa `allViews` (test `viewRenderer.js`).
 - [ ] Lượt vẽ không đọc ngược hàng 4 trở xuống làm nguồn sự thật.
 - [ ] Renderer vẫn dùng latest Activity còn sống.
 - [ ] Renderer phủ lại cả dòng dữ liệu cũ thừa.
 
 ### Chính sách tự động
 
-- [ ] `autoRenderView=true` thì signal dữ liệu gọi vẽ toàn bộ view.
-- [ ] `autoRenderView=false` thì vẫn giữ allViews.
-- [ ] Bật lại auto render lập tức đối chiếu dirty và vẽ toàn bộ view.
-- [ ] Tắt auto render không làm RAM giữ bản ghi cũ.
-- [ ] Lệnh thủ công vẫn vẽ dù auto render tắt.
+- [x] `autoRenderView=true` thì signal dữ liệu gọi vẽ toàn bộ view (test `reloadGates.js`, `triggers.js`).
+- [x] `autoRenderView=false` thì vẫn giữ allViews (test `viewRenderer.js`).
+- [x] Bật lại auto render lập tức đối chiếu dirty và vẽ toàn bộ view (test `viewRenderer.js`).
+- [x] Tắt auto render không làm RAM giữ bản ghi cũ (test `reloadGates.js`, `refresh.js`).
+- [x] Lệnh thủ công vẫn vẽ dù auto render tắt (đường `policyBypass`, test `viewRenderer.js`, `triggers.js`).
 - [ ] Hai user/sidebar có prefs khác nhau không xóa dirty dùng chung sai cách.
 
 ### Kiểm thử offline R6
 
-- [ ] Hai view cùng nguồn đều được vẽ sau một ghi Customer.
-- [ ] View không active vẫn được vẽ.
-- [ ] View có filter đổi vẫn vẽ.
-- [ ] View có sort chung Config đổi vẫn vẽ.
-- [ ] Một view lỗi không làm cờ của view khác bị xóa nhầm.
-- [ ] Bật lại công tắc sau khi tắt làm mọi view cập nhật.
+- [x] Hai view cùng nguồn đều được vẽ sau một ghi Customer (test `triggers.js`).
+- [x] View không active vẫn được vẽ (test `viewRenderer.js`, `triggers.js`).
+- [x] View có filter đổi vẫn vẽ (test `viewRenderer.js`).
+- [x] View có sort chung Config đổi vẫn vẽ (test `viewRenderer.js`).
+- [x] Một view lỗi không làm cờ của view khác bị xóa nhầm (test `viewRenderer.js`).
+- [x] Bật lại công tắc sau khi tắt làm mọi view cập nhật (test `viewRenderer.js`).
 
 ## Slice R7 — Tài liệu, test và triển khai
 

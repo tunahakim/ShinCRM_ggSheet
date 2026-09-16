@@ -58,6 +58,43 @@ function chay(so) {
     [2, ['KH0001', 'KH0002']]);
   check(so, 'lượt vẽ không bật toast nhỏ ở Sheet và luôn nhả khóa', [base.nen.dem.toast, base.nen.stubs._khoa.dangGiu], [0, false]);
 
+  const allViews = taoNen(['@CUS_MA_KH', '@CUS_TEN_CTY']);
+  gieoHaiKhach(allViews.nen);
+  const secondView = allViews.nen.book.insertSheet('!Chăm sóc');
+  secondView.getRange(1, 1, 1, 2).setValues([['@CUS_MA_KH', '@CUS_TEN_CTY']]);
+  secondView.getRange(3, 2).setValue('60..50');
+  allViews.nen.hop.dirtyStateMarkAllViews(['!Lead', '!Chăm sóc']);
+  const managed = allViews.nen.hop.renderAllManagedViewsIfAllowed();
+  const managedByName = {};
+  managed.rendered.forEach((item) => { managedByName[item.sheetName] = item; });
+  check(so, 'renderer thử tiếp mọi view và trả kết quả từng sheet khi một view lỗi',
+    [managed.ok, managedByName['!Lead'].ok, managedByName['!Chăm sóc'].ok, managed.failed.length],
+    [false, true, false, 1]);
+  check(so, 'view không active vẫn được vẽ, cờ view lỗi và allViews vẫn còn',
+    [allViews.view.getRange(4, 1).getValue(), allViews.nen.hop.reloadStateRead().viewSheets, allViews.nen.hop.reloadStateRead().allViews],
+    ['KH0002', ['!Chăm sóc'], true]);
+  secondView.getRange(3, 2).setValue('');
+  allViews.nen.hop.dirtyStateMarkAllViews(['!Lead', '!Chăm sóc']);
+  const complete = allViews.nen.hop.renderAllManagedViewsIfAllowed();
+  check(so, 'mọi view thành công thì xóa allViews và toàn bộ cờ view',
+    [complete.ok, complete.failed.length, allViews.nen.hop.reloadStateRead().viewSheets, allViews.nen.hop.reloadStateRead().allViews],
+    [true, 0, [], false]);
+
+  const policy = taoNen(['@CUS_MA_KH']);
+  policy.nen.hop.userPrefsWrite('autoRenderView', false);
+  policy.nen.hop.dirtyStateMarkAllViews(['!Lead']);
+  const skipped = policy.nen.hop.renderAllManagedViewsIfAllowed();
+  check(so, 'tắt auto render thì không vẽ nhưng giữ cờ allViews',
+    [skipped.skipped, skipped.ok, skipped.dirty.allViews], [true, true, true]);
+  const reenabled = policy.nen.hop.userPrefsWrite('autoRenderView', true);
+  check(so, 'bật lại auto render lập tức vẽ hết view đang bẩn',
+    [reenabled.viewRender.ok, reenabled.viewRender.rendered[0].ok, policy.nen.hop.reloadStateRead().allViews], [true, true, false]);
+  policy.nen.hop.userPrefsWrite('autoRenderView', false);
+  policy.nen.hop.dirtyStateMarkAllViews(['!Lead']);
+  const forced = policy.nen.hop.renderAllManagedViewsIfAllowed({ policyBypass: true });
+  check(so, 'lệnh điều khiển trực tiếp bypass công tắc tự động',
+    [forced.ok, forced.rendered[0].ok, policy.nen.hop.reloadStateRead().allViews], [true, true, false]);
+
   check(so, 'metadata chỉ nhận cột có mã @ ở hàng lọc', result.viewMeta.filterColumns, [1, 2, 3, 4, 5]);
   base.view.getRange(3, 6).setValue('chữ dưới cột thường');
   check(so, 'đổi hàng 3 dưới cột thường không làm dấu vân tay view thay đổi', base.nen.hop.renderViewIfDirty('!Lead').skipped, true);
