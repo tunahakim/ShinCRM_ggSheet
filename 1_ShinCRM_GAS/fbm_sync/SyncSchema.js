@@ -34,22 +34,51 @@ function syncColumnsForSheet(sheetName) {
 }
 
 /** Tự bổ sung cột sync còn thiếu; không đụng dữ liệu hoặc thứ tự cột lõi. */
-function fbmEnsureSyncColumns() {
-  var book = shinOpenBook(), report = [];
-  ['Customer', 'Activity'].forEach(function (sheetName) {
-    var sheet = book.getSheetByName(sheetName), expected = syncColumnsForSheet(sheetName);
-    if (!sheet || !expected.length) { return; }
-    var map = readColumnMap(sheetName), missing = expected.filter(function (item) { return !map.map[item[0]]; });
-    if (!missing.length) { return; }
-    var start = map.lastColumn + 1;
-    if (sheet.getMaxColumns() < start + missing.length - 1) { sheet.insertColumnsAfter(sheet.getMaxColumns(), start + missing.length - 1 - sheet.getMaxColumns()); }
-    sheet.getRange(1, start, 2, missing.length).setValues([
-      missing.map(function (item) { return item[0]; }),
-      missing.map(function (item) { return item[1]; })
-    ]);
-    sheet.getRange(1, start, 1, missing.length).setFontWeight('bold');
-    sheet.getRange(SHEET_FIRST_DATA_ROW, start, Math.max(1, sheet.getMaxRows() - SHEET_FIRST_DATA_ROW + 1), missing.length).setNumberFormat('@');
-    report.push(sheetName + ': thêm ' + missing.length + ' cột sync');
-  });
-  return report;
+function fbmEnsureSyncColumns(source) {
+  var book = shinOpenBook(), report = [], changed = false;
+  var lock = null;
+  if (typeof LockService !== 'undefined' && LockService.getDocumentLock) {
+    lock = LockService.getDocumentLock();
+    if (!lock.tryLock(SETTINGS.LOCK_WAIT_MS)) { throw new Error('Hệ thống bận. Vui lòng thử lại!'); }
+  }
+  try {
+    ['Customer', 'Activity'].forEach(function (sheetName) {
+      var sheet = book.getSheetByName(sheetName), expected = syncColumnsForSheet(sheetName);
+      if (!sheet || !expected.length) { return; }
+      var map = readColumnMap(sheetName), missing = expected.filter(function (item) { return !map.map[item[0]]; });
+      if (!missing.length) { return; }
+      var start = map.lastColumn + 1;
+      if (sheet.getMaxColumns() < start + missing.length - 1) { sheet.insertColumnsAfter(sheet.getMaxColumns(), start + missing.length - 1 - sheet.getMaxColumns()); }
+      sheet.getRange(1, start, 2, missing.length).setValues([
+        missing.map(function (item) { return item[0]; }),
+        missing.map(function (item) { return item[1]; })
+      ]);
+      sheet.getRange(1, start, 1, missing.length).setFontWeight('bold');
+      sheet.getRange(SHEET_FIRST_DATA_ROW, start, Math.max(1, sheet.getMaxRows() - SHEET_FIRST_DATA_ROW + 1), missing.length).setNumberFormat('@');
+      changed = true;
+      report.push(sheetName + ': thêm ' + missing.length + ' cột sync');
+    });
+    if (typeof SpreadsheetApp !== 'undefined' && SpreadsheetApp.flush) { SpreadsheetApp.flush(); }
+  } finally {
+    if (lock) { lock.releaseLock(); }
+  }
+
+  var reload = null;
+  if (changed && typeof reloadDecisionForChange === 'function') {
+    var prefs = typeof userPrefsRead === 'function' ? userPrefsRead() : { autoRenderView: true };
+    var viewNames = typeof shinViewSheetNames === 'function' ? shinViewSheetNames(book) : [];
+    reload = reloadDecisionForChange({
+      source: source === 'background' ? 'background' : 'pull',
+      surface: 'schema',
+      schema: true,
+      viewSheetNames: viewNames,
+      autoRenderView: prefs.autoRenderView !== false,
+      writeSucceeded: true
+    });
+    if (typeof dirtyStateMarkDecision === 'function') { dirtyStateMarkDecision(reload); }
+    if (reload.views.action === 'render' && typeof renderAllManagedViewsIfAllowed === 'function') {
+      reload.viewRender = renderAllManagedViewsIfAllowed();
+    }
+  }
+  return { ok: true, changed: changed, report: report, reload: reload };
 }

@@ -1,4 +1,5 @@
 const { dungHop, ghiO } = require('../lib/dung-hop');
+const { napServer } = require('../lib/load-gas');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 
 function taoHop() {
@@ -33,6 +34,16 @@ function chay(so) {
   check(so, 'writeGateSave background không cần Sidebar vẫn phát signal và render',
     [background.ok, background.reloadDecision.kind, background.dirty.records, background.dirty.allViews, backgroundEnv.hop.rendered],
     [true, 'records', ['KH000001'], true, 1]);
+
+  const schemaEnv = taoHop();
+  napServer(schemaEnv.hop, 'fbm_sync/SyncSchema.js');
+  schemaEnv.hop.shinViewSheetNames = () => ['!Lead'];
+  schemaEnv.hop.rendered = 0;
+  schemaEnv.hop.renderAllManagedViewsIfAllowed = () => { schemaEnv.hop.rendered += 1; return { ok: true }; };
+  const schema = schemaEnv.hop.fbmEnsureSyncColumns('background');
+  check(so, 'bổ sung cột sync bằng GAS phát signal schema/allCore/allViews qua cổng schema',
+    [schema.ok, schema.changed, schema.reload.kind, schemaEnv.hop.reloadStateRead().schema, schemaEnv.hop.reloadStateRead().allCore, schemaEnv.hop.reloadStateRead().allViews, schemaEnv.hop.rendered],
+    [true, true, 'schema', true, true, true, 1]);
 
   const deletedEnv = taoHop();
   const deleted = deletedEnv.hop.deleteGateRemove({ entity: 'customer', ids: ['KH000001'] });

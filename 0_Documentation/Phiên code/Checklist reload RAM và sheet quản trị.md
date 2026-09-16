@@ -130,6 +130,7 @@
 - [ ] Batch lỗi validation không phát tín hiệu thành công.
 - [ ] Lỗi hạ tầng không xóa signal cũ.
 - [ ] Batch cấp mã làm đổi Config không để Config trong RAM giữ counter cũ mà không có đường xử lý.
+- [x] `fbmEnsureSyncColumns` ghi thêm mã cột bằng GAS phải khóa, flush và phát `schema` + `allCore` + `allViews`, kể cả khi Sidebar đóng.
 
 ### Cửa xóa và đường ghi đặc biệt
 
