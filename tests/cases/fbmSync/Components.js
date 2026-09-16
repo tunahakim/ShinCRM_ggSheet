@@ -104,9 +104,10 @@ function chay(so) {
       source['client/sync/fbmSyncSettingsScreen.html'].indexOf('fbmSyncConfigButtonRow(\'identity\'') >= 0,
       styles.slice(styles.indexOf('.shin-card-actions {'), styles.indexOf('.shin-card-actions {') + 220).indexOf('gap: var(--shin-gap-2);') >= 0,
       styles.indexOf('.shin-button.shin-config-edit') >= 0,
+      styles.indexOf('.shin-button.shin-config-edit:hover { border-color: var(--shin-border-strong); background: var(--shin-bg-hover-strong); }') >= 0,
       styles.indexOf('.shin-card-head .shin-icon.shin-config-save') >= 0,
       styles.indexOf('.shin-card-head .shin-icon.shin-config-cancel') >= 0],
-    [true, true, true, true, true, true, true]);
+    [true, true, true, true, true, true, true, true]);
   check(so, 'Sync không tạo DOM trực tiếp trong renderer component',
     [all.indexOf('document.createElement') === -1, all.indexOf('.innerHTML') === -1, all.indexOf('.appendChild') === -1],
     [true, true, true]);
