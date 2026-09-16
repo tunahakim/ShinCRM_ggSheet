@@ -42,7 +42,7 @@ function fbmSyncRenderRun(panel, status) {
       StandaloneField('Loại đồng bộ', { id: 'fbm-sync-mode', kind: 'select', options: FBM_SYNC_UI_SCHEMA.modes, value: FBM_SYNC_CLIENT.mode, disabled: !!FBM_SYNC_CLIENT.running, ariaLabel: 'Loại đồng bộ' }),
       Box({ id: 'fbm-sync-run-action-region', elements: [Row({ className: 'shin-single-action-row', elements: [fbmSyncRunActionBlock(status)] })] })
     ] }),
-    Box({ id: 'fbm-sync-run-details-region', elements: fbmSyncRunDetailsBlocks(status) })
+    Stack({ id: 'fbm-sync-run-details-region', elements: fbmSyncRunDetailsBlocks(status) })
   ]);
 }
 function fbmSyncPatchRun(panel, status) {
