@@ -22,7 +22,7 @@ function getDirtyState() {
   });
 }
 
-function reloadRecords(recordIds) {
+function reloadRecords(recordIds, expectedRevision) {
   return runEntryPoint('reloadRecords', LOAD_SOURCE, 'throw', function () {
     var started = Date.now();
     var ids = (Array.isArray(recordIds) ? recordIds : [recordIds]).map(function (id) { return String(id || '').trim(); }).filter(function (id) { return id; });
@@ -46,12 +46,16 @@ function reloadRecords(recordIds) {
       var customerId = row[activityBlock.fields.indexOf('customerId')];
       if (customerIds[customerId]) { activities.push(row); }
     });
-    dirtyStateClearRecords(ids);
+    var current = typeof reloadStateRead === 'function' ? reloadStateRead() : null;
+    var revisionMatches = expectedRevision === undefined || expectedRevision === null || expectedRevision === ''
+      || (current && current.revision === Number(expectedRevision));
+    if (revisionMatches) { dirtyStateClearRecords(ids, expectedRevision); }
     return {
       ok: true,
       customer: { fields: customerBlock.fields, rows: customers },
       activity: { fields: activityBlock.fields, rows: activities },
-      affectedCustomerIds: customers.map(function (row) { return row[customerBlock.fields.indexOf('id')]; }),
+      affectedCustomerIds: Object.keys(customerIds),
+      processedRevision: current ? current.revision : 0,
       dirty: dirtyStateRead(),
       selection: selectionSnapshot(),
       ms: Date.now() - started

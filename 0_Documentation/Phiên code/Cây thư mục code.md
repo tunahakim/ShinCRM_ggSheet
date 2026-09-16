@@ -237,6 +237,7 @@ tests\
     ├── configRead.js             Khóa trùng thì chặn, còn khối sắp xếp thì thứ tự hàng là nghĩa.
     ├── dirtyState.js             Khối trạng thái bẩn KHÔNG BAO GIỜ được ném, kể cả khi tệp thuộc tính hỏng hoặc đọc dở dang.
     ├── reloadDecision.js         Bảng luật thuần dùng chung cho signal, reload RAM, localDraft và render toàn bộ view.
+    ├── reloadGates.js             Cổng ghi/xóa phát signal sau đọc lại thành công và chứng minh render không phụ thuộc Sidebar.
     ├── userPrefs.js              Ba núm chọn phía máy chủ: giá trị lạ đều rơi về ngầm định, và ghi một núm KHÔNG được để lại dấu vết nào ở DocumentProperties.
     ├── schemaAccess.js           Cửa đọc bảng khai: tên gõ sai nổ ngay kèm gợi ý, còn tên máy như toJSON thì phải đi qua.
     ├── fieldLogic.js             Sáu hàm ngầm định: mã kế tiếp lấy từ bộ đếm dạng chuỗi, và giá trị mang theo từ giao dịch gần nhất CÒN SỐNG.

@@ -62,11 +62,33 @@ function deleteGateRemove(yeuCau) {
     throw new Error('Hệ thống bận. Vui lòng thử lại!');
   }
 
+  var result;
   try {
-    return deleteGateRun(entity, ids, batDau);
+    result = deleteGateRun(entity, ids, batDau);
   } finally {
     try { SpreadsheetApp.flush(); } finally { khoa.releaseLock(); }
   }
+
+  if (result && result.ok && result.recordIds && result.recordIds.length && typeof reloadDecisionForChange === 'function') {
+    var prefs = typeof userPrefsRead === 'function' ? userPrefsRead() : { autoRenderView: true };
+    var viewNames = typeof shinViewSheetNames === 'function' ? shinViewSheetNames(shinOpenBook()) : [];
+    var decision = reloadDecisionForChange({
+      source: 'delete',
+      surface: 'record',
+      entity: entity,
+      recordIds: result.recordIds,
+      viewSheetNames: viewNames,
+      autoRenderView: prefs.autoRenderView !== false,
+      writeSucceeded: true
+    });
+    if (typeof dirtyStateMarkDecision === 'function') { dirtyStateMarkDecision(decision); }
+    result.reloadDecision = decision;
+    if (decision.views.action === 'render' && typeof renderAllManagedViewsIfAllowed === 'function') {
+      result.viewRender = renderAllManagedViewsIfAllowed();
+    }
+    if (typeof reloadStateRead === 'function') { result.dirty = reloadStateRead(); }
+  }
+  return result;
 }
 
 /**
@@ -135,6 +157,7 @@ function deleteGateRun(entity, ids, batDau) {
     entity: entity,
     hard: maHard,
     soft: doc,
+    recordIds: maHard.concat(soft.map(function (item) { return item.id; })),
     reasons: reasons,
     ms: ms
   };

@@ -464,7 +464,15 @@ function writeGateRun(entity, records, source, fields, batDau) {
     detail: { nguon: source, cot: Object.keys(colOf).length, ms: ms }
   });
 
-  return { ok: true, entity: entity, fields: doc.fields, rows: doc.rows, ms: ms };
+  return {
+    ok: true,
+    entity: entity,
+    fields: doc.fields,
+    rows: doc.rows,
+    recordIds: plans.map(function (plan) { return String(plan.id || '').trim(); }).filter(function (id) { return !!id; }),
+    configChanged: moi.length > 0,
+    ms: ms
+  };
 }
 
 /**
@@ -507,11 +515,34 @@ function writeGateSave(yeuCau) {
     throw new Error('Hệ thống bận. Vui lòng thử lại!');
   }
 
+  var result;
   try {
-    return writeGateRun(entity, records, source, fields, batDau);
+    result = writeGateRun(entity, records, source, fields, batDau);
   } finally {
     // `flush` rồi mới nhả khóa, tài liệu 06 Phần 2 `[RÀNG BUỘC CỨNG]`. Bọc lồng nhau để `flush` có ném lỗi thì khóa vẫn được nhả.
     try { SpreadsheetApp.flush(); } finally { khoa.releaseLock(); }
   }
+
+  if (result && result.ok && result.recordIds && result.recordIds.length && typeof reloadDecisionForChange === 'function') {
+    var prefs = typeof userPrefsRead === 'function' ? userPrefsRead() : { autoRenderView: true };
+    var viewNames = typeof shinViewSheetNames === 'function' ? shinViewSheetNames(shinOpenBook()) : [];
+    var decision = reloadDecisionForChange({
+      source: source === 'pull' ? 'pull' : 'write',
+      surface: 'record',
+      entity: entity,
+      recordIds: result.recordIds,
+      configChanged: result.configChanged,
+      viewSheetNames: viewNames,
+      autoRenderView: prefs.autoRenderView !== false,
+      writeSucceeded: true
+    });
+    if (typeof dirtyStateMarkDecision === 'function') { dirtyStateMarkDecision(decision); }
+    result.reloadDecision = decision;
+    if (decision.views.action === 'render' && typeof renderAllManagedViewsIfAllowed === 'function') {
+      result.viewRender = renderAllManagedViewsIfAllowed();
+    }
+    if (typeof reloadStateRead === 'function') { result.dirty = reloadStateRead(); }
+  }
+  return result;
 }
 

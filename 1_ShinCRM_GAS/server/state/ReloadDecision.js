@@ -133,6 +133,10 @@ function reloadDecisionForChange(input) {
     decision.signal.records = ids;
     decision.signal.allViews = true;
     reloadDecisionWithRam(decision, 'records', ids, change, 'Customer/Activity đổi.');
+    if (change.configChanged === true) {
+      decision.signal.config = true;
+      reloadDecisionWithRam(decision, 'fullCore', [], change, 'Cấp mã mới đã làm đổi bộ đếm trong Config.');
+    }
     if (source !== 'edit' && change.appliedByCaller === true && !decision.ram.deferredRecordIds.length) {
       decision.ram.action = 'none';
       decision.ram.reason = 'Bên gọi đã áp dụng bản ghi đọc lại vào RAM.';
