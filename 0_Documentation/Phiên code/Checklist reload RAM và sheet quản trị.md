@@ -153,7 +153,7 @@
 - [ ] Xác nhận `ViewSheetSetup.js` và `SetupSheets.js` chỉ phục vụ cấu trúc/khởi tạo, không được gọi để ghi dữ liệu nghiệp vụ trong runtime.
 - [ ] Xác nhận `SheetColumnWriter.js` chỉ là helper tầng thấp; không có caller runtime nào gọi nó ngoài cửa đã giữ khóa và kiểm tra.
 - [ ] Xác nhận `LogGate.js` là cửa hạ tầng độc lập; ghi `Log` không làm tăng revision dữ liệu nghiệp vụ và không gọi vòng lại `WriteCommit`.
-- [ ] Xác nhận `SheetIo.js` và toàn bộ `server/dev/*` chỉ chứa probe/DEV, có allowlist rõ và không được coi là đường runtime production.
+- [ ] Xác nhận `SheetIo.js` chỉ đọc; `SheetIoProbe.js` và toàn bộ `server/dev/*` chỉ chứa probe/DEV, có allowlist rõ và không được coi là đường runtime production.
 - [ ] Thêm kiểm thử tĩnh quét writer runtime, báo đỏ khi xuất hiện thao tác ghi ngoài allowlist hoặc thêm file writer chưa được phân loại.
 - [ ] Ghi kết quả audit (danh sách file, hàm, sheet bị chạm và lý do ngoại lệ) vào commit cùng nhóm thay đổi.
 

@@ -22,7 +22,6 @@ const RUNTIME_WRITERS = {
   'server/sheet/SheetColumnWriter.js': 'helper/column-writer',
   'server/sheet/SheetGrid.js': 'helper/grid',
   'server/sheet/SetupSheets.js': 'infrastructure/setup',
-  'server/sheet/SheetIo.js': 'development/probe-only',
   'server/view/ViewSheetRenderer.js': 'view/renderer',
   'server/view/ViewSheetSetup.js': 'view/setup',
   'fbm_sync/SyncSchema.js': 'sync/schema'
@@ -107,13 +106,6 @@ function chay(so) {
     writers.push(file);
     if (!Object.prototype.hasOwnProperty.call(RUNTIME_WRITERS, file)) {
       violations.push(file + ': chưa có trong inventory');
-    }
-    if (RUNTIME_WRITERS[file] === 'development/probe-only') {
-      const probeAt = source.indexOf('function probeBadColumnCode');
-      const probeLine = probeAt < 0 ? 0 : source.slice(0, probeAt).split('\n').length;
-      if (probeAt < 0 || mutators.some((item) => item.line < probeLine)) {
-        violations.push(file + ': writer probe không nằm rõ trong hàm probeBadColumnCode');
-      }
     }
   });
 
