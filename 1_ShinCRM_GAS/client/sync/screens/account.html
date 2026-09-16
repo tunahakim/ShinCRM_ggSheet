@@ -18,8 +18,8 @@ function fbmSyncAccountSettingsBlocks() {
     Text({ className: 'shin-muted', text: 'Tiền tố của ma_kh do FBM tự sinh khi tạo Customer mới; chỉ kiểm tra mã FBM trả về, không phải mã CUS- của ShinCRM.' }),
     StandaloneField('Độ dài mã khách FBM', { id: 'fbm-account-customer-length', kind: 'input', inputType: 'number', value: value('customerCodeLength'), placeholder: 'Ví dụ: 8', ariaLabel: 'Độ dài mã khách FBM' }, { className: invalid.customerCodeLength ? 'is-invalid' : '' }),
     Text({ className: 'shin-muted', text: 'Độ dài đầy đủ của ma_kh FBM tự sinh. Nhập cùng tiền tố; để trống cả hai nếu không tạo Customer mới trên FBM.' }),
-    StandaloneField('Mốc Activity', { id: 'fbm-account-activity-since', kind: 'input', inputType: 'text', value: value('activitySince'), placeholder: 'YYYY-MM-DD', ariaLabel: 'Mốc Activity' }, { className: invalid.activitySince ? 'is-invalid' : '' }),
-    Text({ className: 'shin-muted', text: 'Khi quét, mọi Activity có ngày làm việc trước mốc này sẽ bị bỏ qua và không bị coi là bản ghi mất. Để trống để quét toàn bộ Activity.' }),
+    StandaloneField('Mốc ngày Activity trên FBM', { id: 'fbm-account-activity-since', kind: 'input', inputType: 'text', value: value('activitySince'), placeholder: 'YYYY-MM-DD', ariaLabel: 'Mốc ngày Activity trên FBM' }, { className: invalid.activitySince ? 'is-invalid' : '' }),
+    Text({ className: 'shin-muted', text: 'Khi quét FBM, Activity có ngày làm việc (end_date) trước mốc này sẽ bị bỏ qua và không bị coi là bản ghi mất. Để trống để quét toàn bộ Activity.' }),
     Row({ className: 'shin-single-action-row', elements: [Button({ id: 'fbm-sync-save-account-settings', label: 'Lưu cấu hình FBM', className: 'shin-primary', disabled: active })] })
   ];
 }
