@@ -97,7 +97,15 @@ class GiaElement {
     return child;
   }
   remove() { if (this.parentNode) this.parentNode.removeChild(this); }
-  addEventListener(name, fn) { this.listeners[name] = fn; }
+  addEventListener(name, fn) {
+    const previous = this.listeners[name];
+    if (!previous) { this.listeners[name] = fn; return; }
+    const callbacks = previous._callbacks ? previous._callbacks.slice() : [previous];
+    callbacks.push(fn);
+    const listener = (...args) => callbacks.forEach((callback) => callback(...args));
+    listener._callbacks = callbacks;
+    this.listeners[name] = listener;
+  }
   focus() { this.focused = true; this.ownerDocument.activeElement = this; }
   blur() { if (this.ownerDocument.activeElement === this) this.ownerDocument.activeElement = null; }
   contains(node) {
@@ -174,7 +182,15 @@ class GiaDocument {
   getElementById(id) { return this._byId[id] || null; }
   querySelector(selector) { return this.body.querySelector(selector); }
   querySelectorAll(selector) { return this.body.querySelectorAll(selector); }
-  addEventListener(name, fn) { this.listeners[name] = fn; }
+  addEventListener(name, fn) {
+    const previous = this.listeners[name];
+    if (!previous) { this.listeners[name] = fn; return; }
+    const callbacks = previous._callbacks ? previous._callbacks.slice() : [previous];
+    callbacks.push(fn);
+    const listener = (...args) => callbacks.forEach((callback) => callback(...args));
+    listener._callbacks = callbacks;
+    this.listeners[name] = listener;
+  }
   addRoot(id) { const root = this.createElement('div'); root.id = id; this.body.appendChild(root); return root; }
 }
 

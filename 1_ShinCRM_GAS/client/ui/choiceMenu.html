@@ -33,11 +33,6 @@ function choiceMenuHide(trigger) {
   return list;
 }
 
-function choiceMenuHideAll(except) {
-  var keep = except ? choiceMenuListOf(except) : null;
-  return typeof PopupList.closeAll === 'function' ? PopupList.closeAll(keep) : 0;
-}
-
 function choiceMenuMark(trigger, index) {
   var rows = choiceMenuRows(trigger);
   if (!rows.length) { choiceMenuFocusAt = -1; return -1; }
@@ -139,7 +134,6 @@ function choiceMenuClick(event) {
   }
   var trigger = choiceMenuTriggerOf(target);
   if (trigger) { event.preventDefault(); if (choiceMenuListOf(trigger).hidden) { choiceMenuOpen(trigger); } else { choiceMenuHide(trigger); } return; }
-  if (!target.closest('.shin-choice') && typeof PopupList.closeAll === 'function') { PopupList.closeAll(null); }
 }
 
 function choiceMenuInstall() {

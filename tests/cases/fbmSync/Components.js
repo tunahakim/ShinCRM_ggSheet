@@ -92,6 +92,10 @@ function chay(so) {
       menu.indexOf('PopupList.show(lop, nut') >= 0,
       (combo + choiceMenu + search + menu).indexOf('box.style.left =') === -1],
     [true, true, true, true, true]);
+  check(so, 'PopupList la noi duy nhat dong popup khi click ngoai',
+    [source['client/sync/fbmSync.html'].indexOf('PopupList.closeAll(null)') === -1,
+      choiceMenu.indexOf('PopupList.closeAll(null)') === -1],
+    [true, true]);
 
   check(so, 'core khai đủ Block helper dùng chung cho Sync',
     ['Box', 'Stack', 'Card', 'Row', 'Text', 'Field', 'Button', 'Icon', 'Check', 'StandaloneControl', 'StandaloneField'].every((name) => common.indexOf('function ' + name + '(') >= 0),
