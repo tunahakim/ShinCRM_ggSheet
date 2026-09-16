@@ -320,12 +320,12 @@
 - [x] Thêm ca test vào `tests/cases/refresh.js` (entity và Config full core).
 - [x] Thêm ca test cho cổng ghi/pull/push/background (gồm status push trong `reloadGates.js`).
 - [x] Thêm API `inspectEditReload` và kiểm tra GAS là nơi duy nhất quyết định timer sau edit; phản hồi gắn `reloadObservation=false` để không reload sớm (test `selectionService.js`, `selectionPoll.js`).
-- [x] Chạy `node tests/run.js`: `1575` đạt, `0` không đạt.
+- [x] Chạy `node tests/run.js`: `1582` đạt, `0` không đạt.
 - [x] Chạy test GAS DEV cho `getReloadState`, `reloadRecords`, `renderAllManagedViews` với `--push`: `getReloadState` đạt ở `@326`, `reloadRecords` đạt ở `@327` với fallback `fullCore` khi scope rỗng, `renderAllManagedViews` đạt ở `@328` với tất cả view DEV trả `ok` và không có sheet lỗi; đường runtime `renderAllManagedViewsIfAllowed` được kiểm tra tiếp ở revision mới và dọn cờ view stale theo đúng revision guard. `inspectEditReload` đạt ở `@334`, trả `eligible:false`, `ram.action:none`, `reloadObservation:false` trên vùng DEV không hợp lệ.
 - [x] GAS DEV cài trigger installable ở `@331`; `probeTriggerState` xác nhận `shinOnEdit: true`, `shinOnChange: true` và không làm mất các trigger FBM đang có.
 - [x] Chạy test GAS DEV khi không mở Sidebar và xác nhận view vẫn đổi sau ghi Customer/Activity: `viewProbeWriteRenderWithoutSidebar` đạt ở `@337`; view tạm nhận đúng mã Customer và ngày Activity sau từng lần `WriteGate`, rồi probe dọn sạch bản ghi và sheet tạm.
 - [x] Bổ sung và chạy probe GAS DEV `reloadMatrixProbe` ở deployment `@341`: fixture nối sau dữ liệu DEV hiện có (5 Customer + 5 Activity), mô phỏng onEdit ở Customer/Activity/Category/Config và sheet quản trị, kiểm signal/debounce/view; tất cả ca đạt, 3/3 view được vẽ sau các thay đổi hợp lệ. Probe tự dọn fixture, khôi phục ô/thuộc tính; hậu kiểm `probeDirtyState` rỗng và `dumpSheetGrid` còn đúng 1 Customer + 1 Activity ban đầu.
-- [x] Kiểm tra log không chứa cookie, mật khẩu, token hoặc payload nhạy cảm bằng `tests/cases/logMask.js` và các ca DTO/log FBM; bộ offline đạt `1569/1569`.
+- [x] Kiểm tra log không chứa cookie, mật khẩu, token hoặc payload nhạy cảm bằng `tests/cases/logMask.js` và các ca DTO/log FBM; bộ offline hiện tại đạt `1582/1582`.
 - [x] Chỉ thử dữ liệu ở Spreadsheet DEV `2026.09.05 - ShinCRM DEV` qua cổng DEV có token; không chạm Spreadsheet production.
 - [x] Không sửa fixture trong `0_Documentation/Nghiên cứu FBM/`; `git diff` không có đường dẫn thuộc thư mục này.
 - [x] Commit riêng tài liệu/checklist trước core code: `31a74ef`, `e1e98e2`.
