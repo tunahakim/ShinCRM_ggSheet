@@ -13,7 +13,7 @@
  */
 
 /** Hai nguồn gọi, quyết định phép kiểm nào chạy. Tài liệu 06 Phần 4. */
-var WRITE_GATE_SOURCES = ['user', 'pull'];
+var WRITE_GATE_SOURCES = ['user', 'pull', 'push', 'background'];
 
 /**
  * Những trường mà **máy** điền cho bản ghi mới, bất kể bên gọi gửi gì.

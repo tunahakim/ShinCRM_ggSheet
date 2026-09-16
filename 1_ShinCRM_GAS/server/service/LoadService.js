@@ -18,7 +18,14 @@ var LOAD_SOURCE = 'sidebar';
 function getDirtyState() {
   return runEntryPoint('getDirtyState', LOAD_SOURCE, 'throw', function () {
     var started = Date.now();
-    return { ok: true, dirty: dirtyStateRead(), selection: selectionSnapshot(), ms: Date.now() - started };
+    return { ok: true, reload: reloadStateRead(), dirty: dirtyStateRead(), selection: selectionSnapshot(), ms: Date.now() - started };
+  });
+}
+
+function getReloadState() {
+  return runEntryPoint('getReloadState', LOAD_SOURCE, 'throw', function () {
+    var started = Date.now();
+    return { ok: true, reload: reloadStateRead(), dirty: dirtyStateRead(), selection: selectionSnapshot(), ms: Date.now() - started };
   });
 }
 
@@ -29,12 +36,13 @@ function reloadRecords(recordIds, expectedRevision) {
     var customerBlock = entityReadAll('customer');
     var activityBlock = entityReadAll('activity');
     var customerIds = {};
-    ids.forEach(function (id) { customerIds[id] = true; });
+    var activityCustomerById = {};
     activityBlock.rows.forEach(function (row) {
       var activity = {};
       activityBlock.fields.forEach(function (field, i) { activity[field] = row[i]; });
-      if (ids.indexOf(activity.id) >= 0) { customerIds[activity.customerId] = true; }
+      activityCustomerById[String(activity.id || '').trim()] = String(activity.customerId || '').trim();
     });
+    ids.forEach(function (id) { customerIds[activityCustomerById[id] || id] = true; });
     var customers = [];
     customerBlock.rows.forEach(function (row) {
       var customer = {};
@@ -46,6 +54,13 @@ function reloadRecords(recordIds, expectedRevision) {
       var customerId = row[activityBlock.fields.indexOf('customerId')];
       if (customerIds[customerId]) { activities.push(row); }
     });
+    var customerIdAt = customerBlock.fields.indexOf('id');
+    var activityIdAt = activityBlock.fields.indexOf('id');
+    var existingCustomerIds = {};
+    customerBlock.rows.forEach(function (row) { existingCustomerIds[String(row[customerIdAt] || '').trim()] = true; });
+    var existingActivityIds = {};
+    activityBlock.rows.forEach(function (row) { existingActivityIds[String(row[activityIdAt] || '').trim()] = true; });
+    var removedRecordIds = ids.filter(function (id) { return !existingCustomerIds[id] && !existingActivityIds[id]; });
     var current = typeof reloadStateRead === 'function' ? reloadStateRead() : null;
     var revisionMatches = expectedRevision === undefined || expectedRevision === null || expectedRevision === ''
       || (current && current.revision === Number(expectedRevision));
@@ -55,7 +70,9 @@ function reloadRecords(recordIds, expectedRevision) {
       customer: { fields: customerBlock.fields, rows: customers },
       activity: { fields: activityBlock.fields, rows: activities },
       affectedCustomerIds: Object.keys(customerIds),
+      removedRecordIds: removedRecordIds,
       processedRevision: current ? current.revision : 0,
+      reload: typeof reloadStateRead === 'function' ? reloadStateRead() : null,
       dirty: dirtyStateRead(),
       selection: selectionSnapshot(),
       ms: Date.now() - started
@@ -87,7 +104,7 @@ function loadCore() {
         detail: { total: budget.total, ceiling: budget.ceiling, sheets: budget.sheets }
       });
 
-      return { ok: true, blocked: 'cellBudget', budget: budget, dirty: dirtyStateRead(), selection: selectionSnapshot(), pendingMessages: takePendingMessages(), ms: Date.now() - batDau };
+      return { ok: true, blocked: 'cellBudget', budget: budget, reload: reloadStateRead(), dirty: dirtyStateRead(), selection: selectionSnapshot(), pendingMessages: takePendingMessages(), ms: Date.now() - batDau };
     }
 
     var consumedDirty = dirtyStateTakeFullReload();
@@ -142,6 +159,7 @@ function loadCore() {
       activity: { total: soGiaoDich, chunkRows: SETTINGS.CHUNK_ROWS },
       prefs: userPrefsRead(),
       budget: budget,
+      reload: reloadStateRead(),
       dirty: dirtyStateRead(),
       selection: selectionSnapshot(),
       warnings: warnings,
@@ -183,7 +201,7 @@ function loadActivityChunk(cursor, chunkRows) {
     var coGoi = loadChunkRows(chunkRows);
 
     if (context.rowCount <= 0 || endRow < firstDataRow) {
-      return { ok: true, fields: context.names, rows: [], done: true, nextCursor: null, total: context.rowCount, chunkRows: coGoi, dirty: dirtyStateRead(), selection: selectionSnapshot(), ms: Date.now() - batDau };
+      return { ok: true, fields: context.names, rows: [], done: true, nextCursor: null, total: context.rowCount, chunkRows: coGoi, reload: reloadStateRead(), dirty: dirtyStateRead(), selection: selectionSnapshot(), ms: Date.now() - batDau };
     }
 
     var startRow = Math.max(firstDataRow, endRow - coGoi + 1);
@@ -211,6 +229,7 @@ function loadActivityChunk(cursor, chunkRows) {
       nextCursor: done ? null : { endRow: startRow - 1 },
       total: context.rowCount,
       chunkRows: coGoi,
+      reload: reloadStateRead(),
       dirty: dirtyStateRead(),
       selection: selectionSnapshot(),
       ms: ms

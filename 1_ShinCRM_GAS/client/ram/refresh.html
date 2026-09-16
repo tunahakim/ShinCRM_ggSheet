@@ -1,5 +1,16 @@
 <script>
 /** Làm mới đúng các mã do trạng thái bẩn trả về; không tự đọc sheet hay đổi Store ngoài hai cửa của Store. */
+function refreshLocalDraftIds() {
+  var out = [];
+  var stack = typeof ScreenState !== 'undefined' && Array.isArray(ScreenState.formStack) ? ScreenState.formStack : [];
+  stack.forEach(function (form) {
+    if (!form || !form.draft || !Object.keys(form.draft).length) { return; }
+    var id = String(form.record && form.record.id || '').trim();
+    if (id && out.indexOf(id) < 0) { out.push(id); }
+  });
+  return out;
+}
+
 function refreshRecordsApply(result, requestedIds) {
   if (!result || !result.ok) { return; }
   var ids = (requestedIds || []).map(function (id) { return String(id || ''); });
@@ -15,11 +26,16 @@ function refreshRecordsApply(result, requestedIds) {
     var list = Store.activitiesByCustomer[id] || [];
     list.slice().forEach(function (record) { if (!activityIds[record.id] && record.customerId === id) { Store.removeRecord('activity', record.id); } });
   });
+  (result.removedRecordIds || []).forEach(function (id) {
+    var key = String(id || '').trim();
+    if (Store.customers[key]) { Store.removeRecord('customer', key); }
+    Store.removeRecord('activity', key);
+  });
   renderScreen();
 }
 
-function refreshDirtyRecords(ids) {
-  return callServer('reloadRecords', [ids]).then(function (result) {
+function refreshDirtyRecords(ids, expectedRevision) {
+  return callServer('reloadRecords', [ids, expectedRevision]).then(function (result) {
     refreshRecordsApply(result, ids);
     return result;
   });

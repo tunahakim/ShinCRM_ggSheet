@@ -25,6 +25,19 @@ function chay(so) {
   }, ['GD2']);
   check(so, 'bản ghi customer còn trên máy chủ được upsert, bản ghi biến mất bị bỏ', [Object.keys(hop.Store.customers), hop.Store.customers.KH1.id, hop.Store.customers.KH2], [['KH1'], 'KH1', undefined]);
   check(so, 'activity mới được upsert và màn hình được vẽ lại cùng lượt', [hop.Store.activitiesByCustomer.KH1.length, hop.rendered], [1, true]);
+
+  hop.Store.customers.KH3 = { id: 'KH3' };
+  hop.Store.activitiesByCustomer.KH1.push({ id: 'GD3', customerId: 'KH1' });
+  hop.refreshRecordsApply({
+    ok: true,
+    customer: { fields: ['id'], rows: [] },
+    activity: { fields: ['id', 'customerId'], rows: [] },
+    affectedCustomerIds: ['KH3'],
+    removedRecordIds: ['GD3', 'KH3']
+  }, ['GD3', 'KH3']);
+  check(so, 'mã Customer/Activity biến mất được remove trực tiếp bằng removedRecordIds',
+    [hop.Store.customers.KH3, hop.Store.activitiesByCustomer.KH1.some((record) => record.id === 'GD3')],
+    [undefined, false]);
 }
 
 module.exports = { chay };

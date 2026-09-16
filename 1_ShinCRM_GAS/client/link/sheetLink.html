@@ -28,6 +28,9 @@ var SHEET_LINK_RAM_READY = true;
 var SHEET_LINK_APPLY_TICKET = 0;
 var SHEET_LINK_VIEW_STATES = {};
 var SHEET_LINK_DATA_PENDING = null;
+var SHEET_LINK_RELOAD_TIMER = null;
+var SHEET_LINK_RELOAD_CHECKING = null;
+var SHEET_LINK_LAST_SEEN_REVISION = 0;
 var SHEET_LINK_PING_TIMER = null;
 var sheetLinkInstalled = false;
 
@@ -149,7 +152,9 @@ function sheetLinkOnMessage(event) {
   if (data.seq <= SHEET_LINK_SEQ) { return; }
   SHEET_LINK_SEQ = data.seq;
 
+  var wasEditing = !!(SHEET_LINK_LAST_CONTEXT && SHEET_LINK_LAST_CONTEXT.isEditing);
   var applied = sheetLinkApplyContext(data);
+  sheetLinkScheduleEditReload(data, wasEditing);
   if (applied && typeof applied.then === 'function') {
     applied.then(null, function (err) {
       // Context arrives from the background bridge; never interrupt the user with an alert.
@@ -186,8 +191,13 @@ function sheetLinkViewApplyResult(sheetName, result) {
   return result;
 }
 
+function sheetLinkReloadState(payload) {
+  if (!payload) { return {}; }
+  return payload.reload || payload.dirty || payload;
+}
+
 function sheetLinkDirtyNeedsData(dirty) {
-  return !!(dirty && (dirty.all || dirty.config || (dirty.records && dirty.records.length)));
+  return !!(dirty && (dirty.allCore || dirty.all || dirty.config || dirty.category || (dirty.records && dirty.records.length)));
 }
 
 function sheetLinkDirtyNeedsView(dirty, sheetName) {
@@ -196,17 +206,46 @@ function sheetLinkDirtyNeedsView(dirty, sheetName) {
 
 function sheetLinkApplyDirtyData(dirty) {
   if (!sheetLinkDirtyNeedsData(dirty)) { return null; }
-  if ((dirty.all || dirty.config) && typeof sidebarBoot === 'function') { return sidebarBoot(); }
-  if (dirty.records && dirty.records.length && typeof refreshDirtyRecords === 'function') { return refreshDirtyRecords(dirty.records); }
+  var localDraftIds = typeof refreshLocalDraftIds === 'function' ? refreshLocalDraftIds() : [];
+  var draft = {};
+  localDraftIds.forEach(function (id) { draft[id] = true; });
+  if ((dirty.allCore || dirty.all || dirty.config || dirty.category) && typeof sidebarBoot === 'function') {
+    if (localDraftIds.length) { return { deferred: true, reason: 'Sidebar đang giữ bản nháp, chưa nạp lại full core.' }; }
+    return sidebarBoot();
+  }
+  if (dirty.records && dirty.records.length && typeof refreshDirtyRecords === 'function') {
+    var ready = dirty.records.filter(function (id) { return !draft[String(id || '').trim()]; });
+    if (!ready.length) { return { deferred: true, reason: 'Các mã bẩn đều đang có bản nháp Sidebar.' }; }
+    return refreshDirtyRecords(ready, dirty.revision);
+  }
   return null;
+}
+
+function sheetLinkScheduleDirtyCheck(delayMs) {
+  if (SHEET_LINK_RELOAD_TIMER !== null && typeof clearTimeout === 'function') { clearTimeout(SHEET_LINK_RELOAD_TIMER); }
+  SHEET_LINK_RELOAD_TIMER = null;
+  if (typeof setTimeout !== 'function' || !SHEET_LINK_RAM_READY) { return null; }
+  SHEET_LINK_RELOAD_TIMER = setTimeout(function () {
+    SHEET_LINK_RELOAD_TIMER = null;
+    sheetLinkSyncDirtyData();
+  }, Math.max(0, Number(delayMs) || 0));
+  return SHEET_LINK_RELOAD_TIMER;
+}
+
+function sheetLinkScheduleEditReload(ctx, wasEditing) {
+  if (!ctx || ctx.isEditing || !wasEditing || !SHEET_LINK_RAM_READY) { return; }
+  if (ctx.sheetName === 'Customer' || ctx.sheetName === 'Activity') {
+    sheetLinkScheduleDirtyCheck(sheetLinkMs('RELOAD_DEBOUNCE_MS', 3000));
+  }
 }
 
 /** Đồng bộ dữ liệu kho cũng chỉ có một lượt đang bay; chỉ khóa sidebar sau khi máy chủ xác nhận có dữ liệu bẩn. */
 function sheetLinkSyncDirtyData() {
   if (SHEET_LINK_DATA_PENDING) { return SHEET_LINK_DATA_PENDING; }
+  if (SHEET_LINK_RELOAD_CHECKING) { return SHEET_LINK_RELOAD_CHECKING; }
   var settled = false;
-  var work = callServer('getDirtyState').then(function (state) {
-    var dirty = state && state.dirty;
+  var work = callServer('getReloadState').then(function (state) {
+    var dirty = sheetLinkReloadState(state);
     if (!sheetLinkDirtyNeedsData(dirty)) { return null; }
     var refresh = function () { return sheetLinkApplyDirtyData(dirty); };
     return typeof sidebarBusyRun === 'function' ? sidebarBusyRun('Đang đồng bộ dữ liệu vừa thay đổi…', refresh) : refresh();
@@ -222,6 +261,21 @@ function sheetLinkSyncDirtyData() {
   });
   if (!settled) { SHEET_LINK_DATA_PENDING = request; }
   return request;
+}
+
+/** Được gọi sau một lời gọi máy chủ tự nhiên; không chạy theo nhịp riêng và không gọi lại chính getReloadState. */
+function sheetLinkObserveReloadPayload(payload, serverName) {
+  if (!payload || !SHEET_LINK_RAM_READY || serverName === 'getReloadState' || serverName === 'reloadRecords') { return null; }
+  var state = sheetLinkReloadState(payload);
+  var revision = Number(state && state.revision || 0);
+  if (!revision || revision <= SHEET_LINK_LAST_SEEN_REVISION) { return null; }
+  SHEET_LINK_LAST_SEEN_REVISION = revision;
+  if (!sheetLinkDirtyNeedsData(state)) { return null; }
+  if (SHEET_LINK_RELOAD_CHECKING) { return SHEET_LINK_RELOAD_CHECKING; }
+  var check = sheetLinkSyncDirtyData();
+  SHEET_LINK_RELOAD_CHECKING = check;
+  check.then(function (result) { SHEET_LINK_RELOAD_CHECKING = null; return result; }, function (err) { SHEET_LINK_RELOAD_CHECKING = null; if (typeof console !== 'undefined' && console.warn) { console.warn(err); } });
+  return check;
 }
 
 function sheetLinkPositionKey(ctx) {
@@ -254,7 +308,7 @@ function sheetLinkInspectView(sheetName) {
   var settled = false;
   var work = callServer('inspectViewState', [sheetName, state.revision]).then(function (result) {
     if (!result) { return result; }
-    var dirty = result.dirty || {};
+    var dirty = sheetLinkReloadState(result);
     var refreshData = sheetLinkDirtyNeedsData(dirty);
     var refreshView = !state.metaReady || result.changed || result.needsRender || sheetLinkDirtyNeedsView(dirty, sheetName);
     if (!refreshData && !refreshView) { return result; }

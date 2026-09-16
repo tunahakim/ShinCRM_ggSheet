@@ -22,6 +22,12 @@ function chay(so) {
     [saved.ok, saved.recordIds, saved.reloadDecision.kind, saved.dirty.records, saved.dirty.allViews, env.hop.rendered],
     [true, ['KH000001'], 'records', ['KH000001'], true, 1]);
 
+  const pushedEnv = taoHop();
+  const pushed = pushedEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000222' }], source: 'push' });
+  check(so, 'writeGateSave push dùng cùng cổng signal với pull',
+    [pushed.ok, pushed.reloadDecision.kind, pushed.dirty.records, pushed.dirty.allViews, pushedEnv.hop.rendered],
+    [true, 'records', ['KH000001'], true, 1]);
+
   const deletedEnv = taoHop();
   const deleted = deletedEnv.hop.deleteGateRemove({ entity: 'customer', ids: ['KH000001'] });
   check(so, 'DeleteGate hard delete cũng phát signal cho mã biến mất và render',

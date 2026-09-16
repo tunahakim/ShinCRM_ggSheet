@@ -100,6 +100,7 @@
 - [ ] Sửa hàng 3 dưới cột `@CUS_`/`@ACT_` hợp lệ gọi vẽ toàn bộ view.
 - [ ] Sửa hàng 3 dưới cột thường không gọi vẽ.
 - [ ] Sửa hàng 4 trở xuống không đọc ngược và không tự vẽ.
+- [ ] Ngoại lệ được kiểm: hàng 4 trở xuống của `@VIEW_SORT_COL`/`@VIEW_SORT_LEVEL` là cấu hình sắp xếp nên vẫn vẽ toàn bộ view; cột dữ liệu CRM từ hàng 4 trở xuống không vẽ.
 - [ ] Mã `@VIEW_` hoặc mã không hợp lệ không bị coi là cột dữ liệu để reload RAM.
 - [ ] Trigger installable được cài và không tạo bản sao khi chạy lại hàm cài.
 - [ ] Trigger script ghi view không tự tạo vòng lặp onEdit.

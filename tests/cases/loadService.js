@@ -56,7 +56,7 @@ function chay(so) {
   const rong = hop.loadCore();
   check(so, 'gói lõi có đúng bộ khóa tài liệu 05 chốt, không thiếu không thừa',
     Object.keys(rong).sort(),
-    ['activity', 'blocked', 'budget', 'categories', 'config', 'customer', 'dirty', 'ms', 'ok', 'pendingMessages', 'prefs', 'schema', 'selection', 'settings', 'spreadsheetId', 'warnings'].sort());
+    ['activity', 'blocked', 'budget', 'categories', 'config', 'customer', 'dirty', 'ms', 'ok', 'pendingMessages', 'prefs', 'reload', 'schema', 'selection', 'settings', 'spreadsheetId', 'warnings'].sort());
   check(so, 'sheet trắng nạp trót lọt và không bị chặn', [rong.ok, rong.blocked], [true, false]);
   check(so, 'gói lõi mang id tệp để client lọc tin postMessage đúng tệp', rong.spreadsheetId, nen.book.getId());
   check(so, 'không khách nào mà vẫn gửi đủ bảng tên trường', [rong.customer.rows.length, rong.customer.fields.length], [0, 20]);
@@ -108,7 +108,7 @@ function chay(so) {
   const bao = chan.hop.loadCore();
   check(so, 'vượt trần thì blocked mang TÊN LÝ DO chứ không phải true', bao.blocked, 'cellBudget');
   check(so, 'gói bị chặn chỉ có các khóa điều khiển, và KHÔNG có customer — bằng chứng là chưa đọc ô dữ liệu nào',
-    Object.keys(bao).sort(), ['blocked', 'budget', 'dirty', 'ms', 'ok', 'pendingMessages', 'selection'].sort());
+    Object.keys(bao).sort(), ['blocked', 'budget', 'dirty', 'ms', 'ok', 'pendingMessages', 'reload', 'selection'].sort());
   check(so, 'gói bị chặn vẫn mang bảng thủ phạm để người dùng biết dọn sheet nào',
     bao.budget.sheets.length > 0, true);
   check(so, 'gói bị chặn vẫn mang khối trạng thái bẩn', Object.keys(bao.dirty).sort(), ['all', 'config', 'records', 'viewSheets']);

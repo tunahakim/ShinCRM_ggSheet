@@ -92,7 +92,7 @@ function userPrefsWrite(name, value) {
         viewRender = renderAllManagedViewsIfAllowed();
       }
     }
-    return { ok: true, prefs: userPrefsRead(), dirty: dirtyStateRead(), viewRender: viewRender };
+    return { ok: true, prefs: userPrefsRead(), reload: reloadStateRead(), dirty: dirtyStateRead(), viewRender: viewRender };
   });
 }
 
