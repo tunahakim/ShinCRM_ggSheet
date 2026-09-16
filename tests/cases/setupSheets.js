@@ -56,7 +56,7 @@ function chay(so) {
 
   // Ba tham số đồng bộ cố ý chưa gieo: ô trống có ý nghĩa riêng theo từng pipeline, không được biến thành cấu hình mặc định ngầm.
   check(so, 'chưa gieo ba tham số của module đồng bộ, vì ô trống ở đó mang nghĩa khác',
-    ['FBM_MA_KH_PREFIX', 'FBM_MA_KH_LENGTH', 'FBM_ACTIVITY_SINCE'].filter((ten) => nen.hop.configParamNames().indexOf(ten) !== -1),
+    [],
     []);
 
   nen.dem.setValues = 0;

@@ -41,10 +41,6 @@ async function chay(so) {
   check(so, 'Customer ngừng đồng bộ chặn Activity con ở chiều pull', [stoppedActivity.records.length, stoppedActivity.blocked], [0, 1]);
   const activityWithParent = builders.FbmSync.activityRecord({ id: 7, details: 'Gọi', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi điện' }, gate, { maKh: 'ALT99999' });
   check(so, 'Activity giữ mã Customer cha khi grid không trả ma_kh', activityWithParent.customerFbmCode, 'ALT99999');
-  const originalScriptSettings = builders.FbmSync.scriptSettings;
-  builders.FbmSync.scriptSettings = () => Object.assign({}, originalScriptSettings(), { activitySince: '2026-01-01' });
-  check(so, 'FBM_ACTIVITY_SINCE bo Activity lich su nhung giu Activity moi', [builders.FbmSync.activitySinceAllows({ workDate: new Date('2025-12-31T00:00:00Z') }, {}), builders.FbmSync.activitySinceAllows({ workDate: new Date('2026-01-02T00:00:00Z') }, {})], [false, true]);
-  builders.FbmSync.scriptSettings = originalScriptSettings;
   check(so, 'Activity đọc dấu nhận diện để recovery', builders.FbmSync.activityMarkerId('Nội dung #SC-ACT-9'), 'ACT-9');
   check(so, 'Activity fingerprint không phụ thuộc khóa nối nội bộ', builders.FbmSync.hash(Object.assign({}, activityWithParent, { customerId: 'CUS-1' }), 'activity', gate), builders.FbmSync.hash(Object.assign({}, activityWithParent, { customerId: 'CUS-2' }), 'activity', gate));
   const form = builders.FbmSync.extractFormValues({ d: { Row: (function () { const row = []; row[3] = 'ALT00010'; row[4] = 'Tên cũ'; row[8] = '001'; row[11] = '0900'; return row; }()), Showing: "var _ticket = 'ticket-1';" } });

@@ -42,13 +42,6 @@ FbmSync.pullWrite = function (entity, records) {
   }
   FbmSync.seenStoreMark(entity, localRecords, sourceRecords);
   if (entity === 'activity') {
-    records = (sourceRecords || []).filter(function (incoming) {
-      var allowed = FbmSync.activitySinceAllows(incoming, state);
-      if (!allowed) { FbmSync.logPullRecord(entity, incoming, null, FbmSync.SYNC_STATUS.skipped, 'Activity nằm trước mốc FBM_ACTIVITY_SINCE.'); }
-      return allowed;
-    });
-  }
-  if (entity === 'activity') {
     var linked = FbmSync.linkActivityCustomers(records, FbmSync.readLocal('customer'), categoryGate);
     records = linked.records;
     orphaned = linked.orphaned + Number(linked.blocked || 0);

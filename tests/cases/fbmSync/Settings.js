@@ -11,13 +11,13 @@ function chay(so) {
   const writesAfterMigration = Object.keys(data).length;
   legacy.FBM_MA_KH_PREFIX = 'CHANGED-'; legacy.FBM_SYNC_APPROVAL_THRESHOLD = '99';
   const second = hop.FbmSync.syncSettingsRead();
-  check(so, 'migration doc Config cu mot lan va doc lai tu kho moi', [first.customerPrefix, first.customerCodeLength, first.activitySince, first.approvalThreshold, writesAfterMigration, second.customerPrefix, second.approvalThreshold], ['KH-', '8', '2026-01-01', 12, 1, 'KH-', 12]);
-  const invalid = hop.FbmSync.syncSettingsSave({ customerPrefix: 'KH-', customerCodeLength: 0, activitySince: '01/01/2026', approvalThreshold: -1 });
-  check(so, 'tham so sai bi tu choi truoc khi ghi DocumentProperties', [invalid.ok, invalid.code, data.FBM_SYNC_SETTINGS_V1.indexOf('CHANGED-') >= 0], [false, 'FBM_CUSTOMER_CODE_LENGTH_INVALID', false]);
-  const saved = hop.FbmSync.syncSettingsSave({ customerPrefix: 'CRM-', customerCodeLength: 10, activitySince: '', approvalThreshold: 0 });
-  check(so, 'luu tham so hop le va cho phep nguong 0', [saved.ok, saved.settings.customerPrefix, saved.settings.customerCodeLength, saved.settings.approvalThreshold, hop.FbmSync.syncSettingsRead().approvalThreshold], [true, 'CRM-', '10', 0, 0]);
-  const blankLength = hop.FbmSync.syncSettingsSave({ customerPrefix: '', customerCodeLength: '', activitySince: '', approvalThreshold: 10 });
-  check(so, 'de trong do dai ma khach van la tham so hop le de chan tao Customer moi', [blankLength.ok, blankLength.settings.customerCodeLength], [true, '']);
+  check(so, 'migration loai bo tham so ma khach va moc Activity, giu nguong phe duyet', [Object.keys(first).sort(), first.approvalThreshold, writesAfterMigration, Object.keys(second).sort(), second.approvalThreshold], [['approvalThreshold'], 12, 1, ['approvalThreshold'], 12]);
+  const invalid = hop.FbmSync.syncSettingsSave({ approvalThreshold: -1 });
+  check(so, 'nguong phe duyet am bi tu choi truoc khi ghi DocumentProperties', [invalid.ok, invalid.code, data.FBM_SYNC_SETTINGS_V1.indexOf('CHANGED-') >= 0], [false, 'FBM_APPROVAL_THRESHOLD_INVALID', false]);
+  const invalidText = hop.FbmSync.syncSettingsSave({ approvalThreshold: 'khong-phai-so' });
+  check(so, 'nguong phe duyet khong phai so bi tu choi', [invalidText.ok, invalidText.code], [false, 'FBM_APPROVAL_THRESHOLD_INVALID']);
+  const saved = hop.FbmSync.syncSettingsSave({ approvalThreshold: 0 });
+  check(so, 'luu nguong phe duyet hop le va cho phep nguong 0', [saved.ok, Object.keys(saved.settings), saved.settings.approvalThreshold, hop.FbmSync.syncSettingsRead().approvalThreshold], [true, ['approvalThreshold'], 0, 0]);
 }
 
 module.exports = { chay };

@@ -203,7 +203,6 @@ FbmSync.continueAfterPushError = function (state, cursor, failure) {
 FbmSync.pushConfigErrors = function (candidate, settings) {
   var cfg = settings || FbmSync.scriptSettings();
   if (!String(cfg.accountName || '').trim()) { return 'Thiếu tên đầy đủ trong liên kết tài khoản FBM; chiều đẩy đã bị dừng.'; }
-  if (candidate.kind === 'create' && candidate.entity === 'customer' && (!String(cfg.customerPrefix || '').trim() || !String(cfg.customerCodeLength || '').trim())) { return 'Thiếu FBM_MA_KH_PREFIX hoặc FBM_MA_KH_LENGTH; không tạo khách mới.'; }
   return '';
 };
 
@@ -217,14 +216,6 @@ FbmSync.pushOwnerError = function (candidate, settings) {
     return 'Activity ' + String(candidate.id || '') + ' thuộc owner FBM "' + owner + '", khác tài khoản FBM đã liên kết "' + configured + '".';
   }
   return '';
-};
-
-/** Đảm bảo mã khách FBM tự sinh đúng cấu hình trước khi lưu Customer mới. */
-FbmSync.validateAutoCustomerCode = function (code, settings) {
-  var cfg = settings || FbmSync.scriptSettings(), value = String(code || '').trim(), prefix = String(cfg.customerPrefix || '').trim(), length = Number(cfg.customerCodeLength || 0);
-  if (!prefix || !length) { return { ok: false, reason: 'Thiếu FBM_MA_KH_PREFIX hoặc FBM_MA_KH_LENGTH.' }; }
-  if (value.indexOf(prefix) !== 0 || value.length !== length) { return { ok: false, reason: 'Mã khách FBM tự sinh không khớp tiền tố/độ dài đã cấu hình: ' + value }; }
-  return { ok: true };
 };
 
 /** Tạo request kế tiếp của queue push từ state, không giữ queue trong Extension. */
@@ -312,8 +303,6 @@ FbmSync.continuePush = function (state, response) {
   }
   if (cursor.operation === 'customer_create_open') {
     var autoCode = FbmSync.extractAutoCustomerCode(response);
-    var codeCheck = FbmSync.validateAutoCustomerCode(autoCode);
-    if (!codeCheck.ok) { throw new Error(codeCheck.reason); }
     if (!autoCode) { throw new Error('Không lấy được _ma_kh_auto từ form tạo Customer.'); }
     candidate.autoCode = autoCode; cursor.operation = 'customer_create_save'; state.cursor = cursor; FbmSync.stateWrite(state);
     return FbmSync.customerCreateRequest(candidate.record, autoCode, '', gate);

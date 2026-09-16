@@ -23,9 +23,6 @@ FbmSync.scriptSettings = function () {
     activityAuthorized: String(session.activityAuthorized || ''),
     userId: userId,
     accountName: accountName,
-    customerPrefix: FbmSync.configValue('FBM_MA_KH_PREFIX'),
-    customerCodeLength: FbmSync.configValue('FBM_MA_KH_LENGTH'),
-    activitySince: FbmSync.configValue('FBM_ACTIVITY_SINCE'),
     testCustomerCode: testCustomerCode
   };
 };
@@ -101,9 +98,7 @@ FbmSync.activityGridRequest = function (sttRec, options) {
 };
 /** Dựng request bulk Activity theo mốc thời gian; không gắn một Customer cụ thể. */
 FbmSync.activityBulkRequest = function (options) {
-  var opt = Object.assign({}, options || {}), keys = Array.isArray(opt.externalKey) ? opt.externalKey.slice() : [], since = '';
-  try { since = String(FbmSync.scriptSettings().activitySince || '').trim(); } catch (ignore) { since = ''; }
-  if (since && !opt.includeHistory) { keys.push({ Name: 'end_date', Opr: '>=', Value: since, Type: 'Date', Ignore: false }); }
+  var opt = Object.assign({}, options || {}), keys = Array.isArray(opt.externalKey) ? opt.externalKey.slice() : [];
   delete opt.includeHistory;
   var transport = opt.transport;
   delete opt.transport;

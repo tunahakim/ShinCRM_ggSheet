@@ -101,7 +101,7 @@ FbmSync.isTemporaryRecord = function (entity, record) {
 
 /** Đọc tham số FBM an toàn; thiếu Config thì chiều đọc vẫn hoạt động, chiều ghi tự chặn. */
 FbmSync.configValue = function (name) {
-  var mapped = { FBM_MA_KH_PREFIX: 'customerPrefix', FBM_MA_KH_LENGTH: 'customerCodeLength', FBM_ACTIVITY_SINCE: 'activitySince', FBM_SYNC_APPROVAL_THRESHOLD: 'approvalThreshold' }[String(name || '')];
+  var mapped = { FBM_SYNC_APPROVAL_THRESHOLD: 'approvalThreshold' }[String(name || '')];
   if (mapped && typeof FbmSync.syncSettingsRead === 'function') {
     try {
       var settings = FbmSync.syncSettingsRead(), stored = settings && settings[mapped];
