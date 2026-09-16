@@ -86,6 +86,7 @@
 - Tạo kho `FBM_SYNC_SETTINGS_V1` trong `DocumentProperties`, chỉ chứa `{ approvalThreshold }` đã chuẩn hóa. Tạo kho `FBM_ACCOUNT_SETTINGS_V1` cho `{ customerPrefix, customerCodeLength, activitySince }`, có migration một lần từ các key Config cũ tương ứng.
 - Khi kho chưa tồn tại, GAS chỉ một lần đọc `FBM_SYNC_APPROVAL_THRESHOLD` cũ cho tham số phiên và các key `FBM_MA_KH_PREFIX`, `FBM_MA_KH_LENGTH`, `FBM_ACTIVITY_SINCE` cũ cho cấu hình tài khoản, ghi record chuẩn rồi dùng record đó. Sau khi kho tương ứng đã tồn tại, tuyệt đối không đọc lại Config.
 - `customerPrefix` và `customerCodeLength` phải nhập đủ cả hai hoặc để trống cả hai. Khi tạo Customer mới, Preflight chặn nếu thiếu cấu hình; sau bước mở form, mã `ma_kh` FBM tự sinh phải khớp tiền tố và độ dài trước khi gửi request lưu. `activitySince` là ngày hợp lệ hoặc để trống; Activity trước mốc bị bỏ qua nhưng không bị coi là bản ghi mất.
+- `activitySince` được đổi sang filter FBM `end_date:>=DD/MM/YYYY` trên bulk và mọi request Activity theo Customer; missing scan loại Activity trước mốc, refresh conflict đọc đích danh không áp dụng mốc. Mỗi lượt chụp mốc vào state để đổi cấu hình giữa chừng không làm trộn phạm vi cursor.
 - Thêm `FbmSync.syncSettingsRead()`/`syncSettingsSave(input)` và `FbmSync.accountSettingsRead()`/`accountSettingsSave(input)`; server entrypoint công khai tương ứng là `fbmGetSyncSettings()`, `fbmSaveSyncSettings(settings)`, `fbmSaveAccountSettings(settings)`. GAS kiểm tra DTO rồi trả bản đã lưu để Sidebar vá lại.
 
 ### 4.2. Shape cấu hình lịch nền
