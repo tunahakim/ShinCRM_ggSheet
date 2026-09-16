@@ -113,6 +113,49 @@ function chay(so) {
     bao.budget.sheets.length > 0, true);
   check(so, 'gói bị chặn vẫn mang khối trạng thái bẩn', Object.keys(bao.dirty).sort(), ['all', 'config', 'records', 'viewSheets']);
 
+  // Reload theo scope: một mã Activity kéo theo Customer cha và toàn bộ lịch sử
+  // của Customer đó, nhưng không kéo bản ghi của Customer khác.
+  const scope = dungNap();
+  const scopeHop = scope.hop;
+  const scopeFirstRow = scopeHop.SHEET_FIRST_DATA_ROW;
+  ghiKhach(scope, scopeFirstRow, 'KH-SCOPE-1', 'Khách scope 1');
+  ghiKhach(scope, scopeFirstRow + 1, 'KH-SCOPE-2', 'Khách scope 2');
+  ghiGiaoDich(scope, scopeFirstRow, 'GD-SCOPE-1', 'KH-SCOPE-1', '2026-09-01');
+  ghiGiaoDich(scope, scopeFirstRow + 1, 'GD-SCOPE-2', 'KH-SCOPE-1', '2026-09-02');
+  ghiGiaoDich(scope, scopeFirstRow + 2, 'GD-OTHER', 'KH-SCOPE-2', '2026-09-03');
+
+  const scoped = scopeHop.reloadRecords([' GD-SCOPE-2 ', 'KH-SCOPE-1', 'KH-SCOPE-1', 'KH-MISSING']);
+  check(so, 'reloadRecords chỉ trả Customer liên quan và mọi Activity của Customer bị ảnh hưởng',
+    [scoped.reloadMode, scoped.customer.rows.map((row) => row[0]), scoped.activity.rows.map((row) => row[0]).sort(), scoped.removedRecordIds, scoped.affectedCustomerIds.sort()],
+    ['records', ['KH-SCOPE-1'], ['GD-SCOPE-1', 'GD-SCOPE-2'], ['KH-MISSING'], ['KH-MISSING', 'KH-SCOPE-1']]);
+  check(so, 'reloadRecords chuẩn hóa chuỗi và loại mã trùng trước khi đọc', scoped.removedRecordIds, ['KH-MISSING']);
+
+  const stale = dungNap(null, { reloadRevision: '9', dirtyRecords: '["KH-SCOPE-1"]' });
+  ghiKhach(stale, stale.hop.SHEET_FIRST_DATA_ROW, 'KH-SCOPE-1', 'Khách stale');
+  const staleReload = stale.hop.reloadRecords(['KH-SCOPE-1'], 8);
+  check(so, 'reloadRecords không xóa cờ khi revision đã đổi',
+    [staleReload.revisionMatched, staleReload.reload.revision, staleReload.dirty.records],
+    [false, 9, ['KH-SCOPE-1']]);
+
+  const category = dungNap();
+  category.Category.sheet.getRange(category.hop.SHEET_FIRST_DATA_ROW, 1).setValue('Giá trị thử');
+  category.hop.dirtyStateMarkCategory();
+  const categoryReload = category.hop.reloadCategory(category.hop.reloadStateRead().revision);
+  check(so, 'reloadCategory trả danh mục và xóa đúng dirtyCategory',
+    [categoryReload.reloadMode, categoryReload.categories[category.Category.codes[0]], categoryReload.revisionMatched, categoryReload.reload.category, categoryReload.dirty.config],
+    ['category', ['Giá trị thử'], true, false, false]);
+
+  const configReload = category.hop.reloadConfig();
+  check(so, 'reloadConfig trả chỉ thị fullCore rõ ràng để giữ Config và Schema đồng nhất',
+    [configReload.reloadMode, configReload.reason.indexOf('full core') >= 0, !!configReload.reload],
+    ['fullCore', true, true]);
+
+  const emptyScope = scopeHop.reloadRecords([]);
+  check(so, 'reloadRecords scope rỗng trả quyết định fullCore rõ ràng', emptyScope.reloadMode, 'fullCore');
+  scopeHop.SETTINGS.DIRTY_RECORD_LIMIT = 1;
+  const wideScope = scopeHop.reloadRecords(['KH-SCOPE-1', 'KH-SCOPE-2']);
+  check(so, 'reloadRecords scope vượt ngưỡng trả quyết định fullCore', wideScope.reloadMode, 'fullCore');
+
   return chayGoi(so, nen, hop, hangDau);
 }
 

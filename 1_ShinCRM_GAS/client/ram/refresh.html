@@ -34,9 +34,38 @@ function refreshRecordsApply(result, requestedIds) {
   renderScreen();
 }
 
+/** Áp dụng riêng bảng Category; Config và Schema vẫn đi qua full core để không lệch bảng khai. */
+function refreshCategoryApply(result) {
+  if (!result || !result.ok || !result.categories) { return; }
+  Store.categories = result.categories;
+  renderScreen();
+}
+
 function refreshDirtyRecords(ids, expectedRevision) {
   return callServer('reloadRecords', [ids, expectedRevision]).then(function (result) {
+    if (result && result.reloadMode === 'fullCore') {
+      return typeof sidebarBoot === 'function' ? sidebarBoot().then(function () { return result; }) : result;
+    }
     refreshRecordsApply(result, ids);
+    return result;
+  });
+}
+
+function refreshCategory(expectedRevision) {
+  return callServer('reloadCategory', [expectedRevision]).then(function (result) {
+    if (result && result.reloadMode === 'fullCore') {
+      return typeof sidebarBoot === 'function' ? sidebarBoot().then(function () { return result; }) : result;
+    }
+    refreshCategoryApply(result);
+    return result;
+  });
+}
+
+function refreshConfig(expectedRevision) {
+  return callServer('reloadConfig', [expectedRevision]).then(function (result) {
+    if (result && result.reloadMode === 'fullCore') {
+      return typeof sidebarBoot === 'function' ? sidebarBoot().then(function () { return result; }) : result;
+    }
     return result;
   });
 }

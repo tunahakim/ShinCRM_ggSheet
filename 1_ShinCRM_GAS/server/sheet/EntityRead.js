@@ -110,6 +110,57 @@ function entityReadRange(context, firstRow, rowCount) {
   return { entity: context.entity, fields: context.names, rows: rows, blankRows: blankRows };
 }
 
+/**
+ * Đọc một vài cột khóa trong một vùng. `LoadService` dùng đường này để xác định
+ * phạm vi reload mà không phải kéo toàn bộ kho về rồi mới lọc ở cuối.
+ */
+function entityReadFieldBlock(context, firstRow, rowCount, fieldNames) {
+  var names = Array.isArray(fieldNames) ? fieldNames : [];
+  if (!names.length || rowCount <= 0) { return []; }
+
+  var positions = names.map(function (name) {
+    var at = context.names.indexOf(name);
+    if (at < 0) { throw new Error('Không có trường "' + name + '" trong schema ' + context.entity + '.'); }
+    return context.indexes[at];
+  });
+  var firstColumn = Math.min.apply(null, positions);
+  var lastColumn = Math.max.apply(null, positions);
+  var block = sheetGridReadBlock(context.sheet, firstRow, rowCount, lastColumn - firstColumn + 1, firstColumn + 1);
+
+  return block.map(function (raw) {
+    return positions.map(function (position, index) {
+      var fieldIndex = context.names.indexOf(names[index]);
+      return entityReadCell(raw[position - firstColumn], context.specs[fieldIndex], context.timezone);
+    });
+  });
+}
+
+/** Đọc các dòng đã xác định, gộp các dòng liền nhau để không tạo một request cho từng mã. */
+function entityReadRowsAt(context, rowNumbers) {
+  var positions = (Array.isArray(rowNumbers) ? rowNumbers : []).map(function (row) { return Number(row); })
+    .filter(function (row) { return row >= SHEET_FIRST_DATA_ROW && row < SHEET_FIRST_DATA_ROW + context.rowCount; });
+  var unique = {};
+  positions = positions.filter(function (row) {
+    if (unique[row]) { return false; }
+    unique[row] = true;
+    return true;
+  }).sort(function (a, b) { return a - b; });
+
+  var rows = [];
+  var blankRows = 0;
+  var start = 0;
+  while (start < positions.length) {
+    var end = start;
+    while (end + 1 < positions.length && positions[end + 1] === positions[end] + 1) { end += 1; }
+    var block = entityReadRange(context, positions[start], positions[end] - positions[start] + 1);
+    rows = rows.concat(block.rows);
+    blankRows += block.blankRows;
+    start = end + 1;
+  }
+
+  return { entity: context.entity, fields: context.names, rows: rows, blankRows: blankRows };
+}
+
 /** Đọc trọn một thực thể trong một lượt. Dùng cho `customer`, thứ tài liệu 05 Phần 4 yêu cầu nạp hết ngay ở `loadCore`. */
 function entityReadAll(entity, schema) {
   var context = entityReadContext(entity, schema);

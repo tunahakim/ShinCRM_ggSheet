@@ -209,9 +209,12 @@ function sheetLinkApplyDirtyData(dirty) {
   var localDraftIds = typeof refreshLocalDraftIds === 'function' ? refreshLocalDraftIds() : [];
   var draft = {};
   localDraftIds.forEach(function (id) { draft[id] = true; });
-  if ((dirty.allCore || dirty.all || dirty.config || dirty.category) && typeof sidebarBoot === 'function') {
+  if ((dirty.allCore || dirty.all || dirty.config) && typeof sidebarBoot === 'function') {
     if (localDraftIds.length) { return { deferred: true, reason: 'Sidebar đang giữ bản nháp, chưa nạp lại full core.' }; }
     return sidebarBoot();
+  }
+  if (dirty.category && typeof refreshCategory === 'function') {
+    return refreshCategory(dirty.revision);
   }
   if (dirty.records && dirty.records.length && typeof refreshDirtyRecords === 'function') {
     var ready = dirty.records.filter(function (id) { return !draft[String(id || '').trim()]; });

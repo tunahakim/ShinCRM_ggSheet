@@ -47,17 +47,19 @@ function sheetGridDataRowCount(sheet, firstDataRow) {
  *
  * Cắt gọn theo lưới chứ không ném lỗi khi bên gọi hỏi quá tay, vì bên gọi tính vùng đọc từ `getLastRow()` còn lưới thì do `getMaxRows()` quyết định, và hai con số đó lệch nhau là chuyện bình thường.
  */
-function sheetGridReadBlock(sheet, firstRow, rowCount, columnCount) {
+function sheetGridReadBlock(sheet, firstRow, rowCount, columnCount, firstColumn) {
   if (rowCount <= 0 || columnCount <= 0) { return []; }
 
   var maxRows = sheet.getMaxRows();
   if (firstRow > maxRows || firstRow < 1) { return []; }
 
   var rows = Math.min(rowCount, maxRows - firstRow + 1);
-  var cols = Math.min(columnCount, sheet.getMaxColumns());
+  var startColumn = firstColumn === undefined ? 1 : firstColumn;
+  if (startColumn < 1 || startColumn > sheet.getMaxColumns()) { return []; }
+  var cols = Math.min(columnCount, sheet.getMaxColumns() - startColumn + 1);
   if (rows <= 0 || cols <= 0) { return []; }
 
-  return sheet.getRange(firstRow, 1, rows, cols).getValues();
+  return sheet.getRange(firstRow, startColumn, rows, cols).getValues();
 }
 
 /**

@@ -29,50 +29,145 @@ function getReloadState() {
   });
 }
 
+/** Chuẩn hóa scope trước khi đọc để cùng một mã không làm phình request hoặc danh sách cờ bẩn. */
+function loadNormalizeRecordIds(recordIds) {
+  var values = Array.isArray(recordIds) ? recordIds : [recordIds];
+  var out = [];
+  var seen = {};
+  values.forEach(function (value) {
+    var id = String(value === null || value === undefined ? '' : value).trim();
+    if (!id || seen[id]) { return; }
+    seen[id] = true;
+    out.push(id);
+  });
+  return out;
+}
+
 function reloadRecords(recordIds, expectedRevision) {
   return runEntryPoint('reloadRecords', LOAD_SOURCE, 'throw', function () {
     var started = Date.now();
-    var ids = (Array.isArray(recordIds) ? recordIds : [recordIds]).map(function (id) { return String(id || '').trim(); }).filter(function (id) { return id; });
-    var customerBlock = entityReadAll('customer');
-    var activityBlock = entityReadAll('activity');
+    var ids = loadNormalizeRecordIds(recordIds);
+    if (!ids.length || ids.length > SETTINGS.DIRTY_RECORD_LIMIT) {
+      var fullState = typeof reloadStateRead === 'function' ? reloadStateRead() : null;
+      return {
+        ok: true,
+        reloadMode: 'fullCore',
+        reason: !ids.length ? 'Không có mã hợp lệ để xác định scope reload.' : 'Scope reload vượt ngưỡng an toàn.',
+        processedRevision: fullState ? fullState.revision : 0,
+        reload: fullState,
+        dirty: dirtyStateRead(),
+        selection: selectionSnapshot(),
+        ms: Date.now() - started
+      };
+    }
+
+    var customerContext = entityReadContext('customer');
+    var activityContext = entityReadContext('activity');
+    var customerFirstRow = SHEET_FIRST_DATA_ROW;
+    var activityFirstRow = SHEET_FIRST_DATA_ROW;
+    var customerKeyRows = entityReadFieldBlock(customerContext, customerFirstRow, customerContext.rowCount, ['id']);
+    var activityKeyRows = entityReadFieldBlock(activityContext, activityFirstRow, activityContext.rowCount, ['id', 'customerId']);
+    var requested = {};
+    ids.forEach(function (id) { requested[id] = true; });
     var customerIds = {};
-    var activityCustomerById = {};
-    activityBlock.rows.forEach(function (row) {
-      var activity = {};
-      activityBlock.fields.forEach(function (field, i) { activity[field] = row[i]; });
-      activityCustomerById[String(activity.id || '').trim()] = String(activity.customerId || '').trim();
-    });
-    ids.forEach(function (id) { customerIds[activityCustomerById[id] || id] = true; });
-    var customers = [];
-    customerBlock.rows.forEach(function (row) {
-      var customer = {};
-      customerBlock.fields.forEach(function (field, i) { customer[field] = row[i]; });
-      if (customerIds[customer.id]) { customers.push(row); }
-    });
-    var activities = [];
-    activityBlock.rows.forEach(function (row) {
-      var customerId = row[activityBlock.fields.indexOf('customerId')];
-      if (customerIds[customerId]) { activities.push(row); }
-    });
-    var customerIdAt = customerBlock.fields.indexOf('id');
-    var activityIdAt = activityBlock.fields.indexOf('id');
     var existingCustomerIds = {};
-    customerBlock.rows.forEach(function (row) { existingCustomerIds[String(row[customerIdAt] || '').trim()] = true; });
     var existingActivityIds = {};
-    activityBlock.rows.forEach(function (row) { existingActivityIds[String(row[activityIdAt] || '').trim()] = true; });
+    var customerRowsAt = [];
+    var activityRowsAt = [];
+
+    customerKeyRows.forEach(function (row, index) {
+      var id = String(row[0] || '').trim();
+      if (!id) { return; }
+      existingCustomerIds[id] = true;
+      if (requested[id]) {
+        customerIds[id] = true;
+        customerRowsAt.push(customerFirstRow + index);
+      }
+    });
+
+    activityKeyRows.forEach(function (row, index) {
+      var activityId = String(row[0] || '').trim();
+      var customerId = String(row[1] || '').trim();
+      if (!activityId) { return; }
+      existingActivityIds[activityId] = true;
+      if (requested[activityId] && customerId) { customerIds[customerId] = true; }
+      if (customerIds[customerId]) { activityRowsAt.push(activityFirstRow + index); }
+    });
+
+    ids.forEach(function (id) {
+      if (!existingActivityIds[id]) { customerIds[id] = true; }
+    });
+
+    // A requested Activity can reveal its parent only in the first pass; scan again
+    // for all Activity rows belonging to the complete affected-customer set.
+    activityRowsAt = [];
+    activityKeyRows.forEach(function (row, index) {
+      var activityId = String(row[0] || '').trim();
+      var customerId = String(row[1] || '').trim();
+      if (requested[activityId] || customerIds[customerId]) { activityRowsAt.push(activityFirstRow + index); }
+    });
+    var customers = entityReadRowsAt(customerContext, customerRowsAt);
+    var activities = entityReadRowsAt(activityContext, activityRowsAt);
     var removedRecordIds = ids.filter(function (id) { return !existingCustomerIds[id] && !existingActivityIds[id]; });
     var current = typeof reloadStateRead === 'function' ? reloadStateRead() : null;
     var revisionMatches = expectedRevision === undefined || expectedRevision === null || expectedRevision === ''
       || (current && current.revision === Number(expectedRevision));
     if (revisionMatches) { dirtyStateClearRecords(ids, expectedRevision); }
+    var latest = typeof reloadStateRead === 'function' ? reloadStateRead() : current;
     return {
       ok: true,
-      customer: { fields: customerBlock.fields, rows: customers },
-      activity: { fields: activityBlock.fields, rows: activities },
+      reloadMode: 'records',
+      customer: { fields: customers.fields, rows: customers.rows },
+      activity: { fields: activities.fields, rows: activities.rows },
       affectedCustomerIds: Object.keys(customerIds),
       removedRecordIds: removedRecordIds,
-      processedRevision: current ? current.revision : 0,
-      reload: typeof reloadStateRead === 'function' ? reloadStateRead() : null,
+      processedRevision: latest ? latest.revision : 0,
+      revisionMatched: revisionMatches,
+      reload: latest,
+      dirty: dirtyStateRead(),
+      selection: selectionSnapshot(),
+      ms: Date.now() - started
+    };
+  });
+}
+
+/** Nạp riêng Category; chỉ xóa cờ Category khi revision không đổi trong lúc đọc. */
+function reloadCategory(expectedRevision) {
+  return runEntryPoint('reloadCategory', LOAD_SOURCE, 'throw', function () {
+    var started = Date.now();
+    var result = categoryReadAll();
+    var current = reloadStateRead();
+    var revisionMatches = expectedRevision === undefined || expectedRevision === null || expectedRevision === ''
+      || current.revision === Number(expectedRevision);
+    if (revisionMatches) { dirtyStateClear({ category: true, expectedRevision: expectedRevision }); }
+    var latest = reloadStateRead();
+    return {
+      ok: true,
+      reloadMode: 'category',
+      categories: result.categories,
+      warnings: result.warnings,
+      processedRevision: latest.revision,
+      revisionMatched: revisionMatches,
+      reload: latest,
+      dirty: dirtyStateRead(),
+      selection: selectionSnapshot(),
+      ms: Date.now() - started
+    };
+  });
+}
+
+/** Config chưa có patch an toàn cho từng khối; trả chỉ thị fullCore để không lệch schema/default/counter. */
+function reloadConfig(expectedRevision) {
+  return runEntryPoint('reloadConfig', LOAD_SOURCE, 'throw', function () {
+    var started = Date.now();
+    var current = reloadStateRead();
+    return {
+      ok: true,
+      reloadMode: 'fullCore',
+      reason: 'Config dùng full core để giữ Schema, ngầm định và bộ đếm nhất quán.',
+      processedRevision: current.revision,
+      expectedRevision: expectedRevision === undefined || expectedRevision === null || expectedRevision === '' ? null : Number(expectedRevision),
+      reload: current,
       dirty: dirtyStateRead(),
       selection: selectionSnapshot(),
       ms: Date.now() - started
