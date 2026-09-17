@@ -141,7 +141,7 @@ Nếu wake mới đến trong lúc request trước còn chạy, Sidebar chỉ g
 
 Ví dụ năm lần sửa A–E cách nhau một giây: các request trong năm giây đầu chỉ trả `defer`; request kế tiếp tại mốc dữ liệu sẵn sàng trả một payload duy nhất chứa A–E. Mỗi response trước đó không có payload. Nếu F phát sinh sau khi A–E đã được xử lý, F tạo revision mới và được trả trong một request riêng sau mốc debounce của F.
 
-Apps Script không có cơ chế hủy chắc chắn một invocation đang chạy. Vì vậy thiết kế không dựa vào hủy tiến trình: request cũ có thể hoàn tất nhưng chỉ được áp dụng nếu revision của nó không thấp hơn revision đã nạp. Nếu signal đổi trong lúc đọc, GAS giữ signal mới hoặc trả chỉ thị để request kế tiếp xử lý, không xóa nhầm dirty state.
+Apps Script không có cơ chế hủy chắc chắn một invocation đang chạy. Vì vậy thiết kế không dựa vào hủy tiến trình: request cũ có thể hoàn tất nhưng chỉ được áp dụng nếu revision của nó không thấp hơn revision đã nạp. `DirtyState` lưu nhật ký các mã records theo revision trong `DocumentProperties`; khi revision đổi trong lúc đọc, GAS chỉ xóa mã của revision đã đọc và giữ mọi mã xuất hiện ở revision mới, kể cả trường hợp cùng một mã bị sửa lại. Nếu signal đổi trong lúc đọc, GAS giữ signal mới hoặc trả chỉ thị để request kế tiếp xử lý, không xóa nhầm dirty state.
 
 ### 5.2. Debounce dữ liệu 3 giây
 
