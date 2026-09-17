@@ -96,14 +96,21 @@ async function chay(so) {
     { label: 'Tất cả', action: 'setActivityView', value: 'all' }
   ] } };
   hop.Prefs = { autoRenderView: true, activityView: 'active' };
+  const bodyRegion = dom.document.createElement('div');
+  bodyRegion.id = 'sidebar-body';
+  bodyRegion.rect = { left: 0, top: 130, bottom: 800, right: 300 };
+  dom.root.appendChild(bodyRegion);
   const nutMenu = dom.document.createElement('button');
   nutMenu.setAttribute('data-menu', 'menu-1');
-  nutMenu.rect = { left: 280, top: 760, bottom: 780, right: 300 };
+  nutMenu.rect = { left: 280, top: 20, bottom: 40, right: 300 };
   dom.root.appendChild(nutMenu);
   const lop = hop.menuOpen(nutMenu);
-  check(so, 'menuOpen dựng đúng hai mục, đánh dấu công tắc và ép menu vào cửa sổ',
-    [lop.hidden, lop.children.length, lop.children[0].textContent, lop.children[0].getAttribute('aria-checked'), nutMenu.getAttribute('aria-expanded'), lop.style.left],
-    [false, 2, '✓Tự động', 'true', 'true', '196px']);
+  check(so, 'menuOpen dựng đúng hai mục, đánh dấu công tắc và giữ menu trong cửa sổ',
+    [lop.hidden, lop.children.length, lop.children[0].textContent, lop.children[0].getAttribute('aria-checked'), nutMenu.getAttribute('aria-expanded'), lop.style.left, lop.style.top],
+    [false, 2, '✓Tự động', 'true', 'true', '196px', '44px']);
+  nutMenu.rect = { left: 280, top: 200, bottom: 220, right: 300 };
+  hop.PopupList.place(lop, nutMenu, { region: bodyRegion });
+  check(so, 'PopupList luôn bám theo vị trí mới của trigger, không dùng tọa độ cố định', [lop.style.left, lop.style.top], ['196px', '224px']);
   hop.menuToggle(nutMenu);
   check(so, 'bấm lại nút menu đang mở thì đóng và dọn mục con', [lop.hidden, lop.children.length, nutMenu.getAttribute('aria-expanded')], [true, 0, 'false']);
   check(so, 'menuInstall chỉ gắn một tai nghe Escape', [hop.menuInstall(), hop.menuInstall()], [true, false]);

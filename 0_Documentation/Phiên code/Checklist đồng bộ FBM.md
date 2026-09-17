@@ -319,7 +319,7 @@ Hợp đồng chi tiết và checklist triển khai riêng nằm ở `07A. Hợp
 - [x] Click icon Đồng bộ ở menu chính mở thẳng màn hình `Chạy đồng bộ`, không hiện menu trung gian.
 - [x] Module có menu nội bộ bốn màn hình, đặt `Chạy đồng bộ` ở đầu: `Chạy đồng bộ`, `Tài khoản FBM`, `Kết quả & xử lý`, `Cài đặt phiên`.
 - [x] Header có cụm phải `[ON/OFF] [☰]`; khi tắt, phiên thủ công, đồng bộ nền, auto-login và thao tác ghi/giải quyết conflict bị khóa, state/log vẫn xem được; menu con cuộn ở ngưỡng hai phần ba Sidebar.
-- [x] Menu con là hộp nổi dưới header, không làm nội dung màn hình dịch xuống khi mở.
+- [x] Menu con là hộp nổi dưới header, không làm nội dung màn hình dịch xuống khi mở; `PopupList` tự dùng viewport khi trigger nằm ngoài vùng body để không bị ép xuống mép body (test `domUi`).
 - [x] `Tài khoản FBM` gom nhận diện và trạng thái đăng nhập trong một màn hình; login thử phải đối chiếu user, tên tài khoản và Spreadsheet ID. Công tắc auto-login nằm duy nhất trong `Cài đặt phiên`.
 - [x] `Chạy đồng bộ` dùng dropdown diễn giải rõ `Kiểm tra an toàn`, `Lấy từ FBM → ShinCRM`, `Đẩy từ ShinCRM → FBM`, `Đồng bộ hai chiều`; không có checkbox ghi trùng ý nghĩa.
 - [x] Mọi phiên đang chạy hiển thị pipeline theo thực thể với trạng thái chưa chạy/đang chạy/hoàn tất/lỗi.

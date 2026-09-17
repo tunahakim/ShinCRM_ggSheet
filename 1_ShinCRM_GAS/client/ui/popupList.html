@@ -78,13 +78,26 @@ var PopupList = (function () {
     return fallback || viewport();
   }
 
-  function popupRegion(options) {
+  function popupRegion(options, anchorRect) {
+    var region = null;
     if (options && options.region && options.region !== 'viewport' && typeof options.region.getBoundingClientRect === 'function') {
-      return rectOf(options.region, viewport());
+      region = rectOf(options.region, viewport());
+      // A region is a clipping boundary for controls inside it. Header menus
+      // are outside the body, so using the body top would detach the popup
+      // from its trigger. Fall back to the viewport for such anchors.
+      if (anchorRect && (Number(anchorRect.bottom) < Number(region.top) || Number(anchorRect.top) > Number(region.bottom))) {
+        return viewport();
+      }
+      return region;
     }
     if (options && options.region === 'viewport') { return viewport(); }
     var body = typeof document !== 'undefined' && document.getElementById ? document.getElementById('sidebar-body') : null;
-    return body ? rectOf(body, viewport()) : viewport();
+    if (!body) { return viewport(); }
+    region = rectOf(body, viewport());
+    if (anchorRect && (Number(anchorRect.bottom) < Number(region.top) || Number(anchorRect.top) > Number(region.bottom))) {
+      return viewport();
+    }
+    return region;
   }
 
   function clearGeometry(box) {
@@ -165,7 +178,7 @@ var PopupList = (function () {
   }
 
   function place(box, anchor, options) {
-    var opts = options || {}, anchorRect = rectOf(anchor, viewport()), region = popupRegion(opts);
+    var opts = options || {}, anchorRect = rectOf(anchor, viewport()), region = popupRegion(opts, anchorRect);
     var gap = Number(opts.gap);
     if (!Number.isFinite(gap) || gap < 0) { gap = DEFAULT_GAP; }
     var maxWidth = Math.max(1, Number(region.right) - Number(region.left) - gap * 2);
