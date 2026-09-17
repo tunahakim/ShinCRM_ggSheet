@@ -412,14 +412,14 @@
 
 ## Slice R11 — GAS trả payload reload trong chính response Sidebar
 
-- [ ] Tách logic đọc record/category/full core thành hàm nội bộ có thể được gọi trong `probeSelectionAndReload` mà không tạo RPC thứ hai.
-- [ ] Khi `reloadDecisionForState` trả `defer`, `probeSelectionAndReload` trả `waitMs`/`readyAt`, không đọc dữ liệu và không xóa dirty.
-- [ ] Khi đã đủ thời gian, `probeSelectionAndReload` tự nạp đúng scope và trả `payload` trong cùng response; Sidebar không gọi `reloadRecords`, `reloadCategory` hoặc `loadCore` để hoàn tất lượt đó.
-- [ ] Payload records bao phủ Customer, Activity liên quan, bản ghi biến mất và search index; payload full core bao phủ Schema, Config, Category, Customer và thông tin chunk Activity.
-- [ ] Response luôn có `requestId`, `observedRevision`, `processedRevision`, `remainingRevision`, `revisionMatched`, `reload` và `decision`.
-- [ ] Dirty chỉ xóa sau khi GAS đã đọc payload thành công và revision khớp; signal phát sinh trong lúc đọc vẫn còn trong `remainingRevision`.
-- [ ] Sidebar chỉ áp dụng payload có revision không thấp hơn revision đã nạp; response `defer` hoặc response cũ không được làm lùi timer/context/Store.
-- [ ] Sidebar chỉ giữ một timer `readyAt` và một wake đang chờ; nhiều response `defer` không tạo nhiều lượt reload hoặc timer chồng.
+- [x] Tách logic đọc record/category/full core thành hàm nội bộ có thể được gọi trong `probeSelectionAndReload` mà không tạo RPC thứ hai (`LoadService.js`, test `selectionService.js`).
+- [x] Khi `reloadDecisionForState` trả `defer`, `probeSelectionAndReload` trả `waitMs`/`readyAt`, không đọc dữ liệu và không xóa dirty (test `selectionService.js`).
+- [x] Khi đã đủ thời gian, `probeSelectionAndReload` tự nạp đúng scope và trả `payload` trong cùng response; Sidebar không gọi `reloadRecords`, `reloadCategory` hoặc `loadCore` để hoàn tất lượt đó (test `selectionPoll.js`).
+- [x] Payload records bao phủ Customer, Activity liên quan, bản ghi biến mất và search index; payload full core bao phủ Schema, Config, Category, Customer và Activity (test `loadService.js`, `selectionService.js`).
+- [x] Response luôn có `requestId`, `observedRevision`, `processedRevision`, `remainingRevision`, `revisionMatched`, `reload` và `decision` (`SelectionService.js`, test `selectionService.js`).
+- [x] Dirty chỉ xóa sau khi GAS đã đọc payload thành công và revision khớp; signal phát sinh trong lúc đọc vẫn còn trong state mới (guard revision trong `LoadService.js`, test `loadService.js`).
+- [x] Sidebar chỉ áp dụng payload có revision không thấp hơn revision đã nạp; response `defer` hoặc response cũ không được làm lùi timer/context/Store (test `selectionPoll.js`).
+- [x] Sidebar chỉ giữ một timer `readyAt` và một wake đang chờ; nhiều response `defer` không tạo nhiều lượt reload hoặc timer chồng (`sheetLink.html`, test `selectionPoll.js`).
 - [ ] Test offline phủ năm lần sửa A–E cách nhau một giây: các response đầu không có payload, request sau `readyAt` trả một payload chứa toàn bộ A–E.
 - [ ] Test offline phủ sửa F sau khi A–E đã xử lý: F tạo revision mới và được trả ở lượt riêng sau debounce của F.
 - [ ] Test offline phủ F phát sinh trong lúc payload A–E đang được đọc: GAS không xóa F, response ghi `remainingRevision`, request kế tiếp nhận F.

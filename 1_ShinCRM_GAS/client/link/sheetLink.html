@@ -263,7 +263,11 @@ function sheetLinkScheduleDirtyCheck(delayMs, forceImmediate) {
   if (typeof setTimeout !== 'function' || !SHEET_LINK_RAM_READY) { return null; }
   SHEET_LINK_RELOAD_TIMER = setTimeout(function () {
     SHEET_LINK_RELOAD_TIMER = null;
-    sheetLinkSyncDirtyData({ forceImmediate: forceImmediate === true });
+    if (typeof sheetLinkProbeSelectionAndReload === 'function') {
+      sheetLinkProbeSelectionAndReload('ready-at', { forceImmediate: forceImmediate === true });
+    } else {
+      sheetLinkSyncDirtyData({ forceImmediate: forceImmediate === true });
+    }
   }, Math.max(0, Number(delayMs) || 0));
   return SHEET_LINK_RELOAD_TIMER;
 }
@@ -314,6 +318,17 @@ function sheetLinkApplyDecisionResult(result, options) {
   var opts = options || {};
   if (stateRevision && stateRevision <= SHEET_LINK_LAST_SEEN_REVISION && opts.forceReload !== true) {
     return result;
+  }
+  if (result.payload && typeof refreshReloadPayload === 'function') {
+    var payloadWork = function () { return refreshReloadPayload(result.payload); };
+    var payloadRun = typeof sidebarBusyRun === 'function' ? sidebarBusyRun('Đang đồng bộ dữ liệu vừa thay đổi…', payloadWork) : payloadWork();
+    var payloadDone = function (value) {
+      if (value && stateRevision) {
+        SHEET_LINK_LAST_SEEN_REVISION = Math.max(SHEET_LINK_LAST_SEEN_REVISION, Number(result.processedRevision || stateRevision));
+      }
+      return value || result;
+    };
+    return payloadRun && typeof payloadRun.then === 'function' ? payloadRun.then(payloadDone) : payloadDone(payloadRun);
   }
   var decision = result.decision || (typeof reloadDecisionForState === 'function' ? reloadDecisionForState({ reloadState: state }) : null);
   if (!decision || !decision.ram || decision.ram.action === 'none') {
@@ -405,29 +420,13 @@ function sheetLinkProbeSelectionAndReload(reason, options) {
 
 /** Đồng bộ dữ liệu kho cũng chỉ có một lượt đang bay; chỉ khóa sidebar sau khi máy chủ xác nhận có dữ liệu bẩn. */
 function sheetLinkSyncDirtyData(options) {
-  if (SHEET_LINK_DATA_PENDING) { return SHEET_LINK_DATA_PENDING; }
-  if (SHEET_LINK_RELOAD_CHECKING) { return SHEET_LINK_RELOAD_CHECKING; }
   var opts = options || {};
-  var settled = false;
-  var work = callServer('getReloadState', [], { silent: true }).then(function (state) {
-    var dirty = sheetLinkReloadState(state);
-    if (!sheetLinkDirtyNeedsData(dirty)) { return null; }
-    var decision = null;
-    if (typeof reloadDecisionForState === 'function') {
-      decision = reloadDecisionForState({ reloadState: dirty, lastSeenRevision: opts.forceImmediate ? 0 : SHEET_LINK_LAST_SEEN_REVISION, localDraft: sheetLinkLocalDraftInput(), forceImmediate: opts.forceImmediate === true });
-    }
-    return sheetLinkApplyDecisionResult({ reload: dirty, decision: decision }, opts);
-  });
-  var request = work.then(function (result) {
-    settled = true;
-    SHEET_LINK_DATA_PENDING = null;
-    return result;
-  }, function (err) {
-    settled = true;
-    SHEET_LINK_DATA_PENDING = null;
-    throw err;
-  });
-  if (!settled) { SHEET_LINK_DATA_PENDING = request; }
+  if (SHEET_LINK_DATA_PENDING) { return SHEET_LINK_DATA_PENDING; }
+  var request = sheetLinkProbeSelectionAndReload(opts.reason || 'dirty-state', opts);
+  SHEET_LINK_DATA_PENDING = request;
+  if (request && typeof request.then === 'function') {
+    request.then(function () { if (SHEET_LINK_DATA_PENDING === request) { SHEET_LINK_DATA_PENDING = null; } }, function () { if (SHEET_LINK_DATA_PENDING === request) { SHEET_LINK_DATA_PENDING = null; } });
+  }
   return request;
 }
 

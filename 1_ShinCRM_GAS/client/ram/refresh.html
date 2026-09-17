@@ -34,6 +34,37 @@ function refreshRecordsApply(result, requestedIds) {
   renderScreen();
 }
 
+/** Áp dụng payload đã được GAS đọc trong chính request probe; không gọi thêm API reload. */
+function refreshReloadPayload(payload) {
+  if (!payload || !payload.mode) { return null; }
+  if (payload.mode === 'records') {
+    refreshRecordsApply({
+      ok: true,
+      customer: payload.customer || { fields: [], rows: [] },
+      activity: payload.activity || { fields: [], rows: [] },
+      affectedCustomerIds: payload.affectedCustomerIds || [],
+      removedRecordIds: payload.removedRecordIds || []
+    }, payload.affectedCustomerIds || []);
+    return payload;
+  }
+  if (payload.mode === 'category') {
+    refreshCategoryApply({ ok: true, categories: payload.categories || {} });
+    return payload;
+  }
+  if (payload.mode === 'fullCore') {
+    var core = payload.core;
+    if (!core || core.ok === false || core.blocked) { return null; }
+    ingestCore(core);
+    if (core.activity && Array.isArray(core.activity.rows) && core.activity.fields) {
+      ingestActivityChunk(core.activity);
+      ingestActivityDone();
+    }
+    renderScreen();
+    return payload;
+  }
+  return null;
+}
+
 /** Áp dụng riêng bảng Category; Config và Schema vẫn đi qua full core để không lệch bảng khai. */
 function refreshCategoryApply(result) {
   if (!result || !result.ok || !result.categories) { return; }

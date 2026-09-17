@@ -80,6 +80,38 @@ function selectionContextPositionChanged(previous, current) {
   return selectionContextPositionKey(previous) !== selectionContextPositionKey(current);
 }
 
+function selectionReloadRequestId(input) {
+  var supplied = input && input.requestId;
+  if (supplied !== undefined && supplied !== null && String(supplied).trim()) { return String(supplied).trim(); }
+  return 'selection-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+}
+
+function selectionRemainingRevision(state) {
+  if (!state) { return 0; }
+  var hasDirty = !!(state.records && state.records.length) || !!(state.category || state.config || state.schema || state.allCore || state.allViews || (state.viewSheets && state.viewSheets.length));
+  return hasDirty ? Number(state.revision || 0) : 0;
+}
+
+function selectionPayloadFromReload(result) {
+  if (!result || result.ok === false) { return null; }
+  if (result.reloadMode === 'records') {
+    return { mode: 'records', customer: result.customer, activity: result.activity, affectedCustomerIds: result.affectedCustomerIds || [], removedRecordIds: result.removedRecordIds || [] };
+  }
+  if (result.reloadMode === 'category') {
+    return { mode: 'category', categories: result.categories || {}, warnings: result.warnings || [] };
+  }
+  if (result.reloadMode === 'fullCore') {
+    return { mode: 'fullCore', core: result };
+  }
+  return null;
+}
+
+function selectionRenderDirtyViews(state) {
+  if (!state || !(state.allViews || (state.viewSheets && state.viewSheets.length))) { return null; }
+  if (typeof renderAllManagedViewsIfAllowed === 'function') { return renderAllManagedViewsIfAllowed(); }
+  return null;
+}
+
 /**
  * Một request bên ngoài cho cả selection và reload. GAS là nơi duy nhất quyết
  * định có cần đọc cột mã khách và có cần nạp RAM hay không; Sidebar chỉ truyền
@@ -89,6 +121,7 @@ function probeSelectionAndReload(input) {
   return runEntryPoint('probeSelectionAndReload', 'sidebar', 'throw', function () {
     var started = Date.now();
     var request = input || {};
+    var requestId = selectionReloadRequestId(request);
     var context = selectionProbeContext();
     var snapshot = selectionSnapshotFromContext(context);
     var previous = request.previousSelectionContext || request.selectionContext || null;
@@ -110,13 +143,51 @@ function probeSelectionAndReload(input) {
       customerId: customerId,
       customerIdChanged: positionChanged && customerId !== previousCustomerId
     });
+    var viewRender = selectionRenderDirtyViews(state);
+    var payload = null;
+    var processedRevision = 0;
+    var revisionMatched = true;
+    var reloadResult = null;
+    var ram = decision && decision.ram;
+    var waitMs = ram ? Number(ram.waitMs) : 0;
+    if (!isFinite(waitMs) || waitMs < 0) { waitMs = 0; }
+    if (ram && ram.action === 'reload' && waitMs > 0) {
+      decision = Object.assign({}, decision, { ram: Object.assign({}, ram, { action: 'defer' }) });
+      ram = decision.ram;
+    }
+    var deferred = ram && ram.action === 'defer';
+    var ready = !deferred && ram && ram.action === 'reload' && waitMs <= 0;
+    if (ready) {
+      var expectedRevision = state && state.revision ? state.revision : undefined;
+      if (ram.mode === 'records' && typeof reloadRecords === 'function') {
+        reloadResult = reloadRecords(ram.recordIds || [], expectedRevision, { internal: true });
+      } else if (ram.mode === 'category' && typeof reloadCategory === 'function') {
+        reloadResult = reloadCategory(expectedRevision, { internal: true });
+      } else if (ram.mode === 'fullCore' && typeof loadCore === 'function') {
+        reloadResult = loadCore({ internal: true, preserveDirty: true, expectedRevision: expectedRevision });
+        if (reloadResult && reloadResult.ok === true) { reloadResult.reloadMode = 'fullCore'; }
+      }
+      payload = selectionPayloadFromReload(reloadResult);
+      processedRevision = reloadResult && reloadResult.processedRevision !== undefined ? Number(reloadResult.processedRevision || 0) : 0;
+      revisionMatched = reloadResult && reloadResult.revisionMatched !== undefined ? reloadResult.revisionMatched !== false : true;
+    }
+    var latest = reloadResult && reloadResult.reload ? reloadResult.reload : reloadStateRead();
     return {
       ok: true,
+      requestId: requestId,
       selection: selection,
       customerId: customerId,
-      reload: state,
+      reload: latest,
       dirty: dirtyStateRead(),
-      decision: decision,
+      decision: ready && reloadResult ? Object.assign({}, decision, { executed: true, resultMode: reloadResult.reloadMode }) : decision,
+      payload: payload,
+      viewRender: viewRender,
+      observedRevision: state ? Number(state.revision || 0) : 0,
+      processedRevision: processedRevision,
+      remainingRevision: selectionRemainingRevision(latest),
+      revisionMatched: revisionMatched,
+      readyAt: state && state.recordsReadyAt ? Number(state.recordsReadyAt) : 0,
+      waitMs: waitMs,
       ms: Date.now() - started
     };
   });

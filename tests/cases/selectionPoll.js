@@ -192,6 +192,20 @@ async function chay(so) {
   });
   check(so, 'chỉ ghi nhận revision sau khi reload Store thành công', successfulReload.SHEET_LINK_LAST_SEEN_REVISION, 7);
 
+  const directPayload = dungHopPoll(); batDau(directPayload);
+  directPayload.SHEET_LINK_LAST_SEEN_REVISION = 0;
+  directPayload._payloads = [];
+  directPayload.refreshReloadPayload = (payload) => { directPayload._payloads.push(payload.mode); return payload; };
+  directPayload.callServer = (name) => { directPayload._calls.push(name); return syncValue({ ok: true }); };
+  await directPayload.sheetLinkApplyDecisionResult({
+    reload: { revision: 10, records: ['KH1'] },
+    processedRevision: 10,
+    payload: { mode: 'records', customer: { fields: [], rows: [] }, activity: { fields: [], rows: [] } }
+  });
+  check(so, 'payload probe được Sidebar áp dụng trực tiếp, không gọi reloadRecords lần hai',
+    [directPayload._payloads, directPayload._calls, directPayload.SHEET_LINK_LAST_SEEN_REVISION],
+    [['records'], [], 10]);
+
   const failedReload = dungHopPoll(); batDau(failedReload);
   failedReload.SHEET_LINK_LAST_SEEN_REVISION = 0;
   failedReload.refreshDirtyRecords = () => syncValue({ ok: false, error: 'reload failed' });

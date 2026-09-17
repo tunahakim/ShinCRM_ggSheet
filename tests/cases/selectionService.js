@@ -26,7 +26,7 @@ function chay(so) {
 
   let nen;
   try {
-    nen = dungHop({ sheets: ['Customer', 'Activity', 'Category'], tep: TEP_NEN.concat(['server/service/SelectionService.js']) });
+    nen = dungHop({ sheets: ['Customer', 'Activity', 'Category', 'Config'], tep: TEP_NEN.concat(['server/service/SelectionService.js']) });
     nen.book.insertSheet('!Lead');
   } catch (err) {
     return ghiLoiNap(so, 'nạp được SelectionService', err);
@@ -108,6 +108,30 @@ function chay(so) {
   check(so, 'vị trí đổi đọc lại đúng mã khách trong cùng request',
     [movedProbe.selection.positionChanged, movedProbe.customerId, customerReads],
     [true, 'CUS-000006', readsBeforeStable + 1]);
+
+  // R11: khi chưa đến mốc debounce, GAS chỉ trả defer; request sau mốc đó nhận payload trong cùng response.
+  hop.dirtyStateMarkSignal({ records: ['CUS-000004'], allViews: false, recordsDebounceMs: 3000 });
+  const defer = hop.probeSelectionAndReload({ requestId: 'r11-defer', previousSelectionContext: movedProbe.selection, previousCustomerId: movedProbe.customerId });
+  check(so, 'R11 defer không đọc payload và có waitMs',
+    [defer.requestId, defer.decision.ram.action, defer.payload, defer.waitMs > 0, defer.reload.records],
+    ['r11-defer', 'defer', null, true, ['CUS-000004']]);
+  hop.PropertiesService.getDocumentProperties().setProperty(hop.DIRTY_KEYS.recordsReadyAt, String(Date.now() - 1));
+  const ready = hop.probeSelectionAndReload({ requestId: 'r11-ready', previousSelectionContext: movedProbe.selection, previousCustomerId: movedProbe.customerId });
+  check(so, 'R11 request sau readyAt nhận payload records và dọn dirty',
+    [ready.requestId, ready.payload.mode, ready.payload.customer.rows.length, ready.processedRevision > 0, ready.reload.records],
+    ['r11-ready', 'records', 1, true, []]);
+
+  hop.dirtyStateMarkSchema();
+  const fullCore = hop.probeSelectionAndReload({ requestId: 'r11-core', previousSelectionContext: ready.selection, previousCustomerId: ready.customerId });
+  check(so, 'R11 full core mang Activity trong cùng payload',
+    [fullCore.requestId, fullCore.payload.mode, Array.isArray(fullCore.payload.core.activity.rows), fullCore.payload.core.activity.fields.length > 0],
+    ['r11-core', 'fullCore', true, true]);
+
+  hop.dirtyStateMarkCategory();
+  const categoryPayload = hop.probeSelectionAndReload({ requestId: 'r11-category', previousSelectionContext: fullCore.selection, previousCustomerId: fullCore.customerId });
+  check(so, 'R11 Category trả payload Category riêng',
+    [categoryPayload.requestId, categoryPayload.payload && categoryPayload.payload.mode, categoryPayload.decision.ram.mode],
+    ['r11-category', 'category', 'category']);
 
   const calls = [];
   hop.runEntryPoint = function (name, source, channel, fn) {

@@ -54,8 +54,8 @@ function loadStateNeedsFullCore(state) {
   return !!(state && (state.allCore || state.all || state.schema || state.config));
 }
 
-function reloadRecords(recordIds, expectedRevision) {
-  return runEntryPoint('reloadRecords', LOAD_SOURCE, 'throw', function () {
+function reloadRecords(recordIds, expectedRevision, options) {
+  var execute = function () {
     var started = Date.now();
     var ids = loadNormalizeRecordIds(recordIds);
     var requestedRevisionValue = expectedRevision === undefined || expectedRevision === null || expectedRevision === ''
@@ -172,12 +172,13 @@ function reloadRecords(recordIds, expectedRevision) {
       selection: selectionSnapshot(),
       ms: Date.now() - started
     };
-  });
+  };
+  return options && options.internal === true ? execute() : runEntryPoint('reloadRecords', LOAD_SOURCE, 'throw', execute);
 }
 
 /** Nạp riêng Category; chỉ xóa cờ Category khi revision không đổi trong lúc đọc. */
-function reloadCategory(expectedRevision) {
-  return runEntryPoint('reloadCategory', LOAD_SOURCE, 'throw', function () {
+function reloadCategory(expectedRevision, options) {
+  var execute = function () {
     var started = Date.now();
     var result = categoryReadAll();
     var current = reloadStateRead();
@@ -197,7 +198,8 @@ function reloadCategory(expectedRevision) {
       selection: selectionSnapshot(),
       ms: Date.now() - started
     };
-  });
+  };
+  return options && options.internal === true ? execute() : runEntryPoint('reloadCategory', LOAD_SOURCE, 'throw', execute);
 }
 
 /** Config chưa có patch an toàn cho từng khối; trả chỉ thị fullCore để không lệch schema/default/counter. */
@@ -311,8 +313,9 @@ function reloadCurrentSheet(expectedRevision) {
  *
  * `blocked` mang tên lý do chứ không phải `true`, để sau này còn lý do chặn thứ hai thì client không phải đoán.
  */
-function loadCore() {
-  return runEntryPoint('loadCore', LOAD_SOURCE, 'throw', function () {
+function loadCore(options) {
+  var opts = options || {};
+  var execute = function () {
     var batDau = Date.now();
     var book = shinOpenBook();
     var budget = cellBudgetMeasure(book);
@@ -329,7 +332,7 @@ function loadCore() {
       return { ok: true, blocked: 'cellBudget', budget: budget, reload: reloadStateRead(), dirty: dirtyStateRead(), selection: selectionSnapshot(), pendingMessages: takePendingMessages(), ms: Date.now() - batDau };
     }
 
-    var consumedDirty = dirtyStateTakeFullReload();
+    var consumedDirty = opts.preserveDirty === true ? null : dirtyStateTakeFullReload();
     var config;
     var danhMuc;
     var khach;
@@ -341,8 +344,9 @@ function loadCore() {
       danhMuc = categoryReadAll();
       khach = entityReadAll('customer');
       soGiaoDich = entityRowCount('activity');
+      var activityAll = opts.preserveDirty === true ? entityReadAll('activity') : null;
     } catch (err) {
-      dirtyStateRestoreFullReload(consumedDirty);
+      if (consumedDirty) { dirtyStateRestoreFullReload(consumedDirty); }
       throw err;
     }
     var ms = Date.now() - batDau;
@@ -369,6 +373,13 @@ function loadCore() {
       }
     });
 
+    if (opts.preserveDirty === true && opts.expectedRevision !== undefined && opts.expectedRevision !== null && opts.expectedRevision !== ''
+      && reloadStateRead().revision === Number(opts.expectedRevision)) {
+      dirtyStateClear({ records: true, category: true, config: true, schema: true, allCore: true, all: true, expectedRevision: opts.expectedRevision });
+    }
+    var processed = opts.preserveDirty === true
+      ? (opts.expectedRevision === undefined || opts.expectedRevision === null || opts.expectedRevision === '' ? reloadStateRead().revision : Number(opts.expectedRevision))
+      : consumedDirty.revision;
     return {
       ok: true,
       blocked: false,
@@ -378,8 +389,8 @@ function loadCore() {
       config: config,
       categories: danhMuc.categories,
       customer: { fields: khach.fields, rows: khach.rows, blankRows: khach.blankRows },
-      activity: { total: soGiaoDich, chunkRows: SETTINGS.CHUNK_ROWS },
-      processedRevision: consumedDirty.revision,
+      activity: activityAll ? { fields: activityAll.fields, rows: activityAll.rows, total: soGiaoDich, chunkRows: SETTINGS.CHUNK_ROWS } : { total: soGiaoDich, chunkRows: SETTINGS.CHUNK_ROWS },
+      processedRevision: processed,
       prefs: userPrefsRead(),
       budget: budget,
       reload: reloadStateRead(),
@@ -389,7 +400,8 @@ function loadCore() {
       pendingMessages: takePendingMessages(),
       ms: ms
     };
-  });
+  };
+  return opts.internal === true ? execute() : runEntryPoint('loadCore', LOAD_SOURCE, 'throw', execute);
 }
 
 /**
