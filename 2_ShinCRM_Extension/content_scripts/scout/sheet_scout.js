@@ -39,6 +39,22 @@ function liveHeaderForSheet(sheetName) {
   return prefix.length === 1 ? prefix[0].header : '';
 }
 
+function reloadRelevantForContext(context) {
+  var hints = typeof CRM_COLUMN_HINTS !== 'undefined' ? CRM_COLUMN_HINTS : null;
+  var targets = hints && Array.isArray(hints.reloadColumns) ? hints.reloadColumns : null;
+  if (!targets) { return null; }
+  var sheetName = String(context && context.sheetName || '');
+  var row = Number(context && context.row || 0);
+  var firstColumn = Number(context && context.col || 0);
+  var lastColumn = Number(context && context.colEnd || firstColumn);
+  if (row <= 0 || firstColumn <= 0) { return null; }
+  return targets.some(function (target) {
+    if (target.sheetName && target.sheetName !== sheetName) { return false; }
+    if (target.prefix && sheetName.indexOf(target.prefix) !== 0) { return false; }
+    return target.columns.some(function (column) { return column >= firstColumn && column <= lastColumn; });
+  });
+}
+
 function sendResolvedContext(base, result, fallbackHeader, fallbackReason, hint) {
   var context = Object.assign({}, base);
   if (result && result.status === 'ok') { lastResolvedCustomerId = String(result.customerId || '').trim(); }
@@ -48,6 +64,8 @@ function sendResolvedContext(base, result, fallbackHeader, fallbackReason, hint)
   context.customerIdSource = 'live-model';
   context.customerIdStatus = result && result.status ? result.status : 'unavailable';
   context.customerIdReason = result && result.reason ? result.reason : (fallbackReason || '');
+  var reloadRelevant = reloadRelevantForContext(base);
+  if (reloadRelevant !== null) { context.reloadRelevant = reloadRelevant; }
   if (hint) { context.hint = hint; }
   seqCounter += 1;
   context.at = Date.now();
@@ -63,6 +81,8 @@ function sendKeydownHint(base) {
     customerIdStatus: lastResolvedCustomerId ? 'ok' : 'unavailable',
     customerIdReason: 'KEYDOWN_HINT'
   });
+  var reloadRelevant = reloadRelevantForContext(base);
+  if (reloadRelevant !== null) { context.reloadRelevant = reloadRelevant; }
   seqCounter += 1;
   context.at = Date.now();
   context.seq = seqCounter;

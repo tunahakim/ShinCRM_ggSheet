@@ -39,8 +39,8 @@ var SHEET_LINK_SELECTION_WAKE_QUEUED = false;
 var SHEET_LINK_CONTEXT_GENERATION = 0;
 var SHEET_LINK_LAST_SEEN_REVISION = 0;
 var SHEET_LINK_PING_TIMER = null;
-// Tạm bật trong giai đoạn nghiệm thu để nhìn thấy mọi nhịp hỏi GAS; chuyển về false trước khi bàn giao.
-var SHEET_LINK_SHOW_PROBE_PROGRESS = true;
+// Probe selection/reload là request thăm dò; chỉ payload reload thật mới hiển thị tiến trình.
+var SHEET_LINK_SHOW_PROBE_PROGRESS = false;
 var sheetLinkInstalled = false;
 
 var SHEET_LINK_ORIGIN = 'https://docs.google.com';
@@ -78,7 +78,7 @@ function sheetLinkSetColumnHints(hints) {
   }
 
   SHEET_LINK_COLUMN_HINTS = {
-    targets: hints.targets.map(function (target) {
+    targets: (Array.isArray(hints.targets) ? hints.targets : []).map(function (target) {
       return {
         sheetName: typeof target.sheetName === 'string' ? target.sheetName : '',
         prefix: typeof target.prefix === 'string' ? target.prefix : '',
@@ -86,7 +86,16 @@ function sheetLinkSetColumnHints(hints) {
       };
     }).filter(function (target) {
       return target.header && (target.sheetName || target.prefix);
-    })
+    }),
+    reloadColumns: Array.isArray(hints.reloadColumns) ? hints.reloadColumns.map(function (target) {
+      return {
+        sheetName: typeof target.sheetName === 'string' ? target.sheetName : '',
+        prefix: typeof target.prefix === 'string' ? target.prefix : '',
+        columns: Array.isArray(target.columns) ? target.columns.map(function (column) { return Number(column); }).filter(function (column) { return column > 0; }) : []
+      };
+    }).filter(function (target) {
+      return target.columns.length && (target.sheetName || target.prefix);
+    }) : []
   };
 
   if (window.top !== window) {
@@ -99,6 +108,20 @@ function sheetLinkSetColumnHints(hints) {
       }, SHEET_LINK_ORIGIN);
     } catch (err) {}
   }
+}
+
+/** Đồng bộ hint cột từ payload core; dùng lại sau mỗi fullCore để schema mới không giữ map cũ. */
+function sheetLinkApplyCoreHints(core) {
+  if (!core || !core.schema || typeof sheetLinkSetColumnHints !== 'function') { return; }
+  sheetLinkSetSpreadsheetId(core.spreadsheetId);
+  sheetLinkSetColumnHints({
+    targets: [
+      { sheetName: 'Customer', header: core.schema.customer.id.code },
+      { sheetName: 'Activity', header: core.schema.activity.customerId.code },
+      { prefix: '!', header: core.schema.customer.id.code }
+    ],
+    reloadColumns: core.selectionHints && core.selectionHints.reloadColumns
+  });
 }
 
 /** Context chỉ được giải mã sau khi Customer đã vào RAM. */
@@ -180,7 +203,9 @@ function sheetLinkOnMessage(event) {
   var previousPosition = sheetLinkPositionKey(SHEET_LINK_LAST_CONTEXT || {});
   SHEET_LINK_CONTEXT_GENERATION += 1;
   var applied = sheetLinkApplyContext(data);
-  if (data.hint === 'keydown' || previousPosition !== sheetLinkPositionKey(data)) {
+  var reloadHintKnown = typeof data.reloadRelevant === 'boolean';
+  var reloadHintAllowsWake = !reloadHintKnown || data.reloadRelevant === true;
+  if ((data.hint === 'keydown' || previousPosition !== sheetLinkPositionKey(data)) && reloadHintAllowsWake) {
     sheetLinkScheduleWake(data.hint === 'keydown' ? 'keydown' : 'position');
   }
   if (applied && typeof applied.then === 'function') {
@@ -381,7 +406,9 @@ function sheetLinkProbeSelectionAndReload(reason, options) {
     reason: reason || 'wake',
     forceImmediate: opts.forceImmediate === true
   };
-  var request = callServer('probeSelectionAndReload', [input], { silent: SHEET_LINK_SHOW_PROBE_PROGRESS !== true });
+  var request = callServer('probeSelectionAndReload', [input], {
+    silent: opts.silent === true || SHEET_LINK_SHOW_PROBE_PROGRESS !== true
+  });
   var settled = request.then(function (result) {
     var extensionOwnsContext = sheetLinkExtensionAlive() && !!SHEET_LINK_LAST_CONTEXT;
     var contextIsCurrent = contextGeneration === SHEET_LINK_CONTEXT_GENERATION;

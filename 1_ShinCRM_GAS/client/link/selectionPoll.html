@@ -88,7 +88,7 @@ function selectionPollTick() {
 
   SELECTION_POLL.inFlight = true;
   var request = typeof sheetLinkProbeSelectionAndReload === 'function'
-    ? sheetLinkProbeSelectionAndReload('selection-poll')
+    ? sheetLinkProbeSelectionAndReload('selection-poll', { silent: true })
     : null;
   return Promise.resolve(request).then(function (result) {
     if (!selectionPollEligible()) { return null; }
@@ -116,12 +116,11 @@ function selectionPollTick() {
   });
 }
 
-/** Bốn tín hiệu đánh thức dùng chung một cửa: vị trí đổi, tab hiện lại, sidebar focus, hoặc chuột đi vào sidebar. */
+/** Tín hiệu đánh thức fallback: vị trí đổi, tab hiện lại hoặc sidebar focus. */
 function selectionPollWake() {
   SELECTION_POLL.stableCount = 0;
   SELECTION_POLL.intervalMs = selectionPollMs('SELECTION_POLL_MS', 2000);
   if (selectionPollEligible() && !SELECTION_POLL.inFlight) { selectionPollSchedule(SELECTION_POLL.intervalMs); }
-  if (typeof sheetLinkSyncDirtyData === 'function' && typeof SHEET_LINK_RAM_READY !== 'undefined' && SHEET_LINK_RAM_READY) { sheetLinkSyncDirtyData(); }
 }
 
 function selectionPollClearSafety() {
@@ -144,7 +143,7 @@ function selectionPollScheduleSafety() {
       selectionPollScheduleSafety();
       return;
     }
-    var work = typeof sheetLinkProbeSelectionAndReload === 'function' ? sheetLinkProbeSelectionAndReload('safety-poll') : null;
+    var work = typeof sheetLinkProbeSelectionAndReload === 'function' ? sheetLinkProbeSelectionAndReload('safety-poll', { silent: true }) : null;
     Promise.resolve(work).then(selectionPollScheduleSafety, selectionPollScheduleSafety);
   }, selectionPollSafetyMs());
 }
@@ -214,7 +213,6 @@ function selectionPollVisibilityChanged() {
   }
   selectionPollWake();
   selectionPollScheduleSafety();
-  if (typeof sheetLinkSyncDirtyData === 'function' && typeof SHEET_LINK_RAM_READY !== 'undefined' && SHEET_LINK_RAM_READY) { sheetLinkSyncDirtyData(); }
 }
 
 function selectionPollInstall() {

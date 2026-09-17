@@ -53,6 +53,25 @@ async function chay(so) {
   check(so, 'Extension chỉ quan sát selection, không đọc formula bar hoặc suy isEditing',
     [scoutSource.indexOf('readFormulaBar') < 0, scoutSource.indexOf('cachedFormulaBar') < 0, scoutSource.indexOf('isEditing') < 0, scoutSource.indexOf("addEventListener('keydown'") >= 0, scoutSource.indexOf("addEventListener('beforeinput'") >= 0, scoutSource.indexOf("key === 'Delete'") >= 0, scoutSource.indexOf('sendKeydownHint') >= 0],
     [true, true, true, true, true, true, true]);
+  const scoutHop = {
+    console: { log() {} },
+    Date,
+    document: { addEventListener() {} },
+    window: { addEventListener() {} },
+    setInterval() { return 1; },
+    setTimeout,
+    clearTimeout,
+    location: { pathname: '/spreadsheets/d/sheet-1/edit', hash: '#gid=1' }
+  };
+  vm.createContext(scoutHop);
+  vm.runInContext(scoutSource, scoutHop, { filename: SCOUT_FILE });
+  scoutHop.CRM_COLUMN_HINTS = { reloadColumns: [{ sheetName: 'Customer', columns: [1, 3] }] };
+  check(so, 'hint reload không đánh thức GAS ở hàng 1/cột thường hoặc sheet trắng', [
+    scoutHop.reloadRelevantForContext({ sheetName: 'Customer', row: 1, col: 2, colEnd: 2 }),
+    scoutHop.reloadRelevantForContext({ sheetName: 'Customer', row: 1, col: 1, colEnd: 1 }),
+    scoutHop.reloadRelevantForContext({ sheetName: 'Customer', row: 4, col: 2, colEnd: 2 }),
+    scoutHop.reloadRelevantForContext({ sheetName: 'Blank', row: 4, col: 1, colEnd: 1 })
+  ], [false, true, false, false]);
   let hop;
   try { hop = napBridge(); } catch (err) { return ghiLoiNap(so, 'nạp iframe_bridge.js', err); }
 

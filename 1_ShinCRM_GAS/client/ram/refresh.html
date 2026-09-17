@@ -105,6 +105,7 @@ function refreshReloadPayload(payload) {
     var core = payload.core;
     if (!core || core.ok === false || core.blocked) { return null; }
     ingestCore(core);
+    if (typeof sheetLinkApplyCoreHints === 'function') { sheetLinkApplyCoreHints(core); }
     if (core.activity && Array.isArray(core.activity.rows) && core.activity.fields) {
       ingestActivityChunk(core.activity);
       ingestActivityDone();

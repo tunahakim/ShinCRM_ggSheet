@@ -175,11 +175,13 @@ selection probe
   + ReloadState/ReloadDecision
 ```
 
+Client chỉ đặt wake khi context có `reloadRelevant=true`. Metadata này do GAS tính từ vị trí các mã cột hợp lệ và được gửi cùng `loadCore`; client không dùng nó để quyết định scope reload. Khi metadata không có (Extension cũ hoặc chưa đồng bộ), client fail-open và vẫn hỏi GAS.
+
 Nếu vị trí không đổi nhưng `revision` mới, Sidebar vẫn xử lý RAM reload. Nếu vị trí đổi, GAS lấy mã khách mới trong cùng request hoặc trong helper nội bộ của cùng request.
 
 Safety polling theo `n` phút là lưới an toàn thứ hai. Timer được tính từ lần Sidebar hỏi GAS gần nhất thành công; nếu đã có fallback probe hoặc wake request gần hơn thì timer được reset, không tạo request trùng. Request safety chạy âm thầm, chỉ reload thật sự mới được hiện loading.
 
-Khuyến nghị ban đầu cho `n` là 1 phút để nghiệm thu, sau đó có thể tăng nếu cần giảm lưu lượng. Không đặt safety polling khi Sidebar đã đóng.
+Khuyến nghị ban đầu cho `n` là 1 phút để nghiệm thu, sau đó có thể tăng nếu cần giảm lưu lượng. Không đặt safety polling khi Sidebar đã đóng. `focus` và `visibilitychange` chỉ đặt lại lịch fallback/safety, không gọi `sheetLinkSyncDirtyData()` trực tiếp. Khi trình duyệt tạm dừng ACK trong tab nền, fallback có thể hỏi GAS một lượt sau khi quay lại; lượt này phải im lặng nếu không có payload reload.
 
 ## 7. Hợp đồng reload RAM
 
@@ -188,7 +190,8 @@ Một wake request phải truyền cho `ReloadDecision`:
 - `selectionContext` và `previousSelectionContext`;
 - `lastSeenRevision`;
 - `localDraft` và mã Sidebar đang giữ bản nháp;
-- nguyên nhân `position`, `keydown`, `safety-poll`, `focus`, `open`;
+- nguyên nhân `position`, `keydown`, `safety-poll`, `open`;
+- hint vận chuyển `reloadRelevant` do GAS cấp để loại request ở sheet trắng/cột không thuộc mã hợp lệ;
 - `autoRenderView` và các chính sách liên quan.
 
 GAS trả quyết định tối thiểu:
@@ -253,9 +256,9 @@ Sidebar safety polling không phải là cơ chế quyết định vẽ view. N�
 
 ## 11. Loading và request im lặng
 
-Request kiểm tra selection/reload không được làm thanh loading chạy mỗi nhịp. `callServer` hiện là cửa chung bật progress cho mọi request; khi triển khai phải có đường gọi kiểm tra im lặng hoặc tùy chọn không progress.
+Request kiểm tra selection/reload không được làm thanh loading chạy mỗi nhịp. `callServer` hiện là cửa chung bật progress cho mọi request; các probe selection/reload phải truyền `silent: true`, chỉ payload reload thật mới được hiện loading.
 
-Chỉ các lượt thực sự nạp RAM, full core, hoặc thao tác người dùng cần chờ mới được hiện loading. Việc kiểm tra revision không đổi phải kết thúc âm thầm.
+Chỉ các lượt thực sự nạp RAM, full core, hoặc thao tác người dùng cần chờ mới được hiện loading. Việc kiểm tra revision không đổi phải kết thúc âm thầm. `probeSelectionAndReload` luôn chạy với `silent: true`; cờ `SHEET_LINK_SHOW_PROBE_PROGRESS` phải giữ `false`, chỉ payload reload thật mới mở tiến trình.
 
 ## 12. Tiêu chí nghiệm thu mới
 

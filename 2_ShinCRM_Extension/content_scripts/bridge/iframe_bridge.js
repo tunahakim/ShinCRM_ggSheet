@@ -38,26 +38,39 @@ var CRM_COLUMN_HINTS = null;
 
 function isColumnHints(value) {
   if (!value || typeof value !== 'object') { return false; }
-  if (!Array.isArray(value.targets) || !value.targets.length) { return false; }
-  return value.targets.every(function (target) {
+  var targetsOk = Array.isArray(value.targets) && value.targets.length && value.targets.every(function (target) {
     return target && typeof target === 'object'
       && ((typeof target.sheetName === 'string' && target.sheetName.trim() !== '')
         || (typeof target.prefix === 'string' && target.prefix.trim() !== ''))
       && typeof target.header === 'string' && target.header.trim() !== '';
   });
+  var reloadOk = Array.isArray(value.reloadColumns) && value.reloadColumns.every(function (target) {
+    return target && typeof target === 'object'
+      && ((typeof target.sheetName === 'string' && target.sheetName.trim() !== '')
+        || (typeof target.prefix === 'string' && target.prefix.trim() !== ''))
+      && Array.isArray(target.columns) && target.columns.every(function (column) { return Number(column) > 0; });
+  });
+  return !!(targetsOk || (reloadOk && value.reloadColumns.length));
 }
 
 function acceptColumnHints(data) {
   if (!isColumnHints(data.columnHints)) { return; }
   if (data.spreadsheetId && typeof readSpreadsheetId === 'function' && String(data.spreadsheetId) !== String(readSpreadsheetId())) { return; }
   CRM_COLUMN_HINTS = {
-    targets: data.columnHints.targets.map(function (target) {
+    targets: (Array.isArray(data.columnHints.targets) ? data.columnHints.targets : []).map(function (target) {
       return {
         sheetName: typeof target.sheetName === 'string' ? target.sheetName : '',
         prefix: typeof target.prefix === 'string' ? target.prefix : '',
         header: target.header.trim()
       };
-    })
+    }),
+    reloadColumns: Array.isArray(data.columnHints.reloadColumns) ? data.columnHints.reloadColumns.map(function (target) {
+      return {
+        sheetName: typeof target.sheetName === 'string' ? target.sheetName : '',
+        prefix: typeof target.prefix === 'string' ? target.prefix : '',
+        columns: Array.isArray(target.columns) ? target.columns.map(function (column) { return Number(column); }).filter(function (column) { return column > 0; }) : []
+      };
+    }).filter(function (target) { return target.columns.length && (target.sheetName || target.prefix); }) : []
   };
   if (typeof lastContextKey !== 'undefined') { lastContextKey = ''; }
 }

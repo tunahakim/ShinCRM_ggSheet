@@ -116,6 +116,33 @@ function selectionRenderDirtyViews(state) {
 }
 
 /**
+ * Vị trí các cột mà một thay đổi có thể làm bẩn RAM. Đây chỉ là hint vận chuyển
+ * gửi cùng loadCore; GAS vẫn là nơi duy nhất quyết định scope reload từ onEdit/ReloadState.
+ */
+function selectionReloadColumnHints() {
+  var definitions = [
+    { sheetName: ENTITY_SHEETS.customer, entity: 'customer' },
+    { sheetName: ENTITY_SHEETS.activity, entity: 'activity' },
+    { sheetName: 'Category', sheetCore: 'Category' },
+    { sheetName: 'Config', sheetCore: 'Config' }
+  ];
+  var targets = [];
+  definitions.forEach(function (definition) {
+    try {
+      var map = readColumnMap(definition.sheetName);
+      var codes = definition.entity
+        ? Object.keys(DATA_SCHEMA[definition.entity]).map(function (name) { return DATA_SCHEMA[definition.entity][name].code; })
+        : sheetCoreColumns(definition.sheetCore).map(function (pair) { return pair[0]; });
+      var columns = codes.map(function (code) { return map.map[code]; }).filter(function (column) { return Number(column) > 0; });
+      targets.push({ sheetName: definition.sheetName, columns: columns });
+    } catch (ignore) {
+      // Thiếu sheet/map thì client phải fail-open và vẫn gửi wake để GAS tự quyết định.
+    }
+  });
+  return targets;
+}
+
+/**
  * Một request bên ngoài cho cả selection và reload. GAS là nơi duy nhất quyết
  * định có cần đọc cột mã khách và có cần nạp RAM hay không; Sidebar chỉ truyền
  * context lần trước rồi thực thi output.

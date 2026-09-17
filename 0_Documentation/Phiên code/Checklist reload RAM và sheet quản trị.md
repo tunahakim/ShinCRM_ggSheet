@@ -241,8 +241,10 @@
 - [x] Khi selection đổi, GAS tự tra schema và đọc mã khách trong cùng request; Extension vẫn giữ đường live model cũ khi nó đang hoạt động (test `selectionService.js`, `extensionBridge.js`).
 - [x] Response selection/reload luôn kèm `ReloadState`, `decision`, `payload`, `observedRevision`, `processedRevision` và trạng thái còn bẩn; Sidebar không tự quyết định scope và chỉ áp dụng payload (server `SelectionService.js`, test `selectionService.js`, GAS DEV `reloadPayloadProbe` `@412`).
 - [x] Context Extension có `customerId` hợp lệ được áp dụng ngay cho màn hình chính trước các RPC kiểm tra dirty; RPC chạy nền không chặn nguồn-chọn cục bộ (client `sheetLink.html`, test `selectionPoll.js`).
-- [x] Fallback polling vị trí 2 giây rồi 6 giây gộp luôn kiểm tra reload, không tạo request kiểm tra thứ hai (test `selectionPoll.js`).
+- [x] Fallback polling vị trí 2 giây rồi 6 giây gộp luôn kiểm tra reload, không tạo request kiểm tra thứ hai; request probe chạy silent và chỉ payload thật mới hiện loading (test `selectionPoll.js`).
 - [x] Safety polling theo phút chạy im lặng, chỉ phục vụ RAM và không kích hoạt renderer view (client `selectionPoll.html`, test `selectionPoll.js`).
+- [x] `focus`/`visibilitychange` không gọi đồng bộ dirty ngay; chỉ đánh thức fallback/safety, tránh loading khi chuyển tab trình duyệt hoặc chuyển app (client `selectionPoll.html`, test `selectionPoll.js`).
+- [x] Context có `reloadRelevant=false` không đặt wake request; hint thiếu vẫn fail-open để không bỏ sót reload (client `sheetLink.html`, Extension scout/bridge, test `selectionPoll.js`).
 - [x] Customer còn tồn tại được upsert bằng bản ghi máy chủ trả về (test `refresh.js`).
 - [x] Customer biến mất được remove (test `refresh.js`).
 - [x] Activity còn tồn tại được upsert (test `refresh.js`).
@@ -391,7 +393,7 @@
 - [ ] Không còn mục bắt buộc chưa có bằng chứng.
 - [ ] Tài liệu và code thống nhất: không polling liên tục theo giây; chỉ có wake request sau debounce một giây, fallback selection probe gộp kiểm tra reload và safety polling thưa theo `SETTINGS` cho RAM. Sheet quản trị vẫn do GAS chủ động vẽ từ signal.
 - [x] Không còn đường ghi Customer/Activity thành công nào không đi qua signal chung (test tĩnh `writeGateAudit.js`, test hành vi `reloadGates.js`).
-- [x] Không còn client tự phân loại cột `@`; phân loại nằm ở GAS `Triggers`/`ReloadDecision` (test `triggers.js`, `reloadDecision.js`).
+- [x] Không còn client tự phân loại cột `@`; phân loại nằm ở GAS `Triggers`/`ReloadDecision`. Extension chỉ đối chiếu vị trí với metadata do GAS cấp để chặn request thừa, không quyết định scope (test `triggers.js`, `reloadDecision.js`, `selectionPoll.js`).
 - [x] Không còn renderer chỉ vẽ view active sau signal dữ liệu; renderer duyệt toàn bộ sheet `!` (test `viewRenderer.js`, `triggers.js`).
 - [x] Không còn thao tác clear dirty không kiểm revision (test `dirtyState.js`, `loadService.js`, `viewRenderer.js`).
 - [x] Tổng kết test offline và GAS DEV đã được ghi vào checklist và các commit `18c319a`, `7ed2338`, `654e6ad`, `9c44734`.
@@ -425,10 +427,10 @@
 - [x] Test offline phủ sửa F sau khi A–E đã xử lý: F tạo revision mới và được trả ở lượt riêng sau debounce của F (`tests/cases/selectionService.js`).
 - [x] Test offline phủ F phát sinh trong lúc payload A–E đang được đọc: GAS không xóa F, response ghi `remainingRevision`, request kế tiếp nhận F; ca cùng một mã bị sửa lại trong lúc đọc cũng được giữ (`tests/cases/selectionService.js`).
 - [x] Test offline phủ response lệch thứ tự: response cũ không ghi đè payload/revision mới (`tests/cases/selectionPoll.js`).
-- [x] GAS DEV deployment `@412`: `reloadPayloadProbe --push` trả `defer` không payload rồi trả payload records trong chính request sau `readyAt`; probe không ghi dữ liệu khách và khôi phục DocumentProperties. `probeSelectionAndReload` vẫn trả đúng contract `requestId`/selection/ReloadState/decision ở trạng thái sạch.
-- [x] Khi payload reload thực sự được áp dụng, Sidebar bật thanh tiến trình trong lúc nạp; request thăm dò/defer vẫn im lặng. Thanh giữ tối thiểu 120 ms để lượt nạp quá nhanh vẫn quan sát được (`client/ui/progress.html`, `client/link/sheetLink.html`; `node tests/run.js` đạt `1606/1606`).
-- [x] Tạm bật `SHEET_LINK_SHOW_PROBE_PROGRESS=true` trong giai đoạn nghiệm thu trực quan để mọi request `probeSelectionAndReload` hiện thanh tiến trình.
-- [ ] Trước nghiệm thu cuối và bàn giao, đổi `SHEET_LINK_SHOW_PROBE_PROGRESS=false`; xác nhận request thăm dò/defer im lặng và chỉ lượt reload thật mới hiện thanh tiến trình.
+- [x] GAS DEV deployment `@422`: `reloadPayloadProbe --push` trả `defer` không payload rồi trả payload records trong chính request sau `readyAt`; probe cô lập dirty state, không ghi dữ liệu khách và khôi phục DocumentProperties. `probeSelectionAndReload` vẫn trả đúng contract `requestId`/selection/ReloadState/decision ở trạng thái sạch.
+- [x] Khi payload reload thực sự được áp dụng, Sidebar bật thanh tiến trình trong lúc nạp; request thăm dò/defer vẫn im lặng. Thanh giữ tối thiểu 120 ms để lượt nạp quá nhanh vẫn quan sát được (`client/ui/progress.html`, `client/link/sheetLink.html`; `node tests/run.js` đạt `1624/1624`).
+- [x] Các request `probeSelectionAndReload` chạy im lặng; chỉ payload reload thật mới hiện thanh tiến trình (`SHEET_LINK_SHOW_PROBE_PROGRESS=false`).
+- [x] Extension chỉ đặt wake khi vị trí nằm trong cột reload hợp lệ do GAS cấp; hàng 1 cột thường, sheet trắng và cột thường không tạo request thăm dò (test hồi quy `selectionPoll.js`/`extensionBridge.js`).
 
 ## Slice R12 — Đồng bộ pha áp RAM và vẽ màn hiện tại
 

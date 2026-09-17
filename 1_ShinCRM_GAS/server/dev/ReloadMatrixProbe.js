@@ -13,7 +13,7 @@ function reloadMatrixProbePropKeys() {
   return [
     DIRTY_KEYS.viewSheets, DIRTY_KEYS.records, DIRTY_KEYS.config, DIRTY_KEYS.all,
     DIRTY_KEYS.category, DIRTY_KEYS.schema, DIRTY_KEYS.allCore, DIRTY_KEYS.allViews,
-    DIRTY_KEYS.revision, DIRTY_KEYS.changedAt
+    DIRTY_KEYS.revision, DIRTY_KEYS.changedAt, DIRTY_KEYS.recordsReadyAt, DIRTY_KEYS.recordRevisionLog
   ];
 }
 
@@ -174,6 +174,8 @@ function reloadMatrixProbe() {
   var propSnapshot = reloadMatrixProbeSnapshotProperties(reloadMatrixProbePropKeys());
   var viewPropSnapshot = reloadMatrixProbeSnapshotViewProperties(book);
   var userPrefsSnapshot = reloadMatrixProbeSnapshotUserPrefs();
+  // Probe phải bắt đầu từ scope sạch; dirty cũ trên Sheet DEV không được làm đổi mode của ca Customer được kiểm.
+  dirtyStateClear();
   var customerRows = 0;
   var activityRows = 0;
   var customerStartRow = SHEET_FIRST_DATA_ROW + customer.rowCount;
@@ -370,12 +372,16 @@ function reloadPayloadProbe() {
   var snapshot = reloadMatrixProbeSnapshotProperties(propKeys);
   var report = [];
   try {
+    // Cô lập dirty state để ca R11 luôn kiểm đúng records/defer, không bị scope
+    // allCore còn lại từ một lượt nghiệm thu khác trên cùng Sheet DEV.
+    dirtyStateClear();
     var context = entityReadContext('customer');
     var keys = entityReadFieldBlock(context, SHEET_FIRST_DATA_ROW, context.rowCount, ['id']);
     var id = keys.length ? String(keys[0][0] || '').trim() : '';
     if (!id) { throw new Error('DEV không có mã Customer để kiểm payload.'); }
 
-    dirtyStateMarkSignal({ records: [id], allViews: false, recordsReadyAt: Date.now() + 3000 });
+    // Dùng một khoảng dư đủ lớn cho ca defer; thời gian GAS đọc selection/Sheet không được làm trôi qua mốc ba giây của probe.
+    dirtyStateMarkSignal({ records: [id], allViews: false, recordsReadyAt: Date.now() + 30000 });
     var deferred = probeSelectionAndReload({ requestId: 'dev-r11-defer', previousCustomerId: '' });
     reloadMatrixProbeAssert(report, 'R11 DEV defer không đọc payload', deferred.decision.ram.action === 'defer' && deferred.payload === null && deferred.reload.records.indexOf(id) >= 0, JSON.stringify({ action: deferred.decision.ram.action, waitMs: deferred.waitMs, payload: deferred.payload }));
 
