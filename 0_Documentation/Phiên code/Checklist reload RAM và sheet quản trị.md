@@ -423,7 +423,7 @@
 - [x] Test offline phủ năm lần sửa A–E cách nhau một giây: các response đầu không có payload, request sau `readyAt` trả một payload chứa toàn bộ A–E (`tests/cases/selectionService.js`).
 - [x] Test offline phủ sửa F sau khi A–E đã xử lý: F tạo revision mới và được trả ở lượt riêng sau debounce của F (`tests/cases/selectionService.js`).
 - [x] Test offline phủ F phát sinh trong lúc payload A–E đang được đọc: GAS không xóa F, response ghi `remainingRevision`, request kế tiếp nhận F (`tests/cases/selectionService.js`).
-- [ ] Test offline phủ response lệch thứ tự: response cũ không ghi đè payload/revision mới.
+- [x] Test offline phủ response lệch thứ tự: response cũ không ghi đè payload/revision mới (`tests/cases/selectionPoll.js`).
 - [ ] GAS DEV probe xác nhận `probeSelectionAndReload` trả payload khi state đã sẵn sàng và trả `defer` khi chưa đến `readyAt`.
 
 ---

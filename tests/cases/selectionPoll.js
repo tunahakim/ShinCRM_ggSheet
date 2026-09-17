@@ -206,6 +206,15 @@ async function chay(so) {
     [directPayload._payloads, directPayload._calls, directPayload.SHEET_LINK_LAST_SEEN_REVISION],
     [['records'], [], 10]);
 
+  directPayload._payloads = [];
+  await directPayload.sheetLinkApplyDecisionResult({
+    reload: { revision: 9, records: ['KH-OLD'] },
+    processedRevision: 9,
+    payload: { mode: 'records', customer: { fields: [], rows: [] }, activity: { fields: [], rows: [] } }
+  });
+  check(so, 'response payload cũ về muộn không ghi đè revision đã áp dụng',
+    [directPayload._payloads, directPayload.SHEET_LINK_LAST_SEEN_REVISION], [[], 10]);
+
   const failedReload = dungHopPoll(); batDau(failedReload);
   failedReload.SHEET_LINK_LAST_SEEN_REVISION = 0;
   failedReload.refreshDirtyRecords = () => syncValue({ ok: false, error: 'reload failed' });
