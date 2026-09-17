@@ -133,6 +133,45 @@ function chay(so) {
     [categoryPayload.requestId, categoryPayload.payload && categoryPayload.payload.mode, categoryPayload.decision.ram.mode],
     ['r11-category', 'category', 'category']);
 
+  // R11 A-E: nhiều signal trong cùng một cửa sổ debounce được gom thành một payload.
+  hop.dirtyStateClear();
+  const burstIds = ['KH-A', 'KH-B', 'KH-C', 'KH-D', 'KH-E'];
+  burstIds.forEach((id, i) => { ghiO(nen, 'Customer', 10 + i, '@CUS_MA_KH', id); ghiO(nen, 'Customer', 10 + i, '@CUS_TEN_CTY', id); });
+  burstIds.forEach((id) => { hop.dirtyStateMarkSignal({ records: [id], allViews: false, recordsReadyAt: Date.now() + 3000 }); });
+  const burstDefers = [];
+  for (let i = 0; i < 3; i += 1) {
+    const deferred = hop.probeSelectionAndReload({ previousSelectionContext: categoryPayload.selection, previousCustomerId: categoryPayload.customerId });
+    burstDefers.push([deferred.payload, deferred.decision.ram.action]);
+  }
+  check(so, 'R11 A-E các request trước readyAt đều defer không có payload', burstDefers, [[null, 'defer'], [null, 'defer'], [null, 'defer']]);
+  hop.PropertiesService.getDocumentProperties().setProperty(hop.DIRTY_KEYS.recordsReadyAt, String(Date.now() - 1));
+  const burstReady = hop.probeSelectionAndReload({ previousSelectionContext: categoryPayload.selection, previousCustomerId: categoryPayload.customerId });
+  check(so, 'R11 A-E request sau readyAt nhận một payload gồm toàn bộ mã',
+    [burstReady.payload.mode, burstReady.payload.customer.rows.map((row) => row[0]).filter((id) => burstIds.indexOf(id) >= 0).sort(), burstReady.reload.records],
+    ['records', burstIds.slice().sort(), []]);
+
+  // R11 F trong lúc đang đọc A-E: revision mới không bị xóa; request kế tiếp nhận riêng F.
+  ghiO(nen, 'Customer', 20, '@CUS_MA_KH', 'KH-F');
+  ghiO(nen, 'Customer', 20, '@CUS_TEN_CTY', 'KH-F');
+  ghiO(nen, 'Customer', 21, '@CUS_MA_KH', 'KH-NEW');
+  ghiO(nen, 'Customer', 21, '@CUS_TEN_CTY', 'KH-NEW');
+  hop.dirtyStateMarkRecords(['KH-F']);
+  const readRows = hop.entityReadRowsAt;
+  let injected = false;
+  hop.entityReadRowsAt = function (context, rows) {
+    if (!injected) { injected = true; hop.dirtyStateMarkRecords(['KH-NEW']); }
+    return readRows(context, rows);
+  };
+  const duringRead = hop.probeSelectionAndReload({ previousSelectionContext: burstReady.selection, previousCustomerId: burstReady.customerId });
+  hop.entityReadRowsAt = readRows;
+  check(so, 'R11 signal F phát sinh trong lúc đọc không bị mất',
+    [duringRead.revisionMatched, duringRead.reload.records, duringRead.remainingRevision > 0],
+    [false, ['KH-NEW'], true]);
+  const afterDuringRead = hop.probeSelectionAndReload({ previousSelectionContext: duringRead.selection, previousCustomerId: duringRead.customerId });
+  check(so, 'R11 request kế tiếp nhận payload của signal mới',
+    [afterDuringRead.payload.mode, afterDuringRead.payload.customer.rows.map((row) => row[0]), afterDuringRead.reload.records],
+    ['records', ['KH-NEW'], []]);
+
   const calls = [];
   hop.runEntryPoint = function (name, source, channel, fn) {
     calls.push([name, source, channel]);

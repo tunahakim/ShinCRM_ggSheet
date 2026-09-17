@@ -62,6 +62,7 @@ function reloadRecords(recordIds, expectedRevision, options) {
       ? null : Number(expectedRevision);
     var requestedRevision = requestedRevisionValue !== null && isFinite(requestedRevisionValue) ? requestedRevisionValue : null;
     var observed = typeof reloadStateRead === 'function' ? reloadStateRead() : null;
+    var observedRecordsAtStart = observed && Array.isArray(observed.records) ? observed.records.slice() : [];
     var requestWasSuperseded = requestedRevision !== null && observed && observed.revision !== requestedRevision;
 
     // The Sidebar may have sent this request just before another onEdit/write
@@ -155,7 +156,16 @@ function reloadRecords(recordIds, expectedRevision, options) {
     var current = typeof reloadStateRead === 'function' ? reloadStateRead() : null;
     var revisionMatches = expectedRevision === undefined || expectedRevision === null || expectedRevision === ''
       || (current && current.revision === Number(expectedRevision));
-    if (revisionMatches) { dirtyStateClearRecords(ids, expectedRevision); }
+    if (revisionMatches) {
+      dirtyStateClearRecords(ids, expectedRevision);
+    } else if (current && typeof dirtyStateClearRecords === 'function') {
+      // Keep records first seen after this read began. Distinct newer IDs can be
+      // cleared from the old revision; an ID reused by a newer write is kept,
+      // which is conservative and may cause one safe duplicate reload.
+      var newerIds = current.records.filter(function (id) { return observedRecordsAtStart.indexOf(id) < 0; });
+      var clearable = ids.filter(function (id) { return newerIds.indexOf(id) < 0; });
+      if (clearable.length) { dirtyStateClearRecords(clearable); }
+    }
     var latest = typeof reloadStateRead === 'function' ? reloadStateRead() : current;
     return {
       ok: true,
