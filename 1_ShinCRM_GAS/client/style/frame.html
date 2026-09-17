@@ -101,16 +101,16 @@ html, body {
 /* Thuộc tính `align: "right"` của Block dịch ra lớp này: nó đẩy chính nó và mọi thứ sau nó sang phải. */
 .shin-shell-header .shin-align-right { margin-left: auto; }
 
-/* Vùng 2 — Dải tiến trình. Đường ray luôn chiếm đúng chiều cao của nó, kể cả lúc rỗng, nên lúc dải chạy hiện lên thì không
-   có gì bị đẩy xuống. Lúc rảnh dùng cùng nền với thân Sidebar để ray hòa vào bố cục, không lộ thành một vạch trắng. */
+/* Vùng 2 — Dải tiến trình. Luôn giữ 3px để body không nhảy; lúc rảnh ẩn hoàn toàn bằng visibility nên không lộ nền/viền. */
 #sidebar-progress {
   flex: 0 0 var(--shin-progress-height);
   position: relative;
   overflow: hidden;
-  background: var(--shin-bg-sunken);
+  visibility: hidden;
+  background: transparent;
 }
 
-#sidebar-progress.is-running { background: var(--shin-primary-soft); }
+#sidebar-progress.is-running { visibility: visible; background: var(--shin-primary-soft); }
 
 #sidebar-progress.is-running::after {
   content: "";

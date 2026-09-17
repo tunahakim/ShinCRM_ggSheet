@@ -514,4 +514,4 @@ Ghi chú Slice 9A: commit `a1b8e0c` gom lịch nghiệp vụ về GAS, giữ Ext
 ### Cập nhật chuẩn form Sidebar ngày 17/09/2026
 
 - [x] Header các màn sửa/lưu dùng chung bố cục nhãn trái, X và tick cùng neo phải; icon dùng SVG nội tuyến, input/textarea/combo/menu dùng viền, đệm và nhãn theo chuẩn giao diện cũ; test offline `1606/1606`.
-- [x] Dải loading giữ chiều cao ổn định nhưng nền lúc rảnh hòa cùng `#sidebar-body`, không còn lộ vạch trắng khi không chạy; test offline `1606/1606`.
+- [x] Dải loading giữ 3px ổn định để body không nhảy, dùng `visibility: hidden` lúc rảnh nên không lộ vạch và không phụ thuộc màu nền của `#sidebar-body`; test offline `1606/1606`.

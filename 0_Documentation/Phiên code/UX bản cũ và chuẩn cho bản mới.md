@@ -198,7 +198,7 @@ Bản mới có ba thứ bản cũ không có, và chúng đổi cách hiện th
 | Cỡ chữ theo tầng | 11 / 12 / 13 / 15 pixel, khai thành biến ở `client/style/tokens.html` nên đổi một chỗ là đổi cả sidebar. |
 | Thông tin khách luôn nhìn thấy | Vùng 3 (`#sidebar-info`) ghim trên, không cuộn. Hơn bản cũ: nó bật ở **cả ba màn** kể cả khi đang mở form, nên lúc điền giao dịch vẫn thấy đang điền cho khách nào. |
 | Nút Lưu luôn nhìn thấy | Vùng 5 ghim đáy. Hơn bản cũ: bản cũ phải đặt **hai** nút lưu để cuộn tới đâu cũng có nút, bản mới chỉ cần một. |
-| Vạch tiến trình không đẩy nội dung | `#sidebar-progress` chiếm sẵn 3 pixel kể cả lúc rỗng, ẩn bằng cách bỏ lớp `is-running` chứ không bằng `display: none`. |
+| Vạch tiến trình không đẩy nội dung | `#sidebar-progress` luôn giữ 3 pixel để body không nhảy; lúc rảnh dùng `visibility: hidden` nên không vẽ nền/viền, khi có lời gọi máy chủ mới hiện ray 3 pixel bên dưới header. |
 | Hộp gợi ý đè lên thân | `position: absolute` + `z-index: 20`, trần `60vh`. |
 | Dấu sáng bàn phím cùng màu với trỏ chuột | `.shin-suggest.is-active` dùng đúng `--shin-primary-soft` như `:hover`. |
 | Tìm khách: trần 20, vòng lại, `scrollIntoView`, ẩn sau 200ms, chữ giữ lại sau khi chọn | Đã có đủ trong `client/ui/search.html`. Quét **sáu trường** khai `searchable` — mã khách, tên công ty, mã số thuế, điện thoại, người liên hệ, ô từ khóa — so với bốn trường của bản cũ. Hơn bản cũ ở ba chỗ nữa: khớp cả khi gõ **không dấu** (`normalizeText` bỏ dấu, `đ` thành `d`), gõ các mẩu lộn thứ tự vẫn ra khách, và khách đã xóa mềm vẫn tìm được nhưng xếp sau và gạch ngang — kèm **ba ghế dành riêng** ở cuối danh sách nên một khách đã xóa khớp truy vấn thì luôn lên tới danh sách, dù truy vấn đó khớp bao nhiêu khách còn sống. |

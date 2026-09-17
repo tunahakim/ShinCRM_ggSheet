@@ -32,8 +32,13 @@ async function chay(so) {
 
   let canh;
   try { canh = dungCanh(); } catch (err) { return ghiLoiNap(so, 'nạp ba tệp UI DOM', err); }
-  const { hop, dom, overlay, notice } = canh;
+  const { hop, dom, overlay, notice, progress } = canh;
   const menuCloseReal = hop.menuClose;
+
+  hop.progressBegin();
+  check(so, 'progress chỉ bật lớp chạy khi có lời gọi đang chờ', progress.classList.contains('is-running'), true);
+  hop.progressEnd();
+  check(so, 'progress bỏ lớp chạy khi không còn lời gọi', progress.classList.contains('is-running'), false);
 
   const nut = dom.document.createElement('button');
   nut.setAttribute('data-action', 'save');
