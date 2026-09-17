@@ -518,3 +518,4 @@ Ghi chú Slice 9A: commit `a1b8e0c` gom lịch nghiệp vụ về GAS, giữ Ext
 - [x] Dải loading giữ 3px ổn định để body không nhảy, dùng `visibility: hidden` lúc rảnh nên không lộ vạch và không phụ thuộc màu nền của `#sidebar-body`; test offline `1606/1606`.
 - [x] Hợp nhất primitive loading dùng chung `shin-loading-track`/`shin-loading-fill` cho ray toàn Sidebar và progress trong card Sync; bỏ CSS animation riêng theo màn hình; test offline `1608/1608`.
 - [x] Chuẩn hóa nhịp dọc bằng `gap` cho `Stack` và dùng cùng token `shin-gap-2` ở biên `sidebar-info`–`sidebar-body`, tránh Card bị ghi đè margin và tránh khoảng cách phụ thuộc vị trí Card; test offline `1615/1615`.
+- [x] Card `Đăng nhập tự động` có nút mở thẳng block `Chính sách tự đăng nhập`; công tắc tự đăng nhập là cấp cha, tự mở tab và retry là cấp con, bị khóa và không có hiệu lực khi cấp cha tắt; lưu credential bảo toàn chính sách; test offline `1630/1630`.

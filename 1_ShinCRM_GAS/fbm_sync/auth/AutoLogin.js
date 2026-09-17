@@ -39,7 +39,7 @@ FbmSync.loginConfigSave = function (input) {
   };
   var current = FbmSync.loginConfigRead(), retryMinutes = Number(value.retryMinutes === undefined ? current.retryMinutes : value.retryMinutes);
   if (!isFinite(retryMinutes) || retryMinutes < 1 || retryMinutes > 1440) { return { ok: false, code: 'AUTO_LOGIN_RETRY_INVALID', message: 'Chu kỳ tự đăng nhập lại phải từ 1 đến 1.440 phút.' }; }
-  var saved = { enabled: value.enabled !== false, autoOpenTab: value.autoOpenTab === true, retryEnabled: value.retryEnabled !== false, retryMinutes: Math.round(retryMinutes), credentialRef: ref, envelope: { version: Number(envelope.version || 1), alg: String(envelope.alg || 'AES-GCM'), iv: String(envelope.iv), ciphertext: String(envelope.ciphertext) }, public: safePublic, lastAttemptAt: Number(current.lastAttemptAt || 0), lastLoginAt: Number(current.lastLoginAt || 0), nextRetryAt: Number(current.nextRetryAt || 0), lastError: '' };
+  var saved = { enabled: value.enabled !== false, autoOpenTab: value.autoOpenTab === undefined ? current.autoOpenTab === true : value.autoOpenTab === true, retryEnabled: value.retryEnabled === undefined ? current.retryEnabled !== false : value.retryEnabled !== false, retryMinutes: Math.round(retryMinutes), credentialRef: ref, envelope: { version: Number(envelope.version || 1), alg: String(envelope.alg || 'AES-GCM'), iv: String(envelope.iv), ciphertext: String(envelope.ciphertext) }, public: safePublic, lastAttemptAt: Number(current.lastAttemptAt || 0), lastLoginAt: Number(current.lastLoginAt || 0), nextRetryAt: Number(current.nextRetryAt || 0), lastError: '' };
   FbmSync.props().setProperty(FbmSync.LOGIN_CONFIG_KEY, JSON.stringify(saved));
   return { ok: true, configured: true, enabled: saved.enabled, credentialRef: ref, public: safePublic };
 };
@@ -118,7 +118,7 @@ FbmSync.loginRequest = function (credentialRef, testOnly) {
   var cfg = FbmSync.scriptSettings();
   var login = { url: cfg.baseUrl + '/Main/Login.aspx/Login', body: {}, meta: { kind: 'login', credentialRef: String(credentialRef || ''), testOnly: testOnly === true } };
   var policy = FbmSync.loginConfigRead();
-  if (policy.autoOpenTab === true) { login.meta.openFbmContext = { url: cfg.baseUrl + '/Main/zccrAccount.aspx', active: false }; }
+  if (policy.enabled === true && policy.autoOpenTab === true) { login.meta.openFbmContext = { url: cfg.baseUrl + '/Main/zccrAccount.aspx', active: false }; }
   return login;
 };
 

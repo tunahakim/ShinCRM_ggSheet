@@ -7,6 +7,9 @@ function fbmSyncLoginActionBlocks() {
   if (!editing) { return [fbmSyncConfigButtonRow('login', { edit: 'Sửa thông tin', save: 'Lưu thông tin' }, { primary: false })]; }
   return [Row([Button({ id: 'fbm-sync-login-test', label: 'Đăng nhập thử', className: 'shin-primary', disabled: active }), Button({ id: 'fbm-sync-login-save', label: 'Lưu thông tin', className: 'shin-primary', disabled: active, data: { 'sync-config-action': 'save', 'sync-config-key': 'login' } })])];
 }
+function fbmSyncLoginPolicyNavigationBlocks() {
+  return [Row({ className: 'shin-single-action-row', elements: [Button({ id: 'fbm-sync-open-login-policy', label: 'Cài đặt đăng nhập tự động', className: 'shin-config-edit', disabled: !!FBM_SYNC_CLIENT.running || fbmSyncConfigIsEditing('login') })] })];
+}
 function fbmSyncAccountSettingsBlocks() {
   var settings = (FBM_SYNC_CLIENT.syncSettings || {}).account || {}, draft = fbmSyncConfigDraft('accountSettings', FBM_SYNC_CLIENT.accountSettingsDraft || {}), invalid = FBM_SYNC_CLIENT.accountSettingsInvalid || {}, active = !!FBM_SYNC_CLIENT.running, editing = fbmSyncConfigIsEditing('accountSettings'), disabled = active || !editing;
   var value = function (name) { return draft[name] !== undefined ? draft[name] : settings[name] || ''; };
@@ -34,7 +37,8 @@ function fbmSyncRenderAccount(panel, status) {
       StandaloneField('Username FBM', { id: 'fbm-login-username', kind: 'input', inputType: 'text', value: editing ? FBM_SYNC_CLIENT.loginDraft.username : String(login.public && login.public.usernameHint || ''), placeholder: 'Nhập username FBM', ariaLabel: 'Username FBM', disabled: !editing }),
       StandaloneField('Mật khẩu FBM', { id: 'fbm-login-password', kind: 'input', inputType: 'password', value: configured && !editing ? '****' : '', placeholder: 'Nhập mật khẩu FBM', ariaLabel: 'Mật khẩu FBM', disabled: !editing }),
       Box({ id: 'fbm-sync-login-actions-region', elements: fbmSyncLoginActionBlocks() }),
-      Box({ id: 'fbm-sync-login-notice-region', elements: fbmSyncAccountNoticeBlocks('login') })
+      Box({ id: 'fbm-sync-login-notice-region', elements: fbmSyncAccountNoticeBlocks('login') }),
+      Box({ id: 'fbm-sync-login-policy-navigation-region', elements: fbmSyncLoginPolicyNavigationBlocks() })
     ] })] }),
     Box({ id: 'fbm-sync-account-settings-region', elements: [fbmSyncAccountSettingsCard()] })
   ]);
@@ -57,7 +61,8 @@ function fbmSyncPatchAccount(panel, status) {
     StandaloneField('Username FBM', { id: 'fbm-login-username', kind: 'input', inputType: 'text', value: editing ? FBM_SYNC_CLIENT.loginDraft.username : String(login.public && login.public.usernameHint || ''), placeholder: 'Nhập username FBM', ariaLabel: 'Username FBM', disabled: !editing }),
     StandaloneField('Mật khẩu FBM', { id: 'fbm-login-password', kind: 'input', inputType: 'password', value: configured && !editing ? '****' : '', placeholder: 'Nhập mật khẩu FBM', ariaLabel: 'Mật khẩu FBM', disabled: !editing }),
     Box({ id: 'fbm-sync-login-actions-region', elements: fbmSyncLoginActionBlocks() }),
-    Box({ id: 'fbm-sync-login-notice-region', elements: fbmSyncAccountNoticeBlocks('login') })
+    Box({ id: 'fbm-sync-login-notice-region', elements: fbmSyncAccountNoticeBlocks('login') }),
+    Box({ id: 'fbm-sync-login-policy-navigation-region', elements: fbmSyncLoginPolicyNavigationBlocks() })
   ] })]); loginEditState.needsRender = false; }
   else {
     fbmSyncRenderTarget('fbm-sync-login-configured-region', fbmSyncLoginConfiguredBlocks());
@@ -65,6 +70,7 @@ function fbmSyncPatchAccount(panel, status) {
     fbmSyncSetTargetState('fbm-login-password', { value: configured && !editing ? '****' : undefined, disabled: !editing });
     fbmSyncRenderTarget('fbm-sync-login-actions-region', fbmSyncLoginActionBlocks());
     fbmSyncRenderTarget('fbm-sync-login-notice-region', fbmSyncAccountNoticeBlocks('login'));
+    fbmSyncRenderTarget('fbm-sync-login-policy-navigation-region', fbmSyncLoginPolicyNavigationBlocks());
   }
   return true;
 }

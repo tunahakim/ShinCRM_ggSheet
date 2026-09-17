@@ -101,6 +101,9 @@ async function chay(so) {
   const accountRoot = content.children[0];
   hop.fbmSyncPaint(Object.assign(idle(), { message: 'Snapshot Tài khoản mới' }));
   check(so, 'snapshot GAS vá Tài khoản mà giữ nguyên form và mật khẩu bản nháp', [content.children[0] === accountRoot, dom.document.getElementById('fbm-login-password') === accountPassword, accountPassword.value], [true, true, 'mat-khau-khong-duoc-mat']);
+  click(dom, dom.document.getElementById('fbm-sync-open-login-policy'));
+  check(so, 'nút Cài đặt đăng nhập tự động mở đúng màn hình Cài đặt phiên', [hop.FBM_SYNC_CLIENT.subscreen, content.getAttribute('data-fbm-sync-screen'), !!dom.document.getElementById('fbm-sync-login-policy-card-region')], ['settings', 'settings', true]);
+  const accountScreenButton = dom.document.createElement('button'); accountScreenButton.setAttribute('data-sync-screen', 'account'); click(dom, accountScreenButton);
   const accountActions = [];
   hop.fbmSyncAutoFillAndCheck = () => { accountActions.push('autofill'); return Promise.resolve(null); };
   hop.fbmSyncCheckIdentity = () => { accountActions.push('check'); return Promise.resolve(null); };
@@ -144,7 +147,10 @@ async function chay(so) {
   ['background', 'loginPolicy', 'relay'].forEach((key) => click(dom, dom.document.getElementById('fbm-sync-config-' + key + '-edit')));
   toggles.forEach((id) => click(dom, dom.document.getElementById(id)));
   ['fbm-sync-save-extension', 'fbm-sync-save-background', 'fbm-sync-save-login-policy', 'fbm-sync-rotate-relay'].forEach((id) => click(dom, dom.document.getElementById(id)));
-  check(so, 'cai dat phien doi dung tung cong tac va gui tung lenh luu theo nut bam', [settingsActions, toggles.map((id) => dom.document.getElementById(id).getAttribute('aria-pressed'))], [['extension', 'background', 'login-policy', 'rotate-relay'], ['false', 'false', 'false', 'false', 'true', 'false', 'true', 'false']]);
+  check(so, 'cai dat phien doi dung tung cong tac va gui tung lenh luu theo nut bam', [settingsActions, toggles.map((id) => dom.document.getElementById(id).getAttribute('aria-pressed'))], [['extension', 'background', 'login-policy', 'rotate-relay'], ['false', 'false', 'false', 'false', 'true', 'false', 'false', 'true']]);
+  check(so, 'chinh sach tu dang nhap khoa hai muc con khi muc cha tat', [dom.document.getElementById('fbm-sync-policy-auto-login').disabled, dom.document.getElementById('fbm-sync-policy-auto-open').disabled, dom.document.getElementById('fbm-sync-policy-retry').disabled, dom.document.getElementById('fbm-sync-login-retry-minutes').disabled], [false, true, true, true]);
+  click(dom, dom.document.getElementById('fbm-sync-policy-auto-login'));
+  check(so, 'bat lai muc cha mo khoa cac muc con', [dom.document.getElementById('fbm-sync-policy-auto-login').getAttribute('aria-pressed'), dom.document.getElementById('fbm-sync-policy-auto-open').disabled, dom.document.getElementById('fbm-sync-policy-retry').disabled, dom.document.getElementById('fbm-sync-login-retry-minutes').disabled], ['true', false, false, false]);
   const background = dom.document.getElementById('fbm-sync-background-switch');
   click(dom, background);
   check(so, 'công tắc lịch nền phản hồi ngay khi click trước khi GAS trả về', [background.getAttribute('aria-pressed'), background.className.indexOf('is-off') >= 0, background.disabled], ['false', true, true]);

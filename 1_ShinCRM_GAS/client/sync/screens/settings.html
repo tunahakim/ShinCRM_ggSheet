@@ -1,3 +1,8 @@
+<style>
+.shin-sync-login-policy-parent .shin-toggle-copy { font-weight: 700; }
+.shin-sync-login-policy-children { margin: 0 0 var(--shin-gap-2) var(--shin-gap-3); padding-left: var(--shin-gap-2); border-left: 2px solid var(--shin-border-faint); }
+.shin-sync-login-policy-children .shin-toggle-row { margin-top: var(--shin-gap-1); margin-bottom: var(--shin-gap-1); }
+</style>
 <script>
 function fbmSyncSettingsNoticeBlocks(scope, fallback) {
   var notice = (FBM_SYNC_CLIENT.settingsNotices || {})[scope] || fallback, message = notice && notice.message;
@@ -36,9 +41,23 @@ function fbmSyncSettingsBackgroundBlocks(settings) {
 }
 function fbmSyncSettingsLoginBlocks(loginPolicy) {
   loginPolicy = fbmSyncConfigDraft('loginPolicy', loginPolicy || {});
-  var editing = fbmSyncConfigIsEditing('loginPolicy'), disabled = !!FBM_SYNC_CLIENT.running || !editing;
-  var items = [['auto-login', 'Cho phép tự đăng nhập khi phiên hết hạn', loginPolicy.enabled !== false], ['auto-open', 'Cho phép tự mở tab FBM khi GAS yêu cầu', loginPolicy.autoOpenTab === true], ['retry', 'Cho phép tự đăng nhập lại khi lần trước thất bại', loginPolicy.retryEnabled !== false]];
-  return [Box({ id: 'fbm-sync-settings-login-notice-region', elements: fbmSyncSettingsNoticeBlocks('login') })].concat(items.map(function (item) { return Box({ className: 'shin-toggle-row', elements: [Text({ className: 'shin-toggle-copy', text: item[1] }), StandaloneControl({ id: 'fbm-sync-policy-' + item[0], kind: 'toggle', pressed: item[2], className: item[2] ? 'is-on' : 'is-off', data: { 'sync-login-policy': item[0] }, disabled: disabled, ariaLabel: item[1] })] }); })).concat([StandaloneField('Chu kỳ thử lại (phút)', { id: 'fbm-sync-login-retry-minutes', kind: 'input', inputType: 'number', value: loginPolicy.retryMinutes || 30, placeholder: '1–1.440', disabled: disabled, ariaLabel: 'Chu kỳ thử lại' }), fbmSyncConfigButtonRow('loginPolicy', { edit: 'Sửa chính sách đăng nhập', save: 'Lưu chính sách đăng nhập' }, { id: 'fbm-sync-save-login-policy', disabled: !!FBM_SYNC_CLIENT.running })]);
+  var editing = fbmSyncConfigIsEditing('loginPolicy'), disabled = !!FBM_SYNC_CLIENT.running || !editing, parentEnabled = loginPolicy.enabled !== false, childDisabled = disabled || !parentEnabled;
+  var toggle = function (id, label, pressed, isDisabled) { return Box({ className: 'shin-toggle-row', elements: [Text({ className: 'shin-toggle-copy', text: label }), StandaloneControl({ id: id, kind: 'toggle', pressed: pressed, className: pressed ? 'is-on' : 'is-off', data: { 'sync-login-policy': id.replace('fbm-sync-policy-', '') }, disabled: isDisabled, ariaLabel: label })] }); };
+  return [Box({ id: 'fbm-sync-settings-login-notice-region', elements: fbmSyncSettingsNoticeBlocks('login') }),
+    Box({ id: 'fbm-sync-login-policy-parent-row', className: 'shin-toggle-row shin-sync-login-policy-parent', elements: [Text({ className: 'shin-toggle-copy', text: 'Cho phép tự đăng nhập khi phiên hết hạn' }), StandaloneControl({ id: 'fbm-sync-policy-auto-login', kind: 'toggle', pressed: parentEnabled, className: parentEnabled ? 'is-on' : 'is-off', data: { 'sync-login-policy': 'auto-login' }, disabled: disabled, ariaLabel: 'Cho phép tự đăng nhập khi phiên hết hạn' })] }),
+    Box({ id: 'fbm-sync-login-policy-children', className: 'shin-sync-login-policy-children', elements: [
+      toggle('fbm-sync-policy-auto-open', 'Cho phép tự mở tab FBM khi GAS yêu cầu', loginPolicy.autoOpenTab === true, childDisabled),
+      toggle('fbm-sync-policy-retry', 'Cho phép tự đăng nhập lại khi lần trước thất bại', loginPolicy.retryEnabled !== false, childDisabled)
+    ] }),
+    StandaloneField('Chu kỳ thử lại (phút)', { id: 'fbm-sync-login-retry-minutes', kind: 'input', inputType: 'number', value: loginPolicy.retryMinutes || 30, placeholder: '1–1.440', disabled: childDisabled, ariaLabel: 'Chu kỳ thử lại' }),
+    fbmSyncConfigButtonRow('loginPolicy', { edit: 'Sửa chính sách đăng nhập', save: 'Lưu chính sách đăng nhập' }, { id: 'fbm-sync-save-login-policy', disabled: !!FBM_SYNC_CLIENT.running })
+  ];
+}
+
+function fbmSyncSetLoginPolicyDependencyState(parentEnabled) {
+  var disabled = !!FBM_SYNC_CLIENT.running || !fbmSyncConfigIsEditing('loginPolicy') || parentEnabled !== true;
+  ['fbm-sync-policy-auto-open', 'fbm-sync-policy-retry', 'fbm-sync-login-retry-minutes'].forEach(function (id) { fbmSyncSetTargetState(id, { disabled: disabled }); });
+  return disabled;
 }
 function fbmSyncSettingsModuleBlocks(settings, enabled) {
   var draft = fbmSyncConfigDraft('module', settings || {}), editing = fbmSyncConfigIsEditing('module');
@@ -98,11 +117,12 @@ function fbmSyncPatchSettings(panel, status) {
   var extension = settings.extension || {};
   patchValue('fbm-extension-poll-minutes', extension.pollMinutes);
   patchToggle('fbm-sync-run-on-startup', extension.runOnStartup !== false, false);
-  var login = FBM_SYNC_CLIENT.loginStatus || {};
-  patchToggle('fbm-sync-policy-auto-login', login.enabled !== false, false);
+  var login = FBM_SYNC_CLIENT.loginStatus || {}, loginDraft = fbmSyncConfigDraft('loginPolicy', login), loginEnabled = loginDraft.enabled !== false;
+  patchToggle('fbm-sync-policy-auto-login', loginEnabled, false);
   patchToggle('fbm-sync-policy-auto-open', login.autoOpenTab === true, false);
   patchToggle('fbm-sync-policy-retry', login.retryEnabled !== false, false);
   patchValue('fbm-sync-login-retry-minutes', login.retryMinutes);
+  fbmSyncSetLoginPolicyDependencyState(loginEnabled);
   patchValue('fbm-sync-setting-approval-threshold', settings.approvalThreshold);
   fbmSyncSetTargetState('fbm-sync-setting-approval-threshold', { disabled: !masterEnabled || !fbmSyncConfigIsEditing('module') });
   fbmSyncSetTargetState('fbm-sync-save-settings', { disabled: !masterEnabled || !!FBM_SYNC_CLIENT.running });

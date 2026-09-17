@@ -213,6 +213,8 @@ async function chay(so) {
   const savedLoginCard = accountBlocks[1].elements[0];
   const savedLoginFields = savedLoginCard.elements.filter((node) => node && node.role === 'box' && node.className === 'shin-form-field');
   check(so, 'Credential đã lưu hiện username, mật khẩu **** và hai ô chỉ xem', [savedLoginCard.titleActions[0].icon, savedLoginFields[0].elements[1].disabled, savedLoginFields[0].elements[1].value, savedLoginFields[1].elements[1].disabled, savedLoginFields[1].elements[1].value], ['pencil', true, 'anhlt', true, '****']);
+  const loginPolicyNavigation = savedLoginCard.elements.filter((node) => node && node.id === 'fbm-sync-login-policy-navigation-region')[0];
+  check(so, 'Account có nút mở đúng khối cài đặt đăng nhập tự động', [loginPolicyNavigation.elements[0].className, loginPolicyNavigation.elements[0].elements[0].id, loginPolicyNavigation.elements[0].elements[0].label], ['shin-single-action-row', 'fbm-sync-open-login-policy', 'Cài đặt đăng nhập tự động']);
   hop.FBM_SYNC_CLIENT.loginEditMode = true;
   hop.FBM_SYNC_CLIENT.loginDraft.username = 'anhlt';
   hop.fbmSyncAppendBox = (_panel, _className, _id, elements) => { accountBlocks = elements; return content; };

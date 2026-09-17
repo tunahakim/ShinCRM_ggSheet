@@ -292,7 +292,7 @@ function fbmSyncHeartbeatRequest(options) {
     if (typeof FbmSync.heartbeatCustomerRequest !== 'function') { return { ok: false, code: 'HEARTBEAT_REQUEST_UNAVAILABLE', request: null, status: FbmSync.statusView() }; }
     var heartbeatRequest = FbmSync.heartbeatCustomerRequest();
     var loginPolicy = typeof FbmSync.loginConfigRead === 'function' ? FbmSync.loginConfigRead() : {};
-    if (loginPolicy.autoOpenTab === true) {
+    if (loginPolicy.enabled === true && loginPolicy.autoOpenTab === true) {
       heartbeatRequest.meta = heartbeatRequest.meta || {};
       heartbeatRequest.meta.openFbmContext = { url: 'https://fbo.com.vn:8888/Main/zccrAccount.aspx', active: false };
     }
