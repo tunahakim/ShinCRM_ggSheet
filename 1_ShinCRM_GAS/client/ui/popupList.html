@@ -143,7 +143,6 @@ var PopupList = (function () {
     box._popupOnClose = null;
     box._popupAnchor = null;
     box._popupOptions = null;
-    box._popupDetached = false;
     try {
       if (typeof onClose === 'function') { onClose(box); }
     } finally {
@@ -201,11 +200,6 @@ var PopupList = (function () {
     for (var i = 0; i < open.length; i += 1) {
       var box = open[i];
       if (box.hidden || !box._popupAnchor || !box._popupOptions) { continue; }
-      var anchorRect = rectOf(box._popupAnchor, viewport());
-      if (!box._popupDetached && anchorOutsideRegion(box._popupOptions, anchorRect)) {
-        closeOne(box);
-        continue;
-      }
       place(box, box._popupAnchor, box._popupOptions);
       count += 1;
     }
@@ -283,7 +277,6 @@ var PopupList = (function () {
     box._popupOnClose = null;
     box._popupAnchor = null;
     box._popupOptions = null;
-    box._popupDetached = false;
     return hideRaw(box, selector);
   }
 
@@ -294,7 +287,6 @@ var PopupList = (function () {
     closeAll(box);
     box._popupAnchor = anchor || null;
     box._popupOptions = opts;
-    box._popupDetached = anchorOutsideRegion(opts, rectOf(anchor, viewport()));
     box._popupOnClose = typeof opts.onClose === 'function' ? opts.onClose : null;
     box.hidden = false;
     place(box, anchor, opts);

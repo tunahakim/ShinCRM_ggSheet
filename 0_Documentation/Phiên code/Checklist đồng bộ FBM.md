@@ -503,7 +503,7 @@ Ghi chú Slice 9A: commit `a1b8e0c` gom lịch nghiệp vụ về GAS, giữ Ext
 - [x] Chuẩn hóa `PopupList` làm component popup duy nhất cho search, dropdown, customer picker, menu chọn và menu module; controller chỉ giữ dữ liệu/phím tắt, popup dùng chung tự neo, giãn theo nội dung, giới hạn Sidebar, lật chiều và đóng khi click ngoài; test offline `1583/1583`, commit `d255abd`, GAS DEV revision `@376`.
 - [x] Loại bỏ listener đóng popup trùng trong FBM/choice menu; PopupList là nơi duy nhất xử lý click ngoài và bộ DOM test mô phỏng đúng nhiều listener; test offline `1584/1584`, commit `14cc9f6`, GAS DEV revision `@377`.
 - [x] Hợp nhất hoàn toàn menu ba chấm, popup `Sản phẩm`, `Chiều đồng bộ`, tìm kiếm và customer picker vào một `PopupList`: khung/kích thước/bố cục dùng chuẩn popup `Sản phẩm`; typography theo ô nhập (`Roboto` 14px, line-height 1.4, weight thường); dòng thoáng `6px 10px` và có vạch phân cách mảnh như dropdown cũ; màu chữ/active/hover giữ theo hợp đồng PopupList; dòng active/selected không in đậm; không còn CSS popup riêng; test offline `1589/1589`, commit `45d38e1`, GAS DEV revision `@386`.
-- [x] PopupList tái neo popup theo trigger khi vùng body, cửa sổ hoặc viewport cuộn/đổi kích thước; tự đóng khi trigger rời hẳn vùng cuộn, còn menu header vẫn neo theo viewport; test offline `1602/1602`.
+- [x] PopupList tái neo popup theo trigger khi vùng body, cửa sổ hoặc viewport cuộn/đổi kích thước; giữ popup tại mép nhìn thấy khi trigger chạm mép vùng cuộn, còn menu header vẫn neo theo viewport; test offline `1603/1603`.
 
 ### Cập nhật reload RAM và sheet quản trị ngày 16/09/2026
 

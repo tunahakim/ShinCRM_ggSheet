@@ -132,7 +132,10 @@ async function chay(so) {
   check(so, 'PopupList tự neo lại theo vùng body khi sidebar cuộn', [popupTopBeforeScroll, scrollPopup.style.top, scrollPopup.hidden], ['224px', '324px', false]);
   scrollAnchor.rect = { left: 20, top: 900, bottom: 920, right: 120 };
   dom.document.listeners.scroll({ target: bodyRegion });
-  check(so, 'PopupList tự đóng khi trigger rời hẳn vùng cuộn', scrollPopup.hidden, true);
+  check(so, 'PopupList vẫn hiện và neo ở mép dưới khi trigger rời vùng cuộn', [scrollPopup.hidden, scrollPopup.style.top], [false, '716px']);
+  scrollAnchor.rect = { left: 20, top: -50, bottom: -30, right: 120 };
+  dom.document.listeners.scroll({ target: bodyRegion });
+  check(so, 'PopupList vẫn hiện và neo ở mép trên khi trigger rời vùng cuộn', [scrollPopup.hidden, scrollPopup.style.top], [false, '4px']);
 
   const holder = dom.document.createElement('div');
   const khoi = dom.document.createElement('div');
