@@ -173,6 +173,23 @@ function chay(so) {
     [afterDuringRead.payload.mode, afterDuringRead.payload.customer.rows.map((row) => row[0]), afterDuringRead.reload.records],
     ['records', ['KH-NEW'], []]);
 
+  ghiO(nen, 'Customer', 22, '@CUS_MA_KH', 'KH-SAME');
+  ghiO(nen, 'Customer', 22, '@CUS_TEN_CTY', 'KH-SAME');
+  hop.dirtyStateMarkRecords(['KH-SAME']);
+  const sameRevision = hop.reloadStateRead().revision;
+  injected = false;
+  hop.entityReadRowsAt = function (context, rows) {
+    if (!injected) { injected = true; hop.dirtyStateMarkRecords(['KH-SAME']); }
+    return readRows(context, rows);
+  };
+  const sameDuringRead = hop.probeSelectionAndReload({ previousSelectionContext: afterDuringRead.selection, previousCustomerId: afterDuringRead.customerId });
+  hop.entityReadRowsAt = readRows;
+  check(so, 'R11 cùng mã phát sinh lại trong lúc đọc vẫn giữ signal mới',
+    [sameDuringRead.revisionMatched, sameDuringRead.processedRevision, sameDuringRead.reload.records],
+    [false, sameRevision, ['KH-SAME']]);
+  const sameNext = hop.probeSelectionAndReload({ previousSelectionContext: sameDuringRead.selection, previousCustomerId: sameDuringRead.customerId });
+  check(so, 'R11 signal cùng mã được dọn sau request kế tiếp', [sameNext.payload.mode, sameNext.reload.records], ['records', []]);
+
   const calls = [];
   hop.runEntryPoint = function (name, source, channel, fn) {
     calls.push([name, source, channel]);

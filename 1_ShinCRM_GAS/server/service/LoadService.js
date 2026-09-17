@@ -162,7 +162,9 @@ function reloadRecords(recordIds, expectedRevision, options) {
       // Keep records first seen after this read began. Distinct newer IDs can be
       // cleared from the old revision; an ID reused by a newer write is kept,
       // which is conservative and may cause one safe duplicate reload.
-      var newerIds = current.records.filter(function (id) { return observedRecordsAtStart.indexOf(id) < 0; });
+      var newerIds = typeof dirtyStateRecordIdsAfterRevision === 'function'
+        ? dirtyStateRecordIdsAfterRevision(PropertiesService.getDocumentProperties(), expectedRevision)
+        : current.records.filter(function (id) { return observedRecordsAtStart.indexOf(id) < 0; });
       var clearable = ids.filter(function (id) { return newerIds.indexOf(id) < 0; });
       if (clearable.length) { dirtyStateClearRecords(clearable); }
     }

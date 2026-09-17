@@ -423,7 +423,7 @@
 - [x] Category và records cùng dirty được GAS chọn full core để không đánh dấu revision hoàn tất khi mới nạp một scope (`ReloadDecision.js`, test `reloadDecision.js`).
 - [x] Test offline phủ năm lần sửa A–E cách nhau một giây: các response đầu không có payload, request sau `readyAt` trả một payload chứa toàn bộ A–E (`tests/cases/selectionService.js`).
 - [x] Test offline phủ sửa F sau khi A–E đã xử lý: F tạo revision mới và được trả ở lượt riêng sau debounce của F (`tests/cases/selectionService.js`).
-- [x] Test offline phủ F phát sinh trong lúc payload A–E đang được đọc: GAS không xóa F, response ghi `remainingRevision`, request kế tiếp nhận F (`tests/cases/selectionService.js`).
+- [x] Test offline phủ F phát sinh trong lúc payload A–E đang được đọc: GAS không xóa F, response ghi `remainingRevision`, request kế tiếp nhận F; ca cùng một mã bị sửa lại trong lúc đọc cũng được giữ (`tests/cases/selectionService.js`).
 - [x] Test offline phủ response lệch thứ tự: response cũ không ghi đè payload/revision mới (`tests/cases/selectionPoll.js`).
 - [x] GAS DEV deployment `@396`: `reloadPayloadProbe --push` trả `defer` không payload rồi trả payload records trong chính request sau `readyAt`; probe không ghi dữ liệu khách và khôi phục DocumentProperties. `probeSelectionAndReload --push` cũng trả đúng contract `requestId`/selection/ReloadState/decision ở trạng thái sạch.
 

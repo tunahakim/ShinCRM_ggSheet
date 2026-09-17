@@ -24,7 +24,8 @@ Object.defineProperties(DIRTY_KEYS, {
   allViews: { value: 'dirtyAllViews', enumerable: false },
   revision: { value: 'reloadRevision', enumerable: false },
   changedAt: { value: 'reloadChangedAt', enumerable: false },
-  recordsReadyAt: { value: 'dirtyRecordsReadyAt', enumerable: false }
+  recordsReadyAt: { value: 'dirtyRecordsReadyAt', enumerable: false },
+  recordRevisionLog: { value: 'dirtyRecordRevisionLog', enumerable: false }
 });
 
 /** Một khóa dạng danh sách. Rỗng, thiếu, hay hỏng đều trả về mảng rỗng. */
@@ -102,8 +103,46 @@ function reloadStateRead() {
 
 function dirtyStateBumpRevision(props) {
   var state = reloadStateRead();
-  props.setProperty(DIRTY_KEYS.revision, String(state.revision + 1));
+  var next = state.revision + 1;
+  props.setProperty(DIRTY_KEYS.revision, String(next));
   props.setProperty(DIRTY_KEYS.changedAt, String(Date.now()));
+  return next;
+}
+
+function dirtyStateRecordRevisionLogRead(props) {
+  var raw = props.getProperty(DIRTY_KEYS.recordRevisionLog);
+  if (!raw) { return []; }
+  try {
+    var parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter(function (entry) { return entry && Number(entry.revision) > 0 && Array.isArray(entry.records); }) : [];
+  } catch (ignore) { return []; }
+}
+
+function dirtyStateRecordRevisionLogWrite(props, entries) {
+  if (entries && entries.length) { props.setProperty(DIRTY_KEYS.recordRevisionLog, JSON.stringify(entries)); }
+  else { props.deleteProperty(DIRTY_KEYS.recordRevisionLog); }
+}
+
+function dirtyStateRecordRevisionLogAppend(props, revision, recordIds) {
+  var ids = [];
+  var seen = {};
+  (recordIds || []).forEach(function (value) {
+    var id = String(value === null || value === undefined ? '' : value).trim();
+    if (id && !seen[id]) { seen[id] = true; ids.push(id); }
+  });
+  if (!ids.length) { return; }
+  var entries = dirtyStateRecordRevisionLogRead(props);
+  entries.push({ revision: revision, records: ids });
+  dirtyStateRecordRevisionLogWrite(props, entries.slice(-100));
+}
+
+function dirtyStateRecordIdsAfterRevision(props, revision) {
+  var seen = {};
+  dirtyStateRecordRevisionLogRead(props).forEach(function (entry) {
+    if (Number(entry.revision) <= Number(revision || 0)) { return; }
+    entry.records.forEach(function (id) { var key = String(id || '').trim(); if (key) { seen[key] = true; } });
+  });
+  return Object.keys(seen);
 }
 
 function dirtyStateMarkSignal(mark) {
@@ -129,7 +168,8 @@ function dirtyStateMarkSignal(mark) {
   if (mark.viewSheets && mark.viewSheets.length) {
     dirtyStateWriteList(props, DIRTY_KEYS.viewSheets, state.viewSheets.concat(mark.viewSheets));
   }
-  dirtyStateBumpRevision(props);
+  var bumpedRevision = dirtyStateBumpRevision(props);
+  if (hasRecords && !mark.allCore) { dirtyStateRecordRevisionLogAppend(props, bumpedRevision, mark.records); }
   // Tính mốc debounce sau cùng một mốc changedAt của signal. Nếu một lần ghi
   // ô phát thêm onEdit trong lúc xử lý, signal cuối vẫn có đủ ba giây trọn vẹn.
   if (hasRecords && !mark.allCore) {
@@ -147,6 +187,7 @@ function dirtyStateMarkSignal(mark) {
   var limit = Number(SETTINGS.DIRTY_RECORD_LIMIT) || 500;
   if (!next.allCore && next.records.length > limit) {
     props.deleteProperty(DIRTY_KEYS.records);
+    props.deleteProperty(DIRTY_KEYS.recordRevisionLog);
     props.setProperty(DIRTY_KEYS.allCore, 'true');
     props.setProperty(DIRTY_KEYS.all, 'true');
   }
@@ -255,11 +296,11 @@ function dirtyStateClear(options) {
     [DIRTY_KEYS.viewSheets, DIRTY_KEYS.records, DIRTY_KEYS.recordsReadyAt, DIRTY_KEYS.category, DIRTY_KEYS.config, DIRTY_KEYS.schema, DIRTY_KEYS.allCore, DIRTY_KEYS.allViews, DIRTY_KEYS.all].forEach(function (key) { props.deleteProperty(key); });
   } else {
     if (opts.viewSheets) { props.deleteProperty(DIRTY_KEYS.viewSheets); }
-    if (opts.records) { props.deleteProperty(DIRTY_KEYS.records); props.deleteProperty(DIRTY_KEYS.recordsReadyAt); }
+    if (opts.records) { props.deleteProperty(DIRTY_KEYS.records); props.deleteProperty(DIRTY_KEYS.recordsReadyAt); props.deleteProperty(DIRTY_KEYS.recordRevisionLog); }
     if (opts.config) { props.deleteProperty(DIRTY_KEYS.config); }
     if (opts.category) { props.deleteProperty(DIRTY_KEYS.category); }
     if (opts.schema) { props.deleteProperty(DIRTY_KEYS.schema); }
-    if (opts.allCore || opts.all) { props.deleteProperty(DIRTY_KEYS.allCore); props.deleteProperty(DIRTY_KEYS.all); props.deleteProperty(DIRTY_KEYS.recordsReadyAt); }
+    if (opts.allCore || opts.all) { props.deleteProperty(DIRTY_KEYS.allCore); props.deleteProperty(DIRTY_KEYS.all); props.deleteProperty(DIRTY_KEYS.recordsReadyAt); props.deleteProperty(DIRTY_KEYS.recordRevisionLog); }
     if (opts.allViews) { props.deleteProperty(DIRTY_KEYS.allViews); }
   }
   return dirtyStateRead();
@@ -281,7 +322,13 @@ function dirtyStateClearRecords(recordIds, expectedRevision) {
   var props = PropertiesService.getDocumentProperties();
   var remaining = dirtyStateRead().records.filter(function (id) { return !remove[id]; });
   dirtyStateWriteList(props, DIRTY_KEYS.records, remaining);
-  if (!remaining.length) { props.deleteProperty(DIRTY_KEYS.recordsReadyAt); }
+  if (!remaining.length) {
+    props.deleteProperty(DIRTY_KEYS.recordsReadyAt);
+    props.deleteProperty(DIRTY_KEYS.recordRevisionLog);
+  } else if (expectedRevision !== undefined && expectedRevision !== null && expectedRevision !== '') {
+    var keepLog = dirtyStateRecordRevisionLogRead(props).filter(function (entry) { return Number(entry.revision) > Number(expectedRevision); });
+    dirtyStateRecordRevisionLogWrite(props, keepLog);
+  }
   return dirtyStateRead();
 }
 
