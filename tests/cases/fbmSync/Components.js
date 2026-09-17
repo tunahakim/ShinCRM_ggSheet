@@ -206,6 +206,11 @@ function chay(so) {
   check(so, 'frame chung không còn chứa style component Sync legacy',
     ['shin-sync-form-field', 'shin-sync-form-actions', 'shin-sync-muted', 'shin-sync-preview-row', 'shin-sync-login-row'].filter((name) => frame.indexOf(name) >= 0),
     []);
+  check(so, 'shared layout contracts',
+    [frame.indexOf('#sidebar-root {') >= 0 && frame.indexOf('background: var(--shin-bg-sunken);') > frame.indexOf('#sidebar-root {'),
+      frame.indexOf('#sidebar-info {') >= 0 && frame.indexOf('margin-bottom: var(--shin-progress-height);') > frame.indexOf('#sidebar-info {'),
+      styles.indexOf('.shin-loading-track.is-idle { visibility: hidden; background: transparent; }') >= 0],
+    [true, true, true]);
 }
 
 module.exports = { chay };
