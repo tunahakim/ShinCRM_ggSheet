@@ -218,10 +218,8 @@ function reloadMatrixProbe() {
     reloadMatrixProbeWriteEvent(customer.sheet, customerStartRow, customerEdit.column, 'DEV reload customer edit');
     var after = reloadStateRead();
     reloadMatrixProbeAssert(report, 'Customer cột @ hợp lệ phát records + allViews', after.revision > before.revision && after.records.indexOf(customerIds[0]) >= 0, JSON.stringify({ revision: after.revision, records: after.records }));
-    // Ép mốc tương lai để phép thử defer không phụ thuộc độ trễ của lần chạy DEV.
-    PropertiesService.getDocumentProperties().setProperty(DIRTY_KEYS.recordsReadyAt, String(Date.now() + 3000));
     var customerReloadProbe = probeSelectionAndReload({ lastSeenRevision: before.revision, previousCustomerId: '' });
-    reloadMatrixProbeAssert(report, 'Customer cột @ chưa đến mốc sẵn sàng trả defer không payload', customerReloadProbe.decision.ram.mode === 'records' && customerReloadProbe.decision.ram.action === 'defer' && customerReloadProbe.payload === null && customerReloadProbe.reload.recordsReadyAt >= customerReloadProbe.reload.changedAt + 3000 && customerReloadProbe.reload.records.indexOf(customerIds[0]) >= 0, JSON.stringify({ action: customerReloadProbe.decision.ram.action, waitMs: customerReloadProbe.decision.ram.waitMs, payload: customerReloadProbe.payload, records: customerReloadProbe.reload.records }));
+    reloadMatrixProbeAssert(report, 'Customer cột @ có mốc sẵn sàng reload sau 3 giây', customerReloadProbe.decision.ram.mode === 'records' && customerReloadProbe.reload.recordsReadyAt >= customerReloadProbe.reload.changedAt + 3000 && customerReloadProbe.reload.records.indexOf(customerIds[0]) >= 0, JSON.stringify({ mode: customerReloadProbe.decision.ram.mode, waitMs: customerReloadProbe.decision.ram.waitMs, changedAt: customerReloadProbe.reload.changedAt, recordsReadyAt: customerReloadProbe.reload.recordsReadyAt, records: customerReloadProbe.reload.records }));
 
     var batchBefore = reloadStateRead();
     var batchValues = [];
@@ -230,9 +228,6 @@ function reloadMatrixProbe() {
     var batchAfter = reloadStateRead();
     reloadMatrixProbeAssert(report, 'Vùng Customer nhiều hàng gom đủ mã', batchAfter.revision > batchBefore.revision && customerIds.every(function (id) { return batchAfter.records.indexOf(id) >= 0; }), JSON.stringify({ revisionDelta: batchAfter.revision - batchBefore.revision, records: batchAfter.records }));
     report.push('Ghi chú: debounce một lượt sau edit cuối là hành vi Sidebar; probe GAS xác nhận mỗi vùng trả waitMs=3000, không giả vờ đo số lượt reload client.');
-    PropertiesService.getDocumentProperties().setProperty(DIRTY_KEYS.recordsReadyAt, String(Date.now() - 1));
-    var customerReadyProbe = probeSelectionAndReload({ lastSeenRevision: before.revision, previousCustomerId: '' });
-    reloadMatrixProbeAssert(report, 'Customer cột @ sau mốc sẵn sàng trả payload trong cùng response', customerReadyProbe.payload && customerReadyProbe.payload.mode === 'records' && customerReadyProbe.payload.customer.rows.length > 0 && customerReadyProbe.processedRevision === batchAfter.revision, JSON.stringify({ mode: customerReadyProbe.payload && customerReadyProbe.payload.mode, processedRevision: customerReadyProbe.processedRevision, observedRevision: customerReadyProbe.observedRevision }));
 
     var activityBefore = reloadStateRead();
     var activityResult = reloadMatrixProbeWriteEvent(activity.sheet, activityStartRow, activityEdit.column, 'DEV reload activity edit');
@@ -354,5 +349,30 @@ function reloadMatrixProbe() {
     } catch (cleanupError) {
       throw new Error('Probe không dọn sạch được: ' + errorMessage(cleanupError));
     }
+  }
+}
+
+/** Kiểm chứng R11 trên dữ liệu DEV đang có, không ghi hay sửa bất kỳ ô nào. */
+function reloadPayloadProbe() {
+  var propKeys = reloadMatrixProbePropKeys();
+  var snapshot = reloadMatrixProbeSnapshotProperties(propKeys);
+  var report = [];
+  try {
+    var context = entityReadContext('customer');
+    var keys = entityReadFieldBlock(context, SHEET_FIRST_DATA_ROW, context.rowCount, ['id']);
+    var id = keys.length ? String(keys[0][0] || '').trim() : '';
+    if (!id) { throw new Error('DEV không có mã Customer để kiểm payload.'); }
+
+    dirtyStateMarkSignal({ records: [id], allViews: false, recordsReadyAt: Date.now() + 3000 });
+    var deferred = probeSelectionAndReload({ requestId: 'dev-r11-defer', previousCustomerId: '' });
+    reloadMatrixProbeAssert(report, 'R11 DEV defer không đọc payload', deferred.decision.ram.action === 'defer' && deferred.payload === null && deferred.reload.records.indexOf(id) >= 0, JSON.stringify({ action: deferred.decision.ram.action, waitMs: deferred.waitMs, payload: deferred.payload }));
+
+    PropertiesService.getDocumentProperties().setProperty(DIRTY_KEYS.recordsReadyAt, String(Date.now() - 1));
+    var ready = probeSelectionAndReload({ requestId: 'dev-r11-ready', previousCustomerId: '' });
+    reloadMatrixProbeAssert(report, 'R11 DEV ready trả payload cùng response', ready.payload && ready.payload.mode === 'records' && ready.processedRevision === deferred.observedRevision && ready.reload.records.length === 0, JSON.stringify({ mode: ready.payload && ready.payload.mode, processedRevision: ready.processedRevision, observedRevision: ready.observedRevision, records: ready.reload.records }));
+    report.push('R11 DEV hoàn tất: GAS tự quyết định defer/reload và trả payload trong cùng request.');
+    return report;
+  } finally {
+    reloadMatrixProbeRestoreProperties(snapshot);
   }
 }
