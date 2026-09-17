@@ -508,6 +508,7 @@ Ghi chú Slice 9A: commit `a1b8e0c` gom lịch nghiệp vụ về GAS, giữ Ext
 ### Cập nhật reload RAM và sheet quản trị ngày 16/09/2026
 
 - [x] Lõi GAS quyết định scope reload từ `ReloadState`, trigger/cửa ghi phát signal, API `probeSelectionAndReload` gộp selection và reload trong một request; commit `933f308`.
+- [x] Probe GAS DEV `reloadMatrixProbe` đạt ở deployment `@411`: Customer/Activity phát đúng mã và mốc debounce 3 giây, Category/Config phát đúng scope (Config dùng payload riêng), schema/full core và cả 3 sheet quản trị đều được kiểm tra; probe đã sửa snapshot để không nhầm dirty state đã bị request reload kế tiếp tiêu thụ.
 - [x] Sidebar/Extension dùng wake debounce một giây, reload dữ liệu ba giây, fallback selection probe một request và safety polling thưa chỉ cho RAM; revision chỉ được ghi nhận sau khi áp dụng dữ liệu thành công; commit `ab464fe`.
 - [x] Checklist chi tiết và hợp đồng triển khai đã được cập nhật; các ca live trong Sheet DEV còn chờ chủ dự án nghiệm thu.
 

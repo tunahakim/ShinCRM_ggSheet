@@ -218,8 +218,18 @@ function reloadMatrixProbe() {
     reloadMatrixProbeWriteEvent(customer.sheet, customerStartRow, customerEdit.column, 'DEV reload customer edit');
     var after = reloadStateRead();
     reloadMatrixProbeAssert(report, 'Customer cột @ hợp lệ phát records + allViews', after.revision > before.revision && after.records.indexOf(customerIds[0]) >= 0, JSON.stringify({ revision: after.revision, records: after.records }));
+    var customerReloadStateBeforeProbe = reloadStateRead();
     var customerReloadProbe = probeSelectionAndReload({ lastSeenRevision: before.revision, previousCustomerId: '' });
-    reloadMatrixProbeAssert(report, 'Customer cột @ có mốc sẵn sàng reload sau 3 giây', customerReloadProbe.decision.ram.mode === 'records' && customerReloadProbe.reload.recordsReadyAt >= customerReloadProbe.reload.changedAt + 3000 && customerReloadProbe.reload.records.indexOf(customerIds[0]) >= 0, JSON.stringify({ mode: customerReloadProbe.decision.ram.mode, waitMs: customerReloadProbe.decision.ram.waitMs, changedAt: customerReloadProbe.reload.changedAt, recordsReadyAt: customerReloadProbe.reload.recordsReadyAt, records: customerReloadProbe.reload.records }));
+    reloadMatrixProbeAssert(report, 'Customer cột @ có mốc sẵn sàng reload sau 3 giây', customerReloadProbe.decision.ram.mode === 'records'
+      && customerReloadStateBeforeProbe.recordsReadyAt >= customerReloadStateBeforeProbe.changedAt + 3000
+      && customerReloadStateBeforeProbe.records.indexOf(customerIds[0]) >= 0, JSON.stringify({
+        mode: customerReloadProbe.decision.ram.mode,
+        waitMs: customerReloadProbe.waitMs,
+        changedAt: customerReloadStateBeforeProbe.changedAt,
+        recordsReadyAt: customerReloadStateBeforeProbe.recordsReadyAt,
+        recordsBeforeProbe: customerReloadStateBeforeProbe.records,
+        reloadAfterProbe: customerReloadProbe.reload
+      }));
 
     var batchBefore = reloadStateRead();
     var batchValues = [];
@@ -265,6 +275,7 @@ function reloadMatrixProbe() {
     SpreadsheetApp.flush();
     reloadMatrixProbeAssert(report, 'Customer hàng 1 phát schema + fullCore + vẽ toàn bộ view', schemaAfter.revision > schemaBefore.revision && schemaAfter.schema === true && schemaAfter.allCore === true && reloadMatrixProbeRenderedAll(schemaResult, expectedViews), JSON.stringify({ revision: schemaAfter.revision, schema: schemaAfter.schema, allCore: schemaAfter.allCore, rendered: schemaResult && schemaResult.rendered && schemaResult.rendered.length }));
     report.push('Schema map sau khi khôi phục: ' + Object.keys(schemaMap.map).length + ' mã.');
+    dirtyStateClear();
 
     var categoryCell = reloadMatrixProbeFindCategoryCell(book.getSheetByName('Category'));
     var categorySnapshot = reloadMatrixProbeSnapshotCell(categoryCell.cell);
@@ -278,6 +289,7 @@ function reloadMatrixProbe() {
     SpreadsheetApp.flush();
     resetSettingsCache();
     reloadMatrixProbeAssert(report, 'Category cột @ phát dirtyCategory + vẽ toàn bộ view', categoryAfter.revision > categoryBefore.revision && categoryAfter.category === true && reloadMatrixProbeRenderedAll(categoryResult, expectedViews), JSON.stringify({ revision: categoryAfter.revision, category: categoryAfter.category, rendered: categoryResult && categoryResult.rendered && categoryResult.rendered.length }));
+    dirtyStateClear();
 
     var configCell = reloadMatrixProbeFindConfigCell(book.getSheetByName('Config'));
     var configSnapshot = reloadMatrixProbeSnapshotCell(configCell.cell);
@@ -291,7 +303,7 @@ function reloadMatrixProbe() {
     reloadMatrixProbeRestoreCell(configCell.cell, configSnapshot);
     SpreadsheetApp.flush();
     resetSettingsCache();
-    reloadMatrixProbeAssert(report, 'Config cột @ phát dirtyConfig + fullCore + vẽ toàn bộ view', configAfter.revision > configBefore.revision && configAfter.config === true && configAfter.allCore === true && reloadMatrixProbeRenderedAll(configResult, expectedViews), JSON.stringify({ revision: configAfter.revision, config: configAfter.config, allCore: configAfter.allCore, rendered: configResult && configResult.rendered && configResult.rendered.length }));
+    reloadMatrixProbeAssert(report, 'Config cột @ phát dirtyConfig + mode config + vẽ toàn bộ view', configAfter.revision > configBefore.revision && configAfter.config === true && configAfter.allCore === false && reloadMatrixProbeRenderedAll(configResult, expectedViews), JSON.stringify({ revision: configAfter.revision, config: configAfter.config, allCore: configAfter.allCore, rendered: configResult && configResult.rendered && configResult.rendered.length }));
 
     var viewOrdinaryColumn = viewSheet.getLastColumn();
     var viewRow1Before = reloadStateRead();

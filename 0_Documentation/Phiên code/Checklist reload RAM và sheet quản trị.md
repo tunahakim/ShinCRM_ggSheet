@@ -194,7 +194,7 @@
 - [x] Đổi schema luôn fallback full core (test `reloadDecision.js`: schema có `ram.mode: 'fullCore'`; test `reloadGates.js`: signal `allCore`).
 - [x] Có API `getReloadState` dùng khi nhận event, lúc mở Sidebar và tại các điểm kiểm tra tự nhiên (test `loadService.js`, `selectionPoll.js`).
 - [x] Thiết kế và triển khai API một request `probeSelectionAndReload(input)`: trả context hiện tại, mã khách khi vị trí đổi, `ReloadState` và quyết định RAM; không bắt buộc chuỗi `probeSelectionCheap` → `probeSelectionFull` qua mạng (server `SelectionService.js`, test `selectionService.js`).
-- [ ] Nâng `probeSelectionAndReload` thành cổng quyết định + thực thi reload: khi `defer` chỉ trả `waitMs`/`readyAt`; khi đủ thời gian phải trả payload reload trong chính response, không để Sidebar gọi API reload thứ hai.
+- [x] Nâng `probeSelectionAndReload` thành cổng quyết định + thực thi reload: khi `defer` chỉ trả `waitMs`/`readyAt`; khi đủ thời gian trả payload reload trong chính response, không để Sidebar gọi API reload thứ hai (test `selectionService.js`, `selectionPoll.js`; GAS DEV `reloadPayloadProbe` đạt ở `@410`).
 - [x] GAS tự so `selectionContext` với `previousSelectionContext`; vị trí không đổi thì trả mã khách cũ và không đọc lại ô mã; vị trí đổi thì mới tra cột mã theo schema (test `selectionService.js`).
 - [x] Response selection/reload chạy im lặng và luôn kèm `ReloadState`; không dùng producer `CRM_RELOAD` làm đường bắt buộc (server `SelectionService.js`, client request `silent`).
 - [x] Có API render toàn bộ managed views và trả kết quả từng sheet (test `viewRenderer.js`).
@@ -239,7 +239,7 @@
 - [x] Có một request `probeSelectionAndReload` bên ngoài thay cho chuỗi RPC `probeSelectionCheap` → `probeSelectionFull` (client/server, test `selectionPoll.js`, `selectionService.js`).
 - [x] Khi selection không đổi, GAS trả context/mã khách cũ và không đọc lại ô mã khách (test `selectionService.js`).
 - [x] Khi selection đổi, GAS tự tra schema và đọc mã khách trong cùng request; Extension vẫn giữ đường live model cũ khi nó đang hoạt động (test `selectionService.js`, `extensionBridge.js`).
-- [ ] Response selection/reload luôn kèm `ReloadState`, `decision`, `payload`, `observedRevision`, `processedRevision` và trạng thái còn bẩn; Sidebar không tự quyết định scope và chỉ áp dụng payload (server `SelectionService.js`, test `selectionService.js`).
+- [x] Response selection/reload luôn kèm `ReloadState`, `decision`, `payload`, `observedRevision`, `processedRevision` và trạng thái còn bẩn; Sidebar không tự quyết định scope và chỉ áp dụng payload (server `SelectionService.js`, test `selectionService.js`, GAS DEV `reloadPayloadProbe` `@410`).
 - [x] Context Extension có `customerId` hợp lệ được áp dụng ngay cho màn hình chính trước các RPC kiểm tra dirty; RPC chạy nền không chặn nguồn-chọn cục bộ (client `sheetLink.html`, test `selectionPoll.js`).
 - [x] Fallback polling vị trí 2 giây rồi 6 giây gộp luôn kiểm tra reload, không tạo request kiểm tra thứ hai (test `selectionPoll.js`).
 - [x] Safety polling theo phút chạy im lặng, chỉ phục vụ RAM và không kích hoạt renderer view (client `selectionPoll.html`, test `selectionPoll.js`).
@@ -249,7 +249,7 @@
 - [x] Activity biến mất được remove (test `refresh.js`).
 - [x] Activity của Customer bị ảnh hưởng được tính lại danh sách (server trả trọn Activity của Customer, test `loadService.js`).
 - [x] Search index được cập nhật sau upsert/remove (đường `Store.upsertRecord`/`removeRecord`, test `refresh.js` và `ramStore.js`).
-- [ ] Màn hiện tại được vẽ lại sau reload sau khi payload đã áp xong (test `refresh.js`).
+- [x] Màn hiện tại được vẽ lại sau reload sau khi payload đã áp xong (test `refresh.js`, commit `fb5181b`).
 - [x] Full core dựng lại Schema, Category, Config và search index từ đầu (đường `refreshFullCore`, test bootstrap/load).
 - [x] Reload Category cập nhật danh mục SELECT đang dùng (test `refresh.js`).
 - [x] Config đổi làm client dùng cấu hình mới qua payload Config riêng, không giữ bản cũ (test `refresh.js`).
@@ -340,7 +340,7 @@
 - [x] Các probe GAS DEV cũ cho `getReloadState`, `reloadRecords`, `renderAllManagedViews` vẫn còn làm bằng chứng nền cho DirtyState/renderer; bằng chứng `inspectEditReload` không còn được coi là bằng chứng của thiết kế mới.
 - [x] GAS DEV cài trigger installable ở `@374`; `probeTriggerState` xác nhận `shinOnEdit: true`, `shinOnChange: true` và không làm mất các trigger FBM đang có.
 - [x] Chạy test GAS DEV khi không mở Sidebar và xác nhận view vẫn đổi sau ghi Customer/Activity: `viewProbeWriteRenderWithoutSidebar` đạt ở `@337`; view tạm nhận đúng mã Customer và ngày Activity sau từng lần `WriteGate`, rồi probe dọn sạch bản ghi và sheet tạm.
-- [x] Bổ sung và chạy probe GAS DEV `reloadMatrixProbe` ở deployment `@370`: fixture nối sau dữ liệu DEV hiện có (5 Customer + 5 Activity), mô phỏng onEdit ở Customer/Activity/Category/Config và sheet quản trị, kiểm signal/debounce/view; tất cả ca đạt, 3/3 view được vẽ sau các thay đổi hợp lệ. Probe tự dọn fixture và khôi phục ô/thuộc tính; hậu kiểm dirty state được kiểm tra riêng sau probe.
+- [x] Bổ sung và chạy probe GAS DEV `reloadMatrixProbe` ở deployment `@411`: fixture nối sau dữ liệu DEV hiện có (5 Customer + 5 Activity), mô phỏng onEdit ở Customer/Activity/Category/Config và sheet quản trị, kiểm signal/debounce/view; tất cả ca đạt, 3/3 view được vẽ sau các thay đổi hợp lệ. Probe kiểm tra mốc Customer trước khi request reload để không nhầm state đã được request kế tiếp tiêu thụ; ca Config xác nhận `dirtyConfig` dùng mode `config` riêng, không nâng full core khi không ảnh hưởng schema. Probe tự dọn fixture và khôi phục ô/thuộc tính.
 - [x] Hậu kiểm `probeDirtyState` đạt ở deployment `@372`: `dirtyViewSheets` rỗng, `dirtyRecords` rỗng, `dirtyConfig=false`, `dirtyAll=false`.
 - [x] `probeSelectionAndReload` đạt ở deployment `@373`: selection và ReloadState trả trong một request, không có signal mới thì decision `none`.
 - [x] Sửa độ trễ đổi khách khi chuyển sheet: `sheetLink.html` áp dụng `customerId` cục bộ trước RPC dirty; test hồi quy nằm trong `selectionPoll.js`, commit `add8fd7`, GAS DEV `probeSelectionAndReload` đạt ở `@378`.
@@ -435,15 +435,15 @@
 ### Pipeline client
 
 - [x] Mọi payload `records` chỉ được coi là hoàn tất sau khi toàn bộ Customer, Activity, bản ghi biến mất và chỉ mục tìm kiếm đã cập nhật (test `refresh.js`, commit `fb5181b`).
-- [ ] Payload `fullCore` chỉ được coi là hoàn tất sau `ingestCore` và `ingestActivityDone`; không vẽ màn hình trung gian.
+- [x] Payload `fullCore` chỉ được coi là hoàn tất sau `ingestCore` và `ingestActivityDone`; không vẽ màn hình trung gian (test `refresh.js`, `selectionPoll.js`).
 - [x] Payload `category` cập nhật toàn bộ `Store.categories` trước khi quyết định vẽ (test `refresh.js`, commit `fb5181b`).
 - [x] Payload `config` cập nhật toàn bộ `Store.config` trước khi quyết định vẽ (test `refresh.js`, commit `fb5181b`).
 - [x] Các hàm áp payload không gọi trực tiếp `renderScreen()` thiếu `man` và không tự chọn renderer (static audit, test `refresh.js`).
 - [x] Sau mỗi payload áp thành công, bộ điều phối `refreshDecideAndRender` chỉ chạy một lần (test `refresh.js`, commit `fb5181b`).
 - [x] Bộ điều phối đọc `ScreenState` và gọi `screenViewRender` cho view hoặc `screenFormRender` cho form (test `refresh.js`).
 - [x] Đang mở form không bị đưa về view; `formStack[].draft` vẫn còn nguyên sau reload (test `refresh.js`).
-- [ ] Mã khách đang xem bị xóa được dọn trước khi vẽ view, không làm renderer ném lỗi mã không tồn tại.
-- [ ] Payload không có thay đổi hoặc áp thất bại không gọi renderer và không làm mất dirty state.
+- [x] Mã khách đang xem bị xóa được dọn trước khi vẽ view, không làm renderer ném lỗi mã không tồn tại (test `refresh.js`).
+- [x] Payload không có thay đổi hoặc áp thất bại không gọi renderer và không làm mất dirty state (test `refresh.js`, `selectionPoll.js`).
 
 ### Config riêng
 
