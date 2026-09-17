@@ -510,3 +510,7 @@ Ghi chú Slice 9A: commit `a1b8e0c` gom lịch nghiệp vụ về GAS, giữ Ext
 - [x] Lõi GAS quyết định scope reload từ `ReloadState`, trigger/cửa ghi phát signal, API `probeSelectionAndReload` gộp selection và reload trong một request; commit `933f308`.
 - [x] Sidebar/Extension dùng wake debounce một giây, reload dữ liệu ba giây, fallback selection probe một request và safety polling thưa chỉ cho RAM; revision chỉ được ghi nhận sau khi áp dụng dữ liệu thành công; commit `ab464fe`.
 - [x] Checklist chi tiết và hợp đồng triển khai đã được cập nhật; các ca live trong Sheet DEV còn chờ chủ dự án nghiệm thu.
+
+### Cập nhật chuẩn form Sidebar ngày 17/09/2026
+
+- [x] Header các màn sửa/lưu dùng chung bố cục nhãn trái, X và tick cùng neo phải; icon dùng SVG nội tuyến, input/textarea/combo/menu dùng viền, đệm và nhãn theo chuẩn giao diện cũ; test offline `1606/1606`.

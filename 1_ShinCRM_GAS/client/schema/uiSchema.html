@@ -9,10 +9,10 @@
 
 var UI_SCHEMA = {};
 
-/** Hai mục header dùng chung cho ba màn form: hủy bên trái, lưu bên phải. */
+/** Hai mục header dùng chung cho ba màn form: cả hủy và lưu nằm trong cụm bên phải. */
 var UI_FORM_HEADER = [
-  { icon: 'close', tooltip: 'Hủy', action: 'cancelForm' },
-  { icon: 'check', tooltip: 'Lưu', action: 'saveForm', align: 'right' }
+  { icon: 'close', tooltip: 'Hủy', action: 'cancelForm', align: 'right', className: 'shin-form-cancel' },
+  { icon: 'check', tooltip: 'Lưu', action: 'saveForm', align: 'right', className: 'shin-form-save' }
 ];
 
 UI_SCHEMA.view = {

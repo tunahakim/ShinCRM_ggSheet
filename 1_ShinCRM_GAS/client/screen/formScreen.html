@@ -4,6 +4,39 @@
 /* Tiêu đề form dùng cùng kích thước/căn hàng với shell Đồng bộ; form chỉ chọn màu nhấn riêng. */
 .shin-form-title {
   color: var(--shin-primary);
+  font-size: 16px;
+}
+
+/* Hai action của form bám cùng mép phải như bản cũ: X trung tính, tick có nền xám nhạt. */
+.shin-shell-header .shin-form-cancel,
+.shin-shell-header .shin-form-save {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+}
+
+.shin-shell-header .shin-form-cancel {
+  color: var(--shin-border-strong);
+}
+
+.shin-shell-header .shin-form-cancel:hover {
+  color: var(--shin-text-soft);
+  background: var(--shin-bg-hover);
+}
+
+.shin-shell-header .shin-form-save {
+  background: var(--shin-bg-hover);
+  color: var(--shin-primary);
+}
+
+.shin-shell-header .shin-form-save:hover {
+  background: #d2e3fc;
+  color: #174ea6;
+}
+
+.shin-shell-header .shin-form-save .shin-glyph {
+  width: 18px;
+  height: 18px;
 }
 
 /* Nút lưu ở vùng footer: rộng hết dải, cao hơn nút thường vì đây là nút bấm nhiều nhất cả ngày. */
@@ -61,7 +94,7 @@ function screenFormTitle(title, themMoi) {
 }
 
 /**
- * Chèn tiêu đề vào vùng header, ngay trước mục căn phải đầu tiên — ra `[✕][tiêu đề]…[✓]`, đúng nếp của bản cũ.
+ * Chèn tiêu đề vào vùng header, ngay trước cụm mục căn phải — ra `[tiêu đề]…[X][✓]`, đúng bố cục form.
  *
  * Chèn thay vì khai thẳng trong `UI_SCHEMA` vì tiêu đề phụ thuộc bản ghi đang mở, mà `UI_SCHEMA` là bản khai tĩnh. Vắng mục căn phải thì nối vào cuối.
  */

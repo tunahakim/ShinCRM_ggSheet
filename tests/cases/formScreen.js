@@ -58,9 +58,9 @@ function chay(so) {
     () => hop.screenFormTitle({ add: 'Thêm' }, true), 'add');
 
   const hang = hop.screenFormHeader(hop.screenBuild(hop.UI_SCHEMA.customerForm, 'customerForm').header, 'Thêm Khách Hàng');
-  check(so, 'tiêu đề chèn trước mục căn phải đầu tiên: ✕ rồi tiêu đề rồi ✓, đúng nếp bản cũ',
-    [hang.length, hang[0].icon, hang[1].role, hang[1].text, hang[2].icon, hang[2].align],
-    [3, 'close', 'text', 'Thêm Khách Hàng', 'check', 'right']);
+  check(so, 'tiêu đề đứng bên trái, X và tick cùng nằm trong cụm căn phải',
+    [hang.length, hang[0].role, hang[0].text, hang[1].icon, hang[2].icon, hang[2].align],
+    [3, 'text', 'Thêm Khách Hàng', 'close', 'check', 'right']);
 
   section('formScreen — form sửa khách: bốn vùng và ô nhập đầu tiên');
 

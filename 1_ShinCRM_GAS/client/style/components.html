@@ -63,7 +63,7 @@
 /* Ô nhập không thuộc DATA_SCHEMA, dùng chung cho các màn hình có trạng thái riêng. */
 .shin-form-field { display: flex; flex-direction: column; gap: 0; margin-bottom: var(--shin-gap-2); }
 .shin-form-field > * + * { margin-top: var(--shin-gap-1); }
-.shin-form-label { min-width: 0; color: var(--shin-text-soft); font-size: calc(var(--shin-text-xs) + 1px); font-weight: 500; line-height: 1.2; }
+.shin-form-label { min-width: 0; color: var(--shin-text-soft); font-size: var(--shin-text-xs); font-weight: 500; line-height: 1.2; text-transform: uppercase; }
 
 /* Hàng bật/tắt dùng cho cấu hình và các màn hình trạng thái. */
 .shin-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: var(--shin-gap-2); margin: var(--shin-gap-2) 0; }
@@ -247,9 +247,10 @@
 .shin-label {
   flex: 1 1 auto;
   min-width: 0;
-  font-size: calc(var(--shin-text-xs) + 1px);
+  font-size: var(--shin-text-xs);
   font-weight: 500;
   color: var(--shin-text-soft);
+  text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -280,14 +281,16 @@
 .shin-input {
   display: block;
   width: 100%;
-  padding: var(--shin-gap-1) var(--shin-gap-2);
-  border: 1px solid var(--shin-border-strong);
+  padding: var(--shin-gap-2);
+  border: 1px solid var(--shin-border);
   border-radius: var(--shin-radius-sm);
   background: var(--shin-bg);
   color: var(--shin-text);
   font-family: inherit;
   font-size: var(--shin-text-md);
   line-height: var(--shin-line-height);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .shin-input:focus {
@@ -332,7 +335,7 @@
  */
 .shin-textarea {
   resize: vertical;
-  max-height: calc(var(--shin-textarea-lines) * var(--shin-line-height) * var(--shin-text-md) + 2 * var(--shin-gap-1) + 2px);
+  max-height: calc(var(--shin-textarea-lines) * var(--shin-line-height) * var(--shin-text-md) + 2 * var(--shin-gap-2) + 2px);
   overflow-y: auto;
 }
 
@@ -378,8 +381,8 @@
   justify-content: space-between;
   width: 100%;
   min-width: 0;
-  padding: var(--shin-gap-1) var(--shin-gap-2);
-  border: 1px solid var(--shin-border-strong);
+  padding: var(--shin-gap-2);
+  border: 1px solid var(--shin-border);
   border-radius: var(--shin-radius-sm);
   background: var(--shin-bg);
   color: var(--shin-text);
@@ -387,6 +390,8 @@
   line-height: var(--shin-line-height);
   text-align: left;
   cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 .shin-choice-trigger:focus {
   outline: none;

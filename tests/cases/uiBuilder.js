@@ -74,7 +74,7 @@ function chay(so) {
     title: { add: 'Thêm Khách Hàng', edit: 'Sửa Khách Hàng' },
     infoBar: false,
     header: [
-      { icon: 'close', tooltip: 'Hủy', action: 'cancelForm' },
+      { icon: 'close', tooltip: 'Hủy', action: 'cancelForm', align: 'right' },
       { icon: 'check', tooltip: 'Lưu', action: 'saveForm', align: 'right' }
     ],
     body: [
@@ -83,9 +83,9 @@ function chay(so) {
     footer: [{ button: 'LƯU DỮ LIỆU', action: 'saveForm', className: 'btn-save-wide' }]
   }, 'customerForm');
 
-  check(so, 'header thành hai nút glyph, giữ nguyên tooltip và align',
+  check(so, 'header thành hai nút glyph, giữ nguyên tooltip và cùng căn phải',
     form.header.map((n) => [n.role, n.icon, n.tooltip, n.action, n.align]),
-    [['icon', 'close', 'Hủy', 'cancelForm', 'left'], ['icon', 'check', 'Lưu', 'saveForm', 'right']]);
+    [['icon', 'close', 'Hủy', 'cancelForm', 'right'], ['icon', 'check', 'Lưu', 'saveForm', 'right']]);
 
   check(so, 'footer khai bằng khóa `button` thì thành nút chữ, không thành nút glyph',
     [form.footer[0].role, form.footer[0].label, form.footer[0].className],
