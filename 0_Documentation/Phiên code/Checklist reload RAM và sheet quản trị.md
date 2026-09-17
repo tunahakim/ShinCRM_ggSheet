@@ -424,6 +424,6 @@
 - [x] Test offline phủ sửa F sau khi A–E đã xử lý: F tạo revision mới và được trả ở lượt riêng sau debounce của F (`tests/cases/selectionService.js`).
 - [x] Test offline phủ F phát sinh trong lúc payload A–E đang được đọc: GAS không xóa F, response ghi `remainingRevision`, request kế tiếp nhận F (`tests/cases/selectionService.js`).
 - [x] Test offline phủ response lệch thứ tự: response cũ không ghi đè payload/revision mới (`tests/cases/selectionPoll.js`).
-- [ ] GAS DEV probe xác nhận `probeSelectionAndReload` trả payload khi state đã sẵn sàng và trả `defer` khi chưa đến `readyAt`.
+- [x] GAS DEV deployment `@387`: `probeSelectionAndReload --push` trả đúng `requestId`, selection, ReloadState, decision và payload contract ở trạng thái không dirty. Ca `defer`/payload dirty đã có bằng chứng offline; cần nghiệm thu trực tiếp trên Sheet DEV trước khi đóng toàn bộ mục.
 
 ---
