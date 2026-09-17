@@ -218,8 +218,13 @@ function reloadMatrixProbe() {
     reloadMatrixProbeWriteEvent(customer.sheet, customerStartRow, customerEdit.column, 'DEV reload customer edit');
     var after = reloadStateRead();
     reloadMatrixProbeAssert(report, 'Customer cột @ hợp lệ phát records + allViews', after.revision > before.revision && after.records.indexOf(customerIds[0]) >= 0, JSON.stringify({ revision: after.revision, records: after.records }));
+    // Ép mốc tương lai để phép thử defer không phụ thuộc độ trễ của lần chạy DEV.
+    PropertiesService.getDocumentProperties().setProperty(DIRTY_KEYS.recordsReadyAt, String(Date.now() + 3000));
     var customerReloadProbe = probeSelectionAndReload({ lastSeenRevision: before.revision, previousCustomerId: '' });
-    reloadMatrixProbeAssert(report, 'Customer cột @ có mốc sẵn sàng reload sau 3 giây', customerReloadProbe.decision.ram.mode === 'records' && customerReloadProbe.reload.recordsReadyAt >= customerReloadProbe.reload.changedAt + 3000 && customerReloadProbe.reload.records.indexOf(customerIds[0]) >= 0, JSON.stringify({ mode: customerReloadProbe.decision.ram.mode, waitMs: customerReloadProbe.decision.ram.waitMs, changedAt: customerReloadProbe.reload.changedAt, recordsReadyAt: customerReloadProbe.reload.recordsReadyAt, records: customerReloadProbe.reload.records }));
+    reloadMatrixProbeAssert(report, 'Customer cột @ chưa đến mốc sẵn sàng trả defer không payload', customerReloadProbe.decision.ram.mode === 'records' && customerReloadProbe.decision.ram.action === 'defer' && customerReloadProbe.payload === null && customerReloadProbe.reload.recordsReadyAt >= customerReloadProbe.reload.changedAt + 3000 && customerReloadProbe.reload.records.indexOf(customerIds[0]) >= 0, JSON.stringify({ action: customerReloadProbe.decision.ram.action, waitMs: customerReloadProbe.decision.ram.waitMs, payload: customerReloadProbe.payload, records: customerReloadProbe.reload.records }));
+    PropertiesService.getDocumentProperties().setProperty(DIRTY_KEYS.recordsReadyAt, String(Date.now() - 1));
+    var customerReadyProbe = probeSelectionAndReload({ lastSeenRevision: before.revision, previousCustomerId: '' });
+    reloadMatrixProbeAssert(report, 'Customer cột @ sau mốc sẵn sàng trả payload trong cùng response', customerReadyProbe.payload && customerReadyProbe.payload.mode === 'records' && customerReadyProbe.payload.customer.rows.length > 0 && customerReadyProbe.processedRevision === after.revision, JSON.stringify({ mode: customerReadyProbe.payload && customerReadyProbe.payload.mode, processedRevision: customerReadyProbe.processedRevision, observedRevision: customerReadyProbe.observedRevision }));
 
     var batchBefore = reloadStateRead();
     var batchValues = [];
