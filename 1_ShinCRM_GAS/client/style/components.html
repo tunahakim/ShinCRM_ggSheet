@@ -57,6 +57,19 @@
 .shin-loading::before { content: ''; width: 14px; height: 14px; border: 2px solid var(--shin-primary-soft); border-top-color: var(--shin-primary); border-radius: 50%; animation: shin-spin .8s linear infinite; }
 @keyframes shin-spin { to { transform: rotate(360deg); } }
 
+/* Primitive loading dùng chung cho ray toàn Sidebar và progress trong card Sync. Track quyết định nền/kích thước, fill quyết định chuyển động hoặc phần trăm. */
+.shin-loading-track { position: relative; overflow: hidden; height: 5px; margin-top: var(--shin-gap-1); border-radius: 3px; background: var(--shin-border); }
+.shin-loading-fill { height: 100%; border-radius: inherit; background: var(--shin-primary); transition: width 180ms ease; }
+.shin-loading-fill.is-indeterminate { position: absolute; top: 0; bottom: 0; width: 35%; animation: shin-loading-slide 1.1s ease-in-out infinite; }
+.shin-loading-fill.is-waiting { background: linear-gradient(90deg, var(--shin-primary-soft), var(--shin-primary), var(--shin-primary-soft)); background-size: 200% 100%; animation: shin-loading-wait 1s linear infinite; }
+@keyframes shin-loading-slide { 0% { left: -35%; } 100% { left: 100%; } }
+@keyframes shin-loading-wait { 0% { background-position: 0 0; } 100% { background-position: 200% 0; } }
+
+/* Ray dưới header luôn giữ chỗ để body không nhảy, nhưng lúc rảnh không vẽ gì cả. */
+.shin-loading-global { height: var(--shin-progress-height); margin-top: 0; border-radius: 0; visibility: hidden; background: transparent; }
+.shin-loading-global.is-running { visibility: visible; background: var(--shin-primary-soft); }
+.shin-loading-global .shin-loading-fill { width: 40%; }
+
 /* `align: "right"` đẩy chính nó và mọi thứ sau nó sang phải, ở bất cứ vùng nào chứ không riêng header. */
 .shin-align-right { margin-left: auto; }
 

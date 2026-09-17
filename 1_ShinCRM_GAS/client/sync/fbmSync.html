@@ -316,7 +316,7 @@ function fbmSyncApplyProgress(box, status, count) {
   if (!box || !box.querySelector) { return false; }
   fbmSyncSetTargetState('fbm-sync-progress-label', { text: data.label });
   fbmSyncSetTargetState('fbm-sync-progress-track', data.determinate ? { ariaValueNow: data.percent } : { removeAriaValueNow: true });
-  fbmSyncSetTargetState('fbm-sync-progress-fill', { className: 'shin-sync-progress-fill' + (!data.determinate && data.active ? ' is-indeterminate' : '') + (data.waitingForResponse ? ' is-waiting' : ''), style: { width: data.determinate ? data.percent + '%' : '35%' } });
+  fbmSyncSetTargetState('fbm-sync-progress-fill', { className: 'shin-loading-fill' + (!data.determinate && data.active ? ' is-indeterminate' : '') + (data.waitingForResponse ? ' is-waiting' : ''), style: { width: data.determinate ? data.percent + '%' : '35%' } });
   return !!document.getElementById('fbm-sync-progress-fill');
 }
 function fbmSyncPaintProgress(panel, status, count) {

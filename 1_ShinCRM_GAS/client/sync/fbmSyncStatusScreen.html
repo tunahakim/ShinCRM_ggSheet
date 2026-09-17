@@ -13,7 +13,7 @@ function fbmSyncProgressBlocks(status, count) {
   var data = fbmSyncProgressData(status || {}, count || {});
   return Box({ className: 'shin-sync-progress', elements: [
     Text({ id: 'fbm-sync-progress-label', className: 'shin-sync-progress-label', text: data.label }),
-    Box({ id: 'fbm-sync-progress-track', className: 'shin-sync-progress-track', ariaValueNow: data.determinate ? String(data.percent) : null, elements: [Box({ id: 'fbm-sync-progress-fill', className: 'shin-sync-progress-fill' + (!data.determinate && data.active ? ' is-indeterminate' : '') + (data.waitingForResponse ? ' is-waiting' : ''), spatialConfig: { width: data.determinate ? data.percent + '%' : data.active ? '35%' : '0%' }, elements: [] })] })
+    Box({ id: 'fbm-sync-progress-track', className: 'shin-loading-track', ariaValueNow: data.determinate ? String(data.percent) : null, elements: [Box({ id: 'fbm-sync-progress-fill', className: 'shin-loading-fill' + (!data.determinate && data.active ? ' is-indeterminate' : '') + (data.waitingForResponse ? ' is-waiting' : ''), spatialConfig: { width: data.determinate ? data.percent + '%' : data.active ? '35%' : '0%' }, elements: [] })] })
   ] });
 }
 function fbmSyncStatusBlocks(status, count) {

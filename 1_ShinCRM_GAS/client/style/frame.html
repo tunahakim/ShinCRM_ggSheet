@@ -101,30 +101,9 @@ html, body {
 /* Thuộc tính `align: "right"` của Block dịch ra lớp này: nó đẩy chính nó và mọi thứ sau nó sang phải. */
 .shin-shell-header .shin-align-right { margin-left: auto; }
 
-/* Vùng 2 — Dải tiến trình. Luôn giữ 3px để body không nhảy; lúc rảnh ẩn hoàn toàn bằng visibility nên không lộ nền/viền. */
+/* Vùng 2 — Dải tiến trình. Primitive loading ở components.html giữ hình thức; frame chỉ giữ vị trí và chiều cao ổn định. */
 #sidebar-progress {
   flex: 0 0 var(--shin-progress-height);
-  position: relative;
-  overflow: hidden;
-  visibility: hidden;
-  background: transparent;
-}
-
-#sidebar-progress.is-running { visibility: visible; background: var(--shin-primary-soft); }
-
-#sidebar-progress.is-running::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 40%;
-  background: var(--shin-primary);
-  animation: shin-progress-slide 1.1s ease-in-out infinite;
-}
-
-@keyframes shin-progress-slide {
-  0%   { left: -40%; }
-  100% { left: 100%; }
 }
 
 /* Hộp tìm khách — món đồ cố định thứ sáu, không phải một trong năm vùng nên nó không có `flex` co giãn, chỉ cao theo nội dung. */

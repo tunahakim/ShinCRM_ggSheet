@@ -4,12 +4,6 @@
 .shin-sync-operation, .shin-sync-count, .shin-sync-current, .shin-sync-message { margin-top:3px; color:var(--shin-text-soft); font-size:var(--shin-text-sm); overflow-wrap:anywhere; }
 .shin-sync-progress { margin-top:var(--shin-gap-2); }
 .shin-sync-progress-label { color:var(--shin-text-soft); font-size:var(--shin-text-sm); }
-.shin-sync-progress-track { position:relative; height:5px; margin-top:4px; overflow:hidden; border-radius:3px; background:var(--shin-border); }
-.shin-sync-progress-fill { height:100%; border-radius:inherit; background:var(--shin-primary); transition:width 180ms ease; }
-.shin-sync-progress-fill.is-indeterminate { position:absolute; animation:shin-sync-progress-slide 1.1s ease-in-out infinite; }
-.shin-sync-progress-fill.is-waiting { background:linear-gradient(90deg,var(--shin-primary-soft),var(--shin-primary),var(--shin-primary-soft)); background-size:200% 100%; animation:shin-sync-progress-wait 1s linear infinite; }
-@keyframes shin-sync-progress-slide { 0% { left:-35%; } 100% { left:100%; } }
-@keyframes shin-sync-progress-wait { 0% { background-position:0 0; } 100% { background-position:200% 0; } }
 .shin-sync-summary-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--shin-gap-2); }
 .shin-sync-summary-item { padding:var(--shin-gap-2); border:1px solid var(--shin-border-faint); border-radius:var(--shin-radius-sm); background:var(--shin-bg); }
 .shin-sync-summary-value { margin-top:2px; color:var(--shin-text); font-weight:700; }

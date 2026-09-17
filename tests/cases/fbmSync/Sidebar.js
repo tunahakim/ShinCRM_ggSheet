@@ -163,7 +163,7 @@ async function chay(so) {
   check(so, 'Chạy đồng bộ dựng lại được sau loading mà không dùng node cũ', [content.getAttribute('data-fbm-sync-screen'), content.textContent.indexOf('Chọn loại đồng bộ') >= 0], ['run', true]);
   check(so, 'Run render không hiện pipeline khi chưa chạy', render(hop, content, hop.fbmSyncRenderRun, idle).querySelector('.shin-sync-pipeline'), null);
   const idleProgress = hop.fbmSyncProgressBlocks(idle, {}).elements[1].elements[0];
-  check(so, 'Progress idle rỗng hoàn toàn, không tô fill giả', [hop.fbmSyncProgressData(idle, {}).active, idleProgress.spatialConfig.width, idleProgress.className], [false, '0%', 'shin-sync-progress-fill']);
+  check(so, 'Progress idle rỗng hoàn toàn, không tô fill giả', [hop.fbmSyncProgressData(idle, {}).active, idleProgress.spatialConfig.width, idleProgress.className], [false, '0%', 'shin-loading-fill']);
   const appendRun = hop.fbmSyncAppendBox;
   let runBlocks;
   hop.fbmSyncAppendBox = (_panel, _className, _id, elements) => { runBlocks = elements; return content; };
@@ -306,7 +306,7 @@ async function chay(so) {
   check(so, 'lượt mới vá lại cả pipeline cũ đã hoàn tất, không để trạng thái kiểm tra đi với sáu dấu hoàn tất', [nextRunPatched, content.querySelector('.shin-sync-pipeline') === previousPipeline, content.querySelector('.shin-sync-pipeline-title').textContent, nextMarkers], [true, true, 'Pipeline đang chạy', ['●', '○', '○', '○', '○', '○']]);
   render(hop, content, hop.fbmSyncRenderRun, Object.assign({}, nextRunChecking, { counts: { total: 10, completed: 2 } }));
   const progressPatched = hop.fbmSyncPatchLiveStatus(content, Object.assign({}, nextRunChecking, { counts: { total: 10, completed: 7 } }), 'run');
-  check(so, 'vá trạng thái đang chạy cũng cập nhật thanh tiến độ, không giữ số đếm của snapshot cũ', [progressPatched, content.querySelector('.shin-sync-progress-label').textContent, content.querySelector('.shin-sync-progress-track').getAttribute('aria-valuenow'), content.querySelector('.shin-sync-progress-fill').style.width], [true, 'Tiến trình: 7/10 (70%)', '70', '70%']);
+  check(so, 'vá trạng thái đang chạy cũng cập nhật thanh tiến độ, không giữ số đếm của snapshot cũ', [progressPatched, content.querySelector('.shin-sync-progress-label').textContent, content.querySelector('#fbm-sync-progress-track').getAttribute('aria-valuenow'), content.querySelector('#fbm-sync-progress-fill').style.width], [true, 'Tiến trình: 7/10 (70%)', '70', '70%']);
 
   hop.FBM_SYNC_CLIENT.resultsTab = 'summary';
   const conflictStatus = { phase: 'conflict', counts: { conflict: 1 }, metadata: { conflictCount: 1, conflicts: [{ entity: 'customer', id: 'CUS-1', fbmId: 'ALT00010', fields: [{ field: 'phone', left: '0901', right: '0902' }] }] } };
