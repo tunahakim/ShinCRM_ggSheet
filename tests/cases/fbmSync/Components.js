@@ -197,8 +197,8 @@ function chay(so) {
     [frame.indexOf('.shin-scroll-region {') >= 0 && frame.indexOf('overflow-y: auto;') >= 0 && frame.indexOf('scrollbar-gutter: stable both-edges;') >= 0,
       sidebar.indexOf('id="sidebar-body" class="shin-scroll-region"') >= 0,
       sidebar.indexOf('id="sidebar-body" class="shin-scroll-region"') >= 0,
-      frame.indexOf('#sidebar-body {') >= 0 && frame.indexOf('padding: var(--shin-gap-2) 0 var(--shin-gap-4);') >= 0,
-      styles.indexOf('.shin-section { display: flex; flex-direction: column; gap: 0; min-width: 0; padding: var(--shin-gap-1) 0 var(--shin-gap-4); }') >= 0],
+      frame.indexOf('#sidebar-body {') >= 0 && frame.indexOf('padding: 0 0 var(--shin-gap-4);') >= 0,
+      styles.indexOf('.shin-section { display: flex; flex-direction: column; gap: 0; min-width: 0; padding: 0 0 var(--shin-gap-4); }') >= 0],
     [true, true, true, true, true]);
   check(so, 'Sync dùng Notice lõi thay vì tự lặp bảng ánh xạ lớp thông báo',
     [common.indexOf('function Notice(') >= 0, all.indexOf('noticeClasses') >= 0, all.indexOf('noticeClass =') >= 0],
