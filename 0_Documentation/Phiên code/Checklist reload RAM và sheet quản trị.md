@@ -217,7 +217,7 @@
 
 - [x] Sidebar giữ `previousSelectionContext`, `previousCustomerId`, `lastSeenRevision`, `localDraft` và các timer trong state của chính trang đó (client `sheetLink.html`).
 - [x] Extension chỉ gửi context selection và hint `position`/`keydown`; bỏ hoàn toàn suy đoán `isEditing`, đọc thanh công thức và đường `true -> false` (Extension `sheet_scout.js`, test `extensionBridge.js`).
-- [x] Sau một giây yên lặng kể từ hint cuối, Sidebar gọi một request kiểm tra im lặng; không bật progress bar cho request không reload (client `sheetLink.html`, test `selectionPoll.js`).
+- [x] Sau một giây yên lặng kể từ hint cuối, Sidebar gọi một request kiểm tra; hợp đồng bàn giao là im lặng và harness vẫn kiểm tra chế độ đó, còn runtime hiện tạm bật progress để nghiệm thu trực quan (client `sheetLink.html`, test `selectionPoll.js`).
 - [x] Sidebar không tự đọc hàng 1/hàng 3, không tự phân loại cột `@`, không tự chọn API reload (GAS `SelectionService`/`ReloadDecision`, test `selectionService.js`, `triggers.js`).
 - [x] Request đang bay có guard, hint mới được giữ lại để xử lý sau và không tạo Promise chồng (test `selectionPoll.js`).
 - [x] Lỗi wake request không làm Sidebar treo; lần hint/safety poll kế tiếp vẫn có thể chạy (client `sheetLink.html`/`selectionPoll.html`, test `selectionPoll.js`).
@@ -426,5 +426,8 @@
 - [x] Test offline phủ F phát sinh trong lúc payload A–E đang được đọc: GAS không xóa F, response ghi `remainingRevision`, request kế tiếp nhận F; ca cùng một mã bị sửa lại trong lúc đọc cũng được giữ (`tests/cases/selectionService.js`).
 - [x] Test offline phủ response lệch thứ tự: response cũ không ghi đè payload/revision mới (`tests/cases/selectionPoll.js`).
 - [x] GAS DEV deployment `@397`: `reloadPayloadProbe --push` trả `defer` không payload rồi trả payload records trong chính request sau `readyAt`; probe không ghi dữ liệu khách và khôi phục DocumentProperties. `probeSelectionAndReload --push` cũng trả đúng contract `requestId`/selection/ReloadState/decision ở trạng thái sạch.
+- [x] Khi payload reload thực sự được áp dụng, Sidebar bật thanh tiến trình trong lúc nạp; request thăm dò/defer vẫn im lặng. Thanh giữ tối thiểu 120 ms để lượt nạp quá nhanh vẫn quan sát được (`client/ui/progress.html`, `client/link/sheetLink.html`; `node tests/run.js` đạt `1606/1606`).
+- [x] Tạm bật `SHEET_LINK_SHOW_PROBE_PROGRESS=true` trong giai đoạn nghiệm thu trực quan để mọi request `probeSelectionAndReload` hiện thanh tiến trình.
+- [ ] Trước nghiệm thu cuối và bàn giao, đổi `SHEET_LINK_SHOW_PROBE_PROGRESS=false`; xác nhận request thăm dò/defer im lặng và chỉ lượt reload thật mới hiện thanh tiến trình.
 
 ---

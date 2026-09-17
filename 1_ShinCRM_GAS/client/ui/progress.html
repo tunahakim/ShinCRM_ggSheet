@@ -13,6 +13,7 @@
 /** Số lời gọi máy chủ đang chờ. */
 var progressPending = 0;
 var SIDEBAR_BUSY = { next: 0, operations: [] };
+var SIDEBAR_BUSY_PROGRESS_MIN_MS = 120;
 
 /** Bật dải nếu đang có việc, tắt nếu không. Đọc lại thẻ mỗi lần thay vì giữ tham chiếu, vì tệp này nạp trước khi thân trang có thẻ. */
 function progressPaint() {
@@ -74,7 +75,10 @@ function sidebarBusyPaint() {
 /** Một cửa chung cho thông báo và khóa: bỏ message thì không có dải chữ, `block: false` thì không có overlay. */
 function sidebarBusyBegin(message, options) {
   var opts = options || {};
-  var operation = { id: ++SIDEBAR_BUSY.next, message: message === null || message === undefined ? '' : String(message), block: opts.block !== false, done: false };
+  var showProgress = opts.progress === true && typeof progressBegin === 'function';
+  var progressStartedAt = showProgress ? Date.now() : 0;
+  var operation = { id: ++SIDEBAR_BUSY.next, message: message === null || message === undefined ? '' : String(message), block: opts.block !== false, done: false, progressDone: !showProgress };
+  if (showProgress) { progressBegin(); }
   SIDEBAR_BUSY.operations.push(operation);
   if (document.activeElement && document.activeElement.blur) { document.activeElement.blur(); }
   sidebarBusyPaint();
@@ -84,6 +88,16 @@ function sidebarBusyBegin(message, options) {
     operation.done = true;
     SIDEBAR_BUSY.operations = SIDEBAR_BUSY.operations.filter(function (item) { return item.id !== operation.id; });
     sidebarBusyPaint();
+    if (showProgress && !operation.progressDone) {
+      var closeProgress = function () {
+        if (operation.progressDone) { return; }
+        operation.progressDone = true;
+        progressEnd();
+      };
+      var remaining = Math.max(0, SIDEBAR_BUSY_PROGRESS_MIN_MS - (Date.now() - progressStartedAt));
+      if (remaining && typeof setTimeout === 'function') { setTimeout(closeProgress, remaining); }
+      else { closeProgress(); }
+    }
   };
 }
 

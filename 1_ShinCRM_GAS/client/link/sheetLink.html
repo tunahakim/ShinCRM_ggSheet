@@ -39,6 +39,8 @@ var SHEET_LINK_SELECTION_WAKE_QUEUED = false;
 var SHEET_LINK_CONTEXT_GENERATION = 0;
 var SHEET_LINK_LAST_SEEN_REVISION = 0;
 var SHEET_LINK_PING_TIMER = null;
+// Tạm bật trong giai đoạn nghiệm thu để nhìn thấy mọi nhịp hỏi GAS; chuyển về false trước khi bàn giao.
+var SHEET_LINK_SHOW_PROBE_PROGRESS = true;
 var sheetLinkInstalled = false;
 
 var SHEET_LINK_ORIGIN = 'https://docs.google.com';
@@ -321,7 +323,7 @@ function sheetLinkApplyDecisionResult(result, options) {
   }
   if (result.payload && typeof refreshReloadPayload === 'function') {
     var payloadWork = function () { return refreshReloadPayload(result.payload); };
-    var payloadRun = typeof sidebarBusyRun === 'function' ? sidebarBusyRun('Đang đồng bộ dữ liệu vừa thay đổi…', payloadWork) : payloadWork();
+    var payloadRun = typeof sidebarBusyRun === 'function' ? sidebarBusyRun('Đang đồng bộ dữ liệu vừa thay đổi…', payloadWork, { progress: true }) : payloadWork();
     var payloadDone = function (value) {
       if (value && stateRevision) {
         SHEET_LINK_LAST_SEEN_REVISION = Math.max(SHEET_LINK_LAST_SEEN_REVISION, Number(result.processedRevision || stateRevision));
@@ -344,7 +346,7 @@ function sheetLinkApplyDecisionResult(result, options) {
     return { deferred: true, waitMs: waitMs, reload: state, decision: decision };
   }
   var refresh = function () { return sheetLinkApplyDirtyData(state, decision); };
-  var work = typeof sidebarBusyRun === 'function' ? sidebarBusyRun('Đang đồng bộ dữ liệu vừa thay đổi…', refresh) : refresh();
+  var work = typeof sidebarBusyRun === 'function' ? sidebarBusyRun('Đang đồng bộ dữ liệu vừa thay đổi…', refresh, { progress: true }) : refresh();
   if (!work || typeof work.then !== 'function') {
     if (sheetLinkReloadWorkSucceeded(work) && state && state.revision) {
       SHEET_LINK_LAST_SEEN_REVISION = Math.max(SHEET_LINK_LAST_SEEN_REVISION, sheetLinkWorkRevision(work, state));
@@ -379,7 +381,7 @@ function sheetLinkProbeSelectionAndReload(reason, options) {
     reason: reason || 'wake',
     forceImmediate: opts.forceImmediate === true
   };
-  var request = callServer('probeSelectionAndReload', [input], { silent: true });
+  var request = callServer('probeSelectionAndReload', [input], { silent: SHEET_LINK_SHOW_PROBE_PROGRESS !== true });
   var settled = request.then(function (result) {
     var extensionOwnsContext = sheetLinkExtensionAlive() && !!SHEET_LINK_LAST_CONTEXT;
     var contextIsCurrent = contextGeneration === SHEET_LINK_CONTEXT_GENERATION;

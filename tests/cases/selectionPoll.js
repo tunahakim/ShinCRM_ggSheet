@@ -65,6 +65,8 @@ function dungHopPoll() {
     return syncValue({ ok: true, spreadsheetId: 'sheet-1', gid: '1', sheetName: 'Customer', row: 4, col: 1, rowEnd: 4, colEnd: 1, customerId: '', reload: { revision: 0 } });
   };
   napClient(hop, 'client/ram/refresh.html', 'client/link/sheetLink.html', 'client/link/selectionPoll.html');
+  // Các phép kiểm request giữ hợp đồng bàn giao im lặng; bản chạy DEV trực quan bật cờ này ở runtime.
+  hop.SHEET_LINK_SHOW_PROBE_PROGRESS = false;
   return hop;
 }
 
