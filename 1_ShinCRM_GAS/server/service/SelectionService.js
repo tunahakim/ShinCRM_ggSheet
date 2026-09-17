@@ -168,8 +168,13 @@ function probeSelectionAndReload(input) {
         if (reloadResult && reloadResult.ok === true) { reloadResult.reloadMode = 'fullCore'; }
       }
       payload = selectionPayloadFromReload(reloadResult);
-      processedRevision = reloadResult && reloadResult.processedRevision !== undefined ? Number(reloadResult.processedRevision || 0) : 0;
       revisionMatched = reloadResult && reloadResult.revisionMatched !== undefined ? reloadResult.revisionMatched !== false : true;
+      processedRevision = reloadResult && reloadResult.processedRevision !== undefined ? Number(reloadResult.processedRevision || 0) : 0;
+      if (revisionMatched === false && state && state.revision) {
+        // The loader may report the newest observed state for diagnostics, but
+        // this response only processed the revision captured at request start.
+        processedRevision = Number(state.revision);
+      }
     }
     var latest = reloadResult && reloadResult.reload ? reloadResult.reload : reloadStateRead();
     return {

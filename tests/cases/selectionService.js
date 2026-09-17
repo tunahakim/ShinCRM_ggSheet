@@ -156,6 +156,7 @@ function chay(so) {
   ghiO(nen, 'Customer', 21, '@CUS_MA_KH', 'KH-NEW');
   ghiO(nen, 'Customer', 21, '@CUS_TEN_CTY', 'KH-NEW');
   hop.dirtyStateMarkRecords(['KH-F']);
+  const duringRevision = hop.reloadStateRead().revision;
   const readRows = hop.entityReadRowsAt;
   let injected = false;
   hop.entityReadRowsAt = function (context, rows) {
@@ -165,8 +166,8 @@ function chay(so) {
   const duringRead = hop.probeSelectionAndReload({ previousSelectionContext: burstReady.selection, previousCustomerId: burstReady.customerId });
   hop.entityReadRowsAt = readRows;
   check(so, 'R11 signal F phát sinh trong lúc đọc không bị mất',
-    [duringRead.revisionMatched, duringRead.reload.records, duringRead.remainingRevision > 0],
-    [false, ['KH-NEW'], true]);
+    [duringRead.revisionMatched, duringRead.processedRevision, duringRead.reload.records, duringRead.remainingRevision > 0],
+    [false, duringRevision, ['KH-NEW'], true]);
   const afterDuringRead = hop.probeSelectionAndReload({ previousSelectionContext: duringRead.selection, previousCustomerId: duringRead.customerId });
   check(so, 'R11 request kế tiếp nhận payload của signal mới',
     [afterDuringRead.payload.mode, afterDuringRead.payload.customer.rows.map((row) => row[0]), afterDuringRead.reload.records],
