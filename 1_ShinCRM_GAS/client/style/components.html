@@ -21,11 +21,11 @@
 .shin-single-action-row { justify-content: center; }
 .shin-single-action-row > * { flex: 0 1 auto; min-width: min(220px, 100%); }
 .shin-box.shin-stack,
-.shin-box.shin-action-stack { display: flex; flex-direction: column; align-self: stretch; gap: 0; width: 100%; min-width: 0; }
+.shin-box.shin-action-stack { display: flex; flex-direction: column; align-self: stretch; gap: var(--shin-gap-2); width: 100%; min-width: 0; }
 .shin-box.shin-stack { align-items: stretch; }
 .shin-box.shin-action-stack { align-items: center; }
 .shin-stack > * + *,
-.shin-action-stack > * + * { margin-top: var(--shin-gap-2); }
+.shin-action-stack > * + * { margin-top: 0; }
 .shin-action-stack > * { width: min(100%, 220px); }
 .shin-inline-field-row { align-items: center; }
 .shin-inline-field-row > .shin-form-label { flex: 1 1 auto; min-width: 0; }
