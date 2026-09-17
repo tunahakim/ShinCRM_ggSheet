@@ -42,6 +42,14 @@ function chay(so) {
     [category.kind, category.ram.mode, category.signal.category, category.signal.allViews, category.views.action, category.views.immediate],
     ['category', 'category', true, true, 'defer', false]);
 
+  hop.dirtyStateClear();
+  hop.dirtyStateMarkCategory();
+  hop.dirtyStateMarkRecords(['KH1']);
+  const categoryAndRecords = hop.reloadDecisionForState({ reloadState: hop.reloadStateRead() });
+  check(so, 'Category và records cùng revision được gom vào full core',
+    [categoryAndRecords.kind, categoryAndRecords.ram.mode, categoryAndRecords.signal],
+    ['state-full-core', 'fullCore', { records: [], category: false, config: false, schema: false, allCore: false, allViews: false, viewSheets: [] }]);
+
   const config = hop.reloadDecisionForChange({ entity: 'config', surface: 'config' });
   check(so, 'Config dùng full core và đánh dấu toàn bộ view',
     [config.kind, config.ram.mode, config.signal.config, config.signal.allViews, config.views.action],

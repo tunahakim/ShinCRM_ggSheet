@@ -420,6 +420,7 @@
 - [x] Dirty chỉ xóa sau khi GAS đã đọc payload thành công và revision khớp; signal phát sinh trong lúc đọc vẫn còn trong state mới, còn `processedRevision` của response lệch revision chỉ nhận revision thực sự đã đọc (guard revision trong `LoadService.js`/`SelectionService.js`, test `loadService.js`/`selectionService.js`).
 - [x] Sidebar chỉ áp dụng payload có revision không thấp hơn revision đã nạp; response `defer` hoặc response cũ không được làm lùi timer/context/Store (test `selectionPoll.js`).
 - [x] Sidebar chỉ giữ một timer `readyAt` và một wake đang chờ; nhiều response `defer` không tạo nhiều lượt reload hoặc timer chồng (`sheetLink.html`, test `selectionPoll.js`).
+- [x] Category và records cùng dirty được GAS chọn full core để không đánh dấu revision hoàn tất khi mới nạp một scope (`ReloadDecision.js`, test `reloadDecision.js`).
 - [x] Test offline phủ năm lần sửa A–E cách nhau một giây: các response đầu không có payload, request sau `readyAt` trả một payload chứa toàn bộ A–E (`tests/cases/selectionService.js`).
 - [x] Test offline phủ sửa F sau khi A–E đã xử lý: F tạo revision mới và được trả ở lượt riêng sau debounce của F (`tests/cases/selectionService.js`).
 - [x] Test offline phủ F phát sinh trong lúc payload A–E đang được đọc: GAS không xóa F, response ghi `remainingRevision`, request kế tiếp nhận F (`tests/cases/selectionService.js`).

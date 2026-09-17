@@ -196,6 +196,19 @@ function reloadDecisionForState(input) {
     return decision;
   }
 
+  var ids = reloadDecisionIds(state.records);
+
+  // Category and record signals share one revision. A category-only response
+  // would clear one scope while making the client mark the whole revision as
+  // seen, stranding the records. Use the coherent full-core payload instead.
+  if (state.category && ids.length) {
+    decision.kind = 'state-full-core';
+    reloadDecisionWithRam(decision, 'fullCore', [], common, 'ReloadState co Category va ma ban ghi cung revision.');
+    decision.notifySidebar = true;
+    decision.reason = 'ReloadState co Category va records cung revision.';
+    return decision;
+  }
+
   if (state.category) {
     decision.kind = 'state-category';
     reloadDecisionWithRam(decision, 'category', [], common, 'ReloadState yêu cầu nạp Category.');
@@ -204,7 +217,6 @@ function reloadDecisionForState(input) {
     return decision;
   }
 
-  var ids = reloadDecisionIds(state.records);
   if (ids.length) {
     decision.kind = 'state-records';
     reloadDecisionWithRam(decision, 'records', ids, common, 'ReloadState có mã Customer/Activity cần nạp.');
