@@ -115,6 +115,25 @@ async function chay(so) {
   check(so, 'bấm lại nút menu đang mở thì đóng và dọn mục con', [lop.hidden, lop.children.length, nutMenu.getAttribute('aria-expanded')], [true, 0, 'false']);
   check(so, 'menuInstall chỉ gắn một tai nghe Escape', [hop.menuInstall(), hop.menuInstall()], [true, false]);
 
+  const scrollAnchor = dom.document.createElement('button');
+  scrollAnchor.rect = { left: 20, top: 200, bottom: 220, right: 120 };
+  bodyRegion.appendChild(scrollAnchor);
+  const scrollPopup = dom.document.createElement('div');
+  scrollPopup.className = 'shin-popup-list';
+  scrollPopup.rect = { left: 20, top: 224, bottom: 304, right: 120 };
+  scrollPopup.offsetHeight = 80;
+  scrollPopup.offsetWidth = 100;
+  scrollPopup.hidden = true;
+  bodyRegion.appendChild(scrollPopup);
+  hop.PopupList.show(scrollPopup, scrollAnchor, { region: bodyRegion, minHeight: 0, maxHeight: 200 });
+  const popupTopBeforeScroll = scrollPopup.style.top;
+  scrollAnchor.rect = { left: 20, top: 300, bottom: 320, right: 120 };
+  dom.document.listeners.scroll({ target: bodyRegion });
+  check(so, 'PopupList tự neo lại theo vùng body khi sidebar cuộn', [popupTopBeforeScroll, scrollPopup.style.top, scrollPopup.hidden], ['224px', '324px', false]);
+  scrollAnchor.rect = { left: 20, top: 900, bottom: 920, right: 120 };
+  dom.document.listeners.scroll({ target: bodyRegion });
+  check(so, 'PopupList tự đóng khi trigger rời hẳn vùng cuộn', scrollPopup.hidden, true);
+
   const holder = dom.document.createElement('div');
   const khoi = dom.document.createElement('div');
   khoi.setAttribute('data-collapse', '3');

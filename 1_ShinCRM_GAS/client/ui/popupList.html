@@ -60,6 +60,7 @@ var PopupList = (function () {
   var DEFAULT_GAP = 4;
   var DEFAULT_MIN_HEIGHT = 96;
   var DEFAULT_MAX_HEIGHT = 220;
+  var refreshQueued = false;
 
   function viewport() {
     return {
@@ -78,26 +79,30 @@ var PopupList = (function () {
     return fallback || viewport();
   }
 
+  function regionElement(options) {
+    if (options && options.region === 'viewport') { return null; }
+    if (options && options.region && typeof options.region.getBoundingClientRect === 'function') { return options.region; }
+    return typeof document !== 'undefined' && document.getElementById ? document.getElementById('sidebar-body') : null;
+  }
+
+  function anchorOutsideRegion(options, anchorRect) {
+    var element = regionElement(options);
+    if (!element || !anchorRect) { return false; }
+    var region = rectOf(element, viewport());
+    return Number(anchorRect.right) <= Number(region.left)
+      || Number(anchorRect.left) >= Number(region.right)
+      || Number(anchorRect.bottom) <= Number(region.top)
+      || Number(anchorRect.top) >= Number(region.bottom);
+  }
+
   function popupRegion(options, anchorRect) {
-    var region = null;
-    if (options && options.region && options.region !== 'viewport' && typeof options.region.getBoundingClientRect === 'function') {
-      region = rectOf(options.region, viewport());
-      // A region is a clipping boundary for controls inside it. Header menus
-      // are outside the body, so using the body top would detach the popup
-      // from its trigger. Fall back to the viewport for such anchors.
-      if (anchorRect && (Number(anchorRect.bottom) < Number(region.top) || Number(anchorRect.top) > Number(region.bottom))) {
-        return viewport();
-      }
-      return region;
-    }
-    if (options && options.region === 'viewport') { return viewport(); }
-    var body = typeof document !== 'undefined' && document.getElementById ? document.getElementById('sidebar-body') : null;
-    if (!body) { return viewport(); }
-    region = rectOf(body, viewport());
-    if (anchorRect && (Number(anchorRect.bottom) < Number(region.top) || Number(anchorRect.top) > Number(region.bottom))) {
-      return viewport();
-    }
-    return region;
+    var element = regionElement(options);
+    if (!element) { return viewport(); }
+    var region = rectOf(element, viewport());
+    // A region is a clipping boundary for controls inside it. Header menus
+    // are outside the body, so using the body top would detach the popup
+    // from its trigger. Fall back to the viewport for such anchors.
+    return anchorOutsideRegion(options, anchorRect) ? viewport() : region;
   }
 
   function clearGeometry(box) {
@@ -137,6 +142,8 @@ var PopupList = (function () {
     var onClose = box._popupOnClose;
     box._popupOnClose = null;
     box._popupAnchor = null;
+    box._popupOptions = null;
+    box._popupDetached = false;
     try {
       if (typeof onClose === 'function') { onClose(box); }
     } finally {
@@ -173,8 +180,48 @@ var PopupList = (function () {
         if (!open[i].hidden && !isInside(open[i], target)) { closeOne(open[i]); }
       }
     });
+    document.addEventListener('scroll', scheduleRefresh, true);
+    var win = typeof window !== 'undefined' ? window : null;
+    if (win && typeof win.addEventListener === 'function') {
+      win.addEventListener('scroll', scheduleRefresh, true);
+      win.addEventListener('resize', scheduleRefresh);
+      if (win.visualViewport && typeof win.visualViewport.addEventListener === 'function') {
+        win.visualViewport.addEventListener('scroll', scheduleRefresh);
+        win.visualViewport.addEventListener('resize', scheduleRefresh);
+      }
+    }
     document.body.setAttribute(POPUP_MARK, '1');
     return true;
+  }
+
+  /* Fixed popups do not move when an ancestor scrolls; re-anchor them centrally. */
+  function refreshOpen() {
+    if (typeof document === 'undefined' || !document.querySelectorAll) { return 0; }
+    var open = document.querySelectorAll(POPUP_SELECTOR), count = 0;
+    for (var i = 0; i < open.length; i += 1) {
+      var box = open[i];
+      if (box.hidden || !box._popupAnchor || !box._popupOptions) { continue; }
+      var anchorRect = rectOf(box._popupAnchor, viewport());
+      if (!box._popupDetached && anchorOutsideRegion(box._popupOptions, anchorRect)) {
+        closeOne(box);
+        continue;
+      }
+      place(box, box._popupAnchor, box._popupOptions);
+      count += 1;
+    }
+    return count;
+  }
+
+  function scheduleRefresh() {
+    if (refreshQueued) { return; }
+    refreshQueued = true;
+    var run = function () {
+      refreshQueued = false;
+      refreshOpen();
+    };
+    var win = typeof window !== 'undefined' ? window : null;
+    if (win && typeof win.requestAnimationFrame === 'function') { win.requestAnimationFrame(run); }
+    else { run(); }
   }
 
   function place(box, anchor, options) {
@@ -235,6 +282,8 @@ var PopupList = (function () {
     if (!box) { return null; }
     box._popupOnClose = null;
     box._popupAnchor = null;
+    box._popupOptions = null;
+    box._popupDetached = false;
     return hideRaw(box, selector);
   }
 
@@ -244,12 +293,14 @@ var PopupList = (function () {
     install();
     closeAll(box);
     box._popupAnchor = anchor || null;
+    box._popupOptions = opts;
+    box._popupDetached = anchorOutsideRegion(opts, rectOf(anchor, viewport()));
     box._popupOnClose = typeof opts.onClose === 'function' ? opts.onClose : null;
     box.hidden = false;
     place(box, anchor, opts);
     return box;
   }
 
-  return { rows: rows, mark: mark, hide: hide, show: show, closeAll: closeAll, place: place, install: install };
+  return { rows: rows, mark: mark, hide: hide, show: show, closeAll: closeAll, place: place, install: install, refresh: refreshOpen };
 }());
 </script>
