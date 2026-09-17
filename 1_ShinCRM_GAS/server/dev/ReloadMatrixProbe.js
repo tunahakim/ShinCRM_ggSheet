@@ -222,9 +222,6 @@ function reloadMatrixProbe() {
     PropertiesService.getDocumentProperties().setProperty(DIRTY_KEYS.recordsReadyAt, String(Date.now() + 3000));
     var customerReloadProbe = probeSelectionAndReload({ lastSeenRevision: before.revision, previousCustomerId: '' });
     reloadMatrixProbeAssert(report, 'Customer cột @ chưa đến mốc sẵn sàng trả defer không payload', customerReloadProbe.decision.ram.mode === 'records' && customerReloadProbe.decision.ram.action === 'defer' && customerReloadProbe.payload === null && customerReloadProbe.reload.recordsReadyAt >= customerReloadProbe.reload.changedAt + 3000 && customerReloadProbe.reload.records.indexOf(customerIds[0]) >= 0, JSON.stringify({ action: customerReloadProbe.decision.ram.action, waitMs: customerReloadProbe.decision.ram.waitMs, payload: customerReloadProbe.payload, records: customerReloadProbe.reload.records }));
-    PropertiesService.getDocumentProperties().setProperty(DIRTY_KEYS.recordsReadyAt, String(Date.now() - 1));
-    var customerReadyProbe = probeSelectionAndReload({ lastSeenRevision: before.revision, previousCustomerId: '' });
-    reloadMatrixProbeAssert(report, 'Customer cột @ sau mốc sẵn sàng trả payload trong cùng response', customerReadyProbe.payload && customerReadyProbe.payload.mode === 'records' && customerReadyProbe.payload.customer.rows.length > 0 && customerReadyProbe.processedRevision === after.revision, JSON.stringify({ mode: customerReadyProbe.payload && customerReadyProbe.payload.mode, processedRevision: customerReadyProbe.processedRevision, observedRevision: customerReadyProbe.observedRevision }));
 
     var batchBefore = reloadStateRead();
     var batchValues = [];
@@ -233,6 +230,9 @@ function reloadMatrixProbe() {
     var batchAfter = reloadStateRead();
     reloadMatrixProbeAssert(report, 'Vùng Customer nhiều hàng gom đủ mã', batchAfter.revision > batchBefore.revision && customerIds.every(function (id) { return batchAfter.records.indexOf(id) >= 0; }), JSON.stringify({ revisionDelta: batchAfter.revision - batchBefore.revision, records: batchAfter.records }));
     report.push('Ghi chú: debounce một lượt sau edit cuối là hành vi Sidebar; probe GAS xác nhận mỗi vùng trả waitMs=3000, không giả vờ đo số lượt reload client.');
+    PropertiesService.getDocumentProperties().setProperty(DIRTY_KEYS.recordsReadyAt, String(Date.now() - 1));
+    var customerReadyProbe = probeSelectionAndReload({ lastSeenRevision: before.revision, previousCustomerId: '' });
+    reloadMatrixProbeAssert(report, 'Customer cột @ sau mốc sẵn sàng trả payload trong cùng response', customerReadyProbe.payload && customerReadyProbe.payload.mode === 'records' && customerReadyProbe.payload.customer.rows.length > 0 && customerReadyProbe.processedRevision === batchAfter.revision, JSON.stringify({ mode: customerReadyProbe.payload && customerReadyProbe.payload.mode, processedRevision: customerReadyProbe.processedRevision, observedRevision: customerReadyProbe.observedRevision }));
 
     var activityBefore = reloadStateRead();
     var activityResult = reloadMatrixProbeWriteEvent(activity.sheet, activityStartRow, activityEdit.column, 'DEV reload activity edit');
