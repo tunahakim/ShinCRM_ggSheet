@@ -167,10 +167,17 @@ function chay(so) {
     [categoryReload.reloadMode, categoryReload.categories[category.Category.codes[0]], categoryReload.revisionMatched, categoryReload.reload.category, categoryReload.dirty.config],
     ['category', ['Giá trị thử'], true, false, false]);
 
-  const configReload = category.hop.reloadConfig();
+  category.hop.dirtyStateMarkConfig();
+  const configRevision = category.hop.reloadStateRead().revision;
+  const configReload = category.hop.reloadConfig(configRevision);
   check(so, 'reloadConfig trả payload Config riêng và ReloadState',
-    [configReload.reloadMode, !!configReload.config, configReload.config && !!configReload.config.params, !!configReload.reload],
-    ['config', true, true, true]);
+    [configReload.reloadMode, !!configReload.config, configReload.config && !!configReload.config.params, !!configReload.reload, configReload.revisionMatched, configReload.dirty.config],
+    ['config', true, true, true, true, false]);
+
+  category.hop.dirtyStateMarkConfig();
+  const staleConfig = category.hop.reloadConfig(category.hop.reloadStateRead().revision - 1);
+  check(so, 'reloadConfig không xóa cờ khi revision đã đổi',
+    [staleConfig.reloadMode, staleConfig.revisionMatched, staleConfig.dirty.config], ['config', false, true]);
 
   const manual = dungNap();
   ghiKhach(manual, manual.hop.SHEET_FIRST_DATA_ROW, 'KH-MANUAL', 'Khách thủ công');

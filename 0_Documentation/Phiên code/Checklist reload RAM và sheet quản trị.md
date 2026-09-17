@@ -189,8 +189,8 @@
 
 - [x] Có API reload Category riêng (entrypoint `reloadCategory`, test `loadService.js`).
 - [x] Category reload thành công xóa đúng dirtyCategory, không xóa cờ mới (test `loadService.js`: `category=false`, `config=false`).
-- [ ] Có API reload Config riêng trả đủ `params`, `sheetSchema`, `defaults`, `counters`, `sort` (entrypoint `reloadConfig`, test `loadService.js`).
-- [ ] Config reload riêng cập nhật `Store.config` mà không đọc lại Customer/Activity; chỉ nâng full core khi GAS xác định ảnh hưởng Schema/giải mã bản ghi.
+- [x] Có API reload Config riêng trả đủ `params`, `sheetSchema`, `defaults`, `counters`, `sort` (entrypoint `reloadConfig`, test `loadService.js`, commit `fb5181b`).
+- [x] Config reload riêng cập nhật `Store.config` mà không đọc lại Customer/Activity; chỉ nâng full core khi GAS xác định ảnh hưởng Schema/giải mã bản ghi (test `loadService.js`, `reloadDecision.js`).
 - [x] Đổi schema luôn fallback full core (test `reloadDecision.js`: schema có `ram.mode: 'fullCore'`; test `reloadGates.js`: signal `allCore`).
 - [x] Có API `getReloadState` dùng khi nhận event, lúc mở Sidebar và tại các điểm kiểm tra tự nhiên (test `loadService.js`, `selectionPoll.js`).
 - [x] Thiết kế và triển khai API một request `probeSelectionAndReload(input)`: trả context hiện tại, mã khách khi vị trí đổi, `ReloadState` và quyết định RAM; không bắt buộc chuỗi `probeSelectionCheap` → `probeSelectionFull` qua mạng (server `SelectionService.js`, test `selectionService.js`).
@@ -206,7 +206,7 @@
 - [x] Current Customer reload đúng scope Customer (API `reloadCustomer`, test `loadService.js`, `refresh.js`).
 - [x] Current Activity reload đúng scope Activity (API `reloadActivity`, test `loadService.js`, `refresh.js`).
 - [x] Current Category reload đúng scope Category (API `reloadCategory`, test `loadService.js`).
-- [ ] Current Config dùng payload Config riêng; trường hợp GAS xác định ảnh hưởng Schema mới dùng full core (API `reloadConfig`, test `loadService.js`).
+- [x] Current Config dùng payload Config riêng; trường hợp GAS xác định ảnh hưởng Schema mới dùng full core (API `reloadConfig`, test `loadService.js`, `reloadDecision.js`).
 - [x] Current managed view vẽ lại theo chính sách và đối chiếu allViews (API `reloadCurrentSheet`, test `loadService.js`).
 - [x] Có bốn lệnh nạp sheet cụ thể Customer/Activity/Category/Config (UI schema và test `actions.js`).
 - [x] Menu không mở thêm đường ghi dữ liệu ngoài API đã có (các action chỉ gọi API đọc/reload).
@@ -252,7 +252,7 @@
 - [ ] Màn hiện tại được vẽ lại sau reload sau khi payload đã áp xong (test `refresh.js`).
 - [x] Full core dựng lại Schema, Category, Config và search index từ đầu (đường `refreshFullCore`, test bootstrap/load).
 - [x] Reload Category cập nhật danh mục SELECT đang dùng (test `refresh.js`).
-- [ ] Config đổi làm client dùng cấu hình mới qua payload Config riêng, không giữ bản cũ (test `refresh.js`).
+- [x] Config đổi làm client dùng cấu hình mới qua payload Config riêng, không giữ bản cũ (test `refresh.js`).
 
 ### Kiểm thử offline R5
 
@@ -263,7 +263,7 @@
 - [x] Ca record biến mất xóa đúng Store và search index (test `refresh.js`, `ramStore.js`).
 - [x] Ca full core sau schema đổi xóa Store cũ trước khi ingest (test `refresh.js`, `reloadDecision.js`).
 - [x] Ca Category đổi cập nhật dropdown (test `refresh.js`).
-- [x] Ca Config đổi cập nhật default/counter/sort qua chỉ thị full core (test `refresh.js`; server không vá từng khối để tránh lệch).
+- [x] Ca Config đổi cập nhật `Store.config` qua payload Config riêng (test `refresh.js`, `loadService.js`).
 - [x] Ca Sidebar không có bản nháp nhận quyết định `reload` theo scope (test `reloadDecision.js`).
 - [x] Ca Sidebar có bản nháp đúng mã nhận quyết định bảo vệ bản nháp (`defer` hoặc yêu cầu xác nhận), không bị đè RAM âm thầm (test `reloadDecision.js`).
 - [x] Ca Sidebar có bản nháp không liên quan vẫn reload được mã khác trong cùng signal (test `reloadDecision.js`).
@@ -367,7 +367,7 @@
 - [ ] Sửa hàng 3 Customer, xác nhận không reload.
 - [ ] Đổi hàng 1 Customer, xác nhận full core.
 - [ ] Sửa Category, xác nhận danh mục Sidebar đổi.
-- [ ] Sửa Config, xác nhận full core an toàn.
+- [ ] Sửa Config, xác nhận Sidebar nhận payload Config riêng; chỉ trường hợp GAS xác định ảnh hưởng Schema mới dùng full core.
 - [ ] Không có Extension, đổi vị trí giữa hai ô: xác nhận chỉ một request selection, GAS đọc mã mới trong cùng response.
 - [ ] Không có Extension, giữ nguyên vị trí qua nhiều lần probe: xác nhận GAS trả mã cũ và không đọc lại ô mã.
 - [ ] Không có Extension, fallback probe kèm `ReloadState`: xác nhận không có request `cheap` rồi `full` thứ hai.
@@ -434,33 +434,33 @@
 
 ### Pipeline client
 
-- [ ] Mọi payload `records` chỉ được coi là hoàn tất sau khi toàn bộ Customer, Activity, bản ghi biến mất và chỉ mục tìm kiếm đã cập nhật.
+- [x] Mọi payload `records` chỉ được coi là hoàn tất sau khi toàn bộ Customer, Activity, bản ghi biến mất và chỉ mục tìm kiếm đã cập nhật (test `refresh.js`, commit `fb5181b`).
 - [ ] Payload `fullCore` chỉ được coi là hoàn tất sau `ingestCore` và `ingestActivityDone`; không vẽ màn hình trung gian.
-- [ ] Payload `category` cập nhật toàn bộ `Store.categories` trước khi quyết định vẽ.
-- [ ] Payload `config` cập nhật toàn bộ `Store.config` trước khi quyết định vẽ.
-- [ ] Các hàm áp payload không gọi trực tiếp `renderScreen()` thiếu `man` và không tự chọn renderer.
-- [ ] Sau mỗi payload áp thành công, bộ điều phối `refreshDecideAndRender` chỉ chạy một lần.
-- [ ] Bộ điều phối đọc `ScreenState` và gọi `screenViewRender` cho view hoặc `screenFormRender` cho form.
-- [ ] Đang mở form không bị đưa về view; `formStack[].draft` vẫn còn nguyên sau reload.
+- [x] Payload `category` cập nhật toàn bộ `Store.categories` trước khi quyết định vẽ (test `refresh.js`, commit `fb5181b`).
+- [x] Payload `config` cập nhật toàn bộ `Store.config` trước khi quyết định vẽ (test `refresh.js`, commit `fb5181b`).
+- [x] Các hàm áp payload không gọi trực tiếp `renderScreen()` thiếu `man` và không tự chọn renderer (static audit, test `refresh.js`).
+- [x] Sau mỗi payload áp thành công, bộ điều phối `refreshDecideAndRender` chỉ chạy một lần (test `refresh.js`, commit `fb5181b`).
+- [x] Bộ điều phối đọc `ScreenState` và gọi `screenViewRender` cho view hoặc `screenFormRender` cho form (test `refresh.js`).
+- [x] Đang mở form không bị đưa về view; `formStack[].draft` vẫn còn nguyên sau reload (test `refresh.js`).
 - [ ] Mã khách đang xem bị xóa được dọn trước khi vẽ view, không làm renderer ném lỗi mã không tồn tại.
 - [ ] Payload không có thay đổi hoặc áp thất bại không gọi renderer và không làm mất dirty state.
 
 ### Config riêng
 
-- [ ] GAS `reloadConfig` đọc `configReadAll()` và `configParams()` một lần, trả `reloadMode: 'config'` cùng đủ `params`, `sheetSchema`, `defaults`, `counters`, `sort`.
-- [ ] `reloadConfig` chỉ xóa cờ Config khi đọc thành công và revision vẫn khớp.
-- [ ] Sidebar có `refreshConfigApply` thay `Store.config` mà không reset Store hoặc đọc lại Customer/Activity.
-- [ ] `ReloadDecision` nâng Config thành `fullCore` khi thay đổi ảnh hưởng Schema hoặc cách giải mã bản ghi.
-- [ ] Nút Nạp lại Config và `reloadCurrentSheet(Config)` dùng đúng payload Config riêng.
-- [ ] Config reload xong gọi cùng bộ điều phối vẽ màn hiện tại như các scope khác.
+- [x] GAS `reloadConfig` đọc `configReadAll()` và `configParams()` một lần, trả `reloadMode: 'config'` cùng đủ `params`, `sheetSchema`, `defaults`, `counters`, `sort` (test `loadService.js`, commit `fb5181b`).
+- [x] `reloadConfig` chỉ xóa cờ Config khi đọc thành công và revision vẫn khớp (test `loadService.js`).
+- [x] Sidebar có `refreshConfigApply` thay `Store.config` mà không reset Store hoặc đọc lại Customer/Activity (test `refresh.js`).
+- [x] `ReloadDecision` nâng Config thành `fullCore` khi thay đổi ảnh hưởng Schema hoặc cách giải mã bản ghi (test `reloadDecision.js`, commit `d7b6076`).
+- [x] Nút Nạp lại Config và `reloadCurrentSheet(Config)` dùng đúng payload Config riêng (test `refresh.js`, `actions.js`).
+- [x] Config reload xong gọi cùng bộ điều phối vẽ màn hiện tại như các scope khác (test `refresh.js`).
 
 ### Hồi quy hành vi
 
-- [ ] Sửa/xóa một ô Customer khi vẫn đứng nguyên ô: RAM và giao diện cập nhật sau payload, không cần click ô khác.
-- [ ] Sửa hai ô liên tiếp trong cùng khoảng gom: một payload chứa đầy đủ cả hai thay đổi và giao diện vẽ một lần.
-- [ ] Chuyển khách 108 → 113 liên tục không nháy ngược về 108 do response/context cũ.
-- [ ] Rê chuột vào Sidebar không tạo request và không bật loading.
-- [ ] Delete/Backspace vẫn đánh thức request; Extension chỉ gửi hint, GAS mới xác nhận `onEdit`.
+- [x] Sửa/xóa một ô Customer khi vẫn đứng nguyên ô: RAM và giao diện cập nhật sau payload, không cần click ô khác (test `refresh.js`).
+- [x] Sửa hai ô liên tiếp trong cùng khoảng gom: một payload chứa đầy đủ cả hai thay đổi và giao diện vẽ một lần (test `selectionService.js`).
+- [x] Chuyển khách 108 → 113 liên tục không nháy ngược về 108 do response/context cũ (test `selectionPoll.js`).
+- [x] Rê chuột vào Sidebar không tạo request và không bật loading (test `selectionPoll.js`, commit `fb5181b`).
+- [x] Delete/Backspace vẫn đánh thức request; Extension chỉ gửi hint, GAS mới xác nhận `onEdit` (test `extensionBridge.js`).
 - [ ] Request thăm dò/defer vẫn im lặng; chỉ payload reload mới bật loading trong giai đoạn nghiệm thu.
 
 ---
