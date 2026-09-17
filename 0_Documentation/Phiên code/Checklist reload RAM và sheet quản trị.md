@@ -189,8 +189,8 @@
 
 - [x] Có API reload Category riêng (entrypoint `reloadCategory`, test `loadService.js`).
 - [x] Category reload thành công xóa đúng dirtyCategory, không xóa cờ mới (test `loadService.js`: `category=false`, `config=false`).
-- [x] Có API reload Config hoặc trả yêu cầu full core rõ ràng (entrypoint `reloadConfig`, trả `reloadMode: 'fullCore'`, test `loadService.js`).
-- [x] Config reload không làm Schema/Config defaults trong RAM lệch nhau (Config luôn yêu cầu full core, test `loadService.js`).
+- [ ] Có API reload Config riêng trả đủ `params`, `sheetSchema`, `defaults`, `counters`, `sort` (entrypoint `reloadConfig`, test `loadService.js`).
+- [ ] Config reload riêng cập nhật `Store.config` mà không đọc lại Customer/Activity; chỉ nâng full core khi GAS xác định ảnh hưởng Schema/giải mã bản ghi.
 - [x] Đổi schema luôn fallback full core (test `reloadDecision.js`: schema có `ram.mode: 'fullCore'`; test `reloadGates.js`: signal `allCore`).
 - [x] Có API `getReloadState` dùng khi nhận event, lúc mở Sidebar và tại các điểm kiểm tra tự nhiên (test `loadService.js`, `selectionPoll.js`).
 - [x] Thiết kế và triển khai API một request `probeSelectionAndReload(input)`: trả context hiện tại, mã khách khi vị trí đổi, `ReloadState` và quyết định RAM; không bắt buộc chuỗi `probeSelectionCheap` → `probeSelectionFull` qua mạng (server `SelectionService.js`, test `selectionService.js`).
@@ -206,7 +206,7 @@
 - [x] Current Customer reload đúng scope Customer (API `reloadCustomer`, test `loadService.js`, `refresh.js`).
 - [x] Current Activity reload đúng scope Activity (API `reloadActivity`, test `loadService.js`, `refresh.js`).
 - [x] Current Category reload đúng scope Category (API `reloadCategory`, test `loadService.js`).
-- [x] Current Config dùng full core an toàn (API `reloadConfig`, test `loadService.js`).
+- [ ] Current Config dùng payload Config riêng; trường hợp GAS xác định ảnh hưởng Schema mới dùng full core (API `reloadConfig`, test `loadService.js`).
 - [x] Current managed view vẽ lại theo chính sách và đối chiếu allViews (API `reloadCurrentSheet`, test `loadService.js`).
 - [x] Có bốn lệnh nạp sheet cụ thể Customer/Activity/Category/Config (UI schema và test `actions.js`).
 - [x] Menu không mở thêm đường ghi dữ liệu ngoài API đã có (các action chỉ gọi API đọc/reload).
@@ -249,10 +249,10 @@
 - [x] Activity biến mất được remove (test `refresh.js`).
 - [x] Activity của Customer bị ảnh hưởng được tính lại danh sách (server trả trọn Activity của Customer, test `loadService.js`).
 - [x] Search index được cập nhật sau upsert/remove (đường `Store.upsertRecord`/`removeRecord`, test `refresh.js` và `ramStore.js`).
-- [x] Màn hiện tại được vẽ lại sau reload (test `refresh.js`).
+- [ ] Màn hiện tại được vẽ lại sau reload sau khi payload đã áp xong (test `refresh.js`).
 - [x] Full core dựng lại Schema, Category, Config và search index từ đầu (đường `refreshFullCore`, test bootstrap/load).
 - [x] Reload Category cập nhật danh mục SELECT đang dùng (test `refresh.js`).
-- [x] Config đổi làm client dùng cấu hình mới, không giữ bản cũ (Config luôn chuyển `fullCore`, test `loadService.js`).
+- [ ] Config đổi làm client dùng cấu hình mới qua payload Config riêng, không giữ bản cũ (test `refresh.js`).
 
 ### Kiểm thử offline R5
 
@@ -429,5 +429,38 @@
 - [x] Khi payload reload thực sự được áp dụng, Sidebar bật thanh tiến trình trong lúc nạp; request thăm dò/defer vẫn im lặng. Thanh giữ tối thiểu 120 ms để lượt nạp quá nhanh vẫn quan sát được (`client/ui/progress.html`, `client/link/sheetLink.html`; `node tests/run.js` đạt `1606/1606`).
 - [x] Tạm bật `SHEET_LINK_SHOW_PROBE_PROGRESS=true` trong giai đoạn nghiệm thu trực quan để mọi request `probeSelectionAndReload` hiện thanh tiến trình.
 - [ ] Trước nghiệm thu cuối và bàn giao, đổi `SHEET_LINK_SHOW_PROBE_PROGRESS=false`; xác nhận request thăm dò/defer im lặng và chỉ lượt reload thật mới hiện thanh tiến trình.
+
+## Slice R12 — Đồng bộ pha áp RAM và vẽ màn hiện tại
+
+### Pipeline client
+
+- [ ] Mọi payload `records` chỉ được coi là hoàn tất sau khi toàn bộ Customer, Activity, bản ghi biến mất và chỉ mục tìm kiếm đã cập nhật.
+- [ ] Payload `fullCore` chỉ được coi là hoàn tất sau `ingestCore` và `ingestActivityDone`; không vẽ màn hình trung gian.
+- [ ] Payload `category` cập nhật toàn bộ `Store.categories` trước khi quyết định vẽ.
+- [ ] Payload `config` cập nhật toàn bộ `Store.config` trước khi quyết định vẽ.
+- [ ] Các hàm áp payload không gọi trực tiếp `renderScreen()` thiếu `man` và không tự chọn renderer.
+- [ ] Sau mỗi payload áp thành công, bộ điều phối `refreshDecideAndRender` chỉ chạy một lần.
+- [ ] Bộ điều phối đọc `ScreenState` và gọi `screenViewRender` cho view hoặc `screenFormRender` cho form.
+- [ ] Đang mở form không bị đưa về view; `formStack[].draft` vẫn còn nguyên sau reload.
+- [ ] Mã khách đang xem bị xóa được dọn trước khi vẽ view, không làm renderer ném lỗi mã không tồn tại.
+- [ ] Payload không có thay đổi hoặc áp thất bại không gọi renderer và không làm mất dirty state.
+
+### Config riêng
+
+- [ ] GAS `reloadConfig` đọc `configReadAll()` và `configParams()` một lần, trả `reloadMode: 'config'` cùng đủ `params`, `sheetSchema`, `defaults`, `counters`, `sort`.
+- [ ] `reloadConfig` chỉ xóa cờ Config khi đọc thành công và revision vẫn khớp.
+- [ ] Sidebar có `refreshConfigApply` thay `Store.config` mà không reset Store hoặc đọc lại Customer/Activity.
+- [ ] `ReloadDecision` nâng Config thành `fullCore` khi thay đổi ảnh hưởng Schema hoặc cách giải mã bản ghi.
+- [ ] Nút Nạp lại Config và `reloadCurrentSheet(Config)` dùng đúng payload Config riêng.
+- [ ] Config reload xong gọi cùng bộ điều phối vẽ màn hiện tại như các scope khác.
+
+### Hồi quy hành vi
+
+- [ ] Sửa/xóa một ô Customer khi vẫn đứng nguyên ô: RAM và giao diện cập nhật sau payload, không cần click ô khác.
+- [ ] Sửa hai ô liên tiếp trong cùng khoảng gom: một payload chứa đầy đủ cả hai thay đổi và giao diện vẽ một lần.
+- [ ] Chuyển khách 108 → 113 liên tục không nháy ngược về 108 do response/context cũ.
+- [ ] Rê chuột vào Sidebar không tạo request và không bật loading.
+- [ ] Delete/Backspace vẫn đánh thức request; Extension chỉ gửi hint, GAS mới xác nhận `onEdit`.
+- [ ] Request thăm dò/defer vẫn im lặng; chỉ payload reload mới bật loading trong giai đoạn nghiệm thu.
 
 ---

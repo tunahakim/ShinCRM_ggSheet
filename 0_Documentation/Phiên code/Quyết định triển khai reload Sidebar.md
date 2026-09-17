@@ -285,3 +285,13 @@ Trên Spreadsheet DEV phải chứng minh:
 - Không mở rộng sang dependency công thức trong lát này.
 - Không chạm fixture trong `0_Documentation/Nghiên cứu FBM/`.
 - Không thử trên dữ liệu khách production.
+
+## 14. Bổ sung: pipeline sau khi áp payload và reload Config riêng
+
+Sau khi GAS trả payload, Sidebar phải hoàn tất việc bung và tổ chức toàn bộ payload vào RAM trước khi vẽ. Không nhánh nào được vẽ giữa chừng hoặc tự gọi `renderScreen()` không có màn đã dựng. Các nhánh `records`, `category`, `config`, `customer`, `activity` và `fullCore` đều trả tóm tắt scope đã áp dụng; một bộ điều phối chung `refreshDecideAndRender` chạy đúng một lần sau pha áp RAM.
+
+Bộ điều phối nhận scope đã áp dụng, mã bị ảnh hưởng, revision, `ScreenState` và bản nháp cục bộ. Nó không gọi GAS, không tạo dirty signal và không quyết định API reload. Nếu đang ở `view`, nó kiểm tra mã khách còn trong Store rồi gọi `screenViewRender`; nếu đang ở form, nó gọi `screenFormRender` và giữ `formStack[].draft`. Mã khách đã biến mất phải được dọn trước khi vẽ view.
+
+`reloadConfig` là một đường nạp riêng. GAS đọc đủ `params`, `sheetSchema`, `defaults`, `counters` và `sort`, trả `reloadMode: 'config'`; Sidebar thay toàn bộ `Store.config` mà không reset hoặc đọc lại Customer/Activity. Chỉ khi GAS xác định thay đổi Config ảnh hưởng Schema hoặc cách giải mã bản ghi mới nâng scope thành `fullCore`. Sau khi Config áp xong, bộ điều phối vẽ lại màn hình hiện tại theo cùng quy tắc như mọi payload khác.
+
+Các mục kiểm thử bắt buộc cho lát này: payload records cập nhật giao diện ngay cả khi mã khách không đổi; full core không vẽ khi Activity còn đang nạp; Config riêng cập nhật `Store.config` mà không đọc lại Customer/Activity; form giữ bản nháp; không còn request do `mouseenter`; response/context cũ không làm nháy ngược mã khách.
