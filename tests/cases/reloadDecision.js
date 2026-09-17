@@ -55,6 +55,11 @@ function chay(so) {
     [config.kind, config.ram.mode, config.signal.config, config.signal.allViews, config.views.action],
     ['config', 'config', true, true, 'render']);
 
+  const configCore = hop.reloadDecisionForChange({ entity: 'config', surface: 'config', configAffectsSchema: true });
+  check(so, 'Config được nâng full core khi GAS xác định ảnh hưởng Schema',
+    [configCore.ram.mode, configCore.signal.config, configCore.signal.allViews],
+    ['fullCore', true, true]);
+
   const schema = hop.reloadDecisionForChange({ surface: 'schema', schema: true });
   check(so, 'Schema luôn bật full core và toàn bộ view',
     [schema.kind, schema.ram.mode, schema.signal.schema, schema.signal.allCore, schema.signal.allViews, schema.views.policyBypass],
