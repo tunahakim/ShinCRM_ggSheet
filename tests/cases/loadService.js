@@ -168,9 +168,9 @@ function chay(so) {
     ['category', ['Giá trị thử'], true, false, false]);
 
   const configReload = category.hop.reloadConfig();
-  check(so, 'reloadConfig trả chỉ thị fullCore rõ ràng để giữ Config và Schema đồng nhất',
-    [configReload.reloadMode, configReload.reason.indexOf('full core') >= 0, !!configReload.reload],
-    ['fullCore', true, true]);
+  check(so, 'reloadConfig trả payload Config riêng và ReloadState',
+    [configReload.reloadMode, !!configReload.config, configReload.config && !!configReload.config.params, !!configReload.reload],
+    ['config', true, true, true]);
 
   const manual = dungNap();
   ghiKhach(manual, manual.hop.SHEET_FIRST_DATA_ROW, 'KH-MANUAL', 'Khách thủ công');

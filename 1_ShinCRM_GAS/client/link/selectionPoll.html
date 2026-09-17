@@ -224,8 +224,6 @@ function selectionPollInstall() {
   SELECTION_POLL.intervalMs = selectionPollMs('SELECTION_POLL_MS', 2000);
   document.addEventListener('visibilitychange', selectionPollVisibilityChanged);
   window.addEventListener('focus', selectionPollWake);
-  var root = document.getElementById('sidebar-root');
-  if (root) { root.addEventListener('mouseenter', selectionPollWake); }
   selectionPollPaint();
 }
 </script>

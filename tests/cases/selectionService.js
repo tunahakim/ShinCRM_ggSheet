@@ -133,6 +133,13 @@ function chay(so) {
     [categoryPayload.requestId, categoryPayload.payload && categoryPayload.payload.mode, categoryPayload.decision.ram.mode],
     ['r11-category', 'category', 'category']);
 
+  hop.dirtyStateClear();
+  hop.dirtyStateMarkConfig();
+  const configPayload = hop.probeSelectionAndReload({ requestId: 'r11-config', previousSelectionContext: categoryPayload.selection, previousCustomerId: categoryPayload.customerId });
+  check(so, 'R11 Config trả payload Config riêng trong cùng request',
+    [configPayload.requestId, configPayload.payload && configPayload.payload.mode, !!(configPayload.payload && configPayload.payload.config), configPayload.decision.ram.mode, configPayload.reload.config],
+    ['r11-config', 'config', true, 'config', false]);
+
   // R11 A-E: nhiều signal trong cùng một cửa sổ debounce được gom thành một payload.
   hop.dirtyStateClear();
   const burstIds = ['KH-A', 'KH-B', 'KH-C', 'KH-D', 'KH-E'];

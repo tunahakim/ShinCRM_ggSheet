@@ -13,7 +13,10 @@ function chay(so) {
         removeRecord(entity, id) { if (entity === 'customer') { delete this.customers[id]; } else { Object.keys(this.activitiesByCustomer).forEach((key) => { this.activitiesByCustomer[key] = this.activitiesByCustomer[key].filter((record) => record.id !== id); }); } },
       },
       ingestUnpack: (fields, rows) => rows.map((row) => fields.reduce((record, field, i) => { record[field] = row[i]; return record; }, {})),
-      renderScreen: () => { hop.rendered = true; }
+      ScreenState: { screen: 'view', currentCustomerId: 'KH1', formStack: [] },
+      SCREEN_VIEW: 'view',
+      screenViewDropStale: () => null,
+      screenViewRender: () => { hop.rendered = true; return {}; }
     });
     napClient(hop, 'client/ram/refresh.html');
   } catch (err) { return ghiLoiNap(so, 'nạp refresh', err); }
@@ -60,7 +63,10 @@ function chay(so) {
       }
     },
     ingestUnpack: (fields, rows) => rows.map((row) => fields.reduce((record, field, i) => { record[field] = row[i]; return record; }, {})),
-    renderScreen: () => { entityHop.rendered = true; }
+    ScreenState: { screen: 'view', currentCustomerId: 'KH1', formStack: [] },
+    SCREEN_VIEW: 'view',
+    screenViewDropStale: () => null,
+    screenViewRender: () => { entityHop.rendered = true; return {}; }
   });
   napClient(entityHop, 'client/ram/refresh.html');
   entityHop.refreshEntityApply('customer', {
@@ -79,14 +85,15 @@ function chay(so) {
     [['GD9'], undefined]);
 
   const configHop = taoHopCat({
-    Store: { categories: {}, customers: {}, activitiesByCustomer: {} },
-    screenStateGoView: () => { configHop._wentToView = true; },
-    sidebarBoot: () => ({ then: (onValue) => onValue({ ok: true }) })
+    Store: { categories: {}, config: {}, customers: {}, activitiesByCustomer: {} },
+    ScreenState: { screen: 'view', currentCustomerId: '', formStack: [] },
+    SCREEN_VIEW: 'view',
+    screenViewRender: () => { configHop._rendered = true; return {}; }
   });
   napClient(configHop, 'client/ram/refresh.html');
-  const configManual = configHop.refreshManualSheetApply({ ok: true, target: 'config', reloadMode: 'fullCore' });
-  check(so, 'Config reload dùng chỉ thị fullCore để dựng lại Sidebar thay vì vá thiếu defaults/counter/sort',
-    [configHop._wentToView, configManual.ok], [true, true]);
+  const configManual = configHop.refreshManualSheetApply({ ok: true, target: 'config', reloadMode: 'config', config: { params: { X: '1' }, defaults: {}, counters: {}, sort: [], sheetSchema: {} } });
+  check(so, 'Config reload thay Store.config và vẽ màn hiện tại',
+    [configHop.Store.config.params.X, configHop._rendered, configManual.ok], ['1', true, true]);
 }
 
 module.exports = { chay };

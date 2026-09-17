@@ -214,23 +214,46 @@ function reloadCategory(expectedRevision, options) {
   return options && options.internal === true ? execute() : runEntryPoint('reloadCategory', LOAD_SOURCE, 'throw', execute);
 }
 
-/** Config chưa có patch an toàn cho từng khối; trả chỉ thị fullCore để không lệch schema/default/counter. */
-function reloadConfig(expectedRevision) {
-  return runEntryPoint('reloadConfig', LOAD_SOURCE, 'throw', function () {
+/** Nạp riêng toàn bộ Config; chỉ nâng full core khi ReloadState đã có scope khác cần đồng bộ cùng revision. */
+function reloadConfig(expectedRevision, options) {
+  var execute = function () {
     var started = Date.now();
     var current = reloadStateRead();
+    if (current.allCore || current.all || current.schema || (current.records && current.records.length) || current.category) {
+      return {
+        ok: true,
+        reloadMode: 'fullCore',
+        reason: 'ReloadState có scope khác cùng revision, Config cần đi cùng full core.',
+        processedRevision: current.revision,
+        expectedRevision: expectedRevision === undefined || expectedRevision === null || expectedRevision === '' ? null : Number(expectedRevision),
+        reload: current,
+        dirty: dirtyStateRead(),
+        selection: selectionSnapshot(),
+        ms: Date.now() - started
+      };
+    }
+    resetSettingsCache();
+    var config = configReadAll();
+    config.params = configUserParams(configParams());
+    var revisionMatches = expectedRevision === undefined || expectedRevision === null || expectedRevision === ''
+      || current.revision === Number(expectedRevision);
+    if (revisionMatches) { dirtyStateClear({ config: true, expectedRevision: expectedRevision }); }
+    var latest = reloadStateRead();
     return {
       ok: true,
-      reloadMode: 'fullCore',
-      reason: 'Config dùng full core để giữ Schema, ngầm định và bộ đếm nhất quán.',
-      processedRevision: current.revision,
+      reloadMode: 'config',
+      config: config,
+      reason: 'Nạp riêng toàn bộ Config sau khi revision được GAS xác nhận.',
+      processedRevision: latest.revision,
       expectedRevision: expectedRevision === undefined || expectedRevision === null || expectedRevision === '' ? null : Number(expectedRevision),
-      reload: current,
+      revisionMatched: revisionMatches,
+      reload: latest,
       dirty: dirtyStateRead(),
       selection: selectionSnapshot(),
       ms: Date.now() - started
     };
-  });
+  };
+  return options && options.internal === true ? execute() : runEntryPoint('reloadConfig', LOAD_SOURCE, 'throw', execute);
 }
 
 /** Nạp trọn một sheet dữ liệu theo yêu cầu thủ công; không suy diễn từ trạng thái màn hình của Sidebar. */

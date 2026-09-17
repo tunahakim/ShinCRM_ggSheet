@@ -51,9 +51,9 @@ function chay(so) {
     ['state-full-core', 'fullCore', { records: [], category: false, config: false, schema: false, allCore: false, allViews: false, viewSheets: [] }]);
 
   const config = hop.reloadDecisionForChange({ entity: 'config', surface: 'config' });
-  check(so, 'Config dùng full core và đánh dấu toàn bộ view',
+  check(so, 'Config dùng scope riêng và đánh dấu toàn bộ view',
     [config.kind, config.ram.mode, config.signal.config, config.signal.allViews, config.views.action],
-    ['config', 'fullCore', true, true, 'render']);
+    ['config', 'config', true, true, 'render']);
 
   const schema = hop.reloadDecisionForChange({ surface: 'schema', schema: true });
   check(so, 'Schema luôn bật full core và toàn bộ view',

@@ -100,6 +100,9 @@ function selectionPayloadFromReload(result) {
   if (result.reloadMode === 'category') {
     return { mode: 'category', categories: result.categories || {}, warnings: result.warnings || [] };
   }
+  if (result.reloadMode === 'config') {
+    return { mode: 'config', config: result.config || {} };
+  }
   if (result.reloadMode === 'fullCore') {
     return { mode: 'fullCore', core: result };
   }
@@ -163,6 +166,8 @@ function probeSelectionAndReload(input) {
         reloadResult = reloadRecords(ram.recordIds || [], expectedRevision, { internal: true });
       } else if (ram.mode === 'category' && typeof reloadCategory === 'function') {
         reloadResult = reloadCategory(expectedRevision, { internal: true });
+      } else if (ram.mode === 'config' && typeof reloadConfig === 'function') {
+        reloadResult = reloadConfig(expectedRevision, { internal: true });
       } else if (ram.mode === 'fullCore' && typeof loadCore === 'function') {
         reloadResult = loadCore({ internal: true, preserveDirty: true, expectedRevision: expectedRevision });
         if (reloadResult && reloadResult.ok === true) { reloadResult.reloadMode = 'fullCore'; }

@@ -12,7 +12,7 @@ function refreshLocalDraftIds() {
 }
 
 function refreshRecordsApply(result, requestedIds) {
-  if (!result || !result.ok) { return; }
+  if (!result || !result.ok) { return { ok: false, applied: false }; }
   var ids = (requestedIds || []).map(function (id) { return String(id || ''); });
   var affectedCustomerIds = result.affectedCustomerIds || ids;
   var customers = ingestUnpack(result.customer.fields, result.customer.rows);
@@ -31,7 +31,53 @@ function refreshRecordsApply(result, requestedIds) {
     if (Store.customers[key]) { Store.removeRecord('customer', key); }
     Store.removeRecord('activity', key);
   });
-  renderScreen();
+  var applied = {
+    ok: true,
+    applied: true,
+    mode: 'records',
+    affectedCustomerIds: affectedCustomerIds.slice(),
+    affectedRecordIds: ids.concat(result.removedRecordIds || []),
+    revision: result.processedRevision
+  };
+  applied.render = refreshDecideAndRender(applied);
+  return applied;
+}
+
+/**
+ * Quyết định vẽ sau khi một payload đã được áp dụng trọn vào RAM. Hàm này chỉ
+ * điều phối renderer của màn hiện tại; không gọi GAS, không reload và không
+ * chọn scope nghiệp vụ.
+ */
+function refreshDecideAndRender(context) {
+  var ctx = context || {};
+  if (ctx.ok !== true || ctx.applied !== true) { return { rendered: false, reason: 'Payload chưa áp dụng thành công.' }; }
+
+  var mode = String(ctx.mode || '');
+  var screenState = typeof ScreenState !== 'undefined' ? ScreenState : null;
+  var currentCustomerId = screenState ? String(screenState.currentCustomerId || '').trim() : '';
+  var affectedCustomers = Array.isArray(ctx.affectedCustomerIds) ? ctx.affectedCustomerIds.map(function (id) { return String(id || '').trim(); }) : [];
+  var affectedRecords = Array.isArray(ctx.affectedRecordIds) ? ctx.affectedRecordIds.map(function (id) { return String(id || '').trim(); }) : [];
+
+  // Reload records của khách khác không cần làm nhấp nháy màn đang xem. Các
+  // scope cấu hình/full core và reload trọn thực thể thì luôn ảnh hưởng màn.
+  if (mode === 'records') {
+    var top = typeof screenStateTop === 'function' ? screenStateTop() : null;
+    var formRecordId = top && top.record ? String(top.record.id || '').trim() : '';
+    var related = (currentCustomerId && affectedCustomers.indexOf(currentCustomerId) >= 0)
+      || (formRecordId && affectedRecords.indexOf(formRecordId) >= 0);
+    if (!related) { return { rendered: false, reason: 'Payload không ảnh hưởng bản ghi đang hiển thị.' }; }
+  }
+
+  if (screenState && screenState.screen === SCREEN_VIEW && typeof screenViewRender === 'function') {
+    if (typeof screenViewDropStale === 'function') { screenViewDropStale(); }
+    return { rendered: true, screen: SCREEN_VIEW, output: screenViewRender() };
+  }
+
+  if (typeof screenFormRender === 'function' && typeof screenStateTop === 'function' && screenStateTop()) {
+    return { rendered: true, screen: screenState ? screenState.screen : 'form', output: screenFormRender() };
+  }
+
+  return { rendered: false, reason: 'Không có renderer cho màn hình hiện tại.' };
 }
 
 /** Áp dụng payload đã được GAS đọc trong chính request probe; không gọi thêm API reload. */
@@ -51,6 +97,10 @@ function refreshReloadPayload(payload) {
     refreshCategoryApply({ ok: true, categories: payload.categories || {} });
     return payload;
   }
+  if (payload.mode === 'config') {
+    refreshConfigApply({ ok: true, config: payload.config || {} });
+    return payload;
+  }
   if (payload.mode === 'fullCore') {
     var core = payload.core;
     if (!core || core.ok === false || core.blocked) { return null; }
@@ -59,17 +109,28 @@ function refreshReloadPayload(payload) {
       ingestActivityChunk(core.activity);
       ingestActivityDone();
     }
-    renderScreen();
+    refreshDecideAndRender({ ok: true, applied: true, mode: 'fullCore', revision: payload.processedRevision });
     return payload;
   }
   return null;
 }
 
-/** Áp dụng riêng bảng Category; Config và Schema vẫn đi qua full core để không lệch bảng khai. */
+/** Áp dụng riêng bảng Category rồi để pipeline quyết định có vẽ màn hiện tại hay không. */
 function refreshCategoryApply(result) {
-  if (!result || !result.ok || !result.categories) { return; }
+  if (!result || !result.ok || !result.categories) { return { ok: false, applied: false }; }
   Store.categories = result.categories;
-  renderScreen();
+  var applied = { ok: true, applied: true, mode: 'category', revision: result.processedRevision };
+  applied.render = refreshDecideAndRender(applied);
+  return applied;
+}
+
+/** Thay toàn bộ Config trong RAM; không reset Store và không đọc lại Customer/Activity. */
+function refreshConfigApply(result) {
+  if (!result || !result.ok || !result.config) { return { ok: false, applied: false }; }
+  Store.config = result.config;
+  var applied = { ok: true, applied: true, mode: 'config', revision: result.processedRevision };
+  applied.render = refreshDecideAndRender(applied);
+  return applied;
 }
 
 /** Thay toàn bộ một thực thể theo payload máy chủ; mọi thay đổi Store vẫn đi qua hai cửa Store. */
@@ -79,10 +140,13 @@ function refreshEntityApply(entity, result) {
   if (!block) { return result; }
   var records = ingestUnpack(block.fields, block.rows);
   var seen = {};
+  var affectedCustomerIds = [];
   records.forEach(function (record) {
     var id = String(record.id || '').trim();
     if (!id) { return; }
     seen[id] = true;
+    var customerId = entity === 'customer' ? id : String(record.customerId || '').trim();
+    if (customerId && affectedCustomerIds.indexOf(customerId) < 0) { affectedCustomerIds.push(customerId); }
     Store.upsertRecord(entity, record);
   });
 
@@ -97,14 +161,17 @@ function refreshEntityApply(entity, result) {
       });
     });
   }
-  renderScreen();
+  var applied = { ok: true, applied: true, mode: entity, affectedCustomerIds: affectedCustomerIds, affectedRecordIds: Object.keys(seen), revision: result.processedRevision };
+  applied.render = refreshDecideAndRender(applied);
+  result.render = applied.render;
   return result;
 }
 
 function refreshManualSheetApply(result) {
   if (!result || result.ok === false) { return result; }
   var target = result.target || result.reloadMode;
-  if (result.reloadMode === 'fullCore' || target === 'config') { return refreshFullCore(result); }
+  if (result.reloadMode === 'fullCore') { return refreshFullCore(result); }
+  if (target === 'config' || result.reloadMode === 'config') { return refreshConfigApply(result); }
   if (target === 'category') { refreshCategoryApply(result); return result; }
   if (target === 'customer' || target === 'activity') { return refreshEntityApply(target, result); }
   return result;
@@ -155,6 +222,7 @@ function refreshConfig(expectedRevision) {
     if (result && result.reloadMode === 'fullCore') {
       return refreshFullCore(result);
     }
+    refreshConfigApply(result);
     return result;
   });
 }

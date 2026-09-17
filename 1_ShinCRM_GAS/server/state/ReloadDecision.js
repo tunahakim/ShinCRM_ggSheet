@@ -135,7 +135,10 @@ function reloadDecisionForChange(input) {
     decision.kind = 'config';
     decision.signal.config = true;
     decision.signal.allViews = true;
-    reloadDecisionWithRam(decision, 'fullCore', [], change, 'Config dùng full core trong giai đoạn an toàn.');
+    var configNeedsFullCore = change.configAffectsSchema === true || change.forceFullCore === true;
+    reloadDecisionWithRam(decision, configNeedsFullCore ? 'fullCore' : 'config', [], change, configNeedsFullCore
+      ? 'Config ảnh hưởng Schema nên phải nạp lại full core.'
+      : 'Config đổi, nạp riêng toàn bộ khối Config.');
     decision.views = { action: autoRender ? 'render' : 'defer', mode: 'all', immediate: autoRender, policyBypass: false, reason: 'Config có thể ảnh hưởng mọi view.' };
     reloadDecisionViewSheets(decision, change);
     decision.notifySidebar = true;
@@ -188,11 +191,27 @@ function reloadDecisionForState(input) {
     forceImmediate: change.forceImmediate === true
   };
 
-  if (state.allCore || state.all || state.schema || state.config) {
+  if (state.allCore || state.all || state.schema) {
     decision.kind = 'state-full-core';
     reloadDecisionWithRam(decision, 'fullCore', [], common, 'ReloadState yêu cầu nạp full core.');
     decision.notifySidebar = true;
     decision.reason = 'ReloadState yêu cầu nạp full core.';
+    return decision;
+  }
+
+  if (state.config && ((state.records && state.records.length) || state.category)) {
+    decision.kind = 'state-full-core';
+    reloadDecisionWithRam(decision, 'fullCore', [], common, 'Config cùng revision với scope khác nên dùng payload full core nhất quán.');
+    decision.notifySidebar = true;
+    decision.reason = 'ReloadState có Config cùng scope khác.';
+    return decision;
+  }
+
+  if (state.config) {
+    decision.kind = 'state-config';
+    reloadDecisionWithRam(decision, 'config', [], common, 'ReloadState yêu cầu nạp Config.');
+    decision.notifySidebar = true;
+    decision.reason = 'ReloadState yêu cầu nạp Config.';
     return decision;
   }
 
