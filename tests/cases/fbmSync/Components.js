@@ -87,8 +87,14 @@ function chay(so) {
     [true, true, true, true]);
 
   check(so, 'mọi popup dùng hợp đồng PopupList duy nhất, không còn style popup riêng',
-    [popup.indexOf('font: 500 var(--shin-text-sm)/1.2 var(--shin-font);') >= 0,
-      popup.indexOf('color: var(--shin-text-soft);') >= 0,
+    [popup.indexOf('font-family: inherit;') >= 0,
+      popup.indexOf('font-size: var(--shin-text-md);') >= 0,
+      popup.indexOf('font-weight: 400;') >= 0,
+      popup.indexOf('line-height: var(--shin-line-height);') >= 0,
+      popup.indexOf('padding: 6px 10px;') >= 0,
+      popup.indexOf('border-bottom: 1px solid var(--shin-border-faint);') >= 0,
+      popup.indexOf('.shin-popup-item:last-child { border-bottom: 0; }') >= 0,
+      popup.indexOf('color: var(--shin-text);') >= 0,
       popup.indexOf('.shin-popup-item:hover { background: var(--shin-bg-hover); }') >= 0,
       popup.indexOf('.shin-popup-item.is-active') >= 0,
       popup.indexOf('background: var(--shin-primary-soft); color: var(--shin-primary-dark);') >= 0,
@@ -99,7 +105,7 @@ function chay(so) {
       source['client/sync/fbmSyncShell.html'].indexOf('shin-sync-nav') === -1,
       menu.indexOf('shin-menu-item') === -1,
       menu.indexOf("className = 'shin-popup-item'") >= 0],
-    [true, true, true, true, true, true, true, true, true, true, true, true]);
+    [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true]);
   check(so, 'cac controller popup dung API PopupList chung',
     [combo.indexOf('PopupList.show(box, inp') >= 0,
       choiceMenu.indexOf('PopupList.show(list, trigger') >= 0,

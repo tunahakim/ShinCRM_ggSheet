@@ -14,22 +14,27 @@
   box-shadow: var(--shin-shadow);
 }
 
-/* Base row: spacing comes from the input popup; text and state colors come from the old module menu. */
+/* Base row: typography follows the input control; spacing and separators follow the legacy dropdown. */
 .shin-popup-item {
   display: block;
   width: 100%;
   min-width: 0;
   margin: 0;
-  padding: var(--shin-gap-1) var(--shin-gap-2);
+  padding: 6px 10px;
   border: 0;
+  border-bottom: 1px solid var(--shin-border-faint);
   border-radius: 0;
   background: transparent;
-  color: var(--shin-text-soft);
-  font: 500 var(--shin-text-sm)/1.2 var(--shin-font);
+  color: var(--shin-text);
+  font-family: inherit;
+  font-size: var(--shin-text-md);
+  font-weight: 400;
+  line-height: var(--shin-line-height);
   text-align: left;
   cursor: pointer;
 }
 
+.shin-popup-item:last-child { border-bottom: 0; }
 .shin-popup-item:hover { background: var(--shin-bg-hover); }
 .shin-popup-item.is-active,
 .shin-popup-item.is-selected { background: var(--shin-primary-soft); color: var(--shin-primary-dark); }
