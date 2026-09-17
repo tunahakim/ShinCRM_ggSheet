@@ -256,7 +256,7 @@
 
 ### Kiểm thử offline R5
 
-- [ ] Ca nhiều edit chỉ có một payload reload do GAS trả trong request sẵn sàng; không có chuỗi `probeSelectionAndReload` → `reloadRecords` từ Sidebar (test `selectionPoll.js`, `selectionService.js`).
+- [x] Ca nhiều edit chỉ có một payload reload do GAS trả trong request sẵn sàng; không có chuỗi `probeSelectionAndReload` → `reloadRecords` từ Sidebar (test `selectionPoll.js`, `selectionService.js`).
 - [x] Ca rời sheet trước đủ ba giây gọi reload ngay (test `selectionPoll.js`).
 - [x] Ca revision đổi trong lúc request bay không mất mã mới (bounded follow-up trong `refresh.html`, test `selectionPoll.js`).
 - [x] Ca event đang bay không tạo Promise thứ hai (test `selectionPoll.js`).
@@ -425,7 +425,7 @@
 - [x] Test offline phủ sửa F sau khi A–E đã xử lý: F tạo revision mới và được trả ở lượt riêng sau debounce của F (`tests/cases/selectionService.js`).
 - [x] Test offline phủ F phát sinh trong lúc payload A–E đang được đọc: GAS không xóa F, response ghi `remainingRevision`, request kế tiếp nhận F; ca cùng một mã bị sửa lại trong lúc đọc cũng được giữ (`tests/cases/selectionService.js`).
 - [x] Test offline phủ response lệch thứ tự: response cũ không ghi đè payload/revision mới (`tests/cases/selectionPoll.js`).
-- [x] GAS DEV deployment `@397`: `reloadPayloadProbe --push` trả `defer` không payload rồi trả payload records trong chính request sau `readyAt`; probe không ghi dữ liệu khách và khôi phục DocumentProperties. `probeSelectionAndReload --push` cũng trả đúng contract `requestId`/selection/ReloadState/decision ở trạng thái sạch.
+- [x] GAS DEV deployment `@412`: `reloadPayloadProbe --push` trả `defer` không payload rồi trả payload records trong chính request sau `readyAt`; probe không ghi dữ liệu khách và khôi phục DocumentProperties. `probeSelectionAndReload` vẫn trả đúng contract `requestId`/selection/ReloadState/decision ở trạng thái sạch.
 - [x] Khi payload reload thực sự được áp dụng, Sidebar bật thanh tiến trình trong lúc nạp; request thăm dò/defer vẫn im lặng. Thanh giữ tối thiểu 120 ms để lượt nạp quá nhanh vẫn quan sát được (`client/ui/progress.html`, `client/link/sheetLink.html`; `node tests/run.js` đạt `1606/1606`).
 - [x] Tạm bật `SHEET_LINK_SHOW_PROBE_PROGRESS=true` trong giai đoạn nghiệm thu trực quan để mọi request `probeSelectionAndReload` hiện thanh tiến trình.
 - [ ] Trước nghiệm thu cuối và bàn giao, đổi `SHEET_LINK_SHOW_PROBE_PROGRESS=false`; xác nhận request thăm dò/defer im lặng và chỉ lượt reload thật mới hiện thanh tiến trình.
