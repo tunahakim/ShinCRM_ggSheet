@@ -460,18 +460,18 @@
 - [x] Sửa hai ô liên tiếp trong cùng khoảng gom: một payload chứa đầy đủ cả hai thay đổi và giao diện vẽ một lần (test `selectionService.js`).
 - [x] Chuyển khách 108 → 113 liên tục không nháy ngược về 108 do response/context cũ (test `selectionPoll.js`).
 - [x] Rê chuột vào Sidebar không tạo request và không bật loading (test `selectionPoll.js`, commit `fb5181b`).
-- [ ] Mọi phím đều dùng chung `keyboardHint`; click chỉ trong canvas được bắt, click làm Name Box đổi dùng vị trí, click không đổi Name Box vẫn gửi context sau vòng gom 200 ms.
+- [x] Mọi phím đều dùng chung `keyboardHint`; click chỉ trong canvas được bắt, click làm Name Box đổi dùng vị trí, click không đổi Name Box vẫn gửi context sau vòng gom 200 ms (code Extension; còn bổ sung ca test canvas).
 - [ ] Request thăm dò/defer vẫn im lặng; chỉ payload reload mới bật loading trong giai đoạn nghiệm thu.
 
-## Slice R13 — Giao thức context thô và tối ưu request (đang chờ triển khai)
+## Slice R13 — Giao thức context thô và tối ưu request (đang triển khai)
 
-- [ ] Ghi rõ payload `CRM_CONTEXT`: Name Box nguyên bản, sheet/gid/Spreadsheet ID, hàng 1 thô, `complete`, kết quả read plan, tín hiệu bàn phím/click, sequence và timestamp.
-- [ ] Hàng 1 gửi mọi ô có giá trị khác rỗng, dùng địa chỉ vật lý `A1`/`B1` và số cột vật lý; cột ẩn không bị đánh số lại; không gửi toàn bộ hàng dữ liệu.
-- [ ] Sidebar giữ schema và ý nghĩa mã `@`, tự phân tích `E5`, `E5:G7`, `A:A`, `5:7`; Extension không gửi `selectionKind`, `row`, `col` như kết luận nghiệp vụ.
-- [ ] Read plan được gửi lúc bắt tay hoặc khi schema đổi, không tạo chuỗi ba message cho mỗi lần chọn ô; Extension chỉ đối chiếu tọa độ/giá trị kỳ vọng và trả `ok`, `mismatch` hoặc `unavailable`.
-- [ ] Giữ `customerId`/`customerIdSource` cho tương thích; khi có input phải thử đọc giá trị mới, không dùng cache cũ làm giá trị hiện tại nếu live model chưa cập nhật.
-- [ ] Sidebar không hỏi GAS ở ô/vùng chắc chắn ngoài phạm vi; hàng 1 thiếu hoặc read plan lỗi thì fail-open và hỏi GAS.
-- [ ] GAS `probeSelectionAndReload` luôn trả `decision` và payload cần thiết trong cùng response; không có request reload thứ hai để hoàn tất cùng một lượt.
+- [x] Ghi rõ payload `CRM_CONTEXT`: Name Box nguyên bản, sheet/gid/Spreadsheet ID, hàng 1 thô, `complete`, kết quả read plan, tín hiệu bàn phím/click, sequence và timestamp.
+- [x] Hàng 1 gửi mọi ô có giá trị khác rỗng, dùng địa chỉ vật lý `A1`/`B1` và số cột vật lý; cột ẩn không bị đánh số lại; không gửi toàn bộ hàng dữ liệu.
+- [x] Sidebar giữ schema và ý nghĩa mã `@`, tự phân tích `E5`, `E5:G7`, `A:A`, `5:7`; Extension không gửi `selectionKind`, `row`, `col` như kết luận nghiệp vụ.
+- [x] Read plan được gửi lúc bắt tay hoặc khi schema đổi, không tạo chuỗi ba message cho mỗi lần chọn ô; Extension chỉ đối chiếu tọa độ/giá trị kỳ vọng và trả `ok`, `mismatch` hoặc `unavailable`.
+- [x] Giữ `customerId`/`customerIdSource` cho tương thích; khi có input phải thử đọc giá trị mới, không dùng cache cũ làm giá trị hiện tại nếu live model chưa cập nhật.
+- [x] Sidebar không hỏi GAS ở ô/vùng chắc chắn ngoài phạm vi; hàng 1 thiếu hoặc read plan lỗi thì fail-open và hỏi GAS.
+- [x] GAS `probeSelectionAndReload` luôn trả `decision` và payload cần thiết trong cùng response; không có request reload thứ hai để hoàn tất cùng một lượt.
 - [ ] Test click canvas, click phải rồi paste, click Sidebar/menu, click đổi Name Box, cột ẩn, chèn cột, sửa một ô/vùng hàng 1, thường-sang-thường và response cũ đến muộn.
 
 ---

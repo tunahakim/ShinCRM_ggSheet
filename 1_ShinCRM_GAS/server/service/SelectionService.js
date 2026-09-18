@@ -115,31 +115,53 @@ function selectionRenderDirtyViews(state) {
   return null;
 }
 
-/**
- * Vị trí các cột mà một thay đổi có thể làm bẩn RAM. Đây chỉ là hint vận chuyển
- * gửi cùng loadCore; GAS vẫn là nơi duy nhất quyết định scope reload từ onEdit/ReloadState.
- */
-function selectionReloadColumnHints() {
+function selectionColumnLetters(column) {
+  var value = Number(column);
+  var letters = '';
+  while (value > 0) {
+    var remainder = (value - 1) % 26;
+    letters = String.fromCharCode(65 + remainder) + letters;
+    value = Math.floor((value - 1) / 26);
+  }
+  return letters;
+}
+
+/** Kế hoạch đọc thô: Extension chỉ đọc đúng địa chỉ và trả giá trị, không biết token có ý nghĩa gì. */
+function selectionReadPlan() {
   var definitions = [
     { sheetName: ENTITY_SHEETS.customer, entity: 'customer' },
     { sheetName: ENTITY_SHEETS.activity, entity: 'activity' },
     { sheetName: 'Category', sheetCore: 'Category' },
-    { sheetName: 'Config', sheetCore: 'Config' }
+    { sheetName: 'Config', sheetCore: 'Config' },
+    { prefix: '!', entity: 'customer' },
+    { prefix: '!', entity: 'activity' }
   ];
-  var targets = [];
+  var plan = {};
   definitions.forEach(function (definition) {
+    var key = definition.sheetName || definition.prefix;
+    if (!plan[key]) { plan[key] = []; }
     try {
-      var map = readColumnMap(definition.sheetName);
+      var sourceSheet = definition.sheetName || (definition.entity === 'activity' ? ENTITY_SHEETS.activity : ENTITY_SHEETS.customer);
+      var map = readColumnMap(sourceSheet);
       var codes = definition.entity
-        ? Object.keys(DATA_SCHEMA[definition.entity]).map(function (name) { return DATA_SCHEMA[definition.entity][name].code; })
+        ? [definition.entity === 'customer' ? DATA_SCHEMA.customer.id.code : DATA_SCHEMA.activity.customerId.code]
         : sheetCoreColumns(definition.sheetCore).map(function (pair) { return pair[0]; });
-      var columns = codes.map(function (code) { return map.map[code]; }).filter(function (column) { return Number(column) > 0; });
-      targets.push({ sheetName: definition.sheetName, columns: columns });
+      codes.forEach(function (code) {
+        var column = Number(map.map[code] || 0);
+        if (!column) { return; }
+        var letters = selectionColumnLetters(column);
+        plan[key].push({
+          token: key + ':' + code,
+          headerAddress: letters + '1',
+          expectedValue: code,
+          valueAddressTemplate: definition.entity ? letters + '{row}' : ''
+        });
+      });
     } catch (ignore) {
-      // Thiếu sheet/map thì client phải fail-open và vẫn gửi wake để GAS tự quyết định.
+      // Client thiếu plan phải fail-open và hỏi GAS; không đoán cột.
     }
   });
-  return targets;
+  return plan;
 }
 
 /**

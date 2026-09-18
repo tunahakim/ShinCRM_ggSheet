@@ -21,51 +21,21 @@ var liveRequestCounter = 0;
 var livePendingRequest = null;
 var LIVE_MODEL_TIMEOUT_MS = 800;
 var liveRetryAt = 0;
-var pendingKeydownHint = false;
+var pendingInteractionHint = '';
 var lastResolvedCustomerId = '';
 var lastPositionKey = '';
 
-function liveHeaderForSheet(sheetName) {
-  var hints = typeof CRM_COLUMN_HINTS !== 'undefined' ? CRM_COLUMN_HINTS : null;
-  var targets = hints && Array.isArray(hints.targets) ? hints.targets : [];
-  var exact = targets.filter(function (target) {
-    return target.sheetName && target.sheetName === sheetName && target.header;
-  });
-  if (exact.length === 1) { return exact[0].header; }
-
-  var prefix = targets.filter(function (target) {
-    return target.prefix && String(sheetName || '').indexOf(target.prefix) === 0 && target.header;
-  });
-  return prefix.length === 1 ? prefix[0].header : '';
-}
-
-function reloadRelevantForContext(context) {
-  var hints = typeof CRM_COLUMN_HINTS !== 'undefined' ? CRM_COLUMN_HINTS : null;
-  var targets = hints && Array.isArray(hints.reloadColumns) ? hints.reloadColumns : null;
-  if (!targets) { return null; }
-  var sheetName = String(context && context.sheetName || '');
-  var row = Number(context && context.row || 0);
-  var firstColumn = Number(context && context.col || 0);
-  var lastColumn = Number(context && context.colEnd || firstColumn);
-  if (row <= 0 || firstColumn <= 0) { return null; }
-  return targets.some(function (target) {
-    if (target.sheetName && target.sheetName !== sheetName) { return false; }
-    if (target.prefix && sheetName.indexOf(target.prefix) !== 0) { return false; }
-    return target.columns.some(function (column) { return column >= firstColumn && column <= lastColumn; });
-  });
-}
-
 function sendResolvedContext(base, result, fallbackHeader, fallbackReason, hint) {
   var context = Object.assign({}, base);
-  if (result && result.status === 'ok') { lastResolvedCustomerId = String(result.customerId || '').trim(); }
-  // Kết quả live thất bại không được mượn mã cũ cho vị trí mới; cache chỉ phục vụ hint keydown.
-  context.customerId = result && result.status === 'ok' ? lastResolvedCustomerId : '';
-  context.customerIdHeader = result && result.header ? result.header : (fallbackHeader || '');
-  context.customerIdSource = 'live-model';
-  context.customerIdStatus = result && result.status ? result.status : 'unavailable';
+  var firstRead = result && Array.isArray(result.reads) ? result.reads.filter(function (item) { return item.status === 'ok'; })[0] : null;
+  if (firstRead) { lastResolvedCustomerId = String(firstRead.value || '').trim(); }
+  context.customerId = firstRead ? lastResolvedCustomerId : (result && result.status === 'ok' ? String(result.customerId || '').trim() : '');
+  context.customerIdSource = firstRead ? 'live-model' : 'unavailable';
+  context.customerIdStatus = firstRead ? 'ok' : (result && result.status ? result.status : 'unavailable');
   context.customerIdReason = result && result.reason ? result.reason : (fallbackReason || '');
-  var reloadRelevant = reloadRelevantForContext(base);
-  if (reloadRelevant !== null) { context.reloadRelevant = reloadRelevant; }
+  context.rawHeaderRow = result && Array.isArray(result.rawHeaderRow) ? result.rawHeaderRow : [];
+  context.headerComplete = result ? result.complete === true : false;
+  context.reads = result && Array.isArray(result.reads) ? result.reads : [];
   if (hint) { context.hint = hint; }
   seqCounter += 1;
   context.at = Date.now();
@@ -73,33 +43,17 @@ function sendResolvedContext(base, result, fallbackHeader, fallbackReason, hint)
   sendContextToSidebar(context);
 }
 
-function sendKeydownHint(base) {
-  var context = Object.assign({}, base, {
-    hint: 'keydown',
-    customerId: lastResolvedCustomerId,
-    customerIdSource: 'live-model-cache',
-    customerIdStatus: lastResolvedCustomerId ? 'ok' : 'unavailable',
-    customerIdReason: 'KEYDOWN_HINT'
-  });
-  var reloadRelevant = reloadRelevantForContext(base);
-  if (reloadRelevant !== null) { context.reloadRelevant = reloadRelevant; }
-  seqCounter += 1;
-  context.at = Date.now();
-  context.seq = seqCounter;
-  sendContextToSidebar(context);
-}
-
-function requestLiveCustomerId(base, header, hint) {
+function requestLiveCustomerId(base, coordinates, hint) {
   var requestId = 'live-' + Date.now().toString(36) + '-' + (++liveRequestCounter);
   if (livePendingRequest && livePendingRequest.timer) { clearTimeout(livePendingRequest.timer); }
-  livePendingRequest = { requestId: requestId, context: base, header: header, hint: hint || '' };
+  livePendingRequest = { requestId: requestId, context: base, hint: hint || '' };
   livePendingRequest.timer = setTimeout(function () {
     if (!livePendingRequest || livePendingRequest.requestId !== requestId) { return; }
     var pending = livePendingRequest;
     livePendingRequest = null;
     lastContextKey = '';
     liveRetryAt = Date.now() + 1000;
-    sendResolvedContext(pending.context, null, pending.header, 'LIVE_MODEL_TIMEOUT', pending.hint);
+    sendResolvedContext(pending.context, null, '', 'LIVE_MODEL_TIMEOUT', pending.hint);
   }, LIVE_MODEL_TIMEOUT_MS);
   window.postMessage({
     action: 'CRM_LIVE_MODEL_READ_REQUEST',
@@ -108,8 +62,8 @@ function requestLiveCustomerId(base, header, hint) {
     spreadsheetId: base.spreadsheetId,
     gid: base.gid,
     sheetName: base.sheetName,
-    row: base.row,
-    header: header
+    row: coordinates ? coordinates.row : 0,
+    readPlan: typeof CRM_READ_PLAN !== 'undefined' ? CRM_READ_PLAN : null
   }, location.origin);
 }
 
@@ -122,7 +76,7 @@ window.addEventListener('message', function (event) {
   var pending = livePendingRequest;
   livePendingRequest = null;
   if (pending.timer) { clearTimeout(pending.timer); }
-  sendResolvedContext(pending.context, data, pending.header, '', pending.hint);
+  sendResolvedContext(pending.context, data, '', '', pending.hint);
 });
 
 /*
@@ -231,28 +185,30 @@ function buildContext() {
     gid: readGid(),
     sheetName: readActiveSheetName(),
     cellRef: cellRef,
-    row: toaDo ? toaDo.row : 0,
-    col: toaDo ? toaDo.col : 0,
-    rowEnd: toaDo ? toaDo.rowEnd : 0,
-    colEnd: toaDo ? toaDo.colEnd : 0,
-    selectionKind: toaDo ? toaDo.selectionKind : (cellRef ? 'named' : 'none'),
     sheetTabs: readSheetTabs()
   };
 }
 
-function markInputHint() {
-  pendingKeydownHint = true;
+function markInputHint(kind) {
+  pendingInteractionHint = kind || 'keyboardHint';
 }
 
-document.addEventListener('keydown', markInputHint, true);
-document.addEventListener('beforeinput', markInputHint, true);
+document.addEventListener('keydown', function () { markInputHint('keyboardHint'); }, true);
+document.addEventListener('beforeinput', function () { markInputHint('keyboardHint'); }, true);
 document.addEventListener('keyup', function (event) {
-  var key = event && event.key;
-  if (key === 'Delete' || key === 'Backspace') { markInputHint(); }
+  markInputHint('keyboardHint');
+}, true);
+
+document.addEventListener('click', function (event) {
+  var target = event && event.target;
+  if (!target || !target.closest) { return; }
+  if (target.closest('canvas, .waffle-grid-container, .waffle-grid, [role="grid"]')) {
+    markInputHint('canvasClick');
+  }
 }, true);
 
 function contextPositionKey(context) {
-  return [context.sheetName || '', context.row || 0, context.col || 0, context.rowEnd || 0, context.colEnd || 0].join('|');
+  return [context.sheetName || '', context.cellRef || ''].join('|');
 }
 
 setInterval(function () {
@@ -263,33 +219,15 @@ setInterval(function () {
   // Chỉ bắn khi selection đổi hoặc có phím gõ. Phím gõ ở cùng một ô chỉ là
   // hint cho Sidebar, không khởi động live-model đọc mã khách lần nữa.
   var key = JSON.stringify(context);
-  var hasKeydownHint = pendingKeydownHint;
-  if (key === lastContextKey && !hasKeydownHint) { return; }
+  var interactionHint = pendingInteractionHint;
+  if (key === lastContextKey && !interactionHint) { return; }
   if (Date.now() < liveRetryAt) { return; }
   var positionKey = contextPositionKey(context);
   var positionChanged = positionKey !== lastPositionKey;
-  if (key === lastContextKey && hasKeydownHint) {
-    pendingKeydownHint = false;
-    sendKeydownHint(context);
-    return;
-  }
-  if (key !== lastContextKey && hasKeydownHint && !positionChanged) {
-    pendingKeydownHint = false;
-    lastContextKey = key;
-    lastPositionKey = positionKey;
-    sendKeydownHint(context);
-    return;
-  }
-  pendingKeydownHint = false;
+  pendingInteractionHint = '';
   lastContextKey = key;
   lastPositionKey = positionKey;
 
-  var header = liveHeaderForSheet(context.sheetName);
-  if (context.selectionKind !== 'cell') {
-    sendResolvedContext(context, null, header, 'UNSUPPORTED_SELECTION', hasKeydownHint ? 'keydown' : '');
-  } else if (!header) {
-    sendResolvedContext(context, null, '', 'NO_SCHEMA_TARGET', hasKeydownHint ? 'keydown' : '');
-  } else {
-    requestLiveCustomerId(context, header, hasKeydownHint ? 'keydown' : '');
-  }
+  var coordinates = parseRangeRef(context.cellRef);
+  requestLiveCustomerId(context, coordinates, interactionHint || (positionChanged ? 'position' : ''));
 }, 200);

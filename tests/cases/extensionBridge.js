@@ -51,7 +51,7 @@ async function chay(so) {
   section('Extension bridge — nonce đi trọn từ bắt tay tới CRM_CONTEXT');
   const scoutSource = fs.readFileSync(SCOUT_FILE, 'utf8');
   check(so, 'Extension chỉ quan sát selection, không đọc formula bar hoặc suy isEditing',
-    [scoutSource.indexOf('readFormulaBar') < 0, scoutSource.indexOf('cachedFormulaBar') < 0, scoutSource.indexOf('isEditing') < 0, scoutSource.indexOf("addEventListener('keydown'") >= 0, scoutSource.indexOf("addEventListener('beforeinput'") >= 0, scoutSource.indexOf("key === 'Delete'") >= 0, scoutSource.indexOf('sendKeydownHint') >= 0],
+    [scoutSource.indexOf('readFormulaBar') < 0, scoutSource.indexOf('cachedFormulaBar') < 0, scoutSource.indexOf('isEditing') < 0, scoutSource.indexOf("addEventListener('keydown'") >= 0, scoutSource.indexOf("addEventListener('beforeinput'") >= 0, scoutSource.indexOf("addEventListener('click'") >= 0, scoutSource.indexOf('reloadRelevant') < 0],
     [true, true, true, true, true, true, true]);
   const scoutHop = {
     console: { log() {} },
@@ -65,13 +65,6 @@ async function chay(so) {
   };
   vm.createContext(scoutHop);
   vm.runInContext(scoutSource, scoutHop, { filename: SCOUT_FILE });
-  scoutHop.CRM_COLUMN_HINTS = { reloadColumns: [{ sheetName: 'Customer', columns: [1, 3] }] };
-  check(so, 'hint reload không đánh thức GAS ở hàng 1/cột thường hoặc sheet trắng', [
-    scoutHop.reloadRelevantForContext({ sheetName: 'Customer', row: 1, col: 2, colEnd: 2 }),
-    scoutHop.reloadRelevantForContext({ sheetName: 'Customer', row: 1, col: 1, colEnd: 1 }),
-    scoutHop.reloadRelevantForContext({ sheetName: 'Customer', row: 4, col: 2, colEnd: 2 }),
-    scoutHop.reloadRelevantForContext({ sheetName: 'Blank', row: 4, col: 1, colEnd: 1 })
-  ], [false, true, false, false]);
   let hop;
   try { hop = napBridge(); } catch (err) { return ghiLoiNap(so, 'nạp iframe_bridge.js', err); }
 
@@ -86,24 +79,13 @@ async function chay(so) {
     [dung.sent[0].data.action, dung.sent[0].data.nonce, Boolean(dung.sent[0].data.sessionId), dung.sent[0].targetOrigin, hop.lastContextKey],
     ['CRM_HANDSHAKE_ACK', 'nonce-kiem-thu', true, 'https://abc-123.googleusercontent.com', '']);
 
+  const readPlan = { Customer: [{ token: 'id', headerAddress: 'A1', expectedValue: '@CUS_MA_KH', valueAddressTemplate: 'A{row}' }] };
   hop._onMessage({
     origin: 'https://abc-123.googleusercontent.com',
     source: dung.source,
-    data: {
-      action: 'CRM_COLUMN_HINTS',
-      nonce: 'nonce-kiem-thu',
-      columnHints: { targets: [{ sheetName: 'Customer', header: '@CUS_MA_KH' }, { prefix: '!', header: '@CUS_MA_KH' }] }
-    }
+    data: { action: 'CRM_HANDSHAKE', nonce: 'nonce-kiem-thu', readPlan: readPlan }
   });
-  check(so, 'schema mã cột động đi qua đúng kênh đã bắt tay',
-    [hop.CRM_COLUMN_HINTS.targets.length, hop.CRM_COLUMN_HINTS.targets[0].header], [2, '@CUS_MA_KH']);
-
-  hop._onMessage({
-    origin: 'https://abc-123.googleusercontent.com',
-    source: dung.source,
-    data: { action: 'CRM_COLUMN_HINTS', nonce: 'nonce-sai', columnHints: { targets: [{ sheetName: 'Customer', header: '@SAI' }] } }
-  });
-  check(so, 'column hints sai nonce không ghi đè hints đang dùng', hop.CRM_COLUMN_HINTS.targets[0].header, '@CUS_MA_KH');
+  check(so, 'read plan tọa độ đi qua đúng kênh đã bắt tay', hop.CRM_READ_PLAN.Customer[0].headerAddress, 'A1');
 
   hop.lastContextKey = 'ảnh vừa gửi';
   hop._onMessage({
@@ -113,9 +95,9 @@ async function chay(so) {
   });
   check(so, 'nhịp bắt tay lặp lại không ép gửi CRM_CONTEXT thừa mỗi giây', hop.lastContextKey, 'ảnh vừa gửi');
 
-  hop.sendContextToSidebar({ spreadsheetId: 'sheet-1', sheetName: 'Customer', row: 4 });
+  hop.sendContextToSidebar({ spreadsheetId: 'sheet-1', sheetName: 'Customer', cellRef: 'A4' });
   check(so, 'CRM_CONTEXT mang cùng nonce nên sidebar không loại tin hợp lệ',
-    [dung.sent[2].data.action, dung.sent[2].data.nonce, dung.sent[2].data.sessionId, dung.sent[2].data.spreadsheetId, dung.sent[2].targetOrigin],
+    [dung.sent[3].data.action, dung.sent[3].data.nonce, dung.sent[3].data.sessionId, dung.sent[3].data.spreadsheetId, dung.sent[3].targetOrigin],
     ['CRM_CONTEXT', 'nonce-kiem-thu', dung.sent[0].data.sessionId, 'sheet-1', 'https://abc-123.googleusercontent.com']);
 
   const la = nguonTin();
@@ -126,7 +108,7 @@ async function chay(so) {
   });
   hop.sendContextToSidebar({ spreadsheetId: 'sheet-1', sheetName: '!Lead', row: 5 });
   check(so, 'bắt tay sai origin bị bỏ và không chiếm kênh đang dùng',
-    [la.sent.length, dung.sent[3].data.nonce, dung.sent[3].targetOrigin],
+    [la.sent.length, dung.sent[4].data.nonce, dung.sent[4].targetOrigin],
     [0, 'nonce-kiem-thu', 'https://abc-123.googleusercontent.com']);
 
   const rong = nguonTin();

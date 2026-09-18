@@ -65,9 +65,9 @@ function chay(so) {
   check(so, 'chín danh mục thật đều có khóa dù chưa ai gõ giá trị', Object.keys(rong.categories).length, 9);
   check(so, 'khối trạng thái bẩn có mặt trong MỌI phản hồi, kể cả phản hồi rỗng', Object.keys(rong.dirty).sort(), ['all', 'config', 'records', 'viewSheets']);
   check(so, 'gói lõi mang cả bảng khai để client dựng Schema', Object.keys(rong.schema).sort(), ['activity', 'customer']);
-  check(so, 'gói lõi mang hint vị trí cột reload do GAS tính',
-    rong.selectionHints && rong.selectionHints.reloadColumns.map((item) => item.sheetName).sort(),
-    ['Activity', 'Category', 'Config', 'Customer']);
+  check(so, 'gói lõi mang read plan tọa độ do GAS tính',
+    rong.selectionHints && Object.keys(rong.selectionHints.readPlan).sort(),
+    ['!', 'Activity', 'Category', 'Config', 'Customer']);
   check(so, 'ms là số, không phải chuỗi', typeof rong.ms, 'number');
 
   const coLoiCho = dungNap(null, { LOG_PENDING: JSON.stringify(['2026-09-08 09:00:00 — lỗi nền']) });

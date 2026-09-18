@@ -74,6 +74,8 @@ var SETTINGS = {
   /** Nhịp dò chọn ô khi Extension vắng mặt. Chỉ cần khi không có Extension — có Extension thì tin tới liền, không dò. */
   SELECTION_POLL_MS: 2000,
   SELECTION_POLL_IDLE_MS: 6000,
+  POSITION_WAKE_MS: 1000,
+  EDIT_SETTLE_MS: 3000,
   HANDSHAKE_PING_MS: 1000,
   EXTENSION_ACK_TIMEOUT_MS: 3000
 };

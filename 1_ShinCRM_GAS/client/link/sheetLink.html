@@ -18,7 +18,8 @@
 var SHEET_LINK_NONCE = '';
 var SHEET_LINK_SEQ = 0;
 var SHEET_LINK_SPREADSHEET_ID = '';
-var SHEET_LINK_COLUMN_HINTS = null;
+var SHEET_LINK_READ_PLAN = null;
+var SHEET_LINK_SCHEMA = null;
 var SHEET_LINK_LAST_ACK = 0;
 var SHEET_LINK_EXTENSION_SESSION = '';
 var SHEET_LINK_LAST_SHEET = '';
@@ -70,58 +71,44 @@ function sheetLinkSetSpreadsheetId(id) {
   SHEET_LINK_SPREADSHEET_ID = String(id || '');
 }
 
-/** Gửi bảng mã cột do DATA_SCHEMA cung cấp; Extension không tự biết mã `@`. */
-function sheetLinkSetColumnHints(hints) {
-  if (!hints || !Array.isArray(hints.targets) || !hints.targets.length) {
-    SHEET_LINK_COLUMN_HINTS = null;
-    return;
-  }
-
-  SHEET_LINK_COLUMN_HINTS = {
-    targets: (Array.isArray(hints.targets) ? hints.targets : []).map(function (target) {
-      return {
-        sheetName: typeof target.sheetName === 'string' ? target.sheetName : '',
-        prefix: typeof target.prefix === 'string' ? target.prefix : '',
-        header: String(target.header || '').trim()
-      };
-    }).filter(function (target) {
-      return target.header && (target.sheetName || target.prefix);
-    }),
-    reloadColumns: Array.isArray(hints.reloadColumns) ? hints.reloadColumns.map(function (target) {
-      return {
-        sheetName: typeof target.sheetName === 'string' ? target.sheetName : '',
-        prefix: typeof target.prefix === 'string' ? target.prefix : '',
-        columns: Array.isArray(target.columns) ? target.columns.map(function (column) { return Number(column); }).filter(function (column) { return column > 0; }) : []
-      };
-    }).filter(function (target) {
-      return target.columns.length && (target.sheetName || target.prefix);
-    }) : []
-  };
-
+/** Gửi read plan dạng tọa độ; Extension không được nhận luật reload hay ý nghĩa token. */
+function sheetLinkSetReadPlan(plan) {
+  SHEET_LINK_READ_PLAN = plan && typeof plan === 'object' ? plan : null;
   if (window.top !== window) {
     try {
       window.top.postMessage({
-        action: 'CRM_COLUMN_HINTS',
+        action: 'CRM_HANDSHAKE',
         nonce: SHEET_LINK_NONCE,
         spreadsheetId: SHEET_LINK_SPREADSHEET_ID,
-        columnHints: SHEET_LINK_COLUMN_HINTS
+        readPlan: SHEET_LINK_READ_PLAN
       }, SHEET_LINK_ORIGIN);
     } catch (err) {}
   }
 }
 
+function sheetLinkRefreshViewReadPlan(context) {
+  if (!context || String(context.sheetName || '').indexOf('!') !== 0 || !Array.isArray(context.rawHeaderRow) || !SHEET_LINK_READ_PLAN || !Array.isArray(SHEET_LINK_READ_PLAN['!'])) { return; }
+  var headers = context.rawHeaderRow;
+  var dynamic = SHEET_LINK_READ_PLAN['!'].map(function (item) {
+    var match = headers.filter(function (header) { return String(header.value || '').trim() === String(item.expectedValue || '').trim(); })[0];
+    if (!match) { return item; }
+    var column = Number(match.column || 0);
+    var letters = '';
+    while (column > 0) { letters = String.fromCharCode(65 + ((column - 1) % 26)) + letters; column = Math.floor((column - 1) / 26); }
+    return Object.assign({}, item, { headerAddress: match.address, valueAddressTemplate: letters + '{row}' });
+  });
+  if (JSON.stringify(dynamic) !== JSON.stringify(SHEET_LINK_READ_PLAN['!'])) {
+    var next = Object.assign({}, SHEET_LINK_READ_PLAN, { '!': dynamic });
+    sheetLinkSetReadPlan(next);
+  }
+}
+
 /** Đồng bộ hint cột từ payload core; dùng lại sau mỗi fullCore để schema mới không giữ map cũ. */
 function sheetLinkApplyCoreHints(core) {
-  if (!core || !core.schema || typeof sheetLinkSetColumnHints !== 'function') { return; }
+  if (!core || !core.selectionHints || typeof sheetLinkSetReadPlan !== 'function') { return; }
   sheetLinkSetSpreadsheetId(core.spreadsheetId);
-  sheetLinkSetColumnHints({
-    targets: [
-      { sheetName: 'Customer', header: core.schema.customer.id.code },
-      { sheetName: 'Activity', header: core.schema.activity.customerId.code },
-      { prefix: '!', header: core.schema.customer.id.code }
-    ],
-    reloadColumns: core.selectionHints && core.selectionHints.reloadColumns
-  });
+  SHEET_LINK_SCHEMA = core.schema || SHEET_LINK_SCHEMA;
+  sheetLinkSetReadPlan(core.selectionHints.readPlan || null);
 }
 
 /** Context chỉ được giải mã sau khi Customer đã vào RAM. */
@@ -140,7 +127,7 @@ function sheetLinkHandshakePing() {
         action: 'CRM_HANDSHAKE',
         nonce: SHEET_LINK_NONCE,
         spreadsheetId: SHEET_LINK_SPREADSHEET_ID,
-        columnHints: SHEET_LINK_COLUMN_HINTS
+        readPlan: SHEET_LINK_READ_PLAN
       }, SHEET_LINK_ORIGIN);
     } catch (err) {
       // Extension chưa cài hoặc trang chưa sẵn sàng — không sao, ping lại ở nhịp sau.
@@ -201,12 +188,14 @@ function sheetLinkOnMessage(event) {
   SHEET_LINK_SEQ = data.seq;
 
   var previousPosition = sheetLinkPositionKey(SHEET_LINK_LAST_CONTEXT || {});
+  sheetLinkRefreshViewReadPlan(data);
+  var shouldWake = sheetLinkContextMayAffectReload(data);
   SHEET_LINK_CONTEXT_GENERATION += 1;
   var applied = sheetLinkApplyContext(data);
-  var reloadHintKnown = typeof data.reloadRelevant === 'boolean';
-  var reloadHintAllowsWake = !reloadHintKnown || data.reloadRelevant === true;
-  if ((data.hint === 'keydown' || previousPosition !== sheetLinkPositionKey(data)) && reloadHintAllowsWake) {
-    sheetLinkScheduleWake(data.hint === 'keydown' ? 'keydown' : 'position');
+  var positionChanged = previousPosition !== sheetLinkPositionKey(data);
+  var hasInteraction = data.hint === 'keyboardHint' || data.hint === 'keydown' || data.hint === 'canvasClick';
+  if (shouldWake && (hasInteraction || positionChanged)) {
+    sheetLinkScheduleWake(hasInteraction ? data.hint : 'position', data);
   }
   if (applied && typeof applied.then === 'function') {
     applied.then(null, function (err) {
@@ -242,6 +231,83 @@ function sheetLinkViewApplyResult(sheetName, result) {
     if (state.watch && !sheetLinkViewControlCell(state, state.watch.row, state.watch.col)) { state.watch = null; }
   }
   return result;
+}
+
+function sheetLinkParseNameBox(value) {
+  var text = String(value || '').trim().toUpperCase().split('!').pop();
+  var match = text.match(/^([A-Z]+)([0-9]+)(?::([A-Z]+)([0-9]+))?$/);
+  function columnNumber(value) {
+    var result = 0;
+    for (var i = 0; i < value.length; i++) { result = result * 26 + value.charCodeAt(i) - 64; }
+    return result;
+  }
+  if (match) { return { row: Number(match[2]), col: columnNumber(match[1]), rowEnd: Number(match[4] || match[2]), colEnd: columnNumber(match[3] || match[1]) }; }
+  var parts = text.split(':');
+  if (parts.length === 2 && /^\d+$/.test(parts[0]) && /^\d+$/.test(parts[1])) {
+    return { row: Number(parts[0]), col: 1, rowEnd: Number(parts[1]), colEnd: 0 };
+  }
+  if (parts.length === 2 && /^[A-Z]+$/.test(parts[0]) && /^[A-Z]+$/.test(parts[1])) {
+    return { row: 1, col: columnNumber(parts[0]), rowEnd: 0, colEnd: columnNumber(parts[1]) };
+  }
+  return null;
+}
+
+function sheetLinkPlanForSheet(sheetName) {
+  if (!SHEET_LINK_READ_PLAN) { return []; }
+  if (Array.isArray(SHEET_LINK_READ_PLAN[sheetName])) { return SHEET_LINK_READ_PLAN[sheetName]; }
+  return String(sheetName || '').indexOf('!') === 0 && Array.isArray(SHEET_LINK_READ_PLAN['!']) ? SHEET_LINK_READ_PLAN['!'] : [];
+}
+
+function sheetLinkExpectedCodes(sheetName, plans) {
+  var codes = plans.map(function (item) { return String(item.expectedValue || '').trim(); }).filter(Boolean);
+  if (SHEET_LINK_SCHEMA) {
+    var append = function (entity) {
+      var fields = SHEET_LINK_SCHEMA[entity] || {};
+      Object.keys(fields).forEach(function (name) { if (fields[name] && fields[name].code) { codes.push(String(fields[name].code).trim()); } });
+    };
+    if (sheetName === 'Customer') { append('customer'); }
+    else if (sheetName === 'Activity') { append('activity'); }
+    else if (String(sheetName || '').indexOf('!') === 0) { append('customer'); append('activity'); }
+  }
+  return codes.filter(function (code, index, array) { return array.indexOf(code) === index; });
+}
+
+function sheetLinkPlanColumn(address) {
+  var match = String(address || '').toUpperCase().match(/^([A-Z]+)1$/);
+  if (!match) { return 0; }
+  var result = 0;
+  for (var i = 0; i < match[1].length; i++) { result = result * 26 + match[1].charCodeAt(i) - 64; }
+  return result;
+}
+
+function sheetLinkRelevantHeaders(context, plans, coordinates) {
+  var current = Array.isArray(context.rawHeaderRow) ? context.rawHeaderRow : [];
+  var previous = SHEET_LINK_LAST_CONTEXT && Array.isArray(SHEET_LINK_LAST_CONTEXT.rawHeaderRow) ? SHEET_LINK_LAST_CONTEXT.rawHeaderRow : [];
+  var expectedCodes = sheetLinkExpectedCodes(context.sheetName, plans);
+  var columns = current.concat(previous).map(function (item) { return Number(item && item.column || 0); }).filter(function (column, index, array) { return column > 0 && array.indexOf(column) === index; });
+  columns = columns.filter(function (column) { return coordinates.colEnd === 0 || (column >= coordinates.col && column <= coordinates.colEnd); });
+  if (!columns.length) { return false; }
+  return columns.some(function (column) {
+    return current.concat(previous).some(function (item) { return Number(item && item.column || 0) === column && expectedCodes.indexOf(String(item.value || '').trim()) >= 0; });
+  });
+}
+
+/** Chỉ là tối ưu vận chuyển; GAS vẫn xác nhận onEdit/dirty/scope trong request. */
+function sheetLinkContextMayAffectReload(context) {
+  var value = context || {};
+  var plans = sheetLinkPlanForSheet(value.sheetName);
+  if (!plans.length) {
+    var knownSheet = value.sheetName === 'Customer' || value.sheetName === 'Activity' || value.sheetName === 'Category' || value.sheetName === 'Config' || String(value.sheetName || '').indexOf('!') === 0;
+    return knownSheet;
+  }
+  if (value.headerComplete === false || !Array.isArray(value.rawHeaderRow)) { return true; }
+  var coordinates = sheetLinkParseNameBox(value.cellRef);
+  if (!coordinates) { return true; }
+  if (coordinates.row === 1 || coordinates.rowEnd === 0) { return sheetLinkRelevantHeaders(value, plans, coordinates); }
+  var expectedCodes = sheetLinkExpectedCodes(value.sheetName, plans);
+  var columns = value.rawHeaderRow.map(function (item) { return expectedCodes.indexOf(String(item.value || '').trim()) >= 0 ? Number(item.column || 0) : 0; }).filter(function (column) { return column > 0; });
+  if (!columns.length) { return true; }
+  return columns.some(function (column) { return column >= coordinates.col && column <= coordinates.colEnd; });
 }
 
 function sheetLinkReloadState(payload) {
@@ -305,14 +371,18 @@ function sheetLinkCancelDirtyCheck() {
 }
 
 /** Một request đánh thức GAS sau khi hint cuối đã yên một giây. */
-function sheetLinkScheduleWake(reason) {
+function sheetLinkScheduleWake(reason, context) {
   if (!SHEET_LINK_RAM_READY || typeof setTimeout !== 'function') { return null; }
   SHEET_LINK_WAKE_REASON = reason || 'hint';
   if (SHEET_LINK_WAKE_TIMER !== null && typeof clearTimeout === 'function') { clearTimeout(SHEET_LINK_WAKE_TIMER); }
+  var coordinates = sheetLinkParseNameBox(context && context.cellRef);
+  var range = coordinates && (coordinates.rowEnd !== coordinates.row || coordinates.colEnd !== coordinates.col || coordinates.rowEnd === 0);
+  var editHint = reason === 'keyboardHint' || reason === 'keydown' || reason === 'canvasClick' || range;
+  var delay = sheetLinkMs(editHint ? 'EDIT_SETTLE_MS' : 'POSITION_WAKE_MS', editHint ? 3000 : 1000);
   SHEET_LINK_WAKE_TIMER = setTimeout(function () {
     SHEET_LINK_WAKE_TIMER = null;
     sheetLinkProbeSelectionAndReload(SHEET_LINK_WAKE_REASON);
-  }, sheetLinkMs('SELECTION_WAKE_DEBOUNCE_MS', 1000));
+  }, delay);
   return SHEET_LINK_WAKE_TIMER;
 }
 
@@ -474,7 +544,9 @@ function sheetLinkObserveReloadPayload(payload, serverName) {
 }
 
 function sheetLinkPositionKey(ctx) {
-  return [ctx.sheetName || '', ctx.row || 0, ctx.col || 0, ctx.rowEnd || 0, ctx.colEnd || 0].join('|');
+  var value = ctx || {};
+  var coordinates = sheetLinkParseNameBox(value.cellRef);
+  return [value.sheetName || '', value.cellRef || '', coordinates ? coordinates.row : value.row || 0, coordinates ? coordinates.col : value.col || 0, coordinates ? coordinates.rowEnd : value.rowEnd || 0, coordinates ? coordinates.colEnd : value.colEnd || 0].join('|');
 }
 
 /** Một sheet chỉ có một lượt làm mới đang bay; mọi lựa chọn đến trong lúc đó cùng chờ đúng lượt này. */

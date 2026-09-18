@@ -53,7 +53,7 @@ function dungHopPoll() {
     clearInterval: (id) => intervals.delete(id),
     Prefs: { followSelection: true }, SAVE_FLOW: { dangGui: false },
     ScreenState: { screen: 'view', currentCustomerId: '' }, SCREEN_VIEW: 'view',
-    SETTINGS: { SELECTION_POLL_MS: 2000, SELECTION_POLL_IDLE_MS: 6000, HANDSHAKE_PING_MS: 1000, EXTENSION_ACK_TIMEOUT_MS: 3000, RELOAD_SAFETY_POLL_MS: 60000 },
+    SETTINGS: { SELECTION_POLL_MS: 2000, SELECTION_POLL_IDLE_MS: 6000, POSITION_WAKE_MS: 1000, EDIT_SETTLE_MS: 3000, HANDSHAKE_PING_MS: 1000, EXTENSION_ACK_TIMEOUT_MS: 3000, RELOAD_SAFETY_POLL_MS: 60000 },
     ACTIONS: { setCurrentCustomer: () => null }
   });
   hop.Store = { hasCustomer: () => false };
@@ -125,8 +125,8 @@ async function chay(so) {
   const ctx = { action: 'CRM_CONTEXT', nonce: wake.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq: 1, sheetName: 'Customer', row: 4, col: 1, rowEnd: 4, colEnd: 1, hint: 'keydown' };
   wake.sheetLinkOnMessage({ origin: wake.SHEET_LINK_ORIGIN, data: ctx });
   wake.sheetLinkOnMessage({ origin: wake.SHEET_LINK_ORIGIN, data: Object.assign({}, ctx, { seq: 2 }) });
-  const wakeTimer = Array.from(wake._timers.values()).find((item) => item.delay === 1000);
-  check(so, 'keydown liên tiếp chỉ giữ một timer debounce một giây', [Boolean(wakeTimer), wake._timers.size >= 2], [true, true]);
+  const wakeTimer = Array.from(wake._timers.values()).find((item) => item.delay === 3000);
+  check(so, 'keydown liên tiếp chỉ giữ một timer debounce ba giây', [Boolean(wakeTimer), wake._timers.size >= 2], [true, true]);
   wakeTimer.fn();
   check(so, 'hết debounce chỉ hỏi GAS một request và request silent', [wake._calls.length, wake._calls[0].name, wake._calls[0].options.silent], [1, 'probeSelectionAndReload', true]);
 
@@ -140,7 +140,7 @@ async function chay(so) {
   const irrelevant = dungHopPoll(); batDau(irrelevant); irrelevant._calls = [];
   irrelevant.sheetLinkOnMessage({
     origin: irrelevant.SHEET_LINK_ORIGIN,
-    data: { action: 'CRM_CONTEXT', nonce: irrelevant.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq: 1, sheetName: 'Blank', row: 4, col: 1, rowEnd: 4, colEnd: 1, reloadRelevant: false }
+    data: { action: 'CRM_CONTEXT', nonce: irrelevant.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq: 1, sheetName: 'Blank', cellRef: 'A4', rawHeaderRow: [], headerComplete: true }
   });
   check(so, 'context sheet trắng không đặt wake request',
     [irrelevant._calls.length, Array.from(irrelevant._timers.values()).some((item) => item.delay === 1000)], [0, false]);
@@ -148,7 +148,7 @@ async function chay(so) {
   const relevant = dungHopPoll(); batDau(relevant); relevant._calls = [];
   relevant.sheetLinkOnMessage({
     origin: relevant.SHEET_LINK_ORIGIN,
-    data: { action: 'CRM_CONTEXT', nonce: relevant.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq: 1, sheetName: 'Customer', row: 4, col: 1, rowEnd: 4, colEnd: 1, reloadRelevant: true }
+    data: { action: 'CRM_CONTEXT', nonce: relevant.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq: 1, sheetName: 'Customer', cellRef: 'A4', rawHeaderRow: [], headerComplete: false }
   });
   check(so, 'context cột reload hợp lệ vẫn đặt wake debounce', Array.from(relevant._timers.values()).some((item) => item.delay === 1000), true);
 

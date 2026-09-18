@@ -420,7 +420,9 @@ function loadCore(options) {
       blocked: false,
       settings: SETTINGS,
       spreadsheetId: book.getId(),
-      selectionHints: typeof selectionReloadColumnHints === 'function' ? { reloadColumns: selectionReloadColumnHints() } : null,
+      selectionHints: typeof selectionReadPlan === 'function' ? {
+        readPlan: selectionReadPlan()
+      } : null,
       schema: DATA_SCHEMA,
       config: config,
       categories: danhMuc.categories,

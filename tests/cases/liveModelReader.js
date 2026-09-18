@@ -60,9 +60,14 @@ function chay(so) {
     [hop.sent[0].data.status, hop.sent[0].data.customerId, hop.sent[0].data.column, hop.sent[0].targetOrigin],
     ['ok', 'KH000006', 1, 'https://docs.google.com']);
 
+  hop.request(Object.assign({}, base, { requestId: 'plan-1', header: '', readPlan: { Customer: [{ token: 'id', headerAddress: 'A1', expectedValue: '@CUS_MA_KH', valueAddressTemplate: 'A{row}' }] } }));
+  check(so, 'read plan tra hang 1 tho va ket qua doi chieu toa do',
+    [hop.sent[1].data.complete, hop.sent[1].data.rawHeaderRow[0].address, hop.sent[1].data.reads[0].status, hop.sent[1].data.reads[0].value],
+    [true, 'A1', 'ok', 'KH000006']);
+
   hop.request(Object.assign({}, base, { requestId: 'live-2', row: 3 }));
   check(so, 'ô trống trả empty thay vì suy đoán mã',
-    [hop.sent[1].data.status, hop.sent[1].data.customerId], ['empty', '']);
+    [hop.sent[2].data.status, hop.sent[2].data.customerId], ['empty', '']);
 
   const duplicate = napReader([
     [cell('@CUS_MA_KH'), cell('@CUS_MA_KH')],
@@ -72,7 +77,7 @@ function chay(so) {
   check(so, 'header trùng bị đóng an toàn', duplicate.sent[0].data.reason, 'DUPLICATE_HEADER');
 
   hop.request(Object.assign({}, base, { requestId: 'live-3', header: '@KHONG_CO' }));
-  check(so, 'header không tồn tại bị đóng an toàn', hop.sent[2].data.reason, 'HEADER_NOT_FOUND');
+  check(so, 'header không tồn tại bị đóng an toàn', hop.sent[3].data.reason, 'HEADER_NOT_FOUND');
 }
 
 module.exports = { chay };

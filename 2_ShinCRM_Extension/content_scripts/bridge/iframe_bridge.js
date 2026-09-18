@@ -34,44 +34,25 @@ var sidebarWindow = null;
 var sidebarOrigin = '';
 var sidebarNonce = '';
 var extensionSessionId = Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
-var CRM_COLUMN_HINTS = null;
+var CRM_READ_PLAN = null;
 
-function isColumnHints(value) {
+function isReadPlan(value) {
   if (!value || typeof value !== 'object') { return false; }
-  var targetsOk = Array.isArray(value.targets) && value.targets.length && value.targets.every(function (target) {
-    return target && typeof target === 'object'
-      && ((typeof target.sheetName === 'string' && target.sheetName.trim() !== '')
-        || (typeof target.prefix === 'string' && target.prefix.trim() !== ''))
-      && typeof target.header === 'string' && target.header.trim() !== '';
+  return Object.keys(value).every(function (key) {
+    return Array.isArray(value[key]) && value[key].every(function (item) {
+      return item && typeof item === 'object'
+        && typeof item.token === 'string'
+        && typeof item.headerAddress === 'string'
+        && typeof item.expectedValue === 'string'
+        && typeof item.valueAddressTemplate === 'string';
+    });
   });
-  var reloadOk = Array.isArray(value.reloadColumns) && value.reloadColumns.every(function (target) {
-    return target && typeof target === 'object'
-      && ((typeof target.sheetName === 'string' && target.sheetName.trim() !== '')
-        || (typeof target.prefix === 'string' && target.prefix.trim() !== ''))
-      && Array.isArray(target.columns) && target.columns.every(function (column) { return Number(column) > 0; });
-  });
-  return !!(targetsOk || (reloadOk && value.reloadColumns.length));
 }
 
-function acceptColumnHints(data) {
-  if (!isColumnHints(data.columnHints)) { return; }
+function acceptReadPlan(data) {
+  if (!isReadPlan(data.readPlan)) { return; }
   if (data.spreadsheetId && typeof readSpreadsheetId === 'function' && String(data.spreadsheetId) !== String(readSpreadsheetId())) { return; }
-  CRM_COLUMN_HINTS = {
-    targets: (Array.isArray(data.columnHints.targets) ? data.columnHints.targets : []).map(function (target) {
-      return {
-        sheetName: typeof target.sheetName === 'string' ? target.sheetName : '',
-        prefix: typeof target.prefix === 'string' ? target.prefix : '',
-        header: target.header.trim()
-      };
-    }),
-    reloadColumns: Array.isArray(data.columnHints.reloadColumns) ? data.columnHints.reloadColumns.map(function (target) {
-      return {
-        sheetName: typeof target.sheetName === 'string' ? target.sheetName : '',
-        prefix: typeof target.prefix === 'string' ? target.prefix : '',
-        columns: Array.isArray(target.columns) ? target.columns.map(function (column) { return Number(column); }).filter(function (column) { return column > 0; }) : []
-      };
-    }).filter(function (target) { return target.columns.length && (target.sheetName || target.prefix); }) : []
-  };
+  CRM_READ_PLAN = data.readPlan;
   if (typeof lastContextKey !== 'undefined') { lastContextKey = ''; }
 }
 
@@ -177,11 +158,6 @@ window.addEventListener('message', function (event) {
     });
     return;
   }
-  if (data && data.action === 'CRM_COLUMN_HINTS') {
-    if (!isAllowedSidebarOrigin(event.origin) || event.source !== sidebarWindow || String(data.nonce || '') !== sidebarNonce) { return; }
-    acceptColumnHints(data);
-    return;
-  }
   if (!data || data.action !== 'CRM_HANDSHAKE') { return; }
   if (!isAllowedSidebarOrigin(event.origin) || !event.source) { return; }
   var nonce = String(data.nonce || '');
@@ -192,7 +168,7 @@ window.addEventListener('message', function (event) {
   sidebarWindow = event.source;
   sidebarOrigin = event.origin;
   sidebarNonce = nonce;
-  acceptColumnHints(data);
+  acceptReadPlan(data);
   if (newChannel && typeof lastContextKey !== 'undefined') { lastContextKey = ''; }
 
   try {
