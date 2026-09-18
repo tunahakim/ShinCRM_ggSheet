@@ -29,7 +29,7 @@
 
 - [x] Không dùng sheet quản trị làm nguồn sự thật (test `viewRenderer.js`).
 - [x] Không đọc ngược dữ liệu từ hàng 4 trở xuống của sheet quản trị về Customer/Activity (test `viewRenderer.js`).
-- [ ] Extension chỉ chuyển hàng 1 thô (mọi ô khác rỗng, địa chỉ vật lý và `complete`) và tín hiệu tương tác; Sidebar dùng schema/hàng 1 để tối ưu thời điểm hỏi, GAS vẫn quyết định dirty/scope (thiết kế mới, chờ code).
+- [x] Extension chỉ chuyển hàng 1 thô (mọi ô khác rỗng, địa chỉ vật lý và `complete`), `reads` theo địa chỉ và tín hiệu tương tác; Sidebar dùng schema/hàng 1 để tối ưu thời điểm hỏi, GAS vẫn quyết định dirty/scope (`sheet_scout.js`, `live_model_reader.js`, test Extension/Sidebar).
 - [x] Không xóa dirty state dùng chung chỉ vì một Sidebar đã đọc hoặc đã reload (revision guard trong `dirtyState.js`).
 - [x] Không coi ghi trạng thái đồng bộ là “không đổi nội dung” để bỏ qua reload (test status trong `reloadGates.js`).
 - [x] Không để GAS chờ Sidebar, Extension hoặc focus của người dùng trước khi vẽ sheet quản trị (test `triggers.js`, `reloadGates.js`).
@@ -215,8 +215,8 @@
 
 - [x] Sidebar giữ `previousSelectionContext`, `previousCustomerId`, `lastSeenRevision`, `localDraft` và các timer trong state của chính trang đó (client `sheetLink.html`).
 - [x] Extension chỉ gửi context selection và hint `position`/`keydown`; bỏ hoàn toàn suy đoán `isEditing`, đọc thanh công thức và đường `true -> false` (Extension `sheet_scout.js`, test `extensionBridge.js`).
-- [ ] Sidebar dùng `POSITION_WAKE_MS=1000` cho ô đơn/đổi sheet không có input; dùng `EDIT_SETTLE_MS=3000` cho vùng/hàng/cột, click canvas không đổi Name Box hoặc mọi phím.
-- [ ] Sidebar giữ schema và đối chiếu toàn bộ hàng 1 thô; nếu vùng có khả năng ảnh hưởng mã `@` thì mới đặt wake, nếu thiếu dữ liệu thì fail-open; Sidebar không tự quyết định dirty/scope/API reload.
+- [x] Sidebar dùng `POSITION_WAKE_MS=1000` cho ô đơn/đổi sheet không có input; dùng `EDIT_SETTLE_MS=3000` cho vùng/hàng/cột, click canvas không đổi Name Box hoặc mọi phím (`sheetLink.html`, `selectionPoll.js`).
+- [x] Sidebar giữ schema và đối chiếu toàn bộ hàng 1 thô; nếu vùng có khả năng ảnh hưởng mã `@` thì mới đặt wake, nếu thiếu dữ liệu thì fail-open; Sidebar không tự quyết định dirty/scope/API reload (`sheetLink.html`, `selectionPoll.js`).
 - [x] Request đang bay có guard, hint mới được giữ lại để xử lý sau và không tạo Promise chồng (test `selectionPoll.js`).
 - [x] Lỗi wake request không làm Sidebar treo; lần hint/safety poll kế tiếp vẫn có thể chạy (client `sheetLink.html`/`selectionPoll.html`, test `selectionPoll.js`).
 - [x] `lastSeenRevision` và context selection chỉ sống trong Sidebar, không ghi đè `DocumentProperties` dùng chung (client `sheetLink.html`, test `selectionPoll.js`).
@@ -236,9 +236,9 @@
 
 - [x] Có một request `probeSelectionAndReload` bên ngoài thay cho chuỗi RPC `probeSelectionCheap` → `probeSelectionFull` (client/server, test `selectionPoll.js`, `selectionService.js`).
 - [x] Khi selection không đổi, GAS trả context/mã khách cũ và không đọc lại ô mã khách (test `selectionService.js`).
-- [ ] Khi selection đổi, GAS vẫn tự tra schema và đọc mã khách trong cùng request nếu không có dữ liệu Extension; Extension chỉ gửi `reads` thô, Sidebar tự lấy giá trị từ `reads` để đổi khách (test `selectionService.js`, `selectionPoll.js`).
+- [x] Khi selection đổi, GAS vẫn tự tra schema và đọc mã khách trong cùng request nếu không có dữ liệu Extension; Extension chỉ gửi `reads` thô, Sidebar tự lấy giá trị từ `reads` để đổi khách (test `selectionService.js`, `selectionPoll.js`).
 - [x] Response selection/reload luôn kèm `ReloadState`, `decision`, `payload`, `observedRevision`, `processedRevision` và trạng thái còn bẩn; Sidebar không tự quyết định scope và chỉ áp dụng payload (server `SelectionService.js`, test `selectionService.js`, GAS DEV `reloadPayloadProbe` `@412`).
-- [ ] Context Extension có `reads` hợp lệ được Sidebar áp dụng ngay cho màn hình chính trước các RPC kiểm tra dirty; RPC chạy nền không chặn nguồn-chọn cục bộ (client `sheetLink.html`, test `selectionPoll.js`).
+- [x] Context Extension có `reads` hợp lệ được Sidebar áp dụng ngay cho màn hình chính trước các RPC kiểm tra dirty; RPC chạy nền không chặn nguồn-chọn cục bộ (client `sheetLink.html`, test `selectionPoll.js`).
 - [x] Fallback polling vị trí 2 giây rồi 6 giây gộp luôn kiểm tra reload, không tạo request kiểm tra thứ hai; request probe chạy silent và chỉ payload thật mới hiện loading (test `selectionPoll.js`).
 - [x] Safety polling theo phút chạy im lặng, chỉ phục vụ RAM và không kích hoạt renderer view (client `selectionPoll.html`, test `selectionPoll.js`).
 - [x] `focus`/`visibilitychange` không gọi đồng bộ dirty ngay; chỉ đánh thức fallback/safety, tránh loading khi chuyển tab trình duyệt hoặc chuyển app (client `selectionPoll.html`, test `selectionPoll.js`).
@@ -389,7 +389,7 @@
 ## Slice R9 — Điều kiện đóng
 
 - [ ] Không còn mục bắt buộc chưa có bằng chứng.
-- [ ] Tài liệu và code thống nhất: không polling liên tục theo giây; chỉ có wake request sau debounce một giây, fallback selection probe gộp kiểm tra reload và safety polling thưa theo `SETTINGS` cho RAM. Sheet quản trị vẫn do GAS chủ động vẽ từ signal.
+- [x] Tài liệu và code thống nhất: không polling liên tục theo giây; chỉ có wake request sau debounce một giây, fallback selection probe gộp kiểm tra reload và safety polling thưa theo `SETTINGS` cho RAM. Sheet quản trị vẫn do GAS chủ động vẽ từ signal.
 - [x] Không còn đường ghi Customer/Activity thành công nào không đi qua signal chung (test tĩnh `writeGateAudit.js`, test hành vi `reloadGates.js`).
 - [x] Không còn client tự phân loại cột `@`; phân loại nằm ở GAS `Triggers`/`ReloadDecision`. Extension chỉ đối chiếu vị trí với metadata do GAS cấp để chặn request thừa, không quyết định scope (test `triggers.js`, `reloadDecision.js`, `selectionPoll.js`).
 - [x] Không còn renderer chỉ vẽ view active sau signal dữ liệu; renderer duyệt toàn bộ sheet `!` (test `viewRenderer.js`, `triggers.js`).

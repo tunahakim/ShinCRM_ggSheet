@@ -269,7 +269,7 @@ Chỉ các lượt thực sự nạp RAM, full core, hoặc thao tác người d
 
 Trên Spreadsheet DEV phải chứng minh:
 
-1. Extension vẫn lấy đúng `customerId` khi click vào Customer, Activity và sheet quản trị.
+1. Extension vẫn gửi `reads` mới theo read plan khi click vào Customer, Activity và sheet quản trị; Sidebar đối chiếu giá trị đó với Store rồi đổi khách.
 2. Không có Extension, một request selection trả được context, mã khách khi vị trí đổi và quyết định reload.
 3. Không đổi vị trí thì không đọc lại ô mã khách.
 4. Sửa cùng một ô Customer, đứng nguyên sheet, Sidebar reload sau 3 giây tính từ `onEdit` cuối.
