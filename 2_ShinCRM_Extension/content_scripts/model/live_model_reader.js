@@ -74,9 +74,7 @@
       gid: String(request.gid || ''),
       sheetName: String(request.sheetName || ''),
       row: Number(request.row) || 0,
-    header: String(request.header || ''),
     status: 'unavailable',
-    customerId: '',
     reason: '',
     complete: false,
     rawHeaderRow: [],
@@ -128,23 +126,9 @@
       });
     });
 
-    if (!plans.length && reply.header && reply.row > 0) {
-      var matches = headers.filter(function (item) { return item.value === reply.header; });
-      if (matches.length === 1) {
-        var legacyValue = readCell(grid, reply.row, matches[0].column);
-        reply.column = matches[0].column;
-        reply.customerId = legacyValue.value.trim();
-        reply.status = legacyValue.present ? (reply.customerId ? 'ok' : 'empty') : 'unavailable';
-      } else {
-        reply.reason = matches.length ? 'DUPLICATE_HEADER' : 'HEADER_NOT_FOUND';
-      }
-    } else {
-      var first = reply.reads.filter(function (item) { return item.status === 'ok'; })[0];
-      if (first) { reply.customerId = String(first.value || '').trim(); reply.status = reply.customerId ? 'ok' : 'empty'; }
-      else if (reply.reads.some(function (item) { return item.status === 'mismatch'; })) { reply.status = 'mismatch'; reply.reason = 'READ_PLAN_MISMATCH'; }
-      else if (reply.reads.length) { reply.reason = 'READ_PLAN_UNAVAILABLE'; }
-      else { reply.status = 'ok'; }
-    }
+    if (reply.reads.some(function (item) { return item.status === 'mismatch'; })) { reply.status = 'mismatch'; reply.reason = 'READ_PLAN_MISMATCH'; }
+    else if (reply.reads.some(function (item) { return item.status === 'unavailable'; })) { reply.status = 'unavailable'; reply.reason = 'READ_PLAN_UNAVAILABLE'; }
+    else { reply.status = 'ok'; }
     return reply;
   }
 
@@ -165,9 +149,7 @@
         gid: String(data.gid || ''),
         sheetName: String(data.sheetName || ''),
         row: Number(data.row) || 0,
-        header: String(data.header || ''),
         status: 'unavailable',
-        customerId: '',
         reason: 'READER_ERROR',
         complete: false,
         rawHeaderRow: [],

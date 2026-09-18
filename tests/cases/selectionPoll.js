@@ -207,8 +207,8 @@ async function chay(so) {
   staleSelection.SHEET_LINK_LAST_ACK = Date.now();
   let releaseStaleProbe;
   staleSelection.callServer = () => new Promise((resolve) => { releaseStaleProbe = resolve; });
-  const context108 = { action: 'CRM_CONTEXT', nonce: staleSelection.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq: 1, sheetName: 'Customer', row: 4, col: 1, rowEnd: 4, colEnd: 1, customerId: 'CUS-108' };
-  const context113 = Object.assign({}, context108, { seq: 2, row: 5, customerId: 'CUS-113' });
+  const context108 = { action: 'CRM_CONTEXT', nonce: staleSelection.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq: 1, sheetName: 'Customer', row: 4, col: 1, rowEnd: 4, colEnd: 1, reads: [{ status: 'ok', matched: true, value: 'CUS-108' }] };
+  const context113 = Object.assign({}, context108, { seq: 2, row: 5, reads: [{ status: 'ok', matched: true, value: 'CUS-113' }] });
   staleSelection.sheetLinkOnMessage({ origin: staleSelection.SHEET_LINK_ORIGIN, data: context108 });
   staleSelection.sheetLinkProbeSelectionAndReload('old-selection');
   staleSelection.sheetLinkOnMessage({ origin: staleSelection.SHEET_LINK_ORIGIN, data: context113 });
@@ -223,21 +223,21 @@ async function chay(so) {
 
   const direct = dungHopPoll(); batDau(direct); direct.Store.hasCustomer = () => true; direct._picked = [];
   direct.ACTIONS.setCurrentCustomer = ({ pick }) => { direct._picked.push(pick); };
-  direct.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: '!Lead', row: 4, col: 2, customerId: 'KH000001' });
-  check(so, 'context Extension gửi mã khách được dùng trực tiếp, không suy từ tọa độ', direct._picked, ['KH000001']);
-  check(so, 'thiếu customerId thì không đoán khách từ tọa độ', direct.sheetLinkCustomerIdFromContext({ sheetName: '!Lead', row: 4, col: 2 }), '');
+  direct.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: '!Lead', row: 4, col: 2, reads: [{ status: 'ok', matched: true, value: 'KH000001' }] });
+  check(so, 'context Extension gửi reads được Sidebar đối chiếu thành mã khách', direct._picked, ['KH000001']);
+  check(so, 'thiếu reads thì không đoán khách từ tọa độ', direct.sheetLinkCustomerIdFromContext({ sheetName: '!Lead', row: 4, col: 2 }), '');
 
   const immediate = dungHopPoll(); batDau(immediate); immediate.SHEET_LINK_LAST_SHEET = 'Customer';
   immediate.Store.hasCustomer = () => true; immediate._picked = [];
   immediate.ACTIONS.setCurrentCustomer = ({ pick }) => { immediate._picked.push(pick); };
   immediate.callServer = () => new Promise(() => {});
-  immediate.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: 'Activity', row: 4, col: 2, customerId: 'KH000002' });
+  immediate.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: 'Activity', row: 4, col: 2, reads: [{ status: 'ok', matched: true, value: 'KH000002' }] });
   check(so, 'đổi sheet áp dụng khách ngay dù RPC kiểm tra dirty chưa trả', immediate._picked, ['KH000002']);
 
   const syncOpen = dungHopPoll(); batDau(syncOpen); syncOpen.FBM_SYNC_CLIENT = { active: true };
   syncOpen.Store.hasCustomer = () => true; syncOpen._picked = [];
   syncOpen.ACTIONS.setCurrentCustomer = ({ pick }) => { syncOpen._picked.push(pick); };
-  syncOpen.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: 'Customer', row: 4, col: 1, customerId: 'KH-SYNC' });
+  syncOpen.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: 'Customer', row: 4, col: 1, reads: [{ status: 'ok', matched: true, value: 'KH-SYNC' }] });
   check(so, 'click ô khi đang ở module Đồng bộ không vẽ đè màn chính', syncOpen._picked, []);
 
   const taiLai = dungHopPoll(); batDau(taiLai); taiLai.SHEET_LINK_SEQ = 99;

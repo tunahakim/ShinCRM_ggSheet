@@ -469,7 +469,7 @@
 - [x] Hàng 1 gửi mọi ô có giá trị khác rỗng, dùng địa chỉ vật lý `A1`/`B1` và số cột vật lý; cột ẩn không bị đánh số lại; không gửi toàn bộ hàng dữ liệu.
 - [x] Sidebar giữ schema và ý nghĩa mã `@`, tự phân tích `E5`, `E5:G7`, `A:A`, `5:7`; Extension không gửi `selectionKind`, `row`, `col` như kết luận nghiệp vụ.
 - [x] Read plan được gửi lúc bắt tay hoặc khi schema đổi, không tạo chuỗi ba message cho mỗi lần chọn ô; Extension chỉ đối chiếu tọa độ/giá trị kỳ vọng và trả `ok`, `mismatch` hoặc `unavailable`.
-- [ ] Loại trường nghiệp vụ `customerId`/`customerIdSource` khỏi payload Extension; giữ kết quả đọc thô và để Sidebar tự đối chiếu Store. Khi có input phải thử đọc giá trị mới, không dùng cache cũ làm giá trị hiện tại nếu live model chưa cập nhật.
+- [x] Loại trường nghiệp vụ `customerId`/`customerIdSource` khỏi payload Extension; giữ kết quả đọc thô và để Sidebar tự đối chiếu Store. Khi có input phải thử đọc giá trị mới, không dùng cache cũ làm giá trị hiện tại nếu live model chưa cập nhật (`sheet_scout.js`, `live_model_reader.js`, `tests/cases/liveModelReader.js`, `tests/cases/selectionPoll.js`).
 - [x] Không tạo probe thứ hai sau `saveRecord`/`deleteRecords` khi response đã có dữ liệu ghi hoặc payload đủ áp RAM; mọi response có dirty phải được phân loại trước khi quyết định gọi thêm (`tests/cases/selectionPoll.js`).
 - [x] Selection nguyên hàng (`5:7`) và sheet mặc định đã biết là trắng không được bị bỏ sót hoặc tạo wake thừa; có test riêng cho hai nhánh này (`tests/cases/selectionPoll.js`).
 - [ ] Xóa entry point công khai `probeSelectionCheap`/`probeSelectionFull`; chỉ giữ `probeSelectionAndReload`.

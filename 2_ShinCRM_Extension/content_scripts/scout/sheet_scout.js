@@ -22,17 +22,12 @@ var livePendingRequest = null;
 var LIVE_MODEL_TIMEOUT_MS = 800;
 var liveRetryAt = 0;
 var pendingInteractionHint = '';
-var lastResolvedCustomerId = '';
 var lastPositionKey = '';
 
-function sendResolvedContext(base, result, fallbackHeader, fallbackReason, hint) {
+function sendResolvedContext(base, result, fallbackReason, hint) {
   var context = Object.assign({}, base);
-  var firstRead = result && Array.isArray(result.reads) ? result.reads.filter(function (item) { return item.status === 'ok'; })[0] : null;
-  if (firstRead) { lastResolvedCustomerId = String(firstRead.value || '').trim(); }
-  context.customerId = firstRead ? lastResolvedCustomerId : (result && result.status === 'ok' ? String(result.customerId || '').trim() : '');
-  context.customerIdSource = firstRead ? 'live-model' : 'unavailable';
-  context.customerIdStatus = firstRead ? 'ok' : (result && result.status ? result.status : 'unavailable');
-  context.customerIdReason = result && result.reason ? result.reason : (fallbackReason || '');
+  context.readStatus = result && result.status ? String(result.status) : 'unavailable';
+  context.readReason = result && result.reason ? result.reason : (fallbackReason || '');
   context.rawHeaderRow = result && Array.isArray(result.rawHeaderRow) ? result.rawHeaderRow : [];
   context.headerComplete = result ? result.complete === true : false;
   context.reads = result && Array.isArray(result.reads) ? result.reads : [];
@@ -43,7 +38,7 @@ function sendResolvedContext(base, result, fallbackHeader, fallbackReason, hint)
   sendContextToSidebar(context);
 }
 
-function requestLiveCustomerId(base, coordinates, hint) {
+function requestLiveReads(base, coordinates, hint) {
   var requestId = 'live-' + Date.now().toString(36) + '-' + (++liveRequestCounter);
   if (livePendingRequest && livePendingRequest.timer) { clearTimeout(livePendingRequest.timer); }
   livePendingRequest = { requestId: requestId, context: base, hint: hint || '' };
@@ -53,7 +48,7 @@ function requestLiveCustomerId(base, coordinates, hint) {
     livePendingRequest = null;
     lastContextKey = '';
     liveRetryAt = Date.now() + 1000;
-    sendResolvedContext(pending.context, null, '', 'LIVE_MODEL_TIMEOUT', pending.hint);
+    sendResolvedContext(pending.context, null, 'LIVE_MODEL_TIMEOUT', pending.hint);
   }, LIVE_MODEL_TIMEOUT_MS);
   window.postMessage({
     action: 'CRM_LIVE_MODEL_READ_REQUEST',
@@ -76,7 +71,7 @@ window.addEventListener('message', function (event) {
   var pending = livePendingRequest;
   livePendingRequest = null;
   if (pending.timer) { clearTimeout(pending.timer); }
-  sendResolvedContext(pending.context, data, '', '', pending.hint);
+  sendResolvedContext(pending.context, data, '', pending.hint);
 });
 
 /*
@@ -229,5 +224,5 @@ setInterval(function () {
   lastPositionKey = positionKey;
 
   var coordinates = parseRangeRef(context.cellRef);
-  requestLiveCustomerId(context, coordinates, interactionHint || (positionChanged ? 'position' : ''));
+  requestLiveReads(context, coordinates, interactionHint || (positionChanged ? 'position' : ''));
 }, 200);

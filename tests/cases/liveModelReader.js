@@ -53,31 +53,34 @@ function chay(so) {
     gid: '9',
     sheetName: 'Customer',
     row: 2,
-    header: '@CUS_MA_KH'
+    readPlan: { Customer: [{ token: 'id', headerAddress: 'A1', expectedValue: '@CUS_MA_KH', valueAddressTemplate: 'A{row}' }] }
   };
   hop.request(base);
-  check(so, 'đọc đúng mã theo header động và hàng đang chọn',
-    [hop.sent[0].data.status, hop.sent[0].data.customerId, hop.sent[0].data.column, hop.sent[0].targetOrigin],
-    ['ok', 'KH000006', 1, 'https://docs.google.com']);
+  check(so, 'trả giá trị đọc thô theo địa chỉ, không tạo customerId',
+    [hop.sent[0].data.status, hop.sent[0].data.reads[0].value, Object.prototype.hasOwnProperty.call(hop.sent[0].data, 'customerId'), hop.sent[0].targetOrigin],
+    ['ok', 'KH000006', false, 'https://docs.google.com']);
 
-  hop.request(Object.assign({}, base, { requestId: 'plan-1', header: '', readPlan: { Customer: [{ token: 'id', headerAddress: 'A1', expectedValue: '@CUS_MA_KH', valueAddressTemplate: 'A{row}' }] } }));
+  hop.request(Object.assign({}, base, { requestId: 'plan-1' }));
   check(so, 'read plan tra hang 1 tho va ket qua doi chieu toa do',
     [hop.sent[1].data.complete, hop.sent[1].data.rawHeaderRow[0].address, hop.sent[1].data.reads[0].status, hop.sent[1].data.reads[0].value],
     [true, 'A1', 'ok', 'KH000006']);
 
   hop.request(Object.assign({}, base, { requestId: 'live-2', row: 3 }));
-  check(so, 'ô trống trả empty thay vì suy đoán mã',
-    [hop.sent[2].data.status, hop.sent[2].data.customerId], ['empty', '']);
+  check(so, 'ô trống trả reads rỗng thay vì suy đoán mã',
+    [hop.sent[2].data.status, hop.sent[2].data.reads[0].value, Object.prototype.hasOwnProperty.call(hop.sent[2].data, 'customerId')], ['ok', '', false]);
 
   const duplicate = napReader([
     [cell('@CUS_MA_KH'), cell('@CUS_MA_KH')],
     [cell('KH000001'), cell('KH000002')]
   ]);
   duplicate.request(base);
-  check(so, 'header trùng bị đóng an toàn', duplicate.sent[0].data.reason, 'DUPLICATE_HEADER');
+  check(so, 'hàng 1 trả địa chỉ vật lý kể cả khi có header trùng',
+    [duplicate.sent[0].data.rawHeaderRow[0].address, duplicate.sent[0].data.rawHeaderRow[1].address, Object.prototype.hasOwnProperty.call(duplicate.sent[0].data, 'customerId')],
+    ['A1', 'B1', false]);
 
-  hop.request(Object.assign({}, base, { requestId: 'live-3', header: '@KHONG_CO' }));
-  check(so, 'header không tồn tại bị đóng an toàn', hop.sent[3].data.reason, 'HEADER_NOT_FOUND');
+  hop.request(Object.assign({}, base, { requestId: 'live-3', readPlan: { Customer: [{ token: 'id', headerAddress: 'A1', expectedValue: '@KHONG_CO', valueAddressTemplate: 'A{row}' }] } }));
+  check(so, 'giá trị kỳ vọng không khớp bị trả về rõ ràng',
+    [hop.sent[3].data.status, hop.sent[3].data.reason, hop.sent[3].data.reads[0].status], ['mismatch', 'READ_PLAN_MISMATCH', 'mismatch']);
 }
 
 module.exports = { chay };

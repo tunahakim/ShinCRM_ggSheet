@@ -1,14 +1,15 @@
 <script>
 /**
- * `sheetLink` — tai nghe tin `CRM_CONTEXT` từ Extension, giải mã thành mã khách, rồi gọi `ACTIONS.setCurrentCustomer`.
+ * `sheetLink` — tai nghe tin context thô từ Extension, đối chiếu reads trong Sidebar,
+ * rồi gọi `ACTIONS.setCurrentCustomer`.
  *
  * Ba tầng lọc trước khi dùng tin:
  *   1. nonce — chỉ nhận tin mang đúng nonce mà sidebar vừa sinh, bỏ mọi tin lạ.
  *   2. origin — chỉ nhận từ `docs.google.com`, bỏ tin từ iframe khác.
  *   3. seq — bỏ tin cũ (seq nhỏ hơn seq đã dùng), tránh tin đến muộn đè tin mới.
  *
- * Extension gửi `customerId` đã đọc trực tiếp từ model live của Sheets. Sidebar chỉ
- * kiểm tra mã đó có trong Store; không tra theo số hàng và không dùng dữ liệu vị trí cũ.
+ * Extension chỉ gửi Name Box, hàng 1 thô và kết quả đọc theo địa chỉ. Sidebar mới
+ * đối chiếu reads với Store; GAS vẫn là nơi quyết định reload và scope nghiệp vụ.
  *
  * Chỉ gọi `setCurrentCustomer` khi `Prefs.followSelection` bật và đang ở màn `view` (không giật màn khi đang mở form).
  *
@@ -621,9 +622,8 @@ function sheetLinkApplyContext(ctx) {
   if (!ctx) { return null; }
   SHEET_LINK_LAST_CONTEXT = Object.assign({}, ctx);
   SHEET_LINK_SELECTION_CONTEXT = Object.assign({}, ctx);
-  if (Object.prototype.hasOwnProperty.call(ctx, 'customerId')) {
-    SHEET_LINK_PREVIOUS_CUSTOMER_ID = String(ctx.customerId || '').trim();
-  }
+  if (Array.isArray(ctx.reads)) { SHEET_LINK_PREVIOUS_CUSTOMER_ID = sheetLinkCustomerIdFromContext(ctx); }
+  else if (Object.prototype.hasOwnProperty.call(ctx, 'customerId')) { SHEET_LINK_PREVIOUS_CUSTOMER_ID = String(ctx.customerId || '').trim(); }
   var ticket = ++SHEET_LINK_APPLY_TICKET;
   var previousSheet = SHEET_LINK_LAST_SHEET;
   var changedSheet = ctx.sheetName !== previousSheet;
@@ -709,7 +709,13 @@ function sheetLinkApplyCustomerContext(ctx) {
 }
 
 function sheetLinkCustomerIdFromContext(ctx) {
-  // Mã do live model là nguồn chính; mã ngay ô active là đường tắt an toàn.
+  var reads = Array.isArray(ctx && ctx.reads) ? ctx.reads : [];
+  for (var i = 0; i < reads.length; i++) {
+    var read = reads[i] || {};
+    var value = String(read.value || '').trim().toUpperCase();
+    if (read.status === 'ok' && read.matched === true && value && Store.hasCustomer(value)) { return value; }
+  }
+  // GAS selection response vẫn có thể mang mã khách; đây không phải payload Extension.
   var direct = String(ctx.customerId || '').trim().toUpperCase();
   if (direct && Store.hasCustomer(direct)) { return direct; }
 
