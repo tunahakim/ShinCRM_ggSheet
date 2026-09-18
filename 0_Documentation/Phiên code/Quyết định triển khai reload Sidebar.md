@@ -18,7 +18,7 @@ Các yêu cầu phải đạt:
 1. GAS là nơi duy nhất biết một giá trị có thực sự được ghi, cột có mã hợp lệ hay không, mã bản ghi nào bị ảnh hưởng và scope reload nào an toàn.
 2. Mọi ghi thành công vào `Customer` hoặc `Activity` qua `onEdit`, `WriteGate`, `DeleteGate`, pull, push hoặc background đều phát signal dirty chung.
 3. Sheet quản trị được GAS quyết định và vẽ độc lập, không phụ thuộc Sidebar, Extension, focus hay sheet đang active.
-4. Sidebar chỉ hỏi GAS và thực thi output; Sidebar không tự đọc hàng 1, tự phân loại cột `@`, tự đoán dữ liệu đã đổi hay tự chọn API nghiệp vụ.
+4. Sidebar nhận schema và dữ liệu thô từ Extension, tự phân tích Name Box/hàng 1 để quyết định có cần đánh thức GAS hay không; Sidebar không tự quyết định dirty state, scope reload hay API nghiệp vụ.
 5. Khi có Extension hoặc không có Extension, click vào ô vẫn phải lấy được mã khách để đổi khách đang xem.
 6. Tránh nhiều request nối tiếp chỉ để lấy context selection; khi có thể, một request GAS phải trả cả selection và quyết định reload.
 
@@ -40,7 +40,7 @@ GAS không được chờ Sidebar để vẽ view và không được coi Extens
 
 ### 3.2. Extension
 
-Extension trở về nhiệm vụ quan sát selection đã có trước phiên này. Phải giữ nguyên đường đọc `customerId` khi người dùng click vào ô, gồm cả live model nếu đó là đường cũ đang hoạt động.
+Extension là kênh quan sát và vận chuyển dữ liệu thô. Nó không hiểu ý nghĩa nghiệp vụ của mã cột hoặc token đọc. Nó phải giữ đường đọc dữ liệu phục vụ đổi khách khi người dùng click vào ô, nhưng không được biến kết quả đó thành quyết định reload.
 
 Chỉ bỏ những phần mới thêm trong phiên này dùng để suy đoán việc nhập liệu:
 
@@ -49,20 +49,23 @@ Chỉ bỏ những phần mới thêm trong phiên này dùng để suy đoán v
 - dùng chuyển trạng thái `isEditing: true -> false` để đặt timer reload;
 - coi `CRM_CONTEXT` là bằng chứng người dùng vừa sửa dữ liệu.
 
-Extension chỉ gửi `ContextHint` cho Sidebar, gồm:
+Extension gửi một `CRM_CONTEXT` cho Sidebar khi trạng thái hoặc tín hiệu tương tác thực sự thay đổi, gồm:
 
 - tên sheet và `gid`;
-- ô hoặc vùng đang chọn;
-- hàng, cột, hàng/cột cuối;
-- `customerId` nếu đường đọc selection cũ đã lấy được;
-- lý do đánh thức: đổi vị trí hoặc `keydown`;
+- chuỗi nguyên bản của Name Box (`E10`, `E10:G12`, `A:A`, `5:7`, hoặc tên vùng);
+- tên sheet, `gid`, Spreadsheet ID và dữ liệu hàng 1 đọc được dạng thô: mọi ô không rỗng kèm địa chỉ vật lý (`A1`, `B1`, ...), số cột vật lý, giá trị thực tế và cờ `complete`;
+- các ô dữ liệu được Sidebar cấp trong `readPlan` (nếu có), kèm địa chỉ, giá trị thực tế, trạng thái và lỗi đối chiếu giá trị kỳ vọng;
+- tín hiệu tương tác bàn phím hoặc click trên canvas; không phân biệt Delete/Backspace;
+- `customerId`/`customerIdSource` hiện tại được giữ để tương thích và đổi khách tức thời, nhưng không phải quyết định nghiệp vụ;
 - thời điểm phát hiện.
 
-Extension không quyết định có reload, không quyết định cột `@` hợp lệ và không được ghi dirty.
+Extension dùng địa chỉ vật lý thật của Sheet, không đánh số lại theo cột đang hiển thị. Cột ẩn vẫn là `B1`, `B10`... Nếu không xác minh được hàng 1 hoặc ô được yêu cầu, Extension trả `complete=false`/`unavailable` và thông tin lỗi; không tự đoán.
 
-Extension có thể bắt `keydown` ở tầng DOM để đánh thức Sidebar. Đây chỉ là tín hiệu gợi ý; các phím Enter, Esc, phím điều hướng, phím lặp, bộ gõ và thao tác không phát keydown không được coi là nguồn sự thật. Không cần bắt click riêng cho reload vì thay đổi vị trí đã được theo dõi qua địa chỉ ô; việc lấy mã khách khi click vẫn phải giữ.
+Extension không quyết định có reload, không quyết định cột `@` hợp lệ, không phân tích Name Box thành loại nghiệp vụ, không tạo `reloadRelevant`/`reloadColumns` và không được ghi dirty.
 
-Để giảm khả năng bỏ sót Delete/Backspace, Extension có thể gộp thêm `beforeinput` và `keyup` của hai phím này vào cùng `pendingKeydownHint`. Các event này vẫn chỉ là hint; Extension không kết luận có `onEdit`, không đọc mã cột và không tạo dirty signal.
+Extension bắt mọi tín hiệu bàn phím ở tầng DOM như một `keyboardHint`, không tách luật Delete/Backspace. Extension cũng bắt click chỉ trong vùng canvas/lưới của Google Sheets. Nếu click làm Name Box đổi thì context vị trí là tín hiệu chính; nếu click không làm Name Box đổi (ví dụ menu chuột phải rồi paste), click vẫn tạo hint sau vòng gom 200 ms. Click vào Sidebar/menu/iframe không thuộc canvas bị bỏ qua.
+
+Các event này vẫn chỉ là hint; Extension không kết luận có `onEdit`, không đọc ý nghĩa mã cột và không tạo dirty signal.
 
 ### 3.3. Sidebar
 
@@ -74,7 +77,7 @@ Sidebar giữ state riêng của trang đó:
 - bản nháp cục bộ để bảo vệ form đang sửa;
 - các timer đánh thức và timer safety polling.
 
-Sidebar chỉ gửi context và state cho GAS. Sidebar không tự suy luận “ô nào có mã”, “có phải dữ liệu vừa đổi” hoặc “nên gọi `reloadRecords` hay `loadCore`”.
+Sidebar giữ schema, ý nghĩa mã `@` và `readPlan`. Sidebar tự phân tích Name Box và đối chiếu toàn bộ hàng 1 có giá trị để biết một hint có nằm trong vùng có ý nghĩa cần kiểm tra hay không. Đây chỉ là tối ưu thời điểm gửi request; GAS vẫn là nơi xác nhận thay đổi, dirty state, scope reload và payload. Nếu hàng 1 không đầy đủ hoặc không chắc chắn, Sidebar phải fail-open và hỏi GAS.
 
 Khi Extension gửi `CRM_CONTEXT` có `customerId` hợp lệ và mã đã có trong Store, Sidebar phải gọi đường nguồn-chọn cục bộ ngay trong lượt nhận tin để màn hình chính đổi khách không phụ thuộc độ trễ RPC. Các lượt kiểm tra dirty, reload RAM hoặc đồng bộ sheet quản trị có thể chạy nối tiếp ở nền; nếu mã chưa có trong Store thì được thử lại sau khi lượt nạp hoàn tất.
 
@@ -131,11 +134,11 @@ Nếu GAS gọi helper tương đương `probeSelectionFull` bên trong cùng l�
 
 ## 5. Hai mốc thời gian của Sidebar
 
-### 5.1. Debounce đánh thức 1 giây
+### 5.1. Debounce đánh thức theo phạm vi và tương tác
 
-Sau mỗi `ContextHint` do đổi vị trí hoặc `keydown`, Sidebar hủy timer cũ và đặt một timer mới 1 giây. Hết 1 giây không có hint mới, Sidebar gửi một wake request.
+Sau mỗi context, Sidebar đối chiếu Name Box với hàng 1 và hủy timer cũ. Ô đơn/đổi sheet không có `keyboardHint` hoặc click bất thường dùng `POSITION_WAKE_MS=1000`. Vùng/hàng/cột, mọi `keyboardHint`, hoặc click canvas không làm Name Box đổi dùng `EDIT_SETTLE_MS=3000`. Nếu không thuộc phạm vi mã `@` cần kiểm tra thì không đặt wake; nếu hàng 1 không đầy đủ thì fail-open và vẫn đặt wake.
 
-Mục đích là giảm số request khi người dùng di chuyển nhanh giữa các ô hoặc gõ liên tục. Mốc này chỉ điều khiển thời điểm hỏi GAS; nó không quyết định thời điểm reload dữ liệu.
+Mục đích là giảm số request khi người dùng di chuyển nhanh, gõ liên tục hoặc kéo vùng. Hai hằng số này là cấu hình dùng chung giữa Sidebar và GAS; chúng không thay thế `changedAt` do trigger GAS ghi.
 
 Nếu wake mới đến trong lúc request trước còn chạy, Sidebar chỉ giữ một cờ wake đang chờ ở tầng vận chuyển rồi gửi một request tiếp theo. Cờ này không chứa mã, không chứa scope và không quyết định nghiệp vụ. GAS phải đọc `ReloadState` mới nhất và tự thực thi hoặc trả `defer` theo scope đó. Không có request con `reloadRecords` từ Sidebar trong cùng chuỗi.
 
@@ -153,9 +156,9 @@ Ví dụ:
 10:00:00.0  onEdit ô A, changedAt = 10:00:00.0
 10:00:00.4  onEdit ô B, changedAt = 10:00:00.4
 10:00:01.2  onEdit ô C, changedAt = 10:00:01.2
-10:00:02.2  Sidebar hỏi GAS sau debounce 1 giây
-10:00:02.2  GAS trả waitMs còn khoảng 2 giây
-10:00:04.2  reload một lần cho toàn bộ mã đã gom
+10:00:02.2  Sidebar chưa hỏi vì đây là chuỗi input, hẹn theo EDIT_SETTLE_MS
+10:00:04.2  Sidebar hỏi một lần; GAS trả payload nếu trigger đã ghi và đủ mốc
+10:00:04.2  Nếu GAS chưa thấy signal hoặc chưa đủ mốc, GAS trả defer và waitMs còn thiếu
 ```
 
 Mỗi `onEdit` mới cập nhật lại mốc cuối. Rời `Customer` hoặc `Activity` là ngoại lệ đã chốt: Sidebar reload ngay và hủy timer còn lại.
@@ -175,7 +178,7 @@ selection probe
   + ReloadState/ReloadDecision
 ```
 
-Client chỉ đặt wake khi context có `reloadRelevant=true`. Metadata này do GAS tính từ vị trí các mã cột hợp lệ và được gửi cùng `loadCore`; client không dùng nó để quyết định scope reload. Khi metadata không có (Extension cũ hoặc chưa đồng bộ), client fail-open và vẫn hỏi GAS.
+Sidebar chỉ đặt wake khi tự đối chiếu context với schema/hàng 1 thấy vùng có khả năng ảnh hưởng. Metadata `reloadColumns`/`reloadRelevant` không còn là giao thức Extension. Khi hàng 1 chưa đầy đủ, schema/hint thiếu hoặc không thể xác định an toàn, Sidebar fail-open và vẫn hỏi GAS.
 
 Nếu vị trí không đổi nhưng `revision` mới, Sidebar vẫn xử lý RAM reload. Nếu vị trí đổi, GAS lấy mã khách mới trong cùng request hoặc trong helper nội bộ của cùng request.
 
@@ -191,7 +194,7 @@ Một wake request phải truyền cho `ReloadDecision`:
 - `lastSeenRevision`;
 - `localDraft` và mã Sidebar đang giữ bản nháp;
 - nguyên nhân `position`, `keydown`, `safety-poll`, `open`;
-- hint vận chuyển `reloadRelevant` do GAS cấp để loại request ở sheet trắng/cột không thuộc mã hợp lệ;
+- context thô, hàng 1, kết quả `readPlan`, loại tương tác và phạm vi đã Sidebar phân tích để quyết định thời điểm wake;
 - `autoRenderView` và các chính sách liên quan.
 
 GAS trả quyết định tối thiểu:
@@ -227,7 +230,7 @@ Các trường hợp chính:
 
 - Customer/Activity đổi ở cột mã hợp lệ: vẽ toàn bộ view sau signal, nếu chính sách cho phép.
 - Category/Config đổi: vẽ toàn bộ view sau signal.
-- Hàng 1 hoặc hàng 3 điều khiển của sheet quản trị đổi: vẽ toàn bộ view ngay, kể cả khi Sidebar đóng.
+- Hàng 1 sheet quản trị chỉ vẽ khi trước hoặc sau thay đổi có ít nhất một giá trị mã `@` hợp lệ; đổi giá trị thường sang giá trị thường không vẽ. Sửa một ô hay cả vùng đều đối chiếu từng ô trước/sau.
 - Thay đổi cấu trúc qua `onChange`: đánh dấu scope bảo thủ và vẽ lại view cần thiết.
 - `autoRenderView=false`: không vẽ tự động, nhưng giữ cờ; khi bật lại, GAS vẽ toàn bộ ngay.
 
