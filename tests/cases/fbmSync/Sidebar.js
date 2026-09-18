@@ -348,8 +348,9 @@ async function chay(so) {
   const backgroundBlocks = hop.fbmSyncSettingsBackgroundBlocks(hop.FBM_SYNC_CLIENT.syncSettings);
   const backgroundToggleIndex = backgroundBlocks.findIndex((node) => node && node.elements && node.elements.some((child) => child && child.id === 'fbm-sync-background-switch'));
   const directionIndex = backgroundBlocks.findIndex((node) => node && node.elements && node.elements.some((child) => child && child.id === 'fbm-sync-background-direction'));
+  const firstScheduleRow = backgroundBlocks.find((node) => node && node.className === 'shin-sync-schedule-row');
   const detailBlock = backgroundBlocks.find((node) => node && node.className === 'shin-sync-detail-controls');
-  check(so, 'background layout order and detail groups', [backgroundToggleIndex < directionIndex, detailBlock.elements.length, detailBlock.elements[0].className, detailBlock.elements[1].elements[0].className, detailBlock.elements[1].elements[1].className], [true, 2, 'shin-sync-detail-field', 'shin-sync-detail-label', 'shin-sync-detail-inputs']);
+  check(so, 'background layout order and detail groups', [backgroundToggleIndex < directionIndex, backgroundBlocks[directionIndex].className.indexOf('shin-sync-direction-row') >= 0, firstScheduleRow.elements[1].className, detailBlock.elements.length, detailBlock.elements[0].className, detailBlock.elements[1].elements[0].className, detailBlock.elements[1].elements[1].className], [true, true, 'shin-kv-label', 2, 'shin-sync-detail-field', 'shin-sync-detail-label', 'shin-sync-detail-inputs']);
   check(so, 'Settings render được relay và tham số phiên', dom.document.getElementById('fbm-sync-setting-approval-threshold').value === '10' && content.textContent.indexOf('Kết nối Extension') >= 0, true);
 
   hop.FBM_SYNC_CLIENT.subscreen = 'account';

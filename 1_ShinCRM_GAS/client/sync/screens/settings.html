@@ -2,6 +2,7 @@
 .shin-sync-login-policy-parent .shin-toggle-copy { font-weight: 700; }
 .shin-sync-login-policy-children { margin: 0 0 var(--shin-gap-2) var(--shin-gap-3); padding-left: var(--shin-gap-2); border-left: 2px solid var(--shin-border-faint); }
 .shin-sync-login-policy-children .shin-toggle-row { margin-top: var(--shin-gap-1); margin-bottom: var(--shin-gap-1); }
+.shin-sync-direction-row > .shin-standalone-control { flex: 1 1 auto; max-width: none; min-width: 0; }
 .shin-sync-detail-field { display: grid; gap: var(--shin-gap-1); min-width: 0; }
 .shin-sync-detail-label { color: var(--shin-text-soft); font-size: var(--shin-text-xs); font-weight: 500; line-height: 1.2; }
 .shin-sync-detail-inputs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--shin-gap-2); }
@@ -56,7 +57,7 @@ function fbmSyncSettingsBackgroundBlocks(settings) {
       ] })
     ] })
   ] });
-  return [Box({ id: 'fbm-sync-settings-background-notice-region', elements: fbmSyncSettingsNoticeBlocks('background', fbmSyncSettingsSchedulerNotice(FBM_SYNC_CLIENT.lastStatus)) }), Box({ className: 'shin-toggle-row', elements: [Text({ className: 'shin-toggle-copy', text: 'Bật lịch đồng bộ nền' }), StandaloneControl({ id: 'fbm-sync-background-switch', kind: 'toggle', pressed: parentEnabled, className: parentEnabled ? 'is-on' : 'is-off', data: { 'sync-background-draft': true }, disabled: fbmSyncConfigControlDisabled('background', 'enabled'), ariaLabel: 'Bật hoặc tắt lịch đồng bộ nền' })] }), Row({ className: 'shin-inline-field-row', elements: [Text({ className: 'shin-form-label', text: 'Chiều đồng bộ' }), StandaloneControl({ id: 'fbm-sync-background-direction', kind: 'menu', options: directionOptions, value: direction, disabled: fbmSyncConfigControlDisabled('background', 'direction'), ariaLabel: 'Chiều đồng bộ' })] })].concat(rows, [detailControls, fbmSyncConfigButtonRow('background', { edit: 'Sửa lịch nền', save: 'Lưu lịch nền' }, { id: 'fbm-sync-save-background', disabled: !!FBM_SYNC_CLIENT.running })]);
+  return [Box({ id: 'fbm-sync-settings-background-notice-region', elements: fbmSyncSettingsNoticeBlocks('background', fbmSyncSettingsSchedulerNotice(FBM_SYNC_CLIENT.lastStatus)) }), Box({ className: 'shin-toggle-row', elements: [Text({ className: 'shin-toggle-copy', text: 'Bật lịch đồng bộ nền' }), StandaloneControl({ id: 'fbm-sync-background-switch', kind: 'toggle', pressed: parentEnabled, className: parentEnabled ? 'is-on' : 'is-off', data: { 'sync-background-draft': true }, disabled: fbmSyncConfigControlDisabled('background', 'enabled'), ariaLabel: 'Bật hoặc tắt lịch đồng bộ nền' })] }), Row({ className: 'shin-inline-field-row shin-sync-direction-row', elements: [Text({ className: 'shin-form-label', text: 'Chiều đồng bộ' }), StandaloneControl({ id: 'fbm-sync-background-direction', kind: 'menu', options: directionOptions, value: direction, disabled: fbmSyncConfigControlDisabled('background', 'direction'), ariaLabel: 'Chiều đồng bộ' })] })].concat(rows, [detailControls, fbmSyncConfigButtonRow('background', { edit: 'Sửa lịch nền', save: 'Lưu lịch nền' }, { id: 'fbm-sync-save-background', disabled: !!FBM_SYNC_CLIENT.running })]);
 }
 function fbmSyncSettingsLoginBlocks(loginPolicy) {
   loginPolicy = fbmSyncConfigDraft('loginPolicy', loginPolicy || {});
