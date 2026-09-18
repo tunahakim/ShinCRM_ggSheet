@@ -38,6 +38,7 @@ function shinHeaderRangeHasValidCode(sheet, range, event, validCode) {
   var last = range.getLastColumn();
   var current = shinHeaderValues(sheet);
   var previous = shinHeaderSnapshotRead(sheet);
+  if (!previous) { return true; }
   var rowCount = typeof range.getNumRows === 'function' ? range.getNumRows() : range.getLastRow() - range.getRow() + 1;
   var single = first === last && rowCount === 1;
   for (var column = first; column <= last; column++) {
