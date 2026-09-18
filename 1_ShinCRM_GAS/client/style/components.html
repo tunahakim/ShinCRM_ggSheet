@@ -654,12 +654,12 @@
 }
 
 .shin-unsaved-dialog[hidden] { display: none; }
-.shin-unsaved-backdrop { position: absolute; inset: 0; background: rgba(32, 33, 36, 0.32); }
-.shin-unsaved-panel { position: relative; width: min(100%, 360px); padding: var(--shin-gap-4); border: 1px solid var(--shin-border); border-radius: var(--shin-radius); background: var(--shin-bg); box-shadow: var(--shin-shadow); }
+.shin-unsaved-backdrop { position: absolute; inset: 0; background: rgba(32, 33, 36, 0.38); }
+.shin-unsaved-panel { position: relative; display: block; width: min(100%, 420px); padding: calc(var(--shin-gap-4) + 2px); border: 1px solid var(--shin-border); border-radius: var(--shin-radius); background: var(--shin-bg); box-shadow: var(--shin-shadow); }
 .shin-unsaved-title { margin: 0; color: var(--shin-text); font-size: var(--shin-text-lg); line-height: var(--shin-line-height); }
 .shin-unsaved-message { margin: var(--shin-gap-2) 0 0; color: var(--shin-text-soft); font-size: var(--shin-text-md); line-height: var(--shin-line-height); }
-.shin-unsaved-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--shin-gap-2); margin-top: var(--shin-gap-4); }
-.shin-unsaved-actions .shin-button { min-height: 32px; }
+.shin-unsaved-actions { display: grid; grid-template-columns: 1fr; gap: var(--shin-gap-2); margin-top: var(--shin-gap-4); }
+.shin-unsaved-actions .shin-button { width: 100%; min-height: 38px; justify-content: center; white-space: normal; text-align: center; }
 .shin-unsaved-save { background: var(--shin-primary); border-color: var(--shin-primary); color: var(--shin-bg); }
 .shin-unsaved-save:hover { background: var(--shin-primary-dark); border-color: var(--shin-primary-dark); }
 .shin-unsaved-continue { border-color: var(--shin-border-strong); background: var(--shin-bg); color: var(--shin-text); }

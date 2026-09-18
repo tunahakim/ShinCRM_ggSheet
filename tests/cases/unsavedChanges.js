@@ -16,11 +16,8 @@ function taoBoTest() {
     window: { addEventListener: (name, fn) => { calls.push({ name, fn }); } },
     alert: (message) => { calls.push({ name: 'alert', message }); }
   });
-  napClient(hop, 'client/ui/unsavedChanges.html', 'client/sync/fbmSyncConfigEditor.html');
+  napClient(hop, 'client/ui/uiBuilder.html', 'client/ui/renderEngine.html', 'client/ui/unsavedChanges.html', 'client/sync/fbmSyncConfigEditor.html');
   const dialog = dom.document.createElement('div'); dialog.id = 'shin-unsaved-dialog'; dialog.hidden = true;
-  const stay = dom.document.createElement('button'); stay.setAttribute('data-unsaved-choice', 'continue'); dialog.appendChild(stay);
-  const save = dom.document.createElement('button'); save.setAttribute('data-unsaved-choice', 'save'); dialog.appendChild(save);
-  const discard = dom.document.createElement('button'); discard.setAttribute('data-unsaved-choice', 'discard'); dialog.appendChild(discard);
   dom.root.appendChild(dialog);
   const wrapper = dom.document.createElement('div'); wrapper.className = 'shin-form-field';
   const input = dom.document.createElement('input'); input.id = 'field-a'; wrapper.appendChild(input); dom.root.appendChild(wrapper);
@@ -53,6 +50,13 @@ async function testSoSanhVaLazy(so) {
 async function testModalVaActionCho(so) {
   const bo = taoBoTest(), hop = bo.hop;
   let dirty = true, saveCalls = 0, discardCalls = 0, pendingCalls = 0;
+  check(so, 'modal cảnh báo được dựng bằng component dùng lại, không phải HTML hardcode', [
+    !!bo.dialog.querySelector('.shin-unsaved-panel'),
+    !!bo.dialog.querySelector('#shin-unsaved-title'),
+    !!bo.dialog.querySelector('[data-unsaved-choice="save"]'),
+    !!bo.dialog.querySelector('[data-unsaved-choice="discard"]'),
+    !!bo.dialog.querySelector('[data-unsaved-choice="continue"]')
+  ], [true, true, true, true, true]);
   const provider = {
     read: () => ({ dirty, fieldIds: dirty ? ['field-a', 'field-b'] : [] }),
     save: () => { saveCalls += 1; dirty = false; return Promise.resolve({ ok: true }); },
@@ -77,6 +81,17 @@ async function testModalVaActionCho(so) {
   hop.unsavedChangesResolve('discard');
   await new Promise((resolve) => setImmediate(resolve));
   check(so, 'Bỏ thay đổi gọi provider một lần và chạy action sau khi bỏ cục bộ', [discardCalls, pendingCalls, hop.UNSAVED_CHANGES.provider], [1, 2, null]);
+
+  let staleDirty = true, staleDiscardCalls = 0, stalePendingCalls = 0;
+  const staleProvider = {
+    read: () => ({ dirty: staleDirty, fieldIds: ['field-a'] }),
+    discard: () => { staleDiscardCalls += 1; return { ok: true }; }
+  };
+  hop.unsavedChangesReadProvider = () => staleProvider;
+  hop.unsavedChangesGuard('core', () => { stalePendingCalls += 1; });
+  hop.unsavedChangesResolve('discard');
+  await new Promise((resolve) => setImmediate(resolve));
+  check(so, 'discard thành công vẫn chạy action dù provider còn đọc thấy dirty cũ', [staleDiscardCalls, stalePendingCalls, hop.UNSAVED_CHANGES.provider], [1, 1, null]);
 }
 
 async function testLoiVaKhoa(so) {
@@ -156,8 +171,13 @@ async function testFormVaFbm(so) {
   const dirtyCancelBlocked = hop.unsavedChangesGuardFbmTarget(cancel, () => {});
   check(so, 'Chỉ Hủy cùng card mới mở cảnh báo khi card đã dirty', [dirtyCancelBlocked, hop.UNSAVED_CHANGES.dialogOpen], [true, true]);
   hop.unsavedChangesResolve('continue');
+  let fbmPendingCalls = 0;
+  const dirtyCancelAgain = hop.unsavedChangesGuardFbmTarget(cancel, () => { fbmPendingCalls += 1; });
+  hop.unsavedChangesResolve('discard');
+  await new Promise((resolve) => setImmediate(resolve));
+  check(so, 'Bỏ thay đổi và tiếp tục FBM thoát edit rồi chạy action đang chờ', [dirtyCancelAgain, fbmPendingCalls, hop.fbmSyncConfigState('identity').editing, hop.UNSAVED_CHANGES.provider], [true, 1, false, null]);
   const blockedStart = hop.fbmSyncConfigStartEdit('login');
-  check(so, 'Không mở khối thứ hai khi khối hiện tại đã dirty', [blockedStart, hop.fbmSyncConfigState('identity').editing, hop.fbmSyncConfigState('login').editing], [false, true, false]);
+  check(so, 'Mở khối thứ hai thành công sau khi khối hiện tại đã bỏ thay đổi', [blockedStart, hop.fbmSyncConfigState('identity').editing, hop.fbmSyncConfigState('login').editing], [true, false, true]);
 }
 
 function testHopDongTichHop(so) {
@@ -170,8 +190,10 @@ function testHopDongTichHop(so) {
   check(so, 'Sidebar giữ host tĩnh, nạp module dirty guard và cài listener lúc boot', [
     sidebar.indexOf('id="shin-unsaved-dialog"') >= 0,
     sidebar.indexOf("include('client/ui/unsavedChanges')") >= 0,
-    sidebar.indexOf('unsavedChangesInstall();') >= 0
-  ], [true, true, true]);
+    sidebar.indexOf('unsavedChangesInstall();') >= 0,
+    sidebar.indexOf('data-unsaved-choice') < 0,
+    sidebar.indexOf('shin-unsaved-panel') < 0
+  ], [true, true, true, true, true]);
   check(so, 'dispatcher form lõi luôn đi qua guard và vẫn chừa saveForm cho cửa lưu', [
     dispatch.indexOf('function dispatchRunNow(') >= 0,
     dispatch.indexOf('unsavedChangesGuardCore') >= 0,

@@ -5,6 +5,36 @@
  */
 var UNSAVED_CHANGES = { dialogOpen: false, highlighted: false, provider: null, pending: null, busy: false, returnFocus: null };
 
+/**
+ * Component dùng chung cho mọi cảnh báo bản nháp. Sidebar chỉ giữ host cố định;
+ * toàn bộ nội dung nhìn thấy và action phải đi qua Block renderer để không có
+ * màn nào tự chép lại một hộp thoại riêng.
+ */
+function unsavedChangesDialogBlocks() {
+  return [
+    Box({ className: 'shin-unsaved-backdrop', data: { 'unsaved-choice': 'continue' } }),
+    Box({ className: 'shin-unsaved-panel', elements: [
+      Text({ id: 'shin-unsaved-title', className: 'shin-unsaved-title', text: 'Có thay đổi chưa lưu' }),
+      Text({ id: 'shin-unsaved-message', className: 'shin-unsaved-message', text: 'Phát hiện thay đổi chưa lưu. Bạn muốn làm gì trước khi tiếp tục?' }),
+      Row({ className: 'shin-unsaved-actions', elements: [
+        Button({ className: 'shin-unsaved-save', data: { 'unsaved-choice': 'save' }, label: 'Lưu thay đổi và tiếp tục' }),
+        Button({ className: 'shin-unsaved-discard', data: { 'unsaved-choice': 'discard' }, label: 'Bỏ thay đổi và tiếp tục' }),
+        Button({ className: 'shin-unsaved-continue', data: { 'unsaved-choice': 'continue' }, label: 'Tiếp tục sửa' })
+      ] })
+    ] })
+  ];
+}
+
+function unsavedChangesRenderDialog() {
+  var dialog = unsavedChangesDialog();
+  if (!dialog) { throw new Error('Sidebar thiếu host cảnh báo thay đổi chưa lưu.'); }
+  if (!dialog.querySelector('[data-unsaved-choice]')) {
+    if (typeof renderReplaceChildren !== 'function') { throw new Error('Sidebar chưa nạp component renderer cho cảnh báo thay đổi chưa lưu.'); }
+    renderReplaceChildren(dialog, unsavedChangesDialogBlocks(), {});
+  }
+  return dialog;
+}
+
 function unsavedChangesNormalize(value) {
   if (value === null || value === undefined) { return ''; }
   if (typeof value === 'boolean') { return value ? 'true' : 'false'; }
@@ -99,9 +129,11 @@ function unsavedChangesFinish(operation) {
     return;
   }
   Promise.resolve(result).then(function (value) {
-    var state = typeof provider.read === 'function' ? provider.read() : null;
     if (value && value.ok === false) { UNSAVED_CHANGES.pending = pending; unsavedChangesSetBusy(false); return; }
-    if (state && state.dirty) { UNSAVED_CHANGES.pending = pending; unsavedChangesSetBusy(false); return; }
+    /* discard đã là quyết định bỏ bản nháp của provider. Không đọc lại DOM cũ
+       sau đó, vì form chưa render lại có thể vẫn trả dirty dù nháp đã bị bỏ. */
+    var state = operation === 'save' && typeof provider.read === 'function' ? provider.read() : null;
+    if (operation === 'save' && state && state.dirty) { UNSAVED_CHANGES.pending = pending; unsavedChangesSetBusy(false); return; }
     unsavedChangesClearFields();
     UNSAVED_CHANGES.provider = null;
     UNSAVED_CHANGES.pending = null;
@@ -130,6 +162,7 @@ function unsavedChangesResolve(choice) {
 function unsavedChangesInstall() {
   if (UNSAVED_CHANGES.installed) { return; }
   UNSAVED_CHANGES.installed = true;
+  unsavedChangesRenderDialog();
   document.addEventListener('click', function (event) {
     var target = event.target && event.target.closest ? event.target.closest('[data-unsaved-choice]') : null;
     if (!target) { return; }

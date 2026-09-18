@@ -31,7 +31,7 @@ Checklist này theo dõi một cơ chế chung cho mọi khối Sidebar có trư
 - [x] Có phép chuẩn hóa/so sánh an toàn cho text, số, boolean, select/menu và ngày.
 - [x] Có API đọc dirty lazy: chỉ đọc/so sánh đầy đủ khi guard được gọi.
 - [x] Dirty chỉ phục vụ tô màu và quyết định cảnh báo ở nút Hủy/X; không dùng dirty làm điều kiện duy nhất để khóa action ngoài card.
-- [x] Có API `save`, `discard`, `continue` với khóa chống xử lý hai lần.
+- [x] Có API `save`, `discard`, `continue` với khóa chống xử lý hai lần; `discard` thành công là quyết định bỏ nháp có hiệu lực và phải chạy action đang chờ dù lần đọc DOM cũ còn báo dirty.
 - [x] Khi save/discard lỗi, giữ nguyên bản nháp, không chạy action đang chờ và báo lỗi rõ.
 - [x] Khôi phục focus về control phù hợp sau khi đóng cảnh báo hoặc sau khi action tiếp tục.
 - [ ] Không làm mất popup, mật khẩu đang nhập hoặc bản nháp do callback trạng thái đến muộn. (Còn cần nghiệm thu callback thật trên Sheet DEV.)
@@ -58,7 +58,7 @@ Checklist này theo dõi một cơ chế chung cho mọi khối Sidebar có trư
 
 ## 6. Hiển thị và tương tác
 
-- [x] Thêm host tĩnh cho hộp cảnh báo ở Sidebar, không ghép HTML modal trong controller nghiệp vụ.
+- [x] Sidebar chỉ giữ host tĩnh; backdrop, nội dung và ba action của hộp cảnh báo được dựng bởi component Block dùng chung, không hardcode HTML modal trong Sidebar/controller.
 - [x] Có style tập trung cho hộp cảnh báo và trạng thái trường changed; không thêm class vào screen schema.
 - [x] Tô đúng những trường đang khác baseline sau lần cảnh báo đầu tiên.
 - [x] Màu vẫn còn khi chọn `Tiếp tục sửa` và tự cập nhật khi người dùng sửa tiếp.
@@ -70,15 +70,15 @@ Checklist này theo dõi một cơ chế chung cho mọi khối Sidebar có trư
 ## 7. Kiểm thử offline
 
 - [x] Test compare: bằng nhau, khác một trường, nhiều trường, đổi rồi hoàn tác, giá trị rỗng và kiểu khác nhau nhưng cùng nghĩa.
-- [x] Test modal: Save, Discard, Continue; action chờ chỉ chạy đúng một lần.
+- [x] Test modal: Save, Discard, Continue; action chờ chỉ chạy đúng một lần, gồm hồi quy provider còn dirty cũ sau discard và FBM discard thoát `editing` trước khi chạy action.
 - [x] Test save/discard lỗi: dữ liệu và màu không bị xóa nhầm.
 - [x] Test form lõi: cancel/open form lồng/đổi khách/reload bị chặn khi đang sửa, kể cả chưa dirty.
 - [x] Test FBM: chuyển màn, menu, back, sửa khối khác và action nội bộ cùng khối.
 - [x] Test FBM: card sạch vẫn khóa action ngoài, không mở đồng thời hai card; nút Hủy chỉ cảnh báo khi dirty.
 - [x] Test password: dirty đúng nhưng không xuất hiện trong snapshot, log hoặc lỗi.
 - [ ] Test callback snapshot không dựng lại control đang nhập và không mất highlight. (Còn cần nghiệm thu callback thật trên Sheet DEV.)
-- [x] Test hợp đồng tĩnh: Sidebar host/include/boot, guard form/FBM, mapping tám key, password và CSS changed không bị tháo trong phiên sau.
-- [x] Chạy `node tests/run.js`: 1.710 phép đạt, 0 phép lỗi.
+- [x] Test hợp đồng tĩnh: Sidebar host/include/boot, host không còn nút/nội dung modal hardcode, component renderer, guard form/FBM, mapping tám key, password và CSS changed không bị tháo trong phiên sau.
+- [x] Chạy `node tests/run.js`: 1.713 phép đạt, 0 phép lỗi.
 
 ## 8. Nghiệm thu Sheet DEV và bàn giao
 
