@@ -13,17 +13,17 @@ function fbmSyncLiveStatusValue(status, count, field) {
 function fbmSyncProgressBlocks(status, count) {
   var data = fbmSyncProgressData(status || {}, count || {});
   var schema = FBM_SYNC_STATUS_SCHEMA;
-  return schema.layout.progress({ label: data.label, trackClass: !data.active ? ' ' + schema.classes.idle : '', ariaValueNow: data.determinate ? String(data.percent) : null, fillClass: (!data.determinate && data.active ? ' ' + schema.classes.indeterminate : '') + (data.waitingForResponse ? ' ' + schema.classes.waiting : ''), width: data.determinate ? data.percent + '%' : data.active ? '35%' : '0%' });
+  return FBM_SYNC_STATUS_UI.layout.progress({ label: data.label, trackClass: !data.active ? FBM_SYNC_STATUS_UI.classes.idle : '', ariaValueNow: data.determinate ? String(data.percent) : null, fillClass: uiClassJoin(!data.determinate && data.active ? FBM_SYNC_STATUS_UI.classes.indeterminate : '', data.waitingForResponse ? FBM_SYNC_STATUS_UI.classes.waiting : ''), width: data.determinate ? data.percent + '%' : data.active ? '35%' : '0%' });
 }
 function fbmSyncStatusBlocks(status, count) {
   status = status || {}; count = count || {};
-  var schema = FBM_SYNC_STATUS_SCHEMA, fields = [['phase', schema.classes.phase], ['operation', schema.classes.operation], ['session', schema.classes.session], ['count', schema.classes.count], ['current', schema.classes.current], ['message', status.phase === 'error' ? schema.classes.error : schema.classes.message]];
+  var schema = FBM_SYNC_STATUS_SCHEMA, classes = FBM_SYNC_STATUS_UI.classes, fields = [['phase', classes.phase], ['operation', classes.operation], ['session', classes.session], ['count', classes.count], ['current', classes.current], ['message', status.phase === 'error' ? classes.error : classes.message]];
   var elements = fields.map(function (item) {
     var value = fbmSyncLiveStatusValue(status, count, item[0]);
     return value ? Text({ className: item[1], text: value }) : null;
   }).filter(function (node) { return !!node; });
   elements.splice(4, 0, fbmSyncProgressBlocks(status, count));
-  return [schema.layout.card(elements)];
+  return [FBM_SYNC_STATUS_UI.layout.card(elements)];
 }
 function fbmSyncPatchStatusBlocks(panel, status, targetId) {
   var id = targetId || FBM_SYNC_STATUS_SCHEMA.regions.liveStatus;
@@ -40,7 +40,7 @@ function fbmSyncPatchLiveStatus(panel, status, screen) {
 <script>
 function fbmSyncRecordIssueBlocks(metadata) {
   metadata = metadata || {};
-  var schema = FBM_SYNC_ISSUES_SCHEMA;
+  var schema = FBM_SYNC_ISSUES_SCHEMA, ui = FBM_SYNC_ISSUES_UI;
   var conflicts = Array.isArray(metadata.conflicts) ? metadata.conflicts : [];
   var preflight = Array.isArray(metadata.preflightIssues) ? metadata.preflightIssues : [];
   var identityBlocks = Array.isArray(metadata.identityBlocks) ? metadata.identityBlocks : [];
@@ -53,27 +53,27 @@ function fbmSyncRecordIssueBlocks(metadata) {
   var hasRecordIssues = conflicts.length || identityBlocks.length || failures.length || categories.length || activityMissing.length;
   var blocks = [];
   if (preflight.length) {
-    blocks.push(schema.layout.card(schema.titles.preflight, preflight.slice(-30).map(function (item) {
-      var severity = item && item.blocking ? schema.classes.error : schema.classes.preview;
+    blocks.push(ui.card(schema.titles.preflight, preflight.slice(-30).map(function (item) {
+      var severity = item && item.blocking ? ui.classes.error : ui.classes.preview;
       return Text({ className: severity, text: (item && item.blocking ? schema.preflight.error : schema.preflight.warning) + schema.code + String(item && item.code || '') + schema.closeCode + ' ' + String(item && item.message || '') });
     })));
   }
   if (!hasRecordIssues) { return blocks; }
   var elements = [];
-  if (conflicts.length) { elements.push(Text({ className: schema.classes.preview, text: schema.conflict.message.replace('{count}', Number(metadata.conflictCount || conflicts.length)) }), Button({ id: schema.ids.openConflicts, label: schema.conflict.action })); }
-  identityBlocks.slice(-20).forEach(function (item) { elements.push(Text({ className: schema.classes.preview, text: schema.identity + String(item && item.fbmCustomerCode || '') + schema.separator + String(item && item.reason || '') })); });
+  if (conflicts.length) { elements.push(Text({ className: ui.classes.preview, text: schema.conflict.message.replace('{count}', Number(metadata.conflictCount || conflicts.length)) }), Button({ id: schema.ids.openConflicts, label: schema.conflict.action })); }
+  identityBlocks.slice(-20).forEach(function (item) { elements.push(Text({ className: ui.classes.preview, text: schema.identity + String(item && item.fbmCustomerCode || '') + schema.separator + String(item && item.reason || '') })); });
   if (failures.length) {
-    elements.push(Text({ className: schema.classes.preview, text: schema.failures.message.replace('{count}', failures.length) }), Button({ label: schema.failures.action.replace('{count}', failures.length), data: { [schema.ids.retryAll]: true } }));
+    elements.push(Text({ className: ui.classes.preview, text: schema.failures.message.replace('{count}', failures.length) }), Button({ label: schema.failures.action.replace('{count}', failures.length), data: { [schema.ids.retryAll]: true } }));
     failures.slice(-5).forEach(function (key) {
       var detail = pushFailureDetails[key] || {}, suffix = detail.reason ? schema.separator + String(detail.reason) : '';
       if (detail.code) { suffix += schema.code + String(detail.code) + (detail.status ? schema.http + String(detail.status) : '') + schema.closeCode; }
       if (detail.requestKind) { suffix += schema.step + String(detail.requestKind); }
-      elements.push(Text({ className: schema.classes.preview, text: schema.failures.item + String(key) + suffix }));
+      elements.push(Text({ className: ui.classes.preview, text: schema.failures.item + String(key) + suffix }));
     });
   }
-  categories.slice(-20).forEach(function (item) { elements.push(Text({ className: schema.classes.preview, text: schema.category + String(item && item.source || schema.categoryFallback) + (item && item.code ? schema.separator + String(item.code) : '') + (item && item.reason ? schema.separator + String(item.reason) : '') })); });
-  activityMissing.slice(-20).forEach(function (item) { elements.push(Text({ className: schema.classes.preview, text: schema.activityMissing + String(item && item.id || '') + (item && item.fbmId ? schema.separator + schema.fbmPrefix + String(item.fbmId) : '') })); });
-  blocks.push(schema.layout.card(schema.titles.details, elements));
+  categories.slice(-20).forEach(function (item) { elements.push(Text({ className: ui.classes.preview, text: schema.category + String(item && item.source || schema.categoryFallback) + (item && item.code ? schema.separator + String(item.code) : '') + (item && item.reason ? schema.separator + String(item.reason) : '') })); });
+  activityMissing.slice(-20).forEach(function (item) { elements.push(Text({ className: ui.classes.preview, text: schema.activityMissing + String(item && item.id || '') + (item && item.fbmId ? schema.separator + schema.fbmPrefix + String(item.fbmId) : '') })); });
+  blocks.push(ui.card(schema.titles.details, elements));
   return blocks;
 }
 </script>

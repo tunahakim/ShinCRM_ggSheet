@@ -114,7 +114,7 @@ function chay(so) {
   let hopUi = null;
   try {
     hopUi = napClient(taoHopCat(),
-      'client/ui/icons.html', 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html',
+      'client/ui/icons.html', 'client/ui/uiClassMap.html', 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html',
       'client/util/valueText.html', 'client/ui/renderEngine.html', 'client/ui/slots.html',
       'client/schema/screens/formHeader.html', 'client/schema/screens/view.html', 'client/schema/screens/customerForm.html',
       'client/schema/screens/activityForm.html', 'client/schema/screens/noteForm.html', 'client/schema/uiSchema.html',

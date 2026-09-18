@@ -1,7 +1,6 @@
 <script>
 var FBM_SYNC_ISSUES_SCHEMA = {
   ids: { openConflicts: 'fbm-sync-open-conflicts', retryAll: 'fbm-push-retry-all' },
-  classes: { preview: 'shin-preview-row', error: 'shin-error-message' },
   titles: { preflight: 'Preflight', details: 'Chi tiết bản ghi' },
   preflight: { error: 'Lỗi', warning: 'Cảnh báo' },
   conflict: { message: 'Có {count} xung đột đang chờ quyết định.', action: 'Mở xử lý xung đột' },
@@ -14,6 +13,5 @@ var FBM_SYNC_ISSUES_SCHEMA = {
   closeCode: ']',
   http: ' HTTP ',
   step: ' · bước ',
-  layout: { card: function (title, elements) { return Card({ title: title, elements: elements }); } }
 };
 </script>

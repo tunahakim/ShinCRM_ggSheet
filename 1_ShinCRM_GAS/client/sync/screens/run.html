@@ -12,22 +12,22 @@ function fbmSyncPipelineData(status) {
 }
 function fbmSyncPipelineBlock(status, id) {
   var pipeline = fbmSyncPipelineData(status);
-  var classes = FBM_SYNC_RUN_SCHEMA.classes;
-  return FBM_SYNC_RUN_SCHEMA.layout.pipeline(id, String(pipeline.title || FBM_SYNC_RUN_SCHEMA.phaseTitles.running), (pipeline.steps || []).map(function (item) {
+  var classes = FBM_SYNC_RUN_UI.classes;
+  return FBM_SYNC_RUN_UI.layout.pipeline(id, String(pipeline.title || FBM_SYNC_RUN_SCHEMA.phaseTitles.running), (pipeline.steps || []).map(function (item) {
     var state = String(item && item.state || 'pending'), marker = FBM_SYNC_RUN_SCHEMA.pipeline.marker[state === 'paused' ? 'current' : state] || FBM_SYNC_RUN_SCHEMA.pipeline.marker.pending;
-    return FBM_SYNC_RUN_SCHEMA.layout.pipelineStep(classes.pipelineStep + (state === 'done' ? ' ' + classes.stateDone : '') + (state === 'current' || state === 'paused' ? ' ' + classes.stateCurrent : '') + (state === 'error' ? ' ' + classes.stateError : ''), marker, String(item && item.label || ''));
+    return FBM_SYNC_RUN_UI.layout.pipelineStep(uiClassJoin(classes.pipelineStep, state === 'done' ? classes.stateDone : '', state === 'current' || state === 'paused' ? classes.stateCurrent : '', state === 'error' ? classes.stateError : ''), marker, String(item && item.label || ''));
   }));
 }
 function fbmSyncRunActionBlock(status) {
   status = status || {};
   var statusReady = typeof fbmSyncStatusReady === 'function' ? fbmSyncStatusReady() : FBM_SYNC_CLIENT.statusReady === true;
   var active = ['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(status.phase) >= 0, awaiting = status.phase === 'awaiting_approval';
-  return Button({ id: active ? FBM_SYNC_RUN_SCHEMA.action.ids.cancel : awaiting ? FBM_SYNC_RUN_SCHEMA.action.ids.approve : FBM_SYNC_RUN_SCHEMA.action.ids.start, label: statusReady ? (active ? FBM_SYNC_RUN_SCHEMA.action.cancel : awaiting ? FBM_SYNC_RUN_SCHEMA.action.approve : FBM_SYNC_RUN_SCHEMA.action.start) : FBM_SYNC_RUN_SCHEMA.action.loading, className: FBM_SYNC_RUN_SCHEMA.classes.primary, disabled: !statusReady || status.masterEnabled === false || status.enabled === false });
+  return Button({ id: active ? FBM_SYNC_RUN_SCHEMA.action.ids.cancel : awaiting ? FBM_SYNC_RUN_SCHEMA.action.ids.approve : FBM_SYNC_RUN_SCHEMA.action.ids.start, label: statusReady ? (active ? FBM_SYNC_RUN_SCHEMA.action.cancel : awaiting ? FBM_SYNC_RUN_SCHEMA.action.approve : FBM_SYNC_RUN_SCHEMA.action.start) : FBM_SYNC_RUN_SCHEMA.action.loading, className: uiResolveActionClass(active ? 'cancel' : awaiting ? 'approve' : 'start', 'button'), disabled: !statusReady || status.masterEnabled === false || status.enabled === false });
 }
 function fbmSyncRunDetailsBlocks(status) {
   if (!fbmSyncRunHasSnapshot(status)) { return []; }
   var awaiting = status.phase === 'awaiting_approval';
-  return (awaiting ? [Text({ className: FBM_SYNC_RUN_SCHEMA.classes.muted, text: FBM_SYNC_RUN_SCHEMA.awaitingMessage })] : []).concat([fbmSyncPipelineBlock(status, FBM_SYNC_RUN_SCHEMA.regions.pipeline), FBM_SYNC_RUN_SCHEMA.layout.liveStatus(FBM_SYNC_RUN_SCHEMA.regions.liveStatus, fbmSyncStatusBlocks(status, status.counts || {}))]);
+  return (awaiting ? [Text({ className: FBM_SYNC_RUN_UI.classes.muted, text: FBM_SYNC_RUN_SCHEMA.awaitingMessage })] : []).concat([fbmSyncPipelineBlock(status, FBM_SYNC_RUN_SCHEMA.regions.pipeline), FBM_SYNC_RUN_UI.layout.liveStatus(FBM_SYNC_RUN_SCHEMA.regions.liveStatus, fbmSyncStatusBlocks(status, status.counts || {}))]);
 }
 function fbmSyncPatchLivePipeline(panel, status) {
   if (!panel || !RENDER_INDEX.nodes[FBM_SYNC_RUN_SCHEMA.regions.pipeline]) { return false; }
@@ -37,15 +37,15 @@ function fbmSyncPatchLivePipeline(panel, status) {
 }
 function fbmSyncRenderRun(panel, status) {
   status = status || {};
-  return fbmSyncAppendBox(panel, FBM_SYNC_RUN_SCHEMA.rootClass, FBM_SYNC_RUN_SCHEMA.rootId, FBM_SYNC_RUN_SCHEMA.layout.screen({
+  return fbmSyncAppendBox(panel, FBM_SYNC_RUN_UI.rootClass, FBM_SYNC_RUN_SCHEMA.rootId, FBM_SYNC_RUN_UI.layout.screen({
     mode: StandaloneField(FBM_SYNC_RUN_SCHEMA.mode.label, { id: FBM_SYNC_RUN_SCHEMA.mode.id, kind: FBM_SYNC_RUN_SCHEMA.mode.kind, options: FBM_SYNC_UI_SCHEMA.modes, value: FBM_SYNC_CLIENT.mode, disabled: !!FBM_SYNC_CLIENT.running, ariaLabel: FBM_SYNC_RUN_SCHEMA.mode.label }),
-    action: FBM_SYNC_RUN_SCHEMA.layout.actionRow(fbmSyncRunActionBlock(status)),
+    action: FBM_SYNC_RUN_UI.layout.actionRow(fbmSyncRunActionBlock(status)),
     details: fbmSyncRunDetailsBlocks(status)
   }).elements);
 }
 function fbmSyncPatchRun(panel, status) {
   if (!panel || !RENDER_INDEX.nodes[FBM_SYNC_RUN_SCHEMA.rootId]) { return false; }
-  fbmSyncRenderTarget(FBM_SYNC_RUN_SCHEMA.regions.action, [FBM_SYNC_RUN_SCHEMA.layout.actionRow(fbmSyncRunActionBlock(status))]);
+  fbmSyncRenderTarget(FBM_SYNC_RUN_SCHEMA.regions.action, [FBM_SYNC_RUN_UI.layout.actionRow(fbmSyncRunActionBlock(status))]);
   fbmSyncRenderTarget(FBM_SYNC_RUN_SCHEMA.regions.details, fbmSyncRunDetailsBlocks(status));
   return true;
 }

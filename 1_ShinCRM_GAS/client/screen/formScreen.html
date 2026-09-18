@@ -102,7 +102,7 @@ function screenFormHeader(header, tieuDe) {
   var out = header.slice();
   var i = 0;
   while (i < out.length && out[i].align !== 'right') { i += 1; }
-  out.splice(i, 0, Text({ text: tieuDe, className: 'shin-header-title shin-form-title' }));
+  out.splice(i, 0, Text({ text: tieuDe, className: typeof uiResolveComponentClass === 'function' ? uiResolveComponentClass('formTitle') : '' }));
   return out;
 }
 

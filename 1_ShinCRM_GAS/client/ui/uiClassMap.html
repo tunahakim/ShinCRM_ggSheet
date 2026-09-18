@@ -1,0 +1,133 @@
+<script>
+/*
+ * Catalog presentation của UI. Screen schema chỉ nói người dùng làm gì;
+ * tệp này quyết định component đó hiện ra theo token/class nào.
+ * Class vẫn là chi tiết renderer nên không được truyền ngược từ schema màn hình.
+ */
+var UI_PRESENTATION_CLASSES = {
+  action: {
+    button: {
+      saveForm: 'shin-primary shin-save-wide',
+      save: 'shin-primary',
+      edit: 'shin-config-edit',
+      start: 'shin-primary',
+      approve: 'shin-primary',
+      cancel: 'shin-primary',
+      reloadAll: 'shin-primary',
+      retry: 'shin-primary',
+      deleteActivity: 'shin-danger'
+    },
+    icon: {
+      saveForm: 'shin-form-save',
+      save: 'shin-config-save',
+      edit: 'shin-config-edit-icon',
+      cancel: 'shin-config-cancel',
+      cancelForm: 'shin-form-cancel',
+      deleteActivity: 'shin-danger'
+    }
+  },
+  component: {
+    formTitle: 'shin-header-title shin-form-title',
+    noteViewField: 'shin-note',
+    noteFormField: 'shin-note-tall'
+  },
+  status: {
+    text: {
+      copy: 'shin-status-copy',
+      title: 'shin-status-title',
+      strong: 'shin-status-strong',
+      info: 'shin-status-info',
+      tableNum: 'shin-status-table-num',
+      kvLabel: 'shin-status-kv-label',
+      kvValue: 'shin-status-kv-value'
+    },
+    box: {
+      normal: 'shin-status-box',
+      warning: 'shin-status-box shin-status-warn',
+      error: 'shin-status-box shin-status-error'
+    },
+    root: 'shin-status',
+    table: 'shin-status-table',
+    tableRow: 'shin-status-table-row',
+    tableHead: 'shin-status-table-head',
+    kv: 'shin-status-kv'
+  }
+};
+
+var UI_SYNC_CLASSES = {
+  common: { section: 'shin-section' },
+  shell: {
+    header: 'shin-header-title shin-sync-module-title', nav: 'shin-popup-list', navItem: 'shin-popup-item',
+    active: 'shin-sync-active', disabled: 'shin-content-disabled', activeItem: 'is-active',
+    toggleOn: 'is-on', toggleOff: 'is-off', toggleLabelSelector: '.shin-toggle-label',
+    statusRunning: 'shin-sync-status-running', statusPaused: 'shin-sync-status-paused', statusError: 'shin-sync-status-error'
+  },
+  config: { actionRow: 'shin-single-action-row' },
+  run: { actionRow: 'shin-single-action-row', muted: 'shin-muted', pipeline: 'shin-sync-pipeline', pipelineTitle: 'shin-sync-pipeline-title', pipelineStep: 'shin-sync-pipeline-step', marker: 'shin-sync-pipeline-marker', stepLabel: 'shin-sync-pipeline-label', stateDone: 'is-done', stateCurrent: 'is-current', stateError: 'is-error' },
+  account: { invalid: 'is-invalid', muted: 'shin-muted', singleAction: 'shin-single-action-row', actionStack: 'shin-action-stack', actionStatus: 'shin-action-status', pass: 'shin-pass-row', error: 'shin-error-message', preview: 'shin-preview-row' },
+  results: { tabDescription: 'shin-sync-tab-description-region', tabText: 'shin-sync-tab-description', muted: 'shin-muted', row: 'shin-preview-row', pagination: 'shin-pagination', tabRow: 'shin-sync-tab-row', tab: 'shin-sync-tab-trigger', active: 'is-active', multiline: 'is-multiline' },
+  settings: { section: 'shin-section', toggleRow: 'shin-toggle-row', toggleCopy: 'shin-toggle-copy', inlineFieldRow: 'shin-inline-field-row', formLabel: 'shin-form-label', kvLabel: 'shin-kv-label', muted: 'shin-muted', detailControls: 'shin-sync-detail-controls', detailField: 'shin-sync-detail-field', detailLabel: 'shin-sync-detail-label', detailInputs: 'shin-sync-detail-inputs', detailInput: 'shin-sync-detail-input', detailInputLabel: 'shin-sync-detail-input-label', scheduleRow: 'shin-sync-schedule-row', loginParent: 'shin-sync-login-policy-parent', loginChildren: 'shin-sync-login-policy-children', loginRetryGroup: 'shin-sync-login-policy-retry-group', directionRow: 'shin-sync-direction-row', toggleOn: 'is-on', toggleOff: 'is-off', relayPass: 'shin-pass-row' },
+  status: { phase: 'shin-sync-phase', operation: 'shin-sync-operation', session: 'shin-sync-operation', count: 'shin-sync-count', current: 'shin-sync-current', message: 'shin-sync-message', error: 'shin-error-message', progress: 'shin-sync-progress', progressLabel: 'shin-sync-progress-label', track: 'shin-loading-track', fill: 'shin-loading-fill', idle: 'is-idle', indeterminate: 'is-indeterminate', waiting: 'is-waiting' },
+  issues: { preview: 'shin-preview-row', error: 'shin-error-message' },
+  audit: { preview: 'shin-preview-row', muted: 'shin-muted', pass: 'shin-pass-row', error: 'shin-error-message' },
+  conflict: { head: 'shin-sync-conflict-head', count: 'shin-sync-conflict-count', empty: 'shin-empty-state', meta: 'shin-sync-conflict-meta', field: 'shin-sync-conflict-field', fieldName: 'shin-sync-conflict-field-name', value: 'shin-sync-conflict-value', shin: 'shin-sync-conflict-value-shin', fbm: 'shin-sync-conflict-value-fbm', choice: 'shin-sync-conflict-choice', singleAction: 'shin-single-action-row' }
+};
+
+function uiClassJoin() {
+  return Array.prototype.slice.call(arguments).filter(function (value) {
+    return value !== null && value !== undefined && String(value).trim() !== '';
+  }).join(' ').replace(/\s+/g, ' ').trim();
+}
+
+function uiResolveActionClass(action, component, surface) {
+  var byComponent = UI_PRESENTATION_CLASSES.action[component] || {};
+  var exact = surface && UI_PRESENTATION_CLASSES.action[surface] ? UI_PRESENTATION_CLASSES.action[surface][action] : '';
+  return exact || byComponent[action] || '';
+}
+
+function uiResolveComponentClass(name) {
+  return UI_PRESENTATION_CLASSES.component[name] || '';
+}
+
+function uiResolveFieldClass(field, control, surface, action) {
+  if (surface === 'noteForm' && String(field || '') === 'note' && String(control || '') === 'textarea') {
+    return uiResolveComponentClass('noteFormField');
+  }
+  if (String(control || '') === 'readText' && action === 'openNoteForm') {
+    return uiResolveComponentClass('noteViewField');
+  }
+  return '';
+}
+
+function uiResolveStatusTextClass(variant) {
+  return UI_PRESENTATION_CLASSES.status.text[variant || 'copy'] || '';
+}
+
+function uiResolveStatusBoxClass(variant) {
+  return UI_PRESENTATION_CLASSES.status.box[variant || 'normal'] || '';
+}
+
+function uiResolveStatusClass(name) {
+  return UI_PRESENTATION_CLASSES.status[name] || '';
+}
+
+function uiSyncClass(screen, key) {
+  var group = UI_SYNC_CLASSES[screen] || {};
+  return group[key] || '';
+}
+
+function uiSyncClasses(screen) {
+  var group = UI_SYNC_CLASSES[screen] || {};
+  var copy = {};
+  Object.keys(group).forEach(function (key) { copy[key] = group[key]; });
+  return copy;
+}
+
+function uiSyncToggleClass(screen, enabled) {
+  return uiSyncClass(screen || 'settings', enabled ? 'toggleOn' : 'toggleOff');
+}
+
+function uiSyncToggleLabelSelector(screen) {
+  return uiSyncClass(screen || 'shell', 'toggleLabelSelector');
+}
+</script>

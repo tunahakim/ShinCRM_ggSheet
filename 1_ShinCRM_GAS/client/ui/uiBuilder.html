@@ -177,13 +177,34 @@ function Notice(spec) {
 }
 
 /** Một trường dữ liệu. `field` ghi đủ đường dẫn khi trường không thuộc `entity` của màn, ví dụ `customer.note` trên form giao dịch. */
-function Field(spec) { return Block(spec, 'field'); }
+function Field(spec) {
+  var o = Object.assign({}, spec || {});
+  if (!o.className && typeof uiResolveFieldClass === 'function') {
+    o.className = uiResolveFieldClass(o.field, o.control, o.surface, o.action);
+  }
+  delete o.surface;
+  return Block(o, 'field');
+}
 
 /** Nút có chữ. Nhận thẳng chuỗi nhãn cho gọn. */
-function Button(spec) { return Block(typeof spec === 'string' ? { label: spec } : spec, 'button'); }
+function Button(spec) {
+  var o = typeof spec === 'string' ? { label: spec } : Object.assign({}, spec || {});
+  if (!o.className && typeof uiResolveActionClass === 'function') {
+    o.className = uiResolveActionClass(o.action, 'button', o.surface);
+  }
+  delete o.surface;
+  return Block(o, 'button');
+}
 
 /** Nút mang glyph, có thể kèm chữ như các mục `titleActions`, và kèm `menu` thì engine vẽ thêm mũi tên sổ xuống. */
-function Icon(spec) { return Block(typeof spec === 'string' ? { icon: spec } : spec, 'icon'); }
+function Icon(spec) {
+  var o = typeof spec === 'string' ? { icon: spec } : Object.assign({}, spec || {});
+  if (!o.className && typeof uiResolveActionClass === 'function') {
+    o.className = uiResolveActionClass(o.action, 'icon', o.surface);
+  }
+  delete o.surface;
+  return Block(o, 'icon');
+}
 
 /**
  * Ô đánh dấu chọn dòng. `pick` là mã bản ghi mà dòng này mang.

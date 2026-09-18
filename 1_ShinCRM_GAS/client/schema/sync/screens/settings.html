@@ -4,27 +4,7 @@ var FBM_SYNC_SETTINGS_SCHEMA = {
   id: 'settings',
   label: 'Cài đặt phiên',
   rootId: 'fbm-sync-settings-root',
-  rootClass: 'shin-section',
   regions: { module: 'fbm-sync-module-card-region', relay: 'fbm-sync-relay-card-region', extension: 'fbm-sync-extension-card-region', background: 'fbm-sync-background-card-region', loginPolicy: 'fbm-sync-login-policy-card-region', relayNotice: 'fbm-sync-settings-relay-notice-region', relayState: 'fbm-sync-relay-state-region', extensionNotice: 'fbm-sync-settings-extension-notice-region', moduleNotice: 'fbm-sync-settings-module-notice-region', backgroundNotice: 'fbm-sync-settings-background-notice-region', loginNotice: 'fbm-sync-settings-login-notice-region', loginPolicyParent: 'fbm-sync-login-policy-parent-row', loginPolicyChildren: 'fbm-sync-login-policy-children' },
-  classes: { section: 'shin-section', toggleRow: 'shin-toggle-row', toggleCopy: 'shin-toggle-copy', inlineFieldRow: 'shin-inline-field-row', formLabel: 'shin-form-label', kvLabel: 'shin-kv-label', muted: 'shin-muted', detailControls: 'shin-sync-detail-controls', detailField: 'shin-sync-detail-field', detailLabel: 'shin-sync-detail-label', detailInputs: 'shin-sync-detail-inputs', detailInput: 'shin-sync-detail-input', detailInputLabel: 'shin-sync-detail-input-label', scheduleRow: 'shin-sync-schedule-row', loginParent: 'shin-sync-login-policy-parent', loginChildren: 'shin-sync-login-policy-children', loginRetryGroup: 'shin-sync-login-policy-retry-group', directionRow: 'shin-sync-direction-row', toggleOn: 'is-on', toggleOff: 'is-off' },
-  layout: {
-    cardRegion: function (id, card) { return Box({ id: id, elements: [card] }); },
-    inlineField: function (className, label, control) { return Row({ className: className, elements: [label, control] }); },
-    toggle: function (className, label, control) { return Box({ className: className, elements: [label, control] }); },
-    scheduleRow: function (className, toggle, label, minutes) { return Box({ className: className, elements: [toggle, label, minutes] }); },
-    detailField: function (className, label, control) { return Box({ className: className, elements: [label, control] }); },
-    detailInputs: function (className, elements) { return Row({ className: className, elements: elements }); },
-    detailControls: function (className, fields) { return Box({ className: className, elements: fields }); },
-    loginParent: function (id, className, label, control) { return Box({ id: id, className: className, elements: [label, control] }); },
-    loginRetryGroup: function (className, elements) { return Box({ className: className, elements: elements }); },
-    card: function (title, titleActions, elements) { return Card({ title: title, titleActions: titleActions, elements: elements }); },
-    relayCard: function (titleActions, notice, state, actions) { return Card({ title: FBM_SYNC_SETTINGS_SCHEMA.cards.relay, titleActions: titleActions, elements: [Box({ id: FBM_SYNC_SETTINGS_SCHEMA.regions.relayNotice, elements: notice }), Box({ id: FBM_SYNC_SETTINGS_SCHEMA.regions.relayState, elements: state }), actions] }); },
-    extension: function (slots) { return [Box({ id: FBM_SYNC_SETTINGS_SCHEMA.regions.extensionNotice, elements: slots.notice }), slots.poll, slots.startup, slots.actions]; },
-    background: function (slots) { return [Box({ id: FBM_SYNC_SETTINGS_SCHEMA.regions.backgroundNotice, elements: slots.notice }), slots.switch, slots.direction].concat(slots.processes, [slots.detail, slots.actions]); },
-    loginPolicy: function (slots) { return [Box({ id: FBM_SYNC_SETTINGS_SCHEMA.regions.loginNotice, elements: slots.notice }), slots.parent, Box({ id: FBM_SYNC_SETTINGS_SCHEMA.regions.loginPolicyChildren, className: FBM_SYNC_SETTINGS_SCHEMA.classes.loginChildren, elements: slots.children }), slots.actions]; },
-    module: function (slots) { return [slots.switch, Box({ id: FBM_SYNC_SETTINGS_SCHEMA.regions.moduleNotice, elements: slots.notice }), slots.threshold, slots.help, slots.actions]; },
-    screen: function (slots) { return Box({ id: FBM_SYNC_SETTINGS_SCHEMA.rootId, className: FBM_SYNC_SETTINGS_SCHEMA.rootClass, elements: [slots.module, slots.relay, slots.extension, slots.background, slots.loginPolicy] }); }
-  },
   cards: {
     module: 'Bật tắt module đồng bộ FBM', relay: 'Kết nối Extension', extension: 'Nhịp hỏi GAS của Extension',
     background: 'Lịch đồng bộ nền', loginPolicy: 'Chính sách tự đăng nhập'
@@ -59,7 +39,7 @@ var FBM_SYNC_SETTINGS_SCHEMA = {
   },
   module: { thresholdLabel: 'Ngưỡng yêu cầu chấp thuận', thresholdId: 'fbm-sync-setting-approval-threshold', thresholdPlaceholder: '10', edit: 'Sửa cài đặt chung', save: 'Lưu cài đặt chung', saveId: 'fbm-sync-save-settings', enabledOn: 'Module đồng bộ đang bật', enabledOff: 'Module đồng bộ đang tắt', enabledAria: 'Bật hoặc tắt module đồng bộ FBM trong cài đặt', thresholdHelp: 'Số bản ghi ghi lên FBM từ ngưỡng này trở lên sẽ dừng để bạn chấp thuận trước request ghi đầu tiên. Nhập 0 nếu mọi lượt ghi đều phải chờ duyệt.' },
   relay: { edit: 'Sửa cấu hình kết nối', save: 'Lưu cấu hình kết nối', rotateId: 'fbm-sync-rotate-relay' },
-  notice: { relayOk: 'Extension đã nhận cấu hình relay của file này.', relayMissing: 'Chưa xác nhận Extension đã nhận cấu hình relay.', relayClass: 'shin-pass-row', scheduler: 'scheduler', heartbeat: 'Heartbeat', warningKind: 'warning', infoKind: 'info', errorKind: 'error' },
+  notice: { relayOk: 'Extension đã nhận cấu hình relay của file này.', relayMissing: 'Chưa xác nhận Extension đã nhận cấu hình relay.', scheduler: 'scheduler', heartbeat: 'Heartbeat', warningKind: 'warning', infoKind: 'info', errorKind: 'error' },
   defaults: { pollMinutes: 5, detailCustomers: 50, detailMinDelay: 0.5, detailMaxDelay: 2, retryMinutes: 30, approvalThreshold: 10, processKeys: ['heartbeat', 'customerFull', 'activityFull', 'detail'], detailSuffixes: ['count', 'delay-min', 'delay-max'], detailFieldPrefix: 'fbm-sync-detail-', startupId: 'fbm-sync-run-on-startup', masterId: 'fbm-sync-settings-master-switch', backgroundSwitchId: 'fbm-sync-background-switch', policyPrefix: 'fbm-sync-policy-', loginRetryId: 'fbm-sync-login-retry-minutes', thresholdPrefix: 'fbm-sync-setting-', processMinutesSuffix: '-minutes', extensionPrefix: 'fbm-extension-' }
 };
 </script>

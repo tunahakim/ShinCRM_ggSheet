@@ -31,7 +31,7 @@ function syncPanelToggle() {
     // A stale automatic reload can leave the active flag while the shell is gone.
     // Repaint the existing module instead of making the icon appear inert.
     var syncRoot = typeof document !== 'undefined' && document.getElementById ? document.getElementById('sidebar-root') : null;
-    var mounted = !!(syncRoot && syncRoot.classList && syncRoot.classList.contains('shin-sync-active') && document.getElementById('fbm-sync-module-title'));
+    var mounted = !!(syncRoot && syncRoot.classList && syncRoot.classList.contains(uiSyncClass('shell', 'active')) && document.getElementById('fbm-sync-module-title'));
     if (mounted) { return null; }
     if (FBM_SYNC_CLIENT.lastStatus && typeof fbmSyncPaint === 'function') {
       fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus);
@@ -311,7 +311,8 @@ function fbmSyncPaintHeaderState(status) {
   if (!button || !status) { return; }
   var phaseNow = String(status.phase || ''), enabledNow = status.masterEnabled !== false && status.enabled !== false;
   var stateNow = !enabledNow ? '' : (['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(phaseNow) >= 0 ? 'running' : (['paused', 'conflict'].indexOf(phaseNow) >= 0 ? 'paused' : (phaseNow === 'error' ? 'error' : '')));
-  fbmSyncSetTargetState('fbm-sync-module-menu', { removeClass: ['shin-sync-status-running', 'shin-sync-status-paused', 'shin-sync-status-error'], addClass: stateNow ? ['shin-sync-status-' + stateNow] : [], ariaLabel: 'Đồng bộ FBM' + (stateNow === 'running' ? ' — đang chạy' : stateNow === 'paused' ? ' — tạm dừng' : stateNow === 'error' ? ' — có lỗi' : '') });
+  var statusClass = stateNow === 'running' ? uiSyncClass('shell', 'statusRunning') : stateNow === 'paused' ? uiSyncClass('shell', 'statusPaused') : stateNow === 'error' ? uiSyncClass('shell', 'statusError') : '';
+  fbmSyncSetTargetState('fbm-sync-module-menu', { removeClass: [uiSyncClass('shell', 'statusRunning'), uiSyncClass('shell', 'statusPaused'), uiSyncClass('shell', 'statusError')], addClass: statusClass ? [statusClass] : [], ariaLabel: 'Đồng bộ FBM' + (stateNow === 'running' ? ' — đang chạy' : stateNow === 'paused' ? ' — tạm dừng' : stateNow === 'error' ? ' — có lỗi' : '') });
 }
 /** Vẽ tiến trình riêng của phiên, không dùng chung dải loading của Sidebar. */
 function fbmSyncProgressData(status, count) {
@@ -326,8 +327,8 @@ function fbmSyncApplyProgress(box, status, count) {
   var data = fbmSyncProgressData(status || {}, count || {});
   if (!box || !box.querySelector) { return false; }
   fbmSyncSetTargetState('fbm-sync-progress-label', { text: data.label });
-  fbmSyncSetTargetState('fbm-sync-progress-track', Object.assign(data.determinate ? { ariaValueNow: data.percent } : { removeAriaValueNow: true }, { className: 'shin-loading-track' + (!data.active ? ' is-idle' : '') }));
-  fbmSyncSetTargetState('fbm-sync-progress-fill', { className: 'shin-loading-fill' + (!data.determinate && data.active ? ' is-indeterminate' : '') + (data.waitingForResponse ? ' is-waiting' : ''), style: { width: data.determinate ? data.percent + '%' : '35%' } });
+  fbmSyncSetTargetState('fbm-sync-progress-track', Object.assign(data.determinate ? { ariaValueNow: data.percent } : { removeAriaValueNow: true }, { className: uiClassJoin(uiSyncClass('status', 'track'), !data.active ? uiSyncClass('status', 'idle') : '') }));
+  fbmSyncSetTargetState('fbm-sync-progress-fill', { className: uiClassJoin(uiSyncClass('status', 'fill'), !data.determinate && data.active ? uiSyncClass('status', 'indeterminate') : '', data.waitingForResponse ? uiSyncClass('status', 'waiting') : ''), style: { width: data.determinate ? data.percent + '%' : '35%' } });
   return !!document.getElementById('fbm-sync-progress-fill');
 }
 function fbmSyncPaintProgress(panel, status, count) {
@@ -337,7 +338,7 @@ function fbmSyncPaintProgress(panel, status, count) {
   return node;
 }
 function fbmSyncPatchLiveProgress(panel, status, count) {
-  var box = panel && panel.querySelector('.shin-sync-progress');
+  var box = panel && panel.querySelector('.' + uiSyncClass('status', 'progress'));
   return box ? fbmSyncApplyProgress(box, status, count) : false;
 }
 function fbmSyncInstall() {
@@ -387,30 +388,30 @@ function fbmSyncInstall() {
     } else if (target.hasAttribute('data-sync-background-draft')) {
       if (target.disabled) { return; }
       var nextBg = target.getAttribute('aria-pressed') !== 'true';
-      fbmSyncSetTargetState(target.id, { addClass: [nextBg ? 'is-on' : 'is-off'], removeClass: [nextBg ? 'is-off' : 'is-on'], ariaPressed: nextBg });
+      fbmSyncSetTargetState(target.id, { addClass: [uiSyncToggleClass('settings', nextBg)], removeClass: [uiSyncToggleClass('settings', !nextBg)], ariaPressed: nextBg });
       fbmSyncConfigSetDraftValue('background', 'enabled', nextBg);
       if (typeof fbmSyncSetBackgroundDependencyState === 'function') { fbmSyncSetBackgroundDependencyState(nextBg); }
     } else if (target.hasAttribute('data-sync-master-draft')) {
       if (target.disabled) { return; }
       var nextMaster = target.getAttribute('aria-pressed') !== 'true';
-      fbmSyncSetTargetState(target.id, { addClass: [nextMaster ? 'is-on' : 'is-off'], removeClass: [nextMaster ? 'is-off' : 'is-on'], ariaPressed: nextMaster, childText: { '.shin-toggle-label': nextMaster ? 'ON' : 'OFF' } });
+      fbmSyncSetTargetState(target.id, { addClass: [uiSyncToggleClass('settings', nextMaster)], removeClass: [uiSyncToggleClass('settings', !nextMaster)], ariaPressed: nextMaster, childText: { [uiSyncToggleLabelSelector('shell')]: nextMaster ? 'ON' : 'OFF' } });
       fbmSyncConfigSetDraftValue('module', 'enabled', nextMaster);
       fbmSyncSetTargetState('fbm-sync-setting-approval-threshold', { disabled: !nextMaster });
     } else if (target.hasAttribute('data-sync-extension-startup')) {
       if (target.disabled) { return; }
       var startupEnabled = target.getAttribute('aria-pressed') !== 'true';
-      fbmSyncSetTargetState(target.id, { addClass: [startupEnabled ? 'is-on' : 'is-off'], removeClass: [startupEnabled ? 'is-off' : 'is-on'], ariaPressed: startupEnabled });
+      fbmSyncSetTargetState(target.id, { addClass: [uiSyncToggleClass('settings', startupEnabled)], removeClass: [uiSyncToggleClass('settings', !startupEnabled)], ariaPressed: startupEnabled });
       fbmSyncConfigSetDraftValue('extension', 'runOnStartup', startupEnabled);
     } else if (target.hasAttribute('data-sync-process-toggle')) {
       if (target.disabled) { return; }
       var processKind = String(target.getAttribute('data-sync-process-toggle') || ''), processEnabled = target.getAttribute('aria-pressed') !== 'true';
-      fbmSyncSetTargetState(target.id, { addClass: [processEnabled ? 'is-on' : 'is-off'], removeClass: [processEnabled ? 'is-off' : 'is-on'], ariaPressed: processEnabled });
+      fbmSyncSetTargetState(target.id, { addClass: [uiSyncToggleClass('settings', processEnabled)], removeClass: [uiSyncToggleClass('settings', !processEnabled)], ariaPressed: processEnabled });
       var processInput = document.getElementById('fbm-sync-process-' + processKind + '-minutes'); if (processInput) { fbmSyncSetTargetState(processInput.id, { disabled: !processEnabled }); }
       fbmSyncConfigSetDraftValue('background', processKind + '.enabled', processEnabled);
     } else if (target.hasAttribute('data-sync-login-policy')) {
       if (target.disabled) { return; }
       var policy = String(target.getAttribute('data-sync-login-policy') || ''), policyEnabled = target.getAttribute('aria-pressed') !== 'true';
-      fbmSyncSetTargetState(target.id, { addClass: [policyEnabled ? 'is-on' : 'is-off'], removeClass: [policyEnabled ? 'is-off' : 'is-on'], ariaPressed: policyEnabled });
+      fbmSyncSetTargetState(target.id, { addClass: [uiSyncToggleClass('settings', policyEnabled)], removeClass: [uiSyncToggleClass('settings', !policyEnabled)], ariaPressed: policyEnabled });
       fbmSyncConfigSetDraftValue('loginPolicy', policy === 'auto-login' ? 'enabled' : policy === 'auto-open' ? 'autoOpenTab' : 'retryEnabled', policyEnabled);
       if ((policy === 'auto-login' || policy === 'retry') && typeof fbmSyncSetLoginPolicyDependencyState === 'function') { fbmSyncSetLoginPolicyDependencyState(fbmSyncConfigDraftValue('loginPolicy', 'enabled', true) === true); }
     } else if (target.hasAttribute('data-sync-page')) { var pageSpec = String(target.getAttribute('data-sync-page') || '').split(':'); FBM_SYNC_CLIENT.resultPages[pageSpec[0]] = Math.max(0, Number(FBM_SYNC_CLIENT.resultPages[pageSpec[0]] || 0) + Number(pageSpec[1] || 0)); fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus);
@@ -440,7 +441,7 @@ function fbmSyncInstall() {
     } else if (target.id === 'fbm-sync-save-login-policy') { fbmSyncSaveLoginPolicy(target);
     } else if (target.id === 'fbm-sync-save-settings') { fbmSyncSaveSyncSettings(target);
     } else if (target.id === 'fbm-sync-save-account-settings') { fbmSyncSaveAccountSettings(target);
-    } else if (target.id === 'fbm-sync-auto-login') { var autoEnabled = target.getAttribute('aria-pressed') !== 'true'; fbmSyncSetTargetState(target.id, { addClass: [autoEnabled ? 'is-on' : 'is-off'], removeClass: [autoEnabled ? 'is-off' : 'is-on'], ariaPressed: autoEnabled, childText: { '.shin-toggle-label': autoEnabled ? 'ON' : 'OFF' }, disabled: true }); fbmSyncSetAutoLogin(autoEnabled).finally(function () { fbmSyncSetTargetState(target.id, { disabled: false }); });
+    } else if (target.id === 'fbm-sync-auto-login') { var autoEnabled = target.getAttribute('aria-pressed') !== 'true'; fbmSyncSetTargetState(target.id, { addClass: [uiSyncToggleClass('settings', autoEnabled)], removeClass: [uiSyncToggleClass('settings', !autoEnabled)], ariaPressed: autoEnabled, childText: { [uiSyncToggleLabelSelector('shell')]: autoEnabled ? 'ON' : 'OFF' }, disabled: true }); fbmSyncSetAutoLogin(autoEnabled).finally(function () { fbmSyncSetTargetState(target.id, { disabled: false }); });
     } else if (target.id === 'fbm-sync-rotate-relay') { fbmSyncRotateRelay();
     } else if (target.id === 'fbm-sync-check-identity') { fbmSyncCheckIdentity();
     } else if (target.id === 'fbm-sync-probe-identity') { fbmSyncAutoFillAndCheck();
@@ -523,8 +524,8 @@ function syncScreenClose() {
   FBM_SYNC_CLIENT.active = false;
   FBM_SYNC_CLIENT.statusReady = false;
   FBM_SYNC_CLIENT.navOpen = false;
-  fbmSyncSetTargetState('sidebar-root', { removeClass: ['shin-sync-active'] });
-  fbmSyncSetTargetState('sidebar-body', { removeClass: ['shin-content-disabled'] });
+  fbmSyncSetTargetState('sidebar-root', { removeClass: [uiSyncClass('shell', 'active')] });
+  fbmSyncSetTargetState('sidebar-body', { removeClass: [uiSyncClass('shell', 'disabled')] });
   var restored = fbmSyncRestoreReturnScreen();
   var savedUi = FBM_SYNC_CLIENT.returnUi || {};
   Object.keys(savedUi).forEach(function (id) {
@@ -778,10 +779,10 @@ function fbmSyncSetBackgroundSwitchState(enabled, disabled) {
 function fbmSyncSetToggleState(id, enabled, disabled) {
   var state = {};
   if (enabled !== undefined) {
-    state.addClass = [enabled ? 'is-on' : 'is-off'];
-    state.removeClass = [enabled ? 'is-off' : 'is-on'];
+    state.addClass = [uiSyncToggleClass('settings', enabled)];
+    state.removeClass = [uiSyncToggleClass('settings', !enabled)];
     state.ariaPressed = enabled;
-    state.childText = { '.shin-toggle-label': enabled ? 'ON' : 'OFF' };
+    state.childText = { [uiSyncToggleLabelSelector('shell')]: enabled ? 'ON' : 'OFF' };
   }
   if (disabled !== undefined) { state.disabled = disabled; }
   return fbmSyncSetTargetState(id, state);

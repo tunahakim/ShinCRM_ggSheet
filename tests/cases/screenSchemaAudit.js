@@ -1,8 +1,10 @@
 /** Kiểm hợp đồng kiến trúc màn: mỗi màn có schema riêng và màn không tự ghép HTML/DOM. */
 const fs = require('fs');
 const path = require('path');
-const { GAS_DIR, docTep } = require('../lib/load-gas');
+const { GAS_DIR, docTep, taoHopCat, napClient } = require('../lib/load-gas');
 const { section, check } = require('../lib/assert');
+const { liet } = require('./namespace');
+const { lopCoLuat } = require('./cssClass');
 
 function listHtml(relativeDir) {
   return fs.readdirSync(path.join(GAS_DIR, relativeDir)).filter((name) => name.endsWith('.html')).sort();
@@ -48,6 +50,42 @@ function chay(so) {
     return /<(?:div|span|table|button|input|textarea|select|option)\b/i.test(source) || /\b(?:innerHTML|outerHTML|createElement|appendChild|insertAdjacent|querySelector|getElementById)\b/.test(source);
   });
   check(so, 'schema màn hình chỉ mô tả Block, không chứa HTML literal hoặc DOM', schemaViolations, []);
+
+  const coreClassViolations = coreSchemas.map((name) => 'client/schema/screens/' + name)
+    .filter((file) => /\bclassName\s*:|\b(?:root|header|footer|tab|pagination|card|relay|active|disabled|primary|save|cancel|edit)Class\s*:/.test(docTep(file)));
+  check(so, 'schema lõi không chứa class CSS hoặc property class', coreClassViolations, []);
+
+  const statusClassViolations = statusSchemas.filter((name) => name !== 'common.html')
+    .map((name) => 'client/schema/status/' + name)
+    .filter((file) => /\bclassName\s*:|\b(?:root|header|footer|tab|pagination|card|relay|active|disabled|primary|save|cancel|edit)Class\s*:/.test(docTep(file)));
+  check(so, 'schema màn trạng thái không chứa class CSS hoặc property class', statusClassViolations, []);
+
+  const syncSchemaViolations = [...fbmScreens, ...fbmResultSchemas].map((name) => {
+    const folder = fbmScreens.includes(name) ? 'client/schema/sync/screens/' : 'client/schema/sync/results/';
+    return folder + name;
+  }).filter((file) => {
+    const source = docTep(file);
+    return /\bclassName\s*:|\b(?:root|header|footer|tab|pagination|card|relay|active|disabled|primary|save|cancel|edit|toggle|action|notice|layout)Class\s*:/.test(source)
+      || /\buiSyncClass(?:es)?\s*\(/.test(source)
+      || /['"](?:shin-|is-)[A-Za-z0-9_-]+/.test(source);
+  });
+  check(so, 'schema Sync chỉ giữ dữ liệu/ID, không chứa class, catalog hoặc token CSS', syncSchemaViolations, []);
+
+  const catalogSource = docTep('client/ui/uiClassMap.html');
+  const cssSource = liet('client', '.html').map((file) => docTep(file)).join('\n');
+  const cssClasses = new Set(lopCoLuat(cssSource));
+  const catalogClasses = Array.from(new Set((catalogSource.match(/\b(?:shin|is)-[A-Za-z0-9_-]+\b/g) || [])));
+  check(so, 'mọi class catalog presentation có luật CSS tương ứng', catalogClasses.filter((name) => !cssClasses.has(name)), []);
+  check(so, 'catalog presentation có resolver cấu trúc cho action/component/status/Sync', [
+    /function uiResolveActionClass\(/.test(catalogSource),
+    /function uiResolveComponentClass\(/.test(catalogSource),
+    /function uiResolveStatusClass\(/.test(catalogSource),
+    /function uiSyncClass\(/.test(catalogSource),
+    /function uiSyncClasses\(/.test(catalogSource)
+  ], [true, true, true, true, true]);
+  const presentationHop = napClient(taoHopCat(), 'client/ui/uiClassMap.html');
+  const requiredActions = ['save', 'edit', 'start', 'approve', 'cancel', 'reloadAll', 'retry', 'deleteActivity'];
+  check(so, 'action cần presentation đều có mapping button trong catalog', requiredActions.filter((action) => !presentationHop.uiResolveActionClass(action, 'button')), []);
 
   const schemaNames = schemaFiles.map((file) => path.basename(file));
   check(so, 'registry không có tên schema màn hình trùng nhau', new Set(schemaNames).size, schemaNames.length);

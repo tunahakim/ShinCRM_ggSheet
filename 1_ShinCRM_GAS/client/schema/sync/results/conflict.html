@@ -1,6 +1,5 @@
 <script>
 var FBM_SYNC_CONFLICT_SCHEMA = {
-  classes: { head: 'shin-sync-conflict-head', count: 'shin-sync-conflict-count', empty: 'shin-empty-state', meta: 'shin-sync-conflict-meta', field: 'shin-sync-conflict-field', fieldName: 'shin-sync-conflict-field-name', value: 'shin-sync-conflict-value', shin: 'shin-sync-conflict-value-shin', fbm: 'shin-sync-conflict-value-fbm', choice: 'shin-sync-conflict-choice', singleAction: 'shin-single-action-row', primary: 'shin-primary' },
   title: 'Xử lý xung đột',
   empty: 'Không có xung đột cần xử lý.',
   remaining: '{count} xung đột còn lại',
@@ -8,6 +7,5 @@ var FBM_SYNC_CONFLICT_SCHEMA = {
   choiceValues: { shin: 'shin', fbm: 'fbm', manual: 'manual' },
   ids: { choicePrefix: 'fbm-sync-conflict-choice-', manualPrefix: 'fbm-sync-conflict-manual-', back: 'fbm-sync-conflict-back' },
   separators: { meta: ' · ', fbm: ' · FBM ' },
-  layout: { card: function (elements) { return Card({ title: FBM_SYNC_CONFLICT_SCHEMA.title, elements: elements }); } }
 };
 </script>

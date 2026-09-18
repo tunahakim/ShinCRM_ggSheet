@@ -59,21 +59,21 @@ function fbmSyncShellHeaderBlocks(status) {
   var schema = FBM_SYNC_UI_SCHEMA.shell;
   return [
     Icon({ id: schema.ids.back, icon: 'back', tooltip: schema.tooltips.back }),
-    Text({ id: schema.ids.title, className: schema.headerClass, text: fbmSyncShellTitle() }),
-    StandaloneControl({ id: schema.ids.master, kind: 'toggle', pressed: enabled, className: enabled ? schema.toggleOnClass : schema.toggleOffClass, ariaLabel: schema.masterAria }),
+    Text({ id: schema.ids.title, className: uiSyncClass('shell', 'header'), text: fbmSyncShellTitle() }),
+    StandaloneControl({ id: schema.ids.master, kind: 'toggle', pressed: enabled, className: enabled ? uiSyncClass('shell', 'toggleOn') : uiSyncClass('shell', 'toggleOff'), ariaLabel: schema.masterAria }),
     Icon({ id: schema.ids.menu, icon: 'more', tooltip: schema.tooltips.menu, disabled: !fbmSyncStatusReady() })
   ];
 }
 function fbmSyncShellNavBlock() {
   var schema = FBM_SYNC_UI_SCHEMA.shell;
-  return Box({ id: schema.ids.nav, className: schema.navClass, hidden: FBM_SYNC_CLIENT.navOpen !== true, elements: (FBM_SYNC_UI_SCHEMA.screens || []).map(function (item) {
-    return Button({ label: item.label, className: schema.navItemClass + (item.id === FBM_SYNC_CLIENT.subscreen ? ' ' + schema.activeItemClass : ''), data: { 'sync-screen': item.id } });
+  return Box({ id: schema.ids.nav, className: uiSyncClass('shell', 'nav'), hidden: FBM_SYNC_CLIENT.navOpen !== true, elements: (FBM_SYNC_UI_SCHEMA.screens || []).map(function (item) {
+    return Button({ label: item.label, className: uiClassJoin(uiSyncClass('shell', 'navItem'), item.id === FBM_SYNC_CLIENT.subscreen ? uiSyncClass('shell', 'activeItem') : ''), data: { 'sync-screen': item.id } });
   }) });
 }
 function fbmSyncRenderShell(status) {
   var shell = FBM_SYNC_UI_SCHEMA.shell, headerMount = document.getElementById(shell.ids.header), panel = document.getElementById(shell.ids.body);
   if (!headerMount || !panel || typeof RENDER_INDEX === 'undefined') { return; }
-  fbmSyncSetTargetState(shell.ids.root, { addClass: [shell.activeClass] });
+  fbmSyncSetTargetState(shell.ids.root, { addClass: [uiSyncClass('shell', 'active')] });
   fbmSyncSetTargetState(shell.ids.info, { hidden: true });
   fbmSyncSetTargetState(shell.ids.footer, { hidden: true });
   var schema = shell;
@@ -81,7 +81,7 @@ function fbmSyncRenderShell(status) {
   else {
     fbmSyncSetTargetState(schema.ids.title, { text: fbmSyncShellTitle() });
     var enabled = fbmSyncShellEnabled(status);
-    fbmSyncSetTargetState(schema.ids.master, { ariaPressed: enabled, disabled: false, addClass: [enabled ? schema.toggleOnClass : schema.toggleOffClass], removeClass: [enabled ? schema.toggleOffClass : schema.toggleOnClass], childText: { [schema.toggleLabelSelector]: enabled ? schema.onLabel : schema.offLabel }, title: enabled ? schema.onTitle : schema.offTitle });
+    fbmSyncSetTargetState(schema.ids.master, { ariaPressed: enabled, disabled: false, addClass: [enabled ? uiSyncClass('shell', 'toggleOn') : uiSyncClass('shell', 'toggleOff')], removeClass: [enabled ? uiSyncClass('shell', 'toggleOff') : uiSyncClass('shell', 'toggleOn')], childText: { [uiSyncClass('shell', 'toggleLabelSelector')]: enabled ? schema.onLabel : schema.offLabel }, title: enabled ? schema.onTitle : schema.offTitle });
   }
   if (!RENDER_INDEX.nodes[schema.ids.nav] || !document.getElementById(schema.ids.nav)) {
     fbmSyncAppendBlock(headerMount, fbmSyncShellNavBlock());
@@ -99,7 +99,7 @@ function fbmSyncRenderShell(status) {
     fbmSyncSetTargetState(schema.ids.nav, { hidden: FBM_SYNC_CLIENT.navOpen !== true });
   }
   fbmSyncSetTargetState(schema.ids.menu, { disabled: !fbmSyncStatusReady() });
-  fbmSyncSetTargetState(schema.ids.body, { addClass: fbmSyncShellEnabled(status) ? [] : [schema.disabledClass], removeClass: fbmSyncShellEnabled(status) ? [schema.disabledClass] : [] });
+  fbmSyncSetTargetState(schema.ids.body, { addClass: fbmSyncShellEnabled(status) ? [] : [uiSyncClass('shell', 'disabled')], removeClass: fbmSyncShellEnabled(status) ? [uiSyncClass('shell', 'disabled')] : [] });
 }
 /** Dựng ngay khung màn mặc định bằng trạng thái trung tính; snapshot GAS sẽ vá vào sau. */
 function fbmSyncRenderInitial() {

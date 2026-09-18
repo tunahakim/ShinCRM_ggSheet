@@ -2,12 +2,16 @@
 /* Primitive schema dùng chung cho các màn trạng thái; không có thao tác DOM hay ghép HTML. */
 var STATUS_SCHEMA = {};
 
-function statusSchemaText(text, className) {
-  return Text({ className: className || 'shin-status-copy', text: text === null || text === undefined ? '' : String(text) });
+function statusSchemaText(text, variant) {
+  var className = uiResolveStatusTextClass(variant);
+  if (!className) { throw new Error('Vai trò text status không hợp lệ: "' + variant + '".'); }
+  return Text({ className: className, text: text === null || text === undefined ? '' : String(text) });
 }
 
-function statusSchemaBox(elements, className) {
-  return Box({ className: className || 'shin-status-box', elements: elements || [] });
+function statusSchemaBox(elements, variant) {
+  var className = uiResolveStatusBoxClass(variant);
+  if (!className) { throw new Error('Vai trò box status không hợp lệ: "' + variant + '".'); }
+  return Box({ className: className, elements: elements || [] });
 }
 
 function statusSchemaRoot(infoText, elements) {
@@ -17,34 +21,34 @@ function statusSchemaRoot(infoText, elements) {
     infoSlot: 'statusInfo',
     infoText: infoText || '',
     header: [],
-    body: [Box({ className: 'shin-status', elements: elements || [] })],
+    body: [Box({ className: uiResolveStatusClass('root'), elements: elements || [] })],
     footer: []
   };
 }
 
 function statusSchemaKeyValues(pairs) {
-  return Box({ className: 'shin-status-kv', elements: (pairs || []).reduce(function (nodes, pair) {
-    nodes.push(Text({ className: 'shin-status-kv-label', text: pair[0] }));
-    nodes.push(Text({ className: 'shin-status-kv-value', text: pair[1] }));
+  return Box({ className: uiResolveStatusClass('kv'), elements: (pairs || []).reduce(function (nodes, pair) {
+    nodes.push(Text({ className: uiResolveStatusTextClass('kvLabel'), text: pair[0] }));
+    nodes.push(Text({ className: uiResolveStatusTextClass('kvValue'), text: pair[1] }));
     return nodes;
   }, []) });
 }
 
 function statusSchemaTable(sheets) {
-  var rows = [Box({ className: 'shin-status-table-row shin-status-table-head', elements: [
-    Text({ text: 'Sheet' }), Text({ text: 'Hàng', className: 'shin-status-table-num' }),
-    Text({ text: 'Cột', className: 'shin-status-table-num' }), Text({ text: 'Số ô', className: 'shin-status-table-num' })
+  var rows = [Box({ className: uiClassJoin(uiResolveStatusClass('tableRow'), uiResolveStatusClass('tableHead')), elements: [
+    Text({ text: 'Sheet' }), statusSchemaText('Hàng', 'tableNum'),
+    statusSchemaText('Cột', 'tableNum'), statusSchemaText('Số ô', 'tableNum')
   ] })];
   (sheets || []).forEach(function (sheet) {
-    rows.push(Box({ className: 'shin-status-table-row', elements: [
-      Text({ text: sheet.name }), Text({ text: sheet.rows, className: 'shin-status-table-num' }),
-      Text({ text: sheet.columns, className: 'shin-status-table-num' }), Text({ text: sheet.cells, className: 'shin-status-table-num' })
+    rows.push(Box({ className: uiResolveStatusClass('tableRow'), elements: [
+      Text({ text: sheet.name }), statusSchemaText(sheet.rows, 'tableNum'),
+      statusSchemaText(sheet.columns, 'tableNum'), statusSchemaText(sheet.cells, 'tableNum')
     ] }));
   });
-  return Box({ className: 'shin-status-table', elements: rows });
+  return Box({ className: uiResolveStatusClass('table'), elements: rows });
 }
 
 SLOTS.statusInfo = function (ctx) {
-  return [Text({ text: ctx && ctx.screen && ctx.screen.infoText || '', className: 'shin-status-info' })];
+  return [statusSchemaText(ctx && ctx.screen && ctx.screen.infoText || '', 'info')];
 };
 </script>

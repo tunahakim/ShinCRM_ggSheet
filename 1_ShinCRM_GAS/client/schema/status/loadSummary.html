@@ -1,19 +1,19 @@
 <script>
 STATUS_SCHEMA.loadSummary = function (model) {
   var elements = [
-    Text({ className: 'shin-status-title', text: 'Nạp xong' }),
+    statusSchemaText('Nạp xong', 'title'),
     statusSchemaKeyValues(model.summary),
     statusSchemaBox([
-      Text({ className: 'shin-status-strong', text: 'Thời gian lượt nạp này' }),
+      statusSchemaText('Thời gian lượt nạp này', 'strong'),
       statusSchemaKeyValues(model.timing),
       statusSchemaText('Ba phần dưới cộng lại bằng phần trên. Năm con số này luôn hiện ở đây, nhưng chỉ được ghi vào sheet Log ở dòng sidebarBoot khi tham số LOG_TRACE ở sheet Config đang bật; ngày thường thì tắt để log không đầy dòng báo mọi thứ bình thường.')
     ]),
   ];
   if (model.warnings.length) {
-    elements.push(statusSchemaBox([Text({ className: 'shin-status-strong', text: 'Cảnh báo' })].concat(model.warnings.map(function (item) { return statusSchemaText(item); })), 'shin-status-box shin-status-warn'));
+    elements.push(statusSchemaBox([statusSchemaText('Cảnh báo', 'strong')].concat(model.warnings.map(function (item) { return statusSchemaText(item); })), 'warning'));
   }
   if (model.skipped.length) {
-    elements.push(statusSchemaBox([Text({ className: 'shin-status-strong', text: 'Phép tự kiểm schema bị bỏ qua vì thiếu đầu vào' })].concat(model.skipped.map(function (item) { return statusSchemaText(item); }))));
+    elements.push(statusSchemaBox([statusSchemaText('Phép tự kiểm schema bị bỏ qua vì thiếu đầu vào', 'strong')].concat(model.skipped.map(function (item) { return statusSchemaText(item); }))));
   }
   elements.push(statusSchemaText('Đây là màn tạm của chặng nạp dữ liệu. Chặng sau thay nó bằng màn xem khách.'));
   return statusSchemaRoot('Sẵn sàng', elements);

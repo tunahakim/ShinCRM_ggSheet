@@ -167,6 +167,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   ├── ui\                       Bộ máy giao diện màn nào cũng gọi được. spatialConfig giữ toàn quyền về khoảng cách.
 │   │   ├── progress.html         Vạch tiến trình cho mọi lượt gọi máy chủ. Đếm số lời gọi đang chờ, không giữ một cờ bật tắt.
 │   │   ├── icons.html            Bộ glyph SVG nội tuyến, tra theo tên. Tên lạ thì ném lỗi chứ không vẽ nút trống.
+│   │   ├── uiClassMap.html       Catalog action/component → presentation class; screen schema không chứa class CSS.
 │   │   ├── uiBuilder.html        Hình dạng MỘT node Block, và bảy hàm dựng Card/Row/Text/Field/Button/Icon/Check. Khóa lạ bị ném lỗi — đó là cách luật "không có style tự do" thành thật.
 │   │   ├── screenBuild.html      Lối viết tắt của UI_SCHEMA thành cây Block: mảng lồng mảng, chuỗi trần thay cho object, cụm group/rows. Không chạm DOM nên kiểm được offline.
 │   │   ├── slots.html            Ba vùng nội dung mà UI_SCHEMA không khai trước được: danh sách giao dịch, hộp gợi ý tìm khách, khối thông tin chung. Trả về cây Block chứ không trả chuỗi HTML.

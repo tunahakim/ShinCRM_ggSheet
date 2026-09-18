@@ -4,13 +4,13 @@ function fbmSyncResultsTabBlocks() {
   var activeTab = FBM_SYNC_CLIENT.resultsTab || 'summary';
   return FBM_SYNC_RESULT_TABS.map(function (tab) {
     var active = tab.id === activeTab;
-    return Button({ label: tab.label, className: FBM_SYNC_RESULTS_SCHEMA.tabClass + (active ? ' ' + FBM_SYNC_RESULTS_SCHEMA.classes.active : ''), data: { 'sync-results-tab': tab.id } });
+    return Button({ label: tab.label, className: uiClassJoin(FBM_SYNC_RESULTS_UI.classes.tab, active ? FBM_SYNC_RESULTS_UI.classes.active : ''), data: { 'sync-results-tab': tab.id } });
   });
 }
 function fbmSyncResultsTabDescriptionBlock() {
   var activeTab = FBM_SYNC_CLIENT.resultsTab || 'summary';
   var tab = FBM_SYNC_RESULT_TABS.filter(function (item) { return item.id === activeTab; })[0] || FBM_SYNC_RESULT_TABS[0];
-  return FBM_SYNC_RESULTS_SCHEMA.layout.description(tab);
+  return FBM_SYNC_RESULTS_UI.layout.description(tab);
 }
 function fbmSyncResultsBodyBlocks(status) {
   var tab = FBM_SYNC_CLIENT.resultsTab || 'summary';
@@ -22,7 +22,7 @@ function fbmSyncResultsBodyBlocks(status) {
 }
 function fbmSyncRenderResults(panel, status) {
   status = status || {};
-  return fbmSyncAppendBox(panel, FBM_SYNC_RESULTS_SCHEMA.rootClass, FBM_SYNC_RESULTS_SCHEMA.rootId, FBM_SYNC_RESULTS_SCHEMA.layout.screen({ tabs: fbmSyncResultsTabBlocks(), description: fbmSyncResultsTabDescriptionBlock(), body: fbmSyncResultsBodyBlocks(status) }).elements);
+  return fbmSyncAppendBox(panel, FBM_SYNC_RESULTS_UI.rootClass, FBM_SYNC_RESULTS_SCHEMA.rootId, FBM_SYNC_RESULTS_UI.layout.screen({ tabs: fbmSyncResultsTabBlocks(), description: fbmSyncResultsTabDescriptionBlock(), body: fbmSyncResultsBodyBlocks(status) }).elements);
 }
 function fbmSyncResultsSignature(status) {
   var metadata = status && status.metadata || {}, tab = FBM_SYNC_CLIENT.resultsTab || 'summary';
@@ -41,7 +41,7 @@ function fbmSyncResultPageBlocks(status, kind) {
   } else { rows = (metadata.traceTail || []).map(function (item) { return String(item.stage || item.action || FBM_SYNC_RESULTS_SCHEMA.rows.logFallback) + FBM_SYNC_RESULTS_SCHEMA.rows.separator + String(item.operation || item.reason || ''); }); }
   var page = Number(FBM_SYNC_CLIENT.resultPages && FBM_SYNC_CLIENT.resultPages[kind] || 0), size = FBM_SYNC_RESULTS_SCHEMA.pageSize, totalPages = Math.max(1, Math.ceil(rows.length / size)), current = Math.min(page, totalPages - 1);
   var pageText = FBM_SYNC_RESULTS_SCHEMA.pageText.replace('{current}', current + 1).replace('{total}', totalPages).replace('{size}', size);
-  return [FBM_SYNC_RESULTS_SCHEMA.layout.page({ title: FBM_SYNC_RESULTS_SCHEMA.pageTitles[kind], pageText: pageText, rows: rows.slice(current * size, current * size + size).map(function (row) { return Text({ className: FBM_SYNC_RESULTS_SCHEMA.classes.row, text: row }); }), pagination: FBM_SYNC_RESULTS_SCHEMA.layout.pagination({ kind: kind, previousDisabled: page <= 0, nextDisabled: page >= totalPages - 1 }) })];
+  return [FBM_SYNC_RESULTS_UI.layout.page({ title: FBM_SYNC_RESULTS_SCHEMA.pageTitles[kind], pageText: pageText, rows: rows.slice(current * size, current * size + size).map(function (row) { return Text({ className: FBM_SYNC_RESULTS_UI.classes.row, text: row }); }), pagination: FBM_SYNC_RESULTS_UI.layout.pagination({ kind: kind, previousDisabled: page <= 0, nextDisabled: page >= totalPages - 1 }) })];
 }
 function fbmSyncPatchResults(panel, status) {
   if (!panel || !RENDER_INDEX.nodes['fbm-sync-results-root']) { return false; }

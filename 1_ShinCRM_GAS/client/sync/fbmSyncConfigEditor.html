@@ -70,19 +70,19 @@ function fbmSyncConfigTitleActions(key) {
   var state = fbmSyncConfigState(key), editing = fbmSyncConfigIsEditing(key), actions = [];
   if (editing && (state.editing || (key === 'login' && FBM_SYNC_CLIENT.loginEditMode === true))) {
     var schema = fbmSyncConfigSchema();
-    actions.push({ id: fbmSyncConfigActionId(key, schema.actionCancel), icon: 'close', className: schema.cancelClass, tooltip: schema.tooltips.cancel, data: { 'sync-config-action': schema.actionCancel, 'sync-config-key': key } });
-    actions.push({ id: fbmSyncConfigActionId(key, schema.actionSave), icon: 'check', className: schema.saveClass, tooltip: schema.tooltips.save, data: { 'sync-config-action': schema.actionSave, 'sync-config-key': key } });
+    actions.push({ id: fbmSyncConfigActionId(key, schema.actionCancel), icon: 'close', className: uiResolveActionClass('cancel', 'icon'), tooltip: schema.tooltips.cancel, data: { 'sync-config-action': schema.actionCancel, 'sync-config-key': key } });
+    actions.push({ id: fbmSyncConfigActionId(key, schema.actionSave), icon: 'check', className: uiResolveActionClass('save', 'icon'), tooltip: schema.tooltips.save, data: { 'sync-config-action': schema.actionSave, 'sync-config-key': key } });
   } else if (!editing) {
     var editSchema = fbmSyncConfigSchema();
-    actions.push({ id: fbmSyncConfigActionId(key, editSchema.actionEdit), icon: 'pencil', className: editSchema.editIconClass, tooltip: editSchema.tooltips.edit, data: { 'sync-config-action': editSchema.actionEdit, 'sync-config-key': key } });
+    actions.push({ id: fbmSyncConfigActionId(key, editSchema.actionEdit), icon: 'pencil', className: uiResolveActionClass('edit', 'icon'), tooltip: editSchema.tooltips.edit, data: { 'sync-config-action': editSchema.actionEdit, 'sync-config-key': key } });
   }
   return actions;
 }
 
 function fbmSyncConfigButton(key, labels, options) {
-  var opts = options || {}, editing = fbmSyncConfigIsEditing(key);
+  var opts = options || {}, editing = fbmSyncConfigIsEditing(key), schema = fbmSyncConfigSchema();
   var label = editing ? labels.save : labels.edit;
-  var schema = fbmSyncConfigSchema(), className = editing && opts.primary !== false ? schema.primaryClass : (!editing ? schema.editClass : (opts.className || ''));
+  var className = editing && opts.primary !== false ? uiResolveActionClass('save', 'button') : (!editing ? uiResolveActionClass('edit', 'button') : (opts.className || ''));
   return Button({
     id: opts.id || fbmSyncConfigActionId(key, 'button'),
     label: label,
@@ -93,7 +93,7 @@ function fbmSyncConfigButton(key, labels, options) {
 }
 
 function fbmSyncConfigButtonRow(key, labels, options) {
-  return Row({ className: fbmSyncConfigSchema().actionRowClass, elements: [fbmSyncConfigButton(key, labels, options)] });
+  return Row({ className: uiSyncClass('config', 'actionRow'), elements: [fbmSyncConfigButton(key, labels, options)] });
 }
 
 function fbmSyncConfigBeginEdit(key, draft) {

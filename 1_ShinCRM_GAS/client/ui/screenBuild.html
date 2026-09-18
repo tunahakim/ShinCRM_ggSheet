@@ -21,14 +21,23 @@ function screenFieldSpec(phanTu, viTri) {
  */
 function screenBarItem(muc, viTri) {
   if (!muc || typeof muc !== 'object') { throw new Error('Mục ở ' + viTri + ' phải là object.'); }
+  var surface = viTri.indexOf('.footer') >= 0 ? 'footer' : (viTri.indexOf('.header') >= 0 ? 'header' : 'titleActions');
   if (typeof muc.button === 'string') {
     var nut = { label: muc.button };
-    ['action', 'className', 'id', 'menu', 'align', 'spatialConfig'].forEach(function (k) {
+    ['action', 'id', 'menu', 'align', 'spatialConfig'].forEach(function (k) {
       if (muc[k] !== undefined) { nut[k] = muc[k]; }
     });
+    if (muc.className !== undefined) { nut.className = muc.className; }
+    if (!nut.className && typeof uiResolveActionClass === 'function') {
+      nut.className = uiResolveActionClass(nut.action, 'button', surface);
+    }
     return Button(nut);
   }
-  return Icon(muc);
+  var icon = Object.assign({}, muc);
+  if (!icon.className && typeof uiResolveActionClass === 'function') {
+    icon.className = uiResolveActionClass(icon.action, 'icon', surface);
+  }
+  return Icon(icon);
 }
 
 /** Cả một hàng mục thành mảng Block. Vắng khai thì trả mảng rỗng, vì vùng không khai là vùng engine ẩn hẳn. */
@@ -45,7 +54,7 @@ function screenBar(items, viTri) {
  *
  * Trộn hai lối trong cùng một thân thì chặn. Không phải vì khó làm, mà vì một thân nửa cây nửa cụm là thứ không ai đọc ra được thứ tự hiện trên màn.
  */
-function screenBody(body) {
+function screenBody(body, screenName) {
   if (body === undefined || body === null) { return []; }
   if (!Array.isArray(body)) { throw new Error('`body` phải là mảng.'); }
 
@@ -67,7 +76,9 @@ function screenBody(body) {
       elements: cum.rows.map(function (hang, h) {
         if (!Array.isArray(hang)) { throw new Error('Hàng ' + (h + 1) + ' của cụm ' + (i + 1) + ' phải là mảng, vì cùng một mảng là cùng một hàng.'); }
         return Row(hang.map(function (phanTu, c) {
-          return Field(screenFieldSpec(phanTu, 'cụm ' + (i + 1) + ' hàng ' + (h + 1) + ' ô ' + (c + 1)));
+          var fieldSpec = screenFieldSpec(phanTu, 'cụm ' + (i + 1) + ' hàng ' + (h + 1) + ' ô ' + (c + 1));
+          fieldSpec = Object.assign({}, fieldSpec, { surface: screenName });
+          return Field(fieldSpec);
         }));
       })
     });
@@ -89,7 +100,7 @@ function screenBuild(decl, ten) {
     title: decl.title === undefined ? null : decl.title,
     infoBar: decl.infoBar === true,
     header: screenBar(decl.header, nhan + '.header'),
-    body: screenBody(decl.body),
+    body: screenBody(decl.body, nhan),
     footer: screenBar(decl.footer, nhan + '.footer')
   };
 }

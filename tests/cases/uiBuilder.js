@@ -12,7 +12,7 @@ function chay(so) {
 
   let hop = null;
   try {
-    hop = napClient(taoHopCat(), 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html');
+    hop = napClient(taoHopCat(), 'client/ui/uiClassMap.html', 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html');
   } catch (err) {
     return ghiLoiNap(so, 'nạp uiBuilder và screenBuild', err);
   }
@@ -28,6 +28,10 @@ function chay(so) {
 
   check(so, 'Text, Button, Icon, Check nhận thẳng chuỗi cho gọn',
     [hop.Text('chữ').text, hop.Button('LƯU').label, hop.Icon('pencil').icon, hop.Check('ACT-000009').pick], ['chữ', 'LƯU', 'pencil', 'ACT-000009']);
+
+  check(so, 'catalog chọn class theo action thay vì schema truyền class',
+    [hop.Button({ label: 'Lưu', action: 'saveForm' }).className, hop.Icon({ icon: 'check', action: 'saveForm' }).className],
+    ['shin-primary shin-save-wide', 'shin-form-save']);
 
   check(so, 'Notice dùng Text và ánh xạ sắc thái ở component lõi',
     [hop.Notice({ kind: 'success', text: 'Đã xong' }).role, hop.Notice({ kind: 'success', text: 'Đã xong' }).className, hop.Notice({ kind: 'lạ', text: 'Đang chờ' }).className],

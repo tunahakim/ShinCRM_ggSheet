@@ -10,4 +10,83 @@ function fbmSyncRenderTarget(id, elements) {
 }
 function fbmSyncSetTargetState(id, state) { return renderTargetState(id, state || {}); }
 function fbmSyncAppendBox(parent, className, id, elements, data) { return fbmSyncAppendBlock(parent, Box({ id: id || null, className: className || '', elements: elements || [], data: data || null })); }
+
+/* Layout Sync thuộc lớp UI; screen schema chỉ giữ dữ liệu, ID vùng và nhãn. */
+var FBM_SYNC_RUN_UI = {
+  rootClass: uiSyncClass('common', 'section'),
+  classes: uiSyncClasses('run'),
+  layout: {
+    actionRow: function (action) { return Row({ className: FBM_SYNC_RUN_UI.classes.actionRow, elements: [action] }); },
+    pipeline: function (id, title, steps) { return Box({ id: id || null, className: FBM_SYNC_RUN_UI.classes.pipeline, elements: [Text({ className: FBM_SYNC_RUN_UI.classes.pipelineTitle, text: title })].concat(steps || []) }); },
+    pipelineStep: function (className, marker, label) { return Box({ className: className, elements: [Text({ className: FBM_SYNC_RUN_UI.classes.marker, text: marker }), Text({ className: FBM_SYNC_RUN_UI.classes.stepLabel, text: label })] }); },
+    liveStatus: function (id, elements) { return Box({ id: id, elements: elements }); },
+    screen: function (slots) {
+      return Box({ id: FBM_SYNC_RUN_SCHEMA.rootId, className: FBM_SYNC_RUN_UI.rootClass, elements: [
+        Card({ title: FBM_SYNC_RUN_SCHEMA.cardTitle, elements: [slots.mode, Box({ id: FBM_SYNC_RUN_SCHEMA.regions.action, elements: [slots.action] })] }),
+        Stack({ id: FBM_SYNC_RUN_SCHEMA.regions.details, elements: slots.details })
+      ] });
+    }
+  }
+};
+
+var FBM_SYNC_ACCOUNT_UI = {
+  rootClass: uiSyncClass('common', 'section'),
+  classes: uiSyncClasses('account'),
+  layout: {
+    actionRow: function (elements) { return Row({ elements: elements }); },
+    singleAction: function (element) { return Row({ className: FBM_SYNC_ACCOUNT_UI.classes.singleAction, elements: [element] }); },
+    fieldHelp: function (control, help) { return [control, Text({ className: FBM_SYNC_ACCOUNT_UI.classes.muted, text: help })]; },
+    loginCard: function (slots) { return Card({ title: FBM_SYNC_ACCOUNT_SCHEMA.cards.login, titleActions: slots.titleActions, elements: [Box({ id: FBM_SYNC_ACCOUNT_SCHEMA.regions.loginConfigured, elements: slots.configured }), slots.username, slots.password, Box({ id: FBM_SYNC_ACCOUNT_SCHEMA.regions.loginActions, elements: slots.actions }), Box({ id: FBM_SYNC_ACCOUNT_SCHEMA.regions.loginNotice, elements: slots.notice }), Box({ id: FBM_SYNC_ACCOUNT_SCHEMA.regions.loginPolicy, elements: slots.policy })] }); },
+    accountCard: function (elements, titleActions) { return Card({ title: FBM_SYNC_ACCOUNT_SCHEMA.cards.account, titleActions: titleActions, elements: elements }); },
+    accountSettings: function (slots) { return [Box({ id: FBM_SYNC_ACCOUNT_SCHEMA.regions.accountNotice, elements: slots.notice })].concat(slots.fields, [slots.actions]); },
+    identity: function (slots) { return Card({ title: FBM_SYNC_ACCOUNT_SCHEMA.cards.identity, titleActions: slots.titleActions, elements: [Box({ id: FBM_SYNC_ACCOUNT_SCHEMA.regions.identitySummary, elements: slots.summary }), Box({ id: FBM_SYNC_ACCOUNT_SCHEMA.regions.identityForm, elements: slots.form }), Stack({ id: FBM_SYNC_ACCOUNT_SCHEMA.regions.identityActions, className: FBM_SYNC_ACCOUNT_UI.classes.actionStack, elements: slots.actions }), Box({ id: FBM_SYNC_ACCOUNT_SCHEMA.regions.identityActionStatus, elements: slots.actionStatus }), Box({ id: FBM_SYNC_ACCOUNT_SCHEMA.regions.identityNotice, elements: slots.notice }), Box({ id: FBM_SYNC_ACCOUNT_SCHEMA.regions.identityResult, elements: slots.result })] }); },
+    screen: function (slots) { return Box({ id: FBM_SYNC_ACCOUNT_SCHEMA.rootId, className: FBM_SYNC_ACCOUNT_UI.rootClass, elements: [Box({ id: FBM_SYNC_ACCOUNT_SCHEMA.regions.identityCard, elements: [slots.identity] }), Box({ id: FBM_SYNC_ACCOUNT_SCHEMA.regions.loginCard, elements: [slots.login] }), Box({ id: FBM_SYNC_ACCOUNT_SCHEMA.regions.accountSettings, elements: [slots.accountSettings] })] }); }
+  }
+};
+
+var FBM_SYNC_RESULTS_UI = {
+  rootClass: uiSyncClass('common', 'section'),
+  classes: uiSyncClasses('results'),
+  layout: {
+    description: function (tab) { return Box({ id: FBM_SYNC_RESULTS_SCHEMA.regions.description, className: uiClassJoin(FBM_SYNC_RESULTS_UI.classes.tabDescription, tab.multiline ? FBM_SYNC_RESULTS_UI.classes.multiline : ''), elements: [Text({ className: FBM_SYNC_RESULTS_UI.classes.tabText, text: tab.description })] }); },
+    screen: function (slots) { return Box({ id: FBM_SYNC_RESULTS_SCHEMA.rootId, className: FBM_SYNC_RESULTS_UI.rootClass, elements: [Box({ className: FBM_SYNC_RESULTS_UI.classes.tabRow, id: FBM_SYNC_RESULTS_SCHEMA.regions.tabs, elements: slots.tabs }), slots.description, Stack({ id: FBM_SYNC_RESULTS_SCHEMA.regions.body, elements: slots.body })] }); },
+    page: function (slots) { return Card({ title: slots.title, elements: [Text({ className: FBM_SYNC_RESULTS_UI.classes.muted, text: slots.pageText })].concat(slots.rows, [Row({ className: FBM_SYNC_RESULTS_UI.classes.pagination, elements: slots.pagination })]) }); },
+    pagination: function (slots) { return [Button({ label: FBM_SYNC_RESULTS_SCHEMA.pagination.previous, disabled: slots.previousDisabled, data: { 'sync-page': slots.kind + ':-1' } }), Button({ label: FBM_SYNC_RESULTS_SCHEMA.pagination.next, disabled: slots.nextDisabled, data: { 'sync-page': slots.kind + ':1' } })]; }
+  }
+};
+
+var FBM_SYNC_SETTINGS_UI = {
+  rootClass: uiSyncClass('common', 'section'),
+  classes: uiSyncClasses('settings'),
+  layout: {
+    cardRegion: function (id, card) { return Box({ id: id, elements: [card] }); },
+    inlineField: function (className, label, control) { return Row({ className: className, elements: [label, control] }); },
+    toggle: function (className, label, control) { return Box({ className: className, elements: [label, control] }); },
+    scheduleRow: function (className, toggle, label, minutes) { return Box({ className: className, elements: [toggle, label, minutes] }); },
+    detailField: function (className, label, control) { return Box({ className: className, elements: [label, control] }); },
+    detailInputs: function (className, elements) { return Row({ className: className, elements: elements }); },
+    detailControls: function (className, fields) { return Box({ className: className, elements: fields }); },
+    loginParent: function (id, className, label, control) { return Box({ id: id, className: className, elements: [label, control] }); },
+    loginRetryGroup: function (className, elements) { return Box({ className: className, elements: elements }); },
+    card: function (title, titleActions, elements) { return Card({ title: title, titleActions: titleActions, elements: elements }); },
+    relayCard: function (titleActions, notice, state, actions) { return Card({ title: FBM_SYNC_SETTINGS_SCHEMA.cards.relay, titleActions: titleActions, elements: [Box({ id: FBM_SYNC_SETTINGS_SCHEMA.regions.relayNotice, elements: notice }), Box({ id: FBM_SYNC_SETTINGS_SCHEMA.regions.relayState, elements: state }), actions] }); },
+    extension: function (slots) { return [Box({ id: FBM_SYNC_SETTINGS_SCHEMA.regions.extensionNotice, elements: slots.notice }), slots.poll, slots.startup, slots.actions]; },
+    background: function (slots) { return [Box({ id: FBM_SYNC_SETTINGS_SCHEMA.regions.backgroundNotice, elements: slots.notice }), slots.switch, slots.direction].concat(slots.processes, [slots.detail, slots.actions]); },
+    loginPolicy: function (slots) { return [Box({ id: FBM_SYNC_SETTINGS_SCHEMA.regions.loginNotice, elements: slots.notice }), slots.parent, Box({ id: FBM_SYNC_SETTINGS_SCHEMA.regions.loginPolicyChildren, className: FBM_SYNC_SETTINGS_UI.classes.loginChildren, elements: slots.children }), slots.actions]; },
+    module: function (slots) { return [slots.switch, Box({ id: FBM_SYNC_SETTINGS_SCHEMA.regions.moduleNotice, elements: slots.notice }), slots.threshold, slots.help, slots.actions]; },
+    screen: function (slots) { return Box({ id: FBM_SYNC_SETTINGS_SCHEMA.rootId, className: FBM_SYNC_SETTINGS_UI.rootClass, elements: [slots.module, slots.relay, slots.extension, slots.background, slots.loginPolicy] }); }
+  }
+};
+
+var FBM_SYNC_STATUS_UI = {
+  classes: uiSyncClasses('status'),
+  layout: {
+    progress: function (slots) { return Box({ className: FBM_SYNC_STATUS_UI.classes.progress, elements: [Text({ id: FBM_SYNC_STATUS_SCHEMA.regions.progressLabel, className: FBM_SYNC_STATUS_UI.classes.progressLabel, text: slots.label }), Box({ id: FBM_SYNC_STATUS_SCHEMA.regions.progressTrack, className: uiClassJoin(FBM_SYNC_STATUS_UI.classes.track, slots.trackClass), ariaValueNow: slots.ariaValueNow, elements: [Box({ id: FBM_SYNC_STATUS_SCHEMA.regions.progressFill, className: uiClassJoin(FBM_SYNC_STATUS_UI.classes.fill, slots.fillClass), spatialConfig: { width: slots.width }, elements: [] })] })] }); },
+    card: function (elements) { return Card({ title: FBM_SYNC_STATUS_SCHEMA.title, elements: elements }); }
+  }
+};
+
+var FBM_SYNC_ISSUES_UI = { classes: uiSyncClasses('issues'), card: function (title, elements) { return Card({ title: title, elements: elements }); } };
+var FBM_SYNC_AUDIT_UI = { classes: uiSyncClasses('audit'), card: function (title, elements) { return Card({ title: title, elements: elements }); } };
+var FBM_SYNC_CONFLICT_UI = { classes: uiSyncClasses('conflict'), card: function (elements) { return Card({ title: FBM_SYNC_CONFLICT_SCHEMA.title, elements: elements }); } };
 </script>

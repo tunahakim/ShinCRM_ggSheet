@@ -1,32 +1,32 @@
 <script>
 function fbmSyncAuditContentBlocks(status) {
-  var schema = FBM_SYNC_AUDIT_SCHEMA;
+  var schema = FBM_SYNC_AUDIT_SCHEMA, ui = FBM_SYNC_AUDIT_UI;
   var metadata = status.metadata || {}, preview = metadata.preview || {}, audit = metadata.audit || {};
   var customers = Array.isArray(preview.customers) ? preview.customers : [], activities = Array.isArray(preview.activities) ? preview.activities : [];
   var blocks = [];
   if (customers.length || activities.length) {
-    blocks.push(schema.layout.card(schema.titles.preview, customers.slice(0, 10).map(function (item) { return Text({ className: schema.classes.preview, text: schema.labels.customer + String(item.code || '') + schema.labels.separator + String(item.name || '') }); }).concat(activities.slice(0, 10).map(function (item) { return Text({ className: schema.classes.preview, text: schema.labels.activity + String(item.date || '') + schema.labels.separator + String(item.type || '') + schema.labels.separator + String(item.content || '') }); }), preview.truncated ? [Text({ className: schema.classes.muted, text: schema.labels.truncated })] : [])));
+    blocks.push(ui.card(schema.titles.preview, customers.slice(0, 10).map(function (item) { return Text({ className: ui.classes.preview, text: schema.labels.customer + String(item.code || '') + schema.labels.separator + String(item.name || '') }); }).concat(activities.slice(0, 10).map(function (item) { return Text({ className: ui.classes.preview, text: schema.labels.activity + String(item.date || '') + schema.labels.separator + String(item.type || '') + schema.labels.separator + String(item.content || '') }); }), preview.truncated ? [Text({ className: ui.classes.muted, text: schema.labels.truncated })] : [])));
   }
   if (Array.isArray(audit.cases) && audit.cases.length) {
-    blocks.push(schema.layout.card(schema.titles.scope, audit.cases.map(function (item) { return Text({ className: item.status === 'PASS' ? schema.classes.pass : schema.classes.error, text: (item.status === 'PASS' ? schema.labels.pass : schema.labels.fail) + String(item.name || '') + (item.detail ? schema.labels.separator + String(item.detail) : '') }); })));
+    blocks.push(ui.card(schema.titles.scope, audit.cases.map(function (item) { return Text({ className: item.status === 'PASS' ? ui.classes.pass : ui.classes.error, text: (item.status === 'PASS' ? schema.labels.pass : schema.labels.fail) + String(item.name || '') + (item.detail ? schema.labels.separator + String(item.detail) : '') }); })));
   }
   return blocks.concat(fbmSyncRecordIssueBlocks(metadata));
 }
 
 function fbmSyncConflictContentBlocks(status) {
-  var schema = FBM_SYNC_CONFLICT_SCHEMA;
+  var schema = FBM_SYNC_CONFLICT_SCHEMA, ui = FBM_SYNC_CONFLICT_UI;
   var metadata = status.metadata || {}, conflicts = Array.isArray(metadata.conflicts) ? metadata.conflicts : [], item = conflicts[0];
-  var head = Row({ className: schema.classes.head, elements: [Text({ className: schema.classes.count, text: schema.remaining.replace('{count}', Number(metadata.conflictCount || conflicts.length)) })] });
-  if (!item) { return [schema.layout.card([head, Text({ className: schema.classes.empty, text: schema.empty })])]; }
+  var head = Row({ className: ui.classes.head, elements: [Text({ className: ui.classes.count, text: schema.remaining.replace('{count}', Number(metadata.conflictCount || conflicts.length)) })] });
+  if (!item) { return [ui.card([head, Text({ className: ui.classes.empty, text: schema.empty })])]; }
   FBM_SYNC_CLIENT.conflictChoices = FBM_SYNC_CLIENT.conflictChoices || {};
   var fields = (item.fields || []).map(function (field, index) {
     var name = String(field.field || ''), choice = FBM_SYNC_CLIENT.conflictChoices[name] || schema.choiceValues.shin, controlId = schema.ids.choicePrefix + index;
-    var elements = [Text({ className: schema.classes.fieldName, text: name }), Text({ className: schema.classes.value + ' ' + schema.classes.shin, text: schema.labels.shin + String(field.left || schema.labels.empty) }), Text({ className: schema.classes.value + ' ' + schema.classes.fbm, text: schema.labels.fbm + String(field.right || schema.labels.empty) }), StandaloneControl({ id: controlId, kind: 'menu', options: [{ value: schema.choiceValues.shin, label: schema.labels.keepShin }, { value: schema.choiceValues.fbm, label: schema.labels.keepFbm }, { value: schema.choiceValues.manual, label: schema.labels.manual }], value: choice, className: schema.classes.choice, data: { 'fbm-conflict-field': name }, ariaLabel: schema.labels.choiceAria + name })];
+    var elements = [Text({ className: ui.classes.fieldName, text: name }), Text({ className: uiClassJoin(ui.classes.value, ui.classes.shin), text: schema.labels.shin + String(field.left || schema.labels.empty) }), Text({ className: uiClassJoin(ui.classes.value, ui.classes.fbm), text: schema.labels.fbm + String(field.right || schema.labels.empty) }), StandaloneControl({ id: controlId, kind: 'menu', options: [{ value: schema.choiceValues.shin, label: schema.labels.keepShin }, { value: schema.choiceValues.fbm, label: schema.labels.keepFbm }, { value: schema.choiceValues.manual, label: schema.labels.manual }], value: choice, className: ui.classes.choice, data: { 'fbm-conflict-field': name }, ariaLabel: schema.labels.choiceAria + name })];
     elements.push(StandaloneControl({ id: schema.ids.manualPrefix + index, kind: 'input', inputType: 'text', value: (FBM_SYNC_CLIENT.conflictDraft || {})[name] || '', placeholder: schema.labels.manualPlaceholder, hidden: choice !== schema.choiceValues.manual, data: { 'fbm-conflict-manual': name }, ariaLabel: schema.labels.manualAria + name }));
-    return Box({ className: schema.classes.field, elements: elements });
+    return Box({ className: ui.classes.field, elements: elements });
   });
-  var actions = Row([Button({ label: schema.labels.keepAllShin, data: { 'fbm-conflict-choice': schema.choiceValues.shin, 'fbm-conflict-entity': String(item.entity || ''), 'fbm-conflict-id': String(item.id || '') } }), Button({ label: schema.labels.keepAllFbm, data: { 'fbm-conflict-choice': schema.choiceValues.fbm, 'fbm-conflict-entity': String(item.entity || ''), 'fbm-conflict-id': String(item.id || '') } }), Button({ label: schema.labels.saveMerge, className: schema.classes.primary, data: { 'fbm-conflict-merge': true, 'fbm-conflict-entity': String(item.entity || ''), 'fbm-conflict-id': String(item.id || '') } })]);
-  return [schema.layout.card([head, Text({ className: schema.classes.meta, text: String(item.entity || '') + schema.separators.meta + String(item.id || '') + (item.fbmId ? schema.separators.fbm + String(item.fbmId) : '') })].concat(fields, [actions, Row({ className: schema.classes.singleAction, elements: [Button({ id: schema.ids.back, label: schema.labels.back })] })]))];
+  var actions = Row([Button({ label: schema.labels.keepAllShin, data: { 'fbm-conflict-choice': schema.choiceValues.shin, 'fbm-conflict-entity': String(item.entity || ''), 'fbm-conflict-id': String(item.id || '') } }), Button({ label: schema.labels.keepAllFbm, data: { 'fbm-conflict-choice': schema.choiceValues.fbm, 'fbm-conflict-entity': String(item.entity || ''), 'fbm-conflict-id': String(item.id || '') } }), Button({ label: schema.labels.saveMerge, className: uiResolveActionClass('save', 'button'), data: { 'fbm-conflict-merge': true, 'fbm-conflict-entity': String(item.entity || ''), 'fbm-conflict-id': String(item.id || '') } })]);
+  return [ui.card([head, Text({ className: ui.classes.meta, text: String(item.entity || '') + schema.separators.meta + String(item.id || '') + (item.fbmId ? schema.separators.fbm + String(item.fbmId) : '') })].concat(fields, [actions, Row({ className: ui.classes.singleAction, elements: [Button({ id: schema.ids.back, label: schema.labels.back })] })]))];
 }
 
 </script>

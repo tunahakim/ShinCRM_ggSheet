@@ -5,30 +5,30 @@ function fbmSyncLoginConfiguredBlocks() {
 function fbmSyncLoginActionBlocks() {
   var active = !!FBM_SYNC_CLIENT.running, editing = fbmSyncConfigIsEditing('login');
   if (!editing) { return [fbmSyncConfigButtonRow('login', { edit: FBM_SYNC_ACCOUNT_SCHEMA.login.edit, save: FBM_SYNC_ACCOUNT_SCHEMA.login.save }, { primary: false })]; }
-  return [FBM_SYNC_ACCOUNT_SCHEMA.layout.actionRow([Button({ id: FBM_SYNC_ACCOUNT_SCHEMA.login.actionIds.test, label: FBM_SYNC_ACCOUNT_SCHEMA.login.test, className: FBM_SYNC_ACCOUNT_SCHEMA.classes.primary, disabled: active }), Button({ id: FBM_SYNC_ACCOUNT_SCHEMA.login.actionIds.save, label: FBM_SYNC_ACCOUNT_SCHEMA.login.save, className: FBM_SYNC_ACCOUNT_SCHEMA.classes.primary, disabled: active, data: { 'sync-config-action': 'save', 'sync-config-key': 'login' } })])];
+  return [FBM_SYNC_ACCOUNT_UI.layout.actionRow([Button({ id: FBM_SYNC_ACCOUNT_SCHEMA.login.actionIds.test, label: FBM_SYNC_ACCOUNT_SCHEMA.login.test, className: uiResolveActionClass('save', 'button'), disabled: active }), Button({ id: FBM_SYNC_ACCOUNT_SCHEMA.login.actionIds.save, label: FBM_SYNC_ACCOUNT_SCHEMA.login.save, className: uiResolveActionClass('save', 'button'), disabled: active, data: { 'sync-config-action': 'save', 'sync-config-key': 'login' } })])];
 }
 function fbmSyncLoginPolicyNavigationBlocks() {
-  return [FBM_SYNC_ACCOUNT_SCHEMA.layout.singleAction(Button({ id: FBM_SYNC_ACCOUNT_SCHEMA.login.actionIds.policy, label: FBM_SYNC_ACCOUNT_SCHEMA.login.policy, className: FBM_SYNC_ACCOUNT_SCHEMA.classes.edit, disabled: !!FBM_SYNC_CLIENT.running || fbmSyncConfigIsEditing('login') }))];
+  return [FBM_SYNC_ACCOUNT_UI.layout.singleAction(Button({ id: FBM_SYNC_ACCOUNT_SCHEMA.login.actionIds.policy, label: FBM_SYNC_ACCOUNT_SCHEMA.login.policy, className: uiResolveActionClass('edit', 'button'), disabled: !!FBM_SYNC_CLIENT.running || fbmSyncConfigIsEditing('login') }))];
 }
 function fbmSyncAccountSettingsBlocks() {
   var settings = (FBM_SYNC_CLIENT.syncSettings || {}).account || {}, draft = fbmSyncConfigDraft('accountSettings', FBM_SYNC_CLIENT.accountSettingsDraft || {}), invalid = FBM_SYNC_CLIENT.accountSettingsInvalid || {}, active = !!FBM_SYNC_CLIENT.running, editing = fbmSyncConfigIsEditing('accountSettings'), disabled = active || !editing;
   var value = function (name) { return draft[name] !== undefined ? draft[name] : settings[name] || ''; };
   var fields = FBM_SYNC_ACCOUNT_SCHEMA.account.fields.reduce(function (blocks, field) {
-    blocks = blocks.concat(FBM_SYNC_ACCOUNT_SCHEMA.layout.fieldHelp(field, StandaloneField(field.label, { id: field.id, kind: 'input', inputType: field.inputType, value: value(field.key), placeholder: field.placeholder, disabled: disabled, ariaLabel: field.label }, { className: invalid[field.key] ? FBM_SYNC_ACCOUNT_SCHEMA.classes.invalid : '' }), field.help));
+    blocks = blocks.concat(FBM_SYNC_ACCOUNT_UI.layout.fieldHelp(StandaloneField(field.label, { id: field.id, kind: 'input', inputType: field.inputType, value: value(field.key), placeholder: field.placeholder, disabled: disabled, ariaLabel: field.label }, { className: invalid[field.key] ? FBM_SYNC_ACCOUNT_UI.classes.invalid : '' }), field.help));
     return blocks;
   }, []);
-  return FBM_SYNC_ACCOUNT_SCHEMA.layout.accountSettings({
+  return FBM_SYNC_ACCOUNT_UI.layout.accountSettings({
     fields: fields,
     notice: fbmSyncAccountNoticeBlocks('accountSettings'),
     actions: fbmSyncConfigButtonRow('accountSettings', { edit: FBM_SYNC_ACCOUNT_SCHEMA.account.edit, save: FBM_SYNC_ACCOUNT_SCHEMA.account.save }, { id: FBM_SYNC_ACCOUNT_SCHEMA.account.saveId, disabled: active })
   });
 }
 function fbmSyncAccountSettingsCard() {
-  return FBM_SYNC_ACCOUNT_SCHEMA.layout.accountCard(fbmSyncAccountSettingsBlocks(), fbmSyncConfigTitleActions('accountSettings'));
+  return FBM_SYNC_ACCOUNT_UI.layout.accountCard(fbmSyncAccountSettingsBlocks(), fbmSyncConfigTitleActions('accountSettings'));
 }
 function fbmSyncLoginCard() {
   var login = FBM_SYNC_CLIENT.loginStatus || {}, configured = login.configured === true, editing = fbmSyncConfigIsEditing('login');
-  return FBM_SYNC_ACCOUNT_SCHEMA.layout.loginCard({
+  return FBM_SYNC_ACCOUNT_UI.layout.loginCard({
     titleActions: fbmSyncConfigTitleActions('login'), configured: fbmSyncLoginConfiguredBlocks(),
     username: StandaloneField(FBM_SYNC_ACCOUNT_SCHEMA.login.username.label, { id: FBM_SYNC_ACCOUNT_SCHEMA.login.username.id, kind: 'input', inputType: FBM_SYNC_ACCOUNT_SCHEMA.login.username.inputType, value: editing ? FBM_SYNC_CLIENT.loginDraft.username : String(login.public && login.public.usernameHint || ''), placeholder: FBM_SYNC_ACCOUNT_SCHEMA.login.username.placeholder, ariaLabel: FBM_SYNC_ACCOUNT_SCHEMA.login.username.label, disabled: !editing }),
     password: StandaloneField(FBM_SYNC_ACCOUNT_SCHEMA.login.password.label, { id: FBM_SYNC_ACCOUNT_SCHEMA.login.password.id, kind: 'input', inputType: FBM_SYNC_ACCOUNT_SCHEMA.login.password.inputType, value: configured && !editing ? FBM_SYNC_ACCOUNT_SCHEMA.login.password.maskedValue : '', placeholder: FBM_SYNC_ACCOUNT_SCHEMA.login.password.placeholder, ariaLabel: FBM_SYNC_ACCOUNT_SCHEMA.login.password.label, disabled: !editing }),
@@ -37,7 +37,7 @@ function fbmSyncLoginCard() {
 }
 function fbmSyncRenderAccount(panel, status) {
   status = status || {};
-  return fbmSyncAppendBox(panel, FBM_SYNC_ACCOUNT_SCHEMA.rootClass, FBM_SYNC_ACCOUNT_SCHEMA.rootId, FBM_SYNC_ACCOUNT_SCHEMA.layout.screen({ identity: fbmSyncIdentityBlock(status), login: fbmSyncLoginCard(), accountSettings: fbmSyncAccountSettingsCard() }).elements);
+  return fbmSyncAppendBox(panel, FBM_SYNC_ACCOUNT_UI.rootClass, FBM_SYNC_ACCOUNT_SCHEMA.rootId, FBM_SYNC_ACCOUNT_UI.layout.screen({ identity: fbmSyncIdentityBlock(status), login: fbmSyncLoginCard(), accountSettings: fbmSyncAccountSettingsCard() }).elements);
 }
 function fbmSyncPatchAccount(panel, status) {
   if (!panel || !RENDER_INDEX.nodes[FBM_SYNC_ACCOUNT_SCHEMA.rootId]) { return false; }

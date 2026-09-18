@@ -1,7 +1,6 @@
 <script>
 var FBM_SYNC_STATUS_SCHEMA = {
   regions: { progressLabel: 'fbm-sync-progress-label', progressTrack: 'fbm-sync-progress-track', progressFill: 'fbm-sync-progress-fill', liveStatus: 'fbm-sync-live-status-region' },
-  classes: { cardTitle: 'shin-sync-status-card', phase: 'shin-sync-phase', operation: 'shin-sync-operation', session: 'shin-sync-session', count: 'shin-sync-count', current: 'shin-sync-current', message: 'shin-sync-message', error: 'shin-error-message', progress: 'shin-sync-progress', progressLabel: 'shin-sync-progress-label', track: 'shin-loading-track', fill: 'shin-loading-fill', idle: 'is-idle', indeterminate: 'is-indeterminate', waiting: 'is-waiting' },
   title: 'Trạng thái phiên',
   phaseFallback: 'Sẵn sàng',
   operationFallback: 'Chưa xác định',
@@ -13,9 +12,5 @@ var FBM_SYNC_STATUS_SCHEMA = {
   confirmed: 'Đã xác nhận',
   absent: 'Chưa có',
   count: { completed: 'Đã xử lý ', succeeded: ' · thành công ', error: ' · lỗi ', conflict: ' · xung đột ', skipped: ' · hoãn ' },
-  layout: {
-    progress: function (slots) { return Box({ className: FBM_SYNC_STATUS_SCHEMA.classes.progress, elements: [Text({ id: FBM_SYNC_STATUS_SCHEMA.regions.progressLabel, className: FBM_SYNC_STATUS_SCHEMA.classes.progressLabel, text: slots.label }), Box({ id: FBM_SYNC_STATUS_SCHEMA.regions.progressTrack, className: FBM_SYNC_STATUS_SCHEMA.classes.track + slots.trackClass, ariaValueNow: slots.ariaValueNow, elements: [Box({ id: FBM_SYNC_STATUS_SCHEMA.regions.progressFill, className: FBM_SYNC_STATUS_SCHEMA.classes.fill + slots.fillClass, spatialConfig: { width: slots.width }, elements: [] })] })] }); },
-    card: function (elements) { return Card({ title: FBM_SYNC_STATUS_SCHEMA.title, elements: elements }); }
-  }
 };
 </script>

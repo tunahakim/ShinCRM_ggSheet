@@ -143,9 +143,9 @@ function chay(so) {
     [true, true, true, true]);
   check(so, 'các hàng thao tác dùng Row chung để tự chia đều',
     [source['client/sync/screens/account.html'].indexOf('Row([') >= 0,
-      source['client/schema/sync/screens/account.html'].indexOf("cardClass: 'shin-action-stack'") >= 0,
+      source['client/sync/fbmSyncUiSchema.html'].indexOf('FBM_SYNC_ACCOUNT_UI') >= 0,
       source['client/sync/fbmSyncAuditScreen.html'].indexOf('Row([') >= 0,
-      source['client/schema/sync/screens/results.html'].indexOf('FBM_SYNC_RESULTS_SCHEMA.classes.pagination') >= 0],
+      source['client/sync/fbmSyncUiSchema.html'].indexOf('FBM_SYNC_RESULTS_UI') >= 0],
     [true, true, true, true]);
   check(so, 'card cấu hình dùng hàng action và style sửa chung, không tự đặt kích thước từng màn',
     [source['client/sync/fbmSyncConfigEditor.html'].indexOf('function fbmSyncConfigButtonRow(') >= 0,
@@ -197,7 +197,7 @@ function chay(so) {
   check(so, 'các vùng cột chung không phụ thuộc flex gap để tạo khoảng cách',
     [frame.indexOf('#sidebar-body > * + * { margin-top: var(--shin-gap-2); }') >= 0,
       styles.indexOf('.shin-section > * + * { margin-top: var(--shin-gap-2); }') >= 0,
-      source['client/sync/fbmSyncShell.html'].indexOf('schema.navItemClass') >= 0],
+      source['client/sync/fbmSyncShell.html'].indexOf("uiSyncClass('shell', 'navItem')") >= 0],
     [true, true, true]);
   check(so, 'các vùng cuộn giữ trục hai mép bằng gutter ổn định, section không cộng lề lệch',
     [frame.indexOf('.shin-scroll-region {') >= 0 && frame.indexOf('overflow-y: auto;') >= 0 && frame.indexOf('scrollbar-gutter: stable both-edges;') >= 0,
