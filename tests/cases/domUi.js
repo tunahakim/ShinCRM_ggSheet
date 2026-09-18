@@ -111,14 +111,22 @@ async function chay(so) {
   dom.root.appendChild(nutMenu);
   const lop = hop.menuOpen(nutMenu);
   check(so, 'menuOpen dựng đúng hai mục, đánh dấu công tắc và giữ menu trong cửa sổ',
-    [lop.hidden, lop.children.length, lop.children[0].textContent, lop.children[0].getAttribute('aria-checked'), nutMenu.getAttribute('aria-expanded'), lop.style.left, lop.style.top],
-    [false, 2, '✓Tự động', 'true', 'true', '196px', '44px']);
+    [lop.hidden, lop.children.length, lop.children[0].textContent, lop.children[0].getAttribute('aria-checked'), nutMenu.getAttribute('aria-expanded'), lop.style.position, lop.classList.contains('is-body-popup'), lop.style.left, lop.style.top],
+    [false, 2, '✓Tự động', 'true', 'true', 'fixed', false, '196px', '44px']);
   nutMenu.rect = { left: 280, top: 200, bottom: 220, right: 300 };
   hop.PopupList.place(lop, nutMenu, { region: bodyRegion });
   check(so, 'PopupList luôn bám theo vị trí mới của trigger, không dùng tọa độ cố định', [lop.style.left, lop.style.top], ['196px', '224px']);
   hop.menuToggle(nutMenu);
   check(so, 'bấm lại nút menu đang mở thì đóng và dọn mục con', [lop.hidden, lop.children.length, nutMenu.getAttribute('aria-expanded')], [true, 0, 'false']);
   check(so, 'menuInstall chỉ gắn một tai nghe Escape', [hop.menuInstall(), hop.menuInstall()], [true, false]);
+
+  const bodyMenu = dom.document.createElement('button');
+  bodyMenu.setAttribute('data-menu', 'menu-1');
+  bodyMenu.rect = { left: 180, top: 300, bottom: 320, right: 280 };
+  bodyRegion.appendChild(bodyMenu);
+  const bodyLop = hop.menuOpen(bodyMenu);
+  check(so, 'menu trong body nằm cùng lớp cuộn và dùng tọa độ tuyệt đối', [bodyLop.parentNode === bodyRegion, bodyLop.style.position, bodyLop.classList.contains('is-body-popup')], [true, 'absolute', true]);
+  hop.menuClose();
 
   const scrollAnchor = dom.document.createElement('button');
   scrollAnchor.rect = { left: 20, top: 200, bottom: 220, right: 120 };
@@ -132,15 +140,20 @@ async function chay(so) {
   bodyRegion.appendChild(scrollPopup);
   hop.PopupList.show(scrollPopup, scrollAnchor, { region: bodyRegion, minHeight: 0, maxHeight: 200 });
   const popupTopBeforeScroll = scrollPopup.style.top;
+  bodyRegion.scrollTop = 100;
+  scrollAnchor.rect = { left: 20, top: 100, bottom: 120, right: 120 };
+  dom.document.listeners.scroll({ target: bodyRegion });
+  check(so, 'PopupList cuộn cùng trigger trong cùng lớp body', [popupTopBeforeScroll, scrollPopup.style.top], ['94px', '94px']);
+  bodyRegion.scrollTop = 0;
   scrollAnchor.rect = { left: 20, top: 300, bottom: 320, right: 120 };
   dom.document.listeners.scroll({ target: bodyRegion });
-  check(so, 'PopupList tự neo lại theo vùng body khi sidebar cuộn', [popupTopBeforeScroll, scrollPopup.style.top, scrollPopup.hidden], ['224px', '324px', false]);
+  check(so, 'PopupList giữ tọa độ trong vùng body khi sidebar cuộn', [popupTopBeforeScroll, scrollPopup.style.top, scrollPopup.hidden], ['94px', '194px', false]);
   scrollAnchor.rect = { left: 20, top: 900, bottom: 920, right: 120 };
   dom.document.listeners.scroll({ target: bodyRegion });
-  check(so, 'PopupList vẫn hiện và neo ở mép dưới khi trigger rời vùng cuộn', [scrollPopup.hidden, scrollPopup.style.top], [false, '716px']);
+  check(so, 'PopupList không kẹp vào mép dưới khi trigger rời vùng cuộn', [scrollPopup.hidden, scrollPopup.style.top], [false, '686px']);
   scrollAnchor.rect = { left: 20, top: -50, bottom: -30, right: 120 };
   dom.document.listeners.scroll({ target: bodyRegion });
-  check(so, 'PopupList vẫn hiện và neo ở mép trên khi trigger rời vùng cuộn', [scrollPopup.hidden, scrollPopup.style.top], [false, '4px']);
+  check(so, 'PopupList không kẹp vào mép trên khi trigger rời vùng cuộn', [scrollPopup.hidden, scrollPopup.style.top], [false, '-156px']);
 
   const holder = dom.document.createElement('div');
   const khoi = dom.document.createElement('div');

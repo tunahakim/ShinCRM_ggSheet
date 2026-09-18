@@ -96,9 +96,23 @@ function menuClose() {
   }
 
   if (typeof PopupList !== 'undefined') { PopupList.hide(lop); } else { lop.hidden = true; }
+  var root = document.getElementById(DISPATCH_ROOT_ID);
+  if (root && lop.parentNode !== root) { root.appendChild(lop); }
   lop.removeAttribute('data-of');
   lop.textContent = '';
   return lop;
+}
+
+/* A body menu must be a descendant of the scrolling region so that its
+   overflow clips it together with the trigger. Header menus stay in the root
+   and keep the viewport coordinate system. */
+function menuPlaceLayer(lop, trigger) {
+  if (!lop || !trigger) { return; }
+  var root = document.getElementById(DISPATCH_ROOT_ID);
+  var bodyId = typeof RENDER_REGIONS !== 'undefined' && RENDER_REGIONS.body ? RENDER_REGIONS.body : 'sidebar-body';
+  var body = document.getElementById(bodyId);
+  var host = body && body.contains && body.contains(trigger) ? body : root;
+  if (host && lop.parentNode !== host) { host.appendChild(lop); }
 }
 
 /**
@@ -118,6 +132,7 @@ function menuOpen(nut) {
 
   lop.setAttribute('data-of', khoa);
   nut.setAttribute('aria-expanded', 'true');
+  menuPlaceLayer(lop, nut);
   PopupList.show(lop, nut, {
     region: document.getElementById(typeof RENDER_REGIONS !== 'undefined' && RENDER_REGIONS.body ? RENDER_REGIONS.body : 'sidebar-body'),
     onClose: function () {

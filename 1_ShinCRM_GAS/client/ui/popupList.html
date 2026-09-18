@@ -14,6 +14,11 @@
   box-shadow: var(--shin-shadow);
 }
 
+/* Body popups share the scroll/clip context of #sidebar-body.  The class is
+   toggled by PopupList; the inline position is still set there for hosts with
+   a different containing block. */
+.shin-popup-list.is-body-popup { position: absolute; }
+
 /* Base row: typography follows the input control; spacing and separators follow the legacy dropdown. */
 .shin-popup-item {
   display: block;
@@ -85,30 +90,21 @@ var PopupList = (function () {
     return typeof document !== 'undefined' && document.getElementById ? document.getElementById('sidebar-body') : null;
   }
 
-  function anchorOutsideRegion(options, anchorRect) {
+  function anchorInRegion(options, anchor) {
     var element = regionElement(options);
-    if (!element || !anchorRect) { return false; }
-    var region = rectOf(element, viewport());
-    return Number(anchorRect.right) <= Number(region.left)
-      || Number(anchorRect.left) >= Number(region.right)
-      || Number(anchorRect.bottom) <= Number(region.top)
-      || Number(anchorRect.top) >= Number(region.bottom);
+    if (!element || !anchor || typeof element.contains !== 'function') { return false; }
+    return element.contains(anchor);
   }
 
-  function popupRegion(options, anchorRect) {
-    var element = regionElement(options);
-    if (!element) { return viewport(); }
-    var region = rectOf(element, viewport());
-    // A region is a clipping boundary for controls inside it. Header menus
-    // are outside the body, so using the body top would detach the popup
-    // from its trigger. Fall back to the viewport for such anchors.
-    return anchorOutsideRegion(options, anchorRect) ? viewport() : region;
+  function bodyPopup(options, anchor) {
+    return !!regionElement(options) && anchorInRegion(options, anchor);
   }
 
   function clearGeometry(box) {
     if (!box || !box.style) { return; }
-    ['top', 'left', 'width', 'minWidth', 'maxWidth', 'maxHeight'].forEach(function (key) { box.style[key] = ''; });
+    ['position', 'top', 'left', 'width', 'minWidth', 'maxWidth', 'maxHeight'].forEach(function (key) { box.style[key] = ''; });
     if (box.classList) { box.classList.remove('is-up'); }
+    if (box.classList) { box.classList.remove('is-body-popup'); }
   }
 
   function rows(box, selector) {
@@ -218,17 +214,35 @@ var PopupList = (function () {
     else { run(); }
   }
 
+  function containingBlock(box, region) {
+    var parent = box && box.offsetParent;
+    if (!parent || typeof parent.getBoundingClientRect !== 'function') { parent = region && region.element ? region.element : null; }
+    var parentRect = rectOf(parent, region && region.rect ? region.rect : viewport());
+    return {
+      element: parent,
+      rect: parentRect,
+      scrollLeft: parent && Number.isFinite(Number(parent.scrollLeft)) ? Number(parent.scrollLeft) : 0,
+      scrollTop: parent && Number.isFinite(Number(parent.scrollTop)) ? Number(parent.scrollTop) : 0,
+      clientLeft: parent && Number.isFinite(Number(parent.clientLeft)) ? Number(parent.clientLeft) : 0,
+      clientTop: parent && Number.isFinite(Number(parent.clientTop)) ? Number(parent.clientTop) : 0
+    };
+  }
+
   function place(box, anchor, options) {
-    var opts = options || {}, anchorRect = rectOf(anchor, viewport()), region = popupRegion(opts, anchorRect);
+    var opts = options || {}, anchorRect = rectOf(anchor, viewport()), inBody = bodyPopup(opts, anchor);
+    var regionElementForPopup = inBody ? regionElement(opts) : null;
+    var regionRect = inBody ? rectOf(regionElementForPopup, viewport()) : viewport();
+    var region = { element: regionElementForPopup, rect: regionRect };
     var gap = Number(opts.gap);
     if (!Number.isFinite(gap) || gap < 0) { gap = DEFAULT_GAP; }
-    var maxWidth = Math.max(1, Number(region.right) - Number(region.left) - gap * 2);
+    var maxWidth = Math.max(1, Number(regionRect.right) - Number(regionRect.left) - gap * 2);
     var anchorWidth = Math.max(0, Number(anchorRect.right) - Number(anchorRect.left));
     // Khi trigger rộng hơn vùng hiển thị, ưu tiên không tràn Sidebar; min/max CSS không được mâu thuẫn nhau.
     var minWidth = Math.min(maxWidth, Math.max(anchorWidth, Number(opts.minWidth) || 0));
     var widthMode = opts.width || 'content', width;
 
-    box.style.position = 'fixed';
+    box.style.position = inBody ? 'absolute' : 'fixed';
+    if (box.classList) { box.classList.toggle('is-body-popup', inBody); }
     box.style.maxWidth = maxWidth + 'px';
     box.style.minWidth = minWidth + 'px';
     if (widthMode === 'region') {
@@ -249,8 +263,8 @@ var PopupList = (function () {
     if (!Number.isFinite(minHeight) || minHeight < 0) { minHeight = DEFAULT_MIN_HEIGHT; }
     var maxHeight = Number(opts.maxHeight);
     if (!Number.isFinite(maxHeight) || maxHeight <= 0) { maxHeight = DEFAULT_MAX_HEIGHT; }
-    var below = Number(region.bottom) - Number(anchorRect.bottom) - gap;
-    var above = Number(anchorRect.top) - Number(region.top) - gap;
+    var below = Number(regionRect.bottom) - Number(anchorRect.bottom) - gap;
+    var above = Number(anchorRect.top) - Number(regionRect.top) - gap;
     var up = opts.placement === 'up' || (opts.placement !== 'down' && below < minHeight && above > below);
     var available = Math.max(40, up ? above : below);
     var heightLimit = Math.min(maxHeight, available);
@@ -263,13 +277,18 @@ var PopupList = (function () {
       measuredHeight = Math.max(0, Number(boxRect.bottom) - Number(boxRect.top));
     }
     var height = Math.min(heightLimit, measuredHeight || Math.min(heightLimit, minHeight));
-    var left = widthMode === 'region' ? Number(region.left) + gap : Number(anchorRect.left);
-    left = Math.max(Number(region.left) + gap, Math.min(left, Number(region.right) - gap - width));
-    var top = up ? Number(anchorRect.top) - height - gap : Number(anchorRect.bottom) + gap;
-    top = Math.max(Number(region.top) + gap, Math.min(top, Number(region.bottom) - gap - height));
+    var leftViewport = widthMode === 'region' ? Number(regionRect.left) + gap : Number(anchorRect.left);
+    leftViewport = Math.max(Number(regionRect.left) + gap, Math.min(leftViewport, Number(regionRect.right) - gap - width));
+    var topViewport = up ? Number(anchorRect.top) - height - gap : Number(anchorRect.bottom) + gap;
+    var left = leftViewport, top = topViewport;
+    if (inBody) {
+      var containing = containingBlock(box, region);
+      left = leftViewport - Number(containing.rect.left) + containing.scrollLeft - containing.clientLeft;
+      top = topViewport - Number(containing.rect.top) + containing.scrollTop - containing.clientTop;
+    }
     box.style.left = left + 'px';
     box.style.top = top + 'px';
-    return { left: left, top: top, width: width, height: height, up: up, maxHeight: heightLimit };
+    return { left: left, top: top, viewportLeft: leftViewport, viewportTop: topViewport, width: width, height: height, up: up, maxHeight: heightLimit, body: inBody };
   }
 
   function hide(box, selector) {
