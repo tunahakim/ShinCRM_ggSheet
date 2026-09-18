@@ -13,6 +13,21 @@
 - Nếu tài liệu bắt buộc trong phạm vi đang làm đã lỗi thời hoặc mâu thuẫn với quyết định mới của chủ dự án, được phép và phải cập nhật tài liệu đó trong cùng nhóm thay đổi; không giữ quy tắc cũ chỉ vì tài liệu đang tồn tại.
 - Tự thực hiện liên tục các mục chỉ cần code, test offline hoặc GAS DEV. Khi đến mục cần người dùng giữ tab FBM, đăng nhập, bấm ghi thật hoặc kiểm tra dữ liệu live thì dừng và ghi rõ thao tác cần người dùng làm.
 
+## Nguyên tắc nền toàn repo
+
+- Mỗi state và mỗi quyết định chỉ có một nơi sở hữu duy nhất.
+- Tách biệt rõ việc thu thập/truyền tin, xử lý nghiệp vụ/state và hiển thị.
+- Module chỉ hoạt động trong đúng ranh giới trách nhiệm của mình.
+- Mọi thay đổi state phải đi qua hợp đồng hoặc cổng được quy định; không có đường tắt.
+- Giao tiếp giữa các module phải có điều kiện, tối thiểu và tránh thao tác thừa.
+- Ưu tiên tính đúng và nhất quán; cache hoặc dữ liệu cục bộ không thay thế nguồn sự thật.
+
+## Ranh giới Sheet–Extension–Sidebar–GAS
+
+- Extension chỉ quan sát và truyền dữ liệu thô từ Sheet hoặc máy tính; không xử lý nghiệp vụ và không quyết định reload.
+- Sidebar điều phối phía client, quản lý RAM/UI và thời điểm giao tiếp với GAS; không tự thay thế quyết định nghiệp vụ.
+- GAS sở hữu state nghiệp vụ và quyết định dirty, reload, payload và render.
+
 ## Làm việc với chủ dự án
 
 - Trao đổi bằng tiếng Việt. Chủ dự án là người làm bán hàng, tự học code và sẽ tự tiếp quản dự án, nên giải thích lý do và cạm bẫy bằng ngôn ngữ dễ hiểu; thuật ngữ tiếng Anh cần kèm nghĩa tiếng Việt trong ngoặc khi cần.
