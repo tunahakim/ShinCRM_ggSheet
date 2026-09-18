@@ -77,7 +77,7 @@ Kết luận: `ĐÚNG` offline; cần live kiểm ACK khi Extension vừa đư�
 
 ### A3. Tự động điền nhận diện tài khoản
 
-Trigger: nút `Tự động điền - Kiểm tra`.
+Trigger: nút `Tự động điền`.
 
 Pipeline chuẩn theo fixture hiện có:
 
@@ -522,7 +522,7 @@ Phần này là snapshot có hiệu lực sau các revision GAS DEV `@268` đế
 | --- | --- | --- | --- | --- |
 | Bắt tay relay | Mở Sidebar -> nhận cấu hình local -> ACK | Lấy URL, key, Spreadsheet ID thực tế | Lưu config nguyên tử; không gọi `/exec` hoặc FBM | Đúng offline; cần live kiểm ACK sau tải lại Extension |
 | Cấu hình relay lỗi | ACK lỗi/timeout | Trả lỗi tường minh, không cấp phiên nghiệp vụ | Giữ config cũ, không retry/probe | Đúng offline |
-| Tự điền nhận diện | Tài khoản FBM -> Tự động điền - Kiểm tra | Preflight -> authorize Customer -> đọc Authorized -> cấp User grid -> trả draft DTO | Chuyển request/response thô | Đã sửa lỗi P0 trace; cần live xác nhận User grid |
+| Tự điền nhận diện | Tài khoản FBM -> Tự động điền | Preflight -> cấp đúng một User grid -> trả draft DTO | Chuyển request/response thô | Đã sửa lỗi P0 trace; cần live xác nhận User grid |
 | Kiểm tra liên kết | Bấm Kiểm tra sau khi có binding | Authorize -> quét Customer -> đối chiếu dòng có FBM ID -> trả n/N và mẫu | Chuyển grid request/response | Code offline đúng; live paging chưa có bằng chứng |
 | Lưu binding | Bấm Lưu thông tin | Kiểm Spreadsheet ID, userId, username, accountName -> ghi binding | Gửi giá trị người dùng xác nhận | Đúng với username đã đưa vào |
 | Lưu credential | Nhập credential -> Lưu mã hóa | Chỉ nhận credentialRef/envelope, không password rõ | AES-GCM/vault local; không gửi password lên GAS | Đúng theo 09.06 |

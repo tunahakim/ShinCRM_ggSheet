@@ -35,7 +35,7 @@
 
 - Block liên kết chỉ hiển thị `Chưa kết nối với tài khoản FBM nào` khi `UNBOUND` và `Đã kết nối với tài khoản FBM: {accountName}` khi `BOUND`. Các trạng thái lỗi/rebind chỉ hiện chi tiết khi thật sự có lỗi cần người dùng xử lý.
 - Bấm lưu liên kết với một đến ba trường có giá trị sẽ đánh dấu đỏ chính xác các trường bị thiếu, cùng class/state invalid của form chuẩn; giữ form và cuộn/focus vào ô thiếu đầu tiên. Bốn trường đều trống vẫn là lệnh hủy liên kết hiện có.
-- `Tự động điền - Kiểm tra` thành công chỉ thông báo `Đã lấy thông tin thành công và điền vào form.` sau khi đã điền bốn control; không lặp dữ liệu bên dưới. Chỉ lỗi Extension/tab/response/thiếu nhận diện mới hiện chi tiết.
+- `Tự động điền` chỉ đọc User và thành công thì thông báo `Đã lấy thông tin thành công và điền vào form.` sau khi đã điền bốn control; không tự đối chiếu Customer hoặc lặp dữ liệu bên dưới. `Kiểm tra liên kết` do người dùng bấm riêng; chỉ lỗi Extension/tab/response/thiếu nhận diện mới hiện chi tiết ở lượt tự điền.
 - Nếu chưa lưu credential, username/password trống và gõ/lưu theo luồng hiện có. Nếu đã lưu, username và password `****` hiển thị chỉ đọc, không có chú thích thừa.
 - Card `Đăng nhập tự động` có icon bút ở hàng tiêu đề. Bấm bút chuyển form sang sửa: username hiện giá trị đã lưu, password trống để nhập lại; lưu yêu cầu đủ cả username và password, tránh cập nhật nửa vời làm mất credential. Thành công quay về chế độ chỉ đọc; hủy/đóng không thay đổi credential.
 
@@ -135,7 +135,7 @@ Hiện tại tôi thấy màn hình này đang khá vô dụng. Bạn xem làm n
 2.1. Khối Liên kết tài khoản
 - Spreadsheet chưa khớp tài khoản FBM đã lưu. Cần kiểm tra lại trước khi chạy bất kỳ chiều đồng bộ nào. --> Quá dài, sửa lại là "Chưa kết nối với tài khoản FBM nào"/ "Đã kết nối với tài khoản FBM: Lê Tuấn Anh" là đủ
 - Hãy nhập đủ cả bốn thông tin liên kết, hoặc xóa cả bốn ô để hủy liên kết. --> Ở các ô bị thiếu thì tô đỏ ô, giống như khi nhập thiếu các trường bắt buộc ở màn hình Khách hàng/ Giao dịch vậy, như thế mới trực quan.
-- Khi tôi click vào "Tự động điền - Kiểm tra", nếu thành công thì nó đã tự điền thông tin vào 4 ô nhập liệu rồi, do đó không cần ghi chi tiết ở bên dưới. Chỉ cần ghi đã Lấy thông tin thành công và điền vào form. Chỉ hiện chi tiết nếu lỗi thôi.
+- Khi tôi click vào "Tự động điền", nếu thành công thì nó đã tự điền thông tin vào 4 ô nhập liệu rồi, do đó không cần ghi chi tiết ở bên dưới. Chỉ cần ghi đã Lấy thông tin thành công và điền vào form. Việc kiểm tra liên kết do nút riêng đảm nhiệm; chỉ hiện chi tiết nếu lỗi thôi.
 2.2. Đăng nhập tự động
 - Xóa bỏ "Đã lưu thông tin đăng nhập được mã hóa. Chính sách tự đăng nhập, tự mở tab và thử lại được chỉnh trong Cài đặt phiên."
 --> Tôi muốn như sau:

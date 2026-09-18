@@ -105,7 +105,7 @@ async function chay(so) {
   check(so, 'nút Cài đặt đăng nhập tự động mở đúng màn hình Cài đặt phiên', [hop.FBM_SYNC_CLIENT.subscreen, content.getAttribute('data-fbm-sync-screen'), !!dom.document.getElementById('fbm-sync-login-policy-card-region')], ['settings', 'settings', true]);
   const accountScreenButton = dom.document.createElement('button'); accountScreenButton.setAttribute('data-sync-screen', 'account'); click(dom, accountScreenButton);
   const accountActions = [];
-  hop.fbmSyncAutoFillAndCheck = () => { accountActions.push('autofill'); return Promise.resolve(null); };
+  hop.fbmSyncAutoFill = () => { accountActions.push('autofill'); return Promise.resolve(null); };
   hop.fbmSyncCheckIdentity = () => { accountActions.push('check'); return Promise.resolve(null); };
   hop.fbmSyncSaveIdentityManual = () => { accountActions.push('save-binding'); return Promise.resolve(null); };
   hop.fbmSyncTestLogin = () => { accountActions.push('test-login'); return Promise.resolve(null); };

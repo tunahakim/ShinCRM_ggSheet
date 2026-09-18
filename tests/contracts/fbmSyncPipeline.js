@@ -13,8 +13,8 @@ const WORKFLOWS = [
   {
     id: 'identity-autofill',
     source: '09.06/09.08',
-    trigger: 'Tự động điền - Kiểm tra',
-    expect: ['GAS cấp grid User', 'Extension chỉ chuyển envelope', 'GAS trả draft chưa lưu', 'Sidebar hiển thị kết quả']
+    trigger: 'Tự động điền',
+    expect: ['GAS cấp grid User', 'Extension chỉ chuyển envelope', 'GAS trả draft chưa lưu', 'Không quét Customer hoặc tự kiểm tra liên kết']
   },
   {
     id: 'identity-clear-binding',

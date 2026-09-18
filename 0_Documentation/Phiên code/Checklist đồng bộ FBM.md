@@ -330,7 +330,7 @@ Hợp đồng chi tiết và checklist triển khai riêng nằm ở `07A. Hợp
 - [x] Bố cục module động dùng Block/schema và renderer chung; loading mở màn hình, trạng thái tĩnh và tiêu đề không dựng HTML riêng trong từng màn hình.
 - [x] Tên hiển thị `Nghiệm thu phạm vi thử`; `ALT00010` chỉ là phạm vi DEV/live acceptance, không đại diện cho phiên nhiều Customer.
 - [x] Tiêu đề header đổi theo màn hình; menu con nổi dưới header, cuộn nội bộ ở trần khoảng hai phần ba Sidebar; công tắc tổng và auto-login dùng pill nhỏ; các nút có menu trong tiêu đề Card dùng cùng chiều cao compact với tiêu đề Card.
-- [x] Liên kết tài khoản có form nhập tay `Spreadsheet ID`, `Mã user FBM`, `Username FBM`, `Tên tài khoản FBM`; thao tác `Tự động điền - Kiểm tra` và `Lưu thông tin` báo lỗi tường minh, không tự lưu ngầm.
+- [x] Liên kết tài khoản có form nhập tay `Spreadsheet ID`, `Mã user FBM`, `Username FBM`, `Tên tài khoản FBM`; `Tự động điền` chỉ đọc User để điền nháp, `Kiểm tra liên kết` là thao tác riêng quét Customer, và `Lưu thông tin` báo lỗi tường minh, không tự lưu ngầm.
 - [ ] **Cần kiểm chứng thực tế:** tải lại Extension, mở Sidebar và kiểm tra ACK cấu hình relay cùng trạng thái báo trên Sidebar/Log.
 
 ### Bổ sung UI dùng chung sau Slice 8

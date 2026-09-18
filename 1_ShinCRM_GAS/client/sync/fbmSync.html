@@ -444,7 +444,7 @@ function fbmSyncInstall() {
     } else if (target.id === 'fbm-sync-auto-login') { var autoEnabled = target.getAttribute('aria-pressed') !== 'true'; fbmSyncSetTargetState(target.id, { addClass: [uiSyncToggleClass('settings', autoEnabled)], removeClass: [uiSyncToggleClass('settings', !autoEnabled)], ariaPressed: autoEnabled, childText: { [uiSyncToggleLabelSelector('shell')]: autoEnabled ? 'ON' : 'OFF' }, disabled: true }); fbmSyncSetAutoLogin(autoEnabled).finally(function () { fbmSyncSetTargetState(target.id, { disabled: false }); });
     } else if (target.id === 'fbm-sync-rotate-relay') { fbmSyncRotateRelay();
     } else if (target.id === 'fbm-sync-check-identity') { fbmSyncCheckIdentity();
-    } else if (target.id === 'fbm-sync-probe-identity') { fbmSyncAutoFillAndCheck();
+    } else if (target.id === 'fbm-sync-probe-identity') { fbmSyncAutoFill();
     } else if (target.id === 'fbm-sync-confirm-identity') { fbmSyncConfirmIdentity();
     } else if (target.id === 'fbm-sync-save-identity') { fbmSyncSaveIdentityManual(target);
     } else if (target.id === 'fbm-sync-login-save') { fbmSyncSaveLoginConfig(target);
@@ -676,7 +676,7 @@ function fbmSyncProbeIdentity() {
   return callServer('fbmStartIdentityProbe').then(function (started) {
     var launch = started && started.code === 'SYNC_BACKGROUND_STOPPING' ? fbmSyncWaitForIdentityBackground(function () { return callServer('fbmStartIdentityProbe'); }, 0) : Promise.resolve(started);
     return launch.then(function (next) { if (!next || next.ok === false) { throw new Error(next && (next.message || next.code) || 'Không lấy được nhận diện tài khoản FBM.'); } ownRun = true; return fbmSyncLoop(next); });
-  }).then(function (value) { FBM_SYNC_CLIENT.running = false; FBM_SYNC_CLIENT.identityAction = ''; return fbmSyncLoadIdentityStatus().then(function () { return value; }); }).catch(function (error) {
+  }).then(function (value) { FBM_SYNC_CLIENT.running = false; FBM_SYNC_CLIENT.identityAction = ''; return value; }).catch(function (error) {
     FBM_SYNC_CLIENT.running = false; FBM_SYNC_CLIENT.identityAction = '';
     var reason = String(error && error.message || error);
     return callServer('fbmLogSyncError', [reason, FBM_SYNC_CLIENT.traceEvents.slice()]).catch(function () { return null; }).then(function () {
@@ -684,20 +684,22 @@ function fbmSyncProbeIdentity() {
     }).then(function () { fbmSyncPaint({ phase: 'error', label: 'Có lỗi', message: reason, lastError: reason, counts: {} }); return null; });
   });
 }
-function fbmSyncAutoFillAndCheck() {
-  return fbmSyncProbeIdentity().then(function () {
-    var status = FBM_SYNC_CLIENT.lastStatus || {}, probe = status.metadata && status.metadata.identityProbe || {}, binding = FBM_SYNC_CLIENT.identityStatus && FBM_SYNC_CLIENT.identityStatus.binding || {};
+function fbmSyncAutoFill() {
+  fbmSyncSetAccountNotice('identity', 'pending', 'Đang tự động điền thông tin tài khoản FBM...');
+  return fbmSyncProbeIdentity().then(function (value) {
+    var status = FBM_SYNC_CLIENT.lastStatus || {}, probe = status.metadata && status.metadata.identityProbe || {};
+    if ((value && value.phase === 'error' || status.phase === 'error') && !probe.spreadsheetId) {
+      var failure = String(status.message || value && (value.message || value.error) || 'Không lấy được thông tin tài khoản FBM.');
+      fbmSyncSetAccountNotice('identity', 'error', failure);
+      return value || status;
+    }
     if (!probe.spreadsheetId || !probe.userId || !probe.username || !probe.accountName) {
-      status.phase = 'error'; status.label = 'Không thể kiểm tra'; status.message = 'Không đọc đủ Spreadsheet ID, mã user hoặc tên tài khoản từ tab FBM.'; fbmSyncSetAccountNotice('identity', 'error', status.message); fbmSyncPaint(status); return null;
+      status = Object.assign({}, status, { phase: 'error', label: 'Không thể tự động điền', message: 'Không đọc đủ Spreadsheet ID, mã user hoặc tên tài khoản từ tab FBM.' });
+      fbmSyncSetAccountNotice('identity', 'error', status.message); fbmSyncPaint(status); return null;
     }
-    if (!binding.spreadsheetId || !binding.userId || !binding.accountName) {
-      status.phase = 'done'; status.label = 'Đã tự động điền'; status.message = 'Đã lấy thông tin thành công và điền vào form.'; fbmSyncSetAccountNotice('identity', 'success', status.message); fbmSyncPaint(status); return { ok: true, code: 'IDENTITY_DRAFT_READY', status: status };
-    }
-    var same = String(binding.spreadsheetId) === String(probe.spreadsheetId) && String(binding.userId) === String(probe.userId) && String(binding.username) === String(probe.username) && String(binding.accountName) === String(probe.accountName);
-    if (!same) {
-      status.phase = 'error'; status.label = 'Liên kết không khớp'; status.message = 'Nhận diện từ tab FBM không khớp thông tin đã lưu.'; fbmSyncSetAccountNotice('identity', 'error', status.message); fbmSyncPaint(status); return null;
-    }
-    return fbmSyncCheckIdentity();
+    status = Object.assign({}, status, { phase: 'done', label: 'Đã tự động điền', message: 'Đã lấy thông tin thành công và điền vào form.' });
+    fbmSyncSetAccountNotice('identity', 'success', status.message); fbmSyncPaint(status);
+    return { ok: true, code: 'IDENTITY_DRAFT_READY', status: status };
   });
 }
 function fbmSyncConfirmIdentity() {
