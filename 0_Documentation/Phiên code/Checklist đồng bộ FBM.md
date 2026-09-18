@@ -473,7 +473,7 @@ Chi tiết đầy đủ nằm ở `0_Documentation/Phiên code/Checklist cảnh 
 - [x] Tích hợp dirty guard vào tám khối cấu hình FBM và action chuyển màn/menu/back.
 - [x] Tô màu changed sau cảnh báo, giữ màu khi tiếp tục sửa và xóa đúng lúc.
 - [x] Bổ sung kiểm thử offline cho compare, modal, save/discard lỗi, form lõi, FBM và password.
-- [x] Chạy `node tests/run.js`: 1.701 phép đạt, 0 phép lỗi; đã cập nhật checklist riêng và cây thư mục code; test hợp đồng tĩnh đã khóa wiring; commit `bebeae3`, `b5d0a3a`, `4145a90`, `c7592fa`.
+- [x] Chạy `node tests/run.js`: 1.710 phép đạt, 0 phép lỗi; đã cập nhật checklist riêng và cây thư mục code; test hợp đồng tĩnh đã khóa wiring; commit `bebeae3`, `b5d0a3a`, `4145a90`, `c7592fa`, `f6fb40b`.
 - [ ] Nghiệm thu trên Sheet DEV: chuyển khối/màn, menu, quay lại, lưu, bỏ thay đổi, tiếp tục sửa và đóng Sidebar.
 
 ## Slice 9 — Live acceptance và mở rộng production
