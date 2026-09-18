@@ -22,6 +22,17 @@
 - Giao tiếp giữa các module phải có điều kiện, tối thiểu và tránh thao tác thừa.
 - Ưu tiên tính đúng và nhất quán; cache hoặc dữ liệu cục bộ không thay thế nguồn sự thật.
 
+## Nguyên tắc UI và Schema
+
+- UI schema chỉ mô tả ý định và hành vi người dùng: cấu trúc, vùng/ID, nhãn, `action`, dữ liệu và trạng thái tương tác; không mô tả cách trình bày.
+- Không đưa `className`, `rootClass`, `classes`, `*Class`, selector DOM, chuỗi CSS, `style` tự do hoặc token `primary/error/muted` vào screen schema.
+- `action` là hợp đồng hành vi; không thêm `purpose` hay trường diễn giải trùng lặp khi `action` đã đủ nghĩa.
+- Presentation (`variant`, `state`, `muted`...) được ánh xạ tập trung ở lớp UI/catalog/resolver; schema chỉ khai báo dữ liệu có nghĩa với người dùng.
+- Dùng chung component khi cấu trúc và hành vi giống nhau; khác nhãn, dữ liệu, `action` hoặc callback thì truyền tham số, không tạo component theo tên nghiệp vụ.
+- Mỗi quyết định presentation và mỗi trạng thái chỉ có một nơi sở hữu; không khai lại map/class và không ghép class trực tiếp ở controller.
+- Chỉ giữ ngoại lệ ở renderer primitive, DOM nội bộ component, slot domain có stylesheet riêng và host tĩnh; ngoại lệ phải được ghi rõ và không chảy ngược vào schema.
+- Mọi quy tắc schema/UI quan trọng phải có kiểm thử tự động để ngăn tái phạm, không chỉ dựa vào ghi nhớ hoặc review thủ công.
+
 ## Ranh giới Sheet–Extension–Sidebar–GAS
 
 - Extension chỉ quan sát và truyền dữ liệu thô từ Sheet hoặc máy tính; không xử lý nghiệp vụ và không quyết định reload.
