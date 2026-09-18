@@ -8,7 +8,7 @@
 - `[ ]` là việc còn thiếu; mục không có nhãn **Cần kiểm chứng thực tế** là việc AI tự tiếp tục được.
 - Một slice chỉ đóng sau khi đủ code, test, log/báo cáo và checklist case của slice đó.
 - Sau khi đóng slice, ghi commit và revision GAS vào bảng bằng chứng cuối file.
-- Bộ kiểm offline chốt đạt `1636/1636`. Các mục live vẫn được đánh dấu riêng và không được suy ra từ test offline.
+- Bộ kiểm offline chốt đạt `1638/1638`. Các mục live vẫn được đánh dấu riêng và không được suy ra từ test offline.
 
 ## Nguồn hợp đồng
 
@@ -522,3 +522,4 @@ Ghi chú Slice 9A: commit `a1b8e0c` gom lịch nghiệp vụ về GAS, giữ Ext
 - [x] Đồng nhất hành vi 8 khối cấu hình: mọi control thân chỉ sửa được sau khi bấm Sửa, click công tắc chỉ đổi draft và nút tick mới lưu GAS; quan hệ cha/con khai báo trong `FBM_SYNC_CONFIG_UI_SCHEMA`; công tắc trên thanh tiêu đề luôn thao tác được và lưu ngay; công tắc con lịch nền khóa theo công tắc cha; lịch nền đồng bộ `schedule.enabled` với `BACKGROUND_SWITCH_KEY`; test offline `1635/1635`, GAS DEV `fbmSaveBackgroundSchedule --push` đạt `OK` ở revision `@424`.
 - [x] Tinh chỉnh bố cục `Cài đặt phiên`: công tắc lịch nền đứng trước chiều đồng bộ, cột chu kỳ bốn tiến trình rộng hơn và nhóm detail có nhãn `Tối thiểu/Tối đa`; test offline `1636/1636`, đã đẩy GAS DEV revision `@425`.
 - [x] Tinh chỉnh khả năng đọc `Cài đặt phiên`: nhãn bốn tiến trình trở về cỡ chữ dùng chung và được phép xuống dòng; ô `Chiều đồng bộ` dùng flex để co giãn theo nhãn; test offline `1636/1636`, đã đẩy GAS DEV revision `@426`.
+- [x] Chính sách tự đăng nhập khai báo `retryMinutes` là con của `retryEnabled` trong schema UI, render ô phút dưới công tắc retry và khóa/mở theo công tắc đó; test offline `1638/1638`.

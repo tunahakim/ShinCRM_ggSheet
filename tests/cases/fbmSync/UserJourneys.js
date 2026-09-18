@@ -170,6 +170,10 @@ async function chay(so) {
   check(so, 'chinh sach tu dang nhap khoa hai muc con khi muc cha tat', [dom.document.getElementById('fbm-sync-policy-auto-login').disabled, dom.document.getElementById('fbm-sync-policy-auto-open').disabled, dom.document.getElementById('fbm-sync-policy-retry').disabled, dom.document.getElementById('fbm-sync-login-retry-minutes').disabled], [false, true, true, true]);
   click(dom, dom.document.getElementById('fbm-sync-policy-auto-login'));
   check(so, 'bat lai muc cha mo khoa cac muc con', [dom.document.getElementById('fbm-sync-policy-auto-login').getAttribute('aria-pressed'), dom.document.getElementById('fbm-sync-policy-auto-open').disabled, dom.document.getElementById('fbm-sync-policy-retry').disabled, dom.document.getElementById('fbm-sync-login-retry-minutes').disabled], ['true', false, false, false]);
+  click(dom, dom.document.getElementById('fbm-sync-policy-retry'));
+  check(so, 'tat retry khoa rieng chu ky thu lai', [dom.document.getElementById('fbm-sync-policy-retry').getAttribute('aria-pressed'), dom.document.getElementById('fbm-sync-login-retry-minutes').disabled], ['false', true]);
+  click(dom, dom.document.getElementById('fbm-sync-policy-retry'));
+  check(so, 'bat retry mo khoa lai chu ky thu lai', [dom.document.getElementById('fbm-sync-policy-retry').getAttribute('aria-pressed'), dom.document.getElementById('fbm-sync-login-retry-minutes').disabled], ['true', false]);
   const background = dom.document.getElementById('fbm-sync-background-switch');
   click(dom, background);
   check(so, 'công tắc lịch nền chỉ đổi draft ngay khi click, không loading', [background.getAttribute('aria-pressed'), background.className.indexOf('is-off') >= 0, background.disabled], ['false', true, false]);

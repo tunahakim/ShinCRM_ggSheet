@@ -23,7 +23,14 @@ var FBM_SYNC_CONFIG_UI_SCHEMA = {
       'detail.maxDelaySeconds': 'detail.enabled'
     }
   },
-  loginPolicy: { parentPath: 'enabled' }
+  loginPolicy: {
+    parentPath: 'enabled',
+    dependencies: {
+      autoOpenTab: 'enabled',
+      retryEnabled: 'enabled',
+      retryMinutes: 'retryEnabled'
+    }
+  }
 };
 
 function fbmSyncConfigClone(value) {
