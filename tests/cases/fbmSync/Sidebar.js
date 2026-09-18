@@ -344,6 +344,12 @@ async function chay(so) {
 
   hop.FBM_SYNC_CLIENT.syncSettings = { accountName: 'A', approvalThreshold: 10 };
   render(hop, content, hop.fbmSyncRenderSettings, idle);
+  hop.FBM_SYNC_CLIENT.syncSettings = { background: { direction: 'read', enabled: true, heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false, minutes: 30 }, detail: { enabled: true, minutes: 60, customersPerRun: 50, minDelaySeconds: 0.5, maxDelaySeconds: 2 } } };
+  const backgroundBlocks = hop.fbmSyncSettingsBackgroundBlocks(hop.FBM_SYNC_CLIENT.syncSettings);
+  const backgroundToggleIndex = backgroundBlocks.findIndex((node) => node && node.elements && node.elements.some((child) => child && child.id === 'fbm-sync-background-switch'));
+  const directionIndex = backgroundBlocks.findIndex((node) => node && node.elements && node.elements.some((child) => child && child.id === 'fbm-sync-background-direction'));
+  const detailBlock = backgroundBlocks.find((node) => node && node.className === 'shin-sync-detail-controls');
+  check(so, 'background layout order and detail groups', [backgroundToggleIndex < directionIndex, detailBlock.elements.length, detailBlock.elements[0].className, detailBlock.elements[1].elements[0].className, detailBlock.elements[1].elements[1].className], [true, 2, 'shin-sync-detail-field', 'shin-sync-detail-label', 'shin-sync-detail-inputs']);
   check(so, 'Settings render được relay và tham số phiên', dom.document.getElementById('fbm-sync-setting-approval-threshold').value === '10' && content.textContent.indexOf('Kết nối Extension') >= 0, true);
 
   hop.FBM_SYNC_CLIENT.subscreen = 'account';
