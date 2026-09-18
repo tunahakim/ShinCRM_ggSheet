@@ -218,7 +218,8 @@ async function chay(so) {
 
   const loginFlow = workflowGas();
   loginFlow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
-  const loginStarted = loginFlow.hop.FbmSync.loginTestRequest('workflow-credential-ref');
+  loginFlow.hop.FbmSync.loginConfigSave({ credentialRef: 'workflow-credential-ref', enabled: true, envelope: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'ANHLT' } });
+  const loginStarted = loginFlow.hop.FbmSync.loginTestRequest();
   const afterLogin = loginFlow.hop.FbmSync.loginTestResult({
     ok: true, status: 200, body: JSON.stringify({ d: true }),
     transport: { trace: [{ stage: 'executor_response_sent', requestId: loginStarted.request.id }] }

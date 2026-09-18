@@ -59,7 +59,8 @@ async function chay(so) {
 
   const beforeTestConfig = heartbeat.FbmSync.loginConfigRead();
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: false, cookie: '' } });
-  const testRequest = heartbeat.FbmSync.loginTestRequest('cred-heartbeat-123');
+  const testRequest = heartbeat.FbmSync.loginTestRequest();
+  check(so, 'login test khong truyen ref van dung credential da luu', [testRequest.request.meta.credentialRef, testRequest.request.meta.testOnly], ['cred-heartbeat-123', true]);
   const testFailure = heartbeat.FbmSync.loginTestResult({ ok: true, status: 200, body: '{"d":false}', transport: { trace: [{ requestId: testRequest.request.id }] } });
   const afterTestFailure = heartbeat.FbmSync.loginConfigRead();
   check(so, 'dang nhap thu that bai khong thay doi throttle hay loi auto-login', [testFailure.code, afterTestFailure.lastAttemptAt, afterTestFailure.lastLoginAt, afterTestFailure.lastError], ['LOGIN_FAILED', beforeTestConfig.lastAttemptAt, beforeTestConfig.lastLoginAt, beforeTestConfig.lastError]);

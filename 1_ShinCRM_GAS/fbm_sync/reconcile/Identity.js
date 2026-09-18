@@ -73,6 +73,16 @@ FbmSync.identityStatus = function (runtime) {
   var status = reasons.length ? 'REBIND_REQUIRED' : (current.spreadsheetId ? 'BOUND' : 'UNBOUND');
   return { ok: status !== 'REBIND_REQUIRED', status: status, code: status === 'REBIND_REQUIRED' ? 'REBIND_REQUIRED' : '', spreadsheetId: actual, hasLinkedData: hasData, binding: { spreadsheetId: current.spreadsheetId || '', userId: current.userId || '', username: current.username || '', accountName: current.accountName || '' }, reasons: reasons };
 };
+/** Chốt bộ nhận diện mà lượt kiểm tra liên kết đang dùng mà không ghi binding. */
+FbmSync.identityCheckTarget = function (value) {
+  var input = value && typeof value === 'object' ? value : FbmSync.bindingRead();
+  return {
+    spreadsheetId: String(input.spreadsheetId || ''),
+    userId: String(input.userId || ''),
+    username: String(input.username || ''),
+    accountName: String(input.accountName || '')
+  };
+};
 FbmSync.identityPreflight = function (mode) {
   var status = FbmSync.identityStatus(), identityRecovery = mode === 'identity_check' || mode === 'identity_probe';
   var blocking = !identityRecovery && status.status !== 'BOUND';
@@ -86,7 +96,7 @@ FbmSync.identityPreflight = function (mode) {
 
 /** Chuẩn bị bảng đối chiếu ID Customer mà không đưa danh sách lên Sidebar. */
 FbmSync.identityCheckBegin = function (state) {
-  var local = typeof FbmSync.readLocal === 'function' ? FbmSync.readLocal('customer') : [], sample = [];
+  var local = typeof FbmSync.readLocal === 'function' ? FbmSync.readLocal('customer') : [], sample = [], target = state.identityTarget || {};
   (local || []).forEach(function (record) {
     var fbmId = String(record && record.fbmId || '').trim();
     if (!fbmId || String(record.recordStatus || 'active') === 'deleted' || FbmSync.isTemporaryRecord('customer', record)) { return; }
@@ -98,7 +108,7 @@ FbmSync.identityCheckBegin = function (state) {
       return String(record && record.fbmId || '').trim() && String(record.recordStatus || 'active') !== 'deleted' && !FbmSync.isTemporaryRecord('customer', record);
     }).length,
     matched: 0, scanned: 0, pages: 0, missing: 0, missingSample: [], sample: sample,
-    userId: String(state.session && state.session.userId || ''), accountName: String(state.session && state.session.accountName || '')
+    spreadsheetId: String(target.spreadsheetId || ''), userId: String(target.userId || state.session && state.session.userId || ''), username: String(target.username || ''), accountName: String(target.accountName || state.session && state.session.accountName || '')
   };
   return state.metadata.identityCheck;
 };

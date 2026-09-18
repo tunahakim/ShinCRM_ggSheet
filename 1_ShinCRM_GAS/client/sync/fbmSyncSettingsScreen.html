@@ -19,8 +19,19 @@ function fbmSyncIdentityFormBlocks() {
 function fbmSyncIdentityActionBlocks() {
   var active = !!FBM_SYNC_CLIENT.running, action = FBM_SYNC_CLIENT.identityAction, editing = fbmSyncConfigIsEditing('identity');
   var schema = FBM_SYNC_ACCOUNT_SCHEMA.identity;
-  if (!editing) { return [fbmSyncConfigButtonRow('identity', { edit: schema.actionLabels.edit, save: schema.actionLabels.save }, { primary: false })]; }
+  if (!editing) { var editRow = fbmSyncConfigButtonRow('identity', { edit: schema.actionLabels.edit, save: schema.actionLabels.save }, { primary: false }); return [FBM_SYNC_ACCOUNT_UI.layout.actionRow([Button({ id: schema.actionIds.check, label: action === 'check' ? schema.actionLabels.checking : schema.actionLabels.check, className: uiResolveActionClass('save', 'button'), disabled: active || !fbmSyncIdentityActionReady() }), editRow.elements[0]])]; }
   return [Button({ id: schema.actionIds.check, label: action === 'check' ? schema.actionLabels.checking : schema.actionLabels.check, className: uiResolveActionClass('save', 'button'), disabled: active }), Button({ id: schema.actionIds.probe, label: action === 'probe' ? schema.actionLabels.probing : schema.actionLabels.probe, className: uiResolveActionClass('save', 'button'), disabled: active }), Button({ id: schema.actionIds.save, label: schema.actionLabels.save, className: uiResolveActionClass('save', 'button'), disabled: active, data: { 'sync-config-action': 'save', 'sync-config-key': 'identity' } })];
+}
+function fbmSyncIdentityActionValues() {
+  var editing = fbmSyncConfigIsEditing('identity'), binding = FBM_SYNC_CLIENT.identityStatus && FBM_SYNC_CLIENT.identityStatus.binding || {}, draft = FBM_SYNC_CLIENT.identityDraft || {}, read = function (id, key) {
+    var input = document.getElementById(id);
+    return String(editing && input ? input.value || '' : (editing ? draft[key] : binding[key]) || '').trim();
+  };
+  return { spreadsheetId: read('fbm-identity-spreadsheet', 'spreadsheetId'), userId: read('fbm-identity-user', 'userId'), username: read('fbm-identity-username', 'username'), accountName: read('fbm-identity-account', 'accountName') };
+}
+function fbmSyncIdentityActionReady() {
+  var value = fbmSyncIdentityActionValues();
+  return !!(value.spreadsheetId && value.userId && value.username && value.accountName);
 }
 function fbmSyncIdentityResultBlocks(status) {
   var blocks = [], probeResult = status && status.metadata && status.metadata.identityProbe, result = status && status.metadata && status.metadata.identityCheck;

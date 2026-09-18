@@ -46,7 +46,7 @@ FbmSync.loginConfigSave = function (input) {
 
 FbmSync.loginConfigPublic = function () {
   var value = FbmSync.loginConfigRead();
-  return { ok: true, enabled: value.enabled !== false, autoOpenTab: value.autoOpenTab === true, retryEnabled: value.retryEnabled !== false, retryMinutes: Number(value.retryMinutes || 30), configured: value.configured === true, public: value.public || {}, lastAttemptAt: Number(value.lastAttemptAt || 0), lastLoginAt: Number(value.lastLoginAt || 0), nextRetryAt: Number(value.nextRetryAt || 0), lastError: String(value.lastError || '') };
+  return { ok: true, enabled: value.enabled !== false, autoOpenTab: value.autoOpenTab === true, retryEnabled: value.retryEnabled !== false, retryMinutes: Number(value.retryMinutes || 30), configured: value.configured === true, credentialRef: value.configured ? String(value.credentialRef || '') : '', public: value.public || {}, lastAttemptAt: Number(value.lastAttemptAt || 0), lastLoginAt: Number(value.lastLoginAt || 0), nextRetryAt: Number(value.nextRetryAt || 0), lastError: String(value.lastError || '') };
 };
 
 FbmSync.loginConfigSetEnabled = function (enabled) {
@@ -123,7 +123,7 @@ FbmSync.loginRequest = function (credentialRef, testOnly) {
 };
 
 FbmSync.loginTestRequest = function (credentialRef) {
-  var ref = String(credentialRef || '').trim();
+  var saved = FbmSync.loginConfigRead(), ref = String(credentialRef || (saved.configured ? saved.credentialRef : '') || '').trim();
   if (!ref) { return { ok: false, code: 'LOGIN_CREDENTIAL_REF_INVALID', message: 'Chưa có thông tin đăng nhập để thử.' }; }
   var state = FbmSync.stateRead(), active = FbmSync.ACTIVE_PHASES && FbmSync.ACTIVE_PHASES.indexOf(String(state.phase || '')) >= 0;
   if (state.activeRequestId || (state.runId && active)) { return { ok: false, code: 'SYNC_ALREADY_RUNNING', message: 'Đang có phiên đồng bộ; chưa thể đăng nhập thử.' }; }

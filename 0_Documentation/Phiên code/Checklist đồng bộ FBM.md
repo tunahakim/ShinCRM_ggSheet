@@ -451,6 +451,7 @@ Các ràng buộc thiết kế của slice này nằm ở Tài liệu 09.01, 09.
 
 - [x] Xóa màn `Tổng quan`; `Chạy đồng bộ` là màn hình mặc định và đứng đầu menu chọn màn hình.
 - [x] Tài khoản FBM rút gọn thông báo liên kết, tô đỏ đúng ô thiếu, tự điền thành công chỉ báo một dòng, credential đã lưu hiển thị chỉ xem với icon sửa.
+- [x] `Đăng nhập thử` và `Kiểm tra liên kết` hiển thị/chạy được ở cả chế độ sửa và xem; chế độ sửa dùng giá trị trong form, chế độ xem dùng credential hoặc binding đã lưu.
 - [x] Chạy đồng bộ và Kết quả & xử lý dùng popup/tab/action-row chuẩn, progress rỗi rỗng, năm tab đều cột, Summary có khoảng đệm và Conflict có nút quay lại một hàng riêng.
 - [x] Cài đặt phiên có công tắc module đồng bộ, lịch nền hai chiều/bốn tiến trình, batch và delay detail, tham số phiên chỉnh được trong Sidebar.
 - [x] Tám khối cấu hình dùng component điều phối chung cho trạng thái xem/sửa, snapshot hủy, draft và action lưu; view khóa input, edit hiện X + dấu tích ở tiêu đề, nút body dùng cùng lệnh lưu/hủy. Test UI FBM đạt 106/106.
@@ -524,3 +525,4 @@ Ghi chú Slice 9A: commit `a1b8e0c` gom lịch nghiệp vụ về GAS, giữ Ext
 - [x] Tinh chỉnh bố cục `Cài đặt phiên`: công tắc lịch nền đứng trước chiều đồng bộ, cột chu kỳ bốn tiến trình rộng hơn và nhóm detail có nhãn `Tối thiểu/Tối đa`; test offline `1636/1636`, đã đẩy GAS DEV revision `@425`.
 - [x] Tinh chỉnh khả năng đọc `Cài đặt phiên`: nhãn bốn tiến trình trở về cỡ chữ dùng chung và được phép xuống dòng; ô `Chiều đồng bộ` dùng flex để co giãn theo nhãn; test offline `1636/1636`, đã đẩy GAS DEV revision `@426`.
 - [x] Chính sách tự đăng nhập khai báo `retryMinutes` là con của `retryEnabled` trong schema UI, render ô phút dưới công tắc retry và khóa/mở theo công tắc đó; test offline `1638/1638`, đã đẩy GAS DEV revision `@427`.
+- [x] `Đăng nhập thử` và `Kiểm tra liên kết` chạy được ở cả chế độ sửa/xem; sửa dùng giá trị trong form, xem dùng credential/binding đã lưu; test offline `1681/1681`, `fbmGetLoginConfig --push` trả `OK` ở GAS DEV revision `@446`.

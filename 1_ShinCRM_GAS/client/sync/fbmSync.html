@@ -435,7 +435,7 @@ function fbmSyncInstall() {
     } else if (target.id === 'fbm-sync-conflict-back') {
       FBM_SYNC_CLIENT.subscreen = 'results'; FBM_SYNC_CLIENT.resultsTab = 'summary';
       fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus);
-    } else if (target.id === 'fbm-sync-login-edit') { FBM_SYNC_CLIENT.loginDraft.username = String((FBM_SYNC_CLIENT.loginStatus && FBM_SYNC_CLIENT.loginStatus.public && FBM_SYNC_CLIENT.loginStatus.public.usernameHint) || ''); FBM_SYNC_CLIENT.loginEditMode = true; var loginPasswordInput = document.getElementById('fbm-login-password'); if (loginPasswordInput) { loginPasswordInput.value = ''; } fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus || {});
+    } else if (target.id === 'fbm-sync-login-edit') { FBM_SYNC_CLIENT.loginDraft.username = typeof fbmSyncLoginUsernameValue === 'function' ? fbmSyncLoginUsernameValue(FBM_SYNC_CLIENT.loginStatus || {}) : String((FBM_SYNC_CLIENT.loginStatus && FBM_SYNC_CLIENT.loginStatus.public && FBM_SYNC_CLIENT.loginStatus.public.usernameHint) || ''); FBM_SYNC_CLIENT.loginEditMode = true; var loginPasswordInput = document.getElementById('fbm-login-password'); if (loginPasswordInput) { loginPasswordInput.value = ''; } fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus || {});
     } else if (target.id === 'fbm-sync-save-extension') { fbmSyncSaveExtensionSettings(target);
     } else if (target.id === 'fbm-sync-save-background') { fbmSyncSaveBackgroundSettings(target);
     } else if (target.id === 'fbm-sync-save-login-policy') { fbmSyncSaveLoginPolicy(target);
@@ -615,6 +615,12 @@ function fbmSyncPaintError(error, fallback) {
 }
 function fbmSyncCheckIdentity() {
   if (FBM_SYNC_CLIENT.running) { return Promise.resolve(null); }
+  var identityTarget = typeof fbmSyncIdentityActionValues === 'function' ? fbmSyncIdentityActionValues() : {};
+  if (!identityTarget.spreadsheetId || !identityTarget.userId || !identityTarget.username || !identityTarget.accountName) {
+    fbmSyncSetAccountNotice('identity', 'error', 'Cần đủ bốn giá trị nhận diện trước khi kiểm tra liên kết.');
+    fbmSyncPaintError(null, 'Cần đủ Spreadsheet ID, mã user, username và tên tài khoản FBM trước khi kiểm tra liên kết.');
+    return Promise.resolve(null);
+  }
   if (typeof sheetLinkExtensionAlive === 'function' && !sheetLinkExtensionAlive()) {
     var missing = { label: 'Chưa kết nối Extension', phase: 'error', message: 'Chưa nhận được bắt tay từ Extension. Hãy tải lại Extension rồi mở lại tab FBM.', counts: {} };
     fbmSyncSetAccountNotice('identity', 'error', 'Kiểm tra liên kết không thành công: ' + missing.message);
@@ -630,8 +636,8 @@ function fbmSyncCheckIdentity() {
   fbmSyncSetAccountNotice('identity', 'pending', 'Đang kiểm tra liên kết Customer với FBM...');
   var ownRun = false;
   fbmSyncPaint({ phase: 'checking_session', label: 'Đang kiểm tra liên kết', direction: 'Kết nối FBM', entityLabel: 'Chuẩn bị phiên', message: 'Đang chuẩn bị kiểm tra liên kết...', counts: {} });
-  return callServer('fbmStartIdentityCheck').then(function (started) {
-    var launch = started && started.code === 'SYNC_BACKGROUND_STOPPING' ? fbmSyncWaitForIdentityBackground(function () { return callServer('fbmStartIdentityCheck'); }, 0) : Promise.resolve(started);
+  return callServer('fbmStartIdentityCheck', [identityTarget]).then(function (started) {
+    var launch = started && started.code === 'SYNC_BACKGROUND_STOPPING' ? fbmSyncWaitForIdentityBackground(function () { return callServer('fbmStartIdentityCheck', [identityTarget]); }, 0) : Promise.resolve(started);
     return launch.then(function (next) { if (!next || next.ok === false) { throw new Error(next && (next.message || next.code) || 'Không bắt đầu được kiểm tra liên kết.'); } ownRun = true; return fbmSyncLoop(next); });
   }).then(function (value) {
     FBM_SYNC_CLIENT.running = false; FBM_SYNC_CLIENT.identityAction = '';
@@ -894,19 +900,24 @@ function fbmSyncSaveLoginConfig(button) {
 }
 function fbmSyncTestLogin(button) {
   if (button) { button.disabled = true; }
-  var credentials = fbmSyncLoginCredentialsFromForm();
-  if (!credentials.username || !credentials.password) {
+  var editing = fbmSyncConfigIsEditing('login'), credentials = editing ? fbmSyncLoginCredentialsFromForm() : null, login = FBM_SYNC_CLIENT.loginStatus || {};
+  if (editing && (!credentials.username || !credentials.password)) {
     fbmSyncSetAccountNotice('login', 'error', 'Đăng nhập thử không thành công: cần nhập username và mật khẩu FBM.');
     fbmSyncPaintError(null, 'Cần nhập username và mật khẩu FBM trước khi đăng nhập thử.');
     if (button) { button.disabled = false; }
     return Promise.resolve(null);
   }
+  if (!editing && (!login.configured || !login.credentialRef)) {
+    fbmSyncSetAccountNotice('login', 'error', 'Chưa có thông tin đăng nhập đã lưu để thử. Hãy bấm Sửa thông tin và lưu credential trước.');
+    fbmSyncPaintError(null, 'Chưa có credential đã lưu để đăng nhập thử.');
+    if (button) { button.disabled = false; }
+    return Promise.resolve(null);
+  }
   fbmSyncSetAccountNotice('login', 'pending', 'Đang đăng nhập thử và xác minh tài khoản FBM...');
-  return fbmSyncEncryptCredentials(credentials).then(function (encrypted) {
-    return callServer('fbmStartLoginTest', [encrypted.credentialRef]).then(function (started) {
-      if (!started || !started.ok || !started.request) { throw new Error(started && (started.message || started.code) || 'Không tạo được lượt đăng nhập thử.'); }
-      return fbmSyncLoginTestLoop(started);
-    });
+  var start = editing ? fbmSyncEncryptCredentials(credentials).then(function (encrypted) { return callServer('fbmStartLoginTest', [encrypted.credentialRef]); }) : callServer('fbmStartLoginTest', [login.credentialRef]);
+  return start.then(function (started) {
+    if (!started || !started.ok || !started.request) { throw new Error(started && (started.message || started.code) || 'Không tạo được lượt đăng nhập thử.'); }
+    return fbmSyncLoginTestLoop(started);
   }).then(function (result) {
     var snapshot = result && (result.status || result) || FBM_SYNC_CLIENT.lastStatus || {}, message = String(result && (result.message || snapshot.message) || 'Đã kiểm tra đăng nhập thử.');
     fbmSyncSetAccountNotice('login', 'success', message);
