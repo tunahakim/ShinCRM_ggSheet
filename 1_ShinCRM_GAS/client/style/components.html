@@ -18,8 +18,9 @@
 /* `width: "auto"` nghĩa là chia đều phần dư. `min-width: 0` là điều kiện để một ô nhập dài không nong hàng rộng ra quá khung. */
 .shin-row > * { flex: 1 1 0; min-width: 0; }
 .shin-row > * + * { margin-left: var(--shin-gap-2); }
-.shin-single-action-row { justify-content: center; }
-.shin-single-action-row > * { flex: 0 1 auto; min-width: min(220px, 100%); }
+.shin-single-action-row { justify-content: center; flex-wrap: wrap; gap: var(--shin-gap-2); }
+.shin-single-action-row > * { flex: 0 1 auto; width: min(220px, 100%); max-width: 100%; min-width: 0; box-sizing: border-box; white-space: normal; overflow-wrap: anywhere; }
+.shin-single-action-row > * + * { margin-left: 0; }
 .shin-box.shin-stack,
 .shin-box.shin-action-stack { display: flex; flex-direction: column; align-self: stretch; gap: var(--shin-gap-2); width: 100%; min-width: 0; }
 .shin-box.shin-stack { align-items: stretch; }

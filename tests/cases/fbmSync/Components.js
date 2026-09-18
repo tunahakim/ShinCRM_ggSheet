@@ -183,6 +183,12 @@ function chay(so) {
       styles.indexOf('gap: var(--shin-gap-2);') >= 0,
       styles.indexOf('.shin-action-stack > * + * { margin-top: 0; }') >= 0],
     [true, true, true, true, true, true]);
+  check(so, 'Hàng action không làm tràn nhãn nút trên Sidebar hẹp',
+    [styles.indexOf('.shin-single-action-row { justify-content: center; flex-wrap: wrap; gap: var(--shin-gap-2); }') >= 0,
+      styles.indexOf('width: min(220px, 100%); max-width: 100%; min-width: 0;') >= 0,
+      styles.indexOf('white-space: normal; overflow-wrap: anywhere;') >= 0,
+      styles.indexOf('.shin-single-action-row > * + * { margin-left: 0; }') >= 0],
+    [true, true, true, true]);
   check(so, 'action Stack căn giữa ở đúng độ ưu tiên của component lõi',
     [styles.indexOf('.shin-box.shin-action-stack { align-items: center; }') >= 0,
       !/(^|\n)\.shin-action-stack \{ align-items: center; \}/.test(styles)],
@@ -218,7 +224,7 @@ function chay(so) {
       styles.indexOf('.shin-loading-track.is-idle { visibility: hidden; background: transparent; }') >= 0],
     [true, true, true]);
   check(so, 'Stack dùng gap để Card không bị margin: 0 ghi đè',
-    [styles.indexOf('.shin-box.shin-stack,') >= 0, styles.indexOf('gap: var(--shin-gap-2);') > styles.indexOf('.shin-box.shin-stack,'), styles.indexOf('.shin-stack > * + *') >= 0 && styles.indexOf('margin-top: 0;', styles.indexOf('.shin-stack > * + *')) >= 0],
+    [styles.indexOf('.shin-box.shin-stack,') >= 0, styles.indexOf('gap: var(--shin-gap-2);', styles.indexOf('.shin-box.shin-stack,')) > styles.indexOf('.shin-box.shin-stack,'), styles.indexOf('.shin-stack > * + *') >= 0 && styles.indexOf('margin-top: 0;', styles.indexOf('.shin-stack > * + *')) >= 0],
     [true, true, true]);
 }
 
