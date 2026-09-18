@@ -79,7 +79,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   ├── service\
 │   │   ├── LoadService.js        Gom cả một lượt nạp: đo ngân sách ô, đọc tham số, danh mục, toàn bộ khách, rồi giao dịch theo gói.
 │   │   ├── SaveService.js        Vỏ bọc vào ra của hai cửa ghi: bọc lỗi, gắn khối trạng thái bẩn, đo mili giây. Luật ghi nằm ở gate\, không nằm đây.
-│   │   ├── SelectionService.js   Vòng dò khi không có Extension: probeSelectionCheap trả tọa độ ô đang chọn, probeSelectionFull đọc trực tiếp cột mã của hàng đang chọn theo DATA_SCHEMA. Mở tệp bằng shinOpenBook chứ không lấy tệp đang hoạt động.
+│   │   ├── SelectionService.js   Cổng một request khi không có Extension: probeSelectionAndReload trả selection, mã khách khi vị trí đổi và quyết định reload trong cùng response. Mở tệp bằng shinOpenBook chứ không lấy tệp đang hoạt động.
 │   │   └── FbmSyncService.js     Entry points ổn định cho Sidebar đồng bộ FBM.
 │   ├── log\
 │   │   ├── LogGate.js            Cửa ghi log: gom dòng trong RAM, ghi xuống sheet Log bằng đúng một lệnh, che bí mật, cắt log theo hai trần.

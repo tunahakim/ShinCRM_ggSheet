@@ -56,7 +56,7 @@ Extension gửi một `CRM_CONTEXT` cho Sidebar khi trạng thái hoặc tín hi
 - tên sheet, `gid`, Spreadsheet ID và dữ liệu hàng 1 đọc được dạng thô: mọi ô không rỗng kèm địa chỉ vật lý (`A1`, `B1`, ...), số cột vật lý, giá trị thực tế và cờ `complete`;
 - các ô dữ liệu được Sidebar cấp trong `readPlan` (nếu có), kèm địa chỉ, giá trị thực tế, trạng thái và lỗi đối chiếu giá trị kỳ vọng;
 - tín hiệu tương tác bàn phím hoặc click trên canvas; không phân biệt Delete/Backspace;
-- `customerId`/`customerIdSource` hiện tại được giữ để tương thích và đổi khách tức thời, nhưng không phải quyết định nghiệp vụ;
+- Extension không gửi trường mang nghĩa nghiệp vụ như `customerId` hoặc `customerIdSource`; giá trị đọc nằm trong `reads` dạng thô, Sidebar dùng `readPlan`/Store để quyết định mã nào là khách đang xem;
 - thời điểm phát hiện.
 
 Extension dùng địa chỉ vật lý thật của Sheet, không đánh số lại theo cột đang hiển thị. Cột ẩn vẫn là `B1`, `B10`... Nếu không xác minh được hàng 1 hoặc ô được yêu cầu, Extension trả `complete=false`/`unavailable` và thông tin lỗi; không tự đoán.
@@ -81,7 +81,7 @@ Sidebar giữ schema, ý nghĩa mã `@` và `readPlan`. Sidebar tự phân tích
 
 Ở phía GAS, trigger giữ snapshot hàng 1 theo từng sheet để đối chiếu cả sửa một ô lẫn sửa vùng. Snapshot được tạo khi cài trigger và cập nhật sau mỗi lần `onEdit` chạm hàng 1; nếu thiếu snapshot, GAS không được để Sidebar thay thế việc xác nhận nghiệp vụ.
 
-Khi Extension gửi `CRM_CONTEXT` có `customerId` hợp lệ và mã đã có trong Store, Sidebar phải gọi đường nguồn-chọn cục bộ ngay trong lượt nhận tin để màn hình chính đổi khách không phụ thuộc độ trễ RPC. Các lượt kiểm tra dirty, reload RAM hoặc đồng bộ sheet quản trị có thể chạy nối tiếp ở nền; nếu mã chưa có trong Store thì được thử lại sau khi lượt nạp hoàn tất.
+Khi Extension gửi `CRM_CONTEXT` có một kết quả `reads` hợp lệ và giá trị đã có trong Store, Sidebar phải tự đọc kết quả thô đó và gọi đường nguồn-chọn cục bộ ngay trong lượt nhận tin để màn hình chính đổi khách không phụ thuộc độ trễ RPC. Các lượt kiểm tra dirty, reload RAM hoặc đồng bộ sheet quản trị có thể chạy nối tiếp ở nền; nếu giá trị chưa có trong Store thì được thử lại sau khi lượt nạp hoàn tất.
 
 ## 4. Một request selection duy nhất
 
@@ -132,7 +132,7 @@ GAS không tự đẩy response ở `readyAt`: Apps Script không có kênh push
 
 Nếu GAS gọi helper tương đương `probeSelectionFull` bên trong cùng lượt chạy thì đó không phải request mạng thứ hai. Không lưu context selection dùng chung trong `DocumentProperties`: nhiều Sidebar hoặc nhiều người dùng có thể đứng ở các vị trí khác nhau. Context lần trước do Sidebar truyền vào là nguồn tối ưu an toàn hơn.
 
-`probeSelectionCheap` có thể còn tồn tại như helper nội bộ nếu giúp giảm đọc Sheet, nhưng không được là một bước RPC bắt buộc trước `probeSelectionFull`.
+Không giữ `probeSelectionCheap`/`probeSelectionFull` làm entry point công khai. Nếu cần tách helper bên trong `probeSelectionAndReload`, helper phải là hàm nội bộ không được Sidebar gọi qua RPC.
 
 ## 5. Hai mốc thời gian của Sidebar
 
@@ -261,9 +261,9 @@ Sidebar safety polling không phải là cơ chế quyết định vẽ view. N�
 
 ## 11. Loading và request im lặng
 
-Request kiểm tra selection/reload không được làm thanh loading chạy mỗi nhịp. `callServer` hiện là cửa chung bật progress cho mọi request; các probe selection/reload phải truyền `silent: true`, chỉ payload reload thật mới được hiện loading.
+Request kiểm tra selection/reload không được làm thanh loading chạy mỗi nhịp khi nghiệm thu chính thức. Trong giai đoạn debug hiện tại, cờ `SHEET_LINK_SHOW_PROBE_PROGRESS_DEBUG` được bật để quan sát request; cờ này chỉ phục vụ kiểm tra và phải tắt trước khi đóng checklist. `callServer` vẫn là cửa chung bật progress cho mọi request; các probe selection/reload bình thường phải truyền `silent: true`, chỉ payload reload thật mới được hiện loading.
 
-Chỉ các lượt thực sự nạp RAM, full core, hoặc thao tác người dùng cần chờ mới được hiện loading. Việc kiểm tra revision không đổi phải kết thúc âm thầm. `probeSelectionAndReload` luôn chạy với `silent: true`; cờ `SHEET_LINK_SHOW_PROBE_PROGRESS` phải giữ `false`, chỉ payload reload thật mới mở tiến trình.
+Chỉ các lượt thực sự nạp RAM, full core, hoặc thao tác người dùng cần chờ mới được hiện loading. Việc kiểm tra revision không đổi phải kết thúc âm thầm. Sau debug, `probeSelectionAndReload` luôn chạy với `silent: true`; cờ debug phải tắt, chỉ payload reload thật mới mở tiến trình.
 
 ## 12. Tiêu chí nghiệm thu mới
 
