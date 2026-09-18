@@ -1,0 +1,50 @@
+<script>
+/* Primitive schema dùng chung cho các màn trạng thái; không có thao tác DOM hay ghép HTML. */
+var STATUS_SCHEMA = {};
+
+function statusSchemaText(text, className) {
+  return Text({ className: className || 'shin-status-copy', text: text === null || text === undefined ? '' : String(text) });
+}
+
+function statusSchemaBox(elements, className) {
+  return Box({ className: className || 'shin-status-box', elements: elements || [] });
+}
+
+function statusSchemaRoot(infoText, elements) {
+  return {
+    entity: 'status',
+    infoBar: true,
+    infoSlot: 'statusInfo',
+    infoText: infoText || '',
+    header: [],
+    body: [Box({ className: 'shin-status', elements: elements || [] })],
+    footer: []
+  };
+}
+
+function statusSchemaKeyValues(pairs) {
+  return Box({ className: 'shin-status-kv', elements: (pairs || []).reduce(function (nodes, pair) {
+    nodes.push(Text({ className: 'shin-status-kv-label', text: pair[0] }));
+    nodes.push(Text({ className: 'shin-status-kv-value', text: pair[1] }));
+    return nodes;
+  }, []) });
+}
+
+function statusSchemaTable(sheets) {
+  var rows = [Box({ className: 'shin-status-table-row shin-status-table-head', elements: [
+    Text({ text: 'Sheet' }), Text({ text: 'Hàng', className: 'shin-status-table-num' }),
+    Text({ text: 'Cột', className: 'shin-status-table-num' }), Text({ text: 'Số ô', className: 'shin-status-table-num' })
+  ] })];
+  (sheets || []).forEach(function (sheet) {
+    rows.push(Box({ className: 'shin-status-table-row', elements: [
+      Text({ text: sheet.name }), Text({ text: sheet.rows, className: 'shin-status-table-num' }),
+      Text({ text: sheet.columns, className: 'shin-status-table-num' }), Text({ text: sheet.cells, className: 'shin-status-table-num' })
+    ] }));
+  });
+  return Box({ className: 'shin-status-table', elements: rows });
+}
+
+SLOTS.statusInfo = function (ctx) {
+  return [Text({ text: ctx && ctx.screen && ctx.screen.infoText || '', className: 'shin-status-info' })];
+};
+</script>

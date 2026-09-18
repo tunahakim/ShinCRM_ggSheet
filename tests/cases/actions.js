@@ -34,7 +34,9 @@ function dungCanh() {
     'client/util/textNormalize.html', 'client/schema/schemaAccess.html', 'client/ram/store.html',
     'client/ram/prefs.html', 'client/ram/screenState.html', 'client/util/valueText.html',
     'client/ui/icons.html', 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html',
-    'client/ui/renderEngine.html', 'client/ui/slots.html', 'client/schema/uiSchema.html',
+    'client/ui/renderEngine.html', 'client/ui/slots.html', 'client/schema/screens/formHeader.html',
+    'client/schema/screens/view.html', 'client/schema/screens/customerForm.html', 'client/schema/screens/activityForm.html',
+    'client/schema/screens/noteForm.html', 'client/schema/uiSchema.html',
     'client/schema/fieldLogic.html', 'client/screen/viewScreen.html', 'client/screen/formScreen.html',
     'client/ui/actions.html');
 

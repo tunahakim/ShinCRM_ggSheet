@@ -165,8 +165,8 @@ function tuKiemPhepQuet(so) {
     catRuotStyle('<style>/* .bay { } */\n.thuc { color: red; }</style>').includes('bay'), false);
 
   // Tệp `client/style/` nào cũng chỉ có `<style>`, còn tệp màn có cả hai thẻ. Kiểm để chắc phép cắt không bỏ sót loại thứ hai.
-  check(so, 'phép cắt lấy được cả <style> của tệp màn — tệp có cả hai thẻ là loại tệp gây ra lỗi ban đầu',
-    catRuotStyle(docTep('client/screen/statusScreen.html')).includes('.shin-status-box'), true);
+  check(so, 'style màn trạng thái nằm ở tệp style riêng, không trộn vào logic màn',
+    catRuotStyle(docTep('client/style/status.html')).includes('.shin-status-box'), true);
 
   check(so, 'header Sync là Box nhưng vẫn giữ display flex sau luật .shin-box dùng chung',
     catRuotStyle(docTep('client/style/frame.html')).includes('.shin-box.shin-shell-header'), true);

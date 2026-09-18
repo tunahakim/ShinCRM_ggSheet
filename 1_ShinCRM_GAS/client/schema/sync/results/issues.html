@@ -1,0 +1,19 @@
+<script>
+var FBM_SYNC_ISSUES_SCHEMA = {
+  ids: { openConflicts: 'fbm-sync-open-conflicts', retryAll: 'fbm-push-retry-all' },
+  classes: { preview: 'shin-preview-row', error: 'shin-error-message' },
+  titles: { preflight: 'Preflight', details: 'Chi tiết bản ghi' },
+  preflight: { error: 'Lỗi', warning: 'Cảnh báo' },
+  conflict: { message: 'Có {count} xung đột đang chờ quyết định.', action: 'Mở xử lý xung đột' },
+  identity: 'Chặn nhận diện Customer ',
+  failures: { message: 'Có {count} bản ghi lỗi đẩy; mở tab Lỗi để tra từng mã.', action: 'Mở lại {count} bản ghi lỗi', item: 'Lỗi đẩy ' },
+  category: 'Chặn do Category ', categoryFallback: 'Category',
+  activityMissing: 'Activity không thấy trong FBM ', fbmPrefix: 'FBM ',
+  separator: ' · ',
+  code: ' [',
+  closeCode: ']',
+  http: ' HTTP ',
+  step: ' · bước ',
+  layout: { card: function (title, elements) { return Card({ title: title, elements: elements }); } }
+};
+</script>

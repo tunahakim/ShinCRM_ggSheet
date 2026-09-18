@@ -1,12 +1,10 @@
 <script>
 function fbmSyncPipelineFallback(status) {
   var phase = String(status && status.phase || ''), mode = String(status && status.mode || FBM_SYNC_CLIENT.mode || 'read');
-  var steps = mode === 'push'
-    ? [{ id: 'session', label: 'Kiểm tra phiên FBM' }, { id: 'category', label: 'Category' }, { id: 'record', label: 'Kiểm tra bản ghi' }, { id: 'form', label: 'Mở form FBM' }, { id: 'write', label: 'Ghi FBM' }, { id: 'verify', label: 'Đọc xác nhận' }, { id: 'baseline', label: 'Cập nhật baseline' }]
-    : [{ id: 'session', label: 'Kiểm tra phiên FBM' }, { id: 'category', label: 'Category' }, { id: 'customer', label: 'Đọc Customer' }, { id: 'activity', label: 'Đọc Activity' }, { id: 'reconcile', label: 'Đối soát' }];
-  if (mode !== 'check' && mode !== 'push') { steps.push({ id: 'sheet', label: 'Cập nhật Sheet' }); }
+  var steps = (mode === 'push' ? FBM_SYNC_RUN_SCHEMA.pipeline.push : FBM_SYNC_RUN_SCHEMA.pipeline.pull).map(function (step) { return { id: step.id, label: step.label }; });
+  if (mode !== 'check' && mode !== 'push') { steps.push({ id: FBM_SYNC_RUN_SCHEMA.pipeline.sheet.id, label: FBM_SYNC_RUN_SCHEMA.pipeline.sheet.label }); }
   var current = phase === 'pull_activity' ? 'activity' : phase === 'pull_customer' ? 'customer' : phase === 'reconcile' ? 'reconcile' : phase === 'push' ? 'write' : 'session', currentIndex = steps.map(function (step) { return step.id; }).indexOf(current);
-  return { title: phase === 'done' ? 'Pipeline đã hoàn tất' : phase === 'error' ? 'Pipeline dừng vì lỗi' : phase === 'paused' ? 'Pipeline đã tạm dừng' : 'Pipeline đang chạy', steps: steps.map(function (step, index) { return { id: step.id, label: step.label, state: phase === 'done' ? 'done' : index < currentIndex ? 'done' : index === currentIndex ? (phase === 'error' ? 'error' : 'current') : 'pending' }; }) };
+  return { title: FBM_SYNC_RUN_SCHEMA.phaseTitles[phase] || FBM_SYNC_RUN_SCHEMA.phaseTitles.running, steps: steps.map(function (step, index) { return { id: step.id, label: step.label, state: phase === 'done' ? 'done' : index < currentIndex ? 'done' : index === currentIndex ? (phase === 'error' ? 'error' : 'current') : 'pending' }; }) };
 }
 function fbmSyncPipelineData(status) {
   var pipeline = status && status.pipeline;
@@ -14,42 +12,41 @@ function fbmSyncPipelineData(status) {
 }
 function fbmSyncPipelineBlock(status, id) {
   var pipeline = fbmSyncPipelineData(status);
-  return Box({ id: id || null, className: 'shin-sync-pipeline', elements: [Text({ className: 'shin-sync-pipeline-title', text: String(pipeline.title || 'Pipeline đang chạy') })].concat((pipeline.steps || []).map(function (item) {
-    var state = String(item && item.state || 'pending'), marker = state === 'done' ? '✓' : state === 'error' ? '!' : state === 'current' || state === 'paused' ? '●' : '○';
-    return Box({ className: 'shin-sync-pipeline-step' + (state === 'done' ? ' is-done' : '') + (state === 'current' || state === 'paused' ? ' is-current' : '') + (state === 'error' ? ' is-error' : ''), elements: [Text({ className: 'shin-sync-pipeline-marker', text: marker }), Text({ className: 'shin-sync-pipeline-label', text: String(item && item.label || '') })] });
-  })) });
+  var classes = FBM_SYNC_RUN_SCHEMA.classes;
+  return FBM_SYNC_RUN_SCHEMA.layout.pipeline(id, String(pipeline.title || FBM_SYNC_RUN_SCHEMA.phaseTitles.running), (pipeline.steps || []).map(function (item) {
+    var state = String(item && item.state || 'pending'), marker = FBM_SYNC_RUN_SCHEMA.pipeline.marker[state === 'paused' ? 'current' : state] || FBM_SYNC_RUN_SCHEMA.pipeline.marker.pending;
+    return FBM_SYNC_RUN_SCHEMA.layout.pipelineStep(classes.pipelineStep + (state === 'done' ? ' ' + classes.stateDone : '') + (state === 'current' || state === 'paused' ? ' ' + classes.stateCurrent : '') + (state === 'error' ? ' ' + classes.stateError : ''), marker, String(item && item.label || ''));
+  }));
 }
 function fbmSyncRunActionBlock(status) {
   status = status || {};
   var statusReady = typeof fbmSyncStatusReady === 'function' ? fbmSyncStatusReady() : FBM_SYNC_CLIENT.statusReady === true;
   var active = ['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(status.phase) >= 0, awaiting = status.phase === 'awaiting_approval';
-  return Button({ id: active ? 'fbm-sync-cancel' : awaiting ? 'fbm-sync-approve' : 'fbm-sync-start', label: statusReady ? (active ? 'Dừng đồng bộ' : awaiting ? 'Chấp thuận và chạy' : 'Bắt đầu đồng bộ') : 'Đang tải trạng thái...', className: 'shin-primary', disabled: !statusReady || status.masterEnabled === false || status.enabled === false });
+  return Button({ id: active ? FBM_SYNC_RUN_SCHEMA.action.ids.cancel : awaiting ? FBM_SYNC_RUN_SCHEMA.action.ids.approve : FBM_SYNC_RUN_SCHEMA.action.ids.start, label: statusReady ? (active ? FBM_SYNC_RUN_SCHEMA.action.cancel : awaiting ? FBM_SYNC_RUN_SCHEMA.action.approve : FBM_SYNC_RUN_SCHEMA.action.start) : FBM_SYNC_RUN_SCHEMA.action.loading, className: FBM_SYNC_RUN_SCHEMA.classes.primary, disabled: !statusReady || status.masterEnabled === false || status.enabled === false });
 }
 function fbmSyncRunDetailsBlocks(status) {
   if (!fbmSyncRunHasSnapshot(status)) { return []; }
   var awaiting = status.phase === 'awaiting_approval';
-  return (awaiting ? [Text({ className: 'shin-muted', text: 'Phiên có nhiều thay đổi; hãy xem kết quả rồi chấp thuận để tiếp tục.' })] : []).concat([fbmSyncPipelineBlock(status, 'fbm-sync-pipeline-region'), Box({ id: 'fbm-sync-live-status-region', elements: fbmSyncStatusBlocks(status, status.counts || {}) })]);
+  return (awaiting ? [Text({ className: FBM_SYNC_RUN_SCHEMA.classes.muted, text: FBM_SYNC_RUN_SCHEMA.awaitingMessage })] : []).concat([fbmSyncPipelineBlock(status, FBM_SYNC_RUN_SCHEMA.regions.pipeline), FBM_SYNC_RUN_SCHEMA.layout.liveStatus(FBM_SYNC_RUN_SCHEMA.regions.liveStatus, fbmSyncStatusBlocks(status, status.counts || {}))]);
 }
 function fbmSyncPatchLivePipeline(panel, status) {
-  if (!panel || !RENDER_INDEX.nodes['fbm-sync-pipeline-region']) { return false; }
+  if (!panel || !RENDER_INDEX.nodes[FBM_SYNC_RUN_SCHEMA.regions.pipeline]) { return false; }
   var next = fbmSyncPipelineBlock(status);
-  fbmSyncRenderTarget('fbm-sync-pipeline-region', next.elements);
+  fbmSyncRenderTarget(FBM_SYNC_RUN_SCHEMA.regions.pipeline, next.elements);
   return true;
 }
 function fbmSyncRenderRun(panel, status) {
   status = status || {};
-  return fbmSyncAppendBox(panel, 'shin-section', 'fbm-sync-run-root', [
-    Card({ title: 'Chọn loại đồng bộ', elements: [
-      StandaloneField('Loại đồng bộ', { id: 'fbm-sync-mode', kind: 'menu', options: FBM_SYNC_UI_SCHEMA.modes, value: FBM_SYNC_CLIENT.mode, disabled: !!FBM_SYNC_CLIENT.running, ariaLabel: 'Loại đồng bộ' }),
-      Box({ id: 'fbm-sync-run-action-region', elements: [Row({ className: 'shin-single-action-row', elements: [fbmSyncRunActionBlock(status)] })] })
-    ] }),
-    Stack({ id: 'fbm-sync-run-details-region', elements: fbmSyncRunDetailsBlocks(status) })
-  ]);
+  return fbmSyncAppendBox(panel, FBM_SYNC_RUN_SCHEMA.rootClass, FBM_SYNC_RUN_SCHEMA.rootId, FBM_SYNC_RUN_SCHEMA.layout.screen({
+    mode: StandaloneField(FBM_SYNC_RUN_SCHEMA.mode.label, { id: FBM_SYNC_RUN_SCHEMA.mode.id, kind: FBM_SYNC_RUN_SCHEMA.mode.kind, options: FBM_SYNC_UI_SCHEMA.modes, value: FBM_SYNC_CLIENT.mode, disabled: !!FBM_SYNC_CLIENT.running, ariaLabel: FBM_SYNC_RUN_SCHEMA.mode.label }),
+    action: FBM_SYNC_RUN_SCHEMA.layout.actionRow(fbmSyncRunActionBlock(status)),
+    details: fbmSyncRunDetailsBlocks(status)
+  }).elements);
 }
 function fbmSyncPatchRun(panel, status) {
-  if (!panel || !RENDER_INDEX.nodes['fbm-sync-run-root']) { return false; }
-  fbmSyncRenderTarget('fbm-sync-run-action-region', [Row({ className: 'shin-single-action-row', elements: [fbmSyncRunActionBlock(status)] })]);
-  fbmSyncRenderTarget('fbm-sync-run-details-region', fbmSyncRunDetailsBlocks(status));
+  if (!panel || !RENDER_INDEX.nodes[FBM_SYNC_RUN_SCHEMA.rootId]) { return false; }
+  fbmSyncRenderTarget(FBM_SYNC_RUN_SCHEMA.regions.action, [FBM_SYNC_RUN_SCHEMA.layout.actionRow(fbmSyncRunActionBlock(status))]);
+  fbmSyncRenderTarget(FBM_SYNC_RUN_SCHEMA.regions.details, fbmSyncRunDetailsBlocks(status));
   return true;
 }
 function fbmSyncRunHasSnapshot(status) {

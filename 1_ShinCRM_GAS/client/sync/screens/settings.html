@@ -25,109 +25,120 @@ function fbmSyncSetSettingsNotice(scope, kind, message) {
   FBM_SYNC_CLIENT.settingsNotices = FBM_SYNC_CLIENT.settingsNotices || {};
   var notice = { kind: kind || 'info', message: String(message || '') };
   FBM_SYNC_CLIENT.settingsNotices[scope] = notice;
-  var targetId = 'fbm-sync-settings-' + scope + '-notice-region';
+  var targetId = FBM_SYNC_SETTINGS_SCHEMA.regions[scope + 'Notice'];
   if (typeof RENDER_INDEX !== 'undefined' && RENDER_INDEX.nodes[targetId] && document.getElementById(targetId)) { fbmSyncRenderTarget(targetId, fbmSyncSettingsNoticeBlocks(scope)); }
   return notice;
 }
 function fbmSyncSettingsSchedulerNotice(status) {
-  if (!status || !status.message || (!status.scheduledScan && status.origin !== 'background' && String(status.message).indexOf('scheduler') < 0 && String(status.message).indexOf('Heartbeat') < 0)) { return null; }
-  return { kind: status.phase === 'error' ? 'error' : 'info', message: String(status.message) };
+  if (!status || !status.message || (!status.scheduledScan && status.origin !== 'background' && String(status.message).indexOf(FBM_SYNC_SETTINGS_SCHEMA.notice.scheduler) < 0 && String(status.message).indexOf(FBM_SYNC_SETTINGS_SCHEMA.notice.heartbeat) < 0)) { return null; }
+  return { kind: status.phase === 'error' ? FBM_SYNC_SETTINGS_SCHEMA.notice.errorKind : FBM_SYNC_SETTINGS_SCHEMA.notice.infoKind, message: String(status.message) };
 }
 function fbmSyncRelayStateBlocks() {
-  return [FBM_SYNC_CLIENT.relayConfigured ? Text({ className: 'shin-pass-row', text: 'Extension đã nhận cấu hình relay của file này.' }) : Notice({ kind: 'warning', text: 'Chưa xác nhận Extension đã nhận cấu hình relay.' })];
+  return [FBM_SYNC_CLIENT.relayConfigured ? Text({ className: FBM_SYNC_SETTINGS_SCHEMA.notice.relayClass, text: FBM_SYNC_SETTINGS_SCHEMA.notice.relayOk }) : Notice({ kind: FBM_SYNC_SETTINGS_SCHEMA.notice.warningKind, text: FBM_SYNC_SETTINGS_SCHEMA.notice.relayMissing })];
 }
 function fbmSyncSettingsExtensionBlocks(settings) {
-  var extension = fbmSyncConfigDraft('extension', settings.extension || { pollMinutes: 5, runOnStartup: true }), pollDisabled = fbmSyncConfigControlDisabled('extension', 'pollMinutes'), startupDisabled = fbmSyncConfigControlDisabled('extension', 'runOnStartup');
-  return [Box({ id: 'fbm-sync-settings-extension-notice-region', elements: fbmSyncSettingsNoticeBlocks('extension') }), Row({ className: 'shin-inline-field-row', elements: [Text({ className: 'shin-form-label', text: 'Chu kỳ hỏi GAS (phút)' }), StandaloneControl({ id: 'fbm-extension-poll-minutes', kind: 'input', inputType: 'number', value: extension.pollMinutes || 5, placeholder: '1–60', disabled: pollDisabled, ariaLabel: 'Chu kỳ hỏi GAS' })] }), Box({ className: 'shin-toggle-row', elements: [Text({ className: 'shin-toggle-copy', text: 'Hỏi GAS ngay khi Chrome khởi động' }), StandaloneControl({ id: 'fbm-sync-run-on-startup', kind: 'toggle', pressed: extension.runOnStartup !== false, className: extension.runOnStartup !== false ? 'is-on' : 'is-off', data: { 'sync-extension-startup': true }, disabled: startupDisabled, ariaLabel: 'Hỏi GAS ngay khi Chrome khởi động' })] }), fbmSyncConfigButtonRow('extension', { edit: 'Sửa nhịp Extension', save: 'Lưu nhịp Extension' }, { id: 'fbm-sync-save-extension', disabled: !!FBM_SYNC_CLIENT.running })];
+  var extension = fbmSyncConfigDraft('extension', settings.extension || { pollMinutes: FBM_SYNC_SETTINGS_SCHEMA.defaults.pollMinutes, runOnStartup: true }), pollDisabled = fbmSyncConfigControlDisabled('extension', 'pollMinutes'), startupDisabled = fbmSyncConfigControlDisabled('extension', 'runOnStartup');
+  return FBM_SYNC_SETTINGS_SCHEMA.layout.extension({
+    notice: fbmSyncSettingsNoticeBlocks('extension'),
+    poll: FBM_SYNC_SETTINGS_SCHEMA.layout.inlineField(FBM_SYNC_SETTINGS_SCHEMA.classes.inlineFieldRow, Text({ className: FBM_SYNC_SETTINGS_SCHEMA.classes.formLabel, text: FBM_SYNC_SETTINGS_SCHEMA.extension.pollLabel }), StandaloneControl({ id: FBM_SYNC_SETTINGS_SCHEMA.extension.pollId, kind: 'input', inputType: 'number', value: extension.pollMinutes || FBM_SYNC_SETTINGS_SCHEMA.defaults.pollMinutes, placeholder: FBM_SYNC_SETTINGS_SCHEMA.extension.pollPlaceholder, disabled: pollDisabled, ariaLabel: FBM_SYNC_SETTINGS_SCHEMA.extension.pollLabel })),
+    startup: FBM_SYNC_SETTINGS_SCHEMA.layout.toggle(FBM_SYNC_SETTINGS_SCHEMA.classes.toggleRow, Text({ className: FBM_SYNC_SETTINGS_SCHEMA.classes.toggleCopy, text: FBM_SYNC_SETTINGS_SCHEMA.extension.startupLabel }), StandaloneControl({ id: FBM_SYNC_SETTINGS_SCHEMA.extension.startupId, kind: 'toggle', pressed: extension.runOnStartup !== false, className: extension.runOnStartup !== false ? FBM_SYNC_SETTINGS_SCHEMA.classes.toggleOn : FBM_SYNC_SETTINGS_SCHEMA.classes.toggleOff, data: { 'sync-extension-startup': true }, disabled: startupDisabled, ariaLabel: FBM_SYNC_SETTINGS_SCHEMA.extension.startupLabel })),
+    actions: fbmSyncConfigButtonRow('extension', { edit: FBM_SYNC_SETTINGS_SCHEMA.extension.edit, save: FBM_SYNC_SETTINGS_SCHEMA.extension.save }, { id: FBM_SYNC_SETTINGS_SCHEMA.extension.saveId, disabled: !!FBM_SYNC_CLIENT.running })
+  });
 }
 function fbmSyncSettingsBackgroundBlocks(settings) {
   var editing = fbmSyncConfigIsEditing('background'), background = fbmSyncConfigDraft('background', settings.background || {}), parentEnabled = editing ? background.enabled !== false : !(FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.lastStatus.backgroundEnabled === false);
-  var direction = background.direction || 'read', directionOptions = [{ value: 'read', label: 'FBM → ShinCRM' }, { value: 'push', label: 'ShinCRM → FBM' }, { value: 'write', label: 'Đồng bộ hai chiều' }];
-  var process = [['heartbeat', 'Giữ phiên FBM', 5, true], ['customerFull', 'Quét toàn bộ Customer', 480, true], ['activityFull', 'Quét toàn bộ Activity', 1440, false], ['detail', 'Quét chi tiết Customer và Activity', 60, false]];
-  var rows = process.map(function (item) { var spec = background[item[0]] || { enabled: item[3], minutes: item[2] }, toggleDisabled = fbmSyncConfigControlDisabled('background', item[0] + '.enabled'), minutesDisabled = fbmSyncConfigControlDisabled('background', item[0] + '.minutes'); return Box({ className: 'shin-sync-schedule-row', elements: [StandaloneControl({ id: 'fbm-sync-process-' + item[0], kind: 'toggle', pressed: spec.enabled !== false, className: spec.enabled !== false ? 'is-on' : 'is-off', data: { 'sync-process-toggle': item[0] }, disabled: toggleDisabled, ariaLabel: 'Bật ' + item[1] }), Text({ className: 'shin-kv-label', text: item[1] }), StandaloneControl({ id: 'fbm-sync-process-' + item[0] + '-minutes', kind: 'input', inputType: 'number', value: spec.minutes || item[2], placeholder: 'phút', data: { 'sync-process-minutes': item[0] }, disabled: minutesDisabled, ariaLabel: 'Chu kỳ ' + item[1] })] }); });
-  var detail = background.detail || {};
-  var detailControls = Box({ className: 'shin-sync-detail-controls', elements: [
-    Box({ className: 'shin-sync-detail-field', elements: [
-      Text({ className: 'shin-sync-detail-label', text: 'Số lượng Customer mỗi lượt' }),
-      StandaloneControl({ id: 'fbm-sync-detail-count', kind: 'input', inputType: 'number', value: detail.customersPerRun || 50, placeholder: '50', disabled: fbmSyncConfigControlDisabled('background', 'detail.customersPerRun'), ariaLabel: 'Số lượng Customer mỗi lượt' })
-    ] }),
-    Box({ className: 'shin-sync-detail-field', elements: [
-      Text({ className: 'shin-sync-detail-label', text: 'Delay mỗi request (giây)' }),
-      Row({ className: 'shin-sync-detail-inputs', elements: [
-        Box({ className: 'shin-sync-detail-input', elements: [Text({ className: 'shin-sync-detail-input-label', text: 'Tối thiểu' }), StandaloneControl({ id: 'fbm-sync-detail-delay-min', kind: 'input', inputType: 'number', value: detail.minDelaySeconds === undefined ? 0.5 : detail.minDelaySeconds, placeholder: '0,5', disabled: fbmSyncConfigControlDisabled('background', 'detail.minDelaySeconds'), ariaLabel: 'Delay tối thiểu' })] }),
-        Box({ className: 'shin-sync-detail-input', elements: [Text({ className: 'shin-sync-detail-input-label', text: 'Tối đa' }), StandaloneControl({ id: 'fbm-sync-detail-delay-max', kind: 'input', inputType: 'number', value: detail.maxDelaySeconds === undefined ? 2 : detail.maxDelaySeconds, placeholder: '2', disabled: fbmSyncConfigControlDisabled('background', 'detail.maxDelaySeconds'), ariaLabel: 'Delay tối đa' })] })
-      ] })
-    ] })
-  ] });
-  return [Box({ id: 'fbm-sync-settings-background-notice-region', elements: fbmSyncSettingsNoticeBlocks('background', fbmSyncSettingsSchedulerNotice(FBM_SYNC_CLIENT.lastStatus)) }), Box({ className: 'shin-toggle-row', elements: [Text({ className: 'shin-toggle-copy', text: 'Bật lịch đồng bộ nền' }), StandaloneControl({ id: 'fbm-sync-background-switch', kind: 'toggle', pressed: parentEnabled, className: parentEnabled ? 'is-on' : 'is-off', data: { 'sync-background-draft': true }, disabled: fbmSyncConfigControlDisabled('background', 'enabled'), ariaLabel: 'Bật hoặc tắt lịch đồng bộ nền' })] }), Row({ className: 'shin-inline-field-row shin-sync-direction-row', elements: [Text({ className: 'shin-form-label', text: 'Chiều đồng bộ' }), StandaloneControl({ id: 'fbm-sync-background-direction', kind: 'menu', options: directionOptions, value: direction, disabled: fbmSyncConfigControlDisabled('background', 'direction'), ariaLabel: 'Chiều đồng bộ' })] })].concat(rows, [detailControls, fbmSyncConfigButtonRow('background', { edit: 'Sửa lịch nền', save: 'Lưu lịch nền' }, { id: 'fbm-sync-save-background', disabled: !!FBM_SYNC_CLIENT.running })]);
+  var direction = background.direction || 'read', directionOptions = FBM_SYNC_SETTINGS_SCHEMA.background.directions;
+  var process = FBM_SYNC_SETTINGS_SCHEMA.background.processes.map(function (item) { return [item.key, item.label, item.minutes, item.enabled]; }), backgroundSchema = FBM_SYNC_SETTINGS_SCHEMA.background, defaults = FBM_SYNC_SETTINGS_SCHEMA.defaults;
+  var rows = process.map(function (item) { var spec = background[item[0]] || { enabled: item[3], minutes: item[2] }, toggleDisabled = fbmSyncConfigControlDisabled('background', item[0] + '.enabled'), minutesDisabled = fbmSyncConfigControlDisabled('background', item[0] + '.minutes'), toggleId = backgroundSchema.processPrefix + item[0], minutesId = toggleId + backgroundSchema.minutesSuffix; return FBM_SYNC_SETTINGS_SCHEMA.layout.scheduleRow(FBM_SYNC_SETTINGS_SCHEMA.classes.scheduleRow, StandaloneControl({ id: toggleId, kind: 'toggle', pressed: spec.enabled !== false, className: spec.enabled !== false ? FBM_SYNC_SETTINGS_SCHEMA.classes.toggleOn : FBM_SYNC_SETTINGS_SCHEMA.classes.toggleOff, data: { 'sync-process-toggle': item[0] }, disabled: toggleDisabled, ariaLabel: backgroundSchema.toggleAria + item[1] }), Text({ className: FBM_SYNC_SETTINGS_SCHEMA.classes.kvLabel, text: item[1] }), StandaloneControl({ id: minutesId, kind: 'input', inputType: 'number', value: spec.minutes || item[2], placeholder: backgroundSchema.minutesPlaceholder, data: { 'sync-process-minutes': item[0] }, disabled: minutesDisabled, ariaLabel: backgroundSchema.minutesAria + item[1] })); });
+  var detail = background.detail || {}, detailSchema = FBM_SYNC_SETTINGS_SCHEMA.background.detail;
+  var detailControls = FBM_SYNC_SETTINGS_SCHEMA.layout.detailControls(FBM_SYNC_SETTINGS_SCHEMA.classes.detailControls, [
+    FBM_SYNC_SETTINGS_SCHEMA.layout.detailField(FBM_SYNC_SETTINGS_SCHEMA.classes.detailField, Text({ className: FBM_SYNC_SETTINGS_SCHEMA.classes.detailLabel, text: detailSchema.countLabel }), StandaloneControl({ id: detailSchema.countId, kind: 'input', inputType: 'number', value: detail.customersPerRun || FBM_SYNC_SETTINGS_SCHEMA.defaults.detailCustomers, placeholder: detailSchema.countPlaceholder, disabled: fbmSyncConfigControlDisabled('background', 'detail.customersPerRun'), ariaLabel: detailSchema.countLabel })),
+    FBM_SYNC_SETTINGS_SCHEMA.layout.detailField(FBM_SYNC_SETTINGS_SCHEMA.classes.detailField, Text({ className: FBM_SYNC_SETTINGS_SCHEMA.classes.detailLabel, text: detailSchema.delayLabel }), FBM_SYNC_SETTINGS_SCHEMA.layout.detailInputs(FBM_SYNC_SETTINGS_SCHEMA.classes.detailInputs, [
+      FBM_SYNC_SETTINGS_SCHEMA.layout.detailField(FBM_SYNC_SETTINGS_SCHEMA.classes.detailInput, Text({ className: FBM_SYNC_SETTINGS_SCHEMA.classes.detailInputLabel, text: detailSchema.minLabel }), StandaloneControl({ id: detailSchema.minId, kind: 'input', inputType: 'number', value: detail.minDelaySeconds === undefined ? FBM_SYNC_SETTINGS_SCHEMA.defaults.detailMinDelay : detail.minDelaySeconds, placeholder: detailSchema.minPlaceholder, disabled: fbmSyncConfigControlDisabled('background', 'detail.minDelaySeconds'), ariaLabel: detailSchema.minLabel })),
+      FBM_SYNC_SETTINGS_SCHEMA.layout.detailField(FBM_SYNC_SETTINGS_SCHEMA.classes.detailInput, Text({ className: FBM_SYNC_SETTINGS_SCHEMA.classes.detailInputLabel, text: detailSchema.maxLabel }), StandaloneControl({ id: detailSchema.maxId, kind: 'input', inputType: 'number', value: detail.maxDelaySeconds === undefined ? FBM_SYNC_SETTINGS_SCHEMA.defaults.detailMaxDelay : detail.maxDelaySeconds, placeholder: detailSchema.maxPlaceholder, disabled: fbmSyncConfigControlDisabled('background', 'detail.maxDelaySeconds'), ariaLabel: detailSchema.maxLabel }))
+    ]))
+  ]);
+  return FBM_SYNC_SETTINGS_SCHEMA.layout.background({
+    notice: fbmSyncSettingsNoticeBlocks('background', fbmSyncSettingsSchedulerNotice(FBM_SYNC_CLIENT.lastStatus)),
+    switch: FBM_SYNC_SETTINGS_SCHEMA.layout.toggle(FBM_SYNC_SETTINGS_SCHEMA.classes.toggleRow, Text({ className: FBM_SYNC_SETTINGS_SCHEMA.classes.toggleCopy, text: FBM_SYNC_SETTINGS_SCHEMA.background.switchLabel }), StandaloneControl({ id: FBM_SYNC_SETTINGS_SCHEMA.background.switchId, kind: 'toggle', pressed: parentEnabled, className: parentEnabled ? FBM_SYNC_SETTINGS_SCHEMA.classes.toggleOn : FBM_SYNC_SETTINGS_SCHEMA.classes.toggleOff, data: { 'sync-background-draft': true }, disabled: fbmSyncConfigControlDisabled('background', 'enabled'), ariaLabel: FBM_SYNC_SETTINGS_SCHEMA.background.switchLabel })),
+    direction: FBM_SYNC_SETTINGS_SCHEMA.layout.inlineField(FBM_SYNC_SETTINGS_SCHEMA.classes.inlineFieldRow + ' ' + FBM_SYNC_SETTINGS_SCHEMA.classes.directionRow, Text({ className: FBM_SYNC_SETTINGS_SCHEMA.classes.formLabel, text: FBM_SYNC_SETTINGS_SCHEMA.background.directionLabel }), StandaloneControl({ id: FBM_SYNC_SETTINGS_SCHEMA.background.directionId, kind: 'menu', options: directionOptions, value: direction, disabled: fbmSyncConfigControlDisabled('background', 'direction'), ariaLabel: FBM_SYNC_SETTINGS_SCHEMA.background.directionLabel })),
+    processes: rows,
+    detail: detailControls,
+    actions: fbmSyncConfigButtonRow('background', { edit: FBM_SYNC_SETTINGS_SCHEMA.background.edit, save: FBM_SYNC_SETTINGS_SCHEMA.background.save }, { id: FBM_SYNC_SETTINGS_SCHEMA.background.saveId, disabled: !!FBM_SYNC_CLIENT.running })
+  });
 }
 function fbmSyncSettingsLoginBlocks(loginPolicy) {
   loginPolicy = fbmSyncConfigDraft('loginPolicy', loginPolicy || {});
   var parentEnabled = loginPolicy.enabled !== false;
-  var toggle = function (id, label, pressed, path) { return Box({ className: 'shin-toggle-row', elements: [Text({ className: 'shin-toggle-copy', text: label }), StandaloneControl({ id: id, kind: 'toggle', pressed: pressed, className: pressed ? 'is-on' : 'is-off', data: { 'sync-login-policy': id.replace('fbm-sync-policy-', '') }, disabled: fbmSyncConfigControlDisabled('loginPolicy', path), ariaLabel: label })] }); };
-  var retryGroup = Box({ className: 'shin-sync-login-policy-retry-group', elements: [
-    toggle('fbm-sync-policy-retry', 'Cho phép tự đăng nhập lại khi lần trước thất bại', loginPolicy.retryEnabled !== false, 'retryEnabled'),
-    StandaloneField('Chu kỳ thử lại (phút)', { id: 'fbm-sync-login-retry-minutes', kind: 'input', inputType: 'number', value: loginPolicy.retryMinutes || 30, placeholder: '1–1.440', disabled: fbmSyncConfigControlDisabled('loginPolicy', 'retryMinutes'), ariaLabel: 'Chu kỳ thử lại' })
-  ] });
-  return [Box({ id: 'fbm-sync-settings-login-notice-region', elements: fbmSyncSettingsNoticeBlocks('login') }),
-    Box({ id: 'fbm-sync-login-policy-parent-row', className: 'shin-toggle-row shin-sync-login-policy-parent', elements: [Text({ className: 'shin-toggle-copy', text: 'Cho phép tự đăng nhập khi phiên hết hạn' }), StandaloneControl({ id: 'fbm-sync-policy-auto-login', kind: 'toggle', pressed: parentEnabled, className: parentEnabled ? 'is-on' : 'is-off', data: { 'sync-login-policy': 'auto-login' }, disabled: fbmSyncConfigControlDisabled('loginPolicy', 'enabled'), ariaLabel: 'Cho phép tự đăng nhập khi phiên hết hạn' })] }),
-    Box({ id: 'fbm-sync-login-policy-children', className: 'shin-sync-login-policy-children', elements: [
-      toggle('fbm-sync-policy-auto-open', 'Cho phép tự mở tab FBM khi GAS yêu cầu', loginPolicy.autoOpenTab === true, 'autoOpenTab'),
-      retryGroup
-    ] }),
-    fbmSyncConfigButtonRow('loginPolicy', { edit: 'Sửa chính sách đăng nhập', save: 'Lưu chính sách đăng nhập' }, { id: 'fbm-sync-save-login-policy', disabled: !!FBM_SYNC_CLIENT.running })
-  ];
+  var toggle = function (id, label, pressed, path) { return FBM_SYNC_SETTINGS_SCHEMA.layout.toggle(FBM_SYNC_SETTINGS_SCHEMA.classes.toggleRow, Text({ className: FBM_SYNC_SETTINGS_SCHEMA.classes.toggleCopy, text: label }), StandaloneControl({ id: id, kind: 'toggle', pressed: pressed, className: pressed ? FBM_SYNC_SETTINGS_SCHEMA.classes.toggleOn : FBM_SYNC_SETTINGS_SCHEMA.classes.toggleOff, data: { 'sync-login-policy': id.replace(FBM_SYNC_SETTINGS_SCHEMA.defaults.policyPrefix, '') }, disabled: fbmSyncConfigControlDisabled('loginPolicy', path), ariaLabel: label })); };
+  var retryGroup = FBM_SYNC_SETTINGS_SCHEMA.layout.loginRetryGroup(FBM_SYNC_SETTINGS_SCHEMA.classes.loginRetryGroup, [
+    toggle(FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryId, FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryLabel, loginPolicy.retryEnabled !== false, 'retryEnabled'),
+    StandaloneField(FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryMinutesLabel, { id: FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryMinutesId, kind: 'input', inputType: 'number', value: loginPolicy.retryMinutes || FBM_SYNC_SETTINGS_SCHEMA.defaults.retryMinutes, placeholder: FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryMinutesPlaceholder, disabled: fbmSyncConfigControlDisabled('loginPolicy', 'retryMinutes'), ariaLabel: FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryMinutesLabel })
+  ]);
+  return FBM_SYNC_SETTINGS_SCHEMA.layout.loginPolicy({
+    notice: fbmSyncSettingsNoticeBlocks('login'),
+    parent: FBM_SYNC_SETTINGS_SCHEMA.layout.loginParent(FBM_SYNC_SETTINGS_SCHEMA.regions.loginPolicyParent, FBM_SYNC_SETTINGS_SCHEMA.classes.toggleRow + ' ' + FBM_SYNC_SETTINGS_SCHEMA.classes.loginParent, Text({ className: FBM_SYNC_SETTINGS_SCHEMA.classes.toggleCopy, text: FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.parentLabel }), StandaloneControl({ id: FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.parentId, kind: 'toggle', pressed: parentEnabled, className: parentEnabled ? FBM_SYNC_SETTINGS_SCHEMA.classes.toggleOn : FBM_SYNC_SETTINGS_SCHEMA.classes.toggleOff, data: { 'sync-login-policy': 'auto-login' }, disabled: fbmSyncConfigControlDisabled('loginPolicy', 'enabled'), ariaLabel: FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.parentLabel })),
+    children: [toggle(FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.openId, FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.openLabel, loginPolicy.autoOpenTab === true, 'autoOpenTab'), retryGroup],
+    actions: fbmSyncConfigButtonRow('loginPolicy', { edit: FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.edit, save: FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.save }, { id: FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.saveId, disabled: !!FBM_SYNC_CLIENT.running })
+  });
 }
 
 function fbmSyncSetLoginPolicyDependencyState(parentEnabled) {
-  ['fbm-sync-policy-auto-open', 'fbm-sync-policy-retry', 'fbm-sync-login-retry-minutes'].forEach(function (id, index) {
+  [FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.openId, FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryId, FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryMinutesId].forEach(function (id, index) {
     var path = index === 0 ? 'autoOpenTab' : index === 1 ? 'retryEnabled' : 'retryMinutes';
     fbmSyncSetTargetState(id, { disabled: fbmSyncConfigControlDisabled('loginPolicy', path) });
   });
   return parentEnabled !== true;
 }
 function fbmSyncSetBackgroundDependencyState(parentEnabled) {
-  var process = ['heartbeat', 'customerFull', 'activityFull', 'detail'];
-  fbmSyncSetTargetState('fbm-sync-background-direction', { disabled: fbmSyncConfigControlDisabled('background', 'direction') });
+  var process = FBM_SYNC_SETTINGS_SCHEMA.defaults.processKeys;
+  fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.background.directionId, { disabled: fbmSyncConfigControlDisabled('background', 'direction') });
   process.forEach(function (kind) {
     var enabled = fbmSyncConfigDraftValue('background', kind + '.enabled', true) === true;
-    fbmSyncSetTargetState('fbm-sync-process-' + kind, { disabled: fbmSyncConfigControlDisabled('background', kind + '.enabled') });
-    fbmSyncSetTargetState('fbm-sync-process-' + kind + '-minutes', { disabled: fbmSyncConfigControlDisabled('background', kind + '.minutes') });
+    fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.background.processPrefix + kind, { disabled: fbmSyncConfigControlDisabled('background', kind + '.enabled') });
+    fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.background.processPrefix + kind + FBM_SYNC_SETTINGS_SCHEMA.background.minutesSuffix, { disabled: fbmSyncConfigControlDisabled('background', kind + '.minutes') });
   });
-  ['count', 'delay-min', 'delay-max'].forEach(function (suffix) { fbmSyncSetTargetState('fbm-sync-detail-' + suffix, { disabled: fbmSyncConfigControlDisabled('background', 'detail.' + (suffix === 'count' ? 'customersPerRun' : suffix === 'delay-min' ? 'minDelaySeconds' : 'maxDelaySeconds')) }); });
-  fbmSyncSetTargetState('fbm-sync-background-switch', { disabled: fbmSyncConfigControlDisabled('background', 'enabled') });
+  FBM_SYNC_SETTINGS_SCHEMA.defaults.detailSuffixes.forEach(function (suffix) { fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.defaults.detailFieldPrefix + suffix, { disabled: fbmSyncConfigControlDisabled('background', 'detail.' + (suffix === 'count' ? 'customersPerRun' : suffix === 'delay-min' ? 'minDelaySeconds' : 'maxDelaySeconds')) }); });
+  fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.defaults.backgroundSwitchId, { disabled: fbmSyncConfigControlDisabled('background', 'enabled') });
   return parentEnabled !== true;
 }
 function fbmSyncSettingsModuleBlocks(settings, enabled) {
   var draft = fbmSyncConfigDraft('module', settings || {}), parentEnabled = draft.enabled !== false;
-  return [Box({ className: 'shin-toggle-row', elements: [Text({ className: 'shin-toggle-copy', text: parentEnabled ? 'Module đồng bộ đang bật' : 'Module đồng bộ đang tắt' }), StandaloneControl({ id: 'fbm-sync-settings-master-switch', kind: 'toggle', pressed: parentEnabled, className: parentEnabled ? 'is-on' : 'is-off', data: { 'sync-master-draft': true }, disabled: fbmSyncConfigControlDisabled('module', 'enabled'), ariaLabel: 'Bật hoặc tắt module đồng bộ FBM trong cài đặt' })] }), Box({ id: 'fbm-sync-settings-module-notice-region', elements: fbmSyncSettingsNoticeBlocks('module') }), StandaloneField('Ngưỡng yêu cầu chấp thuận', { id: 'fbm-sync-setting-approval-threshold', kind: 'input', inputType: 'number', value: draft.approvalThreshold === undefined ? 10 : draft.approvalThreshold, placeholder: '10', disabled: fbmSyncConfigControlDisabled('module', 'approvalThreshold') || !parentEnabled, ariaLabel: 'Ngưỡng yêu cầu chấp thuận' }), Text({ className: 'shin-muted', text: 'Số bản ghi ghi lên FBM từ ngưỡng này trở lên sẽ dừng để bạn chấp thuận trước request ghi đầu tiên. Nhập 0 nếu mọi lượt ghi đều phải chờ duyệt.' }), fbmSyncConfigButtonRow('module', { edit: 'Sửa cài đặt chung', save: 'Lưu cài đặt chung' }, { id: 'fbm-sync-save-settings', disabled: !!FBM_SYNC_CLIENT.running })];
+  var moduleSchema = FBM_SYNC_SETTINGS_SCHEMA.module;
+  return FBM_SYNC_SETTINGS_SCHEMA.layout.module({
+    switch: FBM_SYNC_SETTINGS_SCHEMA.layout.toggle(FBM_SYNC_SETTINGS_SCHEMA.classes.toggleRow, Text({ className: FBM_SYNC_SETTINGS_SCHEMA.classes.toggleCopy, text: parentEnabled ? moduleSchema.enabledOn : moduleSchema.enabledOff }), StandaloneControl({ id: FBM_SYNC_SETTINGS_SCHEMA.defaults.masterId, kind: 'toggle', pressed: parentEnabled, className: parentEnabled ? FBM_SYNC_SETTINGS_SCHEMA.classes.toggleOn : FBM_SYNC_SETTINGS_SCHEMA.classes.toggleOff, data: { 'sync-master-draft': true }, disabled: fbmSyncConfigControlDisabled('module', 'enabled'), ariaLabel: moduleSchema.enabledAria })),
+    notice: fbmSyncSettingsNoticeBlocks('module'),
+    threshold: StandaloneField(moduleSchema.thresholdLabel, { id: moduleSchema.thresholdId, kind: 'input', inputType: 'number', value: draft.approvalThreshold === undefined ? moduleSchema.thresholdPlaceholder : draft.approvalThreshold, placeholder: moduleSchema.thresholdPlaceholder, disabled: fbmSyncConfigControlDisabled('module', 'approvalThreshold') || !parentEnabled, ariaLabel: moduleSchema.thresholdLabel }),
+    help: Text({ className: FBM_SYNC_SETTINGS_SCHEMA.classes.muted, text: moduleSchema.thresholdHelp }),
+    actions: fbmSyncConfigButtonRow('module', { edit: moduleSchema.edit, save: moduleSchema.save }, { id: moduleSchema.saveId, disabled: !!FBM_SYNC_CLIENT.running })
+  });
 }
 function fbmSyncRenderSettings(panel, status) {
   var settings = FBM_SYNC_CLIENT.syncSettings || {}, loginPolicy = FBM_SYNC_CLIENT.loginStatus || {};
   var enabled = !(status && (status.masterEnabled === false || status.enabled === false));
-  return fbmSyncAppendBox(panel, 'shin-section', 'fbm-sync-settings-root', [
-    Box({ id: 'fbm-sync-module-card-region', elements: [Card({ title: 'Bật tắt module đồng bộ FBM', titleActions: fbmSyncConfigTitleActions('module'), elements: fbmSyncSettingsModuleBlocks(Object.assign({}, settings, { enabled: enabled }), enabled) })] }),
-    Box({ id: 'fbm-sync-relay-card-region', elements: [Card({ title: 'Kết nối Extension', titleActions: fbmSyncConfigTitleActions('relay'), elements: [Box({ id: 'fbm-sync-settings-relay-notice-region', elements: fbmSyncSettingsNoticeBlocks('relay') }), Box({ id: 'fbm-sync-relay-state-region', elements: fbmSyncRelayStateBlocks() }), fbmSyncConfigButtonRow('relay', { edit: 'Sửa cấu hình kết nối', save: 'Lưu cấu hình kết nối' }, { id: 'fbm-sync-rotate-relay', disabled: !!FBM_SYNC_CLIENT.running })] })] }),
-    Box({ id: 'fbm-sync-extension-card-region', elements: [Card({ title: 'Nhịp hỏi GAS của Extension', titleActions: fbmSyncConfigTitleActions('extension'), elements: fbmSyncSettingsExtensionBlocks(settings) })] }),
-    Box({ id: 'fbm-sync-background-card-region', elements: [Card({ title: 'Lịch đồng bộ nền', titleActions: fbmSyncConfigTitleActions('background'), elements: fbmSyncSettingsBackgroundBlocks(settings) })] }),
-    Box({ id: 'fbm-sync-login-policy-card-region', elements: [Card({ title: 'Chính sách tự đăng nhập', titleActions: fbmSyncConfigTitleActions('loginPolicy'), elements: fbmSyncSettingsLoginBlocks(loginPolicy) })] })
-  ]);
+  return fbmSyncAppendBox(panel, FBM_SYNC_SETTINGS_SCHEMA.rootClass, FBM_SYNC_SETTINGS_SCHEMA.rootId, FBM_SYNC_SETTINGS_SCHEMA.layout.screen({
+    module: FBM_SYNC_SETTINGS_SCHEMA.layout.cardRegion(FBM_SYNC_SETTINGS_SCHEMA.regions.module, FBM_SYNC_SETTINGS_SCHEMA.layout.card(FBM_SYNC_SETTINGS_SCHEMA.cards.module, fbmSyncConfigTitleActions('module'), fbmSyncSettingsModuleBlocks(Object.assign({}, settings, { enabled: enabled }), enabled))),
+    relay: FBM_SYNC_SETTINGS_SCHEMA.layout.cardRegion(FBM_SYNC_SETTINGS_SCHEMA.regions.relay, FBM_SYNC_SETTINGS_SCHEMA.layout.relayCard(fbmSyncConfigTitleActions('relay'), fbmSyncSettingsNoticeBlocks('relay'), fbmSyncRelayStateBlocks(), fbmSyncConfigButtonRow('relay', { edit: FBM_SYNC_SETTINGS_SCHEMA.relay.edit, save: FBM_SYNC_SETTINGS_SCHEMA.relay.save }, { id: FBM_SYNC_SETTINGS_SCHEMA.relay.rotateId, disabled: !!FBM_SYNC_CLIENT.running }))),
+    extension: FBM_SYNC_SETTINGS_SCHEMA.layout.cardRegion(FBM_SYNC_SETTINGS_SCHEMA.regions.extension, FBM_SYNC_SETTINGS_SCHEMA.layout.card(FBM_SYNC_SETTINGS_SCHEMA.cards.extension, fbmSyncConfigTitleActions('extension'), fbmSyncSettingsExtensionBlocks(settings))),
+    background: FBM_SYNC_SETTINGS_SCHEMA.layout.cardRegion(FBM_SYNC_SETTINGS_SCHEMA.regions.background, FBM_SYNC_SETTINGS_SCHEMA.layout.card(FBM_SYNC_SETTINGS_SCHEMA.cards.background, fbmSyncConfigTitleActions('background'), fbmSyncSettingsBackgroundBlocks(settings))),
+    loginPolicy: FBM_SYNC_SETTINGS_SCHEMA.layout.cardRegion(FBM_SYNC_SETTINGS_SCHEMA.regions.loginPolicy, FBM_SYNC_SETTINGS_SCHEMA.layout.card(FBM_SYNC_SETTINGS_SCHEMA.cards.loginPolicy, fbmSyncConfigTitleActions('loginPolicy'), fbmSyncSettingsLoginBlocks(loginPolicy)))
+  }).elements);
 }
 function fbmSyncPatchSettings(panel, status) {
-  if (!panel || !RENDER_INDEX.nodes['fbm-sync-settings-root']) { return false; }
+  if (!panel || !RENDER_INDEX.nodes[FBM_SYNC_SETTINGS_SCHEMA.rootId]) { return false; }
   var schedulerNotice = fbmSyncSettingsSchedulerNotice(status);
   if (schedulerNotice) { FBM_SYNC_CLIENT.settingsNotices = FBM_SYNC_CLIENT.settingsNotices || {}; FBM_SYNC_CLIENT.settingsNotices.background = schedulerNotice; }
   var masterEnabled = !(status && (status.masterEnabled === false || status.enabled === false));
   var backgroundEnabled = !(status && status.backgroundEnabled === false);
   var settingCards = [
-    ['fbm-sync-module-card-region', 'module', function () { return Card({ title: 'Bật tắt module đồng bộ FBM', titleActions: fbmSyncConfigTitleActions('module'), elements: fbmSyncSettingsModuleBlocks(Object.assign({}, FBM_SYNC_CLIENT.syncSettings || {}, { enabled: masterEnabled }), masterEnabled) }); }],
-    ['fbm-sync-relay-card-region', 'relay', function () { return Card({ title: 'Kết nối Extension', titleActions: fbmSyncConfigTitleActions('relay'), elements: [Box({ id: 'fbm-sync-settings-relay-notice-region', elements: fbmSyncSettingsNoticeBlocks('relay') }), Box({ id: 'fbm-sync-relay-state-region', elements: fbmSyncRelayStateBlocks() }), fbmSyncConfigButtonRow('relay', { edit: 'Sửa cấu hình kết nối', save: 'Lưu cấu hình kết nối' }, { id: 'fbm-sync-rotate-relay', disabled: !!FBM_SYNC_CLIENT.running })] }); }],
-    ['fbm-sync-extension-card-region', 'extension', function () { return Card({ title: 'Nhịp hỏi GAS của Extension', titleActions: fbmSyncConfigTitleActions('extension'), elements: fbmSyncSettingsExtensionBlocks(FBM_SYNC_CLIENT.syncSettings || {}) }); }],
-    ['fbm-sync-background-card-region', 'background', function () { return Card({ title: 'Lịch đồng bộ nền', titleActions: fbmSyncConfigTitleActions('background'), elements: fbmSyncSettingsBackgroundBlocks(FBM_SYNC_CLIENT.syncSettings || {}) }); }],
-    ['fbm-sync-login-policy-card-region', 'loginPolicy', function () { return Card({ title: 'Chính sách tự đăng nhập', titleActions: fbmSyncConfigTitleActions('loginPolicy'), elements: fbmSyncSettingsLoginBlocks(FBM_SYNC_CLIENT.loginStatus || {}) }); }]
+    [FBM_SYNC_SETTINGS_SCHEMA.regions.module, 'module', function () { return FBM_SYNC_SETTINGS_SCHEMA.layout.card(FBM_SYNC_SETTINGS_SCHEMA.cards.module, fbmSyncConfigTitleActions('module'), fbmSyncSettingsModuleBlocks(Object.assign({}, FBM_SYNC_CLIENT.syncSettings || {}, { enabled: masterEnabled }), masterEnabled)); }],
+    [FBM_SYNC_SETTINGS_SCHEMA.regions.relay, 'relay', function () { return FBM_SYNC_SETTINGS_SCHEMA.layout.relayCard(fbmSyncConfigTitleActions('relay'), fbmSyncSettingsNoticeBlocks('relay'), fbmSyncRelayStateBlocks(), fbmSyncConfigButtonRow('relay', { edit: FBM_SYNC_SETTINGS_SCHEMA.relay.edit, save: FBM_SYNC_SETTINGS_SCHEMA.relay.save }, { id: FBM_SYNC_SETTINGS_SCHEMA.relay.rotateId, disabled: !!FBM_SYNC_CLIENT.running })); }],
+    [FBM_SYNC_SETTINGS_SCHEMA.regions.extension, 'extension', function () { return FBM_SYNC_SETTINGS_SCHEMA.layout.card(FBM_SYNC_SETTINGS_SCHEMA.cards.extension, fbmSyncConfigTitleActions('extension'), fbmSyncSettingsExtensionBlocks(FBM_SYNC_CLIENT.syncSettings || {})); }],
+    [FBM_SYNC_SETTINGS_SCHEMA.regions.background, 'background', function () { return FBM_SYNC_SETTINGS_SCHEMA.layout.card(FBM_SYNC_SETTINGS_SCHEMA.cards.background, fbmSyncConfigTitleActions('background'), fbmSyncSettingsBackgroundBlocks(FBM_SYNC_CLIENT.syncSettings || {})); }],
+    [FBM_SYNC_SETTINGS_SCHEMA.regions.loginPolicy, 'loginPolicy', function () { return FBM_SYNC_SETTINGS_SCHEMA.layout.card(FBM_SYNC_SETTINGS_SCHEMA.cards.loginPolicy, fbmSyncConfigTitleActions('loginPolicy'), fbmSyncSettingsLoginBlocks(FBM_SYNC_CLIENT.loginStatus || {})); }]
   ];
   settingCards.forEach(function (item) { var region = document.getElementById(item[0]), editState = fbmSyncConfigState(item[1]); if (region && !fbmSyncInteractiveControlIsEditing(region) && (!editState.editing || editState.needsRender)) { fbmSyncRenderTarget(item[0], [item[2]()]); editState.needsRender = false; } });
-  if (!fbmSyncConfigIsEditing('module')) { fbmSyncSetToggleState('fbm-sync-settings-master-switch', masterEnabled, true); }
+  if (!fbmSyncConfigIsEditing('module')) { fbmSyncSetToggleState(FBM_SYNC_SETTINGS_SCHEMA.defaults.masterId, masterEnabled, true); }
   if (!fbmSyncConfigIsEditing('background')) { fbmSyncSetBackgroundSwitchState(backgroundEnabled, true); }
   var settings = FBM_SYNC_CLIENT.syncSettings || {}, background = settings.background || {}, activeId = String(document.activeElement && document.activeElement.id || '');
   function patchValue(id, value) {
@@ -142,36 +153,36 @@ function fbmSyncPatchSettings(panel, status) {
     if ((id.indexOf('fbm-sync-run-on-startup') === 0 && fbmSyncConfigIsEditing('extension')) || (id.indexOf('fbm-sync-process-') === 0 && fbmSyncConfigIsEditing('background')) || (id.indexOf('fbm-sync-policy-') === 0 && fbmSyncConfigIsEditing('loginPolicy'))) { return; }
     if (activeId !== id) { fbmSyncSetToggleState(id, enabled, disabled); }
   }
-  if (background.direction !== undefined) { patchValue('fbm-sync-background-direction', background.direction); }
-  ['heartbeat', 'customerFull', 'activityFull', 'detail'].forEach(function (kind) {
+  if (background.direction !== undefined) { patchValue(FBM_SYNC_SETTINGS_SCHEMA.background.directionId, background.direction); }
+  FBM_SYNC_SETTINGS_SCHEMA.defaults.processKeys.forEach(function (kind) {
     var item = background[kind] || {}, enabled = item.enabled !== false;
-    patchToggle('fbm-sync-process-' + kind, enabled, fbmSyncConfigControlDisabled('background', kind + '.enabled'));
-    patchValue('fbm-sync-process-' + kind + '-minutes', item.minutes);
-    var minutes = document.getElementById('fbm-sync-process-' + kind + '-minutes');
+    patchToggle(FBM_SYNC_SETTINGS_SCHEMA.background.processPrefix + kind, enabled, fbmSyncConfigControlDisabled('background', kind + '.enabled'));
+    patchValue(FBM_SYNC_SETTINGS_SCHEMA.background.processPrefix + kind + FBM_SYNC_SETTINGS_SCHEMA.background.minutesSuffix, item.minutes);
+    var minutes = document.getElementById(FBM_SYNC_SETTINGS_SCHEMA.background.processPrefix + kind + FBM_SYNC_SETTINGS_SCHEMA.background.minutesSuffix);
     if (minutes && activeId !== minutes.id) { minutes.disabled = fbmSyncConfigControlDisabled('background', kind + '.minutes'); }
   });
-  patchValue('fbm-sync-detail-count', background.detail && background.detail.customersPerRun);
-  patchValue('fbm-sync-detail-delay-min', background.detail && background.detail.minDelaySeconds);
-  patchValue('fbm-sync-detail-delay-max', background.detail && background.detail.maxDelaySeconds);
+  patchValue(FBM_SYNC_SETTINGS_SCHEMA.background.detail.countId, background.detail && background.detail.customersPerRun);
+  patchValue(FBM_SYNC_SETTINGS_SCHEMA.background.detail.minId, background.detail && background.detail.minDelaySeconds);
+  patchValue(FBM_SYNC_SETTINGS_SCHEMA.background.detail.maxId, background.detail && background.detail.maxDelaySeconds);
   var extension = settings.extension || {};
-  patchValue('fbm-extension-poll-minutes', extension.pollMinutes);
-  patchToggle('fbm-sync-run-on-startup', extension.runOnStartup !== false, fbmSyncConfigControlDisabled('extension', 'runOnStartup'));
+  patchValue(FBM_SYNC_SETTINGS_SCHEMA.extension.pollId, extension.pollMinutes);
+  patchToggle(FBM_SYNC_SETTINGS_SCHEMA.defaults.startupId, extension.runOnStartup !== false, fbmSyncConfigControlDisabled('extension', 'runOnStartup'));
   var login = FBM_SYNC_CLIENT.loginStatus || {}, loginDraft = fbmSyncConfigDraft('loginPolicy', login), loginEnabled = loginDraft.enabled !== false;
-  patchToggle('fbm-sync-policy-auto-login', loginEnabled, fbmSyncConfigControlDisabled('loginPolicy', 'enabled'));
-  patchToggle('fbm-sync-policy-auto-open', login.autoOpenTab === true, fbmSyncConfigControlDisabled('loginPolicy', 'autoOpenTab'));
-  patchToggle('fbm-sync-policy-retry', login.retryEnabled !== false, fbmSyncConfigControlDisabled('loginPolicy', 'retryEnabled'));
-  patchValue('fbm-sync-login-retry-minutes', login.retryMinutes);
+  patchToggle(FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.parentId, loginEnabled, fbmSyncConfigControlDisabled('loginPolicy', 'enabled'));
+  patchToggle(FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.openId, login.autoOpenTab === true, fbmSyncConfigControlDisabled('loginPolicy', 'autoOpenTab'));
+  patchToggle(FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryId, login.retryEnabled !== false, fbmSyncConfigControlDisabled('loginPolicy', 'retryEnabled'));
+  patchValue(FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryMinutesId, login.retryMinutes);
   fbmSyncSetLoginPolicyDependencyState(loginEnabled);
-  patchValue('fbm-sync-setting-approval-threshold', settings.approvalThreshold);
-  fbmSyncSetTargetState('fbm-sync-setting-approval-threshold', { disabled: !fbmSyncConfigIsEditing('module') || !!FBM_SYNC_CLIENT.running || fbmSyncConfigDraftValue('module', 'enabled', masterEnabled) !== true });
-  fbmSyncSetTargetState('fbm-sync-save-settings', { disabled: !!FBM_SYNC_CLIENT.running });
-  if (masterEnabled) { fbmSyncSetTargetState('sidebar-body', { disabledDescendants: false, except: ['fbm-sync-settings-master-switch'] }); }
-  fbmSyncRenderTarget('fbm-sync-settings-relay-notice-region', fbmSyncSettingsNoticeBlocks('relay'));
-  fbmSyncRenderTarget('fbm-sync-settings-extension-notice-region', fbmSyncSettingsNoticeBlocks('extension'));
-  fbmSyncRenderTarget('fbm-sync-settings-module-notice-region', fbmSyncSettingsNoticeBlocks('module'));
-  fbmSyncRenderTarget('fbm-sync-settings-background-notice-region', fbmSyncSettingsNoticeBlocks('background', schedulerNotice));
-  fbmSyncRenderTarget('fbm-sync-settings-login-notice-region', fbmSyncSettingsNoticeBlocks('login'));
-  fbmSyncRenderTarget('fbm-sync-relay-state-region', fbmSyncRelayStateBlocks());
+  patchValue(FBM_SYNC_SETTINGS_SCHEMA.module.thresholdId, settings.approvalThreshold);
+  fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.module.thresholdId, { disabled: !fbmSyncConfigIsEditing('module') || !!FBM_SYNC_CLIENT.running || fbmSyncConfigDraftValue('module', 'enabled', masterEnabled) !== true });
+  fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.module.saveId, { disabled: !!FBM_SYNC_CLIENT.running });
+  if (masterEnabled) { fbmSyncSetTargetState(FBM_SYNC_UI_SCHEMA.shell.ids.body, { disabledDescendants: false, except: [FBM_SYNC_UI_SCHEMA.shell.ids.master] }); }
+  fbmSyncRenderTarget(FBM_SYNC_SETTINGS_SCHEMA.regions.relayNotice, fbmSyncSettingsNoticeBlocks('relay'));
+  fbmSyncRenderTarget(FBM_SYNC_SETTINGS_SCHEMA.regions.extensionNotice, fbmSyncSettingsNoticeBlocks('extension'));
+  fbmSyncRenderTarget(FBM_SYNC_SETTINGS_SCHEMA.regions.moduleNotice, fbmSyncSettingsNoticeBlocks('module'));
+  fbmSyncRenderTarget(FBM_SYNC_SETTINGS_SCHEMA.regions.backgroundNotice, fbmSyncSettingsNoticeBlocks('background', schedulerNotice));
+  fbmSyncRenderTarget(FBM_SYNC_SETTINGS_SCHEMA.regions.loginNotice, fbmSyncSettingsNoticeBlocks('login'));
+  fbmSyncRenderTarget(FBM_SYNC_SETTINGS_SCHEMA.regions.relayState, fbmSyncRelayStateBlocks());
   return true;
 }
 </script>

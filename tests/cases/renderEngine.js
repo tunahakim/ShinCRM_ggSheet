@@ -388,9 +388,9 @@ function quetDuongGan(so) {
   });
 
   const thay = Object.keys(dem).sort().map((tep) => tep + ':' + dem[tep]);
-  check(so, 'đúng ba tệp gán innerHTML, và engine chỉ có ba lời gán được quy định',
+  check(so, 'chỉ renderer và hộp tìm kiếm được gán innerHTML; màn trạng thái cũng đi qua renderer',
     thay,
-    ['client/screen/statusScreen.html:1', 'client/ui/renderEngine.html:3', 'client/ui/search.html:3']);
+    ['client/ui/renderEngine.html:3', 'client/ui/search.html:3']);
 
   check(so, 'thông báo khóa form dùng lớp Notice chung, không tạo lớp Sync generic riêng',
     [docTep('client/ui/inputs.html').indexOf('shin-sync-lock-notice') >= 0, docTep('client/ui/inputs.html').indexOf('shin-notice-warning') >= 0, docTep('client/screen/formScreen.html').indexOf('shin-sync-lock-notice') >= 0],

@@ -1,21 +1,5 @@
 <script>
-/* Khai báo tĩnh cho module Đồng bộ; renderer chỉ đọc các màn hình này, không chứa nghiệp vụ. */
-var FBM_SYNC_UI_SCHEMA = {
-  screens: [
-    { id: 'run', label: 'Chạy đồng bộ' },
-    { id: 'account', label: 'Tài khoản FBM' },
-    { id: 'results', label: 'Kết quả & xử lý' },
-    { id: 'settings', label: 'Cài đặt phiên' }
-  ],
-  modes: [
-    { value: 'check', label: 'Kiểm tra an toàn' },
-    { value: 'read', label: 'Lấy từ FBM → ShinCRM' },
-    { value: 'push', label: 'Đẩy từ ShinCRM → FBM' },
-    { value: 'write', label: 'Đồng bộ hai chiều' }
-  ]
-};
-
-/* Các màn hình động vẫn khai bằng Block; DOM chỉ được chạm qua cổng renderer chung. */
+/* Cổng tương thích cho code Sync cũ: schema chính thức nằm ở client/schema/sync/screens/. */
 function fbmSyncAppendBlock(parent, node, ctx) { return renderBlockInto(parent, node, ctx || {}); }
 function fbmSyncReplaceBlocks(parent, nodes, ctx) { return renderReplaceChildren(parent, nodes || [], ctx || {}); }
 function fbmSyncRenderTarget(id, elements) {

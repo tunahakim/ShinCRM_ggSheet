@@ -1,127 +1,46 @@
-<style>
-/*
- * Style của riêng ba màn không-có-form dưới đây, nằm cùng tệp vì không màn nào khác dùng tới.
- *
- * **Mọi lớp ở đây mang tiền tố `shin-status`**, và đó là luật cứng của tệp này chứ không phải sở thích đặt tên. Lý do: tệp
- * màn được `include` ở khu script, tức **sau** toàn bộ `client/style/`, nên một lớp trùng tên ở đây lặng lẽ thắng lớp cùng
- * tên bên kia. Đúng chuyện đã xảy ra: `.shin-box` của tệp này đè `.shin-box` của `components.html`, và mọi dòng lịch sử trên
- * màn xem mọc một cái khung 1 pixel với lề trong 12 pixel — mất 26 pixel bề ngang ở một sidebar chỉ rộng 300, đủ để tên sản
- * phẩm bị cắt thành "Ống t…". Không có thông báo lỗi nào, vì trùng tên lớp CSS là hợp lệ với trình duyệt.
- *
- * Phép kiểm `tests/cases/cssClass.js` giờ quét trùng tên lớp giữa các tệp client, nên lỗi này không tái diễn trong im lặng.
- */
-.shin-status { display: flex; flex-direction: column; gap: var(--shin-gap-2); }
-.shin-status h2 { margin: 0; font-size: var(--shin-text-lg); }
-.shin-status p { margin: 0; color: var(--shin-text-soft); }
-
-.shin-status-box { padding: var(--shin-gap-3); border-radius: var(--shin-radius); border: 1px solid var(--shin-border); }
-.shin-status-warn { border-color: #f0c36d; background: var(--shin-warn-soft); color: var(--shin-warn); }
-.shin-status-error { border-color: #f2a9a7; background: var(--shin-error-soft); color: var(--shin-error); }
-
-.shin-status-table { width: 100%; border-collapse: collapse; font-size: var(--shin-text-sm); }
-.shin-status-table th, .shin-status-table td { padding: var(--shin-gap-1) var(--shin-gap-2); border-bottom: 1px solid var(--shin-border); text-align: right; }
-.shin-status-table th:first-child, .shin-status-table td:first-child { text-align: left; }
-.shin-status-table th { color: var(--shin-text-faint); font-weight: 600; }
-.shin-status-table td.shin-status-num { font-family: var(--shin-font-mono); }
-
-.shin-status-kv { display: grid; grid-template-columns: auto 1fr; gap: var(--shin-gap-1) var(--shin-gap-3); font-size: var(--shin-text-sm); }
-.shin-status-kv dt { color: var(--shin-text-faint); }
-.shin-status-kv dd { margin: 0; font-family: var(--shin-font-mono); }
-</style>
-
 <script>
-/**
- * Ba màn hình không cần bộ render: màn chặn vì vượt trần ngân sách ô, màn báo lượt nạp vỡ, và bản tóm tắt lượt nạp.
- *
- * Màn chặn là **`[RÀNG BUỘC CỨNG]`** của tài liệu 05 Phần 6, và nó ở lại vĩnh viễn: vượt trần thì chặn hoàn toàn, và màn
- * cảnh báo phải kèm bảng chỉ mặt thủ phạm — tên sheet, số hàng, số cột, số ô, sắp giảm dần. Lý do có bảng đó: nguyên nhân
- * vượt trần thường gặp nhất không phải nhiều dữ liệu mà là một sheet còn nguyên hàng và cột trống thừa. Không có bảng thì
- * người dùng biết mình vượt trần mà không biết phải làm gì, và cái màn chặn trở thành một cánh cửa khóa không có chìa.
- *
- * Bản tóm tắt lượt nạp thì tạm: chặng này chưa có bộ render nên nó là thứ duy nhất vẽ ra được, và nó tồn tại để trả lời
- * đúng câu hỏi nghiệm thu của chặng — nạp được bao nhiêu bản ghi, mất bao nhiêu mili giây, có cảnh báo gì. Chặng dựng form
- * thay nó bằng màn `view` thật.
- *
- * Cả ba màn đều tự thoát ký tự cho mọi thứ đọc từ sheet. Tên sheet do người dùng đặt, và một tên sheet có dấu `<` mà đem
- * ghép thẳng vào HTML thì màn báo lỗi hỏng đúng lúc đang cần nó nhất.
+/*
+ * Điều phối dữ liệu cho các màn trạng thái. Tệp này không ghép HTML và không chạm DOM;
+ * bố cục/nhãn nằm ở client/schema/status/*.html, còn renderScreen là cổng duy nhất ra sidebar.
  */
 
-/** Thoát bốn ký tự có nghĩa trong HTML. Mọi giá trị đọc từ sheet đi qua đây trước khi ghép vào chuỗi HTML. */
-function statusEscape(value) {
-  return String(value === null || value === undefined ? '' : value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-/** Chèn dấu chấm phân cách hàng nghìn theo cách viết số của tiếng Việt, để `500000` đọc thành `500.000`. */
 function statusNumber(value) {
   return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 }
 
-/** Đặt nội dung cho một vùng của khung. Vùng nào truyền `null` thì bị ẩn. */
-function statusSetRegion(id, html) {
-  var node = document.getElementById(id);
-  if (!node) { return; }
-
-  if (html === null) { node.hidden = true; return; }
-  node.hidden = false;
-  node.innerHTML = html;
+function statusMs(ms) {
+  if (ms === null || ms === undefined) { return 'không đo được'; }
+  return statusNumber(ms) + ' ms (' + (ms / 1000).toFixed(1) + ' s)';
 }
 
-/** Bảng chỉ mặt thủ phạm: một hàng một sheet, số ô giảm dần. Máy chủ đã sắp sẵn theo thứ tự đó nên ở đây không sắp lại lần nữa. */
-function statusBudgetTable(sheets) {
-  var rows = sheets.map(function (s) {
-    return '<tr><td>' + statusEscape(s.name) + '</td>'
-      + '<td class="shin-status-num">' + statusNumber(s.rows) + '</td>'
-      + '<td class="shin-status-num">' + statusNumber(s.columns) + '</td>'
-      + '<td class="shin-status-num">' + statusNumber(s.cells) + '</td></tr>';
-  });
-
-  return '<table class="shin-status-table"><thead><tr><th>Sheet</th><th>Hàng</th><th>Cột</th><th>Số ô</th></tr></thead>'
-    + '<tbody>' + rows.join('') + '</tbody></table>';
+function statusRender(name, model) {
+  if (typeof STATUS_SCHEMA === 'undefined' || !STATUS_SCHEMA[name]) {
+    throw new Error('Thiếu schema màn trạng thái "' + name + '".');
+  }
+  return renderScreen(STATUS_SCHEMA[name](model || {}), { records: {} });
 }
 
-/**
- * Màn chặn vì vượt trần ngân sách ô. Chiếm trọn khung và không cho thao tác gì khác.
- *
- * Nó nói ba điều theo đúng thứ tự người đọc cần: vượt bao nhiêu, sheet nào gây ra, và làm gì để hết. Việc phải làm gần như
- * luôn là xóa hàng và cột trống thừa của sheet đứng đầu bảng, nên câu hướng dẫn nói thẳng ra điều đó chứ không nói chung chung.
- */
+function statusBudgetModel(budget) {
+  return {
+    total: statusNumber(budget.total),
+    ceiling: statusNumber(budget.ceiling),
+    sheets: (budget.sheets || []).map(function (sheet) {
+      return {
+        name: sheet.name,
+        rows: statusNumber(sheet.rows),
+        columns: statusNumber(sheet.columns),
+        cells: statusNumber(sheet.cells)
+      };
+    })
+  };
+}
+
 function statusBudgetBlocked(budget) {
-  var html = '<div class="shin-status">'
-    + '<h2>Tệp đã vượt trần ngân sách ô</h2>'
-    + '<div class="shin-status-box shin-status-warn">Tệp đang có <b>' + statusNumber(budget.total) + '</b> ô lưới, trần đang đặt là <b>'
-    + statusNumber(budget.ceiling) + '</b> ô. ShinCRM dừng ở đây và <b>không đọc một ô dữ liệu nào</b>, vì chạy tiếp trên một tệp quá nặng thì mọi thao tác đều có thể hết thời gian giữa đường.</div>'
-    + '<p>Trần tính bằng tổng số ô lưới của mọi sheet, <b>kể cả ô rỗng</b>. Vì vậy nguyên nhân thường gặp nhất không phải nhiều dữ liệu, mà là một sheet còn nguyên hàng và cột trống thừa.</p>'
-    + statusBudgetTable(budget.sheets)
-    + '<p>Việc cần làm: mở sheet đứng đầu bảng, xóa hẳn các hàng và cột trống ở cuối lưới (chọn hàng, bấm phải, Xóa hàng — không phải xóa nội dung), rồi mở lại bảng làm việc. Muốn nới trần thì sửa tham số <code>CELL_BUDGET</code> ở sheet <code>Config</code>.</p>'
-    + '</div>';
-
-  statusSetRegion('sidebar-info', 'Đang chặn — chưa nạp dữ liệu');
-  statusSetRegion('sidebar-body', html);
-  statusSetRegion('sidebar-footer', null);
+  return statusRender('budgetBlocked', statusBudgetModel(budget));
 }
 
-/**
- * Màn báo lượt nạp vỡ. Hiện nguyên văn thông báo lỗi, vì người đọc là chủ dự án và chuỗi đó là thứ đem đi đối chiếu với sheet `Log`.
- *
- * Nút Thử lại gọi thẳng hành động `reloadAll` chứ không có đường gọi riêng, nên nó đi qua bộ phát click như mọi nút khác. Nhờ `data-busy` mà nó tự tắt và đổi chữ trong lúc chạy — bấm liên tục vào một nút đang gọi máy chủ là cách chắc chắn để có ba lượt nạp chồng nhau. Thất bại lần nữa thì `sidebarBoot` vẽ lại chính màn này, tức một nút mới còn nguyên, nên không cần đường bật lại riêng.
- *
- * Vẫn giữ câu nói về việc đóng mở lại bảng làm việc, vì có loại vỡ mà nút này không cứu được: chính đường truyền tới máy chủ gãy.
- */
 function statusLoadError(message) {
-  var html = '<div class="shin-status">'
-    + '<h2>Không nạp được dữ liệu</h2>'
-    + '<div class="shin-status-box shin-status-error">' + statusEscape(message) + '</div>'
-    + '<div><button type="button" class="shin-button shin-primary" data-action="reloadAll" data-busy="Đang thử lại…">Thử lại</button></div>'
-    + '<p>Lượt chạy này đã ghi một dòng vào sheet <code>Log</code> kèm vết gọi. Bấm Thử lại, hoặc đóng rồi mở lại bảng làm việc nếu bấm mấy lần vẫn vỡ.</p>'
-    + '</div>';
-
-  statusSetRegion('sidebar-info', 'Nạp thất bại');
-  statusSetRegion('sidebar-body', html);
-  statusSetRegion('sidebar-footer', null);
+  return statusRender('loadError', { message: message });
 }
 
 /** Một dòng ngắn trong khối thông tin chung, dùng để báo tiến độ nạp nền. */
@@ -130,74 +49,37 @@ function statusInfoLine(text) {
     sidebarBusyMessage(text);
     return;
   }
-  statusSetRegion('sidebar-info', statusEscape(text));
+  if (typeof renderRegionText === 'function') { renderRegionText('info', text); }
 }
 
-/** Danh sách khóa–giá trị của bản tóm tắt. Nhận mảng cặp để thứ tự hiện đúng thứ tự viết. */
-function statusKeyValues(pairs) {
-  var items = pairs.map(function (pair) {
-    return '<dt>' + statusEscape(pair[0]) + '</dt><dd>' + statusEscape(pair[1]) + '</dd>';
-  });
-
-  return '<dl class="shin-status-kv">' + items.join('') + '</dl>';
-}
-
-/** Một con số mili giây kèm cách đọc theo giây, vì "45.145 ms" thì phải nhẩm mới biết là 45 giây. `null` nghĩa là không đo được. */
-function statusMs(ms) {
-  if (ms === null || ms === undefined) { return 'không đo được'; }
-  return statusNumber(ms) + ' ms (' + (ms / 1000).toFixed(1) + ' s)';
-}
-
-/**
- * Bản tóm tắt lượt nạp — màn tạm của chặng này, thay bằng màn `view` khi có bộ render.
- *
- * Nó in cả danh sách phép tự kiểm **bị bỏ qua** vì thiếu đầu vào. Bỏ qua trong im lặng là cách chắc chắn nhất để có một bộ
- * kiểm xanh mà chẳng kiểm gì, nên chỗ nào bỏ qua thì chỗ đó phải đọc được bằng mắt.
- *
- * Khối thời gian tách làm bốn phần vì một con số duy nhất không trả lời được câu "chậm ở đâu". Thời gian tính toán của máy
- * chủ và tiền đi đường của `google.script.run` là hai thứ sửa bằng hai cách khác nhau, nên chúng phải hiện thành hai dòng.
- */
-function statusLoadSummary(info) {
+function statusSummaryModel(info) {
   var core = info.core;
   var timing = info.timing || {};
   var categoryValues = Object.keys(Store.categories).reduce(function (sum, code) { return sum + Store.categories[code].length; }, 0);
-
-  var parts = ['<div class="shin-status">', '<h2>Nạp xong</h2>'];
-
-  parts.push(statusKeyValues([
-    ['Khách', statusNumber(Object.keys(Store.customers).length) + ' bản ghi'],
-    ['Giao dịch', statusNumber(info.activityRecords) + ' bản ghi / ' + info.activityChunks + ' gói'],
-    ['Khách có giao dịch', statusNumber(Object.keys(Store.activitiesByCustomer).length)],
-    ['Chỉ mục tìm kiếm', statusNumber(Store.searchIndex.length) + ' phần tử'],
-    ['Danh mục', Object.keys(Store.categories).length + ' cột / ' + statusNumber(categoryValues) + ' giá trị'],
-    ['Config', 'tham số ' + Object.keys(Store.config.params).length + ' · ngầm định ' + Object.keys(Store.config.defaults).length + ' · bộ đếm ' + Object.keys(Store.config.counters).length + ' · sắp xếp ' + Store.config.sort.length + ' cấp'],
-    ['Ngân sách ô', statusNumber(core.budget.total) + ' / ' + statusNumber(core.budget.ceiling) + ' (' + core.budget.ceilingSource + ')'],
-    ['Trạng thái giao dịch', Store.activityState]
-  ]));
-
-  parts.push('<div class="shin-status-box"><b>Thời gian lượt nạp này</b>'
-    + statusKeyValues([
+  return {
+    summary: [
+      ['Khách', statusNumber(Object.keys(Store.customers).length) + ' bản ghi'],
+      ['Giao dịch', statusNumber(info.activityRecords) + ' bản ghi / ' + info.activityChunks + ' gói'],
+      ['Khách có giao dịch', statusNumber(Object.keys(Store.activitiesByCustomer).length)],
+      ['Chỉ mục tìm kiếm', statusNumber(Store.searchIndex.length) + ' phần tử'],
+      ['Danh mục', Object.keys(Store.categories).length + ' cột / ' + statusNumber(categoryValues) + ' giá trị'],
+      ['Config', 'tham số ' + Object.keys(Store.config.params).length + ' · ngầm định ' + Object.keys(Store.config.defaults).length + ' · bộ đếm ' + Object.keys(Store.config.counters).length + ' · sắp xếp ' + Store.config.sort.length + ' cấp'],
+      ['Ngân sách ô', statusNumber(core.budget.total) + ' / ' + statusNumber(core.budget.ceiling) + ' (' + core.budget.ceilingSource + ')'],
+      ['Trạng thái giao dịch', Store.activityState]
+    ],
+    timing: [
       ['Tổng — thứ bạn chờ', statusMs(timing.msTong)],
       ['Tới khung hình đầu tiên', statusMs(timing.msKhungHinhDau)],
       ['Máy chủ tính toán', statusMs(timing.msMayChu) + ' — cộng cả ' + (timing.soVong || 0) + ' vòng'],
       ['Tiền đi đường', statusMs(timing.msDiDuong) + ' — mỗi vòng ' + statusMs(timing.msDiDuongMoiVong)],
       ['Trình duyệt bung và vẽ', statusMs(timing.msKhachLamViec)]
-    ])
-    + '<p>Ba phần dưới cộng lại bằng phần trên. Năm con số này luôn hiện ở đây, nhưng chỉ <b>được ghi</b> vào sheet <code>Log</code> ở dòng <code>sidebarBoot</code> khi tham số <code>LOG_TRACE</code> ở sheet <code>Config</code> đang bật; ngày thường thì tắt để log không đầy dòng báo mọi thứ bình thường.</p>'
-    + '</div>');
+    ],
+    warnings: (info.warnings || []).map(String),
+    skipped: (info.skipped || []).map(String)
+  };
+}
 
-  if (info.warnings && info.warnings.length) {
-    parts.push('<div class="shin-status-box shin-status-warn"><b>Cảnh báo</b><br>' + info.warnings.map(statusEscape).join('<br>') + '</div>');
-  }
-
-  if (info.skipped && info.skipped.length) {
-    parts.push('<div class="shin-status-box"><b>Phép tự kiểm schema bị bỏ qua vì thiếu đầu vào</b><br>' + info.skipped.map(statusEscape).join('<br>') + '</div>');
-  }
-
-  parts.push('<p>Đây là màn tạm của chặng nạp dữ liệu. Chặng sau thay nó bằng màn xem khách.</p>', '</div>');
-
-  statusSetRegion('sidebar-info', 'Sẵn sàng');
-  statusSetRegion('sidebar-body', parts.join(''));
-  statusSetRegion('sidebar-footer', null);
+function statusLoadSummary(info) {
+  return statusRender('loadSummary', statusSummaryModel(info));
 }
 </script>

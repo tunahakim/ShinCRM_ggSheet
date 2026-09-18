@@ -1,0 +1,55 @@
+<script>
+/* Schema tĩnh của màn Chạy đồng bộ. Trạng thái sống và pipeline do controller điền vào Block. */
+var FBM_SYNC_RUN_SCHEMA = {
+  id: 'run',
+  label: 'Chạy đồng bộ',
+  rootId: 'fbm-sync-run-root',
+  rootClass: 'shin-section',
+  regions: { action: 'fbm-sync-run-action-region', details: 'fbm-sync-run-details-region', pipeline: 'fbm-sync-pipeline-region', liveStatus: 'fbm-sync-live-status-region' },
+  classes: { actionRow: 'shin-single-action-row', primary: 'shin-primary', muted: 'shin-muted', pipeline: 'shin-sync-pipeline', pipelineTitle: 'shin-sync-pipeline-title', pipelineStep: 'shin-sync-pipeline-step', marker: 'shin-sync-pipeline-marker', stepLabel: 'shin-sync-pipeline-label', stateDone: 'is-done', stateCurrent: 'is-current', stateError: 'is-error' },
+  mode: { id: 'fbm-sync-mode', label: 'Loại đồng bộ', kind: 'menu' },
+  cardTitle: 'Chọn loại đồng bộ',
+  action: {
+    ids: { start: 'fbm-sync-start', cancel: 'fbm-sync-cancel', approve: 'fbm-sync-approve' },
+    start: 'Bắt đầu đồng bộ',
+    cancel: 'Dừng đồng bộ',
+    approve: 'Chấp thuận và chạy',
+    loading: 'Đang tải trạng thái...'
+  },
+  awaitingMessage: 'Phiên có nhiều thay đổi; hãy xem kết quả rồi chấp thuận để tiếp tục.',
+  phaseTitles: { done: 'Pipeline đã hoàn tất', error: 'Pipeline dừng vì lỗi', paused: 'Pipeline đã tạm dừng', running: 'Pipeline đang chạy' },
+  layout: {
+    actionRow: function (action) { return Row({ className: FBM_SYNC_RUN_SCHEMA.classes.actionRow, elements: [action] }); },
+    pipeline: function (id, title, steps) { return Box({ id: id || null, className: FBM_SYNC_RUN_SCHEMA.classes.pipeline, elements: [Text({ className: FBM_SYNC_RUN_SCHEMA.classes.pipelineTitle, text: title })].concat(steps || []) }); },
+    pipelineStep: function (className, marker, label) { return Box({ className: className, elements: [Text({ className: FBM_SYNC_RUN_SCHEMA.classes.marker, text: marker }), Text({ className: FBM_SYNC_RUN_SCHEMA.classes.stepLabel, text: label })] }); },
+    liveStatus: function (id, elements) { return Box({ id: id, elements: elements }); },
+    screen: function (slots) {
+      return Box({ id: FBM_SYNC_RUN_SCHEMA.rootId, className: FBM_SYNC_RUN_SCHEMA.rootClass, elements: [
+        Card({ title: FBM_SYNC_RUN_SCHEMA.cardTitle, elements: [slots.mode, Box({ id: FBM_SYNC_RUN_SCHEMA.regions.action, elements: [slots.action] })] }),
+        Stack({ id: FBM_SYNC_RUN_SCHEMA.regions.details, elements: slots.details })
+      ] });
+    }
+  },
+  pipeline: {
+    title: 'Pipeline đang chạy',
+    marker: { done: '✓', error: '!', current: '●', pending: '○' },
+    pull: [
+      { id: 'session', label: 'Kiểm tra phiên FBM' },
+      { id: 'category', label: 'Category' },
+      { id: 'customer', label: 'Đọc Customer' },
+      { id: 'activity', label: 'Đọc Activity' },
+      { id: 'reconcile', label: 'Đối soát' }
+    ],
+    push: [
+      { id: 'session', label: 'Kiểm tra phiên FBM' },
+      { id: 'category', label: 'Category' },
+      { id: 'record', label: 'Kiểm tra bản ghi' },
+      { id: 'form', label: 'Mở form FBM' },
+      { id: 'write', label: 'Ghi FBM' },
+      { id: 'verify', label: 'Đọc xác nhận' },
+      { id: 'baseline', label: 'Cập nhật baseline' }
+    ],
+    sheet: { id: 'sheet', label: 'Cập nhật Sheet' }
+  }
+};
+</script>

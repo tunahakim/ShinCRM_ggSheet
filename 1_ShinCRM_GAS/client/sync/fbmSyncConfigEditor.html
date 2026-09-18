@@ -63,15 +63,18 @@ function fbmSyncConfigDraft(key, fallback) {
   return state.editing && state.draft !== null && state.draft !== undefined ? state.draft : fallback;
 }
 
-function fbmSyncConfigActionId(key, action) { return 'fbm-sync-config-' + key + '-' + action; }
+function fbmSyncConfigSchema() { return FBM_SYNC_UI_SCHEMA.config; }
+function fbmSyncConfigActionId(key, action) { return fbmSyncConfigSchema().actionIdPrefix + key + '-' + action; }
 
 function fbmSyncConfigTitleActions(key) {
   var state = fbmSyncConfigState(key), editing = fbmSyncConfigIsEditing(key), actions = [];
   if (editing && (state.editing || (key === 'login' && FBM_SYNC_CLIENT.loginEditMode === true))) {
-    actions.push({ id: fbmSyncConfigActionId(key, 'cancel'), icon: 'close', className: 'shin-config-cancel', tooltip: 'Hủy thay đổi', data: { 'sync-config-action': 'cancel', 'sync-config-key': key } });
-    actions.push({ id: fbmSyncConfigActionId(key, 'save'), icon: 'check', className: 'shin-config-save', tooltip: 'Lưu thay đổi', data: { 'sync-config-action': 'save', 'sync-config-key': key } });
+    var schema = fbmSyncConfigSchema();
+    actions.push({ id: fbmSyncConfigActionId(key, schema.actionCancel), icon: 'close', className: schema.cancelClass, tooltip: schema.tooltips.cancel, data: { 'sync-config-action': schema.actionCancel, 'sync-config-key': key } });
+    actions.push({ id: fbmSyncConfigActionId(key, schema.actionSave), icon: 'check', className: schema.saveClass, tooltip: schema.tooltips.save, data: { 'sync-config-action': schema.actionSave, 'sync-config-key': key } });
   } else if (!editing) {
-    actions.push({ id: fbmSyncConfigActionId(key, 'edit'), icon: 'pencil', className: 'shin-config-edit-icon', tooltip: 'Sửa cấu hình', data: { 'sync-config-action': 'edit', 'sync-config-key': key } });
+    var editSchema = fbmSyncConfigSchema();
+    actions.push({ id: fbmSyncConfigActionId(key, editSchema.actionEdit), icon: 'pencil', className: editSchema.editIconClass, tooltip: editSchema.tooltips.edit, data: { 'sync-config-action': editSchema.actionEdit, 'sync-config-key': key } });
   }
   return actions;
 }
@@ -79,18 +82,18 @@ function fbmSyncConfigTitleActions(key) {
 function fbmSyncConfigButton(key, labels, options) {
   var opts = options || {}, editing = fbmSyncConfigIsEditing(key);
   var label = editing ? labels.save : labels.edit;
-  var className = editing && opts.primary !== false ? 'shin-primary' : (!editing ? 'shin-config-edit' : (opts.className || ''));
+  var schema = fbmSyncConfigSchema(), className = editing && opts.primary !== false ? schema.primaryClass : (!editing ? schema.editClass : (opts.className || ''));
   return Button({
     id: opts.id || fbmSyncConfigActionId(key, 'button'),
     label: label,
     className: className,
     disabled: !!opts.disabled || (!!FBM_SYNC_CLIENT.running && key !== 'relay'),
-    data: { 'sync-config-action': editing ? 'save' : 'edit', 'sync-config-key': key }
+    data: { 'sync-config-action': editing ? schema.actionSave : schema.actionEdit, 'sync-config-key': key }
   });
 }
 
 function fbmSyncConfigButtonRow(key, labels, options) {
-  return Row({ className: 'shin-single-action-row', elements: [fbmSyncConfigButton(key, labels, options)] });
+  return Row({ className: fbmSyncConfigSchema().actionRowClass, elements: [fbmSyncConfigButton(key, labels, options)] });
 }
 
 function fbmSyncConfigBeginEdit(key, draft) {
@@ -112,7 +115,7 @@ function fbmSyncConfigFinishEdit(key) {
   if (key === 'login') {
     FBM_SYNC_CLIENT.loginEditMode = false;
     FBM_SYNC_CLIENT.loginDraft = { username: '' };
-    var password = document.getElementById('fbm-login-password');
+    var password = document.getElementById(FBM_SYNC_ACCOUNT_SCHEMA.login.password.id);
     if (password) { password.value = ''; }
   }
   return true;
@@ -187,19 +190,19 @@ function fbmSyncConfigStartEdit(key) {
     draft = { username: String(login.public && login.public.usernameHint || '') };
     FBM_SYNC_CLIENT.loginDraft = { username: draft.username };
     FBM_SYNC_CLIENT.loginEditMode = true;
-    var password = document.getElementById('fbm-login-password');
+    var password = document.getElementById(FBM_SYNC_ACCOUNT_SCHEMA.login.password.id);
     if (password) { password.value = ''; }
   } else if (key === 'module') {
-    draft = { approvalThreshold: settings.approvalThreshold === undefined ? 10 : settings.approvalThreshold, enabled: fbmSyncConfigMasterEnabled() };
+    draft = { approvalThreshold: settings.approvalThreshold === undefined ? FBM_SYNC_SETTINGS_SCHEMA.defaults.approvalThreshold : settings.approvalThreshold, enabled: fbmSyncConfigMasterEnabled() };
   } else if (key === 'relay') {
     draft = {};
   } else if (key === 'extension') {
-    draft = fbmSyncConfigClone(settings.extension || { pollMinutes: 5, runOnStartup: true });
+    draft = fbmSyncConfigClone(settings.extension || { pollMinutes: FBM_SYNC_SETTINGS_SCHEMA.defaults.pollMinutes, runOnStartup: true });
   } else if (key === 'background') {
     draft = fbmSyncConfigClone(settings.background || {});
     draft.enabled = !(FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.lastStatus.backgroundEnabled === false);
   } else if (key === 'loginPolicy') {
-    draft = { enabled: login.enabled !== false, autoOpenTab: login.autoOpenTab === true, retryEnabled: login.retryEnabled !== false, retryMinutes: login.retryMinutes || 30 };
+    draft = { enabled: login.enabled !== false, autoOpenTab: login.autoOpenTab === true, retryEnabled: login.retryEnabled !== false, retryMinutes: login.retryMinutes || FBM_SYNC_SETTINGS_SCHEMA.defaults.retryMinutes };
   } else { return false; }
   return fbmSyncConfigBeginEdit(key, draft);
 }

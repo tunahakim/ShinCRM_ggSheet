@@ -533,7 +533,7 @@ function renderScreen(man, boiCanh) {
 
   var html = {
     header: renderNodes(man.header, nen),
-    info: man.infoBar ? renderSlot('infoBarContent', nen) : '',
+    info: man.infoBar ? renderSlot(man.infoSlot || 'infoBarContent', nen) : '',
     body: renderNodes(man.body, nen),
     footer: renderNodes(man.footer, nen)
   };
@@ -601,6 +601,13 @@ function renderTargetState(id, state) {
       }
     });
   }
+  return el;
+}
+
+/** Đổi chữ của một vùng khung cố định mà không cho màn hình tự chạm DOM. */
+function renderRegionText(ten, text) {
+  var el = renderRegionElement(ten);
+  el.textContent = String(text === null || text === undefined ? '' : text);
   return el;
 }
 

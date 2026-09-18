@@ -1,0 +1,24 @@
+<script>
+var UI_SCHEMA_CUSTOMER_FORM = {
+  entity: 'customer',
+  title: { add: 'Thêm Khách Hàng', edit: 'Sửa Khách Hàng' },
+  infoBar: false,
+  header: UI_FORM_HEADER,
+  body: [{ group: '', rows: [
+    ['companyName'],
+    ['id', 'taxNumber'],
+    ['contactPerson', 'phone'],
+    ['product', 'customerGroup'],
+    [{ field: 'note', control: 'textarea' }],
+    ['email'],
+    ['website'],
+    [{ field: 'address', width: '65%' }, 'province'],
+    [{ field: 'parentCompanyName', control: 'customerPicker' }],
+    [{ field: 'searchAliases', control: 'textarea' }],
+    ['bidClosingDate', 'verifyStatus'],
+    ['leadSource', 'allowFbmPush'],
+    ['createdAt']
+  ] }],
+  footer: [{ button: 'LƯU DỮ LIỆU', action: 'saveForm', className: 'shin-primary shin-save-wide' }]
+};
+</script>

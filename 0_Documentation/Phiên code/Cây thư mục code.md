@@ -114,7 +114,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   ├── Sidebar.html              Trang gốc của sidebar: nhúng mọi tệp client theo đúng thứ tự rồi gọi lượt nạp đầu tiên.
 │   ├── sync\\                    Màn hình đồng bộ FBM độc lập, tách khỏi các màn nghiệp vụ.
 │   │   ├── fbmSync.html           Điều phối phiên và bridge request thô.
-│   │   ├── fbmSyncUiSchema.html   Khai tĩnh bốn màn hình nội bộ và các nhãn loại đồng bộ.
+│   │   ├── fbmSyncUiSchema.html   Compatibility bridge cho renderer Sync cũ; schema màn hình nằm ở client\schema\sync\.
 │   │   ├── fbmSyncConfigEditor.html Điều phối trạng thái xem/sửa, bản nháp và action dùng chung cho card cấu hình FBM.
 │   │   ├── fbmSyncShell.html      Shell header, menu nội bộ, công tắc tổng và kiểu bố cục module.
 │   │   ├── screens\\account.html   Màn Tài khoản FBM, nhận diện, auto-login và relay.
@@ -125,7 +125,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── fbmSyncSettingsScreen.html Block nhận diện tài khoản được màn Tài khoản FBM tái sử dụng; không còn checkbox ghi.
 │   │   └── fbmSyncAuditScreen.html Block preview, audit và chi tiết lỗi/xung đột.
 │   ├── link\                     Cầu nối ô đang chọn: ưu tiên postMessage an toàn từ Extension, khi vắng mới mở đường dò máy chủ có nhịp và luật dừng.
-│   │   ├── sheetLink.html        Tai nghe CRM_CONTEXT từ Extension: kiểm tra customerId trực tiếp rồi bật followSelection. Bắt tay có tiếng đáp, đèn sống chết suy từ ACK chứ không suy từ im lặng.
+│   │   ├── sheetLink.html        Tai nghe CRM_CONTEXT thô từ Extension: đối chiếu reads với Store rồi bật followSelection. Bắt tay có tiếng đáp, đèn sống chết suy từ ACK chứ không suy từ im lặng.
 │   │   └── selectionPoll.html    Máy trạng thái dự phòng khi vắng Extension: nhịp dò 2/6 giây, bốn luật dừng, đèn sét bốn trạng thái và băng cảnh báo sau ba giây ân hạn.
 │   ├── ram\                      Kho dữ liệu trong RAM của sidebar, và đường nhận dữ liệu từ máy chủ.
 │   │   ├── store.html            Kho runtime cùng mười đường tra duy nhất được chạm vào nó. Không đường nào nhận tham số chế độ xem.
@@ -135,14 +135,35 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   └── bootstrap.html        Trình tự khởi động: nạp lõi, hiện màn hình, rồi nạp giao dịch theo gói ở phía sau.
 │   ├── schema\
 │   │   ├── schemaAccess.html     Cửa tra bảng khai bên client. Hỏi tên trường không có thì ném lỗi kèm gợi ý tên gần đúng, không trả về undefined.
-│   │   ├── uiSchema.html         Khai bố cục bốn màn bằng dữ liệu: thanh trên, thân, chân trang, và những trường nào nằm ở đâu. Không một dòng logic — mọi câu hỏi "màn này trông thế nào" trả lời được bằng cách đọc tệp này.
+│   │   ├── uiSchema.html         Registry ghép các schema màn lõi; không chứa bố cục cụ thể của màn nào.
+│   │   ├── screens\formHeader.html Mảnh schema header dùng chung cho ba form.
+│   │   ├── screens\view.html     Schema riêng của màn xem khách.
+│   │   ├── screens\customerForm.html Schema riêng của màn thêm/sửa khách.
+│   │   ├── screens\activityForm.html Schema riêng của màn thêm/sửa giao dịch.
+│   │   ├── screens\noteForm.html Schema riêng của màn ghi chú khách.
+│   │   ├── status\common.html    Primitive schema và slot thông tin cho các màn trạng thái.
+│   │   ├── status\budgetBlocked.html Schema màn chặn vì vượt trần ngân sách ô.
+│   │   ├── status\loadError.html Schema màn lỗi nạp dữ liệu.
+│   │   ├── status\loadSummary.html Schema màn tóm tắt lượt nạp.
+│   │   ├── sync\screens\           Registry và schema riêng cho bốn màn hình FBM: run, account, results, settings.
+│   │   │   ├── run.html             Schema màn Chạy đồng bộ.
+│   │   │   ├── account.html         Schema màn Tài khoản FBM.
+│   │   │   ├── results.html         Schema màn Kết quả & xử lý.
+│   │   │   ├── settings.html        Schema màn Cài đặt phiên.
+│   │   │   └── index.html           Registry màn hình, shell và schema action dùng chung.
+│   │   ├── sync\results\           Schema dùng chung cho status, issues, audit và conflict của kết quả FBM.
+│   │   │   ├── status.html           Schema trạng thái phiên.
+│   │   │   ├── issues.html           Schema preflight, issue và retry.
+│   │   │   ├── audit.html            Schema preview và nghiệm thu.
+│   │   │   └── conflict.html         Schema xử lý xung đột.
 │   │   ├── fieldLogic.html       Sáu hàm ngầm định của tài liệu 03 Phần 6: giá trị điền sẵn khi mở form trống, và giá trị mang theo từ giao dịch trước.
 │   │   └── schemaCheck.html      Phép tự kiểm bảng khai cột, chạy được ở cả hai phía.
 │   ├── style\                    Hình thức DÙNG CHUNG cho mọi màn. Chỉ có <style>, không khai tên JavaScript nào.
 │   │   ├── tokens.html           Khối biến CSS: màu, cỡ chữ, khoảng cách. Đổi diện mạo thì vào đây.
 │   │   ├── frame.html            Bố cục năm vùng: thanh trên, vạch tiến trình, khối thông tin, thân cuộn, chân trang.
 │   │   ├── components.html       Hình thức của thứ engine dựng ra: hàng, card, trường, ô nhập, chip, nút. Hai mặc định của spatialConfig nói ở đây một lần thay vì dán vào từng thẻ.
-│   │   └── slots.html            Hình thức riêng của ba vùng do SLOTS sinh ra: dòng lịch sử, hộp gợi ý tìm khách, khối thông tin chung. Tách khỏi components.html vì các lớp này chỉ một tệp sinh ra.
+│   │   ├── slots.html            Hình thức riêng của ba vùng do SLOTS sinh ra: dòng lịch sử, hộp gợi ý tìm khách, khối thông tin chung. Tách khỏi components.html vì các lớp này chỉ một tệp sinh ra.
+│   │   └── status.html           Hình thức của các màn trạng thái; schema chỉ chọn lớp, tệp này chỉ giữ CSS.
 │   ├── ui\                       Bộ máy giao diện màn nào cũng gọi được. spatialConfig giữ toàn quyền về khoảng cách.
 │   │   ├── progress.html         Vạch tiến trình cho mọi lượt gọi máy chủ. Đếm số lời gọi đang chờ, không giữ một cờ bật tắt.
 │   │   ├── icons.html            Bộ glyph SVG nội tuyến, tra theo tên. Tên lạ thì ném lỗi chứ không vẽ nút trống.
@@ -159,7 +180,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── choiceMenu.html       Control menu chọn ít mục: trigger là button, popup dùng chung và không chọn/bôi đen chữ như combo nhập liệu.
 │   │   └── inputs.html           Hai nếp gõ chung của mọi form: Enter nhảy sang ô kế tiếp và dừng ở nút Lưu, và dán một khối nhiều dòng thành nhiều ô rồi nhuộm vàng chỗ máy tự điền.
 │   ├── screen\                   Một tệp một màn người dùng nhìn thấy. Màn được mang theo style riêng, vì style đó chết cùng màn đó.
-│   │   ├── statusScreen.html     Ba màn không có form: tóm tắt lượt nạp, lỗi nạp, và màn chặn khi vượt trần ngân sách ô.
+│   │   ├── statusScreen.html     Điều phối dữ liệu cho ba màn trạng thái; không ghép HTML và không chạm DOM.
 │   │   ├── viewScreen.html       Màn xem khách — màn mặc định. Biết KHI NÀO vẽ lại cái gì, không biết vẽ ra sao. Chỗ duy nhất nối ScreenState.currentCustomerId với Store.
 │   │   └── formScreen.html       Ba màn form dùng chung một trình tự: mở sửa, mở thêm mới, mở lồng, đóng từng lớp. Suy tiêu đề rồi chèn vào vùng header, và tính id ô nhập đầu tiên cho bên đặt con trỏ.
 │   ├── save\                     Đường ghi và đường xóa phía client. Tách khỏi ui\ vì đây là ba tệp duy nhất biết hình dạng câu trả lời của hai cửa máy chủ.
@@ -256,6 +277,7 @@ tests\
     ├── blockKeys.js              Nửa còn lại của phép kiểm khóa Block: vai nhận khóa nào thì phần lá phải vẽ ra khóa đó. Đây là ca `{icon, label}` chỉ ra glyph, và ca `Card({label})` khai đúng cú pháp mà chữ không bao giờ hiện.
     ├── uiSchema.js               Bảng khai bố cục giữ hợp đồng với ba tệp khác: mọi đường dẫn trường tra được trong DATA_SCHEMA, mọi tên hàm có trong ACTIONS, và bốn màn dựng qua screenBuild không nổ.
     ├── cssClass.js               Tên lớp CSS cũng ở chung một vùng tên như biến JS: trùng tên thì tệp nạp sau lặng lẽ thắng. Đây là ca `.shin-box` của tệp màn đè `.shin-box` dùng chung, ăn mất 26 pixel bề ngang.
+    ├── screenSchemaAudit.js      Audit mỗi màn có schema đúng folder, schema không chứa DOM/HTML và Sidebar include đúng thứ tự trước controller.
     ├── renderEngine.js           Cây Block thành HTML: ký tự đặc biệt trong tên công ty, spatialConfig khai rồi mà bố cục không đổi, data-field thiếu đường dẫn, luật chỉ-đọc bị mở khóa; kèm phép quét mã nguồn chốt đúng ba tệp được gán innerHTML.
     ├── slots.js                  Dòng lịch sử giữ đúng thứ tự thời gian kể cả khi có bản ghi đã xóa chen giữa, và KHÔNG dòng nào mang field — engine tra một bản ghi cho một thực thể.
     ├── viewScreen.js             Bốn cái hỏng-trong-im-lặng của màn xem: mã card lệch giữa hai tệp, đổi khách mà chỉ vẽ lại một vùng, đổi khách lúc đang gõ dở, và tệp màn tự chạm DOM.
@@ -313,7 +335,7 @@ Bốn dòng `client/...js` lệch vì một lý do khác hẳn các dòng trên,
 
 Ba dòng cuối lệch vì thư mục: tài liệu 04 gom cả CSS vào `client/ui/`, còn code chia `client/style/` cho hình thức dùng chung, `client/ui/` cho bộ máy giao diện, `client/screen/` cho từng màn. Chủ dự án chốt cách chia này 05/09/2026 và tài liệu 04 Phần 10 đã sửa theo. Một `styles.html` của tài liệu thành ba tệp theo việc: `tokens.html` giữ biến, `frame.html` giữ năm vùng khung, `components.html` giữ các lớp mà renderEngine sinh ra.
 
-Biểu mẫu **không** có thư mục riêng: bộ máy dựng form là `client\ui\` (uiBuilder, renderEngine, actions, slots), bảng khai form là `client\schema\` (uiSchema, fieldLogic), và mỗi màn có form là một tệp trong `client\screen\`.
+Biểu mẫu **không** có thư mục riêng: bộ máy dựng form là `client\ui\` (uiBuilder, renderEngine, actions, slots), bảng khai form là `client\schema\screens\` (mỗi màn một tệp, `uiSchema` chỉ là registry), và điều phối vòng đời form là `client\screen\formScreen.html`.
 ## Shared popup UI
 
 The client UI uses `client/ui/popupList.html` as the shared popup primitive. `search.html`, `combo.html`, and `customerPicker.html` remain separate controllers so search, dropdown, and customer-picker behavior do not get coupled.

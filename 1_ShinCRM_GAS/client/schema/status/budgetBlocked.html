@@ -1,0 +1,14 @@
+<script>
+STATUS_SCHEMA.budgetBlocked = function (model) {
+  return statusSchemaRoot('Đang chặn — chưa nạp dữ liệu', [
+    Text({ className: 'shin-status-title', text: 'Tệp đã vượt trần ngân sách ô' }),
+    statusSchemaBox([
+      Text({ className: 'shin-status-strong', text: 'Tệp đang có ' + model.total + ' ô lưới, trần đang đặt là ' + model.ceiling + ' ô.' }),
+      statusSchemaText('ShinCRM dừng ở đây và không đọc một ô dữ liệu nào, vì chạy tiếp trên một tệp quá nặng thì mọi thao tác đều có thể hết thời gian giữa đường.')
+    ], 'shin-status-box shin-status-warn'),
+    statusSchemaText('Trần tính bằng tổng số ô lưới của mọi sheet, kể cả ô rỗng. Vì vậy nguyên nhân thường gặp nhất không phải nhiều dữ liệu, mà là một sheet còn nguyên hàng và cột trống thừa.'),
+    statusSchemaTable(model.sheets),
+    statusSchemaText('Việc cần làm: mở sheet đứng đầu bảng, xóa hẳn các hàng và cột trống ở cuối lưới (chọn hàng, bấm phải, Xóa hàng — không phải xóa nội dung), rồi mở lại bảng làm việc. Muốn nới trần thì sửa tham số CELL_BUDGET ở sheet Config.')
+  ]);
+};
+</script>

@@ -1,0 +1,53 @@
+<script>
+/* Schema tĩnh của màn Tài khoản FBM: cấu hình nhận diện, đăng nhập và tài khoản. */
+var FBM_SYNC_ACCOUNT_SCHEMA = {
+  id: 'account',
+  label: 'Tài khoản FBM',
+  rootId: 'fbm-sync-account-root',
+  rootClass: 'shin-section',
+  regions: {
+    identityCard: 'fbm-sync-identity-card-region', identitySummary: 'fbm-sync-identity-summary-region', identityForm: 'fbm-sync-identity-form-region', identityActions: 'fbm-sync-identity-actions-region', identityActionStatus: 'fbm-sync-identity-action-status-region', identityNotice: 'fbm-sync-identity-notice-region', identityResult: 'fbm-sync-identity-result-region',
+    loginCard: 'fbm-sync-login-card-region', loginConfigured: 'fbm-sync-login-configured-region', loginActions: 'fbm-sync-login-actions-region', loginNotice: 'fbm-sync-login-notice-region', loginPolicy: 'fbm-sync-login-policy-navigation-region', accountSettings: 'fbm-sync-account-settings-region', accountNotice: 'fbm-sync-account-settings-notice-region'
+  },
+  classes: { primary: 'shin-primary', edit: 'shin-config-edit', invalid: 'is-invalid', muted: 'shin-muted', singleAction: 'shin-single-action-row', actionStack: 'shin-action-stack', actionStatus: 'shin-action-status', pass: 'shin-pass-row', error: 'shin-error-message', preview: 'shin-preview-row' },
+  layout: {
+    actionRow: function (elements) { return Row({ elements: elements }); },
+    singleAction: function (element) { return Row({ className: FBM_SYNC_ACCOUNT_SCHEMA.classes.singleAction, elements: [element] }); },
+    fieldHelp: function (field, control, help) { return [control, Text({ className: FBM_SYNC_ACCOUNT_SCHEMA.classes.muted, text: help })]; },
+    loginCard: function (slots) {
+      return Card({ title: FBM_SYNC_ACCOUNT_SCHEMA.cards.login, titleActions: slots.titleActions, elements: [Box({ id: FBM_SYNC_ACCOUNT_SCHEMA.regions.loginConfigured, elements: slots.configured }), slots.username, slots.password, Box({ id: FBM_SYNC_ACCOUNT_SCHEMA.regions.loginActions, elements: slots.actions }), Box({ id: FBM_SYNC_ACCOUNT_SCHEMA.regions.loginNotice, elements: slots.notice }), Box({ id: FBM_SYNC_ACCOUNT_SCHEMA.regions.loginPolicy, elements: slots.policy })] });
+    },
+    accountCard: function (elements, titleActions) { return Card({ title: FBM_SYNC_ACCOUNT_SCHEMA.cards.account, titleActions: titleActions, elements: elements }); },
+    accountSettings: function (slots) { return [Box({ id: FBM_SYNC_ACCOUNT_SCHEMA.regions.accountNotice, elements: slots.notice })].concat(slots.fields, [slots.actions]); },
+    screen: function (slots) { return Box({ id: FBM_SYNC_ACCOUNT_SCHEMA.rootId, className: FBM_SYNC_ACCOUNT_SCHEMA.rootClass, elements: [Box({ id: FBM_SYNC_ACCOUNT_SCHEMA.regions.identityCard, elements: [slots.identity] }), Box({ id: FBM_SYNC_ACCOUNT_SCHEMA.regions.loginCard, elements: [slots.login] }), Box({ id: FBM_SYNC_ACCOUNT_SCHEMA.regions.accountSettings, elements: [slots.accountSettings] })] }); }
+  },
+  cards: { login: 'Đăng nhập tự động', account: 'Cấu hình tài khoản FBM', identity: 'Liên kết tài khoản' },
+  login: {
+    username: { label: 'Username FBM', id: 'fbm-login-username', placeholder: 'Nhập username FBM', inputType: 'text' },
+    password: { label: 'Mật khẩu FBM', id: 'fbm-login-password', placeholder: 'Nhập mật khẩu FBM', inputType: 'password', maskedValue: '****' },
+    test: 'Đăng nhập thử', save: 'Lưu thông tin', policy: 'Cài đặt đăng nhập tự động', edit: 'Sửa thông tin',
+    actionIds: { test: 'fbm-sync-login-test', save: 'fbm-sync-login-save', policy: 'fbm-sync-open-login-policy' }
+  },
+  account: {
+    fields: [
+      { key: 'customerPrefix', label: 'Tiền tố mã khách FBM', id: 'fbm-account-customer-prefix', placeholder: 'Ví dụ: ALT', inputType: 'text', help: 'Tiền tố của ma_kh do FBM tự sinh khi tạo Customer mới; chỉ kiểm tra mã FBM trả về, không phải mã CUS- của ShinCRM.' },
+      { key: 'customerCodeLength', label: 'Độ dài mã khách FBM', id: 'fbm-account-customer-length', placeholder: 'Ví dụ: 8', inputType: 'number', help: 'Độ dài đầy đủ của ma_kh FBM tự sinh. Nhập cùng tiền tố; để trống cả hai nếu không tạo Customer mới trên FBM.' },
+      { key: 'activitySince', label: 'Mốc ngày Activity trên FBM', id: 'fbm-account-activity-since', placeholder: 'YYYY-MM-DD', inputType: 'text', help: 'Khi quét FBM, Activity có ngày làm việc (end_date) trước mốc này sẽ bị bỏ qua và không bị coi là bản ghi mất. Để trống để quét toàn bộ Activity.' }
+    ],
+    edit: 'Sửa cấu hình FBM', save: 'Lưu cấu hình FBM', saveId: 'fbm-sync-save-account-settings'
+  },
+  identity: {
+    fields: [
+      { key: 'spreadsheet', draftKey: 'spreadsheetId', label: 'Spreadsheet ID', placeholder: 'ID của file ShinCRM' },
+      { key: 'user', draftKey: 'userId', label: 'Mã số user FBM', placeholder: 'Mã số nội bộ của user' },
+      { key: 'username', draftKey: 'username', label: 'Tên đăng nhập FBM', placeholder: 'Tên dùng để đăng nhập' },
+      { key: 'account', draftKey: 'accountName', label: 'Tên đầy đủ', placeholder: 'Tên người dùng trên FBM' }
+    ],
+    actionIds: { check: 'fbm-sync-check-identity', probe: 'fbm-sync-probe-identity', save: 'fbm-sync-save-identity' },
+    actionLabels: { edit: 'Sửa thông tin', save: 'Lưu thông tin', check: 'Kiểm tra liên kết', checking: 'Đang kiểm tra liên kết...', probe: 'Tự động điền - Kiểm tra', probing: 'Đang tự động điền và kiểm tra...' },
+    messages: { bound: 'Đã kết nối với tài khoản FBM: ', unbound: 'Chưa kết nối với tài khoản FBM nào', probeSuccess: 'Đã lấy thông tin thành công và điền vào form.', probeError: 'Không lấy được thông tin tài khoản FBM.', checkDone: 'Kiểm tra liên kết hoàn tất', matched: 'Customer hợp lệ: ', missing: ' · không tìm thấy: ', missingId: 'Chưa thấy FBM ID ', separator: ' · ', actionCheck: 'Đang đối chiếu các Customer đã có FBM_ID với file hiện tại.', actionProbe: 'Đang đọc thông tin tài khoản từ tab FBM đang mở.' },
+    fieldPrefix: 'fbm-identity-', inputType: 'text', cardClass: 'shin-action-stack',
+    layout: function (slots) { return Card({ title: FBM_SYNC_ACCOUNT_SCHEMA.cards.identity, titleActions: slots.titleActions, elements: [Box({ id: FBM_SYNC_ACCOUNT_SCHEMA.regions.identitySummary, elements: slots.summary }), Box({ id: FBM_SYNC_ACCOUNT_SCHEMA.regions.identityForm, elements: slots.form }), Stack({ id: FBM_SYNC_ACCOUNT_SCHEMA.regions.identityActions, className: FBM_SYNC_ACCOUNT_SCHEMA.identity.cardClass, elements: slots.actions }), Box({ id: FBM_SYNC_ACCOUNT_SCHEMA.regions.identityActionStatus, elements: slots.actionStatus }), Box({ id: FBM_SYNC_ACCOUNT_SCHEMA.regions.identityNotice, elements: slots.notice }), Box({ id: FBM_SYNC_ACCOUNT_SCHEMA.regions.identityResult, elements: slots.result })] }); }
+  }
+};
+</script>

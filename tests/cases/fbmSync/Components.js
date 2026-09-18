@@ -3,6 +3,11 @@ const { docTep } = require('../../lib/load-gas');
 const { section, check } = require('../../lib/assert');
 
 const SYNC_FILES = [
+  'client/schema/sync/screens/run.html',
+  'client/schema/sync/screens/account.html',
+  'client/schema/sync/screens/results.html',
+  'client/schema/sync/screens/settings.html',
+  'client/schema/sync/screens/index.html',
   'client/sync/fbmSyncUiSchema.html',
   'client/sync/fbmSyncConfigEditor.html',
   'client/sync/fbmSyncShell.html',
@@ -126,8 +131,8 @@ function chay(so) {
     [true, true, true]);
   check(so, 'các lựa chọn cố định dùng menu trigger, không dùng nhầm combo input',
     [engine.indexOf("kind === 'menu'") >= 0,
-      source['client/sync/screens/run.html'].indexOf("id: 'fbm-sync-mode', kind: 'menu'") >= 0,
-      source['client/sync/screens/settings.html'].indexOf("id: 'fbm-sync-background-direction', kind: 'menu'") >= 0,
+      source['client/schema/sync/screens/run.html'].indexOf("id: 'fbm-sync-mode', label:") >= 0 && source['client/schema/sync/screens/run.html'].indexOf("kind: 'menu'") >= 0,
+      source['client/schema/sync/screens/settings.html'].indexOf("directionId: 'fbm-sync-background-direction'") >= 0,
       source['client/sync/fbmSyncAuditScreen.html'].indexOf("controlId, kind: 'menu'") >= 0],
     [true, true, true, true]);
   check(so, 'mọi màn Sync dùng field độc lập chung cho control ngoài DATA_SCHEMA',
@@ -138,9 +143,9 @@ function chay(so) {
     [true, true, true, true]);
   check(so, 'các hàng thao tác dùng Row chung để tự chia đều',
     [source['client/sync/screens/account.html'].indexOf('Row([') >= 0,
-      source['client/sync/fbmSyncSettingsScreen.html'].indexOf("className: 'shin-action-stack'") >= 0,
+      source['client/schema/sync/screens/account.html'].indexOf("cardClass: 'shin-action-stack'") >= 0,
       source['client/sync/fbmSyncAuditScreen.html'].indexOf('Row([') >= 0,
-      source['client/sync/screens/results.html'].indexOf('Row({ className: \'shin-pagination\'') >= 0],
+      source['client/schema/sync/screens/results.html'].indexOf('FBM_SYNC_RESULTS_SCHEMA.classes.pagination') >= 0],
     [true, true, true, true]);
   check(so, 'card cấu hình dùng hàng action và style sửa chung, không tự đặt kích thước từng màn',
     [source['client/sync/fbmSyncConfigEditor.html'].indexOf('function fbmSyncConfigButtonRow(') >= 0,
@@ -192,7 +197,7 @@ function chay(so) {
   check(so, 'các vùng cột chung không phụ thuộc flex gap để tạo khoảng cách',
     [frame.indexOf('#sidebar-body > * + * { margin-top: var(--shin-gap-2); }') >= 0,
       styles.indexOf('.shin-section > * + * { margin-top: var(--shin-gap-2); }') >= 0,
-      source['client/sync/fbmSyncShell.html'].indexOf("className: 'shin-popup-item'") >= 0],
+      source['client/sync/fbmSyncShell.html'].indexOf('schema.navItemClass') >= 0],
     [true, true, true]);
   check(so, 'các vùng cuộn giữ trục hai mép bằng gutter ổn định, section không cộng lề lệch',
     [frame.indexOf('.shin-scroll-region {') >= 0 && frame.indexOf('overflow-y: auto;') >= 0 && frame.indexOf('scrollbar-gutter: stable both-edges;') >= 0,

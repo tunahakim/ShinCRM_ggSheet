@@ -79,7 +79,9 @@ function chay(so) {
   let DATA;
   try {
     DATA = dungHop().hop.DATA_SCHEMA;
-    hop = napClient(taoHopCat(), 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html', 'client/schema/uiSchema.html');
+    hop = napClient(taoHopCat(), 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html',
+      'client/schema/screens/formHeader.html', 'client/schema/screens/view.html', 'client/schema/screens/customerForm.html',
+      'client/schema/screens/activityForm.html', 'client/schema/screens/noteForm.html', 'client/schema/uiSchema.html');
   } catch (err) {
     return ghiLoiNap(so, 'nạp uiSchema cùng bộ dựng Block', err);
   }

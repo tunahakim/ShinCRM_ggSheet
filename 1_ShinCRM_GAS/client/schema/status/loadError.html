@@ -1,0 +1,10 @@
+<script>
+STATUS_SCHEMA.loadError = function (model) {
+  return statusSchemaRoot('Nạp thất bại', [
+    Text({ className: 'shin-status-title', text: 'Không nạp được dữ liệu' }),
+    statusSchemaBox([statusSchemaText(model.message)], 'shin-status-box shin-status-error'),
+    Row({ elements: [Button({ label: 'Thử lại', action: 'reloadAll', data: { busy: 'Đang thử lại…' }, className: 'shin-primary' })] }),
+    statusSchemaText('Lượt chạy này đã ghi một dòng vào sheet Log kèm vết gọi. Bấm Thử lại, hoặc đóng rồi mở lại bảng làm việc nếu bấm mấy lần vẫn vỡ.')
+  ]);
+};
+</script>

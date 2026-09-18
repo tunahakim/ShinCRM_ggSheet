@@ -1,22 +1,16 @@
 <script>
-var FBM_SYNC_RESULT_TABS = [
-  { id: 'summary', label: 'Tổng quan', description: 'Tóm tắt kết quả phiên' },
-  { id: 'conflict', label: 'Xung đột', description: 'Các thay đổi chờ xử lý' },
-  { id: 'errors', label: 'Lỗi', description: 'Bản ghi cần xem lại' },
-  { id: 'log', label: 'Log', description: 'Nhật ký hoạt động' },
-  { id: 'audit', label: 'Nghiệm thu', description: 'Kết quả kiểm tra dữ liệu thử nghiệm', multiline: true }
-];
+var FBM_SYNC_RESULT_TABS = FBM_SYNC_RESULTS_SCHEMA.tabs;
 function fbmSyncResultsTabBlocks() {
   var activeTab = FBM_SYNC_CLIENT.resultsTab || 'summary';
   return FBM_SYNC_RESULT_TABS.map(function (tab) {
     var active = tab.id === activeTab;
-    return Button({ label: tab.label, className: 'shin-sync-tab-trigger' + (active ? ' is-active' : ''), data: { 'sync-results-tab': tab.id } });
+    return Button({ label: tab.label, className: FBM_SYNC_RESULTS_SCHEMA.tabClass + (active ? ' ' + FBM_SYNC_RESULTS_SCHEMA.classes.active : ''), data: { 'sync-results-tab': tab.id } });
   });
 }
 function fbmSyncResultsTabDescriptionBlock() {
   var activeTab = FBM_SYNC_CLIENT.resultsTab || 'summary';
   var tab = FBM_SYNC_RESULT_TABS.filter(function (item) { return item.id === activeTab; })[0] || FBM_SYNC_RESULT_TABS[0];
-  return Box({ id: 'fbm-sync-results-tab-description-region', className: 'shin-sync-tab-description-region' + (tab.multiline ? ' is-multiline' : ''), elements: [Text({ className: 'shin-sync-tab-description', text: tab.description })] });
+  return FBM_SYNC_RESULTS_SCHEMA.layout.description(tab);
 }
 function fbmSyncResultsBodyBlocks(status) {
   var tab = FBM_SYNC_CLIENT.resultsTab || 'summary';
@@ -28,7 +22,7 @@ function fbmSyncResultsBodyBlocks(status) {
 }
 function fbmSyncRenderResults(panel, status) {
   status = status || {};
-  return fbmSyncAppendBox(panel, 'shin-section', 'fbm-sync-results-root', [Box({ className: 'shin-sync-tab-row', id: 'fbm-sync-results-tabs-region', elements: fbmSyncResultsTabBlocks() }), fbmSyncResultsTabDescriptionBlock(), Stack({ id: 'fbm-sync-results-body-region', elements: fbmSyncResultsBodyBlocks(status) })]);
+  return fbmSyncAppendBox(panel, FBM_SYNC_RESULTS_SCHEMA.rootClass, FBM_SYNC_RESULTS_SCHEMA.rootId, FBM_SYNC_RESULTS_SCHEMA.layout.screen({ tabs: fbmSyncResultsTabBlocks(), description: fbmSyncResultsTabDescriptionBlock(), body: fbmSyncResultsBodyBlocks(status) }).elements);
 }
 function fbmSyncResultsSignature(status) {
   var metadata = status && status.metadata || {}, tab = FBM_SYNC_CLIENT.resultsTab || 'summary';
@@ -41,19 +35,20 @@ function fbmSyncResultsSignature(status) {
 function fbmSyncResultPageBlocks(status, kind) {
   var metadata = status.metadata || {}, rows = [];
   if (kind === 'errors') {
-    Object.keys(metadata.pushFailureDetails || {}).forEach(function (key) { var detail = metadata.pushFailureDetails[key] || {}; rows.push(key + ' · ' + String(detail.reason || 'Lỗi đẩy')); });
-    (metadata.preflightIssues || []).forEach(function (item) { rows.push('Preflight · ' + String(item.message || item.code || '')); });
-    (metadata.categoryBlocks || []).forEach(function (item) { rows.push('Category · ' + String(item.reason || item.code || '')); });
-  } else { rows = (metadata.traceTail || []).map(function (item) { return String(item.stage || item.action || 'Log') + ' · ' + String(item.operation || item.reason || ''); }); }
-  var page = Number(FBM_SYNC_CLIENT.resultPages && FBM_SYNC_CLIENT.resultPages[kind] || 0), size = 20, totalPages = Math.max(1, Math.ceil(rows.length / size)), current = Math.min(page, totalPages - 1);
-  return [Card({ title: kind === 'errors' ? 'Lỗi phiên' : 'Log phiên', elements: [Text({ className: 'shin-muted', text: 'Trang ' + (current + 1) + '/' + totalPages + ' · tối đa 20 dòng mỗi trang.' })].concat(rows.slice(current * size, current * size + size).map(function (row) { return Text({ className: 'shin-preview-row', text: row }); }), [Row({ className: 'shin-pagination', elements: [Button({ label: 'Trang trước', disabled: page <= 0, data: { 'sync-page': kind + ':-1' } }), Button({ label: 'Trang sau', disabled: page >= totalPages - 1, data: { 'sync-page': kind + ':1' } })] })]) })];
+    Object.keys(metadata.pushFailureDetails || {}).forEach(function (key) { var detail = metadata.pushFailureDetails[key] || {}; rows.push(key + FBM_SYNC_RESULTS_SCHEMA.rows.separator + String(detail.reason || FBM_SYNC_RESULTS_SCHEMA.rows.failureFallback)); });
+    (metadata.preflightIssues || []).forEach(function (item) { rows.push(FBM_SYNC_RESULTS_SCHEMA.rows.preflightPrefix + String(item.message || item.code || '')); });
+    (metadata.categoryBlocks || []).forEach(function (item) { rows.push(FBM_SYNC_RESULTS_SCHEMA.rows.categoryPrefix + String(item.reason || item.code || '')); });
+  } else { rows = (metadata.traceTail || []).map(function (item) { return String(item.stage || item.action || FBM_SYNC_RESULTS_SCHEMA.rows.logFallback) + FBM_SYNC_RESULTS_SCHEMA.rows.separator + String(item.operation || item.reason || ''); }); }
+  var page = Number(FBM_SYNC_CLIENT.resultPages && FBM_SYNC_CLIENT.resultPages[kind] || 0), size = FBM_SYNC_RESULTS_SCHEMA.pageSize, totalPages = Math.max(1, Math.ceil(rows.length / size)), current = Math.min(page, totalPages - 1);
+  var pageText = FBM_SYNC_RESULTS_SCHEMA.pageText.replace('{current}', current + 1).replace('{total}', totalPages).replace('{size}', size);
+  return [FBM_SYNC_RESULTS_SCHEMA.layout.page({ title: FBM_SYNC_RESULTS_SCHEMA.pageTitles[kind], pageText: pageText, rows: rows.slice(current * size, current * size + size).map(function (row) { return Text({ className: FBM_SYNC_RESULTS_SCHEMA.classes.row, text: row }); }), pagination: FBM_SYNC_RESULTS_SCHEMA.layout.pagination({ kind: kind, previousDisabled: page <= 0, nextDisabled: page >= totalPages - 1 }) })];
 }
 function fbmSyncPatchResults(panel, status) {
   if (!panel || !RENDER_INDEX.nodes['fbm-sync-results-root']) { return false; }
   if (FBM_SYNC_CLIENT.resultsTab === 'conflict' && fbmSyncInteractiveControlIsEditing(panel)) { FBM_SYNC_CLIENT.deferredPaint = status; return true; }
-  fbmSyncRenderTarget('fbm-sync-results-tabs-region', fbmSyncResultsTabBlocks());
-  fbmSyncRenderTarget('fbm-sync-results-tab-description-region', fbmSyncResultsTabDescriptionBlock().elements);
-  fbmSyncRenderTarget('fbm-sync-results-body-region', fbmSyncResultsBodyBlocks(status));
+  fbmSyncRenderTarget(FBM_SYNC_RESULTS_SCHEMA.regions.tabs, fbmSyncResultsTabBlocks());
+  fbmSyncRenderTarget(FBM_SYNC_RESULTS_SCHEMA.regions.description, fbmSyncResultsTabDescriptionBlock().elements);
+  fbmSyncRenderTarget(FBM_SYNC_RESULTS_SCHEMA.regions.body, fbmSyncResultsBodyBlocks(status));
   return true;
 }
 </script>

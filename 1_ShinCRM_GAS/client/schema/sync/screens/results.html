@@ -1,0 +1,29 @@
+<script>
+/* Schema tĩnh của màn Kết quả & xử lý. Nội dung từng tab là DTO động. */
+var FBM_SYNC_RESULTS_SCHEMA = {
+  id: 'results',
+  label: 'Kết quả & xử lý',
+  rootId: 'fbm-sync-results-root',
+  rootClass: 'shin-section',
+  regions: { tabs: 'fbm-sync-results-tabs-region', description: 'fbm-sync-results-tab-description-region', body: 'fbm-sync-results-body-region' },
+  classes: { tabDescription: 'shin-sync-tab-description-region', tabText: 'shin-sync-tab-description', muted: 'shin-muted', row: 'shin-preview-row', pagination: 'shin-pagination', active: 'is-active', multiline: 'is-multiline' },
+  layout: { description: function (tab) { return Box({ id: FBM_SYNC_RESULTS_SCHEMA.regions.description, className: FBM_SYNC_RESULTS_SCHEMA.classes.tabDescription + (tab.multiline ? ' ' + FBM_SYNC_RESULTS_SCHEMA.classes.multiline : ''), elements: [Text({ className: FBM_SYNC_RESULTS_SCHEMA.classes.tabText, text: tab.description })] }); }, screen: function (slots) { return Box({ id: FBM_SYNC_RESULTS_SCHEMA.rootId, className: FBM_SYNC_RESULTS_SCHEMA.rootClass, elements: [Box({ className: FBM_SYNC_RESULTS_SCHEMA.tabRowClass, id: FBM_SYNC_RESULTS_SCHEMA.regions.tabs, elements: slots.tabs }), slots.description, Stack({ id: FBM_SYNC_RESULTS_SCHEMA.regions.body, elements: slots.body })] }); }, page: function (slots) { return Card({ title: slots.title, elements: [Text({ className: FBM_SYNC_RESULTS_SCHEMA.classes.muted, text: slots.pageText })].concat(slots.rows, [Row({ className: FBM_SYNC_RESULTS_SCHEMA.classes.pagination, elements: slots.pagination })]) }); }, pagination: function (slots) { return [Button({ label: FBM_SYNC_RESULTS_SCHEMA.pagination.previous, disabled: slots.previousDisabled, data: { 'sync-page': slots.kind + ':-1' } }), Button({ label: FBM_SYNC_RESULTS_SCHEMA.pagination.next, disabled: slots.nextDisabled, data: { 'sync-page': slots.kind + ':1' } })]; } },
+  tabs: [
+    { id: 'summary', label: 'Tổng quan', description: 'Tóm tắt kết quả phiên' },
+    { id: 'conflict', label: 'Xung đột', description: 'Các thay đổi chờ xử lý' },
+    { id: 'errors', label: 'Lỗi', description: 'Bản ghi cần xem lại' },
+    { id: 'log', label: 'Log', description: 'Nhật ký hoạt động' },
+    { id: 'audit', label: 'Nghiệm thu', description: 'Kết quả kiểm tra dữ liệu thử nghiệm', multiline: true }
+  ],
+  tabRowClass: 'shin-sync-tab-row',
+  tabClass: 'shin-sync-tab-trigger',
+  descriptionId: 'fbm-sync-results-tab-description-region',
+  bodyId: 'fbm-sync-results-body-region',
+  pageSize: 20,
+  pageText: 'Trang {current}/{total} · tối đa {size} dòng mỗi trang.',
+  pageTitles: { errors: 'Lỗi phiên', log: 'Log phiên' },
+  paginationClass: 'shin-pagination',
+  pagination: { previous: 'Trang trước', next: 'Trang sau' },
+  rows: { separator: ' · ', failureFallback: 'Lỗi đẩy', preflightPrefix: 'Preflight · ', categoryPrefix: 'Category · ', logFallback: 'Log' }
+};
+</script>

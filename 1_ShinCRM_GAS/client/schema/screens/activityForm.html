@@ -1,0 +1,18 @@
+<script>
+var UI_SCHEMA_ACTIVITY_FORM = {
+  entity: 'activity',
+  title: { add: 'Thêm Giao Dịch', edit: 'Sửa Giao Dịch' },
+  infoBar: true,
+  header: UI_FORM_HEADER,
+  body: [{ group: '', rows: [
+    ['customerId'],
+    ['workDate', 'product'],
+    ['taskType', 'priority'],
+    [{ field: 'content', control: 'textarea' }],
+    ['contractValue', 'dueAt'],
+    ['allowFbmPush', 'enteredBy'],
+    [{ field: 'customer.note', control: 'textarea', readonly: true, action: 'openNoteForm' }]
+  ] }],
+  footer: [{ button: 'LƯU GIAO DỊCH', action: 'saveForm', className: 'shin-primary shin-save-wide' }]
+};
+</script>
