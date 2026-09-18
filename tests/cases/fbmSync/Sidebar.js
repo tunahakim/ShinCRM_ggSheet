@@ -203,7 +203,7 @@ async function chay(so) {
   hop.fbmSyncPaintHeaderState({ phase: 'checking_session', masterEnabled: false });
   check(so, 'icon Đồng bộ không quay khi công tắc tổng tắt', [statusButton.className.indexOf('shin-sync-status-running') >= 0, statusButton.getAttribute('aria-label')], [false, 'Đồng bộ FBM']);
 
-  hop.FBM_SYNC_CLIENT.identityStatus = { status: 'REBIND_REQUIRED', binding: { spreadsheetId: 'sheet', userId: 'u', accountName: 'A' } };
+  hop.FBM_SYNC_CLIENT.identityStatus = { status: 'REBIND_REQUIRED', binding: { spreadsheetId: 'sheet', userId: 'u', username: 'anhlt', accountName: 'A' } };
   hop.FBM_SYNC_CLIENT.loginStatus = { configured: false, enabled: true };
   render(hop, content, hop.fbmSyncRenderAccount, idle);
   const identityCard = content.querySelector('#fbm-sync-identity-card-region');
@@ -215,7 +215,7 @@ async function chay(so) {
   check(so, 'Account dùng ô mật khẩu và khóa khi chưa bấm sửa', [dom.document.getElementById('fbm-login-password').type, dom.document.getElementById('fbm-login-password').value, dom.document.getElementById('fbm-login-password').disabled], ['password', '', true]);
   const appendAccount = hop.fbmSyncAppendBox;
   let accountBlocks;
-  hop.FBM_SYNC_CLIENT.loginStatus = { configured: true, public: { usernameHint: 'anhlt' } };
+  hop.FBM_SYNC_CLIENT.loginStatus = { configured: true, public: { usernameHint: 'an***' } };
   hop.FBM_SYNC_CLIENT.loginEditMode = false;
   hop.fbmSyncAppendBox = (_panel, _className, _id, elements) => { accountBlocks = elements; return content; };
   hop.fbmSyncRenderAccount(content, idle);

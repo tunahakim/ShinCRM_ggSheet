@@ -159,6 +159,7 @@ async function chay(so) {
   const syncAuditSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'client', 'sync', 'fbmSyncAuditScreen.html'), 'utf8');
   const syncConflictSchema = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'client', 'schema', 'sync', 'results', 'conflict.html'), 'utf8');
   check(so, 'Extension ma hoa credential bang AES-GCM truoc khi luu', workerSource.indexOf('crypto.subtle.generateKey') >= 0 && workerSource.indexOf('CREDENTIAL_VAULT_PREFIX') >= 0 && workerSource.indexOf('FBM_ENCRYPT_CREDENTIALS') >= 0, true);
+  check(so, 'metadata username hien day du thay vi che an***', workerSource.indexOf('usernameHint: username') >= 0 && workerSource.indexOf("username.slice(0, 2) + '***'") < 0, true);
   check(so, 'bridge credential chi tra envelope va khong tra password ve Sidebar', fs.readFileSync(BRIDGE_FILE, 'utf8').indexOf('CRM_FBM_CREDENTIALS_RESULT') >= 0 && syncSource.indexOf('fbmSyncEncryptCredentials') >= 0 && syncSource.indexOf('fbm-login-password') >= 0, true);
   check(so, 'executor login dung force false va khong logout phien hop le', executorSource.indexOf("force: false") >= 0 && executorSource.indexOf("credentials: 'include'") >= 0 && executorSource.indexOf("meta.kind === 'login'") >= 0, true);
   check(so, 'executor login tai Login.aspx de lay salt truoc khi goi Login', executorSource.indexOf("fetch(base.slice(0, -1)") >= 0 && executorSource.indexOf('login_page_loaded') >= 0 && executorSource.indexOf('Không đọc được mã phiên đăng nhập từ trang FBM.') >= 0, true);

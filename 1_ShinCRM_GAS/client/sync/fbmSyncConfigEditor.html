@@ -162,6 +162,12 @@ function fbmSyncConfigControlDisabled(key, path) {
   return false;
 }
 
+/** Hiển thị username đầy đủ từ liên kết đã xác nhận; cấu hình cũ có thể chỉ lưu usernameHint đã che. */
+function fbmSyncLoginUsernameValue(login) {
+  var value = login || FBM_SYNC_CLIENT.loginStatus || {}, binding = FBM_SYNC_CLIENT.identityStatus && FBM_SYNC_CLIENT.identityStatus.binding || {};
+  return String(binding.username || value.public && value.public.usernameHint || '');
+}
+
 function fbmSyncConfigSetDraftValue(key, path, value) {
   var state = fbmSyncConfigState(key);
   if (!state.editing) { return false; }
@@ -187,7 +193,7 @@ function fbmSyncConfigStartEdit(key) {
     draft = { customerPrefix: String(account.customerPrefix || ''), customerCodeLength: String(account.customerCodeLength || ''), activitySince: String(account.activitySince || '') };
     FBM_SYNC_CLIENT.accountSettingsDraft = fbmSyncConfigClone(draft);
   } else if (key === 'login') {
-    draft = { username: String(login.public && login.public.usernameHint || '') };
+    draft = { username: fbmSyncLoginUsernameValue(login) };
     FBM_SYNC_CLIENT.loginDraft = { username: draft.username };
     FBM_SYNC_CLIENT.loginEditMode = true;
     var password = document.getElementById(FBM_SYNC_ACCOUNT_SCHEMA.login.password.id);

@@ -186,7 +186,7 @@ function credentialRef() { var bytes = new Uint8Array(12); crypto.getRandomValue
 function storageGet(key) { return new Promise(function (resolve) { chrome.storage.local.get([key], function (result) { resolve(result && result[key] || null); }); }); }
 function storageSet(value) { return new Promise(function (resolve, reject) { chrome.storage.local.set(value, function () { var error = chrome.runtime.lastError; if (error) { reject(new Error(error.message)); } else { resolve(true); } }); }); }
 
-/** Mã hóa ngay trên Extension; GAS chỉ nhận ciphertext và metadata đã che. */
+/** Mã hóa ngay trên Extension; GAS chỉ nhận ciphertext và metadata cần cho việc hiển thị. */
 function saveCredentialEnvelope(input) {
   var value = input || {}, ref = String(value.credentialRef || '').trim() || credentialRef(), username = String(value.username || ''), password = String(value.password || '');
   if (!username || !password) { return Promise.resolve({ ok: false, code: 'LOGIN_FIELDS_REQUIRED', error: 'Cần nhập username và mật khẩu FBM.' }); }
@@ -197,7 +197,7 @@ function saveCredentialEnvelope(input) {
       return crypto.subtle.exportKey('jwk', key).then(function (jwk) {
         var envelope = { version: 1, alg: 'AES-GCM', iv: bytesToBase64(iv), ciphertext: bytesToBase64(new Uint8Array(cipher)) };
         return storageSet({ [CREDENTIAL_VAULT_PREFIX + ref]: { ref: ref, key: jwk, envelope: envelope } }).then(function () {
-          return { ok: true, credentialRef: ref, envelope: envelope, public: { usernameHint: username.length > 2 ? username.slice(0, 2) + '***' : '***', database: String(value.database || ''), unit: String(value.unit || ''), language: String(value.language || 'v') } };
+          return { ok: true, credentialRef: ref, envelope: envelope, public: { usernameHint: username, database: String(value.database || ''), unit: String(value.unit || ''), language: String(value.language || 'v') } };
         });
       });
     });

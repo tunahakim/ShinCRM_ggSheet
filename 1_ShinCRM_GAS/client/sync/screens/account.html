@@ -30,7 +30,7 @@ function fbmSyncLoginCard() {
   var login = FBM_SYNC_CLIENT.loginStatus || {}, configured = login.configured === true, editing = fbmSyncConfigIsEditing('login');
   return FBM_SYNC_ACCOUNT_UI.layout.loginCard({
     titleActions: fbmSyncConfigTitleActions('login'), configured: fbmSyncLoginConfiguredBlocks(),
-    username: StandaloneField(FBM_SYNC_ACCOUNT_SCHEMA.login.username.label, { id: FBM_SYNC_ACCOUNT_SCHEMA.login.username.id, kind: 'input', inputType: FBM_SYNC_ACCOUNT_SCHEMA.login.username.inputType, value: editing ? FBM_SYNC_CLIENT.loginDraft.username : String(login.public && login.public.usernameHint || ''), placeholder: FBM_SYNC_ACCOUNT_SCHEMA.login.username.placeholder, ariaLabel: FBM_SYNC_ACCOUNT_SCHEMA.login.username.label, disabled: !editing }),
+    username: StandaloneField(FBM_SYNC_ACCOUNT_SCHEMA.login.username.label, { id: FBM_SYNC_ACCOUNT_SCHEMA.login.username.id, kind: 'input', inputType: FBM_SYNC_ACCOUNT_SCHEMA.login.username.inputType, value: editing ? FBM_SYNC_CLIENT.loginDraft.username : fbmSyncLoginUsernameValue(login), placeholder: FBM_SYNC_ACCOUNT_SCHEMA.login.username.placeholder, ariaLabel: FBM_SYNC_ACCOUNT_SCHEMA.login.username.label, disabled: !editing }),
     password: StandaloneField(FBM_SYNC_ACCOUNT_SCHEMA.login.password.label, { id: FBM_SYNC_ACCOUNT_SCHEMA.login.password.id, kind: 'input', inputType: FBM_SYNC_ACCOUNT_SCHEMA.login.password.inputType, value: configured && !editing ? FBM_SYNC_ACCOUNT_SCHEMA.login.password.maskedValue : '', placeholder: FBM_SYNC_ACCOUNT_SCHEMA.login.password.placeholder, ariaLabel: FBM_SYNC_ACCOUNT_SCHEMA.login.password.label, disabled: !editing }),
     actions: fbmSyncLoginActionBlocks(), notice: fbmSyncAccountNoticeBlocks('login'), policy: fbmSyncLoginPolicyNavigationBlocks()
   });
@@ -55,7 +55,7 @@ function fbmSyncPatchAccount(panel, status) {
   if (!fbmSyncInteractiveControlIsEditing(loginCard) && !preserveLoginDraft && (!loginEditState.editing || loginEditState.needsRender)) { fbmSyncRenderTarget(FBM_SYNC_ACCOUNT_SCHEMA.regions.loginCard, [fbmSyncLoginCard()]); loginEditState.needsRender = false; }
   else {
     fbmSyncRenderTarget(FBM_SYNC_ACCOUNT_SCHEMA.regions.loginConfigured, fbmSyncLoginConfiguredBlocks());
-    fbmSyncSetTargetState(FBM_SYNC_ACCOUNT_SCHEMA.login.username.id, { value: editing ? FBM_SYNC_CLIENT.loginDraft.username : String(login.public && login.public.usernameHint || ''), disabled: !editing });
+    fbmSyncSetTargetState(FBM_SYNC_ACCOUNT_SCHEMA.login.username.id, { value: editing ? FBM_SYNC_CLIENT.loginDraft.username : fbmSyncLoginUsernameValue(login), disabled: !editing });
     fbmSyncSetTargetState(FBM_SYNC_ACCOUNT_SCHEMA.login.password.id, { value: configured && !editing ? FBM_SYNC_ACCOUNT_SCHEMA.login.password.maskedValue : undefined, disabled: !editing });
     fbmSyncRenderTarget(FBM_SYNC_ACCOUNT_SCHEMA.regions.loginActions, fbmSyncLoginActionBlocks());
     fbmSyncRenderTarget(FBM_SYNC_ACCOUNT_SCHEMA.regions.loginNotice, fbmSyncAccountNoticeBlocks('login'));
