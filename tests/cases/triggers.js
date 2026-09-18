@@ -113,6 +113,21 @@ function chay(so) {
   hop.shinOnEdit({ range: eventRange(lead, 1, 5), oldValue: 'Ghi chú thường', value: 'Nhãn thường' });
   check(so, 'sửa tiêu đề thường ở hàng 1 view không liên quan mã hợp lệ thì không vẽ', rendered, []);
 
+  rendered.length = 0;
+  lead.getRange(1, 6).setValue('Ghi chu 2');
+  hop.shinOnEdit({ range: eventRange(lead, 1, 5, 1, 2) });
+  check(so, 'sua ca vung hang 1 thuong sang thuong khong ve', rendered, []);
+
+  const customerHeader = nen.sheet('Customer').getRange(1, 1);
+  const customerCodeBeforeRange = customerHeader.getValue();
+  hop.shinHeaderSnapshotWrite(nen.sheet('Customer'));
+  customerHeader.setValue('Nhan thuong');
+  hop.dirtyStateClear();
+  hop.shinOnEdit({ range: eventRange(nen.sheet('Customer'), 1, 1) });
+  check(so, 'sua mot o hang 1 tu ma hop le sang thuong van phat schema', hop.reloadStateRead().schema, true);
+  customerHeader.setValue(customerCodeBeforeRange);
+  hop.shinHeaderSnapshotWrite(nen.sheet('Customer'));
+
   hop.dirtyStateClear();
   ghiO(nen, 'Customer', 4, '@CUS_MA_KH', 'KH000001');
   hop.shinOnEdit({ range: eventRange(nen.sheet('Customer'), 4, 2) });

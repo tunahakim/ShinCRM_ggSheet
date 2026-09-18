@@ -92,9 +92,9 @@
 
 ### Sheet quản trị
 
-- [ ] Hàng 1 sheet quản trị chỉ gọi vẽ khi trước hoặc sau vùng sửa có ít nhất một mã `@` hợp lệ; giá trị thường đổi sang giá trị thường không vẽ.
-- [ ] Hàng 1 sheet quản trị xử lý đúng cả sửa một ô và sửa vùng nhiều ô, đối chiếu từng ô trước/sau.
-- [ ] Hàng 1 bốn sheet mặc định dùng cùng luật trước/sau có mã `@`; giá trị thường đổi sang giá trị thường không tạo schema/full core.
+- [x] Hàng 1 sheet quản trị chỉ gọi vẽ khi trước hoặc sau vùng sửa có ít nhất một mã `@` hợp lệ; giá trị thường đổi sang giá trị thường không vẽ.
+- [x] Hàng 1 sheet quản trị xử lý đúng cả sửa một ô và sửa vùng nhiều ô, đối chiếu từng ô trước/sau bằng snapshot hàng 1.
+- [x] Hàng 1 bốn sheet mặc định dùng cùng luật trước/sau có mã `@`; giá trị thường đổi sang giá trị thường không tạo schema/full core.
 - [x] Sửa hàng 3 dưới cột `@CUS_`/`@ACT_` hợp lệ gọi vẽ toàn bộ view (test `triggers.js`).
 - [x] Sửa hàng 3 dưới cột thường không gọi vẽ (test `triggers.js`).
 - [x] Sửa hàng 4 trở xuống không đọc ngược và không tự vẽ (test `viewRenderer.js`).

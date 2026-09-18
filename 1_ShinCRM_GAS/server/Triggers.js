@@ -12,6 +12,43 @@ function shinRangeTouchesColumn(range, column) {
   return column > 0 && range.getColumn() <= column && range.getLastColumn() >= column;
 }
 
+function shinHeaderSnapshotKey(sheetName) { return 'SHIN_HEADER_SNAPSHOT_' + String(sheetName || ''); }
+
+function shinHeaderSnapshotRead(sheet) {
+  var raw = PropertiesService.getDocumentProperties().getProperty(shinHeaderSnapshotKey(sheet.getName()));
+  if (!raw) { return null; }
+  try { var parsed = JSON.parse(raw); return Array.isArray(parsed) ? parsed : null; } catch (ignore) { return null; }
+}
+
+function shinHeaderValues(sheet) {
+  var lastColumn = sheet.getLastColumn();
+  if (lastColumn < 1) { return []; }
+  return sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(function (value) {
+    return String(value === null || value === undefined ? '' : value).trim();
+  });
+}
+
+function shinHeaderSnapshotWrite(sheet) {
+  PropertiesService.getDocumentProperties().setProperty(shinHeaderSnapshotKey(sheet.getName()), JSON.stringify(shinHeaderValues(sheet)));
+}
+
+function shinHeaderRangeHasValidCode(sheet, range, event, validCode) {
+  if (!shinRangeTouchesRow(range, 1)) { return false; }
+  var first = range.getColumn();
+  var last = range.getLastColumn();
+  var current = shinHeaderValues(sheet);
+  var previous = shinHeaderSnapshotRead(sheet);
+  var rowCount = typeof range.getNumRows === 'function' ? range.getNumRows() : range.getLastRow() - range.getRow() + 1;
+  var single = first === last && rowCount === 1;
+  for (var column = first; column <= last; column++) {
+    var oldValue = previous && previous[column - 1];
+    var newValue = current[column - 1];
+    if (single && Object.prototype.hasOwnProperty.call(event || {}, 'oldValue')) { oldValue = event.oldValue; }
+    if (validCode(oldValue) || validCode(newValue)) { return true; }
+  }
+  return false;
+}
+
 /** Hàng 3 chỉ là hàng lọc dưới cột mang mã `@`; chữ ghi chú dưới cột thường không phải cấu hình view. */
 function shinRangeTouchesCodedFilter(sheet, range) {
   if (!shinRangeTouchesRow(range, 3)) { return false; }
@@ -55,17 +92,10 @@ function shinDefaultCodeIsValid(sheet, entity, firstColumn, lastColumn) {
 }
 
 function shinSchemaEditNeedsReload(sheet, range, event) {
-  if (!shinRangeTouchesRow(range, 1)) { return false; }
-  var cells = (range.getLastRow() - range.getRow() + 1) * (range.getLastColumn() - range.getColumn() + 1);
-  if (cells !== 1) { return true; }
-  var hasOldValue = Object.prototype.hasOwnProperty.call(event || {}, 'oldValue');
-  var hasNewValue = Object.prototype.hasOwnProperty.call(event || {}, 'value');
-  if (!hasOldValue && !hasNewValue) { return true; }
   var valid = shinDefaultCodeMap(sheet, sheet.getName().toLowerCase()) || {};
-  var isValid = function (value) {
+  return shinHeaderRangeHasValidCode(sheet, range, event, function (value) {
     return !!valid[String(value === null || value === undefined ? '' : value).trim()];
-  };
-  return isValid(event && event.oldValue) || isValid(event && event.value);
+  });
 }
 
 function shinReloadDecision(input) {
@@ -93,12 +123,7 @@ function shinViewHeaderCodeIsValid(code) {
 
 function shinViewEditNeedsRender(sheet, range, event) {
   if (shinRangeTouchesRow(range, 1)) {
-    var cells = (range.getLastRow() - range.getRow() + 1) * (range.getLastColumn() - range.getColumn() + 1);
-    if (cells !== 1) { return true; }
-    var hasOldValue = Object.prototype.hasOwnProperty.call(event || {}, 'oldValue');
-    var hasNewValue = Object.prototype.hasOwnProperty.call(event || {}, 'value');
-    if (!hasOldValue && !hasNewValue) { return true; }
-    return shinViewHeaderCodeIsValid(event && event.oldValue) || shinViewHeaderCodeIsValid(event && event.value);
+    return shinHeaderRangeHasValidCode(sheet, range, event, shinViewHeaderCodeIsValid);
   }
   if (shinRangeTouchesCodedFilter(sheet, range)) { return true; }
   return shinRangeTouchesColumn(range, selectionColumnIndex(sheet, '@VIEW_SORT_COL'))
@@ -107,9 +132,11 @@ function shinViewEditNeedsRender(sheet, range, event) {
 
 function shinOnEdit(event) {
   if (!event || !event.range) { return; }
-  return runEntryPoint('shinOnEdit', 'core', ERROR_CHANNEL_THROW, function () {
-    var range = event.range;
-    var sheet = range.getSheet();
+  var range = event.range;
+  var sheet = range.getSheet();
+  var result;
+  try {
+    result = runEntryPoint('shinOnEdit', 'core', ERROR_CHANNEL_THROW, function () {
     var name = sheet.getName();
     if (name.charAt(0) === '!') {
       if (shinViewEditNeedsRender(sheet, range, event)) {
@@ -140,7 +167,11 @@ function shinOnEdit(event) {
     var recordDecision = shinReloadDecision({ source: 'edit', surface: 'record', entity: entity, recordIds: ids });
     if (recordDecision.views.action === 'render') { return shinRenderAllViewsAfterSignal(); }
     return recordDecision;
-  });
+    });
+  } finally {
+    if (shinRangeTouchesRow(range, 1)) { shinHeaderSnapshotWrite(sheet); }
+  }
+  return result;
 }
 
 function shinOnChange(event) {
@@ -191,6 +222,7 @@ function shinInstallTriggers() {
   });
   ScriptApp.newTrigger('shinOnEdit').forSpreadsheet(book).onEdit().create();
   ScriptApp.newTrigger('shinOnChange').forSpreadsheet(book).onChange().create();
+  book.getSheets().forEach(function (sheet) { shinHeaderSnapshotWrite(sheet); });
   return ['shinOnEdit', 'shinOnChange'];
 }
 

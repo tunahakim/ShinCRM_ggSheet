@@ -79,6 +79,8 @@ Sidebar giữ state riêng của trang đó:
 
 Sidebar giữ schema, ý nghĩa mã `@` và `readPlan`. Sidebar tự phân tích Name Box và đối chiếu toàn bộ hàng 1 có giá trị để biết một hint có nằm trong vùng có ý nghĩa cần kiểm tra hay không. Đây chỉ là tối ưu thời điểm gửi request; GAS vẫn là nơi xác nhận thay đổi, dirty state, scope reload và payload. Nếu hàng 1 không đầy đủ hoặc không chắc chắn, Sidebar phải fail-open và hỏi GAS.
 
+Ở phía GAS, trigger giữ snapshot hàng 1 theo từng sheet để đối chiếu cả sửa một ô lẫn sửa vùng. Snapshot được tạo khi cài trigger và cập nhật sau mỗi lần `onEdit` chạm hàng 1; nếu thiếu snapshot, GAS không được để Sidebar thay thế việc xác nhận nghiệp vụ.
+
 Khi Extension gửi `CRM_CONTEXT` có `customerId` hợp lệ và mã đã có trong Store, Sidebar phải gọi đường nguồn-chọn cục bộ ngay trong lượt nhận tin để màn hình chính đổi khách không phụ thuộc độ trễ RPC. Các lượt kiểm tra dirty, reload RAM hoặc đồng bộ sheet quản trị có thể chạy nối tiếp ở nền; nếu mã chưa có trong Store thì được thử lại sau khi lượt nạp hoàn tất.
 
 ## 4. Một request selection duy nhất
