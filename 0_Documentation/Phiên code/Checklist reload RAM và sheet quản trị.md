@@ -476,5 +476,6 @@
 
   Bằng chứng GAS DEV: `reloadMatrixProbe --push` đạt toàn bộ ca tại deployment `@429`, gồm Customer/Activity, vùng nhiều hàng, hàng 1 trước/sau, Category, Config và sheet quản trị.
   `probeSelectionAndReload --push` đạt tại deployment `@430`, trả selection + decision + ReloadState trong một response, không tạo request reload thứ hai.
+  Sau guard fail-open khi thiếu snapshot, `probeTriggerState --push` đạt tại deployment `@431`; các installable trigger `shinOnEdit`/`shinOnChange` vẫn còn nguyên.
 
 ---
