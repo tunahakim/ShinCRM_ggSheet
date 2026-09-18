@@ -6,6 +6,26 @@
  */
 var FBM_SYNC_CONFIG_KEYS = ['identity', 'login', 'accountSettings', 'module', 'relay', 'extension', 'background', 'loginPolicy'];
 
+/*
+ * Đây là schema hành vi của giao diện, không phải schema dữ liệu lưu trong GAS.
+ * Nó chỉ mô tả khóa cha/con để renderer dùng cùng một luật khóa cho mọi card.
+ */
+var FBM_SYNC_CONFIG_UI_SCHEMA = {
+  module: { parentPath: 'enabled' },
+  background: {
+    parentPath: 'enabled',
+    dependencies: {
+      'heartbeat.minutes': 'heartbeat.enabled',
+      'customerFull.minutes': 'customerFull.enabled',
+      'activityFull.minutes': 'activityFull.enabled',
+      'detail.customersPerRun': 'detail.enabled',
+      'detail.minDelaySeconds': 'detail.enabled',
+      'detail.maxDelaySeconds': 'detail.enabled'
+    }
+  },
+  loginPolicy: { parentPath: 'enabled' }
+};
+
 function fbmSyncConfigClone(value) {
   if (value === undefined || value === null) { return value; }
   if (typeof value !== 'object') { return value; }
@@ -117,6 +137,21 @@ function fbmSyncConfigDraftValue(key, path, fallback) {
   return value === undefined || value === null ? fallback : value;
 }
 
+function fbmSyncConfigMasterEnabled() {
+  var status = FBM_SYNC_CLIENT.lastStatus || {};
+  return status.masterEnabled !== false && status.enabled !== false;
+}
+
+/** Một cổng duy nhất quyết định control thân có được thao tác hay không. */
+function fbmSyncConfigControlDisabled(key, path) {
+  var schema = FBM_SYNC_CONFIG_UI_SCHEMA[key] || {}, editing = fbmSyncConfigIsEditing(key), dependency = schema.dependencies && schema.dependencies[path];
+  if (!editing || FBM_SYNC_CLIENT.running) { return true; }
+  if (key === 'background' && !fbmSyncConfigMasterEnabled()) { return true; }
+  if (schema.parentPath && path !== schema.parentPath && fbmSyncConfigDraftValue(key, schema.parentPath, true) !== true) { return true; }
+  if (dependency && fbmSyncConfigDraftValue(key, dependency, true) !== true) { return true; }
+  return false;
+}
+
 function fbmSyncConfigSetDraftValue(key, path, value) {
   var state = fbmSyncConfigState(key);
   if (!state.editing) { return false; }
@@ -148,7 +183,7 @@ function fbmSyncConfigStartEdit(key) {
     var password = document.getElementById('fbm-login-password');
     if (password) { password.value = ''; }
   } else if (key === 'module') {
-    draft = { approvalThreshold: settings.approvalThreshold === undefined ? 10 : settings.approvalThreshold };
+    draft = { approvalThreshold: settings.approvalThreshold === undefined ? 10 : settings.approvalThreshold, enabled: fbmSyncConfigMasterEnabled() };
   } else if (key === 'relay') {
     draft = {};
   } else if (key === 'extension') {

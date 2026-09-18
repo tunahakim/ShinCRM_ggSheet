@@ -99,6 +99,9 @@ FbmSync.backgroundScheduleSave = function (input) {
   });
   saved.enabled = enabled; saved.direction = direction;
   FbmSync.props().setProperty(FbmSync.BACKGROUND_SCHEDULE_KEY, JSON.stringify(saved));
+  // Công tắc trong card và cờ lịch nền phải cùng một trạng thái sau một lượt lưu.
+  // Nếu chỉ ghi schedule.enabled, cờ BACKGROUND_SWITCH_KEY cũ có thể tiếp tục chặn scheduler.
+  FbmSync.setBackgroundEnabled(saved.enabled);
   if (typeof FbmSync.schedule === 'function') { FbmSync.schedule(); }
   saved.customer = saved.customerFull; saved.activity = saved.activityFull;
   return { ok: true, schedule: saved };

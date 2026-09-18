@@ -8,7 +8,7 @@
 - `[ ]` là việc còn thiếu; mục không có nhãn **Cần kiểm chứng thực tế** là việc AI tự tiếp tục được.
 - Một slice chỉ đóng sau khi đủ code, test, log/báo cáo và checklist case của slice đó.
 - Sau khi đóng slice, ghi commit và revision GAS vào bảng bằng chứng cuối file.
-- Bộ kiểm offline chốt đạt `1585/1585`. Các mục live vẫn được đánh dấu riêng và không được suy ra từ test offline.
+- Bộ kiểm offline chốt đạt `1635/1635`. Các mục live vẫn được đánh dấu riêng và không được suy ra từ test offline.
 
 ## Nguồn hợp đồng
 
@@ -519,3 +519,4 @@ Ghi chú Slice 9A: commit `a1b8e0c` gom lịch nghiệp vụ về GAS, giữ Ext
 - [x] Hợp nhất primitive loading dùng chung `shin-loading-track`/`shin-loading-fill` cho ray toàn Sidebar và progress trong card Sync; bỏ CSS animation riêng theo màn hình; test offline `1608/1608`.
 - [x] Chuẩn hóa nhịp dọc bằng `gap` cho `Stack` và dùng cùng token `shin-gap-2` ở biên `sidebar-info`–`sidebar-body`, tránh Card bị ghi đè margin và tránh khoảng cách phụ thuộc vị trí Card; test offline `1615/1615`.
 - [x] Card `Đăng nhập tự động` có nút mở thẳng block `Chính sách tự đăng nhập`; công tắc tự đăng nhập là cấp cha, tự mở tab và retry là cấp con, bị khóa và không có hiệu lực khi cấp cha tắt; lưu credential bảo toàn chính sách; test offline `1630/1630`.
+- [x] Đồng nhất hành vi 8 khối cấu hình: mọi control thân chỉ sửa được sau khi bấm Sửa, click công tắc chỉ đổi draft và nút tick mới lưu GAS; quan hệ cha/con khai báo trong `FBM_SYNC_CONFIG_UI_SCHEMA`; công tắc trên thanh tiêu đề luôn thao tác được và lưu ngay; công tắc con lịch nền khóa theo công tắc cha; lịch nền đồng bộ `schedule.enabled` với `BACKGROUND_SWITCH_KEY`; test offline `1635/1635`.

@@ -58,7 +58,7 @@ function fbmSyncShellHeaderBlocks(status) {
   return [
     Icon({ id: 'fbm-sync-back', icon: 'back', tooltip: 'Quay lại' }),
     Text({ id: 'fbm-sync-module-title', className: 'shin-header-title shin-sync-module-title', text: fbmSyncShellTitle() }),
-    StandaloneControl({ id: 'fbm-sync-master-switch', kind: 'toggle', pressed: enabled, className: enabled ? 'is-on' : 'is-off', disabled: !fbmSyncStatusReady(), ariaLabel: 'Bật hoặc tắt đồng bộ' }),
+    StandaloneControl({ id: 'fbm-sync-master-switch', kind: 'toggle', pressed: enabled, className: enabled ? 'is-on' : 'is-off', ariaLabel: 'Bật hoặc tắt đồng bộ' }),
     Icon({ id: 'fbm-sync-module-menu', icon: 'more', tooltip: 'Mở menu đồng bộ', disabled: !fbmSyncStatusReady() })
   ];
 }
@@ -77,7 +77,7 @@ function fbmSyncRenderShell(status) {
   else {
     fbmSyncSetTargetState('fbm-sync-module-title', { text: fbmSyncShellTitle() });
     var enabled = fbmSyncShellEnabled(status);
-    fbmSyncSetTargetState('fbm-sync-master-switch', { ariaPressed: enabled, disabled: !fbmSyncStatusReady(), addClass: [enabled ? 'is-on' : 'is-off'], removeClass: [enabled ? 'is-off' : 'is-on'], childText: { '.shin-toggle-label': enabled ? 'ON' : 'OFF' }, title: enabled ? 'Đồng bộ đang bật' : 'Đồng bộ đang tắt' });
+    fbmSyncSetTargetState('fbm-sync-master-switch', { ariaPressed: enabled, disabled: false, addClass: [enabled ? 'is-on' : 'is-off'], removeClass: [enabled ? 'is-off' : 'is-on'], childText: { '.shin-toggle-label': enabled ? 'ON' : 'OFF' }, title: enabled ? 'Đồng bộ đang bật' : 'Đồng bộ đang tắt' });
   }
   if (!RENDER_INDEX.nodes['fbm-sync-nav'] || !document.getElementById('fbm-sync-nav')) {
     fbmSyncAppendBlock(headerMount, fbmSyncShellNavBlock());
@@ -116,16 +116,16 @@ function fbmSyncSetScreen(screenId) {
   if (FBM_SYNC_CLIENT.lastStatus) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); }
 }
 function fbmSyncToggleMaster() {
-  if (!fbmSyncStatusReady()) { return Promise.resolve(null); }
+  if (FBM_SYNC_CLIENT.masterToggleFlight) { return FBM_SYNC_CLIENT.masterToggleFlight; }
   var current = FBM_SYNC_CLIENT.lastStatus || {}, enabled = !(current.masterEnabled === false || current.enabled === false), next = Object.assign({}, current, { masterEnabled: !enabled, enabled: !enabled });
   fbmSyncPaint(next);
-  return callServer('fbmSetMasterSwitch', [!enabled]).then(fbmSyncStatusOnce).catch(function (error) {
+  return FBM_SYNC_CLIENT.masterToggleFlight = callServer('fbmSetMasterSwitch', [!enabled]).then(fbmSyncStatusOnce).catch(function (error) {
     var rollback = Object.assign({}, FBM_SYNC_CLIENT.lastStatus || current, { masterEnabled: enabled, enabled: enabled, message: String(error && error.message || error) }); fbmSyncPaint(rollback); return null;
-  });
+  }).finally(function () { FBM_SYNC_CLIENT.masterToggleFlight = null; });
 }
 function fbmSyncApplyMasterDisabled(status) {
   var ready = fbmSyncStatusReady(), disabled = !ready || !!(status && (status.masterEnabled === false || status.enabled === false));
-  fbmSyncSetTargetState('fbm-sync-master-switch', { disabled: !ready });
+  fbmSyncSetTargetState('fbm-sync-master-switch', { disabled: false });
   fbmSyncSetTargetState('fbm-sync-module-menu', { disabled: !ready });
   fbmSyncSetTargetState('sidebar-body', { disabledDescendants: disabled, except: ready ? ['fbm-sync-settings-master-switch'] : [] });
 }

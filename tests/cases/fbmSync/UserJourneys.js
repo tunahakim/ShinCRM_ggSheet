@@ -122,6 +122,25 @@ async function chay(so) {
   hop.FBM_SYNC_CLIENT.lastStatus = idle();
   hop.fbmSyncPaint(idle());
   const settingsRoot = content.children[0];
+  check(so, 'cài đặt phiên ở chế độ xem khóa toàn bộ control thân card', [
+    dom.document.getElementById('fbm-sync-settings-master-switch').disabled,
+    dom.document.getElementById('fbm-sync-run-on-startup').disabled,
+    dom.document.getElementById('fbm-sync-background-switch').disabled,
+    dom.document.getElementById('fbm-sync-process-heartbeat').disabled,
+    dom.document.getElementById('fbm-sync-policy-auto-login').disabled,
+    dom.document.getElementById('fbm-sync-policy-auto-open').disabled
+  ], [true, true, true, true, true, true]);
+  const moduleViewValue = dom.document.getElementById('fbm-sync-settings-master-switch').getAttribute('aria-pressed');
+  const masterCallsBeforeModuleViewClick = calls.filter((item) => item.name === 'fbmSetMasterSwitch').length;
+  click(dom, dom.document.getElementById('fbm-sync-settings-master-switch'));
+  check(so, 'switch module trong card ở chế độ xem không gọi GAS', [dom.document.getElementById('fbm-sync-settings-master-switch').getAttribute('aria-pressed'), calls.filter((item) => item.name === 'fbmSetMasterSwitch').length], [moduleViewValue, masterCallsBeforeModuleViewClick]);
+  click(dom, dom.document.getElementById('fbm-sync-config-module-edit'));
+  click(dom, dom.document.getElementById('fbm-sync-settings-master-switch'));
+  check(so, 'switch module trong card ở chế độ sửa chỉ đổi draft', [dom.document.getElementById('fbm-sync-settings-master-switch').getAttribute('aria-pressed'), calls.filter((item) => item.name === 'fbmSetMasterSwitch').length], ['false', masterCallsBeforeModuleViewClick]);
+  click(dom, dom.document.getElementById('fbm-sync-config-module-cancel'));
+  const startupViewValue = dom.document.getElementById('fbm-sync-run-on-startup').getAttribute('aria-pressed');
+  click(dom, dom.document.getElementById('fbm-sync-run-on-startup'));
+  check(so, 'click switch thân ở chế độ xem không đổi draft và không gọi GAS', [dom.document.getElementById('fbm-sync-run-on-startup').getAttribute('aria-pressed'), calls.filter((item) => item.name === 'fbmSaveExtensionConfig').length], [startupViewValue, 0]);
   click(dom, dom.document.getElementById('fbm-sync-config-extension-edit'));
   let pollMinutes = dom.document.getElementById('fbm-extension-poll-minutes');
   pollMinutes.value = '17';
@@ -153,9 +172,9 @@ async function chay(so) {
   check(so, 'bat lai muc cha mo khoa cac muc con', [dom.document.getElementById('fbm-sync-policy-auto-login').getAttribute('aria-pressed'), dom.document.getElementById('fbm-sync-policy-auto-open').disabled, dom.document.getElementById('fbm-sync-policy-retry').disabled, dom.document.getElementById('fbm-sync-login-retry-minutes').disabled], ['true', false, false, false]);
   const background = dom.document.getElementById('fbm-sync-background-switch');
   click(dom, background);
-  check(so, 'công tắc lịch nền phản hồi ngay khi click trước khi GAS trả về', [background.getAttribute('aria-pressed'), background.className.indexOf('is-off') >= 0, background.disabled], ['false', true, true]);
+  check(so, 'công tắc lịch nền chỉ đổi draft ngay khi click, không loading', [background.getAttribute('aria-pressed'), background.className.indexOf('is-off') >= 0, background.disabled], ['false', true, false]);
   await tick();
-  check(so, 'cai dat phien bat tat lich nen gui lenh GAS doc lap voi phien thu cong', [calls.filter((item) => item.name === 'fbmSetBackgroundSwitch').map((item) => item.args[0]), background.getAttribute('aria-pressed'), background.className.indexOf('is-off') >= 0, background.disabled], [[false], 'false', true, false]);
+  check(so, 'cài đặt lịch nền không gửi GAS khi click switch; chỉ lưu qua nút Lưu', [calls.filter((item) => item.name === 'fbmSetBackgroundSwitch').map((item) => item.args[0]), background.getAttribute('aria-pressed'), background.className.indexOf('is-off') >= 0, background.disabled], [[], 'false', true, false]);
 
   hop.FBM_SYNC_CLIENT.subscreen = 'results';
   hop.FBM_SYNC_CLIENT.resultsTab = 'summary';

@@ -273,6 +273,8 @@ async function chay(so) {
   check(so, 'cau hinh Extension cho phep doi nhip nhung khong doi lich nghiep vu', [savedExtension.ok, savedExtension.pollMinutes, savedExtension.runOnStartup, scheduleFlow.hop.FbmSync.backgroundSchedulePublic().heartbeat.minutes], [true, 15, false, 5]);
   const savedSchedule = scheduleFlow.hop.FbmSync.backgroundScheduleSave({ heartbeat: { enabled: false, minutes: 10 }, customer: { enabled: true, minutes: 60 }, activity: { enabled: false, minutes: 30 } });
   check(so, 'GAS luu cong tac va chu ky tung tien trinh nen', [savedSchedule.ok, savedSchedule.schedule.heartbeat.enabled, savedSchedule.schedule.heartbeat.minutes, savedSchedule.schedule.activity.enabled], [true, false, 10, false]);
+  const disabledSchedule = scheduleFlow.hop.FbmSync.backgroundScheduleSave({ enabled: false });
+  check(so, 'luu lich nen dong bo ca cong tac lich va co BACKGROUND_SWITCH_KEY', [disabledSchedule.ok, disabledSchedule.schedule.enabled, scheduleFlow.hop.FbmSync.backgroundEnabled()], [true, false, false]);
   const directionSchedule = scheduleFlow.hop.FbmSync.backgroundScheduleSave({
     enabled: true, direction: 'write',
     heartbeat: { enabled: true, minutes: 5 },
@@ -280,7 +282,7 @@ async function chay(so) {
     activityFull: { enabled: false, minutes: 1440 },
     detail: { enabled: true, minutes: 60, customersPerRun: 50, minDelaySeconds: 0.5, maxDelaySeconds: 2 }
   });
-  check(so, 'Lịch nền lưu chiều hai chiều và batch detail cùng khoảng delay', [directionSchedule.schedule.direction, directionSchedule.schedule.detail.enabled, directionSchedule.schedule.detail.customersPerRun, directionSchedule.schedule.detail.minDelaySeconds, directionSchedule.schedule.detail.maxDelaySeconds], ['write', true, 50, 0.5, 2]);
+  check(so, 'Lịch nền lưu chiều hai chiều và batch detail cùng khoảng delay', [directionSchedule.schedule.direction, directionSchedule.schedule.detail.enabled, directionSchedule.schedule.detail.customersPerRun, directionSchedule.schedule.detail.minDelaySeconds, directionSchedule.schedule.detail.maxDelaySeconds, scheduleFlow.hop.FbmSync.backgroundEnabled()], ['write', true, 50, 0.5, 2, true]);
   const detailCursor = scheduleFlow.hop.FbmSync.detailCursorWrite({ pageIndex: 1, pageValue: ['2026-09-16', '2026-09-16T10:00:00', 'CUS-50'] });
   check(so, 'Cursor detail được lưu bền vững chỉ với khóa trang', [detailCursor.pageIndex, scheduleFlow.hop.FbmSync.detailCursorRead().pageValue.join('|')], [1, '2026-09-16|2026-09-16T10:00:00|CUS-50']);
   const detailState = { scan: 'detail', detailCustomerLimit: 50, cursor: { pageIndex: 1, count: 50, seen: 0 } };

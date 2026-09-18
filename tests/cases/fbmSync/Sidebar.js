@@ -150,7 +150,7 @@ async function chay(so) {
 
   const shellHeader = hop.fbmSyncShellHeaderBlocks(idle);
   check(so, 'menu nội bộ bỏ Tổng quan và đặt Chạy đồng bộ lên đầu', [hop.FBM_SYNC_UI_SCHEMA.screens.map((item) => item.id), hop.FBM_SYNC_UI_SCHEMA.screens.some((item) => item.id === 'overview')], [['run', 'account', 'results', 'settings'], false]);
-  check(so, 'header Đồng bộ dùng đúng dãy Block như header Sidebar/form', [shellHeader.length, shellHeader[0].role, shellHeader[0].className, shellHeader[3].role, shellHeader[3].className, hop.fbmSyncShellTitle()], [4, 'icon', '', 'icon', '', 'Chạy đồng bộ']);
+  check(so, 'header Đồng bộ dùng đúng dãy Block như header Sidebar/form', [shellHeader.length, shellHeader[0].role, shellHeader[0].className, shellHeader[2].disabled, shellHeader[3].role, shellHeader[3].className, hop.fbmSyncShellTitle()], [4, 'icon', '', false, 'icon', '', 'Chạy đồng bộ']);
   check(so, 'header Đồng bộ dùng cùng khung và tiêu đề với header Sidebar/form', [shellHeader[1].className.indexOf('shin-header-title') >= 0], [true]);
 
   hop.FBM_SYNC_CLIENT.subscreen = 'run';
@@ -389,11 +389,13 @@ async function chay(so) {
   dom.document.listeners.click({ target: outside, preventDefault: () => {} });
   check(so, 'Click ra ngoài đóng menu Đồng bộ', nav.hidden, true);
 
-  const makeTarget = (attribute, id) => ({ id: id || '', disabled: false, hasAttribute: (name) => name === attribute, closest: function () { return this; } });
-  const backgroundButton = makeTarget('data-sync-background');
+  const makeTarget = (attribute, id) => ({ id: id || '', disabled: false, hasAttribute: (name) => name === attribute, getAttribute: (name) => name === 'aria-pressed' ? 'true' : '', closest: function () { return this; } });
+  let backgroundCalls = 0;
+  hop.callServer = () => { backgroundCalls += 1; return Promise.resolve({}); };
+  const backgroundButton = makeTarget('data-sync-background-draft');
   dom.document.listeners.click({ target: backgroundButton, preventDefault: () => {} });
   await new Promise((resolve) => setTimeout(resolve, 0));
-  check(so, 'Lỗi bật tắt đồng bộ nền hiện rõ và không khóa nút', [backgroundButton.disabled, paints.some((item) => String(item.message).indexOf('GAS_TEST_FAILURE') >= 0)], [false, true]);
+  check(so, 'switch lịch nền là draft, click không gọi GAS ngay', [backgroundButton.disabled, backgroundCalls], [false, 0]);
 
   hop.fbmSyncRetryPushFailures = () => Promise.reject(new Error('RETRY_FAILURE'));
   const retryButton = makeTarget('data-fbm-push-retry-all');
