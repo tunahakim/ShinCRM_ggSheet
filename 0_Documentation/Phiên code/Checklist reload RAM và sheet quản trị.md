@@ -475,5 +475,6 @@
 - [ ] Test click canvas, click phải rồi paste, click Sidebar/menu, click đổi Name Box, cột ẩn, chèn cột, sửa một ô/vùng hàng 1, thường-sang-thường và response cũ đến muộn.
 
   Bằng chứng GAS DEV: `reloadMatrixProbe --push` đạt toàn bộ ca tại deployment `@429`, gồm Customer/Activity, vùng nhiều hàng, hàng 1 trước/sau, Category, Config và sheet quản trị.
+  `probeSelectionAndReload --push` đạt tại deployment `@430`, trả selection + decision + ReloadState trong một response, không tạo request reload thứ hai.
 
 ---
