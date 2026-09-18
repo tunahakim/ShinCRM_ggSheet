@@ -52,10 +52,16 @@ function fbmSyncConfigState(key) {
 function fbmSyncConfigIsEditing(key) {
   var state = fbmSyncConfigState(key);
   if (state.editing === true) { return true; }
-  // Trạng thái thiếu cấu hình vẫn là trạng thái xem; người dùng phải chủ động bấm Sửa.
-  // Giữ cờ legacy loginEditMode để các luồng cũ mở form vẫn đi cùng component này.
-  if (key === 'login') { return FBM_SYNC_CLIENT.loginEditMode === true; }
   return false;
+}
+
+function fbmSyncConfigEditingKey() {
+  var active = null;
+  FBM_SYNC_CONFIG_KEYS.some(function (key) {
+    if (fbmSyncConfigState(key).editing === true) { active = key; return true; }
+    return false;
+  });
+  return active;
 }
 
 function fbmSyncConfigDraft(key, fallback) {
@@ -68,7 +74,7 @@ function fbmSyncConfigActionId(key, action) { return fbmSyncConfigSchema().actio
 
 function fbmSyncConfigTitleActions(key) {
   var state = fbmSyncConfigState(key), editing = fbmSyncConfigIsEditing(key), actions = [];
-  if (editing && (state.editing || (key === 'login' && FBM_SYNC_CLIENT.loginEditMode === true))) {
+  if (editing && state.editing) {
     var schema = fbmSyncConfigSchema();
     actions.push({ id: fbmSyncConfigActionId(key, schema.actionCancel), icon: 'close', className: uiResolveActionClass('cancel', 'icon'), tooltip: schema.tooltips.cancel, data: { 'sync-config-action': schema.actionCancel, 'sync-config-key': key } });
     actions.push({ id: fbmSyncConfigActionId(key, schema.actionSave), icon: 'check', className: uiResolveActionClass('save', 'icon'), tooltip: schema.tooltips.save, data: { 'sync-config-action': schema.actionSave, 'sync-config-key': key } });
@@ -99,6 +105,8 @@ function fbmSyncConfigButtonRow(key, labels, options) {
 function fbmSyncConfigBeginEdit(key, draft) {
   var state = fbmSyncConfigState(key);
   if (state.editing) { return false; }
+  var activeKey = fbmSyncConfigEditingKey();
+  if (activeKey && activeKey !== key) { return false; }
   state.snapshot = fbmSyncConfigClone(draft);
   state.draft = fbmSyncConfigClone(draft);
   state.editing = true;
@@ -113,15 +121,15 @@ function fbmSyncConfigFinishEdit(key) {
   state.snapshot = null;
   state.draft = null;
   if (key === 'login') {
-    FBM_SYNC_CLIENT.loginEditMode = false;
     FBM_SYNC_CLIENT.loginDraft = { username: '' };
-    var password = document.getElementById(FBM_SYNC_ACCOUNT_SCHEMA.login.password.id);
+    var passwordId = typeof FBM_SYNC_ACCOUNT_SCHEMA !== 'undefined' && FBM_SYNC_ACCOUNT_SCHEMA.login && FBM_SYNC_ACCOUNT_SCHEMA.login.password ? FBM_SYNC_ACCOUNT_SCHEMA.login.password.id : 'fbm-login-password';
+    var password = document.getElementById(passwordId);
     if (password) { password.value = ''; }
   }
   return true;
 }
 
-function fbmSyncConfigCancelEdit(key) {
+function fbmSyncConfigCancelEdit(key, skipRender) {
   var state = fbmSyncConfigState(key), snapshot = fbmSyncConfigClone(state.snapshot);
   if (!state.editing) { return false; }
   if (key === 'identity' && snapshot) {
@@ -135,7 +143,7 @@ function fbmSyncConfigCancelEdit(key) {
     FBM_SYNC_CLIENT.loginDraft = { username: String(snapshot.username || '') };
   }
   fbmSyncConfigFinishEdit(key);
-  if (typeof fbmSyncPaint === 'function') { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus || {}); }
+  if (skipRender !== true && typeof fbmSyncPaint === 'function') { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus || {}); }
   return true;
 }
 
@@ -183,6 +191,8 @@ function fbmSyncConfigSetDraftValue(key, path, value) {
 
 function fbmSyncConfigStartEdit(key) {
   var settings = FBM_SYNC_CLIENT.syncSettings || {}, login = FBM_SYNC_CLIENT.loginStatus || {};
+  var activeKey = fbmSyncConfigEditingKey();
+  if (activeKey && activeKey !== key) { return false; }
   var draft;
   if (key === 'identity') {
     var binding = FBM_SYNC_CLIENT.identityStatus && FBM_SYNC_CLIENT.identityStatus.binding || {};
@@ -195,8 +205,8 @@ function fbmSyncConfigStartEdit(key) {
   } else if (key === 'login') {
     draft = { username: fbmSyncLoginUsernameValue(login) };
     FBM_SYNC_CLIENT.loginDraft = { username: draft.username };
-    FBM_SYNC_CLIENT.loginEditMode = true;
-    var password = document.getElementById(FBM_SYNC_ACCOUNT_SCHEMA.login.password.id);
+    var passwordId = typeof FBM_SYNC_ACCOUNT_SCHEMA !== 'undefined' && FBM_SYNC_ACCOUNT_SCHEMA.login && FBM_SYNC_ACCOUNT_SCHEMA.login.password ? FBM_SYNC_ACCOUNT_SCHEMA.login.password.id : 'fbm-login-password';
+    var password = document.getElementById(passwordId);
     if (password) { password.value = ''; }
   } else if (key === 'module') {
     draft = { approvalThreshold: settings.approvalThreshold === undefined ? FBM_SYNC_SETTINGS_SCHEMA.defaults.approvalThreshold : settings.approvalThreshold, enabled: fbmSyncConfigMasterEnabled() };
@@ -265,7 +275,7 @@ function fbmSyncConfigUnsavedControlValue(id) {
 }
 
 function fbmSyncConfigUnsavedRead() {
-  var keys = [], fields = [], fieldIds = [], fieldsByKey = {};
+  var keys = [], fields = [], fieldIds = [], fieldsByKey = {}, editingKey = fbmSyncConfigEditingKey();
   FBM_SYNC_CONFIG_KEYS.forEach(function (key) {
     var state = fbmSyncConfigState(key), map = FBM_SYNC_CONFIG_UNSAVED_FIELDS[key] || {};
     if (!state.editing || state.snapshot === null || state.snapshot === undefined) { return; }
@@ -283,7 +293,7 @@ function fbmSyncConfigUnsavedRead() {
       if (keys.indexOf(key) === -1) { keys.push(key); }
     });
   });
-  return { dirty: keys.length > 0, keys: keys, fields: fields, fieldIds: fieldIds, fieldsByKey: fieldsByKey };
+  return { editing: !!editingKey, editingKey: editingKey, dirty: keys.length > 0, keys: keys, fields: fields, fieldIds: fieldIds, fieldsByKey: fieldsByKey };
 }
 
 var FBM_SYNC_CONFIG_UNSAVED_PROVIDER = null;
@@ -302,15 +312,19 @@ function fbmSyncConfigUnsavedProvider() {
       return { ok: true };
     },
     canRunTarget: function (target, state) {
-      if (!target || !state || !state.keys.length || state.keys.length !== 1) { return false; }
-      var key = state.keys[0], action = target.getAttribute && target.getAttribute('data-sync-config-action'), targetKey = target.getAttribute && target.getAttribute('data-sync-config-key');
+      if (!target || !state || !state.editing || !state.editingKey) { return true; }
+      var key = state.editingKey, action = target.getAttribute && target.getAttribute('data-sync-config-action'), targetKey = target.getAttribute && target.getAttribute('data-sync-config-key');
       if (action === 'save' && targetKey === key) { return true; }
-      if (action === 'cancel' && targetKey === key) { return false; }
+      if (action === 'cancel' && targetKey === key) { return !state.dirty; }
       if (targetKey && targetKey !== key) { return false; }
       if (target.id === 'fbm-sync-open-login-policy' || target.id === 'fbm-sync-back' || target.id === 'fbm-sync-module-menu' || target.id === 'fbm-sync-master-switch' || target.id === 'fbm-sync-settings-master-switch') { return false; }
       if (target.hasAttribute && (target.hasAttribute('data-sync-screen') || target.hasAttribute('data-sync-results-tab') || target.hasAttribute('data-sync-page'))) { return false; }
       var cardId = FBM_SYNC_CONFIG_UNSAVED_CARDS[key], card = cardId && target.closest ? target.closest('#' + cardId) : null;
       return !!card;
+    },
+    needsDecision: function (target, state) {
+      if (!target || !state || !state.editing || !state.dirty) { return false; }
+      return target.getAttribute && target.getAttribute('data-sync-config-action') === 'cancel' && target.getAttribute('data-sync-config-key') === state.editingKey;
     }
   };
   return FBM_SYNC_CONFIG_UNSAVED_PROVIDER;

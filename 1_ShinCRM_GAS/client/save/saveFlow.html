@@ -150,7 +150,7 @@ function saveFlowUnsavedProvider() {
   SAVE_FLOW_UNSAVED_PROVIDER = {
     read: function () {
       var top = typeof screenStateTop === 'function' ? screenStateTop() : null;
-      if (!top || typeof formCollectAll !== 'function' || typeof formCollectEntity !== 'function') { return { dirty: false, fieldIds: [] }; }
+      if (!top || typeof formCollectAll !== 'function' || typeof formCollectEntity !== 'function') { return { editing: false, dirty: false, fieldIds: [] }; }
       var current = formCollectEntity(formCollectAll(), top.entity), baseline = top.record || {}, changed = [], fieldIds = [];
       Object.keys(current || {}).forEach(function (name) {
         var left = current[name], right = baseline[name], same = typeof unsavedChangesEqual === 'function' ? unsavedChangesEqual(left, right) : String(left === undefined || left === null ? '' : left).trim() === String(right === undefined || right === null ? '' : right).trim();
@@ -159,7 +159,7 @@ function saveFlowUnsavedProvider() {
           if (typeof renderFieldId === 'function') { fieldIds.push(renderFieldId({ entity: top.entity, name: name })); }
         }
       });
-      return { dirty: changed.length > 0, fields: changed, fieldIds: fieldIds, top: top };
+      return { editing: true, dirty: changed.length > 0, fields: changed, fieldIds: fieldIds, top: top };
     },
     save: function () {
       var top = typeof screenStateTop === 'function' ? screenStateTop() : null, result = saveFlowSubmit();

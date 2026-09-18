@@ -180,8 +180,15 @@ function unsavedChangesGuard(kind, pending) {
 }
 
 function unsavedChangesGuardCore(action, pending) {
-  if (String(action || '') === 'saveForm' || typeof screenStateTop !== 'function' || !screenStateTop()) { return false; }
-  return unsavedChangesGuard('core', pending);
+  if (String(action || '') === 'saveForm') { return false; }
+  var provider = unsavedChangesReadProvider('core');
+  if (!provider || typeof provider.read !== 'function') { return false; }
+  var state;
+  try { state = provider.read(); } catch (error) { unsavedChangesNotifyFailure(error); return true; }
+  if (!state || !state.editing) { return false; }
+  if (String(action || '') === 'cancelForm' && !state.dirty) { return false; }
+  if (String(action || '') === 'cancelForm' && state.dirty) { return unsavedChangesGuard('core', pending); }
+  return true;
 }
 
 function unsavedChangesGuardFbmTarget(target, pending) {
@@ -189,8 +196,9 @@ function unsavedChangesGuardFbmTarget(target, pending) {
   if (!provider || typeof provider.read !== 'function') { return false; }
   var state;
   try { state = provider.read(); } catch (error) { unsavedChangesNotifyFailure(error); return true; }
-  if (!state || !state.dirty) { return false; }
+  if (!state || !state.editing) { return false; }
   if (typeof provider.canRunTarget === 'function' && provider.canRunTarget(target, state)) { return false; }
-  return unsavedChangesGuard('fbm', pending);
+  if (typeof provider.needsDecision === 'function' && provider.needsDecision(target, state)) { return unsavedChangesGuard('fbm', pending); }
+  return true;
 }
 </script>

@@ -7,6 +7,7 @@ Checklist này theo dõi một cơ chế chung cho mọi khối Sidebar có trư
 - [x] Chỉ tạo `baseline` khi người dùng bấm `Sửa` hoặc `Thêm mới`; không tạo snapshot khi chỉ mở màn hình xem.
 - [x] Chỉ so sánh đầy đủ khi người dùng bấm một `action` có nguy cơ làm mất bản nháp; không so sánh toàn bộ trường sau mỗi phím gõ.
 - [x] Một action bên ngoài khối đang sửa phải bị chặn trước khi chạy; action dự định được giữ lại để chạy sau khi xử lý cảnh báo.
+- [x] Trạng thái `đang sửa` là khóa chính: dù chưa đổi giá trị, mọi action ngoài card đang sửa vẫn bị chặn; không được mở đồng thời hai card.
 - [x] Cảnh báo có đúng ba lựa chọn: `Lưu thay đổi`, `Bỏ thay đổi và tiếp tục`, `Tiếp tục sửa`.
 - [x] `Tiếp tục sửa` đóng cảnh báo, ở lại khối hiện tại và giữ đánh dấu các trường đang khác `baseline`.
 - [x] Chỉ tô màu sau lần cảnh báo đầu tiên; màu là trạng thái trình bày, không thay thế nguồn sự thật dirty.
@@ -29,6 +30,7 @@ Checklist này theo dõi một cơ chế chung cho mọi khối Sidebar có trư
 - [x] Tạo một module client dùng chung làm chủ trạng thái hộp cảnh báo, action đang chờ và ba lựa chọn.
 - [x] Có phép chuẩn hóa/so sánh an toàn cho text, số, boolean, select/menu và ngày.
 - [x] Có API đọc dirty lazy: chỉ đọc/so sánh đầy đủ khi guard được gọi.
+- [x] Dirty chỉ phục vụ tô màu và quyết định cảnh báo ở nút Hủy/X; không dùng dirty làm điều kiện duy nhất để khóa action ngoài card.
 - [x] Có API `save`, `discard`, `continue` với khóa chống xử lý hai lần.
 - [x] Khi save/discard lỗi, giữ nguyên bản nháp, không chạy action đang chờ và báo lỗi rõ.
 - [x] Khôi phục focus về control phù hợp sau khi đóng cảnh báo hoặc sau khi action tiếp tục.
@@ -38,7 +40,7 @@ Checklist này theo dõi một cơ chế chung cho mọi khối Sidebar có trư
 
 - [x] Dùng bản ghi lúc mở form làm baseline cho form sửa/thêm mới.
 - [x] So sánh giá trị hiện tại với baseline qua bộ thu thập hiện có, không tạo bộ đọc DOM thứ hai cho nghiệp vụ.
-- [x] Chặn `cancelForm`, mở form lồng, đổi khách, về màn xem, nạp lại và mở FBM khi form đang dirty.
+- [x] Chặn `cancelForm`, mở form lồng, đổi khách, về màn xem, nạp lại và mở FBM khi form đang sửa; `cancelForm` sạch đi thẳng, dirty mới mở cảnh báo.
 - [x] Cho `saveForm` đi thẳng vào luồng lưu; chỉ chạy action tiếp theo sau khi cửa ghi xác nhận thành công.
 - [x] Bỏ draft khi chọn hủy thay đổi trước khi thực hiện action đang chờ.
 - [x] Không cảnh báo khi người dùng chưa thay đổi gì hoặc đã đưa toàn bộ trường về baseline.
@@ -47,7 +49,7 @@ Checklist này theo dõi một cơ chế chung cho mọi khối Sidebar có trư
 
 - [x] Tính dirty theo từng key của `fbmSyncConfigEditor`, không tách cơ chế theo tên nghiệp vụ.
 - [x] Bao phủ identity, login, account settings, module, relay, extension, background và login policy.
-- [x] Chặn mở/sửa khối khác, menu ba chấm, chuyển màn hình, quay lại và các action ngoài khối khi khối hiện tại dirty.
+- [x] Chặn mở/sửa khối khác, menu ba chấm, chuyển màn hình, quay lại và các action ngoài khối khi khối hiện tại đang sửa, kể cả khi chưa dirty.
 - [x] Cho action nội bộ cùng khối tiếp tục hoạt động theo hợp đồng; nút lưu hiện tại không tự mở thêm cảnh báo.
 - [x] Lưu từ cảnh báo dùng đúng cổng save hiện có của từng key và xác nhận trạng thái đã về chỉ xem.
 - [x] Bỏ thay đổi dùng đúng snapshot của editor, không gọi GAS nếu chỉ cần hủy bản nháp cục bộ.
@@ -70,12 +72,13 @@ Checklist này theo dõi một cơ chế chung cho mọi khối Sidebar có trư
 - [x] Test compare: bằng nhau, khác một trường, nhiều trường, đổi rồi hoàn tác, giá trị rỗng và kiểu khác nhau nhưng cùng nghĩa.
 - [x] Test modal: Save, Discard, Continue; action chờ chỉ chạy đúng một lần.
 - [x] Test save/discard lỗi: dữ liệu và màu không bị xóa nhầm.
-- [x] Test form lõi: cancel/open form lồng/đổi khách/reload bị chặn khi dirty.
+- [x] Test form lõi: cancel/open form lồng/đổi khách/reload bị chặn khi đang sửa, kể cả chưa dirty.
 - [x] Test FBM: chuyển màn, menu, back, sửa khối khác và action nội bộ cùng khối.
+- [x] Test FBM: card sạch vẫn khóa action ngoài, không mở đồng thời hai card; nút Hủy chỉ cảnh báo khi dirty.
 - [x] Test password: dirty đúng nhưng không xuất hiện trong snapshot, log hoặc lỗi.
 - [ ] Test callback snapshot không dựng lại control đang nhập và không mất highlight. (Còn cần nghiệm thu callback thật trên Sheet DEV.)
 - [x] Test hợp đồng tĩnh: Sidebar host/include/boot, guard form/FBM, mapping tám key, password và CSS changed không bị tháo trong phiên sau.
-- [x] Chạy `node tests/run.js`: 1.701 phép đạt, 0 phép lỗi.
+- [x] Chạy `node tests/run.js`: 1.710 phép đạt, 0 phép lỗi.
 
 ## 8. Nghiệm thu Sheet DEV và bàn giao
 

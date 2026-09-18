@@ -103,11 +103,21 @@ async function testLoiVaKhoa(so) {
 
 async function testFormVaFbm(so) {
   const bo = taoBoTest(), hop = bo.hop;
-  let coreDirty = true;
-  hop.saveFlowUnsavedProvider = () => ({ read: () => ({ dirty: coreDirty, fieldIds: [] }) });
+  hop.unsavedChangesClose();
+  hop.UNSAVED_CHANGES.dialogOpen = false;
+  hop.UNSAVED_CHANGES.pending = null;
+  hop.UNSAVED_CHANGES.provider = null;
+  let coreDirty = true, coreEditing = true;
+  hop.saveFlowUnsavedProvider = () => ({ read: () => ({ editing: coreEditing, dirty: coreDirty, fieldIds: [] }) });
   hop.screenStateTop = () => ({ entity: 'customer' });
   const coreActions = ['cancelForm', 'openActivityForm', 'changeCustomer', 'backView', 'reloadData', 'openSync'];
-  check(so, 'form lõi chặn mọi action rời khối khi dirty nhưng cho saveForm đi thẳng', [coreActions.map((action) => hop.unsavedChangesGuardCore(action, () => {})), hop.unsavedChangesGuardCore('saveForm', () => {})], [[true, true, true, true, true, true], false]);
+  check(so, 'form lõi chặn mọi action ngoài khi đang sửa và cho saveForm đi thẳng', [coreActions.map((action) => hop.unsavedChangesGuardCore(action, () => {})), hop.unsavedChangesGuardCore('saveForm', () => {})], [[true, true, true, true, true, true], false]);
+  hop.UNSAVED_CHANGES.dialogOpen = false;
+  hop.UNSAVED_CHANGES.pending = null;
+  hop.UNSAVED_CHANGES.provider = null;
+  coreDirty = false;
+  check(so, 'form lõi đang sửa nhưng chưa đổi vẫn chặn ngoài, còn Hủy đi thẳng', [hop.unsavedChangesGuardCore('openActivityForm', () => {}), hop.unsavedChangesGuardCore('cancelForm', () => {})], [true, false]);
+  coreEditing = false;
 
   hop.FBM_SYNC_CLIENT = { configEdits: {} };
   hop.FBM_SYNC_UI_SCHEMA = { config: { actionIdPrefix: 'config-', actionCancel: 'cancel', actionSave: 'save', actionEdit: 'edit', tooltips: {} } };
@@ -117,14 +127,37 @@ async function testFormVaFbm(so) {
   const card = bo.dom.document.createElement('div'); card.id = 'fbm-sync-identity-card-region'; bo.dom.root.appendChild(card);
   const cancel = bo.dom.document.createElement('button'); cancel.setAttribute('data-sync-config-action', 'cancel'); cancel.setAttribute('data-sync-config-key', 'identity'); card.appendChild(cancel);
   const save = bo.dom.document.createElement('button'); save.setAttribute('data-sync-config-action', 'save'); save.setAttribute('data-sync-config-key', 'identity'); card.appendChild(save);
+  hop.fbmSyncConfigFinishEdit('identity');
   hop.fbmSyncConfigBeginEdit('login', { username: 'old-login' });
   const password = bo.dom.document.createElement('input'); password.id = 'fbm-login-password'; password.value = 'secret'; bo.dom.root.appendChild(password);
   const provider = hop.fbmSyncConfigUnsavedProvider(), passwordState = provider.read();
   const passwordSnapshot = hop.fbmSyncConfigState('login').snapshot;
-  hop.fbmSyncConfigState('login').editing = false;
-  const dirtyState = provider.read();
-  check(so, 'FBM dirty theo key và không đưa password vào snapshot', [passwordState.dirty, passwordState.keys, passwordSnapshot.password, passwordState.fields, dirtyState.keys], [true, ['identity', 'login'], undefined, ['identity.username', 'login.password'], ['identity']]);
-  check(so, 'FBM chặn nút Hủy và action ngoài card nhưng cho nút Lưu cùng card', [provider.canRunTarget(cancel, dirtyState), provider.canRunTarget(save, dirtyState), provider.canRunTarget(bo.dom.document.createElement('button'), dirtyState)], [false, true, false]);
+  const loginDirtyState = provider.read();
+  const loginCard = bo.dom.document.createElement('div'); loginCard.id = 'fbm-sync-login-card-region'; bo.dom.root.appendChild(loginCard);
+  const loginCancel = bo.dom.document.createElement('button'); loginCancel.setAttribute('data-sync-config-action', 'cancel'); loginCancel.setAttribute('data-sync-config-key', 'login'); loginCard.appendChild(loginCancel);
+  const loginSave = bo.dom.document.createElement('button'); loginSave.setAttribute('data-sync-config-action', 'save'); loginSave.setAttribute('data-sync-config-key', 'login'); loginCard.appendChild(loginSave);
+  check(so, 'FBM dirty theo từng key và không đưa password vào snapshot', [passwordState.dirty, passwordState.keys, passwordSnapshot.password, passwordState.fields], [true, ['login'], undefined, ['login.password']]);
+  check(so, 'FBM chặn nút Hủy và action ngoài card nhưng cho nút Lưu cùng card', [provider.canRunTarget(loginCancel, loginDirtyState), provider.canRunTarget(loginSave, loginDirtyState), provider.canRunTarget(cancel, loginDirtyState)], [false, true, false]);
+
+  hop.fbmSyncConfigFinishEdit('login');
+  hop.FBM_SYNC_ACCOUNT_SCHEMA = { login: { password: { id: 'fbm-login-password' } } };
+  hop.FBM_SYNC_CLIENT.loginStatus = { public: { usernameHint: 'old-login' } };
+  hop.FBM_SYNC_CLIENT.identityDraft = { spreadsheetId: 'sheet', userId: 'user', username: 'old', accountName: 'account' };
+  password.value = '';
+  const outside = bo.dom.document.createElement('button');
+  const loginStarted = hop.fbmSyncConfigStartEdit('login');
+  const cleanOutsideBlocked = hop.unsavedChangesGuardFbmTarget(outside, () => {});
+  check(so, 'Đang sửa dù chưa đổi giá trị vẫn chặn action ngoài card', [loginStarted, cleanOutsideBlocked, hop.UNSAVED_CHANGES.dialogOpen], [true, true, false]);
+  check(so, 'Không mở đồng thời khối thứ hai khi khối hiện tại còn đang sửa', [hop.fbmSyncConfigStartEdit('identity'), hop.fbmSyncConfigState('login').editing, hop.fbmSyncConfigState('identity').editing], [false, true, false]);
+  hop.fbmSyncConfigFinishEdit('login');
+  username.value = 'old';
+  check(so, 'Mở khối mới chỉ thành công sau khi khối cũ đã kết thúc', [hop.fbmSyncConfigStartEdit('identity'), hop.fbmSyncConfigState('login').editing, hop.fbmSyncConfigState('identity').editing], [true, false, true]);
+  username.value = 'changed-again';
+  const dirtyCancelBlocked = hop.unsavedChangesGuardFbmTarget(cancel, () => {});
+  check(so, 'Chỉ Hủy cùng card mới mở cảnh báo khi card đã dirty', [dirtyCancelBlocked, hop.UNSAVED_CHANGES.dialogOpen], [true, true]);
+  hop.unsavedChangesResolve('continue');
+  const blockedStart = hop.fbmSyncConfigStartEdit('login');
+  check(so, 'Không mở khối thứ hai khi khối hiện tại đã dirty', [blockedStart, hop.fbmSyncConfigState('identity').editing, hop.fbmSyncConfigState('login').editing], [false, true, false]);
 }
 
 function testHopDongTichHop(so) {
@@ -142,8 +175,9 @@ function testHopDongTichHop(so) {
   check(so, 'dispatcher form lõi luôn đi qua guard và vẫn chừa saveForm cho cửa lưu', [
     dispatch.indexOf('function dispatchRunNow(') >= 0,
     dispatch.indexOf('unsavedChangesGuardCore') >= 0,
-    guard.indexOf("String(action || '') === 'saveForm'") >= 0
-  ], [true, true, true]);
+    guard.indexOf("String(action || '') === 'saveForm'") >= 0,
+    guard.indexOf("String(action || '') === 'cancelForm' && !state.dirty") >= 0
+  ], [true, true, true, true]);
   check(so, 'dispatcher FBM giữ action chờ trong guard trước khi chạy target', [
     fbm.indexOf('unsavedChangesGuardFbmTarget') >= 0,
     fbm.indexOf('function fbmSyncDispatchClickTarget(') >= 0,
@@ -154,6 +188,16 @@ function testHopDongTichHop(so) {
     editor.indexOf("path === 'password'") >= 0,
     editor.indexOf('state.snapshot = fbmSyncConfigClone(draft)') >= 0
   ], [true, true, true]);
+  check(so, 'editor chỉ cho một khối ở chế độ sửa và nút sửa login đi qua cổng chung', [
+    editor.indexOf('function fbmSyncConfigEditingKey()') >= 0,
+    editor.indexOf('if (activeKey && activeKey !== key) { return false; }') >= 0,
+    fbm.indexOf("if (fbmSyncConfigStartEdit('login'))") >= 0,
+    !editor.includes('loginEditMode') && !fbm.includes('loginEditMode')
+  ], [true, true, true, true]);
+  check(so, 'FBM guard chặn theo trạng thái đang sửa, không phụ thuộc dirty', [
+    guard.indexOf('if (!state || !state.editing) { return false; }') >= 0,
+    guard.indexOf('provider.needsDecision') >= 0
+  ], [true, true]);
   check(so, 'CSS changed tập trung ở components và bao phủ input, menu, toggle', [
     styles.indexOf('shin-field-changed') >= 0,
     styles.indexOf('shin-choice-trigger') >= 0,

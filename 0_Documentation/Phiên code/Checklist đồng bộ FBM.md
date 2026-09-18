@@ -465,7 +465,7 @@ Các ràng buộc thiết kế của slice này nằm ở Tài liệu 09.01, 09.
 Chi tiết đầy đủ nằm ở `0_Documentation/Phiên code/Checklist cảnh báo thay đổi chưa lưu Sidebar.md`; các mục dưới đây là cổng theo dõi của phiên đồng bộ FBM.
 
 - [x] Chốt UX: snapshot chỉ tạo khi Sửa/Thêm mới; so sánh lazy khi bấm action; cảnh báo có Lưu, Bỏ thay đổi và Tiếp tục sửa.
-- [x] Chốt phạm vi khóa: mọi action ngoài khối dirty bị chặn, gồm menu ba chấm, đổi màn hình, quay lại, sửa khối khác và đóng module.
+- [x] Chốt phạm vi khóa: mọi action ngoài khối đang sửa bị chặn kể cả khi chưa dirty, gồm menu ba chấm, đổi màn hình, quay lại, sửa khối khác và đóng module; không có hai khối sửa đồng thời.
 - [x] Cập nhật Tài liệu 04 và Tài liệu 09.08 về dirty guard, presentation changed, draft Sidebar và state GAS.
 - [x] Cập nhật `Kế hoạch sửa Sidebar FBM.md` và tạo checklist chi tiết riêng.
 - [x] Tạo lõi dirty guard dùng chung cho modal, action chờ, save/discard/continue và chống chạy trùng.

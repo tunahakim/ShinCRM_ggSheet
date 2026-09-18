@@ -82,7 +82,7 @@
 ### 3.6. Cảnh báo thay đổi chưa lưu
 
 - Mỗi khối cấu hình chỉ tạo snapshot khi người dùng bấm Sửa; Sidebar không so sánh toàn bộ cấu hình sau mỗi phím gõ.
-- Một dirty guard dùng chung chặn mọi action ngoài khối đang sửa, gồm menu ba chấm, đổi màn hình, quay lại, sửa khối khác và đóng module.
+- Một guard dùng chung chặn mọi action ngoài khối đang sửa, kể cả khi chưa dirty; không mở đồng thời hai khối. Dirty chỉ dùng để tô màu và quyết định cảnh báo ở Hủy/X.
 - Cảnh báo có ba lựa chọn: Lưu thay đổi, Bỏ thay đổi và tiếp tục, Tiếp tục sửa. Nút đóng/Escape/vùng nền là Tiếp tục sửa.
 - Màu changed chỉ xuất hiện sau lần cảnh báo đầu tiên, do lớp UI/resolver áp dụng; khi trường về snapshot hoặc lưu/hủy thành công thì bỏ màu.
 - Password không nằm trong snapshot, DTO hoặc log; ô password có giá trị trong lượt sửa vẫn làm card login dirty.

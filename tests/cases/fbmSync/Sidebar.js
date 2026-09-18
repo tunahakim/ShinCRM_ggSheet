@@ -219,7 +219,7 @@ async function chay(so) {
   const appendAccount = hop.fbmSyncAppendBox;
   let accountBlocks;
   hop.FBM_SYNC_CLIENT.loginStatus = { configured: true, credentialRef: 'saved-ref', public: { usernameHint: 'an***' } };
-  hop.FBM_SYNC_CLIENT.loginEditMode = false;
+  hop.fbmSyncConfigFinishEdit('login');
   hop.fbmSyncAppendBox = (_panel, _className, _id, elements) => { accountBlocks = elements; return content; };
   hop.fbmSyncRenderAccount(content, idle);
   hop.fbmSyncAppendBox = appendAccount;
@@ -230,7 +230,7 @@ async function chay(so) {
   check(so, 'Chế độ xem vẫn có nút Đăng nhập thử dùng credential đã lưu', [savedLoginActions.elements[0].id, savedLoginActions.elements[0].label, savedLoginActions.elements[0].disabled], ['fbm-sync-login-test', 'Đăng nhập thử', false]);
   const loginPolicyNavigation = savedLoginCard.elements.filter((node) => node && node.id === 'fbm-sync-login-policy-navigation-region')[0];
   check(so, 'Account có nút mở đúng khối cài đặt đăng nhập tự động', [loginPolicyNavigation.elements[0].className, loginPolicyNavigation.elements[0].elements[0].id, loginPolicyNavigation.elements[0].elements[0].label], ['shin-single-action-row', 'fbm-sync-open-login-policy', 'Cài đặt đăng nhập tự động']);
-  hop.FBM_SYNC_CLIENT.loginEditMode = true;
+  hop.fbmSyncConfigStartEdit('login');
   hop.FBM_SYNC_CLIENT.loginDraft.username = 'anhlt';
   hop.fbmSyncAppendBox = (_panel, _className, _id, elements) => { accountBlocks = elements; return content; };
   hop.fbmSyncRenderAccount(content, idle);
@@ -238,11 +238,12 @@ async function chay(so) {
   const editLoginCard = accountBlocks[1].elements[0];
   const editLoginFields = editLoginCard.elements.filter((node) => node && node.role === 'box' && node.className === 'shin-form-field');
   check(so, 'Bấm sửa mở lại username, để trống ô mật khẩu và tách màu hai icon', [editLoginCard.titleActions[0].icon, editLoginCard.titleActions[0].className, editLoginCard.titleActions[1].icon, editLoginCard.titleActions[1].className, editLoginFields[0].elements[1].disabled, editLoginFields[0].elements[1].value, editLoginFields[1].elements[1].disabled, editLoginFields[1].elements[1].value], ['close', 'shin-config-cancel', 'check', 'shin-config-save', false, 'anhlt', false, '']);
-  hop.FBM_SYNC_CLIENT.loginEditMode = false;
+  hop.fbmSyncConfigFinishEdit('login');
   hop.FBM_SYNC_CLIENT.loginStatus = { configured: false, enabled: true };
   hop.fbmSyncConfigStartEdit('login');
   const loginActionRow = hop.fbmSyncLoginActionBlocks()[0];
   check(so, 'Hai nút đăng nhập dùng Row chung để chia đều hai cột', [loginActionRow.role, loginActionRow.elements.length, loginActionRow.elements[0].role, loginActionRow.elements[1].role], ['row', 2, 'button', 'button']);
+  hop.fbmSyncConfigFinishEdit('login');
   hop.FBM_SYNC_CLIENT.syncSettings = { account: { customerPrefix: 'ALT', customerCodeLength: '8', activitySince: '2026-01-01' } };
   render(hop, content, hop.fbmSyncRenderAccount, idle);
   check(so, 'Account hien cau hinh ma khach FBM va moc Activity tren FBM tu GAS', [dom.document.getElementById('fbm-account-customer-prefix').value, dom.document.getElementById('fbm-account-customer-length').value, dom.document.getElementById('fbm-account-activity-since').value, content.textContent.indexOf('Mốc ngày Activity trên FBM') >= 0, content.textContent.indexOf('end_date') >= 0, content.textContent.indexOf('không bị coi là bản ghi mất') >= 0], ['ALT', '8', '2026-01-01', true, true, true]);
@@ -274,6 +275,7 @@ async function chay(so) {
   dom.document.activeElement = dom.document.getElementById('fbm-identity-user');
   hop.fbmSyncPaint({ phase: 'done', counts: {}, metadata: { identityProbe: { spreadsheetId: 'sheet-focused', userId: '3001', username: 'focused-user', accountName: 'Focused Account' } } });
   check(so, 'Identity probe vẫn hiện kết quả khi ô liên kết còn focus', [dom.document.getElementById('fbm-identity-spreadsheet').value, dom.document.getElementById('fbm-identity-user').value, dom.document.getElementById('fbm-identity-username').value, dom.document.getElementById('fbm-identity-account').value], ['sheet-focused', '3001', 'focused-user', 'Focused Account']);
+  hop.fbmSyncConfigFinishEdit('identity');
   hop.FBM_SYNC_CLIENT.accountNotices = { login: { kind: 'error', message: 'Extension không trả lời yêu cầu FBM.' } };
   render(hop, content, hop.fbmSyncRenderAccount, { phase: 'error', message: 'Extension không trả lời yêu cầu FBM.', counts: {} });
   check(so, 'Account hiện lỗi cầu nối trong đúng card đăng nhập', [content.textContent.indexOf('Extension không trả lời yêu cầu FBM.') >= 0, content.textContent.indexOf('Đăng nhập tự động') < content.textContent.indexOf('Extension không trả lời yêu cầu FBM.')], [true, true]);
@@ -375,6 +377,7 @@ async function chay(so) {
   hop.FBM_SYNC_CLIENT.subscreen = 'account';
   hop.FBM_SYNC_CLIENT.loginStatus = { configured: false, enabled: true };
   render(hop, content, hop.fbmSyncRenderAccount, idle);
+  hop.fbmSyncConfigStartEdit('login');
   dom.document.getElementById('fbm-login-username').value = '';
   dom.document.getElementById('fbm-login-password').value = '';
   const paints = [];
@@ -419,7 +422,7 @@ async function chay(so) {
   let editIdentityArgs = null;
   hop.callServer = (name, args) => { if (name === 'fbmStartIdentityCheck') { editIdentityArgs = args; return Promise.resolve({ ok: true, request: {} }); } return Promise.resolve({}); };
   await hop.fbmSyncCheckIdentity();
-  check(so, 'Kiểm tra liên kết chế độ sửa dùng đúng bốn ô đang nhập và báo n/N', [editIdentityArgs, hop.FBM_SYNC_CLIENT.accountNotices.identity.kind, hop.FBM_SYNC_CLIENT.accountNotices.identity.message], [[{ spreadsheetId: 'sheet-focused', userId: '3001', username: 'focused-user', accountName: 'Focused Account' }], 'warning', 'Kiểm tra liên kết hoàn tất: 2/3 Customer hợp lệ; không tìm thấy: 1.']);
+  check(so, 'Kiểm tra liên kết chế độ xem dùng binding hiện tại và báo n/N', [editIdentityArgs, hop.FBM_SYNC_CLIENT.accountNotices.identity.kind, hop.FBM_SYNC_CLIENT.accountNotices.identity.message], [[{ spreadsheetId: 'sheet', userId: 'u', username: 'anhlt', accountName: 'A' }], 'warning', 'Kiểm tra liên kết hoàn tất: 2/3 Customer hợp lệ; không tìm thấy: 1.']);
 
   hop.fbmSyncConfigFinishEdit('identity');
   hop.FBM_SYNC_CLIENT.identityStatus = { status: 'BOUND', binding: { spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' } };

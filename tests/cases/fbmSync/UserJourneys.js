@@ -111,10 +111,12 @@ async function chay(so) {
   hop.fbmSyncTestLogin = () => { accountActions.push('test-login'); return Promise.resolve(null); };
   hop.fbmSyncSaveLoginConfig = () => { accountActions.push('save-credential'); return Promise.resolve(null); };
   click(dom, dom.document.getElementById('fbm-sync-config-identity-edit'));
+  hop.fbmSyncConfigFinishEdit('identity');
   click(dom, dom.document.getElementById('fbm-sync-config-login-edit'));
   ['fbm-sync-probe-identity', 'fbm-sync-check-identity', 'fbm-sync-save-identity', 'fbm-sync-login-test', 'fbm-sync-login-save'].forEach((id) => click(dom, dom.document.getElementById(id)));
-  check(so, 'tai khoan FBM gui dung tung thao tac ma nguoi dung bam', accountActions, ['autofill', 'check', 'save-binding', 'test-login', 'save-credential']);
+  check(so, 'tai khoan FBM gui dung tung thao tac sau khi ket thuc card truoc', accountActions, ['autofill', 'check', 'save-binding', 'test-login', 'save-credential']);
   check(so, 'tai khoan FBM khong nhan doi cong tac tu dang nhap, chinh sach chi nam o Cai dat phien', content.querySelector('#fbm-sync-auto-login'), null);
+  hop.fbmSyncConfigFinishEdit('login');
 
   hop.FBM_SYNC_CLIENT.subscreen = 'settings';
   hop.FBM_SYNC_CLIENT.loginStatus = { enabled: true, autoOpenTab: false, retryEnabled: true, retryMinutes: 30 };
@@ -137,6 +139,7 @@ async function chay(so) {
   click(dom, dom.document.getElementById('fbm-sync-config-module-edit'));
   click(dom, dom.document.getElementById('fbm-sync-settings-master-switch'));
   check(so, 'switch module trong card ở chế độ sửa chỉ đổi draft', [dom.document.getElementById('fbm-sync-settings-master-switch').getAttribute('aria-pressed'), calls.filter((item) => item.name === 'fbmSetMasterSwitch').length], ['false', masterCallsBeforeModuleViewClick]);
+  hop.fbmSyncConfigFinishEdit('module');
   click(dom, dom.document.getElementById('fbm-sync-config-module-cancel'));
   const startupViewValue = dom.document.getElementById('fbm-sync-run-on-startup').getAttribute('aria-pressed');
   click(dom, dom.document.getElementById('fbm-sync-run-on-startup'));
@@ -163,10 +166,14 @@ async function chay(so) {
   hop.fbmSyncSaveLoginPolicy = () => { settingsActions.push('login-policy'); return Promise.resolve(null); };
   hop.fbmSyncRotateRelay = () => { settingsActions.push('rotate-relay'); return Promise.resolve(null); };
   const toggles = ['fbm-sync-run-on-startup', 'fbm-sync-process-heartbeat', 'fbm-sync-process-customerFull', 'fbm-sync-process-activityFull', 'fbm-sync-process-detail', 'fbm-sync-policy-auto-login', 'fbm-sync-policy-auto-open', 'fbm-sync-policy-retry'];
-  ['background', 'loginPolicy', 'relay'].forEach((key) => click(dom, dom.document.getElementById('fbm-sync-config-' + key + '-edit')));
-  toggles.forEach((id) => click(dom, dom.document.getElementById(id)));
-  ['fbm-sync-save-extension', 'fbm-sync-save-background', 'fbm-sync-save-login-policy', 'fbm-sync-rotate-relay'].forEach((id) => click(dom, dom.document.getElementById(id)));
-  check(so, 'cai dat phien doi dung tung cong tac va gui tung lenh luu theo nut bam', [settingsActions, toggles.map((id) => dom.document.getElementById(id).getAttribute('aria-pressed'))], [['extension', 'background', 'login-policy', 'rotate-relay'], ['false', 'false', 'false', 'false', 'true', 'false', 'false', 'true']]);
+  click(dom, dom.document.getElementById('fbm-sync-save-extension'));
+  hop.fbmSyncConfigFinishEdit('extension');
+  click(dom, dom.document.getElementById('fbm-sync-config-background-edit'));
+  ['fbm-sync-process-heartbeat', 'fbm-sync-process-customerFull', 'fbm-sync-process-activityFull', 'fbm-sync-process-detail'].forEach((id) => click(dom, dom.document.getElementById(id)));
+  click(dom, dom.document.getElementById('fbm-sync-save-background'));
+  hop.fbmSyncConfigFinishEdit('background');
+  click(dom, dom.document.getElementById('fbm-sync-config-loginPolicy-edit'));
+  ['fbm-sync-policy-auto-login', 'fbm-sync-policy-auto-open', 'fbm-sync-policy-retry'].forEach((id) => click(dom, dom.document.getElementById(id)));
   check(so, 'chinh sach tu dang nhap khoa hai muc con khi muc cha tat', [dom.document.getElementById('fbm-sync-policy-auto-login').disabled, dom.document.getElementById('fbm-sync-policy-auto-open').disabled, dom.document.getElementById('fbm-sync-policy-retry').disabled, dom.document.getElementById('fbm-sync-login-retry-minutes').disabled], [false, true, true, true]);
   click(dom, dom.document.getElementById('fbm-sync-policy-auto-login'));
   check(so, 'bat lai muc cha mo khoa cac muc con', [dom.document.getElementById('fbm-sync-policy-auto-login').getAttribute('aria-pressed'), dom.document.getElementById('fbm-sync-policy-auto-open').disabled, dom.document.getElementById('fbm-sync-policy-retry').disabled, dom.document.getElementById('fbm-sync-login-retry-minutes').disabled], ['true', false, false, false]);
@@ -174,11 +181,17 @@ async function chay(so) {
   check(so, 'tat retry khoa rieng chu ky thu lai', [dom.document.getElementById('fbm-sync-policy-retry').getAttribute('aria-pressed'), dom.document.getElementById('fbm-sync-login-retry-minutes').disabled], ['false', true]);
   click(dom, dom.document.getElementById('fbm-sync-policy-retry'));
   check(so, 'bat retry mo khoa lai chu ky thu lai', [dom.document.getElementById('fbm-sync-policy-retry').getAttribute('aria-pressed'), dom.document.getElementById('fbm-sync-login-retry-minutes').disabled], ['true', false]);
+  click(dom, dom.document.getElementById('fbm-sync-save-login-policy'));
+  hop.fbmSyncConfigFinishEdit('loginPolicy');
+  click(dom, dom.document.getElementById('fbm-sync-config-relay-edit'));
+  click(dom, dom.document.getElementById('fbm-sync-rotate-relay'));
+  hop.fbmSyncConfigFinishEdit('relay');
+  check(so, 'cai dat phien doi dung tung cong tac va gui tung lenh luu theo nut bam', settingsActions, ['extension', 'background', 'login-policy', 'rotate-relay']);
   const background = dom.document.getElementById('fbm-sync-background-switch');
   click(dom, background);
-  check(so, 'công tắc lịch nền chỉ đổi draft ngay khi click, không loading', [background.getAttribute('aria-pressed'), background.className.indexOf('is-off') >= 0, background.disabled], ['false', true, false]);
+  check(so, 'công tắc lịch nền trong chế độ xem không đổi', [background.getAttribute('aria-pressed'), background.className.indexOf('is-off') >= 0, background.disabled], ['true', false, true]);
   await tick();
-  check(so, 'cài đặt lịch nền không gửi GAS khi click switch; chỉ lưu qua nút Lưu', [calls.filter((item) => item.name === 'fbmSetBackgroundSwitch').map((item) => item.args[0]), background.getAttribute('aria-pressed'), background.className.indexOf('is-off') >= 0, background.disabled], [[], 'false', true, false]);
+  check(so, 'cài đặt lịch nền chế độ xem không gửi GAS', [calls.filter((item) => item.name === 'fbmSetBackgroundSwitch').map((item) => item.args[0]), background.getAttribute('aria-pressed'), background.className.indexOf('is-off') >= 0, background.disabled], [[], 'true', false, true]);
 
   hop.FBM_SYNC_CLIENT.subscreen = 'results';
   hop.FBM_SYNC_CLIENT.resultsTab = 'summary';
