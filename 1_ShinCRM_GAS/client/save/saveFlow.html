@@ -142,4 +142,36 @@ function saveFlowSubmit() {
     });
   });
 }
+
+/* Provider dirty cho form lõi: dùng lại đúng bộ thu thập của luồng lưu, chỉ chạy khi dirty guard hỏi. */
+var SAVE_FLOW_UNSAVED_PROVIDER = null;
+function saveFlowUnsavedProvider() {
+  if (SAVE_FLOW_UNSAVED_PROVIDER) { return SAVE_FLOW_UNSAVED_PROVIDER; }
+  SAVE_FLOW_UNSAVED_PROVIDER = {
+    read: function () {
+      var top = typeof screenStateTop === 'function' ? screenStateTop() : null;
+      if (!top || typeof formCollectAll !== 'function' || typeof formCollectEntity !== 'function') { return { dirty: false, fieldIds: [] }; }
+      var current = formCollectEntity(formCollectAll(), top.entity), baseline = top.record || {}, changed = [], fieldIds = [];
+      Object.keys(current || {}).forEach(function (name) {
+        var left = current[name], right = baseline[name], same = typeof unsavedChangesEqual === 'function' ? unsavedChangesEqual(left, right) : String(left === undefined || left === null ? '' : left).trim() === String(right === undefined || right === null ? '' : right).trim();
+        if (!same) {
+          changed.push(name);
+          if (typeof renderFieldId === 'function') { fieldIds.push(renderFieldId({ entity: top.entity, name: name })); }
+        }
+      });
+      return { dirty: changed.length > 0, fields: changed, fieldIds: fieldIds, top: top };
+    },
+    save: function () {
+      var top = typeof screenStateTop === 'function' ? screenStateTop() : null, result = saveFlowSubmit();
+      if (!result || typeof result.then !== 'function') { return { ok: false }; }
+      return result.then(function () { return { ok: typeof screenStateTop !== 'function' || screenStateTop() !== top }; });
+    },
+    discard: function () {
+      var top = typeof screenStateTop === 'function' ? screenStateTop() : null;
+      if (top && typeof screenStateSetDraft === 'function') { screenStateSetDraft({}); }
+      return { ok: true };
+    }
+  };
+  return SAVE_FLOW_UNSAVED_PROVIDER;
+}
 </script>

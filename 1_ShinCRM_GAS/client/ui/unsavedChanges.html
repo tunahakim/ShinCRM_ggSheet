@@ -1,0 +1,196 @@
+<script>
+/*
+ * Cổng duy nhất bảo vệ bản nháp Sidebar trước action có thể làm mất dữ liệu.
+ * Module này chỉ điều phối cảnh báo và presentation; provider của form/FBM vẫn giữ snapshot, draft và cửa lưu riêng.
+ */
+var UNSAVED_CHANGES = { dialogOpen: false, highlighted: false, provider: null, pending: null, busy: false, returnFocus: null };
+
+function unsavedChangesNormalize(value) {
+  if (value === null || value === undefined) { return ''; }
+  if (typeof value === 'boolean') { return value ? 'true' : 'false'; }
+  if (typeof value === 'number') { return String(value); }
+  return String(value).trim();
+}
+
+function unsavedChangesEqual(left, right) {
+  return unsavedChangesNormalize(left) === unsavedChangesNormalize(right);
+}
+
+function unsavedChangesApplyFields(fieldIds) {
+  unsavedChangesClearFields();
+  (fieldIds || []).forEach(function (id) {
+    var control = document.getElementById(String(id || ''));
+    if (!control) { return; }
+    var field = control.closest && control.closest('.shin-form-field');
+    field = field || control;
+    if (field.classList) { field.classList.add('shin-field-changed'); }
+    control.setAttribute('data-unsaved-changed', '1');
+  });
+  UNSAVED_CHANGES.highlighted = !!(fieldIds && fieldIds.length);
+}
+
+function unsavedChangesClearFields() {
+  if (typeof document === 'undefined' || !document.querySelectorAll) { return; }
+  document.querySelectorAll('.shin-field-changed').forEach(function (field) { if (field.classList) { field.classList.remove('shin-field-changed'); } });
+  document.querySelectorAll('[data-unsaved-changed]').forEach(function (control) { control.removeAttribute('data-unsaved-changed'); });
+  UNSAVED_CHANGES.highlighted = false;
+}
+
+function unsavedChangesDialog() { return document.getElementById('shin-unsaved-dialog'); }
+
+function unsavedChangesSetBusy(busy) {
+  var dialog = unsavedChangesDialog();
+  UNSAVED_CHANGES.busy = busy === true;
+  if (!dialog) { return; }
+  dialog.setAttribute('aria-busy', UNSAVED_CHANGES.busy ? 'true' : 'false');
+  dialog.querySelectorAll('[data-unsaved-choice]').forEach(function (button) { button.disabled = UNSAVED_CHANGES.busy; });
+}
+
+function unsavedChangesOpen() {
+  var dialog = unsavedChangesDialog();
+  if (!dialog) { throw new Error('Sidebar thiếu host cảnh báo thay đổi chưa lưu.'); }
+  dialog.hidden = false;
+  dialog.setAttribute('aria-hidden', 'false');
+  UNSAVED_CHANGES.dialogOpen = true;
+  var stay = dialog.querySelector('[data-unsaved-choice="continue"]');
+  if (stay && stay.focus) { stay.focus(); }
+}
+
+function unsavedChangesClose(preserveBusy) {
+  var dialog = unsavedChangesDialog();
+  if (dialog) {
+    dialog.hidden = true;
+    dialog.setAttribute('aria-hidden', 'true');
+  }
+  UNSAVED_CHANGES.dialogOpen = false;
+  if (preserveBusy !== true) { unsavedChangesSetBusy(false); }
+  var focus = UNSAVED_CHANGES.returnFocus;
+  UNSAVED_CHANGES.returnFocus = null;
+  if (focus && focus.focus && focus.isConnected !== false) { focus.focus(); }
+}
+
+function unsavedChangesNotifyFailure(error) {
+  if (typeof alert === 'function') { alert(error && error.message ? error.message : 'Không xử lý được thay đổi chưa lưu.'); }
+}
+
+function unsavedChangesReadProvider(kind) {
+  if (kind === 'fbm' && typeof fbmSyncConfigUnsavedProvider === 'function') { return fbmSyncConfigUnsavedProvider(); }
+  if (kind === 'core' && typeof saveFlowUnsavedProvider === 'function') { return saveFlowUnsavedProvider(); }
+  return null;
+}
+
+function unsavedChangesRefresh() {
+  var provider = UNSAVED_CHANGES.provider;
+  if (!provider || !UNSAVED_CHANGES.highlighted || typeof provider.read !== 'function') { return; }
+  var state = provider.read();
+  if (!state || !state.dirty) { unsavedChangesClearFields(); return; }
+  unsavedChangesApplyFields(state.fieldIds || []);
+}
+
+function unsavedChangesFinish(operation) {
+  var provider = UNSAVED_CHANGES.provider, pending = UNSAVED_CHANGES.pending;
+  if (!provider) { return; }
+  unsavedChangesClose(true);
+  var result;
+  try { result = typeof provider[operation] === 'function' ? provider[operation]() : null; } catch (error) {
+    UNSAVED_CHANGES.pending = pending;
+    unsavedChangesSetBusy(false);
+    unsavedChangesNotifyFailure(error);
+    return;
+  }
+  Promise.resolve(result).then(function (value) {
+    var state = typeof provider.read === 'function' ? provider.read() : null;
+    if (value && value.ok === false) { UNSAVED_CHANGES.pending = pending; unsavedChangesSetBusy(false); return; }
+    if (state && state.dirty) { UNSAVED_CHANGES.pending = pending; unsavedChangesSetBusy(false); return; }
+    unsavedChangesClearFields();
+    UNSAVED_CHANGES.provider = null;
+    UNSAVED_CHANGES.pending = null;
+    unsavedChangesSetBusy(false);
+    if (typeof pending === 'function') { return pending(); }
+    return null;
+  }, function (error) {
+    UNSAVED_CHANGES.pending = pending;
+    unsavedChangesSetBusy(false);
+    unsavedChangesNotifyFailure(error);
+  });
+}
+
+function unsavedChangesResolve(choice) {
+  if (!UNSAVED_CHANGES.dialogOpen || UNSAVED_CHANGES.busy) { return; }
+  if (choice === 'continue') {
+    unsavedChangesClose();
+    unsavedChangesRefresh();
+    return;
+  }
+  if (choice !== 'save' && choice !== 'discard') { return; }
+  unsavedChangesSetBusy(true);
+  unsavedChangesFinish(choice);
+}
+
+function unsavedChangesInstall() {
+  if (UNSAVED_CHANGES.installed) { return; }
+  UNSAVED_CHANGES.installed = true;
+  document.addEventListener('click', function (event) {
+    var target = event.target && event.target.closest ? event.target.closest('[data-unsaved-choice]') : null;
+    if (!target) { return; }
+    event.preventDefault();
+    unsavedChangesResolve(target.getAttribute('data-unsaved-choice'));
+  });
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape' && UNSAVED_CHANGES.dialogOpen && !UNSAVED_CHANGES.busy) {
+      event.preventDefault();
+      unsavedChangesResolve('continue');
+    }
+  });
+  if (typeof window !== 'undefined' && window.addEventListener) {
+    window.addEventListener('beforeunload', function (event) {
+      var dirty = false;
+      ['core', 'fbm'].some(function (kind) {
+        var provider = unsavedChangesReadProvider(kind), state;
+        if (!provider || typeof provider.read !== 'function') { return false; }
+        try { state = provider.read(); } catch (ignore) { return false; }
+        dirty = !!(state && state.dirty);
+        return dirty;
+      });
+      if (!dirty) { return; }
+      event.preventDefault();
+      event.returnValue = '';
+      return '';
+    });
+  }
+}
+
+/** Trả true khi action đã bị giữ lại ở hộp cảnh báo; false nghĩa là bên gọi được chạy ngay. */
+function unsavedChangesGuard(kind, pending) {
+  var provider = unsavedChangesReadProvider(kind);
+  if (!provider || typeof provider.read !== 'function') { return false; }
+  var state;
+  try { state = provider.read(); } catch (error) { unsavedChangesNotifyFailure(error); return true; }
+  if (!state || !state.dirty) {
+    if (UNSAVED_CHANGES.provider === provider) { unsavedChangesClearFields(); UNSAVED_CHANGES.provider = null; UNSAVED_CHANGES.pending = null; }
+    return false;
+  }
+  if (UNSAVED_CHANGES.dialogOpen) { return true; }
+  UNSAVED_CHANGES.provider = provider;
+  UNSAVED_CHANGES.pending = pending;
+  UNSAVED_CHANGES.returnFocus = document.activeElement;
+  unsavedChangesApplyFields(state.fieldIds || []);
+  unsavedChangesOpen();
+  return true;
+}
+
+function unsavedChangesGuardCore(action, pending) {
+  if (String(action || '') === 'saveForm' || typeof screenStateTop !== 'function' || !screenStateTop()) { return false; }
+  return unsavedChangesGuard('core', pending);
+}
+
+function unsavedChangesGuardFbmTarget(target, pending) {
+  var provider = unsavedChangesReadProvider('fbm');
+  if (!provider || typeof provider.read !== 'function') { return false; }
+  var state;
+  try { state = provider.read(); } catch (error) { unsavedChangesNotifyFailure(error); return true; }
+  if (!state || !state.dirty) { return false; }
+  if (typeof provider.canRunTarget === 'function' && provider.canRunTarget(target, state)) { return false; }
+  return unsavedChangesGuard('fbm', pending);
+}
+</script>

@@ -94,7 +94,7 @@ function dispatchBusy(el) {
  *
  * `el` là phần tử vừa bấm, và nó chỉ dùng cho một việc duy nhất: khóa nút mang `data-busy` cho tới lúc hành động xong. Không truyền cũng chạy được — đường gọi từ console lúc nghiệm thu không có nút nào.
  */
-function dispatchRun(ten, payload, el) {
+function dispatchRunNow(ten, payload, el) {
   if (typeof ACTIONS === 'undefined' || !Object.prototype.hasOwnProperty.call(ACTIONS, ten)) {
     dispatchError(new Error('Nút vừa bấm gọi hành động "' + ten + '" không có trong bảng ACTIONS. Đây là lỗi bản khai bố cục, không phải bạn làm sai — phép kiểm lúc khởi động lẽ ra phải bắt được nó.'));
     return null;
@@ -124,6 +124,14 @@ function dispatchRun(ten, payload, el) {
   if (xong) { xong(); }
   dispatchAfter(ket);
   return ket;
+}
+
+/** Action lõi của form không được làm mất bản nháp; dirty guard giữ action lại rồi gọi lại hàm này sau khi xử lý. */
+function dispatchRun(ten, payload, el) {
+  if (typeof unsavedChangesGuardCore === 'function' && unsavedChangesGuardCore(ten, function () { return dispatchRunNow(ten, payload, el); })) {
+    return null;
+  }
+  return dispatchRunNow(ten, payload, el);
 }
 
 /**

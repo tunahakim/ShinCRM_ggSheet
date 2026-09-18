@@ -225,6 +225,97 @@ function fbmSyncConfigSave(key, target) {
   return Promise.resolve(null);
 }
 
+/* Ánh xạ control của từng card về path trong snapshot. Đây là hợp đồng nội bộ của editor, không đưa vào screen schema. */
+var FBM_SYNC_CONFIG_UNSAVED_FIELDS = {
+  identity: { spreadsheetId: 'fbm-identity-spreadsheet', userId: 'fbm-identity-user', username: 'fbm-identity-username', accountName: 'fbm-identity-account' },
+  login: { username: 'fbm-login-username', password: 'fbm-login-password' },
+  accountSettings: { customerPrefix: 'fbm-account-customer-prefix', customerCodeLength: 'fbm-account-customer-length', activitySince: 'fbm-account-activity-since' },
+  module: { enabled: 'fbm-sync-settings-master-switch', approvalThreshold: 'fbm-sync-setting-approval-threshold' },
+  relay: {},
+  extension: { pollMinutes: 'fbm-extension-poll-minutes', runOnStartup: 'fbm-sync-run-on-startup' },
+  background: {
+    enabled: 'fbm-sync-background-switch', direction: 'fbm-sync-background-direction',
+    'heartbeat.minutes': 'fbm-sync-process-heartbeat-minutes', 'heartbeat.enabled': 'fbm-sync-process-heartbeat',
+    'customerFull.minutes': 'fbm-sync-process-customerFull-minutes', 'customerFull.enabled': 'fbm-sync-process-customerFull',
+    'activityFull.minutes': 'fbm-sync-process-activityFull-minutes', 'activityFull.enabled': 'fbm-sync-process-activityFull',
+    'detail.minutes': 'fbm-sync-process-detail-minutes', 'detail.enabled': 'fbm-sync-process-detail',
+    'detail.customersPerRun': 'fbm-sync-detail-count', 'detail.minDelaySeconds': 'fbm-sync-detail-delay-min', 'detail.maxDelaySeconds': 'fbm-sync-detail-delay-max'
+  },
+  loginPolicy: { enabled: 'fbm-sync-policy-auto-login', autoOpenTab: 'fbm-sync-policy-auto-open', retryEnabled: 'fbm-sync-policy-retry', retryMinutes: 'fbm-sync-login-retry-minutes' }
+};
+
+var FBM_SYNC_CONFIG_UNSAVED_CARDS = {
+  identity: 'fbm-sync-identity-card-region', login: 'fbm-sync-login-card-region', accountSettings: 'fbm-sync-account-settings-region',
+  module: 'fbm-sync-module-card-region', relay: 'fbm-sync-relay-card-region', extension: 'fbm-sync-extension-card-region',
+  background: 'fbm-sync-background-card-region', loginPolicy: 'fbm-sync-login-policy-card-region'
+};
+
+function fbmSyncConfigPathGet(value, path) {
+  var result = value;
+  String(path || '').split('.').forEach(function (part) { if (result !== null && result !== undefined) { result = result[part]; } });
+  return result;
+}
+
+function fbmSyncConfigUnsavedControlValue(id) {
+  var control = document.getElementById(id);
+  if (!control) { return undefined; }
+  if (control.hasAttribute('aria-pressed')) { return control.getAttribute('aria-pressed') === 'true'; }
+  if (control.getAttribute('data-standalone-menu') === '1' || control.getAttribute('data-standalone-select') === '1') { return control.getAttribute('data-value') || control.value || ''; }
+  return control.value === undefined || control.value === null ? '' : String(control.value);
+}
+
+function fbmSyncConfigUnsavedRead() {
+  var keys = [], fields = [], fieldIds = [], fieldsByKey = {};
+  FBM_SYNC_CONFIG_KEYS.forEach(function (key) {
+    var state = fbmSyncConfigState(key), map = FBM_SYNC_CONFIG_UNSAVED_FIELDS[key] || {};
+    if (!state.editing || state.snapshot === null || state.snapshot === undefined) { return; }
+    Object.keys(map).forEach(function (path) {
+      var current = fbmSyncConfigUnsavedControlValue(map[path]);
+      if (current === undefined) { current = fbmSyncConfigPathGet(state.draft, path); }
+      var baseline = fbmSyncConfigPathGet(state.snapshot, path);
+      var isPassword = key === 'login' && path === 'password';
+      var changed = isPassword ? String(current || '') !== '' : (typeof unsavedChangesEqual === 'function' ? !unsavedChangesEqual(current, baseline) : String(current === undefined || current === null ? '' : current).trim() !== String(baseline === undefined || baseline === null ? '' : baseline).trim());
+      if (!changed) { return; }
+      if (!fieldsByKey[key]) { fieldsByKey[key] = []; }
+      fieldsByKey[key].push(path);
+      fields.push(key + '.' + path);
+      fieldIds.push(map[path]);
+      if (keys.indexOf(key) === -1) { keys.push(key); }
+    });
+  });
+  return { dirty: keys.length > 0, keys: keys, fields: fields, fieldIds: fieldIds, fieldsByKey: fieldsByKey };
+}
+
+var FBM_SYNC_CONFIG_UNSAVED_PROVIDER = null;
+function fbmSyncConfigUnsavedProvider() {
+  if (FBM_SYNC_CONFIG_UNSAVED_PROVIDER) { return FBM_SYNC_CONFIG_UNSAVED_PROVIDER; }
+  FBM_SYNC_CONFIG_UNSAVED_PROVIDER = {
+    read: fbmSyncConfigUnsavedRead,
+    save: function () {
+      var state = fbmSyncConfigUnsavedRead(), key = state.keys[0];
+      if (!key) { return { ok: true }; }
+      return Promise.resolve(fbmSyncConfigSave(key, null)).then(function () { return { ok: true }; });
+    },
+    discard: function () {
+      var state = fbmSyncConfigUnsavedRead();
+      state.keys.forEach(function (key) { fbmSyncConfigCancelEdit(key); });
+      return { ok: true };
+    },
+    canRunTarget: function (target, state) {
+      if (!target || !state || !state.keys.length || state.keys.length !== 1) { return false; }
+      var key = state.keys[0], action = target.getAttribute && target.getAttribute('data-sync-config-action'), targetKey = target.getAttribute && target.getAttribute('data-sync-config-key');
+      if (action === 'save' && targetKey === key) { return true; }
+      if (action === 'cancel' && targetKey === key) { return false; }
+      if (targetKey && targetKey !== key) { return false; }
+      if (target.id === 'fbm-sync-open-login-policy' || target.id === 'fbm-sync-back' || target.id === 'fbm-sync-module-menu' || target.id === 'fbm-sync-master-switch' || target.id === 'fbm-sync-settings-master-switch') { return false; }
+      if (target.hasAttribute && (target.hasAttribute('data-sync-screen') || target.hasAttribute('data-sync-results-tab') || target.hasAttribute('data-sync-page'))) { return false; }
+      var cardId = FBM_SYNC_CONFIG_UNSAVED_CARDS[key], card = cardId && target.closest ? target.closest('#' + cardId) : null;
+      return !!card;
+    }
+  };
+  return FBM_SYNC_CONFIG_UNSAVED_PROVIDER;
+}
+
 function fbmSyncConfigHandleAction(target) {
   if (!target || !target.getAttribute) { return false; }
   var action = target.getAttribute('data-sync-config-action'), key = target.getAttribute('data-sync-config-key');
