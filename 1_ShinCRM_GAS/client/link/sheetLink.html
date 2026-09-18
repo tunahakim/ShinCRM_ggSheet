@@ -40,8 +40,8 @@ var SHEET_LINK_SELECTION_WAKE_QUEUED = false;
 var SHEET_LINK_CONTEXT_GENERATION = 0;
 var SHEET_LINK_LAST_SEEN_REVISION = 0;
 var SHEET_LINK_PING_TIMER = null;
-// Probe selection/reload là request thăm dò; chỉ payload reload thật mới hiển thị tiến trình.
-var SHEET_LINK_SHOW_PROBE_PROGRESS = false;
+// Bật tạm thời để nghiệm thu thấy mọi request probe/defer. Tắt sau khi chủ dự án kiểm tra xong.
+var SHEET_LINK_SHOW_PROBE_PROGRESS_DEBUG = true;
 var sheetLinkInstalled = false;
 
 var SHEET_LINK_ORIGIN = 'https://docs.google.com';
@@ -298,7 +298,21 @@ function sheetLinkContextMayAffectReload(context) {
   var plans = sheetLinkPlanForSheet(value.sheetName);
   if (!plans.length) {
     var knownSheet = value.sheetName === 'Customer' || value.sheetName === 'Activity' || value.sheetName === 'Category' || value.sheetName === 'Config' || String(value.sheetName || '').indexOf('!') === 0;
-    return knownSheet;
+    if (!knownSheet) { return false; }
+    if (value.headerComplete === false || !Array.isArray(value.rawHeaderRow)) { return true; }
+    var knownCoordinates = sheetLinkParseNameBox(value.cellRef);
+    if (!knownCoordinates) { return true; }
+    var knownCodes = sheetLinkExpectedCodes(value.sheetName, plans);
+    var knownColumns = value.rawHeaderRow.map(function (item) {
+      return knownCodes.indexOf(String(item.value || '').trim()) >= 0 ? Number(item.column || 0) : 0;
+    }).filter(function (column) { return column > 0; });
+    if (!knownColumns.length) { return false; }
+    if (knownCoordinates.row === 1 || knownCoordinates.rowEnd === 0) {
+      return sheetLinkRelevantHeaders(value, plans, knownCoordinates);
+    }
+    return knownCoordinates.colEnd === 0 || knownColumns.some(function (column) {
+      return column >= knownCoordinates.col && column <= knownCoordinates.colEnd;
+    });
   }
   if (value.headerComplete === false || !Array.isArray(value.rawHeaderRow)) { return true; }
   var coordinates = sheetLinkParseNameBox(value.cellRef);
@@ -306,8 +320,10 @@ function sheetLinkContextMayAffectReload(context) {
   if (coordinates.row === 1 || coordinates.rowEnd === 0) { return sheetLinkRelevantHeaders(value, plans, coordinates); }
   var expectedCodes = sheetLinkExpectedCodes(value.sheetName, plans);
   var columns = value.rawHeaderRow.map(function (item) { return expectedCodes.indexOf(String(item.value || '').trim()) >= 0 ? Number(item.column || 0) : 0; }).filter(function (column) { return column > 0; });
-  if (!columns.length) { return true; }
-  return columns.some(function (column) { return column >= coordinates.col && column <= coordinates.colEnd; });
+  // Metadata đã hoàn chỉnh mà không có cột mã hợp lệ nghĩa là sheet này không
+  // có vùng reload cần theo dõi; không fail-open để tránh request thừa ở sheet trắng.
+  if (!columns.length) { return false; }
+  return coordinates.colEnd === 0 || columns.some(function (column) { return column >= coordinates.col && column <= coordinates.colEnd; });
 }
 
 function sheetLinkReloadState(payload) {
@@ -477,7 +493,7 @@ function sheetLinkProbeSelectionAndReload(reason, options) {
     forceImmediate: opts.forceImmediate === true
   };
   var request = callServer('probeSelectionAndReload', [input], {
-    silent: opts.silent === true || SHEET_LINK_SHOW_PROBE_PROGRESS !== true
+    silent: opts.silent === true || SHEET_LINK_SHOW_PROBE_PROGRESS_DEBUG !== true
   });
   var settled = request.then(function (result) {
     var extensionOwnsContext = sheetLinkExtensionAlive() && !!SHEET_LINK_LAST_CONTEXT;
@@ -531,7 +547,7 @@ function sheetLinkSyncDirtyData(options) {
 
 /** Được gọi sau một lời gọi máy chủ tự nhiên; không chạy theo nhịp riêng và không gọi lại chính getReloadState. */
 function sheetLinkObserveReloadPayload(payload, serverName) {
-  if (!payload || payload.reloadObservation === false || !SHEET_LINK_RAM_READY || serverName === 'getReloadState' || serverName === 'reloadRecords' || serverName === 'probeSelectionAndReload') { return null; }
+  if (!payload || payload.reloadObservation === false || !SHEET_LINK_RAM_READY || serverName === 'getReloadState' || serverName === 'reloadRecords' || serverName === 'probeSelectionAndReload' || serverName === 'saveRecord' || serverName === 'deleteRecords') { return null; }
   var state = sheetLinkReloadState(payload);
   var revision = Number(state && state.revision || 0);
   if (!revision || revision <= SHEET_LINK_LAST_SEEN_REVISION) { return null; }

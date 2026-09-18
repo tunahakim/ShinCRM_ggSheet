@@ -67,7 +67,7 @@ function dungHopPoll() {
   };
   napClient(hop, 'client/ram/refresh.html', 'client/link/sheetLink.html', 'client/link/selectionPoll.html');
   // Các phép kiểm request giữ hợp đồng bàn giao im lặng; bản chạy DEV trực quan bật cờ này ở runtime.
-  hop.SHEET_LINK_SHOW_PROBE_PROGRESS = false;
+  hop.SHEET_LINK_SHOW_PROBE_PROGRESS_DEBUG = true;
   return hop;
 }
 
@@ -87,7 +87,7 @@ async function chay(so) {
   try { hop = dungHopPoll(); } catch (err) { return ghiLoiNap(so, 'nạp máy trạng thái polling', err); }
 
   batDau(hop);
-  check(so, 'probe selection mặc định chạy im lặng', hop.SHEET_LINK_SHOW_PROBE_PROGRESS, false);
+  check(so, 'probe selection debug hiện loading', hop.SHEET_LINK_SHOW_PROBE_PROGRESS_DEBUG, true);
   check(so, 'mouseenter Sidebar không còn là tín hiệu đánh thức', hop._rootListeners.mouseenter, undefined);
   hop._clock.now = 4000; hop.selectionPollClearTimer(); hop.selectionPollTick();
   await new Promise((resolve) => setImmediate(resolve));
@@ -113,7 +113,7 @@ async function chay(so) {
   safetyTimer.fn();
   check(so, 'safety request chạy silent không bật loading', [safety._calls[0].name, safety._calls[0].options.silent], ['probeSelectionAndReload', true]);
 
-  const safetyVisibleProbe = dungHopPoll(); batDau(safetyVisibleProbe); safetyVisibleProbe.SHEET_LINK_SHOW_PROBE_PROGRESS = true;
+  const safetyVisibleProbe = dungHopPoll(); batDau(safetyVisibleProbe); safetyVisibleProbe.SHEET_LINK_SHOW_PROBE_PROGRESS_DEBUG = true;
   safetyVisibleProbe._calls = [];
   safetyVisibleProbe.callServer = (name, args, options) => { safetyVisibleProbe._calls.push({ name, args, options }); return syncValue({ ok: true, reload: { revision: 0 }, selection: { spreadsheetId: 'sheet-1', gid: '1', sheetName: 'Customer', row: 4, col: 1, rowEnd: 4, colEnd: 1, customerId: '' } }); };
   const visibleSafetyTimer = Array.from(safetyVisibleProbe._timers.values()).find((item) => item.delay === 60000);
@@ -128,7 +128,7 @@ async function chay(so) {
   const wakeTimer = Array.from(wake._timers.values()).find((item) => item.delay === 3000);
   check(so, 'keydown liên tiếp chỉ giữ một timer debounce ba giây', [Boolean(wakeTimer), wake._timers.size >= 2], [true, true]);
   wakeTimer.fn();
-  check(so, 'hết debounce chỉ hỏi GAS một request và request silent', [wake._calls.length, wake._calls[0].name, wake._calls[0].options.silent], [1, 'probeSelectionAndReload', true]);
+  check(so, 'hết debounce chỉ hỏi GAS một request và loading debug bật', [wake._calls.length, wake._calls[0].name, wake._calls[0].options.silent], [1, 'probeSelectionAndReload', false]);
 
   const appFocus = dungHopPoll(); batDau(appFocus); appFocus._calls = [];
   appFocus.SHEET_LINK_LAST_ACK = 5000; appFocus._clock.now = 5001;
@@ -144,6 +144,28 @@ async function chay(so) {
   });
   check(so, 'context sheet trắng không đặt wake request',
     [irrelevant._calls.length, Array.from(irrelevant._timers.values()).some((item) => item.delay === 1000)], [0, false]);
+
+  const knownBlank = dungHopPoll(); batDau(knownBlank); knownBlank._calls = [];
+  knownBlank.sheetLinkOnMessage({
+    origin: knownBlank.SHEET_LINK_ORIGIN,
+    data: { action: 'CRM_CONTEXT', nonce: knownBlank.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq: 1, sheetName: 'Customer', cellRef: 'A4', rawHeaderRow: [], headerComplete: true }
+  });
+  check(so, 'sheet mặc định không có mã @ không đặt wake request',
+    [knownBlank._calls.length, Array.from(knownBlank._timers.values()).some((item) => item.delay === 1000)], [0, false]);
+
+  const wholeRows = dungHopPoll(); batDau(wholeRows); wholeRows._calls = [];
+  wholeRows.SHEET_LINK_READ_PLAN = { Customer: [{ token: 'id', headerAddress: 'A1', expectedValue: '@CUS_MA_KH', valueAddressTemplate: 'A{row}' }] };
+  wholeRows.sheetLinkOnMessage({
+    origin: wholeRows.SHEET_LINK_ORIGIN,
+    data: { action: 'CRM_CONTEXT', nonce: wholeRows.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq: 1, sheetName: 'Customer', cellRef: '5:7', rawHeaderRow: [{ address: 'A1', column: 1, value: '@CUS_MA_KH' }], headerComplete: true }
+  });
+  check(so, 'selection nguyên hàng vẫn đặt wake khi sheet có cột mã',
+    Array.from(wholeRows._timers.values()).some((item) => item.delay === 3000), true);
+
+  const writeResponse = dungHopPoll(); batDau(writeResponse); writeResponse._calls = [];
+  writeResponse.sheetLinkObserveReloadPayload({ reload: { revision: 3, records: ['CUS-1'] } }, 'saveRecord');
+  writeResponse.sheetLinkObserveReloadPayload({ reload: { revision: 4, records: ['CUS-2'] } }, 'deleteRecords');
+  check(so, 'save/delete đã trả kết quả thì không probe reload lần hai', writeResponse._calls, []);
 
   const relevant = dungHopPoll(); batDau(relevant); relevant._calls = [];
   relevant.sheetLinkOnMessage({

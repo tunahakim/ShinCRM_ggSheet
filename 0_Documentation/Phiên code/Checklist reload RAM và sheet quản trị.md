@@ -426,8 +426,8 @@
 - [x] Test offline phủ F phát sinh trong lúc payload A–E đang được đọc: GAS không xóa F, response ghi `remainingRevision`, request kế tiếp nhận F; ca cùng một mã bị sửa lại trong lúc đọc cũng được giữ (`tests/cases/selectionService.js`).
 - [x] Test offline phủ response lệch thứ tự: response cũ không ghi đè payload/revision mới (`tests/cases/selectionPoll.js`).
 - [x] GAS DEV deployment `@422`: `reloadPayloadProbe --push` trả `defer` không payload rồi trả payload records trong chính request sau `readyAt`; probe cô lập dirty state, không ghi dữ liệu khách và khôi phục DocumentProperties. `probeSelectionAndReload` vẫn trả đúng contract `requestId`/selection/ReloadState/decision ở trạng thái sạch.
-- [x] Khi payload reload thực sự được áp dụng, Sidebar bật thanh tiến trình trong lúc nạp; request thăm dò/defer vẫn im lặng. Thanh giữ tối thiểu 120 ms để lượt nạp quá nhanh vẫn quan sát được (`client/ui/progress.html`, `client/link/sheetLink.html`; `node tests/run.js` đạt `1624/1624`).
-- [ ] Các request `probeSelectionAndReload` chạy im lặng sau khi tắt cờ debug; trong giai đoạn hiện tại cờ debug được bật có kiểm soát để quan sát request (`SHEET_LINK_SHOW_PROBE_PROGRESS_DEBUG`).
+- [x] Khi payload reload thực sự được áp dụng, Sidebar bật thanh tiến trình trong lúc nạp. Thanh giữ tối thiểu 120 ms để lượt nạp quá nhanh vẫn quan sát được (`client/ui/progress.html`, `client/link/sheetLink.html`).
+- [ ] Sau khi chủ dự án nghiệm thu debug, tắt `SHEET_LINK_SHOW_PROBE_PROGRESS_DEBUG` để request thăm dò/defer chạy im lặng.
 - [x] Extension chỉ đặt wake khi vị trí nằm trong cột reload hợp lệ do GAS cấp; hàng 1 cột thường, sheet trắng và cột thường không tạo request thăm dò (test hồi quy `selectionPoll.js`/`extensionBridge.js`).
 
 ## Slice R12 — Đồng bộ pha áp RAM và vẽ màn hiện tại
@@ -461,7 +461,7 @@
 - [x] Chuyển khách 108 → 113 liên tục không nháy ngược về 108 do response/context cũ (test `selectionPoll.js`).
 - [x] Rê chuột vào Sidebar không tạo request và không bật loading (test `selectionPoll.js`, commit `fb5181b`).
 - [x] Mọi phím đều dùng chung `keyboardHint`; click chỉ trong canvas được bắt, click làm Name Box đổi dùng vị trí, click không đổi Name Box vẫn gửi context sau vòng gom 200 ms (code Extension; còn bổ sung ca test canvas).
-- [ ] Request thăm dò/defer vẫn im lặng; chỉ payload reload mới bật loading trong giai đoạn nghiệm thu.
+- [x] Trong giai đoạn nghiệm thu hiện tại, cờ `SHEET_LINK_SHOW_PROBE_PROGRESS_DEBUG` được bật để nhìn thấy request probe/defer; sau nghiệm thu sẽ chuyển về chế độ im lặng.
 
 ## Slice R13 — Giao thức context thô và tối ưu request
 
@@ -470,8 +470,8 @@
 - [x] Sidebar giữ schema và ý nghĩa mã `@`, tự phân tích `E5`, `E5:G7`, `A:A`, `5:7`; Extension không gửi `selectionKind`, `row`, `col` như kết luận nghiệp vụ.
 - [x] Read plan được gửi lúc bắt tay hoặc khi schema đổi, không tạo chuỗi ba message cho mỗi lần chọn ô; Extension chỉ đối chiếu tọa độ/giá trị kỳ vọng và trả `ok`, `mismatch` hoặc `unavailable`.
 - [ ] Loại trường nghiệp vụ `customerId`/`customerIdSource` khỏi payload Extension; giữ kết quả đọc thô và để Sidebar tự đối chiếu Store. Khi có input phải thử đọc giá trị mới, không dùng cache cũ làm giá trị hiện tại nếu live model chưa cập nhật.
-- [ ] Không tạo probe thứ hai sau `saveRecord`/`deleteRecords` khi response đã có dữ liệu ghi hoặc payload đủ áp RAM; mọi response có dirty phải được phân loại trước khi quyết định gọi thêm.
-- [ ] Selection nguyên hàng (`5:7`) và sheet mặc định đã biết là trắng không được bị bỏ sót hoặc tạo wake thừa; bổ sung test riêng cho hai nhánh này.
+- [x] Không tạo probe thứ hai sau `saveRecord`/`deleteRecords` khi response đã có dữ liệu ghi hoặc payload đủ áp RAM; mọi response có dirty phải được phân loại trước khi quyết định gọi thêm (`tests/cases/selectionPoll.js`).
+- [x] Selection nguyên hàng (`5:7`) và sheet mặc định đã biết là trắng không được bị bỏ sót hoặc tạo wake thừa; có test riêng cho hai nhánh này (`tests/cases/selectionPoll.js`).
 - [ ] Xóa entry point công khai `probeSelectionCheap`/`probeSelectionFull`; chỉ giữ `probeSelectionAndReload`.
 - [x] Sidebar không hỏi GAS ở ô/vùng chắc chắn ngoài phạm vi; hàng 1 thiếu hoặc read plan lỗi thì fail-open và hỏi GAS.
 - [x] GAS `probeSelectionAndReload` luôn trả `decision` và payload cần thiết trong cùng response; không có request reload thứ hai để hoàn tất cùng một lượt.
