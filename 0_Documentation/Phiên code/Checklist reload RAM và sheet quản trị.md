@@ -472,7 +472,7 @@
 - [x] Loại trường nghiệp vụ `customerId`/`customerIdSource` khỏi payload Extension; giữ kết quả đọc thô và để Sidebar tự đối chiếu Store. Khi có input phải thử đọc giá trị mới, không dùng cache cũ làm giá trị hiện tại nếu live model chưa cập nhật (`sheet_scout.js`, `live_model_reader.js`, `tests/cases/liveModelReader.js`, `tests/cases/selectionPoll.js`).
 - [x] Không tạo probe thứ hai sau `saveRecord`/`deleteRecords` khi response đã có dữ liệu ghi hoặc payload đủ áp RAM; mọi response có dirty phải được phân loại trước khi quyết định gọi thêm (`tests/cases/selectionPoll.js`).
 - [x] Selection nguyên hàng (`5:7`) và sheet mặc định đã biết là trắng không được bị bỏ sót hoặc tạo wake thừa; có test riêng cho hai nhánh này (`tests/cases/selectionPoll.js`).
-- [ ] Xóa entry point công khai `probeSelectionCheap`/`probeSelectionFull`; chỉ giữ `probeSelectionAndReload`.
+- [x] Xóa entry point công khai `probeSelectionCheap`/`probeSelectionFull`; chỉ giữ `probeSelectionAndReload` và probe nghiệm thu view (`SelectionService.js`, `tests/cases/selectionService.js`).
 - [x] Sidebar không hỏi GAS ở ô/vùng chắc chắn ngoài phạm vi; hàng 1 thiếu hoặc read plan lỗi thì fail-open và hỏi GAS.
 - [x] GAS `probeSelectionAndReload` luôn trả `decision` và payload cần thiết trong cùng response; không có request reload thứ hai để hoàn tất cùng một lượt.
 - [ ] Test click canvas, click phải rồi paste, click Sidebar/menu, click đổi Name Box, cột ẩn, chèn cột, sửa một ô/vùng hàng 1, thường-sang-thường và response cũ đến muộn.

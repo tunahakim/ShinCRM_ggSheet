@@ -271,34 +271,15 @@ function selectionCustomerId(context, snapshot) {
   return String(value === null || value === undefined ? '' : value).trim();
 }
 
-/** Tọa độ ô đang chọn, không đọc giá trị ô. */
-function probeSelectionCheap() {
-  return runEntryPoint('probeSelectionCheap', 'sidebar', 'throw', function () {
-    var started = Date.now();
-    return selectionProbeReply(selectionSnapshot(), started);
-  });
-}
-
-/** Tọa độ kèm mã khách đọc trực tiếp từ cột mã của sheet hiện tại. */
-function probeSelectionFull() {
-  return runEntryPoint('probeSelectionFull', 'sidebar', 'throw', function () {
-    var started = Date.now();
-    var context = selectionProbeContext();
-    var snapshot = selectionSnapshotFromContext(context);
-    if (snapshot.sheetName && snapshot.sheetName.charAt(0) === '!') {
-      // Bảo đảm sheet quản trị đã được làm mới trước khi đọc ô mã hiện tại.
-      renderViewIfDirty(snapshot.sheetName);
-    }
-    return selectionProbeReply(snapshot, started, selectionCustomerId(context, snapshot));
-  });
-}
-
 /** Nghiệm thu trên Google: chọn hàng dữ liệu và hàng tiêu đề để đối chiếu mã khách cùng thời gian thật. */
 function viewProbeSelection() {
   return runEntryPoint('viewProbeSelection', 'sidebar', 'throw', function () {
     var started = Date.now();
     var context = selectionProbeContext();
     var snapshot = selectionSnapshotFromContext(context);
+    if (snapshot.sheetName && snapshot.sheetName.charAt(0) === '!') {
+      renderViewIfDirty(snapshot.sheetName);
+    }
     var full = selectionProbeReply(snapshot, started, selectionCustomerId(context, snapshot));
     var report = [];
     report.push('selection: row=' + full.row + ' col=' + full.col + ' sheet="' + full.sheetName + '" cellRef="' + full.cellRef + '"');

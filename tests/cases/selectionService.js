@@ -44,31 +44,31 @@ function chay(so) {
   lead.getRange(1, 1).setValue('@CUS_MA_KH');
   lead.getRange(7, 1).setValue('CUS-000007');
 
-  check(so, 'Customer tra cột mã khách của Customer', hop.probeSelectionFull().customerId, 'CUS-000004');
+  check(so, 'Customer tra cột mã khách của Customer', hop.probeSelectionAndReload({}).customerId, 'CUS-000004');
 
   state.sheetName = 'Activity';
-  check(so, 'Activity tra @ACT_MA_KH, không lấy khách cùng số hàng bên Customer', hop.probeSelectionFull().customerId, 'CUS-000099');
+  check(so, 'Activity tra @ACT_MA_KH, không lấy khách cùng số hàng bên Customer', hop.probeSelectionAndReload({}).customerId, 'CUS-000099');
 
   state.sheetName = 'Customer';
   state.row = 2;
-  check(so, 'hàng tiêu đề 1-3 luôn rỗng', hop.probeSelectionFull().customerId, '');
+  check(so, 'hàng tiêu đề 1-3 luôn rỗng', hop.probeSelectionAndReload({}).customerId, '');
 
   state.sheetName = 'Category';
   state.row = 4;
-  check(so, 'sheet ngoài kho trả rỗng, không dùng nhầm dữ liệu Customer', hop.probeSelectionFull({ Category: { '4': 'CUS-SAI' } }).customerId, '');
+  check(so, 'sheet ngoài kho trả rỗng, không dùng nhầm dữ liệu Customer', hop.probeSelectionAndReload({}).customerId, '');
 
   state.sheetName = 'Customer';
   state.row = 5;
-  check(so, 'hàng dữ liệu trống trả rỗng', hop.probeSelectionFull().customerId, '');
+  check(so, 'hàng dữ liệu trống trả rỗng', hop.probeSelectionAndReload({}).customerId, '');
 
   state.sheetName = '!Lead';
   state.row = 7;
   const rendered = [];
   hop.renderViewIfDirty = (sheetName) => { rendered.push(sheetName); };
-  const viewSelection = hop.probeSelectionFull({ '!Lead': { '7': 'CUS-SAI' } });
+  const viewReport = hop.viewProbeSelection();
   check(so, 'polling trên sheet quản trị đọc trực tiếp cột mã sau khi render',
-    [viewSelection.customerId, rendered],
-    ['CUS-000007', ['!Lead']]);
+    [rendered, viewReport.some((line) => line.indexOf('customerId="CUS-000007"') >= 0)],
+    [['!Lead'], true]);
 
   state.sheetName = 'Customer';
   state.row = 6;
@@ -202,10 +202,10 @@ function chay(so) {
     calls.push([name, source, channel]);
     return fn();
   };
-  const full = hop.probeSelectionFull();
-  hop.probeSelectionCheap();
-  hop.viewProbeSelection();
-  check(so, 'các cửa selection chỉ mở một runEntryPoint và phản hồi đầy đủ báo ms bằng số', [calls, typeof full.ms], [[['probeSelectionFull', 'sidebar', 'throw'], ['probeSelectionCheap', 'sidebar', 'throw'], ['viewProbeSelection', 'sidebar', 'throw']], 'number']);
+  const finalViewReport = hop.viewProbeSelection();
+  check(so, 'chỉ giữ một cổng selection/reload và cửa nghiệm thu view',
+    [typeof hop.probeSelectionFull, typeof hop.probeSelectionCheap, calls, typeof finalViewReport[finalViewReport.length - 1]],
+    ['undefined', 'undefined', [['viewProbeSelection', 'sidebar', 'throw']], 'string']);
 
   return so;
 }
