@@ -163,6 +163,15 @@ async function chay(so) {
   check(so, 'selection nguyên hàng vẫn đặt wake khi sheet có cột mã',
     Array.from(wholeRows._timers.values()).some((item) => item.delay === 3000), true);
 
+  const stalePlan = dungHopPoll(); batDau(stalePlan); stalePlan._calls = [];
+  stalePlan.SHEET_LINK_READ_PLAN = { Customer: [{ token: 'id', headerAddress: 'A1', expectedValue: '@CUS_MA_KH', valueAddressTemplate: 'A{row}' }] };
+  stalePlan.sheetLinkOnMessage({
+    origin: stalePlan.SHEET_LINK_ORIGIN,
+    data: { action: 'CRM_CONTEXT', nonce: stalePlan.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq: 1, sheetName: 'Customer', cellRef: 'A4', rawHeaderRow: [], headerComplete: true }
+  });
+  check(so, 'read plan lệch hàng 1 fail-open để GAS tự xác nhận',
+    Array.from(stalePlan._timers.values()).some((item) => item.delay === 1000), true);
+
   const writeResponse = dungHopPoll(); batDau(writeResponse); writeResponse._calls = [];
   writeResponse.sheetLinkObserveReloadPayload({ reload: { revision: 3, records: ['CUS-1'] } }, 'saveRecord');
   writeResponse.sheetLinkObserveReloadPayload({ reload: { revision: 4, records: ['CUS-2'] } }, 'deleteRecords');

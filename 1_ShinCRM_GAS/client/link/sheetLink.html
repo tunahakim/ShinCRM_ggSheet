@@ -323,9 +323,10 @@ function sheetLinkContextMayAffectReload(context) {
   if (coordinates.row === 1 || coordinates.rowEnd === 0) { return sheetLinkRelevantHeaders(value, plans, coordinates); }
   var expectedCodes = sheetLinkExpectedCodes(value.sheetName, plans);
   var columns = value.rawHeaderRow.map(function (item) { return expectedCodes.indexOf(String(item.value || '').trim()) >= 0 ? Number(item.column || 0) : 0; }).filter(function (column) { return column > 0; });
-  // Metadata đã hoàn chỉnh mà không có cột mã hợp lệ nghĩa là sheet này không
-  // có vùng reload cần theo dõi; không fail-open để tránh request thừa ở sheet trắng.
-  if (!columns.length) { return false; }
+  // Có read plan nhưng hàng 1 không khớp là metadata lệch/chưa chắc chắn;
+  // phải hỏi GAS thay vì âm thầm bỏ mất signal. Sheet trắng đã biết là trắng
+  // được xử lý ở nhánh không có plan phía trên.
+  if (!columns.length) { return true; }
   return coordinates.colEnd === 0 || columns.some(function (column) { return column >= coordinates.col && column <= coordinates.colEnd; });
 }
 
