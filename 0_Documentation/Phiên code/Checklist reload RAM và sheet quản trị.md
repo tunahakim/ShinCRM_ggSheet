@@ -236,13 +236,13 @@
 
 - [x] Có một request `probeSelectionAndReload` bên ngoài thay cho chuỗi RPC `probeSelectionCheap` → `probeSelectionFull` (client/server, test `selectionPoll.js`, `selectionService.js`).
 - [x] Khi selection không đổi, GAS trả context/mã khách cũ và không đọc lại ô mã khách (test `selectionService.js`).
-- [ ] Khi selection đổi, GAS vẫn tự tra schema và đọc mã khách trong cùng request nếu không có dữ liệu Extension; Extension giữ `customerId`/`customerIdSource` hiện tại để tương thích cho đến khi giao thức mới được nghiệm thu.
+- [x] Khi selection đổi, GAS vẫn tự tra schema và đọc mã khách trong cùng request nếu không có dữ liệu Extension; Extension giữ `customerId`/`customerIdSource` hiện tại để tương thích (test `selectionService.js`, GAS DEV `reloadMatrixProbe` `@429`).
 - [x] Response selection/reload luôn kèm `ReloadState`, `decision`, `payload`, `observedRevision`, `processedRevision` và trạng thái còn bẩn; Sidebar không tự quyết định scope và chỉ áp dụng payload (server `SelectionService.js`, test `selectionService.js`, GAS DEV `reloadPayloadProbe` `@412`).
 - [x] Context Extension có `customerId` hợp lệ được áp dụng ngay cho màn hình chính trước các RPC kiểm tra dirty; RPC chạy nền không chặn nguồn-chọn cục bộ (client `sheetLink.html`, test `selectionPoll.js`).
 - [x] Fallback polling vị trí 2 giây rồi 6 giây gộp luôn kiểm tra reload, không tạo request kiểm tra thứ hai; request probe chạy silent và chỉ payload thật mới hiện loading (test `selectionPoll.js`).
 - [x] Safety polling theo phút chạy im lặng, chỉ phục vụ RAM và không kích hoạt renderer view (client `selectionPoll.html`, test `selectionPoll.js`).
 - [x] `focus`/`visibilitychange` không gọi đồng bộ dirty ngay; chỉ đánh thức fallback/safety, tránh loading khi chuyển tab trình duyệt hoặc chuyển app (client `selectionPoll.html`, test `selectionPoll.js`).
-- [ ] Loại bỏ hoàn toàn `reloadRelevant`/`reloadColumns` khỏi giao thức Extension và điều kiện chặn wake; Sidebar chỉ dùng hàng 1/schema thô để tối ưu, thiếu chắc chắn thì fail-open.
+- [x] Loại bỏ hoàn toàn `reloadRelevant`/`reloadColumns` khỏi giao thức Extension và điều kiện chặn wake; Sidebar chỉ dùng hàng 1/schema thô để tối ưu, thiếu chắc chắn thì fail-open (test `extensionBridge.js`/`selectionPoll.js`).
 - [x] Customer còn tồn tại được upsert bằng bản ghi máy chủ trả về (test `refresh.js`).
 - [x] Customer biến mất được remove (test `refresh.js`).
 - [x] Activity còn tồn tại được upsert (test `refresh.js`).
@@ -473,5 +473,7 @@
 - [x] Sidebar không hỏi GAS ở ô/vùng chắc chắn ngoài phạm vi; hàng 1 thiếu hoặc read plan lỗi thì fail-open và hỏi GAS.
 - [x] GAS `probeSelectionAndReload` luôn trả `decision` và payload cần thiết trong cùng response; không có request reload thứ hai để hoàn tất cùng một lượt.
 - [ ] Test click canvas, click phải rồi paste, click Sidebar/menu, click đổi Name Box, cột ẩn, chèn cột, sửa một ô/vùng hàng 1, thường-sang-thường và response cũ đến muộn.
+
+  Bằng chứng GAS DEV: `reloadMatrixProbe --push` đạt toàn bộ ca tại deployment `@429`, gồm Customer/Activity, vùng nhiều hàng, hàng 1 trước/sau, Category, Config và sheet quản trị.
 
 ---
