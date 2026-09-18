@@ -304,6 +304,8 @@ function sheetLinkContextMayAffectReload(context) {
     var knownCoordinates = sheetLinkParseNameBox(value.cellRef);
     if (!knownCoordinates) { return true; }
     var knownCodes = sheetLinkExpectedCodes(value.sheetName, plans);
+    // Chưa có schema/read plan thì Sidebar chưa đủ dữ liệu để loại request an toàn.
+    if (!knownCodes.length && !SHEET_LINK_SCHEMA) { return true; }
     var knownColumns = value.rawHeaderRow.map(function (item) {
       return knownCodes.indexOf(String(item.value || '').trim()) >= 0 ? Number(item.column || 0) : 0;
     }).filter(function (column) { return column > 0; });

@@ -146,6 +146,7 @@ async function chay(so) {
     [irrelevant._calls.length, Array.from(irrelevant._timers.values()).some((item) => item.delay === 1000)], [0, false]);
 
   const knownBlank = dungHopPoll(); batDau(knownBlank); knownBlank._calls = [];
+  knownBlank.SHEET_LINK_SCHEMA = { customer: { id: { code: '@CUS_MA_KH' } } };
   knownBlank.sheetLinkOnMessage({
     origin: knownBlank.SHEET_LINK_ORIGIN,
     data: { action: 'CRM_CONTEXT', nonce: knownBlank.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq: 1, sheetName: 'Customer', cellRef: 'A4', rawHeaderRow: [], headerComplete: true }
