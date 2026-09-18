@@ -1,7 +1,12 @@
 /** Kiểm thử offline cổng cảnh báo thay đổi chưa lưu của Sidebar. */
+const fs = require('fs');
+const path = require('path');
 const { napClient, taoHopCat } = require('../lib/load-gas');
 const { domGia } = require('../lib/dom-gia');
 const { section, check } = require('../lib/assert');
+
+const ROOT = path.join(__dirname, '..', '..');
+function docClient(relative) { return fs.readFileSync(path.join(ROOT, '1_ShinCRM_GAS', 'client', relative), 'utf8'); }
 
 function taoBoTest() {
   const dom = domGia();
@@ -122,12 +127,47 @@ async function testFormVaFbm(so) {
   check(so, 'FBM chặn nút Hủy và action ngoài card nhưng cho nút Lưu cùng card', [provider.canRunTarget(cancel, dirtyState), provider.canRunTarget(save, dirtyState), provider.canRunTarget(bo.dom.document.createElement('button'), dirtyState)], [false, true, false]);
 }
 
+function testHopDongTichHop(so) {
+  const sidebar = docClient('Sidebar.html');
+  const dispatch = docClient('ui/dispatch.html');
+  const guard = docClient('ui/unsavedChanges.html');
+  const fbm = docClient('sync/fbmSync.html');
+  const editor = docClient('sync/fbmSyncConfigEditor.html');
+  const styles = docClient('style/components.html');
+  check(so, 'Sidebar giữ host tĩnh, nạp module dirty guard và cài listener lúc boot', [
+    sidebar.indexOf('id="shin-unsaved-dialog"') >= 0,
+    sidebar.indexOf("include('client/ui/unsavedChanges')") >= 0,
+    sidebar.indexOf('unsavedChangesInstall();') >= 0
+  ], [true, true, true]);
+  check(so, 'dispatcher form lõi luôn đi qua guard và vẫn chừa saveForm cho cửa lưu', [
+    dispatch.indexOf('function dispatchRunNow(') >= 0,
+    dispatch.indexOf('unsavedChangesGuardCore') >= 0,
+    guard.indexOf("String(action || '') === 'saveForm'") >= 0
+  ], [true, true, true]);
+  check(so, 'dispatcher FBM giữ action chờ trong guard trước khi chạy target', [
+    fbm.indexOf('unsavedChangesGuardFbmTarget') >= 0,
+    fbm.indexOf('function fbmSyncDispatchClickTarget(') >= 0,
+    fbm.indexOf('document.addEventListener(\'change\'') > fbm.indexOf('function fbmSyncDispatchClickTarget(')
+  ], [true, true, true]);
+  check(so, 'editor có mapping dirty cho đủ tám key và giữ password ngoài snapshot', [
+    ['identity:', 'login:', 'accountSettings:', 'module:', 'relay:', 'extension:', 'background:', 'loginPolicy:'].every((key) => editor.indexOf(key) >= 0),
+    editor.indexOf("path === 'password'") >= 0,
+    editor.indexOf('state.snapshot = fbmSyncConfigClone(draft)') >= 0
+  ], [true, true, true]);
+  check(so, 'CSS changed tập trung ở components và bao phủ input, menu, toggle', [
+    styles.indexOf('shin-field-changed') >= 0,
+    styles.indexOf('shin-choice-trigger') >= 0,
+    styles.indexOf('shin-toggle-control') >= 0
+  ], [true, true, true]);
+}
+
 async function chay(so) {
   section('Dirty guard Sidebar - compare, modal va scope');
   await testSoSanhVaLazy(so);
   await testModalVaActionCho(so);
   await testLoiVaKhoa(so);
   await testFormVaFbm(so);
+  testHopDongTichHop(so);
 }
 
 module.exports = { chay };

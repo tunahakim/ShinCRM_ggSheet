@@ -74,7 +74,8 @@ Checklist này theo dõi một cơ chế chung cho mọi khối Sidebar có trư
 - [x] Test FBM: chuyển màn, menu, back, sửa khối khác và action nội bộ cùng khối.
 - [x] Test password: dirty đúng nhưng không xuất hiện trong snapshot, log hoặc lỗi.
 - [ ] Test callback snapshot không dựng lại control đang nhập và không mất highlight. (Còn cần nghiệm thu callback thật trên Sheet DEV.)
-- [x] Chạy `node tests/run.js`: 1.696 phép đạt, 0 phép lỗi.
+- [x] Test hợp đồng tĩnh: Sidebar host/include/boot, guard form/FBM, mapping tám key, password và CSS changed không bị tháo trong phiên sau.
+- [x] Chạy `node tests/run.js`: 1.701 phép đạt, 0 phép lỗi.
 
 ## 8. Nghiệm thu Sheet DEV và bàn giao
 
@@ -87,4 +88,4 @@ Checklist này theo dõi một cơ chế chung cho mọi khối Sidebar có trư
 - [ ] Kiểm tra cảnh báo mặc định khi đóng tab/trình duyệt theo giới hạn nền tảng.
 - [ ] Chạy các entrypoint GAS DEV liên quan nếu có thay đổi hợp đồng server; không ghi thật FBM.
 - [ ] Ghi rõ các bước chủ dự án cần giữ tab FBM/đăng nhập hoặc bấm ghi thật; dừng trước mốc đó.
-- [ ] Cập nhật cây thư mục code, checklist đồng bộ FBM và commit theo nhóm lõi/UI/test/tài liệu.
+- [x] Cập nhật cây thư mục code, checklist đồng bộ FBM và commit theo nhóm lõi/UI/test/tài liệu: `bebeae3`, `b5d0a3a`, `4145a90`.
