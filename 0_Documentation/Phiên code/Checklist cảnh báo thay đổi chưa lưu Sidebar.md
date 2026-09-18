@@ -42,7 +42,7 @@ Checklist này theo dõi một cơ chế chung cho mọi khối Sidebar có trư
 - [x] So sánh giá trị hiện tại với baseline qua bộ thu thập hiện có, không tạo bộ đọc DOM thứ hai cho nghiệp vụ.
 - [x] Chặn `cancelForm`, mở form lồng, đổi khách, về màn xem, nạp lại và mở FBM khi form đang sửa; `cancelForm` sạch đi thẳng, dirty mới mở cảnh báo.
 - [x] Cho `saveForm` đi thẳng vào luồng lưu; chỉ chạy action tiếp theo sau khi cửa ghi xác nhận thành công.
-- [x] Bỏ draft khi chọn hủy thay đổi trước khi thực hiện action đang chờ.
+- [x] Bỏ draft khi chọn hủy thay đổi trước khi thực hiện action đang chờ; form lõi khôi phục control DOM về baseline để `screenFormStash` không thu lại giá trị đã bỏ khi mở form lồng.
 - [x] Không cảnh báo khi người dùng chưa thay đổi gì hoặc đã đưa toàn bộ trường về baseline.
 
 ## 5. Các khối cấu hình FBM
@@ -70,7 +70,7 @@ Checklist này theo dõi một cơ chế chung cho mọi khối Sidebar có trư
 ## 7. Kiểm thử offline
 
 - [x] Test compare: bằng nhau, khác một trường, nhiều trường, đổi rồi hoàn tác, giá trị rỗng và kiểu khác nhau nhưng cùng nghĩa.
-- [x] Test modal: Save, Discard, Continue; action chờ chỉ chạy đúng một lần, gồm hồi quy provider còn dirty cũ sau discard và FBM discard thoát `editing` trước khi chạy action.
+- [x] Test modal: Save, Discard, Continue; action chờ chỉ chạy đúng một lần, gồm hồi quy provider còn dirty cũ sau discard, FBM discard thoát `editing` trước khi chạy action và core discard khôi phục DOM baseline.
 - [x] Test save/discard lỗi: dữ liệu và màu không bị xóa nhầm.
 - [x] Test form lõi: cancel/open form lồng/đổi khách/reload bị chặn khi đang sửa, kể cả chưa dirty.
 - [x] Test FBM: chuyển màn, menu, back, sửa khối khác và action nội bộ cùng khối.
@@ -78,7 +78,7 @@ Checklist này theo dõi một cơ chế chung cho mọi khối Sidebar có trư
 - [x] Test password: dirty đúng nhưng không xuất hiện trong snapshot, log hoặc lỗi.
 - [ ] Test callback snapshot không dựng lại control đang nhập và không mất highlight. (Còn cần nghiệm thu callback thật trên Sheet DEV.)
 - [x] Test hợp đồng tĩnh: Sidebar host/include/boot, host không còn nút/nội dung modal hardcode, component renderer, guard form/FBM, mapping tám key, password và CSS changed không bị tháo trong phiên sau.
-- [x] Chạy `node tests/run.js`: 1.713 phép đạt, 0 phép lỗi.
+- [x] Chạy `node tests/run.js`: 1.714 phép đạt, 0 phép lỗi.
 
 ## 8. Nghiệm thu Sheet DEV và bàn giao
 

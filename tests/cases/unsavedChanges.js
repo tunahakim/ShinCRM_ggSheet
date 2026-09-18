@@ -16,7 +16,7 @@ function taoBoTest() {
     window: { addEventListener: (name, fn) => { calls.push({ name, fn }); } },
     alert: (message) => { calls.push({ name: 'alert', message }); }
   });
-  napClient(hop, 'client/ui/uiBuilder.html', 'client/ui/renderEngine.html', 'client/ui/unsavedChanges.html', 'client/sync/fbmSyncConfigEditor.html');
+  napClient(hop, 'client/ui/uiBuilder.html', 'client/ui/renderEngine.html', 'client/ui/unsavedChanges.html', 'client/save/formCollect.html', 'client/save/saveFlow.html', 'client/sync/fbmSyncConfigEditor.html');
   const dialog = dom.document.createElement('div'); dialog.id = 'shin-unsaved-dialog'; dialog.hidden = true;
   dom.root.appendChild(dialog);
   const wrapper = dom.document.createElement('div'); wrapper.className = 'shin-form-field';
@@ -180,6 +180,22 @@ async function testFormVaFbm(so) {
   check(so, 'Mở khối thứ hai thành công sau khi khối hiện tại đã bỏ thay đổi', [blockedStart, hop.fbmSyncConfigState('identity').editing, hop.fbmSyncConfigState('login').editing], [true, false, true]);
 }
 
+function testCoreDiscardRestoresDom(so) {
+  const bo = taoBoTest(), hop = bo.hop;
+  hop.Schema = { customer: { name: {} } };
+  const control = bo.dom.document.createElement('input');
+  control.id = 'shin-f-customer-name';
+  control.setAttribute('data-field', 'customer.name');
+  control.value = 'đã sửa';
+  bo.dom.root.appendChild(control);
+  const top = { entity: 'customer', record: { name: 'bản gốc' }, draft: { name: 'đã sửa' } };
+  hop.screenStateTop = () => top;
+  hop.screenStateSetDraft = (draft) => { top.draft = draft; return top; };
+  const provider = hop.saveFlowUnsavedProvider();
+  const result = provider.discard();
+  check(so, 'Core discard xóa draft và khôi phục control trước pending action', [result.ok, top.draft, control.value], [true, {}, 'bản gốc']);
+}
+
 function testHopDongTichHop(so) {
   const sidebar = docClient('Sidebar.html');
   const dispatch = docClient('ui/dispatch.html');
@@ -233,6 +249,7 @@ async function chay(so) {
   await testModalVaActionCho(so);
   await testLoiVaKhoa(so);
   await testFormVaFbm(so);
+  testCoreDiscardRestoresDom(so);
   testHopDongTichHop(so);
 }
 

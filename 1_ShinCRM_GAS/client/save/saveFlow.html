@@ -169,6 +169,21 @@ function saveFlowUnsavedProvider() {
     discard: function () {
       var top = typeof screenStateTop === 'function' ? screenStateTop() : null;
       if (top && typeof screenStateSetDraft === 'function') { screenStateSetDraft({}); }
+      /* Pending action như mở form lồng sẽ gọi `screenFormStash` trước khi
+         chạy. Khôi phục DOM ngay tại đây để giá trị đã bỏ không bị thu lại
+         thành draft lần nữa. */
+      if (top && typeof document !== 'undefined' && document.querySelectorAll) {
+        document.querySelectorAll('[data-field]').forEach(function (control) {
+          var path = String(control.getAttribute('data-field') || '').split('.');
+          if (path.length !== 2 || path[0] !== top.entity) { return; }
+          var value = top.record && top.record[path[1]];
+          if (typeof renderControlValue === 'function' && control.id) {
+            renderControlValue(control.id, value === undefined || value === null ? '' : value);
+          } else if ('value' in control) {
+            control.value = value === undefined || value === null ? '' : String(value);
+          }
+        });
+      }
       return { ok: true };
     }
   };
