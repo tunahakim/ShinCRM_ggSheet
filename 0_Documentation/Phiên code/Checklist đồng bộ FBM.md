@@ -460,6 +460,22 @@ Các ràng buộc thiết kế của slice này nằm ở Tài liệu 09.01, 09.
 - [x] Khối thông tin khách dùng `--shin-card-pad` cho lề ngang như ruột Card, không để mã khách/liên hệ sát mép Sidebar.
 - [x] Commit triển khai: `4370b08`, `80cb723`, `a10bba3`, `9d38fac`, `8822e72`, `801f391`, `40936a7`, `5c3acf9`, `ab208da`, `5feb4b6`, `2991b29`, `a8856a9`, `3dac581`, `6158962`, `550a738`, `3367e34`, `da6ec7e`, `e58da21`, `d2c6cf8`, `dc9460c`, `3b32296`, `afb119a`, `58e8d5b`, `9cf3b43`, `4ff29fa`; GAS DEV `fbmGetSyncSettings` đạt `OK` ở revision `@353`.
 
+### Đợt bổ sung cảnh báo thay đổi chưa lưu Sidebar
+
+Chi tiết đầy đủ nằm ở `0_Documentation/Phiên code/Checklist cảnh báo thay đổi chưa lưu Sidebar.md`; các mục dưới đây là cổng theo dõi của phiên đồng bộ FBM.
+
+- [x] Chốt UX: snapshot chỉ tạo khi Sửa/Thêm mới; so sánh lazy khi bấm action; cảnh báo có Lưu, Bỏ thay đổi và Tiếp tục sửa.
+- [x] Chốt phạm vi khóa: mọi action ngoài khối dirty bị chặn, gồm menu ba chấm, đổi màn hình, quay lại, sửa khối khác và đóng module.
+- [x] Cập nhật Tài liệu 04 và Tài liệu 09.08 về dirty guard, presentation changed, draft Sidebar và state GAS.
+- [x] Cập nhật `Kế hoạch sửa Sidebar FBM.md` và tạo checklist chi tiết riêng.
+- [x] Tạo lõi dirty guard dùng chung cho modal, action chờ, save/discard/continue và chống chạy trùng.
+- [x] Tích hợp dirty guard vào ba form lõi và luồng form lồng/reload/chọn khách.
+- [x] Tích hợp dirty guard vào tám khối cấu hình FBM và action chuyển màn/menu/back.
+- [x] Tô màu changed sau cảnh báo, giữ màu khi tiếp tục sửa và xóa đúng lúc.
+- [x] Bổ sung kiểm thử offline cho compare, modal, save/discard lỗi, form lõi, FBM và password.
+- [x] Chạy `node tests/run.js`: 1.696 phép đạt, 0 phép lỗi; đã cập nhật checklist riêng và cây thư mục code.
+- [ ] Nghiệm thu trên Sheet DEV: chuyển khối/màn, menu, quay lại, lưu, bỏ thay đổi, tiếp tục sửa và đóng Sidebar.
+
 ## Slice 9 — Live acceptance và mở rộng production
 
 - [ ] **Cần kiểm chứng thực tế:** chạy đủ lượt Đọc thử `ALT00010`, đối chiếu số dòng, field, hash, liên kết và idempotency.

@@ -79,6 +79,14 @@
 - GAS trả DTO kỹ thuật `waitMs` được tính ngẫu nhiên trong khoảng cấu hình 0,5–2 giây. Extension chỉ chờ rồi hỏi lại GAS; không nhận Customer, chiều, cursor, logic conflict hoặc quyết định nghiệp vụ. Nếu Service Worker ngủ trước khi hết chờ, alarm `gas_poll` kế tiếp tôn trọng `notBefore` và không chạy sớm.
 - Extension vẫn chỉ giữ alarm `gas_poll` duy nhất. `waitMs` là primitive transport do GAS cấp, không phải scheduler/logic nghiệp vụ mới trong Extension.
 
+### 3.6. Cảnh báo thay đổi chưa lưu
+
+- Mỗi khối cấu hình chỉ tạo snapshot khi người dùng bấm Sửa; Sidebar không so sánh toàn bộ cấu hình sau mỗi phím gõ.
+- Một dirty guard dùng chung chặn mọi action ngoài khối đang sửa, gồm menu ba chấm, đổi màn hình, quay lại, sửa khối khác và đóng module.
+- Cảnh báo có ba lựa chọn: Lưu thay đổi, Bỏ thay đổi và tiếp tục, Tiếp tục sửa. Nút đóng/Escape/vùng nền là Tiếp tục sửa.
+- Màu changed chỉ xuất hiện sau lần cảnh báo đầu tiên, do lớp UI/resolver áp dụng; khi trường về snapshot hoặc lưu/hủy thành công thì bỏ màu.
+- Password không nằm trong snapshot, DTO hoặc log; ô password có giá trị trong lượt sửa vẫn làm card login dirty.
+
 ## 4. Thiết kế kỹ thuật và API
 
 ### 4.1. Lưu tham số phiên và migration Config
@@ -121,6 +129,7 @@
 - Test offline bổ sung: Account validation/credential locked-editable; PopupList select; single-action alignment; năm tab; summary gap; idle/old pipeline/progress; master switch hai vị trí; migration DocumentProperties; validation tham số; schedule bốn tiến trình/default; direction; ngưỡng auto-write/awaiting approval; detail cursor 50; `waitMs`; worker không tạo alarm mới và không có logic nghiệp vụ.
 - Chạy `node tests/run.js` sau thay đổi code. Chạy GAS DEV các API mới với `node tests/gas.js <tên-hàm> --push` và thêm entrypoint cần thiết vào `DEV_RUNNER_ALLOWED`.
 - Nghiệm thu người dùng cần mở lại Sidebar và tải lại Extension để nhìn UI thật; live FBM chỉ dùng `ALT00010`, không gửi request xóa, và không chạy ghi thật ngoài cờ an toàn hiện có.
+- Bổ sung `Checklist cảnh báo thay đổi chưa lưu Sidebar.md`; cập nhật checklist ngay sau từng nhóm tài liệu, code, test và mốc nghiệm thu.
 
 ---
 

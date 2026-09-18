@@ -174,6 +174,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── renderEngine.html     Cây Block thành HTML rồi gán vào bốn vùng. Thoát ký tự, dịch spatialConfig thành style, và renderTarget — cách DUY NHẤT đổi nội dung màn.
 │   │   ├── actions.html          Mười lăm hành động của cả hệ thống, tra theo tên. Không chạm DOM và không gọi máy chủ trực tiếp, nên mười lăm thân hàm kiểm được offline. Việc chặng sau thì ném lỗi có tên chứ không để thân rỗng.
 │   │   ├── dispatch.html         Một tai nghe click duy nhất đặt ở khung. Chỗ DUY NHẤT đọc data-* thành payload, đặt con trỏ theo focusId, và đưa lỗi vào alert — nhờ vậy actions.html không chạm DOM.
+│   │   ├── unsavedChanges.html   Cổng dirty dùng chung: giữ action chờ, modal ba lựa chọn, highlight trường thay đổi và cảnh báo mặc định khi đóng tab.
 │   │   ├── menu.html             Lớp menu nổi dựng từ dấu data-menu của engine. Dấu tích và chấm tròn đọc ở Prefs. Mục con vẫn mang data-action, nên menu không mở thêm đường gọi hàm nào.
 │   │   ├── collapse.html         Đo xem khối có tràn trần chiều cao hay không rồi mới quyết có nút Xem thêm — phép đo mà bản khai không nói được vì nó phụ thuộc nội dung thật.
 │   │   ├── search.html           Hộp tìm khách: ô nhập nằm ngoài bốn vùng engine vẽ nên con trỏ không nhảy sau mỗi chữ. Dòng gợi ý bấm hay Enter đều đi qua đúng một bộ phát click.
@@ -247,6 +248,7 @@ tests\
 ├── contracts\
 │   └── fbmSyncPipeline.js         Charter use case đồng bộ FBM độc lập với code: trigger và kết quả quan sát được theo tài liệu 09.
     └── cases\
+    ├── unsavedChanges.js         Kiểm dirty guard Sidebar, modal, khóa async, scope form lõi/FBM và password.
     ├── textNormalize.js          Hai bản sinh đôi server và client cho cùng kết quả trên một bảng ca dùng chung.
     ├── schemaCheck.js            Bảng khai cột tự nhất quán, và chiều phụ thuộc một hướng với SYNC_SCHEMA.
     ├── namespace.js              Không tên nào khai ở hai tệp. Bẫy số một của Apps Script.
