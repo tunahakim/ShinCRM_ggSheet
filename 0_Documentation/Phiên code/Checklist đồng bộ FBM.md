@@ -26,6 +26,7 @@ Hợp đồng chi tiết và checklist triển khai riêng nằm ở `07A. Hợp
 - [x] Sidebar đóng vẫn giữ signal trong DocumentProperties và Sidebar mở lại đọc được revision mới (đường `background`, test `reloadGates.js`, `selectionPoll.js`).
 - [x] Ghi trạng thái đồng bộ dù không đổi nội dung chính vẫn reload RAM và vẽ view khi chính sách cho phép (test status `pending/notApplied/conflict/missing/error` trong `reloadGates.js`).
 - [x] Ghi thất bại không xóa dirty state cũ (test `reloadGates.js`).
+- [x] Reload RAM tự động giữ nguyên màn hình/form/module Đồng bộ; nguồn chọn ô và payload full-core không được vẽ đè shell, đồng thời cờ `active` lệch DOM có thể tự gắn lại module (test `bootstrap.js`, `refresh.js`, `selectionPoll.js`, `fbmSync/Sidebar.js`).
 - [ ] Chạy toàn bộ ca R3 và R8 trong `Checklist reload RAM và sheet quản trị.md` trước khi đóng slice FBM có ghi dữ liệu.
 
 ### Kiến trúc và dữ liệu nhạy cảm

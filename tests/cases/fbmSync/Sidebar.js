@@ -134,6 +134,13 @@ async function testSharedShellLifecycle(so) {
   const restoredBody = content.textContent;
   hop.fbmSyncPaint({ phase: 'pull_customer', counts: { completed: 1 } });
   check(so, 'status den muon sau khi dong khong ve de len man form da phuc hoi', content.textContent, restoredBody);
+
+  hop.FBM_SYNC_CLIENT.active = true;
+  hop.FBM_SYNC_CLIENT.lastStatus = { phase: 'idle' };
+  let remountStatus = null;
+  hop.fbmSyncPaint = (status) => { remountStatus = status; };
+  await hop.syncPanelToggle();
+  check(so, 'cờ active lệch với DOM vẫn cho phép icon Đồng bộ tự gắn lại shell', remountStatus, hop.FBM_SYNC_CLIENT.lastStatus);
 }
 
 async function chay(so) {

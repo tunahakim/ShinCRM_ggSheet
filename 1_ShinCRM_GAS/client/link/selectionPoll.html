@@ -66,7 +66,7 @@ function selectionPollApplyResult(result) {
   if (!result) { return; }
   if (SHEET_LINK_SPREADSHEET_ID && result.spreadsheetId !== SHEET_LINK_SPREADSHEET_ID) { return; }
   if (typeof sheetLinkApplyContext === 'function') { return sheetLinkApplyContext(result); }
-  if (!result.customerId || !Prefs.followSelection || ScreenState.screen !== SCREEN_VIEW || result.customerId === ScreenState.currentCustomerId) { return; }
+  if (!result.customerId || !Prefs.followSelection || ScreenState.screen !== SCREEN_VIEW || (typeof FBM_SYNC_CLIENT !== 'undefined' && FBM_SYNC_CLIENT.active) || result.customerId === ScreenState.currentCustomerId) { return; }
   return ACTIONS.setCurrentCustomer({ pick: result.customerId });
 }
 

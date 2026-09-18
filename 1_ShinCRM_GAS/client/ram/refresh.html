@@ -58,6 +58,13 @@ function refreshDecideAndRender(context) {
   var affectedCustomers = Array.isArray(ctx.affectedCustomerIds) ? ctx.affectedCustomerIds.map(function (id) { return String(id || '').trim(); }) : [];
   var affectedRecords = Array.isArray(ctx.affectedRecordIds) ? ctx.affectedRecordIds.map(function (id) { return String(id || '').trim(); }) : [];
 
+  // The sync module overlays the normal view; a RAM refresh must not repaint
+  // that underlying surface while the module owns the shell.
+  if (typeof FBM_SYNC_CLIENT !== 'undefined' && FBM_SYNC_CLIENT.active) {
+    if (FBM_SYNC_CLIENT.lastStatus && typeof fbmSyncPaint === 'function') { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); }
+    return { rendered: false, screen: 'sync', reason: 'Module Đồng bộ đang giữ shell.' };
+  }
+
   // Reload records của khách khác không cần làm nhấp nháy màn đang xem. Các
   // scope cấu hình/full core và reload trọn thực thể thì luôn ảnh hưởng màn.
   if (mode === 'records') {
@@ -179,9 +186,8 @@ function refreshManualSheetApply(result) {
 }
 
 function refreshFullCore(result) {
-  if (typeof screenStateGoView === 'function') { screenStateGoView(); }
   if (typeof sidebarBoot !== 'function') { return result; }
-  return sidebarBoot().then(function (bootResult) {
+  return sidebarBoot({ preserveView: true }).then(function (bootResult) {
     if (!bootResult || bootResult.ok !== true) {
       return { ok: false, reloadFailed: true, reload: result, boot: bootResult || null };
     }

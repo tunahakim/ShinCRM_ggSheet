@@ -331,7 +331,7 @@ function sheetLinkApplyDirtyData(dirty, decision) {
   var mode = decision && decision.ram ? decision.ram.mode : '';
   if ((dirty.allCore || dirty.all || dirty.schema || dirty.config || mode === 'fullCore') && typeof sidebarBoot === 'function') {
     if (localDraftIds.length) { return { deferred: true, reason: 'Sidebar đang giữ bản nháp, chưa nạp lại full core.' }; }
-    return sidebarBoot();
+    return sidebarBoot({ preserveView: true });
   }
   if (dirty.category && typeof refreshCategory === 'function') {
     var categoryWork = refreshCategory(dirty.revision);
@@ -681,7 +681,9 @@ function sheetLinkReplayContext() {
 }
 
 function sheetLinkApplyCustomerContext(ctx) {
-  if (!Prefs.followSelection || ScreenState.screen !== SCREEN_VIEW) { return false; }
+  // Sync overlays the normal `view` screen; changing the selected customer must
+  // never repaint the underlying screen while that module owns the shell.
+  if (!Prefs.followSelection || ScreenState.screen !== SCREEN_VIEW || (typeof FBM_SYNC_CLIENT !== 'undefined' && FBM_SYNC_CLIENT.active)) { return false; }
 
   var ma = sheetLinkCustomerIdFromContext(ctx);
   if (!ma || ma === ScreenState.currentCustomerId) { return false; }

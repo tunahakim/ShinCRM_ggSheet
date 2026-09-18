@@ -212,6 +212,12 @@ async function chay(so) {
   immediate.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: 'Activity', row: 4, col: 2, customerId: 'KH000002' });
   check(so, 'đổi sheet áp dụng khách ngay dù RPC kiểm tra dirty chưa trả', immediate._picked, ['KH000002']);
 
+  const syncOpen = dungHopPoll(); batDau(syncOpen); syncOpen.FBM_SYNC_CLIENT = { active: true };
+  syncOpen.Store.hasCustomer = () => true; syncOpen._picked = [];
+  syncOpen.ACTIONS.setCurrentCustomer = ({ pick }) => { syncOpen._picked.push(pick); };
+  syncOpen.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: 'Customer', row: 4, col: 1, customerId: 'KH-SYNC' });
+  check(so, 'click ô khi đang ở module Đồng bộ không vẽ đè màn chính', syncOpen._picked, []);
+
   const taiLai = dungHopPoll(); batDau(taiLai); taiLai.SHEET_LINK_SEQ = 99;
   taiLai.sheetLinkOnMessage({ origin: taiLai.SHEET_LINK_ORIGIN, data: { action: 'CRM_HANDSHAKE_ACK', nonce: taiLai.SHEET_LINK_NONCE, sessionId: 'extension-moi' } });
   taiLai.sheetLinkOnMessage({ origin: taiLai.SHEET_LINK_ORIGIN, data: { action: 'CRM_CONTEXT', nonce: taiLai.SHEET_LINK_NONCE, sessionId: 'extension-moi', spreadsheetId: 'sheet-1', seq: 1, sheetName: 'Customer', row: 4, col: 1 } });

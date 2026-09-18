@@ -27,7 +27,18 @@ function fbmSyncCaptureReturnScreen() {
 
 /** Mở FBM như một màn bình thường, chỉ giữ trạng thái phiên chạy trong GAS. */
 function syncPanelToggle() {
-  if (FBM_SYNC_CLIENT.active) { return null; }
+  if (FBM_SYNC_CLIENT.active) {
+    // A stale automatic reload can leave the active flag while the shell is gone.
+    // Repaint the existing module instead of making the icon appear inert.
+    var syncRoot = typeof document !== 'undefined' && document.getElementById ? document.getElementById('sidebar-root') : null;
+    var mounted = !!(syncRoot && syncRoot.classList && syncRoot.classList.contains('shin-sync-active') && document.getElementById('fbm-sync-module-title'));
+    if (mounted) { return null; }
+    if (FBM_SYNC_CLIENT.lastStatus && typeof fbmSyncPaint === 'function') {
+      fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus);
+      return FBM_SYNC_CLIENT.lastStatus;
+    }
+    return typeof fbmSyncStatusOnce === 'function' ? fbmSyncStatusOnce(true) : null;
+  }
   fbmSyncCaptureReturnScreen();
   FBM_SYNC_CLIENT.active = true;
   FBM_SYNC_CLIENT.statusReady = false;

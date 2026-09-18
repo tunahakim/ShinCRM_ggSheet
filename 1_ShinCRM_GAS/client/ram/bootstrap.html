@@ -26,7 +26,30 @@
  * vừa gãy chính là đường truyền thì nó gãy lần nữa và cuốn theo thông báo lỗi thật — đúng lúc người dùng cần đọc thông báo
  * đó nhất. Lượt chạy vỡ đã có dòng log kèm vết gọi do máy chủ tự ghi.
  */
-async function sidebarBoot() {
+function sidebarRenderAfterBoot(preserveView) {
+  if (!preserveView) {
+    screenViewDropStale();
+    screenViewGo();
+    return;
+  }
+
+  if (typeof FBM_SYNC_CLIENT !== 'undefined' && FBM_SYNC_CLIENT.active) {
+    // Sync owns the shell while it is open; only patch its current snapshot.
+    if (FBM_SYNC_CLIENT.lastStatus && typeof fbmSyncPaint === 'function') { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); }
+    return;
+  }
+
+  screenViewDropStale();
+  if (typeof ScreenState !== 'undefined' && ScreenState.screen !== SCREEN_VIEW && typeof screenFormRender === 'function' && typeof screenStateTop === 'function' && screenStateTop()) {
+    screenFormRender();
+  } else if (typeof screenViewRender === 'function') {
+    screenViewRender();
+  }
+}
+
+async function sidebarBoot(options) {
+  // Automatic full-core reloads must refresh RAM without changing the user's current surface.
+  var preserveView = !!(options && options.preserveView === true);
   callTimingReset(Date.now());
   var finishBusy = typeof sidebarBusyBegin === 'function' ? sidebarBusyBegin('Đang nạp dữ liệu ShinCRM…') : null;
   bootClearStartupWarning();
@@ -80,8 +103,7 @@ async function sidebarBoot() {
     choiceMenuInstall();
     inputsInstall();
 
-    screenViewDropStale();
-    screenViewGo();
+    sidebarRenderAfterBoot(preserveView);
     if (typeof sheetLinkReplayContext === 'function') { await sheetLinkReplayContext(); }
     collapseScan();
     bootTellProblems(BOOT_LAST_SUMMARY);

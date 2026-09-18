@@ -1,7 +1,7 @@
 const { napClient, taoHopCat } = require('../lib/load-gas');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 
-function chay(so) {
+async function chay(so) {
   section('Làm mới bản ghi bẩn — upsert bản ghi máy trả về và bỏ bản ghi đã biến mất');
   let hop;
   try {
@@ -94,6 +94,29 @@ function chay(so) {
   const configManual = configHop.refreshManualSheetApply({ ok: true, target: 'config', reloadMode: 'config', config: { params: { X: '1' }, defaults: {}, counters: {}, sort: [], sheetSchema: {} } });
   check(so, 'Config reload thay Store.config và vẽ màn hiện tại',
     [configHop.Store.config.params.X, configHop._rendered, configManual.ok], ['1', true, true]);
+
+  const fullCoreHop = taoHopCat();
+  napClient(fullCoreHop, 'client/ram/refresh.html');
+  let bootOptions = null;
+  let resetCalled = false;
+  fullCoreHop.screenStateGoView = () => { resetCalled = true; };
+  fullCoreHop.sidebarBoot = (options) => { bootOptions = options; return Promise.resolve({ ok: true }); };
+  await fullCoreHop.refreshFullCore({ ok: true, reloadMode: 'fullCore' });
+  check(so, 'full-core reload tự động không reset màn hình và yêu cầu bootstrap giữ surface hiện tại',
+    [resetCalled, bootOptions], [false, { preserveView: true }]);
+
+  const syncRefreshHop = taoHopCat({
+    ScreenState: { screen: 'view', currentCustomerId: 'KH1', formStack: [] },
+    SCREEN_VIEW: 'view',
+    FBM_SYNC_CLIENT: { active: true, lastStatus: { phase: 'idle' } },
+    screenViewRender: () => { syncRefreshHop._viewRendered = true; },
+    fbmSyncPaint: (status) => { syncRefreshHop._syncPainted = status; }
+  });
+  napClient(syncRefreshHop, 'client/ram/refresh.html');
+  const syncRender = syncRefreshHop.refreshDecideAndRender({ ok: true, applied: true, mode: 'fullCore' });
+  check(so, 'payload reload trực tiếp cũng không vẽ đè shell Đồng bộ',
+    [syncRender.screen, syncRender.rendered, syncRefreshHop._viewRendered, syncRefreshHop._syncPainted],
+    ['sync', false, undefined, { phase: 'idle' }]);
 }
 
 module.exports = { chay };

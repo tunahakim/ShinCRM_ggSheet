@@ -1,7 +1,7 @@
 /**
  * Nhóm ca kiểm của `client/ram/bootstrap.html` — nhưng chỉ hai hàm thuần của nó: bậc thang cỡ gói và lời báo cuối lượt nạp.
  *
- * `sidebarBoot` không kiểm được ở đây và cố ý không cố: nó `await` máy chủ và vẽ vào DOM, tức đúng hai thứ hộp cát này không có. Bù lại, hai hàm dưới đây là hai chỗ ra quyết định — chọn cỡ gói nào, và nói gì với người dùng — nên hỏng ở đây là hỏng im lặng.
+ * `sidebarBoot` không kiểm được ở đây và cố ý không cố: nó `await` máy chủ và vẽ vào DOM, tức đúng hai thứ hộp cát này không có. Bù lại, các hàm quyết định độc lập của nó được kiểm riêng để reload nền không làm mất màn hình người dùng.
  *
  * Lý do có tệp này: `bootTellProblems` từng trộn `warnings` với `skipped` vào cùng một hộp thoại. Hai danh sách đó khác người đọc — một cái nói về dữ liệu trong sheet, một cái nói về bộ kiểm — nên trộn lại lần nữa là một cú lùi mà không ai nhìn ra bằng mắt.
  */
@@ -89,6 +89,31 @@ async function chay(so) {
   check(so, 'hết mọi bậc lùi thì ném đúng lỗi cuối cùng, không nuốt lỗi',
     [calls.map((call) => call[1][1]), loiCuoi && loiCuoi.message],
     [[30, 15, 5], 'máy chủ vẫn lỗi']);
+
+  section('bootstrap — reload nền giữ nguyên bề mặt người dùng');
+  const paints = [];
+  const renders = [];
+  hop.SCREEN_VIEW = 'view';
+  hop.ScreenState = { screen: 'view' };
+  hop.screenViewDropStale = () => renders.push('drop-stale');
+  hop.screenViewGo = () => renders.push('go-view');
+  hop.screenViewRender = () => renders.push('view-render');
+  hop.screenFormRender = () => renders.push('form-render');
+  hop.screenStateTop = () => ({ screen: 'customerForm' });
+  hop.sidebarRenderAfterBoot(false);
+  check(so, 'lượt khởi tạo ban đầu vẫn vào màn chính', renders, ['drop-stale', 'go-view']);
+
+  renders.length = 0;
+  hop.FBM_SYNC_CLIENT = { active: true, lastStatus: { phase: 'idle' } };
+  hop.fbmSyncPaint = (status) => paints.push(status);
+  hop.sidebarRenderAfterBoot(true);
+  check(so, 'full-core reload khi đang ở Đồng bộ chỉ vá snapshot, không dựng màn chính', [renders, paints], [[], [{ phase: 'idle' }]]);
+
+  renders.length = 0;
+  hop.FBM_SYNC_CLIENT.active = false;
+  hop.ScreenState.screen = 'customerForm';
+  hop.sidebarRenderAfterBoot(true);
+  check(so, 'full-core reload khi đang ở form giữ nguyên form', renders, ['drop-stale', 'form-render']);
 }
 
 module.exports = { chay };
