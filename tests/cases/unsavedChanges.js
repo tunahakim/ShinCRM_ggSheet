@@ -241,6 +241,12 @@ function testHopDongTichHop(so) {
     styles.indexOf('shin-choice-trigger') >= 0,
     styles.indexOf('shin-toggle-control') >= 0
   ], [true, true, true]);
+  check(so, 'lớp phủ modal không bị luật Box rỗng ẩn và nằm dưới panel', [
+    styles.indexOf('.shin-box.shin-unsaved-backdrop') >= 0,
+    styles.indexOf('.shin-box.shin-unsaved-backdrop') < styles.indexOf('.shin-box.shin-unsaved-panel'),
+    styles.indexOf('z-index: 0') > styles.indexOf('.shin-box.shin-unsaved-backdrop'),
+    styles.indexOf('z-index: 1;') > styles.indexOf('.shin-box.shin-unsaved-panel')
+  ], [true, true, true, true]);
 }
 
 async function chay(so) {

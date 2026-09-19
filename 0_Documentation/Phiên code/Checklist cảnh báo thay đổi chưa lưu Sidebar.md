@@ -58,7 +58,7 @@ Checklist này theo dõi một cơ chế chung cho mọi khối Sidebar có trư
 
 ## 6. Hiển thị và tương tác
 
-- [x] Sidebar chỉ giữ host tĩnh; backdrop, nội dung và ba action của hộp cảnh báo được dựng bởi component Block dùng chung, không hardcode HTML modal trong Sidebar/controller.
+- [x] Sidebar chỉ giữ host tĩnh; backdrop, nội dung và ba action của hộp cảnh báo được dựng bởi component Block dùng chung, không hardcode HTML modal trong Sidebar/controller. Backdrop rỗng có selector `.shin-box.shin-unsaved-backdrop` để không bị luật `.shin-box:empty` ẩn.
 - [x] Có style tập trung cho hộp cảnh báo và trạng thái trường changed; không thêm class vào screen schema.
 - [x] Tô đúng những trường đang khác baseline sau lần cảnh báo đầu tiên.
 - [x] Màu vẫn còn khi chọn `Tiếp tục sửa` và tự cập nhật khi người dùng sửa tiếp.
@@ -77,8 +77,8 @@ Checklist này theo dõi một cơ chế chung cho mọi khối Sidebar có trư
 - [x] Test FBM: card sạch vẫn khóa action ngoài, không mở đồng thời hai card; nút Hủy chỉ cảnh báo khi dirty.
 - [x] Test password: dirty đúng nhưng không xuất hiện trong snapshot, log hoặc lỗi.
 - [ ] Test callback snapshot không dựng lại control đang nhập và không mất highlight. (Còn cần nghiệm thu callback thật trên Sheet DEV.)
-- [x] Test hợp đồng tĩnh: Sidebar host/include/boot, host không còn nút/nội dung modal hardcode, component renderer, guard form/FBM, mapping tám key, password và CSS changed không bị tháo trong phiên sau.
-- [x] Chạy `node tests/run.js`: 1.714 phép đạt, 0 phép lỗi.
+- [x] Test hợp đồng tĩnh: Sidebar host/include/boot, host không còn nút/nội dung modal hardcode, component renderer, guard form/FBM, mapping tám key, password, CSS changed và lớp phủ modal không bị tháo trong phiên sau.
+- [x] Chạy `node tests/run.js`: 1.715 phép đạt, 0 phép lỗi.
 
 ## 8. Nghiệm thu Sheet DEV và bàn giao
 
