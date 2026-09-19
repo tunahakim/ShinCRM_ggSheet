@@ -92,4 +92,4 @@ Checklist này theo dõi một cơ chế chung cho mọi khối Sidebar có trư
 - [ ] Kiểm tra cảnh báo mặc định khi đóng tab/trình duyệt theo giới hạn nền tảng.
 - [ ] Chạy các entrypoint GAS DEV liên quan nếu có thay đổi hợp đồng server; không ghi thật FBM.
 - [ ] Ghi rõ các bước chủ dự án cần giữ tab FBM/đăng nhập hoặc bấm ghi thật; dừng trước mốc đó.
-- [x] Cập nhật cây thư mục code, checklist đồng bộ FBM và commit theo nhóm lõi/UI/test/tài liệu: `bebeae3`, `b5d0a3a`, `4145a90`, `c7592fa`, `754532f`, `7754a2d`, `631328b`; GAS DEV đã kiểm tra ở revision `@451`.
+- [x] Cập nhật cây thư mục code, checklist đồng bộ FBM và commit theo nhóm lõi/UI/test/tài liệu: `bebeae3`, `b5d0a3a`, `4145a90`, `c7592fa`, `754532f`, `7754a2d`, `631328b`, `fcf6759`; GAS DEV đã kiểm tra ở revision `@455`.
