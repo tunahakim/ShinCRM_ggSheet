@@ -5,6 +5,7 @@ const vm = require('vm');
 const { section, check } = require('../../lib/assert');
 const { taoHopCat, napServer } = require('../../lib/load-gas');
 const { WORKFLOWS, PIPELINE_CATALOG } = require('../../contracts/fbmSyncPipeline');
+const { taoBoTest } = require('./Sidebar');
 
 const ROOT = path.join(__dirname, '..', '..', '..');
 const EXECUTOR = path.join(ROOT, '2_ShinCRM_Extension', 'content_scripts', 'fbm_sync', 'executor.js');
@@ -20,15 +21,20 @@ function properties() {
   };
 }
 
-function workflowGas() {
-  const documentProperties = properties();
-  const scriptProperties = properties();
-  const hop = taoHopCat({
+function workflowGas(options) {
+  const opt = options || {};
+  const documentProperties = opt.documentProperties || properties();
+  const scriptProperties = opt.scriptProperties || properties();
+  const hop = taoHopCat(Object.assign({
     FbmSync: {},
+    DATA_SCHEMA: {},
+    SYNC_SCHEMA: {},
     PropertiesService: { getDocumentProperties: () => documentProperties, getScriptProperties: () => scriptProperties },
     Utilities: { getUuid: () => 'workflow-uuid' },
-    shinOpenBook: () => ({ getId: () => 'sheet-workflow' })
-  });
+    shinOpenBook: () => ({ getId: () => 'sheet-workflow' }),
+    logEvent: () => {},
+    logTrace: () => {}
+  }, opt));
   napServer(hop,
     'fbm_sync/schema/FbmFields.js',
     'fbm_sync/protocol/Protocol.js',
@@ -38,6 +44,7 @@ function workflowGas() {
     'fbm_sync/reconcile/Identity.js',
     'fbm_sync/reconcile/CategoryGate.js',
     'fbm_sync/reconcile/Fingerprint.js',
+    'fbm_sync/reconcile/Pull.js',
     'fbm_sync/report/Report.js',
     'fbm_sync/read/GridRead.js',
     'fbm_sync/write/RequestBuilders.js',
@@ -48,8 +55,22 @@ function workflowGas() {
   );
   hop.FbmSync.currentSpreadsheetId = () => 'sheet-workflow';
   hop.FbmSync.configValue = () => '';
-  hop.FbmSync.readLocal = () => [];
+  hop.FbmSync.readLocal = opt.readLocal || (() => []);
   return { hop, documentProperties, scriptProperties };
+}
+
+function gridResponse(fields, rows, total) {
+  return JSON.stringify({ d: {
+    TotalRowCount: total === undefined ? rows.length : total,
+    Rows: rows,
+    ViewPage: { Fields: fields.map((AliasName) => ({ AliasName })) }
+  } });
+}
+
+function row(fields, values) {
+  const output = [];
+  fields.forEach((field, index) => { output[index] = values[field] === undefined ? '' : values[field]; });
+  return output;
 }
 
 function fbmResponse(body) {
@@ -355,11 +376,21 @@ async function chay(so) {
   const delayed = waitFlow.hop.FbmSync.nextEnvelope(waitFlow.hop.FbmSync.customerGridRequest({ type: 0, count: 50, gridPageIndex: -1, gridRefresh: false }));
   check(so, 'GAS cấp waitMs transport cho lượt detail trong đúng khoảng cấu hình', [delayed.meta.waitMs >= 500, delayed.meta.waitMs <= 2000], [true, true]);
 
-  const deadlineFlow = workflowGas();
+  const deadlineLogs = [];
+  const deadlineFlow = workflowGas({ logEvent: (event) => deadlineLogs.push(event), LOG_ERROR: 'error' });
   deadlineFlow.hop.FbmSync.statePatch({ runId: 'runtime-limit', phase: 'pull_customer', cursor: { kind: 'customer_grid', pageIndex: 4, pageValue: ['2026-09-20', 'CUS-000004'] }, activeRequestId: '', deadlineAt: Date.now() - 1 });
   const blockedByDeadline = deadlineFlow.hop.FbmSync.nextEnvelope(deadlineFlow.hop.FbmSync.customerGridRequest({ type: 1, count: 3, gridPageIndex: 5, gridRefresh: false }));
   const deadlineState = deadlineFlow.hop.FbmSync.stateRead();
-  check(so, 'lát GAS chạm trần dừng trước request kế tiếp và giữ cursor cuối đã chốt', [blockedByDeadline, deadlineState.phase, deadlineState.lastFailureCode, deadlineState.cursor.pageIndex, deadlineState.activeRequestId], [null, 'paused', 'GAS_RUNTIME_LIMIT', 4, '']);
+  const deadlineStatus = deadlineFlow.hop.FbmSync.statusView();
+  deadlineFlow.hop.FbmSync.logStatus(deadlineStatus, 'runtime_limit');
+  const deadlineLog = deadlineLogs[deadlineLogs.length - 1] || {};
+  const deadlineUi = taoBoTest();
+  deadlineUi.hop.fbmSyncPaint(deadlineStatus);
+  check(so, 'lát GAS chạm trần dừng trước request kế tiếp, DTO Sidebar và Log giữ runId/phase/cursor', [
+    blockedByDeadline, deadlineState.phase, deadlineState.lastFailureCode, deadlineState.cursor.pageIndex, deadlineState.activeRequestId,
+    deadlineLog.action, deadlineLog.detail && deadlineLog.detail.runId, deadlineLog.detail && deadlineLog.detail.phase, deadlineLog.detail && deadlineLog.detail.cursor,
+    deadlineUi.content.textContent.indexOf('Tạm dừng') >= 0
+  ], [null, 'paused', 'GAS_RUNTIME_LIMIT', 4, '', 'runtime_limit', 'runtime-limit', 'paused', 'customer_grid', true]);
 
   const noopWorker = workerHarness([{ ok: true, code: 'HEARTBEAT_NOOP', request: null }], []);
   const noopResult = await noopWorker.context.fbmHeartbeatNow('workflow');
@@ -404,6 +435,81 @@ async function chay(so) {
     completeWorker.metrics().fbmTabQueries, completeWorker.metrics().fbmMessages
   ], [true, ['heartbeat_request', 'heartbeat'], rawHeartbeat, 1, 2]);
 
+  const fullLogs = [], fullWrites = [], fullLocal = { customer: [], activity: [] };
+  const fullFlow = workflowGas({
+    logEvent: (event) => fullLogs.push(event),
+    LOG_OK: 'ok', LOG_WARN: 'warn', LOG_ERROR: 'error', LOG_CONFLICT: 'conflict',
+    readLocal: (entity) => fullLocal[entity].map((item) => Object.assign({}, item)),
+    writeGateSave: (request) => {
+      fullWrites.push(request);
+      const entity = request.entity;
+      (request.records || []).forEach((patch) => {
+        let index = fullLocal[entity].findIndex((item) => String(item.id || '') === String(patch.id || ''));
+        if (index < 0) {
+          index = fullLocal[entity].length;
+          const prefix = entity === 'customer' ? 'CUS-' : 'ACT-';
+          fullLocal[entity].push(Object.assign({}, patch, { id: patch.id || prefix + String(index + 1).padStart(6, '0') }));
+        } else {
+          fullLocal[entity][index] = Object.assign({}, fullLocal[entity][index], patch);
+        }
+      });
+      const fields = fullLocal[entity].length ? Object.keys(fullLocal[entity][0]) : [];
+      return { ok: true, fields, rows: fullLocal[entity].map((record) => fields.map((field) => record[field])) };
+    }
+  });
+  fullFlow.hop.FbmSync.prepareCategoryGate = () => ({ map: {}, names: {}, valid: {}, warnings: [] });
+  const fullCustomerFields = fullFlow.hop.FbmSync.GRID_FIELDS.customer;
+  const fullActivityFields = fullFlow.hop.FbmSync.GRID_FIELDS.activity;
+  const customerRows = [
+    row(fullCustomerFields, { stt_rec_kh: 'FBM-C1', ma_kh: 'ALT00001', ten_kh: 'Cong ty 1', ma_so_thue: '010001', ong_ba: 'A', dc_lh: 'Ha Noi', dien_thoai: '0901', email: 'c1@example.test', ngay_gd: '2026-09-20', datetime0: '2026-09-20T01:00:00', xorder: 1 }),
+    row(fullCustomerFields, { stt_rec_kh: 'FBM-C2', ma_kh: 'ALT00002', ten_kh: 'Cong ty 2', ma_so_thue: '010002', ong_ba: 'B', dc_lh: 'Ha Noi', dien_thoai: '0902', email: 'c2@example.test', ngay_gd: '2026-09-20', datetime0: '2026-09-20T02:00:00', xorder: 2 })
+  ];
+  const activityRows = {
+    'FBM-C1': [row(fullActivityFields, { id: 'FBM-A1', details: 'Goi dien 1', end_date: '2026-09-20', owner: 'Owner 1', datetime0: '2026-09-20T03:00:00', line_nbr: 1 })],
+    'FBM-C2': [row(fullActivityFields, { id: 'FBM-A2', details: 'Goi dien 2', end_date: '2026-09-20', owner: 'Owner 2', datetime0: '2026-09-20T04:00:00', line_nbr: 1 })]
+  };
+  let fullStep = fullFlow.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true });
+  const fullKinds = [], fullStatuses = [];
+  for (let hop = 0; fullStep && fullStep.request && hop < 20; hop += 1) {
+    const request = fullStep.request;
+    const kind = String(request.meta && request.meta.kind || '');
+    fullKinds.push(kind + ':' + String(request.meta && (request.meta.entity || request.meta.field) || ''));
+    let body;
+    if (kind === 'authorize') {
+      body = JSON.stringify({ d: { Authorized: 'auth-' + request.meta.entity } });
+    } else if (kind === 'completion') {
+      body = JSON.stringify({ d: [['CODE', 'Ten danh muc']] });
+    } else if (kind === 'grid' && request.meta.entity === 'customer') {
+      body = gridResponse(fullCustomerFields, customerRows, customerRows.length);
+    } else if (kind === 'grid' && request.meta.entity === 'activity') {
+      const key = request.body.externalKey && request.body.externalKey[0] && request.body.externalKey[0].Value;
+      body = gridResponse(fullActivityFields, activityRows[key] || [], (activityRows[key] || []).length);
+    } else {
+      throw new Error('Ca mô phỏng pipeline gặp request không mong đợi: ' + kind);
+    }
+    const throughExtension = await sendThroughExecutor(request, body);
+    const before = fullFlow.hop.FbmSync.statusView();
+    fullStep = fullFlow.hop.FbmSync.continue(executorRaw(throughExtension.reply, request.id));
+    fullStatuses.push(fullStep.status);
+    if (fullStep.status && fullFlow.hop.FbmSync.shouldLogStatus(before, fullStep.status)) {
+      fullFlow.hop.FbmSync.logStatus(fullStep.status, 'slice');
+    }
+  }
+  const fullFinal = fullFlow.hop.FbmSync.statusView();
+  const ui = taoBoTest();
+  ui.hop.fbmSyncPaint(fullFinal);
+  check(so, 'pipeline giả lập Customer + Activity đi qua GAS, Extension, cửa ghi và kết thúc', [
+    fullStep.ok, fullStep.request || null, fullFinal.phase, fullLocal.customer.length, fullLocal.activity.length,
+    fullWrites.filter((item) => item.source === 'pull').length, fullKinds,
+    fullLogs.some((item) => item.action === 'pull_record' && item.entity === 'customer'),
+    fullLogs.some((item) => item.action === 'pull_record' && item.entity === 'activity'),
+    ui.content.textContent.indexOf('Hoàn tất') >= 0
+  ], [
+    true, null, 'done', 2, 2, 3,
+    ['authorize:customer', 'authorize:activity', 'completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH', 'completion:@CAT_CONG_VIEC', 'completion:@CAT_SAN_PHAM', 'grid:customer', 'grid:activity', 'grid:activity'],
+    true, true, true
+  ]);
+
   const readFlow = workflowGas();
   readFlow.hop.FbmSync.prepareCategoryGate = () => ({ map: {} });
   readFlow.hop.FbmSync.pullWrite = () => ({ ok: true, written: 0, conflicts: 0, skipped: 0 });
@@ -425,12 +531,12 @@ async function chay(so) {
     const throughExtension = await sendThroughExecutor(request, body);
     readStep = readFlow.hop.FbmSync.continue(executorRaw(throughExtension.reply, request.id));
   }
-  check(so, 'read rong: pipeline di het session, lookup va Customer grid qua Extension roi ket thuc', [
-    readKinds, readStep.ok, readStep.request || null, readStep.status.phase, readFlow.hop.FbmSync.stateRead().counts.succeeded
+  check(so, 'phiên rỗng: Extension chỉ chuyển request đọc, không phát request ghi hoặc xóa và pipeline kết thúc', [
+    readKinds, readKinds.length, readKinds.every((kind) => ['authorize:customer', 'authorize:activity', 'completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH', 'completion:@CAT_CONG_VIEC', 'completion:@CAT_SAN_PHAM', 'grid:customer'].indexOf(kind) >= 0), readStep.ok, readStep.request || null, readStep.status.phase, readFlow.hop.FbmSync.stateRead().counts.succeeded
   ], [[
     'authorize:customer', 'authorize:activity', 'completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH',
     'completion:@CAT_CONG_VIEC', 'completion:@CAT_SAN_PHAM', 'grid:customer'
-  ], true, null, 'done', 0]);
+  ], 7, true, true, null, 'done', 0]);
 
   const approval = workflowGas();
   approval.hop.FbmSync.runPreflight = () => ({ ok: true, issues: [], blocking: [], candidateCount: 11 });

@@ -120,7 +120,7 @@ FbmSync.logStatus = function (status, action) {
     source: 'fbm_sync', action: action || 'slice', outcome: outcome,
     entity: status.entity || '', recordId: status.current || '',
     reason: status.message || status.label || phase,
-    detail: { phase: phase, direction: status.direction || '', entityLabel: status.entityLabel || '', counts: status.counts || {}, lastError: status.lastError || '' }
+    detail: { runId: String(status.runId || ''), phase: phase, cursor: status.cursor && status.cursor.kind ? String(status.cursor.kind) : '', direction: status.direction || '', entityLabel: status.entityLabel || '', counts: status.counts || {}, lastError: status.lastError || '' }
   });
 };
 /** Chỉ ghi khi đổi giai đoạn hoặc kết thúc để không làm chậm từng request FBM. */
