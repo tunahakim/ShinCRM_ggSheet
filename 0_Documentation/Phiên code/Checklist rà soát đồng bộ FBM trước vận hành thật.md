@@ -279,7 +279,7 @@
 - [x] 2. FBM trả mã danh mục không có dòng nhận trong `Category` → chỉ bản ghi đó bị cờ mã lạ, không ghi rỗng theo `09.03 Phần 5 — Hai ràng buộc cứng của chiều đi`. Bằng chứng: Đã có test đúng nhánh: `Protocol.js › lookup giu object Rows de doi chieu Category` và `Reconcile.js › ba chieu khong doi`.
 - [x] 3. Activity thiếu ngày hoặc khóa Customer → bản ghi bị chặn/đóng băng, không ghi dòng thiếu liên kết theo `09.04 Phần 7 — Validate theo nguồn và theo hướng đi`. Bằng chứng: Đã có test đúng nhánh: `Reconcile.js › Activity thieu ngay bi chan an toan va ghi Log` và `Reconcile.js › Activity missing Sidebar co thong bao loi va Log`.
 - [x] 4. MST nối nhiều dòng hoặc không nối duy nhất → fail-closed, không tạo Customer trùng theo `09.04 Phần 6 — Nạp lần đầu và luật tạo dòng mới`. Bằng chứng: Đã có test đúng nhánh: `Pull.js › Customer trùng MST nhiều dòng thì fail-closed không tạo bản ghi`.
-- [ ] 5a. Mỗi ca ghi một lỗi an toàn vào `Log`; bản ghi hợp lệ khác chỉ được xử lý trong phạm vi cho phép theo `09.07 Phần 11 — Log`. Bằng chứng: Có test nhưng kiểm chuyện khác: `Audit.js › probe ALT00010 fail-closed khi co ung vien ngoai pham vi` kiểm Log ALT00010, chưa đủ từng ca E05.
+- [x] 5a. Mỗi ca ghi một lỗi an toàn vào `Log`; bản ghi hợp lệ khác chỉ được xử lý trong phạm vi cho phép theo `09.07 Phần 11 — Log`. Bằng chứng: Đã có test đúng nhánh: `Reconcile.js › Activity hop le van duoc ghi khi ca thieu ngay cung lo` kiểm bản ghi hợp lệ được ghi, ca thiếu ngày có Log `error` và không ghi dòng lỗi.
 - [ ] 5b. `[Cần kiểm chứng thật]` Sidebar hiển thị lý do riêng cho từng ca trên bản sao DEV. Bằng chứng: Có test nhưng kiểm chuyện khác: `Sidebar.js › Results Tổng hợp hiển thị đầy đủ Category, Activity missing, preflight và HTTP` kiểm Results tổng hợp.
 
 ## E06 — Hạn mức và giới hạn nền tảng
@@ -331,7 +331,7 @@
 
 - [x] Mọi dòng F01–F15, E01–E07, S01 và H đã có điều kiện đầu, input, output kỳ vọng, nhãn kiểm chứng đơn nhất và ô `Bằng chứng` rõ ràng. Bằng chứng: Checklist đã được rà; các dòng tự động đã trỏ ca test cụ thể, dòng live giữ nhãn `[Cần kiểm chứng thật]`.
 - [x] Chủ dự án duyệt phạm vi, dữ liệu thử, các bước cần thao tác live và thứ tự thực hiện. Bằng chứng: Chủ dự án đã duyệt checklist và yêu cầu tiếp tục tự động qua bước 2–4 trong phiên hiện tại.
-- [x] Chuyển sang bước 2: viết test ưu tiên E06.2, E06.1, E06.4 rồi chạy `node tests/run.js`. Bằng chứng: `Settings.js › DocumentProperties đầy giữ nguyên state cursor/conflict/RecordLocks và không ghi dở JSON`, `Workflow.js › lát GAS chạm trần dừng trước request kế tiếp và giữ cursor cuối đã chốt`, `extensionBridge.js › Extension chờ đủ waitMs trước khi gửi request FBM`, `Workflow.js › DocumentProperties đầy trả DTO lỗi Sidebar, giữ cursor và Log runId/phase/cursor`; tổng kết `1826 đạt, 0 không đạt`.
+- [x] Chuyển sang bước 2: viết test ưu tiên E06.2, E06.1, E06.4 rồi chạy `node tests/run.js`. Bằng chứng: `Settings.js › DocumentProperties đầy giữ nguyên state cursor/conflict/RecordLocks và không ghi dở JSON`, `Workflow.js › lát GAS chạm trần dừng trước request kế tiếp và giữ cursor cuối đã chốt`, `extensionBridge.js › Extension chờ đủ waitMs trước khi gửi request FBM`, `Workflow.js › DocumentProperties đầy trả DTO lỗi Sidebar, giữ cursor và Log runId/phase/cursor`; tổng kết `1827 đạt, 0 không đạt`.
 
 ## Các điểm cần chủ dự án xác nhận sau khi duyệt checklist
 

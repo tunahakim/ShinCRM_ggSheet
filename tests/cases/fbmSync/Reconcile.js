@@ -85,6 +85,9 @@ async function chay(so) {
   invalidActivityUi.hop.fbmSyncPaint(edges.FbmSync.statusView());
   check(so, 'Activity missing Sidebar co thong bao loi va Log', [invalidActivityUi.content.textContent.indexOf('lỗi') >= 0 || invalidActivityUi.content.textContent.indexOf('ngày') >= 0, invalidActivityLog && invalidActivityLog.outcome], [true, 'error']);
   check(so, 'Activity thieu ngay bi chan an toan va ghi Log', [invalidActivityResult.written, invalidActivityLog && invalidActivityLog.detail.statusAfter, invalidActivityLog && invalidActivityLog.outcome], [0, edges.FbmSync.SYNC_STATUS.error, 'error']);
+  const validActivity = edges.FbmSync.activityRecord({ id: 91, ma_kh: 'ALT00014', ten_cv: 'Gọi', details: 'Đủ ngày', end_date: '/Date(1757386800000)/' }, gate);
+  const mixedActivityResult = edges.FbmSync.pullWrite('activity', [validActivity, invalidActivity]);
+  check(so, 'Activity hop le van duoc ghi khi ca thieu ngay cung lo', [mixedActivityResult.written, activityPullWrite.records.some((record) => String(record.fbmId) === '91'), reconcileLogs.some((event) => event.action === 'pull_record' && event.recordId === '91' && event.outcome === 'ok'), reconcileLogs.some((event) => event.action === 'pull_record' && event.recordId === '90' && event.outcome === 'error')], [1, true, true, true]);
 
   const conflictRawBase = { stt_rec_kh: 'FBM-CONFLICT', ma_kh: 'ALT00015', ten_kh: 'Ten goc', ma_so_thue: '010015', dien_thoai: '090015', dc_lh: 'Ha Noi' };
   const conflictState = { runId: 'conflict-run', mode: 'read', phase: 'conflict', entity: 'customer', cursor: { kind: 'customer_grid', index: 4 }, session: { customerAuthorized: '', activityAuthorized: '', expired: false }, metadata: { categoryGate: gate, seen: { customer: {}, activity: {} }, conflicts: [] }, locks: {}, counts: { total: 0, completed: 0, succeeded: 0, skipped: 0, conflict: 0, error: 0 } };
