@@ -472,7 +472,7 @@ Chi tiết đầy đủ nằm ở `0_Documentation/Phiên code/Checklist cảnh 
 - [x] Tích hợp dirty guard vào ba form lõi và luồng form lồng/reload/chọn khách.
 - [x] Tích hợp dirty guard vào tám khối cấu hình FBM và action chuyển màn/menu/back.
 - [x] Tô màu changed sau cảnh báo, giữ màu khi tiếp tục sửa và xóa đúng lúc.
-- [x] Bổ sung kiểm thử offline cho compare, modal, save/discard lỗi, form lõi, FBM và password; khóa hồi quy dirty ngoài FBM phải mở modal, mọi dispatch qua ActionCoordinator, adapter tương lai thiếu `canRun` fail-closed, discard phải chạy pending action, khôi phục DOM form lõi, component modal không được hardcode HTML và backdrop không bị CSS `.shin-box:empty` ẩn.
+- [x] Bổ sung kiểm thử offline cho compare, modal, save/discard lỗi, form lõi, FBM và password; khóa hồi quy mọi action ngoài FBM đang edit (kể cả card sạch) phải mở modal, mọi dispatch qua ActionCoordinator, adapter tương lai thiếu `canRun` fail-closed, discard phải chạy pending action, khôi phục DOM form lõi, component modal không được hardcode HTML và backdrop không bị CSS `.shin-box:empty` ẩn.
 - [x] Chạy `node tests/run.js`: 1.719 phép đạt, 0 phép lỗi; đã cập nhật checklist riêng và cây thư mục code; test hợp đồng tĩnh đã khóa wiring; commit `bebeae3`, `b5d0a3a`, `4145a90`, `c7592fa`, `f6fb40b`, `754532f`, `7754a2d`, `631328b`, `fcf6759`; GAS DEV `fbmGetSyncSettings --push` đạt `OK` ở revision `@455`.
 - [ ] Nghiệm thu trên Sheet DEV: chuyển khối/màn, menu, quay lại, lưu, bỏ thay đổi, tiếp tục sửa và đóng Sidebar.
 

@@ -134,7 +134,9 @@ async function testFormVaFbm(so) {
   hop.UNSAVED_CHANGES.pending = null;
   hop.UNSAVED_CHANGES.provider = null;
   coreDirty = false;
-  check(so, 'form lõi đang sửa nhưng chưa đổi vẫn chặn ngoài, còn Hủy đi thẳng', [hop.unsavedChangesGuardCore('openActivityForm', () => {}), hop.unsavedChangesGuardCore('cancelForm', () => {})], [true, false]);
+  const cleanCoreOutsideBlocked = hop.unsavedChangesGuardCore('openActivityForm', () => {});
+  check(so, 'form lõi đang sửa nhưng chưa đổi vẫn chặn ngoài và mở modal, còn Hủy đi thẳng', [cleanCoreOutsideBlocked, hop.UNSAVED_CHANGES.dialogOpen, hop.unsavedChangesGuardCore('cancelForm', () => {})], [true, true, false]);
+  hop.unsavedChangesResolve('continue');
   coreEditing = false;
 
   hop.FBM_SYNC_CLIENT = { configEdits: {} };
@@ -165,7 +167,8 @@ async function testFormVaFbm(so) {
   const outside = bo.dom.document.createElement('button');
   const loginStarted = hop.fbmSyncConfigStartEdit('login');
   const cleanOutsideBlocked = hop.unsavedChangesGuardFbmTarget(outside, () => {});
-  check(so, 'Đang sửa dù chưa đổi giá trị vẫn chặn action ngoài card', [loginStarted, cleanOutsideBlocked, hop.UNSAVED_CHANGES.dialogOpen], [true, true, false]);
+  check(so, 'Đang sửa dù chưa đổi giá trị vẫn chặn action ngoài card và mở modal', [loginStarted, cleanOutsideBlocked, hop.UNSAVED_CHANGES.dialogOpen], [true, true, true]);
+  hop.unsavedChangesResolve('continue');
   check(so, 'Không mở đồng thời khối thứ hai khi khối hiện tại còn đang sửa', [hop.fbmSyncConfigStartEdit('identity'), hop.fbmSyncConfigState('login').editing, hop.fbmSyncConfigState('identity').editing], [false, true, false]);
   hop.fbmSyncConfigFinishEdit('login');
   username.value = 'old';

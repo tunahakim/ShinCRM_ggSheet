@@ -31,7 +31,7 @@ Checklist này theo dõi một cơ chế chung cho mọi khối Sidebar có trư
 - [x] Nâng module thành `ActionCoordinator` duy nhất: mọi dispatch lõi/FBM và surface tương lai đều qua registry adapter `read/canRun/save/discard`; adapter thiếu `canRun` bị chặn fail-closed.
 - [x] Có phép chuẩn hóa/so sánh an toàn cho text, số, boolean, select/menu và ngày.
 - [x] Có API đọc dirty lazy: chỉ đọc/so sánh đầy đủ khi guard được gọi.
-- [x] Dirty chỉ phục vụ tô màu và quyết định cảnh báo khi action bị chặn; trạng thái editing mới là khóa chính. Action ngoài surface dirty mở cùng modal, surface sạch vẫn bị chặn theo chính sách.
+- [x] Trạng thái `editing` là khóa chính: mọi action ngoài surface đang sửa đều bị chặn và mở cùng modal, kể cả khi chưa dirty; `dirty` chỉ phục vụ tô màu, so sánh và xác nhận lưu.
 - [x] Có API `save`, `discard`, `continue` với khóa chống xử lý hai lần; `discard` thành công là quyết định bỏ nháp có hiệu lực và phải chạy action đang chờ dù lần đọc DOM cũ còn báo dirty.
 - [x] Khi save/discard lỗi, giữ nguyên bản nháp, không chạy action đang chờ và báo lỗi rõ.
 - [x] Khôi phục focus về control phù hợp sau khi đóng cảnh báo hoặc sau khi action tiếp tục.
@@ -41,16 +41,16 @@ Checklist này theo dõi một cơ chế chung cho mọi khối Sidebar có trư
 
 - [x] Dùng bản ghi lúc mở form làm baseline cho form sửa/thêm mới.
 - [x] So sánh giá trị hiện tại với baseline qua bộ thu thập hiện có, không tạo bộ đọc DOM thứ hai cho nghiệp vụ.
-- [x] Chặn `cancelForm`, mở form lồng, đổi khách, về màn xem, nạp lại và mở FBM khi form đang sửa; `cancelForm` sạch đi thẳng, dirty mới mở cảnh báo.
+- [x] Chặn action ngoài như mở form lồng, đổi khách, về màn xem, nạp lại và mở FBM khi form đang sửa, kể cả khi chưa dirty; `cancelForm` cùng form vẫn đi thẳng khi sạch và mở cảnh báo khi dirty.
 - [x] Cho `saveForm` đi thẳng vào luồng lưu; chỉ chạy action tiếp theo sau khi cửa ghi xác nhận thành công.
 - [x] Bỏ draft khi chọn hủy thay đổi trước khi thực hiện action đang chờ; form lõi khôi phục control DOM về baseline để `screenFormStash` không thu lại giá trị đã bỏ khi mở form lồng.
-- [x] Không cảnh báo khi người dùng chưa thay đổi gì hoặc đã đưa toàn bộ trường về baseline.
+- [x] Action ngoài vẫn cảnh báo khi người dùng chưa thay đổi gì; chỉ action nội bộ được `canRun` cho phép (như `cancelForm` khi sạch) mới đi thẳng.
 
 ## 5. Các khối cấu hình FBM
 
 - [x] Tính dirty theo từng key của `fbmSyncConfigEditor`, không tách cơ chế theo tên nghiệp vụ.
 - [x] Bao phủ identity, login, account settings, module, relay, extension, background và login policy.
-- [x] Chặn mở/sửa khối khác, menu ba chấm, chuyển màn hình, quay lại và các action ngoài khối khi khối hiện tại đang sửa, kể cả khi chưa dirty; mọi đường click đi qua `ActionCoordinator`, dirty ngoài khối mở modal.
+- [x] Chặn mở/sửa khối khác, menu ba chấm, chuyển màn hình, quay lại và các action ngoài khối khi khối hiện tại đang sửa, kể cả khi chưa dirty; mọi đường click đi qua `ActionCoordinator` và đều mở modal.
 - [x] Cho action nội bộ cùng khối tiếp tục hoạt động theo hợp đồng; nút lưu hiện tại không tự mở thêm cảnh báo.
 - [x] Lưu từ cảnh báo dùng đúng cổng save hiện có của từng key và xác nhận trạng thái đã về chỉ xem.
 - [x] Bỏ thay đổi dùng đúng snapshot của editor, không gọi GAS nếu chỉ cần hủy bản nháp cục bộ.
@@ -75,7 +75,7 @@ Checklist này theo dõi một cơ chế chung cho mọi khối Sidebar có trư
 - [x] Test save/discard lỗi: dữ liệu và màu không bị xóa nhầm.
 - [x] Test form lõi: cancel/open form lồng/đổi khách/reload bị chặn khi đang sửa, kể cả chưa dirty.
 - [x] Test FBM: chuyển màn, menu, back, sửa khối khác và action nội bộ cùng khối.
-- [x] Test FBM: card sạch vẫn khóa action ngoài, card dirty ngoài khối mở modal dùng chung, không mở đồng thời hai card; adapter thiếu `canRun` fail-closed.
+- [x] Test FBM: card sạch và card dirty đều khóa action ngoài rồi mở modal dùng chung, không mở đồng thời hai card; adapter thiếu `canRun` fail-closed.
 - [x] Test password: dirty đúng nhưng không xuất hiện trong snapshot, log hoặc lỗi.
 - [ ] Test callback snapshot không dựng lại control đang nhập và không mất highlight. (Còn cần nghiệm thu callback thật trên Sheet DEV.)
 - [x] Test hợp đồng tĩnh: Sidebar host/include/boot, host không còn nút/nội dung modal hardcode, component renderer/Stack, ActionCoordinator, adapter form/FBM, mapping tám key, password, CSS changed và lớp phủ modal không bị tháo trong phiên sau.
