@@ -211,7 +211,9 @@ async function chay(so) {
   const identityEditButton = identityCard.querySelector('.shin-config-edit');
   const loginEditButton = loginCard.querySelector('.shin-config-edit');
   check(so, 'Account render đủ ô liên kết, có bút sửa và khóa ô nhập khi đang xem', [dom.document.getElementById('fbm-identity-spreadsheet') !== null, dom.document.getElementById('fbm-identity-user') !== null, dom.document.getElementById('fbm-identity-account') !== null, identityCard.querySelector('[data-sync-config-action="edit"]') !== null, dom.document.getElementById('fbm-identity-spreadsheet').disabled], [true, true, true, true, true]);
-  check(so, 'Nút Sửa thông tin của Liên kết và Đăng nhập dùng cùng chiều rộng/style', [identityCard.querySelector('.shin-single-action-row').className, loginCard.querySelector('.shin-single-action-row').className, identityEditButton.className, loginEditButton.className, identityEditButton.getAttribute('data-sync-config-key'), loginEditButton.getAttribute('data-sync-config-key')], ['shin-row shin-single-action-row', 'shin-row shin-single-action-row', 'shin-button shin-config-edit', 'shin-button shin-config-edit', 'identity', 'login']);
+  const identityActionRegion = identityCard.querySelector('#fbm-sync-identity-actions-region');
+  const loginActionRegion = loginCard.querySelector('#fbm-sync-login-actions-region');
+  check(so, 'Nút Sửa thông tin của Liên kết và Đăng nhập dùng hai hàng dọc riêng', [identityActionRegion.className, loginActionRegion.className, identityActionRegion.children.length, loginActionRegion.children.length, identityActionRegion.children[0].className, loginActionRegion.children[0].className, identityEditButton.className, loginEditButton.className, identityEditButton.getAttribute('data-sync-config-key'), loginEditButton.getAttribute('data-sync-config-key')], ['shin-box shin-stack shin-action-stack', 'shin-box', 1, 1, 'shin-box shin-stack', 'shin-box shin-stack', 'shin-button shin-config-edit', 'shin-button shin-config-edit', 'identity', 'login']);
   const viewIdentityActions = identityCard.querySelector('#fbm-sync-identity-actions-region');
   const viewIdentityCheck = viewIdentityActions.querySelector('#fbm-sync-check-identity');
   check(so, 'Chế độ xem vẫn có nút Kiểm tra liên kết dùng binding đã lưu', [viewIdentityCheck && viewIdentityCheck.id, viewIdentityCheck && viewIdentityCheck.textContent, viewIdentityCheck && viewIdentityCheck.disabled, identityEditButton !== null], ['fbm-sync-check-identity', 'Kiểm tra liên kết', false, true]);
@@ -242,7 +244,7 @@ async function chay(so) {
   hop.FBM_SYNC_CLIENT.loginStatus = { configured: false, enabled: true };
   hop.fbmSyncConfigStartEdit('login');
   const loginActionRow = hop.fbmSyncLoginActionBlocks()[0];
-  check(so, 'Hai nút đăng nhập dùng Row chung để chia đều hai cột', [loginActionRow.role, loginActionRow.elements.length, loginActionRow.elements[0].role, loginActionRow.elements[1].role], ['row', 2, 'button', 'button']);
+  check(so, 'Hai nút đăng nhập dùng Stack để xếp thành hai hàng', [loginActionRow.role, loginActionRow.className, loginActionRow.elements.length, loginActionRow.elements[0].role, loginActionRow.elements[1].role], ['box', 'shin-stack', 2, 'button', 'button']);
   hop.fbmSyncConfigFinishEdit('login');
   hop.FBM_SYNC_CLIENT.syncSettings = { account: { customerPrefix: 'ALT', customerCodeLength: '8', activitySince: '2026-01-01' } };
   render(hop, content, hop.fbmSyncRenderAccount, idle);
