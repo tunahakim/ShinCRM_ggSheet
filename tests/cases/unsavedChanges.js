@@ -293,6 +293,75 @@ function testFbmAdapterUseCaseMatrix(so) {
   check(so, 'cancel cùng connection chỉ bị chặn khi thật sự dirty', [provider.canRunTarget(cancel, state), provider.canRunTarget(save, state)], [false, true]);
 }
 
+async function testAllFbmSurfaceActionMatrix(so) {
+  const bo = taoBoTest(), hop = bo.hop;
+  hop.FBM_SYNC_CLIENT = {
+    configEdits: {}, syncSettings: {
+      account: {}, extension: {}, background: {
+        heartbeat: {}, customerFull: {}, activityFull: {}, detail: {}
+      }
+    }, loginStatus: {}, identityStatus: { binding: {} }, lastStatus: {}
+  };
+  hop.FBM_SYNC_SETTINGS_SCHEMA = { defaults: { approvalThreshold: 100, pollMinutes: 5, retryMinutes: 30 } };
+  hop.FBM_SYNC_UI_SCHEMA = { config: { actionIdPrefix: 'config-', actionCancel: 'cancel', actionSave: 'save', actionEdit: 'edit', tooltips: {} } };
+  hop.FBM_SYNC_CONFIG_UNSAVED_PROVIDER = null;
+  const keys = ['connection', 'accountSettings', 'module', 'relay', 'extension', 'background', 'loginPolicy'];
+  const provider = hop.fbmSyncConfigUnsavedProvider();
+  const outside = bo.dom.document.createElement('button'); bo.dom.root.appendChild(outside);
+  const targets = [
+    outside,
+    Object.assign(bo.dom.document.createElement('button'), { id: 'fbm-sync-module-menu' }),
+    Object.assign(bo.dom.document.createElement('button'), { id: 'fbm-sync-back' }),
+    Object.assign(bo.dom.document.createElement('button'), { id: 'fbm-sync-open-login-policy' }),
+    (() => { const node = bo.dom.document.createElement('button'); node.setAttribute('data-sync-screen', 'settings'); return node; })(),
+    (() => { const node = bo.dom.document.createElement('button'); node.setAttribute('data-sync-results-tab', 'summary'); return node; })(),
+    (() => { const node = bo.dom.document.createElement('button'); node.setAttribute('data-sync-page', 'log:1'); return node; })()
+  ];
+  const outsideAllowed = [];
+  for (const key of keys) {
+    hop.fbmSyncConfigStartEdit(key);
+    const card = bo.dom.document.createElement('div'); card.id = hop.FBM_SYNC_CONFIG_UNSAVED_CARDS[key]; bo.dom.root.appendChild(card);
+    const state = provider.read();
+    outsideAllowed.push({ key, clean: !state.dirty, targets: targets.map((target) => provider.canRunTarget(target, state)) });
+    check(so, 'surface ' + key + ' sạch vẫn khóa toàn bộ action ngoài card', [state.editingKey, state.dirty, outsideAllowed[outsideAllowed.length - 1].targets.some(Boolean)], [key, false, false]);
+    const blocked = hop.unsavedChangesGuardTransition({ source: 'fbm', target: outside }, () => {});
+    check(so, 'surface ' + key + ' sạch vẫn mở modal qua coordinator', [blocked, hop.UNSAVED_CHANGES.dialogOpen], [true, true]);
+    hop.unsavedChangesResolve('continue');
+    check(so, 'surface ' + key + ' Continue giữ nguyên trạng thái đang sửa', [hop.fbmSyncConfigIsEditing(key), hop.UNSAVED_CHANGES.dialogOpen], [true, false]);
+    hop.fbmSyncConfigFinishEdit(key);
+    card.remove();
+  }
+  check(so, 'ma trận action ngoài áp dụng đồng nhất cho đủ bảy surface', [outsideAllowed.length, outsideAllowed.every((item) => item.clean && item.targets.every((allowed) => allowed === false))], [7, true]);
+
+  const dirtyKeys = keys.filter((key) => Object.keys(hop.FBM_SYNC_CONFIG_UNSAVED_FIELDS[key] || {}).length);
+  const dirtyResults = [];
+  for (const key of dirtyKeys) {
+    hop.fbmSyncConfigStartEdit(key);
+    const path = Object.keys(hop.FBM_SYNC_CONFIG_UNSAVED_FIELDS[key])[0];
+    const fieldId = hop.FBM_SYNC_CONFIG_UNSAVED_FIELDS[key][path];
+    const field = bo.dom.document.createElement('input'); field.id = fieldId; field.value = 'changed'; bo.dom.root.appendChild(field);
+    const state = hop.fbmSyncConfigState(key);
+    state.snapshot = {}; state.draft = {};
+    const parts = path.split('.'); let snapshot = state.snapshot, draft = state.draft;
+    parts.forEach((part, index) => {
+      if (index === parts.length - 1) { snapshot[part] = 'original'; draft[part] = 'changed'; return; }
+      snapshot[part] = {}; draft[part] = {}; snapshot = snapshot[part]; draft = draft[part];
+    });
+    const dirtyState = provider.read();
+    const blocked = hop.unsavedChangesGuardTransition({ source: 'fbm', target: outside }, () => {});
+    dirtyResults.push({ key, blocked, dirty: dirtyState.dirty, highlighted: field.getAttribute('data-unsaved-changed') === '1' && hop.UNSAVED_CHANGES.dialogOpen });
+    hop.unsavedChangesResolve('continue');
+    check(so, 'surface ' + key + ' dirty tô màu và giữ action ngoài', [blocked, dirtyState.dirty, field.classList.contains('shin-field-changed'), hop.fbmSyncConfigIsEditing(key)], [true, true, true, true]);
+    const cancel = bo.dom.document.createElement('button'); cancel.setAttribute('data-sync-config-action', 'cancel'); cancel.setAttribute('data-sync-config-key', key); const cancelCard = bo.dom.document.createElement('div'); cancelCard.id = hop.FBM_SYNC_CONFIG_UNSAVED_CARDS[key]; cancelCard.appendChild(cancel); bo.dom.root.appendChild(cancelCard);
+    const cancelBlocked = hop.unsavedChangesGuardTransition({ source: 'fbm', target: cancel }, () => {});
+    hop.unsavedChangesResolve('discard');
+    await new Promise((resolve) => setImmediate(resolve));
+    check(so, 'surface ' + key + ' discard thoát edit và xóa màu', [cancelBlocked, hop.fbmSyncConfigIsEditing(key), field.classList.contains('shin-field-changed'), hop.UNSAVED_CHANGES.provider], [true, false, false, null]);
+    field.remove(); cancelCard.remove();
+  }
+  check(so, 'mọi surface có field đều chạy đủ nhánh dirty/Continue/Discard', [dirtyResults.length, dirtyResults.every((item) => item.blocked && item.dirty && item.highlighted)], [6, true]);
+}
+
 async function testProviderSaveResultMatrix(so) {
   const bo = taoBoTest(), hop = bo.hop;
   hop.FBM_SYNC_CLIENT = { configEdits: { connection: { editing: true, snapshot: { identity: {}, loginUsername: '' }, draft: { identity: {}, loginUsername: '' } } }, syncSettings: {}, loginStatus: {}, identityStatus: { binding: {} } };
@@ -383,6 +452,7 @@ async function chay(so) {
   testCoordinatorUseCaseMatrix(so);
   testCoordinatorFailureMatrix(so);
   testFbmAdapterUseCaseMatrix(so);
+  await testAllFbmSurfaceActionMatrix(so);
   await testProviderSaveResultMatrix(so);
   testHopDongTichHop(so);
 }
