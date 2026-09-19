@@ -187,8 +187,10 @@ function chay(so) {
     [styles.indexOf('.shin-single-action-row { justify-content: center; flex-wrap: wrap; gap: var(--shin-gap-2); }') >= 0,
       styles.indexOf('width: min(220px, 100%); max-width: 100%; min-width: 0;') >= 0,
       styles.indexOf('white-space: normal; overflow-wrap: anywhere;') >= 0,
+      styles.indexOf('.shin-single-action-row > .shin-button { white-space: normal; text-align: center; overflow-wrap: anywhere; }') >= 0,
+      styles.indexOf('.shin-single-action-row > .shin-button .shin-btn-label { min-width: 0; overflow-wrap: anywhere; white-space: normal; }') >= 0,
       styles.indexOf('.shin-single-action-row > * + * { margin-left: 0; }') >= 0],
-    [true, true, true, true]);
+    [true, true, true, true, true, true]);
   check(so, 'action Stack căn giữa ở đúng độ ưu tiên của component lõi',
     [styles.indexOf('.shin-box.shin-action-stack { align-items: center; }') >= 0,
       !/(^|\n)\.shin-action-stack \{ align-items: center; \}/.test(styles)],
