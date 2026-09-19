@@ -25,16 +25,17 @@ function idle() {
 
 async function testConnectionSaveValidation(so) {
   const { hop, dom } = taoBoTest();
-  const calls = [], notices = [], errors = [];
+  const calls = [], logs = [], notices = [], errors = [];
   hop.FBM_SYNC_CLIENT.identityDraft = { spreadsheetId: 'sheet-a', userId: 'user-a', username: 'USERA', accountName: 'Tai khoan A' };
   hop.FBM_SYNC_CLIENT.identityStatus = { status: 'BOUND', binding: Object.assign({}, hop.FBM_SYNC_CLIENT.identityDraft) };
   hop.FBM_SYNC_CLIENT.loginStatus = { enabled: true };
   hop.fbmSyncSetAccountNotice = (area, level, message) => { notices.push({ area, level, message }); };
-  hop.fbmSyncPaintError = (error, message) => { errors.push(String(message || error || '')); };
+  const paintError = hop.fbmSyncPaintError;
+  hop.fbmSyncPaintError = (error, message) => { errors.push(String(message || error || '')); return paintError(error, message); };
   hop.fbmSyncPaint = () => {};
   hop.fbmSyncStatusOnce = () => Promise.resolve({ phase: 'idle' });
   hop.fbmSyncConfigFinishEdit = () => {};
-  hop.callServer = (name, args) => { calls.push({ name, args }); return Promise.resolve({ ok: true, binding: hop.FBM_SYNC_CLIENT.identityDraft, identityStatus: hop.FBM_SYNC_CLIENT.identityStatus, login: hop.FBM_SYNC_CLIENT.loginStatus }); };
+  hop.callServer = (name, args) => { if (name === 'fbmLogSyncError') { logs.push({ name, args }); return Promise.resolve({ ok: true }); } calls.push({ name, args }); return Promise.resolve({ ok: true, binding: hop.FBM_SYNC_CLIENT.identityDraft, identityStatus: hop.FBM_SYNC_CLIENT.identityStatus, login: hop.FBM_SYNC_CLIENT.loginStatus }); };
   const add = (id, value) => { const input = dom.document.createElement('input'); input.id = id; input.value = value; dom.root.appendChild(input); return input; };
   const spreadsheet = add('fbm-identity-spreadsheet', 'sheet-a');
   add('fbm-identity-user', 'user-a'); add('fbm-identity-username', 'USERA'); add('fbm-identity-account', 'Tai khoan A');
@@ -67,6 +68,7 @@ async function testConnectionSaveValidation(so) {
   hop.fbmSyncEncryptCredentials = () => Promise.resolve({ credentialRef: 'cred-client-123', envelope: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'USERA' } });
   await hop.fbmSyncSaveConnection(button);
   check(so, 'client gửi credential đã mã hóa đúng payload và xóa password sau save', [calls.length, calls[1] && calls[1].args[0].credential.mode, calls[1] && calls[1].args[0].credential.credentialRef, password.value], [2, 'save', 'cred-client-123', '']);
+  check(so, 'mọi lỗi lưu kết nối đều hiện Sidebar và ghi Sheet Log', [errors.length, logs.length >= errors.length, logs.every((item) => item.name === 'fbmLogSyncError')], [4, true, true]);
 }
 
 async function chay(so) {

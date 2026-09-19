@@ -330,6 +330,7 @@ function fbmHeartbeatNow(source) {
         if (!tab) {
           noteHeartbeatStatus('blocked_tab', { source: origin, code: 'FBM_TAB_NOT_FOUND' });
           return relayHeartbeatTransportFailure(config, gasRequest.request, 'FBM_TAB_NOT_FOUND', 'Không tìm thấy tab FBM đang mở.').then(function (gasReply) {
+            if (gasReply && gasReply.request) { return relayScheduledRequests(null, config, gasReply, 0); }
             return Object.assign({}, gasReply || {}, { ok: false, code: 'FBM_TAB_NOT_FOUND', error: 'Không tìm thấy tab FBM đang mở.' });
           });
         }
@@ -337,6 +338,7 @@ function fbmHeartbeatNow(source) {
         return sendToFbmTab(tab.id, gasRequest.request).then(function (reply) {
           if (reply && reply.error) {
             return relayHeartbeatTransportFailure(config, gasRequest.request, reply.code || 'FBM_TRANSPORT_UNAVAILABLE', reply.error).then(function (gasReply) {
+              if (gasReply && gasReply.request) { return relayScheduledRequests(null, config, gasReply, 0); }
               return Object.assign({}, gasReply || {}, { ok: false, code: String(reply.code || 'FBM_TRANSPORT_UNAVAILABLE'), error: String(reply.error) });
             });
           }
@@ -348,6 +350,7 @@ function fbmHeartbeatNow(source) {
           });
         }).catch(function (error) {
           return relayHeartbeatTransportFailure(config, gasRequest.request, 'FBM_TRANSPORT_UNAVAILABLE', error && error.message || error).then(function (gasReply) {
+            if (gasReply && gasReply.request) { return relayScheduledRequests(null, config, gasReply, 0); }
             return Object.assign({}, gasReply || {}, { ok: false, code: 'FBM_TRANSPORT_UNAVAILABLE', error: String(error && error.message || error) });
           });
         });
@@ -433,16 +436,25 @@ function configureRelay(config) {
 function relayScheduledRequests(tabId, config, gasReply, count) {
   var next = gasReply && gasReply.request, used = Number(count || 0);
   if (!next || !config || !config.url || !config.key) { return Promise.resolve(gasReply); }
-  return sendToFbmTab(tabId, next).then(function (reply) {
-      if (reply && reply.error) {
-        return postRelay(config.url, config.key, {
-          kind: 'background_sync',
-          command: 'transport_failure',
-          payload: { requestId: next.id, code: reply.code || 'FBM_TRANSPORT_UNAVAILABLE', message: reply.error },
-          spreadsheetId: config.spreadsheetId,
-          hop: used + 1
-        });
-      }
+  function reportFailure(code, message) {
+    return postRelay(config.url, config.key, {
+      kind: 'background_sync',
+      command: 'transport_failure',
+      payload: { requestId: next.id, code: String(code || 'FBM_TRANSPORT_UNAVAILABLE'), message: String(message || 'Extension không gửi được request tới tab FBM.').slice(0, 240) },
+      spreadsheetId: config.spreadsheetId,
+      hop: used + 1
+    }).then(function (failureReply) {
+      return relayScheduledRequests(null, config, failureReply, used + 1);
+    }).catch(function (relayError) {
+      var relayMessage = String(relayError && relayError.message || relayError || 'Không thể báo lỗi transport lên GAS.').slice(0, 240);
+      noteRelayStatus({ stage: 'failed', ok: false, code: 'GAS_RELAY_FAILED', error: relayMessage });
+      return { ok: false, code: 'GAS_RELAY_FAILED', error: relayMessage, request: null };
+    });
+  }
+  return ensureFbmTab(next).then(function (tab) {
+    if (!tab) { return reportFailure('FBM_TAB_NOT_FOUND', 'Không tìm thấy tab FBM đang mở.'); }
+    return sendToFbmTab(tab.id, next).then(function (reply) {
+      if (reply && reply.error) { return reportFailure(reply.code || 'FBM_TRANSPORT_UNAVAILABLE', reply.error); }
       var raw = rawFbmReply(reply);
       return postRelay(config.url, config.key, {
         kind: 'background_sync',
@@ -450,17 +462,12 @@ function relayScheduledRequests(tabId, config, gasReply, count) {
         payload: { response: raw },
         spreadsheetId: config.spreadsheetId,
         hop: used + 1
-      }).then(function (nextReply) {
-      return relayScheduledRequests(tabId, config, nextReply, used + 1);
+      }).then(function (nextReply) { return relayScheduledRequests(null, config, nextReply, used + 1); }).catch(function (error) {
+        return reportFailure('FBM_TRANSPORT_UNAVAILABLE', error && error.message || error);
+      });
     });
   }).catch(function (error) {
-    return postRelay(config.url, config.key, {
-      kind: 'background_sync',
-      command: 'transport_failure',
-      payload: { requestId: next.id, code: 'FBM_TRANSPORT_UNAVAILABLE', message: error && error.message || error },
-      spreadsheetId: config.spreadsheetId,
-      hop: used + 1
-    });
+    return reportFailure('FBM_TRANSPORT_UNAVAILABLE', error && error.message || error);
   });
 }
 

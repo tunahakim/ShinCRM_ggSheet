@@ -42,6 +42,42 @@ async function chay(so) {
   const userResponse = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[2037,"ANHLT","Le Tuan Anh"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { trace: [{ requestId: authorizeResponse.request.id }] } });
   check(so, 'chi identity khop moi tiep tuc heartbeat', [userResponse.ok, userResponse.code, userResponse.request.meta.kind, heartbeat.FbmSync.stateRead().session.accountUsername, heartbeat.FbmSync.stateRead().session.accountName], [true, 'AUTO_LOGIN_OK', 'heartbeat', 'ANHLT', 'Le Tuan Anh']);
 
+  const gateLogs = [];
+  let gateFlushes = 0;
+  heartbeat.logEvent = (event) => gateLogs.push(event);
+  heartbeat.flushLog = () => { gateFlushes += 1; };
+  heartbeat.FbmSync.statePatch({ runId: '', phase: 'checking_session', mode: 'read', cursor: { kind: 'authorize_customer' }, activeRequestId: '', deadlineAt: 0, session: { expired: false } });
+  const validRead = heartbeat.FbmSync.nextEnvelope({ url: 'https://fbm.test/read', body: { read: true }, meta: { kind: 'valid_read' } });
+  heartbeat.FbmSync.statePatch({ activeRequestId: '', phase: 'push', mode: 'push', cursor: { kind: 'customer_edit_save' }, session: { expired: false } });
+  const validWrite = heartbeat.FbmSync.nextEnvelope({ url: 'https://fbm.test/write', body: { write: true }, meta: { kind: 'valid_write' } });
+  check(so, 'session hop le khong doi hanh vi ca doc va ghi', [validRead.meta.kind, validWrite.meta.kind, validRead.meta.openFbmContext, validWrite.meta.openFbmContext, gateLogs.length], ['valid_read', 'valid_write', undefined, undefined, 0]);
+
+  heartbeat.FbmSync.loginConfigPolicySave({ enabled: false, autoOpenTab: false, retryEnabled: true, retryMinutes: 30 });
+  heartbeat.FbmSync.statePatch({ runId: 'closed-gate', phase: 'checking_session', mode: 'read', cursor: { kind: 'authorize_customer' }, activeRequestId: '', deadlineAt: 0, session: { expired: true }, lastFailureCode: '', lastError: '' });
+  const closedGate = heartbeat.FbmSync.nextEnvelope({ url: 'https://fbm.test/blocked', body: {}, meta: { kind: 'blocked_read' } });
+  check(so, 'cổng fail-closed khi tự đăng nhập tắt', [closedGate, heartbeat.FbmSync.stateRead().phase, heartbeat.FbmSync.stateRead().lastFailureCode, gateLogs.some((event) => event.action === 'session_gate_blocked'), gateFlushes > 0], [null, 'paused', 'AUTO_LOGIN_NOT_CONFIGURED', true, true]);
+
+  heartbeat.FbmSync.statePatch({ runId: 'write-expired', phase: 'push', mode: 'push', cursor: { kind: 'push_wait', operation: 'customer_edit_save' }, activeRequestId: '', deadlineAt: 0, session: { expired: true } });
+  const blockedWrite = heartbeat.FbmSync.nextEnvelope({ url: 'https://fbm.test/write-blocked', body: {}, meta: { kind: 'customer_edit_save' } });
+  check(so, 'request ghi khong duoc tu dong gui lai khi session het han', [blockedWrite, heartbeat.FbmSync.stateRead().lastFailureCode, heartbeat.FbmSync.stateRead().phase], [null, 'SESSION_EXPIRED_AT_WRITE', 'paused']);
+
+  heartbeat.FbmSync.loginConfigPolicySave({ enabled: true, autoOpenTab: false, retryEnabled: true, retryMinutes: 30 });
+  heartbeat.FbmSync.statePatch({ runId: 'login-flight', phase: 'checking_session', mode: 'read', cursor: { kind: 'login', credentialRef: 'cred-heartbeat-123' }, activeRequestId: 'login-flight-request', deadlineAt: Date.now() + 1000, session: { expired: true } });
+  const concurrentGate = heartbeat.FbmSync.nextEnvelope({ url: 'https://fbm.test/second', body: {}, meta: { kind: 'second_request' } });
+  check(so, 'hai luong phat hien mat session chi giu mot tien trinh login', [concurrentGate, heartbeat.FbmSync.stateRead().lastFailureCode, heartbeat.FbmSync.stateRead().activeRequestId], [null, 'AUTO_LOGIN_IN_PROGRESS', 'login-flight-request']);
+
+  heartbeat.FbmSync.loginConfigSave({ credentialRef: 'cred-heartbeat-123', enabled: true, autoOpenTab: true, envelope: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'anhlt', database: 'FHN_CRM_App', unit: 'CTY' } });
+  heartbeat.FbmSync.statePatch({ runId: 'no-tab-run', phase: 'checking_session', mode: 'read', cursor: { kind: 'heartbeat' }, activeRequestId: 'tab-request-1', deadlineAt: Date.now() + 1000, session: { expired: false } });
+  const noTabRetry = heartbeat.FbmSync.heartbeatTransportFailure({ requestId: 'tab-request-1', code: 'FBM_TAB_NOT_FOUND', message: 'Không tìm thấy tab FBM đang mở.' });
+  const retryId = noTabRetry.request && noTabRetry.request.id;
+  const noTabFinal = heartbeat.FbmSync.heartbeatTransportFailure({ requestId: retryId, code: 'FBM_TAB_NOT_FOUND', message: 'Không tìm thấy tab FBM đang mở.' });
+  check(so, 'no-tab chi retry mot lan theo policy va co log loi', [noTabRetry.ok, noTabRetry.code, noTabRetry.request.meta.openFbmContext !== undefined, noTabFinal.ok, noTabFinal.code, heartbeat.FbmSync.stateRead().phase, gateLogs.filter((event) => event.action === 'transport_retry' || event.action === 'transport_failure').length >= 2], [true, 'FBM_TAB_RETRY_REQUEST_READY', true, false, 'FBM_TAB_NOT_FOUND', 'error', true]);
+  heartbeat.FbmSync.loginConfigPolicySave({ enabled: true, autoOpenTab: false, retryEnabled: true, retryMinutes: 30 });
+  heartbeat.FbmSync.statePatch({ runId: 'no-tab-closed', phase: 'checking_session', cursor: { kind: 'heartbeat' }, activeRequestId: 'tab-request-closed', deadlineAt: Date.now() + 1000, session: { expired: false } });
+  const noTabClosed = heartbeat.FbmSync.heartbeatTransportFailure({ requestId: 'tab-request-closed', code: 'FBM_TAB_NOT_FOUND', message: 'Không tìm thấy tab FBM đang mở.' });
+  check(so, 'no-tab bi chan ngay khi policy tu mo tab tat', [noTabClosed.ok, noTabClosed.request, noTabClosed.code, heartbeat.FbmSync.stateRead().phase], [false, null, 'FBM_TAB_NOT_FOUND', 'error']);
+  check(so, 'log session gate khong chua bi mat hoac payload nhay cam', /password|cookie|envelope|authorized/i.test(JSON.stringify(gateLogs)), false);
+
   const savedConfig = JSON.parse(heartbeatData.FBM_LOGIN_CONFIG_V1);
   savedConfig.lastAttemptAt = Date.now() - 31 * 60 * 1000;
   heartbeatData.FBM_LOGIN_CONFIG_V1 = JSON.stringify(savedConfig);
@@ -49,13 +85,36 @@ async function chay(so) {
   heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
   const failedLoginRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   const failedLogin = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":false}', trace: [{ requestId: failedLoginRequest.request.id }] });
-  check(so, 'login heartbeat that bai tam dung va khong lap ngay', [failedLogin.ok, failedLogin.code, failedLogin.request, heartbeat.FbmSync.stateRead().phase], [false, 'AUTO_LOGIN_FAILED', null, 'paused']);
+  check(so, 'login heartbeat that bai tam dung va khong lap ngay', [failedLogin.ok, failedLogin.code, failedLogin.request, heartbeat.FbmSync.stateRead().phase, gateLogs.some((event) => event.action === 'login_failure')], [false, 'AUTO_LOGIN_FAILED', null, 'paused', true]);
   const throttledAfterFailure = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   check(so, 'login that bai khong tu chay khi chua den lich', [throttledAfterFailure.ok, throttledAfterFailure.code, throttledAfterFailure.request], [true, 'NO_PROCESS_DUE', null]);
   heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
   heartbeat.FbmSync.statePatch({ scheduledScan: 'heartbeat' });
   const throttledDue = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   check(so, 'login that bai bi throttle toi da mot lan moi 30 phut khi den lich', [throttledDue.ok, throttledDue.code, throttledDue.request], [true, 'AUTO_LOGIN_THROTTLED', null]);
+
+  const expiredConfig = JSON.parse(heartbeatData.FBM_LOGIN_CONFIG_V1);
+  expiredConfig.lastAttemptAt = Date.now() - 31 * 60 * 1000;
+  expiredConfig.nextRetryAt = 0;
+  heartbeatData.FBM_LOGIN_CONFIG_V1 = JSON.stringify(expiredConfig);
+  heartbeat.FbmSync.statePatch({ runId: 'expired-401', phase: 'pull_customer', mode: 'read', entity: 'customer', cursor: { kind: 'customer_grid', type: 1, pageIndex: 3, pageValue: ['x'] }, activeRequestId: 'expired-401-request', deadlineAt: Date.now() + 1000, session: { expired: false } });
+  const expired401 = heartbeat.FbmSync.continue({ ok: false, status: 401, body: '', transport: { trace: [{ requestId: 'expired-401-request' }] } });
+  check(so, 'FBM 401 di qua cong session va bat dau auto-login mot lan', [expired401.ok, expired401.request.meta.kind, heartbeat.FbmSync.stateRead().cursor.kind, gateLogs.some((event) => event.action === 'session_expired')], [true, 'login', 'login', true]);
+
+  heartbeat.FbmSync.loginConfigPolicySave({ enabled: true, autoOpenTab: false, retryEnabled: true, retryMinutes: 30 });
+  heartbeat.FbmSync.statePatch({ runId: 'network-failure', phase: 'checking_session', mode: 'read', cursor: { kind: 'heartbeat' }, activeRequestId: 'network-request', deadlineAt: Date.now() + 1000, session: { expired: false } });
+  const networkFailure = heartbeat.FbmSync.heartbeatTransportFailure({ requestId: 'network-request', code: 'FBM_TRANSPORT_UNAVAILABLE', message: 'Relay timeout.' });
+  check(so, 'loi mang transport ket thuc huu han va van ghi Log khi Sidebar dong', [networkFailure.ok, networkFailure.code, heartbeat.FbmSync.stateRead().phase, gateLogs.some((event) => event.action === 'transport_failure'), gateFlushes > 0], [false, 'FBM_TRANSPORT_UNAVAILABLE', 'error', true, true]);
+
+  const savedLoginConfigRead = heartbeat.FbmSync.loginConfigRead;
+  heartbeat.FbmSync.loginConfigRead = () => { throw new Error('secret-internal'); };
+  heartbeat.FbmSync.statePatch({ runId: 'gate-exception', phase: 'checking_session', mode: 'read', cursor: { kind: 'heartbeat' }, activeRequestId: '', deadlineAt: 0, session: { expired: true } });
+  const gateException = heartbeat.FbmSync.nextEnvelope({ url: 'https://fbm.test/gate-exception', body: {}, meta: { kind: 'gate_exception_read' } });
+  check(so, 'exception noi bo cong fail-closed va ghi loi an toan', [gateException, heartbeat.FbmSync.stateRead().phase, heartbeat.FbmSync.stateRead().lastFailureCode, gateLogs.some((event) => event.action === 'session_gate_exception'), /secret-internal|password|cookie|envelope|authorized/i.test(JSON.stringify(gateLogs))], [null, 'error', 'FBM_SESSION_GATE_EXCEPTION', true, false]);
+  heartbeat.FbmSync.statePatch({ runId: 'gate-transport-exception', phase: 'checking_session', mode: 'read', cursor: { kind: 'heartbeat' }, activeRequestId: 'gate-transport-request', deadlineAt: Date.now() + 1000, session: { expired: false } });
+  const gateTransportException = heartbeat.FbmSync.heartbeatTransportFailure({ requestId: 'gate-transport-request', code: 'FBM_TAB_NOT_FOUND', message: 'Không tìm thấy tab FBM đang mở.' });
+  check(so, 'exception cong trong nhanh no-tab cung thu hoi reservation', [gateTransportException, heartbeat.FbmSync.stateRead().phase, heartbeat.FbmSync.stateRead().activeRequestId, heartbeat.FbmSync.stateRead().lastFailureCode], [null, 'error', '', 'FBM_SESSION_GATE_EXCEPTION']);
+  heartbeat.FbmSync.loginConfigRead = savedLoginConfigRead;
 
   const beforeTestConfig = heartbeat.FbmSync.loginConfigRead();
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: false, cookie: '' } });

@@ -127,7 +127,10 @@ function fbmSyncToggleMaster() {
   var current = FBM_SYNC_CLIENT.lastStatus || {}, enabled = !(current.masterEnabled === false || current.enabled === false), next = Object.assign({}, current, { masterEnabled: !enabled, enabled: !enabled });
   fbmSyncPaint(next);
   return FBM_SYNC_CLIENT.masterToggleFlight = callServer('fbmSetMasterSwitch', [!enabled]).then(fbmSyncStatusOnce).catch(function (error) {
-    var rollback = Object.assign({}, FBM_SYNC_CLIENT.lastStatus || current, { masterEnabled: enabled, enabled: enabled, message: String(error && error.message || error) }); fbmSyncPaint(rollback); return null;
+    var rollback = Object.assign({}, FBM_SYNC_CLIENT.lastStatus || current, { masterEnabled: enabled, enabled: enabled });
+    if (typeof fbmSyncPaintError === 'function') { fbmSyncPaintError(error, 'Khong doi duoc cong tac dong bo.'); }
+    fbmSyncPaint(rollback);
+    return null;
   }).finally(function () { FBM_SYNC_CLIENT.masterToggleFlight = null; });
 }
 function fbmSyncApplyMasterDisabled(status) {

@@ -320,7 +320,7 @@ async function chay(so) {
    heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
    const failedRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   const failedHeartbeat = heartbeat.fbmSyncHeartbeat({ ok: false, status: 500, body: '{"Message":"There was an error processing the request."}', transport: { trace: [{ requestId: failedRequest.request.id }] } });
-  check(so, 'heartbeat HTTP 500 dung phien va tra loi ro rang', [failedHeartbeat.ok, failedHeartbeat.code, heartbeat.FbmSync.stateRead().lastFailureCode], [false, 'FBM_BUSINESS_ERROR', 'FBM_BUSINESS_ERROR']);
+  check(so, 'heartbeat HTTP 500 dung phien va tra loi ro rang', [failedHeartbeat.ok, failedHeartbeat.code, heartbeat.FbmSync.stateRead().lastFailureCode], [false, 'TRANSPORT_ERROR', 'TRANSPORT_ERROR']);
    heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { cookie: 'userFHN_CRM_App', expired: false } });
    heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
    const emptyRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });

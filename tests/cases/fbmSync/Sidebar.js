@@ -497,6 +497,20 @@ async function chay(so) {
   dom.document.listeners.click({ target: conflictButton, preventDefault: () => {} });
   await new Promise((resolve) => setTimeout(resolve, 0));
   check(so, 'Lỗi xử lý xung đột hiện rõ và không khóa nút', [conflictButton.disabled, paints.some((item) => String(item.message).indexOf('CONFLICT_FAILURE') >= 0)], [false, true]);
+  const errorLogs = [];
+  hop.callServer = (name) => name === 'fbmLogSyncError' ? (errorLogs.push(name), Promise.resolve({ ok: true })) : Promise.reject(new Error('NETWORK_DOWN'));
+  await hop.fbmSyncLoadIdentityStatus();
+  hop.fbmSyncPaintError(new Error('EXTENSION_DOWN'), 'Bridge failed');
+  check(so, 'Lỗi mạng và lỗi bridge đều hiện Sidebar và gọi ghi Sheet Log', [errorLogs.length, paints.some((item) => item.phase === 'error' && String(item.message).indexOf('NETWORK_DOWN') >= 0), paints.some((item) => item.phase === 'error' && String(item.message).indexOf('EXTENSION_DOWN') >= 0)], [2, true, true]);
+  hop.fbmSyncPaintError(new Error('EXTENSION_DOWN'), 'Bridge failed');
+  check(so, 'Hai lỗi cùng message ở hai thời điểm đều ghi Log, không dedupe vĩnh viễn', errorLogs.length, 3);
+  hop.callServer = (name) => name === 'fbmReportSyncTransportFailure' ? Promise.resolve({ ok: true, code: 'FBM_TAB_RETRY_REQUEST_READY', request: { id: 'retry-once' } }) : Promise.resolve({ ok: true });
+  const transportRetry = await hop.fbmSyncReportTransportFailure({ id: 'request-1' }, new Error('Không thấy tab FBM'), 'FBM_TAB_NOT_FOUND');
+  check(so, 'Sidebar nhận request retry no-tab do GAS cấp thay vì tự quyết policy', [transportRetry.code, transportRetry.request.id], ['FBM_TAB_RETRY_REQUEST_READY', 'retry-once']);
+  hop.callServer = () => Promise.reject(new Error('NETWORK_DOWN'));
+  const transportReportError = new Error('Bridge failed');
+  const failedTransportReport = await hop.fbmSyncReportTransportFailure({ id: 'request-2' }, transportReportError, 'FBM_TRANSPORT_UNAVAILABLE');
+  check(so, 'GAS mất mạng khi báo transport không bị đánh dấu đã ghi nhận', [failedTransportReport.code, transportReportError.transportReported], ['GAS_REPORT_FAILED', false]);
 }
 
 module.exports = { chay, taoBoTest };

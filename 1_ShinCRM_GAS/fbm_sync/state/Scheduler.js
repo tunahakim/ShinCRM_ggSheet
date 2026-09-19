@@ -253,7 +253,7 @@ function fbmSyncHeartbeatRequest(options) {
     if (state.activeRequestId && now - Number(state.lastProgressAt || 0) < 120000) {
       return fbmSyncLockResult('REQUEST_IN_FLIGHT', 'Đã có request FBM đang chờ response; không cấp request heartbeat chồng.');
     }
-    if (state.runId && activePhase && cursor.kind !== 'login') {
+    if (state.runId && activePhase && !(typeof FbmSync.sessionGateCursorIsInternal === 'function' && FbmSync.sessionGateCursorIsInternal(state))) {
       var resumed = FbmSync.requestForCursor(state);
       if (!resumed) { return fbmSyncLockResult('SYNC_RESUME_UNAVAILABLE', 'Phiên đồng bộ đang chạy nhưng GAS không dựng lại được request từ cursor.'); }
       return { ok: true, code: 'SYNC_RESUME_REQUEST_READY', request: FbmSync.nextEnvelope(resumed), status: FbmSync.statusView(), resumed: true };
@@ -262,44 +262,18 @@ function fbmSyncHeartbeatRequest(options) {
       return { ok: true, code: 'RELAY_SLICE_COMPLETE', request: null, status: FbmSync.statusView() };
     }
     // Select and reserve one due business process before checking the session.
-    // This prevents auto-login from running on every technical poll.
+    // This prevents a technical poll from starting work on every heartbeat.
     var picked = FbmSync.schedulerPickDue(now, { startup: source === 'startup' });
     if (!picked.ok) {
       return { ok: true, noop: true, code: picked.code || 'NO_PROCESS_DUE', request: null, status: FbmSync.statusView() };
-    }
-    // State chưa có cookie không đồng nghĩa tab FBM đã logout: request heartbeat
-    // vẫn có thể lấy cookie qua capture generic do GAS chỉ dẫn.
-    var missingSession = session.expired === true;
-    if (cursor.kind === 'login' && state.activeRequestId && Number(state.lastProgressAt || 0) && now - Number(state.lastProgressAt) < 120000) {
-      return fbmSyncLockResult('AUTO_LOGIN_IN_PROGRESS', 'Đang chờ response đăng nhập tự động; không gửi thêm request.');
-    }
-    if (missingSession) {
-      var resumeCursor = cursor.kind === 'login' ? cursor.resumeCursor : (cursor.kind ? cursor : { kind: 'heartbeat' });
-      var loginRequest = typeof FbmSync.beginAutoLogin === 'function' ? FbmSync.beginAutoLogin(state, resumeCursor, { heartbeat: true }) : null;
-      if (loginRequest) { return { ok: true, code: 'AUTO_LOGIN_REQUEST_READY', request: FbmSync.nextEnvelope(loginRequest), status: FbmSync.statusView(), autoLogin: true }; }
-      var loginConfig = typeof FbmSync.autoLoginCanAttempt === 'function' ? FbmSync.autoLoginCanAttempt() : { code: 'AUTO_LOGIN_NOT_CONFIGURED' }, waitingCode = loginConfig.code || 'SESSION_EXPIRED_WAITING_LOGIN';
-      state.phase = 'paused';
-      state.lastFailureCode = waitingCode;
-      state.retryable = false;
-      state.lastError = waitingCode === 'AUTO_LOGIN_THROTTLED'
-        ? 'Đang chờ đủ 30 phút trước khi thử đăng nhập FBM lại.'
-        : 'Chưa có điều kiện tự đăng nhập FBM; đang chờ người dùng đăng nhập thủ công hoặc cấu hình auto-login.';
-      state.message = state.lastError;
-      FbmSync.stateWrite(state);
-      return { ok: true, noop: true, code: waitingCode, request: null, retryAt: loginConfig.retryAt || 0, status: FbmSync.statusView() };
     }
     // Customer/Activity runs start only after this one session heartbeat.
     state.cursor = { kind: 'heartbeat' };
     state.relayHop = 0;
     FbmSync.stateWrite(state);
     if (typeof FbmSync.heartbeatCustomerRequest !== 'function') { return { ok: false, code: 'HEARTBEAT_REQUEST_UNAVAILABLE', request: null, status: FbmSync.statusView() }; }
-    var heartbeatRequest = FbmSync.heartbeatCustomerRequest();
-    var loginPolicy = typeof FbmSync.loginConfigRead === 'function' ? FbmSync.loginConfigRead() : {};
-    if (loginPolicy.enabled === true && loginPolicy.autoOpenTab === true) {
-      heartbeatRequest.meta = heartbeatRequest.meta || {};
-      heartbeatRequest.meta.openFbmContext = { url: 'https://fbo.com.vn:8888/Main/zccrAccount.aspx', active: false };
-    }
-    return { ok: true, code: 'HEARTBEAT_REQUEST_READY', request: FbmSync.nextEnvelope(heartbeatRequest), status: FbmSync.statusView() };
+    var heartbeatRequest = FbmSync.heartbeatCustomerRequest(), heartbeatEnvelope = FbmSync.nextEnvelope(heartbeatRequest), currentState = FbmSync.stateRead();
+    return { ok: true, code: typeof FbmSync.sessionGateRequestCode === 'function' ? FbmSync.sessionGateRequestCode(heartbeatEnvelope, currentState) : 'HEARTBEAT_REQUEST_READY', request: heartbeatEnvelope, status: FbmSync.statusView() };
   } finally { lock.releaseLock(); }
 }
 FbmSync.heartbeatRequest = fbmSyncHeartbeatRequest;
@@ -323,6 +297,7 @@ function fbmSyncHeartbeatLocked(rawResponse, options) {
   state.activeRequestId = '';
   state.deadlineAt = 0;
   state.lastProgressAt = Date.now();
+  if (typeof FbmSync.sessionGateResponseStarted === 'function') { FbmSync.sessionGateResponseStarted(state); }
   state.relayHop = Number(options && options.hop || 0) + 1;
   FbmSync.stateWrite(state);
   if (result.ok && FbmSync.protocol.hasHeartbeatData && !FbmSync.protocol.hasHeartbeatData(rawResponse)) {
@@ -333,6 +308,10 @@ function fbmSyncHeartbeatLocked(rawResponse, options) {
   if (!result.ok && result.code === 'SESSION_EXPIRED') {
     state.session.expired = true; state.session.customerAuthorized = ''; state.session.activityAuthorized = '';
     state.lastFailureCode = result.code; state.retryable = false; state.lastError = result.bug.Message; state.message = result.bug.Message;
+    if (typeof FbmSync.sessionGateHandleFailure === 'function') {
+      var gateFailure = FbmSync.sessionGateHandleFailure(state, cursor, result);
+      if (gateFailure) { return gateFailure; }
+    }
   } else if (!result.ok) {
     state.lastFailureCode = result.code || 'HEARTBEAT_FAILED';
     state.retryable = result.retryable === true;
@@ -382,18 +361,29 @@ function fbmSyncHeartbeatTransportFailure(payload) {
   try {
     var state = FbmSync.stateRead();
     if (!requestId || String(state.activeRequestId || '') !== requestId) {
+      if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, 'STALE_RESPONSE', 'Lỗi cầu nối không còn thuộc request đang chờ.', 'transport_failure_stale'); }
       return { ok: false, code: 'STALE_RESPONSE', request: null, status: FbmSync.statusView(), error: 'Lỗi cầu nối không còn thuộc request đang chờ.' };
     }
+    var failureCode = String(value.code || 'FBM_TRANSPORT_UNAVAILABLE'), failureMessage = String(value.message || 'Extension không gửi được request tới tab FBM.').slice(0, 240), retry;
+    try { retry = typeof FbmSync.sessionGateTransportRetry === 'function' ? FbmSync.sessionGateTransportRetry(state, requestId, failureCode, failureMessage) : null; }
+    catch (ignoreGateError) {
+      if (typeof FbmSync.sessionGateFailClosed === 'function') { return FbmSync.sessionGateFailClosed(state); }
+      state.activeRequestId = ''; state.deadlineAt = 0; state.phase = 'error'; state.cursor = {};
+      state.lastFailureCode = 'FBM_SESSION_GATE_EXCEPTION'; state.lastError = 'Cổng phiên FBM gặp lỗi nội bộ; request đã bị chặn an toàn.'; state.message = state.lastError; FbmSync.stateWrite(state);
+      return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError };
+    }
+    if (retry) { return retry; }
     state.activeRequestId = '';
     state.deadlineAt = 0;
     state.lastProgressAt = Date.now();
-    state.lastFailureCode = String(value.code || 'FBM_TRANSPORT_UNAVAILABLE');
+    state.lastFailureCode = failureCode;
     state.retryable = false;
-    state.lastError = String(value.message || 'Extension không gửi được request tới tab FBM.').slice(0, 240);
+    state.lastError = failureMessage;
     state.message = state.lastError;
     state.cursor = {};
     state.phase = 'error';
     FbmSync.stateWrite(state);
+    if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, failureCode, failureMessage, 'transport_failure'); }
     return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError };
   } finally { lock.releaseLock(); }
 }

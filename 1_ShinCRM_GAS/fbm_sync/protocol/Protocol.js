@@ -58,12 +58,20 @@ FbmSync.protocol = {
   },
   /** Phân loại lỗi để orchestration biết khi nào được retry. */
   classifyFailure: function (response) {
-    if (response && typeof response === 'object' && response.ok === false && Number(response.status) >= 500 && !String(response.body || '').trim()) {
-      return { code: 'TRANSPORT_ERROR', retryable: true, status: Number(response.status || 0), bug: { FieldName: '$HTTP', Message: FbmSync.protocol.httpErrorMessage(response.status, response.body) } };
+    // HTTP 4xx/5xx là lỗi vận chuyển bất kể thân trả về có JSON giống Bugs hay không.
+    // Nếu parse thân trước, HTTP 500 của máy chủ có thể bị nhận nhầm là lỗi nghiệp vụ
+    // và bị cấm retry, trong khi tài liệu 09 yêu cầu giữ cursor để thử lại kỳ sau.
+    var httpStatus = Number(response && typeof response === 'object' ? response.status || 0 : 0);
+    // FBM dùng 401 để báo phiên hết hạn; phải đi qua session gate trước khi
+    // áp dụng luật retry chung của lỗi vận chuyển.
+    if (httpStatus === 401 || FbmSync.protocol.isSessionExpired(response)) {
+      return { code: 'SESSION_EXPIRED', retryable: false, status: httpStatus, bug: { FieldName: '$SESSION', Message: 'Phiên FBM đã hết hạn; hãy đăng nhập lại.' } };
+    }
+    if (httpStatus >= 400) {
+      return { code: 'TRANSPORT_ERROR', retryable: true, status: httpStatus, bug: { FieldName: '$HTTP', Message: FbmSync.protocol.httpErrorMessage(httpStatus, response.body) } };
     }
     var parsed = FbmSync.protocol.parse(response) || {};
     var bug = FbmSync.protocol.fbmBug(parsed);
-    if (FbmSync.protocol.isSessionExpired(response)) { return { code: 'SESSION_EXPIRED', retryable: false, status: Number(response && response.status || 0), bug: { FieldName: '$SESSION', Message: 'Phiên FBM đã hết hạn; hãy đăng nhập lại.' } }; }
     if (parsed.parseError) { return { code: 'PARSE_ERROR', retryable: true, status: Number(response && response.status || 0), bug: { FieldName: '$PARSE', Message: parsed.parseError } }; }
     if (bug) { return { code: 'FBM_BUSINESS_ERROR', retryable: false, status: Number(response && response.status || 0), bug: bug }; }
     if (response && response.ok === false) { return { code: 'TRANSPORT_ERROR', retryable: true, status: Number(response.status || 0), bug: { FieldName: '$HTTP', Message: FbmSync.protocol.httpErrorMessage(response.status, response.body) } }; }

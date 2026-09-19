@@ -212,16 +212,18 @@ async function chay(so) {
     : [{ id: 'ACT-NEW', customerId: 'CUS-PARENT', fbmId: '', allowFbmPush: pushed.FbmSync.PUSH_ALLOW_VALUE, taskType: 'Goi', content: 'Noi dung', workDate: '2026-09-09' }];
   check(so, 'Activity moi co Customer cha lien ket duoc dua vao queue', pushed.FbmSync.pushCandidates('activity').length, 1);
   const transportState = push.FbmSync.stateStart('', 'read', 0);
+  push.FbmSync.scriptSettings = () => ({ baseUrl: 'https://fbm.test', testCustomerCode: 'ALT00010', cookie: 'cookie' });
   transportState.phase = 'pull_customer'; transportState.activeRequestId = 'test-transport-request'; transportState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 3, pageValue: ['x'] };
   push.FbmSync.stateWrite(transportState);
   const http500 = push.FbmSync.continue({ ok: false, status: 500, body: '{"Message":"server"}', transport: { trace: [{ requestId: 'test-transport-request' }] } });
-  check(so, 'HTTP 500 giu cursor doc hop le cho ky sau', [http500.ok, push.FbmSync.stateRead().phase, push.FbmSync.stateRead().cursor.kind], [false, 'error', 'customer_grid']);
+  check(so, 'HTTP 500 cho phep retry doc co gioi han va giu cursor', [http500.ok, http500.retrying, push.FbmSync.stateRead().phase, push.FbmSync.stateRead().cursor.kind], [true, true, 'pull_customer', 'customer_grid']);
   [{ status: 401, body: '' }, { status: 403, body: '' }, { status: 200, body: '<form action="Login.aspx"></form>' }].forEach((failure) => {
     const sessionState = push.FbmSync.stateStart('', 'read', 0);
     sessionState.phase = 'pull_customer'; sessionState.activeRequestId = 'test-session-request'; sessionState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 2, pageValue: ['x'] };
     push.FbmSync.stateWrite(sessionState);
     const sessionResult = push.FbmSync.continue({ ok: failure.status === 200, status: failure.status, body: failure.body, transport: { trace: [{ requestId: 'test-session-request' }] } });
-  check(so, 'Session error ' + failure.status + ' giu cursor de chay ky sau', [sessionResult.ok, push.FbmSync.stateRead().phase, push.FbmSync.stateRead().cursor.kind], [false, 'error', 'customer_grid']);
+  const expectTransportRetry = failure.status === 403;
+  check(so, 'Session error ' + failure.status + ' giu cursor an toan', [sessionResult.ok, expectTransportRetry ? sessionResult.retrying : null, push.FbmSync.stateRead().phase, push.FbmSync.stateRead().cursor.kind], expectTransportRetry ? [true, true, 'pull_customer', 'customer_grid'] : [false, null, 'error', 'customer_grid']);
   });
   const skippedLogs = [];
   push.logEvent = (event) => skippedLogs.push(event);

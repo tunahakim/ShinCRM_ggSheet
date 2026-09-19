@@ -141,10 +141,7 @@ FbmSync.applyTransportSession = function (state, response) {
 
 FbmSync.loginRequest = function (credentialRef, testOnly) {
   var cfg = FbmSync.scriptSettings();
-  var login = { url: cfg.baseUrl + '/Main/Login.aspx/Login', body: {}, meta: { kind: 'login', credentialRef: String(credentialRef || ''), testOnly: testOnly === true } };
-  var policy = FbmSync.loginConfigRead();
-  if (policy.enabled === true && policy.autoOpenTab === true) { login.meta.openFbmContext = { url: cfg.baseUrl + '/Main/zccrAccount.aspx', active: false }; }
-  return login;
+  return { url: cfg.baseUrl + '/Main/Login.aspx/Login', body: {}, meta: { kind: 'login', credentialRef: String(credentialRef || ''), testOnly: testOnly === true } };
 };
 
 FbmSync.loginTestRequest = function (credentialRef, expectedIdentity) {
@@ -188,6 +185,7 @@ FbmSync.loginAdapterContinue = function (state, cursor, response) {
     state.phase = 'paused'; state.cursor = {}; state.lastFailureCode = cursor.testOnly ? 'LOGIN_FAILED' : 'AUTO_LOGIN_FAILED'; state.retryable = false; state.lastError = failure;
     state.message = cursor.testOnly ? 'Đăng nhập thử không thành công; hãy kiểm tra lại thông tin FBM.' : 'Tự đăng nhập thất bại; sẽ thử lại sau 30 phút.';
     FbmSync.stateWrite(state);
+    if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'login_failure'); }
     return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.message, message: state.message };
   }
   state.session = state.session || {};
@@ -202,6 +200,7 @@ FbmSync.loginAuthorizeContinue = function (state, cursor, response) {
   var authorized = FbmSync.extractAuthorized(response);
   if (!authorized) {
     state.phase = 'paused'; state.cursor = {}; state.lastFailureCode = 'LOGIN_IDENTITY_AUTHORIZE_FAILED'; state.lastError = 'FBM không trả mã xác thực để kiểm tra tài khoản sau đăng nhập.'; state.message = state.lastError; FbmSync.stateWrite(state);
+    if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'login_identity_failure'); }
     return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError, message: state.lastError };
   }
   state.session.customerAuthorized = authorized;
@@ -215,6 +214,7 @@ FbmSync.loginIdentityContinue = function (state, cursor, response) {
   var identity = FbmSync.identityUser(response);
   if (!identity.ok) {
     state.phase = 'paused'; state.cursor = {}; state.lastFailureCode = identity.code || 'LOGIN_IDENTITY_INCOMPLETE'; state.lastError = identity.message || 'Không đọc đủ nhận diện tài khoản FBM sau đăng nhập.'; state.message = state.lastError; FbmSync.stateWrite(state);
+    if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'login_identity_failure'); }
     return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError, message: state.lastError };
   }
   var runtime = { spreadsheetId: FbmSync.currentSpreadsheetId(), userId: identity.userId, username: identity.username, accountName: identity.accountName };
@@ -229,6 +229,7 @@ FbmSync.loginIdentityContinue = function (state, cursor, response) {
       ? 'Đăng nhập thử thành công nhưng tài khoản FBM không khớp liên kết đã xác nhận.'
       : 'Đăng nhập thành công nhưng tài khoản FBM không khớp liên kết đã xác nhận; tự động đăng nhập đã được tắt.';
     state.message = state.lastError; FbmSync.stateWrite(state);
+    if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'login_identity_mismatch'); }
     return { ok: false, code: state.lastFailureCode, request: null, identity: runtime, status: FbmSync.statusView(), error: state.lastError, message: state.lastError };
   }
   state.session.userId = identity.userId;
@@ -247,6 +248,7 @@ FbmSync.loginIdentityContinue = function (state, cursor, response) {
   var resumed = FbmSync.loginResumeRequest(state);
   if (!resumed) {
     state.phase = 'error'; state.lastFailureCode = 'AUTO_LOGIN_RESUME_FAILED'; state.lastError = 'Đăng nhập lại thành công nhưng không dựng lại được request đồng bộ.'; state.message = state.lastError; FbmSync.stateWrite(state);
+    if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'login_resume_failure'); }
     return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError };
   }
   return { ok: true, code: cursor.resumeHeartbeat ? 'AUTO_LOGIN_OK' : '', request: resumed, status: FbmSync.statusView(), autoLogin: true };
@@ -271,4 +273,13 @@ FbmSync.loginResumeRequest = function (state) {
   FbmSync.stateWrite(state);
   var request = FbmSync.requestForCursor(state);
   return request ? FbmSync.nextEnvelope(request) : null;
+};
+
+/** Cổng gọi hook này khi nhận response của tiến trình login; flow không biết owner xử lý ra sao. */
+FbmSync.continueSessionGate = function (state, cursor, rawResponse) {
+  var kind = String(cursor && cursor.kind || '');
+  if (kind === 'login') { return FbmSync.loginAdapterContinue(state, cursor, rawResponse); }
+  if (kind === 'login_identity_authorize') { return FbmSync.loginAuthorizeContinue(state, cursor, rawResponse); }
+  if (kind === 'login_identity_user') { return FbmSync.loginIdentityContinue(state, cursor, rawResponse); }
+  return null;
 };

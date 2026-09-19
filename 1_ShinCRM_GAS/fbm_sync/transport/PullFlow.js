@@ -311,6 +311,7 @@ FbmSync.continue = function (rawResponse) {
   }
   state.activeRequestId = '';
   state.lastProgressAt = Date.now();
+  if (typeof FbmSync.sessionGateResponseStarted === 'function') { FbmSync.sessionGateResponseStarted(state); }
   FbmSync.stateWrite(state);
   response = FbmSync.protocol.parse(rawResponse);
   if (state.origin === 'background' && state.metadata && state.metadata.manualPending) {
@@ -321,15 +322,16 @@ FbmSync.continue = function (rawResponse) {
     return { ok: true, request: null, status: FbmSync.statusView(), manualReady: true };
   }
   if (FbmSync.applyTransportSession && FbmSync.applyTransportSession(state, rawResponse)) { FbmSync.stateWrite(state); }
-  if (cursor.kind === 'login') {
-    return FbmSync.loginAdapterContinue(state, cursor, rawResponse);
+  if (typeof FbmSync.continueSessionGate === 'function') {
+    var gateResponse = FbmSync.continueSessionGate(state, cursor, rawResponse);
+    if (gateResponse) { return gateResponse; }
   }
   // Phân loại trên wrapper HTTP gốc; parse trước sẽ làm mất status và biến lỗi vận chuyển thành Bugs giả.
   var success = FbmSync.protocol.assertSuccess(rawResponse);
   if (!success.ok) {
-    if (success.code === 'SESSION_EXPIRED' && cursor.kind !== 'push_wait' && typeof FbmSync.beginAutoLogin === 'function') {
-      var loginRequest = FbmSync.beginAutoLogin(state, cursor);
-      if (loginRequest) { return { ok: true, request: FbmSync.nextEnvelope(loginRequest), status: FbmSync.statusView(), autoLogin: true }; }
+    if (typeof FbmSync.sessionGateHandleFailure === 'function') {
+      var gateFailure = FbmSync.sessionGateHandleFailure(state, cursor, success);
+      if (gateFailure) { return gateFailure; }
     }
     var retryRequest = FbmSync.retryRead(state, success);
     if (retryRequest) {
@@ -374,8 +376,10 @@ FbmSync.continue = function (rawResponse) {
   state.lastFailureCode = '';
   FbmSync.stateWrite(state);
 
-  if (cursor.kind === 'login_identity_authorize') { return FbmSync.loginAuthorizeContinue(state, cursor, rawResponse); }
-  if (cursor.kind === 'login_identity_user') { return FbmSync.loginIdentityContinue(state, cursor, rawResponse); }
+  if (typeof FbmSync.continueSessionGate === 'function') {
+    var completedGate = FbmSync.continueSessionGate(state, cursor, rawResponse);
+    if (completedGate) { return completedGate; }
+  }
 
   if (cursor.kind === 'push_wait') {
     try {
