@@ -139,40 +139,34 @@ async function testFormVaFbm(so) {
   hop.unsavedChangesResolve('continue');
   coreEditing = false;
 
-  hop.FBM_SYNC_CLIENT = { configEdits: {} };
+  hop.FBM_SYNC_CLIENT = { configEdits: {}, syncSettings: {}, loginStatus: { public: { usernameHint: 'old-login' } }, identityStatus: { binding: {} }, identityDraft: {} };
   hop.FBM_SYNC_UI_SCHEMA = { config: { actionIdPrefix: 'config-', actionCancel: 'cancel', actionSave: 'save', actionEdit: 'edit', tooltips: {} } };
-  hop.fbmSyncConfigBeginEdit('identity', { username: 'old' });
-  const state = hop.fbmSyncConfigState('identity');
+  hop.fbmSyncConfigBeginEdit('connection', { identity: { username: 'old' }, loginUsername: 'old-login' });
+  const state = hop.fbmSyncConfigState('connection');
   const username = bo.dom.document.createElement('input'); username.id = 'fbm-identity-username'; username.value = 'new'; bo.dom.root.appendChild(username);
-  const card = bo.dom.document.createElement('div'); card.id = 'fbm-sync-identity-card-region'; bo.dom.root.appendChild(card);
-  const cancel = bo.dom.document.createElement('button'); cancel.setAttribute('data-sync-config-action', 'cancel'); cancel.setAttribute('data-sync-config-key', 'identity'); card.appendChild(cancel);
-  const save = bo.dom.document.createElement('button'); save.setAttribute('data-sync-config-action', 'save'); save.setAttribute('data-sync-config-key', 'identity'); card.appendChild(save);
-  hop.fbmSyncConfigFinishEdit('identity');
-  hop.fbmSyncConfigBeginEdit('login', { username: 'old-login' });
   const password = bo.dom.document.createElement('input'); password.id = 'fbm-login-password'; password.value = 'secret'; bo.dom.root.appendChild(password);
   const provider = hop.fbmSyncConfigUnsavedProvider(), passwordState = provider.read();
-  const passwordSnapshot = hop.fbmSyncConfigState('login').snapshot;
+  const passwordSnapshot = hop.fbmSyncConfigState('connection').snapshot;
   const loginDirtyState = provider.read();
-  const loginCard = bo.dom.document.createElement('div'); loginCard.id = 'fbm-sync-login-card-region'; bo.dom.root.appendChild(loginCard);
-  const loginCancel = bo.dom.document.createElement('button'); loginCancel.setAttribute('data-sync-config-action', 'cancel'); loginCancel.setAttribute('data-sync-config-key', 'login'); loginCard.appendChild(loginCancel);
-  const loginSave = bo.dom.document.createElement('button'); loginSave.setAttribute('data-sync-config-action', 'save'); loginSave.setAttribute('data-sync-config-key', 'login'); loginCard.appendChild(loginSave);
-  check(so, 'FBM dirty theo từng key và không đưa password vào snapshot', [passwordState.dirty, passwordState.keys, passwordSnapshot.password, passwordState.fields], [true, ['login'], undefined, ['login.password']]);
-  check(so, 'FBM chặn nút Hủy và action ngoài card nhưng cho nút Lưu cùng card', [provider.canRunTarget(loginCancel, loginDirtyState), provider.canRunTarget(loginSave, loginDirtyState), provider.canRunTarget(cancel, loginDirtyState)], [false, true, false]);
+  const card = bo.dom.document.createElement('div'); card.id = 'fbm-sync-connection-card-region'; bo.dom.root.appendChild(card);
+  const cancel = bo.dom.document.createElement('button'); cancel.setAttribute('data-sync-config-action', 'cancel'); cancel.setAttribute('data-sync-config-key', 'connection'); card.appendChild(cancel);
+  const save = bo.dom.document.createElement('button'); save.setAttribute('data-sync-config-action', 'save'); save.setAttribute('data-sync-config-key', 'connection'); card.appendChild(save);
+  check(so, 'FBM connection dirty theo từng path và không đưa password vào snapshot', [passwordState.dirty, passwordState.keys, passwordSnapshot.password, passwordState.fields], [true, ['connection'], undefined, ['connection.identity.username', 'connection.password']]);
+  check(so, 'FBM chặn nút Hủy và action ngoài card nhưng cho nút Lưu cùng card', [provider.canRunTarget(cancel, loginDirtyState), provider.canRunTarget(save, loginDirtyState), provider.canRunTarget(bo.dom.document.createElement('button'), loginDirtyState)], [false, true, false]);
 
-  hop.fbmSyncConfigFinishEdit('login');
+  hop.fbmSyncConfigFinishEdit('connection');
   hop.FBM_SYNC_ACCOUNT_SCHEMA = { login: { password: { id: 'fbm-login-password' } } };
-  hop.FBM_SYNC_CLIENT.loginStatus = { public: { usernameHint: 'old-login' } };
   hop.FBM_SYNC_CLIENT.identityDraft = { spreadsheetId: 'sheet', userId: 'user', username: 'old', accountName: 'account' };
   password.value = '';
   const outside = bo.dom.document.createElement('button');
-  const loginStarted = hop.fbmSyncConfigStartEdit('login');
+  const loginStarted = hop.fbmSyncConfigStartEdit('connection');
   const cleanOutsideBlocked = hop.unsavedChangesGuardFbmTarget(outside, () => {});
   check(so, 'Đang sửa dù chưa đổi giá trị vẫn chặn action ngoài card và mở modal', [loginStarted, cleanOutsideBlocked, hop.UNSAVED_CHANGES.dialogOpen], [true, true, true]);
   hop.unsavedChangesResolve('continue');
-  check(so, 'Không mở đồng thời khối thứ hai khi khối hiện tại còn đang sửa', [hop.fbmSyncConfigStartEdit('identity'), hop.fbmSyncConfigState('login').editing, hop.fbmSyncConfigState('identity').editing], [false, true, false]);
-  hop.fbmSyncConfigFinishEdit('login');
+  check(so, 'Không mở đồng thời khối thứ hai khi khối hiện tại còn đang sửa', [hop.fbmSyncConfigStartEdit('accountSettings'), hop.fbmSyncConfigEditingKey(), hop.fbmSyncConfigState('connection').editing], [false, 'connection', true]);
+  hop.fbmSyncConfigFinishEdit('connection');
   username.value = 'old';
-  check(so, 'Mở khối mới chỉ thành công sau khi khối cũ đã kết thúc', [hop.fbmSyncConfigStartEdit('identity'), hop.fbmSyncConfigState('login').editing, hop.fbmSyncConfigState('identity').editing], [true, false, true]);
+  check(so, 'Mở connection lại chỉ thành công sau khi khối cũ đã kết thúc', [hop.fbmSyncConfigStartEdit('identity'), hop.fbmSyncConfigEditingKey(), hop.fbmSyncConfigState('connection').editing], [true, 'connection', true]);
   username.value = 'changed-again';
   let fbmPendingCalls = 0;
   const outsideDirtyPending = () => { fbmPendingCalls += 1; };
@@ -185,9 +179,9 @@ async function testFormVaFbm(so) {
   const dirtyCancelAgain = hop.unsavedChangesGuardFbmTarget(cancel, () => { fbmPendingCalls += 1; });
   hop.unsavedChangesResolve('discard');
   await new Promise((resolve) => setImmediate(resolve));
-  check(so, 'Bỏ thay đổi và tiếp tục FBM thoát edit rồi chạy action đang chờ', [dirtyCancelAgain, fbmPendingCalls, hop.fbmSyncConfigState('identity').editing, hop.UNSAVED_CHANGES.provider], [true, 1, false, null]);
+  check(so, 'Bỏ thay đổi và tiếp tục FBM thoát edit rồi chạy action đang chờ', [dirtyCancelAgain, fbmPendingCalls, hop.fbmSyncConfigState('connection').editing, hop.UNSAVED_CHANGES.provider], [true, 1, false, null]);
   const blockedStart = hop.fbmSyncConfigStartEdit('login');
-  check(so, 'Mở khối thứ hai thành công sau khi khối hiện tại đã bỏ thay đổi', [blockedStart, hop.fbmSyncConfigState('identity').editing, hop.fbmSyncConfigState('login').editing], [true, false, true]);
+  check(so, 'Alias login mở connection thành công sau khi surface cũ đã bỏ thay đổi', [blockedStart, hop.fbmSyncConfigEditingKey(), hop.fbmSyncConfigState('connection').editing], [true, 'connection', true]);
 }
 
 function testCoreDiscardRestoresDom(so) {
@@ -225,6 +219,94 @@ function testSurfaceAdapterContract(so) {
   check(so, 'Adapter thiếu canRun bị chặn fail-closed thay vì chạy tắt', [invalidBlocked, invalid.calls.filter((item) => item.name === 'alert').length], [true, 1]);
 }
 
+function testCoordinatorUseCaseMatrix(so) {
+  const bo = taoBoTest(), hop = bo.hop, target = bo.dom.document.createElement('button');
+  bo.dom.root.appendChild(target);
+  let editing = false, dirty = false, pendingCalls = 0, allow = false;
+  const provider = {
+    read: () => ({ editing, dirty, fieldIds: dirty ? ['field-a'] : [] }),
+    canRun: () => allow,
+    save: () => ({ ok: true }),
+    discard: () => ({ ok: true })
+  };
+  hop.unsavedChangesRegisterSurface('matrix', () => provider);
+  check(so, 'surface không sửa thì action đi thẳng và không mở modal', [hop.unsavedChangesGuardTransition({ source: 'matrix', target }, () => { pendingCalls += 1; }), hop.UNSAVED_CHANGES.dialogOpen, pendingCalls], [false, false, 0]);
+
+  editing = true;
+  target.focus();
+  const cleanBlocked = hop.unsavedChangesGuardTransition({ source: 'matrix', target }, () => { pendingCalls += 1; });
+  check(so, 'surface đang sửa nhưng sạch vẫn chặn action ngoài và mở modal', [cleanBlocked, hop.UNSAVED_CHANGES.dialogOpen, hop.UNSAVED_CHANGES.highlighted, pendingCalls], [true, true, false, 0]);
+  const continueButton = bo.dialog.querySelector('[data-unsaved-choice="continue"]');
+  const backdrop = bo.dialog.querySelector('.shin-unsaved-backdrop');
+  let prevented = false;
+  bo.dom.document.listeners.click({ target: backdrop, preventDefault: () => { prevented = true; } });
+  check(so, 'bấm backdrop là Tiếp tục sửa, giữ focus và bỏ action đang chờ', [prevented, hop.UNSAVED_CHANGES.dialogOpen, bo.dom.document.activeElement === target, hop.UNSAVED_CHANGES.pending, pendingCalls], [true, false, true, null, 0]);
+
+  dirty = true;
+  const dirtyBlocked = hop.unsavedChangesGuardTransition({ source: 'matrix', target }, () => { pendingCalls += 1; });
+  check(so, 'surface dirty mở modal và tô đúng trường thay đổi', [dirtyBlocked, hop.UNSAVED_CHANGES.dialogOpen, bo.wrapper.classList.contains('shin-field-changed')], [true, true, true]);
+  bo.dom.document.listeners.keydown({ key: 'Escape', preventDefault: () => { prevented = true; } });
+  check(so, 'Escape đóng modal như Tiếp tục sửa nhưng không chạy action', [hop.UNSAVED_CHANGES.dialogOpen, hop.UNSAVED_CHANGES.pending, pendingCalls, bo.wrapper.classList.contains('shin-field-changed')], [false, null, 0, true]);
+
+  allow = true;
+  check(so, 'action nội bộ được adapter cho phép đi thẳng dù surface đang sửa', [hop.unsavedChangesGuardTransition({ source: 'matrix', target }, () => { pendingCalls += 1; }), hop.UNSAVED_CHANGES.dialogOpen, pendingCalls], [false, false, 0]);
+  check(so, 'sau Continue không giữ provider/pending cũ làm giao dịch ma', [hop.UNSAVED_CHANGES.provider, hop.UNSAVED_CHANGES.pending], [null, null]);
+  void continueButton;
+}
+
+function testCoordinatorFailureMatrix(so) {
+  const two = taoBoTest(), twoHop = two.hop, target = two.dom.document.createElement('button');
+  twoHop.unsavedChangesRegisterSurface('one', () => ({ read: () => ({ editing: true, dirty: false, fieldIds: [] }), canRun: () => false }));
+  twoHop.unsavedChangesRegisterSurface('two', () => ({ read: () => ({ editing: true, dirty: false, fieldIds: [] }), canRun: () => false }));
+  check(so, 'hai surface cùng sửa bị chặn fail-closed và báo lỗi thay vì đoán surface', [twoHop.unsavedChangesGuardTransition({ source: 'two', target }, () => {}), twoHop.UNSAVED_CHANGES.dialogOpen, two.calls.filter((item) => item.name === 'alert').length], [true, false, 1]);
+
+  const readError = taoBoTest(), readHop = readError.hop;
+  readHop.unsavedChangesRegisterSurface('broken.read', () => ({ read: () => { throw new Error('READ_FAIL'); } }));
+  check(so, 'provider read lỗi bị chặn và báo lỗi rõ', [readHop.unsavedChangesGuardTransition({ source: 'broken.read', target }, () => {}), readError.calls.filter((item) => item.name === 'alert').length], [true, 1]);
+
+  const canRunError = taoBoTest(), canRunHop = canRunError.hop;
+  canRunHop.unsavedChangesRegisterSurface('broken.canRun', () => ({ read: () => ({ editing: true, dirty: false, fieldIds: [] }), canRun: () => { throw new Error('CANRUN_FAIL'); } }));
+  check(so, 'adapter canRun lỗi bị chặn và báo lỗi rõ', [canRunHop.unsavedChangesGuardTransition({ source: 'broken.canRun', target }, () => {}), canRunError.calls.filter((item) => item.name === 'alert').length], [true, 1]);
+}
+
+function testFbmAdapterUseCaseMatrix(so) {
+  const bo = taoBoTest(), hop = bo.hop;
+  hop.FBM_SYNC_CLIENT = { configEdits: {}, syncSettings: { account: {}, extension: {}, background: {} }, loginStatus: {}, identityStatus: { binding: {} }, lastStatus: {} };
+  hop.FBM_SYNC_SETTINGS_SCHEMA = { defaults: { approvalThreshold: 100, pollMinutes: 5, retryMinutes: 30 } };
+  hop.FBM_SYNC_UI_SCHEMA = { config: { actionIdPrefix: 'config-', actionCancel: 'cancel', actionSave: 'save', actionEdit: 'edit', tooltips: {} } };
+  const keys = ['connection', 'accountSettings', 'module', 'relay', 'extension', 'background', 'loginPolicy'];
+  const started = keys.map((key) => { const result = hop.fbmSyncConfigStartEdit(key); hop.fbmSyncConfigFinishEdit(key); return result; });
+  check(so, 'mọi edit surface FBM đều có thể mở qua cùng một editor', started, keys.map(() => true));
+  const connection = hop.fbmSyncConfigStartEdit('identity');
+  const secondAliasBlocked = hop.fbmSyncConfigStartEdit('login');
+  check(so, 'identity và login cũ cùng trỏ về connection, không tạo hai surface song song', [connection, secondAliasBlocked, hop.fbmSyncConfigEditingKey(), hop.fbmSyncConfigState('connection') === hop.fbmSyncConfigState('identity')], [true, false, 'connection', true]);
+
+  const provider = hop.fbmSyncConfigUnsavedProvider(), state = { editing: true, editingKey: 'connection', dirty: false };
+  const card = bo.dom.document.createElement('div'); card.id = 'fbm-sync-connection-card-region'; bo.dom.root.appendChild(card);
+  const inside = bo.dom.document.createElement('button'); card.appendChild(inside);
+  const save = bo.dom.document.createElement('button'); save.setAttribute('data-sync-config-action', 'save'); save.setAttribute('data-sync-config-key', 'connection'); card.appendChild(save);
+  const cancel = bo.dom.document.createElement('button'); cancel.setAttribute('data-sync-config-action', 'cancel'); cancel.setAttribute('data-sync-config-key', 'connection'); card.appendChild(cancel);
+  const outside = bo.dom.document.createElement('button'); bo.dom.root.appendChild(outside);
+  const screen = bo.dom.document.createElement('button'); screen.setAttribute('data-sync-screen', 'settings');
+  check(so, 'FBM adapter phân biệt nội bộ, cancel sạch, save, màn hình và target rỗng', [provider.canRunTarget(inside, state), provider.canRunTarget(cancel, state), provider.canRunTarget(save, state), provider.canRunTarget(outside, state), provider.canRunTarget(screen, state), provider.canRunTarget(null, state)], [true, true, true, false, false, false]);
+  state.dirty = true;
+  check(so, 'cancel cùng connection chỉ bị chặn khi thật sự dirty', [provider.canRunTarget(cancel, state), provider.canRunTarget(save, state)], [false, true]);
+}
+
+async function testProviderSaveResultMatrix(so) {
+  const bo = taoBoTest(), hop = bo.hop;
+  hop.FBM_SYNC_CLIENT = { configEdits: { connection: { editing: true, snapshot: { identity: {}, loginUsername: '' }, draft: { identity: {}, loginUsername: '' } } }, syncSettings: {}, loginStatus: {}, identityStatus: { binding: {} } };
+  hop.FBM_SYNC_CONFIG_UNSAVED_PROVIDER = null;
+  hop.fbmSyncSaveConnection = () => Promise.resolve({ ok: false, message: 'CONNECTION_SAVE_FAIL' });
+  const password = bo.dom.document.createElement('input'); password.id = 'fbm-login-password'; password.value = 'secret'; bo.dom.root.appendChild(password);
+  const outside = bo.dom.document.createElement('button');
+  let pendingCalls = 0;
+  const blocked = hop.unsavedChangesGuardFbmTarget(outside, () => { pendingCalls += 1; });
+  hop.unsavedChangesResolve('save');
+  await new Promise((resolve) => setImmediate(resolve));
+  check(so, 'FBM save trả ok:false không bị nuốt thành thành công', [blocked, pendingCalls, hop.UNSAVED_CHANGES.provider !== null, hop.UNSAVED_CHANGES.pending !== null, bo.calls.filter((item) => item.name === 'alert').length], [true, 0, true, true, 1]);
+}
+
 function testHopDongTichHop(so) {
   const sidebar = docClient('Sidebar.html');
   const dispatch = docClient('ui/dispatch.html');
@@ -250,8 +332,8 @@ function testHopDongTichHop(so) {
     fbm.indexOf('function fbmSyncDispatchClickTarget(') >= 0,
     fbm.indexOf('document.addEventListener(\'change\'') > fbm.indexOf('function fbmSyncDispatchClickTarget(')
   ], [true, true, true]);
-  check(so, 'editor có mapping dirty cho đủ tám key và giữ password ngoài snapshot', [
-    ['identity:', 'login:', 'accountSettings:', 'module:', 'relay:', 'extension:', 'background:', 'loginPolicy:'].every((key) => editor.indexOf(key) >= 0),
+  check(so, 'editor có mapping dirty cho đủ surface và giữ password ngoài snapshot', [
+    ['connection:', 'accountSettings:', 'module:', 'relay:', 'extension:', 'background:', 'loginPolicy:'].every((key) => editor.indexOf(key) >= 0),
     editor.indexOf("path === 'password'") >= 0,
     editor.indexOf('state.snapshot = fbmSyncConfigClone(draft)') >= 0
   ], [true, true, true]);
@@ -298,6 +380,10 @@ async function chay(so) {
   await testFormVaFbm(so);
   testCoreDiscardRestoresDom(so);
   testSurfaceAdapterContract(so);
+  testCoordinatorUseCaseMatrix(so);
+  testCoordinatorFailureMatrix(so);
+  testFbmAdapterUseCaseMatrix(so);
+  await testProviderSaveResultMatrix(so);
   testHopDongTichHop(so);
 }
 

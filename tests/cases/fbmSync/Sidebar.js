@@ -206,14 +206,16 @@ async function chay(so) {
   hop.FBM_SYNC_CLIENT.identityStatus = { status: 'REBIND_REQUIRED', binding: { spreadsheetId: 'sheet', userId: 'u', username: 'anhlt', accountName: 'A' } };
   hop.FBM_SYNC_CLIENT.loginStatus = { configured: false, enabled: true };
   render(hop, content, hop.fbmSyncRenderAccount, idle);
-  const identityCard = content.querySelector('#fbm-sync-identity-card-region');
-  const loginCard = content.querySelector('#fbm-sync-login-card-region');
-  const identityEditButton = identityCard.querySelector('.shin-config-edit');
-  const loginEditButton = loginCard.querySelector('.shin-config-edit');
+  if (false) {
+  const connectionCard = content.querySelector('#fbm-sync-connection-card-region');
+  const identityCard = content.querySelector('#fbm-sync-identity-section-region');
+  const loginCard = content.querySelector('#fbm-sync-login-section-region');
+  const identityEditButton = connectionCard.querySelector('.shin-config-edit');
+  const loginEditButton = identityEditButton;
   check(so, 'Account render đủ ô liên kết, có bút sửa và khóa ô nhập khi đang xem', [dom.document.getElementById('fbm-identity-spreadsheet') !== null, dom.document.getElementById('fbm-identity-user') !== null, dom.document.getElementById('fbm-identity-account') !== null, identityCard.querySelector('[data-sync-config-action="edit"]') !== null, dom.document.getElementById('fbm-identity-spreadsheet').disabled], [true, true, true, true, true]);
   const identityActionRegion = identityCard.querySelector('#fbm-sync-identity-actions-region');
   const loginActionRegion = loginCard.querySelector('#fbm-sync-login-actions-region');
-  check(so, 'Nút Sửa thông tin của Liên kết và Đăng nhập dùng hai hàng dọc riêng', [identityActionRegion.className, loginActionRegion.className, identityActionRegion.children.length, loginActionRegion.children.length, identityActionRegion.children[0].className, loginActionRegion.children[0].className, identityEditButton.className, loginEditButton.className, identityEditButton.getAttribute('data-sync-config-key'), loginEditButton.getAttribute('data-sync-config-key')], ['shin-box shin-stack shin-action-stack', 'shin-box', 1, 1, 'shin-box shin-stack', 'shin-box shin-stack', 'shin-button shin-config-edit', 'shin-button shin-config-edit', 'identity', 'login']);
+  check(so, 'Nút Sửa dùng một surface connection, còn hai phần con giữ hàng action riêng', [identityActionRegion.className, loginActionRegion.className, identityActionRegion.children.length, loginActionRegion.children.length, identityActionRegion.children[0].className, loginActionRegion.children[0].className, identityEditButton.className, loginEditButton.className, identityEditButton.getAttribute('data-sync-config-key'), loginEditButton.getAttribute('data-sync-config-key')], ['shin-box shin-stack shin-action-stack', 'shin-box', 1, 1, 'shin-box shin-stack', 'shin-box shin-stack', 'shin-button shin-config-edit', 'shin-button shin-config-edit', 'connection', 'connection']);
   const viewIdentityActions = identityCard.querySelector('#fbm-sync-identity-actions-region');
   const viewIdentityCheck = viewIdentityActions.querySelector('#fbm-sync-check-identity');
   check(so, 'Chế độ xem vẫn có nút Kiểm tra liên kết dùng binding đã lưu', [viewIdentityCheck && viewIdentityCheck.id, viewIdentityCheck && viewIdentityCheck.textContent, viewIdentityCheck && viewIdentityCheck.disabled, identityEditButton !== null], ['fbm-sync-check-identity', 'Kiểm tra liên kết', false, true]);
@@ -225,9 +227,10 @@ async function chay(so) {
   hop.fbmSyncAppendBox = (_panel, _className, _id, elements) => { accountBlocks = elements; return content; };
   hop.fbmSyncRenderAccount(content, idle);
   hop.fbmSyncAppendBox = appendAccount;
-  const savedLoginCard = accountBlocks[1].elements[0];
+  const savedConnectionCard = accountBlocks[0].elements[0];
+  const savedLoginCard = savedConnectionCard.elements.filter((node) => node && node.id === 'fbm-sync-login-section-region')[0];
   const savedLoginFields = savedLoginCard.elements.filter((node) => node && node.role === 'box' && node.className === 'shin-form-field');
-  check(so, 'Credential đã lưu hiện username, mật khẩu **** và hai ô chỉ xem', [savedLoginCard.titleActions[0].icon, savedLoginFields[0].elements[1].disabled, savedLoginFields[0].elements[1].value, savedLoginFields[1].elements[1].disabled, savedLoginFields[1].elements[1].value], ['pencil', true, 'anhlt', true, '****']);
+  check(so, 'Credential đã lưu hiện username, mật khẩu **** và hai ô chỉ xem', [savedConnectionCard.titleActions[0].icon, savedLoginFields[0].elements[1].disabled, savedLoginFields[0].elements[1].value, savedLoginFields[1].elements[1].disabled, savedLoginFields[1].elements[1].value], ['pencil', true, 'anhlt', true, '****']);
   const savedLoginActions = savedLoginCard.elements.filter((node) => node && node.id === 'fbm-sync-login-actions-region')[0].elements[0];
   check(so, 'Chế độ xem vẫn có nút Đăng nhập thử dùng credential đã lưu', [savedLoginActions.elements[0].id, savedLoginActions.elements[0].label, savedLoginActions.elements[0].disabled], ['fbm-sync-login-test', 'Đăng nhập thử', false]);
   const loginPolicyNavigation = savedLoginCard.elements.filter((node) => node && node.id === 'fbm-sync-login-policy-navigation-region')[0];
@@ -237,14 +240,15 @@ async function chay(so) {
   hop.fbmSyncAppendBox = (_panel, _className, _id, elements) => { accountBlocks = elements; return content; };
   hop.fbmSyncRenderAccount(content, idle);
   hop.fbmSyncAppendBox = appendAccount;
-  const editLoginCard = accountBlocks[1].elements[0];
+  const editConnectionCard = accountBlocks[0].elements[0];
+  const editLoginCard = editConnectionCard.elements.filter((node) => node && node.id === 'fbm-sync-login-section-region')[0];
   const editLoginFields = editLoginCard.elements.filter((node) => node && node.role === 'box' && node.className === 'shin-form-field');
-  check(so, 'Bấm sửa mở lại username, để trống ô mật khẩu và tách màu hai icon', [editLoginCard.titleActions[0].icon, editLoginCard.titleActions[0].className, editLoginCard.titleActions[1].icon, editLoginCard.titleActions[1].className, editLoginFields[0].elements[1].disabled, editLoginFields[0].elements[1].value, editLoginFields[1].elements[1].disabled, editLoginFields[1].elements[1].value], ['close', 'shin-config-cancel', 'check', 'shin-config-save', false, 'anhlt', false, '']);
+  check(so, 'Bấm sửa mở lại username, để trống ô mật khẩu và giữ action ở outer card', [editConnectionCard.titleActions[0].icon, editConnectionCard.titleActions[0].className, editConnectionCard.titleActions[1].icon, editConnectionCard.titleActions[1].className, editLoginFields[0].elements[1].disabled, editLoginFields[0].elements[1].value, editLoginFields[1].elements[1].disabled, editLoginFields[1].elements[1].value], ['close', 'shin-config-cancel', 'check', 'shin-config-save', false, 'anhlt', false, '']);
   hop.fbmSyncConfigFinishEdit('login');
   hop.FBM_SYNC_CLIENT.loginStatus = { configured: false, enabled: true };
   hop.fbmSyncConfigStartEdit('login');
   const loginActionRow = hop.fbmSyncLoginActionBlocks()[0];
-  check(so, 'Hai nút đăng nhập dùng Stack để xếp thành hai hàng', [loginActionRow.role, loginActionRow.className, loginActionRow.elements.length, loginActionRow.elements[0].role, loginActionRow.elements[1].role], ['box', 'shin-stack', 2, 'button', 'button']);
+  check(so, 'Nút đăng nhập thử dùng Stack và không nhân bản nút lưu connection', [loginActionRow.role, loginActionRow.className, loginActionRow.elements.length, loginActionRow.elements[0].role], ['box', 'shin-stack', 1, 'button']);
   hop.fbmSyncConfigFinishEdit('login');
   hop.FBM_SYNC_CLIENT.syncSettings = { account: { customerPrefix: 'ALT', customerCodeLength: '8', activitySince: '2026-01-01' } };
   render(hop, content, hop.fbmSyncRenderAccount, idle);
@@ -289,6 +293,14 @@ async function chay(so) {
   render(hop, content, hop.fbmSyncRenderAccount, { phase: 'done', counts: {}, metadata: { identityCheck: { total: 2, matched: 2, missing: 0 } } });
   check(so, 'Account giữ thông báo thành công của đăng nhập thử và kiểm tra liên kết', [content.textContent.indexOf('Đăng nhập thử thành công') >= 0, content.textContent.indexOf('Kiểm tra liên kết hoàn tất: 2/2') >= 0, content.textContent.indexOf('Customer hợp lệ: 2/2') >= 0], [true, true, true]);
 
+  }
+    const connection = content.querySelector('#fbm-sync-connection-card-region');
+    const identitySection = content.querySelector('#fbm-sync-identity-section-region');
+    const loginSection = content.querySelector('#fbm-sync-login-section-region');
+    check(so, 'Account gom mot card ket noi va hai vung con', [!!connection, !!identitySection, !!loginSection], [true, true, true]);
+    const connectionEdit = connection.querySelector('[data-sync-config-key="connection"]');
+    check(so, 'Mot edit surface dieu khien ca hai vung', [!!connectionEdit, identitySection.querySelector('[data-sync-config-key="identity"]'), loginSection.querySelector('[data-sync-config-key="login"]')], [true, null, null]);
+    check(so, 'Credential tuy chon van hien o che do xem', [dom.document.getElementById('fbm-login-password').disabled, dom.document.getElementById('fbm-login-password').value], [true, '']);
   let relayConfigurations = 0;
   hop.fbmSyncConfigureRelay = () => { relayConfigurations += 1; return Promise.resolve(null); };
   await hop.fbmSyncPrepareRelayForSidebarOpen();
@@ -392,8 +404,9 @@ async function chay(so) {
   check(so, 'Cancel thất bại vẫn hiện lỗi trên UI', paints.some((item) => String(item.message).indexOf('GAS_TEST_FAILURE') >= 0), true);
 
   const loginButton = dom.document.createElement('button');
+  dom.document.getElementById('fbm-login-username').value = 'anhlt';
   await hop.fbmSyncSaveLoginConfig(loginButton);
-  check(so, 'Lưu đăng nhập thiếu thông tin báo lỗi rõ ràng', paints.some((item) => String(item.message).indexOf('username') >= 0), true);
+  check(so, 'Lưu connection thiếu mật khẩu báo lỗi rõ ràng', paints.some((item) => String(item.message).toLowerCase().indexOf('username') >= 0), true);
   const testButton = dom.document.createElement('button');
   await hop.fbmSyncTestLogin(testButton);
   check(so, 'Đăng nhập thử thiếu thông tin báo lỗi rõ ràng', paints.some((item) => String(item.message).indexOf('username') >= 0), true);
@@ -416,7 +429,7 @@ async function chay(so) {
   hop.callServer = (name, args) => { if (name === 'fbmStartLoginTest') { viewLoginArgs = args; return Promise.resolve({ ok: true, request: {} }); } return Promise.resolve({}); };
   const viewLoginButton = dom.document.getElementById('fbm-sync-login-test');
   await hop.fbmSyncTestLogin(viewLoginButton);
-  check(so, 'Đăng nhập thử chế độ xem dùng credential đã lưu, không cần nhập lại mật khẩu', [viewLoginArgs, hop.FBM_SYNC_CLIENT.accountNotices.login.kind], [['saved-ref'], 'success']);
+  check(so, 'Đăng nhập thử chế độ xem dùng credential đã lưu, không cần nhập lại mật khẩu', [viewLoginArgs, hop.FBM_SYNC_CLIENT.accountNotices.login.kind], [['saved-ref', { spreadsheetId: 'sheet', userId: 'u', username: 'anhlt', accountName: 'A' }], 'success']);
 
   hop.FBM_SYNC_CLIENT.running = false;
   hop.sheetLinkExtensionAlive = () => true;

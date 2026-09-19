@@ -149,8 +149,8 @@ function chay(so) {
     [true, true, true, true]);
   check(so, 'card cấu hình dùng hàng action và style sửa chung, không tự đặt kích thước từng màn',
     [source['client/sync/fbmSyncConfigEditor.html'].indexOf('function fbmSyncConfigButtonRow(') >= 0,
-      source['client/sync/screens/account.html'].indexOf('fbmSyncConfigButtonRow(\'login\'') >= 0,
-      source['client/sync/fbmSyncSettingsScreen.html'].indexOf('fbmSyncConfigButtonRow(\'identity\'') >= 0,
+      source['client/sync/screens/account.html'].indexOf("fbmSyncConfigTitleActions('connection')") >= 0,
+      source['client/sync/fbmSyncSettingsScreen.html'].indexOf("fbmSyncConfigIsEditing('connection')") >= 0,
       styles.slice(styles.indexOf('.shin-card-actions {'), styles.indexOf('.shin-card-actions {') + 220).indexOf('gap: var(--shin-gap-2);') >= 0,
       styles.indexOf('.shin-button.shin-config-edit') >= 0,
       styles.indexOf('.shin-button.shin-config-edit { border-color: var(--shin-bg-hover); background: var(--shin-bg-hover); color: var(--shin-text); }') >= 0,

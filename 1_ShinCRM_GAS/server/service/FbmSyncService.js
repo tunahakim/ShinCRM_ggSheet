@@ -44,6 +44,7 @@ function fbmSaveBackgroundSchedule(schedule) { return runEntryPoint('fbmSaveBack
 function fbmSetMasterSwitch(enabled) { return runEntryPoint('fbmSetMasterSwitch', 'sidebar', 'throw', function () { return FbmSync.controlDispatchLocked('set_master_switch', { enabled: enabled === true }); }); }
 function fbmSetBackgroundSwitch(enabled) { return runEntryPoint('fbmSetBackgroundSwitch', 'sidebar', 'throw', function () { return FbmSync.controlDispatchLocked('set_background_switch', { enabled: enabled === true }); }); }
 function fbmSaveLoginPolicy(policy) { return runEntryPoint('fbmSaveLoginPolicy', 'sidebar', 'throw', function () { return FbmSync.loginConfigPolicySave(policy || {}); }); }
+function fbmSaveConnection(config) { return runEntryPoint('fbmSaveConnection', 'sidebar', 'throw', function () { return fbmPublicResult(FbmSync.controlDispatchLocked('save_connection', config || {})); }); }
 function fbmRetryPushFailures() { return runEntryPoint('fbmRetryPushFailures', 'sidebar', 'throw', function () { return FbmSync.controlDispatchLocked('retry_push_failures', {}); }); }
 function fbmGetRelayConfig() { return runEntryPoint('fbmGetRelayConfig', 'sidebar', 'throw', function () { return fbmSyncRelayConfig(); }); }
 function fbmRotateRelayKey() { return runEntryPoint('fbmRotateRelayKey', 'sidebar', 'throw', function () { return fbmSyncRotateRelayKey(); }); }

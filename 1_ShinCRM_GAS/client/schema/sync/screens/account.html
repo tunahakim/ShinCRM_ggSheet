@@ -5,10 +5,11 @@ var FBM_SYNC_ACCOUNT_SCHEMA = {
   label: 'Tài khoản FBM',
   rootId: 'fbm-sync-account-root',
   regions: {
-    identityCard: 'fbm-sync-identity-card-region', identitySummary: 'fbm-sync-identity-summary-region', identityForm: 'fbm-sync-identity-form-region', identityActions: 'fbm-sync-identity-actions-region', identityActionStatus: 'fbm-sync-identity-action-status-region', identityNotice: 'fbm-sync-identity-notice-region', identityResult: 'fbm-sync-identity-result-region',
-    loginCard: 'fbm-sync-login-card-region', loginConfigured: 'fbm-sync-login-configured-region', loginActions: 'fbm-sync-login-actions-region', loginNotice: 'fbm-sync-login-notice-region', loginPolicy: 'fbm-sync-login-policy-navigation-region', accountSettings: 'fbm-sync-account-settings-region', accountNotice: 'fbm-sync-account-settings-notice-region'
+    connectionCard: 'fbm-sync-connection-card-region', identitySection: 'fbm-sync-identity-section-region', identitySummary: 'fbm-sync-identity-summary-region', identityForm: 'fbm-sync-identity-form-region', identityActions: 'fbm-sync-identity-actions-region', identityActionStatus: 'fbm-sync-identity-action-status-region', identityNotice: 'fbm-sync-identity-notice-region', identityResult: 'fbm-sync-identity-result-region',
+    loginSection: 'fbm-sync-login-section-region', loginConfigured: 'fbm-sync-login-configured-region', loginActions: 'fbm-sync-login-actions-region', loginNotice: 'fbm-sync-login-notice-region', loginPolicy: 'fbm-sync-login-policy-navigation-region', connectionNotice: 'fbm-sync-connection-notice-region', accountSettings: 'fbm-sync-account-settings-region', accountNotice: 'fbm-sync-account-settings-notice-region'
   },
-  cards: { login: 'Đăng nhập tự động', account: 'Cấu hình tài khoản FBM', identity: 'Liên kết tài khoản' },
+  cards: { connection: 'Kết nối tài khoản FBM', login: 'Đăng nhập tự động', account: 'Cấu hình tài khoản FBM', identity: 'Liên kết tài khoản' },
+  connection: { backgroundOn: 'Đồng bộ nền đang bật', backgroundOff: 'Đồng bộ nền đang tắt', backgroundSettings: 'Cài đặt đồng bộ nền', directionPush: 'ShinCRM → FBM', directionWrite: 'Hai chiều', directionRead: 'FBM → ShinCRM' },
   login: {
     username: { label: 'Username FBM', id: 'fbm-login-username', placeholder: 'Nhập username FBM', inputType: 'text' },
     password: { label: 'Mật khẩu FBM', id: 'fbm-login-password', placeholder: 'Nhập mật khẩu FBM', inputType: 'password', maskedValue: '****' },
@@ -31,7 +32,7 @@ var FBM_SYNC_ACCOUNT_SCHEMA = {
       { key: 'account', draftKey: 'accountName', label: 'Tên đầy đủ', placeholder: 'Tên người dùng trên FBM' }
     ],
     actionIds: { check: 'fbm-sync-check-identity', probe: 'fbm-sync-probe-identity', save: 'fbm-sync-save-identity' },
-    actionLabels: { edit: 'Sửa thông tin', save: 'Lưu thông tin', check: 'Kiểm tra liên kết', checking: 'Đang kiểm tra liên kết...', probe: 'Tự động điền', probing: 'Đang tự động điền...' },
+    actionLabels: { edit: 'Sửa thông tin', save: 'Lưu kết nối', check: 'Kiểm tra liên kết', checking: 'Đang kiểm tra liên kết...', probe: 'Tự động điền', probing: 'Đang tự động điền...' },
     messages: { bound: 'Đã kết nối với tài khoản FBM: ', unbound: 'Chưa kết nối với tài khoản FBM nào', probeSuccess: 'Đã lấy thông tin thành công và điền vào form.', probeError: 'Không lấy được thông tin tài khoản FBM.', checkDone: 'Kiểm tra liên kết hoàn tất', matched: 'Customer hợp lệ: ', missing: ' · không tìm thấy: ', missingId: 'Chưa thấy FBM ID ', separator: ' · ', actionCheck: 'Đang đối chiếu các Customer đã có FBM_ID với file hiện tại.', actionProbe: 'Đang đọc thông tin tài khoản từ tab FBM đang mở.' },
     fieldPrefix: 'fbm-identity-', inputType: 'text'
   }

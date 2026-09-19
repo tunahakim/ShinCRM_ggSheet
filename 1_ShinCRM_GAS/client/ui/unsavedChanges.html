@@ -158,7 +158,12 @@ function unsavedChangesFinish(operation) {
     return;
   }
   Promise.resolve(result).then(function (value) {
-    if (value && value.ok === false) { UNSAVED_CHANGES.pending = pending; unsavedChangesSetBusy(false); return; }
+    if (value && value.ok === false) {
+      UNSAVED_CHANGES.pending = pending;
+      unsavedChangesSetBusy(false);
+      unsavedChangesNotifyFailure(value.message || value.error || 'Không lưu được thay đổi chưa lưu.');
+      return;
+    }
     /* discard đã là quyết định bỏ bản nháp của provider. Không đọc lại DOM cũ
        sau đó, vì form chưa render lại có thể vẫn trả dirty dù nháp đã bị bỏ. */
     var state = operation === 'save' && typeof provider.read === 'function' ? provider.read() : null;
@@ -181,6 +186,8 @@ function unsavedChangesResolve(choice) {
   if (choice === 'continue') {
     unsavedChangesClose();
     unsavedChangesRefresh();
+    UNSAVED_CHANGES.provider = null;
+    UNSAVED_CHANGES.pending = null;
     return;
   }
   if (choice !== 'save' && choice !== 'discard') { return; }
@@ -229,7 +236,7 @@ function unsavedChangesGuard(kind, pending) {
   var state;
   try { state = provider.read(); } catch (error) { unsavedChangesNotifyFailure(error); return true; }
   if (!state || !state.dirty) {
-    if (UNSAVED_CHANGES.provider === provider) { unsavedChangesClearFields(); UNSAVED_CHANGES.provider = null; UNSAVED_CHANGES.pending = null; }
+    if (UNSAVED_CHANGES.provider === provider || (!UNSAVED_CHANGES.provider && UNSAVED_CHANGES.highlighted)) { unsavedChangesClearFields(); UNSAVED_CHANGES.provider = null; UNSAVED_CHANGES.pending = null; }
     return false;
   }
   if (UNSAVED_CHANGES.dialogOpen) { return true; }
@@ -267,7 +274,10 @@ function unsavedChangesGuardTransition(intent, pending) {
     unsavedChangesNotifyFailure(error);
     return true;
   }
-  if (canRun) { return false; }
+  if (canRun) {
+    if (!surface.state.dirty) { unsavedChangesClearFields(); UNSAVED_CHANGES.provider = null; UNSAVED_CHANGES.pending = null; }
+    return false;
+  }
   if (UNSAVED_CHANGES.dialogOpen) { return true; }
   UNSAVED_CHANGES.provider = surface.provider;
   UNSAVED_CHANGES.pending = pending;

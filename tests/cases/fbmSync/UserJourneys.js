@@ -107,16 +107,15 @@ async function chay(so) {
   const accountActions = [];
   hop.fbmSyncAutoFill = () => { accountActions.push('autofill'); return Promise.resolve(null); };
   hop.fbmSyncCheckIdentity = () => { accountActions.push('check'); return Promise.resolve(null); };
-  hop.fbmSyncSaveIdentityManual = () => { accountActions.push('save-binding'); return Promise.resolve(null); };
+  hop.fbmSyncSaveConnection = () => { accountActions.push('save-connection'); return Promise.resolve(null); };
   hop.fbmSyncTestLogin = () => { accountActions.push('test-login'); return Promise.resolve(null); };
-  hop.fbmSyncSaveLoginConfig = () => { accountActions.push('save-credential'); return Promise.resolve(null); };
-  click(dom, dom.document.getElementById('fbm-sync-config-identity-edit'));
-  hop.fbmSyncConfigFinishEdit('identity');
-  click(dom, dom.document.getElementById('fbm-sync-config-login-edit'));
-  ['fbm-sync-probe-identity', 'fbm-sync-check-identity', 'fbm-sync-save-identity', 'fbm-sync-login-test', 'fbm-sync-login-save'].forEach((id) => click(dom, dom.document.getElementById(id)));
-  check(so, 'tai khoan FBM gui dung tung thao tac sau khi ket thuc card truoc', accountActions, ['autofill', 'check', 'save-binding', 'test-login', 'save-credential']);
+  click(dom, dom.document.getElementById('fbm-sync-config-connection-edit'));
+  hop.fbmSyncConfigFinishEdit('connection');
+  click(dom, dom.document.getElementById('fbm-sync-config-connection-edit'));
+  ['fbm-sync-probe-identity', 'fbm-sync-check-identity', 'fbm-sync-login-test', 'fbm-sync-config-connection-save'].forEach((id) => click(dom, dom.document.getElementById(id)));
+  check(so, 'tai khoan FBM gui dung tung thao tac sau khi ket thuc surface connection truoc', accountActions, ['autofill', 'check', 'test-login', 'save-connection']);
   check(so, 'tai khoan FBM khong nhan doi cong tac tu dang nhap, chinh sach chi nam o Cai dat phien', content.querySelector('#fbm-sync-auto-login'), null);
-  hop.fbmSyncConfigFinishEdit('login');
+  hop.fbmSyncConfigFinishEdit('connection');
 
   hop.FBM_SYNC_CLIENT.subscreen = 'settings';
   hop.FBM_SYNC_CLIENT.loginStatus = { enabled: true, autoOpenTab: false, retryEnabled: true, retryMinutes: 30 };

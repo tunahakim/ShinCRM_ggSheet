@@ -3,6 +3,7 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 /** Khóa liên kết Spreadsheet ↔ tài khoản FBM; không lưu cookie hay mật khẩu. */
 FbmSync.BINDING_KEY = 'FBM_SYNC_BINDING_V1';
+FbmSync.BINDING_CLEAR_KEY = 'FBM_SYNC_BINDING_CLEAR_V1';
 FbmSync.currentSpreadsheetId = function () {
   try { return String(shinOpenBook().getId() || ''); } catch (ignore) { return ''; }
 };
@@ -29,7 +30,12 @@ FbmSync.bindingClear = function () {
   var state = typeof FbmSync.stateRead === 'function' ? FbmSync.stateRead() : {}, phase = String(state && state.phase || '');
   var active = !!(state && state.activeRequestId) || (!!(state && state.runId) && ['idle', 'done', 'error', 'paused', 'conflict'].indexOf(phase) < 0);
   if (active) { return { ok: false, code: 'SYNC_ALREADY_RUNNING', message: 'Đang có phiên đồng bộ; hãy dừng phiên trước khi hủy liên kết tài khoản.' }; }
-  PropertiesService.getDocumentProperties().deleteProperty(FbmSync.BINDING_KEY);
+  var props = PropertiesService.getDocumentProperties(), previous = FbmSync.bindingRead();
+  if (previous.spreadsheetId) {
+    props.setProperty(FbmSync.BINDING_CLEAR_KEY, JSON.stringify({ spreadsheetId: String(previous.spreadsheetId || ''), userId: String(previous.userId || ''), username: String(previous.username || ''), accountName: String(previous.accountName || ''), clearedAt: Date.now() }));
+  }
+  if (typeof props.deleteProperty === 'function') { props.deleteProperty(FbmSync.BINDING_KEY); }
+  else { props.setProperty(FbmSync.BINDING_KEY, ''); }
   var status = FbmSync.identityStatus();
   return { ok: true, code: 'IDENTITY_BINDING_CLEARED', binding: {}, identityStatus: status, message: 'Đã hủy liên kết tài khoản. Đồng bộ bị khóa cho đến khi liên kết lại.' };
 };
@@ -41,12 +47,61 @@ FbmSync.bindingWrite = function (binding) {
   if (actual && actual !== spreadsheetId) { return { ok: false, code: 'SPREADSHEET_MISMATCH', message: 'SpreadsheetId liên kết không khớp file đang chạy.' }; }
   var previous = FbmSync.bindingRead();
   var nextIdentity = { spreadsheetId: spreadsheetId, userId: userId, username: username, accountName: accountName };
-  if (previous.spreadsheetId && (previous.spreadsheetId !== spreadsheetId || previous.userId !== userId || String(previous.username || '') !== username || previous.accountName !== accountName) && !FbmSync.bindingCanUpgradeUsername(previous, nextIdentity) && FbmSync.bindingHasLinkedData()) {
+  var cleared = {};
+  try { cleared = JSON.parse(PropertiesService.getDocumentProperties().getProperty(FbmSync.BINDING_CLEAR_KEY) || '{}') || {}; } catch (ignoreClear) { cleared = {}; }
+  var sameBinding = previous.spreadsheetId === spreadsheetId && previous.userId === userId && String(previous.username || '') === username && previous.accountName === accountName;
+  var rebindBlocked = FbmSync.bindingHasLinkedData() && !sameBinding && !FbmSync.bindingCanUpgradeUsername(previous, nextIdentity) && (previous.spreadsheetId || cleared.spreadsheetId);
+  if (rebindBlocked) {
     return { ok: false, code: 'REBIND_REQUIRED', message: 'Spreadsheet còn dữ liệu đã liên kết FBM; xử lý dữ liệu cũ rồi kiểm tra lại trước khi đổi tài khoản.' };
   }
   var saved = { spreadsheetId: spreadsheetId, userId: userId, username: username, accountName: accountName, updatedAt: Date.now() };
-  PropertiesService.getDocumentProperties().setProperty(FbmSync.BINDING_KEY, JSON.stringify(saved));
+  var props = PropertiesService.getDocumentProperties();
+  props.setProperty(FbmSync.BINDING_KEY, JSON.stringify(saved));
+  if (typeof props.deleteProperty === 'function') { props.deleteProperty(FbmSync.BINDING_CLEAR_KEY); }
   return { ok: true, binding: { spreadsheetId: saved.spreadsheetId, userId: saved.userId, username: saved.username, accountName: saved.accountName, updatedAt: saved.updatedAt } };
+};
+/* LÆ°u cáº£ nháº­n diá»‡n vÃ  credential dÆ°á»›i cÃ¹ng lock; khÃ´ng Ä‘á»ƒ há»‡ thá»‘ng rÆ¡i vÃ o tráº¡ng thÃ¡i ná»­a A ná»­a B. */
+FbmSync.connectionSave = function (input) {
+  var value = input || {}, binding = value.binding || {}, credential = value.credential || {}, props = PropertiesService.getDocumentProperties();
+  var loginKey = FbmSync.LOGIN_CONFIG_KEY || 'FBM_LOGIN_CONFIG_V1', oldBindingRaw = props.getProperty(FbmSync.BINDING_KEY), oldLoginRaw = props.getProperty(loginKey), oldClearRaw = props.getProperty(FbmSync.BINDING_CLEAR_KEY);
+  var identity = { spreadsheetId: String(binding.spreadsheetId || '').trim(), userId: String(binding.userId || '').trim(), username: String(binding.username || '').trim(), accountName: String(binding.accountName || '').trim() };
+  var allEmpty = !identity.spreadsheetId && !identity.userId && !identity.username && !identity.accountName;
+  if (!allEmpty && (!identity.spreadsheetId || !identity.userId || !identity.username || !identity.accountName)) {
+    return { ok: false, code: 'IDENTITY_BINDING_INCOMPLETE', message: 'Thiáº¿u SpreadsheetId, mÃ£ sá»‘ user, tÃªn Ä‘Äƒng nháº­p hoáº·c tÃªn Ä‘áº§y Ä‘á»§ FBM.' };
+  }
+  var previous = FbmSync.bindingRead(), changed = !previous.spreadsheetId || allEmpty || previous.spreadsheetId !== identity.spreadsheetId || previous.userId !== identity.userId || String(previous.username || '') !== identity.username || previous.accountName !== identity.accountName;
+  var mode = String(credential.mode || 'preserve');
+  if (['preserve', 'save', 'clear'].indexOf(mode) < 0) { return { ok: false, code: 'LOGIN_CREDENTIAL_MODE_INVALID', message: 'CÃ¡ch lÆ°u credential khÃ´ng há»£p lá»‡.' }; }
+  if (mode === 'save' && allEmpty) { return { ok: false, code: 'IDENTITY_BINDING_REQUIRED', message: 'Pháº£i cÃ³ nháº­n diá»‡n tÃ i khoáº£n trÆ°á»›c khi lÆ°u credential.' }; }
+  if (mode === 'save' && credential.public && String(credential.public.usernameHint || '').trim() && String(credential.public.usernameHint || '').trim() !== identity.username) {
+    return { ok: false, code: 'LOGIN_IDENTITY_MISMATCH', message: 'Username trong credential khÃ´ng khá»›p username tÃ i khoáº£n Ä‘ang liÃªn káº¿t.' };
+  }
+  if (changed && mode === 'preserve') { mode = 'clear'; }
+  try {
+    var bindingResult = allEmpty ? FbmSync.bindingClear() : FbmSync.bindingWrite(identity);
+    if (!bindingResult || bindingResult.ok === false) { return bindingResult; }
+    var loginResult;
+    if (mode === 'save') {
+      if (typeof FbmSync.loginConfigSave !== 'function') { throw new Error('Kho credential chÆ°a Ä‘Æ°á»£c náº¡p.'); }
+      loginResult = FbmSync.loginConfigSave({ enabled: credential.enabled !== false, credentialRef: credential.credentialRef, envelope: credential.envelope, public: credential.public || {} });
+      if (!loginResult || loginResult.ok === false) { throw new Error(loginResult && (loginResult.message || loginResult.code) || 'KhÃ´ng lÆ°u Ä‘Æ°á»£c credential.'); }
+    } else if (mode === 'clear' && typeof FbmSync.loginConfigClearCredential === 'function') {
+      loginResult = FbmSync.loginConfigClearCredential();
+    } else {
+      loginResult = typeof FbmSync.loginConfigPublic === 'function' ? FbmSync.loginConfigPublic() : { ok: true };
+    }
+    return { ok: true, binding: allEmpty ? {} : bindingResult.binding, identityStatus: FbmSync.identityStatus(), login: loginResult, credentialMode: mode };
+  } catch (error) {
+    try {
+      if (oldBindingRaw === null || oldBindingRaw === undefined || oldBindingRaw === '') { if (typeof props.deleteProperty === 'function') { props.deleteProperty(FbmSync.BINDING_KEY); } else { props.setProperty(FbmSync.BINDING_KEY, ''); } }
+      else { props.setProperty(FbmSync.BINDING_KEY, oldBindingRaw); }
+      if (oldLoginRaw === null || oldLoginRaw === undefined || oldLoginRaw === '') { if (typeof props.deleteProperty === 'function') { props.deleteProperty(loginKey); } else { props.setProperty(loginKey, ''); } }
+      else { props.setProperty(loginKey, oldLoginRaw); }
+      if (oldClearRaw === null || oldClearRaw === undefined || oldClearRaw === '') { if (typeof props.deleteProperty === 'function') { props.deleteProperty(FbmSync.BINDING_CLEAR_KEY); } else { props.setProperty(FbmSync.BINDING_CLEAR_KEY, ''); } }
+      else { props.setProperty(FbmSync.BINDING_CLEAR_KEY, oldClearRaw); }
+    } catch (rollbackError) {}
+    return { ok: false, code: 'CONNECTION_SAVE_ROLLED_BACK', message: String(error && error.message || error) };
+  }
 };
 FbmSync.bindingHasLinkedData = function () {
   try {

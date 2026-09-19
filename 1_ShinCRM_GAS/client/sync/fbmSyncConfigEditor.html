@@ -4,7 +4,11 @@
  * Card chỉ khai control và lệnh nghiệp vụ; lớp này giữ một snapshot trước khi sửa
  * để mọi icon/nút đều đi qua cùng một luồng lưu hoặc hủy.
  */
-var FBM_SYNC_CONFIG_KEYS = ['identity', 'login', 'accountSettings', 'module', 'relay', 'extension', 'background', 'loginPolicy'];
+var FBM_SYNC_CONFIG_KEYS = ['connection', 'accountSettings', 'module', 'relay', 'extension', 'background', 'loginPolicy'];
+
+function fbmSyncConfigCanonicalKey(key) {
+  return key === 'identity' || key === 'login' ? 'connection' : key;
+}
 
 /*
  * Đây là schema hành vi của giao diện, không phải schema dữ liệu lưu trong GAS.
@@ -40,6 +44,7 @@ function fbmSyncConfigClone(value) {
 }
 
 function fbmSyncConfigState(key) {
+  key = fbmSyncConfigCanonicalKey(key);
   FBM_SYNC_CLIENT.configEdits = FBM_SYNC_CLIENT.configEdits || {};
   var state = FBM_SYNC_CLIENT.configEdits[key];
   if (!state) {
@@ -50,6 +55,7 @@ function fbmSyncConfigState(key) {
 }
 
 function fbmSyncConfigIsEditing(key) {
+  key = fbmSyncConfigCanonicalKey(key);
   var state = fbmSyncConfigState(key);
   if (state.editing === true) { return true; }
   return false;
@@ -65,6 +71,7 @@ function fbmSyncConfigEditingKey() {
 }
 
 function fbmSyncConfigDraft(key, fallback) {
+  key = fbmSyncConfigCanonicalKey(key);
   var state = fbmSyncConfigState(key);
   return state.editing && state.draft !== null && state.draft !== undefined ? state.draft : fallback;
 }
@@ -73,6 +80,7 @@ function fbmSyncConfigSchema() { return FBM_SYNC_UI_SCHEMA.config; }
 function fbmSyncConfigActionId(key, action) { return fbmSyncConfigSchema().actionIdPrefix + key + '-' + action; }
 
 function fbmSyncConfigTitleActions(key) {
+  key = fbmSyncConfigCanonicalKey(key);
   var state = fbmSyncConfigState(key), editing = fbmSyncConfigIsEditing(key), actions = [];
   if (editing && state.editing) {
     var schema = fbmSyncConfigSchema();
@@ -86,6 +94,7 @@ function fbmSyncConfigTitleActions(key) {
 }
 
 function fbmSyncConfigButton(key, labels, options) {
+  key = fbmSyncConfigCanonicalKey(key);
   var opts = options || {}, editing = fbmSyncConfigIsEditing(key), schema = fbmSyncConfigSchema();
   var label = editing ? labels.save : labels.edit;
   var className = editing && opts.primary !== false ? uiResolveActionClass('save', 'button') : (!editing ? uiResolveActionClass('edit', 'button') : (opts.className || ''));
@@ -103,6 +112,7 @@ function fbmSyncConfigButtonRow(key, labels, options) {
 }
 
 function fbmSyncConfigBeginEdit(key, draft) {
+  key = fbmSyncConfigCanonicalKey(key);
   var state = fbmSyncConfigState(key);
   if (state.editing) { return false; }
   var activeKey = fbmSyncConfigEditingKey();
@@ -115,12 +125,13 @@ function fbmSyncConfigBeginEdit(key, draft) {
 }
 
 function fbmSyncConfigFinishEdit(key) {
+  key = fbmSyncConfigCanonicalKey(key);
   var state = fbmSyncConfigState(key);
   state.editing = false;
   state.needsRender = false;
   state.snapshot = null;
   state.draft = null;
-  if (key === 'login') {
+  if (key === 'connection') {
     FBM_SYNC_CLIENT.loginDraft = { username: '' };
     var passwordId = typeof FBM_SYNC_ACCOUNT_SCHEMA !== 'undefined' && FBM_SYNC_ACCOUNT_SCHEMA.login && FBM_SYNC_ACCOUNT_SCHEMA.login.password ? FBM_SYNC_ACCOUNT_SCHEMA.login.password.id : 'fbm-login-password';
     var password = document.getElementById(passwordId);
@@ -130,17 +141,17 @@ function fbmSyncConfigFinishEdit(key) {
 }
 
 function fbmSyncConfigCancelEdit(key, skipRender) {
+  key = fbmSyncConfigCanonicalKey(key);
   var state = fbmSyncConfigState(key), snapshot = fbmSyncConfigClone(state.snapshot);
   if (!state.editing) { return false; }
-  if (key === 'identity' && snapshot) {
-    FBM_SYNC_CLIENT.identityDraft = fbmSyncConfigClone(snapshot);
+  if (key === 'connection' && snapshot) {
+    FBM_SYNC_CLIENT.identityDraft = fbmSyncConfigClone(snapshot.identity || snapshot);
+    FBM_SYNC_CLIENT.loginDraft = { username: String(snapshot.loginUsername || '') };
     FBM_SYNC_CLIENT.identityInvalid = {};
     FBM_SYNC_CLIENT.identityAction = '';
   } else if (key === 'accountSettings' && snapshot) {
     FBM_SYNC_CLIENT.accountSettingsDraft = fbmSyncConfigClone(snapshot);
     FBM_SYNC_CLIENT.accountSettingsInvalid = {};
-  } else if (key === 'login' && snapshot) {
-    FBM_SYNC_CLIENT.loginDraft = { username: String(snapshot.username || '') };
   }
   fbmSyncConfigFinishEdit(key);
   if (skipRender !== true && typeof fbmSyncPaint === 'function') { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus || {}); }
@@ -148,6 +159,7 @@ function fbmSyncConfigCancelEdit(key, skipRender) {
 }
 
 function fbmSyncConfigDraftValue(key, path, fallback) {
+  key = fbmSyncConfigCanonicalKey(key);
   var source = fbmSyncConfigDraft(key, null);
   if (!source || typeof source !== 'object') { return fallback; }
   var value = source;
@@ -177,6 +189,7 @@ function fbmSyncLoginUsernameValue(login) {
 }
 
 function fbmSyncConfigSetDraftValue(key, path, value) {
+  key = fbmSyncConfigCanonicalKey(key);
   var state = fbmSyncConfigState(key);
   if (!state.editing) { return false; }
   var parts = String(path || '').split('.'), target = state.draft;
@@ -190,24 +203,20 @@ function fbmSyncConfigSetDraftValue(key, path, value) {
 }
 
 function fbmSyncConfigStartEdit(key) {
+  key = fbmSyncConfigCanonicalKey(key);
   var settings = FBM_SYNC_CLIENT.syncSettings || {}, login = FBM_SYNC_CLIENT.loginStatus || {};
   var activeKey = fbmSyncConfigEditingKey();
   if (activeKey && activeKey !== key) { return false; }
   var draft;
-  if (key === 'identity') {
+  if (key === 'connection') {
     var binding = FBM_SYNC_CLIENT.identityStatus && FBM_SYNC_CLIENT.identityStatus.binding || {};
-    draft = { spreadsheetId: String((FBM_SYNC_CLIENT.identityDraft || {}).spreadsheetId || binding.spreadsheetId || ''), userId: String((FBM_SYNC_CLIENT.identityDraft || {}).userId || binding.userId || ''), username: String((FBM_SYNC_CLIENT.identityDraft || {}).username || binding.username || ''), accountName: String((FBM_SYNC_CLIENT.identityDraft || {}).accountName || binding.accountName || '') };
-    FBM_SYNC_CLIENT.identityDraft = fbmSyncConfigClone(draft);
+    draft = { identity: { spreadsheetId: String((FBM_SYNC_CLIENT.identityDraft || {}).spreadsheetId || binding.spreadsheetId || ''), userId: String((FBM_SYNC_CLIENT.identityDraft || {}).userId || binding.userId || ''), username: String((FBM_SYNC_CLIENT.identityDraft || {}).username || binding.username || ''), accountName: String((FBM_SYNC_CLIENT.identityDraft || {}).accountName || binding.accountName || '') }, loginUsername: String(fbmSyncLoginUsernameValue(login) || '') };
+    FBM_SYNC_CLIENT.identityDraft = fbmSyncConfigClone(draft.identity);
+    FBM_SYNC_CLIENT.loginDraft = { username: draft.loginUsername };
   } else if (key === 'accountSettings') {
     var account = settings.account || {};
     draft = { customerPrefix: String(account.customerPrefix || ''), customerCodeLength: String(account.customerCodeLength || ''), activitySince: String(account.activitySince || '') };
     FBM_SYNC_CLIENT.accountSettingsDraft = fbmSyncConfigClone(draft);
-  } else if (key === 'login') {
-    draft = { username: fbmSyncLoginUsernameValue(login) };
-    FBM_SYNC_CLIENT.loginDraft = { username: draft.username };
-    var passwordId = typeof FBM_SYNC_ACCOUNT_SCHEMA !== 'undefined' && FBM_SYNC_ACCOUNT_SCHEMA.login && FBM_SYNC_ACCOUNT_SCHEMA.login.password ? FBM_SYNC_ACCOUNT_SCHEMA.login.password.id : 'fbm-login-password';
-    var password = document.getElementById(passwordId);
-    if (password) { password.value = ''; }
   } else if (key === 'module') {
     draft = { approvalThreshold: settings.approvalThreshold === undefined ? FBM_SYNC_SETTINGS_SCHEMA.defaults.approvalThreshold : settings.approvalThreshold, enabled: fbmSyncConfigMasterEnabled() };
   } else if (key === 'relay') {
@@ -224,8 +233,8 @@ function fbmSyncConfigStartEdit(key) {
 }
 
 function fbmSyncConfigSave(key, target) {
-  if (key === 'identity' && typeof fbmSyncSaveIdentityManual === 'function') { return fbmSyncSaveIdentityManual(target); }
-  if (key === 'login' && typeof fbmSyncSaveLoginConfig === 'function') { return fbmSyncSaveLoginConfig(target); }
+  key = fbmSyncConfigCanonicalKey(key);
+  if (key === 'connection' && typeof fbmSyncSaveConnection === 'function') { return fbmSyncSaveConnection(target); }
   if (key === 'accountSettings' && typeof fbmSyncSaveAccountSettings === 'function') { return fbmSyncSaveAccountSettings(target); }
   if (key === 'module' && typeof fbmSyncSaveSyncSettings === 'function') { return fbmSyncSaveSyncSettings(target); }
   if (key === 'relay' && typeof fbmSyncRotateRelay === 'function') { return fbmSyncRotateRelay(); }
@@ -237,8 +246,7 @@ function fbmSyncConfigSave(key, target) {
 
 /* Ánh xạ control của từng card về path trong snapshot. Đây là hợp đồng nội bộ của editor, không đưa vào screen schema. */
 var FBM_SYNC_CONFIG_UNSAVED_FIELDS = {
-  identity: { spreadsheetId: 'fbm-identity-spreadsheet', userId: 'fbm-identity-user', username: 'fbm-identity-username', accountName: 'fbm-identity-account' },
-  login: { username: 'fbm-login-username', password: 'fbm-login-password' },
+  connection: { 'identity.spreadsheetId': 'fbm-identity-spreadsheet', 'identity.userId': 'fbm-identity-user', 'identity.username': 'fbm-identity-username', 'identity.accountName': 'fbm-identity-account', loginUsername: 'fbm-login-username', password: 'fbm-login-password' },
   accountSettings: { customerPrefix: 'fbm-account-customer-prefix', customerCodeLength: 'fbm-account-customer-length', activitySince: 'fbm-account-activity-since' },
   module: { enabled: 'fbm-sync-settings-master-switch', approvalThreshold: 'fbm-sync-setting-approval-threshold' },
   relay: {},
@@ -255,7 +263,7 @@ var FBM_SYNC_CONFIG_UNSAVED_FIELDS = {
 };
 
 var FBM_SYNC_CONFIG_UNSAVED_CARDS = {
-  identity: 'fbm-sync-identity-card-region', login: 'fbm-sync-login-card-region', accountSettings: 'fbm-sync-account-settings-region',
+  connection: 'fbm-sync-connection-card-region', accountSettings: 'fbm-sync-account-settings-region',
   module: 'fbm-sync-module-card-region', relay: 'fbm-sync-relay-card-region', extension: 'fbm-sync-extension-card-region',
   background: 'fbm-sync-background-card-region', loginPolicy: 'fbm-sync-login-policy-card-region'
 };
@@ -283,7 +291,7 @@ function fbmSyncConfigUnsavedRead() {
       var current = fbmSyncConfigUnsavedControlValue(map[path]);
       if (current === undefined) { current = fbmSyncConfigPathGet(state.draft, path); }
       var baseline = fbmSyncConfigPathGet(state.snapshot, path);
-      var isPassword = key === 'login' && path === 'password';
+      var isPassword = key === 'connection' && path === 'password';
       var changed = isPassword ? String(current || '') !== '' : (typeof unsavedChangesEqual === 'function' ? !unsavedChangesEqual(current, baseline) : String(current === undefined || current === null ? '' : current).trim() !== String(baseline === undefined || baseline === null ? '' : baseline).trim());
       if (!changed) { return; }
       if (!fieldsByKey[key]) { fieldsByKey[key] = []; }
@@ -304,7 +312,10 @@ function fbmSyncConfigUnsavedProvider() {
     save: function () {
       var state = fbmSyncConfigUnsavedRead(), key = state.keys[0];
       if (!key) { return { ok: true }; }
-      return Promise.resolve(fbmSyncConfigSave(key, null)).then(function () { return { ok: true }; });
+      return Promise.resolve(fbmSyncConfigSave(key, null)).then(function (result) {
+        if (!result || result.ok === false) { return { ok: false, message: result && (result.message || result.error || result.code) || 'Không lưu được cấu hình FBM.' }; }
+        return { ok: true };
+      });
     },
     discard: function () {
       var state = fbmSyncConfigUnsavedRead();
@@ -315,8 +326,9 @@ function fbmSyncConfigUnsavedProvider() {
       return this.canRunTarget(intent && intent.target, state);
     },
     canRunTarget: function (target, state) {
-      if (!target || !state || !state.editing || !state.editingKey) { return true; }
-      var key = state.editingKey, action = target.getAttribute && target.getAttribute('data-sync-config-action'), targetKey = target.getAttribute && target.getAttribute('data-sync-config-key');
+      if (!state || !state.editing || !state.editingKey) { return true; }
+      if (!target || !target.getAttribute) { return false; }
+      var key = state.editingKey, action = target.getAttribute && target.getAttribute('data-sync-config-action'), targetKey = fbmSyncConfigCanonicalKey(target.getAttribute && target.getAttribute('data-sync-config-key'));
       if (action === 'save' && targetKey === key) { return true; }
       if (action === 'cancel' && targetKey === key) { return !state.dirty; }
       if (targetKey && targetKey !== key) { return false; }
@@ -332,6 +344,7 @@ function fbmSyncConfigUnsavedProvider() {
 function fbmSyncConfigHandleAction(target) {
   if (!target || !target.getAttribute) { return false; }
   var action = target.getAttribute('data-sync-config-action'), key = target.getAttribute('data-sync-config-key');
+  key = fbmSyncConfigCanonicalKey(key);
   if (!action || FBM_SYNC_CONFIG_KEYS.indexOf(key) < 0) { return false; }
   if (action === 'edit') {
     if (fbmSyncConfigStartEdit(key)) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus || {}); }

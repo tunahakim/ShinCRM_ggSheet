@@ -1,6 +1,6 @@
 <script>
 /* Sidebar chỉ hiển thị tiến độ; GAS là nguồn state duy nhất. */
-var FBM_SYNC_CLIENT = { installed: false, active: false, waiting: {}, relayWaiters: {}, credentialWaiters: {}, running: false, statusReady: false, mode: 'read', openedAt: 0, returnScreen: 'view', returnUi: null, relayConfigured: false, relayOpenId: 0, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0, traceEvents: [], subscreen: 'run', navOpen: false, resultsTab: 'summary', resultPages: {}, lastStatus: null, deferredPaint: null, identityStatus: null, identityAction: '', identityLastAction: '', identityProbeSignature: '', identityInvalid: {}, identityDraft: { spreadsheetId: '', userId: '', username: '', accountName: '' }, accountSettingsDraft: {}, accountSettingsInvalid: {}, loginStatus: null, loginDraft: { username: '' }, configEdits: {}, accountNotices: { identity: null, accountSettings: null, login: null }, settingsNotices: { module: null, relay: null, extension: null, background: null, login: null }, syncSettings: null };
+var FBM_SYNC_CLIENT = { installed: false, active: false, waiting: {}, relayWaiters: {}, credentialWaiters: {}, running: false, statusReady: false, mode: 'read', openedAt: 0, returnScreen: 'view', returnUi: null, relayConfigured: false, relayOpenId: 0, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0, traceEvents: [], subscreen: 'run', navOpen: false, resultsTab: 'summary', resultPages: {}, lastStatus: null, identityStatus: null, identityAction: '', identityLastAction: '', identityProbeSignature: '', identityInvalid: {}, identityDraft: { spreadsheetId: '', userId: '', username: '', accountName: '' }, accountSettingsDraft: {}, accountSettingsInvalid: {}, loginStatus: null, loginDraft: { username: '' }, pendingLoginEnvelope: null, configEdits: {}, accountNotices: { identity: null, accountSettings: null, login: null }, settingsNotices: { module: null, relay: null, extension: null, background: null, login: null }, syncSettings: null };
 /** Timeout cho một request Extension để phiên không treo vô hạn khi tab FBM/bridge mất kết nối. */
 var FBM_SYNC_REQUEST_TIMEOUT_MS = 20000;
 var FBM_SYNC_GAS_CONTINUE_WARN_MS = 5000;
@@ -42,7 +42,7 @@ function syncPanelToggle() {
   fbmSyncCaptureReturnScreen();
   FBM_SYNC_CLIENT.active = true;
   FBM_SYNC_CLIENT.statusReady = false;
-  FBM_SYNC_CLIENT.subscreen = 'run'; FBM_SYNC_CLIENT.openedAt = Date.now(); FBM_SYNC_CLIENT.viewEpoch += 1; FBM_SYNC_CLIENT.configEdits = {}; FBM_SYNC_CLIENT.accountNotices = { identity: null, accountSettings: null, login: null }; FBM_SYNC_CLIENT.accountSettingsDraft = {}; FBM_SYNC_CLIENT.accountSettingsInvalid = {}; FBM_SYNC_CLIENT.settingsNotices = { module: null, relay: null, extension: null, background: null, login: null };
+  FBM_SYNC_CLIENT.subscreen = 'run'; FBM_SYNC_CLIENT.openedAt = Date.now(); FBM_SYNC_CLIENT.viewEpoch += 1; FBM_SYNC_CLIENT.configEdits = {}; FBM_SYNC_CLIENT.pendingLoginEnvelope = null; FBM_SYNC_CLIENT.accountNotices = { identity: null, accountSettings: null, login: null }; FBM_SYNC_CLIENT.accountSettingsDraft = {}; FBM_SYNC_CLIENT.accountSettingsInvalid = {}; FBM_SYNC_CLIENT.settingsNotices = { module: null, relay: null, extension: null, background: null, login: null };
   if (typeof fbmSyncRenderInitial === 'function') { fbmSyncRenderInitial(); }
   if (typeof fbmSyncStatusOnce !== 'function') { return null; }
   return Promise.all([fbmSyncStatusOnce(true), fbmSyncLoadIdentityStatus(), fbmSyncLoadSettings()]).then(function (results) { return fbmSyncLoadLoginStatus().then(function () { return results[0]; }); });
@@ -427,7 +427,10 @@ function fbmSyncInstall() {
       fbmSyncRenderShell(FBM_SYNC_CLIENT.lastStatus || {});
       var loginPolicyCard = document.getElementById('fbm-sync-login-policy-card-region');
       if (loginPolicyCard && typeof loginPolicyCard.scrollIntoView === 'function') { loginPolicyCard.scrollIntoView({ block: 'start' }); }
-    } else if (target.hasAttribute('data-sync-screen')) { FBM_SYNC_CLIENT.navOpen = false; fbmSyncSetScreen(target.getAttribute('data-sync-screen')); fbmSyncRenderShell(FBM_SYNC_CLIENT.lastStatus || {});
+    } else if (target.hasAttribute('data-sync-screen')) {
+      FBM_SYNC_CLIENT.navOpen = false; fbmSyncSetScreen(target.getAttribute('data-sync-screen')); fbmSyncRenderShell(FBM_SYNC_CLIENT.lastStatus || {});
+      var settingsTarget = target.getAttribute('data-sync-settings-target');
+      if (settingsTarget) { setTimeout(function () { var region = document.getElementById('fbm-sync-' + settingsTarget + '-card-region'); if (region && typeof region.scrollIntoView === 'function') { region.scrollIntoView({ block: 'start' }); } }, 0); }
     } else if (target.hasAttribute('data-fbm-push-retry-all')) {
       target.disabled = true;
       fbmSyncRetryPushFailures().catch(function (error) {
@@ -504,7 +507,12 @@ function fbmSyncInstall() {
   document.addEventListener('input', function (event) {
     var target = event.target, id = String(target && target.id || '');
     var identity = { 'fbm-identity-spreadsheet': 'spreadsheetId', 'fbm-identity-user': 'userId', 'fbm-identity-username': 'username', 'fbm-identity-account': 'accountName' };
-    if (identity[id]) { FBM_SYNC_CLIENT.identityDraft[identity[id]] = String(target.value || ''); var invalidKey = id.replace('fbm-identity-', ''); if (FBM_SYNC_CLIENT.identityInvalid) { delete FBM_SYNC_CLIENT.identityInvalid[invalidKey]; if (typeof RENDER_INDEX !== 'undefined' && RENDER_INDEX.nodes['fbm-sync-identity-form-region']) { fbmSyncRenderTarget('fbm-sync-identity-form-region', fbmSyncIdentityFormBlocks()); } } }
+    if (identity[id]) {
+      var identityValue = String(target.value || ''); FBM_SYNC_CLIENT.identityDraft[identity[id]] = identityValue;
+      if (identity[id] === 'username') { FBM_SYNC_CLIENT.loginDraft.username = identityValue; var loginUsername = document.getElementById('fbm-login-username'); if (loginUsername && loginUsername.value !== identityValue) { loginUsername.value = identityValue; } }
+      FBM_SYNC_CLIENT.pendingLoginEnvelope = null;
+      var invalidKey = id.replace('fbm-identity-', ''); if (FBM_SYNC_CLIENT.identityInvalid) { delete FBM_SYNC_CLIENT.identityInvalid[invalidKey]; if (typeof RENDER_INDEX !== 'undefined' && RENDER_INDEX.nodes['fbm-sync-identity-form-region']) { fbmSyncRenderTarget('fbm-sync-identity-form-region', fbmSyncIdentityFormBlocks()); } }
+    }
     var accountSettings = { 'fbm-account-customer-prefix': 'customerPrefix', 'fbm-account-customer-length': 'customerCodeLength', 'fbm-account-activity-since': 'activitySince' };
     if (accountSettings[id]) { FBM_SYNC_CLIENT.accountSettingsDraft[accountSettings[id]] = String(target.value || ''); fbmSyncConfigSetDraftValue('accountSettings', accountSettings[id], String(target.value || '')); if (FBM_SYNC_CLIENT.accountSettingsInvalid) { delete FBM_SYNC_CLIENT.accountSettingsInvalid[accountSettings[id]]; } }
     var settingsInput = { 'fbm-extension-poll-minutes': 'extension.pollMinutes', 'fbm-sync-detail-count': 'background.detail.customersPerRun', 'fbm-sync-detail-delay-min': 'background.detail.minDelaySeconds', 'fbm-sync-detail-delay-max': 'background.detail.maxDelaySeconds', 'fbm-sync-login-retry-minutes': 'loginPolicy.retryMinutes', 'fbm-sync-setting-approval-threshold': 'module.approvalThreshold' };
@@ -512,7 +520,11 @@ function fbmSyncInstall() {
       var configKey = settingsInput[id].split('.')[0] === 'module' ? 'module' : settingsInput[id].split('.')[0] === 'loginPolicy' ? 'loginPolicy' : settingsInput[id].split('.')[0];
       fbmSyncConfigSetDraftValue(configKey, settingsInput[id].split('.').slice(1).join('.'), String(target.value || ''));
     }
-    if (id === 'fbm-login-username') { FBM_SYNC_CLIENT.loginDraft.username = String(target.value || ''); }
+    if (id === 'fbm-login-username') {
+      var loginUsernameValue = String(target.value || ''); FBM_SYNC_CLIENT.loginDraft.username = loginUsernameValue; FBM_SYNC_CLIENT.pendingLoginEnvelope = null;
+      FBM_SYNC_CLIENT.identityDraft.username = loginUsernameValue; var identityUsername = document.getElementById('fbm-identity-username'); if (identityUsername && identityUsername.value !== loginUsernameValue) { identityUsername.value = loginUsernameValue; }
+    }
+    if (id === 'fbm-login-password') { FBM_SYNC_CLIENT.pendingLoginEnvelope = null; }
   });
   document.addEventListener('focusout', function () { setTimeout(fbmSyncFlushDeferredPaint, 0); });
 }
@@ -868,8 +880,8 @@ function fbmSyncSaveLoginPolicy(button) {
 }
 function fbmSyncLoginCredentialsFromForm() {
   var username = document.getElementById('fbm-login-username'), password = document.getElementById('fbm-login-password');
-  var binding = FBM_SYNC_CLIENT.identityStatus && FBM_SYNC_CLIENT.identityStatus.binding || {};
-  return { username: username ? String(username.value || '') : '', password: password ? String(password.value || '') : '', userId: String(binding.userId || ''), spreadsheetId: String(binding.spreadsheetId || ''), database: '', unit: '', language: 'v' };
+  var identity = typeof fbmSyncIdentityActionValues === 'function' ? fbmSyncIdentityActionValues() : (FBM_SYNC_CLIENT.identityStatus && FBM_SYNC_CLIENT.identityStatus.binding || {});
+  return { username: username ? String(username.value || '').trim() : '', password: password ? String(password.value || '') : '', userId: String(identity.userId || ''), spreadsheetId: String(identity.spreadsheetId || ''), database: '', unit: '', language: 'v' };
 }
 function fbmSyncEncryptCredentials(credentials) {
   if (window.top === window) { return Promise.reject(new Error('Không tìm thấy Extension để mã hóa thông tin đăng nhập.')); }
@@ -888,24 +900,46 @@ function fbmSyncEncryptCredentials(credentials) {
   });
 }
 function fbmSyncSaveLoginConfig(button) {
+  return fbmSyncSaveConnection(button);
+}
+function fbmSyncConnectionDraftValues() {
+  var read = function (id, fallback) { var node = document.getElementById(id); return String(node ? node.value || '' : fallback || '').trim(); };
+  var draft = FBM_SYNC_CLIENT.identityDraft || {};
+  return { spreadsheetId: read('fbm-identity-spreadsheet', draft.spreadsheetId), userId: read('fbm-identity-user', draft.userId), username: read('fbm-identity-username', draft.username), accountName: read('fbm-identity-account', draft.accountName) };
+}
+function fbmSyncSaveConnection(button) {
   if (button) { button.disabled = true; }
-  var credentials = fbmSyncLoginCredentialsFromForm();
-  if (!credentials.username || !credentials.password) {
-    fbmSyncPaintError(null, 'Cần nhập username và mật khẩu FBM trước khi lưu.');
-    if (button) { button.disabled = false; }
-    return Promise.resolve(null);
+  var binding = fbmSyncConnectionDraftValues(), credentials = fbmSyncLoginCredentialsFromForm(), password = document.getElementById('fbm-login-password');
+  var allIdentityEmpty = !binding.spreadsheetId && !binding.userId && !binding.username && !binding.accountName;
+  var partialIdentity = !allIdentityEmpty && (!binding.spreadsheetId || !binding.userId || !binding.username || !binding.accountName);
+  var hasUsername = !!credentials.username, hasPassword = !!credentials.password;
+  if (partialIdentity) { fbmSyncSetAccountNotice('identity', 'error', 'Identity incomplete.'); fbmSyncPaintError(null, 'Identity incomplete.'); if (button) { button.disabled = false; } return Promise.resolve(null); }
+  if (hasUsername !== hasPassword) { fbmSyncSetAccountNotice('login', 'error', 'Username va mat khau phai duoc nhap cung nhau.'); fbmSyncPaintError(null, 'Username va mat khau phai duoc nhap cung nhau.'); if (button) { button.disabled = false; } return Promise.resolve(null); }
+  if (hasUsername && binding.username !== credentials.username) { fbmSyncSetAccountNotice('login', 'error', 'Username credential phai trung username lien ket.'); fbmSyncPaintError(null, 'Username credential phai trung username lien ket.'); if (button) { button.disabled = false; } return Promise.resolve(null); }
+  var oldBinding = FBM_SYNC_CLIENT.identityStatus && FBM_SYNC_CLIENT.identityStatus.binding || {}, identityChanged = ['spreadsheetId', 'userId', 'username', 'accountName'].some(function (key) { return String(oldBinding[key] || '') !== String(binding[key] || ''); });
+  var credential = { mode: hasUsername ? 'save' : (identityChanged ? 'clear' : 'preserve') }, encryptPromise = Promise.resolve(null);
+  if (hasUsername) {
+    var pending = FBM_SYNC_CLIENT.pendingLoginEnvelope, samePending = pending && pending.username === credentials.username;
+    encryptPromise = samePending ? Promise.resolve(pending.encrypted) : fbmSyncEncryptCredentials(credentials);
   }
-  return fbmSyncEncryptCredentials(credentials).then(function (encrypted) {
-    return callServer('fbmSaveLoginConfig', [{ enabled: (FBM_SYNC_CLIENT.loginStatus || {}).enabled !== false, credentialRef: encrypted.credentialRef, envelope: encrypted.envelope, public: encrypted.public }]);
+  return encryptPromise.then(function (encrypted) {
+    if (encrypted) { FBM_SYNC_CLIENT.pendingLoginEnvelope = { username: credentials.username, encrypted: encrypted }; credential.credentialRef = encrypted.credentialRef; credential.envelope = encrypted.envelope; credential.public = encrypted.public || {}; credential.enabled = (FBM_SYNC_CLIENT.loginStatus || {}).enabled !== false; }
+    return callServer('fbmSaveConnection', [{ binding: binding, credential: credential }]);
   }).then(function (saved) {
-    var password = document.getElementById('fbm-login-password'); if (password) { password.value = ''; }
-    FBM_SYNC_CLIENT.loginStatus = saved || FBM_SYNC_CLIENT.loginStatus; if (typeof fbmSyncConfigFinishEdit === 'function') { fbmSyncConfigFinishEdit('login'); } return fbmSyncStatusOnce();
-  }).catch(function (error) { var reason = String(error && error.message || error); fbmSyncSetAccountNotice('login', 'error', reason); var status = FBM_SYNC_CLIENT.lastStatus || {}; status.message = reason; fbmSyncPaint(status); return null;
+    if (!saved || saved.ok === false) { throw new Error(saved && (saved.message || saved.code) || 'Khong luu duoc ket noi tai khoan.'); }
+    FBM_SYNC_CLIENT.identityDraft = Object.assign({}, binding); FBM_SYNC_CLIENT.identityStatus = saved.identityStatus || Object.assign({}, FBM_SYNC_CLIENT.identityStatus || {}, { status: binding.spreadsheetId ? 'BOUND' : 'UNBOUND', binding: saved.binding || {} });
+    if (saved.login) { FBM_SYNC_CLIENT.loginStatus = saved.login; }
+    if (password) { password.value = ''; }
+    FBM_SYNC_CLIENT.pendingLoginEnvelope = null;
+    if (typeof fbmSyncConfigFinishEdit === 'function') { fbmSyncConfigFinishEdit('connection'); }
+    fbmSyncSetAccountNotice('identity', 'success', 'Da luu ket noi tai khoan FBM.');
+    return fbmSyncStatusOnce();
+  }).catch(function (error) { var reason = String(error && error.message || error); fbmSyncSetAccountNotice('identity', 'error', reason); fbmSyncSetAccountNotice('login', 'error', reason); fbmSyncPaint(Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { phase: 'error', message: reason })); return null;
   }).finally(function () { if (button) { button.disabled = false; } });
 }
 function fbmSyncTestLogin(button) {
   if (button) { button.disabled = true; }
-  var editing = fbmSyncConfigIsEditing('login'), credentials = editing ? fbmSyncLoginCredentialsFromForm() : null, login = FBM_SYNC_CLIENT.loginStatus || {};
+  var editing = fbmSyncConfigIsEditing('connection'), credentials = editing ? fbmSyncLoginCredentialsFromForm() : null, login = FBM_SYNC_CLIENT.loginStatus || {}, expectedIdentity = editing ? fbmSyncConnectionDraftValues() : (FBM_SYNC_CLIENT.identityStatus && FBM_SYNC_CLIENT.identityStatus.binding || {});
   if (editing && (!credentials.username || !credentials.password)) {
     fbmSyncSetAccountNotice('login', 'error', 'Đăng nhập thử không thành công: cần nhập username và mật khẩu FBM.');
     fbmSyncPaintError(null, 'Cần nhập username và mật khẩu FBM trước khi đăng nhập thử.');
@@ -919,7 +953,7 @@ function fbmSyncTestLogin(button) {
     return Promise.resolve(null);
   }
   fbmSyncSetAccountNotice('login', 'pending', 'Đang đăng nhập thử và xác minh tài khoản FBM...');
-  var start = editing ? fbmSyncEncryptCredentials(credentials).then(function (encrypted) { return callServer('fbmStartLoginTest', [encrypted.credentialRef]); }) : callServer('fbmStartLoginTest', [login.credentialRef]);
+  var start = editing ? fbmSyncEncryptCredentials(credentials).then(function (encrypted) { FBM_SYNC_CLIENT.pendingLoginEnvelope = { username: credentials.username, encrypted: encrypted }; return callServer('fbmStartLoginTest', [encrypted.credentialRef, expectedIdentity]); }) : callServer('fbmStartLoginTest', [login.credentialRef, expectedIdentity]);
   return start.then(function (started) {
     if (!started || !started.ok || !started.request) { throw new Error(started && (started.message || started.code) || 'Không tạo được lượt đăng nhập thử.'); }
     return fbmSyncLoginTestLoop(started);

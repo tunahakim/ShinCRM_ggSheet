@@ -3,12 +3,11 @@ function fbmSyncLoginConfiguredBlocks() {
   return [];
 }
 function fbmSyncLoginActionBlocks() {
-  var active = !!FBM_SYNC_CLIENT.running, editing = fbmSyncConfigIsEditing('login'), login = FBM_SYNC_CLIENT.loginStatus || {}, configured = login.configured === true && !!login.credentialRef;
-  if (!editing) { var editRow = fbmSyncConfigButtonRow('login', { edit: FBM_SYNC_ACCOUNT_SCHEMA.login.edit, save: FBM_SYNC_ACCOUNT_SCHEMA.login.save }, { primary: false }); return [FBM_SYNC_ACCOUNT_UI.layout.actionRow([Button({ id: FBM_SYNC_ACCOUNT_SCHEMA.login.actionIds.test, label: FBM_SYNC_ACCOUNT_SCHEMA.login.test, className: uiResolveActionClass('save', 'button'), disabled: active || !configured }), editRow.elements[0]])]; }
-  return [FBM_SYNC_ACCOUNT_UI.layout.actionRow([Button({ id: FBM_SYNC_ACCOUNT_SCHEMA.login.actionIds.test, label: FBM_SYNC_ACCOUNT_SCHEMA.login.test, className: uiResolveActionClass('save', 'button'), disabled: active }), Button({ id: FBM_SYNC_ACCOUNT_SCHEMA.login.actionIds.save, label: FBM_SYNC_ACCOUNT_SCHEMA.login.save, className: uiResolveActionClass('save', 'button'), disabled: active, data: { 'sync-config-action': 'save', 'sync-config-key': 'login' } })])];
+  var active = !!FBM_SYNC_CLIENT.running, editing = fbmSyncConfigIsEditing('connection'), login = FBM_SYNC_CLIENT.loginStatus || {}, configured = login.configured === true && !!login.credentialRef;
+  return [FBM_SYNC_ACCOUNT_UI.layout.actionRow([Button({ id: FBM_SYNC_ACCOUNT_SCHEMA.login.actionIds.test, label: FBM_SYNC_ACCOUNT_SCHEMA.login.test, className: uiResolveActionClass('save', 'button'), disabled: active || (!editing && !configured) })])];
 }
 function fbmSyncLoginPolicyNavigationBlocks() {
-  return [FBM_SYNC_ACCOUNT_UI.layout.singleAction(Button({ id: FBM_SYNC_ACCOUNT_SCHEMA.login.actionIds.policy, label: FBM_SYNC_ACCOUNT_SCHEMA.login.policy, className: uiResolveActionClass('edit', 'button'), disabled: !!FBM_SYNC_CLIENT.running || fbmSyncConfigIsEditing('login') }))];
+  return [FBM_SYNC_ACCOUNT_UI.layout.singleAction(Button({ id: FBM_SYNC_ACCOUNT_SCHEMA.login.actionIds.policy, label: FBM_SYNC_ACCOUNT_SCHEMA.login.policy, className: uiResolveActionClass('edit', 'button'), disabled: !!FBM_SYNC_CLIENT.running || fbmSyncConfigIsEditing('connection') }))];
 }
 function fbmSyncAccountSettingsBlocks() {
   var settings = (FBM_SYNC_CLIENT.syncSettings || {}).account || {}, draft = fbmSyncConfigDraft('accountSettings', FBM_SYNC_CLIENT.accountSettingsDraft || {}), invalid = FBM_SYNC_CLIENT.accountSettingsInvalid || {}, active = !!FBM_SYNC_CLIENT.running, editing = fbmSyncConfigIsEditing('accountSettings'), disabled = active || !editing;
@@ -27,7 +26,7 @@ function fbmSyncAccountSettingsCard() {
   return FBM_SYNC_ACCOUNT_UI.layout.accountCard(fbmSyncAccountSettingsBlocks(), fbmSyncConfigTitleActions('accountSettings'));
 }
 function fbmSyncLoginCard() {
-  var login = FBM_SYNC_CLIENT.loginStatus || {}, configured = login.configured === true, editing = fbmSyncConfigIsEditing('login');
+  var login = FBM_SYNC_CLIENT.loginStatus || {}, configured = login.configured === true, editing = fbmSyncConfigIsEditing('connection');
   return FBM_SYNC_ACCOUNT_UI.layout.loginCard({
     titleActions: fbmSyncConfigTitleActions('login'), configured: fbmSyncLoginConfiguredBlocks(),
     username: StandaloneField(FBM_SYNC_ACCOUNT_SCHEMA.login.username.label, { id: FBM_SYNC_ACCOUNT_SCHEMA.login.username.id, kind: 'input', inputType: FBM_SYNC_ACCOUNT_SCHEMA.login.username.inputType, value: editing ? FBM_SYNC_CLIENT.loginDraft.username : fbmSyncLoginUsernameValue(login), placeholder: FBM_SYNC_ACCOUNT_SCHEMA.login.username.placeholder, ariaLabel: FBM_SYNC_ACCOUNT_SCHEMA.login.username.label, disabled: !editing }),
@@ -35,28 +34,37 @@ function fbmSyncLoginCard() {
     actions: fbmSyncLoginActionBlocks(), notice: fbmSyncAccountNoticeBlocks('login'), policy: fbmSyncLoginPolicyNavigationBlocks()
   });
 }
+function fbmSyncConnectionStatusBlocks() {
+  var status = FBM_SYNC_CLIENT.lastStatus || {}, background = FBM_SYNC_CLIENT.syncSettings && FBM_SYNC_CLIENT.syncSettings.background || {}, enabled = status.backgroundEnabled !== false;
+  var labels = FBM_SYNC_ACCOUNT_SCHEMA.connection, label = enabled ? labels.backgroundOn : labels.backgroundOff;
+  var direction = background.direction ? ' · ' + (background.direction === 'push' ? labels.directionPush : background.direction === 'write' ? labels.directionWrite : labels.directionRead) : '';
+  return [Text({ className: FBM_SYNC_ACCOUNT_UI.classes.muted, text: label + direction }), Button({ id: 'fbm-sync-open-background-settings', label: labels.backgroundSettings, className: uiResolveActionClass('edit', 'button'), disabled: !!FBM_SYNC_CLIENT.running || fbmSyncConfigIsEditing('connection'), data: { 'sync-screen': 'settings', 'sync-settings-target': 'background' } })];
+}
+function fbmSyncConnectionCard(status) {
+  return FBM_SYNC_ACCOUNT_UI.layout.connectionCard({ titleActions: fbmSyncConfigTitleActions('connection'), notice: fbmSyncConnectionStatusBlocks(), identity: fbmSyncIdentityBlock(status), login: fbmSyncLoginCard() });
+}
 function fbmSyncRenderAccount(panel, status) {
   status = status || {};
-  return fbmSyncAppendBox(panel, FBM_SYNC_ACCOUNT_UI.rootClass, FBM_SYNC_ACCOUNT_SCHEMA.rootId, FBM_SYNC_ACCOUNT_UI.layout.screen({ identity: fbmSyncIdentityBlock(status), login: fbmSyncLoginCard(), accountSettings: fbmSyncAccountSettingsCard() }).elements);
+  return fbmSyncAppendBox(panel, FBM_SYNC_ACCOUNT_UI.rootClass, FBM_SYNC_ACCOUNT_SCHEMA.rootId, FBM_SYNC_ACCOUNT_UI.layout.screen({ connection: fbmSyncConnectionCard(status), accountSettings: fbmSyncAccountSettingsCard() }).elements);
 }
 function fbmSyncPatchAccount(panel, status) {
   if (!panel || !RENDER_INDEX.nodes[FBM_SYNC_ACCOUNT_SCHEMA.rootId]) { return false; }
   var identityForm = document.getElementById(FBM_SYNC_ACCOUNT_SCHEMA.regions.identityForm);
-  var identityEditState = fbmSyncConfigState('identity');
-  if (!fbmSyncInteractiveControlIsEditing(identityForm) && RENDER_INDEX.nodes[FBM_SYNC_ACCOUNT_SCHEMA.regions.identityCard] && (!identityEditState.editing || identityEditState.needsRender)) { fbmSyncRenderTarget(FBM_SYNC_ACCOUNT_SCHEMA.regions.identityCard, [fbmSyncIdentityBlock(status)]); identityEditState.needsRender = false; }
+  var connectionEditState = fbmSyncConfigState('connection'), connectionRegion = document.getElementById(FBM_SYNC_ACCOUNT_SCHEMA.regions.connectionCard), connectionInteractive = fbmSyncInteractiveControlIsEditing(connectionRegion), loginPasswordBefore = document.getElementById(FBM_SYNC_ACCOUNT_SCHEMA.login.password.id), preserveLoginDraft = !!(loginPasswordBefore && loginPasswordBefore.value && loginPasswordBefore.value !== '****');
+  if (!connectionInteractive && !preserveLoginDraft && RENDER_INDEX.nodes[FBM_SYNC_ACCOUNT_SCHEMA.regions.connectionCard] && (!connectionEditState.editing || connectionEditState.needsRender)) { fbmSyncRenderTarget(FBM_SYNC_ACCOUNT_SCHEMA.regions.connectionCard, [fbmSyncConnectionCard(status)]); connectionEditState.needsRender = false; }
   else { fbmSyncPatchIdentityBlock(panel, !!FBM_SYNC_CLIENT.running, status); }
+  if (RENDER_INDEX.nodes[FBM_SYNC_ACCOUNT_SCHEMA.regions.connectionNotice]) { fbmSyncRenderTarget(FBM_SYNC_ACCOUNT_SCHEMA.regions.connectionNotice, fbmSyncConnectionStatusBlocks()); }
   var accountSettingsRegion = document.getElementById(FBM_SYNC_ACCOUNT_SCHEMA.regions.accountSettings);
   var accountSettingsEditState = fbmSyncConfigState('accountSettings');
   if (!fbmSyncInteractiveControlIsEditing(accountSettingsRegion) && (!accountSettingsEditState.editing || accountSettingsEditState.needsRender)) { fbmSyncRenderTarget(FBM_SYNC_ACCOUNT_SCHEMA.regions.accountSettings, [fbmSyncAccountSettingsCard()]); accountSettingsEditState.needsRender = false; }
-  var login = FBM_SYNC_CLIENT.loginStatus || {}, configured = login.configured === true, editing = fbmSyncConfigIsEditing('login');
-  var loginCard = document.getElementById(FBM_SYNC_ACCOUNT_SCHEMA.regions.loginCard);
-  var loginPassword = document.getElementById(FBM_SYNC_ACCOUNT_SCHEMA.login.password.id), preserveLoginDraft = !!(loginPassword && loginPassword.value && loginPassword.value !== '****');
-  var loginEditState = fbmSyncConfigState('login');
-  if (!fbmSyncInteractiveControlIsEditing(loginCard) && !preserveLoginDraft && (!loginEditState.editing || loginEditState.needsRender)) { fbmSyncRenderTarget(FBM_SYNC_ACCOUNT_SCHEMA.regions.loginCard, [fbmSyncLoginCard()]); loginEditState.needsRender = false; }
+  var login = FBM_SYNC_CLIENT.loginStatus || {}, configured = login.configured === true, editing = fbmSyncConfigIsEditing('connection');
+  var loginCard = document.getElementById(FBM_SYNC_ACCOUNT_SCHEMA.regions.loginSection);
+  var loginPassword = document.getElementById(FBM_SYNC_ACCOUNT_SCHEMA.login.password.id); preserveLoginDraft = preserveLoginDraft || !!(loginPassword && loginPassword.value && loginPassword.value !== '****');
+  if (!fbmSyncInteractiveControlIsEditing(loginCard) && !preserveLoginDraft && !connectionEditState.editing) { fbmSyncRenderTarget(FBM_SYNC_ACCOUNT_SCHEMA.regions.loginSection, [fbmSyncLoginCard()]); }
   else {
     fbmSyncRenderTarget(FBM_SYNC_ACCOUNT_SCHEMA.regions.loginConfigured, fbmSyncLoginConfiguredBlocks());
     fbmSyncSetTargetState(FBM_SYNC_ACCOUNT_SCHEMA.login.username.id, { value: editing ? FBM_SYNC_CLIENT.loginDraft.username : fbmSyncLoginUsernameValue(login), disabled: !editing });
-    fbmSyncSetTargetState(FBM_SYNC_ACCOUNT_SCHEMA.login.password.id, { value: configured && !editing ? FBM_SYNC_ACCOUNT_SCHEMA.login.password.maskedValue : undefined, disabled: !editing });
+    if (!preserveLoginDraft) { fbmSyncSetTargetState(FBM_SYNC_ACCOUNT_SCHEMA.login.password.id, { value: configured && !editing ? FBM_SYNC_ACCOUNT_SCHEMA.login.password.maskedValue : undefined, disabled: !editing }); }
     fbmSyncRenderTarget(FBM_SYNC_ACCOUNT_SCHEMA.regions.loginActions, fbmSyncLoginActionBlocks());
     fbmSyncRenderTarget(FBM_SYNC_ACCOUNT_SCHEMA.regions.loginNotice, fbmSyncAccountNoticeBlocks('login'));
     fbmSyncRenderTarget(FBM_SYNC_ACCOUNT_SCHEMA.regions.loginPolicy, fbmSyncLoginPolicyNavigationBlocks());

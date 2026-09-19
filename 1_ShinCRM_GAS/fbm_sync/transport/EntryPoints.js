@@ -52,7 +52,7 @@ function fbmSyncCancel() {
 function fbmGetLoginConfig() { return FbmSync.loginConfigPublic(); }
 function fbmSaveLoginConfig(config) { return FbmSync.loginConfigSave(config || {}); }
 function fbmSetAutoLogin(enabled) { return FbmSync.loginConfigSetEnabled(enabled === true); }
-function fbmStartLoginTest(credentialRef) { return FbmSync.loginTestRequest(credentialRef); }
+function fbmStartLoginTest(credentialRef, expectedIdentity) { return FbmSync.loginTestRequest(credentialRef, expectedIdentity || null); }
 function fbmLoginTestResult(response) { return FbmSync.loginTestResult(response); }
 
 /** Mở lại toàn bộ nhóm lỗi sau khi người dùng đã sửa nguyên nhân; không lặp request FBM tại đây. */
