@@ -16,20 +16,25 @@
 - `D:\ShinCRM_ggSheet\0_Documentation\00. Tài liệu chính thức\01. Quy chuẩn nền ShinCRM.md` là nguồn chuẩn duy nhất của quy tắc nền. Đầu mỗi phiên chỉ đọc các phần liên quan đến công việc; chỉ đọc toàn bộ khi thay đổi kiến trúc lõi, Schema, ranh giới module hoặc xử lý mâu thuẫn tài liệu.
 - Trước khi đọc code, viết test hoặc sửa tệp, phải xác định và đọc các tài liệu chính thức, checklist và hợp đồng liên quan trực tiếp đến nhiệm vụ; không được suy ra yêu cầu từ code. Nếu chưa biết cần đọc tài liệu nào, phải tìm mục lục trước.
 - Không tạo bản tóm tắt lặp lại quy tắc nền ở nơi khác; tài liệu điều hướng (nếu có) chỉ được chỉ đến nguồn chuẩn và không được chứa quyết định nghiệp vụ.
-
 - Nếu đang làm phiên khác không phải phiên đồng bộ FBM thì bỏ qua các tài liệu liên quan đến FBM, cấm được đọc vì các file đó cực kỳ dài và tốn token.
-- Mục tiêu hiện tại của branch là hoàn thiện phiên đồng bộ FBM/ShinCRM theo `0_Documentation/Phiên code/Checklist đồng bộ FBM.md`. ShinCRM độc lập đã hoàn tất phần chính; không tự mở rộng sang bot tra cứu, Zalobot hoặc nạp 1.700 khách thật trước khi checklist cho phép.
-- Khi làm đồng bộ FBM, đọc `0_Documentation/00. Tài liệu chính thức/09. Đồng bộ FBM/00. Mục lục và phạm vi.md`, các chuyên đề 09 liên quan trực tiếp, `0_Documentation/Phiên code/Checklist đồng bộ FBM.md` và `0_Documentation/Phiên code/Câu hỏi đêm.md`; không đọc toàn bộ 09 nếu công việc không cần. Sau khi ngữ cảnh bị nén thì đọc lại đúng các tài liệu thuộc phạm vi đang làm.
+- Mục tiêu hiện tại của branch là rà soát module đồng bộ FBM trước vận hành thật theo `0_Documentation/Phiên code/Checklist rà soát đồng bộ FBM trước vận hành thật.md`. Phần code tính năng theo `0_Documentation/Phiên code/Checklist đồng bộ FBM.md` và phần cổng phiên FBM theo `0_Documentation/Phiên code/Checklist cổng phiên FBM.md` đã xong; hai checklist đó chỉ đọc để biết phạm vi, cấm tick và cấm sửa.
+- ShinCRM độc lập đã hoàn tất phần chính; không tự mở rộng sang bot tra cứu, Zalobot hoặc nạp 1.700 khách thật trước khi checklist cho phép.
+- Khi làm đồng bộ FBM, đọc `0_Documentation/00. Tài liệu chính thức/09. Đồng bộ FBM/00. Mục lục và phạm vi.md`, các chuyên đề 09 liên quan trực tiếp, checklist của phiên đang làm và `0_Documentation/Phiên code/Câu hỏi đêm.md`; không đọc toàn bộ 09 nếu công việc không cần. Sau khi ngữ cảnh bị nén thì đọc lại đúng các tài liệu thuộc phạm vi đang làm.
 - Chỉ đọc tệp khi dòng code sắp viết cần đến nó; không quét cả codebase để chuẩn bị.
 - Nếu tài liệu bắt buộc trong phạm vi đang làm đã lỗi thời hoặc mâu thuẫn với quyết định mới của chủ dự án, được phép và phải cập nhật tài liệu đó trong cùng nhóm thay đổi; không giữ quy tắc cũ chỉ vì tài liệu đang tồn tại.
 - Tự thực hiện liên tục các mục chỉ cần code, test offline hoặc GAS DEV. Khi đến mục cần người dùng giữ tab FBM, đăng nhập, bấm ghi thật hoặc kiểm tra dữ liệu live thì dừng và ghi rõ thao tác cần người dùng làm.
 
-## Quy tắc riêng phiên đồng bộ FBM
+## Quy tắc riêng phiên rà soát đồng bộ FBM
 
-- `0_Documentation/Phiên code/Checklist đồng bộ FBM.md` là nơi theo dõi tiến độ duy nhất của phiên. Sau khi ngữ cảnh bị nén, mở checklist và tiếp tục từ các mục chưa hoàn thành; không đọc lại toàn bộ tài liệu đã được tổng hợp trong checklist.
-- Checklist phải bao phủ cả use case thành công và thất bại, gồm lỗi mạng, DNS/TLS, timeout, bridge, HTTP, parse, đăng nhập, session, quota, conflict và các lỗi ghi/đối soát. Chỉ đánh dấu `[x]` khi có bằng chứng kiểm thử cho đúng nhánh đó.
-- Không có lỗi im lặng. Mọi lỗi phát sinh trong luồng đồng bộ, kể cả lỗi mạng, phải được thông báo rõ cho người dùng ở Sidebar và ghi vào Sheet `Log`; thiếu một trong hai thì use case vẫn chưa đạt và không được tick checklist.
+- `0_Documentation/Phiên code/Checklist rà soát đồng bộ FBM trước vận hành thật.md` là nơi theo dõi tiến độ duy nhất của phiên rà soát. Sau khi ngữ cảnh bị nén, mở checklist này và tiếp tục từ các mục chưa hoàn thành; không đọc lại toàn bộ tài liệu đã được tổng hợp trong checklist.
+- Checklist rà soát phải dựng từ tài liệu 09 và `tests/contracts/fbmSyncPipeline.js`, không được suy ra từ code. Mục nào mô tả bằng tên hàm nội bộ thay vì bằng hành vi người dùng quan sát được là sai gốc, phải viết lại.
+- Checklist phải bao phủ cả nhánh thành công và nhánh thất bại. Lỗi được nhóm theo lớp xử lý chứ không theo nguyên nhân: mọi lỗi mạng (DNS, TLS, timeout, đứt kết nối) quy về một lớp tại cổng request chung và chỉ cần một ca đại diện. Nếu mỗi nguyên nhân lại đi một đường xử lý khác nhau thì đó là lỗi kiến trúc phải sửa, không phải lý do viết thêm test. Các lớp cần tách riêng vì đường xử lý khác nhau: transport, HTTP/parse, đăng nhập/session, hạn mức và giới hạn nền tảng, conflict, ghi/đối soát.
+- Mỗi bước trong checklist chỉ mang đúng một nhãn `[Tự động]` hoặc `[Cần kiểm chứng thật]`. Cấm nhãn gộp kiểu `[Kết hợp]`; bước nào có cả hai phần thì tách thành hai dòng con.
+- Chỉ đánh dấu `[x]` khi trỏ được tới tên test cụ thể kiểm đúng nhánh đó. Test có sẵn từ trước chỉ được dùng làm bằng chứng nếu nó kiểm đúng nhánh đang xét, không phải chỉ vì nó cùng chủ đề.
+- Output kỳ vọng phải cụ thể đến mức có thể fail được. Cấm viết "hoạt động đúng" hoặc "theo hợp đồng"; phải nêu giá trị, trạng thái hoặc tên tài liệu và mục cụ thể.
+- Không có lỗi im lặng. Mọi lỗi phát sinh trong luồng đồng bộ, kể cả lỗi mạng và lỗi phát sinh khi Sidebar đang đóng, phải được thông báo rõ cho người dùng ở Sidebar và ghi vào Sheet `Log`; thiếu một trong hai thì use case vẫn chưa đạt và không được tick checklist.
 - Không che lỗi bằng `catch` rỗng, trả `null`/giá trị mặc định hoặc chỉ ghi console. Thông báo cho người dùng không được chứa cookie, mật khẩu, token, `authorized` hoặc payload nhạy cảm.
+- Mật khẩu FBM và envelope đăng nhập không được xuất hiện trong Log, Trace, thông báo lỗi Sidebar hay fixture test. Phải có ít nhất một kiểm thử tự động chốt luật này.
 
 ## Nguyên tắc UI và Schema
 
