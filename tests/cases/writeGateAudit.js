@@ -21,9 +21,9 @@ const RUNTIME_WRITERS = {
   'server/log/LogGate.js': 'infrastructure/log',
   'server/sheet/SheetGrid.js': 'helper/grid',
   'server/sheet/SetupSheets.js': 'infrastructure/setup',
+  'server/sheet/SyncColumnSetup.js': 'sync/schema',
   'server/view/ViewSheetRenderer.js': 'view/renderer',
-  'server/view/ViewSheetSetup.js': 'view/setup',
-  'fbm_sync/SyncSchema.js': 'sync/schema'
+  'server/view/ViewSheetSetup.js': 'view/setup'
 };
 
 const MUTATOR_NAMES = [
@@ -130,7 +130,16 @@ function chay(so) {
   check(so, 'mọi file runtime có mutator đều nằm trong inventory cửa ghi', violations, []);
   check(so, 'inventory không bỏ sót file có mutator', writers.slice().sort(), Object.keys(RUNTIME_WRITERS).slice().sort());
 
-  const requiredCommit = ['server/gate/WriteGate.js', 'server/gate/DeleteGate.js', 'server/config/ConfigSheetSetup.js', 'fbm_sync/SyncSchema.js'];
+  const syncViolations = [];
+  files.filter((file) => file.startsWith('fbm_sync/')).forEach((file) => {
+    const mutators = mutatorsIn(fs.readFileSync(path.join(GAS_DIR, file), 'utf8'));
+    if (mutators.length) { syncViolations.push(file + ':' + mutators.map((item) => item.name + '@' + item.line).join(',')); }
+  });
+  check(so, 'fbm_sync không ghi thẳng Sheet ngoài cửa ghi chung', syncViolations, []);
+  const fixtureViolation = mutatorsIn("function fixtureViolation(sheet) { sheet.getRange('A1').setValue('x'); }");
+  check(so, 'phép quét cửa ghi tự bắt được fixture vi phạm trong fbm_sync', [fixtureViolation.length, fixtureViolation[0] && fixtureViolation[0].name], [1, 'setValue']);
+
+  const requiredCommit = ['server/gate/WriteGate.js', 'server/gate/DeleteGate.js', 'server/config/ConfigSheetSetup.js', 'server/sheet/SyncColumnSetup.js'];
   requiredCommit.forEach((file) => {
     const source = fs.readFileSync(path.join(GAS_DIR, file), 'utf8');
     check(so, file + ' gọi hậu xử lý WriteCommit', source.indexOf('writeCommitAfterSuccess') >= 0, true);
@@ -143,7 +152,7 @@ function chay(so) {
     return fs.readFileSync(path.join(GAS_DIR, file), 'utf8').indexOf('sheetWriteColumns') >= 0;
   }), []);
 
-  const noDirectReload = ['server/gate/WriteGate.js', 'server/gate/DeleteGate.js', 'server/config/ConfigSheetSetup.js', 'fbm_sync/SyncSchema.js'];
+  const noDirectReload = ['server/gate/WriteGate.js', 'server/gate/DeleteGate.js', 'server/config/ConfigSheetSetup.js', 'server/sheet/SyncColumnSetup.js'];
   noDirectReload.forEach((file) => {
     const source = stripNonCode(fs.readFileSync(path.join(GAS_DIR, file), 'utf8'));
     check(so, file + ' không tự gọi ReloadDecision/DirtyState/renderer', [

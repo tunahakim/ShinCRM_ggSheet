@@ -62,7 +62,7 @@ function chay(so) {
     [true, 'records', ['KH000001'], true, 1]);
 
   const statusEnv = taoHop();
-  napServer(statusEnv.hop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/SyncSchema.js');
+  napServer(statusEnv.hop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/SyncSchema.js', 'server/sheet/SyncColumnSetup.js');
   statusEnv.hop.fbmEnsureSyncColumns('background');
   statusEnv.hop.dirtyStateClear();
   const statusNames = ['pending', 'notApplied', 'conflict', 'missing', 'error'];
@@ -80,7 +80,7 @@ function chay(so) {
     statusNames.map((statusName) => [statusName, 'records', ['KH000001'], true, true]));
 
   const schemaEnv = taoHop();
-  napServer(schemaEnv.hop, 'fbm_sync/SyncSchema.js');
+  napServer(schemaEnv.hop, 'fbm_sync/SyncSchema.js', 'server/sheet/SyncColumnSetup.js');
   schemaEnv.hop.shinViewSheetNames = () => ['!Lead'];
   schemaEnv.hop.rendered = 0;
   schemaEnv.hop.renderAllManagedViewsIfAllowed = () => { schemaEnv.hop.rendered += 1; return { ok: true }; };

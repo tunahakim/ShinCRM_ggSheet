@@ -115,7 +115,7 @@ FbmSync.logStatus = function (status, action) {
   if (!status || typeof logEvent !== 'function') { return; }
   var phase = String(status.phase || 'idle');
   var outcome = phase === 'error' || status.lastError ? LOG_ERROR : (phase === 'conflict' ? LOG_CONFLICT : LOG_OK);
-  var writer = outcome === LOG_ERROR ? logEvent : logTrace;
+  var writer = outcome === LOG_ERROR || phase === 'done' ? logEvent : logTrace;
   writer({
     source: 'fbm_sync', action: action || 'slice', outcome: outcome,
     entity: status.entity || '', recordId: status.current || '',

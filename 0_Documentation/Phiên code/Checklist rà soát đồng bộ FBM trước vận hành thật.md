@@ -288,7 +288,7 @@
 
 - [x] 1. Khi lát chạm trần thời gian GAS giữa chừng, hệ dừng trước request kế tiếp, ghi cursor của bản ghi cuối đã chốt vào `DocumentProperties`, đặt trạng thái tạm dừng và không phát lại request đã bay theo `09.02 Phần 3 — Nhịp chạy và cắt lát`. Bằng chứng: `Workflow.js › lát GAS chạm trần dừng trước request kế tiếp và giữ cursor cuối đã chốt`.
 - [x] 2. Khi ghi state chạm trần dung lượng `DocumentProperties`, GAS fail-closed trước khi ghi dở JSON cursor/progress/conflict/khóa/cấu hình; giữ bản state trước đó, trả lỗi lưu state cụ thể và ghi cùng lỗi vào `Log` theo `09.07 Phần 13 — Kiểm chứng còn treo`. Bằng chứng: `Settings.js › DocumentProperties đầy giữ nguyên state cursor/conflict/RecordLocks và không ghi dở JSON`.
-- [ ] 3. Đặt `Số lượng Customer mỗi lượt = 3` → mỗi lát chỉ cấp đúng 3 Customer và cursor chuyển sang Customer thứ 4; không dùng số cứng 30/50. Bằng chứng: Có test nhưng kiểm chuyện khác: `Workflow.js › moi pipeline co nguon, trigger, ket qua quan sat va bang chung bat buoc` kiểm lưu `customersPerRun` và cursor, chưa chứng minh số request thực tế bằng tham số.
+- [x] 3. Đặt `Số lượng Customer mỗi lượt = 3` → mỗi lát chỉ cấp đúng 3 Customer và cursor chuyển sang Customer thứ 4; không dùng số cứng 30/50. Bằng chứng: `Workflow.js › Số Customer mỗi lượt = 3 được áp dụng và cursor đến Customer thứ 4` kiểm giá trị cấu hình, `count` request và cursor sau ba Customer.
 - [x] 4. Đặt `Delay mỗi request = 0,5–2 giây` → envelope kế tiếp mang `waitMs` trong khoảng 500–2000 ms và Extension chỉ gửi sau khoảng chờ đó. Bằng chứng: `Workflow.js › GAS cấp waitMs transport cho lượt detail trong đúng khoảng cấu hình`; `extensionBridge.js › Extension chờ đủ waitMs trước khi gửi request FBM` và `extensionBridge.js › Extension chỉ gửi sau khi đồng hồ vượt đủ khoảng delay`.
 - [ ] 5. `[Cần kiểm chứng thật]` Với cấu hình delay an toàn, người dùng đối chiếu timestamp các request liên tiếp và không có burst làm FBM từ chối/mất quyền truy cập; delay được xem là giới hạn truy cập chứ không chỉ là tốc độ. Bằng chứng: Chưa có test; cần FBM thật.
 - [ ] 6a. Lỗi trần thời gian hoặc dung lượng đều tạo DTO lỗi Sidebar và một dòng `Log` có `runId`, phase, cursor cuối và lý do an toàn; không có `catch` rỗng. Bằng chứng: Chưa có test.
@@ -298,8 +298,8 @@
 
 **Điều kiện đầu:** Một request đọc/ghi nhận response HTTP 500 hoặc body là trang HTML lỗi/đăng nhập thay vì JSON grid FBM.
 
-- [ ] 1. Protocol nhận response 500 hoặc HTML không parse được → trả `ok: false` với lớp lỗi HTTP/parse, giữ cursor/reservation an toàn và không biến body thành grid rỗng; không ghi Sheet, không cập nhật baseline. Output đối chiếu `09.01 Phần 1 — Phân biệt hai loại thất bại`. Bằng chứng: Có test nhưng kiểm chuyện khác: `Protocol.js › body Login.aspx voi HTTP 200 bi nhan la het phien` kiểm HTTP 500 JSON và malformed JSON, chưa có HTML error page.
-- [ ] 2a. GAS ghi một dòng `Log` lỗi với status/lớp parse, `runId` và requestId; không có payload hoặc bí mật. Bằng chứng: Có test nhưng kiểm chuyện khác: `Orchestration.js › heartbeat HTTP 500 dung phien va tra loi ro rang` kiểm HTTP 500 heartbeat, chưa kiểm HTML.
+- [x] 1. Protocol nhận response 500 hoặc HTML không parse được → trả `ok: false` với lớp lỗi HTTP/parse, giữ cursor/reservation an toàn và không biến body thành grid rỗng; không ghi Sheet, không cập nhật baseline. Output đối chiếu `09.01 Phần 1 — Phân biệt hai loại thất bại`. Bằng chứng: `Workflow.js › HTML lỗi qua continuation bị fail-closed, giữ cursor và ghi Log lỗi` kiểm ba lần retry parse, phase `error`, `PARSE_ERROR`, cursor cũ và không cấp request tiếp.
+- [x] 2a. GAS ghi một dòng `Log` lỗi với status/lớp parse, `runId` và requestId; không có payload hoặc bí mật. Bằng chứng: `Workflow.js › HTML lỗi qua continuation bị fail-closed, giữ cursor và ghi Log lỗi` kiểm `html_parse_error` đi qua `logEvent` sau khi phase lỗi.
 - [ ] 2b. `[Cần kiểm chứng thật]` Sidebar hiển thị lỗi HTTP/parse dễ hiểu và không hiển thị “0 bản ghi” hoặc “FBM không có dữ liệu”. Bằng chứng: Có test nhưng kiểm chuyện khác: `Sidebar.js › Results Tổng hợp hiển thị đầy đủ Category, Activity missing, preflight và HTTP` kiểm hiển thị HTTP 500 trong Results giả lập.
 - [ ] 3. `[Cần kiểm chứng thật]` Người dùng chạy một ca đại diện trên DEV/FBM test và đối chiếu Sheet không bị ghi rỗng hoặc reset cursor. Bằng chứng: Chưa có test; cần response thật.
 
@@ -316,15 +316,15 @@
 
 **Điều kiện đầu:** Snapshot Customer/Activity trên Sheet và FBM giống nhau, không có bản ghi mới, sửa, conflict, vắng mặt hoặc ứng viên push.
 
-- [ ] 1. GAS hoàn tất pull/đối soát với bộ đếm `created=0`, `updated=0`, `pushed=0`, `conflict=0`, `error=0`, không cấp request ghi và không thay đổi hash/baseline/cursor ngoài metadata phiên. Bằng chứng: Chưa có test.
+- [x] 1. GAS hoàn tất pull/đối soát với bộ đếm `created=0`, `updated=0`, `pushed=0`, `conflict=0`, `error=0`, không cấp request ghi và không thay đổi hash/baseline/cursor ngoài metadata phiên. Bằng chứng: `ProductionMatrix.js › phiên rỗng hai phía kết thúc với mọi bộ đếm bằng 0 và chỉ một tổng kết` kiểm hai chiều rỗng, không write và toàn bộ bộ đếm 0.
 - [ ] 2. Extension không gửi request FBM ngoài các request đọc cần thiết; không tạo dòng Sheet, không tạo Log per-record và không phát Delete. Bằng chứng: Có test nhưng kiểm chuyện khác: `Workflow.js › alarm noop: Extension hoi GAS mot lan, khong tim tab va khong fetch FBM` kiểm alarm noop, chưa kiểm phiên hai phía rỗng.
-- [ ] 3a. GAS ghi một tổng kết phiên duy nhất vào `Log` với các bộ đếm bằng 0 theo `09.07 Phần 11 — Log`. Bằng chứng: Có test nhưng kiểm chuyện khác: `Audit.js › nghiệm thu ALT00010 có case PASS` kiểm tổng kết ALT00010 có dữ liệu.
+- [x] 3a. GAS ghi một tổng kết phiên duy nhất vào `Log` với các bộ đếm bằng 0 theo `09.07 Phần 11 — Log`. Bằng chứng: `ProductionMatrix.js › phiên rỗng hai phía kết thúc với mọi bộ đếm bằng 0 và chỉ một tổng kết` kiểm đúng một dòng `empty_run` và bộ đếm 0.
 - [ ] 3b. `[Cần kiểm chứng thật]` Sidebar hiển thị rõ “không có thay đổi” và người dùng đối chiếu Sheet/FBM vẫn nguyên trạng. Bằng chứng: Chưa có test; cần nghiệm thu DEV/live.
 
 ## H. Quét kiến trúc cửa ghi FBM sync
 
-- [ ] 1. Quét toàn bộ `1_ShinCRM_GAS/fbm_sync/**/*.js` sau khi bỏ comment/literal, tìm mọi mutator Sheet (`setValue`, `setValues`, `appendRow`, `clear*`, ...); mọi mutator phải đi qua cửa ghi chung được tài liệu 09.04 Phần 7 và 09.07 Phần 11 cho phép, không có file tự ghi vòng ngoài. Output phải nêu file/dòng vi phạm nếu có. Bằng chứng: Có test nhưng kiểm chuyện khác: `writeGateAudit.js › inventory không bỏ sót file có mutator` quét inventory mutator toàn GAS, chưa khóa riêng bypass trong `fbm_sync/`.
-- [ ] 2. Phép quét kiểm chính nó bằng một fixture vi phạm có mutator trong `fbm_sync/` và phải chuyển đỏ; cách kiểm tương tự `renderEngine.js › ca kiểm tra tương ứng` (quét `innerHTML`) và `namespace.js › ca kiểm tra tương ứng` (quét vùng tên). Bằng chứng: Chưa có test.
+- [x] 1. Quét toàn bộ `1_ShinCRM_GAS/fbm_sync/**/*.js` sau khi bỏ comment/literal, tìm mọi mutator Sheet (`setValue`, `setValues`, `appendRow`, `clear*`, ...); mọi mutator phải đi qua cửa ghi chung được tài liệu 09.04 Phần 7 và 09.07 Phần 11 cho phép, không có file tự ghi vòng ngoài. Output phải nêu file/dòng vi phạm nếu có. Bằng chứng: `writeGateAudit.js › fbm_sync không ghi thẳng Sheet ngoài cửa ghi chung` quét riêng toàn bộ `fbm_sync/` và trả danh sách vi phạm rỗng.
+- [x] 2. Phép quét kiểm chính nó bằng một fixture vi phạm có mutator trong `fbm_sync/` và phải chuyển đỏ; cách kiểm tương tự `renderEngine.js › ca kiểm tra tương ứng` (quét `innerHTML`) và `namespace.js › ca kiểm tra tương ứng` (quét vùng tên). Bằng chứng: `writeGateAudit.js › phép quét cửa ghi tự bắt được fixture vi phạm trong fbm_sync` phát hiện `setValue` trong fixture.
 - [ ] 3. `[Cần kiểm chứng thật]` Không có bước live; người dùng chỉ xem báo cáo quét đỏ/xanh trước khi cho phép chạy thật. Bằng chứng: Chưa có test; cần review báo cáo.
 
 ## Điều kiện hoàn thành bước 1

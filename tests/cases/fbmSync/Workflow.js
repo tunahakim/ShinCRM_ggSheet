@@ -292,6 +292,30 @@ async function chay(so) {
   check(so, 'Trang detail đủ batch không đánh dấu hết danh sách và lưu trang kế tiếp', [detailNext, scheduleFlow.hop.FbmSync.detailCursorRead().pageIndex, scheduleFlow.hop.FbmSync.detailCursorRead().pageValue[2]], [null, 2, '49']);
   scheduleFlow.hop.FbmSync.customerNext({ scan: 'detail', detailCustomerLimit: 50, cursor: { pageIndex: 2, count: 50, seen: 0 } }, [], 120);
   check(so, 'Trang detail rỗng xóa cursor để lượt sau bắt đầu lại an toàn', scheduleFlow.hop.FbmSync.detailCursorRead(), null);
+  const batchLimitFlow = workflowGas();
+  batchLimitFlow.hop.FbmSync.prepareCategoryGate = () => ({ map: {}, valid: {}, warnings: [] });
+  batchLimitFlow.hop.FbmSync.start({ mode: 'read', origin: 'background', scan: 'detail', detail: { customersPerRun: 3 } });
+  const batchState = batchLimitFlow.hop.FbmSync.stateRead();
+  const firstBatchRequest = batchLimitFlow.hop.FbmSync.beginCustomerPull(batchLimitFlow.hop.FbmSync.stateRead());
+  const batchRows = [1, 2, 3].map((index) => ({ ngay_gd: '2026-09-16', datetime0: String(index), xorder: String(index), stt_rec_kh: 'CUS-' + index }));
+  const secondBatchRequest = batchLimitFlow.hop.FbmSync.customerNext(batchLimitFlow.hop.FbmSync.stateRead(), batchRows, 10);
+  const batchCursor = batchLimitFlow.hop.FbmSync.detailCursorRead();
+  check(so, 'Số Customer mỗi lượt = 3 được áp dụng và cursor đến Customer thứ 4', [batchState.detailCustomerLimit, firstBatchRequest.body.count, secondBatchRequest, batchCursor.pageIndex, batchCursor.pageValue[2]], [3, 3, null, 0, '3']);
+  const htmlFailureFlow = workflowGas();
+  const htmlLogs = [];
+  htmlFailureFlow.hop.LOG_OK = 'ok'; htmlFailureFlow.hop.LOG_ERROR = 'error'; htmlFailureFlow.hop.LOG_CONFLICT = 'conflict';
+  htmlFailureFlow.hop.logEvent = (event) => htmlLogs.push(event);
+  htmlFailureFlow.hop.logTrace = () => {};
+  const htmlStarted = htmlFailureFlow.hop.FbmSync.start({ mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true });
+  let htmlResult = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const requestId = htmlFailureFlow.hop.FbmSync.stateRead().activeRequestId;
+    htmlResult = htmlFailureFlow.hop.FbmSync.continue({ ok: true, status: 200, body: '<html><h1>500 Internal Server Error</h1></html>', transport: { trace: [{ stage: 'executor_response_sent', requestId }] } });
+    if (!htmlResult.request) { break; }
+  }
+  htmlFailureFlow.hop.FbmSync.logStatus(htmlResult.status, 'html_parse_error');
+  const htmlState = htmlFailureFlow.hop.FbmSync.stateRead();
+  check(so, 'HTML lỗi qua continuation bị fail-closed, giữ cursor và ghi Log lỗi', [htmlStarted.request.meta.kind, htmlResult.ok, htmlResult.request || null, htmlState.phase, htmlState.lastFailureCode, htmlState.cursor.kind, htmlLogs.length, htmlLogs[0] && htmlLogs[0].action], ['identity_user_grid', false, null, 'error', 'PARSE_ERROR', 'identity_user_grid', 1, 'html_parse_error']);
   scheduleFlow.hop.FbmSync.identityPreflight = () => ({ blocking: false, status: { status: 'BOUND' }, message: '' });
   const now = Date.now();
   scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_CUSTOMER_SCAN', String(now - 1));

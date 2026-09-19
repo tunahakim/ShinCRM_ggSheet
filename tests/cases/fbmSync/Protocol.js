@@ -19,6 +19,8 @@ async function chay(so) {
   check(so, 'parse response FBM va doc Bugs', parsed.d.Bugs.Message, 'bad');
   check(so, 'Bugs khong bi coi la thanh cong', hop.FbmSync.protocol.assertSuccess(parsed).ok, false);
   check(so, 'response hong JSON bi chan', hop.FbmSync.protocol.assertSuccess('{not-json}').ok, false);
+  const htmlError = hop.FbmSync.protocol.classifyFailure({ ok: true, status: 200, body: '<!doctype html><html><body><h1>500 Internal Server Error</h1></body></html>' });
+  check(so, 'HTML lỗi HTTP 200 bị fail-closed thay vì thành grid rỗng', [htmlError.code, htmlError.retryable, hop.FbmSync.protocol.parse({ ok: true, status: 200, body: '<html><h1>500 Internal Server Error</h1></html>' }).parseError !== undefined], ['PARSE_ERROR', true, true]);
   const httpError = hop.FbmSync.protocol.parse({ ok: false, status: 401, body: '', transport: { payloadCookie: 'cookie-1' } });
   check(so, 'HTTP error van giu transport cookie', httpError._transport.payloadCookie, 'cookie-1');
   const httpBug = hop.FbmSync.protocol.parse({ ok: false, status: 500, body: '{"d":{"Bugs":{"Message":"Sai tham so"}}}' });

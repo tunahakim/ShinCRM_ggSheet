@@ -62,6 +62,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── EntityRead.js         Đọc bản ghi Customer và Activity ra dạng { fields, rows } truyền được sang client. Bỏ hàng không có mã và đếm số hàng đã bỏ.
 │   │   ├── CategoryRead.js       Đọc sheet Category thành "mã danh mục → danh sách giá trị". Biết loại cột đi kèm _FBM mà không loại nhầm @CAT_CHO_PHEP_FBM.
 │   │   ├── ConfigRead.js         Đọc các khối bảng của Config và trả hợp đồng counters riêng dù bộ đếm đã lưu chung trong khối tham số.
+│   │   ├── SyncColumnSetup.js    Dựng các cột metadata đồng bộ qua cửa ghi chung; module fbm_sync chỉ khai báo schema.
 │   │   └── SetupSheets.js        Dựng và kiểm khung năm sheet từ hai tệp khai ở data\, rồi gọi lớp chuẩn bị Config. Chạy được nhiều lần, không phá dữ liệu đang có.
 │   ├── util\
 │   │   ├── DateText.js           Biên giới duy nhất giữa Date và hai dạng chuỗi thời gian của dự án. google.script.run không mang Date qua được, nên mọi mốc thời gian đi đường chuỗi.

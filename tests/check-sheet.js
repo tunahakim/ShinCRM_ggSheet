@@ -26,7 +26,8 @@ function loadDeclaration() {
     'server/sheet/Book.js',
     'server/data/DataSchema.js',
     'server/data/SheetLayout.js',
-    'fbm_sync/SyncSchema.js'
+    'fbm_sync/SyncSchema.js',
+    'server/sheet/SyncColumnSetup.js'
   );
 }
 
