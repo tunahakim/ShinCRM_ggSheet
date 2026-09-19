@@ -511,7 +511,7 @@ function fbmSyncInstall() {
       var identityValue = String(target.value || ''); FBM_SYNC_CLIENT.identityDraft[identity[id]] = identityValue;
       if (identity[id] === 'username') { FBM_SYNC_CLIENT.loginDraft.username = identityValue; var loginUsername = document.getElementById('fbm-login-username'); if (loginUsername && loginUsername.value !== identityValue) { loginUsername.value = identityValue; } }
       FBM_SYNC_CLIENT.pendingLoginEnvelope = null;
-      var invalidKey = id.replace('fbm-identity-', ''); if (FBM_SYNC_CLIENT.identityInvalid) { delete FBM_SYNC_CLIENT.identityInvalid[invalidKey]; if (typeof RENDER_INDEX !== 'undefined' && RENDER_INDEX.nodes['fbm-sync-identity-form-region']) { fbmSyncRenderTarget('fbm-sync-identity-form-region', fbmSyncIdentityFormBlocks()); } }
+      fbmSyncClearIdentityInvalidField(id.replace('fbm-identity-', ''));
     }
     var accountSettings = { 'fbm-account-customer-prefix': 'customerPrefix', 'fbm-account-customer-length': 'customerCodeLength', 'fbm-account-activity-since': 'activitySince' };
     if (accountSettings[id]) { FBM_SYNC_CLIENT.accountSettingsDraft[accountSettings[id]] = String(target.value || ''); fbmSyncConfigSetDraftValue('accountSettings', accountSettings[id], String(target.value || '')); if (FBM_SYNC_CLIENT.accountSettingsInvalid) { delete FBM_SYNC_CLIENT.accountSettingsInvalid[accountSettings[id]]; } }
@@ -522,7 +522,7 @@ function fbmSyncInstall() {
     }
     if (id === 'fbm-login-username') {
       var loginUsernameValue = String(target.value || ''); FBM_SYNC_CLIENT.loginDraft.username = loginUsernameValue; FBM_SYNC_CLIENT.pendingLoginEnvelope = null;
-      FBM_SYNC_CLIENT.identityDraft.username = loginUsernameValue; var identityUsername = document.getElementById('fbm-identity-username'); if (identityUsername && identityUsername.value !== loginUsernameValue) { identityUsername.value = loginUsernameValue; }
+      FBM_SYNC_CLIENT.identityDraft.username = loginUsernameValue; var identityUsername = document.getElementById('fbm-identity-username'); if (identityUsername && identityUsername.value !== loginUsernameValue) { identityUsername.value = loginUsernameValue; } fbmSyncClearIdentityInvalidField('username');
     }
     if (id === 'fbm-login-password') { FBM_SYNC_CLIENT.pendingLoginEnvelope = null; }
   });

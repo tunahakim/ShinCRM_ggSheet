@@ -466,6 +466,13 @@ async function chay(so) {
 
   const nav = dom.document.createElement('nav'); nav.id = 'fbm-sync-nav'; nav.className = 'shin-popup-list'; nav.hidden = false; dom.root.appendChild(nav);
   hop.fbmSyncInstall();
+  const inputField = dom.document.createElement('div'); inputField.id = 'fbm-identity-user-field'; inputField.className = 'shin-form-field is-invalid';
+  const inputNode = dom.document.createElement('input'); inputNode.id = 'fbm-identity-user'; inputNode.value = ''; inputField.appendChild(inputNode); dom.root.appendChild(inputField);
+  hop.FBM_SYNC_CLIENT.identityInvalid = { user: true }; hop.FBM_SYNC_CLIENT.identityDraft = { spreadsheetId: '', userId: '', username: '', accountName: '' };
+  const originalRenderTarget = hop.fbmSyncRenderTarget; let identityInputRenders = 0; hop.fbmSyncRenderTarget = () => { identityInputRenders += 1; };
+  dom.document.activeElement = inputNode; inputNode.value = 'user-b'; dom.document.listeners.input({ target: inputNode });
+  hop.fbmSyncRenderTarget = originalRenderTarget;
+  check(so, 'Nhập ô nhận diện không dựng lại form, giữ nguyên focus và xóa lỗi đúng dòng', [dom.document.getElementById('fbm-identity-user') === inputNode, dom.document.activeElement === inputNode, hop.FBM_SYNC_CLIENT.identityDraft.userId, inputField.className, identityInputRenders], [true, true, 'user-b', 'shin-form-field', 0]);
   const outside = { closest: () => null };
   dom.document.listeners.click({ target: outside, preventDefault: () => {} });
   check(so, 'Click ra ngoài đóng menu Đồng bộ', nav.hidden, true);

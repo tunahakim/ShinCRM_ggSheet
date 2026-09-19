@@ -12,9 +12,16 @@ function fbmSyncIdentitySummaryBlocks() {
 function fbmSyncIdentityFormBlocks() {
   var identity = FBM_SYNC_CLIENT.identityStatus || {}, binding = identity.binding || {}, draft = FBM_SYNC_CLIENT.identityDraft || {}, editing = fbmSyncConfigIsEditing('connection');
   return FBM_SYNC_ACCOUNT_SCHEMA.identity.fields.map(function (field) {
-    var invalid = !!(FBM_SYNC_CLIENT.identityInvalid || {})[field.key], value = draft[field.draftKey] !== undefined ? draft[field.draftKey] : binding[field.draftKey];
-    return StandaloneField(field.label, { id: FBM_SYNC_ACCOUNT_SCHEMA.identity.fieldPrefix + field.key, kind: 'input', inputType: FBM_SYNC_ACCOUNT_SCHEMA.identity.inputType, value: value || '', placeholder: field.placeholder, disabled: !editing || !!FBM_SYNC_CLIENT.running, ariaLabel: field.label }, { className: invalid ? FBM_SYNC_ACCOUNT_UI.classes.invalid : '' });
+    var invalid = !!(FBM_SYNC_CLIENT.identityInvalid || {})[field.key], value = draft[field.draftKey] !== undefined ? draft[field.draftKey] : binding[field.draftKey], controlId = FBM_SYNC_ACCOUNT_SCHEMA.identity.fieldPrefix + field.key;
+    return StandaloneField(field.label, { id: controlId, kind: 'input', inputType: FBM_SYNC_ACCOUNT_SCHEMA.identity.inputType, value: value || '', placeholder: field.placeholder, disabled: !editing || !!FBM_SYNC_CLIENT.running, ariaLabel: field.label }, { id: controlId + '-field', className: invalid ? FBM_SYNC_ACCOUNT_UI.classes.invalid : '' });
   });
+}
+function fbmSyncClearIdentityInvalidField(key) {
+  var invalid = FBM_SYNC_CLIENT.identityInvalid || {};
+  if (!invalid[key]) { return false; }
+  delete invalid[key];
+  var fieldId = FBM_SYNC_ACCOUNT_SCHEMA.identity.fieldPrefix + key + '-field';
+  return typeof fbmSyncSetTargetState === 'function' && fbmSyncSetTargetState(fieldId, { removeClass: [FBM_SYNC_ACCOUNT_UI.classes.invalid] });
 }
 function fbmSyncIdentityActionBlocks() {
   var active = !!FBM_SYNC_CLIENT.running, action = FBM_SYNC_CLIENT.identityAction, editing = fbmSyncConfigIsEditing('connection');
