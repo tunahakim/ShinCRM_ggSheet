@@ -1,5 +1,16 @@
 # Quy tắc làm việc với dự án ShinCRM
 
+## Nguyên tắc nền toàn repo
+
+- Một hành vi, một chỗ định nghĩa. Trước khi viết bất kỳ thứ gì — hàm, component, hằng số, config, hay đoạn logic — phải kiểm tra xem đã có thứ tương tự trong repo chưa. Nếu có — tái sử dụng hoặc mở rộng. Nếu chưa — tạo mới ở đúng vị trí chung, không viết inline tại chỗ dùng. [RÀNG BUỘC CỨNG]
+- Đừng viết code để bắt lỗi — hãy dựng kiến trúc mà lỗi đó không có đường xảy ra. Nguyên tắc này áp mạnh nhất ở nơi định nghĩa trường (Schema) và cửa ghi ra hệ ngoài (FBM,...); những chỗ khác chỉ cần đủ tốt, không cầu toàn. [RÀNG BUỘC CỨNG]
+- Mỗi state và mỗi quyết định chỉ có một nơi sở hữu duy nhất.
+- Tách biệt rõ việc thu thập/truyền tin, xử lý nghiệp vụ/state và hiển thị.
+- Module chỉ hoạt động trong đúng ranh giới trách nhiệm của mình.
+- Mọi thay đổi state phải đi qua hợp đồng hoặc cổng được quy định; không có đường tắt.
+- Giao tiếp giữa các module phải có điều kiện, tối thiểu và tránh thao tác thừa.
+- Ưu tiên tính đúng và nhất quán; cache hoặc dữ liệu cục bộ không thay thế nguồn sự thật.
+
 ## Mục tiêu và phạm vi
 
 - `D:\ShinCRM_ggSheet\0_Documentation\00. Tài liệu chính thức\01. Quy chuẩn nền ShinCRM.md` là nguồn chuẩn duy nhất của quy tắc nền. Đầu mỗi phiên chỉ đọc các phần liên quan đến công việc; chỉ đọc toàn bộ khi thay đổi kiến trúc lõi, Schema, ranh giới module hoặc xử lý mâu thuẫn tài liệu.
@@ -13,14 +24,12 @@
 - Nếu tài liệu bắt buộc trong phạm vi đang làm đã lỗi thời hoặc mâu thuẫn với quyết định mới của chủ dự án, được phép và phải cập nhật tài liệu đó trong cùng nhóm thay đổi; không giữ quy tắc cũ chỉ vì tài liệu đang tồn tại.
 - Tự thực hiện liên tục các mục chỉ cần code, test offline hoặc GAS DEV. Khi đến mục cần người dùng giữ tab FBM, đăng nhập, bấm ghi thật hoặc kiểm tra dữ liệu live thì dừng và ghi rõ thao tác cần người dùng làm.
 
-## Nguyên tắc nền toàn repo
+## Quy tắc riêng phiên đồng bộ FBM
 
-- Mỗi state và mỗi quyết định chỉ có một nơi sở hữu duy nhất.
-- Tách biệt rõ việc thu thập/truyền tin, xử lý nghiệp vụ/state và hiển thị.
-- Module chỉ hoạt động trong đúng ranh giới trách nhiệm của mình.
-- Mọi thay đổi state phải đi qua hợp đồng hoặc cổng được quy định; không có đường tắt.
-- Giao tiếp giữa các module phải có điều kiện, tối thiểu và tránh thao tác thừa.
-- Ưu tiên tính đúng và nhất quán; cache hoặc dữ liệu cục bộ không thay thế nguồn sự thật.
+- `0_Documentation/Phiên code/Checklist đồng bộ FBM.md` là nơi theo dõi tiến độ duy nhất của phiên. Sau khi ngữ cảnh bị nén, mở checklist và tiếp tục từ các mục chưa hoàn thành; không đọc lại toàn bộ tài liệu đã được tổng hợp trong checklist.
+- Checklist phải bao phủ cả use case thành công và thất bại, gồm lỗi mạng, DNS/TLS, timeout, bridge, HTTP, parse, đăng nhập, session, quota, conflict và các lỗi ghi/đối soát. Chỉ đánh dấu `[x]` khi có bằng chứng kiểm thử cho đúng nhánh đó.
+- Không có lỗi im lặng. Mọi lỗi phát sinh trong luồng đồng bộ, kể cả lỗi mạng, phải được thông báo rõ cho người dùng ở Sidebar và ghi vào Sheet `Log`; thiếu một trong hai thì use case vẫn chưa đạt và không được tick checklist.
+- Không che lỗi bằng `catch` rỗng, trả `null`/giá trị mặc định hoặc chỉ ghi console. Thông báo cho người dùng không được chứa cookie, mật khẩu, token, `authorized` hoặc payload nhạy cảm.
 
 ## Nguyên tắc UI và Schema
 
