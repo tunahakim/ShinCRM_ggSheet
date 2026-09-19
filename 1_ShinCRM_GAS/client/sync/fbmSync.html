@@ -380,7 +380,7 @@ function fbmSyncInstall() {
     var target = event.target && event.target.closest ? event.target.closest('#fbm-sync-back, #fbm-sync-module-menu, #fbm-sync-master-switch, #fbm-sync-settings-master-switch, #fbm-sync-start, #fbm-sync-approve, #fbm-sync-rotate-relay, #fbm-sync-cancel, #fbm-sync-open-conflicts, #fbm-sync-conflict-back, #fbm-sync-check-identity, #fbm-sync-probe-identity, #fbm-sync-confirm-identity, #fbm-sync-save-identity, #fbm-sync-auto-login, #fbm-sync-login-edit, #fbm-sync-login-save, #fbm-sync-login-test, #fbm-sync-open-login-policy, #fbm-sync-save-extension, #fbm-sync-save-background, #fbm-sync-save-login-policy, #fbm-sync-save-settings, [data-sync-config-action], [data-sync-screen], [data-sync-results-tab], [data-sync-background-draft], [data-sync-master-draft], [data-sync-extension-startup], [data-sync-process-toggle], [data-sync-login-policy], [data-sync-page], [data-fbm-conflict-choice], [data-fbm-conflict-merge], [data-fbm-push-retry-all]') : null;
     if (!target) { return; }
     event.preventDefault();
-    if (typeof unsavedChangesGuardFbmTarget === 'function' && unsavedChangesGuardFbmTarget(target, function () { return fbmSyncDispatchClickTarget(target); })) { return; }
+    if (typeof unsavedChangesGuardTransition === 'function' && unsavedChangesGuardTransition({ source: 'fbm', target: target }, function () { return fbmSyncDispatchClickTarget(target); })) { return; }
     fbmSyncDispatchClickTarget(target);
   });
   function fbmSyncDispatchClickTarget(target) {

@@ -3,7 +3,36 @@
  * Cổng duy nhất bảo vệ bản nháp Sidebar trước action có thể làm mất dữ liệu.
  * Module này chỉ điều phối cảnh báo và presentation; provider của form/FBM vẫn giữ snapshot, draft và cửa lưu riêng.
  */
-var UNSAVED_CHANGES = { dialogOpen: false, highlighted: false, provider: null, pending: null, busy: false, returnFocus: null };
+var UNSAVED_CHANGES = { dialogOpen: false, highlighted: false, provider: null, pending: null, busy: false, returnFocus: null, surfaces: {} };
+
+/**
+ * Cổng điều phối duy nhất cho mọi vùng có thể chỉnh sửa. Adapter của màn hình
+ * chỉ mô tả state và khả năng chạy một intent; nó không được tự chặn click hay
+ * tự mở modal. Nhờ vậy màn hình mới không thể tạo thêm một biến thể guard.
+ */
+function unsavedChangesRegisterSurface(id, factory) {
+  var key = String(id || '').trim();
+  if (!key || typeof factory !== 'function') { throw new Error('Edit surface phải có id và factory hợp lệ.'); }
+  UNSAVED_CHANGES.surfaces[key] = factory;
+  return key;
+}
+
+function unsavedChangesEnsureDefaultSurfaces() {
+  if (!UNSAVED_CHANGES.surfaces.core) {
+    unsavedChangesRegisterSurface('core', function () { return unsavedChangesReadProvider('core'); });
+  }
+  if (!UNSAVED_CHANGES.surfaces.fbm) {
+    unsavedChangesRegisterSurface('fbm', function () { return unsavedChangesReadProvider('fbm'); });
+  }
+}
+
+function unsavedChangesSurfaceCanRun(surface, intent, state) {
+  var provider = surface.provider;
+  if (!provider || typeof provider.canRun !== 'function') {
+    throw new Error('Edit surface "' + surface.id + '" thiếu adapter `canRun`.');
+  }
+  return provider.canRun(intent || {}, state) === true;
+}
 
 /**
  * Component dùng chung cho mọi cảnh báo bản nháp. Sidebar chỉ giữ host cố định;
@@ -16,7 +45,7 @@ function unsavedChangesDialogBlocks() {
     Box({ className: 'shin-unsaved-panel', elements: [
       Text({ id: 'shin-unsaved-title', className: 'shin-unsaved-title', text: 'Có thay đổi chưa lưu' }),
       Text({ id: 'shin-unsaved-message', className: 'shin-unsaved-message', text: 'Phát hiện thay đổi chưa lưu. Bạn muốn làm gì trước khi tiếp tục?' }),
-      Row({ className: 'shin-unsaved-actions', elements: [
+      Stack({ className: 'shin-unsaved-actions', elements: [
         Button({ className: 'shin-unsaved-save', data: { 'unsaved-choice': 'save' }, label: 'Lưu thay đổi và tiếp tục' }),
         Button({ className: 'shin-unsaved-discard', data: { 'unsaved-choice': 'discard' }, label: 'Bỏ thay đổi và tiếp tục' }),
         Button({ className: 'shin-unsaved-continue', data: { 'unsaved-choice': 'continue' }, label: 'Tiếp tục sửa' })
@@ -104,7 +133,7 @@ function unsavedChangesNotifyFailure(error) {
 }
 
 function unsavedChangesReadProvider(kind) {
-  if (kind === 'fbm' && typeof fbmSyncConfigUnsavedProvider === 'function') { return fbmSyncConfigUnsavedProvider(); }
+  if (kind === 'fbm' && typeof FBM_SYNC_CLIENT !== 'undefined' && typeof fbmSyncConfigUnsavedProvider === 'function') { return fbmSyncConfigUnsavedProvider(); }
   if (kind === 'core' && typeof saveFlowUnsavedProvider === 'function') { return saveFlowUnsavedProvider(); }
   return null;
 }
@@ -212,26 +241,48 @@ function unsavedChangesGuard(kind, pending) {
   return true;
 }
 
-function unsavedChangesGuardCore(action, pending) {
-  if (String(action || '') === 'saveForm') { return false; }
-  var provider = unsavedChangesReadProvider('core');
-  if (!provider || typeof provider.read !== 'function') { return false; }
-  var state;
-  try { state = provider.read(); } catch (error) { unsavedChangesNotifyFailure(error); return true; }
-  if (!state || !state.editing) { return false; }
-  if (String(action || '') === 'cancelForm' && !state.dirty) { return false; }
-  if (String(action || '') === 'cancelForm' && state.dirty) { return unsavedChangesGuard('core', pending); }
+function unsavedChangesGuardTransition(intent, pending) {
+  unsavedChangesEnsureDefaultSurfaces();
+  var active = [];
+  Object.keys(UNSAVED_CHANGES.surfaces).forEach(function (id) {
+    var provider;
+    try { provider = UNSAVED_CHANGES.surfaces[id](); } catch (error) { unsavedChangesNotifyFailure(error); active.push({ error: true }); return; }
+    if (!provider || typeof provider.read !== 'function') { return; }
+    var state;
+    try { state = provider.read(); } catch (error) { unsavedChangesNotifyFailure(error); active.push({ error: true }); return; }
+    if (state && state.editing) { active.push({ id: id, provider: provider, state: state }); }
+  });
+  if (active.some(function (item) { return item.error; })) { return true; }
+  /* Hai vùng cùng edit là trạng thái không hợp lệ. Chặn fail-closed thay vì
+     đoán vùng nào được ưu tiên rồi để một action chạy nhầm dữ liệu. */
+  if (active.length > 1) {
+    unsavedChangesNotifyFailure(new Error('Có nhiều edit surface đang mở đồng thời.'));
+    return true;
+  }
+  if (!active.length) { return false; }
+
+  var surface = active[0];
+  var canRun;
+  try { canRun = unsavedChangesSurfaceCanRun(surface, intent || {}, surface.state); } catch (error) {
+    unsavedChangesNotifyFailure(error);
+    return true;
+  }
+  if (canRun) { return false; }
+  if (!surface.state.dirty) { return true; }
+  if (UNSAVED_CHANGES.dialogOpen) { return true; }
+  UNSAVED_CHANGES.provider = surface.provider;
+  UNSAVED_CHANGES.pending = pending;
+  UNSAVED_CHANGES.returnFocus = document.activeElement;
+  unsavedChangesApplyFields(surface.state.fieldIds || []);
+  unsavedChangesOpen();
   return true;
 }
 
+function unsavedChangesGuardCore(action, pending) {
+  return unsavedChangesGuardTransition({ surfaceId: 'core', action: action }, pending);
+}
+
 function unsavedChangesGuardFbmTarget(target, pending) {
-  var provider = unsavedChangesReadProvider('fbm');
-  if (!provider || typeof provider.read !== 'function') { return false; }
-  var state;
-  try { state = provider.read(); } catch (error) { unsavedChangesNotifyFailure(error); return true; }
-  if (!state || !state.editing) { return false; }
-  if (typeof provider.canRunTarget === 'function' && provider.canRunTarget(target, state)) { return false; }
-  if (typeof provider.needsDecision === 'function' && provider.needsDecision(target, state)) { return unsavedChangesGuard('fbm', pending); }
-  return true;
+  return unsavedChangesGuardTransition({ surfaceId: 'fbm', target: target }, pending);
 }
 </script>

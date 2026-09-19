@@ -311,6 +311,9 @@ function fbmSyncConfigUnsavedProvider() {
       state.keys.forEach(function (key) { fbmSyncConfigCancelEdit(key); });
       return { ok: true };
     },
+    canRun: function (intent, state) {
+      return this.canRunTarget(intent && intent.target, state);
+    },
     canRunTarget: function (target, state) {
       if (!target || !state || !state.editing || !state.editingKey) { return true; }
       var key = state.editingKey, action = target.getAttribute && target.getAttribute('data-sync-config-action'), targetKey = target.getAttribute && target.getAttribute('data-sync-config-key');
@@ -321,10 +324,6 @@ function fbmSyncConfigUnsavedProvider() {
       if (target.hasAttribute && (target.hasAttribute('data-sync-screen') || target.hasAttribute('data-sync-results-tab') || target.hasAttribute('data-sync-page'))) { return false; }
       var cardId = FBM_SYNC_CONFIG_UNSAVED_CARDS[key], card = cardId && target.closest ? target.closest('#' + cardId) : null;
       return !!card;
-    },
-    needsDecision: function (target, state) {
-      if (!target || !state || !state.editing || !state.dirty) { return false; }
-      return target.getAttribute && target.getAttribute('data-sync-config-action') === 'cancel' && target.getAttribute('data-sync-config-key') === state.editingKey;
     }
   };
   return FBM_SYNC_CONFIG_UNSAVED_PROVIDER;

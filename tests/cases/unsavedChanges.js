@@ -123,7 +123,10 @@ async function testFormVaFbm(so) {
   hop.UNSAVED_CHANGES.pending = null;
   hop.UNSAVED_CHANGES.provider = null;
   let coreDirty = true, coreEditing = true;
-  hop.saveFlowUnsavedProvider = () => ({ read: () => ({ editing: coreEditing, dirty: coreDirty, fieldIds: [] }) });
+  hop.saveFlowUnsavedProvider = () => ({
+    read: () => ({ editing: coreEditing, dirty: coreDirty, fieldIds: [] }),
+    canRun: (intent, state) => String(intent && intent.action || '') === 'saveForm' || (String(intent && intent.action || '') === 'cancelForm' && !state.dirty)
+  });
   hop.screenStateTop = () => ({ entity: 'customer' });
   const coreActions = ['cancelForm', 'openActivityForm', 'changeCustomer', 'backView', 'reloadData', 'openSync'];
   check(so, 'form lõi chặn mọi action ngoài khi đang sửa và cho saveForm đi thẳng', [coreActions.map((action) => hop.unsavedChangesGuardCore(action, () => {})), hop.unsavedChangesGuardCore('saveForm', () => {})], [[true, true, true, true, true, true], false]);
@@ -168,10 +171,14 @@ async function testFormVaFbm(so) {
   username.value = 'old';
   check(so, 'Mở khối mới chỉ thành công sau khi khối cũ đã kết thúc', [hop.fbmSyncConfigStartEdit('identity'), hop.fbmSyncConfigState('login').editing, hop.fbmSyncConfigState('identity').editing], [true, false, true]);
   username.value = 'changed-again';
+  let fbmPendingCalls = 0;
+  const outsideDirtyPending = () => { fbmPendingCalls += 1; };
+  const outsideDirtyBlocked = hop.unsavedChangesGuardFbmTarget(outside, outsideDirtyPending);
+  check(so, 'FBM dirty chặn action ngoài và mở đúng modal dùng chung', [outsideDirtyBlocked, hop.UNSAVED_CHANGES.dialogOpen], [true, true]);
+  hop.unsavedChangesResolve('continue');
   const dirtyCancelBlocked = hop.unsavedChangesGuardFbmTarget(cancel, () => {});
   check(so, 'Chỉ Hủy cùng card mới mở cảnh báo khi card đã dirty', [dirtyCancelBlocked, hop.UNSAVED_CHANGES.dialogOpen], [true, true]);
   hop.unsavedChangesResolve('continue');
-  let fbmPendingCalls = 0;
   const dirtyCancelAgain = hop.unsavedChangesGuardFbmTarget(cancel, () => { fbmPendingCalls += 1; });
   hop.unsavedChangesResolve('discard');
   await new Promise((resolve) => setImmediate(resolve));
@@ -196,6 +203,25 @@ function testCoreDiscardRestoresDom(so) {
   check(so, 'Core discard xóa draft và khôi phục control trước pending action', [result.ok, top.draft, control.value], [true, {}, 'bản gốc']);
 }
 
+function testSurfaceAdapterContract(so) {
+  const bo = taoBoTest(), hop = bo.hop;
+  let pendingCalls = 0;
+  hop.unsavedChangesRegisterSurface('future.settings', () => ({
+    read: () => ({ editing: true, dirty: true, fieldIds: [] }),
+    canRun: () => false,
+    save: () => ({ ok: true }),
+    discard: () => ({ ok: true })
+  }));
+  const target = bo.dom.document.createElement('button');
+  const blocked = hop.unsavedChangesGuardTransition({ source: 'future', target }, () => { pendingCalls += 1; });
+  check(so, 'Màn hình tương lai đăng ký adapter thì tự được ActionCoordinator bảo vệ', [blocked, hop.UNSAVED_CHANGES.dialogOpen, pendingCalls], [true, true, 0]);
+
+  const invalid = taoBoTest(), invalidHop = invalid.hop;
+  invalidHop.unsavedChangesRegisterSurface('invalid', () => ({ read: () => ({ editing: true, dirty: false, fieldIds: [] }) }));
+  const invalidBlocked = invalidHop.unsavedChangesGuardTransition({ source: 'invalid', target: invalid.dom.document.createElement('button') }, () => {});
+  check(so, 'Adapter thiếu canRun bị chặn fail-closed thay vì chạy tắt', [invalidBlocked, invalid.calls.filter((item) => item.name === 'alert').length], [true, 1]);
+}
+
 function testHopDongTichHop(so) {
   const sidebar = docClient('Sidebar.html');
   const dispatch = docClient('ui/dispatch.html');
@@ -210,14 +236,14 @@ function testHopDongTichHop(so) {
     sidebar.indexOf('data-unsaved-choice') < 0,
     sidebar.indexOf('shin-unsaved-panel') < 0
   ], [true, true, true, true, true]);
-  check(so, 'dispatcher form lõi luôn đi qua guard và vẫn chừa saveForm cho cửa lưu', [
+  check(so, 'dispatcher form lõi luôn đi qua ActionCoordinator và provider giữ cửa saveForm', [
     dispatch.indexOf('function dispatchRunNow(') >= 0,
-    dispatch.indexOf('unsavedChangesGuardCore') >= 0,
-    guard.indexOf("String(action || '') === 'saveForm'") >= 0,
-    guard.indexOf("String(action || '') === 'cancelForm' && !state.dirty") >= 0
+    dispatch.indexOf('unsavedChangesGuardTransition') >= 0,
+    docClient('save/saveFlow.html').indexOf("action === 'saveForm'") >= 0,
+    docClient('save/saveFlow.html').indexOf("action === 'cancelForm'") >= 0
   ], [true, true, true, true]);
-  check(so, 'dispatcher FBM giữ action chờ trong guard trước khi chạy target', [
-    fbm.indexOf('unsavedChangesGuardFbmTarget') >= 0,
+  check(so, 'dispatcher FBM giữ action chờ trong ActionCoordinator trước khi chạy target', [
+    fbm.indexOf('unsavedChangesGuardTransition') >= 0,
     fbm.indexOf('function fbmSyncDispatchClickTarget(') >= 0,
     fbm.indexOf('document.addEventListener(\'change\'') > fbm.indexOf('function fbmSyncDispatchClickTarget(')
   ], [true, true, true]);
@@ -232,10 +258,17 @@ function testHopDongTichHop(so) {
     fbm.indexOf("if (fbmSyncConfigStartEdit('login'))") >= 0,
     !editor.includes('loginEditMode') && !fbm.includes('loginEditMode')
   ], [true, true, true, true]);
-  check(so, 'FBM guard chặn theo trạng thái đang sửa, không phụ thuộc dirty', [
-    guard.indexOf('if (!state || !state.editing) { return false; }') >= 0,
-    guard.indexOf('provider.needsDecision') >= 0
-  ], [true, true]);
+  check(so, 'mọi dispatch dùng một ActionCoordinator và provider có adapter canRun', [
+    dispatch.indexOf('unsavedChangesGuardTransition') >= 0,
+    !dispatch.includes('unsavedChangesGuardCore'),
+    fbm.indexOf('unsavedChangesGuardTransition') >= 0,
+    !fbm.includes('unsavedChangesGuardFbmTarget'),
+    guard.indexOf('function unsavedChangesRegisterSurface') >= 0,
+    guard.indexOf('function unsavedChangesGuardTransition') >= 0,
+    !guard.includes('provider.needsDecision'),
+    docClient('save/saveFlow.html').indexOf('canRun: function') >= 0,
+    editor.indexOf('canRun: function') >= 0
+  ], [true, true, true, true, true, true, true, true, true]);
   check(so, 'CSS changed tập trung ở components và bao phủ input, menu, toggle', [
     styles.indexOf('shin-field-changed') >= 0,
     styles.indexOf('shin-choice-trigger') >= 0,
@@ -247,6 +280,11 @@ function testHopDongTichHop(so) {
     styles.indexOf('z-index: 0') > styles.indexOf('.shin-box.shin-unsaved-backdrop'),
     styles.indexOf('z-index: 1;') > styles.indexOf('.shin-box.shin-unsaved-panel')
   ], [true, true, true, true]);
+  check(so, 'action modal dùng Stack dọc, không thừa hưởng Row margin ngang', [
+    docClient('ui/unsavedChanges.html').indexOf("Stack({ className: 'shin-unsaved-actions'") >= 0,
+    styles.indexOf('.shin-unsaved-actions { display: grid') < 0,
+    styles.indexOf('.shin-unsaved-actions > * + *') < 0
+  ], [true, true, true]);
 }
 
 async function chay(so) {
@@ -256,6 +294,7 @@ async function chay(so) {
   await testLoiVaKhoa(so);
   await testFormVaFbm(so);
   testCoreDiscardRestoresDom(so);
+  testSurfaceAdapterContract(so);
   testHopDongTichHop(so);
 }
 

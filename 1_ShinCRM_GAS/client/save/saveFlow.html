@@ -161,6 +161,13 @@ function saveFlowUnsavedProvider() {
       });
       return { editing: true, dirty: changed.length > 0, fields: changed, fieldIds: fieldIds, top: top };
     },
+    canRun: function (intent, state) {
+      if (!state || !state.editing) { return true; }
+      var action = String(intent && intent.action || '');
+      if (action === 'saveForm') { return true; }
+      if (action === 'cancelForm') { return !state.dirty; }
+      return false;
+    },
     save: function () {
       var top = typeof screenStateTop === 'function' ? screenStateTop() : null, result = saveFlowSubmit();
       if (!result || typeof result.then !== 'function') { return { ok: false }; }

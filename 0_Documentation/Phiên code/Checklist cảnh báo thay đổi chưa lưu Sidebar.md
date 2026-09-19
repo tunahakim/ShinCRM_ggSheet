@@ -28,9 +28,10 @@ Checklist này theo dõi một cơ chế chung cho mọi khối Sidebar có trư
 ## 3. Lõi dirty guard dùng chung
 
 - [x] Tạo một module client dùng chung làm chủ trạng thái hộp cảnh báo, action đang chờ và ba lựa chọn.
+- [x] Nâng module thành `ActionCoordinator` duy nhất: mọi dispatch lõi/FBM và surface tương lai đều qua registry adapter `read/canRun/save/discard`; adapter thiếu `canRun` bị chặn fail-closed.
 - [x] Có phép chuẩn hóa/so sánh an toàn cho text, số, boolean, select/menu và ngày.
 - [x] Có API đọc dirty lazy: chỉ đọc/so sánh đầy đủ khi guard được gọi.
-- [x] Dirty chỉ phục vụ tô màu và quyết định cảnh báo ở nút Hủy/X; không dùng dirty làm điều kiện duy nhất để khóa action ngoài card.
+- [x] Dirty chỉ phục vụ tô màu và quyết định cảnh báo khi action bị chặn; trạng thái editing mới là khóa chính. Action ngoài surface dirty mở cùng modal, surface sạch vẫn bị chặn theo chính sách.
 - [x] Có API `save`, `discard`, `continue` với khóa chống xử lý hai lần; `discard` thành công là quyết định bỏ nháp có hiệu lực và phải chạy action đang chờ dù lần đọc DOM cũ còn báo dirty.
 - [x] Khi save/discard lỗi, giữ nguyên bản nháp, không chạy action đang chờ và báo lỗi rõ.
 - [x] Khôi phục focus về control phù hợp sau khi đóng cảnh báo hoặc sau khi action tiếp tục.
@@ -49,7 +50,7 @@ Checklist này theo dõi một cơ chế chung cho mọi khối Sidebar có trư
 
 - [x] Tính dirty theo từng key của `fbmSyncConfigEditor`, không tách cơ chế theo tên nghiệp vụ.
 - [x] Bao phủ identity, login, account settings, module, relay, extension, background và login policy.
-- [x] Chặn mở/sửa khối khác, menu ba chấm, chuyển màn hình, quay lại và các action ngoài khối khi khối hiện tại đang sửa, kể cả khi chưa dirty.
+- [x] Chặn mở/sửa khối khác, menu ba chấm, chuyển màn hình, quay lại và các action ngoài khối khi khối hiện tại đang sửa, kể cả khi chưa dirty; mọi đường click đi qua `ActionCoordinator`, dirty ngoài khối mở modal.
 - [x] Cho action nội bộ cùng khối tiếp tục hoạt động theo hợp đồng; nút lưu hiện tại không tự mở thêm cảnh báo.
 - [x] Lưu từ cảnh báo dùng đúng cổng save hiện có của từng key và xác nhận trạng thái đã về chỉ xem.
 - [x] Bỏ thay đổi dùng đúng snapshot của editor, không gọi GAS nếu chỉ cần hủy bản nháp cục bộ.
@@ -74,11 +75,11 @@ Checklist này theo dõi một cơ chế chung cho mọi khối Sidebar có trư
 - [x] Test save/discard lỗi: dữ liệu và màu không bị xóa nhầm.
 - [x] Test form lõi: cancel/open form lồng/đổi khách/reload bị chặn khi đang sửa, kể cả chưa dirty.
 - [x] Test FBM: chuyển màn, menu, back, sửa khối khác và action nội bộ cùng khối.
-- [x] Test FBM: card sạch vẫn khóa action ngoài, không mở đồng thời hai card; nút Hủy chỉ cảnh báo khi dirty.
+- [x] Test FBM: card sạch vẫn khóa action ngoài, card dirty ngoài khối mở modal dùng chung, không mở đồng thời hai card; adapter thiếu `canRun` fail-closed.
 - [x] Test password: dirty đúng nhưng không xuất hiện trong snapshot, log hoặc lỗi.
 - [ ] Test callback snapshot không dựng lại control đang nhập và không mất highlight. (Còn cần nghiệm thu callback thật trên Sheet DEV.)
-- [x] Test hợp đồng tĩnh: Sidebar host/include/boot, host không còn nút/nội dung modal hardcode, component renderer, guard form/FBM, mapping tám key, password, CSS changed và lớp phủ modal không bị tháo trong phiên sau.
-- [x] Chạy `node tests/run.js`: 1.715 phép đạt, 0 phép lỗi.
+- [x] Test hợp đồng tĩnh: Sidebar host/include/boot, host không còn nút/nội dung modal hardcode, component renderer/Stack, ActionCoordinator, adapter form/FBM, mapping tám key, password, CSS changed và lớp phủ modal không bị tháo trong phiên sau.
+- [x] Chạy `node tests/run.js`: 1.719 phép đạt, 0 phép lỗi.
 
 ## 8. Nghiệm thu Sheet DEV và bàn giao
 

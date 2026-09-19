@@ -128,7 +128,7 @@ function dispatchRunNow(ten, payload, el) {
 
 /** Action lõi của form không được làm mất bản nháp; dirty guard giữ action lại rồi gọi lại hàm này sau khi xử lý. */
 function dispatchRun(ten, payload, el) {
-  if (typeof unsavedChangesGuardCore === 'function' && unsavedChangesGuardCore(ten, function () { return dispatchRunNow(ten, payload, el); })) {
+  if (typeof unsavedChangesGuardTransition === 'function' && unsavedChangesGuardTransition({ source: 'dispatch', action: ten, target: el }, function () { return dispatchRunNow(ten, payload, el); })) {
     return null;
   }
   return dispatchRunNow(ten, payload, el);
