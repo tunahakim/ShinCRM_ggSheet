@@ -293,16 +293,20 @@ tests\
     ├── fbmSync.js                Điều phối các nhóm kiểm thử đồng bộ FBM; không chứa logic nghiệp vụ của từng nhóm.
     ├── fbmSync\AutoLogin.js     Kiểm envelope đăng nhập, throttle và phục hồi cursor.
     ├── fbmSync\Sidebar.js       Smoke test renderer và thao tác chính của Sidebar Đồng bộ FBM.
+    ├── fbmSync\UserJourneys.js  Kiểm các hành trình Sidebar, cấu hình kết nối, công tắc và thông báo lỗi.
     ├── fbmSync\Components.js    Kiểm hợp đồng Sync dùng component/lớp chung của ShinCRM, không tái tạo control generic.
     ├── fbmSync\
     │   ├── Protocol.js            Kiểm envelope, lỗi transport, fingerprint và đối soát ba chiều.
     │   ├── Builders.js            Kiểm builder/parser request Customer và Activity.
     │   ├── Pull.js                Kiểm pull Customer/Activity, marker, missing và bảo toàn trường nội bộ.
     │   ├── Reconcile.js           Kiểm identity, MST, hash, conflict và trạng thái đồng bộ.
+    │   ├── Preflight.js            Kiểm cổng điều kiện trước khi cấp request push và identity probe.
     │   ├── Orchestration.js       Kiểm state, cursor, resume, preflight và luồng nhiều lát.
     │   ├── Workflow.js             Chạy contract xuyên GAS -> executor Extension -> GAS với fixture FBM, cùng các cổng fail-closed cấp pipeline.
     │   ├── Push.js                Kiểm cổng ghi, khóa, owner, builder ghi và xử lý lỗi push.
-    │   └── Audit.js               Kiểm log, báo cáo, fixture an toàn và các ranh giới không ghi/xóa.
+    │   ├── Audit.js               Kiểm log, báo cáo, fixture an toàn và các ranh giới không ghi/xóa.
+    │   ├── ProductionMatrix.js    Ma trận nhiều Customer/Activity, phân trang, cắt lô missing, retry mạng và idempotency.
+    │   └── writeGateAudit.js      Quét mọi mutator Sheet trong runtime và bảo đảm không bỏ sót cửa ghi chung.
     └── domUi.js                  DOM giả tối thiểu kiểm ba đường UI: phát click, menu nổi và thu gọn nội dung.
 ```
 
