@@ -91,9 +91,9 @@ Phạm vi phiên này không bao gồm `Checklist rà soát đồng bộ FBM tr�
 
 ## Việc người dùng cần làm sau khi test tự động đạt
 
-- [ ] Mở tab FBM thật và giữ tab trong ca D3/F3 khi được yêu cầu.
-- [ ] Xác nhận identity thật ở ca D3.
-- [ ] Kiểm chứng Sidebar khi mở lại sau lỗi nền ở G6.
+- [ ] D3: mở Sidebar → phần kết nối tài khoản → giữ tab FBM thật đang đăng nhập → chạy “Đăng nhập thử” → đối chiếu đúng Spreadsheet ID, mã user, username và tên tài khoản đã liên kết; xác nhận không có mật khẩu/envelope trong thông báo hoặc Sheet `Log`.
+- [ ] F3: bật chính sách “Cho phép tự mở tab FBM khi GAS yêu cầu”, đóng tab FBM, chạy một lượt đọc an toàn; xác nhận Extension chỉ mở URL do GAS cấp và chỉ thử lại một lần. Lặp lại khi tắt chính sách để xác nhận bị chặn, không có request nghiệp vụ đi tiếp.
+- [ ] G6: đóng Sidebar nhưng để lịch nền hoạt động, tạo lỗi transport bằng cách đóng/mất tab FBM giữa lượt; mở Sidebar lại sau khi relay kết thúc, xác nhận trạng thái lỗi dễ hiểu và kiểm tra Sheet `Log` có đúng mã lỗi.
 - [ ] Nếu được yêu cầu, chạy một ca ghi thật trên dữ liệu an toàn theo cờ an toàn hiện hành; không dùng request xóa.
 
 ## Tệp dự kiến sửa
