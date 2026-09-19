@@ -26,7 +26,7 @@ FbmSync.logPushRecord = function (candidate, operation, outcome, reason, detail)
   logEvent({
     source: 'fbm_sync', action: 'push_record', outcome: outcome || (typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok'), entity: entity, recordId: id,
     reason: String(reason || ''),
-    detail: Object.assign({ direction: 'ShinCRM → FBM', requestKind: String(operation || candidate && candidate.kind || ''), hSHIN: hShin, hBASE: String(record.fbmHash || '') }, detail || {})
+    detail: Object.assign({ direction: 'ShinCRM → FBM', requestKind: String(operation || candidate && candidate.kind || ''), owner: String(record.owner || ''), hSHIN: hShin, hBASE: String(record.fbmHash || '') }, detail || {})
   });
 };
 /** Ghi trạng thái kỹ thuật sau push; baseline chỉ cập nhật sau bước đọc xác nhận. */

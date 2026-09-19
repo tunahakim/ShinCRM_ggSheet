@@ -1,12 +1,16 @@
 /** Kiểm tra missing, tombstone, khóa và ứng viên push. */
 const { section, check } = require("../../lib/assert");
 const { taoHopCat, napServer } = require("../../lib/load-gas");
+const { taoBoTest } = require('./Sidebar');
 
 async function chay(so) {
   section("FBM sync — reconcile và candidate");
   const gate = { map: { '@CAT_TINH_THANH\u001fHà Nội': 'HNI' }, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true, HNI: true } } };
   const edges = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {} });
-  napServer(edges, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/reconcile/CategoryGate.js');
+  const reconcileLogs = [];
+  edges.logEvent = (event) => reconcileLogs.push(event);
+  edges.LOG_OK = 'ok'; edges.LOG_WARN = 'warn'; edges.LOG_ERROR = 'error'; edges.LOG_CONFLICT = 'conflict';
+  napServer(edges, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/reconcile/CategoryGate.js');
   check(so, 'normalize placeholder 1999 thanh rong', edges.FbmSync.normalize('/Date(915123600000)/'), '');
   check(so, 'normalize Date co offset chi dung timestamp chinh', edges.FbmSync.normalize('/Date(1757386800000+0700)/'), edges.FbmSync.normalize('/Date(1757386800000)/'));
   check(so, 'normalize Date khong hop le khong nem loi', edges.FbmSync.normalize(new Date(NaN)), '');
@@ -71,9 +75,31 @@ async function chay(so) {
   const orphanActivity = edges.FbmSync.activityRecord({ id: 89, ma_kh: 'ALT00014', ten_cv: 'Gọi', details: 'Mồ côi #SC-ACT-UNKNOWN', end_date: '/Date(1757386800000)/' }, gate);
   const orphanActivityResult = edges.FbmSync.pullWrite('activity', [orphanActivity]);
   check(so, 'Activity marker mo coi khong tao dong moi', orphanActivityResult.written, 0);
+  const invalidState = { runId: 'invalid-activity', phase: 'pull_activity', entity: 'activity', cursor: { kind: 'activity_grid', index: 2 }, session: { customerAuthorized: '', activityAuthorized: '', expired: false }, metadata: { categoryGate: gate, seen: { customer: {}, activity: {} }, conflicts: [] }, locks: {}, counts: { total: 1, completed: 0, succeeded: 0, skipped: 0, conflict: 0, error: 0 }, message: '', lastError: '' };
+  edges.FbmSync.stateRead = () => invalidState;
+  edges.FbmSync.stateWrite = (next) => { Object.assign(invalidState, next); return invalidState; };
   const invalidActivity = edges.FbmSync.activityRecord({ id: 90, ma_kh: 'ALT00014', ten_cv: 'Gọi', details: 'Thiếu ngày', end_date: '' }, gate);
   const invalidActivityResult = edges.FbmSync.pullWrite('activity', [invalidActivity]);
-  check(so, 'Activity thieu ngay bi chan an toan', invalidActivityResult.written, 0);
+  const invalidActivityLog = reconcileLogs.filter((event) => event.action === 'pull_record' && event.recordId === '90').slice(-1)[0];
+  const invalidActivityUi = taoBoTest();
+  invalidActivityUi.hop.fbmSyncPaint(edges.FbmSync.statusView());
+  check(so, 'Activity missing Sidebar co thong bao loi va Log', [invalidActivityUi.content.textContent.indexOf('lỗi') >= 0 || invalidActivityUi.content.textContent.indexOf('ngày') >= 0, invalidActivityLog && invalidActivityLog.outcome], [true, 'error']);
+  check(so, 'Activity thieu ngay bi chan an toan va ghi Log', [invalidActivityResult.written, invalidActivityLog && invalidActivityLog.detail.statusAfter, invalidActivityLog && invalidActivityLog.outcome], [0, edges.FbmSync.SYNC_STATUS.error, 'error']);
+
+  const conflictRawBase = { stt_rec_kh: 'FBM-CONFLICT', ma_kh: 'ALT00015', ten_kh: 'Ten goc', ma_so_thue: '010015', dien_thoai: '090015', dc_lh: 'Ha Noi' };
+  const conflictState = { runId: 'conflict-run', mode: 'read', phase: 'conflict', entity: 'customer', cursor: { kind: 'customer_grid', index: 4 }, session: { customerAuthorized: '', activityAuthorized: '', expired: false }, metadata: { categoryGate: gate, seen: { customer: {}, activity: {} }, conflicts: [] }, locks: {}, counts: { total: 0, completed: 0, succeeded: 0, skipped: 0, conflict: 0, error: 0 } };
+  const conflictLocal = { id: 'CUS-CONFLICT', fbmId: 'FBM-CONFLICT', fbmCustomerCode: 'ALT00015', companyName: 'Ten Shin moi', taxNumber: '010015', phone: '090015', address: 'Ha Noi', fbmHash: edges.FbmSync.hash(conflictRawBase, 'customer', gate), syncStatus: edges.FbmSync.SYNC_STATUS.synced };
+  edges.FbmSync.stateRead = () => conflictState;
+  edges.FbmSync.stateWrite = (next) => { Object.assign(conflictState, next); return conflictState; };
+  edges.FbmSync.readLocal = () => [conflictLocal];
+  edges.writeGateSave = () => ({ ok: true });
+  const conflictIncoming = edges.FbmSync.customerRecord(Object.assign({}, conflictRawBase, { ten_kh: 'Ten FBM moi' }), gate);
+  const conflictResult = edges.FbmSync.pullWrite('customer', [conflictIncoming]);
+  const conflictLog = reconcileLogs.filter((event) => event.action === 'pull_record' && event.recordId === 'CUS-CONFLICT').slice(-1)[0];
+  const conflictUi = taoBoTest();
+  conflictUi.hop.fbmSyncPaint(edges.FbmSync.statusView());
+  check(so, 'Conflict Sidebar hien thi cho quyet dinh va Log co ket qua', [conflictUi.content.textContent.toLowerCase().indexOf('xung đột') >= 0 || conflictUi.content.textContent.toLowerCase().indexOf('quyết định') >= 0, conflictLog && conflictLog.outcome], [true, 'conflict']);
+  check(so, 'conflict hai phia giu nguyen record, ghi Log va cho quyet dinh', [conflictResult.conflicts, conflictState.metadata.conflicts.length, conflictLog && conflictLog.detail.statusAfter, conflictLog && conflictLog.outcome], [1, 1, edges.FbmSync.SYNC_STATUS.conflict, 'conflict']);
 
   const failedRecord = { id: 'C-FAIL', fbmId: 'FBM-FAIL', fbmCustomerCode: 'ALT00010', companyName: 'Cũ', allowFbmPush: 'Cho phép', syncStatus: edges.FbmSync.SYNC_STATUS.error };
   const failedHash = edges.FbmSync.hash(failedRecord, 'customer', {});

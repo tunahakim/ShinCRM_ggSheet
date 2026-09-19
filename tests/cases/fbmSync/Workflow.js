@@ -40,6 +40,7 @@ function workflowGas(options) {
     'fbm_sync/protocol/Protocol.js',
     'fbm_sync/state/State.js',
     'fbm_sync/state/AccountSettings.js',
+    'fbm_sync/control/ControlPort.js',
     'fbm_sync/state/Scheduler.js',
     'fbm_sync/reconcile/Identity.js',
     'fbm_sync/reconcile/CategoryGate.js',
@@ -392,6 +393,27 @@ async function chay(so) {
     deadlineUi.content.textContent.indexOf('Tạm dừng') >= 0
   ], [null, 'paused', 'GAS_RUNTIME_LIMIT', 4, '', 'runtime_limit', 'runtime-limit', 'paused', 'customer_grid', true]);
 
+  const quotaData = {}, quotaLogs = [];
+  let quotaFull = false;
+  const quotaProperties = {
+    getProperty(key) { return Object.prototype.hasOwnProperty.call(quotaData, key) ? quotaData[key] : null; },
+    setProperty(key, value) { if (quotaFull) { throw new Error('DocumentProperties quota exceeded'); } quotaData[key] = String(value); },
+    deleteProperty(key) { delete quotaData[key]; }
+  };
+  const quotaFlow = workflowGas({ documentProperties: quotaProperties, logEvent: (event) => quotaLogs.push(event), LOG_ERROR: 'error' });
+  quotaFlow.hop.FbmSync.statePatch({ runId: 'quota-run', phase: 'pull_customer', cursor: { kind: 'customer_grid', pageIndex: 7, pageValue: ['2026-09-20', 'CUS-000007'] }, metadata: { conflicts: [{ entity: 'customer', id: 'CUS-LOCK' }] }, locks: { 'customer:CUS-LOCK': { owner: 'sync', revision: 'r7' } } });
+  quotaFull = true;
+  const quotaResult = quotaFlow.hop.FbmSync.controlDispatchLocked('cancel', {});
+  const quotaLog = quotaLogs.filter((item) => item.reason === 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED').slice(-1)[0] || quotaLogs.filter((item) => item.reason === 'FBM_DOCUMENT_PROPERTIES_QUOTA').slice(-1)[0] || {};
+  const quotaUi = taoBoTest();
+  quotaUi.hop.fbmSyncPaint(quotaResult.status);
+  check(so, 'DocumentProperties đầy trả DTO lỗi Sidebar, giữ cursor và Log runId/phase/cursor', [
+    quotaResult.ok, quotaResult.code, quotaResult.status && quotaResult.status.runId, quotaResult.status && quotaResult.status.phase,
+    quotaResult.status && quotaResult.status.cursor && quotaResult.status.cursor.kind, quotaLog.detail && quotaLog.detail.runId,
+    quotaLog.detail && quotaLog.detail.phase, quotaLog.detail && quotaLog.detail.cursor && quotaLog.detail.cursor.kind,
+    quotaUi.content.textContent.indexOf('DocumentProperties') >= 0 || quotaUi.content.textContent.indexOf('lưu trạng thái') >= 0
+  ], [false, 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED', 'quota-run', 'error', 'customer_grid', 'quota-run', 'pull_customer', 'customer_grid', true]);
+
   const noopWorker = workerHarness([{ ok: true, code: 'HEARTBEAT_NOOP', request: null }], []);
   const noopResult = await noopWorker.context.fbmHeartbeatNow('workflow');
   check(so, 'alarm noop: Extension hoi GAS mot lan, khong tim tab va khong fetch FBM', [
@@ -496,6 +518,7 @@ async function chay(so) {
     }
   }
   const fullFinal = fullFlow.hop.FbmSync.statusView();
+  const fullSummaryLog = fullLogs.filter((item) => item.action === 'slice' && item.detail && item.detail.phase === 'done').slice(-1)[0] || {};
   const ui = taoBoTest();
   ui.hop.fbmSyncPaint(fullFinal);
   check(so, 'pipeline giả lập Customer + Activity đi qua GAS, Extension, cửa ghi và kết thúc', [
@@ -503,11 +526,12 @@ async function chay(so) {
     fullWrites.filter((item) => item.source === 'pull').length, fullKinds,
     fullLogs.some((item) => item.action === 'pull_record' && item.entity === 'customer'),
     fullLogs.some((item) => item.action === 'pull_record' && item.entity === 'activity'),
+    fullSummaryLog.detail && fullSummaryLog.detail.runId === fullFinal.runId, fullSummaryLog.detail && fullSummaryLog.detail.counts && fullSummaryLog.detail.counts.succeeded,
     ui.content.textContent.indexOf('Hoàn tất') >= 0
   ], [
     true, null, 'done', 2, 2, 3,
     ['authorize:customer', 'authorize:activity', 'completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH', 'completion:@CAT_CONG_VIEC', 'completion:@CAT_SAN_PHAM', 'grid:customer', 'grid:activity', 'grid:activity'],
-    true, true, true
+    true, true, true, 4, true
   ]);
 
   const readFlow = workflowGas();

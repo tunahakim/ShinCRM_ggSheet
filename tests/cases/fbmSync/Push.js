@@ -232,6 +232,10 @@ async function chay(so) {
   const skippedEntry = skippedLogs.filter((event) => event.action === 'push_record_skipped')[0];
   const skippedDetail = skippedLogs.filter((event) => event.action === 'push_record')[0];
   check(so, 'Push record bi hoan co log chi tiet', [!!skippedEntry, skippedEntry && skippedEntry.recordId, skippedDetail && skippedDetail.detail.direction, skippedDetail && skippedDetail.detail.syncStatus], [true, 'ACT-SKIP', 'ShinCRM → FBM', push.FbmSync.SYNC_STATUS.unknownCategory]);
+  push.logEvent = (event) => {
+    pushLogs.push(event);
+    skippedLogs.push(event);
+  };
   const countedConflict = { counts: { conflict: 1 }, metadata: {} };
   check(so, 'Push dung lai khi bo dem conflict duong du chi tiet bi thieu', [push.FbmSync.stopPushOnConflicts(countedConflict), countedConflict.phase, countedConflict.cursor], [true, 'conflict', {}]);
 
@@ -283,7 +287,7 @@ async function chay(so) {
   check(so, 'Activity moi dung request New va marker', [activityCreate.meta.kind, activityCreate.body.action, activityCreate.body.memvars.filter((item) => item.Name === 'details')[0].NewValue, push.FbmSync.stateRead().cursor.operation], ['activity_create', 'New', 'Nội dung #SC-ACT-NEW', 'activity_create']);
   const activityResponse = push.FbmSync.continuePush(push.FbmSync.stateRead(), { d: { InternalValues: [{ Name: 'id', Value: 42 }] } });
   check(so, 'Activity New nhan ID FBM va tao request doc xac nhan', [activityResponse.meta.kind, activityResponse.meta.id, push.FbmSync.stateRead().counts.succeeded, push.FbmSync.stateRead().phase], ['activity_edit_open', '42', 0, 'push']);
-  const verifyRecord = { id: 'ACT-VERIFY', fbmId: '42', customerFbmCode: 'ALT00010', taskType: 'Goi', content: 'Noi dung', workDate: '2026-09-09', fbmHash: 'base', syncStatus: push.FbmSync.SYNC_STATUS.pushed };
+  const verifyRecord = { id: 'ACT-VERIFY', fbmId: '42', customerFbmCode: 'ALT00010', taskType: 'Goi', content: 'Noi dung', workDate: '2026-09-09', owner: 'Owner', fbmHash: 'base', syncStatus: push.FbmSync.SYNC_STATUS.pushed };
   push.FbmSync.pendingPushSet('activity', verifyRecord.id, { hSHIN: push.FbmSync.hash(verifyRecord, 'activity', {}), fbmId: '42' });
   push.FbmSync.readLocal = () => [verifyRecord];
   push.writeGateSave = () => ({ ok: true });
@@ -292,7 +296,8 @@ async function chay(so) {
   push.FbmSync.stateWrite(verifyState);
   const verifyRow = []; verifyRow[0] = 42; verifyRow[3] = 'Goi'; verifyRow[10] = new Date('2026-09-09T00:00:00Z'); verifyRow[15] = 'Noi dung #SC-ACT-VERIFY';
   push.FbmSync.continuePush(push.FbmSync.stateRead(), { d: { Controller: 'zccrAccountTask', Row: verifyRow } });
-  check(so, 'Activity chi tinh thanh cong sau khi doc xac nhan khop hash', [push.FbmSync.stateRead().counts.succeeded, push.FbmSync.pendingPushGet('activity', verifyRecord.id)], [1, null]);
+  const verifiedActivityLog = pushLogs.filter((event) => event.action === 'push_record' && event.recordId === 'ACT-VERIFY').slice(-1)[0];
+  check(so, 'Activity chi tinh thanh cong sau khi doc xac nhan khop hash', [push.FbmSync.stateRead().counts.succeeded, push.FbmSync.pendingPushGet('activity', verifyRecord.id), verifiedActivityLog && verifiedActivityLog.detail.owner, verifiedActivityLog && verifiedActivityLog.detail.direction], [1, null, 'Owner', 'ShinCRM → FBM']);
   const createLocal = { id: 'CUS-CREATE', fbmId: '', fbmCustomerCode: '', companyName: 'Khach tao lai', taxNumber: '0100123456', contactPerson: 'Nguoi lien he', phone: '0900000000', email: 'a@example.com', address: 'Ha Noi', province: 'HNI', website: '', leadSource: 'Source', product: '', allowFbmPush: push.FbmSync.PUSH_ALLOW_VALUE };
   const createCandidate = { entity: 'customer', kind: 'create', id: createLocal.id, autoCode: 'ALT00020', record: createLocal };
   push.FbmSync.readLocal = (entity) => entity === 'customer' ? [createLocal] : [];

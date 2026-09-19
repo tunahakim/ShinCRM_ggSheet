@@ -11,13 +11,15 @@ FbmSync.SEEN_SHARD_HEX_LENGTH = 8000;
 FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT = 9000;
 FbmSync.documentPropertySet = function (key, value, context) {
   var text = String(value === null || value === undefined ? '' : value), bytes = text.length;
+  var previous = null;
+  try { previous = key === FbmSync.STATE_KEY && typeof FbmSync.stateRead === 'function' ? FbmSync.stateRead() : null; } catch (ignorePrevious) {}
   try {
     if (typeof Utilities !== 'undefined' && Utilities.newBlob) { bytes = Utilities.newBlob(text).getBytes().length; }
   } catch (ignoreBytes) {}
   if (bytes > FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT) {
     var tooLarge = new Error('Không thể lưu state đồng bộ vì DocumentProperties đã chạm giới hạn dung lượng.');
     tooLarge.code = 'FBM_DOCUMENT_PROPERTIES_QUOTA';
-    if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'state_write', outcome: typeof LOG_ERROR === 'undefined' ? 'error' : LOG_ERROR, reason: tooLarge.code, detail: { key: String(key || ''), bytes: bytes, context: String(context || '') } }); }
+    if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'state_write', outcome: typeof LOG_ERROR === 'undefined' ? 'error' : LOG_ERROR, reason: tooLarge.code, detail: { key: String(key || ''), bytes: bytes, context: String(context || ''), runId: previous && String(previous.runId || ''), phase: previous && String(previous.phase || ''), cursor: previous && previous.cursor || {} } }); }
     return { ok: false, code: tooLarge.code, message: tooLarge.message, error: tooLarge };
   }
   try {
@@ -26,7 +28,7 @@ FbmSync.documentPropertySet = function (key, value, context) {
   } catch (err) {
     var failure = new Error('Không thể lưu state đồng bộ vào DocumentProperties.');
     failure.code = 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED';
-    if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'state_write', outcome: typeof LOG_ERROR === 'undefined' ? 'error' : LOG_ERROR, reason: failure.code, detail: { key: String(key || ''), context: String(context || '') } }); }
+    if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'state_write', outcome: typeof LOG_ERROR === 'undefined' ? 'error' : LOG_ERROR, reason: failure.code, detail: { key: String(key || ''), context: String(context || ''), runId: previous && String(previous.runId || ''), phase: previous && String(previous.phase || ''), cursor: previous && previous.cursor || {} } }); }
     return { ok: false, code: failure.code, message: failure.message, error: failure };
   }
 };

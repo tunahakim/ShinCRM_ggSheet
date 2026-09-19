@@ -70,7 +70,20 @@ FbmSync.controlDispatchLocked = function (command, payload) {
   // một handler; không bọc thêm ở đây vì Apps Script Lock không tái nhập.
   var name = String(command || ''), mutating = ['start', 'continue', 'approve_push', 'cancel', 'retry_push_failures', 'set_master_switch', 'set_background_switch', 'save_extension_config', 'save_background_schedule', 'save_login_config', 'set_auto_login', 'identity_status', 'save_identity_binding', 'save_connection', 'prepare_conflict', 'confirm_conflict'];
   if (mutating.indexOf(name) < 0) { return FbmSync.controlDispatch(name, payload); }
-  return FbmSync.withOrchestrationLock(function () { return FbmSync.controlDispatch(name, payload); });
+  try {
+    return FbmSync.withOrchestrationLock(function () { return FbmSync.controlDispatch(name, payload); });
+  } catch (error) {
+    var code = String(error && error.code || '');
+    if (code !== 'FBM_DOCUMENT_PROPERTIES_QUOTA' && code !== 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED') { throw error; }
+    var status = FbmSync.statusView();
+    status.ok = false;
+    status.phase = 'error';
+    status.lastFailureCode = code;
+    status.lastError = String(error && error.message || 'Không thể lưu trạng thái phiên vào DocumentProperties.');
+    status.message = status.lastError;
+    status.retryable = false;
+    return { ok: false, code: code, error: status.lastError, status: status };
+  }
 };
 
 /** DTO thông báo dùng chung; adapter Sidebar/Zalo tự chọn cách trình bày và phím tắt. */
