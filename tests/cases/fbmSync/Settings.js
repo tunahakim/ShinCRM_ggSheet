@@ -29,6 +29,36 @@ function chay(so) {
   check(so, 'nguong phe duyet khong phai so bi tu choi', [invalidText.ok, invalidText.code], [false, 'FBM_APPROVAL_THRESHOLD_INVALID']);
   const saved = hop.FbmSync.syncSettingsSave({ approvalThreshold: 0 });
   check(so, 'luu nguong phe duyet hop le va cho phep nguong 0', [saved.ok, Object.keys(saved.settings), saved.settings.approvalThreshold, hop.FbmSync.syncSettingsRead().approvalThreshold], [true, ['approvalThreshold'], 0, 0]);
+
+  const quotaData = {};
+  let quotaFull = false;
+  const quotaLogs = [];
+  const quotaProps = {
+    getProperty: (key) => quotaData[key] || null,
+    setProperty: (key, value) => {
+      if (quotaFull) { throw new Error('DocumentProperties quota exceeded'); }
+      quotaData[key] = String(value);
+    },
+    deleteProperty: (key) => { delete quotaData[key]; }
+  };
+  const quotaHop = taoHopCat({
+    FbmSync: {},
+    PropertiesService: { getDocumentProperties: () => quotaProps },
+    logEvent: (event) => quotaLogs.push(event),
+    LOG_ERROR: 'error',
+    configGet: () => ''
+  });
+  napServer(quotaHop, 'fbm_sync/state/State.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js');
+  quotaHop.FbmSync.stateWrite({ runId: 'before-quota', cursor: { pageIndex: 2, pageValue: ['2026-09-20', 'CUS-000002'] }, metadata: { conflicts: [{ entity: 'customer', id: 'CUS-000001', fields: { companyName: 'x'.repeat(200) } }] }, locks: { 'customer:CUS-000001': { owner: 'sync', revision: 'r1' } } });
+  const previousState = quotaData.FBM_SYNC_STATE_V1;
+  quotaFull = true;
+  let quotaError = null;
+  try {
+    quotaHop.FbmSync.stateWrite({ runId: 'too-large', cursor: { pageIndex: 3 }, metadata: { conflicts: Array.from({ length: 120 }, (_, index) => ({ entity: 'customer', id: 'CUS-' + String(index).padStart(6, '0'), fields: { companyName: 'x'.repeat(200) } })) }, locks: { 'customer:CUS-000001': { owner: 'sync', revision: 'r2' } } });
+  } catch (error) { quotaError = error; }
+  const syncQuota = quotaHop.FbmSync.syncSettingsSave({ approvalThreshold: 4 });
+  const accountQuota = quotaHop.FbmSync.accountSettingsSave({ customerPrefix: 'ALT', customerCodeLength: '8', activitySince: '2026-01-01' });
+  check(so, 'DocumentProperties đầy giữ nguyên state cursor/conflict/RecordLocks và không ghi dở JSON', [quotaError && quotaError.code, quotaData.FBM_SYNC_STATE_V1 === previousState, syncQuota.code, accountQuota.code, quotaLogs.some((event) => event.reason === 'FBM_DOCUMENT_PROPERTIES_QUOTA')], ['FBM_DOCUMENT_PROPERTIES_QUOTA', true, 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED', 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED', true]);
 }
 
 module.exports = { chay };

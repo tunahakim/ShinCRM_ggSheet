@@ -48,13 +48,23 @@ FbmSync.syncSettingsRead = function () {
       var parsed = JSON.parse(raw), valid = fbmSyncSettingsValidate(fbmSyncSettingsNormalize(parsed, true));
       if (valid.ok) {
         // Ghi lại dạng tối giản để loại bỏ các key cài đặt cũ khỏi kho hiện tại.
-        if (props && JSON.stringify(parsed) !== JSON.stringify(valid.settings)) { props.setProperty(FbmSync.SYNC_SETTINGS_KEY, JSON.stringify(valid.settings)); }
+        if (props && JSON.stringify(parsed) !== JSON.stringify(valid.settings)) {
+          var normalizedWrite;
+          if (typeof FbmSync.documentPropertySet === 'function') { normalizedWrite = FbmSync.documentPropertySet(FbmSync.SYNC_SETTINGS_KEY, JSON.stringify(valid.settings), 'sync_settings'); }
+          else { props.setProperty(FbmSync.SYNC_SETTINGS_KEY, JSON.stringify(valid.settings)); normalizedWrite = { ok: true }; }
+          if (!normalizedWrite.ok) { throw normalizedWrite.error; }
+        }
         return valid.settings;
       }
     } catch (ignoreJson) {}
   }
   var migrated = fbmSyncSettingsLegacy();
-  try { if (props) { props.setProperty(FbmSync.SYNC_SETTINGS_KEY, JSON.stringify(migrated)); } } catch (ignoreWrite) {}
+  if (props) {
+    var migratedWrite;
+    if (typeof FbmSync.documentPropertySet === 'function') { migratedWrite = FbmSync.documentPropertySet(FbmSync.SYNC_SETTINGS_KEY, JSON.stringify(migrated), 'sync_settings_migration'); }
+    else { props.setProperty(FbmSync.SYNC_SETTINGS_KEY, JSON.stringify(migrated)); migratedWrite = { ok: true }; }
+    if (!migratedWrite.ok) { return migrated; }
+  }
   return migrated;
 };
 
@@ -63,7 +73,10 @@ FbmSync.syncSettingsSave = function (input) {
   if (!check.ok) { return check; }
   var props = fbmSyncSettingsProps(), previous = FbmSync.syncSettingsRead();
   if (!props) { return { ok: false, code: 'FBM_SYNC_SETTINGS_STORAGE_UNAVAILABLE', message: 'Không truy cập được DocumentProperties.' }; }
-  props.setProperty(FbmSync.SYNC_SETTINGS_KEY, JSON.stringify(check.settings));
+  var saved;
+  if (typeof FbmSync.documentPropertySet === 'function') { saved = FbmSync.documentPropertySet(FbmSync.SYNC_SETTINGS_KEY, JSON.stringify(check.settings), 'sync_settings'); }
+  else { props.setProperty(FbmSync.SYNC_SETTINGS_KEY, JSON.stringify(check.settings)); saved = { ok: true }; }
+  if (!saved.ok) { return { ok: false, code: saved.code, message: saved.message }; }
   return { ok: true, settings: check.settings, previous: previous };
 };
 

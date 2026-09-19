@@ -6,6 +6,30 @@ FbmSync.LOCK_KEY = 'FBM_SYNC_RECORD_LOCKS_V1';
 FbmSync.STALE_RUN_MS = 2 * 60 * 1000;
 FbmSync.ACTIVE_PHASES = ['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'];
 FbmSync.SEEN_SHARD_HEX_LENGTH = 8000;
+// Apps Script giới hạn một giá trị DocumentProperties khoảng 9 KB. Chặn trước
+// khi gọi setProperty để không đẩy một JSON dở dang vào kho state.
+FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT = 9000;
+FbmSync.documentPropertySet = function (key, value, context) {
+  var text = String(value === null || value === undefined ? '' : value), bytes = text.length;
+  try {
+    if (typeof Utilities !== 'undefined' && Utilities.newBlob) { bytes = Utilities.newBlob(text).getBytes().length; }
+  } catch (ignoreBytes) {}
+  if (bytes > FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT) {
+    var tooLarge = new Error('Không thể lưu state đồng bộ vì DocumentProperties đã chạm giới hạn dung lượng.');
+    tooLarge.code = 'FBM_DOCUMENT_PROPERTIES_QUOTA';
+    if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'state_write', outcome: typeof LOG_ERROR === 'undefined' ? 'error' : LOG_ERROR, reason: tooLarge.code, detail: { key: String(key || ''), bytes: bytes, context: String(context || '') } }); }
+    return { ok: false, code: tooLarge.code, message: tooLarge.message, error: tooLarge };
+  }
+  try {
+    FbmSync.props().setProperty(key, text);
+    return { ok: true };
+  } catch (err) {
+    var failure = new Error('Không thể lưu state đồng bộ vào DocumentProperties.');
+    failure.code = 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED';
+    if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'state_write', outcome: typeof LOG_ERROR === 'undefined' ? 'error' : LOG_ERROR, reason: failure.code, detail: { key: String(key || ''), context: String(context || '') } }); }
+    return { ok: false, code: failure.code, message: failure.message, error: failure };
+  }
+};
 
 /** Khóa riêng cho state/cursor đồng bộ; không dùng DocumentLock vì WriteGate tự giữ khóa đó khi ghi Sheet. */
 FbmSync.orchestrationLock = function () {
@@ -115,7 +139,8 @@ FbmSync.pendingPushGet = function (entity, id) {
 FbmSync.pendingPushSet = function (entity, id, value) {
   var key = String(entity || '') + ':' + String(id || ''), all = FbmSync.pendingPushesRead();
   if (value && typeof value === 'object') { all[key] = value; } else { delete all[key]; }
-  FbmSync.props().setProperty('FBM_SYNC_PENDING_PUSHES_V1', JSON.stringify(all));
+  var pendingWrite = FbmSync.documentPropertySet('FBM_SYNC_PENDING_PUSHES_V1', JSON.stringify(all), 'pending_push');
+  if (!pendingWrite.ok) { throw pendingWrite.error; }
   return value || null;
 };
 FbmSync.pendingPushClear = function (entity, id) { return FbmSync.pendingPushSet(entity, id, null); };
@@ -146,7 +171,8 @@ FbmSync.stateWrite = function (state) {
   next.metadata.preview = Object.assign(FbmSync.stateDefault().metadata.preview, next.metadata.preview || {});
   next.counts = Object.assign(FbmSync.stateDefault().counts, next.counts || {});
   next.updatedAt = Date.now();
-  FbmSync.props().setProperty(FbmSync.STATE_KEY, JSON.stringify(next));
+  var stateWrite = FbmSync.documentPropertySet(FbmSync.STATE_KEY, JSON.stringify(next), 'state');
+  if (!stateWrite.ok) { throw stateWrite.error; }
   return next;
 };
 /** Ghi một phần state mà không làm mất field đang có. */

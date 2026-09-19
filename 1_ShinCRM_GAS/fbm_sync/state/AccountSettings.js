@@ -77,13 +77,23 @@ FbmSync.accountSettingsRead = function () {
     try {
       var parsed = JSON.parse(raw), valid = fbmAccountSettingsValidate(parsed);
       if (valid.ok) {
-        if (props && JSON.stringify(parsed) !== JSON.stringify(valid.settings)) { props.setProperty(FbmSync.ACCOUNT_SETTINGS_KEY, JSON.stringify(valid.settings)); }
+        if (props && JSON.stringify(parsed) !== JSON.stringify(valid.settings)) {
+          var normalizedWrite;
+          if (typeof FbmSync.documentPropertySet === 'function') { normalizedWrite = FbmSync.documentPropertySet(FbmSync.ACCOUNT_SETTINGS_KEY, JSON.stringify(valid.settings), 'account_settings'); }
+          else { props.setProperty(FbmSync.ACCOUNT_SETTINGS_KEY, JSON.stringify(valid.settings)); normalizedWrite = { ok: true }; }
+          if (!normalizedWrite.ok) { throw normalizedWrite.error; }
+        }
         return valid.settings;
       }
     } catch (ignoreJson) {}
   }
   var migrated = fbmAccountSettingsLegacy();
-  try { if (props) { props.setProperty(FbmSync.ACCOUNT_SETTINGS_KEY, JSON.stringify(migrated)); } } catch (ignoreWrite) {}
+  if (props) {
+    var migratedWrite;
+    if (typeof FbmSync.documentPropertySet === 'function') { migratedWrite = FbmSync.documentPropertySet(FbmSync.ACCOUNT_SETTINGS_KEY, JSON.stringify(migrated), 'account_settings_migration'); }
+    else { props.setProperty(FbmSync.ACCOUNT_SETTINGS_KEY, JSON.stringify(migrated)); migratedWrite = { ok: true }; }
+    if (!migratedWrite.ok) { return migrated; }
+  }
   return migrated;
 };
 
@@ -92,7 +102,10 @@ FbmSync.accountSettingsSave = function (input) {
   if (!check.ok) { return check; }
   var props = fbmAccountSettingsProps(), previous = FbmSync.accountSettingsRead();
   if (!props) { return { ok: false, code: 'FBM_ACCOUNT_SETTINGS_STORAGE_UNAVAILABLE', message: 'Không truy cập được DocumentProperties.' }; }
-  props.setProperty(FbmSync.ACCOUNT_SETTINGS_KEY, JSON.stringify(check.settings));
+  var saved;
+  if (typeof FbmSync.documentPropertySet === 'function') { saved = FbmSync.documentPropertySet(FbmSync.ACCOUNT_SETTINGS_KEY, JSON.stringify(check.settings), 'account_settings'); }
+  else { props.setProperty(FbmSync.ACCOUNT_SETTINGS_KEY, JSON.stringify(check.settings)); saved = { ok: true }; }
+  if (!saved.ok) { return { ok: false, code: saved.code, message: saved.message }; }
   return { ok: true, settings: check.settings, previous: previous };
 };
 

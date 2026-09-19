@@ -176,8 +176,8 @@ async function chay(so) {
   check(so, 'status noi ro chieu ShinCRM sang FBM', pushView.direction, 'ShinCRM → FBM');
   check(so, 'status noi ro dang dong bo giao dich', pushView.entityLabel, 'Giao dịch');
   const compactState = orchestration.FbmSync.stateRead();
-  compactState.cursor = { kind: 'push_wait', operation: 'activity_edit_save', entity: 'activity', index: 0, candidate: { record: { payload: new Array(200).join('khong_duoc_gui_') } }, oldValues: { details: new Array(200).join('old_value_') } };
-  compactState.metadata.categoryGate = { map: { huge: new Array(500).join('category_') }, valid: { huge: true } };
+  compactState.cursor = { kind: 'push_wait', operation: 'activity_edit_save', entity: 'activity', index: 0, candidate: { record: { payload: 'khong-duoc-gui' } }, oldValues: { details: 'old-value' } };
+  compactState.metadata.categoryGate = { map: { category: 'FBM' }, valid: { category: true } };
   compactState.metadata.identityProbe = { spreadsheetId: 'sheet-probe', userId: '2037', accountName: 'ANHLT' };
   orchestration.FbmSync.stateWrite(compactState);
   const compactView = orchestration.FbmSync.statusView();

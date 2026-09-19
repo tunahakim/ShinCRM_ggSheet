@@ -266,6 +266,23 @@ async function chay(so) {
   };
   vm.createContext(workerContext);
   vm.runInContext(workerSource, workerContext, { filename: WORKER_FILE });
+  let virtualNow = 1000;
+  const waitTimers = [];
+  let executeSentAt = 0;
+  workerContext.clearTimeout = () => {};
+  workerContext.setTimeout = (fn, ms) => { const timer = { fn, ms: Number(ms) }; waitTimers.push(timer); return timer; };
+  workerContext.chrome.tabs.sendMessage = (tabId, message, done) => {
+    if (message.type === 'FBM_PING_V2') { done({ ready: true, version: '21.14' }); return; }
+    if (message.type === 'FBM_EXECUTE_V2') { executeSentAt = virtualNow; done({ result: { ok: true, status: 200, body: '{}', transport: { trace: [] } } }); }
+  };
+  const delayedSend = workerContext.sendToFbmTab(77, { id: 'delay-proof', url: 'https://fbo.com.vn:8888/service', method: 'POST', bodyText: '{}', meta: { waitMs: 1200 } });
+  await new Promise((resolve) => setImmediate(resolve));
+  check(so, 'Extension chờ đủ waitMs trước khi gửi request FBM', [executeSentAt, waitTimers.some((timer) => timer.ms === 1200)], [0, true]);
+  const delayTimer = waitTimers.find((timer) => timer.ms === 1200);
+  virtualNow += delayTimer.ms;
+  delayTimer.fn();
+  await delayedSend;
+  check(so, 'Extension chỉ gửi sau khi đồng hồ vượt đủ khoảng delay', executeSentAt, 2200);
   const localRelay = await workerContext.configureRelay({ url: 'https://script.google.com/macros/s/relay-test/exec', key: 'relay-key', spreadsheetId: 'sheet-test' });
   const unchangedRelay = await workerContext.configureRelay({ url: 'https://script.google.com/macros/s/relay-test/exec', key: 'relay-key', spreadsheetId: 'sheet-test' });
   const changedRelay = await workerContext.configureRelay({ url: 'https://script.google.com/macros/s/relay-test/exec', key: 'relay-key', spreadsheetId: 'sheet-test', extension: { pollMinutes: 6, runOnStartup: true } });

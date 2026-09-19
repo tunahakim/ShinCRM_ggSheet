@@ -201,6 +201,19 @@ FbmSync.sessionGateResponseStarted = function (state) {
   if (gate && gate.noTabRetryRequestId) { gate.noTabRetryRequestId = ''; }
   return state;
 };
+FbmSync.pauseForRuntimeLimit = function (state) {
+  var current = state || (FbmSync.stateRead ? FbmSync.stateRead() : {});
+  current.activeRequestId = '';
+  current.deadlineAt = 0;
+  current.phase = 'paused';
+  current.lastFailureCode = 'GAS_RUNTIME_LIMIT';
+  current.lastError = 'Lát GAS đã chạm trần thời gian; đã dừng trước request kế tiếp và giữ cursor an toàn.';
+  current.message = current.lastError;
+  current.retryable = true;
+  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'slice_limit', outcome: typeof LOG_ERROR === 'undefined' ? 'error' : LOG_ERROR, reason: current.lastFailureCode, detail: { runId: String(current.runId || ''), phase: String(current.phase || ''), cursor: current.cursor || {} } }); }
+  if (FbmSync.stateWrite) { FbmSync.stateWrite(current); }
+  return null;
+};
 /** Bọc request nội bộ thành envelope gửi qua Extension. */
 FbmSync.nextEnvelope = function (request) {
   if (!request) { return null; }
@@ -215,6 +228,8 @@ FbmSync.nextEnvelope = function (request) {
     return null;
   }
   var pendingState = FbmSync.stateRead ? FbmSync.stateRead() : {};
+  var sliceDeadline = Number(pendingState.deadlineAt || FbmSync._sliceDeadlineAt || 0);
+  if (sliceDeadline > 0 && Date.now() >= sliceDeadline) { return FbmSync.pauseForRuntimeLimit(pendingState); }
   if (pendingState.metadata && pendingState.metadata.cancelPending === true) {
     pendingState.phase = 'paused';
     pendingState.activeRequestId = '';
@@ -288,6 +303,7 @@ FbmSync.nextEnvelope = function (request) {
     state.lastProgressAt = Date.now();
     state.deadlineAt = Date.now() + 120000;
     FbmSync.stateWrite(state);
+    FbmSync._sliceDeadlineAt = 0;
   }
   if (FbmSync.traceEvent) { FbmSync.traceEvent('response_built', { requestId: id, operation: meta.kind, entity: meta.entity, recordId: meta.id || meta.shinId || meta.stt_rec_kh }); }
   return FbmSync.protocol.request(id, request.url, FbmSync.transportValue(request.body), FbmSync.transportValue(meta));
