@@ -46,8 +46,8 @@ function unsavedChangesDialogBlocks() {
       Text({ id: 'shin-unsaved-title', className: 'shin-unsaved-title', text: 'Có thay đổi chưa lưu' }),
       Text({ id: 'shin-unsaved-message', className: 'shin-unsaved-message', text: 'Phát hiện thay đổi chưa lưu. Bạn muốn làm gì trước khi tiếp tục?' }),
       Stack({ className: 'shin-unsaved-actions', elements: [
-        Button({ className: 'shin-unsaved-save', data: { 'unsaved-choice': 'save' }, label: 'Lưu thay đổi và tiếp tục' }),
-        Button({ className: 'shin-unsaved-discard', data: { 'unsaved-choice': 'discard' }, label: 'Bỏ thay đổi và tiếp tục' }),
+        Button({ className: 'shin-unsaved-save', data: { 'unsaved-choice': 'save' }, label: 'Lưu thay đổi' }),
+        Button({ className: 'shin-unsaved-discard', data: { 'unsaved-choice': 'discard' }, label: 'Hủy bỏ thay đổi' }),
         Button({ className: 'shin-unsaved-continue', data: { 'unsaved-choice': 'continue' }, label: 'Tiếp tục sửa' })
       ] })
     ] })

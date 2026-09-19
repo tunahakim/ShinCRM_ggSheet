@@ -8,7 +8,7 @@
 - `[ ]` là việc còn thiếu; mục không có nhãn **Cần kiểm chứng thực tế** là việc AI tự tiếp tục được.
 - Một slice chỉ đóng sau khi đủ code, test, log/báo cáo và checklist case của slice đó.
 - Sau khi đóng slice, ghi commit và revision GAS vào bảng bằng chứng cuối file.
-- Bộ kiểm offline chốt đạt `1638/1638`. Các mục live vẫn được đánh dấu riêng và không được suy ra từ test offline.
+- Bộ kiểm offline chốt đạt `1777/1777`. Các mục live vẫn được đánh dấu riêng và không được suy ra từ test offline.
 
 ## Nguồn hợp đồng
 
@@ -473,7 +473,7 @@ Chi tiết đầy đủ nằm ở `0_Documentation/Phiên code/Checklist cảnh 
 - [x] Tích hợp dirty guard vào tám khối cấu hình FBM và action chuyển màn/menu/back.
 - [x] Tô màu changed sau cảnh báo, giữ màu khi tiếp tục sửa và xóa đúng lúc.
 - [x] Bổ sung kiểm thử offline cho compare, modal, save/discard lỗi, form lõi, FBM và password; khóa hồi quy mọi action ngoài FBM đang edit (kể cả card sạch) phải mở modal, mọi dispatch qua ActionCoordinator, adapter tương lai thiếu `canRun` fail-closed, discard phải chạy pending action, khôi phục DOM form lõi, component modal không được hardcode HTML và backdrop không bị CSS `.shin-box:empty` ẩn.
-- [x] Chạy `node tests/run.js`: 1.719 phép đạt, 0 phép lỗi; đã cập nhật checklist riêng và cây thư mục code; test hợp đồng tĩnh đã khóa wiring; commit `bebeae3`, `b5d0a3a`, `4145a90`, `c7592fa`, `f6fb40b`, `754532f`, `7754a2d`, `631328b`, `fcf6759`, `0f4f4e5`; GAS DEV đã push/redeploy thành công ở revision `@457`.
+- [x] Chạy `node tests/run.js`: 1.777 phép đạt, 0 phép lỗi; bổ sung ma trận bảy edit surface, toàn bộ action ngoài card, nhánh Save/Discard/Continue, validation connection và rollback credential; test hợp đồng tĩnh vẫn khóa wiring; GAS DEV đã push/probe `fbmGetSyncSettings` thành công ở revision `@460`.
 - [ ] Probe `fbmGetSyncSettings` qua cửa web DEV đang bị Google trả HTTP 403 “Bạn cần có quyền truy cập”; chưa đánh dấu đạt vì đây là vấn đề quyền deployment, không phải kết quả chạy code.
 - [ ] Nghiệm thu trên Sheet DEV: chuyển khối/màn, menu, quay lại, lưu, bỏ thay đổi, tiếp tục sửa và đóng Sidebar.
 

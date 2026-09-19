@@ -310,7 +310,7 @@ function fbmSyncConfigUnsavedProvider() {
   FBM_SYNC_CONFIG_UNSAVED_PROVIDER = {
     read: fbmSyncConfigUnsavedRead,
     save: function () {
-      var state = fbmSyncConfigUnsavedRead(), key = state.keys[0];
+      var state = fbmSyncConfigUnsavedRead(), key = state.keys[0] || state.editingKey;
       if (!key) { return { ok: true }; }
       return Promise.resolve(fbmSyncConfigSave(key, null)).then(function (result) {
         if (!result || result.ok === false) { return { ok: false, message: result && (result.message || result.error || result.code) || 'Không lưu được cấu hình FBM.' }; }

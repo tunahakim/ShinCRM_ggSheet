@@ -23,7 +23,54 @@ function idle() {
   return { phase: 'idle', label: 'Sẵn sàng', mode: 'read', counts: {}, masterEnabled: true, backgroundEnabled: true };
 }
 
+async function testConnectionSaveValidation(so) {
+  const { hop, dom } = taoBoTest();
+  const calls = [], notices = [], errors = [];
+  hop.FBM_SYNC_CLIENT.identityDraft = { spreadsheetId: 'sheet-a', userId: 'user-a', username: 'USERA', accountName: 'Tai khoan A' };
+  hop.FBM_SYNC_CLIENT.identityStatus = { status: 'BOUND', binding: Object.assign({}, hop.FBM_SYNC_CLIENT.identityDraft) };
+  hop.FBM_SYNC_CLIENT.loginStatus = { enabled: true };
+  hop.fbmSyncSetAccountNotice = (area, level, message) => { notices.push({ area, level, message }); };
+  hop.fbmSyncPaintError = (error, message) => { errors.push(String(message || error || '')); };
+  hop.fbmSyncPaint = () => {};
+  hop.fbmSyncStatusOnce = () => Promise.resolve({ phase: 'idle' });
+  hop.fbmSyncConfigFinishEdit = () => {};
+  hop.callServer = (name, args) => { calls.push({ name, args }); return Promise.resolve({ ok: true, binding: hop.FBM_SYNC_CLIENT.identityDraft, identityStatus: hop.FBM_SYNC_CLIENT.identityStatus, login: hop.FBM_SYNC_CLIENT.loginStatus }); };
+  const add = (id, value) => { const input = dom.document.createElement('input'); input.id = id; input.value = value; dom.root.appendChild(input); return input; };
+  const spreadsheet = add('fbm-identity-spreadsheet', 'sheet-a');
+  add('fbm-identity-user', 'user-a'); add('fbm-identity-username', 'USERA'); add('fbm-identity-account', 'Tai khoan A');
+  const username = add('fbm-login-username', '');
+  const password = add('fbm-login-password', '');
+  const button = dom.document.createElement('button');
+
+  spreadsheet.value = 'sheet-a'; dom.document.getElementById('fbm-identity-user').value = '';
+  await hop.fbmSyncSaveConnection(button);
+  check(so, 'client chặn identity thiếu trường trước khi gọi GAS', [calls.length, button.disabled, notices[0] && notices[0].area], [0, false, 'identity']);
+
+  dom.document.getElementById('fbm-identity-user').value = 'user-a'; username.value = 'USERA'; password.value = '';
+  await hop.fbmSyncSaveConnection(button);
+  check(so, 'client chặn username không đi cùng password', [calls.length, button.disabled, notices[1] && notices[1].area], [0, false, 'login']);
+
+  password.value = 'secret'; username.value = 'USERB';
+  await hop.fbmSyncSaveConnection(button);
+  check(so, 'client chặn credential lệch username liên kết', [calls.length, button.disabled, notices[2] && notices[2].area], [0, false, 'login']);
+
+  username.value = 'USERA'; password.value = 'secret';
+  hop.fbmSyncEncryptCredentials = () => Promise.reject(new Error('ENCRYPT_FAIL'));
+  await hop.fbmSyncSaveConnection(button);
+  check(so, 'client giữ bản nháp khi Extension mã hóa credential lỗi', [calls.length, button.disabled, password.value, notices.some((item) => String(item.message).indexOf('ENCRYPT_FAIL') >= 0)], [0, false, 'secret', true]);
+
+  password.value = ''; username.value = '';
+  await hop.fbmSyncSaveConnection(button);
+  check(so, 'client lưu identity không credential bằng chế độ preserve', [calls.length, calls[0] && calls[0].name, calls[0] && calls[0].args[0].credential.mode, button.disabled], [1, 'fbmSaveConnection', 'preserve', false]);
+
+  username.value = 'USERA'; password.value = 'secret';
+  hop.fbmSyncEncryptCredentials = () => Promise.resolve({ credentialRef: 'cred-client-123', envelope: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'USERA' } });
+  await hop.fbmSyncSaveConnection(button);
+  check(so, 'client gửi credential đã mã hóa đúng payload và xóa password sau save', [calls.length, calls[1] && calls[1].args[0].credential.mode, calls[1] && calls[1].args[0].credential.credentialRef, password.value], [2, 'save', 'cred-client-123', '']);
+}
+
 async function chay(so) {
+  await testConnectionSaveValidation(so);
   section('FBM sync — hành trình người dùng Sidebar');
   const { hop, dom, content } = taoBoTest();
   const calls = [];

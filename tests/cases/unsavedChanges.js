@@ -57,6 +57,12 @@ async function testModalVaActionCho(so) {
     !!bo.dialog.querySelector('[data-unsaved-choice="discard"]'),
     !!bo.dialog.querySelector('[data-unsaved-choice="continue"]')
   ], [true, true, true, true, true]);
+  check(so, 'modal dùng đúng ba nhãn hành động và lớp phủ component', [
+    bo.dialog.querySelector('[data-unsaved-choice="save"]').textContent,
+    bo.dialog.querySelector('[data-unsaved-choice="discard"]').textContent,
+    bo.dialog.querySelector('.shin-unsaved-continue').textContent,
+    !!bo.dialog.querySelector('.shin-unsaved-backdrop')
+  ], ['Lưu thay đổi', 'Hủy bỏ thay đổi', 'Tiếp tục sửa', true]);
   const provider = {
     read: () => ({ dirty, fieldIds: dirty ? ['field-a', 'field-b'] : [] }),
     save: () => { saveCalls += 1; dirty = false; return Promise.resolve({ ok: true }); },
@@ -334,6 +340,35 @@ async function testAllFbmSurfaceActionMatrix(so) {
   check(so, 'ma trận action ngoài áp dụng đồng nhất cho đủ bảy surface', [outsideAllowed.length, outsideAllowed.every((item) => item.clean && item.targets.every((allowed) => allowed === false))], [7, true]);
 
   const dirtyKeys = keys.filter((key) => Object.keys(hop.FBM_SYNC_CONFIG_UNSAVED_FIELDS[key] || {}).length);
+  const saveCalls = [];
+  const saveFunctions = {
+    connection: 'fbmSyncSaveConnection', accountSettings: 'fbmSyncSaveAccountSettings', module: 'fbmSyncSaveSyncSettings',
+    relay: 'fbmSyncRotateRelay', extension: 'fbmSyncSaveExtensionSettings', background: 'fbmSyncSaveBackgroundSettings', loginPolicy: 'fbmSyncSaveLoginPolicy'
+  };
+  keys.forEach((key) => {
+    hop[saveFunctions[key]] = () => { saveCalls.push(key); hop.fbmSyncConfigFinishEdit(key); return Promise.resolve({ ok: true }); };
+  });
+  for (const key of keys) {
+    hop.fbmSyncConfigStartEdit(key);
+    const map = hop.FBM_SYNC_CONFIG_UNSAVED_FIELDS[key] || {}, path = Object.keys(map)[0];
+    if (path) {
+      const field = bo.dom.document.createElement('input'); field.id = map[path]; field.value = 'save-value'; bo.dom.root.appendChild(field);
+      const state = hop.fbmSyncConfigState(key); state.snapshot = {}; state.draft = {};
+      const parts = path.split('.'); let snapshot = state.snapshot, draft = state.draft;
+      parts.forEach((part, index) => {
+        if (index === parts.length - 1) { snapshot[part] = 'save-original'; draft[part] = 'save-value'; return; }
+        snapshot[part] = {}; draft[part] = {}; snapshot = snapshot[part]; draft = draft[part];
+      });
+    }
+    let pendingCalls = 0;
+    const blocked = hop.unsavedChangesGuardTransition({ source: 'fbm', target: outside }, () => { pendingCalls += 1; });
+    hop.unsavedChangesResolve('save');
+    await new Promise((resolve) => setImmediate(resolve));
+    check(so, 'surface ' + key + ' save thành công kết thúc edit và chạy action chờ', [blocked, pendingCalls, hop.fbmSyncConfigIsEditing(key), hop.UNSAVED_CHANGES.provider], [true, 1, false, null]);
+    bo.dom.document.querySelectorAll('[data-unsaved-changed]').forEach((control) => control.remove());
+  }
+  check(so, 'coordinator gọi đúng cổng save cho toàn bộ surface', [saveCalls.length, keys.every((key) => saveCalls.indexOf(key) >= 0)], [7, true]);
+
   const dirtyResults = [];
   for (const key of dirtyKeys) {
     hop.fbmSyncConfigStartEdit(key);

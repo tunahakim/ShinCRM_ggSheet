@@ -76,10 +76,12 @@ Checklist này theo dõi một cơ chế chung cho mọi khối Sidebar có trư
 - [x] Test form lõi: cancel/open form lồng/đổi khách/reload bị chặn khi đang sửa, kể cả chưa dirty.
 - [x] Test FBM: chuyển màn, menu, back, sửa khối khác và action nội bộ cùng khối.
 - [x] Test FBM: card sạch và card dirty đều khóa action ngoài rồi mở modal dùng chung, không mở đồng thời hai card; adapter thiếu `canRun` fail-closed.
+- [x] Test FBM mở rộng: ma trận bảy surface (`connection`, `accountSettings`, `module`, `relay`, `extension`, `background`, `loginPolicy`) phủ action ngoài card gồm menu, back, chuyển màn hình, tab kết quả và phân trang; mọi surface sạch vẫn bị chặn, Continue giữ edit, Discard xóa edit và Save gọi đúng cổng.
+- [x] Test connection mở rộng: identity thiếu trường, SpreadsheetId lệch, credential không có identity, mode không hợp lệ, username credential lệch, lỗi mã hóa và lỗi ghi đều bị chặn/rollback; lưu identity không credential và lưu credential mã hóa được kiểm tra không làm lộ mật khẩu.
 - [x] Test password: dirty đúng nhưng không xuất hiện trong snapshot, log hoặc lỗi.
 - [ ] Test callback snapshot không dựng lại control đang nhập và không mất highlight. (Còn cần nghiệm thu callback thật trên Sheet DEV.)
 - [x] Test hợp đồng tĩnh: Sidebar host/include/boot, host không còn nút/nội dung modal hardcode, component renderer/Stack, ActionCoordinator, adapter form/FBM, mapping tám key, password, CSS changed và lớp phủ modal không bị tháo trong phiên sau.
-- [x] Chạy `node tests/run.js`: 1.719 phép đạt, 0 phép lỗi.
+- [x] Chạy `node tests/run.js`: 1.777 phép đạt, 0 phép lỗi.
 
 ## 8. Nghiệm thu Sheet DEV và bàn giao
 
@@ -92,4 +94,4 @@ Checklist này theo dõi một cơ chế chung cho mọi khối Sidebar có trư
 - [ ] Kiểm tra cảnh báo mặc định khi đóng tab/trình duyệt theo giới hạn nền tảng.
 - [ ] Chạy các entrypoint GAS DEV liên quan nếu có thay đổi hợp đồng server; không ghi thật FBM.
 - [ ] Ghi rõ các bước chủ dự án cần giữ tab FBM/đăng nhập hoặc bấm ghi thật; dừng trước mốc đó.
-- [x] Cập nhật cây thư mục code, checklist đồng bộ FBM và commit theo nhóm lõi/UI/test/tài liệu: `bebeae3`, `b5d0a3a`, `4145a90`, `c7592fa`, `754532f`, `7754a2d`, `631328b`, `fcf6759`; GAS DEV đã kiểm tra ở revision `@455`.
+- [x] Cập nhật checklist đồng bộ FBM và commit theo nhóm lõi/UI/test/tài liệu; test offline đạt `1777/1777`; GAS DEV đã push/probe `fbmGetSyncSettings` thành công ở revision `@460`.
