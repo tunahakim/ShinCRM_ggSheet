@@ -26,6 +26,8 @@ function fbmSyncStateProbe() {
   var trace = [], traceRaw = values.FBM_SYNC_TRACE_V1 || '';
   try { trace = JSON.parse(traceRaw); } catch (ignoreTrace) { trace = []; }
   if (!Array.isArray(trace)) { trace = []; }
+  var responseTrace = trace.filter(function (item) { return item && ['fetch_finished', 'fbm_response_received', 'client_extension_success'].indexOf(String(item.stage || '')) >= 0; });
+  if (!responseTrace.length) { responseTrace = trace.slice(-12); }
   return {
     ok: true,
     limitBytes: 9000,
@@ -51,7 +53,7 @@ function fbmSyncStateProbe() {
       countsBytes: fbmSyncProbeJsonBytes(state && state.counts),
       branchBytes: branchBytes
     },
-    extensionResponses: trace.slice(-12).map(function (item) {
+    extensionResponses: responseTrace.slice(-12).map(function (item) {
       return { at: Number(item && item.at || 0) || 0, stage: String(item && item.stage || ''), operation: String(item && item.operation || ''), httpStatus: Number(item && item.httpStatus || 0) || 0, responseLength: Number(item && item.responseLength || 0) || 0 };
     })
   };
