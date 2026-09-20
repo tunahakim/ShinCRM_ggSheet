@@ -154,6 +154,48 @@
 - Cần có thao tác rõ ràng `Xóa thông tin đăng nhập tự động`, tách khỏi thay đổi identity; phải xác nhận, xóa credential ở GAS và vault Extension, tắt auto-login, giữ nguyên liên kết tài khoản.
 - Sau khi xóa thành công, khối quay về trạng thái `Chưa lưu`; mọi lỗi xóa một phần phải báo rõ và ghi Log, không hiện thành công giả.
 
+## 3.9. Thảo luận bổ sung — CHƯA ĐƯỢC DUYỆT
+
+### Password: phân biệt mask, giá trị nhập và mã hóa
+
+- Khi xem đã lưu: hiển thị `********`; đây là dấu hiệu có credential, không phải password thật.
+- Khi click vào ô password đã lưu: xóa dấu `********`, để input rỗng, placeholder `Nhập mật khẩu mới`.
+- Khi rời ô mà input vẫn rỗng: khôi phục `********`, đánh dấu `preserve`; không đổi password.
+- Khi người dùng gõ rồi xóa hết và rời ô: cũng khôi phục `********`, đánh dấu `preserve`.
+- Khi input có giá trị: đây là password mới cần lưu. Mã hóa chỉ diễn ra tại Extension trước khi gửi credential đi lưu.
+- Về an toàn, đề xuất giữ `type=password` và che các ký tự đang gõ; nếu chủ dự án bắt buộc nhìn plaintext từng ký tự thì phải chấp nhận rủi ro lộ mật khẩu qua người đứng cạnh, ảnh chụp và quay màn hình. Đây là điểm cần duyệt riêng.
+
+### Realtime username và password
+
+- Theo dõi username với debounce khoảng 100 ms; chỉ cập nhật trạng thái password, không dựng lại cả card làm mất focus.
+- Có credential đã lưu, username hiện tại đúng `ANHLT`: password ở trạng thái `********`/preserve; nếu người dùng nhập giá trị mới vào password thì đó là update password.
+- Username khác `ANHLT`, kể cả rỗng: xóa marker `********`, password về rỗng với placeholder `Nhập mật khẩu mới`; đây là thay tài khoản hoặc ý định xóa.
+- Username gõ lệch rồi quay lại đúng `ANHLT`: nếu password draft đang rỗng thì khôi phục marker; nếu đã có password draft thì giữ draft và coi là update password.
+- Username rỗng + password khác rỗng: chặn lưu. Username khác rỗng + password rỗng sau khi username đã đổi: chặn lưu. Thiếu một trong hai thì không tạo credential mới.
+
+### Validation chỉ khi bấm lưu
+
+- Không hiện cảnh báo thiếu cặp username/password trong lúc đang gõ.
+- Bấm lưu mới hiện popup/notice lỗi; khi người dùng click lại để sửa, notice lỗi cũ biến mất.
+- Cả hai rỗng khi đang có credential và username đã bị xóa: coi là yêu cầu xóa, không coi là preserve.
+- Cả hai rỗng khi chưa từng có credential: giữ trạng thái `Chưa lưu`, không tạo credential; có thể cho lưu như thao tác không đổi.
+
+### Phương án xóa credential
+
+- Phương án khuyến nghị: kết hợp nút `Xóa thông tin đăng nhập` và quy tắc xóa khi người dùng chủ động làm cả hai ô rỗng rồi bấm `Lưu thông tin`.
+- Hai đường đi phải vào cùng một confirmation và cùng một nghiệp vụ xóa; không có đường xóa âm thầm.
+- Nút popup dùng đúng `[Quay lại]` và `[Xác nhận xóa]`.
+- Xác nhận xóa: xóa cấu hình credential GAS, xóa credential tương ứng trong vault Extension, tắt auto-login, giữ nguyên liên kết tài khoản.
+- Cần thiết kế xử lý bù nếu GAS và Extension không thể giao dịch nguyên tử xuyên hệ thống; không được báo thành công khi mới xóa một phía.
+
+### Chính sách tự đăng nhập khi chưa có credential
+
+- Khối chính sách phải luôn có dòng trạng thái riêng phía trên thông báo/chỗ sửa.
+- Nếu policy bật: đề xuất hiển thị dòng xanh `Đã bật tính năng đăng nhập tự động`; nếu policy tắt: dòng đỏ `Đã tắt tính năng đăng nhập tự động`.
+- Khi policy bật nhưng chưa có credential, cần thêm notice readiness rõ ràng `Chưa sẵn sàng: hãy nhập username và mật khẩu ở màn Đăng nhập tự động`; nếu muốn tránh mâu thuẫn màu xanh/chưa sẵn sàng, có thể dùng trạng thái thứ ba màu cảnh báo. Đây là điểm cần chủ dự án duyệt.
+- Chưa có credential thì không cho sửa policy. Icon sửa vẫn có thể bấm để hiện popup, không nên chỉ disabled khiến người dùng không biết lý do.
+- Popup có link/nút `Đi tới Đăng nhập tự động` và nút `Quay lại`; link đưa người dùng tới đúng khối khai báo credential.
+
 ## 4. Việc cần làm theo thứ tự
 
 - [x] Đọc Extension để xác định hợp đồng metadata username; code hiện tại trả username đầy đủ, còn `AN***` là dữ liệu metadata đã tồn tại trong GAS/deployment.
