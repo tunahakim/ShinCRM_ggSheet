@@ -223,8 +223,8 @@
 - [x] Thêm/điều chỉnh test cho Account không có dòng nền, Run layout dọc, username đầy đủ, mismatch, blank password preserve, marker focus/blur/realtime, legacy mask, xóa credential và nhánh lỗi vault.
 - [x] Chạy `node tests/run.js`: `1853 đạt, 0 không đạt`.
 - [x] Chạy `git diff --check`: không có lỗi whitespace.
-- [ ] Push GAS DEV bằng `node tests/gas.js fbmGetLoginConfig --push`; ghi version và kết quả vào mục 6.
-- [ ] Chỉ sau khi kiểm thử pass mới commit nhóm thay đổi; không đưa file untracked có sẵn hoặc thay đổi Category gate ngoài phạm vi vào commit.
+- [x] Push GAS DEV bằng `node tests/gas.js fbmGetLoginConfig --push`; revision `@469` trả `OK`, `configured: true`, `public.usernameHint: ANHLT`.
+- [x] Chỉ sau khi kiểm thử pass mới commit nhóm thay đổi; commit `46c1575` không đưa file untracked có sẵn hoặc thay đổi Category gate ngoài phạm vi vào commit.
 - [ ] Nghiệm thu live trên Sheet DEV; không dùng dữ liệu khách thật và không gửi request xóa.
 
 ## 5. Quy tắc không được vi phạm khi tiếp tục
@@ -248,9 +248,10 @@
 | 2026-09-20 | Deployment trước phiên hiện tại | `node tests/gas.js fbmGetLoginConfig --push`: deployment `@468`, trả `OK`; chưa phải deployment của các sửa mới |
 | 2026-09-20 | Sửa core ActionStack và loại status nền khỏi Account | `node tests/run.js`: `1843 đạt, 0 không đạt`; test layout xác nhận hai Row nằm trong `shin-action-stack`, Account không còn vùng notice nền |
 | 2026-09-20 | Hoàn thiện credential state machine và kiểm thử xóa | Username legacy đọc metadata vault hoặc fail-closed; marker `********` focus/blur/realtime; preserve không mã hóa lại; xóa vault trước GAS và chặn partial failure; `node tests/run.js`: `1853 đạt, 0 không đạt`; `git diff --check` sạch |
+| 2026-09-20 | Commit và push nhóm credential/UI | Commit `46c1575 Hoàn thiện state machine credential FBM`; GAS DEV `@469`, `fbmGetLoginConfig --push` trả `OK`, username `ANHLT` |
 
 ## 7. Điểm tiếp tục sau khi context bị nén
 
 1. Đọc file này trước, không thu thập lại từ đầu.
-2. Còn lại: push GAS DEV, stage/commit riêng nhóm credential/UI và cập nhật version deployment; không stage `Ghi chú khảo sát getChanges và revision.md` hay thay đổi pipeline ngoài phạm vi.
-3. Sau commit/push, ghi version và kết quả vào mục 6; nghiệm thu live trên Sheet DEV vẫn để `[ ]` cho tới khi chủ dự án kiểm tra.
+2. Đã hoàn tất code/test/commit/push của nhóm credential/UI; không stage `Ghi chú khảo sát getChanges và revision.md` hay thay đổi pipeline ngoài phạm vi.
+3. Chỉ còn nghiệm thu live trên Sheet DEV; giữ `[ ]` cho tới khi chủ dự án kiểm tra, không chạy thao tác xóa live.
