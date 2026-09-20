@@ -49,6 +49,7 @@ function workflowGas(options) {
     'fbm_sync/reconcile/Pull.js',
     'fbm_sync/report/Report.js',
     'fbm_sync/read/GridRead.js',
+    'fbm_sync/write/PushCandidates.js',
     'fbm_sync/write/RequestBuilders.js',
     'fbm_sync/auth/AutoLogin.js',
     'fbm_sync/transport/TransportCore.js',
@@ -381,6 +382,7 @@ async function chay(so) {
   pushState.metadata.categoryGate = compactLookupFlow.hop.FbmSync.categoryGateForState(compactLookupFlow.hop.FbmSync.readCategoryGate());
   pushState.metadata.categoryBlocks = [];
   pushState.metadata.categoryLookupFailed = false;
+  compactLookupFlow.hop.FbmSync.previewRecords(pushState, 'activity', [{ customerId: 'CUS-1', workDate: '2026-09-20', taskType: 'GD', content: 'x'.repeat(4000) }]);
   pushState.mode = 'write'; pushState.phase = 'push'; pushState.entity = 'activity'; pushState.cursor = { kind: 'push_scan', entity: 'activity', index: 0 };
   compactLookupFlow.hop.FbmSync.stateWrite(pushState);
   compactLookupFlow.hop.FbmSync.pushCandidates = () => [{ kind: 'edit', id: 'ACT-QUOTA', record: { id: 'ACT-QUOTA', fbmId: 'FBM-ACT-QUOTA', taskType: 'CODE-3', content: 'Nội dung', workDate: '2026-09-20', customerId: 'CUS-1', customerFbmCode: 'ALT00001', allowFbmPush: 'Cho phép', fbmHash: 'old' } }];
@@ -397,24 +399,32 @@ async function chay(so) {
   const pushWaitState = compactLookupFlow.hop.FbmSync.stateRead();
   const pushRawState = compactLookupFlow.documentProperties.data.FBM_SYNC_STATE_V1 || '';
   let pushRawParsed = null; try { pushRawParsed = JSON.parse(pushRawState); } catch (ignorePushRaw) {}
-  check(so, 'push candidate không nhân đôi Category gate trong state DocumentProperties', [
+  check(so, 'state push không lưu preview Activity dài hoặc payload candidate', [
     Buffer.byteLength(JSON.stringify(pushWaitState), 'utf8') < compactLookupFlow.hop.FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT,
     pushWaitState.cursor.kind,
     pushWaitState.cursor.candidate && Object.prototype.hasOwnProperty.call(pushWaitState.cursor.candidate, 'categoryGate'),
+    pushWaitState.cursor.candidate && Object.prototype.hasOwnProperty.call(pushWaitState.cursor.candidate, 'record'),
+    pushWaitState.metadata.preview.activities[0].content.length,
+    String(pushRawState).indexOf('x'.repeat(4000)),
     pushWaitState.metadata.categoryGate && Object.keys(pushWaitState.metadata.categoryGate.map || {}).length,
     pushState.cursor.kind,
     pushRequest && pushRequest.meta && pushRequest.meta.kind,
     pushRawState.length,
     pushRawParsed && pushRawParsed.cursor && pushRawParsed.cursor.kind
-  ], [true, 'push_wait', false, 103, 'push_wait', 'activity_edit_open', pushRawState.length, 'push_wait']);
+  ], [true, 'push_wait', false, false, 163, -1, 103, 'push_wait', 'activity_edit_open', pushRawState.length, 'push_wait']);
+  compactLookupFlow.hop.FbmSync.readLocal = (entity) => entity === 'activity'
+    ? [{ id: 'ACT-QUOTA', fbmId: 'FBM-ACT-QUOTA', content: 'x'.repeat(4000), customerId: 'CUS-1' }]
+    : [{ id: 'CUS-1', fbmId: 'FBM-CUS-1', fbmCustomerCode: 'ALT00001' }];
+  const hydratedCandidate = compactLookupFlow.hop.FbmSync.hydratePushCandidate(pushWaitState.cursor.candidate);
+  check(so, 'candidate compact được dựng lại từ Sheet trước bước push tiếp theo', [hydratedCandidate.record.content.length, hydratedCandidate.record.customerFbmCode, hydratedCandidate.record.stt_rec], [4000, 'ALT00001', 'FBM-CUS-1']);
   const probeState = compactLookupFlow.hop.FbmSync.stateRead();
   compactLookupFlow.documentProperties.setProperty('FBM_SYNC_PENDING_PUSHES_V1', 'x'.repeat(42));
   const probe = compactLookupFlow.hop.fbmSyncStateProbe();
   check(so, 'probe state chỉ trả kích thước từng nhánh, không trả payload', [
     probe.ok, probe.state.parseOk, probe.state.cursorKind, probe.state.cursorCandidateCategoryGateBytes,
-    probe.state.metadataCategoryGateBytes > 0, probe.state.sessionLookupsBytes, probe.largestProperties[0].key,
+    probe.state.metadataCategoryGateBytes > 0, probe.state.branchBytes.metadata > 0, probe.state.sessionLookupsBytes, Array.isArray(probe.extensionResponses), probe.largestProperties[0].key,
     JSON.stringify(probe).indexOf('ACT-QUOTA') < 0
-  ], [true, true, 'push_wait', 0, true, 2, 'FBM_SYNC_STATE_V1', true]);
+  ], [true, true, 'push_wait', 0, true, true, 2, true, 'FBM_SYNC_STATE_V1', true]);
   const orderFlow = workflowGas();
   const orderState = orderFlow.hop.FbmSync.stateStart('', 'push', 0);
   orderState.mode = 'write'; orderState.phase = 'push'; orderState.entity = 'activity'; orderState.metadata.categoryGate = { map: {}, codesBySource: {}, blocked: {} };

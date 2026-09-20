@@ -143,13 +143,18 @@ FbmSync.previewRecords = function (state, entity, records) {
   state.metadata.preview.customers = state.metadata.preview.customers || [];
   state.metadata.preview.activities = state.metadata.preview.activities || [];
   var target = entity === 'customer' ? state.metadata.preview.customers : state.metadata.preview.activities;
-  var limit = entity === 'customer' ? 10 : 50;
+  // Preview nằm trong state bền vững; không được giữ nguyên nội dung Activity
+  // (có thể dài 4.000 ký tự) vì một bản ghi cũng đủ đẩy state qua trần 9 KB.
+  var limit = entity === 'customer' ? 10 : 10, clip = function (value, length) {
+    var text = String(value === null || value === undefined ? '' : value);
+    return text.length > length ? text.slice(0, length) + '...' : text;
+  };
   (records || []).forEach(function (record) {
     if (target.length >= limit) { state.metadata.preview.truncated = true; return; }
     if (entity === 'customer') {
-      target.push({ code: String(record.fbmCustomerCode || ''), name: String(record.companyName || ''), fbmId: String(record.fbmId || '') });
+      target.push({ code: clip(record.fbmCustomerCode, 80), name: clip(record.companyName, 160), fbmId: clip(record.fbmId, 80) });
     } else {
-      target.push({ customerCode: String(record.customerId || ''), date: String(record.workDate || ''), type: String(record.taskType || ''), content: String(record.content || '') });
+      target.push({ customerCode: clip(record.customerId, 80), date: clip(record.workDate, 40), type: clip(record.taskType, 80), content: clip(record.content, 160) });
     }
   });
   return state;

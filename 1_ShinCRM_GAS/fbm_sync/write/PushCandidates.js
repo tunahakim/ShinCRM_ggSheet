@@ -104,6 +104,32 @@ FbmSync.pushCandidates = function (entity) {
   });
 };
 
+/** Chỉ lưu khóa cần để dựng lại candidate; payload đầy đủ phải đọc lại từ Sheet. */
+FbmSync.pushCandidateForState = function (candidate) {
+  var value = candidate || {};
+  return {
+    kind: String(value.kind || ''),
+    id: String(value.id || ''),
+    entity: String(value.entity || ''),
+    autoCode: String(value.autoCode || '')
+  };
+};
+
+/** Dựng lại payload candidate từ Sheet sau khi state đã bỏ payload để không vượt quota. */
+FbmSync.hydratePushCandidate = function (candidate) {
+  var value = candidate || {}, entity = String(value.entity || ''), id = String(value.id || ''), record = value.record;
+  if (record && typeof record === 'object') { return value; }
+  if (!id || typeof FbmSync.readLocal !== 'function') { return value; }
+  var records = FbmSync.readLocal(entity) || [];
+  record = records.filter(function (item) { return String(item && item.id || '') === id; })[0];
+  if (!record) { return value; }
+  if (entity === 'activity') {
+    var customers = FbmSync.readLocal('customer') || [], customer = customers.filter(function (item) { return String(item && item.id || '') === String(record.customerId || ''); })[0];
+    if (customer) { record = Object.assign({}, record, { customerFbmCode: customer.fbmCustomerCode || '', stt_rec: customer.fbmId || '' }); }
+  }
+  return Object.assign({}, value, { record: record });
+};
+
 /** Kiểm đủ dữ liệu và giới hạn trước khi dựng request ghi FBM. */
 FbmSync.pushEligibilityErrors = function (record, entity) {
   var errors = [], required = entity === 'customer'

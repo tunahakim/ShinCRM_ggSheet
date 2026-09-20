@@ -21,6 +21,7 @@ FbmSync.prepareCategoryGate = function (state) {
 /** Ghi kết quả push theo record; chỉ giữ ID, request kind và hash, không giữ payload. */
 FbmSync.logPushRecord = function (candidate, operation, outcome, reason, detail) {
   if (typeof logEvent !== 'function') { return; }
+  candidate = typeof FbmSync.hydratePushCandidate === 'function' ? FbmSync.hydratePushCandidate(candidate) : candidate;
   var record = candidate && candidate.record || {}, entity = String(candidate && candidate.entity || ''), id = String(candidate && candidate.id || record.id || '');
   var current = typeof FbmSync.stateRead === 'function' ? FbmSync.stateRead() : {}, gate = (candidate && candidate.categoryGate) || current.metadata && current.metadata.categoryGate || {};
   var hShin = typeof FbmSync.hash === 'function' ? FbmSync.hash(record, entity, gate) : '';
@@ -60,16 +61,16 @@ FbmSync.markPushResult = function (candidate, response, operation) {
 
 /** Khi New Customer mất response, chỉ đọc lại theo mã tự sinh để xác định có ghi thành công hay chưa. */
 FbmSync.customerCreateRecoveryRequest = function (state, cursor) {
-  var candidate = cursor && cursor.candidate || {}, record = candidate.record || {}, taxNumber = String(record.taxNumber || '').trim();
+  var candidate = typeof FbmSync.hydratePushCandidate === 'function' ? FbmSync.hydratePushCandidate(cursor && cursor.candidate || {}) : cursor && cursor.candidate || {}, record = candidate.record || {}, taxNumber = String(record.taxNumber || '').trim();
   if (!taxNumber || typeof FbmSync.customerGridRequest !== 'function') { return null; }
-  state.cursor = { kind: 'push_wait', operation: 'customer_create_recover', entity: 'customer', index: Number(cursor.index || 0), candidate: candidate };
+  state.cursor = { kind: 'push_wait', operation: 'customer_create_recover', entity: 'customer', index: Number(cursor.index || 0), candidate: FbmSync.pushCandidateForState(candidate) };
   state.message = 'Đang kiểm tra Customer vừa tạo sau khi mất phản hồi; không gửi lại lệnh ghi.';
   FbmSync.stateWrite(state);
   return FbmSync.customerGridRequest({ type: 0, count: 20, gridPageIndex: -2, gridRefresh: false, includeTestCustomer: false, filter: ['ma_so_thue:**' + taxNumber] });
 };
 /** Đối chiếu đúng một dòng Customer sau create mất response rồi vá ID/baseline. */
 FbmSync.finishCustomerCreateRecovery = function (state, response) {
-  var cursor = state.cursor || {}, candidate = cursor.candidate || {}, record = candidate.record || {}, grid = FbmSync.rowsToRecords('customer', response, state.metadata && state.metadata.customerFields), taxNumber = String(record.taxNumber || '').trim(), autoCode = String(candidate.autoCode || '').trim(), rows = grid.rows.filter(function (row) { return String(row.ma_so_thue || '').trim() === taxNumber && String(row.ma_kh || '').trim() === autoCode; }), local = (FbmSync.readLocal('customer') || []).filter(function (item) { return String(item.id || '') === String(candidate.id || ''); })[0];
+  var cursor = state.cursor || {}, candidate = typeof FbmSync.hydratePushCandidate === 'function' ? FbmSync.hydratePushCandidate(cursor.candidate || {}) : cursor.candidate || {}, record = candidate.record || {}, grid = FbmSync.rowsToRecords('customer', response, state.metadata && state.metadata.customerFields), taxNumber = String(record.taxNumber || '').trim(), autoCode = String(candidate.autoCode || '').trim(), rows = grid.rows.filter(function (row) { return String(row.ma_so_thue || '').trim() === taxNumber && String(row.ma_kh || '').trim() === autoCode; }), local = (FbmSync.readLocal('customer') || []).filter(function (item) { return String(item.id || '') === String(candidate.id || ''); })[0];
   if (rows.length !== 1 || !local) { throw new Error('CREATE_RECOVERY_NOT_EXACT: không xác định duy nhất Customer vừa tạo; không gửi lại request ghi.'); }
   var incoming = FbmSync.customerRecord(rows[0], state.metadata && state.metadata.categoryGate || {}), localHash = FbmSync.hash(local, 'customer', state.metadata && state.metadata.categoryGate || {}), incomingHash = FbmSync.hash(incoming, 'customer', state.metadata && state.metadata.categoryGate || {}), sentHash = FbmSync.hash(candidate.record || {}, 'customer', state.metadata && state.metadata.categoryGate || {});
   if (incomingHash !== sentHash || localHash !== sentHash) { throw new Error('CREATE_RECOVERY_MISMATCH: Customer tìm thấy không khớp chính xác dữ liệu đã gửi.'); }
@@ -124,7 +125,7 @@ FbmSync.finishPushVerification = function (state, response) {
 
 /** Xử lý lỗi đọc xác nhận mà không lặp lại request ghi. */
 FbmSync.continueAfterPushVerificationError = function (state, cursor, failure) {
-  var candidate = cursor && cursor.candidate, entity = String(cursor && cursor.entity || ''), id = String(candidate && candidate.id || '');
+  var candidate = typeof FbmSync.hydratePushCandidate === 'function' ? FbmSync.hydratePushCandidate(cursor && cursor.candidate || {}) : cursor && cursor.candidate, entity = String(cursor && cursor.entity || ''), id = String(candidate && candidate.id || '');
   state.counts.error += 1; state.phase = 'error'; state.lastFailureCode = 'FBM_VERIFY_FAILED'; state.retryable = false;
   state.message = 'Đã ghi FBM nhưng chưa xác nhận được ' + entity + ' ' + id + ': ' + String(failure && failure.message || failure || 'Lỗi đọc xác nhận.') + '. Không tự ghi lại.';
   FbmSync.stateWrite(state);
@@ -188,7 +189,7 @@ FbmSync.markPushSkipped = function (state, candidate, status, reason) {
 
 /** Bỏ qua một record push lỗi và tiếp tục candidate kế tiếp, không lặp request đã gửi. */
 FbmSync.continueAfterPushError = function (state, cursor, failure) {
-  var candidate = cursor && cursor.candidate;
+  var candidate = typeof FbmSync.hydratePushCandidate === 'function' ? FbmSync.hydratePushCandidate(cursor && cursor.candidate || {}) : cursor && cursor.candidate;
   if (candidate) { FbmSync.markPushError(state, candidate, failure, cursor.operation); }
   state.cursor = { kind: 'push_scan', entity: cursor.entity, index: Number(cursor.index || 0) + 1 };
   state.current = '';
@@ -279,7 +280,7 @@ FbmSync.nextPushRequest = function (state) {
       request = candidate.kind === 'create' ? FbmSync.activityCreateRequest(candidate.record, state.metadata.categoryGate) : FbmSync.activityEditOpenRequest(candidate.record.fbmId);
     }
     if (typeof FbmSync.lockRecord === 'function') { state = FbmSync.lockRecord(entity, candidate.id, candidate.record.fbmHash || '', 'sync'); }
-    state.phase = 'push'; state.entity = entity; state.current = candidate.id; state.cursor = { kind: 'push_wait', operation: request.meta.kind, entity: entity, index: index, candidate: candidate };
+    state.phase = 'push'; state.entity = entity; state.current = candidate.id; state.cursor = { kind: 'push_wait', operation: request.meta.kind, entity: entity, index: index, candidate: typeof FbmSync.pushCandidateForState === 'function' ? FbmSync.pushCandidateForState(candidate) : candidate };
     state.message = 'Đang đẩy ' + (entity === 'customer' ? 'khách hàng' : 'giao dịch') + ' ' + candidate.id + '...'; FbmSync.stateWrite(state);
     if (typeof writeGateSave === 'function') {
       try { writeGateSave({ entity: entity, records: [{ id: candidate.id, syncStatus: FbmSync.SYNC_STATUS.pushing }], source: 'push', schemas: [DATA_SCHEMA, SYNC_SCHEMA] }); } catch (ignore) {}
@@ -303,7 +304,7 @@ FbmSync.nextPushRequest = function (state) {
 
 /** Xử lý bước mở form và bước lưu của một candidate push. */
 FbmSync.continuePush = function (state, response) {
-  var cursor = state.cursor, candidate = cursor.candidate, gate = state.metadata.categoryGate || {};
+  var cursor = state.cursor, candidate = typeof FbmSync.hydratePushCandidate === 'function' ? FbmSync.hydratePushCandidate(cursor.candidate) : cursor.candidate, gate = state.metadata.categoryGate || {};
   if (cursor.operation === 'customer_create_recover') {
     return FbmSync.finishCustomerCreateRecovery(state, response);
   }

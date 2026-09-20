@@ -21,6 +21,11 @@ function fbmSyncStateProbe() {
   var stateRaw = values.FBM_SYNC_STATE_V1 || '', state = null, stateParseOk = false;
   try { state = stateRaw ? JSON.parse(stateRaw) : null; stateParseOk = !!state; } catch (ignoreState) {}
   var cursor = state && state.cursor || {}, candidate = cursor && cursor.candidate || {}, metadata = state && state.metadata || {}, session = state && state.session || {};
+  var branchBytes = {};
+  ['cursor', 'session', 'metadata', 'locks', 'counts'].forEach(function (key) { branchBytes[key] = fbmSyncProbeJsonBytes(state && state[key]); });
+  var trace = [], traceRaw = values.FBM_SYNC_TRACE_V1 || '';
+  try { trace = JSON.parse(traceRaw); } catch (ignoreTrace) { trace = []; }
+  if (!Array.isArray(trace)) { trace = []; }
   return {
     ok: true,
     limitBytes: 9000,
@@ -43,7 +48,11 @@ function fbmSyncStateProbe() {
       sessionBytes: fbmSyncProbeJsonBytes(session),
       sessionLookupsBytes: fbmSyncProbeJsonBytes(session && session.lookups),
       locksBytes: fbmSyncProbeJsonBytes(state && state.locks),
-      countsBytes: fbmSyncProbeJsonBytes(state && state.counts)
-    }
+      countsBytes: fbmSyncProbeJsonBytes(state && state.counts),
+      branchBytes: branchBytes
+    },
+    extensionResponses: trace.slice(-12).map(function (item) {
+      return { at: Number(item && item.at || 0) || 0, stage: String(item && item.stage || ''), operation: String(item && item.operation || ''), httpStatus: Number(item && item.httpStatus || 0) || 0, responseLength: Number(item && item.responseLength || 0) || 0 };
+    })
   };
 }
