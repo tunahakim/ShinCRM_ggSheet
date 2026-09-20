@@ -11,9 +11,9 @@ var FBM_SYNC_ACCOUNT_SCHEMA = {
   cards: { connection: 'Kết nối tài khoản FBM', login: 'Đăng nhập tự động', account: 'Cấu hình tài khoản FBM', identity: 'Liên kết tài khoản' },
   connection: { usernameMismatchWarning: 'Username nhận diện tài khoản và username đăng nhập đang khác nhau. Bạn có chắc chắn muốn lưu không?', usernameMismatchBanner: 'Username nhận diện tài khoản và username đăng nhập đang khác nhau.' },
   login: {
-    username: { label: 'Username FBM', id: 'fbm-login-username', placeholder: 'Nhập username FBM', inputType: 'text', unconfiguredValue: 'Chưa lưu' },
+    username: { label: 'Username FBM', id: 'fbm-login-username', placeholder: 'Nhập username FBM', inputType: 'text', unconfiguredValue: 'Chưa lưu', unavailableValue: 'Không đọc được username đã lưu' },
     password: { label: 'Mật khẩu FBM', id: 'fbm-login-password', placeholder: 'Nhập mật khẩu FBM', newPlaceholder: 'Nhập mật khẩu mới', inputType: 'password', maskedValue: '********', unconfiguredValue: 'Chưa lưu' },
-    test: 'Đăng nhập thử', save: 'Lưu thông tin', delete: 'Xóa thông tin đăng nhập', policy: 'Cài đặt đăng nhập tự động', edit: 'Sửa thông tin',
+    test: 'Đăng nhập thử', save: 'Lưu thông tin', delete: 'Xóa thông tin đăng nhập', policy: 'Cài đặt đăng nhập tự động', edit: 'Sửa thông tin', metadataUnavailableNotice: 'Không đọc được username đã lưu từ Extension. Hãy mở lại Extension hoặc nhập lại username và mật khẩu để thay thông tin đăng nhập.',
     actionIds: { test: 'fbm-sync-login-test', save: 'fbm-sync-login-save', delete: 'fbm-sync-login-delete', policy: 'fbm-sync-open-login-policy' }
   },
   account: {

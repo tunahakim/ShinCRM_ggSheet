@@ -72,8 +72,45 @@ async function testConnectionSaveValidation(so) {
   hop.FBM_SYNC_CLIENT.loginStatus = { enabled: true, configured: true, credentialRef: 'cred-client-123', public: { usernameHint: 'USERB' } };
   username.value = 'USERB'; password.value = '';
   await hop.fbmSyncSaveConnection(button);
-  check(so, 'client cho lưu identity lệch và giữ credential đã lưu khi password để trống', [calls.length, calls[2] && calls[2].args[0].credential.mode, password.value], [3, 'preserve', '']);
-  check(so, 'mọi lỗi lưu kết nối đều hiện Sidebar và ghi Sheet Log', [errors.length, logs.length >= errors.length, logs.every((item) => item.name === 'fbmLogSyncError')], [3, true, true]);
+  hop.FBM_SYNC_CLIENT.loginStatus = { enabled: true, configured: true, credentialRef: 'cred-marker-123', public: { usernameHint: 'USERA' } };
+  username.value = 'USERA'; password.value = '********';
+  hop.FBM_SYNC_CLIENT.configEdits = { connection: { editing: true, snapshot: {}, draft: {} } };
+  hop.FBM_SYNC_CLIENT.loginDraft.username = 'USERA';
+  hop.fbmSyncLoginPasswordEnterDraft(password);
+  const passwordAfterFocus = password.value;
+  hop.fbmSyncBlurLoginPassword(password);
+  const passwordAfterBlur = password.value;
+  hop.FBM_SYNC_CLIENT.loginDraft.username = 'OTHER';
+  hop.fbmSyncSyncLoginPasswordState();
+  const passwordAfterUsernameChange = password.value;
+  hop.FBM_SYNC_CLIENT.loginDraft.username = 'USERA';
+  hop.fbmSyncSyncLoginPasswordState();
+  check(so, 'password marker focus blur va username realtime dung state machine', [passwordAfterFocus, passwordAfterBlur, passwordAfterUsernameChange, password.value], ['', '********', '', '********']);
+  let encryptedMarker = false;
+  hop.fbmSyncEncryptCredentials = () => { encryptedMarker = true; return Promise.reject(new Error('marker must preserve')); };
+  await hop.fbmSyncSaveConnection(button);
+  check(so, 'marker password khong bi gui nhu password moi va van preserve credential', [calls.length, calls[3] && calls[3].args[0].credential.mode, encryptedMarker], [4, 'preserve', false]);
+  hop.FBM_SYNC_CLIENT.loginStatus.usernameMetadataUnavailable = true;
+  username.value = ''; password.value = '';
+  await hop.fbmSyncSaveConnection(button);
+  check(so, 'legacy username khong doc duoc thi chan luu/xoa am tham', [calls.length, notices[notices.length - 1] && notices[notices.length - 1].area, notices[notices.length - 1] && notices[notices.length - 1].level], [4, 'login', 'error']);
+  hop.FBM_SYNC_CLIENT.loginStatus.usernameMetadataUnavailable = false;
+  const deleteOrder = [];
+  hop.fbmSyncConfirmCredentialDelete = () => Promise.resolve(true);
+  hop.fbmSyncClearCredentialInExtension = () => { deleteOrder.push('extension'); return Promise.resolve({ ok: true }); };
+  hop.callServer = (name, args) => { if (name === 'fbmSaveConnection') { deleteOrder.push('gas'); } calls.push({ name, args }); return Promise.resolve({ ok: true, binding: hop.FBM_SYNC_CLIENT.identityStatus.binding, identityStatus: hop.FBM_SYNC_CLIENT.identityStatus, login: { configured: false, enabled: false } }); };
+  await hop.fbmSyncDeleteLoginCredential(button);
+  check(so, 'xoa credential xoa vault truoc GAS va khong bao thanh cong mot phan', [deleteOrder, calls[calls.length - 1].args[0].credential.mode], [['extension', 'gas'], 'clear']);
+  hop.FBM_SYNC_CLIENT.loginStatus = { enabled: true, configured: true, credentialRef: 'cred-fail-123', public: { usernameHint: 'USERA' } };
+  const failedDeleteOrder = [];
+  hop.fbmSyncClearCredentialInExtension = () => { failedDeleteOrder.push('extension'); return Promise.reject(new Error('EXTENSION_CLEAR_FAILED')); };
+  hop.fbmSyncLogClientError = () => Promise.resolve(null);
+  hop.fbmSyncPaintError = () => {};
+  hop.callServer = (name, args) => { if (name === 'fbmSaveConnection') { failedDeleteOrder.push('gas'); } calls.push({ name, args }); return Promise.resolve({ ok: true }); };
+  await hop.fbmSyncDeleteLoginCredential(button);
+  check(so, 'xoa vault loi khong duoc bao thanh cong va khong ghi GAS nua', failedDeleteOrder, ['extension']);
+  check(so, 'client cho lưu identity lệch và giữ credential đã lưu khi password để trống', [calls.length, calls[2] && calls[2].args[0].credential.mode, password.value], [5, 'preserve', '']);
+  check(so, 'mọi lỗi lưu kết nối đều hiện Sidebar và ghi Sheet Log', [errors.length, logs.length >= errors.length, logs.every((item) => item.name === 'fbmLogSyncError')], [4, true, true]);
 }
 
 async function chay(so) {

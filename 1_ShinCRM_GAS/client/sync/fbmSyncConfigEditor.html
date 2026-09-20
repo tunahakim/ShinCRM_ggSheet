@@ -189,6 +189,13 @@ function fbmSyncLoginUsernameValue(login) {
   var value = login || FBM_SYNC_CLIENT.loginStatus || {}, publicValue = value.public || {};
   return String(publicValue.usernameHint || value.usernameHint || value.username || '');
 }
+function fbmSyncLoginUsernameDisplayValue(login) {
+  var value = login || FBM_SYNC_CLIENT.loginStatus || {};
+  if (value.usernameMetadataUnavailable === true) {
+    return FBM_SYNC_ACCOUNT_SCHEMA.login.username.unavailableValue;
+  }
+  return fbmSyncLoginUsernameValue(value);
+}
 
 function fbmSyncUsernameComparable(value) {
   var username = String(value || '').trim();
@@ -240,7 +247,7 @@ function fbmSyncConfigStartEdit(key) {
   var draft;
   if (key === 'connection') {
     var binding = FBM_SYNC_CLIENT.identityStatus && FBM_SYNC_CLIENT.identityStatus.binding || {};
-    draft = { identity: { spreadsheetId: String((FBM_SYNC_CLIENT.identityDraft || {}).spreadsheetId || binding.spreadsheetId || ''), userId: String((FBM_SYNC_CLIENT.identityDraft || {}).userId || binding.userId || ''), username: String((FBM_SYNC_CLIENT.identityDraft || {}).username || binding.username || ''), accountName: String((FBM_SYNC_CLIENT.identityDraft || {}).accountName || binding.accountName || '') }, loginUsername: String(fbmSyncLoginUsernameValue(login) || '') };
+    draft = { identity: { spreadsheetId: String((FBM_SYNC_CLIENT.identityDraft || {}).spreadsheetId || binding.spreadsheetId || ''), userId: String((FBM_SYNC_CLIENT.identityDraft || {}).userId || binding.userId || ''), username: String((FBM_SYNC_CLIENT.identityDraft || {}).username || binding.username || ''), accountName: String((FBM_SYNC_CLIENT.identityDraft || {}).accountName || binding.accountName || '') }, loginUsername: login.usernameMetadataUnavailable === true ? '' : String(fbmSyncLoginUsernameValue(login) || '') };
     FBM_SYNC_CLIENT.identityDraft = fbmSyncConfigClone(draft.identity);
     FBM_SYNC_CLIENT.loginDraft = { username: draft.loginUsername };
     FBM_SYNC_CLIENT.loginPasswordMode = login.configured === true ? 'saved' : 'draft';

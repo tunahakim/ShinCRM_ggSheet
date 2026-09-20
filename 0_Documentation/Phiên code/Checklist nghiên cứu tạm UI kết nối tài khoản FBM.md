@@ -20,39 +20,46 @@
 - [x] Bỏ hoàn toàn dòng `Đồng bộ nền đang tắt · FBM → ShinCRM` và biến thể `Đồng bộ nền đang bật ...` khỏi màn Tài khoản FBM. `fbmSyncConnectionStatusBlocks()` và vùng notice connection đã được loại khỏi renderer; test `Account không có dòng nền` sẽ chốt DOM không chứa dòng này.
 - [x] Không còn link `Cài đặt đồng bộ nền` trong card kết nối tài khoản; link duy nhất vẫn ở màn `Chạy đồng bộ`.
 - [x] Link `Cài đặt đồng bộ nền` đã được chuyển sang màn `Chạy đồng bộ` trong patch trước; cần kiểm tra lại sau khi sửa layout.
-- [ ] Giữ link `Cài đặt đăng nhập tự động` ở đúng vùng `Đăng nhập tự động`.
+- [x] Giữ link `Cài đặt đăng nhập tự động` ở đúng vùng `Đăng nhập tự động`; kiểm thử UserJourneys xác nhận link mở đúng khối `Chính sách tự đăng nhập`.
 
 ### 1.2. Hai nút ở màn Chạy đồng bộ
 
 - [x] `Dừng đồng bộ` và `Cài đặt đồng bộ nền` nằm trên hai hàng dọc riêng qua `ActionStack` lõi với gap token; không dính mép và không phụ thuộc margin cục bộ màn Run.
 - [x] Sửa ở tầng hệ thống: thêm helper `ActionStack` trong `client/ui/uiBuilder.html` và fallback `.shin-box > .shin-single-action-row + .shin-single-action-row` trong `client/style/components.html`; layout Run chỉ dùng helper này.
 - [x] Regression test `Các action Run đi qua ActionStack lõi có hai Row con và nhịp dọc dùng chung` cùng test core `ActionStack lõi và fallback ngăn hai nhóm action dính mép` đạt.
-- [ ] Không sửa `9_Code_cu_tham_chieu/src/ui/Styles.html`; đây là đặc tả hình thức chỉ đọc.
+- [x] Không sửa `9_Code_cu_tham_chieu/src/ui/Styles.html`; đã kiểm tra diff không có tệp đặc tả hình thức.
 
 ### 1.3. Username FBM
 
-- [ ] Hiển thị đầy đủ username đã lưu, ví dụ `ANHLT`; không tự ý mask thành `AN***`.
-- [ ] Không coi chuỗi đã mask là username thật để so lệch, lưu lại hoặc dựng bản nháp.
-- [ ] Credential/password vẫn phải giữ nguyên quy tắc bảo mật hiện hành; yêu cầu bỏ mask chỉ áp dụng cho `Username FBM`, không suy diễn thành hiển thị mật khẩu rõ.
+- [x] Hiển thị đầy đủ username đã lưu, ví dụ `ANHLT`; không tự ý mask thành `AN***`. Legacy `AN***` được đọc metadata từ vault Extension và sửa metadata GAS khi đọc được.
+- [x] Không coi chuỗi đã mask là username thật để so lệch, lưu lại hoặc dựng bản nháp; nếu Extension không đọc được metadata thì hiển thị trạng thái không xác định và chặn lưu/xóa âm thầm.
+- [x] Credential/password vẫn giữ quy tắc bảo mật: username hiển thị đầy đủ, password đã lưu chỉ là marker `********`, password mới vẫn là input `type=password` và chỉ Extension mã hóa.
 
 ### 1.4. Cảnh báo hai username khác nhau
 
-- [ ] `Tên đăng nhập FBM` trong vùng liên kết (`identity.username`) và `Username FBM` trong vùng đăng nhập (`credential.public.usernameHint`) là hai giá trị độc lập; không tự đồng bộ/ghi đè lẫn nhau khi gõ.
-- [ ] Nếu cả hai có giá trị và khác nhau, lúc lưu edit surface `connection` phải hiện popup cảnh báo.
-- [ ] Popup phải cho phép xác nhận để lưu; không biến mismatch thành lỗi chặn ở GAS.
-- [ ] Hủy popup thì không gọi GAS, giữ nguyên bản nháp và hiện notice phù hợp.
-- [ ] Khi module đồng bộ FBM đang bật, dòng cảnh báo nhỏ về mismatch phải luôn ở ngay dưới header trên mọi màn hình của shell.
-- [ ] Dòng cảnh báo cố định dưới header không được dùng câu hỏi `Bạn có chắc chắn muốn lưu không?`; popup và banner là hai thông điệp khác mục đích.
+- [x] `Tên đăng nhập FBM` trong vùng liên kết và `Username FBM` trong vùng đăng nhập là hai giá trị độc lập; không tự đồng bộ/ghi đè lẫn nhau khi gõ.
+- [x] Nếu cả hai có giá trị và khác nhau, lúc lưu edit surface `connection` hiện popup cảnh báo.
+- [x] Popup cho phép xác nhận để lưu; mismatch không bị biến thành lỗi chặn ở GAS.
+- [x] Hủy popup không gọi GAS, giữ bản nháp và hiện notice phù hợp.
+- [x] Khi module đồng bộ FBM bật, banner mismatch nằm dưới header trên mọi màn hình shell; test Sidebar chạy đủ `run/account/results/settings`.
+- [x] Banner không dùng câu hỏi xác nhận; popup và banner là hai thông điệp riêng.
 - [x] Patch trước đã tách `usernameMismatchWarning` (popup) và `usernameMismatchBanner` (banner); cần giữ khi sửa tiếp.
 - [x] Patch trước đã bổ sung ca shell banner trên các màn `run/account/results/settings`; cần chạy lại sau thay đổi mới.
 
 ### 1.5. Password rỗng khi mở chế độ sửa
 
-- [ ] Mở edit không thể lấy plaintext password cũ ra UI; ô mật khẩu rỗng là trạng thái nhập mật khẩu mới, không phải giá trị mới cần ghi.
-- [ ] Nếu người dùng không nhập password mới và không đổi `Username FBM`, thao tác lưu phải giữ nguyên credential/envelope/password cũ (ví dụ password thật vẫn là `abcd1234`), không ghi password rỗng.
-- [ ] Username không đổi phải giữ đúng username đầy đủ đã lưu (ví dụ `ANHLT`), không lấy `AN***` làm giá trị mới.
-- [ ] Nếu người dùng chỉ đổi identity username và để nguyên credential username/password, mismatch phải cảnh báo theo mục 1.4; sau khi xác nhận vẫn lưu được identity và không làm mất credential cũ.
-- [ ] Phải kiểm tra riêng trường hợp người dùng đổi `Username FBM` nhưng để password rỗng: không được âm thầm tạo credential mới thiếu password, không được nhầm chuỗi mask là giá trị nhập thật; hợp đồng cuối cùng phải được chốt bằng code/test.
+- [x] Mở edit không lấy plaintext password cũ ra UI; password marker được xóa khi focus và khôi phục khi blur rỗng.
+- [x] Không nhập password mới và không đổi `Username FBM` gửi `credential.mode: preserve`; không ghi password rỗng hoặc marker.
+- [x] Username không đổi giữ đúng username đầy đủ; legacy mask không được dùng làm giá trị mới.
+- [x] Đổi identity username nhưng giữ credential username/password vẫn đi qua mismatch popup và preserve credential sau xác nhận.
+- [x] Đổi `Username FBM` nhưng để password rỗng chỉ bị cảnh báo/chặn lúc lưu; không tạo credential thiếu password và không nhầm marker là giá trị nhập.
+
+### 1.6. Xóa credential và dữ liệu legacy
+
+- [x] Có nút riêng `Xóa thông tin đăng nhập`; xóa bằng hai ô rỗng khi đã có credential dùng cùng popup xác nhận.
+- [x] Chưa từng có credential với hai ô rỗng không hiện popup xóa và giữ trạng thái `Chưa lưu`.
+- [x] Xóa thành công xóa vault Extension trước rồi mới xóa cấu hình GAS, tắt auto-login và giữ nguyên liên kết tài khoản.
+- [x] Extension lỗi khi xóa thì không gọi GAS tiếp và không báo thành công; test UserJourneys khóa thứ tự và nhánh lỗi.
 
 ## 2. Quy tắc tài liệu chuẩn áp dụng
 
@@ -72,6 +79,7 @@
 - Hàm hiện đọc `FBM_SYNC_CLIENT.lastStatus.backgroundEnabled`, `syncSettings.background.direction`, rồi dựng `Text` dạng `Đồng bộ nền đang bật/tắt · ...`.
 - `fbmSyncConnectionCard()` truyền kết quả hàm này vào `FBM_SYNC_ACCOUNT_UI.layout.connectionCard({ notice: ... })`, nên dòng xuất hiện ngay dưới header card `Kết nối tài khoản FBM`.
 - Tài liệu UI chuẩn quy định màn `Tài khoản FBM` dành cho nhận diện tài khoản, auto-login và relay; link cài đặt nền thuộc màn `Chạy đồng bộ`. Vì vậy dòng này là presentation/state đặt sai vùng, không phải thông tin cần giữ ở Account.
+- Cập nhật sau sửa: hàm và slot notice nền đã bị loại khỏi card Account; regression test xác nhận không còn chuỗi trạng thái đồng bộ nền trong màn này.
 
 ### 3.2. Nguyên nhân hai nút ở Run bị dính
 
@@ -83,6 +91,7 @@
 - Tệp: `1_ShinCRM_GAS/client/ui/uiClassMap.html`, map `run.actionRow = 'shin-single-action-row'`; mỗi action row có class riêng nhưng không có container dọc chung.
 - Tệp: `1_ShinCRM_GAS/client/style/components.html`, `.shin-row` có `gap: 0`, chỉ đặt khoảng cách giữa các con trực tiếp bằng `.shin-row > * + *`; `.shin-single-action-row` chỉ điều chỉnh chính một row; `.shin-stack/.shin-action-stack` mới có `flex-direction: column` và `gap: var(--shin-gap-2)`.
 - Kết luận hiện tại: lỗi trực tiếp do patch trước ghép hai `Row` sibling vào `Box` không có `Stack/gap`; không phải do `Row` tự nhiên làm sai. Tuy nhiên hệ thống thiếu ràng buộc/helper để ngăn kiểu ghép này, nên cần sửa cả cấu trúc layout dùng chung và thêm test regression.
+- Cập nhật sau sửa: core có `ActionStack` sở hữu xếp dọc và gap; Run chỉ truyền hai action vào helper này. CSS fallback cũng ngăn hai `shin-single-action-row` sibling dính mép; không thêm margin cục bộ.
 
 ### 3.3. Nguyên nhân username bị hiển thị `AN***`
 
@@ -91,7 +100,7 @@
 - Tệp GAS: `1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js`, `loginConfigSave()` lưu `safePublic.usernameHint` từ metadata Extension; `loginConfigPublic()` trả metadata này ra Sidebar.
 - Deployment DEV tại thời điểm nghiên cứu trả `public.usernameHint: "AN***"`, nên dữ liệu credential hiện có hoặc Extension đang dùng giá trị đã mask. Không được kết luận chỉ từ UI rằng password bị mã hóa; cần tách rõ mask username, envelope password và dữ liệu cũ.
 - Đã đọc Extension: `2_ShinCRM_Extension/background/service_worker.js:190-200` cho thấy `saveCredentialEnvelope()` mã hóa payload gồm username/password bằng AES-GCM, lưu key/envelope ở vault local Extension, và trả `public.usernameHint: username` đầy đủ; `iframe_bridge.js` chỉ chuyển request/result, không mask username. Test `tests/cases/extensionBridge.js` cũng khóa luật metadata username đầy đủ.
-- Patch trước đã thêm `fbmSyncUsernameComparable()` để coi username chứa `*` là không đủ dữ kiện so mismatch; đây chỉ là biện pháp tránh cảnh báo giả, chưa đáp ứng yêu cầu phải hiển thị đầy đủ username.
+- Patch hiện tại giữ `fbmSyncUsernameComparable()` để không so lệch giả với legacy mask, đồng thời đọc metadata username đầy đủ từ vault Extension. Nếu đọc metadata thất bại, UI hiển thị `Không đọc được username đã lưu`, không dựng bản nháp rỗng rồi xóa âm thầm.
 
 ### 3.4. Luồng edit surface và cổng lưu
 
@@ -208,12 +217,12 @@
 - [x] Chốt thiết kế layout action dọc bằng API `ActionStack` lõi và fallback CSS hệ thống, không lặp class hoặc margin tại màn Run.
 - [x] Xóa status line nền khỏi Account ở schema/render/patch và cập nhật test snapshot/hành vi liên quan.
 - [x] Sửa layout Run để `Dừng đồng bộ` và `Cài đặt đồng bộ nền` tách hàng có gap chuẩn qua `ActionStack`.
-- [ ] Khôi phục hiển thị username đầy đủ, đồng thời xử lý dữ liệu cũ đã mask theo phương án không gây cảnh báo lệch giả và không ghi đè credential âm thầm.
-- [ ] Rà lại semantics password rỗng: preserve credential cũ, không clear nhầm, không gửi plaintext/password rỗng.
-- [ ] Rà lại mismatch khi chỉ sửa `Tên đăng nhập FBM`: popup phải xuất hiện nếu hai username đều có giá trị và lệch; xác nhận cho lưu, hủy không gọi GAS.
-- [ ] Thêm/điều chỉnh test cho: Account không có dòng nền; Run có khoảng cách/layout dọc; username đầy đủ; identity-only change mismatch; blank password preserve; username mask legacy không tạo cảnh báo giả.
-- [ ] Chạy `node tests/run.js`; đọc chỉ tổng kết/lỗi.
-- [ ] Chạy `git diff --check`.
+- [x] Khôi phục hiển thị username đầy đủ, xử lý legacy mask qua metadata vault và fail-closed khi metadata không đọc được.
+- [x] Rà lại semantics password rỗng: preserve credential cũ, không clear nhầm, marker không được gửi như password mới, plaintext không đi qua GAS.
+- [x] Rà lại mismatch khi chỉ sửa `Tên đăng nhập FBM`: popup xuất hiện khi hai username có giá trị và lệch; xác nhận lưu, hủy không gọi GAS.
+- [x] Thêm/điều chỉnh test cho Account không có dòng nền, Run layout dọc, username đầy đủ, mismatch, blank password preserve, marker focus/blur/realtime, legacy mask, xóa credential và nhánh lỗi vault.
+- [x] Chạy `node tests/run.js`: `1853 đạt, 0 không đạt`.
+- [x] Chạy `git diff --check`: không có lỗi whitespace.
 - [ ] Push GAS DEV bằng `node tests/gas.js fbmGetLoginConfig --push`; ghi version và kết quả vào mục 6.
 - [ ] Chỉ sau khi kiểm thử pass mới commit nhóm thay đổi; không đưa file untracked có sẵn hoặc thay đổi Category gate ngoài phạm vi vào commit.
 - [ ] Nghiệm thu live trên Sheet DEV; không dùng dữ liệu khách thật và không gửi request xóa.
@@ -238,9 +247,10 @@
 | 2026-09-20 | Test trước phiên hiện tại | `node tests/run.js`: `1840 đạt, 0 không đạt` trước khi tạo file |
 | 2026-09-20 | Deployment trước phiên hiện tại | `node tests/gas.js fbmGetLoginConfig --push`: deployment `@468`, trả `OK`; chưa phải deployment của các sửa mới |
 | 2026-09-20 | Sửa core ActionStack và loại status nền khỏi Account | `node tests/run.js`: `1843 đạt, 0 không đạt`; test layout xác nhận hai Row nằm trong `shin-action-stack`, Account không còn vùng notice nền |
+| 2026-09-20 | Hoàn thiện credential state machine và kiểm thử xóa | Username legacy đọc metadata vault hoặc fail-closed; marker `********` focus/blur/realtime; preserve không mã hóa lại; xóa vault trước GAS và chặn partial failure; `node tests/run.js`: `1853 đạt, 0 không đạt`; `git diff --check` sạch |
 
 ## 7. Điểm tiếp tục sau khi context bị nén
 
 1. Đọc file này trước, không thu thập lại từ đầu.
-2. Tiếp tục từ mục 4 theo thứ tự: Extension username → renderer/layout → xóa dòng nền → sửa action stack → semantics username/password → test/push.
-3. Trước mỗi lần sửa, ghi ngắn phát hiện mới vào mục 3; sau khi test chứng minh thì tick mục 1/4 tương ứng và cập nhật mục 6.
+2. Còn lại: push GAS DEV, stage/commit riêng nhóm credential/UI và cập nhật version deployment; không stage `Ghi chú khảo sát getChanges và revision.md` hay thay đổi pipeline ngoài phạm vi.
+3. Sau commit/push, ghi version và kết quả vào mục 6; nghiệm thu live trên Sheet DEV vẫn để `[ ]` cho tới khi chủ dự án kiểm tra.

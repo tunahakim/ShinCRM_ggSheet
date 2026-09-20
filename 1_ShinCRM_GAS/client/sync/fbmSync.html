@@ -104,18 +104,20 @@ function fbmSyncLoadLoginStatus() {
   return callServer('fbmGetLoginConfig').then(function (login) {
     FBM_SYNC_CLIENT.loginStatus = login || {};
     FBM_SYNC_CLIENT.loginPasswordMode = FBM_SYNC_CLIENT.loginStatus.configured === true ? 'saved' : 'draft';
-    if (FBM_SYNC_CLIENT.loginStatus.configured === true && /\*/.test(fbmSyncLoginUsernameValue(FBM_SYNC_CLIENT.loginStatus)) && FBM_SYNC_CLIENT.loginStatus.credentialRef) {
+    if (FBM_SYNC_CLIENT.loginStatus.configured === true && FBM_SYNC_CLIENT.loginStatus.credentialRef && (!fbmSyncLoginUsernameValue(FBM_SYNC_CLIENT.loginStatus) || /\*/.test(fbmSyncLoginUsernameValue(FBM_SYNC_CLIENT.loginStatus)))) {
       return fbmSyncLoadCredentialMetadata(FBM_SYNC_CLIENT.loginStatus.credentialRef).then(function (metadata) {
         var username = String(metadata && metadata.username || '').trim();
-        if (username) {
+        if (username && username.indexOf('*') < 0) {
           FBM_SYNC_CLIENT.loginStatus.public = Object.assign({}, FBM_SYNC_CLIENT.loginStatus.public || {}, { usernameHint: username });
           return callServer('fbmRepairLoginUsername', [{ credentialRef: FBM_SYNC_CLIENT.loginStatus.credentialRef, username: username }]).then(function (repaired) {
             if (repaired && repaired.ok !== false) { FBM_SYNC_CLIENT.loginStatus = repaired; }
+            else { FBM_SYNC_CLIENT.loginStatus.usernameMetadataUnavailable = true; }
             return FBM_SYNC_CLIENT.loginStatus;
-          }).catch(function () { return FBM_SYNC_CLIENT.loginStatus; });
+          }).catch(function () { FBM_SYNC_CLIENT.loginStatus.usernameMetadataUnavailable = true; return FBM_SYNC_CLIENT.loginStatus; });
         }
+        FBM_SYNC_CLIENT.loginStatus.usernameMetadataUnavailable = true;
         return FBM_SYNC_CLIENT.loginStatus;
-      }).catch(function () { return FBM_SYNC_CLIENT.loginStatus; });
+      }).catch(function () { FBM_SYNC_CLIENT.loginStatus.usernameMetadataUnavailable = true; return FBM_SYNC_CLIENT.loginStatus; });
     }
     if (FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.statusReady) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); }
     return FBM_SYNC_CLIENT.loginStatus;
@@ -1112,9 +1114,11 @@ function fbmSyncDeleteLoginCredential(button, bindingOverride) {
   if (button) { button.disabled = true; }
   return fbmSyncConfirmCredentialDelete().then(function (confirmed) {
     if (!confirmed) { return null; }
-    return callServer('fbmSaveConnection', [{ binding: binding, credential: { mode: 'clear' } }]).then(function (saved) {
+    return fbmSyncClearCredentialInExtension(ref).then(function () {
+      return callServer('fbmSaveConnection', [{ binding: binding, credential: { mode: 'clear' } }]);
+    }).then(function (saved) {
       if (!saved || saved.ok === false) { throw new Error(saved && (saved.message || saved.code) || 'Không xóa được cấu hình đăng nhập trên GAS.'); }
-      return fbmSyncClearCredentialInExtension(ref).then(function () { return fbmSyncApplyConnectionSaveResult(saved, null); });
+      return fbmSyncApplyConnectionSaveResult(saved, null);
     }).catch(function (error) {
       var reason = String(error && error.message || error);
       fbmSyncLogClientError(error, reason, 'credential_delete');
@@ -1131,6 +1135,12 @@ function fbmSyncSaveConnection(button) {
   var partialIdentity = !allIdentityEmpty && (!binding.spreadsheetId || !binding.userId || !binding.username || !binding.accountName);
   var hasUsername = !!credentials.username, hasPassword = !!credentials.password;
   var savedLogin = FBM_SYNC_CLIENT.loginStatus || {}, savedCredentialUsername = fbmSyncLoginUsernameValue(savedLogin), preservingCredential = hasUsername && !hasPassword && credentials.username === savedCredentialUsername, wantsCredentialDelete = savedLogin.configured === true && !hasUsername && !hasPassword;
+  if (savedLogin.usernameMetadataUnavailable === true && !hasUsername) {
+    fbmSyncSetAccountNotice('login', 'error', 'Không xác định được username đã lưu. Hãy nhập lại username và mật khẩu trước khi lưu hoặc xóa thông tin đăng nhập.');
+    fbmSyncPaintError(null, 'Không xác định được username đã lưu.');
+    if (button) { button.disabled = false; }
+    return Promise.resolve(null);
+  }
   if (partialIdentity) { fbmSyncSetAccountNotice('identity', 'error', 'Identity incomplete.'); fbmSyncPaintError(null, 'Identity incomplete.'); if (button) { button.disabled = false; } return Promise.resolve(null); }
   if (wantsCredentialDelete) {
     if (button) { button.disabled = false; }

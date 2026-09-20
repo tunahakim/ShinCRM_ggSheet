@@ -1,5 +1,9 @@
 <script>
 function fbmSyncLoginConfiguredBlocks() {
+  var login = FBM_SYNC_CLIENT.loginStatus || {};
+  if (login.usernameMetadataUnavailable === true) {
+    return [Notice({ kind: 'error', text: FBM_SYNC_ACCOUNT_SCHEMA.login.metadataUnavailableNotice })];
+  }
   return [];
 }
 function fbmSyncLoginActionBlocks() {
@@ -34,7 +38,7 @@ function fbmSyncLoginCard() {
   var login = FBM_SYNC_CLIENT.loginStatus || {}, configured = login.configured === true, editing = fbmSyncConfigIsEditing('connection');
   var passwordMarker = configured && (!editing || fbmSyncLoginPasswordMarkerVisible(login)), passwordValue = passwordMarker ? FBM_SYNC_ACCOUNT_SCHEMA.login.password.maskedValue : (configured ? '' : (editing ? '' : FBM_SYNC_ACCOUNT_SCHEMA.login.password.unconfiguredValue));
   var passwordPlaceholder = passwordMarker ? '' : (configured && editing ? FBM_SYNC_ACCOUNT_SCHEMA.login.password.newPlaceholder : FBM_SYNC_ACCOUNT_SCHEMA.login.password.placeholder);
-  var usernameValue = editing ? FBM_SYNC_CLIENT.loginDraft.username : (configured ? fbmSyncLoginUsernameValue(login) : FBM_SYNC_ACCOUNT_SCHEMA.login.username.unconfiguredValue);
+  var usernameValue = editing ? FBM_SYNC_CLIENT.loginDraft.username : (configured ? fbmSyncLoginUsernameDisplayValue(login) : FBM_SYNC_ACCOUNT_SCHEMA.login.username.unconfiguredValue);
   return FBM_SYNC_ACCOUNT_UI.layout.loginCard({
     titleActions: fbmSyncConfigTitleActions('login'), configured: fbmSyncLoginConfiguredBlocks(),
     username: StandaloneField(FBM_SYNC_ACCOUNT_SCHEMA.login.username.label, { id: FBM_SYNC_ACCOUNT_SCHEMA.login.username.id, kind: 'input', inputType: FBM_SYNC_ACCOUNT_SCHEMA.login.username.inputType, value: usernameValue, placeholder: FBM_SYNC_ACCOUNT_SCHEMA.login.username.placeholder, ariaLabel: FBM_SYNC_ACCOUNT_SCHEMA.login.username.label, disabled: !editing }),
@@ -64,7 +68,7 @@ function fbmSyncPatchAccount(panel, status) {
   if (!fbmSyncInteractiveControlIsEditing(loginCard) && !preserveLoginDraft && !connectionEditState.editing) { fbmSyncRenderTarget(FBM_SYNC_ACCOUNT_SCHEMA.regions.loginSection, [fbmSyncLoginCard()]); }
   else {
     fbmSyncRenderTarget(FBM_SYNC_ACCOUNT_SCHEMA.regions.loginConfigured, fbmSyncLoginConfiguredBlocks());
-    fbmSyncSetTargetState(FBM_SYNC_ACCOUNT_SCHEMA.login.username.id, { value: editing ? FBM_SYNC_CLIENT.loginDraft.username : fbmSyncLoginUsernameValue(login), disabled: !editing });
+    fbmSyncSetTargetState(FBM_SYNC_ACCOUNT_SCHEMA.login.username.id, { value: editing ? FBM_SYNC_CLIENT.loginDraft.username : fbmSyncLoginUsernameDisplayValue(login), disabled: !editing });
     if (!preserveLoginDraft) { fbmSyncSetTargetState(FBM_SYNC_ACCOUNT_SCHEMA.login.password.id, { value: configured && (!editing || fbmSyncLoginPasswordMarkerVisible(login)) ? FBM_SYNC_ACCOUNT_SCHEMA.login.password.maskedValue : (configured || editing ? '' : FBM_SYNC_ACCOUNT_SCHEMA.login.password.unconfiguredValue), placeholder: configured && editing && !fbmSyncLoginPasswordMarkerVisible(login) ? FBM_SYNC_ACCOUNT_SCHEMA.login.password.newPlaceholder : '', disabled: !editing }); }
     fbmSyncRenderTarget(FBM_SYNC_ACCOUNT_SCHEMA.regions.loginActions, fbmSyncLoginActionBlocks());
     fbmSyncRenderTarget(FBM_SYNC_ACCOUNT_SCHEMA.regions.loginNotice, fbmSyncAccountNoticeBlocks('login'));
