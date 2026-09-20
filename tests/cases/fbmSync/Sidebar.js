@@ -301,6 +301,13 @@ async function chay(so) {
     const connectionEdit = connection.querySelector('[data-sync-config-key="connection"]');
     check(so, 'Mot edit surface dieu khien ca hai vung', [!!connectionEdit, identitySection.querySelector('[data-sync-config-key="identity"]'), loginSection.querySelector('[data-sync-config-key="login"]')], [true, null, null]);
     check(so, 'Credential tuy chon van hien o che do xem', [dom.document.getElementById('fbm-login-password').disabled, dom.document.getElementById('fbm-login-password').value], [true, '']);
+    const backgroundAction = connection.querySelector('#fbm-sync-open-background-settings');
+    check(so, 'Nút cài đặt đồng bộ nền đi qua hàng action chung và được căn giữa', [backgroundAction && backgroundAction.parentNode.className, backgroundAction && backgroundAction.textContent], ['shin-row shin-single-action-row', 'Cài đặt đồng bộ nền']);
+    hop.fbmSyncConfigStartEdit('connection');
+    render(hop, content, hop.fbmSyncRenderAccount, idle);
+    const connectionSave = content.querySelector('[data-sync-config-action="save"]');
+    check(so, 'Surface kết nối khi sửa vẫn có đúng icon lưu ở card cha', [!!connectionSave, connectionSave && connectionSave.getAttribute('data-sync-config-key'), connectionSave && connectionSave.getAttribute('title')], [true, 'connection', 'Lưu thay đổi']);
+    hop.fbmSyncConfigFinishEdit('connection');
   let relayConfigurations = 0;
   hop.fbmSyncConfigureRelay = () => { relayConfigurations += 1; return Promise.resolve(null); };
   await hop.fbmSyncPrepareRelayForSidebarOpen();
