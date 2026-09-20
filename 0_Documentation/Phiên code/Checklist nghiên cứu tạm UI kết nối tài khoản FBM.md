@@ -58,8 +58,8 @@
 
 - [x] Có nút riêng `Xóa thông tin đăng nhập`; xóa bằng hai ô rỗng khi đã có credential dùng cùng popup xác nhận.
 - [x] Chưa từng có credential với hai ô rỗng không hiện popup xóa và giữ trạng thái `Chưa lưu`.
-- [x] Xóa thành công xóa vault Extension trước rồi mới xóa cấu hình GAS, tắt auto-login và giữ nguyên liên kết tài khoản.
-- [x] Extension lỗi khi xóa thì không gọi GAS tiếp và không báo thành công; test UserJourneys khóa thứ tự và nhánh lỗi.
+- [x] Xóa thành công xóa vault Extension trước rồi mới xóa cấu hình GAS, tắt auto-login và giữ nguyên liên kết tài khoản; cổng GAS được retry một lần theo thao tác idempotent.
+- [x] Extension lỗi khi xóa thì không gọi GAS tiếp và không báo thành công; GAS lỗi tạm thời được retry, lỗi cuối vẫn báo thất bại; test UserJourneys khóa các nhánh này.
 
 ## 2. Quy tắc tài liệu chuẩn áp dụng
 
@@ -220,8 +220,8 @@
 - [x] Khôi phục hiển thị username đầy đủ, xử lý legacy mask qua metadata vault và fail-closed khi metadata không đọc được.
 - [x] Rà lại semantics password rỗng: preserve credential cũ, không clear nhầm, marker không được gửi như password mới, plaintext không đi qua GAS.
 - [x] Rà lại mismatch khi chỉ sửa `Tên đăng nhập FBM`: popup xuất hiện khi hai username có giá trị và lệch; xác nhận lưu, hủy không gọi GAS.
-- [x] Thêm/điều chỉnh test cho Account không có dòng nền, Run layout dọc, username đầy đủ, mismatch, blank password preserve, marker focus/blur/realtime, legacy mask, xóa credential và nhánh lỗi vault.
-- [x] Chạy `node tests/run.js`: `1853 đạt, 0 không đạt`.
+- [x] Thêm/điều chỉnh test cho Account không có dòng nền, Run layout dọc, username đầy đủ, mismatch, blank password preserve, marker focus/blur/realtime, legacy mask, xóa credential, retry GAS và nhánh lỗi vault.
+- [x] Chạy `node tests/run.js`: `1854 đạt, 0 không đạt`.
 - [x] Chạy `git diff --check`: không có lỗi whitespace.
 - [x] Push GAS DEV bằng `node tests/gas.js fbmGetLoginConfig --push`; revision `@469` trả `OK`, `configured: true`, `public.usernameHint: ANHLT`.
 - [x] Chỉ sau khi kiểm thử pass mới commit nhóm thay đổi; commit `46c1575` không đưa file untracked có sẵn hoặc thay đổi Category gate ngoài phạm vi vào commit.
@@ -247,7 +247,7 @@
 | 2026-09-20 | Test trước phiên hiện tại | `node tests/run.js`: `1840 đạt, 0 không đạt` trước khi tạo file |
 | 2026-09-20 | Deployment trước phiên hiện tại | `node tests/gas.js fbmGetLoginConfig --push`: deployment `@468`, trả `OK`; chưa phải deployment của các sửa mới |
 | 2026-09-20 | Sửa core ActionStack và loại status nền khỏi Account | `node tests/run.js`: `1843 đạt, 0 không đạt`; test layout xác nhận hai Row nằm trong `shin-action-stack`, Account không còn vùng notice nền |
-| 2026-09-20 | Hoàn thiện credential state machine và kiểm thử xóa | Username legacy đọc metadata vault hoặc fail-closed; marker `********` focus/blur/realtime; preserve không mã hóa lại; xóa vault trước GAS và chặn partial failure; `node tests/run.js`: `1853 đạt, 0 không đạt`; `git diff --check` sạch |
+| 2026-09-20 | Hoàn thiện credential state machine và kiểm thử xóa | Username legacy đọc metadata vault hoặc fail-closed; marker `********` focus/blur/realtime; preserve không mã hóa lại; xóa vault trước GAS, retry GAS một lần và chặn partial failure; `node tests/run.js`: `1854 đạt, 0 không đạt`; `git diff --check` sạch |
 | 2026-09-20 | Commit và push nhóm credential/UI | Commit `46c1575 Hoàn thiện state machine credential FBM`; GAS DEV `@469`, `fbmGetLoginConfig --push` trả `OK`, username `ANHLT` |
 
 ## 7. Điểm tiếp tục sau khi context bị nén

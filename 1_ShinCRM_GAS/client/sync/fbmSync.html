@@ -1112,12 +1112,20 @@ function fbmSyncDeleteLoginCredential(button, bindingOverride) {
   var login = FBM_SYNC_CLIENT.loginStatus || {}, ref = String(login.credentialRef || '').trim(), binding = bindingOverride || (FBM_SYNC_CLIENT.identityStatus && FBM_SYNC_CLIENT.identityStatus.binding || {});
   if (!ref || login.configured !== true) { return Promise.resolve(null); }
   if (button) { button.disabled = true; }
+  var clearGasWithRetry = function (attempt) {
+    return callServer('fbmSaveConnection', [{ binding: binding, credential: { mode: 'clear' } }]).then(function (saved) {
+      if (!saved || saved.ok === false) { throw new Error(saved && (saved.message || saved.code) || 'Không xóa được cấu hình đăng nhập trên GAS.'); }
+      return saved;
+    }).catch(function (error) {
+      if (attempt < 1) { return clearGasWithRetry(attempt + 1); }
+      throw error;
+    });
+  };
   return fbmSyncConfirmCredentialDelete().then(function (confirmed) {
     if (!confirmed) { return null; }
     return fbmSyncClearCredentialInExtension(ref).then(function () {
-      return callServer('fbmSaveConnection', [{ binding: binding, credential: { mode: 'clear' } }]);
+      return clearGasWithRetry(0);
     }).then(function (saved) {
-      if (!saved || saved.ok === false) { throw new Error(saved && (saved.message || saved.code) || 'Không xóa được cấu hình đăng nhập trên GAS.'); }
       return fbmSyncApplyConnectionSaveResult(saved, null);
     }).catch(function (error) {
       var reason = String(error && error.message || error);

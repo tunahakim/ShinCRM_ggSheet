@@ -101,6 +101,12 @@ async function testConnectionSaveValidation(so) {
   hop.callServer = (name, args) => { if (name === 'fbmSaveConnection') { deleteOrder.push('gas'); } calls.push({ name, args }); return Promise.resolve({ ok: true, binding: hop.FBM_SYNC_CLIENT.identityStatus.binding, identityStatus: hop.FBM_SYNC_CLIENT.identityStatus, login: { configured: false, enabled: false } }); };
   await hop.fbmSyncDeleteLoginCredential(button);
   check(so, 'xoa credential xoa vault truoc GAS va khong bao thanh cong mot phan', [deleteOrder, calls[calls.length - 1].args[0].credential.mode], [['extension', 'gas'], 'clear']);
+  hop.FBM_SYNC_CLIENT.loginStatus = { enabled: true, configured: true, credentialRef: 'cred-retry-123', public: { usernameHint: 'USERA' } };
+  const retryOrder = [], retryCalls = { count: 0 };
+  hop.fbmSyncClearCredentialInExtension = () => { retryOrder.push('extension'); return Promise.resolve({ ok: true }); };
+  hop.callServer = (name, args) => { if (name === 'fbmSaveConnection') { retryOrder.push('gas'); retryCalls.count += 1; return Promise.resolve(retryCalls.count === 1 ? { ok: false, code: 'TEMPORARY_GAS_FAILURE' } : { ok: true, binding: hop.FBM_SYNC_CLIENT.identityStatus.binding, identityStatus: hop.FBM_SYNC_CLIENT.identityStatus, login: { configured: false, enabled: false } }); } calls.push({ name, args }); return Promise.resolve({ ok: true }); };
+  await hop.fbmSyncDeleteLoginCredential(button);
+  check(so, 'GAS loi tam thoi duoc retry idempotent sau khi vault da xoa', [retryOrder, retryCalls.count], [['extension', 'gas', 'gas'], 2]);
   hop.FBM_SYNC_CLIENT.loginStatus = { enabled: true, configured: true, credentialRef: 'cred-fail-123', public: { usernameHint: 'USERA' } };
   const failedDeleteOrder = [];
   hop.fbmSyncClearCredentialInExtension = () => { failedDeleteOrder.push('extension'); return Promise.reject(new Error('EXTENSION_CLEAR_FAILED')); };
