@@ -418,6 +418,14 @@ async function chay(so) {
     : [{ id: 'CUS-1', fbmId: 'FBM-CUS-1', fbmCustomerCode: 'ALT00001' }];
   const hydratedCandidate = compactLookupFlow.hop.FbmSync.hydratePushCandidate(pushWaitState.cursor.candidate);
   check(so, 'candidate compact được dựng lại từ Sheet trước bước push tiếp theo', [hydratedCandidate.record.content.length, hydratedCandidate.record.customerFbmCode, hydratedCandidate.record.stt_rec], [4000, 'ALT00001', 'FBM-CUS-1']);
+  const createCursor = { operation: 'customer_create_open', entity: 'customer', candidate: { kind: 'create', id: 'CUS-COMPACT', entity: 'customer' } };
+  const createState = compactLookupFlow.hop.FbmSync.stateRead(); createState.cursor = createCursor; createState.metadata.categoryGate = { map: {}, codesBySource: {}, blocked: {} };
+  compactLookupFlow.hop.FbmSync.customerCreateRequest = () => ({ url: 'https://example.test', meta: { kind: 'customer_create_save' } });
+  compactLookupFlow.hop.FbmSync.extractAutoCustomerCode = () => 'ALT00099';
+  compactLookupFlow.hop.FbmSync.validateAutoCustomerCode = () => ({ ok: true });
+  compactLookupFlow.hop.FbmSync.continuePush(createState, { d: { ClientScript: "_ma_kh_auto = 'ALT00099';" } });
+  check(so, 'candidate compact giữ mã Customer tự sinh cho nhánh khôi phục', compactLookupFlow.hop.FbmSync.stateRead().cursor.candidate.autoCode, 'ALT00099');
+  compactLookupFlow.documentProperties.setProperty('FBM_SYNC_STATE_V1', pushRawState);
   const previewOverflow = compactLookupFlow.hop.FbmSync.stateRead();
   previewOverflow.metadata.preview = { customers: Array.from({ length: 50 }, () => ({ code: 'C', name: 'N'.repeat(160), fbmId: 'F' })), activities: Array.from({ length: 50 }, () => ({ customerCode: 'C', date: '2026', type: 'GD', content: 'A'.repeat(160) })), truncated: false };
   compactLookupFlow.hop.FbmSync.stateWrite(previewOverflow);

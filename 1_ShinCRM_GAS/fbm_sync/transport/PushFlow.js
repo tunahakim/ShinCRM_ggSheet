@@ -316,7 +316,7 @@ FbmSync.continuePush = function (state, response) {
     var codeCheck = FbmSync.validateAutoCustomerCode(autoCode);
     if (!codeCheck.ok) { throw new Error(codeCheck.reason); }
     if (!autoCode) { throw new Error('Không lấy được _ma_kh_auto từ form tạo Customer.'); }
-    candidate.autoCode = autoCode; cursor.operation = 'customer_create_save'; state.cursor = cursor; FbmSync.stateWrite(state);
+    candidate.autoCode = autoCode; cursor.candidate = typeof FbmSync.pushCandidateForState === 'function' ? FbmSync.pushCandidateForState(candidate) : candidate; cursor.operation = 'customer_create_save'; state.cursor = cursor; FbmSync.stateWrite(state);
     return FbmSync.customerCreateRequest(candidate.record, autoCode, '', gate);
   }
   if (cursor.operation === 'customer_edit_open') {
