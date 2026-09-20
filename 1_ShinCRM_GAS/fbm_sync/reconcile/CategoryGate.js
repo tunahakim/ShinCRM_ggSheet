@@ -62,13 +62,10 @@ FbmSync.readCategoryGate = function () {
 
 /** Giữ đúng phần gate cần cho các lượt GAS tiếp theo; bỏ các bản sao dẫn xuất. */
 FbmSync.categoryGateForState = function (categoryGate) {
-  var source = categoryGate || {}, compact = { map: {}, namesBySource: {}, blocked: {} };
+  var source = categoryGate || {}, compact = { map: {}, codesBySource: {}, blocked: {} };
   Object.keys(source.map || {}).forEach(function (key) { compact.map[key] = source.map[key]; });
   Object.keys(source.namesBySource || {}).forEach(function (sourceName) {
-    compact.namesBySource[sourceName] = {};
-    Object.keys(source.namesBySource[sourceName] || {}).forEach(function (code) {
-      compact.namesBySource[sourceName][code] = source.namesBySource[sourceName][code];
-    });
+    compact.codesBySource[sourceName] = Object.keys(source.namesBySource[sourceName] || {});
   });
   Object.keys(source.blocked || {}).forEach(function (key) { compact.blocked[key] = source.blocked[key]; });
   return compact;
@@ -85,8 +82,8 @@ FbmSync.categoryCode = function (categoryGate, source, value) {
 FbmSync.categoryValueAllowed = function (categoryGate, source, value) {
   var text = String(value === null || value === undefined ? '' : value).trim();
   if (!text) { return { ok: true, code: '' }; }
-  var valid = categoryGate && categoryGate.valid && categoryGate.valid[source], mapped = categoryGate && categoryGate.map && categoryGate.map[source + '\u001f' + text], names = categoryGate && categoryGate.namesBySource && categoryGate.namesBySource[source];
-  if (!valid && !mapped && !(names && Object.prototype.hasOwnProperty.call(names, text))) { return { ok: false, code: '', reason: 'Giá trị danh mục "' + text + '" chưa có mã FBM trong Category.' }; }
+  var valid = categoryGate && categoryGate.valid && categoryGate.valid[source], mapped = categoryGate && categoryGate.map && categoryGate.map[source + '\u001f' + text], codes = categoryGate && categoryGate.codesBySource && categoryGate.codesBySource[source];
+  if (!valid && !mapped && !(codes && codes.indexOf(text) >= 0)) { return { ok: false, code: '', reason: 'Giá trị danh mục "' + text + '" chưa có mã FBM trong Category.' }; }
   if (valid && !valid[text]) { return { ok: false, code: '', reason: 'Giá trị danh mục "' + text + '" chưa có mã FBM trong Category.' }; }
   var code = FbmSync.categoryCode(categoryGate, source, text), blocked = categoryGate && categoryGate.blocked && categoryGate.blocked[source + '\u001f' + code];
   return blocked ? { ok: false, code: code, reason: blocked } : { ok: true, code: code };

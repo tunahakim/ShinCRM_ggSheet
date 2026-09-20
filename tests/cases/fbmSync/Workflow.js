@@ -325,9 +325,23 @@ async function chay(so) {
   const batchCursor = batchLimitFlow.hop.FbmSync.detailCursorRead();
   check(so, 'Số Customer mỗi lượt = 3 được áp dụng và cursor đến Customer thứ 4', [batchState.detailCustomerLimit, firstBatchRequest.body.count, secondBatchRequest, batchCursor.pageIndex, batchCursor.pageValue[2]], [3, 3, null, 0, '3']);
   const compactLookupFlow = workflowGas();
-  const compactLookupNames = {};
-  compactLookupFlow.hop.FbmSync.SYNC_LOOKUPS.forEach((item, index) => { compactLookupNames[item.key] = {}; compactLookupNames[item.key]['CODE-' + index] = 'Name-' + index; });
-  compactLookupFlow.hop.FbmSync.readCategoryGate = () => ({ map: {}, names: {}, namesBySource: compactLookupNames, valid: {}, warnings: [] });
+  const compactLookupNames = {}, compactLookupMap = {}, compactLookupValid = {}, compactLookupAllNames = {};
+  const liveCategoryCounts = [63, 11, 12, 17];
+  compactLookupFlow.hop.FbmSync.SYNC_LOOKUPS.forEach((item, index) => {
+    compactLookupNames[item.key] = {};
+    compactLookupValid[item.key] = {};
+    for (let categoryIndex = 0; categoryIndex < liveCategoryCounts[index]; categoryIndex += 1) {
+      const code = categoryIndex === 0 ? 'CODE-' + index : 'LIVE-' + index + '-' + categoryIndex;
+      const name = 'Tên danh mục live ' + index + ' ' + categoryIndex + ' có tên đủ dài';
+      const value = 'Giá trị Sheet ' + index + ' ' + categoryIndex;
+      compactLookupNames[item.key][code] = name;
+      compactLookupValid[item.key][code] = true;
+      compactLookupValid[item.key][value] = true;
+      compactLookupMap[item.key + '\u001f' + value] = code;
+      compactLookupAllNames[code] = name;
+    }
+  });
+  compactLookupFlow.hop.FbmSync.readCategoryGate = () => ({ map: compactLookupMap, names: compactLookupAllNames, namesBySource: compactLookupNames, valid: compactLookupValid, warnings: [] });
   compactLookupFlow.hop.FbmSync.start({ mode: 'read', origin: 'manual', scan: 'full' });
   const compactContinue = (body) => {
     const requestId = compactLookupFlow.hop.FbmSync.stateRead().activeRequestId;
@@ -336,24 +350,27 @@ async function chay(so) {
   compactContinue({ d: { Authorized: 'customer-auth' } });
   compactContinue({ d: { Authorized: 'activity-auth' } });
   let compactLast = null;
+  let compactPairValue = '';
   compactLookupFlow.hop.FbmSync.SYNC_LOOKUPS.forEach((item, index) => {
-    const rows = Array.from({ length: 700 }, (_, rowIndex) => ['NOISE-' + index + '-' + rowIndex, 'Tên dài để mô phỏng danh mục lớn']);
-    rows.push(['CODE-' + index, 'Name-' + index]);
+    const rows = Object.keys(compactLookupNames[item.key]).map((code) => [code, compactLookupNames[item.key][code]]);
+    rows.push(...Array.from({ length: 700 }, (_, rowIndex) => ['NOISE-' + index + '-' + rowIndex, 'Tên dài để mô phỏng danh mục lớn']));
     compactLast = compactContinue({ d: { TotalRowCount: rows.length, Rows: rows } });
+    if (index === 0) { compactPairValue = compactLookupFlow.hop.FbmSync.stateRead().session.lookups['@CAT_TINH_THANH'].pairs['CODE-0']; }
   });
   const compactState = compactLookupFlow.hop.FbmSync.stateRead();
   const compactStateBytes = Buffer.byteLength(JSON.stringify(compactState), 'utf8');
   check(so, 'lookup lớn chỉ giữ cặp Category cần dùng, không làm đầy DocumentProperties', [
     compactLast.request && compactLast.request.meta.kind,
     compactStateBytes < compactLookupFlow.hop.FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT,
-    compactState.session.lookups['@CAT_TINH_THANH'].pairs['CODE-0'],
+    compactPairValue,
     JSON.stringify(compactState).indexOf('NOISE-') < 0,
     compactState.metadata.categoryGate && compactState.metadata.categoryGate.valid,
     compactState.metadata.categoryGate && compactState.metadata.categoryGate.names,
     compactState.metadata.categoryGate && Object.keys(compactState.metadata.categoryGate.map || {}).length,
-    compactState.metadata.categoryGate && Object.keys(compactState.metadata.categoryGate.namesBySource || {}).length,
+    compactState.metadata.categoryGate && Object.keys(compactState.metadata.categoryGate.codesBySource || {}).length,
+    Object.keys(compactState.session.lookups || {}).length,
     compactState.metadata.categoryGate && compactLookupFlow.hop.FbmSync.categoryValueAllowed(compactState.metadata.categoryGate, '@CAT_TINH_THANH', 'CODE-0')
-  ], ['grid', true, 'Name-0', true, undefined, undefined, 0, 4, { ok: true, code: 'CODE-0' }]);
+  ], ['grid', true, 'Tên danh mục live 0 0 có tên đủ dài', true, undefined, undefined, 103, 4, 0, { ok: true, code: 'CODE-0' }]);
   const htmlFailureFlow = workflowGas();
   const htmlLogs = [];
   htmlFailureFlow.hop.LOG_OK = 'ok'; htmlFailureFlow.hop.LOG_ERROR = 'error'; htmlFailureFlow.hop.LOG_CONFLICT = 'conflict';

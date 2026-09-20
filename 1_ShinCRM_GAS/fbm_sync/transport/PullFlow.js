@@ -438,7 +438,6 @@ FbmSync.continue = function (rawResponse) {
     if (state.mode === 'write' || state.mode === 'push') {
       // Category is user-owned configuration; sync only reads and validates it.
       state.message = 'Đã đọc danh mục FBM; đang đối chiếu Category...';
-      FbmSync.stateWrite(state);
     }
     return { ok: true, request: FbmSync.nextEnvelope(FbmSync.beginCustomerPull(state)), status: FbmSync.statusView() };
   }

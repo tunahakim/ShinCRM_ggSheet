@@ -15,6 +15,7 @@ FbmSync.prepareCategoryGate = function (state) {
   blocks.forEach(function (block) { if (block.source && block.code) { gate.blocked[block.source + '\u001f' + block.code] = block.reason; } });
   state.metadata.categoryGate = typeof FbmSync.categoryGateForState === 'function' ? FbmSync.categoryGateForState(gate) : gate;
   state.metadata.categoryBlocks = blocks;
+  if (state.session) { state.session.lookups = {}; }
   return blocks;
 };
 /** Ghi kết quả push theo record; chỉ giữ ID, request kind và hash, không giữ payload. */
