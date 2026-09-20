@@ -137,6 +137,20 @@
 | Đổi username và nhập password mới | `mode: save`, envelope mới từ Extension | Lưu credential mới và metadata username mới |
 | Identity đổi, không preserve credential | `mode: clear` | Xóa credential khỏi cấu hình GAS và tắt auto-login |
 
+## 3.8. Phương án hành vi đề xuất — CHƯA ĐƯỢC DUYỆT
+
+- Đổi nhãn để phân biệt tuyệt đối ba dữ liệu: `Tên nhận diện tài khoản FBM` (identity), `Username đăng nhập tự động FBM` (credential username) và `Mật khẩu đăng nhập tự động FBM` (credential secret).
+- Chế độ xem hiển thị đầy đủ identity username và credential username; không dùng `AN***` làm giá trị người dùng có thể hiểu là username thật. Ô mật khẩu chỉ hiển thị trạng thái `Đã lưu`/`Chưa có`, không hiển thị plaintext.
+- Khi vào edit: username giữ đầy đủ giá trị hiện tại; password để trống nhưng có giải thích rõ `Để trống để giữ mật khẩu hiện tại; nhập giá trị mới để thay đổi`.
+- Không đổi gì: `preserve`, giữ nguyên cả credential username và password cũ.
+- Chỉ đổi identity username: hiện popup mismatch nếu credential username đầy đủ và khác; xác nhận lưu identity, giữ credential, không tự clear credential.
+- Đổi credential username nhưng password rỗng: chặn với thông báo cụ thể yêu cầu nhập password tương ứng; không gọi GAS và không coi đây là preserve.
+- Đổi credential username kèm password mới: tạo credential mới; nếu khác identity thì popup xác nhận, xác nhận vẫn cho lưu.
+- Xóa credential phải là thao tác rõ ràng riêng có xác nhận; không suy diễn `ô trống` thành xóa.
+- Với dữ liệu legacy `AN***`, phương án ưu tiên là Extension đọc username đầy đủ từ vault local và chỉ trả metadata username, không trả password/envelope; nếu vault không đọc được thì hiển thị trạng thái `Chưa xác định` và yêu cầu người dùng nhập lại username/password để thay credential, không so mismatch bằng chuỗi mask.
+- Layout UI: `Row` chỉ đại diện các phần tử cùng một dòng; core `Flow/Stack` sở hữu khoảng cách dọc giữa các block; `ActionGroup` sở hữu quy tắc các lệnh độc lập. Không sửa bằng margin cục bộ màn Run.
+- Toàn bộ audit UI theo yêu cầu của chủ dự án đang ở trạng thái chờ lệnh; chưa rà toàn bộ codebase và chưa tick mục audit.
+
 ## 4. Việc cần làm theo thứ tự
 
 - [x] Đọc Extension để xác định hợp đồng metadata username; code hiện tại trả username đầy đủ, còn `AN***` là dữ liệu metadata đã tồn tại trong GAS/deployment.
