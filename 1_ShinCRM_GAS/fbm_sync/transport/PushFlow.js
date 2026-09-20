@@ -13,7 +13,7 @@ FbmSync.prepareCategoryGate = function (state) {
   state.metadata = state.metadata || {};
   gate.blocked = {};
   blocks.forEach(function (block) { if (block.source && block.code) { gate.blocked[block.source + '\u001f' + block.code] = block.reason; } });
-  state.metadata.categoryGate = gate;
+  state.metadata.categoryGate = typeof FbmSync.categoryGateForState === 'function' ? FbmSync.categoryGateForState(gate) : gate;
   state.metadata.categoryBlocks = blocks;
   return blocks;
 };

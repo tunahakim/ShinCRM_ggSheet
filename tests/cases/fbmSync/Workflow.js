@@ -51,6 +51,7 @@ function workflowGas(options) {
     'fbm_sync/write/RequestBuilders.js',
     'fbm_sync/auth/AutoLogin.js',
     'fbm_sync/transport/TransportCore.js',
+    'fbm_sync/transport/PushFlow.js',
     'fbm_sync/transport/PullFlow.js',
     'fbm_sync/transport/EntryPoints.js'
   );
@@ -327,7 +328,6 @@ async function chay(so) {
   const compactLookupNames = {};
   compactLookupFlow.hop.FbmSync.SYNC_LOOKUPS.forEach((item, index) => { compactLookupNames[item.key] = {}; compactLookupNames[item.key]['CODE-' + index] = 'Name-' + index; });
   compactLookupFlow.hop.FbmSync.readCategoryGate = () => ({ map: {}, names: {}, namesBySource: compactLookupNames, valid: {}, warnings: [] });
-  compactLookupFlow.hop.FbmSync.prepareCategoryGate = (state) => { state.metadata = state.metadata || {}; state.metadata.categoryGate = compactLookupFlow.hop.FbmSync.readCategoryGate(); state.metadata.categoryBlocks = []; return []; };
   compactLookupFlow.hop.FbmSync.start({ mode: 'read', origin: 'manual', scan: 'full' });
   const compactContinue = (body) => {
     const requestId = compactLookupFlow.hop.FbmSync.stateRead().activeRequestId;
@@ -347,8 +347,13 @@ async function chay(so) {
     compactLast.request && compactLast.request.meta.kind,
     compactStateBytes < compactLookupFlow.hop.FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT,
     compactState.session.lookups['@CAT_TINH_THANH'].pairs['CODE-0'],
-    JSON.stringify(compactState).indexOf('NOISE-') < 0
-  ], ['grid', true, 'Name-0', true]);
+    JSON.stringify(compactState).indexOf('NOISE-') < 0,
+    compactState.metadata.categoryGate && compactState.metadata.categoryGate.valid,
+    compactState.metadata.categoryGate && compactState.metadata.categoryGate.names,
+    compactState.metadata.categoryGate && Object.keys(compactState.metadata.categoryGate.map || {}).length,
+    compactState.metadata.categoryGate && Object.keys(compactState.metadata.categoryGate.namesBySource || {}).length,
+    compactState.metadata.categoryGate && compactLookupFlow.hop.FbmSync.categoryValueAllowed(compactState.metadata.categoryGate, '@CAT_TINH_THANH', 'CODE-0')
+  ], ['grid', true, 'Name-0', true, undefined, undefined, 0, 4, { ok: true, code: 'CODE-0' }]);
   const htmlFailureFlow = workflowGas();
   const htmlLogs = [];
   htmlFailureFlow.hop.LOG_OK = 'ok'; htmlFailureFlow.hop.LOG_ERROR = 'error'; htmlFailureFlow.hop.LOG_CONFLICT = 'conflict';
