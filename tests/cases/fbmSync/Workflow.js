@@ -415,6 +415,27 @@ async function chay(so) {
     probe.state.metadataCategoryGateBytes > 0, probe.state.sessionLookupsBytes, probe.largestProperties[0].key,
     JSON.stringify(probe).indexOf('ACT-QUOTA') < 0
   ], [true, true, 'push_wait', 0, true, 2, 'FBM_SYNC_STATE_V1', true]);
+  const orderFlow = workflowGas();
+  const orderState = orderFlow.hop.FbmSync.stateStart('', 'push', 0);
+  orderState.mode = 'write'; orderState.phase = 'push'; orderState.entity = 'activity'; orderState.metadata.categoryGate = { map: {}, codesBySource: {}, blocked: {} };
+  orderState.cursor = { kind: 'push_scan', entity: 'activity', index: 0 };
+  orderFlow.hop.FbmSync.stateWrite(orderState);
+  orderFlow.hop.FbmSync.pushCandidates = () => [{ kind: 'edit', id: 'ACT-ORDER', record: { id: 'ACT-ORDER', fbmId: 'FBM-ACT-ORDER', taskType: 'GD', content: 'Nội dung', workDate: '2026-09-20', customerId: 'CUS-1', customerFbmCode: 'ALT00001', allowFbmPush: 'Cho phép', fbmHash: 'old' } }];
+  orderFlow.hop.FbmSync.pushConfigErrors = () => '';
+  orderFlow.hop.FbmSync.pushOwnerError = () => '';
+  orderFlow.hop.FbmSync.validatePushCategories = () => [];
+  orderFlow.hop.FbmSync.pushEligibilityErrors = () => [];
+  orderFlow.hop.FbmSync.isRecordLocked = () => false;
+  orderFlow.hop.FbmSync.lockRecord = () => orderState;
+  orderFlow.hop.FbmSync.activityEditOpenRequest = () => ({ url: 'https://example.test', meta: { kind: 'activity_edit_open' } });
+  let orderSheetWrites = 0;
+  orderFlow.hop.FbmSync.writeGateSave = () => { orderSheetWrites += 1; return { ok: true }; };
+  const orderStateWrite = orderFlow.hop.FbmSync.stateWrite;
+  let orderWriteCount = 0;
+  orderFlow.hop.FbmSync.stateWrite = (state) => { orderWriteCount += 1; if (orderWriteCount === 1) { const error = new Error('quota'); error.code = 'FBM_DOCUMENT_PROPERTIES_QUOTA'; throw error; } return orderStateWrite(state); };
+  let orderError = null;
+  try { orderFlow.hop.FbmSync.nextPushRequest(orderState); } catch (error) { orderError = error; }
+  check(so, 'state push được chốt trước khi đánh dấu Sheet đang đẩy', [orderError && orderError.code, orderSheetWrites, orderFlow.hop.FbmSync.stateRead().cursor.kind], ['FBM_DOCUMENT_PROPERTIES_QUOTA', 0, 'push_scan']);
   const htmlFailureFlow = workflowGas();
   const htmlLogs = [];
   htmlFailureFlow.hop.LOG_OK = 'ok'; htmlFailureFlow.hop.LOG_ERROR = 'error'; htmlFailureFlow.hop.LOG_CONFLICT = 'conflict';

@@ -279,11 +279,11 @@ FbmSync.nextPushRequest = function (state) {
       request = candidate.kind === 'create' ? FbmSync.activityCreateRequest(candidate.record, state.metadata.categoryGate) : FbmSync.activityEditOpenRequest(candidate.record.fbmId);
     }
     if (typeof FbmSync.lockRecord === 'function') { state = FbmSync.lockRecord(entity, candidate.id, candidate.record.fbmHash || '', 'sync'); }
+    state.phase = 'push'; state.entity = entity; state.current = candidate.id; state.cursor = { kind: 'push_wait', operation: request.meta.kind, entity: entity, index: index, candidate: candidate };
+    state.message = 'Đang đẩy ' + (entity === 'customer' ? 'khách hàng' : 'giao dịch') + ' ' + candidate.id + '...'; FbmSync.stateWrite(state);
     if (typeof writeGateSave === 'function') {
       try { writeGateSave({ entity: entity, records: [{ id: candidate.id, syncStatus: FbmSync.SYNC_STATUS.pushing }], source: 'push', schemas: [DATA_SCHEMA, SYNC_SCHEMA] }); } catch (ignore) {}
     }
-    state.phase = 'push'; state.entity = entity; state.current = candidate.id; state.cursor = { kind: 'push_wait', operation: request.meta.kind, entity: entity, index: index, candidate: candidate };
-    state.message = 'Đang đẩy ' + (entity === 'customer' ? 'khách hàng' : 'giao dịch') + ' ' + candidate.id + '...'; FbmSync.stateWrite(state);
     return request;
   }
   if (entity === 'customer') {
