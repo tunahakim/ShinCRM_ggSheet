@@ -31,7 +31,7 @@ function workflowGas(options) {
     DATA_SCHEMA: {},
     SYNC_SCHEMA: {},
     PropertiesService: { getDocumentProperties: () => documentProperties, getScriptProperties: () => scriptProperties },
-    Utilities: { getUuid: () => 'workflow-uuid' },
+    Utilities: { getUuid: () => 'workflow-uuid', newBlob: (value) => ({ getBytes: () => Buffer.from(String(value), 'utf8') }) },
     shinOpenBook: () => ({ getId: () => 'sheet-workflow' }),
     logEvent: () => {},
     logTrace: () => {}
@@ -412,11 +412,17 @@ async function chay(so) {
     pushRawState.length,
     pushRawParsed && pushRawParsed.cursor && pushRawParsed.cursor.kind
   ], [true, 'push_wait', false, false, 163, -1, 103, 'push_wait', 'activity_edit_open', pushRawState.length, 'push_wait']);
+  check(so, 'state push raw size remains below quota after candidate compact', Buffer.byteLength(pushRawState, 'utf8') < compactLookupFlow.hop.FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT, true);
   compactLookupFlow.hop.FbmSync.readLocal = (entity) => entity === 'activity'
     ? [{ id: 'ACT-QUOTA', fbmId: 'FBM-ACT-QUOTA', content: 'x'.repeat(4000), customerId: 'CUS-1' }]
     : [{ id: 'CUS-1', fbmId: 'FBM-CUS-1', fbmCustomerCode: 'ALT00001' }];
   const hydratedCandidate = compactLookupFlow.hop.FbmSync.hydratePushCandidate(pushWaitState.cursor.candidate);
   check(so, 'candidate compact được dựng lại từ Sheet trước bước push tiếp theo', [hydratedCandidate.record.content.length, hydratedCandidate.record.customerFbmCode, hydratedCandidate.record.stt_rec], [4000, 'ALT00001', 'FBM-CUS-1']);
+  const previewOverflow = compactLookupFlow.hop.FbmSync.stateRead();
+  previewOverflow.metadata.preview = { customers: Array.from({ length: 50 }, () => ({ code: 'C', name: 'N'.repeat(160), fbmId: 'F' })), activities: Array.from({ length: 50 }, () => ({ customerCode: 'C', date: '2026', type: 'GD', content: 'A'.repeat(160) })), truncated: false };
+  compactLookupFlow.hop.FbmSync.stateWrite(previewOverflow);
+  const compactPreviewState = compactLookupFlow.hop.FbmSync.stateRead();
+  check(so, 'preview quá lớn tự cắt và giữ state nghiệp vụ trong quota', [compactPreviewState.metadata.preview.truncated, Buffer.byteLength(compactLookupFlow.documentProperties.data.FBM_SYNC_STATE_V1, 'utf8') <= compactLookupFlow.hop.FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT], [true, true]);
   const probeState = compactLookupFlow.hop.FbmSync.stateRead();
   compactLookupFlow.documentProperties.setProperty('FBM_SYNC_PENDING_PUSHES_V1', 'x'.repeat(42));
   const probe = compactLookupFlow.hop.fbmSyncStateProbe();

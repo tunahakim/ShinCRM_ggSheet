@@ -157,6 +157,23 @@ FbmSync.stateRead = function () {
     return Object.assign(fallback, parsed, { counts: Object.assign(fallback.counts, parsed.counts || {}), session: Object.assign(fallback.session, parsed.session || {}), metadata: Object.assign(fallback.metadata, metadata, { seen: Object.assign(fallback.metadata.seen, metadata.seen || {}), conflicts: Array.isArray(metadata.conflicts) ? metadata.conflicts : [], pushSucceeded: Number(metadata.pushSucceeded || 0), preflightIssues: Array.isArray(metadata.preflightIssues) ? metadata.preflightIssues : [], pushFailures: Object.assign(fallback.metadata.pushFailures, metadata.pushFailures || {}), pushFailureDetails: Object.assign(fallback.metadata.pushFailureDetails, metadata.pushFailureDetails || {}), callbackTrace: metadata.callbackTrace || null, manualPending: metadata.manualPending || null, preview: Object.assign(fallback.metadata.preview, metadata.preview || {}) }), locks: parsed.locks || {} });
   } catch (err) { return fallback; }
 };
+/** Bỏ preview tùy chọn trước khi bỏ state nghiệp vụ khi gần chạm trần property. */
+FbmSync.compactStatePreview = function (state) {
+  var value = state || {}, metadata = value.metadata || {}, preview = metadata.preview;
+  if (!preview || typeof preview !== 'object') { return value; }
+  var bytes = function () {
+    var raw = '';
+    try { raw = JSON.stringify(value); } catch (ignore) { return Number.MAX_SAFE_INTEGER; }
+    try { if (typeof Utilities !== 'undefined' && Utilities.newBlob) { return Utilities.newBlob(raw).getBytes().length; } } catch (ignoreBytes) {}
+    return raw.length;
+  };
+  if (bytes() <= FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT) { return value; }
+  preview.truncated = true;
+  while (bytes() > FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT && Array.isArray(preview.activities) && preview.activities.length) { preview.activities.pop(); }
+  while (bytes() > FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT && Array.isArray(preview.customers) && preview.customers.length) { preview.customers.pop(); }
+  if (bytes() > FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT) { preview.activities = []; preview.customers = []; }
+  return value;
+};
 /** Ghi state, cập nhật timestamp và giữ cấu trúc nhất quán. */
 FbmSync.stateWrite = function (state) {
   var next = Object.assign(FbmSync.stateDefault(), state || {});
@@ -173,6 +190,7 @@ FbmSync.stateWrite = function (state) {
   next.metadata.preview = Object.assign(FbmSync.stateDefault().metadata.preview, next.metadata.preview || {});
   next.counts = Object.assign(FbmSync.stateDefault().counts, next.counts || {});
   next.updatedAt = Date.now();
+  FbmSync.compactStatePreview(next);
   var stateWrite = FbmSync.documentPropertySet(FbmSync.STATE_KEY, JSON.stringify(next), 'state');
   if (!stateWrite.ok) { throw stateWrite.error; }
   return next;
