@@ -90,7 +90,7 @@
 - Tệp client: `1_ShinCRM_GAS/client/sync/fbmSyncConfigEditor.html`, hàm `fbmSyncLoginUsernameValue()` lấy `public.usernameHint` để dựng giá trị username.
 - Tệp GAS: `1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js`, `loginConfigSave()` lưu `safePublic.usernameHint` từ metadata Extension; `loginConfigPublic()` trả metadata này ra Sidebar.
 - Deployment DEV tại thời điểm nghiên cứu trả `public.usernameHint: "AN***"`, nên dữ liệu credential hiện có hoặc Extension đang dùng giá trị đã mask. Không được kết luận chỉ từ UI rằng password bị mã hóa; cần tách rõ mask username, envelope password và dữ liệu cũ.
-- Tệp Extension cần đọc ở bước tiếp theo để xác định nguồn mask: `2_ShinCRM_Extension/background/service_worker.js` quanh các nhánh `FBM_ENCRYPT_CREDENTIALS`/`usernameHint`, và `2_ShinCRM_Extension/content_scripts/bridge/iframe_bridge.js` quanh `CRM_FBM_CREDENTIALS`.
+- Đã đọc Extension: `2_ShinCRM_Extension/background/service_worker.js:190-200` cho thấy `saveCredentialEnvelope()` mã hóa payload gồm username/password bằng AES-GCM, lưu key/envelope ở vault local Extension, và trả `public.usernameHint: username` đầy đủ; `iframe_bridge.js` chỉ chuyển request/result, không mask username. Test `tests/cases/extensionBridge.js` cũng khóa luật metadata username đầy đủ.
 - Patch trước đã thêm `fbmSyncUsernameComparable()` để coi username chứa `*` là không đủ dữ kiện so mismatch; đây chỉ là biện pháp tránh cảnh báo giả, chưa đáp ứng yêu cầu phải hiển thị đầy đủ username.
 
 ### 3.4. Luồng edit surface và cổng lưu
@@ -116,9 +116,30 @@
 - Nếu `public.usernameHint` đang là `AN***`, phép so sánh `credentials.username === savedCredentialUsername` không thể coi `AN***` là username thật `ANHLT`; đây là nguồn rủi ro chính cho câu hỏi “password rỗng đang giữ hay xóa”.
 - Chưa được kết luận giá trị password thật sau thao tác không đổi cho tới khi kiểm tra payload test và `FbmSync.connectionSave()`/`loginConfigClearCredential()` trên từng nhánh.
 
+### 3.6. Kết luận hành vi hiện tại cho năm câu hỏi của chủ dự án
+
+- Câu 1: Dòng trạng thái nền hiện vẫn được dựng ở `fbmSyncConnectionStatusBlocks()` và truyền vào card kết nối Account; nó chưa được xóa.
+- Câu 2: Hai nút Run dính là lỗi trực tiếp của patch trước: hai `shin-single-action-row` được đưa làm sibling trực tiếp vào `Box` action không có `Stack/gap`. CSS `gap` của từng Row chỉ áp dụng bên trong Row; không tạo khoảng cách giữa hai Row. Đây chưa phải lỗi bản thân primitive `Row`, nhưng hệ thống thiếu API/ràng buộc ngăn cách ghép sai nên phải sửa ở layout dùng chung và thêm regression test.
+- Câu 3: Code Extension hiện tại không mask username khi mã hóa/lưu credential mới; nó trả username đầy đủ ở metadata và payload mã hóa. Giá trị `AN***` đang xuất hiện vì metadata `public.usernameHint` đã lưu trong GAS/deployment hiện tại là chuỗi đã mask từ dữ liệu/lần lưu cũ. Sidebar hiện chỉ đọc metadata đó nên hiển thị lại `AN***`; GAS/Sidebar không có key để giải mã vault Extension và tự khôi phục `ANHLT`.
+- Câu 4: Khi identity username đổi nhưng `Username FBM` vẫn là username đầy đủ cũ, client sẽ phát hiện mismatch và popup trước khi gọi GAS; xác nhận thì gửi `mode: 'preserve'` và `keepOnIdentityChange: true`, nên identity mới được lưu còn credential cũ giữ nguyên. Nhưng nếu ô `Username FBM` đang là `AN***`, hàm `fbmSyncUsernameComparable()` cố ý bỏ qua chuỗi có `*`, nên hiện tại không cảnh báo; đây là lý do hành vi trong ảnh không đạt yêu cầu.
+- Câu 5, password: Mở edit không lấy plaintext password cũ; ô password rỗng. Nếu username trên form trùng `public.usernameHint` hiện tại và password để rỗng, client gửi `credential.mode: 'preserve'`; GAS không ghi envelope mới, nên password cũ trong vault Extension không bị thay bằng rỗng. Sau save, DOM password lại bị xóa. Nếu username form khác hint hiện tại mà password vẫn rỗng, client hiện chặn cục bộ vì chỉ có một trong hai trường username/password; chưa gọi GAS.
+- Câu 5, username: Với nhánh `preserve`, GAS giữ nguyên metadata/public username đang lưu. Nếu metadata hiện là `AN***`, nó vẫn là `AN***`; code hiện tại không tự biết hoặc khôi phục `ANHLT`. Credential thật trong vault Extension chỉ giữ nguyên giá trị cũ nếu nhánh preserve; nội dung vault không thể kết luận là `ANHLT` chỉ bằng dữ liệu GAS, nhưng nếu credential cũ được tạo đúng từ Extension hiện tại thì payload mã hóa đã chứa username đầy đủ.
+- Câu 5, nhánh xóa: Nếu identity thay đổi nhưng client không đặt `keepOnIdentityChange: true`, `FbmSync.connectionSave()` đổi `preserve` thành `clear`; `loginConfigClearCredential()` xóa ref/envelope/public khỏi cấu hình GAS và tắt auto-login. Việc đó không đồng nghĩa đã xóa vault local Extension, trừ khi có luồng clear Extension riêng.
+
+### 3.7. Ma trận payload hiện tại cần chủ dự án duyệt
+
+| Tình huống | Client hiện gửi | GAS hiện làm |
+|---|---|---|
+| Không đổi identity, username đầy đủ giữ nguyên, password rỗng | `mode: preserve` | Giữ envelope/password/public cũ |
+| Không đổi identity, username đang là `AN***`, password rỗng | `mode: preserve` | Giữ nguyên cấu hình GAS đang chứa `AN***`; không khôi phục `ANHLT` |
+| Chỉ đổi identity username, credential username đầy đủ cũ, password rỗng, xác nhận popup | `mode: preserve`, `keepOnIdentityChange: true` | Lưu identity mới, giữ credential cũ; hai username có thể lệch theo chủ ý |
+| Đổi `Username FBM` nhưng để password rỗng | Bị client chặn trước GAS nếu username khác hint hiện tại | Không có ghi |
+| Đổi username và nhập password mới | `mode: save`, envelope mới từ Extension | Lưu credential mới và metadata username mới |
+| Identity đổi, không preserve credential | `mode: clear` | Xóa credential khỏi cấu hình GAS và tắt auto-login |
+
 ## 4. Việc cần làm theo thứ tự
 
-- [ ] Đọc Extension để xác định chính xác nguồn `AN***` và hợp đồng metadata username; không sửa fixture nghiên cứu FBM.
+- [x] Đọc Extension để xác định hợp đồng metadata username; code hiện tại trả username đầy đủ, còn `AN***` là dữ liệu metadata đã tồn tại trong GAS/deployment.
 - [ ] Đọc đầy đủ renderer `Row`, `Stack`, `Box` và CSS component liên quan để chọn helper/layout chung phù hợp.
 - [ ] Chốt thiết kế layout action dọc: một API/container sở hữu gap, không lặp class hoặc margin tại màn Run.
 - [ ] Xóa status line nền khỏi Account ở schema/render/patch và cập nhật test snapshot/hành vi liên quan.
@@ -149,6 +170,7 @@
 |---|---|---|
 | 2026-09-20 | Đọc tài liệu UI FBM, mục lục 09, checklist rà soát và Câu hỏi đêm | Đã ghi các ràng buộc liên quan ở mục 2 |
 | 2026-09-20 | Rà code Account/Run/editor/shell/CSS | Đã xác nhận nguyên nhân hai Row Run dính nhau ở mục 3.2 |
+| 2026-09-20 | Đọc Extension và truy vết các nhánh save/preserve/clear | Đã ghi câu trả lời hiện tại cho 5 câu hỏi và ma trận payload ở mục 3.6–3.7; chưa sửa code |
 | 2026-09-20 | Test trước phiên hiện tại | `node tests/run.js`: `1840 đạt, 0 không đạt` trước khi tạo file |
 | 2026-09-20 | Deployment trước phiên hiện tại | `node tests/gas.js fbmGetLoginConfig --push`: deployment `@468`, trả `OK`; chưa phải deployment của các sửa mới |
 
