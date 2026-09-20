@@ -137,64 +137,69 @@
 | Đổi username và nhập password mới | `mode: save`, envelope mới từ Extension | Lưu credential mới và metadata username mới |
 | Identity đổi, không preserve credential | `mode: clear` | Xóa credential khỏi cấu hình GAS và tắt auto-login |
 
-## 3.8. Phương án hành vi đề xuất — CHƯA ĐƯỢC DUYỆT
+## 3.8. Phương án hành vi đã được chủ dự án duyệt
 
-- Đổi nhãn để phân biệt tuyệt đối ba dữ liệu: `Tên nhận diện tài khoản FBM` (identity), `Username đăng nhập tự động FBM` (credential username) và `Mật khẩu đăng nhập tự động FBM` (credential secret).
-- Chế độ xem hiển thị đầy đủ identity username và credential username; không dùng `AN***` làm giá trị người dùng có thể hiểu là username thật. Ô mật khẩu chỉ hiển thị trạng thái `Đã lưu`/`Chưa có`, không hiển thị plaintext.
-- Khi vào edit: username giữ đầy đủ giá trị hiện tại; password để trống nhưng có giải thích rõ `Để trống để giữ mật khẩu hiện tại; nhập giá trị mới để thay đổi`.
-- Không đổi gì: `preserve`, giữ nguyên cả credential username và password cũ.
-- Chỉ đổi identity username: hiện popup mismatch nếu credential username đầy đủ và khác; xác nhận lưu identity, giữ credential, không tự clear credential.
-- Đổi credential username nhưng password rỗng: chặn với thông báo cụ thể yêu cầu nhập password tương ứng; không gọi GAS và không coi đây là preserve.
-- Đổi credential username kèm password mới: tạo credential mới; nếu khác identity thì popup xác nhận, xác nhận vẫn cho lưu.
-- Xóa credential phải là thao tác rõ ràng riêng có xác nhận; không suy diễn `ô trống` thành xóa.
-- Với dữ liệu legacy `AN***`, phương án ưu tiên là Extension đọc username đầy đủ từ vault local và chỉ trả metadata username, không trả password/envelope; nếu vault không đọc được thì hiển thị trạng thái `Chưa xác định` và yêu cầu người dùng nhập lại username/password để thay credential, không so mismatch bằng chuỗi mask.
-- Layout UI: `Row` chỉ đại diện các phần tử cùng một dòng; core `Flow/Stack` sở hữu khoảng cách dọc giữa các block; `ActionGroup` sở hữu quy tắc các lệnh độc lập. Không sửa bằng margin cục bộ màn Run.
-- Toàn bộ audit UI theo yêu cầu của chủ dự án đang ở trạng thái chờ lệnh; chưa rà toàn bộ codebase và chưa tick mục audit.
-- Trạng thái chưa từng có credential phải được hiển thị riêng: username/password đều `Chưa lưu`, nút đăng nhập thử bị khóa; khi edit, để trống cả hai không được hiểu là preserve vì chưa có gì để preserve.
-- Cần có thao tác rõ ràng `Xóa thông tin đăng nhập tự động`, tách khỏi thay đổi identity; phải xác nhận, xóa credential ở GAS và vault Extension, tắt auto-login, giữ nguyên liên kết tài khoản.
-- Sau khi xóa thành công, khối quay về trạng thái `Chưa lưu`; mọi lỗi xóa một phần phải báo rõ và ghi Log, không hiện thành công giả.
+- Giữ nguyên các nhãn hiện tại (`USERNAME FBM`, `MẬT KHẨU FBM`); nội dung trong ô và trạng thái tương tác phải đủ tường minh, không đổi nhãn để thay thế cho UX.
+- Username credential đã lưu phải hiển thị đầy đủ, ví dụ `ANHLT`; không mask thành `AN***`. Username nhận diện và username credential là hai giá trị độc lập, không tự ghi đè nhau.
+- Password đã lưu ở chế độ xem hoặc đang sửa nhưng chưa thao tác vào ô hiển thị đúng marker `********`; marker chỉ là dấu hiệu đã có mật khẩu, không phải giá trị thật.
+- Khi click vào ô password đã lưu, xóa marker, để input rỗng và dùng placeholder `Nhập mật khẩu mới`. Khi rời ô mà input rỗng, hoặc đã gõ rồi xóa hết rồi rời ô, khôi phục marker `********` và hiểu là preserve, không đổi password.
+- Giá trị password người dùng đang gõ vẫn giữ `type=password` để hiển thị dạng dấu chấm; không hiển thị plaintext mặc định. Có thể dùng icon mắt chung của core nếu phù hợp, nhưng không đổi giá trị password và không đưa password ra GAS/Sidebar DTO/log.
+- Mọi thay đổi trong ô username đều phải được theo dõi, gồm gõ, dán và thao tác menu chuột phải/phím tắt; có thể debounce khoảng 100 ms. Chỉ cập nhật vùng password, không dựng lại cả card làm mất focus/nội dung.
+- Có credential cũ và username hiện tại đúng `ANHLT`: password rỗng thì hiện lại `********`; password mới khác rỗng là update password.
+- Username khác `ANHLT`, kể cả rỗng: xóa marker, để password rỗng với placeholder `Nhập mật khẩu mới`; hiểu là đổi tài khoản hoặc ý định xóa. Nếu gõ lệch rồi quay lại `ANHLT`, password rỗng thì khôi phục marker; password đã nhập thì giữ draft.
+- Chỉ kiểm tra thiếu cặp khi bấm `Lưu thông tin`, không hiện cảnh báo trong lúc đang nhập. Username có mà password rỗng, hoặc password có mà username rỗng, đều chặn lưu và yêu cầu đủ cả hai; sau khi người dùng click lại để nhập thì notice lỗi cũ biến mất.
+- Cả username và password khác rỗng thì cho phép lưu credential mới. Cả hai rỗng khi chưa từng có credential là trạng thái `Chưa lưu`, không tạo credential và không hiện popup xóa.
+- Cả hai rỗng khi đang có credential và người dùng đã xóa username là yêu cầu xóa; không bao giờ xóa chỉ vì password rỗng.
+- Xóa credential dùng phương án kết hợp: có nút riêng `Xóa thông tin đăng nhập` và nhận diện thêm trường hợp người dùng làm cả hai ô rỗng rồi bấm `Lưu thông tin`. Hai đường đi dùng chung một popup và cùng nghiệp vụ xóa.
+- Popup xóa dùng đúng hai lựa chọn `[Quay lại]` và `[Xác nhận xóa]`, nêu rõ username/mật khẩu bị xóa nhưng liên kết tài khoản FBM vẫn giữ. Hủy không gọi GAS và giữ bản nháp.
+- Xác nhận xóa phải xóa cấu hình credential ở GAS, xóa credential tương ứng trong vault Extension, tắt auto-login, giữ nguyên `Liên kết tài khoản`, rồi trả khối về `Chưa lưu`. GAS và Extension không có transaction xuyên hệ thống nên phải có xử lý bù; không báo thành công nếu mới xóa một phía.
+- Khi hai username đều có giá trị và khác nhau, lúc lưu edit surface `connection` hiện popup cảnh báo; xác nhận vẫn cho lưu nguyên tử, hủy không gọi GAS. Mismatch banner nhỏ dưới header chỉ hiện khi module đang bật, trên mọi màn hình; banner không thay popup.
+- Khối `Chính sách tự đăng nhập` luôn có dòng trạng thái riêng phía trên: bật là `Đã bật tính năng đăng nhập tự động` màu xanh, tắt là `Đã tắt tính năng đăng nhập tự động` màu đỏ. Nếu policy bật nhưng chưa có credential thì thêm notice readiness riêng.
+- Nếu chưa có credential, không cho sửa policy; icon sửa vẫn có thể bấm để mở popup giải thích, có nút/link `Đi tới Đăng nhập tự động` và `[Quay lại]`, link tới đúng khối khai báo username/password.
+- Layout UI: `Row` chỉ đại diện phần tử cùng một dòng; container/`Stack`/`Flow` dùng chung sở hữu khoảng cách dọc giữa các action độc lập. Không sửa bằng margin cục bộ màn Run. Toàn bộ audit UI codebase vẫn chờ lệnh riêng, không mở rộng trong phiên này.
 
-## 3.9. Thảo luận bổ sung — CHƯA ĐƯỢC DUYỆT
+## 3.9. Chi tiết state machine đã được chủ dự án duyệt
 
-### Password: phân biệt mask, giá trị nhập và mã hóa
+### Password: phân biệt marker, giá trị nhập và mã hóa
 
 - Khi xem đã lưu: hiển thị `********`; đây là dấu hiệu có credential, không phải password thật.
 - Khi click vào ô password đã lưu: xóa dấu `********`, để input rỗng, placeholder `Nhập mật khẩu mới`.
 - Khi rời ô mà input vẫn rỗng: khôi phục `********`, đánh dấu `preserve`; không đổi password.
 - Khi người dùng gõ rồi xóa hết và rời ô: cũng khôi phục `********`, đánh dấu `preserve`.
 - Khi input có giá trị: đây là password mới cần lưu. Mã hóa chỉ diễn ra tại Extension trước khi gửi credential đi lưu.
-- Về an toàn, đề xuất giữ `type=password` và che các ký tự đang gõ; nếu chủ dự án bắt buộc nhìn plaintext từng ký tự thì phải chấp nhận rủi ro lộ mật khẩu qua người đứng cạnh, ảnh chụp và quay màn hình. Đây là điểm cần duyệt riêng.
+- Input luôn dùng `type=password`, ký tự đang gõ hiển thị dạng dấu chấm; giá trị tạm vẫn giữ nguyên để submit. Icon mắt chỉ là tùy chọn theo component chung, không hiển thị plaintext mặc định.
 
 ### Realtime username và password
 
-- Theo dõi username với debounce khoảng 100 ms; chỉ cập nhật trạng thái password, không dựng lại cả card làm mất focus.
+- Theo dõi username với debounce khoảng 100 ms kể từ thay đổi cuối; bao gồm gõ, dán, chuột phải và phím tắt. Chỉ cập nhật vùng password, không dựng lại card.
 - Có credential đã lưu, username hiện tại đúng `ANHLT`: password ở trạng thái `********`/preserve; nếu người dùng nhập giá trị mới vào password thì đó là update password.
 - Username khác `ANHLT`, kể cả rỗng: xóa marker `********`, password về rỗng với placeholder `Nhập mật khẩu mới`; đây là thay tài khoản hoặc ý định xóa.
 - Username gõ lệch rồi quay lại đúng `ANHLT`: nếu password draft đang rỗng thì khôi phục marker; nếu đã có password draft thì giữ draft và coi là update password.
-- Username rỗng + password khác rỗng: chặn lưu. Username khác rỗng + password rỗng sau khi username đã đổi: chặn lưu. Thiếu một trong hai thì không tạo credential mới.
+- Username rỗng + password có giá trị, hoặc username có giá trị + password rỗng sau khi username đã đổi: chỉ chặn khi bấm lưu, không chặn realtime.
 
 ### Validation chỉ khi bấm lưu
 
 - Không hiện cảnh báo thiếu cặp username/password trong lúc đang gõ.
 - Bấm lưu mới hiện popup/notice lỗi; khi người dùng click lại để sửa, notice lỗi cũ biến mất.
-- Cả hai rỗng khi đang có credential và username đã bị xóa: coi là yêu cầu xóa, không coi là preserve.
-- Cả hai rỗng khi chưa từng có credential: giữ trạng thái `Chưa lưu`, không tạo credential; có thể cho lưu như thao tác không đổi.
+- Cả hai rỗng khi đang có credential và username đã bị xóa: yêu cầu xóa, mở confirmation chung.
+- Cả hai rỗng khi chưa từng có credential: giữ `Chưa lưu`, không tạo credential, không hiện popup xóa.
+- Chế độ xem chưa từng lưu hiển thị `Chưa lưu` trong cả hai ô; khi bấm sửa, cả hai input rỗng với placeholder tương ứng, không coi `Chưa lưu` là giá trị nhập.
 
 ### Phương án xóa credential
 
-- Phương án khuyến nghị: kết hợp nút `Xóa thông tin đăng nhập` và quy tắc xóa khi người dùng chủ động làm cả hai ô rỗng rồi bấm `Lưu thông tin`.
-- Hai đường đi phải vào cùng một confirmation và cùng một nghiệp vụ xóa; không có đường xóa âm thầm.
+- Đã duyệt phương án kết hợp: nút riêng `Xóa thông tin đăng nhập` và xóa khi người dùng chủ động làm cả hai ô rỗng rồi bấm `Lưu thông tin`.
+- Hai đường đi vào cùng một confirmation và cùng một nghiệp vụ; không xóa âm thầm, không xóa chỉ vì password rỗng.
 - Nút popup dùng đúng `[Quay lại]` và `[Xác nhận xóa]`.
 - Xác nhận xóa: xóa cấu hình credential GAS, xóa credential tương ứng trong vault Extension, tắt auto-login, giữ nguyên liên kết tài khoản.
-- Cần thiết kế xử lý bù nếu GAS và Extension không thể giao dịch nguyên tử xuyên hệ thống; không được báo thành công khi mới xóa một phía.
+- Vì GAS/Extension không có transaction xuyên hệ thống, cần protocol lỗi bù/idempotent và báo lỗi rõ khi một phía thất bại; tuyệt đối không báo thành công một phần.
 
 ### Chính sách tự đăng nhập khi chưa có credential
 
-- Khối chính sách phải luôn có dòng trạng thái riêng phía trên thông báo/chỗ sửa.
-- Nếu policy bật: đề xuất hiển thị dòng xanh `Đã bật tính năng đăng nhập tự động`; nếu policy tắt: dòng đỏ `Đã tắt tính năng đăng nhập tự động`.
-- Khi policy bật nhưng chưa có credential, cần thêm notice readiness rõ ràng `Chưa sẵn sàng: hãy nhập username và mật khẩu ở màn Đăng nhập tự động`; nếu muốn tránh mâu thuẫn màu xanh/chưa sẵn sàng, có thể dùng trạng thái thứ ba màu cảnh báo. Đây là điểm cần chủ dự án duyệt.
-- Chưa có credential thì không cho sửa policy. Icon sửa vẫn có thể bấm để hiện popup, không nên chỉ disabled khiến người dùng không biết lý do.
-- Popup có link/nút `Đi tới Đăng nhập tự động` và nút `Quay lại`; link đưa người dùng tới đúng khối khai báo credential.
+- Khối chính sách luôn có dòng trạng thái riêng phía trên notice/chỗ sửa.
+- Policy bật: dòng xanh `Đã bật tính năng đăng nhập tự động`; policy tắt: dòng đỏ `Đã tắt tính năng đăng nhập tự động`.
+- Policy bật nhưng chưa có credential: thêm notice readiness `Chưa sẵn sàng: hãy nhập username và mật khẩu ở màn Đăng nhập tự động`; dòng xanh vẫn phản ánh công tắc, notice phản ánh khả năng hoạt động.
+- Chưa có credential thì không cho sửa policy; click icon sửa phải mở popup giải thích thay vì disable im lặng.
+- Popup có nút/link `Đi tới Đăng nhập tự động` và `[Quay lại]`; link tới đúng khối khai báo credential.
 
 ## 4. Việc cần làm theo thứ tự
 
