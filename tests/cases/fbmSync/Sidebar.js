@@ -152,6 +152,7 @@ async function chay(so) {
   let bo;
   try { bo = taoBoTest(); } catch (error) { return ghiLoiNap(so, 'nạp renderer Sidebar Đồng bộ FBM', error); }
   const { hop, dom, content } = bo;
+  const info = dom.document.getElementById('sidebar-info');
 
   const idle = { phase: 'idle', label: 'Sẵn sàng', mode: 'read', counts: {}, masterEnabled: true };
   const active = { phase: 'pull_customer', runId: 'r1', cursor: { kind: 'customer_grid' }, label: 'Đang đọc khách hàng', mode: 'read', counts: {} };
@@ -204,6 +205,18 @@ async function chay(so) {
   check(so, 'icon Đồng bộ không quay khi công tắc tổng tắt', [statusButton.className.indexOf('shin-sync-status-running') >= 0, statusButton.getAttribute('aria-label')], [false, 'Đồng bộ FBM']);
 
   hop.FBM_SYNC_CLIENT.identityStatus = { status: 'REBIND_REQUIRED', binding: { spreadsheetId: 'sheet', userId: 'u', username: 'anhlt', accountName: 'A' } };
+  hop.FBM_SYNC_CLIENT.loginStatus = { configured: true, credentialRef: 'saved-ref', enabled: true, public: { usernameHint: 'other-user' } };
+  hop.FBM_SYNC_CLIENT.subscreen = 'run';
+  hop.fbmSyncRenderShell(Object.assign({}, idle, { masterEnabled: true }));
+  check(so, 'cảnh báo username lệch nằm dưới header trên mọi màn hình khi module bật', [info.hidden, !!info.querySelector('#fbm-sync-account-warning-region')], [false, true]);
+  ['run', 'account', 'results', 'settings'].forEach((screen) => { hop.FBM_SYNC_CLIENT.subscreen = screen; hop.fbmSyncRenderShell(Object.assign({}, idle, { masterEnabled: true })); check(so, 'cảnh báo username lệch giữ nguyên khi chuyển màn ' + screen, info.hidden, false); });
+  hop.FBM_SYNC_CLIENT.loginStatus.public.usernameHint = 'an***';
+  hop.fbmSyncRenderShell(Object.assign({}, idle, { masterEnabled: true }));
+  check(so, 'username đã che không tạo cảnh báo lệch giả', info.hidden, true);
+  hop.FBM_SYNC_CLIENT.loginStatus.public.usernameHint = 'other-user';
+  hop.fbmSyncRenderShell(Object.assign({}, idle, { masterEnabled: false }));
+  check(so, 'module tắt thì không hiện cảnh báo username lệch', info.hidden, true);
+  hop.fbmSyncRenderShell(Object.assign({}, idle, { masterEnabled: true }));
   hop.FBM_SYNC_CLIENT.loginStatus = { configured: false, enabled: true };
   render(hop, content, hop.fbmSyncRenderAccount, idle);
   if (false) {
@@ -302,11 +315,19 @@ async function chay(so) {
     check(so, 'Mot edit surface dieu khien ca hai vung', [!!connectionEdit, identitySection.querySelector('[data-sync-config-key="identity"]'), loginSection.querySelector('[data-sync-config-key="login"]')], [true, null, null]);
     check(so, 'Credential tuy chon van hien o che do xem', [dom.document.getElementById('fbm-login-password').disabled, dom.document.getElementById('fbm-login-password').value], [true, '']);
     const backgroundAction = connection.querySelector('#fbm-sync-open-background-settings');
-    check(so, 'Nút cài đặt đồng bộ nền đi qua hàng action chung và được căn giữa', [backgroundAction && backgroundAction.parentNode.className, backgroundAction && backgroundAction.textContent], ['shin-row shin-single-action-row', 'Cài đặt đồng bộ nền']);
+    check(so, 'Account không còn link cài đặt đồng bộ nền', backgroundAction, null);
+    hop.FBM_SYNC_CLIENT.subscreen = 'run';
+    render(hop, content, hop.fbmSyncRenderRun, idle);
+    const runBackgroundAction = content.querySelector('#fbm-sync-open-background-settings');
+    check(so, 'Nút cài đặt đồng bộ nền nằm ở Chạy đồng bộ và đi qua hàng action chung', [runBackgroundAction && runBackgroundAction.parentNode.className, runBackgroundAction && runBackgroundAction.textContent], ['shin-row shin-single-action-row', 'Cài đặt đồng bộ nền']);
+    hop.FBM_SYNC_CLIENT.subscreen = 'account';
+    render(hop, content, hop.fbmSyncRenderAccount, idle);
     hop.fbmSyncConfigStartEdit('connection');
     render(hop, content, hop.fbmSyncRenderAccount, idle);
     const connectionSave = content.querySelector('[data-sync-config-action="save"]');
     check(so, 'Surface kết nối khi sửa vẫn có đúng icon lưu ở card cha', [!!connectionSave, connectionSave && connectionSave.getAttribute('data-sync-config-key'), connectionSave && connectionSave.getAttribute('title')], [true, 'connection', 'Lưu thay đổi']);
+    const loginSaveButton = content.querySelector('#fbm-sync-login-save');
+    check(so, 'Khi sửa vẫn có nút chữ Lưu thông tin trong vùng Đăng nhập tự động', [!!loginSaveButton, loginSaveButton && loginSaveButton.textContent, loginSaveButton && loginSaveButton.getAttribute('data-sync-config-key')], [true, 'Lưu thông tin', 'connection']);
     hop.fbmSyncConfigFinishEdit('connection');
   let relayConfigurations = 0;
   hop.fbmSyncConfigureRelay = () => { relayConfigurations += 1; return Promise.resolve(null); };

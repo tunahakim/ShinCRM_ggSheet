@@ -22,7 +22,7 @@ var FBM_SYNC_RUN_UI = {
     liveStatus: function (id, elements) { return Box({ id: id, elements: elements }); },
     screen: function (slots) {
       return Box({ id: FBM_SYNC_RUN_SCHEMA.rootId, className: FBM_SYNC_RUN_UI.rootClass, elements: [
-        Card({ title: FBM_SYNC_RUN_SCHEMA.cardTitle, elements: [slots.mode, Box({ id: FBM_SYNC_RUN_SCHEMA.regions.action, elements: [slots.action] })] }),
+        Card({ title: FBM_SYNC_RUN_SCHEMA.cardTitle, elements: [slots.mode, Box({ id: FBM_SYNC_RUN_SCHEMA.regions.action, elements: [slots.action, slots.settings] })] }),
         Stack({ id: FBM_SYNC_RUN_SCHEMA.regions.details, elements: slots.details })
       ] });
     }

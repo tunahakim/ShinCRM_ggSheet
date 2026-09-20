@@ -528,7 +528,6 @@ function fbmSyncInstall() {
     var identity = { 'fbm-identity-spreadsheet': 'spreadsheetId', 'fbm-identity-user': 'userId', 'fbm-identity-username': 'username', 'fbm-identity-account': 'accountName' };
     if (identity[id]) {
       var identityValue = String(target.value || ''); FBM_SYNC_CLIENT.identityDraft[identity[id]] = identityValue;
-      if (identity[id] === 'username') { FBM_SYNC_CLIENT.loginDraft.username = identityValue; var loginUsername = document.getElementById('fbm-login-username'); if (loginUsername && loginUsername.value !== identityValue) { loginUsername.value = identityValue; } }
       FBM_SYNC_CLIENT.pendingLoginEnvelope = null;
       fbmSyncClearIdentityInvalidField(id.replace('fbm-identity-', ''));
     }
@@ -541,9 +540,9 @@ function fbmSyncInstall() {
     }
     if (id === 'fbm-login-username') {
       var loginUsernameValue = String(target.value || ''); FBM_SYNC_CLIENT.loginDraft.username = loginUsernameValue; FBM_SYNC_CLIENT.pendingLoginEnvelope = null;
-      FBM_SYNC_CLIENT.identityDraft.username = loginUsernameValue; var identityUsername = document.getElementById('fbm-identity-username'); if (identityUsername && identityUsername.value !== loginUsernameValue) { identityUsername.value = loginUsernameValue; } fbmSyncClearIdentityInvalidField('username');
     }
     if (id === 'fbm-login-password') { FBM_SYNC_CLIENT.pendingLoginEnvelope = null; }
+    if (typeof fbmSyncRenderShellWarning === 'function') { fbmSyncRenderShellWarning(FBM_SYNC_CLIENT.lastStatus || {}); }
   });
   document.addEventListener('focusout', function () { setTimeout(fbmSyncFlushDeferredPaint, 0); });
 }
@@ -936,6 +935,14 @@ function fbmSyncEncryptCredentials(credentials) {
     });
   });
 }
+function fbmSyncConfirmConnectionUsernameMismatch(binding, credentials) {
+  if (!fbmSyncConnectionUsernamesDiffer(binding, { public: { usernameHint: credentials.username } })) { return true; }
+  var message = FBM_SYNC_ACCOUNT_SCHEMA.connection.usernameMismatchWarning;
+  if (typeof window === 'undefined' || typeof window.confirm !== 'function') { return false; }
+  if (window.confirm(message)) { return true; }
+  fbmSyncSetAccountNotice('login', 'warning', 'Đã hủy lưu vì hai username đang khác nhau.');
+  return false;
+}
 function fbmSyncSaveLoginConfig(button) {
   return fbmSyncSaveConnection(button);
 }
@@ -950,12 +957,13 @@ function fbmSyncSaveConnection(button) {
   var allIdentityEmpty = !binding.spreadsheetId && !binding.userId && !binding.username && !binding.accountName;
   var partialIdentity = !allIdentityEmpty && (!binding.spreadsheetId || !binding.userId || !binding.username || !binding.accountName);
   var hasUsername = !!credentials.username, hasPassword = !!credentials.password;
+  var savedCredentialUsername = fbmSyncLoginUsernameValue(FBM_SYNC_CLIENT.loginStatus || {}), preservingCredential = hasUsername && !hasPassword && credentials.username === savedCredentialUsername;
   if (partialIdentity) { fbmSyncSetAccountNotice('identity', 'error', 'Identity incomplete.'); fbmSyncPaintError(null, 'Identity incomplete.'); if (button) { button.disabled = false; } return Promise.resolve(null); }
-  if (hasUsername !== hasPassword) { fbmSyncSetAccountNotice('login', 'error', 'Username va mat khau phai duoc nhap cung nhau.'); fbmSyncPaintError(null, 'Username va mat khau phai duoc nhap cung nhau.'); if (button) { button.disabled = false; } return Promise.resolve(null); }
-  if (hasUsername && binding.username !== credentials.username) { fbmSyncSetAccountNotice('login', 'error', 'Username credential phai trung username lien ket.'); fbmSyncPaintError(null, 'Username credential phai trung username lien ket.'); if (button) { button.disabled = false; } return Promise.resolve(null); }
+  if (hasUsername !== hasPassword && !preservingCredential) { fbmSyncSetAccountNotice('login', 'error', 'Username và mật khẩu phải được nhập cùng nhau, hoặc để trống để giữ credential đã lưu.'); fbmSyncPaintError(null, 'Username và mật khẩu phải được nhập cùng nhau, hoặc để trống để giữ credential đã lưu.'); if (button) { button.disabled = false; } return Promise.resolve(null); }
+  if (!fbmSyncConfirmConnectionUsernameMismatch(binding, credentials)) { if (button) { button.disabled = false; } return Promise.resolve(null); }
   var oldBinding = FBM_SYNC_CLIENT.identityStatus && FBM_SYNC_CLIENT.identityStatus.binding || {}, identityChanged = ['spreadsheetId', 'userId', 'username', 'accountName'].some(function (key) { return String(oldBinding[key] || '') !== String(binding[key] || ''); });
-  var credential = { mode: hasUsername ? 'save' : (identityChanged ? 'clear' : 'preserve') }, encryptPromise = Promise.resolve(null);
-  if (hasUsername) {
+  var credential = { mode: hasPassword ? 'save' : (preservingCredential ? 'preserve' : (identityChanged ? 'clear' : 'preserve')), keepOnIdentityChange: preservingCredential }, encryptPromise = Promise.resolve(null);
+  if (hasPassword) {
     var pending = FBM_SYNC_CLIENT.pendingLoginEnvelope, samePending = pending && pending.username === credentials.username;
     encryptPromise = samePending ? Promise.resolve(pending.encrypted) : fbmSyncEncryptCredentials(credentials);
   }

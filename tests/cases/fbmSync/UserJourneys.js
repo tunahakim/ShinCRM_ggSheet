@@ -52,13 +52,14 @@ async function testConnectionSaveValidation(so) {
   check(so, 'client chặn username không đi cùng password', [calls.length, button.disabled, notices[1] && notices[1].area], [0, false, 'login']);
 
   password.value = 'secret'; username.value = 'USERB';
+  hop.window.confirm = () => false;
   await hop.fbmSyncSaveConnection(button);
-  check(so, 'client chặn credential lệch username liên kết', [calls.length, button.disabled, notices[2] && notices[2].area], [0, false, 'login']);
+  check(so, 'client hiện popup và cho hủy khi credential lệch username liên kết', [calls.length, button.disabled, notices[2] && notices[2].area, notices[2] && notices[2].level], [0, false, 'login', 'warning']);
 
-  username.value = 'USERA'; password.value = 'secret';
+  hop.window.confirm = () => true;
   hop.fbmSyncEncryptCredentials = () => Promise.reject(new Error('ENCRYPT_FAIL'));
   await hop.fbmSyncSaveConnection(button);
-  check(so, 'client giữ bản nháp khi Extension mã hóa credential lỗi', [calls.length, button.disabled, password.value, notices.some((item) => String(item.message).indexOf('ENCRYPT_FAIL') >= 0)], [0, false, 'secret', true]);
+  check(so, 'client vẫn cho lưu sau khi xác nhận lệch, nhưng giữ bản nháp khi mã hóa lỗi', [calls.length, button.disabled, password.value, notices.some((item) => String(item.message).indexOf('ENCRYPT_FAIL') >= 0)], [0, false, 'secret', true]);
 
   password.value = ''; username.value = '';
   await hop.fbmSyncSaveConnection(button);
@@ -68,7 +69,11 @@ async function testConnectionSaveValidation(so) {
   hop.fbmSyncEncryptCredentials = () => Promise.resolve({ credentialRef: 'cred-client-123', envelope: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'USERA' } });
   await hop.fbmSyncSaveConnection(button);
   check(so, 'client gửi credential đã mã hóa đúng payload và xóa password sau save', [calls.length, calls[1] && calls[1].args[0].credential.mode, calls[1] && calls[1].args[0].credential.credentialRef, password.value], [2, 'save', 'cred-client-123', '']);
-  check(so, 'mọi lỗi lưu kết nối đều hiện Sidebar và ghi Sheet Log', [errors.length, logs.length >= errors.length, logs.every((item) => item.name === 'fbmLogSyncError')], [4, true, true]);
+  hop.FBM_SYNC_CLIENT.loginStatus = { enabled: true, configured: true, credentialRef: 'cred-client-123', public: { usernameHint: 'USERB' } };
+  username.value = 'USERB'; password.value = '';
+  await hop.fbmSyncSaveConnection(button);
+  check(so, 'client cho lưu identity lệch và giữ credential đã lưu khi password để trống', [calls.length, calls[2] && calls[2].args[0].credential.mode, password.value], [3, 'preserve', '']);
+  check(so, 'mọi lỗi lưu kết nối đều hiện Sidebar và ghi Sheet Log', [errors.length, logs.length >= errors.length, logs.every((item) => item.name === 'fbmLogSyncError')], [3, true, true]);
 }
 
 async function chay(so) {

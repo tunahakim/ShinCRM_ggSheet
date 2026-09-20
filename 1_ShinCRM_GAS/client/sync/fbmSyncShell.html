@@ -73,11 +73,27 @@ function fbmSyncShellNavBlock() {
     return Button({ label: item.label, className: uiClassJoin(uiSyncClass('shell', 'navItem'), item.id === FBM_SYNC_CLIENT.subscreen ? uiSyncClass('shell', 'activeItem') : ''), data: { 'sync-screen': item.id } });
   }) });
 }
+function fbmSyncShellWarningBlocks(status) {
+  var schema = FBM_SYNC_UI_SCHEMA.shell;
+  if (!fbmSyncShellEnabled(status) || typeof fbmSyncConnectionHasUsernameMismatch !== 'function' || !fbmSyncConnectionHasUsernameMismatch()) { return []; }
+  return [Notice({ kind: 'warning', text: FBM_SYNC_ACCOUNT_SCHEMA.connection.usernameMismatchBanner })];
+}
+function fbmSyncRenderShellWarning(status) {
+  var schema = FBM_SYNC_UI_SCHEMA.shell, info = document.getElementById(schema.ids.info), blocks = fbmSyncShellWarningBlocks(status);
+  if (!info) { return false; }
+  if (!RENDER_INDEX.nodes[schema.ids.warning]) {
+    fbmSyncReplaceBlocks(info, [Box({ id: schema.ids.warning, elements: blocks })]);
+  } else {
+    fbmSyncRenderTarget(schema.ids.warning, blocks);
+  }
+  fbmSyncSetTargetState(schema.ids.info, { hidden: blocks.length === 0 });
+  return true;
+}
 function fbmSyncRenderShell(status) {
   var shell = FBM_SYNC_UI_SCHEMA.shell, headerMount = document.getElementById(shell.ids.header), panel = document.getElementById(shell.ids.body);
   if (!headerMount || !panel || typeof RENDER_INDEX === 'undefined') { return; }
   fbmSyncSetTargetState(shell.ids.root, { addClass: [uiSyncClass('shell', 'active')] });
-  fbmSyncSetTargetState(shell.ids.info, { hidden: true });
+  fbmSyncRenderShellWarning(status);
   fbmSyncSetTargetState(shell.ids.footer, { hidden: true });
   var schema = shell;
   if (!document.getElementById(schema.ids.title)) { fbmSyncReplaceBlocks(headerMount, fbmSyncShellHeaderBlocks(status)); }

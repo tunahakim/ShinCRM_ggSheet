@@ -73,10 +73,7 @@ FbmSync.connectionSave = function (input) {
   var mode = String(credential.mode || 'preserve');
   if (['preserve', 'save', 'clear'].indexOf(mode) < 0) { return { ok: false, code: 'LOGIN_CREDENTIAL_MODE_INVALID', message: 'CÃ¡ch lÆ°u credential khÃ´ng há»£p lá»‡.' }; }
   if (mode === 'save' && allEmpty) { return { ok: false, code: 'IDENTITY_BINDING_REQUIRED', message: 'Pháº£i cÃ³ nháº­n diá»‡n tÃ i khoáº£n trÆ°á»›c khi lÆ°u credential.' }; }
-  if (mode === 'save' && credential.public && String(credential.public.usernameHint || '').trim() && String(credential.public.usernameHint || '').trim() !== identity.username) {
-    return { ok: false, code: 'LOGIN_IDENTITY_MISMATCH', message: 'Username trong credential khÃ´ng khá»›p username tÃ i khoáº£n Ä‘ang liÃªn káº¿t.' };
-  }
-  if (changed && mode === 'preserve') { mode = 'clear'; }
+  if (changed && mode === 'preserve' && credential.keepOnIdentityChange !== true) { mode = 'clear'; }
   try {
     var bindingResult = allEmpty ? FbmSync.bindingClear() : FbmSync.bindingWrite(identity);
     if (!bindingResult || bindingResult.ok === false) { return bindingResult; }

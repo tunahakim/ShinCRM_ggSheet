@@ -24,6 +24,10 @@ function fbmSyncRunActionBlock(status) {
   var active = ['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(status.phase) >= 0, awaiting = status.phase === 'awaiting_approval';
   return Button({ id: active ? FBM_SYNC_RUN_SCHEMA.action.ids.cancel : awaiting ? FBM_SYNC_RUN_SCHEMA.action.ids.approve : FBM_SYNC_RUN_SCHEMA.action.ids.start, label: statusReady ? (active ? FBM_SYNC_RUN_SCHEMA.action.cancel : awaiting ? FBM_SYNC_RUN_SCHEMA.action.approve : FBM_SYNC_RUN_SCHEMA.action.start) : FBM_SYNC_RUN_SCHEMA.action.loading, className: uiResolveActionClass(active ? 'cancel' : awaiting ? 'approve' : 'start', 'button'), disabled: !statusReady || status.masterEnabled === false || status.enabled === false });
 }
+function fbmSyncRunBackgroundSettingsBlock(status) {
+  var schema = FBM_SYNC_RUN_SCHEMA.action;
+  return FBM_SYNC_RUN_UI.layout.actionRow(Button({ id: schema.backgroundSettingsId, label: schema.backgroundSettings, className: uiResolveActionClass('edit', 'button'), disabled: !!FBM_SYNC_CLIENT.running || fbmSyncConfigIsEditing('connection'), data: { 'sync-screen': 'settings', 'sync-settings-target': 'background' } }));
+}
 function fbmSyncRunDetailsBlocks(status) {
   if (!fbmSyncRunHasSnapshot(status)) { return []; }
   var awaiting = status.phase === 'awaiting_approval';
@@ -40,12 +44,13 @@ function fbmSyncRenderRun(panel, status) {
   return fbmSyncAppendBox(panel, FBM_SYNC_RUN_UI.rootClass, FBM_SYNC_RUN_SCHEMA.rootId, FBM_SYNC_RUN_UI.layout.screen({
     mode: StandaloneField(FBM_SYNC_RUN_SCHEMA.mode.label, { id: FBM_SYNC_RUN_SCHEMA.mode.id, kind: FBM_SYNC_RUN_SCHEMA.mode.kind, options: FBM_SYNC_UI_SCHEMA.modes, value: FBM_SYNC_CLIENT.mode, disabled: !!FBM_SYNC_CLIENT.running, ariaLabel: FBM_SYNC_RUN_SCHEMA.mode.label }),
     action: FBM_SYNC_RUN_UI.layout.actionRow(fbmSyncRunActionBlock(status)),
+    settings: fbmSyncRunBackgroundSettingsBlock(status),
     details: fbmSyncRunDetailsBlocks(status)
   }).elements);
 }
 function fbmSyncPatchRun(panel, status) {
   if (!panel || !RENDER_INDEX.nodes[FBM_SYNC_RUN_SCHEMA.rootId]) { return false; }
-  fbmSyncRenderTarget(FBM_SYNC_RUN_SCHEMA.regions.action, [FBM_SYNC_RUN_UI.layout.actionRow(fbmSyncRunActionBlock(status))]);
+  fbmSyncRenderTarget(FBM_SYNC_RUN_SCHEMA.regions.action, [FBM_SYNC_RUN_UI.layout.actionRow(fbmSyncRunActionBlock(status)), fbmSyncRunBackgroundSettingsBlock(status)]);
   fbmSyncRenderTarget(FBM_SYNC_RUN_SCHEMA.regions.details, fbmSyncRunDetailsBlocks(status));
   return true;
 }

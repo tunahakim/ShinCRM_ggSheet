@@ -182,10 +182,38 @@ function fbmSyncConfigControlDisabled(key, path) {
   return false;
 }
 
-/** Hiển thị username đầy đủ từ liên kết đã xác nhận; cấu hình cũ có thể chỉ lưu usernameHint đã che. */
+/** Hiển thị username của credential; không lấy username nhận diện để che mất trạng thái lệch giữa hai vùng. */
 function fbmSyncLoginUsernameValue(login) {
-  var value = login || FBM_SYNC_CLIENT.loginStatus || {}, binding = FBM_SYNC_CLIENT.identityStatus && FBM_SYNC_CLIENT.identityStatus.binding || {};
-  return String(binding.username || value.public && value.public.usernameHint || '');
+  var value = login || FBM_SYNC_CLIENT.loginStatus || {}, publicValue = value.public || {};
+  return String(publicValue.usernameHint || value.usernameHint || value.username || '');
+}
+
+function fbmSyncUsernameComparable(value) {
+  var username = String(value || '').trim();
+  return !!username && username.indexOf('*') < 0;
+}
+
+function fbmSyncConnectionUsernamesDiffer(binding, login) {
+  var left = String(binding && binding.username || '').trim();
+  var right = String(fbmSyncLoginUsernameValue(login) || '').trim();
+  return fbmSyncUsernameComparable(left) && fbmSyncUsernameComparable(right) && left !== right;
+}
+
+function fbmSyncConnectionDraftUsernames() {
+  var binding = FBM_SYNC_CLIENT.identityStatus && FBM_SYNC_CLIENT.identityStatus.binding || {};
+  var login = FBM_SYNC_CLIENT.loginStatus || {};
+  if (fbmSyncConfigIsEditing('connection') && typeof document !== 'undefined') {
+    var identityInput = document.getElementById('fbm-identity-username');
+    var loginInput = document.getElementById('fbm-login-username');
+    if (identityInput) { binding = Object.assign({}, binding, { username: identityInput.value }); }
+    if (loginInput) { login = Object.assign({}, login, { public: Object.assign({}, login.public || {}, { usernameHint: loginInput.value }) }); }
+  }
+  return { binding: binding, login: login };
+}
+
+function fbmSyncConnectionHasUsernameMismatch() {
+  var values = fbmSyncConnectionDraftUsernames();
+  return fbmSyncConnectionUsernamesDiffer(values.binding, values.login);
 }
 
 function fbmSyncConfigSetDraftValue(key, path, value) {
