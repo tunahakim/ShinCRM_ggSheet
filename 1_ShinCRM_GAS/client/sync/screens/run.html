@@ -50,7 +50,7 @@ function fbmSyncRenderRun(panel, status) {
 }
 function fbmSyncPatchRun(panel, status) {
   if (!panel || !RENDER_INDEX.nodes[FBM_SYNC_RUN_SCHEMA.rootId]) { return false; }
-  fbmSyncRenderTarget(FBM_SYNC_RUN_SCHEMA.regions.action, [FBM_SYNC_RUN_UI.layout.actionRow(fbmSyncRunActionBlock(status)), fbmSyncRunBackgroundSettingsBlock(status)]);
+  fbmSyncRenderTarget(FBM_SYNC_RUN_SCHEMA.regions.action, [FBM_SYNC_RUN_UI.layout.actionStack([FBM_SYNC_RUN_UI.layout.actionRow(fbmSyncRunActionBlock(status)), fbmSyncRunBackgroundSettingsBlock(status)])]);
   fbmSyncRenderTarget(FBM_SYNC_RUN_SCHEMA.regions.details, fbmSyncRunDetailsBlocks(status));
   return true;
 }

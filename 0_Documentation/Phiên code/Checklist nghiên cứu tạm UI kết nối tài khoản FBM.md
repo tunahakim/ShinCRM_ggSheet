@@ -17,16 +17,16 @@
 
 ### 1.1. Màn Tài khoản FBM
 
-- [ ] Bỏ hoàn toàn dòng `Đồng bộ nền đang tắt · FBM → ShinCRM` và biến thể `Đồng bộ nền đang bật ...` khỏi màn Tài khoản FBM. Đây là màn thông tin tài khoản, không phải màn cài đặt đồng bộ nền.
-- [ ] Không còn link `Cài đặt đồng bộ nền` trong card kết nối tài khoản.
+- [x] Bỏ hoàn toàn dòng `Đồng bộ nền đang tắt · FBM → ShinCRM` và biến thể `Đồng bộ nền đang bật ...` khỏi màn Tài khoản FBM. `fbmSyncConnectionStatusBlocks()` và vùng notice connection đã được loại khỏi renderer; test `Account không có dòng nền` sẽ chốt DOM không chứa dòng này.
+- [x] Không còn link `Cài đặt đồng bộ nền` trong card kết nối tài khoản; link duy nhất vẫn ở màn `Chạy đồng bộ`.
 - [x] Link `Cài đặt đồng bộ nền` đã được chuyển sang màn `Chạy đồng bộ` trong patch trước; cần kiểm tra lại sau khi sửa layout.
 - [ ] Giữ link `Cài đặt đăng nhập tự động` ở đúng vùng `Đăng nhập tự động`.
 
 ### 1.2. Hai nút ở màn Chạy đồng bộ
 
-- [ ] `Dừng đồng bộ` và `Cài đặt đồng bộ nền` phải nằm trên hai hàng dọc riêng, có khoảng cách dùng token layout chuẩn; không dính mép và không phụ thuộc margin cục bộ của một màn.
-- [ ] Sửa ở đúng ranh giới hệ thống/layout để cấu trúc nhiều action độc lập không thể vô ý tạo hai hàng liền nhau không có `Stack/gap`.
-- [ ] Thêm test regression kiểm tra quan hệ DOM/schema hoặc class layout: action chính và action điều hướng phải đi qua container xếp dọc có gap; không chỉ kiểm tra chuỗi HTML hay màu nút.
+- [x] `Dừng đồng bộ` và `Cài đặt đồng bộ nền` nằm trên hai hàng dọc riêng qua `ActionStack` lõi với gap token; không dính mép và không phụ thuộc margin cục bộ màn Run.
+- [x] Sửa ở tầng hệ thống: thêm helper `ActionStack` trong `client/ui/uiBuilder.html` và fallback `.shin-box > .shin-single-action-row + .shin-single-action-row` trong `client/style/components.html`; layout Run chỉ dùng helper này.
+- [x] Regression test `Các action Run đi qua ActionStack lõi có hai Row con và nhịp dọc dùng chung` cùng test core `ActionStack lõi và fallback ngăn hai nhóm action dính mép` đạt.
 - [ ] Không sửa `9_Code_cu_tham_chieu/src/ui/Styles.html`; đây là đặc tả hình thức chỉ đọc.
 
 ### 1.3. Username FBM
@@ -204,10 +204,10 @@
 ## 4. Việc cần làm theo thứ tự
 
 - [x] Đọc Extension để xác định hợp đồng metadata username; code hiện tại trả username đầy đủ, còn `AN***` là dữ liệu metadata đã tồn tại trong GAS/deployment.
-- [ ] Đọc đầy đủ renderer `Row`, `Stack`, `Box` và CSS component liên quan để chọn helper/layout chung phù hợp.
-- [ ] Chốt thiết kế layout action dọc: một API/container sở hữu gap, không lặp class hoặc margin tại màn Run.
-- [ ] Xóa status line nền khỏi Account ở schema/render/patch và cập nhật test snapshot/hành vi liên quan.
-- [ ] Sửa layout Run để `Dừng đồng bộ` và `Cài đặt đồng bộ nền` tách hàng có gap chuẩn; cập nhật schema/UI helper nếu cần.
+- [x] Đọc đầy đủ renderer `Row`, `Stack`, `Box` và CSS component liên quan; xác định `Row` chỉ có trách nhiệm một hàng và gap dọc phải do container chung sở hữu.
+- [x] Chốt thiết kế layout action dọc bằng API `ActionStack` lõi và fallback CSS hệ thống, không lặp class hoặc margin tại màn Run.
+- [x] Xóa status line nền khỏi Account ở schema/render/patch và cập nhật test snapshot/hành vi liên quan.
+- [x] Sửa layout Run để `Dừng đồng bộ` và `Cài đặt đồng bộ nền` tách hàng có gap chuẩn qua `ActionStack`.
 - [ ] Khôi phục hiển thị username đầy đủ, đồng thời xử lý dữ liệu cũ đã mask theo phương án không gây cảnh báo lệch giả và không ghi đè credential âm thầm.
 - [ ] Rà lại semantics password rỗng: preserve credential cũ, không clear nhầm, không gửi plaintext/password rỗng.
 - [ ] Rà lại mismatch khi chỉ sửa `Tên đăng nhập FBM`: popup phải xuất hiện nếu hai username đều có giá trị và lệch; xác nhận cho lưu, hủy không gọi GAS.
@@ -237,6 +237,7 @@
 | 2026-09-20 | Đọc Extension và truy vết các nhánh save/preserve/clear | Đã ghi câu trả lời hiện tại cho 5 câu hỏi và ma trận payload ở mục 3.6–3.7; chưa sửa code |
 | 2026-09-20 | Test trước phiên hiện tại | `node tests/run.js`: `1840 đạt, 0 không đạt` trước khi tạo file |
 | 2026-09-20 | Deployment trước phiên hiện tại | `node tests/gas.js fbmGetLoginConfig --push`: deployment `@468`, trả `OK`; chưa phải deployment của các sửa mới |
+| 2026-09-20 | Sửa core ActionStack và loại status nền khỏi Account | `node tests/run.js`: `1843 đạt, 0 không đạt`; test layout xác nhận hai Row nằm trong `shin-action-stack`, Account không còn vùng notice nền |
 
 ## 7. Điểm tiếp tục sau khi context bị nén
 

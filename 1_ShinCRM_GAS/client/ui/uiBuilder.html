@@ -154,6 +154,13 @@ function Stack(spec) {
   return Box(Object.assign({}, o, { className: className }));
 }
 
+/** Nhóm lệnh độc lập theo cột; core sở hữu nhịp dọc để màn không thể ghép hai Row sát nhau. */
+function ActionStack(spec) {
+  var o = Array.isArray(spec) ? { elements: spec } : (spec || {});
+  var className = ('shin-action-stack ' + String(o.className || '')).trim();
+  return Box(Object.assign({}, o, { className: className }));
+}
+
 /** Khối có khung và có tiêu đề, `titleActions` là hàng hành động trên tiêu đề — và nó là **mảng** kể cả khi có đúng một mục, tài liệu 04 Phần 4B. */
 function Card(spec) { return Block(spec, 'card'); }
 

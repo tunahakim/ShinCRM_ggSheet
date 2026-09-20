@@ -124,7 +124,7 @@ function chay(so) {
     [true, true]);
 
   check(so, 'core khai đủ Block helper dùng chung cho Sync',
-    ['Box', 'Stack', 'Card', 'Row', 'Text', 'Field', 'Button', 'Icon', 'Check', 'StandaloneControl', 'StandaloneField'].every((name) => common.indexOf('function ' + name + '(') >= 0),
+    ['Box', 'Stack', 'ActionStack', 'Card', 'Row', 'Text', 'Field', 'Button', 'Icon', 'Check', 'StandaloneControl', 'StandaloneField'].every((name) => common.indexOf('function ' + name + '(') >= 0),
     true);
   check(so, 'renderer StandaloneControl dùng lớp input/toggle chung, không có lớp Sync riêng',
     [engine.indexOf("'shin-input'") >= 0, engine.indexOf("'shin-toggle-control'") >= 0, engine.indexOf('shin-sync-') === -1],
@@ -206,6 +206,10 @@ function chay(so) {
     [frame.indexOf('#sidebar-body > * + * { margin-top: var(--shin-gap-2); }') >= 0,
       styles.indexOf('.shin-section > * + * { margin-top: var(--shin-gap-2); }') >= 0,
       source['client/sync/fbmSyncShell.html'].indexOf("uiSyncClass('shell', 'navItem')") >= 0],
+    [true, true, true]);
+  check(so, 'ActionStack lõi và fallback ngăn hai nhóm action dính mép',
+    [common.indexOf('function ActionStack(') >= 0, styles.indexOf('.shin-box > .shin-single-action-row + .shin-single-action-row') >= 0,
+      source['client/sync/fbmSyncUiSchema.html'].indexOf('actionStack: function') >= 0],
     [true, true, true]);
   check(so, 'các vùng cuộn giữ trục hai mép bằng gutter ổn định, section không cộng lề lệch',
     [frame.indexOf('.shin-scroll-region {') >= 0 && frame.indexOf('overflow-y: auto;') >= 0 && frame.indexOf('scrollbar-gutter: stable both-edges;') >= 0,

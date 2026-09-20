@@ -183,7 +183,7 @@ async function chay(so) {
   hop.fbmSyncRenderRun(content, idle);
   hop.fbmSyncAppendBox = appendRun;
   const runCard = runBlocks[0], runActionRegion = runCard.elements.filter((node) => node && node.id === 'fbm-sync-run-action-region')[0];
-  check(so, 'Nút bắt đầu đồng bộ đứng trong hàng action dùng chung để căn giữa', [runActionRegion.elements[0].role, runActionRegion.elements[0].className, runActionRegion.elements[0].elements.length], ['row', 'shin-single-action-row', 1]);
+  check(so, 'Các action Run đi qua ActionStack lõi có hai Row con và nhịp dọc dùng chung', [runActionRegion.elements[0].role, runActionRegion.elements[0].className, runActionRegion.elements[0].elements.length, runActionRegion.elements[0].elements[0].className, runActionRegion.elements[0].elements[1].className], ['box', 'shin-action-stack', 2, 'shin-single-action-row', 'shin-single-action-row']);
   const runDetailsRegion = runBlocks.filter((node) => node && node.id === 'fbm-sync-run-details-region')[0];
   check(so, 'Pipeline và trạng thái phiên nằm trong Stack để giữ khoảng cách dọc', [runDetailsRegion.role, runDetailsRegion.className], ['box', 'shin-stack']);
   check(so, 'Run render giữ pipeline khi preflight thất bại để người dùng thấy chặng dừng', !!render(hop, content, hop.fbmSyncRenderRun, preflightError).querySelector('.shin-sync-pipeline'), true);

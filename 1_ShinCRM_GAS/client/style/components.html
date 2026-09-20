@@ -29,6 +29,8 @@
 .shin-box.shin-action-stack { align-items: center; }
 .shin-stack > * + *,
 .shin-action-stack > * + * { margin-top: 0; }
+/* Fallback ở tầng core: hai nhóm action ghép trực tiếp trong Box vẫn có nhịp. */
+.shin-box > .shin-single-action-row + .shin-single-action-row { margin-top: var(--shin-gap-2); }
 .shin-action-stack > * { width: min(100%, 220px); }
 .shin-inline-field-row { align-items: center; }
 .shin-inline-field-row > .shin-form-label { flex: 1 1 auto; min-width: 0; }

@@ -38,14 +38,8 @@ function fbmSyncLoginCard() {
     actions: fbmSyncLoginActionBlocks(), notice: fbmSyncAccountNoticeBlocks('login'), policy: fbmSyncLoginPolicyNavigationBlocks()
   });
 }
-function fbmSyncConnectionStatusBlocks() {
-  var status = FBM_SYNC_CLIENT.lastStatus || {}, background = FBM_SYNC_CLIENT.syncSettings && FBM_SYNC_CLIENT.syncSettings.background || {}, enabled = status.backgroundEnabled !== false;
-  var labels = FBM_SYNC_ACCOUNT_SCHEMA.connection, label = enabled ? labels.backgroundOn : labels.backgroundOff;
-  var direction = background.direction ? ' · ' + (background.direction === 'push' ? labels.directionPush : background.direction === 'write' ? labels.directionWrite : labels.directionRead) : '';
-  return [Text({ className: FBM_SYNC_ACCOUNT_UI.classes.muted, text: label + direction })];
-}
 function fbmSyncConnectionCard(status) {
-  return FBM_SYNC_ACCOUNT_UI.layout.connectionCard({ titleActions: fbmSyncConfigTitleActions('connection'), notice: fbmSyncConnectionStatusBlocks(), identity: fbmSyncIdentityBlock(status), login: fbmSyncLoginCard() });
+  return FBM_SYNC_ACCOUNT_UI.layout.connectionCard({ titleActions: fbmSyncConfigTitleActions('connection'), identity: fbmSyncIdentityBlock(status), login: fbmSyncLoginCard() });
 }
 function fbmSyncRenderAccount(panel, status) {
   status = status || {};
@@ -57,7 +51,6 @@ function fbmSyncPatchAccount(panel, status) {
   var connectionEditState = fbmSyncConfigState('connection'), connectionRegion = document.getElementById(FBM_SYNC_ACCOUNT_SCHEMA.regions.connectionCard), connectionInteractive = fbmSyncInteractiveControlIsEditing(connectionRegion), loginPasswordBefore = document.getElementById(FBM_SYNC_ACCOUNT_SCHEMA.login.password.id), preserveLoginDraft = !!(loginPasswordBefore && loginPasswordBefore.value && loginPasswordBefore.value !== '****');
   if (!connectionInteractive && !preserveLoginDraft && RENDER_INDEX.nodes[FBM_SYNC_ACCOUNT_SCHEMA.regions.connectionCard] && (!connectionEditState.editing || connectionEditState.needsRender)) { fbmSyncRenderTarget(FBM_SYNC_ACCOUNT_SCHEMA.regions.connectionCard, [fbmSyncConnectionCard(status)]); connectionEditState.needsRender = false; }
   else { fbmSyncPatchIdentityBlock(panel, !!FBM_SYNC_CLIENT.running, status); }
-  if (RENDER_INDEX.nodes[FBM_SYNC_ACCOUNT_SCHEMA.regions.connectionNotice]) { fbmSyncRenderTarget(FBM_SYNC_ACCOUNT_SCHEMA.regions.connectionNotice, fbmSyncConnectionStatusBlocks()); }
   var accountSettingsRegion = document.getElementById(FBM_SYNC_ACCOUNT_SCHEMA.regions.accountSettings);
   var accountSettingsEditState = fbmSyncConfigState('accountSettings');
   if (!fbmSyncInteractiveControlIsEditing(accountSettingsRegion) && (!accountSettingsEditState.editing || accountSettingsEditState.needsRender)) { fbmSyncRenderTarget(FBM_SYNC_ACCOUNT_SCHEMA.regions.accountSettings, [fbmSyncAccountSettingsCard()]); accountSettingsEditState.needsRender = false; }
