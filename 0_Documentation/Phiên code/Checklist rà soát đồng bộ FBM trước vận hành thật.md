@@ -331,7 +331,7 @@
 
 - [x] Mọi dòng F01–F15, E01–E07, S01 và H đã có điều kiện đầu, input, output kỳ vọng, nhãn kiểm chứng đơn nhất và ô `Bằng chứng` rõ ràng. Bằng chứng: Checklist đã được rà; các dòng tự động đã trỏ ca test cụ thể, dòng live giữ nhãn `[Cần kiểm chứng thật]`.
 - [x] Chủ dự án duyệt phạm vi, dữ liệu thử, các bước cần thao tác live và thứ tự thực hiện. Bằng chứng: Chủ dự án đã duyệt checklist và yêu cầu tiếp tục tự động qua bước 2–4 trong phiên hiện tại.
-- [x] Chuyển sang bước 2: viết test ưu tiên E06.2, E06.1, E06.4 rồi chạy `node tests/run.js`. Bằng chứng: `Settings.js › DocumentProperties đầy giữ nguyên state cursor/conflict/RecordLocks và không ghi dở JSON`, `Workflow.js › lát GAS chạm trần dừng trước request kế tiếp và giữ cursor cuối đã chốt`, `extensionBridge.js › Extension chờ đủ waitMs trước khi gửi request FBM`, `Workflow.js › DocumentProperties đầy trả DTO lỗi Sidebar, giữ cursor và Log runId/phase/cursor`; tổng kết `1827 đạt, 0 không đạt`.
+- [x] Chuyển sang bước 2: viết test ưu tiên E06.2, E06.1, E06.4 rồi chạy `node tests/run.js`. Bằng chứng: `Settings.js › DocumentProperties đầy giữ nguyên state cursor/conflict/RecordLocks và không ghi dở JSON`, `Workflow.js › lát GAS chạm trần dừng trước request kế tiếp và giữ cursor cuối đã chốt`, `extensionBridge.js › Extension chờ đủ waitMs trước khi gửi request FBM`, `Workflow.js › DocumentProperties đầy trả DTO lỗi Sidebar, giữ cursor và Log runId/phase/cursor`; tổng kết `1839 đạt, 0 không đạt`.
 
 ## Các điểm cần chủ dự án xác nhận sau khi duyệt checklist
 
