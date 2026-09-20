@@ -223,7 +223,7 @@
 - [x] Thêm/điều chỉnh test cho Account không có dòng nền, Run layout dọc, username đầy đủ, mismatch, blank password preserve, marker focus/blur/realtime, legacy mask, xóa credential, retry GAS và nhánh lỗi vault.
 - [x] Chạy `node tests/run.js`: `1855 đạt, 0 không đạt`.
 - [x] Chạy `git diff --check`: không có lỗi whitespace.
-- [x] Push GAS DEV bằng `node tests/gas.js fbmGetLoginConfig --push`; revision cuối `@470` trả `OK`, `configured: true`, `public.usernameHint: ANHLT`.
+- [x] Push GAS DEV bằng `node tests/gas.js fbmGetLoginConfig --push`; revision cuối `@471` trả `OK`, `configured: true`, `public.usernameHint: ANHLT`.
 - [x] Chỉ sau khi kiểm thử pass mới commit nhóm thay đổi; commit `46c1575` không đưa file untracked có sẵn hoặc thay đổi Category gate ngoài phạm vi vào commit.
 - [ ] Nghiệm thu live trên Sheet DEV; không dùng dữ liệu khách thật và không gửi request xóa.
 
@@ -250,6 +250,7 @@
 | 2026-09-20 | Hoàn thiện credential state machine và kiểm thử xóa | Username legacy đọc metadata vault hoặc fail-closed; marker `********` focus/blur/realtime và dirty-state; preserve không mã hóa lại; xóa vault trước GAS, retry GAS một lần và chặn partial failure; `node tests/run.js`: `1855 đạt, 0 không đạt`; `git diff --check` sạch |
 | 2026-09-20 | Commit và push nhóm credential/UI | Commit `46c1575 Hoàn thiện state machine credential FBM`; GAS DEV `@469`, `fbmGetLoginConfig --push` trả `OK`, username `ANHLT` |
 | 2026-09-20 | Bổ sung retry xóa credential và push lại | Commit `fe0972b Bổ sung retry xóa credential FBM`; GAS DEV `@470`, `fbmGetLoginConfig --push` trả `OK`, username `ANHLT` |
+| 2026-09-20 | Sửa dirty-state marker password và push cuối | Commit `c58ba9e Sửa dirty-state marker password FBM`; GAS DEV `@471`, `fbmGetLoginConfig --push` trả `OK`, username `ANHLT` |
 
 ## 7. Điểm tiếp tục sau khi context bị nén
 
