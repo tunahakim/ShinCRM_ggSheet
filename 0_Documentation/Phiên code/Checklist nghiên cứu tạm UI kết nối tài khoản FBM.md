@@ -49,7 +49,7 @@
 ### 1.5. Password rỗng khi mở chế độ sửa
 
 - [x] Mở edit không lấy plaintext password cũ ra UI; password marker được xóa khi focus và khôi phục khi blur rỗng.
-- [x] Không nhập password mới và không đổi `Username FBM` gửi `credential.mode: preserve`; không ghi password rỗng hoặc marker.
+- [x] Không nhập password mới và không đổi `Username FBM` gửi `credential.mode: preserve`; không ghi password rỗng hoặc marker. Dirty-state cũng coi `********` là preserve, không mở modal unsaved giả.
 - [x] Username không đổi giữ đúng username đầy đủ; legacy mask không được dùng làm giá trị mới.
 - [x] Đổi identity username nhưng giữ credential username/password vẫn đi qua mismatch popup và preserve credential sau xác nhận.
 - [x] Đổi `Username FBM` nhưng để password rỗng chỉ bị cảnh báo/chặn lúc lưu; không tạo credential thiếu password và không nhầm marker là giá trị nhập.
@@ -221,7 +221,7 @@
 - [x] Rà lại semantics password rỗng: preserve credential cũ, không clear nhầm, marker không được gửi như password mới, plaintext không đi qua GAS.
 - [x] Rà lại mismatch khi chỉ sửa `Tên đăng nhập FBM`: popup xuất hiện khi hai username có giá trị và lệch; xác nhận lưu, hủy không gọi GAS.
 - [x] Thêm/điều chỉnh test cho Account không có dòng nền, Run layout dọc, username đầy đủ, mismatch, blank password preserve, marker focus/blur/realtime, legacy mask, xóa credential, retry GAS và nhánh lỗi vault.
-- [x] Chạy `node tests/run.js`: `1854 đạt, 0 không đạt`.
+- [x] Chạy `node tests/run.js`: `1855 đạt, 0 không đạt`.
 - [x] Chạy `git diff --check`: không có lỗi whitespace.
 - [x] Push GAS DEV bằng `node tests/gas.js fbmGetLoginConfig --push`; revision cuối `@470` trả `OK`, `configured: true`, `public.usernameHint: ANHLT`.
 - [x] Chỉ sau khi kiểm thử pass mới commit nhóm thay đổi; commit `46c1575` không đưa file untracked có sẵn hoặc thay đổi Category gate ngoài phạm vi vào commit.
@@ -247,7 +247,7 @@
 | 2026-09-20 | Test trước phiên hiện tại | `node tests/run.js`: `1840 đạt, 0 không đạt` trước khi tạo file |
 | 2026-09-20 | Deployment trước phiên hiện tại | `node tests/gas.js fbmGetLoginConfig --push`: deployment `@468`, trả `OK`; chưa phải deployment của các sửa mới |
 | 2026-09-20 | Sửa core ActionStack và loại status nền khỏi Account | `node tests/run.js`: `1843 đạt, 0 không đạt`; test layout xác nhận hai Row nằm trong `shin-action-stack`, Account không còn vùng notice nền |
-| 2026-09-20 | Hoàn thiện credential state machine và kiểm thử xóa | Username legacy đọc metadata vault hoặc fail-closed; marker `********` focus/blur/realtime; preserve không mã hóa lại; xóa vault trước GAS, retry GAS một lần và chặn partial failure; `node tests/run.js`: `1854 đạt, 0 không đạt`; `git diff --check` sạch |
+| 2026-09-20 | Hoàn thiện credential state machine và kiểm thử xóa | Username legacy đọc metadata vault hoặc fail-closed; marker `********` focus/blur/realtime và dirty-state; preserve không mã hóa lại; xóa vault trước GAS, retry GAS một lần và chặn partial failure; `node tests/run.js`: `1855 đạt, 0 không đạt`; `git diff --check` sạch |
 | 2026-09-20 | Commit và push nhóm credential/UI | Commit `46c1575 Hoàn thiện state machine credential FBM`; GAS DEV `@469`, `fbmGetLoginConfig --push` trả `OK`, username `ANHLT` |
 | 2026-09-20 | Bổ sung retry xóa credential và push lại | Commit `fe0972b Bổ sung retry xóa credential FBM`; GAS DEV `@470`, `fbmGetLoginConfig --push` trả `OK`, username `ANHLT` |
 

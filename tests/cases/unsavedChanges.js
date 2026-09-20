@@ -158,6 +158,9 @@ async function testFormVaFbm(so) {
   const cancel = bo.dom.document.createElement('button'); cancel.setAttribute('data-sync-config-action', 'cancel'); cancel.setAttribute('data-sync-config-key', 'connection'); card.appendChild(cancel);
   const save = bo.dom.document.createElement('button'); save.setAttribute('data-sync-config-action', 'save'); save.setAttribute('data-sync-config-key', 'connection'); card.appendChild(save);
   check(so, 'FBM connection dirty theo từng path và không đưa password vào snapshot', [passwordState.dirty, passwordState.keys, passwordSnapshot.password, passwordState.fields], [true, ['connection'], undefined, ['connection.identity.username', 'connection.password']]);
+  username.value = 'old'; password.value = '********';
+  const markerCleanState = provider.read();
+  check(so, 'password marker da luu khong bi coi la thay doi unsaved', [markerCleanState.dirty, markerCleanState.fields], [false, []]);
   check(so, 'FBM chặn nút Hủy và action ngoài card nhưng cho nút Lưu cùng card', [provider.canRunTarget(cancel, loginDirtyState), provider.canRunTarget(save, loginDirtyState), provider.canRunTarget(bo.dom.document.createElement('button'), loginDirtyState)], [false, true, false]);
 
   hop.fbmSyncConfigFinishEdit('connection');

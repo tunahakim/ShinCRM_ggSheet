@@ -330,8 +330,8 @@ function fbmSyncConfigUnsavedRead() {
       var current = fbmSyncConfigUnsavedControlValue(map[path]);
       if (current === undefined) { current = fbmSyncConfigPathGet(state.draft, path); }
       var baseline = fbmSyncConfigPathGet(state.snapshot, path);
-      var isPassword = key === 'connection' && path === 'password';
-      var changed = isPassword ? String(current || '') !== '' : (typeof unsavedChangesEqual === 'function' ? !unsavedChangesEqual(current, baseline) : String(current === undefined || current === null ? '' : current).trim() !== String(baseline === undefined || baseline === null ? '' : baseline).trim());
+      var isPassword = key === 'connection' && path === 'password', passwordMarker = isPassword && typeof FBM_SYNC_ACCOUNT_SCHEMA !== 'undefined' && FBM_SYNC_ACCOUNT_SCHEMA.login && FBM_SYNC_ACCOUNT_SCHEMA.login.password ? FBM_SYNC_ACCOUNT_SCHEMA.login.password.maskedValue : '********';
+      var changed = isPassword ? (String(current || '') !== '' && String(current || '') !== passwordMarker) : (typeof unsavedChangesEqual === 'function' ? !unsavedChangesEqual(current, baseline) : String(current === undefined || current === null ? '' : current).trim() !== String(baseline === undefined || baseline === null ? '' : baseline).trim());
       if (!changed) { return; }
       if (!fieldsByKey[key]) { fieldsByKey[key] = []; }
       fieldsByKey[key].push(path);
