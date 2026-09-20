@@ -105,6 +105,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │       ├── DumpGrid.js           Đo lưới từng sheet: bao nhiêu hàng, bao nhiêu cột, còn chỗ ghi thêm bao nhiêu hàng.
 │       ├── SheetIoProbe.js        Cố tình làm hỏng rồi khôi phục một mã hàng 1 để nghiệm thu readColumnMap; chỉ ghi trên DEV.
 │       ├── DumpRecentLog.js      Đọc tối đa 20 dòng Log cuối trên DEV để chẩn đoán; chỉ đọc, không dùng khi vận hành thật.
+│       ├── FbmSyncStateProbe.js  Đo byte từng DocumentProperties và từng nhánh state FBM mà không trả giá trị nhạy cảm.
 │       ├── MeasureLog.js         Đo chi phí thật của deleteRows trên sheet Log lớn. Con số trong tài liệu 10 đến từ đây.
 │       ├── MeasureChunk.js       Đo đường nạp trên dữ liệu đang có, không ghi ô nào: measureFirstPaint đo thời gian tới khung hình đầu, measureChunkRows so các cỡ gói.
 │       ├── LogTraceSwitch.js     Bật/tắt tham số LOG_TRACE ở sheet Config: devLogTraceOn ghi "all", devLogTraceOff xóa trắng. Tra cột theo mã hàng 1 nên không gõ sai khối.

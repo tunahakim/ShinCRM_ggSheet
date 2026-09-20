@@ -22,7 +22,7 @@ FbmSync.prepareCategoryGate = function (state) {
 FbmSync.logPushRecord = function (candidate, operation, outcome, reason, detail) {
   if (typeof logEvent !== 'function') { return; }
   var record = candidate && candidate.record || {}, entity = String(candidate && candidate.entity || ''), id = String(candidate && candidate.id || record.id || '');
-  var gate = (candidate && candidate.categoryGate) || {};
+  var current = typeof FbmSync.stateRead === 'function' ? FbmSync.stateRead() : {}, gate = (candidate && candidate.categoryGate) || current.metadata && current.metadata.categoryGate || {};
   var hShin = typeof FbmSync.hash === 'function' ? FbmSync.hash(record, entity, gate) : '';
   logEvent({
     source: 'fbm_sync', action: 'push_record', outcome: outcome || (typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok'), entity: entity, recordId: id,
@@ -32,7 +32,7 @@ FbmSync.logPushRecord = function (candidate, operation, outcome, reason, detail)
 };
 /** Ghi trạng thái kỹ thuật sau push; baseline chỉ cập nhật sau bước đọc xác nhận. */
 FbmSync.markPushResult = function (candidate, response, operation) {
-  var record = candidate.record || {}, values = FbmSync.extractInternalValues(response), data = FbmSync.protocol.parse(response) || {}, gate = candidate.categoryGate || {};
+  var record = candidate.record || {}, values = FbmSync.extractInternalValues(response), data = FbmSync.protocol.parse(response) || {}, current = typeof FbmSync.stateRead === 'function' ? FbmSync.stateRead() : {}, gate = candidate.categoryGate || current.metadata && current.metadata.categoryGate || {};
   data = data.d || data;
   // Giữ baseline cũ; hash payload gửi được lưu riêng để kỳ đọc nhận ra chính lần ghi này.
   var sentHash = typeof FbmSync.hash === 'function' ? FbmSync.hash(record, candidate.entity, gate) : '';
@@ -272,7 +272,6 @@ FbmSync.nextPushRequest = function (state) {
       index += 1; state.cursor.index = index; FbmSync.stateWrite(state); continue;
     }
     candidate.entity = entity;
-    candidate.categoryGate = state.metadata.categoryGate || {};
     var request;
     if (entity === 'customer') {
       request = candidate.kind === 'create' ? FbmSync.customerCreateOpenRequest() : FbmSync.customerEditOpenRequest(candidate.record.fbmId);

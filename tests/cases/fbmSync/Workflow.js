@@ -17,6 +17,7 @@ function properties() {
     getProperty(key) { return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : null; },
     setProperty(key, value) { data[key] = String(value); },
     deleteProperty(key) { delete data[key]; },
+    getProperties() { return Object.assign({}, data); },
     data
   };
 }
@@ -53,7 +54,8 @@ function workflowGas(options) {
     'fbm_sync/transport/TransportCore.js',
     'fbm_sync/transport/PushFlow.js',
     'fbm_sync/transport/PullFlow.js',
-    'fbm_sync/transport/EntryPoints.js'
+    'fbm_sync/transport/EntryPoints.js',
+    'server/dev/FbmSyncStateProbe.js'
   );
   hop.FbmSync.currentSpreadsheetId = () => 'sheet-workflow';
   hop.FbmSync.configValue = () => '';
@@ -375,6 +377,44 @@ async function chay(so) {
     Object.keys(compactState.session.lookups || {}).length,
     compactState.metadata.categoryGate && compactLookupFlow.hop.FbmSync.categoryValueAllowed(compactState.metadata.categoryGate, '@CAT_TINH_THANH', 'CODE-0')
   ], ['grid', true, 'Tên danh mục live 0 0 có tên đủ dài', true, undefined, undefined, 103, 4, 0, { ok: true, code: 'CODE-0' }]);
+  const pushState = compactLookupFlow.hop.FbmSync.stateRead();
+  pushState.metadata.categoryGate = compactLookupFlow.hop.FbmSync.categoryGateForState(compactLookupFlow.hop.FbmSync.readCategoryGate());
+  pushState.metadata.categoryBlocks = [];
+  pushState.metadata.categoryLookupFailed = false;
+  pushState.mode = 'write'; pushState.phase = 'push'; pushState.entity = 'activity'; pushState.cursor = { kind: 'push_scan', entity: 'activity', index: 0 };
+  compactLookupFlow.hop.FbmSync.stateWrite(pushState);
+  compactLookupFlow.hop.FbmSync.pushCandidates = () => [{ kind: 'edit', id: 'ACT-QUOTA', record: { id: 'ACT-QUOTA', fbmId: 'FBM-ACT-QUOTA', taskType: 'CODE-3', content: 'Nội dung', workDate: '2026-09-20', customerId: 'CUS-1', customerFbmCode: 'ALT00001', allowFbmPush: 'Cho phép', fbmHash: 'old' } }];
+  compactLookupFlow.hop.FbmSync.pushConfigErrors = () => '';
+  compactLookupFlow.hop.FbmSync.pushOwnerError = () => '';
+  compactLookupFlow.hop.FbmSync.validatePushCategories = () => [];
+  compactLookupFlow.hop.FbmSync.pushEligibilityErrors = () => [];
+  compactLookupFlow.hop.FbmSync.isRecordLocked = () => false;
+  compactLookupFlow.hop.FbmSync.lockRecord = () => pushState;
+  compactLookupFlow.hop.FbmSync.writeGateSave = () => ({ ok: true });
+  compactLookupFlow.hop.FbmSync.stopPushOnConflicts = () => false;
+  compactLookupFlow.hop.FbmSync.activityEditOpenRequest = () => ({ url: 'https://example.test', meta: { kind: 'activity_edit_open' } });
+  const pushRequest = compactLookupFlow.hop.FbmSync.nextPushRequest(pushState);
+  const pushWaitState = compactLookupFlow.hop.FbmSync.stateRead();
+  const pushRawState = compactLookupFlow.documentProperties.data.FBM_SYNC_STATE_V1 || '';
+  let pushRawParsed = null; try { pushRawParsed = JSON.parse(pushRawState); } catch (ignorePushRaw) {}
+  check(so, 'push candidate không nhân đôi Category gate trong state DocumentProperties', [
+    Buffer.byteLength(JSON.stringify(pushWaitState), 'utf8') < compactLookupFlow.hop.FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT,
+    pushWaitState.cursor.kind,
+    pushWaitState.cursor.candidate && Object.prototype.hasOwnProperty.call(pushWaitState.cursor.candidate, 'categoryGate'),
+    pushWaitState.metadata.categoryGate && Object.keys(pushWaitState.metadata.categoryGate.map || {}).length,
+    pushState.cursor.kind,
+    pushRequest && pushRequest.meta && pushRequest.meta.kind,
+    pushRawState.length,
+    pushRawParsed && pushRawParsed.cursor && pushRawParsed.cursor.kind
+  ], [true, 'push_wait', false, 103, 'push_wait', 'activity_edit_open', pushRawState.length, 'push_wait']);
+  const probeState = compactLookupFlow.hop.FbmSync.stateRead();
+  compactLookupFlow.documentProperties.setProperty('FBM_SYNC_PENDING_PUSHES_V1', 'x'.repeat(42));
+  const probe = compactLookupFlow.hop.fbmSyncStateProbe();
+  check(so, 'probe state chỉ trả kích thước từng nhánh, không trả payload', [
+    probe.ok, probe.state.parseOk, probe.state.cursorKind, probe.state.cursorCandidateCategoryGateBytes,
+    probe.state.metadataCategoryGateBytes > 0, probe.state.sessionLookupsBytes, probe.largestProperties[0].key,
+    JSON.stringify(probe).indexOf('ACT-QUOTA') < 0
+  ], [true, true, 'push_wait', 0, true, 2, 'FBM_SYNC_STATE_V1', true]);
   const htmlFailureFlow = workflowGas();
   const htmlLogs = [];
   htmlFailureFlow.hop.LOG_OK = 'ok'; htmlFailureFlow.hop.LOG_ERROR = 'error'; htmlFailureFlow.hop.LOG_CONFLICT = 'conflict';
