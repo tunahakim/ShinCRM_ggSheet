@@ -272,7 +272,7 @@ function fbmSyncHeartbeatRequest(options) {
     state.relayHop = 0;
     FbmSync.stateWrite(state);
     if (typeof FbmSync.heartbeatCustomerRequest !== 'function') { return { ok: false, code: 'HEARTBEAT_REQUEST_UNAVAILABLE', request: null, status: FbmSync.statusView() }; }
-    var heartbeatRequest = FbmSync.heartbeatCustomerRequest(), heartbeatEnvelope = FbmSync.nextEnvelope(heartbeatRequest), currentState = FbmSync.stateRead();
+    var heartbeatRequest = FbmSync.sessionSystemRequest('heartbeat'), heartbeatEnvelope = FbmSync.nextEnvelope(heartbeatRequest), currentState = FbmSync.stateRead();
     return { ok: true, code: typeof FbmSync.sessionGateRequestCode === 'function' ? FbmSync.sessionGateRequestCode(heartbeatEnvelope, currentState) : 'HEARTBEAT_REQUEST_READY', request: heartbeatEnvelope, status: FbmSync.statusView() };
   } finally { lock.releaseLock(); }
 }

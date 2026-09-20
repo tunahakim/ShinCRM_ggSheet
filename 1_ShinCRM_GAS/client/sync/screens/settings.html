@@ -70,13 +70,15 @@ function fbmSyncSettingsBackgroundBlocks(settings) {
 function fbmSyncSettingsLoginBlocks(loginPolicy) {
   loginPolicy = fbmSyncConfigDraft('loginPolicy', loginPolicy || {});
   var parentEnabled = loginPolicy.enabled !== false;
+  var configured = (FBM_SYNC_CLIENT.loginStatus || {}).configured === true;
   var toggle = function (id, label, pressed, path) { return FBM_SYNC_SETTINGS_UI.layout.toggle(FBM_SYNC_SETTINGS_UI.classes.toggleRow, Text({ className: FBM_SYNC_SETTINGS_UI.classes.toggleCopy, text: label }), StandaloneControl({ id: id, kind: 'toggle', pressed: pressed, className: pressed ? FBM_SYNC_SETTINGS_UI.classes.toggleOn : FBM_SYNC_SETTINGS_UI.classes.toggleOff, data: { 'sync-login-policy': id.replace(FBM_SYNC_SETTINGS_SCHEMA.defaults.policyPrefix, '') }, disabled: fbmSyncConfigControlDisabled('loginPolicy', path), ariaLabel: label })); };
   var retryGroup = FBM_SYNC_SETTINGS_UI.layout.loginRetryGroup(FBM_SYNC_SETTINGS_UI.classes.loginRetryGroup, [
     toggle(FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryId, FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryLabel, loginPolicy.retryEnabled !== false, 'retryEnabled'),
     StandaloneField(FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryMinutesLabel, { id: FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryMinutesId, kind: 'input', inputType: 'number', value: loginPolicy.retryMinutes || FBM_SYNC_SETTINGS_SCHEMA.defaults.retryMinutes, placeholder: FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryMinutesPlaceholder, disabled: fbmSyncConfigControlDisabled('loginPolicy', 'retryMinutes'), ariaLabel: FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryMinutesLabel })
   ]);
   return FBM_SYNC_SETTINGS_UI.layout.loginPolicy({
-    notice: fbmSyncSettingsNoticeBlocks('login'),
+    status: [Text({ className: parentEnabled ? 'shin-pass-row' : 'shin-error-message', text: parentEnabled ? 'Đã bật tính năng đăng nhập tự động' : 'Đã tắt tính năng đăng nhập tự động' })],
+    notice: fbmSyncSettingsNoticeBlocks('login', parentEnabled && !configured ? { kind: 'warning', message: 'Chưa sẵn sàng: hãy nhập username và mật khẩu ở màn Đăng nhập tự động.' } : null),
     parent: FBM_SYNC_SETTINGS_UI.layout.loginParent(FBM_SYNC_SETTINGS_SCHEMA.regions.loginPolicyParent, uiClassJoin(FBM_SYNC_SETTINGS_UI.classes.toggleRow, FBM_SYNC_SETTINGS_UI.classes.loginParent), Text({ className: FBM_SYNC_SETTINGS_UI.classes.toggleCopy, text: FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.parentLabel }), StandaloneControl({ id: FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.parentId, kind: 'toggle', pressed: parentEnabled, className: parentEnabled ? FBM_SYNC_SETTINGS_UI.classes.toggleOn : FBM_SYNC_SETTINGS_UI.classes.toggleOff, data: { 'sync-login-policy': 'auto-login' }, disabled: fbmSyncConfigControlDisabled('loginPolicy', 'enabled'), ariaLabel: FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.parentLabel })),
     children: [toggle(FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.openId, FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.openLabel, loginPolicy.autoOpenTab === true, 'autoOpenTab'), retryGroup],
     actions: fbmSyncConfigButtonRow('loginPolicy', { edit: FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.edit, save: FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.save }, { id: FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.saveId, disabled: !!FBM_SYNC_CLIENT.running })

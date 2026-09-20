@@ -4,6 +4,7 @@
  * Module này chỉ điều phối cảnh báo và presentation; provider của form/FBM vẫn giữ snapshot, draft và cửa lưu riêng.
  */
 var UNSAVED_CHANGES = { dialogOpen: false, highlighted: false, provider: null, pending: null, busy: false, returnFocus: null, surfaces: {} };
+var UI_DECISION_DIALOG = { open: false, busy: false, resolve: null };
 
 /**
  * Cổng điều phối duy nhất cho mọi vùng có thể chỉnh sửa. Adapter của màn hình
@@ -96,6 +97,39 @@ function unsavedChangesClearFields() {
 }
 
 function unsavedChangesDialog() { return document.getElementById('shin-unsaved-dialog'); }
+
+/* Dialog quyết định dùng chung cho các thao tác nguy hiểm của Sidebar. Khối nghiệp vụ
+   chỉ truyền nội dung và callback; host, renderer và nút lựa chọn vẫn thuộc core. */
+function uiDecisionOpen(options) {
+  var opts = options || {}, dialog = unsavedChangesDialog();
+  if (!dialog || typeof renderReplaceChildren !== 'function') { return Promise.reject(new Error('Sidebar thiếu host dialog quyết định.')); }
+  if (UI_DECISION_DIALOG.open) { return Promise.resolve(false); }
+  renderReplaceChildren(dialog, [
+    Box({ className: 'shin-unsaved-backdrop', data: { 'ui-decision-choice': 'cancel' } }),
+    Box({ className: 'shin-unsaved-panel', elements: [
+      Text({ id: 'shin-decision-title', className: 'shin-unsaved-title', text: String(opts.title || '') }),
+      Text({ id: 'shin-decision-message', className: 'shin-unsaved-message', text: String(opts.message || '') }),
+      Stack({ className: 'shin-unsaved-actions', elements: [
+        Button({ className: 'shin-unsaved-continue', data: { 'ui-decision-choice': 'cancel' }, label: String(opts.cancelLabel || 'Quay lại') }),
+        Button({ className: 'shin-unsaved-discard', data: { 'ui-decision-choice': 'confirm' }, label: String(opts.confirmLabel || 'Xác nhận') })
+      ] })
+    ] })
+  ], {});
+  dialog.hidden = false;
+  dialog.setAttribute('aria-hidden', 'false');
+  UI_DECISION_DIALOG.open = true;
+  UI_DECISION_DIALOG.busy = false;
+  return new Promise(function (resolve) { UI_DECISION_DIALOG.resolve = resolve; });
+}
+function uiDecisionResolve(choice) {
+  if (!UI_DECISION_DIALOG.open || UI_DECISION_DIALOG.busy) { return; }
+  var dialog = unsavedChangesDialog(), confirmed = choice === 'confirm';
+  var resolve = UI_DECISION_DIALOG.resolve;
+  UI_DECISION_DIALOG.open = false;
+  UI_DECISION_DIALOG.resolve = null;
+  if (dialog) { dialog.hidden = true; dialog.setAttribute('aria-hidden', 'true'); }
+  if (resolve) { resolve(confirmed); }
+}
 
 function unsavedChangesSetBusy(busy) {
   var dialog = unsavedChangesDialog();
@@ -200,12 +234,28 @@ function unsavedChangesInstall() {
   UNSAVED_CHANGES.installed = true;
   unsavedChangesRenderDialog();
   document.addEventListener('click', function (event) {
+    var decision = event.target && event.target.closest ? event.target.closest('[data-ui-decision-choice]') : null;
+    if (decision && UI_DECISION_DIALOG.open) {
+      event.preventDefault();
+      var choice = decision.getAttribute('data-ui-decision-choice'), resolver = UI_DECISION_DIALOG.resolve;
+      UI_DECISION_DIALOG.open = false;
+      UI_DECISION_DIALOG.resolve = null;
+      var dialog = unsavedChangesDialog();
+      if (dialog) { dialog.hidden = true; dialog.setAttribute('aria-hidden', 'true'); }
+      if (resolver) { resolver(choice === 'confirm'); }
+      return;
+    }
     var target = event.target && event.target.closest ? event.target.closest('[data-unsaved-choice]') : null;
     if (!target) { return; }
     event.preventDefault();
     unsavedChangesResolve(target.getAttribute('data-unsaved-choice'));
   });
   document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape' && UI_DECISION_DIALOG.open && !UI_DECISION_DIALOG.busy) {
+      event.preventDefault();
+      uiDecisionResolve('cancel');
+      return;
+    }
     if (event.key === 'Escape' && UNSAVED_CHANGES.dialogOpen && !UNSAVED_CHANGES.busy) {
       event.preventDefault();
       unsavedChangesResolve('continue');

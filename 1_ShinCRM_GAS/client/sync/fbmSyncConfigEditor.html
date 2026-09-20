@@ -133,6 +133,8 @@ function fbmSyncConfigFinishEdit(key) {
   state.draft = null;
   if (key === 'connection') {
     FBM_SYNC_CLIENT.loginDraft = { username: '' };
+    FBM_SYNC_CLIENT.loginPasswordMode = 'saved';
+    FBM_SYNC_CLIENT.loginPasswordFocused = false;
     var passwordId = typeof FBM_SYNC_ACCOUNT_SCHEMA !== 'undefined' && FBM_SYNC_ACCOUNT_SCHEMA.login && FBM_SYNC_ACCOUNT_SCHEMA.login.password ? FBM_SYNC_ACCOUNT_SCHEMA.login.password.id : 'fbm-login-password';
     var password = document.getElementById(passwordId);
     if (password) { password.value = ''; }
@@ -241,6 +243,8 @@ function fbmSyncConfigStartEdit(key) {
     draft = { identity: { spreadsheetId: String((FBM_SYNC_CLIENT.identityDraft || {}).spreadsheetId || binding.spreadsheetId || ''), userId: String((FBM_SYNC_CLIENT.identityDraft || {}).userId || binding.userId || ''), username: String((FBM_SYNC_CLIENT.identityDraft || {}).username || binding.username || ''), accountName: String((FBM_SYNC_CLIENT.identityDraft || {}).accountName || binding.accountName || '') }, loginUsername: String(fbmSyncLoginUsernameValue(login) || '') };
     FBM_SYNC_CLIENT.identityDraft = fbmSyncConfigClone(draft.identity);
     FBM_SYNC_CLIENT.loginDraft = { username: draft.loginUsername };
+    FBM_SYNC_CLIENT.loginPasswordMode = login.configured === true ? 'saved' : 'draft';
+    FBM_SYNC_CLIENT.loginPasswordFocused = false;
   } else if (key === 'accountSettings') {
     var account = settings.account || {};
     draft = { customerPrefix: String(account.customerPrefix || ''), customerCodeLength: String(account.customerCodeLength || ''), activitySince: String(account.activitySince || '') };
@@ -375,6 +379,17 @@ function fbmSyncConfigHandleAction(target) {
   key = fbmSyncConfigCanonicalKey(key);
   if (!action || FBM_SYNC_CONFIG_KEYS.indexOf(key) < 0) { return false; }
   if (action === 'edit') {
+    if (key === 'loginPolicy' && !((FBM_SYNC_CLIENT.loginStatus || {}).configured === true)) {
+      var decision = typeof window !== 'undefined' && typeof window.uiDecisionOpen === 'function' ? window.uiDecisionOpen({ title: 'Chưa có thông tin đăng nhập tự động', message: 'Hãy nhập username và mật khẩu ở khối Đăng nhập tự động trước khi sửa chính sách.', cancelLabel: 'Quay lại', confirmLabel: 'Đi tới Đăng nhập tự động' }) : Promise.resolve(typeof window !== 'undefined' && typeof window.confirm === 'function' && window.confirm('Hãy nhập username và mật khẩu ở khối Đăng nhập tự động trước khi sửa chính sách.'));
+      decision.then(function (go) {
+        if (!go) { return; }
+        fbmSyncSetScreen('account');
+        fbmSyncRenderShell(FBM_SYNC_CLIENT.lastStatus || {});
+        var loginCard = document.getElementById('fbm-sync-login-section-region');
+        if (loginCard && typeof loginCard.scrollIntoView === 'function') { loginCard.scrollIntoView({ block: 'start' }); }
+      });
+      return true;
+    }
     if (fbmSyncConfigStartEdit(key)) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus || {}); }
     return true;
   }

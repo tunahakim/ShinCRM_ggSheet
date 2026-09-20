@@ -1,6 +1,6 @@
 <script>
 /* Sidebar chỉ hiển thị tiến độ; GAS là nguồn state duy nhất. */
-var FBM_SYNC_CLIENT = { installed: false, active: false, waiting: {}, relayWaiters: {}, credentialWaiters: {}, running: false, statusReady: false, mode: 'read', openedAt: 0, returnScreen: 'view', returnUi: null, relayConfigured: false, relayOpenId: 0, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0, traceEvents: [], subscreen: 'run', navOpen: false, resultsTab: 'summary', resultPages: {}, lastStatus: null, identityStatus: null, identityAction: '', identityLastAction: '', identityProbeSignature: '', identityInvalid: {}, identityDraft: { spreadsheetId: '', userId: '', username: '', accountName: '' }, accountSettingsDraft: {}, accountSettingsInvalid: {}, loginStatus: null, loginDraft: { username: '' }, pendingLoginEnvelope: null, configEdits: {}, accountNotices: { identity: null, accountSettings: null, login: null }, settingsNotices: { module: null, relay: null, extension: null, background: null, login: null }, syncSettings: null };
+var FBM_SYNC_CLIENT = { installed: false, active: false, waiting: {}, relayWaiters: {}, credentialWaiters: {}, credentialMetadataWaiters: {}, credentialClearWaiters: {}, running: false, statusReady: false, mode: 'read', openedAt: 0, returnScreen: 'view', returnUi: null, relayConfigured: false, relayOpenId: 0, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0, traceEvents: [], subscreen: 'run', navOpen: false, resultsTab: 'summary', resultPages: {}, lastStatus: null, identityStatus: null, identityAction: '', identityLastAction: '', identityProbeSignature: '', identityInvalid: {}, identityDraft: { spreadsheetId: '', userId: '', username: '', accountName: '' }, accountSettingsDraft: {}, accountSettingsInvalid: {}, loginStatus: null, loginDraft: { username: '' }, loginPasswordMode: 'saved', loginPasswordFocused: false, loginPasswordTimer: null, pendingLoginEnvelope: null, configEdits: {}, accountNotices: { identity: null, accountSettings: null, login: null }, settingsNotices: { module: null, relay: null, extension: null, background: null, login: null }, syncSettings: null };
 /** Timeout cho một request Extension để phiên không treo vô hạn khi tab FBM/bridge mất kết nối. */
 var FBM_SYNC_REQUEST_TIMEOUT_MS = 20000;
 var FBM_SYNC_GAS_CONTINUE_WARN_MS = 5000;
@@ -42,7 +42,7 @@ function syncPanelToggle() {
   fbmSyncCaptureReturnScreen();
   FBM_SYNC_CLIENT.active = true;
   FBM_SYNC_CLIENT.statusReady = false;
-  FBM_SYNC_CLIENT.subscreen = 'run'; FBM_SYNC_CLIENT.openedAt = Date.now(); FBM_SYNC_CLIENT.viewEpoch += 1; FBM_SYNC_CLIENT.configEdits = {}; FBM_SYNC_CLIENT.pendingLoginEnvelope = null; FBM_SYNC_CLIENT.accountNotices = { identity: null, accountSettings: null, login: null }; FBM_SYNC_CLIENT.accountSettingsDraft = {}; FBM_SYNC_CLIENT.accountSettingsInvalid = {}; FBM_SYNC_CLIENT.settingsNotices = { module: null, relay: null, extension: null, background: null, login: null };
+  FBM_SYNC_CLIENT.subscreen = 'run'; FBM_SYNC_CLIENT.openedAt = Date.now(); FBM_SYNC_CLIENT.viewEpoch += 1; FBM_SYNC_CLIENT.configEdits = {}; FBM_SYNC_CLIENT.pendingLoginEnvelope = null; FBM_SYNC_CLIENT.loginPasswordMode = 'saved'; FBM_SYNC_CLIENT.loginPasswordFocused = false; FBM_SYNC_CLIENT.loginPasswordTimer = null; FBM_SYNC_CLIENT.accountNotices = { identity: null, accountSettings: null, login: null }; FBM_SYNC_CLIENT.accountSettingsDraft = {}; FBM_SYNC_CLIENT.accountSettingsInvalid = {}; FBM_SYNC_CLIENT.settingsNotices = { module: null, relay: null, extension: null, background: null, login: null };
   if (typeof fbmSyncRenderInitial === 'function') { fbmSyncRenderInitial(); }
   if (typeof fbmSyncStatusOnce !== 'function') { return null; }
   return Promise.all([fbmSyncStatusOnce(true), fbmSyncLoadIdentityStatus(), fbmSyncLoadSettings()]).then(function (results) { return fbmSyncLoadLoginStatus().then(function () { return results[0]; }); }).catch(function (error) {
@@ -101,10 +101,90 @@ function fbmSyncSetAccountNotice(scope, kind, message) {
 }
 function fbmSyncLoadLoginStatus() {
   if (typeof callServer !== 'function') { return Promise.resolve(null); }
-  return callServer('fbmGetLoginConfig').then(function (login) { FBM_SYNC_CLIENT.loginStatus = login || {}; if (FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.statusReady) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); } return login; }).catch(function (error) {
+  return callServer('fbmGetLoginConfig').then(function (login) {
+    FBM_SYNC_CLIENT.loginStatus = login || {};
+    FBM_SYNC_CLIENT.loginPasswordMode = FBM_SYNC_CLIENT.loginStatus.configured === true ? 'saved' : 'draft';
+    if (FBM_SYNC_CLIENT.loginStatus.configured === true && /\*/.test(fbmSyncLoginUsernameValue(FBM_SYNC_CLIENT.loginStatus)) && FBM_SYNC_CLIENT.loginStatus.credentialRef) {
+      return fbmSyncLoadCredentialMetadata(FBM_SYNC_CLIENT.loginStatus.credentialRef).then(function (metadata) {
+        var username = String(metadata && metadata.username || '').trim();
+        if (username) {
+          FBM_SYNC_CLIENT.loginStatus.public = Object.assign({}, FBM_SYNC_CLIENT.loginStatus.public || {}, { usernameHint: username });
+          return callServer('fbmRepairLoginUsername', [{ credentialRef: FBM_SYNC_CLIENT.loginStatus.credentialRef, username: username }]).then(function (repaired) {
+            if (repaired && repaired.ok !== false) { FBM_SYNC_CLIENT.loginStatus = repaired; }
+            return FBM_SYNC_CLIENT.loginStatus;
+          }).catch(function () { return FBM_SYNC_CLIENT.loginStatus; });
+        }
+        return FBM_SYNC_CLIENT.loginStatus;
+      }).catch(function () { return FBM_SYNC_CLIENT.loginStatus; });
+    }
+    if (FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.statusReady) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); }
+    return FBM_SYNC_CLIENT.loginStatus;
+  }).then(function (result) { if (FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.statusReady) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); } return result; }).catch(function (error) {
     fbmSyncPaintError(error, 'Khong tai duoc cau hinh dang nhap FBM.');
     return null;
   });
+}
+
+function fbmSyncLoginPasswordMarkerVisible(login) {
+  var value = login || FBM_SYNC_CLIENT.loginStatus || {}, configured = value.configured === true && !!value.credentialRef, stored = fbmSyncLoginUsernameValue(value), draft = String((FBM_SYNC_CLIENT.loginDraft || {}).username || '').trim();
+  if (!configured || !stored || stored.indexOf('*') >= 0) { return false; }
+  if (!fbmSyncConfigIsEditing('connection')) { return true; }
+  return FBM_SYNC_CLIENT.loginPasswordMode !== 'draft' && draft === stored && FBM_SYNC_CLIENT.loginPasswordFocused !== true;
+}
+
+function fbmSyncLoginPasswordInput() { return typeof document === 'undefined' ? null : document.getElementById('fbm-login-password'); }
+function fbmSyncLoginPasswordStoredUsername() { return String(fbmSyncLoginUsernameValue(FBM_SYNC_CLIENT.loginStatus || {}) || '').trim(); }
+function fbmSyncLoginPasswordUsernameMatchesStored() {
+  var stored = fbmSyncLoginPasswordStoredUsername(), draft = String((FBM_SYNC_CLIENT.loginDraft || {}).username || '').trim();
+  return !!stored && stored.indexOf('*') < 0 && draft === stored;
+}
+function fbmSyncLoginPasswordEnterDraft(input) {
+  input = input || fbmSyncLoginPasswordInput();
+  if (!input || input.disabled || !fbmSyncConfigIsEditing('connection')) { return false; }
+  FBM_SYNC_CLIENT.loginPasswordFocused = true;
+  if (input.value === FBM_SYNC_ACCOUNT_SCHEMA.login.password.maskedValue) { input.value = ''; }
+  input.placeholder = FBM_SYNC_ACCOUNT_SCHEMA.login.password.newPlaceholder;
+  FBM_SYNC_CLIENT.loginPasswordMode = 'draft';
+  fbmSyncClearAccountNotice('login');
+  return true;
+}
+function fbmSyncSyncLoginPasswordState() {
+  var input = fbmSyncLoginPasswordInput();
+  if (!input || !fbmSyncConfigIsEditing('connection')) { return false; }
+  var matches = fbmSyncLoginPasswordUsernameMatchesStored(), marker = FBM_SYNC_ACCOUNT_SCHEMA.login.password.maskedValue;
+  if (!matches) {
+    if (input.value === marker) { input.value = ''; }
+    input.placeholder = FBM_SYNC_ACCOUNT_SCHEMA.login.password.newPlaceholder;
+    FBM_SYNC_CLIENT.loginPasswordMode = 'draft';
+    return true;
+  }
+  if (!input.value && FBM_SYNC_CLIENT.loginPasswordFocused !== true) {
+    input.value = marker;
+    input.placeholder = '';
+    FBM_SYNC_CLIENT.loginPasswordMode = 'saved';
+  } else if (input.value && input.value !== marker) {
+    input.placeholder = FBM_SYNC_ACCOUNT_SCHEMA.login.password.newPlaceholder;
+    FBM_SYNC_CLIENT.loginPasswordMode = 'draft';
+  }
+  return true;
+}
+function fbmSyncScheduleLoginPasswordState() {
+  if (FBM_SYNC_CLIENT.loginPasswordTimer) { clearTimeout(FBM_SYNC_CLIENT.loginPasswordTimer); }
+  FBM_SYNC_CLIENT.loginPasswordTimer = setTimeout(function () { FBM_SYNC_CLIENT.loginPasswordTimer = null; fbmSyncSyncLoginPasswordState(); }, 100);
+}
+function fbmSyncBlurLoginPassword(input) {
+  input = input || fbmSyncLoginPasswordInput();
+  FBM_SYNC_CLIENT.loginPasswordFocused = false;
+  if (!input || !fbmSyncConfigIsEditing('connection')) { return false; }
+  if (!input.value && fbmSyncLoginPasswordUsernameMatchesStored()) {
+    input.value = FBM_SYNC_ACCOUNT_SCHEMA.login.password.maskedValue;
+    input.placeholder = '';
+    FBM_SYNC_CLIENT.loginPasswordMode = 'saved';
+  } else if (input.value !== FBM_SYNC_ACCOUNT_SCHEMA.login.password.maskedValue) {
+    input.placeholder = FBM_SYNC_ACCOUNT_SCHEMA.login.password.newPlaceholder;
+    FBM_SYNC_CLIENT.loginPasswordMode = 'draft';
+  }
+  return true;
 }
 function fbmSyncLoadSettings() {
   if (typeof callServer !== 'function') { return Promise.resolve(null); }
@@ -378,6 +458,24 @@ function fbmSyncInstall() {
       if (data.error || !data.result || data.result.ok === false) { credentialWaiter.reject(new Error(String(data.error || data.result && data.result.error || 'Extension không mã hóa được thông tin đăng nhập.'))); } else { credentialWaiter.resolve(data.result); }
       return;
     }
+    if (data.action === 'CRM_FBM_CREDENTIAL_METADATA_RESULT' && data.nonce === SHEET_LINK_NONCE) {
+      if (String(data.sessionId || '') !== FBM_SYNC_RELAY_SESSION) { return; }
+      var metadataWaiter = FBM_SYNC_CLIENT.credentialMetadataWaiters[String(data.id || '')];
+      if (!metadataWaiter) { return; }
+      delete FBM_SYNC_CLIENT.credentialMetadataWaiters[String(data.id || '')];
+      clearTimeout(metadataWaiter.timer);
+      if (data.error || !data.result || data.result.ok === false) { metadataWaiter.reject(new Error(String(data.error || data.result && data.result.error || 'Extension không đọc được metadata username.'))); } else { metadataWaiter.resolve(data.result); }
+      return;
+    }
+    if (data.action === 'CRM_FBM_CREDENTIAL_CLEAR_RESULT' && data.nonce === SHEET_LINK_NONCE) {
+      if (String(data.sessionId || '') !== FBM_SYNC_RELAY_SESSION) { return; }
+      var clearWaiter = FBM_SYNC_CLIENT.credentialClearWaiters[String(data.id || '')];
+      if (!clearWaiter) { return; }
+      delete FBM_SYNC_CLIENT.credentialClearWaiters[String(data.id || '')];
+      clearTimeout(clearWaiter.timer);
+      if (data.error || !data.result || data.result.ok === false) { clearWaiter.reject(new Error(String(data.error || data.result && data.result.error || 'Extension không xóa được thông tin đăng nhập.'))); } else { clearWaiter.resolve(data.result); }
+      return;
+    }
     if (data.action !== 'CRM_FBM_RESPONSE' || (typeof SHEET_LINK_NONCE !== 'undefined' && data.nonce !== SHEET_LINK_NONCE)) { return; }
     var waiter = FBM_SYNC_CLIENT.waiting[data.id];
     if (!waiter) { return; }
@@ -396,7 +494,7 @@ function fbmSyncInstall() {
     } else { waiter.resolve(data.result); }
   });
   document.addEventListener('click', function (event) {
-    var target = event.target && event.target.closest ? event.target.closest('#fbm-sync-back, #fbm-sync-module-menu, #fbm-sync-master-switch, #fbm-sync-settings-master-switch, #fbm-sync-start, #fbm-sync-approve, #fbm-sync-rotate-relay, #fbm-sync-cancel, #fbm-sync-open-conflicts, #fbm-sync-conflict-back, #fbm-sync-check-identity, #fbm-sync-probe-identity, #fbm-sync-confirm-identity, #fbm-sync-save-identity, #fbm-sync-auto-login, #fbm-sync-login-edit, #fbm-sync-login-save, #fbm-sync-login-test, #fbm-sync-open-login-policy, #fbm-sync-save-extension, #fbm-sync-save-background, #fbm-sync-save-login-policy, #fbm-sync-save-settings, [data-sync-config-action], [data-sync-screen], [data-sync-results-tab], [data-sync-background-draft], [data-sync-master-draft], [data-sync-extension-startup], [data-sync-process-toggle], [data-sync-login-policy], [data-sync-page], [data-fbm-conflict-choice], [data-fbm-conflict-merge], [data-fbm-push-retry-all]') : null;
+    var target = event.target && event.target.closest ? event.target.closest('#fbm-sync-back, #fbm-sync-module-menu, #fbm-sync-master-switch, #fbm-sync-settings-master-switch, #fbm-sync-start, #fbm-sync-approve, #fbm-sync-rotate-relay, #fbm-sync-cancel, #fbm-sync-open-conflicts, #fbm-sync-conflict-back, #fbm-sync-check-identity, #fbm-sync-probe-identity, #fbm-sync-confirm-identity, #fbm-sync-save-identity, #fbm-sync-auto-login, #fbm-sync-login-edit, #fbm-sync-login-save, #fbm-sync-login-delete, #fbm-sync-login-test, #fbm-sync-open-login-policy, #fbm-sync-save-extension, #fbm-sync-save-background, #fbm-sync-save-login-policy, #fbm-sync-save-settings, [data-sync-config-action], [data-sync-screen], [data-sync-results-tab], [data-sync-background-draft], [data-sync-master-draft], [data-sync-extension-startup], [data-sync-process-toggle], [data-sync-login-policy], [data-sync-page], [data-fbm-conflict-choice], [data-fbm-conflict-merge], [data-fbm-push-retry-all]') : null;
     if (!target) { return; }
     event.preventDefault();
     if (typeof unsavedChangesGuardTransition === 'function' && unsavedChangesGuardTransition({ source: 'fbm', target: target }, function () { return fbmSyncDispatchClickTarget(target); })) { return; }
@@ -475,6 +573,7 @@ function fbmSyncInstall() {
     } else if (target.id === 'fbm-sync-confirm-identity') { fbmSyncConfirmIdentity();
     } else if (target.id === 'fbm-sync-save-identity') { fbmSyncSaveIdentityManual(target);
     } else if (target.id === 'fbm-sync-login-save') { fbmSyncSaveLoginConfig(target);
+    } else if (target.id === 'fbm-sync-login-delete') { fbmSyncDeleteLoginCredential(target);
     } else if (target.id === 'fbm-sync-login-test') { fbmSyncTestLogin(target);
     } else if (target.hasAttribute('data-fbm-conflict-merge')) {
       target.disabled = true;
@@ -539,11 +638,13 @@ function fbmSyncInstall() {
       fbmSyncConfigSetDraftValue(configKey, settingsInput[id].split('.').slice(1).join('.'), String(target.value || ''));
     }
     if (id === 'fbm-login-username') {
-      var loginUsernameValue = String(target.value || ''); FBM_SYNC_CLIENT.loginDraft.username = loginUsernameValue; FBM_SYNC_CLIENT.pendingLoginEnvelope = null;
+      var loginUsernameValue = String(target.value || ''); FBM_SYNC_CLIENT.loginDraft.username = loginUsernameValue; FBM_SYNC_CLIENT.pendingLoginEnvelope = null; fbmSyncClearAccountNotice('login'); fbmSyncScheduleLoginPasswordState();
     }
-    if (id === 'fbm-login-password') { FBM_SYNC_CLIENT.pendingLoginEnvelope = null; }
+    if (id === 'fbm-login-password') { FBM_SYNC_CLIENT.pendingLoginEnvelope = null; if (target.value !== FBM_SYNC_ACCOUNT_SCHEMA.login.password.maskedValue) { FBM_SYNC_CLIENT.loginPasswordMode = 'draft'; } fbmSyncClearAccountNotice('login'); }
     if (typeof fbmSyncRenderShellWarning === 'function') { fbmSyncRenderShellWarning(FBM_SYNC_CLIENT.lastStatus || {}); }
   });
+  document.addEventListener('focusin', function (event) { if (event.target && event.target.id === 'fbm-login-password') { fbmSyncLoginPasswordEnterDraft(event.target); } });
+  document.addEventListener('focusout', function (event) { if (event.target && event.target.id === 'fbm-login-password') { fbmSyncBlurLoginPassword(event.target); } });
   document.addEventListener('focusout', function () { setTimeout(fbmSyncFlushDeferredPaint, 0); });
 }
 /** Dựng lại màn chuẩn đã bị FBM tạm thay, gồm cả footer và bản nháp form nếu có. */
@@ -603,6 +704,13 @@ function fbmSyncReportTransportFailure(request, error, code) {
     try { error.transportReported = !!result && result.code !== 'GAS_REPORT_FAILED'; } catch (ignore) {}
     return result;
   });
+}
+function fbmSyncClearAccountNotice(scope) {
+  var name = scope === 'identity' ? 'identity' : scope === 'accountSettings' ? 'accountSettings' : 'login';
+  FBM_SYNC_CLIENT.accountNotices = FBM_SYNC_CLIENT.accountNotices || {};
+  FBM_SYNC_CLIENT.accountNotices[name] = null;
+  var targetId = name === 'accountSettings' ? 'fbm-sync-account-settings-notice-region' : 'fbm-sync-' + name + '-notice-region';
+  if (typeof RENDER_INDEX !== 'undefined' && RENDER_INDEX.nodes[targetId]) { fbmSyncRenderTarget(targetId, []); }
 }
 /** Lấy status một lần, không tạo vòng polling khi không chạy. */
 function fbmSyncStatusOnce(freshOpen) {
@@ -917,7 +1025,9 @@ function fbmSyncSaveLoginPolicy(button) {
 function fbmSyncLoginCredentialsFromForm() {
   var username = document.getElementById('fbm-login-username'), password = document.getElementById('fbm-login-password');
   var identity = typeof fbmSyncIdentityActionValues === 'function' ? fbmSyncIdentityActionValues() : (FBM_SYNC_CLIENT.identityStatus && FBM_SYNC_CLIENT.identityStatus.binding || {});
-  return { username: username ? String(username.value || '').trim() : '', password: password ? String(password.value || '') : '', userId: String(identity.userId || ''), spreadsheetId: String(identity.spreadsheetId || ''), database: '', unit: '', language: 'v' };
+  var passwordValue = password ? String(password.value || '') : '';
+  if (passwordValue === FBM_SYNC_ACCOUNT_SCHEMA.login.password.maskedValue) { passwordValue = ''; }
+  return { username: username ? String(username.value || '').trim() : '', password: passwordValue, userId: String(identity.userId || ''), spreadsheetId: String(identity.spreadsheetId || ''), database: '', unit: '', language: 'v' };
 }
 function fbmSyncEncryptCredentials(credentials) {
   if (window.top === window) { return Promise.reject(new Error('Không tìm thấy Extension để mã hóa thông tin đăng nhập.')); }
@@ -935,6 +1045,39 @@ function fbmSyncEncryptCredentials(credentials) {
     });
   });
 }
+function fbmSyncLoadCredentialMetadata(credentialRef) {
+  if (window.top === window) { return Promise.reject(new Error('Không tìm thấy Extension để đọc metadata username.')); }
+  return fbmSyncWaitForBridge().then(function (ready) {
+    var sessionId = String(typeof SHEET_LINK_EXTENSION_SESSION === 'undefined' ? '' : SHEET_LINK_EXTENSION_SESSION || '');
+    if (sessionId && sessionId !== FBM_SYNC_RELAY_SESSION) { fbmSyncNotifyBridgeReady(); }
+    if (!ready || !sessionId || sessionId !== FBM_SYNC_RELAY_SESSION) { throw new Error('Kênh Extension chưa sẵn sàng để đọc username đã lưu.'); }
+    var id = String(Date.now()) + '-' + Math.random().toString(36).slice(2), source = window.top;
+    return new Promise(function (resolve, reject) {
+      var timer = setTimeout(function () { delete FBM_SYNC_CLIENT.credentialMetadataWaiters[id]; reject(new Error('Extension không trả lời yêu cầu đọc username sau 5 giây.')); }, 5000);
+      FBM_SYNC_CLIENT.credentialMetadataWaiters[id] = { resolve: resolve, reject: reject, timer: timer };
+      source.postMessage({ action: 'CRM_FBM_CREDENTIAL_METADATA', id: id, nonce: SHEET_LINK_NONCE, sessionId: FBM_SYNC_RELAY_SESSION, credentialRef: String(credentialRef || '') }, 'https://docs.google.com');
+    });
+  });
+}
+function fbmSyncClearCredentialInExtension(credentialRef) {
+  if (window.top === window) { return Promise.reject(new Error('Không tìm thấy Extension để xóa thông tin đăng nhập.')); }
+  return fbmSyncWaitForBridge().then(function (ready) {
+    var sessionId = String(typeof SHEET_LINK_EXTENSION_SESSION === 'undefined' ? '' : SHEET_LINK_EXTENSION_SESSION || '');
+    if (sessionId && sessionId !== FBM_SYNC_RELAY_SESSION) { fbmSyncNotifyBridgeReady(); }
+    if (!ready || !sessionId || sessionId !== FBM_SYNC_RELAY_SESSION) { throw new Error('Kênh Extension chưa sẵn sàng để xóa thông tin đăng nhập.'); }
+    var id = String(Date.now()) + '-' + Math.random().toString(36).slice(2), source = window.top;
+    return new Promise(function (resolve, reject) {
+      var timer = setTimeout(function () { delete FBM_SYNC_CLIENT.credentialClearWaiters[id]; reject(new Error('Extension không trả lời yêu cầu xóa sau 5 giây.')); }, 5000);
+      FBM_SYNC_CLIENT.credentialClearWaiters[id] = { resolve: resolve, reject: reject, timer: timer };
+      source.postMessage({ action: 'CRM_FBM_CREDENTIAL_CLEAR', id: id, nonce: SHEET_LINK_NONCE, sessionId: FBM_SYNC_RELAY_SESSION, credentialRef: String(credentialRef || '') }, 'https://docs.google.com');
+    });
+  });
+}
+function fbmSyncConfirmCredentialDelete() {
+  var message = 'Username và mật khẩu đã lưu sẽ bị xóa. Liên kết tài khoản FBM vẫn được giữ nguyên.';
+  if (typeof uiDecisionOpen === 'function') { return uiDecisionOpen({ title: 'Xóa thông tin đăng nhập tự động?', message: message, cancelLabel: 'Quay lại', confirmLabel: 'Xác nhận xóa' }); }
+  return Promise.resolve(typeof window !== 'undefined' && typeof window.confirm === 'function' && window.confirm('Xóa thông tin đăng nhập tự động?\n\n' + message));
+}
 function fbmSyncConfirmConnectionUsernameMismatch(binding, credentials) {
   if (!fbmSyncConnectionUsernamesDiffer(binding, { public: { usernameHint: credentials.username } })) { return true; }
   var message = FBM_SYNC_ACCOUNT_SCHEMA.connection.usernameMismatchWarning;
@@ -951,15 +1094,49 @@ function fbmSyncConnectionDraftValues() {
   var draft = FBM_SYNC_CLIENT.identityDraft || {};
   return { spreadsheetId: read('fbm-identity-spreadsheet', draft.spreadsheetId), userId: read('fbm-identity-user', draft.userId), username: read('fbm-identity-username', draft.username), accountName: read('fbm-identity-account', draft.accountName) };
 }
+function fbmSyncApplyConnectionSaveResult(saved, password) {
+  var binding = fbmSyncConnectionDraftValues();
+  FBM_SYNC_CLIENT.identityDraft = Object.assign({}, binding); FBM_SYNC_CLIENT.identityStatus = saved.identityStatus || Object.assign({}, FBM_SYNC_CLIENT.identityStatus || {}, { status: binding.spreadsheetId ? 'BOUND' : 'UNBOUND', binding: saved.binding || {} });
+  if (saved.login) { FBM_SYNC_CLIENT.loginStatus = saved.login; }
+  if (password) { password.value = ''; }
+  FBM_SYNC_CLIENT.loginPasswordMode = FBM_SYNC_CLIENT.loginStatus && FBM_SYNC_CLIENT.loginStatus.configured === true ? 'saved' : 'draft';
+  FBM_SYNC_CLIENT.loginPasswordFocused = false;
+  FBM_SYNC_CLIENT.pendingLoginEnvelope = null;
+  if (typeof fbmSyncConfigFinishEdit === 'function') { fbmSyncConfigFinishEdit('connection'); }
+  fbmSyncSetAccountNotice('identity', 'success', 'Đã lưu kết nối tài khoản FBM.');
+  return fbmSyncStatusOnce();
+}
+function fbmSyncDeleteLoginCredential(button, bindingOverride) {
+  var login = FBM_SYNC_CLIENT.loginStatus || {}, ref = String(login.credentialRef || '').trim(), binding = bindingOverride || (FBM_SYNC_CLIENT.identityStatus && FBM_SYNC_CLIENT.identityStatus.binding || {});
+  if (!ref || login.configured !== true) { return Promise.resolve(null); }
+  if (button) { button.disabled = true; }
+  return fbmSyncConfirmCredentialDelete().then(function (confirmed) {
+    if (!confirmed) { return null; }
+    return callServer('fbmSaveConnection', [{ binding: binding, credential: { mode: 'clear' } }]).then(function (saved) {
+      if (!saved || saved.ok === false) { throw new Error(saved && (saved.message || saved.code) || 'Không xóa được cấu hình đăng nhập trên GAS.'); }
+      return fbmSyncClearCredentialInExtension(ref).then(function () { return fbmSyncApplyConnectionSaveResult(saved, null); });
+    }).catch(function (error) {
+      var reason = String(error && error.message || error);
+      fbmSyncLogClientError(error, reason, 'credential_delete');
+      fbmSyncSetAccountNotice('login', 'error', 'Không xóa trọn vẹn thông tin đăng nhập: ' + reason);
+      fbmSyncPaintError(error, reason, 'credential_delete');
+      return null;
+    });
+  }).finally(function () { if (button) { button.disabled = false; } });
+}
 function fbmSyncSaveConnection(button) {
   if (button) { button.disabled = true; }
   var binding = fbmSyncConnectionDraftValues(), credentials = fbmSyncLoginCredentialsFromForm(), password = document.getElementById('fbm-login-password');
   var allIdentityEmpty = !binding.spreadsheetId && !binding.userId && !binding.username && !binding.accountName;
   var partialIdentity = !allIdentityEmpty && (!binding.spreadsheetId || !binding.userId || !binding.username || !binding.accountName);
   var hasUsername = !!credentials.username, hasPassword = !!credentials.password;
-  var savedCredentialUsername = fbmSyncLoginUsernameValue(FBM_SYNC_CLIENT.loginStatus || {}), preservingCredential = hasUsername && !hasPassword && credentials.username === savedCredentialUsername;
+  var savedLogin = FBM_SYNC_CLIENT.loginStatus || {}, savedCredentialUsername = fbmSyncLoginUsernameValue(savedLogin), preservingCredential = hasUsername && !hasPassword && credentials.username === savedCredentialUsername, wantsCredentialDelete = savedLogin.configured === true && !hasUsername && !hasPassword;
   if (partialIdentity) { fbmSyncSetAccountNotice('identity', 'error', 'Identity incomplete.'); fbmSyncPaintError(null, 'Identity incomplete.'); if (button) { button.disabled = false; } return Promise.resolve(null); }
-  if (hasUsername !== hasPassword && !preservingCredential) { fbmSyncSetAccountNotice('login', 'error', 'Username và mật khẩu phải được nhập cùng nhau, hoặc để trống để giữ credential đã lưu.'); fbmSyncPaintError(null, 'Username và mật khẩu phải được nhập cùng nhau, hoặc để trống để giữ credential đã lưu.'); if (button) { button.disabled = false; } return Promise.resolve(null); }
+  if (wantsCredentialDelete) {
+    if (button) { button.disabled = false; }
+    return fbmSyncDeleteLoginCredential(button, binding);
+  }
+  if (hasUsername !== hasPassword && !preservingCredential) { fbmSyncSetAccountNotice('login', 'error', hasUsername ? 'Đã nhập username nhưng chưa có mật khẩu tương ứng.' : 'Đã nhập mật khẩu nhưng chưa có username tương ứng.'); fbmSyncPaintError(null, hasUsername ? 'Đã nhập username nhưng chưa có mật khẩu tương ứng.' : 'Đã nhập mật khẩu nhưng chưa có username tương ứng.'); if (button) { button.disabled = false; } return Promise.resolve(null); }
   if (!fbmSyncConfirmConnectionUsernameMismatch(binding, credentials)) { if (button) { button.disabled = false; } return Promise.resolve(null); }
   var oldBinding = FBM_SYNC_CLIENT.identityStatus && FBM_SYNC_CLIENT.identityStatus.binding || {}, identityChanged = ['spreadsheetId', 'userId', 'username', 'accountName'].some(function (key) { return String(oldBinding[key] || '') !== String(binding[key] || ''); });
   var credential = { mode: hasPassword ? 'save' : (preservingCredential ? 'preserve' : (identityChanged ? 'clear' : 'preserve')), keepOnIdentityChange: preservingCredential }, encryptPromise = Promise.resolve(null);
@@ -972,13 +1149,7 @@ function fbmSyncSaveConnection(button) {
     return callServer('fbmSaveConnection', [{ binding: binding, credential: credential }]);
   }).then(function (saved) {
     if (!saved || saved.ok === false) { throw new Error(saved && (saved.message || saved.code) || 'Khong luu duoc ket noi tai khoan.'); }
-    FBM_SYNC_CLIENT.identityDraft = Object.assign({}, binding); FBM_SYNC_CLIENT.identityStatus = saved.identityStatus || Object.assign({}, FBM_SYNC_CLIENT.identityStatus || {}, { status: binding.spreadsheetId ? 'BOUND' : 'UNBOUND', binding: saved.binding || {} });
-    if (saved.login) { FBM_SYNC_CLIENT.loginStatus = saved.login; }
-    if (password) { password.value = ''; }
-    FBM_SYNC_CLIENT.pendingLoginEnvelope = null;
-    if (typeof fbmSyncConfigFinishEdit === 'function') { fbmSyncConfigFinishEdit('connection'); }
-    fbmSyncSetAccountNotice('identity', 'success', 'Da luu ket noi tai khoan FBM.');
-    return fbmSyncStatusOnce();
+    return fbmSyncApplyConnectionSaveResult(saved, password);
   }).catch(function (error) { var reason = String(error && error.message || error); fbmSyncLogClientError(error, reason, 'connection_save'); fbmSyncSetAccountNotice('identity', 'error', reason); fbmSyncSetAccountNotice('login', 'error', reason); fbmSyncPaintError(error, reason, 'connection_save'); return null;
   }).finally(function () { if (button) { button.disabled = false; } });
 }

@@ -313,7 +313,7 @@ async function chay(so) {
     check(so, 'Account gom mot card ket noi va hai vung con', [!!connection, !!identitySection, !!loginSection], [true, true, true]);
     const connectionEdit = connection.querySelector('[data-sync-config-key="connection"]');
     check(so, 'Mot edit surface dieu khien ca hai vung', [!!connectionEdit, identitySection.querySelector('[data-sync-config-key="identity"]'), loginSection.querySelector('[data-sync-config-key="login"]')], [true, null, null]);
-    check(so, 'Credential tuy chon van hien o che do xem', [dom.document.getElementById('fbm-login-password').disabled, dom.document.getElementById('fbm-login-password').value], [true, '']);
+    check(so, 'Credential chưa từng lưu ở chế độ xem hiển thị Chưa lưu', [dom.document.getElementById('fbm-login-password').disabled, dom.document.getElementById('fbm-login-password').value], [true, 'Chưa lưu']);
     const backgroundAction = connection.querySelector('#fbm-sync-open-background-settings');
     check(so, 'Account không còn link cài đặt đồng bộ nền', backgroundAction, null);
     hop.FBM_SYNC_CLIENT.subscreen = 'run';

@@ -57,6 +57,41 @@ FbmSync.sessionGateMeta = function (state) {
   state.metadata.sessionGate = state.metadata.sessionGate || {};
   return state.metadata.sessionGate;
 };
+/** Nhóm request hệ thống chỉ cổng phiên được quyền dựng và phát. */
+FbmSync.SESSION_SYSTEM_KINDS = ['login', 'authorize', 'identity_user_grid', 'session_probe', 'heartbeat'];
+FbmSync.isSessionSystemRequest = function (request) {
+  var kind = String(request && request.meta && request.meta.kind || '');
+  return FbmSync.SESSION_SYSTEM_KINDS.indexOf(kind) >= 0;
+};
+FbmSync.sessionIdentityIsVerified = function (state) {
+  var session = state && state.session || {};
+  return session.expired !== true && session.identityVerified === true && !!String(session.sessionId || '') && String(session.identitySessionId || '') === String(session.sessionId || '');
+};
+FbmSync.sessionIdentityClear = function (state) {
+  var session = (state || {}).session || {};
+  session.identityVerified = false;
+  session.identitySessionId = '';
+  session.identityVerifiedAt = 0;
+  session.expired = true;
+  if (state) { state.session = session; }
+  return state;
+};
+FbmSync.sessionSystemRequest = function (kind, value) {
+  var request, options = value && typeof value === 'object' ? value : {};
+  if (kind === 'login') { request = FbmSync.loginRequest(value && value.credentialRef, value && value.testOnly === true); }
+  else if (kind === 'authorize') { request = FbmSync.authorizeRequest(value && value.entity || value || 'customer'); }
+  else if (kind === 'session_probe') { request = FbmSync.identityUserRequest(); request.meta.kind = 'session_probe'; }
+  else if (kind === 'identity_user_grid') { request = FbmSync.identityUserRequest(); }
+  else if (kind === 'heartbeat') { request = FbmSync.heartbeatCustomerRequest(); }
+  else { return null; }
+  request.meta = Object.assign({}, request.meta || {}, { systemRequest: true });
+  if (options.requireIdentityProbe === true) { request.meta.requireIdentityProbe = true; }
+  return request;
+};
+FbmSync.sessionSystemEnvelope = function (kind, value) {
+  var request = FbmSync.sessionSystemRequest(kind, value);
+  return request ? FbmSync.nextEnvelope(request) : null;
+};
 FbmSync.sessionGateCursorIsInternal = function (state) {
   var cursor = state && state.cursor || {};
   return cursor.kind === 'login' || cursor.kind === 'login_identity_authorize' || cursor.kind === 'login_identity_user';
@@ -125,7 +160,11 @@ FbmSync.sessionGateBlock = function (state, code, message) {
 FbmSync.sessionGateStart = function (state, failedCursor) {
   var current = state || FbmSync.stateRead(), policy = FbmSync.sessionGatePolicy(), cursor = failedCursor || current.cursor || {}, allowed, request, gate;
   if (cursor.kind === 'login' && current.activeRequestId) {
-    FbmSync.sessionGateBlock(current, 'AUTO_LOGIN_IN_PROGRESS', 'Đang chờ tiến trình xác thực FBM hiện tại; chưa gửi request song song.');
+    current.phase = 'waiting_session';
+    current.retryable = true;
+    current.lastFailureCode = 'AUTO_LOGIN_IN_PROGRESS';
+    current.message = 'Đang chờ tiến trình xác thực FBM hiện tại; chưa gửi request song song.';
+    FbmSync.stateWrite(current);
     return null;
   }
   if (cursor.kind === 'push_wait') {
@@ -160,7 +199,7 @@ FbmSync.sessionGateHandleFailure = function (state, cursor, failure) {
   if (String(value.code || '') !== 'SESSION_EXPIRED' || (cursor && cursor.kind === 'push_wait')) { return null; }
   if (typeof FbmSync.beginAutoLogin !== 'function') { return null; }
   state.session = state.session || {};
-  state.session.expired = true;
+  FbmSync.sessionIdentityClear(state);
   state.session.customerAuthorized = '';
   state.session.activityAuthorized = '';
   FbmSync.stateWrite(state);
@@ -250,7 +289,25 @@ FbmSync.nextEnvelope = function (request) {
       request = FbmSync.sessionGateAttachLoginToken(request, pendingState);
       internalLogin = true;
     }
-    if (pendingState.session && pendingState.session.expired === true && !internalLogin) {
+    // Mọi request nghiệp vụ phải đi qua probe User một lần trong phiên hiện tại.
+    // Probe là request hệ thống nên không quay lại nhánh này.
+    var gateCursorKinds = ['customer_grid', 'activity_grid', 'activity_bulk_grid', 'lookup', 'push_scan', 'push_wait'];
+    var cursorNeedsGate = gateCursorKinds.indexOf(String(pendingState.cursor && pendingState.cursor.kind || '')) >= 0 && String(pendingState.cursor && pendingState.cursor.kind || '') !== 'push_wait';
+    if ((!FbmSync.isSessionSystemRequest(request) || request.meta && request.meta.requireIdentityProbe === true) && !internalLogin && !FbmSync.sessionIdentityIsVerified(pendingState) && (cursorNeedsGate || request.meta && request.meta.requireIdentityProbe === true)) {
+      var gate = FbmSync.sessionGateMeta(pendingState), originalCursor = Object.assign({}, pendingState.cursor || {});
+      if (originalCursor.kind !== 'session_probe') {
+        gate.resumeCursor = originalCursor;
+        gate.resumePhase = String(pendingState.phase || 'checking_session');
+        gate.resumeEntity = String(pendingState.entity || '');
+        pendingState.cursor = { kind: 'session_probe' };
+        pendingState.phase = 'checking_session';
+        pendingState.entity = '';
+        pendingState.message = 'Đang kiểm tra tab và tài khoản FBM...';
+        FbmSync.stateWrite(pendingState);
+        request = FbmSync.sessionSystemRequest('session_probe');
+      }
+    }
+    if (pendingState.session && pendingState.session.expired === true && !internalLogin && (!FbmSync.isSessionSystemRequest(request) || String(request.meta && request.meta.kind || '') === 'heartbeat')) {
       var gateRequest = FbmSync.sessionGateStart(pendingState, pendingState.cursor || {});
       if (!gateRequest) { return null; }
       request = gateRequest;
@@ -336,13 +393,14 @@ FbmSync.limitRelayResult = function (result, hop) {
 /** Dựng lại request đọc từ cursor; không lưu payload/cookie để retry không làm lộ bí mật. */
 FbmSync.requestForCursor = function (state) {
   var cursor = state && state.cursor || {}, lookup, customerId, pageType;
-  if (cursor.kind === 'heartbeat') { return FbmSync.heartbeatCustomerRequest(); }
-  if (cursor.kind === 'login') { return FbmSync.loginRequest(cursor.credentialRef, false); }
-  if (cursor.kind === 'login_identity_authorize') { return FbmSync.authorizeRequest('customer'); }
-  if (cursor.kind === 'login_identity_user') { return FbmSync.identityUserRequest(); }
-  if (cursor.kind === 'authorize_customer') { return FbmSync.authorizeRequest('customer'); }
-  if (cursor.kind === 'authorize_activity') { return FbmSync.authorizeRequest('activity'); }
-  if (cursor.kind === 'identity_user_grid') { return FbmSync.identityUserRequest(); }
+  if (cursor.kind === 'heartbeat') { return FbmSync.sessionSystemRequest('heartbeat'); }
+  if (cursor.kind === 'login') { return FbmSync.sessionSystemRequest('login', { credentialRef: cursor.credentialRef, testOnly: false }); }
+  if (cursor.kind === 'login_identity_authorize') { return FbmSync.sessionSystemRequest('authorize', { entity: 'customer' }); }
+  if (cursor.kind === 'login_identity_user') { return FbmSync.sessionSystemRequest('identity_user_grid'); }
+  if (cursor.kind === 'session_probe') { return FbmSync.sessionSystemRequest('session_probe'); }
+  if (cursor.kind === 'authorize_customer') { return FbmSync.sessionSystemRequest('authorize', { entity: 'customer' }); }
+  if (cursor.kind === 'authorize_activity') { return FbmSync.sessionSystemRequest('authorize', { entity: 'activity' }); }
+  if (cursor.kind === 'identity_user_grid') { return FbmSync.sessionSystemRequest('identity_user_grid'); }
   if (cursor.kind === 'lookup') {
     lookup = FbmSync.SYNC_LOOKUPS[Number(cursor.index || 0)];
     return lookup ? FbmSync.completionRequest(lookup.controller, lookup.key) : null;

@@ -226,9 +226,12 @@ async function chay(so) {
 
   const identityCheck = workflowGas();
   identityCheck.hop.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-000001', fbmId: 'FBM-1', fbmCustomerCode: 'ALT00010' }] : [];
+  identityCheck.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
   const identityStarted = identityCheck.hop.FbmSync.start({ mode: 'check', scan: 'identity_check', origin: 'manual', manual: true });
-  const identityAuthorized = await sendThroughExecutor(identityStarted.request, JSON.stringify({ d: { Authorized: 'identity-auth' } }));
-  const identityGridStep = identityCheck.hop.FbmSync.continue(executorRaw(identityAuthorized.reply, identityStarted.request.id));
+  const identityProbe = await sendThroughExecutor(identityStarted.request, userResponse);
+  const identityAfterProbe = identityCheck.hop.FbmSync.continue(executorRaw(identityProbe.reply, identityStarted.request.id));
+  const identityAuthorized = await sendThroughExecutor(identityAfterProbe.request, JSON.stringify({ d: { Authorized: 'identity-auth' } }));
+  const identityGridStep = identityCheck.hop.FbmSync.continue(executorRaw(identityAuthorized.reply, identityAfterProbe.request.id));
   const customerFields = ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ma_so_thue', 'ong_ba', 'dc_lh', 'dien_thoai', 'email', 'website', 'ten_dclh_tinh', 'ten_nguon_dm', 'ten_sp', 'ngay_gd', 'datetime0', 'xorder'];
   const customerRow = customerFields.map((field) => field === 'stt_rec_kh' ? 'FBM-1' : field === 'ma_kh' ? 'ALT00010' : '');
   const identityGrid = await sendThroughExecutor(identityGridStep.request, JSON.stringify({ d: { TotalRowCount: 1, Rows: [customerRow], ViewPage: { Fields: customerFields.map((AliasName) => ({ AliasName })) } } }));
@@ -236,8 +239,8 @@ async function chay(so) {
   check(so, 'kiem tra lien ket: chi quet Customer va tra tong hop n/N, khong cap Activity hoac ghi binding', [
     identityGridStep.request.meta.entity, identityDone.request || null, identityDone.status.phase,
     identityDone.status.metadata.identityCheck.total, identityDone.status.metadata.identityCheck.matched, identityDone.status.metadata.identityCheck.missing,
-    identityCheck.documentProperties.getProperty('FBM_SYNC_BINDING_V1')
-  ], ['customer', null, 'done', 1, 1, 0, null]);
+    identityCheck.documentProperties.getProperty('FBM_SYNC_BINDING_V1') === null
+  ], ['customer', null, 'done', 1, 1, 0, false]);
 
   const loginFlow = workflowGas();
   loginFlow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
@@ -342,6 +345,7 @@ async function chay(so) {
     }
   });
   compactLookupFlow.hop.FbmSync.readCategoryGate = () => ({ map: compactLookupMap, names: compactLookupAllNames, namesBySource: compactLookupNames, valid: compactLookupValid, warnings: [] });
+  compactLookupFlow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   compactLookupFlow.hop.FbmSync.start({ mode: 'read', origin: 'manual', scan: 'full' });
   const compactContinue = (body) => {
     const requestId = compactLookupFlow.hop.FbmSync.stateRead().activeRequestId;
@@ -538,6 +542,7 @@ async function chay(so) {
     'FBM-C1': [row(fullActivityFields, { id: 'FBM-A1', details: 'Goi dien 1', end_date: '2026-09-20', owner: 'Owner 1', datetime0: '2026-09-20T03:00:00', line_nbr: 1 })],
     'FBM-C2': [row(fullActivityFields, { id: 'FBM-A2', details: 'Goi dien 2', end_date: '2026-09-20', owner: 'Owner 2', datetime0: '2026-09-20T04:00:00', line_nbr: 1 })]
   };
+  fullFlow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   let fullStep = fullFlow.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true });
   const fullKinds = [], fullStatuses = [];
   for (let hop = 0; fullStep && fullStep.request && hop < 20; hop += 1) {
@@ -545,7 +550,9 @@ async function chay(so) {
     const kind = String(request.meta && request.meta.kind || '');
     fullKinds.push(kind + ':' + String(request.meta && (request.meta.entity || request.meta.field) || ''));
     let body;
-    if (kind === 'authorize') {
+    if (kind === 'session_probe' || kind === 'identity_user_grid') {
+      body = userResponse;
+    } else if (kind === 'authorize') {
       body = JSON.stringify({ d: { Authorized: 'auth-' + request.meta.entity } });
     } else if (kind === 'completion') {
       body = JSON.stringify({ d: [['CODE', 'Ten danh muc']] });
@@ -586,6 +593,7 @@ async function chay(so) {
   readFlow.hop.FbmSync.prepareCategoryGate = () => ({ map: {} });
   readFlow.hop.FbmSync.pullWrite = () => ({ ok: true, written: 0, conflicts: 0, skipped: 0 });
   readFlow.hop.FbmSync.markMissingAfterFullScan = () => ({ total: 0, written: 0 });
+  readFlow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   let readStep = readFlow.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true });
   const readKinds = [];
   for (let hop = 0; readStep && readStep.request && hop < 12; hop += 1) {
@@ -620,6 +628,7 @@ async function chay(so) {
   ], [true, null, 'awaiting_approval', true, 'authorize', 'checking_session']);
 
   const stopAfterResponse = workflowGas();
+  stopAfterResponse.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const stopStarted = stopAfterResponse.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true });
   const stopPending = stopAfterResponse.hop.fbmSyncCancel();
   const stopped = stopAfterResponse.hop.FbmSync.continue({
@@ -631,6 +640,7 @@ async function chay(so) {
   ], ['SYNC_CANCEL_PENDING', true, null, 'paused', 'authorize_activity']);
 
   const masterOff = workflowGas();
+  masterOff.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const masterStarted = masterOff.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true });
   masterOff.hop.FbmSync.setMasterEnabled(false);
   const masterStopped = masterOff.hop.FbmSync.continue({

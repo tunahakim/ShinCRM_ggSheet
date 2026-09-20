@@ -155,7 +155,7 @@ FbmSync.activityEditRequest = function (record, oldValues, categoryGate) {
 };
 
 /** Bước bootstrap riêng của luồng tạo Customer hai bước. */
-FbmSync.customerCreateAuthorizeRequest = function () { return FbmSync.authorizeRequest('customer'); };
+FbmSync.customerCreateAuthorizeRequest = function () { return FbmSync.sessionSystemRequest('authorize', { entity: 'customer' }); };
 /** Chuẩn hóa field Customer và tạo memvars cho New/Edit. */
 FbmSync.customerValues = function (record, oldValues, categoryGate) {
   var value = function (name, aliases, fallback) { return FbmSync.fieldValue(record, oldValues, name, aliases, fallback); };

@@ -211,6 +211,11 @@ function readCredential(ref) {
     });
   });
 }
+function readCredentialMetadata(ref) {
+  return readCredential(ref).then(function (credentials) {
+    return { ok: true, username: String(credentials && credentials.username || '') };
+  });
+}
 function hydrateLoginRequest(request) {
   if (!request) { return Promise.resolve(request); }
   var value = request || {}, meta = value.meta || {};
@@ -495,7 +500,12 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   }
   if (message && message.type === 'FBM_CLEAR_CREDENTIALS') {
     var clearKey = CREDENTIAL_VAULT_PREFIX + String(message.credentialRef || '');
-    chrome.storage.local.remove([clearKey], function () { sendResponse({ ok: !chrome.runtime.lastError }); });
+    if (!String(message.credentialRef || '').trim()) { sendResponse({ ok: false, code: 'LOGIN_CREDENTIAL_REF_REQUIRED', error: 'Thiếu mã tham chiếu thông tin đăng nhập.' }); return false; }
+    chrome.storage.local.remove([clearKey], function () { var error = chrome.runtime.lastError; sendResponse(error ? { ok: false, code: 'LOGIN_CREDENTIAL_CLEAR_FAILED', error: String(error.message || error) } : { ok: true, credentialRef: String(message.credentialRef || '') }); });
+    return true;
+  }
+  if (message && message.type === 'FBM_GET_CREDENTIAL_METADATA') {
+    readCredentialMetadata(message.credentialRef).then(sendResponse).catch(function (error) { sendResponse({ ok: false, code: 'LOGIN_METADATA_READ_FAILED', error: String(error && error.message || error) }); });
     return true;
   }
   if (message && message.type === 'FBM_CONFIGURE_RELAY') {

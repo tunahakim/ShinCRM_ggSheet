@@ -141,19 +141,37 @@ async function chay(so) {
   const schedulerSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'state', 'Scheduler.js'), 'utf8');
   const gasSyncRoot = path.join(__dirname, '..', '..', '1_ShinCRM_GAS');
   const gasRequestCallers = [];
+  const gasSessionBypassCallers = [];
+  const sessionLayerCustomerCalls = [];
   (function scanSyncFiles(dir) {
     fs.readdirSync(dir, { withFileTypes: true }).forEach((entry) => {
       const file = path.join(dir, entry.name);
       if (entry.isDirectory()) { scanSyncFiles(file); return; }
       if (!/\.js$/.test(entry.name) || /TransportCore\.js$/.test(entry.name)) { return; }
-      if (fs.readFileSync(file, 'utf8').indexOf('FbmSync.protocol.request(') >= 0) { gasRequestCallers.push(file); }
+      const source = fs.readFileSync(file, 'utf8');
+      if (source.indexOf('FbmSync.protocol.request(') >= 0) { gasRequestCallers.push(file); }
+      const executable = source.split('\n').filter((line) => !/FbmSync\.(loginRequest|authorizeRequest|identityUserRequest|heartbeatCustomerRequest|beginAutoLogin)\s*=\s*function/.test(line)).join('\n');
+      if (/FbmSync\.(loginRequest|authorizeRequest|identityUserRequest|heartbeatCustomerRequest|beginAutoLogin)\s*\(/.test(executable)) { gasSessionBypassCallers.push(file); }
     });
   }(gasSyncRoot));
+  const sessionLayerSources = [
+    { name: 'TransportCore.js', source: fs.readFileSync(TRANSPORT_CORE_FILE, 'utf8') },
+    { name: 'AutoLogin.js', source: fs.readFileSync(path.join(gasSyncRoot, 'fbm_sync', 'auth', 'AutoLogin.js'), 'utf8') }
+  ];
+  const customerReconcileNames = ['identityCheckBegin', 'identityCheckPage', 'identityCheckFinish', 'identityCheckCustomerRequest', 'customerTaxIdentityIssue', 'threeWay', 'pullWrite'];
+  sessionLayerSources.forEach((item) => {
+    customerReconcileNames.forEach((name) => {
+      if (new RegExp('FbmSync\\.' + name + '\\s*\\(').test(item.source)) { sessionLayerCustomerCalls.push(item.name + ':' + name); }
+    });
+  });
   const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', '2_ShinCRM_Extension', 'manifest.json'), 'utf8'));
   check(so, 'worker ping dung executor phien ban truoc request FBM', workerSource.indexOf("FBM_PING_V2") >= 0 && workerSource.indexOf("FBM_EXECUTOR_VERSION") >= 0 && workerSource.indexOf("sendTabMessage(tabId, { type: 'FBM_EXECUTE_V2'") >= 0, true);
   check(so, 'worker chi co mot diem gui request FBM', (workerSource.match(/sendTabMessage\(tabId, \{ type: 'FBM_EXECUTE_V2', request: request \}/g) || []).length, 1);
   check(so, 'flow orchestration khong con tham chieu owner login', [pullFlowSource.toLowerCase().indexOf('login'), schedulerSource.toLowerCase().indexOf('login')], [-1, -1]);
   check(so, 'GAS chi co TransportCore goi protocol.request', gasRequestCallers, []);
+  check(so, 'kiến trúc một cửa: không có GAS caller nào phát builder login/authorize/User/heartbeat ngoài cổng', gasSessionBypassCallers, []);
+  check(so, 'tầng cổng và xác thực không gọi logic đối chiếu Customer của tầng 3', sessionLayerCustomerCalls, []);
+  check(so, 'cổng khai báo nhóm request hệ thống và marker phiên trước khi phát request nghiệp vụ', /SESSION_SYSTEM_KINDS/.test(fs.readFileSync(TRANSPORT_CORE_FILE, 'utf8')) && /sessionIdentityIsVerified/.test(fs.readFileSync(TRANSPORT_CORE_FILE, 'utf8')) && /requireIdentityProbe/.test(fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'transport', 'PullFlow.js'), 'utf8')), true);
   check(so, 'bypass session gate khong nam trong tham so caller', fs.readFileSync(TRANSPORT_CORE_FILE, 'utf8').indexOf('bypass') < 0, true);
   check(so, 'Extension chi co mot alarm ky thuat gas_poll va khong co alarm theo tien trinh', [workerSource.indexOf("var GAS_POLL_ALARM = 'gas_poll'") >= 0, workerSource.indexOf("'fbm-heartbeat'") < 0, workerSource.indexOf("periodInMinutes: minutes") >= 0, workerSource.indexOf("fbmHeartbeatNow('startup')") >= 0], [true, true, true, true]);
   check(so, 'worker khong tao hai request FBM khi Sidebar thu lai cung id', workerSource.indexOf('fbmRequestFlights') >= 0 && workerSource.indexOf('existingFlight') >= 0, true);

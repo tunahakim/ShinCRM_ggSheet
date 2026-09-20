@@ -14,10 +14,12 @@ async function chay(so) {
     PropertiesService: { getDocumentProperties: () => propertyApi, getScriptProperties: () => propertyApi }
   });
   napServer(orchestration, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/EntryPoints.js');
+  orchestration.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const approvalProps = { data: {} };
   const approvalPropertyApi = { getProperty: (key) => approvalProps.data[key] || null, setProperty: (key, value) => { approvalProps.data[key] = String(value); } };
   const approval = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => approvalPropertyApi, getScriptProperties: () => approvalPropertyApi } });
   napServer(approval, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/EntryPoints.js');
+  approval.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   approval.FbmSync.runPreflight = () => ({ ok: true, issues: [], blocking: [], candidateCount: 11 });
   const awaiting = approval.FbmSync.start({ mode: 'write' });
   check(so, 'push hon 10 ban ghi phai cho nguoi dung chap thuan', [awaiting.ok, awaiting.approvalRequired, awaiting.request, approval.FbmSync.stateRead().phase, approval.FbmSync.stateRead().metadata.approvalCount], [true, true, null, 'awaiting_approval', 11]);
@@ -42,6 +44,7 @@ async function chay(so) {
   const readPull = approval.FbmSync.pullRecords('customer', [{ id: 'C-1' }], 'read');
   const checkPull = approval.FbmSync.pullRecords('customer', [{ id: 'C-2' }], 'check');
   check(so, 'read ghi Sheet con check chi preview', [readPull.written, checkPull.preview, pullWriteCalls], [1, true, 1]);
+  orchestration.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const started = orchestration.FbmSync.start({ mode: 'read' });
   check(so, 'start bat dau bang bootstrap Customer', started.request.meta.kind, 'authorize');
   check(so, 'bootstrap dung viewPage false', started.request.body.viewPage, false);
@@ -116,8 +119,10 @@ async function chay(so) {
   const pushPropertyApi = { getProperty: (key) => pushProps.data[key] || null, setProperty: (key, value) => { pushProps.data[key] = String(value); } };
   const push = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {}, PropertiesService: { getDocumentProperties: () => pushPropertyApi, getScriptProperties: () => pushPropertyApi }, writeGateSave: () => ({ ok: true }) });
   napServer(push, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/RecordLocks.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/EntryPoints.js');
+  push.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const pushCandidatesImpl = push.FbmSync.pushCandidates;
-  push.FbmSync.scriptSettings = () => ({ accountName: 'Lê Tuấn Anh' });
+  push.FbmSync.scriptSettings = () => ({ accountName: 'FBM test', baseUrl: 'https://fbm.test' });
+  push.FbmSync.scriptSettings = () => ({ accountName: 'Lê Tuấn Anh', baseUrl: 'https://fbm.test' });
   push.FbmSync.pushCandidates = () => [{ kind: 'edit', id: 'C-1', record: { id: 'C-1', fbmId: 'A-1', fbmHash: 'h1' } }];
   push.FbmSync.validatePushCategories = () => [];
   const pushEligibilityErrors = push.FbmSync.pushEligibilityErrors;
@@ -303,6 +308,7 @@ async function chay(so) {
   push.FbmSync.readLocal = (entity) => entity === 'customer' ? [createLocal] : [];
   push.FbmSync.pushCandidates = pushCandidatesImpl;
   push.FbmSync.scriptSettings = () => ({ accountName: 'Owner', baseUrl: 'https://fbm.test', cookie: 'cookie', customerAuthorized: '1.test', testCustomerCode: 'ALT00010' });
+  push.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const createState = push.FbmSync.stateStart('', 'push', 0); createState.metadata.categoryGate = {}; createState.activeRequestId = 'test-create-request'; createState.cursor = { kind: 'push_wait', entity: 'customer', index: 0, operation: 'customer_create_save', candidate: createCandidate }; push.FbmSync.stateWrite(createState);
   const recoveryStart = push.FbmSync.continue({ ok: false, status: 500, body: '{"Message":"timeout"}', transport: { trace: [{ requestId: 'test-create-request' }] } });
   check(so, 'Customer create mat response chuyen sang request doc MST contains, khong ghi lai', [recoveryStart.recovering, recoveryStart.request.meta.kind, recoveryStart.request.body.gridPageIndex, recoveryStart.request.body.filter, recoveryStart.request.body.externalKey.some((item) => item.Name === 'ma_kh' && item.Value === 'ALT00010'), push.FbmSync.stateRead().cursor.operation], [true, 'grid', -2, ['ma_so_thue:**0100123456'], false, 'customer_create_recover']);

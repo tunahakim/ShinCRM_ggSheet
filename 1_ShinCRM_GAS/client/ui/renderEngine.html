@@ -579,6 +579,7 @@ function renderTargetState(id, state) {
     if (el.getAttribute && (el.getAttribute('data-standalone-select') === '1' || el.getAttribute('data-standalone-menu') === '1')) { renderControlValue(id, state.value); }
     else { el.value = state.value === null || state.value === undefined ? '' : String(state.value); }
   }
+  if (state.placeholder !== undefined && el.getAttribute) { el.setAttribute('placeholder', String(state.placeholder || '')); }
   if (state.childText && typeof state.childText === 'object') {
     Object.keys(state.childText).forEach(function (selector) { var child = el.querySelector(selector); if (child) { child.textContent = String(state.childText[selector] === null || state.childText[selector] === undefined ? '' : state.childText[selector]); } });
   }

@@ -9,12 +9,12 @@ var FBM_SYNC_ACCOUNT_SCHEMA = {
     loginSection: 'fbm-sync-login-section-region', loginConfigured: 'fbm-sync-login-configured-region', loginActions: 'fbm-sync-login-actions-region', loginNotice: 'fbm-sync-login-notice-region', loginPolicy: 'fbm-sync-login-policy-navigation-region', connectionNotice: 'fbm-sync-connection-notice-region', accountSettings: 'fbm-sync-account-settings-region', accountNotice: 'fbm-sync-account-settings-notice-region'
   },
   cards: { connection: 'Kết nối tài khoản FBM', login: 'Đăng nhập tự động', account: 'Cấu hình tài khoản FBM', identity: 'Liên kết tài khoản' },
-  connection: { backgroundOn: 'Đồng bộ nền đang bật', backgroundOff: 'Đồng bộ nền đang tắt', directionPush: 'ShinCRM → FBM', directionWrite: 'Hai chiều', directionRead: 'FBM → ShinCRM', usernameMismatchWarning: 'Username nhận diện tài khoản và username đăng nhập đang khác nhau. Bạn có chắc chắn muốn lưu không?', usernameMismatchBanner: 'Username nhận diện tài khoản và username đăng nhập đang khác nhau.' },
+  connection: { usernameMismatchWarning: 'Username nhận diện tài khoản và username đăng nhập đang khác nhau. Bạn có chắc chắn muốn lưu không?', usernameMismatchBanner: 'Username nhận diện tài khoản và username đăng nhập đang khác nhau.' },
   login: {
-    username: { label: 'Username FBM', id: 'fbm-login-username', placeholder: 'Nhập username FBM', inputType: 'text' },
-    password: { label: 'Mật khẩu FBM', id: 'fbm-login-password', placeholder: 'Nhập mật khẩu FBM', inputType: 'password', maskedValue: '****' },
-    test: 'Đăng nhập thử', save: 'Lưu thông tin', policy: 'Cài đặt đăng nhập tự động', edit: 'Sửa thông tin',
-    actionIds: { test: 'fbm-sync-login-test', save: 'fbm-sync-login-save', policy: 'fbm-sync-open-login-policy' }
+    username: { label: 'Username FBM', id: 'fbm-login-username', placeholder: 'Nhập username FBM', inputType: 'text', unconfiguredValue: 'Chưa lưu' },
+    password: { label: 'Mật khẩu FBM', id: 'fbm-login-password', placeholder: 'Nhập mật khẩu FBM', newPlaceholder: 'Nhập mật khẩu mới', inputType: 'password', maskedValue: '********', unconfiguredValue: 'Chưa lưu' },
+    test: 'Đăng nhập thử', save: 'Lưu thông tin', delete: 'Xóa thông tin đăng nhập', policy: 'Cài đặt đăng nhập tự động', edit: 'Sửa thông tin',
+    actionIds: { test: 'fbm-sync-login-test', save: 'fbm-sync-login-save', delete: 'fbm-sync-login-delete', policy: 'fbm-sync-open-login-policy' }
   },
   account: {
     fields: [

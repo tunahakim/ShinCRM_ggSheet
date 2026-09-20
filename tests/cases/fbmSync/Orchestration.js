@@ -50,7 +50,8 @@ async function chay(so) {
     PropertiesService: { getDocumentProperties: () => propertyApi, getScriptProperties: () => propertyApi }
   });
   napServer(orchestration, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/EntryPoints.js');
-  const started = orchestration.FbmSync.start({ mode: 'read' });
+   orchestration.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+   const started = orchestration.FbmSync.start({ mode: 'read' });
   check(so, 'start bat dau bang bootstrap Customer', started.request.meta.kind, 'authorize');
   check(so, 'DTO pipeline tu GAS chi danh dau buoc kiem tra phien o dau luot', [started.status.pipeline.kind, started.status.pipeline.title, started.status.pipeline.steps.map((step) => step.state)], ['read', 'Pipeline đang chạy', ['current', 'pending', 'pending', 'pending', 'pending', 'pending']]);
   const pipelineActivityState = orchestration.FbmSync.stateRead();
@@ -99,7 +100,8 @@ async function chay(so) {
   restartFromConflict.counts.conflict = 1;
   restartFromConflict.locks = { 'activity:ACT-DELETED-2': { owner: 'sync', reason: 'conflict' } };
   orchestration.FbmSync.stateWrite(restartFromConflict);
-  const restartedConflict = orchestration.FbmSync.start({ mode: 'read' });
+   orchestration.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+   const restartedConflict = orchestration.FbmSync.start({ mode: 'read' });
   check(so, 'bam Dong bo ngay khi phase conflict phai tao phien moi', [restartedConflict.ok, restartedConflict.request.meta.kind, restartedConflict.status.metadata.conflicts.length, restartedConflict.status.counts.conflict], [true, 'authorize', 0, 0]);
   orchestration.FbmSync.readLocal = () => { throw new Error('sheet temporarily unavailable'); };
   const uncertainConflictState = orchestration.FbmSync.stateRead();
@@ -168,7 +170,8 @@ async function chay(so) {
   const resumeState = orchestration.FbmSync.stateRead();
   resumeState.runId = 'resume-run'; resumeState.phase = 'pull_customer'; resumeState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 2, pageValue: ['d', 't', 'x'], count: 2000 };
   orchestration.FbmSync.stateWrite(resumeState);
-  const resumedGrid = orchestration.FbmSync.start({ mode: 'read' });
+   orchestration.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+   const resumedGrid = orchestration.FbmSync.start({ mode: 'read' });
   check(so, 'Sidebar mo lai tiep tuc cursor doc Customer dang do', [resumedGrid.ok, resumedGrid.resumed, resumedGrid.request.meta.kind, resumedGrid.request.body.type], [true, true, 'grid', 1]);
   const pushStatus = orchestration.FbmSync.stateRead();
   pushStatus.phase = 'push'; pushStatus.entity = 'activity'; pushStatus.mode = 'write'; orchestration.FbmSync.stateWrite(pushStatus);
@@ -188,7 +191,8 @@ async function chay(so) {
   const pausedState = orchestration.FbmSync.stateRead();
   pausedState.runId = 'paused-run'; pausedState.phase = 'paused'; pausedState.cursor = {};
   orchestration.FbmSync.stateWrite(pausedState);
-  const restartedPaused = orchestration.FbmSync.start({ mode: 'read' });
+   orchestration.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+   const restartedPaused = orchestration.FbmSync.start({ mode: 'read' });
   check(so, 'dong bo lai tu trang thai tam dung tao request FBM moi', [restartedPaused.ok, restartedPaused.request.meta.kind, restartedPaused.resumed], [true, 'authorize', undefined]);
   orchestration.FbmSync.statePatch({ runId: 'scheduled-run', phase: 'pull_customer', scheduledScan: 'customer', activeRequestId: '', deadlineAt: 0 });
   orchestration.fbmSyncCancel();
@@ -292,14 +296,14 @@ async function chay(so) {
    heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
    const missingCookieRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   check(so, 'cookie chua capture khong bi coi la logout', [missingCookieRequest.ok, missingCookieRequest.code, missingCookieRequest.request.meta.kind], [true, 'HEARTBEAT_REQUEST_READY', 'heartbeat']);
-  heartbeat.FbmSync.statePatch({ session: { customerTotal: 2, cookie: 'userFHN_CRM_App', expired: false }, scheduledScan: 'customer', phase: 'idle', runId: '', cursor: {}, activeRequestId: '', deadlineAt: 0 });
+   heartbeat.FbmSync.statePatch({ session: { customerTotal: 2, cookie: 'userFHN_CRM_App', expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' }, scheduledScan: 'customer', phase: 'idle', runId: '', cursor: {}, activeRequestId: '', deadlineAt: 0 });
   const scheduledRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   check(so, 'heartbeat scheduled phai co reservation truoc khi nhan response', [scheduledRequest.ok, scheduledRequest.request.meta.kind], [true, 'heartbeat']);
   const scheduledHeartbeat = heartbeat.fbmSyncHeartbeat({ d: { TotalRowCount: 2 }, transport: { trace: [{ requestId: scheduledRequest.request.id }] } });
   check(so, 'heartbeat handoff bat dau full Customer khi scheduler den han', [scheduledHeartbeat.ok, scheduledHeartbeat.request.meta.kind, scheduledHeartbeat.status.phase], [true, 'authorize', 'checking_session']);
   const continuedBackground = heartbeat.fbmSyncHeartbeat({ d: { Authorized: 'auth-customer' }, transport: { trace: [{ requestId: scheduledHeartbeat.request.id }], payloadCookie: 'userFHN_CRM_App' } });
   check(so, 'response authorize cua phien nen di qua continuation chung', [continuedBackground.ok, continuedBackground.request.meta.kind, continuedBackground.request.meta.entity, heartbeat.FbmSync.stateRead().cursor.kind], [true, 'authorize', 'activity', 'authorize_activity']);
-  heartbeat.FbmSync.statePatch({ runId: 'slice-run', origin: 'background', phase: 'pull_customer', cursor: { kind: 'customer_grid', type: 1, pageIndex: 3, pageValue: ['d', 't', 'x'], count: 2000 }, activeRequestId: '', deadlineAt: 0 });
+   heartbeat.FbmSync.statePatch({ runId: 'slice-run', origin: 'background', phase: 'pull_customer', cursor: { kind: 'customer_grid', type: 1, pageIndex: 3, pageValue: ['d', 't', 'x'], count: 2000 }, activeRequestId: '', deadlineAt: 0, session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const resumedAfterSlice = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   check(so, 'alarm ke tiep tiep tuc cursor sau khi het relay slice', [resumedAfterSlice.ok, resumedAfterSlice.code, resumedAfterSlice.resumed, resumedAfterSlice.request.meta.kind, resumedAfterSlice.request.body.gridPageIndex], [true, 'SYNC_RESUME_REQUEST_READY', true, 'grid', 3]);
   heartbeat.FbmSync.statePatch({ runId: 'slice-limit-run', phase: 'pull_customer', cursor: { kind: 'customer_grid', type: 1, pageIndex: 4, pageValue: ['e', 't', 'x'], count: 2000 }, activeRequestId: 'slice-request', deadlineAt: Date.now() + 60000 });
@@ -310,7 +314,7 @@ async function chay(so) {
   heartbeat.FbmSync.stateWrite(activeState);
   const overlapDuringSync = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   check(so, 'heartbeat khong ghi de cursor phien Customer dang chay', [overlapDuringSync.ok, overlapDuringSync.code, overlapDuringSync.request], [false, 'REQUEST_IN_FLIGHT', null]);
-   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { customerTotal: 2, cookie: 'userFHN_CRM_App', expired: false }, scheduledScan: '' });
+   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { customerTotal: 2, cookie: 'userFHN_CRM_App', expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' }, scheduledScan: '' });
    heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
    const changedRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   check(so, 'heartbeat thay doi tong Customer co reservation moi', [changedRequest.ok, changedRequest.request.meta.kind], [true, 'heartbeat']);

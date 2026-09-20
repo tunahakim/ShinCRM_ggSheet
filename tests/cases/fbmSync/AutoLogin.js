@@ -20,7 +20,7 @@ async function chay(so) {
   check(so, 'hết phiên tạo request login và giữ cursor cũ', [login.meta.kind, hop.FbmSync.stateRead().cursor.kind, hop.FbmSync.stateRead().cursor.resumeCursor.pageIndex], ['login', 'login', 2]);
   check(so, 'auto-login chỉ thử lại một lần trong 30 phút', hop.FbmSync.autoLoginCanAttempt(Date.now() + 1000).code, 'AUTO_LOGIN_THROTTLED');
   const resumed = hop.FbmSync.loginResumeRequest(hop.FbmSync.stateRead());
-  check(so, 'login thành công dựng lại request grid theo cursor', [resumed.meta.kind, resumed.body.gridPageIndex, hop.FbmSync.stateRead().session.expired], ['grid', 2, false]);
+  check(so, 'login resume chưa có marker phải quay lại probe User trước request nghiệp vụ', [resumed.meta.kind, hop.FbmSync.stateRead().cursor.kind, hop.FbmSync.stateRead().session.expired], ['session_probe', 'session_probe', false]);
   check(so, 'login test không coi Login.aspx là thành công', hop.FbmSync.protocol.isSessionExpired({ ok: true, status: 200, body: '<form action="Login.aspx"></form>' }), true);
   const heartbeatData = {};
   const heartbeatProps = { getProperty: (key) => heartbeatData[key] || null, setProperty: (key, value) => { heartbeatData[key] = String(value); } };
@@ -41,6 +41,25 @@ async function chay(so) {
   check(so, 'sau authorize GAS cap User grid de xac minh identity', [authorizeResponse.ok, authorizeResponse.request.meta.kind, authorizeResponse.request.body.controller], [true, 'identity_user_grid', 'User']);
   const userResponse = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[2037,"ANHLT","Le Tuan Anh"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { trace: [{ requestId: authorizeResponse.request.id }] } });
   check(so, 'chi identity khop moi tiep tuc heartbeat', [userResponse.ok, userResponse.code, userResponse.request.meta.kind, heartbeat.FbmSync.stateRead().session.accountUsername, heartbeat.FbmSync.stateRead().session.accountName], [true, 'AUTO_LOGIN_OK', 'heartbeat', 'ANHLT', 'Le Tuan Anh']);
+
+  let identityUserRequests = 0;
+  const identityUserBuilder = heartbeat.FbmSync.identityUserRequest;
+  heartbeat.FbmSync.identityUserRequest = function () { identityUserRequests += 1; return identityUserBuilder(); };
+  heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: false, identityVerified: false, identitySessionId: '', sessionId: '' } });
+  const probeStart = heartbeat.FbmSync.start({ mode: 'read', origin: 'manual' });
+  const probeResponse = heartbeat.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[2037,"ANHLT","Le Tuan Anh"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { trace: [{ requestId: probeStart.request.id }] } });
+  check(so, 'session probe đầu lượt đọc User rồi trả lại cursor authorize', [probeStart.request.meta.kind, probeResponse.request.meta.kind, heartbeat.FbmSync.stateRead().session.identityVerified, heartbeat.FbmSync.stateRead().cursor.kind], ['session_probe', 'authorize', true, 'authorize_customer']);
+  heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0 });
+  const secondStart = heartbeat.FbmSync.start({ mode: 'read', origin: 'manual' });
+  check(so, 'marker xác thực cùng session bỏ qua User ở lượt kế tiếp', [secondStart.request.meta.kind, identityUserRequests, heartbeat.FbmSync.stateRead().session.identitySessionId === heartbeat.FbmSync.stateRead().session.sessionId], ['authorize', 1, true]);
+
+  heartbeat.FbmSync.statePatch({ runId: 'marker-mismatch', phase: 'checking_session', cursor: { kind: 'authorize_customer' }, activeRequestId: '', deadlineAt: 0, session: { expired: false, identityVerified: true, identitySessionId: 'old-session', sessionId: 'new-session' } });
+  const markerMismatch = heartbeat.FbmSync.nextEnvelope({ url: 'https://fbm.test/marker-mismatch', body: {}, meta: { kind: 'business_request', requireIdentityProbe: true } });
+  check(so, 'marker lệch session bị coi là chưa xác thực và chặn request nghiệp vụ', [markerMismatch.meta.kind, heartbeat.FbmSync.stateRead().cursor.kind], ['session_probe', 'session_probe']);
+
+  heartbeat.FbmSync.statePatch({ runId: 'auto-mismatch', phase: 'checking_session', cursor: { kind: 'login_identity_user', purpose: 'auto', testOnly: false, resumeCursor: { kind: 'heartbeat' } }, activeRequestId: '', deadlineAt: 0, session: { expired: false, identityVerified: true, sessionId: 'old-session', identitySessionId: 'old-session' } });
+  const autoMismatch = heartbeat.FbmSync.loginIdentityContinue(heartbeat.FbmSync.stateRead(), heartbeat.FbmSync.stateRead().cursor, { ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[9999,"OTHER","Other User"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}' });
+  check(so, 'auto-login sai identity fail-closed va xoa marker phien', [autoMismatch.code, heartbeat.FbmSync.stateRead().session.identityVerified, heartbeat.FbmSync.stateRead().session.expired, heartbeat.FbmSync.loginConfigPublic().enabled], ['LOGIN_IDENTITY_MISMATCH', false, true, false]);
 
   const gateLogs = [];
   let gateFlushes = 0;
@@ -64,7 +83,7 @@ async function chay(so) {
   heartbeat.FbmSync.loginConfigPolicySave({ enabled: true, autoOpenTab: false, retryEnabled: true, retryMinutes: 30 });
   heartbeat.FbmSync.statePatch({ runId: 'login-flight', phase: 'checking_session', mode: 'read', cursor: { kind: 'login', credentialRef: 'cred-heartbeat-123' }, activeRequestId: 'login-flight-request', deadlineAt: Date.now() + 1000, session: { expired: true } });
   const concurrentGate = heartbeat.FbmSync.nextEnvelope({ url: 'https://fbm.test/second', body: {}, meta: { kind: 'second_request' } });
-  check(so, 'hai luong phat hien mat session chi giu mot tien trinh login', [concurrentGate, heartbeat.FbmSync.stateRead().lastFailureCode, heartbeat.FbmSync.stateRead().activeRequestId], [null, 'AUTO_LOGIN_IN_PROGRESS', 'login-flight-request']);
+  check(so, 'hai luong phat hien mat session chi giu mot tien trinh login va luong sau cho', [concurrentGate, heartbeat.FbmSync.stateRead().lastFailureCode, heartbeat.FbmSync.stateRead().phase, heartbeat.FbmSync.stateRead().activeRequestId], [null, 'AUTO_LOGIN_IN_PROGRESS', 'waiting_session', 'login-flight-request']);
 
   heartbeat.FbmSync.loginConfigSave({ credentialRef: 'cred-heartbeat-123', enabled: true, autoOpenTab: true, envelope: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'anhlt', database: 'FHN_CRM_App', unit: 'CTY' } });
   heartbeat.FbmSync.statePatch({ runId: 'no-tab-run', phase: 'checking_session', mode: 'read', cursor: { kind: 'heartbeat' }, activeRequestId: 'tab-request-1', deadlineAt: Date.now() + 1000, session: { expired: false } });
@@ -129,7 +148,7 @@ async function chay(so) {
   const mismatchLogin = heartbeat.FbmSync.loginTestResult({ ok: true, status: 200, body: '{"d":true}', transport: { trace: [{ requestId: mismatchTest.request.id }] } });
   const mismatchAuthorize = heartbeat.FbmSync.loginTestResult({ ok: true, status: 200, body: '{"d":{"Authorized":"auth-customer"}}', transport: { trace: [{ requestId: mismatchLogin.request.id }] } });
   const mismatchIdentity = heartbeat.FbmSync.loginTestResult({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[9999,"OTHER","Other User"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { trace: [{ requestId: mismatchAuthorize.request.id }] } });
-  check(so, 'dang nhap thu sai identity bao loi nhung khong tu tat auto-login', [mismatchIdentity.code, heartbeat.FbmSync.loginConfigPublic().enabled], ['LOGIN_IDENTITY_MISMATCH', true]);
+  check(so, 'dang nhap thu sai identity fail-closed nhung khong tu tat auto-login', [mismatchIdentity.code, heartbeat.FbmSync.loginConfigPublic().enabled, heartbeat.FbmSync.stateRead().session.identityVerified], ['LOGIN_IDENTITY_MISMATCH', true, false]);
 
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: false, cookie: '' } });
   const draftB = { spreadsheetId: 'sheet-test', userId: '2040', username: 'USERB', accountName: 'Tai khoan B' };

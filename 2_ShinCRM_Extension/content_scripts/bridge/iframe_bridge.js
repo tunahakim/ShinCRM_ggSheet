@@ -129,6 +129,24 @@ window.addEventListener('message', function (event) {
     });
     return;
   }
+  if (data && data.action === 'CRM_FBM_CREDENTIAL_METADATA') {
+    if (!isAllowedSidebarOrigin(event.origin) || event.source !== sidebarWindow || String(data.nonce || '') !== sidebarNonce || !isCurrentExtensionSession(data)) { return; }
+    sendRequestToWorker({ type: 'FBM_GET_CREDENTIAL_METADATA', credentialRef: String(data.credentialRef || '') }, function (error, reply) {
+      try {
+        event.source.postMessage({ action: 'CRM_FBM_CREDENTIAL_METADATA_RESULT', nonce: sidebarNonce, sessionId: extensionSessionId, id: String(data.id || ''), result: error ? null : reply, code: error ? bridgeErrorCode(error) : (reply && reply.code || ''), error: error ? bridgeErrorMessage(error) : (reply && reply.error || '') }, event.origin);
+      } catch (ignoreMetadataAck) {}
+    });
+    return;
+  }
+  if (data && data.action === 'CRM_FBM_CREDENTIAL_CLEAR') {
+    if (!isAllowedSidebarOrigin(event.origin) || event.source !== sidebarWindow || String(data.nonce || '') !== sidebarNonce || !isCurrentExtensionSession(data)) { return; }
+    sendRequestToWorker({ type: 'FBM_CLEAR_CREDENTIALS', credentialRef: String(data.credentialRef || '') }, function (error, reply) {
+      try {
+        event.source.postMessage({ action: 'CRM_FBM_CREDENTIAL_CLEAR_RESULT', nonce: sidebarNonce, sessionId: extensionSessionId, id: String(data.id || ''), result: error ? null : reply, code: error ? bridgeErrorCode(error) : (reply && reply.code || ''), error: error ? bridgeErrorMessage(error) : (reply && reply.error || '') }, event.origin);
+      } catch (ignoreClearAck) {}
+    });
+    return;
+  }
   if (data && data.action === 'CRM_FBM_REQUEST') {
     // Chuyển nguyên request qua service worker; bridge không phân tích response FBM.
     if (!isAllowedSidebarOrigin(event.origin) || String(data.nonce || '') !== sidebarNonce || !isCurrentExtensionSession(data)) { return; }

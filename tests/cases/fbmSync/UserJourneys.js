@@ -225,6 +225,7 @@ async function chay(so) {
   ['fbm-sync-process-heartbeat', 'fbm-sync-process-customerFull', 'fbm-sync-process-activityFull', 'fbm-sync-process-detail'].forEach((id) => click(dom, dom.document.getElementById(id)));
   click(dom, dom.document.getElementById('fbm-sync-save-background'));
   hop.fbmSyncConfigFinishEdit('background');
+  hop.FBM_SYNC_CLIENT.loginStatus = { configured: true, credentialRef: 'policy-credential', enabled: true, autoOpenTab: false, retryEnabled: true, retryMinutes: 30, public: { usernameHint: 'USERA' } };
   click(dom, dom.document.getElementById('fbm-sync-config-loginPolicy-edit'));
   ['fbm-sync-policy-auto-login', 'fbm-sync-policy-auto-open', 'fbm-sync-policy-retry'].forEach((id) => click(dom, dom.document.getElementById(id)));
   check(so, 'chinh sach tu dang nhap khoa hai muc con khi muc cha tat', [dom.document.getElementById('fbm-sync-policy-auto-login').disabled, dom.document.getElementById('fbm-sync-policy-auto-open').disabled, dom.document.getElementById('fbm-sync-policy-retry').disabled, dom.document.getElementById('fbm-sync-login-retry-minutes').disabled], [false, true, true, true]);
