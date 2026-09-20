@@ -87,6 +87,9 @@ FbmSync.lookupPayload = function (response) {
 
 /** Chuẩn hóa response completion thành map mã -> tên. */
 FbmSync.lookupPairs = function (response) {
+  if (response && typeof response === 'object' && response.pairs && typeof response.pairs === 'object' && !Array.isArray(response.pairs)) {
+    return response.pairs;
+  }
   var data = FbmSync.lookupPayload(response);
   if (data && !Array.isArray(data) && Array.isArray(data.Rows)) { data = data.Rows; }
   var out = {};

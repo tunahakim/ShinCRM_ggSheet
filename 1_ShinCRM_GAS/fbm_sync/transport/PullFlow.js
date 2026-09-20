@@ -425,9 +425,11 @@ FbmSync.continue = function (rawResponse) {
   }
   // Write mode phải nạp danh mục trước khi dựng payload ghi.
   if (cursor.kind === 'lookup') {
-    var lookup = FbmSync.SYNC_LOOKUPS[Number(cursor.index || 0)], lookupData = FbmSync.lookupPayload(response);
-    // FBM trả `{TotalRowCount, Rows}`; giữ cả object để đối chiếu Category.
-    state.session.lookups[lookup.key] = lookupData;
+    var lookup = FbmSync.SYNC_LOOKUPS[Number(cursor.index || 0)], lookupPairs = FbmSync.lookupPairs(response), categorySnapshot = typeof FbmSync.readCategoryGate === 'function' ? FbmSync.readCategoryGate() : { namesBySource: {} }, expectedCodes = categorySnapshot.namesBySource && categorySnapshot.namesBySource[lookup.key] || {}, compactLookup = {};
+    // Chỉ giữ các mã Category đang dùng; Rows đầy đủ có thể vượt trần một DocumentProperty.
+    Object.keys(expectedCodes).forEach(function (code) { if (Object.prototype.hasOwnProperty.call(lookupPairs, code)) { compactLookup[code] = lookupPairs[code]; } });
+    if (!Object.keys(expectedCodes).length && Object.keys(lookupPairs).length) { compactLookup.__FBM_LOOKUP_PRESENT__ = ''; }
+    state.session.lookups[lookup.key] = { pairs: compactLookup };
     var lookupIndex = Number(cursor.index || 0) + 1;
     if (lookupIndex < FbmSync.SYNC_LOOKUPS.length) {
       state.cursor.index = lookupIndex; FbmSync.stateWrite(state);

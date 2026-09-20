@@ -323,6 +323,32 @@ async function chay(so) {
   const secondBatchRequest = batchLimitFlow.hop.FbmSync.customerNext(batchLimitFlow.hop.FbmSync.stateRead(), batchRows, 10);
   const batchCursor = batchLimitFlow.hop.FbmSync.detailCursorRead();
   check(so, 'Số Customer mỗi lượt = 3 được áp dụng và cursor đến Customer thứ 4', [batchState.detailCustomerLimit, firstBatchRequest.body.count, secondBatchRequest, batchCursor.pageIndex, batchCursor.pageValue[2]], [3, 3, null, 0, '3']);
+  const compactLookupFlow = workflowGas();
+  const compactLookupNames = {};
+  compactLookupFlow.hop.FbmSync.SYNC_LOOKUPS.forEach((item, index) => { compactLookupNames[item.key] = {}; compactLookupNames[item.key]['CODE-' + index] = 'Name-' + index; });
+  compactLookupFlow.hop.FbmSync.readCategoryGate = () => ({ map: {}, names: {}, namesBySource: compactLookupNames, valid: {}, warnings: [] });
+  compactLookupFlow.hop.FbmSync.prepareCategoryGate = (state) => { state.metadata = state.metadata || {}; state.metadata.categoryGate = compactLookupFlow.hop.FbmSync.readCategoryGate(); state.metadata.categoryBlocks = []; return []; };
+  compactLookupFlow.hop.FbmSync.start({ mode: 'read', origin: 'manual', scan: 'full' });
+  const compactContinue = (body) => {
+    const requestId = compactLookupFlow.hop.FbmSync.stateRead().activeRequestId;
+    return compactLookupFlow.hop.FbmSync.continue({ ok: true, status: 200, body: JSON.stringify(body), transport: { trace: [{ stage: 'executor_response_sent', requestId }] } });
+  };
+  compactContinue({ d: { Authorized: 'customer-auth' } });
+  compactContinue({ d: { Authorized: 'activity-auth' } });
+  let compactLast = null;
+  compactLookupFlow.hop.FbmSync.SYNC_LOOKUPS.forEach((item, index) => {
+    const rows = Array.from({ length: 700 }, (_, rowIndex) => ['NOISE-' + index + '-' + rowIndex, 'Tên dài để mô phỏng danh mục lớn']);
+    rows.push(['CODE-' + index, 'Name-' + index]);
+    compactLast = compactContinue({ d: { TotalRowCount: rows.length, Rows: rows } });
+  });
+  const compactState = compactLookupFlow.hop.FbmSync.stateRead();
+  const compactStateBytes = Buffer.byteLength(JSON.stringify(compactState), 'utf8');
+  check(so, 'lookup lớn chỉ giữ cặp Category cần dùng, không làm đầy DocumentProperties', [
+    compactLast.request && compactLast.request.meta.kind,
+    compactStateBytes < compactLookupFlow.hop.FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT,
+    compactState.session.lookups['@CAT_TINH_THANH'].pairs['CODE-0'],
+    JSON.stringify(compactState).indexOf('NOISE-') < 0
+  ], ['grid', true, 'Name-0', true]);
   const htmlFailureFlow = workflowGas();
   const htmlLogs = [];
   htmlFailureFlow.hop.LOG_OK = 'ok'; htmlFailureFlow.hop.LOG_ERROR = 'error'; htmlFailureFlow.hop.LOG_CONFLICT = 'conflict';
