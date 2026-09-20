@@ -150,6 +150,9 @@
 - Với dữ liệu legacy `AN***`, phương án ưu tiên là Extension đọc username đầy đủ từ vault local và chỉ trả metadata username, không trả password/envelope; nếu vault không đọc được thì hiển thị trạng thái `Chưa xác định` và yêu cầu người dùng nhập lại username/password để thay credential, không so mismatch bằng chuỗi mask.
 - Layout UI: `Row` chỉ đại diện các phần tử cùng một dòng; core `Flow/Stack` sở hữu khoảng cách dọc giữa các block; `ActionGroup` sở hữu quy tắc các lệnh độc lập. Không sửa bằng margin cục bộ màn Run.
 - Toàn bộ audit UI theo yêu cầu của chủ dự án đang ở trạng thái chờ lệnh; chưa rà toàn bộ codebase và chưa tick mục audit.
+- Trạng thái chưa từng có credential phải được hiển thị riêng: username/password đều `Chưa lưu`, nút đăng nhập thử bị khóa; khi edit, để trống cả hai không được hiểu là preserve vì chưa có gì để preserve.
+- Cần có thao tác rõ ràng `Xóa thông tin đăng nhập tự động`, tách khỏi thay đổi identity; phải xác nhận, xóa credential ở GAS và vault Extension, tắt auto-login, giữ nguyên liên kết tài khoản.
+- Sau khi xóa thành công, khối quay về trạng thái `Chưa lưu`; mọi lỗi xóa một phần phải báo rõ và ghi Log, không hiện thành công giả.
 
 ## 4. Việc cần làm theo thứ tự
 
