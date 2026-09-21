@@ -157,11 +157,11 @@ Ghi chú tiến độ: tài liệu nền đã cập nhật; core/header, Sync sh
 
 ## 11. Tiêu chí hoàn tất phiên
 
-- [ ] Không còn screen schema nào dùng alignment tự do.
-- [ ] Header form/view dùng cấu trúc nhóm thay vì marker `align` trên item lá.
-- [ ] Primitive/layout catalog là nơi duy nhất sở hữu mặc định alignment generic.
-- [ ] Ngoại lệ domain có owner, consumer, lý do và test.
-- [ ] Test contract chặn việc thêm lại alignment tự do vào schema.
-- [ ] Tất cả nhóm code đã được tick ngay sau khi hoàn thành và đã commit riêng.
-- [ ] `node tests/run.js` đã được chạy; các lỗi còn lại nếu thuộc thay đổi có sẵn phải được ghi rõ, không che hoặc tự ý sửa ngoài phạm vi.
+- [x] Không còn screen schema nào dùng alignment tự do. Bằng chứng: `uiSchema`, `screenSchemaAudit` và bộ `node tests/run.js` đạt `1920/1920`.
+- [x] Header form/view dùng cấu trúc nhóm thay vì marker `align` trên item lá. Bằng chứng: `UI_FORM_HEADER`, `screenHeaderGroup` và test form/view.
+- [x] Primitive/layout catalog là nơi duy nhất sở hữu mặc định alignment generic. Bằng chứng: `UI_LAYOUT_POLICY`/`uiLayoutClass` trong `client/ui/uiBuilder.html` và test policy.
+- [x] Ngoại lệ domain có owner, consumer, lý do và test. Bằng chứng: allowlist Tài liệu 04 Phần 6, hợp đồng Sync Tài liệu 09 Phần 8 và ca domain tương ứng.
+- [x] Test contract chặn việc thêm lại alignment tự do vào schema. Bằng chứng: `loiAlignmentSchema` và các ca header sai trong `tests/cases/uiSchema.js`, `tests/cases/uiBuilder.js`.
+- [x] Tất cả nhóm code đã được tick ngay sau khi hoàn thành và đã commit riêng; các commit gần nhất: `343b422`, `1f385b7`.
+- [x] `node tests/run.js` đã được chạy; kết quả gần nhất `1920` đạt, `0` lỗi, không có lỗi ngoài phạm vi cần che hoặc sửa ngoài phạm vi.
 - [ ] Checklist có ghi trạng thái nghiệm thu DEV và commit cuối cùng của phiên.
