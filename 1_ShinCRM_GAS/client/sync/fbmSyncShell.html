@@ -60,10 +60,14 @@ function fbmSyncShellHeaderBlocks(status) {
   var enabled = fbmSyncShellEnabled(status);
   var schema = FBM_SYNC_UI_SCHEMA.shell;
   return [
-    Icon({ id: schema.ids.back, icon: 'back', tooltip: schema.tooltips.back }),
-    Text({ id: schema.ids.title, className: uiSyncClass('shell', 'header'), text: fbmSyncShellTitle() }),
-    StandaloneControl({ id: schema.ids.master, kind: 'toggle', pressed: enabled, className: enabled ? uiSyncClass('shell', 'toggleOn') : uiSyncClass('shell', 'toggleOff'), ariaLabel: schema.masterAria }),
-    Icon({ id: schema.ids.menu, icon: 'more', tooltip: schema.tooltips.menu, disabled: !fbmSyncStatusReady() })
+    screenHeaderGroup('start', [
+      Icon({ id: schema.ids.back, icon: 'back', tooltip: schema.tooltips.back }),
+      Text({ id: schema.ids.title, className: uiSyncClass('shell', 'header'), text: fbmSyncShellTitle() })
+    ]),
+    screenHeaderGroup('end', [
+      StandaloneControl({ id: schema.ids.master, kind: 'toggle', pressed: enabled, className: enabled ? uiSyncClass('shell', 'toggleOn') : uiSyncClass('shell', 'toggleOff'), ariaLabel: schema.masterAria }),
+      Icon({ id: schema.ids.menu, icon: 'more', tooltip: schema.tooltips.menu, disabled: !fbmSyncStatusReady() })
+    ])
   ];
 }
 function fbmSyncShellNavBlock() {

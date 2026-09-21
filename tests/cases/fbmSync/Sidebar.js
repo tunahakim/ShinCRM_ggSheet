@@ -161,8 +161,8 @@ async function chay(so) {
 
   const shellHeader = hop.fbmSyncShellHeaderBlocks(idle);
   check(so, 'menu nội bộ bỏ Tổng quan và đặt Chạy đồng bộ lên đầu', [hop.FBM_SYNC_UI_SCHEMA.screens.map((item) => item.id), hop.FBM_SYNC_UI_SCHEMA.screens.some((item) => item.id === 'overview')], [['run', 'account', 'results', 'settings'], false]);
-  check(so, 'header Đồng bộ dùng đúng dãy Block như header Sidebar/form', [shellHeader.length, shellHeader[0].role, shellHeader[0].className, shellHeader[2].disabled, shellHeader[3].role, shellHeader[3].className, hop.fbmSyncShellTitle()], [4, 'icon', '', false, 'icon', '', 'Chạy đồng bộ']);
-  check(so, 'header Đồng bộ dùng cùng khung và tiêu đề với header Sidebar/form', [shellHeader[1].className.indexOf('shin-header-title') >= 0], [true]);
+  check(so, 'header Đồng bộ dùng hai HeaderGroup chung với header Sidebar/form', [shellHeader.length, shellHeader[0].className, shellHeader[0].elements.map((node) => node.role + ':' + (node.id || '')).join('|'), shellHeader[1].className, shellHeader[1].elements.map((node) => node.role + ':' + (node.id || '')).join('|'), shellHeader[1].elements[0].disabled, hop.fbmSyncShellTitle()], [2, 'shin-header-group shin-header-group-start', 'icon:fbm-sync-back|text:fbm-sync-module-title', 'shin-header-group shin-header-group-end', 'standaloneControl:fbm-sync-master-switch|icon:fbm-sync-module-menu', false, 'Chạy đồng bộ']);
+  check(so, 'header Đồng bộ dùng cùng khung và tiêu đề với header Sidebar/form', [shellHeader[0].elements[1].className.indexOf('shin-header-title') >= 0], [true]);
 
   hop.FBM_SYNC_CLIENT.subscreen = 'run';
   hop.FBM_SYNC_CLIENT.statusReady = false;

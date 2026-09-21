@@ -77,7 +77,7 @@ Ghi chú nhóm tài liệu: đã cập nhật `03. Data schema & UI schema.md`, 
 - [ ] Giữ lại các `text-align`/`justify-content` đặc thù có consumer và ghi chúng vào allowlist; không cấm mù mọi căn chỉnh nội bộ.
 - [x] Chạy test primitive/layout ngay sau nhóm này; `node tests/run.js` đạt `1910`, lỗi `0`, bao gồm owner mặc định và selector cũ.
 - [ ] Tick ngay từng mục primitive đã có bằng chứng test trong checklist.
-- [x] Commit riêng nhóm primitive/layout policy và checklist tương ứng; chuẩn bị commit sau khi test xanh.
+- [x] Commit riêng nhóm primitive/layout policy và checklist tương ứng; đã commit `e3996d3`.
 
 ## 6. Migration screen schema và builder
 
@@ -92,7 +92,7 @@ Ghi chú nhóm tài liệu: đã cập nhật `03. Data schema & UI schema.md`, 
 - [x] Cập nhật các schema/controller FBM nếu đang dùng pattern `align` hoặc helper tương đương; không đổi nhãn/action nghiệp vụ. Bằng chứng: kiểm kê trước sửa không có consumer `align` trong schema/controller FBM.
 - [x] Chạy test `uiBuilder`, `blockKeys`, `schemaCheck`, `renderEngine`, `formScreen`, `viewScreen`, `uiSchema` sau migration. Bằng chứng: `node tests/run.js` đạt `1910`, lỗi `0`.
 - [x] Tick ngay từng mục migration có test cụ thể; các mục đã được đánh dấu cùng bằng chứng ngay sau khi `1910/1910` test xanh.
-- [x] Commit riêng nhóm migration schema/builder/renderer; chuẩn bị commit sau khi test xanh.
+- [x] Commit riêng nhóm migration schema/builder/renderer; đã commit `e3996d3`.
 
 ## 7. Chuẩn hóa các màn hình và component dùng chung
 
@@ -106,7 +106,7 @@ Ghi chú nhóm tài liệu: đã cập nhật `03. Data schema & UI schema.md`, 
 - [ ] Kiểm tra Results: tab, description, summary, conflict, error, log, audit và pagination giữ alignment đặc thù đã định nghĩa.
 - [ ] Kiểm tra Settings: công tắc tổng, chiều đồng bộ, schedule row, detail inputs và nút Lưu lịch nền dùng preset đúng owner.
 - [ ] Kiểm tra Notice/Error/Preview xuất hiện và biến mất không làm node con tự căn lại ngoài wrapper.
-- [ ] Kiểm tra header shell Sync và header form không tạo hai cơ chế căn phải khác nhau.
+- [x] Kiểm tra header shell Sync và header form không tạo hai cơ chế căn phải khác nhau. Bằng chứng: `fbmSyncShellHeaderBlocks` dùng `screenHeaderGroup('start'/'end')`, test `fbmSync/Sidebar`.
 - [ ] Với mỗi ngoại lệ domain, ghi consumer, lý do, selector/component owner và test bảo vệ ngay trong checklist hoặc allowlist.
 - [ ] Chạy test layout/UI sau từng màn hình; tick ngay mục tương ứng và không gom tick cuối nhóm.
 - [ ] Commit riêng từng nhóm màn hình nếu diff độc lập; không đưa thay đổi FBM session/pipeline có sẵn vào commit.
