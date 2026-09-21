@@ -61,7 +61,7 @@ Ghi chú kiểm kê: `align` đang được khai tại `client/schema/screens/fo
 - [x] Kiểm tra `0_Documentation/Phiên code/Cây thư mục code.md`: không phát sinh file hoặc thư mục mới cho layout policy/test, nên không cần cập nhật cây.
 - [x] Ghi commit tài liệu riêng sau khi các tài liệu trên không còn mâu thuẫn với quyết định phiên này.
 
-Ghi chú tiến độ: tài liệu nền đã cập nhật; core/header, Sync shell, ActionStack Account, Empty và token schedule đã được commit riêng. Policy semantic hiện nằm trong `UI_LAYOUT_POLICY` của `client/ui/uiBuilder.html`; nhóm policy đã commit `343b422`, nhóm hồi quy form/view/card đã commit `1f385b7`; test offline gần nhất đạt `1920/1920`. Còn nghiệm thu trực quan DEV.
+Ghi chú tiến độ: tài liệu nền đã cập nhật; core/header, Sync shell, ActionStack Account, Empty và token schedule đã được commit riêng. Policy semantic hiện nằm trong `UI_LAYOUT_POLICY` của `client/ui/uiBuilder.html`; nhóm policy đã commit `343b422`, nhóm hồi quy form/view/card đã commit `1f385b7`; test offline gần nhất đạt `1920/1920`; GAS DEV probe Sidebar đạt ở revision `@480`. Còn nghiệm thu trực quan DEV.
 
 ## 5. Primitive và layout policy
 
@@ -135,7 +135,7 @@ Ghi chú tiến độ: tài liệu nền đã cập nhật; core/header, Sync sh
 - [x] Kiểm tra diff từng commit chỉ chứa checklist/tài liệu/code/test alignment thuộc nhóm đó; nhóm hiện tại chỉ gồm ba ca test và checklist.
 - [x] Kiểm tra các thay đổi FBM session/pipeline có sẵn vẫn giữ nguyên và không bị stage/commit nhầm; `tests/run.js` vẫn ngoài stage, không có file session/pipeline trong commit nhóm này.
 - [x] Kiểm tra không có cookie, mật khẩu, token, payload nhạy cảm hoặc dữ liệu khách thật trong diff/test/log; rà diff nhóm hiện tại không có giá trị bí mật hay dữ liệu khách thật.
-- [x] Kiểm tra thứ tự include của layout policy, uiBuilder, screenBuild, renderer và schema không tạo lỗi runtime; ca `screenSchemaAudit` mới đạt trong bộ `1920/1920`.
+- [x] Kiểm tra thứ tự include của layout policy, uiBuilder, screenBuild, renderer và schema không tạo lỗi runtime; ca `screenSchemaAudit` đạt trong bộ `1920/1920`, probe GAS DEV `probeSidebarTemplate --push` đạt ở revision `@480`.
 - [x] Tick mục hồi quy ngay khi có output tương ứng.
 
 ## 10. Nghiệm thu trực quan trên Sheet DEV
