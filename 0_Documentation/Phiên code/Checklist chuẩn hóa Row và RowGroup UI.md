@@ -104,7 +104,7 @@
 - [x] [Tự động] Refactor layout Sync Settings: toggle, schedule row, parent login row, child login group và detail inputs dùng primitive owner đúng cấp. Bằng chứng: `fbmSync/Sidebar` kiểm tra toggle, schedule và login parent là `row`, child group là `box` mang policy `RowGroup`; `layoutSpacing` kiểm tra schedule không còn Grid và detail group không tự sở hữu gap.
 - [ ] [Tự động] Giữ DetailField dạng dọc nếu label nằm trên control; không ép mọi layout thành Row ngang.
 - [x] [Tự động] Cho phép RowGroup lồng RowGroup cho nhóm tùy chọn con; kiểm tra indentation là policy wrapper, không phải margin tùy ý trong schema. Bằng chứng: login policy dùng `RowGroup` cho children/retry group; `layoutSpacing` chặn `margin-left` cũ của wrapper children.
-- [x] [Tự động] Các component Loading/Empty/Notice/Table/Pipeline/Conflict giữ preset đặc thù có lý do, không bị đổi default generic. Bằng chứng: test `fbmSync/Sidebar` kiểm tra Pipeline/Progress vẫn là preset có class riêng; conflict field chuyển sang `RowGroup` nhưng giữ class/border domain; test `layoutSpacing` chặn flex/grid/gap lặp lại trong các preset này.
+- [x] [Tự động] Các component Loading/Empty/Notice/Table/Pipeline/Conflict/Status giữ preset đặc thù có lý do, không bị đổi default generic. Bằng chứng: test `fbmSync/Sidebar` kiểm tra Pipeline/Progress vẫn là preset có class riêng; conflict field và status root dùng `RowGroup` nhưng giữ hình thức domain; bảng status vẫn giữ Grid để thẳng cột; test `layoutSpacing` chặn flex/grid/gap lặp lại trong các wrapper này.
 - [x] [Tự động] Tìm và xử lý mọi `Stack(`, `shin-stack`, `UI_LAYOUT_POLICY.stack` theo quyết định canonical; không để consumer cũ tạo owner thứ hai.
 
 ## I. Dọn hardcode và contract chống tái phạm

@@ -29,6 +29,8 @@ function chay(so) {
   const toggleRow = rule(components, '.shin-toggle-row {');
   const button = rule(components, '.shin-button {');
   const icon = rule(components, '.shin-icon {');
+  const statusSchema = docTep('client/schema/status/common.html');
+  const statusStyle = docTep('client/style/status.html');
 
   check(so, 'spacing token có đúng một nguồn khai báo',
     (tokens.match(/^\s*--shin-gap-[1-5]\s*:/gm) || []).length, 5);
@@ -41,6 +43,11 @@ function chay(so) {
       components.indexOf('.shin-row-group > * + *') === -1,
       components.indexOf('.shin-action-stack > * + *') === -1],
     [true, true, true, true]);
+  check(so, 'Status root dÃ¹ng RowGroup, cÃ²n table giá»¯ Grid Ä‘á»ƒ tháº³ng cÃ¡c cá»™t',
+    [statusSchema.indexOf('body: [RowGroup({') >= 0,
+      statusStyle.indexOf('.shin-status { display: flex;') === -1,
+      statusStyle.indexOf('.shin-status-table-row { display: grid;') >= 0],
+    [true, true, true]);
   check(so, 'ActionStack không còn fallback margin có thể cộng với gap',
     [components.indexOf('.shin-box > .shin-single-action-row + .shin-single-action-row') === -1,
       runUi.indexOf('actionStack: function (elements) { return ActionStack({ elements: elements }); }') >= 0],

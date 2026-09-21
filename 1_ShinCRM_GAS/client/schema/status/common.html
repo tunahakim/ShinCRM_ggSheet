@@ -21,7 +21,7 @@ function statusSchemaRoot(infoText, elements) {
     infoSlot: 'statusInfo',
     infoText: infoText || '',
     header: [],
-    body: [Box({ className: uiResolveStatusClass('root'), elements: elements || [] })],
+    body: [RowGroup({ className: uiResolveStatusClass('root'), elements: elements || [] })],
     footer: []
   };
 }
