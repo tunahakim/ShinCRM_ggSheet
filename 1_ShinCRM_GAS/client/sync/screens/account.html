@@ -13,7 +13,7 @@ function fbmSyncLoginActionBlocks() {
   if (editing) {
     actions.push(fbmSyncConfigButton('connection', { edit: FBM_SYNC_ACCOUNT_SCHEMA.login.edit, save: FBM_SYNC_ACCOUNT_SCHEMA.login.save }, { id: FBM_SYNC_ACCOUNT_SCHEMA.login.actionIds.save, disabled: active }));
   }
-  return [FBM_SYNC_ACCOUNT_UI.layout.actionRow(actions)];
+  return [FBM_SYNC_ACCOUNT_UI.layout.actionStack(actions)];
 }
 function fbmSyncLoginPolicyNavigationBlocks() {
   return [FBM_SYNC_ACCOUNT_UI.layout.singleAction(Button({ id: FBM_SYNC_ACCOUNT_SCHEMA.login.actionIds.policy, label: FBM_SYNC_ACCOUNT_SCHEMA.login.policy, className: uiResolveActionClass('edit', 'button'), disabled: !!FBM_SYNC_CLIENT.running || fbmSyncConfigIsEditing('connection') }))];

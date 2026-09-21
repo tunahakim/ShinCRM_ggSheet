@@ -105,7 +105,7 @@ function chay(so) {
       settings.indexOf('.shin-sync-login-policy-retry-group .shin-form-field') === -1,
       settings.indexOf('.shin-sync-detail-inputs > * + *') === -1,
       runUi.indexOf('fieldHelp: function (control, help) { return Stack({ elements:') >= 0,
-      runUi.indexOf('identityForm, elements: slots.form }), Stack') >= 0,
+      runUi.indexOf('identityForm, elements: slots.form }), ActionStack') >= 0,
       runUi.indexOf('loginRetryGroup: function (className, elements) { return Stack') >= 0,
       runUi.indexOf('loginPolicyChildren, className: FBM_SYNC_SETTINGS_UI.classes.loginChildren, elements: slots.children }), slots.actions') >= 0,
       runUi.indexOf('Stack({ id: FBM_SYNC_SETTINGS_SCHEMA.regions.loginPolicyChildren') >= 0,
