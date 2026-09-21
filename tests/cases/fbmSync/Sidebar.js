@@ -183,7 +183,7 @@ async function chay(so) {
   hop.fbmSyncRenderRun(content, idle);
   hop.fbmSyncAppendBox = appendRun;
   const runCard = runBlocks[0], runActionRegion = runCard.elements.filter((node) => node && node.id === 'fbm-sync-run-action-region')[0];
-  check(so, 'Các action Run đi qua ActionStack lõi có hai Row con và nhịp dọc dùng chung', [runActionRegion.elements[0].role, runActionRegion.elements[0].className, runActionRegion.elements[0].elements.length, runActionRegion.elements[0].elements[0].className, runActionRegion.elements[0].elements[1].className], ['box', 'shin-action-stack', 2, 'shin-single-action-row', 'shin-single-action-row']);
+  check(so, 'Các action Run đi qua ActionStack lõi có hai Row con và nhịp dọc dùng chung', [runActionRegion.elements[0].role, runActionRegion.elements[0].className, runActionRegion.elements[0].elements.length, runActionRegion.elements[0].elements[0].className, runActionRegion.elements[0].elements[1].className], ['box', 'shin-row-group shin-action-stack', 2, 'shin-single-action-row', 'shin-single-action-row']);
   const runDetailsRegion = runBlocks.filter((node) => node && node.id === 'fbm-sync-run-details-region')[0];
   const pipelineNode = hop.fbmSyncPipelineBlock(active, 'pipeline-test');
   check(so, 'Pipeline và trạng thái phiên nằm trong RowGroup để giữ khoảng cách dọc', [runDetailsRegion.role, runDetailsRegion.className, pipelineNode.role, pipelineNode.elements[1].role, hop.fbmSyncProgressBlocks(active, {}).role], ['box', 'shin-row-group', 'box', 'row', 'box']);
@@ -410,7 +410,7 @@ async function chay(so) {
   const directionIndex = backgroundBlocks.findIndex((node) => node && node.elements && node.elements.some((child) => child && child.id === 'fbm-sync-background-direction'));
   const firstScheduleRow = backgroundBlocks.find((node) => node && String(node.className || '').indexOf('shin-sync-schedule-row') >= 0);
   const detailBlock = backgroundBlocks.find((node) => node && String(node.className || '').indexOf('shin-sync-detail-controls') >= 0);
-  check(so, 'background layout order and detail groups', [backgroundToggleIndex < directionIndex, backgroundBlocks[backgroundToggleIndex].role, backgroundBlocks[directionIndex].className.indexOf('shin-sync-direction-row') >= 0, firstScheduleRow.role, firstScheduleRow.elements[1].className, detailBlock.role, detailBlock.elements.length, detailBlock.elements[0].className, detailBlock.elements[1].elements[0].className, detailBlock.elements[1].elements[1].className], [true, 'row', true, 'row', 'shin-kv-label', 'box', 2, 'shin-sync-detail-field', 'shin-sync-detail-label', 'shin-sync-detail-inputs']);
+  check(so, 'background layout order and detail groups', [backgroundToggleIndex < directionIndex, backgroundBlocks[backgroundToggleIndex].role, backgroundBlocks[directionIndex].className.indexOf('shin-sync-direction-row') >= 0, firstScheduleRow.role, firstScheduleRow.elements[1].className, detailBlock.role, detailBlock.elements.length, detailBlock.elements[0].className, detailBlock.elements[1].elements[0].className, detailBlock.elements[1].elements[1].className], [true, 'row', true, 'row', 'shin-kv-label', 'box', 2, 'shin-row-group shin-sync-detail-field', 'shin-sync-detail-label', 'shin-sync-detail-inputs']);
   const loginPolicyBlocks = hop.fbmSyncSettingsLoginBlocks({ enabled: true, autoOpenTab: false, retryEnabled: true, retryMinutes: 30 });
   const loginPolicyChildren = loginPolicyBlocks.find((node) => node && node.id === 'fbm-sync-login-policy-children');
   const retryGroup = loginPolicyChildren.elements[1];

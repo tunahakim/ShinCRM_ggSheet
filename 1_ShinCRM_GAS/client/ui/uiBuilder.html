@@ -176,7 +176,7 @@ function RowGroup(spec) {
 function ActionStack(spec) {
   var o = Array.isArray(spec) ? { elements: spec } : (spec || {});
   var className = (uiLayoutClass('actionStack') + ' ' + String(o.className || '')).trim();
-  return Box(Object.assign({}, o, { className: className }));
+  return RowGroup(Object.assign({}, o, { className: className }));
 }
 
 /** Khối có khung và có tiêu đề, `titleActions` là hàng hành động trên tiêu đề — và nó là **mảng** kể cả khi có đúng một mục, tài liệu 04 Phần 4B. */

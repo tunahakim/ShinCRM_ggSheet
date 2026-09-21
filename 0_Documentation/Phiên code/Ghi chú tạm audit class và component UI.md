@@ -45,7 +45,7 @@ Tổng cộng: 18 schema HTML có class-related values: 5 schema lõi, 4 schema 
 
 ### 2.3 Component, slot, controller và host có class
 
-- `client/ui/uiBuilder.html`: `Notice` đã có map tone `pending/success/warning/error` sang class; `Stack`, `StandaloneField` thêm class primitive.
+- `client/ui/uiBuilder.html`: `Notice` đã có map tone `pending/success/warning/error` sang class; `RowGroup`, `StandaloneField` thêm class primitive.
 - `client/ui/renderEngine.html`: sinh class HTML cố định cho Block/Field/Button/Icon/Check/StandaloneControl; đây là lớp renderer, không phải class màn hình.
 - `client/ui/slots.html`: class đặc thù slot hoạt động, gợi ý khách, info bar, badge và empty state.
 - `client/ui/menu.html`, `client/ui/choiceMenu.html`, `client/ui/combo.html`, `client/ui/popupList.html`, `client/ui/collapse.html`: class DOM nội bộ menu/combo/popup/collapse.
@@ -135,7 +135,7 @@ Các role semantic có thể chồng về nghĩa sử dụng (ví dụ `is-error
 ### Đã có component/helper dùng chung
 
 - Primitive Block đã có trong `ui/uiBuilder.html`: `Box`, `Card`, `Row`, `Text`, `Field`, `Button`, `Icon`, `Check`, `StandaloneControl`.
-- `Stack` và `StandaloneField` là component layout/control dùng lại.
+- `RowGroup` và `StandaloneField` là component layout/control dùng lại.
 - `Notice` đã gom tone → class ở một chỗ.
 - Status có `statusSchemaText`, `statusSchemaBox`, `statusSchemaRoot`, `statusSchemaKeyValues`, `statusSchemaTable`.
 - Form header dùng chung qua `UI_FORM_HEADER`.
@@ -193,7 +193,7 @@ Phương pháp: quét toàn bộ `client/schema`, `client/screen` và `client/sy
 | Nút lưu cấu hình | `fbmSyncConfigEditor.html`, account, settings, identity | cặp edit/save, hàng action, khóa cấu hình và callback khác nhau | Dùng `fbmSyncConfigButton`, `fbmSyncConfigButtonRow`, `fbmSyncConfigTitleActions`; đã gom action class về resolver. |
 | Nút sửa/điều hướng | form header, titleActions, mở chính sách đăng nhập, tab/menu Sync | semantics khác nhau nhưng đều là Button/Icon với keyboard và callback chuẩn | Không tách `NavigationButton`; schema chỉ khai action/label/menu, UI chọn appearance. |
 | Notice/status | core status, Sync settings/account/status/issues | tone, text, vùng cập nhật động | Dùng `Notice` và status helper; `pending/success/warning/error/info` được map tập trung. |
-| Card/section | view, form, status, toàn bộ card cấu hình Sync, kết quả/audit/conflict | khung Card/Box/Stack, title và elements khác dữ liệu | Dùng `Card`, `Box`, `Stack`; layout Sync đặc thù giữ trong UI helper, chưa cần `ConfigCard` mới. |
+| Card/section | view, form, status, toàn bộ card cấu hình Sync, kết quả/audit/conflict | khung Card/Box/RowGroup, title và elements khác dữ liệu | Dùng `Card`, `Box`, `RowGroup`; layout Sync đặc thù giữ trong UI helper, chưa cần `ConfigCard` mới. |
 | Field row/control | form lõi, account/settings, conflict | label/control/disabled/error khác field và dữ liệu | Dùng `Field`, `StandaloneField`, `StandaloneControl`; trạng thái invalid chỉ là data/state. |
 | Toggle | settings module/background/process/login policy, shell master | control toggle, `aria-pressed`, on/off state | Dùng `StandaloneControl(kind: 'toggle')` và `uiSyncToggleClass`; chưa có cấu trúc/hành vi mới đủ để tách `Toggle` riêng. |
 | Tab | results có 5 tab | Button trigger, active state, tab data | Dùng Button + `FBM_SYNC_RESULTS_UI`; chưa có consumer khác với cấu trúc/hành vi tương tự cần component mới. |

@@ -168,10 +168,10 @@ function chay(so) {
     REMOVED_DUPLICATE_LAYOUT_CLASSES.filter((name) => all.indexOf(name) >= 0),
     []);
   check(so, 'lớp generic notice/form/toggle/value/pagination nằm ở components chung',
-    ['shin-form-field', 'shin-toggle-row', 'shin-toggle-control', 'shin-notice', 'shin-kv-row', 'shin-pagination', 'shin-section', 'shin-content-disabled', 'shin-loading'].every((name) => styles.indexOf(name) >= 0),
+    ['shin-form-field', 'shin-toggle-row', 'shin-toggle-control', 'shin-notice', 'shin-kv-label', 'shin-pagination', 'shin-section', 'shin-content-disabled', 'shin-loading'].every((name) => styles.indexOf(name) >= 0),
     true);
   check(so, 'Card và RowGroup dùng gap dọc, component con không cộng margin lần hai',
-    [styles.indexOf('.shin-card-body {') >= 0, styles.indexOf('.shin-box.shin-row-group,') >= 0,
+    [styles.indexOf('.shin-card-body {') >= 0, styles.indexOf('.shin-box.shin-row-group {') >= 0,
       styles.indexOf('gap: var(--shin-gap-2);', styles.indexOf('.shin-card-body {')) >= 0,
       styles.indexOf('.shin-card-body > * { margin: 0; }') >= 0,
       styles.indexOf('.shin-row-group > * + *') === -1,
@@ -181,10 +181,10 @@ function chay(so) {
     [styles.indexOf('align-items: stretch;') >= 0, styles.indexOf('align-self: stretch;') >= 0, styles.indexOf('width: 100%;') >= 0,
       styles.indexOf('.shin-box.shin-action-stack') >= 0,
       styles.indexOf('gap: var(--shin-gap-2);') >= 0,
-      styles.indexOf('.shin-row-group > *,\n.shin-action-stack > * { margin: 0; }') >= 0],
+      styles.indexOf('.shin-row-group > * { margin: 0; }') >= 0],
     [true, true, true, true, true, true]);
   check(so, 'Nút action dài được xếp dọc trong Sidebar hẹp',
-    [styles.indexOf('.shin-single-action-row { justify-content: center; flex-wrap: wrap; gap: var(--shin-gap-2); }') >= 0,
+    [styles.indexOf('.shin-single-action-row { justify-content: center; flex-wrap: wrap; }') >= 0,
       styles.indexOf('width: min(220px, 100%); max-width: 100%; min-width: 0;') >= 0,
       styles.indexOf('white-space: normal; overflow-wrap: anywhere;') >= 0,
       styles.indexOf('.shin-single-action-row > .shin-button { white-space: normal; text-align: center; overflow-wrap: anywhere; }') >= 0,
@@ -231,7 +231,7 @@ function chay(so) {
       styles.indexOf('.shin-loading-track.is-idle { visibility: hidden; background: transparent; }') >= 0],
     [true, true, true]);
   check(so, 'RowGroup dùng gap và reset margin con trực tiếp',
-    [styles.indexOf('.shin-box.shin-row-group,') >= 0, styles.indexOf('gap: var(--shin-gap-2);', styles.indexOf('.shin-box.shin-row-group,')) > styles.indexOf('.shin-box.shin-row-group,'), styles.indexOf('.shin-row-group > *,\n.shin-action-stack > * { margin: 0; }') >= 0],
+    [styles.indexOf('.shin-box.shin-row-group {') >= 0, styles.indexOf('gap: var(--shin-gap-2);', styles.indexOf('.shin-box.shin-row-group {')) > styles.indexOf('.shin-box.shin-row-group {'), styles.indexOf('.shin-row-group > * { margin: 0; }') >= 0],
     [true, true, true]);
 }
 

@@ -6,7 +6,7 @@
 
 ## A. Phạm vi và nguyên tắc bất biến
 
-- [x] [Tự động] Ghi nhận phạm vi: `Row`, nhóm dọc hiện đang là `Stack`, `UI_SCHEMA` dạng `group + rows`, catalog/resolver, CSS primitive và các component Sidebar/FBM dùng layout ngang/dọc.
+- [x] [Tự động] Ghi nhận phạm vi: `Row`, nhóm dọc canonical là `RowGroup`, `UI_SCHEMA` dạng `group + rows`, catalog/resolver, CSS primitive và các component Sidebar/FBM dùng layout ngang/dọc.
 - [x] [Tự động] Ghi nhận không sửa fixture trong `0_Documentation/Nghiên cứu FBM/`.
 - [x] [Tự động] Ghi nhận không thêm `className`, `rootClass`, selector DOM, chuỗi CSS hoặc `style` tự do vào screen schema.
 - [x] [Tự động] Ghi nhận mỗi hành vi layout chỉ có một owner; component con không dùng margin để điều khiển sibling spacing.
@@ -26,7 +26,7 @@
 - [x] [Tự động] Chốt `Field`, `Text`, `Icon`, `Button`, `Toggle` không tự thêm margin bên ngoài để đẩy sibling.
 - [x] [Tự động] Chốt `HeaderGroup`, `ActionStack`, `SplitRow` là preset có tên cho các cấu trúc khác vai trò; không ép `Row` generic nhận `space-between`.
 - [x] [Tự động] Chốt Row có thể dùng độc lập trong component nội bộ khi parent đã sở hữu spacing; schema form vẫn bung danh sách hàng qua RowGroup.
-- [ ] [Tự động] Chốt Row không nhận trực tiếp một danh sách Row khác như sibling; layout lồng phải đi qua cell/block hoặc RowGroup.
+- [x] [Tự động] Chốt Row không nhận trực tiếp một danh sách Row khác như sibling; layout lồng chỉ xuất hiện như một cell/block của Row hoặc qua RowGroup. Bằng chứng: `tests/cases/uiBuilder.js` kiểm tra RowGroup chỉ chứa Row và nested Row nằm trong một cell.
 - [x] [Tự động] Chốt Row lồng Row chỉ là ngoại lệ khi một cell thật sự chứa một layout ngang độc lập; không dùng để gom Toggle + Text một cách máy móc.
 
 ## C. Hợp đồng khoảng cách và căn chỉnh
@@ -43,7 +43,7 @@
 - [x] [Tự động] Chốt căn dọc mặc định của Row theo policy chung; API công khai dùng `top`, `middle`, `bottom` nếu primitive/wrapper cần override.
 - [x] [Tự động] Tách căn block trong cell khỏi căn nội dung bên trong Field/Text/Button; không dùng một thuộc tính để điều khiển cả hai tầng.
 - [x] [Tự động] Giữ `start/end` chỉ ở layout policy nội bộ nếu cần RTL; không đưa `start/end` vào screen schema hiện tại.
-- [ ] [Tự động] Mặc định gridlines/border của Row tắt; nếu cần bật phải là policy có tên và test riêng, không là CSS màn hình.
+- [x] [Tự động] Mặc định gridlines/border của Row tắt; nếu cần bật phải là policy có tên và test riêng, không là CSS màn hình. Bằng chứng: `tests/cases/layoutSpacing.js` kiểm tra rule `.shin-row` không có `border`.
 
 ## D. Hợp đồng UI schema
 
@@ -68,17 +68,17 @@
 - [x] [Tự động] Ghi ví dụ form customer: một cell, hai cell, control override và mapping runtime trong hợp đồng `rows` hiện có.
 - [x] [Tự động] Ghi quy tắc màn Settings: Row đơn cho từng dòng; RowGroup lồng cho nhóm tùy chọn con; Row lồng Row chỉ khi cell có layout ngang độc lập.
 - [x] [Tự động] Ghi rõ CSS màn hình chỉ được dùng cho hình thức/domain exception đã có owner và test; không dùng để sửa sibling spacing trong hợp đồng layout.
-- [ ] [Tự động] Cập nhật tài liệu điều hướng hoặc cây thư mục nếu thêm tệp code; không tạo bản tóm tắt lặp lại quy chuẩn nền.
+- [x] [Tự động] Không thêm tệp code hoặc thư mục trong nhóm này nên không phát sinh cập nhật cây thư mục; tài liệu chỉ sửa các hợp đồng bị lỗi thời.
 
 ## F. Primitive và catalog
 
 - [x] [Tự động] Tạo hoặc đổi tên implementation RowGroup theo quyết định ở mục B, bảo đảm chỉ có một hàm/ policy sở hữu nhóm dọc.
 - [x] [Tự động] Di chuyển policy/class owner từ `Stack` sang tên canonical; không giữ alias song song.
-- [ ] [Tự động] Cập nhật `BLOCK_ROLES`, key contract và thông báo lỗi để RowGroup hợp lệ nếu RowGroup là Block role mới.
+- [x] [Tự động] Không thêm `RowGroup` vào `BLOCK_ROLES`: đây là wrapper trên vai `box`, đúng hợp đồng `03A`; test `uiBuilder` xác nhận `RowGroup`/`ActionStack` trả `box` và không có role song song.
 - [x] [Tự động] Cập nhật `UI_LAYOUT_POLICY` với owner, axis, cross-axis, content và class duy nhất của RowGroup.
 - [x] [Tự động] Cập nhật CSS primitive: Row dùng column gap; RowGroup dùng row gap; reset margin con trực tiếp; không dùng sibling margin.
 - [x] [Tự động] Cập nhật chính sách width equal/flex/auto/fixed ở một nơi; không rải rule theo màn hình.
-- [ ] [Tự động] Cập nhật policy horizontal/vertical alignment và test các enum sai bị fail sớm.
+- [x] [Tự động] Policy căn chỉnh nằm tập trung trong `UI_LAYOUT_POLICY`; `Row` từ chối khóa `align` tự do và test `uiBuilder` kiểm tra lỗi sớm. Các preset dùng `HeaderGroup`, `ActionStack`, `Loading`, `Empty`.
 - [x] [Tự động] Giữ HeaderGroup/ActionStack/SplitRow là preset riêng, không làm biến dạng Row generic.
 - [x] [Tự động] Kiểm tra Button/Icon/Text/Field không có API hoặc CSS margin để điều khiển sibling.
 - [x] [Tự động] Thêm test primitive chứng minh Row nhận một hàng, RowGroup nhận một hoặc nhiều Row và nested layout hợp lệ.
@@ -95,35 +95,35 @@
 
 ## H. Refactor component dùng chung
 
-- [ ] [Tự động] Kiểm kê component có nhiều phần tử ngang đồng cấp: HeaderGroup, CardTitleBar, ActionRow, InlineFieldRow, ToggleRow và layout tương đương.
-- [ ] [Tự động] Với mỗi component, xác định Row là owner ngang; không tự viết lại `display:flex`, gap và căn chỉnh nếu cùng hành vi.
+- [x] [Tự động] Kiểm kê component có nhiều phần tử ngang đồng cấp: HeaderGroup, CardTitleBar, ActionRow, InlineFieldRow, ToggleRow và layout tương đương. Kết quả và allowlist nằm trong `Ghi chú tạm audit class và component UI.md`.
+- [x] [Tự động] Với mỗi component, xác định Row là owner ngang; không tự viết lại `display:flex`, gap và căn chỉnh nếu cùng hành vi. Bằng chứng: `layoutSpacing`, `fbmSync/Components` và các test Sidebar kiểm tra ToggleRow, schedule, conflict head, action row.
 - [x] [Tự động] Refactor HeaderGroup để title ở vùng start, Cancel/Save ở vùng end; thứ tự `[Hủy, Lưu]` giữ nguyên. Bằng chứng: test `formScreen`, `uiSchema`, `fbmSync/Sidebar` và `layoutSpacing` kiểm tra hai nhóm header, thứ tự action và owner căn mép.
 - [x] [Tự động] Refactor ToggleRow/InlineFieldRow để dùng Row primitive hoặc preset Row có tên; không để CSS màn hình quyết định sibling spacing. Bằng chứng: test `layoutSpacing` kiểm tra owner spacing; test `fbmSync/Sidebar` kiểm tra toggle Settings có role `row`.
 - [x] [Tự động] Refactor Card title/actions để dùng wrapper action chung, không gắn align lên Icon/Button lá. Bằng chứng: test `renderEngine` kiểm tra `shin-card-actions` và không còn `shin-align-right`; test `fbmSync/Components` kiểm tra action card dùng style chung.
 - [x] [Tự động] Refactor panel cảnh báo thay đổi chưa lưu và dialog quyết định dùng `RowGroup`; CSS panel chỉ giữ khung/hình thức, không tự sở hữu `display:flex` hoặc `gap`. Bằng chứng: test `unsavedChanges` và `layoutSpacing`.
 - [x] [Tự động] Refactor layout Sync Settings: toggle, schedule row, parent login row, child login group và detail inputs dùng primitive owner đúng cấp. Bằng chứng: `fbmSync/Sidebar` kiểm tra toggle, schedule và login parent là `row`, child group là `box` mang policy `RowGroup`; `layoutSpacing` kiểm tra schedule không còn Grid và detail group không tự sở hữu gap.
-- [ ] [Tự động] Giữ DetailField dạng dọc nếu label nằm trên control; không ép mọi layout thành Row ngang.
+- [x] [Tự động] Giữ DetailField dạng dọc nếu label nằm trên control; `detailField` dùng `RowGroup` và chỉ giữ class hình thức `min-width`. Bằng chứng: `tests/cases/fbmSync/Sidebar.js` và `layoutSpacing`.
 - [x] [Tự động] Cho phép RowGroup lồng RowGroup cho nhóm tùy chọn con; kiểm tra indentation là policy wrapper, không phải margin tùy ý trong schema. Bằng chứng: login policy dùng `RowGroup` cho children/retry group; `layoutSpacing` chặn `margin-left` cũ của wrapper children.
 - [x] [Tự động] Các component Loading/Empty/Notice/Table/Pipeline/Conflict/Status giữ preset đặc thù có lý do, không bị đổi default generic. Bằng chứng: test `fbmSync/Sidebar` kiểm tra Pipeline/Progress vẫn là preset có class riêng; conflict field và status root dùng `RowGroup` nhưng giữ hình thức domain; bảng status vẫn giữ Grid để thẳng cột; test `layoutSpacing` chặn flex/grid/gap lặp lại trong các wrapper này.
 - [x] [Tự động] Tìm và xử lý mọi `Stack(`, `shin-stack`, `UI_LAYOUT_POLICY.stack` theo quyết định canonical; không để consumer cũ tạo owner thứ hai.
 
 ## I. Dọn hardcode và contract chống tái phạm
 
-- [ ] [Tự động] Quét toàn bộ screen schema tìm `className`, `rootClass`, `classes`, `*Class`, `style`, selector DOM và alignment tự do.
-- [ ] [Tự động] Quét CSS màn hình tìm margin/gap dùng để điều khiển sibling spacing; phân loại thành lỗi cần xóa hoặc ngoại lệ có owner.
+- [x] [Tự động] Quét toàn bộ screen schema tìm `className`, `rootClass`, `classes`, `*Class`, `style`, selector DOM và alignment tự do. Bằng chứng: `tests/cases/screenSchemaAudit.js` và `tests/cases/uiSchema.js`.
+- [x] [Tự động] Quét CSS màn hình tìm margin/gap dùng để điều khiển sibling spacing; phân loại thành lỗi cần xóa hoặc ngoại lệ có owner. Bằng chứng: `tests/cases/layoutSpacing.js`, `fbmSync/Components.js` và audit allowlist.
 - [x] [Tự động] Xóa hardcode gây lệch mép phải của nhóm toggle khi wrapper full-width đi cùng margin ngang; chuyển indentation vào policy wrapper nếu cần. Bằng chứng: `.shin-sync-login-policy-children` chỉ còn padding/border; `layoutSpacing` chặn lại `margin-left` và selector margin con.
-- [ ] [Tự động] Với mọi ngoại lệ còn lại, ghi consumer, lý do, owner, selector và test trong allowlist.
-- [ ] [Tự động] Bổ sung contract test chặn primitive con tự thêm margin ngoài.
-- [ ] [Tự động] Bổ sung contract test chặn Row generic tự `space-between` hoặc nhận alignment không thuộc preset.
-- [ ] [Tự động] Bổ sung contract test chặn thêm primitive/layout function mới trùng owner đã có.
-- [ ] [Tự động] Bổ sung contract test kiểm tra nested Row chỉ xuất hiện ở vị trí cell/block hợp lệ.
-- [ ] [Tự động] Bổ sung contract test schema `rows` luôn map đúng số lượng Row và thứ tự field.
+- [x] [Tự động] Với mọi ngoại lệ còn lại, ghi consumer, lý do, owner, selector và test trong allowlist `Ghi chú tạm audit class và component UI.md` mục 10.
+- [x] [Tự động] Bổ sung contract test chặn primitive con tự thêm margin ngoài. Bằng chứng: `layoutSpacing` kiểm tra Row/Field/Toggle/Button/Icon và reset margin chỉ ở wrapper owner.
+- [x] [Tự động] Bổ sung contract test chặn Row generic tự `space-between` hoặc nhận alignment không thuộc preset. Bằng chứng: `uiBuilder` và `layoutSpacing`.
+- [x] [Tự động] Bổ sung contract test chặn thêm primitive/layout function mới trùng owner đã có. Bằng chứng: `uiBuilder` xác nhận không có `Stack`, chỉ có `RowGroup` và `ActionStack` dùng lại wrapper canonical.
+- [x] [Tự động] Bổ sung contract test kiểm tra nested Row chỉ xuất hiện ở vị trí cell/block hợp lệ. Bằng chứng: `uiBuilder` kiểm tra nested Row là phần tử của Row và RowGroup chỉ nhận Row.
+- [x] [Tự động] Bổ sung contract test schema `rows` luôn map đúng số lượng Row và thứ tự field. Bằng chứng: `tests/cases/uiBuilder.js` và `tests/cases/uiSchema.js`.
 
 ## J. Kiểm thử hồi quy
 
-- [ ] [Tự động] Chạy nhóm test `uiBuilder`, `screenBuild`, `blockKeys`, `schemaCheck`, `renderEngine` sau primitive/resolver.
-- [ ] [Tự động] Chạy nhóm test `layoutSpacing`, `fbmSync/Components`, `fbmSync/Sidebar`, `formScreen`, `viewScreen`, `uiSchema` sau migration component.
-- [ ] [Tự động] Chạy `node tests/run.js`; chỉ tick khi toàn bộ test xanh và ghi tổng số test cụ thể.
+- [x] [Tự động] Chạy nhóm test `uiBuilder`, `screenBuild`, `blockKeys`, `schemaCheck`, `renderEngine` sau primitive/resolver; nằm trong bộ chạy `node tests/run.js`.
+- [x] [Tự động] Chạy nhóm test `layoutSpacing`, `fbmSync/Components`, `fbmSync/Sidebar`, `formScreen`, `viewScreen`, `uiSchema` sau migration component; nằm trong bộ chạy `node tests/run.js`.
+- [x] [Tự động] Chạy `node tests/run.js`: `1937 đạt, 0 không đạt`.
 - [ ] [Tự động] Kiểm tra diff không chạm fixture `0_Documentation/Nghiên cứu FBM/`.
 - [ ] [Tự động] Kiểm tra diff từng commit chỉ chứa checklist/tài liệu/code/test thuộc nhóm đang commit.
 - [ ] [Tự động] Kiểm tra không có cookie, password, token, payload nhạy cảm hoặc dữ liệu khách thật trong diff/test/log.

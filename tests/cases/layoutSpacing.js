@@ -22,7 +22,7 @@ function chay(so) {
   const builder = docTep('client/ui/uiBuilder.html');
   const renderer = docTep('client/ui/renderEngine.html');
   const row = rule(components, '.shin-row {');
-  const rowGroup = rule(components, '.shin-box.shin-row-group,');
+  const rowGroup = rule(components, '.shin-box.shin-row-group {');
   const cardBody = rule(components, '.shin-card-body {');
   const sectionStyle = rule(components, '.shin-section {');
   const formField = rule(components, '.shin-form-field {');
@@ -35,11 +35,11 @@ function chay(so) {
   check(so, 'spacing token có đúng một nguồn khai báo',
     (tokens.match(/^\s*--shin-gap-[1-5]\s*:/gm) || []).length, 5);
   check(so, 'Row sở hữu khoảng cách ngang bằng gap, không dùng margin sibling',
-    [row.indexOf('gap: var(--shin-gap-2);') >= 0, components.indexOf('.shin-row > * + *') === -1],
-    [true, true]);
+    [row.indexOf('gap: var(--shin-gap-2);') >= 0, components.indexOf('.shin-row > * + *') === -1, row.indexOf('border') === -1],
+    [true, true, true]);
   check(so, 'RowGroup và ActionStack sở hữu nhịp dọc, reset margin của con trực tiếp',
       [rowGroup.indexOf('gap: var(--shin-gap-2);') >= 0,
-      components.indexOf('.shin-row-group > *,\n.shin-action-stack > * { margin: 0; }') >= 0,
+      components.indexOf('.shin-row-group > * { margin: 0; }') >= 0,
       components.indexOf('.shin-row-group > * + *') === -1,
       components.indexOf('.shin-action-stack > * + *') === -1],
     [true, true, true, true]);
@@ -66,9 +66,11 @@ function chay(so) {
   check(so, 'Field/Toggle không tự cộng margin ngoài khi nằm trong layout wrapper',
     [formField.indexOf('gap: var(--shin-gap-1);') >= 0,
       formField.indexOf('margin-bottom') === -1,
-      toggleRow.indexOf('gap: var(--shin-gap-2);') >= 0,
+      toggleRow.indexOf('justify-content: space-between;') >= 0,
+      toggleRow.indexOf('display: flex') === -1,
+      toggleRow.indexOf('gap: var') === -1,
       toggleRow.indexOf('margin: var') === -1],
-    [true, true, true, true]);
+    [true, true, true, true, true, true]);
   check(so, 'control-row có căn dọc riêng và không đổi Row generic',
       [components.indexOf('.shin-inline-field-row { align-items: center; }') >= 0,
       row.indexOf('align-items: center') >= 0],
@@ -101,25 +103,31 @@ function chay(so) {
   check(so, 'ActionStack là wrapper duy nhất căn nhóm action',
     [components.indexOf('.shin-box.shin-action-stack { align-items: center; }') >= 0,
       components.indexOf('.shin-action-stack > * { width: min(100%, 220px); }') >= 0,
+      components.indexOf('.shin-box.shin-action-stack { display:') === -1,
+      components.indexOf('.shin-box.shin-action-stack { flex-direction:') === -1,
+      components.indexOf('.shin-box.shin-action-stack { gap:') === -1,
       components.indexOf('.shin-button {') >= 0 && button.indexOf('margin') === -1],
-    [true, true, true]);
+    [true, true, true, true, true, true]);
   check(so, 'Sync layout đặc thù dùng Row/RowGroup làm owner spacing',
     [shell.indexOf('.shin-sync-connection-section { display:grid; gap:var(--shin-gap-2);') === -1,
       shell.indexOf('.shin-sync-schedule-row { display:grid;') === -1,
       shell.indexOf('.shin-sync-schedule-row > .shin-standalone-control:first-child { flex:0 0 var(--shin-sync-schedule-control-width); }') >= 0,
       shell.indexOf('.shin-sync-detail-controls { display:grid;') === -1,
-      settings.indexOf('.shin-sync-detail-field { display: grid; gap: var(--shin-gap-1);') >= 0,
+      settings.indexOf('.shin-sync-detail-field { min-width: 0; }') >= 0,
+      settings.indexOf('.shin-sync-detail-field { display:') === -1,
+      settings.indexOf('.shin-sync-detail-field { gap:') === -1,
       settings.indexOf('.shin-sync-detail-inputs { display: grid;') === -1],
-    [true, true, true, true, true, true]);
+    [true, true, true, true, true, true, true, true]);
   check(so, 'Sync layout đặc thù có owner vị trí và token domain duy nhất',
     [shell.indexOf('--shin-sync-schedule-control-width:42px;') >= 0,
       shell.indexOf('.shin-sync-schedule-row > .shin-kv-label { flex:1 1 0; }') >= 0,
       shell.indexOf('margin-left:var(--shin-sync-schedule-control-width)') >= 0,
       shell.indexOf('.shin-sync-tab-trigger') >= 0 && shell.indexOf('text-align:center;') >= 0,
       shell.indexOf('.shin-sync-tab-description') >= 0 && shell.indexOf('text-align:center;') >= 0,
-      shell.indexOf('.shin-sync-conflict-head') >= 0 && shell.indexOf('justify-content:space-between;') >= 0,
+      shell.indexOf('.shin-sync-conflict-head { justify-content:space-between; }') >= 0,
+      shell.indexOf('.shin-sync-conflict-head { display:') === -1,
       components.indexOf('.shin-pagination .shin-button { width: 100%;') >= 0],
-    [true, true, true, true, true, true, true]);
+    [true, true, true, true, true, true, true, true]);
   check(so, 'Sync status, pipeline, results và conflict không dùng margin để cộng sibling spacing',
     [shell.indexOf('.shin-sync-phase { margin') === -1,
       shell.indexOf('.shin-sync-operation, .shin-sync-count, .shin-sync-current, .shin-sync-message { margin') === -1,

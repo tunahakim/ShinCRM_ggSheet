@@ -33,6 +33,9 @@ function chay(so) {
     Object.keys(hop.UI_LAYOUT_POLICY).some((name) => /left|right/i.test(JSON.stringify(hop.UI_LAYOUT_POLICY[name]))), false);
   checkThrows(so, 'layout policy thiếu tên thì bị chặn sớm',
     () => hop.uiLayoutClass('middle'), 'Không có layout policy');
+  check(so, 'RowGroup là implementation dọc canonical, không còn Stack song song',
+    [typeof hop.Stack, typeof hop.RowGroup, typeof hop.ActionStack],
+    ['undefined', 'function', 'function']);
 
   check(so, 'Text, Button, Icon, Check nhận thẳng chuỗi cho gọn',
     [hop.Text('chữ').text, hop.Button('LƯU').label, hop.Icon('pencil').icon, hop.Check('ACT-000009').pick], ['chữ', 'LƯU', 'pencil', 'ACT-000009']);
@@ -53,10 +56,16 @@ function chay(so) {
     hop.Icon({ icon: 'bolt', toggle: 'followSelection' }).toggle, 'followSelection');
 
   check(so, 'Row nhận thẳng mảng con', hop.Row([hop.Text('a')]).elements.length, 1);
+  checkThrows(so, 'Row không nhận alignment tự do từ caller',
+    () => hop.Row({ elements: [hop.Text('a')], align: 'left' }), 'không có khóa "align"');
   const rowGroup = hop.RowGroup([hop.Row([hop.Text('a')]), hop.Row([hop.Text('b')])]);
   check(so, 'RowGroup là wrapper box duy nhất cho một hoặc nhiều Row',
     [rowGroup.role, rowGroup.className, rowGroup.elements.length, rowGroup.elements.every((item) => item.role === 'row')],
     ['box', 'shin-row-group', 2, true]);
+  const actionStack = hop.ActionStack([hop.Row([hop.Text('lệnh')])]);
+  check(so, 'ActionStack dùng lại wrapper RowGroup và chỉ thêm preset semantic',
+    [actionStack.role, actionStack.className, actionStack.elements[0].role],
+    ['box', 'shin-row-group shin-action-stack', 'row']);
   const nestedRow = hop.Row([hop.Row([hop.Text('trái')]), hop.Text('phải')]);
   check(so, 'Row lồng Row chỉ xuất hiện như một cell layout độc lập',
     [nestedRow.role, nestedRow.elements[0].role, nestedRow.elements[1].role],

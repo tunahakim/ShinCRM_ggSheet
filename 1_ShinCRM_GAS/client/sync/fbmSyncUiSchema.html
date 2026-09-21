@@ -66,7 +66,7 @@ var FBM_SYNC_SETTINGS_UI = {
     inlineField: function (className, label, control) { return Row({ className: className, elements: [label, control] }); },
     toggle: function (className, label, control) { return Row({ className: className, elements: [label, control] }); },
     scheduleRow: function (className, toggle, label, minutes) { return Row({ className: className, elements: [toggle, label, minutes] }); },
-    detailField: function (className, label, control) { return Box({ className: className, elements: [label, control] }); },
+    detailField: function (className, label, control) { return RowGroup({ className: className, elements: [label, control] }); },
     detailInputs: function (className, elements) { return Row({ className: className, elements: elements }); },
     detailControls: function (className, fields) { return RowGroup({ className: className, elements: fields }); },
     loginParent: function (id, className, label, control) { return Row({ id: id, className: className, elements: [label, control] }); },
