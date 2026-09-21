@@ -392,6 +392,11 @@ FbmSync.continue = function (rawResponse) {
   if (cursor.kind === 'session_probe') {
     var probedIdentity = FbmSync.identityUser(response);
     if (!probedIdentity.ok) {
+      if (typeof FbmSync.protocol.isUnauthenticatedSessionProbeResponse === 'function' && FbmSync.protocol.isUnauthenticatedSessionProbeResponse(rawResponse)) {
+        var probeRecovery = FbmSync.sessionGateHandleProbeFailure(state, cursor, rawResponse);
+        if (probeRecovery && probeRecovery.request) { return probeRecovery; }
+        if (probeRecovery) { return probeRecovery; }
+      }
       FbmSync.sessionIdentityClear(state);
       state.phase = 'error'; state.cursor = {}; state.lastFailureCode = probedIdentity.code || 'IDENTITY_PROBE_INCOMPLETE';
       state.lastError = probedIdentity.message; state.message = probedIdentity.message; FbmSync.stateWrite(state);

@@ -53,6 +53,15 @@ async function chay(so) {
   const secondStart = heartbeat.FbmSync.start({ mode: 'read', origin: 'manual' });
   check(so, 'moi luot moi probe lai User du khong con cookie cu', [secondStart.request.meta.kind, identityUserRequests, heartbeat.FbmSync.stateRead().session.identityVerified], ['session_probe', 2, false]);
   check(so, 'probe User khong co payload cookie van duoc cap fallback transport tuy chon', [secondStart.request.body.cookie, secondStart.request.meta.transport.replacements[0].required, secondStart.request.meta.transport.replacements[0].fallback], ['{{FBM_PAYLOAD_COOKIE}}', false, '']);
+  const unauthenticatedConfig = JSON.parse(heartbeatData.FBM_LOGIN_CONFIG_V1);
+  unauthenticatedConfig.lastAttemptAt = 0;
+  unauthenticatedConfig.nextRetryAt = 0;
+  heartbeatData.FBM_LOGIN_CONFIG_V1 = JSON.stringify(unauthenticatedConfig);
+  heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: false, identityVerified: false, identitySessionId: '', sessionId: '' } });
+  const unauthenticatedProbe = heartbeat.FbmSync.start({ mode: 'read', origin: 'manual' });
+  const unauthenticatedResult = heartbeat.FbmSync.continue({ ok: true, status: 200, body: JSON.stringify({ d: { TotalRowCount: 0, Rows: null, Repetition: null, Aggregation: null, ViewPage: null, Authorized: false } }), transport: { trace: [{ requestId: unauthenticatedProbe.request.id }] } });
+  check(so, 'probe User Authorized false khong dong bo phai chuyen sang auto-login', [unauthenticatedResult.ok, unauthenticatedResult.request && unauthenticatedResult.request.meta.kind, heartbeat.FbmSync.stateRead().cursor.kind], [true, 'login', 'login']);
+  heartbeat.FbmSync.statePatch({ metadata: { sessionGate: null } });
 
   heartbeat.FbmSync.statePatch({ runId: 'marker-mismatch', phase: 'checking_session', cursor: { kind: 'authorize_customer' }, activeRequestId: '', deadlineAt: 0, session: { expired: false, identityVerified: true, identitySessionId: 'old-session', sessionId: 'new-session' } });
   const markerMismatch = heartbeat.FbmSync.nextEnvelope({ url: 'https://fbm.test/marker-mismatch', body: {}, meta: { kind: 'business_request', requireIdentityProbe: true } });

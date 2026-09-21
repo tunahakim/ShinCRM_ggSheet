@@ -54,6 +54,16 @@ FbmSync.protocol = {
     var status = Number(response && response.status || 0);
     return status === 401 || status === 403;
   },
+  /** FBM có thể trả JSON HTTP 200 nhưng báo chưa xác thực bằng Authorized:false. */
+  isUnauthenticatedSessionProbeResponse: function (response) {
+    var status = Number(response && response.status || 0), parsed, data, rows;
+    if (status !== 200) { return false; }
+    parsed = FbmSync.protocol.parse(response) || {};
+    data = parsed.d || parsed;
+    if (!data || typeof data !== 'object' || data.Authorized !== false) { return false; }
+    rows = data.Rows;
+    return !Array.isArray(rows) || rows.length === 0;
+  },
   /** Tương thích tên cũ cho login adapter; không còn dò chữ Login.aspx trong body. */
   isSessionExpired: function (response) { return !FbmSync.protocol.isLiveSessionResponse(response); },
   /** Heartbeat Customer phải trả đúng shape dữ liệu; response rỗng không được coi là phiên khỏe. */
