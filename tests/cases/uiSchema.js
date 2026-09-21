@@ -126,8 +126,11 @@ function chay(so) {
     MAN.map((m) => [Array.isArray(hop.UI_SCHEMA[m].header && hop.UI_SCHEMA[m].header.start), Array.isArray(hop.UI_SCHEMA[m].header && hop.UI_SCHEMA[m].header.end)]),
     [[true, true], [true, true], [true, true], [true, true]]);
 
-  check(so, 'ba màn form dùng đúng một hàng header chung: hủy bên trái, lưu bên phải',
-    ['customerForm', 'activityForm', 'noteForm'].map((m) => hop.UI_SCHEMA[m].header === hop.UI_FORM_HEADER), [true, true, true]);
+  check(so, 'ba màn form dùng đúng một header chung: nhóm start để builder chèn tiêu đề, nhóm end là Hủy rồi Lưu',
+    [['customerForm', 'activityForm', 'noteForm'].map((m) => hop.UI_SCHEMA[m].header === hop.UI_FORM_HEADER),
+      hop.UI_FORM_HEADER.start.length,
+      hop.UI_FORM_HEADER.end.map((item) => [item.icon, item.tooltip, item.action])],
+    [[true, true, true], 0, [['close', 'Hủy', 'cancelForm'], ['check', 'Lưu', 'saveForm']]]);
 
   // Mọi tên trường phải có thật, ở đúng thực thể mà đường dẫn chỉ tới.
   const truongLa = [];

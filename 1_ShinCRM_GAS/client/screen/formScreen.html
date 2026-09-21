@@ -94,9 +94,9 @@ function screenFormTitle(title, themMoi) {
 }
 
 /**
- * Chèn tiêu đề vào nhóm start của header — ra `[X][tiêu đề]…[✓]`, đúng bố cục form mà không cần marker align.
+ * Chèn tiêu đề vào nhóm start của header — ra `[tiêu đề]…[X][✓]`, đúng bố cục form mà không cần marker align.
  *
- * Chèn thay vì khai thẳng trong `UI_SCHEMA` vì tiêu đề phụ thuộc bản ghi đang mở, mà `UI_SCHEMA` là bản khai tĩnh. Vắng mục căn phải thì nối vào cuối.
+ * Chèn thay vì khai thẳng trong `UI_SCHEMA` vì tiêu đề phụ thuộc bản ghi đang mở, mà `UI_SCHEMA` là bản khai tĩnh. Nhóm end và thứ tự action do schema dùng chung sở hữu.
  */
 function screenFormHeader(header, tieuDe) {
   var source = header || {}, start = Array.isArray(source.start) ? source.start.slice() : [], end = Array.isArray(source.end) ? source.end.slice() : [];

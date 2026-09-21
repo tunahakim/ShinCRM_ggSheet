@@ -61,17 +61,21 @@ function chay(so) {
 
   const hangDecl = hop.screenFormHeader(hop.UI_SCHEMA.customerForm.header, 'Thêm Khách Hàng');
   const hang = hop.screenBuild({ entity: 'customer', header: hangDecl }, 'customerForm').header;
-  check(so, 'tiêu đề nằm trong nhóm start, nút Hủy và Lưu nằm trong hai nhóm header chuẩn',
-    [hang.length, hang[0].className, hang[0].elements[0].icon, hang[0].elements[1].text, hang[1].className, hang[1].elements[0].icon],
-    [2, 'shin-header-group shin-header-group-start', 'close', 'Thêm Khách Hàng', 'shin-header-group shin-header-group-end', 'check']);
+  check(so, 'tiêu đề nằm ở start, Hủy rồi Lưu nằm ở end theo đúng thứ tự header form',
+    [hang.length, hang[0].className, hang[0].elements.length, hang[0].elements[0].text,
+      hang[1].className, hang[1].elements.map((node) => [node.icon, node.tooltip, node.action])],
+    [2, 'shin-header-group shin-header-group-start', 1, 'Thêm Khách Hàng',
+      'shin-header-group shin-header-group-end', [['close', 'Hủy', 'cancelForm'], ['check', 'Lưu', 'saveForm']]]);
 
   const activityHang = hop.screenBuild({ entity: 'activity', header: hop.screenFormHeader(hop.UI_SCHEMA.activityForm.header, 'Thêm Giao Dịch') }, 'activityForm').header;
   const noteHang = hop.screenBuild({ entity: 'customer', header: hop.screenFormHeader(hop.UI_SCHEMA.noteForm.header, 'Ghi Chú Khách Hàng') }, 'noteForm').header;
-  check(so, 'form activity và note giữ cùng HeaderGroup: tiêu đề ở start, Lưu ở end, không tạo nhánh căn riêng',
-    [activityHang.map((group) => group.className).join('|'), activityHang[0].elements[1].text, activityHang[1].elements[0].icon,
-      noteHang.map((group) => group.className).join('|'), noteHang[0].elements[1].text, noteHang[1].elements[0].icon],
-    ['shin-header-group shin-header-group-start|shin-header-group shin-header-group-end', 'Thêm Giao Dịch', 'check',
-      'shin-header-group shin-header-group-start|shin-header-group shin-header-group-end', 'Ghi Chú Khách Hàng', 'check']);
+  check(so, 'form activity và note giữ cùng HeaderGroup: tiêu đề ở start, Hủy rồi Lưu ở end',
+    [activityHang.map((group) => group.className).join('|'), activityHang[0].elements[0].text,
+      activityHang[1].elements.map((node) => node.icon).join('|'),
+      noteHang.map((group) => group.className).join('|'), noteHang[0].elements[0].text,
+      noteHang[1].elements.map((node) => node.icon).join('|')],
+    ['shin-header-group shin-header-group-start|shin-header-group shin-header-group-end', 'Thêm Giao Dịch', 'close|check',
+      'shin-header-group shin-header-group-start|shin-header-group shin-header-group-end', 'Ghi Chú Khách Hàng', 'close|check']);
 
   const customerTree = hop.screenBuild(hop.UI_SCHEMA.customerForm, 'customerForm');
   check(so, 'form lõi dùng Card → Row → Field, footer dùng Button save chung',
@@ -90,6 +94,11 @@ function chay(so) {
       els['sidebar-footer'].innerHTML.indexOf('shin-save-wide') > 0,
       els['sidebar-info'].hidden, els['sidebar-footer'].hidden],
     [true, true, true, true, false]);
+
+  const headerHtml = els['sidebar-header'].innerHTML;
+  check(so, 'form render giữ thứ tự trực quan tiêu đề, Hủy, Lưu trong cùng header',
+    [headerHtml.indexOf('Sửa Khách Hàng') < headerHtml.indexOf('shin-form-cancel'),
+      headerHtml.indexOf('shin-form-cancel') < headerHtml.indexOf('shin-form-save')], [true, true]);
 
   check(so, 'ô nhập đầu tiên bỏ qua trường mà DATA_SCHEMA khóa: mã khách chỉ-đọc nên con trỏ về tên khách',
     raSua.focusId, 'shin-f-customer-companyName');
