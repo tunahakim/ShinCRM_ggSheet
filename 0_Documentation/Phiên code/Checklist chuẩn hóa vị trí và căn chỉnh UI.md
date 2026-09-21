@@ -26,7 +26,7 @@
 - [x] Chốt Button: kích thước/vị trí ngoài do wrapper; nội dung chữ và icon bên trong Button căn giữa.
 - [x] Chốt Icon/IconButton: glyph căn giữa trong vùng của chính nó; Icon không tự tạo khoảng cách với sibling.
 - [x] Chốt ActionStack: nhóm action được đặt ở vị trí cuối của vùng hành động theo preset tập trung; từng Button không tự nhận biết mình nằm bên phải.
-- [x] Chốt Header: nhóm đầu, tiêu đề và nhóm cuối được biểu diễn bằng cấu trúc nhóm; không dùng một item đánh dấu `align` để tạo khoảng trống.
+- [x] Chốt Header: cấu trúc nhóm sở hữu vị trí, không dùng một item đánh dấu `align`; riêng form header chốt thứ tự `tiêu đề | Hủy | Lưu`, với `Lưu` ngoài cùng bên phải.
 - [x] Chốt Notice/Error/Preview: nội dung bắt đầu từ `start`; icon trạng thái và nút đóng do component đặc thù sở hữu.
 - [x] Chốt Loading/Empty state: được căn giữa chỉ vì trạng thái này có ý nghĩa hiển thị rỗng/chờ; không dùng làm mặc định cho Stack/Card.
 - [x] Chốt bảng: căn cột theo ý nghĩa dữ liệu do Table resolver sở hữu; chữ bắt đầu, số kết thúc, cột action theo preset Table.
@@ -61,7 +61,7 @@ Ghi chú kiểm kê: `align` đang được khai tại `client/schema/screens/fo
 - [x] Kiểm tra `0_Documentation/Phiên code/Cây thư mục code.md`: không phát sinh file hoặc thư mục mới cho layout policy/test, nên không cần cập nhật cây.
 - [x] Ghi commit tài liệu riêng sau khi các tài liệu trên không còn mâu thuẫn với quyết định phiên này.
 
-Ghi chú tiến độ: tài liệu nền đã cập nhật; core/header, Sync shell, ActionStack Account, Empty và token schedule đã được commit riêng. Policy semantic hiện nằm trong `UI_LAYOUT_POLICY` của `client/ui/uiBuilder.html`; nhóm policy đã commit `343b422`, nhóm hồi quy form/view/card đã commit `1f385b7`; test offline gần nhất đạt `1920/1920`; GAS DEV probe Sidebar đạt ở revision `@480`. Còn nghiệm thu trực quan DEV.
+Ghi chú tiến độ: tài liệu nền đã cập nhật; core/header, Sync shell, ActionStack Account, Empty và token schedule đã được commit riêng. Policy semantic hiện nằm trong `UI_LAYOUT_POLICY` của `client/ui/uiBuilder.html`; nhóm policy đã commit `343b422`, nhóm hồi quy form/view/card đã commit `1f385b7`; test offline gần nhất đạt `1920/1920`; GAS DEV probe Sidebar đạt ở revision `@480`. Hợp đồng form header vừa chốt lại thành `tiêu đề | Hủy | Lưu`; code/test migration còn chờ thực hiện. Còn nghiệm thu trực quan DEV.
 
 ## 5. Primitive và layout policy
 
@@ -81,11 +81,11 @@ Ghi chú tiến độ: tài liệu nền đã cập nhật; core/header, Sync sh
 
 ## 6. Migration screen schema và builder
 
-- [x] Đổi form header từ danh sách phẳng có `align` sang cấu trúc nhóm start/end; giữ nguyên action, tooltip và thứ tự trong từng nhóm. Bằng chứng: `client/schema/screens/formHeader.html` và test form.
+- [ ] Đổi form header sang cấu trúc nhóm với `start` chỉ chứa tiêu đề động và `end` chứa đúng thứ tự `[Hủy, Lưu]`; giữ nguyên action/tooltip. Tài liệu đã chốt; code/schema/test migration còn chờ.
 - [x] Đổi view header sang cấu trúc nhóm start/end; giữ nguyên thứ tự các nút tìm kiếm, refresh, menu, sửa và thêm. Bằng chứng: `client/schema/screens/view.html` và `tests/cases/uiSchema.js`.
 - [x] Cập nhật screen builder để dựng HeaderGroup từ cấu trúc nhóm, không chuyển tiếp khóa `align` xuống Block. Bằng chứng: `screenHeader`/`screenHeaderGroup` và test cây header.
 - [x] Cập nhật screen builder để từ chối header cấu trúc sai, thiếu nhóm hoặc item không hợp lệ bằng thông báo cụ thể. Bằng chứng: các ca header thiếu nhóm, nhóm lạ, nhóm không phải mảng và item `align` trong `tests/cases/uiBuilder.js`.
-- [x] Cập nhật chèn tiêu đề form để tiêu đề nằm trong nhóm start giữa nút đóng và nhóm action cuối, không dò vị trí bằng `align`. Bằng chứng: `screenFormHeader` và `tests/cases/formScreen.js`.
+- [ ] Cập nhật chèn tiêu đề form để cây header thành `start: [tiêu đề]`, `end: [Hủy, Lưu]`; không dò vị trí bằng `align`. Tài liệu đã chốt; `screenFormHeader` và test còn chờ migration.
 - [x] Cập nhật schema checker để quét cả item trong nhóm header và vẫn kiểm action/menu/tooltip như trước. Bằng chứng: `tests/cases/schemaCheck.js` và toàn bộ test xanh.
 - [x] Cập nhật Block key contract: Button/Icon không còn nhận `align` từ screen schema; các khóa lạ vẫn bị chặn. Bằng chứng: `BLOCK_KEYS_BY_ROLE` và `tests/cases/blockKeys.js`.
 - [x] Cập nhật renderer: node lá không còn sinh class `shin-align-right`; HeaderGroup mới là nơi sinh cấu trúc vị trí. Bằng chứng: `renderClassList`, CSS HeaderGroup và test render/layout.
@@ -96,9 +96,9 @@ Ghi chú tiến độ: tài liệu nền đã cập nhật; core/header, Sync sh
 
 ## 7. Chuẩn hóa các màn hình và component dùng chung
 
-- [x] Kiểm tra form customer: tiêu đề, nút hủy, nút lưu header và footer giữ đúng vị trí sau khi bỏ `align`. Bằng chứng: ca header `formScreen` và ca render footer trong `tests/cases/formScreen.js`.
-- [x] Kiểm tra form activity: cùng header/footer contract với customer, không tạo nhánh căn riêng. Bằng chứng: ca `form activity và note giữ cùng HeaderGroup` trong `tests/cases/formScreen.js`, cùng identity `UI_FORM_HEADER` trong `tests/cases/uiSchema.js`.
-- [x] Kiểm tra note form: title/action và textarea không bị đổi owner vị trí. Bằng chứng: ca HeaderGroup note trong `tests/cases/formScreen.js`, ca `noteForm` field/class trong `tests/cases/uiSchema.js`.
+- [ ] Kiểm tra form customer: thứ tự mới là tiêu đề trái, Hủy bên phải, Lưu ngoài cùng bên phải; footer giữ nguyên. Test cũ đang chứng minh hợp đồng trước và phải cập nhật.
+- [ ] Kiểm tra form activity: dùng cùng header/footer contract mới với customer, không tạo nhánh căn riêng.
+- [ ] Kiểm tra note form: title/action theo thứ tự mới và textarea không bị đổi owner vị trí.
 - [x] Kiểm tra view: nhóm công cụ đầu và nhóm hành động cuối không bị dồn hoặc đảo thứ tự. Bằng chứng: ca header view trong `tests/cases/uiSchema.js` và render vùng header trong `tests/cases/viewScreen.js`.
 - [x] Kiểm tra Card titleActions: dùng wrapper action chuẩn của Card; không dùng `align` lá để đẩy icon. Bằng chứng: `.shin-card-actions` và không có `.shin-align-right` trong `tests/cases/renderEngine.js`.
 - [x] Kiểm tra Run: action kiểm tra, chạy, settings và approval dùng wrapper semantic tương ứng. Bằng chứng: ActionStack + hai `shin-single-action-row` trong `tests/cases/fbmSync/Sidebar.js`.
@@ -110,6 +110,7 @@ Ghi chú tiến độ: tài liệu nền đã cập nhật; core/header, Sync sh
 - [x] Với mỗi ngoại lệ domain, ghi consumer, lý do, selector/component owner và test bảo vệ ngay trong checklist hoặc allowlist. Bằng chứng: allowlist Tài liệu 04 Phần 6, hợp đồng Sync Tài liệu 09 Phần 8 và ca domain trong `layoutSpacing`/`fbmSync/Sidebar`.
 - [x] Chạy test layout/UI sau từng màn hình; tick các mục đã kiểm chứng sau khi `node tests/run.js` đạt `1918`, lỗi `0`.
 - [x] Commit riêng từng nhóm màn hình nếu diff độc lập; nhóm form/view/card đã commit `1f385b7`, không đưa thay đổi FBM session/pipeline có sẵn vào commit.
+- [ ] Commit migration form header theo hợp đồng mới `start: [tiêu đề]`, `end: [Hủy, Lưu]` và cập nhật test/checklist ngay sau khi code xanh.
 
 ## 8. Hợp đồng chống tái phạm
 
@@ -158,7 +159,7 @@ Ghi chú tiến độ: tài liệu nền đã cập nhật; core/header, Sync sh
 ## 11. Tiêu chí hoàn tất phiên
 
 - [x] Không còn screen schema nào dùng alignment tự do. Bằng chứng: `uiSchema`, `screenSchemaAudit` và bộ `node tests/run.js` đạt `1920/1920`.
-- [x] Header form/view dùng cấu trúc nhóm thay vì marker `align` trên item lá. Bằng chứng: `UI_FORM_HEADER`, `screenHeaderGroup` và test form/view.
+- [ ] Header form dùng cấu trúc nhóm với thứ tự `start: [tiêu đề]`, `end: [Hủy, Lưu]`; Header view vẫn dùng cấu trúc nhóm thay vì marker `align` trên item lá. Form migration còn chờ.
 - [x] Primitive/layout catalog là nơi duy nhất sở hữu mặc định alignment generic. Bằng chứng: `UI_LAYOUT_POLICY`/`uiLayoutClass` trong `client/ui/uiBuilder.html` và test policy.
 - [x] Ngoại lệ domain có owner, consumer, lý do và test. Bằng chứng: allowlist Tài liệu 04 Phần 6, hợp đồng Sync Tài liệu 09 Phần 8 và ca domain tương ứng.
 - [x] Test contract chặn việc thêm lại alignment tự do vào schema. Bằng chứng: `loiAlignmentSchema` và các ca header sai trong `tests/cases/uiSchema.js`, `tests/cases/uiBuilder.js`.
