@@ -158,5 +158,5 @@
 - [x] [Tự động] Đối chiếu toàn bộ consumer `RowGroup` và ghi nhận các trường hợp truyền Block trực tiếp; xác định đây là hàng một ô hợp lệ, không phải owner layout thứ hai.
 - [x] [Tự động] Cập nhật tài liệu chính thức 03, 03A và 04 để dùng cùng định nghĩa row item với runtime.
 - [x] [Tự động] Bổ sung test hồi quy cho `RowGroup([Row(...)])`, `RowGroup([Text(...)])` và `RowGroup([Box(...)])`; test `uiBuilder` xác nhận `1938 đạt, 0 không đạt`, spacing vẫn do RowGroup sở hữu và nested Row chỉ nằm trong cell khi cần.
-- [ ] [Tự động] Chạy `node tests/run.js`, ghi tổng số đạt/không đạt và commit riêng nhóm contract.
+- [x] [Tự động] Chạy `node tests/run.js`: `1938 đạt, 0 không đạt`; commit riêng nhóm contract là `3e63dc2`.
 - [ ] [Cần kiểm chứng thật] Sau commit contract, mở Sidebar DEV và kiểm tra một nhóm chỉ có Block đơn không đổi hình thức hoặc thứ tự hiển thị.
