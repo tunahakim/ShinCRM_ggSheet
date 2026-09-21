@@ -29,6 +29,13 @@ FbmSync.writeEnabled = function (mode) { return FbmSync.canWriteFbm(mode); };
 // FBM có thể đặt dấu nháy trong script trang dưới dạng \" hoặc ". GAS cấp pattern,
 // Extension chỉ áp dụng nguyên trạng nên không được để hai nơi tự giữ pattern riêng.
 FbmSync.PAYLOAD_COOKIE_CAPTURE_PATTERN = String.raw`\\?['"]cookie\\?['"]\s*[:=]\s*\\?['"]([^'"\\]+FHN_CRM_App)\\?['"]`;
+/** Probe may run on Login.aspx before the page exposes a payload cookie. */
+FbmSync.sessionProbeTransport = function () {
+  return {
+    captures: [{ name: 'payloadCookie', source: 'page_html', pattern: FbmSync.PAYLOAD_COOKIE_CAPTURE_PATTERN, flags: 'i', group: 1 }],
+    replacements: [{ token: '{{FBM_PAYLOAD_COOKIE}}', capture: 'payloadCookie', source: 'page_html', required: false, fallback: '' }]
+  };
+};
 /** Chỉ trả dữ liệu JSON thuần qua google.script.run; Date phải về dạng .NET của FBM. */
 if (typeof FbmSync.transportValue !== 'function') {
   FbmSync.transportValue = function (value) {
@@ -414,6 +421,9 @@ FbmSync.nextEnvelope = function (request) {
       request = gateRequest;
       pendingState = FbmSync.stateRead();
     }
+    // Cổng có thể thay request authorize/nghiệp vụ bằng probe; transport phải
+    // được chọn theo request thực tế sẽ gửi, không theo request caller ban đầu.
+    requestKind = String(request.meta && request.meta.kind || requestKind);
   } catch (gateError) {
     return FbmSync.sessionGateFailClosed(pendingState);
   }
@@ -432,10 +442,13 @@ FbmSync.nextEnvelope = function (request) {
   var id = now.toString(36) + (sequence ? '-' + sequence.toString(36) : ''), state = FbmSync.stateRead ? FbmSync.stateRead() : {}, meta = Object.assign({}, request.meta || {});
   meta.trace = Object.assign({}, meta.trace || {}, { runId: String(state.runId || ''), requestId: id });
   // Extension chỉ có bộ lọc generic; GAS quyết định rõ dữ liệu phụ trợ cần lấy từ tab.
-  meta.transport = Object.assign({
-    captures: [{ name: 'payloadCookie', source: 'page_html', pattern: FbmSync.PAYLOAD_COOKIE_CAPTURE_PATTERN, flags: 'i', group: 1 }],
-    replacements: [{ token: '{{FBM_PAYLOAD_COOKIE}}', capture: 'payloadCookie', source: 'page_html' }]
-  }, meta.transport || {});
+  var defaultTransport = ['session_probe', 'identity_user_grid'].indexOf(requestKind) >= 0 && typeof FbmSync.sessionProbeTransport === 'function'
+    ? FbmSync.sessionProbeTransport()
+    : {
+      captures: [{ name: 'payloadCookie', source: 'page_html', pattern: FbmSync.PAYLOAD_COOKIE_CAPTURE_PATTERN, flags: 'i', group: 1 }],
+      replacements: [{ token: '{{FBM_PAYLOAD_COOKIE}}', capture: 'payloadCookie', source: 'page_html' }]
+    };
+  meta.transport = Object.assign(defaultTransport, meta.transport || {});
   if (state.scan === 'detail' && state.backgroundDetail) {
     var detail = state.backgroundDetail, minDelay = Math.max(0, Number(detail.minDelaySeconds || 0)), maxDelay = Math.max(minDelay, Number(detail.maxDelaySeconds === undefined ? minDelay : detail.maxDelaySeconds));
     if (isFinite(minDelay) && isFinite(maxDelay) && maxDelay > 0) { meta.waitMs = Math.round((minDelay + Math.random() * (maxDelay - minDelay)) * 1000); }

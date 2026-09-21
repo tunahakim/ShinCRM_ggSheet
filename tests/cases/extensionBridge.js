@@ -398,6 +398,7 @@ async function chay(so) {
     let invalidReply = null;
     let validReply = null;
     let sentBody = null;
+    let probeBody = null;
     let responseText = '{"d":{}}';
     let responseStatus = 200;
     let responseOk = true;
@@ -411,7 +412,7 @@ async function chay(so) {
       console: { log() {}, warn() {} }, Date, URL, Promise, Error, AbortController, setTimeout, clearTimeout,
       Blob, Response, TextDecoder, TextEncoder, DecompressionStream: undefined,
       document: { documentElement: { innerHTML: '', textContent: String.raw`var payload={\"cookie\":\"461020379855cFHN_CRM_App\"};` } },
-      fetch(url, options) { fetchCalls += 1; sentBody = options && options.body; return Promise.resolve(response); },
+      fetch(url, options) { fetchCalls += 1; sentBody = options && options.body; if (String(url).indexOf('/GetGridViewPage') >= 0) { probeBody = sentBody; } return Promise.resolve(response); },
       chrome: { runtime: { onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
     };
     vm.createContext(context);
@@ -425,6 +426,13 @@ async function chay(so) {
         listener({ type: 'FBM_EXECUTE_V2', request: { url: 'https://fbo.com.vn:8888/Main/customer', method: 'POST', bodyText: '{"cookie":"{{FBM_PAYLOAD_COOKIE}}"}', meta: { transport: { captures: [{ name: 'payloadCookie', source: 'page_html', pattern: payloadCookieCapturePattern(), flags: 'i', group: 1 }], replacements: [{ token: '{{FBM_PAYLOAD_COOKIE}}', capture: 'payloadCookie', source: 'page_html' }] } } } }, null, (reply) => {
           setTimeout(() => {
             check(so, 'executor lay capture generic do GAS cap tu text trang co dau nhay escape', [fetchCalls, sentBody, reply && reply.result && reply.result.status], [2, '{"cookie":"461020379855cFHN_CRM_App"}', 200]);
+            context.document.documentElement.innerHTML = '';
+            context.document.documentElement.textContent = '';
+            listener({ type: 'FBM_EXECUTE_V2', request: { url: 'https://fbo.com.vn:8888/Main/GetGridViewPage', method: 'POST', bodyText: '{"cookie":"{{FBM_PAYLOAD_COOKIE}}"}', meta: { kind: 'session_probe', transport: { captures: [{ name: 'payloadCookie', source: 'page_html', pattern: payloadCookieCapturePattern(), flags: 'i', group: 1 }], replacements: [{ token: '{{FBM_PAYLOAD_COOKIE}}', capture: 'payloadCookie', source: 'page_html', required: false, fallback: '' }] } } } }, null, (probeReply) => {
+              setTimeout(() => {
+                check(so, 'executor gui probe khi Login.aspx chua co payload cookie bang cookie rong, khong chặn truoc fetch', [fetchCalls, probeBody, probeReply && probeReply.result && probeReply.result.status, probeReply && probeReply.code], [4, '{"cookie":""}', 200, undefined]);
+              }, 20);
+            });
             responseText = JSON.stringify({ d: { Authorized: 'auth-c', UserId: '2037', UserName: 'ANHLT', AccountName: 'Le Tuan Anh', Huge: 'x'.repeat(5000) } });
             listener({ type: 'FBM_EXECUTE_V2', request: { url: 'https://fbo.com.vn:8888/Main/authorize', method: 'POST', bodyText: '{}', meta: { transport: { jsonPaths: ['d.Authorized', 'd.UserId', 'd.UserName', 'd.AccountName'] } } } }, null, (projectedReply) => {
               setTimeout(() => {

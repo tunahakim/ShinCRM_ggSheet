@@ -54,7 +54,11 @@
     var transport = request && request.transport || request && request.meta && request.meta.transport || {}, replacements = Array.isArray(transport.replacements) ? transport.replacements : [], values = captureTransportValues(request, '', ''), output = bodyText;
     replacements.forEach(function (replacement) {
       var item = replacement || {}, token = String(item.token || ''), value = values[String(item.capture || '')];
-      if (!token || value === undefined || value === null) { return; }
+      if (!token) { return; }
+      if (value === undefined || value === null) {
+        if (item.required === false) { output = String(output).split(token).join(String(item.fallback === undefined ? '' : item.fallback)); }
+        return;
+      }
       output = String(output).split(token).join(String(value));
     });
     return output;
