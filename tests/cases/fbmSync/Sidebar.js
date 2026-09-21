@@ -185,7 +185,7 @@ async function chay(so) {
   const runCard = runBlocks[0], runActionRegion = runCard.elements.filter((node) => node && node.id === 'fbm-sync-run-action-region')[0];
   check(so, 'Các action Run đi qua ActionStack lõi có hai Row con và nhịp dọc dùng chung', [runActionRegion.elements[0].role, runActionRegion.elements[0].className, runActionRegion.elements[0].elements.length, runActionRegion.elements[0].elements[0].className, runActionRegion.elements[0].elements[1].className], ['box', 'shin-action-stack', 2, 'shin-single-action-row', 'shin-single-action-row']);
   const runDetailsRegion = runBlocks.filter((node) => node && node.id === 'fbm-sync-run-details-region')[0];
-  check(so, 'Pipeline và trạng thái phiên nằm trong Stack để giữ khoảng cách dọc', [runDetailsRegion.role, runDetailsRegion.className], ['box', 'shin-stack']);
+  check(so, 'Pipeline và trạng thái phiên nằm trong RowGroup để giữ khoảng cách dọc', [runDetailsRegion.role, runDetailsRegion.className], ['box', 'shin-row-group']);
   check(so, 'Run render giữ pipeline khi preflight thất bại để người dùng thấy chặng dừng', !!render(hop, content, hop.fbmSyncRenderRun, preflightError).querySelector('.shin-sync-pipeline'), true);
   check(so, 'Run render hiện pipeline khi đang xử lý', !!render(hop, content, hop.fbmSyncRenderRun, active).querySelector('.shin-sync-pipeline'), true);
   check(so, 'Run render giữ pipeline để chẩn đoán lỗi sau request', !!render(hop, content, hop.fbmSyncRenderRun, pushError).querySelector('.shin-sync-pipeline'), true);
@@ -228,7 +228,7 @@ async function chay(so) {
   check(so, 'Account render đủ ô liên kết, có bút sửa và khóa ô nhập khi đang xem', [dom.document.getElementById('fbm-identity-spreadsheet') !== null, dom.document.getElementById('fbm-identity-user') !== null, dom.document.getElementById('fbm-identity-account') !== null, identityCard.querySelector('[data-sync-config-action="edit"]') !== null, dom.document.getElementById('fbm-identity-spreadsheet').disabled], [true, true, true, true, true]);
   const identityActionRegion = identityCard.querySelector('#fbm-sync-identity-actions-region');
   const loginActionRegion = loginCard.querySelector('#fbm-sync-login-actions-region');
-  check(so, 'Nút Sửa dùng một surface connection, còn hai phần con giữ nhóm action bằng ActionStack', [identityActionRegion.className, loginActionRegion.className, identityActionRegion.children.length, loginActionRegion.children.length, identityActionRegion.children[0].className, loginActionRegion.children[0].className, identityEditButton.className, loginEditButton.className, identityEditButton.getAttribute('data-sync-config-key'), loginEditButton.getAttribute('data-sync-config-key')], ['shin-box shin-stack shin-action-stack', 'shin-box', 1, 1, 'shin-box shin-stack', 'shin-box shin-action-stack', 'shin-button shin-config-edit', 'shin-button shin-config-edit', 'connection', 'connection']);
+  check(so, 'Nút Sửa dùng một surface connection, còn hai phần con giữ nhóm action bằng ActionStack', [identityActionRegion.className, loginActionRegion.className, identityActionRegion.children.length, loginActionRegion.children.length, identityActionRegion.children[0].className, loginActionRegion.children[0].className, identityEditButton.className, loginEditButton.className, identityEditButton.getAttribute('data-sync-config-key'), loginEditButton.getAttribute('data-sync-config-key')], ['shin-box shin-row-group shin-action-stack', 'shin-box', 1, 1, 'shin-box shin-row-group', 'shin-box shin-action-stack', 'shin-button shin-config-edit', 'shin-button shin-config-edit', 'connection', 'connection']);
   const viewIdentityActions = identityCard.querySelector('#fbm-sync-identity-actions-region');
   const viewIdentityCheck = viewIdentityActions.querySelector('#fbm-sync-check-identity');
   check(so, 'Chế độ xem vẫn có nút Kiểm tra liên kết dùng binding đã lưu', [viewIdentityCheck && viewIdentityCheck.id, viewIdentityCheck && viewIdentityCheck.textContent, viewIdentityCheck && viewIdentityCheck.disabled, identityEditButton !== null], ['fbm-sync-check-identity', 'Kiểm tra liên kết', false, true]);
@@ -261,7 +261,7 @@ async function chay(so) {
   hop.FBM_SYNC_CLIENT.loginStatus = { configured: false, enabled: true };
   hop.fbmSyncConfigStartEdit('login');
   const loginActionRow = hop.fbmSyncLoginActionBlocks()[0];
-  check(so, 'Nút đăng nhập thử dùng Stack và không nhân bản nút lưu connection', [loginActionRow.role, loginActionRow.className, loginActionRow.elements.length, loginActionRow.elements[0].role], ['box', 'shin-stack', 1, 'button']);
+  check(so, 'Nút đăng nhập thử dùng RowGroup và không nhân bản nút lưu connection', [loginActionRow.role, loginActionRow.className, loginActionRow.elements.length, loginActionRow.elements[0].role], ['box', 'shin-row-group', 1, 'button']);
   hop.fbmSyncConfigFinishEdit('login');
   hop.FBM_SYNC_CLIENT.syncSettings = { account: { customerPrefix: 'ALT', customerCodeLength: '8', activitySince: '2026-01-01' } };
   render(hop, content, hop.fbmSyncRenderAccount, idle);
@@ -273,7 +273,7 @@ async function chay(so) {
   hop.fbmSyncConfigStartEdit('identity');
   const identityBlock = hop.fbmSyncIdentityBlock(idle);
   const identityActions = identityBlock.elements.filter((node) => node && node.id === 'fbm-sync-identity-actions-region')[0];
-  check(so, 'Ba nút liên kết tài khoản dùng Stack lõi và biến thể action dọc', [identityActions.className, identityActions.elements.length, identityActions.elements[0].role], ['shin-stack shin-action-stack', 3, 'button']);
+  check(so, 'Ba nút liên kết tài khoản dùng RowGroup lõi và biến thể action dọc', [identityActions.className, identityActions.elements.length, identityActions.elements[0].role], ['shin-row-group shin-action-stack', 3, 'button']);
 
   hop.FBM_SYNC_CLIENT.identityDraft = { spreadsheetId: 'sheet', userId: '', username: 'anhlt', accountName: '' };
   hop.FBM_SYNC_CLIENT.identityInvalid = { spreadsheet: false, user: true, username: false, account: true };
@@ -377,7 +377,7 @@ async function chay(so) {
   const resultTabButtons = Array.from(content.querySelectorAll('.shin-sync-tab-trigger'));
   const resultTabLabels = resultTabButtons.map((node) => node.querySelector('.shin-btn-label').textContent);
   const resultBody = content.querySelector('#fbm-sync-results-body-region');
-  check(so, 'Results summary render năm tab chỉ có tên và mô tả nằm riêng bên dưới', [demTheoThuocTinh(content, 'data-sync-results-tab'), resultTabLabels, content.querySelectorAll('.shin-sync-tab-description').length, content.querySelector('#fbm-sync-results-tab-description-region').textContent, resultBody.className.indexOf('shin-stack') >= 0, resultBody.className.indexOf('shin-section') >= 0, resultBody.querySelectorAll('.shin-section').length, dom.document.getElementById('fbm-sync-open-conflicts') !== null], [5, ['Tổng quan', 'Xung đột', 'Lỗi', 'Log', 'Nghiệm thu'], 1, 'Tóm tắt kết quả phiên', true, false, 0, true]);
+  check(so, 'Results summary render năm tab chỉ có tên và mô tả nằm riêng bên dưới', [demTheoThuocTinh(content, 'data-sync-results-tab'), resultTabLabels, content.querySelectorAll('.shin-sync-tab-description').length, content.querySelector('#fbm-sync-results-tab-description-region').textContent, resultBody.className.indexOf('shin-row-group') >= 0, resultBody.className.indexOf('shin-section') >= 0, resultBody.querySelectorAll('.shin-section').length, dom.document.getElementById('fbm-sync-open-conflicts') !== null], [5, ['Tổng quan', 'Xung đột', 'Lỗi', 'Log', 'Nghiệm thu'], 1, 'Tóm tắt kết quả phiên', true, false, 0, true]);
   hop.FBM_SYNC_CLIENT.resultsTab = 'conflict';
   render(hop, content, hop.fbmSyncRenderResults, conflictStatus);
   check(so, 'Màn hình xung đột có hai phía và ô tự nhập', [demTheoThuocTinh(content, 'data-fbm-conflict-choice'), demTheoThuocTinh(content, 'data-fbm-conflict-manual')], [2, 1]);
@@ -413,7 +413,7 @@ async function chay(so) {
   const loginPolicyBlocks = hop.fbmSyncSettingsLoginBlocks({ enabled: true, autoOpenTab: false, retryEnabled: true, retryMinutes: 30 });
   const loginPolicyChildren = loginPolicyBlocks.find((node) => node && node.id === 'fbm-sync-login-policy-children');
   const retryGroup = loginPolicyChildren.elements[1];
-  check(so, 'login policy groups retry interval under retry toggle', [retryGroup.className, retryGroup.elements.length, retryGroup.elements[0].elements[1].id, retryGroup.elements[1].className, retryGroup.elements[1].elements[1].id], ['shin-stack shin-sync-login-policy-retry-group', 2, 'fbm-sync-policy-retry', 'shin-form-field', 'fbm-sync-login-retry-minutes']);
+  check(so, 'login policy groups retry interval under retry toggle', [retryGroup.className, retryGroup.elements.length, retryGroup.elements[0].elements[1].id, retryGroup.elements[1].className, retryGroup.elements[1].elements[1].id], ['shin-row-group shin-sync-login-policy-retry-group', 2, 'fbm-sync-policy-retry', 'shin-form-field', 'fbm-sync-login-retry-minutes']);
   check(so, 'Settings render được relay và tham số phiên', dom.document.getElementById('fbm-sync-setting-approval-threshold').value === '10' && content.textContent.indexOf('Kết nối Extension') >= 0, true);
 
   hop.FBM_SYNC_CLIENT.subscreen = 'account';

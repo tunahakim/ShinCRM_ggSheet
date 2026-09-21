@@ -46,7 +46,7 @@ function unsavedChangesDialogBlocks() {
     Box({ className: 'shin-unsaved-panel', elements: [
       Text({ id: 'shin-unsaved-title', className: 'shin-unsaved-title', text: 'Có thay đổi chưa lưu' }),
       Text({ id: 'shin-unsaved-message', className: 'shin-unsaved-message', text: 'Phát hiện thay đổi chưa lưu. Bạn muốn làm gì trước khi tiếp tục?' }),
-      Stack({ className: 'shin-unsaved-actions', elements: [
+      RowGroup({ className: 'shin-unsaved-actions', elements: [
         Button({ className: 'shin-unsaved-save', data: { 'unsaved-choice': 'save' }, label: 'Lưu thay đổi' }),
         Button({ className: 'shin-unsaved-discard', data: { 'unsaved-choice': 'discard' }, label: 'Hủy bỏ thay đổi' }),
         Button({ className: 'shin-unsaved-continue', data: { 'unsaved-choice': 'continue' }, label: 'Tiếp tục sửa' })
@@ -109,7 +109,7 @@ function uiDecisionOpen(options) {
     Box({ className: 'shin-unsaved-panel', elements: [
       Text({ id: 'shin-decision-title', className: 'shin-unsaved-title', text: String(opts.title || '') }),
       Text({ id: 'shin-decision-message', className: 'shin-unsaved-message', text: String(opts.message || '') }),
-      Stack({ className: 'shin-unsaved-actions', elements: [
+      RowGroup({ className: 'shin-unsaved-actions', elements: [
         Button({ className: 'shin-unsaved-continue', data: { 'ui-decision-choice': 'cancel' }, label: String(opts.cancelLabel || 'Quay lại') }),
         Button({ className: 'shin-unsaved-discard', data: { 'ui-decision-choice': 'confirm' }, label: String(opts.confirmLabel || 'Xác nhận') })
       ] })

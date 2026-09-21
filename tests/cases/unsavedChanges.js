@@ -472,8 +472,8 @@ function testHopDongTichHop(so) {
     styles.indexOf('z-index: 0') > styles.indexOf('.shin-box.shin-unsaved-backdrop'),
     styles.indexOf('z-index: 1;') > styles.indexOf('.shin-box.shin-unsaved-panel')
   ], [true, true, true, true]);
-  check(so, 'action modal dùng Stack dọc, không thừa hưởng Row margin ngang', [
-    docClient('ui/unsavedChanges.html').indexOf("Stack({ className: 'shin-unsaved-actions'") >= 0,
+  check(so, 'action modal dùng RowGroup dọc, không thừa hưởng Row margin ngang', [
+    docClient('ui/unsavedChanges.html').indexOf("RowGroup({ className: 'shin-unsaved-actions'") >= 0,
     styles.indexOf('.shin-unsaved-actions { display: grid') < 0,
     styles.indexOf('.shin-unsaved-actions > * + *') < 0
   ], [true, true, true]);

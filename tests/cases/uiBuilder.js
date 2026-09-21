@@ -27,8 +27,8 @@ function chay(so) {
     ['card', 'row', 'text', 'field', 'button', 'icon', 'check', 'standaloneControl']);
 
   check(so, 'layout policy tập trung quyết định class và owner của primitive',
-    [hop.uiLayoutClass('stack'), hop.UI_LAYOUT_POLICY.stack.owner, hop.UI_LAYOUT_POLICY.actionStack.content, hop.uiLayoutClass('headerGroupEnd'), hop.UI_LAYOUT_POLICY.empty.content],
-    ['shin-stack', 'Stack', 'end', 'shin-header-group shin-header-group-end', 'center']);
+    [hop.uiLayoutClass('rowGroup'), hop.UI_LAYOUT_POLICY.rowGroup.owner, hop.UI_LAYOUT_POLICY.actionStack.content, hop.uiLayoutClass('headerGroupEnd'), hop.UI_LAYOUT_POLICY.empty.content],
+    ['shin-row-group', 'RowGroup', 'end', 'shin-header-group shin-header-group-end', 'center']);
   check(so, 'layout policy dùng hướng logic, không hard-code left/right',
     Object.keys(hop.UI_LAYOUT_POLICY).some((name) => /left|right/i.test(JSON.stringify(hop.UI_LAYOUT_POLICY[name]))), false);
   checkThrows(so, 'layout policy thiếu tên thì bị chặn sớm',
@@ -53,6 +53,14 @@ function chay(so) {
     hop.Icon({ icon: 'bolt', toggle: 'followSelection' }).toggle, 'followSelection');
 
   check(so, 'Row nhận thẳng mảng con', hop.Row([hop.Text('a')]).elements.length, 1);
+  const rowGroup = hop.RowGroup([hop.Row([hop.Text('a')]), hop.Row([hop.Text('b')])]);
+  check(so, 'RowGroup là wrapper box duy nhất cho một hoặc nhiều Row',
+    [rowGroup.role, rowGroup.className, rowGroup.elements.length, rowGroup.elements.every((item) => item.role === 'row')],
+    ['box', 'shin-row-group', 2, true]);
+  const nestedRow = hop.Row([hop.Row([hop.Text('trái')]), hop.Text('phải')]);
+  check(so, 'Row lồng Row chỉ xuất hiện như một cell layout độc lập',
+    [nestedRow.role, nestedRow.elements[0].role, nestedRow.elements[1].role],
+    ['row', 'row', 'text']);
 
   const standAloneField = hop.StandaloneField('Mật khẩu', { id: 'password', kind: 'input', inputType: 'password' });
   check(so, 'StandaloneField dùng Block chung để ghép nhãn và ô trạng thái',
@@ -107,16 +115,16 @@ function chay(so) {
     [form.footer[0].role, form.footer[0].label, form.footer[0].className],
     ['button', 'LƯU DỮ LIỆU', 'btn-save-wide']);
 
-  check(so, 'một cụm thành một Card, mỗi mảng con thành một Row',
-    [form.body.length, form.body[0].role, form.body[0].elements.map((h) => h.role)],
-    [1, 'card', ['row', 'row', 'row']]);
+  check(so, 'một cụm thành một Card chứa RowGroup, mỗi mảng con thành một Row',
+    [form.body.length, form.body[0].role, form.body[0].elements.map((h) => h.role), form.body[0].elements[0].elements.map((h) => h.role)],
+    [1, 'card', ['box'], ['row', 'row', 'row']]);
 
   check(so, 'chuỗi trần trong hàng thành Field, cùng hàng thì cùng một Row',
-    form.body[0].elements[1].elements.map((o) => [o.role, o.field]),
+    form.body[0].elements[0].elements[1].elements.map((o) => [o.role, o.field]),
     [['field', 'id'], ['field', 'taxNumber']]);
 
   check(so, 'object trong hàng giữ được control khai thêm',
-    [form.body[0].elements[2].elements[0].field, form.body[0].elements[2].elements[0].control],
+    [form.body[0].elements[0].elements[2].elements[0].field, form.body[0].elements[0].elements[2].elements[0].control],
     ['note', 'textarea']);
 
   check(so, 'title giữ nguyên hình dạng đã khai, việc chọn add hay edit không thuộc tệp này',

@@ -40,7 +40,7 @@ var BLOCK_KEYS_BY_ROLE = {
 
 /* Chính sách layout của primitive. CSS chỉ hiện thực class đã chọn; màn hình không tự khai alignment. */
 var UI_LAYOUT_POLICY = {
-  stack: { className: 'shin-stack', axis: 'vertical', cross: 'stretch', content: 'start', owner: 'Stack' },
+  rowGroup: { className: 'shin-row-group', axis: 'vertical', cross: 'stretch', content: 'start', owner: 'RowGroup' },
   actionStack: { className: 'shin-action-stack', axis: 'vertical', cross: 'center', content: 'end', owner: 'ActionStack' },
   headerGroupStart: { className: 'shin-header-group shin-header-group-start', axis: 'horizontal', content: 'start', owner: 'HeaderGroup' },
   headerGroupEnd: { className: 'shin-header-group shin-header-group-end', axis: 'horizontal', content: 'end', owner: 'HeaderGroup' },
@@ -165,10 +165,10 @@ function Block(spec, role) {
 /** Hộp chứa Block con; vai đã có trong hợp đồng renderer nhưng trước đây thiếu hàm dựng công khai. */
 function Box(spec) { return Block(spec, 'box'); }
 
-/** Nhóm Block theo cột; nhịp dọc do component lõi quyết định, màn chỉ chọn biến thể hình thức. */
-function Stack(spec) {
+/** Nhóm Row theo cột; nhịp dọc do RowGroup sở hữu, màn chỉ chọn nội dung. */
+function RowGroup(spec) {
   var o = Array.isArray(spec) ? { elements: spec } : (spec || {});
-  var className = (uiLayoutClass('stack') + ' ' + String(o.className || '')).trim();
+  var className = (uiLayoutClass('rowGroup') + ' ' + String(o.className || '')).trim();
   return Box(Object.assign({}, o, { className: className }));
 }
 

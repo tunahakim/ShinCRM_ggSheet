@@ -11,7 +11,7 @@
 
 .shin-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--shin-gap-2);
 }
 
@@ -21,11 +21,11 @@
 .shin-single-action-row > * { flex: 0 1 auto; width: min(220px, 100%); max-width: 100%; min-width: 0; box-sizing: border-box; white-space: normal; overflow-wrap: anywhere; }
 .shin-single-action-row > .shin-button { white-space: normal; text-align: center; overflow-wrap: anywhere; }
 .shin-single-action-row > .shin-button .shin-btn-label { min-width: 0; overflow-wrap: anywhere; white-space: normal; }
-.shin-box.shin-stack,
+.shin-box.shin-row-group,
 .shin-box.shin-action-stack { display: flex; flex-direction: column; align-self: stretch; gap: var(--shin-gap-2); width: 100%; min-width: 0; }
-.shin-box.shin-stack { align-items: stretch; }
+.shin-box.shin-row-group { align-items: stretch; }
 .shin-box.shin-action-stack { align-items: center; }
-.shin-stack > *,
+.shin-row-group > *,
 .shin-action-stack > * { margin: 0; }
 .shin-action-stack > * { width: min(100%, 220px); }
 .shin-inline-field-row { align-items: center; }
@@ -41,7 +41,7 @@
    pseudo-class này tự mất và vùng hiện lại mà không cần JS biết về layout. */
 .shin-box:empty { display: none; }
 
-/* Khối xếp dọc dùng cho các màn hình có nhiều Card; module chỉ chọn nội dung, không tự định nghĩa layout mới. */
+/* RowGroup xếp dọc dùng cho các màn hình có nhiều Card hoặc nhiều Row; module chỉ chọn nội dung, không tự định nghĩa layout mới. */
 /* Section không tự bù scrollbar: vùng cuộn cha đã giữ gutter ổn định ở cả hai mép. */
 .shin-section { display: flex; flex-direction: column; gap: var(--shin-gap-2); min-width: 0; padding: 0 0 var(--shin-gap-4); }
 .shin-section > * { min-width: 0; }

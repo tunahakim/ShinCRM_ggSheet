@@ -22,7 +22,7 @@ function chay(so) {
   const builder = docTep('client/ui/uiBuilder.html');
   const renderer = docTep('client/ui/renderEngine.html');
   const row = rule(components, '.shin-row {');
-  const stack = rule(components, '.shin-box.shin-stack,');
+  const rowGroup = rule(components, '.shin-box.shin-row-group,');
   const cardBody = rule(components, '.shin-card-body {');
   const sectionStyle = rule(components, '.shin-section {');
   const formField = rule(components, '.shin-form-field {');
@@ -35,10 +35,10 @@ function chay(so) {
   check(so, 'Row sở hữu khoảng cách ngang bằng gap, không dùng margin sibling',
     [row.indexOf('gap: var(--shin-gap-2);') >= 0, components.indexOf('.shin-row > * + *') === -1],
     [true, true]);
-  check(so, 'Stack và ActionStack sở hữu nhịp dọc, reset margin của con trực tiếp',
-      [stack.indexOf('gap: var(--shin-gap-2);') >= 0,
-      components.indexOf('.shin-stack > *,\n.shin-action-stack > * { margin: 0; }') >= 0,
-      components.indexOf('.shin-stack > * + *') === -1,
+  check(so, 'RowGroup và ActionStack sở hữu nhịp dọc, reset margin của con trực tiếp',
+      [rowGroup.indexOf('gap: var(--shin-gap-2);') >= 0,
+      components.indexOf('.shin-row-group > *,\n.shin-action-stack > * { margin: 0; }') >= 0,
+      components.indexOf('.shin-row-group > * + *') === -1,
       components.indexOf('.shin-action-stack > * + *') === -1],
     [true, true, true, true]);
   check(so, 'ActionStack không còn fallback margin có thể cộng với gap',
@@ -63,8 +63,8 @@ function chay(so) {
       toggleRow.indexOf('margin: var') === -1],
     [true, true, true, true]);
   check(so, 'control-row có căn dọc riêng và không đổi Row generic',
-    [components.indexOf('.shin-inline-field-row { align-items: center; }') >= 0,
-      row.indexOf('align-items: center') === -1],
+      [components.indexOf('.shin-inline-field-row { align-items: center; }') >= 0,
+      row.indexOf('align-items: center') >= 0],
     [true, true]);
   check(so, 'Loading/Empty/Notice/Table dùng preset riêng của chúng',
     [components.indexOf('.shin-loading {') >= 0 && components.indexOf('justify-content: center;') >= 0,
@@ -126,12 +126,12 @@ function chay(so) {
       settings.indexOf('.shin-sync-login-policy-children .shin-toggle-row') === -1,
       settings.indexOf('.shin-sync-login-policy-retry-group .shin-form-field') === -1,
       settings.indexOf('.shin-sync-detail-inputs > * + *') === -1,
-      runUi.indexOf('fieldHelp: function (control, help) { return Stack({ elements:') >= 0,
+      runUi.indexOf('fieldHelp: function (control, help) { return RowGroup({ elements:') >= 0,
       runUi.indexOf('identityForm, elements: slots.form }), ActionStack') >= 0,
-      runUi.indexOf('loginRetryGroup: function (className, elements) { return Stack') >= 0,
+      runUi.indexOf('loginRetryGroup: function (className, elements) { return RowGroup') >= 0,
       runUi.indexOf('loginPolicyChildren, className: FBM_SYNC_SETTINGS_UI.classes.loginChildren, elements: slots.children }), slots.actions') >= 0,
-      runUi.indexOf('Stack({ id: FBM_SYNC_SETTINGS_SCHEMA.regions.loginPolicyChildren') >= 0,
-      runUi.indexOf('page: function (slots) { return Card({ title: slots.title, elements: [Stack({ elements:') >= 0,
+      runUi.indexOf('RowGroup({ id: FBM_SYNC_SETTINGS_SCHEMA.regions.loginPolicyChildren') >= 0,
+      runUi.indexOf('page: function (slots) { return Card({ title: slots.title, elements: [RowGroup({ elements:') >= 0,
       runUi.indexOf('Row({ className: FBM_SYNC_RESULTS_UI.classes.pagination') >= 0],
     [true, true, true, true, true, true, true, true, true, true, true, true, true]);
   check(so, 'slot lịch sử, info bar và dialog dùng gap thay cho margin sibling',

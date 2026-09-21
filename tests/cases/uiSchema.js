@@ -217,13 +217,13 @@ function chay(so) {
 
   check(so, 'customerForm dựng thành một cụm liền mạch, là một Card',
     daDung.customerForm.body.map((c) => c.role), ['card']);
-  check(so, 'mỗi hàng khai thành một Row, và mỗi ô trong hàng thành một Field',
-    daDung.customerForm.body[0].elements.map((r) => r.role + '/' + r.elements.length).join(' '),
+  check(so, 'mỗi hàng khai thành một Row trong RowGroup, và mỗi ô trong hàng thành một Field',
+    daDung.customerForm.body[0].elements[0].elements.map((r) => r.role + '/' + r.elements.length).join(' '),
     'row/1 row/2 row/2 row/2 row/1 row/1 row/1 row/2 row/1 row/1 row/2 row/2 row/1');
   check(so, 'khóa viết tắt width gộp vào spatialConfig lúc dựng',
-    daDung.customerForm.body[0].elements[7].elements[0].spatialConfig.width, '65%');
+    daDung.customerForm.body[0].elements[0].elements[7].elements[0].spatialConfig.width, '65%');
   check(so, 'noteForm chỉ có một trường, và nó mang class riêng để ô gõ cao hơn',
-    (() => { const f = daDung.noteForm.body[0].elements[0].elements[0]; return [f.field, f.control, f.className]; })(),
+    (() => { const f = daDung.noteForm.body[0].elements[0].elements[0].elements[0]; return [f.field, f.control, f.className]; })(),
     ['note', 'textarea', 'shin-note-tall']);
   check(so, 'màn view khai bằng cây Block nên screenBuild trả nguyên cây, không bọc thêm Card',
     daDung.view.body === hop.UI_SCHEMA.view.body, true);

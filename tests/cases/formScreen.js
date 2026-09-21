@@ -78,10 +78,11 @@ function chay(so) {
       'shin-header-group shin-header-group-start|shin-header-group shin-header-group-end', 'Ghi Chú Khách Hàng', 'close|check']);
 
   const customerTree = hop.screenBuild(hop.UI_SCHEMA.customerForm, 'customerForm');
-  check(so, 'form lõi dùng Card → Row → Field, footer dùng Button save chung',
-    [customerTree.body.length, customerTree.body[0].role, customerTree.body[0].elements.every((row) => row.role === 'row'),
-      customerTree.body[0].elements[0].elements[0].role, customerTree.footer[0].role, customerTree.footer[0].className.indexOf('shin-save-wide') >= 0],
-    [1, 'card', true, 'field', 'button', true]);
+  check(so, 'form lõi dùng Card → RowGroup → Row → Field, footer dùng Button save chung',
+    [customerTree.body.length, customerTree.body[0].role, customerTree.body[0].elements[0].role,
+      customerTree.body[0].elements[0].elements.every((row) => row.role === 'row'),
+      customerTree.body[0].elements[0].elements[0].elements[0].role, customerTree.footer[0].role, customerTree.footer[0].className.indexOf('shin-save-wide') >= 0],
+    [1, 'card', 'box', true, 'field', 'button', true]);
 
   section('formScreen — form sửa khách: bốn vùng và ô nhập đầu tiên');
 

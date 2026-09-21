@@ -116,14 +116,14 @@ function screenBody(body, screenName) {
     return Card({
       title: cum.group === undefined ? null : cum.group,
       className: cum.className || '',
-      elements: cum.rows.map(function (hang, h) {
+      elements: [RowGroup({ elements: cum.rows.map(function (hang, h) {
         if (!Array.isArray(hang)) { throw new Error('Hàng ' + (h + 1) + ' của cụm ' + (i + 1) + ' phải là mảng, vì cùng một mảng là cùng một hàng.'); }
         return Row(hang.map(function (phanTu, c) {
           var fieldSpec = screenFieldSpec(phanTu, 'cụm ' + (i + 1) + ' hàng ' + (h + 1) + ' ô ' + (c + 1));
           fieldSpec = Object.assign({}, fieldSpec, { surface: screenName });
           return Field(fieldSpec);
         }));
-      })
+      }) })]
     });
   });
 }

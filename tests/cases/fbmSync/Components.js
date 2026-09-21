@@ -124,7 +124,7 @@ function chay(so) {
     [true, true]);
 
   check(so, 'core khai đủ Block helper dùng chung cho Sync',
-    ['Box', 'Stack', 'ActionStack', 'Card', 'Row', 'Text', 'Field', 'Button', 'Icon', 'Check', 'StandaloneControl', 'StandaloneField', 'Empty'].every((name) => common.indexOf('function ' + name + '(') >= 0),
+    ['Box', 'RowGroup', 'ActionStack', 'Card', 'Row', 'Text', 'Field', 'Button', 'Icon', 'Check', 'StandaloneControl', 'StandaloneField', 'Empty'].every((name) => common.indexOf('function ' + name + '(') >= 0),
     true);
   check(so, 'renderer StandaloneControl dùng lớp input/toggle chung, không có lớp Sync riêng',
     [engine.indexOf("'shin-input'") >= 0, engine.indexOf("'shin-toggle-control'") >= 0, engine.indexOf('shin-sync-') === -1],
@@ -170,18 +170,18 @@ function chay(so) {
   check(so, 'lớp generic notice/form/toggle/value/pagination nằm ở components chung',
     ['shin-form-field', 'shin-toggle-row', 'shin-toggle-control', 'shin-notice', 'shin-kv-row', 'shin-pagination', 'shin-section', 'shin-content-disabled', 'shin-loading'].every((name) => styles.indexOf(name) >= 0),
     true);
-  check(so, 'Card và Stack dùng gap dọc, component con không cộng margin lần hai',
-    [styles.indexOf('.shin-card-body {') >= 0, styles.indexOf('.shin-box.shin-stack,') >= 0,
+  check(so, 'Card và RowGroup dùng gap dọc, component con không cộng margin lần hai',
+    [styles.indexOf('.shin-card-body {') >= 0, styles.indexOf('.shin-box.shin-row-group,') >= 0,
       styles.indexOf('gap: var(--shin-gap-2);', styles.indexOf('.shin-card-body {')) >= 0,
       styles.indexOf('.shin-card-body > * { margin: 0; }') >= 0,
-      styles.indexOf('.shin-stack > * + *') === -1,
+      styles.indexOf('.shin-row-group > * + *') === -1,
       styles.indexOf('.shin-form-field > * + *') === -1],
     [true, true, true, true, true, true]);
-  check(so, 'Nhóm action dùng Stack lõi và vẫn tương thích class cũ',
+  check(so, 'Nhóm action dùng RowGroup lõi và vẫn giữ owner riêng',
     [styles.indexOf('align-items: stretch;') >= 0, styles.indexOf('align-self: stretch;') >= 0, styles.indexOf('width: 100%;') >= 0,
       styles.indexOf('.shin-box.shin-action-stack') >= 0,
       styles.indexOf('gap: var(--shin-gap-2);') >= 0,
-      styles.indexOf('.shin-stack > *,\n.shin-action-stack > * { margin: 0; }') >= 0],
+      styles.indexOf('.shin-row-group > *,\n.shin-action-stack > * { margin: 0; }') >= 0],
     [true, true, true, true, true, true]);
   check(so, 'Nút action dài được xếp dọc trong Sidebar hẹp',
     [styles.indexOf('.shin-single-action-row { justify-content: center; flex-wrap: wrap; gap: var(--shin-gap-2); }') >= 0,
@@ -191,7 +191,7 @@ function chay(so) {
       styles.indexOf('.shin-single-action-row > .shin-button .shin-btn-label { min-width: 0; overflow-wrap: anywhere; white-space: normal; }') >= 0,
       styles.indexOf('.shin-single-action-row > * + *') === -1],
     [true, true, true, true, true, true]);
-  check(so, 'action Stack căn giữa ở đúng độ ưu tiên của component lõi',
+  check(so, 'ActionStack căn giữa ở đúng độ ưu tiên của component lõi',
     [styles.indexOf('.shin-box.shin-action-stack { align-items: center; }') >= 0,
       !/(^|\n)\.shin-action-stack \{ align-items: center; \}/.test(styles)],
     [true, true]);
@@ -230,8 +230,8 @@ function chay(so) {
       frame.indexOf('#sidebar-info {') >= 0 && frame.indexOf('margin-bottom: var(--shin-gap-2);') > frame.indexOf('#sidebar-info {'),
       styles.indexOf('.shin-loading-track.is-idle { visibility: hidden; background: transparent; }') >= 0],
     [true, true, true]);
-  check(so, 'Stack dùng gap và reset margin con trực tiếp',
-    [styles.indexOf('.shin-box.shin-stack,') >= 0, styles.indexOf('gap: var(--shin-gap-2);', styles.indexOf('.shin-box.shin-stack,')) > styles.indexOf('.shin-box.shin-stack,'), styles.indexOf('.shin-stack > *,\n.shin-action-stack > * { margin: 0; }') >= 0],
+  check(so, 'RowGroup dùng gap và reset margin con trực tiếp',
+    [styles.indexOf('.shin-box.shin-row-group,') >= 0, styles.indexOf('gap: var(--shin-gap-2);', styles.indexOf('.shin-box.shin-row-group,')) > styles.indexOf('.shin-box.shin-row-group,'), styles.indexOf('.shin-row-group > *,\n.shin-action-stack > * { margin: 0; }') >= 0],
     [true, true, true]);
 }
 
