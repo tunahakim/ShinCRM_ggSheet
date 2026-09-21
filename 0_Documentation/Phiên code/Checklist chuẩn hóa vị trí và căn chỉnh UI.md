@@ -58,10 +58,10 @@ Ghi chú kiểm kê: `align` đang được khai tại `client/schema/screens/fo
 - [x] Cập nhật `04. Bộ máy render và luồng lưu.md`: chốt renderer không dịch khóa `align` của screen schema thành class `shin-align-right` nữa.
 - [x] Cập nhật `09/08. UI đồng bộ và cấu hình.md`: ghi các mặc định vị trí cho Settings schedule row, detail controls, action group, notice và tab/result.
 - [x] Cập nhật `09/08. UI đồng bộ và cấu hình.md`: ghi ngoại lệ domain còn lại và owner của từng ngoại lệ.
-- [ ] Cập nhật `0_Documentation/Phiên code/Cây thư mục code.md` nếu thêm file layout policy hoặc test mới.
+- [x] Kiểm tra `0_Documentation/Phiên code/Cây thư mục code.md`: không phát sinh file hoặc thư mục mới cho layout policy/test, nên không cần cập nhật cây.
 - [x] Ghi commit tài liệu riêng sau khi các tài liệu trên không còn mâu thuẫn với quyết định phiên này.
 
-Ghi chú tiến độ: tài liệu nền đã cập nhật; core/header, Sync shell, ActionStack Account, Empty và token schedule đã được commit riêng. Policy semantic hiện nằm trong `UI_LAYOUT_POLICY` của `client/ui/uiBuilder.html`; nhóm policy đã commit `343b422`; test offline gần nhất đạt `1918/1918`. Còn phải hoàn tất allowlist/domain audit, hồi quy cuối và nghiệm thu trực quan DEV.
+Ghi chú tiến độ: tài liệu nền đã cập nhật; core/header, Sync shell, ActionStack Account, Empty và token schedule đã được commit riêng. Policy semantic hiện nằm trong `UI_LAYOUT_POLICY` của `client/ui/uiBuilder.html`; nhóm policy đã commit `343b422`; nhóm hồi quy form/view/card đang chuẩn bị commit sau khi test đạt `1920/1920`. Còn nghiệm thu trực quan DEV.
 
 ## 5. Primitive và layout policy
 
@@ -96,11 +96,11 @@ Ghi chú tiến độ: tài liệu nền đã cập nhật; core/header, Sync sh
 
 ## 7. Chuẩn hóa các màn hình và component dùng chung
 
-- [ ] Kiểm tra form customer: tiêu đề, nút hủy, nút lưu header và footer giữ đúng vị trí sau khi bỏ `align`.
-- [ ] Kiểm tra form activity: cùng header/footer contract với customer, không tạo nhánh căn riêng.
-- [ ] Kiểm tra note form: title/action và textarea không bị đổi owner vị trí.
-- [ ] Kiểm tra view: nhóm công cụ đầu và nhóm hành động cuối không bị dồn hoặc đảo thứ tự.
-- [ ] Kiểm tra Card titleActions: dùng nhóm action chuẩn; không dùng `align` lá để đẩy icon.
+- [x] Kiểm tra form customer: tiêu đề, nút hủy, nút lưu header và footer giữ đúng vị trí sau khi bỏ `align`. Bằng chứng: ca header `formScreen` và ca render footer trong `tests/cases/formScreen.js`.
+- [x] Kiểm tra form activity: cùng header/footer contract với customer, không tạo nhánh căn riêng. Bằng chứng: ca `form activity và note giữ cùng HeaderGroup` trong `tests/cases/formScreen.js`, cùng identity `UI_FORM_HEADER` trong `tests/cases/uiSchema.js`.
+- [x] Kiểm tra note form: title/action và textarea không bị đổi owner vị trí. Bằng chứng: ca HeaderGroup note trong `tests/cases/formScreen.js`, ca `noteForm` field/class trong `tests/cases/uiSchema.js`.
+- [x] Kiểm tra view: nhóm công cụ đầu và nhóm hành động cuối không bị dồn hoặc đảo thứ tự. Bằng chứng: ca header view trong `tests/cases/uiSchema.js` và render vùng header trong `tests/cases/viewScreen.js`.
+- [x] Kiểm tra Card titleActions: dùng wrapper action chuẩn của Card; không dùng `align` lá để đẩy icon. Bằng chứng: `.shin-card-actions` và không có `.shin-align-right` trong `tests/cases/renderEngine.js`.
 - [x] Kiểm tra Run: action kiểm tra, chạy, settings và approval dùng wrapper semantic tương ứng. Bằng chứng: ActionStack + hai `shin-single-action-row` trong `tests/cases/fbmSync/Sidebar.js`.
 - [x] Kiểm tra Account: identity fields, status và action group dùng Field/Stack/ActionStack chuẩn. Bằng chứng: `FBM_SYNC_ACCOUNT_UI.layout.actionStack`, cây identity/login và test `fbmSync/Sidebar`.
 - [x] Kiểm tra Results: tab, description, summary, conflict, error, log, audit và pagination giữ alignment đặc thù đã định nghĩa. Bằng chứng: các ca Results trong `tests/cases/fbmSync/Sidebar.js` và preset domain trong `tests/cases/layoutSpacing.js`.
@@ -109,7 +109,7 @@ Ghi chú tiến độ: tài liệu nền đã cập nhật; core/header, Sync sh
 - [x] Kiểm tra header shell Sync và header form không tạo hai cơ chế căn phải khác nhau. Bằng chứng: `fbmSyncShellHeaderBlocks` dùng `screenHeaderGroup('start'/'end')`, test `fbmSync/Sidebar`.
 - [x] Với mỗi ngoại lệ domain, ghi consumer, lý do, selector/component owner và test bảo vệ ngay trong checklist hoặc allowlist. Bằng chứng: allowlist Tài liệu 04 Phần 6, hợp đồng Sync Tài liệu 09 Phần 8 và ca domain trong `layoutSpacing`/`fbmSync/Sidebar`.
 - [x] Chạy test layout/UI sau từng màn hình; tick các mục đã kiểm chứng sau khi `node tests/run.js` đạt `1918`, lỗi `0`.
-- [ ] Commit riêng từng nhóm màn hình nếu diff độc lập; không đưa thay đổi FBM session/pipeline có sẵn vào commit.
+- [ ] Commit riêng từng nhóm màn hình nếu diff độc lập; nhóm form/view/card đang chờ commit cùng checklist sau khi tick hồi quy.
 
 ## 8. Hợp đồng chống tái phạm
 
@@ -129,14 +129,14 @@ Ghi chú tiến độ: tài liệu nền đã cập nhật; core/header, Sync sh
 
 ## 9. Hồi quy và an toàn
 
-- [ ] Chạy `node tests/run.js` sau mỗi nhóm code; ghi tổng đạt/lỗi và phân loại lỗi ngoài phạm vi nếu có.
-- [ ] Chạy lại toàn bộ test UI/layout liên quan: `layoutSpacing`, `uiBuilder`, `blockKeys`, `schemaCheck`, `renderEngine`, `uiSchema`, `formScreen`, `viewScreen`, `screenSchemaAudit`, `fbmSync/Components`, `fbmSync/Sidebar`.
-- [ ] Kiểm tra không sửa fixture trong `0_Documentation/Nghiên cứu FBM/`.
-- [ ] Kiểm tra diff từng commit chỉ chứa checklist/tài liệu/code/test alignment thuộc nhóm đó.
-- [ ] Kiểm tra các thay đổi FBM session/pipeline có sẵn vẫn giữ nguyên và không bị stage/commit nhầm.
-- [ ] Kiểm tra không có cookie, mật khẩu, token, payload nhạy cảm hoặc dữ liệu khách thật trong diff/test/log.
-- [ ] Kiểm tra thứ tự include của layout policy, uiBuilder, screenBuild, renderer và schema không tạo lỗi runtime.
-- [ ] Tick mục hồi quy ngay khi có output tương ứng.
+- [x] Chạy `node tests/run.js` sau mỗi nhóm code; nhóm form/view/card đạt `1920`, lỗi `0`.
+- [x] Chạy lại toàn bộ test UI/layout liên quan: `layoutSpacing`, `uiBuilder`, `blockKeys`, `schemaCheck`, `renderEngine`, `uiSchema`, `formScreen`, `viewScreen`, `screenSchemaAudit`, `fbmSync/Components`, `fbmSync/Sidebar`; tất cả nằm trong bộ `node tests/run.js` và đạt `1920/1920`.
+- [x] Kiểm tra không sửa fixture trong `0_Documentation/Nghiên cứu FBM/`; `git diff --name-only` không có đường dẫn thuộc thư mục này.
+- [x] Kiểm tra diff từng commit chỉ chứa checklist/tài liệu/code/test alignment thuộc nhóm đó; nhóm hiện tại chỉ gồm ba ca test và checklist.
+- [x] Kiểm tra các thay đổi FBM session/pipeline có sẵn vẫn giữ nguyên và không bị stage/commit nhầm; `tests/run.js` vẫn ngoài stage, không có file session/pipeline trong commit nhóm này.
+- [x] Kiểm tra không có cookie, mật khẩu, token, payload nhạy cảm hoặc dữ liệu khách thật trong diff/test/log; rà diff nhóm hiện tại không có giá trị bí mật hay dữ liệu khách thật.
+- [x] Kiểm tra thứ tự include của layout policy, uiBuilder, screenBuild, renderer và schema không tạo lỗi runtime; ca `screenSchemaAudit` mới đạt trong bộ `1920/1920`.
+- [x] Tick mục hồi quy ngay khi có output tương ứng.
 
 ## 10. Nghiệm thu trực quan trên Sheet DEV
 

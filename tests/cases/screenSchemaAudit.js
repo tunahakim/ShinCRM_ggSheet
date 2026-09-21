@@ -131,6 +131,9 @@ function chay(so) {
     fbmResultSchemas.filter((name) => sidebar.includes("include('client/schema/sync/results/" + name.slice(0, -5) + "')")), fbmResultSchemas);
 
   const includeOrder = [
+    ['client/ui/uiClassMap', 'client/ui/uiBuilder'],
+    ['client/ui/uiBuilder', 'client/ui/screenBuild'],
+    ['client/ui/screenBuild', 'client/ui/renderEngine'],
     ['client/schema/screens/view', 'client/screen/viewScreen'],
     ['client/schema/screens/customerForm', 'client/screen/formScreen'],
     ['client/schema/screens/activityForm', 'client/screen/formScreen'],

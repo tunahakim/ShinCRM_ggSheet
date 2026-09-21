@@ -65,6 +65,14 @@ function chay(so) {
     [hang.length, hang[0].className, hang[0].elements[0].icon, hang[0].elements[1].text, hang[1].className, hang[1].elements[0].icon],
     [2, 'shin-header-group shin-header-group-start', 'close', 'Thêm Khách Hàng', 'shin-header-group shin-header-group-end', 'check']);
 
+  const activityHang = hop.screenBuild({ entity: 'activity', header: hop.screenFormHeader(hop.UI_SCHEMA.activityForm.header, 'Thêm Giao Dịch') }, 'activityForm').header;
+  const noteHang = hop.screenBuild({ entity: 'customer', header: hop.screenFormHeader(hop.UI_SCHEMA.noteForm.header, 'Ghi Chú Khách Hàng') }, 'noteForm').header;
+  check(so, 'form activity và note giữ cùng HeaderGroup: tiêu đề ở start, Lưu ở end, không tạo nhánh căn riêng',
+    [activityHang.map((group) => group.className).join('|'), activityHang[0].elements[1].text, activityHang[1].elements[0].icon,
+      noteHang.map((group) => group.className).join('|'), noteHang[0].elements[1].text, noteHang[1].elements[0].icon],
+    ['shin-header-group shin-header-group-start|shin-header-group shin-header-group-end', 'Thêm Giao Dịch', 'check',
+      'shin-header-group shin-header-group-start|shin-header-group shin-header-group-end', 'Ghi Chú Khách Hàng', 'check']);
+
   const customerTree = hop.screenBuild(hop.UI_SCHEMA.customerForm, 'customerForm');
   check(so, 'form lõi dùng Card → Row → Field, footer dùng Button save chung',
     [customerTree.body.length, customerTree.body[0].role, customerTree.body[0].elements.every((row) => row.role === 'row'),
