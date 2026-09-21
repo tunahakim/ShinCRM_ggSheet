@@ -24,11 +24,11 @@ async function chay(so) {
   const awaiting = approval.FbmSync.start({ mode: 'write' });
   check(so, 'push hon 10 ban ghi phai cho nguoi dung chap thuan', [awaiting.ok, awaiting.approvalRequired, awaiting.request, approval.FbmSync.stateRead().phase, approval.FbmSync.stateRead().metadata.approvalCount], [true, true, null, 'awaiting_approval', 11]);
   const approved = approval.fbmSyncApprovePush();
-  check(so, 'chap thuan push cap request authorize dau tien', [approved.ok, approved.request.meta.kind, approval.FbmSync.stateRead().metadata.approvalGranted], [true, 'authorize', true]);
+  check(so, 'chap thuan push cap probe User dau tien', [approved.ok, approved.request.meta.kind, approval.FbmSync.stateRead().metadata.approvalGranted], [true, 'session_probe', true]);
   approval.FbmSync.stateWrite(approval.FbmSync.stateStart('', 'idle', 0));
   approval.FbmSync.runPreflight = () => ({ ok: true, issues: [], blocking: [], candidateCount: 0 });
   const pushOnly = approval.FbmSync.start({ mode: 'push' });
-  check(so, 'mode day rieng chi gui du lieu ShinCRM len FBM', [pushOnly.ok, pushOnly.request.meta.kind, approval.FbmSync.stateRead().mode], [true, 'authorize', 'push']);
+  check(so, 'mode day rieng chi probe truoc khi gui du lieu ShinCRM len FBM', [pushOnly.ok, pushOnly.request.meta.kind, approval.FbmSync.stateRead().mode], [true, 'session_probe', 'push']);
   approval.FbmSync.stateWrite(approval.FbmSync.stateStart('', 'idle', 0));
   const checkOnly = approval.FbmSync.start({ mode: 'check' });
   check(so, 'bon mode tach dung quyen ghi Sheet va FBM', [
@@ -46,21 +46,27 @@ async function chay(so) {
   check(so, 'read ghi Sheet con check chi preview', [readPull.written, checkPull.preview, pullWriteCalls], [1, true, 1]);
   orchestration.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const started = orchestration.FbmSync.start({ mode: 'read' });
-  check(so, 'start bat dau bang bootstrap Customer', started.request.meta.kind, 'authorize');
-  check(so, 'bootstrap dung viewPage false', started.request.body.viewPage, false);
-  check(so, 'bootstrap khong gui authorized cu', started.request.body.authorized, null);
-  const retrySlice = orchestration.FbmSync.continue({ ok: false, status: 503, body: '', transport: { trace: [{ requestId: started.request.id }] } });
-  check(so, 'loi doc tam thoi duoc retry co gioi han', [retrySlice.ok, retrySlice.retrying, retrySlice.request.meta.kind, orchestration.FbmSync.stateRead().retryCount], [true, true, 'authorize', 1]);
+  check(so, 'start bat dau bang probe User', started.request.meta.kind, 'session_probe');
+  check(so, 'probe khong gui authorized cu', started.request.body.authorized, undefined);
+  orchestration.FbmSync.currentSpreadsheetId = () => 'sheet-push-test';
+  orchestration.FbmSync.identityStatus = () => ({ status: 'BOUND' });
+  orchestration.FbmSync.statePatch({ runId: 'business-failure-run', origin: 'manual', phase: 'pull_customer', cursor: { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 }, activeRequestId: '', deadlineAt: 0, metadata: { sessionGate: {} }, session: { expired: false, sessionId: '', identityVerified: false, identitySessionId: '' } });
+  const businessProbe = orchestration.FbmSync.nextEnvelope({ url: 'https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage', body: { controller: 'zccrAccount' }, meta: { kind: 'grid' } });
+  check(so, 'request nghiep vu chi duoc cap sau probe User dat', businessProbe.meta.kind, 'session_probe');
+  const businessRequest = orchestration.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[2037,"ANHLT","Le Tuan Anh"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { trace: [{ requestId: businessProbe.id }] } });
+  check(so, 'probe dat thi moi phat request nghiep vu de kiem fail-closed', [businessRequest.ok, businessRequest.request && businessRequest.request.meta.kind], [true, 'grid']);
+  const retrySlice = orchestration.FbmSync.continue({ ok: false, status: 503, body: '', transport: { trace: [{ requestId: businessRequest.request.id }] } });
+  check(so, 'loi request nghiep vu fail-closed khong tu retry', [retrySlice && retrySlice.ok, retrySlice && retrySlice.request, orchestration.FbmSync.stateRead().phase, orchestration.FbmSync.stateRead().lastFailureCode], [false, null, 'error', 'TRANSPORT_ERROR']);
   const blockedDuplicate = orchestration.FbmSync.start({ mode: 'read' });
-  check(so, 'start khong cap request chong khi retry dang cho response', [blockedDuplicate.ok, blockedDuplicate.code, blockedDuplicate.request], [false, 'REQUEST_IN_FLIGHT', null]);
+  check(so, 'sau loi request chi cho phep nguoi dung chay lai tu dau bang probe', [blockedDuplicate.ok, blockedDuplicate.request && blockedDuplicate.request.meta.kind, orchestration.FbmSync.stateRead().phase], [true, 'session_probe', 'checking_session']);
   orchestration.FbmSync.statePatch({ activeRequestId: '', deadlineAt: 0 });
   const resumed = orchestration.FbmSync.start({ mode: 'read' });
-  check(so, 'start tiep tuc cursor sau khi reservation cu da thu hoi', [resumed.ok, resumed.resumed, resumed.request.meta.entity], [true, true, 'customer']);
+  check(so, 'start tiep tuc sau khi reservation cu da thu hoi bang probe moi', [resumed.ok, resumed.resumed, resumed.request.meta.kind], [true, true, 'session_probe']);
   const staleState = JSON.parse(props.data[orchestration.FbmSync.STATE_KEY]);
   staleState.runId = 'old-run'; staleState.updatedAt = Date.now() - orchestration.FbmSync.STALE_RUN_MS - 1; staleState.lastProgressAt = staleState.updatedAt;
   props.data[orchestration.FbmSync.STATE_KEY] = JSON.stringify(staleState);
   const restarted = orchestration.FbmSync.start({ mode: 'read' });
-  check(so, 'authorize cu qua thoi gian stale duoc thay bang phien moi', [restarted.ok, restarted.resumed, orchestration.FbmSync.stateRead().runId === 'old-run'], [true, undefined, false]);
+  check(so, 'run stale duoc thay bang phien moi va probe lai', [restarted.ok, restarted.resumed, restarted.request.meta.kind, orchestration.FbmSync.stateRead().runId === 'old-run'], [true, undefined, 'session_probe', false]);
   check(so, 'lookup san pham dung controller FBM that', orchestration.FbmSync.SYNC_LOOKUPS.filter((item) => item.key === '@CAT_SAN_PHAM')[0].controller, 'crdmsp');
   const previewState = { metadata: {} };
   orchestration.FbmSync.previewRecords(previewState, 'customer', [{ fbmCustomerCode: 'ALT00010', companyName: 'Test', fbmId: 'A1' }]);
@@ -74,7 +80,7 @@ async function chay(so) {
   resumeState.runId = 'resume-run'; resumeState.phase = 'pull_customer'; resumeState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 2, pageValue: ['d', 't', 'x'], count: 2000 }; resumeState.activeRequestId = ''; resumeState.deadlineAt = 0;
   orchestration.FbmSync.stateWrite(resumeState);
   const resumedGrid = orchestration.FbmSync.start({ mode: 'read' });
-  check(so, 'Sidebar mo lai tiep tuc cursor doc Customer dang do', [resumedGrid.ok, resumedGrid.resumed, resumedGrid.request.meta.kind, resumedGrid.request.body.type], [true, true, 'grid', 1]);
+  check(so, 'Sidebar mo lai probe lai phien truoc khi tiep tuc cursor Customer', [resumedGrid.ok, resumedGrid.resumed, resumedGrid.request.meta.kind], [true, true, 'session_probe']);
   const pushStatus = orchestration.FbmSync.stateRead();
   pushStatus.phase = 'push'; pushStatus.entity = 'activity'; pushStatus.mode = 'write'; orchestration.FbmSync.stateWrite(pushStatus);
   const pushView = orchestration.FbmSync.statusView();
@@ -129,6 +135,7 @@ async function chay(so) {
   push.FbmSync.pushEligibilityErrors = () => [];
   push.FbmSync.customerEditOpenRequest = () => ({ url: 'https://fbm.test/edit', body: {}, meta: { kind: 'customer_edit_open' } });
   const pushState = push.FbmSync.stateStart('', 'push', 0);
+  pushState.session = { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' };
   pushState.metadata.categoryGate = {};
   pushState.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
   push.FbmSync.stateWrite(pushState);
@@ -176,6 +183,7 @@ async function chay(so) {
     { kind: 'edit', id: 'C-NEXT', record: { id: 'C-NEXT', fbmId: 'A-NEXT', fbmHash: 'h-next' } }
   ];
   const pushErrorProps = push.FbmSync.stateStart('', 'push', 0);
+  pushErrorProps.session = { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' };
   pushErrorProps.metadata.categoryGate = {};
   pushErrorProps.cursor = { kind: 'push_wait', entity: 'customer', index: 0, operation: 'customer_edit_save', candidate: { entity: 'customer', id: 'C-ERR', record: { id: 'C-ERR', fbmId: 'A-ERR', fbmHash: 'h-err' } } };
   push.FbmSync.stateWrite(pushErrorProps);
@@ -221,14 +229,14 @@ async function chay(so) {
   transportState.phase = 'pull_customer'; transportState.activeRequestId = 'test-transport-request'; transportState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 3, pageValue: ['x'] };
   push.FbmSync.stateWrite(transportState);
   const http500 = push.FbmSync.continue({ ok: false, status: 500, body: '{"Message":"server"}', transport: { trace: [{ requestId: 'test-transport-request' }] } });
-  check(so, 'HTTP 500 cho phep retry doc co gioi han va giu cursor', [http500.ok, http500.retrying, push.FbmSync.stateRead().phase, push.FbmSync.stateRead().cursor.kind], [true, true, 'pull_customer', 'customer_grid']);
+  check(so, 'HTTP 500 cua request nghiep vu fail-closed va giu cursor', [http500.ok, http500.request, push.FbmSync.stateRead().phase, push.FbmSync.stateRead().cursor.kind], [false, null, 'error', 'customer_grid']);
   [{ status: 401, body: '' }, { status: 403, body: '' }, { status: 200, body: '<form action="Login.aspx"></form>' }].forEach((failure) => {
     const sessionState = push.FbmSync.stateStart('', 'read', 0);
     sessionState.phase = 'pull_customer'; sessionState.activeRequestId = 'test-session-request'; sessionState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 2, pageValue: ['x'] };
     push.FbmSync.stateWrite(sessionState);
     const sessionResult = push.FbmSync.continue({ ok: failure.status === 200, status: failure.status, body: failure.body, transport: { trace: [{ requestId: 'test-session-request' }] } });
-  const expectTransportRetry = failure.status === 403;
-  check(so, 'Session error ' + failure.status + ' giu cursor an toan', [sessionResult.ok, expectTransportRetry ? sessionResult.retrying : null, push.FbmSync.stateRead().phase, push.FbmSync.stateRead().cursor.kind], expectTransportRetry ? [true, true, 'pull_customer', 'customer_grid'] : [false, null, 'error', 'customer_grid']);
+  const suspicious = failure.status === 401 || failure.status === 403;
+  check(so, 'Session error ' + failure.status + ' duoc probe lai hoac fail-closed', [sessionResult.ok, sessionResult.request && sessionResult.request.meta.kind, push.FbmSync.stateRead().phase, push.FbmSync.stateRead().cursor.kind], suspicious ? [true, 'session_probe', 'checking_session', 'session_probe'] : [false, null, 'error', 'customer_grid']);
   });
   const skippedLogs = [];
   push.logEvent = (event) => skippedLogs.push(event);
@@ -309,7 +317,7 @@ async function chay(so) {
   push.FbmSync.pushCandidates = pushCandidatesImpl;
   push.FbmSync.scriptSettings = () => ({ accountName: 'Owner', baseUrl: 'https://fbm.test', cookie: 'cookie', customerAuthorized: '1.test', testCustomerCode: 'ALT00010' });
   push.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-  const createState = push.FbmSync.stateStart('', 'push', 0); createState.metadata.categoryGate = {}; createState.activeRequestId = 'test-create-request'; createState.cursor = { kind: 'push_wait', entity: 'customer', index: 0, operation: 'customer_create_save', candidate: createCandidate }; push.FbmSync.stateWrite(createState);
+  const createState = push.FbmSync.stateStart('', 'push', 0); createState.metadata.categoryGate = {}; createState.session = { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' }; createState.activeRequestId = 'test-create-request'; createState.cursor = { kind: 'push_wait', entity: 'customer', index: 0, operation: 'customer_create_save', candidate: createCandidate }; push.FbmSync.stateWrite(createState);
   const recoveryStart = push.FbmSync.continue({ ok: false, status: 500, body: '{"Message":"timeout"}', transport: { trace: [{ requestId: 'test-create-request' }] } });
   check(so, 'Customer create mat response chuyen sang request doc MST contains, khong ghi lai', [recoveryStart.recovering, recoveryStart.request.meta.kind, recoveryStart.request.body.gridPageIndex, recoveryStart.request.body.filter, recoveryStart.request.body.externalKey.some((item) => item.Name === 'ma_kh' && item.Value === 'ALT00010'), push.FbmSync.stateRead().cursor.operation], [true, 'grid', -2, ['ma_so_thue:**0100123456'], false, 'customer_create_recover']);
   const customerFields = push.FbmSync.GRID_FIELDS.customer.slice();

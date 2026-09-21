@@ -253,7 +253,14 @@ function fbmSyncHeartbeatRequest(options) {
     if (state.activeRequestId && now - Number(state.lastProgressAt || 0) < 120000) {
       return fbmSyncLockResult('REQUEST_IN_FLIGHT', 'Đã có request FBM đang chờ response; không cấp request heartbeat chồng.');
     }
+    var gate = typeof FbmSync.sessionGateMeta === 'function' ? FbmSync.sessionGateMeta(state) : {}, waitingResult = typeof FbmSync.sessionGateWaitRequest === 'function' ? FbmSync.sessionGateWaitRequest(state, now) : null;
+    if (waitingResult && waitingResult.handled) { return waitingResult; }
     if (state.runId && activePhase && !(typeof FbmSync.sessionGateCursorIsInternal === 'function' && FbmSync.sessionGateCursorIsInternal(state))) {
+      if (gate.sliceProbePending === true && state.cursor && state.cursor.kind !== 'session_probe') {
+        gate.sliceProbePending = false;
+        var sliceProbe = FbmSync.sessionGateResumeProbeRequest(state, state.cursor, 'Đang probe lại phiên FBM ở đầu lát relay mới...');
+        return sliceProbe ? { ok: true, code: 'SESSION_SLICE_PROBE_READY', request: sliceProbe, status: FbmSync.statusView(), probingSlice: true } : { ok: false, code: 'SESSION_PROBE_UNAVAILABLE', request: null, status: FbmSync.statusView() };
+      }
       var resumed = FbmSync.requestForCursor(state);
       if (!resumed) { return fbmSyncLockResult('SYNC_RESUME_UNAVAILABLE', 'Phiên đồng bộ đang chạy nhưng GAS không dựng lại được request từ cursor.'); }
       return { ok: true, code: 'SYNC_RESUME_REQUEST_READY', request: FbmSync.nextEnvelope(resumed), status: FbmSync.statusView(), resumed: true };
@@ -294,32 +301,24 @@ function fbmSyncHeartbeatLocked(rawResponse, options) {
   if (!state.activeRequestId || !responseRequestId || responseRequestId !== String(state.activeRequestId)) {
     return { ok: false, code: 'STALE_RESPONSE', request: null, status: FbmSync.statusView(), error: 'Response heartbeat không còn thuộc request đang chờ.' };
   }
+  // Heartbeat không được tự suy ra phiên từ shape dữ liệu. Lỗi HTTP/parse đi qua
+  // continuation chung để 401/403 được probe và mọi lỗi khác fail-closed.
+  if (!result.ok) { return FbmSync.continue(rawResponse); }
   state.activeRequestId = '';
   state.deadlineAt = 0;
   state.lastProgressAt = Date.now();
   if (typeof FbmSync.sessionGateResponseStarted === 'function') { FbmSync.sessionGateResponseStarted(state); }
   state.relayHop = Number(options && options.hop || 0) + 1;
   FbmSync.stateWrite(state);
-  if (result.ok && FbmSync.protocol.hasHeartbeatData && !FbmSync.protocol.hasHeartbeatData(rawResponse)) {
-    result = { ok: false, code: 'SESSION_EXPIRED', status: Number(rawResponse && rawResponse.status || 0), retryable: false, bug: { FieldName: '$SESSION', Message: 'FBM không trả dữ liệu Customer hợp lệ; phiên có thể đã hết hạn.' } };
+  if (FbmSync.protocol.hasHeartbeatData && !FbmSync.protocol.hasHeartbeatData(rawResponse)) {
+    state.phase = 'error'; state.cursor = {}; state.lastFailureCode = 'HEARTBEAT_RESPONSE_INVALID'; state.lastError = 'Heartbeat FBM không trả dữ liệu Customer đúng định dạng; đã dừng để probe phiên ở lượt sau.'; state.message = state.lastError; state.retryable = false; state.scheduledScan = '';
+    FbmSync.stateWrite(state);
+    if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.lastError, 'heartbeat_invalid_response'); }
+    return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError };
   }
   state.session = state.session || {};
   state.session.lastHeartbeatAt = Date.now();
-  if (!result.ok && result.code === 'SESSION_EXPIRED') {
-    state.session.expired = true; state.session.customerAuthorized = ''; state.session.activityAuthorized = '';
-    state.lastFailureCode = result.code; state.retryable = false; state.lastError = result.bug.Message; state.message = result.bug.Message;
-    if (typeof FbmSync.sessionGateHandleFailure === 'function') {
-      var gateFailure = FbmSync.sessionGateHandleFailure(state, cursor, result);
-      if (gateFailure) { return gateFailure; }
-    }
-  } else if (!result.ok) {
-    state.lastFailureCode = result.code || 'HEARTBEAT_FAILED';
-    state.retryable = result.retryable === true;
-    state.lastError = result.bug && result.bug.Message || ('Heartbeat FBM thất bại: HTTP ' + String(result.status || 'không xác định') + '.');
-    state.message = state.lastError;
-    state.scheduledScan = '';
-  } else if (result.ok) {
-    state.session.expired = false;
+  if (result.ok) {
     var total = FbmSync.heartbeatCustomerTotal(rawResponse);
     var previousTotal = state.session.customerTotal;
     if (total !== null) {
@@ -336,6 +335,10 @@ function fbmSyncHeartbeatLocked(rawResponse, options) {
   state = FbmSync.stateRead();
   if (result.ok && Number(options && options.hop || 0) >= Number(FbmSync.RELAY_HOP_LIMIT || 20)) {
     state.relayHop = 0;
+    if (String(state.origin || '') === 'background' && state.runId && state.cursor && state.cursor.kind) {
+      var heartbeatGate = typeof FbmSync.sessionGateMeta === 'function' ? FbmSync.sessionGateMeta(state) : {};
+      heartbeatGate.sliceProbePending = true;
+    }
     state.message = 'Đã hết lát heartbeat an toàn; lượt sau sẽ tiếp tục từ cursor đã lưu.';
     FbmSync.stateWrite(state);
     return { ok: true, code: 'RELAY_SLICE_COMPLETE', request: null, status: FbmSync.statusView() };

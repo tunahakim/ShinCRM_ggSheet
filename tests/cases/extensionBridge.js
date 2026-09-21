@@ -47,6 +47,45 @@ function nguonTin() {
   };
 }
 
+function listSourceFiles(rootDir) {
+  const files = [];
+  (function walk(dir) {
+    fs.readdirSync(dir, { withFileTypes: true }).forEach((entry) => {
+      const file = path.join(dir, entry.name);
+      if (entry.isDirectory() && ['tests', 'node_modules', '.git'].indexOf(entry.name) >= 0) { return; }
+      if (entry.isDirectory()) { walk(file); return; }
+      if (/\.(?:js|html)$/.test(entry.name)) { files.push(file); }
+    });
+  }(rootDir));
+  return files;
+}
+
+function scanFbmRequestArchitecture(rootDir, virtualFiles) {
+  const files = listSourceFiles(rootDir).map((file) => ({ file, source: fs.readFileSync(file, 'utf8') }));
+  (virtualFiles || []).forEach((item) => { files.push({ file: item.file, source: item.source }); });
+  const violations = { protocolRequest: [], fbmFetch: [], loginCaller: [] };
+  const executorName = '/2_ShinCRM_Extension/content_scripts/fbm_sync/executor.js';
+  const transportName = '/1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js';
+  files.forEach((item) => {
+    const normalized = item.file.replace(/\\/g, '/');
+    const relative = path.relative(rootDir, item.file).replace(/\\/g, '/');
+    const source = item.source;
+    if (source.indexOf('FbmSync.protocol.request(') >= 0 && !normalized.endsWith(transportName)) {
+      violations.protocolRequest.push(relative);
+    }
+    if (normalized.endsWith('.js') && !normalized.endsWith(executorName) && /fetch\s*\([^;]*(?:fbo\.com\.vn|FBM_EXECUTE|req\.url|request\.url)/is.test(source)) {
+      violations.fbmFetch.push(relative);
+    }
+    if (!normalized.endsWith('fbm_sync/auth/AutoLogin.js') && !normalized.endsWith(transportName)) {
+      const executable = source.split('\n').filter((line) => !/FbmSync\.(loginRequest|beginAutoLogin)\s*=\s*function/.test(line)).join('\n');
+      if (/(?:FbmSync|sync)\.(?:loginRequest|beginAutoLogin)\s*\(/.test(executable)) {
+        violations.loginCaller.push(relative);
+      }
+    }
+  });
+  return violations;
+}
+
 async function chay(so) {
   section('Extension bridge — nonce đi trọn từ bắt tay tới CRM_CONTEXT');
   const scoutSource = fs.readFileSync(SCOUT_FILE, 'utf8');
@@ -140,20 +179,16 @@ async function chay(so) {
   const pullFlowSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'transport', 'PullFlow.js'), 'utf8');
   const schedulerSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'state', 'Scheduler.js'), 'utf8');
   const gasSyncRoot = path.join(__dirname, '..', '..', '1_ShinCRM_GAS');
-  const gasRequestCallers = [];
-  const gasSessionBypassCallers = [];
+  const architectureRoot = path.join(__dirname, '..', '..');
+  const architectureScan = scanFbmRequestArchitecture(architectureRoot);
+  const gasRequestCallers = architectureScan.protocolRequest;
+  const gasSessionBypassCallers = architectureScan.loginCaller;
+  const fixtureRoot = path.join(architectureRoot, '1_ShinCRM_GAS', 'server', 'dev');
+  const fixtureScan = scanFbmRequestArchitecture(architectureRoot, [{
+    file: path.join(fixtureRoot, 'ScannerFixture.js'),
+    source: 'function scannerFixture() { return sync.loginRequest("fixture"); }'
+  }]);
   const sessionLayerCustomerCalls = [];
-  (function scanSyncFiles(dir) {
-    fs.readdirSync(dir, { withFileTypes: true }).forEach((entry) => {
-      const file = path.join(dir, entry.name);
-      if (entry.isDirectory()) { scanSyncFiles(file); return; }
-      if (!/\.js$/.test(entry.name) || /TransportCore\.js$/.test(entry.name)) { return; }
-      const source = fs.readFileSync(file, 'utf8');
-      if (source.indexOf('FbmSync.protocol.request(') >= 0) { gasRequestCallers.push(file); }
-      const executable = source.split('\n').filter((line) => !/FbmSync\.(loginRequest|authorizeRequest|identityUserRequest|heartbeatCustomerRequest|beginAutoLogin)\s*=\s*function/.test(line)).join('\n');
-      if (/FbmSync\.(loginRequest|authorizeRequest|identityUserRequest|heartbeatCustomerRequest|beginAutoLogin)\s*\(/.test(executable)) { gasSessionBypassCallers.push(file); }
-    });
-  }(gasSyncRoot));
   const sessionLayerSources = [
     { name: 'TransportCore.js', source: fs.readFileSync(TRANSPORT_CORE_FILE, 'utf8') },
     { name: 'AutoLogin.js', source: fs.readFileSync(path.join(gasSyncRoot, 'fbm_sync', 'auth', 'AutoLogin.js'), 'utf8') }
@@ -169,9 +204,13 @@ async function chay(so) {
   check(so, 'worker chi co mot diem gui request FBM', (workerSource.match(/sendTabMessage\(tabId, \{ type: 'FBM_EXECUTE_V2', request: request \}/g) || []).length, 1);
   check(so, 'flow orchestration khong con tham chieu owner login', [pullFlowSource.toLowerCase().indexOf('login'), schedulerSource.toLowerCase().indexOf('login')], [-1, -1]);
   check(so, 'GAS chi co TransportCore goi protocol.request', gasRequestCallers, []);
+  check(so, 'scanner bat fixture goi login ngoai cong', fixtureScan.loginCaller.some((file) => file.endsWith('ScannerFixture.js')), true);
+  check(so, 'scanner bat fixture goi protocol.request ngoai TransportCore', scanFbmRequestArchitecture(architectureRoot, [{ file: path.join(fixtureRoot, 'ScannerFixture.js'), source: 'function scannerFixture() { return FbmSync.protocol.request("x"); }' }]).protocolRequest.some((file) => file.endsWith('ScannerFixture.js')), true);
+  check(so, 'scanner bat fixture fetch FBM ngoai executor', scanFbmRequestArchitecture(architectureRoot, [{ file: path.join(architectureRoot, '2_ShinCRM_Extension', 'background', 'ScannerFixture.js'), source: 'function scannerFixture() { return fetch("https://fbo.com.vn:8888/Main/Login.aspx"); }' }]).fbmFetch.some((file) => file.endsWith('ScannerFixture.js')), true);
+  check(so, 'toan bo Extension chi executor fetch toi FBM', architectureScan.fbmFetch, []);
   check(so, 'kiến trúc một cửa: không có GAS caller nào phát builder login/authorize/User/heartbeat ngoài cổng', gasSessionBypassCallers, []);
   check(so, 'tầng cổng và xác thực không gọi logic đối chiếu Customer của tầng 3', sessionLayerCustomerCalls, []);
-  check(so, 'cổng khai báo nhóm request hệ thống và marker phiên trước khi phát request nghiệp vụ', /SESSION_SYSTEM_KINDS/.test(fs.readFileSync(TRANSPORT_CORE_FILE, 'utf8')) && /sessionIdentityIsVerified/.test(fs.readFileSync(TRANSPORT_CORE_FILE, 'utf8')) && /requireIdentityProbe/.test(fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'transport', 'PullFlow.js'), 'utf8')), true);
+  check(so, 'cổng khai báo nhóm request hệ thống và marker phiên trước khi phát request nghiệp vụ', /SESSION_SYSTEM_KINDS/.test(fs.readFileSync(TRANSPORT_CORE_FILE, 'utf8')) && /sessionIdentityIsVerified/.test(fs.readFileSync(TRANSPORT_CORE_FILE, 'utf8')) && /requestNeedsGate/.test(fs.readFileSync(TRANSPORT_CORE_FILE, 'utf8')) && /session_probe/.test(fs.readFileSync(TRANSPORT_CORE_FILE, 'utf8')), true);
   check(so, 'bypass session gate khong nam trong tham so caller', fs.readFileSync(TRANSPORT_CORE_FILE, 'utf8').indexOf('bypass') < 0, true);
   check(so, 'Extension chi co mot alarm ky thuat gas_poll va khong co alarm theo tien trinh', [workerSource.indexOf("var GAS_POLL_ALARM = 'gas_poll'") >= 0, workerSource.indexOf("'fbm-heartbeat'") < 0, workerSource.indexOf("periodInMinutes: minutes") >= 0, workerSource.indexOf("fbmHeartbeatNow('startup')") >= 0], [true, true, true, true]);
   check(so, 'worker khong tao hai request FBM khi Sidebar thu lai cung id', workerSource.indexOf('fbmRequestFlights') >= 0 && workerSource.indexOf('existingFlight') >= 0, true);
@@ -360,9 +399,11 @@ async function chay(so) {
     let validReply = null;
     let sentBody = null;
     let responseText = '{"d":{}}';
+    let responseStatus = 200;
+    let responseOk = true;
     const response = {
-      ok: true,
-      status: 200,
+      get ok() { return responseOk; },
+      get status() { return responseStatus; },
       headers: { get() { return 'application/json'; } },
       arrayBuffer() { return Promise.resolve(new TextEncoder().encode(responseText).buffer); }
     };
@@ -388,12 +429,19 @@ async function chay(so) {
             listener({ type: 'FBM_EXECUTE_V2', request: { url: 'https://fbo.com.vn:8888/Main/authorize', method: 'POST', bodyText: '{}', meta: { transport: { jsonPaths: ['d.Authorized', 'd.UserId', 'd.UserName', 'd.AccountName'] } } } }, null, (projectedReply) => {
               setTimeout(() => {
                 const body = JSON.parse(projectedReply.result.body);
-                check(so, 'executor projection generic giu du field GAS yeu cau va bo payload lon', [body.d.Authorized, body.d.UserId, body.d.UserName, body.d.AccountName, body.d.Huge, projectedReply.result.body.length < responseText.length], ['auth-c', '2037', 'ANHLT', 'Le Tuan Anh', undefined, true]);
-                const rawBeforeFallback = responseText;
+                check(so, 'executor tra nguyen response JSON cho GAS, khong projection truoc GAS', [body.d.Authorized, body.d.UserId, body.d.UserName, body.d.AccountName, body.d.Huge, projectedReply.result.body === responseText], ['auth-c', '2037', 'ANHLT', 'Le Tuan Anh', body.d.Huge, true]);
                 listener({ type: 'FBM_EXECUTE_V2', request: { url: 'https://fbo.com.vn:8888/Main/authorize', method: 'POST', bodyText: '{}', meta: { transport: { jsonPaths: ['d.NotPresent'] } } } }, null, (fallbackReply) => {
                   setTimeout(() => {
-                    check(so, 'projection khong khop path phai fail closed thay vi tra payload lon', [fallbackReply && fallbackReply.code, fallbackReply && fallbackReply.error, fallbackReply && fallbackReply.result], ['FBM_TRANSPORT_PROJECTION_MISSING', 'Response FBM không chứa path projection nào do GAS yêu cầu.', undefined]);
-                    resolve();
+                    check(so, 'projection cu khong con lam thay doi response FBM', [fallbackReply && fallbackReply.code, fallbackReply && fallbackReply.result && fallbackReply.result.body === responseText], [undefined, true]);
+                    responseStatus = 500;
+                    responseOk = false;
+                    responseText = '\ufffd\ufffd\ufffd';
+                    listener({ type: 'FBM_EXECUTE_V2', request: { url: 'https://fbo.com.vn:8888/Main/authorize', method: 'POST', bodyText: '{}' } }, null, (rawFailure) => {
+                      setTimeout(() => {
+                        check(so, 'executor giu nguyen body HTTP 500 ky tu thay the cho GAS', [rawFailure && rawFailure.result && rawFailure.result.status, rawFailure && rawFailure.result && rawFailure.result.ok, rawFailure && rawFailure.result && rawFailure.result.body], [500, false, '\ufffd\ufffd\ufffd']);
+                        resolve();
+                      }, 20);
+                    });
                   }, 20);
                 });
               }, 20);
@@ -419,21 +467,21 @@ async function chay(so) {
     listener({ type: 'FBM_EXECUTE_V2', request: { url: 'https://fbo.com.vn:8888/Main/activity', method: 'POST', bodyText: '{}', meta: { transport: { arrayFilters: [{ path: 'd.Rows', keyIndex: 0, values: ['1', '3'] }] } } } }, null, (reply) => {
       setTimeout(() => {
         const body = JSON.parse(reply.result.body);
-        check(so, 'executor loc mang generic theo tap khoa GAS cap', [body.d.Rows.length, body.d.Rows.map((row) => row[0]).join(','), reply.result.transport.trace.some((item) => item.stage === 'fetch_finished')], [2, '1,3', true]);
+        check(so, 'executor tra nguyen mang FBM thay vi loc o Extension', [body.d.Rows.length, body.d.Rows.map((row) => row[0]).join(','), reply.result.transport.trace.some((item) => item.stage === 'fetch_finished')], [3, '1,2,3', true]);
         responseText = 'not-json';
         listener({ type: 'FBM_EXECUTE_V2', request: { url: 'https://fbo.com.vn:8888/Main/activity', method: 'POST', bodyText: '{}', meta: { transport: { arrayFilters: [{ path: 'd.Rows', keyIndex: 0, values: ['1'] }] } } } }, null, (invalid) => {
           setTimeout(() => {
-            check(so, 'executor loc JSON loi theo chi dan phai fail closed', [invalid.code, invalid.result], ['FBM_TRANSPORT_FILTER_INVALID_JSON', undefined]);
+            check(so, 'executor tra nguyen body khong phai JSON de GAS tu phan loai', [invalid.code, invalid.result && invalid.result.body], [undefined, 'not-json']);
             responseText = JSON.stringify({ d: { Rows: [[1, 'A', 'drop'], [2, 'B', 'drop']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'ma_kh' }, { AliasName: 'details' }] } } });
             listener({ type: 'FBM_EXECUTE_V2', request: { url: 'https://fbo.com.vn:8888/Main/activity', method: 'POST', bodyText: '{}', meta: { transport: { arrayProjections: [{ paths: ['d.Rows', 'd.ViewPage.Fields'], indices: [0, 2] }] } } } }, null, (projectionReply) => {
               setTimeout(() => {
                 const projected = projectionReply && projectionReply.result ? JSON.parse(projectionReply.result.body) : null;
-                check(so, 'executor chieu cot generic theo vi tri GAS cap cho ca rows va metadata', [projected && projected.d.Rows[0].join(','), projected && projected.d.ViewPage.Fields.map((field) => field.AliasName).join(','), projectionReply && projectionReply.result && projectionReply.result.transport.trace.some((item) => item.stage === 'fetch_finished'), projectionReply && projectionReply.code, projectionReply && projectionReply.error], ['1,drop', 'id,details', true, undefined, undefined]);
+                check(so, 'executor tra nguyen ca rows va metadata cho GAS', [projected && projected.d.Rows[0].join(','), projected && projected.d.ViewPage.Fields.map((field) => field.AliasName).join(','), projectionReply && projectionReply.result && projectionReply.result.transport.trace.some((item) => item.stage === 'fetch_finished'), projectionReply && projectionReply.code, projectionReply && projectionReply.error], ['1,A,drop', 'id,ma_kh,details', true, undefined, undefined]);
                 responseText = JSON.stringify({ d: { Rows: [], ViewPage: { Fields: [] } } });
                 listener({ type: 'FBM_EXECUTE_V2', request: { url: 'https://fbo.com.vn:8888/Main/activity', method: 'POST', bodyText: '{}', meta: { transport: { arrayProjections: [{ paths: ['d.Rows', 'd.ViewPage.Fields'], indices: [0, 2] }] } } } }, null, (emptyReply) => {
                   setTimeout(() => {
                     const empty = emptyReply && emptyReply.result ? JSON.parse(emptyReply.result.body) : null;
-                    check(so, 'executor chieu cot khong tao dong gia khi mang FBM rong', [empty && empty.d.Rows.length, empty && empty.d.ViewPage.Fields.length], [0, 0]);
+                    check(so, 'executor tra nguyen response rong khong tu bien doi', [empty && empty.d.Rows.length, empty && empty.d.ViewPage.Fields.length], [0, 0]);
                     resolve();
                   }, 20);
                 });
@@ -478,6 +526,42 @@ async function chay(so) {
         const loginBody = calls[3] && JSON.parse(calls[3].body);
         check(so, 'executor login chay du trang salt, database, don vi, Login va trang tai khoan', [calls.map((item) => item.url.replace('https://fbo.com.vn:8888/Main/', '')).join('|'), reply && reply.result && reply.result.ok], ['Login.aspx|Login.aspx/GetEntityData|Login.aspx/GetUnitData|Login.aspx/Login|zccrAccount.aspx', true]);
         check(so, 'executor login doc salt ChallengeScript HTML live, force false va khong dua mat khau goc len FBM', [loginBody.value, loginBody.force, loginBody.password === 'mat-khau', loginBody.database, loginBody.unit], ['a2838e6f471b', false, false, 'FHN_CRM_App', 'CTY']);
+        resolve();
+      }, 20);
+    });
+  });
+
+  await new Promise((resolve) => {
+    let listener = null;
+    const calls = [];
+    function response(text) {
+      return {
+        ok: true,
+        status: 200,
+        headers: { get() { return 'text/html; charset=UTF-8'; } },
+        arrayBuffer() { return Promise.resolve(new TextEncoder().encode(text).buffer); }
+      };
+    }
+    const context = {
+      console: { log() {}, warn() {} }, Date, URL, Promise, Error, AbortController, setTimeout, clearTimeout,
+      Blob, Response, TextDecoder, TextEncoder, DecompressionStream: undefined,
+      document: { documentElement: { innerHTML: '', textContent: '' } },
+      fetch(url, options) {
+        calls.push({ url: String(url), method: options && options.method || 'GET' });
+        if (String(url).endsWith('/Main/Login.aspx')) { return Promise.resolve(response(String.raw`<script>{"ChallengeScript":"eval(\u0027\\\u0027a2838e\\\u0027+\\\u00276f471b\\\u0027\u0027)"}</script>`)); }
+        if (String(url).endsWith('/GetEntityData')) { return Promise.resolve(response('{"d":[["01","Fast FBM Online","FHN_CRM_App"]]}')); }
+        if (String(url).endsWith('/GetUnitData')) { return Promise.resolve(response('{"d":[["CTY","Company","Company"]]}')); }
+        if (String(url).endsWith('/Login')) { return Promise.resolve(response('Đã đăng nhập. Hủy phiên làm việc trước')); }
+        if (String(url).endsWith('/zccrAccount.aspx')) { return Promise.resolve(response('unexpected-account-page')); }
+        return Promise.resolve(response('{}'));
+      },
+      chrome: { runtime: { onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
+    };
+    vm.createContext(context);
+    vm.runInContext(executorSource, context, { filename: EXECUTOR_FILE });
+    listener({ type: 'FBM_EXECUTE_V2', request: { meta: { kind: 'login', loginCredentials: { username: 'anhlt' } } } }, null, (reply) => {
+      setTimeout(() => {
+        check(so, 'executor dung tai Login khi FBM bao dang co phien khac, khong tu huy va khong mo trang tai khoan', [calls.map((item) => item.url.replace('https://fbo.com.vn:8888/Main/', '')).join('|'), reply && reply.result && reply.result.transport && reply.result.transport.loginBlocked, reply && reply.result && reply.result.body], ['Login.aspx|Login.aspx/GetEntityData|Login.aspx/GetUnitData|Login.aspx/Login', true, 'Đã đăng nhập. Hủy phiên làm việc trước']);
         resolve();
       }, 20);
     });

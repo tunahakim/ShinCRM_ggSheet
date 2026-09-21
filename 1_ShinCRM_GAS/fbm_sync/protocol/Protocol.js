@@ -40,17 +40,22 @@ FbmSync.protocol = {
       var bug = data && data.Bugs;
       detail = bug && (bug.Message || bug.message) || '';
     } catch (ignore) {}
-    if (!detail) {
-      detail = String(body || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 240);
-    }
-    return 'HTTP ' + status + (detail ? ': ' + detail : '');
+    return 'HTTP ' + status + (detail ? ': ' + detail : ': FBM không trả nội dung lỗi đọc được.');
   },
-  /** FBM đôi khi trả trang đăng nhập với HTTP 200 thay vì 401/403. */
-  isSessionExpired: function (response) {
-    var parsed = FbmSync.protocol.parse(response) || {};
-    var body = parsed && parsed.raw !== undefined ? String(parsed.raw) : String((response && response.body) || '');
-    return /(?:Login\.aspx|name\s*=\s*["'](?:username|userName)["']|id\s*=\s*["'](?:login|loginForm)["'])/i.test(body);
+  /** Phiên sống chỉ được xác nhận bằng ba điều kiện tích cực do FBM đo được. */
+  isLiveSessionResponse: function (response) {
+    var status = Number(response && response.status || 0), parsed;
+    if (status !== 200) { return false; }
+    parsed = FbmSync.protocol.parse(response) || {};
+    return !parsed.parseError && parsed && typeof parsed === 'object' && Object.prototype.hasOwnProperty.call(parsed, 'd');
   },
+  /** 401/403 chỉ là dấu hiệu đáng ngờ; probe mới được phép kết luận phiên. */
+  isSessionSuspicious: function (response) {
+    var status = Number(response && response.status || 0);
+    return status === 401 || status === 403;
+  },
+  /** Tương thích tên cũ cho login adapter; không còn dò chữ Login.aspx trong body. */
+  isSessionExpired: function (response) { return !FbmSync.protocol.isLiveSessionResponse(response); },
   /** Heartbeat Customer phải trả đúng shape dữ liệu; response rỗng không được coi là phiên khỏe. */
   hasHeartbeatData: function (response) {
     var parsed = FbmSync.protocol.parse(response) || {}, data = parsed.d || parsed;
@@ -64,8 +69,8 @@ FbmSync.protocol = {
     var httpStatus = Number(response && typeof response === 'object' ? response.status || 0 : 0);
     // FBM dùng 401 để báo phiên hết hạn; phải đi qua session gate trước khi
     // áp dụng luật retry chung của lỗi vận chuyển.
-    if (httpStatus === 401 || FbmSync.protocol.isSessionExpired(response)) {
-      return { code: 'SESSION_EXPIRED', retryable: false, status: httpStatus, bug: { FieldName: '$SESSION', Message: 'Phiên FBM đã hết hạn; hãy đăng nhập lại.' } };
+    if (FbmSync.protocol.isSessionSuspicious(response)) {
+      return { code: 'SESSION_SUSPECTED', retryable: false, status: httpStatus, bug: { FieldName: '$SESSION', Message: 'Phản hồi FBM đáng ngờ; cần probe lại phiên.' } };
     }
     if (httpStatus >= 400) {
       return { code: 'TRANSPORT_ERROR', retryable: true, status: httpStatus, bug: { FieldName: '$HTTP', Message: FbmSync.protocol.httpErrorMessage(httpStatus, response.body) } };

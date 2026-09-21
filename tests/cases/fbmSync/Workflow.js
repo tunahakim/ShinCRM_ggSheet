@@ -348,12 +348,14 @@ async function chay(so) {
     }
   });
   compactLookupFlow.hop.FbmSync.readCategoryGate = () => ({ map: compactLookupMap, names: compactLookupAllNames, namesBySource: compactLookupNames, valid: compactLookupValid, warnings: [] });
+  compactLookupFlow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
   compactLookupFlow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   compactLookupFlow.hop.FbmSync.start({ mode: 'read', origin: 'manual', scan: 'full' });
   const compactContinue = (body) => {
     const requestId = compactLookupFlow.hop.FbmSync.stateRead().activeRequestId;
     return compactLookupFlow.hop.FbmSync.continue({ ok: true, status: 200, body: JSON.stringify(body), transport: { trace: [{ stage: 'executor_response_sent', requestId }] } });
   };
+  compactContinue({ d: { TotalRowCount: 1, Rows: [[2037, 'ANHLT', 'Le Tuan Anh']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] } } });
   compactContinue({ d: { Authorized: 'customer-auth' } });
   compactContinue({ d: { Authorized: 'activity-auth' } });
   let compactLast = null;
@@ -362,7 +364,7 @@ async function chay(so) {
     const rows = Object.keys(compactLookupNames[item.key]).map((code) => [code, compactLookupNames[item.key][code]]);
     rows.push(...Array.from({ length: 700 }, (_, rowIndex) => ['NOISE-' + index + '-' + rowIndex, 'Tên dài để mô phỏng danh mục lớn']));
     compactLast = compactContinue({ d: { TotalRowCount: rows.length, Rows: rows } });
-    if (index === 0) { compactPairValue = compactLookupFlow.hop.FbmSync.stateRead().session.lookups['@CAT_TINH_THANH'].pairs['CODE-0']; }
+    if (index === 0) { const lookup = compactLookupFlow.hop.FbmSync.stateRead().session.lookups['@CAT_TINH_THANH']; compactPairValue = lookup && lookup.pairs && lookup.pairs['CODE-0']; }
   });
   const compactState = compactLookupFlow.hop.FbmSync.stateRead();
   const compactStateBytes = Buffer.byteLength(JSON.stringify(compactState), 'utf8');
@@ -472,9 +474,8 @@ async function chay(so) {
     htmlResult = htmlFailureFlow.hop.FbmSync.continue({ ok: true, status: 200, body: '<html><h1>500 Internal Server Error</h1></html>', transport: { trace: [{ stage: 'executor_response_sent', requestId }] } });
     if (!htmlResult.request) { break; }
   }
-  htmlFailureFlow.hop.FbmSync.logStatus(htmlResult.status, 'html_parse_error');
   const htmlState = htmlFailureFlow.hop.FbmSync.stateRead();
-  check(so, 'HTML lỗi qua continuation bị fail-closed, giữ cursor và ghi Log lỗi', [htmlStarted.request.meta.kind, htmlResult.ok, htmlResult.request || null, htmlState.phase, htmlState.lastFailureCode, htmlState.cursor.kind, htmlLogs.length, htmlLogs[0] && htmlLogs[0].action], ['identity_user_grid', false, null, 'error', 'PARSE_ERROR', 'identity_user_grid', 1, 'html_parse_error']);
+  check(so, 'HTML lỗi qua continuation bị fail-closed, giữ cursor và ghi Log lỗi', [htmlStarted.request.meta.kind, htmlResult.ok, htmlResult.request || null, htmlState.phase, htmlState.lastFailureCode, htmlState.cursor.kind, htmlLogs.length, htmlLogs[0] && htmlLogs[0].action], ['identity_user_grid', false, null, 'error', 'PARSE_ERROR', 'identity_user_grid', 1, 'business_request_failed']);
   scheduleFlow.hop.FbmSync.identityPreflight = () => ({ blocking: false, status: { status: 'BOUND' }, message: '' });
   const now = Date.now();
   scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_CUSTOMER_SCAN', String(now - 1));
@@ -617,6 +618,7 @@ async function chay(so) {
     }
   });
   fullFlow.hop.FbmSync.prepareCategoryGate = () => ({ map: {}, names: {}, valid: {}, warnings: [] });
+  fullFlow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
   const fullCustomerFields = fullFlow.hop.FbmSync.GRID_FIELDS.customer;
   const fullActivityFields = fullFlow.hop.FbmSync.GRID_FIELDS.activity;
   const customerRows = [
@@ -670,12 +672,13 @@ async function chay(so) {
     ui.content.textContent.indexOf('Hoàn tất') >= 0
   ], [
     true, null, 'done', 2, 2, 3,
-    ['authorize:customer', 'authorize:activity', 'completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH', 'completion:@CAT_CONG_VIEC', 'completion:@CAT_SAN_PHAM', 'grid:customer', 'grid:activity', 'grid:activity'],
+     ['session_probe:user', 'authorize:customer', 'authorize:activity', 'completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH', 'completion:@CAT_CONG_VIEC', 'completion:@CAT_SAN_PHAM', 'grid:customer', 'grid:activity', 'grid:activity'],
     true, true, true, 4, true
   ]);
 
   const readFlow = workflowGas();
   readFlow.hop.FbmSync.prepareCategoryGate = () => ({ map: {} });
+  readFlow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
   readFlow.hop.FbmSync.pullWrite = () => ({ ok: true, written: 0, conflicts: 0, skipped: 0 });
   readFlow.hop.FbmSync.markMissingAfterFullScan = () => ({ total: 0, written: 0 });
   readFlow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
@@ -685,7 +688,8 @@ async function chay(so) {
     const request = readStep.request;
     readKinds.push(request.meta.kind + ':' + String(request.meta.entity || request.meta.field || ''));
     let body;
-    if (request.meta.kind === 'authorize') { body = JSON.stringify({ d: { Authorized: 'auth-' + request.meta.entity } }); }
+    if (request.meta.kind === 'session_probe') { body = userResponse; }
+    else if (request.meta.kind === 'authorize') { body = JSON.stringify({ d: { Authorized: 'auth-' + request.meta.entity } }); }
     else if (request.meta.kind === 'completion') { body = JSON.stringify({ d: [['CODE', 'Tên danh mục']] }); }
     else {
       body = JSON.stringify({ d: {
@@ -697,11 +701,11 @@ async function chay(so) {
     readStep = readFlow.hop.FbmSync.continue(executorRaw(throughExtension.reply, request.id));
   }
   check(so, 'phiên rỗng: Extension chỉ chuyển request đọc, không phát request ghi hoặc xóa và pipeline kết thúc', [
-    readKinds, readKinds.length, readKinds.every((kind) => ['authorize:customer', 'authorize:activity', 'completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH', 'completion:@CAT_CONG_VIEC', 'completion:@CAT_SAN_PHAM', 'grid:customer'].indexOf(kind) >= 0), readStep.ok, readStep.request || null, readStep.status.phase, readFlow.hop.FbmSync.stateRead().counts.succeeded
+    readKinds, readKinds.length, readKinds.every((kind) => ['session_probe:user', 'authorize:customer', 'authorize:activity', 'completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH', 'completion:@CAT_CONG_VIEC', 'completion:@CAT_SAN_PHAM', 'grid:customer'].indexOf(kind) >= 0), readStep.ok, readStep.request || null, readStep.status.phase, readFlow.hop.FbmSync.stateRead().counts.succeeded
   ], [[
-    'authorize:customer', 'authorize:activity', 'completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH',
+     'session_probe:user', 'authorize:customer', 'authorize:activity', 'completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH',
     'completion:@CAT_CONG_VIEC', 'completion:@CAT_SAN_PHAM', 'grid:customer'
-  ], 7, true, true, null, 'done', 0]);
+  ], 8, true, true, null, 'done', 0]);
 
   const approval = workflowGas();
   approval.hop.FbmSync.runPreflight = () => ({ ok: true, issues: [], blocking: [], candidateCount: 11 });
@@ -710,31 +714,33 @@ async function chay(so) {
   check(so, 'push lon: GAS khong cap request truoc chap thuan, sau chap thuan moi cap authorize', [
     awaitingApproval.approvalRequired, awaitingApproval.request || null, awaitingApproval.status.phase,
     approved.ok, approved.request.meta.kind, approved.status.phase
-  ], [true, null, 'awaiting_approval', true, 'authorize', 'checking_session']);
+  ], [true, null, 'awaiting_approval', true, 'session_probe', 'checking_session']);
 
   const stopAfterResponse = workflowGas();
+  stopAfterResponse.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
   stopAfterResponse.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const stopStarted = stopAfterResponse.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true });
   const stopPending = stopAfterResponse.hop.fbmSyncCancel();
   const stopped = stopAfterResponse.hop.FbmSync.continue({
-    ok: true, status: 200, body: JSON.stringify({ d: { Authorized: 'auth-customer' } }),
+    ok: true, status: 200, body: userResponse,
     transport: { trace: [{ stage: 'executor_response_sent', requestId: stopStarted.request.id }] }
   });
   check(so, 'cancel request doc dang bay: nhan response de dong lat roi dung, khong cap authorize Activity', [
     stopPending.code, stopped.ok, stopped.request || null, stopped.status.phase, stopAfterResponse.hop.FbmSync.stateRead().cursor.kind
-  ], ['SYNC_CANCEL_PENDING', true, null, 'paused', 'authorize_activity']);
+  ], ['SYNC_CANCEL_PENDING', true, null, 'paused', 'authorize_customer']);
 
   const masterOff = workflowGas();
+  masterOff.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
   masterOff.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const masterStarted = masterOff.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true });
   masterOff.hop.FbmSync.setMasterEnabled(false);
   const masterStopped = masterOff.hop.FbmSync.continue({
-    ok: true, status: 200, body: JSON.stringify({ d: { Authorized: 'auth-customer' } }),
+    ok: true, status: 200, body: userResponse,
     transport: { trace: [{ stage: 'executor_response_sent', requestId: masterStarted.request.id }] }
   });
   check(so, 'master OFF request dang bay: chi chan envelope tiep theo va giu cursor de chan doan', [
     masterStopped.ok, masterStopped.request || null, masterStopped.status.phase, masterOff.hop.FbmSync.stateRead().cursor.kind
-  ], [true, null, 'paused', 'authorize_activity']);
+  ], [true, null, 'paused', 'authorize_customer']);
 
   const dto = workflowGas();
   const privateState = dto.hop.FbmSync.stateRead();

@@ -14,7 +14,8 @@ async function chay(so) {
   check(so, 'loi nghiep vu khong retry tu dong', hop.FbmSync.protocol.classifyFailure({ ok: true, status: 200, body: '{"d":{"Bugs":{"Message":"Sai du lieu"}}}' }).retryable, false);
   check(so, 'loi HTTP co the retry', hop.FbmSync.protocol.classifyFailure({ ok: false, status: 503, body: '' }).retryable, true);
   check(so, 'HTTP 500 co JSON van la loi van chuyen, khong bi nham la Bugs nghiep vu', [hop.FbmSync.protocol.classifyFailure({ ok: false, status: 500, body: '{"Message":"server"}' }).code, hop.FbmSync.protocol.classifyFailure({ ok: false, status: 500, body: '{"Message":"server"}' }).retryable], ['TRANSPORT_ERROR', true]);
-  check(so, 'HTTP 401 di vao session gate, 403 van la loi van chuyen', [hop.FbmSync.protocol.classifyFailure({ ok: false, status: 401, body: '{"d":{"Bugs":{"Message":"Login"}}}' }).code, hop.FbmSync.protocol.classifyFailure({ ok: false, status: 403, body: 'forbidden' }).retryable], ['SESSION_EXPIRED', true]);
+  check(so, 'HTTP 401 va 403 chi la phien dang ngo, khong tu ket luan het phien', [hop.FbmSync.protocol.classifyFailure({ ok: false, status: 401, body: '{"d":{"Bugs":{"Message":"Login"}}}' }).code, hop.FbmSync.protocol.classifyFailure({ ok: false, status: 403, body: 'forbidden' }).code], ['SESSION_SUSPECTED', 'SESSION_SUSPECTED']);
+  check(so, 'hop dong phien song chi dat khi HTTP 200 JSON co khoa d', [hop.FbmSync.protocol.isLiveSessionResponse({ ok: true, status: 200, body: '{"d":{}}' }), hop.FbmSync.protocol.isLiveSessionResponse({ ok: true, status: 200, body: '{"x":1}' }), hop.FbmSync.protocol.isLiveSessionResponse({ ok: false, status: 500, body: '\ufffd\ufffd\ufffd' })], [true, false, false]);
   check(so, 'SYNC_STATUS co du 11 gia tri hop dong', Object.keys(hop.FbmSync.SYNC_STATUS).length, 11);
   check(so, 'parse response FBM va doc Bugs', parsed.d.Bugs.Message, 'bad');
   check(so, 'Bugs khong bi coi la thanh cong', hop.FbmSync.protocol.assertSuccess(parsed).ok, false);

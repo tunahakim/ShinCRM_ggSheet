@@ -5,6 +5,14 @@ FbmSync.LOGIN_CONFIG_KEY = 'FBM_LOGIN_CONFIG_V1';
 FbmSync.AUTO_LOGIN_LAST_ATTEMPT_KEY = 'FBM_AUTO_LOGIN_LAST_ATTEMPT_V1';
 // Không thử dồn dập và tuyệt đối không ép logout phiên đang dùng ở máy khác.
 FbmSync.AUTO_LOGIN_RETRY_MS = 30 * 60 * 1000;
+FbmSync.AUTO_LOGIN_MAX_BLOCK_WAITS = 3;
+
+/** Chỉ nhận diện đúng thông báo FBM giữ khóa phiên; không coi mọi login lỗi là bị chặn. */
+FbmSync.loginBlockedResponse = function (response) {
+  var body = String(response && response.body || '').toLowerCase().replace(/\s+/g, ' ');
+  return body.indexOf('đã đăng nhập') >= 0 && body.indexOf('hủy phiên làm việc trước') >= 0
+    || body.indexOf('da dang nhap') >= 0 && body.indexOf('huy phien lam viec truoc') >= 0;
+};
 
 FbmSync.loginConfigDefault = function () {
   return { enabled: true, autoOpenTab: false, retryEnabled: true, retryMinutes: 30, configured: false, credentialRef: '', envelope: null, public: {}, lastAttemptAt: 0, lastLoginAt: 0, nextRetryAt: 0, lastError: '' };
@@ -186,8 +194,42 @@ FbmSync.loginCursorNext = function (cursor, kind) {
   };
 };
 
+/** Ghi nhận FBM còn khóa phiên cũ; máy không được tự bấm nút hủy. */
+FbmSync.loginSessionBlockedContinue = function (state, cursor) {
+  var current = state || FbmSync.stateRead(), gate = FbmSync.sessionGateMeta(current), retryMinutes = Number(FbmSync.loginConfigRead().retryMinutes || 30), waitMs = Math.max(1, retryMinutes) * 60 * 1000, maxWaits = Number(FbmSync.AUTO_LOGIN_MAX_BLOCK_WAITS || 3), count;
+  if (cursor && cursor.testOnly === true) {
+    current.phase = 'paused'; current.cursor = {}; current.retryable = false; current.lastFailureCode = 'LOGIN_SESSION_BLOCKED'; current.lastError = 'FBM báo tài khoản đang có phiên khác; hãy tự xử lý trên tab FBM, máy không tự hủy phiên cũ.'; current.message = current.lastError; FbmSync.stateWrite(current);
+    if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(current, current.lastFailureCode, current.message, 'login_session_blocked'); }
+    return { ok: false, code: current.lastFailureCode, request: null, status: FbmSync.statusView(), error: current.lastError, message: current.lastError };
+  }
+  count = Number(gate.blockedWaitCount || 0) + 1;
+  gate.blockedWaitCount = count;
+  gate.blockedSession = true;
+  gate.blockedSessionProbe = false;
+  gate.loginAttempted = false;
+  gate.resumeCursor = cursor && cursor.resumeCursor && cursor.resumeCursor.kind ? Object.assign({}, cursor.resumeCursor) : gate.resumeCursor || {};
+  gate.resumePhase = String(cursor && cursor.resumePhase || gate.resumePhase || 'checking_session');
+  gate.resumeEntity = String(cursor && cursor.resumeEntity || gate.resumeEntity || '');
+  gate.blockedNextProbeAt = Date.now() + waitMs;
+  FbmSync.sessionIdentityClear(current);
+  if (FbmSync.autoLoginMarkFailure) { FbmSync.autoLoginMarkFailure('FBM đang giữ một phiên đăng nhập cũ; chờ chu kỳ an toàn trước khi probe lại.'); }
+  current.retryable = true;
+  current.lastFailureCode = 'LOGIN_SESSION_BLOCKED';
+  current.lastError = 'FBM báo tài khoản đang có phiên khác; không hủy phiên cũ. Đang chờ chu kỳ an toàn trước khi probe lại.';
+  current.message = current.lastError;
+  if (count >= maxWaits) {
+    current.phase = 'error'; current.cursor = {}; current.retryable = false; current.lastFailureCode = 'LOGIN_SESSION_BLOCKED_TIMEOUT'; current.lastError = 'FBM báo tài khoản đang có phiên khác; đã hết số lần chờ an toàn, cần người dùng xử lý trên FBM.'; current.message = current.lastError;
+  } else {
+    current.phase = 'waiting_session'; current.cursor = { kind: 'session_wait' };
+  }
+  FbmSync.stateWrite(current);
+  if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(current, current.lastFailureCode, current.message, count >= maxWaits ? 'login_session_blocked_timeout' : 'login_session_blocked'); }
+  return { ok: false, code: current.lastFailureCode, request: null, status: FbmSync.statusView(), error: current.lastError, message: current.message, waiting: count < maxWaits };
+};
+
 /** Sau adapter login, GAS luôn authorize và đọc User trước khi tin phiên mới. */
 FbmSync.loginAdapterContinue = function (state, cursor, response) {
+  if (FbmSync.loginBlockedResponse(response)) { return FbmSync.loginSessionBlockedContinue(state, cursor); }
   var success = FbmSync.protocol.assertSuccess(response), parsed = FbmSync.protocol.parse(response) || {}, data = parsed && parsed.d !== undefined ? parsed.d : parsed;
   if (!success.ok || data === false || FbmSync.protocol.isSessionExpired(response)) {
     var failure = success.bug && (success.bug.Message || success.bug.message) || 'Đăng nhập FBM thất bại.';
@@ -276,6 +318,10 @@ FbmSync.beginAutoLogin = function (state, failedCursor, options) {
   if (!allowed.ok) { return null; }
   var opt = options || {};
   var gate = FbmSync.sessionGateMeta(state);
+  gate.loginAttempted = true;
+  gate.blockedSession = false;
+  gate.blockedSessionProbe = false;
+  gate.probeRetryCount = 0;
   var resumeCursor = failedCursor && failedCursor.kind === 'session_probe' && gate.resumeCursor ? gate.resumeCursor : (failedCursor || {});
   FbmSync.autoLoginMarkAttempt();
   state.cursor = { kind: 'login', credentialRef: allowed.credentialRef, purpose: 'auto', resumeCursor: Object.assign({}, resumeCursor), resumePhase: String(gate.resumePhase || state.phase || ''), resumeEntity: String(gate.resumeEntity || state.entity || ''), resumeHeartbeat: opt.heartbeat === true };

@@ -48,3 +48,14 @@ Quy tắc: mỗi mục chỉ đánh dấu `[x]` khi đã có dẫn chứng tệp
 - [x] [Gốc lỗi] Run mới tái sử dụng `session.cookie` và `identityVerified` của run trước; khi tab vừa mở ở `Login.aspx`, cổng tưởng marker cũ là phiên sống, cấp authorize ngay. Response rác bị Extension ném lỗi projection trước GAS, nên không có cơ hội phân loại `SESSION_EXPIRED` và gọi auto-login.
 - [x] [Kiến trúc cần sửa] Tách trạng thái “đã xác thực live trong run hiện tại” khỏi state phiên cũ; mọi run đồng bộ phải probe User trước request nghiệp vụ; cookie cũ không là bằng chứng sống; malformed/projection có dấu hiệu trang login phải vào cùng session gate; bỏ caller dev gọi thẳng `loginRequest`; mở rộng scanner/test chốt toàn repo.
 - [ ] [Cảnh báo hợp đồng] Sửa các điểm trên sẽ đụng hợp đồng state/session marker, mã lỗi transport Extension→GAS và ca test scanner; cần duyệt trước khi viết code.
+
+## F. Thứ tự sửa đã được duyệt
+
+- [x] Bước 1: viết scanner trước; chạy trước sửa runtime; kết quả chỉ lộ caller đã nêu `server/dev/FbmSyncFixture.js`.
+- [ ] Bước 2: Extension chỉ trả `status`, `ok`, body text nguyên trạng và transport trace; không parse/filter/project response FBM.
+- [ ] Bước 3: mỗi run bắt buộc probe User trước request nghiệp vụ; phiên sống chỉ khi HTTP 200 + JSON parse được + có khóa `d`; cookie/marker cũ không là bằng chứng; bỏ ngoại lệ `activity_bulk`.
+- [ ] Bước 4: request nghiệp vụ fail-closed, Sidebar/Log báo rõ, không tự kích hoạt login; probe sau login không đạt cũng dừng, không vòng login.
+- [ ] Bước 5: xóa/chuyển hướng `server/dev/FbmSyncFixture.js:fbmProbeAutoLogin`; scanner phải xanh.
+- [ ] Bước 6: cập nhật tài liệu 09.01 bằng hai mẫu response đo thực tế; 401/403 chỉ đáng ngờ và phải probe lại.
+- [ ] Bước 7: bổ sung test cho body HTTP 500 không decode, probe đầu mỗi run, marker/cookie không tái sử dụng, login một lần và không login từ lỗi nghiệp vụ; chạy `node tests/run.js`.
+- [ ] Nghiệm thu thật: đóng tab FBM và đăng xuất, chạy `Lấy từ FBM → ShinCRM`; DevTools phải cho thấy probe User trước request nghiệp vụ, nếu probe không sống thì chuỗi login đầy đủ rồi authorize/User, không có authorize nghiệp vụ trước login và không có request thứ hai sau fail-closed.

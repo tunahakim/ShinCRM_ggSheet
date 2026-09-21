@@ -193,6 +193,42 @@ FbmSync.sessionGateStart = function (state, failedCursor) {
   request = FbmSync.sessionGateAttachLoginToken(allowed, current);
   return request;
 };
+/** Điều phối vòng chờ khi FBM còn giữ khóa phiên; Scheduler chỉ gọi cổng này. */
+FbmSync.sessionGateWaitRequest = function (state, now) {
+  var current = state || FbmSync.stateRead(), gate = FbmSync.sessionGateMeta(current), at = Number(now || Date.now()), nextAt, count, maxWaits, envelope;
+  if (gate.blockedSession !== true || !current.runId || current.phase !== 'waiting_session') { return null; }
+  nextAt = Number(gate.blockedNextProbeAt || 0); count = Number(gate.blockedWaitCount || 0); maxWaits = Number(FbmSync.AUTO_LOGIN_MAX_BLOCK_WAITS || 3);
+  if (count >= maxWaits && at >= nextAt) {
+    current.phase = 'error'; current.cursor = {}; current.lastFailureCode = 'LOGIN_SESSION_BLOCKED_TIMEOUT'; current.lastError = 'FBM báo tài khoản đang có phiên khác; đã hết số lần chờ an toàn, cần người dùng xử lý trên FBM.'; current.message = current.lastError; current.retryable = false; current.activeRequestId = ''; current.deadlineAt = 0; FbmSync.stateWrite(current);
+    FbmSync.sessionGateRecordFailure(current, current.lastFailureCode, current.lastError, 'login_session_blocked_timeout');
+    return { handled: true, ok: false, code: current.lastFailureCode, request: null, status: FbmSync.statusView(), error: current.lastError };
+  }
+  if (at < nextAt) { return { handled: true, ok: true, code: 'AUTO_LOGIN_WAITING_SESSION', request: null, status: FbmSync.statusView(), retryAt: nextAt }; }
+  gate.blockedSessionProbe = true;
+  current.cursor = { kind: 'session_probe' }; current.phase = 'checking_session'; current.entity = ''; current.activeRequestId = ''; current.deadlineAt = 0;
+  current.message = 'Đã hết chu kỳ chờ; probe phiên FBM trước khi thử đăng nhập lại.';
+  FbmSync.stateWrite(current);
+  envelope = FbmSync.sessionSystemEnvelope('session_probe');
+  return envelope ? { handled: true, ok: true, code: 'SESSION_PROBE_REQUEST_READY', request: envelope, status: FbmSync.statusView(), probingBlockedSession: true } : { handled: true, ok: false, code: 'SESSION_PROBE_UNAVAILABLE', request: null, status: FbmSync.statusView() };
+};
+/** Probe thấy phiên sống sau thời gian chờ thì tiếp tục cursor, không login lại. */
+FbmSync.sessionGateResumeAfterWaitProbe = function (state) {
+  var current = state || FbmSync.stateRead(), gate = FbmSync.sessionGateMeta(current), resume, request;
+  if (gate.blockedSessionProbe !== true) { return null; }
+  gate.blockedSessionProbe = false;
+  gate.blockedSession = false;
+  gate.blockedNextProbeAt = 0;
+  resume = gate.resumeCursor && gate.resumeCursor.kind ? gate.resumeCursor : { kind: 'authorize_customer' };
+  gate.resumeCursor = null;
+  current.cursor = resume; current.phase = gate.resumePhase || 'checking_session'; current.entity = gate.resumeEntity || '';
+  FbmSync.stateWrite(current);
+  request = FbmSync.requestForCursor(current);
+  if (!request) {
+    current.phase = 'error'; current.lastFailureCode = 'SESSION_RESUME_FAILED'; current.lastError = 'Đã xác minh phiên sau khi chờ phiên cũ nhưng không dựng lại được request đang chờ.'; current.message = current.lastError; FbmSync.stateWrite(current);
+    return { ok: false, code: current.lastFailureCode, request: null, status: FbmSync.statusView(), error: current.lastError };
+  }
+  return { ok: true, request: FbmSync.nextEnvelope(request), status: FbmSync.statusView(), sessionVerified: true, blockedSessionResumed: true };
+};
 /** Phản ứng tập trung khi response xác nhận phiên đã hết hạn. */
 FbmSync.sessionGateHandleFailure = function (state, cursor, failure) {
   var value = failure || {};
@@ -212,6 +248,67 @@ FbmSync.sessionGateHandleFailure = function (state, cursor, failure) {
   try { envelope = FbmSync.nextEnvelope(request); } catch (ignoreEnvelopeError) { return FbmSync.sessionGateFailClosed(state); }
   if (!envelope) { return { ok: false, code: String(state.lastFailureCode || 'FBM_SESSION_GATE_FAILED'), request: null, status: FbmSync.statusView(), error: state.lastError }; }
   return { ok: true, request: envelope, status: FbmSync.statusView(), autoLogin: true };
+};
+/** Tạo probe hệ thống sau một response nghiệp vụ đáng ngờ; không retry nghiệp vụ. */
+FbmSync.sessionGateProbeRequest = function (state, failedCursor, reason) {
+  var current = state || FbmSync.stateRead(), gate = FbmSync.sessionGateMeta(current);
+  gate.resumeCursor = Object.assign({}, failedCursor || {});
+  gate.probeOnly = true;
+  gate.probeRetryCount = 0;
+  current.cursor = { kind: 'session_probe' };
+  current.phase = 'checking_session';
+  current.entity = '';
+  current.message = String(reason || 'Đang probe lại phiên FBM để xác minh phản hồi đáng ngờ.');
+  FbmSync.stateWrite(current);
+  return FbmSync.nextEnvelope(FbmSync.sessionSystemRequest('session_probe'));
+};
+/** Ép probe ở đầu một lượt/lát mới rồi mới trả lại cursor nghiệp vụ. */
+FbmSync.sessionGateResumeProbeRequest = function (state, resumeCursor, reason) {
+  var current = state || FbmSync.stateRead(), gate = FbmSync.sessionGateMeta(current), resume = Object.assign({}, resumeCursor || current.cursor || {});
+  gate.resumeCursor = resume;
+  gate.resumePhase = String(current.phase || 'checking_session');
+  gate.resumeEntity = String(current.entity || '');
+  current.cursor = { kind: 'session_probe' };
+  current.phase = 'checking_session';
+  current.entity = '';
+  current.activeRequestId = '';
+  current.deadlineAt = 0;
+  current.message = String(reason || 'Đang kiểm tra lại phiên FBM trước khi tiếp tục lát mới...');
+  FbmSync.stateWrite(current);
+  return FbmSync.sessionSystemEnvelope('session_probe');
+};
+/** Xử lý probe không đạt; chỉ probe được phép khởi động auto-login, tối đa một lần. */
+FbmSync.sessionGateHandleProbeFailure = function (state, cursor, response) {
+  var current = state || FbmSync.stateRead(), gate = FbmSync.sessionGateMeta(current), suspicious = FbmSync.protocol.isSessionSuspicious(response);
+  if (suspicious && Number(gate.probeRetryCount || 0) < 1) {
+    gate.probeRetryCount = 1;
+    current.message = 'Phản hồi FBM đáng ngờ; đang probe lại phiên đúng một lần.';
+    current.lastFailureCode = 'SESSION_PROBE_RETRY';
+    FbmSync.stateWrite(current);
+    return FbmSync.nextEnvelope(FbmSync.sessionSystemRequest('session_probe'));
+  }
+  if (gate.probeOnly === true || gate.loginAttempted === true) {
+    var code = gate.probeOnly === true ? 'SESSION_PROBE_UNCERTAIN' : 'SESSION_PROBE_FAILED_AFTER_LOGIN';
+    var message = gate.probeOnly === true
+      ? 'Không xác minh được phiên FBM sau request đáng ngờ; request nghiệp vụ đã bị dừng.'
+      : 'Đăng nhập FBM đã hoàn tất nhưng probe phiên không đạt; đã dừng để tránh lặp đăng nhập.';
+    FbmSync.sessionGateRecordFailure(current, code, message, 'session_probe_failure');
+    current.phase = 'error'; current.cursor = {}; current.activeRequestId = ''; current.deadlineAt = 0; current.retryable = false; current.lastFailureCode = code; current.lastError = message; current.message = message;
+    FbmSync.stateWrite(current);
+    return { ok: false, code: code, request: null, status: FbmSync.statusView(), error: message };
+  }
+  if (gate.resumeCursor && gate.resumeCursor.kind === 'push_wait') {
+    FbmSync.sessionGateRecordFailure(current, 'SESSION_EXPIRED_AT_WRITE', 'Phiên FBM không được xác minh trong lúc chờ ghi; đã chặn để tránh ghi trùng.', 'session_expired_at_write');
+    current.phase = 'paused'; current.cursor = gate.resumeCursor; current.activeRequestId = ''; current.deadlineAt = 0; current.retryable = false;
+    current.lastFailureCode = 'SESSION_EXPIRED_AT_WRITE'; current.lastError = 'Phiên FBM không được xác minh trong lúc chờ ghi; đã chặn để tránh ghi trùng.'; current.message = current.lastError;
+    FbmSync.stateWrite(current);
+    return { ok: false, code: 'SESSION_EXPIRED_AT_WRITE', request: null, status: FbmSync.statusView(), error: current.lastError };
+  }
+  FbmSync.sessionIdentityClear(current);
+  var request = FbmSync.sessionGateStart(current, cursor), envelope;
+  if (!request) { return { ok: false, code: String(current.lastFailureCode || 'SESSION_PROBE_FAILED'), request: null, status: FbmSync.statusView(), error: current.lastError }; }
+  envelope = FbmSync.nextEnvelope(request);
+  return envelope ? { ok: true, request: envelope, status: FbmSync.statusView(), autoLogin: true } : { ok: false, code: 'AUTO_LOGIN_REQUEST_UNAVAILABLE', request: null, status: FbmSync.statusView(), error: current.lastError };
 };
 /** Chỉ thử lại một lần khi Extension báo không có tab; policy vẫn do GAS quyết định. */
 FbmSync.sessionGateTransportRetry = function (state, requestId, code, message) {
@@ -289,11 +386,15 @@ FbmSync.nextEnvelope = function (request) {
       request = FbmSync.sessionGateAttachLoginToken(request, pendingState);
       internalLogin = true;
     }
-    // Mọi request nghiệp vụ phải đi qua probe User một lần trong phiên hiện tại.
+    // Mọi request nghiệp vụ và authorize đầu lượt phải qua probe User.
     // Probe là request hệ thống nên không quay lại nhánh này.
     var gateCursorKinds = ['customer_grid', 'activity_grid', 'activity_bulk_grid', 'lookup', 'push_scan', 'push_wait'];
-    var cursorNeedsGate = gateCursorKinds.indexOf(String(pendingState.cursor && pendingState.cursor.kind || '')) >= 0 && String(pendingState.cursor && pendingState.cursor.kind || '') !== 'push_wait';
-    if ((!FbmSync.isSessionSystemRequest(request) || request.meta && request.meta.requireIdentityProbe === true) && !internalLogin && !FbmSync.sessionIdentityIsVerified(pendingState) && (cursorNeedsGate || request.meta && request.meta.requireIdentityProbe === true)) {
+    var requestKind = String(request.meta && request.meta.kind || ''), cursorNeedsGate = gateCursorKinds.indexOf(String(pendingState.cursor && pendingState.cursor.kind || '')) >= 0 && String(pendingState.cursor && pendingState.cursor.kind || '') !== 'push_wait';
+    // Mọi request không thuộc nhóm hệ thống đều phải qua cổng; không cho
+    // caller né cổng bằng cách đặt một tên meta.kind lạ.
+    var requestNeedsGate = !FbmSync.isSessionSystemRequest(request) || cursorNeedsGate || requestKind === 'authorize';
+    var loginFlowOwnsSystemRequest = typeof FbmSync.sessionGateCursorIsInternal === 'function' && FbmSync.sessionGateCursorIsInternal(pendingState);
+    if (requestKind !== 'session_probe' && !internalLogin && !loginFlowOwnsSystemRequest && !FbmSync.sessionIdentityIsVerified(pendingState) && requestNeedsGate) {
       var gate = FbmSync.sessionGateMeta(pendingState), originalCursor = Object.assign({}, pendingState.cursor || {});
       if (originalCursor.kind !== 'session_probe') {
         gate.resumeCursor = originalCursor;
@@ -335,11 +436,6 @@ FbmSync.nextEnvelope = function (request) {
     captures: [{ name: 'payloadCookie', source: 'page_html', pattern: FbmSync.PAYLOAD_COOKIE_CAPTURE_PATTERN, flags: 'i', group: 1 }],
     replacements: [{ token: '{{FBM_PAYLOAD_COOKIE}}', capture: 'payloadCookie', source: 'page_html' }]
   }, meta.transport || {});
-  if (meta.kind === 'authorize') {
-    meta.transport.jsonPaths = ['d.Authorized', 'd.authorized', 'd.FBM_USER_ID', 'd.UserId', 'd.userId', 'd.AccountName', 'd.accountName', 'd.UserName', 'd.userName'];
-  } else if (/(?:customer|activity)_edit_open$/.test(String(meta.kind || ''))) {
-    meta.transport.jsonPaths = ['d.Row', 'd.row', 'd.FieldValues', 'd.fieldValues', 'd.InternalValues', 'd.internalValues', 'd.Showing', 'd.showing', 'd.Controller', 'd.controller', 'd.GridController', 'd.gridController', 'd.Bugs', 'd.bugs', 'd.Authorized', 'd.authorized'];
-  }
   if (state.scan === 'detail' && state.backgroundDetail) {
     var detail = state.backgroundDetail, minDelay = Math.max(0, Number(detail.minDelaySeconds || 0)), maxDelay = Math.max(minDelay, Number(detail.maxDelaySeconds === undefined ? minDelay : detail.maxDelaySeconds));
     if (isFinite(minDelay) && isFinite(maxDelay) && maxDelay > 0) { meta.waitMs = Math.round((minDelay + Math.random() * (maxDelay - minDelay)) * 1000); }
@@ -386,6 +482,10 @@ FbmSync.limitRelayResult = function (result, hop) {
   state.activeRequestId = '';
   state.deadlineAt = 0;
   state.relayHop = 0;
+  if (String(state.origin || '') === 'background' && state.runId && state.cursor && state.cursor.kind) {
+    var gate = FbmSync.sessionGateMeta(state);
+    gate.sliceProbePending = true;
+  }
   state.message = 'Đã hết lát xử lý an toàn; lượt sau sẽ tiếp tục từ cursor đã lưu.';
   FbmSync.stateWrite(state);
   return Object.assign({}, value, { ok: true, code: 'RELAY_SLICE_COMPLETE', request: null, status: value.status || FbmSync.statusView() });

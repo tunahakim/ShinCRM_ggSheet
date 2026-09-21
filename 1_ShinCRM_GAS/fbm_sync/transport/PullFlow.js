@@ -27,10 +27,13 @@ FbmSync.start = function (options) {
     var recent = Date.now() - Number(current.updatedAt || 0) <= 60000;
     var resumable = recent ? FbmSync.requestForCursor(current) : null;
     if (resumable && current.cursor && current.cursor.kind !== 'push_wait') {
-      return { ok: true, request: FbmSync.nextEnvelope(resumable), status: FbmSync.statusView(), resumed: true };
+      var resumeProbe = typeof FbmSync.sessionGateResumeProbeRequest === 'function'
+        ? FbmSync.sessionGateResumeProbeRequest(current, resumable, 'Đang probe lại phiên FBM trước khi tiếp tục cursor đã lưu...')
+        : FbmSync.nextEnvelope(resumable);
+      return { ok: true, request: resumeProbe, status: FbmSync.statusView(), resumed: true };
     }
     if (initialRequest && recent && current.cursor.kind === 'authorize_customer') {
-      return { ok: true, request: FbmSync.sessionSystemEnvelope('authorize', { entity: 'customer', requireIdentityProbe: current.scan !== 'activity_bulk' }), status: FbmSync.statusView(), resumed: true };
+      return { ok: true, request: FbmSync.sessionSystemEnvelope('authorize', { entity: 'customer' }), status: FbmSync.statusView(), resumed: true };
     }
     if (!initialRequest) { return { ok: false, code: 'SYNC_ALREADY_RUNNING', status: FbmSync.statusView() }; }
   }
@@ -83,7 +86,7 @@ FbmSync.start = function (options) {
   state.cursor = { kind: 'authorize_customer' };
   state.message = 'Dang kiem tra phien FBM...';
   FbmSync.stateWrite(state);
-  return { ok: true, request: FbmSync.sessionSystemEnvelope('authorize', { entity: 'customer', requireIdentityProbe: state.scan !== 'activity_bulk' }), status: FbmSync.statusView() };
+  return { ok: true, request: FbmSync.sessionSystemEnvelope('authorize', { entity: 'customer' }), status: FbmSync.statusView() };
 };
 /** Xử lý một trang pull; read/write ghi Sheet, check/push chỉ xem trước. */
 FbmSync.pullRecords = function (entity, records, mode) {
@@ -327,16 +330,21 @@ FbmSync.continue = function (rawResponse) {
     var gateResponse = FbmSync.continueSessionGate(state, cursor, rawResponse);
     if (gateResponse) { return gateResponse; }
   }
+  if (cursor.kind === 'session_probe' && !FbmSync.protocol.isLiveSessionResponse(rawResponse)) {
+    var probeFailure = FbmSync.sessionGateHandleProbeFailure(state, cursor, rawResponse);
+    if (probeFailure && probeFailure.request) { return probeFailure; }
+    return probeFailure;
+  }
   // Phân loại trên wrapper HTTP gốc; parse trước sẽ làm mất status và biến lỗi vận chuyển thành Bugs giả.
   var success = FbmSync.protocol.assertSuccess(rawResponse);
   if (!success.ok) {
+    if (success.code === 'SESSION_SUSPECTED' && cursor.kind !== 'push_wait' && cursor.kind !== 'session_probe') {
+      var suspicionProbe = FbmSync.sessionGateProbeRequest(state, cursor, 'Phản hồi FBM đáng ngờ; request nghiệp vụ đã dừng để probe lại phiên.');
+      return suspicionProbe ? { ok: true, request: suspicionProbe, status: FbmSync.statusView(), probing: true } : { ok: false, code: 'SESSION_PROBE_UNAVAILABLE', request: null, status: FbmSync.statusView(), error: state.lastError };
+    }
     if (typeof FbmSync.sessionGateHandleFailure === 'function') {
       var gateFailure = FbmSync.sessionGateHandleFailure(state, cursor, success);
       if (gateFailure) { return gateFailure; }
-    }
-    var retryRequest = FbmSync.retryRead(state, success);
-    if (retryRequest) {
-      return { ok: true, request: FbmSync.nextEnvelope(retryRequest), status: FbmSync.statusView(), retrying: true };
     }
     var failureReason = (success.bug && (success.bug.Message || success.bug.message)) || 'FBM tra ve loi nghiep vu';
     if (cursor.kind === 'push_wait' && cursor.candidate) {
@@ -357,20 +365,17 @@ FbmSync.continue = function (rawResponse) {
     } else {
       state.message = failureReason;
     }
-    if (cursor.kind === 'lookup') {
-      var failedLookup = FbmSync.SYNC_LOOKUPS[Number(cursor.index || 0)];
-      if (failedLookup) { failureReason = 'Không đọc được danh mục ' + failedLookup.key + ' (' + failedLookup.controller + '): ' + failureReason; }
-      state.metadata = state.metadata || {};
-      state.metadata.categoryLookupFailed = true;
-      state.metadata.categoryBlocks = (state.metadata.categoryBlocks || []).concat([{ source: failedLookup ? failedLookup.key : 'Category', reason: failureReason }]);
-      state.session.lookups[failedLookup ? failedLookup.key : ''] = [];
-      FbmSync.beginCustomerPull(state);
-      state.message = 'Không đọc được danh mục; vẫn tiếp tục chiều lấy về, chiều đẩy sẽ tạm dừng.';
+    state.phase = 'error';
+    state.retryable = false;
+    state.lastFailureCode = String(success.code || 'FBM_ERROR');
+    state.lastError = failureReason;
+    state.message = 'Request FBM thất bại; đã dừng và không gửi lại tự động.';
+    if (typeof FbmSync.sessionGateRecordFailure === 'function') {
+      FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'business_request_failed');
+    } else {
       FbmSync.stateWrite(state);
-      return { ok: true, request: FbmSync.nextEnvelope(FbmSync.customerGridRequest({ type: 0, count: 2000, gridPageIndex: -1, gridRefresh: false })), status: FbmSync.statusView() };
     }
-    state.phase = 'error'; state.lastError = failureReason; FbmSync.stateWrite(state);
-    return { ok: false, status: FbmSync.statusView(), error: success.bug };
+    return { ok: false, code: String(success.code || 'FBM_ERROR'), status: FbmSync.statusView(), error: success.bug };
   }
   state.retryCount = 0;
   state.retryable = false;
@@ -419,6 +424,18 @@ FbmSync.continue = function (rawResponse) {
       return { ok: true, request: null, status: FbmSync.statusView() };
     }
     var gateMeta = FbmSync.sessionGateMeta(state), resume = gateMeta.resumeCursor && gateMeta.resumeCursor.kind ? gateMeta.resumeCursor : { kind: 'authorize_customer' };
+    var waitedResume = typeof FbmSync.sessionGateResumeAfterWaitProbe === 'function' ? FbmSync.sessionGateResumeAfterWaitProbe(state) : null;
+    if (waitedResume) { return waitedResume; }
+    if (gateMeta.probeOnly === true) {
+      gateMeta.probeOnly = false;
+      state.cursor = {}; state.phase = 'error'; state.entity = '';
+      state.lastFailureCode = 'SESSION_SUSPECTED_LIVE';
+      state.lastError = 'FBM trả phản hồi đáng ngờ nhưng probe vẫn xác nhận phiên sống; request nghiệp vụ đã bị dừng để không gửi lại.';
+      state.message = state.lastError;
+      FbmSync.stateWrite(state);
+      if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'session_suspected_live'); }
+      return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError };
+    }
     state.cursor = resume; state.phase = gateMeta.resumePhase || 'checking_session'; state.entity = gateMeta.resumeEntity || '';
     gateMeta.resumeCursor = null;
     FbmSync.stateWrite(state);
