@@ -97,12 +97,13 @@ function chay(so) {
       components.indexOf('.shin-button {') >= 0 && button.indexOf('margin') === -1],
     [true, true, true]);
   check(so, 'Sync layout đặc thù dùng Row/RowGroup làm owner spacing',
-    [shell.indexOf('.shin-sync-connection-section { display:grid; gap:var(--shin-gap-2);') >= 0,
+    [shell.indexOf('.shin-sync-connection-section { display:grid; gap:var(--shin-gap-2);') === -1,
       shell.indexOf('.shin-sync-schedule-row { display:grid;') === -1,
       shell.indexOf('.shin-sync-schedule-row > .shin-standalone-control:first-child { flex:0 0 var(--shin-sync-schedule-control-width); }') >= 0,
       shell.indexOf('.shin-sync-detail-controls { display:grid;') === -1,
-      settings.indexOf('.shin-sync-detail-field { display: grid; gap: var(--shin-gap-1);') >= 0],
-    [true, true, true, true, true]);
+      settings.indexOf('.shin-sync-detail-field { display: grid; gap: var(--shin-gap-1);') >= 0,
+      settings.indexOf('.shin-sync-detail-inputs { display: grid;') === -1],
+    [true, true, true, true, true, true]);
   check(so, 'Sync layout đặc thù có owner vị trí và token domain duy nhất',
     [shell.indexOf('--shin-sync-schedule-control-width:42px;') >= 0,
       shell.indexOf('.shin-sync-schedule-row > .shin-kv-label { flex:1 1 0; }') >= 0,
@@ -115,15 +116,16 @@ function chay(so) {
   check(so, 'Sync status, pipeline, results và conflict không dùng margin để cộng sibling spacing',
     [shell.indexOf('.shin-sync-phase { margin') === -1,
       shell.indexOf('.shin-sync-operation, .shin-sync-count, .shin-sync-current, .shin-sync-message { margin') === -1,
-      shell.indexOf('.shin-sync-progress { display:flex; flex-direction:column; gap:var(--shin-gap-1); }') >= 0,
-      shell.indexOf('.shin-sync-pipeline { display:flex; flex-direction:column; gap:var(--shin-gap-1);') >= 0,
+      shell.indexOf('.shin-sync-progress { display:flex; flex-direction:column; gap:var(--shin-gap-1); }') === -1,
+      shell.indexOf('.shin-sync-pipeline { display:flex; flex-direction:column; gap:var(--shin-gap-1);') === -1,
+      shell.indexOf('.shin-sync-pipeline-step { display:flex;') === -1,
       shell.indexOf('.shin-sync-pipeline-title { margin') === -1,
       shell.indexOf('margin-bottom:var(--shin-gap-2)') === -1,
       shell.indexOf('margin-top:3px') === -1],
-    [true, true, true, true, true, true, true]);
+    [true, true, true, true, true, true, true, true]);
   check(so, 'Sync results và Settings để wrapper lõi sở hữu nhịp',
     [shell.indexOf('#fbm-sync-results-root > #fbm-sync-results-body-region { margin') === -1,
-      shell.indexOf('.shin-sync-conflict-field { display:flex; flex-direction:column; gap:var(--shin-gap-1);') >= 0,
+      shell.indexOf('.shin-sync-conflict-field { display:flex; flex-direction:column; gap:var(--shin-gap-1);') === -1,
       settings.indexOf('.shin-sync-login-policy-children { margin: 0 0') === -1,
       settings.indexOf('.shin-sync-login-policy-children { margin-left:') === -1,
       settings.indexOf('.shin-sync-login-policy-children .shin-toggle-row') === -1,

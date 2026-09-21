@@ -185,7 +185,8 @@ async function chay(so) {
   const runCard = runBlocks[0], runActionRegion = runCard.elements.filter((node) => node && node.id === 'fbm-sync-run-action-region')[0];
   check(so, 'Các action Run đi qua ActionStack lõi có hai Row con và nhịp dọc dùng chung', [runActionRegion.elements[0].role, runActionRegion.elements[0].className, runActionRegion.elements[0].elements.length, runActionRegion.elements[0].elements[0].className, runActionRegion.elements[0].elements[1].className], ['box', 'shin-action-stack', 2, 'shin-single-action-row', 'shin-single-action-row']);
   const runDetailsRegion = runBlocks.filter((node) => node && node.id === 'fbm-sync-run-details-region')[0];
-  check(so, 'Pipeline và trạng thái phiên nằm trong RowGroup để giữ khoảng cách dọc', [runDetailsRegion.role, runDetailsRegion.className], ['box', 'shin-row-group']);
+  const pipelineNode = hop.fbmSyncPipelineBlock(active, 'pipeline-test');
+  check(so, 'Pipeline và trạng thái phiên nằm trong RowGroup để giữ khoảng cách dọc', [runDetailsRegion.role, runDetailsRegion.className, pipelineNode.role, pipelineNode.elements[1].role, hop.fbmSyncProgressBlocks(active, {}).role], ['box', 'shin-row-group', 'box', 'row', 'box']);
   check(so, 'Run render giữ pipeline khi preflight thất bại để người dùng thấy chặng dừng', !!render(hop, content, hop.fbmSyncRenderRun, preflightError).querySelector('.shin-sync-pipeline'), true);
   check(so, 'Run render hiện pipeline khi đang xử lý', !!render(hop, content, hop.fbmSyncRenderRun, active).querySelector('.shin-sync-pipeline'), true);
   check(so, 'Run render giữ pipeline để chẩn đoán lỗi sau request', !!render(hop, content, hop.fbmSyncRenderRun, pushError).querySelector('.shin-sync-pipeline'), true);
