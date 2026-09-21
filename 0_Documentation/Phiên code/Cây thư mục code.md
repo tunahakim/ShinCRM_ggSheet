@@ -282,6 +282,7 @@ tests\
     ├── blockKeys.js              Nửa còn lại của phép kiểm khóa Block: vai nhận khóa nào thì phần lá phải vẽ ra khóa đó. Đây là ca `{icon, label}` chỉ ra glyph, và ca `Card({label})` khai đúng cú pháp mà chữ không bao giờ hiện.
     ├── uiSchema.js               Bảng khai bố cục giữ hợp đồng với ba tệp khác: mọi đường dẫn trường tra được trong DATA_SCHEMA, mọi tên hàm có trong ACTIONS, và bốn màn dựng qua screenBuild không nổ.
     ├── cssClass.js               Tên lớp CSS cũng ở chung một vùng tên như biến JS: trùng tên thì tệp nạp sau lặng lẽ thắng. Đây là ca `.shin-box` của tệp màn đè `.shin-box` dùng chung, ăn mất 26 pixel bề ngang.
+    ├── layoutSpacing.js          Kiểm hợp đồng owner spacing: token một nguồn, sibling dùng gap, primitive không cộng margin kép và ngoại lệ Sync/slot có wrapper riêng.
     ├── screenSchemaAudit.js      Audit mỗi màn có schema đúng folder, schema không chứa DOM/HTML và Sidebar include đúng thứ tự trước controller.
     ├── renderEngine.js           Cây Block thành HTML: ký tự đặc biệt trong tên công ty, spatialConfig khai rồi mà bố cục không đổi, data-field thiếu đường dẫn, luật chỉ-đọc bị mở khóa; kèm phép quét mã nguồn chốt đúng ba tệp được gán innerHTML.
     ├── slots.js                  Dòng lịch sử giữ đúng thứ tự thời gian kể cả khi có bản ghi đã xóa chen giữa, và KHÔNG dòng nào mang field — engine tra một bản ghi cho một thực thể.

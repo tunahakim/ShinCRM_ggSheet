@@ -17,12 +17,14 @@
   Dòng cuối bỏ cả gạch lẫn lề dưới, vì card đã tự có lề dưới của nó.
 */
 .shin-act-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--shin-gap-1);
   padding-bottom: 6px;
-  margin-bottom: 6px;
   border-bottom: 1px solid var(--shin-border-faint);
 }
 
-.shin-act-row:last-of-type { padding-bottom: 0; margin-bottom: 0; border-bottom: 0; }
+.shin-act-row:last-of-type { padding-bottom: 0; border-bottom: 0; }
 
 /*
   Hàng đầu **ghim hai mép**: nhóm trái ngày với sản phẩm, nhóm phải chip loại việc với hai nút. Đây là bố cục `.tx-meta` của
@@ -119,7 +121,6 @@
 /* Nội dung là phần dài và là phần người ta đọc, nên nó cỡ chữ nền và màu chữ chính — không phải màu phụ. Trần chiều cao thì
    engine đặt bằng style nội tuyến từ `spatialConfig`, không phải ở đây. */
 .shin-act-content {
-  margin-top: 2px;
   color: var(--shin-text);
   font-size: var(--shin-text-md);
   white-space: pre-wrap;

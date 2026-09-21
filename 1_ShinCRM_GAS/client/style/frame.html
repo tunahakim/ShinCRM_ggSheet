@@ -124,6 +124,9 @@ html, body {
    `client/style/slots.html`, cùng chỗ với slot dựng ra nó. */
 #sidebar-info {
   flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--shin-gap-1);
   margin-bottom: var(--shin-gap-2);
   padding: var(--shin-gap-2) var(--shin-card-pad);
   border-bottom: 1px solid var(--shin-border);
@@ -132,8 +135,6 @@ html, body {
 
 /* Khoảng giữa ba hàng của khối: tên công ty, rồi hai hàng hai cột. Bốn pixel, đúng con số bản cũ đặt cho `.info-row` — dày
    hơn thì khối này chiếm chỗ của phần thân, mỏng hơn thì ba hàng dính thành một mảng chữ. */
-#sidebar-info .shin-row + .shin-row { margin-top: var(--shin-gap-1); }
-
 /* Vùng 4 — Thân. Chiếm hết phần dư và cuộn dọc khi tràn. `min-height: 0` là điều kiện để một con flex biết cuộn; thiếu nó
    thì thân nở ra theo nội dung và đẩy vùng chân ra khỏi khung.
 

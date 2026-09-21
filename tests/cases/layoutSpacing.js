@@ -15,6 +15,7 @@ function chay(so) {
   const tokens = docTep('client/style/tokens.html');
   const components = docTep('client/style/components.html');
   const frame = docTep('client/style/frame.html');
+  const slots = docTep('client/style/slots.html');
   const runUi = docTep('client/sync/fbmSyncUiSchema.html');
   const shell = docTep('client/sync/fbmSyncShell.html');
   const settings = docTep('client/sync/screens/settings.html');
@@ -91,6 +92,17 @@ function chay(so) {
       runUi.indexOf('page: function (slots) { return Card({ title: slots.title, elements: [Stack({ elements:') >= 0,
       runUi.indexOf('Row({ className: FBM_SYNC_RESULTS_UI.classes.pagination') >= 0],
     [true, true, true, true, true, true, true, true, true, true, true, true, true]);
+  check(so, 'slot lịch sử, info bar và dialog dùng gap thay cho margin sibling',
+    [slots.indexOf('.shin-act-row {\n  display: flex;\n  flex-direction: column;\n  gap: var(--shin-gap-1);') >= 0,
+      slots.indexOf('margin-bottom: 6px') === -1,
+      slots.indexOf('.shin-act-content {\n  margin-top') === -1,
+      frame.indexOf('display: flex;\n  flex-direction: column;\n  gap: var(--shin-gap-1);', frame.indexOf('#sidebar-info {')) >= 0,
+      frame.indexOf('#sidebar-info .shin-row + .shin-row') === -1,
+      components.indexOf('.shin-loading-track { position: relative; overflow: hidden; height: 5px; margin-top') === -1,
+      components.indexOf('.shin-box.shin-unsaved-panel { position: relative; z-index: 1; display: flex; flex-direction: column; gap: var(--shin-gap-2);') >= 0,
+      components.indexOf('.shin-unsaved-message { margin:') === -1,
+      shell.indexOf('.shin-sync-tab-row { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:0; margin-bottom') === -1],
+    [true, true, true, true, true, true, true, true, true]);
 }
 
 module.exports = { chay };

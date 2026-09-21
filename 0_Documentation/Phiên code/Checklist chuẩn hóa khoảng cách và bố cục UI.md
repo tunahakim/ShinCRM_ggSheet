@@ -186,17 +186,19 @@ Ghi chú nhóm D: `layoutSpacing`, `fbmSync/Components` và `fbmSync/Sidebar` đ
 
 ## 12. Nhóm code E — xử lý ngoại lệ và dọn đường cũ
 
-- [ ] Lập allowlist cuối cùng cho pipeline, schedule, conflict, tabs, progress, summary, shell, slots và host tĩnh.
-- [ ] Với mỗi ngoại lệ, ghi owner, consumer, lý do không dùng primitive generic và test bảo vệ.
-- [ ] Loại các class Sync chỉ lặp lại spacing generic mà không có hình thức/ngữ nghĩa đặc thù.
-- [ ] Loại các fallback CSS đã hết consumer sau khi chuyển sang primitive chuẩn.
-- [ ] Tìm và loại các selector sibling margin còn sót ngoài allowlist.
-- [ ] Tìm và loại các wrapper Box chỉ tồn tại để bù margin thủ công.
-- [ ] Kiểm tra không có `!important`, selector theo id màn hình hoặc selector theo thứ tự nút được thêm để vá khoảng cách.
-- [ ] Kiểm tra không có class mới theo tên nghiệp vụ chỉ để thay đổi spacing của một màn.
-- [ ] Chạy toàn bộ kiểm thử kiến trúc và `node tests/run.js`.
-- [ ] Tick từng mục nhóm E ngay sau bằng chứng tương ứng.
-- [ ] Commit riêng nhóm E.
+- [x] Lập allowlist cuối cùng cho pipeline, schedule, conflict, tabs, progress, summary, shell, slots và host tĩnh.
+- [x] Với mỗi ngoại lệ, ghi owner, consumer, lý do không dùng primitive generic và test bảo vệ.
+- [x] Loại các class Sync chỉ lặp lại spacing generic mà không có hình thức/ngữ nghĩa đặc thù.
+- [x] Loại các fallback CSS đã hết consumer sau khi chuyển sang primitive chuẩn.
+- [x] Tìm và loại các selector sibling margin còn sót ngoài allowlist.
+- [x] Tìm và loại các wrapper Box chỉ tồn tại để bù margin thủ công.
+- [x] Kiểm tra không có `!important`, selector theo id màn hình hoặc selector theo thứ tự nút được thêm để vá khoảng cách.
+- [x] Kiểm tra không có class mới theo tên nghiệp vụ chỉ để thay đổi spacing của một màn.
+- [x] Chạy toàn bộ kiểm thử kiến trúc và `node tests/run.js`.
+- [x] Tick từng mục nhóm E ngay sau bằng chứng tương ứng.
+- [x] Commit riêng nhóm E.
+
+Allowlist nhóm E: `margin: 0` chỉ là reset trên primitive/status/control; `margin-left: auto` chỉ căn phải; `#sidebar-info` giữ `margin-bottom` để tách vùng info với body; `login-policy-children` và `detail-controls` giữ `margin-left` để thụt lề domain; `popup-mark` giữ `margin-right` cho glyph; padding/border của lịch sử, schedule, conflict là nội bộ. `layoutSpacing` kiểm không còn selector sibling margin generic, và `components.html`/`frame.html`/`slots.html` đã chuyển các quan hệ sibling tương ứng sang `gap`.
 
 ## 13. Kiểm thử hồi quy offline sau toàn bộ code
 
