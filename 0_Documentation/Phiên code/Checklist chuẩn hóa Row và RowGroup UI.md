@@ -149,6 +149,6 @@
 - [x] [Tự động] Commit từng nhóm component sau khi H và test liên quan xanh. Nhóm Settings commit tại `15e4154`; nhóm Sync generic commit tại `5b352f4`; nhóm activity slot commit tại `68da852`; nhóm unsaved dialog commit tại `3cf1883`; nhóm status commit tại `85280f3`.
 - [x] [Tự động] Commit nhóm contract test/dọn hardcode sau khi I và test liên quan xanh: `3a8357f`.
 - [x] [Tự động] Chạy lại full test trước commit cuối: `node tests/run.js` đạt `1937 đạt, 0 không đạt` sau commit `57ee0cf`.
-- [ ] [Tự động] Nghiệm thu GAS DEV bằng `node tests/gas.js <tên-hàm> --push` nếu có thay đổi cần kiểm tra trên GAS.
+- [x] [Tự động] Nghiệm thu GAS DEV bằng `node tests/gas.js verifySheets --push`: deployment `@490`, kết quả `OK`; Activity/Category/Config/Log đạt, Customer vẫn có cảnh báo lệch thứ tự cột có sẵn trên Sheet.
 - [x] [Tự động] Ghi commit hash vào checklist sau mỗi nhóm; nhóm hiện tại dùng `3a8357f`, không gom file ngoài phạm vi.
 - [ ] [Cần kiểm chứng thật] Sau khi code và test offline hoàn tất, dừng ở bước cần chủ dự án kiểm tra trực quan và ghi rõ thao tác cần thực hiện.
