@@ -431,6 +431,23 @@ async function chay(so) {
   await new Promise((resolve) => setTimeout(resolve, 0));
   check(so, 'Cancel thất bại vẫn hiện lỗi trên UI', paints.some((item) => String(item.message).indexOf('GAS_TEST_FAILURE') >= 0), true);
 
+  hop.FBM_SYNC_CLIENT.running = true;
+  hop.FBM_SYNC_CLIENT.cancelRequested = false;
+  const cancelPaint = hop.fbmSyncPaint;
+  hop.fbmSyncPaint = () => {};
+  hop.callServer = (name) => name === 'fbmCancelSync' ? Promise.resolve({ ok: true, code: 'SYNC_CANCEL_PENDING', status: { phase: 'pull_customer', message: 'Đang chờ response để dừng.' } }) : Promise.resolve({});
+  await hop.fbmSyncCancel();
+  check(so, 'Cancel khi request đang bay giữ relay đến response cuối thay vì bỏ dở state', [hop.FBM_SYNC_CLIENT.running, hop.FBM_SYNC_CLIENT.cancelRequested], [true, true]);
+  hop.fbmSyncExtensionRequest = () => Promise.resolve({});
+  hop.fbmSyncContinueServer = () => Promise.resolve({ ok: true, request: null, status: { phase: 'paused' } });
+  await hop.fbmSyncLoop({ request: { meta: { entity: 'customer' } } });
+  check(so, 'response cuối sau Cancel chuyển client về trạng thái đã dừng', [hop.FBM_SYNC_CLIENT.running, hop.FBM_SYNC_CLIENT.cancelRequested], [false, false]);
+  hop.FBM_SYNC_CLIENT.cancelRequested = true;
+  const stoppingAction = hop.fbmSyncRunActionBlock({ phase: 'pull_customer', masterEnabled: true, enabled: true });
+  check(so, 'Sidebar khóa nút và báo đang dừng trong lúc chờ response cuối', [stoppingAction.disabled, stoppingAction.label.indexOf('Đang dừng') >= 0], [true, true]);
+  hop.FBM_SYNC_CLIENT.cancelRequested = false;
+  hop.fbmSyncPaint = cancelPaint;
+
   const loginButton = dom.document.createElement('button');
   dom.document.getElementById('fbm-login-username').value = 'anhlt';
   await hop.fbmSyncSaveLoginConfig(loginButton);

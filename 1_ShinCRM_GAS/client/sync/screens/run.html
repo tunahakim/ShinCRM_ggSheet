@@ -21,8 +21,8 @@ function fbmSyncPipelineBlock(status, id) {
 function fbmSyncRunActionBlock(status) {
   status = status || {};
   var statusReady = typeof fbmSyncStatusReady === 'function' ? fbmSyncStatusReady() : FBM_SYNC_CLIENT.statusReady === true;
-  var active = ['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(status.phase) >= 0, awaiting = status.phase === 'awaiting_approval';
-  return Button({ id: active ? FBM_SYNC_RUN_SCHEMA.action.ids.cancel : awaiting ? FBM_SYNC_RUN_SCHEMA.action.ids.approve : FBM_SYNC_RUN_SCHEMA.action.ids.start, label: statusReady ? (active ? FBM_SYNC_RUN_SCHEMA.action.cancel : awaiting ? FBM_SYNC_RUN_SCHEMA.action.approve : FBM_SYNC_RUN_SCHEMA.action.start) : FBM_SYNC_RUN_SCHEMA.action.loading, className: uiResolveActionClass(active ? 'cancel' : awaiting ? 'approve' : 'start', 'button'), disabled: !statusReady || status.masterEnabled === false || status.enabled === false });
+  var active = ['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(status.phase) >= 0, awaiting = status.phase === 'awaiting_approval', cancelling = FBM_SYNC_CLIENT.cancelRequested === true;
+  return Button({ id: active ? FBM_SYNC_RUN_SCHEMA.action.ids.cancel : awaiting ? FBM_SYNC_RUN_SCHEMA.action.ids.approve : FBM_SYNC_RUN_SCHEMA.action.ids.start, label: statusReady ? (cancelling ? 'Đang dừng…' : active ? FBM_SYNC_RUN_SCHEMA.action.cancel : awaiting ? FBM_SYNC_RUN_SCHEMA.action.approve : FBM_SYNC_RUN_SCHEMA.action.start) : FBM_SYNC_RUN_SCHEMA.action.loading, className: uiResolveActionClass(cancelling ? 'cancel' : active ? 'cancel' : awaiting ? 'approve' : 'start', 'button'), disabled: !statusReady || status.masterEnabled === false || status.enabled === false || cancelling });
 }
 function fbmSyncRunBackgroundSettingsBlock(status) {
   var schema = FBM_SYNC_RUN_SCHEMA.action;

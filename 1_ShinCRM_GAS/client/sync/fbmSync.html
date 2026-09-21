@@ -1,6 +1,6 @@
 <script>
 /* Sidebar chỉ hiển thị tiến độ; GAS là nguồn state duy nhất. */
-var FBM_SYNC_CLIENT = { installed: false, active: false, waiting: {}, relayWaiters: {}, credentialWaiters: {}, credentialMetadataWaiters: {}, credentialClearWaiters: {}, running: false, statusReady: false, mode: 'read', openedAt: 0, returnScreen: 'view', returnUi: null, relayConfigured: false, relayOpenId: 0, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0, traceEvents: [], subscreen: 'run', navOpen: false, resultsTab: 'summary', resultPages: {}, lastStatus: null, identityStatus: null, identityAction: '', identityLastAction: '', identityProbeSignature: '', identityInvalid: {}, identityDraft: { spreadsheetId: '', userId: '', username: '', accountName: '' }, accountSettingsDraft: {}, accountSettingsInvalid: {}, loginStatus: null, loginDraft: { username: '' }, loginPasswordMode: 'saved', loginPasswordFocused: false, loginPasswordTimer: null, pendingLoginEnvelope: null, configEdits: {}, accountNotices: { identity: null, accountSettings: null, login: null }, settingsNotices: { module: null, relay: null, extension: null, background: null, login: null }, syncSettings: null };
+var FBM_SYNC_CLIENT = { installed: false, active: false, waiting: {}, relayWaiters: {}, credentialWaiters: {}, credentialMetadataWaiters: {}, credentialClearWaiters: {}, running: false, cancelRequested: false, statusReady: false, mode: 'read', openedAt: 0, returnScreen: 'view', returnUi: null, relayConfigured: false, relayOpenId: 0, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0, traceEvents: [], subscreen: 'run', navOpen: false, resultsTab: 'summary', resultPages: {}, lastStatus: null, identityStatus: null, identityAction: '', identityLastAction: '', identityProbeSignature: '', identityInvalid: {}, identityDraft: { spreadsheetId: '', userId: '', username: '', accountName: '' }, accountSettingsDraft: {}, accountSettingsInvalid: {}, loginStatus: null, loginDraft: { username: '' }, loginPasswordMode: 'saved', loginPasswordFocused: false, loginPasswordTimer: null, pendingLoginEnvelope: null, configEdits: {}, accountNotices: { identity: null, accountSettings: null, login: null }, settingsNotices: { module: null, relay: null, extension: null, background: null, login: null }, syncSettings: null };
 /** Timeout cho một request Extension để phiên không treo vô hạn khi tab FBM/bridge mất kết nối. */
 var FBM_SYNC_REQUEST_TIMEOUT_MS = 20000;
 var FBM_SYNC_GAS_CONTINUE_WARN_MS = 5000;
@@ -1254,8 +1254,19 @@ function fbmSyncStartServer(mode, attempt) {
 }
 /** Dừng phiên ở GAS và hủy vòng chạy phía Sidebar. */
 function fbmSyncCancel() {
-  FBM_SYNC_CLIENT.running = false;
-  return callServer('fbmCancelSync').then(fbmSyncPaint).catch(function (error) {
+  var keepRelay = FBM_SYNC_CLIENT.running === true;
+  FBM_SYNC_CLIENT.cancelRequested = keepRelay;
+  if (!keepRelay) { FBM_SYNC_CLIENT.running = false; }
+  return callServer('fbmCancelSync').then(function (result) {
+    var pending = result && result.code === 'SYNC_CANCEL_PENDING';
+    if (!pending) {
+      FBM_SYNC_CLIENT.cancelRequested = false;
+      FBM_SYNC_CLIENT.running = false;
+    }
+    return fbmSyncPaint(result);
+  }).catch(function (error) {
+    FBM_SYNC_CLIENT.cancelRequested = false;
+    FBM_SYNC_CLIENT.running = false;
     return fbmSyncPaintError(error, 'Không dừng được phiên đồng bộ trên GAS.');
   });
 }
@@ -1304,7 +1315,7 @@ function fbmSyncContinueServer(status, response) {
   var timeoutId;
   var timeout = new Promise(function (resolve) {
     timeoutId = setTimeout(function () {
-      if (!FBM_SYNC_CLIENT.running) { resolve({ cancelled: true, status: status }); return; }
+      if (!FBM_SYNC_CLIENT.running && !FBM_SYNC_CLIENT.cancelRequested) { resolve({ cancelled: true, status: status }); return; }
       var fallback = status && (status.status || status) || {}, requestId = String(status && status.request && status.request.meta && status.request.meta.trace && status.request.meta.trace.requestId || '');
       var traceCall = typeof callServer === 'function' ? callServer('fbmGetSyncTrace').catch(function () { return null; }) : Promise.resolve(null);
       var traceTimeout = new Promise(function (done) { setTimeout(function () { done(null); }, 3000); });
@@ -1348,10 +1359,11 @@ function fbmSyncContinueServer(status, response) {
 }
 /** Chạy chuỗi request GAS -> Extension cho tới khi hết cursor. */
 function fbmSyncLoop(status) {
-  if (!FBM_SYNC_CLIENT.running) { return fbmSyncStatusOnce(); }
+  if (!FBM_SYNC_CLIENT.running && !FBM_SYNC_CLIENT.cancelRequested) { return fbmSyncStatusOnce(); }
   fbmSyncPaint(status);
   if (!status || !status.request) {
     FBM_SYNC_CLIENT.running = false;
+    FBM_SYNC_CLIENT.cancelRequested = false;
     // A terminal response without a request is a transport error; never leave Sidebar silent.
     if (!status) {
       var emptyResultError = 'GAS returned no sync result.';
@@ -1366,7 +1378,7 @@ function fbmSyncLoop(status) {
   var entity = status.request.meta && status.request.meta.entity === 'activity' ? 'giao dịch' : 'khách hàng';
   fbmSyncPaint(fbmSyncWaitingStatus(status, 'Đang chờ tab FBM trả dữ liệu ' + entity + '...'));
   return fbmSyncExtensionRequest(status.request).then(function (response) {
-    if (!FBM_SYNC_CLIENT.running) { return fbmSyncStatusOnce(); }
+    if (!FBM_SYNC_CLIENT.running && !FBM_SYNC_CLIENT.cancelRequested) { return fbmSyncStatusOnce(); }
     fbmSyncPaint(fbmSyncWaitingStatus(status, 'Đã nhận phản hồi FBM; đang chờ GAS xử lý...'));
     return fbmSyncContinueServer(status, fbmSyncRelayResponse(response));
   }).then(fbmSyncLoop);
@@ -1381,6 +1393,7 @@ function fbmSyncRun(mode) {
     return Promise.resolve(missing);
   }
   FBM_SYNC_CLIENT.running = true;
+  FBM_SYNC_CLIENT.cancelRequested = false;
   FBM_SYNC_CLIENT.traceEvents = [];
   FBM_SYNC_CLIENT.viewEpoch += 1;
   fbmSyncPaint({ phase: 'checking_session', label: 'Đang chuẩn bị đồng bộ', direction: 'Kết nối FBM', entityLabel: 'Chuẩn bị phiên', message: 'Đang chuẩn bị phiên đồng bộ...', counts: {} });
