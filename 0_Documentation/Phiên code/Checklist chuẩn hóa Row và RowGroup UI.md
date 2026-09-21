@@ -145,7 +145,7 @@
 - [ ] [Tự động] Commit nhóm tài liệu sau khi E hoàn tất và checklist được tick.
 - [ ] [Tự động] Commit nhóm primitive/catalog sau khi F và test liên quan xanh.
 - [ ] [Tự động] Commit nhóm resolver/schema sau khi G và test liên quan xanh.
-- [x] [Tự động] Commit từng nhóm component sau khi H và test liên quan xanh. Nhóm Settings commit tại `15e4154`; nhóm Sync generic commit tại `5b352f4`.
+- [x] [Tự động] Commit từng nhóm component sau khi H và test liên quan xanh. Nhóm Settings commit tại `15e4154`; nhóm Sync generic commit tại `5b352f4`; nhóm activity slot commit tại `68da852`.
 - [ ] [Tự động] Commit nhóm contract test/dọn hardcode sau khi I và test liên quan xanh.
 - [ ] [Tự động] Chạy lại full test trước commit cuối và ghi kết quả vào checklist.
 - [ ] [Tự động] Nghiệm thu GAS DEV bằng `node tests/gas.js <tên-hàm> --push` nếu có thay đổi cần kiểm tra trên GAS.
