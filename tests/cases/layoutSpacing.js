@@ -87,8 +87,10 @@ function chay(so) {
       runUi.indexOf('identityForm, elements: slots.form }), Stack') >= 0,
       runUi.indexOf('loginRetryGroup: function (className, elements) { return Stack') >= 0,
       runUi.indexOf('loginPolicyChildren, className: FBM_SYNC_SETTINGS_UI.classes.loginChildren, elements: slots.children }), slots.actions') >= 0,
-      runUi.indexOf('Stack({ id: FBM_SYNC_SETTINGS_SCHEMA.regions.loginPolicyChildren') >= 0],
-    [true, true, true, true, true, true, true, true, true, true, true]);
+      runUi.indexOf('Stack({ id: FBM_SYNC_SETTINGS_SCHEMA.regions.loginPolicyChildren') >= 0,
+      runUi.indexOf('page: function (slots) { return Card({ title: slots.title, elements: [Stack({ elements:') >= 0,
+      runUi.indexOf('Row({ className: FBM_SYNC_RESULTS_UI.classes.pagination') >= 0],
+    [true, true, true, true, true, true, true, true, true, true, true, true, true]);
 }
 
 module.exports = { chay };

@@ -169,18 +169,20 @@ Ghi chú nhóm C: `layoutSpacing`, `fbmSync/Components` và `fbmSync/Sidebar` đ
 
 ## 11. Nhóm code D — chuẩn hóa Sync Results và Settings
 
-- [ ] Chuẩn hóa Results tab row, tab description và Results body theo owner spacing rõ ràng.
-- [ ] Chuẩn hóa Card kết quả và pagination; không để preview/error/pagination tự cộng margin kép.
-- [ ] Chuẩn hóa Settings card region để các Card có cùng nhịp xếp.
-- [ ] Chuẩn hóa nhóm module, relay, Extension, background và login policy theo Stack/CardBody contract.
-- [ ] Chuẩn hóa schedule row và detail controls như ngoại lệ grid có owner duy nhất.
-- [ ] Chuẩn hóa toggle row/login children để margin không cộng với gap Stack.
-- [ ] Chuẩn hóa các action save/rotate/edit/cancel trong Settings qua cùng layout action contract.
-- [ ] Kiểm tra trạng thái notice/error/success/preview không làm thay đổi bất ngờ spacing khi xuất hiện hoặc biến mất.
-- [ ] Chạy kiểm thử cấu trúc DOM cho Results và Settings ở trạng thái rỗng, có dữ liệu, lỗi và đang sửa.
-- [ ] Chạy `node tests/run.js` sau nhóm D.
-- [ ] Tick từng mục nhóm D ngay sau bằng chứng tương ứng.
-- [ ] Commit riêng nhóm D.
+- [x] Chuẩn hóa Results tab row, tab description và Results body theo owner spacing rõ ràng.
+- [x] Chuẩn hóa Card kết quả và pagination; không để preview/error/pagination tự cộng margin kép.
+- [x] Chuẩn hóa Settings card region để các Card có cùng nhịp xếp.
+- [x] Chuẩn hóa nhóm module, relay, Extension, background và login policy theo Stack/CardBody contract.
+- [x] Chuẩn hóa schedule row và detail controls như ngoại lệ grid có owner duy nhất.
+- [x] Chuẩn hóa toggle row/login children để margin không cộng với gap Stack.
+- [x] Chuẩn hóa các action save/rotate/edit/cancel trong Settings qua cùng layout action contract.
+- [x] Kiểm tra trạng thái notice/error/success/preview không làm thay đổi bất ngờ spacing khi xuất hiện hoặc biến mất.
+- [x] Chạy kiểm thử cấu trúc DOM cho Results và Settings ở trạng thái rỗng, có dữ liệu, lỗi và đang sửa.
+- [x] Chạy `node tests/run.js` sau nhóm D.
+- [x] Tick từng mục nhóm D ngay sau bằng chứng tương ứng.
+- [x] Commit riêng nhóm D.
+
+Ghi chú nhóm D: `layoutSpacing`, `fbmSync/Components` và `fbmSync/Sidebar` đạt `40/40`; Results gom page text/rows vào `Stack`, pagination giữ `Row`, Settings giữ grid schedule/detail và wrapper CardBody làm owner.
 
 ## 12. Nhóm code E — xử lý ngoại lệ và dọn đường cũ
 

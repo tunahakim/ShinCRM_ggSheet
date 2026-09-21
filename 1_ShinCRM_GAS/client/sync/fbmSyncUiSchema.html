@@ -53,7 +53,7 @@ var FBM_SYNC_RESULTS_UI = {
   layout: {
     description: function (tab) { return Box({ id: FBM_SYNC_RESULTS_SCHEMA.regions.description, className: uiClassJoin(FBM_SYNC_RESULTS_UI.classes.tabDescription, tab.multiline ? FBM_SYNC_RESULTS_UI.classes.multiline : ''), elements: [Text({ className: FBM_SYNC_RESULTS_UI.classes.tabText, text: tab.description })] }); },
     screen: function (slots) { return Box({ id: FBM_SYNC_RESULTS_SCHEMA.rootId, className: FBM_SYNC_RESULTS_UI.rootClass, elements: [Box({ className: FBM_SYNC_RESULTS_UI.classes.tabRow, id: FBM_SYNC_RESULTS_SCHEMA.regions.tabs, elements: slots.tabs }), slots.description, Stack({ id: FBM_SYNC_RESULTS_SCHEMA.regions.body, elements: slots.body })] }); },
-    page: function (slots) { return Card({ title: slots.title, elements: [Text({ className: FBM_SYNC_RESULTS_UI.classes.muted, text: slots.pageText })].concat(slots.rows, [Row({ className: FBM_SYNC_RESULTS_UI.classes.pagination, elements: slots.pagination })]) }); },
+    page: function (slots) { return Card({ title: slots.title, elements: [Stack({ elements: [Text({ className: FBM_SYNC_RESULTS_UI.classes.muted, text: slots.pageText })].concat(slots.rows || []) }), Row({ className: FBM_SYNC_RESULTS_UI.classes.pagination, elements: slots.pagination })] }); },
     pagination: function (slots) { return [Button({ label: FBM_SYNC_RESULTS_SCHEMA.pagination.previous, disabled: slots.previousDisabled, data: { 'sync-page': slots.kind + ':-1' } }), Button({ label: FBM_SYNC_RESULTS_SCHEMA.pagination.next, disabled: slots.nextDisabled, data: { 'sync-page': slots.kind + ':1' } })]; }
   }
 };
