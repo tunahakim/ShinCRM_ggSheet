@@ -202,14 +202,16 @@ Allowlist nhóm E: `margin: 0` chỉ là reset trên primitive/status/control; `
 
 ## 13. Kiểm thử hồi quy offline sau toàn bộ code
 
-- [ ] Chạy `node tests/run.js`; ghi tổng kết cuối phiên.
-- [ ] Chạy các test contract Block/schema/UI liên quan spacing và layout; ghi tên test cụ thể.
-- [ ] Kiểm tra mọi class trong catalog/allowlist đều tồn tại trong CSS hoặc thuộc whitelist primitive/host.
-- [ ] Kiểm tra mọi primitive layout được include đúng thứ tự trước consumer.
-- [ ] Kiểm tra không có thay đổi fixture FBM hoặc dữ liệu nhạy cảm.
-- [ ] Kiểm tra diff không chứa thay đổi nghiệp vụ ngoài phạm vi.
-- [ ] Kiểm tra mỗi commit chỉ chứa một nhóm liên quan và checklist đã tick tương ứng.
-- [ ] Cập nhật tài liệu chính thức nếu code thực tế buộc phải điều chỉnh contract đã ghi.
+- [x] Chạy `node tests/run.js`; ghi tổng kết cuối phiên.
+- [x] Chạy các test contract Block/schema/UI liên quan spacing và layout; ghi tên test cụ thể.
+- [x] Kiểm tra mọi class trong catalog/allowlist đều tồn tại trong CSS hoặc thuộc whitelist primitive/host.
+- [x] Kiểm tra mọi primitive layout được include đúng thứ tự trước consumer.
+- [x] Kiểm tra không có thay đổi fixture FBM hoặc dữ liệu nhạy cảm.
+- [x] Kiểm tra diff không chứa thay đổi nghiệp vụ ngoài phạm vi.
+- [x] Kiểm tra mỗi commit chỉ chứa một nhóm liên quan và checklist đã tick tương ứng.
+- [x] Cập nhật tài liệu chính thức nếu code thực tế buộc phải điều chỉnh contract đã ghi.
+
+Ghi chú hồi quy cuối phiên: `layoutSpacing`, `slots`, `unsavedChanges`, `formScreen`, `viewScreen`, `screenSchemaAudit`, `renderEngine`, `fbmSync/Components` và `fbmSync/Sidebar` đạt `200/200`. `node tests/run.js` đạt `1883`, lỗi `4`; bốn lỗi là ca FBM session/pipeline có sẵn trong worktree (cursor probe và fail-closed), không chạm tệp spacing.
 
 ## 14. Nghiệm thu trực quan trên Sheet DEV
 
@@ -228,13 +230,13 @@ Allowlist nhóm E: `margin: 0` chỉ là reset trên primitive/status/control; `
 
 ## 15. Tiêu chí hoàn tất phiên
 
-- [ ] Có một token spacing nền duy nhất.
-- [ ] Mỗi loại sibling spacing có đúng một owner.
-- [ ] Button/Icon không sở hữu spacing bên ngoài.
-- [ ] Các màn dùng cấu trúc wrapper chuẩn theo loại bố cục.
-- [ ] Mọi ngoại lệ có allowlist, consumer, lý do và test.
-- [ ] Không còn luật generic cộng đồng thời `gap` và margin cho cùng một sibling relationship.
+- [x] Có một token spacing nền duy nhất.
+- [x] Mỗi loại sibling spacing có đúng một owner.
+- [x] Button/Icon không sở hữu spacing bên ngoài.
+- [x] Các màn dùng cấu trúc wrapper chuẩn theo loại bố cục.
+- [x] Mọi ngoại lệ có allowlist, consumer, lý do và test.
+- [x] Không còn luật generic cộng đồng thời `gap` và margin cho cùng một sibling relationship.
 - [ ] Test kiến trúc và `node tests/run.js` đạt không lỗi.
-- [ ] Tài liệu chính thức phản ánh đúng code sau refactor.
-- [ ] Mọi nhóm code đã được commit riêng và checklist đã tick ngay sau commit.
+- [x] Tài liệu chính thức phản ánh đúng code sau refactor.
+- [x] Mọi nhóm code đã được commit riêng và checklist đã tick ngay sau commit.
 - [ ] Chủ dự án đã nghiệm thu trực quan trên Sheet DEV.
