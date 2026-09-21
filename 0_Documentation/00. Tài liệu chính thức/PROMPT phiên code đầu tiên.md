@@ -8,11 +8,11 @@ ShinCRM mini là CRM cá nhân một người dùng, chạy trên Google Sheet c
 
 Phiên này là **phiên code đầu tiên**. Trước nó, số dòng code viết theo kiến trúc mới là **không**.
 
-Nhưng trong repo **đã có khoảng 3.550 dòng code cũ đang chạy được**, theo một kiến trúc khác. Đừng nhầm nó là code của kiến trúc mới, và đừng sửa nó. Quyết định đã chốt với chủ dự án: **viết mới hoàn toàn, không refactor** (tái cấu trúc). Lý do đầy đủ và bảng "phần nào bê nguyên, phần nào chỉ đọc, phần nào bỏ" nằm ở **`00. Lộ trình và checklist.md` Phần 6** — đọc phần đó trước khi mở bất cứ tệp code cũ nào.
+Nhưng trong repo **đã có khoảng 3.550 dòng code cũ đang chạy được**, theo một kiến trúc khác. Đừng nhầm nó là code của kiến trúc mới, và đừng sửa nó. Quyết định đã chốt với chủ dự án: **viết mới hoàn toàn, không refactor** (tái cấu trúc). Lý do và ranh giới được ghi trong bộ tài liệu chính thức; đọc Tài liệu 01 và bản đồ code trước khi mở bất cứ tệp code cũ nào.
 
 ### Thứ tự đọc tài liệu
 
-1. `00. Lộ trình và checklist.md` — toàn bộ. Đây là bản đồ: đang ở đâu, còn treo gì, làm gì tiếp, và Phần 6 là bảng tra code cũ.
+1. `00. Tổng quan dự án ShinCRM.md` — bản đồ kiến trúc, Sheet, code và đường đọc tài liệu.
 2. `01. Quy chuẩn nền ShinCRM.md` — luật đặt tên, luật trình bày tài liệu, bản đồ tài liệu. Phần 5 của nó cho biết tài liệu nào là nguồn chuẩn của việc gì.
 3. `02. KIẾN TRÚC DỮ LIỆU ShinCRM.md` và `02A` — hình dạng sheet, mã cột `@`, mười cột mô tả bản ghi.
 4. `03. Data schema & UI schema.md` và `03A` — hai bảng `DATA_SCHEMA` và `UI_SCHEMA`, nối nhau bằng **tên trường**.
