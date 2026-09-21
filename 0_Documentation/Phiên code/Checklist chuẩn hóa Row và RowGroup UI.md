@@ -130,16 +130,37 @@
 
 ## K. Nghiệm thu trực quan trên Sheet DEV
 
-- [ ] [Cần kiểm chứng thật] Mở Sidebar trên Sheet DEV, không dùng Sheet có dữ liệu khách thật.
-- [ ] [Cần kiểm chứng thật] Kiểm tra form Customer thêm/sửa: title, Hủy, Lưu, footer và các hàng field không bị lệch/tràn.
-- [ ] [Cần kiểm chứng thật] Kiểm tra các hàng một cột và hai cột có cùng rowGap/columnGap theo policy.
-- [ ] [Cần kiểm chứng thật] Kiểm tra các Card liên tiếp có cardGap riêng, không bị dùng nhầm rowGap.
-- [ ] [Cần kiểm chứng thật] Kiểm tra HeaderGroup: tiêu đề trái, Hủy bên phải, Lưu ngoài cùng bên phải.
-- [ ] [Cần kiểm chứng thật] Kiểm tra Settings: toggle, input, detail fields và các icon/action thẳng hàng.
-- [ ] [Cần kiểm chứng thật] Kiểm tra nhóm login children có indentation đúng nhưng không làm lệch mép phải của toggle.
-- [ ] [Cần kiểm chứng thật] Kiểm tra viewport Sidebar hẹp: label dài xuống dòng đúng vùng, control không tràn, action không chồng.
-- [ ] [Cần kiểm chứng thật] Kiểm tra focus bằng bàn phím không đổi thứ tự do wrapper layout.
-- [ ] [Cần kiểm chứng thật] Ghi ảnh và mô tả cụ thể cho từng sai lệch; không đánh dấu đạt bằng nhận xét chung chung.
+- [ ] [Cần kiểm chứng thật] Mở đúng Sheet DEV của dự án, xác nhận không phải Sheet chứa dữ liệu khách thật, rồi mở Sidebar bằng luồng khởi động chính.
+- [ ] [Cần kiểm chứng thật] Xác nhận Sidebar mở không báo lỗi JavaScript, không hiện màn trắng và header/sidebar body đều có nội dung.
+- [ ] [Cần kiểm chứng thật] Mở form thêm Customer; xác nhận tiêu đề màn hiển thị đúng ngữ cảnh `Thêm Khách Hàng`.
+- [ ] [Cần kiểm chứng thật] Trong form thêm Customer, xác nhận nút Hủy nằm bên phải tiêu đề và nút Lưu nằm ngoài cùng bên phải.
+- [ ] [Cần kiểm chứng thật] Trong form thêm Customer, xác nhận thứ tự hai action header là Hủy trước, Lưu sau; không bị đảo do wrapper.
+- [ ] [Cần kiểm chứng thật] Trong form thêm Customer, xác nhận nút footer `LƯU DỮ LIỆU` nằm đúng vùng footer và không bị dính vào hàng field cuối.
+- [ ] [Cần kiểm chứng thật] Trong form thêm Customer, xác nhận hàng chỉ có `companyName` chiếm toàn bộ chiều rộng khả dụng.
+- [ ] [Cần kiểm chứng thật] Trong form thêm Customer, xác nhận các hàng `id`/`taxNumber`, `contactPerson`/`phone`, `product`/`customerGroup` chia cột đều.
+- [ ] [Cần kiểm chứng thật] Trong form thêm Customer, xác nhận hàng textarea `note` không làm cột bên cạnh xuất hiện giả hoặc làm Card tràn ngang.
+- [ ] [Cần kiểm chứng thật] Mở form sửa Customer; xác nhận cấu trúc, thứ tự field, header và footer giữ nguyên như form thêm, chỉ khác title/dữ liệu.
+- [ ] [Cần kiểm chứng thật] So sánh khoảng cách dọc giữa hai hàng một cột liên tiếp với hai hàng hai cột; khoảng cách phải do cùng rowGap, không phụ thuộc số cell.
+- [ ] [Cần kiểm chứng thật] So sánh khoảng cách ngang giữa các cell trong hai hàng hai cột; khoảng cách phải đồng nhất theo columnGap.
+- [ ] [Cần kiểm chứng thật] Xác nhận Field, Text, Button và Icon không tự tạo thêm khoảng cách khiến một cặp sibling bị rộng hơn cặp khác.
+- [ ] [Cần kiểm chứng thật] Mở màn có ít nhất hai Card liên tiếp; xác nhận khoảng cách Card-Card lớn/nhỏ theo cardGap riêng, không bằng rowGap nội bộ Card.
+- [ ] [Cần kiểm chứng thật] Xác nhận thay đổi chiều cao nội dung một Card không làm khoảng cách giữa Card kế bên biến thành margin của Card con.
+- [ ] [Cần kiểm chứng thật] Mở màn Settings; xác nhận hàng toggle có nhãn ở vùng trái và control ở vùng phải, cùng một trục ngang.
+- [ ] [Cần kiểm chứng thật] Mở Settings có schedule; xác nhận toggle, nhãn và ô chu kỳ nằm trên cùng một hàng, không bị rơi cột hoặc lệch icon.
+- [ ] [Cần kiểm chứng thật] Mở Settings có detail field; xác nhận label nằm trên control theo dạng dọc và các detail field có cùng nhịp dọc.
+- [ ] [Cần kiểm chứng thật] Mở Settings có action nhiều nút; xác nhận các nút thuộc cùng ActionStack, có khoảng cách đều và không bị Button tự đẩy.
+- [ ] [Cần kiểm chứng thật] Mở nhóm login policy; xác nhận hàng parent và nhóm children có cùng mép phải logic của control.
+- [ ] [Cần kiểm chứng thật] Trong login policy, xác nhận indentation của children chỉ thụt phần nội dung theo policy, không làm cả wrapper lệch khỏi Card.
+- [ ] [Cần kiểm chứng thật] Trong login policy, xác nhận toggle parent và toggle child không bị lệch hàng dọc khi label dài.
+- [ ] [Cần kiểm chứng thật] Kiểm tra HeaderGroup trên ít nhất một màn có title dài; xác nhận title co/ellipsis mà không đẩy Hủy/Lưu ra ngoài viewport.
+- [ ] [Cần kiểm chứng thật] Thu hẹp viewport Sidebar đến kích thước hẹp thực tế; xác nhận label dài xuống dòng trong vùng của nó.
+- [ ] [Cần kiểm chứng thật] Ở viewport hẹp, xác nhận input/select/textarea không tràn ngang khỏi Card hoặc che control kế bên.
+- [ ] [Cần kiểm chứng thật] Ở viewport hẹp, xác nhận action button không chồng chữ, không bị cắt nhãn và không tạo scrollbar ngang ngoài ý muốn.
+- [ ] [Cần kiểm chứng thật] Dùng phím Tab từ đầu Sidebar; ghi lại thứ tự focus qua header, field, control và action, rồi xác nhận thứ tự khớp thứ tự người dùng nhìn thấy.
+- [ ] [Cần kiểm chứng thật] Dùng Shift+Tab quay ngược từ footer; xác nhận wrapper Row/RowGroup không làm bỏ qua hoặc lặp lại control.
+- [ ] [Cần kiểm chứng thật] Kiểm tra một component chỉ có Block đơn trong RowGroup; xác nhận hình thức và thứ tự hiển thị không đổi so với trước refactor.
+- [ ] [Cần kiểm chứng thật] Với mỗi ca đạt, ghi màn hình, thao tác, kết quả quan sát và ảnh chụp tương ứng; không đánh dấu đạt bằng nhận xét chung chung.
+- [ ] [Cần kiểm chứng thật] Với mỗi ca không đạt, ghi selector/vùng nhìn thấy, bước tái hiện, ảnh trước/sau và không tự sửa CSS tại màn hình để che lỗi.
 
 ## L. Commit và bàn giao
 
