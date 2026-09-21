@@ -50,16 +50,18 @@ Ghi chú kiểm kê: `align` đang được khai tại `client/schema/screens/fo
 
 ## 4. Cập nhật tài liệu chính thức trước code
 
-- [ ] Cập nhật `03. Data schema & UI schema.md`: bỏ mô tả screen schema tự do khai `align`; mô tả cấu trúc header theo nhóm và vị trí do layout wrapper sở hữu.
-- [ ] Cập nhật `03. Data schema & UI schema.md`: tách căn nội dung bên trong primitive, căn con trong wrapper và vị trí cả wrapper trong vùng cha.
-- [ ] Cập nhật `03. Data schema & UI schema.md`: ghi bảng mặc định cho Page, CardBody, Stack, Row, Field, Text, Button, Icon, ActionStack, Table, Loading/Empty.
-- [ ] Cập nhật `03. Data schema & UI schema.md`: ghi rõ ngoại lệ dùng resolver/catalog hoặc component ngữ nghĩa, không dùng CSS/style trong schema.
-- [ ] Cập nhật `04. Bộ máy render và luồng lưu.md`: mô tả layout policy tập trung, header group và ranh giới giữa `spatialConfig` với alignment.
-- [ ] Cập nhật `04. Bộ máy render và luồng lưu.md`: chốt renderer không dịch khóa `align` của screen schema thành class `shin-align-right` nữa.
-- [ ] Cập nhật `09/08. UI đồng bộ và cấu hình.md`: ghi các mặc định vị trí cho Settings schedule row, detail controls, action group, notice và tab/result.
-- [ ] Cập nhật `09/08. UI đồng bộ và cấu hình.md`: ghi ngoại lệ domain còn lại và owner của từng ngoại lệ.
+- [x] Cập nhật `03. Data schema & UI schema.md`: bỏ mô tả screen schema tự do khai `align`; mô tả cấu trúc header theo nhóm và vị trí do layout wrapper sở hữu.
+- [x] Cập nhật `03. Data schema & UI schema.md`: tách căn nội dung bên trong primitive, căn con trong wrapper và vị trí cả wrapper trong vùng cha.
+- [x] Cập nhật `03. Data schema & UI schema.md`: ghi bảng mặc định cho Page, CardBody, Stack, Row, Field, Text, Button, Icon, ActionStack, Table, Loading/Empty.
+- [x] Cập nhật `03. Data schema & UI schema.md`: ghi rõ ngoại lệ dùng resolver/catalog hoặc component ngữ nghĩa, không dùng CSS/style trong schema.
+- [x] Cập nhật `04. Bộ máy render và luồng lưu.md`: mô tả layout policy tập trung, header group và ranh giới giữa `spatialConfig` với alignment.
+- [x] Cập nhật `04. Bộ máy render và luồng lưu.md`: chốt renderer không dịch khóa `align` của screen schema thành class `shin-align-right` nữa.
+- [x] Cập nhật `09/08. UI đồng bộ và cấu hình.md`: ghi các mặc định vị trí cho Settings schedule row, detail controls, action group, notice và tab/result.
+- [x] Cập nhật `09/08. UI đồng bộ và cấu hình.md`: ghi ngoại lệ domain còn lại và owner của từng ngoại lệ.
 - [ ] Cập nhật `0_Documentation/Phiên code/Cây thư mục code.md` nếu thêm file layout policy hoặc test mới.
-- [ ] Ghi commit tài liệu riêng sau khi các tài liệu trên không còn mâu thuẫn với quyết định phiên này.
+- [x] Ghi commit tài liệu riêng sau khi các tài liệu trên không còn mâu thuẫn với quyết định phiên này.
+
+Ghi chú nhóm tài liệu: đã cập nhật `03. Data schema & UI schema.md`, `04. Bộ máy render và luồng lưu.md` và `09. Đồng bộ FBM/08. UI đồng bộ và cấu hình.md`; phần code vẫn chưa bắt đầu. Cần tiếp tục nhóm primitive/layout policy.
 
 ## 5. Primitive và layout policy
 
