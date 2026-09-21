@@ -94,16 +94,14 @@ function screenFormTitle(title, themMoi) {
 }
 
 /**
- * Chèn tiêu đề vào vùng header, ngay trước cụm mục căn phải — ra `[tiêu đề]…[X][✓]`, đúng bố cục form.
+ * Chèn tiêu đề vào nhóm start của header — ra `[X][tiêu đề]…[✓]`, đúng bố cục form mà không cần marker align.
  *
  * Chèn thay vì khai thẳng trong `UI_SCHEMA` vì tiêu đề phụ thuộc bản ghi đang mở, mà `UI_SCHEMA` là bản khai tĩnh. Vắng mục căn phải thì nối vào cuối.
  */
 function screenFormHeader(header, tieuDe) {
-  var out = header.slice();
-  var i = 0;
-  while (i < out.length && out[i].align !== 'right') { i += 1; }
-  out.splice(i, 0, Text({ text: tieuDe, className: typeof uiResolveComponentClass === 'function' ? uiResolveComponentClass('formTitle') : '' }));
-  return out;
+  var source = header || {}, start = Array.isArray(source.start) ? source.start.slice() : [], end = Array.isArray(source.end) ? source.end.slice() : [];
+  start.push({ text: tieuDe, className: typeof uiResolveComponentClass === 'function' ? uiResolveComponentClass('formTitle') : '' });
+  return { start: start, end: end };
 }
 
 /**
@@ -147,9 +145,9 @@ function screenFormRender() {
   var top = screenStateTop();
   if (!top) { throw new Error('Không có form nào đang mở để vẽ. Màn hiện tại là "' + ScreenState.screen + '".'); }
 
-  var man = screenBuild(screenFormDecl(top.screen), top.screen);
+  var decl = screenFormDecl(top.screen), title = screenFormTitle(decl.title, top.themMoi);
+  var man = screenBuild(Object.assign({}, decl, { header: screenFormHeader(decl.header, title) }), top.screen);
   var record = screenStateFormRecord();
-  man.header = screenFormHeader(man.header, screenFormTitle(man.title, top.themMoi));
 
   var html = renderScreen(man, { records: screenFormRecords(man, record), carried: top.carried });
   html.focusId = screenFormFirstCellId(man);

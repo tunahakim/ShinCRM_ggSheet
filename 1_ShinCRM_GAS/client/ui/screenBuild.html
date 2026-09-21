@@ -21,10 +21,14 @@ function screenFieldSpec(phanTu, viTri) {
  */
 function screenBarItem(muc, viTri) {
   if (!muc || typeof muc !== 'object') { throw new Error('Mục ở ' + viTri + ' phải là object.'); }
+  if (Object.prototype.hasOwnProperty.call(muc, 'align')) { throw new Error(viTri + ' không được khai `align`; dùng nhóm header hoặc wrapper layout.'); }
   var surface = viTri.indexOf('.footer') >= 0 ? 'footer' : (viTri.indexOf('.header') >= 0 ? 'header' : 'titleActions');
+  if (typeof muc.text === 'string') {
+    return Text({ text: muc.text, className: muc.className || '' });
+  }
   if (typeof muc.button === 'string') {
     var nut = { label: muc.button };
-    ['action', 'id', 'menu', 'align', 'spatialConfig'].forEach(function (k) {
+    ['action', 'id', 'menu', 'spatialConfig'].forEach(function (k) {
       if (muc[k] !== undefined) { nut[k] = muc[k]; }
     });
     if (muc.className !== undefined) { nut.className = muc.className; }
@@ -45,6 +49,45 @@ function screenBar(items, viTri) {
   if (items === undefined || items === null) { return []; }
   if (!Array.isArray(items)) { throw new Error('`' + viTri + '` phải là mảng, kể cả khi chỉ có một mục.'); }
   return items.map(function (muc, i) { return screenBarItem(muc, viTri + ' mục ' + (i + 1)); });
+}
+
+/** Header dùng hai nhóm có owner rõ ràng; item lá không còn cờ align để tự đẩy mình. */
+function screenHeaderGroup(side, elements) {
+  if (side !== 'start' && side !== 'end') { throw new Error('HeaderGroup chỉ nhận phía "start" hoặc "end".'); }
+  if (!elements.length) { return null; }
+  return side === 'start'
+    ? Box({ className: 'shin-header-group shin-header-group-start', elements: elements })
+    : Box({ className: 'shin-header-group shin-header-group-end', elements: elements });
+}
+
+function screenHeader(header, viTri) {
+  if (header === undefined || header === null) { return []; }
+  if (!header || Array.isArray(header) || typeof header !== 'object') {
+    throw new Error('`header` phải là object có hai nhóm `start` và `end`.');
+  }
+  var hasStart = Object.prototype.hasOwnProperty.call(header, 'start');
+  var hasEnd = Object.prototype.hasOwnProperty.call(header, 'end');
+  if (!hasStart && !hasEnd) {
+    throw new Error('`header` phải là object có hai nhóm `start` và `end`.');
+  }
+  ['start', 'end'].forEach(function (side) {
+    if (!Object.prototype.hasOwnProperty.call(header, side)) {
+      throw new Error('`header` phải khai đủ nhóm "start" và "end". Thiếu nhóm "' + side + '".');
+    }
+  });
+  Object.keys(header).forEach(function (side) {
+    if (side !== 'start' && side !== 'end') {
+      throw new Error('`header` không nhận nhóm "' + side + '"; chỉ dùng "start" và "end".');
+    }
+  });
+  ['start', 'end'].forEach(function (side) {
+    if (!Array.isArray(header[side])) {
+      throw new Error('Nhóm header "' + side + '" phải là mảng item.');
+    }
+  });
+  var start = screenBar(header.start, viTri + '.start');
+  var end = screenBar(header.end, viTri + '.end');
+  return [screenHeaderGroup('start', start), screenHeaderGroup('end', end)].filter(function (group) { return group !== null; });
 }
 
 /**
@@ -99,7 +142,7 @@ function screenBuild(decl, ten) {
     entity: decl.entity,
     title: decl.title === undefined ? null : decl.title,
     infoBar: decl.infoBar === true,
-    header: screenBar(decl.header, nhan + '.header'),
+    header: screenHeader(decl.header, nhan + '.header'),
     body: screenBody(decl.body, nhan),
     footer: screenBar(decl.footer, nhan + '.footer')
   };

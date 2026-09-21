@@ -99,8 +99,11 @@ html, body {
   background: var(--shin-bg);
 }
 
-/* Thuộc tính `align: "right"` của Block dịch ra lớp này: nó đẩy chính nó và mọi thứ sau nó sang phải. */
-.shin-shell-header .shin-align-right { margin-left: auto; }
+/* HeaderGroup là owner duy nhất của việc tách nhóm đầu/cuối; node lá không tự đẩy mình bằng margin. */
+.shin-header-group { display: flex; align-items: center; gap: var(--shin-gap-1); min-width: 0; }
+.shin-header-group-start { flex: 1 1 auto; }
+.shin-header-group-end { flex: 0 0 auto; margin-left: auto; }
+.shin-header-group > * { min-width: 0; }
 
 /* Vùng 2 — Dải tiến trình. Primitive loading ở components.html giữ hình thức; frame chỉ giữ vị trí và chiều cao ổn định. */
 #sidebar-progress {

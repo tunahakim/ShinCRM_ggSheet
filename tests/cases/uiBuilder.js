@@ -20,7 +20,7 @@ function chay(so) {
   // Hình dạng node. Mọi node cùng một bộ khóa nên engine không phải hỏi khóa có tồn tại không.
   const hop1 = hop.Block({});
   check(so, 'Block trần có vai box và đủ ba mươi khóa',
-    [hop1.role, Object.keys(hop1).length], ['box', 30]);
+    [hop1.role, Object.keys(hop1).length], ['box', 29]);
 
   check(so, 'các hàm dựng chỉ điền vai, không sinh loại node mới',
     [hop.Card({}).role, hop.Row([]).role, hop.Text('x').role, hop.Field({ field: 'a' }).role, hop.Button('L').role, hop.Icon('close').role, hop.Check('ACT-000001').role, hop.StandaloneControl({ id: 'c', kind: 'input' }).role],
@@ -77,19 +77,19 @@ function chay(so) {
     entity: 'customer',
     title: { add: 'Thêm Khách Hàng', edit: 'Sửa Khách Hàng' },
     infoBar: false,
-    header: [
-      { icon: 'close', tooltip: 'Hủy', action: 'cancelForm', align: 'right' },
-      { icon: 'check', tooltip: 'Lưu', action: 'saveForm', align: 'right' }
-    ],
+    header: {
+      start: [{ icon: 'close', tooltip: 'Hủy', action: 'cancelForm' }],
+      end: [{ icon: 'check', tooltip: 'Lưu', action: 'saveForm' }]
+    },
     body: [
       { group: '', rows: [['companyName'], ['id', 'taxNumber'], [{ field: 'note', control: 'textarea' }]] }
     ],
     footer: [{ button: 'LƯU DỮ LIỆU', action: 'saveForm', className: 'btn-save-wide' }]
   }, 'customerForm');
 
-  check(so, 'header thành hai nút glyph, giữ nguyên tooltip và cùng căn phải',
-    form.header.map((n) => [n.role, n.icon, n.tooltip, n.action, n.align]),
-    [['icon', 'close', 'Hủy', 'cancelForm', 'right'], ['icon', 'check', 'Lưu', 'saveForm', 'right']]);
+  check(so, 'header thành hai nhóm glyph, giữ nguyên tooltip và action',
+    [form.header.length, form.header[0].className, form.header[0].elements.map((n) => [n.icon, n.tooltip, n.action]), form.header[1].className, form.header[1].elements.map((n) => [n.icon, n.tooltip, n.action])],
+    [2, 'shin-header-group shin-header-group-start', [['close', 'Hủy', 'cancelForm']], 'shin-header-group shin-header-group-end', [['check', 'Lưu', 'saveForm']]]);
 
   check(so, 'footer khai bằng khóa `button` thì thành nút chữ, không thành nút glyph',
     [form.footer[0].role, form.footer[0].label, form.footer[0].className],
@@ -114,7 +114,7 @@ function chay(so) {
   const view = hop.screenBuild({
     entity: 'customer',
     infoBar: true,
-    header: [{ icon: 'more', tooltip: 'Khác', menu: [{ label: 'Bám theo ô đang chọn', action: 'toggleFollowSelection', toggle: true }] }],
+    header: { start: [{ icon: 'more', tooltip: 'Khác', menu: [{ label: 'Bám theo ô đang chọn', action: 'toggleFollowSelection', toggle: true }] }], end: [] },
     body: [hop.Card({ title: 'LỊCH SỬ LÀM VIỆC', elements: 'activityList' })]
   }, 'view');
 
@@ -122,7 +122,7 @@ function chay(so) {
     [view.body.length, view.body[0].title, view.body[0].elements], [1, 'LỊCH SỬ LÀM VIỆC', 'activityList']);
 
   check(so, 'menu đi qua nguyên trạng, phép kiểm toggle với value thuộc bộ tự kiểm lúc khởi động',
-    view.header[0].menu.length, 1);
+    view.header[0].elements[0].menu.length, 1);
 
   checkThrows(so, 'thân trộn cây Block với cụm group/rows thì bị chặn',
     () => hop.screenBuild({ entity: 'customer', body: [hop.Card({}), { group: '', rows: [] }] }, 'lẫn'), 'trộn cây Block');
@@ -134,8 +134,18 @@ function chay(so) {
     () => hop.screenBuild({ entity: 'customer', body: [{ group: 'A' }] }, 'x'), 'phải có khóa `rows`');
   checkThrows(so, 'phần tử trong hàng không phải tên trường thì bị chặn',
     () => hop.screenBuild({ entity: 'customer', body: [{ group: '', rows: [[{ control: 'text' }]] }] }, 'x'), 'phải là tên trường');
-  checkThrows(so, 'header khai bằng một mục lẻ thay vì mảng thì bị chặn',
-    () => hop.screenBuild({ entity: 'customer', header: { icon: 'close' } }, 'x'), 'phải là mảng, kể cả khi chỉ có một mục');
+  checkThrows(so, 'header khai bằng một mục lẻ thay vì nhóm start/end thì bị chặn',
+    () => hop.screenBuild({ entity: 'customer', header: { icon: 'close' } }, 'x'), 'phải là object có hai nhóm');
+  checkThrows(so, 'header thiếu nhóm end thì bị chặn',
+    () => hop.screenBuild({ entity: 'customer', header: { start: [] } }, 'x'), 'phải khai đủ nhóm');
+  checkThrows(so, 'header có nhóm lạ thì bị chặn',
+    () => hop.screenBuild({ entity: 'customer', header: { start: [], end: [], middle: [] } }, 'x'), 'không nhận nhóm');
+  checkThrows(so, 'header group không phải mảng thì bị chặn',
+    () => hop.screenBuild({ entity: 'customer', header: { start: {}, end: [] } }, 'x'), 'phải là mảng item');
+  checkThrows(so, 'HeaderGroup không nhận phía lạ',
+    () => hop.screenHeaderGroup('middle', []), 'chỉ nhận phía');
+  checkThrows(so, 'header không được dùng align trên item lá',
+    () => hop.screenBuild({ entity: 'customer', header: { start: [{ icon: 'close', align: 'right' }], end: [] } }, 'x'), 'không được khai `align`');
 
   check(so, 'vùng không khai thì thành mảng rỗng, để engine ẩn hẳn vùng đó',
     [hop.screenBuild({ entity: 'customer' }, 'trống').header, hop.screenBuild({ entity: 'customer' }, 'trống').footer, hop.screenBuild({ entity: 'customer' }, 'trống').body],

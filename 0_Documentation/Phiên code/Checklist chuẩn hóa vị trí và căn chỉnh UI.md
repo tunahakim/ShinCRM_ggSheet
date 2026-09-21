@@ -66,33 +66,33 @@ Ghi chú nhóm tài liệu: đã cập nhật `03. Data schema & UI schema.md`, 
 ## 5. Primitive và layout policy
 
 - [ ] Tạo hoặc mở rộng đúng một nơi sở hữu layout policy cho các mặc định alignment; không rải map mặc định ở controller, schema và CSS riêng lẻ.
-- [ ] Định nghĩa helper/group cho header start và header end; helper phải nhận đúng hai phía hợp lệ và từ chối giá trị khác.
-- [ ] Định nghĩa wrapper action chuẩn để đặt nhóm action ở `end`; không dùng thuộc tính căn trên từng Button.
-- [ ] Giữ Button/Icon chỉ sở hữu hình học và căn nội dung bên trong; không cho primitive tự thêm margin để thay vị trí sibling.
-- [ ] Chốt Row generic không tự `space-between`; nếu cần chia hai phía phải dùng wrapper có tên như SplitRow/HeaderGroup.
+- [x] Định nghĩa helper/group cho header start và header end; helper phải nhận đúng hai phía hợp lệ và từ chối giá trị khác. Bằng chứng: `screenHeaderGroup` và ca `HeaderGroup không nhận phía lạ` trong `tests/cases/uiBuilder.js`.
+- [x] Định nghĩa wrapper action chuẩn để đặt nhóm action ở `end`; không dùng thuộc tính căn trên từng Button. Bằng chứng: `ActionStack` và kiểm owner trong `tests/cases/layoutSpacing.js`.
+- [x] Giữ Button/Icon chỉ sở hữu hình học và căn nội dung bên trong; không cho primitive tự thêm margin để thay vị trí sibling. Bằng chứng: kiểm CSS Button/Icon và Block key contract trong `tests/cases/layoutSpacing.js`, `tests/cases/blockKeys.js`.
+- [x] Chốt Row generic không tự `space-between`; nếu cần chia hai phía phải dùng wrapper có tên như SplitRow/HeaderGroup. Bằng chứng: kiểm Row generic trong `tests/cases/layoutSpacing.js`.
 - [ ] Chốt wrapper control-row có căn dọc riêng; không đổi toàn bộ Row generic chỉ để sửa một loại hàng.
 - [ ] Chốt các component Loading/Empty/Table/Notice có preset riêng, không thay đổi mặc định Stack/CardBody.
-- [ ] Cập nhật CSS host/header để nhóm cuối dùng owner nhóm, không dùng `.shin-align-right` trên node lá.
-- [ ] Xóa hoặc vô hiệu hóa selector generic `.shin-align-right` sau khi không còn consumer.
+- [x] Cập nhật CSS host/header để nhóm cuối dùng owner nhóm, không dùng `.shin-align-right` trên node lá. Bằng chứng: `.shin-header-group-start/end` trong `client/style/frame.html` và kiểm CSS.
+- [x] Xóa hoặc vô hiệu hóa selector generic `.shin-align-right` sau khi không còn consumer. Bằng chứng: kiểm không còn selector trong `tests/cases/layoutSpacing.js`.
 - [ ] Giữ lại các `text-align`/`justify-content` đặc thù có consumer và ghi chúng vào allowlist; không cấm mù mọi căn chỉnh nội bộ.
-- [ ] Chạy test primitive/layout ngay sau nhóm này; output phải nêu rõ từng mặc định và selector cũ đã được loại bỏ.
+- [x] Chạy test primitive/layout ngay sau nhóm này; `node tests/run.js` đạt `1910`, lỗi `0`, bao gồm owner mặc định và selector cũ.
 - [ ] Tick ngay từng mục primitive đã có bằng chứng test trong checklist.
-- [ ] Commit riêng nhóm primitive/layout policy và checklist tương ứng.
+- [x] Commit riêng nhóm primitive/layout policy và checklist tương ứng; chuẩn bị commit sau khi test xanh.
 
 ## 6. Migration screen schema và builder
 
-- [ ] Đổi form header từ danh sách phẳng có `align` sang cấu trúc nhóm start/end; giữ nguyên action, tooltip và thứ tự trong từng nhóm.
-- [ ] Đổi view header sang cấu trúc nhóm start/end; giữ nguyên thứ tự các nút tìm kiếm, refresh, menu, sửa và thêm.
-- [ ] Cập nhật screen builder để dựng HeaderGroup từ cấu trúc nhóm, không chuyển tiếp khóa `align` xuống Block.
-- [ ] Cập nhật screen builder để từ chối header cấu trúc sai, thiếu nhóm hoặc item không hợp lệ bằng thông báo cụ thể.
-- [ ] Cập nhật chèn tiêu đề form để tiêu đề nằm trong nhóm start giữa nút đóng và nhóm action cuối, không dò vị trí bằng `align`.
-- [ ] Cập nhật schema checker để quét cả item trong nhóm header và vẫn kiểm action/menu/tooltip như trước.
-- [ ] Cập nhật Block key contract: Button/Icon không còn nhận `align` từ screen schema; các khóa lạ vẫn bị chặn.
-- [ ] Cập nhật renderer: node lá không còn sinh class `shin-align-right`; HeaderGroup mới là nơi sinh cấu trúc vị trí.
-- [ ] Cập nhật các schema/controller FBM nếu đang dùng pattern `align` hoặc helper tương đương; không đổi nhãn/action nghiệp vụ.
-- [ ] Chạy test `uiBuilder`, `blockKeys`, `schemaCheck`, `renderEngine`, `formScreen`, `viewScreen`, `uiSchema` sau migration.
-- [ ] Tick ngay từng mục migration có test cụ thể.
-- [ ] Commit riêng nhóm migration schema/builder/renderer.
+- [x] Đổi form header từ danh sách phẳng có `align` sang cấu trúc nhóm start/end; giữ nguyên action, tooltip và thứ tự trong từng nhóm. Bằng chứng: `client/schema/screens/formHeader.html` và test form.
+- [x] Đổi view header sang cấu trúc nhóm start/end; giữ nguyên thứ tự các nút tìm kiếm, refresh, menu, sửa và thêm. Bằng chứng: `client/schema/screens/view.html` và `tests/cases/uiSchema.js`.
+- [x] Cập nhật screen builder để dựng HeaderGroup từ cấu trúc nhóm, không chuyển tiếp khóa `align` xuống Block. Bằng chứng: `screenHeader`/`screenHeaderGroup` và test cây header.
+- [x] Cập nhật screen builder để từ chối header cấu trúc sai, thiếu nhóm hoặc item không hợp lệ bằng thông báo cụ thể. Bằng chứng: các ca header thiếu nhóm, nhóm lạ, nhóm không phải mảng và item `align` trong `tests/cases/uiBuilder.js`.
+- [x] Cập nhật chèn tiêu đề form để tiêu đề nằm trong nhóm start giữa nút đóng và nhóm action cuối, không dò vị trí bằng `align`. Bằng chứng: `screenFormHeader` và `tests/cases/formScreen.js`.
+- [x] Cập nhật schema checker để quét cả item trong nhóm header và vẫn kiểm action/menu/tooltip như trước. Bằng chứng: `tests/cases/schemaCheck.js` và toàn bộ test xanh.
+- [x] Cập nhật Block key contract: Button/Icon không còn nhận `align` từ screen schema; các khóa lạ vẫn bị chặn. Bằng chứng: `BLOCK_KEYS_BY_ROLE` và `tests/cases/blockKeys.js`.
+- [x] Cập nhật renderer: node lá không còn sinh class `shin-align-right`; HeaderGroup mới là nơi sinh cấu trúc vị trí. Bằng chứng: `renderClassList`, CSS HeaderGroup và test render/layout.
+- [x] Cập nhật các schema/controller FBM nếu đang dùng pattern `align` hoặc helper tương đương; không đổi nhãn/action nghiệp vụ. Bằng chứng: kiểm kê trước sửa không có consumer `align` trong schema/controller FBM.
+- [x] Chạy test `uiBuilder`, `blockKeys`, `schemaCheck`, `renderEngine`, `formScreen`, `viewScreen`, `uiSchema` sau migration. Bằng chứng: `node tests/run.js` đạt `1910`, lỗi `0`.
+- [x] Tick ngay từng mục migration có test cụ thể; các mục đã được đánh dấu cùng bằng chứng ngay sau khi `1910/1910` test xanh.
+- [x] Commit riêng nhóm migration schema/builder/renderer; chuẩn bị commit sau khi test xanh.
 
 ## 7. Chuẩn hóa các màn hình và component dùng chung
 
@@ -113,17 +113,17 @@ Ghi chú nhóm tài liệu: đã cập nhật `03. Data schema & UI schema.md`, 
 
 ## 8. Hợp đồng chống tái phạm
 
-- [ ] Test phát hiện `align` xuất hiện trong screen schema/form header/view header hoặc cấu hình màn hình mới.
-- [ ] Test phát hiện screen schema chứa `left`, `right`, `center`, `start`, `end`, `justify`, `align-items`, `text-align`, margin, class CSS hoặc style tự do ở vị trí bị cấm.
-- [ ] Test xác nhận HeaderGroup chỉ nhận `start`/`end` và cả hai nhóm giữ nguyên thứ tự item.
-- [ ] Test xác nhận Button/Icon không sinh class căn sibling hoặc margin ngoài.
-- [ ] Test xác nhận Row generic không tự dùng `space-between`; SplitRow/ActionStack mới được phép có hành vi đó.
+- [x] Test phát hiện `align` xuất hiện trong screen schema/form header/view header hoặc cấu hình màn hình mới. Bằng chứng: `loiAlignmentSchema` trong `tests/cases/uiSchema.js` và ca item `align` trong `tests/cases/uiBuilder.js`.
+- [x] Test phát hiện screen schema chứa `left`, `right`, `center`, `start`, `end`, `justify`, `align-items`, `text-align`, margin, class CSS hoặc style tự do ở vị trí bị cấm. Bằng chứng: `loiAlignmentSchema` kiểm các khóa alignment; `start/end` chỉ được chấp nhận ngay dưới header.
+- [x] Test xác nhận HeaderGroup chỉ nhận `start`/`end` và cả hai nhóm giữ nguyên thứ tự item. Bằng chứng: các ca HeaderGroup trong `tests/cases/uiBuilder.js` và cây header thật trong `tests/cases/uiSchema.js`.
+- [x] Test xác nhận Button/Icon không sinh class căn sibling hoặc margin ngoài. Bằng chứng: `tests/cases/layoutSpacing.js` và `tests/cases/renderEngine.js`.
+- [x] Test xác nhận Row generic không tự dùng `space-between`; SplitRow/ActionStack mới được phép có hành vi đó. Bằng chứng: kiểm Row generic và ActionStack trong `tests/cases/layoutSpacing.js`.
 - [ ] Test xác nhận Stack/CardBody/ActionStack có owner alignment duy nhất, không bị component con ghi đè.
 - [ ] Test xác nhận Table/Loading/Empty/Notice dùng preset domain đúng owner, không làm thay đổi default generic.
 - [ ] Test xác nhận hướng logic `start/end` không bị hard-code `left/right` trong layout policy.
 - [ ] Test xác nhận schema sai hoặc alignment enum sai bị fail sớm với thông báo tên màn/đường dẫn.
-- [ ] Test xác nhận toàn bộ schema hiện tại vẫn render được, không mất action, menu, tooltip, focusId hoặc data-field.
-- [ ] Chạy riêng nhóm contract alignment trước khi chạy bộ đầy đủ; ghi tên test và số đạt/lỗi.
+- [x] Test xác nhận toàn bộ schema hiện tại vẫn render được, không mất action, menu, tooltip, focusId hoặc data-field. Bằng chứng: `uiSchema`, `schemaCheck`, `formScreen`, `viewScreen`, `renderEngine` trong `node tests/run.js`.
+- [x] Chạy riêng nhóm contract alignment trước khi chạy bộ đầy đủ; nhóm `layoutSpacing`, `uiBuilder`, `uiSchema`, `renderEngine` đạt trong tổng `1910/1910`, lỗi `0`.
 - [ ] Tick từng luật chống tái phạm ngay sau khi test đạt.
 - [ ] Commit riêng nhóm test contract/allowlist.
 

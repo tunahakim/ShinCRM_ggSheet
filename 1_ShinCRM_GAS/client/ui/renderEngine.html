@@ -105,7 +105,6 @@ var RENDER_CONTROL_BY_TYPE = { TEXT: 'text', NUMBER: 'number', DATE: 'date', SEL
 function renderClassList(node) {
   var lop = ['shin-' + node.role];
   if (node.className) { lop.push(node.className); }
-  if (node.align === 'right') { lop.push('shin-align-right'); }
   if (node.menu) { lop.push('shin-has-menu'); }
   if (node.role === 'icon' && node.toggle) { lop.push('shin-toggle'); }
   return lop.join(' ');

@@ -75,9 +75,11 @@ function chay(so) {
   check(so, 'chữ thuần: một thẻ, một lớp theo vai, không style rác',
     hop.renderNode(hop.Text('Ghi chú "gấp"'), null), '<div class="shin-text">Ghi chú &quot;gấp&quot;</div>');
 
-  check(so, 'nút chữ mang type="button" để khỏi tự gửi form, và lớp align đi cùng lớp trang trí',
-    hop.renderNode(hop.Button({ label: 'LƯU', action: 'saveForm', className: 'shin-primary', align: 'right' }), null),
-    '<button type="button" class="shin-button shin-primary shin-align-right" data-action="saveForm"><span class="shin-btn-label">LƯU</span></button>');
+  checkThrows(so, 'nút chữ không nhận align để tự đẩy sibling',
+    () => hop.Button({ label: 'LƯU', action: 'saveForm', className: 'shin-primary', align: 'right' }), 'không có khóa "align"');
+  check(so, 'nút chữ mang type="button" và chỉ giữ lớp presentation của action',
+    hop.renderNode(hop.Button({ label: 'LƯU', action: 'saveForm', className: 'shin-primary' }), null),
+    '<button type="button" class="shin-button shin-primary" data-action="saveForm"><span class="shin-btn-label">LƯU</span></button>');
 
   const nutIcon = hop.renderNode(hop.Icon({ icon: 'close', tooltip: 'Hủy', action: 'cancelForm' }), null);
   check(so, 'nút glyph: tooltip vào cả title lẫn aria-label, glyph nội tuyến ngay trong nút',
@@ -278,7 +280,7 @@ function chay(so) {
   const man = hop.screenBuild({
     entity: 'customer',
     infoBar: true,
-    header: [{ icon: 'close', tooltip: 'Đóng', action: 'closeSidebar' }],
+    header: { start: [{ icon: 'close', tooltip: 'Đóng', action: 'closeSidebar' }], end: [] },
     body: [hop.Card({ id: 'the-lich-su', title: 'LỊCH SỬ LÀM VIỆC', elements: 'activityList' })],
     footer: [{ button: 'LƯU', action: 'saveForm' }]
   }, 'view');
@@ -317,7 +319,7 @@ function chay(so) {
   // `[RÀNG BUỘC CỨNG]` tài liệu 04 Phần 6: dựng đủ trong RAM rồi mới gán. Vùng chân lỗi thì vùng đầu cũng không được gán.
   hop.document = khungGia();
   try {
-    hop.renderScreen(hop.screenBuild({ entity: 'customer', header: [{ icon: 'close' }], footer: [{ icon: 'bánh-xe' }] }, 'hỏng'), {});
+    hop.renderScreen(hop.screenBuild({ entity: 'customer', header: { start: [{ icon: 'close' }], end: [] }, footer: [{ icon: 'bánh-xe' }] }, 'hỏng'), {});
   } catch (err) { /* lỗi này là điều đang kiểm */ }
   check(so, 'một vùng dựng lỗi thì không vùng nào bị gán, màn không có trạng thái nửa cũ nửa mới',
     [hop.document._els['sidebar-header'].innerHTML, hop.document._els['sidebar-body'].innerHTML], ['', '']);

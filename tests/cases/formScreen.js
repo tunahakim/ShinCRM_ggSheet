@@ -59,10 +59,11 @@ function chay(so) {
   checkThrows(so, 'khai thiếu một nửa của cặp add/edit thì hét lên chứ không vẽ ra tiêu đề `undefined`',
     () => hop.screenFormTitle({ add: 'Thêm' }, true), 'add');
 
-  const hang = hop.screenFormHeader(hop.screenBuild(hop.UI_SCHEMA.customerForm, 'customerForm').header, 'Thêm Khách Hàng');
-  check(so, 'tiêu đề đứng bên trái, X và tick cùng nằm trong cụm căn phải',
-    [hang.length, hang[0].role, hang[0].text, hang[1].icon, hang[2].icon, hang[2].align],
-    [3, 'text', 'Thêm Khách Hàng', 'close', 'check', 'right']);
+  const hangDecl = hop.screenFormHeader(hop.UI_SCHEMA.customerForm.header, 'Thêm Khách Hàng');
+  const hang = hop.screenBuild({ entity: 'customer', header: hangDecl }, 'customerForm').header;
+  check(so, 'tiêu đề nằm trong nhóm start, nút Hủy và Lưu nằm trong hai nhóm header chuẩn',
+    [hang.length, hang[0].className, hang[0].elements[0].icon, hang[0].elements[1].text, hang[1].className, hang[1].elements[0].icon],
+    [2, 'shin-header-group shin-header-group-start', 'close', 'Thêm Khách Hàng', 'shin-header-group shin-header-group-end', 'check']);
 
   const customerTree = hop.screenBuild(hop.UI_SCHEMA.customerForm, 'customerForm');
   check(so, 'form lõi dùng Card → Row → Field, footer dùng Button save chung',

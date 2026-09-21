@@ -19,6 +19,8 @@ function chay(so) {
   const runUi = docTep('client/sync/fbmSyncUiSchema.html');
   const shell = docTep('client/sync/fbmSyncShell.html');
   const settings = docTep('client/sync/screens/settings.html');
+  const builder = docTep('client/ui/uiBuilder.html');
+  const renderer = docTep('client/ui/renderEngine.html');
   const row = rule(components, '.shin-row {');
   const stack = rule(components, '.shin-box.shin-stack,');
   const cardBody = rule(components, '.shin-card-body {');
@@ -63,6 +65,24 @@ function chay(so) {
   check(so, 'Button và Icon không sở hữu margin bên ngoài',
     [button.indexOf('margin') === -1, icon.indexOf('margin') === -1],
     [true, true]);
+  check(so, 'vị trí header do HeaderGroup sở hữu, không còn marker align trên node lá',
+    [frame.indexOf('.shin-header-group {') >= 0,
+      frame.indexOf('.shin-header-group-start { flex: 1 1 auto; }') >= 0,
+      frame.indexOf('.shin-header-group-end { flex: 0 0 auto; margin-left: auto; }') >= 0,
+      components.indexOf('.shin-align-right') === -1,
+      frame.indexOf('.shin-align-right') === -1,
+      renderer.indexOf('shin-align-right') === -1],
+    [true, true, true, true, true, true]);
+  check(so, 'Button/Icon không có API align và Row generic không tự space-between',
+    [builder.indexOf("button: ['align'") === -1,
+      builder.indexOf("icon: ['icon', 'tooltip', 'align'") === -1,
+      row.indexOf('space-between') === -1],
+    [true, true, true]);
+  check(so, 'ActionStack là wrapper duy nhất căn nhóm action',
+    [components.indexOf('.shin-box.shin-action-stack { align-items: center; }') >= 0,
+      components.indexOf('.shin-action-stack > * { width: min(100%, 220px); }') >= 0,
+      components.indexOf('.shin-button {') >= 0 && button.indexOf('margin') === -1],
+    [true, true, true]);
   check(so, 'Sync layout đặc thù vẫn dùng gap cho sibling trong wrapper',
     [shell.indexOf('.shin-sync-connection-section { display:grid; gap:var(--shin-gap-2);') >= 0,
       shell.indexOf('.shin-sync-schedule-row { display:grid;') >= 0 && shell.indexOf('gap:var(--shin-gap-2);') >= 0,

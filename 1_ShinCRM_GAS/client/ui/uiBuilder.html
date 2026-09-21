@@ -32,8 +32,8 @@ var BLOCK_KEYS_BY_ROLE = {
   row: ['elements'],
   text: ['text'],
   field: ['field', 'control', 'readonly', 'width', 'label'],
-  button: ['align', 'label', 'disabled'],
-  icon: ['icon', 'tooltip', 'align', 'label', 'toggle', 'disabled'],
+  button: ['label', 'disabled'],
+  icon: ['icon', 'tooltip', 'label', 'toggle', 'disabled'],
   check: ['label'],
   standaloneControl: ['kind', 'inputType', 'label', 'value', 'placeholder', 'options', 'disabled', 'pressed', 'ariaLabel', 'hidden']
 };
@@ -129,7 +129,6 @@ function Block(spec, role) {
     readonly: y.readonly === true,
     icon: y.icon || null,
     tooltip: y.tooltip || null,
-    align: y.align || 'left',
     pick: y.pick === undefined ? null : y.pick,
     toggle: y.toggle || null,
     kind: y.kind || null,

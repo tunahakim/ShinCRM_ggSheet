@@ -44,7 +44,8 @@ function moiTruong(man) {
 /** Mọi mảng `menu` của một màn: menu ở hàng header, và menu ở `titleActions` của một card. */
 function moiMenu(man) {
   const ra = [];
-  (man.header || []).forEach((m) => { if (m.menu) { ra.push(m.menu); } });
+  const header = man.header || {};
+  ['start', 'end'].forEach((side) => (header[side] || []).forEach((m) => { if (m.menu) { ra.push(m.menu); } }));
   moiNode(man.body, []).forEach((n) => {
     (n.titleActions || []).forEach((m) => { if (m.menu) { ra.push(m.menu); } });
   });
@@ -60,7 +61,8 @@ function moiAction(man) {
     (m.menu || []).forEach((con) => { if (con.action) { ra.push(con.action); } });
   };
 
-  (man.header || []).forEach(nhan);
+  const header = man.header || {};
+  ['start', 'end'].forEach((side) => (header[side] || []).forEach(nhan));
   (man.footer || []).forEach(nhan);
   moiNode(man.body, []).forEach((n) => {
     nhan(n);
@@ -70,6 +72,29 @@ function moiAction(man) {
     (cum.rows || []).forEach((hang) => { hang.forEach((o) => { if (typeof o !== 'string') { nhan(o); } }); });
   });
   return ra;
+}
+
+/** Quet schema thuan de chan alignment tu do; start/end chi hop le o ngay cap header. */
+function loiAlignmentSchema(value, path, trongHeader, ra) {
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => loiAlignmentSchema(item, path + '[' + index + ']', false, ra));
+    return;
+  }
+  if (!value || typeof value !== 'object') { return; }
+  Object.keys(value).forEach((key) => {
+    const o = path + '.' + key;
+    if (['align', 'left', 'right', 'center', 'justify', 'alignItems', 'align-items', 'textAlign', 'text-align', 'margin', 'style'].indexOf(key) >= 0) {
+      ra.push(o);
+    }
+    if (key === 'start' || key === 'end') {
+      if (!trongHeader || !Array.isArray(value[key])) { ra.push(o); }
+      if (Array.isArray(value[key])) {
+        value[key].forEach((item, index) => loiAlignmentSchema(item, o + '[' + index + ']', false, ra));
+      }
+      return;
+    }
+    loiAlignmentSchema(value[key], o, key === 'header', ra);
+  });
 }
 
 function chay(so) {
@@ -93,6 +118,13 @@ function chay(so) {
 
   check(so, 'infoBar tắt ở customerForm và bật ở ba màn còn lại',
     MAN.map((m) => hop.UI_SCHEMA[m].infoBar), [true, false, true, true]);
+
+  const alignmentLoi = [];
+  MAN.forEach((tenMan) => loiAlignmentSchema(hop.UI_SCHEMA[tenMan], tenMan, false, alignmentLoi));
+  check(so, 'screen schema không chứa alignment tự do; header chỉ có nhóm start/end', alignmentLoi, []);
+  check(so, 'header thật của mọi màn đều có đủ hai nhóm là mảng',
+    MAN.map((m) => [Array.isArray(hop.UI_SCHEMA[m].header && hop.UI_SCHEMA[m].header.start), Array.isArray(hop.UI_SCHEMA[m].header && hop.UI_SCHEMA[m].header.end)]),
+    [[true, true], [true, true], [true, true], [true, true]]);
 
   check(so, 'ba màn form dùng đúng một hàng header chung: hủy bên trái, lưu bên phải',
     ['customerForm', 'activityForm', 'noteForm'].map((m) => hop.UI_SCHEMA[m].header === hop.UI_FORM_HEADER), [true, true, true]);
@@ -192,9 +224,9 @@ function chay(so) {
     ['note', 'textarea', 'shin-note-tall']);
   check(so, 'màn view khai bằng cây Block nên screenBuild trả nguyên cây, không bọc thêm Card',
     daDung.view.body === hop.UI_SCHEMA.view.body, true);
-  check(so, 'hàng header của màn view dựng thành tám Icon, nút sét là followSelection và menu nạp lại có đủ sáu lệnh',
-    [daDung.view.header.map((n) => n.role).join(','), daDung.view.header[1].icon, daDung.view.header[1].toggle, daDung.view.header[3].icon, daDung.view.header[3].menu.length, daDung.view.header[4].icon, daDung.view.header[4].menu.length, daDung.view.header[5].menu.length],
-    ['icon,icon,icon,icon,icon,icon,icon,icon', 'bolt', 'followSelection', 'refresh', 6, 'sync', 2, 1]);
+  check(so, 'header view dựng thành nhóm start/end, giữ thứ tự icon và menu',
+    [daDung.view.header.map((n) => n.className).join('|'), daDung.view.header[0].elements.map((n) => n.icon).join('|'), daDung.view.header[0].elements[1].toggle, daDung.view.header[0].elements[3].menu.length, daDung.view.header[0].elements[4].menu.length, daDung.view.header[1].elements.map((n) => n.icon).join('|')],
+    ['shin-header-group shin-header-group-start|shin-header-group shin-header-group-end', 'search|bolt|table|refresh|sync|more', 'followSelection', 6, 2, 'pencil|addUser']);
   check(so, 'nút chân dựng thành Button có nhãn chữ, không thành Icon',
     [daDung.noteForm.footer[0].role, daDung.noteForm.footer[0].label], ['button', 'LƯU GHI CHÚ']);
 }
