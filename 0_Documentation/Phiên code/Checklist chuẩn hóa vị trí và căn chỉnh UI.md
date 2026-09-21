@@ -61,7 +61,7 @@ Ghi chú kiểm kê: `align` đang được khai tại `client/schema/screens/fo
 - [x] Kiểm tra `0_Documentation/Phiên code/Cây thư mục code.md`: không phát sinh file hoặc thư mục mới cho layout policy/test, nên không cần cập nhật cây.
 - [x] Ghi commit tài liệu riêng sau khi các tài liệu trên không còn mâu thuẫn với quyết định phiên này.
 
-Ghi chú tiến độ: tài liệu nền đã cập nhật; core/header, Sync shell, ActionStack Account, Empty và token schedule đã được commit riêng. Policy semantic hiện nằm trong `UI_LAYOUT_POLICY` của `client/ui/uiBuilder.html`; nhóm policy đã commit `343b422`; nhóm hồi quy form/view/card đang chuẩn bị commit sau khi test đạt `1920/1920`. Còn nghiệm thu trực quan DEV.
+Ghi chú tiến độ: tài liệu nền đã cập nhật; core/header, Sync shell, ActionStack Account, Empty và token schedule đã được commit riêng. Policy semantic hiện nằm trong `UI_LAYOUT_POLICY` của `client/ui/uiBuilder.html`; nhóm policy đã commit `343b422`, nhóm hồi quy form/view/card đã commit `1f385b7`; test offline gần nhất đạt `1920/1920`. Còn nghiệm thu trực quan DEV.
 
 ## 5. Primitive và layout policy
 
@@ -109,7 +109,7 @@ Ghi chú tiến độ: tài liệu nền đã cập nhật; core/header, Sync sh
 - [x] Kiểm tra header shell Sync và header form không tạo hai cơ chế căn phải khác nhau. Bằng chứng: `fbmSyncShellHeaderBlocks` dùng `screenHeaderGroup('start'/'end')`, test `fbmSync/Sidebar`.
 - [x] Với mỗi ngoại lệ domain, ghi consumer, lý do, selector/component owner và test bảo vệ ngay trong checklist hoặc allowlist. Bằng chứng: allowlist Tài liệu 04 Phần 6, hợp đồng Sync Tài liệu 09 Phần 8 và ca domain trong `layoutSpacing`/`fbmSync/Sidebar`.
 - [x] Chạy test layout/UI sau từng màn hình; tick các mục đã kiểm chứng sau khi `node tests/run.js` đạt `1918`, lỗi `0`.
-- [ ] Commit riêng từng nhóm màn hình nếu diff độc lập; nhóm form/view/card đang chờ commit cùng checklist sau khi tick hồi quy.
+- [x] Commit riêng từng nhóm màn hình nếu diff độc lập; nhóm form/view/card đã commit `1f385b7`, không đưa thay đổi FBM session/pipeline có sẵn vào commit.
 
 ## 8. Hợp đồng chống tái phạm
 
