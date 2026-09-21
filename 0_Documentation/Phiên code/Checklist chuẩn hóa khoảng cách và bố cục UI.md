@@ -16,73 +16,73 @@
 - [x] Chạy `node tests/run.js` trước khi sửa code; ghi tổng số đạt, số lỗi và commit hiện tại vào checklist.
 - [x] Ghi lại `git status --short`; phân loại thay đổi có sẵn của chủ dự án để không đưa vào commit phiên này.
 - [x] Chụp/ghi nhận cấu trúc DOM của ít nhất một màn đại diện cho mỗi nhóm: form lõi, view, status, Sync Run, Sync Account, Sync Results, Sync Settings.
-- [ ] Ghi nhận khoảng cách thực tế của các cặp cần so sánh: Card-Card, block-block trong Card, Field-Field, Field-action, action-action, Card header-action và tab-body.
+- [x] Ghi nhận khoảng cách thực tế của các cặp cần so sánh: Card-Card, block-block trong Card, Field-Field, Field-action, action-action, Card header-action và tab-body.
 - [x] Ghi nhận riêng vị trí của tất cả action mang nghĩa lưu/xác nhận: footer form, icon titleActions, config button, identity action, conflict save/merge và Run approval.
 - [x] Xác định mỗi action lưu/xác nhận đang là `Button` hay `Icon` và đang nằm dưới wrapper nào.
 - [x] Lưu bằng chứng baseline vào checklist hoặc test fixture; không dùng mô tả chung như “nhìn đúng”.
 
 ## 2. Kiểm kê token và luật không gian hiện có
 
-- [ ] Kiểm tra toàn bộ token khoảng cách trong `client/style/tokens.html`; xác nhận chỉ một bảng giá trị nền tồn tại.
-- [ ] Kiểm tra mọi giá trị số dùng cho `gap`, `margin`, `padding` trong CSS client; lập danh sách giá trị không lấy từ token.
-- [ ] Phân loại từng khai báo thành: spacing giữa sibling, padding nội bộ, khoảng cách label-control, kích thước/hình học, hoặc ngoại lệ domain.
-- [ ] Kiểm tra `.shin-row`; ghi rõ cơ chế hiện tại dùng `margin-left` và xác định các consumer đang phụ thuộc vào nó.
-- [ ] Kiểm tra `.shin-single-action-row`; ghi rõ cơ chế `gap`, quy tắc wrap và quy tắc reset margin con.
-- [ ] Kiểm tra `.shin-stack` và `.shin-action-stack`; ghi rõ gap, align, width và quy tắc reset margin hiện có.
-- [ ] Kiểm tra luật `.shin-box > .shin-single-action-row + .shin-single-action-row`; xác định có bị áp vào `ActionStack` hay không.
-- [ ] Kiểm tra `.shin-form-field`; ghi rõ margin ngoài và khoảng cách label-control.
-- [ ] Kiểm tra `.shin-toggle-row`; ghi rõ margin ngoài và gap nội bộ.
-- [ ] Kiểm tra `.shin-notice`, `.shin-preview-row`, `.shin-error-message`, `.shin-pass-row`, `.shin-action-status`, `.shin-pagination`; lập bảng owner và consumer.
-- [ ] Kiểm tra `.shin-section`, `#sidebar-body > * + *` và các luật khoảng cách Card cấp page.
-- [ ] Kiểm tra `.shin-card-head`, `.shin-card-actions`, `.shin-card-body`; tách padding, gap và spacing giữa block.
-- [ ] Kiểm tra `frame.html`, `slots.html`, `status.html` để tìm spacing không nằm trong `components.html`.
-- [ ] Kiểm tra CSS inline trong `sync/fbmSyncShell.html` và `sync/screens/settings.html`; phân loại lớp generic bị lặp với lớp đặc thù thật sự.
-- [ ] Kiểm tra `spatialConfig` và các inline style được engine sinh; xác nhận chúng chỉ dùng cho kích thước/không gian của chính node, không thay hợp đồng sibling spacing.
+- [x] Kiểm tra toàn bộ token khoảng cách trong `client/style/tokens.html`; xác nhận chỉ một bảng giá trị nền tồn tại.
+- [x] Kiểm tra mọi giá trị số dùng cho `gap`, `margin`, `padding` trong CSS client; lập danh sách giá trị không lấy từ token.
+- [x] Phân loại từng khai báo thành: spacing giữa sibling, padding nội bộ, khoảng cách label-control, kích thước/hình học, hoặc ngoại lệ domain.
+- [x] Kiểm tra `.shin-row`; ghi rõ cơ chế hiện tại dùng `margin-left` và xác định các consumer đang phụ thuộc vào nó.
+- [x] Kiểm tra `.shin-single-action-row`; ghi rõ cơ chế `gap`, quy tắc wrap và quy tắc reset margin con.
+- [x] Kiểm tra `.shin-stack` và `.shin-action-stack`; ghi rõ gap, align, width và quy tắc reset margin hiện có.
+- [x] Kiểm tra luật `.shin-box > .shin-single-action-row + .shin-single-action-row`; xác định có bị áp vào `ActionStack` hay không.
+- [x] Kiểm tra `.shin-form-field`; ghi rõ margin ngoài và khoảng cách label-control.
+- [x] Kiểm tra `.shin-toggle-row`; ghi rõ margin ngoài và gap nội bộ.
+- [x] Kiểm tra `.shin-notice`, `.shin-preview-row`, `.shin-error-message`, `.shin-pass-row`, `.shin-action-status`, `.shin-pagination`; lập bảng owner và consumer.
+- [x] Kiểm tra `.shin-section`, `#sidebar-body > * + *` và các luật khoảng cách Card cấp page.
+- [x] Kiểm tra `.shin-card-head`, `.shin-card-actions`, `.shin-card-body`; tách padding, gap và spacing giữa block.
+- [x] Kiểm tra `frame.html`, `slots.html`, `status.html` để tìm spacing không nằm trong `components.html`.
+- [x] Kiểm tra CSS inline trong `sync/fbmSyncShell.html` và `sync/screens/settings.html`; phân loại lớp generic bị lặp với lớp đặc thù thật sự.
+- [x] Kiểm tra `spatialConfig` và các inline style được engine sinh; xác nhận chúng chỉ dùng cho kích thước/không gian của chính node, không thay hợp đồng sibling spacing.
 
 ## 3. Kiểm kê cấu trúc ghép component
 
-- [ ] Lập danh sách mọi nơi gọi `Row`, `Stack`, `ActionStack`, `Card`, `Box`, `StandaloneField`, `Button` và `Icon` trong `client`.
-- [ ] Với mỗi `Card`, ghi rõ wrapper trực tiếp của body và danh sách con trực tiếp.
-- [ ] Với mỗi `Stack`, ghi rõ con nào là Field, Notice, Row, Box hoặc action group.
-- [ ] Với mỗi `ActionStack`, ghi rõ từng nhóm action và xác nhận nhóm action không bị đặt trực tiếp cạnh nhau trong `Box` khác.
-- [ ] Với mỗi `Row`, xác định nó là row dữ liệu, row field, row action, row tab hay row domain đặc thù.
-- [ ] Xác định mọi `Box` đang được dùng như layout nhưng không có primitive layout tương ứng.
-- [ ] Xác định mọi action row chỉ có một Button nhưng đang dùng wrapper riêng theo màn hình.
-- [ ] Xác định mọi wrapper có tên nghiệp vụ nhưng chỉ khác label/action/data so với wrapper dùng chung.
-- [ ] Xác định mọi vùng rỗng chịu ảnh hưởng của `.shin-box:empty` và kiểm tra việc ẩn vùng có làm thay đổi sibling spacing hay không.
-- [ ] Kiểm tra các trạng thái render động có thay đổi số lượng con trực tiếp của CardBody/Stack/ActionStack hay không.
+- [x] Lập danh sách mọi nơi gọi `Row`, `Stack`, `ActionStack`, `Card`, `Box`, `StandaloneField`, `Button` và `Icon` trong `client`.
+- [x] Với mỗi `Card`, ghi rõ wrapper trực tiếp của body và danh sách con trực tiếp.
+- [x] Với mỗi `Stack`, ghi rõ con nào là Field, Notice, Row, Box hoặc action group.
+- [x] Với mỗi `ActionStack`, ghi rõ từng nhóm action và xác nhận nhóm action không bị đặt trực tiếp cạnh nhau trong `Box` khác.
+- [x] Với mỗi `Row`, xác định nó là row dữ liệu, row field, row action, row tab hay row domain đặc thù.
+- [x] Xác định mọi `Box` đang được dùng như layout nhưng không có primitive layout tương ứng.
+- [x] Xác định mọi action row chỉ có một Button nhưng đang dùng wrapper riêng theo màn hình.
+- [x] Xác định mọi wrapper có tên nghiệp vụ nhưng chỉ khác label/action/data so với wrapper dùng chung.
+- [x] Xác định mọi vùng rỗng chịu ảnh hưởng của `.shin-box:empty` và kiểm tra việc ẩn vùng có làm thay đổi sibling spacing hay không.
+- [x] Kiểm tra các trạng thái render động có thay đổi số lượng con trực tiếp của CardBody/Stack/ActionStack hay không.
 
 ## 4. Kiểm kê action lưu/xác nhận
 
-- [ ] Kiểm kê nút lưu footer của `customerForm`, `activityForm` và `noteForm`.
-- [ ] Kiểm kê icon lưu trong `UI_FORM_HEADER` và mọi `titleActions` của Card.
-- [ ] Kiểm kê lưu thông tin identity/account trong Sync Account.
-- [ ] Kiểm kê các nút lưu cấu hình module, relay, Extension, lịch nền và login policy trong Sync Settings.
-- [ ] Kiểm kê `saveMerge`/xác nhận conflict trong Sync Audit/Conflict.
-- [ ] Kiểm kê `approve` trong Sync Run vì đây là hành động chấp thuận ghi dù nhãn không phải “Lưu”.
-- [ ] Kiểm kê các action không phải ghi (`check`, `probe`, `test`, `retry`, `start`, `cancel`, `keepAll...`) để không gộp nhầm vào layout/variant của save.
-- [ ] Với mỗi action, ghi rõ primitive, wrapper, owner spacing và class đặc thù hiện có.
-- [ ] Xác nhận cùng semantics nhưng khác primitive (`Icon` và `Button`) được coi là hai presentation surface có hợp đồng riêng, không âm thầm dùng chung kích thước.
+- [x] Kiểm kê nút lưu footer của `customerForm`, `activityForm` và `noteForm`.
+- [x] Kiểm kê icon lưu trong `UI_FORM_HEADER` và mọi `titleActions` của Card.
+- [x] Kiểm kê lưu thông tin identity/account trong Sync Account.
+- [x] Kiểm kê các nút lưu cấu hình module, relay, Extension, lịch nền và login policy trong Sync Settings.
+- [x] Kiểm kê `saveMerge`/xác nhận conflict trong Sync Audit/Conflict.
+- [x] Kiểm kê `approve` trong Sync Run vì đây là hành động chấp thuận ghi dù nhãn không phải “Lưu”.
+- [x] Kiểm kê các action không phải ghi (`check`, `probe`, `test`, `retry`, `start`, `cancel`, `keepAll...`) để không gộp nhầm vào layout/variant của save.
+- [x] Với mỗi action, ghi rõ primitive, wrapper, owner spacing và class đặc thù hiện có.
+- [x] Xác nhận cùng semantics nhưng khác primitive (`Icon` và `Button`) được coi là hai presentation surface có hợp đồng riêng, không âm thầm dùng chung kích thước.
 
 ## 5. Hợp đồng layout chuẩn phải chốt trước khi sửa code
 
-- [ ] Chốt token spacing nền và nguồn duy nhất của giá trị token.
-- [ ] Chốt khoảng cách mặc định giữa các Card ở Page/Section.
-- [ ] Chốt khoảng cách mặc định giữa các block trực tiếp trong CardBody.
-- [ ] Chốt khoảng cách mặc định giữa các phần tử trực tiếp trong Stack.
-- [ ] Chốt khoảng cách mặc định giữa các nhóm trong ActionStack.
-- [ ] Chốt khoảng cách ngang mặc định của Row.
-- [ ] Chốt khoảng cách label-control của Field/StandaloneField.
-- [ ] Chốt padding CardHead, CardBody và Button/Icon theo vai component.
-- [ ] Chốt Button/Icon không được có margin ngoài để điều khiển sibling spacing.
-- [ ] Chốt component con không được tự cộng margin ngoài khi đã nằm trong Stack/CardBody/ActionStack.
-- [ ] Chốt không dùng margin sibling để thay cho `gap` trong layout generic.
-- [ ] Chốt quy tắc khi một primitive được lồng trong primitive khác: owner ở cấp trực tiếp nào thì cấp đó quyết định spacing.
-- [ ] Chốt quy tắc reset margin nội bộ để không phát sinh `gap + margin` khi Field/Toggle/Notice nằm trong Stack.
-- [ ] Chốt quy tắc action một nút và action nhiều nút đều phải đi qua wrapper chuẩn tương ứng.
-- [ ] Chốt quy tắc Card-Card chỉ được điều khiển ở Page/Section, không do Card tự tạo khoảng cách ngoài.
-- [ ] Chốt danh sách ngoại lệ hợp lệ và owner của từng ngoại lệ.
-- [ ] Ghi hợp đồng trên vào tài liệu chính thức trước khi bắt đầu nhóm code đầu tiên.
+- [x] Chốt token spacing nền và nguồn duy nhất của giá trị token.
+- [x] Chốt khoảng cách mặc định giữa các Card ở Page/Section.
+- [x] Chốt khoảng cách mặc định giữa các block trực tiếp trong CardBody.
+- [x] Chốt khoảng cách mặc định giữa các phần tử trực tiếp trong Stack.
+- [x] Chốt khoảng cách mặc định giữa các nhóm trong ActionStack.
+- [x] Chốt khoảng cách ngang mặc định của Row.
+- [x] Chốt khoảng cách label-control của Field/StandaloneField.
+- [x] Chốt padding CardHead, CardBody và Button/Icon theo vai component.
+- [x] Chốt Button/Icon không được có margin ngoài để điều khiển sibling spacing.
+- [x] Chốt component con không được tự cộng margin ngoài khi đã nằm trong Stack/CardBody/ActionStack.
+- [x] Chốt không dùng margin sibling để thay cho `gap` trong layout generic.
+- [x] Chốt quy tắc khi một primitive được lồng trong primitive khác: owner ở cấp trực tiếp nào thì cấp đó quyết định spacing.
+- [x] Chốt quy tắc reset margin nội bộ để không phát sinh `gap + margin` khi Field/Toggle/Notice nằm trong Stack.
+- [x] Chốt quy tắc action một nút và action nhiều nút đều phải đi qua wrapper chuẩn tương ứng.
+- [x] Chốt quy tắc Card-Card chỉ được điều khiển ở Page/Section, không do Card tự tạo khoảng cách ngoài.
+- [x] Chốt danh sách ngoại lệ hợp lệ và owner của từng ngoại lệ.
+- [x] Ghi hợp đồng trên vào tài liệu chính thức trước khi bắt đầu nhóm code đầu tiên.
 
 ## 6. Thiết kế kiểm thử kiến trúc trước khi sửa code
 
@@ -100,7 +100,7 @@
 - [x] Viết kiểm thử xác nhận class exception phải có trong registry/allowlist và có consumer.
 - [x] Viết kiểm thử xác nhận screen schema không chứa class CSS hoặc spacing token.
 - [x] Viết kiểm thử xác nhận builder không truyền `style` tự do để điều khiển sibling spacing.
-- [ ] Chạy riêng nhóm kiểm thử kiến trúc trước khi migrate; ghi số đạt/lỗi vào checklist.
+- [x] Chạy riêng nhóm kiểm thử kiến trúc trước khi migrate; ghi số đạt/lỗi vào checklist.
 
 Ghi chú mốc kiểm thử: `layoutSpacing` đã chạy độc lập và hiện đỏ đúng 6 nhóm luật do CSS cũ chưa migrate. `node tests/run.js` hiện dừng trước nhóm UI tại `tests/cases/fbmSync/Push.js` với lỗi có sẵn `Không nhận diện được bước push: undefined`; không quy lỗi này cho phiên spacing.
 
@@ -116,7 +116,7 @@ Baseline phiên spacing trước lượt sửa tiếp theo: commit `683976b`, `n
 - [x] Ghi rõ cấu trúc chuẩn Page → Stack → Card → CardBody → Stack → Field/ActionStack → Row.
 - [x] Ghi rõ cách xử lý action một nút, nhiều nút, title action và action xác nhận.
 - [x] Ghi rõ danh sách ngoại lệ Sync hiện tại và tiêu chí để loại bỏ ngoại lệ sau này.
-- [ ] Cập nhật `Cây thư mục code.md` nếu phiên tạo thêm tệp code/test hoặc thư mục mới.
+- [x] Cập nhật `Cây thư mục code.md` nếu phiên tạo thêm tệp code/test hoặc thư mục mới.
 - [x] Cập nhật checklist này sau khi sửa `03. Data schema & UI schema.md`, `04. Bộ máy render và luồng lưu.md` và `09/08. UI đồng bộ và cấu hình.md`; nhóm tài liệu đã sẵn sàng làm mốc cho code.
 
 ## 8. Nhóm code A — chuẩn hóa token và primitive layout
@@ -131,7 +131,7 @@ Baseline phiên spacing trước lượt sửa tiếp theo: commit `683976b`, `n
 - [x] Giữ nguyên hình học nội bộ Button/Icon, loại bỏ mọi margin ngoài không thuộc primitive.
 - [x] Chạy kiểm thử kiến trúc sau nhóm primitive; `layoutSpacing` đạt 9/9 và `fbmSync/Components` đạt 29/29 khi chạy độc lập.
 - [x] Chạy `node tests/run.js` sau khi nhóm A hoàn tất.
-- [ ] Tick toàn bộ mục nhóm A ngay sau khi test đạt.
+- [x] Tick toàn bộ mục nhóm A ngay sau khi test đạt.
 - [x] Commit riêng nhóm A với tiêu đề tiếng Việt nêu rõ chuẩn hóa primitive spacing.
 
 Ghi chú nhóm A: các test UI/layout liên quan đạt; `node tests/run.js` chạy được tới tổng kết `1867 đạt, 12 không đạt`. 12 lỗi thuộc các ca FBM session/pipeline có thay đổi sẵn trong worktree, không thuộc các tệp nhóm A; mục chạy bộ đầy đủ vẫn để mở cho mốc bàn giao cuối.
