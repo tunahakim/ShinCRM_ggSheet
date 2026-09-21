@@ -98,11 +98,11 @@
 - [ ] [Tự động] Kiểm kê component có nhiều phần tử ngang đồng cấp: HeaderGroup, CardTitleBar, ActionRow, InlineFieldRow, ToggleRow và layout tương đương.
 - [ ] [Tự động] Với mỗi component, xác định Row là owner ngang; không tự viết lại `display:flex`, gap và căn chỉnh nếu cùng hành vi.
 - [ ] [Tự động] Refactor HeaderGroup để title ở vùng start, Cancel/Save ở vùng end; thứ tự `[Hủy, Lưu]` giữ nguyên.
-- [ ] [Tự động] Refactor ToggleRow/InlineFieldRow để dùng Row primitive hoặc preset Row có tên; không để CSS màn hình quyết định sibling spacing.
+- [x] [Tự động] Refactor ToggleRow/InlineFieldRow để dùng Row primitive hoặc preset Row có tên; không để CSS màn hình quyết định sibling spacing. Bằng chứng: test `layoutSpacing` kiểm tra owner spacing; test `fbmSync/Sidebar` kiểm tra toggle Settings có role `row`.
 - [ ] [Tự động] Refactor Card title/actions để dùng wrapper action chung, không gắn align lên Icon/Button lá.
-- [ ] [Tự động] Refactor layout Sync Settings: toggle, schedule row, parent login row, child login group và detail inputs dùng primitive owner đúng cấp.
+- [x] [Tự động] Refactor layout Sync Settings: toggle, schedule row, parent login row, child login group và detail inputs dùng primitive owner đúng cấp. Bằng chứng: `fbmSync/Sidebar` kiểm tra toggle, schedule và login parent là `row`, child group là `box` mang policy `RowGroup`; `layoutSpacing` kiểm tra schedule không còn Grid và detail group không tự sở hữu gap.
 - [ ] [Tự động] Giữ DetailField dạng dọc nếu label nằm trên control; không ép mọi layout thành Row ngang.
-- [ ] [Tự động] Cho phép RowGroup lồng RowGroup cho nhóm tùy chọn con; kiểm tra indentation là policy wrapper, không phải margin tùy ý trong schema.
+- [x] [Tự động] Cho phép RowGroup lồng RowGroup cho nhóm tùy chọn con; kiểm tra indentation là policy wrapper, không phải margin tùy ý trong schema. Bằng chứng: login policy dùng `RowGroup` cho children/retry group; `layoutSpacing` chặn `margin-left` cũ của wrapper children.
 - [ ] [Tự động] Các component Loading/Empty/Notice/Table/Pipeline/Conflict giữ preset đặc thù có lý do, không bị đổi default generic.
 - [x] [Tự động] Tìm và xử lý mọi `Stack(`, `shin-stack`, `UI_LAYOUT_POLICY.stack` theo quyết định canonical; không để consumer cũ tạo owner thứ hai.
 
@@ -110,7 +110,7 @@
 
 - [ ] [Tự động] Quét toàn bộ screen schema tìm `className`, `rootClass`, `classes`, `*Class`, `style`, selector DOM và alignment tự do.
 - [ ] [Tự động] Quét CSS màn hình tìm margin/gap dùng để điều khiển sibling spacing; phân loại thành lỗi cần xóa hoặc ngoại lệ có owner.
-- [ ] [Tự động] Xóa hardcode gây lệch mép phải của nhóm toggle khi wrapper full-width đi cùng margin ngang; chuyển indentation vào policy wrapper nếu cần.
+- [x] [Tự động] Xóa hardcode gây lệch mép phải của nhóm toggle khi wrapper full-width đi cùng margin ngang; chuyển indentation vào policy wrapper nếu cần. Bằng chứng: `.shin-sync-login-policy-children` chỉ còn padding/border; `layoutSpacing` chặn lại `margin-left` và selector margin con.
 - [ ] [Tự động] Với mọi ngoại lệ còn lại, ghi consumer, lý do, owner, selector và test trong allowlist.
 - [ ] [Tự động] Bổ sung contract test chặn primitive con tự thêm margin ngoài.
 - [ ] [Tự động] Bổ sung contract test chặn Row generic tự `space-between` hoặc nhận alignment không thuộc preset.
@@ -145,7 +145,7 @@
 - [ ] [Tự động] Commit nhóm tài liệu sau khi E hoàn tất và checklist được tick.
 - [ ] [Tự động] Commit nhóm primitive/catalog sau khi F và test liên quan xanh.
 - [ ] [Tự động] Commit nhóm resolver/schema sau khi G và test liên quan xanh.
-- [ ] [Tự động] Commit từng nhóm component sau khi H và test liên quan xanh.
+- [x] [Tự động] Commit từng nhóm component sau khi H và test liên quan xanh. Nhóm Settings đã commit tại `d5550be`.
 - [ ] [Tự động] Commit nhóm contract test/dọn hardcode sau khi I và test liên quan xanh.
 - [ ] [Tự động] Chạy lại full test trước commit cuối và ghi kết quả vào checklist.
 - [ ] [Tự động] Nghiệm thu GAS DEV bằng `node tests/gas.js <tên-hàm> --push` nếu có thay đổi cần kiểm tra trên GAS.

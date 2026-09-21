@@ -96,14 +96,16 @@ function chay(so) {
       components.indexOf('.shin-action-stack > * { width: min(100%, 220px); }') >= 0,
       components.indexOf('.shin-button {') >= 0 && button.indexOf('margin') === -1],
     [true, true, true]);
-  check(so, 'Sync layout đặc thù vẫn dùng gap cho sibling trong wrapper',
+  check(so, 'Sync layout đặc thù dùng Row/RowGroup làm owner spacing',
     [shell.indexOf('.shin-sync-connection-section { display:grid; gap:var(--shin-gap-2);') >= 0,
-      shell.indexOf('.shin-sync-schedule-row { display:grid;') >= 0 && shell.indexOf('gap:var(--shin-gap-2);') >= 0,
+      shell.indexOf('.shin-sync-schedule-row { display:grid;') === -1,
+      shell.indexOf('.shin-sync-schedule-row > .shin-standalone-control:first-child { flex:0 0 var(--shin-sync-schedule-control-width); }') >= 0,
+      shell.indexOf('.shin-sync-detail-controls { display:grid;') === -1,
       settings.indexOf('.shin-sync-detail-field { display: grid; gap: var(--shin-gap-1);') >= 0],
-    [true, true, true]);
+    [true, true, true, true, true]);
   check(so, 'Sync layout đặc thù có owner vị trí và token domain duy nhất',
     [shell.indexOf('--shin-sync-schedule-control-width:42px;') >= 0,
-      shell.indexOf('grid-template-columns:var(--shin-sync-schedule-control-width)') >= 0,
+      shell.indexOf('.shin-sync-schedule-row > .shin-kv-label { flex:1 1 0; }') >= 0,
       shell.indexOf('margin-left:var(--shin-sync-schedule-control-width)') >= 0,
       shell.indexOf('.shin-sync-tab-trigger') >= 0 && shell.indexOf('text-align:center;') >= 0,
       shell.indexOf('.shin-sync-tab-description') >= 0 && shell.indexOf('text-align:center;') >= 0,
@@ -123,6 +125,7 @@ function chay(so) {
     [shell.indexOf('#fbm-sync-results-root > #fbm-sync-results-body-region { margin') === -1,
       shell.indexOf('.shin-sync-conflict-field { display:flex; flex-direction:column; gap:var(--shin-gap-1);') >= 0,
       settings.indexOf('.shin-sync-login-policy-children { margin: 0 0') === -1,
+      settings.indexOf('.shin-sync-login-policy-children { margin-left:') === -1,
       settings.indexOf('.shin-sync-login-policy-children .shin-toggle-row') === -1,
       settings.indexOf('.shin-sync-login-policy-retry-group .shin-form-field') === -1,
       settings.indexOf('.shin-sync-detail-inputs > * + *') === -1,
@@ -133,7 +136,7 @@ function chay(so) {
       runUi.indexOf('RowGroup({ id: FBM_SYNC_SETTINGS_SCHEMA.regions.loginPolicyChildren') >= 0,
       runUi.indexOf('page: function (slots) { return Card({ title: slots.title, elements: [RowGroup({ elements:') >= 0,
       runUi.indexOf('Row({ className: FBM_SYNC_RESULTS_UI.classes.pagination') >= 0],
-    [true, true, true, true, true, true, true, true, true, true, true, true, true]);
+    [true, true, true, true, true, true, true, true, true, true, true, true, true, true]);
   check(so, 'slot lịch sử, info bar và dialog dùng gap thay cho margin sibling',
     [slots.indexOf('.shin-act-row {\n  display: flex;\n  flex-direction: column;\n  gap: var(--shin-gap-1);') >= 0,
       slots.indexOf('margin-bottom: 6px') === -1,

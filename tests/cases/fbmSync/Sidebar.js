@@ -407,13 +407,14 @@ async function chay(so) {
   const backgroundBlocks = hop.fbmSyncSettingsBackgroundBlocks(hop.FBM_SYNC_CLIENT.syncSettings);
   const backgroundToggleIndex = backgroundBlocks.findIndex((node) => node && node.elements && node.elements.some((child) => child && child.id === 'fbm-sync-background-switch'));
   const directionIndex = backgroundBlocks.findIndex((node) => node && node.elements && node.elements.some((child) => child && child.id === 'fbm-sync-background-direction'));
-  const firstScheduleRow = backgroundBlocks.find((node) => node && node.className === 'shin-sync-schedule-row');
-  const detailBlock = backgroundBlocks.find((node) => node && node.className === 'shin-sync-detail-controls');
-  check(so, 'background layout order and detail groups', [backgroundToggleIndex < directionIndex, backgroundBlocks[directionIndex].className.indexOf('shin-sync-direction-row') >= 0, firstScheduleRow.elements[1].className, detailBlock.elements.length, detailBlock.elements[0].className, detailBlock.elements[1].elements[0].className, detailBlock.elements[1].elements[1].className], [true, true, 'shin-kv-label', 2, 'shin-sync-detail-field', 'shin-sync-detail-label', 'shin-sync-detail-inputs']);
+  const firstScheduleRow = backgroundBlocks.find((node) => node && String(node.className || '').indexOf('shin-sync-schedule-row') >= 0);
+  const detailBlock = backgroundBlocks.find((node) => node && String(node.className || '').indexOf('shin-sync-detail-controls') >= 0);
+  check(so, 'background layout order and detail groups', [backgroundToggleIndex < directionIndex, backgroundBlocks[backgroundToggleIndex].role, backgroundBlocks[directionIndex].className.indexOf('shin-sync-direction-row') >= 0, firstScheduleRow.role, firstScheduleRow.elements[1].className, detailBlock.role, detailBlock.elements.length, detailBlock.elements[0].className, detailBlock.elements[1].elements[0].className, detailBlock.elements[1].elements[1].className], [true, 'row', true, 'row', 'shin-kv-label', 'box', 2, 'shin-sync-detail-field', 'shin-sync-detail-label', 'shin-sync-detail-inputs']);
   const loginPolicyBlocks = hop.fbmSyncSettingsLoginBlocks({ enabled: true, autoOpenTab: false, retryEnabled: true, retryMinutes: 30 });
   const loginPolicyChildren = loginPolicyBlocks.find((node) => node && node.id === 'fbm-sync-login-policy-children');
   const retryGroup = loginPolicyChildren.elements[1];
-  check(so, 'login policy groups retry interval under retry toggle', [retryGroup.className, retryGroup.elements.length, retryGroup.elements[0].elements[1].id, retryGroup.elements[1].className, retryGroup.elements[1].elements[1].id], ['shin-row-group shin-sync-login-policy-retry-group', 2, 'fbm-sync-policy-retry', 'shin-form-field', 'fbm-sync-login-retry-minutes']);
+  const loginParent = loginPolicyBlocks.find((node) => node && node.id === 'fbm-sync-login-policy-parent-row');
+  check(so, 'login policy groups retry interval under retry toggle', [loginParent.role, loginPolicyChildren.role, retryGroup.className, retryGroup.elements.length, retryGroup.elements[0].role, retryGroup.elements[0].elements[1].id, retryGroup.elements[1].className, retryGroup.elements[1].elements[1].id], ['row', 'box', 'shin-row-group shin-sync-login-policy-retry-group', 2, 'row', 'fbm-sync-policy-retry', 'shin-form-field', 'fbm-sync-login-retry-minutes']);
   check(so, 'Settings render được relay và tham số phiên', dom.document.getElementById('fbm-sync-setting-approval-threshold').value === '10' && content.textContent.indexOf('Kết nối Extension') >= 0, true);
 
   hop.FBM_SYNC_CLIENT.subscreen = 'account';
