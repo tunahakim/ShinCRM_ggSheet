@@ -474,9 +474,11 @@ function testHopDongTichHop(so) {
   ], [true, true, true, true]);
   check(so, 'action modal dùng RowGroup dọc, không thừa hưởng Row margin ngang', [
     docClient('ui/unsavedChanges.html').indexOf("RowGroup({ className: 'shin-unsaved-actions'") >= 0,
+    docClient('ui/unsavedChanges.html').indexOf("RowGroup({ className: 'shin-unsaved-panel'") >= 0,
     styles.indexOf('.shin-unsaved-actions { display: grid') < 0,
-    styles.indexOf('.shin-unsaved-actions > * + *') < 0
-  ], [true, true, true]);
+    styles.indexOf('.shin-unsaved-actions > * + *') < 0,
+    styles.indexOf('.shin-box.shin-unsaved-panel { position: relative; z-index: 1; display: flex;') < 0
+  ], [true, true, true, true, true]);
 }
 
 async function chay(so) {

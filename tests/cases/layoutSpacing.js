@@ -147,7 +147,7 @@ function chay(so) {
       frame.indexOf('display: flex;\n  flex-direction: column;\n  gap: var(--shin-gap-1);', frame.indexOf('#sidebar-info {')) >= 0,
       frame.indexOf('#sidebar-info .shin-row + .shin-row') === -1,
       components.indexOf('.shin-loading-track { position: relative; overflow: hidden; height: 5px; margin-top') === -1,
-      components.indexOf('.shin-box.shin-unsaved-panel { position: relative; z-index: 1; display: flex; flex-direction: column; gap: var(--shin-gap-2);') >= 0,
+      components.indexOf('.shin-box.shin-unsaved-panel { position: relative; z-index: 1; display: flex; flex-direction: column; gap: var(--shin-gap-2);') === -1,
       components.indexOf('.shin-unsaved-message { margin:') === -1,
       shell.indexOf('.shin-sync-tab-row { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:0; margin-bottom') === -1],
     [true, true, true, true, true, true, true, true, true, true]);

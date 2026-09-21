@@ -43,7 +43,7 @@ function unsavedChangesSurfaceCanRun(surface, intent, state) {
 function unsavedChangesDialogBlocks() {
   return [
     Box({ className: 'shin-unsaved-backdrop', data: { 'unsaved-choice': 'continue' } }),
-    Box({ className: 'shin-unsaved-panel', elements: [
+    RowGroup({ className: 'shin-unsaved-panel', elements: [
       Text({ id: 'shin-unsaved-title', className: 'shin-unsaved-title', text: 'Có thay đổi chưa lưu' }),
       Text({ id: 'shin-unsaved-message', className: 'shin-unsaved-message', text: 'Phát hiện thay đổi chưa lưu. Bạn muốn làm gì trước khi tiếp tục?' }),
       RowGroup({ className: 'shin-unsaved-actions', elements: [
@@ -106,7 +106,7 @@ function uiDecisionOpen(options) {
   if (UI_DECISION_DIALOG.open) { return Promise.resolve(false); }
   renderReplaceChildren(dialog, [
     Box({ className: 'shin-unsaved-backdrop', data: { 'ui-decision-choice': 'cancel' } }),
-    Box({ className: 'shin-unsaved-panel', elements: [
+    RowGroup({ className: 'shin-unsaved-panel', elements: [
       Text({ id: 'shin-decision-title', className: 'shin-unsaved-title', text: String(opts.title || '') }),
       Text({ id: 'shin-decision-message', className: 'shin-unsaved-message', text: String(opts.message || '') }),
       RowGroup({ className: 'shin-unsaved-actions', elements: [
