@@ -8,18 +8,18 @@
 - [x] Ghi nhận nguyên tắc sibling spacing: chỉ dùng một cơ chế cho khoảng cách giữa các sibling; phiên này chọn `gap` làm cơ chế chuẩn.
 - [x] Ghi nhận nguyên tắc bảo toàn: không đổi nghiệp vụ, state, action, payload, Schema dữ liệu hoặc hợp đồng GAS/Extension.
 - [x] Ghi nhận nguyên tắc ngoại lệ: layout pipeline, schedule, conflict, tab, shell và host tĩnh chỉ giữ CSS riêng khi không thể biểu diễn bằng primitive chung; mỗi ngoại lệ phải có consumer và lý do.
-- [ ] Xác định danh sách màn hình nằm trong phạm vi: form lõi, view, status, Sync Run, Account, Results, Settings, header, footer, host và slot có ảnh hưởng khoảng cách.
-- [ ] Xác định rõ phần ngoài phạm vi: giao diện Google Sheets do Google sở hữu, fixture FBM, nghiệp vụ GAS/Extension và các thay đổi visual không liên quan khoảng cách/bố cục.
+- [x] Xác định danh sách màn hình nằm trong phạm vi: form lõi, view, status, Sync Run, Account, Results, Settings, header, footer, host và slot có ảnh hưởng khoảng cách.
+- [x] Xác định rõ phần ngoài phạm vi: giao diện Google Sheets do Google sở hữu, fixture FBM, nghiệp vụ GAS/Extension và các thay đổi visual không liên quan khoảng cách/bố cục.
 
 ## 1. Mốc xuất phát và bằng chứng
 
-- [ ] Chạy `node tests/run.js` trước khi sửa code; ghi tổng số đạt, số lỗi và commit hiện tại vào checklist.
-- [ ] Ghi lại `git status --short`; phân loại thay đổi có sẵn của chủ dự án để không đưa vào commit phiên này.
-- [ ] Chụp/ghi nhận cấu trúc DOM của ít nhất một màn đại diện cho mỗi nhóm: form lõi, view, status, Sync Run, Sync Account, Sync Results, Sync Settings.
+- [x] Chạy `node tests/run.js` trước khi sửa code; ghi tổng số đạt, số lỗi và commit hiện tại vào checklist.
+- [x] Ghi lại `git status --short`; phân loại thay đổi có sẵn của chủ dự án để không đưa vào commit phiên này.
+- [x] Chụp/ghi nhận cấu trúc DOM của ít nhất một màn đại diện cho mỗi nhóm: form lõi, view, status, Sync Run, Sync Account, Sync Results, Sync Settings.
 - [ ] Ghi nhận khoảng cách thực tế của các cặp cần so sánh: Card-Card, block-block trong Card, Field-Field, Field-action, action-action, Card header-action và tab-body.
-- [ ] Ghi nhận riêng vị trí của tất cả action mang nghĩa lưu/xác nhận: footer form, icon titleActions, config button, identity action, conflict save/merge và Run approval.
-- [ ] Xác định mỗi action lưu/xác nhận đang là `Button` hay `Icon` và đang nằm dưới wrapper nào.
-- [ ] Lưu bằng chứng baseline vào checklist hoặc test fixture; không dùng mô tả chung như “nhìn đúng”.
+- [x] Ghi nhận riêng vị trí của tất cả action mang nghĩa lưu/xác nhận: footer form, icon titleActions, config button, identity action, conflict save/merge và Run approval.
+- [x] Xác định mỗi action lưu/xác nhận đang là `Button` hay `Icon` và đang nằm dưới wrapper nào.
+- [x] Lưu bằng chứng baseline vào checklist hoặc test fixture; không dùng mô tả chung như “nhìn đúng”.
 
 ## 2. Kiểm kê token và luật không gian hiện có
 
@@ -104,6 +104,8 @@
 
 Ghi chú mốc kiểm thử: `layoutSpacing` đã chạy độc lập và hiện đỏ đúng 6 nhóm luật do CSS cũ chưa migrate. `node tests/run.js` hiện dừng trước nhóm UI tại `tests/cases/fbmSync/Push.js` với lỗi có sẵn `Không nhận diện được bước push: undefined`; không quy lỗi này cho phiên spacing.
 
+Baseline phiên spacing trước lượt sửa tiếp theo: commit `683976b`, `node tests/run.js` đạt `1873`, lỗi `8`; `git status --short` chỉ có các thay đổi FBM session/pipeline có sẵn của chủ dự án, không đưa vào các commit spacing. Cây đại diện và vị trí action được kiểm bằng `formScreen`, `viewScreen`, `fbmSync/Sidebar`, `fbmSync/Components`.
+
 ## 7. Cập nhật tài liệu chính thức trước khi sửa code
 
 - [x] Cập nhật `03. Data schema & UI schema.md` để nói rõ UI schema khai cấu trúc/hành vi, còn layout primitive sở hữu spacing.
@@ -128,7 +130,7 @@ Ghi chú mốc kiểm thử: `layoutSpacing` đã chạy độc lập và hiện
 - [x] Chuẩn hóa Field/StandaloneField để label-control và spacing ngoài không bị cộng kép.
 - [x] Giữ nguyên hình học nội bộ Button/Icon, loại bỏ mọi margin ngoài không thuộc primitive.
 - [x] Chạy kiểm thử kiến trúc sau nhóm primitive; `layoutSpacing` đạt 9/9 và `fbmSync/Components` đạt 29/29 khi chạy độc lập.
-- [ ] Chạy `node tests/run.js` sau khi nhóm A hoàn tất.
+- [x] Chạy `node tests/run.js` sau khi nhóm A hoàn tất.
 - [ ] Tick toàn bộ mục nhóm A ngay sau khi test đạt.
 - [x] Commit riêng nhóm A với tiêu đề tiếng Việt nêu rõ chuẩn hóa primitive spacing.
 
@@ -136,16 +138,18 @@ Ghi chú nhóm A: các test UI/layout liên quan đạt; `node tests/run.js` ch�
 
 ## 9. Nhóm code B — chuẩn hóa Page, frame, Card và form lõi
 
-- [ ] Chuẩn hóa khoảng cách giữa các Card ở view/form/status theo Page/Section contract.
-- [ ] Chuẩn hóa CardBody của các màn lõi theo cùng cấu trúc con trực tiếp.
-- [ ] Chuyển các form field/action về Stack và ActionStack chuẩn, không thêm margin tại screen.
-- [ ] Kiểm tra footer save của ba form lõi dùng đúng wrapper action chuẩn.
-- [ ] Kiểm tra header/title action dùng đúng contract của CardHead/CardActions, không bị lẫn với Button body.
-- [ ] Xóa các luật margin trùng đã được primitive cấp cao sở hữu.
-- [ ] Chạy kiểm thử cấu trúc DOM cho view/customerForm/activityForm/noteForm/status.
-- [ ] Chạy `node tests/run.js` sau nhóm B.
-- [ ] Tick từng mục nhóm B ngay sau bằng chứng tương ứng.
-- [ ] Commit riêng nhóm B.
+- [x] Chuẩn hóa khoảng cách giữa các Card ở view/form/status theo Page/Section contract.
+- [x] Chuẩn hóa CardBody của các màn lõi theo cùng cấu trúc con trực tiếp.
+- [x] Chuyển các form field/action về Stack và ActionStack chuẩn, không thêm margin tại screen.
+- [x] Kiểm tra footer save của ba form lõi dùng đúng wrapper action chuẩn.
+- [x] Kiểm tra header/title action dùng đúng contract của CardHead/CardActions, không bị lẫn với Button body.
+- [x] Xóa các luật margin trùng đã được primitive cấp cao sở hữu.
+- [x] Chạy kiểm thử cấu trúc DOM cho view/customerForm/activityForm/noteForm/status.
+- [x] Chạy `node tests/run.js` sau nhóm B.
+- [x] Tick từng mục nhóm B ngay sau bằng chứng tương ứng.
+- [x] Commit riêng nhóm B.
+
+Ghi chú nhóm B: `formScreen` đạt 20/20 và `viewScreen` đạt 16/16; các assertion mới kiểm trực tiếp cây `Card → Row → Field`, `titleActions` và footer Button.
 
 ## 10. Nhóm code C — chuẩn hóa Sync Run và Account
 

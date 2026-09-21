@@ -64,6 +64,12 @@ function chay(so) {
     [hang.length, hang[0].role, hang[0].text, hang[1].icon, hang[2].icon, hang[2].align],
     [3, 'text', 'Thêm Khách Hàng', 'close', 'check', 'right']);
 
+  const customerTree = hop.screenBuild(hop.UI_SCHEMA.customerForm, 'customerForm');
+  check(so, 'form lõi dùng Card → Row → Field, footer dùng Button save chung',
+    [customerTree.body.length, customerTree.body[0].role, customerTree.body[0].elements.every((row) => row.role === 'row'),
+      customerTree.body[0].elements[0].elements[0].role, customerTree.footer[0].role, customerTree.footer[0].className.indexOf('shin-save-wide') >= 0],
+    [1, 'card', true, 'field', 'button', true]);
+
   section('formScreen — form sửa khách: bốn vùng và ô nhập đầu tiên');
 
   const els = hop.document._els;

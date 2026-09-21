@@ -55,6 +55,12 @@ function chay(so) {
   check(so, 'mã card lịch sử ở viewScreen khớp id khai trong UI_SCHEMA.view — lệch một chữ là nút đổi nấc xem không vẽ lại gì',
     hop.SCREEN_VIEW_HISTORY_ID, hop.UI_SCHEMA.view.body[1].id);
 
+  const viewTree = hop.screenBuild(hop.UI_SCHEMA.view, 'view');
+  check(so, 'view dùng Page body gồm các Card, titleActions tách khỏi CardBody',
+    [viewTree.body.length, viewTree.body.every((card) => card.role === 'card'),
+      Array.isArray(viewTree.body[0].titleActions), viewTree.body[0].elements[0].role],
+    [2, true, true, 'field']);
+
   check(so, 'chưa chọn khách thì không có bản ghi và không có ai bị coi là đã xóa',
     [hop.screenViewCustomer(), hop.screenViewDeleted()], [null, false]);
 
