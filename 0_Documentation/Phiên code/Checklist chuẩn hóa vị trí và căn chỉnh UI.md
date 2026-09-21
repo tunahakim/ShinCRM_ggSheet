@@ -36,15 +36,17 @@
 
 ## 3. Kiểm kê hiện trạng trước khi sửa
 
-- [ ] Liệt kê mọi khai báo `align` trong screen schema, form header, view header và các schema FBM; đầu ra phải có đường dẫn file và action/consumer tương ứng.
-- [ ] Liệt kê mọi nơi `Block` cho phép khóa `align`; phân biệt API primitive với khai báo screen schema.
-- [ ] Liệt kê mọi nơi renderer dịch `align` thành class hoặc style.
-- [ ] Liệt kê mọi selector CSS còn dùng `shin-align-right`, `margin-left: auto`, `justify-content`, `align-items` và `text-align`; phân loại generic, primitive, domain và host tĩnh.
-- [ ] Liệt kê mọi nơi dùng `Row`, `Stack`, `ActionStack`, `StandaloneField`, `Button`, `Icon` trong form lõi và bốn màn Sync.
-- [ ] Liệt kê mọi header có cấu trúc nhóm đầu/tiêu đề/nhóm cuối; ghi rõ thứ tự hiện tại phải được bảo toàn.
-- [ ] Liệt kê các layout đặc thù được giữ lại: shell header, schedule row, tab row, pipeline, conflict header, status table, history row, popup và dialog.
-- [ ] Ghi baseline test trước khi sửa: nhóm UI/layout và tổng `node tests/run.js`, chỉ ghi số lỗi thuộc phiên khác nếu có.
-- [ ] Chụp/ghi cây Block hiện tại của form header và view header để đối chiếu sau migration.
+- [x] Liệt kê mọi khai báo `align` trong screen schema, form header, view header và các schema FBM; đầu ra phải có đường dẫn file và action/consumer tương ứng.
+- [x] Liệt kê mọi nơi `Block` cho phép khóa `align`; phân biệt API primitive với khai báo screen schema.
+- [x] Liệt kê mọi nơi renderer dịch `align` thành class hoặc style.
+- [x] Liệt kê mọi selector CSS còn dùng `shin-align-right`, `margin-left: auto`, `justify-content`, `align-items` và `text-align`; phân loại generic, primitive, domain và host tĩnh.
+- [x] Liệt kê mọi nơi dùng `Row`, `Stack`, `ActionStack`, `StandaloneField`, `Button`, `Icon` trong form lõi và bốn màn Sync.
+- [x] Liệt kê mọi header có cấu trúc nhóm đầu/tiêu đề/nhóm cuối; ghi rõ thứ tự hiện tại phải được bảo toàn.
+- [x] Liệt kê các layout đặc thù được giữ lại: shell header, schedule row, tab row, pipeline, conflict header, status table, history row, popup và dialog.
+- [x] Ghi baseline test trước khi sửa: nhóm UI/layout và tổng `node tests/run.js`, chỉ ghi số lỗi thuộc phiên khác nếu có.
+- [x] Chụp/ghi cây Block hiện tại của form header và view header để đối chiếu sau migration.
+
+Ghi chú kiểm kê: `align` đang được khai tại `client/schema/screens/formHeader.html`, `client/schema/screens/view.html`, được cho phép trong `client/ui/uiBuilder.html`, chuyển thành class tại `client/ui/renderEngine.html` và CSS `.shin-align-right` ở `client/style/components.html`/`frame.html`. Các consumer chính là header form/view; không tìm thấy consumer screen khác. Baseline UI gần nhất là `layoutSpacing`, `fbmSync/Components`, `fbmSync/Sidebar` đạt `200/200`; `node tests/run.js` có `1883` đạt và `4` lỗi FBM session/pipeline có sẵn ngoài phạm vi.
 
 ## 4. Cập nhật tài liệu chính thức trước code
 
