@@ -104,16 +104,16 @@
 
 ## 7. Cập nhật tài liệu chính thức trước khi sửa code
 
-- [ ] Cập nhật `03. Data schema & UI schema.md` để nói rõ UI schema khai cấu trúc/hành vi, còn layout primitive sở hữu spacing.
-- [ ] Cập nhật `04. Bộ máy render và luồng lưu.md` để mô tả `Stack`, `ActionStack`, `Row`, `CardBody` và owner spacing.
-- [ ] Cập nhật `09/08. UI đồng bộ và cấu hình.md` để Sync dùng cùng layout contract và chỉ giữ ngoại lệ domain.
-- [ ] Ghi rõ Button/Icon không sở hữu khoảng cách bên ngoài trong tài liệu component/render.
-- [ ] Ghi rõ chỉ dùng `gap` cho sibling spacing generic; margin chỉ giữ trong allowlist nội bộ/ngoại lệ.
-- [ ] Ghi rõ cấu trúc chuẩn Page → Stack → Card → CardBody → Stack → Field/ActionStack → Row.
-- [ ] Ghi rõ cách xử lý action một nút, nhiều nút, title action và action xác nhận.
-- [ ] Ghi rõ danh sách ngoại lệ Sync hiện tại và tiêu chí để loại bỏ ngoại lệ sau này.
+- [x] Cập nhật `03. Data schema & UI schema.md` để nói rõ UI schema khai cấu trúc/hành vi, còn layout primitive sở hữu spacing.
+- [x] Cập nhật `04. Bộ máy render và luồng lưu.md` để mô tả `Stack`, `ActionStack`, `Row`, `CardBody` và owner spacing.
+- [x] Cập nhật `09/08. UI đồng bộ và cấu hình.md` để Sync dùng cùng layout contract và chỉ giữ ngoại lệ domain.
+- [x] Ghi rõ Button/Icon không sở hữu khoảng cách bên ngoài trong tài liệu component/render.
+- [x] Ghi rõ chỉ dùng `gap` cho sibling spacing generic; margin chỉ giữ trong allowlist nội bộ/ngoại lệ.
+- [x] Ghi rõ cấu trúc chuẩn Page → Stack → Card → CardBody → Stack → Field/ActionStack → Row.
+- [x] Ghi rõ cách xử lý action một nút, nhiều nút, title action và action xác nhận.
+- [x] Ghi rõ danh sách ngoại lệ Sync hiện tại và tiêu chí để loại bỏ ngoại lệ sau này.
 - [ ] Cập nhật `Cây thư mục code.md` nếu phiên tạo thêm tệp code/test hoặc thư mục mới.
-- [ ] Cập nhật checklist này với đường dẫn/mục tài liệu đã sửa trước khi bắt đầu code.
+- [x] Cập nhật checklist này sau khi sửa `03. Data schema & UI schema.md`, `04. Bộ máy render và luồng lưu.md` và `09/08. UI đồng bộ và cấu hình.md`; nhóm tài liệu đã sẵn sàng làm mốc cho code.
 
 ## 8. Nhóm code A — chuẩn hóa token và primitive layout
 
@@ -224,4 +224,3 @@
 - [ ] Tài liệu chính thức phản ánh đúng code sau refactor.
 - [ ] Mọi nhóm code đã được commit riêng và checklist đã tick ngay sau commit.
 - [ ] Chủ dự án đã nghiệm thu trực quan trên Sheet DEV.
-
