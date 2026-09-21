@@ -1,0 +1,735 @@
+# [Chờ xử lý] Phương án refactor cơ chế đồng bộ FBM và phân tải Extension
+
+> Trạng thái: tài liệu thảo luận, chưa phải hợp đồng chính thức.
+>
+> Mục đích: lưu lại đầy đủ phương án đã trao đổi để sau khi các lỗi vận hành nhỏ của pipeline hiện tại được xử lý xong, có thể mở một phiên refactor riêng mà không phải suy lại từ đầu.
+>
+> Quy tắc quan trọng: tệp này không thay thế Tài liệu 09, không được dùng làm căn cứ sửa code ngay trong phiên hiện tại. Khi bắt đầu refactor, phải đối chiếu và cập nhật các tài liệu chính thức trước, sau đó mới triển khai theo hợp đồng mới.
+
+## 1. Phạm vi và lý do tạo tài liệu
+
+Module đồng bộ FBM hiện tại đã có phần lớn pipeline và cổng phiên. Các lỗi còn lại đang được xử lý theo checklist vận hành trước khi chạy thật. Việc thay đổi sâu vai trò của Extension, cách truyền bulk response, DSL và state không nên làm chen vào phiên sửa lỗi nhỏ, vì có thể làm lẫn hai loại công việc:
+
+- sửa lỗi của hợp đồng hiện tại để pipeline đang có chạy đúng;
+- thiết kế lại hợp đồng tương lai để GAS và Extension phân tải khác đi.
+
+Tài liệu này ghi nhận phương án tương lai. Khi refactor, phải coi đây là đầu vào thiết kế cần duyệt lại, không coi mọi câu trong đây đã tự động trở thành quyết định nghiệp vụ.
+
+Nguồn hiện hành cần đối chiếu khi triển khai:
+
+- `0_Documentation/00. Tài liệu chính thức/09. Đồng bộ FBM/00. Mục lục và phạm vi.md`;
+- các chuyên đề 09.01–09.08 liên quan đến kiến trúc, pipeline, trường, fingerprint, xóa/vắng mặt, bảo mật, log và UI;
+- `0_Documentation/Phiên code/Checklist rà soát đồng bộ FBM trước vận hành thật.md`;
+- code và test hiện tại trong `1_ShinCRM_GAS/fbm_sync/`, `2_ShinCRM_Extension/` và `tests/cases/fbmSync/`.
+
+## 2. Tóm tắt phương án đang nghiêng về
+
+Phương án tổng thể:
+
+```text
+GAS:
+  bộ não nghiệp vụ và nguồn sự thật
+  đọc Sheet, tính hSHIN, giữ hBASE
+  tạo plan cho Extension
+  phân loại kết quả
+  sở hữu cursor, conflict, baseline
+  ghi Sheet và Log qua các cổng hiện có
+  quyết định session/login có được tiếp tục hay không
+
+Extension:
+  công nhân kỹ thuật chạy trong tab FBM
+  gọi FBM bằng request do GAS cấp
+  đọc HTML/JSON theo plan
+  lọc, chiếu, ghép, normalize và hash theo contract
+  giữ bulk tạm trong RAM của lượt hiện tại
+  trả observation/chunk đã làm sạch
+  không quyết định nghiệp vụ và không ghi Sheet/Log
+
+DocumentProperties:
+  chỉ giữ state điều khiển nhỏ
+  không chứa full response, Rows lớn, preview dài hay record ứng viên
+```
+
+Điểm cốt lõi là: **GAS không nhận full response của các lượt đọc bulk nghiệp vụ. GAS nhận dữ liệu đã chiếu/rút gọn và tự quyết định kết quả nghiệp vụ.**
+
+Điều này không có nghĩa Extension được tự quyết định. Extension chỉ thực thi các thao tác kỹ thuật được mô tả trong plan JSON do GAS cấp. GAS vẫn là nơi diễn giải kết quả thành `unchanged`, `pull`, `push`, `conflict`, `missing`, `fbm-only`, trạng thái lỗi hoặc quyết định dừng phiên.
+
+## 3. Ranh giới GAS – Extension – Sidebar
+
+### 3.1. GAS sở hữu
+
+GAS tiếp tục sở hữu duy nhất:
+
+- `DATA_SCHEMA`, `SYNC_SCHEMA` và các quy tắc trường tham gia đồng bộ;
+- mapping Category và điều kiện được phép ghi;
+- quy tắc chuẩn hóa/fingerprint ở cấp hợp đồng;
+- tính `hSHIN` từ dữ liệu hiện tại của ShinCRM;
+- đọc `hBASE` đã lưu;
+- phân loại ba chiều và quyết định ghi;
+- cursor, tiến độ, lock, conflict và baseline;
+- quy tắc auto-login, probe, retry, session blocked và identity;
+- cửa ghi Sheet, cửa ghi state và Log;
+- DTO trả Sidebar.
+
+Extension không được tự thay thế bất kỳ quyết định nào ở trên.
+
+### 3.2. Extension sở hữu
+
+Extension thực hiện những việc thuần kỹ thuật gần nguồn FBM:
+
+- gọi request trong tab FBM với cookie và Referer của tab;
+- đọc response HTML/JSON;
+- trích xuất trường kỹ thuật mà plan yêu cầu;
+- projection/filter/limit dữ liệu;
+- tạo map theo khóa;
+- normalize theo hash contract;
+- tính `hFBM` nếu plan yêu cầu;
+- chỉ trả các observation và record cần thiết;
+- chia output thành chunk theo ngân sách byte.
+
+Extension không được:
+
+- tự kết luận phiên còn sống hay đã chết;
+- tự quyết định login lại;
+- tự chọn FBM hay ShinCRM khi conflict;
+- tự cập nhật baseline;
+- tự ghi Sheet hoặc Log;
+- lưu state nghiệp vụ lâu dài trong `chrome.storage`.
+
+### 3.3. Sidebar
+
+Sidebar chỉ điều phối thao tác người dùng và hiển thị DTO. Sidebar không được tự tính hash, tự phân loại conflict, tự dựng request FBM hoặc tự quyết định reload.
+
+## 4. Đăng nhập và session theo phương án mới
+
+Ý “đưa việc đăng nhập sang Extension” được hiểu là Extension làm phần kỹ thuật, không phải Extension làm chủ chính sách đăng nhập.
+
+### 4.1. Việc Extension làm
+
+Theo `LoginPlan` do GAS cấp, Extension có thể:
+
+- gửi request đăng nhập trong tab FBM;
+- đọc HTML/JSON phản hồi;
+- lấy salt, marker hoặc trường kỹ thuật cần cho bước tiếp theo;
+- nhận diện dạng body: JSON, HTML, không decode được;
+- lấy các trường identity đã được phép trả;
+- làm sạch kết quả và loại password, cookie, envelope, payload dài;
+- trả `LoginObservation` về GAS.
+
+Extension không trả kết luận kiểu `sessionAlive: true` và không tự chuyển sang request nghiệp vụ.
+
+### 4.2. Việc GAS làm
+
+GAS nhận observation và tự quyết định:
+
+```text
+httpStatus = 200
+jsonValid = true
+hasD = true
+identity khớp binding
+  -> cho phép tiếp tục
+```
+
+Các trường hợp khác được phân loại tại GAS:
+
+- phiên sống;
+- bị chặn do FBM còn phiên khác;
+- sai thông tin hoặc identity không khớp;
+- lỗi transport;
+- response không đúng shape;
+- cần dừng và báo người dùng.
+
+### 4.3. Không gửi full response login/probe
+
+Phương án mới không bắt GAS nhận full body trong mọi trường hợp. Extension có thể trả các dữ kiện kỹ thuật đã làm sạch:
+
+```json
+{
+  "httpStatus": 200,
+  "bodyKind": "json",
+  "jsonValid": true,
+  "hasD": true,
+  "loginMarker": "success",
+  "identity": {
+    "userId": "...",
+  },
+  "extractorVersion": "login-v1"
+}
+```
+
+Tên trường thật và mức độ chi tiết phải chốt trong contract; ví dụ trên không phải schema cuối.
+
+Nếu Extension không nhận diện được body, nó trả observation lỗi đã làm sạch, không trả nguyên HTML lỗi hoặc payload nhạy cảm. GAS vẫn là nơi quyết định fail-closed.
+
+Đây là thay đổi so với một số câu trong Tài liệu 09 hiện tại đang yêu cầu Extension chuyển body probe nguyên trạng. Khi refactor, phải cập nhật hợp đồng để phân biệt:
+
+```text
+Extension parse/trích xuất dữ kiện kỹ thuật
+GAS diễn giải và quyết định session
+```
+
+## 5. Hai loại ngân sách dữ liệu, không được nhầm lẫn
+
+### 5.1. `19.918 byte` trong Log
+
+Log vận hành có dạng:
+
+```text
+key: FBM_SYNC_STATE_V1
+bytes: 19918
+context: state
+phase: checking_session
+cursor: lookup index: 3
+```
+
+`19.918 byte` là kích thước chuỗi JSON của **một state GAS đang cố ghi vào `DocumentProperties`**. Nó không phải kích thước response FBM và không phải kích thước relay chunk.
+
+State này tồn tại lâu dài để lát sau đọc lại và tiếp tục. Vì vậy nó chịu trần nhỏ của `DocumentProperties`. Kích thước khoảng 17–20 KB vượt xa ngân sách an toàn, nên các lần chạy lặp lại tiếp tục lỗi.
+
+Vị trí `lookup index: 3` cho thấy state đã phình trong giai đoạn lookup, chưa cần có hàng nghìn Customer mới xảy ra. Các nguồn đã được nghi ngờ/xác định trong quá trình rà trước gồm:
+
+- giữ nguyên `Rows` của lookup;
+- giữ `categoryGate` lớn hoặc trùng ở nhiều nhánh;
+- giữ preview Activity dài;
+- giữ candidate là toàn bộ record;
+- giữ dữ liệu phụ không cần để tiếp tục cursor.
+
+### 5.2. `256–512 KB` và ngân sách relay
+
+Đây là ngân sách cho một JSON tạm thời Extension gửi về GAS qua relay. Nó chỉ sống trong lượt xử lý hiện tại, sau khi GAS ghi xong thì không phải state chính.
+
+Để “thoải mái” nhưng không sát trần relay khoảng 1 MB, phương án tạm đề xuất:
+
+```text
+Mục tiêu chunk: 512 KiB
+Giới hạn cứng: 768 KiB
+```
+
+Đo trên JSON đã serialize, gồm cả envelope, metadata, `records`, `jobId` và `chunkIndex`.
+
+Quy tắc:
+
+- thêm record khi vẫn dưới mục tiêu;
+- dừng trước khi vượt mục tiêu nếu record kế tiếp làm gói quá lớn;
+- tuyệt đối không vượt giới hạn cứng;
+- record riêng lẻ quá lớn phải projection hoặc đọc chi tiết riêng.
+
+Hai ngân sách được hiểu như sau:
+
+```text
+DocumentProperties:
+  state lâu dài, mục tiêu vài KB
+
+Relay:
+  dữ liệu tạm của lượt hiện tại, tối đa 768 KiB theo đề xuất ban đầu
+```
+
+Các con số này chưa phải hợp đồng cuối. Khi refactor phải đo bằng test và gom thành một policy dùng chung, không khai riêng cho Customer, Activity và `fbmOnly`.
+
+## 6. Customer: một request tới FBM, nhiều chunk về GAS
+
+### 6.1. Quyết định đang chọn
+
+Nếu endpoint FBM tiếp tục cho phép lấy toàn bộ Customer an toàn, Extension gọi **một request tới FBM** để lấy toàn bộ dữ liệu cần quét.
+
+Không được nhầm với việc gửi toàn bộ response đó về GAS.
+
+### 6.2. Luồng đề xuất
+
+```text
+1. GAS đọc một nhóm ID/hash ShinCRM vừa phải.
+2. GAS gửi plan và danh sách đó cho Extension.
+3. Extension gọi FBM một lần.
+4. Extension tạo map Customer trong RAM.
+5. Extension tính hFBM và tạo observation.
+6. Extension trả kết quả theo output chunk.
+7. GAS phân loại và ghi từng chunk qua cửa ghi.
+8. GAS chỉ tăng cursor sau khi ghi và state thành công.
+```
+
+### 6.3. Nội dung observation
+
+Không đổi thì chỉ cần:
+
+```json
+{
+  "id": "CUS-001",
+  "hFBM": "...",
+  "status": "unchanged"
+}
+```
+
+Bản ghi thay đổi mới mang các trường đã projection để GAS ghi:
+
+```json
+{
+  "id": "CUS-002",
+  "hFBM": "...",
+  "status": "changed",
+  "record": {
+    "companyName": "...",
+    "phone": "..."
+  }
+}
+```
+
+Không trả toàn bộ cột FBM nếu GAS không dùng.
+
+### 6.4. Envelope chunk
+
+Mỗi chunk cần có tối thiểu:
+
+```json
+{
+  "runId": "run-123",
+  "jobId": "customer-scan-1",
+  "chunkIndex": 0,
+  "inputFingerprint": "...",
+  "hasMore": true,
+  "records": []
+}
+```
+
+`inputFingerprint` dùng để phát hiện GAS và Extension đang xử lý cùng một plan/dataset logic, không phải để thay thế baseline.
+
+## 7. Activity quy mô lớn
+
+FBM đã từng trả khoảng 171.771 Activity, 35,5 MB trong khoảng 19 giây. Điều này chứng minh Extension có thể giữ bulk lớn trong RAM của lượt xử lý, nhưng không chứng minh rằng dữ liệu đó nên đi qua GAS hoặc được lưu lâu dài.
+
+### 7.1. Tầng bulk
+
+Khi response và thời gian còn trong ngân sách:
+
+```text
+FBM → Extension:
+  bulk lớn
+
+Extension:
+  map, hash, match, lọc
+
+Extension → GAS:
+  changed, missing, fbmOnly, observation theo chunk
+```
+
+### 7.2. Tầng dự phòng
+
+Không coi kích thước hiện tại là giới hạn vĩnh viễn. Nếu bulk vượt ngân sách, timeout hoặc xử lý không kịp, GAS chuyển sang cửa sổ ngày hoặc phân trang:
+
+```text
+2024-01-01 → 2024-03-31
+2024-04-01 → 2024-06-30
+...
+```
+
+Chính sách chọn `bulk` hay `windowed` phải do một module/policy duy nhất sở hữu.
+
+`activitySince` chỉ giới hạn phạm vi ngày; nó không chứng minh mọi Activity cũ không bị sửa vì FBM không có timestamp sửa cuối đáng tin cậy. Vì vậy vẫn cần một full reconcile định kỳ nếu muốn phát hiện sửa ở bản ghi cũ.
+
+### 7.3. Không giữ queue bulk lâu dài
+
+Không lưu hàng trăm nghìn Activity trong `chrome.storage`, Sheet staging hoặc `DocumentProperties`. Nếu Extension mất tab, GAS phải có thể khởi động lại từ cursor và cửa ghi phải idempotent.
+
+Nếu cần chia output thành nhiều chunk, phải ưu tiên cơ chế có thể đọc lại hoặc lấy chi tiết theo ID thay vì biến RAM Extension thành nguồn sự thật lâu dài.
+
+## 8. DSL/plan mới và việc dọn sạch DSL cũ
+
+### 8.1. Quyết định
+
+Không nuôi song song DSL mới với các trường cũ:
+
+```text
+jsonPaths
+arrayFilters
+arrayProjections
+```
+
+Các trường cũ chỉ được dùng để rà inventory và chuyển đổi. Khi refactor hoàn tất, parser, field và test cũ phải được loại bỏ nếu không còn contract nào dùng.
+
+### 8.2. Plan mới
+
+Nên có một schema plan có phiên bản, nhưng phân tách rõ hai nhóm trách nhiệm:
+
+```text
+TransportPlan:
+  request đã soạn
+  path cần giữ
+  projection/filter
+  giới hạn output
+
+BulkPlan:
+  khóa ghép
+  trường hash
+  chuẩn hóa
+  cách emit changed/missing/fbmOnly
+  chính sách chunk
+```
+
+Tên schema cuối phải kiểm tra với các module hiện có trước khi tạo mới.
+
+### 8.3. Primitive allowlist
+
+Bộ máy Extension chỉ cho một tập lệnh kỹ thuật cố định, dự kiến:
+
+```text
+selectPath
+extractText
+projectRows
+filterRows
+matchByKey
+normalizeForHash
+hashRows
+emitObservations
+chunkOutput
+```
+
+Không có `eval`, `new Function`, JavaScript tùy ý, thao tác ghi Sheet, thao tác đổi state GAS hoặc quyết định conflict.
+
+### 8.4. Một nơi định nghĩa
+
+`SYNC_SCHEMA` và hợp đồng fingerprint là nguồn định nghĩa duy nhất cho:
+
+- trường tham gia;
+- mapping tên/mã;
+- chuẩn hóa;
+- khóa ghép;
+- thuật toán hash.
+
+GAS tạo plan từ nguồn đó. Extension chỉ chạy plan đã biên dịch. Không khai lại danh sách trường ở từng flow.
+
+## 9. Hash và đối soát ba chiều
+
+### 9.1. Ba giá trị
+
+```text
+hBASE:
+  baseline đã được xác nhận ở lần trước
+
+hSHIN:
+  GAS đọc Sheet hiện tại và tự tính
+
+hFBM:
+  Extension tính từ dữ liệu FBM theo hash contract
+```
+
+Không lưu `hSHIN` thành cột riêng.
+
+### 9.2. Hợp đồng hash
+
+Plan phải mang phiên bản contract, danh sách field, normalization và thuật toán. Extension không được tự chọn field hoặc tự quyết định quy tắc.
+
+Hai môi trường cần test vector chung. Nếu GAS và Extension không cho ra cùng kết quả từ cùng input, phải dừng trước bulk.
+
+Việc Extension thực thi primitive `hashRows` không có nghĩa Extension sở hữu nghiệp vụ. Nó chỉ thực hiện công thức do GAS cấp; GAS vẫn là nơi phân loại và ghi.
+
+## 10. Quy tắc conflict
+
+### 10.1. Không tự động cho FBM thắng
+
+Khi hai bên cùng thay đổi, tự động lấy FBM sẽ có nguy cơ ghi đè thay đổi có chủ ý trên ShinCRM. Log chỉ truy vết được, không khôi phục quyết định đã bị mất.
+
+Phương án được chủ dự án xác nhận:
+
+```text
+Conflict:
+  máy phát hiện và đóng băng
+  người dùng xem nguyên nhân
+  chỉ có một hướng giải quyết:
+  xác nhận lấy giá trị hiện tại từ FBM vào ShinCRM
+```
+
+Có thể có nút “Để xử lý sau”, nhưng đây không phải một hướng giải quyết khác; nó chỉ giữ conflict nguyên trạng.
+
+### 10.2. Luồng xác nhận
+
+```text
+1. GAS phát hiện conflict.
+2. Ghi trạng thái xung đột và khóa bản ghi.
+3. Sidebar hiển thị diff giới hạn.
+4. Người dùng bấm xác nhận lấy FBM.
+5. GAS đọc lại ShinCRM và FBM hiện tại.
+6. Nếu FBM đã đổi thêm, đưa về hàng đợi xem lại.
+7. Nếu không đổi, ghi giá trị FBM vào ShinCRM.
+8. Cập nhật baseline bằng hFBM hiện tại.
+9. Ghi Log quyết định.
+```
+
+Không có lựa chọn tự động giữ ShinCRM hoặc trộn tay trong chính sách hiện tại.
+
+### 10.3. Định danh và khóa ghép
+
+Phải phân biệt:
+
+```text
+stt_rec_kh của Customer
+activity id
+  → khóa kỹ thuật để ghép bản ghi
+
+ma_kh và mọi trường đồng bộ khác
+  → nếu lệch theo luật đối soát thì đi vào conflict
+```
+
+Nếu khóa kỹ thuật không tìm thấy, đó là `missing` hoặc liên kết không chắc chắn, không phải máy tự chọn bên thắng.
+
+Đặc biệt, không còn ngoại lệ “`ma_kh` lệch thì FBM thắng tự động”. Tài liệu 09 hiện có đoạn quy định ngược lại; khi refactor phải cập nhật đoạn đó trước khi sửa code.
+
+## 11. Baseline và cửa ghi
+
+Baseline tiếp tục nằm trên Sheet:
+
+```text
+@CUS_HASH_FBM
+@ACT_HASH_FBM
+```
+
+### Pull
+
+Khi `hFBM == hSHIN`, GAS ghi dữ liệu và baseline trong đúng một lần qua cửa ghi. Không ghi baseline nếu còn conflict, thiếu dữ liệu hoặc kết quả chưa xác nhận.
+
+### Push
+
+Response ghi thành công chưa đủ. GAS phải đọc lại đúng bản ghi FBM, tính/kiểm tra hash thực tế, chỉ khi khớp `hPUSH` mới cập nhật baseline.
+
+`hPUSH` chỉ là metadata tạm của lượt đang chờ xác nhận, không phải bản sao record.
+
+## 12. Missing, deleted và dữ liệu vắng mặt
+
+Không suy ra:
+
+```text
+missing = deleted
+```
+
+Customer có thể vắng do chuyển giao hoặc phân quyền. Activity có thể bị hard-delete nhưng cơ chế hiện tại chưa có bằng chứng đủ chắc cho mọi trường hợp.
+
+Luật an toàn:
+
+- đánh cờ bản ghi không thấy;
+- đóng băng khi cần;
+- không tự xóa mềm;
+- không tự gửi lệnh xóa lên FBM;
+- không tạo Drive/database index mới để cố đoán.
+
+## 13. Không dùng Drive/database index
+
+Đã loại khỏi phương án.
+
+Không dùng:
+
+- Drive làm kho danh sách Activity;
+- database ngoài làm nguồn index;
+- `chrome.storage` làm state nghiệp vụ;
+- Sheet staging chứa toàn bộ bulk.
+
+Extension chỉ giữ dữ liệu tạm của lượt hiện tại trong RAM. GAS chỉ giữ cursor, thống kê, conflict compact và lỗi.
+
+## 14. Idempotency khi mất tab hoặc mất response
+
+Không thể đảm bảo exactly-once trong trình duyệt. Thiết kế theo at-least-once nhưng kết quả ghi phải idempotent.
+
+Mỗi job/chunk cần có:
+
+```text
+runId
+jobId
+chunkIndex
+inputFingerprint
+```
+
+GAS chỉ tăng cursor sau khi ghi Sheet, Log và state thành công.
+
+Nếu Extension mất tab trước khi GAS nhận kết quả:
+
+```text
+cursor không tăng
+Extension chạy lại
+cửa ghi nhận ra bản ghi đã có
+ghi lặp trở thành no-op hoặc cập nhật có kiểm soát
+```
+
+Với push, không gửi lại mù sau khi mất response. Phải đi qua read-back/recovery để xác định request đã tới FBM hay chưa.
+
+## 15. Di chuyển state V1 sang V2
+
+Không để hai owner song song đọc/ghi `V1` và `V2`.
+
+Phương án ưu tiên:
+
+1. Giữ `stateRead/stateWrite` làm owner duy nhất.
+2. Thêm `schemaVersion` vào state.
+3. Khi mở phiên, repository chuyển state cũ thành state nhỏ mới.
+4. Kiểm tra state mới trước khi ghi.
+5. Chỉ sau khi ghi thành công mới bỏ phần dữ liệu cũ không còn cần.
+6. Nếu state đang ở giữa một request ghi nguy hiểm, không tự resume mù; chuyển qua recovery.
+
+V2 chỉ giữ:
+
+```json
+{
+  "schemaVersion": 2,
+  "runId": "...",
+  "phase": "...",
+  "cursor": {},
+  "counts": {},
+  "lastError": "...",
+  "conflicts": []
+}
+```
+
+Không giữ response FBM, lookup Rows đầy đủ, preview dài, candidate record hay danh sách hàng trăm nghìn ID.
+
+## 16. Các phương án đã bị loại
+
+### 16.1. GAS nhận full bulk response
+
+Bị loại vì:
+
+- response Activity có thể lên hàng chục MB;
+- vượt trần doPost hoặc tốn thời gian parse;
+- làm callback GAS nặng;
+- dễ bị giữ nhầm vào state;
+- không cần thiết vì phần lớn bản ghi không đổi.
+
+### 16.2. Extension chạy JavaScript gửi từ GAS bằng `eval`
+
+Bị loại vì:
+
+- Manifest V3/CSP hạn chế `eval` và `new Function`;
+- remote code khó kiểm soát và khó kiểm thử;
+- tạo rủi ro chạy mã tùy ý trên Extension có quyền đọc tab FBM;
+- phá nguyên tắc một bộ máy kỹ thuật cố định.
+
+### 16.3. Extension tự ghi Sheet
+
+Bị loại vì:
+
+- tạo cửa ghi thứ hai;
+- phải thêm OAuth/Sheets API vào Extension;
+- dễ lệch với cửa ghi, validate và Log của GAS;
+- làm Extension trở thành nơi sở hữu state nghiệp vụ.
+
+### 16.4. Lưu bulk vào `DocumentProperties`
+
+Bị loại vì lỗi 17–20 KB đã chứng minh state có thể vượt trần ngay ở lookup. `DocumentProperties` chỉ phù hợp với cursor và metadata nhỏ.
+
+### 16.5. Lưu bulk vào `chrome.storage`
+
+Bị loại vì dữ liệu gắn với từng máy, có thể mất khi xóa Extension/đổi máy, và biến Extension thành nguồn sự thật.
+
+### 16.6. Sheet staging chứa toàn bộ Activity
+
+Bị loại vì quy mô hàng trăm nghìn dòng làm staging thành kho dữ liệu thứ hai, tăng chi phí và tạo thêm đường ghi.
+
+### 16.7. Drive/database làm index
+
+Bị loại khỏi phương án hiện tại để không thêm quyền, chi phí, nguồn sự thật và cơ chế đồng bộ mới.
+
+### 16.8. Tự động cho FBM thắng conflict
+
+Bị loại vì conflict nghĩa là chưa biết thay đổi nào là quyết định cuối. Log không cứu được dữ liệu đã bị ghi đè.
+
+### 16.9. Suy ra `missing` là deleted
+
+Bị loại vì vắng Customer có thể do phân quyền/chuyển giao; Activity hard-delete chưa đủ bằng chứng để tự xóa an toàn.
+
+### 16.10. Giữ DSL cũ và DSL mới song song lâu dài
+
+Bị loại vì tạo hai hợp đồng, hai parser và nhiều nơi có thể khai cùng một hành vi. Khi refactor phải chuyển sang plan mới sạch rồi dọn tàn dư.
+
+## 17. Nguyên tắc “một hành vi, một chỗ định nghĩa” khi refactor
+
+Trước khi tạo module hoặc hàm mới, phải inventory các owner hiện có và tái sử dụng/mở rộng nếu đã có:
+
+```text
+stateRead/stateWrite:
+  owner state
+
+write gate:
+  owner ghi Sheet
+
+SYNC_SCHEMA:
+  owner trường và fingerprint contract
+
+AutoLogin/session gate:
+  owner chính sách phiên
+
+projection/executor hiện có:
+  nền để chuyển sang plan mới
+
+seenStore/marker/read-back:
+  nền idempotency và recovery
+```
+
+Không tạo một hàm normalize/hash thứ hai theo từng entity. Không tạo một bộ cursor mới trong Extension. Không tạo một cổng ghi riêng cho chunk bulk.
+
+Nếu một hành vi thật sự cần chuyển owner, phải ghi rõ:
+
+```text
+owner cũ là gì
+owner mới là gì
+module nào bị loại bỏ
+test nào chứng minh không còn hai đường thực thi
+```
+
+## 18. Thứ tự triển khai refactor sau này
+
+Đây là lộ trình đề xuất, chưa phải checklist đã duyệt:
+
+1. Đọc lại các chuyên đề 09 liên quan và đối chiếu toàn bộ owner hiện có.
+2. Cập nhật tài liệu chính thức về ranh giới mới GAS–Extension.
+3. Cập nhật luật conflict: không tự động cho `ma_kh` hoặc trường khác thắng; hướng xử lý duy nhất là người dùng xác nhận lấy FBM.
+4. Chốt schema plan mới và xóa thiết kế DSL cũ khỏi hợp đồng.
+5. Chốt `LoginObservation`, `BulkObservation`, `HashPlan` và `ChunkEnvelope`.
+6. Viết test vector hash và test Extension/GAS tương thích contract.
+7. Viết test byte riêng cho state và relay; không trộn hai ngân sách.
+8. Tách state V1 thành state logic V2 nhỏ, giữ một owner.
+9. Mở rộng executor Extension bằng primitive allowlist.
+10. Chuyển Customer sang một request FBM và output chunk.
+11. Chuyển Activity bulk và fallback windowed.
+12. Bổ sung test mất tab, mất response, duplicate chunk và read-back.
+13. Chạy `node tests/run.js`.
+14. Push GAS/Extension DEV theo đúng quy trình.
+15. Chạy dữ liệu giả lập lớn.
+16. Chỉ sau khi đạt mới kiểm chứng `ALT00010` trên FBM thật.
+
+## 19. Những điều chưa nên tự coi là đã chốt
+
+Các điểm sau vẫn cần duyệt lại khi bắt đầu phiên refactor:
+
+- tên cuối của các plan và DTO;
+- danh sách primitive chính thức của interpreter;
+- field cụ thể của `LoginObservation` để không lộ dữ liệu nhạy cảm;
+- cách Extension lấy chi tiết khi một output chunk quá lớn;
+- ngưỡng byte sau khi test thực tế;
+- chiến lược fallback Activity giữa bulk và cửa sổ ngày;
+- cách migration state đang có request dở;
+- cách phát hiện và xử lý snapshot thay đổi giữa lúc Extension đọc bulk;
+- phạm vi chính xác của các trường được coi là conflict ngoài khóa kỹ thuật.
+
+Riêng các điểm sau đã được định hướng rõ trong cuộc thảo luận:
+
+```text
+GAS là bộ não và nguồn sự thật.
+Extension làm phần kỹ thuật nặng, kể cả parse login theo plan.
+GAS không nhận full bulk response.
+Customer ưu tiên một request lấy toàn bộ từ FBM, sau đó chunk về GAS.
+State lâu dài phải nhỏ hơn rất nhiều so với relay payload.
+V2 là phiên bản logic trong cùng owner state.
+DSL cũ không được nuôi song song khi refactor.
+Conflict không tự động cho FBM thắng.
+Missing không tự động biến thành deleted.
+Không dùng Drive/database index trong phương án này.
+```
+
+## 20. Trạng thái hiện tại
+
+Tài liệu này mới được tạo để giữ phương án và lịch sử lý do. Chưa có hành động nào sau đây trong phiên này:
+
+- chưa sửa Tài liệu 09;
+- chưa sửa code GAS;
+- chưa sửa code Extension;
+- chưa xóa DSL cũ;
+- chưa migration state;
+- chưa viết test refactor;
+- chưa push GAS hoặc Extension.
+
+Khi quay lại công việc, phải bắt đầu bằng việc đọc tệp này và checklist đang làm, sau đó xác nhận lại các điểm “chưa nên tự coi là đã chốt” trước khi sửa hợp đồng chính thức.
