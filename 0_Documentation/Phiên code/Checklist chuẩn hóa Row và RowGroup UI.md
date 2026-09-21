@@ -18,7 +18,7 @@
 - [x] [Tự động] Chốt `Row` là đúng một hàng ngang, chứa một hoặc nhiều cell/block.
 - [x] [Tự động] Chốt `Row` sở hữu khoảng cách ngang giữa các cột, chính sách độ rộng cột và căn chỉnh nội bộ của hàng.
 - [x] [Tự động] Chốt `Row` không sở hữu khoảng cách với Row khác, Card khác hoặc sibling bên ngoài.
-- [x] [Tự động] Chốt `RowGroup` là nhóm một hoặc nhiều `Row` xếp dọc.
+- [x] [Tự động] Chốt `RowGroup` là nhóm một hoặc nhiều row item xếp dọc; `Row` là hàng nhiều ô, còn Block trực tiếp là hàng một ô để component không phải bọc cú pháp thừa.
 - [x] [Tự động] Chốt `RowGroup` sở hữu khoảng cách dọc giữa các Row trực tiếp và không sở hữu khoảng cách giữa các Card.
 - [x] [Tự động] Chốt runtime chỉ có một implementation cho vai trò `RowGroup`; không để `Stack` và `RowGroup` cùng triển khai hành vi riêng.
 - [x] [Tự động] Quyết định tên runtime chính thức: đổi `Stack` thành `RowGroup`; không để hai policy độc lập.
@@ -116,7 +116,7 @@
 - [x] [Tự động] Bổ sung contract test chặn primitive con tự thêm margin ngoài. Bằng chứng: `layoutSpacing` kiểm tra Row/Field/Toggle/Button/Icon và reset margin chỉ ở wrapper owner.
 - [x] [Tự động] Bổ sung contract test chặn Row generic tự `space-between` hoặc nhận alignment không thuộc preset. Bằng chứng: `uiBuilder` và `layoutSpacing`.
 - [x] [Tự động] Bổ sung contract test chặn thêm primitive/layout function mới trùng owner đã có. Bằng chứng: `uiBuilder` xác nhận không có `Stack`, chỉ có `RowGroup` và `ActionStack` dùng lại wrapper canonical.
-- [x] [Tự động] Bổ sung contract test kiểm tra nested Row chỉ xuất hiện ở vị trí cell/block hợp lệ. Bằng chứng: `uiBuilder` kiểm tra nested Row là phần tử của Row và RowGroup chỉ nhận Row.
+- [x] [Tự động] Bổ sung contract test kiểm tra nested Row chỉ xuất hiện ở vị trí cell/block hợp lệ và Block trực tiếp trong RowGroup được chấp nhận như row item một ô. Bằng chứng: `uiBuilder` kiểm tra nested Row là phần tử của Row và kiểm tra cả hai dạng row item.
 - [x] [Tự động] Bổ sung contract test schema `rows` luôn map đúng số lượng Row và thứ tự field. Bằng chứng: `tests/cases/uiBuilder.js` và `tests/cases/uiSchema.js`.
 
 ## J. Kiểm thử hồi quy
@@ -152,3 +152,11 @@
 - [x] [Tự động] Nghiệm thu GAS DEV bằng `node tests/gas.js verifySheets --push`: deployment `@490`, kết quả `OK`; Activity/Category/Config/Log đạt, Customer vẫn có cảnh báo lệch thứ tự cột có sẵn trên Sheet.
 - [x] [Tự động] Ghi commit hash vào checklist sau mỗi nhóm; nhóm hiện tại dùng `3a8357f`, không gom file ngoài phạm vi.
 - [ ] [Cần kiểm chứng thật] Sau khi code và test offline hoàn tất, dừng ở bước cần chủ dự án kiểm tra trực quan và ghi rõ thao tác cần thực hiện.
+
+## M. Audit hợp đồng RowGroup sau refactor
+
+- [x] [Tự động] Đối chiếu toàn bộ consumer `RowGroup` và ghi nhận các trường hợp truyền Block trực tiếp; xác định đây là hàng một ô hợp lệ, không phải owner layout thứ hai.
+- [x] [Tự động] Cập nhật tài liệu chính thức 03, 03A và 04 để dùng cùng định nghĩa row item với runtime.
+- [x] [Tự động] Bổ sung test hồi quy cho `RowGroup([Row(...)])`, `RowGroup([Text(...)])` và `RowGroup([Box(...)])`; test `uiBuilder` xác nhận `1938 đạt, 0 không đạt`, spacing vẫn do RowGroup sở hữu và nested Row chỉ nằm trong cell khi cần.
+- [ ] [Tự động] Chạy `node tests/run.js`, ghi tổng số đạt/không đạt và commit riêng nhóm contract.
+- [ ] [Cần kiểm chứng thật] Sau commit contract, mở Sidebar DEV và kiểm tra một nhóm chỉ có Block đơn không đổi hình thức hoặc thứ tự hiển thị.

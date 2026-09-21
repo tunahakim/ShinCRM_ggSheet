@@ -59,9 +59,13 @@ function chay(so) {
   checkThrows(so, 'Row không nhận alignment tự do từ caller',
     () => hop.Row({ elements: [hop.Text('a')], align: 'left' }), 'không có khóa "align"');
   const rowGroup = hop.RowGroup([hop.Row([hop.Text('a')]), hop.Row([hop.Text('b')])]);
-  check(so, 'RowGroup là wrapper box duy nhất cho một hoặc nhiều Row',
+  check(so, 'RowGroup là wrapper box duy nhất cho các Row nhiều ô',
     [rowGroup.role, rowGroup.className, rowGroup.elements.length, rowGroup.elements.every((item) => item.role === 'row')],
     ['box', 'shin-row-group', 2, true]);
+  const rowGroupSingleBlocks = hop.RowGroup([hop.Text('một ô'), hop.Box({})]);
+  check(so, 'RowGroup nhận Block đơn như row item một ô mà không tạo wrapper layout thứ hai',
+    [rowGroupSingleBlocks.role, rowGroupSingleBlocks.elements.map((item) => item.role), rowGroupSingleBlocks.elements[0].text, rowGroupSingleBlocks.elements[1].role],
+    ['box', ['text', 'box'], 'một ô', 'box']);
   const actionStack = hop.ActionStack([hop.Row([hop.Text('lệnh')])]);
   check(so, 'ActionStack dùng lại wrapper RowGroup và chỉ thêm preset semantic',
     [actionStack.role, actionStack.className, actionStack.elements[0].role],

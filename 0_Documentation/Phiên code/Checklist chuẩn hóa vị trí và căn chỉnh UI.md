@@ -1,5 +1,7 @@
 # Checklist chuẩn hóa vị trí và căn chỉnh UI
 
+> Thuật ngữ hiện hành: `Stack` trong các mục lịch sử là tên cũ; primitive nhóm dọc canonical hiện tại là `RowGroup`.
+
 Đây là checklist duy nhất của phiên chuẩn hóa vị trí/căn chỉnh UI. Phạm vi là cách các phần tử được đặt trong vùng cha và cách nội dung được căn trong chính phần tử; không làm lại checklist spacing đã hoàn tất. Mỗi mục chỉ được đánh dấu `[x]` khi có bằng chứng cụ thể ở test, diff tài liệu hoặc nghiệm thu Sheet DEV được ghi ngay bên cạnh.
 
 ## 1. Phạm vi và nguyên tắc không đổi

@@ -1,5 +1,7 @@
 # Checklist refactor UI Sidebar theo Schema
 
+> Thuật ngữ hiện hành: các mục lịch sử ghi `Stack` dùng tên cũ; layout nhóm dọc canonical hiện tại là `RowGroup`.
+
 ## Mục tiêu và ranh giới
 
 - [x] Chốt nguyên tắc: mọi màn hình người dùng nhìn thấy phải có một file schema riêng; controller chỉ đọc schema, xử lý state/DTO và tạo Block động qua renderer dùng chung.

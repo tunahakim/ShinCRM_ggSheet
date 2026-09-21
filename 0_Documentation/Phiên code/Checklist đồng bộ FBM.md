@@ -1,5 +1,7 @@
 # Checklist phiên đồng bộ FBM
 
+> Thuật ngữ UI hiện hành: `Stack` trong các ghi nhận cũ là tên trước đây của nhóm dọc; primitive canonical hiện tại là `RowGroup`, dùng chung cho các layout dọc.
+
 Đây là checklist duy nhất của phiên đồng bộ FBM/ShinCRM. Công việc được thực hiện theo thứ tự từ trên xuống dưới; trong một slice, các mục độc lập có thể làm song song. Chỉ mục có nhãn **Cần kiểm chứng thực tế** mới cần chủ dự án giữ tab FBM, đăng nhập, bật ghi thật hoặc kiểm tra dữ liệu live. Live test chỉ được chạm `ALT00010`, tuyệt đối không gửi request xóa và không đưa `note` nội bộ ShinCRM lên FBM.
 
 ## Quy ước tiến độ

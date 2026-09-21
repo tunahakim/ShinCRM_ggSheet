@@ -1,5 +1,7 @@
 # Checklist nghiên cứu tạm — UI kết nối tài khoản FBM
 
+> Thuật ngữ hiện hành: các mục lịch sử ghi `Stack` là tên cũ của primitive nhóm dọc; code và hợp đồng hiện hành dùng `RowGroup`. Không tạo implementation `Stack` mới.
+
 > Tài liệu tạm để giữ ngữ cảnh giữa các lượt làm việc và sau khi context bị nén. Đây không phải nguồn chuẩn nghiệp vụ. Mỗi phát hiện mới phải ghi ngay vào đây; mục đã sửa và đã kiểm thử thì đánh dấu `[x]`, không xóa lịch sử quyết định. Khi toàn bộ việc đã được nghiệm thu, có thể xóa file này nếu chủ dự án yêu cầu.
 
 ## 0. Phạm vi và trạng thái phiên

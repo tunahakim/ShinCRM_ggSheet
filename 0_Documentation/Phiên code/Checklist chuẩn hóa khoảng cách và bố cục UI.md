@@ -1,9 +1,11 @@
 # Checklist chuẩn hóa khoảng cách và bố cục UI
 
+> Thuật ngữ hiện hành: `Stack` trong các mục lịch sử của checklist là tên cũ của primitive nhóm dọc; code và tài liệu hiện hành dùng `RowGroup`. Không tạo implementation `Stack` song song.
+
 ## 0. Mục tiêu và ranh giới
 
 - [x] Ghi nhận mục tiêu phiên: mọi khoảng cách mặc định phải đi qua hợp đồng layout dùng chung; ngoại lệ chỉ tồn tại khi có lý do layout/ngữ nghĩa riêng.
-- [x] Ghi nhận nguyên tắc chủ sở hữu: Page/Section sở hữu khoảng cách giữa Card; CardBody sở hữu khoảng cách giữa block; Stack sở hữu khoảng cách dọc; Row sở hữu khoảng cách ngang; ActionStack sở hữu khoảng cách giữa các nhóm action; Field/StandaloneField sở hữu khoảng cách label-control; Button/Icon chỉ sở hữu hình học bên trong.
+- [x] Ghi nhận nguyên tắc chủ sở hữu: Page/Section sở hữu khoảng cách giữa Card; CardBody sở hữu khoảng cách giữa block; RowGroup sở hữu khoảng cách dọc; Row sở hữu khoảng cách ngang; ActionStack sở hữu khoảng cách giữa các nhóm action; Field/StandaloneField sở hữu khoảng cách label-control; Button/Icon chỉ sở hữu hình học bên trong.
 - [x] Ghi nhận nguyên tắc cấu trúc: cùng một loại bố cục phải dùng cùng wrapper, không giải quyết khoảng cách bằng margin rải tại màn hình.
 - [x] Ghi nhận nguyên tắc sibling spacing: chỉ dùng một cơ chế cho khoảng cách giữa các sibling; phiên này chọn `gap` làm cơ chế chuẩn.
 - [x] Ghi nhận nguyên tắc bảo toàn: không đổi nghiệp vụ, state, action, payload, Schema dữ liệu hoặc hợp đồng GAS/Extension.

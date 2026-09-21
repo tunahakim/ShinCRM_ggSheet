@@ -165,7 +165,7 @@ function Block(spec, role) {
 /** Hộp chứa Block con; vai đã có trong hợp đồng renderer nhưng trước đây thiếu hàm dựng công khai. */
 function Box(spec) { return Block(spec, 'box'); }
 
-/** Nhóm Row theo cột; nhịp dọc do RowGroup sở hữu, màn chỉ chọn nội dung. */
+/** Nhóm các row item theo cột; `Row` là hàng nhiều ô, Block đơn là hàng một ô. Nhịp dọc do RowGroup sở hữu, màn chỉ chọn nội dung. */
 function RowGroup(spec) {
   var o = Array.isArray(spec) ? { elements: spec } : (spec || {});
   var className = (uiLayoutClass('rowGroup') + ' ' + String(o.className || '')).trim();
