@@ -67,6 +67,28 @@ function chay(so) {
       shell.indexOf('.shin-sync-schedule-row { display:grid;') >= 0 && shell.indexOf('gap:var(--shin-gap-2);') >= 0,
       settings.indexOf('.shin-sync-detail-field { display: grid; gap: var(--shin-gap-1);') >= 0],
     [true, true, true]);
+  check(so, 'Sync status, pipeline, results và conflict không dùng margin để cộng sibling spacing',
+    [shell.indexOf('.shin-sync-phase { margin') === -1,
+      shell.indexOf('.shin-sync-operation, .shin-sync-count, .shin-sync-current, .shin-sync-message { margin') === -1,
+      shell.indexOf('.shin-sync-progress { display:flex; flex-direction:column; gap:var(--shin-gap-1); }') >= 0,
+      shell.indexOf('.shin-sync-pipeline { display:flex; flex-direction:column; gap:var(--shin-gap-1);') >= 0,
+      shell.indexOf('.shin-sync-pipeline-title { margin') === -1,
+      shell.indexOf('margin-bottom:var(--shin-gap-2)') === -1,
+      shell.indexOf('margin-top:3px') === -1],
+    [true, true, true, true, true, true, true]);
+  check(so, 'Sync results và Settings để wrapper lõi sở hữu nhịp',
+    [shell.indexOf('#fbm-sync-results-root > #fbm-sync-results-body-region { margin') === -1,
+      shell.indexOf('.shin-sync-conflict-field { display:flex; flex-direction:column; gap:var(--shin-gap-1);') >= 0,
+      settings.indexOf('.shin-sync-login-policy-children { margin: 0 0') === -1,
+      settings.indexOf('.shin-sync-login-policy-children .shin-toggle-row') === -1,
+      settings.indexOf('.shin-sync-login-policy-retry-group .shin-form-field') === -1,
+      settings.indexOf('.shin-sync-detail-inputs > * + *') === -1,
+      runUi.indexOf('fieldHelp: function (control, help) { return Stack({ elements:') >= 0,
+      runUi.indexOf('identityForm, elements: slots.form }), Stack') >= 0,
+      runUi.indexOf('loginRetryGroup: function (className, elements) { return Stack') >= 0,
+      runUi.indexOf('loginPolicyChildren, className: FBM_SYNC_SETTINGS_UI.classes.loginChildren, elements: slots.children }), slots.actions') >= 0,
+      runUi.indexOf('Stack({ id: FBM_SYNC_SETTINGS_SCHEMA.regions.loginPolicyChildren') >= 0],
+    [true, true, true, true, true, true, true, true, true, true, true]);
 }
 
 module.exports = { chay };

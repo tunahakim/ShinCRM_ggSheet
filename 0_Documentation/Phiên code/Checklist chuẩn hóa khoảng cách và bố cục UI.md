@@ -153,17 +153,19 @@ Ghi chú nhóm B: `formScreen` đạt 20/20 và `viewScreen` đạt 16/16; các 
 
 ## 10. Nhóm code C — chuẩn hóa Sync Run và Account
 
-- [ ] Chuẩn hóa cây Run thành Card → CardBody → Stack/ActionStack theo contract.
-- [ ] Loại bỏ khả năng cộng kép gap/margin giữa các nhóm action Run.
-- [ ] Chuẩn hóa pipeline spacing như một ngoại lệ domain có owner duy nhất.
-- [ ] Chuẩn hóa Account connection section; xác định rõ padding/gap đặc thù nào còn cần giữ.
-- [ ] Chuẩn hóa identity fields và identity actions theo Field/Stack/ActionStack chung.
-- [ ] Chuẩn hóa login section; không để FormField/ToggleRow tự cộng spacing với Stack cha.
-- [ ] Kiểm tra các action `check`, `probe`, `save`, `approve` dùng đúng layout nhưng không gộp nhầm presentation.
-- [ ] Chạy kiểm thử cấu trúc DOM cho Run và Account ở trạng thái xem, sửa, lỗi và đang chạy.
-- [ ] Chạy `node tests/run.js` sau nhóm C.
-- [ ] Tick từng mục nhóm C ngay sau bằng chứng tương ứng.
-- [ ] Commit riêng nhóm C.
+- [x] Chuẩn hóa cây Run thành Card → CardBody → Stack/ActionStack theo contract.
+- [x] Loại bỏ khả năng cộng kép gap/margin giữa các nhóm action Run.
+- [x] Chuẩn hóa pipeline spacing như một ngoại lệ domain có owner duy nhất.
+- [x] Chuẩn hóa Account connection section; xác định rõ padding/gap đặc thù nào còn cần giữ.
+- [x] Chuẩn hóa identity fields và identity actions theo Field/Stack/ActionStack chung.
+- [x] Chuẩn hóa login section; không để FormField/ToggleRow tự cộng spacing với Stack cha.
+- [x] Kiểm tra các action `check`, `probe`, `save`, `approve` dùng đúng layout nhưng không gộp nhầm presentation.
+- [x] Chạy kiểm thử cấu trúc DOM cho Run và Account ở trạng thái xem, sửa, lỗi và đang chạy.
+- [x] Chạy `node tests/run.js` sau nhóm C.
+- [x] Tick từng mục nhóm C ngay sau bằng chứng tương ứng.
+- [x] Commit riêng nhóm C.
+
+Ghi chú nhóm C: `layoutSpacing`, `fbmSync/Components` và `fbmSync/Sidebar` đạt `40/40`; các lớp status/pipeline/conflict đã bỏ margin sibling, Account dùng Stack cho identity fields, field-help và login policy groups.
 
 ## 11. Nhóm code D — chuẩn hóa Sync Results và Settings
 

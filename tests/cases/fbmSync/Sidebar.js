@@ -413,7 +413,7 @@ async function chay(so) {
   const loginPolicyBlocks = hop.fbmSyncSettingsLoginBlocks({ enabled: true, autoOpenTab: false, retryEnabled: true, retryMinutes: 30 });
   const loginPolicyChildren = loginPolicyBlocks.find((node) => node && node.id === 'fbm-sync-login-policy-children');
   const retryGroup = loginPolicyChildren.elements[1];
-  check(so, 'login policy groups retry interval under retry toggle', [retryGroup.className, retryGroup.elements.length, retryGroup.elements[0].elements[1].id, retryGroup.elements[1].className, retryGroup.elements[1].elements[1].id], ['shin-sync-login-policy-retry-group', 2, 'fbm-sync-policy-retry', 'shin-form-field', 'fbm-sync-login-retry-minutes']);
+  check(so, 'login policy groups retry interval under retry toggle', [retryGroup.className, retryGroup.elements.length, retryGroup.elements[0].elements[1].id, retryGroup.elements[1].className, retryGroup.elements[1].elements[1].id], ['shin-stack shin-sync-login-policy-retry-group', 2, 'fbm-sync-policy-retry', 'shin-form-field', 'fbm-sync-login-retry-minutes']);
   check(so, 'Settings render được relay và tham số phiên', dom.document.getElementById('fbm-sync-setting-approval-threshold').value === '10' && content.textContent.indexOf('Kết nối Extension') >= 0, true);
 
   hop.FBM_SYNC_CLIENT.subscreen = 'account';
