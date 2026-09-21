@@ -25,7 +25,19 @@ function fbmContinueSync(response, clientTrace) { return runEntryPoint('fbmConti
 /** Dừng phiên đồng bộ mà không đụng dữ liệu nghiệp vụ. */
 function fbmCancelSync() { return runEntryPoint('fbmCancelSync', 'sidebar', 'throw', function () { var result = FbmSync.controlDispatchLocked('cancel', {}); if (result && result.status) { FbmSync.logStatus(result.status, 'cancel'); } return result; }); }
 /** Đọc snapshot tiến độ hiện tại; Sidebar chỉ polling khi đang chạy. */
-function fbmGetSyncStatus() { return runEntryPoint('fbmGetSyncStatus', 'sidebar', 'throw', function () { var before = FbmSync.stateRead(), result = FbmSync.controlDispatch('status', {}); if (result && result.lastFailureCode === 'SYNC_STALE_RUN' && before.lastFailureCode !== result.lastFailureCode) { FbmSync.logStatus(result, 'stale_run'); } return result; }); }
+function fbmGetSyncStatus() { return runEntryPoint('fbmGetSyncStatus', 'sidebar', 'throw', function () {
+  // Reload có thể là caller duy nhất sau khi callback cuối bị mất. Thu hồi phiên
+  // treo dưới cùng orchestration lock để không giữ nút "Dừng đồng bộ" vô hạn.
+  var before, recovered = { recovered: false }, read = function () {
+    before = FbmSync.stateRead();
+    recovered = typeof FbmSync.recoverStaleRun === 'function' ? FbmSync.recoverStaleRun(before) : { state: before, recovered: false };
+    return FbmSync.controlDispatch('status', {});
+  };
+  var result = typeof FbmSync.withOrchestrationLock === 'function' ? FbmSync.withOrchestrationLock(read) : read();
+  if (result && result.code === 'BUSY') { result = FbmSync.controlDispatch('status', {}); }
+  if (recovered.recovered && result && result.lastFailureCode === 'SYNC_STALE_RUN' && before.lastFailureCode !== result.lastFailureCode) { FbmSync.logStatus(result, 'stale_run'); }
+  return result;
+}); }
 /** Ghi lỗi cầu nối do Sidebar phát hiện trước khi có response FBM. */
 function fbmLogSyncError(message, clientTrace) { return runEntryPoint('fbmLogSyncError', 'sidebar', 'throw', function () { if (FbmSync.traceImport) { FbmSync.traceImport(clientTrace); } fbmTraceBoundary('gas_entered', 'fbmLogSyncError'); return FbmSync.logTransportError(message); }); }
 /** Thu hồi đúng reservation khi Sidebar không chuyển được envelope tới tab FBM. */

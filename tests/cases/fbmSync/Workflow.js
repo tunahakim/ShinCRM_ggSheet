@@ -34,7 +34,8 @@ function workflowGas(options) {
     Utilities: { getUuid: () => 'workflow-uuid', newBlob: (value) => ({ getBytes: () => Buffer.from(String(value), 'utf8') }) },
     shinOpenBook: () => ({ getId: () => 'sheet-workflow' }),
     logEvent: () => {},
-    logTrace: () => {}
+    logTrace: () => {},
+    runEntryPoint: (name, source, channel, fn) => fn()
   }, opt));
   napServer(hop,
     'fbm_sync/schema/FbmFields.js',
@@ -56,6 +57,7 @@ function workflowGas(options) {
     'fbm_sync/transport/PushFlow.js',
     'fbm_sync/transport/PullFlow.js',
     'fbm_sync/transport/EntryPoints.js',
+    'server/service/FbmSyncService.js',
     'server/dev/FbmSyncStateProbe.js'
   );
   hop.FbmSync.currentSpreadsheetId = () => 'sheet-workflow';
@@ -791,6 +793,19 @@ async function chay(so) {
   check(so, 'dung khi request dang bay: chi danh dau cho response, khong xoa reservation hay cursor', [
     cancelPending.code, cancelState.activeRequestId === cancellingStarted.request.id, cancelState.cursor.kind, cancelState.metadata.cancelPending
   ], ['SYNC_CANCEL_PENDING', true, 'identity_user_grid', true]);
+
+  const reloaded = workflowGas();
+  const orphan = reloaded.hop.FbmSync.stateRead();
+  orphan.runId = 'cancelled-orphan'; orphan.phase = 'checking_session'; orphan.cursor = { kind: 'identity_user_grid' };
+  orphan.activeRequestId = 'orphan-request'; orphan.metadata.cancelPending = true;
+  orphan.updatedAt = Date.now() - reloaded.hop.FbmSync.STALE_RUN_MS - 1;
+  orphan.lastProgressAt = orphan.updatedAt;
+  reloaded.hop.FbmSync.stateWrite(orphan);
+  reloaded.documentProperties.setProperty(reloaded.hop.FbmSync.STATE_KEY, JSON.stringify(orphan));
+  const reloadedStatus = reloaded.hop.fbmGetSyncStatus();
+  check(so, 'reload sau khi callback dừng bị mất thu hồi phiên treo và không còn nút Dừng đồng bộ', [
+    reloadedStatus.phase, reloadedStatus.lastFailureCode, reloadedStatus.runId, reloaded.hop.FbmSync.stateRead().activeRequestId
+  ], ['error', 'SYNC_STALE_RUN', 'cancelled-orphan', 'orphan-request']);
 }
 
 module.exports = { chay };
