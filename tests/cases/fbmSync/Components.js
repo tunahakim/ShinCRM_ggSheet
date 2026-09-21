@@ -124,7 +124,7 @@ function chay(so) {
     [true, true]);
 
   check(so, 'core khai đủ Block helper dùng chung cho Sync',
-    ['Box', 'Stack', 'ActionStack', 'Card', 'Row', 'Text', 'Field', 'Button', 'Icon', 'Check', 'StandaloneControl', 'StandaloneField'].every((name) => common.indexOf('function ' + name + '(') >= 0),
+    ['Box', 'Stack', 'ActionStack', 'Card', 'Row', 'Text', 'Field', 'Button', 'Icon', 'Check', 'StandaloneControl', 'StandaloneField', 'Empty'].every((name) => common.indexOf('function ' + name + '(') >= 0),
     true);
   check(so, 'renderer StandaloneControl dùng lớp input/toggle chung, không có lớp Sync riêng',
     [engine.indexOf("'shin-input'") >= 0, engine.indexOf("'shin-toggle-control'") >= 0, engine.indexOf('shin-sync-') === -1],

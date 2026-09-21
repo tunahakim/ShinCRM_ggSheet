@@ -17,7 +17,7 @@ function fbmSyncConflictContentBlocks(status) {
   var schema = FBM_SYNC_CONFLICT_SCHEMA, ui = FBM_SYNC_CONFLICT_UI;
   var metadata = status.metadata || {}, conflicts = Array.isArray(metadata.conflicts) ? metadata.conflicts : [], item = conflicts[0];
   var head = Row({ className: ui.classes.head, elements: [Text({ className: ui.classes.count, text: schema.remaining.replace('{count}', Number(metadata.conflictCount || conflicts.length)) })] });
-  if (!item) { return [ui.card([head, Text({ className: ui.classes.empty, text: schema.empty })])]; }
+  if (!item) { return [ui.card([head, Empty(schema.empty)])]; }
   FBM_SYNC_CLIENT.conflictChoices = FBM_SYNC_CLIENT.conflictChoices || {};
   var fields = (item.fields || []).map(function (field, index) {
     var name = String(field.field || ''), choice = FBM_SYNC_CLIENT.conflictChoices[name] || schema.choiceValues.shin, controlId = schema.ids.choicePrefix + index;

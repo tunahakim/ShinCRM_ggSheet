@@ -115,7 +115,7 @@
 .shin-error-message { margin: 0; color: var(--shin-error); font-size: var(--shin-text-sm); }
 .shin-pass-row { margin: 0; color: var(--shin-ok); font-size: var(--shin-text-sm); }
 .shin-action-status { margin: 0; color: var(--shin-primary-dark); font-size: var(--shin-text-sm); }
-.shin-empty-state { padding: var(--shin-gap-3) 0; color: var(--shin-text-soft); font-size: var(--shin-text-sm); }
+.shin-empty-state { display:flex; align-items:center; justify-content:center; min-width:0; padding:var(--shin-gap-3) 0; color:var(--shin-text-soft); font-size:var(--shin-text-sm); text-align:center; overflow-wrap:anywhere; }
 .shin-kv-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--shin-gap-2); padding: var(--shin-gap-2) 0; border-bottom: 1px solid var(--shin-border-faint); }
 .shin-kv-row:last-of-type { border-bottom: 0; }
 .shin-kv-label { color: var(--shin-text-soft); font-size: var(--shin-text-sm); }
@@ -593,7 +593,6 @@
 
 /* --- Chữ khi rỗng ------------------------------------------------ */
 
-.shin-empty { padding: var(--shin-gap-3) 0; color: var(--shin-text-soft); font-size: var(--shin-text-sm); font-style: italic; }
 
 /* --- Lớp menu nổi ------------------------------------------------ */
 

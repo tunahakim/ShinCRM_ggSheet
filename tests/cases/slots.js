@@ -77,6 +77,9 @@ function chay(so) {
     Object.keys(hop.SLOTS).map((ten) => Array.isArray(hop.SLOTS[ten](ctxCua(hop, 'CUS-000001', { search: [] })))),
     [true, true, true]);
 
+  check(so, 'trạng thái rỗng của slot dùng primitive Empty thay vì class rải tại consumer',
+    hop.SLOTS.activityList(ctxCua(hop, ''))[0].className, 'shin-empty-state');
+
   // Ba dòng chữ rỗng nói ba chuyện khác nhau.
   check(so, 'chưa chọn khách thì nói chưa chọn khách',
     chuCua(hop.SLOTS.activityList(ctxCua(hop, ''))), ['Chưa chọn khách hàng nào.']);

@@ -37,6 +37,10 @@ function chay(so) {
     [hop.Notice({ kind: 'success', text: 'Đã xong' }).role, hop.Notice({ kind: 'success', text: 'Đã xong' }).className, hop.Notice({ kind: 'lạ', text: 'Đang chờ' }).className],
     ['text', 'shin-notice shin-notice-success', 'shin-notice shin-notice-pending']);
 
+  check(so, 'Empty dùng Text với preset căn giữa chung',
+    [hop.Empty('Không có dữ liệu').role, hop.Empty('Không có dữ liệu').className, hop.Empty({ text: 0 }).text],
+    ['text', 'shin-empty-state', '0']);
+
   check(so, 'nút glyph giữ tên núm toggle để engine đọc trạng thái trong Prefs',
     hop.Icon({ icon: 'bolt', toggle: 'followSelection' }).toggle, 'followSelection');
 

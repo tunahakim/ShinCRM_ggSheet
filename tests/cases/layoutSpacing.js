@@ -62,6 +62,16 @@ function chay(so) {
       toggleRow.indexOf('gap: var(--shin-gap-2);') >= 0,
       toggleRow.indexOf('margin: var') === -1],
     [true, true, true, true]);
+  check(so, 'control-row có căn dọc riêng và không đổi Row generic',
+    [components.indexOf('.shin-inline-field-row { align-items: center; }') >= 0,
+      row.indexOf('align-items: center') === -1],
+    [true, true]);
+  check(so, 'Loading/Empty/Notice/Table dùng preset riêng của chúng',
+    [components.indexOf('.shin-loading {') >= 0 && components.indexOf('justify-content: center;') >= 0,
+      components.indexOf('.shin-empty-state { display:flex; align-items:center; justify-content:center;') >= 0,
+      components.indexOf('.shin-notice {') >= 0 && components.indexOf('margin: 0;') >= 0,
+      docTep('client/style/status.html').indexOf('.shin-status-table-num {') >= 0 && docTep('client/style/status.html').indexOf('text-align: right;') >= 0],
+    [true, true, true, true]);
   check(so, 'Button và Icon không sở hữu margin bên ngoài',
     [button.indexOf('margin') === -1, icon.indexOf('margin') === -1],
     [true, true]);
@@ -88,6 +98,15 @@ function chay(so) {
       shell.indexOf('.shin-sync-schedule-row { display:grid;') >= 0 && shell.indexOf('gap:var(--shin-gap-2);') >= 0,
       settings.indexOf('.shin-sync-detail-field { display: grid; gap: var(--shin-gap-1);') >= 0],
     [true, true, true]);
+  check(so, 'Sync layout đặc thù có owner vị trí và token domain duy nhất',
+    [shell.indexOf('--shin-sync-schedule-control-width:42px;') >= 0,
+      shell.indexOf('grid-template-columns:var(--shin-sync-schedule-control-width)') >= 0,
+      shell.indexOf('margin-left:var(--shin-sync-schedule-control-width)') >= 0,
+      shell.indexOf('.shin-sync-tab-trigger') >= 0 && shell.indexOf('text-align:center;') >= 0,
+      shell.indexOf('.shin-sync-tab-description') >= 0 && shell.indexOf('text-align:center;') >= 0,
+      shell.indexOf('.shin-sync-conflict-head') >= 0 && shell.indexOf('justify-content:space-between;') >= 0,
+      components.indexOf('.shin-pagination .shin-button { width: 100%;') >= 0],
+    [true, true, true, true, true, true, true]);
   check(so, 'Sync status, pipeline, results và conflict không dùng margin để cộng sibling spacing',
     [shell.indexOf('.shin-sync-phase { margin') === -1,
       shell.indexOf('.shin-sync-operation, .shin-sync-count, .shin-sync-current, .shin-sync-message { margin') === -1,

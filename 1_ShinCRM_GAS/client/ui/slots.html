@@ -11,7 +11,7 @@ var SLOTS = {};
 
 /** Chữ hiện ra khi không có gì để hiện. Một dòng chữ nhạt, không phải khoảng trắng — khoảng trắng khiến người dùng tưởng đang nạp dở. */
 function slotEmpty(chu) {
-  return [Text({ text: chu, className: 'shin-empty' })];
+  return [Empty(chu)];
 }
 
 /** Mã khách của ngữ cảnh đang vẽ. Lấy từ bản ghi trong `ctx` chứ không đọc `ScreenState`, để slot kiểm được offline. */

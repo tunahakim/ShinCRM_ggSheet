@@ -182,6 +182,12 @@ function Notice(spec) {
   return Text({ className: classes[tone], text: o.text });
 }
 
+/** Trạng thái rỗng dùng cùng một preset căn giữa cho slot lõi và màn Sync. */
+function Empty(spec) {
+  var text = typeof spec === 'string' ? spec : (spec && spec.text);
+  return Text({ className: 'shin-empty-state', text: text === undefined || text === null ? '' : String(text) });
+}
+
 /** Một trường dữ liệu. `field` ghi đủ đường dẫn khi trường không thuộc `entity` của màn, ví dụ `customer.note` trên form giao dịch. */
 function Field(spec) {
   var o = Object.assign({}, spec || {});
