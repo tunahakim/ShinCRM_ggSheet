@@ -172,6 +172,7 @@
 - [x] [Tự động] Chạy lại full test trước commit cuối: `node tests/run.js` đạt `1937 đạt, 0 không đạt` sau commit `57ee0cf`.
 - [x] [Tự động] Nghiệm thu GAS DEV bằng `node tests/gas.js verifySheets --push`: deployment `@490`, kết quả `OK`; Activity/Category/Config/Log đạt, Customer vẫn có cảnh báo lệch thứ tự cột có sẵn trên Sheet.
 - [x] [Tự động] Ghi commit hash vào checklist sau mỗi nhóm; nhóm hiện tại dùng `3a8357f`, không gom file ngoài phạm vi.
+- [x] [Tự động] Tách các ca nghiệm thu trực quan thành các bước độc lập, mỗi bước có kết quả kỳ vọng cụ thể; commit checklist là `0064f22`.
 - [ ] [Cần kiểm chứng thật] Sau khi code và test offline hoàn tất, dừng ở bước cần chủ dự án kiểm tra trực quan và ghi rõ thao tác cần thực hiện.
 
 ## M. Audit hợp đồng RowGroup sau refactor
