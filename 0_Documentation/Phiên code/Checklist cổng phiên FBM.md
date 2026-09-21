@@ -17,10 +17,14 @@ Phạm vi phiên này không bao gồm `Checklist rà soát đồng bộ FBM tr�
 - [x] [Tự động] Phép quét vĩnh viễn liệt kê mọi đường tạo và phát request FBM, chốt đúng một cổng phát envelope; bằng chứng: `GAS chỉ có TransportCore gọi protocol.request`; `worker chỉ có một điểm gửi request FBM`; `kiến trúc một cửa: không có GAS caller nào phát builder login/authorize/User/heartbeat ngoài cổng`.
 - [x] [Tự động] Ba tầng và ba nhánh cổng phiên đã có test độc lập cho cả thành công và thất bại; bằng chứng: `session hop le khong doi hanh vi ca doc va ghi`; `FBM 401 di qua cong session va bat dau auto-login mot lan`; `cổng fail-closed khi tự đăng nhập tắt`; `no-tab chi retry mot lan theo policy va co log loi`; `dang nhap thu: Login thanh cong phai qua authorize va User grid khop binding moi duoc bao thanh cong`; `kiem tra lien ket: chi quet Customer va tra tong hop n/N, khong cap Activity hoac ghi binding`.
 - [x] [Tự động] Ba bẫy đệ quy, chạy song song và thử lại vô hạn đã có test hồi quy; bằng chứng: `cổng khai báo nhóm request hệ thống và marker phiên trước khi phát request nghiệp vụ`; `hai luong phat hien mat session chi giu mot tien trinh login va luong sau cho`; `login heartbeat that bai tam dung va khong lap ngay`; `login that bai bi throttle toi da mot lan moi 30 phut khi den lich`.
-- [x] [Tự động] `node tests/run.js` chạy xanh sau thay đổi; bằng chứng: tổng kết `Đạt: 1848`, `Không đạt: 0`.
+- [x] [Tự động] `node tests/run.js` chạy xanh sau thay đổi; bằng chứng: tổng kết `Đạt: 1865`, `Không đạt: 0`.
 - [ ] [Cần kiểm chứng thật] Người dùng đã kiểm tra các ca cần tab FBM thật, Sidebar đóng/mở lại và không ghi dữ liệu thật ngoài cờ an toàn đã bật.
 
 ## Tầng 1 — Cổng phiên FBM
+
+- [x] [Tự động] Extension nhận cả hai dạng `chrome.tabs.create` callback và Promise; khi API callback trả tab vừa mở, cổng chờ tab sẵn sàng thay vì kết thúc im lặng; bằng chứng: `auto-open tuong thich Chrome tabs.create dang callback va khong dung im lang`.
+- [x] [Tự động] Khi worker không có tab FBM, bridge nhận mã `FBM_TAB_NOT_FOUND` cụ thể để GAS chạy đúng chu kỳ retry hoặc kết thúc fail-closed; bằng chứng: `worker tra ma va bao ro no-tab thay vi bridge dung im lang`.
+- [x] [Tự động] Khi GAS trả lỗi terminal không có request, Sidebar chuyển sang phase `error` và hiển thị mã lỗi thay vì dừng im lặng; bằng chứng: `Sidebar không kết thúc im lặng khi GAS trả lỗi không có request`.
 
 - [x] [Tự động] Khi tab còn phiên hợp lệ, một lượt đọc cấp đúng một request nghiệp vụ, không khởi động login và giữ nguyên cursor/reservation; bằng chứng: `session hop le khong doi hanh vi ca doc va ghi`; `start chi tiep tuc cursor sau khi reservation cu da thu hoi`.
 - [x] [Tự động] Khi tab còn phiên hợp lệ, một lượt ghi cấp đúng request theo thứ tự cũ và không gửi lại request ghi; bằng chứng: `session hop le khong doi hanh vi ca doc va ghi`; `request ghi khong duoc tu dong gui lai khi session het han`.

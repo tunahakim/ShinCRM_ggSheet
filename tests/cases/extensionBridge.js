@@ -336,6 +336,23 @@ async function chay(so) {
   await pendingTab;
   check(so, 'auto-open tiep tuc sau khi tab FBM ready va thao listener', [openedTab && openedTab.id, openedTab && openedTab.status, updatedRemoved], [77, 'complete', true]);
 
+  let callbackCreatedUrl = '';
+  workerContext.chrome.tabs.query = () => Promise.resolve([]);
+  workerContext.chrome.tabs.create = (options, callback) => {
+    callbackCreatedUrl = options.url;
+    setImmediate(() => callback({ id: 78, status: 'complete' }));
+    return undefined;
+  };
+  workerContext.chrome.tabs.onUpdated = { addListener() {}, removeListener() {} };
+  const callbackTab = await workerContext.ensureFbmTab({ meta: { openFbmContext: { url: 'https://fbo.com.vn:8888/Main/zccrAccount.aspx', active: false } } });
+  check(so, 'auto-open tuong thich Chrome tabs.create dang callback va khong dung im lang', [callbackTab && callbackTab.id, callbackCreatedUrl], [78, 'https://fbo.com.vn:8888/Main/zccrAccount.aspx']);
+
+  workerContext.chrome.tabs.create = (options) => Promise.resolve({ id: 79, status: 'complete' });
+  const noTabRequest = await new Promise((resolve) => {
+    workerMessageListener({ type: 'FBM_EXECUTE_REQUEST', id: 'no-tab-request', request: { id: 'no-tab-request', url: 'https://fbo.com.vn:8888/Main/service', meta: {} } }, null, resolve);
+  });
+  check(so, 'worker tra ma va bao ro no-tab thay vi bridge dung im lang', [noTabRequest.code, noTabRequest.error], ['FBM_TAB_NOT_FOUND', 'Không tìm thấy tab FBM đang mở.']);
+
   await new Promise((resolve) => {
     let listener = null;
     let fetchCalls = 0;

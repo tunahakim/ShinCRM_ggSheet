@@ -461,6 +461,7 @@ async function chay(so) {
 
   hop.FBM_SYNC_CLIENT.running = false;
   hop.sheetLinkExtensionAlive = () => true;
+  const realFbmSyncLoop = hop.fbmSyncLoop;
   hop.fbmSyncLoop = () => Promise.resolve({ ok: true, status: { phase: 'done', metadata: { identityCheck: { total: 3, matched: 2, missing: 1 } } } });
   let editIdentityArgs = null;
   hop.callServer = (name, args) => { if (name === 'fbmStartIdentityCheck') { editIdentityArgs = args; return Promise.resolve({ ok: true, request: {} }); } return Promise.resolve({}); };
@@ -539,6 +540,12 @@ async function chay(so) {
   const transportReportError = new Error('Bridge failed');
   const failedTransportReport = await hop.fbmSyncReportTransportFailure({ id: 'request-2' }, transportReportError, 'FBM_TRANSPORT_UNAVAILABLE');
   check(so, 'GAS mất mạng khi báo transport không bị đánh dấu đã ghi nhận', [failedTransportReport.code, transportReportError.transportReported], ['GAS_REPORT_FAILED', false]);
+
+  const loopPaints = [];
+  hop.FBM_SYNC_CLIENT.running = true;
+  hop.fbmSyncPaint = (status) => { loopPaints.push(status); };
+  await realFbmSyncLoop({ ok: false, code: 'FBM_TAB_NOT_FOUND', request: null });
+  check(so, 'Sidebar không kết thúc im lặng khi GAS trả lỗi không có request', [hop.FBM_SYNC_CLIENT.running, loopPaints.some((item) => item && item.phase === 'error' && String(item.message).indexOf('FBM_TAB_NOT_FOUND') >= 0)], [false, true]);
 }
 
 module.exports = { chay, taoBoTest };

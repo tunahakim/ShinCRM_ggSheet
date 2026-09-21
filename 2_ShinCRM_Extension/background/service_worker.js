@@ -50,8 +50,17 @@ function ensureFbmTab(request) {
     if (tab) { return waitForFbmTabReady(tab); }
     var instruction = request && request.meta && request.meta.openFbmContext;
     if (!instruction || !instruction.url || !chrome.tabs || typeof chrome.tabs.create !== 'function') { return null; }
-    var created = chrome.tabs.create({ url: String(instruction.url), active: instruction.active === true });
-    return Promise.resolve(created).then(function (newTab) { return newTab ? waitForFbmTabReady(newTab) : null; });
+    // Dùng được cả Chrome API kiểu callback và kiểu Promise; không tạo tab lần hai.
+    var created = new Promise(function (resolve, reject) {
+      var settled = false;
+      function finish(value) { if (settled) { return; } settled = true; resolve(value || null); }
+      function fail(error) { if (settled) { return; } settled = true; reject(error); }
+      try {
+        var result = chrome.tabs.create({ url: String(instruction.url), active: instruction.active === true }, finish);
+        if (result && typeof result.then === 'function') { result.then(finish, fail); }
+      } catch (error) { fail(error); }
+    });
+    return created.then(function (newTab) { return newTab ? waitForFbmTabReady(newTab) : null; });
   });
 }
 var FBM_EXECUTOR_VERSION = '21.14';
@@ -130,7 +139,11 @@ function ensureFbmExecutor(tabId) {
     return chrome.scripting.executeScript({ target: { tabId: tabId }, files: ['content_scripts/fbm_sync/executor.js'] }).then(function () {
       return sendTabMessage(tabId, { type: 'FBM_PING_V2' }, 1500);
     }).then(function (injectedReply) {
-      if (!injectedReply || !injectedReply.ready) { throw new Error(injectedReply && injectedReply.error || 'Executor FBM không trả lời sau khi nạp.'); }
+      if (!injectedReply || !injectedReply.ready) {
+        var executorError = new Error(injectedReply && injectedReply.error || 'Executor FBM không trả lời sau khi nạp.');
+        executorError.code = 'FBM_TAB_NOT_READY';
+        throw executorError;
+      }
       return injectedReply;
     });
   });
@@ -526,7 +539,7 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     return true;
   }
   var flight = ensureFbmTab(message.request).then(function (tab) {
-    if (!tab) { return addWorkerTrace({ error: 'Không tìm thấy tab FBM đang mở.' }, message.request, 'fbm_tab_not_found'); }
+    if (!tab) { return addWorkerTrace({ error: 'Không tìm thấy tab FBM đang mở.', code: 'FBM_TAB_NOT_FOUND' }, message.request, 'fbm_tab_not_found'); }
     return sendToFbmTab(tab.id, message.request).then(function (reply) { return addWorkerTrace(addWorkerTrace(reply, message.request, 'worker_received'), message.request, 'fbm_tab_found'); });
   });
   if (requestId) {

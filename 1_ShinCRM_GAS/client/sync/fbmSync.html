@@ -1352,6 +1352,15 @@ function fbmSyncLoop(status) {
   fbmSyncPaint(status);
   if (!status || !status.request) {
     FBM_SYNC_CLIENT.running = false;
+    // A terminal response without a request is a transport error; never leave Sidebar silent.
+    if (!status) {
+      var emptyResultError = 'GAS returned no sync result.';
+      fbmSyncLogClientError(new Error(emptyResultError), emptyResultError, 'empty_sync_result');
+      fbmSyncPaint({ phase: 'error', label: 'Error', message: emptyResultError, lastError: 'SYNC_EMPTY_RESULT', counts: {} });
+    } else if (status.ok === false) {
+      var terminal = status.status && typeof status.status === 'object' ? status.status : {};
+      fbmSyncPaint(Object.assign({}, terminal, { phase: 'error', label: 'Error', message: String(status.error || status.message || status.code || 'Sync failed.'), lastError: String(status.error || status.message || status.code || 'SYNC_TERMINAL_FAILURE'), counts: terminal.counts || {} }));
+    }
     return status;
   }
   var entity = status.request.meta && status.request.meta.entity === 'activity' ? 'giao dịch' : 'khách hàng';
