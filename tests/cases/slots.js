@@ -118,7 +118,10 @@ function chay(so) {
   // bằng `margin-left: auto`, nên tổng bề ngang vượt lòng card là cái thùng rác lòi ra ngoài mép — chủ dự án chụp ảnh chỉ ra.
   check(so, 'hàng đầu chia hai nhóm ghim hai mép, không phải một hàng phẳng',
     moiNode([tatCa[0]], []).filter((n) => n.role === 'box' || n.role === 'row').map((n) => n.className),
-    ['shin-act-row', 'shin-act-head', 'shin-act-left', 'shin-act-right']);
+    ['shin-row-group shin-act-row', 'shin-act-head', 'shin-act-left', 'shin-act-right']);
+  check(so, 'activity slot dÃ¹ng RowGroup cho dÃ²ng vÃ  Row cho hai nhÃ³m ngang',
+    [tatCa[0].role, moiNode([tatCa[0]], []).filter((n) => n.className === 'shin-act-left')[0].role, moiNode([tatCa[0]], []).filter((n) => n.className === 'shin-act-right')[0].role],
+    ['box', 'row', 'row']);
 
   // Chủ dự án bỏ cột tiền khỏi dòng lịch sử ngày 06/09/2026: một dòng lịch sử là để nhớ đã nói gì với khách, tiền thì tra ở form.
   check(so, 'dòng đầy đủ: ngày kiểu Việt, sản phẩm, chip loại việc, rồi nội dung ở dòng riêng',
@@ -141,9 +144,9 @@ function chay(so) {
     chuCua([tatCa[1]]).slice(-1)[0], 'Gửi bản chào\nkèm chiết khấu');
 
   check(so, 'dòng đã xóa mềm mang class gạch ngang, và có chip "Đã xóa"',
-    [tatCa[1].className, chuCua([tatCa[1]])[1]], ['shin-act-row shin-act-deleted', 'Đã xóa']);
+    [tatCa[1].className, chuCua([tatCa[1]])[1]], ['shin-row-group shin-act-row shin-act-deleted', 'Đã xóa']);
   check(so, 'dòng còn dùng không mang class gạch ngang và không có chip',
-    [tatCa[0].className, chuCua([tatCa[0]]).indexOf('Đã xóa')], ['shin-act-row', -1]);
+    [tatCa[0].className, chuCua([tatCa[0]]).indexOf('Đã xóa')], ['shin-row-group shin-act-row', -1]);
 
   // Chủ dự án chốt ngày 06/09/2026: bút sửa ra ngoài cùng. Sửa là việc làm mười lần thì xóa mới một lần, nên cái hay bấm phải gần mép nhất.
   check(so, 'bút sửa là nút ngoài cùng bên phải, mang mã giao dịch của chính dòng đó',

@@ -140,7 +140,8 @@ function chay(so) {
       runUi.indexOf('Row({ className: FBM_SYNC_RESULTS_UI.classes.pagination') >= 0],
     [true, true, true, true, true, true, true, true, true, true, true, true, true, true]);
   check(so, 'slot lịch sử, info bar và dialog dùng gap thay cho margin sibling',
-    [slots.indexOf('.shin-act-row {\n  display: flex;\n  flex-direction: column;\n  gap: var(--shin-gap-1);') >= 0,
+    [slots.indexOf('.shin-act-row {\n  display: flex;') === -1,
+      slots.indexOf('.shin-act-left,\n.shin-act-right {\n  display: flex;') === -1,
       slots.indexOf('margin-bottom: 6px') === -1,
       slots.indexOf('.shin-act-content {\n  margin-top') === -1,
       frame.indexOf('display: flex;\n  flex-direction: column;\n  gap: var(--shin-gap-1);', frame.indexOf('#sidebar-info {')) >= 0,
@@ -149,7 +150,7 @@ function chay(so) {
       components.indexOf('.shin-box.shin-unsaved-panel { position: relative; z-index: 1; display: flex; flex-direction: column; gap: var(--shin-gap-2);') >= 0,
       components.indexOf('.shin-unsaved-message { margin:') === -1,
       shell.indexOf('.shin-sync-tab-row { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:0; margin-bottom') === -1],
-    [true, true, true, true, true, true, true, true, true]);
+    [true, true, true, true, true, true, true, true, true, true]);
 }
 
 module.exports = { chay };

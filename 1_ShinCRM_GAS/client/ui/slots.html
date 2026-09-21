@@ -39,7 +39,7 @@ function slotActivityLeft(a, daXoa) {
   var phan = [Text({ text: valueTextDate(a.workDate), className: 'shin-act-date' })];
   if (daXoa) { phan.push(Text({ text: 'Đã xóa', className: 'shin-badge shin-badge-deleted' })); }
   if (a.product) { phan.push(Text({ text: a.product, className: 'shin-act-prod' })); }
-  return Block({ className: 'shin-act-left', elements: phan });
+  return Row({ className: 'shin-act-left', elements: phan });
 }
 
 /**
@@ -54,7 +54,7 @@ function slotActivityRight(a) {
   if (a.taskType) { phan.push(Text({ text: a.taskType, className: 'shin-act-type' })); }
   phan.push(Icon({ icon: 'trash', tooltip: 'Xóa giao dịch', action: 'deleteActivity', pick: a.id, className: 'shin-act-del' }));
   phan.push(Icon({ icon: 'pencil', tooltip: 'Sửa giao dịch', action: 'openActivityForm', pick: a.id, className: 'shin-act-edit' }));
-  return Block({ className: 'shin-act-right', elements: phan });
+  return Row({ className: 'shin-act-right', elements: phan });
 }
 
 /**
@@ -69,7 +69,7 @@ function slotActivityRight(a) {
 function slotActivityRow(a) {
   var daXoa = (a.recordStatus || STORE_ACTIVE) === STORE_DELETED;
 
-  return Block({
+  return RowGroup({
     className: 'shin-act-row' + (daXoa ? ' shin-act-deleted' : ''),
     elements: [
       Row({ className: 'shin-act-head', elements: [slotActivityLeft(a, daXoa), slotActivityRight(a)] }),
