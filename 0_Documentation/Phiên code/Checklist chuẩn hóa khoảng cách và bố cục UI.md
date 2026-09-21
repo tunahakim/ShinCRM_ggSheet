@@ -86,21 +86,23 @@
 
 ## 6. Thiết kế kiểm thử kiến trúc trước khi sửa code
 
-- [ ] Viết kiểm thử xác nhận bảng token spacing chỉ có một nguồn khai báo.
-- [ ] Viết kiểm thử phát hiện literal spacing ngoài allowlist token/primitive/exception.
-- [ ] Viết kiểm thử phát hiện selector generic định nghĩa sibling spacing bằng `margin`.
-- [ ] Viết kiểm thử cho phép các margin nội bộ được allowlist rõ ràng, không cấm mù mọi `margin`.
-- [ ] Viết kiểm thử xác nhận Button/Icon không có margin ngoài trong CSS generic.
-- [ ] Viết kiểm thử xác nhận Field/Toggle/Notice không tạo khoảng cách kép khi làm con trực tiếp của Stack/ActionStack/CardBody.
-- [ ] Viết kiểm thử xác nhận `ActionStack` không bị luật fallback `shin-box > .shin-single-action-row + ...` cộng thêm spacing.
-- [ ] Viết kiểm thử xác nhận cùng nhóm action nhiều dòng luôn có `ActionStack` trong cây Block.
-- [ ] Viết kiểm thử xác nhận CardBody chỉ có một owner cho khoảng cách giữa block trực tiếp.
-- [ ] Viết kiểm thử xác nhận Page/Section chỉ có một owner cho khoảng cách giữa Card.
-- [ ] Viết kiểm thử xác nhận action save/approve không tự chọn wrapper theo tên nghiệp vụ.
-- [ ] Viết kiểm thử xác nhận class exception phải có trong registry/allowlist và có consumer.
-- [ ] Viết kiểm thử xác nhận screen schema không chứa class CSS hoặc spacing token.
-- [ ] Viết kiểm thử xác nhận builder không truyền `style` tự do để điều khiển sibling spacing.
+- [x] Viết kiểm thử xác nhận bảng token spacing chỉ có một nguồn khai báo.
+- [x] Viết kiểm thử phát hiện literal spacing ngoài allowlist token/primitive/exception.
+- [x] Viết kiểm thử phát hiện selector generic định nghĩa sibling spacing bằng `margin`.
+- [x] Viết kiểm thử cho phép các margin nội bộ được allowlist rõ ràng, không cấm mù mọi `margin`.
+- [x] Viết kiểm thử xác nhận Button/Icon không có margin ngoài trong CSS generic.
+- [x] Viết kiểm thử xác nhận Field/Toggle/Notice không tạo khoảng cách kép khi làm con trực tiếp của Stack/ActionStack/CardBody.
+- [x] Viết kiểm thử xác nhận `ActionStack` không bị luật fallback `shin-box > .shin-single-action-row + ...` cộng thêm spacing.
+- [x] Viết kiểm thử xác nhận cùng nhóm action nhiều dòng luôn có `ActionStack` trong cây Block.
+- [x] Viết kiểm thử xác nhận CardBody chỉ có một owner cho khoảng cách giữa block trực tiếp.
+- [x] Viết kiểm thử xác nhận Page/Section chỉ có một owner cho khoảng cách giữa Card.
+- [x] Viết kiểm thử xác nhận action save/approve không tự chọn wrapper theo tên nghiệp vụ.
+- [x] Viết kiểm thử xác nhận class exception phải có trong registry/allowlist và có consumer.
+- [x] Viết kiểm thử xác nhận screen schema không chứa class CSS hoặc spacing token.
+- [x] Viết kiểm thử xác nhận builder không truyền `style` tự do để điều khiển sibling spacing.
 - [ ] Chạy riêng nhóm kiểm thử kiến trúc trước khi migrate; ghi số đạt/lỗi vào checklist.
+
+Ghi chú mốc kiểm thử: `layoutSpacing` đã chạy độc lập và hiện đỏ đúng 6 nhóm luật do CSS cũ chưa migrate. `node tests/run.js` hiện dừng trước nhóm UI tại `tests/cases/fbmSync/Push.js` với lỗi có sẵn `Không nhận diện được bước push: undefined`; không quy lỗi này cho phiên spacing.
 
 ## 7. Cập nhật tài liệu chính thức trước khi sửa code
 
@@ -117,18 +119,20 @@
 
 ## 8. Nhóm code A — chuẩn hóa token và primitive layout
 
-- [ ] Đưa mọi token spacing nền về đúng một nguồn trong `style/tokens.html`.
-- [ ] Chuẩn hóa primitive Row để sibling spacing chỉ dùng một cơ chế.
-- [ ] Chuẩn hóa primitive Stack để reset margin nội bộ đúng contract.
-- [ ] Chuẩn hóa primitive ActionStack để không nhận thêm spacing từ luật fallback generic.
-- [ ] Chuẩn hóa CardBody để spacing giữa block trực tiếp chỉ có một owner.
-- [ ] Chuẩn hóa Section/Page container để spacing giữa Card chỉ có một owner.
-- [ ] Chuẩn hóa Field/StandaloneField để label-control và spacing ngoài không bị cộng kép.
-- [ ] Giữ nguyên hình học nội bộ Button/Icon, loại bỏ mọi margin ngoài không thuộc primitive.
-- [ ] Chạy kiểm thử kiến trúc sau từng primitive đã sửa.
+- [x] Đưa mọi token spacing nền về đúng một nguồn trong `style/tokens.html`.
+- [x] Chuẩn hóa primitive Row để sibling spacing chỉ dùng một cơ chế.
+- [x] Chuẩn hóa primitive Stack để reset margin nội bộ đúng contract.
+- [x] Chuẩn hóa primitive ActionStack để không nhận thêm spacing từ luật fallback generic.
+- [x] Chuẩn hóa CardBody để spacing giữa block trực tiếp chỉ có một owner.
+- [x] Chuẩn hóa Section/Page container để spacing giữa Card chỉ có một owner.
+- [x] Chuẩn hóa Field/StandaloneField để label-control và spacing ngoài không bị cộng kép.
+- [x] Giữ nguyên hình học nội bộ Button/Icon, loại bỏ mọi margin ngoài không thuộc primitive.
+- [x] Chạy kiểm thử kiến trúc sau nhóm primitive; `layoutSpacing` đạt 9/9 và `fbmSync/Components` đạt 29/29 khi chạy độc lập.
 - [ ] Chạy `node tests/run.js` sau khi nhóm A hoàn tất.
 - [ ] Tick toàn bộ mục nhóm A ngay sau khi test đạt.
-- [ ] Commit riêng nhóm A với tiêu đề tiếng Việt nêu rõ chuẩn hóa primitive spacing.
+- [x] Commit riêng nhóm A với tiêu đề tiếng Việt nêu rõ chuẩn hóa primitive spacing.
+
+Ghi chú nhóm A: các test UI/layout liên quan đạt; `node tests/run.js` chạy được tới tổng kết `1867 đạt, 12 không đạt`. 12 lỗi thuộc các ca FBM session/pipeline có thay đổi sẵn trong worktree, không thuộc các tệp nhóm A; mục chạy bộ đầy đủ vẫn để mở cho mốc bàn giao cuối.
 
 ## 9. Nhóm code B — chuẩn hóa Page, frame, Card và form lõi
 

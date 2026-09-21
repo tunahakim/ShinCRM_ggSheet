@@ -170,18 +170,18 @@ function chay(so) {
   check(so, 'lớp generic notice/form/toggle/value/pagination nằm ở components chung',
     ['shin-form-field', 'shin-toggle-row', 'shin-toggle-control', 'shin-notice', 'shin-kv-row', 'shin-pagination', 'shin-section', 'shin-content-disabled', 'shin-loading'].every((name) => styles.indexOf(name) >= 0),
     true);
-  check(so, 'Card và Stack dùng spacing dọc theo token, tương thích môi trường không hỗ trợ flex gap',
+  check(so, 'Card và Stack dùng gap dọc, component con không cộng margin lần hai',
     [styles.indexOf('.shin-card-body {') >= 0, styles.indexOf('.shin-box.shin-stack,') >= 0,
-      styles.indexOf('.shin-card-body > * + * { margin-top: var(--shin-gap-2); }') >= 0,
-      styles.indexOf('.shin-stack > * + *') >= 0,
-      styles.indexOf('.shin-form-field > * + * { margin-top: var(--shin-gap-1); }') >= 0,
-      styles.indexOf('.shin-card-body > * { margin-top: 0; margin-bottom: 0; }') >= 0],
+      styles.indexOf('gap: var(--shin-gap-2);', styles.indexOf('.shin-card-body {')) >= 0,
+      styles.indexOf('.shin-card-body > * { margin: 0; }') >= 0,
+      styles.indexOf('.shin-stack > * + *') === -1,
+      styles.indexOf('.shin-form-field > * + *') === -1],
     [true, true, true, true, true, true]);
   check(so, 'Nhóm action dùng Stack lõi và vẫn tương thích class cũ',
     [styles.indexOf('align-items: stretch;') >= 0, styles.indexOf('align-self: stretch;') >= 0, styles.indexOf('width: 100%;') >= 0,
       styles.indexOf('.shin-box.shin-action-stack') >= 0,
       styles.indexOf('gap: var(--shin-gap-2);') >= 0,
-      styles.indexOf('.shin-action-stack > * + * { margin-top: 0; }') >= 0],
+      styles.indexOf('.shin-stack > *,\n.shin-action-stack > * { margin: 0; }') >= 0],
     [true, true, true, true, true, true]);
   check(so, 'Nút action dài được xếp dọc trong Sidebar hẹp',
     [styles.indexOf('.shin-single-action-row { justify-content: center; flex-wrap: wrap; gap: var(--shin-gap-2); }') >= 0,
@@ -189,7 +189,7 @@ function chay(so) {
       styles.indexOf('white-space: normal; overflow-wrap: anywhere;') >= 0,
       styles.indexOf('.shin-single-action-row > .shin-button { white-space: normal; text-align: center; overflow-wrap: anywhere; }') >= 0,
       styles.indexOf('.shin-single-action-row > .shin-button .shin-btn-label { min-width: 0; overflow-wrap: anywhere; white-space: normal; }') >= 0,
-      styles.indexOf('.shin-single-action-row > * + * { margin-left: 0; }') >= 0],
+      styles.indexOf('.shin-single-action-row > * + *') === -1],
     [true, true, true, true, true, true]);
   check(so, 'action Stack căn giữa ở đúng độ ưu tiên của component lõi',
     [styles.indexOf('.shin-box.shin-action-stack { align-items: center; }') >= 0,
@@ -198,17 +198,18 @@ function chay(so) {
   check(so, 'Box rỗng giữ vùng callback nhưng không tạo khoảng cách giả trong Card',
     styles.indexOf('.shin-box:empty { display: none; }') >= 0,
     true);
-  check(so, 'reset Card không xóa khoảng giữa các Card trong section',
-    [styles.indexOf('.shin-section > * + * { margin-top: var(--shin-gap-2); }') > styles.indexOf('.shin-card {'),
-      styles.indexOf('.shin-section > .shin-card { margin: 0; }') >= 0],
-    [true, false]);
-  check(so, 'các vùng cột chung không phụ thuộc flex gap để tạo khoảng cách',
-    [frame.indexOf('#sidebar-body > * + * { margin-top: var(--shin-gap-2); }') >= 0,
-      styles.indexOf('.shin-section > * + * { margin-top: var(--shin-gap-2); }') >= 0,
+  check(so, 'Section sở hữu khoảng giữa các Card bằng gap',
+    [styles.indexOf('.shin-section { display: flex; flex-direction: column; gap: var(--shin-gap-2);') >= 0,
+      styles.indexOf('.shin-section > * + *') === -1,
+      styles.indexOf('.shin-card {') >= 0],
+    [true, true, true]);
+  check(so, 'các vùng cột chung dùng gap làm owner spacing',
+    [frame.indexOf('#sidebar-body {') >= 0 && frame.indexOf('gap: var(--shin-gap-2);', frame.indexOf('#sidebar-body {')) >= 0,
+      styles.indexOf('.shin-section { display: flex; flex-direction: column; gap: var(--shin-gap-2);') >= 0,
       source['client/sync/fbmSyncShell.html'].indexOf("uiSyncClass('shell', 'navItem')") >= 0],
     [true, true, true]);
-  check(so, 'ActionStack lõi và fallback ngăn hai nhóm action dính mép',
-    [common.indexOf('function ActionStack(') >= 0, styles.indexOf('.shin-box > .shin-single-action-row + .shin-single-action-row') >= 0,
+  check(so, 'ActionStack lõi tự sở hữu nhịp, không cần fallback margin',
+    [common.indexOf('function ActionStack(') >= 0, styles.indexOf('.shin-box > .shin-single-action-row + .shin-single-action-row') === -1,
       source['client/sync/fbmSyncUiSchema.html'].indexOf('actionStack: function') >= 0],
     [true, true, true]);
   check(so, 'các vùng cuộn giữ trục hai mép bằng gutter ổn định, section không cộng lề lệch',
@@ -216,7 +217,7 @@ function chay(so) {
       sidebar.indexOf('id="sidebar-body" class="shin-scroll-region"') >= 0,
       sidebar.indexOf('id="sidebar-body" class="shin-scroll-region"') >= 0,
       frame.indexOf('#sidebar-body {') >= 0 && frame.indexOf('padding: 0 0 var(--shin-gap-4);') >= 0,
-      styles.indexOf('.shin-section { display: flex; flex-direction: column; gap: 0; min-width: 0; padding: 0 0 var(--shin-gap-4); }') >= 0],
+      styles.indexOf('.shin-section { display: flex; flex-direction: column; gap: var(--shin-gap-2); min-width: 0; padding: 0 0 var(--shin-gap-4); }') >= 0],
     [true, true, true, true, true]);
   check(so, 'Sync dùng Notice lõi thay vì tự lặp bảng ánh xạ lớp thông báo',
     [common.indexOf('function Notice(') >= 0, all.indexOf('noticeClasses') >= 0, all.indexOf('noticeClass =') >= 0],
@@ -229,8 +230,8 @@ function chay(so) {
       frame.indexOf('#sidebar-info {') >= 0 && frame.indexOf('margin-bottom: var(--shin-gap-2);') > frame.indexOf('#sidebar-info {'),
       styles.indexOf('.shin-loading-track.is-idle { visibility: hidden; background: transparent; }') >= 0],
     [true, true, true]);
-  check(so, 'Stack dùng gap để Card không bị margin: 0 ghi đè',
-    [styles.indexOf('.shin-box.shin-stack,') >= 0, styles.indexOf('gap: var(--shin-gap-2);', styles.indexOf('.shin-box.shin-stack,')) > styles.indexOf('.shin-box.shin-stack,'), styles.indexOf('.shin-stack > * + *') >= 0 && styles.indexOf('margin-top: 0;', styles.indexOf('.shin-stack > * + *')) >= 0],
+  check(so, 'Stack dùng gap và reset margin con trực tiếp',
+    [styles.indexOf('.shin-box.shin-stack,') >= 0, styles.indexOf('gap: var(--shin-gap-2);', styles.indexOf('.shin-box.shin-stack,')) > styles.indexOf('.shin-box.shin-stack,'), styles.indexOf('.shin-stack > *,\n.shin-action-stack > * { margin: 0; }') >= 0],
     [true, true, true]);
 }
 
