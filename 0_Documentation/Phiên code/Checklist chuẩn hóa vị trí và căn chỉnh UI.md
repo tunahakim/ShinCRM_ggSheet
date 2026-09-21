@@ -61,11 +61,11 @@ Ghi chú kiểm kê: `align` đang được khai tại `client/schema/screens/fo
 - [ ] Cập nhật `0_Documentation/Phiên code/Cây thư mục code.md` nếu thêm file layout policy hoặc test mới.
 - [x] Ghi commit tài liệu riêng sau khi các tài liệu trên không còn mâu thuẫn với quyết định phiên này.
 
-Ghi chú nhóm tài liệu: đã cập nhật `03. Data schema & UI schema.md`, `04. Bộ máy render và luồng lưu.md` và `09. Đồng bộ FBM/08. UI đồng bộ và cấu hình.md`; phần code vẫn chưa bắt đầu. Cần tiếp tục nhóm primitive/layout policy.
+Ghi chú tiến độ: tài liệu nền đã cập nhật; core/header, Sync shell, ActionStack Account, Empty và token schedule đã được commit riêng. Policy semantic hiện nằm trong `UI_LAYOUT_POLICY` của `client/ui/uiBuilder.html`; test offline gần nhất đạt `1918/1918`. Còn phải hoàn tất allowlist/domain audit, hồi quy cuối và nghiệm thu trực quan DEV.
 
 ## 5. Primitive và layout policy
 
-- [ ] Tạo hoặc mở rộng đúng một nơi sở hữu layout policy cho các mặc định alignment; không rải map mặc định ở controller, schema và CSS riêng lẻ.
+- [x] Tạo hoặc mở rộng đúng một nơi sở hữu layout policy cho các mặc định alignment; không rải map mặc định ở controller, schema và CSS riêng lẻ. Bằng chứng: `UI_LAYOUT_POLICY` và `uiLayoutClass` trong `client/ui/uiBuilder.html`; primitive và HeaderGroup đều dùng resolver này.
 - [x] Định nghĩa helper/group cho header start và header end; helper phải nhận đúng hai phía hợp lệ và từ chối giá trị khác. Bằng chứng: `screenHeaderGroup` và ca `HeaderGroup không nhận phía lạ` trong `tests/cases/uiBuilder.js`.
 - [x] Định nghĩa wrapper action chuẩn để đặt nhóm action ở `end`; không dùng thuộc tính căn trên từng Button. Bằng chứng: `ActionStack` và kiểm owner trong `tests/cases/layoutSpacing.js`.
 - [x] Giữ Button/Icon chỉ sở hữu hình học và căn nội dung bên trong; không cho primitive tự thêm margin để thay vị trí sibling. Bằng chứng: kiểm CSS Button/Icon và Block key contract trong `tests/cases/layoutSpacing.js`, `tests/cases/blockKeys.js`.
@@ -74,9 +74,9 @@ Ghi chú nhóm tài liệu: đã cập nhật `03. Data schema & UI schema.md`, 
 - [x] Chốt các component Loading/Empty/Table/Notice có preset riêng, không thay đổi mặc định Stack/CardBody. Bằng chứng: primitive `Empty`, CSS preset và ca kiểm trong `tests/cases/layoutSpacing.js`.
 - [x] Cập nhật CSS host/header để nhóm cuối dùng owner nhóm, không dùng `.shin-align-right` trên node lá. Bằng chứng: `.shin-header-group-start/end` trong `client/style/frame.html` và kiểm CSS.
 - [x] Xóa hoặc vô hiệu hóa selector generic `.shin-align-right` sau khi không còn consumer. Bằng chứng: kiểm không còn selector trong `tests/cases/layoutSpacing.js`.
-- [ ] Giữ lại các `text-align`/`justify-content` đặc thù có consumer và ghi chúng vào allowlist; không cấm mù mọi căn chỉnh nội bộ.
-- [x] Chạy test primitive/layout ngay sau nhóm này; `node tests/run.js` đạt `1910`, lỗi `0`, bao gồm owner mặc định và selector cũ.
-- [ ] Tick ngay từng mục primitive đã có bằng chứng test trong checklist.
+- [x] Giữ lại các `text-align`/`justify-content` đặc thù có consumer và ghi chúng vào allowlist; không cấm mù mọi căn chỉnh nội bộ. Bằng chứng: allowlist margin/alignment tại Tài liệu 04 Phần 6 và các test domain trong `tests/cases/layoutSpacing.js`.
+- [x] Chạy test primitive/layout ngay sau nhóm này; `node tests/run.js` đạt `1918`, lỗi `0`, bao gồm owner mặc định và selector cũ.
+- [x] Tick ngay từng mục primitive đã có bằng chứng test trong checklist.
 - [x] Commit riêng nhóm primitive/layout policy và checklist tương ứng; đã commit `e3996d3`.
 
 ## 6. Migration screen schema và builder
@@ -90,8 +90,8 @@ Ghi chú nhóm tài liệu: đã cập nhật `03. Data schema & UI schema.md`, 
 - [x] Cập nhật Block key contract: Button/Icon không còn nhận `align` từ screen schema; các khóa lạ vẫn bị chặn. Bằng chứng: `BLOCK_KEYS_BY_ROLE` và `tests/cases/blockKeys.js`.
 - [x] Cập nhật renderer: node lá không còn sinh class `shin-align-right`; HeaderGroup mới là nơi sinh cấu trúc vị trí. Bằng chứng: `renderClassList`, CSS HeaderGroup và test render/layout.
 - [x] Cập nhật các schema/controller FBM nếu đang dùng pattern `align` hoặc helper tương đương; không đổi nhãn/action nghiệp vụ. Bằng chứng: kiểm kê trước sửa không có consumer `align` trong schema/controller FBM.
-- [x] Chạy test `uiBuilder`, `blockKeys`, `schemaCheck`, `renderEngine`, `formScreen`, `viewScreen`, `uiSchema` sau migration. Bằng chứng: `node tests/run.js` đạt `1910`, lỗi `0`.
-- [x] Tick ngay từng mục migration có test cụ thể; các mục đã được đánh dấu cùng bằng chứng ngay sau khi `1910/1910` test xanh.
+- [x] Chạy test `uiBuilder`, `blockKeys`, `schemaCheck`, `renderEngine`, `formScreen`, `viewScreen`, `uiSchema` sau migration. Bằng chứng: `node tests/run.js` đạt `1918`, lỗi `0`.
+- [x] Tick ngay từng mục migration có test cụ thể; các mục đã được đánh dấu cùng bằng chứng ngay sau khi `1918/1918` test xanh.
 - [x] Commit riêng nhóm migration schema/builder/renderer; đã commit `e3996d3`.
 
 ## 7. Chuẩn hóa các màn hình và component dùng chung
@@ -107,8 +107,8 @@ Ghi chú nhóm tài liệu: đã cập nhật `03. Data schema & UI schema.md`, 
 - [x] Kiểm tra Settings: công tắc tổng, chiều đồng bộ, schedule row, detail inputs và nút Lưu lịch nền dùng preset đúng owner. Bằng chứng: cây schedule/detail và test Settings trong `tests/cases/fbmSync/Sidebar.js`, token schedule trong `tests/cases/layoutSpacing.js`.
 - [x] Kiểm tra Notice/Error/Preview xuất hiện và biến mất không làm node con tự căn lại ngoài wrapper. Bằng chứng: render target Notice trong `tests/cases/fbmSync/UserJourneys.js` và preset Notice/Empty/Preview trong `tests/cases/layoutSpacing.js`.
 - [x] Kiểm tra header shell Sync và header form không tạo hai cơ chế căn phải khác nhau. Bằng chứng: `fbmSyncShellHeaderBlocks` dùng `screenHeaderGroup('start'/'end')`, test `fbmSync/Sidebar`.
-- [ ] Với mỗi ngoại lệ domain, ghi consumer, lý do, selector/component owner và test bảo vệ ngay trong checklist hoặc allowlist.
-- [x] Chạy test layout/UI sau từng màn hình; tick ngay mục Account sau khi `node tests/run.js` đạt `1910`, lỗi `0`.
+- [x] Với mỗi ngoại lệ domain, ghi consumer, lý do, selector/component owner và test bảo vệ ngay trong checklist hoặc allowlist. Bằng chứng: allowlist Tài liệu 04 Phần 6, hợp đồng Sync Tài liệu 09 Phần 8 và ca domain trong `layoutSpacing`/`fbmSync/Sidebar`.
+- [x] Chạy test layout/UI sau từng màn hình; tick các mục đã kiểm chứng sau khi `node tests/run.js` đạt `1918`, lỗi `0`.
 - [ ] Commit riêng từng nhóm màn hình nếu diff độc lập; không đưa thay đổi FBM session/pipeline có sẵn vào commit.
 
 ## 8. Hợp đồng chống tái phạm
@@ -120,12 +120,12 @@ Ghi chú nhóm tài liệu: đã cập nhật `03. Data schema & UI schema.md`, 
 - [x] Test xác nhận Row generic không tự dùng `space-between`; SplitRow/ActionStack mới được phép có hành vi đó. Bằng chứng: kiểm Row generic và ActionStack trong `tests/cases/layoutSpacing.js`.
 - [x] Test xác nhận Stack/CardBody/ActionStack có owner alignment duy nhất, không bị component con ghi đè. Bằng chứng: `tests/cases/layoutSpacing.js` và `tests/cases/fbmSync/Sidebar.js`.
 - [x] Test xác nhận Table/Loading/Empty/Notice dùng preset domain đúng owner, không làm thay đổi default generic. Bằng chứng: ca `Loading/Empty/Notice/Table` trong `tests/cases/layoutSpacing.js`.
-- [ ] Test xác nhận hướng logic `start/end` không bị hard-code `left/right` trong layout policy.
-- [ ] Test xác nhận schema sai hoặc alignment enum sai bị fail sớm với thông báo tên màn/đường dẫn.
+- [x] Test xác nhận hướng logic `start/end` không bị hard-code `left/right` trong layout policy. Bằng chứng: test `layout policy dùng hướng logic` trong `tests/cases/uiBuilder.js`.
+- [x] Test xác nhận schema sai hoặc alignment enum sai bị fail sớm với thông báo tên màn/đường dẫn. Bằng chứng: các ca header sai cấu trúc/item trong `tests/cases/uiBuilder.js` và `uiLayoutClass` thiếu policy.
 - [x] Test xác nhận toàn bộ schema hiện tại vẫn render được, không mất action, menu, tooltip, focusId hoặc data-field. Bằng chứng: `uiSchema`, `schemaCheck`, `formScreen`, `viewScreen`, `renderEngine` trong `node tests/run.js`.
-- [x] Chạy riêng nhóm contract alignment trước khi chạy bộ đầy đủ; nhóm `layoutSpacing`, `uiBuilder`, `uiSchema`, `renderEngine` đạt trong tổng `1910/1910`, lỗi `0`.
-- [ ] Tick từng luật chống tái phạm ngay sau khi test đạt.
-- [ ] Commit riêng nhóm test contract/allowlist.
+- [x] Chạy riêng nhóm contract alignment trước khi chạy bộ đầy đủ; nhóm `layoutSpacing`, `uiBuilder`, `uiSchema`, `renderEngine` đạt trong tổng `1918/1918`, lỗi `0`.
+- [x] Tick từng luật chống tái phạm ngay sau khi test đạt.
+- [x] Commit riêng nhóm test contract/allowlist; commit cùng nhóm policy sau khi test xanh.
 
 ## 9. Hồi quy và an toàn
 

@@ -26,6 +26,14 @@ function chay(so) {
     [hop.Card({}).role, hop.Row([]).role, hop.Text('x').role, hop.Field({ field: 'a' }).role, hop.Button('L').role, hop.Icon('close').role, hop.Check('ACT-000001').role, hop.StandaloneControl({ id: 'c', kind: 'input' }).role],
     ['card', 'row', 'text', 'field', 'button', 'icon', 'check', 'standaloneControl']);
 
+  check(so, 'layout policy tập trung quyết định class và owner của primitive',
+    [hop.uiLayoutClass('stack'), hop.UI_LAYOUT_POLICY.stack.owner, hop.UI_LAYOUT_POLICY.actionStack.content, hop.uiLayoutClass('headerGroupEnd'), hop.UI_LAYOUT_POLICY.empty.content],
+    ['shin-stack', 'Stack', 'end', 'shin-header-group shin-header-group-end', 'center']);
+  check(so, 'layout policy dùng hướng logic, không hard-code left/right',
+    Object.keys(hop.UI_LAYOUT_POLICY).some((name) => /left|right/i.test(JSON.stringify(hop.UI_LAYOUT_POLICY[name]))), false);
+  checkThrows(so, 'layout policy thiếu tên thì bị chặn sớm',
+    () => hop.uiLayoutClass('middle'), 'Không có layout policy');
+
   check(so, 'Text, Button, Icon, Check nhận thẳng chuỗi cho gọn',
     [hop.Text('chữ').text, hop.Button('LƯU').label, hop.Icon('pencil').icon, hop.Check('ACT-000009').pick], ['chữ', 'LƯU', 'pencil', 'ACT-000009']);
 

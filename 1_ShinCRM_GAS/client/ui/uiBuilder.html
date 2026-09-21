@@ -38,6 +38,25 @@ var BLOCK_KEYS_BY_ROLE = {
   standaloneControl: ['kind', 'inputType', 'label', 'value', 'placeholder', 'options', 'disabled', 'pressed', 'ariaLabel', 'hidden']
 };
 
+/* Chính sách layout của primitive. CSS chỉ hiện thực class đã chọn; màn hình không tự khai alignment. */
+var UI_LAYOUT_POLICY = {
+  stack: { className: 'shin-stack', axis: 'vertical', cross: 'stretch', content: 'start', owner: 'Stack' },
+  actionStack: { className: 'shin-action-stack', axis: 'vertical', cross: 'center', content: 'end', owner: 'ActionStack' },
+  headerGroupStart: { className: 'shin-header-group shin-header-group-start', axis: 'horizontal', content: 'start', owner: 'HeaderGroup' },
+  headerGroupEnd: { className: 'shin-header-group shin-header-group-end', axis: 'horizontal', content: 'end', owner: 'HeaderGroup' },
+  field: { className: 'shin-form-field', axis: 'vertical', content: 'start', owner: 'Field' },
+  loading: { className: 'shin-loading', content: 'center', owner: 'Loading' },
+  empty: { className: 'shin-empty-state', content: 'center', owner: 'Empty' },
+  notice: { className: 'shin-notice', content: 'start', owner: 'Notice' },
+  table: { className: 'shin-status-table', content: 'start', owner: 'Table' }
+};
+
+function uiLayoutClass(name) {
+  var policy = UI_LAYOUT_POLICY[name];
+  if (!policy) { throw new Error('Không có layout policy cho primitive "' + name + '".'); }
+  return policy.className;
+}
+
 /**
  * Chặn khóa lạ ngay lúc dựng cây thay vì để nó rơi vào im lặng.
  *
@@ -149,14 +168,14 @@ function Box(spec) { return Block(spec, 'box'); }
 /** Nhóm Block theo cột; nhịp dọc do component lõi quyết định, màn chỉ chọn biến thể hình thức. */
 function Stack(spec) {
   var o = Array.isArray(spec) ? { elements: spec } : (spec || {});
-  var className = ('shin-stack ' + String(o.className || '')).trim();
+  var className = (uiLayoutClass('stack') + ' ' + String(o.className || '')).trim();
   return Box(Object.assign({}, o, { className: className }));
 }
 
 /** Nhóm lệnh độc lập theo cột; core sở hữu nhịp dọc để màn không thể ghép hai Row sát nhau. */
 function ActionStack(spec) {
   var o = Array.isArray(spec) ? { elements: spec } : (spec || {});
-  var className = ('shin-action-stack ' + String(o.className || '')).trim();
+  var className = (uiLayoutClass('actionStack') + ' ' + String(o.className || '')).trim();
   return Box(Object.assign({}, o, { className: className }));
 }
 
@@ -178,14 +197,14 @@ function Notice(spec) {
   var o = typeof spec === 'string' ? { text: spec } : (spec || {});
   var kind = String(o.kind || 'pending');
   var tone = { info: 'pending', pending: 'pending', success: 'success', warning: 'warning', error: 'error' }[kind] || 'pending';
-  var classes = { pending: 'shin-notice shin-notice-pending', success: 'shin-notice shin-notice-success', warning: 'shin-notice shin-notice-warning', error: 'shin-notice shin-notice-error' };
+  var classes = { pending: uiLayoutClass('notice') + ' shin-notice-pending', success: uiLayoutClass('notice') + ' shin-notice-success', warning: uiLayoutClass('notice') + ' shin-notice-warning', error: uiLayoutClass('notice') + ' shin-notice-error' };
   return Text({ className: classes[tone], text: o.text });
 }
 
 /** Trạng thái rỗng dùng cùng một preset căn giữa cho slot lõi và màn Sync. */
 function Empty(spec) {
   var text = typeof spec === 'string' ? spec : (spec && spec.text);
-  return Text({ className: 'shin-empty-state', text: text === undefined || text === null ? '' : String(text) });
+  return Text({ className: uiLayoutClass('empty'), text: text === undefined || text === null ? '' : String(text) });
 }
 
 /** Một trường dữ liệu. `field` ghi đủ đường dẫn khi trường không thuộc `entity` của màn, ví dụ `customer.note` trên form giao dịch. */
@@ -233,7 +252,7 @@ function StandaloneField(label, controlSpec, options) {
   var o = options || {}, spec = controlSpec || {};
   return Box({
     id: o.id || null,
-    className: 'shin-form-field' + (o.className ? ' ' + o.className : ''),
+    className: uiLayoutClass('field') + (o.className ? ' ' + o.className : ''),
     elements: [
       Text({ className: 'shin-form-label', text: String(label === undefined || label === null ? '' : label) }),
       StandaloneControl(spec)
