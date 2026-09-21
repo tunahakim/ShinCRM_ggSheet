@@ -61,7 +61,7 @@ Ghi chú kiểm kê: `align` đang được khai tại `client/schema/screens/fo
 - [ ] Cập nhật `0_Documentation/Phiên code/Cây thư mục code.md` nếu thêm file layout policy hoặc test mới.
 - [x] Ghi commit tài liệu riêng sau khi các tài liệu trên không còn mâu thuẫn với quyết định phiên này.
 
-Ghi chú tiến độ: tài liệu nền đã cập nhật; core/header, Sync shell, ActionStack Account, Empty và token schedule đã được commit riêng. Policy semantic hiện nằm trong `UI_LAYOUT_POLICY` của `client/ui/uiBuilder.html`; test offline gần nhất đạt `1918/1918`. Còn phải hoàn tất allowlist/domain audit, hồi quy cuối và nghiệm thu trực quan DEV.
+Ghi chú tiến độ: tài liệu nền đã cập nhật; core/header, Sync shell, ActionStack Account, Empty và token schedule đã được commit riêng. Policy semantic hiện nằm trong `UI_LAYOUT_POLICY` của `client/ui/uiBuilder.html`; nhóm policy đã commit `343b422`; test offline gần nhất đạt `1918/1918`. Còn phải hoàn tất allowlist/domain audit, hồi quy cuối và nghiệm thu trực quan DEV.
 
 ## 5. Primitive và layout policy
 
@@ -77,7 +77,7 @@ Ghi chú tiến độ: tài liệu nền đã cập nhật; core/header, Sync sh
 - [x] Giữ lại các `text-align`/`justify-content` đặc thù có consumer và ghi chúng vào allowlist; không cấm mù mọi căn chỉnh nội bộ. Bằng chứng: allowlist margin/alignment tại Tài liệu 04 Phần 6 và các test domain trong `tests/cases/layoutSpacing.js`.
 - [x] Chạy test primitive/layout ngay sau nhóm này; `node tests/run.js` đạt `1918`, lỗi `0`, bao gồm owner mặc định và selector cũ.
 - [x] Tick ngay từng mục primitive đã có bằng chứng test trong checklist.
-- [x] Commit riêng nhóm primitive/layout policy và checklist tương ứng; đã commit `e3996d3`.
+- [x] Commit riêng nhóm primitive/layout policy và checklist tương ứng; các phần trước đã commit `e3996d3`, policy semantic đã commit `343b422`.
 
 ## 6. Migration screen schema và builder
 
