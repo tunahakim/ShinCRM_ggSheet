@@ -100,7 +100,7 @@ function screenFormTitle(title, themMoi) {
  */
 function screenFormHeader(header, tieuDe) {
   var source = header || {}, start = Array.isArray(source.start) ? source.start.slice() : [], end = Array.isArray(source.end) ? source.end.slice() : [];
-  start.push({ text: tieuDe, className: typeof uiResolveComponentClass === 'function' ? uiResolveComponentClass('formTitle') : '' });
+  start.push(Text({ text: tieuDe, className: typeof uiResolveComponentClass === 'function' ? uiResolveComponentClass('formTitle') : '' }));
   return { start: start, end: end };
 }
 

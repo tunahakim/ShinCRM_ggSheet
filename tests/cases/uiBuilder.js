@@ -117,7 +117,7 @@ function chay(so) {
     body: [
       { group: '', rows: [['companyName'], ['id', 'taxNumber'], [{ field: 'note', control: 'textarea' }]] }
     ],
-    footer: [{ button: 'LƯU DỮ LIỆU', action: 'saveForm', className: 'btn-save-wide' }]
+    footer: [{ button: 'LƯU DỮ LIỆU', action: 'saveForm' }]
   }, 'customerForm');
 
   check(so, 'header thành hai nhóm glyph, giữ nguyên tooltip và action',
@@ -126,7 +126,7 @@ function chay(so) {
 
   check(so, 'footer khai bằng khóa `button` thì thành nút chữ, không thành nút glyph',
     [form.footer[0].role, form.footer[0].label, form.footer[0].className],
-    ['button', 'LƯU DỮ LIỆU', 'btn-save-wide']);
+    ['button', 'LƯU DỮ LIỆU', 'shin-primary shin-save-wide']);
 
   check(so, 'một cụm thành một Card chứa RowGroup, mỗi mảng con thành một Row',
     [form.body.length, form.body[0].role, form.body[0].elements.map((h) => h.role), form.body[0].elements[0].elements.map((h) => h.role)],
@@ -179,6 +179,23 @@ function chay(so) {
     () => hop.screenHeaderGroup('middle', []), 'chỉ nhận phía');
   checkThrows(so, 'header không được dùng align trên item lá',
     () => hop.screenBuild({ entity: 'customer', header: { start: [{ icon: 'close', align: 'right' }], end: [] } }, 'x'), 'không được khai `align`');
+  check(so, 'screenBar giữ nguyên Block do component dựng sẵn',
+    hop.screenBar([hop.Icon({ icon: 'pencil', className: 'shin-config-edit-icon' })], 'titleActions của card')[0].className,
+    'shin-config-edit-icon');
+  checkThrows(so, 'titleActions dạng object không được truyền className',
+    () => hop.screenBar([{ icon: 'pencil', className: 'shin-x' }], 'titleActions của card'), 'không được khai `className`');
+  checkThrows(so, 'screen schema không nhận className ở group body',
+    () => hop.screenBuild({ entity: 'customer', body: [{ group: '', rows: [], className: 'shin-x' }] }, 'x'), 'không được khai `className`');
+  checkThrows(so, 'screen schema không nhận className ở footer item',
+    () => hop.screenBuild({ entity: 'customer', footer: [{ button: 'Lưu', action: 'saveForm', className: 'shin-x' }] }, 'x'), 'không được khai `className`');
+  checkThrows(so, 'screen schema không nhận className ở field object',
+    () => hop.screenBuild({ entity: 'customer', body: [{ group: '', rows: [[{ field: 'companyName', className: 'shin-x' }]] }] }, 'x'), 'không được khai `className`');
+  checkThrows(so, 'screen schema không nhận style ở menu lồng',
+    () => hop.screenBuild({ entity: 'customer', header: { start: [{ icon: 'more', menu: [{ label: 'Lưu', action: 'saveForm', style: 'color:red' }] }], end: [] } }, 'x'), 'không được khai `style`');
+  checkThrows(so, 'screen schema không nhận khóa layout ở cấp màn',
+    () => hop.screenBuild({ entity: 'customer', align: 'right' }, 'x'), 'không được khai `align`');
+  checkThrows(so, 'body group chỉ nhận group và rows',
+    () => hop.screenBuild({ entity: 'customer', body: [{ group: '', rows: [], extra: true }] }, 'x'), 'chỉ dùng `group` và `rows`');
 
   check(so, 'vùng không khai thì thành mảng rỗng, để engine ẩn hẳn vùng đó',
     [hop.screenBuild({ entity: 'customer' }, 'trống').header, hop.screenBuild({ entity: 'customer' }, 'trống').footer, hop.screenBuild({ entity: 'customer' }, 'trống').body],

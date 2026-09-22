@@ -7,10 +7,58 @@
  * Tệp này cũng **không chạm DOM**, nên bộ kiểm offline gọi được đúng hàm thật.
  */
 
+/* Các khóa presentation không được đi từ screen schema xuống Block. Resolver/catalog là owner duy nhất của chúng. */
+var SCREEN_SCHEMA_PRESENTATION_KEYS = {
+  className: true,
+  rootClass: true,
+  classes: true,
+  style: true,
+  align: true,
+  justify: true,
+  margin: true,
+  marginTop: true,
+  marginRight: true,
+  marginBottom: true,
+  marginLeft: true,
+  gap: true,
+  rowGap: true,
+  columnGap: true,
+  padding: true,
+  display: true,
+  position: true,
+  selector: true,
+  spatialConfig: true,
+  variant: true,
+  state: true,
+  muted: true,
+  tone: true,
+  color: true
+};
+
+function screenSchemaPresentationKey(key) {
+  return Object.prototype.hasOwnProperty.call(SCREEN_SCHEMA_PRESENTATION_KEYS, key) || /class$/i.test(key);
+}
+
+function screenRejectPresentationKeys(value, viTri, daDuyet) {
+  if (!value || typeof value !== 'object') { return; }
+  daDuyet = daDuyet || [];
+  if (daDuyet.indexOf(value) !== -1) { return; }
+  daDuyet.push(value);
+  Object.keys(value).forEach(function (key) {
+    if (screenSchemaPresentationKey(key)) {
+      throw new Error(viTri + ' không được khai `' + key + '`; presentation phải do UI catalog/resolver sở hữu.');
+    }
+    screenRejectPresentationKeys(value[key], viTri + '.' + key, daDuyet);
+  });
+}
+
 /** Một phần tử trong hàng: chuỗi trần là dạng viết tắt của object chỉ có `field` — tài liệu 03 Phần 8. */
 function screenFieldSpec(phanTu, viTri) {
   if (typeof phanTu === 'string') { return { field: phanTu }; }
-  if (phanTu && typeof phanTu === 'object' && typeof phanTu.field === 'string') { return phanTu; }
+  if (phanTu && typeof phanTu === 'object' && typeof phanTu.field === 'string') {
+    screenRejectPresentationKeys(phanTu, viTri);
+    return phanTu;
+  }
   throw new Error('Phần tử ở ' + viTri + ' phải là tên trường, hoặc object có khóa `field`.');
 }
 
@@ -21,26 +69,25 @@ function screenFieldSpec(phanTu, viTri) {
  */
 function screenBarItem(muc, viTri) {
   if (!muc || typeof muc !== 'object') { throw new Error('Mục ở ' + viTri + ' phải là object.'); }
-  if (Object.prototype.hasOwnProperty.call(muc, 'align')) { throw new Error(viTri + ' không được khai `align`; dùng nhóm header hoặc wrapper layout.'); }
+  if (muc.role && BLOCK_ROLES.indexOf(muc.role) !== -1) { return muc; }
+  screenRejectPresentationKeys(muc, viTri);
   var surface = viTri.indexOf('.footer') >= 0 ? 'footer' : (viTri.indexOf('.header') >= 0 ? 'header' : 'titleActions');
   if (typeof muc.text === 'string') {
-    return Text({ text: muc.text, className: muc.className || '' });
+    return Text({ text: muc.text });
   }
   if (typeof muc.button === 'string') {
     var nut = { label: muc.button };
-    ['action', 'id', 'menu', 'spatialConfig'].forEach(function (k) {
+    ['action', 'id', 'menu', 'disabled'].forEach(function (k) {
       if (muc[k] !== undefined) { nut[k] = muc[k]; }
     });
-    if (muc.className !== undefined) { nut.className = muc.className; }
-    if (!nut.className && typeof uiResolveActionClass === 'function') {
-      nut.className = uiResolveActionClass(nut.action, 'button', surface);
-    }
+    nut.className = typeof uiResolveActionClass === 'function' ? uiResolveActionClass(nut.action, 'button', surface) : '';
     return Button(nut);
   }
-  var icon = Object.assign({}, muc);
-  if (!icon.className && typeof uiResolveActionClass === 'function') {
-    icon.className = uiResolveActionClass(icon.action, 'icon', surface);
-  }
+  var icon = {};
+  ['icon', 'tooltip', 'label', 'action', 'id', 'menu', 'toggle', 'disabled'].forEach(function (k) {
+    if (muc[k] !== undefined) { icon[k] = muc[k]; }
+  });
+  icon.className = typeof uiResolveActionClass === 'function' ? uiResolveActionClass(icon.action, 'icon', surface) : '';
   return Icon(icon);
 }
 
@@ -113,9 +160,14 @@ function screenBody(body, screenName) {
     if (!cum || typeof cum !== 'object' || !Array.isArray(cum.rows)) {
       throw new Error('Cụm thứ ' + (i + 1) + ' của `body` phải có khóa `rows` là mảng các hàng.');
     }
+    screenRejectPresentationKeys(cum, 'body cụm ' + (i + 1));
+    Object.keys(cum).forEach(function (key) {
+      if (key !== 'group' && key !== 'rows') {
+        throw new Error('Cụm thứ ' + (i + 1) + ' của `body` không có khóa `' + key + '`; chỉ dùng `group` và `rows`.');
+      }
+    });
     return Card({
       title: cum.group === undefined ? null : cum.group,
-      className: cum.className || '',
       elements: [RowGroup({ elements: cum.rows.map(function (hang, h) {
         if (!Array.isArray(hang)) { throw new Error('Hàng ' + (h + 1) + ' của cụm ' + (i + 1) + ' phải là mảng, vì cùng một mảng là cùng một hàng.'); }
         return Row(hang.map(function (phanTu, c) {
@@ -136,6 +188,11 @@ function screenBody(body, screenName) {
 function screenBuild(decl, ten) {
   var nhan = ten || 'màn';
   if (!decl || typeof decl !== 'object') { throw new Error('Bản khai của ' + nhan + ' không có.'); }
+  Object.keys(decl).forEach(function (key) {
+    if (screenSchemaPresentationKey(key)) {
+      throw new Error('Bản khai ' + nhan + ' không được khai `' + key + '`; presentation phải do UI catalog/resolver sở hữu.');
+    }
+  });
   if (typeof decl.entity !== 'string') { throw new Error('Màn ' + nhan + ' thiếu khóa `entity` — thực thể mà màn này ghi vào.'); }
 
   return {

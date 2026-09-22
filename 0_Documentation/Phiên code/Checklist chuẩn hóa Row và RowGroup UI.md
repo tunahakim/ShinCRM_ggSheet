@@ -110,6 +110,7 @@
 ## I. Dọn hardcode và contract chống tái phạm
 
 - [x] [Tự động] Quét toàn bộ screen schema tìm `className`, `rootClass`, `classes`, `*Class`, `style`, selector DOM và alignment tự do. Bằng chứng: `tests/cases/screenSchemaAudit.js` và `tests/cases/uiSchema.js`.
+- [x] [Tự động] Enforce tại runtime rằng presentation tự do trong screen schema bị chặn ở cấp màn, group/field, header/footer, menu lồng và `titleActions`; component chỉ được truyền Block đã dựng bằng catalog/resolver. Bằng chứng: `tests/cases/uiBuilder.js` kiểm tra từng cửa, resolver vẫn cấp class theo `action`, `screenFormHeader` trả `Text` Block và `fbmSyncConfigTitleActions` trả `Icon` Block; `node tests/run.js` đạt `1946 đạt, 0 không đạt`.
 - [x] [Tự động] Quét CSS màn hình tìm margin/gap dùng để điều khiển sibling spacing; phân loại thành lỗi cần xóa hoặc ngoại lệ có owner. Bằng chứng: `tests/cases/layoutSpacing.js`, `fbmSync/Components.js` và audit allowlist.
 - [x] [Tự động] Xóa hardcode gây lệch mép phải của nhóm toggle khi wrapper full-width đi cùng margin ngang; chuyển indentation vào policy wrapper nếu cần. Bằng chứng: `.shin-sync-login-policy-children` chỉ còn padding/border; `layoutSpacing` chặn lại `margin-left` và selector margin con.
 - [x] [Tự động] Với mọi ngoại lệ còn lại, ghi consumer, lý do, owner, selector và test trong allowlist `Ghi chú tạm audit class và component UI.md` mục 10.
@@ -171,6 +172,7 @@
 - [x] [Tự động] Commit từng nhóm component sau khi H và test liên quan xanh. Nhóm Settings commit tại `15e4154`; nhóm Sync generic commit tại `5b352f4`; nhóm activity slot commit tại `68da852`; nhóm unsaved dialog commit tại `3cf1883`; nhóm status commit tại `85280f3`.
 - [x] [Tự động] Commit nhóm contract test/dọn hardcode sau khi I và test liên quan xanh: `3a8357f`.
 - [x] [Tự động] Chạy lại full test trước commit cuối: `node tests/run.js` đạt `1937 đạt, 0 không đạt` sau commit `57ee0cf`.
+- [x] [Tự động] Chạy lại full test sau contract screen schema: `node tests/run.js` đạt `1946 đạt, 0 không đạt`; nhóm thay đổi đang chờ commit ngay sau khi checklist được ghi.
 - [x] [Tự động] Nghiệm thu GAS DEV bằng `node tests/gas.js verifySheets --push`: deployment `@491`, kết quả `OK`; Activity/Category/Config/Log đạt, Customer vẫn có cảnh báo lệch thứ tự cột có sẵn trên Sheet.
 - [x] [Tự động] Ghi commit hash vào checklist sau mỗi nhóm; nhóm hiện tại dùng `3a8357f`, không gom file ngoài phạm vi.
 - [x] [Tự động] Tách các ca nghiệm thu trực quan thành các bước độc lập, mỗi bước có kết quả kỳ vọng cụ thể; commit checklist là `0064f22`.
