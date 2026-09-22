@@ -185,6 +185,8 @@
 - [x] [Tự động] Cập nhật số liệu tiến độ trong checklist căn chỉnh sang test `1938/1938` và GAS DEV `@491`; commit là `a3919c9`.
 - [x] [Tự động] Tái sinh và kiểm tra artifact preview Sidebar sau refactor; commit bằng chứng là `a73bef4`.
 - [x] [Tự động] Sửa mô tả kích thước preview để phản ánh viewport `500×1200` và Sidebar 300px hiển thị trọn; commit là `90dd647`.
+- [x] [Tự động] Commit nhóm Card dùng `Row` cho header và `RowGroup` cho body sau khi full test đạt `1946 đạt, 0 không đạt`: `2502cbe`.
+- [x] [Tự động] Đẩy nhóm Card lên GAS DEV bằng `node tests/gas.js verifySheets --push`: revision `@494`, hàm trả `OK`; Customer vẫn có cảnh báo thứ tự cột có sẵn trên Sheet.
 - [ ] [Cần kiểm chứng thật] Sau khi code và test offline hoàn tất, dừng ở bước cần chủ dự án kiểm tra trực quan và ghi rõ thao tác cần thực hiện.
 
 ## M. Audit hợp đồng RowGroup sau refactor
