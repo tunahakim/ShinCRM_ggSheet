@@ -63,7 +63,7 @@ Ghi chú kiểm kê: `align` đang được khai tại `client/schema/screens/fo
 - [x] Kiểm tra `0_Documentation/Phiên code/Cây thư mục code.md`: không phát sinh file hoặc thư mục mới cho layout policy/test, nên không cần cập nhật cây.
 - [x] Ghi commit tài liệu riêng sau khi các tài liệu trên không còn mâu thuẫn với quyết định phiên này.
 
-Ghi chú tiến độ: tài liệu nền đã cập nhật; core/header, Sync shell, ActionStack Account, Empty và token schedule đã được commit riêng. Policy semantic hiện nằm trong `UI_LAYOUT_POLICY` của `client/ui/uiBuilder.html`; nhóm policy đã commit `343b422`, nhóm hồi quy form/view/card đã commit `1f385b7`; test offline gần nhất đạt `1922/1922`; GAS DEV probe Sidebar đạt ở revision `@481`. Hợp đồng form header `tiêu đề | Hủy | Lưu` đã được triển khai và kiểm thử; còn nghiệm thu trực quan DEV.
+Ghi chú tiến độ: tài liệu nền đã cập nhật; core/header, Sync shell, ActionStack Account, Empty và token schedule đã được commit riêng. Policy semantic hiện nằm trong `UI_LAYOUT_POLICY` của `client/ui/uiBuilder.html`; nhóm policy đã commit `343b422`, nhóm hồi quy form/view/card đã commit `1f385b7`; lượt kiểm thử hiện tại đạt `1938/1938`; GAS DEV hiện ở revision `@491`. Hợp đồng form header `tiêu đề | Hủy | Lưu` đã được triển khai và kiểm thử; còn nghiệm thu trực quan DEV.
 
 ## 5. Primitive và layout policy
 
