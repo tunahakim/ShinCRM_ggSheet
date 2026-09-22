@@ -49,7 +49,7 @@
 
 ### Ranh giới thực thi đã chốt
 
-- [x] Schema màn hình giữ nhãn, id, class, thứ tự vùng, factory Card/Row/Stack/Box và các giá trị mặc định nhìn thấy trên giao diện.
+- [x] Schema màn hình giữ nhãn, id, class, thứ tự vùng, factory Card/Row/RowGroup/Box và các giá trị mặc định nhìn thấy trên giao diện.
 - [x] Controller màn hình giữ state/DTO, phép chọn nhánh nghiệp vụ, phép map dữ liệu động và truyền slot vào factory schema; không giữ HTML, DOM construction hoặc chuỗi UI tĩnh.
 - [x] Khung năm vùng cố định trong `client/Sidebar.html` chỉ là host của renderer (header/progress/info/body/footer), không phải một màn nghiệp vụ; mọi nội dung màn được thay bằng Block từ schema.
 - [x] Schema kết quả giữ format nội dung động (prefix, separator, fallback) để controller chỉ nối dữ liệu trả về từ GAS/Extension.

@@ -20,7 +20,7 @@
 
 - [x] Chốt Page/Section: các Card con đi theo trục `start`, chiếm vùng được phép và không tự căn riêng.
 - [x] Chốt Card/CardBody: block con bắt đầu từ `start`; Card không sở hữu vị trí ngoài của chính nó.
-- [x] Chốt Stack: xếp dọc, mặc định `stretch` theo chiều ngang và `start` theo nội dung.
+- [x] Chốt RowGroup: xếp dọc, mặc định `stretch` theo chiều ngang và `start` theo nội dung.
 - [x] Chốt Row generic: xếp ngang, mặc định bắt đầu từ `start`; không tự `space-between`; căn dọc mặc định không được làm lệch Field nhiều dòng.
 - [x] Chốt wrapper hàng điều khiển có tên riêng được phép căn dọc `center` khi tất cả con là control cùng hàng.
 - [x] Chốt Field/StandaloneField: label và control đi theo trục `start`; control chiếm độ rộng do Field/wrapper quyết định.
@@ -30,7 +30,7 @@
 - [x] Chốt ActionStack: nhóm action được đặt ở vị trí cuối của vùng hành động theo preset tập trung; từng Button không tự nhận biết mình nằm bên phải.
 - [x] Chốt Header: cấu trúc nhóm sở hữu vị trí, không dùng một item đánh dấu `align`; riêng form header chốt thứ tự `tiêu đề | Hủy | Lưu`, với `Lưu` ngoài cùng bên phải.
 - [x] Chốt Notice/Error/Preview: nội dung bắt đầu từ `start`; icon trạng thái và nút đóng do component đặc thù sở hữu.
-- [x] Chốt Loading/Empty state: được căn giữa chỉ vì trạng thái này có ý nghĩa hiển thị rỗng/chờ; không dùng làm mặc định cho Stack/Card.
+- [x] Chốt Loading/Empty state: được căn giữa chỉ vì trạng thái này có ý nghĩa hiển thị rỗng/chờ; không dùng làm mặc định cho RowGroup/Card.
 - [x] Chốt bảng: căn cột theo ý nghĩa dữ liệu do Table resolver sở hữu; chữ bắt đầu, số kết thúc, cột action theo preset Table.
 - [x] Chốt form nhập số: không tự động đổi sang căn phải chỉ vì kiểu dữ liệu NUMBER; quy tắc căn trong form và trong bảng là hai ngữ cảnh khác nhau.
 - [x] Chốt ngoại lệ chỉ được thêm ở primitive/layout catalog/domain component có tên, consumer, lý do và test bảo vệ.
@@ -42,7 +42,7 @@
 - [x] Liệt kê mọi nơi `Block` cho phép khóa `align`; phân biệt API primitive với khai báo screen schema.
 - [x] Liệt kê mọi nơi renderer dịch `align` thành class hoặc style.
 - [x] Liệt kê mọi selector CSS còn dùng `shin-align-right`, `margin-left: auto`, `justify-content`, `align-items` và `text-align`; phân loại generic, primitive, domain và host tĩnh.
-- [x] Liệt kê mọi nơi dùng `Row`, `Stack`, `ActionStack`, `StandaloneField`, `Button`, `Icon` trong form lõi và bốn màn Sync.
+- [x] Liệt kê mọi nơi dùng `Row`, `RowGroup`, `ActionStack`, `StandaloneField`, `Button`, `Icon` trong form lõi và bốn màn Sync.
 - [x] Liệt kê mọi header có cấu trúc nhóm đầu/tiêu đề/nhóm cuối; ghi rõ thứ tự hiện tại phải được bảo toàn.
 - [x] Liệt kê các layout đặc thù được giữ lại: shell header, schedule row, tab row, pipeline, conflict header, status table, history row, popup và dialog.
 - [x] Ghi baseline test trước khi sửa: nhóm UI/layout và tổng `node tests/run.js`, chỉ ghi số lỗi thuộc phiên khác nếu có.
@@ -54,7 +54,7 @@ Ghi chú kiểm kê: `align` đang được khai tại `client/schema/screens/fo
 
 - [x] Cập nhật `03. Data schema & UI schema.md`: bỏ mô tả screen schema tự do khai `align`; mô tả cấu trúc header theo nhóm và vị trí do layout wrapper sở hữu.
 - [x] Cập nhật `03. Data schema & UI schema.md`: tách căn nội dung bên trong primitive, căn con trong wrapper và vị trí cả wrapper trong vùng cha.
-- [x] Cập nhật `03. Data schema & UI schema.md`: ghi bảng mặc định cho Page, CardBody, Stack, Row, Field, Text, Button, Icon, ActionStack, Table, Loading/Empty.
+- [x] Cập nhật `03. Data schema & UI schema.md`: ghi bảng mặc định cho Page, CardBody, RowGroup, Row, Field, Text, Button, Icon, ActionStack, Table, Loading/Empty.
 - [x] Cập nhật `03. Data schema & UI schema.md`: ghi rõ ngoại lệ dùng resolver/catalog hoặc component ngữ nghĩa, không dùng CSS/style trong schema.
 - [x] Cập nhật `04. Bộ máy render và luồng lưu.md`: mô tả layout policy tập trung, header group và ranh giới giữa `spatialConfig` với alignment.
 - [x] Cập nhật `04. Bộ máy render và luồng lưu.md`: chốt renderer không dịch khóa `align` của screen schema thành class `shin-align-right` nữa.
@@ -73,7 +73,7 @@ Ghi chú tiến độ: tài liệu nền đã cập nhật; core/header, Sync sh
 - [x] Giữ Button/Icon chỉ sở hữu hình học và căn nội dung bên trong; không cho primitive tự thêm margin để thay vị trí sibling. Bằng chứng: kiểm CSS Button/Icon và Block key contract trong `tests/cases/layoutSpacing.js`, `tests/cases/blockKeys.js`.
 - [x] Chốt Row generic không tự `space-between`; nếu cần chia hai phía phải dùng wrapper có tên như SplitRow/HeaderGroup. Bằng chứng: kiểm Row generic trong `tests/cases/layoutSpacing.js`.
 - [x] Chốt wrapper control-row có căn dọc riêng; không đổi toàn bộ Row generic chỉ để sửa một loại hàng. Bằng chứng: `.shin-inline-field-row` và ca kiểm trong `tests/cases/layoutSpacing.js`.
-- [x] Chốt các component Loading/Empty/Table/Notice có preset riêng, không thay đổi mặc định Stack/CardBody. Bằng chứng: primitive `Empty`, CSS preset và ca kiểm trong `tests/cases/layoutSpacing.js`.
+- [x] Chốt các component Loading/Empty/Table/Notice có preset riêng, không thay đổi mặc định RowGroup/CardBody. Bằng chứng: primitive `Empty`, CSS preset và ca kiểm trong `tests/cases/layoutSpacing.js`.
 - [x] Cập nhật CSS host/header để nhóm cuối dùng owner nhóm, không dùng `.shin-align-right` trên node lá. Bằng chứng: `.shin-header-group-start/end` trong `client/style/frame.html` và kiểm CSS.
 - [x] Xóa hoặc vô hiệu hóa selector generic `.shin-align-right` sau khi không còn consumer. Bằng chứng: kiểm không còn selector trong `tests/cases/layoutSpacing.js`.
 - [x] Giữ lại các `text-align`/`justify-content` đặc thù có consumer và ghi chúng vào allowlist; không cấm mù mọi căn chỉnh nội bộ. Bằng chứng: allowlist margin/alignment tại Tài liệu 04 Phần 6 và các test domain trong `tests/cases/layoutSpacing.js`.
@@ -104,7 +104,7 @@ Ghi chú tiến độ: tài liệu nền đã cập nhật; core/header, Sync sh
 - [x] Kiểm tra view: nhóm công cụ đầu và nhóm hành động cuối không bị dồn hoặc đảo thứ tự. Bằng chứng: ca header view trong `tests/cases/uiSchema.js` và render vùng header trong `tests/cases/viewScreen.js`.
 - [x] Kiểm tra Card titleActions: dùng wrapper action chuẩn của Card; không dùng `align` lá để đẩy icon. Bằng chứng: `.shin-card-actions` và không có `.shin-align-right` trong `tests/cases/renderEngine.js`.
 - [x] Kiểm tra Run: action kiểm tra, chạy, settings và approval dùng wrapper semantic tương ứng. Bằng chứng: ActionStack + hai `shin-single-action-row` trong `tests/cases/fbmSync/Sidebar.js`.
-- [x] Kiểm tra Account: identity fields, status và action group dùng Field/Stack/ActionStack chuẩn. Bằng chứng: `FBM_SYNC_ACCOUNT_UI.layout.actionStack`, cây identity/login và test `fbmSync/Sidebar`.
+- [x] Kiểm tra Account: identity fields, status và action group dùng Field/RowGroup/ActionStack chuẩn. Bằng chứng: `FBM_SYNC_ACCOUNT_UI.layout.actionStack`, cây identity/login và test `fbmSync/Sidebar`.
 - [x] Kiểm tra Results: tab, description, summary, conflict, error, log, audit và pagination giữ alignment đặc thù đã định nghĩa. Bằng chứng: các ca Results trong `tests/cases/fbmSync/Sidebar.js` và preset domain trong `tests/cases/layoutSpacing.js`.
 - [x] Kiểm tra Settings: công tắc tổng, chiều đồng bộ, schedule row, detail inputs và nút Lưu lịch nền dùng preset đúng owner. Bằng chứng: cây schedule/detail và test Settings trong `tests/cases/fbmSync/Sidebar.js`, token schedule trong `tests/cases/layoutSpacing.js`.
 - [x] Kiểm tra Notice/Error/Preview xuất hiện và biến mất không làm node con tự căn lại ngoài wrapper. Bằng chứng: render target Notice trong `tests/cases/fbmSync/UserJourneys.js` và preset Notice/Empty/Preview trong `tests/cases/layoutSpacing.js`.
@@ -122,7 +122,7 @@ Ghi chú tiến độ: tài liệu nền đã cập nhật; core/header, Sync sh
 - [x] Test xác nhận selector hai class của HeaderGroup giữ `display:flex` dù `.shin-box { display:block; }` được nạp sau. Bằng chứng: ca CSS cascade trong `tests/cases/layoutSpacing.js`.
 - [x] Test xác nhận Button/Icon không sinh class căn sibling hoặc margin ngoài. Bằng chứng: `tests/cases/layoutSpacing.js` và `tests/cases/renderEngine.js`.
 - [x] Test xác nhận Row generic không tự dùng `space-between`; SplitRow/ActionStack mới được phép có hành vi đó. Bằng chứng: kiểm Row generic và ActionStack trong `tests/cases/layoutSpacing.js`.
-- [x] Test xác nhận Stack/CardBody/ActionStack có owner alignment duy nhất, không bị component con ghi đè. Bằng chứng: `tests/cases/layoutSpacing.js` và `tests/cases/fbmSync/Sidebar.js`.
+- [x] Test xác nhận RowGroup/CardBody/ActionStack có owner alignment duy nhất, không bị component con ghi đè. Bằng chứng: `tests/cases/layoutSpacing.js` và `tests/cases/fbmSync/Sidebar.js`.
 - [x] Test xác nhận Table/Loading/Empty/Notice dùng preset domain đúng owner, không làm thay đổi default generic. Bằng chứng: ca `Loading/Empty/Notice/Table` trong `tests/cases/layoutSpacing.js`.
 - [x] Test xác nhận hướng logic `start/end` không bị hard-code `left/right` trong layout policy. Bằng chứng: test `layout policy dùng hướng logic` trong `tests/cases/uiBuilder.js`.
 - [x] Test xác nhận schema sai hoặc alignment enum sai bị fail sớm với thông báo tên màn/đường dẫn. Bằng chứng: các ca header sai cấu trúc/item trong `tests/cases/uiBuilder.js` và `uiLayoutClass` thiếu policy.

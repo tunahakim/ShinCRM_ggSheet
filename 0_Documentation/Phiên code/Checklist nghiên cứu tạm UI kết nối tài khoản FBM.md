@@ -66,10 +66,10 @@
 ## 2. Quy tắc tài liệu chuẩn áp dụng
 
 - UI schema chỉ mô tả ý định/hành vi; không đưa selector/CSS tự do vào schema.
-- Dùng component chung khi cấu trúc và hành vi giống nhau; không tự tạo HTML theo nghiệp vụ nếu `Card`, `Row`, `Stack`, `Button`, `Text`, `StandaloneField` đã đủ.
+- Dùng component chung khi cấu trúc và hành vi giống nhau; không tự tạo HTML theo nghiệp vụ nếu `Card`, `Row`, `RowGroup`, `Button`, `Text`, `StandaloneField` đã đủ.
 - Mỗi quyết định presentation và trạng thái chỉ có một nơi sở hữu; layout action phải được ánh xạ tập trung.
 - Module FBM dùng renderer/schema chung; không ghép chuỗi HTML cho card, header, trạng thái hoặc loading.
-- `Row` dùng cho một hàng nút chia đều; `Stack` dùng để xếp dọc các phần tử với gap. Các action độc lập không được đặt trực tiếp cạnh nhau trong một `Box` không có gap.
+- `Row` dùng cho một hàng nút chia đều; `RowGroup` dùng để xếp dọc các row item với gap. Các action độc lập không được đặt trực tiếp cạnh nhau trong một `Box` không có gap.
 - Thông báo chung dưới header là ngoại lệ có điều kiện đã được tài liệu UI chuẩn ghi rõ cho mismatch username; các dòng trạng thái đồng bộ nền không thuộc màn Tài khoản.
 - GAS giữ state nghiệp vụ, quyết định payload/dirty/conflict; Sidebar điều phối hiển thị và thời điểm gọi GAS.
 
@@ -89,10 +89,10 @@
 - Hàm mới trả về một `Row` qua `FBM_SYNC_RUN_UI.layout.actionRow(Button(...))` cho nút `Cài đặt đồng bộ nền`.
 - Tệp: `1_ShinCRM_GAS/client/sync/screens/run.html`, `fbmSyncRenderRun()` khoảng dòng 44–49: truyền `action: actionRow(fbmSyncRunActionBlock(status))` và `settings: fbmSyncRunBackgroundSettingsBlock(status)`.
 - Tệp: `1_ShinCRM_GAS/client/sync/screens/run.html`, `fbmSyncPatchRun()` khoảng dòng 51–55: render trực tiếp `[actionRow(...), fbmSyncRunBackgroundSettingsBlock(status)]` vào cùng `FBM_SYNC_RUN_SCHEMA.regions.action`.
-- Tệp: `1_ShinCRM_GAS/client/sync/fbmSyncUiSchema.html`, `FBM_SYNC_RUN_UI.layout.screen()` khoảng dòng 23–29: vùng action là `Box({ id: regions.action, elements: [slots.action, slots.settings] })`; `Box` này không có class Stack/gap.
+- Tệp: `1_ShinCRM_GAS/client/sync/fbmSyncUiSchema.html`, `FBM_SYNC_RUN_UI.layout.screen()` khoảng dòng 23–29: vùng action là `Box({ id: regions.action, elements: [slots.action, slots.settings] })`; `Box` này không có class RowGroup/gap.
 - Tệp: `1_ShinCRM_GAS/client/ui/uiClassMap.html`, map `run.actionRow = 'shin-single-action-row'`; mỗi action row có class riêng nhưng không có container dọc chung.
-- Tệp: `1_ShinCRM_GAS/client/style/components.html`, `.shin-row` có `gap: 0`, chỉ đặt khoảng cách giữa các con trực tiếp bằng `.shin-row > * + *`; `.shin-single-action-row` chỉ điều chỉnh chính một row; `.shin-stack/.shin-action-stack` mới có `flex-direction: column` và `gap: var(--shin-gap-2)`.
-- Kết luận hiện tại: lỗi trực tiếp do patch trước ghép hai `Row` sibling vào `Box` không có `Stack/gap`; không phải do `Row` tự nhiên làm sai. Tuy nhiên hệ thống thiếu ràng buộc/helper để ngăn kiểu ghép này, nên cần sửa cả cấu trúc layout dùng chung và thêm test regression.
+- Tệp: `1_ShinCRM_GAS/client/style/components.html`, `.shin-row` có `gap: 0`, chỉ đặt khoảng cách giữa các con trực tiếp bằng `.shin-row > * + *`; `.shin-single-action-row` chỉ điều chỉnh chính một row; `.shin-row-group/.shin-action-stack` mới có `flex-direction: column` và `gap: var(--shin-gap-2)`.
+- Kết luận hiện tại: lỗi trực tiếp do patch trước ghép hai `Row` sibling vào `Box` không có `RowGroup/gap`; không phải do `Row` tự nhiên làm sai. Tuy nhiên hệ thống thiếu ràng buộc/helper để ngăn kiểu ghép này, nên cần sửa cả cấu trúc layout dùng chung và thêm test regression.
 - Cập nhật sau sửa: core có `ActionStack` sở hữu xếp dọc và gap; Run chỉ truyền hai action vào helper này. CSS fallback cũng ngăn hai `shin-single-action-row` sibling dính mép; không thêm margin cục bộ.
 
 ### 3.3. Nguyên nhân username bị hiển thị `AN***`
@@ -130,7 +130,7 @@
 ### 3.6. Kết luận hành vi hiện tại cho năm câu hỏi của chủ dự án
 
 - Câu 1: Dòng trạng thái nền hiện vẫn được dựng ở `fbmSyncConnectionStatusBlocks()` và truyền vào card kết nối Account; nó chưa được xóa.
-- Câu 2: Hai nút Run dính là lỗi trực tiếp của patch trước: hai `shin-single-action-row` được đưa làm sibling trực tiếp vào `Box` action không có `Stack/gap`. CSS `gap` của từng Row chỉ áp dụng bên trong Row; không tạo khoảng cách giữa hai Row. Đây chưa phải lỗi bản thân primitive `Row`, nhưng hệ thống thiếu API/ràng buộc ngăn cách ghép sai nên phải sửa ở layout dùng chung và thêm regression test.
+- Câu 2: Hai nút Run dính là lỗi trực tiếp của patch trước: hai `shin-single-action-row` được đưa làm sibling trực tiếp vào `Box` action không có `RowGroup/gap`. CSS `gap` của từng Row chỉ áp dụng bên trong Row; không tạo khoảng cách giữa hai Row. Đây chưa phải lỗi bản thân primitive `Row`, nhưng hệ thống thiếu API/ràng buộc ngăn cách ghép sai nên phải sửa ở layout dùng chung và thêm regression test.
 - Câu 3: Code Extension hiện tại không mask username khi mã hóa/lưu credential mới; nó trả username đầy đủ ở metadata và payload mã hóa. Giá trị `AN***` đang xuất hiện vì metadata `public.usernameHint` đã lưu trong GAS/deployment hiện tại là chuỗi đã mask từ dữ liệu/lần lưu cũ. Sidebar hiện chỉ đọc metadata đó nên hiển thị lại `AN***`; GAS/Sidebar không có key để giải mã vault Extension và tự khôi phục `ANHLT`.
 - Câu 4: Khi identity username đổi nhưng `Username FBM` vẫn là username đầy đủ cũ, client sẽ phát hiện mismatch và popup trước khi gọi GAS; xác nhận thì gửi `mode: 'preserve'` và `keepOnIdentityChange: true`, nên identity mới được lưu còn credential cũ giữ nguyên. Nhưng nếu ô `Username FBM` đang là `AN***`, hàm `fbmSyncUsernameComparable()` cố ý bỏ qua chuỗi có `*`, nên hiện tại không cảnh báo; đây là lý do hành vi trong ảnh không đạt yêu cầu.
 - Câu 5, password: Mở edit không lấy plaintext password cũ; ô password rỗng. Nếu username trên form trùng `public.usernameHint` hiện tại và password để rỗng, client gửi `credential.mode: 'preserve'`; GAS không ghi envelope mới, nên password cũ trong vault Extension không bị thay bằng rỗng. Sau save, DOM password lại bị xóa. Nếu username form khác hint hiện tại mà password vẫn rỗng, client hiện chặn cục bộ vì chỉ có một trong hai trường username/password; chưa gọi GAS.
@@ -167,7 +167,7 @@
 - Khi hai username đều có giá trị và khác nhau, lúc lưu edit surface `connection` hiện popup cảnh báo; xác nhận vẫn cho lưu nguyên tử, hủy không gọi GAS. Mismatch banner nhỏ dưới header chỉ hiện khi module đang bật, trên mọi màn hình; banner không thay popup.
 - Khối `Chính sách tự đăng nhập` luôn có dòng trạng thái riêng phía trên: bật là `Đã bật tính năng đăng nhập tự động` màu xanh, tắt là `Đã tắt tính năng đăng nhập tự động` màu đỏ. Nếu policy bật nhưng chưa có credential thì thêm notice readiness riêng.
 - Nếu chưa có credential, không cho sửa policy; icon sửa vẫn có thể bấm để mở popup giải thích, có nút/link `Đi tới Đăng nhập tự động` và `[Quay lại]`, link tới đúng khối khai báo username/password.
-- Layout UI: `Row` chỉ đại diện phần tử cùng một dòng; container/`Stack`/`Flow` dùng chung sở hữu khoảng cách dọc giữa các action độc lập. Không sửa bằng margin cục bộ màn Run. Toàn bộ audit UI codebase vẫn chờ lệnh riêng, không mở rộng trong phiên này.
+- Layout UI: `Row` chỉ đại diện phần tử cùng một dòng; `RowGroup`/`Flow` dùng chung sở hữu khoảng cách dọc giữa các action độc lập. Không sửa bằng margin cục bộ màn Run. Toàn bộ audit UI codebase vẫn chờ lệnh riêng, không mở rộng trong phiên này.
 
 ## 3.9. Chi tiết state machine đã được chủ dự án duyệt
 
@@ -215,7 +215,7 @@
 ## 4. Việc cần làm theo thứ tự
 
 - [x] Đọc Extension để xác định hợp đồng metadata username; code hiện tại trả username đầy đủ, còn `AN***` là dữ liệu metadata đã tồn tại trong GAS/deployment.
-- [x] Đọc đầy đủ renderer `Row`, `Stack`, `Box` và CSS component liên quan; xác định `Row` chỉ có trách nhiệm một hàng và gap dọc phải do container chung sở hữu.
+- [x] Đọc đầy đủ renderer `Row`, `RowGroup`, `Box` và CSS component liên quan; xác định `Row` chỉ có trách nhiệm một hàng và gap dọc phải do container chung sở hữu.
 - [x] Chốt thiết kế layout action dọc bằng API `ActionStack` lõi và fallback CSS hệ thống, không lặp class hoặc margin tại màn Run.
 - [x] Xóa status line nền khỏi Account ở schema/render/patch và cập nhật test snapshot/hành vi liên quan.
 - [x] Sửa layout Run để `Dừng đồng bộ` và `Cài đặt đồng bộ nền` tách hàng có gap chuẩn qua `ActionStack`.
@@ -234,7 +234,7 @@
 - Không đọc/sửa `0_Documentation/Nghiên cứu FBM` hoặc fixture trong thư mục đó.
 - Không sửa `9_Code_cu_tham_chieu/src/ui/Styles.html`.
 - Không tự ý xóa/revert thay đổi có sẵn của chủ dự án, đặc biệt file `0_Documentation/Phiên code/Ghi chú khảo sát getChanges và revision.md` đang untracked.
-- Không hardcode HTML mới; ưu tiên schema, renderer primitive, `Row`, `Stack`, `Button`, `Notice` và layout catalog dùng chung.
+- Không hardcode HTML mới; ưu tiên schema, renderer primitive, `Row`, `RowGroup`, `Button`, `Notice` và layout catalog dùng chung.
 - Không đưa password, cookie, envelope, `authorized` hoặc payload nhạy cảm vào log/test fixture/sidebar notice.
 - Không kết luận password cũ đã bị thay đổi chỉ từ việc ô nhập đang rỗng; phải truy payload/mode/cổng GAS.
 - Sau mỗi nhóm sửa, tick đúng mục đã có bằng chứng; không tick chỉ vì code đã viết.

@@ -80,7 +80,7 @@ Checklist này theo dõi một cơ chế chung cho mọi khối Sidebar có trư
 - [x] Test connection mở rộng: identity thiếu trường, SpreadsheetId lệch, credential không có identity, mode không hợp lệ, username credential lệch, lỗi mã hóa và lỗi ghi đều bị chặn/rollback; lưu identity không credential và lưu credential mã hóa được kiểm tra không làm lộ mật khẩu.
 - [x] Test password: dirty đúng nhưng không xuất hiện trong snapshot, log hoặc lỗi.
 - [ ] Test callback snapshot không dựng lại control đang nhập và không mất highlight. (Còn cần nghiệm thu callback thật trên Sheet DEV.)
-- [x] Test hợp đồng tĩnh: Sidebar host/include/boot, host không còn nút/nội dung modal hardcode, component renderer/Stack, ActionCoordinator, adapter form/FBM, mapping tám key, password, CSS changed và lớp phủ modal không bị tháo trong phiên sau.
+- [x] Test hợp đồng tĩnh: Sidebar host/include/boot, host không còn nút/nội dung modal hardcode, component renderer/RowGroup, ActionCoordinator, adapter form/FBM, mapping tám key, password, CSS changed và lớp phủ modal không bị tháo trong phiên sau.
 - [x] Chạy `node tests/run.js`: 1.777 phép đạt, 0 phép lỗi.
 
 ## 8. Nghiệm thu Sheet DEV và bàn giao

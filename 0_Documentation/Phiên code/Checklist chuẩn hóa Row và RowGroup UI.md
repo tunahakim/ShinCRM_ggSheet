@@ -19,14 +19,14 @@
 - [x] [Tự động] Chốt `Row` sở hữu khoảng cách ngang giữa các cột, chính sách độ rộng cột và căn chỉnh nội bộ của hàng.
 - [x] [Tự động] Chốt `Row` không sở hữu khoảng cách với Row khác, Card khác hoặc sibling bên ngoài.
 - [x] [Tự động] Chốt `RowGroup` là nhóm một hoặc nhiều row item xếp dọc; `Row` là hàng nhiều ô, còn Block trực tiếp là hàng một ô để component không phải bọc cú pháp thừa.
-- [x] [Tự động] Chốt `RowGroup` sở hữu khoảng cách dọc giữa các Row trực tiếp và không sở hữu khoảng cách giữa các Card.
+- [x] [Tự động] Chốt `RowGroup` sở hữu khoảng cách dọc giữa các row item trực tiếp và không sở hữu khoảng cách giữa các Card.
 - [x] [Tự động] Chốt runtime chỉ có một implementation cho vai trò `RowGroup`; không để `Stack` và `RowGroup` cùng triển khai hành vi riêng.
 - [x] [Tự động] Quyết định tên runtime chính thức: đổi `Stack` thành `RowGroup`; không để hai policy độc lập.
 - [x] [Tự động] Chốt `Card` sở hữu khung, title, padding và body; container chứa Card sở hữu khoảng cách giữa các Card.
 - [x] [Tự động] Chốt `Field`, `Text`, `Icon`, `Button`, `Toggle` không tự thêm margin bên ngoài để đẩy sibling.
 - [x] [Tự động] Chốt `HeaderGroup`, `ActionStack`, `SplitRow` là preset có tên cho các cấu trúc khác vai trò; không ép `Row` generic nhận `space-between`.
 - [x] [Tự động] Chốt Row có thể dùng độc lập trong component nội bộ khi parent đã sở hữu spacing; schema form vẫn bung danh sách hàng qua RowGroup.
-- [x] [Tự động] Chốt Row không nhận trực tiếp một danh sách Row khác như sibling; layout lồng chỉ xuất hiện như một cell/block của Row hoặc qua RowGroup. Bằng chứng: `tests/cases/uiBuilder.js` kiểm tra RowGroup chỉ chứa Row và nested Row nằm trong một cell.
+- [x] [Tự động] Chốt Row không nhận trực tiếp một danh sách Row khác như sibling; layout lồng chỉ xuất hiện như một cell/block của Row hoặc qua RowGroup. Bằng chứng: `tests/cases/uiBuilder.js` kiểm tra nested Row nằm trong một cell và row item Block đơn được RowGroup chấp nhận.
 - [x] [Tự động] Chốt Row lồng Row chỉ là ngoại lệ khi một cell thật sự chứa một layout ngang độc lập; không dùng để gom Toggle + Text một cách máy móc.
 
 ## C. Hợp đồng khoảng cách và căn chỉnh
@@ -81,7 +81,7 @@
 - [x] [Tự động] Policy căn chỉnh nằm tập trung trong `UI_LAYOUT_POLICY`; `Row` từ chối khóa `align` tự do và test `uiBuilder` kiểm tra lỗi sớm. Các preset dùng `HeaderGroup`, `ActionStack`, `Loading`, `Empty`.
 - [x] [Tự động] Giữ HeaderGroup/ActionStack/SplitRow là preset riêng, không làm biến dạng Row generic.
 - [x] [Tự động] Kiểm tra Button/Icon/Text/Field không có API hoặc CSS margin để điều khiển sibling.
-- [x] [Tự động] Thêm test primitive chứng minh Row nhận một hàng, RowGroup nhận một hoặc nhiều Row và nested layout hợp lệ.
+- [x] [Tự động] Thêm test primitive chứng minh Row nhận một hàng, RowGroup nhận một hoặc nhiều row item và nested layout hợp lệ.
 
 ## G. Resolver và screen builder
 

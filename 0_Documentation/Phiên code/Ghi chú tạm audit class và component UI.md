@@ -103,7 +103,7 @@ Extension chỉ có một class không thuộc UI ShinCRM: `2_ShinCRM_Extension/
 | Sync/FBM domain | 49 | `shin-sync-*`, cùng các class `shin-config-*` gắn với module Sync. |
 | Semantic/feedback | 15 | primary, muted, error, warning, success/pass, notice, invalid/disabled, input error, save-wide. |
 | Control/menu | 43 | button/input/field/label, combo/choice/toggle, popup/menu, icon/glyph/check/collapse. |
-| Layout/frame/host | 35 | box/row/stack/card/section/shell/header, loading/busy/search/undo, action/pagination/preview và layout còn lại. |
+| Layout/frame/host | 35 | box/row/rowGroup/card/section/shell/header, loading/busy/search/undo, action/pagination/preview và layout còn lại. |
 | **Tổng** | **201** | 186 `shin-*` + 15 `is-*`. |
 
 Các role semantic có thể chồng về nghĩa sử dụng (ví dụ `is-error` là state, `shin-error-message` là class semantic); vì vậy bảng trên là phân nhóm kỹ thuật loại trừ nhau, còn bảng role ở mục 3.1 là góc nhìn hành vi.

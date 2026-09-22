@@ -43,16 +43,16 @@
 
 ## 3. Kiểm kê cấu trúc ghép component
 
-- [x] Lập danh sách mọi nơi gọi `Row`, `Stack`, `ActionStack`, `Card`, `Box`, `StandaloneField`, `Button` và `Icon` trong `client`.
+- [x] Lập danh sách mọi nơi gọi `Row`, `RowGroup`, `ActionStack`, `Card`, `Box`, `StandaloneField`, `Button` và `Icon` trong `client`.
 - [x] Với mỗi `Card`, ghi rõ wrapper trực tiếp của body và danh sách con trực tiếp.
-- [x] Với mỗi `Stack`, ghi rõ con nào là Field, Notice, Row, Box hoặc action group.
+- [x] Với mỗi `RowGroup`, ghi rõ con nào là Field, Notice, Row, Box hoặc action group.
 - [x] Với mỗi `ActionStack`, ghi rõ từng nhóm action và xác nhận nhóm action không bị đặt trực tiếp cạnh nhau trong `Box` khác.
 - [x] Với mỗi `Row`, xác định nó là row dữ liệu, row field, row action, row tab hay row domain đặc thù.
 - [x] Xác định mọi `Box` đang được dùng như layout nhưng không có primitive layout tương ứng.
 - [x] Xác định mọi action row chỉ có một Button nhưng đang dùng wrapper riêng theo màn hình.
 - [x] Xác định mọi wrapper có tên nghiệp vụ nhưng chỉ khác label/action/data so với wrapper dùng chung.
 - [x] Xác định mọi vùng rỗng chịu ảnh hưởng của `.shin-box:empty` và kiểm tra việc ẩn vùng có làm thay đổi sibling spacing hay không.
-- [x] Kiểm tra các trạng thái render động có thay đổi số lượng con trực tiếp của CardBody/Stack/ActionStack hay không.
+- [x] Kiểm tra các trạng thái render động có thay đổi số lượng con trực tiếp của CardBody/RowGroup/ActionStack hay không.
 
 ## 4. Kiểm kê action lưu/xác nhận
 
@@ -71,16 +71,16 @@
 - [x] Chốt token spacing nền và nguồn duy nhất của giá trị token.
 - [x] Chốt khoảng cách mặc định giữa các Card ở Page/Section.
 - [x] Chốt khoảng cách mặc định giữa các block trực tiếp trong CardBody.
-- [x] Chốt khoảng cách mặc định giữa các phần tử trực tiếp trong Stack.
+- [x] Chốt khoảng cách mặc định giữa các row item trực tiếp trong RowGroup.
 - [x] Chốt khoảng cách mặc định giữa các nhóm trong ActionStack.
 - [x] Chốt khoảng cách ngang mặc định của Row.
 - [x] Chốt khoảng cách label-control của Field/StandaloneField.
 - [x] Chốt padding CardHead, CardBody và Button/Icon theo vai component.
 - [x] Chốt Button/Icon không được có margin ngoài để điều khiển sibling spacing.
-- [x] Chốt component con không được tự cộng margin ngoài khi đã nằm trong Stack/CardBody/ActionStack.
+- [x] Chốt component con không được tự cộng margin ngoài khi đã nằm trong RowGroup/CardBody/ActionStack.
 - [x] Chốt không dùng margin sibling để thay cho `gap` trong layout generic.
 - [x] Chốt quy tắc khi một primitive được lồng trong primitive khác: owner ở cấp trực tiếp nào thì cấp đó quyết định spacing.
-- [x] Chốt quy tắc reset margin nội bộ để không phát sinh `gap + margin` khi Field/Toggle/Notice nằm trong Stack.
+- [x] Chốt quy tắc reset margin nội bộ để không phát sinh `gap + margin` khi Field/Toggle/Notice nằm trong RowGroup.
 - [x] Chốt quy tắc action một nút và action nhiều nút đều phải đi qua wrapper chuẩn tương ứng.
 - [x] Chốt quy tắc Card-Card chỉ được điều khiển ở Page/Section, không do Card tự tạo khoảng cách ngoài.
 - [x] Chốt danh sách ngoại lệ hợp lệ và owner của từng ngoại lệ.
@@ -93,7 +93,7 @@
 - [x] Viết kiểm thử phát hiện selector generic định nghĩa sibling spacing bằng `margin`.
 - [x] Viết kiểm thử cho phép các margin nội bộ được allowlist rõ ràng, không cấm mù mọi `margin`.
 - [x] Viết kiểm thử xác nhận Button/Icon không có margin ngoài trong CSS generic.
-- [x] Viết kiểm thử xác nhận Field/Toggle/Notice không tạo khoảng cách kép khi làm con trực tiếp của Stack/ActionStack/CardBody.
+- [x] Viết kiểm thử xác nhận Field/Toggle/Notice không tạo khoảng cách kép khi làm row item trực tiếp của RowGroup/ActionStack/CardBody.
 - [x] Viết kiểm thử xác nhận `ActionStack` không bị luật fallback `shin-box > .shin-single-action-row + ...` cộng thêm spacing.
 - [x] Viết kiểm thử xác nhận cùng nhóm action nhiều dòng luôn có `ActionStack` trong cây Block.
 - [x] Viết kiểm thử xác nhận CardBody chỉ có một owner cho khoảng cách giữa block trực tiếp.
@@ -111,11 +111,11 @@ Baseline phiên spacing trước lượt sửa tiếp theo: commit `683976b`, `n
 ## 7. Cập nhật tài liệu chính thức trước khi sửa code
 
 - [x] Cập nhật `03. Data schema & UI schema.md` để nói rõ UI schema khai cấu trúc/hành vi, còn layout primitive sở hữu spacing.
-- [x] Cập nhật `04. Bộ máy render và luồng lưu.md` để mô tả `Stack`, `ActionStack`, `Row`, `CardBody` và owner spacing.
+- [x] Cập nhật `04. Bộ máy render và luồng lưu.md` để mô tả `RowGroup`, `ActionStack`, `Row`, `CardBody` và owner spacing.
 - [x] Cập nhật `09/08. UI đồng bộ và cấu hình.md` để Sync dùng cùng layout contract và chỉ giữ ngoại lệ domain.
 - [x] Ghi rõ Button/Icon không sở hữu khoảng cách bên ngoài trong tài liệu component/render.
 - [x] Ghi rõ chỉ dùng `gap` cho sibling spacing generic; margin chỉ giữ trong allowlist nội bộ/ngoại lệ.
-- [x] Ghi rõ cấu trúc chuẩn Page → Stack → Card → CardBody → Stack → Field/ActionStack → Row.
+- [x] Ghi rõ cấu trúc chuẩn Page → RowGroup → Card → CardBody → RowGroup → Field/ActionStack → Row.
 - [x] Ghi rõ cách xử lý action một nút, nhiều nút, title action và action xác nhận.
 - [x] Ghi rõ danh sách ngoại lệ Sync hiện tại và tiêu chí để loại bỏ ngoại lệ sau này.
 - [x] Cập nhật `Cây thư mục code.md` nếu phiên tạo thêm tệp code/test hoặc thư mục mới.
@@ -125,7 +125,7 @@ Baseline phiên spacing trước lượt sửa tiếp theo: commit `683976b`, `n
 
 - [x] Đưa mọi token spacing nền về đúng một nguồn trong `style/tokens.html`.
 - [x] Chuẩn hóa primitive Row để sibling spacing chỉ dùng một cơ chế.
-- [x] Chuẩn hóa primitive Stack để reset margin nội bộ đúng contract.
+- [x] Chuẩn hóa primitive RowGroup để reset margin nội bộ đúng contract.
 - [x] Chuẩn hóa primitive ActionStack để không nhận thêm spacing từ luật fallback generic.
 - [x] Chuẩn hóa CardBody để spacing giữa block trực tiếp chỉ có một owner.
 - [x] Chuẩn hóa Section/Page container để spacing giữa Card chỉ có một owner.
@@ -142,7 +142,7 @@ Ghi chú nhóm A: các test UI/layout liên quan đạt; `node tests/run.js` ch�
 
 - [x] Chuẩn hóa khoảng cách giữa các Card ở view/form/status theo Page/Section contract.
 - [x] Chuẩn hóa CardBody của các màn lõi theo cùng cấu trúc con trực tiếp.
-- [x] Chuyển các form field/action về Stack và ActionStack chuẩn, không thêm margin tại screen.
+- [x] Chuyển các form field/action về RowGroup và ActionStack chuẩn, không thêm margin tại screen.
 - [x] Kiểm tra footer save của ba form lõi dùng đúng wrapper action chuẩn.
 - [x] Kiểm tra header/title action dùng đúng contract của CardHead/CardActions, không bị lẫn với Button body.
 - [x] Xóa các luật margin trùng đã được primitive cấp cao sở hữu.
@@ -155,28 +155,28 @@ Ghi chú nhóm B: `formScreen` đạt 20/20 và `viewScreen` đạt 16/16; các 
 
 ## 10. Nhóm code C — chuẩn hóa Sync Run và Account
 
-- [x] Chuẩn hóa cây Run thành Card → CardBody → Stack/ActionStack theo contract.
+- [x] Chuẩn hóa cây Run thành Card → CardBody → RowGroup/ActionStack theo contract.
 - [x] Loại bỏ khả năng cộng kép gap/margin giữa các nhóm action Run.
 - [x] Chuẩn hóa pipeline spacing như một ngoại lệ domain có owner duy nhất.
 - [x] Chuẩn hóa Account connection section; xác định rõ padding/gap đặc thù nào còn cần giữ.
-- [x] Chuẩn hóa identity fields và identity actions theo Field/Stack/ActionStack chung.
-- [x] Chuẩn hóa login section; không để FormField/ToggleRow tự cộng spacing với Stack cha.
+- [x] Chuẩn hóa identity fields và identity actions theo Field/RowGroup/ActionStack chung.
+- [x] Chuẩn hóa login section; không để FormField/ToggleRow tự cộng spacing với RowGroup cha.
 - [x] Kiểm tra các action `check`, `probe`, `save`, `approve` dùng đúng layout nhưng không gộp nhầm presentation.
 - [x] Chạy kiểm thử cấu trúc DOM cho Run và Account ở trạng thái xem, sửa, lỗi và đang chạy.
 - [x] Chạy `node tests/run.js` sau nhóm C.
 - [x] Tick từng mục nhóm C ngay sau bằng chứng tương ứng.
 - [x] Commit riêng nhóm C.
 
-Ghi chú nhóm C: `layoutSpacing`, `fbmSync/Components` và `fbmSync/Sidebar` đạt `40/40`; các lớp status/pipeline/conflict đã bỏ margin sibling, Account dùng Stack cho identity fields, field-help và login policy groups.
+Ghi chú nhóm C: `layoutSpacing`, `fbmSync/Components` và `fbmSync/Sidebar` đạt `40/40`; các lớp status/pipeline/conflict đã bỏ margin sibling, Account dùng RowGroup cho identity fields, field-help và login policy groups.
 
 ## 11. Nhóm code D — chuẩn hóa Sync Results và Settings
 
 - [x] Chuẩn hóa Results tab row, tab description và Results body theo owner spacing rõ ràng.
 - [x] Chuẩn hóa Card kết quả và pagination; không để preview/error/pagination tự cộng margin kép.
 - [x] Chuẩn hóa Settings card region để các Card có cùng nhịp xếp.
-- [x] Chuẩn hóa nhóm module, relay, Extension, background và login policy theo Stack/CardBody contract.
+- [x] Chuẩn hóa nhóm module, relay, Extension, background và login policy theo RowGroup/CardBody contract.
 - [x] Chuẩn hóa schedule row và detail controls như ngoại lệ grid có owner duy nhất.
-- [x] Chuẩn hóa toggle row/login children để margin không cộng với gap Stack.
+- [x] Chuẩn hóa toggle row/login children để margin không cộng với gap RowGroup.
 - [x] Chuẩn hóa các action save/rotate/edit/cancel trong Settings qua cùng layout action contract.
 - [x] Kiểm tra trạng thái notice/error/success/preview không làm thay đổi bất ngờ spacing khi xuất hiện hoặc biến mất.
 - [x] Chạy kiểm thử cấu trúc DOM cho Results và Settings ở trạng thái rỗng, có dữ liệu, lỗi và đang sửa.
@@ -184,7 +184,7 @@ Ghi chú nhóm C: `layoutSpacing`, `fbmSync/Components` và `fbmSync/Sidebar` đ
 - [x] Tick từng mục nhóm D ngay sau bằng chứng tương ứng.
 - [x] Commit riêng nhóm D.
 
-Ghi chú nhóm D: `layoutSpacing`, `fbmSync/Components` và `fbmSync/Sidebar` đạt `40/40`; Results gom page text/rows vào `Stack`, pagination giữ `Row`, Settings giữ grid schedule/detail và wrapper CardBody làm owner.
+Ghi chú nhóm D: `layoutSpacing`, `fbmSync/Components` và `fbmSync/Sidebar` đạt `40/40`; Results gom page text/rows vào `RowGroup`, pagination giữ `Row`, Settings giữ grid schedule/detail và wrapper CardBody làm owner.
 
 ## 12. Nhóm code E — xử lý ngoại lệ và dọn đường cũ
 
@@ -218,7 +218,7 @@ Ghi chú hồi quy cuối phiên: `layoutSpacing`, `slots`, `unsavedChanges`, `f
 ## 14. Nghiệm thu trực quan trên Sheet DEV
 
 - [ ] Mở Sidebar trên Sheet DEV và kiểm tra Card-Card ở mọi màn; output kỳ vọng: cùng nhịp theo Page/Section contract, không có khoảng trắng kép.
-- [ ] Kiểm tra khoảng cách block-block trong từng Card; output kỳ vọng: cùng owner CardBody/Stack, không phụ thuộc tên màn.
+- [ ] Kiểm tra khoảng cách block-block trong từng Card; output kỳ vọng: cùng owner CardBody/RowGroup, không phụ thuộc tên màn.
 - [ ] Kiểm tra cùng một loại action save trong form lõi; output kỳ vọng: wrapper và nhịp action giống nhau ở các form có cùng surface.
 - [ ] Kiểm tra save icon trong Card header; output kỳ vọng: giữ kích thước Icon riêng nhưng khoảng cách CardHead/CardActions nhất quán.
 - [ ] Kiểm tra save Button trong Card body; output kỳ vọng: không nhận margin từ Button, chỉ nhận spacing từ ActionStack/Row cha.
