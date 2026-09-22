@@ -4,7 +4,7 @@ var CONFIG_PARAM_OWNER_USER = 'user';
 var CONFIG_PARAM_OWNER_SYSTEM = 'system';
 var SORT_LEVEL_OPTIONS = ['Tăng dần (A → Z)', 'Giảm dần (Z → A)'];
 /** Nguồn log đang có trong bản ShinCRM độc lập; `all` và tổ hợp hiện tại là lựa chọn vận hành, không phải nguồn mới. */
-var LOG_TRACE_SOURCE_OPTIONS = ['off', 'all', 'core', 'sidebar', 'core,sidebar'];
+var LOG_TRACE_SOURCE_OPTIONS = ['off', 'all', 'core', 'sidebar', 'fbm_sync', 'core,sidebar'];
 
 /** Hai bộ đếm dùng chung cặp cột tham số nhưng vẫn là trạng thái do cửa cấp mã sở hữu. */
 var ID_COUNTER_CONFIG_NAMES = {
@@ -29,7 +29,7 @@ function configParamCatalog() {
         + 'off = tắt. Giá trị trống của Config cũ vẫn được hiểu là tắt và sẽ được chuẩn hóa thành off khi chạy chuẩn bị/reset Config.\n'
         + '"all" = bật cho mọi nguồn.\n'
         + 'Hoặc kể tên nguồn, cách nhau bằng dấu phẩy: core, sidebar, fbm_sync, bot.\n\n'
-        + 'CẢNH BÁO: đang bật thì log ghi cả bí mật ra nguyên văn. Tắt trước khi chia sẻ tệp.'
+        + 'CẢNH BÁO: chỉ bật trong lúc chẩn đoán. Password, cookie, token và envelope đăng nhập luôn bị che; payload FBM/GAS chỉ ghi tóm tắt. Tắt sau khi kiểm tra xong trước khi chia sẻ tệp.'
     },
     {
       name: CELL_BUDGET_CONFIG_NAME,

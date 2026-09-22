@@ -298,6 +298,7 @@ tests\
     ├── fbmSync\Sidebar.js       Smoke test renderer và thao tác chính của Sidebar Đồng bộ FBM.
     ├── fbmSync\UserJourneys.js  Kiểm các hành trình Sidebar, cấu hình kết nối, công tắc và thông báo lỗi.
     ├── fbmSync\Components.js    Kiểm hợp đồng Sync dùng component/lớp chung của ShinCRM, không tái tạo control generic.
+    ├── fbmSync\FunctionTrace.js  Kiểm log bắt đầu/kết thúc hàm, tóm tắt payload và che dữ liệu bí mật.
     ├── fbmSync\
     │   ├── Protocol.js            Kiểm envelope, lỗi transport, fingerprint và đối soát ba chiều.
     │   ├── Builders.js            Kiểm builder/parser request Customer và Activity.
