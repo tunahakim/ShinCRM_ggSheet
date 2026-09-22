@@ -189,6 +189,7 @@
 - [x] [Tự động] Đẩy nhóm Card lên GAS DEV bằng `node tests/gas.js verifySheets --push`: revision `@494`, hàm trả `OK`; Customer vẫn có cảnh báo thứ tự cột có sẵn trên Sheet.
 - [x] [Tự động] Bổ sung contract test khóa Card header/body không tự dựng flex/gap ngoài primitive; full test đạt `1947 đạt, 0 không đạt`.
 - [x] [Tự động] Commit nhóm contract test Card: `tests/cases/layoutSpacing.js`, commit `adc08f8`.
+- [x] [Tự động] Bổ sung entry `UI_LAYOUT_POLICY.row` và để renderer lấy class Row từ policy; full test đạt `1947 đạt, 0 không đạt`; commit nhóm code/tài liệu/test `2108a90`.
 - [ ] [Cần kiểm chứng thật] Sau khi code và test offline hoàn tất, dừng ở bước cần chủ dự án kiểm tra trực quan và ghi rõ thao tác cần thực hiện.
 
 ## M. Audit hợp đồng RowGroup sau refactor
