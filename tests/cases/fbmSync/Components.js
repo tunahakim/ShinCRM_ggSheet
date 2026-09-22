@@ -65,6 +65,7 @@ function chay(so) {
   const engine = docTep('client/ui/renderEngine.html');
   const frame = docTep('client/style/frame.html');
   const styles = docTep('client/style/components.html');
+  const cardActionsCss = styles.slice(styles.indexOf('.shin-card-actions {'), styles.indexOf('/*\n * Nút trong hàng tiêu đề card'));
   const sidebar = docTep('client/Sidebar.html');
   const popup = docTep('client/ui/popupList.html');
   const combo = docTep('client/ui/combo.html');
@@ -151,7 +152,7 @@ function chay(so) {
     [source['client/sync/fbmSyncConfigEditor.html'].indexOf('function fbmSyncConfigButtonRow(') >= 0,
       source['client/sync/screens/account.html'].indexOf("fbmSyncConfigTitleActions('connection')") >= 0,
       source['client/sync/fbmSyncSettingsScreen.html'].indexOf("fbmSyncConfigIsEditing('connection')") >= 0,
-      styles.slice(styles.indexOf('.shin-card-actions {'), styles.indexOf('.shin-card-actions {') + 220).indexOf('gap: var(--shin-gap-2);') >= 0,
+      engine.indexOf("Row({ className: 'shin-card-actions'") >= 0 && styles.indexOf('.shin-card-actions > * { flex: 0 0 auto; }') >= 0 && (cardActionsCss.match(/}/g) || []).length === 2,
       styles.indexOf('.shin-button.shin-config-edit') >= 0,
       styles.indexOf('.shin-button.shin-config-edit { border-color: var(--shin-bg-hover); background: var(--shin-bg-hover); color: var(--shin-text); }') >= 0,
       styles.indexOf('.shin-button.shin-config-edit:hover { border-color: var(--shin-bg-hover-strong); background: var(--shin-bg-hover-strong); }') >= 0,
@@ -172,7 +173,7 @@ function chay(so) {
     true);
   check(so, 'Card và RowGroup dùng gap dọc, component con không cộng margin lần hai',
     [styles.indexOf('.shin-card-body {') >= 0, styles.indexOf('.shin-box.shin-row-group {') >= 0,
-      styles.indexOf('gap: var(--shin-gap-2);', styles.indexOf('.shin-card-body {')) >= 0,
+      styles.indexOf('gap: var(--shin-gap-2);', styles.indexOf('.shin-card-body {')) === -1,
       styles.indexOf('.shin-card-body > * { margin: 0; }') >= 0,
       styles.indexOf('.shin-row-group > * + *') === -1,
       styles.indexOf('.shin-form-field > * + *') === -1],

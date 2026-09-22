@@ -148,13 +148,13 @@ function chay(so) {
 
   check(so, 'card: style không gian nằm ở thẻ ruột nên hàng tiêu đề không bị cuộn mất',
     [card.indexOf('<section class="shin-card">') === 0,
-      card.indexOf('<div class="shin-card-body" style="overflow: hidden; max-height: 160px" data-collapse="3">') > 0,
+      card.indexOf('<div class="shin-box shin-row-group shin-card-body" style="overflow: hidden; max-height: 160px" data-collapse="3">') > 0,
       card.indexOf('shin-card-title">LỊCH SỬ LÀM VIỆC') > 0,
       card.indexOf('shin-card-actions') > 0],
     [true, true, true, true]);
 
   check(so, 'card titleActions đặt sibling spacing ở wrapper, không đẩy item lá bằng align cũ',
-    [card.indexOf('<div class="shin-card-actions">') > 0, card.indexOf('shin-align-right') === -1], [true, true]);
+    [card.indexOf('<div class="shin-row shin-card-actions">') > 0, card.indexOf('shin-align-right') === -1], [true, true]);
 
   check(so, 'card không tiêu đề và không hành động thì không sinh hàng tiêu đề rỗng',
     hop.renderNode(hop.Card({ elements: [hop.Text('x')] }), null).indexOf('shin-card-head') === -1, true);

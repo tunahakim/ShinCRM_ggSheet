@@ -53,10 +53,11 @@ function chay(so) {
       runUi.indexOf('actionStack: function (elements) { return ActionStack({ elements: elements }); }') >= 0],
     [true, true]);
   check(so, 'CardBody sở hữu khoảng cách giữa block trực tiếp',
-    [cardBody.indexOf('gap: var(--shin-gap-2);') >= 0,
+    [cardBody.indexOf('padding: 6px var(--shin-card-pad) var(--shin-card-pad);') >= 0,
+      components.indexOf('.shin-card-body') >= 0,
       components.indexOf('.shin-card-body > * { margin: 0; }') >= 0,
       components.indexOf('.shin-card-body > * + *') === -1],
-    [true, true, true]);
+    [true, true, true, true]);
   check(so, 'Page/Section và sidebar body dùng gap thay cho sibling margin',
     [sectionStyle.indexOf('gap: var(--shin-gap-2);') >= 0,
       components.indexOf('.shin-section > * + *') === -1,

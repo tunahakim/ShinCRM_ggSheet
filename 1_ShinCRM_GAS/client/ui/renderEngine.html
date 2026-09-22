@@ -180,18 +180,18 @@ function renderMenuCaret(node) {
   return node.menu && !node.action ? '<span class="shin-caret" aria-hidden="true">▾</span>' : '';
 }
 
-/** Ruột một card: hàng tiêu đề rồi thẻ ruột. `titleActions` là mảng khai thô nên đi qua `screenBar` để thành Block, cùng đường với mục header. */
+/** Ruột một card: Header dùng Row, body dùng RowGroup; `titleActions` là mảng khai thô nên đi qua `screenBar` để thành Block. */
 function renderCardInner(node, ctx) {
   var muc = screenBar(node.titleActions, 'titleActions của card');
   var dau = '';
 
   if (node.title || muc.length) {
-    dau = '<div class="shin-card-head"><div class="shin-card-title">' + renderEscape(node.title) + '</div>'
-      + (muc.length ? '<div class="shin-card-actions">' + renderNodes(muc, ctx) + '</div>' : '')
-      + '</div>';
+    var headElements = [Text({ className: 'shin-card-title', text: node.title || '' })];
+    if (muc.length) { headElements.push(Row({ className: 'shin-card-actions', elements: muc })); }
+    dau = renderNode(Row({ className: 'shin-card-head', elements: headElements }), ctx);
   }
 
-  return dau + '<div class="shin-card-body"' + renderSpatialAttrs(node.spatialConfig) + '>' + renderChildren(node, ctx) + '</div>';
+  return dau + renderNode(RowGroup({ className: 'shin-card-body', spatialConfig: node.spatialConfig, elements: node.elements }), ctx);
 }
 
 /** Đường dẫn đầy đủ của một trường. Khai cụt thì lấy `entity` của màn — tài liệu 03 Phần 8. */
