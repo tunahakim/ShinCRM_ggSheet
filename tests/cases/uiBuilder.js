@@ -121,8 +121,8 @@ function chay(so) {
   }, 'customerForm');
 
   check(so, 'header thành hai nhóm glyph, giữ nguyên tooltip và action',
-    [form.header.length, form.header[0].className, form.header[0].elements.map((n) => [n.icon, n.tooltip, n.action]), form.header[1].className, form.header[1].elements.map((n) => [n.icon, n.tooltip, n.action])],
-    [2, 'shin-header-group shin-header-group-start', [['close', 'Hủy', 'cancelForm']], 'shin-header-group shin-header-group-end', [['check', 'Lưu', 'saveForm']]]);
+    [form.header.length, form.header[0].role, form.header[0].className, form.header[0].elements.map((n) => [n.icon, n.tooltip, n.action]), form.header[1].role, form.header[1].className, form.header[1].elements.map((n) => [n.icon, n.tooltip, n.action])],
+    [2, 'row', 'shin-header-group shin-header-group-start', [['close', 'Hủy', 'cancelForm']], 'row', 'shin-header-group shin-header-group-end', [['check', 'Lưu', 'saveForm']]]);
 
   check(so, 'footer khai bằng khóa `button` thì thành nút chữ, không thành nút glyph',
     [form.footer[0].role, form.footer[0].label, form.footer[0].className],

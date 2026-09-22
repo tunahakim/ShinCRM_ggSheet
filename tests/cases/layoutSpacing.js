@@ -85,7 +85,7 @@ function chay(so) {
     [button.indexOf('margin') === -1, icon.indexOf('margin') === -1],
     [true, true]);
   check(so, 'vị trí header do HeaderGroup sở hữu, không còn marker align trên node lá',
-    [frame.indexOf('.shin-box.shin-header-group { display: flex;') >= 0,
+    [frame.indexOf('.shin-row.shin-header-group { gap: var(--shin-gap-1);') >= 0,
       frame.indexOf('.shin-header-group-start { flex: 1 1 auto; }') >= 0,
       frame.indexOf('.shin-header-group-end { flex: 0 0 auto; margin-left: auto; }') >= 0,
       components.indexOf('.shin-align-right') === -1,
@@ -93,7 +93,7 @@ function chay(so) {
       renderer.indexOf('shin-align-right') === -1],
     [true, true, true, true, true, true]);
   check(so, 'HeaderGroup không bị luật display block generic của Box ghi đè',
-    [frame.indexOf('.shin-box.shin-header-group { display: flex;') >= 0,
+    [frame.indexOf('.shin-row.shin-header-group {') >= 0,
       components.indexOf('.shin-box { display: block; }') >= 0], [true, true]);
   check(so, 'Button/Icon không có API align và Row generic không tự space-between',
     [builder.indexOf("button: ['align'") === -1,

@@ -99,8 +99,8 @@ html, body {
   background: var(--shin-bg);
 }
 
-/* HeaderGroup là owner duy nhất của việc tách nhóm đầu/cuối; hai class thắng luật display block generic của Box. */
-.shin-box.shin-header-group { display: flex; align-items: center; gap: var(--shin-gap-1); min-width: 0; }
+/* HeaderGroup dùng Row làm nền; preset này chỉ đổi nhịp header và chính sách co giãn hai nhóm. */
+.shin-row.shin-header-group { gap: var(--shin-gap-1); min-width: 0; }
 .shin-header-group-start { flex: 1 1 auto; }
 .shin-header-group-end { flex: 0 0 auto; margin-left: auto; }
 .shin-header-group > * { min-width: 0; }

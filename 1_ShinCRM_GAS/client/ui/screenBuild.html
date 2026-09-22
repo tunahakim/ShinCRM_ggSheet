@@ -103,8 +103,8 @@ function screenHeaderGroup(side, elements) {
   if (side !== 'start' && side !== 'end') { throw new Error('HeaderGroup chỉ nhận phía "start" hoặc "end".'); }
   if (!elements.length) { return null; }
   return side === 'start'
-    ? Box({ className: uiLayoutClass('headerGroupStart'), elements: elements })
-    : Box({ className: uiLayoutClass('headerGroupEnd'), elements: elements });
+    ? Row({ className: uiLayoutClass('headerGroupStart'), elements: elements })
+    : Row({ className: uiLayoutClass('headerGroupEnd'), elements: elements });
 }
 
 function screenHeader(header, viTri) {
