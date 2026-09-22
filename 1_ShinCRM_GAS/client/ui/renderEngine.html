@@ -103,7 +103,8 @@ var RENDER_CONTROL_BY_TYPE = { TEXT: 'text', NUMBER: 'number', DATE: 'date', SEL
 
 /** Danh sách lớp CSS của một node: lớp theo vai, lớp trang trí của schema, và ba lớp engine tự thêm. */
 function renderClassList(node) {
-  var lop = ['shin-' + node.role];
+  var roleClass = node.role === 'row' ? uiLayoutClass('row') : 'shin-' + node.role;
+  var lop = [roleClass];
   if (node.className) { lop.push(node.className); }
   if (node.menu) { lop.push('shin-has-menu'); }
   if (node.role === 'icon' && node.toggle) { lop.push('shin-toggle'); }

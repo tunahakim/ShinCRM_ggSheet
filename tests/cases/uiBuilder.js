@@ -27,8 +27,8 @@ function chay(so) {
     ['card', 'row', 'text', 'field', 'button', 'icon', 'check', 'standaloneControl']);
 
   check(so, 'layout policy tập trung quyết định class và owner của primitive',
-    [hop.uiLayoutClass('rowGroup'), hop.UI_LAYOUT_POLICY.rowGroup.owner, hop.UI_LAYOUT_POLICY.actionStack.content, hop.uiLayoutClass('headerGroupEnd'), hop.UI_LAYOUT_POLICY.empty.content],
-    ['shin-row-group', 'RowGroup', 'end', 'shin-header-group shin-header-group-end', 'center']);
+    [hop.uiLayoutClass('row'), hop.UI_LAYOUT_POLICY.row.axis, hop.UI_LAYOUT_POLICY.row.cross, hop.UI_LAYOUT_POLICY.row.content, hop.UI_LAYOUT_POLICY.row.width, hop.UI_LAYOUT_POLICY.row.owner, hop.uiLayoutClass('rowGroup'), hop.UI_LAYOUT_POLICY.rowGroup.owner, hop.UI_LAYOUT_POLICY.actionStack.content, hop.uiLayoutClass('headerGroupEnd'), hop.UI_LAYOUT_POLICY.empty.content],
+    ['shin-row', 'horizontal', 'middle', 'start', 'equal', 'Row', 'shin-row-group', 'RowGroup', 'end', 'shin-header-group shin-header-group-end', 'center']);
   check(so, 'layout policy dùng hướng logic, không hard-code left/right',
     Object.keys(hop.UI_LAYOUT_POLICY).some((name) => /left|right/i.test(JSON.stringify(hop.UI_LAYOUT_POLICY[name]))), false);
   checkThrows(so, 'layout policy thiếu tên thì bị chặn sớm',

@@ -40,6 +40,7 @@ var BLOCK_KEYS_BY_ROLE = {
 
 /* Chính sách layout của primitive. CSS chỉ hiện thực class đã chọn; màn hình không tự khai alignment. */
 var UI_LAYOUT_POLICY = {
+  row: { className: 'shin-row', axis: 'horizontal', cross: 'middle', content: 'start', width: 'equal', owner: 'Row' },
   rowGroup: { className: 'shin-row-group', axis: 'vertical', cross: 'stretch', content: 'start', owner: 'RowGroup' },
   actionStack: { className: 'shin-action-stack', axis: 'vertical', cross: 'center', content: 'end', owner: 'ActionStack' },
   headerGroupStart: { className: 'shin-header-group shin-header-group-start', axis: 'horizontal', content: 'start', owner: 'HeaderGroup' },
