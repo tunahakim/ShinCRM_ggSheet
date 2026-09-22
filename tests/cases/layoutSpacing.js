@@ -23,6 +23,7 @@ function chay(so) {
   const renderer = docTep('client/ui/renderEngine.html');
   const row = rule(components, '.shin-row {');
   const rowGroup = rule(components, '.shin-box.shin-row-group {');
+  const cardHead = rule(components, '.shin-card-head {');
   const cardBody = rule(components, '.shin-card-body {');
   const sectionStyle = rule(components, '.shin-section {');
   const formField = rule(components, '.shin-form-field {');
@@ -57,6 +58,12 @@ function chay(so) {
       components.indexOf('.shin-card-body') >= 0,
       components.indexOf('.shin-card-body > * { margin: 0; }') >= 0,
       components.indexOf('.shin-card-body > * + *') === -1],
+    [true, true, true, true]);
+  check(so, 'Card header/body không dựng layout sibling thứ hai ngoài Row/RowGroup',
+    [cardHead.indexOf('display:') === -1,
+      cardHead.indexOf('gap:') === -1,
+      cardBody.indexOf('display:') === -1,
+      cardBody.indexOf('gap:') === -1],
     [true, true, true, true]);
   check(so, 'Page/Section và sidebar body dùng gap thay cho sibling margin',
     [sectionStyle.indexOf('gap: var(--shin-gap-2);') >= 0,
