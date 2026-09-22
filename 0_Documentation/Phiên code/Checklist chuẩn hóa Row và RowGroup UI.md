@@ -175,6 +175,7 @@
 - [x] [Tự động] Tách các ca nghiệm thu trực quan thành các bước độc lập, mỗi bước có kết quả kỳ vọng cụ thể; commit checklist là `0064f22`.
 - [x] [Tự động] Đẩy bản hiện tại lên GAS DEV để chủ dự án kiểm tra Sidebar: revision `@491`, hàm `verifySheets` trả `OK`.
 - [x] [Tự động] Đồng bộ các checklist/tài liệu liên quan, thay mô tả primitive `Stack` hiện hành bằng `RowGroup`; commit tài liệu là `1462b93`.
+- [x] [Tự động] Cập nhật số liệu tiến độ trong checklist căn chỉnh sang test `1938/1938` và GAS DEV `@491`; commit là `a3919c9`.
 - [ ] [Cần kiểm chứng thật] Sau khi code và test offline hoàn tất, dừng ở bước cần chủ dự án kiểm tra trực quan và ghi rõ thao tác cần thực hiện.
 
 ## M. Audit hợp đồng RowGroup sau refactor
