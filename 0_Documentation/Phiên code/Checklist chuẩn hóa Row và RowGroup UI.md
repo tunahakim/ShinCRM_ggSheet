@@ -126,6 +126,7 @@
 - [x] [Tự động] Chạy nhóm test `layoutSpacing`, `fbmSync/Components`, `fbmSync/Sidebar`, `formScreen`, `viewScreen`, `uiSchema` sau migration component; nằm trong bộ chạy `node tests/run.js`.
 - [x] [Tự động] Chạy `node tests/run.js`: `1937 đạt, 0 không đạt`.
 - [x] [Tự động] Tái sinh preview bằng `node tests/preview.js`: 12 khách, 52 giao dịch, 3 gói; quét `tests/xem-sidebar.html` không còn `.shin-align-right` hoặc `shin-stack`; Chrome headless render viewport `500×1200` để Sidebar 300px hiển thị trọn, xác nhận artifact không giữ class layout cũ.
+- [x] [Tự động] Chrome headless mở `openCustomerFormBlank` tại viewport Sidebar 300px: đo được 13 `Row`, 1 `RowGroup`, 19 control, header action `[cancelForm, saveForm]` ở vùng phải, footer `saveForm` nằm trong vùng footer, `documentElement.scrollWidth === clientWidth`; ảnh kiểm tra xác nhận hai cột và textarea không tràn. Ảnh là artifact tạm, không commit.
 - [x] [Tự động] Kiểm tra diff không chạm fixture `0_Documentation/Nghiên cứu FBM/`: `git diff HEAD^ -- ...` không có dòng thay đổi.
 - [x] [Tự động] Kiểm tra diff commit `3a8357f` chỉ chứa 12 tệp checklist/tài liệu/code/test thuộc nhóm RowGroup và dọn CSS; không chứa tệp ngoài phạm vi.
 - [x] [Tự động] Kiểm tra diff/test/log không có cookie, giá trị password, token, payload nhạy cảm hoặc dữ liệu khách thật; phép quét diff theo các khóa nhạy cảm không trả kết quả.
