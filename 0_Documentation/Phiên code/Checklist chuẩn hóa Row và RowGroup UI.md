@@ -173,7 +173,7 @@
 - [x] [Tự động] Commit nhóm contract test/dọn hardcode sau khi I và test liên quan xanh: `3a8357f`.
 - [x] [Tự động] Chạy lại full test trước commit cuối: `node tests/run.js` đạt `1937 đạt, 0 không đạt` sau commit `57ee0cf`.
 - [x] [Tự động] Chạy lại full test sau contract screen schema: `node tests/run.js` đạt `1946 đạt, 0 không đạt`; nhóm code/test/tài liệu đã commit tại `79d39b3`.
-- [x] [Tự động] Nghiệm thu GAS DEV bằng `node tests/gas.js verifySheets --push`: deployment `@491`, kết quả `OK`; Activity/Category/Config/Log đạt, Customer vẫn có cảnh báo lệch thứ tự cột có sẵn trên Sheet.
+- [x] [Tự động] Nghiệm thu GAS DEV bằng `node tests/gas.js verifySheets --push`: deployment `@492`, kết quả `OK`; Activity/Category/Config/Log đạt, Customer vẫn có cảnh báo lệch thứ tự cột có sẵn trên Sheet.
 - [x] [Tự động] Ghi commit hash vào checklist sau mỗi nhóm; nhóm hiện tại dùng `3a8357f`, không gom file ngoài phạm vi.
 - [x] [Tự động] Commit nhóm contract chặn presentation screen schema và chuyển consumer form/Sync sang Block: `79d39b3`.
 - [x] [Tự động] Tách các ca nghiệm thu trực quan thành các bước độc lập, mỗi bước có kết quả kỳ vọng cụ thể; commit checklist là `0064f22`.
