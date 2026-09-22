@@ -136,6 +136,7 @@
 .shin-card {
   display: block;
   margin: 0;
+  padding: var(--shin-card-pad);
   border: 1px solid var(--shin-border);
   border-radius: var(--shin-radius);
   background: var(--shin-bg);
@@ -150,11 +151,10 @@
  * Chủ dự án nói "phần tiêu đề của các thẻ đang khá cao"; bản cũ chỉ có `padding-bottom: 4px` với một gạch đứt #eee, tức
  * tiêu đề là **nhãn của khối chữ bên dưới** chứ không phải một thanh riêng.
  *
- * Lề ngang phải bằng lề ngang của `.shin-card-body`, không thì chữ tiêu đề lệch một nhịp so với chữ trong ruột.
+ * Padding thuộc về `.shin-card`; header và body chỉ giữ hình thức/nội dung, không khai thêm padding.
  */
 .shin-card-head {
   min-height: 28px;
-  padding: 4px var(--shin-card-pad);
   border-bottom: 1px dashed var(--shin-border-faint);
 }
 
@@ -222,7 +222,6 @@
 }
 
 .shin-card-body {
-  padding: 6px var(--shin-card-pad) var(--shin-card-pad);
 }
 
 /* Card là nơi duy nhất quyết định nhịp giữa các Block con; component con không được cộng margin dọc lần nữa. */

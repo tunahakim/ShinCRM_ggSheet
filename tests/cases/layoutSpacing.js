@@ -23,6 +23,7 @@ function chay(so) {
   const renderer = docTep('client/ui/renderEngine.html');
   const row = rule(components, '.shin-row {');
   const rowGroup = rule(components, '.shin-box.shin-row-group {');
+  const card = rule(components, '.shin-card {');
   const cardHead = rule(components, '.shin-card-head {');
   const cardBody = rule(components, '.shin-card-body {');
   const sectionStyle = rule(components, '.shin-section {');
@@ -53,12 +54,14 @@ function chay(so) {
     [components.indexOf('.shin-box > .shin-single-action-row + .shin-single-action-row') === -1,
       runUi.indexOf('actionStack: function (elements) { return ActionStack({ elements: elements }); }') >= 0],
     [true, true]);
-  check(so, 'CardBody sở hữu khoảng cách giữa block trực tiếp',
-    [cardBody.indexOf('padding: 6px var(--shin-card-pad) var(--shin-card-pad);') >= 0,
+  check(so, 'Card là padding owner duy nhất, Header/Body không khai padding lần hai',
+    [card.indexOf('padding: var(--shin-card-pad);') >= 0,
+      cardHead.indexOf('padding:') === -1,
+      cardBody.indexOf('padding:') === -1,
       components.indexOf('.shin-card-body') >= 0,
       components.indexOf('.shin-card-body > * { margin: 0; }') >= 0,
       components.indexOf('.shin-card-body > * + *') === -1],
-    [true, true, true, true]);
+    [true, true, true, true, true, true]);
   check(so, 'Card header/body không dựng layout sibling thứ hai ngoài Row/RowGroup',
     [cardHead.indexOf('display:') === -1,
       cardHead.indexOf('gap:') === -1,

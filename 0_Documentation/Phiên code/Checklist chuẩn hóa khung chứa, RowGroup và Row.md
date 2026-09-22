@@ -73,6 +73,7 @@ Các quyết định trong phần này là hợp đồng đầu vào cho các m�
 - [ ] [Tự động] Đặt mặc định bốn chiều `padding` của `RowGroup` bằng `0`.
 - [ ] [Tự động] Đặt mặc định bốn chiều `margin` của `Row` bằng `0`.
 - [ ] [Tự động] Đặt mặc định bốn chiều `padding` của `Row` bằng `0`.
+- [ ] [Tự động] Ghi rõ `RowGroup` và `Row` vẫn được phép có padding nội tại khác `0` khi policy của component cần; default `0` chỉ là giá trị ngầm định, không phải lệnh cấm.
 - [ ] [Tự động] Kiểm tra một `RowGroup` bên trong Card không tự cộng thêm padding/margin với padding của Card.
 - [ ] [Tự động] Kiểm tra một `Row` bên trong RowGroup không tự cộng thêm padding/margin với gap của RowGroup.
 - [ ] [Tự động] Cấm các selector `> * + *`, margin sibling hoặc selector màn hình thay thế cho owner gap của `RowGroup`/`Row`.
@@ -82,9 +83,10 @@ Các quyết định trong phần này là hợp đồng đầu vào cho các m�
 
 - [ ] [Tự động] Lập danh sách component lớn/container và xác định component nào phải có padding mặc định ở cả bốn hướng.
 - [ ] [Tự động] Với từng component lớn/container, khai một nguồn mặc định duy nhất cho `padding-top`, `padding-right`, `padding-bottom`, `padding-left`; không khai lại theo từng màn hình.
-- [ ] [Tự động] Kiểm tra Card có padding bốn hướng mặc định cho vùng nội dung của nó; header, body và các vùng đặc biệt phải ghi rõ vùng nào sở hữu padding nào.
-- [ ] [Tự động] Kiểm tra Card canonical chỉ có một khai báo padding owner ở Card shell; không có khai báo padding ở CardHeader/CardBody/RowGroup/Row cho cùng vùng nội dung.
-- [ ] [Tự động] Kiểm tra các component lớn khác có thể sở hữu padding riêng theo policy của chính loại đó; không áp nhầm quy tắc Card thành lệnh cấm padding cho mọi component.
+- [x] [Tự động] Kiểm tra Card có padding bốn hướng mặc định cho vùng nội dung của nó; header, body và các vùng đặc biệt phải ghi rõ vùng nào sở hữu padding nào. Bằng chứng: `tests/cases/layoutSpacing.js` ca `Card là padding owner duy nhất...`.
+- [x] [Tự động] Kiểm tra Card canonical chỉ có một khai báo padding owner ở Card shell; không có khai báo padding ở CardHeader/CardBody/RowGroup/Row cho cùng vùng nội dung. Bằng chứng: `tests/cases/layoutSpacing.js` và `tests/cases/fbmSync/Components.js` cùng kiểm tra Card shell có padding, Header/Body không khai padding.
+- [x] [Tự động] Kiểm tra các component lớn khác có thể sở hữu padding riêng theo policy của chính loại đó; không áp nhầm quy tắc Card thành lệnh cấm padding cho mọi component. Bằng chứng: hợp đồng `03A. Hợp đồng Schema.md` và `03. Data schema & UI schema.md` ghi rõ mọi Block được phép có padding, Card chỉ là recipe cụ thể.
+- [ ] [Tự động] Kiểm tra mọi component composite đều chọn đúng một padding owner cho từng vùng/cạnh; Card shell chỉ là ví dụ recipe, không phải ngoại lệ khỏi luật chung.
 - [ ] [Tự động] Kiểm tra container lớn chỉ quyết định `gap` giữa các component con trực tiếp theo chiều dọc.
 - [ ] [Tự động] Kiểm tra container lớn không đặt `gap`, margin sibling hoặc selector descendant để quyết định khoảng cách giữa component cháu, chắt hoặc sâu hơn.
 - [ ] [Tự động] Kiểm tra khi một component con trực tiếp thay đổi chiều cao, khoảng cách với sibling cùng cấp vẫn do container mẹ quyết định, không chuyển thành margin của component con.
@@ -211,7 +213,7 @@ Card cấp 1
 ## J. Migration, tài liệu, test và nghiệm thu
 
 - [ ] [Tự động] Trước khi sửa code, đối chiếu checklist này với tài liệu chính thức về UI schema, renderer, layout policy và `spatialConfig`; ghi mọi mâu thuẫn cần quyết định vào `Câu hỏi đêm.md`, không tự lách bằng CSS.
-- [ ] [Tự động] Cập nhật tài liệu chính thức sau khi các quyết định tại checklist được chốt: công thức chiều rộng, phân loại component, ownership padding/margin/gap, API Row, bất biến `RowGroup → Row` và ví dụ cây đúng/sai.
+- [x] [Tự động] Cập nhật tài liệu chính thức sau khi các quyết định tại checklist được chốt: công thức chiều rộng, phân loại component, ownership padding/margin/gap, API Row, bất biến `RowGroup → Row` và ví dụ cây đúng/sai. Bằng chứng: `03. Data schema & UI schema.md`, `03A. Hợp đồng Schema.md`, `04. Bộ máy render và luồng lưu.md`.
 - [ ] [Tự động] Cập nhật `Cây thư mục code.md` nếu quá trình triển khai tạo tệp/thư mục code mới.
 - [ ] [Tự động] Kiểm kê tất cả CSS `display:flex`, `display:grid`, `gap`, `padding`, `margin`, `justify-content`, `align-items`, `text-align` và width rule của component trong phạm vi; phân loại thành owner hợp lệ, hình thức nội tại, ngoại lệ domain có lý do hoặc dư thừa phải xóa.
 - [ ] [Tự động] Kiểm kê tất cả consumer dựng `Row`, `RowGroup`, Card, Button, Icon, Text, Field và control; xác định consumer nào vi phạm parent trực tiếp, owner gap hoặc owner alignment.

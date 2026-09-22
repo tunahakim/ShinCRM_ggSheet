@@ -65,6 +65,9 @@ function chay(so) {
   const engine = docTep('client/ui/renderEngine.html');
   const frame = docTep('client/style/frame.html');
   const styles = docTep('client/style/components.html');
+  const cardCss = styles.slice(styles.indexOf('.shin-card {'), styles.indexOf('/*\n * Hàng tiêu đề nằm ngoài thẻ ruột'));
+  const cardHeadCss = styles.slice(styles.indexOf('.shin-card-head {'), styles.indexOf('.shin-card-title {'));
+  const cardBodyCss = styles.slice(styles.indexOf('.shin-card-body {'), styles.indexOf('/* --- Trường và nhãn'));
   const cardActionsCss = styles.slice(styles.indexOf('.shin-card-actions {'), styles.indexOf('/*\n * Nút trong hàng tiêu đề card'));
   const sidebar = docTep('client/Sidebar.html');
   const popup = docTep('client/ui/popupList.html');
@@ -172,12 +175,12 @@ function chay(so) {
     ['shin-form-field', 'shin-toggle-row', 'shin-toggle-control', 'shin-notice', 'shin-kv-label', 'shin-pagination', 'shin-section', 'shin-content-disabled', 'shin-loading'].every((name) => styles.indexOf(name) >= 0),
     true);
   check(so, 'Card và RowGroup dùng gap dọc, component con không cộng margin lần hai',
-    [styles.indexOf('.shin-card-body {') >= 0, styles.indexOf('.shin-box.shin-row-group {') >= 0,
-      styles.indexOf('gap: var(--shin-gap-2);', styles.indexOf('.shin-card-body {')) === -1,
+    [cardCss.indexOf('padding: var(--shin-card-pad);') >= 0, cardHeadCss.indexOf('padding:') === -1,
+      cardBodyCss.indexOf('padding:') === -1, styles.indexOf('.shin-box.shin-row-group {') >= 0,
       styles.indexOf('.shin-card-body > * { margin: 0; }') >= 0,
       styles.indexOf('.shin-row-group > * + *') === -1,
       styles.indexOf('.shin-form-field > * + *') === -1],
-    [true, true, true, true, true, true]);
+    [true, true, true, true, true, true, true]);
   check(so, 'Nhóm action dùng RowGroup lõi và vẫn giữ owner riêng',
     [styles.indexOf('align-items: stretch;') >= 0, styles.indexOf('align-self: stretch;') >= 0, styles.indexOf('width: 100%;') >= 0,
       styles.indexOf('.shin-box.shin-action-stack') >= 0,
