@@ -400,6 +400,16 @@ async function chay(so) {
   const acLatest = fbmActivity('Nội dung FBM', '/Date(1757473200000)/');
   const acOpened = AC.conflictOpened(activityGrid(acOpen.request && acOpen.request.id, [acLatest]));
   const acFields = ((acOpened.conflict && acOpened.conflict.fields) || []).map((item) => item.field);
+  // DTO cho màn chọn giá trị (G9.1) đọc nhãn và kiểu từ DATA_SCHEMA thật; hộp test mặc định để DATA_SCHEMA rỗng nên nạp bảng khai thật rồi trả lại.
+  const realSchema = napServer(taoHopCat({}), 'server/data/DataSchema.js').DATA_SCHEMA;
+  ac.hop.DATA_SCHEMA = realSchema;
+  const acView = AC.conflictView({ entity: 'activity', id: ac.local.activity[0].id, local: ac.local.activity[0], latest: AC.activityRecord(acLatest, acGate), gate: acGate }, 1);
+  check(so, 'G9.1: DTO xung đột mang mã · tên bản ghi, nhãn trường theo DATA_SCHEMA; trường chữ tự do cho sửa, trường ngày chỉ chọn và hiện dạng ISO',
+    [acView.code, acView.name, acView.fields.map((item) => [item.field, item.label, item.editable, item.right])],
+    ['ALT00001', 'Gọi điện', [['details', 'Nội dung công việc', true, 'Nội dung FBM'], ['end_date', 'Ngày làm việc', false, '2025-09-10']]]);
+  const cvView = AC.conflictView({ entity: 'customer', id: 'CUS-X', local: { fbmCustomerCode: 'ALT00009', companyName: 'Cty X', taxNumber: '0101', phone: '090' }, latest: { fbmCustomerCode: 'ALT00009', companyName: 'Cty X', taxNumber: '0202', phone: '091' }, gate: acGate }, 1);
+  check(so, 'G9.1: mã số thuế (có validate và unique) chỉ được chọn một bên, điện thoại được gõ tay', (cvView.fields || []).map((item) => [item.label, item.editable]), [['Điện thoại', true], ['Mã số thuế', false]]);
+  ac.hop.DATA_SCHEMA = {};
   const acPrepare = AC.prepareConflictResolution('activity', ac.local.activity[0].id, 'manual');
   const acManual = AC.confirmConflict('activity', ac.local.activity[0].id, 'manual', { details: { choice: 'manual', value: 'Nội dung tự nhập' }, end_date: { choice: 'fbm' } }, activityGrid(acPrepare.request && acPrepare.request.id, [acLatest]));
   const acRow = ac.local.activity[0];

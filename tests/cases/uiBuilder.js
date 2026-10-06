@@ -20,7 +20,7 @@ function chay(so) {
   // Hình dạng node. Mọi node cùng một bộ khóa nên engine không phải hỏi khóa có tồn tại không.
   const hop1 = hop.Block({});
   check(so, 'Block trần có vai box và đủ ba mươi khóa',
-    [hop1.role, Object.keys(hop1).length], ['box', 29]);
+    [hop1.role, Object.keys(hop1).length], ['box', 30]);
 
   check(so, 'các hàm dựng chỉ điền vai, không sinh loại node mới',
     [hop.Card({}).role, hop.Row([]).role, hop.Text('x').role, hop.Field({ field: 'a' }).role, hop.Button('L').role, hop.Icon('close').role, hop.Check('ACT-000001').role, hop.StandaloneControl({ id: 'c', kind: 'input' }).role],

@@ -382,7 +382,40 @@ async function chay(so) {
   check(so, 'Results summary render năm tab chỉ có tên và mô tả nằm riêng bên dưới', [demTheoThuocTinh(content, 'data-sync-results-tab'), resultTabLabels, content.querySelectorAll('.shin-sync-tab-description').length, content.querySelector('#fbm-sync-results-tab-description-region').textContent, resultBody.className.indexOf('shin-row-group') >= 0, resultBody.className.indexOf('shin-section') >= 0, resultBody.querySelectorAll('.shin-section').length, dom.document.getElementById('fbm-sync-open-conflicts') !== null], [5, ['Tổng quan', 'Xung đột', 'Lỗi', 'Log', 'Nghiệm thu'], 1, 'Tóm tắt kết quả phiên', true, false, 0, true]);
   hop.FBM_SYNC_CLIENT.resultsTab = 'conflict';
   render(hop, content, hop.fbmSyncRenderResults, conflictStatus);
-  check(so, 'Màn hình xung đột có hai phía và ô tự nhập', [demTheoThuocTinh(content, 'data-fbm-conflict-choice'), demTheoThuocTinh(content, 'data-fbm-conflict-manual')], [2, 1]);
+  check(so, 'Màn hình xung đột có hai phía và ô tự nhập', [demTheoThuocTinh(content, 'data-fbm-conflict-pick'), demTheoThuocTinh(content, 'data-fbm-conflict-value')], [2, 2]);
+
+  // G9.1: mỗi trường xung đột là một khối dọc, người dùng phải chọn phía cho mọi trường rồi mới lưu được; thiếu thì tô đỏ như thiếu trường bắt buộc.
+  const pickCalls = [];
+  const savedResolve = hop.fbmSyncResolveConflict;
+  hop.fbmSyncResolveConflict = (entity, id, choice, merged) => { pickCalls.push([entity, id, choice, merged === undefined ? null : merged]); return Promise.resolve(null); };
+  hop.fbmSyncShowConflict({ entity: 'customer', id: 'CUS-2', code: 'KH-02', name: 'Công ty A', remaining: 3, fields: [{ field: 'phone', label: 'Điện thoại', editable: true, left: '0901', right: '' }, { field: 'industry', label: 'Ngành', editable: false, left: 'Gỗ', right: 'Thép' }] });
+  render(hop, content, hop.fbmSyncRenderResults, conflictStatus);
+  const byId = (id) => dom.document.getElementById(id);
+  check(so, 'G9.1: màn xung đột hiện mã · tên, nhãn trường theo Schema, chữ (trống) cho phía rỗng và menu chọn tất cả có ba lệnh', [content.textContent.indexOf('KH-02 · Công ty A') >= 0, content.textContent.indexOf('Điện thoại') >= 0, content.textContent.indexOf('Ngành') >= 0, byId('fbm-sync-conflict-value-0-fbm').getAttribute('placeholder'), JSON.parse(byId('fbm-sync-conflict-bulk').getAttribute('data-standalone-options').replace(/&quot;/g, '"')).map((option) => option.label)], [true, true, true, '(trống)', ['Lựa chọn', 'Chọn tất cả theo FBM', 'Chọn tất cả theo ShinCRM', 'Bỏ chọn tất cả']]);
+  const saveButton = byId('fbm-sync-conflict-save');
+  hop.fbmSyncSaveConflict(saveButton);
+  check(so, 'G9.1: bấm Lưu khi chưa chọn trường nào thì tô đỏ cả hai trường, hiện "Còn 2 trường chưa chọn giá trị." và không gọi GAS', [byId('fbm-sync-conflict-field-0').classList.contains('is-invalid'), byId('fbm-sync-conflict-field-1').classList.contains('is-invalid'), byId('fbm-sync-conflict-missing').hidden, byId('fbm-sync-conflict-missing').textContent, pickCalls.length, saveButton.disabled], [true, true, false, 'Còn 2 trường chưa chọn giá trị.', 0, false]);
+  const phoneShin = byId('fbm-sync-conflict-pick-0-shin');
+  hop.fbmSyncConflictPick(phoneShin);
+  hop.fbmSyncSaveConflict(saveButton);
+  check(so, 'G9.1: chọn một trường thì trường đó hết đỏ, trường còn lại vẫn đỏ và vẫn không gọi GAS', [byId('fbm-sync-conflict-field-0').classList.contains('is-invalid'), byId('fbm-sync-conflict-field-1').classList.contains('is-invalid'), byId('fbm-sync-conflict-missing').textContent, pickCalls.length], [false, true, 'Còn 1 trường chưa chọn giá trị.', 0]);
+  check(so, 'G9.1: phía được chọn rõ và sửa được, phía kia mờ và chỉ đọc', [byId('fbm-sync-conflict-value-0-shin').classList.contains('is-selected'), byId('fbm-sync-conflict-value-0-shin').readOnly, byId('fbm-sync-conflict-value-0-fbm').classList.contains('is-dimmed'), byId('fbm-sync-conflict-value-0-fbm').readOnly], [true, false, true, true]);
+  const bulkMenu = byId('fbm-sync-conflict-bulk');
+  hop.renderControlValue('fbm-sync-conflict-bulk', 'all_fbm'); hop.fbmSyncConflictPick(bulkMenu);
+  check(so, 'G9.1: menu "Chọn tất cả theo FBM" chọn phía FBM cho mọi trường, quyết định là PA1 (fbm) không kèm merged, không báo sẽ đẩy lên FBM, rồi menu trở lại nhãn "Lựa chọn"', [hop.fbmSyncConflictDecision(hop.FBM_SYNC_CLIENT.conflict), byId('fbm-sync-conflict-push-note').hidden, hop.fbmSyncControlValue('fbm-sync-conflict-bulk')], [{ missing: [], choice: 'fbm', merged: null, pushes: false }, true, '']);
+  check(so, 'G9.1: trường danh mục (editable false) được chọn vẫn chỉ đọc, không cho tự nhập', byId('fbm-sync-conflict-value-1-fbm').readOnly, true);
+  hop.fbmSyncConflictPick(byId('fbm-sync-conflict-pick-1-shin'));
+  check(so, 'G9.1: chọn trộn FBM và ShinCRM là PA3 (manual), merged ghi lựa chọn từng trường và báo sẽ đẩy lên FBM', [hop.fbmSyncConflictDecision(hop.FBM_SYNC_CLIENT.conflict), byId('fbm-sync-conflict-push-note').hidden], [{ missing: [], choice: 'manual', merged: { phone: { choice: 'fbm' }, industry: { choice: 'shin' } }, pushes: true }, false]);
+  hop.fbmSyncConflictPick(phoneShin);
+  const phoneShinBox = byId('fbm-sync-conflict-value-0-shin');
+  phoneShinBox.value = '0909'; hop.fbmSyncConflictEdit(phoneShinBox);
+  hop.fbmSyncConflictPick(byId('fbm-sync-conflict-pick-0-fbm')); hop.fbmSyncConflictPick(phoneShin);
+  check(so, 'G9.1: sửa ô đang chọn hiện nhãn "đã sửa", đổi sang phía kia rồi quay lại vẫn giữ bản sửa, quyết định là manual mang giá trị tự nhập', [byId('fbm-sync-conflict-edited-0-shin').hidden, hop.fbmSyncConflictDecision(hop.FBM_SYNC_CLIENT.conflict)], [false, { missing: [], choice: 'manual', merged: { phone: { choice: 'manual', value: '0909' }, industry: { choice: 'shin' } }, pushes: true }]);
+  hop.fbmSyncSaveConflict(saveButton);
+  check(so, 'G9.1: đủ lựa chọn thì Lưu gửi GAS đúng entity, id, choice và merged rồi khóa nút chờ kết quả', [pickCalls, saveButton.disabled], [[['customer', 'CUS-2', 'manual', { phone: { choice: 'manual', value: '0909' }, industry: { choice: 'shin' } }]], true]);
+  hop.renderControlValue('fbm-sync-conflict-bulk', 'clear'); hop.fbmSyncConflictPick(bulkMenu);
+  check(so, 'G9.1: "Bỏ chọn tất cả" xóa mọi lựa chọn, hai trường quay về chưa chọn', hop.fbmSyncConflictDecision(hop.FBM_SYNC_CLIENT.conflict).missing, ['phone', 'industry']);
+  hop.fbmSyncResolveConflict = savedResolve;
 
   const logRows = Array.from({ length: 21 }, (_, index) => ({ stage: 'stage-' + index, operation: 'op-' + index }));
   hop.FBM_SYNC_CLIENT.resultsTab = 'log'; hop.FBM_SYNC_CLIENT.resultPages = { log: 0 };
@@ -561,8 +594,9 @@ async function chay(so) {
   check(so, 'Lỗi mở lại bản ghi hiện rõ và không khóa nút', [retryButton.disabled, paints.some((item) => String(item.message).indexOf('RETRY_FAILURE') >= 0)], [false, true]);
 
   hop.fbmSyncResolveConflict = () => Promise.reject(new Error('CONFLICT_FAILURE'));
-  const conflictButton = makeTarget('data-fbm-conflict-choice');
-  conflictButton.getAttribute = (name) => name === 'data-fbm-conflict-choice' ? 'shin' : '';
+  hop.FBM_SYNC_CLIENT.conflict = { entity: 'customer', id: 'CUS-1', remaining: 1, fields: [{ field: 'phone', left: '0901', right: '0902' }] };
+  hop.FBM_SYNC_CLIENT.conflictChoices = { phone: 'fbm' }; hop.FBM_SYNC_CLIENT.conflictDraft = {}; hop.FBM_SYNC_CLIENT.conflictInvalid = {};
+  const conflictButton = makeTarget('', 'fbm-sync-conflict-save');
   dom.document.listeners.click({ target: conflictButton, preventDefault: () => {} });
   await new Promise((resolve) => setTimeout(resolve, 0));
   check(so, 'Lỗi xử lý xung đột hiện rõ và không khóa nút', [conflictButton.disabled, paints.some((item) => String(item.message).indexOf('CONFLICT_FAILURE') >= 0)], [false, true]);

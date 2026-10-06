@@ -65,6 +65,8 @@ const DAU_DO = [
   ,{ vai: 'standaloneControl', khoa: 'options', nen: { id: 'probe-control', kind: 'select', options: [{ value: 'a', label: 'A' }], value: 'a' }, gia: [{ value: 'b', label: 'B' }] }
   ,{ vai: 'standaloneControl', khoa: 'disabled', nen: { id: 'probe-control', kind: 'input', inputType: 'text', value: 'x' }, gia: true }
   ,{ vai: 'standaloneControl', khoa: 'pressed', nen: { id: 'probe-control', kind: 'toggle' }, gia: true }
+  ,{ vai: 'standaloneControl', khoa: 'readonly', nen: { id: 'probe-control', kind: 'textarea', value: 'x' }, gia: true }
+  ,{ vai: 'standaloneControl', khoa: 'group', nen: { id: 'probe-control', kind: 'radio', group: 'nhom-a', value: 'a' }, gia: 'nhom-b' }
   ,{ vai: 'standaloneControl', khoa: 'ariaLabel', nen: { id: 'probe-control', kind: 'input', inputType: 'text', value: 'x' }, gia: 'Ô thử' }
   ,{ vai: 'standaloneControl', khoa: 'hidden', nen: { id: 'probe-control', kind: 'input', inputType: 'text', value: 'x' }, gia: true }
 ];

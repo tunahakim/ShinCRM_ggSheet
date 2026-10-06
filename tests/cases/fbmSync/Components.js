@@ -137,7 +137,7 @@ function chay(so) {
     [engine.indexOf("kind === 'menu'") >= 0,
       source['client/schema/sync/screens/run.html'].indexOf("id: 'fbm-sync-mode', label:") >= 0 && source['client/schema/sync/screens/run.html'].indexOf("kind: 'menu'") >= 0,
       source['client/schema/sync/screens/settings.html'].indexOf("directionId: 'fbm-sync-background-direction'") >= 0,
-      source['client/sync/fbmSyncAuditScreen.html'].indexOf("controlId, kind: 'menu'") >= 0],
+      source['client/sync/fbmSyncAuditScreen.html'].indexOf("schema.ids.bulk, kind: 'menu'") >= 0],
     [true, true, true, true]);
   check(so, 'mọi màn Sync dùng field độc lập chung cho control ngoài DATA_SCHEMA',
     [source['client/sync/screens/account.html'].indexOf('StandaloneField(') >= 0,
@@ -148,7 +148,7 @@ function chay(so) {
   check(so, 'các hàng thao tác dùng Row chung để tự chia đều',
     [source['client/sync/fbmSyncUiSchema.html'].indexOf('singleAction: function') >= 0,
       source['client/sync/fbmSyncUiSchema.html'].indexOf('FBM_SYNC_ACCOUNT_UI') >= 0,
-      source['client/sync/fbmSyncAuditScreen.html'].indexOf('Row([') >= 0,
+      source['client/sync/fbmSyncAuditScreen.html'].indexOf('Row({ className: classes.singleAction') >= 0,
       source['client/sync/fbmSyncUiSchema.html'].indexOf('FBM_SYNC_RESULTS_UI') >= 0],
     [true, true, true, true]);
   check(so, 'card cấu hình dùng hàng action và style sửa chung, không tự đặt kích thước từng màn',

@@ -314,7 +314,9 @@ async function chay(so) {
   hop.fbmSyncRetryPushFailures = () => { retries += 1; return Promise.resolve(null); };
   hop.fbmSyncResolveConflict = (entity, id, choice) => { conflictChoice = entity + ':' + id + ':' + choice; return Promise.resolve(null); };
   const retry = dom.document.createElement('button'); retry.setAttribute('data-fbm-push-retry-all', 'true');
-  const conflict = dom.document.createElement('button'); conflict.setAttribute('data-fbm-conflict-choice', 'shin'); conflict.setAttribute('data-fbm-conflict-entity', 'customer'); conflict.setAttribute('data-fbm-conflict-id', 'CUS-1');
+  hop.FBM_SYNC_CLIENT.conflict = { entity: 'customer', id: 'CUS-1', remaining: 1, fields: [{ field: 'phone', left: '0901', right: '0902' }] };
+  hop.FBM_SYNC_CLIENT.conflictChoices = { phone: 'shin' }; hop.FBM_SYNC_CLIENT.conflictDraft = {}; hop.FBM_SYNC_CLIENT.conflictInvalid = {};
+  const conflict = dom.document.createElement('button'); conflict.id = 'fbm-sync-conflict-save';
   click(dom, retry);
   click(dom, conflict);
   await tick();
