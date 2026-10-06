@@ -555,6 +555,22 @@ async function chay(so) {
   await hop.fbmSyncCheckIdentity();
   check(so, 'Kiểm tra liên kết bị cổng đăng nhập chặn thì hiện đúng lý do GAS, không ghi thêm lỗi chung chung', [hop.FBM_SYNC_CLIENT.accountNotices.identity.kind, hop.FBM_SYNC_CLIENT.accountNotices.identity.message, pausedIdentityCalls.indexOf('fbmLogSyncError') < 0], ['error', 'Kiểm tra liên kết không thành công: Lần tự đăng nhập FBM trước thất bại; đang chờ chu kỳ an toàn trước khi thử lại.', true]);
   hop.fbmSyncLoop = () => Promise.resolve({ ok: true, status: { phase: 'done', metadata: { identityCheck: { total: 3, matched: 2, missing: 1 } } } });
+  // ACK cũ (tab ẩn làm chậm nhịp ping) không được kết luận Extension vắng: ping ngay, ACK về thì chạy tiếp.
+  let bridgeAlive = false;
+  const lateAckCalls = [];
+  hop.sheetLinkExtensionAlive = () => bridgeAlive;
+  hop.sheetLinkMs = () => 5;
+  hop.sheetLinkHandshakePing = () => { bridgeAlive = true; hop.fbmSyncNotifyBridgeReady(); };
+  hop.callServer = (name) => { lateAckCalls.push(name); return name === 'fbmStartIdentityCheck' ? Promise.resolve({ ok: true, request: {} }) : Promise.resolve({}); };
+  await hop.fbmSyncCheckIdentity();
+  check(so, 'Kiểm tra liên kết khi ACK Extension đã cũ thì ping lại và chạy tiếp khi Extension trả lời, không báo lỗi bắt tay', [lateAckCalls.indexOf('fbmStartIdentityCheck') >= 0, hop.FBM_SYNC_CLIENT.accountNotices.identity.kind], [true, 'warning']);
+  bridgeAlive = false;
+  hop.sheetLinkHandshakePing = () => {};
+  const absentCalls = [];
+  hop.callServer = (name) => { absentCalls.push(name); return Promise.resolve({}); };
+  await hop.fbmSyncCheckIdentity();
+  check(so, 'Kiểm tra liên kết khi Extension vắng thật thì báo Sidebar, ghi Log và không gọi GAS khởi chạy', [hop.FBM_SYNC_CLIENT.accountNotices.identity.kind, absentCalls.indexOf('fbmLogSyncError') >= 0, absentCalls.indexOf('fbmStartIdentityCheck') < 0, hop.FBM_SYNC_CLIENT.running], ['error', true, true, false]);
+  hop.sheetLinkExtensionAlive = () => true;
 
 
   const waitForIdentityBackground = hop.fbmSyncWaitForIdentityBackground;
