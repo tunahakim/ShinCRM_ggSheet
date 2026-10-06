@@ -41,7 +41,7 @@ function fbmSyncPatchLiveStatus(panel, status, screen) {
 function fbmSyncRecordIssueBlocks(metadata) {
   metadata = metadata || {};
   var schema = FBM_SYNC_ISSUES_SCHEMA, ui = FBM_SYNC_ISSUES_UI;
-  var conflicts = Array.isArray(metadata.conflicts) ? metadata.conflicts : [];
+  var conflictCount = Number(metadata.conflictCount || 0);
   var preflight = Array.isArray(metadata.preflightIssues) ? metadata.preflightIssues : [];
   var identityBlocks = Array.isArray(metadata.identityBlocks) ? metadata.identityBlocks : [];
   var pushFailures = metadata.pushFailures || {};
@@ -50,7 +50,7 @@ function fbmSyncRecordIssueBlocks(metadata) {
   Object.keys(pushFailureDetails).forEach(function (key) { if (failures.indexOf(key) < 0) { failures.push(key); } });
   var categories = Array.isArray(metadata.categoryBlocks) ? metadata.categoryBlocks : [];
   var activityMissing = Array.isArray(metadata.activityBulkMissing) ? metadata.activityBulkMissing : [];
-  var hasRecordIssues = conflicts.length || identityBlocks.length || failures.length || categories.length || activityMissing.length;
+  var hasRecordIssues = conflictCount || identityBlocks.length || failures.length || categories.length || activityMissing.length;
   var blocks = [];
   if (preflight.length) {
     blocks.push(ui.card(schema.titles.preflight, preflight.slice(-30).map(function (item) {
@@ -60,7 +60,7 @@ function fbmSyncRecordIssueBlocks(metadata) {
   }
   if (!hasRecordIssues) { return blocks; }
   var elements = [];
-  if (conflicts.length) { elements.push(Text({ className: ui.classes.preview, text: schema.conflict.message.replace('{count}', Number(metadata.conflictCount || conflicts.length)) }), Button({ id: schema.ids.openConflicts, label: schema.conflict.action })); }
+  if (conflictCount) { elements.push(Text({ className: ui.classes.preview, text: schema.conflict.message.replace('{count}', conflictCount) }), Button({ id: schema.ids.openConflicts, label: schema.conflict.action })); }
   identityBlocks.slice(-20).forEach(function (item) { elements.push(Text({ className: ui.classes.preview, text: schema.identity + String(item && item.fbmCustomerCode || '') + schema.separator + String(item && item.reason || '') })); });
   if (failures.length) {
     elements.push(Text({ className: ui.classes.preview, text: schema.failures.message.replace('{count}', failures.length) }), Button({ label: schema.failures.action.replace('{count}', failures.length), data: { [schema.ids.retryAll]: true } }));

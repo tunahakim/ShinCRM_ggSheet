@@ -26,8 +26,8 @@ function fbmSyncRenderResults(panel, status) {
 }
 function fbmSyncResultsSignature(status) {
   var metadata = status && status.metadata || {}, tab = FBM_SYNC_CLIENT.resultsTab || 'summary';
-  if (tab === 'summary') { return tab + '|' + JSON.stringify({ phase: status && status.phase, metadata: { conflicts: metadata.conflicts, conflictCount: metadata.conflictCount, preflightIssues: metadata.preflightIssues, pushFailures: metadata.pushFailures, categoryBlocks: metadata.categoryBlocks } }); }
-  if (tab === 'conflict') { return tab + '|' + JSON.stringify({ count: metadata.conflictCount, conflicts: metadata.conflicts }); }
+  if (tab === 'summary') { return tab + '|' + JSON.stringify({ phase: status && status.phase, metadata: { conflictCount: metadata.conflictCount, preflightIssues: metadata.preflightIssues, pushFailures: metadata.pushFailures, categoryBlocks: metadata.categoryBlocks } }); }
+  if (tab === 'conflict') { return tab + '|' + JSON.stringify({ count: metadata.conflictCount, conflict: FBM_SYNC_CLIENT.conflict }); }
   if (tab === 'errors') { return tab + '|' + JSON.stringify({ failures: metadata.pushFailureDetails, preflightIssues: metadata.preflightIssues, categoryBlocks: metadata.categoryBlocks, page: FBM_SYNC_CLIENT.resultPages && FBM_SYNC_CLIENT.resultPages.errors }); }
   if (tab === 'log') { return tab + '|' + JSON.stringify({ trace: metadata.traceTail, page: FBM_SYNC_CLIENT.resultPages && FBM_SYNC_CLIENT.resultPages.log }); }
   return tab + '|' + JSON.stringify({ preview: metadata.preview, audit: metadata.audit });

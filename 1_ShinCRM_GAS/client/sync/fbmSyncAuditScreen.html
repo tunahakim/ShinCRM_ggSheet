@@ -15,8 +15,9 @@ function fbmSyncAuditContentBlocks(status) {
 
 function fbmSyncConflictContentBlocks(status) {
   var schema = FBM_SYNC_CONFLICT_SCHEMA, ui = FBM_SYNC_CONFLICT_UI;
-  var metadata = status.metadata || {}, conflicts = Array.isArray(metadata.conflicts) ? metadata.conflicts : [], item = conflicts[0];
-  var head = Row({ className: ui.classes.head, elements: [Text({ className: ui.classes.count, text: schema.remaining.replace('{count}', Number(metadata.conflictCount || conflicts.length)) })] });
+  // Bản ghi đang mở là DTO GAS trả khi mở chế độ xung đột, giữ trong RAM Sidebar; status chỉ mang số đếm.
+  var metadata = status.metadata || {}, item = FBM_SYNC_CLIENT.conflict;
+  var head = Row({ className: ui.classes.head, elements: [Text({ className: ui.classes.count, text: schema.remaining.replace('{count}', Number(item ? item.remaining : metadata.conflictCount) || 0) })] });
   if (!item) { return [ui.card([head, Empty(schema.empty)])]; }
   FBM_SYNC_CLIENT.conflictChoices = FBM_SYNC_CLIENT.conflictChoices || {};
   var fields = (item.fields || []).map(function (field, index) {
