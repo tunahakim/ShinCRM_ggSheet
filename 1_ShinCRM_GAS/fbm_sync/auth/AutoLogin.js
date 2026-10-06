@@ -67,7 +67,7 @@ FbmSync.loginConfigRepairUsername = function (input) {
   return FbmSync.loginConfigPublic();
 };
 
-/* XÃ³a credential cÅ© nhÆ°ng giá»¯ nguyÃªn chÃ­nh sÃ¡ch retry/auto-open; Ä‘á»•i identity khÃ´ng Ä‘Æ°á»£c dÃ¹ng láº¡i máº­t kháº©u A. */
+/* Xóa credential cũ nhưng giữ nguyên chính sách retry/auto-open; đổi identity không được dùng lại mật khẩu A. */
 FbmSync.loginConfigClearCredential = function () {
   var current = FbmSync.loginConfigRead(), saved = {
     enabled: false,

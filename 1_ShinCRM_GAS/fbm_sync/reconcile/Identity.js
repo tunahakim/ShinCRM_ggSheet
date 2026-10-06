@@ -60,28 +60,28 @@ FbmSync.bindingWrite = function (binding) {
   if (typeof props.deleteProperty === 'function') { props.deleteProperty(FbmSync.BINDING_CLEAR_KEY); }
   return { ok: true, binding: { spreadsheetId: saved.spreadsheetId, userId: saved.userId, username: saved.username, accountName: saved.accountName, updatedAt: saved.updatedAt } };
 };
-/* LÆ°u cáº£ nháº­n diá»‡n vÃ  credential dÆ°á»›i cÃ¹ng lock; khÃ´ng Ä‘á»ƒ há»‡ thá»‘ng rÆ¡i vÃ o tráº¡ng thÃ¡i ná»­a A ná»­a B. */
+/* Lưu cả nhận diện và credential dưới cùng lock; không để hệ thống rơi vào trạng thái nửa A nửa B. */
 FbmSync.connectionSave = function (input) {
   var value = input || {}, binding = value.binding || {}, credential = value.credential || {}, props = PropertiesService.getDocumentProperties();
   var loginKey = FbmSync.LOGIN_CONFIG_KEY || 'FBM_LOGIN_CONFIG_V1', oldBindingRaw = props.getProperty(FbmSync.BINDING_KEY), oldLoginRaw = props.getProperty(loginKey), oldClearRaw = props.getProperty(FbmSync.BINDING_CLEAR_KEY);
   var identity = { spreadsheetId: String(binding.spreadsheetId || '').trim(), userId: String(binding.userId || '').trim(), username: String(binding.username || '').trim(), accountName: String(binding.accountName || '').trim() };
   var allEmpty = !identity.spreadsheetId && !identity.userId && !identity.username && !identity.accountName;
   if (!allEmpty && (!identity.spreadsheetId || !identity.userId || !identity.username || !identity.accountName)) {
-    return { ok: false, code: 'IDENTITY_BINDING_INCOMPLETE', message: 'Thiáº¿u SpreadsheetId, mÃ£ sá»‘ user, tÃªn Ä‘Äƒng nháº­p hoáº·c tÃªn Ä‘áº§y Ä‘á»§ FBM.' };
+    return { ok: false, code: 'IDENTITY_BINDING_INCOMPLETE', message: 'Thiếu SpreadsheetId, mã số user, tên đăng nhập hoặc tên đầy đủ FBM.' };
   }
   var previous = FbmSync.bindingRead(), changed = !previous.spreadsheetId || allEmpty || previous.spreadsheetId !== identity.spreadsheetId || previous.userId !== identity.userId || String(previous.username || '') !== identity.username || previous.accountName !== identity.accountName;
   var mode = String(credential.mode || 'preserve');
-  if (['preserve', 'save', 'clear'].indexOf(mode) < 0) { return { ok: false, code: 'LOGIN_CREDENTIAL_MODE_INVALID', message: 'CÃ¡ch lÆ°u credential khÃ´ng há»£p lá»‡.' }; }
-  if (mode === 'save' && allEmpty) { return { ok: false, code: 'IDENTITY_BINDING_REQUIRED', message: 'Pháº£i cÃ³ nháº­n diá»‡n tÃ i khoáº£n trÆ°á»›c khi lÆ°u credential.' }; }
+  if (['preserve', 'save', 'clear'].indexOf(mode) < 0) { return { ok: false, code: 'LOGIN_CREDENTIAL_MODE_INVALID', message: 'Cách lưu credential không hợp lệ.' }; }
+  if (mode === 'save' && allEmpty) { return { ok: false, code: 'IDENTITY_BINDING_REQUIRED', message: 'Phải có nhận diện tài khoản trước khi lưu credential.' }; }
   if (changed && mode === 'preserve' && credential.keepOnIdentityChange !== true) { mode = 'clear'; }
   try {
     var bindingResult = allEmpty ? FbmSync.bindingClear() : FbmSync.bindingWrite(identity);
     if (!bindingResult || bindingResult.ok === false) { return bindingResult; }
     var loginResult;
     if (mode === 'save') {
-      if (typeof FbmSync.loginConfigSave !== 'function') { throw new Error('Kho credential chÆ°a Ä‘Æ°á»£c náº¡p.'); }
+      if (typeof FbmSync.loginConfigSave !== 'function') { throw new Error('Kho credential chưa được nạp.'); }
       loginResult = FbmSync.loginConfigSave({ enabled: credential.enabled !== false, credentialRef: credential.credentialRef, envelope: credential.envelope, public: credential.public || {} });
-      if (!loginResult || loginResult.ok === false) { throw new Error(loginResult && (loginResult.message || loginResult.code) || 'KhÃ´ng lÆ°u Ä‘Æ°á»£c credential.'); }
+      if (!loginResult || loginResult.ok === false) { throw new Error(loginResult && (loginResult.message || loginResult.code) || 'Không lưu được credential.'); }
     } else if (mode === 'clear' && typeof FbmSync.loginConfigClearCredential === 'function') {
       loginResult = FbmSync.loginConfigClearCredential();
     } else {

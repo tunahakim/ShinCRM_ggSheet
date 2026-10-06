@@ -3,7 +3,7 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 /** API bắt đầu phiên cho Sidebar hoặc DEV runner. */
 function fbmSyncStart(mode) { return FbmSync.start({ mode: mode }); }
-/** Chá»‰ quÃ©t Customer FBM Ä‘á»ƒ kiá»ƒm tra liÃªn káº¿t, khÃ´ng ghi Sheet/FBM vÃ  khÃ´ng Ä‘á»c Activity. */
+/** Chỉ quét Customer FBM để kiểm tra liên kết, không ghi Sheet/FBM và không đọc Activity. */
 function fbmSyncStartIdentityCheck(identity) { return FbmSync.controlDispatch('start', { mode: 'check', scan: 'identity_check', identity: identity || null, origin: 'manual', manual: true }); }
 /** Chỉ lấy nhận diện từ authorize để Sidebar tự điền; không quét Customer và không ghi. */
 function fbmSyncStartIdentityProbe() { return FbmSync.controlDispatch('start', { mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true }); }
