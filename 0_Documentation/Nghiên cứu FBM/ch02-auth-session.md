@@ -91,6 +91,26 @@ Giải thích: `user` là tên đăng nhập. `password` là hash hai lần MD5.
 
 Server có thể trả thêm cookie xác thực trong `Set-Cookie`. Cookie cuối cùng dùng cho mọi request sau là kết quả ghép cookie từ bước 1 (session) và bước 4 (auth, nếu có).
 
+#### 2.5.1 Khóa localStorage trang Login lưu sau khi đăng nhập (bắt buộc nếu người dùng còn mở FBM trên trình duyệt)
+
+Đọc mã `ScriptResource.axd` của `Login.aspx` ngày 2026-10-06. Khi người dùng tự đăng nhập, ngoài request `Login`, trang Login còn làm thêm phần phía trình duyệt trong hàm `_onLoginComplete`:
+
+```
+i = MD5(matKhau)
+this._k = "k" + String.fromCharCode(0)          // tên khóa: "k\0"
+this._secretKey = MD5(MD5(salt) + i)            // salt = giá trị `value` gửi trong request Login
+PageMethods.Login(user, MD5(salt + i), database, unit, language, salt, force, storage, ...)
+// khi Login thành công:
+sessionStorage.clear()
+localStorage.removeItem("menuItems")
+localStorage.setItem(this._k, this._secretKey)
+window.location = url                           // "../Default.aspx", chuyển tiếp sang /Main/zccrAccount.aspx
+```
+
+Trên trang chính, các bảng dữ liệu (`ReportExtender`) kiểm khóa này trước khi vẽ: `_salt` của bảng có dạng `<hash>\t<tên khóa>`, bảng đọc `localStorage[<tên khóa>]` và chỉ vẽ khi `MD5(khóa + payloadCookie) == hash`; lệch hoặc thiếu thì bảng không hiện.
+
+Hệ quả đã gặp thật: đăng nhập ngầm bằng fetch (Extension gọi đủ 4 bước nhưng không chạy JS trang Login) thì phiên phía máy chủ vẫn hợp lệ, nhưng mở FBM trên trình duyệt chỉ thấy khung trống, menu và cây nhân viên có nhưng bảng khách hàng/hoạt động trắng, phải đăng xuất rồi tự đăng nhập lại mới hiện. Cách xử lý: sau khi `Login` trả `{"d":true}`, chạy đúng ba lệnh trên trong một trang cùng origin `https://fbo.com.vn:8888` (ví dụ content script trên tab FBM), với `salt` là giá trị đã gửi trong request Login. Không ghi khóa này vào log vì nó suy ra từ mật khẩu.
+
 ### 2.6 Trích xuất userId và cookie payload
 
 Sau khi đăng nhập thành công, cần truy cập trang quản lý khách hàng để lấy hai thông tin quan trọng.
