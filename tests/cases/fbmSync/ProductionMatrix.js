@@ -87,7 +87,7 @@ async function chay(so) {
   const sync = makeSync();
   const state = sync.hop.FbmSync.stateStart('', 'pull_customer', 0);
   state.mode = 'read';
-  state.metadata.categoryGate = { map: {}, names: {}, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true }, '@CAT_CONG_VIEC': { 'Gọi điện': true } }, warnings: [] };
+  sync.hop.FbmSync.readCategoryGate = () => ({ map: {}, names: {}, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true }, '@CAT_CONG_VIEC': { 'Gọi điện': true } }, warnings: [] });
   sync.hop.FbmSync.stateWrite(state);
   const customers = [customer('FBM-C1', 'ALT00001', 'Công ty 1'), customer('FBM-C2', 'ALT00002', 'Công ty 2'), customer('FBM-C3', 'ALT00003', 'Công ty 3')];
   const firstPull = sync.hop.FbmSync.pullWrite('customer', customers);
@@ -158,7 +158,7 @@ async function chay(so) {
     F.validatePushCategories = () => [];
     F.nextEnvelope = (request) => request;
     const st = F.stateStart('', 'push', 0);
-    st.mode = 'write'; st.phase = 'push'; st.metadata.categoryGate = { map: {}, names: {}, valid: {}, blocked: {} };
+    st.mode = 'write'; st.phase = 'push'; 
     st.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
     F.stateWrite(st);
     return { run, F };
@@ -239,7 +239,7 @@ async function chay(so) {
   CF.masterEnabled = () => true;
   const cfState = CF.stateStart('', 'pull_customer', 0);
   const cfGate = { map: {}, names: {}, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true } }, warnings: [] };
-  cfState.mode = 'read'; cfState.metadata.categoryGate = cfGate; CF.stateWrite(cfState);
+  cfState.mode = 'read'; CF.readCategoryGate = () => cfGate; CF.stateWrite(cfState);
   const cfIds = [1, 2, 3];
   CF.pullWrite('customer', cfIds.map((n) => CF.customerRecord(fbmRow('F-' + n, 'ALT0000' + n, 'Tên gốc ' + n), {})));
   cf.local.customer.forEach((row) => { row.companyName = 'Tên Shin ' + row.fbmCustomerCode.slice(-1); });
@@ -302,7 +302,7 @@ async function chay(so) {
   // FBM-033: bản ghi đầu hàng đợi không đọc được trên FBM thì rời hàng đợi, không chặn các xung đột phía sau.
   const un = makeSync(), UN = un.hop.FbmSync;
   UN.masterEnabled = () => true;
-  const unState = UN.stateStart('', 'pull_customer', 0); unState.mode = 'read'; unState.metadata.categoryGate = cfGate; UN.stateWrite(unState);
+  const unState = UN.stateStart('', 'pull_customer', 0); unState.mode = 'read'; UN.readCategoryGate = () => cfGate; UN.stateWrite(unState);
   const unIds = [1, 2, 3, 4];
   UN.pullWrite('customer', unIds.map((n) => UN.customerRecord(fbmRow('F-' + n, 'ALT0000' + n, 'Tên gốc ' + n), {})));
   un.local.customer.forEach((row) => { row.companyName = 'Tên Shin ' + row.fbmCustomerCode.slice(-1); });
@@ -328,7 +328,7 @@ async function chay(so) {
   check(so, 'FBM-033: bản ghi xung đột thiếu ID FBM cũng rời hàng đợi ngay, không phát request', [unNoId.code, unNoId.request, un.local.customer[2].syncStatus, UN.openConflict().request.meta.conflictId], ['CONFLICT_RECORD_UNREADABLE', undefined, 'không thấy bên FBM', 'CUS-000004']);
 
   const cfBig = makeSync(), CB = cfBig.hop.FbmSync;
-  const cfBigState = CB.stateStart('', 'pull_customer', 0); cfBigState.mode = 'read'; cfBigState.metadata.categoryGate = cfGate; CB.stateWrite(cfBigState);
+  const cfBigState = CB.stateStart('', 'pull_customer', 0); cfBigState.mode = 'read'; CB.readCategoryGate = () => cfGate; CB.stateWrite(cfBigState);
   const cfBigIds = Array.from({ length: 80 }, (_, index) => index + 10);
   const longName = (prefix, n) => prefix + ' ' + n + ' ' + 'x'.repeat(400);
   CB.pullWrite('customer', cfBigIds.map((n) => CB.customerRecord(fbmRow('F-' + n, 'ALT000' + n, longName('Gốc', n)), {})));
@@ -387,9 +387,9 @@ async function chay(so) {
   AC.masterEnabled = () => true;
   AC.scriptSettings = () => ({ baseUrl: 'https://fbm.test', accountName: 'Le Tuan Anh', customerPrefix: 'ALT', customerCodeLength: 8 });
   const acState = AC.stateStart('', 'pull_activity', 0); acState.mode = 'read';
-  acState.metadata.categoryGate = { map: {}, names: {}, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true }, '@CAT_CONG_VIEC': { 'Gọi điện': true } }, warnings: [] };
+  AC.readCategoryGate = () => ({ map: {}, names: {}, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true }, '@CAT_CONG_VIEC': { 'Gọi điện': true } }, warnings: [] });
   AC.stateWrite(acState);
-  const acGate = acState.metadata.categoryGate;
+  const acGate = AC.stateCategoryGate(acState);
   AC.pullWrite('customer', [customer('FBM-C1', 'ALT00001', 'Công ty 1')]);
   AC.pullRecords('activity', [AC.activityRecord(fbmActivity('Nội dung gốc', '/Date(1757386800000)/'), acGate)], 'read');
   ac.local.activity[0].content = 'Nội dung Shin';

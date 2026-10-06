@@ -11,6 +11,7 @@ async function chay(so) {
   edges.logEvent = (event) => reconcileLogs.push(event);
   edges.LOG_OK = 'ok'; edges.LOG_WARN = 'warn'; edges.LOG_ERROR = 'error'; edges.LOG_CONFLICT = 'conflict';
   napServer(edges, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/SheetSave.js');
+  edges.FbmSync.readCategoryGate = () => gate;
   check(so, 'normalize placeholder 1999 thanh rong', edges.FbmSync.normalize('/Date(915123600000)/'), '');
   check(so, 'normalize Date co offset chi dung timestamp chinh', edges.FbmSync.normalize('/Date(1757386800000+0700)/'), edges.FbmSync.normalize('/Date(1757386800000)/'));
   check(so, 'normalize Date khong hop le khong nem loi', edges.FbmSync.normalize(new Date(NaN)), '');
@@ -24,7 +25,7 @@ async function chay(so) {
   check(so, 'conflict dựng request đọc lại đúng Activity FBM, không bị giới hạn bởi mốc', [refresh.meta.kind, refresh.meta.entity, refresh.body.externalKey[0].Name, refresh.body.externalKey[0].Value, refresh.body.filter], ['conflict_refresh_grid', 'activity', 'id', '174813', []]);
 
   let lockedWrite = false;
-  const lockedState = { mode: 'write', metadata: { categoryGate: {}, seen: { customer: {}, activity: {} } }, locks: { 'customer:CUS-000010': { owner: 'user', revision: 'r1' } } };
+  const lockedState = { mode: 'write', metadata: { seen: { customer: {}, activity: {} } }, locks: { 'customer:CUS-000010': { owner: 'user', revision: 'r1' } } };
   edges.FbmSync.stateRead = () => lockedState;
   edges.FbmSync.stateWrite = () => {};
   edges.FbmSync.validateIncomingCategories = () => [];
@@ -55,7 +56,7 @@ async function chay(so) {
   const activityMissingResult = edges.FbmSync.markMissingAfterFullScan('activity', fullScanState);
   check(so, 'Activity vang trong bulk chi danh dau missing khong xoa cung', [activityMissingResult.written, activityMissingBatch.records[0].id, activityMissingBatch.records[0].syncStatus, activityMissingBatch.records.length], [1, 'ACT-000021', edges.FbmSync.SYNC_STATUS.missing, 1]);
   let activityPullWrite;
-  edges.FbmSync.stateRead = () => ({ metadata: { categoryGate: gate, seen: { customer: {}, activity: {} } }, locks: {} });
+  edges.FbmSync.stateRead = () => ({ metadata: { seen: { customer: {}, activity: {} } }, locks: {} });
   edges.FbmSync.stateWrite = () => {};
   edges.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-ACT', fbmCustomerCode: 'ALT00014' }] : [];
   edges.writeGateSave = (request) => { activityPullWrite = request; return { ok: true }; };
@@ -66,7 +67,7 @@ async function chay(so) {
   const orphanActivity = edges.FbmSync.activityRecord({ id: 89, ma_kh: 'ALT00014', ten_cv: 'Gọi', details: 'Mồ côi #SC-ACT-UNKNOWN', end_date: '/Date(1757386800000)/' }, gate);
   const orphanActivityResult = edges.FbmSync.pullWrite('activity', [orphanActivity]);
   check(so, 'Activity marker mo coi khong tao dong moi', orphanActivityResult.written, 0);
-  const invalidState = { runId: 'invalid-activity', phase: 'pull_activity', entity: 'activity', cursor: { kind: 'activity_grid', index: 2 }, session: { customerAuthorized: '', activityAuthorized: '', expired: false }, metadata: { categoryGate: gate, seen: { customer: {}, activity: {} }, conflicts: [] }, locks: {}, counts: { total: 1, completed: 0, succeeded: 0, skipped: 0, conflict: 0, error: 0 }, message: '', lastError: '' };
+  const invalidState = { runId: 'invalid-activity', phase: 'pull_activity', entity: 'activity', cursor: { kind: 'activity_grid', index: 2 }, session: { customerAuthorized: '', activityAuthorized: '', expired: false }, metadata: { seen: { customer: {}, activity: {} }, conflicts: [] }, locks: {}, counts: { total: 1, completed: 0, succeeded: 0, skipped: 0, conflict: 0, error: 0 }, message: '', lastError: '' };
   edges.FbmSync.stateRead = () => invalidState;
   edges.FbmSync.stateWrite = (next) => { Object.assign(invalidState, next); return invalidState; };
   const invalidActivity = edges.FbmSync.activityRecord({ id: 90, ma_kh: 'ALT00014', ten_cv: 'Gọi', details: 'Thiếu ngày', end_date: '' }, gate);
@@ -80,7 +81,7 @@ async function chay(so) {
   check(so, 'Activity hợp lệ vẫn được ghi khi cả thiếu ngày cùng lô', [mixedActivityResult.written, activityPullWrite.records.some((record) => String(record.fbmId) === '91'), reconcileLogs.some((event) => event.action === 'pull_record')], [1, true, false]);
 
   const conflictRawBase = { stt_rec_kh: 'FBM-CONFLICT', ma_kh: 'ALT00015', ten_kh: 'Ten goc', ma_so_thue: '010015', dien_thoai: '090015', dc_lh: 'Ha Noi' };
-  const conflictState = { runId: 'conflict-run', mode: 'read', phase: 'conflict', entity: 'customer', cursor: { kind: 'customer_grid', index: 4 }, session: { customerAuthorized: '', activityAuthorized: '', expired: false }, metadata: { categoryGate: gate, seen: { customer: {}, activity: {} }, conflicts: [] }, locks: {}, counts: { total: 0, completed: 0, succeeded: 0, skipped: 0, conflict: 0, error: 0 } };
+  const conflictState = { runId: 'conflict-run', mode: 'read', phase: 'conflict', entity: 'customer', cursor: { kind: 'customer_grid', index: 4 }, session: { customerAuthorized: '', activityAuthorized: '', expired: false }, metadata: { seen: { customer: {}, activity: {} }, conflicts: [] }, locks: {}, counts: { total: 0, completed: 0, succeeded: 0, skipped: 0, conflict: 0, error: 0 } };
   const conflictLocal = { id: 'CUS-CONFLICT', fbmId: 'FBM-CONFLICT', fbmCustomerCode: 'ALT00015', companyName: 'Ten Shin moi', taxNumber: '010015', phone: '090015', address: 'Ha Noi', fbmHash: edges.FbmSync.hash(conflictRawBase, 'customer', gate), syncStatus: edges.FbmSync.SYNC_STATUS.synced };
   edges.FbmSync.stateRead = () => conflictState;
   edges.FbmSync.stateWrite = (next) => { Object.assign(conflictState, next); return conflictState; };
@@ -95,7 +96,7 @@ async function chay(so) {
 
   const failedRecord = { id: 'C-FAIL', fbmId: 'FBM-FAIL', fbmCustomerCode: 'ALT00010', companyName: 'Cũ', allowFbmPush: 'Cho phép', syncStatus: edges.FbmSync.SYNC_STATUS.error };
   const failedHash = edges.FbmSync.hash(failedRecord, 'customer', {});
-  const failedState = { metadata: { categoryGate: {}, pushFailures: { 'customer:C-FAIL': failedHash } } };
+  const failedState = { metadata: { pushFailures: { 'customer:C-FAIL': failedHash } } };
   edges.FbmSync.stateRead = () => failedState;
   edges.FbmSync.readLocal = () => [failedRecord];
   check(so, 'push loi cung hash khong bi lap lai', edges.FbmSync.pushCandidates('customer').length, 0);
@@ -106,7 +107,7 @@ async function chay(so) {
   const pushedRecord = { id: 'C-PUSHED', fbmId: 'FBM-PUSHED', fbmCustomerCode: 'ALT00010', companyName: 'Mới ở Shin', allowFbmPush: 'Chưa cho phép', syncStatus: edges.FbmSync.SYNC_STATUS.pushed };
   const oldFbm = { stt_rec_kh: 'FBM-PUSHED', ma_kh: 'ALT00010', ten_kh: 'Cũ ở FBM' };
   pushedRecord.fbmHash = edges.FbmSync.hash(oldFbm, 'customer', {});
-  const notAppliedState = { metadata: { categoryGate: {}, seen: { customer: {}, activity: {} } }, locks: {} };
+  const notAppliedState = { metadata: { seen: { customer: {}, activity: {} } }, locks: {} };
   edges.FbmSync.stateRead = () => notAppliedState;
   edges.FbmSync.stateWrite = (next) => { Object.assign(notAppliedState, next); return notAppliedState; };
   edges.FbmSync.readLocal = () => [pushedRecord];
@@ -116,6 +117,7 @@ async function chay(so) {
 
   const pushed = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {} });
   napServer(pushed, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
+  pushed.FbmSync.readCategoryGate = () => gate;
   pushed.FbmSync.readLocal = () => [{ id: 'CUS-1', fbmId: 'A1', fbmCustomerCode: 'ALT1', companyName: 'X', allowFbmPush: 'Cho phép', syncStatus: pushed.FbmSync.SYNC_STATUS.pushed, fbmHash: '' }];
   check(so, 'bản ghi đã đẩy chờ xác nhận không bị đẩy lặp', pushed.FbmSync.pushCandidates('customer').length, 0);
   pushed.FbmSync.readLocal = (entity) => entity === 'customer'

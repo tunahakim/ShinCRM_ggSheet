@@ -370,20 +370,19 @@ async function chay(so) {
   });
   const compactState = compactLookupFlow.hop.FbmSync.stateRead();
   const compactStateBytes = Buffer.byteLength(JSON.stringify(compactState), 'utf8');
-  check(so, 'lookup lớn chỉ giữ cặp Category cần dùng, không làm đầy DocumentProperties', [
+  check(so, 'lookup lớn không chép map Category vào state; gate dựng lại từ Sheet Category vẫn đủ mã (FBM-042)', [
     compactLast.request && compactLast.request.meta.kind,
     compactStateBytes < compactLookupFlow.hop.FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT,
     compactPairValue,
     JSON.stringify(compactState).indexOf('NOISE-') < 0,
-    compactState.metadata.categoryGate && compactState.metadata.categoryGate.valid,
-    compactState.metadata.categoryGate && compactState.metadata.categoryGate.names,
-    compactState.metadata.categoryGate && Object.keys(compactState.metadata.categoryGate.map || {}).length,
-    compactState.metadata.categoryGate && Object.keys(compactState.metadata.categoryGate.codesBySource || {}).length,
+    Object.prototype.hasOwnProperty.call(compactState.metadata, 'categoryGate'),
+    JSON.stringify(compactState).indexOf('categoryGateOfRun') < 0,
+    Object.keys(compactLookupFlow.hop.FbmSync.stateCategoryGate(compactState).map || {}).length,
+    Object.keys(compactLookupFlow.hop.FbmSync.stateCategoryGate(compactState).namesBySource || {}).length,
     Object.keys(compactState.session.lookups || {}).length,
-    compactState.metadata.categoryGate && compactLookupFlow.hop.FbmSync.categoryValueAllowed(compactState.metadata.categoryGate, '@CAT_TINH_THANH', 'CODE-0')
-  ], ['grid', true, 'Tên danh mục live 0 0 có tên đủ dài', true, undefined, undefined, 103, 4, 0, { ok: true, code: 'CODE-0' }]);
+    compactLookupFlow.hop.FbmSync.categoryValueAllowed(compactLookupFlow.hop.FbmSync.stateCategoryGate(compactState), '@CAT_TINH_THANH', 'CODE-0')
+  ], ['grid', true, 'Tên danh mục live 0 0 có tên đủ dài', true, false, true, 103, 4, 0, { ok: true, code: 'CODE-0' }]);
   const pushState = compactLookupFlow.hop.FbmSync.stateRead();
-  pushState.metadata.categoryGate = compactLookupFlow.hop.FbmSync.categoryGateForState(compactLookupFlow.hop.FbmSync.readCategoryGate());
   pushState.metadata.categoryBlocks = [];
   pushState.metadata.categoryLookupFailed = false;
   compactLookupFlow.hop.FbmSync.previewRecords(pushState, 'activity', [{ customerId: 'CUS-1', workDate: '2026-09-20', taskType: 'GD', content: 'x'.repeat(4000) }]);
@@ -410,12 +409,12 @@ async function chay(so) {
     pushWaitState.cursor.candidate && Object.prototype.hasOwnProperty.call(pushWaitState.cursor.candidate, 'record'),
     pushWaitState.metadata.preview.activities[0].content.length,
     String(pushRawState).indexOf('x'.repeat(4000)),
-    pushWaitState.metadata.categoryGate && Object.keys(pushWaitState.metadata.categoryGate.map || {}).length,
+    Object.prototype.hasOwnProperty.call(pushWaitState.metadata, 'categoryGate'),
     pushState.cursor.kind,
     pushRequest && pushRequest.meta && pushRequest.meta.kind,
     pushRawState.length,
     pushRawParsed && pushRawParsed.cursor && pushRawParsed.cursor.kind
-  ], [true, 'push_wait', false, false, 163, -1, 103, 'push_wait', 'activity_edit_open', pushRawState.length, 'push_wait']);
+  ], [true, 'push_wait', false, false, 163, -1, false, 'push_wait', 'activity_edit_open', pushRawState.length, 'push_wait']);
   check(so, 'state push raw size remains below quota after candidate compact', Buffer.byteLength(pushRawState, 'utf8') < compactLookupFlow.hop.FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT, true);
   compactLookupFlow.hop.FbmSync.readLocal = (entity) => entity === 'activity'
     ? [{ id: 'ACT-QUOTA', fbmId: 'FBM-ACT-QUOTA', content: 'x'.repeat(4000), customerId: 'CUS-1' }]
@@ -423,7 +422,7 @@ async function chay(so) {
   const hydratedCandidate = compactLookupFlow.hop.FbmSync.hydratePushCandidate(pushWaitState.cursor.candidate);
   check(so, 'candidate compact được dựng lại từ Sheet trước bước push tiếp theo', [hydratedCandidate.record.content.length, hydratedCandidate.record.customerFbmCode, hydratedCandidate.record.stt_rec], [4000, 'ALT00001', 'FBM-CUS-1']);
   const createCursor = { operation: 'customer_create_open', entity: 'customer', candidate: { kind: 'create', id: 'CUS-COMPACT', entity: 'customer' } };
-  const createState = compactLookupFlow.hop.FbmSync.stateRead(); createState.cursor = createCursor; createState.metadata.categoryGate = { map: {}, codesBySource: {}, blocked: {} };
+  const createState = compactLookupFlow.hop.FbmSync.stateRead(); createState.cursor = createCursor;
   compactLookupFlow.hop.FbmSync.customerCreateRequest = () => ({ url: 'https://example.test', meta: { kind: 'customer_create_save' } });
   compactLookupFlow.hop.FbmSync.extractAutoCustomerCode = () => 'ALT00099';
   compactLookupFlow.hop.FbmSync.validateAutoCustomerCode = () => ({ ok: true });
@@ -439,13 +438,13 @@ async function chay(so) {
   compactLookupFlow.documentProperties.setProperty('FBM_SYNC_PENDING_PUSHES_V1', 'x'.repeat(42));
   const probe = compactLookupFlow.hop.fbmSyncStateProbe();
   check(so, 'probe state chỉ trả kích thước từng nhánh, không trả payload', [
-    probe.ok, probe.state.parseOk, probe.state.cursorKind, probe.state.cursorCandidateCategoryGateBytes,
-    probe.state.metadataCategoryGateBytes > 0, probe.state.branchBytes.metadata > 0, probe.state.sessionLookupsBytes, Array.isArray(probe.extensionResponses), probe.largestProperties[0].key,
+    probe.ok, probe.state.parseOk, probe.state.cursorKind, 'metadataCategoryGateBytes' in probe.state,
+    probe.state.metadataCategoryBlocksBytes > 0, probe.state.branchBytes.metadata > 0, probe.state.sessionLookupsBytes, Array.isArray(probe.extensionResponses), probe.largestProperties[0].key,
     JSON.stringify(probe).indexOf('ACT-QUOTA') < 0
-  ], [true, true, 'push_wait', 0, true, true, 2, true, 'FBM_SYNC_STATE_V1', true]);
+  ], [true, true, 'push_wait', false, true, true, 2, true, 'FBM_SYNC_STATE_V1', true]);
   const orderFlow = workflowGas();
   const orderState = orderFlow.hop.FbmSync.stateStart('', 'push', 0);
-  orderState.mode = 'write'; orderState.phase = 'push'; orderState.entity = 'activity'; orderState.metadata.categoryGate = { map: {}, codesBySource: {}, blocked: {} };
+  orderState.mode = 'write'; orderState.phase = 'push'; orderState.entity = 'activity';
   orderState.cursor = { kind: 'push_scan', entity: 'activity', index: 0 };
   orderFlow.hop.FbmSync.stateWrite(orderState);
   orderFlow.hop.FbmSync.pushCandidates = () => [{ kind: 'edit', id: 'ACT-ORDER', position: 0, record: { id: 'ACT-ORDER', fbmId: 'FBM-ACT-ORDER', taskType: 'GD', content: 'Nội dung', workDate: '2026-09-20', customerId: 'CUS-1', customerFbmCode: 'ALT00001', allowFbmPush: 'Cho phép', fbmHash: 'old' } }];
@@ -467,7 +466,7 @@ async function chay(so) {
   // FBM-002: không ghi được `đang đẩy` xuống Sheet thì không phát lệnh ghi FBM.
   const pushingFlow = workflowGas();
   const pushingState = pushingFlow.hop.FbmSync.stateStart('', 'push', 0);
-  pushingState.mode = 'write'; pushingState.phase = 'push'; pushingState.entity = 'activity'; pushingState.metadata.categoryGate = { map: {}, codesBySource: {}, blocked: {} };
+  pushingState.mode = 'write'; pushingState.phase = 'push'; pushingState.entity = 'activity';
   pushingState.cursor = { kind: 'push_scan', entity: 'activity', index: 0 };
   pushingFlow.hop.FbmSync.stateWrite(pushingState);
   ['pushConfigErrors', 'pushOwnerError'].forEach((name) => { pushingFlow.hop.FbmSync[name] = () => ''; });
