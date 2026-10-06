@@ -159,6 +159,13 @@ async function chay(so) {
   push.FbmSync.markPushResult({ entity: 'customer', record: { id: 'C-OLD', fbmId: 'A-OLD', fbmCustomerCode: 'ALT00010', fbmHash: 'BASE' } }, { d: { InternalValues: [{ Name: 'stt_rec_kh', Value: 'A-OLD' }, { Name: 'ma_kh', Value: 'ALT00010' }] } }, 'customer_edit_save');
   check(so, 'push thanh cong giu baseline cu cho ky xac nhan va dung source push', [pushPatch.fbmHash, pushWriteRequest.source], ['BASE', 'push']);
   check(so, 'push thành công không ghi Log từng record', pushLogs.length, 0);
+  let pendingSet;
+  const realPendingSet = push.FbmSync.pendingPushSet;
+  push.FbmSync.pendingPushSet = (entity, id, value) => { pendingSet = value; };
+  const createdActivity = { id: 'ACT-NEW', fbmId: '', content: 'Tạo từ ShinCRM', taskType: 'CV1', workDate: '2026-10-07' };
+  push.FbmSync.markPushResult({ entity: 'activity', record: createdActivity }, { d: { InternalValues: [{ Name: 'id', Value: 174900 }] } }, 'activity_new_save');
+  check(so, 'FBM-050: tạo Activity lưu hash đã gửi kèm ID FBM vừa cấp, khớp bản đọc xác nhận', pendingSet.hSHIN, push.FbmSync.hash(Object.assign({}, createdActivity, { fbmId: '174900' }), 'activity', {}));
+  push.FbmSync.pendingPushSet = realPendingSet;
   const errorState = { counts: { error: 0 }, metadata: { pushFailures: {} }, locks: {} };
   push.FbmSync.unlockRecord = () => ({ locks: {} });
   push.FbmSync.markPushError(errorState, { entity: 'customer', id: 'C-ERR', record: { id: 'C-ERR', companyName: 'Lỗi' } }, 'FBM từ chối', 'customer_edit_save');
