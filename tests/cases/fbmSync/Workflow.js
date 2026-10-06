@@ -59,7 +59,7 @@ function workflowGas(options) {
     'fbm_sync/transport/EntryPoints.js',
     'server/service/FbmSyncService.js',
     'server/dev/FbmSyncStateProbe.js'
-  );
+  , 'fbm_sync/write/SheetSave.js');
   hop.FbmSync.currentSpreadsheetId = () => 'sheet-workflow';
   hop.FbmSync.configValue = () => '';
   hop.FbmSync.readLocal = opt.readLocal || (() => []);
@@ -396,7 +396,7 @@ async function chay(so) {
   compactLookupFlow.hop.FbmSync.pushEligibilityErrors = () => [];
   compactLookupFlow.hop.FbmSync.isRecordLocked = () => false;
   compactLookupFlow.hop.FbmSync.lockRecord = () => pushState;
-  compactLookupFlow.hop.FbmSync.writeGateSave = () => ({ ok: true });
+  compactLookupFlow.hop.writeGateSave = () => ({ ok: true });
   compactLookupFlow.hop.FbmSync.stopPushOnConflicts = () => false;
   compactLookupFlow.hop.FbmSync.activityEditOpenRequest = () => ({ url: 'https://example.test', meta: { kind: 'activity_edit_open' } });
   const pushRequest = compactLookupFlow.hop.FbmSync.nextPushRequest(pushState);
@@ -457,13 +457,39 @@ async function chay(so) {
   orderFlow.hop.FbmSync.lockRecord = () => orderState;
   orderFlow.hop.FbmSync.activityEditOpenRequest = () => ({ url: 'https://example.test', meta: { kind: 'activity_edit_open' } });
   let orderSheetWrites = 0;
-  orderFlow.hop.FbmSync.writeGateSave = () => { orderSheetWrites += 1; return { ok: true }; };
+  orderFlow.hop.writeGateSave = () => { orderSheetWrites += 1; return { ok: true }; };
   const orderStateWrite = orderFlow.hop.FbmSync.stateWrite;
   let orderWriteCount = 0;
   orderFlow.hop.FbmSync.stateWrite = (state) => { orderWriteCount += 1; if (orderWriteCount === 1) { const error = new Error('quota'); error.code = 'FBM_DOCUMENT_PROPERTIES_QUOTA'; throw error; } return orderStateWrite(state); };
   let orderError = null;
   try { orderFlow.hop.FbmSync.nextPushRequest(orderState); } catch (error) { orderError = error; }
   check(so, 'state push được chốt trước khi đánh dấu Sheet đang đẩy', [orderError && orderError.code, orderSheetWrites, orderFlow.hop.FbmSync.stateRead().cursor.kind], ['FBM_DOCUMENT_PROPERTIES_QUOTA', 0, 'push_scan']);
+  // FBM-002: không ghi được `đang đẩy` xuống Sheet thì không phát lệnh ghi FBM.
+  const pushingFlow = workflowGas();
+  const pushingState = pushingFlow.hop.FbmSync.stateStart('', 'push', 0);
+  pushingState.mode = 'write'; pushingState.phase = 'push'; pushingState.entity = 'activity'; pushingState.metadata.categoryGate = { map: {}, codesBySource: {}, blocked: {} };
+  pushingState.cursor = { kind: 'push_scan', entity: 'activity', index: 0 };
+  pushingFlow.hop.FbmSync.stateWrite(pushingState);
+  ['pushConfigErrors', 'pushOwnerError'].forEach((name) => { pushingFlow.hop.FbmSync[name] = () => ''; });
+  ['validatePushCategories', 'pushEligibilityErrors'].forEach((name) => { pushingFlow.hop.FbmSync[name] = () => []; });
+  pushingFlow.hop.FbmSync.pushCandidates = () => [{ kind: 'edit', id: 'ACT-PUSHING', record: { id: 'ACT-PUSHING', fbmId: 'FBM-ACT-PUSHING', taskType: 'GD', content: 'Nội dung', workDate: '2026-09-20', customerId: 'CUS-1', customerFbmCode: 'ALT00001', allowFbmPush: 'Cho phép', fbmHash: 'old' } }];
+  pushingFlow.hop.FbmSync.isRecordLocked = () => false;
+  pushingFlow.hop.FbmSync.activityEditOpenRequest = () => ({ url: 'https://example.test', meta: { kind: 'activity_edit_open' } });
+  pushingFlow.hop.writeGateSave = () => ({ ok: false, invalid: [{ id: 'ACT-PUSHING', field: 'syncStatus', label: 'Trạng thái đồng bộ', reason: 'Giá trị không hợp lệ.' }] });
+  let pushingRequest = 'chưa gọi', pushingError = null;
+  try { pushingRequest = pushingFlow.hop.FbmSync.nextPushRequest(pushingFlow.hop.FbmSync.stateRead()); } catch (error) { pushingError = error; }
+  check(so, 'không ghi được trạng thái "đang đẩy" thì không phát lệnh ghi FBM và báo lỗi có tên bản ghi',
+    [pushingError && pushingError.code, pushingRequest, /ACT-PUSHING/.test(pushingError && pushingError.message)],
+    ['FBM_SHEET_WRITE_FAILED', 'chưa gọi', true]);
+  ['markPushError', 'markPushSkipped'].forEach((name) => {
+    let markError = null;
+    const candidate = { kind: 'edit', entity: 'activity', id: 'ACT-MARK', record: { id: 'ACT-MARK' } };
+    try {
+      if (name === 'markPushError') { pushingFlow.hop.FbmSync.markPushError(pushingFlow.hop.FbmSync.stateRead(), candidate, { reason: 'FBM từ chối', code: 'FBM_ERROR' }, 'activity_edit'); }
+      else { pushingFlow.hop.FbmSync.markPushSkipped(pushingFlow.hop.FbmSync.stateRead(), candidate, 'bỏ qua', 'Chưa đủ điều kiện'); }
+    } catch (error) { markError = error; }
+    check(so, name + ': không ghi được trạng thái bản ghi xuống Sheet thì ném lỗi để phiên dừng, không đi tiếp như đã ghi (FBM-001)', markError && markError.code, 'FBM_SHEET_WRITE_FAILED');
+  });
   const htmlFailureFlow = workflowGas();
   const htmlLogs = [];
   htmlFailureFlow.hop.LOG_OK = 'ok'; htmlFailureFlow.hop.LOG_ERROR = 'error'; htmlFailureFlow.hop.LOG_CONFLICT = 'conflict';

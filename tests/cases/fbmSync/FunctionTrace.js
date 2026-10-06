@@ -42,7 +42,7 @@ function chay(so) {
       PropertiesService: { getDocumentProperties: () => ({ getProperty: (k) => (k in kho ? kho[k] : null), setProperty: (k, v) => { kho[k] = String(v); }, deleteProperty: (k) => { delete kho[k]; }, getKeys: () => Object.keys(kho) }) },
       logTrace: (entry) => dong.push(entry), logEvent: (entry) => dong.push(entry)
     });
-    napServer(nen, 'fbm_sync/state/State.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/transport/EntryPoints.js');
+    napServer(nen, 'fbm_sync/state/State.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/write/SheetSave.js');
     const st = nen.FbmSync.stateStart('', 'checking_session', 0);
     nen.FbmSync.businessStepStart(st, 'run', {});
     nen.FbmSync.businessStepStart(st, 'session', {});
@@ -138,7 +138,7 @@ function chay(so) {
     client.dong.slice(truocLan2).map((e) => e.outcome + '|' + e.reason), ['error|Sidebar báo lỗi phiên đồng bộ: Lỗi khác sau khi phiên đã dừng']);
   // FBM-009/FBM-020: lỗi theo bản ghi gom trong RAM, xả ra Sheet Log ở ranh giới lát, kể cả khi lát bị exception.
   const gom = dungState();
-  napServer(gom.nen, 'fbm_sync/control/ControlPort.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/PushFlow.js');
+  napServer(gom.nen, 'fbm_sync/control/ControlPort.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/write/SheetSave.js');
   const runIdGom = gom.st.runId;
   gom.nen.FbmSync.continue = () => {
     for (let i = 1; i <= 25; i += 1) { gom.nen.FbmSync.recordIssueAdd('pull', 'customer', 'xung đột', 'CUS-' + i, 'FBM và ShinCRM cùng đổi', 'conflict'); }
@@ -172,10 +172,12 @@ function chay(so) {
     [2, ['preflight_issue|error|customer|3', 'preflight_issue|warn|activity|1']]);
   // FBM-004: cửa ghi Sheet chặn trang pull thì phiên phải lỗi, không được tổng kết "Hoàn tất", cursor đứng nguyên trang đó.
   const ghi = dungState();
-  napServer(ghi.nen, 'fbm_sync/control/ControlPort.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/PullFlow.js');
+  napServer(ghi.nen, 'fbm_sync/control/ControlPort.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/write/SheetSave.js');
   ghi.nen.FbmSync.SYNC_STATUS = { error: 'lỗi' };
   ghi.nen.FbmSync.canWriteSheet = () => true;
-  ghi.nen.FbmSync.pullWrite = () => ({ ok: false, written: 0, conflicts: 0, skipped: 0, writeResult: { ok: false, invalid: [{ id: 'CUS-3', field: 'fbmCustomerCode', label: 'Mã KH FBM', reason: 'Đã có bản ghi khác mang mã kh fbm "ALT00010".' }] } });
+  ghi.nen.DATA_SCHEMA = {}; ghi.nen.SYNC_SCHEMA = {};
+  ghi.nen.writeGateSave = () => ({ ok: false, invalid: [{ id: 'CUS-3', field: 'fbmCustomerCode', label: 'Mã KH FBM', reason: 'Đã có bản ghi khác mang mã kh fbm "ALT00010".' }] });
+  ghi.nen.FbmSync.pullWrite = (entity, records) => { ghi.nen.FbmSync.sheetSave(entity, records, 'pull'); return { ok: true, written: records.length, conflicts: 0, skipped: 0 }; };
   const cursorGhi = JSON.stringify(ghi.nen.FbmSync.stateRead().cursor || {});
   ghi.nen.FbmSync.continue = () => { ghi.nen.FbmSync.pullRecords('customer', [{ fbmId: 'C-3' }, { fbmId: 'C-4' }], 'read'); return { ok: true }; };
   const truocGhi = ghi.dong.length;
@@ -183,7 +185,7 @@ function chay(so) {
   try { ghi.nen.FbmSync.controlDispatchLocked('continue', { response: {} }); } catch (err) { nemGhi = err.code; }
   const sauGhi = ghi.nen.FbmSync.stateRead(), viewGhi = ghi.nen.FbmSync.statusView ? ghi.nen.FbmSync.statusView() : sauGhi;
   check(so, 'ghi Sheet bị chặn khi pull: phiên chuyển error có lý do đọc được, cursor đứng nguyên, không cộng số thành công',
-    [nemGhi, sauGhi.phase, sauGhi.lastFailureCode, /Không ghi được trang customer vào Sheet.*Mã KH FBM của CUS-3/.test(sauGhi.lastError), JSON.stringify(sauGhi.cursor || {}) === cursorGhi, Number(sauGhi.counts.succeeded || 0), viewGhi.phase],
+    [nemGhi, sauGhi.phase, sauGhi.lastFailureCode, /Không ghi được 2 bản ghi customer vào Sheet.*Mã KH FBM của CUS-3/.test(sauGhi.lastError), JSON.stringify(sauGhi.cursor || {}) === cursorGhi, Number(sauGhi.counts.succeeded || 0), viewGhi.phase],
     ['FBM_SHEET_WRITE_FAILED', 'error', 'FBM_SHEET_WRITE_FAILED', true, true, 0, 'error']);
   const dongGhi = ghi.dong.slice(truocGhi);
   check(so, 'ghi Sheet bị chặn khi pull: Log có dòng kết thúc bước với lỗi và dòng lỗi bản ghi mang mã CUS-3',

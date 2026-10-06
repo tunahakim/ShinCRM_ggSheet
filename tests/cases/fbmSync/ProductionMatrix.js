@@ -42,7 +42,7 @@ function makeSync() {
     'fbm_sync/transport/TransportCore.js',
     'fbm_sync/transport/PushFlow.js',
     'fbm_sync/transport/PullFlow.js',
-    'fbm_sync/report/Report.js');
+    'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
   hop.FbmSync.readLocal = (entity) => local[entity].map(clone);
   hop.writeGateSave = (request) => {
     writes.push(request);

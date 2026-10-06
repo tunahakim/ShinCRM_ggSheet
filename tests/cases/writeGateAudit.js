@@ -136,6 +136,9 @@ function chay(so) {
     if (mutators.length) { syncViolations.push(file + ':' + mutators.map((item) => item.name + '@' + item.line).join(',')); }
   });
   check(so, 'fbm_sync không ghi thẳng Sheet ngoài cửa ghi chung', syncViolations, []);
+  // FBM-001/002/004: kết quả `ok:false` của writeGateSave từng bị bỏ qua ở nhiều chỗ; mọi lần ghi của module đồng bộ phải qua FbmSync.sheetSave.
+  const gateCallers = files.filter((file) => file.startsWith('fbm_sync/') && /\bwriteGateSave\s*\(/.test(stripNonCode(fs.readFileSync(path.join(GAS_DIR, file), 'utf8'))));
+  check(so, 'fbm_sync chỉ gọi writeGateSave trong cửa ghi đồng bộ SheetSave.js', gateCallers, ['fbm_sync/write/SheetSave.js']);
   const fixtureViolation = mutatorsIn("function fixtureViolation(sheet) { sheet.getRange('A1').setValue('x'); }");
   check(so, 'phép quét cửa ghi tự bắt được fixture vi phạm trong fbm_sync', [fixtureViolation.length, fixtureViolation[0] && fixtureViolation[0].name], [1, 'setValue']);
 
