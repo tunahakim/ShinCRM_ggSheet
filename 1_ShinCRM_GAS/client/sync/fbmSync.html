@@ -1399,8 +1399,9 @@ function fbmSyncLoop(status) {
     }
     return status;
   }
-  var entity = status.request.meta && status.request.meta.entity === 'activity' ? 'giao dịch' : 'khách hàng';
-  fbmSyncPaint(fbmSyncWaitingStatus(status, 'Đang chờ tab FBM trả dữ liệu ' + entity + '...'));
+  // Nhãn đối tượng lấy từ GAS (theo state.entity), không đoán từ meta của request: builder nào thiếu meta.entity sẽ hiện nhầm (FBM-006).
+  var entityLabel = String((status.status || status).entityLabel || '').trim().toLowerCase();
+  fbmSyncPaint(fbmSyncWaitingStatus(status, 'Đang chờ tab FBM trả dữ liệu' + (entityLabel ? ' ' + entityLabel : '') + '...'));
   return fbmSyncExtensionRequest(status.request).then(function (response) {
     if (!FBM_SYNC_CLIENT.running && !FBM_SYNC_CLIENT.cancelRequested) { return fbmSyncStatusOnce(); }
     fbmSyncPaint(fbmSyncWaitingStatus(status, 'Đã nhận phản hồi FBM; đang chờ GAS xử lý...'));
