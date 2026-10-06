@@ -32,11 +32,13 @@ FbmSync.GRID_FIELDS = {
 FbmSync.CUSTOMER_MEMVARS = [
   'stt_rec_kh', 'stt_rec_kh0', 'user_ref', 'ma_kh', 'ten_kh', 'kh_me', 'ngay_tl', 'ma_so_thue', 'ong_ba', 'chuc_danh',
   'dien_thoai', 'fax', 'email', 'website', 'ma_lvkd', 'qm_ns', 'sl_kt', 'loai_kh', 'nguon_dm', 'dc_lh', 'dc_lh_tinh',
-  'dc_lh_quan', 'dc_lh_qg', 'dc_gh', 'nh_kh1', 'nh_kh2', 'nh_kh3', 'ma_cv', 'ma_sp', 'ma_module', 'ma_tt',
+  'dc_lh_quan', 'dc_lh_qg', 'dc_gh', 'nh_kh1', 'nh_kh2', 'nh_kh3', 'ma_cv', 'ma_sp', 'ma_module', 'ghi_chu', 'ma_tt',
   'status', 'controller', 'parentController', 'nv_kd', 'nv_tele', 'ngay_gd', 'ngay_kh', 'datetime0', 'nguoi_sua', 'nguoi_tim', 'id', 'ds_ma_hd'
 ];
 // Field ngày trong form FBM: ô trống phải gửi null như form gốc; gửi "" thì FBM không đổi được sang ngày và trả HTTP 500 (FBM-046).
 FbmSync.FORM_DATE_FIELDS = ['ngay_tl', 'ngay_gd', 'ngay_kh', 'datetime0', 'start_date', 'end_date', 'ngay_nhac'];
+// Bảng con của form Customer (chia sẻ KH, người liên hệ phụ). ShinCRM không đồng bộ hai bảng này nhưng form lưu vẫn phải có, gửi rỗng và không đổi (ch13 13.4).
+FbmSync.CUSTOMER_FORM_GRIDS = ['chiasekh', 'crlhkh'];
 FbmSync.ACTIVITY_MEMVARS = [
   'id', 'event_yn', 'text', 'ma_cv', 'assigned_name', 'muc_do', 'start_date', 'start_time', 'end_date', 'end_time',
   'ngay_nhac', 'gio_nhac', 'full_day', 'details', 'private', 'share_user', 'share_group', 'ma_nhom', 'owner', 'comment',

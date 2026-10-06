@@ -20,7 +20,7 @@ async function chay(so) {
   builders.FbmSync.stateRead = () => ({ session: { cookie: '', userId: '', customerAuthorized: '', activityAuthorized: '' } });
   check(so, 'authorize chưa có session dùng placeholder do GAS chỉ dẫn', builders.FbmSync.authorizeRequest('customer').body.cookie, '{{FBM_PAYLOAD_COOKIE}}');
   builders.FbmSync.stateRead = () => ({ session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: 'auth-c', activityAuthorized: 'auth-a' } });
-  check(so, 'ghi chú nội bộ không vào memvars FBM', newCustomer.body.memvars.some((item) => item.Name === 'ghi_chu'), false);
+  check(so, 'ghi chú nội bộ không vào memvars FBM, field ghi_chu của form gửi rỗng khi tạo mới', newCustomer.body.memvars.filter((item) => item.Name === 'ghi_chu').map((item) => [item.OldValue, item.NewValue]), [[null, '']]);
   check(so, 'SELECT Customer đổi sang mã FBM', newCustomer.body.memvars.filter((item) => item.Name === 'dc_lh_tinh')[0].NewValue, 'HNI');
   const activity = builders.FbmSync.activityCreateRequest({ id: 'ACT-9', customerFbmCode: 'ALT99999', taskType: 'Gọi', content: 'Nội dung' }, gate);
   check(so, 'Activity mới gắn dấu nhận diện', activity.body.memvars.filter((item) => item.Name === 'details')[0].NewValue, 'Nội dung #SC-ACT-9');
