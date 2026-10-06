@@ -6,7 +6,7 @@ function chay(so) {
   const data = {}, legacy = { FBM_MA_KH_PREFIX: 'KH-', FBM_MA_KH_LENGTH: '8', FBM_ACTIVITY_SINCE: '2026-01-01', FBM_SYNC_APPROVAL_THRESHOLD: '12' };
   const props = { getProperty: (key) => data[key] || null, setProperty: (key, value) => { data[key] = String(value); } };
   const hop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => props }, configGet: (name, fallback) => legacy[name] === undefined ? fallback : legacy[name] });
-  napServer(hop, 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js', 'fbm_sync/reconcile/Fingerprint.js');
+  napServer(hop, 'fbm_sync/state/State.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js', 'fbm_sync/reconcile/Fingerprint.js');
   const first = hop.FbmSync.accountSettingsRead();
   const syncFirst = hop.FbmSync.syncSettingsRead();
   const writesAfterMigration = Object.keys(data).length;
@@ -59,6 +59,15 @@ function chay(so) {
   const syncQuota = quotaHop.FbmSync.syncSettingsSave({ approvalThreshold: 4 });
   const accountQuota = quotaHop.FbmSync.accountSettingsSave({ customerPrefix: 'ALT', customerCodeLength: '8', activitySince: '2026-01-01' });
   check(so, 'DocumentProperties đầy giữ nguyên state cursor/conflict/RecordLocks và không ghi dở JSON', [quotaError && quotaError.code, quotaData.FBM_SYNC_STATE_V1 === previousState, syncQuota.code, accountQuota.code, quotaLogs.some((event) => event.reason === 'FBM_DOCUMENT_PROPERTIES_QUOTA')], ['FBM_DOCUMENT_PROPERTIES_QUOTA', true, 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED', 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED', true]);
+
+  const brokenData = { FBM_ACCOUNT_SETTINGS_V1: '{"customerPrefix":"ALT"', FBM_SYNC_SETTINGS_V1: '{"approvalThreshold":' };
+  const brokenProps = { getProperty: (key) => brokenData[key] || null, setProperty: (key, value) => { brokenData[key] = String(value); } };
+  const brokenHop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => brokenProps }, configGet: () => 'LEGACY-' });
+  napServer(brokenHop, 'fbm_sync/state/State.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js');
+  const brokenCode = (work) => { try { work(); return 'không ném'; } catch (error) { return error.code; } };
+  check(so, 'FBM-025: cài đặt tài khoản/đồng bộ JSON hỏng thì ném FBM_DOCUMENT_PROPERTY_CORRUPT, không rơi về giá trị cũ rồi ghi đè cài đặt người dùng',
+    [brokenCode(() => brokenHop.FbmSync.accountSettingsRead()), brokenCode(() => brokenHop.FbmSync.syncSettingsRead()), brokenData.FBM_ACCOUNT_SETTINGS_V1, brokenData.FBM_SYNC_SETTINGS_V1],
+    ['FBM_DOCUMENT_PROPERTY_CORRUPT', 'FBM_DOCUMENT_PROPERTY_CORRUPT', '{"customerPrefix":"ALT"', '{"approvalThreshold":']);
 }
 
 module.exports = { chay };

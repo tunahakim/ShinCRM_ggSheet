@@ -310,6 +310,46 @@ async function chay(so) {
   const cfStateBytes = Object.keys(cfBig.documentProperties.data).filter((key) => /^FBM_SYNC_STATE/.test(key)).reduce((sum, key) => sum + Buffer.byteLength(cfBig.documentProperties.data[key], 'utf8'), 0);
   check(so, 'FBM-024: 80 xung đột nội dung dài, pull lặp lại hai lần, state vẫn dưới 3KB và số đếm không nhân bản',
     [cfBigPull.conflicts, cfStateBytes > 0 && cfStateBytes < 3000, CB.stateRead().metadata.conflictCount], [80, true, 80]);
+
+  // FBM-025/026/028: DocumentProperties đọc lỗi hoặc JSON hỏng phải ném lỗi có mã lên lát, không coi như "chưa có" rồi ghi đè.
+  const thrownCode = (work) => { try { work(); return 'không ném'; } catch (error) { return String(error && error.code || ''); } };
+  const dp = makeSync(), DP = dp.hop.FbmSync, dpData = dp.documentProperties.data;
+  napServer(dp.hop, 'fbm_sync/auth/AutoLogin.js');
+  const dpStart = DP.stateStart('', 'pull_customer', 0); dpStart.cursor = { pageIndex: 7 }; DP.stateWrite(dpStart);
+  dpData.FBM_SYNC_STATE_V1 = '{"runId":"r1","cursor":{"pageIndex":7'; // JSON đứt giữa chừng
+  const corruptStateRaw = dpData.FBM_SYNC_STATE_V1;
+  dp.logs.length = 0;
+  const corruptSliceCode = thrownCode(() => DP.runSlice(() => DP.stateRead()));
+  const corruptLog = dp.logs.find((event) => event.action === 'state_fail_run');
+  check(so, 'FBM-025: state đồng bộ JSON hỏng thì lát ném FBM_DOCUMENT_PROPERTY_CORRUPT, Log có dòng lỗi và state hỏng giữ nguyên để khôi phục, không bị đè bằng state rỗng',
+    [corruptSliceCode, !!corruptLog && /DocumentProperties/.test(String(corruptLog.reason)), dpData.FBM_SYNC_STATE_V1 === corruptStateRaw],
+    ['FBM_DOCUMENT_PROPERTY_CORRUPT', true, true]);
+
+  const dpPending = makeSync(), PP = dpPending.hop.FbmSync, ppData = dpPending.documentProperties.data;
+  const ppStart = PP.stateStart('', 'push', 0); ppStart.mode = 'write'; PP.stateWrite(ppStart);
+  ppData.FBM_SYNC_PENDING_PUSHES_V1 = '["không phải object"]';
+  const pendingSliceCode = thrownCode(() => PP.runSlice(() => PP.pendingPushSet('customer', 'CUS-000001', { hash: 'mới' })));
+  const ppState = PP.stateRead();
+  check(so, 'FBM-026: hash chờ xác nhận hỏng thì không ghi đè bằng bản chỉ có một hash mới; phiên chuyển lỗi có mã để Sidebar hiện',
+    [pendingSliceCode, ppData.FBM_SYNC_PENDING_PUSHES_V1, ppState.phase, ppState.lastFailureCode, /hash chờ xác nhận/.test(ppState.lastError)],
+    ['FBM_DOCUMENT_PROPERTY_CORRUPT', '["không phải object"]', 'error', 'FBM_DOCUMENT_PROPERTY_CORRUPT', true]);
+
+  const dpDown = makeSync(), DD = dpDown.hop.FbmSync, ddProps = dpDown.documentProperties, ddGet = ddProps.getProperty;
+  napServer(dpDown.hop, 'fbm_sync/auth/AutoLogin.js');
+  ddProps.getProperty = () => { throw new Error('Service invoked too many times: properties'); };
+  check(so, 'FBM-025/026/028: dịch vụ DocumentProperties lỗi thì state, hash chờ xác nhận, cấu hình đăng nhập và công tắc tổng đều ném FBM_DOCUMENT_PROPERTIES_READ_FAILED, công tắc không mở theo mặc định',
+    [thrownCode(() => DD.stateRead()), thrownCode(() => DD.pendingPushesRead()), thrownCode(() => DD.loginConfigRead()), thrownCode(() => DD.masterEnabled())],
+    ['FBM_DOCUMENT_PROPERTIES_READ_FAILED', 'FBM_DOCUMENT_PROPERTIES_READ_FAILED', 'FBM_DOCUMENT_PROPERTIES_READ_FAILED', 'FBM_DOCUMENT_PROPERTIES_READ_FAILED']);
+  ddProps.getProperty = ddGet;
+  check(so, 'FBM-028: Spreadsheet chưa có công tắc tổng vẫn coi là bật; chỉ "false" rõ ràng mới khóa', [DD.masterEnabled(), (DD.setMasterEnabled(false), DD.masterEnabled())], [true, false]);
+
+  const secretEnvelope = '{"ciphertext":"BI-MAT-ENVELOPE","password":"mat-khau-that"';
+  dpData.FBM_LOGIN_CONFIG_V1 = secretEnvelope;
+  let loginError = null;
+  try { DP.loginConfigRead(); } catch (error) { loginError = error; }
+  check(so, 'FBM-028: cấu hình đăng nhập JSON hỏng thì ném lỗi có mã, thông báo không chứa envelope hay mật khẩu, không ghi đè cấu hình',
+    [loginError && loginError.code, /BI-MAT|mat-khau/.test(String(loginError && loginError.message)), dpData.FBM_LOGIN_CONFIG_V1 === secretEnvelope],
+    ['FBM_DOCUMENT_PROPERTY_CORRUPT', false, true]);
 }
 
 module.exports = { chay };
