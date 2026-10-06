@@ -97,7 +97,16 @@ FbmSync.conflictDropUnreadable = function (state, entity, id, reason) {
 
 /** DTO một bản ghi cho Sidebar; giá trị chỉ để hiển thị, quyết định từng trường được GAS lấy lại từ hai bản ghi gốc. */
 FbmSync.conflictView = function (read, remaining) {
-  return { entity: read.entity, id: read.id, fbmId: String(read.local.fbmId || ''), remaining: remaining, fields: FbmSync.diff(read.entity, read.local, read.latest, read.gate) };
+  var schema = typeof DATA_SCHEMA !== 'undefined' && DATA_SCHEMA && DATA_SCHEMA[read.entity] || {}, local = read.local;
+  var fields = FbmSync.diff(read.entity, local, read.latest, read.gate).map(function (item) {
+    var localField = FbmSync.conflictLocalField(read.entity, item.field), spec = schema[localField] || {};
+    // Diff so ở dạng chuẩn hóa (danh mục là mã FBM, ngày là ISO); người dùng xem giá trị gốc của Sheet, riêng ngày hiện dạng chuẩn hóa.
+    // Chỉ trường chữ tự do mới được gõ tay: giá trị PA3 ghi bằng cửa 'pull' không qua kiểm định dạng/trùng, nên danh mục, ngày, trường có validate hoặc unique chỉ chọn một bên.
+    var display = function (raw, canonical) { return raw === null || raw === undefined || raw === '' ? '' : spec.type === 'DATE' || FbmSync.isDate(raw) ? String(canonical || '') : String(raw); };
+    var editable = spec.type === 'TEXT' && !spec.source && !spec.validate && !spec.unique && !spec.readonly;
+    return { field: item.field, label: String(spec.label || localField), editable: editable, left: display(local[localField], item.left), right: display(read.latest[localField], item.right) };
+  });
+  return { entity: read.entity, id: read.id, fbmId: String(local.fbmId || ''), code: String(local.fbmCustomerCode || local.customerFbmCode || ''), name: String(read.entity === 'customer' ? local.companyName || '' : local.taskType || ''), remaining: remaining, fields: fields };
 };
 
 /** Bước mở: chốt hash FBM lúc người dùng bắt đầu xem để bước chốt phát hiện FBM đổi giữa chừng. */
