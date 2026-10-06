@@ -22,7 +22,7 @@ FbmSync.logCategoryBlocks = function (blocks) {
   if (typeof logEvent !== 'function') { return; }
   (blocks || []).forEach(function (block) {
     var whole = !block.code;
-    logEvent({ source: 'fbm_sync', action: 'category_block', outcome: whole ? (typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error') : (typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn'), entity: 'category', recordId: String(block.code || ''), reason: String(block.source || '') + (whole ? '' : ' ' + String(block.code)) + ': ' + String(block.reason || '') + (whole ? ' Bỏ toàn bộ chiều đẩy kỳ này.' : ' Bản ghi dùng mục này không được đẩy lên FBM cho đến khi sửa Category.'), detail: { source: String(block.source || ''), code: String(block.code || '') } });
+    logEvent({ source: 'fbm_sync', action: 'category_block', outcome: whole ? (typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error') : (typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn'), entity: 'category', recordId: String(block.code || ''), reason: String(block.source || '') + (whole ? '' : ' ' + String(block.code)) + ': ' + String(block.reason || '').replace(/\.?\s*$/, '.') + (whole ? ' Bỏ toàn bộ chiều đẩy kỳ này.' : ' Bản ghi dùng mục này không được đẩy lên FBM cho đến khi sửa Category.'), detail: { source: String(block.source || ''), code: String(block.code || '') } });
   });
 };
 /** Push thành công chỉ cộng vào số liệu bước; lỗi và bỏ qua vào bộ gom Log của lát. */
@@ -302,7 +302,7 @@ FbmSync.nextPushRequest = function (state) {
     } else {
       request = candidate.kind === 'create' ? FbmSync.activityCreateRequest(candidate.record, FbmSync.stateCategoryGate(state)) : FbmSync.activityEditOpenRequest(candidate.record.fbmId);
     }
-    if (typeof FbmSync.lockRecord === 'function') { state = FbmSync.lockRecord(entity, candidate.id, candidate.record.fbmHash || '', 'sync'); }
+    FbmSync.lockRecordIn(state, entity, candidate.id, candidate.record.fbmHash || '', 'sync');
     state.phase = 'push'; state.entity = entity; state.current = candidate.id; state.cursor = { kind: 'push_wait', operation: request.meta.kind, entity: entity, index: index, candidate: typeof FbmSync.pushCandidateForState === 'function' ? FbmSync.pushCandidateForState(candidate) : candidate };
     state.message = 'Đang đẩy ' + (entity === 'customer' ? 'khách hàng' : 'giao dịch') + ' ' + candidate.id + '...'; FbmSync.stateWrite(state);
     // `09/04` bước 1: state chốt cursor trước, rồi ghi `đang đẩy`, rồi mới phát lệnh; ghi Sheet không được thì sheetSave ném lỗi và lệnh ghi FBM không được phát (FBM-002).

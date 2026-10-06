@@ -304,10 +304,13 @@ FbmSync.stateCount = function (name, amount) {
 };
 /** Khóa một record khi Sidebar đang sửa hoặc sync chuẩn bị ghi. */
 FbmSync.lockRecord = function (entity, id, revision, owner) {
-  var state = FbmSync.stateRead();
-  var key = String(entity) + ':' + String(id);
-  state.locks[key] = { revision: String(revision || ''), owner: owner || 'sync', at: Date.now() };
-  return FbmSync.stateWrite(state);
+  return FbmSync.stateWrite(FbmSync.lockRecordIn(FbmSync.stateRead(), entity, id, revision, owner));
+};
+/** Khóa trên object state mà phiên đang giữ: đọc lại kho thì hàm gọi vẫn cầm object cũ, lần ghi sau của nó đè mất cursor `push_wait` (FBM-045). */
+FbmSync.lockRecordIn = function (state, entity, id, revision, owner) {
+  state.locks = state.locks || {};
+  state.locks[String(entity) + ':' + String(id)] = { revision: String(revision || ''), owner: owner || 'sync', at: Date.now() };
+  return state;
 };
 /** Bỏ khóa record sau khi kết thúc chỉnh sửa. */
 FbmSync.unlockRecord = function (entity, id) {
