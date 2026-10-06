@@ -445,6 +445,13 @@ async function chay(so) {
   hop.fbmSyncContinueServer = () => Promise.resolve({ ok: true, request: null, status: { phase: 'paused' } });
   await hop.fbmSyncLoop({ request: { meta: { entity: 'customer' } } });
   check(so, 'response cuối sau Cancel chuyển client về trạng thái đã dừng', [hop.FBM_SYNC_CLIENT.running, hop.FBM_SYNC_CLIENT.cancelRequested], [false, false]);
+  const waitingPaints = [];
+  hop.fbmSyncPaint = (status) => waitingPaints.push(status);
+  hop.FBM_SYNC_CLIENT.running = true;
+  await hop.fbmSyncLoop({ ok: true, request: { meta: { kind: 'activity_edit_open', id: '174813' } }, status: { phase: 'push', entityLabel: 'Giao dịch' } });
+  check(so, 'FBM-006: request Activity không mang meta.entity vẫn hiện "Đang chờ tab FBM trả dữ liệu giao dịch...", lấy nhãn từ GAS',
+    waitingPaints.map((item) => item.message).filter((message) => /Đang chờ tab FBM/.test(message)), ['Đang chờ tab FBM trả dữ liệu giao dịch...']);
+  hop.fbmSyncPaint = () => {};
   hop.FBM_SYNC_CLIENT.cancelRequested = true;
   const stoppingAction = hop.fbmSyncRunActionBlock({ phase: 'pull_customer', masterEnabled: true, enabled: true });
   check(so, 'Sidebar khóa nút và báo đang dừng trong lúc chờ response cuối', [stoppingAction.disabled, stoppingAction.label.indexOf('Đang dừng') >= 0], [true, true]);

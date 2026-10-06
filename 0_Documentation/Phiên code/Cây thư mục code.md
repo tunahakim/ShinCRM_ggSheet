@@ -255,6 +255,7 @@ tests\
     ├── textNormalize.js          Hai bản sinh đôi server và client cho cùng kết quả trên một bảng ca dùng chung.
     ├── schemaCheck.js            Bảng khai cột tự nhất quán, và chiều phụ thuộc một hướng với SYNC_SCHEMA.
     ├── namespace.js              Không tên nào khai ở hai tệp. Bẫy số một của Apps Script.
+    ├── sourceEncoding.js         Mã GAS và Sidebar không chứa chữ mojibake (UTF-8 bị đọc nhầm bảng mã).
     ├── settings.js               SETTINGS và khối tham số Config, kể cả ca sheet chưa có dòng nào.
     ├── logMask.js                Luật che bí mật. Sai một lần là bí mật ra sheet, không thu lại được.
     ├── logGate.js                Kỷ luật bộ đệm, "cả lượt một lệnh ghi", và hai trần cắt log.
