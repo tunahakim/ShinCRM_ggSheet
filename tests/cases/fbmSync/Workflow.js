@@ -382,6 +382,12 @@ async function chay(so) {
     Object.keys(compactState.session.lookups || {}).length,
     compactLookupFlow.hop.FbmSync.categoryValueAllowed(compactLookupFlow.hop.FbmSync.stateCategoryGate(compactState), '@CAT_TINH_THANH', 'CODE-0')
   ], ['grid', true, 'Tên danh mục live 0 0 có tên đủ dài', true, false, true, 103, 4, 0, { ok: true, code: 'CODE-0' }]);
+  const legacyGateState = compactLookupFlow.hop.FbmSync.stateRead();
+  legacyGateState.metadata.categoryGate = { map: Object.fromEntries(Array.from({ length: 400 }, (_, i) => ['@CAT_TINH_THANH' + String.fromCharCode(31) + 'Tỉnh ' + i, 'CODE-' + i])) };
+  let legacyGateError = '';
+  try { compactLookupFlow.hop.FbmSync.stateWrite(legacyGateState); } catch (error) { legacyGateError = String(error && error.code || error); }
+  check(so, 'state cũ còn bản sao map Category lớn hơn 9 KB vẫn ghi được và bỏ bản sao đó, Sidebar không kẹt (FBM-042)',
+    [legacyGateError, Object.prototype.hasOwnProperty.call(compactLookupFlow.hop.FbmSync.stateRead().metadata, 'categoryGate')], ['', false]);
   const pushState = compactLookupFlow.hop.FbmSync.stateRead();
   pushState.metadata.categoryBlocks = [];
   pushState.metadata.categoryLookupFailed = false;
