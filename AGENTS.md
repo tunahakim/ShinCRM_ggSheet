@@ -26,7 +26,8 @@
 
 ## Quy tắc riêng phiên rà soát đồng bộ FBM
 
-- `0_Documentation/Phiên code/Checklist rà soát đồng bộ FBM trước vận hành thật.md` là nơi theo dõi tiến độ duy nhất của phiên rà soát. Sau khi ngữ cảnh bị nén, mở checklist này và tiếp tục từ các mục chưa hoàn thành; không đọc lại toàn bộ tài liệu đã được tổng hợp trong checklist.
+- Đợt sửa lỗi sau audit theo dõi tiến độ duy nhất ở `0_Documentation/Phiên code/2026.10.06 Kế hoạch sửa lỗi FBM sau audit.md` (kế hoạch G0–G8 và bảng lỗi FBM-xxx). Sau khi ngữ cảnh bị nén, chỉ đọc file này và tiếp tục từ dòng `[ ]` đầu tiên. `Checklist rà soát đồng bộ FBM trước vận hành thật.md` (ma trận luồng F/E) và `Audit pipeline đồng bộ FBM.md` (hồ sơ lưu trữ) quá nặng: chỉ tìm đúng mục cần, cấm đọc cả file.
+- Tệp tài liệu mới tạo trong `0_Documentation/Phiên code/` đặt tiền tố ngày `YYYY.MM.DD ` (ví dụ `2026.10.06 Kế hoạch ...md`) để phân biệt tệp mới và cũ.
 - Checklist rà soát phải dựng từ tài liệu 09 và `tests/contracts/fbmSyncPipeline.js`, không được suy ra từ code. Mục nào mô tả bằng tên hàm nội bộ thay vì bằng hành vi người dùng quan sát được là sai gốc, phải viết lại.
 - Checklist phải bao phủ cả nhánh thành công và nhánh thất bại. Lỗi được nhóm theo lớp xử lý chứ không theo nguyên nhân: mọi lỗi mạng (DNS, TLS, timeout, đứt kết nối) quy về một lớp tại cổng request chung và chỉ cần một ca đại diện. Nếu mỗi nguyên nhân lại đi một đường xử lý khác nhau thì đó là lỗi kiến trúc phải sửa, không phải lý do viết thêm test. Các lớp cần tách riêng vì đường xử lý khác nhau: transport, HTTP/parse, đăng nhập/session, hạn mức và giới hạn nền tảng, conflict, ghi/đối soát.
 - Mỗi bước trong checklist chỉ mang đúng một nhãn `[Tự động]` hoặc `[Cần kiểm chứng thật]`. Cấm nhãn gộp kiểu `[Kết hợp]`; bước nào có cả hai phần thì tách thành hai dòng con.
