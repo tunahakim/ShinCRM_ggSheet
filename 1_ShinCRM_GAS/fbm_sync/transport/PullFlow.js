@@ -546,7 +546,7 @@ FbmSync.continue = function (rawResponse) {
   }
   // Customer là grid cha; mỗi trang xong sẽ mở Activity con của trang đó.
   if (cursor.kind === 'customer_grid') {
-    var customerGrid = FbmSync.rowsToRecords('customer', response, state.metadata && state.metadata.customerFields), categoryGate = state.metadata && state.metadata.categoryGate || {}, eligibleCustomerRows = customerGrid.rows.filter(function (row) { return !FbmSync.isTemporaryRecord('customer', row); }), customerRecords = eligibleCustomerRows.map(function (row) { return FbmSync.customerRecord(row, categoryGate); });
+    var customerGrid = FbmSync.rowsToRecords('customer', response, state.metadata && state.metadata.customerFields), categoryGate = FbmSync.stateCategoryGate(state), eligibleCustomerRows = customerGrid.rows.filter(function (row) { return !FbmSync.isTemporaryRecord('customer', row); }), customerRecords = eligibleCustomerRows.map(function (row) { return FbmSync.customerRecord(row, categoryGate); });
     state.metadata.customerFields = customerGrid.fields;
     FbmSync.stateWrite(state);
     if (state.scan === 'identity_check') {
@@ -576,7 +576,7 @@ FbmSync.continue = function (rawResponse) {
   }
   // Activity được quét theo từng stt_rec, rồi mới quay lại trang Customer kế.
   if (cursor.kind === 'activity_grid') {
-    var activityGrid = FbmSync.rowsToRecords('activity', response, state.metadata && state.metadata.activityFields), activityGate = state.metadata && state.metadata.categoryGate || {}, parentContext = (cursor.customerContexts || [])[Number(cursor.customerIndex || 0)] || {}, activityRecords = activityGrid.rows.filter(function (row) { return !FbmSync.isTemporaryRecord('activity', row); }).map(function (row) { return FbmSync.activityRecord(row, activityGate, parentContext); });
+    var activityGrid = FbmSync.rowsToRecords('activity', response, state.metadata && state.metadata.activityFields), activityGate = FbmSync.stateCategoryGate(state), parentContext = (cursor.customerContexts || [])[Number(cursor.customerIndex || 0)] || {}, activityRecords = activityGrid.rows.filter(function (row) { return !FbmSync.isTemporaryRecord('activity', row); }).map(function (row) { return FbmSync.activityRecord(row, activityGate, parentContext); });
     state.metadata.activityFields = activityGrid.fields;
     FbmSync.stateWrite(state);
     FbmSync.pullRecords('activity', activityRecords, state.mode);
@@ -615,7 +615,7 @@ FbmSync.continue = function (rawResponse) {
     return { ok: true, status: FbmSync.statusView(), imported: activityRecords.length };
   }
   if (cursor.kind === 'activity_bulk_grid') {
-    var bulkGrid = FbmSync.rowsToRecords('activity', response, state.metadata && state.metadata.activityFields), bulkGate = state.metadata && state.metadata.categoryGate || {}, bulkRecords = bulkGrid.rows.filter(function (row) { return !FbmSync.isTemporaryRecord('activity', row); }).map(function (row) { return FbmSync.activityRecord(row, bulkGate); });
+    var bulkGrid = FbmSync.rowsToRecords('activity', response, state.metadata && state.metadata.activityFields), bulkGate = FbmSync.stateCategoryGate(state), bulkRecords = bulkGrid.rows.filter(function (row) { return !FbmSync.isTemporaryRecord('activity', row); }).map(function (row) { return FbmSync.activityRecord(row, bulkGate); });
     state.metadata.activityFields = bulkGrid.fields;
     FbmSync.stateWrite(state);
     FbmSync.pullRecords('activity', bulkRecords, state.mode);

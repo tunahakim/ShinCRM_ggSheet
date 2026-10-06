@@ -60,15 +60,21 @@ FbmSync.readCategoryGate = function () {
   return { map: map, names: names, namesBySource: namesBySource, valid: valid, warnings: warnings };
 };
 
-/** Giữ đúng phần gate cần cho các lượt GAS tiếp theo; bỏ các bản sao dẫn xuất. */
-FbmSync.categoryGateForState = function (categoryGate) {
-  var source = categoryGate || {}, compact = { map: {}, codesBySource: {}, blocked: {} };
-  Object.keys(source.map || {}).forEach(function (key) { compact.map[key] = source.map[key]; });
-  Object.keys(source.namesBySource || {}).forEach(function (sourceName) {
-    compact.codesBySource[sourceName] = Object.keys(source.namesBySource[sourceName] || {});
+/**
+ * Gate danh mục của phiên: map dựng lại từ Sheet Category (nguồn sự thật), mã bị chặn suy từ `metadata.categoryBlocks` của phiên.
+ * Không chép map vào state: một giá trị DocumentProperties chỉ khoảng 9 KB, Category thật vượt ngưỡng đó làm phiên dừng ở bước đọc Customer (FBM-042).
+ * Bản dựng gắn trên chính object state dạng không enumerable để một lượt GAS chỉ đọc Sheet một lần và JSON.stringify không ghi nó vào state.
+ */
+FbmSync.stateCategoryGate = function (state, freshGate) {
+  var holder = state && typeof state === 'object' ? state : null;
+  if (!freshGate && holder && holder.categoryGateOfRun) { return holder.categoryGateOfRun; }
+  var gate = freshGate || FbmSync.readCategoryGate();
+  gate.blocked = {};
+  (holder && holder.metadata && holder.metadata.categoryBlocks || []).forEach(function (block) {
+    if (block && block.source && block.code) { gate.blocked[block.source + '\u001f' + block.code] = block.reason; }
   });
-  Object.keys(source.blocked || {}).forEach(function (key) { compact.blocked[key] = source.blocked[key]; });
-  return compact;
+  if (holder) { Object.defineProperty(holder, 'categoryGateOfRun', { value: gate, enumerable: false, configurable: true, writable: true }); }
+  return gate;
 };
 
 /** Đổi giá trị Sheet sang mã FBM, giữ mã đã có nếu không có companion. */

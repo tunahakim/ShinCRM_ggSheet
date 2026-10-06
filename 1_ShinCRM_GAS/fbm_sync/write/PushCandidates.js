@@ -76,7 +76,7 @@ FbmSync.pushCandidates = function (entity) {
   var testCustomerCode = '';
   try {
     state = FbmSync.stateRead();
-    categoryGate = state.metadata && state.metadata.categoryGate || (typeof FbmSync.readCategoryGate === 'function' ? FbmSync.readCategoryGate() : {});
+    categoryGate = FbmSync.stateCategoryGate(state);
     pushFailures = state.metadata && state.metadata.pushFailures || {};
   } catch (ignore) {}
   try { testCustomerCode = typeof FbmSync.scriptSettings === 'function' ? String(FbmSync.scriptSettings().testCustomerCode || '').trim() : ''; } catch (ignoreSettings) {}

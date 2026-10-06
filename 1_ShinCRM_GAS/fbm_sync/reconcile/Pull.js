@@ -26,7 +26,7 @@ FbmSync.pullWrite = function (entity, records) {
   if (!records || !records.length) { return { ok: true, written: 0, conflicts: 0, skipped: 0 }; }
   var state = FbmSync.stateRead();
   var orphaned = 0;
-  var categoryGate = state.metadata && state.metadata.categoryGate || {};
+  var categoryGate = FbmSync.stateCategoryGate(state);
   var sourceRecords = records;
   var localRecords = FbmSync.readLocal(entity);
   state.metadata = state.metadata || {};
@@ -208,7 +208,7 @@ FbmSync.pullWrite = function (entity, records) {
 
 /** Tính lại baseline theo luật hiện tại; chỉ ghi cột sync, không gọi FBM. */
 FbmSync.recalculateBaseline = function (entity) {
-  var state = FbmSync.stateRead(), gate = state.metadata && state.metadata.categoryGate || {};
+  var state = FbmSync.stateRead(), gate = FbmSync.stateCategoryGate(state);
   var records = FbmSync.readLocal(entity), patches = records.filter(function (record) {
     return !FbmSync.isTemporaryRecord(entity, record) && String(record.fbmId || '').trim();
   }).map(function (record) {
