@@ -427,33 +427,33 @@ Việc Extension thực thi primitive `hashRows` không có nghĩa Extension s�
 
 Khi hai bên cùng thay đổi, tự động lấy FBM sẽ có nguy cơ ghi đè thay đổi có chủ ý trên ShinCRM. Log chỉ truy vết được, không khôi phục quyết định đã bị mất.
 
-Phương án được chủ dự án xác nhận:
+Phương án chủ dự án chốt ngày 2026-10-06 (thay cho bản "chỉ lấy FBM" trước đó; đã ghi vào `09/04` mục "Chế độ xử lý xung đột riêng"):
 
 ```text
 Conflict:
-  máy phát hiện và đóng băng
-  người dùng xem nguyên nhân
-  chỉ có một hướng giải quyết:
-  xác nhận lấy giá trị hiện tại từ FBM vào ShinCRM
+  máy phát hiện và đóng băng, không bao giờ tự quyết
+  người dùng xem các trường đang khác
+  chọn một trong ba phương án:
+    PA1 lấy FBM
+    PA2 lấy ShinCRM (kỳ sau đẩy lên FBM)
+    PA3 tùy chỉnh: từng trường chọn FBM, ShinCRM hoặc tự nhập giá trị mới; kết quả ghi vào ShinCRM và kỳ sau đẩy lên FBM
 ```
 
-Có thể có nút “Để xử lý sau”, nhưng đây không phải một hướng giải quyết khác; nó chỉ giữ conflict nguyên trạng.
+Lý do giữ đủ ba phương án: mọi quyết định đều do người bấm nên không có ghi đè vô tình; rủi ro còn lại chỉ là độ phức tạp của code, phải chặn bằng test. Có thể có nút “Để xử lý sau”; nó chỉ giữ conflict nguyên trạng.
 
 ### 10.2. Luồng xác nhận
 
 ```text
-1. GAS phát hiện conflict.
-2. Ghi trạng thái xung đột và khóa bản ghi.
-3. Sidebar hiển thị diff giới hạn.
-4. Người dùng bấm xác nhận lấy FBM.
-5. GAS đọc lại ShinCRM và FBM hiện tại.
-6. Nếu FBM đã đổi thêm, đưa về hàng đợi xem lại.
-7. Nếu không đổi, ghi giá trị FBM vào ShinCRM.
-8. Cập nhật baseline bằng hFBM hiện tại.
+1. GAS phát hiện conflict, ghi trạng thái "xung đột chờ quyết" lên Sheet (dòng Sheet chính là hàng đợi).
+2. Người dùng mở chế độ xung đột; GAS đọc FBM, tính diff và trả DTO một bản ghi.
+3. Người dùng chọn PA1, PA2 hoặc PA3.
+4. GAS đọc lại FBM hiện tại.
+5. Nếu FBM đã đổi từ lúc mở, trả DTO mới để xem lại.
+6. Nếu không đổi, ghi kết quả vào ShinCRM qua cửa ghi.
+7. Cập nhật baseline bằng hFBM hiện tại.
+8. PA2/PA3 để trạng thái chờ đối soát; kỳ sau đi đường đẩy bình thường.
 9. Ghi Log quyết định.
 ```
-
-Không có lựa chọn tự động giữ ShinCRM hoặc trộn tay trong chính sách hiện tại.
 
 ### 10.3. Định danh và khóa ghép
 
@@ -580,6 +580,16 @@ Không giữ response FBM, lookup Rows đầy đủ, preview dài, candidate rec
 
 Xung đột không có danh sách trong state (theo G7.2, FBM-024): hàng đợi xung đột chính là các dòng Sheet có trạng thái `xung đột chờ quyết`. State chỉ giữ số đếm `conflictCount` và đúng một bản ghi đang mở `conflictRefresh` (entity, id, hash FBM lúc mở); giá trị hai bên được đọc lại và tính diff khi người dùng mở bản ghi, nên state không phình theo số xung đột.
 
+## 15A. Lỗi sau audit chuyển vào phiên refactor
+
+Chủ dự án duyệt ngày 2026-10-06: các lỗi dưới đây nằm đúng phần "GAS gánh dữ liệu lớn và chuỗi thời gian chờ" mà refactor viết lại, nên không sửa trên kiến trúc hiện tại để tránh sửa hai lần. Mô tả đầy đủ ở bảng lỗi của `2026.10.06 Kế hoạch sửa lỗi FBM sau audit.md`. Refactor chỉ coi là xong khi từng lỗi có test chứng minh không còn đường xảy ra.
+
+- FBM-005, FBM-016: thời gian chờ Sidebar, Extension và GAS không thống nhất (Sidebar báo lỗi trước khi Extension hết thời gian hợp lệ).
+- FBM-030: trang Customer khoảng 2.000 dòng xử lý trong một lần gọi GAS; cần đo lại sau khi Extension chiếu/rút gọn dữ liệu.
+- FBM-031: mốc "trần thời gian lát" thực ra là hạn khứ hồi request 120 giây, không phải chốt 6 phút của GAS.
+- FBM-013: cuối pull ghi Customer và Activity bằng hai cửa ghi trong cùng một lần chạy GAS (đánh dấu vắng mặt); làm lại cùng luồng `missing`/`fbmOnly` mới.
+- Kiểm chứng thật phần pull số lượng lớn (phần pull của Kịch bản L1–L3) chạy sau refactor.
+
 ## 16. Các phương án đã bị loại
 
 ### 16.1. GAS nhận full bulk response
@@ -679,7 +689,7 @@ test nào chứng minh không còn hai đường thực thi
 
 1. Đọc lại các chuyên đề 09 liên quan và đối chiếu toàn bộ owner hiện có.
 2. Cập nhật tài liệu chính thức về ranh giới mới GAS–Extension.
-3. Cập nhật luật conflict: không tự động cho `ma_kh` hoặc trường khác thắng; hướng xử lý duy nhất là người dùng xác nhận lấy FBM.
+3. Cập nhật luật conflict: không tự động cho `ma_kh` hoặc trường khác thắng; người dùng quyết bằng một trong ba phương án ở mục 10.1.
 4. Chốt schema plan mới và xóa thiết kế DSL cũ khỏi hợp đồng.
 5. Chốt `LoginObservation`, `BulkObservation`, `HashPlan` và `ChunkEnvelope`.
 6. Viết test vector hash và test Extension/GAS tương thích contract.
