@@ -165,29 +165,40 @@ function fbmSyncRelayCap(result, hop) {
   return value;
 }
 
-/** Cổng HTTP tùy chọn cho runner; bắt buộc khóa trước khi xử lý. */
+/**
+ * Cổng HTTP Extension gọi cho nhịp nền, chạy cả khi Sidebar đóng; bắt buộc khóa trước khi xử lý.
+ * Phải đi qua `runEntryPoint` như mọi cửa vào: Log chỉ nằm trong bộ đệm RAM tới khi cửa vào xả, và exception phải có dòng Log cùng tin chờ hiện ở Sidebar lần mở sau (FBM-034).
+ * Khóa sai thì không ghi Log: ai biết URL cũng gọi được, ghi Log ở nhánh này là cho người lạ đẩy trôi Log thật.
+ */
 function doPost(event) {
+  var reply = function (value) { return ContentService.createTextOutput(JSON.stringify(value)).setMimeType(ContentService.MimeType.JSON); };
   try {
-    var body = event && event.postData && event.postData.contents ? JSON.parse(event.postData.contents) : {}, expected = String(PropertiesService.getScriptProperties().getProperty('FBM_SYNC_KEY') || '');
-    if (!expected || body.key !== expected) { return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'unauthorized' })).setMimeType(ContentService.MimeType.JSON); }
-    var actualSpreadsheetId = '';
-    try { actualSpreadsheetId = String(shinOpenBook().getId() || ''); } catch (ignoreId) {}
-    if (!body.spreadsheetId || !actualSpreadsheetId || String(body.spreadsheetId) !== actualSpreadsheetId) { return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'spreadsheet_mismatch' })).setMimeType(ContentService.MimeType.JSON); }
-    var result;
-    if (body.command) {
-      var commandPayload = body.payload || {};
-      if (body.hop !== undefined && commandPayload.hop === undefined) { commandPayload = Object.assign({}, commandPayload, { hop: Number(body.hop || 0) }); }
-      result = FbmSync.controlDispatchLocked(String(body.command), commandPayload);
-    } else if (body.kind === 'heartbeat_request') {
-      result = fbmSyncHeartbeatRequest({ source: body.source || 'alarm', hop: Number(body.hop || 0) });
-    } else if (body.kind === 'heartbeat_transport_failure') {
-      result = fbmSyncHeartbeatTransportFailure({ requestId: body.requestId, code: body.code, message: body.error || body.message });
-    } else if (body.kind === 'heartbeat') {
-      result = fbmSyncHeartbeat(body.response, { hop: Number(body.hop || 0) });
-    } else {
-      result = { ok: false, code: 'RELAY_KIND_UNSUPPORTED', error: 'Relay chỉ nhận các nhịp nền do GAS quy định.', request: null };
-    }
-    if (body.kind === 'heartbeat_request' || body.kind === 'heartbeat' || body.kind === 'heartbeat_transport_failure' || body.kind === 'background_sync') { result = fbmSyncRelayCompactResult(result); result = fbmSyncRelayCap(result, body.hop); }
-    return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
-  } catch (err) { return ContentService.createTextOutput(JSON.stringify({ ok: false, error: String(err && err.message || err) })).setMimeType(ContentService.MimeType.JSON); }
+    var body;
+    // Thông báo lỗi JSON.parse có thể trích một đoạn nội dung gửi lên (chứa khóa relay), nên thay bằng câu không mang nội dung.
+    try { body = event && event.postData && event.postData.contents ? JSON.parse(event.postData.contents) : {}; } catch (badJson) { return reply({ ok: false, error: 'invalid_json' }); }
+    var expected = String(PropertiesService.getScriptProperties().getProperty('FBM_SYNC_KEY') || '');
+    if (!expected || body.key !== expected) { return reply({ ok: false, error: 'unauthorized' }); }
+    return reply(runEntryPoint('fbmRelay', 'fbm_sync', ERROR_CHANNEL_PENDING, function () { return fbmSyncRelayHandle(body); }));
+  } catch (err) { return reply({ ok: false, error: errorMessage(err) }); }
+}
+/** Phần nghiệp vụ của nhịp nền sau khi đã qua khóa; lỗi ném ra để `runEntryPoint` ghi Log. */
+function fbmSyncRelayHandle(body) {
+  var actualSpreadsheetId = String(shinOpenBook().getId() || '');
+  if (!body.spreadsheetId || String(body.spreadsheetId) !== actualSpreadsheetId) { throw new Error('Extension gửi nhịp nền cho bảng tính khác với bảng tính đang gắn script; kiểm tra lại cấu hình relay.'); }
+  var result;
+  if (body.command) {
+    var commandPayload = body.payload || {};
+    if (body.hop !== undefined && commandPayload.hop === undefined) { commandPayload = Object.assign({}, commandPayload, { hop: Number(body.hop || 0) }); }
+    result = FbmSync.controlDispatchLocked(String(body.command), commandPayload);
+  } else if (body.kind === 'heartbeat_request') {
+    result = fbmSyncHeartbeatRequest({ source: body.source || 'alarm', hop: Number(body.hop || 0) });
+  } else if (body.kind === 'heartbeat_transport_failure') {
+    result = fbmSyncHeartbeatTransportFailure({ requestId: body.requestId, code: body.code, message: body.error || body.message });
+  } else if (body.kind === 'heartbeat') {
+    result = fbmSyncHeartbeat(body.response, { hop: Number(body.hop || 0) });
+  } else {
+    result = { ok: false, code: 'RELAY_KIND_UNSUPPORTED', error: 'Relay chỉ nhận các nhịp nền do GAS quy định.', request: null };
+  }
+  if (body.kind === 'heartbeat_request' || body.kind === 'heartbeat' || body.kind === 'heartbeat_transport_failure' || body.kind === 'background_sync') { result = fbmSyncRelayCompactResult(result); result = fbmSyncRelayCap(result, body.hop); }
+  return result;
 }
