@@ -35,8 +35,10 @@ FbmSync.writeEnabled = function (mode) { return FbmSync.canWriteFbm(mode); };
 // FBM có thể đặt dấu nháy trong script trang dưới dạng \" hoặc ". GAS cấp pattern,
 // Extension chỉ áp dụng nguyên trạng nên không được để hai nơi tự giữ pattern riêng.
 FbmSync.PAYLOAD_COOKIE_CAPTURE_PATTERN = String.raw`\\?['"]cookie\\?['"]\s*[:=]\s*\\?['"]([^'"\\]+FHN_CRM_App)\\?['"]`;
-/** Probe may run on Login.aspx before the page exposes a payload cookie. */
-FbmSync.sessionProbeTransport = function () {
+/** Trường `cookie` trong body FBM là tùy chọn: đo 2026-10-06 trên FBM thật, đọc grid, xin quyền mở form và lưu Customer (ALT00010) đều thành công với mã cũ,
+ * mã giả, mã người khác hoặc rỗng; FBM chỉ xác thực bằng cookie trình duyệt. Có mã trên tab thì gửi, không có thì để rỗng; không bao giờ chặn request vì
+ * thiếu mã, vì chặn như vậy chỉ làm phiên đồng bộ hỏng tùy tab đang hiện trang nào (FBM-037). */
+FbmSync.payloadCookieTransport = function () {
   return {
     captures: [{ name: 'payloadCookie', source: 'page_html', pattern: FbmSync.PAYLOAD_COOKIE_CAPTURE_PATTERN, flags: 'i', group: 1 }],
     replacements: [{ token: '{{FBM_PAYLOAD_COOKIE}}', capture: 'payloadCookie', source: 'page_html', required: false, fallback: '' }]
@@ -438,12 +440,7 @@ FbmSync.nextEnvelope = function (request) {
   var id = now.toString(36) + (sequence ? '-' + sequence.toString(36) : ''), state = FbmSync.stateRead ? FbmSync.stateRead() : {}, meta = Object.assign({}, request.meta || {});
   meta.trace = Object.assign({}, meta.trace || {}, { runId: String(state.runId || ''), requestId: id });
   // Extension chỉ có bộ lọc generic; GAS quyết định rõ dữ liệu phụ trợ cần lấy từ tab.
-  var defaultTransport = ['session_probe', 'identity_user_grid'].indexOf(requestKind) >= 0 && typeof FbmSync.sessionProbeTransport === 'function'
-    ? FbmSync.sessionProbeTransport()
-    : {
-      captures: [{ name: 'payloadCookie', source: 'page_html', pattern: FbmSync.PAYLOAD_COOKIE_CAPTURE_PATTERN, flags: 'i', group: 1 }],
-      replacements: [{ token: '{{FBM_PAYLOAD_COOKIE}}', capture: 'payloadCookie', source: 'page_html' }]
-    };
+  var defaultTransport = FbmSync.payloadCookieTransport();
   meta.transport = Object.assign(defaultTransport, meta.transport || {});
   if (state.scan === 'detail' && state.backgroundDetail) {
     var detail = state.backgroundDetail, minDelay = Math.max(0, Number(detail.minDelaySeconds || 0)), maxDelay = Math.max(minDelay, Number(detail.maxDelaySeconds === undefined ? minDelay : detail.maxDelaySeconds));
