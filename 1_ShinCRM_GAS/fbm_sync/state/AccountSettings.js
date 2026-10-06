@@ -71,21 +71,21 @@ function fbmAccountSettingsLegacy() {
 }
 
 FbmSync.accountSettingsRead = function () {
-  var props = fbmAccountSettingsProps(), raw = '';
-  try { raw = props && props.getProperty(FbmSync.ACCOUNT_SETTINGS_KEY) || ''; } catch (ignoreRead) { raw = ''; }
-  if (raw) {
-    try {
-      var parsed = JSON.parse(raw), valid = fbmAccountSettingsValidate(parsed);
-      if (valid.ok) {
-        if (props && JSON.stringify(parsed) !== JSON.stringify(valid.settings)) {
-          var normalizedWrite;
-          if (typeof FbmSync.documentPropertySet === 'function') { normalizedWrite = FbmSync.documentPropertySet(FbmSync.ACCOUNT_SETTINGS_KEY, JSON.stringify(valid.settings), 'account_settings'); }
-          else { props.setProperty(FbmSync.ACCOUNT_SETTINGS_KEY, JSON.stringify(valid.settings)); normalizedWrite = { ok: true }; }
-          if (!normalizedWrite.ok) { throw normalizedWrite.error; }
-        }
-        return valid.settings;
-      }
-    } catch (ignoreJson) {}
+  // Đọc lỗi hoặc JSON hỏng phải ném lỗi: rơi về giá trị cũ rồi ghi đè sẽ xóa âm thầm cài đặt của người dùng.
+  var props = fbmAccountSettingsProps(), parsed = props ? FbmSync.documentPropertyJson(FbmSync.ACCOUNT_SETTINGS_KEY, 'cài đặt tài khoản FBM') : null;
+  if (parsed) {
+    var valid = fbmAccountSettingsValidate(parsed);
+    if (!valid.ok) {
+      var invalid = new Error('Dữ liệu cài đặt tài khoản FBM trong DocumentProperties không hợp lệ (' + FbmSync.ACCOUNT_SETTINGS_KEY + '); đã dừng để không ghi đè.');
+      invalid.code = 'FBM_DOCUMENT_PROPERTY_CORRUPT'; throw invalid;
+    }
+    if (props && JSON.stringify(parsed) !== JSON.stringify(valid.settings)) {
+      var normalizedWrite;
+      if (typeof FbmSync.documentPropertySet === 'function') { normalizedWrite = FbmSync.documentPropertySet(FbmSync.ACCOUNT_SETTINGS_KEY, JSON.stringify(valid.settings), 'account_settings'); }
+      else { props.setProperty(FbmSync.ACCOUNT_SETTINGS_KEY, JSON.stringify(valid.settings)); normalizedWrite = { ok: true }; }
+      if (!normalizedWrite.ok) { throw normalizedWrite.error; }
+    }
+    return valid.settings;
   }
   var migrated = fbmAccountSettingsLegacy();
   if (props) {

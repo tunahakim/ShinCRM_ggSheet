@@ -26,13 +26,11 @@ FbmSync.loginExpectedIdentity = function (value) {
 /** Chỉ đọc cấu hình đã mã hóa và loại envelope trước khi trả ra Sidebar. */
 FbmSync.loginConfigRead = function () {
   var fallback = FbmSync.loginConfigDefault();
-  try {
-    var raw = FbmSync.props().getProperty(FbmSync.LOGIN_CONFIG_KEY), parsed = raw ? JSON.parse(raw) : {};
-    if (!parsed || typeof parsed !== 'object') { return fallback; }
-    var retryMinutes = Number(parsed.retryMinutes);
-    fallback = Object.assign(fallback, parsed, { public: parsed.public && typeof parsed.public === 'object' ? parsed.public : {}, envelope: parsed.envelope && typeof parsed.envelope === 'object' ? parsed.envelope : null, enabled: parsed.enabled !== false, autoOpenTab: parsed.autoOpenTab === true, retryEnabled: parsed.retryEnabled !== false, retryMinutes: isFinite(retryMinutes) ? Math.max(1, Math.min(1440, Math.round(retryMinutes))) : fallback.retryMinutes, configured: !!parsed.credentialRef && !!parsed.envelope });
-    return fallback;
-  } catch (ignore) { return fallback; }
+  var parsed = FbmSync.documentPropertyJson(FbmSync.LOGIN_CONFIG_KEY, 'cấu hình đăng nhập FBM');
+  if (!parsed) { return fallback; }
+  var retryMinutes = Number(parsed.retryMinutes);
+  fallback = Object.assign(fallback, parsed, { public: parsed.public && typeof parsed.public === 'object' ? parsed.public : {}, envelope: parsed.envelope && typeof parsed.envelope === 'object' ? parsed.envelope : null, enabled: parsed.enabled !== false, autoOpenTab: parsed.autoOpenTab === true, retryEnabled: parsed.retryEnabled !== false, retryMinutes: isFinite(retryMinutes) ? Math.max(1, Math.min(1440, Math.round(retryMinutes))) : fallback.retryMinutes, configured: !!parsed.credentialRef && !!parsed.envelope });
+  return fallback;
 };
 
 /** Nhận duy nhất envelope đã mã hóa từ Extension; không nhận credential bản rõ. */

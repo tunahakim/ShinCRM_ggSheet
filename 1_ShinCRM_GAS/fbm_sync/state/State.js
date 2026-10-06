@@ -33,6 +33,27 @@ FbmSync.documentPropertySet = function (key, value, context) {
     return { ok: false, code: failure.code, message: failure.message, error: failure };
   }
 };
+/**
+ * Đọc một property JSON dạng object; chưa có thì trả `null`.
+ * Lỗi dịch vụ hoặc JSON hỏng thì ném lỗi có mã, không coi như "chưa có": coi như trống thì lần ghi kế tiếp đè mất cursor, hash chờ xác nhận hay cấu hình thật (FBM-025, FBM-026). Thông điệp không chứa giá trị property vì có thể là envelope đăng nhập.
+ */
+FbmSync.documentPropertyJson = function (key, context) {
+  var raw;
+  try { raw = FbmSync.props().getProperty(key); } catch (err) {
+    var readFailure = new Error('Không đọc được ' + context + ' từ DocumentProperties; thử lại sau ít phút.');
+    readFailure.code = 'FBM_DOCUMENT_PROPERTIES_READ_FAILED';
+    throw readFailure;
+  }
+  if (!raw) { return null; }
+  var parsed = null;
+  try { parsed = JSON.parse(raw); } catch (ignoreParse) { parsed = null; }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    var corrupt = new Error('Dữ liệu ' + context + ' trong DocumentProperties bị hỏng (' + key + '); đã dừng để không ghi đè.');
+    corrupt.code = 'FBM_DOCUMENT_PROPERTY_CORRUPT';
+    throw corrupt;
+  }
+  return parsed;
+};
 
 /** Khóa riêng cho state/cursor đồng bộ; không dùng DocumentLock vì WriteGate tự giữ khóa đó khi ghi Sheet. */
 FbmSync.orchestrationLock = function () {
@@ -152,10 +173,7 @@ FbmSync.stateDefault = function () {
 FbmSync.props = function () { return PropertiesService.getDocumentProperties(); };
 /** Hash của lần ghi đang chờ xác nhận; không đưa metadata kỹ thuật vào Sheet. */
 FbmSync.pendingPushesRead = function () {
-  try {
-    var raw = FbmSync.props().getProperty('FBM_SYNC_PENDING_PUSHES_V1'), parsed = raw ? JSON.parse(raw) : {};
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
-  } catch (ignore) { return {}; }
+  return FbmSync.documentPropertyJson('FBM_SYNC_PENDING_PUSHES_V1', 'hash chờ xác nhận') || {};
 };
 FbmSync.pendingPushGet = function (entity, id) {
   return FbmSync.pendingPushesRead()[String(entity || '') + ':' + String(id || '')] || null;
@@ -171,13 +189,10 @@ FbmSync.pendingPushClear = function (entity, id) { return FbmSync.pendingPushSet
 /** Đọc state và tự bù field thiếu từ mặc định. */
 FbmSync.stateRead = function () {
   var fallback = FbmSync.stateDefault();
-  try {
-    var raw = FbmSync.props().getProperty(FbmSync.STATE_KEY);
-    if (!raw) { return fallback; }
-    var parsed = JSON.parse(raw);
-    var metadata = parsed.metadata || {};
-    return Object.assign(fallback, parsed, { counts: Object.assign(fallback.counts, parsed.counts || {}), session: Object.assign(fallback.session, parsed.session || {}), metadata: Object.assign(fallback.metadata, metadata, { seen: Object.assign(fallback.metadata.seen, metadata.seen || {}), conflictCount: Number(metadata.conflictCount || 0), pushSucceeded: Number(metadata.pushSucceeded || 0), preflightIssues: Array.isArray(metadata.preflightIssues) ? metadata.preflightIssues : [], pushFailures: Object.assign(fallback.metadata.pushFailures, metadata.pushFailures || {}), pushFailureDetails: Object.assign(fallback.metadata.pushFailureDetails, metadata.pushFailureDetails || {}), callbackTrace: metadata.callbackTrace || null, manualPending: metadata.manualPending || null, preview: Object.assign(fallback.metadata.preview, metadata.preview || {}) }), locks: parsed.locks || {} });
-  } catch (err) { return fallback; }
+  var parsed = FbmSync.documentPropertyJson(FbmSync.STATE_KEY, 'state đồng bộ');
+  if (!parsed) { return fallback; }
+  var metadata = parsed.metadata || {};
+  return Object.assign(fallback, parsed, { counts: Object.assign(fallback.counts, parsed.counts || {}), session: Object.assign(fallback.session, parsed.session || {}), metadata: Object.assign(fallback.metadata, metadata, { seen: Object.assign(fallback.metadata.seen, metadata.seen || {}), conflictCount: Number(metadata.conflictCount || 0), pushSucceeded: Number(metadata.pushSucceeded || 0), preflightIssues: Array.isArray(metadata.preflightIssues) ? metadata.preflightIssues : [], pushFailures: Object.assign(fallback.metadata.pushFailures, metadata.pushFailures || {}), pushFailureDetails: Object.assign(fallback.metadata.pushFailureDetails, metadata.pushFailureDetails || {}), callbackTrace: metadata.callbackTrace || null, manualPending: metadata.manualPending || null, preview: Object.assign(fallback.metadata.preview, metadata.preview || {}) }), locks: parsed.locks || {} });
 };
 /** Bỏ preview tùy chọn trước khi bỏ state nghiệp vụ khi gần chạm trần property. */
 FbmSync.compactStatePreview = function (state) {

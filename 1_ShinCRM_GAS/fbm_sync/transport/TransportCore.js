@@ -4,8 +4,14 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 /** Khóa tổng của module; Spreadsheet cũ chưa có thuộc tính được coi là bật. */
 FbmSync.MASTER_SWITCH_KEY = 'FBM_SYNC_ENABLED';
 FbmSync.masterEnabled = function () {
-  // Không phá hành vi các Spreadsheet đã có trước khi công tắc được thêm; chỉ giá trị false rõ ràng mới khóa module.
-  try { return FbmSync.props().getProperty(FbmSync.MASTER_SWITCH_KEY) !== 'false'; } catch (err) { return true; }
+  // Chưa có thuộc tính thì coi là bật (Spreadsheet có trước công tắc). Đọc lỗi thì ném lên: công tắc an toàn không được hỏng theo hướng mở (FBM-028).
+  var value;
+  try { value = FbmSync.props().getProperty(FbmSync.MASTER_SWITCH_KEY); } catch (err) {
+    var failure = new Error('Không đọc được công tắc đồng bộ FBM; đã dừng để an toàn, thử lại sau ít phút.');
+    failure.code = 'FBM_DOCUMENT_PROPERTIES_READ_FAILED';
+    throw failure;
+  }
+  return value !== 'false';
 };
 FbmSync.setMasterEnabled = function (enabled) {
   var value = enabled === true;
