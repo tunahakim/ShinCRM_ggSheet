@@ -42,5 +42,13 @@ function fbmEndFakeDeletedCustomer() {
   var fakes = FbmSync.readLocal('customer').filter(function (record) { return String(record.fbmCustomerCode || '').trim() === FBM_FAKE_DELETED_CODE; });
   if (fakes.length) { FbmSync.sheetSave('customer', fakes.map(function (record) { return { id: record.id, recordStatus: 'deleted' }; }), 'pull'); }
   PropertiesService.getDocumentProperties().deleteProperty('FBM_SYNC_TEST_CUSTOMER_CODE');
-  return { ok: true, softDeleted: fakes.map(function (record) { return record.id; }), scope: FbmSync.scriptSettings().testCustomerCode };
+  return { ok: true, softDeleted: fakes.map(function (record) { return record.id + ': ' + record.syncStatus; }), scope: FbmSync.scriptSettings().testCustomerCode };
+}
+/** Dò luồng xung đột (G10.7): sửa Website của ALT00010 bên ShinCRM và thay baseline bằng giá trị giả, nên lượt kéo thấy cả hai phía khác baseline và khác nhau. Không ghi FBM. */
+function fbmSeedConflict() {
+  var source = FbmSync.readLocal('customer').filter(function (record) { return String(record.fbmCustomerCode || '').trim() === 'ALT00010' && String(record.recordStatus || 'active') !== 'deleted'; })[0];
+  if (!source) { return { ok: false, reason: 'Chưa có khách ALT00010 trên Sheet DEV.' }; }
+  var website = 'Website xung đột ShinCRM ' + Utilities.formatDate(new Date(), 'Asia/Ho_Chi_Minh', 'HH:mm');
+  FbmSync.sheetSave('customer', [{ id: source.id, website: website, fbmHash: 'baseline-gia-xung-dot', syncStatus: FbmSync.SYNC_STATUS.pending }], 'pull');
+  return { ok: true, id: source.id, website: website };
 }

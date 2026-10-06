@@ -19,7 +19,7 @@
  */
 var DEV_RUNNER_ALLOWED = [
   'smokeTest', 'smokeDiag', 'setupSheets', 'verifySheets', 'measureDeleteRows', 'measureChunkRows', 'measureFirstPaint',
-  'seedFakeData', 'seedFakeCategory', 'seedFakeCategoryMappings', 'wipeFakeData', 'fbmPrepareAltTest', 'fbmProbeAltState', 'fbmSeedFakeDeletedCustomer', 'fbmEndFakeDeletedCustomer', 'fbmAuditAltState',
+  'seedFakeData', 'seedFakeCategory', 'seedFakeCategoryMappings', 'wipeFakeData', 'fbmPrepareAltTest', 'fbmProbeAltState', 'fbmSeedFakeDeletedCustomer', 'fbmEndFakeDeletedCustomer', 'fbmSeedConflict', 'fbmAuditAltState',
   'dumpColumnMap', 'dumpSettings', 'dumpSheetGrid', 'dumpRecentLog',
   'devLogTraceOn', 'devLogTraceOff',
   'probeBadColumnCode', 'probeLogGate', 'probeDateText', 'probeSheetGrid', 'probeCellBudget',
