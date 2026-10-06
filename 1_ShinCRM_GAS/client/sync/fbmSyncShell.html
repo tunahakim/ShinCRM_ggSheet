@@ -40,16 +40,27 @@
 .shin-sync-schedule-row > .shin-standalone-control { min-width:0; }
 .shin-sync-schedule-row > .shin-standalone-control:last-child .shin-input { width:100%; box-sizing:border-box; }
 .shin-sync-detail-controls { margin-left:var(--shin-sync-schedule-control-width); padding-top:var(--shin-gap-1); padding-left:var(--shin-gap-2); border-left:2px solid var(--shin-border-faint); }
-.shin-sync-conflict-choice { width:100%; }
 .shin-sync-summary-label { color:var(--shin-text); font-size:var(--shin-text-sm); font-weight:600; }
 .shin-sync-conflict-head { justify-content:space-between; }
 .shin-sync-conflict-count { color:var(--shin-error); font-size:var(--shin-text-md); font-weight:700; }
 .shin-sync-conflict-meta { color:var(--shin-text-soft); font-size:var(--shin-text-sm); }
 .shin-sync-conflict-field { padding:var(--shin-gap-2); border:1px solid var(--shin-border); border-radius:var(--shin-radius-sm); background:var(--shin-bg-sunken); }
+.shin-sync-conflict-field.is-invalid { border-color:var(--shin-error); box-shadow:0 0 0 1px var(--shin-error); }
+.shin-sync-conflict-field-head, .shin-sync-conflict-side-head { justify-content:space-between; }
 .shin-sync-conflict-field-name { color:var(--shin-text); font-size:var(--shin-text-sm); font-weight:700; }
-.shin-sync-conflict-value { font-size:var(--shin-text-sm); overflow-wrap:anywhere; }
-.shin-sync-conflict-value-shin { color:var(--shin-primary-dark); }
-.shin-sync-conflict-value-fbm { color:var(--shin-warn); }
+.shin-sync-conflict-field.is-invalid .shin-sync-conflict-field-name { color:var(--shin-error); }
+.shin-sync-conflict-pick-label, .shin-sync-conflict-side-label { color:var(--shin-text-soft); font-size:var(--shin-text-xs); }
+.shin-sync-conflict-edited { color:var(--shin-warn); font-size:var(--shin-text-xs); font-style:italic; }
+.shin-sync-conflict-side-row { align-items:flex-start; }
+.shin-sync-conflict-side-row > .shin-standalone-control:first-child { flex:1 1 auto; min-width:0; }
+.shin-sync-conflict-side-row > .shin-standalone-control:last-child { flex:0 0 auto; }
+/* Ô cao theo nội dung để trường dài (địa chỉ, nội dung giao dịch) không bị cắt. */
+.shin-sync-conflict-value { width:100%; box-sizing:border-box; resize:none; field-sizing:content; min-height:0; font-size:var(--shin-text-sm); overflow-wrap:anywhere; }
+.shin-sync-conflict-value[readonly] { background:var(--shin-bg-sunken); }
+.shin-sync-conflict-value.is-selected { border-color:var(--shin-primary); background:var(--shin-bg); }
+.shin-sync-conflict-value.is-dimmed { opacity:.55; }
+.shin-sync-conflict-radio { margin:var(--shin-gap-2) 0 0 var(--shin-gap-2); cursor:pointer; }
+.shin-sync-conflict-note { color:var(--shin-warn); font-size:var(--shin-text-sm); }
 .shin-sync-pipeline-marker { flex:0 0 14px; }
 .shin-sync-pipeline-label { min-width:0; }
 </style>

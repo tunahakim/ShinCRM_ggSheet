@@ -410,6 +410,14 @@ function renderStandaloneControlInner(node) {
       + '<div class="shin-popup-list" hidden></div>'
       + '</div>';
   }
+  if (kind === 'textarea') {
+    return '<textarea rows="1"' + renderAttr('class', 'shin-input shin-textarea' + (className ? ' ' + className : '')) + common + renderAttr('placeholder', node.placeholder) + renderInputGuard() + (node.readonly ? ' readonly' : '') + '>' + renderEscape(node.value === null || node.value === undefined ? '' : node.value) + '</textarea>';
+  }
+  // Nút tròn chọn một trong nhóm: `group` là tên nhóm, `pressed` là đang chọn.
+  if (kind === 'radio') {
+    if (!node.group) { throw new Error('StandaloneControl radio cần `group` để các nút cùng nhóm loại trừ nhau.'); }
+    return '<input type="radio"' + renderAttr('class', 'shin-radio' + (className ? ' ' + className : '')) + common + renderAttr('name', node.group) + renderAttr('value', node.value) + (node.pressed ? ' checked' : '') + '>';
+  }
   if (kind === 'toggle') {
     return '<button type="button"' + renderAttr('class', 'shin-toggle-control' + (className ? ' ' + className : '')) + common + renderAttr('aria-pressed', node.pressed ? 'true' : 'false') + '>'
       + '<span class="shin-toggle-label">' + (node.pressed ? 'ON' : 'OFF') + '</span><span class="shin-toggle-knob"></span></button>';
@@ -569,6 +577,8 @@ function renderTargetState(id, state) {
   if (!el || !state) { return false; }
   if (state.hidden !== undefined) { el.hidden = !!state.hidden; }
   if (state.disabled !== undefined) { el.disabled = !!state.disabled; }
+  if (state.checked !== undefined) { el.checked = !!state.checked; }
+  if (state.readonly !== undefined) { el.readOnly = !!state.readonly; }
   if (state.ariaPressed !== undefined) { el.setAttribute('aria-pressed', state.ariaPressed ? 'true' : 'false'); }
   if (state.ariaValueNow !== undefined && state.ariaValueNow !== null) { el.setAttribute('aria-valuenow', String(state.ariaValueNow)); }
   if (state.removeAriaValueNow) { el.removeAttribute('aria-valuenow'); }

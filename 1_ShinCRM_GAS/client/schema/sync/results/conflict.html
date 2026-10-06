@@ -3,9 +3,11 @@ var FBM_SYNC_CONFLICT_SCHEMA = {
   title: 'Xử lý xung đột',
   empty: 'Không có xung đột cần xử lý.',
   remaining: '{count} xung đột còn lại',
-  labels: { shin: 'ShinCRM: ', fbm: 'FBM: ', empty: '(trống)', keepShin: 'Giữ ShinCRM', keepFbm: 'Giữ FBM', manual: 'Tự nhập', manualPlaceholder: 'Giá trị kết hợp', manualAria: 'Giá trị kết hợp cho ', choiceAria: 'Lựa chọn cho ', keepAllShin: 'Giữ toàn bộ ShinCRM', keepAllFbm: 'Giữ toàn bộ FBM', saveMerge: 'Lưu lựa chọn từng trường', back: 'Quay lại kết quả' },
-  choiceValues: { shin: 'shin', fbm: 'fbm', manual: 'manual' },
-  ids: { choicePrefix: 'fbm-sync-conflict-choice-', manualPrefix: 'fbm-sync-conflict-manual-', back: 'fbm-sync-conflict-back' },
-  separators: { meta: ' · ', fbm: ' · FBM ' },
+  labels: { pick: 'Lựa chọn', shinValue: 'Giá trị ở ShinCRM', fbmValue: 'Giá trị ở FBM', empty: '(trống)', edited: 'đã sửa', choiceAria: '{side} cho {field}', valueAria: '{side} của {field}', save: 'Lưu', back: 'Quay lại kết quả', missing: 'Còn {count} trường chưa chọn giá trị.', pushNote: 'Sẽ đẩy lên FBM ở lần đồng bộ sau.' },
+  sides: ['shin', 'fbm'],
+  bulk: { none: '', fbm: 'all_fbm', shin: 'all_shin', clear: 'clear' },
+  bulkLabels: { all_fbm: 'Chọn tất cả theo FBM', all_shin: 'Chọn tất cả theo ShinCRM', clear: 'Bỏ chọn tất cả' },
+  ids: { bulk: 'fbm-sync-conflict-bulk', fieldPrefix: 'fbm-sync-conflict-field-', radioPrefix: 'fbm-sync-conflict-pick-', valuePrefix: 'fbm-sync-conflict-value-', editedPrefix: 'fbm-sync-conflict-edited-', missing: 'fbm-sync-conflict-missing', pushNote: 'fbm-sync-conflict-push-note', save: 'fbm-sync-conflict-save', back: 'fbm-sync-conflict-back' },
+  separators: { meta: ' · ' },
 };
 </script>

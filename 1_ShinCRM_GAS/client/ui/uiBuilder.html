@@ -35,7 +35,7 @@ var BLOCK_KEYS_BY_ROLE = {
   button: ['label', 'disabled'],
   icon: ['icon', 'tooltip', 'label', 'toggle', 'disabled'],
   check: ['label'],
-  standaloneControl: ['kind', 'inputType', 'label', 'value', 'placeholder', 'options', 'disabled', 'pressed', 'ariaLabel', 'hidden']
+  standaloneControl: ['kind', 'inputType', 'label', 'value', 'placeholder', 'options', 'disabled', 'pressed', 'readonly', 'group', 'ariaLabel', 'hidden']
 };
 
 /* Chính sách layout của primitive. CSS chỉ hiện thực class đã chọn; màn hình không tự khai alignment. */
@@ -158,6 +158,7 @@ function Block(spec, role) {
     options: y.options || null,
     disabled: y.disabled === true,
     pressed: y.pressed === true,
+    group: y.group || null,
     ariaLabel: y.ariaLabel || null,
   hidden: y.hidden === true
   };

@@ -14,20 +14,36 @@ function fbmSyncAuditContentBlocks(status) {
 }
 
 function fbmSyncConflictContentBlocks(status) {
-  var schema = FBM_SYNC_CONFLICT_SCHEMA, ui = FBM_SYNC_CONFLICT_UI;
+  var schema = FBM_SYNC_CONFLICT_SCHEMA, ui = FBM_SYNC_CONFLICT_UI, classes = ui.classes;
   // Bản ghi đang mở là DTO GAS trả khi mở chế độ xung đột, giữ trong RAM Sidebar; status chỉ mang số đếm.
   var metadata = status.metadata || {}, item = FBM_SYNC_CLIENT.conflict;
-  var head = Row({ className: ui.classes.head, elements: [Text({ className: ui.classes.count, text: schema.remaining.replace('{count}', Number(item ? item.remaining : metadata.conflictCount) || 0) })] });
+  var head = Row({ className: classes.head, elements: [Text({ className: classes.count, text: schema.remaining.replace('{count}', Number(item ? item.remaining : metadata.conflictCount) || 0) })] });
   if (!item) { return [ui.card([head, Empty(schema.empty)])]; }
-  FBM_SYNC_CLIENT.conflictChoices = FBM_SYNC_CLIENT.conflictChoices || {};
+  var invalid = FBM_SYNC_CLIENT.conflictInvalid || {}, missingCount = Object.keys(invalid).length;
+  var bulk = StandaloneControl({ id: schema.ids.bulk, kind: 'menu', value: schema.bulk.none, ariaLabel: schema.labels.pick, options: [{ value: schema.bulk.none, label: schema.labels.pick }].concat([schema.bulk.fbm, schema.bulk.shin, schema.bulk.clear].map(function (value) { return { value: value, label: schema.bulkLabels[value] }; })) });
   var fields = (item.fields || []).map(function (field, index) {
-    var name = String(field.field || ''), choice = FBM_SYNC_CLIENT.conflictChoices[name] || schema.choiceValues.shin, controlId = schema.ids.choicePrefix + index;
-    var elements = [Text({ className: ui.classes.fieldName, text: name }), Text({ className: uiClassJoin(ui.classes.value, ui.classes.shin), text: schema.labels.shin + String(field.left || schema.labels.empty) }), Text({ className: uiClassJoin(ui.classes.value, ui.classes.fbm), text: schema.labels.fbm + String(field.right || schema.labels.empty) }), StandaloneControl({ id: controlId, kind: 'menu', options: [{ value: schema.choiceValues.shin, label: schema.labels.keepShin }, { value: schema.choiceValues.fbm, label: schema.labels.keepFbm }, { value: schema.choiceValues.manual, label: schema.labels.manual }], value: choice, className: ui.classes.choice, data: { 'fbm-conflict-field': name }, ariaLabel: schema.labels.choiceAria + name })];
-    elements.push(StandaloneControl({ id: schema.ids.manualPrefix + index, kind: 'input', inputType: 'text', value: (FBM_SYNC_CLIENT.conflictDraft || {})[name] || '', placeholder: schema.labels.manualPlaceholder, hidden: choice !== schema.choiceValues.manual, data: { 'fbm-conflict-manual': name }, ariaLabel: schema.labels.manualAria + name }));
-    return RowGroup({ className: ui.classes.field, elements: elements });
+    var label = String(field.label || field.field || '');
+    var sides = schema.sides.map(function (side) {
+      var view = fbmSyncConflictSide(field, side), key = index + '-' + side, sideLabel = side === 'fbm' ? schema.labels.fbmValue : schema.labels.shinValue;
+      var fill = function (text) { return text.replace('{side}', sideLabel).replace('{field}', label); };
+      return RowGroup({ elements: [
+        Row({ className: classes.sideHead, elements: [Text({ className: classes.sideLabel, text: sideLabel }), Text({ id: schema.ids.editedPrefix + key, className: classes.edited, text: schema.labels.edited, hidden: !view.edited })] }),
+        Row({ className: classes.sideRow, elements: [
+          StandaloneControl({ id: schema.ids.valuePrefix + key, kind: 'textarea', value: view.value, placeholder: schema.labels.empty, readonly: !view.editable, className: uiClassJoin(classes.value, view.selected ? classes.selected : '', view.dimmed ? classes.dimmed : ''), data: { 'fbm-conflict-value': field.field, 'fbm-conflict-side': side }, ariaLabel: fill(schema.labels.valueAria) }),
+          StandaloneControl({ id: schema.ids.radioPrefix + key, kind: 'radio', group: schema.ids.radioPrefix + index, value: side, pressed: view.selected, className: classes.radio, data: { 'fbm-conflict-pick': field.field, 'fbm-conflict-side': side }, ariaLabel: fill(schema.labels.choiceAria) })
+        ] })
+      ] });
+    });
+    return RowGroup({ id: schema.ids.fieldPrefix + index, className: uiClassJoin(classes.field, invalid[field.field] ? classes.invalid : ''), elements: [Row({ className: classes.fieldHead, elements: [Text({ className: classes.fieldName, text: label }), Text({ className: classes.pickLabel, text: schema.labels.pick })] })].concat(sides) });
   });
-  var actions = Row([Button({ label: schema.labels.keepAllShin, data: { 'fbm-conflict-choice': schema.choiceValues.shin, 'fbm-conflict-entity': String(item.entity || ''), 'fbm-conflict-id': String(item.id || '') } }), Button({ label: schema.labels.keepAllFbm, data: { 'fbm-conflict-choice': schema.choiceValues.fbm, 'fbm-conflict-entity': String(item.entity || ''), 'fbm-conflict-id': String(item.id || '') } }), Button({ label: schema.labels.saveMerge, className: uiResolveActionClass('save', 'button'), data: { 'fbm-conflict-merge': true, 'fbm-conflict-entity': String(item.entity || ''), 'fbm-conflict-id': String(item.id || '') } })]);
-  return [ui.card([head, Text({ className: ui.classes.meta, text: String(item.entity || '') + schema.separators.meta + String(item.id || '') + (item.fbmId ? schema.separators.fbm + String(item.fbmId) : '') })].concat(fields, [actions, Row({ className: ui.classes.singleAction, elements: [Button({ id: schema.ids.back, label: schema.labels.back })] })]))];
+  var footer = [
+    Text({ id: schema.ids.missing, className: classes.missing, text: schema.labels.missing.replace('{count}', missingCount), hidden: !missingCount }),
+    Text({ id: schema.ids.pushNote, className: classes.note, text: schema.labels.pushNote, hidden: !fbmSyncConflictDecision(item).pushes }),
+    Row({ className: classes.singleAction, elements: [Button({ id: schema.ids.save, label: schema.labels.save, className: uiResolveActionClass('save', 'button') })] }),
+    Row({ className: classes.singleAction, elements: [Button({ id: schema.ids.back, label: schema.labels.back })] })
+  ];
+  var meta = [item.code || item.id, item.name].filter(function (part) { return !!part; }).join(schema.separators.meta);
+  return [ui.card([head, Text({ className: classes.meta, text: meta }), bulk].concat(fields, footer))];
 }
 
 </script>
