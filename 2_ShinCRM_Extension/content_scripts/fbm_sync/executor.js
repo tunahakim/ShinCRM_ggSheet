@@ -1,6 +1,6 @@
 /* Cầu nối FBM: nhận request, fetch trong tab đăng nhập, trả response thô. */
 (function () {
-  var EXECUTOR_VERSION = '21.16';
+  var EXECUTOR_VERSION = '21.17';
   var FETCH_TIMEOUT_MS = 10000;
   function traceEvent(trace, stage, request, extra) {
     trace.push(Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {}));
@@ -28,6 +28,12 @@
       }
     });
     return values;
+  }
+  /** Dấu vết chẩn đoán an toàn khi bắt mã phiên: chỉ đường dẫn, độ dài và có/không có dấu hiệu database FBM; không đưa nội dung trang hay mã phiên vào trace. */
+  function payloadCookieDiagnostic(html, url) {
+    var text = String(html || ''), path = '';
+    try { path = new URL(String(url || location.href)).pathname; } catch (ignorePath) { path = ''; }
+    return { endpoint: path, responseLength: text.length, error: text.indexOf('FHN_CRM_App') >= 0 ? 'payload_marker_present' : 'payload_marker_absent' };
   }
   function captureTransport(request, responseBody) {
     var values = captureTransportValues(request, responseBody);
@@ -165,8 +171,8 @@
             return readResponseText(account).then(function (accountHtml) {
               // Mẫu bắt cookie do GAS cấp trong request (một chỗ định nghĩa); ưu tiên trang tài khoản vừa đọc, rồi response Login, cuối cùng mới tới trang đang mở.
               var captures = Object.assign({}, captureTransportValues(request, '', 'page_html'), captureTransportValues(request, login.text, 'response'), captureTransportValues(request, accountHtml, 'response'));
-              var accountPath = ''; try { accountPath = new URL(account.url).pathname; } catch (ignorePath) { accountPath = ''; }
-              traceEvent(trace, 'payload_cookie_page_read', request, { httpStatus: account.status, responseLength: accountHtml.length, endpoint: accountPath, code: captures.payloadCookie ? 'PAYLOAD_COOKIE_CAPTURED' : 'PAYLOAD_COOKIE_MISSING' });
+              traceEvent(trace, 'payload_cookie_page_read', request, Object.assign(payloadCookieDiagnostic(accountHtml, account.url), { httpStatus: account.status, code: captures.payloadCookie ? 'PAYLOAD_COOKIE_CAPTURED' : 'PAYLOAD_COOKIE_MISSING' }));
+              traceEvent(trace, 'payload_cookie_tab_read', request, Object.assign(payloadCookieDiagnostic(document.documentElement ? document.documentElement.innerHTML : ''), { code: document.readyState }));
               return { ok: login.response.ok, status: login.response.status, headers: { contentType: login.response.headers.get('content-type') || '' }, body: login.text, transport: { captures: captures, trace: trace } };
             });
           });
@@ -203,7 +209,7 @@
     if (replacements.some(function (replacement) { return String(sent || '').indexOf(String(replacement && replacement.token || '')) >= 0; })) {
       var captureError = new Error('Không lấy được giá trị transport do GAS yêu cầu; đã chặn trước khi gửi FBM.');
       captureError.code = 'FBM_TRANSPORT_CAPTURE_MISSING';
-      traceEvent(trace, 'transport_capture_missing', req, { code: captureError.code });
+      traceEvent(trace, 'transport_capture_missing', req, Object.assign(payloadCookieDiagnostic(document.documentElement ? document.documentElement.innerHTML : ''), { code: captureError.code }));
       captureError.trace = trace;
       return Promise.reject(captureError);
     }

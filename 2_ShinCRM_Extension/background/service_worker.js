@@ -63,7 +63,7 @@ function ensureFbmTab(request) {
     return created.then(function (newTab) { return newTab ? waitForFbmTabReady(newTab) : null; });
   });
 }
-var FBM_EXECUTOR_VERSION = '21.16';
+var FBM_EXECUTOR_VERSION = '21.17';
 
 function addWorkerTrace(reply, request, stage, extra) {
   var event = Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {});
