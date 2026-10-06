@@ -129,7 +129,7 @@ async function chay(so) {
   const pushCandidatesImpl = push.FbmSync.pushCandidates;
   push.FbmSync.scriptSettings = () => ({ accountName: 'FBM test', baseUrl: 'https://fbm.test' });
   push.FbmSync.scriptSettings = () => ({ accountName: 'Lê Tuấn Anh', baseUrl: 'https://fbm.test' });
-  push.FbmSync.pushCandidates = () => [{ kind: 'edit', id: 'C-1', record: { id: 'C-1', fbmId: 'A-1', fbmHash: 'h1' } }];
+  push.FbmSync.pushCandidates = () => [{ kind: 'edit', id: 'C-1', position: 0, record: { id: 'C-1', fbmId: 'A-1', fbmHash: 'h1' } }];
   push.FbmSync.validatePushCategories = () => [];
   const pushEligibilityErrors = push.FbmSync.pushEligibilityErrors;
   push.FbmSync.pushEligibilityErrors = () => [];
@@ -179,8 +179,8 @@ async function chay(so) {
   const retryEnabled = push.fbmSyncRetryPushFailures();
   check(so, 'retry push mo lai ca lo cung payload khong doi du lieu', [retryEnabled.ok, retryPatch[0].syncStatus, push.FbmSync.stateRead().metadata.pushFailures['activity:ACT-FAIL']], [true, push.FbmSync.SYNC_STATUS.pending, undefined]);
   push.FbmSync.pushCandidates = () => [
-    { kind: 'edit', id: 'C-ERR', record: { id: 'C-ERR', fbmId: 'A-ERR', fbmHash: 'h-err' } },
-    { kind: 'edit', id: 'C-NEXT', record: { id: 'C-NEXT', fbmId: 'A-NEXT', fbmHash: 'h-next' } }
+    { kind: 'edit', id: 'C-ERR', position: 0, record: { id: 'C-ERR', fbmId: 'A-ERR', fbmHash: 'h-err' } },
+    { kind: 'edit', id: 'C-NEXT', position: 1, record: { id: 'C-NEXT', fbmId: 'A-NEXT', fbmHash: 'h-next' } }
   ];
   const pushErrorProps = push.FbmSync.stateStart('', 'push', 0);
   pushErrorProps.session = { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' };
@@ -250,7 +250,7 @@ async function chay(so) {
   const countedConflict = { counts: { conflict: 1 }, metadata: {} };
   check(so, 'Push dung lai khi bo dem conflict duong du chi tiet bi thieu', [push.FbmSync.stopPushOnConflicts(countedConflict), countedConflict.phase, countedConflict.cursor], [true, 'conflict', {}]);
 
-  const activityCandidate = { entity: 'activity', kind: 'create', id: 'ACT-NEW', record: { id: 'ACT-NEW', fbmId: '', customerFbmCode: 'ALT00010', stt_rec: 'A-CUS', taskType: 'Gọi', content: 'Nội dung', workDate: '2026-09-09', allowFbmPush: push.FbmSync.PUSH_ALLOW_VALUE } };
+  const activityCandidate = { entity: 'activity', kind: 'create', id: 'ACT-NEW', position: 0, record: { id: 'ACT-NEW', fbmId: '', customerFbmCode: 'ALT00010', stt_rec: 'A-CUS', taskType: 'Gọi', content: 'Nội dung', workDate: '2026-09-09', allowFbmPush: push.FbmSync.PUSH_ALLOW_VALUE } };
   push.FbmSync.pushCandidates = () => [activityCandidate];
   push.FbmSync.validatePushCategories = () => [];
   push.FbmSync.pushEligibilityErrors = () => [];

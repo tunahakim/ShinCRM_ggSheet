@@ -149,6 +149,86 @@ async function chay(so) {
   empty.hop.FbmSync.logStatus(empty.hop.FbmSync.statusView(), 'empty_run');
   const emptyCounts = empty.hop.FbmSync.stateRead().counts;
   check(so, 'phiên rỗng hai phía kết thúc với mọi bộ đếm bằng 0 và chỉ một tổng kết', [emptyCustomer.written, emptyActivity.written, empty.writes.length, [emptyCounts.total, emptyCounts.completed, emptyCounts.succeeded, emptyCounts.skipped, emptyCounts.conflict, emptyCounts.error], empty.logs.length, empty.logs[0] && empty.logs[0].action], [0, 0, 0, [0, 0, 0, 0, 0, 0], 1, 'empty_run']);
+
+  // Hàng đợi push: Sheet giả trong bộ nhớ, danh sách ứng viên dựng lại từ Sheet sau mỗi bản ghi như GAS thật.
+  function pushQueue(customers, activities) {
+    const run = makeSync(), F = run.hop.FbmSync;
+    run.local.customer.push(...customers); run.local.activity.push(...(activities || []));
+    F.scriptSettings = () => ({ accountName: 'Le Tuan Anh', customerPrefix: 'ALT', customerCodeLength: 8 });
+    F.validatePushCategories = () => [];
+    F.nextEnvelope = (request) => request;
+    const st = F.stateStart('', 'push', 0);
+    st.mode = 'write'; st.phase = 'push'; st.metadata.categoryGate = { map: {}, names: {}, valid: {}, blocked: {} };
+    st.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
+    F.stateWrite(st);
+    return { run, F };
+  }
+  const editCustomer = (x) => ({ id: 'CUS-' + x, fbmId: 'F-' + x, fbmCustomerCode: 'ALT0000' + x, companyName: 'Cty ' + x, taxNumber: '010' + x, contactPerson: 'Người liên hệ', phone: '0900000000', leadSource: 'Web', address: 'Hà Nội', province: 'Hà Nội', allowFbmPush: 'Cho phép', syncStatus: 'đã đồng bộ', fbmHash: 'cũ' });
+
+  const skipOnError = pushQueue(['A', 'B', 'C'].map(editCustomer));
+  const triedOnError = [];
+  let errorRequest = skipOnError.F.nextPushRequest(skipOnError.F.stateRead());
+  for (let guard = 0; guard < 5 && errorRequest; guard += 1) {
+    const current = skipOnError.F.stateRead(); triedOnError.push(current.cursor.candidate.id);
+    errorRequest = skipOnError.F.continueAfterPushError(current, current.cursor, { reason: 'FBM từ chối', code: 'FBM_ERROR' }).request;
+  }
+  check(so, 'FBM-032: ba Customer liên tiếp bị FBM từ chối thì phiên vẫn thử đủ cả ba, không bỏ sót bản ghi ở giữa', triedOnError, ['CUS-A', 'CUS-B', 'CUS-C']);
+
+  const skipOnSuccess = pushQueue(['A', 'B', 'C'].map(editCustomer));
+  const triedOnSuccess = [];
+  let successRequest = skipOnSuccess.F.nextPushRequest(skipOnSuccess.F.stateRead());
+  for (let guard = 0; guard < 5 && successRequest; guard += 1) {
+    const current = skipOnSuccess.F.stateRead(), id = current.cursor.candidate.id;
+    triedOnSuccess.push(id);
+    // Như finishPushVerification: bản ghi đã đồng bộ rời danh sách ứng viên, cursor tiến qua dòng của nó.
+    const row = skipOnSuccess.run.local.customer.find((item) => item.id === id);
+    row.syncStatus = 'đã đồng bộ'; row.fbmHash = skipOnSuccess.F.hash(row, 'customer', {});
+    current.cursor = { kind: 'push_scan', entity: 'customer', index: current.cursor.index + 1 };
+    skipOnSuccess.F.stateWrite(current);
+    successRequest = skipOnSuccess.F.nextPushRequest(skipOnSuccess.F.stateRead());
+  }
+  check(so, 'FBM-032: bản ghi vừa đẩy xong rời danh sách ứng viên thì bản ghi kế tiếp vẫn được đẩy', triedOnSuccess, ['CUS-A', 'CUS-B', 'CUS-C']);
+
+  const stuckActivity = { id: 'ACT-STUCK', customerId: 'CUS-A', fbmId: '', workDate: '2026-09-19', taskType: 'Gọi điện', content: 'Gọi lại', owner: 'Le Tuan Anh', allowFbmPush: 'Cho phép', syncStatus: 'đang đẩy' };
+  const stuck = pushQueue([editCustomer('A')], [stuckActivity]);
+  stuck.run.local.customer[0].fbmHash = stuck.F.hash(stuck.run.local.customer[0], 'customer', {});
+  const stuckRequest = stuck.F.nextPushRequest(stuck.F.stateRead());
+  stuck.F.recordIssuesFlush();
+  const stuckState = stuck.F.stateRead(), stuckLog = stuck.run.logs.find((event) => event.action === 'push_record_issue');
+  check(so, 'FBM-027: Activity "đang đẩy" chưa có ID FBM không được gửi lại lệnh tạo; giữ "đang đẩy", phiên báo lỗi và Log có ID bản ghi',
+    [stuckRequest, stuck.run.local.activity[0].syncStatus, stuckState.phase, stuckState.counts.error, Object.keys(stuckState.metadata.pushFailures), /ACT-STUCK/.test(JSON.stringify(stuckLog)), /Mở lại bản ghi lỗi/.test(JSON.stringify(stuckLog))],
+    [null, 'đang đẩy', 'done', 1, ['activity:ACT-STUCK'], true, true]);
+
+  const lostCustomer = Object.assign(editCustomer('N'), { id: 'CUS-LOST', fbmId: '', fbmCustomerCode: '', taxNumber: '0101234567', syncStatus: 'đang đẩy', fbmHash: '' });
+  const customerGridFields = ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ma_so_thue', 'ong_ba', 'dc_lh', 'dien_thoai', 'email', 'website', 'ten_dclh_tinh', 'ten_nguon_dm', 'ten_sp', 'ngay_gd', 'datetime0', 'xorder'];
+  const taxRows = (rows) => ({ d: { TotalRowCount: rows.length, Rows: rows.map((row) => customerGridFields.map((field) => row[field] === undefined ? '' : row[field])), ViewPage: { Fields: customerGridFields.map((AliasName) => ({ AliasName })) } } });
+  const recoverFound = pushQueue([lostCustomer]);
+  const lookup = recoverFound.F.nextPushRequest(recoverFound.F.stateRead());
+  check(so, 'FBM-027: Customer "đang đẩy" chưa có ID FBM ở phiên sau chỉ phát request tra theo MST, không phát lệnh tạo',
+    [lookup && lookup.meta && lookup.meta.kind, JSON.stringify(lookup && lookup.body && lookup.body.filter), recoverFound.F.stateRead().cursor.operation],
+    ['grid', JSON.stringify(['ma_so_thue:**0101234567']), 'customer_create_recover']);
+  const afterFound = recoverFound.F.continuePush(recoverFound.F.stateRead(), taxRows([{ stt_rec_kh: 'FBM-OTHER', ma_kh: 'ALT00078', ma_so_thue: '01012345678' }, { stt_rec_kh: 'FBM-LOST', ma_kh: 'ALT00077', ma_so_thue: '0101234567', ten_kh: 'Tên đã sửa bên FBM' }]));
+  const foundRow = recoverFound.run.local.customer[0];
+  check(so, 'FBM-027: tra thấy đúng một Customer khớp chính xác MST thì vá stt_rec_kh và ma_kh, chuyển "chờ đối soát", baseline rỗng, không tạo lại',
+    [foundRow.fbmId, foundRow.fbmCustomerCode, foundRow.syncStatus, foundRow.fbmHash, afterFound, recoverFound.F.stateRead().counts.error],
+    ['FBM-LOST', 'ALT00077', 'chờ đối soát', '', null, 0]);
+
+  const recoverMissing = pushQueue([Object.assign({}, lostCustomer)]);
+  recoverMissing.F.nextPushRequest(recoverMissing.F.stateRead());
+  let missingError = null;
+  try { recoverMissing.F.continuePush(recoverMissing.F.stateRead(), taxRows([{ stt_rec_kh: 'FBM-OTHER', ma_kh: 'ALT00078', ma_so_thue: '01012345678' }])); } catch (error) { missingError = error; }
+  const missingState = recoverMissing.F.stateRead();
+  const afterMissing = recoverMissing.F.continueAfterPushError(missingState, missingState.cursor, missingError && missingError.message);
+  check(so, 'FBM-027: tra không thấy Customer khớp chính xác MST thì báo lỗi, giữ "đang đẩy" và không phát lệnh tạo lại',
+    [/không tự tạo lại/i.test(missingError && missingError.message), recoverMissing.run.local.customer[0].syncStatus, afterMissing.request, recoverMissing.F.stateRead().counts.error],
+    [true, 'đang đẩy', null, 1]);
+
+  const openFailed = pushQueue([Object.assign({}, lostCustomer)]);
+  openFailed.F.markPushError(openFailed.F.stateRead(), { entity: 'customer', kind: 'create', id: 'CUS-LOST', record: lostCustomer }, { reason: 'Không mở được form tạo', code: 'FBM_ERROR' }, 'customer_create_open');
+  const sentFailed = pushQueue([Object.assign({}, lostCustomer)]);
+  sentFailed.F.markPushError(sentFailed.F.stateRead(), { entity: 'customer', kind: 'create', id: 'CUS-LOST', record: lostCustomer }, { reason: 'Mất phản hồi', code: 'FBM_ERROR' }, 'customer_create_save');
+  check(so, 'FBM-027: lỗi ở bước mở form tạo (lệnh lưu chưa phát) thì chuyển "đẩy lỗi"; lỗi sau khi đã phát lệnh lưu thì giữ "đang đẩy"',
+    [openFailed.run.local.customer[0].syncStatus, sentFailed.run.local.customer[0].syncStatus], ['đẩy lỗi', 'đang đẩy']);
 }
 
 module.exports = { chay };

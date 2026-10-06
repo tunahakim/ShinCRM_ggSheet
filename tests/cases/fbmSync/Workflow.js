@@ -389,7 +389,7 @@ async function chay(so) {
   compactLookupFlow.hop.FbmSync.previewRecords(pushState, 'activity', [{ customerId: 'CUS-1', workDate: '2026-09-20', taskType: 'GD', content: 'x'.repeat(4000) }]);
   pushState.mode = 'write'; pushState.phase = 'push'; pushState.entity = 'activity'; pushState.cursor = { kind: 'push_scan', entity: 'activity', index: 0 };
   compactLookupFlow.hop.FbmSync.stateWrite(pushState);
-  compactLookupFlow.hop.FbmSync.pushCandidates = () => [{ kind: 'edit', id: 'ACT-QUOTA', record: { id: 'ACT-QUOTA', fbmId: 'FBM-ACT-QUOTA', taskType: 'CODE-3', content: 'Nội dung', workDate: '2026-09-20', customerId: 'CUS-1', customerFbmCode: 'ALT00001', allowFbmPush: 'Cho phép', fbmHash: 'old' } }];
+  compactLookupFlow.hop.FbmSync.pushCandidates = () => [{ kind: 'edit', id: 'ACT-QUOTA', position: 0, record: { id: 'ACT-QUOTA', fbmId: 'FBM-ACT-QUOTA', taskType: 'CODE-3', content: 'Nội dung', workDate: '2026-09-20', customerId: 'CUS-1', customerFbmCode: 'ALT00001', allowFbmPush: 'Cho phép', fbmHash: 'old' } }];
   compactLookupFlow.hop.FbmSync.pushConfigErrors = () => '';
   compactLookupFlow.hop.FbmSync.pushOwnerError = () => '';
   compactLookupFlow.hop.FbmSync.validatePushCategories = () => [];
@@ -448,7 +448,7 @@ async function chay(so) {
   orderState.mode = 'write'; orderState.phase = 'push'; orderState.entity = 'activity'; orderState.metadata.categoryGate = { map: {}, codesBySource: {}, blocked: {} };
   orderState.cursor = { kind: 'push_scan', entity: 'activity', index: 0 };
   orderFlow.hop.FbmSync.stateWrite(orderState);
-  orderFlow.hop.FbmSync.pushCandidates = () => [{ kind: 'edit', id: 'ACT-ORDER', record: { id: 'ACT-ORDER', fbmId: 'FBM-ACT-ORDER', taskType: 'GD', content: 'Nội dung', workDate: '2026-09-20', customerId: 'CUS-1', customerFbmCode: 'ALT00001', allowFbmPush: 'Cho phép', fbmHash: 'old' } }];
+  orderFlow.hop.FbmSync.pushCandidates = () => [{ kind: 'edit', id: 'ACT-ORDER', position: 0, record: { id: 'ACT-ORDER', fbmId: 'FBM-ACT-ORDER', taskType: 'GD', content: 'Nội dung', workDate: '2026-09-20', customerId: 'CUS-1', customerFbmCode: 'ALT00001', allowFbmPush: 'Cho phép', fbmHash: 'old' } }];
   orderFlow.hop.FbmSync.pushConfigErrors = () => '';
   orderFlow.hop.FbmSync.pushOwnerError = () => '';
   orderFlow.hop.FbmSync.validatePushCategories = () => [];
@@ -472,7 +472,7 @@ async function chay(so) {
   pushingFlow.hop.FbmSync.stateWrite(pushingState);
   ['pushConfigErrors', 'pushOwnerError'].forEach((name) => { pushingFlow.hop.FbmSync[name] = () => ''; });
   ['validatePushCategories', 'pushEligibilityErrors'].forEach((name) => { pushingFlow.hop.FbmSync[name] = () => []; });
-  pushingFlow.hop.FbmSync.pushCandidates = () => [{ kind: 'edit', id: 'ACT-PUSHING', record: { id: 'ACT-PUSHING', fbmId: 'FBM-ACT-PUSHING', taskType: 'GD', content: 'Nội dung', workDate: '2026-09-20', customerId: 'CUS-1', customerFbmCode: 'ALT00001', allowFbmPush: 'Cho phép', fbmHash: 'old' } }];
+  pushingFlow.hop.FbmSync.pushCandidates = () => [{ kind: 'edit', id: 'ACT-PUSHING', position: 0, record: { id: 'ACT-PUSHING', fbmId: 'FBM-ACT-PUSHING', taskType: 'GD', content: 'Nội dung', workDate: '2026-09-20', customerId: 'CUS-1', customerFbmCode: 'ALT00001', allowFbmPush: 'Cho phép', fbmHash: 'old' } }];
   pushingFlow.hop.FbmSync.isRecordLocked = () => false;
   pushingFlow.hop.FbmSync.activityEditOpenRequest = () => ({ url: 'https://example.test', meta: { kind: 'activity_edit_open' } });
   pushingFlow.hop.writeGateSave = () => ({ ok: false, invalid: [{ id: 'ACT-PUSHING', field: 'syncStatus', label: 'Trạng thái đồng bộ', reason: 'Giá trị không hợp lệ.' }] });
