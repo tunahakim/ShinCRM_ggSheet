@@ -180,9 +180,18 @@ async function chay(so) {
   const afterTestFailure = heartbeat.FbmSync.loginConfigRead();
   check(so, 'dang nhap thu that bai khong thay doi throttle hay loi auto-login', [testFailure.code, afterTestFailure.lastAttemptAt, afterTestFailure.lastLoginAt, afterTestFailure.lastError], ['LOGIN_FAILED', beforeTestConfig.lastAttemptAt, beforeTestConfig.lastLoginAt, beforeTestConfig.lastError]);
 
+  // Login FBM thành công mà Extension không bắt được mã phiên: dừng ngay với lý do rõ và dòng Log, không phát request xác minh mang token
+  // {{FBM_PAYLOAD_COOKIE}} để Extension tự lấy cookie trên tab (có thể là phiên cũ) rồi báo lỗi transport khó hiểu.
+  heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: false, cookie: '' } });
+  const noCookieTest = heartbeat.FbmSync.loginTestRequest('cred-heartbeat-123');
+  const noCookieLogsBefore = gateLogs.length;
+  const noCookieLogin = heartbeat.FbmSync.loginTestResult({ ok: true, status: 200, body: '{"d":true}', transport: { captures: {}, trace: [{ requestId: noCookieTest.request.id }] } });
+  check(so, 'đăng nhập thử thành công nhưng thiếu mã phiên thì dừng LOGIN_PAYLOAD_COOKIE_MISSING, không phát request xác minh, có dòng Log lỗi',
+    [noCookieLogin.ok, noCookieLogin.code, noCookieLogin.request, heartbeat.FbmSync.stateRead().phase, gateLogs.slice(noCookieLogsBefore).some((event) => event.outcome === 'error' && String(event.reason || '').indexOf('mã phiên') >= 0)],
+    [false, 'LOGIN_PAYLOAD_COOKIE_MISSING', null, 'paused', true]);
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: false, cookie: '' } });
   const mismatchTest = heartbeat.FbmSync.loginTestRequest('cred-heartbeat-123');
-  const mismatchLogin = heartbeat.FbmSync.loginTestResult({ ok: true, status: 200, body: '{"d":true}', transport: { trace: [{ requestId: mismatchTest.request.id }] } });
+  const mismatchLogin = heartbeat.FbmSync.loginTestResult({ ok: true, status: 200, body: '{"d":true}', transport: { payloadCookie: '461020379855cFHN_CRM_App', trace: [{ requestId: mismatchTest.request.id }] } });
   const mismatchAuthorize = heartbeat.FbmSync.loginTestResult({ ok: true, status: 200, body: '{"d":{"Authorized":"auth-customer"}}', transport: { trace: [{ requestId: mismatchLogin.request.id }] } });
   const mismatchIdentity = heartbeat.FbmSync.loginTestResult({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[9999,"OTHER","Other User"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { trace: [{ requestId: mismatchAuthorize.request.id }] } });
   check(so, 'dang nhap thu sai identity fail-closed nhung khong tu tat auto-login', [mismatchIdentity.code, heartbeat.FbmSync.loginConfigPublic().enabled, heartbeat.FbmSync.stateRead().session.identityVerified], ['LOGIN_IDENTITY_MISMATCH', true, false]);

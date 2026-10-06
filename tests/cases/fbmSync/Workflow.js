@@ -253,7 +253,7 @@ async function chay(so) {
   const loginStarted = loginFlow.hop.FbmSync.loginTestRequest();
   const afterLogin = loginFlow.hop.FbmSync.loginTestResult({
     ok: true, status: 200, body: JSON.stringify({ d: true }),
-    transport: { trace: [{ stage: 'executor_response_sent', requestId: loginStarted.request.id }] }
+    transport: { captures: { payloadCookie: '461020379855cFHN_CRM_App' }, trace: [{ stage: 'executor_response_sent', requestId: loginStarted.request.id }] }
   });
   const loginAuthorize = await sendThroughExecutor(afterLogin.request, JSON.stringify({ d: { Authorized: 'login-auth' } }));
   const afterAuthorize = loginFlow.hop.FbmSync.loginTestResult(executorRaw(loginAuthorize.reply, afterLogin.request.id));
@@ -267,7 +267,7 @@ async function chay(so) {
   const wrongLogin = workflowGas();
   wrongLogin.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
   const wrongStart = wrongLogin.hop.FbmSync.loginTestRequest('workflow-credential-ref');
-  const wrongAfterLogin = wrongLogin.hop.FbmSync.loginTestResult({ ok: true, status: 200, body: JSON.stringify({ d: true }), transport: { trace: [{ stage: 'executor_response_sent', requestId: wrongStart.request.id }] } });
+  const wrongAfterLogin = wrongLogin.hop.FbmSync.loginTestResult({ ok: true, status: 200, body: JSON.stringify({ d: true }), transport: { captures: { payloadCookie: '461020379855cFHN_CRM_App' }, trace: [{ stage: 'executor_response_sent', requestId: wrongStart.request.id }] } });
   const wrongAuthorize = wrongLogin.hop.FbmSync.loginTestResult({ ok: true, status: 200, body: JSON.stringify({ d: { Authorized: 'wrong-auth' } }), transport: { trace: [{ stage: 'executor_response_sent', requestId: wrongAfterLogin.request.id }] } });
   const wrongDone = wrongLogin.hop.FbmSync.loginTestResult({
     ok: true, status: 200,
@@ -599,7 +599,7 @@ async function chay(so) {
     { ok: true, request: { id: 'open-heartbeat', url: 'https://fbo.com.vn:8888/service', method: 'POST', bodyText: '{}', meta: { openFbmContext: { url: 'https://fbo.com.vn:8888/Main/zccrAccount.aspx', active: false } } } },
     { ok: true, code: 'HEARTBEAT_COMPLETE', request: null }
   ], [], (tabId, message) => {
-    if (message.type === 'FBM_PING_V2') { return { ready: true, version: '21.14' }; }
+    if (message.type === 'FBM_PING_V2') { return { ready: true, version: '21.16' }; }
     if (message.type === 'FBM_EXECUTE_V2') { return { result: { ok: true, status: 200, body: '{"d":{"TotalRowCount":12,"Rows":[]}}', transport: { trace: [{ stage: 'executor_response_sent', requestId: message.request.id }] } } }; }
     return null;
   });
@@ -611,7 +611,7 @@ async function chay(so) {
     { ok: true, request: { id: 'heartbeat-envelope', url: 'https://fbo.com.vn:8888/service', method: 'POST', bodyText: '{"from":"gas"}' } },
     { ok: true, code: 'HEARTBEAT_COMPLETE', request: null }
   ], [{ id: 17 }], (tabId, message) => {
-    if (message.type === 'FBM_PING_V2') { return { ready: true, version: '21.14' }; }
+    if (message.type === 'FBM_PING_V2') { return { ready: true, version: '21.16' }; }
     if (message.type === 'FBM_EXECUTE_V2') {
       return { result: { ok: true, status: 200, body: rawHeartbeat, transport: { trace: [{ stage: 'executor_response_sent', requestId: message.request.id }] } } };
     }
