@@ -370,12 +370,7 @@ function fbmSyncHeartbeatTransportFailure(payload) {
     }
     var failureCode = String(value.code || 'FBM_TRANSPORT_UNAVAILABLE'), failureMessage = String(value.message || 'Extension không gửi được request tới tab FBM.').slice(0, 240), retry;
     try { retry = typeof FbmSync.sessionGateTransportRetry === 'function' ? FbmSync.sessionGateTransportRetry(state, requestId, failureCode, failureMessage) : null; }
-    catch (ignoreGateError) {
-      if (typeof FbmSync.sessionGateFailClosed === 'function') { return FbmSync.sessionGateFailClosed(state); }
-      state.activeRequestId = ''; state.deadlineAt = 0; state.phase = 'error'; state.cursor = {};
-      state.lastFailureCode = 'FBM_SESSION_GATE_EXCEPTION'; state.lastError = 'Cổng phiên FBM gặp lỗi nội bộ; request đã bị chặn an toàn.'; state.message = state.lastError; FbmSync.stateWrite(state);
-      return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError };
-    }
+    catch (gateError) { return FbmSync.sessionGateFailClosed(state, gateError); }
     if (retry) { return retry; }
     state.activeRequestId = '';
     state.deadlineAt = 0;
