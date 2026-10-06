@@ -19,6 +19,14 @@ async function chay(so) {
   const login = hop.FbmSync.beginAutoLogin(hop.FbmSync.stateRead(), state.cursor);
   check(so, 'hết phiên tạo request login và giữ cursor cũ', [login.meta.kind, hop.FbmSync.stateRead().cursor.kind, hop.FbmSync.stateRead().cursor.resumeCursor.pageIndex], ['login', 'login', 2]);
   check(so, 'auto-login chỉ thử lại một lần trong 30 phút', hop.FbmSync.autoLoginCanAttempt(Date.now() + 1000).code, 'AUTO_LOGIN_THROTTLED');
+  const attemptAt = Date.now();
+  hop.FbmSync.autoLoginMarkSuccess(attemptAt + 500);
+  check(so, 'đăng nhập tự động thành công rồi phiên bị đăng xuất thì được đăng nhập lại ngay, không phải chờ chu kỳ 30 phút', hop.FbmSync.autoLoginCanAttempt(attemptAt + 13 * 60 * 1000).ok, true);
+  const retryOffConfig = JSON.parse(data.FBM_LOGIN_CONFIG_V1); retryOffConfig.retryEnabled = false; data.FBM_LOGIN_CONFIG_V1 = JSON.stringify(retryOffConfig);
+  check(so, 'tắt tự thử lại chỉ chặn sau lần thất bại, lần trước thành công vẫn được đăng nhập lại', hop.FbmSync.autoLoginCanAttempt(attemptAt + 60 * 1000).ok, true);
+  hop.FbmSync.autoLoginMarkAttempt(attemptAt + 2000);
+  check(so, 'tắt tự thử lại thì lần thử chưa thành công chặn với lý do riêng', [hop.FbmSync.autoLoginCanAttempt(attemptAt + 60 * 60 * 1000).code, hop.FbmSync.autoLoginBlockMessage('AUTO_LOGIN_RETRY_DISABLED').indexOf('tắt tự thử lại') >= 0], ['AUTO_LOGIN_RETRY_DISABLED', true]);
+  data.FBM_LOGIN_CONFIG_V1 = JSON.stringify(Object.assign(JSON.parse(data.FBM_LOGIN_CONFIG_V1), { retryEnabled: true }));
   const resumed = hop.FbmSync.loginResumeRequest(hop.FbmSync.stateRead());
   check(so, 'login resume chưa có marker phải quay lại probe User trước request nghiệp vụ', [resumed.meta.kind, hop.FbmSync.stateRead().cursor.kind, hop.FbmSync.stateRead().session.expired], ['session_probe', 'session_probe', false]);
   check(so, 'login test không coi Login.aspx là thành công', hop.FbmSync.protocol.isSessionExpired({ ok: true, status: 200, body: '<form action="Login.aspx"></form>' }), true);
