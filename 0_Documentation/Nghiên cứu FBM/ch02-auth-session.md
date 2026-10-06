@@ -111,6 +111,8 @@ Trên trang chính, các bảng dữ liệu (`ReportExtender`) kiểm khóa này
 
 Hệ quả đã gặp thật: đăng nhập ngầm bằng fetch (Extension gọi đủ 4 bước nhưng không chạy JS trang Login) thì phiên phía máy chủ vẫn hợp lệ, nhưng mở FBM trên trình duyệt chỉ thấy khung trống, menu và cây nhân viên có nhưng bảng khách hàng/hoạt động trắng, phải đăng xuất rồi tự đăng nhập lại mới hiện. Cách xử lý: sau khi `Login` trả `{"d":true}`, chạy đúng ba lệnh trên trong một trang cùng origin `https://fbo.com.vn:8888` (ví dụ content script trên tab FBM), với `salt` là giá trị đã gửi trong request Login. Không ghi khóa này vào log vì nó suy ra từ mật khẩu.
 
+Đính chính 2026-10-06 (đo thật trên FBM, mã lỗi FBM-041): không được ghi khóa mù ngay sau `{"d":true}`. Khi gọi `Login` lúc phiên trình duyệt vẫn đang sống, máy chủ vẫn trả `{"d":true}` nhưng giữ khóa của lần đăng nhập cũ; ghi đè `k\0` bằng khóa tính từ `salt` mới làm bảng trên tab FBM đang mở bị trắng. Mã kiểm của bảng có sẵn trong HTML trang `/Main/zccrAccount.aspx` (cùng một lần tải trang): chuỗi `"salt":"<32 ký tự hex>\tk\u0000"` và `"cookie":"<payloadCookie>"`, cả hai đổi theo mỗi lần tải trang. Cách đúng: sau Login, tải trang tài khoản, tính khóa ứng viên `MD5(MD5(salt) + MD5(matKhau))` và chỉ ghi khi `MD5(ứng viên + payloadCookie) == hash`; nếu không khớp mà khóa đang có trong `localStorage` khớp thì giữ nguyên khóa cũ; trang không có mã kiểm thì không ghi gì. Đã kiểm thật: đăng nhập lại khi phiên đang sống thì giữ khóa cũ và bảng vẫn vẽ đủ; đăng xuất rồi tự đăng nhập thì khóa mới khớp và bảng vẽ đủ.
+
 ### 2.6 Trích xuất userId và cookie payload
 
 Sau khi đăng nhập thành công, cần truy cập trang quản lý khách hàng để lấy hai thông tin quan trọng.
