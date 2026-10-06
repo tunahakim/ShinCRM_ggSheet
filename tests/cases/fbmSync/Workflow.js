@@ -382,6 +382,17 @@ async function chay(so) {
     Object.keys(compactState.session.lookups || {}).length,
     compactLookupFlow.hop.FbmSync.categoryValueAllowed(compactLookupFlow.hop.FbmSync.stateCategoryGate(compactState), '@CAT_TINH_THANH', 'CODE-0')
   ], ['grid', true, 'Tên danh mục live 0 0 có tên đủ dài', true, false, true, 103, 4, 0, { ok: true, code: 'CODE-0' }]);
+  const blockFlow = workflowGas(), blockLogs = [];
+  blockFlow.hop.logEvent = (event) => blockLogs.push(event);
+  blockFlow.hop.FbmSync.readCategoryGate = () => ({ map: {}, names: {}, namesBySource: { '@CAT_SAN_PHAM': { HDDV: 'Hóa đơn dịch vụ' } }, valid: {}, warnings: [] });
+  const blockLookups = {};
+  blockFlow.hop.FbmSync.SYNC_LOOKUPS.forEach((item) => { blockLookups[item.key] = { pairs: item.key === '@CAT_SAN_PHAM' ? { HDDV: 'Hóa đơn đầu vào - đầu ra' } : { X: 'x' } }; });
+  blockLookups['@CAT_CONG_VIEC'] = { pairs: {} };
+  blockFlow.hop.FbmSync.prepareCategoryGate({ metadata: {}, session: { lookups: blockLookups } });
+  const blockRows = blockLogs.filter((event) => event.action === 'category_block');
+  check(so, 'mã danh mục bị chặn vào Sheet Log kèm tên FBM hiện tại; thiếu danh sách FBM là lỗi chặn cả chiều đẩy (tài liệu 09/03)',
+    [blockRows.length, blockRows.map((event) => event.outcome).sort().join(','), blockRows.some((event) => event.recordId === 'HDDV' && /Hóa đơn đầu vào - đầu ra/.test(event.reason)), blockRows.some((event) => /@CAT_CONG_VIEC/.test(event.reason) && /toàn bộ chiều đẩy/.test(event.reason))],
+    [2, 'error,warn', true, true]);
   const legacyGateState = compactLookupFlow.hop.FbmSync.stateRead();
   legacyGateState.metadata.categoryGate = { map: Object.fromEntries(Array.from({ length: 400 }, (_, i) => ['@CAT_TINH_THANH' + String.fromCharCode(31) + 'Tỉnh ' + i, 'CODE-' + i])) };
   let legacyGateError = '';
