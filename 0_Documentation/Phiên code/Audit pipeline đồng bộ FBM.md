@@ -1,10 +1,33 @@
 # Audit pipeline đồng bộ FBM
 
-Ngày rà ban đầu: 2026-09-14. Cập nhật kiến trúc/scheduler/Extension lần cuối: 2026-09-15.
+Ngày rà ban đầu: 2026-09-14. Cập nhật kiến trúc/scheduler/Extension lần cuối: 2026-09-15. Cập nhật rà soát sâu chốt lỗi: 2026-10-01.
 
 Phạm vi: toàn bộ pipeline thuộc module đồng bộ FBM đi qua Sidebar, GAS Web App relay, Extension và tab FBM. Tài liệu này là hồ sơ đối chiếu trong phiên code, không thay thế các quyết định nghiệp vụ ở `00. Tài liệu chính thức/09. Đồng bộ FBM/`.
 
-Bộ kiểm offline sau đợt rà này: `node tests/run.js` đạt `1395/1395`; bằng chứng đó không thay thế nghiệm thu GAS DEV hoặc live FBM.
+## Bảng phát hiện mới 2026-10-01 (chưa xử lý)
+
+| Mã | Mức | Vị trí | Phát hiện |
+|---|---|---|---|
+| FBM-001 | P0 | `fbm_sync/transport/PushFlow.js:162` và `:175` | `writeGateSave` bị bọc trong `try/catch` nuốt lỗi ở `markPushError`/`markPushSkipped`: cửa ghi hỏng vẫn đi tiếp như thể trạng thái `đẩy lỗi`/`bỏ qua` đã xuống Sheet; bản ghi có thể giữ `đang đẩy` và hệ không biết rằng ô Sheet chưa được cập nhật |
+| FBM-002 | P0 | `fbm_sync/transport/PushFlow.js:281` | Cùng kiểu `try/catch` nuốt `writeGateSave` khi đặt `@..._SYNC_TT='đang đẩy'`: nếu ghi Sheet thất bại, hệ vẫn phát request ghi FBM cho bản ghi chưa được đánh dấu → kỳ sau không tra cứu recovery được |
+| FBM-003 | P0 | `fbm_sync/diagnostic/Trace.js:171-209` + `report/Report.js:114-135` | Ngoại lệ giữa `businessStepStart` và `businessStepFinish` chỉ được đóng lại khi `logStatus` chạy với phase kết thúc. Nếu `fbmContinueSync` ném lỗi (timeout GAS/exception), wrapper `runEntryPoint` chỉ ghi một dòng `error` chung; bước nghiệp vụ không có dòng `kết thúc lỗi` |
+| FBM-004 | P1 | `fbm_sync/transport/PullFlow.js` | Khi `pullWrite` lỗi, `result.ok=false` chỉ tăng `counts.error` và `businessStepAdd` errors; không có dòng Log nào cho `pullWrite` fail tới khi phiên đóng. `pullWrite` cũng không thấy entry `logEvent` nào để phản ánh `saved.ok=false` |
+| FBM-005 | P1 | `1_ShinCRM_GAS/client/util/serverCall.html:26` | Timeout `callServer('fbmContinueSync', ...)` chỉ 30 giây, nhỏ hơn `waitMs`/`delay` tối đa ở Extension và vòng chờ 120 giây của GAS. Khi FBM chậm, Sidebar reject trước khi có response, phiên tưởng lỗi mạng dù server vẫn đang xử lý |
+| FBM-006 | P1 | `fbm_sync/write/RequestBuilders.js:149` và `:154` | `activityEditOpenRequest`/`activityEditRequest` thiếu `meta.entity='activity'` nên `fbmSyncLoop` hiện `Đang chờ tab FBM trả dữ liệu khách hàng...` cho cả request Activity |
+| FBM-007 | P1 | `fbm_sync/transport/PushFlow.js:345` | Chuỗi `state.message` chứa mojibake literal `ÄÃ£ ghi ... Ä‘ang Ä‘á»c xÃ¡c nháº­n FBM...`: người dùng thấy chữ rác trong phiên push sau khi request ghi xong |
+| FBM-009 | P0 | `tests/cases/fbmSync/Pull.js:227` và `fbm_sync/reconcile/Conflict.js:5-18` | `node tests/run.js` hiện dừng với `TypeError: conflictEntries[0] is undefined`: nhóm log mới đã bỏ log conflict từng record nhưng test conflict chưa được chuyển sang log tổng hợp; nghiêm trọng hơn, nếu bỏ log conflict hoàn toàn thì lỗi conflict không còn bằng chứng Sheet khi phiên chưa tới terminal |
+| FBM-010 | Rút lại | `fbm_sync/control/ControlPort.js:15-17` | Đã kiểm lại: tên `heartbeatTransportFailure` gây hiểu nhầm nhưng handler kiểm `activeRequestId` tổng quát và có thể nhận lỗi transport của phiên thủ công. Chưa có kịch bản chứng minh lỗi riêng nên không xếp là phát hiện |
+| FBM-014 | Rút lại | `tests/run.js` và kết quả chạy `node tests/run.js` ngày 2026-10-01 | Đã kiểm lại: runner có `main().catch(... process.exit(1))`; exit code 0 trước đó là do lệnh chẩn đoán dùng pipe `| tail`, lấy mã của `tail`. Lỗi thật vẫn là suite dừng ở `Pull.js:227` và cần sửa nhóm test/log |
+| FBM-016 | P0 | `client/sync/fbmSync.html:677-697`, `2_ShinCRM_Extension/background/service_worker.js:18-45,135-149`, `executor.js:231-241` | Sidebar cắt request Extension sau 20 giây, nhưng Extension được phép đợi tab FBM tải 15 giây, ping/tiêm executor (tối đa thêm 3 giây) và executor `fetch` tối đa 10 giây. Ca tự mở tab hoặc FBM chậm sẽ bị client báo transport lỗi trước response hợp lệ; sau đó GAS có thể còn nhận/đang xử lý response nhưng Sidebar đã báo lỗi và gửi cancel |
+| FBM-017 | P1 | `client/sync/fbmSync.html:1411-1426`, `client/sync/screens/run.html:57-62` | Khi callback lỗi thường, Sidebar ghi đè `lastStatus` bằng object chỉ có `phase/error/message/counts:{}`. Nó mất `runId`, pipeline, cursor và bộ đếm thật của GAS; renderer vì thiếu `runId` xóa pipeline và hiển thị các số 0 do client tự dựng, không phải kết quả đồng bộ |
+| FBM-012 | P1 | `fbm_sync/reconcile/Conflict.js:21-57` | `resolveConflict` yêu cầu `verified=true` nhưng lấy `item.fbmRecord`/`item.shinRecord` trong queue; nếu caller khác gọi trực tiếp sau khi tự đặt cờ verified, cổng vẫn ghi mà không có reservation đọc lại. Chỉ `confirmConflict` hiện kiểm request; hợp đồng phải khóa đường gọi trực tiếp ở cùng một cổng |
+| FBM-018 | P0 | `fbm_sync/diagnostic/Trace.js:177` + `server/log/LogGate.js:105-108` + `server/entry/EntryPoint.js:41-44` | Dòng `Bắt đầu <bước>` đi qua `logTrace` vào `LOG_BUFFER`, chỉ ra Sheet khi buffer đủ `SETTINGS.LOG_TRACE_BUFFER` dòng hoặc ở `finally` của `runEntryPoint`. Một invocation chỉ có vài dòng bước nên gần như luôn đợi tới `finally`; khi GAS bị cắt ở trần 6 phút thì `finally` không chạy → mất luôn dòng bắt đầu lẫn dòng kết thúc, đúng khoảng mù mà chủ dự án yêu cầu loại bỏ (2026-10-06) |
+| FBM-013 | P1 | `fbm_sync/transport/PullFlow.js:572-574` và `:607-613` | Khi kết thúc pull, `markMissingAfterFullScan` được gọi hai entity liên tiếp trong cùng invocation; mỗi hàm có thể tự gọi WriteGate/Lock riêng, trái quy tắc một lát một cửa ghi và có thể làm invocation vượt thời gian hoặc ghi Customer xong nhưng Activity lỗi |
+
+
+---
+
+Bằng chứng lịch sử tại đợt rà cũ: `node tests/run.js` đạt `1395/1395`; bằng chứng đó không thay thế nghiệm thu GAS DEV hoặc live FBM. **Trạng thái hiện tại ngày 2026-10-01: suite dừng ở `tests/cases/fbmSync/Pull.js:227` vì test vẫn kỳ vọng log `conflict` từng record sau khi code đã bỏ loại log này; chưa được coi là đạt.**
 
 Quy ước kết luận: `ĐÚNG` là code hiện tại khớp tài liệu và có test phù hợp; `SAI` là có mâu thuẫn xác định được; `THIẾU BẰNG CHỨNG` là hình dạng code hợp lý nhưng chưa được fixture, GAS DEV hoặc live chứng minh; `KHÔNG HOÀN CHỈNH` là có một phần đúng và một phần còn hở. Các kết luận ghi `SAI` trong phần lịch sử phải được đọc cùng bảng cập nhật bên dưới; không dùng chúng làm mô tả code hiện tại.
 

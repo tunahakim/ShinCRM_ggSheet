@@ -9,6 +9,66 @@
 - Quy ước: chỉ tick `[x]` khi toàn bộ bước của use case đạt và có bằng chứng phù hợp với cột kiểm chứng.
 - Nếu một bước yêu cầu người dùng giữ tab FBM, đăng nhập, bấm ghi thật hoặc đối chiếu dữ liệu live thì để `[ ]` cho tới khi người dùng xác nhận.
 
+## Kế hoạch thực thi đợt sửa lỗi sau audit 2026-10
+
+Nguồn lỗi: bảng đầu của `Audit pipeline đồng bộ FBM.md` (mã `FBM-xxx`). Sau khi bị nén ngữ cảnh: đọc mục này, làm tiếp từ dòng `[ ]` đầu tiên; không rà lại phần đã tick. Mỗi nhóm xong thì commit và ghi mã commit vào dòng cuối của nhóm. Phát hiện mới trong lúc làm thì ghi ngay vào bảng audit trước khi làm tiếp.
+
+**Đang làm:** G1.
+
+### G0. Chốt kế hoạch
+
+- [x] Ghi FBM-018 (dòng `Bắt đầu bước` nằm trong bộ đệm, mất khi GAS bị cắt 6 phút) vào bảng audit và lập kế hoạch này.
+
+### G1. Log theo bước nghiệp vụ đáng tin cậy (FBM-018, FBM-003, FBM-009, FBM-004) và hoàn tất nhóm thay đổi đang dở
+
+Lý do làm trước: Log là công cụ chỉ ra lỗi live nằm ở bước nào; working tree đang có 18 tệp sửa dở và suite đỏ nên không thể commit hay rà trên nền ổn định.
+
+- [ ] 1. Đối chiếu nhóm thay đổi chưa commit với `09.07 Phần 11 — Log` và quyết định Log theo bước nghiệp vụ trong `Nghiên cứu nguyên nhân bất thường phiên đồng bộ FBM.md`; ghi chỗ lệch vào bảng audit.
+- [ ] 2. Khi bật Log chi tiết, dòng `Bắt đầu <bước>` có trên Sheet `Log` ngay cả khi lần chạy GAS bị cắt trước khi kết thúc (FBM-018). Có test.
+- [ ] 3. Lỗi nổ giữa một bước tạo đúng một dòng `Kết thúc <bước> với lỗi` cùng `runId`, ngoài dòng lỗi chung của cửa vào (FBM-003). Có test.
+- [ ] 4. Conflict được ghi vào Sheet `Log` ngay trong lát phát hiện, không đợi phiên đóng, và không theo từng record nhân lên vô hạn (FBM-009). Test `Pull.js:227` được chuyển sang kiểm bằng chứng thay thế, không xóa cho xanh.
+- [ ] 5. Ghi Sheet trong pull thất bại thì phiên không được tổng kết `Hoàn tất`; Sheet `Log` có dòng lỗi và Sidebar báo lỗi (FBM-004). Có test.
+- [ ] 6. `node tests/run.js` xanh; commit nhóm G1 theo chủ đề (lõi GAS / test / tài liệu). Commit: —
+
+### G2. Rà tiếp các lớp lỗi chưa rà (hướng B — chỉ ghi phát hiện, chưa sửa)
+
+Mỗi mục rà xong thì ghi phát hiện vào bảng audit và commit tài liệu ngay.
+
+- [ ] 1. State/cursor khi dữ liệu lớn: kích thước `FBM_SYNC_STATE_V1`, tập ID đã thấy, conflict/lock/push failure trong một property.
+- [ ] 2. Nút `Dừng đồng bộ` và công tắc tổng khi đang có request bay, nhất là request ghi đang chờ xác nhận.
+- [ ] 3. Auto-login và tự mở tab: các nhánh hết phiên, đăng nhập sai, throttle 30 phút, không có tab.
+- [ ] 4. Response lớn từ FBM và trần thời gian GAS mỗi lát.
+- [ ] 5. Sidebar: mọi nhánh lỗi có hiển thị thông báo, không mất Pipeline, không hiện số do client tự dựng.
+- [ ] 6. Dọn hồ sơ audit: bỏ phần lịch sử mâu thuẫn, chỉ giữ trạng thái hiện tại.
+
+### G3. Cửa ghi Sheet không nuốt lỗi (FBM-001, FBM-002)
+
+- [ ] 1. Không ghi được trạng thái `đang đẩy` xuống Sheet thì không gửi request ghi FBM; có Log và thông báo Sidebar. Có test.
+- [ ] 2. Không ghi được `đẩy lỗi`/`bỏ qua` thì phiên dừng ở lỗi, không đi tiếp như đã ghi. Có test. Commit: —
+
+### G4. Thời gian chờ thống nhất giữa Sidebar, Extension và GAS (FBM-005, FBM-016)
+
+- [ ] 1. Sidebar không báo lỗi trước khi Extension hết thời gian hợp lệ (mở tab + tiêm executor + fetch); không báo timeout oan khi GAS còn xử lý. Có test. Commit: —
+
+### G5. UI phiên đồng bộ (FBM-017, FBM-006, FBM-007)
+
+- [ ] 1. Lỗi callback không làm mất Pipeline và không hiện bộ đếm 0 tự dựng.
+- [ ] 2. Request Activity hiển thị đúng chữ Activity; không còn chuỗi mojibake. Có test. Commit: —
+
+### G6. Conflict và một lát một cửa ghi (FBM-012, FBM-013)
+
+- [ ] 1. Mọi đường chốt conflict đều phải đọc lại FBM qua reservation. Có test.
+- [ ] 2. Cuối pull không ghi Customer và Activity bằng hai cửa ghi trong cùng một lần chạy GAS. Có test. Commit: —
+
+### G7. Sửa các lỗi phát hiện ở G2
+
+- [ ] Chia nhóm sau khi G2 xong; thêm dòng con tại đây.
+
+### G8. Nghiệm thu GAS DEV và bàn giao kiểm chứng thật
+
+- [ ] 1. `node tests/gas.js <entrypoint> --push` cho identity, heartbeat, continue, transport failure, status.
+- [ ] 2. Báo chủ dự án chạy Kịch bản L1–L3 ở cuối checklist này.
+
 ## Quy tắc an toàn bắt buộc
 
 - [ ] Mọi test ghi thật chỉ chạy trên Sheet DEV hoặc file trắng; dữ liệu live FBM chỉ dùng phạm vi `ALT00010`, không gửi request xóa và không chạm dữ liệu khách của người khác. Bằng chứng: Đã có test đúng nhánh: `Audit.js › probe ALT00010 fail-closed khi co ung vien ngoai pham vi` kiểm scope ALT00010; phần live còn chờ nghiệm thu.
