@@ -222,6 +222,8 @@ FbmSync.stateWrite = function (state) {
   // State cũ còn mảng `conflicts` thì bỏ ở lần ghi kế tiếp; hàng đợi xung đột nay đọc từ Sheet (FBM-024).
   next.metadata.conflictCount = Number(next.metadata.conflictCount || 0);
   delete next.metadata.conflicts;
+  // State ghi trước FBM-042 còn bản sao map Category; giữ lại thì mọi lần ghi (kể cả đóng phiên lỗi) đều vượt 9 KB và Sidebar kẹt.
+  delete next.metadata.categoryGate;
   next.metadata.pushFailures = Object.assign({}, FbmSync.stateDefault().metadata.pushFailures, next.metadata.pushFailures || {});
   next.metadata.pushFailureDetails = Object.assign({}, FbmSync.stateDefault().metadata.pushFailureDetails, next.metadata.pushFailureDetails || {});
   next.metadata.manualPending = next.metadata.manualPending || null;
