@@ -488,7 +488,8 @@ FbmSync.continue = function (rawResponse) {
       if (cursor.operation === 'customer_verify' || cursor.operation === 'activity_verify') {
         return FbmSync.continueAfterPushVerificationError(state, cursor, pushError && pushError.message || pushError);
       }
-      return FbmSync.continueAfterPushError(state, cursor, pushError && pushError.message || pushError);
+      // Giữ nguyên object lỗi có mã để markPushError chọn đúng trạng thái (ví dụ FBM_RECORD_NOT_FOUND).
+      return FbmSync.continueAfterPushError(state, cursor, pushError && pushError.code ? pushError : (pushError && pushError.message || pushError));
     }
   }
 

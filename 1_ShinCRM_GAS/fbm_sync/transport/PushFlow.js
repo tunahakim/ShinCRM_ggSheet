@@ -164,6 +164,20 @@ FbmSync.pushFailureDetail = function (failure) {
   return { code: 'PUSH_ERROR', status: 0, fieldName: '', reason: String(failure || 'Không thể đẩy bản ghi.') };
 };
 
+/**
+ * Form sửa phải trả đúng bản ghi đang đẩy. FBM không còn bản ghi (xóa, chuyển quyền) mà vẫn phát lệnh Edit thì có thể ghi rác lên CRM thật,
+ * nên chặn ngay tại đây; bản ghi chuyển sang "không thấy bên FBM" như vắng mặt khi quét (09/05).
+ */
+FbmSync.requireOpenedRecord = function (values, entity, candidate) {
+  var key = entity === 'activity' ? 'id' : 'stt_rec_kh', expected = String(FbmSync.value(candidate && candidate.record || {}, 'fbmId', '') || '').trim();
+  var opened = values && values[key] !== undefined && values[key] !== null ? String(values[key]).trim() : '';
+  if (expected && opened === expected) { return values; }
+  var error = new Error('FBM không trả bản ghi ' + (expected || '(thiếu ID FBM)') + ' khi mở form sửa, có thể đã bị xóa hoặc chuyển quyền; không gửi lệnh lưu, kiểm tra bản ghi này trên FBM.');
+  error.code = FbmSync.PUSH_RECORD_NOT_FOUND;
+  throw error;
+};
+FbmSync.PUSH_RECORD_NOT_FOUND = 'FBM_RECORD_NOT_FOUND';
+
 /** Ghi trạng thái kỹ thuật và giải phóng khóa khi một bản ghi không thể đẩy. */
 FbmSync.markPushError = function (state, candidate, failure, operation) {
   var detail = FbmSync.pushFailureDetail(failure);
@@ -177,8 +191,9 @@ FbmSync.markPushError = function (state, candidate, failure, operation) {
   state.metadata.pushFailureDetails[candidate.entity + ':' + String(candidate.id || '')] = detail;
   // Lệnh tạo đã có thể tới FBM thì giữ `đang đẩy` để không bị tạo lại (FBM-027); lỗi ở bước mở form thì lệnh lưu chưa phát nên an toàn để đẩy lại.
   var waitingForMarker = candidate.kind === 'recover' || candidate.kind === 'stuck' || (candidate.kind === 'create' && operation !== 'customer_create_open');
-  FbmSync.sheetSave(candidate.entity, [{ id: candidate.id, syncStatus: waitingForMarker ? FbmSync.SYNC_STATUS.pushing : FbmSync.SYNC_STATUS.error }], 'push');
-  FbmSync.logPushRecord(candidate, operation || candidate.kind, typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', detail.reason, { syncStatus: FbmSync.SYNC_STATUS.error, failureCode: detail.code, httpStatus: detail.status, fieldName: detail.fieldName });
+  var failedStatus = detail.code === FbmSync.PUSH_RECORD_NOT_FOUND ? FbmSync.SYNC_STATUS.missing : FbmSync.SYNC_STATUS.error;
+  FbmSync.sheetSave(candidate.entity, [{ id: candidate.id, syncStatus: waitingForMarker ? FbmSync.SYNC_STATUS.pushing : failedStatus }], 'push');
+  FbmSync.logPushRecord(candidate, operation || candidate.kind, typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', detail.reason, { syncStatus: failedStatus, failureCode: detail.code, httpStatus: detail.status, fieldName: detail.fieldName });
   state.metadata.pushFailureDetails[candidate.entity + ':' + String(candidate.id || '')].requestKind = String(operation || candidate.kind || '');
   if (typeof FbmSync.businessStepAdd === 'function') { FbmSync.businessStepAdd(state, 'push_' + String(candidate.entity || ''), { errors: 1 }); }
   if (!waitingForMarker) { FbmSync.releasePushLock(state, candidate.entity, candidate.id); }
@@ -342,7 +357,7 @@ FbmSync.continuePush = function (state, response) {
     return FbmSync.customerCreateRequest(candidate.record, autoCode, '', gate);
   }
   if (cursor.operation === 'customer_edit_open') {
-    var customerOldValues = FbmSync.extractFormValues(response, 'customer');
+    var customerOldValues = FbmSync.requireOpenedRecord(FbmSync.extractFormValues(response, 'customer'), 'customer', candidate);
     var customerSaveRequest = FbmSync.customerEditRequest(candidate.record, customerOldValues, gate);
     cursor.operation = 'customer_edit_save';
     delete cursor.oldValues;
@@ -350,7 +365,7 @@ FbmSync.continuePush = function (state, response) {
     return customerSaveRequest;
   }
   if (cursor.operation === 'activity_edit_open') {
-    var activityOldValues = FbmSync.extractFormValues(response, 'activity');
+    var activityOldValues = FbmSync.requireOpenedRecord(FbmSync.extractFormValues(response, 'activity'), 'activity', candidate);
     var configuredOwner = String(FbmSync.scriptSettings().accountName || ''), currentOwner = String(activityOldValues.owner || '');
     if (!configuredOwner || (currentOwner && currentOwner !== configuredOwner)) { throw new Error('Hoạt động thuộc owner FBM khác tài khoản đã cấu hình.'); }
     var activitySaveRequest = FbmSync.activityEditRequest(candidate.record, activityOldValues, gate);
