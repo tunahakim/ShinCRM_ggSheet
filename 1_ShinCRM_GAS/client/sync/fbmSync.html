@@ -894,6 +894,13 @@ function fbmSyncCheckIdentity() {
   }).then(function (value) {
     FBM_SYNC_CLIENT.running = false; FBM_SYNC_CLIENT.identityAction = '';
     var snapshot = value && (value.status || value) || FBM_SYNC_CLIENT.lastStatus || {}, result = snapshot.metadata && snapshot.metadata.identityCheck;
+    // Phiên dừng/lỗi ở GAS (vd. cổng đăng nhập chặn) đã có Log phía GAS: hiện đúng lý do GAS, không ghi thêm dòng lỗi chung chung che lý do thật.
+    var stopReason = !result && ['paused', 'error'].indexOf(String(snapshot.phase || '')) >= 0 ? String(snapshot.lastError || snapshot.message || '') : '';
+    if (stopReason) {
+      fbmSyncSetAccountNotice('identity', 'error', 'Kiểm tra liên kết không thành công: ' + stopReason);
+      fbmSyncPaint(snapshot);
+      return value;
+    }
     if (!result) { throw new Error('GAS không trả kết quả kiểm tra liên kết để hiển thị.'); }
     var total = Math.max(0, Number(result.total || 0)), matched = Math.max(0, Number(result.matched || 0)), missing = Math.max(0, Number(result.missing || 0));
     var summary = total
