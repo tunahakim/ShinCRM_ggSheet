@@ -80,14 +80,13 @@ async function chay(so) {
   edges.FbmSync.stateWrite = (next) => { Object.assign(invalidState, next); return invalidState; };
   const invalidActivity = edges.FbmSync.activityRecord({ id: 90, ma_kh: 'ALT00014', ten_cv: 'Gọi', details: 'Thiếu ngày', end_date: '' }, gate);
   const invalidActivityResult = edges.FbmSync.pullWrite('activity', [invalidActivity]);
-  const invalidActivityLog = reconcileLogs.filter((event) => event.action === 'pull_record' && event.recordId === '90').slice(-1)[0];
   const invalidActivityUi = taoBoTest();
   invalidActivityUi.hop.fbmSyncPaint(edges.FbmSync.statusView());
-  check(so, 'Activity missing Sidebar co thong bao loi va Log', [invalidActivityUi.content.textContent.indexOf('lỗi') >= 0 || invalidActivityUi.content.textContent.indexOf('ngày') >= 0, invalidActivityLog && invalidActivityLog.outcome], [true, 'error']);
-  check(so, 'Activity thieu ngay bi chan an toan va ghi Log', [invalidActivityResult.written, invalidActivityLog && invalidActivityLog.detail.statusAfter, invalidActivityLog && invalidActivityLog.outcome], [0, edges.FbmSync.SYNC_STATUS.error, 'error']);
+  check(so, 'Activity missing Sidebar có thông báo lỗi', invalidActivityUi.content.textContent.indexOf('lỗi') >= 0 || invalidActivityUi.content.textContent.indexOf('ngày') >= 0, true);
+  check(so, 'Activity thiếu ngày bị chặn an toàn và không ghi Log từng record', [invalidActivityResult.written, reconcileLogs.some((event) => event.action === 'pull_record')], [0, false]);
   const validActivity = edges.FbmSync.activityRecord({ id: 91, ma_kh: 'ALT00014', ten_cv: 'Gọi', details: 'Đủ ngày', end_date: '/Date(1757386800000)/' }, gate);
   const mixedActivityResult = edges.FbmSync.pullWrite('activity', [validActivity, invalidActivity]);
-  check(so, 'Activity hop le van duoc ghi khi ca thieu ngay cung lo', [mixedActivityResult.written, activityPullWrite.records.some((record) => String(record.fbmId) === '91'), reconcileLogs.some((event) => event.action === 'pull_record' && event.recordId === '91' && event.outcome === 'ok'), reconcileLogs.some((event) => event.action === 'pull_record' && event.recordId === '90' && event.outcome === 'error')], [1, true, true, true]);
+  check(so, 'Activity hợp lệ vẫn được ghi khi cả thiếu ngày cùng lô', [mixedActivityResult.written, activityPullWrite.records.some((record) => String(record.fbmId) === '91'), reconcileLogs.some((event) => event.action === 'pull_record')], [1, true, false]);
 
   const conflictRawBase = { stt_rec_kh: 'FBM-CONFLICT', ma_kh: 'ALT00015', ten_kh: 'Ten goc', ma_so_thue: '010015', dien_thoai: '090015', dc_lh: 'Ha Noi' };
   const conflictState = { runId: 'conflict-run', mode: 'read', phase: 'conflict', entity: 'customer', cursor: { kind: 'customer_grid', index: 4 }, session: { customerAuthorized: '', activityAuthorized: '', expired: false }, metadata: { categoryGate: gate, seen: { customer: {}, activity: {} }, conflicts: [] }, locks: {}, counts: { total: 0, completed: 0, succeeded: 0, skipped: 0, conflict: 0, error: 0 } };
@@ -98,11 +97,10 @@ async function chay(so) {
   edges.writeGateSave = () => ({ ok: true });
   const conflictIncoming = edges.FbmSync.customerRecord(Object.assign({}, conflictRawBase, { ten_kh: 'Ten FBM moi' }), gate);
   const conflictResult = edges.FbmSync.pullWrite('customer', [conflictIncoming]);
-  const conflictLog = reconcileLogs.filter((event) => event.action === 'pull_record' && event.recordId === 'CUS-CONFLICT').slice(-1)[0];
   const conflictUi = taoBoTest();
   conflictUi.hop.fbmSyncPaint(edges.FbmSync.statusView());
-  check(so, 'Conflict Sidebar hien thi cho quyet dinh va Log co ket qua', [conflictUi.content.textContent.toLowerCase().indexOf('xung đột') >= 0 || conflictUi.content.textContent.toLowerCase().indexOf('quyết định') >= 0, conflictLog && conflictLog.outcome], [true, 'conflict']);
-  check(so, 'conflict hai phia giu nguyen record, ghi Log va cho quyet dinh', [conflictResult.conflicts, conflictState.metadata.conflicts.length, conflictLog && conflictLog.detail.statusAfter, conflictLog && conflictLog.outcome], [1, 1, edges.FbmSync.SYNC_STATUS.conflict, 'conflict']);
+  check(so, 'Conflict Sidebar hiển thị cho quyết định', conflictUi.content.textContent.toLowerCase().indexOf('xung đột') >= 0 || conflictUi.content.textContent.toLowerCase().indexOf('quyết định') >= 0, true);
+  check(so, 'conflict hai phía giữ nguyên record và chờ quyết định', [conflictResult.conflicts, conflictState.metadata.conflicts.length, reconcileLogs.some((event) => event.action === 'pull_record')], [1, 1, false]);
 
   const failedRecord = { id: 'C-FAIL', fbmId: 'FBM-FAIL', fbmCustomerCode: 'ALT00010', companyName: 'Cũ', allowFbmPush: 'Cho phép', syncStatus: edges.FbmSync.SYNC_STATUS.error };
   const failedHash = edges.FbmSync.hash(failedRecord, 'customer', {});
@@ -126,7 +124,7 @@ async function chay(so) {
   check(so, 'FBM khong doi sau push thanh notApplied va khoa record', [notApplied.skipped, notAppliedWrite.records[0].syncStatus, notAppliedState.locks['customer:C-PUSHED'].reason], [1, edges.FbmSync.SYNC_STATUS.notApplied, 'not_applied']);
 
   const pushed = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {} });
-  napServer(pushed, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/reconcile/CategoryGate.js');
+  napServer(pushed, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/report/Report.js');
   pushed.FbmSync.readLocal = () => [{ id: 'CUS-1', fbmId: 'A1', fbmCustomerCode: 'ALT1', companyName: 'X', allowFbmPush: 'Cho phép', syncStatus: pushed.FbmSync.SYNC_STATUS.pushed, fbmHash: '' }];
   check(so, 'bản ghi đã đẩy chờ xác nhận không bị đẩy lặp', pushed.FbmSync.pushCandidates('customer').length, 0);
   pushed.FbmSync.readLocal = (entity) => entity === 'customer'

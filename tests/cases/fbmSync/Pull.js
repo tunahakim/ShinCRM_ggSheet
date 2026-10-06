@@ -191,7 +191,7 @@ async function chay(so) {
   builders.FbmSync.readLocal = () => [];
   builders.writeGateSave = () => ({ ok: true });
   builders.FbmSync.pullWrite('customer', [builders.FbmSync.customerRecord({ stt_rec_kh: 'LOG-C', ma_kh: 'ALT00015', ten_kh: 'Có log', ma_so_thue: '002' }, gate)]);
-  check(so, 'Pull ghi log từng record co huong trang thai truoc sau va ly do', [pullLogs.length, pullLogs[0].action, pullLogs[0].detail.direction, pullLogs[0].detail.statusBefore, pullLogs[0].detail.statusAfter, !!pullLogs[0].reason], [1, 'pull_record', 'FBM → ShinCRM', 'chưa liên kết', builders.FbmSync.SYNC_STATUS.synced, true]);
+  check(so, 'Pull không ghi Log từng record; PullFlow sẽ tổng hợp tại bước nghiệp vụ', pullLogs.length, 0);
   let reconcileWrite;
   const reconcileIncoming = builders.FbmSync.customerRecord({ stt_rec_kh: 'REC-1', ma_kh: 'ALT00013', ten_kh: 'Gốc' }, gate);
   const reconcileLocal = Object.assign({}, reconcileIncoming, { id: 'CUS-REC', syncStatus: builders.FbmSync.SYNC_STATUS.synced });
@@ -221,10 +221,14 @@ async function chay(so) {
   builders.FbmSync.stateWrite = (next) => { conflictState = next; return next; };
   builders.FbmSync.readLocal = () => [{ id: 'CUS-2', fbmId: 'C-2', fbmCustomerCode: 'ALT99999', companyName: 'Shin', fbmHash: builders.FbmSync.hash({ stt_rec_kh: 'C-2', ma_kh: 'ALT99999', ten_kh: 'Base' }, 'customer', gate) }];
   builders.writeGateSave = (request) => { conflictWrite = request; return { ok: true }; };
+  builders.FbmSync.recordIssues = {};
   const conflictResult = builders.FbmSync.pullWrite('customer', [builders.FbmSync.customerRecord({ stt_rec_kh: 'C-2', ma_kh: 'ALT99999', ten_kh: 'FBM' }, gate)]);
   check(so, 'conflict luu diff va khong ghi noi dung', [conflictResult.conflicts, conflictState.metadata.conflicts.length, conflictWrite.records[0].syncStatus], [1, 1, builders.FbmSync.SYNC_STATUS.conflict]);
-  const conflictEntries = conflictLog.filter((event) => event.action === 'conflict');
-  check(so, 'conflict ghi log diff co cau truc', [conflictEntries.length, conflictEntries[0].action, conflictEntries[0].detail.fields.length > 0], [1, 'conflict', true]);
+  builders.FbmSync.recordIssuesFlush();
+  const conflictEntries = conflictLog.filter((event) => event.action === 'pull_record_issue');
+  check(so, 'conflict theo bản ghi có đúng một dòng Log gom ở ranh giới lát, mang mã bản ghi và trạng thái xung đột',
+    [conflictEntries.length, conflictEntries[0] && conflictEntries[0].outcome, conflictEntries[0] && conflictEntries[0].recordId, conflictEntries[0] && conflictEntries[0].detail.status],
+    [1, 'conflict', 'CUS-2', builders.FbmSync.SYNC_STATUS.conflict]);
   check(so, 'conflict tao khoa sync', conflictState.locks['customer:CUS-2'].owner, 'sync');
   check(so, 'khong cho chot conflict neu chua doc lai', builders.FbmSync.resolveConflict('customer', 'CUS-2', 'fbm').code, 'CONFLICT_REREAD_REQUIRED');
   conflictState.metadata.conflicts[0].shinRecord = builders.FbmSync.readLocal('customer')[0];
@@ -243,7 +247,7 @@ async function chay(so) {
     FbmSync: {},
     PropertiesService: { getDocumentProperties: () => ({ getProperty: (key) => bindingStore[key] || null, setProperty: (key, value) => { bindingStore[key] = String(value); } }) }
   });
-  napServer(identity, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Identity.js');
+  napServer(identity, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/report/Report.js');
   identity.FbmSync.currentSpreadsheetId = () => 'sheet-a';
   identity.FbmSync.configValue = () => '';
   identity.FbmSync.readLocal = () => [{ id: 'CUS-LINKED', fbmId: 'FBM-A' }];
@@ -264,7 +268,7 @@ async function chay(so) {
 
   const edgeProperties = {};
   const edges = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {}, PropertiesService: { getDocumentProperties: () => ({ getProperty: (key) => edgeProperties[key] || null, setProperty: (key, value) => { edgeProperties[key] = String(value); }, deleteProperty: (key) => { delete edgeProperties[key]; } }) } });
-  napServer(edges, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/transport/TransportCore.js');
+  napServer(edges, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js');
   check(so, 'normalize placeholder 1999 thanh rong', edges.FbmSync.normalize('/Date(915123600000)/'), '');
   check(so, 'normalize Date co offset chi dung timestamp chinh', edges.FbmSync.normalize('/Date(1757386800000+0700)/'), edges.FbmSync.normalize('/Date(1757386800000)/'));
   check(so, 'normalize Date khong hop le khong nem loi', edges.FbmSync.normalize(new Date(NaN)), '');

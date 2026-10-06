@@ -216,7 +216,7 @@ async function chay(so) {
     deleteProperty: (key) => { delete connectionData[key]; }
   };
   const connection = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => connectionProps }, shinOpenBook: () => ({ getId: () => 'sheet-connection' }) });
-  napServer(connection, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/auth/AutoLogin.js');
+  napServer(connection, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/report/Report.js');
   connection.FbmSync.configValue = () => '';
   connection.FbmSync.readLocal = () => [];
   const incompleteBinding = connection.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-connection', userId: 'user-a', username: '' }, credential: { mode: 'preserve' } });
@@ -251,7 +251,7 @@ async function chay(so) {
   const clearData = {};
   const clearProps = { getProperty: (key) => clearData[key] || null, setProperty: (key, value) => { clearData[key] = String(value); }, deleteProperty: (key) => { delete clearData[key]; } };
   const cleared = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => clearProps }, shinOpenBook: () => ({ getId: () => 'sheet-clear' }) });
-  napServer(cleared, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/reconcile/Identity.js');
+  napServer(cleared, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/report/Report.js');
   cleared.FbmSync.configValue = () => '';
   cleared.FbmSync.readLocal = () => [{ id: 'CUS-OLD', fbmId: 'FBM-OLD' }];
   cleared.FbmSync.bindingWrite({ spreadsheetId: 'sheet-clear', userId: 'user-a', username: 'USERA', accountName: 'Tai khoan A' });

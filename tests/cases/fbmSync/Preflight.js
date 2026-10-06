@@ -9,7 +9,7 @@ async function chay(so) {
     category: { categories: { '@CAT_CHO_PHEP_FBM': [] } },
     issues: []
   }) });
-  napServer(hop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/report/Preflight.js');
+  napServer(hop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/report/Preflight.js', 'fbm_sync/report/Report.js');
   hop.FbmSync.scriptSettings = () => ({ accountName: '' });
   hop.FbmSync.readCategoryGate = () => ({ valid: {} });
   hop.FbmSync.currentSpreadsheetId = () => 'sheet-a';

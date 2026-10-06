@@ -665,17 +665,16 @@ async function chay(so) {
   const fullSummaryLog = fullLogs.filter((item) => item.action === 'slice' && item.detail && item.detail.phase === 'done').slice(-1)[0] || {};
   const ui = taoBoTest();
   ui.hop.fbmSyncPaint(fullFinal);
-  check(so, 'pipeline giả lập Customer + Activity đi qua GAS, Extension, cửa ghi và kết thúc', [
+  check(so, 'pipeline giả lập Customer + Activity đi qua GAS, Extension, cửa ghi và kết thúc; bản ghi thành công không sinh dòng Log theo bản ghi', [
     fullStep.ok, fullStep.request || null, fullFinal.phase, fullLocal.customer.length, fullLocal.activity.length,
     fullWrites.filter((item) => item.source === 'pull').length, fullKinds,
-    fullLogs.some((item) => item.action === 'pull_record' && item.entity === 'customer'),
-    fullLogs.some((item) => item.action === 'pull_record' && item.entity === 'activity'),
+    fullLogs.filter((item) => /_record/.test(String(item.action || ''))).length,
     fullSummaryLog.detail && fullSummaryLog.detail.runId === fullFinal.runId, fullSummaryLog.detail && fullSummaryLog.detail.counts && fullSummaryLog.detail.counts.succeeded,
     ui.content.textContent.indexOf('Hoàn tất') >= 0
   ], [
     true, null, 'done', 2, 2, 3,
      ['session_probe:user', 'authorize:customer', 'authorize:activity', 'completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH', 'completion:@CAT_CONG_VIEC', 'completion:@CAT_SAN_PHAM', 'grid:customer', 'grid:activity', 'grid:activity'],
-    true, true, true, 4, true
+    0, true, 4, true
   ]);
 
   const readFlow = workflowGas();

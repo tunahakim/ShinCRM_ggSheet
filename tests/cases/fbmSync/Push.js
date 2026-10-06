@@ -5,7 +5,7 @@ const { taoHopCat, napServer } = require("../../lib/load-gas");
 async function chay(so) {
   section("FBM sync — push");
   const pushed = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {} });
-  napServer(pushed, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/reconcile/CategoryGate.js');
+  napServer(pushed, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/report/Report.js');
   pushed.FbmSync.readLocal = () => [{ id: 'CUS-1', fbmId: 'A1', fbmCustomerCode: 'ALT1', companyName: 'X', allowFbmPush: 'Cho phép', syncStatus: pushed.FbmSync.SYNC_STATUS.pushed, fbmHash: '' }];
   const props = { data: {} };
   const propertyApi = { getProperty: (key) => props.data[key] || null, setProperty: (key, value) => { props.data[key] = String(value); } };
@@ -93,7 +93,7 @@ async function chay(so) {
   check(so, 'DTO Sidebar chi nhan mot conflict dau hang doi', [queueMetadata.conflicts.length, queueMetadata.conflictCount, queueMetadata.conflicts[0].id], [1, 2, 'ACT-1']);
 
   const guards = taoHopCat({ FbmSync: {}, PropertiesService: { getScriptProperties: () => ({ getProperty: () => '' }), getDocumentProperties: () => ({ getProperty: () => null, setProperty: () => {} }) } });
-  napServer(guards, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js');
+  napServer(guards, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/report/Report.js');
   check(so, 'push config chan khi binding khong co ten tai khoan', guards.FbmSync.pushConfigErrors({ entity: 'customer', kind: 'edit' }, { accountName: '' }), 'Thiếu tên đầy đủ trong liên kết tài khoản FBM; chiều đẩy đã bị dừng.');
   check(so, 'push config chan tao Customer khi thieu prefix va do dai ma khach', guards.FbmSync.pushConfigErrors({ entity: 'customer', kind: 'create' }, { accountName: 'Lê Tuấn Anh' }), 'Thiếu tiền tố hoặc độ dài mã khách FBM; không tạo Customer mới.');
   check(so, 'push config cho phep tao Customer khi du prefix va do dai ma khach', guards.FbmSync.pushConfigErrors({ entity: 'customer', kind: 'create' }, { accountName: 'Lê Tuấn Anh', customerPrefix: 'ALT', customerCodeLength: '8' }), '');
@@ -160,7 +160,7 @@ async function chay(so) {
   push.writeGateSave = (request) => { pushWriteRequest = request; pushPatch = request.records[0]; return { ok: true }; };
   push.FbmSync.markPushResult({ entity: 'customer', record: { id: 'C-OLD', fbmId: 'A-OLD', fbmCustomerCode: 'ALT00010', fbmHash: 'BASE' } }, { d: { InternalValues: [{ Name: 'stt_rec_kh', Value: 'A-OLD' }, { Name: 'ma_kh', Value: 'ALT00010' }] } }, 'customer_edit_save');
   check(so, 'push thanh cong giu baseline cu cho ky xac nhan va dung source push', [pushPatch.fbmHash, pushWriteRequest.source], ['BASE', 'push']);
-  check(so, 'push thanh cong ghi log request kind huong va hash', [pushLogs[0].action, pushLogs[0].detail.requestKind, pushLogs[0].detail.direction, pushLogs[0].detail.hBASE], ['push_record', 'customer_edit_save', 'ShinCRM → FBM', 'BASE']);
+  check(so, 'push thành công không ghi Log từng record', pushLogs.length, 0);
   const errorState = { counts: { error: 0 }, metadata: { categoryGate: {}, pushFailures: {} }, locks: {} };
   push.FbmSync.unlockRecord = () => ({ locks: {} });
   push.FbmSync.markPushError(errorState, { entity: 'customer', id: 'C-ERR', record: { id: 'C-ERR', companyName: 'Lỗi' } }, 'FBM từ chối', 'customer_edit_save');
@@ -242,9 +242,7 @@ async function chay(so) {
   push.logEvent = (event) => skippedLogs.push(event);
   const skippedState = { counts: { skipped: 0 }, metadata: {} };
   push.FbmSync.markPushSkipped(skippedState, { entity: 'activity', id: 'ACT-SKIP' }, push.FbmSync.SYNC_STATUS.unknownCategory, 'Category chua khop');
-  const skippedEntry = skippedLogs.filter((event) => event.action === 'push_record_skipped')[0];
-  const skippedDetail = skippedLogs.filter((event) => event.action === 'push_record')[0];
-  check(so, 'Push record bi hoan co log chi tiet', [!!skippedEntry, skippedEntry && skippedEntry.recordId, skippedDetail && skippedDetail.detail.direction, skippedDetail && skippedDetail.detail.syncStatus], [true, 'ACT-SKIP', 'ShinCRM → FBM', push.FbmSync.SYNC_STATUS.unknownCategory]);
+  check(so, 'Push record bị hoãn chỉ tăng state, không ghi Log chi tiết', [skippedState.counts.skipped, skippedLogs.length], [1, 0]);
   push.logEvent = (event) => {
     pushLogs.push(event);
     skippedLogs.push(event);
@@ -309,8 +307,7 @@ async function chay(so) {
   push.FbmSync.stateWrite(verifyState);
   const verifyRow = []; verifyRow[0] = 42; verifyRow[3] = 'Goi'; verifyRow[10] = new Date('2026-09-09T00:00:00Z'); verifyRow[15] = 'Noi dung #SC-ACT-VERIFY';
   push.FbmSync.continuePush(push.FbmSync.stateRead(), { d: { Controller: 'zccrAccountTask', Row: verifyRow } });
-  const verifiedActivityLog = pushLogs.filter((event) => event.action === 'push_record' && event.recordId === 'ACT-VERIFY').slice(-1)[0];
-  check(so, 'Activity chi tinh thanh cong sau khi doc xac nhan khop hash', [push.FbmSync.stateRead().counts.succeeded, push.FbmSync.pendingPushGet('activity', verifyRecord.id), verifiedActivityLog && verifiedActivityLog.detail.owner, verifiedActivityLog && verifiedActivityLog.detail.direction], [1, null, 'Owner', 'ShinCRM → FBM']);
+  check(so, 'Activity chỉ tính thành công sau khi đọc xác nhận khớp hash', [push.FbmSync.stateRead().counts.succeeded, push.FbmSync.pendingPushGet('activity', verifyRecord.id), pushLogs.some((event) => event.action === 'push_record')], [1, null, false]);
   const createLocal = { id: 'CUS-CREATE', fbmId: '', fbmCustomerCode: '', companyName: 'Khach tao lai', taxNumber: '0100123456', contactPerson: 'Nguoi lien he', phone: '0900000000', email: 'a@example.com', address: 'Ha Noi', province: 'HNI', website: '', leadSource: 'Source', product: '', allowFbmPush: push.FbmSync.PUSH_ALLOW_VALUE };
   const createCandidate = { entity: 'customer', kind: 'create', id: createLocal.id, autoCode: 'ALT00020', record: createLocal };
   push.FbmSync.readLocal = (entity) => entity === 'customer' ? [createLocal] : [];

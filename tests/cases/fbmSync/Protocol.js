@@ -7,7 +7,7 @@ async function chay(so) {
   // Fixture chỉ chạy offline; không gửi request hoặc ghi dữ liệu FBM thật.
   section('FBM sync - protocol, fingerprint va ba chieu');
   const hop = taoHopCat({ FbmSync: {} });
-  napServer(hop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Identity.js');
+  napServer(hop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/report/Report.js');
 
   const parsed = hop.FbmSync.protocol.parse('{"d":{"Bugs":{"FieldName":"x","Message":"bad"}}}');
   check(so, 'body Login.aspx voi HTTP 200 bi nhan la het phien', hop.FbmSync.protocol.isSessionExpired({ ok: true, status: 200, body: '<html><form action="Login.aspx"><input name="username"></form></html>' }), true);

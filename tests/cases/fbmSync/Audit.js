@@ -8,13 +8,16 @@ async function chay(so) {
     FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {},
     PropertiesService: { getDocumentProperties: () => ({ getProperty: (key) => ({ FBM_SYNC_TEST_CUSTOMER_CODE: 'ALT00010' }[key] || '') }) }
   });
-  napServer(auditPull, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js');
+  napServer(auditPull, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/report/Report.js');
   const gate = { map: { '@CAT_TINH_THANH\u001fHà Nội': 'HNI' }, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true, HNI: true } } };
-  const activityDecisionLogs = [];
-  auditPull.logEvent = (event) => activityDecisionLogs.push(event);
+  const activityIssueLogs = [];
+  auditPull.logEvent = (event) => activityIssueLogs.push(event);
+  auditPull.FbmSync.stateRead = () => ({ runId: 'RUN-AUDIT' });
   auditPull.FbmSync.linkActivityCustomers([{ fbmId: 'ACT-ORPHAN', customerFbmCode: 'ALT-MISSING' }], []);
-  const orphanEntries = activityDecisionLogs.filter((event) => event.action === 'activity_pull_skipped');
-  check(so, 'Activity pull bo qua co log Customer cha va Activity ID', [orphanEntries.length, orphanEntries[0].recordId, orphanEntries[0].detail.customerCode], [1, 'ACT-ORPHAN', 'ALT-MISSING']);
+  const logsBeforeFlush = activityIssueLogs.length;
+  auditPull.FbmSync.recordIssuesFlush();
+  const orphanEntries = activityIssueLogs.filter((event) => event.action === 'pull_record_issue');
+  check(so, 'Activity pull bỏ qua vì thiếu Customer cha: không ghi Log giữa lát, flush ra đúng một dòng có Activity ID và lý do', [logsBeforeFlush, orphanEntries.length, orphanEntries[0] && orphanEntries[0].recordId, orphanEntries[0] && orphanEntries[0].entity, orphanEntries[0] && orphanEntries[0].cycleId, /Customer cha/.test(orphanEntries[0] && orphanEntries[0].reason)], [0, 1, 'ACT-ORPHAN', 'activity', 'RUN-AUDIT', true]);
 
   const audit = taoHopCat({ FbmSync: {}, LOG_OK: 'ok', LOG_ERROR: 'error', FbmSyncLog: [] });
   napServer(audit, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/report/Probe.js');

@@ -7,6 +7,7 @@
  */
 
 const { dungHop } = require('../lib/dung-hop');
+const { napServer } = require('../lib/load-gas');
 const { formatDateGia } = require('../lib/gas-stubs');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 
@@ -199,6 +200,26 @@ function chay(so) {
   check(so, 'tệp giả từ chối xóa hết các hàng không đóng băng, đúng như Google',
     (() => { try { chanLuoi.Log.sheet.deleteRows(1, 5); return 'KHÔNG NÉM LỖI'; } catch (err) { return String(err.message).indexOf('không thể xóa tất cả các hàng không được cố định') !== -1; } })(),
     true);
+
+
+  // FBM-018: lượt bị Google cắt ở 6 phút không chạy `finally`, nên dòng "Bắt đầu bước" phải tự lên sheet ngay khi chế độ vết bật.
+  // Kiểm bằng Trace.js thật nạp chung với LogGate thật, và KHÔNG gọi flushLog — giả lập đúng lượt chết giữa đường.
+  const vetBat = dungLog([['LOG_TRACE', 'fbm_sync']]);
+  vetBat.hop.FbmSync = {};
+  napServer(vetBat.hop, 'fbm_sync/diagnostic/Trace.js');
+  const stateVet = { runId: 'run-018', mode: 'read', scan: 'full', origin: 'manual', metadata: {}, counts: {} };
+  vetBat.hop.FbmSync.businessStepStart(stateVet, 'pull_customer', {});
+  const sauBatDau = docLog(vetBat).map((dong) => dong[6]);
+  vetBat.hop.FbmSync.businessStepFinish(stateVet, 'pull_customer', 'ok', { received: 3 });
+  check(so, 'LOG_TRACE phủ fbm_sync: dòng "Bắt đầu bước" lên sheet ngay, không đợi flushLog cuối lượt',
+    [sauBatDau.length, String(sauBatDau[0]).indexOf('Bắt đầu đọc Customer từ FBM') === 0, docLog(vetBat).length],
+    [1, true, 2]);
+  const vetTat = dungLog();
+  vetTat.hop.FbmSync = {};
+  napServer(vetTat.hop, 'fbm_sync/diagnostic/Trace.js');
+  const ghiTruocVetTat = vetTat.dem.setValues;
+  vetTat.hop.FbmSync.businessStepStart({ runId: 'run-018', metadata: {}, counts: {} }, 'pull_customer', {});
+  check(so, 'LOG_TRACE tắt: mốc bước không tốn lệnh ghi nào giữa lượt', vetTat.dem.setValues - ghiTruocVetTat, 0);
 
   return so;
 }

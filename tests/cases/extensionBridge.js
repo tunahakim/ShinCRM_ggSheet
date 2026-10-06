@@ -52,7 +52,7 @@ function listSourceFiles(rootDir) {
   (function walk(dir) {
     fs.readdirSync(dir, { withFileTypes: true }).forEach((entry) => {
       const file = path.join(dir, entry.name);
-      if (entry.isDirectory() && ['tests', 'node_modules', '.git'].indexOf(entry.name) >= 0) { return; }
+      if (entry.isDirectory() && ['tests', 'node_modules', '.git', '.claude'].indexOf(entry.name) >= 0) { return; }
       if (entry.isDirectory()) { walk(file); return; }
       if (/\.(?:js|html)$/.test(entry.name)) { files.push(file); }
     });

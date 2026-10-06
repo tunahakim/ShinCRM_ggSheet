@@ -15,7 +15,7 @@ async function chay(so) {
     PropertiesService: { getDocumentProperties: () => bindingProperties },
     shinOpenBook: () => ({ getId: () => 'sheet-binding-test' })
   });
-  napServer(identity, 'fbm_sync/reconcile/Identity.js');
+  napServer(identity, 'fbm_sync/reconcile/Identity.js', 'fbm_sync/report/Report.js');
   identity.FbmSync.configValue = () => '';
   identity.FbmSync.readLocal = () => [];
   bindingData[identity.FbmSync.BINDING_KEY] = JSON.stringify({ spreadsheetId: 'sheet-binding-test', userId: '2037', username: 'anhlt', accountName: 'Le Tuan Anh' });
@@ -215,7 +215,7 @@ async function chay(so) {
   check(so, 'dung dong bo xoa marker scheduler va giu ket qua o trang thai tam dung', [orchestration.FbmSync.stateRead().phase, orchestration.FbmSync.stateRead().scheduledScan], ['paused', '']);
 
   const guards = taoHopCat({ FbmSync: {}, PropertiesService: { getScriptProperties: () => ({ getProperty: () => '' }), getDocumentProperties: () => ({ getProperty: () => null, setProperty: () => {} }) } });
-  napServer(guards, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js');
+  napServer(guards, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/report/Report.js');
   check(so, 'push config chan khi binding khong co ten tai khoan', guards.FbmSync.pushConfigErrors({ entity: 'customer', kind: 'edit' }, { accountName: '' }), 'Thiếu tên đầy đủ trong liên kết tài khoản FBM; chiều đẩy đã bị dừng.');
   check(so, 'push config chan tao Customer khi thieu prefix va do dai ma khach', guards.FbmSync.pushConfigErrors({ entity: 'customer', kind: 'create' }, { accountName: 'Lê Tuấn Anh' }), 'Thiếu tiền tố hoặc độ dài mã khách FBM; không tạo Customer mới.');
   check(so, 'push config cho phep tao Customer khi du prefix va do dai ma khach', guards.FbmSync.pushConfigErrors({ entity: 'customer', kind: 'create' }, { accountName: 'Lê Tuấn Anh', customerPrefix: 'ALT', customerCodeLength: '8' }), '');
