@@ -52,3 +52,25 @@ function fbmSeedConflict() {
   FbmSync.sheetSave('customer', [{ id: source.id, website: website, fbmHash: 'baseline-gia-xung-dot', syncStatus: FbmSync.SYNC_STATUS.pending }], 'pull');
   return { ok: true, id: source.id, website: website };
 }
+/** Dò ca "FBM đổi giữa chừng" (G10.7f): sau khi Sidebar đã mở xem xung đột, làm lệch hash FBM chốt lúc mở; bước Lưu kế tiếp phải thấy khác và trả về xem lại thay vì chốt. Không chạm FBM. */
+function fbmTamperConflictOpenedHash() {
+  var state = FbmSync.stateRead(), refresh = state.metadata && state.metadata.conflictRefresh;
+  if (!refresh || refresh.stage !== 'review') { return { ok: false, reason: 'Chưa mở xem xung đột nào trên Sidebar.' }; }
+  refresh.openedHash = 'fbm-doi-giua-chung';
+  FbmSync.stateWrite(state);
+  return { ok: true, id: refresh.id };
+}
+/** Dò đẩy Activity (G10.4): sửa nội dung Activity đang có của ALT00010 và nhân bản nó thành một Activity mới chưa có ID FBM, nên lượt đẩy kế tiếp có một lệnh sửa và một lệnh tạo. */
+function fbmSeedActivityPush() {
+  var customer = FbmSync.readLocal('customer').filter(function (record) { return String(record.fbmCustomerCode || '').trim() === 'ALT00010' && String(record.recordStatus || 'active') !== 'deleted'; })[0];
+  if (!customer) { return { ok: false, reason: 'Chưa có khách ALT00010 trên Sheet DEV.' }; }
+  var source = FbmSync.readLocal('activity').filter(function (record) { return String(record.customerId || '') === String(customer.id) && String(record.fbmId || '').trim() && String(record.recordStatus || 'active') !== 'deleted'; })[0];
+  if (!source) { return { ok: false, reason: 'ALT00010 chưa có Activity mang ID FBM.' }; }
+  var stamp = Utilities.formatDate(new Date(), 'Asia/Ho_Chi_Minh', 'HH:mm');
+  var created = {};
+  Object.keys(source).forEach(function (key) { if (['id', 'fbmId', 'fbmHash', 'syncStatus', 'syncedAt'].indexOf(key) < 0) { created[key] = source[key]; } });
+  created.id = ''; created.content = 'Activity tạo từ ShinCRM ' + stamp; created.syncStatus = FbmSync.SYNC_STATUS.pending; created.recordStatus = 'active';
+  FbmSync.sheetSave('activity', [{ id: source.id, content: 'Sửa từ ShinCRM ' + stamp, syncStatus: FbmSync.SYNC_STATUS.pending }], 'pull');
+  var saved = FbmSync.sheetSave('activity', [created], 'pull');
+  return { ok: true, edited: source.id, created: saved.recordIds };
+}
