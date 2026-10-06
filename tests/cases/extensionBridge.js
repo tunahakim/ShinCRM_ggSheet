@@ -223,7 +223,7 @@ async function chay(so) {
   check(so, 'relay config luu Spreadsheet ID', workerSource.indexOf('fbmSpreadsheetId: spreadsheetId') >= 0, true);
   check(so, 'relay config luu nhịp gas_poll va tuy chon startup', workerSource.indexOf('fbmPollMinutes') >= 0 && workerSource.indexOf('fbmRunOnStartup') >= 0 && workerSource.indexOf('config.extension') >= 0, true);
   check(so, 'service worker co quyen goi Sheets va Web App GAS', manifest.host_permissions.includes('https://docs.google.com/*') && manifest.host_permissions.includes('https://script.google.com/macros/*') && manifest.host_permissions.includes('https://script.googleusercontent.com/macros/*'), true);
-  check(so, 'manifest Extension dong bo cung phien ban phat hanh moi', [manifest.version, manifest.name], ['21.17', 'CRM Local Pro V21.17']);
+  check(so, 'manifest Extension dong bo cung phien ban phat hanh moi', [manifest.version, manifest.name], ['21.18', 'CRM Local Pro V21.18']);
   check(so, 'relay GAS co timeout va luu chan doan toi thieu', workerSource.indexOf('GAS_RELAY_TIMEOUT_MS') >= 0 && workerSource.indexOf('RELAY_TIMEOUT') >= 0 && workerSource.indexOf('fbmRelayLastStatus') >= 0, true);
   const sidebarSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'client', 'Sidebar.html'), 'utf8');
   const entryPointsSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'transport', 'EntryPoints.js'), 'utf8');
@@ -286,7 +286,7 @@ async function chay(so) {
   check(so, 'heartbeat coi GAS noop hop le la thanh cong va khong tim tab FBM', workerSource.indexOf("noteHeartbeatStatus('gas_noop'") >= 0 && workerSource.indexOf('if (!gasRequest.request)') >= 0, true);
   check(so, 'background relay dung DTO gon, khong gui traceTail/metadata Sidebar', workerSource.indexOf("kind: 'background_sync'") >= 0 && entryPointsSource.indexOf('fbmSyncRelayCompactResult') >= 0 && entryPointsSource.indexOf("body.kind === 'background_sync'") >= 0, true);
   check(so, 'background relay chi tiep tuc command GAS da cap tu heartbeat', workerSource.indexOf("command: 'start'") < 0 && workerSource.indexOf("command: 'continue'") >= 0 && entryPointsSource.indexOf('FbmSync.controlDispatch') >= 0, true);
-  check(so, 'executor co ping phien ban 21.17 va kenh execute moi', /EXECUTOR_VERSION\s*=\s*'21\.17'/.test(executorSource) && workerSource.indexOf("FBM_EXECUTOR_VERSION = '21.17'") >= 0 && executorSource.indexOf('FBM_PING_V2') >= 0 && executorSource.indexOf('FBM_EXECUTE_V2') >= 0, true);
+  check(so, 'executor co ping phien ban 21.18 va kenh execute moi', /EXECUTOR_VERSION\s*=\s*'21\.18'/.test(executorSource) && workerSource.indexOf("FBM_EXECUTOR_VERSION = '21.18'") >= 0 && executorSource.indexOf('FBM_PING_V2') >= 0 && executorSource.indexOf('FBM_EXECUTE_V2') >= 0, true);
   check(so, 'GAS la noi duy nhat kiem tra endpoint FBM', executorSource.indexOf('validateEndpoint(req.url)') < 0 && executorSource.indexOf('FBM_ENDPOINT_UNALLOWED') < 0, true);
   check(so, 'GAS chan endpoint thieu truoc cap envelope', fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'protocol', 'Protocol.js'), 'utf8').indexOf('validateEndpoint: function') >= 0 && fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'transport', 'TransportCore.js'), 'utf8').indexOf('validateEndpoint(request.url)') >= 0, true);
   check(so, 'GAS tu dung envelope heartbeat va relay co cong cap request', entryPointsSource.indexOf("body.kind === 'heartbeat_request'") >= 0 && fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'state', 'Scheduler.js'), 'utf8').indexOf('function fbmSyncHeartbeatRequest') >= 0 && fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'read', 'GridRead.js'), 'utf8').indexOf('FbmSync.heartbeatCustomerRequest') >= 0, true);
@@ -329,7 +329,7 @@ async function chay(so) {
   workerContext.clearTimeout = () => {};
   workerContext.setTimeout = (fn, ms) => { const timer = { fn, ms: Number(ms) }; waitTimers.push(timer); return timer; };
   workerContext.chrome.tabs.sendMessage = (tabId, message, done) => {
-    if (message.type === 'FBM_PING_V2') { done({ ready: true, version: '21.17' }); return; }
+    if (message.type === 'FBM_PING_V2') { done({ ready: true, version: '21.18' }); return; }
     if (message.type === 'FBM_EXECUTE_V2') { executeSentAt = virtualNow; done({ result: { ok: true, status: 200, body: '{}', transport: { trace: [] } } }); }
   };
   const delayedSend = workerContext.sendToFbmTab(77, { id: 'delay-proof', url: 'https://fbo.com.vn:8888/service', method: 'POST', bodyText: '{}', meta: { waitMs: 1200 } });
@@ -541,12 +541,13 @@ async function chay(so) {
 
   // Đăng nhập: mã phiên phải bắt bằng mẫu GAS cấp trong request, không bằng mẫu viết cứng trong Extension. Mẫu cũ của Extension không nhận dạng \"...\" mà
   // FBM dùng trong script trang, nên Login thành công nhưng không có cookie và request xác minh kế tiếp bị chặn FBM_TRANSPORT_CAPTURE_MISSING.
-  const runLoginWithAccountPage = (accountHtml) => new Promise((resolve) => {
+  const runLoginWithAccountPage = (accountHtml, storage) => new Promise((resolve) => {
     let listener = null;
     const response = (text) => ({ ok: true, status: 200, url: 'https://fbo.com.vn:8888/Main/zccrAccount.aspx', headers: { get() { return 'text/html'; } }, arrayBuffer() { return Promise.resolve(new TextEncoder().encode(text).buffer); } });
     const context = {
       console: { log() {}, warn() {} }, Date, URL, Promise, Error, AbortController, setTimeout, clearTimeout, Blob, Response, TextDecoder, TextEncoder, DecompressionStream: undefined,
       document: { documentElement: { innerHTML: '', textContent: '' } },
+      localStorage: storage && storage.local || { setItem() {}, removeItem() {} }, sessionStorage: storage && storage.session || { clear() {} },
       fetch(url) {
         if (String(url).endsWith('/Main/Login.aspx')) { return Promise.resolve(response(String.raw`<script>{"ChallengeScript":"eval('\'a2838e\'+\'6f471b\'')"}</script>`)); }
         if (String(url).endsWith('/GetEntityData')) { return Promise.resolve(response('{"d":[["01","Fast FBM Online","FHN_CRM_App"]]}')); }
@@ -567,6 +568,19 @@ async function chay(so) {
   check(so, 'executor login bắt mã phiên dạng \\"cookie\\":\\"...\\" trên trang tài khoản bằng mẫu GAS cấp và ghi trace đã bắt được, không kèm nội dung trang',
     [escapedLogin.transport && escapedLogin.transport.captures && escapedLogin.transport.captures.payloadCookie, escapedRead.code, escapedRead.endpoint, JSON.stringify(escapedLogin.transport.trace).indexOf('461020379855c') < 0],
     ['461020379855cFHN_CRM_App', 'PAYLOAD_COOKIE_CAPTURED', '/Main/zccrAccount.aspx', true]);
+  // Màn hình FBM trắng sau khi ShinCRM đăng nhập: trang Login của FBM lưu khóa MD5(MD5(salt)+MD5(mật khẩu)) vào localStorage "k\0" (bảng dữ liệu trang chính kiểm khóa này),
+  // xóa sessionStorage và menu cũ. Đăng nhập ngầm phải làm y hệt; trace chỉ mang mã kết quả, không mang khóa.
+  const md5hex = (text) => require('crypto').createHash('md5').update(text).digest('hex');
+  const browserStore = { items: { menuItems: 'menu-cu' }, sessionCleared: false };
+  const storedLogin = await runLoginWithAccountPage('<html></html>', {
+    local: { setItem(key, value) { browserStore.items[key] = value; }, removeItem(key) { delete browserStore.items[key]; } },
+    session: { clear() { browserStore.sessionCleared = true; } }
+  });
+  const storageTrace = (storedLogin.transport && storedLogin.transport.trace || []).filter((item) => item.stage === 'login_page_storage')[0] || {};
+  const expectedKey = md5hex(md5hex('a2838e6f471b') + md5hex('mat-khau'));
+  check(so, 'đăng nhập ngầm lưu khóa trang FBM vào localStorage "k\\0" như trang Login, xóa menu và sessionStorage cũ, trace không chứa khóa',
+    [browserStore.items['k\u0000'], 'menuItems' in browserStore.items, browserStore.sessionCleared, storageTrace.code, JSON.stringify(storedLogin.transport.trace).indexOf(expectedKey) < 0],
+    [expectedKey, false, true, 'LOGIN_PAGE_KEY_STORED', true]);
   const noCookieLogin = await runLoginWithAccountPage('<html><body>Đăng nhập</body></html>');
   const noCookieRead = (noCookieLogin.transport && noCookieLogin.transport.trace || []).filter((item) => item.stage === 'payload_cookie_page_read')[0] || {};
   check(so, 'executor login không thấy mã phiên thì trả captures rỗng và trace PAYLOAD_COOKIE_MISSING để GAS dừng có lý do', [noCookieLogin.transport && noCookieLogin.transport.captures, noCookieRead.code], [{}, 'PAYLOAD_COOKIE_MISSING']);
