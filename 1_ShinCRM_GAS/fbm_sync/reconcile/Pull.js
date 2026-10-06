@@ -76,12 +76,12 @@ FbmSync.pullWrite = function (entity, records) {
     }
     if (entity === 'activity' && !current) {
       var markerId = String(incoming.markerId || '').trim(), marked = markerId ? localById[markerId] : null;
+      if (marked && FbmSync.isConflictPending(marked)) { skipped += 1; return; }
       if (marked) {
         var markedLock = state.locks && state.locks[entity + ':' + String(marked.id || '')];
         if (markedLock && markedLock.owner === 'user') { skipped += 1; FbmSync.logPullRecord(entity, incoming, marked, FbmSync.SYNC_STATUS.skipped, 'Hoãn vì người dùng đang sửa Activity.'); return; }
         if (String(marked.fbmId || '').trim() && String(marked.fbmId).trim() !== key) {
           conflicts += 1;
-          FbmSync.rememberConflict(state, entity, marked, incoming, { hBASE: String(marked.fbmHash || ''), hSHIN: FbmSync.hash(marked, entity, categoryGate), hFBM: FbmSync.hash(incoming, entity, categoryGate) }, categoryGate);
           statusWrites.push({ id: marked.id, syncStatus: FbmSync.SYNC_STATUS.conflict });
           FbmSync.logPullRecord(entity, incoming, marked, FbmSync.SYNC_STATUS.conflict, 'Marker trỏ tới Activity đã liên kết với FBM ID khác.');
         } else {
@@ -93,6 +93,8 @@ FbmSync.pullWrite = function (entity, records) {
       }
       if (markerId) { skipped += 1; FbmSync.logPullRecord(entity, incoming, null, FbmSync.SYNC_STATUS.skipped, 'Marker không trỏ tới Activity nội bộ.', { issue: true }); return; }
     }
+    // `09/04`: dòng đang chờ quyết bị khóa đồng bộ, không lấy về; nó đã nằm trong hàng đợi xung đột nên không ghi Log lặp mỗi kỳ.
+    if (current && FbmSync.isConflictPending(current)) { skipped += 1; return; }
     var currentLock = current && state.locks && state.locks[entity + ':' + String(current.id || '')];
     if (currentLock && currentLock.owner === 'user') { skipped += 1; FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.skipped, 'Hoãn vì người dùng đang sửa bản ghi.'); return; }
     var mergedIncoming = current ? FbmSync.preserveLocalFields(entity, current, incoming) : incoming;
@@ -146,13 +148,10 @@ FbmSync.pullWrite = function (entity, records) {
         if (pendingHash) { pendingClears.push({ entity: entity, id: current.id }); }
         skipped += 1;
         statusWrites.push({ id: current.id, syncStatus: FbmSync.SYNC_STATUS.notApplied });
-        state.locks = state.locks || {};
-        state.locks[entity + ':' + String(current.id)] = { revision: localHash, owner: 'sync', reason: 'not_applied', at: Date.now() };
-        FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.notApplied, 'FBM không đổi sau khi ghi; khóa để tránh lặp vô hạn.');
+        FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.notApplied, 'FBM không đổi sau khi ghi; trạng thái đẩy không ăn chặn đẩy lại để tránh lặp vô hạn.');
       } else {
         if (pendingHash) { pendingClears.push({ entity: entity, id: current.id }); }
         conflicts += 1;
-        FbmSync.rememberConflict(state, entity, current, incoming, { hBASE: previousHash, hSHIN: localHash, hFBM: incomingHash }, categoryGate);
         statusWrites.push({ id: current.id, syncStatus: FbmSync.SYNC_STATUS.conflict });
         FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.conflict, 'Hai phía cùng thay đổi sau lần đẩy.');
       }
@@ -174,7 +173,6 @@ FbmSync.pullWrite = function (entity, records) {
     }
     if (decision.conflict) {
       conflicts += 1;
-      FbmSync.rememberConflict(state, entity, current, incoming, decision, categoryGate);
       statusWrites.push({ id: current.id, syncStatus: FbmSync.SYNC_STATUS.conflict });
       FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.conflict, 'Hai phía cùng thay đổi; chờ giải quyết.');
       return;

@@ -38,7 +38,7 @@ FbmSync.start = function (options) {
     if (!initialRequest) { return { ok: false, code: 'SYNC_ALREADY_RUNNING', status: FbmSync.statusView() }; }
   }
   if (typeof fbmEnsureSyncColumns === 'function') { fbmEnsureSyncColumns(opt.origin === 'background' ? 'background' : 'pull'); }
-  var state = FbmSync.stateStart('', 'checking_session', 0, { preserveConflicts: current.phase === 'conflict' });
+  var state = FbmSync.stateStart('', 'checking_session', 0);
   state.origin = opt.origin === 'background' ? 'background' : 'manual';
   state.mode = opt.mode === 'write' || opt.mode === 'push' ? opt.mode : opt.mode === 'check' ? 'check' : 'read';
   state.scan = opt.scan === 'activity_bulk' ? 'activity_bulk' : opt.scan === 'identity_check' ? 'identity_check' : opt.scan === 'identity_probe' ? 'identity_probe' : opt.scan === 'detail' ? 'detail' : 'full';
@@ -113,6 +113,7 @@ FbmSync.pullRecords = function (entity, records, mode) {
   var result = FbmSync.pullWrite(entity, records || []);
   state.counts.succeeded += Number(result.written || 0);
   state.counts.conflict += Number(result.conflicts || 0);
+  state.metadata.conflictCount = Number(state.metadata.conflictCount || 0) + Number(result.conflicts || 0);
   state.counts.skipped += Number(result.skipped || 0);
   if (typeof FbmSync.businessStepAdd === 'function') {
     FbmSync.businessStepAdd(state, reconcileStep, { received: count, written: Number(result.written || 0), conflict: Number(result.conflicts || 0), skipped: Number(result.skipped || 0), sheetWriteBatches: Number(result.sheetWriteBatches || 0) });

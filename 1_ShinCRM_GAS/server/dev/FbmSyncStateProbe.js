@@ -45,7 +45,7 @@ function fbmSyncStateProbe() {
       metadataBytes: fbmSyncProbeJsonBytes(metadata),
       metadataCategoryGateBytes: fbmSyncProbeJsonBytes(metadata && metadata.categoryGate),
       metadataPreviewBytes: fbmSyncProbeJsonBytes(metadata && metadata.preview),
-      metadataConflictsBytes: fbmSyncProbeJsonBytes(metadata && metadata.conflicts),
+      metadataConflictRefreshBytes: fbmSyncProbeJsonBytes(metadata && metadata.conflictRefresh),
       metadataSeenBytes: fbmSyncProbeJsonBytes(metadata && metadata.seen),
       sessionBytes: fbmSyncProbeJsonBytes(session),
       sessionLookupsBytes: fbmSyncProbeJsonBytes(session && session.lookups),

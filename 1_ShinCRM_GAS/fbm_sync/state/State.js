@@ -145,7 +145,7 @@ FbmSync.seenStoreReader = function (scope) {
 
 /** Tạo state rỗng với đủ field để các phiên cũ vẫn đọc được. */
 FbmSync.stateDefault = function () {
-  return { version: 1, runId: '', origin: 'manual', mode: 'read', scan: 'full', scheduledScan: '', activitySince: '', phase: 'idle', entity: '', cursor: {}, activeRequestId: '', identityTarget: null, lastProgressAt: 0, deadlineAt: 0, session: { customerAuthorized: '', activityAuthorized: '', cookie: '', userId: '', accountUsername: '', accountName: '', lookups: {}, expired: false, identityVerified: false, identitySessionId: '', identityVerifiedAt: 0, sessionId: '', lastHeartbeatAt: 0, customerTotal: null }, metadata: { categoryGate: null, categoryBlocks: [], preflight: null, preflightIssues: [], seen: { customer: {}, activity: {} }, conflicts: [], pushSucceeded: 0, pushFailures: {}, pushFailureDetails: {}, callbackTrace: null, manualPending: null, sessionGate: null, preview: { customers: [], activities: [], truncated: false } }, counts: { total: 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 }, current: '', message: '', startedAt: 0, updatedAt: 0, lastError: '', lastFailureCode: '', retryable: false, retryCount: 0, retryLimit: 2, locks: {} };
+  return { version: 1, runId: '', origin: 'manual', mode: 'read', scan: 'full', scheduledScan: '', activitySince: '', phase: 'idle', entity: '', cursor: {}, activeRequestId: '', identityTarget: null, lastProgressAt: 0, deadlineAt: 0, session: { customerAuthorized: '', activityAuthorized: '', cookie: '', userId: '', accountUsername: '', accountName: '', lookups: {}, expired: false, identityVerified: false, identitySessionId: '', identityVerifiedAt: 0, sessionId: '', lastHeartbeatAt: 0, customerTotal: null }, metadata: { categoryGate: null, categoryBlocks: [], preflight: null, preflightIssues: [], seen: { customer: {}, activity: {} }, conflictCount: 0, conflictRefresh: null, pushSucceeded: 0, pushFailures: {}, pushFailureDetails: {}, callbackTrace: null, manualPending: null, sessionGate: null, preview: { customers: [], activities: [], truncated: false } }, counts: { total: 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 }, current: '', message: '', startedAt: 0, updatedAt: 0, lastError: '', lastFailureCode: '', retryable: false, retryCount: 0, retryLimit: 2, locks: {} };
 };
 
 /** Lấy kho state cấp tài liệu, dùng chung giữa các lần gọi GAS. */
@@ -176,7 +176,7 @@ FbmSync.stateRead = function () {
     if (!raw) { return fallback; }
     var parsed = JSON.parse(raw);
     var metadata = parsed.metadata || {};
-    return Object.assign(fallback, parsed, { counts: Object.assign(fallback.counts, parsed.counts || {}), session: Object.assign(fallback.session, parsed.session || {}), metadata: Object.assign(fallback.metadata, metadata, { seen: Object.assign(fallback.metadata.seen, metadata.seen || {}), conflicts: Array.isArray(metadata.conflicts) ? metadata.conflicts : [], pushSucceeded: Number(metadata.pushSucceeded || 0), preflightIssues: Array.isArray(metadata.preflightIssues) ? metadata.preflightIssues : [], pushFailures: Object.assign(fallback.metadata.pushFailures, metadata.pushFailures || {}), pushFailureDetails: Object.assign(fallback.metadata.pushFailureDetails, metadata.pushFailureDetails || {}), callbackTrace: metadata.callbackTrace || null, manualPending: metadata.manualPending || null, preview: Object.assign(fallback.metadata.preview, metadata.preview || {}) }), locks: parsed.locks || {} });
+    return Object.assign(fallback, parsed, { counts: Object.assign(fallback.counts, parsed.counts || {}), session: Object.assign(fallback.session, parsed.session || {}), metadata: Object.assign(fallback.metadata, metadata, { seen: Object.assign(fallback.metadata.seen, metadata.seen || {}), conflictCount: Number(metadata.conflictCount || 0), pushSucceeded: Number(metadata.pushSucceeded || 0), preflightIssues: Array.isArray(metadata.preflightIssues) ? metadata.preflightIssues : [], pushFailures: Object.assign(fallback.metadata.pushFailures, metadata.pushFailures || {}), pushFailureDetails: Object.assign(fallback.metadata.pushFailureDetails, metadata.pushFailureDetails || {}), callbackTrace: metadata.callbackTrace || null, manualPending: metadata.manualPending || null, preview: Object.assign(fallback.metadata.preview, metadata.preview || {}) }), locks: parsed.locks || {} });
   } catch (err) { return fallback; }
 };
 /** Bỏ preview tùy chọn trước khi bỏ state nghiệp vụ khi gần chạm trần property. */
@@ -204,7 +204,9 @@ FbmSync.stateWrite = function (state) {
   next.metadata = Object.assign(FbmSync.stateDefault().metadata, next.metadata || {});
   next.metadata.pushSucceeded = Number(next.metadata.pushSucceeded || 0);
   next.metadata.seen = Object.assign(FbmSync.stateDefault().metadata.seen, next.metadata.seen || {});
-  next.metadata.conflicts = Array.isArray(next.metadata.conflicts) ? next.metadata.conflicts.slice(-100) : [];
+  // State cũ còn mảng `conflicts` thì bỏ ở lần ghi kế tiếp; hàng đợi xung đột nay đọc từ Sheet (FBM-024).
+  next.metadata.conflictCount = Number(next.metadata.conflictCount || 0);
+  delete next.metadata.conflicts;
   next.metadata.pushFailures = Object.assign({}, FbmSync.stateDefault().metadata.pushFailures, next.metadata.pushFailures || {});
   next.metadata.pushFailureDetails = Object.assign({}, FbmSync.stateDefault().metadata.pushFailureDetails, next.metadata.pushFailureDetails || {});
   next.metadata.manualPending = next.metadata.manualPending || null;
@@ -223,42 +225,17 @@ FbmSync.stateWrite = function (state) {
 };
 /** Ghi một phần state mà không làm mất field đang có. */
 FbmSync.statePatch = function (patch) { return FbmSync.stateWrite(Object.assign(FbmSync.stateRead(), patch || {})); };
-/** Lọc conflict cũ theo bản ghi còn tồn tại; lỗi đọc Sheet thì giữ nguyên để fail-closed. */
-FbmSync.relevantConflicts = function (conflicts) {
-  var source = Array.isArray(conflicts) ? conflicts : [], records = { customer: {}, activity: {} };
-  if (!source.length) { return { ok: true, conflicts: [], removed: 0 }; }
-  if (typeof FbmSync.readLocal !== 'function') { return { ok: false, conflicts: source.slice(-100), removed: 0 }; }
-  try {
-    ['customer', 'activity'].forEach(function (entity) {
-      (FbmSync.readLocal(entity) || []).forEach(function (record) {
-        var id = String(record && record.id || '').trim();
-        if (id && String(record && record.recordStatus || 'active') !== 'deleted') { records[entity][id] = true; }
-      });
-    });
-    var kept = source.filter(function (item) {
-      var entity = String(item && item.entity || '').trim(), id = String(item && item.id || '').trim();
-      return !!(records[entity] && id && records[entity][id]);
-    });
-    return { ok: true, conflicts: kept.slice(-100), removed: Math.max(0, source.length - kept.length) };
-  } catch (err) {
-    return { ok: false, conflicts: source.slice(-100), removed: 0, error: String(err && err.message || err) };
-  }
-};
 /** Mở phiên mới và xóa cursor/đếm của phiên trước. */
 FbmSync.stateStart = function (entity, phase, total) {
-  var preserveConflicts = arguments[3] && arguments[3].preserveConflicts === true, now = Date.now(), previous = FbmSync.stateRead(), userLocks = {}, freshSession = FbmSync.stateDefault().session, conflictSource = preserveConflicts && previous.phase === 'conflict' && previous.metadata && Array.isArray(previous.metadata.conflicts) ? previous.metadata.conflicts.slice(-100) : [], conflictCheck = FbmSync.relevantConflicts(conflictSource), preservedConflicts = conflictCheck.conflicts, conflictKeys = {};
-  preservedConflicts.forEach(function (item) { conflictKeys[String(item.entity || '') + ':' + String(item.id || '')] = true; });
+  var now = Date.now(), previous = FbmSync.stateRead(), userLocks = {}, freshSession = FbmSync.stateDefault().session;
   Object.keys(previous.locks || {}).forEach(function (key) { if (previous.locks[key] && previous.locks[key].owner === 'user') { userLocks[key] = previous.locks[key]; } });
-  Object.keys(previous.locks || {}).forEach(function (key) { if (conflictKeys[key] && previous.locks[key] && previous.locks[key].owner === 'sync') { userLocks[key] = previous.locks[key]; } });
   ['customer', 'activity', 'activity_bulk'].forEach(function (scope) { FbmSync.seenStoreClear(scope); });
   // Phiên cũ chưa tới phase kết thúc mà bị phiên mới thay thì các bước của nó phải được đóng trước khi metadata bị xóa.
   if (typeof FbmSync.businessFinishOpenSteps === 'function') { FbmSync.businessFinishOpenSteps(previous, 'paused', { error: 'Phiên mới đã bắt đầu thay phiên này.' }); }
   // Mỗi run phải xác nhận phiên sống lại; cookie và marker của run trước không
   // được dùng làm bằng chứng live cho request đầu tiên của run mới.
-  var next = FbmSync.stateWrite({ runId: now.toString(36), entity: entity || '', phase: phase || 'checking_session', cursor: {}, session: freshSession, counts: { total: Number(total) || 0, completed: 0, succeeded: 0, error: 0, conflict: preservedConflicts.length, skipped: 0 }, metadata: { conflicts: preservedConflicts }, current: '', message: '', startedAt: now, updatedAt: now, lastError: '', lastFailureCode: '', retryable: false, retryCount: 0, retryLimit: 2, locks: userLocks });
-  if (conflictCheck.ok && conflictCheck.removed && typeof logEvent === 'function') {
-    logEvent({ source: 'fbm_sync', action: 'conflict_orphan_discarded', outcome: typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn', entity: 'fbm_sync', reason: 'Đã bỏ ' + conflictCheck.removed + ' conflict không còn bản ghi trong Sheet; không còn đối tượng để người dùng quyết định.', detail: { removed: conflictCheck.removed, previousCount: conflictSource.length, keptCount: preservedConflicts.length } });
-  }
+  // Số xung đột phản ánh các dòng Sheet đang chờ quyết nên đi theo sang phiên mới; preflight đếm lại từ Sheet.
+  var next = FbmSync.stateWrite({ runId: now.toString(36), entity: entity || '', phase: phase || 'checking_session', cursor: {}, session: freshSession, counts: { total: Number(total) || 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 }, metadata: { conflictCount: Number(previous.metadata && previous.metadata.conflictCount || 0) }, current: '', message: '', startedAt: now, updatedAt: now, lastError: '', lastFailureCode: '', retryable: false, retryCount: 0, retryLimit: 2, locks: userLocks });
   return next;
 };
 /** Thu hoi state dang chay nhung khong con caller; khong retry lenh ghi dang mo. */

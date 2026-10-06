@@ -87,6 +87,7 @@ FbmSync.pushCandidates = function (entity) {
     var record = item.record;
     if (FbmSync.isTemporaryRecord(entity, record)) { return false; }
     if (String(record.recordStatus || 'active') === 'deleted') { return false; }
+    if (FbmSync.isConflictPending(record)) { return false; }
     var customer = entity === 'activity' ? customers[String(record.customerId || '')] : null;
     // Keep live writes inside the configured test customer until the gate is cleared.
     if (testCustomerCode && (entity === 'customer' ? String(record.fbmCustomerCode || '').trim() !== testCustomerCode : !customer || String(customer.fbmCustomerCode || '').trim() !== testCustomerCode)) { return false; }

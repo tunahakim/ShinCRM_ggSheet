@@ -61,17 +61,11 @@ FbmSync.preflightHashSummary = function (gate) {
 FbmSync.preflightCandidates = function (issues, mode) {
   var gate = { valid: {} }, candidates = [], settings = {};
   try { settings = typeof FbmSync.scriptSettings === 'function' ? FbmSync.scriptSettings() : {}; } catch (ignoreSettings) {}
-  var reportedConflicts = {};
   try {
-    if (typeof FbmSync.readLocal === 'function') {
-      ['customer', 'activity'].forEach(function (entity) {
-        (FbmSync.readLocal(entity) || []).forEach(function (record) {
-          var id = String(record && record.id || '').trim();
-          if (!id || String(record.syncStatus || '') !== String(FbmSync.SYNC_STATUS && FbmSync.SYNC_STATUS.conflict || 'xung đột chờ quyết')) { return; }
-          reportedConflicts[entity + ':' + id] = true;
-          FbmSync.preflightIssue(issues, 'FBM_RECORD_CONFLICT_PENDING', 'error', entity, 'Bản ghi ' + id + ' đang xung đột chờ quyết; không được tự động ghi đè.', mode === 'write');
-        });
-      });
+    // Gộp một issue có số đếm: số dòng xung đột tồn đọng không làm phình danh sách issue hay Log.
+    var pending = FbmSync.conflictQueue().length;
+    if (pending) {
+      FbmSync.preflightIssue(issues, 'FBM_RECORD_CONFLICT_PENDING', 'error', 'fbm_sync', 'Có ' + pending + ' bản ghi đang xung đột chờ quyết; mở chế độ xử lý xung đột để quyết từng bản ghi.', mode === 'write');
     }
   } catch (localConflictError) {
     FbmSync.preflightIssue(issues, 'FBM_LOCAL_CONFLICT_CHECK_FAILED', 'error', 'fbm_sync', 'Không kiểm tra được conflict cục bộ: ' + String(localConflictError && localConflictError.message || localConflictError), mode === 'write');
@@ -98,9 +92,6 @@ FbmSync.preflightCandidates = function (issues, mode) {
         var ownerError = typeof FbmSync.pushOwnerError === 'function' ? FbmSync.pushOwnerError(candidate, settings) : '';
         if (ownerError) {
           FbmSync.preflightIssue(issues, 'FBM_ACTIVITY_OWNER_MISMATCH', 'error', entity, ownerError, mode === 'write');
-        }
-        if (String(record.syncStatus || '') === String(FbmSync.SYNC_STATUS && FbmSync.SYNC_STATUS.conflict || 'xung đột chờ quyết') && !reportedConflicts[entity + ':' + String(candidate.id || '')]) {
-          FbmSync.preflightIssue(issues, 'FBM_RECORD_CONFLICT_PENDING', 'error', entity, 'Bản ghi ' + String(candidate.id || '') + ' đang xung đột chờ quyết; không được tự động ghi đè.', mode === 'write');
         }
         var fields = entity === 'customer'
           ? [['@CAT_TINH_THANH', FbmSync.value(record, 'province', '')], ['@CAT_NGUON_KH', FbmSync.value(record, 'leadSource', '')], ['@CAT_SAN_PHAM', FbmSync.value(record, 'product', '')]]

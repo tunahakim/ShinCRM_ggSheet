@@ -29,10 +29,8 @@ FbmSync.statusMetadata = function (metadata) {
     if (data[key] !== undefined) { result[key] = data[key]; }
     return result;
   }, {});
-  // GAS giữ cả hàng đợi conflict; Sidebar chỉ cần một bản ghi để đối chiếu và quyết định.
-  var conflicts = Array.isArray(data.conflicts) ? data.conflicts : [];
-  out.conflictCount = conflicts.length;
-  out.conflicts = conflicts.length ? [conflicts[0]] : [];
+  // Hàng đợi xung đột nằm trên Sheet; Sidebar chỉ nhận số đếm, bản ghi cụ thể đến khi người dùng mở chế độ xung đột.
+  out.conflictCount = Number(data.conflictCount || 0);
   var failures = data.pushFailures && typeof data.pushFailures === 'object' ? data.pushFailures : {}, failureKeys = Object.keys(failures), details = data.pushFailureDetails && typeof data.pushFailureDetails === 'object' ? data.pushFailureDetails : {};
   out.pushFailureCount = failureKeys.length;
   out.pushFailures = {};

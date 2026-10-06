@@ -112,19 +112,19 @@ FbmSync.finishPushVerification = function (state, response) {
   }
   if (previousHash && incomingHash === previousHash) {
     state.counts.skipped += 1;
-    state.locks = state.locks || {}; state.locks[entity + ':' + id] = { revision: localHash, owner: 'sync', reason: 'not_applied', at: Date.now() };
     FbmSync.sheetSave(entity, [{ id: local.id, syncStatus: FbmSync.SYNC_STATUS.notApplied }], 'push');
     FbmSync.pendingPushClear(entity, id);
     FbmSync.logPullRecord(entity, values, local, FbmSync.SYNC_STATUS.notApplied, 'FBM không đổi sau lần ghi; đọc xác nhận trực tiếp.');
     state.cursor = { kind: 'push_scan', entity: entity, index: Number(cursor.index || 0) + 1 }; state.current = ''; state.message = 'FBM chưa áp dụng ' + entity + ' ' + id + '.'; FbmSync.stateWrite(state);
     return FbmSync.nextPushRequest(state);
   }
-  var conflict = FbmSync.threeWay({ hBASE: previousHash }, local, values, entity, state.metadata && state.metadata.categoryGate || {});
-  FbmSync.rememberConflict(state, entity, local, values, conflict, state.metadata && state.metadata.categoryGate || {});
-  FbmSync.logPullRecord(entity, values, local, FbmSync.SYNC_STATUS.conflict, 'Đọc xác nhận khác dữ liệu vừa ghi; chờ quyết định xung đột.');
-  state.counts.conflict += 1; state.cursor = {}; state.current = ''; state.phase = 'conflict'; state.message = 'Đọc xác nhận khác dữ liệu vừa ghi; đã dừng để kiểm tra xung đột.'; FbmSync.stateWrite(state);
+  // Sheet là nguồn của hàng đợi xung đột nên ghi trạng thái trước; khóa push nhả luôn vì dòng `xung đột chờ quyết` đã bị khóa đồng bộ.
   FbmSync.sheetSave(entity, [{ id: local.id, syncStatus: FbmSync.SYNC_STATUS.conflict }], 'push');
   FbmSync.pendingPushClear(entity, id);
+  FbmSync.logPullRecord(entity, values, local, FbmSync.SYNC_STATUS.conflict, 'Đọc xác nhận khác dữ liệu vừa ghi; chờ quyết định xung đột.');
+  FbmSync.releasePushLock(state, entity, id);
+  state.metadata.conflictCount = Number(state.metadata.conflictCount || 0) + 1;
+  state.counts.conflict += 1; state.cursor = {}; state.current = ''; state.phase = 'conflict'; state.message = 'Đọc xác nhận khác dữ liệu vừa ghi; đã dừng để kiểm tra xung đột.'; FbmSync.stateWrite(state);
   return null;
 };
 
@@ -228,10 +228,9 @@ FbmSync.pushOwnerError = function (candidate, settings) {
   return '';
 };
 
-/** Tạo request kế tiếp của queue push từ state, không giữ queue trong Extension. */
+/** Xung đột phát hiện trong phiên này dừng cả chiều đẩy; xung đột tồn đọng từ trước chỉ khóa đúng dòng của nó. */
 FbmSync.stopPushOnConflicts = function (state) {
-  var conflicts = state && state.metadata && state.metadata.conflicts || [];
-  var conflictCount = Math.max(conflicts.length, Number(state && state.counts && state.counts.conflict || 0));
+  var conflictCount = Number(state && state.counts && state.counts.conflict || 0);
   if (!conflictCount) { return false; }
   state.phase = 'conflict'; state.entity = ''; state.current = ''; state.cursor = {};
   state.message = 'Đã phát hiện ' + conflictCount + ' xung đột; chiều đẩy tạm dừng để người dùng quyết định.';
@@ -239,6 +238,7 @@ FbmSync.stopPushOnConflicts = function (state) {
   return true;
 };
 
+/** Tạo request kế tiếp của queue push từ state, không giữ queue trong Extension. */
 FbmSync.nextPushRequest = function (state) {
   var globalCategoryBlock = state.metadata && (state.metadata.categoryLookupFailed || (state.metadata.categoryBlocks || []).some(function (block) { return !block.code; }));
   if (globalCategoryBlock) {

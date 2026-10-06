@@ -69,5 +69,7 @@ function fbmBeginEdit(entity, id, revision) { return runEntryPoint('fbmBeginEdit
 function fbmEndEdit(entity, id) { return runEntryPoint('fbmEndEdit', 'sidebar', 'throw', function () { return FbmSync.withOrchestrationLock(function () { return fbmSyncEditEnd(entity, id); }); }); }
 /** Kiểm tra revision trước khi lưu form. */
 function fbmCheckSave(entity, id, revision) { return runEntryPoint('fbmCheckSave', 'sidebar', 'throw', function () { return FbmSync.withOrchestrationLock(function () { return fbmSyncSaveAllowed(entity, id, revision); }); }); }
-function fbmPrepareConflictResolution(entity, id, choice, merged) { return runEntryPoint('fbmPrepareConflictResolution', 'sidebar', 'throw', function () { return FbmSync.controlDispatchLocked('prepare_conflict', { entity: entity, id: id, choice: choice, merged: merged }); }); }
+function fbmOpenConflict() { return runEntryPoint('fbmOpenConflict', 'sidebar', 'throw', function () { return FbmSync.controlDispatchLocked('open_conflict', {}); }); }
+function fbmConflictOpened(response) { return runEntryPoint('fbmConflictOpened', 'sidebar', 'throw', function () { return FbmSync.controlDispatchLocked('conflict_opened', { response: response }); }); }
+function fbmPrepareConflictResolution(entity, id, choice) { return runEntryPoint('fbmPrepareConflictResolution', 'sidebar', 'throw', function () { return FbmSync.controlDispatchLocked('prepare_conflict', { entity: entity, id: id, choice: choice }); }); }
 function fbmConfirmConflict(entity, id, choice, merged, response) { return runEntryPoint('fbmConfirmConflict', 'sidebar', 'throw', function () { return FbmSync.controlDispatchLocked('confirm_conflict', { entity: entity, id: id, choice: choice, merged: merged, response: response }); }); }
