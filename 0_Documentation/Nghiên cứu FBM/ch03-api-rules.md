@@ -61,6 +61,16 @@ Header `Referer` rất quan trọng — FBM server kiểm tra Referer trong mọ
 
 **Cookie payload trong JSON body:** Hầu hết API dữ liệu yêu cầu trường `"cookie"` trong JSON body chứa `fbmPayloadCookie` (ví dụ `"500020372f578FHN_CRM_App"`). Đây KHÔNG phải HTTP cookie — đây là trường trong payload. FBM dùng cơ chế cookie kép: HTTP cookie (trong header) để xác thực phiên, payload cookie (trong body) để xác minh ngữ cảnh người dùng. Cả hai đều bắt buộc.
 
+> **Đính chính 2026-10-06 (đo trên FBM thật):** câu "cả hai đều bắt buộc" ở trên sai với payload cookie. Câu cũ không kèm phép đo nào. Đo trên phiên đã đăng nhập, chỉ thay trường `cookie` trong body, giữ nguyên HTTP cookie:
+>
+> | Request | Mã đúng của tab | Mã cũ (lần tải trang trước) | Mã giả | Mã của user khác | Rỗng `""` |
+> |---|---|---|---|---|---|
+> | `GetGridViewPage` (đọc grid zccrAccount) | 200, có `Rows` | 200, có `Rows` | 200, có `Rows` | — | 200, có `Rows` |
+> | `GetDirViewPage` lấy `authorized` (`viewPage:false`) | 200, có `Authorized` | 200, có `Authorized` | 200, có `Authorized` | 200, có `Authorized` | 200, có `Authorized` |
+> | `GetDirViewPage` lưu Edit Customer `ALT00010` (`type:1`, 46 memvars, form FBM tự dựng) | — | — | — | — | 200, `Bugs: null` |
+>
+> Kết luận: FBM chỉ xác thực bằng HTTP cookie; trường `cookie` trong body không được kiểm, có thì gửi, không có thì để rỗng. Payload cookie còn **đổi sau mỗi lần tải trang** (4 ký tự đầu và 5 ký tự trước tên database đổi, phần userId giữ nguyên), không chỉ đổi theo lần đăng nhập như mục 2.6 viết. Chưa đo với Activity (`zccrAccountTask`) và lệnh Delete. Dùng payload cookie để tách userId (mục 2.6) vẫn đúng. Payload cookie vẫn cần cho trình duyệt: bảng dữ liệu trên trang chính kiểm `MD5(khóa localStorage + payloadCookie)` (mục 2.5.1).
+
 ### 3.3 Quy tắc response chung
 
 **Response bọc trong trường "d":** Tất cả response từ PageMethods và ASMX Web Service đều được bọc trong trường `"d"`. Đây là cơ chế bảo mật mặc định của ASP.NET AJAX để ngăn JSON hijacking. Client luôn truy cập `response.d` để lấy dữ liệu thực.
