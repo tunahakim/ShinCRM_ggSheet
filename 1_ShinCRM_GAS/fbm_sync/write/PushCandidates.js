@@ -65,7 +65,11 @@ FbmSync.extractAutoCustomerCode = function (response) {
   return match ? String(match[1]) : '';
 };
 
-/** Đọc các bản ghi local cần đẩy; không bao giờ chọn bản ghi đã xóa hoặc bị cấm. */
+/**
+ * Đọc các bản ghi local cần đẩy; không bao giờ chọn bản ghi đã xóa hoặc bị cấm.
+ * `position` là vị trí dòng trong Sheet: danh sách được dựng lại sau mỗi bản ghi và co lại khi bản ghi vừa đẩy rời khỏi nó, nên cursor phải nhớ vị trí dòng chứ không nhớ thứ tự trong danh sách (FBM-032).
+ * Bản ghi `đang đẩy` chưa có ID FBM là lệnh tạo đã phát mà không biết kết quả; tạo lại có thể sinh bản ghi trùng (`09/04`, FBM-027). Customer đi đường tra theo MST (`recover`), Activity không có đường tra nên chỉ báo người dùng (`stuck`).
+ */
 FbmSync.pushCandidates = function (entity) {
   var records = FbmSync.readLocal(entity), customers = {}, state = {}, pushFailures = {};
   var categoryGate = {};
@@ -79,7 +83,8 @@ FbmSync.pushCandidates = function (entity) {
   if (entity === 'activity') {
     FbmSync.readLocal('customer').forEach(function (customer) { customers[String(customer.id || '')] = customer; });
   }
-  return records.filter(function (record) {
+  return records.map(function (record, position) { return { record: record, position: position }; }).filter(function (item) {
+    var record = item.record;
     if (FbmSync.isTemporaryRecord(entity, record)) { return false; }
     if (String(record.recordStatus || 'active') === 'deleted') { return false; }
     var customer = entity === 'activity' ? customers[String(record.customerId || '')] : null;
@@ -88,20 +93,27 @@ FbmSync.pushCandidates = function (entity) {
     if (entity === 'activity' && !FbmSync.activityParentReady(customer)) { return false; }
     if (!FbmSync.pushPermission(record, entity, customer).push) { return false; }
     var status = String(record.syncStatus || ''), failureKey = entity + ':' + String(record.id || '');
+    if (FbmSync.isUnconfirmedCreate(record)) { return true; }
     if (status === FbmSync.SYNC_STATUS.pushed || status === FbmSync.SYNC_STATUS.notApplied) { return false; }
     var currentHash = FbmSync.hash(record, entity, categoryGate);
     if (String(pushFailures[failureKey] || '') === currentHash) { return false; }
     var hasFbm = String(record.fbmId || '').trim() !== '';
     var changed = !String(record.fbmHash || '').trim() || currentHash !== String(record.fbmHash || '').trim();
     return !hasFbm || changed || String(record.syncStatus || '') === FbmSync.SYNC_STATUS.pending;
-  }).map(function (record) {
-    var customer = entity === 'activity' ? customers[String(record.customerId || '')] : null;
-    var candidate = { kind: String(record.fbmId || '').trim() ? 'edit' : 'create', id: String(record.id || ''), record: record };
+  }).map(function (item) {
+    var record = item.record, customer = entity === 'activity' ? customers[String(record.customerId || '')] : null;
+    var kind = FbmSync.isUnconfirmedCreate(record) ? (entity === 'customer' ? 'recover' : 'stuck') : String(record.fbmId || '').trim() ? 'edit' : 'create';
+    var candidate = { kind: kind, id: String(record.id || ''), record: record, position: item.position };
     if (customer) {
       candidate.record = Object.assign({}, record, { customerFbmCode: customer.fbmCustomerCode || '', stt_rec: customer.fbmId || '' });
     }
     return candidate;
   });
+};
+
+/** Lệnh tạo đã phát nhưng chưa biết FBM có lưu hay không; bản ghi sửa (đã có ID FBM) gửi lại không sinh trùng nên không thuộc nhóm này. */
+FbmSync.isUnconfirmedCreate = function (record) {
+  return String(record && record.syncStatus || '') === FbmSync.SYNC_STATUS.pushing && !String(record && record.fbmId || '').trim();
 };
 
 /** Chỉ lưu khóa cần để dựng lại candidate; payload đầy đủ phải đọc lại từ Sheet. */
