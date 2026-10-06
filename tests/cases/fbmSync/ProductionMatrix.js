@@ -299,6 +299,34 @@ async function chay(so) {
   const cfEmpty = CF.openConflict();
   check(so, 'FBM-024: hàng đợi rỗng thì mở chế độ xung đột báo không còn xung đột, không phát request', [cfEmpty.empty, cfEmpty.request], [true, undefined]);
 
+  // FBM-033: bản ghi đầu hàng đợi không đọc được trên FBM thì rời hàng đợi, không chặn các xung đột phía sau.
+  const un = makeSync(), UN = un.hop.FbmSync;
+  UN.masterEnabled = () => true;
+  const unState = UN.stateStart('', 'pull_customer', 0); unState.mode = 'read'; unState.metadata.categoryGate = cfGate; UN.stateWrite(unState);
+  const unIds = [1, 2, 3, 4];
+  UN.pullWrite('customer', unIds.map((n) => UN.customerRecord(fbmRow('F-' + n, 'ALT0000' + n, 'Tên gốc ' + n), {})));
+  un.local.customer.forEach((row) => { row.companyName = 'Tên Shin ' + row.fbmCustomerCode.slice(-1); });
+  UN.pullWrite('customer', unIds.map((n) => UN.customerRecord(fbmRow('F-' + n, 'ALT0000' + n, 'Tên FBM ' + n), {})));
+  const unDone = UN.stateStart('', 'checking_session', 0); unDone.phase = 'done'; UN.stateWrite(unDone);
+  UN.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+  un.logs.length = 0;
+  const unOpen = UN.openConflict();
+  const unMissing = UN.conflictOpened(gridResponse(unOpen.request.id, []));
+  const unLog = un.logs.find((event) => event.action === 'pull_record_issue' && /rời hàng đợi xung đột/.test(String(event.reason)));
+  check(so, 'FBM-033: FBM không trả bản ghi đầu hàng đợi thì dòng đó chuyển "không thấy bên FBM", rời hàng đợi, Sidebar nhận lý do và Log có dòng ghi mã bản ghi',
+    [unMissing.code, un.local.customer[0].syncStatus, unMissing.remaining, /CUS-000001.*bị xóa hoặc chuyển quyền/.test(unMissing.message), !!unLog && unLog.recordId, UN.stateRead().metadata.conflictRefresh],
+    ['CONFLICT_RECORD_UNREADABLE', 'không thấy bên FBM', 3, true, 'CUS-000001', null]);
+  const unNext = UN.openConflict();
+  check(so, 'FBM-033: mở lại chế độ xung đột thì tới lượt bản ghi kế tiếp, không kẹt ở bản ghi không đọc được', [unNext.ok, unNext.request && unNext.request.meta.conflictId, unNext.remaining], [true, 'CUS-000002', 3]);
+  UN.conflictOpened(gridResponse(unNext.request.id, [fbmRow('F-2', 'ALT00002', 'Tên FBM 2')]));
+  const unPrepare = UN.prepareConflictResolution('customer', 'CUS-000002', 'fbm');
+  const unConfirmMissing = UN.confirmConflict('customer', 'CUS-000002', 'fbm', null, gridResponse(unPrepare.request.id, []));
+  check(so, 'FBM-033: bản ghi biến mất trên FBM giữa lúc mở và lúc chốt cũng đi chung đường: không ghi quyết định, rời hàng đợi với "không thấy bên FBM"',
+    [unConfirmMissing.code, un.local.customer[1].syncStatus, un.local.customer[1].companyName, unConfirmMissing.remaining], ['CONFLICT_RECORD_UNREADABLE', 'không thấy bên FBM', 'Tên Shin 2', 2]);
+  un.local.customer[2].fbmId = '';
+  const unNoId = UN.openConflict();
+  check(so, 'FBM-033: bản ghi xung đột thiếu ID FBM cũng rời hàng đợi ngay, không phát request', [unNoId.code, unNoId.request, un.local.customer[2].syncStatus, UN.openConflict().request.meta.conflictId], ['CONFLICT_RECORD_UNREADABLE', undefined, 'không thấy bên FBM', 'CUS-000004']);
+
   const cfBig = makeSync(), CB = cfBig.hop.FbmSync;
   const cfBigState = CB.stateStart('', 'pull_customer', 0); cfBigState.mode = 'read'; cfBigState.metadata.categoryGate = cfGate; CB.stateWrite(cfBigState);
   const cfBigIds = Array.from({ length: 80 }, (_, index) => index + 10);
