@@ -204,9 +204,25 @@ async function chay(so) {
   push.FbmSync.scriptSettings = () => ({ accountName: 'Chu tai khoan dung' });
   let ownerMismatch = '';
   try {
-    push.FbmSync.continuePush({ metadata: {}, cursor: { operation: 'activity_edit_open', entity: 'activity', candidate: { entity: 'activity', id: 'ACT-OWNER', record: { id: 'ACT-OWNER', fbmId: 'A-OWNER' } } } }, { d: { InternalValues: [{ Name: 'owner', NewValue: 'Chu tai khoan khac' }] } });
+    push.FbmSync.continuePush({ metadata: {}, cursor: { operation: 'activity_edit_open', entity: 'activity', candidate: { entity: 'activity', id: 'ACT-OWNER', record: { id: 'ACT-OWNER', fbmId: 'A-OWNER' } } } }, { d: { Row: ['A-OWNER'], InternalValues: [{ Name: 'owner', NewValue: 'Chu tai khoan khac' }] } });
   } catch (error) { ownerMismatch = String(error && error.message || error); }
-  check(so, 'Activity sai owner bi chan truoc request sua', ownerMismatch.indexOf('FBM') >= 0, true);
+  check(so, 'Activity sai owner bi chan truoc request sua', ownerMismatch.indexOf('owner FBM khác') >= 0, true);
+  ['customer', 'activity'].forEach((entity) => {
+    let notFound = null;
+    try {
+      push.FbmSync.continuePush({ metadata: {}, cursor: { operation: entity + '_edit_open', entity, candidate: { entity, id: 'X-GIA', record: { id: 'X-GIA', fbmId: 'FBM-GIA' } } } }, { d: { Row: null, InternalValues: [{ Name: 'nguoi_sua', NewValue: '' }] } });
+    } catch (error) { notFound = error; }
+    check(so, 'FBM-048: ' + entity + ' mở form không thấy đúng bản ghi thì không phát lệnh lưu', [notFound && notFound.code, push.FbmSync.stateRead().cursor && push.FbmSync.stateRead().cursor.operation === entity + '_edit_save'], ['FBM_RECORD_NOT_FOUND', false]);
+  });
+  {
+    const savedSheet = push.FbmSync.sheetSave, savedLog = push.FbmSync.logPushRecord, sheetRows = [], logRows = [];
+    push.FbmSync.sheetSave = (entity, rows) => { sheetRows.push(...rows); return { ok: true }; };
+    push.FbmSync.logPushRecord = (candidate, op, outcome, reason, detail) => { logRows.push([outcome, detail.syncStatus, detail.failureCode]); };
+    const missingState = push.FbmSync.stateStart('', 'push', 0);
+    push.FbmSync.markPushError(missingState, { entity: 'customer', id: 'X-GIA', kind: 'edit', record: { id: 'X-GIA', fbmId: 'FBM-GIA' } }, Object.assign(new Error('FBM không trả bản ghi FBM-GIA'), { code: 'FBM_RECORD_NOT_FOUND' }), 'customer_edit_open');
+    push.FbmSync.sheetSave = savedSheet; push.FbmSync.logPushRecord = savedLog;
+    check(so, 'FBM-048: không thấy bản ghi khi mở form ghi Sheet "không thấy bên FBM" và Log lỗi kèm mã', [sheetRows.map((row) => row.syncStatus), logRows], [[push.FbmSync.SYNC_STATUS.missing], [['error', push.FbmSync.SYNC_STATUS.missing, 'FBM_RECORD_NOT_FOUND']]]);
+  }
   const bugState = push.FbmSync.stateStart('', 'push', 0);
   bugState.activeRequestId = 'test-bug-request'; bugState.cursor = { kind: 'push_wait', operation: 'customer_edit_save', entity: 'customer', index: 0, candidate: { entity: 'customer', id: 'C-ERR', record: { id: 'C-ERR', fbmId: 'A-ERR', fbmHash: 'h-err' } } };
   push.FbmSync.stateWrite(bugState);
