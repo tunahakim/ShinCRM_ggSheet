@@ -844,7 +844,7 @@ function fbmSyncCheckIdentity() {
     return fbmSyncLogClientError(error, reason, 'identity_check').then(function () {
       return ownRun && (!error || (error.code !== 'GAS_CALLBACK_TIMEOUT' && !error.transportReported)) ? callServer('fbmCancelSync').catch(function () { return null; }) : null;
     }).then(function () {
-      fbmSyncPaint({ phase: 'error', label: 'Có lỗi', message: reason, lastError: reason, counts: {} });
+      fbmSyncPaint(fbmSyncClientErrorStatus(reason));
       return null;
     });
   });
@@ -873,7 +873,7 @@ function fbmSyncProbeIdentity() {
     var reason = String(error && error.message || error);
     return fbmSyncLogClientError(error, reason, 'identity_probe').then(function () {
       return ownRun && (!error || (error.code !== 'GAS_CALLBACK_TIMEOUT' && !error.transportReported)) ? callServer('fbmCancelSync').catch(function () { return null; }) : null;
-    }).then(function () { fbmSyncPaint({ phase: 'error', label: 'Có lỗi', message: reason, lastError: reason, counts: {} }); return null; });
+    }).then(function () { fbmSyncPaint(fbmSyncClientErrorStatus(reason)); return null; });
   });
 }
 function fbmSyncAutoFill() {
@@ -1262,7 +1262,7 @@ function fbmSyncApprovePush() {
   }).then(function (value) { FBM_SYNC_CLIENT.running = false; return value; }).catch(function (error) {
     FBM_SYNC_CLIENT.running = false;
     fbmSyncLogClientError(error, 'Khong tiep tuc duoc phien ghi.', 'approve_push');
-    fbmSyncPaint({ phase: 'error', label: 'Có lỗi', message: String(error && error.message || error), counts: {} });
+    fbmSyncPaint(fbmSyncClientErrorStatus(String(error && error.message || error)));
     return null;
   });
 }
@@ -1320,6 +1320,13 @@ function fbmSyncWaitForIdentityBackground(startCall, attempt) {
   });
 }
 /** Mô tả chặng đang chờ mà không ghi thêm tiến độ tạm vào GAS. */
+/**
+ * Lỗi phía client (callback GAS lỗi, quá giờ, kết quả rỗng) vẽ đè lên snapshot GAS gần nhất: giữ runId, pipeline và bộ đếm thật.
+ * Dựng object mới chỉ có `counts: {}` thì renderer xóa pipeline và hiện các số 0 không phải kết quả đồng bộ (FBM-017).
+ */
+function fbmSyncClientErrorStatus(reason, extra) {
+  return Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, extra || {}, { phase: 'error', label: 'Có lỗi', message: reason, lastError: reason });
+}
 function fbmSyncWaitingStatus(status, message) {
   var snapshot = status && (status.status || status) || {};
   return Object.assign({}, snapshot, { message: message });
@@ -1392,7 +1399,7 @@ function fbmSyncLoop(status) {
     if (!status) {
       var emptyResultError = 'GAS returned no sync result.';
       fbmSyncLogClientError(new Error(emptyResultError), emptyResultError, 'empty_sync_result');
-      fbmSyncPaint({ phase: 'error', label: 'Error', message: emptyResultError, lastError: 'SYNC_EMPTY_RESULT', counts: {} });
+      fbmSyncPaint(fbmSyncClientErrorStatus(emptyResultError, { lastFailureCode: 'SYNC_EMPTY_RESULT' }));
     } else if (status.ok === false) {
       var terminal = status.status && typeof status.status === 'object' ? status.status : {};
       fbmSyncPaint(Object.assign({}, terminal, { phase: 'error', label: 'Error', message: String(status.error || status.message || status.code || 'Sync failed.'), lastError: String(status.error || status.message || status.code || 'SYNC_TERMINAL_FAILURE'), counts: terminal.counts || {} }));
@@ -1438,7 +1445,7 @@ function fbmSyncRun(mode) {
     var reason = err && err.message ? err.message : String(err);
     if (err && err.code === 'GAS_CALLBACK_TIMEOUT') {
       var diagnostic = err.diagnostic || {};
-      var timeoutStatus = Object.assign({}, diagnostic, { phase: 'error', label: 'Lỗi', message: reason, lastError: reason, lastFailureCode: err.code, counts: diagnostic.counts || {} });
+      var timeoutStatus = fbmSyncClientErrorStatus(reason, Object.assign({}, diagnostic, { lastFailureCode: err.code }));
       return callServer('fbmLogSyncError', [reason, FBM_SYNC_CLIENT.traceEvents.slice()]).catch(function () { return null; }).then(function () {
         fbmSyncPaint(timeoutStatus);
         return null;
@@ -1447,7 +1454,7 @@ function fbmSyncRun(mode) {
     return callServer('fbmLogSyncError', [reason, FBM_SYNC_CLIENT.traceEvents.slice()]).catch(function () { return null; }).then(function () {
       return err && err.transportReported ? null : callServer('fbmCancelSync').catch(function () { return null; });
     }).then(function () {
-      fbmSyncPaint({ label: 'Lỗi', phase: 'error', message: reason, lastError: reason, counts: {} });
+      fbmSyncPaint(fbmSyncClientErrorStatus(reason));
       return null;
     });
   });
