@@ -35,8 +35,6 @@ FbmSync.logPushRecord = function (candidate, operation, outcome, reason, detail)
 FbmSync.markPushResult = function (candidate, response, operation) {
   var record = candidate.record || {}, values = FbmSync.extractInternalValues(response), data = FbmSync.protocol.parse(response) || {}, current = typeof FbmSync.stateRead === 'function' ? FbmSync.stateRead() : {}, gate = FbmSync.stateCategoryGate(current);
   data = data.d || data;
-  // Giữ baseline cũ; hash payload gửi được lưu riêng để kỳ đọc nhận ra chính lần ghi này.
-  var sentHash = typeof FbmSync.hash === 'function' ? FbmSync.hash(record, candidate.entity, gate) : '';
   var patch = { id: record.id, syncStatus: FbmSync.SYNC_STATUS.pushed, fbmHash: String(record.fbmHash || '').trim() };
   if (candidate.entity === 'customer') {
     patch.fbmId = String(values.stt_rec_kh || values.stt_rec_kh0 || record.fbmId || '').trim();
@@ -47,6 +45,9 @@ FbmSync.markPushResult = function (candidate, response, operation) {
     patch.fbmId = String(activityId).trim();
     if (!patch.fbmId) { throw new Error('FBM không trả id sau khi ghi Activity.'); }
   }
+  // Giữ baseline cũ; hash payload gửi được lưu riêng để kỳ đọc nhận ra chính lần ghi này.
+  // Fingerprint Activity có `id` FBM nên phải tính sau khi gắn ID vừa nhận; tính trên bản ghi lúc tạo (chưa có ID) thì mọi lệnh tạo đọc xác nhận lệch thành xung đột giả (FBM-050).
+  var sentHash = FbmSync.hash(Object.assign({}, record, { fbmId: patch.fbmId }), candidate.entity, gate);
   FbmSync.sheetSave(candidate.entity, [patch], 'push');
   // Hash chờ xác nhận chỉ lưu trong state server, không ghi vào Sheet.
   try {
