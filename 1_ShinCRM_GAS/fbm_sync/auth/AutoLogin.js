@@ -111,11 +111,23 @@ FbmSync.autoLoginCanAttempt = function (now) {
   var at = Number(now || Date.now()), value = FbmSync.loginConfigRead();
   if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED' }; }
   if (!value.enabled || !value.configured) { return { ok: false, code: 'AUTO_LOGIN_NOT_CONFIGURED' }; }
-  if (!value.retryEnabled && value.lastAttemptAt) { return { ok: false, code: 'AUTO_LOGIN_RETRY_DISABLED' }; }
-  var last = Number(value.lastAttemptAt || 0);
+  // Chu kỳ chờ chỉ áp sau lần thử chưa thành công (tài liệu 06): lần trước đăng nhập được mà phiên rơi sau đó thì phải được đăng nhập lại ngay.
+  var last = Number(value.lastAttemptAt || 0), lastFailed = last > 0 && Number(value.lastLoginAt || 0) < last;
+  if (!value.retryEnabled && lastFailed) { return { ok: false, code: 'AUTO_LOGIN_RETRY_DISABLED' }; }
   var retryMs = Math.max(1, Number(value.retryMinutes || 30)) * 60 * 1000;
-  if (last && at - last < retryMs) { return { ok: false, code: 'AUTO_LOGIN_THROTTLED', retryAt: last + retryMs }; }
+  if (lastFailed && at - last < retryMs) { return { ok: false, code: 'AUTO_LOGIN_THROTTLED', retryAt: last + retryMs }; }
   return { ok: true, credentialRef: value.credentialRef };
+};
+
+/** Lý do cổng không được tự đăng nhập, theo đúng mã autoLoginCanAttempt trả về. */
+FbmSync.autoLoginBlockMessage = function (code) {
+  var messages = {
+    SYNC_DISABLED: 'Đồng bộ FBM đang tắt; không tự đăng nhập.',
+    AUTO_LOGIN_NOT_CONFIGURED: 'Tự đăng nhập FBM đang tắt hoặc chưa được cấu hình; request đã bị chặn.',
+    AUTO_LOGIN_RETRY_DISABLED: 'Lần tự đăng nhập FBM trước thất bại và đang tắt tự thử lại; hãy đăng nhập trên tab FBM hoặc bật thử lại trong Cài đặt phiên.',
+    AUTO_LOGIN_THROTTLED: 'Lần tự đăng nhập FBM trước thất bại; đang chờ chu kỳ an toàn trước khi thử lại.'
+  };
+  return messages[String(code || '')] || messages.AUTO_LOGIN_NOT_CONFIGURED;
 };
 
 FbmSync.autoLoginMarkAttempt = function (now) {

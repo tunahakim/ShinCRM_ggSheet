@@ -180,14 +180,13 @@ FbmSync.sessionGateStart = function (state, failedCursor) {
   if (!policy.autoLogin) {
     var canAttempt = typeof FbmSync.autoLoginCanAttempt === 'function' ? FbmSync.autoLoginCanAttempt() : { code: 'AUTO_LOGIN_NOT_CONFIGURED' };
     var code = String(canAttempt.code || 'AUTO_LOGIN_NOT_CONFIGURED');
-    var message = code === 'AUTO_LOGIN_THROTTLED' ? 'Đang chờ chu kỳ an toàn trước khi thử đăng nhập FBM lại.' : 'Tự đăng nhập FBM đang tắt hoặc chưa được cấu hình; request đã bị chặn.';
-    FbmSync.sessionGateBlock(current, code, message);
+    FbmSync.sessionGateBlock(current, code, FbmSync.autoLoginBlockMessage(code));
     return null;
   }
   allowed = FbmSync.beginAutoLogin(current, cursor, { heartbeat: cursor.kind === 'heartbeat' });
   if (!allowed) {
     var blocked = typeof FbmSync.autoLoginCanAttempt === 'function' ? FbmSync.autoLoginCanAttempt() : { code: 'AUTO_LOGIN_NOT_CONFIGURED' };
-    FbmSync.sessionGateBlock(current, blocked.code || 'AUTO_LOGIN_NOT_CONFIGURED', 'Chưa đủ điều kiện tự đăng nhập FBM; request đã bị chặn.');
+    FbmSync.sessionGateBlock(current, blocked.code || 'AUTO_LOGIN_NOT_CONFIGURED', FbmSync.autoLoginBlockMessage(blocked.code));
     return null;
   }
   gate = FbmSync.sessionGateMeta(current);
