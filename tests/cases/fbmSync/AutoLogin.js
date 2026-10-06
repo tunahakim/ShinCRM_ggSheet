@@ -148,6 +148,25 @@ async function chay(so) {
   heartbeat.FbmSync.statePatch({ runId: 'gate-exception', phase: 'checking_session', mode: 'read', cursor: { kind: 'heartbeat' }, activeRequestId: '', deadlineAt: 0, session: { expired: true } });
   const gateException = heartbeat.FbmSync.nextEnvelope({ url: 'https://fbm.test/gate-exception', body: {}, meta: { kind: 'gate_exception_read' } });
   check(so, 'exception noi bo cong fail-closed va ghi loi an toan', [gateException, heartbeat.FbmSync.stateRead().phase, heartbeat.FbmSync.stateRead().lastFailureCode, gateLogs.some((event) => event.action === 'session_gate_exception'), /secret-internal|password|cookie|envelope|authorized/i.test(JSON.stringify(gateLogs))], [null, 'error', 'FBM_SESSION_GATE_EXCEPTION', true, false]);
+
+  // FBM-029: sự kiện cổng không kết thúc phiên vẫn có dòng Log riêng dù phiên có sổ bước; ghi state lỗi thì ném lên lát.
+  const stepBookState = heartbeat.FbmSync.stateRead();
+  Object.assign(stepBookState, { runId: 'step-book-expired', phase: 'pull_customer', metadata: Object.assign({}, stepBookState.metadata, { businessSteps: { pull_customer: { status: 'running' } } }) });
+  heartbeat.FbmSync.stateWrite(stepBookState);
+  const logsBeforeExpired = gateLogs.length, savedLogStatus = heartbeat.FbmSync.logStatus, savedStatusView = heartbeat.FbmSync.statusView;
+  heartbeat.FbmSync.logStatus = () => {}; // như logStatus thật với phiên có sổ bước: không ghi snapshot
+  heartbeat.FbmSync.statusView = () => ({ runId: 'step-book-expired' });
+  heartbeat.FbmSync.sessionGateRecordFailure(heartbeat.FbmSync.stateRead(), 'SESSION_EXPIRED', 'Phiên FBM đã hết hạn; cổng đang xử lý đăng nhập lại an toàn.', 'session_expired');
+  heartbeat.FbmSync.logStatus = savedLogStatus; heartbeat.FbmSync.statusView = savedStatusView;
+  const expiredLog = gateLogs.slice(logsBeforeExpired).find((event) => event.action === 'session_expired');
+  check(so, 'FBM-029: phiên có sổ bước gặp "Phiên FBM đã hết hạn" (chưa kết thúc phiên) vẫn có dòng Log lỗi mang lý do và mã',
+    [!!expiredLog, expiredLog && expiredLog.reason, expiredLog && expiredLog.detail.code, heartbeat.FbmSync.stateRead().phase], [true, 'Phiên FBM đã hết hạn; cổng đang xử lý đăng nhập lại an toàn.', 'SESSION_EXPIRED', 'pull_customer']);
+  const savedGateStateWrite = heartbeat.FbmSync.stateWrite;
+  heartbeat.FbmSync.stateWrite = () => { const error = new Error('Không thể lưu state đồng bộ vào DocumentProperties.'); error.code = 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED'; throw error; };
+  let gateWriteError = null;
+  try { heartbeat.FbmSync.sessionGateRecordFailure(heartbeat.FbmSync.stateRead(), 'FBM_TAB_NOT_FOUND', 'Không tìm thấy tab FBM.', 'transport_retry'); } catch (error) { gateWriteError = error; }
+  heartbeat.FbmSync.stateWrite = savedGateStateWrite;
+  check(so, 'FBM-029: cổng phiên ghi state lỗi thì ném FBM_DOCUMENT_PROPERTIES_WRITE_FAILED lên lát, không nuốt', gateWriteError && gateWriteError.code, 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED');
   heartbeat.FbmSync.statePatch({ runId: 'gate-transport-exception', phase: 'checking_session', mode: 'read', cursor: { kind: 'heartbeat' }, activeRequestId: 'gate-transport-request', deadlineAt: Date.now() + 1000, session: { expired: false } });
   const gateTransportException = heartbeat.FbmSync.heartbeatTransportFailure({ requestId: 'gate-transport-request', code: 'FBM_TAB_NOT_FOUND', message: 'Không tìm thấy tab FBM đang mở.' });
   check(so, 'exception cong trong nhanh no-tab cung thu hoi reservation', [gateTransportException, heartbeat.FbmSync.stateRead().phase, heartbeat.FbmSync.stateRead().activeRequestId, heartbeat.FbmSync.stateRead().lastFailureCode], [null, 'error', '', 'FBM_SESSION_GATE_EXCEPTION']);
