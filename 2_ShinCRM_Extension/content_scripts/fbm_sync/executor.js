@@ -1,6 +1,6 @@
 /* Cầu nối FBM: nhận request, fetch trong tab đăng nhập, trả response thô. */
 (function () {
-  var EXECUTOR_VERSION = '21.17';
+  var EXECUTOR_VERSION = '21.18';
   var FETCH_TIMEOUT_MS = 10000;
   function traceEvent(trace, stage, request, extra) {
     trace.push(Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {}));
@@ -133,6 +133,19 @@
     function hex(n) { var out = '', k; for (k = 0; k < 4; k += 1) { out += ('0' + ((n >> (k * 8)) & 255).toString(16)).slice(-2); } return out; }
     return hex(a) + hex(b) + hex(c) + hex(d);
   }
+  /** Mô phỏng phần phía trình duyệt của trang Login FBM (_onLoginComplete); trả mã kết quả cho trace, không trả khóa. */
+  function storeLoginPageKey(credentials, salt) {
+    var password = String(credentials && credentials.password || '');
+    if (!password || /^[a-f0-9]{32}$/i.test(password)) { return 'LOGIN_PAGE_KEY_SKIPPED_HASHED_CREDENTIAL'; }
+    try {
+      sessionStorage.clear();
+      localStorage.removeItem('menuItems');
+      localStorage.setItem('k' + String.fromCharCode(0), md5(md5(String(salt || '')) + md5(password)));
+      return 'LOGIN_PAGE_KEY_STORED';
+    } catch (storageError) {
+      return 'LOGIN_PAGE_KEY_STORAGE_FAILED';
+    }
+  }
   function executeLogin(request, trace) {
     var credentials = request && request.meta && request.meta.loginCredentials || {}, base = 'https://fbo.com.vn:8888/Main/Login.aspx/', headers = { accept: '*/*', 'content-type': 'application/json; charset=UTF-8' };
     function post(url, body) { return fetch(base + url, { method: 'POST', headers: headers, body: body, credentials: 'include', cache: 'no-store' }).then(function (response) { return readResponseText(response).then(function (text) { return { response: response, text: text }; }); }); }
@@ -167,6 +180,9 @@
             return { ok: true, status: login.response.status, headers: { contentType: login.response.headers.get('content-type') || '' }, body: login.text, transport: { loginStage: 'login', loginBlocked: true, trace: trace } };
           }
           traceEvent(trace, 'login_successful', request, { httpStatus: login.response.status });
+          // Trang Login của FBM, khi người dùng tự đăng nhập, lưu khóa MD5(MD5(salt)+MD5(mật khẩu)) vào localStorage "k "; bảng dữ liệu trên trang chính
+          // kiểm khóa này và không vẽ nếu lệch, nên đăng nhập ngầm mà thiếu bước này thì tab FBM trắng trơn. Làm y hệt trang Login để tab dùng chung phiên.
+          traceEvent(trace, 'login_page_storage', request, { code: storeLoginPageKey(credentials, salt) });
           return fetch('https://fbo.com.vn:8888/Main/zccrAccount.aspx', { method: 'GET', credentials: 'include', cache: 'no-store' }).then(function (account) {
             return readResponseText(account).then(function (accountHtml) {
               // Mẫu bắt cookie do GAS cấp trong request (một chỗ định nghĩa); ưu tiên trang tài khoản vừa đọc, rồi response Login, cuối cùng mới tới trang đang mở.
