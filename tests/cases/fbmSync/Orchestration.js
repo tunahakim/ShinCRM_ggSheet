@@ -34,13 +34,32 @@ async function chay(so) {
     PropertiesService: { getDocumentProperties: () => ({ getProperty: () => 'relay-test-key' }), getScriptProperties: () => ({ getProperty: () => 'relay-test-key' }) },
     ScriptApp: { getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/head-only/exec' }) },
     shinOpenBook: () => ({ getId: () => 'sheet-relay-test' }),
-    ContentService: { MimeType: { JSON: 'application/json' }, createTextOutput: (text) => ({ text: text, setMimeType() { return this; } }) }
+    ContentService: { MimeType: { JSON: 'application/json' }, createTextOutput: (text) => ({ text: text, setMimeType() { return this; } }) },
+    ERROR_CHANNEL_PENDING: 'pending', LOG_ERROR: 'error', errorMessage: (err) => String(err && err.message || err)
   });
-  napServer(relay, 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/write/SheetSave.js');
+  // Bộ ghi Log giả: đếm dòng đệm và số lần xả để chốt cổng nhịp nền đi qua đúng vỏ runEntryPoint (FBM-034).
+  const relayLog = { lines: [], flushes: 0, reports: [] };
+  relay.logEvent = (entry) => { relayLog.lines.push(entry); };
+  relay.flushLog = () => { relayLog.flushes += 1; return 0; };
+  relay.reportError = (err, channel) => { relayLog.reports.push([String(err && err.message || err), channel]); };
+  napServer(relay, 'server/entry/EntryPoint.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/write/SheetSave.js');
   const stableRelayConfig = relay.fbmSyncRelayConfig();
   check(so, 'relay cap URL deployment co dinh, khong lay URL @HEAD theo context Sidebar', [stableRelayConfig.url, stableRelayConfig.url.indexOf('head-only') >= 0], ['https://script.google.com/macros/s/AKfycbx0ueI_gR2zzkTUGV5lTAXty0zotK2owAd5zPy0Z0SzJkJjRa0dIvbMREAoVJm3iFrX/exec', false]);
   const rejectedProbe = JSON.parse(relay.doPost({ postData: { contents: JSON.stringify({ key: 'relay-test-key', spreadsheetId: 'sheet-relay-test', kind: 'probe' }) } }).text);
   check(so, 'Web App từ chối probe ngoài nhịp nền', [rejectedProbe.ok, rejectedProbe.code, rejectedProbe.request], [false, 'RELAY_KIND_UNSUPPORTED', null]);
+  // FBM-034: nhịp nền chạy cả khi Sidebar đóng, nên lỗi ở đây chỉ còn Log và tin chờ ở Sidebar lần mở sau. Trước đây doPost không qua runEntryPoint: Log nằm trong RAM rồi mất, exception chỉ trả về Extension.
+  const relayPost = (body) => JSON.parse(relay.doPost({ postData: { contents: typeof body === 'string' ? body : JSON.stringify(body) } }).text);
+  check(so, 'FBM-034: nhịp nền thành công vẫn xả bộ đệm Log đúng một lần', relayLog.flushes, 1);
+  relay.fbmSyncHeartbeatRequest = () => { throw new Error('Lỗi đọc state thử nghiệm'); };
+  const relayBoom = relayPost({ key: 'relay-test-key', spreadsheetId: 'sheet-relay-test', kind: 'heartbeat_request' });
+  const boomLine = relayLog.lines.filter((line) => line.action === 'fbmRelay')[0] || {};
+  check(so, 'FBM-034: exception trong nhịp nền có dòng Log lỗi action fbmRelay, được xả ra Sheet, đẩy tin chờ cho Sidebar và vẫn trả JSON lỗi cho Extension',
+    [relayBoom.ok, relayBoom.error, boomLine.outcome, boomLine.reason, relayLog.flushes, relayLog.reports], [false, 'Lỗi đọc state thử nghiệm', 'error', 'Lỗi đọc state thử nghiệm', 2, [['Lỗi đọc state thử nghiệm', 'pending']]]);
+  const mismatch = relayPost({ key: 'relay-test-key', spreadsheetId: 'sheet-khac', kind: 'heartbeat_request' });
+  check(so, 'FBM-034: Extension gửi nhịp nền cho bảng tính khác thì có dòng Log lỗi và tin chờ, không xử lý nhịp', [mismatch.ok, relayLog.lines.length, relayLog.reports.length, relayLog.lines[1] && relayLog.lines[1].reason.indexOf('bảng tính khác') >= 0], [false, 2, 2, true]);
+  const intruder = relayPost({ key: 'sai-khoa', spreadsheetId: 'sheet-relay-test', kind: 'heartbeat_request' });
+  const badJson = relayPost('{"key":"relay-test-key", hỏng');
+  check(so, 'FBM-034: khóa sai hoặc JSON hỏng bị từ chối mà không ghi Log (người lạ không đẩy trôi được Log thật) và câu trả về không trích nội dung gửi lên', [intruder.error, badJson.error, JSON.stringify(badJson).indexOf('relay-test-key') < 0, relayLog.lines.length, relayLog.flushes], ['unauthorized', 'invalid_json', true, 2, 3]);
 
   const props = { data: {} };
   let propertyWrites = 0;
