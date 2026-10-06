@@ -350,6 +350,35 @@ async function chay(so) {
   check(so, 'FBM-028: cấu hình đăng nhập JSON hỏng thì ném lỗi có mã, thông báo không chứa envelope hay mật khẩu, không ghi đè cấu hình',
     [loginError && loginError.code, /BI-MAT|mat-khau/.test(String(loginError && loginError.message)), dpData.FBM_LOGIN_CONFIG_V1 === secretEnvelope],
     ['FBM_DOCUMENT_PROPERTY_CORRUPT', false, true]);
+
+  // G9.3: PA3 cho Activity đi đúng đường confirmConflict; trường FBM `details`/`end_date` ghi về `content`/`workDate` của ShinCRM.
+  const activityGridFields = ['id', 'ten_loai', 'ten_cv', 'details', 'start_date', 'end_date', 'ten_tt', 'owner', 'nguoi_sua', 'datetime0', 'line_nbr'];
+  const activityGrid = (requestId, rows) => ({ trace: [{ requestId, stage: 'fetch' }], d: { TotalRowCount: rows.length, Rows: rows.map((row) => activityGridFields.map((field) => row[field] === undefined ? '' : row[field])), ViewPage: { Fields: activityGridFields.map((AliasName) => ({ AliasName })) } } });
+  const fbmActivity = (details, endDate) => ({ id: 'FBM-A1', ma_kh: 'ALT00001', ten_cv: 'Gọi điện', details, end_date: endDate });
+  const ac = makeSync(), AC = ac.hop.FbmSync;
+  AC.masterEnabled = () => true;
+  AC.scriptSettings = () => ({ baseUrl: 'https://fbm.test', accountName: 'Le Tuan Anh', customerPrefix: 'ALT', customerCodeLength: 8 });
+  const acState = AC.stateStart('', 'pull_activity', 0); acState.mode = 'read';
+  acState.metadata.categoryGate = { map: {}, names: {}, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true }, '@CAT_CONG_VIEC': { 'Gọi điện': true } }, warnings: [] };
+  AC.stateWrite(acState);
+  const acGate = acState.metadata.categoryGate;
+  AC.pullWrite('customer', [customer('FBM-C1', 'ALT00001', 'Công ty 1')]);
+  AC.pullRecords('activity', [AC.activityRecord(fbmActivity('Nội dung gốc', '/Date(1757386800000)/'), acGate)], 'read');
+  ac.local.activity[0].content = 'Nội dung Shin';
+  const acPull = AC.pullRecords('activity', [AC.activityRecord(fbmActivity('Nội dung FBM', '/Date(1757473200000)/'), acGate)], 'read');
+  const acDone = AC.stateRead(); acDone.phase = 'done'; AC.stateWrite(acDone);
+  AC.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+  const acOpen = AC.openConflict();
+  const acLatest = fbmActivity('Nội dung FBM', '/Date(1757473200000)/');
+  const acOpened = AC.conflictOpened(activityGrid(acOpen.request && acOpen.request.id, [acLatest]));
+  const acFields = ((acOpened.conflict && acOpened.conflict.fields) || []).map((item) => item.field);
+  const acPrepare = AC.prepareConflictResolution('activity', ac.local.activity[0].id, 'manual');
+  const acManual = AC.confirmConflict('activity', ac.local.activity[0].id, 'manual', { details: { choice: 'manual', value: 'Nội dung tự nhập' }, end_date: { choice: 'fbm' } }, activityGrid(acPrepare.request && acPrepare.request.id, [acLatest]));
+  const acRow = ac.local.activity[0];
+  check(so, 'G9.3: Activity xung đột hai trường thì DTO mở ra đúng hai trường FBM details và end_date', [acPull.conflicts, acFields], [1, ['details', 'end_date']]);
+  check(so, 'G9.3: PA3 Activity ghi giá trị tự nhập vào content, lấy end_date FBM vào workDate, giữ liên kết Customer, chờ đối soát và hết hàng đợi',
+    [acManual.ok, acRow.content, acRow.workDate, acRow.customerId, acRow.syncStatus, acRow.fbmHash === AC.activityRecord(acLatest, acGate).fbmHash, acManual.remaining],
+    [true, 'Nội dung tự nhập', '2025-09-10T03:00:00.000Z', 'CUS-000001', 'chờ đối soát', true, 0]);
 }
 
 module.exports = { chay };
