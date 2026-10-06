@@ -169,7 +169,8 @@ FbmSync.applyTransportSession = function (state, response) {
 
 FbmSync.loginRequest = function (credentialRef, testOnly) {
   var cfg = FbmSync.scriptSettings();
-  return { url: cfg.baseUrl + '/Main/Login.aspx/Login', body: {}, meta: { kind: 'login', credentialRef: String(credentialRef || ''), testOnly: testOnly === true } };
+  // afterLoginUrl: trang Login gốc chuyển sang ../Default.aspx sau khi đăng nhập (ch02), nên tab FBM vào đúng màn hình làm việc mặc định.
+  return { url: cfg.baseUrl + '/Main/Login.aspx/Login', body: {}, meta: { kind: 'login', credentialRef: String(credentialRef || ''), testOnly: testOnly === true, afterLoginUrl: cfg.baseUrl + '/Default.aspx' } };
 };
 
 FbmSync.loginTestRequest = function (credentialRef, expectedIdentity) {

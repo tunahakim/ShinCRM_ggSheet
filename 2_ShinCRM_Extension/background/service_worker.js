@@ -186,9 +186,24 @@ function sendToFbmTab(tabId, request) {
     return hydrateLoginRequest(request).then(function (readyRequest) {
       request = readyRequest;
       return waitForGenericRequestDelay(request).then(function () {
-        return sendTabMessage(tabId, { type: 'FBM_EXECUTE_V2', request: request }, 15000);
+        return sendTabMessage(tabId, { type: 'FBM_EXECUTE_V2', request: request }, 15000).then(function (reply) { return showFbmHomeAfterLogin(tabId, request, reply); });
       });
     });
+  });
+}
+
+/** Đăng nhập chạy bằng fetch nên tab vẫn đứng ở trang lỗi/Login; GAS cấp địa chỉ màn hình làm việc, Extension chỉ mở và chờ tải xong trước khi trả kết quả để request kế tiếp không rơi vào tab đang tải. */
+function showFbmHomeAfterLogin(tabId, request, reply) {
+  var url = request && request.meta && request.meta.afterLoginUrl, result = reply && reply.result;
+  if (!url || !result || !result.ok || (result.transport && result.transport.loginBlocked) || !chrome.tabs || typeof chrome.tabs.update !== 'function') { return Promise.resolve(reply); }
+  return new Promise(function (resolve, reject) {
+    chrome.tabs.update(tabId, { url: String(url) }, function (tab) {
+      var error = chrome.runtime.lastError;
+      if (error) { reject(Object.assign(new Error(error.message), { code: 'FBM_HOME_OPEN_FAILED' })); } else { resolve(tab || { id: tabId, status: 'loading' }); }
+    });
+  }).then(waitForFbmTabReady).then(function () { return addWorkerTrace(reply, request, 'fbm_home_opened'); }, function (error) {
+    // Đăng nhập đã thành công; chỉ ghi vết để GAS thấy, không đổi kết quả đăng nhập.
+    return addWorkerTrace(reply, request, 'fbm_home_open_failed', { code: String(error && error.code || 'FBM_HOME_OPEN_FAILED') });
   });
 }
 

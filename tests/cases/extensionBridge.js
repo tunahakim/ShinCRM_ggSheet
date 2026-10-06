@@ -386,6 +386,21 @@ async function chay(so) {
   const callbackTab = await workerContext.ensureFbmTab({ meta: { openFbmContext: { url: 'https://fbo.com.vn:8888/Main/zccrAccount.aspx', active: false } } });
   check(so, 'auto-open tuong thich Chrome tabs.create dang callback va khong dung im lang', [callbackTab && callbackTab.id, callbackCreatedUrl], [78, 'https://fbo.com.vn:8888/Main/zccrAccount.aspx']);
 
+  let homeUrl = '', homeListener = null;
+  workerContext.chrome.tabs.update = (tabId, options, callback) => { homeUrl = options.url; setImmediate(() => callback({ id: tabId, status: 'loading' })); };
+  workerContext.chrome.tabs.onUpdated = { addListener(fn) { homeListener = fn; }, removeListener() {} };
+  const loginRequest = { id: 'login-1', meta: { kind: 'login', afterLoginUrl: 'https://fbo.com.vn:8888/Default.aspx' } };
+  let homeReply = null;
+  const pendingHome = workerContext.showFbmHomeAfterLogin(80, loginRequest, { result: { ok: true, transport: {} } }).then((reply) => { homeReply = reply; });
+  await new Promise((resolve) => setImmediate(resolve));
+  check(so, 'đăng nhập thành công mở màn hình làm việc GAS cấp và chưa trả kết quả khi tab đang tải', [homeUrl, homeReply, typeof homeListener], ['https://fbo.com.vn:8888/Default.aspx', null, 'function']);
+  homeListener(80, { status: 'complete' }, { id: 80, status: 'complete' });
+  await pendingHome;
+  check(so, 'màn hình làm việc tải xong mới trả kết quả đăng nhập kèm vết', homeReply.result.transport.trace.map((item) => item.stage), ['fbm_home_opened']);
+  homeUrl = '';
+  await workerContext.showFbmHomeAfterLogin(80, loginRequest, { result: { ok: true, transport: { loginBlocked: true } } });
+  await workerContext.showFbmHomeAfterLogin(80, loginRequest, { result: { ok: false } });
+  check(so, 'đăng nhập bị chặn hoặc thất bại thì không đổi trang tab FBM', homeUrl, '');
   workerContext.chrome.tabs.create = (options) => Promise.resolve({ id: 79, status: 'complete' });
   const noTabRequest = await new Promise((resolve) => {
     workerMessageListener({ type: 'FBM_EXECUTE_REQUEST', id: 'no-tab-request', request: { id: 'no-tab-request', url: 'https://fbo.com.vn:8888/Main/service', meta: {} } }, null, resolve);
