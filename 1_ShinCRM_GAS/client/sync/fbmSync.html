@@ -233,7 +233,18 @@ function fbmSyncWaitForBridge() {
       var waiters = FBM_SYNC_BRIDGE_WAITERS.splice(0, FBM_SYNC_BRIDGE_WAITERS.length);
       FBM_SYNC_BRIDGE_WAIT_TIMER = null;
       waiters.forEach(function (waiter) { waiter(false); });
-    }, 5000);
+    }, typeof sheetLinkMs === 'function' ? sheetLinkMs('EXTENSION_ACK_TIMEOUT_MS', 3000) : 3000);
+  });
+}
+/** Cổng Extension chung của mọi nút khởi chạy phiên. Nhịp ping bị Chrome làm chậm khi tab ẩn nên ACK cũ chưa chắc là Extension vắng: ping ngay và chờ ACK rồi mới kết luận. Vắng thật thì ghi Log (không lỗi im lặng) và trả trạng thái lỗi để nơi gọi hiển thị; còn sống thì trả null. */
+function fbmSyncRequireBridge(action) {
+  if (typeof sheetLinkExtensionAlive !== 'function' || sheetLinkExtensionAlive()) { return Promise.resolve(null); }
+  if (typeof sheetLinkHandshakePing === 'function') { sheetLinkHandshakePing(); }
+  return fbmSyncWaitForBridge().then(function (ready) {
+    if (ready) { return null; }
+    var message = 'Chưa nhận được bắt tay từ Extension. Hãy tải lại Extension rồi mở lại tab FBM.';
+    fbmSyncLogClientError(null, message, action);
+    return { label: 'Chưa kết nối Extension', phase: 'error', message: message, counts: {} };
   });
 }
 function fbmSyncConfigureRelay() {
@@ -873,13 +884,16 @@ function fbmSyncCheckIdentity() {
     fbmSyncPaintError(null, 'Cần đủ Spreadsheet ID, mã user, username và tên tài khoản FBM trước khi kiểm tra liên kết.');
     return Promise.resolve(null);
   }
-  if (typeof sheetLinkExtensionAlive === 'function' && !sheetLinkExtensionAlive()) {
-    var missing = { label: 'Chưa kết nối Extension', phase: 'error', message: 'Chưa nhận được bắt tay từ Extension. Hãy tải lại Extension rồi mở lại tab FBM.', counts: {} };
+  FBM_SYNC_CLIENT.running = true;
+  return fbmSyncRequireBridge('identity_check').then(function (missing) {
+    if (!missing) { return fbmSyncCheckIdentityStart(identityTarget); }
+    FBM_SYNC_CLIENT.running = false;
     fbmSyncSetAccountNotice('identity', 'error', 'Kiểm tra liên kết không thành công: ' + missing.message);
     fbmSyncPaint(missing);
-    return Promise.resolve(missing);
-  }
-  FBM_SYNC_CLIENT.running = true;
+    return missing;
+  });
+}
+function fbmSyncCheckIdentityStart(identityTarget) {
   FBM_SYNC_CLIENT.identityAction = 'check';
   FBM_SYNC_CLIENT.identityLastAction = 'check';
   FBM_SYNC_CLIENT.mode = 'check';
@@ -924,12 +938,15 @@ function fbmSyncCheckIdentity() {
 }
 function fbmSyncProbeIdentity() {
   if (FBM_SYNC_CLIENT.running) { return Promise.resolve(null); }
-  if (typeof sheetLinkExtensionAlive === 'function' && !sheetLinkExtensionAlive()) {
-    var missing = { label: 'Chưa kết nối Extension', phase: 'error', message: 'Chưa nhận được bắt tay từ Extension. Hãy tải lại Extension rồi mở lại tab FBM.', counts: {} };
-    fbmSyncPaint(missing);
-    return Promise.resolve(missing);
-  }
   FBM_SYNC_CLIENT.running = true;
+  return fbmSyncRequireBridge('identity_probe').then(function (missing) {
+    if (!missing) { return fbmSyncProbeIdentityStart(); }
+    FBM_SYNC_CLIENT.running = false;
+    fbmSyncPaint(missing);
+    return missing;
+  });
+}
+function fbmSyncProbeIdentityStart() {
   FBM_SYNC_CLIENT.identityAction = 'probe';
   FBM_SYNC_CLIENT.identityLastAction = 'probe';
   FBM_SYNC_CLIENT.identityProbeSignature = '';
@@ -1492,12 +1509,15 @@ function fbmSyncLoop(status) {
 function fbmSyncRun(mode) {
   if (!fbmSyncStatusReady()) { return Promise.resolve(null); }
   if (FBM_SYNC_CLIENT.running) { return Promise.resolve(null); }
-  if (typeof sheetLinkExtensionAlive === 'function' && !sheetLinkExtensionAlive()) {
-    var missing = { label: 'Chưa kết nối Extension', phase: 'error', message: 'Chưa nhận được bắt tay từ Extension. Hãy tải lại Extension rồi mở lại tab FBM.', counts: {} };
-    fbmSyncPaint(missing);
-    return Promise.resolve(missing);
-  }
   FBM_SYNC_CLIENT.running = true;
+  return fbmSyncRequireBridge('sync_run').then(function (missing) {
+    if (!missing) { return fbmSyncRunStart(mode); }
+    FBM_SYNC_CLIENT.running = false;
+    fbmSyncPaint(missing);
+    return missing;
+  });
+}
+function fbmSyncRunStart(mode) {
   FBM_SYNC_CLIENT.cancelRequested = false;
   FBM_SYNC_CLIENT.traceEvents = [];
   FBM_SYNC_CLIENT.viewEpoch += 1;
