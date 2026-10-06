@@ -1,6 +1,6 @@
 /* Cầu nối FBM: nhận request, fetch trong tab đăng nhập, trả response thô. */
 (function () {
-  var EXECUTOR_VERSION = '21.18';
+  var EXECUTOR_VERSION = '21.19';
   var FETCH_TIMEOUT_MS = 10000;
   function traceEvent(trace, stage, request, extra) {
     trace.push(Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {}));
@@ -133,15 +133,21 @@
     function hex(n) { var out = '', k; for (k = 0; k < 4; k += 1) { out += ('0' + ((n >> (k * 8)) & 255).toString(16)).slice(-2); } return out; }
     return hex(a) + hex(b) + hex(c) + hex(d);
   }
-  /** Mô phỏng phần phía trình duyệt của trang Login FBM (_onLoginComplete); trả mã kết quả cho trace, không trả khóa. */
-  function storeLoginPageKey(credentials, salt) {
-    var password = String(credentials && credentials.password || '');
+  /** Mô phỏng phần phía trình duyệt của trang Login FBM (_onLoginComplete); trả mã kết quả cho trace, không trả khóa. Không ghi mù như trang Login: khi phiên trên trình duyệt đang sống, Login vẫn trả d:true nhưng máy chủ giữ khóa cũ (đo 2026-10-06), ghi khóa mới sẽ làm bảng FBM trắng. Nên chỉ ghi khi khóa khớp mã kiểm "salt" + "cookie" của bảng trên trang tài khoản vừa tải sau Login. */
+  function storeLoginPageKey(credentials, salt, accountHtml) {
+    var password = String(credentials && credentials.password || ''), keyName = 'k' + String.fromCharCode(0);
     if (!password || /^[a-f0-9]{32}$/i.test(password)) { return 'LOGIN_PAGE_KEY_SKIPPED_HASHED_CREDENTIAL'; }
+    var html = String(accountHtml || ''), check = html.match(/"salt"\s*:\s*"([a-f0-9]{32})\\t/i), pageCookie = html.match(/"cookie"\s*:\s*"([^"]+)"/i);
+    if (!check || !pageCookie) { return 'LOGIN_PAGE_KEY_UNVERIFIABLE'; }
+    var candidate = md5(md5(String(salt || '')) + md5(password)), expected = check[1].toLowerCase();
     try {
-      sessionStorage.clear();
-      localStorage.removeItem('menuItems');
-      localStorage.setItem('k' + String.fromCharCode(0), md5(md5(String(salt || '')) + md5(password)));
-      return 'LOGIN_PAGE_KEY_STORED';
+      if (md5(candidate + pageCookie[1]) === expected) {
+        sessionStorage.clear();
+        localStorage.removeItem('menuItems');
+        localStorage.setItem(keyName, candidate);
+        return 'LOGIN_PAGE_KEY_STORED';
+      }
+      return md5(String(localStorage.getItem(keyName) || '') + pageCookie[1]) === expected ? 'LOGIN_PAGE_KEY_KEPT_EXISTING' : 'LOGIN_PAGE_KEY_MISMATCH';
     } catch (storageError) {
       return 'LOGIN_PAGE_KEY_STORAGE_FAILED';
     }
@@ -180,14 +186,13 @@
             return { ok: true, status: login.response.status, headers: { contentType: login.response.headers.get('content-type') || '' }, body: login.text, transport: { loginStage: 'login', loginBlocked: true, trace: trace } };
           }
           traceEvent(trace, 'login_successful', request, { httpStatus: login.response.status });
-          // Trang Login của FBM, khi người dùng tự đăng nhập, lưu khóa MD5(MD5(salt)+MD5(mật khẩu)) vào localStorage "k "; bảng dữ liệu trên trang chính
-          // kiểm khóa này và không vẽ nếu lệch, nên đăng nhập ngầm mà thiếu bước này thì tab FBM trắng trơn. Làm y hệt trang Login để tab dùng chung phiên.
-          traceEvent(trace, 'login_page_storage', request, { code: storeLoginPageKey(credentials, salt) });
           return fetch('https://fbo.com.vn:8888/Main/zccrAccount.aspx', { method: 'GET', credentials: 'include', cache: 'no-store' }).then(function (account) {
             return readResponseText(account).then(function (accountHtml) {
               // Mẫu bắt cookie do GAS cấp trong request (một chỗ định nghĩa); ưu tiên trang tài khoản vừa đọc, rồi response Login, cuối cùng mới tới trang đang mở.
               var captures = Object.assign({}, captureTransportValues(request, '', 'page_html'), captureTransportValues(request, login.text, 'response'), captureTransportValues(request, accountHtml, 'response'));
               traceEvent(trace, 'payload_cookie_page_read', request, Object.assign(payloadCookieDiagnostic(accountHtml, account.url), { httpStatus: account.status, code: captures.payloadCookie ? 'PAYLOAD_COOKIE_CAPTURED' : 'PAYLOAD_COOKIE_MISSING' }));
+              // Bảng dữ liệu trên trang chính kiểm khóa localStorage "k\0" mà trang Login lưu; thiếu/lệch thì tab FBM trắng trơn (ch02 2.5.1).
+              traceEvent(trace, 'login_page_storage', request, { code: storeLoginPageKey(credentials, salt, accountHtml) });
               traceEvent(trace, 'payload_cookie_tab_read', request, Object.assign(payloadCookieDiagnostic(document.documentElement ? document.documentElement.innerHTML : ''), { code: document.readyState }));
               return { ok: login.response.ok, status: login.response.status, headers: { contentType: login.response.headers.get('content-type') || '' }, body: login.text, transport: { captures: captures, trace: trace } };
             });
