@@ -599,7 +599,7 @@ async function chay(so) {
     { ok: true, request: { id: 'open-heartbeat', url: 'https://fbo.com.vn:8888/service', method: 'POST', bodyText: '{}', meta: { openFbmContext: { url: 'https://fbo.com.vn:8888/Main/zccrAccount.aspx', active: false } } } },
     { ok: true, code: 'HEARTBEAT_COMPLETE', request: null }
   ], [], (tabId, message) => {
-    if (message.type === 'FBM_PING_V2') { return { ready: true, version: '21.18' }; }
+    if (message.type === 'FBM_PING_V2') { return { ready: true, version: '21.19' }; }
     if (message.type === 'FBM_EXECUTE_V2') { return { result: { ok: true, status: 200, body: '{"d":{"TotalRowCount":12,"Rows":[]}}', transport: { trace: [{ stage: 'executor_response_sent', requestId: message.request.id }] } } }; }
     return null;
   });
@@ -611,7 +611,7 @@ async function chay(so) {
     { ok: true, request: { id: 'heartbeat-envelope', url: 'https://fbo.com.vn:8888/service', method: 'POST', bodyText: '{"from":"gas"}' } },
     { ok: true, code: 'HEARTBEAT_COMPLETE', request: null }
   ], [{ id: 17 }], (tabId, message) => {
-    if (message.type === 'FBM_PING_V2') { return { ready: true, version: '21.18' }; }
+    if (message.type === 'FBM_PING_V2') { return { ready: true, version: '21.19' }; }
     if (message.type === 'FBM_EXECUTE_V2') {
       return { result: { ok: true, status: 200, body: rawHeartbeat, transport: { trace: [{ stage: 'executor_response_sent', requestId: message.request.id }] } } };
     }
