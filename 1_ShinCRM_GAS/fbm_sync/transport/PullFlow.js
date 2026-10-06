@@ -42,6 +42,10 @@ FbmSync.start = function (options) {
   state.origin = opt.origin === 'background' ? 'background' : 'manual';
   state.mode = opt.mode === 'write' || opt.mode === 'push' ? opt.mode : opt.mode === 'check' ? 'check' : 'read';
   state.scan = opt.scan === 'activity_bulk' ? 'activity_bulk' : opt.scan === 'identity_check' ? 'identity_check' : opt.scan === 'identity_probe' ? 'identity_probe' : opt.scan === 'detail' ? 'detail' : 'full';
+  if (typeof FbmSync.businessStepStart === 'function') {
+    FbmSync.businessStepStart(state, 'run', { mode: state.mode, scan: state.scan, origin: state.origin });
+    FbmSync.businessStepStart(state, 'preflight_hash', { mode: state.mode, scan: state.scan, origin: state.origin });
+  }
   state.identityTarget = state.scan === 'identity_check' && typeof FbmSync.identityCheckTarget === 'function' ? FbmSync.identityCheckTarget(opt.identity) : null;
   var accountSettings = typeof FbmSync.accountSettingsRead === 'function' ? FbmSync.accountSettingsRead() : {};
   state.activitySince = String(accountSettings && accountSettings.activitySince || '').trim();
@@ -53,6 +57,9 @@ FbmSync.start = function (options) {
     state.metadata.preflight = preflight;
     state.metadata.preflightIssues = preflight.issues || [];
     if (typeof FbmSync.logPreflight === 'function') { FbmSync.logPreflight(preflight); }
+    if (typeof FbmSync.businessStepFinish === 'function') {
+      FbmSync.businessStepFinish(state, 'preflight_hash', preflight.ok ? 'ok' : 'error', Object.assign({}, preflight.hashSummary || {}, { candidateCount: Number(preflight.candidateCount || 0), errors: Number(preflight.blocking && preflight.blocking.length || 0), skipped: Number(preflight.warnings && preflight.warnings.length || 0), error: !preflight.ok && String(preflight.blocking[0] && preflight.blocking[0].message || '') }));
+    }
     if (!preflight.ok) {
       var first = preflight.blocking[0] || {};
       state.phase = 'error'; state.entity = ''; state.cursor = {}; state.lastFailureCode = 'SYNC_PREFLIGHT_FAILED';
@@ -75,6 +82,7 @@ FbmSync.start = function (options) {
       return { ok: true, request: null, status: FbmSync.statusView(), approvalRequired: true };
     }
   }
+  if (typeof FbmSync.businessStepStart === 'function') { FbmSync.businessStepStart(state, 'session', { mode: state.mode, scan: state.scan }); }
   if (state.scan === 'identity_probe') {
     // User grid đã tự chứng minh cookie/session đọc được. Không lấy Authorized
     // chỉ để tự động điền, vì token này không được probe sử dụng.
@@ -91,21 +99,43 @@ FbmSync.start = function (options) {
 /** Xử lý một trang pull; read/write ghi Sheet, check/push chỉ xem trước. */
 FbmSync.pullRecords = function (entity, records, mode) {
   var state = FbmSync.stateRead(), count = (records || []).length;
+  var pullStep = 'pull_' + String(entity || ''), reconcileStep = 'reconcile_' + String(entity || '');
   state.counts.completed += count;
   state.counts.total = Math.max(Number(state.counts.total || 0), Number(state.counts.completed || 0));
+  if (typeof FbmSync.businessStepAdd === 'function') { FbmSync.businessStepAdd(state, pullStep, { received: count }); }
   if (!FbmSync.canWriteSheet(mode)) {
     state.counts.skipped += count;
     state.message = 'Da doc ' + count + ' ban ghi (che do khong ghi Sheet).';
+    if (typeof FbmSync.businessStepAdd === 'function') { FbmSync.businessStepAdd(state, reconcileStep, { received: count, skipped: count }); }
     FbmSync.stateWrite(state);
     return { ok: true, preview: true, written: 0, skipped: count };
   }
   var result = FbmSync.pullWrite(entity, records || []);
+  if (!result.ok) { FbmSync.pullWriteFail(entity, result.writeResult || {}); }
   state.counts.succeeded += Number(result.written || 0);
   state.counts.conflict += Number(result.conflicts || 0);
   state.counts.skipped += Number(result.skipped || 0);
   state.counts.error += result.ok ? 0 : count;
+  if (typeof FbmSync.businessStepAdd === 'function') {
+    FbmSync.businessStepAdd(state, reconcileStep, { received: count, written: Number(result.written || 0), conflict: Number(result.conflicts || 0), skipped: Number(result.skipped || 0), errors: result.ok ? 0 : count, sheetWriteBatches: Number(result.sheetWriteBatches || 0) });
+  }
   FbmSync.stateWrite(state);
   return result;
+};
+
+/**
+ * Cửa ghi chặn cả lô thì ném lỗi để `runSlice` chuyển phiên sang lỗi trước khi cursor qua trang này; trả `ok:false` rồi đi tiếp sẽ kết thúc "Hoàn tất" với dữ liệu chưa ghi (FBM-004).
+ * Lỗi hệ thống của cửa ghi đã tự ném exception nên chỉ nhánh dữ liệu không đạt đi qua đây.
+ */
+FbmSync.pullWriteFail = function (entity, saved) {
+  var invalid = Array.isArray(saved.invalid) ? saved.invalid : [];
+  invalid.forEach(function (item) {
+    FbmSync.recordIssueAdd('pull', entity, FbmSync.SYNC_STATUS.error, String(item.id || ''), 'Cửa ghi Sheet chặn trường ' + String(item.label || item.field || ''), typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error');
+  });
+  var first = invalid[0], detail = first ? String(first.label || first.field || '') + ' của ' + String(first.id || 'bản ghi mới') + ': ' + String(first.reason || '') : String(saved.error || 'cửa ghi trả kết quả không thành công');
+  var error = new Error('Không ghi được trang ' + entity + ' vào Sheet (' + invalid.length + ' trường không đạt). ' + detail);
+  error.code = 'FBM_SHEET_WRITE_FAILED';
+  throw error;
 };
 
 /** Nhận token bootstrap và chuyển sang lookup hoặc đọc grid. */
@@ -143,6 +173,8 @@ FbmSync.authContinue = function (entity, response) {
     return FbmSync.sessionSystemRequest('authorize', { entity: 'activity' });
   }
   // Lookup is read-only in both modes; Category remains user-owned configuration.
+  if (typeof FbmSync.businessStepFinish === 'function') { FbmSync.businessStepFinish(state, 'session', 'ok', {}); }
+  if (typeof FbmSync.businessStepStart === 'function') { FbmSync.businessStepStart(state, 'category', { mode: state.mode, scan: state.scan }); }
   state.cursor = { kind: 'lookup', index: 0 };
   state.message = 'Dang kiem tra danh muc FBM...';
   FbmSync.stateWrite(state);
@@ -184,6 +216,10 @@ FbmSync.activityForCustomers = function (state, customerContexts, customerNext, 
   var contexts = (customerContexts || []).map(function (item) { return typeof item === 'string' ? { sttRec: item, maKh: '' } : { sttRec: String(item.sttRec || item.stt_rec_kh || ''), maKh: String(item.maKh || item.ma_kh || '') }; }).filter(function (item) { return item.sttRec; });
   var customerIds = contexts.map(function (item) { return item.sttRec; });
   state.phase = 'pull_activity'; state.entity = 'activity';
+  if (typeof FbmSync.businessStepStart === 'function') {
+    FbmSync.businessStepStart(state, 'pull_activity', { mode: state.mode, scan: state.scan, entity: 'activity' });
+    FbmSync.businessStepStart(state, 'reconcile_activity', { mode: state.mode, scan: state.scan, entity: 'activity' });
+  }
   state.cursor = { kind: 'activity_grid', customerIds: customerIds, customerContexts: contexts, customerIndex: 0, pageIndex: -1, pageValue: null, count: 100, customerNext: customerNext || null, customerSeen: Number(customerSeen || 0), afterActivity: afterActivity || null };
   state.message = 'Dang doc giao dich cua khach hang...';
   FbmSync.stateWrite(state);
@@ -219,6 +255,10 @@ FbmSync.beginCustomerPull = function (state) {
     return FbmSync.nextPushRequest(state);
   }
   FbmSync.prepareCategoryGate(state);
+  if (typeof FbmSync.businessStepStart === 'function') {
+    FbmSync.businessStepStart(state, 'pull_customer', { mode: state.mode, scan: state.scan, entity: 'customer' });
+    FbmSync.businessStepStart(state, 'reconcile_customer', { mode: state.mode, scan: state.scan, entity: 'customer' });
+  }
   if (FbmSync.canWriteSheet(state.mode)) {
     state.metadata = state.metadata || {};
     state.metadata.seen = state.metadata.seen || { customer: {}, activity: {} };
@@ -240,6 +280,10 @@ FbmSync.beginCustomerPull = function (state) {
 /** Khởi tạo quét bulk Activity; tập đã thấy nằm trong bitmap phân mảnh của GAS. */
 FbmSync.beginActivityBulkPull = function (state) {
   state.phase = 'pull_activity'; state.entity = 'activity';
+  if (typeof FbmSync.businessStepStart === 'function') {
+    FbmSync.businessStepStart(state, 'pull_activity', { mode: state.mode, scan: state.scan, entity: 'activity' });
+    FbmSync.businessStepStart(state, 'reconcile_activity', { mode: state.mode, scan: state.scan, entity: 'activity' });
+  }
   FbmSync.seenStoreBegin('activity_bulk', FbmSync.readLocal('activity'));
   state.cursor = { kind: 'activity_bulk_grid', type: 0, pageIndex: -1, pageValue: null, count: 100, seen: 0 };
   state.message = 'Đang đọc bulk giao dịch từ FBM...';
@@ -509,7 +553,12 @@ FbmSync.continue = function (rawResponse) {
       // Category is user-owned configuration; sync only reads and validates it.
       state.message = 'Đã đọc danh mục FBM; đang đối chiếu Category...';
     }
-    return { ok: true, request: FbmSync.nextEnvelope(FbmSync.beginCustomerPull(state)), status: FbmSync.statusView() };
+    var customerRequest = FbmSync.beginCustomerPull(state), categoryBlocks = state.metadata && state.metadata.categoryBlocks || [];
+    if (typeof FbmSync.businessStepFinish === 'function') {
+      FbmSync.businessStepFinish(state, 'category', 'ok', { lookups: Number(FbmSync.SYNC_LOOKUPS.length || 0), errors: Number(categoryBlocks.length || 0) });
+    }
+    FbmSync.stateWrite(state);
+    return { ok: true, request: FbmSync.nextEnvelope(customerRequest), status: FbmSync.statusView() };
   }
   // Customer là grid cha; mỗi trang xong sẽ mở Activity con của trang đó.
   if (cursor.kind === 'customer_grid') {

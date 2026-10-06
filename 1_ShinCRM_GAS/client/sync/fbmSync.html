@@ -1,6 +1,6 @@
 <script>
 /* Sidebar chỉ hiển thị tiến độ; GAS là nguồn state duy nhất. */
-var FBM_SYNC_CLIENT = { installed: false, active: false, waiting: {}, relayWaiters: {}, credentialWaiters: {}, credentialMetadataWaiters: {}, credentialClearWaiters: {}, running: false, cancelRequested: false, statusReady: false, mode: 'read', openedAt: 0, returnScreen: 'view', returnUi: null, relayConfigured: false, relayOpenId: 0, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0, traceEvents: [], traceFlushing: false, subscreen: 'run', navOpen: false, resultsTab: 'summary', resultPages: {}, lastStatus: null, identityStatus: null, identityAction: '', identityLastAction: '', identityProbeSignature: '', identityInvalid: {}, identityDraft: { spreadsheetId: '', userId: '', username: '', accountName: '' }, accountSettingsDraft: {}, accountSettingsInvalid: {}, loginStatus: null, loginDraft: { username: '' }, loginPasswordMode: 'saved', loginPasswordFocused: false, loginPasswordTimer: null, pendingLoginEnvelope: null, configEdits: {}, accountNotices: { identity: null, accountSettings: null, login: null }, settingsNotices: { module: null, relay: null, extension: null, background: null, login: null }, syncSettings: null };
+var FBM_SYNC_CLIENT = { installed: false, active: false, waiting: {}, relayWaiters: {}, credentialWaiters: {}, credentialMetadataWaiters: {}, credentialClearWaiters: {}, running: false, cancelRequested: false, statusReady: false, mode: 'read', openedAt: 0, returnScreen: 'view', returnUi: null, relayConfigured: false, relayOpenId: 0, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0, traceEvents: [], subscreen: 'run', navOpen: false, resultsTab: 'summary', resultPages: {}, lastStatus: null, identityStatus: null, identityAction: '', identityLastAction: '', identityProbeSignature: '', identityInvalid: {}, identityDraft: { spreadsheetId: '', userId: '', username: '', accountName: '' }, accountSettingsDraft: {}, accountSettingsInvalid: {}, loginStatus: null, loginDraft: { username: '' }, loginPasswordMode: 'saved', loginPasswordFocused: false, loginPasswordTimer: null, pendingLoginEnvelope: null, configEdits: {}, accountNotices: { identity: null, accountSettings: null, login: null }, settingsNotices: { module: null, relay: null, extension: null, background: null, login: null }, syncSettings: null };
 /** Timeout cho một request Extension để phiên không treo vô hạn khi tab FBM/bridge mất kết nối. */
 var FBM_SYNC_REQUEST_TIMEOUT_MS = 20000;
 var FBM_SYNC_GAS_CONTINUE_WARN_MS = 5000;
@@ -12,110 +12,6 @@ function fbmSyncClientTrace(stage, request, extra) {
   FBM_SYNC_CLIENT.traceEvents.push(event);
   if (FBM_SYNC_CLIENT.traceEvents.length > 20) { FBM_SYNC_CLIENT.traceEvents.shift(); }
   return event;
-}
-
-/* Keep the client-side orchestration visible in the same GAS trace stream. */
-function fbmSyncTraceSummary(value) {
-  var result = { payload: true, type: Array.isArray(value) ? 'array' : value === null ? 'null' : typeof value };
-  if (typeof value === 'string') { result.length = value.length; return result; }
-  if (Array.isArray(value)) { result.length = value.length; return result; }
-  if (value && typeof value === 'object') {
-    result.keyCount = Object.keys(value).length;
-    result.keys = Object.keys(value).slice(0, 80);
-    if (value.status !== undefined) { result.status = Number(value.status || 0) || 0; }
-    if (value.ok !== undefined) { result.ok = value.ok === true; }
-    if (value.code !== undefined) { result.code = String(value.code || ''); }
-    if (value.url !== undefined) { result.url = String(value.url || ''); }
-    return result;
-  }
-  return result;
-}
-function fbmSyncTraceShape(value, key, depth, seen) {
-  var name = String(key || '');
-  if (/password|cookie|token|authorization|session|envelope|secret/i.test(name)) { return '[secret]'; }
-  if (/^(body|bodyText|payload|request|response|rawResponse|postData|contents|wire)$/i.test(name)) { return fbmSyncTraceSummary(value); }
-  if (value === null || value === undefined) { return value === undefined ? '[undefined]' : null; }
-  if (typeof value !== 'object') { return value; }
-  if (depth > 8) { return '[trace depth limit]'; }
-  if (value instanceof Error || (value.name && value.message && typeof value.message === 'string')) { return { name: String(value.name || 'Error'), message: String(value.message || ''), stack: String(value.stack || '') }; }
-  seen = seen || [];
-  if (seen.indexOf(value) >= 0) { return '[circular]'; }
-  seen.push(value);
-  if (Array.isArray(value)) { var arrayValue = value.map(function (item) { return fbmSyncTraceShape(item, '', depth + 1, seen); }); seen.pop(); return arrayValue; }
-  var output = {};
-  Object.keys(value).forEach(function (itemKey) { output[itemKey] = fbmSyncTraceShape(value[itemKey], itemKey, depth + 1, seen); });
-  seen.pop();
-  return output;
-}
-var FBM_SYNC_FUNCTION_TRACE_NAMES = {
-  callServer: true,
-  fbmSyncRun: true,
-  fbmSyncStartServer: true,
-  fbmSyncWaitForBackgroundStop: true,
-  fbmSyncWaitForIdentityBackground: true,
-  fbmSyncExtensionRequest: true,
-  fbmSyncReportTransportFailure: true,
-  fbmSyncStatusOnce: true,
-  fbmSyncContinueServer: true,
-  fbmSyncLoop: true,
-  fbmSyncCancel: true,
-  fbmSyncPaint: true,
-  fbmSyncPaintError: true,
-  fbmSyncLogClientError: true,
-  fbmSyncWaitingStatus: true,
-  fbmSyncRelayResponse: true,
-  fbmSyncApprovePush: true
-};
-function fbmSyncFunctionTraceInstall() {
-  if (FBM_SYNC_CLIENT.functionTraceInstalled || typeof window === 'undefined') { return false; }
-  FBM_SYNC_CLIENT.functionTraceInstalled = true;
-  Object.keys(FBM_SYNC_FUNCTION_TRACE_NAMES).forEach(function (name) {
-    var original = window[name];
-    if (typeof original !== 'function' || original.__fbmClientTraceWrapper) { return; }
-    var wrapped = function () {
-      if (name === 'callServer' && FBM_SYNC_CLIENT.traceFlushing) {
-        return original.apply(this, arguments);
-      }
-      var args = Array.prototype.slice.call(arguments), startedAt = Date.now();
-      fbmSyncClientTrace('client_function_started', null, { functionName: name, input: fbmSyncTraceShape(args, 'input', 0, []) });
-      try {
-        var result = original.apply(this, arguments);
-        if (result && typeof result.then === 'function') {
-          return result.then(function (value) {
-            fbmSyncClientTrace('client_function_succeeded', null, { functionName: name, output: fbmSyncTraceShape(value, 'output', 0, []), durationMs: Date.now() - startedAt });
-            var flush = (name === 'fbmSyncRun' || name === 'fbmSyncCancel' || name === 'fbmSyncApprovePush') ? fbmSyncFlushClientTrace() : Promise.resolve(null);
-            return flush.then(function () { return value; });
-          }, function (error) {
-            fbmSyncClientTrace('client_function_failed', null, { functionName: name, error: fbmSyncTraceShape(error, 'error', 0, []), durationMs: Date.now() - startedAt });
-            throw error;
-          });
-        }
-        fbmSyncClientTrace('client_function_succeeded', null, { functionName: name, output: fbmSyncTraceShape(result, 'output', 0, []), durationMs: Date.now() - startedAt });
-        return result;
-      } catch (error) {
-        fbmSyncClientTrace('client_function_failed', null, { functionName: name, error: fbmSyncTraceShape(error, 'error', 0, []), durationMs: Date.now() - startedAt });
-        throw error;
-      }
-    };
-    wrapped.__fbmClientTraceWrapper = true;
-    wrapped.__fbmClientTraceOriginal = original;
-    window[name] = wrapped;
-  });
-  return true;
-}
-
-function fbmSyncFlushClientTrace() {
-  if (typeof callServer !== 'function' || !FBM_SYNC_CLIENT.traceEvents || !FBM_SYNC_CLIENT.traceEvents.length) { return Promise.resolve(null); }
-  if (FBM_SYNC_CLIENT.traceFlushing) { return Promise.resolve(null); }
-  FBM_SYNC_CLIENT.traceFlushing = true;
-  var trace = FBM_SYNC_CLIENT.traceEvents.slice();
-  return callServer('fbmLogSyncTrace', [trace], { silent: true }).then(function (result) {
-    FBM_SYNC_CLIENT.traceFlushing = false;
-    return result;
-  }, function () {
-    FBM_SYNC_CLIENT.traceFlushing = false;
-    return null;
-  });
 }
 
 /** Cất màn hiện tại trước khi FBM dùng chung bốn vùng render của Sidebar. */
@@ -752,7 +648,6 @@ function fbmSyncInstall() {
   document.addEventListener('focusin', function (event) { if (event.target && event.target.id === 'fbm-login-password') { fbmSyncLoginPasswordEnterDraft(event.target); } });
   document.addEventListener('focusout', function (event) { if (event.target && event.target.id === 'fbm-login-password') { fbmSyncBlurLoginPassword(event.target); } });
   document.addEventListener('focusout', function () { setTimeout(fbmSyncFlushDeferredPaint, 0); });
-  fbmSyncFunctionTraceInstall();
 }
 /** Dựng lại màn chuẩn đã bị FBM tạm thay, gồm cả footer và bản nháp form nếu có. */
 function fbmSyncRestoreReturnScreen() {
@@ -1500,13 +1395,6 @@ function fbmSyncRun(mode) {
   FBM_SYNC_CLIENT.running = true;
   FBM_SYNC_CLIENT.cancelRequested = false;
   FBM_SYNC_CLIENT.traceEvents = [];
-  // The generic client wrapper records its start before entering this function.
-  // Recreate that boundary after the per-run trace buffer is cleared so the
-  // first click is present in the trace sent with fbmStartSync.
-  fbmSyncClientTrace('client_function_started', null, {
-    functionName: 'fbmSyncRun',
-    input: fbmSyncTraceShape([mode], 'input', 0, [])
-  });
   FBM_SYNC_CLIENT.viewEpoch += 1;
   fbmSyncPaint({ phase: 'checking_session', label: 'Đang chuẩn bị đồng bộ', direction: 'Kết nối FBM', entityLabel: 'Chuẩn bị phiên', message: 'Đang chuẩn bị phiên đồng bộ...', counts: {} });
   var work = fbmSyncStartServer(mode || 'read', 0).then(function (started) {

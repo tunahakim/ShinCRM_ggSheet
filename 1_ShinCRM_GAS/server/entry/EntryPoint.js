@@ -20,20 +20,13 @@
  */
 function runEntryPoint(name, source, channel, fn) {
   var trace = typeof fbmTraceBoundary === 'function' && /^fbm/i.test(String(name || ''));
-  var failed = false, result, startedAt = Date.now(), traceInput = arguments.length > 4 ? arguments[4] : [];
-  // Install the per-invocation function tracer before the first business call.
-  // Apps Script starts a fresh VM for each google.script.run callback, so this
-  // must happen at every entry point rather than only at sync start.
-  if (trace && typeof fbmSyncFunctionTraceEnsure === 'function') { fbmSyncFunctionTraceEnsure(); }
-  if (trace && typeof fbmSyncFunctionTraceLog === 'function') { fbmSyncFunctionTraceLog('started', name, traceInput); }
+  var failed = false, result;
   if (trace) { fbmTraceBoundary('gas_entered', name); }
   try {
     result = fn();
-    if (trace && typeof fbmSyncFunctionTraceLog === 'function') { fbmSyncFunctionTraceLog('succeeded', name, traceInput, result, null, Date.now() - startedAt); }
     return result;
   } catch (err) {
     failed = true;
-    if (trace && typeof fbmSyncFunctionTraceLog === 'function') { fbmSyncFunctionTraceLog('failed', name, traceInput, undefined, err, Date.now() - startedAt); }
     if (trace) { fbmTraceBoundary('gas_failed', name, err); }
     logEvent({
       source: source,

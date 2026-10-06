@@ -16,9 +16,6 @@ FbmSync.rememberConflict = function (state, entity, current, incoming, decision,
       if (state.locks[key] && state.locks[key].owner === 'sync' && state.locks[key].reason === 'conflict') { delete state.locks[key]; }
     });
   }
-  if (typeof logEvent === 'function') {
-    logEvent({ source: 'fbm_sync', action: 'conflict', outcome: LOG_CONFLICT, entity: entity, recordId: String(current && current.id || ''), reason: 'Hai phía cùng thay đổi; chờ quyết định.', detail: { fbmId: String(incoming && incoming.fbmId || current && current.fbmId || ''), hBASE: decision.hBASE, hSHIN: decision.hSHIN, hFBM: decision.hFBM, fields: FbmSync.diff(entity, current, incoming, categoryGate) } });
-  }
 };
 /** Chốt conflict theo phía được chọn; baseline mới chỉ ghi sau quyết định rõ ràng. */
 FbmSync.resolveConflict = function (entity, id, choice, merged, verified) {

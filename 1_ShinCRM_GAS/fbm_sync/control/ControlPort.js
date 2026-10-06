@@ -71,7 +71,10 @@ FbmSync.controlDispatchLocked = function (command, payload) {
   var name = String(command || ''), mutating = ['start', 'continue', 'approve_push', 'cancel', 'retry_push_failures', 'set_master_switch', 'set_background_switch', 'save_extension_config', 'save_background_schedule', 'save_login_config', 'set_auto_login', 'identity_status', 'save_identity_binding', 'save_connection', 'prepare_conflict', 'confirm_conflict'];
   if (mutating.indexOf(name) < 0) { return FbmSync.controlDispatch(name, payload); }
   try {
-    return FbmSync.withOrchestrationLock(function () { return FbmSync.controlDispatch(name, payload); });
+    return FbmSync.withOrchestrationLock(function () {
+      if (['start', 'continue', 'approve_push', 'retry_push_failures'].indexOf(name) < 0) { return FbmSync.controlDispatch(name, payload); }
+      return FbmSync.runSlice(function () { return FbmSync.controlDispatch(name, payload); });
+    });
   } catch (error) {
     var code = String(error && error.code || '');
     if (code !== 'FBM_DOCUMENT_PROPERTIES_QUOTA' && code !== 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED') { throw error; }

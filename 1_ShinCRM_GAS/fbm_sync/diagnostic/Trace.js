@@ -97,10 +97,7 @@ FbmSync.traceResponse = function (raw) {
 /** Nhận trace của client/Extension nhưng chỉ giữ các field an toàn và giới hạn số lượng. */
 FbmSync.traceImport = function (events, fallback) {
   if (!Array.isArray(events)) { return 0; }
-  var base = fallback || {}, context = FbmSync.traceContext(base), imported = [], previous = {};
-  FbmSync.traceRead(FbmSync.TRACE_LIMIT).forEach(function (item) {
-    if (item && item.stage) { previous[[item.stage, item.runId, item.requestId, item.at].join('|')] = true; }
-  });
+  var base = fallback || {}, context = FbmSync.traceContext(base), imported = [];
   events.slice(-20).forEach(function (item) {
     if (!item || !item.stage) { return; }
     imported.push(Object.assign({}, context, {
@@ -116,234 +113,137 @@ FbmSync.traceImport = function (events, fallback) {
       responseLength: Number(item.responseLength || 0) || 0,
       error: FbmSync.traceClip(item.error || '', 500),
       stack: FbmSync.traceClip(item.stack || '', 1200),
-      functionName: item.functionName !== undefined ? FbmSync.traceClip(item.functionName, 160) : '',
-      input: item.input !== undefined && typeof FbmSync.traceFunctionShape === 'function' ? FbmSync.traceFunctionShape(item.input, 'input', 0, []) : undefined,
-      output: item.output !== undefined && typeof FbmSync.traceFunctionShape === 'function' ? FbmSync.traceFunctionShape(item.output, 'output', 0, []) : undefined,
-      durationMs: Number(item.durationMs || 0) || 0,
       at: Number(item.at || 0) || Date.now(),
       stage: String(item.stage)
     }));
   });
-  var added = FbmSync.traceAppend(imported);
-  if (typeof logTrace === 'function') {
-    imported.forEach(function (event) {
-      var key = [event.stage, event.runId, event.requestId, event.at].join('|');
-      if (!event.functionName || previous[key]) { return; }
-      var inputText = JSON.stringify(event.input === undefined ? '[undefined]' : event.input);
-      var outputText = JSON.stringify(event.output === undefined ? '[undefined]' : event.output);
-      var errorText = JSON.stringify(event.error || '');
-      var reason = /_started$/.test(event.stage)
-        ? 'Khởi chạy hàm ' + event.functionName + ' - Input: ' + inputText
-        : /_succeeded$/.test(event.stage)
-          ? 'Hàm ' + event.functionName + ' đã thực thi thành công - Output: ' + outputText
-          : 'Hàm ' + event.functionName + ' thực thi lỗi - Error: ' + errorText;
-      logTrace({
-        source: 'fbm_sync',
-        action: 'client_function_' + (/^client_function_(.*)$/.exec(event.stage) || ['', event.stage])[1],
-        outcome: /_failed$/.test(event.stage) ? (typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error') : 'trace',
-        reason: reason,
-        entity: event.entity,
-        recordId: event.recordId,
-        detail: { function: event.functionName, input: event.input, output: event.output, error: event.error, durationMs: event.durationMs }
-      });
-    });
-  }
-  return added;
+  return FbmSync.traceAppend(imported);
 };
 
-/*
- * Detailed function trace
- * -----------------------
- * The transport trace above answers "which hop was reached".  It is not
- * enough when a sync appears to jump back to the idle screen, because a
- * function can be entered and fail before it produces a transport hop.  When
- * LOG_TRACE covers `fbm_sync`, wrap every FbmSync method for the current GAS
- * invocation and write a pair of rows to Sheet `Log` for each call.
- *
- * The wrapper deliberately lives here instead of in each business file.  That
- * gives one contract for every function, including functions added later, and
- * keeps the business modules free of diagnostic side effects.
- */
-FbmSync.FUNCTION_TRACE_MARK = '__fbmFunctionTraceWrapper';
-FbmSync.FUNCTION_TRACE_SKIP = {
-  traceClip: true,
-  traceContext: true,
-  traceAppend: true,
-  traceEvent: true,
-  traceRead: true,
-  traceResponse: true,
-  traceImport: true,
-  traceFunctionShape: true,
-  traceFunctionPayloadKey: true,
-  traceFunctionHash: true,
-  traceFunctionSummary: true,
-  traceFunctionLog: true,
-  functionTraceEnabled: true,
-  functionTraceEnsure: true
+/** Chi ghi cap buoc nghiep vu: mot cap mo/dong cho moi key trong mot runId. */
+FbmSync.BUSINESS_STEPS = {
+  run: { action: 'sync_session', label: 'phiên đồng bộ' },
+  preflight_hash: { action: 'preflight_hash', label: 'tính hash ShinCRM' },
+  session: { action: 'session', label: 'kiểm tra phiên FBM' },
+  auto_login: { action: 'auto_login', label: 'đăng nhập FBM tự động' },
+  category: { action: 'category', label: 'nạp và đối chiếu Category FBM' },
+  pull_customer: { action: 'pull_customer', label: 'đọc Customer từ FBM' },
+  reconcile_customer: { action: 'reconcile_customer', label: 'đối soát và cập nhật Customer ShinCRM' },
+  pull_activity: { action: 'pull_activity', label: 'đọc Activity từ FBM' },
+  reconcile_activity: { action: 'reconcile_activity', label: 'đối soát và cập nhật Activity ShinCRM' },
+  push_customer: { action: 'push_customer', label: 'quét và đẩy Customer ShinCRM lên FBM' },
+  push_activity: { action: 'push_activity', label: 'quét và đẩy Activity ShinCRM lên FBM' }
 };
 
-FbmSync.functionTraceEnabled = function () {
-  try {
-    return typeof logTraceCoversSource === 'function' && logTraceCoversSource('fbm_sync');
-  } catch (ignore) {
-    return false;
-  }
+FbmSync.businessStepDefinition = function (key) {
+  return FbmSync.BUSINESS_STEPS[String(key || '')] || { action: String(key || 'business_step'), label: String(key || 'bước nghiệp vụ') };
 };
 
-FbmSync.traceFunctionPayloadKey = function (key) {
-  return /^(body|bodyText|payload|request|response|rawResponse|postData|contents|wire)$/i.test(String(key || ''));
-};
-
-FbmSync.traceFunctionHash = function (value) {
-  var text = String(value === null || value === undefined ? '' : value), hash = 2166136261;
-  for (var i = 0; i < text.length; i += 1) {
-    hash ^= text.charCodeAt(i);
-    hash = (hash * 16777619) >>> 0;
-  }
-  return ('00000000' + hash.toString(16)).slice(-8);
-};
-
-/** Keep request/response bodies out of the sheet while retaining useful facts. */
-FbmSync.traceFunctionSummary = function (value) {
-  var result = { payload: true, type: Array.isArray(value) ? 'array' : value === null ? 'null' : typeof value };
-  if (typeof value === 'string') {
-    result.length = value.length;
-    result.hash = FbmSync.traceFunctionHash(value);
-    return result;
-  }
-  if (Array.isArray(value)) {
-    result.length = value.length;
-    return result;
-  }
-  if (value && typeof value === 'object') {
-    var keys = Object.keys(value);
-    result.keyCount = keys.length;
-    result.keys = keys.slice(0, 80);
-    if (value.status !== undefined) { result.status = Number(value.status || 0) || 0; }
-    if (value.ok !== undefined) { result.ok = value.ok === true; }
-    if (value.code !== undefined) { result.code = String(value.code || ''); }
-    if (value.url !== undefined) { result.url = String(value.url || ''); }
-    if (value.method !== undefined) { result.method = String(value.method || ''); }
-    return result;
-  }
+FbmSync.businessStepNumbers = function (value) {
+  var result = {}, source = value || {};
+  Object.keys(source).forEach(function (key) {
+    if (typeof source[key] === 'number' && isFinite(source[key])) { result[key] = Number(source[key]); }
+  });
   return result;
 };
 
-FbmSync.traceFunctionShape = function (value, key, depth, seen) {
-  var name = String(key || '');
-  if (typeof logIsSecretKey === 'function' && logIsSecretKey(name)) {
-    return typeof logMaskLabel === 'function' ? logMaskLabel(value) : '[secret]';
-  }
-  if (FbmSync.traceFunctionPayloadKey(name)) { return FbmSync.traceFunctionSummary(value); }
-  if (value === null || value === undefined) { return value === undefined ? '[undefined]' : null; }
-  if (typeof value !== 'object') { return value; }
-  if (depth > 12) { return '[trace depth limit]'; }
-  if (value instanceof Error || (value.name && value.message && typeof value.message === 'string')) {
-    return {
-      name: String(value.name || 'Error'),
-      message: String(value.message || ''),
-      stack: String(value.stack || '')
-    };
-  }
-  seen = seen || [];
-  if (seen.indexOf(value) >= 0) { return '[circular]'; }
-  seen.push(value);
-  if (Object.prototype.toString.call(value) === '[object Date]') {
-    var dateValue = String(value);
-    seen.pop();
-    return dateValue;
-  }
-  if (Array.isArray(value)) {
-    var arrayValue = value.map(function (item) { return FbmSync.traceFunctionShape(item, '', depth + 1, seen); });
-    seen.pop();
-    return arrayValue;
-  }
-  var output = {};
-  Object.keys(value).forEach(function (itemKey) {
-    output[itemKey] = FbmSync.traceFunctionShape(value[itemKey], itemKey, depth + 1, seen);
+FbmSync.businessStepSummary = function (values) {
+  var labels = {
+    localRecords: 'bản ghi ShinCRM', baselineComparable: 'bản ghi có baseline', changed: 'bản ghi khác baseline', unchanged: 'bản ghi giống baseline',
+    newRecords: 'bản ghi chưa liên kết FBM', withoutBaseline: 'bản ghi thiếu baseline', candidateCount: 'ứng viên đẩy', received: 'bản ghi FBM đã nhận',
+    written: 'bản ghi đã ghi Sheet', updated: 'bản ghi đã cập nhật', created: 'bản ghi đã tạo', lookups: 'danh mục Category đã đọc', skipped: 'bản ghi bỏ qua', conflict: 'xung đột',
+    errors: 'lỗi', sheetWriteBatches: 'lần ghi Sheet', verified: 'bản ghi FBM đã xác nhận', pushed: 'bản ghi đã đẩy'
+  }, source = values || [], parts = [];
+  Object.keys(labels).forEach(function (key) {
+    if (source[key] !== undefined) { parts.push(Number(source[key] || 0) + ' ' + labels[key]); }
   });
-  seen.pop();
-  return output;
+  return parts.length ? 'có ' + parts.join(', ') : 'không có số liệu phát sinh';
 };
 
-FbmSync.traceFunctionLog = function (stage, name, input, output, error, durationMs) {
-  if (typeof logTrace !== 'function') { return; }
-  try {
-    var inputValue = FbmSync.traceFunctionShape(input, 'input', 0, []);
-    var outputValue = output === undefined ? '[undefined]' : FbmSync.traceFunctionShape(output, 'output', 0, []);
-    var detail = {
-      function: String(name || ''),
-      input: inputValue,
-      output: stage === 'succeeded' ? outputValue : undefined,
-      error: stage === 'failed' ? FbmSync.traceFunctionShape(error, 'error', 0, []) : undefined,
-      durationMs: Number(durationMs || 0) || 0
-    };
-    var inputText = JSON.stringify(inputValue), outputText = JSON.stringify(outputValue), errorText = JSON.stringify(detail.error);
-    var reason;
-    if (stage === 'started') {
-      reason = 'Khởi chạy hàm ' + String(name || '') + ' - Input: ' + inputText;
-    } else if (stage === 'succeeded') {
-      reason = 'Hàm ' + String(name || '') + ' đã thực thi thành công - Output: ' + outputText;
-    } else {
-      reason = 'Hàm ' + String(name || '') + ' thực thi lỗi - Error: ' + errorText;
-    }
-    logTrace({
-      source: 'fbm_sync',
-      action: 'function_' + String(stage || ''),
-      outcome: stage === 'failed' ? (typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error') : 'trace',
-      reason: reason,
-      detail: detail
-    });
-  } catch (ignore) {
-    try { if (typeof console !== 'undefined' && console.warn) { console.warn('FBM detailed trace skipped: ' + String(ignore)); } } catch (ignoreConsole) {}
-  }
+FbmSync.businessStepInput = function (input) {
+  var source = input || {}, parts = [];
+  ['mode', 'scan', 'entity', 'origin'].forEach(function (key) {
+    if (source[key] !== undefined && String(source[key]) !== '') { parts.push(key + ': ' + String(source[key])); }
+  });
+  return parts.length ? parts.join(', ') : 'không có tham số nghiệp vụ bổ sung';
 };
 
-FbmSync.functionTraceEnsure = function () {
-  if (!FbmSync.functionTraceEnabled()) { return false; }
-  Object.keys(FbmSync).forEach(function (key) {
-    var original = FbmSync[key];
-    if (typeof original !== 'function' || FbmSync.FUNCTION_TRACE_SKIP[key] || original[FbmSync.FUNCTION_TRACE_MARK]) { return; }
-    var name = 'FbmSync.' + key;
-    var wrapped = function () {
-      var args = Array.prototype.slice.call(arguments), startedAt = Date.now();
-      FbmSync.traceFunctionLog('started', name, args);
-      try {
-        var result = original.apply(this, arguments);
-        if (result && typeof result.then === 'function') {
-          return result.then(function (value) {
-            FbmSync.traceFunctionLog('succeeded', name, args, value, null, Date.now() - startedAt);
-            return value;
-          }, function (err) {
-            FbmSync.traceFunctionLog('failed', name, args, undefined, err, Date.now() - startedAt);
-            throw err;
-          });
-        }
-        FbmSync.traceFunctionLog('succeeded', name, args, result, null, Date.now() - startedAt);
-        return result;
-      } catch (err) {
-        FbmSync.traceFunctionLog('failed', name, args, undefined, err, Date.now() - startedAt);
-        throw err;
-      }
-    };
-    wrapped[FbmSync.FUNCTION_TRACE_MARK] = true;
-    wrapped.__fbmOriginal = original;
-    FbmSync[key] = wrapped;
-  });
+FbmSync.businessStepStart = function (state, key, input) {
+  var current = state || {}, metadata = current.metadata = current.metadata || {}, steps = metadata.businessSteps = metadata.businessSteps || {}, name = String(key || ''), definition = FbmSync.businessStepDefinition(name);
+  if (!current.runId || steps[name] && steps[name].startedAt) { return false; }
+  var detail = Object.assign({}, FbmSync.businessStepNumbers(input), { mode: String(current.mode || ''), scan: String(current.scan || ''), origin: String(current.origin || '') });
+  steps[name] = { startedAt: Date.now(), input: detail, totals: {} };
+  // Hủy phiên xóa runId trước khi ghi state; giữ runId riêng để dòng đóng bước vẫn cùng cycleId với dòng mở.
+  metadata.businessRunId = String(current.runId);
+  if (name !== 'run') { metadata.businessActiveStep = name; }
+  if (typeof logTrace === 'function') {
+    logTrace({ source: 'fbm_sync', action: definition.action + '_started', outcome: 'trace', cycleId: String(current.runId), entity: String(current.entity || ''), reason: 'Bắt đầu ' + definition.label + ' - Input: ' + FbmSync.businessStepInput(Object.assign({}, detail, input || {})), detail: { step: name, input: detail } });
+  }
+  if (typeof flushLogIfTraced === 'function') { flushLogIfTraced('fbm_sync'); }
   return true;
 };
 
-/* Lower-case bridge keeps the generic server entry wrapper independent from
- * the FBM namespace (the namespace belongs to the sync module boundary). */
-function fbmSyncFunctionTraceEnsure() {
-  return typeof FbmSync !== 'undefined' && FbmSync && typeof FbmSync.functionTraceEnsure === 'function'
-    ? FbmSync.functionTraceEnsure()
-    : false;
-}
+FbmSync.businessStepAdd = function (state, key, totals) {
+  var current = state || {}, name = String(key || ''), step = current.metadata && current.metadata.businessSteps && current.metadata.businessSteps[name];
+  if (!step || step.finishedAt) { return false; }
+  step.totals = step.totals || {};
+  Object.keys(FbmSync.businessStepNumbers(totals)).forEach(function (field) { step.totals[field] = Number(step.totals[field] || 0) + Number(totals[field] || 0); });
+  if (name !== 'run') { current.metadata.businessActiveStep = name; }
+  return true;
+};
 
-function fbmSyncFunctionTraceLog(stage, name, input, output, error, durationMs) {
-  if (typeof FbmSync === 'undefined' || !FbmSync || typeof FbmSync.traceFunctionLog !== 'function' || !FbmSync.functionTraceEnabled()) { return; }
-  FbmSync.traceFunctionLog(stage, 'GAS.' + String(name || ''), input, output, error, durationMs);
-}
+/** outcome: ok | error | paused | stopped. `stopped` là bước còn mở khi một bước khác lỗi; nó không tự lỗi nên không được ghi "với lỗi". */
+FbmSync.businessStepFinish = function (state, key, outcome, result) {
+  var current = state || {}, metadata = current.metadata || {}, step = metadata.businessSteps && metadata.businessSteps[String(key || '')], name = String(key || ''), definition = FbmSync.businessStepDefinition(name);
+  if (!step || step.finishedAt) { return false; }
+  var now = Date.now(), totals = Object.assign({}, step.totals || {}, FbmSync.businessStepNumbers(result)), failed = outcome === 'error', paused = outcome === 'paused', stopped = outcome === 'stopped', error = String(result && result.error || (failed ? current.lastError : '') || '');
+  step.finishedAt = now;
+  step.outcome = failed ? 'error' : paused ? 'paused' : stopped ? 'stopped' : 'ok';
+  step.totals = totals;
+  step.durationMs = Math.max(0, now - Number(step.startedAt || now));
+  if (metadata.businessActiveStep === name) { metadata.businessActiveStep = ''; }
+  var reason = failed
+    ? 'Kết thúc ' + definition.label + ' với lỗi - Kết quả: ' + FbmSync.businessStepSummary(totals) + (error ? '. Lỗi: ' + error : '')
+    : paused
+      ? 'Tạm dừng ' + definition.label + ' - Kết quả: ' + FbmSync.businessStepSummary(totals) + (error ? '. Lý do: ' + error : '')
+      : stopped
+        ? 'Dừng ' + definition.label + ' vì lỗi ở bước ' + FbmSync.businessStepDefinition(result && result.failedStep).label + ' - Kết quả: ' + FbmSync.businessStepSummary(totals)
+        : 'Hoàn thành ' + definition.label + ' - Kết quả: ' + FbmSync.businessStepSummary(totals);
+  var entry = { source: 'fbm_sync', action: definition.action + '_finished', outcome: failed ? (typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error') : paused || stopped ? (typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn') : name === 'run' ? (typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok') : 'trace', cycleId: String(current.runId || metadata.businessRunId || ''), entity: String(current.entity || ''), reason: reason, detail: { step: name, input: step.input || {}, result: totals, durationMs: step.durationMs, phase: String(current.phase || ''), failureCode: String(current.lastFailureCode || '') } };
+  if (failed || paused || stopped || name === 'run') {
+    if (typeof logEvent === 'function') { logEvent(entry); }
+  } else if (typeof logTrace === 'function') {
+    logTrace(entry);
+  }
+  if (typeof flushLogIfTraced === 'function') { flushLogIfTraced('fbm_sync'); }
+  return true;
+};
+
+/** Bước đang làm khi phiên lỗi: bước được mở/cộng số gần nhất; thiếu thì lấy bước mở muộn nhất còn mở. */
+FbmSync.businessFailingStep = function (state) {
+  var metadata = state && state.metadata || {}, steps = metadata.businessSteps || {}, active = String(metadata.businessActiveStep || ''), latest = '';
+  if (active && steps[active] && !steps[active].finishedAt) { return active; }
+  Object.keys(steps).forEach(function (key) {
+    if (key !== 'run' && !steps[key].finishedAt && (!latest || Number(steps[key].startedAt || 0) >= Number(steps[latest].startedAt || 0))) { latest = key; }
+  });
+  return latest;
+};
+
+/**
+ * Đóng mọi bước còn mở khi phiên tới phase kết thúc. Chỉ `stateWrite` gọi hàm này cho phiên đang ghi, nên mọi đường kết thúc
+ * (xong, lỗi, hủy, thu hồi phiên treo) đều đóng đúng một lần; `stateStart` gọi thêm cho phiên cũ bị phiên mới thay.
+ */
+FbmSync.businessFinishOpenSteps = function (state, phase, result) {
+  var current = state || {}, steps = current.metadata && current.metadata.businessSteps || {}, terminal = String(phase || current.phase || ''), outcome = terminal === 'error' ? 'error' : terminal === 'paused' || terminal === 'conflict' ? 'paused' : 'ok', error = String(result && result.error || ''), failing = outcome === 'error' ? FbmSync.businessFailingStep(current) : '';
+  Object.keys(steps).forEach(function (key) {
+    if (key === 'run' || steps[key].finishedAt) { return; }
+    if (outcome !== 'error') { FbmSync.businessStepFinish(current, key, outcome, { error: error }); return; }
+    FbmSync.businessStepFinish(current, key, key === failing ? 'error' : 'stopped', key === failing ? { error: error } : { failedStep: failing });
+  });
+  if (steps.run && !steps.run.finishedAt) {
+    FbmSync.businessStepFinish(current, 'run', outcome, { received: Number(current.counts && current.counts.completed || 0), written: Number(current.counts && current.counts.succeeded || 0), errors: Number(current.counts && current.counts.error || 0), conflict: Number(current.counts && current.counts.conflict || 0), skipped: Number(current.counts && current.counts.skipped || 0), error: error });
+  }
+  return current;
+};
 
 function fbmSyncTrace() { return FbmSync.traceRead(60); }

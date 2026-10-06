@@ -18,6 +18,7 @@ function fbmSyncApprovePush() {
   state.cursor = { kind: 'authorize_customer' };
   state.metadata.approvalGranted = true;
   state.message = 'Đã chấp thuận; đang kiểm tra phiên FBM...';
+  if (typeof FbmSync.businessStepStart === 'function') { FbmSync.businessStepStart(state, 'session', { mode: state.mode, scan: state.scan }); }
   FbmSync.stateWrite(state);
   if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'push_batch_approved', outcome: typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', reason: 'Người dùng chấp thuận phiên có hơn 10 bản ghi thay đổi.', detail: { candidateCount: Number(state.metadata.approvalCount || 0) } }); }
   return { ok: true, request: FbmSync.sessionSystemEnvelope('authorize', { entity: 'customer' }), status: FbmSync.statusView() };
@@ -36,8 +37,9 @@ function fbmSyncIdentityStatus(runtime) { return FbmSync.identityStatus(runtime 
 function fbmSyncSaveIdentityBinding(binding) { return FbmSync.bindingWrite(binding || {}); }
 /** Dừng phiên lỗi; chỉ nhả khóa sync, giữ khóa user đang sửa. */
 function fbmSyncCancel() {
-  var state = FbmSync.stateRead(), locks = state.locks || {}, kept = {};
-  if (state.activeRequestId) {
+  var state = FbmSync.stateRead(), locks = state.locks || {}, kept = {}, failed = String(state.phase || '') === 'error';
+  // Client luôn gọi hủy sau khi báo lỗi; phiên đã lỗi phải giữ nguyên lỗi để Sidebar và Log không đổi thành "Đã dừng".
+  if (state.activeRequestId && !failed) {
     state.metadata = state.metadata || {};
     state.metadata.cancelPending = true;
     state.message = 'Đang chờ response FBM hiện tại để dừng an toàn; sẽ không cấp request kế tiếp.';
@@ -46,7 +48,8 @@ function fbmSyncCancel() {
     return { ok: true, code: 'SYNC_CANCEL_PENDING', pending: true, status: FbmSync.statusView() };
   }
   Object.keys(locks).forEach(function (key) { if (locks[key] && locks[key].owner === 'user') { kept[key] = locks[key]; } });
-  state.runId = ''; state.phase = 'paused'; state.entity = ''; state.cursor = {}; state.current = ''; state.scheduledScan = ''; state.activeRequestId = ''; state.deadlineAt = 0; state.locks = kept; state.message = 'Đã dừng phiên đồng bộ; kết quả và log của lượt này vẫn được giữ để xem lại.'; state.lastError = '';
+  state.runId = ''; state.entity = ''; state.cursor = {}; state.current = ''; state.scheduledScan = ''; state.activeRequestId = ''; state.deadlineAt = 0; state.locks = kept;
+  if (!failed) { state.phase = 'paused'; state.message = 'Đã dừng phiên đồng bộ; kết quả và log của lượt này vẫn được giữ để xem lại.'; state.lastError = ''; }
   return FbmSync.stateWrite(state);
 }
 function fbmGetLoginConfig() { return FbmSync.loginConfigPublic(); }

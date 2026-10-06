@@ -5,6 +5,7 @@ FbmSync.LOCK_KEY = 'FBM_SYNC_RECORD_LOCKS_V1';
 // Request FBM thuong ket thuc trong vai giay; state im qua lau la phien bi bo roi.
 FbmSync.STALE_RUN_MS = 2 * 60 * 1000;
 FbmSync.ACTIVE_PHASES = ['checking_session', 'waiting_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'];
+FbmSync.TERMINAL_PHASES = ['done', 'error', 'paused', 'conflict'];
 FbmSync.SEEN_SHARD_HEX_LENGTH = 8000;
 // Apps Script giới hạn một giá trị DocumentProperties khoảng 9 KB. Chặn trước
 // khi gọi setProperty để không đẩy một JSON dở dang vào kho state.
@@ -43,6 +44,27 @@ FbmSync.withOrchestrationLock = function (work) {
   var lock = FbmSync.orchestrationLock(), waitMs = typeof SETTINGS !== 'undefined' && SETTINGS && SETTINGS.LOCK_WAIT_MS ? SETTINGS.LOCK_WAIT_MS : 10000;
   if (!lock.tryLock(waitMs)) { return { ok: false, code: 'BUSY', request: null, message: 'GAS đang xử lý một lượt đồng bộ khác; chưa thay đổi state.', status: typeof FbmSync.statusView === 'function' ? FbmSync.statusView() : null }; }
   try { return work(); } finally { lock.releaseLock(); }
+};
+
+/**
+ * Ranh giới một lát đồng bộ, chạy bên trong khóa điều phối: nhả bộ gom vấn đề theo bản ghi, và nếu lát ném lỗi thì chuyển phiên sang lỗi
+ * trước khi nhả khóa (nhả khóa rồi mới ghi thì một lát khác có thể chen vào giữa). Đường Sidebar và đường nền dùng chung hàm này.
+ */
+FbmSync.runSlice = function (work) {
+  var failure = null;
+  try { return work(); } catch (error) { failure = error; throw error; } finally {
+    if (typeof FbmSync.recordIssuesFlush === 'function') { FbmSync.recordIssuesFlush(); }
+    if (failure) { FbmSync.controlFailRun(failure); }
+  }
+};
+
+/** Ghi phiên lỗi sau exception của lát. Lỗi gốc luôn được ném lại ở chỗ gọi; ghi state hỏng thì chỉ thêm một dòng Log, không thay lỗi gốc. */
+FbmSync.controlFailRun = function (error) {
+  try {
+    FbmSync.stateFailRun(String(error && error.message || error), String(error && error.code || ''));
+  } catch (writeError) {
+    if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'state_fail_run', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', reason: 'Không ghi được trạng thái lỗi của phiên: ' + String(writeError && writeError.message || writeError) }); }
+  }
 };
 
 /** Bitmap phân mảnh theo mã nội bộ ổn định; thứ tự dòng Sheet có đổi thì dấu vẫn đúng. */
@@ -190,6 +212,10 @@ FbmSync.stateWrite = function (state) {
   next.metadata.preview = Object.assign(FbmSync.stateDefault().metadata.preview, next.metadata.preview || {});
   next.counts = Object.assign(FbmSync.stateDefault().counts, next.counts || {});
   next.updatedAt = Date.now();
+  // Cửa ghi state là chỗ duy nhất thấy mọi đường kết thúc phiên, nên sổ bước nghiệp vụ được đóng tại đây chứ không rải ở từng lệnh.
+  if (FbmSync.TERMINAL_PHASES.indexOf(String(next.phase || '')) >= 0 && typeof FbmSync.businessFinishOpenSteps === 'function') {
+    FbmSync.businessFinishOpenSteps(next, next.phase, { error: String(next.lastError || next.message || '') });
+  }
   FbmSync.compactStatePreview(next);
   var stateWrite = FbmSync.documentPropertySet(FbmSync.STATE_KEY, JSON.stringify(next), 'state');
   if (!stateWrite.ok) { throw stateWrite.error; }
@@ -225,6 +251,8 @@ FbmSync.stateStart = function (entity, phase, total) {
   Object.keys(previous.locks || {}).forEach(function (key) { if (previous.locks[key] && previous.locks[key].owner === 'user') { userLocks[key] = previous.locks[key]; } });
   Object.keys(previous.locks || {}).forEach(function (key) { if (conflictKeys[key] && previous.locks[key] && previous.locks[key].owner === 'sync') { userLocks[key] = previous.locks[key]; } });
   ['customer', 'activity', 'activity_bulk'].forEach(function (scope) { FbmSync.seenStoreClear(scope); });
+  // Phiên cũ chưa tới phase kết thúc mà bị phiên mới thay thì các bước của nó phải được đóng trước khi metadata bị xóa.
+  if (typeof FbmSync.businessFinishOpenSteps === 'function') { FbmSync.businessFinishOpenSteps(previous, 'paused', { error: 'Phiên mới đã bắt đầu thay phiên này.' }); }
   // Mỗi run phải xác nhận phiên sống lại; cookie và marker của run trước không
   // được dùng làm bằng chứng live cho request đầu tiên của run mới.
   var next = FbmSync.stateWrite({ runId: now.toString(36), entity: entity || '', phase: phase || 'checking_session', cursor: {}, session: freshSession, counts: { total: Number(total) || 0, completed: 0, succeeded: 0, error: 0, conflict: preservedConflicts.length, skipped: 0 }, metadata: { conflicts: preservedConflicts }, current: '', message: '', startedAt: now, updatedAt: now, lastError: '', lastFailureCode: '', retryable: false, retryCount: 0, retryLimit: 2, locks: userLocks });
@@ -254,6 +282,22 @@ FbmSync.recoverStaleRun = function (state, now) {
     current.locks = kept;
   }
   return { state: FbmSync.stateWrite(current), recovered: true, waitingWrite: waitingWrite };
+};
+/**
+ * Chuyển phiên đang chạy sang lỗi, giữ cursor và khóa ghi như thu hồi phiên treo. Gọi khi một lát ném exception hoặc client báo lỗi,
+ * để phiên không đứng ở phase đang chạy chờ 2 phút mới bị thu hồi. Phiên đã kết thúc thì không đổi gì.
+ */
+FbmSync.stateFailRun = function (reason, code) {
+  var state = FbmSync.stateRead();
+  if (!state.runId || FbmSync.ACTIVE_PHASES.concat(['awaiting_approval']).indexOf(String(state.phase || '')) < 0) { return { state: state, failed: false }; }
+  var step = typeof FbmSync.businessFailingStep === 'function' ? FbmSync.businessFailingStep(state) : '';
+  var label = step && typeof FbmSync.businessStepDefinition === 'function' ? FbmSync.businessStepDefinition(step).label : 'phiên đồng bộ';
+  state.phase = 'error';
+  state.lastFailureCode = String(code || 'FBM_SYNC_EXCEPTION');
+  state.retryable = false;
+  state.lastError = 'Lỗi khi ' + label + ': ' + String(reason || 'không rõ nguyên nhân');
+  state.message = state.lastError;
+  return { state: FbmSync.stateWrite(state), failed: true };
 };
 /** Đóng hoặc chuyển phase với thông báo cuối. */
 FbmSync.stateFinish = function (phase, message) { return FbmSync.statePatch({ phase: phase || 'done', message: message || '', current: '' }); };

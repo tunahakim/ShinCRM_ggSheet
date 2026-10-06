@@ -121,6 +121,15 @@ function logTrace(entry) {
   logPush(entry, true);
 }
 
+/**
+ * Nhả bộ đệm ngay nếu `LOG_TRACE` phủ nguồn này; chế độ thường thì không làm gì để giữ luật một lượt một lệnh ghi.
+ *
+ * Dùng cho mốc bắt đầu và kết thúc bước nghiệp vụ. Lượt bị Google cắt ở trần sáu phút không chạy `finally`, nên mốc "Bắt đầu bước X" chỉ còn trên sheet nếu đã được nhả ngay lúc đó — mà đó lại là dòng duy nhất cho biết lượt chết ở bước nào. Tài liệu 10 Phần 3.
+ */
+function flushLogIfTraced(source) {
+  return logTraceCoversSource(source) ? flushLog() : 0;
+}
+
 /** Tên khóa này có phải tên khóa giữ bí mật không. Khớp theo chuỗi con và không phân biệt hoa thường, nên `payloadCookie` và `ASP.NET_SessionId` đều trúng. Tài liệu 10 Phần 7. */
 function logIsSecretKey(name) {
   var lower = String(name === null || name === undefined ? '' : name).toLowerCase();

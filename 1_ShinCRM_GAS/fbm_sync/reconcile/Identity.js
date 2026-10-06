@@ -258,11 +258,6 @@ FbmSync.activityRecord = function (fbm, categoryGate, parent) {
 };
 
 /** Nối Activity FBM vào mã Customer nội bộ và giữ hash ổn định sau khi đổi khóa ngoại. */
-FbmSync.logActivityDecision = function (action, record, reason, outcome, detail) {
-  if (typeof logEvent !== 'function') { return; }
-  logEvent({ source: 'fbm_sync', action: action || 'activity_pull', outcome: outcome || (typeof LOG_TRACE !== 'undefined' ? LOG_TRACE : 'trace'), entity: 'activity', recordId: String(record && (record.fbmId || record.id) || ''), reason: String(reason || ''), detail: Object.assign({ customerCode: String(record && (record.customerFbmCode || record.customerId) || '') }, detail || {}) });
-};
-
 FbmSync.linkActivityCustomers = function (records, customers, categoryGate) {
   var byFbm = {}, orphaned = 0, blocked = 0;
   (customers || []).forEach(function (customer) {
@@ -273,13 +268,11 @@ FbmSync.linkActivityCustomers = function (records, customers, categoryGate) {
     var customerCode = String(record.customerFbmCode || record.customerId || '').trim(), customer = byFbm[customerCode];
     if (!customer) {
       orphaned += 1;
-      FbmSync.logActivityDecision('activity_pull_skipped', record, 'Khong tim thay Customer cha trong ShinCRM.');
-      if (FbmSync.logPullRecord) { FbmSync.logPullRecord('activity', record, null, FbmSync.SYNC_STATUS.skipped, 'Không tìm thấy Customer cha trong ShinCRM.'); }
+      if (FbmSync.logPullRecord) { FbmSync.logPullRecord('activity', record, null, FbmSync.SYNC_STATUS.skipped, 'Không tìm thấy Customer cha trong ShinCRM.', { issue: true }); }
       return null;
     }
     if (FbmSync.pushPermission && FbmSync.pushPermission(customer, 'customer').stop) {
       blocked += 1;
-      FbmSync.logActivityDecision('activity_pull_skipped', record, 'Customer cha da ngung dong bo.');
       if (FbmSync.logPullRecord) { FbmSync.logPullRecord('activity', record, customer, FbmSync.SYNC_STATUS.skipped, 'Customer cha đã ngừng đồng bộ.'); }
       return null;
     }

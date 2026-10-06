@@ -110,10 +110,39 @@ FbmSync.statusView = function () {
   return { ok: true, enabled: enabled, masterEnabled: enabled, backgroundEnabled: background, runId: state.runId, mode: state.mode, scan: state.scan || 'full', scheduledScan: state.scheduledScan ? state.scheduledScan : '', login: typeof FbmSync.loginConfigPublic === 'function' ? FbmSync.loginConfigPublic() : null, phase: state.phase, label: FbmSync.statusLabel(state.phase), direction: FbmSync.syncDirection(state), entity: state.entity, entityLabel: FbmSync.syncEntityLabel(state.entity, state.phase), pipeline: FbmSync.pipelineView(state), cursor: FbmSync.statusCursor(state.cursor), session: { customer: !!state.session.customerAuthorized, activity: !!state.session.activityAuthorized, expired: state.session.expired === true, lastHeartbeatAt: Number(state.session.lastHeartbeatAt || 0) }, metadata: metadata, counts: state.counts, current: state.current, message: state.message, startedAt: state.startedAt, updatedAt: state.updatedAt, nextRunAt: state.nextRunAt, lastError: state.lastError, lastFailureCode: state.lastFailureCode || '', retryable: state.retryable === true };
 };
 
+/**
+ * Bộ gom vấn đề theo bản ghi trong RAM của một lần chạy GAS. Một lát xử lý đúng một response FBM, nên mỗi nhóm
+ * (chiều, entity, trạng thái, lý do) thành đúng một dòng Log có số lượng và tối đa 20 mã; bản ghi bình thường chỉ cộng vào số liệu bước.
+ */
+FbmSync.RECORD_ISSUE_ID_LIMIT = 20;
+FbmSync.recordIssues = {};
+FbmSync.recordIssueAdd = function (direction, entity, status, id, reason, outcome) {
+  var key = [direction, entity, status, reason].join('|'), group = FbmSync.recordIssues[key];
+  if (!group) { group = FbmSync.recordIssues[key] = { direction: String(direction || ''), entity: String(entity || ''), status: String(status || ''), reason: String(reason || ''), outcome: outcome, count: 0, ids: [] }; }
+  group.count += 1;
+  if (id && group.ids.length < FbmSync.RECORD_ISSUE_ID_LIMIT) { group.ids.push(String(id)); }
+  return group;
+};
+/** Ghi mỗi nhóm thành một dòng Log rồi xóa bộ gom; gọi ở ranh giới lát, kể cả khi lát ném lỗi. */
+FbmSync.recordIssuesFlush = function () {
+  var groups = FbmSync.recordIssues, keys = Object.keys(groups);
+  FbmSync.recordIssues = {};
+  if (!keys.length || typeof logEvent !== 'function') { return 0; }
+  var state = FbmSync.stateRead(), cycleId = String(state.runId || state.metadata && state.metadata.businessRunId || '');
+  keys.forEach(function (key) {
+    var group = groups[key], more = group.count - group.ids.length;
+    logEvent({ source: 'fbm_sync', action: group.direction + '_record_issue', outcome: group.outcome, entity: group.entity, recordId: group.count === 1 ? (group.ids[0] || '') : '', cycleId: cycleId, reason: group.reason + ' — ' + group.count + ' bản ghi' + (group.ids.length ? ': ' + group.ids.join(', ') : '') + (more > 0 ? ' và ' + more + ' bản ghi khác' : ''), detail: { status: group.status, count: group.count, ids: group.ids } });
+  });
+  return keys.length;
+};
+
 /** Ghi snapshot nghiệp vụ; payload/cookie không bao giờ đi vào Log. */
 FbmSync.logStatus = function (status, action) {
   if (!status || typeof logEvent !== 'function') { return; }
   var phase = String(status.phase || 'idle');
+  var state = typeof FbmSync.stateRead === 'function' ? FbmSync.stateRead() : {};
+  // Phiên có sổ bước nghiệp vụ đã có dòng mở/đóng bước (đóng tại stateWrite), nên không ghi thêm snapshot cho mỗi lát.
+  if (state && state.runId && String(state.runId) === String(status.runId || '') && state.metadata && state.metadata.businessSteps) { return; }
   var outcome = phase === 'error' || status.lastError ? LOG_ERROR : (phase === 'conflict' ? LOG_CONFLICT : LOG_OK);
   var writer = outcome === LOG_ERROR || phase === 'done' ? logEvent : logTrace;
   writer({
@@ -131,9 +160,16 @@ FbmSync.shouldLogStatus = function (before, after) {
 };
 /** Ghi lỗi vận chuyển khi Sidebar không nhận được response từ Extension. */
 FbmSync.logTransportError = function (message, action) {
-  var status = FbmSync.statusView(), reason = String(message || 'Không nhận được phản hồi từ Extension.');
-  status.phase = 'error'; status.lastError = reason; status.message = reason;
-  FbmSync.logStatus(status, action || 'transport_error');
+  var reason = String(message || 'Không nhận được phản hồi từ Extension.'), before = FbmSync.stateRead();
+  // Tự giữ khóa như transport_failure; khóa bận thì vẫn phải ghi Log, không được im lặng.
+  var outcome = FbmSync.withOrchestrationLock(function () { return FbmSync.stateFailRun(reason, 'FBM_CLIENT_ERROR'); });
+  var recorded = String(before.phase || '') === 'error' && String(before.lastError || '').indexOf(reason) >= 0;
+  // stateFailRun đã đóng bước đang chạy với đúng lý do này, nên chỉ ghi thêm khi phiên không được chuyển sang lỗi ở đây.
+  if (!(outcome && outcome.failed) && !recorded && typeof logEvent === 'function') {
+    logEvent({ source: 'fbm_sync', action: action || 'transport_error', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(before.runId || before.metadata && before.metadata.businessRunId || ''), reason: 'Sidebar báo lỗi phiên đồng bộ: ' + reason });
+  }
+  var status = FbmSync.statusView();
+  status.phase = 'error'; status.lastError = status.lastError || reason; status.message = status.lastError;
   return status;
 };
 /** Keep a bounded read-only preview for live verification without writing Sheet data. */

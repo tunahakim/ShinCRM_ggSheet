@@ -33,6 +33,31 @@ FbmSync.preflightPushPermissions = function (issues, mode, gate) {
   });
 };
 
+/** Tổng hợp đúng một lần số liệu hash local cho log bước preflight, không ghi theo record. */
+FbmSync.preflightHashSummary = function (gate) {
+  var summary = { localRecords: 0, baselineComparable: 0, changed: 0, unchanged: 0, newRecords: 0, withoutBaseline: 0, customer: { localRecords: 0, baselineComparable: 0, changed: 0, unchanged: 0, newRecords: 0, withoutBaseline: 0 }, activity: { localRecords: 0, baselineComparable: 0, changed: 0, unchanged: 0, newRecords: 0, withoutBaseline: 0 } };
+  ['customer', 'activity'].forEach(function (entity) {
+    var records = [];
+    try { records = typeof FbmSync.readLocal === 'function' ? FbmSync.readLocal(entity) || [] : []; } catch (ignore) { records = []; }
+    records.forEach(function (record) {
+      var item = summary[entity], baseline = String(record && record.fbmHash || '').trim(), linked = entity === 'customer'
+        ? !!String(record && (record.fbmId || record.fbmCustomerCode) || '').trim()
+        : !!String(record && record.fbmId || '').trim();
+      summary.localRecords += 1; item.localRecords += 1;
+      if (!baseline) {
+        summary.withoutBaseline += 1; item.withoutBaseline += 1;
+        if (!linked) { summary.newRecords += 1; item.newRecords += 1; }
+        return;
+      }
+      var current = typeof FbmSync.hash === 'function' ? String(FbmSync.hash(record, entity, gate || {})) : '';
+      summary.baselineComparable += 1; item.baselineComparable += 1;
+      if (current === baseline) { summary.unchanged += 1; item.unchanged += 1; }
+      else { summary.changed += 1; item.changed += 1; }
+    });
+  });
+  return summary;
+};
+
 FbmSync.preflightCandidates = function (issues, mode) {
   var gate = { valid: {} }, candidates = [], settings = {};
   try { settings = typeof FbmSync.scriptSettings === 'function' ? FbmSync.scriptSettings() : {}; } catch (ignoreSettings) {}
@@ -64,7 +89,7 @@ FbmSync.preflightCandidates = function (issues, mode) {
     FbmSync.preflightIssue(issues, 'FBM_CATEGORY_GATE_FAILED', 'error', 'Category', 'Không dựng được ánh xạ Category FBM: ' + String(gateError && gateError.message || gateError), mode === 'write');
   }
   try {
-    if (typeof FbmSync.pushCandidates !== 'function') { return { candidates: candidates, gate: gate, settings: settings }; }
+    if (typeof FbmSync.pushCandidates !== 'function') { return { candidates: candidates, gate: gate, settings: settings, hashSummary: FbmSync.preflightHashSummary(gate) }; }
     ['customer', 'activity'].forEach(function (entity) {
       (FbmSync.pushCandidates(entity) || []).forEach(function (candidate) {
         candidate.entity = entity;
@@ -95,7 +120,7 @@ FbmSync.preflightCandidates = function (issues, mode) {
   } catch (candidateError) {
     FbmSync.preflightIssue(issues, 'FBM_LOCAL_CANDIDATE_CHECK_FAILED', 'error', 'fbm_sync', 'Không kiểm tra được ứng viên local trước phiên: ' + String(candidateError && candidateError.message || candidateError), mode === 'write');
   }
-  return { candidates: candidates, gate: gate, settings: settings };
+  return { candidates: candidates, gate: gate, settings: settings, hashSummary: FbmSync.preflightHashSummary(gate) };
 };
 
 /** Quét điều kiện local; lookup live/owner vẫn được đối chiếu sau response FBM. */
@@ -114,12 +139,22 @@ FbmSync.runPreflight = function (options) {
   var candidateReport = FbmSync.preflightCandidates(issues, writeMode ? 'write' : mode);
   FbmSync.preflightPushPermissions(issues, writeMode ? 'write' : mode, candidateReport.gate || {});
   var blocking = issues.filter(function (item) { return item.blocking; });
-  return { ok: blocking.length === 0, mode: mode, issues: issues, blocking: blocking, warnings: issues.filter(function (item) { return !item.blocking; }), candidateCount: candidateReport.candidates.length };
+  return { ok: blocking.length === 0, mode: mode, issues: issues, blocking: blocking, warnings: issues.filter(function (item) { return !item.blocking; }), candidateCount: candidateReport.candidates.length, hashSummary: candidateReport.hashSummary || FbmSync.preflightHashSummary(candidateReport.gate || {}) };
 };
 
 FbmSync.logPreflight = function (result) {
-  if (!result || !Array.isArray(result.issues) || typeof logEvent !== 'function') { return; }
+  // Một dòng cho mỗi mã vấn đề; thông điệp mang mã bản ghi nên gom theo mã để số dòng không tăng theo số bản ghi.
+  if (!result || !Array.isArray(result.issues) || !result.issues.length || typeof logEvent !== 'function') { return 0; }
+  var groups = {}, order = [];
   result.issues.forEach(function (item) {
-    logEvent({ source: 'fbm_sync', action: 'preflight', outcome: item.blocking ? (typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error') : (typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn'), entity: item.scope || '', recordId: '', reason: item.message, detail: { code: item.code, severity: item.severity, blocking: item.blocking, mode: result.mode } });
+    var code = String(item && item.code || 'FBM_PREFLIGHT_ISSUE');
+    if (!groups[code]) { groups[code] = { item: item, count: 0, messages: [] }; order.push(code); }
+    groups[code].count += 1;
+    if (groups[code].messages.length < FbmSync.RECORD_ISSUE_ID_LIMIT) { groups[code].messages.push(String(item && item.message || '')); }
   });
+  order.forEach(function (code) {
+    var group = groups[code], item = group.item;
+    logEvent({ source: 'fbm_sync', action: 'preflight_issue', outcome: item.blocking ? (typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error') : (typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn'), entity: String(item.scope || ''), reason: String(item.message || code) + (group.count > 1 ? ' (và ' + (group.count - 1) + ' vấn đề cùng loại)' : ''), detail: { code: code, blocking: !!item.blocking, count: group.count, messages: group.messages } });
+  });
+  return order.length;
 };
