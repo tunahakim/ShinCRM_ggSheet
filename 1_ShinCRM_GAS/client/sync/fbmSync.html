@@ -1430,7 +1430,8 @@ function fbmSyncContinueServer(status, response) {
     fbmSyncPaint(fbmSyncWaitingStatus(status, 'GAS đang xử lý phản hồi quá 5 giây. Có thể bấm Dừng đồng bộ; hệ sẽ không tự gửi lại lệnh ghi.'));
   }, FBM_SYNC_GAS_CONTINUE_WARN_MS);
   fbmSyncClientTrace('client_gas_call_started', status && status.request);
-  var callback = callServer('fbmContinueSync', [response, FBM_SYNC_CLIENT.traceEvents.slice()]);
+  // Hạn chờ của bước này do race FBM_SYNC_GAS_CONTINUE_TIMEOUT_MS bên dưới sở hữu; hạn mặc định 30 giây của callServer sẽ cắt trước và hủy phiên đang chạy đúng.
+  var callback = callServer('fbmContinueSync', [response, FBM_SYNC_CLIENT.traceEvents.slice()], { timeoutMs: 0 });
   // Race chi dung de hien chan doan; callback goc van duoc giu nguyen va khong bi gui lai.
   callback.catch(function () {});
   var timeoutId;
