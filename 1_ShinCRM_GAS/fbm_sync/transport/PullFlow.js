@@ -111,31 +111,14 @@ FbmSync.pullRecords = function (entity, records, mode) {
     return { ok: true, preview: true, written: 0, skipped: count };
   }
   var result = FbmSync.pullWrite(entity, records || []);
-  if (!result.ok) { FbmSync.pullWriteFail(entity, result.writeResult || {}); }
   state.counts.succeeded += Number(result.written || 0);
   state.counts.conflict += Number(result.conflicts || 0);
   state.counts.skipped += Number(result.skipped || 0);
-  state.counts.error += result.ok ? 0 : count;
   if (typeof FbmSync.businessStepAdd === 'function') {
-    FbmSync.businessStepAdd(state, reconcileStep, { received: count, written: Number(result.written || 0), conflict: Number(result.conflicts || 0), skipped: Number(result.skipped || 0), errors: result.ok ? 0 : count, sheetWriteBatches: Number(result.sheetWriteBatches || 0) });
+    FbmSync.businessStepAdd(state, reconcileStep, { received: count, written: Number(result.written || 0), conflict: Number(result.conflicts || 0), skipped: Number(result.skipped || 0), sheetWriteBatches: Number(result.sheetWriteBatches || 0) });
   }
   FbmSync.stateWrite(state);
   return result;
-};
-
-/**
- * Cửa ghi chặn cả lô thì ném lỗi để `runSlice` chuyển phiên sang lỗi trước khi cursor qua trang này; trả `ok:false` rồi đi tiếp sẽ kết thúc "Hoàn tất" với dữ liệu chưa ghi (FBM-004).
- * Lỗi hệ thống của cửa ghi đã tự ném exception nên chỉ nhánh dữ liệu không đạt đi qua đây.
- */
-FbmSync.pullWriteFail = function (entity, saved) {
-  var invalid = Array.isArray(saved.invalid) ? saved.invalid : [];
-  invalid.forEach(function (item) {
-    FbmSync.recordIssueAdd('pull', entity, FbmSync.SYNC_STATUS.error, String(item.id || ''), 'Cửa ghi Sheet chặn trường ' + String(item.label || item.field || ''), typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error');
-  });
-  var first = invalid[0], detail = first ? String(first.label || first.field || '') + ' của ' + String(first.id || 'bản ghi mới') + ': ' + String(first.reason || '') : String(saved.error || 'cửa ghi trả kết quả không thành công');
-  var error = new Error('Không ghi được trang ' + entity + ' vào Sheet (' + invalid.length + ' trường không đạt). ' + detail);
-  error.code = 'FBM_SHEET_WRITE_FAILED';
-  throw error;
 };
 
 /** Nhận token bootstrap và chuyển sang lookup hoặc đọc grid. */

@@ -40,9 +40,7 @@ FbmSync.resolveConflict = function (entity, id, choice, merged, verified) {
   record.syncStatus = FbmSync.hash(record, entity, categoryGate) === String(item.hFBM || '')
     ? FbmSync.SYNC_STATUS.synced
     : FbmSync.SYNC_STATUS.pending;
-  if (typeof writeGateSave !== 'function') { return { ok: false, code: 'WRITE_GATE_UNAVAILABLE', message: 'Không có cửa ghi để chốt conflict.' }; }
-  var saved = writeGateSave({ entity: entity, records: [record], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
-  if (!saved || !saved.ok) { return { ok: false, code: 'CONFLICT_WRITE_FAILED', result: saved }; }
+  FbmSync.sheetSave(entity, [record], 'pull');
   state.metadata.conflicts = conflicts.filter(function (entry) { return entry !== item; });
   var lockKey = entity + ':' + target;
   if (state.locks && state.locks[lockKey] && state.locks[lockKey].owner === 'sync') { delete state.locks[lockKey]; }

@@ -173,9 +173,8 @@ FbmSync.writeActivityBulkMissing = function (localRecords) {
   var local = localRecords || [], hasSeen = FbmSync.seenStoreReader('activity_bulk'), batchSize = typeof SETTINGS !== 'undefined' && SETTINGS.CHUNK_ROWS ? Number(SETTINGS.CHUNK_ROWS) : 2000;
   var batch = [], sample = [], total = 0, written = 0;
   function flush() {
-    if (!batch.length || typeof writeGateSave !== 'function') { batch = []; return; }
-    var saved = writeGateSave({ entity: 'activity', records: batch, source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
-    if (!saved || !saved.ok) { throw new Error('Không ghi được trạng thái Activity vắng sau lượt bulk.'); }
+    if (!batch.length) { return; }
+    FbmSync.sheetSave('activity', batch, 'pull');
     written += batch.length; batch = [];
   }
   local.forEach(function (record) {

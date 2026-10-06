@@ -189,12 +189,11 @@ FbmSync.pullWrite = function (entity, records) {
     FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.synced, 'Chỉ FBM thay đổi; cập nhật nội dung ShinCRM.');
   });
   var result = { ok: true, written: 0, conflicts: conflicts, skipped: skipped + orphaned, sheetWriteBatches: 0 };
-  var schemas = [DATA_SCHEMA, SYNC_SCHEMA];
   var allWrites = writes.concat(statusWrites);
   if (allWrites.length) {
-    var saved = writeGateSave({ entity: entity, records: allWrites, source: 'pull', schemas: schemas });
-    result.ok = !!saved.ok; result.written = saved.ok ? writes.length : 0; result.sheetWriteBatches = saved.ok ? 1 : 0; result.writeResult = saved;
-    if (saved.ok && saved.rows && saved.fields) {
+    var saved = FbmSync.sheetSave(entity, allWrites, 'pull');
+    result.written = writes.length; result.sheetWriteBatches = 1;
+    if (saved.rows && saved.fields) {
       var savedRecords = saved.rows.map(function (row) {
         var record = {};
         saved.fields.forEach(function (field, index) { record[field] = row[index]; });
@@ -218,9 +217,8 @@ FbmSync.recalculateBaseline = function (entity) {
     return { id: record.id, fbmHash: FbmSync.hash(record, entity, gate), syncStatus: FbmSync.SYNC_STATUS.synced, syncedAt: new Date() };
   });
   if (!patches.length) { return { ok: true, written: 0, reason: 'Không có bản ghi đã liên kết để tính baseline.' }; }
-  if (typeof writeGateSave !== 'function') { return { ok: false, written: 0, reason: 'Thiếu cửa ghi nội bộ.' }; }
-  var saved = writeGateSave({ entity: entity, records: patches, source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
-  return { ok: !!(saved && saved.ok), written: saved && saved.ok ? patches.length : 0, result: saved };
+  var saved = FbmSync.sheetSave(entity, patches, 'pull');
+  return { ok: true, written: patches.length, result: saved };
 };
 
 /** Giữ tombstone có FBM ID; bản ghi chưa từng đẩy vẫn được xóa cứng bình thường. */

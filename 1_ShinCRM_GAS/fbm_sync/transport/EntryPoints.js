@@ -71,11 +71,9 @@ function fbmSyncRetryPushFailures() {
     if (!recordsByEntity[entity][id]) { missing.push(key); return; }
     byEntity[entity].push({ id: id, syncStatus: FbmSync.SYNC_STATUS.pending });
   });
-  if (typeof writeGateSave !== 'function') { return { ok: false, code: 'WRITE_GATE_UNAVAILABLE', message: 'Không có cửa ghi để đặt lại trạng thái nhóm lỗi.' }; }
   ['customer', 'activity'].forEach(function (entity) {
     if (!byEntity[entity].length) { return; }
-    var saved = writeGateSave({ entity: entity, records: byEntity[entity], source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
-    if (!saved || !saved.ok) { throw new Error('Không đặt lại được nhóm lỗi ' + entity + '.'); }
+    FbmSync.sheetSave(entity, byEntity[entity], 'pull');
     byEntity[entity].forEach(function (record) { var key = entity + ':' + record.id; reset.push(key); delete failures[key]; delete details[key]; });
   });
   state.metadata.pushFailures = failures;

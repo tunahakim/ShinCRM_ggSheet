@@ -237,10 +237,9 @@ FbmSync.markMissingAfterFullScan = function (entity, state) {
     if (FbmSync.logPullRecord) { FbmSync.logPullRecord(entity, { fbmId: fbmId }, record, FbmSync.SYNC_STATUS.missing, 'Không thấy ID trong lượt quét FBM; không suy ra xóa.'); }
   });
   if (!missing.length) { FbmSync.seenStoreClear(entity); return { written: 0 }; }
-  if (typeof writeGateSave !== 'function') { return { written: 0 }; }
-  var saved = writeGateSave({ entity: entity, records: missing, source: 'pull', schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
-  if (saved && saved.ok) { FbmSync.seenStoreClear(entity); }
-  return { written: saved && saved.ok ? missing.length : 0, result: saved };
+  var saved = FbmSync.sheetSave(entity, missing, 'pull');
+  FbmSync.seenStoreClear(entity);
+  return { written: missing.length, result: saved };
 };
 
 /** Đổi record Customer FBM sang schema nội bộ của Sheet. */
