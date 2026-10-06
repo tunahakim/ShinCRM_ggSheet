@@ -238,6 +238,17 @@ FbmSync.loginAdapterContinue = function (state, cursor, response) {
     if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'login_failure'); }
     return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.message, message: state.message };
   }
+  // Request xác minh sau đăng nhập phải mang cookie của chính lần đăng nhập này. Thiếu thì dừng ở đây: để token cho Extension tự tìm trên tab là
+  // lấy cookie của trang đang mở, có thể là phiên cũ, và người dùng chỉ thấy lỗi transport khó hiểu.
+  var loginTransport = parsed && parsed._transport || {}, loginCookie = loginTransport.payloadCookie || loginTransport.captures && loginTransport.captures.payloadCookie;
+  if (!loginCookie) {
+    var cookieFailure = 'FBM báo đăng nhập thành công nhưng Extension không đọc được mã phiên (payload cookie) từ trang tài khoản; chưa xác minh được tài khoản.';
+    if (!cursor.testOnly && FbmSync.autoLoginMarkFailure) { FbmSync.autoLoginMarkFailure(cookieFailure); }
+    state.phase = 'paused'; state.cursor = {}; state.lastFailureCode = 'LOGIN_PAYLOAD_COOKIE_MISSING'; state.retryable = false; state.lastError = cookieFailure; state.message = cookieFailure;
+    FbmSync.stateWrite(state);
+    if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'login_failure'); }
+    return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.message, message: state.message };
+  }
   state.session = state.session || {};
   FbmSync.sessionIdentityClear(state);
   state.cursor = FbmSync.loginCursorNext(cursor, 'login_identity_authorize');
