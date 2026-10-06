@@ -40,7 +40,7 @@ FbmSync.openConflict = function () {
     return { ok: true, empty: true, remaining: 0, status: FbmSync.statusView() };
   }
   var item = queue[0], request = FbmSync.conflictRefreshRequest(item.entity, item);
-  if (!request) { FbmSync.stateWrite(state); return FbmSync.conflictFail('CONFLICT_REFRESH_UNAVAILABLE', 'Bản ghi ' + item.id + ' đang xung đột nhưng chưa có ID FBM để đọc lại; kiểm tra dòng này trên Sheet.'); }
+  if (!request) { return FbmSync.conflictDropUnreadable(state, item.entity, item.id, 'không có ID FBM để đọc lại'); }
   state.metadata.conflictRefresh = { entity: item.entity, id: item.id, stage: 'open', openedHash: '', choice: '' };
   state.cursor = { kind: 'conflict_refresh', entity: item.entity, id: item.id };
   state.message = 'Đang đọc FBM để mở xung đột ' + item.id + '...';
@@ -72,12 +72,27 @@ FbmSync.conflictRefreshRead = function (state, stage, rawResponse) {
     return { failure: FbmSync.conflictFail('CONFLICT_NOT_FOUND', state.message) };
   }
   var latest = (FbmSync.rowsToRecords(entity, rawResponse, state.metadata[entity + 'Fields']).rows || [])[0];
-  if (!latest) {
-    state.message = 'FBM không trả bản ghi ' + target + '; xung đột chưa được chốt, kiểm tra bản ghi trên FBM.'; FbmSync.stateWrite(state);
-    return { failure: FbmSync.conflictFail('CONFLICT_REFRESH_MISSING', state.message) };
-  }
+  if (!latest) { return { failure: FbmSync.conflictDropUnreadable(state, entity, target, 'không còn đọc được trên FBM (bị xóa hoặc chuyển quyền)') }; }
   var gate = state.metadata.categoryGate || {}, latestRecord = entity === 'customer' ? FbmSync.customerRecord(latest, gate) : FbmSync.activityRecord(latest, gate);
   return { entity: entity, id: target, local: local, latest: latestRecord, latestHash: String(latestRecord.fbmHash || FbmSync.hash(latestRecord, entity, gate)), gate: gate, refresh: refresh };
+};
+
+/**
+ * Bản ghi xung đột không đọc được trên FBM thì rời hàng đợi với trạng thái `không thấy bên FBM` (FBM-033, chủ dự án chốt 2026-10-06).
+ * Giữ nó trong hàng đợi thì mỗi lần mở lại gặp đúng bản ghi đó và các xung đột phía sau không bao giờ tới lượt. Mọi nguyên nhân (bị xóa, chuyển quyền, thiếu ID FBM) đi chung đường này; người dùng tự kiểm tra trên FBM.
+ */
+FbmSync.conflictDropUnreadable = function (state, entity, id, reason) {
+  FbmSync.sheetSave(entity, [{ id: id, syncStatus: FbmSync.SYNC_STATUS.missing }], 'pull');
+  FbmSync.logPullRecord(entity, null, { id: id }, FbmSync.SYNC_STATUS.missing, 'Xung đột ' + reason + '; đã rời hàng đợi xung đột, cần kiểm tra trên FBM.');
+  // Lệnh chế độ xung đột không đi qua ranh giới lát, nên tự nhả dòng Log ngay.
+  FbmSync.recordIssuesFlush();
+  var remaining = FbmSync.conflictQueue().length;
+  state.metadata.conflictRefresh = null;
+  state.metadata.conflictCount = remaining;
+  if (state.phase === 'conflict' && !remaining) { state.phase = 'done'; }
+  state.message = 'Bản ghi ' + id + ' ' + reason + '. Đã chuyển sang "' + FbmSync.SYNC_STATUS.missing + '" và rời hàng đợi; kiểm tra bản ghi này trên FBM. Còn ' + remaining + ' xung đột.';
+  FbmSync.stateWrite(state);
+  return { ok: false, code: 'CONFLICT_RECORD_UNREADABLE', message: state.message, remaining: remaining, status: FbmSync.statusView() };
 };
 
 /** DTO một bản ghi cho Sidebar; giá trị chỉ để hiển thị, quyết định từng trường được GAS lấy lại từ hai bản ghi gốc. */
