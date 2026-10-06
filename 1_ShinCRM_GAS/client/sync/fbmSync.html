@@ -46,7 +46,7 @@ function syncPanelToggle() {
   if (typeof fbmSyncRenderInitial === 'function') { fbmSyncRenderInitial(); }
   if (typeof fbmSyncStatusOnce !== 'function') { return null; }
   return Promise.all([fbmSyncStatusOnce(true), fbmSyncLoadIdentityStatus(), fbmSyncLoadSettings()]).then(function (results) { return fbmSyncLoadLoginStatus().then(function () { return results[0]; }); }).catch(function (error) {
-    fbmSyncPaintError(error, 'Khong tai duoc trang thai dong bo FBM.', 'sidebar_open');
+    fbmSyncPaintError(error, 'Không tải được trạng thái đồng bộ FBM.', 'sidebar_open');
     return null;
   });
 }
@@ -61,7 +61,7 @@ function fbmSyncLoadIdentityStatus() {
     if (FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.statusReady) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); }
     return identity;
   }).catch(function (error) {
-    fbmSyncPaintError(error, 'Khong tai duoc trang thai lien ket FBM.');
+    fbmSyncPaintError(error, 'Không tải được trạng thái liên kết FBM.');
     return null;
   });
 }
@@ -122,7 +122,7 @@ function fbmSyncLoadLoginStatus() {
     if (FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.statusReady) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); }
     return FBM_SYNC_CLIENT.loginStatus;
   }).then(function (result) { if (FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.statusReady) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); } return result; }).catch(function (error) {
-    fbmSyncPaintError(error, 'Khong tai duoc cau hinh dang nhap FBM.');
+    fbmSyncPaintError(error, 'Không tải được cấu hình đăng nhập FBM.');
     return null;
   });
 }
@@ -192,7 +192,7 @@ function fbmSyncLoadSettings() {
   if (typeof callServer !== 'function') { return Promise.resolve(null); }
   return callServer('fbmGetSyncSettings').then(function (result) { FBM_SYNC_CLIENT.syncSettings = result && result.settings || {}; if (FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.statusReady) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); } return FBM_SYNC_CLIENT.syncSettings; }).catch(function (error) {
     FBM_SYNC_CLIENT.syncSettings = {};
-    fbmSyncPaintError(error, 'Khong tai duoc cai dat dong bo FBM.');
+    fbmSyncPaintError(error, 'Không tải được cài đặt đồng bộ FBM.');
     return null;
   });
 }
@@ -708,7 +708,7 @@ function fbmSyncStatusOnce(freshOpen) {
     FBM_SYNC_CLIENT.statusReady = true;
     return fbmSyncPaint(status, freshOpen);
   }).catch(function (error) {
-    fbmSyncPaintError(error, 'Khong tai duoc trang thai dong bo FBM.', 'status_load');
+    fbmSyncPaintError(error, 'Không tải được trạng thái đồng bộ FBM.', 'status_load');
     throw error;
   });
 }
@@ -850,7 +850,7 @@ function fbmSyncRetryPushFailures() {
 }
 /** Hiển thị lỗi thao tác ngay trong màn hình hiện tại, không để Promise bị từ chối im lặng. */
 function fbmSyncLogClientError(error, fallback, action) {
-  var reason = String(error && error.message || error || fallback || 'Thao tac dong bo that bai.').slice(0, 500);
+  var reason = String(error && error.message || error || fallback || 'Thao tác đồng bộ thất bại.').slice(0, 500);
   if (typeof callServer !== 'function') { return Promise.resolve(null); }
   return callServer('fbmLogSyncError', [reason, (FBM_SYNC_CLIENT.traceEvents || []).slice()], { silent: true }).catch(function () { return null; });
 }
@@ -976,7 +976,7 @@ function fbmSyncConfirmIdentity() {
     fbmSyncPaint(Object.assign({}, status, { message: 'Đã lưu liên kết tài khoản sau khi người dùng xác nhận.' }));
     return result;
   }).catch(function (error) {
-    fbmSyncLogClientError(error, 'Khong luu duoc lien ket tai khoan.', 'identity_save');
+    fbmSyncLogClientError(error, 'Không lưu được liên kết tài khoản.', 'identity_save');
     fbmSyncPaint(Object.assign({}, status, { phase: 'error', label: 'Có lỗi', message: String(error && error.message || error) }));
     return null;
   });
@@ -1263,7 +1263,7 @@ function fbmSyncSaveConnection(button) {
     if (encrypted) { FBM_SYNC_CLIENT.pendingLoginEnvelope = { username: credentials.username, encrypted: encrypted }; credential.credentialRef = encrypted.credentialRef; credential.envelope = encrypted.envelope; credential.public = encrypted.public || {}; credential.enabled = (FBM_SYNC_CLIENT.loginStatus || {}).enabled !== false; }
     return callServer('fbmSaveConnection', [{ binding: binding, credential: credential }]);
   }).then(function (saved) {
-    if (!saved || saved.ok === false) { throw new Error(saved && (saved.message || saved.code) || 'Khong luu duoc ket noi tai khoan.'); }
+    if (!saved || saved.ok === false) { throw new Error(saved && (saved.message || saved.code) || 'Không lưu được kết nối tài khoản.'); }
     return fbmSyncApplyConnectionSaveResult(saved, password);
   }).catch(function (error) { var reason = String(error && error.message || error); fbmSyncLogClientError(error, reason, 'connection_save'); fbmSyncSetAccountNotice('identity', 'error', reason); fbmSyncSetAccountNotice('login', 'error', reason); fbmSyncPaintError(error, reason, 'connection_save'); return null;
   }).finally(function () { if (button) { button.disabled = false; } });
@@ -1321,7 +1321,7 @@ function fbmSyncRotateRelay() {
     });
   }).catch(function (error) {
     var status = FBM_SYNC_CLIENT.lastStatus || {};
-    fbmSyncLogClientError(error, 'Khong doi duoc cau hinh ket noi.', 'relay_rotate');
+    fbmSyncLogClientError(error, 'Không đổi được cấu hình kết nối.', 'relay_rotate');
     if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('relay', 'error', 'Không đổi được cấu hình kết nối: ' + String(error && error.message || error)); }
     fbmSyncPaint(Object.assign({}, status, { message: String(error && error.message || error), phase: 'error', label: 'Có lỗi' }));
     return null;
@@ -1334,7 +1334,7 @@ function fbmSyncApprovePush() {
     return fbmSyncLoop(started);
   }).then(function (value) { FBM_SYNC_CLIENT.running = false; return value; }).catch(function (error) {
     FBM_SYNC_CLIENT.running = false;
-    fbmSyncLogClientError(error, 'Khong tiep tuc duoc phien ghi.', 'approve_push');
+    fbmSyncLogClientError(error, 'Không tiếp tục được phiên ghi.', 'approve_push');
     fbmSyncPaint(fbmSyncClientErrorStatus(String(error && error.message || error)));
     return null;
   });

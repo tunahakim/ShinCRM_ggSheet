@@ -87,12 +87,12 @@ FbmSync.start = function (options) {
     // User grid đã tự chứng minh cookie/session đọc được. Không lấy Authorized
     // chỉ để tự động điền, vì token này không được probe sử dụng.
     state.cursor = { kind: 'identity_user_grid' };
-    state.message = 'Dang doc thong tin tai khoan FBM...';
+    state.message = 'Đang đọc thông tin tài khoản FBM...';
     FbmSync.stateWrite(state);
     return { ok: true, request: FbmSync.sessionSystemEnvelope('identity_user_grid'), status: FbmSync.statusView() };
   }
   state.cursor = { kind: 'authorize_customer' };
-  state.message = 'Dang kiem tra phien FBM...';
+  state.message = 'Đang kiểm tra phiên FBM...';
   FbmSync.stateWrite(state);
   return { ok: true, request: FbmSync.sessionSystemEnvelope('authorize', { entity: 'customer' }), status: FbmSync.statusView() };
 };
@@ -105,7 +105,7 @@ FbmSync.pullRecords = function (entity, records, mode) {
   if (typeof FbmSync.businessStepAdd === 'function') { FbmSync.businessStepAdd(state, pullStep, { received: count }); }
   if (!FbmSync.canWriteSheet(mode)) {
     state.counts.skipped += count;
-    state.message = 'Da doc ' + count + ' ban ghi (che do khong ghi Sheet).';
+    state.message = 'Đã đọc ' + count + ' bản ghi (chế độ không ghi Sheet).';
     if (typeof FbmSync.businessStepAdd === 'function') { FbmSync.businessStepAdd(state, reconcileStep, { received: count, skipped: count }); }
     FbmSync.stateWrite(state);
     return { ok: true, preview: true, written: 0, skipped: count };
@@ -126,7 +126,7 @@ FbmSync.pullRecords = function (entity, records, mode) {
 FbmSync.authContinue = function (entity, response) {
   // Token gắn với phiên và phải lưu trước mọi request ghi.
   var auth = FbmSync.extractAuthorized(response), state = FbmSync.stateRead(), identity = typeof FbmSync.extractSessionIdentity === 'function' ? FbmSync.extractSessionIdentity(response) : {};
-  if (!auth) { throw new Error('FBM khong tra ma authorized cho ' + entity + '.'); }
+  if (!auth) { throw new Error('FBM không trả mã authorized cho ' + entity + '.'); }
   if (identity.userId) { state.session.userId = identity.userId; }
   if (identity.accountName) { state.session.accountName = identity.accountName; }
   if ((state.mode === 'write' || state.mode === 'push') && typeof FbmSync.identityPreflight === 'function') {
@@ -147,12 +147,12 @@ FbmSync.authContinue = function (entity, response) {
     if (state.scan === 'identity_check') {
       FbmSync.identityCheckBegin(state);
       state.phase = 'pull_customer'; state.entity = 'customer'; state.cursor = { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 };
-      state.message = 'Dang kiem tra lien ket Customer FBM...';
+      state.message = 'Đang kiểm tra liên kết Customer FBM...';
       FbmSync.stateWrite(state);
       return FbmSync.identityCheckCustomerRequest({ type: 0, count: 2000, gridPageIndex: -1, gridPageValue: null, gridRefresh: false });
     }
     state.cursor = { kind: 'authorize_activity' };
-    state.message = 'Da xac thuc Customer; dang xac thuc Activity...';
+    state.message = 'Đã xác thực Customer; đang xác thực Activity...';
     FbmSync.stateWrite(state);
     return FbmSync.sessionSystemRequest('authorize', { entity: 'activity' });
   }
@@ -160,7 +160,7 @@ FbmSync.authContinue = function (entity, response) {
   if (typeof FbmSync.businessStepFinish === 'function') { FbmSync.businessStepFinish(state, 'session', 'ok', {}); }
   if (typeof FbmSync.businessStepStart === 'function') { FbmSync.businessStepStart(state, 'category', { mode: state.mode, scan: state.scan }); }
   state.cursor = { kind: 'lookup', index: 0 };
-  state.message = 'Dang kiem tra danh muc FBM...';
+  state.message = 'Đang kiểm tra danh mục FBM...';
   FbmSync.stateWrite(state);
   return FbmSync.completionRequest(FbmSync.SYNC_LOOKUPS[0].controller, FbmSync.SYNC_LOOKUPS[0].key);
 };
@@ -205,7 +205,7 @@ FbmSync.activityForCustomers = function (state, customerContexts, customerNext, 
     FbmSync.businessStepStart(state, 'reconcile_activity', { mode: state.mode, scan: state.scan, entity: 'activity' });
   }
   state.cursor = { kind: 'activity_grid', customerIds: customerIds, customerContexts: contexts, customerIndex: 0, pageIndex: -1, pageValue: null, count: 100, customerNext: customerNext || null, customerSeen: Number(customerSeen || 0), afterActivity: afterActivity || null };
-  state.message = 'Dang doc giao dich cua khach hang...';
+  state.message = 'Đang đọc giao dịch của khách hàng...';
   FbmSync.stateWrite(state);
   return customerIds.length ? FbmSync.activityGridRequest(customerIds[0], { type: 0, count: 100, gridPageIndex: -1, gridRefresh: false }) : null;
 };
@@ -256,7 +256,7 @@ FbmSync.beginCustomerPull = function (state) {
   var detailPageIndex = detailCursor ? Number(detailCursor.pageIndex || 0) : -1;
   var detailPageValue = detailCursor && Array.isArray(detailCursor.pageValue) ? detailCursor.pageValue : null;
   state.cursor = { kind: 'customer_grid', type: detailPageIndex >= 0 ? 1 : 0, pageIndex: detailPageIndex, pageValue: detailPageValue, count: customerCount };
-  state.phase = 'pull_customer'; state.entity = 'customer'; state.message = 'Dang doc khach hang tu FBM...';
+  state.phase = 'pull_customer'; state.entity = 'customer'; state.message = 'Đang đọc khách hàng từ FBM...';
   FbmSync.stateWrite(state);
   return FbmSync.customerGridRequest({ type: 0, count: customerCount, gridPageIndex: -1, gridRefresh: false });
 };
@@ -374,7 +374,7 @@ FbmSync.continue = function (rawResponse) {
       var gateFailure = FbmSync.sessionGateHandleFailure(state, cursor, success);
       if (gateFailure) { return gateFailure; }
     }
-    var failureReason = (success.bug && (success.bug.Message || success.bug.message)) || 'FBM tra ve loi nghiep vu';
+    var failureReason = (success.bug && (success.bug.Message || success.bug.message)) || 'FBM trả về lỗi nghiệp vụ';
     if (cursor.kind === 'push_wait' && cursor.candidate) {
       if (cursor.operation === 'customer_verify' || cursor.operation === 'activity_verify') {
         return FbmSync.continueAfterPushVerificationError(state, cursor, { code: success.code, status: success.status, fieldName: success.bug && success.bug.FieldName, reason: failureReason });
@@ -558,7 +558,7 @@ FbmSync.continue = function (rawResponse) {
         return { ok: true, request: FbmSync.nextEnvelope(FbmSync.identityCheckCustomerRequest({ type: 1, count: identityNext.body.count, gridPageIndex: identityNext.body.gridPageIndex, gridPageValue: identityNext.body.gridPageValue, gridRefresh: false })), status: FbmSync.statusView(), imported: eligibleCustomerRows.length };
       }
       FbmSync.identityCheckFinish(state);
-      state.cursor = {}; state.phase = 'done'; state.entity = ''; state.message = 'Da kiem tra lien ket Customer FBM.'; FbmSync.stateWrite(state);
+      state.cursor = {}; state.phase = 'done'; state.entity = ''; state.message = 'Đã kiểm tra liên kết Customer FBM.'; FbmSync.stateWrite(state);
       return { ok: true, status: FbmSync.statusView(), imported: eligibleCustomerRows.length };
     }
     FbmSync.pullRecords('customer', customerRecords, state.mode);
@@ -637,6 +637,6 @@ FbmSync.continue = function (rawResponse) {
     var emptySupplement = FbmSync.activitySupplementNext(state, afterKind);
     return { ok: true, request: emptySupplement ? FbmSync.nextEnvelope(emptySupplement) : null, status: FbmSync.statusView() };
   }
-  state.phase = 'error'; state.lastError = 'Khong nhan dien duoc cursor dong bo.'; FbmSync.stateWrite(state);
+  state.phase = 'error'; state.lastError = 'Không nhận diện được cursor đồng bộ.'; FbmSync.stateWrite(state);
   return { ok: false, status: FbmSync.statusView(), error: state.lastError };
 };

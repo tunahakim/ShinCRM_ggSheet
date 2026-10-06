@@ -140,7 +140,7 @@ FbmSync.pullWrite = function (entity, records) {
         } else {
           statusWrites.push({ id: current.id, fbmHash: incomingHash, syncStatus: confirmedStatus, syncedAt: new Date() });
         }
-        FbmSync.logPullRecord(entity, incoming, current, confirmedStatus, confirmedStatus === FbmSync.SYNC_STATUS.synced ? 'Xac nhan ban ghi sau lan day truc tiep.' : 'Xac nhan lan day; ShinCRM da sua tiep nen cho luot day moi.');
+        FbmSync.logPullRecord(entity, incoming, current, confirmedStatus, confirmedStatus === FbmSync.SYNC_STATUS.synced ? 'Xác nhận bản ghi sau lần đẩy trực tiếp.' : 'Xác nhận lần đẩy; ShinCRM đã sửa tiếp nên chờ lượt đẩy mới.');
       } else if (incomingHash === localHash) {
         writes.push(Object.assign({}, mergedIncoming, { id: current.id, fbmHash: incomingHash, syncStatus: FbmSync.SYNC_STATUS.synced, syncedAt: new Date() }));
         FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.synced, 'Xác nhận bản ghi sau lần đẩy trước.');

@@ -162,7 +162,7 @@ function fbmSyncToggleMaster() {
   fbmSyncPaint(next);
   return FBM_SYNC_CLIENT.masterToggleFlight = callServer('fbmSetMasterSwitch', [!enabled]).then(fbmSyncStatusOnce).catch(function (error) {
     var rollback = Object.assign({}, FBM_SYNC_CLIENT.lastStatus || current, { masterEnabled: enabled, enabled: enabled });
-    if (typeof fbmSyncPaintError === 'function') { fbmSyncPaintError(error, 'Khong doi duoc cong tac dong bo.'); }
+    if (typeof fbmSyncPaintError === 'function') { fbmSyncPaintError(error, 'Không đổi được công tắc đồng bộ.'); }
     fbmSyncPaint(rollback);
     return null;
   }).finally(function () { FBM_SYNC_CLIENT.masterToggleFlight = null; });
