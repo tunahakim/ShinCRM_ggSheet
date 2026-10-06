@@ -548,6 +548,14 @@ async function chay(so) {
   hop.callServer = (name, args) => { if (name === 'fbmStartIdentityCheck') { viewIdentityArgs = args; return Promise.resolve({ ok: true, request: {} }); } return Promise.resolve({}); };
   await hop.fbmSyncCheckIdentity();
   check(so, 'Kiểm tra liên kết chế độ xem dùng binding đã lưu', viewIdentityArgs, [{ spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' }]);
+  hop.fbmSyncLoop = () => Promise.resolve({ ok: true, status: { phase: 'paused', lastFailureCode: 'AUTO_LOGIN_THROTTLED', lastError: 'Chưa đủ điều kiện tự đăng nhập FBM; request đã bị chặn.', metadata: {} } });
+  hop.FBM_SYNC_CLIENT.identityStatus = { status: 'BOUND', binding: { spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' } };
+  const pausedIdentityCalls = [];
+  hop.callServer = (name) => { pausedIdentityCalls.push(name); return name === 'fbmStartIdentityCheck' ? Promise.resolve({ ok: true, request: {} }) : Promise.resolve({}); };
+  await hop.fbmSyncCheckIdentity();
+  check(so, 'Kiểm tra liên kết bị cổng đăng nhập chặn thì hiện đúng lý do GAS, không ghi thêm lỗi chung chung', [hop.FBM_SYNC_CLIENT.accountNotices.identity.kind, hop.FBM_SYNC_CLIENT.accountNotices.identity.message, pausedIdentityCalls.indexOf('fbmLogSyncError') < 0], ['error', 'Kiểm tra liên kết không thành công: Chưa đủ điều kiện tự đăng nhập FBM; request đã bị chặn.', true]);
+  hop.fbmSyncLoop = () => Promise.resolve({ ok: true, status: { phase: 'done', metadata: { identityCheck: { total: 3, matched: 2, missing: 1 } } } });
+
 
   const waitForIdentityBackground = hop.fbmSyncWaitForIdentityBackground;
   hop.fbmSyncWaitForIdentityBackground = (startCall) => startCall();
