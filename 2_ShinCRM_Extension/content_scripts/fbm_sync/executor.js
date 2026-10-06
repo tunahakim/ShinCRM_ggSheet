@@ -1,25 +1,9 @@
 /* Cầu nối FBM: nhận request, fetch trong tab đăng nhập, trả response thô. */
 (function () {
-  var EXECUTOR_VERSION = '21.14';
+  var EXECUTOR_VERSION = '21.16';
   var FETCH_TIMEOUT_MS = 10000;
   function traceEvent(trace, stage, request, extra) {
     trace.push(Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {}));
-  }
-  /** Đọc cookie payload nếu request GAS không truyền cookie. */
-  function payloadCookieFromPage() {
-    var html = document.documentElement ? document.documentElement.innerHTML : '';
-    var sources = [html, document.documentElement ? document.documentElement.textContent || '' : ''];
-    var patterns = [
-      /\\?["']cookie\\?["']\s*[:=]\s*\\?["']([^"'\\]+FHN_CRM_App)["']/i,
-      /(?:payloadCookie|cookiePayload)\s*[=:]\s*\\?["']([^"'\\]+FHN_CRM_App)["']/i
-    ];
-    for (var i = 0; i < sources.length; i++) {
-      for (var j = 0; j < patterns.length; j++) {
-        var match = sources[i].match(patterns[j]);
-        if (match) { return match[1]; }
-      }
-    }
-    return '';
   }
   function requestBody(req) {
     if (typeof req.bodyText === 'string') { return req.bodyText; }
@@ -106,14 +90,6 @@
     walk(data);
     return found || String(fallback || '');
   }
-  function payloadCookieFromText(text) {
-    var source = String(text || ''), patterns = [
-      /\\?["']cookie\\?["']\s*[:=]\s*\\?["']([^"'\\]+FHN_CRM_App)["']/i,
-      /(?:payloadCookie|cookiePayload)\s*[=:]\s*\\?["']([^"'\\]+FHN_CRM_App)["']/i
-    ];
-    for (var i = 0; i < patterns.length; i += 1) { var match = source.match(patterns[i]); if (match) { return match[1]; } }
-    return '';
-  }
   function md5(value) {
     function rotate(x, n) { return (x << n) | (x >>> (32 - n)); }
     function add(x, y) { return (x + y) | 0; }
@@ -187,8 +163,11 @@
           traceEvent(trace, 'login_successful', request, { httpStatus: login.response.status });
           return fetch('https://fbo.com.vn:8888/Main/zccrAccount.aspx', { method: 'GET', credentials: 'include', cache: 'no-store' }).then(function (account) {
             return readResponseText(account).then(function (accountHtml) {
-              traceEvent(trace, 'payload_cookie_page_read', request, { httpStatus: account.status, responseLength: accountHtml.length });
-              return { ok: login.response.ok, status: login.response.status, headers: { contentType: login.response.headers.get('content-type') || '' }, body: login.text, transport: { payloadCookie: payloadCookieFromText(accountHtml) || payloadCookieFromText(login.text) || payloadCookieFromPage(), trace: trace } };
+              // Mẫu bắt cookie do GAS cấp trong request (một chỗ định nghĩa); ưu tiên trang tài khoản vừa đọc, rồi response Login, cuối cùng mới tới trang đang mở.
+              var captures = Object.assign({}, captureTransportValues(request, '', 'page_html'), captureTransportValues(request, login.text, 'response'), captureTransportValues(request, accountHtml, 'response'));
+              var accountPath = ''; try { accountPath = new URL(account.url).pathname; } catch (ignorePath) { accountPath = ''; }
+              traceEvent(trace, 'payload_cookie_page_read', request, { httpStatus: account.status, responseLength: accountHtml.length, endpoint: accountPath, code: captures.payloadCookie ? 'PAYLOAD_COOKIE_CAPTURED' : 'PAYLOAD_COOKIE_MISSING' });
+              return { ok: login.response.ok, status: login.response.status, headers: { contentType: login.response.headers.get('content-type') || '' }, body: login.text, transport: { captures: captures, trace: trace } };
             });
           });
         });
