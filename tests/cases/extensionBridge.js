@@ -254,6 +254,18 @@ async function chay(so) {
   check(so, 'man dong bo hien thi chi tiet loi day kem HTTP', syncStatusSource.indexOf('pushFailureDetails') >= 0 && syncStatusSource.indexOf('detail.reason') >= 0 && syncStatusSource.indexOf('detail.status') >= 0, true);
   check(so, 'Sidebar chi chuyen nguyen response FBM', syncSource.indexOf('fbmSyncProjectFormResponse') < 0 && syncSource.indexOf('InternalValues') < 0 && syncSource.indexOf('function fbmSyncRelayResponse(response) { return response; }') >= 0, true);
   check(so, 'Sidebar khong cat callback GAS som va giu cursor khi timeout', syncSource.indexOf('FBM_SYNC_GAS_CONTINUE_TIMEOUT_MS = 120000') >= 0 && syncSource.indexOf("code = 'GAS_CALLBACK_TIMEOUT'") >= 0 && syncSource.indexOf('Promise.race([callback, timeout])') >= 0 && syncSource.indexOf("error.code !== 'GAS_CALLBACK_TIMEOUT'") >= 0, true);
+  check(so, 'Sidebar: fbmContinueSync tat han 30 giay cua callServer de race 120 giay so huu han cho', syncSource.indexOf("callServer('fbmContinueSync', [response, FBM_SYNC_CLIENT.traceEvents.slice()], { timeoutMs: 0 })") >= 0, true);
+  (function () {
+    const { catRuotScript } = require('../lib/load-gas');
+    const file = path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'client', 'util', 'serverCall.html');
+    const timers = [];
+    const runner = new Proxy({}, { get(t, k) { return /^with/.test(String(k)) ? () => runner : () => {}; } });
+    const hop = { Promise, Date, setTimeout(fn, ms) { timers.push(ms); return timers.length; }, clearTimeout() {}, progressBegin() {}, progressEnd() {}, callTimingRecord() {}, google: { script: { run: runner } } };
+    vm.createContext(hop);
+    vm.runInContext(catRuotScript(fs.readFileSync(file, 'utf8'), file), hop, { filename: file });
+    hop.callServer('a', []); hop.callServer('b', [], { timeoutMs: 0 });
+    check(so, 'callServer: mac dinh dat han 30000 ms, timeoutMs 0 thi khong dat han nao', timers, [30000]);
+  })();
   check(so, 'GAS ghi dau vet callback khong chua payload', fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'server', 'service', 'FbmSyncService.js'), 'utf8').indexOf("fbmTraceContinue('entered')") >= 0 && fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'report', 'Report.js'), 'utf8').indexOf("'callbackTrace'") >= 0, true);
   check(so, 'GAS chuan hoa toan bo ket qua truoc callback Sidebar', fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'server', 'service', 'FbmSyncService.js'), 'utf8').indexOf('function fbmPublicResult') >= 0 && fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'server', 'service', 'FbmSyncService.js'), 'utf8').indexOf('return fbmPublicResult(result)') >= 0, true);
   check(so, 'status cu khong ve de ghi de loading cua luot moi', syncSource.indexOf('viewEpoch') >= 0 && syncSource.indexOf('epoch !== FBM_SYNC_CLIENT.viewEpoch') >= 0 && syncSource.indexOf('lastServerUpdatedAt') >= 0, true);
