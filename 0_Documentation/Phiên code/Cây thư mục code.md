@@ -215,6 +215,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── read\GridRead.js          Grid metadata, phân trang và category request.
     ├── write\RequestBuilders.js  Builder Customer/Activity create/edit.
     ├── write\PushCandidates.js   Chọn record local và kiểm điều kiện trước khi đẩy.
+    ├── write\SheetSave.js        Cửa ghi Sheet duy nhất của module đồng bộ; ghi thất bại thì ném lỗi.
     ├── reconcile\Fingerprint.js  Normalize, canonical và fingerprint ba chiều.
     ├── reconcile\Conflict.js     Lưu, hiển thị và giải quyết conflict.
     ├── reconcile\Identity.js     Nối định danh, ánh xạ bản ghi và liên kết Activity với Customer.
