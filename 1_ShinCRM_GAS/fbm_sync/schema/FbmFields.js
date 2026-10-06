@@ -35,6 +35,8 @@ FbmSync.CUSTOMER_MEMVARS = [
   'dc_lh_quan', 'dc_lh_qg', 'dc_gh', 'nh_kh1', 'nh_kh2', 'nh_kh3', 'ma_cv', 'ma_sp', 'ma_module', 'ma_tt',
   'status', 'controller', 'parentController', 'nv_kd', 'nv_tele', 'ngay_gd', 'ngay_kh', 'datetime0', 'nguoi_sua', 'nguoi_tim', 'id', 'ds_ma_hd'
 ];
+// Field ngày trong form FBM: ô trống phải gửi null như form gốc; gửi "" thì FBM không đổi được sang ngày và trả HTTP 500 (FBM-046).
+FbmSync.FORM_DATE_FIELDS = ['ngay_tl', 'ngay_gd', 'ngay_kh', 'datetime0', 'start_date', 'end_date', 'ngay_nhac'];
 FbmSync.ACTIVITY_MEMVARS = [
   'id', 'event_yn', 'text', 'ma_cv', 'assigned_name', 'muc_do', 'start_date', 'start_time', 'end_date', 'end_time',
   'ngay_nhac', 'gio_nhac', 'full_day', 'details', 'private', 'share_user', 'share_group', 'ma_nhom', 'owner', 'comment',

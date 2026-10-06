@@ -78,6 +78,10 @@ async function chay(so) {
   check(so, 'Activity marker trỏ FBM ID khác ghi trạng thái xung đột chờ quyết lên Sheet, không cất bản ghi vào state', [markerConflict.conflicts, 'conflicts' in markerState.metadata, markerConflictWrite.records[0].syncStatus, Object.keys(markerState.locks)], [1, false, builders.FbmSync.SYNC_STATUS.conflict, []]);
   const edit = builders.FbmSync.customerEditRequest({ fbmId: 'A1', companyName: 'Đổi tên' }, { stt_rec_kh: 'A1', ma_kh: 'ALT00010', ten_kh: 'Cũ', dien_thoai: '0123' }, gate);
   check(so, 'Customer sửa giữ OldValue field không đụng tới', edit.body.memvars.filter((item) => item.Name === 'dien_thoai')[0].NewValue, '0123');
+  const editWithShinId = builders.FbmSync.customerEditRequest({ id: 'CUS-020059', fbmId: 'A1', website: 'Mới' }, { stt_rec_kh: 'A1', ma_kh: 'ALT00010', id: 0 }, gate).body.memvars.filter((item) => item.Name === 'id')[0];
+  check(so, 'FBM-046: Customer sửa không gửi mã CUS-* của Sheet vào memvar id của FBM', [editWithShinId.OldValue, editWithShinId.NewValue], [0, 0]);
+  const emptyDate = builders.FbmSync.customerEditRequest({ fbmId: 'A1' }, { stt_rec_kh: 'A1', ngay_tl: '' }, gate).body.memvars.filter((item) => item.Name === 'ngay_tl')[0];
+  check(so, 'FBM-046: field ngày trống gửi null như form FBM, không gửi chuỗi rỗng', [emptyDate.OldValue, emptyDate.NewValue], [null, null]);
   check(so, 'fixture session giữ cookie và userId', [builders.FbmSync.stateRead().session.cookie, builders.FbmSync.stateRead().session.userId], ['461020379855cFHN_CRM_App', '2037']);
   check(so, 'Customer grid gắn điều kiện phân quyền theo userId trong payload cookie', builders.FbmSync.customerGridRequest({ type: 0 }).body.externalKey[0].Name, "stt_rec_kh in (select stt_rec_kh from dbo.zcFastBusiness$Function$GetCustomerValidate('2037')) and 1");
   const customerGridKeys = builders.FbmSync.customerGridRequest({ type: 0 }).body.externalKey;
