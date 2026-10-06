@@ -6,6 +6,7 @@ FbmSync.LOCK_KEY = 'FBM_SYNC_RECORD_LOCKS_V1';
 FbmSync.STALE_RUN_MS = 2 * 60 * 1000;
 FbmSync.ACTIVE_PHASES = ['checking_session', 'waiting_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'];
 FbmSync.TERMINAL_PHASES = ['done', 'error', 'paused', 'conflict'];
+FbmSync.DONE_MESSAGE = 'Đồng bộ hoàn tất.';
 FbmSync.SEEN_SHARD_HEX_LENGTH = 8000;
 // Apps Script giới hạn một giá trị DocumentProperties khoảng 9 KB. Chặn trước
 // khi gọi setProperty để không đẩy một JSON dở dang vào kho state.

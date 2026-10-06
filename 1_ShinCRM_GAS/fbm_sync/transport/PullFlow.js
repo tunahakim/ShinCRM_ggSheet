@@ -224,7 +224,7 @@ FbmSync.activitySupplementNext = function (state, afterActivity) {
   }
   if (after.kind === 'done') { FbmSync.activityRotationSave(after.rows || []); }
   state.cursor = {};
-  state.phase = 'done'; state.entity = ''; state.message = 'Dong bo hoan tat.'; FbmSync.stateWrite(state);
+  state.phase = 'done'; state.entity = ''; state.message = FbmSync.DONE_MESSAGE; FbmSync.stateWrite(state);
   return null;
 };
 
@@ -572,7 +572,7 @@ FbmSync.continue = function (rawResponse) {
     if (nextCustomer) { state.cursor = { kind: 'customer_grid', type: 1, pageIndex: nextCustomer.body.gridPageIndex, pageValue: nextCustomer.body.gridPageValue, count: nextCustomer.body.count, seen: Number(state.cursor.customerSeen || 0) }; FbmSync.stateWrite(state); return { ok: true, request: FbmSync.nextEnvelope(nextCustomer), status: FbmSync.statusView() }; }
     if (state.mode === 'write' && FbmSync.canWriteFbm(state.mode)) { if (FbmSync.stopPushOnConflicts && FbmSync.stopPushOnConflicts(state)) { return { ok: true, request: null, status: FbmSync.statusView() }; } state.cursor = { kind: 'push_scan', entity: 'customer', index: 0 }; state.phase = 'push'; FbmSync.stateWrite(state); return { ok: true, request: FbmSync.nextEnvelope(FbmSync.nextPushRequest(state)), status: FbmSync.statusView() }; }
     if (FbmSync.canWriteSheet(state.mode) && state.scan !== 'detail') { FbmSync.markMissingAfterFullScan('customer', state); FbmSync.markMissingAfterFullScan('activity', state); }
-    state.cursor = {}; state.phase = 'done'; state.message = 'Dong bo hoan tat.'; FbmSync.stateWrite(state); return { ok: true, status: FbmSync.statusView() };
+    state.cursor = {}; state.phase = 'done'; state.message = FbmSync.DONE_MESSAGE; FbmSync.stateWrite(state); return { ok: true, status: FbmSync.statusView() };
   }
   // Activity được quét theo từng stt_rec, rồi mới quay lại trang Customer kế.
   if (cursor.kind === 'activity_grid') {
@@ -611,7 +611,7 @@ FbmSync.continue = function (rawResponse) {
       return { ok: true, request: FbmSync.nextEnvelope(FbmSync.nextPushRequest(state)), status: FbmSync.statusView(), imported: activityRecords.length };
     }
     if (FbmSync.canWriteSheet(state.mode) && state.scan !== 'detail') { FbmSync.markMissingAfterFullScan('customer', state); FbmSync.markMissingAfterFullScan('activity', state); }
-    state.cursor = {}; state.phase = 'done'; state.entity = ''; state.message = 'Dong bo hoan tat.'; FbmSync.stateWrite(state);
+    state.cursor = {}; state.phase = 'done'; state.entity = ''; state.message = FbmSync.DONE_MESSAGE; FbmSync.stateWrite(state);
     return { ok: true, status: FbmSync.statusView(), imported: activityRecords.length };
   }
   if (cursor.kind === 'activity_bulk_grid') {

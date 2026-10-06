@@ -13,8 +13,17 @@ FbmSync.prepareCategoryGate = function (state) {
   state.metadata = state.metadata || {};
   state.metadata.categoryBlocks = blocks;
   FbmSync.stateCategoryGate(state, gate);
+  FbmSync.logCategoryBlocks(blocks);
   if (state.session) { state.session.lookups = {}; }
   return blocks;
+};
+/** Tài liệu 09/03: mã danh mục bị chặn phải vào Log kèm tên FBM hiện tại, không chỉ nằm trong state; thiếu danh sách FBM thì chặn cả chiều đẩy nên là lỗi. */
+FbmSync.logCategoryBlocks = function (blocks) {
+  if (typeof logEvent !== 'function') { return; }
+  (blocks || []).forEach(function (block) {
+    var whole = !block.code;
+    logEvent({ source: 'fbm_sync', action: 'category_block', outcome: whole ? (typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error') : (typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn'), entity: 'category', recordId: String(block.code || ''), reason: String(block.source || '') + (whole ? '' : ' ' + String(block.code)) + ': ' + String(block.reason || '') + (whole ? ' Bỏ toàn bộ chiều đẩy kỳ này.' : ' Bản ghi dùng mục này không được đẩy lên FBM cho đến khi sửa Category.'), detail: { source: String(block.source || ''), code: String(block.code || '') } });
+  });
 };
 /** Push thành công chỉ cộng vào số liệu bước; lỗi và bỏ qua vào bộ gom Log của lát. */
 FbmSync.logPushRecord = function (candidate, operation, outcome, reason, detail) {
@@ -311,7 +320,7 @@ FbmSync.nextPushRequest = function (state) {
       ? 'Đồng bộ hoàn tất; bản ghi vừa đẩy đã được FBM xác nhận.'
       : (state.mode === 'write' || state.mode === 'push')
         ? 'Đồng bộ hoàn tất; không có bản ghi nào được đẩy.'
-        : 'Đồng bộ hoàn tất.';
+        : FbmSync.DONE_MESSAGE;
   state.cursor = {}; FbmSync.stateWrite(state); return null;
 };
 
