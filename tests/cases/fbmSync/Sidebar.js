@@ -452,6 +452,19 @@ async function chay(so) {
   check(so, 'FBM-006: request Activity không mang meta.entity vẫn hiện "Đang chờ tab FBM trả dữ liệu giao dịch...", lấy nhãn từ GAS',
     waitingPaints.map((item) => item.message).filter((message) => /Đang chờ tab FBM/.test(message)), ['Đang chờ tab FBM trả dữ liệu giao dịch...']);
   hop.fbmSyncPaint = () => {};
+  // FBM-017: callback lỗi giữa phiên vẽ lỗi lên snapshot GAS gần nhất, không dựng bộ đếm 0 và không làm mất pipeline.
+  const errorPaints = [], savedExtensionRequest = hop.fbmSyncExtensionRequest, savedCallServer = hop.callServer;
+  hop.fbmSyncPaint = (status) => { const snapshot = status.status || status; hop.FBM_SYNC_CLIENT.lastStatus = snapshot; errorPaints.push(snapshot); };
+  hop.fbmSyncExtensionRequest = () => Promise.reject(new Error('Mất kết nối tới GAS'));
+  const gasSnapshot = { runId: 'run-017', phase: 'push', entityLabel: 'Khách hàng', counts: { total: 5, completed: 2, succeeded: 2, error: 0, conflict: 0, skipped: 0 }, pipeline: { steps: [{ id: 'push', status: 'running' }] } };
+  hop.callServer = (name) => name === 'fbmApprovePush' ? Promise.resolve({ ok: true, request: { meta: { kind: 'customer_edit_open' } }, status: gasSnapshot }) : Promise.resolve(null);
+  await hop.fbmSyncApprovePush();
+  const lastErrorPaint = errorPaints[errorPaints.length - 1] || {};
+  check(so, 'FBM-017: callback lỗi giữa phiên giữ runId, pipeline và bộ đếm thật của GAS, chỉ đổi sang trạng thái lỗi kèm lý do',
+    [lastErrorPaint.phase, lastErrorPaint.message, lastErrorPaint.runId, lastErrorPaint.counts, lastErrorPaint.pipeline && lastErrorPaint.pipeline.steps.length],
+    ['error', 'Mất kết nối tới GAS', 'run-017', gasSnapshot.counts, 1]);
+  hop.fbmSyncExtensionRequest = savedExtensionRequest; hop.callServer = savedCallServer;
+  hop.fbmSyncPaint = () => {};
   hop.FBM_SYNC_CLIENT.cancelRequested = true;
   const stoppingAction = hop.fbmSyncRunActionBlock({ phase: 'pull_customer', masterEnabled: true, enabled: true });
   check(so, 'Sidebar khóa nút và báo đang dừng trong lúc chờ response cuối', [stoppingAction.disabled, stoppingAction.label.indexOf('Đang dừng') >= 0], [true, true]);
