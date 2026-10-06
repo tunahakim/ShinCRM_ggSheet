@@ -23,12 +23,15 @@ Nguồn lỗi: bảng đầu của `Audit pipeline đồng bộ FBM.md` (mã `FB
 
 Lý do làm trước: Log là công cụ chỉ ra lỗi live nằm ở bước nào; working tree đang có 18 tệp sửa dở và suite đỏ nên không thể commit hay rà trên nền ổn định.
 
-- [ ] 1. Đối chiếu nhóm thay đổi chưa commit với `09.07 Phần 11 — Log` và quyết định Log theo bước nghiệp vụ trong `Nghiên cứu nguyên nhân bất thường phiên đồng bộ FBM.md`; ghi chỗ lệch vào bảng audit.
-- [ ] 2. Khi bật Log chi tiết, dòng `Bắt đầu <bước>` có trên Sheet `Log` ngay cả khi lần chạy GAS bị cắt trước khi kết thúc (FBM-018). Có test.
-- [ ] 3. Lỗi nổ giữa một bước tạo đúng một dòng `Kết thúc <bước> với lỗi` cùng `runId`, ngoài dòng lỗi chung của cửa vào (FBM-003). Có test.
-- [ ] 4. Conflict được ghi vào Sheet `Log` ngay trong lát phát hiện, không đợi phiên đóng, và không theo từng record nhân lên vô hạn (FBM-009). Test `Pull.js:227` được chuyển sang kiểm bằng chứng thay thế, không xóa cho xanh.
-- [ ] 5. Ghi Sheet trong pull thất bại thì phiên không được tổng kết `Hoàn tất`; Sheet `Log` có dòng lỗi và Sidebar báo lỗi (FBM-004). Có test.
-- [ ] 6. `node tests/run.js` xanh; commit nhóm G1 theo chủ đề (lõi GAS / test / tài liệu). Commit: —
+Thiết kế đã chốt: mục `Thiết kế sửa nhóm G1` trong hồ sơ audit.
+
+- [x] 1. Đối chiếu nhóm thay đổi chưa commit với `09.07 Phần 11 — Log`, tài liệu 10 Phần 3–5 và quyết định Log theo bước nghiệp vụ; đã ghi thêm FBM-019, FBM-020, FBM-021 và thiết kế sửa vào hồ sơ audit.
+- [ ] 2. Khi bật Log chi tiết, dòng `Bắt đầu <bước>` có trên Sheet `Log` ngay cả khi lần chạy GAS bị cắt trước khi kết thúc (FBM-018). Có test. Cập nhật tài liệu 10 Phần 3.
+- [ ] 3. Mọi đường kết thúc phiên (xong, lỗi, dừng, thu hồi phiên treo, hủy) đóng mỗi bước đang mở đúng một lần; khi lỗi, chỉ bước đang chạy ghi `Kết thúc <bước> với lỗi`, bước mở khác ghi `Dừng ... vì lỗi ở bước <tên>` (FBM-019). Có test.
+- [ ] 4. Exception giữa lát chuyển phiên sang lỗi ngay trong lần chạy đó và tạo dòng `Kết thúc <bước> với lỗi` cùng `runId` (FBM-003). Có test.
+- [ ] 5. Lỗi/conflict theo record có trên Sheet `Log` ngay trong lát phát hiện, pull gom tối đa một dòng mỗi loại mỗi trang (FBM-009, FBM-020). Test `Pull.js:227` được chuyển sang kiểm bằng chứng thay thế, không xóa cho xanh.
+- [ ] 6. Ghi Sheet trong pull thất bại thì phiên không được tổng kết `Hoàn tất`; Sheet `Log` có dòng lỗi và Sidebar báo lỗi (FBM-004). Có test.
+- [ ] 7. `node tests/run.js` xanh; commit nhóm G1 theo chủ đề (lõi GAS / test / tài liệu). Commit: —
 
 ### G2. Rà tiếp các lớp lỗi chưa rà (hướng B — chỉ ghi phát hiện, chưa sửa)
 
