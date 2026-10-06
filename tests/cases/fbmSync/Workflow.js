@@ -411,7 +411,6 @@ async function chay(so) {
   compactLookupFlow.hop.FbmSync.validatePushCategories = () => [];
   compactLookupFlow.hop.FbmSync.pushEligibilityErrors = () => [];
   compactLookupFlow.hop.FbmSync.isRecordLocked = () => false;
-  compactLookupFlow.hop.FbmSync.lockRecord = () => pushState;
   compactLookupFlow.hop.writeGateSave = () => ({ ok: true });
   compactLookupFlow.hop.FbmSync.stopPushOnConflicts = () => false;
   compactLookupFlow.hop.FbmSync.activityEditOpenRequest = () => ({ url: 'https://example.test', meta: { kind: 'activity_edit_open' } });
@@ -470,7 +469,6 @@ async function chay(so) {
   orderFlow.hop.FbmSync.validatePushCategories = () => [];
   orderFlow.hop.FbmSync.pushEligibilityErrors = () => [];
   orderFlow.hop.FbmSync.isRecordLocked = () => false;
-  orderFlow.hop.FbmSync.lockRecord = () => orderState;
   orderFlow.hop.FbmSync.activityEditOpenRequest = () => ({ url: 'https://example.test', meta: { kind: 'activity_edit_open' } });
   let orderSheetWrites = 0;
   orderFlow.hop.writeGateSave = () => { orderSheetWrites += 1; return { ok: true }; };
@@ -480,6 +478,21 @@ async function chay(so) {
   let orderError = null;
   try { orderFlow.hop.FbmSync.nextPushRequest(orderState); } catch (error) { orderError = error; }
   check(so, 'state push được chốt trước khi đánh dấu Sheet đang đẩy', [orderError && orderError.code, orderSheetWrites, orderFlow.hop.FbmSync.stateRead().cursor.kind], ['FBM_DOCUMENT_PROPERTIES_QUOTA', 0, 'push_scan']);
+  // FBM-045: bước nạp Category gọi nextPushRequest rồi tự ghi lại object state của nó; khóa phải đặt trên chính object đó.
+  const aliasFlow = workflowGas();
+  const aliasState = aliasFlow.hop.FbmSync.stateStart('', 'push', 0);
+  aliasState.mode = 'push'; aliasState.phase = 'push'; aliasState.entity = 'customer'; aliasState.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
+  aliasFlow.hop.FbmSync.stateWrite(aliasState);
+  aliasFlow.hop.FbmSync.pushCandidates = () => [{ kind: 'edit', id: 'CUS-ALIAS', position: 0, record: { id: 'CUS-ALIAS', fbmId: 'FBM-CUS-ALIAS', fbmHash: 'h0', allowFbmPush: 'Cho phép' } }];
+  ['pushConfigErrors', 'pushOwnerError'].forEach((name) => { aliasFlow.hop.FbmSync[name] = () => ''; });
+  ['validatePushCategories', 'pushEligibilityErrors'].forEach((name) => { aliasFlow.hop.FbmSync[name] = () => []; });
+  aliasFlow.hop.writeGateSave = () => ({ ok: true });
+  aliasFlow.hop.FbmSync.customerEditOpenRequest = () => ({ url: 'https://example.test', meta: { kind: 'customer_edit_open' } });
+  const aliasRequest = aliasFlow.hop.FbmSync.nextPushRequest(aliasState);
+  aliasFlow.hop.FbmSync.stateWrite(aliasState);
+  const aliasStored = aliasFlow.hop.FbmSync.stateRead();
+  check(so, 'FBM-045: hàm gọi ghi lại object state sau khi phát lệnh đẩy vẫn giữ cursor push_wait và khóa bản ghi',
+    [aliasRequest && aliasRequest.meta.kind, aliasState.cursor.kind, aliasStored.cursor.kind, !!(aliasStored.locks || {})['customer:CUS-ALIAS']], ['customer_edit_open', 'push_wait', 'push_wait', true]);
   // FBM-002: không ghi được `đang đẩy` xuống Sheet thì không phát lệnh ghi FBM.
   const pushingFlow = workflowGas();
   const pushingState = pushingFlow.hop.FbmSync.stateStart('', 'push', 0);
