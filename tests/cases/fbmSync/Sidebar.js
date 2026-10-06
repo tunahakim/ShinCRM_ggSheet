@@ -373,7 +373,8 @@ async function chay(so) {
   check(so, 'vá trạng thái đang chạy cũng cập nhật thanh tiến độ, không giữ số đếm của snapshot cũ', [progressPatched, content.querySelector('.shin-sync-progress-label').textContent, content.querySelector('#fbm-sync-progress-track').getAttribute('aria-valuenow'), content.querySelector('#fbm-sync-progress-fill').style.width], [true, 'Tiến trình: 7/10 (70%)', '70', '70%']);
 
   hop.FBM_SYNC_CLIENT.resultsTab = 'summary';
-  const conflictStatus = { phase: 'conflict', counts: { conflict: 1 }, metadata: { conflictCount: 1, conflicts: [{ entity: 'customer', id: 'CUS-1', fbmId: 'ALT00010', fields: [{ field: 'phone', left: '0901', right: '0902' }] }] } };
+  const conflictStatus = { phase: 'conflict', counts: { conflict: 1 }, metadata: { conflictCount: 1 } };
+  hop.FBM_SYNC_CLIENT.conflict = { entity: 'customer', id: 'CUS-1', fbmId: 'ALT00010', remaining: 1, fields: [{ field: 'phone', left: '0901', right: '0902' }] };
   render(hop, content, hop.fbmSyncRenderResults, conflictStatus);
   const resultTabButtons = Array.from(content.querySelectorAll('.shin-sync-tab-trigger'));
   const resultTabLabels = resultTabButtons.map((node) => node.querySelector('.shin-btn-label').textContent);

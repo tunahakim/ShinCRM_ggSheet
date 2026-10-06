@@ -87,10 +87,10 @@ async function chay(so) {
   check(so, 'status noi ro chieu ShinCRM sang FBM', pushView.direction, 'ShinCRM → FBM');
   check(so, 'status noi ro dang dong bo giao dich', pushView.entityLabel, 'Giao dịch');
   const queueState = orchestration.FbmSync.stateRead();
-  queueState.metadata.conflicts = [{ entity: 'activity', id: 'ACT-1' }, { entity: 'activity', id: 'ACT-2' }];
+  queueState.metadata.conflictCount = 2;
   orchestration.FbmSync.stateWrite(queueState);
   const queueMetadata = orchestration.FbmSync.statusView().metadata;
-  check(so, 'DTO Sidebar chi nhan mot conflict dau hang doi', [queueMetadata.conflicts.length, queueMetadata.conflictCount, queueMetadata.conflicts[0].id], [1, 2, 'ACT-1']);
+  check(so, 'FBM-024: DTO Sidebar chỉ nhận số xung đột, bản ghi cụ thể chỉ có khi mở chế độ xung đột', [queueMetadata.conflictCount, 'conflicts' in queueMetadata], [2, false]);
 
   const guards = taoHopCat({ FbmSync: {}, PropertiesService: { getScriptProperties: () => ({ getProperty: () => '' }), getDocumentProperties: () => ({ getProperty: () => null, setProperty: () => {} }) } });
   napServer(guards, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
@@ -146,7 +146,7 @@ async function chay(so) {
   check(so, 'push request co envelope protocol', pushRequest.meta.kind, 'customer_edit_open');
   const conflictPushState = push.FbmSync.stateStart('', 'push', 0);
   conflictPushState.metadata.categoryGate = {};
-  conflictPushState.metadata.conflicts = [{ entity: 'activity', id: 'ACT-1' }];
+  conflictPushState.counts.conflict = 1;
   conflictPushState.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
   push.FbmSync.stateWrite(conflictPushState);
   check(so, 'push dung lai khi pull da phat hien conflict', [push.FbmSync.nextPushRequest(conflictPushState), push.FbmSync.stateRead().phase, push.FbmSync.stateRead().cursor], [null, 'conflict', {}]);

@@ -567,7 +567,7 @@ async function chay(so) {
     deleteProperty(key) { delete quotaData[key]; }
   };
   const quotaFlow = workflowGas({ documentProperties: quotaProperties, logEvent: (event) => quotaLogs.push(event), LOG_ERROR: 'error' });
-  quotaFlow.hop.FbmSync.statePatch({ runId: 'quota-run', phase: 'pull_customer', cursor: { kind: 'customer_grid', pageIndex: 7, pageValue: ['2026-09-20', 'CUS-000007'] }, metadata: { conflicts: [{ entity: 'customer', id: 'CUS-LOCK' }] }, locks: { 'customer:CUS-LOCK': { owner: 'sync', revision: 'r7' } } });
+  quotaFlow.hop.FbmSync.statePatch({ runId: 'quota-run', phase: 'pull_customer', cursor: { kind: 'customer_grid', pageIndex: 7, pageValue: ['2026-09-20', 'CUS-000007'] }, metadata: {}, locks: { 'customer:CUS-LOCK': { owner: 'sync', revision: 'r7' } } });
   quotaFull = true;
   const quotaResult = quotaFlow.hop.FbmSync.controlDispatchLocked('cancel', {});
   const quotaLog = quotaLogs.filter((item) => item.reason === 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED').slice(-1)[0] || quotaLogs.filter((item) => item.reason === 'FBM_DOCUMENT_PROPERTIES_QUOTA').slice(-1)[0] || {};

@@ -49,12 +49,12 @@ function chay(so) {
     configGet: () => ''
   });
   napServer(quotaHop, 'fbm_sync/state/State.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js');
-  quotaHop.FbmSync.stateWrite({ runId: 'before-quota', cursor: { pageIndex: 2, pageValue: ['2026-09-20', 'CUS-000002'] }, metadata: { conflicts: [{ entity: 'customer', id: 'CUS-000001', fields: { companyName: 'x'.repeat(200) } }] }, locks: { 'customer:CUS-000001': { owner: 'sync', revision: 'r1' } } });
+  quotaHop.FbmSync.stateWrite({ runId: 'before-quota', cursor: { pageIndex: 2, pageValue: ['2026-09-20', 'CUS-000002'] }, metadata: { pushFailureDetails: { 'customer:CUS-000001': { reason: 'x'.repeat(200) } } }, locks: { 'customer:CUS-000001': { owner: 'sync', revision: 'r1' } } });
   const previousState = quotaData.FBM_SYNC_STATE_V1;
   quotaFull = true;
   let quotaError = null;
   try {
-    quotaHop.FbmSync.stateWrite({ runId: 'too-large', cursor: { pageIndex: 3 }, metadata: { conflicts: Array.from({ length: 120 }, (_, index) => ({ entity: 'customer', id: 'CUS-' + String(index).padStart(6, '0'), fields: { companyName: 'x'.repeat(200) } })) }, locks: { 'customer:CUS-000001': { owner: 'sync', revision: 'r2' } } });
+    quotaHop.FbmSync.stateWrite({ runId: 'too-large', cursor: { pageIndex: 3 }, metadata: { pushFailureDetails: Object.fromEntries(Array.from({ length: 120 }, (_, index) => ['customer:CUS-' + String(index).padStart(6, '0'), { reason: 'x'.repeat(200) }])) }, locks: { 'customer:CUS-000001': { owner: 'sync', revision: 'r2' } } });
   } catch (error) { quotaError = error; }
   const syncQuota = quotaHop.FbmSync.syncSettingsSave({ approvalThreshold: 4 });
   const accountQuota = quotaHop.FbmSync.accountSettingsSave({ customerPrefix: 'ALT', customerCodeLength: '8', activitySince: '2026-01-01' });

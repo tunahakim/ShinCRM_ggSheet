@@ -9,19 +9,21 @@ async function chay(so) {
     category: { categories: { '@CAT_CHO_PHEP_FBM': [] } },
     issues: []
   }) });
-  napServer(hop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/report/Preflight.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
+  napServer(hop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/report/Preflight.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
   hop.FbmSync.scriptSettings = () => ({ accountName: '' });
   hop.FbmSync.readCategoryGate = () => ({ valid: {} });
   hop.FbmSync.currentSpreadsheetId = () => 'sheet-a';
   hop.FbmSync.configValue = () => '';
   hop.FbmSync.bindingRead = () => ({});
-  hop.FbmSync.readLocal = (entity) => entity === 'activity' ? [{ id: 'ACT-NOPERM', customerId: 'CUS-1', fbmId: '174813', fbmHash: 'old', allowFbmPush: 'Chưa cho phép', syncStatus: 'chờ đối soát', taskType: 'Gọi điện chăm sóc', content: 'Nội dung mới' }] : [{ id: 'CUS-1', fbmCustomerCode: 'ALT00010', allowFbmPush: 'Cho phép' }];
+  hop.FbmSync.readLocal = (entity) => entity === 'activity' ? [{ id: 'ACT-NOPERM', customerId: 'CUS-1', fbmId: '174813', fbmHash: 'old', allowFbmPush: 'Chưa cho phép', syncStatus: 'chờ đối soát', taskType: 'Gọi điện chăm sóc', content: 'Nội dung mới' }] : [{ id: 'CUS-1', fbmCustomerCode: 'ALT00010', allowFbmPush: 'Cho phép' }, { id: 'CUS-2', fbmId: 'FBM-2', allowFbmPush: 'Cho phép', syncStatus: hop.FbmSync.SYNC_STATUS.conflict }, { id: 'CUS-3', fbmId: 'FBM-3', allowFbmPush: 'Cho phép', syncStatus: hop.FbmSync.SYNC_STATUS.conflict }];
   hop.FbmSync.pushPermission = (record) => ({ push: String(record.allowFbmPush || '') === 'Cho phép' });
-  hop.FbmSync.pushCandidates = (entity) => entity === 'activity' ? [{ entity: 'activity', kind: 'edit', id: 'ACT-1', record: { id: 'ACT-1', syncStatus: hop.FbmSync.SYNC_STATUS.conflict, taskType: 'Gọi điện chăm sóc', owner: 'Owner khác' } }] : [];
+  hop.FbmSync.pushCandidates = (entity) => entity === 'activity' ? [{ entity: 'activity', kind: 'edit', id: 'ACT-1', record: { id: 'ACT-1', syncStatus: hop.FbmSync.SYNC_STATUS.pending, taskType: 'Gọi điện chăm sóc', owner: 'Owner khác' } }] : [];
 
   const write = hop.FbmSync.runPreflight({ mode: 'write' });
   check(so, 'preflight write khong dung Config ten tai khoan cu lam cong chan', write.issues.some((item) => item.code === 'FBM_ACCOUNT_NAME_MISSING'), false);
   check(so, 'preflight write báo conflict và mapping theo mã riêng', [write.issues.some((item) => item.code === 'FBM_RECORD_CONFLICT_PENDING'), write.issues.some((item) => item.code === 'FBM_CATEGORY_MAPPING_MISSING')], [true, true]);
+  const pendingConflicts = write.issues.filter((item) => item.code === 'FBM_RECORD_CONFLICT_PENDING');
+  check(so, 'FBM-024: preflight gộp mọi dòng xung đột chờ quyết thành một issue có số đếm, chặn chế độ ghi', [pendingConflicts.length, /Có 2 bản ghi/.test(pendingConflicts[0] && pendingConflicts[0].message), pendingConflicts[0] && pendingConflicts[0].blocking], [1, true, true]);
   check(so, 'preflight báo Activity đổi nhưng chưa bật quyền đẩy', write.issues.some((item) => item.code === 'FBM_RECORD_PUSH_PERMISSION_MISSING'), true);
   check(so, 'preflight gộp cảnh báo quyền đẩy theo tổng số', write.issues.filter((item) => item.code === 'FBM_RECORD_PUSH_PERMISSION_MISSING').length, 1);
 

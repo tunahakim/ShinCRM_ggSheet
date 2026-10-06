@@ -17,7 +17,7 @@ async function chay(so) {
     builders.FbmSync.canWriteSheet('push'), builders.FbmSync.canWriteFbm('push'),
     builders.FbmSync.canWriteSheet('write'), builders.FbmSync.canWriteFbm('write')
   ], [false, false, true, false, false, true, true, true]);
-  let readModeState = { mode: 'read', counts: { total: 0, completed: 0, succeeded: 0, conflict: 0, skipped: 0, error: 0 } };
+  let readModeState = { mode: 'read', counts: { total: 0, completed: 0, succeeded: 0, conflict: 0, skipped: 0, error: 0 }, metadata: {} };
   let readModeSheetWrites = 0;
   const realPullWrite = builders.FbmSync.pullWrite;
   builders.FbmSync.stateRead = () => readModeState;
@@ -66,13 +66,13 @@ async function chay(so) {
   builders.writeGateSave = (request) => { recoveryWrite = request; return { ok: true }; };
   const recovered = builders.FbmSync.pullWrite('activity', [builders.FbmSync.activityRecord({ id: 77, ma_kh: 'ALT99999', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi', details: 'Nội dung #SC-ACT-9' }, gate)], 'write');
   check(so, 'Activity marker recovery vá FBM ID không tạo dòng mới', [recovered.written, recoveryWrite.records[0].id, recoveryWrite.records[0].fbmId, recoveryState.locks['activity:ACT-9']], [1, 'ACT-9', '77', undefined]);
-  let markerConflictWrite, markerState = { session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: 'auth-c', activityAuthorized: 'auth-a' }, metadata: { categoryGate: gate, seen: { customer: {}, activity: {} }, conflicts: [] }, locks: { 'activity:ACT-9': { owner: 'sync' } }, counts: { conflict: 0 } };
+  let markerConflictWrite, markerState = { session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: 'auth-c', activityAuthorized: 'auth-a' }, metadata: { categoryGate: gate, seen: { customer: {}, activity: {} } }, locks: {}, counts: { conflict: 0 } };
   builders.FbmSync.stateRead = () => markerState;
   builders.FbmSync.stateWrite = (next) => { markerState = next; return next; };
   builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmCustomerCode: 'ALT99999' }] : [{ id: 'ACT-9', fbmId: 'OLD-FBM', customerId: 'KH-1', content: 'Nội dung cũ', taskType: 'Gọi', workDate: '/Date(1757386800000)/', fbmHash: 'old-hash' }];
   builders.writeGateSave = (request) => { markerConflictWrite = request; return { ok: true }; };
   const markerConflict = builders.FbmSync.pullWrite('activity', [builders.FbmSync.activityRecord({ id: 'NEW-FBM', ma_kh: 'ALT99999', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi', details: 'Nội dung mới #SC-ACT-9' }, gate)]);
-  check(so, 'Activity marker trỏ FBM ID khác tạo conflict và khóa', [markerConflict.conflicts, markerState.metadata.conflicts.length, markerConflictWrite.records[0].syncStatus, markerState.locks['activity:ACT-9'].owner], [1, 1, builders.FbmSync.SYNC_STATUS.conflict, 'sync']);
+  check(so, 'Activity marker trỏ FBM ID khác ghi trạng thái xung đột chờ quyết lên Sheet, không cất bản ghi vào state', [markerConflict.conflicts, 'conflicts' in markerState.metadata, markerConflictWrite.records[0].syncStatus, Object.keys(markerState.locks)], [1, false, builders.FbmSync.SYNC_STATUS.conflict, []]);
   const edit = builders.FbmSync.customerEditRequest({ fbmId: 'A1', companyName: 'Đổi tên' }, { stt_rec_kh: 'A1', ma_kh: 'ALT00010', ten_kh: 'Cũ', dien_thoai: '0123' }, gate);
   check(so, 'Customer sửa giữ OldValue field không đụng tới', edit.body.memvars.filter((item) => item.Name === 'dien_thoai')[0].NewValue, '0123');
   check(so, 'fixture session giữ cookie và userId', [builders.FbmSync.stateRead().session.cookie, builders.FbmSync.stateRead().session.userId], ['461020379855cFHN_CRM_App', '2037']);
@@ -214,7 +214,7 @@ async function chay(so) {
   builders.FbmSync.readLocal = () => [shinChanged];
   const shinChangedResult = builders.FbmSync.pullWrite('customer', [reconcileIncoming]);
   check(so, 'chi ShinCRM doi thi khong pull de', [shinChangedResult.written, reconcileWrite.records[0].syncStatus], [0, builders.FbmSync.SYNC_STATUS.pending]);
-  let conflictState = { metadata: { categoryGate: gate, conflicts: [] }, counts: { conflict: 0 } }, conflictWrite, conflictLog = [];
+  let conflictState = { metadata: { categoryGate: gate }, counts: { conflict: 0 } }, conflictWrite, conflictLog = [];
   builders.LOG_CONFLICT = 'conflict';
   builders.logEvent = (event) => { conflictLog.push(event); };
   builders.FbmSync.stateRead = () => conflictState;
@@ -223,24 +223,12 @@ async function chay(so) {
   builders.writeGateSave = (request) => { conflictWrite = request; return { ok: true }; };
   builders.FbmSync.recordIssues = {};
   const conflictResult = builders.FbmSync.pullWrite('customer', [builders.FbmSync.customerRecord({ stt_rec_kh: 'C-2', ma_kh: 'ALT99999', ten_kh: 'FBM' }, gate)]);
-  check(so, 'conflict luu diff va khong ghi noi dung', [conflictResult.conflicts, conflictState.metadata.conflicts.length, conflictWrite.records[0].syncStatus], [1, 1, builders.FbmSync.SYNC_STATUS.conflict]);
+  check(so, 'conflict chỉ ghi trạng thái xung đột chờ quyết, không ghi nội dung FBM và không cất diff vào state', [conflictResult.conflicts, 'conflicts' in conflictState.metadata, conflictWrite.records[0].syncStatus, conflictWrite.records[0].companyName], [1, false, builders.FbmSync.SYNC_STATUS.conflict, undefined]);
   builders.FbmSync.recordIssuesFlush();
   const conflictEntries = conflictLog.filter((event) => event.action === 'pull_record_issue');
   check(so, 'conflict theo bản ghi có đúng một dòng Log gom ở ranh giới lát, mang mã bản ghi và trạng thái xung đột',
     [conflictEntries.length, conflictEntries[0] && conflictEntries[0].outcome, conflictEntries[0] && conflictEntries[0].recordId, conflictEntries[0] && conflictEntries[0].detail.status],
     [1, 'conflict', 'CUS-2', builders.FbmSync.SYNC_STATUS.conflict]);
-  check(so, 'conflict tao khoa sync', conflictState.locks['customer:CUS-2'].owner, 'sync');
-  check(so, 'khong cho chot conflict neu chua doc lai', builders.FbmSync.resolveConflict('customer', 'CUS-2', 'fbm').code, 'CONFLICT_REREAD_REQUIRED');
-  conflictState.metadata.conflicts[0].shinRecord = builders.FbmSync.readLocal('customer')[0];
-  conflictState.metadata.conflicts[0].fbmRecord = builders.FbmSync.customerRecord({ stt_rec_kh: 'C-2', ma_kh: 'ALT99999', ten_kh: 'FBM' }, gate);
-  const resolved = builders.FbmSync.resolveConflict('customer', 'CUS-2', 'fbm', null, true);
-  check(so, 'resolve conflict theo FBM cap nhat baseline va xoa hang doi', [resolved.ok, conflictState.metadata.conflicts.length, conflictWrite.records[0].fbmHash !== '', conflictState.locks['customer:CUS-2']], [true, 0, true, undefined]);
-  conflictState.metadata.conflicts = [{ entity: 'customer', id: 'CUS-3', hFBM: 'FBM-HASH', hSHIN: 'SHIN-HASH', fbmRecord: { id: 'CUS-3', companyName: 'FBM' }, shinRecord: { id: 'CUS-3', companyName: 'Shin' } }];
-  conflictState.metadata.pushFailures = { 'customer:CUS-3': 'SHIN-HASH' };
-  conflictState.metadata.pushFailureDetails = { 'customer:CUS-3': { reason: 'HTTP 500' } };
-  conflictState.counts.conflict = 1; conflictState.phase = 'conflict';
-  const resolvedShin = builders.FbmSync.resolveConflict('customer', 'CUS-3', 'shin', null, true);
-  check(so, 'resolve conflict theo ShinCRM dat baseline FBM va cho phep push', [resolvedShin.ok, resolvedShin.status, conflictWrite.records[0].fbmHash, conflictWrite.records[0].syncStatus, conflictState.metadata.pushFailures['customer:CUS-3']], [true, builders.FbmSync.SYNC_STATUS.pending, 'FBM-HASH', builders.FbmSync.SYNC_STATUS.pending, undefined]);
 
   const bindingStore = {};
   const identity = taoHopCat({
@@ -372,7 +360,7 @@ async function chay(so) {
   edges.FbmSync.readLocal = () => [pushedRecord];
   edges.writeGateSave = (request) => { notAppliedWrite = request; return { ok: true }; };
   const notApplied = edges.FbmSync.pullWrite('customer', [edges.FbmSync.customerRecord(oldFbm, {})]);
-  check(so, 'FBM khong doi sau push thanh notApplied va khoa record', [notApplied.skipped, notAppliedWrite.records[0].syncStatus, notAppliedState.locks['customer:C-PUSHED'].reason], [1, edges.FbmSync.SYNC_STATUS.notApplied, 'not_applied']);
+  check(so, 'FBM khong doi sau push thanh notApplied, chặn đẩy bằng trạng thái Sheet thay vì khóa trong state', [notApplied.skipped, notAppliedWrite.records[0].syncStatus, Object.keys(notAppliedState.locks)], [1, edges.FbmSync.SYNC_STATUS.notApplied, []]);
 
 }
 

@@ -18,15 +18,6 @@ async function chay(so) {
   check(so, 'conflict map Activity details ve content noi bo', edges.FbmSync.conflictLocalField('activity', 'details'), 'content');
   check(so, 'conflict map Activity end_date ve workDate noi bo', edges.FbmSync.conflictLocalField('activity', 'end_date'), 'workDate');
   check(so, 'conflict map Customer ten_kh ve companyName noi bo', edges.FbmSync.conflictLocalField('customer', 'ten_kh'), 'companyName');
-  let mergedSaved = null;
-  const mergedFbm = { id: 'FBM-1', fbmId: 'FBM-1', taskType: 'Gọi', content: 'Nội dung FBM', workDate: '/Date(1757386800000)/' };
-  const mergedShin = { id: 'ACT-1', fbmId: 'FBM-1', taskType: 'Gọi', content: 'Nội dung Shin', workDate: '/Date(1757386800000)/' };
-  const mergedState = { metadata: { conflicts: [{ entity: 'activity', id: 'ACT-1', fbmId: 'FBM-1', hFBM: edges.FbmSync.hash(mergedFbm, 'activity', {}), fields: [{ field: 'details', left: 'Nội dung Shin', right: 'Nội dung FBM' }], shinRecord: mergedShin, fbmRecord: mergedFbm }], categoryGate: {} }, counts: { conflict: 1 }, locks: { 'activity:ACT-1': { owner: 'sync' } }, phase: 'conflict' };
-  edges.FbmSync.stateRead = () => mergedState;
-  edges.FbmSync.stateWrite = (next) => { Object.assign(mergedState, next); return mergedState; };
-  edges.writeGateSave = (request) => { mergedSaved = request.records[0]; return { ok: true }; };
-  const mergedResult = edges.FbmSync.resolveConflict('activity', 'ACT-1', 'manual', { details: 'Nội dung FBM' }, true);
-  check(so, 'trộn conflict đổi details về content nội bộ', [mergedResult.ok, mergedSaved && mergedSaved.content], [true, 'Nội dung FBM']);
   edges.PropertiesService = { getDocumentProperties: () => ({ getProperty: () => '' }) };
   edges.FbmSync.accountSettingsRead = () => ({ activitySince: '2024-10-07' });
   const refresh = edges.FbmSync.conflictRefreshRequest('activity', { id: 'ACT-1', fbmId: '174813' });
@@ -100,7 +91,7 @@ async function chay(so) {
   const conflictUi = taoBoTest();
   conflictUi.hop.fbmSyncPaint(edges.FbmSync.statusView());
   check(so, 'Conflict Sidebar hiển thị cho quyết định', conflictUi.content.textContent.toLowerCase().indexOf('xung đột') >= 0 || conflictUi.content.textContent.toLowerCase().indexOf('quyết định') >= 0, true);
-  check(so, 'conflict hai phía giữ nguyên record và chờ quyết định', [conflictResult.conflicts, conflictState.metadata.conflicts.length, reconcileLogs.some((event) => event.action === 'pull_record')], [1, 1, false]);
+  check(so, 'conflict hai phía giữ nguyên record và chờ quyết định, không cất bản ghi vào danh sách trong state', [conflictResult.conflicts, (conflictState.metadata.conflicts || []).length, reconcileLogs.some((event) => event.action === 'pull_record')], [1, 0, false]);
 
   const failedRecord = { id: 'C-FAIL', fbmId: 'FBM-FAIL', fbmCustomerCode: 'ALT00010', companyName: 'Cũ', allowFbmPush: 'Cho phép', syncStatus: edges.FbmSync.SYNC_STATUS.error };
   const failedHash = edges.FbmSync.hash(failedRecord, 'customer', {});
@@ -121,7 +112,7 @@ async function chay(so) {
   edges.FbmSync.readLocal = () => [pushedRecord];
   edges.writeGateSave = (request) => { notAppliedWrite = request; return { ok: true }; };
   const notApplied = edges.FbmSync.pullWrite('customer', [edges.FbmSync.customerRecord(oldFbm, {})]);
-  check(so, 'FBM khong doi sau push thanh notApplied va khoa record', [notApplied.skipped, notAppliedWrite.records[0].syncStatus, notAppliedState.locks['customer:C-PUSHED'].reason], [1, edges.FbmSync.SYNC_STATUS.notApplied, 'not_applied']);
+  check(so, 'FBM khong doi sau push thanh notApplied, chặn đẩy bằng trạng thái Sheet thay vì khóa trong state', [notApplied.skipped, notAppliedWrite.records[0].syncStatus, Object.keys(notAppliedState.locks)], [1, edges.FbmSync.SYNC_STATUS.notApplied, []]);
 
   const pushed = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {} });
   napServer(pushed, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
