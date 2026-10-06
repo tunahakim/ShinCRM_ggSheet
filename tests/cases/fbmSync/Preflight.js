@@ -9,7 +9,7 @@ async function chay(so) {
     category: { categories: { '@CAT_CHO_PHEP_FBM': [] } },
     issues: []
   }) });
-  napServer(hop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/report/Preflight.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
+  napServer(hop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/report/Preflight.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
   hop.FbmSync.scriptSettings = () => ({ accountName: '' });
   hop.FbmSync.readCategoryGate = () => ({ valid: {} });
   hop.FbmSync.currentSpreadsheetId = () => 'sheet-a';
@@ -55,6 +55,27 @@ async function chay(so) {
   hop.FbmSync.scriptSettings = () => ({ accountName: 'Owner đúng' });
   const owner = hop.FbmSync.runPreflight({ mode: 'write' });
   check(so, 'preflight chặn toàn bộ ứng viên Activity lệch owner trước khi cấp request', [owner.ok, owner.blocking.some((item) => item.code === 'FBM_ACTIVITY_OWNER_MISMATCH')], [false, true]);
+
+  // FBM-022: đọc Sheet lỗi thì preflight chặn có mã, không báo 0 bản ghi như Sheet trống; Sheet và hash chỉ tính một lần mỗi lượt preflight.
+  const savedReadLocal = hop.FbmSync.readLocal, savedHash = hop.FbmSync.hash;
+  hop.FbmSync.readLocal = () => { throw new Error('Exception: Service Spreadsheets timed out'); };
+  const readFailed = hop.FbmSync.runPreflight({ mode: 'read' });
+  const readFailedIssue = readFailed.blocking.find((item) => item.code === 'FBM_LOCAL_READ_FAILED');
+  check(so, 'FBM-022: đọc Sheet Customer/Activity lỗi thì preflight chặn bằng FBM_LOCAL_READ_FAILED (kể cả chế độ đọc), không trả tóm tắt 0 bản ghi',
+    [readFailed.ok, !!readFailedIssue, /timed out/.test(readFailedIssue && readFailedIssue.message), readFailed.hashSummary], [false, true, true, null]);
+  const localReads = { customer: 0, activity: 0 };
+  let hashCalls = 0;
+  hop.FbmSync.readLocal = (entity) => { localReads[entity] += 1; return entity === 'activity'
+    ? [{ id: 'ACT-NOPERM', customerId: 'CUS-1', fbmId: '174813', fbmHash: 'old', allowFbmPush: 'Chưa cho phép', syncStatus: 'đã đồng bộ' }]
+    : [{ id: 'CUS-1', fbmId: 'FBM-CU', fbmCustomerCode: 'ALT00010', fbmHash: 'old', allowFbmPush: 'Cho phép' }, { id: 'CUS-2', allowFbmPush: 'Cho phép' }]; };
+  hop.FbmSync.pushCandidates = () => [];
+  hop.FbmSync.hash = (...args) => { hashCalls += 1; return savedHash(...args); };
+  const scanned = hop.FbmSync.runPreflight({ mode: 'write' });
+  // Customer: quét preflight + hàng đợi xung đột + kiểm tra liên kết tài khoản; Activity: quét preflight + hàng đợi xung đột. Trước FBM-022 là 5 và 3.
+  check(so, 'FBM-022: một lượt preflight đọc Sheet một lần cho cả quyền đẩy lẫn tóm tắt hash, tính hash một lần cho mỗi bản ghi có baseline',
+    [localReads, hashCalls, scanned.hashSummary.localRecords, scanned.hashSummary.changed, scanned.hashSummary.newRecords, scanned.issues.filter((item) => item.code === 'FBM_RECORD_PUSH_PERMISSION_MISSING').length],
+    [{ customer: 3, activity: 2 }, 2, 3, 2, 1, 1]);
+  hop.FbmSync.readLocal = savedReadLocal; hop.FbmSync.hash = savedHash;
 }
 
 module.exports = { chay };
