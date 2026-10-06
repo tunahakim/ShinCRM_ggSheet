@@ -520,7 +520,7 @@ Không dùng:
 - `chrome.storage` làm state nghiệp vụ;
 - Sheet staging chứa toàn bộ bulk.
 
-Extension chỉ giữ dữ liệu tạm của lượt hiện tại trong RAM. GAS chỉ giữ cursor, thống kê, conflict compact và lỗi.
+Extension chỉ giữ dữ liệu tạm của lượt hiện tại trong RAM. GAS chỉ giữ cursor, thống kê, số đếm xung đột cùng một bản ghi xung đột đang mở, và lỗi.
 
 ## 14. Idempotency khi mất tab hoặc mất response
 
@@ -571,11 +571,14 @@ V2 chỉ giữ:
   "cursor": {},
   "counts": {},
   "lastError": "...",
-  "conflicts": []
+  "conflictCount": 0,
+  "conflictRefresh": null
 }
 ```
 
 Không giữ response FBM, lookup Rows đầy đủ, preview dài, candidate record hay danh sách hàng trăm nghìn ID.
+
+Xung đột không có danh sách trong state (theo G7.2, FBM-024): hàng đợi xung đột chính là các dòng Sheet có trạng thái `xung đột chờ quyết`. State chỉ giữ số đếm `conflictCount` và đúng một bản ghi đang mở `conflictRefresh` (entity, id, hash FBM lúc mở); giá trị hai bên được đọc lại và tính diff khi người dùng mở bản ghi, nên state không phình theo số xung đột.
 
 ## 16. Các phương án đã bị loại
 
