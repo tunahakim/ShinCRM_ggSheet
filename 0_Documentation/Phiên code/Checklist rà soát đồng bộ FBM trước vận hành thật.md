@@ -100,7 +100,7 @@
 
 ## F05 — Đẩy Customer đã có FBM_ID → FBM
 
-**Điều kiện đầu:** Một Customer đã liên kết được sửa ở ShinCRM, có `@CUS_CHO_PHEP_FBM = Cho phép`, Category hợp lệ, binding và owner phiên hợp lệ; một Customer khác không thay đổi để kiểm tra không ghi thừa.
+**Điều kiện đầu:** Một Customer đã liên kết được sửa ở ShinCRM, có `@CUS_CHO_PHEP_DONG_BO_FBM = Cho phép`, Category hợp lệ, binding và owner phiên hợp lệ; một Customer khác không thay đổi để kiểm tra không ghi thừa.
 
 - [ ] 1. `[Cần kiểm chứng thật]` Người dùng chọn `Đẩy từ ShinCRM → FBM` → Sidebar hiển thị preview ứng viên và chỉ cấp ghi sau preflight. Bằng chứng: Có test nhưng kiểm chuyện khác: `Preflight.js › preflight mode push van fail-closed theo binding va cac cong thuc te` kiểm cổng, chưa kiểm thao tác live.
 - [x] 2. GAS đọc lại Sheet, tính `hSHIN`, `hFBM`, `hBASE` và chọn đúng bản ghi chỉ-ShinCRM-đổi → Customer không đổi bị bỏ qua. Bằng chứng: Đã có test đúng nhánh: `Push.js › push thanh cong giu baseline cu cho ky xac nhan va dung source push` và `Reconcile.js › FBM khong doi sau push thanh notApplied va khoa record`.
@@ -206,7 +206,7 @@
 - [ ] 3. `[Cần kiểm chứng thật]` Người dùng chọn hủy → không có request ghi FBM, Sheet không đổi, Sidebar và `Log` ghi rõ đã hủy/chưa ghi. Bằng chứng: Có test nhưng kiểm chuyện khác: `UserJourneys.js › mọi lỗi lưu kết nối đều hiện Sidebar và ghi Sheet Log` kiểm callback approve/cancel, chưa kiểm live Sheet/FBM.
 - [ ] 4. `[Cần kiểm chứng thật]` Người dùng chạy lại và chọn chấp thuận → chỉ ứng viên preview được cấp request, sau đó đi qua F05/F06/F07/F08. Bằng chứng: Có test nhưng kiểm chuyện khác: `Push.js › push hon 10 ban ghi phai cho nguoi dung chap thuan` kiểm cổng approval, chưa kiểm chuỗi live.
 
-### F13-B — `@CUS_CHO_PHEP_FBM` tắt nhưng có bản ghi thay đổi
+### F13-B — `@CUS_CHO_PHEP_DONG_BO_FBM` không cho đẩy nhưng có bản ghi thay đổi
 
 **Điều kiện đầu:** Customer đã có FBM_ID và thay đổi ở ShinCRM, nhưng ô cho phép đẩy là rỗng, `Chưa cho phép` hoặc giá trị tầng giữa; Activity con cũng được dùng để kiểm tra kế thừa.
 
