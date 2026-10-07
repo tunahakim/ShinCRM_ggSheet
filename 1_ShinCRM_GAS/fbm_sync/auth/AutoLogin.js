@@ -302,10 +302,12 @@ FbmSync.loginAdapterContinue = function (state, cursor, response) {
 FbmSync.LOGIN_FACT_HIDDEN_KEY = /authori|cookie|pass|token|salt|key/i;
 FbmSync.loginResponseFacts = function (response) {
   var meta = FbmSync.traceResponse(response), parsed = FbmSync.protocol.parse(response) || {}, data = parsed.d !== undefined ? parsed.d : parsed;
-  if (typeof data === 'string') { data = FbmSync.protocol.parse(data) || data; }
+  // `d` dạng chuỗi chỉ ghi độ dài, không ghi giá trị: chưa biết FBM để gì trong đó.
+  var textLength = typeof data === 'string' ? data.length : undefined;
+  if (typeof data === 'string') { var inner = FbmSync.protocol.parse(data); data = inner && !inner.parseError ? inner : data; }
   return {
     httpStatus: meta.httpStatus, responseLength: meta.responseLength, json: !parsed.parseError,
-    dType: data === null ? 'null' : typeof data,
+    dType: data === null ? 'null' : typeof data, dTextLength: textLength,
     dKeys: data && typeof data === 'object' ? Object.keys(data).filter(function (key) { return key.charAt(0) !== '_' && !FbmSync.LOGIN_FACT_HIDDEN_KEY.test(key); }).slice(0, 20).join(',') : '',
     deniedFlag: !!(data && typeof data === 'object' && data.Authorized === false)
   };
