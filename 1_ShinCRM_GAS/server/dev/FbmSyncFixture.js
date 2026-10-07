@@ -128,3 +128,17 @@ function fbmProbeStuckState() {
 function fbmProbePendingPushes() {
   return { pending: FbmSync.pendingPushesRead(), cursor: FbmSync.stateRead().cursor, conflictRefresh: FbmSync.stateRead().metadata.conflictRefresh };
 }
+
+/** Tạm thu phạm vi live (đọc và đẩy) về khách CUS-020061 đã tạo thật, để lượt hai chiều đọc được Activity của khách này (G12.5). Trả về ALT00010 bằng `fbmScopeDefaultCustomer`. */
+function fbmScopeCreatedCustomer() {
+  var record = FbmSync.readLocal('customer').filter(function (item) { return String(item.id || '') === FBM_TEST_CREATE_CUSTOMER_ID; })[0];
+  var code = record ? String(record.fbmCustomerCode || '').trim() : '';
+  if (!code) { return { ok: false, reason: FBM_TEST_CREATE_CUSTOMER_ID + ' chưa có mã FBM trên Sheet DEV.' }; }
+  PropertiesService.getDocumentProperties().setProperty('FBM_SYNC_TEST_CUSTOMER_CODE', code);
+  return { ok: true, scope: FbmSync.scriptSettings().testCustomerCode };
+}
+/** Trả phạm vi live về mặc định ALT00010. */
+function fbmScopeDefaultCustomer() {
+  PropertiesService.getDocumentProperties().deleteProperty('FBM_SYNC_TEST_CUSTOMER_CODE');
+  return { ok: true, scope: FbmSync.scriptSettings().testCustomerCode };
+}
