@@ -11,14 +11,9 @@ FbmSync.scriptSettings = function () {
     var compact = cookie.slice(0, cookie.indexOf('FHN_CRM_App'));
     userId = compact.length > 9 ? compact.slice(4, -5) : '';
   }
-  // Keep live reads narrow by default; set the property to an empty value for a full scan.
-  var testProps = PropertiesService.getDocumentProperties ? PropertiesService.getDocumentProperties() : { getProperty: function () { return null; } };
-  var testCustomerCode = testProps.getProperty('FBM_SYNC_TEST_CUSTOMER_CODE');
   var accountName = typeof FbmSync.bindingAccountName === 'function' ? FbmSync.bindingAccountName() : '';
   var accountSettings = typeof FbmSync.accountSettingsRead === 'function' ? FbmSync.accountSettingsRead() : {};
-  testCustomerCode = testCustomerCode === null ? 'ALT00010' : String(testCustomerCode || '').trim();
-  // Khách mới chưa có mã FBM thì không lọt cổng theo mã; chủ dự án cho phép đích danh theo mã ShinCRM để thử tạo thật.
-  var testCustomerIds = String(testProps.getProperty('FBM_SYNC_TEST_CUSTOMER_IDS') || '').split(',').map(function (id) { return id.trim(); }).filter(Boolean);
+  var testCodes = typeof FbmSync.testScopeCodes === 'function' ? FbmSync.testScopeCodes() : null;
   var activitySince = currentState.runId && currentState.activitySince !== undefined ? currentState.activitySince : accountSettings.activitySince;
   return {
     baseUrl: 'https://fbo.com.vn:8888',
@@ -30,8 +25,7 @@ FbmSync.scriptSettings = function () {
     customerPrefix: String(accountSettings.customerPrefix || ''),
     customerCodeLength: String(accountSettings.customerCodeLength || ''),
     activitySince: String(activitySince || ''),
-    testCustomerCode: testCustomerCode,
-    testCustomerIds: testCustomerIds
+    testCodes: testCodes
   };
 };
 /** Đổi chuỗi /Date(ms)/ của .NET, giữ nguyên giá trị khác. */
@@ -59,8 +53,10 @@ FbmSync.gridRequest = function (entity, options) {
   if (entity === 'customer' && cfg.userId) {
     payload.externalKey.push({ Name: "stt_rec_kh in (select stt_rec_kh from dbo.zcFastBusiness$Function$GetCustomerValidate('" + cfg.userId + "')) and 1", Opr: '=', Value: 1, Type: 'String', Ignore: false });
   }
-  if (entity === 'customer' && cfg.testCustomerCode && opt.includeTestCustomer !== false) {
-    payload.externalKey.push({ Name: 'ma_kh', Opr: '=', Value: cfg.testCustomerCode, Type: 'String', Ignore: false });
+  if (entity === 'customer' && cfg.testCodes && opt.includeTestCustomer !== false) {
+    // Danh sách rỗng thành điều kiện không khớp ai, để chế độ thử không bao giờ rơi thành quét toàn bộ. Mã đã qua TEST_CODE_PATTERN nên không có dấu nháy.
+    var inList = cfg.testCodes.length ? cfg.testCodes.map(function (code) { return "'" + code + "'"; }).join(',') : "''";
+    payload.externalKey.push({ Name: 'ma_kh in (' + inList + ') and 1', Opr: '=', Value: 1, Type: 'String', Ignore: false });
   }
   if (entity === 'customer' && payload.type === 0 && cfg.userId) {
     payload.memvars = [{ Name: 'user_id', OldValue: null, NewValue: '' }];

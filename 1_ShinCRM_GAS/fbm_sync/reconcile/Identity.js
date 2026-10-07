@@ -227,7 +227,7 @@ FbmSync.findCustomerByIdentity = function (localById, localByCode, incoming, loc
 FbmSync.markMissingAfterFullScan = function (entity, state) {
   var settings = typeof FbmSync.scriptSettings === 'function' ? FbmSync.scriptSettings() : {};
   var canWriteSheet = state && (typeof FbmSync.canWriteSheet === 'function' ? FbmSync.canWriteSheet(state.mode) : state.mode === 'read' || state.mode === 'write');
-  if (!state || !canWriteSheet || String(settings.testCustomerCode || '').trim()) { return { written: 0, skipped: true }; }
+  if (!state || !canWriteSheet || settings.testCodes) { return { written: 0, skipped: true }; }
   var local = FbmSync.readLocal(entity), missing = [];
   local.forEach(function (record) {
     var fbmId = String(record.fbmId || '').trim();

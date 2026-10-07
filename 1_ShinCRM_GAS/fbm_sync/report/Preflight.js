@@ -138,6 +138,11 @@ FbmSync.runPreflight = function (options) {
     if (identity.blocking) { FbmSync.preflightIssue(issues, identity.status && identity.status.status === 'UNBOUND' ? 'FBM_IDENTITY_UNBOUND' : 'REBIND_REQUIRED', 'error', 'Identity', identity.message, true); }
     else if (identity.status && identity.status.status === 'REBIND_REQUIRED') { FbmSync.preflightIssue(issues, 'REBIND_REQUIRED', 'warn', 'Identity', identity.message, false); }
   }
+  // Hai lệnh kiểm liên kết chỉ đọc toàn bộ để đối chiếu danh tính, không ghi bản ghi nào, nên không cần phạm vi thử.
+  if (opt.scan !== 'identity_check' && opt.scan !== 'identity_probe' && typeof FbmSync.testScopeCodes === 'function') {
+    var testCodes = FbmSync.testScopeCodes();
+    if (testCodes && !testCodes.length) { FbmSync.preflightIssue(issues, 'FBM_TEST_SCOPE_EMPTY', 'error', 'fbm_sync', 'Chế độ thử đang bật nhưng danh sách mã thử trống. Vào Cài đặt phiên, thêm mã khách được phép thử hoặc tắt chế độ thử rồi chạy lại.', true); }
+  }
   var candidateReport = FbmSync.preflightCandidates(issues, writeMode ? 'write' : mode);
   var local = null;
   try { local = FbmSync.preflightLocalScan(candidateReport.gate || {}); } catch (localError) {

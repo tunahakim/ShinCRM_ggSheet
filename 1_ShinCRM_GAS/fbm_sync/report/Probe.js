@@ -2,7 +2,7 @@
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 function fbmProbeAltState() {
-  var settings = FbmSync.scriptSettings(), code = settings.testCustomerCode;
+  var settings = FbmSync.scriptSettings(), code = settings.testCodes;
   var customers = FbmSync.readLocal('customer');
   var customerIds = {};
   var selectedCustomers = customers.filter(function (record) {
@@ -30,7 +30,7 @@ function fbmProbeAltState() {
     return !selectedIds[String(candidate.customerId || '')];
   });
   if (violations.length) {
-    return { ok: false, customerCode: code, reason: 'Có ứng viên nằm ngoài phạm vi ALT00010; probe bị dừng an toàn.', totalCustomers: customers.length, customers: selectedCustomers.map(summarizeCustomer), activities: selectedActivities.map(summarizeActivity), pushCandidates: candidates, scopeViolations: violations, writesToFbm: 0, deletesToFbm: 0 };
+    return { ok: false, customerCode: code, reason: 'Có ứng viên nằm ngoài phạm vi thử; probe bị dừng an toàn.', totalCustomers: customers.length, customers: selectedCustomers.map(summarizeCustomer), activities: selectedActivities.map(summarizeActivity), pushCandidates: candidates, scopeViolations: violations, writesToFbm: 0, deletesToFbm: 0 };
   }
   return { ok: true, customerCode: code, totalCustomers: customers.length, customers: selectedCustomers.map(summarizeCustomer), activities: selectedActivities.map(summarizeActivity), pushCandidates: candidates, scopeViolations: [], writesToFbm: 0, deletesToFbm: 0 };
 }

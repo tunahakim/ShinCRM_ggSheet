@@ -2,10 +2,21 @@
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 FbmSync.SYNC_SETTINGS_KEY = 'FBM_SYNC_SETTINGS_V1';
-FbmSync.SYNC_SETTINGS_DEFAULT = { approvalThreshold: 10 };
+// Chế độ thử mặc định bật: tệp mới chưa ai cấu hình thì không được quét và ghi toàn bộ khách thật.
+FbmSync.SYNC_SETTINGS_DEFAULT = { approvalThreshold: 10, testMode: true, testCodes: [] };
+// Mã thử đi thẳng vào điều kiện SQL của grid FBM, nên chỉ nhận ký tự an toàn; dấu nháy không có đường lọt vào.
+FbmSync.TEST_CODE_PATTERN = /^[A-Za-z0-9._-]{1,32}$/;
+FbmSync.TEST_CODES_MAX = 20;
 
 function fbmSyncSettingsCloneDefault() {
-  return { approvalThreshold: FbmSync.SYNC_SETTINGS_DEFAULT.approvalThreshold };
+  return { approvalThreshold: FbmSync.SYNC_SETTINGS_DEFAULT.approvalThreshold, testMode: FbmSync.SYNC_SETTINGS_DEFAULT.testMode, testCodes: FbmSync.SYNC_SETTINGS_DEFAULT.testCodes.slice() };
+}
+
+/** Nhận mảng hoặc chuỗi ngăn bởi dấu phẩy, khoảng trắng, xuống dòng; bỏ trùng, giữ thứ tự người dùng nhập. */
+function fbmSyncTestCodesParse(raw) {
+  var list = Array.isArray(raw) ? raw : String(raw === null || raw === undefined ? '' : raw).split(/[\s,;]+/), seen = {}, result = [];
+  list.forEach(function (item) { var code = String(item === null || item === undefined ? '' : item).trim(); if (code && !seen[code]) { seen[code] = true; result.push(code); } });
+  return result;
 }
 
 function fbmSyncSettingsProps() {
@@ -19,6 +30,8 @@ function fbmSyncSettingsNormalize(input, allowDefaults) {
   var raw = source.approvalThreshold;
   var threshold = raw === '' || raw === null || raw === undefined ? (allowDefaults ? FbmSync.SYNC_SETTINGS_DEFAULT.approvalThreshold : NaN) : Number(raw);
   if (isFinite(threshold)) { result.approvalThreshold = Math.floor(threshold); }
+  if (allowDefaults || source.testMode !== undefined) { result.testMode = source.testMode === undefined ? FbmSync.SYNC_SETTINGS_DEFAULT.testMode : source.testMode !== false; }
+  if (allowDefaults || source.testCodes !== undefined) { result.testCodes = source.testCodes === undefined ? FbmSync.SYNC_SETTINGS_DEFAULT.testCodes.slice() : fbmSyncTestCodesParse(source.testCodes); }
   return result;
 }
 
@@ -29,6 +42,13 @@ function fbmSyncSettingsValidate(input) {
     return { ok: false, code: 'FBM_APPROVAL_THRESHOLD_INVALID', message: 'Ngưỡng yêu cầu chấp thuận phải là số nguyên không âm.' };
   }
   normalized.approvalThreshold = threshold;
+  var badCodes = normalized.testCodes.filter(function (code) { return !FbmSync.TEST_CODE_PATTERN.test(code); });
+  if (badCodes.length) {
+    return { ok: false, code: 'FBM_TEST_CODE_INVALID', message: 'Mã thử chỉ gồm chữ không dấu, số, dấu chấm, gạch ngang hoặc gạch dưới, dài tối đa 32 ký tự. Mã sai: ' + badCodes.join(', ') + '.' };
+  }
+  if (normalized.testCodes.length > FbmSync.TEST_CODES_MAX) {
+    return { ok: false, code: 'FBM_TEST_CODES_TOO_MANY', message: 'Danh sách mã thử tối đa ' + FbmSync.TEST_CODES_MAX + ' mã; muốn chạy rộng hơn thì tắt chế độ thử.' };
+  }
   return { ok: true, settings: normalized };
 }
 
@@ -69,9 +89,10 @@ FbmSync.syncSettingsRead = function () {
 };
 
 FbmSync.syncSettingsSave = function (input) {
-  var check = fbmSyncSettingsValidate(input || {});
+  // Gộp lên bản đang lưu: bên gọi chỉ gửi vài trường thì các trường còn lại giữ nguyên, không bị mặc định đè mất danh sách mã thử.
+  var previous = FbmSync.syncSettingsRead(), check = fbmSyncSettingsValidate(Object.assign({}, previous, input || {}));
   if (!check.ok) { return check; }
-  var props = fbmSyncSettingsProps(), previous = FbmSync.syncSettingsRead();
+  var props = fbmSyncSettingsProps();
   if (!props) { return { ok: false, code: 'FBM_SYNC_SETTINGS_STORAGE_UNAVAILABLE', message: 'Không truy cập được DocumentProperties.' }; }
   var saved;
   if (typeof FbmSync.documentPropertySet === 'function') { saved = FbmSync.documentPropertySet(FbmSync.SYNC_SETTINGS_KEY, JSON.stringify(check.settings), 'sync_settings'); }
@@ -82,4 +103,10 @@ FbmSync.syncSettingsSave = function (input) {
 
 FbmSync.syncSettingsPublic = function () {
   return FbmSync.syncSettingsRead();
+};
+
+/** Phạm vi thử của lượt chạy: `null` khi tắt chế độ thử (chạy toàn bộ), ngược lại là danh sách mã — mảng rỗng nghĩa là chưa được chạy. */
+FbmSync.testScopeCodes = function () {
+  var settings = FbmSync.syncSettingsRead();
+  return settings.testMode === false ? null : settings.testCodes.slice();
 };
