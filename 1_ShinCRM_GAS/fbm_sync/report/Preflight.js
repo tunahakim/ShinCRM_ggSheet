@@ -94,6 +94,8 @@ FbmSync.preflightCandidates = function (issues, mode) {
   try { if (typeof FbmSync.readCategoryGate === 'function') { gate = FbmSync.readCategoryGate() || gate; } } catch (gateError) {
     FbmSync.preflightIssue(issues, 'FBM_CATEGORY_GATE_FAILED', 'error', 'Category', 'Không dựng được ánh xạ Category FBM: ' + String(gateError && gateError.message || gateError), mode === 'write');
   }
+  // Chiều Lấy từ FBM → ShinCRM không đẩy gì: dựng ứng viên đẩy chỉ tốn một lượt duyệt cả hai Sheet. "Kiểm tra an toàn" (check) và chiều ghi vẫn dựng.
+  if (mode === 'read') { return { candidates: candidates, gate: gate, settings: settings }; }
   try {
     if (typeof FbmSync.pushCandidates !== 'function') { return { candidates: candidates, gate: gate, settings: settings }; }
     ['customer', 'activity'].forEach(function (entity) {

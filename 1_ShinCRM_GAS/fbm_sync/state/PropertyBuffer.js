@@ -13,14 +13,40 @@
  * - GAS bị Google cắt giữa chừng (trần 6 phút) thì `finally` không chạy, kho quay về lúc lấy khóa; chấp nhận vì cửa ghi idempotent, lượt sau chạy lại đúng khách đang xử lý.
  * - Hash chờ xác nhận (ghi trước khi gửi lệnh ghi FBM) vẫn bền trước khi Extension gửi lệnh, vì kho được ghi trước khi nhả khóa và trước khi GAS trả response.
  * Trace là chẩn đoán: gom trong bộ nhớ suốt lần gọi và ghi một lần ở `propertyBufferEnd`; ghi trace hỏng không làm hỏng nghiệp vụ.
+ * Bản chụp Sheet (đợt 1 bước C) sống cùng phạm vi và bị bỏ cùng lúc với bộ đệm kho: Customer/Activity/Category đọc một lần mỗi lần gọi; cửa ghi `FbmSync.sheetSave` bỏ bản chụp của thực thể vừa ghi, nên không có đường đọc lại dữ liệu cũ sau khi ghi.
  */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
-FbmSync.propertyBuffer = { lockDepth: 0, callDepth: 0, loaded: false, values: {}, dirty: {}, tracePending: [] };
+FbmSync.propertyBuffer = { lockDepth: 0, callDepth: 0, snapshotDepth: 0, loaded: false, values: {}, dirty: {}, tracePending: [] };
+
+/** Bản chụp Sheet của phạm vi hiện tại; khóa là `customer`, `activity` hoặc `category`. */
+FbmSync.sheetCache = {};
 
 FbmSync.propertyStore = function () { return PropertiesService.getDocumentProperties(); };
 FbmSync.propertyBufferActive = function () { var buffer = FbmSync.propertyBuffer; return buffer.lockDepth > 0 || buffer.callDepth > 0; };
-FbmSync.propertyBufferClear = function () { var buffer = FbmSync.propertyBuffer; buffer.loaded = false; buffer.values = {}; buffer.dirty = {}; };
+FbmSync.propertyBufferClear = function () { var buffer = FbmSync.propertyBuffer; buffer.loaded = false; buffer.values = {}; buffer.dirty = {}; FbmSync.sheetCache = {}; };
+
+/** Đọc Sheet qua bản chụp: trong phạm vi một lần gọi (hoặc `withLocalSnapshot`) chỉ đọc một lần; ngoài phạm vi thì đọc mới mỗi lần. */
+FbmSync.sheetCacheRead = function (key, read) {
+  if (!FbmSync.propertyBufferActive() && FbmSync.propertyBuffer.snapshotDepth === 0) { return read(); }
+  if (!Object.prototype.hasOwnProperty.call(FbmSync.sheetCache, key)) { FbmSync.sheetCache[key] = read(); }
+  return FbmSync.sheetCache[key];
+};
+FbmSync.sheetCacheDrop = function (key) { delete FbmSync.sheetCache[key]; };
+
+/**
+ * Bản chụp cho khối chỉ đọc chạy ngoài một lần gọi (preflight gọi từ hàm dò, test): preflight gọi `readLocal` ở nhiều kiểm tra, mỗi lần đọc nghìn dòng mất vài giây và từng làm lượt khởi động vượt hạn chờ 30 giây của Sidebar.
+ * Trong một lần gọi thì bản chụp đã có sẵn, hàm này không làm gì thêm.
+ */
+FbmSync.withLocalSnapshot = function (fn) {
+  var buffer = FbmSync.propertyBuffer, outer = !FbmSync.propertyBufferActive() && buffer.snapshotDepth === 0;
+  if (outer) { FbmSync.sheetCache = {}; }
+  buffer.snapshotDepth += 1;
+  try { return fn(); } finally {
+    buffer.snapshotDepth -= 1;
+    if (outer) { FbmSync.sheetCache = {}; }
+  }
+};
 
 /** Nạp cả kho một lần; giá trị đang chờ ghi trong bộ đệm được giữ đè lên bản vừa đọc. Kho giả trong test có thể thiếu `getProperties`. */
 FbmSync.propertyBufferLoad = function () {

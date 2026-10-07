@@ -112,8 +112,9 @@ FbmSync.bindingHasLinkedData = function () {
 /** Đối chiếu nguyên văn nhận diện; không trim/đổi hoa thường khi so hai giá trị đã lưu. */
 FbmSync.identityStatus = function (runtime) {
   var actual = String((runtime && runtime.spreadsheetId) || FbmSync.currentSpreadsheetId() || ''), current = FbmSync.bindingRead(), incoming = runtime || {};
-  var hasData = FbmSync.bindingHasLinkedData(), reasons = [];
-  if (!current.spreadsheetId) { if (hasData) { reasons.push('missing_binding_with_linked_data'); } }
+  var reasons = [];
+  // Chỉ khi chưa có liên kết mới cần biết Sheet đã có ID FBM chưa; đã liên kết thì không đọc cả Sheet Customer/Activity mỗi lần Sidebar mở.
+  if (!current.spreadsheetId) { if (FbmSync.bindingHasLinkedData()) { reasons.push('missing_binding_with_linked_data'); } }
   else {
     if (actual && current.spreadsheetId !== actual) { reasons.push('spreadsheet_mismatch'); }
     if (incoming.userId !== undefined && String(incoming.userId) !== current.userId) { reasons.push('user_mismatch'); }
@@ -123,7 +124,7 @@ FbmSync.identityStatus = function (runtime) {
   var expectedId = String(FbmSync.configValue('FBM_SPREADSHEET_ID') || '');
   if (expectedId && actual && expectedId !== actual) { reasons.push('configured_spreadsheet_mismatch'); }
   var status = reasons.length ? 'REBIND_REQUIRED' : (current.spreadsheetId ? 'BOUND' : 'UNBOUND');
-  return { ok: status !== 'REBIND_REQUIRED', status: status, code: status === 'REBIND_REQUIRED' ? 'REBIND_REQUIRED' : '', spreadsheetId: actual, hasLinkedData: hasData, binding: { spreadsheetId: current.spreadsheetId || '', userId: current.userId || '', username: current.username || '', accountName: current.accountName || '' }, reasons: reasons };
+  return { ok: status !== 'REBIND_REQUIRED', status: status, code: status === 'REBIND_REQUIRED' ? 'REBIND_REQUIRED' : '', spreadsheetId: actual, binding: { spreadsheetId: current.spreadsheetId || '', userId: current.userId || '', username: current.username || '', accountName: current.accountName || '' }, reasons: reasons };
 };
 /** Chốt bộ nhận diện mà lượt kiểm tra liên kết đang dùng mà không ghi binding. */
 FbmSync.identityCheckTarget = function (value) {

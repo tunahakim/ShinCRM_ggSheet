@@ -29,8 +29,10 @@ FbmSync.categoryMapFromRows = function (rows) {
   return map;
 };
 
-/** Đọc cặp danh mục thật/companion một lần khi có môi trường Sheet. */
-FbmSync.readCategoryGate = function () {
+/** Đọc cặp danh mục thật/companion, một lần mỗi lần gọi qua bản chụp Sheet; lần gọi sau đọc lại nên sửa Category có hiệu lực ngay. */
+FbmSync.readCategoryGate = function () { return FbmSync.sheetCacheRead('category', FbmSync.readCategoryGateSheet); };
+
+FbmSync.readCategoryGateSheet = function () {
   if (typeof shinOpenSheet !== 'function' || typeof CATEGORY_COLUMNS === 'undefined') { return { map: {}, names: {}, valid: {}, warnings: [] }; }
   var sheet = shinOpenSheet('Category'), columns = readColumnMap('Category'), codes = CATEGORY_COLUMNS.map(function (pair) { return pair[0]; });
   var rows = sheetGridReadBlock(sheet, SHEET_FIRST_DATA_ROW, sheetGridDataRowCount(sheet, SHEET_FIRST_DATA_ROW), columns.lastColumn);
@@ -68,7 +70,8 @@ FbmSync.readCategoryGate = function () {
 FbmSync.stateCategoryGate = function (state, freshGate) {
   var holder = state && typeof state === 'object' ? state : null;
   if (!freshGate && holder && holder.categoryGateOfRun) { return holder.categoryGateOfRun; }
-  var gate = freshGate || FbmSync.readCategoryGate();
+  // Chép nông: gate đọc từ bản chụp dùng chung cho cả lần gọi, không được gắn `blocked` của phiên này lên nó.
+  var gate = Object.assign({}, freshGate || FbmSync.readCategoryGate());
   gate.blocked = {};
   (holder && holder.metadata && holder.metadata.categoryBlocks || []).forEach(function (block) {
     if (block && block.source && block.code) { gate.blocked[block.source + '\u001f' + block.code] = block.reason; }

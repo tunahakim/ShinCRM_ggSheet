@@ -7,7 +7,10 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
  * `source` là `pull` hoặc `push`, quyết định quy tắc kiểm trường của cửa ghi và chiều của dòng Log lỗi bản ghi.
  */
 FbmSync.sheetSave = function (entity, records, source) {
+  // Bỏ bản chụp trước khi ghi: ghi hỏng giữa chừng thì Sheet có thể đã đổi một phần, lần đọc sau phải đọc lại.
+  FbmSync.sheetCacheDrop(entity);
   var saved = writeGateSave({ entity: entity, records: records, source: source, schemas: [DATA_SCHEMA, SYNC_SCHEMA] });
+  FbmSync.sheetCacheDrop(entity);
   if (saved && saved.ok) { return saved; }
   var invalid = saved && Array.isArray(saved.invalid) ? saved.invalid : [];
   invalid.forEach(function (item) {
