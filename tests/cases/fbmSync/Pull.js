@@ -169,6 +169,13 @@ async function chay(so) {
   const identityResult = builders.FbmSync.pullWrite('customer', [identityIncoming]);
   check(so, 'Customer lech stt_rec_kh van cap nhat dung dong theo ma_kh', [identityResult.written, identityWrite.records[0].id, identityWrite.records[0].fbmId], [1, 'CUS-1', 'NEW-ID']);
 
+  // FBM đổi ma_kh mà nội dung giữ nguyên: hash không đổi nhưng mã FBM phải theo FBM, nếu không Activity mới mang mã mới sẽ mồ côi.
+  let codeWrite;
+  const codeIncoming = builders.FbmSync.customerRecord({ stt_rec_kh: 'CODE-ID', ma_kh: 'ALT00777', ten_kh: 'Giữ nguyên' }, gate);
+  builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [Object.assign({}, codeIncoming, { id: 'CUS-CODE', fbmCustomerCode: 'ALT00111', fbmHash: codeIncoming.fbmHash, syncStatus: 'đã đồng bộ' })] : [];
+  builders.writeGateSave = (request) => { codeWrite = request; return { ok: true }; };
+  builders.FbmSync.pullWrite('customer', [codeIncoming]);
+  check(so, 'FBM-054: FBM đổi ma_kh mà nội dung không đổi thì lượt kéo vẫn ghi mã FBM mới xuống ShinCRM', [codeWrite && codeWrite.records.length, codeWrite && codeWrite.records[0].id, codeWrite && codeWrite.records[0].fbmCustomerCode], [1, 'CUS-CODE', 'ALT00777']);
   let taxWrite;
   let taxState = { metadata: {} };
   builders.FbmSync.stateRead = () => taxState;
