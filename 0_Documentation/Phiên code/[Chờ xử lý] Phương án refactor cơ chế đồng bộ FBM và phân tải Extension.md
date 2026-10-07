@@ -847,10 +847,9 @@ Số liệu làm căn cứ ở mục 2B.6. Mỗi đợt kết thúc bằng đo l
 
 **Đợt 1: A + C, mỗi lần gọi GAS làm ít việc nhất, không đổi hợp đồng GAS–Extension.** Là điều kiện cần cho phân tải Extension: gom khách vào một gói mà mỗi lần gọi vẫn đọc/ghi state hàng chục lần thì lợi ích mất.
 1. **Bước A: đọc state một lần, ghi state một lần, ghi trace một lần mỗi lần gọi.**
-   - `fbm_sync/state/State.js`: `stateRead` giữ một bản trong bộ nhớ của lần gọi (biến toàn cục sống theo lần thực thi, cùng cách `stateCategoryGate` đang làm); `stateWrite` cập nhật bản đó rồi ghi một lần; `documentPropertySet` bỏ việc đọc state chỉ để ghi lỗi.
-   - `fbm_sync/diagnostic/Trace.js`: `traceContext` dùng state trong bộ nhớ; `traceAppend` gom sự kiện trong bộ nhớ, `traceRead` (dùng bởi `statusView`) gộp cả phần chưa ghi; ghi một lần ở cuối lần gọi và ngay khi gặp lỗi.
-   - `server/entry/EntryPoint.js` (`runEntryPoint`, nơi đã có hook đo): bước kết thúc lần gọi trong `finally` (ghi trace còn đệm, bỏ bản state trong bộ nhớ) để lần gọi sau luôn đọc lại từ DocumentProperties.
-   - State ghi ở cuối lần gọi và trước khi trả response; mất giữa chừng thì chạy lại khách đang xử lý nhờ cửa ghi idempotent (2A điểm 6).
+   - Đã làm (2026-10-07) bằng bộ đệm ở tầng kho thay vì giữ riêng object state: `fbm_sync/state/PropertyBuffer.js`, mọi code đồng bộ FBM lấy kho qua `FbmSync.props()`. Lần đọc đầu nạp cả kho bằng một `getProperties()`; trong khóa điều phối ghi chỉ chờ và được ghi gộp một lần trước khi nhả khóa; lấy khóa thì bỏ bộ đệm để thấy lượt khác vừa ghi. Lý do: một chỗ giữ cho mọi khóa (state, trace, dấu đã thấy, lịch), không phải sửa từng hàm đọc.
+   - `documentPropertySet` chỉ đọc state cũ ở nhánh lỗi; trace gom trong bộ nhớ suốt lần gọi, `traceRead` gộp phần chưa ghi, ghi một lần khi `runEntryPoint` đóng lần gọi (hook toàn cục `fbmCallBegin`/`fbmCallEnd`, vì core không được nhắc tới FbmSync).
+   - State ghi trước khi nhả khóa, tức trước khi trả response; mất giữa chừng thì chạy lại khách đang xử lý nhờ cửa ghi idempotent (2A điểm 6). Kết quả test offline: một lát Activity từ 83 xuống 4–5 lần gọi kho, lát kết thúc lượt cộng 8 lần xóa dấu đã thấy (kho Google không có lệnh xóa nhiều khóa).
    - Test: đếm số lần gọi DocumentProperties của một lần `fbmContinueSync` nhánh Activity, giới hạn bằng hằng số có tên (khoảng 10), phá thử bằng cách thêm lại một lần đọc thừa; hai lần gọi liên tiếp không dùng chung bản state trong bộ nhớ; lỗi giữa lần gọi vẫn ghi trace và state lỗi.
 2. **Bước C: đọc Sheet một lần mỗi lần gọi, bỏ việc thừa.**
    - `readCategoryGate` và `entityReadAll` đọc một lần mỗi lần gọi qua `FbmSync.stateCategoryGate` (không cất giữa các lần gọi, vì cache không thay thế nguồn sự thật).
