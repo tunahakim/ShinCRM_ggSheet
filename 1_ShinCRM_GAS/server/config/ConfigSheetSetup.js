@@ -136,7 +136,10 @@ function seedConfigParams(file, initialCounters, resetValues) {
   }
   if (missing.length) {
     sheetGridEnsureRoom(sheet, lastFilled + missing.length, 0);
-    sheet.getRange(lastFilled + 1, nameColumn, missing.length, 2).setValues(missing.map(function (item) { return [item.name, desiredValue(item)]; }));
+    // Ô tên đang mang dropdown của danh mục cũ (chưa có tên mới) nên Sheets từ chối ghi; gỡ ở đúng các ô sắp ghi, `configApplyGuidance` đặt lại dropdown theo danh mục mới ngay sau đó.
+    var newRows = sheet.getRange(lastFilled + 1, nameColumn, missing.length, 2);
+    if (typeof newRows.clearDataValidations === 'function') { newRows.clearDataValidations(); }
+    newRows.setValues(missing.map(function (item) { return [item.name, desiredValue(item)]; }));
     missing.forEach(function (item, index) { rowOfName[item.name] = lastFilled + 1 + index; });
   }
 
