@@ -9,7 +9,7 @@ FbmSync.currentSpreadsheetId = function () {
 };
 FbmSync.bindingRead = function () {
   try {
-    var raw = PropertiesService.getDocumentProperties().getProperty(FbmSync.BINDING_KEY);
+    var raw = FbmSync.props().getProperty(FbmSync.BINDING_KEY);
     var value = raw ? JSON.parse(raw) : {};
     return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   } catch (ignore) { return {}; }
@@ -30,7 +30,7 @@ FbmSync.bindingClear = function () {
   var state = typeof FbmSync.stateRead === 'function' ? FbmSync.stateRead() : {}, phase = String(state && state.phase || '');
   var active = !!(state && state.activeRequestId) || (!!(state && state.runId) && ['idle', 'done', 'error', 'paused', 'conflict'].indexOf(phase) < 0);
   if (active) { return { ok: false, code: 'SYNC_ALREADY_RUNNING', message: 'Đang có phiên đồng bộ; hãy dừng phiên trước khi hủy liên kết tài khoản.' }; }
-  var props = PropertiesService.getDocumentProperties(), previous = FbmSync.bindingRead();
+  var props = FbmSync.props(), previous = FbmSync.bindingRead();
   if (previous.spreadsheetId) {
     props.setProperty(FbmSync.BINDING_CLEAR_KEY, JSON.stringify({ spreadsheetId: String(previous.spreadsheetId || ''), userId: String(previous.userId || ''), username: String(previous.username || ''), accountName: String(previous.accountName || ''), clearedAt: Date.now() }));
   }
@@ -48,21 +48,21 @@ FbmSync.bindingWrite = function (binding) {
   var previous = FbmSync.bindingRead();
   var nextIdentity = { spreadsheetId: spreadsheetId, userId: userId, username: username, accountName: accountName };
   var cleared = {};
-  try { cleared = JSON.parse(PropertiesService.getDocumentProperties().getProperty(FbmSync.BINDING_CLEAR_KEY) || '{}') || {}; } catch (ignoreClear) { cleared = {}; }
+  try { cleared = JSON.parse(FbmSync.props().getProperty(FbmSync.BINDING_CLEAR_KEY) || '{}') || {}; } catch (ignoreClear) { cleared = {}; }
   var sameBinding = previous.spreadsheetId === spreadsheetId && previous.userId === userId && String(previous.username || '') === username && previous.accountName === accountName;
   var rebindBlocked = FbmSync.bindingHasLinkedData() && !sameBinding && !FbmSync.bindingCanUpgradeUsername(previous, nextIdentity) && (previous.spreadsheetId || cleared.spreadsheetId);
   if (rebindBlocked) {
     return { ok: false, code: 'REBIND_REQUIRED', message: 'Spreadsheet còn dữ liệu đã liên kết FBM; xử lý dữ liệu cũ rồi kiểm tra lại trước khi đổi tài khoản.' };
   }
   var saved = { spreadsheetId: spreadsheetId, userId: userId, username: username, accountName: accountName, updatedAt: Date.now() };
-  var props = PropertiesService.getDocumentProperties();
+  var props = FbmSync.props();
   props.setProperty(FbmSync.BINDING_KEY, JSON.stringify(saved));
   if (typeof props.deleteProperty === 'function') { props.deleteProperty(FbmSync.BINDING_CLEAR_KEY); }
   return { ok: true, binding: { spreadsheetId: saved.spreadsheetId, userId: saved.userId, username: saved.username, accountName: saved.accountName, updatedAt: saved.updatedAt } };
 };
 /* Lưu cả nhận diện và credential dưới cùng lock; không để hệ thống rơi vào trạng thái nửa A nửa B. */
 FbmSync.connectionSave = function (input) {
-  var value = input || {}, binding = value.binding || {}, credential = value.credential || {}, props = PropertiesService.getDocumentProperties();
+  var value = input || {}, binding = value.binding || {}, credential = value.credential || {}, props = FbmSync.props();
   var loginKey = FbmSync.LOGIN_CONFIG_KEY || 'FBM_LOGIN_CONFIG_V1', oldBindingRaw = props.getProperty(FbmSync.BINDING_KEY), oldLoginRaw = props.getProperty(loginKey), oldClearRaw = props.getProperty(FbmSync.BINDING_CLEAR_KEY);
   var identity = { spreadsheetId: String(binding.spreadsheetId || '').trim(), userId: String(binding.userId || '').trim(), username: String(binding.username || '').trim(), accountName: String(binding.accountName || '').trim() };
   var allEmpty = !identity.spreadsheetId && !identity.userId && !identity.username && !identity.accountName;

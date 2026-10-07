@@ -27,10 +27,24 @@ FbmSync.traceContext = function (extra) {
   };
 };
 
+/** Trong một lần gọi qua `runEntryPoint` thì chỉ gom vào bộ nhớ, ghi một lần ở cuối (PropertyBuffer.js); ngoài đó ghi ngay. */
 FbmSync.traceAppend = function (events) {
   if (!Array.isArray(events) || !events.length) { return 0; }
+  if (typeof FbmSync.traceGathering !== 'function' || !FbmSync.traceGathering()) { return FbmSync.traceStore(events); }
+  var pending = FbmSync.propertyBuffer.tracePending, seen = {}, added = 0;
+  pending.forEach(function (item) { seen[FbmSync.traceKey(item)] = true; });
+  events.forEach(function (event) {
+    if (!event || !event.stage || seen[FbmSync.traceKey(event)]) { return; }
+    seen[FbmSync.traceKey(event)] = true; pending.push(event); added += 1;
+  });
+  return added;
+};
+
+/** Gộp sự kiện vào khóa trace trong kho, bỏ trùng với dòng đã có. */
+FbmSync.traceStore = function (events) {
+  if (!Array.isArray(events) || !events.length) { return 0; }
   try {
-    var props = PropertiesService.getDocumentProperties(), rows = JSON.parse(props.getProperty(FbmSync.TRACE_KEY) || '[]');
+    var props = FbmSync.props(), rows = JSON.parse(props.getProperty(FbmSync.TRACE_KEY) || '[]');
     if (!Array.isArray(rows)) { rows = []; }
     var seen = {};
     rows.forEach(function (item) { if (item && item.stage) { seen[[item.stage, item.runId, item.requestId, item.at].join('|')] = true; } });
@@ -78,8 +92,11 @@ FbmSync.traceEvent = function (stage, extra) {
 
 FbmSync.traceRead = function (limit) {
   var rows = [], take = Math.max(1, Math.min(Number(limit || 20), FbmSync.TRACE_LIMIT));
-  try { rows = JSON.parse(PropertiesService.getDocumentProperties().getProperty(FbmSync.TRACE_KEY) || '[]'); } catch (ignore) { rows = []; }
-  return Array.isArray(rows) ? rows.slice(-take) : [];
+  try { rows = JSON.parse(FbmSync.props().getProperty(FbmSync.TRACE_KEY) || '[]'); } catch (ignore) { rows = []; }
+  if (!Array.isArray(rows)) { rows = []; }
+  // Sự kiện còn gom trong bộ nhớ của lần gọi này cũng phải hiện ở status, nếu không Sidebar thấy trace trễ một lần gọi.
+  if (FbmSync.propertyBuffer && FbmSync.propertyBuffer.tracePending.length) { rows = rows.concat(FbmSync.propertyBuffer.tracePending); }
+  return rows.slice(-take);
 };
 
 FbmSync.traceResponse = function (raw) {

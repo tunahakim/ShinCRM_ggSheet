@@ -13,14 +13,17 @@ FbmSync.SEEN_SHARD_HEX_LENGTH = 8000;
 FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT = 9000;
 FbmSync.documentPropertySet = function (key, value, context) {
   var text = String(value === null || value === undefined ? '' : value), bytes = text.length;
-  var previous = null;
-  try { previous = key === FbmSync.STATE_KEY && typeof FbmSync.stateRead === 'function' ? FbmSync.stateRead() : null; } catch (ignorePrevious) {}
+  // State cũ chỉ để ghi chi tiết Log khi ghi hỏng, nên chỉ đọc ở nhánh hỏng; đọc ở mỗi lần ghi từng tốn một lần gọi DocumentProperties (đợt 1 bước A).
+  var previous = null, loadPrevious = function () {
+    try { previous = key === FbmSync.STATE_KEY ? JSON.parse(FbmSync.props().getProperty(key) || 'null') : null; } catch (ignorePrevious) { previous = null; }
+  };
   try {
     if (typeof Utilities !== 'undefined' && Utilities.newBlob) { bytes = Utilities.newBlob(text).getBytes().length; }
   } catch (ignoreBytes) {}
   if (bytes > FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT) {
     var tooLarge = new Error('Không thể lưu state đồng bộ vì DocumentProperties đã chạm giới hạn dung lượng.');
     tooLarge.code = 'FBM_DOCUMENT_PROPERTIES_QUOTA';
+    loadPrevious();
     if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'state_write', outcome: typeof LOG_ERROR === 'undefined' ? 'error' : LOG_ERROR, reason: tooLarge.code, detail: { key: String(key || ''), bytes: bytes, context: String(context || ''), runId: previous && String(previous.runId || ''), phase: previous && String(previous.phase || ''), cursor: previous && previous.cursor || {} } }); }
     return { ok: false, code: tooLarge.code, message: tooLarge.message, error: tooLarge };
   }
@@ -30,6 +33,7 @@ FbmSync.documentPropertySet = function (key, value, context) {
   } catch (err) {
     var failure = new Error('Không thể lưu state đồng bộ vào DocumentProperties.');
     failure.code = 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED';
+    loadPrevious();
     if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'state_write', outcome: typeof LOG_ERROR === 'undefined' ? 'error' : LOG_ERROR, reason: failure.code, detail: { key: String(key || ''), context: String(context || ''), runId: previous && String(previous.runId || ''), phase: previous && String(previous.phase || ''), cursor: previous && previous.cursor || {} } }); }
     return { ok: false, code: failure.code, message: failure.message, error: failure };
   }
@@ -65,7 +69,8 @@ FbmSync.orchestrationLock = function () {
 FbmSync.withOrchestrationLock = function (work) {
   var lock = FbmSync.orchestrationLock(), waitMs = typeof SETTINGS !== 'undefined' && SETTINGS && SETTINGS.LOCK_WAIT_MS ? SETTINGS.LOCK_WAIT_MS : 10000;
   if (!lock.tryLock(waitMs)) { return { ok: false, code: 'BUSY', request: null, message: 'GAS đang xử lý một lượt đồng bộ khác; chưa thay đổi state.', status: typeof FbmSync.statusView === 'function' ? FbmSync.statusView() : null }; }
-  try { return work(); } finally { lock.releaseLock(); }
+  // State ghi gộp trước khi nhả khóa, để lượt chờ khóa đọc được bản hoàn chỉnh (PropertyBuffer.js).
+  try { return FbmSync.withPropertyBuffer(work); } finally { lock.releaseLock(); }
 };
 
 /**
@@ -171,7 +176,6 @@ FbmSync.stateDefault = function () {
 };
 
 /** Lấy kho state cấp tài liệu, dùng chung giữa các lần gọi GAS. */
-FbmSync.props = function () { return PropertiesService.getDocumentProperties(); };
 /** Hash của lần ghi đang chờ xác nhận; không đưa metadata kỹ thuật vào Sheet. */
 FbmSync.pendingPushesRead = function () {
   return FbmSync.documentPropertyJson('FBM_SYNC_PENDING_PUSHES_V1', 'hash chờ xác nhận') || {};

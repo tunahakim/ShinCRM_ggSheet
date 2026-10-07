@@ -116,7 +116,7 @@ FbmSync.backgroundSchedulePublic = function () {
 };
 /** Ghi thời điểm dự kiến cho các tiến trình nghiệp vụ. */
 FbmSync.schedule = function () {
-  var props = PropertiesService.getDocumentProperties(), at = Date.now(), schedule = FbmSync.backgroundScheduleRead();
+  var props = FbmSync.props(), at = Date.now(), schedule = FbmSync.backgroundScheduleRead();
   props.setProperty('FBM_SYNC_NEXT_HEARTBEAT', String(at + schedule.heartbeat.minutes * 60 * 1000));
   props.setProperty('FBM_SYNC_NEXT_CUSTOMER_FULL_SCAN', String(at + schedule.customerFull.minutes * 60 * 1000));
   props.setProperty('FBM_SYNC_NEXT_ACTIVITY_FULL_SCAN', String(at + schedule.activityFull.minutes * 60 * 1000));
@@ -126,7 +126,7 @@ FbmSync.schedule = function () {
   return { heartbeatMinutes: schedule.heartbeat.minutes, customerMinutes: schedule.customerFull.minutes, activityMinutes: schedule.activityFull.minutes, detailMinutes: schedule.detail.minutes, direction: schedule.direction };
 };
 FbmSync.ensureScheduleMarkers = function (now) {
-  var props = PropertiesService.getDocumentProperties(), at = Number(now || Date.now()), schedule = FbmSync.backgroundScheduleRead();
+  var props = FbmSync.props(), at = Number(now || Date.now()), schedule = FbmSync.backgroundScheduleRead();
   var oldCustomer = Number(props.getProperty('FBM_SYNC_NEXT_CUSTOMER_SCAN') || 0), oldActivity = Number(props.getProperty('FBM_SYNC_NEXT_ACTIVITY_SCAN') || 0);
   if (!Number(props.getProperty('FBM_SYNC_NEXT_CUSTOMER_FULL_SCAN') || 0)) { props.setProperty('FBM_SYNC_NEXT_CUSTOMER_FULL_SCAN', String(oldCustomer || (at + schedule.customerFull.minutes * 60 * 1000))); }
   if (!Number(props.getProperty('FBM_SYNC_NEXT_ACTIVITY_FULL_SCAN') || 0)) { props.setProperty('FBM_SYNC_NEXT_ACTIVITY_FULL_SCAN', String(oldActivity || (at + schedule.activityFull.minutes * 60 * 1000))); }
@@ -137,7 +137,7 @@ FbmSync.ensureScheduleMarkers = function (now) {
 };
 /** Chọn một tiến trình đến hạn sau khi Extension đã hỏi GAS; không tạo request song song. */
 FbmSync.schedulerPickDue = function (now, options) {
-  var at = Number(now || Date.now()), opt = options || {}, props = PropertiesService.getDocumentProperties(), schedule = FbmSync.backgroundScheduleRead(), state = FbmSync.stateRead();
+  var at = Number(now || Date.now()), opt = options || {}, props = FbmSync.props(), schedule = FbmSync.backgroundScheduleRead(), state = FbmSync.stateRead();
   FbmSync.ensureScheduleMarkers(at);
   if (!FbmSync.masterEnabled() || !FbmSync.backgroundEnabled() || schedule.enabled === false) { return { ok: false, code: 'BACKGROUND_DISABLED' }; }
   if (state.runId && ['idle', 'done', 'error'].indexOf(String(state.phase || '')) < 0) { return { ok: false, code: 'SYNC_ALREADY_RUNNING' }; }
@@ -166,7 +166,7 @@ FbmSync.schedulerPickDue = function (now, options) {
 /** Nhận quyền một lượt scheduler bằng khóa tài liệu; không giữ công việc trong RAM. */
 FbmSync.schedulerClaim = function (kind, now) {
   var configured = FbmSync.backgroundScheduleRead(), names = { heartbeat: ['FBM_SYNC_NEXT_HEARTBEAT', configured.heartbeat.minutes * 60 * 1000], customerFull: ['FBM_SYNC_NEXT_CUSTOMER_FULL_SCAN', configured.customerFull.minutes * 60 * 1000], activityFull: ['FBM_SYNC_NEXT_ACTIVITY_FULL_SCAN', configured.activityFull.minutes * 60 * 1000], detail: ['FBM_SYNC_NEXT_DETAIL_SCAN', configured.detail.minutes * 60 * 1000], customer: ['FBM_SYNC_NEXT_CUSTOMER_SCAN', configured.customerFull.minutes * 60 * 1000], activity: ['FBM_SYNC_NEXT_ACTIVITY_SCAN', configured.activityFull.minutes * 60 * 1000] };
-  var item = names[String(kind || '')], props = PropertiesService.getDocumentProperties(), at = Number(now || Date.now());
+  var item = names[String(kind || '')], props = FbmSync.props(), at = Number(now || Date.now());
   if (!item) { return { ok: false, code: 'UNKNOWN_SCHEDULE' }; }
     var configuredKind = String(kind) === 'customer' ? 'customerFull' : String(kind) === 'activity' ? 'activityFull' : String(kind);
     if (configuredKind !== 'heartbeat' && configured[configuredKind] && configured[configuredKind].enabled === false) { return { ok: false, code: 'PROCESS_DISABLED', message: 'Tiến trình nền ' + String(kind) + ' đang tắt.' }; }

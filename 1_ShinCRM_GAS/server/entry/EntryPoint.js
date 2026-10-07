@@ -23,6 +23,9 @@ function runEntryPoint(name, source, channel, fn) {
   // Mốc đo DEV (server/dev/FbmPerfProbe.js); gỡ thư mục dev thì hàm không tồn tại và dòng này không làm gì. Tham số thứ năm là đối số gốc của cửa vào.
   var perf = typeof devPerfBegin === 'function' ? devPerfBegin(name, arguments[4]) : null;
   var failed = false, result;
+  // Bộ đệm DocumentProperties của đồng bộ FBM sống đúng một lần gọi (fbm_sync/state/PropertyBuffer.js); mở trước mốc trace đầu tiên để mốc đó cũng được gom.
+  var buffered = trace && typeof fbmCallBegin === 'function';
+  if (buffered) { fbmCallBegin(); }
   if (trace) { fbmTraceBoundary('gas_entered', name); }
   try {
     result = fn();
@@ -46,6 +49,7 @@ function runEntryPoint(name, source, channel, fn) {
       flushLog();
     } finally {
       if (trace) { fbmTraceBoundary('after_flush', name); if (!failed) { fbmTraceBoundary('gas_returned', name); } }
+      if (buffered) { fbmCallEnd(); }
       if (perf) { devPerfEnd(perf, failed); }
     }
   }

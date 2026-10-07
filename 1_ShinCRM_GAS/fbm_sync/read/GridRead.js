@@ -236,7 +236,7 @@ FbmSync.activityCatchupCustomerRequest = function () {
 
 /** Đọc cursor xoay Customer từ DocumentProperties, không giữ trong Extension. */
 FbmSync.activityRotationCursor = function () {
-  var props = PropertiesService.getDocumentProperties(), raw = props.getProperty('FBM_SYNC_ACTIVITY_ROTATION');
+  var props = FbmSync.props(), raw = props.getProperty('FBM_SYNC_ACTIVITY_ROTATION');
   if (!raw) { return { pageIndex: -1, pageValue: null }; }
   try {
     var parsed = JSON.parse(raw);
@@ -273,7 +273,7 @@ FbmSync.activityRotationNext = function (rows) {
 
 /** Lưu vị trí trang xoay do `activityRotationNext` tính. */
 FbmSync.activityRotationSave = function (next) {
-  PropertiesService.getDocumentProperties().setProperty('FBM_SYNC_ACTIVITY_ROTATION', JSON.stringify({ pageIndex: next.pageIndex, pageValue: next.pageValue }));
+  FbmSync.props().setProperty('FBM_SYNC_ACTIVITY_ROTATION', JSON.stringify({ pageIndex: next.pageIndex, pageValue: next.pageValue }));
 };
 /** Lấy AliasName metadata; fallback tên field để tránh hardcode schema. */
 FbmSync.gridFields = function (response) {
