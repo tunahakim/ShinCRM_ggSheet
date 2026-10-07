@@ -1396,7 +1396,7 @@ function fbmSyncResetState() {
     return fbmSyncPaintError(error, 'Không đặt lại được phiên đồng bộ.', 'state_reset');
   });
 }
-/** Hủy phiên FBM cũ chỉ sau khi người dùng xác nhận; GAS quyết có được làm không và tự đối chiếu đúng tài khoản đã liên kết. */
+/** Hủy phiên FBM cũ chỉ sau khi người dùng xác nhận; GAS quyết có được làm không và tự đối chiếu đúng tài khoản đã liên kết. Đăng nhập xong thì chạy lại đúng loại đồng bộ đang chọn, vì lượt cũ đã dừng hẳn khi đăng nhập hỏng. */
 function fbmSyncForceLogin() {
   var schema = FBM_SYNC_RUN_SCHEMA.forceLogin;
   if (FBM_SYNC_CLIENT.running) { return Promise.resolve(null); }
@@ -1407,8 +1407,8 @@ function fbmSyncForceLogin() {
       fbmSyncPaint(started.status);
       return fbmSyncLoginTestLoop(started);
     }).then(function (result) {
-      FBM_SYNC_CLIENT.running = false;
-      return fbmSyncPaint(result && result.status || result);
+      fbmSyncPaint(result && result.status || result);
+      return fbmSyncRun(FBM_SYNC_CLIENT.mode);
     });
   }).catch(function (error) {
     return fbmSyncPaintError(error, schema.failed, 'force_login');

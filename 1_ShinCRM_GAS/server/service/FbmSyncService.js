@@ -26,6 +26,10 @@ function fbmContinueSync(response, clientTrace) { return runEntryPoint('fbmConti
 function fbmCancelSync() { return runEntryPoint('fbmCancelSync', 'sidebar', 'throw', function () { return FbmSync.controlDispatchLocked('cancel', {}); }, {}); }
 /** Lối thoát khi màn đồng bộ kẹt vì không lưu/đọc được trạng thái phiên; GAS tự từ chối nếu phiên còn chạy bình thường. */
 function fbmResetSyncState() { return runEntryPoint('fbmResetSyncState', 'sidebar', 'throw', function () { return FbmSync.controlDispatchLocked('reset_state', {}); }, {}); }
+/** Đăng nhập thử, hủy phiên cũ và nhận từng bước đăng nhập phải qua runEntryPoint: Log đăng nhập chỉ nằm trong bộ đệm, không có vỏ này thì dòng Log của nhánh thành công mất (gặp thật 2026-10-07). */
+function fbmStartLoginTest(credentialRef, expectedIdentity) { return runEntryPoint('fbmStartLoginTest', 'sidebar', 'throw', function () { return fbmPublicResult(FbmSync.loginTestRequest(credentialRef, expectedIdentity || null)); }, {}); }
+function fbmStartForceLogin() { return runEntryPoint('fbmStartForceLogin', 'sidebar', 'throw', function () { return fbmPublicResult(FbmSync.loginForceRequest()); }, {}); }
+function fbmLoginTestResult(response) { return runEntryPoint('fbmLoginTestResult', 'sidebar', 'throw', function () { return fbmPublicResult(FbmSync.loginTestResult(response)); }, {}); }
 /** Đọc snapshot tiến độ hiện tại; Sidebar chỉ polling khi đang chạy. */
 function fbmGetSyncStatus() { return runEntryPoint('fbmGetSyncStatus', 'sidebar', 'throw', function () {
   // Reload có thể là caller duy nhất sau khi callback cuối bị mất. Thu hồi phiên
