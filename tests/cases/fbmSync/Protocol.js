@@ -30,7 +30,7 @@ async function chay(so) {
   const lookupPayload = hop.FbmSync.lookupPayload({ d: { TotalRowCount: 1, Rows: [['GD', 'Gọi điện chăm sóc']] } });
   check(so, 'lookup giu object Rows de doi chieu Category', [Array.isArray(lookupPayload.Rows), hop.FbmSync.lookupPairs({ d: lookupPayload }).GD], [true, 'Gọi điện chăm sóc']);
   const mappings = taoHopCat({ FbmSync: {} });
-  napServer(mappings, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/reconcile/CategoryGate.js');
+  napServer(mappings, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js');
   const rows = [
     { source: '@CAT_TINH_THANH', value: 'Hà Nội', companion: 'HNI. Hà Nội # | HN. Hà Nội cũ' },
     { source: '@CAT_TINH_THANH', value: 'Hà Nội văn phòng', companion: 'HNI. Hà Nội #' }

@@ -103,11 +103,18 @@ async function chay(so) {
   hop.FbmSync.readLocal = realReadLocal;
   const reread = {};
   hop.FbmSync.pushCandidates = (entity) => { const first = hop.FbmSync.readLocal(entity); first[0].id = 'BẨN'; reread[entity] = hop.FbmSync.readLocal(entity)[0].id; return []; };
-  hop.FbmSync.runPreflight({ mode: 'read' });
+  hop.FbmSync.runPreflight({ mode: 'check' });
   const insideReads = Object.assign({}, sheetReads);
   hop.FbmSync.readLocal('customer');
   check(so, 'một lượt preflight đọc mỗi Sheet đúng một lần dù nhiều kiểm tra gọi readLocal, record sửa ở bên gọi không làm bẩn lần đọc sau, hết preflight thì đọc Sheet mới',
-    [insideReads, reread, sheetReads.customer, hop.FbmSync.localSnapshot], [{ customer: 1, activity: 1 }, { customer: 'CUS-1', activity: 'ACT-1' }, 2, null]);
+    [insideReads, reread, sheetReads.customer, Object.keys(hop.FbmSync.sheetCache).length], [{ customer: 1, activity: 1 }, { customer: 'CUS-1', activity: 'ACT-1' }, 2, 0]);
+  const candidateCalls = { read: 0, check: 0 };
+  let candidateMode = 'read';
+  hop.FbmSync.pushCandidates = () => { candidateCalls[candidateMode] += 1; return []; };
+  hop.FbmSync.runPreflight({ mode: 'read' });
+  candidateMode = 'check';
+  hop.FbmSync.runPreflight({ mode: 'check' });
+  check(so, 'đợt 1 bước C: preflight chiều Lấy từ FBM → ShinCRM không dựng ứng viên đẩy; "Kiểm tra an toàn" vẫn dựng cho cả Customer và Activity', [candidateCalls], [{ read: 0, check: 2 }]);
   hop.FbmSync.readLocal = savedReadLocal; hop.FbmSync.hash = savedHash;
 }
 

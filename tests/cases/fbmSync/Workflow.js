@@ -69,7 +69,8 @@ function workflowGas(options) {
   , 'fbm_sync/write/SheetSave.js', ...(opt.extraFiles || []));
   hop.FbmSync.currentSpreadsheetId = () => 'sheet-workflow';
   hop.FbmSync.configValue = () => '';
-  hop.FbmSync.readLocal = opt.readLocal || (() => []);
+  // `readLocal: 'sheet'` giữ readLocal thật (đi qua bản chụp Sheet) để đếm số lần đọc Sheet.
+  if (opt.readLocal !== 'sheet') { hop.FbmSync.readLocal = opt.readLocal || (() => []); }
   return { hop, documentProperties, scriptProperties };
 }
 
@@ -663,7 +664,7 @@ async function chay(so) {
   async function fullPipeline(withTrace) {
     const fullLogs = [], fullWrites = [], fullLocal = { customer: [], activity: [] };
     // Đếm mọi lần gọi kho DocumentProperties để chốt đợt 1 bước A: một lát Activity không được đọc/ghi kho theo số sự kiện.
-    const fullProps = properties(), fullPropCalls = { count: 0 };
+    const fullProps = properties(), fullPropCalls = { count: 0 }, fullSheetReads = { customer: 0, activity: 0, category: 0 };
     ['getProperty', 'setProperty', 'deleteProperty', 'getProperties'].forEach((name) => { const original = fullProps[name]; fullProps[name] = function () { fullPropCalls.count += 1; return original.apply(this, arguments); }; });
     fullProps.setProperties = function (batch) { fullPropCalls.count += 1; Object.keys(batch).forEach((key) => { fullProps.data[key] = String(batch[key]); }); };
     const fullFlow = workflowGas({
@@ -671,7 +672,12 @@ async function chay(so) {
       extraFiles: withTrace ? ['fbm_sync/diagnostic/Trace.js'] : [],
       logEvent: (event) => fullLogs.push(event),
       LOG_OK: 'ok', LOG_WARN: 'warn', LOG_ERROR: 'error', LOG_CONFLICT: 'conflict',
-      readLocal: (entity) => fullLocal[entity].map((item) => Object.assign({}, item)),
+      readLocal: 'sheet', DATA_SCHEMA: {}, SYNC_SCHEMA: {},
+      entityReadAllCombined: (entity) => {
+        fullSheetReads[entity] += 1;
+        const fields = Array.from(new Set(fullLocal[entity].flatMap((record) => Object.keys(record))));
+        return { fields, rows: fullLocal[entity].map((record) => fields.map((field) => record[field])) };
+      },
       writeGateSave: (request) => {
         fullWrites.push(request);
         const entity = request.entity;
@@ -690,6 +696,7 @@ async function chay(so) {
       }
     });
     fullFlow.hop.FbmSync.prepareCategoryGate = () => ({ map: {}, names: {}, valid: {}, warnings: [] });
+    fullFlow.hop.FbmSync.readCategoryGateSheet = () => { fullSheetReads.category += 1; return { map: {}, names: {}, namesBySource: {}, valid: {}, warnings: [] }; };
     fullFlow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
     const fullCustomerFields = fullFlow.hop.FbmSync.GRID_FIELDS.customer;
     const fullActivityFields = fullFlow.hop.FbmSync.GRID_FIELDS.activity;
@@ -703,7 +710,7 @@ async function chay(so) {
     };
     fullFlow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
     let fullStep = fullFlow.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true });
-    const fullKinds = [], fullStatuses = [], fullActivityPropCalls = [];
+    const fullKinds = [], fullStatuses = [], fullActivityPropCalls = [], fullActivitySheetReads = [];
     for (let hop = 0; fullStep && fullStep.request && hop < 20; hop += 1) {
       const request = fullStep.request;
       const kind = String(request.meta && request.meta.kind || '');
@@ -726,7 +733,7 @@ async function chay(so) {
       const throughExtension = await sendThroughExecutor(request, body);
       if (kind === 'grid' && request.meta.entity === 'activity') {
         // Đi đúng đường của fbmContinueSync (bộ đệm một lần gọi, khóa điều phối) để đếm số lần gọi kho của một lát Activity.
-        const callsBefore = fullPropCalls.count;
+        const callsBefore = fullPropCalls.count, readsBefore = Object.assign({}, fullSheetReads), writesBefore = fullWrites.length;
         fullFlow.hop.FbmSync.propertyBufferBegin();
         const before = fullFlow.hop.FbmSync.statusView();
         fullStep = fullFlow.hop.FbmSync.controlDispatchLocked('continue', { response: executorRaw(throughExtension.reply, request.id) });
@@ -734,6 +741,9 @@ async function chay(so) {
         if (fullStep.status && fullFlow.hop.FbmSync.shouldLogStatus(before, fullStep.status)) { fullFlow.hop.FbmSync.logStatus(fullStep.status, 'slice'); }
         fullFlow.hop.FbmSync.propertyBufferEnd();
         fullActivityPropCalls.push(fullPropCalls.count - callsBefore);
+        const sliceReads = Object.keys(fullSheetReads).reduce((out, key) => Object.assign(out, { [key]: fullSheetReads[key] - readsBefore[key] }), {});
+        const sliceWrites = fullWrites.slice(writesBefore).reduce((out, item) => Object.assign(out, { [item.entity]: (out[item.entity] || 0) + 1 }), {});
+        fullActivitySheetReads.push({ reads: sliceReads, writes: sliceWrites });
         fullStatuses.push(fullStep.status);
         continue;
       }
@@ -744,7 +754,7 @@ async function chay(so) {
         fullFlow.hop.FbmSync.logStatus(fullStep.status, 'slice');
       }
     }
-    return { fullFlow, fullLogs, fullWrites, fullLocal, fullStep, fullKinds, fullStatuses, fullActivityPropCalls };
+    return { fullFlow, fullLogs, fullWrites, fullLocal, fullStep, fullKinds, fullStatuses, fullActivityPropCalls, fullActivitySheetReads };
   }
   const { fullFlow, fullLogs, fullWrites, fullLocal, fullStep, fullKinds, fullStatuses } = await fullPipeline(false);
   const fullFinal = fullFlow.hop.FbmSync.statusView();
@@ -762,7 +772,11 @@ async function chay(so) {
      ['session_probe:user', 'authorize:customer', 'authorize:activity', 'completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH', 'completion:@CAT_CONG_VIEC', 'grid:customer', 'grid:activity', 'grid:activity'],
     0, true, 4, true
   ]);
-  const tracedActivityPropCalls = (await fullPipeline(true)).fullActivityPropCalls;
+  const traced = await fullPipeline(true), tracedActivityPropCalls = traced.fullActivityPropCalls;
+  // Đợt 1 bước C: mỗi Sheet đọc một lần mỗi lần gọi; chỉ được đọc lại sau mỗi lần cửa ghi ghi đúng thực thể đó (bản chụp bị bỏ khi ghi).
+  const sheetReadsWithinBudget = traced.fullActivitySheetReads.every((slice) => ['customer', 'activity', 'category'].every((key) => slice.reads[key] <= 1 + (slice.writes[key] || 0)));
+  check(so, 'đợt 1 bước C: mỗi lát Activity đọc mỗi Sheet (Customer, Activity, Category) một lần, chỉ đọc lại sau khi cửa ghi ghi đúng Sheet đó',
+    [traced.fullActivitySheetReads.length >= 2, sheetReadsWithinBudget, traced.fullActivitySheetReads.map((slice) => slice.reads)], [true, true, traced.fullActivitySheetReads.map((slice) => slice.reads)]);
   const lastActivitySlice = tracedActivityPropCalls.length - 1;
   check(so, 'đợt 1 bước A: mỗi lát Activity gọi kho DocumentProperties không quá ' + FBM_ACTIVITY_SLICE_PROPERTY_CALLS_MAX + ' lần, lát kết thúc lượt cộng thêm ' + FBM_SEEN_STORE_RESET_DELETES + ' lần xóa dấu đã thấy (trước refactor: 83)',
     [tracedActivityPropCalls.length >= 2, tracedActivityPropCalls.every((count, index) => count <= FBM_ACTIVITY_SLICE_PROPERTY_CALLS_MAX + (index === lastActivitySlice ? FBM_SEEN_STORE_RESET_DELETES : 0)), tracedActivityPropCalls], [true, true, tracedActivityPropCalls]);

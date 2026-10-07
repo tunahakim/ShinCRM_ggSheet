@@ -17,8 +17,11 @@ async function chay(so) {
   });
   napServer(identity, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
   identity.FbmSync.configValue = () => '';
-  identity.FbmSync.readLocal = () => [];
+  let identityLocalReads = 0;
+  identity.FbmSync.readLocal = () => { identityLocalReads += 1; return []; };
   bindingData[identity.FbmSync.BINDING_KEY] = JSON.stringify({ spreadsheetId: 'sheet-binding-test', userId: '2037', username: 'anhlt', accountName: 'Le Tuan Anh' });
+  const boundStatus = identity.FbmSync.identityStatus();
+  check(so, 'đợt 1 bước C: đã liên kết thì xem trạng thái liên kết (Sidebar mở) không đọc Sheet Customer/Activity', [boundStatus.status, identityLocalReads], ['BOUND', 0]);
   const clearedBinding = identity.FbmSync.bindingWrite({});
   check(so, 'lưu liên kết rỗng xóa binding và khóa mọi đồng bộ thường', [clearedBinding.ok, clearedBinding.code, bindingData[identity.FbmSync.BINDING_KEY], clearedBinding.identityStatus.status], [true, 'IDENTITY_BINDING_CLEARED', undefined, 'UNBOUND']);
   bindingData[identity.FbmSync.BINDING_KEY] = JSON.stringify({ spreadsheetId: 'sheet-binding-test', userId: '2037', username: 'anhlt', accountName: 'Le Tuan Anh' });
@@ -42,7 +45,7 @@ async function chay(so) {
   relay.logEvent = (entry) => { relayLog.lines.push(entry); };
   relay.flushLog = () => { relayLog.flushes += 1; return 0; };
   relay.reportError = (err, channel) => { relayLog.reports.push([String(err && err.message || err), channel]); };
-  napServer(relay, 'server/entry/EntryPoint.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/write/SheetSave.js');
+  napServer(relay, 'server/entry/EntryPoint.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/write/SheetSave.js');
   const stableRelayConfig = relay.fbmSyncRelayConfig();
   check(so, 'relay cap URL deployment co dinh, khong lay URL @HEAD theo context Sidebar', [stableRelayConfig.url, stableRelayConfig.url.indexOf('head-only') >= 0], ['https://script.google.com/macros/s/AKfycbx0ueI_gR2zzkTUGV5lTAXty0zotK2owAd5zPy0Z0SzJkJjRa0dIvbMREAoVJm3iFrX/exec', false]);
   const rejectedProbe = JSON.parse(relay.doPost({ postData: { contents: JSON.stringify({ key: 'relay-test-key', spreadsheetId: 'sheet-relay-test', kind: 'probe' }) } }).text);
@@ -222,7 +225,7 @@ async function chay(so) {
   check(so, 'dung dong bo xoa marker scheduler va giu ket qua o trang thai tam dung', [orchestration.FbmSync.stateRead().phase, orchestration.FbmSync.stateRead().scheduledScan], ['paused', '']);
 
   const guards = taoHopCat({ FbmSync: {}, PropertiesService: { getScriptProperties: () => ({ getProperty: () => '' }), getDocumentProperties: () => ({ getProperty: () => null, setProperty: () => {} }) } });
-  napServer(guards, 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
+  napServer(guards, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
   check(so, 'push config chan khi binding khong co ten tai khoan', guards.FbmSync.pushConfigErrors({ entity: 'customer', kind: 'edit' }, { accountName: '' }), 'Thiếu tên đầy đủ trong liên kết tài khoản FBM; chiều đẩy đã bị dừng.');
   check(so, 'push config chan tao Customer khi thieu prefix va do dai ma khach', guards.FbmSync.pushConfigErrors({ entity: 'customer', kind: 'create' }, { accountName: 'Lê Tuấn Anh' }), 'Thiếu tiền tố hoặc độ dài mã khách FBM; không tạo Customer mới.');
   check(so, 'push config cho phep tao Customer khi du prefix va do dai ma khach', guards.FbmSync.pushConfigErrors({ entity: 'customer', kind: 'create' }, { accountName: 'Lê Tuấn Anh', customerPrefix: 'ALT', customerCodeLength: '8' }), '');
@@ -414,6 +417,33 @@ async function chay(so) {
     });
   } catch (err) { workError = err.message; }
   check(so, 'đợt 1 bước A: phần việc lỗi giữa chừng vẫn ghi gộp phần đã ghi và ném nguyên lỗi gốc', [workError, bufferData.k, 'gone' in bufferData, fs.propertyBuffer.lockDepth], ['work-failed', 'v3', false, 0]);
+
+  // Bản chụp Sheet (đợt 1 bước C): đọc một lần mỗi lần gọi, cửa ghi bỏ bản chụp, lần gọi sau đọc lại Category.
+  const sheetRows = { customer: [['CUS-1', 'Cũ']] }, sheetReadCount = { customer: 0, category: 0 };
+  let categoryName = 'Hà Nội';
+  const sheetHop = taoHopCat({
+    FbmSync: {}, PropertiesService: { getDocumentProperties: () => bufferStore }, DATA_SCHEMA: {}, SYNC_SCHEMA: {},
+    entityReadAllCombined: (entity) => { sheetReadCount[entity] += 1; return { fields: ['id', 'name'], rows: sheetRows[entity].map((row) => row.slice()) }; },
+    writeGateSave: (request) => { request.records.forEach((record) => { sheetRows[request.entity] = sheetRows[request.entity].map((row) => row[0] === record.id ? [record.id, record.name] : row); }); return { ok: true }; }
+  });
+  napServer(sheetHop, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/write/SheetSave.js');
+  const ss = sheetHop.FbmSync;
+  ss.readCategoryGateSheet = () => { sheetReadCount.category += 1; return { map: {}, names: { HN: categoryName }, namesBySource: {}, valid: {}, warnings: [] }; };
+  ss.propertyBufferBegin();
+  const namesBefore = [ss.readLocal('customer')[0].name, ss.readLocal('customer')[0].name];
+  const readsBeforeSave = sheetReadCount.customer;
+  ss.sheetSave('customer', [{ id: 'CUS-1', name: 'Mới' }], 'pull');
+  const nameAfterSave = ss.readLocal('customer')[0].name;
+  const firstCategory = [ss.readCategoryGate().names.HN, ss.stateCategoryGate({ metadata: {} }).names.HN];
+  ss.propertyBufferEnd();
+  categoryName = 'Hà Nội mới';
+  ss.propertyBufferBegin();
+  const secondCategory = ss.readCategoryGate().names.HN;
+  ss.propertyBufferEnd();
+  check(so, 'đợt 1 bước C: trong một lần gọi đọc Sheet Customer một lần, cửa ghi bỏ bản chụp nên đọc sau khi ghi thấy giá trị mới',
+    [namesBefore, readsBeforeSave, nameAfterSave, sheetReadCount.customer], [['Cũ', 'Cũ'], 1, 'Mới', 2]);
+  check(so, 'đợt 1 bước C: Category đọc một lần mỗi lần gọi, sửa Category giữa hai lần gọi thì lần gọi sau thấy giá trị mới',
+    [firstCategory, secondCategory, sheetReadCount.category], [['Hà Nội', 'Hà Nội'], 'Hà Nội mới', 2]);
 }
 
 module.exports = { chay };
