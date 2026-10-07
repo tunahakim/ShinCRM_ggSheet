@@ -265,20 +265,33 @@ FbmSync.loginSessionBlockedContinue = function (state, cursor) {
   return { ok: false, code: current.lastFailureCode, request: null, status: FbmSync.statusView(), error: current.lastError, message: current.message, waiting: count < maxWaits };
 };
 
+FbmSync.LOGIN_REJECT_TEXT = {
+  credentials: 'FBM báo sai tên đăng nhập hoặc mật khẩu.',
+  oldSession: 'FBM còn giữ phiên đăng nhập cũ của tài khoản này.',
+  unknown: 'FBM từ chối đăng nhập: có thể do FBM còn giữ phiên cũ hoặc sai mật khẩu.'
+};
+FbmSync.loginRejectReason = function (success, data) {
+  if (!success.ok) { return 'unknown'; }
+  if (data === false) { return 'credentials'; }
+  if (typeof data === 'string' && data !== '') { return 'oldSession'; }
+  return 'unknown';
+};
+
 /** Sau adapter login, GAS luôn authorize và đọc User trước khi tin phiên mới. */
 FbmSync.loginAdapterContinue = function (state, cursor, response) {
   if (FbmSync.loginBlockedResponse(response)) { return FbmSync.loginSessionBlockedContinue(state, cursor); }
   var success = FbmSync.protocol.assertSuccess(response), parsed = FbmSync.protocol.parse(response) || {}, data = parsed && parsed.d !== undefined ? parsed.d : parsed;
   // FBM chỉ báo thành công bằng `{"d":true}`; thất bại có thể là `false` hoặc `null` (Nghiên cứu FBM ch02 mục 2.5). Chỉ nhận đúng `true`, vì coi `null` là thành công thì lỗi sai mật khẩu hiện thành "FBM không trả mã xác thực" ở bước sau (gặp thật 2026-10-07).
   if (!success.ok || data !== true || FbmSync.protocol.isSessionExpired(response)) {
-    // FBM trả cùng d:null cho cả "còn giữ phiên cũ" lẫn sai mật khẩu (gặp thật 2026-10-07: đăng nhập tay trên FBM hủy phiên cũ xong thì máy đăng nhập được), nên thông báo phải nêu cả hai và cách xử lý; máy không tự hủy phiên cũ. Cổng Log cắt thông báo ở 240 ký tự nên câu phải ngắn, không thì mất phần hướng dẫn.
-    var failure = success.bug && (success.bug.Message || success.bug.message) || 'FBM từ chối đăng nhập: thường do FBM còn giữ phiên đăng nhập cũ, ít khi do sai mật khẩu.';
-    var fix = ' Hãy mở tab FBM, tự đăng nhập (chọn hủy phiên cũ nếu FBM hỏi) rồi bấm chạy lại.';
+    // Gặp thật 2026-10-07: sai tên/mật khẩu thì FBM trả `{"d":false}` (màn FBM hiện "Tên hoặc mật khẩu không đúng"), còn giữ phiên cũ thì `d` là một chuỗi ngắn. Dạng khác chưa gặp nên báo chung cả hai khả năng. Máy không tự hủy phiên cũ. Cổng Log cắt thông báo ở 240 ký tự nên câu phải ngắn, không thì mất phần hướng dẫn.
+    var reason = FbmSync.loginRejectReason(success, data);
+    var failure = success.bug && (success.bug.Message || success.bug.message) || FbmSync.LOGIN_REJECT_TEXT[reason];
+    var fix = reason === 'credentials' ? ' Hãy sửa tên đăng nhập hoặc mật khẩu ở màn Tài khoản rồi bấm chạy lại.' : ' Bấm "Hủy phiên cũ và đăng nhập" hoặc tự đăng nhập trên tab FBM rồi bấm chạy lại.';
     if (!cursor.testOnly && FbmSync.autoLoginMarkFailure) { FbmSync.autoLoginMarkFailure(failure); }
     state.phase = 'paused'; state.cursor = {}; state.lastFailureCode = cursor.testOnly ? 'LOGIN_FAILED' : 'AUTO_LOGIN_FAILED'; state.retryable = false; state.lastError = failure;
     // Mở nút hủy phiên cũ chỉ khi FBM thật sự trả lời từ chối; đã hủy phiên cũ mà vẫn bị từ chối thì gần như chắc sai mật khẩu, không mở lại.
     var forced = cursor.purpose === 'force';
-    state.loginForceOffered = success.ok === true && !forced;
+    state.loginForceOffered = success.ok === true && !forced && reason !== 'credentials';
     if (forced) { state.lastError = failure = 'Đã hủy phiên cũ nhưng FBM vẫn từ chối đăng nhập: nhiều khả năng sai tên đăng nhập hoặc mật khẩu; hãy kiểm tra trong cài đặt tài khoản.'; }
     // Lượt người dùng bấm không chịu chu kỳ chờ nên không hứa "tự thử lại"; chỉ chạy nền mới tự thử lại sau chu kỳ.
     state.message = forced ? failure
