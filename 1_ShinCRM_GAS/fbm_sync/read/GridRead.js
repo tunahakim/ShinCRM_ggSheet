@@ -152,7 +152,8 @@ FbmSync.conflictRefreshRequest = function (entity, item) {
   var target = item || {}, fbmId = String(target.fbmId || '').trim();
   if (!fbmId) { return null; }
   if (entity === 'customer') {
-    var customerRequest = FbmSync.customerGridRequest({ type: 0, count: 20, gridPageIndex: -1, gridRefresh: false, externalKey: [{ Name: 'stt_rec_kh', Opr: '=', Value: fbmId, Type: 'String', Ignore: false }] });
+    // Đọc đích danh theo ID FBM; phạm vi thử đã xét lúc bản ghi vào hàng đợi. Gắn thêm lọc mã khách thử thì khách mới tạo (mã khác ALT00010) bị coi là không còn trên FBM (FBM-052).
+    var customerRequest = FbmSync.customerGridRequest({ type: 0, count: 20, gridPageIndex: -1, gridRefresh: false, includeTestCustomer: false, externalKey: [{ Name: 'stt_rec_kh', Opr: '=', Value: fbmId, Type: 'String', Ignore: false }] });
     customerRequest.meta.kind = 'conflict_refresh_grid'; customerRequest.meta.entity = 'customer'; customerRequest.meta.conflictId = String(target.id || '');
     return customerRequest;
   }
