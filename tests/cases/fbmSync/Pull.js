@@ -76,6 +76,22 @@ async function chay(so) {
   builders.writeGateSave = (request) => { markerConflictWrite = request; return { ok: true }; };
   const markerConflict = builders.FbmSync.pullWrite('activity', [builders.FbmSync.activityRecord({ id: 'NEW-FBM', ma_kh: 'ALT99999', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi', details: 'Nội dung mới #SC-ACT-9' }, gate)]);
   check(so, 'Activity marker trỏ FBM ID khác ghi trạng thái xung đột chờ quyết lên Sheet, không cất bản ghi vào state', [markerConflict.conflicts, 'conflicts' in markerState.metadata, markerConflictWrite.records[0].syncStatus, Object.keys(markerState.locks)], [1, false, builders.FbmSync.SYNC_STATUS.conflict, []]);
+  // G12: giao dịch đã đồng bộ của chính tài khoản mà FBM còn dấu #SC thì xếp đẩy sửa để bỏ dấu; của tài khoản khác thì không đụng.
+  const settingsBeforeMarker = builders.FbmSync.scriptSettings;
+  gate.map['@CAT_CONG_VIECGọi'] = 'GOI'; gate.valid['@CAT_CONG_VIEC'] = { 'Gọi': true, GOI: true };
+  const markedIncoming = builders.FbmSync.activityRecord({ id: 'FBM-9', ma_kh: 'ALT99999', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi', details: 'Nội dung #SC-ACT-9', owner: 'Chủ tài khoản' }, gate);
+  let markedWrite = null;
+  builders.FbmSync.scriptSettings = () => ({ accountName: 'Chủ tài khoản' });
+  builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmCustomerCode: 'ALT99999' }] : [{ id: 'ACT-9', fbmId: 'FBM-9', customerId: 'KH-1', content: 'Nội dung', taskType: 'Gọi', workDate: '/Date(1757386800000)/', fbmHash: markedIncoming.fbmHash, syncStatus: builders.FbmSync.SYNC_STATUS.synced }];
+  builders.writeGateSave = (request) => { markedWrite = request; return { ok: true }; };
+  builders.FbmSync.pullWrite('activity', [Object.assign({}, markedIncoming)]);
+  const ownMarked = markedWrite && markedWrite.records[0].syncStatus;
+  markedWrite = null;
+  builders.FbmSync.scriptSettings = () => ({ accountName: 'Đồng nghiệp' });
+  builders.FbmSync.pullWrite('activity', [Object.assign({}, markedIncoming)]);
+  check(so, 'G12: lượt kéo xếp "chờ đối soát" cho giao dịch của mình còn dấu #SC trên FBM, không đụng giao dịch tài khoản khác', [ownMarked, markedWrite && markedWrite.records[0].syncStatus], [builders.FbmSync.SYNC_STATUS.pending, null]);
+  builders.FbmSync.scriptSettings = settingsBeforeMarker;
+  delete gate.map['@CAT_CONG_VIECGọi']; delete gate.valid['@CAT_CONG_VIEC'];
   const edit = builders.FbmSync.customerEditRequest({ fbmId: 'A1', companyName: 'Đổi tên' }, { stt_rec_kh: 'A1', ma_kh: 'ALT00010', ten_kh: 'Cũ', dien_thoai: '0123' }, gate);
   check(so, 'Customer sửa giữ OldValue field không đụng tới', edit.body.memvars.filter((item) => item.Name === 'dien_thoai')[0].NewValue, '0123');
   const editWithShinId = builders.FbmSync.customerEditRequest({ id: 'CUS-020059', fbmId: 'A1', website: 'Mới' }, { stt_rec_kh: 'A1', ma_kh: 'ALT00010', id: 0 }, gate).body.memvars.filter((item) => item.Name === 'id')[0];
