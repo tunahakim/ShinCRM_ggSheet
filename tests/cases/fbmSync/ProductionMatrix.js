@@ -110,7 +110,7 @@ async function chay(so) {
   sync.hop.FbmSync.stateWrite(pageState);
   const pageRows = [{ stt_rec_kh: 'FBM-C1', ma_kh: 'ALT00001', ngay_gd: '2026-09-19', datetime0: '2026-09-19T01:00:00', xorder: 1 }, { stt_rec_kh: 'FBM-C2', ma_kh: 'ALT00002', ngay_gd: '2026-09-18', datetime0: '2026-09-18T01:00:00', xorder: 2 }];
   const nextPage = sync.hop.FbmSync.customerNext(sync.hop.FbmSync.stateRead(), pageRows, 3);
-  check(so, 'cursor Customer nhieu trang dung composite key va trang ke tiep', [nextPage.body.type, nextPage.body.gridPageIndex, nextPage.body.gridPageValue], [1, 0, ['2026-09-18', '2026-09-18T01:00:00', 2]]);
+  check(so, 'cursor Customer nhieu trang dung composite key bốn giá trị kèm stt_rec_kh (Nghiên cứu FBM ch04 mục 4.10) va trang ke tiep', [nextPage.body.type, nextPage.body.gridPageIndex, nextPage.body.gridPageValue], [1, 0, ['2026-09-18', '2026-09-18T01:00:00', 2, 'FBM-C2']]);
 
   const bulkLocal = [];
   for (let index = 0; index < 2505; index += 1) {

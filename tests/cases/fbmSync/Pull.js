@@ -172,7 +172,17 @@ async function chay(so) {
   const cursorBytes = Buffer.byteLength(JSON.stringify(pageState.cursor));
   check(so, 'cursor Activity cua mot trang Customer day voi ma dai nhat van duoi nua tran DocumentProperty va khong chep doi danh sach ma', [cursorBytes < builders.FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT / 2, pageState.cursor.customerIds, pageState.cursor.customerContexts.length], [true, undefined, pageRows]);
   const rotationRows = Array.from({ length: builders.FbmSync.ACTIVITY_SUPPLEMENT_CUSTOMERS }, (_, i) => ({ stt_rec_kh: 'R' + i, ngay_gd: '2026-10-0' + (i % 9 + 1), datetime0: 'T' + i, xorder: i, ten_kh: 'Ten dai '.repeat(20) }));
-  check(so, 'vong xoay chi giu vi tri trang ke tiep, khong giu cac dong Customer; trang thieu thi quay ve dau', [builders.FbmSync.activityRotationNext(rotationRows), builders.FbmSync.activityRotationNext(rotationRows.slice(1))], [{ pageIndex: 0, pageValue: ['2026-10-03', 'T29', 29] }, { pageIndex: -1, pageValue: null }]);
+  check(so, 'vong xoay chi giu vi tri trang ke tiep, khong giu cac dong Customer; trang thieu thi quay ve dau', [builders.FbmSync.activityRotationNext(rotationRows), builders.FbmSync.activityRotationNext(rotationRows.slice(1))], [{ pageIndex: 0, pageValue: ['2026-10-03', 'T29', 29, 'R29'] }, { pageIndex: -1, pageValue: null }]);
+  // Lượt dừng sớm (phân trang Customer hỏng) mà vẫn đánh vắng mặt thì mọi khách chưa quét tới bị đánh "không thấy bên FBM" (gặp thật: 1.262/1.312 khách).
+  const marked = [];
+  const savedMark = builders.FbmSync.markMissingAfterFullScan;
+  builders.FbmSync.markMissingAfterFullScan = (entity) => { marked.push(entity); return { written: 0 }; };
+  const scanRun = (pages) => { const st = { mode: 'read', scan: 'full', phase: 'pull_activity', metadata: {}, session: {}, cursor: {} }; pages.forEach((grid, i) => builders.FbmSync.customerScanRecord(st, grid, i === 0)); marked.length = 0; builders.FbmSync.finishPullRun(st); return [st.phase, st.lastFailureCode || '', marked.slice()]; };
+  const rowsOf = (n) => Array.from({ length: n }, () => ({}));
+  check(so, 'chỉ đánh không thấy bên FBM khi đã nhận đủ số khách FBM báo ở trang đầu; dừng ở 50/1312 hoặc FBM không báo tổng thì phiên lỗi FBM_SCAN_INCOMPLETE và không đánh',
+    [scanRun([{ total: 1312, rows: rowsOf(50) }, { total: 0, rows: [] }]), scanRun([{ total: 0, rows: rowsOf(50) }]), scanRun([{ total: 60, rows: rowsOf(50) }, { total: 0, rows: rowsOf(10) }]), scanRun([{ total: 0, rows: [] }])],
+    [['error', 'FBM_SCAN_INCOMPLETE', []], ['error', 'FBM_SCAN_INCOMPLETE', []], ['done', '', ['customer', 'activity']], ['done', '', ['customer', 'activity']]]);
+  builders.FbmSync.markMissingAfterFullScan = savedMark;
   builders.FbmSync.readLocal = (entity) => entity === 'activity' ? [{ id: 'A-NEW', fbmId: 'F-NEW', workDate: '2026-09-10' }] : [];
   const catchup = builders.FbmSync.activityCatchupCustomerRequest();
   check(so, 'Lop catchup tao Customer grid theo ngay_gd moi hon Activity local', [catchup.meta.kind, catchup.meta.activityMaxDate, catchup.body.externalKey.some((item) => item.Name === 'ngay_gd' && item.Opr === '>')], ['activity_catchup_customer_grid', '2026-09-10', true]);
