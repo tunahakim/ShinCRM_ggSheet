@@ -19,6 +19,14 @@ async function chay(so) {
   const login = hop.FbmSync.beginAutoLogin(hop.FbmSync.stateRead(), state.cursor);
   check(so, 'hết phiên tạo request login và giữ cursor cũ', [login.meta.kind, hop.FbmSync.stateRead().cursor.kind, hop.FbmSync.stateRead().cursor.resumeCursor.pageIndex], ['login', 'login', 2]);
   check(so, 'auto-login chỉ thử lại một lần trong 30 phút', hop.FbmSync.autoLoginCanAttempt(Date.now() + 1000).code, 'AUTO_LOGIN_THROTTLED');
+  // Chủ dự án chốt 2026-10-07: chu kỳ chờ chỉ dành cho chạy nền; người bấm chạy phải được thử ngay hoặc nhận hướng dẫn.
+  const attemptKinds = [['manual', 'customer_grid'], ['manual', 'heartbeat'], ['manual', 'session_probe'], ['background', 'customer_grid']].map(([origin, kind]) => hop.FbmSync.autoLoginAttemptOptions({ origin }, { kind }).manual);
+  check(so, 'chỉ lượt người dùng bấm chạy mới được bỏ qua chu kỳ chờ; heartbeat, probe chờ phiên cũ và chạy nền vẫn chịu chu kỳ', [hop.FbmSync.autoLoginCanAttempt(Date.now() + 1000, { manual: true }).ok, attemptKinds], [true, [true, false, false, false]]);
+  hop.FbmSync.statePatch({ origin: 'background', cursor: { kind: 'customer_grid' } });
+  const backgroundThrottled = hop.FbmSync.beginAutoLogin(hop.FbmSync.stateRead(), { kind: 'customer_grid' });
+  hop.FbmSync.statePatch({ origin: 'manual' });
+  const manualRetry = hop.FbmSync.beginAutoLogin(hop.FbmSync.stateRead(), { kind: 'customer_grid' });
+  check(so, 'lượt bấm tay ngay sau lần đăng nhập hỏng vẫn gửi đăng nhập và đánh dấu cursor là bấm tay, chạy nền thì bị chặn', [backgroundThrottled, manualRetry && manualRetry.meta.kind, hop.FbmSync.stateRead().cursor.manual], [null, 'login', true]);
   const attemptAt = Date.now();
   hop.FbmSync.autoLoginMarkSuccess(attemptAt + 500);
   check(so, 'đăng nhập tự động thành công rồi phiên bị đăng xuất thì được đăng nhập lại ngay, không phải chờ chu kỳ 30 phút', hop.FbmSync.autoLoginCanAttempt(attemptAt + 13 * 60 * 1000).ok, true);
@@ -217,6 +225,11 @@ async function chay(so) {
   heartbeat.FbmSync.statePatch({ runId: 'login-null-run', phase: 'checking_session', cursor: { kind: 'login', purpose: 'auto', testOnly: false, resumeCursor: { kind: 'heartbeat' } }, activeRequestId: '', deadlineAt: 0, session: { expired: true } });
   const loginNull = heartbeat.FbmSync.loginAdapterContinue(heartbeat.FbmSync.stateRead(), heartbeat.FbmSync.stateRead().cursor, { ok: true, status: 200, body: '{"d":null}' });
   check(so, 'Login trả d:null là đăng nhập thất bại, không đi tiếp sang xin mã xác thực', [loginNull.code, loginNull.request, heartbeat.FbmSync.loginConfigPublic().lastError.indexOf('FBM từ chối đăng nhập') === 0, heartbeat.FbmSync.stateRead().message.indexOf('Tự đăng nhập thất bại: FBM từ chối đăng nhập') === 0, (gateLogs.filter((event) => event.action === 'login_failure').pop() || {}).detail.response.dType], ['AUTO_LOGIN_FAILED', null, true, true, 'null']);
+  const backgroundNullText = heartbeat.FbmSync.stateRead().message;
+  heartbeat.FbmSync.statePatch({ runId: 'login-null-manual', origin: 'manual', phase: 'checking_session', cursor: { kind: 'login', purpose: 'auto', manual: true, testOnly: false, resumeCursor: { kind: 'customer_grid' } }, activeRequestId: '', deadlineAt: 0, session: { expired: true } });
+  heartbeat.FbmSync.loginAdapterContinue(heartbeat.FbmSync.stateRead(), heartbeat.FbmSync.stateRead().cursor, { ok: true, status: 200, body: '{"d":null}' });
+  const manualNullText = heartbeat.FbmSync.stateRead().message;
+  check(so, 'Login trả d:null thì thông báo nêu khả năng FBM còn giữ phiên cũ và cách hủy trên tab FBM; lượt bấm tay không hứa tự thử lại, chạy nền thì có', [manualNullText.indexOf('còn giữ phiên đăng nhập cũ') > 0, manualNullText.indexOf('chọn hủy phiên cũ') > 0, manualNullText.indexOf('tự thử lại') < 0, backgroundNullText.indexOf('Chạy nền tự thử lại sau 30 phút') > 0, backgroundNullText.indexOf('chọn hủy phiên cũ') > 0], [true, true, true, true, true]);
   const throttleText = heartbeat.FbmSync.autoLoginBlockMessage('AUTO_LOGIN_THROTTLED', { retryAt: new Date(2026, 9, 7, 16, 48).getTime() });
   check(so, 'thông báo chờ chu kỳ nêu giờ được thử lại, lý do lần trước và cách kiểm tra ngay', [throttleText.indexOf('sau 16:48') > 0, throttleText.indexOf('Lý do lần trước: FBM từ chối đăng nhập') > 0, throttleText.indexOf('Đăng nhập thử') > 0], [true, true, true]);
   heartbeat.FbmSync.statePatch({ runId: 'authorize-false-run', phase: 'checking_session', cursor: { kind: 'login_identity_authorize', purpose: 'auto', testOnly: false }, activeRequestId: '', deadlineAt: 0, session: { expired: true } });
