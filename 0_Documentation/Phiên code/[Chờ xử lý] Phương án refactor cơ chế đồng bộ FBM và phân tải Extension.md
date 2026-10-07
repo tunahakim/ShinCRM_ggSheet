@@ -208,6 +208,27 @@ Phải làm A trước B: nếu gom 50 khách mà mỗi lần gọi vẫn đọc
 
 Kết luận: bộ nhớ và việc hash ở GAS không phải điểm nghẽn ở mọi quy mô thấy trước; điểm nghẽn là số lần gọi GAS và số lần đọc/ghi DocumentProperties. Giới hạn 9 KB là của mỗi ô DocumentProperties (state lưu giữa các lần gọi), không liên quan kích thước gói; gói chỉ sống trong RAM của một lần gọi và không bao giờ cất vào DocumentProperties (mục 16.4).
 
+### 2B.7. Số đo sau đợt 1 (2026-10-08, Sheet DEV, chế độ thử 20 khách, "Lấy từ FBM → ShinCRM")
+
+**Lần đo 1 (sau nhóm 1.1–1.2, trước khi bỏ nạp danh mục) đo nhầm khách:** hàm chọn mã thử `fbmPerfTestScopeOn` so mã khách ShinCRM với mã FBM nên chọn 20 khách không có giao dịch trên Sheet; số đo chỉ đúng cho nhánh khách rỗng. Đã sửa hàm (so theo mã khách ShinCRM) và hàm xóa giao dịch thử `fbmPerfDropScopeActivities` (dùng chung `FbmSync.inTestScope`).
+
+| Nhánh khách rỗng (lần đo 1) | Trước đợt 1 (2B.6) | Sau nhóm 1.1–1.2 |
+|---|---|---|
+| GAS mỗi lần gọi Activity | 5,0 giây | 1,5 giây (0,9–3,6) |
+| Khứ hồi mỗi lần gọi Activity | khoảng 7,7 giây | 4,2 giây (đường truyền 2,8 giây) |
+| Nạp 3 danh mục FBM | — | 3 lần gọi, 15,7 giây (đã bỏ ở nhóm 1.3) |
+
+**Lần đo 2 (sau nhóm 1.3, khách có giao dịch, xóa trước 10 dòng Activity của khách thử để lượt Lấy ghi lại):** 20 lần gọi Activity, 7 lần ghi Sheet; không lỗi, không request danh mục.
+
+- GAS mỗi lần gọi Activity trung bình 11,3 giây (3,4–32,2), khứ hồi 14,2 giây. Kỳ vọng 1,3 giây không đạt vì hai thứ đợt 1 chưa đụng tới:
+  - **Cửa ghi chung `writeGateSave` (core ShinCRM)**: 7 lần ghi tốn 64 giây tự thân cộng 1.045 lần `getProperty`, 77 `setProperty`, 35 `deleteProperty` thẳng vào DocumentProperties (khoảng 41 giây), tức khoảng 15 giây mỗi lần ghi. Nguồn: tín hiệu reload (`DirtyState`), cấp mã (`IdGate`) và vẽ lại sheet View sau mỗi lần ghi (`writeCommitRender`, `ViewSheetRenderer`); các khối này dùng khóa riêng nên không đi qua bộ đệm của bước A.
+  - **Đọc Sheet mỗi lần gọi**: `entityReadAll` Customer + Activity khoảng 4,3 giây mỗi lần gọi (bản chụp chỉ sống trong một lần gọi). Đợt 3 gom nhiều khách vào một lần gọi sẽ chia đều chi phí này.
+  - `readCategoryGate` khoảng 0,6 giây mỗi lần gọi, `flushLog` 0,56 giây (LOG_TRACE đang bật).
+- Lần gọi không ghi Sheet: khoảng 3,4–5 giây GAS, phần lớn là đọc Sheet.
+- Đầu lượt: khởi động `fbmStartSync` 10,1 giây GAS (đọc Sheet 3,4 giây, `flushLog` ×5 2,1 giây, 10 lần `deleteProperty` reset dấu đã thấy 0,5 giây); dò phiên 16,1 giây khứ hồi (2 lần); lấy quyền Activity 37 giây khứ hồi, trong đó 29,8 giây là đường truyền (bất thường, chưa rõ nguyên nhân, cần đo lại); lưới Customer 6,8 giây. Bỏ nạp danh mục đã bớt 15,7 giây.
+
+**Đề xuất đưa vào đợt 2 (chờ chủ dự án):** (1) lượt đồng bộ ghi Sheet không vẽ lại View sau mỗi lần ghi mà đánh dấu và vẽ một lần cuối lượt, và cho tín hiệu reload/cấp mã đi qua một bộ đệm DocumentProperties dùng chung với core thay vì đọc thẳng (đụng core ShinCRM nên cần duyệt); (2) đo lại riêng lần lấy quyền Activity 29,8 giây đường truyền.
+
 ## 3. Ranh giới GAS – Extension – Sidebar
 
 ### 3.1. GAS sở hữu
