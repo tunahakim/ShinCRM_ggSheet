@@ -76,7 +76,7 @@ var FBM_SYNC_SETTINGS_UI = {
     extension: function (slots) { return [Box({ id: FBM_SYNC_SETTINGS_SCHEMA.regions.extensionNotice, elements: slots.notice }), slots.poll, slots.startup, slots.actions]; },
     background: function (slots) { return [Box({ id: FBM_SYNC_SETTINGS_SCHEMA.regions.backgroundNotice, elements: slots.notice }), slots.switch, slots.direction].concat(slots.processes, [slots.detail, slots.actions]); },
     loginPolicy: function (slots) { return [Box({ id: FBM_SYNC_SETTINGS_SCHEMA.regions.loginPolicyStatus, elements: slots.status }), Box({ id: FBM_SYNC_SETTINGS_SCHEMA.regions.loginNotice, elements: slots.notice }), slots.parent, RowGroup({ id: FBM_SYNC_SETTINGS_SCHEMA.regions.loginPolicyChildren, className: FBM_SYNC_SETTINGS_UI.classes.loginChildren, elements: slots.children }), slots.actions]; },
-    module: function (slots) { return [slots.switch, Box({ id: FBM_SYNC_SETTINGS_SCHEMA.regions.moduleNotice, elements: slots.notice }), slots.threshold, slots.help, slots.actions]; },
+    module: function (slots) { return [slots.switch, Box({ id: FBM_SYNC_SETTINGS_SCHEMA.regions.moduleNotice, elements: slots.notice }), slots.threshold, slots.help, slots.testMode, slots.testCodes, slots.testHelp, slots.actions]; },
     screen: function (slots) { return Box({ id: FBM_SYNC_SETTINGS_SCHEMA.rootId, className: FBM_SYNC_SETTINGS_UI.rootClass, elements: [slots.module, slots.relay, slots.extension, slots.background, slots.loginPolicy] }); }
   }
 };

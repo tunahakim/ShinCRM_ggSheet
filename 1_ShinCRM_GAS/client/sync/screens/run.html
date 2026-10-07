@@ -40,8 +40,14 @@ function fbmSyncRunForceLoginBlocks(status) {
   var schema = FBM_SYNC_RUN_SCHEMA.forceLogin;
   return [FBM_SYNC_RUN_UI.layout.actionRow(Button({ id: schema.id, label: schema.label, className: uiResolveActionClass('cancel', 'button'), disabled: !!FBM_SYNC_CLIENT.running }))];
 }
+/** Băng cảnh báo chế độ thử, để người dùng luôn thấy lượt chạy đang bị giới hạn trong danh sách mã nào. */
+function fbmSyncRunTestModeBlocks() {
+  var settings = FBM_SYNC_CLIENT.syncSettings || {}, schema = FBM_SYNC_RUN_SCHEMA.testMode;
+  if (settings.testMode === false || !Array.isArray(settings.testCodes)) { return []; }
+  return [Notice({ kind: 'warning', text: settings.testCodes.length ? schema.on + settings.testCodes.join(', ') + '.' : schema.empty })];
+}
 function fbmSyncRunDetailsBlocks(status) {
-  var reset = fbmSyncRunResetBlocks(status).concat(fbmSyncRunForceLoginBlocks(status));
+  var reset = fbmSyncRunTestModeBlocks().concat(fbmSyncRunResetBlocks(status), fbmSyncRunForceLoginBlocks(status));
   if (!fbmSyncRunHasSnapshot(status)) { return reset; }
   var awaiting = status.phase === 'awaiting_approval';
   return reset.concat(awaiting ? [Text({ className: FBM_SYNC_RUN_UI.classes.muted, text: FBM_SYNC_RUN_SCHEMA.awaitingMessage })] : []).concat([fbmSyncPipelineBlock(status, FBM_SYNC_RUN_SCHEMA.regions.pipeline), FBM_SYNC_RUN_UI.layout.liveStatus(FBM_SYNC_RUN_SCHEMA.regions.liveStatus, fbmSyncStatusBlocks(status, status.counts || {}))]);

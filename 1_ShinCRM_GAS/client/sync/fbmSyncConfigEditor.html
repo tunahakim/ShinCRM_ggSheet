@@ -257,7 +257,7 @@ function fbmSyncConfigStartEdit(key) {
     draft = { customerPrefix: String(account.customerPrefix || ''), customerCodeLength: String(account.customerCodeLength || ''), activitySince: String(account.activitySince || '') };
     FBM_SYNC_CLIENT.accountSettingsDraft = fbmSyncConfigClone(draft);
   } else if (key === 'module') {
-    draft = { approvalThreshold: settings.approvalThreshold === undefined ? FBM_SYNC_SETTINGS_SCHEMA.defaults.approvalThreshold : settings.approvalThreshold, enabled: fbmSyncConfigMasterEnabled() };
+    draft = { approvalThreshold: settings.approvalThreshold === undefined ? FBM_SYNC_SETTINGS_SCHEMA.defaults.approvalThreshold : settings.approvalThreshold, enabled: fbmSyncConfigMasterEnabled(), testMode: settings.testMode !== false, testCodes: (settings.testCodes || []).join(', ') };
   } else if (key === 'relay') {
     draft = {};
   } else if (key === 'extension') {
@@ -287,7 +287,7 @@ function fbmSyncConfigSave(key, target) {
 var FBM_SYNC_CONFIG_UNSAVED_FIELDS = {
   connection: { 'identity.spreadsheetId': 'fbm-identity-spreadsheet', 'identity.userId': 'fbm-identity-user', 'identity.username': 'fbm-identity-username', 'identity.accountName': 'fbm-identity-account', loginUsername: 'fbm-login-username', password: 'fbm-login-password' },
   accountSettings: { customerPrefix: 'fbm-account-customer-prefix', customerCodeLength: 'fbm-account-customer-length', activitySince: 'fbm-account-activity-since' },
-  module: { enabled: 'fbm-sync-settings-master-switch', approvalThreshold: 'fbm-sync-setting-approval-threshold' },
+  module: { enabled: 'fbm-sync-settings-master-switch', approvalThreshold: 'fbm-sync-setting-approval-threshold', testMode: 'fbm-sync-setting-test-mode', testCodes: 'fbm-sync-setting-test-codes' },
   relay: {},
   extension: { pollMinutes: 'fbm-extension-poll-minutes', runOnStartup: 'fbm-sync-run-on-startup' },
   background: {

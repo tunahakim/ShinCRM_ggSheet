@@ -109,6 +109,9 @@ function fbmSyncSettingsModuleBlocks(settings, enabled) {
     notice: fbmSyncSettingsNoticeBlocks('module'),
     threshold: StandaloneField(moduleSchema.thresholdLabel, { id: moduleSchema.thresholdId, kind: 'input', inputType: 'number', value: draft.approvalThreshold === undefined ? moduleSchema.thresholdPlaceholder : draft.approvalThreshold, placeholder: moduleSchema.thresholdPlaceholder, disabled: fbmSyncConfigControlDisabled('module', 'approvalThreshold') || !parentEnabled, ariaLabel: moduleSchema.thresholdLabel }),
     help: Text({ className: FBM_SYNC_SETTINGS_UI.classes.muted, text: moduleSchema.thresholdHelp }),
+    testMode: FBM_SYNC_SETTINGS_UI.layout.toggle(FBM_SYNC_SETTINGS_UI.classes.toggleRow, Text({ className: FBM_SYNC_SETTINGS_UI.classes.toggleCopy, text: moduleSchema.testModeLabel }), StandaloneControl({ id: moduleSchema.testModeId, kind: 'toggle', pressed: draft.testMode !== false, className: draft.testMode !== false ? FBM_SYNC_SETTINGS_UI.classes.toggleOn : FBM_SYNC_SETTINGS_UI.classes.toggleOff, data: { 'sync-test-mode-draft': true }, disabled: fbmSyncConfigControlDisabled('module', 'testMode'), ariaLabel: moduleSchema.testModeLabel })),
+    testCodes: StandaloneField(moduleSchema.testCodesLabel, { id: moduleSchema.testCodesId, kind: 'input', inputType: 'text', value: Array.isArray(draft.testCodes) ? draft.testCodes.join(', ') : String(draft.testCodes || ''), placeholder: moduleSchema.testCodesPlaceholder, disabled: fbmSyncConfigControlDisabled('module', 'testCodes') || draft.testMode === false, ariaLabel: moduleSchema.testCodesLabel }),
+    testHelp: Text({ className: FBM_SYNC_SETTINGS_UI.classes.muted, text: moduleSchema.testHelp }),
     actions: fbmSyncConfigButtonRow('module', { edit: moduleSchema.edit, save: moduleSchema.save }, { id: moduleSchema.saveId, disabled: !!FBM_SYNC_CLIENT.running })
   });
 }
