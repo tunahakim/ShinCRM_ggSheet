@@ -19,7 +19,6 @@ var SEED_FAKE_SELECT = {
   '@CAT_SAN_PHAM': ['Thép hộp', 'Thép tấm', 'Tôn mạ kẽm', 'Ống thép'],
   '@CAT_NGUON_KH': ['FBM', 'Giới thiệu', 'Tự tìm', 'Hội chợ'],
   '@CAT_XAC_THUC': ['Đã xác thực', 'Chưa xác thực'],
-  '@CAT_CHO_PHEP_FBM': ['Cho phép', 'Chưa cho phép', 'Ngừng đồng bộ'],
   '@CAT_CONG_VIEC': ['Gọi điện', 'Gặp mặt', 'Gửi báo giá', 'Chốt đơn'],
   '@CAT_UU_TIEN': ['Cao', 'Thường', 'Thấp']
 };
@@ -115,7 +114,7 @@ function seedFakeWrite(sheet, rows) {
  *
  * Dùng chung một bảng là chỗ đáng nói: nếu danh mục và dữ liệu lấy từ hai nguồn khác nhau thì mọi ô SELECT trên sheet sẽ là một giá trị ngoài danh mục, và lúc dựng ô chọn ở chặng 1.3 thì không phân biệt được đó là lỗi code hay là dữ liệu giả đặt lệch.
  *
- * Cột đi kèm `_FBM` nhận mã giả dạng `FBM-1`, xếp đúng hàng với danh mục gốc. Nhận diện cột đi kèm bằng `categoryIsCompanion` chứ không tự xét hậu tố, vì `@CAT_CHO_PHEP_FBM` cũng kết thúc bằng `_FBM` mà nó là một danh mục thật.
+ * Cột đi kèm `_FBM` nhận mã giả dạng `FBM-1`, xếp đúng hàng với danh mục gốc. Nhận diện cột đi kèm bằng `categoryIsCompanion` chứ không tự xét hậu tố, vì một danh mục thật cũng có thể có tên kết thúc bằng `_FBM`.
  */
 function seedFakeCategory() {
   var sheet = shinOpenSheet('Category');

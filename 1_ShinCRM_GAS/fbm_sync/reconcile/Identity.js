@@ -244,14 +244,14 @@ FbmSync.markMissingAfterFullScan = function (entity, state) {
 
 /** Đổi record Customer FBM sang schema nội bộ của Sheet. */
 FbmSync.customerRecord = function (fbm, categoryGate) {
-  var record = { companyName: fbm.ten_kh || '', taxNumber: fbm.ma_so_thue || '', phone: fbm.dien_thoai || '', email: fbm.email || '', address: fbm.dc_lh || '', province: fbm.ten_dclh_tinh || fbm.dc_lh_tinh || '', website: fbm.website || '', contactPerson: fbm.ong_ba || '', leadSource: fbm.ten_nguon_dm || fbm.nguon_dm || '', verifyStatus: 'Chưa xác thực', allowFbmPush: FbmSync.PUSH_ALLOW_VALUE, fbmCustomerCode: fbm.ma_kh || '', fbmId: fbm.stt_rec_kh || '', syncedAt: new Date(), syncStatus: FbmSync.SYNC_STATUS.synced };
+  var record = { companyName: fbm.ten_kh || '', taxNumber: fbm.ma_so_thue || '', phone: fbm.dien_thoai || '', email: fbm.email || '', address: fbm.dc_lh || '', province: fbm.ten_dclh_tinh || fbm.dc_lh_tinh || '', website: fbm.website || '', contactPerson: fbm.ong_ba || '', leadSource: fbm.ten_nguon_dm || fbm.nguon_dm || '', verifyStatus: 'Chưa xác thực', fbmSyncPermission: FbmSync.pullDefaultPermission(), fbmCustomerCode: fbm.ma_kh || '', fbmId: fbm.stt_rec_kh || '', syncedAt: new Date(), syncStatus: FbmSync.SYNC_STATUS.synced };
   record.fbmHash = FbmSync.hash(fbm, 'customer', categoryGate);
   return record;
 };
 /** Đổi record Activity FBM sang schema nội bộ của Sheet. */
 FbmSync.activityRecord = function (fbm, categoryGate, parent) {
   var parentCode = fbm.ma_kh || (parent && (parent.ma_kh || parent.maKh)) || '';
-  var details = fbm.details || '', record = { customerId: parentCode, customerFbmCode: parentCode, workDate: fbm.end_date || '', taskType: fbm.ten_cv || fbm.ma_cv || '', content: FbmSync.stripActivityMarker(details), markerId: FbmSync.activityMarkerId(details), owner: fbm.owner || '', enteredBy: fbm.owner || '', allowFbmPush: FbmSync.PUSH_ALLOW_VALUE, fbmId: fbm.id || '', syncStatus: FbmSync.SYNC_STATUS.synced };
+  var details = fbm.details || '', record = { customerId: parentCode, customerFbmCode: parentCode, workDate: fbm.end_date || '', taskType: fbm.ten_cv || fbm.ma_cv || '', content: FbmSync.stripActivityMarker(details), markerId: FbmSync.activityMarkerId(details), owner: fbm.owner || '', enteredBy: fbm.owner || '', fbmSyncPermission: FbmSync.pullDefaultPermission(), fbmId: fbm.id || '', syncStatus: FbmSync.SYNC_STATUS.synced };
   record.fbmHash = FbmSync.hash(fbm, 'activity', categoryGate);
   return record;
 };
@@ -270,9 +270,10 @@ FbmSync.linkActivityCustomers = function (records, customers, categoryGate) {
       if (FbmSync.logPullRecord) { FbmSync.logPullRecord('activity', record, null, FbmSync.SYNC_STATUS.skipped, 'Không tìm thấy Customer cha trong ShinCRM.', { issue: true }); }
       return null;
     }
-    if (FbmSync.pushPermission && FbmSync.pushPermission(customer, 'customer').stop) {
+    var parentPermission = FbmSync.syncPermission(customer, 'customer');
+    if (!parentPermission.pull) {
       blocked += 1;
-      if (FbmSync.logPullRecord) { FbmSync.logPullRecord('activity', record, customer, FbmSync.SYNC_STATUS.skipped, 'Customer cha đã ngừng đồng bộ.'); }
+      if (FbmSync.logPullRecord) { FbmSync.logPullRecord('activity', record, customer, FbmSync.SYNC_STATUS.skipped, 'Customer cha ' + String(customer.id || '') + ' không cho phép lấy từ FBM: ' + parentPermission.reason, { issue: parentPermission.invalid }); }
       return null;
     }
     var linkedRecord = Object.assign({}, record, { customerId: String(customer.id || '').trim(), customerFbmCode: customerCode });
@@ -285,8 +286,8 @@ FbmSync.linkActivityCustomers = function (records, customers, categoryGate) {
 /** Giữ trường chỉ thuộc ShinCRM khi FBM trả lại bản ghi đã tồn tại. */
 FbmSync.preserveLocalFields = function (entity, current, incoming) {
   var fields = entity === 'customer'
-    ? ['note', 'allowFbmPush', 'verifyStatus', 'customerGroup', 'searchAliases', 'bidClosingDate']
-    : ['allowFbmPush', 'contractValue', 'priority', 'dueAt'];
+    ? ['note', 'fbmSyncPermission', 'verifyStatus', 'customerGroup', 'searchAliases', 'bidClosingDate']
+    : ['fbmSyncPermission', 'contractValue', 'priority', 'dueAt'];
   var merged = Object.assign({}, incoming);
   fields.forEach(function (field) {
     if (current && Object.prototype.hasOwnProperty.call(current, field)) { merged[field] = current[field]; }

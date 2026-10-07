@@ -28,6 +28,7 @@ function setupSheets() {
     }
     sheet.setFrozenRows(headerRows);
 
+    if (header.renamed.length) { report.push('🔁 ' + sheetName + ': đổi mã cột, giữ dữ liệu: ' + header.renamed.join(', ')); }
     if (header.appended.length) { report.push('➕ ' + sheetName + ': thêm cột còn thiếu vào cuối: ' + header.appended.join(', ')); }
     if (header.extra.length) { report.push('ℹ️ ' + sheetName + ': mã cột ngoài bảng khai của lõi, giữ nguyên: ' + header.extra.join(', ')); }
 

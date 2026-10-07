@@ -271,6 +271,10 @@ function writeGateBuild(plan, names, fields, source, invalid, selectAllowed) {
           && !selectAllowed[spec.source][String(ep.value).trim()]) {
         loi = '"' + (spec.label || ten) + '" không chấp nhận giá trị "' + ep.value + '".';
       }
+      // Trường có danh sách cố định trong schema (không lấy từ Category) thì so khớp đúng chữ: logic đồng bộ đọc đúng chuỗi này.
+      if (!loi && spec.type === 'SELECT' && spec.options && String(ep.value) !== '' && spec.options.indexOf(String(ep.value)) < 0) {
+        loi = '"' + (spec.label || ten) + '" chỉ nhận một trong các giá trị: ' + spec.options.join(', ') + '.';
+      }
       if (loi) { invalid.push(writeGateInvalid(plan, ten, spec, loi)); return; }
     }
 

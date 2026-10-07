@@ -91,7 +91,7 @@ FbmSync.pushCandidates = function (entity) {
     var customer = entity === 'activity' ? customers[String(record.customerId || '')] : null;
     if (!FbmSync.inTestScope(entity === 'customer' ? record : customer, settings)) { return false; }
     if (entity === 'activity' && !FbmSync.activityParentReady(customer)) { return false; }
-    if (!FbmSync.pushPermission(record, entity, customer).push) { return false; }
+    if (!FbmSync.syncPermission(record, entity, customer).push) { return false; }
     var status = String(record.syncStatus || ''), failureKey = entity + ':' + String(record.id || '');
     if (FbmSync.isUnconfirmedCreate(record)) { return true; }
     if (status === FbmSync.SYNC_STATUS.pushed || status === FbmSync.SYNC_STATUS.notApplied) { return false; }

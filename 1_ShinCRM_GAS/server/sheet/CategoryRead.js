@@ -11,9 +11,9 @@
 /**
  * Cột này có phải cột đi kèm phục vụ đồng bộ không.
  *
- * **Không** được nhận diện bằng hậu tố `_FBM` một mình, và đây là chỗ dễ sai nhất của cả tệp: `@CAT_CHO_PHEP_FBM` — danh mục "Cho phép đẩy FBM" với ba giá trị `Cho phép`, `Chưa cho phép`, `Ngừng đồng bộ` — cũng kết thúc bằng `_FBM`. Loại nó ra thì trường `allowFbmPush` mất sạch giá trị để chọn, mà đó lại là trường bắt buộc ở cả hai thực thể, nên form sẽ không lưu được bản ghi nào và nguyên nhân thì không hiện ra ở đâu.
+ * **Không** được nhận diện bằng hậu tố `_FBM` một mình: một danh mục thật cũng có thể có tên kết thúc bằng `_FBM` (từng có `@CAT_CHO_PHEP_FBM`). Loại nhầm nó ra thì trường dùng danh mục đó mất sạch giá trị để chọn mà nguyên nhân không hiện ra ở đâu.
  *
- * Phép nhận diện đúng là hỏi thêm một câu: bỏ hậu tố ra thì phần còn lại **có phải một danh mục đã khai** không. `@CAT_TINH_THANH_FBM` bỏ hậu tố còn `@CAT_TINH_THANH`, có khai, nên nó là cột đi kèm. `@CAT_CHO_PHEP_FBM` bỏ hậu tố còn `@CAT_CHO_PHEP`, không khai ở đâu, nên nó là một danh mục thật. Luật này chính là luật của tài liệu 02 Phần 9: danh mục nào tham gia đồng bộ được trả lời bằng chính sự tồn tại của cột đi kèm.
+ * Phép nhận diện đúng là hỏi thêm một câu: bỏ hậu tố ra thì phần còn lại **có phải một danh mục đã khai** không. `@CAT_TINH_THANH_FBM` bỏ hậu tố còn `@CAT_TINH_THANH`, có khai, nên nó là cột đi kèm. Một mã như `@CAT_VI_DU_FBM` bỏ hậu tố còn `@CAT_VI_DU`, không khai ở đâu, nên nó là một danh mục thật. Luật này chính là luật của tài liệu 02 Phần 9: danh mục nào tham gia đồng bộ được trả lời bằng chính sự tồn tại của cột đi kèm.
  */
 function categoryIsCompanion(code) {
   var suffix = CATEGORY_FBM_SUFFIX;
@@ -84,7 +84,6 @@ function probeCategoryRead() {
   var companions = CATEGORY_COLUMNS.map(function (pair) { return pair[0]; }).filter(categoryIsCompanion);
 
   report.push('Danh mục thật: ' + Object.keys(ket.categories).length + ' — cột đi kèm đã loại: ' + (companions.join(', ') || 'không có'));
-  report.push('@CAT_CHO_PHEP_FBM có bị nhận nhầm là cột đi kèm không? ' + categoryIsCompanion('@CAT_CHO_PHEP_FBM') + ' (phải là false)');
 
   Object.keys(ket.categories).forEach(function (code) {
     var values = ket.categories[code];

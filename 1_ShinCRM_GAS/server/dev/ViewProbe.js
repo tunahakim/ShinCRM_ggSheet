@@ -112,7 +112,7 @@ function viewProbeWriteRenderWithoutSidebar() {
     var activity = writeGateSave({
       entity: 'activity',
       source: 'background',
-      records: [{ customerId: customerId, workDate: '2026-09-16', taskType: 'DEV probe', content: 'DEV probe', product: 'DEV probe', allowFbmPush: 'DEV probe' }]
+      records: [{ customerId: customerId, workDate: '2026-09-16', taskType: 'DEV probe', content: 'DEV probe', product: 'DEV probe', fbmSyncPermission: 'Chỉ lấy từ FBM' }]
     });
     if (!activity.ok || !activity.recordIds || !activity.recordIds.length) {
       throw new Error('Ghi Activity probe không thành công: ' + JSON.stringify(activity));

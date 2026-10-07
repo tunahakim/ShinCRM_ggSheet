@@ -12,10 +12,10 @@ function fbmProbeAltState() {
   });
   var selectedActivities = FbmSync.readLocal('activity').filter(function (record) { return !!customerIds[String(record.customerId || '')]; });
   var summarizeCustomer = function (record) {
-    return { id: record.id || '', fbmId: record.fbmId || '', fbmCustomerCode: record.fbmCustomerCode || '', companyName: record.companyName || '', syncStatus: record.syncStatus || '', allowFbmPush: record.allowFbmPush || '', hasInternalNote: !!String(record.note || '').trim() };
+    return { id: record.id || '', fbmId: record.fbmId || '', fbmCustomerCode: record.fbmCustomerCode || '', companyName: record.companyName || '', syncStatus: record.syncStatus || '', fbmSyncPermission: record.fbmSyncPermission || '', hasInternalNote: !!String(record.note || '').trim() };
   };
   var summarizeActivity = function (record) {
-    return { id: record.id || '', fbmId: record.fbmId || '', customerId: record.customerId || '', taskType: record.taskType || '', workDate: record.workDate || '', syncStatus: record.syncStatus || '', allowFbmPush: record.allowFbmPush || '' };
+    return { id: record.id || '', fbmId: record.fbmId || '', customerId: record.customerId || '', taskType: record.taskType || '', workDate: record.workDate || '', syncStatus: record.syncStatus || '', fbmSyncPermission: record.fbmSyncPermission || '' };
   };
   var candidates = [];
   ['customer', 'activity'].forEach(function (entity) {

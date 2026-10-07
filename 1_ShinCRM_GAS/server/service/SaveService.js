@@ -70,7 +70,7 @@ function probeSaveGate() {
     phone: '0912345678',
     leadSource: 'Tự tìm',
     verifyStatus: 'Chưa xác thực',
-    allowFbmPush: 'Chưa cho phép'
+    fbmSyncPermission: 'Chỉ lấy từ FBM'
   });
   report.push('Thêm: ok=' + them.ok + ', ' + them.ms + 'ms' + (them.ok ? '' : ', không đạt: ' + JSON.stringify(them.invalid)));
   if (!them.ok) { report.forEach(function (line) { Logger.log(line); }); return report; }
@@ -85,7 +85,7 @@ function probeSaveGate() {
   report.push('Sửa một trường: ok=' + sua.ok + ', ' + sua.ms + 'ms, điện thoại đọc lại: "' + sua.rows[0][sua.fields.indexOf('phone')] + '"');
   report.push('  tên công ty vẫn nguyên sau khi chỉ gửi một trường? ' + (sua.rows[0][sua.fields.indexOf('companyName')] === 'THỬ CỬA GHI — xóa được'));
 
-  var trung = saveRecord('customer', { id: '', companyName: 'THỬ TRÙNG MST', taxNumber: '0101243150', leadSource: 'Tự tìm', verifyStatus: 'Chưa xác thực', allowFbmPush: 'Chưa cho phép' });
+  var trung = saveRecord('customer', { id: '', companyName: 'THỬ TRÙNG MST', taxNumber: '0101243150', leadSource: 'Tự tìm', verifyStatus: 'Chưa xác thực', fbmSyncPermission: 'Chỉ lấy từ FBM' });
   report.push('Thêm bản ghi trùng mã số thuế: ok=' + trung.ok + ' (phải là false), lý do: ' + (trung.ok ? '(không có)' : trung.invalid[0].reason));
 
   var xoa = deleteRecords('customer', [ma]);

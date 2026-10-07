@@ -13,6 +13,23 @@
  * nên đưa một cột đồng bộ vào đây là mỗi lần bấm Lưu lại xóa trắng một cột mà lõi không có giá trị để điền.
  */
 
+/**
+ * Năm giá trị cố định của ô "Cho phép đồng bộ FBM" và nghĩa của từng giá trị ở hai chiều (chủ dự án chốt 2026-10-07). Đây là chỗ khai duy nhất: danh sách chọn của form và luật đồng bộ của `fbm_sync` cùng đọc bảng này.
+ *
+ * Máy so khớp đúng từng chữ. Ô trống hoặc giá trị ngoài bảng thì không đẩy lên nhưng vẫn kéo về, và bị cảnh báo kèm mã bản ghi: đẩy lên FBM là ghi vào CRM chung không rút lại được, còn kéo về chỉ ghi vào sheet riêng. Ba giá trị cuối cùng nghĩa, chỉ khác nhãn để người dùng tự nhắc mình.
+ */
+var FBM_SYNC_PERMISSION_OPTIONS = [
+  { value: 'Cho phép', push: true, pull: true, pullDefault: true },
+  { value: 'Chỉ lấy từ FBM', push: false, pull: true },
+  { value: 'Chờ đồng bộ', push: false, pull: false },
+  { value: 'Không đồng bộ', push: false, pull: false },
+  { value: 'Cấm đồng bộ', push: false, pull: false }
+];
+
+function fbmSyncPermissionValues() {
+  return FBM_SYNC_PERMISSION_OPTIONS.map(function (option) { return option.value; });
+}
+
 var DATA_SCHEMA = {
 
   customer: {
@@ -34,7 +51,7 @@ var DATA_SCHEMA = {
     note: { code: '@CUS_GHI_CHU', type: 'TEXT', label: 'Ghi chú' },
     searchAliases: { code: '@CUS_TIM_KIEM', type: 'TEXT', label: 'Từ khóa tìm kiếm', searchable: true },
     createdAt: { code: '@CUS_NGAY_NHAP_LIEU', type: 'DATE', label: 'Ngày nhập liệu', precision: 'day', readonly: true, default: 'today' },
-    allowFbmPush: { code: '@CUS_CHO_PHEP_FBM', type: 'SELECT', label: 'Cho phép đẩy FBM', source: '@CAT_CHO_PHEP_FBM', required: true },
+    fbmSyncPermission: { code: '@CUS_CHO_PHEP_DONG_BO_FBM', type: 'SELECT', label: 'Cho phép đồng bộ FBM', options: fbmSyncPermissionValues(), required: true },
     recordStatus: { code: '@CUS_TT_BAN_GHI', type: 'SELECT', label: 'Tình trạng bản ghi', readonly: true, options: ['active', 'deleted'] }
   },
 
@@ -50,7 +67,7 @@ var DATA_SCHEMA = {
     priority: { code: '@ACT_UU_TIEN', type: 'SELECT', label: 'Ưu tiên', source: '@CAT_UU_TIEN', default: 'carryForwardPriority' },
     dueAt: { code: '@ACT_HAN_XU_LY', type: 'DATE', label: 'Hạn xử lý', precision: 'minute', default: 'carryForwardDueAt' },
     createdAt: { code: '@ACT_NGAY_NHAP_LIEU', type: 'DATE', label: 'Ngày nhập liệu', precision: 'minute', readonly: true, default: 'now' },
-    allowFbmPush: { code: '@ACT_CHO_PHEP_FBM', type: 'SELECT', label: 'Cho phép đẩy FBM', source: '@CAT_CHO_PHEP_FBM', required: true },
+    fbmSyncPermission: { code: '@ACT_CHO_PHEP_DONG_BO_FBM', type: 'SELECT', label: 'Cho phép đồng bộ FBM', options: fbmSyncPermissionValues(), required: true },
     recordStatus: { code: '@ACT_TT_BAN_GHI', type: 'SELECT', label: 'Tình trạng bản ghi', readonly: true, options: ['active', 'deleted'] }
   }
 

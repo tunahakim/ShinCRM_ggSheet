@@ -137,13 +137,23 @@ FbmSync.validateLookupGate = function (state, categoryGate) {
   return blocked;
 };
 
-/** Cho biết bản ghi có được phép đẩy lên FBM hay không. */
-FbmSync.pushPermission = function (record, entity, customer) {
-  var allow = String(FbmSync.value(record, 'allowFbmPush', '')).trim();
-  var stop = String(FbmSync.PUSH_STOP_VALUE).trim();
-  if (allow.toLowerCase() === stop.toLowerCase()) { return { push: false, stop: true, reason: 'Bản ghi đã chọn ngừng đồng bộ.' }; }
-  if (entity === 'activity' && customer && !FbmSync.pushPermission(customer, 'customer').push) { return { push: false, reason: 'Khách hàng cha chưa cho phép đẩy.' }; }
-  return { push: allow.toLowerCase() === String(FbmSync.PUSH_ALLOW_VALUE).toLowerCase(), reason: 'Chưa bật Cho phép đẩy FBM.' };
+/**
+ * Bản ghi được đẩy lên và được kéo về hay không, theo ô "Cho phép đồng bộ FBM". So khớp đúng chữ với bảng `FBM_SYNC_PERMISSION_OPTIONS`; ô trống hoặc sai giá trị thì `invalid`: không đẩy nhưng vẫn kéo về (kéo về chỉ ghi vào sheet riêng, sai thì sửa được; đẩy lên ghi vào CRM chung không rút lại được), bên gọi phải cảnh báo kèm mã bản ghi.
+ * Activity còn bị chặn theo Customer cha: cha không được đẩy thì con không được đẩy, cha không được kéo thì con không được kéo.
+ */
+FbmSync.syncPermission = function (record, entity, customer) {
+  var value = String(FbmSync.value(record, 'fbmSyncPermission', '')), option = null;
+  FBM_SYNC_PERMISSION_OPTIONS.some(function (item) { if (item.value === value) { option = item; } return !!option; });
+  if (!option) {
+    return { push: false, pull: true, invalid: true, value: value, reason: value.trim() ? 'Ô "Cho phép đồng bộ FBM" có giá trị không hợp lệ "' + value + '".' : 'Ô "Cho phép đồng bộ FBM" đang trống.' };
+  }
+  var result = { push: option.push, pull: option.pull, invalid: false, value: value, reason: option.push ? '' : 'Bản ghi đang chọn "' + value + '".' };
+  if (entity === 'activity' && customer) {
+    var parent = FbmSync.syncPermission(customer, 'customer');
+    if (result.push && !parent.push) { result.push = false; result.reason = 'Khách hàng cha không cho phép đẩy lên FBM.'; }
+    if (result.pull && !parent.pull) { result.pull = false; result.reason = 'Khách hàng cha không cho phép lấy từ FBM.'; }
+  }
+  return result;
 };
 
 /** Activity chỉ được đẩy khi Customer cha đã liên kết đủ hai mã FBM. */

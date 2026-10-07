@@ -26,11 +26,18 @@ var CATEGORY_COLUMNS = [
   ['@CAT_NGUON_KH', 'Nguồn khách'],
   ['@CAT_NGUON_KH_FBM', 'Nguồn khách — mã FBM'],
   ['@CAT_XAC_THUC', 'Xác thực'],
-  ['@CAT_CHO_PHEP_FBM', 'Cho phép đẩy FBM'],
   ['@CAT_CONG_VIEC', 'Công việc'],
   ['@CAT_CONG_VIEC_FBM', 'Công việc — mã FBM'],
   ['@CAT_UU_TIEN', 'Ưu tiên']
 ];
+
+/**
+ * Mã cột đã đổi tên (mã cũ → mã mới). Chạy lại `setupSheets` thì mã cũ được đổi thành mã mới ngay tại cột đó, dữ liệu bên dưới giữ nguyên; thiếu bước này thì mã mới bị coi là cột thiếu và thêm một cột trống ở cuối. Xóa cặp khi mọi Sheet đã chạy lại.
+ */
+var SHEET_RENAMED_CODES = {
+  '@CUS_CHO_PHEP_FBM': '@CUS_CHO_PHEP_DONG_BO_FBM',
+  '@ACT_CHO_PHEP_FBM': '@ACT_CHO_PHEP_DONG_BO_FBM'
+};
 
 /** Hậu tố của cột đi kèm cho danh mục đồng bộ. Tài liệu 02 Phần 9. */
 var CATEGORY_FBM_SUFFIX = '_FBM';

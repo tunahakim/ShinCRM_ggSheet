@@ -7,7 +7,7 @@
  *
  * Cạm bẫy đã gặp thật (FBM-056): ghi lại hàng mã theo thứ tự bảng khai trên một sheet xếp cột khác làm dữ liệu cũ mang nhãn của cột khác — điện thoại thành email, địa chỉ thành tỉnh thành — mà không có lỗi nào nổ. Vì vậy sheet đã có mã thì chỉ đối chiếu theo mã: mã có rồi giữ nguyên cột và chỉ ghi lại nhãn tại chính cột đó, mã thiếu thì thêm vào sau cột cuối, mã lạ để yên. Sheet trắng thì dựng theo thứ tự bảng khai.
  *
- * Trả về `{ appended, extra }` để bên gọi báo cho người dùng. Mã trùng trên sheet thì ném lỗi trước khi ghi gì, cùng luật với `readColumnMap`.
+ * Trả về `{ appended, renamed, extra }` để bên gọi báo cho người dùng. Mã trùng trên sheet thì ném lỗi trước khi ghi gì, cùng luật với `readColumnMap`.
  */
 function sheetEnsureHeader(sheet, columns, headerRows) {
   var width = sheet.getLastColumn();
@@ -26,6 +26,20 @@ function sheetEnsureHeader(sheet, columns, headerRows) {
   if (duplicates.length) {
     throw new Error('Sheet "' + sheet.getName() + '" có mã cột trùng nhau: ' + duplicates.join(', ') + '. Sửa hàng 1 rồi chạy lại.');
   }
+
+  // Đổi mã đã đổi tên ngay tại cột cũ trước khi đối chiếu, để dữ liệu không bị bỏ lại dưới một mã không còn ai đọc.
+  var renamed = [];
+  Object.keys(SHEET_RENAMED_CODES).forEach(function (oldCode) {
+    var newCode = SHEET_RENAMED_CODES[oldCode];
+    if (!at[oldCode]) { return; }
+    if (at[newCode]) {
+      throw new Error('Sheet "' + sheet.getName() + '" có cả mã cũ ' + oldCode + ' (cột ' + at[oldCode] + ') và mã mới ' + newCode + ' (cột ' + at[newCode] + '). Chuyển dữ liệu về một cột, xóa cột còn lại rồi chạy lại.');
+    }
+    current[0][at[oldCode] - 1] = newCode;
+    at[newCode] = at[oldCode];
+    delete at[oldCode];
+    renamed.push(oldCode + ' → ' + newCode);
+  });
 
   var known = {};
   var appended = [];
@@ -52,6 +66,7 @@ function sheetEnsureHeader(sheet, columns, headerRows) {
 
   return {
     appended: appended,
+    renamed: renamed,
     extra: Object.keys(at).filter(function (code) { return !known[code]; }),
     width: total
   };

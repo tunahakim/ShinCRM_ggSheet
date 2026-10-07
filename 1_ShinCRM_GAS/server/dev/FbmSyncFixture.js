@@ -83,8 +83,8 @@ function fbmProbeCreateCustomer() {
   var gate = FbmSync.stateCategoryGate(FbmSync.stateRead());
   return {
     ok: true, id: record.id, companyName: record.companyName || '', fbmId: record.fbmId || '', fbmCustomerCode: record.fbmCustomerCode || '',
-    syncStatus: record.syncStatus || '', recordStatus: record.recordStatus || '', allowFbmPush: record.allowFbmPush || '',
-    permission: FbmSync.pushPermission(record, 'customer'), eligibilityErrors: FbmSync.pushEligibilityErrors(record, 'customer'),
+    syncStatus: record.syncStatus || '', recordStatus: record.recordStatus || '', fbmSyncPermission: record.fbmSyncPermission || '',
+    permission: FbmSync.syncPermission(record, 'customer'), eligibilityErrors: FbmSync.pushEligibilityErrors(record, 'customer'),
     categoryErrors: FbmSync.validatePushCategories(record, 'customer', gate), canonical: FbmSync.canonical('customer', record, gate),
     scope: FbmSync.scriptSettings().testCustomerCode, candidates: FbmSync.pushCandidates('customer').map(function (item) { return item.kind + ':' + item.id; })
   };

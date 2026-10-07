@@ -98,10 +98,11 @@ FbmSync.pullWrite = function (entity, records) {
     var currentLock = current && state.locks && state.locks[entity + ':' + String(current.id || '')];
     if (currentLock && currentLock.owner === 'user') { skipped += 1; FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.skipped, 'Hoãn vì người dùng đang sửa bản ghi.'); return; }
     var mergedIncoming = current ? FbmSync.preserveLocalFields(entity, current, incoming) : incoming;
-    if (current && FbmSync.pushPermission && FbmSync.pushPermission(current, entity).stop) {
+    var currentPermission = current ? FbmSync.syncPermission(current, entity) : null;
+    if (currentPermission && !currentPermission.pull) {
       skipped += 1;
       statusWrites.push({ id: current.id, syncStatus: FbmSync.SYNC_STATUS.skipped });
-      FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.skipped, 'Customer hoặc Activity đã ngừng đồng bộ.');
+      FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.skipped, 'Không lấy từ FBM: ' + currentPermission.reason, { issue: currentPermission.invalid });
       return;
     }
     var categoryErrors = typeof FbmSync.validateIncomingCategories === 'function' ? FbmSync.validateIncomingCategories(incoming, entity, categoryGate) : [];

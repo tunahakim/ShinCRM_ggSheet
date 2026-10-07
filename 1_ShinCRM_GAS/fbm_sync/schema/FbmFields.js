@@ -93,8 +93,10 @@ FbmSync.SYNC_LOOKUPS = [
   { key: '@CAT_CONG_VIEC', controller: 'crJob' }
 ];
 
-FbmSync.PUSH_ALLOW_VALUE = 'Cho phép';
-FbmSync.PUSH_STOP_VALUE = 'Ngừng đồng bộ';
+/** Giá trị "Cho phép đồng bộ FBM" gán cho bản ghi mới kéo từ FBM về; bảng giá trị khai ở `FBM_SYNC_PERMISSION_OPTIONS` (DataSchema). */
+FbmSync.pullDefaultPermission = function () {
+  return FBM_SYNC_PERMISSION_OPTIONS.filter(function (option) { return option.pullDefault === true; })[0].value;
+};
 FbmSync.ACTIVITY_MARKER_RE = /\s+#SC-([A-Za-z0-9_-]+)\s*$/;
 
 /** Đọc field an toàn, phân biệt null/undefined với giá trị 0 hoặc false. */
