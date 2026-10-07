@@ -31,6 +31,7 @@ const NHOM_CA = [
   require('./cases/entityRead'),
   require('./cases/categoryRead'),
   require('./cases/configRead'),
+  require('./cases/idGate'),
   require('./cases/dirtyState'),
   require('./cases/reloadDecision'),
   require('./cases/reloadGates'),

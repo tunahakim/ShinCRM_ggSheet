@@ -16,7 +16,6 @@ const GAS_DIR = path.join(__dirname, '..', '..', '1_ShinCRM_GAS');
 const RUNTIME_WRITERS = {
   'server/config/ConfigSheetSetup.js': 'config/setup',
   'server/gate/DeleteGate.js': 'record/delete',
-  'server/gate/IdGate.js': 'record/id-helper',
   'server/gate/WriteGate.js': 'record/write',
   'server/log/LogGate.js': 'infrastructure/log',
   'server/sheet/SheetGrid.js': 'helper/grid',
