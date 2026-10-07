@@ -27,6 +27,7 @@ const NHOM_CA = [
   require('./cases/cellBudget'),
   require('./cases/setupSheets'),
   require('./cases/columnFormat'),
+  require('./cases/creatorField'),
   require('./cases/entityRead'),
   require('./cases/categoryRead'),
   require('./cases/configRead'),

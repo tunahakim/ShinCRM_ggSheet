@@ -30,8 +30,7 @@ const DANH_MUC = {
   '@CAT_XAC_THUC': ['Đã xác thực', 'Chưa xác thực', 'Nghi ngờ trùng'],
   '@CAT_CHO_PHEP_FBM': ['Có', 'Không'],
   '@CAT_CONG_VIEC': ['Gọi điện', 'Gửi báo giá', 'Gặp mặt tại công trình', 'Chốt hợp đồng', 'Chăm sóc lại'],
-  '@CAT_UU_TIEN': ['Cao', 'Trung bình', 'Thấp'],
-  '@CAT_NGUOI_NHAP_LIEU': ['Tuấn', 'Hà', 'Minh']
+  '@CAT_UU_TIEN': ['Cao', 'Trung bình', 'Thấp']
 };
 
 /** Ghi chú dài hơn ba dòng ở bề rộng 300 pixel — khách này PHẢI có nút "Xem thêm" trên card ghi chú. */
@@ -113,7 +112,7 @@ function dungNen() {
         taskType: DANH_MUC['@CAT_CONG_VIEC'][so % 5],
         content: NOI_DUNG[so % NOI_DUNG.length],
         product: DANH_MUC['@CAT_SAN_PHAM'][so % 4],
-        enteredBy: DANH_MUC['@CAT_NGUOI_NHAP_LIEU'][so % 3],
+        enteredBy: 'Lê Tuấn Anh',
         contractValue: so % 3 === 0 ? so * 12500000 : '',
         priority: DANH_MUC['@CAT_UU_TIEN'][so % 3],
         dueAt: new Date(2026, 8, 1 + so % 20, 9, 30),

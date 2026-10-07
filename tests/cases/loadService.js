@@ -62,7 +62,7 @@ function chay(so) {
   check(so, 'không khách nào mà vẫn gửi đủ bảng tên trường', [rong.customer.rows.length, rong.customer.fields.length], [0, 20]);
   check(so, 'khối activity chỉ báo số hàng và cỡ gói, không mang bản ghi nào', Object.keys(rong.activity).sort(), ['chunkRows', 'total']);
   check(so, 'cỡ gói lấy đúng từ SETTINGS chứ không gõ cứng ở đây', rong.activity.chunkRows, hop.SETTINGS.CHUNK_ROWS);
-  check(so, 'chín danh mục thật đều có khóa dù chưa ai gõ giá trị', Object.keys(rong.categories).length, 9);
+  check(so, 'tám danh mục thật đều có khóa dù chưa ai gõ giá trị', Object.keys(rong.categories).length, 8);
   check(so, 'khối trạng thái bẩn có mặt trong MỌI phản hồi, kể cả phản hồi rỗng', Object.keys(rong.dirty).sort(), ['all', 'config', 'records', 'viewSheets']);
   check(so, 'gói lõi mang cả bảng khai để client dựng Schema', Object.keys(rong.schema).sort(), ['activity', 'customer']);
   check(so, 'gói lõi mang read plan tọa độ do GAS tính',

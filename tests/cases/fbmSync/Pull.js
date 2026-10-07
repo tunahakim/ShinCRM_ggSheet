@@ -82,7 +82,7 @@ async function chay(so) {
   const markedIncoming = builders.FbmSync.activityRecord({ id: 'FBM-9', ma_kh: 'ALT99999', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi', details: 'Nội dung #SC-ACT-9', owner: 'Chủ tài khoản' }, gate);
   let markedWrite = null;
   builders.FbmSync.scriptSettings = () => ({ accountName: 'Chủ tài khoản' });
-  builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmCustomerCode: 'ALT99999' }] : [{ id: 'ACT-9', fbmId: 'FBM-9', customerId: 'KH-1', content: 'Nội dung', taskType: 'Gọi', workDate: '/Date(1757386800000)/', fbmHash: markedIncoming.fbmHash, syncStatus: builders.FbmSync.SYNC_STATUS.synced }];
+  builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmCustomerCode: 'ALT99999' }] : [{ id: 'ACT-9', fbmId: 'FBM-9', customerId: 'KH-1', content: 'Nội dung', taskType: 'Gọi', workDate: '/Date(1757386800000)/', enteredBy: 'Chủ tài khoản', fbmHash: markedIncoming.fbmHash, syncStatus: builders.FbmSync.SYNC_STATUS.synced }];
   builders.writeGateSave = (request) => { markedWrite = request; return { ok: true }; };
   builders.FbmSync.pullWrite('activity', [Object.assign({}, markedIncoming)]);
   const ownMarked = markedWrite && markedWrite.records[0].syncStatus;
@@ -90,6 +90,13 @@ async function chay(so) {
   builders.FbmSync.scriptSettings = () => ({ accountName: 'Đồng nghiệp' });
   builders.FbmSync.pullWrite('activity', [Object.assign({}, markedIncoming)]);
   check(so, 'G12: lượt kéo xếp "chờ đối soát" cho giao dịch của mình còn dấu #SC trên FBM, không đụng giao dịch tài khoản khác', [ownMarked, markedWrite && markedWrite.records[0].syncStatus], [builders.FbmSync.SYNC_STATUS.pending, null]);
+  // Người tạo trên FBM đứng ngoài fingerprint: nội dung không đổi thì hash không lộ, lượt kéo vẫn phải ghi tên người tạo xuống ShinCRM.
+  const ownerIncoming = builders.FbmSync.activityRecord({ id: 'FBM-10', ma_kh: 'ALT99999', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi', details: 'Nội dung', owner: 'Sale Cũ' }, gate);
+  let ownerWrite = null;
+  builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmCustomerCode: 'ALT99999' }] : [{ id: 'ACT-10', fbmId: 'FBM-10', customerId: 'KH-1', content: 'Nội dung', taskType: 'Gọi', workDate: '/Date(1757386800000)/', enteredBy: '', fbmHash: ownerIncoming.fbmHash, syncStatus: builders.FbmSync.SYNC_STATUS.synced }];
+  builders.writeGateSave = (request) => { ownerWrite = request; return { ok: true }; };
+  builders.FbmSync.pullWrite('activity', [Object.assign({}, ownerIncoming)]);
+  check(so, 'Người tạo trên FBM: lượt kéo ghi owner FBM vào enteredBy khi nội dung không đổi, không đổi trạng thái đồng bộ', [ownerIncoming.enteredBy, ownerWrite && ownerWrite.records.length, ownerWrite && ownerWrite.records[0].id, ownerWrite && ownerWrite.records[0].enteredBy, ownerWrite && ownerWrite.records[0].syncStatus], ['Sale Cũ', 1, 'ACT-10', 'Sale Cũ', undefined]);
   builders.FbmSync.scriptSettings = settingsBeforeMarker;
   delete gate.map['@CAT_CONG_VIECGọi']; delete gate.valid['@CAT_CONG_VIEC'];
   const edit = builders.FbmSync.customerEditRequest({ fbmId: 'A1', companyName: 'Đổi tên' }, { stt_rec_kh: 'A1', ma_kh: 'ALT00010', ten_kh: 'Cũ', dien_thoai: '0123' }, gate);

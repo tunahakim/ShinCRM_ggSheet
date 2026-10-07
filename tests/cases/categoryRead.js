@@ -35,16 +35,16 @@ function chay(so) {
   check(so, 'companion không khai trong CATEGORY_COLUMNS phải bị bỏ qua', hop.categoryIsCompanion('@CAT_NHOM_KH_FBM'), false);
 
   const ma = hop.categoryCodes();
-  check(so, '12 cột khai trừ 3 cột đi kèm còn 9 danh mục thật',
-    [hop.CATEGORY_COLUMNS.length, ma.length], [12, 9]);
+  check(so, '11 cột khai trừ 3 cột đi kèm còn 8 danh mục thật',
+    [hop.CATEGORY_COLUMNS.length, ma.length], [11, 8]);
   check(so, '@CAT_CHO_PHEP_FBM có mặt trong danh sách danh mục thật', ma.indexOf('@CAT_CHO_PHEP_FBM') >= 0, true);
   check(so, 'không một mã đi kèm nào lọt vào danh sách danh mục thật', ma.filter(hop.categoryIsCompanion), []);
 
   // Ca rỗng: sheet mới dựng, chưa ai gõ giá trị nào. Vẫn phải đủ khóa, vì client hỏi thẳng `categories[source]`.
   const rong = hop.categoryReadAll();
-  check(so, 'sheet trắng vẫn trả về đủ 9 khóa, mỗi khóa một mảng rỗng',
+  check(so, 'sheet trắng vẫn trả về đủ 8 khóa, mỗi khóa một mảng rỗng',
     [Object.keys(rong.categories).length, Object.keys(rong.categories).every((code) => JSON.stringify(rong.categories[code]) === '[]')],
-    [9, true]);
+    [8, true]);
   check(so, 'sheet trắng không sinh cảnh báo nào', rong.warnings, []);
   check(so, 'không một cột đi kèm nào thành khóa trong kết quả',
     Object.keys(rong.categories).filter(hop.categoryIsCompanion), []);
