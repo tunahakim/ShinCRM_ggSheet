@@ -85,12 +85,25 @@ function fbmProbeCreateCustomer() {
     ok: true, id: record.id, companyName: record.companyName || '', fbmId: record.fbmId || '', fbmCustomerCode: record.fbmCustomerCode || '',
     syncStatus: record.syncStatus || '', recordStatus: record.recordStatus || '', allowFbmPush: record.allowFbmPush || '',
     permission: FbmSync.pushPermission(record, 'customer'), eligibilityErrors: FbmSync.pushEligibilityErrors(record, 'customer'),
-    categoryErrors: FbmSync.validatePushCategories(record, 'customer', gate),
+    categoryErrors: FbmSync.validatePushCategories(record, 'customer', gate), canonical: FbmSync.canonical('customer', record, gate),
     scope: FbmSync.scriptSettings().testCustomerCode, candidates: FbmSync.pushCandidates('customer').map(function (item) { return item.kind + ':' + item.id; })
   };
 }
 /** Mở phạm vi ghi thử cho đúng khách được phép tạo thật; phạm vi theo mã FBM `ALT00010` giữ nguyên. */
 function fbmAllowTestCreateCustomer() {
   PropertiesService.getDocumentProperties().setProperty('FBM_SYNC_TEST_CUSTOMER_IDS', FBM_TEST_CREATE_CUSTOMER_ID);
+  return fbmProbeCreateCustomer();
+}
+/** Đưa CUS-020061 về `chờ đối soát` để lượt hai chiều đẩy lại và Log ghi tên trường FBM không nhận. */
+function fbmRequeueCreateCustomerPush() {
+  FbmSync.sheetSave('customer', [{ id: FBM_TEST_CREATE_CUSTOMER_ID, syncStatus: FbmSync.SYNC_STATUS.pending }], 'pull');
+  return fbmProbeCreateCustomer();
+}
+/** Trả CUS-020061 về hàng đợi xung đột sau khi FBM-052 chuyển nhầm sang `không thấy bên FBM`; bản FBM vẫn còn, cần đọc lại để xem trường lệch. */
+function fbmRequeueCreateCustomerConflict() {
+  FbmSync.sheetSave('customer', [{ id: FBM_TEST_CREATE_CUSTOMER_ID, syncStatus: FbmSync.SYNC_STATUS.conflict }], 'pull');
+  var state = FbmSync.stateRead();
+  state.phase = 'conflict'; state.metadata.conflictCount = FbmSync.conflictQueue().length; state.message = 'Có xung đột chờ quyết.';
+  FbmSync.stateWrite(state);
   return fbmProbeCreateCustomer();
 }
