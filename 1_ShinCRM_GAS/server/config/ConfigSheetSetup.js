@@ -81,14 +81,9 @@ function configMigrateLegacyCounters(sheet) {
 }
 
 function configWriteFrame(sheet) {
-  var rows = [
-    CONFIG_COLUMNS.map(function (column) { return column[0]; }),
-    CONFIG_COLUMNS.map(function (column) { return column[1]; }),
-    CONFIG_COLUMNS.map(function () { return ''; })
-  ];
-  sheet.getRange(1, 1, SHEET_HEADER_ROWS, CONFIG_COLUMNS.length).setValues(rows);
-  sheet.getRange(1, 1, 1, CONFIG_COLUMNS.length).setFontWeight('bold').setBackground(SHEET_LAYOUT.Config.headerColor);
-  sheet.getRange(2, 1, 1, CONFIG_COLUMNS.length).setFontWeight('bold');
+  var header = sheetEnsureHeader(sheet, CONFIG_COLUMNS, SHEET_HEADER_ROWS);
+  sheet.getRange(1, 1, 1, header.width).setFontWeight('bold').setBackground(SHEET_LAYOUT.Config.headerColor);
+  sheet.getRange(2, 1, 1, header.width).setFontWeight('bold');
   sheet.setFrozenRows(SHEET_HEADER_ROWS);
 }
 

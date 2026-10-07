@@ -7,7 +7,7 @@
  */
 
 /**
- * Dựng toàn bộ khung sheet. Chạy lại được nhiều lần: sheet đã có thì chỉ ghi lại hàng tiêu đề, không đụng dữ liệu bên dưới.
+ * Dựng toàn bộ khung sheet. Chạy lại được nhiều lần: sheet đã có thì chỉ đối chiếu hàng tiêu đề theo mã (thêm mã thiếu vào cuối, không đổi chỗ cột nào), không đụng dữ liệu bên dưới.
  */
 function setupSheets() {
   var file = shinOpenBook();
@@ -19,22 +19,17 @@ function setupSheets() {
     var sheet = file.getSheetByName(sheetName) || file.insertSheet(sheetName);
     var headerRows = layout.headerRows;
 
-    var rows = [columns.map(function (column) { return column[0]; })];
-    if (headerRows >= 2) {
-      rows.push(columns.map(function (column) { return column[1]; }));
-    }
-    while (rows.length < headerRows) {
-      rows.push(columns.map(function () { return ''; }));
-    }
+    // Đối chiếu theo mã, không ghi lại theo vị trí: sheet đã có dữ liệu có thể xếp cột khác bảng khai (FBM-056).
+    var header = sheetEnsureHeader(sheet, columns, headerRows);
 
-    // Ghi cả các hàng tiêu đề bằng đúng một lệnh, theo luật gộp lệnh ghi của tài liệu 06.
-    sheet.getRange(1, 1, headerRows, columns.length).setValues(rows);
-
-    sheet.getRange(1, 1, 1, columns.length).setFontWeight('bold').setBackground(layout.headerColor);
+    sheet.getRange(1, 1, 1, header.width).setFontWeight('bold').setBackground(layout.headerColor);
     if (headerRows >= 2) {
-      sheet.getRange(2, 1, 1, columns.length).setFontWeight('bold');
+      sheet.getRange(2, 1, 1, header.width).setFontWeight('bold');
     }
     sheet.setFrozenRows(headerRows);
+
+    if (header.appended.length) { report.push('➕ ' + sheetName + ': thêm cột còn thiếu vào cuối: ' + header.appended.join(', ')); }
+    if (header.extra.length) { report.push('ℹ️ ' + sheetName + ': mã cột ngoài bảng khai của lõi, giữ nguyên: ' + header.extra.join(', ')); }
 
     report.push('✅ ' + sheetName + ': ' + columns.length + ' cột lõi, ' + headerRows + ' hàng tiêu đề, dữ liệu từ hàng ' + layout.firstDataRow);
   });
