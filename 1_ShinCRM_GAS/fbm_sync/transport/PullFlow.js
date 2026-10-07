@@ -198,16 +198,15 @@ FbmSync.customerNext = function (state, rows, total) {
 /** Khởi tạo cursor Activity cho danh sách Customer vừa đọc. */
 FbmSync.activityForCustomers = function (state, customerContexts, customerNext, customerSeen, afterActivity) {
   var contexts = (customerContexts || []).map(function (item) { return typeof item === 'string' ? { sttRec: item, maKh: '' } : { sttRec: String(item.sttRec || item.stt_rec_kh || ''), maKh: String(item.maKh || item.ma_kh || '') }; }).filter(function (item) { return item.sttRec; });
-  var customerIds = contexts.map(function (item) { return item.sttRec; });
   state.phase = 'pull_activity'; state.entity = 'activity';
   if (typeof FbmSync.businessStepStart === 'function') {
     FbmSync.businessStepStart(state, 'pull_activity', { mode: state.mode, scan: state.scan, entity: 'activity' });
     FbmSync.businessStepStart(state, 'reconcile_activity', { mode: state.mode, scan: state.scan, entity: 'activity' });
   }
-  state.cursor = { kind: 'activity_grid', customerIds: customerIds, customerContexts: contexts, customerIndex: 0, pageIndex: -1, pageValue: null, count: 100, customerNext: customerNext || null, customerSeen: Number(customerSeen || 0), afterActivity: afterActivity || null };
+  state.cursor = { kind: 'activity_grid', customerContexts: contexts, customerIndex: 0, pageIndex: -1, pageValue: null, count: 100, customerNext: customerNext || null, customerSeen: Number(customerSeen || 0), afterActivity: afterActivity || null };
   state.message = 'Đang đọc giao dịch của khách hàng...';
   FbmSync.stateWrite(state);
-  return customerIds.length ? FbmSync.activityGridRequest(customerIds[0], { type: 0, count: 100, gridPageIndex: -1, gridRefresh: false }) : null;
+  return contexts.length ? FbmSync.activityGridRequest(contexts[0].sttRec, { type: 0, count: 100, gridPageIndex: -1, gridRefresh: false }) : null;
 };
 
 /** Chuyển tiếp sau một batch Activity bổ sung mà không làm mất cursor GAS. */
@@ -222,7 +221,7 @@ FbmSync.activitySupplementNext = function (state, afterActivity) {
       return rotation;
     }
   }
-  if (after.kind === 'done') { FbmSync.activityRotationSave(after.rows || []); }
+  if (after.kind === 'done') { FbmSync.activityRotationSave(after.rotation || FbmSync.activityRotationNext([])); }
   state.cursor = {};
   state.phase = 'done'; state.entity = ''; state.message = FbmSync.DONE_MESSAGE; FbmSync.stateWrite(state);
   return null;
@@ -251,7 +250,7 @@ FbmSync.beginCustomerPull = function (state) {
     state.metadata.seen.customer = { initialized: true };
     state.metadata.seen.activity = { initialized: true };
   }
-  var customerCount = state.scan === 'detail' ? Math.max(1, Math.min(50, Number(state.detailCustomerLimit || 50))) : 2000;
+  var customerCount = state.scan === 'detail' ? Math.max(1, Math.min(FbmSync.CUSTOMER_PAGE_ROWS, Number(state.detailCustomerLimit || FbmSync.CUSTOMER_PAGE_ROWS))) : FbmSync.CUSTOMER_PAGE_ROWS;
   var detailCursor = state.scan === 'detail' && typeof FbmSync.detailCursorRead === 'function' ? FbmSync.detailCursorRead() : null;
   var detailPageIndex = detailCursor ? Number(detailCursor.pageIndex || 0) : -1;
   var detailPageValue = detailCursor && Array.isArray(detailCursor.pageValue) ? detailCursor.pageValue : null;
@@ -590,12 +589,12 @@ FbmSync.continue = function (rawResponse) {
       state.cursor.pageIndex = Number(cursor.pageIndex || -1) + 1;
       state.cursor.pageValue = [lastActivity.end_date || '', lastActivity.datetime0 || '', lastActivity.id || '', lastActivity.line_nbr || 0];
       FbmSync.stateWrite(state);
-      return { ok: true, request: FbmSync.nextEnvelope(FbmSync.activityGridRequest(cursor.customerIds[cursor.customerIndex], { type: 1, count: cursor.count, gridPageIndex: state.cursor.pageIndex, gridPageValue: state.cursor.pageValue, gridRefresh: false })), status: FbmSync.statusView(), imported: activityRecords.length };
+      return { ok: true, request: FbmSync.nextEnvelope(FbmSync.activityGridRequest(cursor.customerContexts[cursor.customerIndex].sttRec, { type: 1, count: cursor.count, gridPageIndex: state.cursor.pageIndex, gridPageValue: state.cursor.pageValue, gridRefresh: false })), status: FbmSync.statusView(), imported: activityRecords.length };
     }
     var nextIndex = Number(cursor.customerIndex || 0) + 1;
-    if (nextIndex < cursor.customerIds.length) {
+    if (nextIndex < cursor.customerContexts.length) {
       state.cursor.customerIndex = nextIndex; state.cursor.pageIndex = -1; state.cursor.pageValue = null; FbmSync.stateWrite(state);
-      return { ok: true, request: FbmSync.nextEnvelope(FbmSync.activityGridRequest(cursor.customerIds[nextIndex], { type: 0, count: cursor.count, gridPageIndex: -1, gridRefresh: false })), status: FbmSync.statusView() };
+      return { ok: true, request: FbmSync.nextEnvelope(FbmSync.activityGridRequest(cursor.customerContexts[nextIndex].sttRec, { type: 0, count: cursor.count, gridPageIndex: -1, gridRefresh: false })), status: FbmSync.statusView() };
     }
     if (cursor.customerNext) {
       var next = cursor.customerNext; state.cursor = { kind: 'customer_grid', type: 1, pageIndex: next.body.gridPageIndex, pageValue: next.body.gridPageValue, count: next.body.count, seen: Number(cursor.customerSeen || 0) }; state.phase = 'pull_customer'; state.entity = 'customer'; FbmSync.stateWrite(state);
@@ -632,7 +631,7 @@ FbmSync.continue = function (rawResponse) {
     state.metadata.customerFields = supplementGrid.fields;
     FbmSync.stateWrite(state);
     var supplementContexts = supplementGrid.rows.filter(function (row) { return !FbmSync.isTemporaryRecord('customer', row); }).map(function (row) { return { sttRec: String(row.stt_rec_kh || '').trim(), maKh: String(row.ma_kh || '').trim() }; }).filter(function (item) { return item.sttRec; });
-    var afterKind = cursor.kind === 'activity_catchup_customer_grid' ? { kind: 'rotation' } : { kind: 'done', rows: supplementGrid.rows };
+    var afterKind = cursor.kind === 'activity_catchup_customer_grid' ? { kind: 'rotation' } : { kind: 'done', rotation: FbmSync.activityRotationNext(supplementGrid.rows) };
     var supplementActivityRequest = FbmSync.activityForCustomers(state, supplementContexts, null, 0, afterKind);
     if (supplementActivityRequest) { return { ok: true, request: FbmSync.nextEnvelope(supplementActivityRequest), status: FbmSync.statusView() }; }
     var emptySupplement = FbmSync.activitySupplementNext(state, afterKind);

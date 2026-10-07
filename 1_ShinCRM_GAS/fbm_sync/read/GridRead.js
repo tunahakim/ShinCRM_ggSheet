@@ -1,6 +1,10 @@
 /** Tạo request grid/completion và đổi response FBM thành record ổn định. */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
+// Một trang Customer kéo theo danh sách khách chờ quét Activity nằm trong cursor; trang nhỏ để state luôn dưới trần một DocumentProperty dù tổng số khách là bao nhiêu.
+FbmSync.CUSTOMER_PAGE_ROWS = 50;
+FbmSync.ACTIVITY_SUPPLEMENT_CUSTOMERS = 30;
+
 /** Đọc cấu hình runtime; token ưu tiên state của phiên hiện tại. */
 FbmSync.scriptSettings = function () {
   var currentState = {}, session = {};
@@ -222,7 +226,7 @@ FbmSync.activityCatchupCustomerRequest = function () {
   var maxDate = FbmSync.activityLocalMaxDate();
   if (!maxDate) { return null; }
   var request = FbmSync.customerGridRequest({
-    type: 0, count: 30, gridPageIndex: -1, gridRefresh: false,
+    type: 0, count: FbmSync.ACTIVITY_SUPPLEMENT_CUSTOMERS, gridPageIndex: -1, gridRefresh: false,
     externalKey: [{ Name: 'ngay_gd', Opr: '>', Value: maxDate, Type: 'Date', Ignore: false }]
   });
   request.meta.kind = 'activity_catchup_customer_grid';
@@ -240,25 +244,27 @@ FbmSync.activityRotationCursor = function () {
   } catch (ignore) { return { pageIndex: -1, pageValue: null }; }
 };
 
-/** Lớp 3: lấy một trang 30 Customer theo cursor xoay đã lưu. */
+/** Lớp 3: lấy một trang Customer theo cursor xoay đã lưu. */
 FbmSync.activityRotationCustomerRequest = function () {
   var cursor = FbmSync.activityRotationCursor(), request = FbmSync.customerGridRequest({
-    type: cursor.pageIndex < 0 ? 0 : 1, count: 30, gridPageIndex: cursor.pageIndex,
+    type: cursor.pageIndex < 0 ? 0 : 1, count: FbmSync.ACTIVITY_SUPPLEMENT_CUSTOMERS, gridPageIndex: cursor.pageIndex,
     gridPageValue: cursor.pageValue, gridRefresh: false
   });
   request.meta.kind = 'activity_rotation_customer_grid';
   return request;
 };
 
-/** Lưu vị trí trang xoay tiếp theo; hết danh sách thì quay lại trang đầu. */
-FbmSync.activityRotationSave = function (rows) {
-  var props = PropertiesService.getDocumentProperties(), list = rows || [];
-  if (!list.length || list.length < 30) { props.setProperty('FBM_SYNC_ACTIVITY_ROTATION', JSON.stringify({ pageIndex: -1, pageValue: null })); return; }
+/** Vị trí trang xoay tiếp theo tính từ trang vừa đọc; hết danh sách thì quay lại trang đầu. Tính ngay khi nhận trang để cursor chỉ mang vị trí này, không mang cả các dòng Customer. */
+FbmSync.activityRotationNext = function (rows) {
+  var list = rows || [];
+  if (list.length < FbmSync.ACTIVITY_SUPPLEMENT_CUSTOMERS) { return { pageIndex: -1, pageValue: null }; }
   var last = list[list.length - 1], pageIndex = FbmSync.activityRotationCursor().pageIndex;
-  props.setProperty('FBM_SYNC_ACTIVITY_ROTATION', JSON.stringify({
-    pageIndex: Number(pageIndex < 0 ? 0 : pageIndex + 1),
-    pageValue: [last.ngay_gd || '', last.datetime0 || '', last.xorder || '']
-  }));
+  return { pageIndex: Number(pageIndex < 0 ? 0 : pageIndex + 1), pageValue: [last.ngay_gd || '', last.datetime0 || '', last.xorder || ''] };
+};
+
+/** Lưu vị trí trang xoay do `activityRotationNext` tính. */
+FbmSync.activityRotationSave = function (next) {
+  PropertiesService.getDocumentProperties().setProperty('FBM_SYNC_ACTIVITY_ROTATION', JSON.stringify({ pageIndex: next.pageIndex, pageValue: next.pageValue }));
 };
 /** Lấy AliasName metadata; fallback tên field để tránh hardcode schema. */
 FbmSync.gridFields = function (response) {
