@@ -30,7 +30,8 @@ async function chay(so) {
   check(so, 'nghiệm thu ALT00010 có case PASS', auditResult.ok, true);
   check(so, 'nghiệm thu ghi từng case vào Log', audit.FbmSyncLog.length >= 6, true);
   const probe = taoHopCat({ FbmSync: {} });
-  napServer(probe, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/report/Probe.js');
+  napServer(probe, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/report/Probe.js');
+  probe.FbmSync.scriptSettings = () => ({ testCustomerCode: 'ALT00010', testCustomerIds: [] });
   probe.FbmSync.readLocal = (entity) => entity === 'customer'
     ? [{ id: 'CUS-ALT', fbmCustomerCode: 'ALT00010' }, { id: 'CUS-OTHER', fbmCustomerCode: 'ALT00011' }]
     : [];

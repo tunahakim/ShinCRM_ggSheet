@@ -17,6 +17,8 @@ FbmSync.scriptSettings = function () {
   var accountName = typeof FbmSync.bindingAccountName === 'function' ? FbmSync.bindingAccountName() : '';
   var accountSettings = typeof FbmSync.accountSettingsRead === 'function' ? FbmSync.accountSettingsRead() : {};
   testCustomerCode = testCustomerCode === null ? 'ALT00010' : String(testCustomerCode || '').trim();
+  // Khách mới chưa có mã FBM thì không lọt cổng theo mã; chủ dự án cho phép đích danh theo mã ShinCRM để thử tạo thật.
+  var testCustomerIds = String(testProps.getProperty('FBM_SYNC_TEST_CUSTOMER_IDS') || '').split(',').map(function (id) { return id.trim(); }).filter(Boolean);
   var activitySince = currentState.runId && currentState.activitySince !== undefined ? currentState.activitySince : accountSettings.activitySince;
   return {
     baseUrl: 'https://fbo.com.vn:8888',
@@ -28,7 +30,8 @@ FbmSync.scriptSettings = function () {
     customerPrefix: String(accountSettings.customerPrefix || ''),
     customerCodeLength: String(accountSettings.customerCodeLength || ''),
     activitySince: String(activitySince || ''),
-    testCustomerCode: testCustomerCode
+    testCustomerCode: testCustomerCode,
+    testCustomerIds: testCustomerIds
   };
 };
 /** Đổi chuỗi /Date(ms)/ của .NET, giữ nguyên giá trị khác. */

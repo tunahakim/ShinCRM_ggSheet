@@ -243,6 +243,25 @@ async function chay(so) {
     ? [{ id: 'CUS-PARENT', fbmId: 'FBM-PARENT', fbmCustomerCode: 'ALT-PARENT', allowFbmPush: pushed.FbmSync.PUSH_ALLOW_VALUE }]
     : [{ id: 'ACT-NEW', customerId: 'CUS-PARENT', fbmId: '', allowFbmPush: pushed.FbmSync.PUSH_ALLOW_VALUE, taskType: 'Goi', content: 'Noi dung', workDate: '2026-09-09' }];
   check(so, 'Activity moi co Customer cha lien ket duoc dua vao queue', pushed.FbmSync.pushCandidates('activity').length, 1);
+  {
+    const allow = pushed.FbmSync.PUSH_ALLOW_VALUE, savedSettings = pushed.FbmSync.scriptSettings;
+    pushed.FbmSync.scriptSettings = () => ({ testCustomerCode: 'ALT00010', testCustomerIds: ['CUS-NEW'] });
+    pushed.FbmSync.readLocal = (entity) => entity === 'customer'
+      ? [
+        { id: 'CUS-ALT', fbmId: 'FBM-ALT', fbmCustomerCode: 'ALT00010', allowFbmPush: allow, syncStatus: pushed.FbmSync.SYNC_STATUS.pending },
+        { id: 'CUS-NEW', fbmId: '', fbmCustomerCode: '', allowFbmPush: allow, companyName: 'Khách mới' },
+        { id: 'CUS-KHAC', fbmId: '', fbmCustomerCode: '', allowFbmPush: allow, companyName: 'Khách ngoài phạm vi' },
+        { id: 'CUS-THAT', fbmId: 'FBM-THAT', fbmCustomerCode: 'ALT00999', allowFbmPush: allow }
+      ]
+      : [
+        { id: 'ACT-ALT', customerId: 'CUS-ALT', fbmId: '', allowFbmPush: allow, taskType: 'Goi', content: 'A', workDate: '2026-10-07' },
+        { id: 'ACT-THAT', customerId: 'CUS-THAT', fbmId: '', allowFbmPush: allow, taskType: 'Goi', content: 'B', workDate: '2026-10-07' }
+      ];
+    check(so, 'Phạm vi thử: chỉ đẩy khách mang mã FBM thử và khách mới được cho phép đích danh theo mã ShinCRM; khách khác và Activity của khách ngoài phạm vi bị chặn',
+      [pushed.FbmSync.pushCandidates('customer').map((c) => c.kind + ':' + c.id), pushed.FbmSync.pushCandidates('activity').map((c) => c.id)],
+      [['edit:CUS-ALT', 'create:CUS-NEW'], ['ACT-ALT']]);
+    pushed.FbmSync.scriptSettings = savedSettings;
+  }
   const transportState = push.FbmSync.stateStart('', 'read', 0);
   push.FbmSync.scriptSettings = () => ({ baseUrl: 'https://fbm.test', testCustomerCode: 'ALT00010', cookie: 'cookie' });
   transportState.phase = 'pull_customer'; transportState.activeRequestId = 'test-transport-request'; transportState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 3, pageValue: ['x'] };

@@ -73,13 +73,13 @@ FbmSync.extractAutoCustomerCode = function (response) {
 FbmSync.pushCandidates = function (entity) {
   var records = FbmSync.readLocal(entity), customers = {}, state = {}, pushFailures = {};
   var categoryGate = {};
-  var testCustomerCode = '';
+  var settings = {};
   try {
     state = FbmSync.stateRead();
     categoryGate = FbmSync.stateCategoryGate(state);
     pushFailures = state.metadata && state.metadata.pushFailures || {};
   } catch (ignore) {}
-  try { testCustomerCode = typeof FbmSync.scriptSettings === 'function' ? String(FbmSync.scriptSettings().testCustomerCode || '').trim() : ''; } catch (ignoreSettings) {}
+  try { settings = typeof FbmSync.scriptSettings === 'function' ? FbmSync.scriptSettings() : {}; } catch (ignoreSettings) {}
   if (entity === 'activity') {
     FbmSync.readLocal('customer').forEach(function (customer) { customers[String(customer.id || '')] = customer; });
   }
@@ -89,8 +89,7 @@ FbmSync.pushCandidates = function (entity) {
     if (String(record.recordStatus || 'active') === 'deleted') { return false; }
     if (FbmSync.isConflictPending(record)) { return false; }
     var customer = entity === 'activity' ? customers[String(record.customerId || '')] : null;
-    // Keep live writes inside the configured test customer until the gate is cleared.
-    if (testCustomerCode && (entity === 'customer' ? String(record.fbmCustomerCode || '').trim() !== testCustomerCode : !customer || String(customer.fbmCustomerCode || '').trim() !== testCustomerCode)) { return false; }
+    if (!FbmSync.inTestScope(entity === 'customer' ? record : customer, settings)) { return false; }
     if (entity === 'activity' && !FbmSync.activityParentReady(customer)) { return false; }
     if (!FbmSync.pushPermission(record, entity, customer).push) { return false; }
     var status = String(record.syncStatus || ''), failureKey = entity + ':' + String(record.id || '');
@@ -110,6 +109,14 @@ FbmSync.pushCandidates = function (entity) {
     }
     return candidate;
   });
+};
+
+/** Khi còn phạm vi thử, chỉ ghi khách mang đúng mã FBM thử hoặc có mã ShinCRM được cho phép đích danh; Activity theo khách cha. Xóa phạm vi thì mở hết. */
+FbmSync.inTestScope = function (customer, settings) {
+  var code = String(settings && settings.testCustomerCode || '').trim();
+  if (!code) { return true; }
+  if (!customer) { return false; }
+  return String(customer.fbmCustomerCode || '').trim() === code || (settings.testCustomerIds || []).indexOf(String(customer.id || '').trim()) >= 0;
 };
 
 /** Lệnh tạo đã phát nhưng chưa biết FBM có lưu hay không; bản ghi sửa (đã có ID FBM) gửi lại không sinh trùng nên không thuộc nhóm này. */

@@ -2,11 +2,11 @@
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 function fbmProbeAltState() {
-  var code = 'ALT00010';
+  var settings = FbmSync.scriptSettings(), code = settings.testCustomerCode;
   var customers = FbmSync.readLocal('customer');
   var customerIds = {};
   var selectedCustomers = customers.filter(function (record) {
-    var selected = String(record.fbmCustomerCode || '').trim() === code;
+    var selected = FbmSync.inTestScope(record, settings);
     if (selected) { customerIds[String(record.id || '')] = true; }
     return selected;
   });
