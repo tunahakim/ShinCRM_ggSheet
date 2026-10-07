@@ -10,6 +10,7 @@
 - Mọi thay đổi state phải đi qua hợp đồng hoặc cổng được quy định; không có đường tắt.
 - Giao tiếp giữa các module phải có điều kiện, tối thiểu và tránh thao tác thừa.
 - Ưu tiên tính đúng và nhất quán; cache hoặc dữ liệu cục bộ không thay thế nguồn sự thật.
+- Thao tác đắt phải được tối ưu theo chi phí thật, không theo cảm giác. Thao tác đắt là thứ có giá cố định mỗi lần (gọi GAS khoảng 2–3 giây đường truyền, gọi FBM, đọc/ghi Sheet, đọc/ghi DocumentProperties, hạn mức nền tảng) hoặc tốn token. Cách làm theo thứ tự: không làm khi kết quả không được dùng; không làm lại thứ đã có trong cùng lần gọi; gom nhiều việc vào một lần (một lần gọi GAS xử lý nhiều khách, một lần đọc cả Sheet, ghi một lần cuối lời gọi). Trước khi tối ưu phải đo để biết chi phí nằm ở đâu; tối ưu không được đổi lấy sai dữ liệu hay lỗi im lặng.
 
 ## Mục tiêu và phạm vi
 
