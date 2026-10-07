@@ -245,7 +245,7 @@ async function chay(so) {
   check(so, 'Activity moi co Customer cha lien ket duoc dua vao queue', pushed.FbmSync.pushCandidates('activity').length, 1);
   {
     const allow = pushed.FbmSync.pullDefaultPermission(), savedSettings = pushed.FbmSync.scriptSettings;
-    pushed.FbmSync.scriptSettings = () => ({ testCustomerCode: 'ALT00010', testCustomerIds: ['CUS-NEW'] });
+    pushed.FbmSync.scriptSettings = () => ({ testCodes: ['ALT00010', 'CUS-NEW'] });
     pushed.FbmSync.readLocal = (entity) => entity === 'customer'
       ? [
         { id: 'CUS-ALT', fbmId: 'FBM-ALT', fbmCustomerCode: 'ALT00010', fbmSyncPermission: allow, syncStatus: pushed.FbmSync.SYNC_STATUS.pending },
@@ -263,7 +263,7 @@ async function chay(so) {
     pushed.FbmSync.scriptSettings = savedSettings;
   }
   const transportState = push.FbmSync.stateStart('', 'read', 0);
-  push.FbmSync.scriptSettings = () => ({ baseUrl: 'https://fbm.test', testCustomerCode: 'ALT00010', cookie: 'cookie' });
+  push.FbmSync.scriptSettings = () => ({ baseUrl: 'https://fbm.test', testCodes: ['ALT00010'], cookie: 'cookie' });
   transportState.phase = 'pull_customer'; transportState.activeRequestId = 'test-transport-request'; transportState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 3, pageValue: ['x'] };
   push.FbmSync.stateWrite(transportState);
   const http500 = push.FbmSync.continue({ ok: false, status: 500, body: '{"Message":"server"}', transport: { trace: [{ requestId: 'test-transport-request' }] } });
@@ -375,7 +375,7 @@ async function chay(so) {
   const createCandidate = { entity: 'customer', kind: 'create', id: createLocal.id, autoCode: 'ALT00020', record: createLocal };
   push.FbmSync.readLocal = (entity) => entity === 'customer' ? [createLocal] : [];
   push.FbmSync.pushCandidates = pushCandidatesImpl;
-  push.FbmSync.scriptSettings = () => ({ accountName: 'Owner', baseUrl: 'https://fbm.test', cookie: 'cookie', customerAuthorized: '1.test', testCustomerCode: 'ALT00010' });
+  push.FbmSync.scriptSettings = () => ({ accountName: 'Owner', baseUrl: 'https://fbm.test', cookie: 'cookie', customerAuthorized: '1.test', testCodes: ['ALT00010'] });
   push.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const createState = push.FbmSync.stateStart('', 'push', 0); createState.session = { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' }; createState.activeRequestId = 'test-create-request'; createState.cursor = { kind: 'push_wait', entity: 'customer', index: 0, operation: 'customer_create_save', candidate: createCandidate }; push.FbmSync.stateWrite(createState);
   const recoveryStart = push.FbmSync.continue({ ok: false, status: 500, body: '{"Message":"timeout"}', transport: { trace: [{ requestId: 'test-create-request' }] } });

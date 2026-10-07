@@ -23,7 +23,7 @@ async function chay(so) {
   edges.FbmSync.accountSettingsRead = () => ({ activitySince: '2024-10-07' });
   const refresh = edges.FbmSync.conflictRefreshRequest('activity', { id: 'ACT-1', fbmId: '174813' });
   check(so, 'conflict dựng request đọc lại đúng Activity FBM, không bị giới hạn bởi mốc', [refresh.meta.kind, refresh.meta.entity, refresh.body.externalKey[0].Name, refresh.body.externalKey[0].Value, refresh.body.filter], ['conflict_refresh_grid', 'activity', 'id', '174813', []]);
-  edges.PropertiesService = { getDocumentProperties: () => ({ getProperty: (key) => key === 'FBM_SYNC_TEST_CUSTOMER_CODE' ? 'ALT00010' : '' }) };
+  edges.FbmSync.testScopeCodes = () => ['ALT00010'];
   const customerRefresh = edges.FbmSync.conflictRefreshRequest('customer', { id: 'CUS-NEW', fbmId: 'A000080352' });
   check(so, 'FBM-052: conflict đọc lại Customer đích danh theo ID FBM, không gắn lọc mã khách thử nên khách mới tạo mã khác vẫn đọc được', customerRefresh.body.externalKey.map((key) => key.Name + '=' + key.Value), ['stt_rec_kh=A000080352']);
   edges.PropertiesService = { getDocumentProperties: () => ({ getProperty: () => '' }) };
@@ -46,7 +46,7 @@ async function chay(so) {
   check(so, 'missing scan bo qua record dang user sua', [edges.FbmSync.markMissingAfterFullScan('customer', missingState).written, missingWrite], [0, false]);
   let missingBatch;
   const fullScanState = { mode: 'write', metadata: { seen: { customer: {} } }, locks: {} };
-  edges.FbmSync.scriptSettings = () => ({ testCustomerCode: '' });
+  edges.FbmSync.scriptSettings = () => ({ testCodes: null });
   edges.FbmSync.stateRead = () => fullScanState;
   edges.FbmSync.readLocal = () => [{ id: 'CUS-000011', fbmId: 'FBM-MISSING', recordStatus: 'active' }, { id: 'CUS-000012', fbmId: 'FBM-TOMBSTONE', recordStatus: 'deleted' }];
   edges.writeGateSave = (request) => { missingBatch = request; return { ok: true }; };

@@ -6,7 +6,7 @@ async function chay(so) {
   section("FBM sync — audit");
   const auditPull = taoHopCat({
     FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {},
-    PropertiesService: { getDocumentProperties: () => ({ getProperty: (key) => ({ FBM_SYNC_TEST_CUSTOMER_CODE: 'ALT00010' }[key] || '') }) }
+    PropertiesService: { getDocumentProperties: () => ({ getProperty: () => '' }) }
   });
   napServer(auditPull, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
   const gate = { map: { '@CAT_TINH_THANH\u001fHà Nội': 'HNI' }, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true, HNI: true } } };
@@ -31,7 +31,7 @@ async function chay(so) {
   check(so, 'nghiệm thu ghi từng case vào Log', audit.FbmSyncLog.length >= 6, true);
   const probe = taoHopCat({ FbmSync: {} });
   napServer(probe, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/report/Probe.js');
-  probe.FbmSync.scriptSettings = () => ({ testCustomerCode: 'ALT00010', testCustomerIds: [] });
+  probe.FbmSync.scriptSettings = () => ({ testCodes: ['ALT00010'] });
   probe.FbmSync.readLocal = (entity) => entity === 'customer'
     ? [{ id: 'CUS-ALT', fbmCustomerCode: 'ALT00010' }, { id: 'CUS-OTHER', fbmCustomerCode: 'ALT00011' }]
     : [];

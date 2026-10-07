@@ -13,7 +13,7 @@ function chay(so) {
   legacy.FBM_MA_KH_PREFIX = 'CHANGED-'; legacy.FBM_SYNC_APPROVAL_THRESHOLD = '99';
   const second = hop.FbmSync.accountSettingsRead();
   const syncSecond = hop.FbmSync.syncSettingsRead();
-  check(so, 'migration tach cau hinh tai khoan FBM khoi tham so phien', [Object.keys(first).sort(), first.customerPrefix, first.customerCodeLength, first.activitySince, writesAfterMigration, Object.keys(second).sort(), second.customerPrefix, Object.keys(syncFirst).sort(), syncSecond.approvalThreshold], [['activitySince', 'customerCodeLength', 'customerPrefix'], 'KH-', '8', '2026-01-01', 2, ['activitySince', 'customerCodeLength', 'customerPrefix'], 'KH-', ['approvalThreshold'], 12]);
+  check(so, 'migration tach cau hinh tai khoan FBM khoi tham so phien', [Object.keys(first).sort(), first.customerPrefix, first.customerCodeLength, first.activitySince, writesAfterMigration, Object.keys(second).sort(), second.customerPrefix, Object.keys(syncFirst).sort(), syncSecond.approvalThreshold], [['activitySince', 'customerCodeLength', 'customerPrefix'], 'KH-', '8', '2026-01-01', 2, ['activitySince', 'customerCodeLength', 'customerPrefix'], 'KH-', ['approvalThreshold', 'testCodes', 'testMode'], 12]);
   check(so, 'luu cau hinh tai khoan FBM hop le', [hop.FbmSync.accountSettingsSave({ customerPrefix: 'ALT', customerCodeLength: '8', activitySince: '2026-02-01' }).ok, hop.FbmSync.accountSettingsRead()], [true, { customerPrefix: 'ALT', customerCodeLength: '8', activitySince: '2026-02-01' }]);
   const invalidAccount = hop.FbmSync.accountSettingsSave({ customerPrefix: 'ALT', customerCodeLength: '', activitySince: '2026-02-31' });
   check(so, 'cau hinh tai khoan FBM chan cap thieu va ngay sai', [invalidAccount.ok, invalidAccount.code], [false, 'FBM_CUSTOMER_CODE_CONFIG_INCOMPLETE']);
@@ -28,7 +28,19 @@ function chay(so) {
   const invalidText = hop.FbmSync.syncSettingsSave({ approvalThreshold: 'khong-phai-so' });
   check(so, 'nguong phe duyet khong phai so bi tu choi', [invalidText.ok, invalidText.code], [false, 'FBM_APPROVAL_THRESHOLD_INVALID']);
   const saved = hop.FbmSync.syncSettingsSave({ approvalThreshold: 0 });
-  check(so, 'luu nguong phe duyet hop le va cho phep nguong 0', [saved.ok, Object.keys(saved.settings), saved.settings.approvalThreshold, hop.FbmSync.syncSettingsRead().approvalThreshold], [true, ['approvalThreshold'], 0, 0]);
+  check(so, 'luu nguong phe duyet hop le va cho phep nguong 0', [saved.ok, Object.keys(saved.settings), saved.settings.approvalThreshold, hop.FbmSync.syncSettingsRead().approvalThreshold], [true, ['approvalThreshold', 'testMode', 'testCodes'], 0, 0]);
+
+  check(so, 'Chế độ thử mặc định bật với danh sách rỗng, nên tệp chưa cấu hình không quét toàn bộ', [hop.FbmSync.SYNC_SETTINGS_DEFAULT.testMode, hop.FbmSync.SYNC_SETTINGS_DEFAULT.testCodes], [true, []]);
+  const codes = hop.FbmSync.syncSettingsSave({ approvalThreshold: 0, testMode: true, testCodes: 'ALT00010, CUS-020061\nALT00010' });
+  check(so, 'Danh sách mã thử nhận chuỗi ngăn bởi phẩy/xuống dòng, bỏ trùng, giữ thứ tự', [codes.ok, codes.settings.testCodes, hop.FbmSync.testScopeCodes()], [true, ['ALT00010', 'CUS-020061'], ['ALT00010', 'CUS-020061']]);
+  const quoteCode = hop.FbmSync.syncSettingsSave({ approvalThreshold: 0, testMode: true, testCodes: ["ALT'1", 'Mã có dấu'] });
+  check(so, 'Mã thử có dấu nháy hoặc ký tự lạ bị từ chối trước khi ghi, nên không lọt vào điều kiện grid FBM', [quoteCode.ok, quoteCode.code, hop.FbmSync.testScopeCodes()], [false, 'FBM_TEST_CODE_INVALID', ['ALT00010', 'CUS-020061']]);
+  const tooMany = hop.FbmSync.syncSettingsSave({ approvalThreshold: 0, testMode: true, testCodes: Array.from({ length: hop.FbmSync.TEST_CODES_MAX + 1 }, (_, i) => 'A' + i) });
+  check(so, 'Danh sách mã thử vượt trần bị từ chối', [tooMany.ok, tooMany.code], [false, 'FBM_TEST_CODES_TOO_MANY']);
+  hop.FbmSync.syncSettingsSave({ approvalThreshold: 0, testMode: false, testCodes: ['ALT00010'] });
+  check(so, 'Tắt chế độ thử thì phạm vi là null (chạy toàn bộ) dù danh sách còn mã', hop.FbmSync.testScopeCodes(), null);
+  hop.FbmSync.syncSettingsSave({ approvalThreshold: 3 });
+  check(so, 'Lưu riêng ngưỡng chấp thuận giữ nguyên công tắc và danh sách mã thử đang lưu', [hop.FbmSync.syncSettingsRead().testMode, hop.FbmSync.syncSettingsRead().testCodes], [false, ['ALT00010']]);
 
   const quotaData = {};
   let quotaFull = false;

@@ -46,6 +46,15 @@ async function chay(so) {
   check(so, 'preflight read chặn khi file có FBM ID nhưng chưa kiểm tra liên kết', [rebindRead.ok, rebindRead.blocking.some((item) => item.code === 'REBIND_REQUIRED')], [false, true]);
   const identityCheck = hop.FbmSync.runPreflight({ mode: 'check', scan: 'identity_check' });
   check(so, 'preflight identity check được phép chạy để xử lý REBIND', [identityCheck.ok, identityCheck.blocking.some((item) => item.code === 'REBIND_REQUIRED')], [true, false]);
+  {
+    const savedScope = hop.FbmSync.testScopeCodes;
+    hop.FbmSync.testScopeCodes = () => [];
+    const emptyRead = hop.FbmSync.runPreflight({ mode: 'read' }), emptyIdentity = hop.FbmSync.runPreflight({ mode: 'check', scan: 'identity_check' });
+    check(so, 'Chế độ thử bật mà danh sách mã trống: chặn lượt đọc trước request FBM đầu tiên, lệnh kiểm liên kết vẫn chạy', [emptyRead.ok, emptyRead.blocking.some((item) => item.code === 'FBM_TEST_SCOPE_EMPTY'), emptyIdentity.blocking.some((item) => item.code === 'FBM_TEST_SCOPE_EMPTY')], [false, true, false]);
+    hop.FbmSync.testScopeCodes = () => null;
+    check(so, 'Tắt chế độ thử: không có lỗi phạm vi thử trống', hop.FbmSync.runPreflight({ mode: 'read' }).issues.some((item) => item.code === 'FBM_TEST_SCOPE_EMPTY'), false);
+    hop.FbmSync.testScopeCodes = savedScope;
+  }
   const identityProbe = hop.FbmSync.runPreflight({ mode: 'check', scan: 'identity_probe' });
   check(so, 'preflight identity probe được phép chạy để tự điền liên kết', [identityProbe.ok, identityProbe.blocking.some((item) => item.code === 'REBIND_REQUIRED')], [true, false]);
 
