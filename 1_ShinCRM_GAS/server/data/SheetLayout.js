@@ -29,7 +29,6 @@ var CATEGORY_COLUMNS = [
   ['@CAT_CHO_PHEP_FBM', 'Cho phép đẩy FBM'],
   ['@CAT_CONG_VIEC', 'Công việc'],
   ['@CAT_CONG_VIEC_FBM', 'Công việc — mã FBM'],
-  ['@CAT_NGUOI_NHAP_LIEU', 'Người nhập liệu'],
   ['@CAT_UU_TIEN', 'Ưu tiên']
 ];
 

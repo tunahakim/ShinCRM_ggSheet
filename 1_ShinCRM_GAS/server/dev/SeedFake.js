@@ -21,8 +21,7 @@ var SEED_FAKE_SELECT = {
   '@CAT_XAC_THUC': ['Đã xác thực', 'Chưa xác thực'],
   '@CAT_CHO_PHEP_FBM': ['Cho phép', 'Chưa cho phép', 'Ngừng đồng bộ'],
   '@CAT_CONG_VIEC': ['Gọi điện', 'Gặp mặt', 'Gửi báo giá', 'Chốt đơn'],
-  '@CAT_UU_TIEN': ['Cao', 'Thường', 'Thấp'],
-  '@CAT_NGUOI_NHAP_LIEU': ['Hakim', 'Trợ lý 1', 'Trợ lý 2']
+  '@CAT_UU_TIEN': ['Cao', 'Thường', 'Thấp']
 };
 
 /** Giá trị giả cho những trường TEXT cần trông ra hình dáng thật, vì mã số thuế hay email mà là "Nhãn giả 7" thì phép kiểm định dạng không thử được gì. */

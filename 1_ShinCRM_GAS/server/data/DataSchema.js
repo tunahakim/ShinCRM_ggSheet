@@ -45,7 +45,7 @@ var DATA_SCHEMA = {
     taskType: { code: '@ACT_CONG_VIEC', type: 'SELECT', label: 'Công việc', source: '@CAT_CONG_VIEC', required: true },
     content: { code: '@ACT_NOI_DUNG_CV', type: 'TEXT', label: 'Nội dung công việc', required: true, normalize: 'newlineLf' },
     product: { code: '@ACT_SAN_PHAM', type: 'SELECT', label: 'Sản phẩm', source: '@CAT_SAN_PHAM', required: true, default: 'carryForwardProduct' },
-    enteredBy: { code: '@ACT_NGUOI_NHAP_LIEU', type: 'SELECT', label: 'Người nhập liệu', source: '@CAT_NGUOI_NHAP_LIEU' },
+    enteredBy: { code: '@ACT_NGUOI_NHAP_LIEU', type: 'TEXT', label: 'Người tạo trên FBM', readonly: true },
     contractValue: { code: '@ACT_GIA_TRI_HD', type: 'NUMBER', label: 'Giá trị hợp đồng' },
     priority: { code: '@ACT_UU_TIEN', type: 'SELECT', label: 'Ưu tiên', source: '@CAT_UU_TIEN', default: 'carryForwardPriority' },
     dueAt: { code: '@ACT_HAN_XU_LY', type: 'DATE', label: 'Hạn xử lý', precision: 'minute', default: 'carryForwardDueAt' },

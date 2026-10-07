@@ -28,6 +28,16 @@ var WRITE_GATE_MACHINE_FIELDS = {
   recordStatus: function () { return 'active'; }
 };
 
+/**
+ * Trường máy điền cho bản ghi **người dùng** tạo mới; người dùng không sửa được chúng ở bất kỳ lượt lưu nào.
+ *
+ * Khác `WRITE_GATE_MACHINE_FIELDS` ở chỗ nguồn `pull` được ghi thẳng: `enteredBy` là người tạo trên FBM, lượt kéo mang giá trị thật của FBM (09/03 mục "Người tạo trên FBM"). Bản ghi người dùng tạo lấy tên ở tham số `USER_NAME` của Config chứ không hỏi module FBM, vì lõi không được phụ thuộc `fbm_sync`; người dùng gõ đúng tên tài khoản FBM thì hai đường ra cùng một tên.
+ */
+var WRITE_GATE_CREATOR_CONFIG_NAME = 'USER_NAME';
+var WRITE_GATE_USER_CREATE_FIELDS = {
+  enteredBy: function () { return String(configGet(WRITE_GATE_CREATOR_CONFIG_NAME, '') || '').trim(); }
+};
+
 /** Mốc hiện tại theo độ mịn của trường. `precision: 'day'` thì cắt phần giờ, để ô ngày là ngày trơn chứ không phải ngày kèm giờ ẩn. */
 function writeGateNow(precision) {
   var bay = new Date();
@@ -238,7 +248,7 @@ function writeGateBuild(plan, names, fields, source, invalid, selectAllowed) {
   var laUser = source === 'user';
 
   names.forEach(function (ten) {
-    if (WRITE_GATE_MACHINE_FIELDS[ten]) { return; }
+    if (WRITE_GATE_MACHINE_FIELDS[ten] || (laUser && WRITE_GATE_USER_CREATE_FIELDS[ten])) { return; }
 
     var spec = fields[ten];
     var coKhoa = Object.prototype.hasOwnProperty.call(plan.record, ten);
@@ -447,6 +457,10 @@ function writeGateRun(entity, records, source, fields, batDau) {
     Object.keys(WRITE_GATE_MACHINE_FIELDS).forEach(function (ten) {
       if (!fields[ten]) { return; }
       moi[i].values[ten] = WRITE_GATE_MACHINE_FIELDS[ten]({ id: ma, spec: fields[ten] });
+    });
+    if (source !== 'user') { return; }
+    Object.keys(WRITE_GATE_USER_CREATE_FIELDS).forEach(function (ten) {
+      if (fields[ten]) { moi[i].values[ten] = WRITE_GATE_USER_CREATE_FIELDS[ten](); }
     });
   });
 

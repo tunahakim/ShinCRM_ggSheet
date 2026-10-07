@@ -42,6 +42,15 @@ function configParamCatalog() {
         + 'Gõ số bình thường; dấu chấm hay dấu phẩy phân cách nghìn cũng đọc được.'
     },
     {
+      name: WRITE_GATE_CREATOR_CONFIG_NAME,
+      owner: CONFIG_PARAM_OWNER_USER,
+      type: 'TEXT',
+      defaultValue: '',
+      note: 'Tên người dùng ShinCRM, tự điền vào cột "Người tạo trên FBM" của giao dịch tạo mới.\n\n'
+        + 'Gõ đúng tên đầy đủ của tài khoản FBM (ví dụ: Lê Tuấn Anh) để giao dịch chưa đồng bộ và đã đồng bộ hiện cùng một tên; giao dịch đã đồng bộ luôn lấy tên người tạo thật trên FBM.\n'
+        + 'Để trống = cột này trống cho tới khi giao dịch được đồng bộ FBM.'
+    },
+    {
       name: ID_COUNTER_CONFIG_NAMES.customer,
       owner: CONFIG_PARAM_OWNER_SYSTEM,
       type: 'NUMBER',
