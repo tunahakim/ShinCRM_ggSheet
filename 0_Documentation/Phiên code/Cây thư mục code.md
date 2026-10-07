@@ -269,6 +269,7 @@ tests\
     ├── entityRead.js             Tra cột theo mã chứ không theo thứ tự, hàng trắng bị đếm, và không giá trị nào còn là Date.
     ├── categoryRead.js           Cái bẫy @CAT_CHO_PHEP_FBM, và mọi trường SELECT đều tìm được danh mục của mình.
     ├── configRead.js             Khóa trùng thì chặn, còn khối sắp xếp thì thứ tự hàng là nghĩa.
+    ├── idGate.js                 Bộ đếm cấp mã ở Document Properties: di chuyển một lần từ Config, khóa đã có thì thắng, giá trị hỏng thì dừng chứ không về 0.
     ├── dirtyState.js             Khối trạng thái bẩn KHÔNG BAO GIỜ được ném, kể cả khi tệp thuộc tính hỏng hoặc đọc dở dang.
     ├── reloadDecision.js         Bảng luật thuần dùng chung cho signal, reload RAM, localDraft và render toàn bộ view.
     ├── reloadGates.js             Cổng ghi/xóa phát signal sau đọc lại thành công và chứng minh render không phụ thuộc Sidebar.
