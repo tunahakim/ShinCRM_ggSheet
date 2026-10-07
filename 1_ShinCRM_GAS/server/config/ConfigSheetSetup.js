@@ -94,15 +94,8 @@ function configSourceCodes() {
   }, []);
 }
 
-function configCounterMaxima() {
-  return {
-    customer: idGateMaxOnSheet(entityReadContext('customer')),
-    activity: idGateMaxOnSheet(entityReadContext('activity'))
-  };
-}
-
-/** Gieo danh mục; chạy thường giữ giá trị cũ, còn reset ghi đúng mặc định và bộ đếm được truyền vào. */
-function seedConfigParams(file, initialCounters, resetValues) {
+/** Gieo danh mục; chạy thường giữ giá trị cũ, còn reset ghi đúng mặc định. */
+function seedConfigParams(file, resetValues) {
   var sheet = file.getSheetByName('Config');
   var columnMap = readColumnMap('Config');
   var nameColumn = columnIndex(columnMap, '@CFG_THAM_SO');
@@ -123,12 +116,7 @@ function seedConfigParams(file, initialCounters, resetValues) {
 
   var catalog = configParamCatalog();
   var missing = catalog.filter(function (item) { return !rowOfName[item.name]; });
-  var counters = initialCounters || {};
-  function desiredValue(item) {
-    if (item.name === ID_COUNTER_CONFIG_NAMES.customer && counters.customer !== undefined) { return counters.customer; }
-    if (item.name === ID_COUNTER_CONFIG_NAMES.activity && counters.activity !== undefined) { return counters.activity; }
-    return item.defaultValue;
-  }
+  function desiredValue(item) { return item.defaultValue; }
   if (missing.length) {
     sheetGridEnsureRoom(sheet, lastFilled + missing.length, 0);
     // Ô tên đang mang dropdown của danh mục cũ (chưa có tên mới) nên Sheets từ chối ghi; gỡ ở đúng các ô sắp ghi, `configApplyGuidance` đặt lại dropdown theo danh mục mới ngay sau đó.
@@ -198,11 +186,8 @@ function prepareConfigSheet(file, options) {
   var opts = options || {};
   var sheet = file.getSheetByName('Config') || file.insertSheet('Config');
   var migration = configMigrateLegacyCounters(sheet);
-  var maxima = configCounterMaxima();
-  var counters = {
-    customer: opts.reset ? maxima.customer : (migration.values.customer === undefined ? maxima.customer : migration.values.customer),
-    activity: opts.reset ? maxima.activity : (migration.values.activity === undefined ? maxima.activity : migration.values.activity)
-  };
+  // Bộ đếm đã chuyển sang Document Properties; giá trị từ cột bộ đếm đời cũ chỉ được nhận khi kho mới chưa có.
+  Object.keys(migration.values).forEach(function (entity) { idGateAdoptCounter(entity, migration.values[entity]); });
 
   configWriteFrame(sheet);
   if (opts.reset) {
@@ -216,12 +201,12 @@ function prepareConfigSheet(file, options) {
     }
   }
 
-  var seeded = seedConfigParams(file, counters, opts.reset === true);
+  var seeded = seedConfigParams(file, opts.reset === true);
   configApplyGuidance(sheet, seeded.rows);
-  return { sheet: sheet, migration: migration, seeded: seeded, counters: counters };
+  return { sheet: sheet, migration: migration, seeded: seeded };
 }
 
-/** Khôi phục chỉ Config; hai kho dữ liệu được đọc để tính bộ đếm nhưng không bị ghi. */
+/** Khôi phục chỉ Config; bộ đếm cấp mã nằm ở Document Properties nên không bị đụng. */
 function resetConfigToDefaults() {
   if (typeof writeCommitAssertAvailable !== 'function') {
     throw new Error('Thiếu WriteCommit; không ghi Config để tránh mất signal reload.');
@@ -253,7 +238,6 @@ function resetConfigToDefaults() {
 
   return {
     ok: true,
-    counters: result.counters,
     viewSheets: views,
     params: configUserParams(configParams()),
     reload: commit && commit.reloadDecision,

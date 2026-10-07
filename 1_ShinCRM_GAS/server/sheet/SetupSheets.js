@@ -40,7 +40,7 @@ function setupSheets() {
   report.push('');
   report.push('Khối tham số của Config: ' + configResult.seeded.total + ' tên trong danh mục, thêm mới ' + configResult.seeded.added.length
     + (configResult.seeded.added.length ? ' (' + configResult.seeded.added.join(', ') + ')' : ' — các tên đã có sẵn, giá trị giữ nguyên'));
-  if (configResult.migration.found) { report.push('Đã chuyển hai bộ đếm cũ vào khối tham số và xóa hai cột bộ đếm cũ.'); }
+  if (configResult.migration.found) { report.push('Đã chuyển hai bộ đếm cũ sang Document Properties và xóa hai cột bộ đếm cũ.'); }
 
   setupColumnFormats().forEach(function (line) { report.push(line); });
 

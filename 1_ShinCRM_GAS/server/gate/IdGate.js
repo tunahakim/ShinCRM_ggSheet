@@ -1,5 +1,7 @@
 /**
- * Cửa cấp mã bản ghi: đọc bộ đếm ở sheet `Config`, cấp một dải mã liền mạch, ghi bộ đếm mới. Tài liệu 06 Phần 7.
+ * Cửa cấp mã bản ghi: đọc bộ đếm trong Document Properties, cấp một dải mã liền mạch, ghi bộ đếm mới. Tài liệu 06 Phần 7.
+ *
+ * Bộ đếm là trạng thái hệ thống, không phải núm vặn người dùng, nên không nằm trên sheet: người dùng không gõ nhầm được, và sheet `Config` bỏ đi được mà không mất bộ đếm.
  *
  * **Cửa này không bao giờ tự lấy khóa** `[RÀNG BUỘC CỨNG]`. Nó luôn chạy bên trong khóa mà cửa ghi đang giữ. Nhờ vậy trong cả hệ chỉ có đúng một chỗ lấy khóa, và không có đường nào để một luồng tự khóa chính mình. Gọi hàm ở đây từ ngoài khóa là sai, và cái sai đó im lặng: hai người bấm Lưu cùng lúc sẽ nhận cùng một mã, rồi một bản ghi đè lên bản kia.
  *
@@ -12,12 +14,14 @@ var ID_GATE_PREFIXES = { customer: 'CUS-', activity: 'ACT-' };
 /** Số chữ số của phần đuôi. Đổi con số này là đổi khuôn mã của toàn bộ dữ liệu cũ, nên nó nằm đây một mình để không ai đổi nhầm. */
 var ID_GATE_DIGITS = 6;
 
-/** Tên tham số bộ đếm của từng thực thể trong cặp cột tham số chung. */
+/** Khóa Document Properties giữ bộ đếm của từng thực thể. Tên giữ như dòng tham số cũ trong `Config` để bước di chuyển một lần tìm được giá trị cũ. */
+var ID_GATE_COUNTER_KEYS = { customer: 'ID_COUNTER_CUSTOMER', activity: 'ID_COUNTER_ACTIVITY' };
+
 function idGateCounterKey(entity) {
   if (!ID_GATE_PREFIXES[entity]) {
     throw new Error('Không có tiền tố mã cho thực thể "' + entity + '". Có: ' + Object.keys(ID_GATE_PREFIXES).join(', ') + '.');
   }
-  return ID_COUNTER_CONFIG_NAMES[entity];
+  return ID_GATE_COUNTER_KEYS[entity];
 }
 
 /** Dựng một mã từ số thứ tự. */
@@ -54,42 +58,34 @@ function idGateMaxOnSheet(context) {
 }
 
 /**
- * Vị trí ô bộ đếm của một thực thể trong cặp cột tham số của `Config`, cộng giá trị đang có.
+ * Giá trị bộ đếm đang lưu của một thực thể. Trả về `{ current, stored }`; `stored` sai nghĩa là Document Properties chưa có khóa này.
  *
- * Trả về `{ row, valueColumn, current }`, và `row` bằng 0 khi chưa có dòng nào cho thực thể đó. Bên gọi tự quyết ghi vào dòng nào — hàm này chỉ đọc.
+ * Di chuyển một lần: khi chưa có khóa thì lấy số ở dòng tham số cũ cùng tên trong sheet `Config` (nếu sheet còn), để mã không bị cấp lại cho bản ghi đã xóa ở cuối sheet. Lần cấp mã đầu tiên ghi khóa, từ đó dòng cũ không còn ai đọc. Giá trị lưu không phải số nguyên không âm thì ném lỗi chứ không tự về 0, vì về 0 rồi ghi đè là xóa âm thầm bộ đếm.
  */
-function idGateCounterCell(entity) {
-  var sheet = shinOpenSheet('Config');
-  var columnMap = readColumnMap('Config');
-  var cotLoai = columnIndex(columnMap, '@CFG_THAM_SO');
-  var cotGiaTri = columnIndex(columnMap, '@CFG_THAM_SO_GIA_TRI');
-  var firstRow = SHEET_LAYOUT.Config.firstDataRow;
-  var soDong = sheet.getLastRow() - firstRow + 1;
-
-  var ra = { row: 0, valueColumn: cotGiaTri, current: 0, sheet: sheet, firstRow: firstRow, keyColumn: cotLoai };
-  if (soDong <= 0) { return ra; }
-
-  var rong = Math.max(cotLoai, cotGiaTri) - Math.min(cotLoai, cotGiaTri) + 1;
-  var values = sheet.getRange(firstRow, Math.min(cotLoai, cotGiaTri), soDong, rong).getValues();
-  var lechLoai = cotLoai - Math.min(cotLoai, cotGiaTri);
-  var lechGiaTri = cotGiaTri - Math.min(cotLoai, cotGiaTri);
-  var can = idGateCounterKey(entity);
-
-  var found = 0;
-  for (var i = 0; i < values.length; i++) {
-    if (String(values[i][lechLoai]).trim() === can) {
-      if (found) { throw new Error('Sheet Config có tham số khai trùng: ' + can + '. Mỗi tham số chỉ được một dòng — xóa dòng thừa rồi chạy lại.'); }
-      found = firstRow + i;
-      ra.row = firstRow + i;
-      ra.current = idGateNumberOf(values[i][lechGiaTri]);
+function idGateCounterRead(entity) {
+  var key = idGateCounterKey(entity);
+  var raw = PropertiesService.getDocumentProperties().getProperty(key);
+  if (raw !== null) {
+    if (!/^\d+$/.test(String(raw))) {
+      throw new Error('Bộ đếm cấp mã ' + key + ' trong Document Properties hỏng (giá trị "' + raw + '"). Đã dừng cấp mã để không cấp trùng; báo người phụ trách kỹ thuật sửa giá trị này.');
     }
+    return { current: Number(raw), stored: true };
   }
+  var legacy = shinOpenBook().getSheetByName('Config') ? configParams()[key] : '';
+  return { current: idGateNumberOf(legacy), stored: false };
+}
 
-  if (found) { return ra; }
+/** Nhận bộ đếm từ nơi lưu đời cũ, chỉ khi kho mới chưa có khóa; kho mới đã có thì giữ nguyên để không kéo bộ đếm lùi. */
+function idGateAdoptCounter(entity, value) {
+  var key = idGateCounterKey(entity), props = PropertiesService.getDocumentProperties();
+  if (props.getProperty(key) !== null) { return false; }
+  props.setProperty(key, String(idGateNumberOf(value)));
+  return true;
+}
 
-  // Chưa có dòng nào cho thực thể này thì dòng mới đặt ngay sau dòng cuối đang có nội dung của khối.
-  ra.row = 0;
-  return ra;
+/** Bộ đếm của cả hai thực thể cho hợp đồng RAM `config.counters`, thứ client dùng để vẽ mã xem trước lên form. */
+function idGateCounterValues() {
+  return { customer: idGateCounterRead('customer').current, activity: idGateCounterRead('activity').current };
 }
 
 /**
@@ -105,7 +101,7 @@ function idGateIssue(entity, soLuong, context) {
   var can = soLuong === undefined ? 1 : soLuong;
   if (can <= 0) { return []; }
 
-  var o = idGateCounterCell(entity);
+  var o = idGateCounterRead(entity);
   var batDau = o.current + 1;
   var maxSheet = idGateMaxOnSheet(context);
 
@@ -121,15 +117,7 @@ function idGateIssue(entity, soLuong, context) {
   var ra = [];
   for (var i = 0; i < can; i++) { ra.push(idGateFormat(entity, batDau + i)); }
 
-  var dongGhi = o.row;
-  if (!dongGhi) {
-    dongGhi = Math.max(o.sheet.getLastRow() + 1, o.firstRow);
-    sheetGridEnsureRoom(o.sheet, dongGhi, SHEET_GRID_SLACK);
-    o.sheet.getRange(dongGhi, o.keyColumn).setValue(idGateCounterKey(entity));
-  }
-
-  o.sheet.getRange(dongGhi, o.valueColumn).setValue(batDau + can - 1);
-  resetSettingsCache();
+  PropertiesService.getDocumentProperties().setProperty(idGateCounterKey(entity), String(batDau + can - 1));
   return ra;
 }
 
@@ -139,9 +127,9 @@ function probeIdGate() {
 
   ['customer', 'activity'].forEach(function (entity) {
     var context = entityReadContext(entity);
-    var o = idGateCounterCell(entity);
+    var o = idGateCounterRead(entity);
     var maxSheet = idGateMaxOnSheet(context);
-    report.push(entity + ': bộ đếm ' + o.current + (o.row ? ' (dòng ' + o.row + ')' : ' (chưa có dòng)') + ' — max trên sheet ' + maxSheet + ' — mã kế tiếp sẽ là ' + idGateFormat(entity, Math.max(o.current, maxSheet) + 1));
+    report.push(entity + ': bộ đếm ' + o.current + (o.stored ? '' : ' (chưa chuyển sang Document Properties, đang đọc từ Config)') + ' — max trên sheet ' + maxSheet + ' — mã kế tiếp sẽ là ' + idGateFormat(entity, Math.max(o.current, maxSheet) + 1));
   });
 
   report.forEach(function (line) { Logger.log(line); });

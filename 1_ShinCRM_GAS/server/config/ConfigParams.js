@@ -6,12 +6,6 @@ var SORT_LEVEL_OPTIONS = ['Tăng dần (A → Z)', 'Giảm dần (Z → A)'];
 /** Nguồn log đang có trong bản ShinCRM độc lập; `all` và tổ hợp hiện tại là lựa chọn vận hành, không phải nguồn mới. */
 var LOG_TRACE_SOURCE_OPTIONS = ['off', 'all', 'core', 'sidebar', 'fbm_sync', 'core,sidebar'];
 
-/** Hai bộ đếm dùng chung cặp cột tham số nhưng vẫn là trạng thái do cửa cấp mã sở hữu. */
-var ID_COUNTER_CONFIG_NAMES = {
-  customer: 'ID_COUNTER_CUSTOMER',
-  activity: 'ID_COUNTER_ACTIVITY'
-};
-
 /**
  * Danh mục theo thứ tự gieo xuống sheet.
  *
@@ -49,24 +43,6 @@ function configParamCatalog() {
       note: 'Tên người dùng ShinCRM, tự điền vào cột "Người tạo trên FBM" của giao dịch tạo mới.\n\n'
         + 'Gõ đúng tên đầy đủ của tài khoản FBM (ví dụ: Lê Tuấn Anh) để giao dịch chưa đồng bộ và đã đồng bộ hiện cùng một tên; giao dịch đã đồng bộ luôn lấy tên người tạo thật trên FBM.\n'
         + 'Để trống = cột này trống cho tới khi giao dịch được đồng bộ FBM.'
-    },
-    {
-      name: ID_COUNTER_CONFIG_NAMES.customer,
-      owner: CONFIG_PARAM_OWNER_SYSTEM,
-      type: 'NUMBER',
-      minimum: 0,
-      defaultValue: 0,
-      note: 'Bộ đếm cấp mã khách hàng do ShinCRM tự quản lý.\n\n'
-        + 'Giá trị là phần số lớn nhất đã cấp. Không sửa bằng tay; cửa cấp mã luôn đối chiếu với mã lớn nhất trong sheet Customer trước khi cấp mã mới.'
-    },
-    {
-      name: ID_COUNTER_CONFIG_NAMES.activity,
-      owner: CONFIG_PARAM_OWNER_SYSTEM,
-      type: 'NUMBER',
-      minimum: 0,
-      defaultValue: 0,
-      note: 'Bộ đếm cấp mã lần làm việc do ShinCRM tự quản lý.\n\n'
-        + 'Giá trị là phần số lớn nhất đã cấp. Không sửa bằng tay; cửa cấp mã luôn đối chiếu với mã lớn nhất trong sheet Activity trước khi cấp mã mới.'
     }
   ];
 }
@@ -98,11 +74,3 @@ function configUserParams(allParams) {
   return result;
 }
 
-/** Giữ hợp đồng RAM `{ customer, activity }` dù vị trí lưu vật lý đã chuyển vào khối tham số. */
-function configCounterValues(allParams) {
-  var source = allParams || {};
-  return {
-    customer: Object.prototype.hasOwnProperty.call(source, ID_COUNTER_CONFIG_NAMES.customer) ? source[ID_COUNTER_CONFIG_NAMES.customer] : '',
-    activity: Object.prototype.hasOwnProperty.call(source, ID_COUNTER_CONFIG_NAMES.activity) ? source[ID_COUNTER_CONFIG_NAMES.activity] : ''
-  };
-}

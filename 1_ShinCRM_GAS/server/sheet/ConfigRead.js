@@ -84,7 +84,7 @@ function configReadAll() {
   return {
     sheetSchema: configReadBlock(CONFIG_READ_BLOCKS.sheetSchema, columnMap, rows),
     defaults: configReadBlock(CONFIG_READ_BLOCKS.defaults, columnMap, rows),
-    counters: configCounterValues(configParams()),
+    counters: idGateCounterValues(),
     sort: configReadSort(columnMap, rows)
   };
 }
