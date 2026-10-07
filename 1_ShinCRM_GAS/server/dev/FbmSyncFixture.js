@@ -123,3 +123,8 @@ function fbmProbeStuckState() {
   }
   return out;
 }
+
+/** Dò hash chờ xác nhận và khóa ghi (không chứa cookie hay mật khẩu) để điều tra lệch dữ liệu sau lệnh ghi FBM. */
+function fbmProbePendingPushes() {
+  return { pending: FbmSync.pendingPushesRead(), cursor: FbmSync.stateRead().cursor, conflictRefresh: FbmSync.stateRead().metadata.conflictRefresh };
+}
