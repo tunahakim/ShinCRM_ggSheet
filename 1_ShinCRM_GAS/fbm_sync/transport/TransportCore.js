@@ -93,7 +93,7 @@ FbmSync.sessionIdentityClear = function (state) {
 };
 FbmSync.sessionSystemRequest = function (kind, value) {
   var request, options = value && typeof value === 'object' ? value : {};
-  if (kind === 'login') { request = FbmSync.loginRequest(value && value.credentialRef, value && value.testOnly === true); }
+  if (kind === 'login') { request = FbmSync.loginRequest(value && value.credentialRef, value && value.testOnly === true, value && value.force === true); }
   else if (kind === 'authorize') { request = FbmSync.authorizeRequest(value && value.entity || value || 'customer'); }
   else if (kind === 'session_probe') { request = FbmSync.identityUserRequest(); request.meta.kind = 'session_probe'; }
   else if (kind === 'identity_user_grid') { request = FbmSync.identityUserRequest(); }
