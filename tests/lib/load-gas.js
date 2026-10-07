@@ -61,7 +61,8 @@ function docTep(duongDanTuongDoi) {
   if (!fs.existsSync(duongDan)) {
     throw new Error('Không thấy tệp "' + duongDanTuongDoi + '" trong 1_ShinCRM_GAS. Chưa dựng hoặc đặt sai chỗ.');
   }
-  return fs.readFileSync(duongDan, 'utf8');
+  // Repo lưu LF nhưng Windows có thể checkout CRLF; test so chuỗi nhiều dòng bằng '\n' nên luôn đọc về LF.
+  return fs.readFileSync(duongDan, 'utf8').replace(/\r\n/g, '\n');
 }
 
 /** Nạp một hoặc nhiều tệp `.js` phía máy chủ vào hộp cát, theo đúng thứ tự truyền vào. */
