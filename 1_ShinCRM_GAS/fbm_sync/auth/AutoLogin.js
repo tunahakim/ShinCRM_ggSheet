@@ -107,10 +107,10 @@ FbmSync.loginConfigPolicySave = function (input) {
   return FbmSync.loginConfigPublic();
 };
 
-/** Lượt người dùng bấm chạy thì không chịu chu kỳ chờ: chu kỳ chỉ để chạy nền không thử dồn dập, còn người bấm cần được thử ngay hoặc nhận hướng dẫn (chủ dự án chốt 2026-10-07). Heartbeat và probe chờ phiên cũ do máy tự gọi nên vẫn chịu chu kỳ. Mỗi lượt bấm vẫn chỉ thử một lần vì đăng nhập hỏng thì lượt chạy dừng. */
+/** Lượt người dùng bấm chạy thì không chịu chu kỳ chờ: chu kỳ chỉ để chạy nền không thử dồn dập, còn người bấm cần được thử ngay hoặc nhận hướng dẫn (chủ dự án chốt 2026-10-07). Heartbeat và probe sau chu kỳ chờ phiên cũ do máy tự gọi nên vẫn chịu chu kỳ. Cạm bẫy: mọi lượt chạy đều mở đầu bằng `session_probe`, nên không được loại theo loại cursor đó mà phải nhìn cờ `blockedSessionProbe` của vòng chờ (gặp thật 2026-10-07). Mỗi lượt bấm vẫn chỉ thử một lần vì đăng nhập hỏng thì lượt chạy dừng. */
 FbmSync.autoLoginAttemptOptions = function (state, cursor) {
-  var kind = String(cursor && cursor.kind || '');
-  return { manual: String(state && state.origin || '') === 'manual' && kind !== 'heartbeat' && kind !== 'session_probe' && kind !== 'session_wait' };
+  var kind = String(cursor && cursor.kind || ''), gate = state && state.metadata && state.metadata.sessionGate || {};
+  return { manual: String(state && state.origin || '') === 'manual' && !!(state && state.runId) && kind !== 'heartbeat' && gate.blockedSessionProbe !== true };
 };
 
 FbmSync.autoLoginCanAttempt = function (now, options) {
