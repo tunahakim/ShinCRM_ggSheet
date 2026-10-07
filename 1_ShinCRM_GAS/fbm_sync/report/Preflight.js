@@ -103,7 +103,7 @@ FbmSync.preflightCandidates = function (issues, mode) {
           FbmSync.preflightIssue(issues, 'FBM_ACTIVITY_OWNER_MISMATCH', 'error', entity, ownerError, mode === 'write');
         }
         var fields = entity === 'customer'
-          ? [['@CAT_TINH_THANH', FbmSync.value(record, 'province', '')], ['@CAT_NGUON_KH', FbmSync.value(record, 'leadSource', '')], ['@CAT_SAN_PHAM', FbmSync.value(record, 'product', '')]]
+          ? [['@CAT_TINH_THANH', FbmSync.value(record, 'province', '')], ['@CAT_NGUON_KH', FbmSync.value(record, 'leadSource', '')]]
           : [['@CAT_CONG_VIEC', FbmSync.value(record, 'taskType', '')]];
         fields.forEach(function (field) {
           var value = String(field[1] === null || field[1] === undefined ? '' : field[1]).trim();

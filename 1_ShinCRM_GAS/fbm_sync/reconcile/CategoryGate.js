@@ -155,8 +155,7 @@ FbmSync.activityParentReady = function (customer) {
 FbmSync.validatePushCategories = function (record, entity, categoryGate) {
   var fields = entity === 'customer' ? [
     ['@CAT_TINH_THANH', FbmSync.value(record, 'province', FbmSync.value(record, 'dc_lh_tinh', ''))],
-    ['@CAT_NGUON_KH', FbmSync.value(record, 'leadSource', FbmSync.value(record, 'nguon_dm', ''))],
-    ['@CAT_SAN_PHAM', FbmSync.value(record, 'product', FbmSync.value(record, 'ma_sp', ''))]
+    ['@CAT_NGUON_KH', FbmSync.value(record, 'leadSource', FbmSync.value(record, 'nguon_dm', ''))]
   ] : [
     ['@CAT_CONG_VIEC', FbmSync.value(record, 'taskType', FbmSync.value(record, 'ma_cv', ''))]
   ];
@@ -190,8 +189,7 @@ FbmSync.mergeLiveCategoryCell = function (cell, code, name) {
 FbmSync.validateIncomingCategories = function (record, entity, categoryGate) {
   var fields = entity === 'customer' ? [
     ['@CAT_TINH_THANH', FbmSync.value(record, 'province', '')],
-    ['@CAT_NGUON_KH', FbmSync.value(record, 'leadSource', '')],
-    ['@CAT_SAN_PHAM', FbmSync.value(record, 'product', '')]
+    ['@CAT_NGUON_KH', FbmSync.value(record, 'leadSource', '')]
   ] : [
     ['@CAT_CONG_VIEC', FbmSync.value(record, 'taskType', '')]
   ];

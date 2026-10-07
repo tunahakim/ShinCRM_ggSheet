@@ -244,7 +244,7 @@ FbmSync.markMissingAfterFullScan = function (entity, state) {
 
 /** Đổi record Customer FBM sang schema nội bộ của Sheet. */
 FbmSync.customerRecord = function (fbm, categoryGate) {
-  var record = { companyName: fbm.ten_kh || '', taxNumber: fbm.ma_so_thue || '', phone: fbm.dien_thoai || '', email: fbm.email || '', address: fbm.dc_lh || '', province: fbm.ten_dclh_tinh || fbm.dc_lh_tinh || '', website: fbm.website || '', contactPerson: fbm.ong_ba || '', leadSource: fbm.ten_nguon_dm || fbm.nguon_dm || '', product: fbm.ten_sp || fbm.ma_sp || '', verifyStatus: 'Chưa xác thực', allowFbmPush: FbmSync.PUSH_ALLOW_VALUE, fbmCustomerCode: fbm.ma_kh || '', fbmId: fbm.stt_rec_kh || '', syncedAt: new Date(), syncStatus: FbmSync.SYNC_STATUS.synced };
+  var record = { companyName: fbm.ten_kh || '', taxNumber: fbm.ma_so_thue || '', phone: fbm.dien_thoai || '', email: fbm.email || '', address: fbm.dc_lh || '', province: fbm.ten_dclh_tinh || fbm.dc_lh_tinh || '', website: fbm.website || '', contactPerson: fbm.ong_ba || '', leadSource: fbm.ten_nguon_dm || fbm.nguon_dm || '', verifyStatus: 'Chưa xác thực', allowFbmPush: FbmSync.PUSH_ALLOW_VALUE, fbmCustomerCode: fbm.ma_kh || '', fbmId: fbm.stt_rec_kh || '', syncedAt: new Date(), syncStatus: FbmSync.SYNC_STATUS.synced };
   record.fbmHash = FbmSync.hash(fbm, 'customer', categoryGate);
   return record;
 };

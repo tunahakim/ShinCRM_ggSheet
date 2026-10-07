@@ -56,14 +56,14 @@ FbmSync.ACTIVITY_FORM_ROW_FIELDS = [];
 FbmSync.ACTIVITY_FORM_ROW_FIELDS[0] = 'id'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[1] = 'event_yn'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[2] = 'text'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[3] = 'ma_cv'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[5] = 'assigned_name'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[7] = 'muc_do'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[8] = 'start_date'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[9] = 'start_time'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[10] = 'end_date'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[11] = 'end_time'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[12] = 'ngay_nhac'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[13] = 'gio_nhac'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[14] = 'full_day'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[15] = 'details'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[16] = 'private'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[17] = 'share_user'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[18] = 'share_group'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[19] = 'ma_nhom'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[21] = 'owner'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[22] = 'comment'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[23] = 'nguoi_sua'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[24] = 'datetime0'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[25] = 'status'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[26] = 'gia_bao'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[27] = 'gia_dt'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[28] = 'ma_dt'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[29] = 'nd_chinh_sua'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[30] = 'ma_sp'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[31] = 'ma_module'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[37] = 'stt_rec'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[38] = 'type'; FbmSync.ACTIVITY_FORM_ROW_FIELDS[39] = 'user_ref';
 
 FbmSync.FIELD_ALIASES = {
-  customer: { id: 'ma_kh', companyName: 'ten_kh', taxNumber: 'ma_so_thue', phone: 'dien_thoai', email: 'email', address: 'dc_lh', province: 'dc_lh_tinh', website: 'website', contactPerson: 'ong_ba', leadSource: 'nguon_dm', product: 'ma_sp' },
+  customer: { id: 'ma_kh', companyName: 'ten_kh', taxNumber: 'ma_so_thue', phone: 'dien_thoai', email: 'email', address: 'dc_lh', province: 'dc_lh_tinh', website: 'website', contactPerson: 'ong_ba', leadSource: 'nguon_dm' },
   activity: { id: 'id', customerId: 'ma_kh', workDate: 'end_date', taskType: 'ma_cv', content: 'details', createdAt: 'datetime0' }
 };
 
 /* Chỉ fingerprint field nghiệp vụ; alias hiển thị không tham gia. */
 FbmSync.FINGERPRINT_FIELDS = {
   // stt_rec_kh/ma_kh là định danh FBM riêng, không được biến thành thay đổi nội dung ShinCRM.
-  customer: ['ten_kh', 'ma_so_thue', 'ong_ba', 'dien_thoai', 'email', 'website', 'dc_lh', 'dc_lh_tinh', 'nguon_dm', 'ma_sp'],
+  customer: ['ten_kh', 'ma_so_thue', 'ong_ba', 'dien_thoai', 'email', 'website', 'dc_lh', 'dc_lh_tinh', 'nguon_dm'],
   // Quan hệ với Customer là khóa nối, không phải nội dung của Activity.
   activity: ['id', 'ma_cv', 'details', 'end_date']
 };
@@ -84,8 +84,7 @@ FbmSync.AUTH_VARS = {
 FbmSync.SYNC_LOOKUPS = [
   { key: '@CAT_TINH_THANH', controller: 'crProvinceCity' },
   { key: '@CAT_NGUON_KH', controller: 'crLeadSource' },
-  { key: '@CAT_CONG_VIEC', controller: 'crJob' },
-  { key: '@CAT_SAN_PHAM', controller: 'crdmsp' }
+  { key: '@CAT_CONG_VIEC', controller: 'crJob' }
 ];
 
 FbmSync.PUSH_ALLOW_VALUE = 'Cho phép';

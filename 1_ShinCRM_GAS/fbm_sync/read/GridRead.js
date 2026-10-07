@@ -279,7 +279,7 @@ FbmSync.gridRows = function (response) {
 };
 /** Kiểm metadata đủ để ghép rows; thiếu AliasName thì dừng thay vì đoán theo index. */
 FbmSync.validateGridFields = function (entity, fields) {
-  var required = entity === 'customer' ? ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ma_so_thue', 'ong_ba', 'dc_lh', 'dien_thoai', 'email', 'website', 'ten_dclh_tinh', 'ten_nguon_dm', 'ten_sp', 'ngay_gd', 'datetime0', 'xorder'] : ['id', 'ten_cv', 'details', 'end_date', 'owner', 'datetime0', 'line_nbr'];
+  var required = entity === 'customer' ? ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ma_so_thue', 'ong_ba', 'dc_lh', 'dien_thoai', 'email', 'website', 'ten_dclh_tinh', 'ten_nguon_dm', 'ngay_gd', 'datetime0', 'xorder'] : ['id', 'ten_cv', 'details', 'end_date', 'owner', 'datetime0', 'line_nbr'];
   var seen = {};
   (fields || []).forEach(function (field) { if (seen[field]) { throw new Error('FBM trả AliasName trùng: ' + field); } seen[field] = true; });
   var missing = required.filter(function (field) { return !seen[field]; });

@@ -89,9 +89,7 @@ FbmSync.canonical = function (entity, record, categoryGate) {
     var toFbmCode = typeof FbmSync.categoryCode === 'function' ? FbmSync.categoryCode : function (gate, source, value) { return value; };
     if (entity === 'customer' && alias === 'dc_lh_tinh') { raw = toFbmCode(categoryGate || {}, '@CAT_TINH_THANH', raw); }
     if (entity === 'customer' && alias === 'nguon_dm') { raw = toFbmCode(categoryGate || {}, '@CAT_NGUON_KH', raw); }
-    if (entity === 'customer' && alias === 'ma_sp') { raw = toFbmCode(categoryGate || {}, '@CAT_SAN_PHAM', raw); }
     if (entity === 'activity' && alias === 'ma_cv') { raw = toFbmCode(categoryGate || {}, '@CAT_CONG_VIEC', raw); }
-    if (entity === 'activity' && alias === 'ma_sp') { raw = toFbmCode(categoryGate || {}, '@CAT_SAN_PHAM', raw); }
     result[alias] = FbmSync.normalizeFingerprintValue(entity, alias, raw);
   });
   return result;
