@@ -6,7 +6,7 @@ async function chay(so) {
   section("FBM sync — preflight");
   const hop = taoHopCat({ FbmSync: {}, shinCorePreflight: () => ({
     params: {},
-    category: { categories: { '@CAT_CHO_PHEP_FBM': [] } },
+    category: { categories: {} },
     issues: []
   }) });
   napServer(hop, 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/report/Preflight.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
@@ -15,8 +15,7 @@ async function chay(so) {
   hop.FbmSync.currentSpreadsheetId = () => 'sheet-a';
   hop.FbmSync.configValue = () => '';
   hop.FbmSync.bindingRead = () => ({});
-  hop.FbmSync.readLocal = (entity) => entity === 'activity' ? [{ id: 'ACT-NOPERM', customerId: 'CUS-1', fbmId: '174813', fbmHash: 'old', allowFbmPush: 'Chưa cho phép', syncStatus: 'chờ đối soát', taskType: 'Gọi điện chăm sóc', content: 'Nội dung mới' }] : [{ id: 'CUS-1', fbmCustomerCode: 'ALT00010', allowFbmPush: 'Cho phép' }, { id: 'CUS-2', fbmId: 'FBM-2', allowFbmPush: 'Cho phép', syncStatus: hop.FbmSync.SYNC_STATUS.conflict }, { id: 'CUS-3', fbmId: 'FBM-3', allowFbmPush: 'Cho phép', syncStatus: hop.FbmSync.SYNC_STATUS.conflict }];
-  hop.FbmSync.pushPermission = (record) => ({ push: String(record.allowFbmPush || '') === 'Cho phép' });
+  hop.FbmSync.readLocal = (entity) => entity === 'activity' ? [{ id: 'ACT-NOPERM', customerId: 'CUS-1', fbmId: '174813', fbmHash: 'old', fbmSyncPermission: 'Chỉ lấy từ FBM', syncStatus: 'chờ đối soát', taskType: 'Gọi điện chăm sóc', content: 'Nội dung mới' }] : [{ id: 'CUS-1', fbmCustomerCode: 'ALT00010', fbmSyncPermission: 'Cho phép' }, { id: 'CUS-2', fbmId: 'FBM-2', fbmSyncPermission: 'Cho phép', syncStatus: hop.FbmSync.SYNC_STATUS.conflict }, { id: 'CUS-3', fbmId: 'FBM-3', fbmSyncPermission: 'Cho phép', syncStatus: hop.FbmSync.SYNC_STATUS.conflict }];
   hop.FbmSync.pushCandidates = (entity) => entity === 'activity' ? [{ entity: 'activity', kind: 'edit', id: 'ACT-1', record: { id: 'ACT-1', syncStatus: hop.FbmSync.SYNC_STATUS.pending, taskType: 'Gọi điện chăm sóc', owner: 'Owner khác' } }] : [];
 
   const write = hop.FbmSync.runPreflight({ mode: 'write' });
@@ -26,8 +25,20 @@ async function chay(so) {
   check(so, 'FBM-024: preflight gộp mọi dòng xung đột chờ quyết thành một issue có số đếm, chặn chế độ ghi', [pendingConflicts.length, /Có 2 bản ghi/.test(pendingConflicts[0] && pendingConflicts[0].message), pendingConflicts[0] && pendingConflicts[0].blocking], [1, true, true]);
   check(so, 'preflight báo Activity đổi nhưng chưa bật quyền đẩy', write.issues.some((item) => item.code === 'FBM_RECORD_PUSH_PERMISSION_MISSING'), true);
   check(so, 'preflight gộp cảnh báo quyền đẩy theo tổng số', write.issues.filter((item) => item.code === 'FBM_RECORD_PUSH_PERMISSION_MISSING').length, 1);
+  // Chủ dự án chốt 2026-10-07: năm giá trị cố định, so khớp đúng chữ; ô trống hoặc sai thì không đẩy, vẫn kéo về, và bị cảnh báo kèm mã.
+  const quyen = (value, entity, parent) => { const r = hop.FbmSync.syncPermission({ fbmSyncPermission: value }, entity || 'customer', parent); return [r.push, r.pull, r.invalid]; };
+  check(so, 'Cho phép đồng bộ FBM: năm giá trị cố định cho đúng quyền đẩy/kéo; ô trống, sai chữ hoặc lệch hoa thường là không hợp lệ: không đẩy, vẫn kéo',
+    [quyen('Cho phép'), quyen('Chỉ lấy từ FBM'), quyen('Chờ đồng bộ'), quyen('Không đồng bộ'), quyen('Cấm đồng bộ'), quyen(''), quyen('cho phép'), quyen('Ngừng đồng bộ'), hop.FbmSync.pullDefaultPermission()],
+    [[true, true, false], [false, true, false], [false, false, false], [false, false, false], [false, false, false], [false, true, true], [false, true, true], [false, true, true], 'Cho phép']);
+  check(so, 'Activity bị chặn theo Customer cha: cha chỉ lấy thì con không đẩy, cha cấm thì con không kéo',
+    [quyen('Cho phép', 'activity', { fbmSyncPermission: 'Chỉ lấy từ FBM' }), quyen('Cho phép', 'activity', { fbmSyncPermission: 'Cấm đồng bộ' })], [[false, true, false], [false, false, false]]);
+  const docCu = hop.FbmSync.readLocal;
+  hop.FbmSync.readLocal = (entity) => entity === 'activity' ? [] : [{ id: 'CUS-TRONG', fbmSyncPermission: '' }, { id: 'CUS-SAI', fbmSyncPermission: 'Ngừng đồng bộ' }, { id: 'CUS-DUNG', fbmSyncPermission: 'Cho phép' }];
+  const sai = hop.FbmSync.runPreflight({ mode: 'read' }).issues.filter((item) => item.code === 'FBM_SYNC_PERMISSION_INVALID');
+  hop.FbmSync.readLocal = docCu;
+  check(so, 'preflight cảnh báo ô Cho phép đồng bộ FBM trống hoặc sai, nêu đúng mã bản ghi, không chặn phiên', [sai.length, sai[0] && sai[0].severity, sai[0] && sai[0].blocking, /CUS-TRONG, CUS-SAI./.test(sai[0] && sai[0].message), /CUS-DUNG/.test(sai[0] && sai[0].message)], [1, 'warn', false, true, false]);
 
-  hop.FbmSync.readLocal = (entity) => entity === 'activity' ? [{ id: 'ACT-NOPERM', customerId: 'CUS-1', fbmId: '' }] : [{ id: 'CUS-1', fbmCustomerCode: 'ALT00010', allowFbmPush: 'Cho phép' }];
+  hop.FbmSync.readLocal = (entity) => entity === 'activity' ? [{ id: 'ACT-NOPERM', customerId: 'CUS-1', fbmId: '' }] : [{ id: 'CUS-1', fbmCustomerCode: 'ALT00010', fbmSyncPermission: 'Cho phép' }];
   const read = hop.FbmSync.runPreflight({ mode: 'read' });
   check(so, 'preflight read chan truoc khi lien ket tai khoan FBM nhung khong can Config ten tai khoan', [read.ok, read.blocking.some((item) => item.code === 'FBM_IDENTITY_UNBOUND'), read.warnings.some((item) => item.code === 'FBM_ACCOUNT_NAME_MISSING')], [false, true, false]);
   hop.FbmSync.readLocal = (entity) => entity === 'activity' ? [{ id: 'ACT-NOPERM', customerId: 'CUS-1', fbmId: '174813' }] : [{ id: 'CUS-1', fbmId: 'FBM-CU', fbmCustomerCode: 'ALT00010' }];
@@ -42,7 +53,7 @@ async function chay(so) {
   check(so, 'preflight mode push van fail-closed theo binding va cac cong thuc te', [push.ok, push.blocking.some((item) => item.code === 'FBM_ACCOUNT_NAME_MISSING')], [false, false]);
 
   hop.FbmSync.scriptSettings = () => ({ accountName: 'Lê Tuấn Anh', customerPrefix: '', customerCodeLength: '' });
-  hop.FbmSync.pushCandidates = (entity) => entity === 'customer' ? [{ entity: 'customer', kind: 'create', id: 'CUS-NEW', record: { id: 'CUS-NEW', allowFbmPush: 'Cho phép' } }] : [];
+  hop.FbmSync.pushCandidates = (entity) => entity === 'customer' ? [{ entity: 'customer', kind: 'create', id: 'CUS-NEW', record: { id: 'CUS-NEW', fbmSyncPermission: 'Cho phép' } }] : [];
   const missingCustomerCode = hop.FbmSync.runPreflight({ mode: 'write' });
   check(so, 'preflight chan Customer moi khi thieu prefix va do dai ma khach FBM', missingCustomerCode.blocking.some((item) => item.code === 'FBM_CUSTOMER_CODE_CONFIG_MISSING'), true);
   hop.FbmSync.scriptSettings = () => ({ accountName: 'Lê Tuấn Anh', customerPrefix: 'ALT', customerCodeLength: '8' });
@@ -66,8 +77,8 @@ async function chay(so) {
   const localReads = { customer: 0, activity: 0 };
   let hashCalls = 0;
   hop.FbmSync.readLocal = (entity) => { localReads[entity] += 1; return entity === 'activity'
-    ? [{ id: 'ACT-NOPERM', customerId: 'CUS-1', fbmId: '174813', fbmHash: 'old', allowFbmPush: 'Chưa cho phép', syncStatus: 'đã đồng bộ' }]
-    : [{ id: 'CUS-1', fbmId: 'FBM-CU', fbmCustomerCode: 'ALT00010', fbmHash: 'old', allowFbmPush: 'Cho phép' }, { id: 'CUS-2', allowFbmPush: 'Cho phép' }]; };
+    ? [{ id: 'ACT-NOPERM', customerId: 'CUS-1', fbmId: '174813', fbmHash: 'old', fbmSyncPermission: 'Chỉ lấy từ FBM', syncStatus: 'đã đồng bộ' }]
+    : [{ id: 'CUS-1', fbmId: 'FBM-CU', fbmCustomerCode: 'ALT00010', fbmHash: 'old', fbmSyncPermission: 'Cho phép' }, { id: 'CUS-2', fbmSyncPermission: 'Cho phép' }]; };
   hop.FbmSync.pushCandidates = () => [];
   hop.FbmSync.hash = (...args) => { hashCalls += 1; return savedHash(...args); };
   const scanned = hop.FbmSync.runPreflight({ mode: 'write' });

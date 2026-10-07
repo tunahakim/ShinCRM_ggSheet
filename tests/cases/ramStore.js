@@ -85,9 +85,9 @@ function chay(so) {
   check(so, 'bản ghi là object có khóa là TÊN TRƯỜNG — hình dạng đường truyền chỉ tồn tại tới đây',
     hop.Store.getCustomer('KH0001').companyName, 'Công ty Xây dựng Đông Á');
   check(so, 'SETTINGS đi cùng gói nạp và được gán một lần', hop.SETTINGS.CHUNK_ROWS, nen.hop.SETTINGS.CHUNK_ROWS);
-  check(so, 'tám danh mục vào bộ nhớ, và Config bốn khối cộng khối tham số cũng vậy',
+  check(so, 'bảy danh mục vào bộ nhớ, và Config bốn khối cộng khối tham số cũng vậy',
     [Object.keys(hop.Store.categories).length, Object.keys(hop.Store.config).sort()],
-    [8, ['counters', 'defaults', 'params', 'sheetSchema', 'sort']]);
+    [7, ['counters', 'defaults', 'params', 'sheetSchema', 'sort']]);
   check(so, 'cờ nạp giao dịch bật ở loading ngay sau ingestCore, chưa phải ready', hop.Store.activityState, hop.STORE_LOADING);
 
   return chayTraCuu(so, nen, hop, hangDau);

@@ -14,7 +14,7 @@ function dungDay(tenNguoiDung) {
 function giaoDich(them) {
   return Object.assign({
     customerId: 'CUS-000001', workDate: '2026-09-06', taskType: 'Gọi điện', content: 'Chào hàng',
-    product: 'Thép hộp', allowFbmPush: 'Cho phép'
+    product: 'Thép hộp', fbmSyncPermission: 'Cho phép'
   }, them || {});
 }
 

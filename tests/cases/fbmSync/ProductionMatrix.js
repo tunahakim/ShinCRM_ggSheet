@@ -65,11 +65,11 @@ function makeSync() {
 }
 
 function customer(id, code, name) {
-  return { fbmId: id, fbmCustomerCode: code, companyName: name, taxNumber: '010000' + code.slice(-2), phone: '0900000000', email: code.toLowerCase() + '@example.test', address: 'Hà Nội', province: 'Hà Nội', contactPerson: 'Người liên hệ', leadSource: '', product: '', allowFbmPush: 'Cho phép', syncStatus: 'đã đồng bộ' };
+  return { fbmId: id, fbmCustomerCode: code, companyName: name, taxNumber: '010000' + code.slice(-2), phone: '0900000000', email: code.toLowerCase() + '@example.test', address: 'Hà Nội', province: 'Hà Nội', contactPerson: 'Người liên hệ', leadSource: '', product: '', fbmSyncPermission: 'Cho phép', syncStatus: 'đã đồng bộ' };
 }
 
 function activity(id, customerCode, content) {
-  return { fbmId: id, customerFbmCode: customerCode, workDate: '2026-09-19', taskType: 'Gọi điện', content, owner: 'Le Tuan Anh', allowFbmPush: 'Cho phép', syncStatus: 'đã đồng bộ' };
+  return { fbmId: id, customerFbmCode: customerCode, workDate: '2026-09-19', taskType: 'Gọi điện', content, owner: 'Le Tuan Anh', fbmSyncPermission: 'Cho phép', syncStatus: 'đã đồng bộ' };
 }
 
 async function chay(so) {
@@ -163,7 +163,7 @@ async function chay(so) {
     F.stateWrite(st);
     return { run, F };
   }
-  const editCustomer = (x) => ({ id: 'CUS-' + x, fbmId: 'F-' + x, fbmCustomerCode: 'ALT0000' + x, companyName: 'Cty ' + x, taxNumber: '010' + x, contactPerson: 'Người liên hệ', phone: '0900000000', leadSource: 'Web', address: 'Hà Nội', province: 'Hà Nội', allowFbmPush: 'Cho phép', syncStatus: 'đã đồng bộ', fbmHash: 'cũ' });
+  const editCustomer = (x) => ({ id: 'CUS-' + x, fbmId: 'F-' + x, fbmCustomerCode: 'ALT0000' + x, companyName: 'Cty ' + x, taxNumber: '010' + x, contactPerson: 'Người liên hệ', phone: '0900000000', leadSource: 'Web', address: 'Hà Nội', province: 'Hà Nội', fbmSyncPermission: 'Cho phép', syncStatus: 'đã đồng bộ', fbmHash: 'cũ' });
 
   const skipOnError = pushQueue(['A', 'B', 'C'].map(editCustomer));
   const triedOnError = [];
@@ -189,7 +189,7 @@ async function chay(so) {
   }
   check(so, 'FBM-032: bản ghi vừa đẩy xong rời danh sách ứng viên thì bản ghi kế tiếp vẫn được đẩy', triedOnSuccess, ['CUS-A', 'CUS-B', 'CUS-C']);
 
-  const stuckActivity = { id: 'ACT-STUCK', customerId: 'CUS-A', fbmId: '', workDate: '2026-09-19', taskType: 'Gọi điện', content: 'Gọi lại', owner: 'Le Tuan Anh', allowFbmPush: 'Cho phép', syncStatus: 'đang đẩy' };
+  const stuckActivity = { id: 'ACT-STUCK', customerId: 'CUS-A', fbmId: '', workDate: '2026-09-19', taskType: 'Gọi điện', content: 'Gọi lại', owner: 'Le Tuan Anh', fbmSyncPermission: 'Cho phép', syncStatus: 'đang đẩy' };
   const stuck = pushQueue([editCustomer('A')], [stuckActivity]);
   stuck.run.local.customer[0].fbmHash = stuck.F.hash(stuck.run.local.customer[0], 'customer', {});
   const stuckRequest = stuck.F.nextPushRequest(stuck.F.stateRead());

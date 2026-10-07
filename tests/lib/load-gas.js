@@ -65,8 +65,20 @@ function docTep(duongDanTuongDoi) {
 }
 
 /** Nạp một hoặc nhiều tệp `.js` phía máy chủ vào hộp cát, theo đúng thứ tự truyền vào. */
+/**
+ * Trên GAS mọi tệp chung một phạm vi toàn cục, nên module đồng bộ luôn thấy bảng giá trị "Cho phép đồng bộ FBM" khai ở `DataSchema.js`. Hộp cát chỉ nạp vài tệp nên phải cấp riêng bảng đó; chỉ chép đúng hai tên này để không đè `DATA_SCHEMA` giả mà test tự dựng.
+ */
+function capBangChoPhepDongBo(hopCat) {
+  if (hopCat.FBM_SYNC_PERMISSION_OPTIONS) { return; }
+  const rieng = taoHopCat({});
+  vm.runInContext(docTep('server/data/DataSchema.js'), rieng, { filename: 'server/data/DataSchema.js' });
+  hopCat.FBM_SYNC_PERMISSION_OPTIONS = rieng.FBM_SYNC_PERMISSION_OPTIONS;
+  hopCat.fbmSyncPermissionValues = rieng.fbmSyncPermissionValues;
+}
+
 function napServer(hopCat, ...duongDans) {
   duongDans.forEach((duongDan) => {
+    if (duongDan.indexOf('fbm_sync/') === 0) { capBangChoPhepDongBo(hopCat); }
     vm.runInContext(docTep(duongDan), hopCat, { filename: duongDan });
   });
   return hopCat;

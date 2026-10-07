@@ -183,6 +183,25 @@ function chay(so) {
   check(so, 'dữ liệu dưới mỗi mã không đổi nghĩa sau khi chạy lại',
     [sheetKh.getRange(4, sauMap['@CUS_SDT']).getValue(), sheetKh.getRange(4, sauMap['@CUS_NGUOI_LIEN_HE']).getValue()], ['0912345678', 'Anh Minh']);
 
+  section('Chạy lại setupSheets đổi mã cột đã đổi tên ngay tại chỗ, giữ dữ liệu');
+
+  const doi = dungHop({ sheets: ['Customer', 'Activity', 'Category', 'Config', 'Log'], tep: TEP });
+  const sheetDoi = doi.Customer.sheet;
+  const maCu = doi.hop.readColumnMap('Customer').headerRow.map((ma) => ma === '@CUS_CHO_PHEP_DONG_BO_FBM' ? '@CUS_CHO_PHEP_FBM' : ma);
+  sheetDoi.getRange(1, 1, 1, maCu.length).setValues([maCu]);
+  const cotCu = maCu.indexOf('@CUS_CHO_PHEP_FBM') + 1;
+  sheetDoi.getRange(4, cotCu).setValue('Cho phép');
+  doi.hop.setupSheets();
+  const sauDoi = doi.hop.readColumnMap('Customer');
+  check(so, 'mã cũ @CUS_CHO_PHEP_FBM thành mã mới tại đúng cột cũ, không thêm cột trống ở cuối, dữ liệu giữ nguyên',
+    [sauDoi.map['@CUS_CHO_PHEP_DONG_BO_FBM'], sauDoi.headerRow.indexOf('@CUS_CHO_PHEP_FBM'), sauDoi.headerRow.filter((ma) => ma).length, sheetDoi.getRange(4, cotCu).getValue()],
+    [cotCu, -1, maCu.filter((ma) => ma).length, 'Cho phép']);
+  const hai = maCu.concat(['@CUS_CHO_PHEP_DONG_BO_FBM']);
+  sheetDoi.getRange(1, 1, 1, hai.length).setValues([hai]);
+  let loiHai = '';
+  try { doi.hop.setupSheets(); } catch (e) { loiHai = String(e.message); }
+  check(so, 'sheet có cả mã cũ lẫn mã mới thì dừng và báo, không tự chọn cột nào', loiHai.indexOf('có cả mã cũ @CUS_CHO_PHEP_FBM') >= 0, true);
+
   section('Khôi phục Config mặc định không chạm dữ liệu nghiệp vụ');
 
   const reset = dungKhung([]);

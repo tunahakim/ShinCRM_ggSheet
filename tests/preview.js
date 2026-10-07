@@ -28,7 +28,6 @@ const DANH_MUC = {
   '@CAT_SAN_PHAM': ['Thép hình H', 'Thép tấm cán nóng', 'Tôn mạ kẽm', 'Ống thép đúc'],
   '@CAT_NGUON_KH': ['Facebook Marketplace', 'Khách giới thiệu', 'Tự tìm', 'Hội chợ triển lãm'],
   '@CAT_XAC_THUC': ['Đã xác thực', 'Chưa xác thực', 'Nghi ngờ trùng'],
-  '@CAT_CHO_PHEP_FBM': ['Có', 'Không'],
   '@CAT_CONG_VIEC': ['Gọi điện', 'Gửi báo giá', 'Gặp mặt tại công trình', 'Chốt hợp đồng', 'Chăm sóc lại'],
   '@CAT_UU_TIEN': ['Cao', 'Trung bình', 'Thấp']
 };
@@ -91,7 +90,7 @@ function dungNen() {
       id: ma('KH', i + 1),
       bidClosingDate: new Date(2026, 9, 5 + (i % 20)),
       createdAt: new Date(2026, 2, 1 + (i * 7) % 300),
-      allowFbmPush: i % 4 === 3 ? 'Không' : 'Có',
+      fbmSyncPermission: i % 4 === 3 ? 'Không' : 'Có',
       recordStatus: 'active'
     }, khach));
   });
@@ -117,7 +116,7 @@ function dungNen() {
         priority: DANH_MUC['@CAT_UU_TIEN'][so % 3],
         dueAt: new Date(2026, 8, 1 + so % 20, 9, 30),
         createdAt: new Date(ngay.getFullYear(), ngay.getMonth(), ngay.getDate(), 8, 15),
-        allowFbmPush: 'Có',
+        fbmSyncPermission: 'Có',
         recordStatus: iK === 0 && j % 5 === 4 ? 'deleted' : 'active'
       });
       hang += 1;

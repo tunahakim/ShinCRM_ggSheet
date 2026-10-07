@@ -168,6 +168,12 @@ function chay(so) {
 
   const pullSource = stripNonCode(fs.readFileSync(path.join(GAS_DIR, 'fbm_sync/reconcile/Pull.js'), 'utf8'));
   check(so, 'Pull không tự đánh dấu dirty sau khi WriteGate đã commit', /dirtyStateMark(?:Records|Decision|Signal)\s*\(/.test(pullSource), false);
+  section('Cửa ghi — trường có danh sách cố định trong schema');
+  const { taoHopCat, napServer } = require('../lib/load-gas');
+  const hop = taoHopCat({});
+  napServer(hop, 'server/data/DataSchema.js', 'server/gate/FieldLogic.js', 'server/gate/WriteGate.js');
+  const ghiQuyen = (value) => { const plan = { moi: false, record: { fbmSyncPermission: value }, values: {} }, invalid = []; hop.writeGateBuild(plan, ['fbmSyncPermission'], hop.DATA_SCHEMA.customer, 'user', invalid, {}); return [plan.values.fbmSyncPermission === undefined ? null : plan.values.fbmSyncPermission, invalid.length]; };
+  check(so, 'ô Cho phép đồng bộ FBM chỉ nhận đúng chữ của năm giá trị; giá trị cũ hoặc lệch hoa thường bị từ chối', [ghiQuyen('Cho phép'), ghiQuyen('Cấm đồng bộ'), ghiQuyen('Ngừng đồng bộ'), ghiQuyen('cho phép')], [['Cho phép', 0], ['Cấm đồng bộ', 0], [null, 1], [null, 1]]);
 }
 
 module.exports = { chay };

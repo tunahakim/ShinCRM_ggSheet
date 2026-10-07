@@ -6,7 +6,7 @@ async function chay(so) {
   section("FBM sync — push");
   const pushed = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {} });
   napServer(pushed, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
-  pushed.FbmSync.readLocal = () => [{ id: 'CUS-1', fbmId: 'A1', fbmCustomerCode: 'ALT1', companyName: 'X', allowFbmPush: 'Cho phép', syncStatus: pushed.FbmSync.SYNC_STATUS.pushed, fbmHash: '' }];
+  pushed.FbmSync.readLocal = () => [{ id: 'CUS-1', fbmId: 'A1', fbmCustomerCode: 'ALT1', companyName: 'X', fbmSyncPermission: 'Cho phép', syncStatus: pushed.FbmSync.SYNC_STATUS.pushed, fbmHash: '' }];
   const props = { data: {} };
   const propertyApi = { getProperty: (key) => props.data[key] || null, setProperty: (key, value) => { props.data[key] = String(value); } };
   const orchestration = taoHopCat({
@@ -236,26 +236,26 @@ async function chay(so) {
   const bugResult = push.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"Bugs":{"Message":"Sai du lieu"}}}', transport: { trace: [{ requestId: 'test-bug-request' }] } });
   check(so, 'Bugs HTTP 200 danh dau loi record va khong retry request da gui', [bugResult.continued, push.FbmSync.stateRead().counts.error, push.FbmSync.stateRead().metadata.pushFailures['customer:C-ERR'] !== undefined], [true, 1, true]);
   pushed.FbmSync.readLocal = (entity) => entity === 'customer'
-    ? [{ id: 'CUS-NEW', fbmId: '', fbmCustomerCode: '', allowFbmPush: 'Chưa cho phép' }]
+    ? [{ id: 'CUS-NEW', fbmId: '', fbmCustomerCode: '', fbmSyncPermission: 'Chỉ lấy từ FBM' }]
     : [];
   check(so, 'Customer moi chua cho phep chi pull khong push', pushed.FbmSync.pushCandidates('customer').length, 0);
   pushed.FbmSync.readLocal = (entity) => entity === 'customer'
-    ? [{ id: 'CUS-PARENT', fbmId: 'FBM-PARENT', fbmCustomerCode: 'ALT-PARENT', allowFbmPush: pushed.FbmSync.PUSH_ALLOW_VALUE }]
-    : [{ id: 'ACT-NEW', customerId: 'CUS-PARENT', fbmId: '', allowFbmPush: pushed.FbmSync.PUSH_ALLOW_VALUE, taskType: 'Goi', content: 'Noi dung', workDate: '2026-09-09' }];
+    ? [{ id: 'CUS-PARENT', fbmId: 'FBM-PARENT', fbmCustomerCode: 'ALT-PARENT', fbmSyncPermission: pushed.FbmSync.pullDefaultPermission() }]
+    : [{ id: 'ACT-NEW', customerId: 'CUS-PARENT', fbmId: '', fbmSyncPermission: pushed.FbmSync.pullDefaultPermission(), taskType: 'Goi', content: 'Noi dung', workDate: '2026-09-09' }];
   check(so, 'Activity moi co Customer cha lien ket duoc dua vao queue', pushed.FbmSync.pushCandidates('activity').length, 1);
   {
-    const allow = pushed.FbmSync.PUSH_ALLOW_VALUE, savedSettings = pushed.FbmSync.scriptSettings;
+    const allow = pushed.FbmSync.pullDefaultPermission(), savedSettings = pushed.FbmSync.scriptSettings;
     pushed.FbmSync.scriptSettings = () => ({ testCustomerCode: 'ALT00010', testCustomerIds: ['CUS-NEW'] });
     pushed.FbmSync.readLocal = (entity) => entity === 'customer'
       ? [
-        { id: 'CUS-ALT', fbmId: 'FBM-ALT', fbmCustomerCode: 'ALT00010', allowFbmPush: allow, syncStatus: pushed.FbmSync.SYNC_STATUS.pending },
-        { id: 'CUS-NEW', fbmId: '', fbmCustomerCode: '', allowFbmPush: allow, companyName: 'Khách mới' },
-        { id: 'CUS-KHAC', fbmId: '', fbmCustomerCode: '', allowFbmPush: allow, companyName: 'Khách ngoài phạm vi' },
-        { id: 'CUS-THAT', fbmId: 'FBM-THAT', fbmCustomerCode: 'ALT00999', allowFbmPush: allow }
+        { id: 'CUS-ALT', fbmId: 'FBM-ALT', fbmCustomerCode: 'ALT00010', fbmSyncPermission: allow, syncStatus: pushed.FbmSync.SYNC_STATUS.pending },
+        { id: 'CUS-NEW', fbmId: '', fbmCustomerCode: '', fbmSyncPermission: allow, companyName: 'Khách mới' },
+        { id: 'CUS-KHAC', fbmId: '', fbmCustomerCode: '', fbmSyncPermission: allow, companyName: 'Khách ngoài phạm vi' },
+        { id: 'CUS-THAT', fbmId: 'FBM-THAT', fbmCustomerCode: 'ALT00999', fbmSyncPermission: allow }
       ]
       : [
-        { id: 'ACT-ALT', customerId: 'CUS-ALT', fbmId: '', allowFbmPush: allow, taskType: 'Goi', content: 'A', workDate: '2026-10-07' },
-        { id: 'ACT-THAT', customerId: 'CUS-THAT', fbmId: '', allowFbmPush: allow, taskType: 'Goi', content: 'B', workDate: '2026-10-07' }
+        { id: 'ACT-ALT', customerId: 'CUS-ALT', fbmId: '', fbmSyncPermission: allow, taskType: 'Goi', content: 'A', workDate: '2026-10-07' },
+        { id: 'ACT-THAT', customerId: 'CUS-THAT', fbmId: '', fbmSyncPermission: allow, taskType: 'Goi', content: 'B', workDate: '2026-10-07' }
       ];
     check(so, 'Phạm vi thử: chỉ đẩy khách mang mã FBM thử và khách mới được cho phép đích danh theo mã ShinCRM; khách khác và Activity của khách ngoài phạm vi bị chặn',
       [pushed.FbmSync.pushCandidates('customer').map((c) => c.kind + ':' + c.id), pushed.FbmSync.pushCandidates('activity').map((c) => c.id)],
@@ -288,7 +288,7 @@ async function chay(so) {
   const countedConflict = { counts: { conflict: 1 }, metadata: {} };
   check(so, 'Push dung lai khi bo dem conflict duong du chi tiet bi thieu', [push.FbmSync.stopPushOnConflicts(countedConflict), countedConflict.phase, countedConflict.cursor], [true, 'conflict', {}]);
 
-  const activityCandidate = { entity: 'activity', kind: 'create', id: 'ACT-NEW', position: 0, record: { id: 'ACT-NEW', fbmId: '', customerFbmCode: 'ALT00010', stt_rec: 'A-CUS', taskType: 'Gọi', content: 'Nội dung', workDate: '2026-09-09', allowFbmPush: push.FbmSync.PUSH_ALLOW_VALUE } };
+  const activityCandidate = { entity: 'activity', kind: 'create', id: 'ACT-NEW', position: 0, record: { id: 'ACT-NEW', fbmId: '', customerFbmCode: 'ALT00010', stt_rec: 'A-CUS', taskType: 'Gọi', content: 'Nội dung', workDate: '2026-09-09', fbmSyncPermission: push.FbmSync.pullDefaultPermission() } };
   push.FbmSync.pushCandidates = () => [activityCandidate];
   push.FbmSync.validatePushCategories = () => [];
   push.FbmSync.pushEligibilityErrors = () => [];
@@ -371,7 +371,7 @@ async function chay(so) {
   check(so, 'G12: lệnh sửa không mang dấu mà FBM vẫn giữ dấu thì ghi "đẩy không ăn" để không xếp dọn lại mỗi lượt', [cleanWrites.slice(-1)[0].records[0].syncStatus, /chưa bỏ được dấu #SC/.test(push.FbmSync.stateRead().message)], [push.FbmSync.SYNC_STATUS.notApplied, true]);
   const cleanEdit = push.FbmSync.activityEditRequest({ id: 'ACT-1', fbmId: 5, content: 'Nội dung' }, { id: 5, details: 'Nội dung #SC-ACT-1' }, {});
   check(so, 'G12: lệnh sửa Activity không gắn dấu #SC, chỉ lệnh tạo gắn', cleanEdit.body.memvars.filter((item) => item.Name === 'details')[0].NewValue, 'Nội dung');
-  const createLocal = { id: 'CUS-CREATE', fbmId: '', fbmCustomerCode: '', companyName: 'Khach tao lai', taxNumber: '0100123456', contactPerson: 'Nguoi lien he', phone: '0900000000', email: 'a@example.com', address: 'Ha Noi', province: 'HNI', website: '', leadSource: 'Source', product: '', allowFbmPush: push.FbmSync.PUSH_ALLOW_VALUE };
+  const createLocal = { id: 'CUS-CREATE', fbmId: '', fbmCustomerCode: '', companyName: 'Khach tao lai', taxNumber: '0100123456', contactPerson: 'Nguoi lien he', phone: '0900000000', email: 'a@example.com', address: 'Ha Noi', province: 'HNI', website: '', leadSource: 'Source', product: '', fbmSyncPermission: push.FbmSync.pullDefaultPermission() };
   const createCandidate = { entity: 'customer', kind: 'create', id: createLocal.id, autoCode: 'ALT00020', record: createLocal };
   push.FbmSync.readLocal = (entity) => entity === 'customer' ? [createLocal] : [];
   push.FbmSync.pushCandidates = pushCandidatesImpl;

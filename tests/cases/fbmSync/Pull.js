@@ -227,7 +227,7 @@ async function chay(so) {
   builders.dirtyStateMarkRecords = () => { dirtyMarkCalls += 1; };
   builders.writeGateSave = (request) => { newPullCalls += 1; newPullWrite = request; return { ok: true, fields: ['id'], rows: [['CUS-NEW']] }; };
   const newPullResult = builders.FbmSync.pullWrite('customer', [builders.FbmSync.customerRecord({ stt_rec_kh: 'NEW-C', ma_kh: 'ALT00012', ten_kh: 'Khách mới', ma_so_thue: '001' }, gate)]);
-  check(so, 'Customer pull mới ghi cả định danh baseline và quyền đẩy qua cửa ghi', [newPullResult.written, newPullWrite.source, newPullWrite.schemas.length, newPullWrite.records[0].fbmId, newPullWrite.records[0].fbmHash !== '', newPullWrite.records[0].parentCompanyName, newPullWrite.records[0].allowFbmPush, dirtyMarkCalls], [1, 'pull', 2, 'NEW-C', true, '', builders.FbmSync.PUSH_ALLOW_VALUE, 0]);
+  check(so, 'Customer pull mới ghi cả định danh baseline và quyền đẩy qua cửa ghi', [newPullResult.written, newPullWrite.source, newPullWrite.schemas.length, newPullWrite.records[0].fbmId, newPullWrite.records[0].fbmHash !== '', newPullWrite.records[0].parentCompanyName, newPullWrite.records[0].fbmSyncPermission, dirtyMarkCalls], [1, 'pull', 2, 'NEW-C', true, '', builders.FbmSync.pullDefaultPermission(), 0]);
   check(so, 'Pull gộp nội dung và trạng thái vào một lượt cửa ghi', newPullCalls, 1);
   const pullLogs = [];
   builders.logEvent = (event) => pullLogs.push(event);
@@ -376,7 +376,7 @@ async function chay(so) {
   edges.writeGateSave = (request) => { activityPullWrite = request; return { ok: true }; };
   const newActivity = edges.FbmSync.activityRecord({ id: 88, ma_kh: 'ALT00014', ten_cv: 'Gọi', details: 'Nội dung', end_date: '/Date(1757386800000)/' }, gate);
   const activityPull = edges.FbmSync.pullWrite('activity', [newActivity]);
-  check(so, 'Activity pull moi noi dung vao Customer noi bo va cho phep day', [activityPull.written, activityPullWrite.records[0].customerId, activityPullWrite.records[0].fbmId, activityPullWrite.records[0].allowFbmPush], [1, 'CUS-ACT', 88, edges.FbmSync.PUSH_ALLOW_VALUE]);
+  check(so, 'Activity pull moi noi dung vao Customer noi bo va cho phep day', [activityPull.written, activityPullWrite.records[0].customerId, activityPullWrite.records[0].fbmId, activityPullWrite.records[0].fbmSyncPermission], [1, 'CUS-ACT', 88, edges.FbmSync.pullDefaultPermission()]);
   edges.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-ACT', fbmCustomerCode: 'ALT00014' }] : [];
   const orphanActivity = edges.FbmSync.activityRecord({ id: 89, ma_kh: 'ALT00014', ten_cv: 'Gọi', details: 'Mồ côi #SC-ACT-UNKNOWN', end_date: '/Date(1757386800000)/' }, gate);
   const orphanActivityResult = edges.FbmSync.pullWrite('activity', [orphanActivity]);
@@ -385,7 +385,7 @@ async function chay(so) {
   const invalidActivityResult = edges.FbmSync.pullWrite('activity', [invalidActivity]);
   check(so, 'Activity thieu ngay bi chan an toan', invalidActivityResult.written, 0);
 
-  const failedRecord = { id: 'C-FAIL', fbmId: 'FBM-FAIL', fbmCustomerCode: 'ALT00010', companyName: 'Cũ', allowFbmPush: 'Cho phép', syncStatus: edges.FbmSync.SYNC_STATUS.error };
+  const failedRecord = { id: 'C-FAIL', fbmId: 'FBM-FAIL', fbmCustomerCode: 'ALT00010', companyName: 'Cũ', fbmSyncPermission: 'Cho phép', syncStatus: edges.FbmSync.SYNC_STATUS.error };
   const failedHash = edges.FbmSync.hash(failedRecord, 'customer', {});
   const failedState = { metadata: { pushFailures: { 'customer:C-FAIL': failedHash } } };
   edges.FbmSync.stateRead = () => failedState;
@@ -395,7 +395,7 @@ async function chay(so) {
   check(so, 'push loi duoc phep thu lai khi hash doi', edges.FbmSync.pushCandidates('customer').length, 1);
 
   let notAppliedWrite;
-  const pushedRecord = { id: 'C-PUSHED', fbmId: 'FBM-PUSHED', fbmCustomerCode: 'ALT00010', companyName: 'Mới ở Shin', allowFbmPush: 'Chưa cho phép', syncStatus: edges.FbmSync.SYNC_STATUS.pushed };
+  const pushedRecord = { id: 'C-PUSHED', fbmId: 'FBM-PUSHED', fbmCustomerCode: 'ALT00010', companyName: 'Mới ở Shin', fbmSyncPermission: 'Chỉ lấy từ FBM', syncStatus: edges.FbmSync.SYNC_STATUS.pushed };
   const oldFbm = { stt_rec_kh: 'FBM-PUSHED', ma_kh: 'ALT00010', ten_kh: 'Cũ ở FBM' };
   pushedRecord.fbmHash = edges.FbmSync.hash(oldFbm, 'customer', {});
   const notAppliedState = { metadata: { seen: { customer: {}, activity: {} } }, locks: {} };

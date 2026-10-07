@@ -1,7 +1,7 @@
 /**
  * Ca kiểm cho `server/sheet/CategoryRead.js`: đọc sheet `Category` thành bảng "mã danh mục → danh sách giá trị".
  *
- * Ca quan trọng nhất ở đây là **cái bẫy `@CAT_CHO_PHEP_FBM`**. Nhận diện cột đi kèm bằng hậu tố `_FBM` một mình là một dòng code trông rất hợp lý và sai rất nặng: danh mục "Cho phép đẩy FBM" cũng kết thúc bằng `_FBM`, loại nó ra thì trường `allowFbmPush` mất sạch giá trị để chọn — mà đó là trường **bắt buộc ở cả hai thực thể**, nên form sẽ không lưu được bản ghi nào và nguyên nhân thì không hiện ra ở đâu. Phép kiểm này canh đúng luật đúng: bỏ hậu tố ra thì phần còn lại có phải một danh mục đã khai không.
+ * Ca quan trọng nhất ở đây là **cái bẫy hậu tố `_FBM`**. Nhận diện cột đi kèm bằng hậu tố `_FBM` một mình là một dòng code trông rất hợp lý và sai rất nặng: một danh mục thật cũng có thể có tên kết thúc bằng `_FBM` (từng có `@CAT_CHO_PHEP_FBM`), loại nó ra thì trường dùng danh mục đó mất sạch giá trị để chọn mà nguyên nhân không hiện ra ở đâu. Phép kiểm này canh đúng luật đúng: bỏ hậu tố ra thì phần còn lại có phải một danh mục đã khai không.
  *
  * Điều thứ hai được canh, và nó bắc qua hai tệp: **mọi trường SELECT đều tìm được danh mục của mình**. Một `source` trỏ vào một mã không có trong `Category` thì danh sách chọn rỗng, người dùng không chọn được gì, và bảng khai vẫn trông đúng.
  *
@@ -27,24 +27,24 @@ function chay(so) {
   // Bảng chân lý của phép nhận diện. Ca thứ hai là ca đã nêu ở đầu tệp; ba ca sau canh việc luật không bị nới ra thành "cứ _FBM là cột đi kèm".
   check(so, '@CAT_TINH_THANH_FBM là cột đi kèm vì bỏ hậu tố ra vẫn còn một danh mục đã khai',
     hop.categoryIsCompanion('@CAT_TINH_THANH_FBM'), true);
-  check(so, '@CAT_CHO_PHEP_FBM KHÔNG phải cột đi kèm — đây là cái bẫy làm rỗng allowFbmPush',
-    hop.categoryIsCompanion('@CAT_CHO_PHEP_FBM'), false);
+  check(so, 'danh mục thật có tên kết thúc bằng _FBM KHÔNG bị nhận là cột đi kèm',
+    hop.categoryIsCompanion('@CAT_VI_DU_FBM'), false);
   check(so, 'mã không có hậu tố thì không phải cột đi kèm', hop.categoryIsCompanion('@CAT_TINH_THANH'), false);
   check(so, 'đúng bằng hậu tố mà không có phần gốc thì không phải cột đi kèm', hop.categoryIsCompanion('_FBM'), false);
   check(so, 'hậu tố đúng nhưng phần gốc chưa khai thì vẫn là danh mục thật', hop.categoryIsCompanion('@CAT_LA_LUNG_FBM'), false);
   check(so, 'companion không khai trong CATEGORY_COLUMNS phải bị bỏ qua', hop.categoryIsCompanion('@CAT_NHOM_KH_FBM'), false);
 
   const ma = hop.categoryCodes();
-  check(so, '11 cột khai trừ 3 cột đi kèm còn 8 danh mục thật',
-    [hop.CATEGORY_COLUMNS.length, ma.length], [11, 8]);
-  check(so, '@CAT_CHO_PHEP_FBM có mặt trong danh sách danh mục thật', ma.indexOf('@CAT_CHO_PHEP_FBM') >= 0, true);
+  check(so, '10 cột khai trừ 3 cột đi kèm còn 7 danh mục thật',
+    [hop.CATEGORY_COLUMNS.length, ma.length], [10, 7]);
+  check(so, 'Cho phép đồng bộ FBM là danh sách cố định trong schema, không còn danh mục trong Category', ma.indexOf('@CAT_CHO_PHEP_FBM') < 0, true);
   check(so, 'không một mã đi kèm nào lọt vào danh sách danh mục thật', ma.filter(hop.categoryIsCompanion), []);
 
   // Ca rỗng: sheet mới dựng, chưa ai gõ giá trị nào. Vẫn phải đủ khóa, vì client hỏi thẳng `categories[source]`.
   const rong = hop.categoryReadAll();
-  check(so, 'sheet trắng vẫn trả về đủ 8 khóa, mỗi khóa một mảng rỗng',
+  check(so, 'sheet trắng vẫn trả về đủ 7 khóa, mỗi khóa một mảng rỗng',
     [Object.keys(rong.categories).length, Object.keys(rong.categories).every((code) => JSON.stringify(rong.categories[code]) === '[]')],
-    [8, true]);
+    [7, true]);
   check(so, 'sheet trắng không sinh cảnh báo nào', rong.warnings, []);
   check(so, 'không một cột đi kèm nào thành khóa trong kết quả',
     Object.keys(rong.categories).filter(hop.categoryIsCompanion), []);

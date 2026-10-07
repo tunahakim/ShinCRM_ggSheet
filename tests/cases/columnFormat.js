@@ -26,7 +26,7 @@ function cot(nen, tenSheet, ma) {
 function khachMoi() {
   return {
     companyName: 'Thép Đồng Tâm', taxNumber: '0101243150', phone: '0912345678',
-    leadSource: 'Facebook', verifyStatus: 'Đã xác thực', allowFbmPush: 'Cho phép'
+    leadSource: 'Facebook', verifyStatus: 'Đã xác thực', fbmSyncPermission: 'Cho phép'
   };
 }
 
@@ -113,7 +113,7 @@ function chay(so) {
     entity: 'activity',
     records: [{
       customerId: 'CUS-000001', workDate: '2026-09-06', taskType: 'Gọi điện', content: 'Chào hàng',
-      product: 'Thép hộp', contractValue: '1.500.000', allowFbmPush: 'Cho phép'
+      product: 'Thép hộp', contractValue: '1.500.000', fbmSyncPermission: 'Cho phép'
     }]
   });
 
