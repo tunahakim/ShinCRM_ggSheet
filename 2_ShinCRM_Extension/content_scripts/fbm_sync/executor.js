@@ -173,7 +173,9 @@
         var units = jsonValue(unit.text), selectedUnit = String(credentials.unit || loginListValue(units, ['Ma_Dvcs', 'ma_dvcs', 'unit', 'Unit'], 'CTY')), salt = String(credentials.value || prepared.salt || '');
         if (!database || !selectedUnit || !salt) { throw new Error('Không lấy đủ database, đơn vị hoặc mã phiên để đăng nhập FBM.'); }
         var firstHash = /^[a-f0-9]{32}$/i.test(String(credentials.password || '')) ? String(credentials.password) : md5(salt + md5(String(credentials.password || '')));
-        var body = JSON.stringify({ user: String(credentials.username || ''), password: firstHash, database: database, unit: selectedUnit, language: String(credentials.language || 'v'), value: salt, force: false, storage: true });
+        // force:true hủy phiên cũ; chỉ bật khi GAS gửi cờ từ nút người dùng đã xác nhận, mặc định luôn login mềm.
+        var forceOldSession = request.meta.force === true;
+        var body = JSON.stringify({ user: String(credentials.username || ''), password: firstHash, database: database, unit: selectedUnit, language: String(credentials.language || 'v'), value: salt, force: forceOldSession, storage: true });
         traceEvent(trace, 'login_request_built', request, { database: database, unit: selectedUnit });
         return post('Login', body).then(function (login) {
           if (!login.response.ok) { return { ok: false, status: login.response.status, headers: { contentType: login.response.headers.get('content-type') || '' }, body: login.text, transport: { trace: trace } }; }
