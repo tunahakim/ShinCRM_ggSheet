@@ -204,6 +204,12 @@ function chay(so) {
 
   section('Khôi phục Config mặc định không chạm dữ liệu nghiệp vụ');
 
+  const giu = dungKhung([['ID_COUNTER_ACTIVITY', 29]]);
+  giu.hop.setupSheets();
+  giu.hop.resetConfigToDefaults();
+  check(so, 'dựng hoặc khôi phục Config chốt dòng bộ đếm đời cũ vào Document Properties trước khi quét trắng khối tham số',
+    [giu.props.ID_COUNTER_ACTIVITY, giu.props.ID_COUNTER_CUSTOMER, giu.hop.configParams().ID_COUNTER_ACTIVITY], ['29', '0', undefined]);
+
   const reset = dungKhung([]);
   reset.hop.setupSheets();
   reset.Customer = { sheet: reset.book.getSheetByName('Customer'), codes: reset.hop.readColumnMap('Customer').headerRow };
