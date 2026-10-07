@@ -68,6 +68,12 @@ FbmSync.FINGERPRINT_FIELDS = {
   activity: ['id', 'ma_cv', 'details', 'end_date']
 };
 
+/* Trường FBM sở hữu, đứng ngoài fingerprint nên hash không lộ khi chúng đổi; lượt kéo luôn ghi đè theo FBM (09/03, 09/04 Phần 6). */
+FbmSync.PULL_OVERWRITE_FIELDS = {
+  customer: ['fbmCustomerCode'],
+  activity: ['enteredBy']
+};
+
 FbmSync.AUTH_VARS = {
   customer: [
     { Name: 'recordID', Type: 'String', Value: '' },

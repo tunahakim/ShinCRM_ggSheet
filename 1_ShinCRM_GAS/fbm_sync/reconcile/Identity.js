@@ -251,7 +251,7 @@ FbmSync.customerRecord = function (fbm, categoryGate) {
 /** Đổi record Activity FBM sang schema nội bộ của Sheet. */
 FbmSync.activityRecord = function (fbm, categoryGate, parent) {
   var parentCode = fbm.ma_kh || (parent && (parent.ma_kh || parent.maKh)) || '';
-  var details = fbm.details || '', record = { customerId: parentCode, customerFbmCode: parentCode, workDate: fbm.end_date || '', taskType: fbm.ten_cv || fbm.ma_cv || '', content: FbmSync.stripActivityMarker(details), markerId: FbmSync.activityMarkerId(details), owner: fbm.owner || '', allowFbmPush: FbmSync.PUSH_ALLOW_VALUE, fbmId: fbm.id || '', syncStatus: FbmSync.SYNC_STATUS.synced };
+  var details = fbm.details || '', record = { customerId: parentCode, customerFbmCode: parentCode, workDate: fbm.end_date || '', taskType: fbm.ten_cv || fbm.ma_cv || '', content: FbmSync.stripActivityMarker(details), markerId: FbmSync.activityMarkerId(details), owner: fbm.owner || '', enteredBy: fbm.owner || '', allowFbmPush: FbmSync.PUSH_ALLOW_VALUE, fbmId: fbm.id || '', syncStatus: FbmSync.SYNC_STATUS.synced };
   record.fbmHash = FbmSync.hash(fbm, 'activity', categoryGate);
   return record;
 };
@@ -286,7 +286,7 @@ FbmSync.linkActivityCustomers = function (records, customers, categoryGate) {
 FbmSync.preserveLocalFields = function (entity, current, incoming) {
   var fields = entity === 'customer'
     ? ['note', 'allowFbmPush', 'verifyStatus', 'customerGroup', 'searchAliases', 'bidClosingDate']
-    : ['allowFbmPush', 'enteredBy', 'contractValue', 'priority', 'dueAt'];
+    : ['allowFbmPush', 'contractValue', 'priority', 'dueAt'];
   var merged = Object.assign({}, incoming);
   fields.forEach(function (field) {
     if (current && Object.prototype.hasOwnProperty.call(current, field)) { merged[field] = current[field]; }
