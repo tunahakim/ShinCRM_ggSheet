@@ -74,3 +74,23 @@ function fbmSeedActivityPush() {
   var saved = FbmSync.sheetSave('activity', [created], 'pull');
   return { ok: true, edited: source.id, created: saved.recordIds };
 }
+/** Khách chủ dự án cho phép tạo thật trên FBM (G10.8c, 2026-10-07). */
+var FBM_TEST_CREATE_CUSTOMER_ID = 'CUS-020061';
+/** Dò trước khi tạo khách thật: đủ trường bắt buộc, quyền đẩy, danh mục và có lọt vào danh sách đẩy không. Chỉ đọc. */
+function fbmProbeCreateCustomer() {
+  var record = FbmSync.readLocal('customer').filter(function (item) { return String(item.id || '') === FBM_TEST_CREATE_CUSTOMER_ID; })[0];
+  if (!record) { return { ok: false, reason: 'Không thấy ' + FBM_TEST_CREATE_CUSTOMER_ID + ' trên Sheet DEV.' }; }
+  var gate = FbmSync.stateCategoryGate(FbmSync.stateRead());
+  return {
+    ok: true, id: record.id, companyName: record.companyName || '', fbmId: record.fbmId || '', fbmCustomerCode: record.fbmCustomerCode || '',
+    syncStatus: record.syncStatus || '', recordStatus: record.recordStatus || '', allowFbmPush: record.allowFbmPush || '',
+    permission: FbmSync.pushPermission(record, 'customer'), eligibilityErrors: FbmSync.pushEligibilityErrors(record, 'customer'),
+    categoryErrors: FbmSync.validatePushCategories(record, 'customer', gate),
+    scope: FbmSync.scriptSettings().testCustomerCode, candidates: FbmSync.pushCandidates('customer').map(function (item) { return item.kind + ':' + item.id; })
+  };
+}
+/** Mở phạm vi ghi thử cho đúng khách được phép tạo thật; phạm vi theo mã FBM `ALT00010` giữ nguyên. */
+function fbmAllowTestCreateCustomer() {
+  PropertiesService.getDocumentProperties().setProperty('FBM_SYNC_TEST_CUSTOMER_IDS', FBM_TEST_CREATE_CUSTOMER_ID);
+  return fbmProbeCreateCustomer();
+}
