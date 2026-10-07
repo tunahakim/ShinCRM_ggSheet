@@ -11,7 +11,7 @@
 
 ## Kế hoạch thực thi đợt sửa lỗi sau audit 2026-10
 
-Đã chuyển sang `2026.10.06 Kế hoạch sửa lỗi FBM sau audit.md`; tiến độ đợt sửa lỗi chỉ ghi ở đó.
+Đã chuyển sang `2026.10.07 Kế hoạch sửa lỗi FBM sau audit.md`; tiến độ đợt sửa lỗi chỉ ghi ở đó.
 
 ## Quy tắc an toàn bắt buộc
 

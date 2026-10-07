@@ -582,7 +582,7 @@ Xung đột không có danh sách trong state (theo G7.2, FBM-024): hàng đợi
 
 ## 15A. Lỗi sau audit chuyển vào phiên refactor
 
-Chủ dự án duyệt ngày 2026-10-06: các lỗi dưới đây nằm đúng phần "GAS gánh dữ liệu lớn và chuỗi thời gian chờ" mà refactor viết lại, nên không sửa trên kiến trúc hiện tại để tránh sửa hai lần. Mô tả đầy đủ ở bảng lỗi của `2026.10.06 Kế hoạch sửa lỗi FBM sau audit.md`. Refactor chỉ coi là xong khi từng lỗi có test chứng minh không còn đường xảy ra.
+Chủ dự án duyệt ngày 2026-10-06: các lỗi dưới đây nằm đúng phần "GAS gánh dữ liệu lớn và chuỗi thời gian chờ" mà refactor viết lại, nên không sửa trên kiến trúc hiện tại để tránh sửa hai lần. Mô tả đầy đủ ở bảng lỗi của `2026.10.07 Kế hoạch sửa lỗi FBM sau audit.md`. Refactor chỉ coi là xong khi từng lỗi có test chứng minh không còn đường xảy ra.
 
 - FBM-005, FBM-016: thời gian chờ Sidebar, Extension và GAS không thống nhất (Sidebar báo lỗi trước khi Extension hết thời gian hợp lệ).
 - FBM-030: trang Customer khoảng 2.000 dòng xử lý trong một lần gọi GAS; cần đo lại sau khi Extension chiếu/rút gọn dữ liệu.

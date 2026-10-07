@@ -4,7 +4,7 @@ Ngày rà ban đầu: 2026-09-14. Cập nhật kiến trúc/scheduler/Extension 
 
 Phạm vi: toàn bộ pipeline thuộc module đồng bộ FBM đi qua Sidebar, GAS Web App relay, Extension và tab FBM. Tài liệu này là hồ sơ đối chiếu trong phiên code, không thay thế các quyết định nghiệp vụ ở `00. Tài liệu chính thức/09. Đồng bộ FBM/`.
 
-Trạng thái: lưu trữ, chỉ tra đúng mục khi cần. Bảng lỗi FBM-xxx đang xử lý và thiết kế sửa đã chuyển sang `2026.10.06 Kế hoạch sửa lỗi FBM sau audit.md`.
+Trạng thái: lưu trữ, chỉ tra đúng mục khi cần. Bảng lỗi FBM-xxx đang xử lý và thiết kế sửa đã chuyển sang `2026.10.07 Kế hoạch sửa lỗi FBM sau audit.md`.
 
 ## Bảng cập nhật sau Slice 9A
 
