@@ -20,12 +20,13 @@ async function chay(so) {
   check(so, 'hết phiên tạo request login và giữ cursor cũ', [login.meta.kind, hop.FbmSync.stateRead().cursor.kind, hop.FbmSync.stateRead().cursor.resumeCursor.pageIndex], ['login', 'login', 2]);
   check(so, 'auto-login chỉ thử lại một lần trong 30 phút', hop.FbmSync.autoLoginCanAttempt(Date.now() + 1000).code, 'AUTO_LOGIN_THROTTLED');
   // Chủ dự án chốt 2026-10-07: chu kỳ chờ chỉ dành cho chạy nền; người bấm chạy phải được thử ngay hoặc nhận hướng dẫn.
-  const attemptKinds = [['manual', 'customer_grid'], ['manual', 'heartbeat'], ['manual', 'session_probe'], ['background', 'customer_grid']].map(([origin, kind]) => hop.FbmSync.autoLoginAttemptOptions({ origin }, { kind }).manual);
-  check(so, 'chỉ lượt người dùng bấm chạy mới được bỏ qua chu kỳ chờ; heartbeat, probe chờ phiên cũ và chạy nền vẫn chịu chu kỳ', [hop.FbmSync.autoLoginCanAttempt(Date.now() + 1000, { manual: true }).ok, attemptKinds], [true, [true, false, false, false]]);
+  const waitProbe = { sessionGate: { blockedSessionProbe: true } };
+  const attemptKinds = [['manual', 'r1', 'session_probe', {}], ['manual', 'r1', 'customer_grid', {}], ['manual', 'r1', 'heartbeat', {}], ['manual', 'r1', 'session_probe', waitProbe], ['manual', '', 'session_probe', {}], ['background', 'r1', 'session_probe', {}]].map(([origin, runId, kind, metadata]) => hop.FbmSync.autoLoginAttemptOptions({ origin, runId, metadata }, { kind }).manual);
+  check(so, 'lượt bấm tay (kể cả bước kiểm tra phiên đầu lượt) được bỏ qua chu kỳ chờ; heartbeat, probe sau chu kỳ chờ phiên cũ, lúc không có lượt chạy và chạy nền vẫn chịu chu kỳ', [hop.FbmSync.autoLoginCanAttempt(Date.now() + 1000, { manual: true }).ok, attemptKinds], [true, [true, true, false, false, false, false]]);
   hop.FbmSync.statePatch({ origin: 'background', cursor: { kind: 'customer_grid' } });
   const backgroundThrottled = hop.FbmSync.beginAutoLogin(hop.FbmSync.stateRead(), { kind: 'customer_grid' });
-  hop.FbmSync.statePatch({ origin: 'manual' });
-  const manualRetry = hop.FbmSync.beginAutoLogin(hop.FbmSync.stateRead(), { kind: 'customer_grid' });
+  hop.FbmSync.statePatch({ origin: 'manual', runId: 'manual-run' });
+  const manualRetry = hop.FbmSync.beginAutoLogin(hop.FbmSync.stateRead(), { kind: 'session_probe' });
   check(so, 'lượt bấm tay ngay sau lần đăng nhập hỏng vẫn gửi đăng nhập và đánh dấu cursor là bấm tay, chạy nền thì bị chặn', [backgroundThrottled, manualRetry && manualRetry.meta.kind, hop.FbmSync.stateRead().cursor.manual], [null, 'login', true]);
   const attemptAt = Date.now();
   hop.FbmSync.autoLoginMarkSuccess(attemptAt + 500);
