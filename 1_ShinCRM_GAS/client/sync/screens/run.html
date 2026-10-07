@@ -28,10 +28,17 @@ function fbmSyncRunBackgroundSettingsBlock(status) {
   var schema = FBM_SYNC_RUN_SCHEMA.action;
   return FBM_SYNC_RUN_UI.layout.actionRow(Button({ id: schema.backgroundSettingsId, label: schema.backgroundSettings, className: uiResolveActionClass('edit', 'button'), disabled: !!FBM_SYNC_CLIENT.running || fbmSyncConfigIsEditing('connection'), data: { 'sync-screen': 'settings', 'sync-settings-target': 'background' } }));
 }
+/** Lối thoát khi GAS báo kho state hỏng (FBM-044): hiện lý do, lời giải thích và nút đặt lại; GAS quyết có mở hay không qua `resetOffered`. */
+function fbmSyncRunResetBlocks(status) {
+  if (!status || status.resetOffered !== true) { return []; }
+  var schema = FBM_SYNC_RUN_SCHEMA.reset;
+  return [Text({ text: String(status.message || status.lastError || '') }), Text({ className: FBM_SYNC_RUN_UI.classes.muted, text: schema.explain }), FBM_SYNC_RUN_UI.layout.actionRow(Button({ id: schema.id, label: schema.label, className: uiResolveActionClass('cancel', 'button'), disabled: !!FBM_SYNC_CLIENT.running }))];
+}
 function fbmSyncRunDetailsBlocks(status) {
-  if (!fbmSyncRunHasSnapshot(status)) { return []; }
+  var reset = fbmSyncRunResetBlocks(status);
+  if (!fbmSyncRunHasSnapshot(status)) { return reset; }
   var awaiting = status.phase === 'awaiting_approval';
-  return (awaiting ? [Text({ className: FBM_SYNC_RUN_UI.classes.muted, text: FBM_SYNC_RUN_SCHEMA.awaitingMessage })] : []).concat([fbmSyncPipelineBlock(status, FBM_SYNC_RUN_SCHEMA.regions.pipeline), FBM_SYNC_RUN_UI.layout.liveStatus(FBM_SYNC_RUN_SCHEMA.regions.liveStatus, fbmSyncStatusBlocks(status, status.counts || {}))]);
+  return reset.concat(awaiting ? [Text({ className: FBM_SYNC_RUN_UI.classes.muted, text: FBM_SYNC_RUN_SCHEMA.awaitingMessage })] : []).concat([fbmSyncPipelineBlock(status, FBM_SYNC_RUN_SCHEMA.regions.pipeline), FBM_SYNC_RUN_UI.layout.liveStatus(FBM_SYNC_RUN_SCHEMA.regions.liveStatus, fbmSyncStatusBlocks(status, status.counts || {}))]);
 }
 function fbmSyncPatchLivePipeline(panel, status) {
   if (!panel || !RENDER_INDEX.nodes[FBM_SYNC_RUN_SCHEMA.regions.pipeline]) { return false; }

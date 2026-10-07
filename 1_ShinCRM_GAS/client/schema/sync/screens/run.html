@@ -16,6 +16,15 @@ var FBM_SYNC_RUN_SCHEMA = {
     backgroundSettings: 'Cài đặt đồng bộ nền',
     backgroundSettingsId: 'fbm-sync-open-background-settings'
   },
+  reset: {
+    id: 'fbm-sync-reset-state',
+    label: 'Đặt lại phiên đồng bộ',
+    explain: 'Hệ thống không lưu hoặc không đọc được ghi nhớ của phiên đồng bộ (phiên đang chạy tới đâu), nên màn này không tự thoát được. Nếu tải lại Sheet mà vẫn thấy thông báo này, hãy bấm "Đặt lại phiên đồng bộ". Việc này không xóa khách hàng, giao dịch, Log hay cài đặt.',
+    confirmTitle: 'Đặt lại phiên đồng bộ?',
+    confirmMessage: 'Chỉ xóa ghi nhớ của phiên đang dở. Khách hàng, giao dịch trên Sheet và trên FBM, Log và cài đặt giữ nguyên. Sau đó bấm "Bắt đầu đồng bộ" để chạy lại từ đầu. Bản ghi nào đang gửi dở lên FBM sẽ được kiểm tra lại ở lần chạy sau, không tạo trùng.',
+    confirmLabel: 'Đặt lại',
+    cancelLabel: 'Quay lại'
+  },
   awaitingMessage: 'Phiên có nhiều thay đổi; hãy xem kết quả rồi chấp thuận để tiếp tục.',
   phaseTitles: { done: 'Pipeline đã hoàn tất', error: 'Pipeline dừng vì lỗi', paused: 'Pipeline đã tạm dừng', running: 'Pipeline đang chạy' },
   pipeline: {

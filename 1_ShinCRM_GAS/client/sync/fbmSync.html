@@ -363,7 +363,7 @@ function fbmSyncPaint(status, freshOpen) {
   // GAS orchestration returns { ok, request, status }; the panel only paints the inner snapshot.
   status = status.status || status;
   // Do not replay a terminal error from an earlier sidebar session as the new screen's state.
-  if (freshOpen && status.phase === 'error' && Number(status.updatedAt || 0) < Number(FBM_SYNC_CLIENT.openedAt || 0)) {
+  if (freshOpen && status.phase === 'error' && status.resetOffered !== true && Number(status.updatedAt || 0) < Number(FBM_SYNC_CLIENT.openedAt || 0)) {
     status = Object.assign({}, status, { phase: 'idle', label: 'Sẵn sàng', message: '', lastError: '', counts: { total: 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 } });
   }
   FBM_SYNC_CLIENT.lastStatus = status;
@@ -507,7 +507,7 @@ function fbmSyncInstall() {
     } else { waiter.resolve(data.result); }
   });
   document.addEventListener('click', function (event) {
-    var target = event.target && event.target.closest ? event.target.closest('#fbm-sync-back, #fbm-sync-module-menu, #fbm-sync-master-switch, #fbm-sync-settings-master-switch, #fbm-sync-start, #fbm-sync-approve, #fbm-sync-rotate-relay, #fbm-sync-cancel, #fbm-sync-open-conflicts, #fbm-sync-conflict-back, #fbm-sync-check-identity, #fbm-sync-probe-identity, #fbm-sync-confirm-identity, #fbm-sync-save-identity, #fbm-sync-auto-login, #fbm-sync-login-edit, #fbm-sync-login-save, #fbm-sync-login-delete, #fbm-sync-login-test, #fbm-sync-open-login-policy, #fbm-sync-save-extension, #fbm-sync-save-background, #fbm-sync-save-login-policy, #fbm-sync-save-settings, [data-sync-config-action], [data-sync-screen], [data-sync-results-tab], [data-sync-background-draft], [data-sync-master-draft], [data-sync-extension-startup], [data-sync-process-toggle], [data-sync-login-policy], [data-sync-page], #fbm-sync-conflict-save, [data-fbm-push-retry-all]') : null;
+    var target = event.target && event.target.closest ? event.target.closest('#fbm-sync-back, #fbm-sync-module-menu, #fbm-sync-master-switch, #fbm-sync-settings-master-switch, #fbm-sync-start, #fbm-sync-approve, #fbm-sync-rotate-relay, #fbm-sync-cancel, #fbm-sync-reset-state, #fbm-sync-open-conflicts, #fbm-sync-conflict-back, #fbm-sync-check-identity, #fbm-sync-probe-identity, #fbm-sync-confirm-identity, #fbm-sync-save-identity, #fbm-sync-auto-login, #fbm-sync-login-edit, #fbm-sync-login-save, #fbm-sync-login-delete, #fbm-sync-login-test, #fbm-sync-open-login-policy, #fbm-sync-save-extension, #fbm-sync-save-background, #fbm-sync-save-login-policy, #fbm-sync-save-settings, [data-sync-config-action], [data-sync-screen], [data-sync-results-tab], [data-sync-background-draft], [data-sync-master-draft], [data-sync-extension-startup], [data-sync-process-toggle], [data-sync-login-policy], [data-sync-page], #fbm-sync-conflict-save, [data-fbm-push-retry-all]') : null;
     if (!target) { return; }
     event.preventDefault();
     if (typeof unsavedChangesGuardTransition === 'function' && unsavedChangesGuardTransition({ source: 'fbm', target: target }, function () { return fbmSyncDispatchClickTarget(target); })) { return; }
@@ -596,6 +596,7 @@ function fbmSyncInstall() {
     else if (target.id === 'fbm-sync-approve') { fbmSyncApprovePush(); }
     else if (target.id === 'fbm-sync-start') { fbmSyncRun(FBM_SYNC_CLIENT.mode); }
     else if (target.id === 'fbm-sync-cancel') { fbmSyncCancel(); }
+    else if (target.id === FBM_SYNC_RUN_SCHEMA.reset.id) { fbmSyncResetState(); }
   }
   document.addEventListener('change', function (event) {
     var target = event.target;
@@ -1382,6 +1383,17 @@ function fbmSyncCancel() {
     FBM_SYNC_CLIENT.cancelRequested = false;
     FBM_SYNC_CLIENT.running = false;
     return fbmSyncPaintError(error, 'Không dừng được phiên đồng bộ trên GAS.');
+  });
+}
+/** Lối thoát khi màn đồng bộ kẹt (FBM-044): hỏi lại bằng dialog chung, còn việc có được đặt lại hay không do GAS quyết. */
+function fbmSyncResetState() {
+  var schema = FBM_SYNC_RUN_SCHEMA.reset;
+  if (FBM_SYNC_CLIENT.running) { return Promise.resolve(null); }
+  return uiDecisionOpen({ title: schema.confirmTitle, message: schema.confirmMessage, cancelLabel: schema.cancelLabel, confirmLabel: schema.confirmLabel }).then(function (confirmed) {
+    if (!confirmed) { return null; }
+    return callServer('fbmResetSyncState').then(function (result) { return fbmSyncPaint(result); });
+  }).catch(function (error) {
+    return fbmSyncPaintError(error, 'Không đặt lại được phiên đồng bộ.', 'state_reset');
   });
 }
 /** Chờ GAS thu hồi phiên nền sau response đang bay rồi mới mở phiên thủ công. */

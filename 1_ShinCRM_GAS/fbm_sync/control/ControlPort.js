@@ -39,6 +39,8 @@ FbmSync.controlDispatch = function (command, payload) {
       return fbmSyncApprovePush();
     case 'cancel':
       return fbmSyncCancel();
+    case 'reset_state':
+      return FbmSync.controlResetState();
     case 'retry_push_failures':
       return fbmSyncRetryPushFailures();
     case 'login_config':
@@ -72,7 +74,7 @@ FbmSync.controlDispatch = function (command, payload) {
 FbmSync.controlDispatchLocked = function (command, payload) {
   // transport_failure tự giữ orchestration lock để cả Sidebar và relay nền dùng chung
   // một handler; không bọc thêm ở đây vì Apps Script Lock không tái nhập.
-  var name = String(command || ''), mutating = ['start', 'continue', 'approve_push', 'cancel', 'retry_push_failures', 'set_master_switch', 'set_background_switch', 'save_extension_config', 'save_background_schedule', 'save_login_config', 'set_auto_login', 'identity_status', 'save_identity_binding', 'save_connection', 'open_conflict', 'conflict_opened', 'prepare_conflict', 'confirm_conflict'];
+  var name = String(command || ''), mutating = ['start', 'continue', 'approve_push', 'cancel', 'reset_state', 'retry_push_failures', 'set_master_switch', 'set_background_switch', 'save_extension_config', 'save_background_schedule', 'save_login_config', 'set_auto_login', 'identity_status', 'save_identity_binding', 'save_connection', 'open_conflict', 'conflict_opened', 'prepare_conflict', 'confirm_conflict'];
   if (mutating.indexOf(name) < 0) { return FbmSync.controlDispatch(name, payload); }
   try {
     return FbmSync.withOrchestrationLock(function () {
@@ -81,8 +83,11 @@ FbmSync.controlDispatchLocked = function (command, payload) {
     });
   } catch (error) {
     var code = String(error && error.code || '');
-    if (code !== 'FBM_DOCUMENT_PROPERTIES_QUOTA' && code !== 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED') { throw error; }
-    var status = FbmSync.statusView();
+    if (!FbmSync.stateStorageError(error)) { throw error; }
+    var status;
+    try { status = FbmSync.statusView(); } catch (readError) { status = FbmSync.stateStuckView(readError); return { ok: false, code: status.code, error: status.lastError, status: status }; }
+    // Phiên còn đứng ở pha đang chạy nghĩa là cả bản state rút gọn cũng không ghi được: mở lối đặt lại (FBM-044).
+    status.resetOffered = FbmSync.ACTIVE_PHASES.indexOf(String(status.phase || '')) >= 0;
     status.ok = false;
     status.phase = 'error';
     status.lastFailureCode = code;
@@ -115,4 +120,10 @@ FbmSync.controlNotification = function (status) {
       message: String(snapshot.message || '')
     }
   };
+};
+/** Đặt lại phiên kẹt rồi trả status mới; bị từ chối thì trả status hiện tại kèm lý do để Sidebar hiện đúng chỗ. */
+FbmSync.controlResetState = function () {
+  var reset = FbmSync.stateReset();
+  if (!reset.ok) { return Object.assign({}, FbmSync.statusView(), { ok: false, code: reset.code, message: reset.message }); }
+  return Object.assign({}, FbmSync.statusView(), { message: 'Đã đặt lại phiên đồng bộ. Bấm "Bắt đầu đồng bộ" để chạy lại từ đầu.' });
 };
