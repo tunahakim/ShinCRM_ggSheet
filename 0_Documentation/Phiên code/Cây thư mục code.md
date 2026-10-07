@@ -264,6 +264,7 @@ tests\
     ├── cellBudget.js             Cái bẫy gõ "500.000" thành 500, và bảng thủ phạm phải sắp giảm dần.
     ├── setupSheets.js            Chạy lại lần thứ hai có phá gì không: giá trị người dùng đã vặn phải còn nguyên, và tên mới nối dưới dòng cuối của chính cột tham số.
     ├── columnFormat.js           Khuôn chống mất chữ số đầu của mã số thuế: bảng khuôn khớp kiểu cột, cửa ghi đặt lại khuôn trước khi ghi, dựng và kiểm sheet áp khuôn đúng ô.
+    ├── creatorField.js           Cột Người tạo trên FBM ở cửa ghi: người dùng tạo mới lấy USER_NAME của Config, không gõ đè được; nguồn pull ghi thẳng người tạo FBM.
     ├── entityRead.js             Tra cột theo mã chứ không theo thứ tự, hàng trắng bị đếm, và không giá trị nào còn là Date.
     ├── categoryRead.js           Cái bẫy @CAT_CHO_PHEP_FBM, và mọi trường SELECT đều tìm được danh mục của mình.
     ├── configRead.js             Khóa trùng thì chặn, còn khối sắp xếp thì thứ tự hàng là nghĩa.
