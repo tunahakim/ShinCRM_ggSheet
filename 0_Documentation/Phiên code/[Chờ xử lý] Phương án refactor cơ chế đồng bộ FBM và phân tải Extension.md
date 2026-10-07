@@ -116,6 +116,7 @@ Hệ quả: nhánh lỗi ghi thêm `lastError` (Supervisor ghi khoảng 90 ký t
 3. Mỗi lần gọi GAS chỉ ghi state một lần và ghi trace một lần (gom trong bộ nhớ, ghi ở cuối).
 4. Preflight ở chế độ chỉ đọc bỏ quét ứng viên đẩy (`pushCandidates`, khoảng 4 giây) vì chỉ chiều ghi cần.
 5. Thu gọn state (2B.3) và sửa mẫu số tiến trình (2B.4).
+6. **Bỏ phân trang Customer bên FBM (chủ dự án đồng ý 2026-10-07).** FBM cho lấy toàn bộ khách bằng một request; trang 50 khách chỉ là cách né trần state khi cursor phải mang danh sách mã khách (G14 mục 1). Phân trang keyset đã gây lỗi thật: con trỏ trang thiếu `stt_rec_kh` làm trang 2 về rỗng, lượt quét tưởng xong và đánh nhầm 1.262 khách "không thấy bên FBM" (G14 mục 4, đã vá tạm bằng con trỏ 4 giá trị và chốt chặn so với `TotalRowCount`). Phương án: một request lấy toàn bộ Customer, ghi Sheet Customer; hàng chờ lấy Activity đọc mã FBM từ Sheet Customer, state chỉ giữ vị trí (số thứ tự khách đang xử lý), không giữ danh sách mã. Lấy Activity từng khách chỉ cần `stt_rec_kh`. "Không thấy bên FBM" dựa trên một lần trả về đầy đủ nên không còn trường hợp nhận thiếu mà tưởng đủ. Cần đo dung lượng gói toàn bộ Customer qua đường Extension → Sidebar → GAS (mục 5.2, mục 6) trước khi chốt có chia gói về GAS hay không; chia gói về GAS khác với phân trang bên FBM.
 
 Về giới hạn 6 phút: mỗi khách hiện là một lần gọi GAS riêng (khoảng 20 giây), vòng lặp nằm ở Sidebar, cursor lưu trong state nên phiên 9 giờ không lần gọi nào chạm 6 phút; đóng Sidebar thì phiên ngừng gửi request, Supervisor đánh lỗi sau `STALE_RUN_MS` (2 phút). Khi gom gói (điểm 1), mỗi lần gọi dài hơn nên ngân sách gói phải tính cả trần 6 phút và hạn chờ của Sidebar.
 
@@ -756,8 +757,8 @@ test nào chứng minh không còn hai đường thực thi
 
 1. Đọc lại các chuyên đề 09 liên quan và đối chiếu toàn bộ owner hiện có.
 2. Cập nhật tài liệu chính thức về ranh giới mới GAS–Extension và luật conflict (mục 10.1).
-3. Thu gọn state cho cả trang đầy cộng nhánh lỗi, sửa mẫu số tiến trình (mục 2B.3, 2B.4); có thể làm trước khi tách branch nếu chủ dự án muốn.
-4. Gắn mốc thời gian từng bước trong một lần gọi GAS, đo một trang 50 khách để biết khoảng 10 giây chưa rõ (mục 2B.2).
+3. **Đo và lập kế hoạch, chưa refactor (chủ dự án yêu cầu 2026-10-07).** Gắn mốc thời gian (chỉ thêm đo, không đổi hành vi) cho mọi giai đoạn của một lượt: preflight, kiểm phiên đăng nhập, Category, Customer, Activity, đóng phiên; trong mỗi lần gọi GAS đo từng bước (đọc/ghi state, đọc Sheet, hash, cửa ghi, trace) để biết khoảng 10 giây chưa rõ (mục 2B.2). Tự chạy thử trên DEV bằng chế độ thử hoặc quét nền chi tiết giới hạn khách, lấy bảng thời gian từng giai đoạn và từng bước, xếp theo tổng thời gian và công sức. Từ đó phân tích, thảo luận với chủ dự án, lập kế hoạch refactor cụ thể; chỉ bắt đầu refactor khi chủ dự án chốt.
+4. Thu gọn state, bỏ phân trang Customer bên FBM, sửa mẫu số tiến trình (mục 2B.3, 2B.4, 2B.5 điểm 6).
 5. Bắt tay phiên bản GAS–Extension (mục 2A điểm 1), có test và thông báo Sidebar/Log khi lệch.
 6. Đo ngân sách đường Extension → GAS: dung lượng và thời gian GAS xử lý một gói, tính cả trần 6 phút (mục 2A điểm 7).
 7. Nhiều khách trong một lần gọi GAS (mục 2B.5 điểm 1–3), làm trước bulk vì giữ nguyên cách gọi FBM và cho số đo chắc chắn.
