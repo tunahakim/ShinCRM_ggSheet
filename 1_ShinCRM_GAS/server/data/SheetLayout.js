@@ -14,7 +14,7 @@ var SHEET_HEADER_ROWS = 3;
 var SHEET_FIRST_DATA_ROW = 4;
 
 /**
- * Danh mục của sheet `Category`, theo tài liệu 02 Phần 9. Bốn danh mục có cột đi kèm hậu tố `_FBM` là bốn danh mục
+ * Danh mục của sheet `Category`, theo tài liệu 02 Phần 9. Ba danh mục có cột đi kèm hậu tố `_FBM` là ba danh mục
  * thực sự đồng bộ với FBM; sự tồn tại của cột đi kèm chính là câu trả lời cho "danh mục nào tham gia đồng bộ",
  * nên không có bảng khai thứ hai nào cho việc đó.
  */
@@ -23,7 +23,6 @@ var CATEGORY_COLUMNS = [
   ['@CAT_TINH_THANH_FBM', 'Tỉnh thành — mã FBM'],
   ['@CAT_NHOM_KH', 'Nhóm khách'],
   ['@CAT_SAN_PHAM', 'Sản phẩm'],
-  ['@CAT_SAN_PHAM_FBM', 'Sản phẩm — mã FBM'],
   ['@CAT_NGUON_KH', 'Nguồn khách'],
   ['@CAT_NGUON_KH_FBM', 'Nguồn khách — mã FBM'],
   ['@CAT_XAC_THUC', 'Xác thực'],

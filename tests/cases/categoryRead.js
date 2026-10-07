@@ -35,8 +35,8 @@ function chay(so) {
   check(so, 'companion không khai trong CATEGORY_COLUMNS phải bị bỏ qua', hop.categoryIsCompanion('@CAT_NHOM_KH_FBM'), false);
 
   const ma = hop.categoryCodes();
-  check(so, '13 cột khai trừ 4 cột đi kèm còn 9 danh mục thật',
-    [hop.CATEGORY_COLUMNS.length, ma.length], [13, 9]);
+  check(so, '12 cột khai trừ 3 cột đi kèm còn 9 danh mục thật',
+    [hop.CATEGORY_COLUMNS.length, ma.length], [12, 9]);
   check(so, '@CAT_CHO_PHEP_FBM có mặt trong danh sách danh mục thật', ma.indexOf('@CAT_CHO_PHEP_FBM') >= 0, true);
   check(so, 'không một mã đi kèm nào lọt vào danh sách danh mục thật', ma.filter(hop.categoryIsCompanion), []);
 

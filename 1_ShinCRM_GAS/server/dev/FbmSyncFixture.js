@@ -3,7 +3,7 @@ function fbmPrepareAltTest() {
   if (typeof fbmEnsureSyncColumns === 'function') { fbmEnsureSyncColumns(); }
   var cases = [
     'Đọc phiên Customer/Activity qua Extension; chỉ nhận ALT00010.',
-    'Nhập bốn danh mục live vào Category và bỏ qua mã companion giả.',
+    'Nhập ba danh mục live vào Category và bỏ qua mã companion giả.',
     'Kéo Customer về Customer, giữ nguyên ghi chú nội bộ.',
     'Kéo Activity về Activity và nối đúng Customer.id nội bộ.',
     'Không đổi dữ liệu: hash ba chiều phải giữ trạng thái đã đồng bộ.',
