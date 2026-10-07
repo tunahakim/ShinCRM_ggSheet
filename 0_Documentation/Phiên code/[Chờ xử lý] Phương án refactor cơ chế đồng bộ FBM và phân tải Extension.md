@@ -68,6 +68,57 @@ Các điểm dưới đây thay cho câu tương ứng ở các mục sau; mục
 8. **Đăng nhập để sau cùng hoặc bỏ khỏi đợt này**: đăng nhập hiện chạy được và không liên quan dữ liệu lớn.
 9. **Lỗi cursor phình theo số khách đã sửa ngoài refactor** (commit 71a792d, bf89e77): quét toàn bộ đọc Customer theo trang 50, cursor Activity chỉ mang khách của trang đang quét. Đúng hướng state V2 ở mục 15 nên refactor giữ nguyên.
 
+## 2B. Hiện trạng và số đo trước refactor (2026-10-07, Sheet DEV, 1.312 khách thật)
+
+Số đo dưới đây lấy từ lượt "Đọc toàn bộ" thật với chế độ thử tắt, sau khi đã sửa cursor phình (2A điểm 9) và preflight đọc Sheet một lần (commit 906370b). Hàm đo DEV chỉ đọc: `fbmProbePreflightTiming`, `fbmProbeActivityStepTiming`, `fbmProbeCursorPosition`, `fbmProbeStateMetadataSizes` (trong `server/dev/FbmSyncStateProbe.js`); trace từng request đọc bằng `fbmGetSyncTrace`.
+
+### 2B.1. Kết luận chính
+
+**Nút thắt không phải FBM, cũng không phải số bước nghiệp vụ, mà là chi phí của mỗi lần gọi GAS.** Một khách Activity tốn khoảng 23 giây, trong đó Extension gọi FBM chỉ 0,1 giây. Quét Activity theo kiểu một khách một lần gọi GAS thì 1.312 khách mất khoảng 8–9 giờ; lượt thật đo được 47 khách trong khoảng 22 phút.
+
+| Đoạn của một khách Activity | Thời gian đo |
+|---|---|
+| Extension gọi FBM lấy grid Activity của một khách | 0,1 giây |
+| Sidebar gọi GAS (`google.script.run`) đến lúc GAS bắt đầu chạy | khoảng 2,6 giây |
+| GAS xử lý response một khách (từ `fbm_response_received` đến `response_built`) | khoảng 20 giây |
+| Tổng một vòng | 15–30 giây |
+
+Đầu phiên chậm vì cùng lý do: preflight 6 giây (trước khi sửa là 20–34 giây, làm `fbmStartSync` vượt hạn chờ 30 giây của Sidebar), kiểm tra phiên khoảng 22 giây, nạp Category khoảng 23 giây; mỗi bước chỉ vài request FBM nhưng mỗi request là một lần gọi GAS đắt.
+
+### 2B.2. GAS đang làm gì trong mỗi lần xử lý một khách Activity
+
+Theo code hiện tại (`PullFlow.js` nhánh `activity_grid`, `FbmSync.pullRecords`, `FbmSync.pullWrite`):
+
+1. Ghi trace vào DocumentProperties nhiều lần mỗi lượt gọi (khóa `FBM_SYNC_TRACE_V1`, khoảng 6 KB, đọc rồi ghi lại cả khóa mỗi lần).
+2. Đọc và ghi state khoảng 9 KB 4–5 lần (đọc một lần khoảng 300 ms; ghi tương tự).
+3. Đọc lại toàn bộ Sheet Customer để nối giao dịch với khách: **3,5 giây với 1.312 dòng**, dù cursor đã biết đang quét khách nào.
+4. Đọc lại toàn bộ Sheet Activity: 0,4 giây với 93 dòng, tăng theo số giao dịch.
+5. Đánh dấu "đã thấy" vào DocumentProperties (`FBM_SYNC_SEEN_*`).
+6. Ghi Sheet qua `writeGateSave`: khoảng 0,6–1,5 giây.
+7. Ghi Log, cộng số liệu bước, ghi state lần cuối.
+
+Các phần đã đo cộng lại khoảng 8–10 giây; **khoảng 10 giây còn lại chưa đo được** vì không gắn được mốc thời gian khi phiên thật đang chạy. Việc đầu tiên của phần tối ưu là gắn mốc thời gian theo từng bước trong một lần gọi GAS (ghi vào trace, không ghi Log từng bản ghi) rồi chạy một trang 50 khách.
+
+### 2B.3. State đang sát trần một khóa DocumentProperties
+
+Khi đang quét Activity, `FBM_SYNC_STATE_V1` là **8.901/9.000 byte**: cursor 3.025 byte (50 khách × `{sttRec, maKh}` cộng envelope trang Customer kế), `metadata.preview` 2.000 byte, `metadata.businessSteps` 1.417 byte, `metadata.preflight` 447 byte, `customerFields` 291 byte, `session` 416 byte. Test `bf89e77` chỉ chốt cursor dưới nửa trần, không chốt cả state.
+
+Hệ quả: nhánh lỗi ghi thêm `lastError` (Supervisor ghi khoảng 90 ký tự) là vượt trần, `FBM_DOCUMENT_PROPERTIES_QUOTA` che mất lỗi thật. Phải sửa trước hoặc ngay đầu refactor: cursor giữ cặp `[sttRec, maKh]` thay vì object, đưa `preview` ra khỏi state (hoặc thu nhỏ), bỏ `metadata.preflight` đầy đủ khỏi state; test chốt **cả state** của một trang đầy cộng `lastError` dài nhất vẫn dưới khoảng 70% trần.
+
+### 2B.4. Tiến trình hiển thị sai
+
+`counts.total = max(total, completed)` (`PullFlow.js`, `FbmSync.pullRecords`), mà `total` ban đầu bằng 0, nên Sidebar luôn hiện `N/N (100%)` và cả hai số cùng tăng. Chủ dự án chốt: mẫu số là **số khách cần xử lý trong lượt** (toàn bộ: số khách FBM trả theo bộ lọc của lượt, lấy từ `TotalRowCount` grid Customer; chế độ thử: số mã thử; quét nền chi tiết: giới hạn khách mỗi lượt), tử số là số khách đã quét Activity; số giao dịch nhận/ghi vẫn ở dòng đếm riêng.
+
+### 2B.5. Phương án tối ưu đề xuất (đưa vào lộ trình mục 18)
+
+1. **Nhiều khách trong một lần gọi GAS** (thay đổi lớn nhất). Extension lấy Activity của cả trang 50 khách (khoảng 50 × 0,1 giây), gửi về GAS một gói; GAS đọc mỗi Sheet một lần, ghi Sheet một lần, ghi state một lần cho cả gói. Ước tính dưới 1 giây mỗi khách, 1.312 khách khoảng 20–30 phút thay vì 8–9 giờ. Đây là bước trung gian của Activity bulk (mục 7, mục 18 bước 5): cùng hợp đồng "Extension gom, GAS xử lý theo gói", khác ở chỗ Extension gọi FBM theo từng khách thay vì một request bulk. Ngân sách gói phải đo (2A điểm 7); trần thời gian một lần gọi GAS là 6 phút.
+2. Không đọc lại Sheet Customer mỗi lần xử lý Activity; ánh xạ khách lấy từ cursor hoặc đọc một lần cho cả gói.
+3. Mỗi lần gọi GAS chỉ ghi state một lần và ghi trace một lần (gom trong bộ nhớ, ghi ở cuối).
+4. Preflight ở chế độ chỉ đọc bỏ quét ứng viên đẩy (`pushCandidates`, khoảng 4 giây) vì chỉ chiều ghi cần.
+5. Thu gọn state (2B.3) và sửa mẫu số tiến trình (2B.4).
+
+Về giới hạn 6 phút: mỗi khách hiện là một lần gọi GAS riêng (khoảng 20 giây), vòng lặp nằm ở Sidebar, cursor lưu trong state nên phiên 9 giờ không lần gọi nào chạm 6 phút; đóng Sidebar thì phiên ngừng gửi request, Supervisor đánh lỗi sau `STALE_RUN_MS` (2 phút). Khi gom gói (điểm 1), mỗi lần gọi dài hơn nên ngân sách gói phải tính cả trần 6 phút và hạn chờ của Sidebar.
+
 ## 3. Ranh giới GAS – Extension – Sidebar
 
 ### 3.1. GAS sở hữu
@@ -705,15 +756,18 @@ test nào chứng minh không còn hai đường thực thi
 
 1. Đọc lại các chuyên đề 09 liên quan và đối chiếu toàn bộ owner hiện có.
 2. Cập nhật tài liệu chính thức về ranh giới mới GAS–Extension và luật conflict (mục 10.1).
-3. Bắt tay phiên bản GAS–Extension (mục 2A điểm 1), có test và thông báo Sidebar/Log khi lệch.
-4. Đo ngân sách đường Extension → GAS: dung lượng và thời gian GAS xử lý một gói (mục 2A điểm 7).
-5. Activity bulk: Extension gọi FBM một lần (hoặc theo cửa sổ ngày), lọc theo mã khách GAS gửi, chiếu cột, chia gói; GAS hash và đối soát. Đây là phần giá trị nhất: thay khoảng một request mỗi khách bằng một request.
-6. Luật vắng mặt theo lượt hoàn tất và chạy lại cả lượt khi mất tab (mục 2A điểm 5–6), có test mất tab, mất response, gói trùng.
-7. Customer theo cùng khung.
-8. Gọn state V2 và đóng các lỗi ở mục 15A.
-9. Chỉ khi số đo cho thấy cần: chuyển hash sang Extension bằng tệp dùng chung (mục 2A điểm 3).
-10. Đăng nhập qua Extension, nếu vẫn cần (mục 2A điểm 8).
-11. Chạy `node tests/run.js`, push GAS/Extension DEV, chạy dữ liệu giả lập lớn, rồi mới kiểm chứng trên FBM thật với mã thử.
+3. Thu gọn state cho cả trang đầy cộng nhánh lỗi, sửa mẫu số tiến trình (mục 2B.3, 2B.4); có thể làm trước khi tách branch nếu chủ dự án muốn.
+4. Gắn mốc thời gian từng bước trong một lần gọi GAS, đo một trang 50 khách để biết khoảng 10 giây chưa rõ (mục 2B.2).
+5. Bắt tay phiên bản GAS–Extension (mục 2A điểm 1), có test và thông báo Sidebar/Log khi lệch.
+6. Đo ngân sách đường Extension → GAS: dung lượng và thời gian GAS xử lý một gói, tính cả trần 6 phút (mục 2A điểm 7).
+7. Nhiều khách trong một lần gọi GAS (mục 2B.5 điểm 1–3), làm trước bulk vì giữ nguyên cách gọi FBM và cho số đo chắc chắn.
+8. Activity bulk: Extension gọi FBM một lần (hoặc theo cửa sổ ngày), lọc theo mã khách GAS gửi, chiếu cột, chia gói; GAS hash và đối soát. Đây là phần giá trị nhất: thay khoảng một request mỗi khách bằng một request.
+9. Luật vắng mặt theo lượt hoàn tất và chạy lại cả lượt khi mất tab (mục 2A điểm 5–6), có test mất tab, mất response, gói trùng.
+10. Customer theo cùng khung.
+11. Gọn state V2 và đóng các lỗi ở mục 15A.
+12. Chỉ khi số đo cho thấy cần: chuyển hash sang Extension bằng tệp dùng chung (mục 2A điểm 3).
+13. Đăng nhập qua Extension, nếu vẫn cần (mục 2A điểm 8).
+14. Chạy `node tests/run.js`, push GAS/Extension DEV, chạy dữ liệu giả lập lớn, rồi mới kiểm chứng trên FBM thật với mã thử.
 
 ## 19. Những điều chưa nên tự coi là đã chốt
 
@@ -747,7 +801,7 @@ Không dùng Drive/database index trong phương án này.
 
 ## 20. Trạng thái hiện tại
 
-Đã điều chỉnh phương án ngày 2026-10-07 (mục 2A) và sửa lỗi cursor phình ngoài refactor. Chưa có hành động nào sau đây:
+Đã điều chỉnh phương án ngày 2026-10-07 (mục 2A), sửa lỗi cursor phình và preflight đọc lặp ngoài refactor, ghi hiện trạng và số đo ở mục 2B. Refactor làm ở branch riêng tách từ `main` sau khi gộp `feature/fbm-sync`. Chưa có hành động nào sau đây:
 
 - chưa sửa Tài liệu 09;
 - chưa sửa code GAS;
