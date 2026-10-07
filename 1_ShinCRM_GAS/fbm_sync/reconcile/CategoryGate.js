@@ -121,6 +121,12 @@ FbmSync.lookupPairs = function (response) {
   return out;
 };
 
+/**
+ * Lượt có cần nạp danh mục FBM (`SYNC_LOOKUPS`) không. Chiều Lấy từ FBM → ShinCRM không nạp (2A điểm 12, chủ dự án chốt 2026-10-07): bản ghi kéo về vẫn kiểm theo từng bản ghi bằng Sheet Category; chỉ bỏ phép kiểm "FBM đã đổi tên danh mục", phép này còn ở chiều đẩy và "Kiểm tra an toàn".
+ * Mỗi danh mục là một lần gọi GAS (khoảng 5 giây, đo 2026-10-07), nên bỏ nạp tiết kiệm khoảng 15 giây đầu mỗi lượt Lấy.
+ */
+FbmSync.needsFbmLookups = function (state) { return String(state && state.mode || 'read') !== 'read'; };
+
 /** Tìm các mã Sheet không còn tồn tại hoặc đã đổi tên trên FBM. */
 FbmSync.validateLookupGate = function (state, categoryGate) {
   var blocked = [], session = state && state.session && state.session.lookups || {};

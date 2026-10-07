@@ -156,9 +156,15 @@ FbmSync.authContinue = function (entity, response) {
     FbmSync.stateWrite(state);
     return FbmSync.sessionSystemRequest('authorize', { entity: 'activity' });
   }
-  // Lookup is read-only in both modes; Category remains user-owned configuration.
+  // Category là cấu hình của người dùng; đồng bộ chỉ đọc và đối chiếu. Chiều Lấy không nạp danh mục FBM (`needsFbmLookups`).
   if (typeof FbmSync.businessStepFinish === 'function') { FbmSync.businessStepFinish(state, 'session', 'ok', {}); }
   if (typeof FbmSync.businessStepStart === 'function') { FbmSync.businessStepStart(state, 'category', { mode: state.mode, scan: state.scan }); }
+  if (!FbmSync.needsFbmLookups(state)) {
+    var pullRequest = FbmSync.beginCustomerPull(state);
+    if (typeof FbmSync.businessStepFinish === 'function') { FbmSync.businessStepFinish(state, 'category', 'ok', { lookups: 0, errors: Number(state.metadata && state.metadata.categoryBlocks && state.metadata.categoryBlocks.length || 0) }); }
+    FbmSync.stateWrite(state);
+    return pullRequest;
+  }
   state.cursor = { kind: 'lookup', index: 0 };
   state.message = 'Đang kiểm tra danh mục FBM...';
   FbmSync.stateWrite(state);

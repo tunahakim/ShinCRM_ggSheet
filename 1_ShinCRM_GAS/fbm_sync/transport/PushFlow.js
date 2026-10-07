@@ -6,7 +6,7 @@ FbmSync.prepareCategoryGate = function (state) {
   var gate = { map: {}, names: {}, valid: {}, warnings: [] }, blocks = [];
   try {
     gate = FbmSync.readCategoryGate();
-    blocks = FbmSync.validateLookupGate(state, gate);
+    blocks = FbmSync.needsFbmLookups(state) ? FbmSync.validateLookupGate(state, gate) : [];
   } catch (err) {
     blocks = [{ source: 'Category', reason: 'Không đọc được bảng Category: ' + String(err && err.message || err) }];
   }
