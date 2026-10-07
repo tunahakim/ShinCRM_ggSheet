@@ -119,13 +119,18 @@ FbmSync.autoLoginCanAttempt = function (now) {
   return { ok: true, credentialRef: value.credentialRef };
 };
 
-/** Lý do cổng không được tự đăng nhập, theo đúng mã autoLoginCanAttempt trả về. */
-FbmSync.autoLoginBlockMessage = function (code) {
+/** Lý do cổng không được tự đăng nhập, theo đúng kết quả autoLoginCanAttempt trả về.
+ * Thông báo chờ phải mang lý do lần trước và giờ được thử lại: chỉ nói "đang chờ" thì người dùng bấm lại mãi mà không biết phải sửa gì (gặp thật 2026-10-07). */
+FbmSync.autoLoginBlockMessage = function (code, blocked) {
+  var lastError = String(FbmSync.loginConfigRead().lastError || '').trim();
+  var reason = lastError ? ' Lý do lần trước: ' + lastError.replace(/[.\s]+$/, '') + '.' : '';
+  var retryAt = Number(blocked && blocked.retryAt || 0), when = '';
+  if (retryAt) { var at = new Date(retryAt); when = ' sau ' + ('0' + at.getHours()).slice(-2) + ':' + ('0' + at.getMinutes()).slice(-2); }
   var messages = {
     SYNC_DISABLED: 'Đồng bộ FBM đang tắt; không tự đăng nhập.',
     AUTO_LOGIN_NOT_CONFIGURED: 'Tự đăng nhập FBM đang tắt hoặc chưa được cấu hình; request đã bị chặn.',
-    AUTO_LOGIN_RETRY_DISABLED: 'Lần tự đăng nhập FBM trước thất bại và đang tắt tự thử lại; hãy đăng nhập trên tab FBM hoặc bật thử lại trong Cài đặt phiên.',
-    AUTO_LOGIN_THROTTLED: 'Lần tự đăng nhập FBM trước thất bại; đang chờ chu kỳ an toàn trước khi thử lại.'
+    AUTO_LOGIN_RETRY_DISABLED: 'Lần tự đăng nhập FBM trước thất bại và đang tắt tự thử lại.' + reason + ' Hãy đăng nhập trên tab FBM hoặc bật thử lại trong Cài đặt phiên.',
+    AUTO_LOGIN_THROTTLED: 'Lần tự đăng nhập FBM trước thất bại; để tránh khóa tài khoản, hệ thống chỉ tự thử lại' + (when || ' sau chu kỳ an toàn') + '.' + reason + ' Muốn kiểm tra ngay thì đăng nhập trên tab FBM hoặc bấm "Đăng nhập thử" trong cài đặt tài khoản.'
   };
   return messages[String(code || '')] || messages.AUTO_LOGIN_NOT_CONFIGURED;
 };
@@ -242,13 +247,15 @@ FbmSync.loginSessionBlockedContinue = function (state, cursor) {
 FbmSync.loginAdapterContinue = function (state, cursor, response) {
   if (FbmSync.loginBlockedResponse(response)) { return FbmSync.loginSessionBlockedContinue(state, cursor); }
   var success = FbmSync.protocol.assertSuccess(response), parsed = FbmSync.protocol.parse(response) || {}, data = parsed && parsed.d !== undefined ? parsed.d : parsed;
-  if (!success.ok || data === false || FbmSync.protocol.isSessionExpired(response)) {
-    var failure = success.bug && (success.bug.Message || success.bug.message) || 'Đăng nhập FBM thất bại.';
+  // FBM chỉ báo thành công bằng `{"d":true}`; thất bại có thể là `false` hoặc `null` (Nghiên cứu FBM ch02 mục 2.5). Chỉ nhận đúng `true`, vì coi `null` là thành công thì lỗi sai mật khẩu hiện thành "FBM không trả mã xác thực" ở bước sau (gặp thật 2026-10-07).
+  if (!success.ok || data !== true || FbmSync.protocol.isSessionExpired(response)) {
+    var failure = success.bug && (success.bug.Message || success.bug.message) || 'FBM từ chối đăng nhập: sai tên đăng nhập, mật khẩu, hoặc mã phiên của trang đăng nhập đã hết hạn.';
     if (!cursor.testOnly && FbmSync.autoLoginMarkFailure) { FbmSync.autoLoginMarkFailure(failure); }
     state.phase = 'paused'; state.cursor = {}; state.lastFailureCode = cursor.testOnly ? 'LOGIN_FAILED' : 'AUTO_LOGIN_FAILED'; state.retryable = false; state.lastError = failure;
-    state.message = cursor.testOnly ? 'Đăng nhập thử không thành công; hãy kiểm tra lại thông tin FBM.' : 'Tự đăng nhập thất bại; sẽ thử lại sau 30 phút.';
+    // Thông báo phải mang lý do FBM trả về, không chỉ "thất bại": người dùng cần biết là sai mật khẩu hay phải chờ.
+    state.message = cursor.testOnly ? 'Đăng nhập thử không thành công: ' + failure : 'Tự đăng nhập thất bại: ' + failure + ' Hệ thống tự thử lại sau ' + FbmSync.loginConfigPublic().retryMinutes + ' phút; muốn kiểm tra ngay thì bấm "Đăng nhập thử" trong cài đặt tài khoản.';
     FbmSync.stateWrite(state);
-    if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'login_failure'); }
+    if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'login_failure', null, FbmSync.loginResponseFacts(response)); }
     return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.message, message: state.message };
   }
   state.session = state.session || {};
@@ -259,11 +266,26 @@ FbmSync.loginAdapterContinue = function (state, cursor, response) {
   return { ok: true, request: FbmSync.sessionSystemEnvelope('authorize', { entity: 'customer' }), status: FbmSync.statusView() };
 };
 
+/** Dấu hiệu an toàn của response đăng nhập hoặc authorize hỏng để Log chẩn đoán được: chỉ mã HTTP, độ dài, có phải JSON và tên khóa của `d`, không bao giờ ghi giá trị. */
+// Log cấm cả chữ của trường nhạy cảm, kể cả khi chỉ là tên khóa, nên tên khóa loại này không được liệt kê.
+FbmSync.LOGIN_FACT_HIDDEN_KEY = /authori|cookie|pass|token|salt|key/i;
+FbmSync.loginResponseFacts = function (response) {
+  var meta = FbmSync.traceResponse(response), parsed = FbmSync.protocol.parse(response) || {}, data = parsed.d !== undefined ? parsed.d : parsed;
+  if (typeof data === 'string') { data = FbmSync.protocol.parse(data) || data; }
+  return {
+    httpStatus: meta.httpStatus, responseLength: meta.responseLength, json: !parsed.parseError,
+    dType: data === null ? 'null' : typeof data,
+    dKeys: data && typeof data === 'object' ? Object.keys(data).filter(function (key) { return key.charAt(0) !== '_' && !FbmSync.LOGIN_FACT_HIDDEN_KEY.test(key); }).slice(0, 20).join(',') : '',
+    deniedFlag: !!(data && typeof data === 'object' && data.Authorized === false)
+  };
+};
 FbmSync.loginAuthorizeContinue = function (state, cursor, response) {
   var authorized = FbmSync.extractAuthorized(response);
   if (!authorized) {
     state.phase = 'paused'; state.cursor = {}; state.lastFailureCode = 'LOGIN_IDENTITY_AUTHORIZE_FAILED'; state.lastError = 'FBM không trả mã xác thực để kiểm tra tài khoản sau đăng nhập.'; state.message = state.lastError; FbmSync.stateWrite(state);
-    if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'login_identity_failure'); }
+    // Ghi lý do vào cấu hình đăng nhập để thông báo chờ chu kỳ của lần bấm sau nói được vì sao lần trước hỏng.
+    if (!cursor.testOnly && FbmSync.autoLoginMarkFailure) { FbmSync.autoLoginMarkFailure(state.lastError); }
+    if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'login_identity_failure', null, FbmSync.loginResponseFacts(response)); }
     return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError, message: state.lastError };
   }
   state.session.customerAuthorized = authorized;

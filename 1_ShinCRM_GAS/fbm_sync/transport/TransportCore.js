@@ -131,7 +131,7 @@ FbmSync.sessionGateOwnsRequest = function (request, state) {
  * Mọi sự kiện cổng phiên, kể cả sự kiện không kết thúc phiên (hết hạn đang đăng nhập lại, thử lại tìm tab), đều có một dòng Log riêng (FBM-029).
  * Ghi state lỗi thì ném lên lát để `runSlice` chuyển phiên sang lỗi; nuốt ở đây thì Sidebar thấy state cũ còn Log không có gì.
  */
-FbmSync.sessionGateRecordFailure = function (state, code, message, action, cause) {
+FbmSync.sessionGateRecordFailure = function (state, code, message, action, cause, facts) {
   var current = state || FbmSync.stateRead(), reason = String(message || 'Cổng phát request FBM đã dừng vì lỗi.').slice(0, 240), detail;
   current.lastFailureCode = String(code || 'FBM_SESSION_GATE_FAILED');
   current.lastError = reason;
@@ -140,6 +140,8 @@ FbmSync.sessionGateRecordFailure = function (state, code, message, action, cause
   detail = { code: current.lastFailureCode, phase: String(current.phase || ''), runId: String(current.runId || '') };
   // Chỉ ghi mã/loại lỗi gốc, không ghi message: exception trong cổng có thể mang nội dung cấu hình đăng nhập.
   if (cause) { detail.causeCode = String(cause.code || cause.name || 'Error'); }
+  // `facts` chỉ nhận dấu hiệu đã lọc sẵn (mã, độ dài, tên khóa), không nhận giá trị response.
+  if (facts) { detail.response = facts; }
   if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: action || 'session_gate_error', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', reason: reason, detail: detail }); }
   if (typeof flushLog === 'function') { flushLog(); }
   return current;
@@ -180,13 +182,13 @@ FbmSync.sessionGateStart = function (state, failedCursor) {
   if (!policy.autoLogin) {
     var canAttempt = typeof FbmSync.autoLoginCanAttempt === 'function' ? FbmSync.autoLoginCanAttempt() : { code: 'AUTO_LOGIN_NOT_CONFIGURED' };
     var code = String(canAttempt.code || 'AUTO_LOGIN_NOT_CONFIGURED');
-    FbmSync.sessionGateBlock(current, code, FbmSync.autoLoginBlockMessage(code));
+    FbmSync.sessionGateBlock(current, code, FbmSync.autoLoginBlockMessage(code, canAttempt));
     return null;
   }
   allowed = FbmSync.beginAutoLogin(current, cursor, { heartbeat: cursor.kind === 'heartbeat' });
   if (!allowed) {
     var blocked = typeof FbmSync.autoLoginCanAttempt === 'function' ? FbmSync.autoLoginCanAttempt() : { code: 'AUTO_LOGIN_NOT_CONFIGURED' };
-    FbmSync.sessionGateBlock(current, blocked.code || 'AUTO_LOGIN_NOT_CONFIGURED', FbmSync.autoLoginBlockMessage(blocked.code));
+    FbmSync.sessionGateBlock(current, blocked.code || 'AUTO_LOGIN_NOT_CONFIGURED', FbmSync.autoLoginBlockMessage(blocked.code, blocked));
     return null;
   }
   gate = FbmSync.sessionGateMeta(current);
