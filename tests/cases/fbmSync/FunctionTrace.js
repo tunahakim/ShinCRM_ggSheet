@@ -14,7 +14,7 @@ function chay(so) {
     logTrace: (entry) => events.push(entry),
     logEvent: (entry) => events.push(entry)
   });
-  napServer(hop, 'fbm_sync/diagnostic/Trace.js');
+  napServer(hop, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/diagnostic/Trace.js');
 
   const state = { runId: 'run-thuc-te', mode: 'read', scan: 'full', origin: 'manual', entity: '', metadata: {}, counts: { completed: 0, succeeded: 0, skipped: 0, conflict: 0, error: 0 } };
   hop.FbmSync.businessStepStart(state, 'preflight_hash', { mode: 'read', scan: 'full', password: 'khong-duoc-ghi' });
@@ -42,7 +42,7 @@ function chay(so) {
       PropertiesService: { getDocumentProperties: () => ({ getProperty: (k) => (k in kho ? kho[k] : null), setProperty: (k, v) => { kho[k] = String(v); }, deleteProperty: (k) => { delete kho[k]; }, getKeys: () => Object.keys(kho) }) },
       logTrace: (entry) => dong.push(entry), logEvent: (entry) => dong.push(entry)
     });
-    napServer(nen, 'fbm_sync/state/State.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/write/SheetSave.js');
+    napServer(nen, 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/write/SheetSave.js');
     const st = nen.FbmSync.stateStart('', 'checking_session', 0);
     nen.FbmSync.businessStepStart(st, 'run', {});
     nen.FbmSync.businessStepStart(st, 'session', {});
@@ -116,7 +116,7 @@ function chay(so) {
     ['error', true, 0]);
 
   const nenHb = dungState();
-  napServer(nenHb.nen, 'fbm_sync/control/ControlPort.js', 'fbm_sync/state/Scheduler.js');
+  napServer(nenHb.nen, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/control/ControlPort.js', 'fbm_sync/state/Scheduler.js');
   nenHb.nen.fbmSyncHeartbeatLocked = () => { throw new Error('Lỗi lát nền'); };
   let nemNen = '';
   try { nenHb.nen.fbmSyncHeartbeat({}, {}); } catch (err) { nemNen = err.message; }

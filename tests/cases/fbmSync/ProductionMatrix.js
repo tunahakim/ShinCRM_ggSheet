@@ -30,7 +30,7 @@ function makeSync() {
   napServer(hop,
     'fbm_sync/schema/FbmFields.js',
     'fbm_sync/protocol/Protocol.js',
-    'fbm_sync/state/State.js',
+    'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js',
     'fbm_sync/read/GridRead.js',
     'fbm_sync/reconcile/Fingerprint.js',
     'fbm_sync/reconcile/Conflict.js',

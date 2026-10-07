@@ -15,7 +15,7 @@ async function chay(so) {
     PropertiesService: { getDocumentProperties: () => bindingProperties },
     shinOpenBook: () => ({ getId: () => 'sheet-binding-test' })
   });
-  napServer(identity, 'fbm_sync/reconcile/Identity.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
+  napServer(identity, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
   identity.FbmSync.configValue = () => '';
   identity.FbmSync.readLocal = () => [];
   bindingData[identity.FbmSync.BINDING_KEY] = JSON.stringify({ spreadsheetId: 'sheet-binding-test', userId: '2037', username: 'anhlt', accountName: 'Le Tuan Anh' });
@@ -68,7 +68,7 @@ async function chay(so) {
     FbmSync: {},
     PropertiesService: { getDocumentProperties: () => propertyApi, getScriptProperties: () => propertyApi }
   });
-  napServer(orchestration, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/write/SheetSave.js');
+  napServer(orchestration, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/write/SheetSave.js');
    orchestration.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
    const started = orchestration.FbmSync.start({ mode: 'read' });
    check(so, 'start bat dau bang probe User truoc bootstrap Customer', started.request.meta.kind, 'session_probe');
@@ -172,7 +172,7 @@ async function chay(so) {
   check(so, 'state ghi bi bo roi khong tu retry va giu khoa', [recoveredWrite.state.phase, recoveredWrite.state.lastFailureCode, !!recoveredWrite.state.locks['customer:C-1']], ['error', 'SYNC_STALE_WRITE', true]);
   const lookupProps = {};
   const lookupHop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => ({ getProperty: (key) => lookupProps[key] || null, setProperty: (key, value) => { lookupProps[key] = String(value); } }) } });
-  napServer(lookupHop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/write/SheetSave.js');
+  napServer(lookupHop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/write/SheetSave.js');
   lookupHop.FbmSync.currentSpreadsheetId = () => 'sheet-lookup-test';
   lookupHop.FbmSync.identityStatus = () => ({ status: 'BOUND' });
   const lookupErrorState = lookupHop.FbmSync.stateStart('', 'checking_session', 0);
@@ -237,7 +237,7 @@ async function chay(so) {
     const data = recordLocks._props || (recordLocks._props = {});
     return { getProperty: (key) => data[key] || null, setProperty: (key, value) => { data[key] = String(value); } };
   } } });
-  napServer(recordLocks, 'fbm_sync/state/State.js', 'fbm_sync/state/RecordLocks.js');
+  napServer(recordLocks, 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/state/RecordLocks.js');
   recordLocks.FbmSync.stateStart('', 'idle', 0);
   recordLocks.FbmSync.lockRecord('customer', 'C-1', 'h1', 'sync');
   check(so, 'save bi chan khi record dang bi sync khoa', recordLocks.FbmSync.saveAllowed('customer', 'C-1', 'h1').code, 'RECORD_BUSY');
@@ -251,7 +251,7 @@ async function chay(so) {
   const schedulerData = {};
   const schedulerPropertyApi = { getProperty: (key) => schedulerData[key] || null, setProperty: (key, value) => { schedulerData[key] = String(value); } };
   const scheduler = taoHopCat({ FbmSync: {}, SETTINGS: { LOCK_WAIT_MS: 1 }, PropertiesService: { getDocumentProperties: () => schedulerPropertyApi }, LockService: { getDocumentLock: () => ({ tryLock: () => true, releaseLock: () => {} }) } });
-  napServer(scheduler, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/state/State.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/state/Scheduler.js');
+  napServer(scheduler, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/state/Scheduler.js');
   const schedule = scheduler.FbmSync.schedule();
   check(so, 'scheduler Activity mặc định tắt với chu kỳ 1 ngày', [schedule.activityMinutes, schedulerData.FBM_SYNC_NEXT_ACTIVITY_SCAN !== undefined], [1440, true]);
   schedulerData.FBM_SYNC_NEXT_CUSTOMER_SCAN = '1000';
@@ -285,7 +285,7 @@ async function chay(so) {
   const heartbeatData = {};
   const heartbeatPropertyApi = { getProperty: (key) => heartbeatData[key] || null, setProperty: (key, value) => { heartbeatData[key] = String(value); } };
   const heartbeat = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => heartbeatPropertyApi, getScriptProperties: () => heartbeatPropertyApi }, LockService: { getDocumentLock: () => ({ tryLock: () => true, releaseLock: () => {} }) } });
-  napServer(heartbeat, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/write/SheetSave.js');
+  napServer(heartbeat, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/write/SheetSave.js');
   heartbeat.FbmSync.stateStart('', 'idle', 0);
   heartbeat.FbmSync.statePatch({ session: { cookie: '', expired: false } });
   heartbeat.FbmSync.identityPreflight = () => ({ blocking: true, status: { status: 'UNBOUND' }, message: 'Chưa có liên kết tài khoản FBM.' });
@@ -383,6 +383,37 @@ async function chay(so) {
   check(so, 'response hien tai duoc dong nhung khong cap request tiep', [stoppedAfterResponse.ok, stoppedAfterResponse.request, heartbeat.FbmSync.stateRead().phase, heartbeat.FbmSync.stateRead().activeRequestId], [true, null, 'paused', '']);
   const cancelWithoutFlight = heartbeat.fbmSyncCancel();
   check(so, 'dung phien khi khong con request bay giu man ket qua o trang thai tam dung ma khong khoa lich nen sau do', [cancelWithoutFlight.phase, cancelWithoutFlight.runId, cancelWithoutFlight.message.indexOf('kết quả và log') >= 0], ['paused', '', true]);
+
+  // Bộ đệm DocumentProperties (đợt 1 bước A): lượt khác ghi trong lúc chờ khóa phải được thấy; lỗi giữa chừng vẫn lưu phần đã ghi và giữ lỗi gốc.
+  const bufferData = {};
+  const bufferStore = {
+    getProperty: (key) => Object.prototype.hasOwnProperty.call(bufferData, key) ? bufferData[key] : null,
+    getProperties: () => Object.assign({}, bufferData),
+    setProperty: (key, value) => { bufferData[key] = String(value); },
+    setProperties: (values) => { Object.keys(values).forEach((key) => { bufferData[key] = String(values[key]); }); },
+    deleteProperty: (key) => { delete bufferData[key]; }
+  };
+  const buffered = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => bufferStore } });
+  napServer(buffered, 'fbm_sync/state/PropertyBuffer.js');
+  const fs = buffered.FbmSync;
+  bufferData.k = 'v1';
+  fs.propertyBufferBegin();
+  const firstScope = fs.withPropertyBuffer(() => fs.props().getProperty('k'));
+  bufferData.k = 'v2';
+  const secondScope = fs.withPropertyBuffer(() => fs.props().getProperty('k'));
+  fs.propertyBufferEnd();
+  check(so, 'đợt 1 bước A: lấy khóa lần sau trong cùng lần gọi đọc lại kho, thấy giá trị lượt khác vừa ghi', [firstScope, secondScope], ['v1', 'v2']);
+  bufferData.gone = 'x';
+  let workError = null;
+  try {
+    fs.withPropertyBuffer(() => {
+      fs.props().setProperty('k', 'v3');
+      fs.props().deleteProperty('gone');
+      check(so, 'đợt 1 bước A: trong khóa, ghi chỉ chờ, kho chưa đổi', [bufferData.k, bufferData.gone], ['v2', 'x']);
+      throw new Error('work-failed');
+    });
+  } catch (err) { workError = err.message; }
+  check(so, 'đợt 1 bước A: phần việc lỗi giữa chừng vẫn ghi gộp phần đã ghi và ném nguyên lỗi gốc', [workError, bufferData.k, 'gone' in bufferData, fs.propertyBuffer.lockDepth], ['work-failed', 'v3', false, 0]);
 }
 
 module.exports = { chay };

@@ -11,6 +11,13 @@ const ROOT = path.join(__dirname, '..', '..', '..');
 const EXECUTOR = path.join(ROOT, '2_ShinCRM_Extension', 'content_scripts', 'fbm_sync', 'executor.js');
 const WORKER = path.join(ROOT, '2_ShinCRM_Extension', 'background', 'service_worker.js');
 
+/**
+ * Trần số lần gọi kho DocumentProperties của một lát Activity sau đợt 1 bước A: nạp cả kho trước khóa, nạp lại trong khóa, ghi gộp, ghi trace (đo 2026-10-07 trước refactor: 83).
+ * Lát kết thúc lượt được cộng thêm số lần xóa dấu "đã thấy", vì kho Google không có lệnh xóa nhiều khóa một lần.
+ */
+const FBM_ACTIVITY_SLICE_PROPERTY_CALLS_MAX = 5;
+const FBM_SEEN_STORE_RESET_DELETES = 8;
+
 function properties() {
   const data = {};
   return {
@@ -40,7 +47,7 @@ function workflowGas(options) {
   napServer(hop,
     'fbm_sync/schema/FbmFields.js',
     'fbm_sync/protocol/Protocol.js',
-    'fbm_sync/state/State.js',
+    'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js',
     'fbm_sync/state/AccountSettings.js',
     'fbm_sync/control/ControlPort.js',
     'fbm_sync/state/Scheduler.js',
@@ -59,7 +66,7 @@ function workflowGas(options) {
     'fbm_sync/transport/EntryPoints.js',
     'server/service/FbmSyncService.js',
     'server/dev/FbmSyncStateProbe.js'
-  , 'fbm_sync/write/SheetSave.js');
+  , 'fbm_sync/write/SheetSave.js', ...(opt.extraFiles || []));
   hop.FbmSync.currentSpreadsheetId = () => 'sheet-workflow';
   hop.FbmSync.configValue = () => '';
   hop.FbmSync.readLocal = opt.readLocal || (() => []);
@@ -652,70 +659,94 @@ async function chay(so) {
     completeWorker.metrics().fbmTabQueries, completeWorker.metrics().fbmMessages
   ], [true, ['heartbeat_request', 'heartbeat'], rawHeartbeat, 1, 2]);
 
-  const fullLogs = [], fullWrites = [], fullLocal = { customer: [], activity: [] };
-  const fullFlow = workflowGas({
-    logEvent: (event) => fullLogs.push(event),
-    LOG_OK: 'ok', LOG_WARN: 'warn', LOG_ERROR: 'error', LOG_CONFLICT: 'conflict',
-    readLocal: (entity) => fullLocal[entity].map((item) => Object.assign({}, item)),
-    writeGateSave: (request) => {
-      fullWrites.push(request);
-      const entity = request.entity;
-      (request.records || []).forEach((patch) => {
-        let index = fullLocal[entity].findIndex((item) => String(item.id || '') === String(patch.id || ''));
-        if (index < 0) {
-          index = fullLocal[entity].length;
-          const prefix = entity === 'customer' ? 'CUS-' : 'ACT-';
-          fullLocal[entity].push(Object.assign({}, patch, { id: patch.id || prefix + String(index + 1).padStart(6, '0') }));
-        } else {
-          fullLocal[entity][index] = Object.assign({}, fullLocal[entity][index], patch);
-        }
-      });
-      const fields = fullLocal[entity].length ? Object.keys(fullLocal[entity][0]) : [];
-      return { ok: true, fields, rows: fullLocal[entity].map((record) => fields.map((field) => record[field])) };
+  // Chạy cả pipeline Customer + Activity. `withTrace` nạp thêm Trace.js như GAS thật (có sổ bước nghiệp vụ thay cho dòng Log tóm tắt mỗi lát), dùng cho phép đếm lần gọi kho.
+  async function fullPipeline(withTrace) {
+    const fullLogs = [], fullWrites = [], fullLocal = { customer: [], activity: [] };
+    // Đếm mọi lần gọi kho DocumentProperties để chốt đợt 1 bước A: một lát Activity không được đọc/ghi kho theo số sự kiện.
+    const fullProps = properties(), fullPropCalls = { count: 0 };
+    ['getProperty', 'setProperty', 'deleteProperty', 'getProperties'].forEach((name) => { const original = fullProps[name]; fullProps[name] = function () { fullPropCalls.count += 1; return original.apply(this, arguments); }; });
+    fullProps.setProperties = function (batch) { fullPropCalls.count += 1; Object.keys(batch).forEach((key) => { fullProps.data[key] = String(batch[key]); }); };
+    const fullFlow = workflowGas({
+      documentProperties: fullProps,
+      extraFiles: withTrace ? ['fbm_sync/diagnostic/Trace.js'] : [],
+      logEvent: (event) => fullLogs.push(event),
+      LOG_OK: 'ok', LOG_WARN: 'warn', LOG_ERROR: 'error', LOG_CONFLICT: 'conflict',
+      readLocal: (entity) => fullLocal[entity].map((item) => Object.assign({}, item)),
+      writeGateSave: (request) => {
+        fullWrites.push(request);
+        const entity = request.entity;
+        (request.records || []).forEach((patch) => {
+          let index = fullLocal[entity].findIndex((item) => String(item.id || '') === String(patch.id || ''));
+          if (index < 0) {
+            index = fullLocal[entity].length;
+            const prefix = entity === 'customer' ? 'CUS-' : 'ACT-';
+            fullLocal[entity].push(Object.assign({}, patch, { id: patch.id || prefix + String(index + 1).padStart(6, '0') }));
+          } else {
+            fullLocal[entity][index] = Object.assign({}, fullLocal[entity][index], patch);
+          }
+        });
+        const fields = fullLocal[entity].length ? Object.keys(fullLocal[entity][0]) : [];
+        return { ok: true, fields, rows: fullLocal[entity].map((record) => fields.map((field) => record[field])) };
+      }
+    });
+    fullFlow.hop.FbmSync.prepareCategoryGate = () => ({ map: {}, names: {}, valid: {}, warnings: [] });
+    fullFlow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
+    const fullCustomerFields = fullFlow.hop.FbmSync.GRID_FIELDS.customer;
+    const fullActivityFields = fullFlow.hop.FbmSync.GRID_FIELDS.activity;
+    const customerRows = [
+      row(fullCustomerFields, { stt_rec_kh: 'FBM-C1', ma_kh: 'ALT00001', ten_kh: 'Cong ty 1', ma_so_thue: '010001', ong_ba: 'A', dc_lh: 'Ha Noi', dien_thoai: '0901', email: 'c1@example.test', ngay_gd: '2026-09-20', datetime0: '2026-09-20T01:00:00', xorder: 1 }),
+      row(fullCustomerFields, { stt_rec_kh: 'FBM-C2', ma_kh: 'ALT00002', ten_kh: 'Cong ty 2', ma_so_thue: '010002', ong_ba: 'B', dc_lh: 'Ha Noi', dien_thoai: '0902', email: 'c2@example.test', ngay_gd: '2026-09-20', datetime0: '2026-09-20T02:00:00', xorder: 2 })
+    ];
+    const activityRows = {
+      'FBM-C1': [row(fullActivityFields, { id: 'FBM-A1', details: 'Goi dien 1', end_date: '2026-09-20', owner: 'Owner 1', datetime0: '2026-09-20T03:00:00', line_nbr: 1 })],
+      'FBM-C2': [row(fullActivityFields, { id: 'FBM-A2', details: 'Goi dien 2', end_date: '2026-09-20', owner: 'Owner 2', datetime0: '2026-09-20T04:00:00', line_nbr: 1 })]
+    };
+    fullFlow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+    let fullStep = fullFlow.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true });
+    const fullKinds = [], fullStatuses = [], fullActivityPropCalls = [];
+    for (let hop = 0; fullStep && fullStep.request && hop < 20; hop += 1) {
+      const request = fullStep.request;
+      const kind = String(request.meta && request.meta.kind || '');
+      fullKinds.push(kind + ':' + String(request.meta && (request.meta.entity || request.meta.field) || ''));
+      let body;
+      if (kind === 'session_probe' || kind === 'identity_user_grid') {
+        body = userResponse;
+      } else if (kind === 'authorize') {
+        body = JSON.stringify({ d: { Authorized: 'auth-' + request.meta.entity } });
+      } else if (kind === 'completion') {
+        body = JSON.stringify({ d: [['CODE', 'Ten danh muc']] });
+      } else if (kind === 'grid' && request.meta.entity === 'customer') {
+        body = gridResponse(fullCustomerFields, customerRows, customerRows.length);
+      } else if (kind === 'grid' && request.meta.entity === 'activity') {
+        const key = request.body.externalKey && request.body.externalKey[0] && request.body.externalKey[0].Value;
+        body = gridResponse(fullActivityFields, activityRows[key] || [], (activityRows[key] || []).length);
+      } else {
+        throw new Error('Ca mô phỏng pipeline gặp request không mong đợi: ' + kind);
+      }
+      const throughExtension = await sendThroughExecutor(request, body);
+      if (kind === 'grid' && request.meta.entity === 'activity') {
+        // Đi đúng đường của fbmContinueSync (bộ đệm một lần gọi, khóa điều phối) để đếm số lần gọi kho của một lát Activity.
+        const callsBefore = fullPropCalls.count;
+        fullFlow.hop.FbmSync.propertyBufferBegin();
+        const before = fullFlow.hop.FbmSync.statusView();
+        fullStep = fullFlow.hop.FbmSync.controlDispatchLocked('continue', { response: executorRaw(throughExtension.reply, request.id) });
+        if (withTrace) { fullFlow.hop.FbmSync.traceEvent('engine_after', { operation: 'fbmContinueSync' }); }
+        if (fullStep.status && fullFlow.hop.FbmSync.shouldLogStatus(before, fullStep.status)) { fullFlow.hop.FbmSync.logStatus(fullStep.status, 'slice'); }
+        fullFlow.hop.FbmSync.propertyBufferEnd();
+        fullActivityPropCalls.push(fullPropCalls.count - callsBefore);
+        fullStatuses.push(fullStep.status);
+        continue;
+      }
+      const before = fullFlow.hop.FbmSync.statusView();
+      fullStep = fullFlow.hop.FbmSync.continue(executorRaw(throughExtension.reply, request.id));
+      fullStatuses.push(fullStep.status);
+      if (fullStep.status && fullFlow.hop.FbmSync.shouldLogStatus(before, fullStep.status)) {
+        fullFlow.hop.FbmSync.logStatus(fullStep.status, 'slice');
+      }
     }
-  });
-  fullFlow.hop.FbmSync.prepareCategoryGate = () => ({ map: {}, names: {}, valid: {}, warnings: [] });
-  fullFlow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
-  const fullCustomerFields = fullFlow.hop.FbmSync.GRID_FIELDS.customer;
-  const fullActivityFields = fullFlow.hop.FbmSync.GRID_FIELDS.activity;
-  const customerRows = [
-    row(fullCustomerFields, { stt_rec_kh: 'FBM-C1', ma_kh: 'ALT00001', ten_kh: 'Cong ty 1', ma_so_thue: '010001', ong_ba: 'A', dc_lh: 'Ha Noi', dien_thoai: '0901', email: 'c1@example.test', ngay_gd: '2026-09-20', datetime0: '2026-09-20T01:00:00', xorder: 1 }),
-    row(fullCustomerFields, { stt_rec_kh: 'FBM-C2', ma_kh: 'ALT00002', ten_kh: 'Cong ty 2', ma_so_thue: '010002', ong_ba: 'B', dc_lh: 'Ha Noi', dien_thoai: '0902', email: 'c2@example.test', ngay_gd: '2026-09-20', datetime0: '2026-09-20T02:00:00', xorder: 2 })
-  ];
-  const activityRows = {
-    'FBM-C1': [row(fullActivityFields, { id: 'FBM-A1', details: 'Goi dien 1', end_date: '2026-09-20', owner: 'Owner 1', datetime0: '2026-09-20T03:00:00', line_nbr: 1 })],
-    'FBM-C2': [row(fullActivityFields, { id: 'FBM-A2', details: 'Goi dien 2', end_date: '2026-09-20', owner: 'Owner 2', datetime0: '2026-09-20T04:00:00', line_nbr: 1 })]
-  };
-  fullFlow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-  let fullStep = fullFlow.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true });
-  const fullKinds = [], fullStatuses = [];
-  for (let hop = 0; fullStep && fullStep.request && hop < 20; hop += 1) {
-    const request = fullStep.request;
-    const kind = String(request.meta && request.meta.kind || '');
-    fullKinds.push(kind + ':' + String(request.meta && (request.meta.entity || request.meta.field) || ''));
-    let body;
-    if (kind === 'session_probe' || kind === 'identity_user_grid') {
-      body = userResponse;
-    } else if (kind === 'authorize') {
-      body = JSON.stringify({ d: { Authorized: 'auth-' + request.meta.entity } });
-    } else if (kind === 'completion') {
-      body = JSON.stringify({ d: [['CODE', 'Ten danh muc']] });
-    } else if (kind === 'grid' && request.meta.entity === 'customer') {
-      body = gridResponse(fullCustomerFields, customerRows, customerRows.length);
-    } else if (kind === 'grid' && request.meta.entity === 'activity') {
-      const key = request.body.externalKey && request.body.externalKey[0] && request.body.externalKey[0].Value;
-      body = gridResponse(fullActivityFields, activityRows[key] || [], (activityRows[key] || []).length);
-    } else {
-      throw new Error('Ca mô phỏng pipeline gặp request không mong đợi: ' + kind);
-    }
-    const throughExtension = await sendThroughExecutor(request, body);
-    const before = fullFlow.hop.FbmSync.statusView();
-    fullStep = fullFlow.hop.FbmSync.continue(executorRaw(throughExtension.reply, request.id));
-    fullStatuses.push(fullStep.status);
-    if (fullStep.status && fullFlow.hop.FbmSync.shouldLogStatus(before, fullStep.status)) {
-      fullFlow.hop.FbmSync.logStatus(fullStep.status, 'slice');
-    }
+    return { fullFlow, fullLogs, fullWrites, fullLocal, fullStep, fullKinds, fullStatuses, fullActivityPropCalls };
   }
+  const { fullFlow, fullLogs, fullWrites, fullLocal, fullStep, fullKinds, fullStatuses } = await fullPipeline(false);
   const fullFinal = fullFlow.hop.FbmSync.statusView();
   const fullSummaryLog = fullLogs.filter((item) => item.action === 'slice' && item.detail && item.detail.phase === 'done').slice(-1)[0] || {};
   const ui = taoBoTest();
@@ -731,6 +762,10 @@ async function chay(so) {
      ['session_probe:user', 'authorize:customer', 'authorize:activity', 'completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH', 'completion:@CAT_CONG_VIEC', 'grid:customer', 'grid:activity', 'grid:activity'],
     0, true, 4, true
   ]);
+  const tracedActivityPropCalls = (await fullPipeline(true)).fullActivityPropCalls;
+  const lastActivitySlice = tracedActivityPropCalls.length - 1;
+  check(so, 'đợt 1 bước A: mỗi lát Activity gọi kho DocumentProperties không quá ' + FBM_ACTIVITY_SLICE_PROPERTY_CALLS_MAX + ' lần, lát kết thúc lượt cộng thêm ' + FBM_SEEN_STORE_RESET_DELETES + ' lần xóa dấu đã thấy (trước refactor: 83)',
+    [tracedActivityPropCalls.length >= 2, tracedActivityPropCalls.every((count, index) => count <= FBM_ACTIVITY_SLICE_PROPERTY_CALLS_MAX + (index === lastActivitySlice ? FBM_SEEN_STORE_RESET_DELETES : 0)), tracedActivityPropCalls], [true, true, tracedActivityPropCalls]);
 
   const readFlow = workflowGas();
   readFlow.hop.FbmSync.prepareCategoryGate = () => ({ map: {} });

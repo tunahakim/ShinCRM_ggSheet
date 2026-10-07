@@ -206,7 +206,7 @@ function chay(so) {
   // Kiểm bằng Trace.js thật nạp chung với LogGate thật, và KHÔNG gọi flushLog — giả lập đúng lượt chết giữa đường.
   const vetBat = dungLog([['LOG_TRACE', 'fbm_sync']]);
   vetBat.hop.FbmSync = {};
-  napServer(vetBat.hop, 'fbm_sync/diagnostic/Trace.js');
+  napServer(vetBat.hop, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/diagnostic/Trace.js');
   const stateVet = { runId: 'run-018', mode: 'read', scan: 'full', origin: 'manual', metadata: {}, counts: {} };
   vetBat.hop.FbmSync.businessStepStart(stateVet, 'pull_customer', {});
   const sauBatDau = docLog(vetBat).map((dong) => dong[6]);
@@ -216,7 +216,7 @@ function chay(so) {
     [1, true, 2]);
   const vetTat = dungLog();
   vetTat.hop.FbmSync = {};
-  napServer(vetTat.hop, 'fbm_sync/diagnostic/Trace.js');
+  napServer(vetTat.hop, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/diagnostic/Trace.js');
   const ghiTruocVetTat = vetTat.dem.setValues;
   vetTat.hop.FbmSync.businessStepStart({ runId: 'run-018', metadata: {}, counts: {} }, 'pull_customer', {});
   check(so, 'LOG_TRACE tắt: mốc bước không tốn lệnh ghi nào giữa lượt', vetTat.dem.setValues - ghiTruocVetTat, 0);

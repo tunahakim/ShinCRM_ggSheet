@@ -6,7 +6,7 @@ function chay(so) {
   const data = {}, legacy = { FBM_MA_KH_PREFIX: 'KH-', FBM_MA_KH_LENGTH: '8', FBM_ACTIVITY_SINCE: '2026-01-01', FBM_SYNC_APPROVAL_THRESHOLD: '12' };
   const props = { getProperty: (key) => data[key] || null, setProperty: (key, value) => { data[key] = String(value); } };
   const hop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => props }, configGet: (name, fallback) => legacy[name] === undefined ? fallback : legacy[name] });
-  napServer(hop, 'fbm_sync/state/State.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js', 'fbm_sync/reconcile/Fingerprint.js');
+  napServer(hop, 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js', 'fbm_sync/reconcile/Fingerprint.js');
   const first = hop.FbmSync.accountSettingsRead();
   const syncFirst = hop.FbmSync.syncSettingsRead();
   const writesAfterMigration = Object.keys(data).length;
@@ -60,7 +60,7 @@ function chay(so) {
     LOG_ERROR: 'error',
     configGet: () => ''
   });
-  napServer(quotaHop, 'fbm_sync/state/State.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js');
+  napServer(quotaHop, 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js');
   quotaHop.FbmSync.stateWrite({ runId: 'before-quota', cursor: { pageIndex: 2, pageValue: ['2026-09-20', 'CUS-000002'] }, metadata: { pushFailureDetails: { 'customer:CUS-000001': { reason: 'x'.repeat(200) } } }, locks: { 'customer:CUS-000001': { owner: 'sync', revision: 'r1' } } });
   const previousState = quotaData.FBM_SYNC_STATE_V1;
   quotaFull = true;
@@ -75,7 +75,7 @@ function chay(so) {
   const brokenData = { FBM_ACCOUNT_SETTINGS_V1: '{"customerPrefix":"ALT"', FBM_SYNC_SETTINGS_V1: '{"approvalThreshold":' };
   const brokenProps = { getProperty: (key) => brokenData[key] || null, setProperty: (key, value) => { brokenData[key] = String(value); } };
   const brokenHop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => brokenProps }, configGet: () => 'LEGACY-' });
-  napServer(brokenHop, 'fbm_sync/state/State.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js');
+  napServer(brokenHop, 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js');
   const brokenCode = (work) => { try { work(); return 'không ném'; } catch (error) { return error.code; } };
   check(so, 'FBM-025: cài đặt tài khoản/đồng bộ JSON hỏng thì ném FBM_DOCUMENT_PROPERTY_CORRUPT, không rơi về giá trị cũ rồi ghi đè cài đặt người dùng',
     [brokenCode(() => brokenHop.FbmSync.accountSettingsRead()), brokenCode(() => brokenHop.FbmSync.syncSettingsRead()), brokenData.FBM_ACCOUNT_SETTINGS_V1, brokenData.FBM_SYNC_SETTINGS_V1],
@@ -85,7 +85,7 @@ function chay(so) {
   const escData = {}, escLogs = [];
   const escProps = { getProperty: (key) => escData[key] || null, setProperty: (key, value) => { escData[key] = String(value); }, deleteProperty: (key) => { delete escData[key]; } };
   const escHop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => escProps }, logEvent: (event) => escLogs.push(event), LOG_ERROR: 'error', LOG_WARN: 'warn', configGet: () => '', runEntryPoint: (name, source, channel, fn) => fn() });
-  napServer(escHop, 'fbm_sync/state/State.js', 'server/service/FbmSyncService.js');
+  napServer(escHop, 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'server/service/FbmSyncService.js');
   const bloated = Object.fromEntries(Array.from({ length: 120 }, (_, index) => ['customer:CUS-' + String(index).padStart(6, '0'), { reason: 'x'.repeat(200) }]));
   escHop.FbmSync.stateWrite({ runId: 'r-push', phase: 'push', cursor: { kind: 'push_wait' }, locks: { 'customer:CUS-000001': { owner: 'sync' } } });
   const closed = escHop.FbmSync.stateWrite(Object.assign(escHop.FbmSync.stateRead(), { phase: 'error', lastError: 'Lỗi khi ghi FBM', message: 'Lỗi khi ghi FBM', metadata: { pushFailureDetails: bloated } }));
