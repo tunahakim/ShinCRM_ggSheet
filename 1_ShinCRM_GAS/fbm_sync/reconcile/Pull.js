@@ -167,6 +167,12 @@ FbmSync.pullWrite = function (entity, records) {
     }
     var decision = FbmSync.threeWay({ hBASE: current.fbmHash || '' }, current, incoming, entity, categoryGate);
     if (decision.unchanged) {
+      // G12: dấu #SC đứng ngoài hash nên chỉ thấy qua markerId. Giao dịch của chính tài khoản đang đồng bộ còn dấu thì xếp một lệnh sửa (không mang dấu) để bỏ, kể cả giao dịch đẩy trước G12; đẩy không ăn thì trạng thái đó chặn xếp lại.
+      if (entity === 'activity' && String(incoming.markerId || '') === String(current.id || '') && String(current.syncStatus || '') === FbmSync.SYNC_STATUS.synced && String(incoming.owner || '') === String(FbmSync.scriptSettings().accountName || '')) {
+        statusWrites.push({ id: current.id, syncStatus: FbmSync.SYNC_STATUS.pending });
+        FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.pending, 'Nội dung trên FBM còn dấu nhận diện #SC; xếp lượt đẩy để bỏ dấu.');
+        return;
+      }
       if (String(current.syncStatus || '') !== FbmSync.SYNC_STATUS.synced || String(current.fbmHash || '') !== decision.hFBM) {
         statusWrites.push({ id: current.id, fbmHash: decision.hFBM, syncStatus: FbmSync.SYNC_STATUS.synced, syncedAt: new Date() });
       }

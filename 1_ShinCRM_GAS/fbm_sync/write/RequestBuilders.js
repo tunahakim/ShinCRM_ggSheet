@@ -131,7 +131,9 @@ FbmSync.activityValues = function (record, oldValues, categoryGate) {
   var value = function (name, aliases, fallback) { return FbmSync.fieldValue(record, oldValues, name, aliases, fallback); };
   var details = value('details', ['content'], '');
   var localId = value('shinId', ['id'], '');
-  if (details && localId && !FbmSync.stripActivityMarker(details).match(FbmSync.ACTIVITY_MARKER_RE)) { details = FbmSync.stripActivityMarker(details) + ' #SC-' + String(localId); }
+  // Dấu chỉ cần cho lệnh tạo (mất phản hồi trước khi có ID FBM); lệnh sửa đi theo ID nên gửi nội dung sạch, đó cũng là cách bỏ dấu cũ trên FBM (G12).
+  details = FbmSync.stripActivityMarker(details);
+  if (details && localId && !oldValues) { details = details + ' #SC-' + String(localId); }
   var values = {
     // Activity id là khóa FBM; mã nội bộ ACT-* chỉ được dùng làm marker, không được gửi vào memvars.
     id: Number(FbmSync.value(record, 'fbmId', value('id', [], 0))) || Number(oldValues && oldValues.id || 0) || 0, event_yn: value('event_yn', [], 0), text: value('text', [], ''), ma_cv: FbmSync.categoryField(categoryGate, '@CAT_CONG_VIEC', value('ma_cv', ['taskType'], '')), assigned_name: value('assigned_name', [], ''), muc_do: value('muc_do', [], '2'),

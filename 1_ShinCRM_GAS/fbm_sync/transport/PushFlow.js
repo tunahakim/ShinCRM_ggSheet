@@ -106,6 +106,9 @@ FbmSync.finishPushVerification = function (state, response) {
   var values = FbmSync.verifyFormValues(response, entity), incomingHash = FbmSync.hash(values, entity, FbmSync.stateCategoryGate(state)), sentHash = pendingHash;
   if (!local) { FbmSync.pendingPushClear(entity, id); throw new Error('FBM_VERIFY_RECORD_MISSING: bản ghi không còn tồn tại trong ShinCRM.'); }
   var localHash = FbmSync.hash(local, entity, FbmSync.stateCategoryGate(state)), previousHash = String(local.fbmHash || '').trim();
+  // Lệnh sửa không mang dấu mà FBM vẫn còn dấu: coi là đẩy không ăn để không xếp dọn lại mỗi lượt (G12).
+  var markerLeft = entity === 'activity' && !!FbmSync.activityMarkerId(values.details);
+  if (incomingHash === sentHash && markerLeft && candidate.kind !== 'create') { incomingHash = ''; }
   if (incomingHash === sentHash) {
     var status = localHash === sentHash ? FbmSync.SYNC_STATUS.synced : FbmSync.SYNC_STATUS.pending;
     FbmSync.sheetSave(entity, [{ id: local.id, fbmHash: incomingHash, syncStatus: status, syncedAt: new Date() }], 'push');
@@ -114,6 +117,11 @@ FbmSync.finishPushVerification = function (state, response) {
     state.metadata.pushSucceeded = Number(state.metadata.pushSucceeded || 0) + 1;
     state.counts.succeeded += 1;
     if (typeof FbmSync.businessStepAdd === 'function') { FbmSync.businessStepAdd(state, 'push_' + entity, { verified: 1, pushed: 1, written: 1, sheetWriteBatches: 1 }); }
+    // G12: dấu #SC chỉ cần tới lúc có ID FBM nên bỏ ngay bằng một lệnh sửa dựng từ form vừa đọc, không mở form thêm. ShinCRM đã sửa tiếp thì để lệnh đẩy kế tiếp (không mang dấu) bỏ hộ.
+    if (markerLeft && status === FbmSync.SYNC_STATUS.synced) {
+      cursor.operation = 'activity_marker_clean'; state.cursor = cursor; state.message = 'Đang bỏ dấu nhận diện của giao dịch ' + id + ' trên FBM...'; FbmSync.stateWrite(state);
+      return FbmSync.activityEditRequest(Object.assign({}, local, { fbmId: values.id }), values, FbmSync.stateCategoryGate(state));
+    }
     FbmSync.releasePushLock(state, entity, id);
     state.cursor = { kind: 'push_scan', entity: entity, index: Number(cursor.index || 0) + 1 }; state.current = ''; state.message = 'Đã xác nhận ' + entity + ' ' + id + '.'; FbmSync.stateWrite(state);
     return FbmSync.nextPushRequest(state);
@@ -122,7 +130,8 @@ FbmSync.finishPushVerification = function (state, response) {
   var shortValue = function (text) { text = String(text === undefined || text === null ? '' : text); return '"' + (text.length > 40 ? text.slice(0, 40) + '…' : text) + '"'; };
   var differingFields = FbmSync.diff(entity, local, values, FbmSync.stateCategoryGate(state)).map(function (item) { return item.field + ' (ShinCRM ' + shortValue(item.left) + ', FBM ' + shortValue(item.right) + ')'; });
   var differing = differingFields.length ? ' ở trường ' + differingFields.join(', ') : '';
-  if (previousHash && incomingHash === previousHash) {
+  if (markerLeft && !incomingHash) { differing = ' (FBM vẫn giữ dấu nhận diện #SC sau lệnh sửa không mang dấu)'; FbmSync.markerCleanCount(state); }
+  if ((previousHash && incomingHash === previousHash) || (markerLeft && !incomingHash)) {
     state.counts.skipped += 1;
     FbmSync.sheetSave(entity, [{ id: local.id, syncStatus: FbmSync.SYNC_STATUS.notApplied }], 'push');
     FbmSync.pendingPushClear(entity, id);
@@ -138,6 +147,24 @@ FbmSync.finishPushVerification = function (state, response) {
   state.metadata.conflictCount = Number(state.metadata.conflictCount || 0) + 1;
   state.counts.conflict += 1; state.cursor = {}; state.current = ''; state.phase = 'conflict'; state.message = 'Đọc xác nhận khác dữ liệu vừa ghi; đã dừng để kiểm tra xung đột.'; FbmSync.stateWrite(state);
   return null;
+};
+
+/** Dọn dấu chỉ là việc làm gọn: hỏng thì cảnh báo ở Log và câu chốt phiên trên Sidebar, giao dịch vẫn đã đồng bộ và lượt kéo sau xếp dọn lại. */
+FbmSync.markerCleanCount = function (state) {
+  state.metadata = state.metadata || {};
+  state.metadata.markerCleanFailed = Number(state.metadata.markerCleanFailed || 0) + 1;
+};
+FbmSync.finishMarkerClean = function (state, cursor, candidate, failure) {
+  var id = String(candidate && candidate.id || '');
+  if (failure) {
+    FbmSync.markerCleanCount(state);
+    FbmSync.logPushRecord(candidate, 'activity_marker_clean', typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn', 'Chưa bỏ được dấu nhận diện #SC trên FBM: ' + FbmSync.pushFailureDetail(failure).reason + '. Giao dịch vẫn đã đồng bộ; lượt sau sẽ thử lại.', { failureCode: 'ACTIVITY_MARKER_CLEAN_FAILED' });
+  } else {
+    FbmSync.logPushRecord(candidate, 'activity_marker_clean', typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', 'Đã bỏ dấu nhận diện #SC khỏi nội dung giao dịch trên FBM.');
+  }
+  FbmSync.releasePushLock(state, 'activity', id);
+  state.cursor = { kind: 'push_scan', entity: 'activity', index: Number(cursor.index || 0) + 1 }; state.current = ''; state.phase = 'push'; state.lastError = ''; state.message = failure ? 'Chưa bỏ được dấu nhận diện của giao dịch ' + id + '; đang xử lý bản ghi tiếp theo.' : 'Đã bỏ dấu nhận diện của giao dịch ' + id + '.'; FbmSync.stateWrite(state);
+  return FbmSync.nextPushRequest(state);
 };
 
 /** Xử lý lỗi đọc xác nhận mà không lặp lại request ghi. */
@@ -215,6 +242,10 @@ FbmSync.markPushSkipped = function (state, candidate, status, reason) {
 
 /** Bỏ qua một record push lỗi và tiếp tục candidate kế tiếp, không lặp request đã gửi. */
 FbmSync.continueAfterPushError = function (state, cursor, failure) {
+  if (cursor && cursor.operation === 'activity_marker_clean') {
+    var cleanNext = FbmSync.finishMarkerClean(state, cursor, typeof FbmSync.hydratePushCandidate === 'function' ? FbmSync.hydratePushCandidate(cursor.candidate || {}) : cursor.candidate, failure || 'Lỗi không rõ.');
+    return { ok: true, request: cleanNext ? FbmSync.nextEnvelope(cleanNext) : null, status: FbmSync.statusView(), continued: true };
+  }
   var candidate = typeof FbmSync.hydratePushCandidate === 'function' ? FbmSync.hydratePushCandidate(cursor && cursor.candidate || {}) : cursor && cursor.candidate;
   if (candidate) { FbmSync.markPushError(state, candidate, failure, cursor.operation); }
   state.cursor = { kind: 'push_scan', entity: cursor.entity, index: Number(cursor.index || 0) + 1 };
@@ -333,14 +364,14 @@ FbmSync.nextPushRequest = function (state) {
     state.cursor = { kind: 'push_scan', entity: 'activity', index: 0 }; state.entity = 'activity'; FbmSync.stateWrite(state); return FbmSync.nextPushRequest(state);
   }
   state.phase = 'done'; state.entity = ''; state.current = '';
-  var pushSucceeded = Number(state.metadata && state.metadata.pushSucceeded || 0);
-  state.message = Number(state.counts.error || 0) > 0
+  var pushSucceeded = Number(state.metadata && state.metadata.pushSucceeded || 0), markerCleanFailed = Number(state.metadata && state.metadata.markerCleanFailed || 0);
+  state.message = (Number(state.counts.error || 0) > 0
     ? 'Đồng bộ hoàn tất nhưng có ' + Number(state.counts.error || 0) + ' lỗi đẩy; xem Chi tiết bản ghi.'
     : pushSucceeded > 0
       ? 'Đồng bộ hoàn tất; bản ghi vừa đẩy đã được FBM xác nhận.'
       : (state.mode === 'write' || state.mode === 'push')
         ? 'Đồng bộ hoàn tất; không có bản ghi nào được đẩy.'
-        : FbmSync.DONE_MESSAGE;
+        : FbmSync.DONE_MESSAGE) + (markerCleanFailed > 0 ? ' Có ' + markerCleanFailed + ' giao dịch chưa bỏ được dấu #SC trên FBM; xem Log.' : '');
   state.cursor = {}; FbmSync.stateWrite(state); return null;
 };
 
@@ -352,6 +383,9 @@ FbmSync.continuePush = function (state, response) {
   }
   if (cursor.operation === 'customer_verify' || cursor.operation === 'activity_verify') {
     return FbmSync.finishPushVerification(state, response);
+  }
+  if (cursor.operation === 'activity_marker_clean') {
+    return FbmSync.finishMarkerClean(state, cursor, candidate, null);
   }
   if (cursor.operation === 'customer_create_open') {
     var autoCode = FbmSync.extractAutoCustomerCode(response);
