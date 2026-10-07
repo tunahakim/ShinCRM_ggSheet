@@ -478,6 +478,23 @@ async function chay(so) {
   hop.fbmSyncContinueServer = () => Promise.resolve({ ok: true, request: null, status: { phase: 'paused' } });
   await hop.fbmSyncLoop({ request: { meta: { entity: 'customer' } } });
   check(so, 'response cuối sau Cancel chuyển client về trạng thái đã dừng', [hop.FBM_SYNC_CLIENT.running, hop.FBM_SYNC_CLIENT.cancelRequested], [false, false]);
+
+  // FBM-044: GAS báo kho state hỏng thì màn Chạy hiện lý do, lời giải thích và nút đặt lại; status thường không có nút.
+  hop.FBM_SYNC_CLIENT.running = false;
+  const stuckStatus = { ok: false, code: 'SYNC_STATE_STUCK', resetOffered: true, runId: '', phase: 'error', message: 'Màn đồng bộ đang kẹt: state hỏng', counts: {} };
+  render(hop, content, hop.fbmSyncRenderRun, stuckStatus);
+  const resetButton = dom.document.getElementById('fbm-sync-reset-state');
+  const coNutDatLai = (node) => node.id === 'fbm-sync-reset-state' || (node.children || []).some(coNutDatLai);
+  const stuckHasButton = coNutDatLai(content);
+  render(hop, content, hop.fbmSyncRenderRun, { phase: 'error', runId: 'r1', message: 'lỗi thường', counts: {} });
+  check(so, 'FBM-044: status kẹt hiện nút "Đặt lại phiên đồng bộ", status lỗi thường không hiện', [stuckHasButton, resetButton && resetButton.textContent, coNutDatLai(content)], [true, 'Đặt lại phiên đồng bộ', false]);
+  const resetCalls = [];
+  hop.callServer = (name) => { resetCalls.push(name); return Promise.resolve({ ok: true, phase: 'idle', counts: {} }); };
+  hop.uiDecisionOpen = () => Promise.resolve(false);
+  await hop.fbmSyncResetState();
+  hop.uiDecisionOpen = () => Promise.resolve(true);
+  await hop.fbmSyncResetState();
+  check(so, 'FBM-044: bấm Quay lại ở hộp xác nhận không gọi GAS; bấm Đặt lại mới gọi fbmResetSyncState', resetCalls, ['fbmResetSyncState']);
   const waitingPaints = [];
   hop.fbmSyncPaint = (status) => waitingPaints.push(status);
   hop.FBM_SYNC_CLIENT.running = true;

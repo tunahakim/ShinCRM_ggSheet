@@ -68,6 +68,35 @@ function chay(so) {
   check(so, 'FBM-025: cài đặt tài khoản/đồng bộ JSON hỏng thì ném FBM_DOCUMENT_PROPERTY_CORRUPT, không rơi về giá trị cũ rồi ghi đè cài đặt người dùng',
     [brokenCode(() => brokenHop.FbmSync.accountSettingsRead()), brokenCode(() => brokenHop.FbmSync.syncSettingsRead()), brokenData.FBM_ACCOUNT_SETTINGS_V1, brokenData.FBM_SYNC_SETTINGS_V1],
     ['FBM_DOCUMENT_PROPERTY_CORRUPT', 'FBM_DOCUMENT_PROPERTY_CORRUPT', '{"customerPrefix":"ALT"', '{"approvalThreshold":']);
+
+  // FBM-044: đóng phiên mà state đầy đủ không ghi được thì ghi bản rút gọn để màn đồng bộ thoát khỏi pha đang chạy.
+  const escData = {}, escLogs = [];
+  const escProps = { getProperty: (key) => escData[key] || null, setProperty: (key, value) => { escData[key] = String(value); }, deleteProperty: (key) => { delete escData[key]; } };
+  const escHop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => escProps }, logEvent: (event) => escLogs.push(event), LOG_ERROR: 'error', LOG_WARN: 'warn', configGet: () => '', runEntryPoint: (name, source, channel, fn) => fn() });
+  napServer(escHop, 'fbm_sync/state/State.js', 'server/service/FbmSyncService.js');
+  const bloated = Object.fromEntries(Array.from({ length: 120 }, (_, index) => ['customer:CUS-' + String(index).padStart(6, '0'), { reason: 'x'.repeat(200) }]));
+  escHop.FbmSync.stateWrite({ runId: 'r-push', phase: 'push', cursor: { kind: 'push_wait' }, locks: { 'customer:CUS-000001': { owner: 'sync' } } });
+  const closed = escHop.FbmSync.stateWrite(Object.assign(escHop.FbmSync.stateRead(), { phase: 'error', lastError: 'Lỗi khi ghi FBM', message: 'Lỗi khi ghi FBM', metadata: { pushFailureDetails: bloated } }));
+  const escSaved = escHop.FbmSync.stateRead();
+  check(so, 'FBM-044: đóng phiên mà state phình quá giới hạn thì lưu bản rút gọn ở phase lỗi, giữ cursor/khóa ghi, báo Log và Sidebar',
+    [escSaved.phase, escSaved.runId, escSaved.cursor.kind, !!escSaved.locks['customer:CUS-000001'], Object.keys(escSaved.metadata.pushFailureDetails).length, escSaved.message.indexOf('bản rút gọn') > 0, closed.phase, escLogs.some((event) => event.action === 'state_write_minimal' && event.outcome === 'warn')],
+    ['error', 'r-push', 'push_wait', true, 0, true, 'error', true]);
+  let midRunError = null;
+  try { escHop.FbmSync.stateWrite(Object.assign(escHop.FbmSync.stateRead(), { phase: 'push', metadata: { pushFailureDetails: bloated } })); } catch (error) { midRunError = error; }
+  check(so, 'FBM-044: lát giữa chừng ghi state hỏng vẫn ném lỗi, không lặng lẽ thay bằng bản rút gọn', [midRunError && midRunError.code, escHop.FbmSync.stateRead().phase], ['FBM_DOCUMENT_PROPERTIES_QUOTA', 'error']);
+
+  // State hỏng: status trả snapshot kẹt kèm cờ mở nút đặt lại thay vì ném; đặt lại xóa riêng state phiên.
+  escData.FBM_SYNC_STATE_V1 = '{"phase":"push"';
+  escData.FBM_SYNC_PENDING_PUSHES_V1 = '{"activity:ACT-1":{"hash":"h"}}';
+  escLogs.length = 0;
+  const stuck = escHop.fbmGetSyncStatus();
+  check(so, 'FBM-044: state hỏng thì status trả "kẹt" kèm nút đặt lại và ghi Log, không ném lỗi', [stuck.code, stuck.resetOffered, stuck.phase, escLogs.some((event) => event.action === 'state_stuck')], ['SYNC_STATE_STUCK', true, 'error', true]);
+  const escReset = escHop.FbmSync.stateReset();
+  check(so, 'FBM-044: đặt lại xóa state phiên hỏng, giữ hash chờ xác nhận và ghi Log', [escReset.ok, escData.FBM_SYNC_STATE_V1, escData.FBM_SYNC_PENDING_PUSHES_V1, escHop.FbmSync.stateRead().phase, escLogs.some((event) => event.action === 'state_reset')], [true, undefined, '{"activity:ACT-1":{"hash":"h"}}', 'idle', true]);
+  escHop.FbmSync.stateWrite({ runId: 'r-live', phase: 'pull_customer' });
+  const refused = escHop.FbmSync.stateReset();
+  const staleAllowed = escHop.FbmSync.stateReset(Date.now() + escHop.FbmSync.STALE_RUN_MS + 1000);
+  check(so, 'FBM-044: phiên đang chạy bình thường thì từ chối đặt lại, phiên treo quá hạn thì cho', [refused.code, staleAllowed.ok, escData.FBM_SYNC_STATE_V1], ['SYNC_RESET_RUNNING', true, undefined]);
 }
 
 module.exports = { chay };
