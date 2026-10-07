@@ -54,6 +54,20 @@ DocumentProperties:
 
 Điều này không có nghĩa Extension được tự quyết định. Extension chỉ thực thi các thao tác kỹ thuật được mô tả trong plan JSON do GAS cấp. GAS vẫn là nơi diễn giải kết quả thành `unchanged`, `pull`, `push`, `conflict`, `missing`, `fbm-only`, trạng thái lỗi hoặc quyết định dừng phiên.
 
+## 2A. Điều chỉnh sau rà soát 2026-10-07 (chủ dự án đồng ý)
+
+Các điểm dưới đây thay cho câu tương ứng ở các mục sau; mục nào đã sửa theo đây thì ghi rõ.
+
+1. **Bắt tay phiên bản là việc đầu tiên của refactor.** GAS và Extension cài ở hai nơi (GAS trên Google, Extension trên máy chủ dự án), nên có thể lệch bản cài: push GAS mà chưa tải lại Extension, hoặc hai máy hai bản. Mỗi lượt quét GAS gửi mã phiên bản hợp đồng; Extension trả mã của nó; khác nhau thì GAS từ chối chạy, báo ở Sidebar và ghi Log "Extension trên máy này đang dùng bản cũ, hãy tải lại Extension", không ghi gì xuống Sheet. Mã phiên bản lấy từ nội dung tệp hợp đồng, test fail nếu sửa hợp đồng mà quên đổi mã. Áp cho mọi giao tiếp GAS–Extension, không riêng hash.
+2. **Hash: giai đoạn đầu GAS tự tính cả hai phía.** Extension chỉ lọc (bỏ bản ghi không thuộc khách của mình) và chiếu (bỏ cột không dùng), rồi chia gói gửi về. Lý do: Extension tính hFBM thì có hai bản code chuẩn hóa/hash, mà mục 11 đã bắt GAS tự tính hFBM khi đọc lại sau push; lệch một chi tiết (NFC/NFD tiếng Việt, khoảng trắng, định dạng ngày/số) là mọi bản ghi thành "đã đổi" hoặc "xung đột" mà không lỗi nào nổ. Ưu điểm của phương án cũ (gói về GAS nhỏ hơn 5–10 lần vì bản ghi không đổi chỉ gửi id + hash) là có thật nhưng chỉ đáng giá khi đo thấy GAS chậm hoặc gói quá nhiều.
+3. **Nếu đo thấy cần chuyển hash sang Extension:** một tệp JavaScript duy nhất chứa chuẩn hóa và hash, không gọi API riêng của Google hay Chrome; dùng y nguyên ở GAS và Extension, có test bắt hai bản giống từng byte; kèm bắt tay phiên bản (điểm 1) và mẫu thử chạy trước mỗi lượt bulk (mục 9.2).
+4. **Không dựng DSL/trình thông dịch primitive tổng quát.** Extension có vài loại việc cố định, đặt tên rõ (quét Customer, quét Activity, sau này đăng nhập); GAS truyền tham số: danh sách trường lấy từ `SYNC_SCHEMA`, danh sách mã khách cần lọc, ngân sách gói. Danh sách trường vẫn chỉ định nghĩa một chỗ ở GAS.
+5. **Chỉ kết luận vắng mặt khi đã nhận đủ mọi gói của cùng một lượt quét.** GAS giữ dấu "lượt quét hoàn tất"; mất tab giữa chừng thì không đánh cờ vắng mặt.
+6. **Mất tab thì chạy lại cả lượt, không tiếp từ gói số N**, vì thứ tự bulk có thể khác giữa hai lần tải; dựa vào cửa ghi idempotent.
+7. **Ngân sách gói phải đo**, gồm cả trần dung lượng đường Extension → GAS lẫn thời gian GAS xử lý một gói; đường này dễ chạm trần thời gian trước trần dung lượng.
+8. **Đăng nhập để sau cùng hoặc bỏ khỏi đợt này**: đăng nhập hiện chạy được và không liên quan dữ liệu lớn.
+9. **Lỗi cursor phình theo số khách đã sửa ngoài refactor** (commit 71a792d, bf89e77): quét toàn bộ đọc Customer theo trang 50, cursor Activity chỉ mang khách của trang đang quét. Đúng hướng state V2 ở mục 15 nên refactor giữ nguyên.
+
 ## 3. Ranh giới GAS – Extension – Sidebar
 
 ### 3.1. GAS sở hữu
@@ -82,8 +96,7 @@ Extension thực hiện những việc thuần kỹ thuật gần nguồn FBM:
 - trích xuất trường kỹ thuật mà plan yêu cầu;
 - projection/filter/limit dữ liệu;
 - tạo map theo khóa;
-- normalize theo hash contract;
-- tính `hFBM` nếu plan yêu cầu;
+- normalize và tính `hFBM` chỉ khi đã chuyển hash sang Extension theo mục 2A điểm 3;
 - chỉ trả các observation và record cần thiết;
 - chia output thành chunk theo ngân sách byte.
 
@@ -106,7 +119,7 @@ Sidebar chỉ điều phối thao tác người dùng và hiển thị DTO. Side
 
 ### 4.1. Việc Extension làm
 
-Theo `LoginPlan` do GAS cấp, Extension có thể:
+Phần này làm sau cùng hoặc bỏ khỏi đợt refactor (mục 2A điểm 8). Theo `LoginPlan` do GAS cấp, Extension có thể:
 
 - gửi request đăng nhập trong tab FBM;
 - đọc HTML/JSON phản hồi;
@@ -240,16 +253,16 @@ Không được nhầm với việc gửi toàn bộ response đó về GAS.
 1. GAS đọc một nhóm ID/hash ShinCRM vừa phải.
 2. GAS gửi plan và danh sách đó cho Extension.
 3. Extension gọi FBM một lần.
-4. Extension tạo map Customer trong RAM.
-5. Extension tính hFBM và tạo observation.
-6. Extension trả kết quả theo output chunk.
+4. Extension lọc và chiếu các trường GAS yêu cầu.
+5. Extension trả kết quả theo output chunk (giai đoạn đầu chưa tính hFBM, mục 2A điểm 2).
+6. GAS tính hFBM, hSHIN và đọc hBASE.
 7. GAS phân loại và ghi từng chunk qua cửa ghi.
 8. GAS chỉ tăng cursor sau khi ghi và state thành công.
 ```
 
 ### 6.3. Nội dung observation
 
-Không đổi thì chỉ cần:
+Giai đoạn đầu mỗi bản ghi mang các trường đã chiếu để GAS tự hash. Dạng dưới đây chỉ áp dụng khi đã chuyển hash sang Extension (mục 2A điểm 3). Không đổi thì chỉ cần:
 
 ```json
 {
@@ -305,10 +318,10 @@ FBM → Extension:
   bulk lớn
 
 Extension:
-  map, hash, match, lọc
+  lọc theo mã khách, chiếu cột
 
 Extension → GAS:
-  changed, missing, fbmOnly, observation theo chunk
+  bản ghi đã chiếu theo chunk; GAS hash và phân loại changed, missing, fbmOnly
 ```
 
 ### 7.2. Tầng dự phòng
@@ -332,6 +345,8 @@ Không lưu hàng trăm nghìn Activity trong `chrome.storage`, Sheet staging ho
 Nếu cần chia output thành nhiều chunk, phải ưu tiên cơ chế có thể đọc lại hoặc lấy chi tiết theo ID thay vì biến RAM Extension thành nguồn sự thật lâu dài.
 
 ## 8. DSL/plan mới và việc dọn sạch DSL cũ
+
+Đã điều chỉnh theo mục 2A điểm 4: không dựng trình thông dịch primitive tổng quát; các mục 8.2–8.3 dưới đây chỉ giữ làm tham khảo khi đặt tên tham số của từng loại việc cố định.
 
 ### 8.1. Quyết định
 
@@ -408,7 +423,8 @@ hSHIN:
   GAS đọc Sheet hiện tại và tự tính
 
 hFBM:
-  Extension tính từ dữ liệu FBM theo hash contract
+  GAS tính từ dữ liệu FBM đã chiếu (giai đoạn đầu);
+  Extension tính chỉ khi chuyển theo mục 2A điểm 3
 ```
 
 Không lưu `hSHIN` thành cột riêng.
@@ -417,7 +433,7 @@ Không lưu `hSHIN` thành cột riêng.
 
 Plan phải mang phiên bản contract, danh sách field, normalization và thuật toán. Extension không được tự chọn field hoặc tự quyết định quy tắc.
 
-Hai môi trường cần test vector chung. Nếu GAS và Extension không cho ra cùng kết quả từ cùng input, phải dừng trước bulk.
+Chỉ áp dụng khi hash đã chuyển sang Extension. Hai môi trường dùng một tệp hash chung (mục 2A điểm 3) và cần test vector chung. Nếu GAS và Extension không cho ra cùng kết quả từ cùng input, phải dừng trước bulk.
 
 Việc Extension thực thi primitive `hashRows` không có nghĩa Extension sở hữu nghiệp vụ. Nó chỉ thực hiện công thức do GAS cấp; GAS vẫn là nơi phân loại và ghi.
 
@@ -585,7 +601,7 @@ Xung đột không có danh sách trong state (theo G7.2, FBM-024): hàng đợi
 Chủ dự án duyệt ngày 2026-10-06: các lỗi dưới đây nằm đúng phần "GAS gánh dữ liệu lớn và chuỗi thời gian chờ" mà refactor viết lại, nên không sửa trên kiến trúc hiện tại để tránh sửa hai lần. Mô tả đầy đủ ở bảng lỗi của `2026.10.07 Kế hoạch sửa lỗi FBM sau audit.md`. Refactor chỉ coi là xong khi từng lỗi có test chứng minh không còn đường xảy ra.
 
 - FBM-005, FBM-016: thời gian chờ Sidebar, Extension và GAS không thống nhất (Sidebar báo lỗi trước khi Extension hết thời gian hợp lệ).
-- FBM-030: trang Customer khoảng 2.000 dòng xử lý trong một lần gọi GAS; cần đo lại sau khi Extension chiếu/rút gọn dữ liệu.
+- FBM-030: trang Customer khoảng 2.000 dòng xử lý trong một lần gọi GAS. Trang quét toàn bộ đã giảm còn 50 (mục 2A điểm 9); kiểm lại thời gian một lát khi kéo toàn bộ thật rồi mới đóng.
 - FBM-031: mốc "trần thời gian lát" thực ra là hạn khứ hồi request 120 giây, không phải chốt 6 phút của GAS.
 - FBM-013: cuối pull ghi Customer và Activity bằng hai cửa ghi trong cùng một lần chạy GAS (đánh dấu vắng mặt); làm lại cùng luồng `missing`/`fbmOnly` mới.
 - Kiểm chứng thật phần pull số lượng lớn (phần pull của Kịch bản L1–L3) chạy sau refactor.
@@ -688,28 +704,22 @@ test nào chứng minh không còn hai đường thực thi
 Đây là lộ trình đề xuất, chưa phải checklist đã duyệt:
 
 1. Đọc lại các chuyên đề 09 liên quan và đối chiếu toàn bộ owner hiện có.
-2. Cập nhật tài liệu chính thức về ranh giới mới GAS–Extension.
-3. Cập nhật luật conflict: không tự động cho `ma_kh` hoặc trường khác thắng; người dùng quyết bằng một trong ba phương án ở mục 10.1.
-4. Chốt schema plan mới và xóa thiết kế DSL cũ khỏi hợp đồng.
-5. Chốt `LoginObservation`, `BulkObservation`, `HashPlan` và `ChunkEnvelope`.
-6. Viết test vector hash và test Extension/GAS tương thích contract.
-7. Viết test byte riêng cho state và relay; không trộn hai ngân sách.
-8. Tách state V1 thành state logic V2 nhỏ, giữ một owner.
-9. Mở rộng executor Extension bằng primitive allowlist.
-10. Chuyển Customer sang một request FBM và output chunk.
-11. Chuyển Activity bulk và fallback windowed.
-12. Bổ sung test mất tab, mất response, duplicate chunk và read-back.
-13. Chạy `node tests/run.js`.
-14. Push GAS/Extension DEV theo đúng quy trình.
-15. Chạy dữ liệu giả lập lớn.
-16. Chỉ sau khi đạt mới kiểm chứng `ALT00010` trên FBM thật.
+2. Cập nhật tài liệu chính thức về ranh giới mới GAS–Extension và luật conflict (mục 10.1).
+3. Bắt tay phiên bản GAS–Extension (mục 2A điểm 1), có test và thông báo Sidebar/Log khi lệch.
+4. Đo ngân sách đường Extension → GAS: dung lượng và thời gian GAS xử lý một gói (mục 2A điểm 7).
+5. Activity bulk: Extension gọi FBM một lần (hoặc theo cửa sổ ngày), lọc theo mã khách GAS gửi, chiếu cột, chia gói; GAS hash và đối soát. Đây là phần giá trị nhất: thay khoảng một request mỗi khách bằng một request.
+6. Luật vắng mặt theo lượt hoàn tất và chạy lại cả lượt khi mất tab (mục 2A điểm 5–6), có test mất tab, mất response, gói trùng.
+7. Customer theo cùng khung.
+8. Gọn state V2 và đóng các lỗi ở mục 15A.
+9. Chỉ khi số đo cho thấy cần: chuyển hash sang Extension bằng tệp dùng chung (mục 2A điểm 3).
+10. Đăng nhập qua Extension, nếu vẫn cần (mục 2A điểm 8).
+11. Chạy `node tests/run.js`, push GAS/Extension DEV, chạy dữ liệu giả lập lớn, rồi mới kiểm chứng trên FBM thật với mã thử.
 
 ## 19. Những điều chưa nên tự coi là đã chốt
 
 Các điểm sau vẫn cần duyệt lại khi bắt đầu phiên refactor:
 
 - tên cuối của các plan và DTO;
-- danh sách primitive chính thức của interpreter;
 - field cụ thể của `LoginObservation` để không lộ dữ liệu nhạy cảm;
 - cách Extension lấy chi tiết khi một output chunk quá lớn;
 - ngưỡng byte sau khi test thực tế;
@@ -722,7 +732,9 @@ Riêng các điểm sau đã được định hướng rõ trong cuộc thảo l
 
 ```text
 GAS là bộ não và nguồn sự thật.
-Extension làm phần kỹ thuật nặng, kể cả parse login theo plan.
+Extension làm phần kỹ thuật nặng: gọi FBM, lọc, chiếu, chia gói.
+GAS tự tính hash ở giai đoạn đầu; chuyển sang Extension chỉ khi đo thấy cần, bằng một tệp dùng chung.
+Bắt tay phiên bản GAS–Extension trước mọi lượt quét.
 GAS không nhận full bulk response.
 Customer ưu tiên một request lấy toàn bộ từ FBM, sau đó chunk về GAS.
 State lâu dài phải nhỏ hơn rất nhiều so với relay payload.
@@ -735,7 +747,7 @@ Không dùng Drive/database index trong phương án này.
 
 ## 20. Trạng thái hiện tại
 
-Tài liệu này mới được tạo để giữ phương án và lịch sử lý do. Chưa có hành động nào sau đây trong phiên này:
+Đã điều chỉnh phương án ngày 2026-10-07 (mục 2A) và sửa lỗi cursor phình ngoài refactor. Chưa có hành động nào sau đây:
 
 - chưa sửa Tài liệu 09;
 - chưa sửa code GAS;
