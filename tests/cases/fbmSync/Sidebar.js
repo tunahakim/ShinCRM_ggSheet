@@ -190,6 +190,8 @@ async function chay(so) {
   check(so, 'Run render giữ pipeline khi preflight thất bại để người dùng thấy chặng dừng', !!render(hop, content, hop.fbmSyncRenderRun, preflightError).querySelector('.shin-sync-pipeline'), true);
   check(so, 'Run render hiện pipeline khi đang xử lý', !!render(hop, content, hop.fbmSyncRenderRun, active).querySelector('.shin-sync-pipeline'), true);
   check(so, 'Run render giữ pipeline để chẩn đoán lỗi sau request', !!render(hop, content, hop.fbmSyncRenderRun, pushError).querySelector('.shin-sync-pipeline'), true);
+  const clientTimeout = { phase: 'error', label: 'Có lỗi', message: 'Máy chủ không phản hồi hàm fbmStartSync sau 30000 ms.', lastError: 'Máy chủ không phản hồi hàm fbmStartSync sau 30000 ms.', counts: {} };
+  check(so, 'Run render hiện lỗi Sidebar tự phát hiện dù chưa có runId (hết hạn chờ fbmStartSync)', render(hop, content, hop.fbmSyncRenderRun, clientTimeout).textContent.indexOf('không phản hồi hàm fbmStartSync') >= 0, true);
   const pausedTransport = { phase: 'paused', runId: 'r4', lastError: 'Cầu nối FBM không phản hồi.', label: 'Tạm dừng', counts: {} };
   const pausedRun = render(hop, content, hop.fbmSyncRenderRun, pausedTransport);
   check(so, 'Run render giữ pipeline và lỗi khi phiên tạm dừng', [!!pausedRun.querySelector('.shin-sync-pipeline'), pausedRun.textContent.indexOf('Pipeline đã tạm dừng') >= 0], [true, true]);

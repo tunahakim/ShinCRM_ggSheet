@@ -9,7 +9,8 @@ async function chay(so) {
     category: { categories: {} },
     issues: []
   }) });
-  napServer(hop, 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/report/Preflight.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
+  napServer(hop, 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/report/Preflight.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
+  const realReadLocal = hop.FbmSync.readLocal;
   hop.FbmSync.scriptSettings = () => ({ accountName: '' });
   hop.FbmSync.readCategoryGate = () => ({ valid: {} });
   hop.FbmSync.currentSpreadsheetId = () => 'sheet-a';
@@ -95,6 +96,18 @@ async function chay(so) {
   check(so, 'FBM-022: một lượt preflight đọc Sheet một lần cho cả quyền đẩy lẫn tóm tắt hash, tính hash một lần cho mỗi bản ghi có baseline',
     [localReads, hashCalls, scanned.hashSummary.localRecords, scanned.hashSummary.changed, scanned.hashSummary.newRecords, scanned.issues.filter((item) => item.code === 'FBM_RECORD_PUSH_PERMISSION_MISSING').length],
     [{ customer: 3, activity: 2 }, 2, 3, 2, 1, 1]);
+  // Mỗi lần đọc nghìn dòng mất vài giây; đọc lại theo từng kiểm tra từng làm fbmStartSync vượt hạn chờ 30 giây của Sidebar với 1.312 khách.
+  const sheetReads = { customer: 0, activity: 0 };
+  hop.DATA_SCHEMA = {}; hop.SYNC_SCHEMA = {};
+  hop.entityReadAllCombined = (entity) => { sheetReads[entity] += 1; return { fields: ['id', 'fbmSyncPermission'], rows: [[entity === 'activity' ? 'ACT-1' : 'CUS-1', 'Cho phép']] }; };
+  hop.FbmSync.readLocal = realReadLocal;
+  const reread = {};
+  hop.FbmSync.pushCandidates = (entity) => { const first = hop.FbmSync.readLocal(entity); first[0].id = 'BẨN'; reread[entity] = hop.FbmSync.readLocal(entity)[0].id; return []; };
+  hop.FbmSync.runPreflight({ mode: 'read' });
+  const insideReads = Object.assign({}, sheetReads);
+  hop.FbmSync.readLocal('customer');
+  check(so, 'một lượt preflight đọc mỗi Sheet đúng một lần dù nhiều kiểm tra gọi readLocal, record sửa ở bên gọi không làm bẩn lần đọc sau, hết preflight thì đọc Sheet mới',
+    [insideReads, reread, sheetReads.customer, hop.FbmSync.localSnapshot], [{ customer: 1, activity: 1 }, { customer: 'CUS-1', activity: 'ACT-1' }, 2, null]);
   hop.FbmSync.readLocal = savedReadLocal; hop.FbmSync.hash = savedHash;
 }
 

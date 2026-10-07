@@ -162,7 +162,7 @@ function chay(so) {
 
   const pf = taoHopCat({ FbmSync: {}, LOG_WARN: 'warn', LOG_ERROR: 'error', logEvent: (entry) => pf.dong.push(entry) });
   pf.dong = [];
-  napServer(pf, 'fbm_sync/report/Report.js', 'fbm_sync/report/Preflight.js');
+  napServer(pf, 'fbm_sync/report/Report.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/report/Preflight.js');
   const pfIssues = [];
   for (let i = 1; i <= 3; i += 1) { pfIssues.push({ code: 'FBM_DUP_CODE', scope: 'customer', blocking: true, message: 'Trùng mã khách ALT0000' + i }); }
   pfIssues.push({ code: 'FBM_OWNER_MISSING', scope: 'activity', blocking: false, message: 'Thiếu người phụ trách ACT-9' });
