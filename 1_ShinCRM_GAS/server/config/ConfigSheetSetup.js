@@ -188,6 +188,9 @@ function prepareConfigSheet(file, options) {
   var migration = configMigrateLegacyCounters(sheet);
   // Bộ đếm đã chuyển sang Document Properties; giá trị từ cột bộ đếm đời cũ chỉ được nhận khi kho mới chưa có.
   Object.keys(migration.values).forEach(function (entity) { idGateAdoptCounter(entity, migration.values[entity]); });
+  // Chốt luôn dòng tham số đời cũ trước khi reset quét trắng khối tham số, nếu không số đó mất trước khi kịp cấp mã lần đầu.
+  resetSettingsCache();
+  ['customer', 'activity'].forEach(function (entity) { var o = idGateCounterRead(entity); if (!o.stored) { idGateAdoptCounter(entity, o.current); } });
 
   configWriteFrame(sheet);
   if (opts.reset) {
