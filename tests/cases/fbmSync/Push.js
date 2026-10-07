@@ -67,7 +67,7 @@ async function chay(so) {
   props.data[orchestration.FbmSync.STATE_KEY] = JSON.stringify(staleState);
   const restarted = orchestration.FbmSync.start({ mode: 'read' });
   check(so, 'run stale duoc thay bang phien moi va probe lai', [restarted.ok, restarted.resumed, restarted.request.meta.kind, orchestration.FbmSync.stateRead().runId === 'old-run'], [true, undefined, 'session_probe', false]);
-  check(so, 'lookup san pham dung controller FBM that', orchestration.FbmSync.SYNC_LOOKUPS.filter((item) => item.key === '@CAT_SAN_PHAM')[0].controller, 'crdmsp');
+  check(so, 'FBM-051: sản phẩm không đồng bộ nên phiên chỉ tải ba danh mục FBM, không tải crdmsp', orchestration.FbmSync.SYNC_LOOKUPS.map((item) => item.key + ':' + item.controller), ['@CAT_TINH_THANH:crProvinceCity', '@CAT_NGUON_KH:crLeadSource', '@CAT_CONG_VIEC:crJob']);
   const previewState = { metadata: {} };
   orchestration.FbmSync.previewRecords(previewState, 'customer', [{ fbmCustomerCode: 'ALT00010', companyName: 'Test', fbmId: 'A1' }]);
   check(so, 'preview luu ma va ten Customer doc tu FBM', previewState.metadata.preview.customers[0].code, 'ALT00010');

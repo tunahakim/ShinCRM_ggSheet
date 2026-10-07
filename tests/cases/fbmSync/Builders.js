@@ -49,7 +49,7 @@ async function chay(so) {
   check(so, 'Activity form Row object không phụ thuộc hoa thường', [objectForm.end_time, objectForm.owner], ['02:00', 'Lê Tuấn Anh']);
   const explicitActivity = builders.FbmSync.extractFormValues({ d: { Row: (function () { const row = []; row[11] = '03:00'; return row; }()) } }, 'activity');
   check(so, 'Activity form Row thưa dùng entity từ cursor', explicitActivity.end_time, '03:00');
-  check(so, 'Customer fingerprint có mã sản phẩm', builders.FbmSync.FINGERPRINT_FIELDS.customer.indexOf('ma_sp') >= 0, true);
+  check(so, 'FBM-051: sản phẩm Customer không đồng bộ nên không vào fingerprint và không có ánh xạ trường', [builders.FbmSync.FINGERPRINT_FIELDS.customer.indexOf('ma_sp'), 'product' in builders.FbmSync.FIELD_ALIASES.customer], [-1, false]);
   check(so, 'TMP- bị loại khỏi ứng viên push', builders.FbmSync.isTemporaryRecord('customer', { fbmCustomerCode: 'TMP-001' }), true);
   check(so, 'thiếu field Customer bị chặn trước request', builders.FbmSync.pushEligibilityErrors({ companyName: 'X' }, 'customer').length > 0, true);
   const blockedGate = { map: { '@CAT_CONG_VIEC\u001fGọi': 'CALL' }, valid: { '@CAT_CONG_VIEC': { Gọi: true } }, blocked: { '@CAT_CONG_VIEC\u001fCALL': 'Tên danh mục trên FBM khác Category.' } };

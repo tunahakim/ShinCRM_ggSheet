@@ -83,6 +83,8 @@ async function chay(so) {
   const editNote = builders.FbmSync.customerEditRequest({ fbmId: 'A1', note: 'nội bộ ShinCRM' }, { stt_rec_kh: 'A1', ghi_chu: 'Ghi chú FBM' }, gate).body.memvars.filter((item) => item.Name === 'ghi_chu')[0];
   const editGrids = builders.FbmSync.customerEditRequest({ fbmId: 'A1' }, { stt_rec_kh: 'A1' }, gate).body.memvars.filter((item) => Array.isArray(item.Items)).map((item) => [item.Name, item.Modified, item.Items.length]);
   check(so, 'FBM-046: Customer lưu form kèm hai bảng con rỗng, không đổi', editGrids, [['chiasekh', false, 0], ['crlhkh', false, 0]]);
+  const editProduct = builders.FbmSync.customerEditRequest({ fbmId: 'A1', product: 'Sản phẩm ShinCRM' }, { stt_rec_kh: 'A1', ma_sp: 'F1' }, gate).body.memvars.filter((item) => item.Name === 'ma_sp')[0];
+  check(so, 'FBM-051: sản phẩm Customer không đồng bộ, lệnh sửa gửi lại đúng ma_sp FBM đang có, không lấy sản phẩm ShinCRM', editProduct.NewValue, 'F1');
   check(so, 'FBM-046: Customer sửa giữ nguyên ghi chú FBM, không gửi ghi chú ShinCRM', [editNote.OldValue, editNote.NewValue], ['Ghi chú FBM', 'Ghi chú FBM']);
   const emptyDate = builders.FbmSync.customerEditRequest({ fbmId: 'A1' }, { stt_rec_kh: 'A1', ngay_tl: '' }, gate).body.memvars.filter((item) => item.Name === 'ngay_tl')[0];
   check(so, 'FBM-046: field ngày trống gửi null như form FBM, không gửi chuỗi rỗng', [emptyDate.OldValue, emptyDate.NewValue], [null, null]);

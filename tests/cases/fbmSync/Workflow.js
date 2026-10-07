@@ -381,12 +381,12 @@ async function chay(so) {
     Object.keys(compactLookupFlow.hop.FbmSync.stateCategoryGate(compactState).namesBySource || {}).length,
     Object.keys(compactState.session.lookups || {}).length,
     compactLookupFlow.hop.FbmSync.categoryValueAllowed(compactLookupFlow.hop.FbmSync.stateCategoryGate(compactState), '@CAT_TINH_THANH', 'CODE-0')
-  ], ['grid', true, 'Tên danh mục live 0 0 có tên đủ dài', true, false, true, 103, 4, 0, { ok: true, code: 'CODE-0' }]);
+  ], ['grid', true, 'Tên danh mục live 0 0 có tên đủ dài', true, false, true, 86, 3, 0, { ok: true, code: 'CODE-0' }]);
   const blockFlow = workflowGas(), blockLogs = [];
   blockFlow.hop.logEvent = (event) => blockLogs.push(event);
-  blockFlow.hop.FbmSync.readCategoryGate = () => ({ map: {}, names: {}, namesBySource: { '@CAT_SAN_PHAM': { HDDV: 'Hóa đơn dịch vụ' } }, valid: {}, warnings: [] });
+  blockFlow.hop.FbmSync.readCategoryGate = () => ({ map: {}, names: {}, namesBySource: { '@CAT_NGUON_KH': { HDDV: 'Hóa đơn dịch vụ' } }, valid: {}, warnings: [] });
   const blockLookups = {};
-  blockFlow.hop.FbmSync.SYNC_LOOKUPS.forEach((item) => { blockLookups[item.key] = { pairs: item.key === '@CAT_SAN_PHAM' ? { HDDV: 'Hóa đơn đầu vào - đầu ra' } : { X: 'x' } }; });
+  blockFlow.hop.FbmSync.SYNC_LOOKUPS.forEach((item) => { blockLookups[item.key] = { pairs: item.key === '@CAT_NGUON_KH' ? { HDDV: 'Hóa đơn đầu vào - đầu ra' } : { X: 'x' } }; });
   blockLookups['@CAT_CONG_VIEC'] = { pairs: {} };
   blockFlow.hop.FbmSync.prepareCategoryGate({ metadata: {}, session: { lookups: blockLookups } });
   const blockRows = blockLogs.filter((event) => event.action === 'category_block');
@@ -728,7 +728,7 @@ async function chay(so) {
     ui.content.textContent.indexOf('Hoàn tất') >= 0
   ], [
     true, null, 'done', 2, 2, 3,
-     ['session_probe:user', 'authorize:customer', 'authorize:activity', 'completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH', 'completion:@CAT_CONG_VIEC', 'completion:@CAT_SAN_PHAM', 'grid:customer', 'grid:activity', 'grid:activity'],
+     ['session_probe:user', 'authorize:customer', 'authorize:activity', 'completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH', 'completion:@CAT_CONG_VIEC', 'grid:customer', 'grid:activity', 'grid:activity'],
     0, true, 4, true
   ]);
 
@@ -757,11 +757,11 @@ async function chay(so) {
     readStep = readFlow.hop.FbmSync.continue(executorRaw(throughExtension.reply, request.id));
   }
   check(so, 'phiên rỗng: Extension chỉ chuyển request đọc, không phát request ghi hoặc xóa và pipeline kết thúc', [
-    readKinds, readKinds.length, readKinds.every((kind) => ['session_probe:user', 'authorize:customer', 'authorize:activity', 'completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH', 'completion:@CAT_CONG_VIEC', 'completion:@CAT_SAN_PHAM', 'grid:customer'].indexOf(kind) >= 0), readStep.ok, readStep.request || null, readStep.status.phase, readFlow.hop.FbmSync.stateRead().counts.succeeded
+    readKinds, readKinds.length, readKinds.every((kind) => ['session_probe:user', 'authorize:customer', 'authorize:activity', 'completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH', 'completion:@CAT_CONG_VIEC', 'grid:customer'].indexOf(kind) >= 0), readStep.ok, readStep.request || null, readStep.status.phase, readFlow.hop.FbmSync.stateRead().counts.succeeded
   ], [[
      'session_probe:user', 'authorize:customer', 'authorize:activity', 'completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH',
-    'completion:@CAT_CONG_VIEC', 'completion:@CAT_SAN_PHAM', 'grid:customer'
-  ], 8, true, true, null, 'done', 0]);
+    'completion:@CAT_CONG_VIEC', 'grid:customer'
+  ], 7, true, true, null, 'done', 0]);
 
   const approval = workflowGas();
   approval.hop.FbmSync.runPreflight = () => ({ ok: true, issues: [], blocking: [], candidateCount: 11 });

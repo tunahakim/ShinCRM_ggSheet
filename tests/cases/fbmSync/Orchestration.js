@@ -170,7 +170,6 @@ async function chay(so) {
   orchestration.FbmSync.stateWrite(uncertainWrite);
   const recoveredWrite = orchestration.FbmSync.recoverStaleRun(orchestration.FbmSync.stateRead(), Date.now() + orchestration.FbmSync.STALE_RUN_MS + 1);
   check(so, 'state ghi bi bo roi khong tu retry va giu khoa', [recoveredWrite.state.phase, recoveredWrite.state.lastFailureCode, !!recoveredWrite.state.locks['customer:C-1']], ['error', 'SYNC_STALE_WRITE', true]);
-  check(so, 'lookup san pham dung controller FBM that', orchestration.FbmSync.SYNC_LOOKUPS.filter((item) => item.key === '@CAT_SAN_PHAM')[0].controller, 'crdmsp');
   const lookupProps = {};
   const lookupHop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => ({ getProperty: (key) => lookupProps[key] || null, setProperty: (key, value) => { lookupProps[key] = String(value); } }) } });
   napServer(lookupHop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/write/SheetSave.js');
