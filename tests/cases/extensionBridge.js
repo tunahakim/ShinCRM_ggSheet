@@ -566,6 +566,35 @@ async function chay(so) {
     });
   });
 
+  // FBM từ chối đăng nhập (d khác true) thì dừng ở response Login, không mở trang tài khoản (mở khi chưa đăng nhập thì FBM chuyển sang Error.htm); cờ hủy phiên cũ chỉ đi theo meta.force của GAS.
+  await new Promise((resolve) => {
+    let listener = null;
+    const calls = [];
+    const response = (text) => ({ ok: true, status: 200, headers: { get() { return 'application/json'; } }, arrayBuffer() { return Promise.resolve(new TextEncoder().encode(text).buffer); } });
+    const context = {
+      console: { log() {}, warn() {} }, Date, URL, Promise, Error, AbortController, setTimeout, clearTimeout, Blob, Response, TextDecoder, TextEncoder, DecompressionStream: undefined,
+      document: { documentElement: { innerHTML: '', textContent: '' } },
+      fetch(url, options) {
+        calls.push({ url: String(url), body: options && options.body });
+        if (String(url).endsWith('/Main/Login.aspx')) { return Promise.resolve(response(String.raw`<script>{"ChallengeScript":"eval('\'a2838e\'+\'6f471b\'')"}</script>`)); }
+        if (String(url).endsWith('/GetEntityData')) { return Promise.resolve(response('{"d":[["01","Fast FBM Online","FHN_CRM_App"]]}')); }
+        if (String(url).endsWith('/GetUnitData')) { return Promise.resolve(response('{"d":[["CTY","Công ty","Company"]]}')); }
+        if (String(url).endsWith('/Login')) { return Promise.resolve(response('{"d":"x"}')); }
+        return Promise.resolve(response('<html>Error</html>'));
+      },
+      chrome: { runtime: { onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
+    };
+    vm.createContext(context);
+    vm.runInContext(executorSource, context, { filename: EXECUTOR_FILE });
+    listener({ type: 'FBM_EXECUTE_V2', request: { meta: { kind: 'login', force: true, loginCredentials: { username: 'anhlt', password: 'mat-khau', language: 'v' } } } }, null, (reply) => {
+      setTimeout(() => {
+        const loginBody = calls[3] && JSON.parse(calls[3].body);
+        check(so, 'executor: FBM từ chối đăng nhập thì trả nguyên response Login, không mở trang tài khoản; GAS gắn cờ thì Login gửi force true', [calls.map((item) => item.url.replace('https://fbo.com.vn:8888/Main/', '')).join('|'), reply && reply.result && reply.result.body, loginBody && loginBody.force], ['Login.aspx|Login.aspx/GetEntityData|Login.aspx/GetUnitData|Login.aspx/Login', '{"d":"x"}', true]);
+        resolve();
+      }, 20);
+    });
+  });
+
   // Đăng nhập: mã phiên phải bắt bằng mẫu GAS cấp trong request, không bằng mẫu viết cứng trong Extension. Mẫu cũ của Extension không nhận dạng \"...\" mà
   // FBM dùng trong script trang, nên Login thành công nhưng không có cookie và request xác minh kế tiếp bị chặn FBM_TRANSPORT_CAPTURE_MISSING.
   const runLoginWithAccountPage = (accountHtml, storage) => new Promise((resolve) => {
