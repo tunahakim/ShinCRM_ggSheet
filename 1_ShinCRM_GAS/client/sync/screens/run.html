@@ -77,6 +77,8 @@ function fbmSyncRunHasSnapshot(status) {
   status = status || {};
   var active = ['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(status.phase) >= 0, awaiting = status.phase === 'awaiting_approval';
   var explicitPipeline = status.pipeline && Array.isArray(status.pipeline.steps);
-  return active || awaiting || !!explicitPipeline || ((status.phase === 'done' || status.phase === 'error' || status.phase === 'paused') && !!status.runId);
+  // Lỗi Sidebar tự phát hiện (hết hạn chờ GAS, mất kết nối) chưa có runId nhưng vẫn phải hiện, nếu không màn Chạy đồng bộ trống trơn khi phiên đã dừng.
+  var clientError = status.phase === 'error' && !!String(status.lastError || status.message || '').trim();
+  return active || awaiting || !!explicitPipeline || clientError || ((status.phase === 'done' || status.phase === 'error' || status.phase === 'paused') && !!status.runId);
 }
 </script>

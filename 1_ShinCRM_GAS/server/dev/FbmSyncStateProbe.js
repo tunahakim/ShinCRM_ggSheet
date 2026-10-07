@@ -57,3 +57,19 @@ function fbmSyncStateProbe() {
     })
   };
 }
+
+/** Đo từng phần của preflight trên dữ liệu thật mà không ghi gì, để biết phần nào làm lượt khởi động vượt hạn chờ của Sidebar. */
+function fbmProbePreflightTiming() {
+  var out = [], t = Date.now();
+  function mark(label) { var now = Date.now(); out.push(label + ': ' + (now - t) + ' ms'); t = now; }
+  shinCorePreflight({ mode: 'read' }); mark('shinCorePreflight');
+  FbmSync.identityPreflight('read'); mark('identityPreflight');
+  var c = FbmSync.readLocal('customer'); mark('readLocal customer (' + c.length + ')');
+  var a = FbmSync.readLocal('activity'); mark('readLocal activity (' + a.length + ')');
+  var gate = FbmSync.readCategoryGate(); mark('readCategoryGate');
+  c.slice(0, 200).forEach(function (r) { FbmSync.hash(r, 'customer', gate); }); mark('hash 200 customer');
+  FbmSync.pushCandidates('customer'); mark('pushCandidates customer');
+  FbmSync.pushCandidates('activity'); mark('pushCandidates activity');
+  FbmSync.runPreflight({ mode: 'read', origin: 'manual', scan: 'full' }); mark('runPreflight tổng');
+  return out;
+}

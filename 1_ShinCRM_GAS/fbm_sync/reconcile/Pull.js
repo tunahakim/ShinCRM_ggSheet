@@ -1,9 +1,24 @@
 /** Reconcile chieu pull va ghi thay doi an toan vao ShinCRM. */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
+/** Bản chụp Sheet dùng chung trong một khối chỉ đọc; `null` nghĩa là mỗi lần gọi đọc Sheet mới. */
+FbmSync.localSnapshot = null;
+
+/**
+ * Chạy `fn` với mỗi Sheet Customer/Activity chỉ đọc một lần: preflight gọi `readLocal` ở nhiều kiểm tra (liên kết, ứng viên đẩy, hash), mỗi lần đọc nghìn dòng mất vài giây và từng làm lượt khởi động vượt hạn chờ 30 giây của Sidebar.
+ * Chỉ dùng cho khối không ghi Sheet: khối có ghi mà vẫn đọc bản chụp là đọc dữ liệu cũ. Bản chụp giữ dòng thô, mỗi lần gọi vẫn dựng record mới nên bên gọi sửa record không làm bẩn lần đọc sau.
+ */
+FbmSync.withLocalSnapshot = function (fn) {
+  if (FbmSync.localSnapshot) { return fn(); }
+  FbmSync.localSnapshot = {};
+  try { return fn(); } finally { FbmSync.localSnapshot = null; }
+};
+
 /** Đọc dữ liệu cục bộ kèm cột sync để phục vụ reconcile. */
 FbmSync.readLocal = function (entity) {
-  var block = typeof entityReadAllCombined === 'function' ? entityReadAllCombined(entity, [DATA_SCHEMA, SYNC_SCHEMA]) : entityReadAll(entity);
+  var snapshot = FbmSync.localSnapshot;
+  var block = snapshot && snapshot[entity] || (typeof entityReadAllCombined === 'function' ? entityReadAllCombined(entity, [DATA_SCHEMA, SYNC_SCHEMA]) : entityReadAll(entity));
+  if (snapshot) { snapshot[entity] = block; }
   return block.rows.map(function (row) {
     var record = {};
     block.fields.forEach(function (field, index) { record[field] = row[index]; });
