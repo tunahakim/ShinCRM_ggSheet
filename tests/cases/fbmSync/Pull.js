@@ -155,6 +155,24 @@ async function chay(so) {
   const finishedSupplementState = { cursor: { kind: 'activity_grid' }, phase: 'pull_activity', entity: 'activity', metadata: {}, session: {} };
   check(so, 'Trang thai done xoa cursor Activity da ket thuc', [builders.FbmSync.activitySupplementNext(finishedSupplementState, { kind: 'done', rows: [] }), finishedSupplementState.phase, finishedSupplementState.cursor], [null, 'done', {}]);
 
+  // Cursor Activity mang danh sách khách của trang Customer vừa đọc; trang phải đủ nhỏ để state không vượt trần một DocumentProperty dù tổng số khách là bao nhiêu (lỗi thật: 1.312 khách làm state 76 KB).
+  const pageRows = builders.FbmSync.CUSTOMER_PAGE_ROWS;
+  let pageState = { mode: 'read', scan: 'full', phase: 'lookup', metadata: {}, session: {}, cursor: {} };
+  builders.FbmSync.stateRead = () => pageState;
+  builders.FbmSync.stateWrite = (next) => { pageState = next; return next; };
+  builders.FbmSync.prepareCategoryGate = () => {};
+  builders.FbmSync.seenStoreBegin = () => {};
+  builders.FbmSync.readLocal = () => [];
+  const firstPage = builders.FbmSync.beginCustomerPull(pageState);
+  check(so, 'quet toan bo doc Customer theo trang nho co dinh, khong doc 2000 khach mot trang', [pageState.cursor.count, firstPage.body.count, pageRows <= 50], [pageRows, pageRows, true]);
+  // stt_rec_kh của FBM là 'A' + 9 chữ số; ma_kh lấy dài tối đa 32 ký tự như luật mã thử.
+  const fullPage = Array.from({ length: pageRows }, (_, i) => ({ sttRec: 'A' + String(100000000 + i), maKh: 'M'.repeat(32) }));
+  const nextCustomerPage = builders.FbmSync.customerGridRequest({ type: 1, count: pageRows, gridPageIndex: 7, gridPageValue: ['2026-10-07', '2026-10-07T00:00:00', 'X'.repeat(20)], gridRefresh: false });
+  builders.FbmSync.activityForCustomers(pageState, fullPage, nextCustomerPage, 0);
+  const cursorBytes = Buffer.byteLength(JSON.stringify(pageState.cursor));
+  check(so, 'cursor Activity cua mot trang Customer day voi ma dai nhat van duoi nua tran DocumentProperty va khong chep doi danh sach ma', [cursorBytes < builders.FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT / 2, pageState.cursor.customerIds, pageState.cursor.customerContexts.length], [true, undefined, pageRows]);
+  const rotationRows = Array.from({ length: builders.FbmSync.ACTIVITY_SUPPLEMENT_CUSTOMERS }, (_, i) => ({ stt_rec_kh: 'R' + i, ngay_gd: '2026-10-0' + (i % 9 + 1), datetime0: 'T' + i, xorder: i, ten_kh: 'Ten dai '.repeat(20) }));
+  check(so, 'vong xoay chi giu vi tri trang ke tiep, khong giu cac dong Customer; trang thieu thi quay ve dau', [builders.FbmSync.activityRotationNext(rotationRows), builders.FbmSync.activityRotationNext(rotationRows.slice(1))], [{ pageIndex: 0, pageValue: ['2026-10-03', 'T29', 29] }, { pageIndex: -1, pageValue: null }]);
   builders.FbmSync.readLocal = (entity) => entity === 'activity' ? [{ id: 'A-NEW', fbmId: 'F-NEW', workDate: '2026-09-10' }] : [];
   const catchup = builders.FbmSync.activityCatchupCustomerRequest();
   check(so, 'Lop catchup tao Customer grid theo ngay_gd moi hon Activity local', [catchup.meta.kind, catchup.meta.activityMaxDate, catchup.body.externalKey.some((item) => item.Name === 'ngay_gd' && item.Opr === '>')], ['activity_catchup_customer_grid', '2026-09-10', true]);
