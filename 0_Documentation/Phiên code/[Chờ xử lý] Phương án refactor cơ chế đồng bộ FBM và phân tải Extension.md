@@ -872,6 +872,7 @@ Các điểm sau vẫn cần duyệt lại khi bắt đầu phiên refactor:
 - cách migration state đang có request dở;
 - cách phát hiện và xử lý snapshot thay đổi giữa lúc Extension đọc bulk;
 - phạm vi chính xác của các trường được coi là conflict ngoài khóa kỹ thuật.
+- **FBM đổi danh mục giữa lúc đang đẩy (chủ dự án nêu 2026-10-07).** Tài liệu 09/03 chốt "kiểm một lần mỗi phiên, không phải mỗi lát": danh mục FBM chỉ nạp và đối soát lúc mở phiên đẩy, các bản ghi sau đó không kiểm lại. FBM không chặn mã sai ở server, nên nếu FBM sửa danh mục giữa lúc đẩy (phiên 100 bản ghi hiện mất khoảng 12 phút) thì bản ghi đẩy sau đó có thể mang mã không còn hợp lệ; tài liệu và code chưa nhắc trường hợp này. Đề xuất chờ chốt: chiều đẩy nạp lại ba danh mục FBM ở đầu mỗi gói đẩy (không phải mỗi bản ghi, khi gom gói thì một lần gọi cho cả gói), mã nào không còn khớp thì chặn các bản ghi dùng mã đó trong gói; khung rủi ro co lại bằng một gói thay vì cả phiên.
 
 Riêng các điểm sau đã được định hướng rõ trong cuộc thảo luận:
 
