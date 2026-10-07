@@ -299,22 +299,25 @@ async function chay(so) {
   check(so, 'Activity edit gui id FBM thay vi id noi bo', activityEdit.body.memvars.filter((item) => item.Name === 'id')[0].NewValue, 174813);
   check(so, 'Activity edit khong tra Date trong ket qua GAS', JSON.stringify(activityEdit).indexOf('2026-09-09T00:00:00.000Z') < 0 && String(activityEdit.body.memvars.filter((item) => item.Name === 'start_date')[0].OldValue || '').indexOf('/Date(') === 0 && String(activityEdit.body.memvars.filter((item) => item.Name === 'start_date')[0].NewValue || '').indexOf('/Date(') === 0 && String(activityEdit.body.memvars.filter((item) => item.Name === 'end_date')[0].NewValue || '').indexOf('/Date(') === 0, true);
   check(so, 'Activity edit doi ngay Sheet thanh Date .NET dung fixture', [activityEdit.body.memvars.filter((item) => item.Name === 'start_date')[0].NewValue, activityEdit.body.memvars.filter((item) => item.Name === 'end_date')[0].NewValue], ['/Date(1788912000000)/', '/Date(1788912000000)/']);
-  const unchangedDateEdit = push.FbmSync.activityEditRequest({ id: 'ACT-008600', fbmId: '174813', content: 'Noi dung moi', taskType: 'Gọi', workDate: '2026-09-09' }, { id: 174813, start_date: new Date('2026-09-09T00:00:00Z'), end_date: new Date('2026-09-09T23:59:59Z'), details: 'Noi dung cu', fileticket: 'ticket' }, {});
-  check(so, 'Activity edit giu nguyen moc end_date cua form khi Sheet khong doi ngay', [unchangedDateEdit.body.memvars.filter((item) => item.Name === 'start_date')[0].NewValue, unchangedDateEdit.body.memvars.filter((item) => item.Name === 'end_date')[0].NewValue], ['/Date(1788912000000)/', '/Date(1788998399000)/']);
+  const unchangedDateEdit = push.FbmSync.activityEditRequest({ id: 'ACT-008600', fbmId: '174813', content: 'Noi dung moi', taskType: 'Gọi', workDate: '2026-09-09' }, { id: 174813, start_date: new Date('2026-09-09T00:00:00Z'), end_date: new Date('2026-09-09T16:59:59Z'), details: 'Noi dung cu', fileticket: 'ticket' }, {});
+  check(so, 'Activity edit Sheet không đổi ngày thì gửi lại đúng ngày của form ở dạng 0 giờ UTC', [unchangedDateEdit.body.memvars.filter((item) => item.Name === 'start_date')[0].NewValue, unchangedDateEdit.body.memvars.filter((item) => item.Name === 'end_date')[0].NewValue], ['/Date(1788912000000)/', '/Date(1788912000000)/']);
   const formDateEdit = push.FbmSync.activityEditRequest({ id: 'ACT-008601', fbmId: '174813', content: 'Noi dung moi', taskType: 'GD', workDate: '2026-09-09' }, { id: 174813, start_date: new Date('2026-09-08T17:00:00Z'), end_date: new Date('2026-09-09T16:59:00Z'), details: 'Noi dung cu', fileticket: 'ticket' }, {});
-  check(so, 'Activity edit giu nguyen moc ngay gio cua form', [
+  check(so, 'Activity edit gửi ngày form dạng 0 giờ UTC theo ngày VN như giao diện FBM, không gửi lại mốc FBM trả (lùi 7 tiếng)', [
     formDateEdit.body.memvars.filter((item) => item.Name === 'start_date')[0].OldValue,
     formDateEdit.body.memvars.filter((item) => item.Name === 'start_date')[0].NewValue,
     formDateEdit.body.memvars.filter((item) => item.Name === 'end_date')[0].OldValue,
     formDateEdit.body.memvars.filter((item) => item.Name === 'end_date')[0].NewValue
-  ], ['/Date(1788886800000)/', '/Date(1788886800000)/', '/Date(1788973140000)/', '/Date(1788973140000)/']);
+  ], ['/Date(1788912000000)/', '/Date(1788912000000)/', '/Date(1788912000000)/', '/Date(1788912000000)/']);
   const changedWorkDateEdit = push.FbmSync.activityEditRequest({ id: 'ACT-008601', fbmId: '174813', content: 'Noi dung moi', taskType: 'GD', workDate: '2026-10-11' }, { id: 174813, start_date: new Date('2026-09-08T17:00:00Z'), end_date: new Date('2026-09-09T16:59:00Z'), details: 'Noi dung cu', fileticket: 'ticket' }, {});
   check(so, 'Activity edit doi ngay phat sinh nhung giu ngay bat dau', [
     changedWorkDateEdit.body.memvars.filter((item) => item.Name === 'start_date')[0].OldValue,
     changedWorkDateEdit.body.memvars.filter((item) => item.Name === 'start_date')[0].NewValue,
     changedWorkDateEdit.body.memvars.filter((item) => item.Name === 'end_date')[0].OldValue,
     changedWorkDateEdit.body.memvars.filter((item) => item.Name === 'end_date')[0].NewValue
-  ], ['/Date(1788886800000)/', '/Date(1788886800000)/', '/Date(1788973140000)/', '/Date(1791676800000)/']);
+  ], ['/Date(1788912000000)/', '/Date(1788912000000)/', '/Date(1788912000000)/', '/Date(1791676800000)/']);
+  // Ca gặp thật 2026-10-07: form trả 22/09 01:00 VN thành 21/09 18:00 UTC; gửi lại nguyên mốc thì FBM lưu thành 21/09.
+  const shiftedEdit = push.FbmSync.activityEditRequest({ id: 'ACT-008616', fbmId: '176920', content: 'Noi dung', taskType: 'GD', workDate: '2026-09-22' }, { id: 176920, start_date: '/Date(1790010000000)/', end_date: '/Date(1790013600000)/', details: 'Noi dung #SC-ACT-008616', fileticket: 'ticket' }, {});
+  check(so, 'Activity edit không lùi ngày khi form FBM trả mốc giờ VN lùi 7 tiếng (ACT-008616)', ['start_date', 'end_date'].map((name) => shiftedEdit.body.memvars.filter((item) => item.Name === name)[0].NewValue), ['/Date(1790035200000)/', '/Date(1790035200000)/']);
   check(so, 'Activity edit gui fileticket theo OldValue/NewValue cua fixture', [activityEdit.body.memvars.filter((item) => item.Name === 'fileticket')[0].OldValue, activityEdit.body.memvars.filter((item) => item.Name === 'fileticket')[0].NewValue], ['', 'ticket']);
   check(so, 'Activity edit cap nhat datetime0 moi', activityEdit.body.memvars.filter((item) => item.Name === 'datetime0')[0].NewValue !== activityEdit.body.memvars.filter((item) => item.Name === 'datetime0')[0].OldValue, true);
   check(so, 'Activity edit de comment rong thanh null', activityEdit.body.memvars.filter((item) => item.Name === 'comment')[0].NewValue, null);
