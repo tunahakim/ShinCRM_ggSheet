@@ -48,7 +48,7 @@ FbmSync.pullWrite = function (entity, records) {
     records = linked.records;
     orphaned = linked.orphaned + Number(linked.blocked || 0);
   }
-  var local = {}, localById = {}, localByCode = {}, localByTaxNumber = {};
+  var local = {}, localById = {}, localByCode = {}, localByTaxNumber = {}, codeFixes = {};
   localRecords.forEach(function (record) {
     if (record.fbmId) { local[String(record.fbmId).trim()] = record; localById[String(record.fbmId).trim()] = record; }
     if (record.id) { localById[String(record.id).trim()] = record; }
@@ -125,6 +125,8 @@ FbmSync.pullWrite = function (entity, records) {
       FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.unknownCategory, 'Mã danh mục lạ; giữ nguyên nội dung nội bộ.');
       return;
     }
+    // Lệch định danh thì FBM thắng (09/04 Phần 6). ma_kh đứng ngoài fingerprint nên hash không lộ việc FBM đổi mã; ghi đè riêng để Activity mới còn nối được Customer cha (FBM-054).
+    if (entity === 'customer' && String(incoming.fbmCustomerCode || '').trim() && String(incoming.fbmCustomerCode) !== String(current.fbmCustomerCode || '')) { codeFixes[current.id] = String(incoming.fbmCustomerCode); }
     if (identityMatched) {
       writes.push(Object.assign({}, mergedIncoming, { id: current.id, fbmId: key, fbmCustomerCode: incoming.fbmCustomerCode || current.fbmCustomerCode, fbmHash: FbmSync.hash(incoming, entity, categoryGate), syncStatus: FbmSync.SYNC_STATUS.synced, syncedAt: new Date() }));
       FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.synced, 'Nối lại định danh FBM vào dòng ShinCRM hiện có.');
@@ -187,6 +189,10 @@ FbmSync.pullWrite = function (entity, records) {
     FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.synced, 'Chỉ FBM thay đổi; cập nhật nội dung ShinCRM.');
   });
   var result = { ok: true, written: 0, conflicts: conflicts, skipped: skipped + orphaned, sheetWriteBatches: 0 };
+  Object.keys(codeFixes).forEach(function (id) {
+    var patch = writes.concat(statusWrites).filter(function (item) { return String(item.id) === id; })[0];
+    if (patch) { patch.fbmCustomerCode = codeFixes[id]; } else { statusWrites.push({ id: id, fbmCustomerCode: codeFixes[id] }); }
+  });
   var allWrites = writes.concat(statusWrites);
   if (allWrites.length) {
     var saved = FbmSync.sheetSave(entity, allWrites, 'pull');
