@@ -73,3 +73,30 @@ function fbmProbePreflightTiming() {
   FbmSync.runPreflight({ mode: 'read', origin: 'manual', scan: 'full' }); mark('runPreflight tổng');
   return out;
 }
+
+/** Vị trí con trỏ của phiên đang chạy, chỉ đọc, để đo tốc độ quét Activity theo khách mà không chạm state. */
+function fbmProbeCursorPosition() {
+  var state = FbmSync.stateRead(), cursor = state.cursor || {};
+  return { at: new Date().toISOString(), phase: state.phase, kind: cursor.kind, customerIndex: cursor.customerIndex, pageCustomers: (cursor.customerContexts || []).length, customerSeen: cursor.customerSeen, seen: cursor.seen, activityPage: cursor.pageIndex, updatedAt: state.updatedAt, counts: state.counts };
+}
+
+/** Đo các phép đọc mà mỗi lượt xử lý một khách Activity phải làm, chỉ đọc, chạy được khi phiên thật đang chạy. */
+function fbmProbeActivityStepTiming() {
+  var out = [], t = Date.now();
+  function mark(label) { var now = Date.now(); out.push(label + ': ' + (now - t) + ' ms'); t = now; }
+  var raw = FbmSync.props().getProperty(FbmSync.STATE_KEY); mark('getProperty state (' + String(raw || '').length + ' ký tự)');
+  for (var i = 0; i < 4; i++) { FbmSync.stateRead(); } mark('stateRead x4');
+  var all = FbmSync.props().getProperties(); mark('getProperties toàn bộ (' + Object.keys(all).length + ' khóa)');
+  var c = FbmSync.readLocal('customer'); mark('readLocal customer (' + c.length + ')');
+  var a = FbmSync.readLocal('activity'); mark('readLocal activity (' + a.length + ')');
+  FbmSync.stateCategoryGate(FbmSync.stateRead()); mark('stateCategoryGate');
+  return out;
+}
+
+/** Kích thước từng khóa metadata của state, chỉ đọc và không trả giá trị, để tìm phần làm state chạm trần một khóa DocumentProperties. */
+function fbmProbeStateMetadataSizes() {
+  var state = FbmSync.stateRead(), meta = state.metadata || {}, out = {};
+  Object.keys(meta).forEach(function (key) { out[key] = fbmSyncProbeJsonBytes(meta[key]); });
+  Object.keys(state).forEach(function (key) { if (key !== 'metadata') { out['state.' + key] = fbmSyncProbeJsonBytes(state[key]); } });
+  return out;
+}
