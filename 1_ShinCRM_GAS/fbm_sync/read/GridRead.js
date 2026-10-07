@@ -254,12 +254,21 @@ FbmSync.activityRotationCustomerRequest = function () {
   return request;
 };
 
+/**
+ * Con trỏ trang kế của grid Customer (keyset): bốn giá trị sort key của dòng cuối trang, theo tài liệu Nghiên cứu FBM ch04 mục 4.10.
+ * Thiếu `stt_rec_kh` thì FBM trả trang kế rỗng và lượt quét tưởng đã hết khách (gặp thật 2026-10-07: dừng ở 50/1.312 khách).
+ */
+FbmSync.customerPageValue = function (row) {
+  var last = row || {};
+  return [last.ngay_gd || '', last.datetime0 || '', last.xorder || '', last.stt_rec_kh || ''];
+};
+
 /** Vị trí trang xoay tiếp theo tính từ trang vừa đọc; hết danh sách thì quay lại trang đầu. Tính ngay khi nhận trang để cursor chỉ mang vị trí này, không mang cả các dòng Customer. */
 FbmSync.activityRotationNext = function (rows) {
   var list = rows || [];
   if (list.length < FbmSync.ACTIVITY_SUPPLEMENT_CUSTOMERS) { return { pageIndex: -1, pageValue: null }; }
   var last = list[list.length - 1], pageIndex = FbmSync.activityRotationCursor().pageIndex;
-  return { pageIndex: Number(pageIndex < 0 ? 0 : pageIndex + 1), pageValue: [last.ngay_gd || '', last.datetime0 || '', last.xorder || ''] };
+  return { pageIndex: Number(pageIndex < 0 ? 0 : pageIndex + 1), pageValue: FbmSync.customerPageValue(last) };
 };
 
 /** Lưu vị trí trang xoay do `activityRotationNext` tính. */
