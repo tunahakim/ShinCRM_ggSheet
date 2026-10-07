@@ -219,9 +219,9 @@ function fbmPerfReport() {
 /** Phạm vi đo có giới hạn: bật chế độ thử với tối đa `FbmSync.TEST_CODES_MAX` mã FBM (`fbmCustomerCode`, vì bộ lọc chiều lấy so với `ma_kh` bên FBM chứ không so với mã ShinCRM). Ưu tiên khách đã có giao dịch trong Sheet Activity để đo cả nhánh ghi Sheet, bù bằng khách cuối Sheet Customer đã có FBM ID. Chỉ đọc FBM nên an toàn; cất cài đặt cũ để `fbmPerfTestScopeOff` trả lại. */
 function fbmPerfTestScopeOn() {
   var before = FbmSync.syncSettingsRead(), codes = [], withActivity = {};
-  FbmSync.readLocal('activity').forEach(function (record) { var code = String(record.customerFbmCode || record.customerId || '').trim(); if (code) { withActivity[code] = true; } });
+  FbmSync.readLocal('activity').forEach(function (record) { var id = String(record.customerId || '').trim(); if (id) { withActivity[id] = true; } });
   var customers = FbmSync.readLocal('customer').filter(function (record) { return String(record.fbmId || '').trim() && FbmSync.TEST_CODE_PATTERN.test(String(record.fbmCustomerCode || '').trim()); });
-  var ordered = customers.filter(function (record) { return withActivity[String(record.fbmCustomerCode).trim()]; }).concat(customers.slice().reverse());
+  var ordered = customers.filter(function (record) { return withActivity[String(record.id || '').trim()]; }).concat(customers.slice().reverse());
   ordered.forEach(function (record) {
     var id = String(record.fbmCustomerCode).trim();
     if (codes.length < FbmSync.TEST_CODES_MAX && codes.indexOf(id) < 0) { codes.push(id); }
@@ -235,6 +235,29 @@ function fbmPerfTestScopeOff() {
   if (!raw) { return 'Không còn bản cài đặt cũ trong Cache; hãy sửa chế độ thử bằng tay ở Sidebar.'; }
   var saved = FbmSync.syncSettingsSave(JSON.parse(raw));
   return saved.ok ? 'Đã trả chế độ thử và danh sách mã thử về như trước khi đo.' : 'LỖI ' + saved.code + ': ' + saved.message;
+}
+
+/** Số dòng Activity của khách thử bị xóa khỏi Sheet DEV để lượt Lấy kế tiếp đi nhánh ghi giao dịch mới (`fbmPerfDropScopeActivities`). */
+var FBM_PERF_DROP_ACTIVITY_ROWS = 10;
+
+/**
+ * Chuẩn bị đo nhánh ghi Sheet mà không tạo giao dịch thật trên FBM: xóa vài dòng Activity đã liên kết FBM của khách trong phạm vi thử khỏi Sheet DEV; lượt "Lấy từ FBM → ShinCRM" kế tiếp thấy chúng là giao dịch mới và ghi lại.
+ * Chỉ chạy khi chế độ thử đang bật (gọi `fbmPerfTestScopeOn` trước). Xóa từ dưới lên để vị trí dòng phía trên không dịch.
+ */
+function fbmPerfDropScopeActivities() {
+  var settings = FbmSync.syncSettingsRead(), customers = {};
+  if (!settings.testMode || !(settings.testCodes || []).length) { return 'LỖI: chế độ thử chưa bật; chạy fbmPerfTestScopeOn trước.'; }
+  FbmSync.readLocal('customer').forEach(function (customer) { customers[String(customer.id || '')] = customer; });
+  var targets = {}, picked = 0;
+  FbmSync.readLocal('activity').forEach(function (record) {
+    var fbmId = String(record.fbmId || '').trim(), customer = customers[String(record.customerId || '')];
+    if (picked < FBM_PERF_DROP_ACTIVITY_ROWS && fbmId && customer && FbmSync.inTestScope(customer, settings)) { targets[fbmId] = true; picked += 1; }
+  });
+  var sheet = shinOpenSheet('Activity'), columns = readColumnMap('Activity'), at = columnIndex(columns, '@ACT_FBM_ID');
+  var count = sheetGridDataRowCount(sheet, SHEET_FIRST_DATA_ROW), values = count ? sheet.getRange(SHEET_FIRST_DATA_ROW, at, count, 1).getValues() : [], rows = [];
+  values.forEach(function (row, index) { if (targets[String(row[0] || '').trim()]) { rows.push(SHEET_FIRST_DATA_ROW + index); } });
+  rows.reverse().forEach(function (row) { sheet.deleteRow(row); });
+  return 'Đã xóa ' + rows.length + ' dòng Activity của khách thử khỏi Sheet DEV (FBM ID: ' + Object.keys(targets).join(', ') + ').';
 }
 
 /** Kích thước gói (MB) thử ở `fbmProbePayloadBudget`; lớn dần để thấy chỗ GAS bắt đầu chậm hoặc vỡ. */
