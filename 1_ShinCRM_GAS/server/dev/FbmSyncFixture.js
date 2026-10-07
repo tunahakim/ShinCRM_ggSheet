@@ -150,3 +150,17 @@ function fbmScopeDefaultCustomer() {
   fbmDevSetTestCodes(FBM_DEV_DEFAULT_TEST_CODES);
   return { ok: true, scope: FbmSync.scriptSettings().testCodes };
 }
+
+/**
+ * Sửa dữ liệu sau lỗi phân trang Customer ngày 2026-10-07: lượt quét dừng ở 50/1.312 khách nhưng vẫn đánh "không thấy bên FBM" cho phần còn lại.
+ * Chỉ trả về "đã đồng bộ" cho Customer đang mang trạng thái đó mà có baseline (đã từng đọc khớp FBM); `apply` khác true thì chỉ đếm, không ghi.
+ */
+function fbmRepairFalseMissing(apply) {
+  var sync = FbmSync.SYNC_STATUS, targets = FbmSync.readLocal('customer').filter(function (record) {
+    return String(record.syncStatus || '') === sync.missing && String(record.fbmHash || '').trim() && String(record.fbmId || '').trim();
+  }).map(function (record) { return { id: record.id, syncStatus: sync.synced }; });
+  if (apply !== true || !targets.length) { return { apply: apply === true, count: targets.length, sample: targets.slice(0, 3).map(function (item) { return item.id; }) }; }
+  var saved = FbmSync.sheetSave('customer', targets, 'pull');
+  return { apply: true, count: targets.length, ok: saved && saved.ok !== false };
+}
+function fbmRepairFalseMissingApply() { return fbmRepairFalseMissing(true); }
