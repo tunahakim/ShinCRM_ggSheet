@@ -20,6 +20,7 @@ const RUNTIME_WRITERS = {
   'server/gate/WriteGate.js': 'record/write',
   'server/log/LogGate.js': 'infrastructure/log',
   'server/sheet/SheetGrid.js': 'helper/grid',
+  'server/sheet/SheetHeader.js': 'infrastructure/header',
   'server/sheet/SetupSheets.js': 'infrastructure/setup',
   'server/sheet/SyncColumnSetup.js': 'sync/schema',
   'server/view/ViewSheetRenderer.js': 'view/renderer',

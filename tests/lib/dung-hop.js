@@ -25,6 +25,7 @@ const TEP_NEN = [
   'server/data/SheetLayout.js',
   'server/data/ColumnFormat.js',
   'server/sheet/SheetIo.js',
+  'server/sheet/SheetHeader.js',
   'server/sheet/SheetGrid.js',
   'server/config/Settings.js',
   'server/log/LogGate.js',
