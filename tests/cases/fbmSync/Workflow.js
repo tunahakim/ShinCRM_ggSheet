@@ -661,7 +661,7 @@ async function chay(so) {
   ], [true, ['heartbeat_request', 'heartbeat'], rawHeartbeat, 1, 2]);
 
   // Chạy cả pipeline Customer + Activity. `withTrace` nạp thêm Trace.js như GAS thật (có sổ bước nghiệp vụ thay cho dòng Log tóm tắt mỗi lát), dùng cho phép đếm lần gọi kho.
-  async function fullPipeline(withTrace) {
+  async function fullPipeline(withTrace, mode) {
     const fullLogs = [], fullWrites = [], fullLocal = { customer: [], activity: [] };
     // Đếm mọi lần gọi kho DocumentProperties để chốt đợt 1 bước A: một lát Activity không được đọc/ghi kho theo số sự kiện.
     const fullProps = properties(), fullPropCalls = { count: 0 }, fullSheetReads = { customer: 0, activity: 0, category: 0 };
@@ -709,7 +709,7 @@ async function chay(so) {
       'FBM-C2': [row(fullActivityFields, { id: 'FBM-A2', details: 'Goi dien 2', end_date: '2026-09-20', owner: 'Owner 2', datetime0: '2026-09-20T04:00:00', line_nbr: 1 })]
     };
     fullFlow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-    let fullStep = fullFlow.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true });
+    let fullStep = fullFlow.hop.FbmSync.start({ mode: mode || 'read', origin: 'manual', manual: true });
     const fullKinds = [], fullStatuses = [], fullActivityPropCalls = [], fullActivitySheetReads = [];
     for (let hop = 0; fullStep && fullStep.request && hop < 20; hop += 1) {
       const request = fullStep.request;
@@ -772,6 +772,11 @@ async function chay(so) {
      ['session_probe:user', 'authorize:customer', 'authorize:activity', 'completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH', 'completion:@CAT_CONG_VIEC', 'grid:customer', 'grid:activity', 'grid:activity'],
     0, true, 4, true
   ]);
+  const checkRun = await fullPipeline(false, 'check');
+  check(so, 'nhóm 1.3: "Kiểm tra an toàn" nạp đủ 3 danh mục FBM trước khi đọc Customer', [checkRun.fullKinds.filter((kind) => kind.indexOf('completion:') === 0)], [['completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH', 'completion:@CAT_CONG_VIEC']]);
+  // Nhóm 1.3 (2A điểm 12) giả định chiều Lấy không dùng kết quả nạp danh mục; thực tế mã có tên FBM khác Category (categoryBlocks) bị chặn cả khi kéo về. Test này giữ hành vi hiện tại cho tới khi chủ dự án quyết (Câu hỏi đêm).
+  const renamedGate = { map: { '@CAT_CONG_VIECGọi điện': 'CV1' }, valid: { '@CAT_CONG_VIEC': { 'Gọi điện': true, CV1: true } }, blocked: { '@CAT_CONG_VIECCV1': 'Tên danh mục trên FBM khác Category: Gọi' } };
+  check(so, 'nhóm 1.3: chiều Lấy hiện có dùng kết quả nạp danh mục: giao dịch kéo về mang mã bị FBM đổi tên bị chặn', [checkRun.fullFlow.hop.FbmSync.validateIncomingCategories({ taskType: 'CV1' }, 'activity', renamedGate).map((item) => item.result.reason)], [['Tên danh mục trên FBM khác Category: Gọi']]);
   const traced = await fullPipeline(true), tracedActivityPropCalls = traced.fullActivityPropCalls;
   // Đợt 1 bước C: mỗi Sheet đọc một lần mỗi lần gọi; chỉ được đọc lại sau mỗi lần cửa ghi ghi đúng thực thể đó (bản chụp bị bỏ khi ghi).
   const sheetReadsWithinBudget = traced.fullActivitySheetReads.every((slice) => ['customer', 'activity', 'category'].every((key) => slice.reads[key] <= 1 + (slice.writes[key] || 0)));
