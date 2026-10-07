@@ -193,14 +193,16 @@ FbmSync.writeActivityBulkMissing = function (localRecords) {
   return { total: total, written: written, sample: sample };
 };
 
-/** Chuẩn hóa ngày Activity để lập kế hoạch quét bù Customer. */
+FbmSync.FALLBACK_TIME_ZONE_OFFSET_MS = 7 * 60 * 60 * 1000;
+/** Chuẩn hóa ngày Activity về khóa yyyy-MM-dd theo múi giờ dự án (Asia/Ho_Chi_Minh). */
 FbmSync.activityDateKey = function (value) {
   var date = typeof FbmSync.fbDate === 'function' ? FbmSync.fbDate(value) : value;
   if (Object.prototype.toString.call(date) === '[object Date]' && !isNaN(date.getTime())) {
     if (typeof Utilities !== 'undefined' && typeof Session !== 'undefined' && Utilities.formatDate) {
       return Utilities.formatDate(date, Session.getScriptTimeZone() || 'Asia/Ho_Chi_Minh', 'yyyy-MM-dd');
     }
-    return date.getUTCFullYear() + '-' + ('0' + (date.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + date.getUTCDate()).slice(-2);
+    // Ngoài GAS (test offline) không có Session: tính theo giờ VN như múi giờ của dự án, không theo UTC.
+    return new Date(date.getTime() + FbmSync.FALLBACK_TIME_ZONE_OFFSET_MS).toISOString().slice(0, 10);
   }
   var text = String(date || '').trim();
   var match = text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);

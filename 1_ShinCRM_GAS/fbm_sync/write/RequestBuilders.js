@@ -58,37 +58,26 @@ FbmSync.formDate = function (value, fallback) {
 FbmSync.activityFormDate = function (value, fallback) {
   var parsed = typeof FbmSync.fbDate === 'function' ? FbmSync.fbDate(value) : value;
   var key = typeof FbmSync.activityDateKey === 'function' ? FbmSync.activityDateKey(parsed) : '';
-  if (!key && parsed && Object.prototype.toString.call(parsed) === '[object Date]' && isFinite(parsed.getTime())) {
-    if (typeof Utilities !== 'undefined' && typeof Session !== 'undefined' && Utilities.formatDate) {
-      key = Utilities.formatDate(parsed, Session.getScriptTimeZone() || 'Asia/Ho_Chi_Minh', 'yyyy-MM-dd');
-    } else {
-      key = new Date(parsed.getTime() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    }
-  }
   return key ? FbmSync.formDate(key, fallback) : FbmSync.formDate(value, fallback);
 };
-/** Giữ nguyên mốc ngày/giờ mà form FBM đã trả; không làm tròn theo ngày hoặc múi giờ. */
-FbmSync.activityRawDate = function (value, fallback) {
-  if (value === null || value === undefined || value === '') { return fallback || ''; }
-  if (typeof value === 'string' && /^\/Date\(-?\d+(?:[+-]\d+)?\)\/$/.test(value)) { return value; }
-  if (value && Object.prototype.toString.call(value) === '[object Date]' && isFinite(value.getTime())) { return '/Date(' + value.getTime() + ')/'; }
-  return FbmSync.formDate(value, fallback);
-};
+/**
+ * Ngày Activity của lệnh sửa luôn gửi dạng giao diện FBM gửi: 0 giờ UTC của ngày theo giờ Việt Nam (giờ nằm riêng ở start_time/end_time).
+ * Không gửi lại nguyên mốc form trả về: FBM trả ngày giờ VN lùi 7 tiếng (22/09 01:00 VN thành 21/09 18:00 UTC) nhưng đọc lệnh ghi theo ngày UTC,
+ * nên gửi lại nguyên mốc là lùi một ngày (gặp thật 2026-10-07 ở ACT-008616).
+ */
 FbmSync.activityEditDate = function (record, oldValues, name, aliases, fallback) {
   var hasOld = oldValues && Object.prototype.hasOwnProperty.call(oldValues, name), localValue = FbmSync.fieldValue(record, oldValues, name, aliases, '');
-  if (hasOld && name === 'start_date') {
-    return FbmSync.activityRawDate(oldValues[name], fallback);
-  }
+  var oldDate = hasOld ? FbmSync.activityFormDate(oldValues[name], fallback) : '';
+  if (hasOld && name === 'start_date') { return oldDate; }
   if (hasOld && name === 'end_date') {
-    if (!record || !Object.prototype.hasOwnProperty.call(record, 'workDate')) { return FbmSync.activityRawDate(oldValues[name], fallback); }
+    if (!record || !Object.prototype.hasOwnProperty.call(record, 'workDate')) { return oldDate; }
     var localKey = FbmSync.activityDateKey(record.workDate), oldKey = FbmSync.activityDateKey(oldValues[name]);
-    if (localKey && oldKey && localKey === oldKey) { return FbmSync.activityRawDate(oldValues[name], fallback); }
-    return FbmSync.activityFormDate(record.workDate, FbmSync.activityRawDate(oldValues[name], fallback));
+    return localKey && oldKey && localKey === oldKey ? oldDate : FbmSync.activityFormDate(record.workDate, oldDate);
   }
   if (record && Object.prototype.hasOwnProperty.call(record, 'workDate')) {
     return FbmSync.activityFormDate(record.workDate, fallback);
   }
-  return FbmSync.activityRawDate(localValue, fallback);
+  return FbmSync.activityFormDate(localValue, fallback);
 };
 
 /** Đổi giá trị SELECT của ShinCRM thành mã FBM từ companion Category. */
@@ -144,7 +133,7 @@ FbmSync.activityValues = function (record, oldValues, categoryGate) {
   if (oldValues) {
     memvars.forEach(function (item) {
       if (['start_date', 'end_date'].indexOf(item.Name) >= 0 && Object.prototype.hasOwnProperty.call(oldValues, item.Name)) {
-        item.OldValue = FbmSync.activityRawDate(oldValues[item.Name], item.OldValue);
+        item.OldValue = FbmSync.activityFormDate(oldValues[item.Name], item.OldValue);
       }
     });
   }
