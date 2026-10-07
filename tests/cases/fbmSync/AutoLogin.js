@@ -230,8 +230,21 @@ async function chay(so) {
   heartbeat.FbmSync.loginAdapterContinue(heartbeat.FbmSync.stateRead(), heartbeat.FbmSync.stateRead().cursor, { ok: true, status: 200, body: '{"d":null}' });
   const manualNullText = heartbeat.FbmSync.stateRead().message;
   check(so, 'Login trả d:null thì thông báo nêu khả năng FBM còn giữ phiên cũ và cách hủy trên tab FBM; lượt bấm tay không hứa tự thử lại, chạy nền thì có', [manualNullText.indexOf('còn giữ phiên đăng nhập cũ') > 0, manualNullText.indexOf('chọn hủy phiên cũ') > 0, manualNullText.indexOf('tự thử lại') < 0, backgroundNullText.indexOf('Chạy nền tự thử lại sau 30 phút') > 0, backgroundNullText.indexOf('chọn hủy phiên cũ') > 0], [true, true, true, true, true]);
+  // FBM-057: nút hủy phiên cũ. GAS chỉ mở sau khi FBM trả lời từ chối; đăng nhập tự động luôn là login mềm.
+  check(so, 'FBM từ chối đăng nhập thì status mở nút hủy phiên cũ; request đăng nhập tự động không mang cờ hủy phiên', [heartbeat.FbmSync.statusView().forceLoginOffered, heartbeat.FbmSync.loginRequest('cred-heartbeat-123', false).meta.force], [true, false]);
+  const forceLogsBefore = gateLogs.length;
+  const forceStart = heartbeat.FbmSync.loginForceRequest();
+  check(so, 'bấm hủy phiên cũ gửi đăng nhập có cờ hủy phiên bằng thông tin đã lưu, đóng nút lại và ghi Log', [forceStart.ok, forceStart.request.meta.force, forceStart.request.meta.credentialRef, heartbeat.FbmSync.statusView().forceLoginOffered, heartbeat.FbmSync.loginForceRequest().code, gateLogs.slice(forceLogsBefore).some((event) => event.action === 'login_force_requested')], [true, true, 'cred-heartbeat-123', false, 'LOGIN_FORCE_NOT_OFFERED', true]);
+  heartbeat.FbmSync.loginTestResult({ ok: true, status: 200, body: '{"d":null}', transport: { trace: [{ requestId: forceStart.request.id }] } });
+  check(so, 'đã hủy phiên cũ mà FBM vẫn từ chối thì báo khả năng sai mật khẩu và không mở lại nút hủy phiên', [heartbeat.FbmSync.stateRead().message.indexOf('Đã hủy phiên cũ nhưng FBM vẫn từ chối') === 0, heartbeat.FbmSync.statusView().forceLoginOffered], [true, false]);
   const throttleText = heartbeat.FbmSync.autoLoginBlockMessage('AUTO_LOGIN_THROTTLED', { retryAt: new Date(2026, 9, 7, 16, 48).getTime() });
   check(so, 'thông báo chờ chu kỳ nêu giờ được thử lại, lý do lần trước và cách kiểm tra ngay', [throttleText.indexOf('sau 16:48') > 0, throttleText.indexOf('Lý do lần trước: FBM từ chối đăng nhập') > 0, throttleText.indexOf('Đăng nhập thử') > 0], [true, true, true]);
+  heartbeat.FbmSync.statePatch({ phase: 'paused', loginForceOffered: true, activeRequestId: '', deadlineAt: 0 });
+  const forceAgain = heartbeat.FbmSync.loginForceRequest();
+  const forceLogin = heartbeat.FbmSync.loginTestResult({ ok: true, status: 200, body: '{"d":true}', transport: { payloadCookie: '461020379855cFHN_CRM_App', trace: [{ requestId: forceAgain.request.id }] } });
+  const forceAuthorize = heartbeat.FbmSync.loginTestResult({ ok: true, status: 200, body: '{"d":{"Authorized":"auth-customer"}}', transport: { trace: [{ requestId: forceLogin.request.id }] } });
+  const forceIdentity = heartbeat.FbmSync.loginTestResult({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[2037,"ANHLT","Le Tuan Anh"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { trace: [{ requestId: forceAuthorize.request.id }] } });
+  check(so, 'hủy phiên cũ và đăng nhập đúng tài khoản đã liên kết thì báo bấm chạy lại, mở lại quyền tự đăng nhập ngay và ghi Log', [forceIdentity.code, heartbeat.FbmSync.stateRead().message.indexOf('Đã hủy phiên cũ và đăng nhập') === 0, heartbeat.FbmSync.autoLoginCanAttempt().ok, gateLogs.some((event) => event.action === 'login_force_ok')], ['LOGIN_OK', true, true, true]);
   heartbeat.FbmSync.statePatch({ runId: 'authorize-false-run', phase: 'checking_session', cursor: { kind: 'login_identity_authorize', purpose: 'auto', testOnly: false }, activeRequestId: '', deadlineAt: 0, session: { expired: true } });
   const logsBeforeAuthorize = gateLogs.length;
   const authorizeFalse = heartbeat.FbmSync.loginAuthorizeContinue(heartbeat.FbmSync.stateRead(), heartbeat.FbmSync.stateRead().cursor, { ok: true, status: 200, body: '{"d":{"Authorized":false,"Rows":null}}' });

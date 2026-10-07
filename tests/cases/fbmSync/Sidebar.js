@@ -495,6 +495,18 @@ async function chay(so) {
   hop.uiDecisionOpen = () => Promise.resolve(true);
   await hop.fbmSyncResetState();
   check(so, 'FBM-044: bấm Quay lại ở hộp xác nhận không gọi GAS; bấm Đặt lại mới gọi fbmResetSyncState', resetCalls, ['fbmResetSyncState']);
+  // FBM-057: nút hủy phiên cũ chỉ hiện khi GAS mở, và chỉ gọi GAS sau khi người dùng xác nhận.
+  const coNutHuyPhien = (node) => node.id === 'fbm-sync-force-login' || (node.children || []).some(coNutHuyPhien);
+  render(hop, content, hop.fbmSyncRenderRun, { phase: 'paused', runId: 'r2', lastFailureCode: 'AUTO_LOGIN_FAILED', forceLoginOffered: true, message: 'FBM từ chối đăng nhập', counts: {} });
+  const forceShown = coNutHuyPhien(content);
+  render(hop, content, hop.fbmSyncRenderRun, { phase: 'paused', runId: 'r2', lastFailureCode: 'AUTO_LOGIN_FAILED', message: 'FBM từ chối đăng nhập', counts: {} });
+  const forceCalls = [];
+  hop.callServer = (name) => { forceCalls.push(name); return Promise.resolve({ ok: false, code: 'LOGIN_FORCE_NOT_OFFERED', message: 'không mở' }); };
+  hop.uiDecisionOpen = () => Promise.resolve(false);
+  await hop.fbmSyncForceLogin();
+  hop.uiDecisionOpen = () => Promise.resolve(true);
+  await hop.fbmSyncForceLogin();
+  check(so, 'FBM-057: nút "Hủy phiên cũ và đăng nhập" chỉ hiện khi GAS mở; bấm Quay lại không gọi GAS, xác nhận mới gọi fbmStartForceLogin; GAS từ chối thì lỗi được ghi Log', [forceShown, coNutHuyPhien(content), forceCalls], [true, false, ['fbmStartForceLogin', 'fbmLogSyncError']]);
   const waitingPaints = [];
   hop.fbmSyncPaint = (status) => waitingPaints.push(status);
   hop.FBM_SYNC_CLIENT.running = true;
