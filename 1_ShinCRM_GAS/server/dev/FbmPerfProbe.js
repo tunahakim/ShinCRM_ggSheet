@@ -1,0 +1,217 @@
+/**
+ * Bộ đo thời gian của phiên đồng bộ FBM (chỉ dùng lúc phát triển, xóa cùng `server/dev/`).
+ *
+ * Vì sao bọc hàm thay vì rải `Date.now()` vào code nghiệp vụ: đo là việc tạm, rải mốc vào nghiệp vụ thì gỡ sót là thành rác lâu dài. Ở đây mỗi lần gọi GAS bọc tạm một danh sách hàm có sẵn, đo thời gian tự thân (trừ thời gian các hàm con cũng được bọc) nên các ô cộng lại đúng bằng tổng thời gian lần gọi, không đếm trùng.
+ * Cạm bẫy: chỉ đo khi đã bật bằng `fbmPerfOn`; tắt thì `runEntryPoint` chỉ tốn một lần đọc Cache. Kết quả nằm trong CacheService (hết hạn sau 6 giờ) chứ không nằm trong DocumentProperties, vì state đã sát trần 9 KB và chính phép đo không được làm đổi state.
+ * Thời gian phía Sidebar/Extension lấy từ trace client gửi kèm mỗi lần gọi; các mốc đó cùng đồng hồ máy người dùng nên trừ nhau được. Thời gian đường truyền GAS = (Sidebar thấy GAS trả về − lúc Sidebar gọi) − thời gian GAS tự đo, nên không phụ thuộc lệch đồng hồ hai máy.
+ */
+var FBM_PERF_FLAG_KEY = 'FBM_PERF_ON';
+var FBM_PERF_STORE_KEY = 'FBM_PERF_STORE';
+var FBM_PERF_TTL_SECONDS = 21600;
+/** Hàm của FbmSync được bọc; thêm tên ở đây khi cần chẻ nhỏ một ô còn lớn. */
+var FBM_PERF_FBM_FUNCTIONS = [
+  'stateRead', 'stateWrite', 'documentPropertySet', 'documentPropertyJson', 'compactStatePreview', 'stateWriteMinimal',
+  'traceEvent', 'traceImport', 'traceAppend', 'traceContext', 'traceRead',
+  'statusView', 'recoverStaleRun', 'shouldLogStatus', 'logStatus', 'recordIssuesFlush', 'limitRelayResult', 'transportValue',
+  'withOrchestrationLock', 'nextEnvelope', 'requestForCursor',
+  'rowsToRecords', 'customerRecord', 'activityRecord', 'isTemporaryRecord', 'stateCategoryGate', 'readCategoryGate',
+  'pullRecords', 'pullWrite', 'readLocal', 'seenStoreBegin', 'seenStoreMark', 'seenStoreHas', 'sheetSave', 'previewRecords',
+  'hash', 'threeWay', 'canonical', 'activitySinceAllows',
+  'businessStepStart', 'businessStepAdd', 'businessStepFinish',
+  'customerScanRecord', 'customerNext', 'activityForCustomers', 'finishPullRun', 'beginCustomerPull',
+  'runPreflight', 'preflightEvaluate', 'preflightLocalScan', 'preflightHashSummary', 'preflightCandidates', 'preflightPushPermissions', 'logPreflight', 'identityPreflight', 'pushCandidates',
+  'continueSessionGate', 'sessionGateResponseStarted', 'applyTransportSession', 'authContinue', 'lookupPairs'
+];
+var FBM_PERF_PROTOCOL_FUNCTIONS = ['parse', 'assertSuccess', 'isLiveSessionResponse'];
+/** Hàm toàn cục của lõi ShinCRM mà đồng bộ gọi tới: đọc Sheet, cửa ghi, Log. */
+var FBM_PERF_GLOBAL_FUNCTIONS = ['entityReadAllCombined', 'entityReadAll', 'writeGateSave', 'logEvent', 'logTrace', 'flushLog', 'flushLogIfTraced', 'shinCorePreflight'];
+/** Cặp mốc phía client: [tên đoạn, mốc bắt đầu, mốc kết thúc, thuộc lần gọi trước?]. */
+var FBM_PERF_CLIENT_SEGMENTS = [
+  ['sidebar_to_extension', 'client_next_request_started', 'executor_started', false],
+  ['extension_fetch_fbm', 'fetch_started', 'fetch_finished', false],
+  ['extension_to_gas_call', 'fetch_finished', 'client_gas_call_started', false],
+  ['gas_roundtrip', 'client_gas_call_started', 'client_gas_success', true],
+  ['sidebar_after_gas', 'client_gas_success', 'client_next_request_started', true]
+];
+
+function fbmPerfCache() { return CacheService.getDocumentCache(); }
+
+/** Mở phiên đo của một lần gọi GAS; trả `null` khi chưa bật để `runEntryPoint` chạy như thường. */
+function devPerfBegin(name, args) {
+  if (!/^fbm/i.test(String(name || ''))) { return null; }
+  try { return fbmPerfBeginUnsafe(name, args); } catch (error) { fbmPerfRecordError('bắt đầu', error); return null; }
+}
+
+/** Bộ đo hỏng không được làm hỏng lần gọi đồng bộ; lỗi được cất lại để `fbmPerfReport` hiện ra, không nuốt im. */
+function fbmPerfRecordError(where, error) {
+  var text = 'Bộ đo DEV lỗi lúc ' + where + ': ' + String(error && error.message || error);
+  if (typeof console !== 'undefined' && console.error) { console.error(text); }
+  fbmPerfCache().put('FBM_PERF_ERROR', text, FBM_PERF_TTL_SECONDS);
+}
+
+function fbmPerfBeginUnsafe(name, args) {
+  var startedAt = Date.now(), cache = fbmPerfCache(), raw = cache.getAll([FBM_PERF_FLAG_KEY, FBM_PERF_STORE_KEY]);
+  if (raw[FBM_PERF_FLAG_KEY] !== '1') { return null; }
+  var perf = { name: String(name), startedAt: startedAt, flagMs: Date.now() - startedAt, stack: [], buckets: {}, callers: {}, restore: [], runId: '', kind: '', store: null, args: args || {} };
+  try { perf.store = raw[FBM_PERF_STORE_KEY] ? JSON.parse(raw[FBM_PERF_STORE_KEY]) : null; } catch (parseError) { perf.store = null; perf.storeError = String(parseError && parseError.message || parseError); }
+  if (!perf.store || typeof perf.store !== 'object') { perf.store = { runs: {}, order: [], client: { lastAt: 0, lastStage: {}, lastKind: '', lastServerMs: 0 } }; }
+  FBM_PERF_FBM_FUNCTIONS.forEach(function (fn) { fbmPerfWrap(perf, FbmSync, fn, fn); });
+  if (FbmSync.protocol) { FBM_PERF_PROTOCOL_FUNCTIONS.forEach(function (fn) { fbmPerfWrap(perf, FbmSync.protocol, fn, 'protocol.' + fn); }); }
+  FBM_PERF_GLOBAL_FUNCTIONS.forEach(function (fn) { fbmPerfWrap(perf, globalThis, fn, fn); });
+  fbmPerfWrapProps(perf);
+  fbmPerfWrapLock(perf);
+  return perf;
+}
+
+/** Bọc một hàm: cộng thời gian tự thân và đếm hàm gọi nó; giữ nguyên `this`, giá trị trả về và lỗi ném ra. */
+function fbmPerfWrap(perf, owner, key, label) {
+  if (!owner || typeof owner[key] !== 'function' || owner[key].__fbmPerf) { return; }
+  var original = owner[key];
+  var wrapped = function () {
+    var frame = fbmPerfEnter(perf, label), result;
+    try {
+      result = original.apply(this, arguments);
+      if (label === 'stateRead' && !perf.kind && result) { perf.runId = String(result.runId || ''); perf.kind = String(result.cursor && result.cursor.kind || result.phase || ''); }
+      return result;
+    } finally { fbmPerfExit(perf, frame); }
+  };
+  wrapped.__fbmPerf = true;
+  owner[key] = wrapped;
+  perf.restore.push(function () { owner[key] = original; });
+}
+
+/** DocumentProperties: đo từng lần getProperty/setProperty thật, vì đó là thứ bị nghi tốn thời gian nhất. */
+function fbmPerfWrapProps(perf) {
+  if (typeof FbmSync.props !== 'function') { return; }
+  var originalProps = FbmSync.props, originalService = PropertiesService.getDocumentProperties;
+  var timed = function (props) {
+    return {
+      getProperty: function (key) { var f = fbmPerfEnter(perf, 'props.getProperty'); try { return props.getProperty(key); } finally { fbmPerfExit(perf, f); } },
+      setProperty: function (key, value) { var f = fbmPerfEnter(perf, 'props.setProperty'); try { return props.setProperty(key, value); } finally { fbmPerfExit(perf, f); } },
+      deleteProperty: function (key) { var f = fbmPerfEnter(perf, 'props.deleteProperty'); try { return props.deleteProperty(key); } finally { fbmPerfExit(perf, f); } },
+      getProperties: function () { var f = fbmPerfEnter(perf, 'props.getProperties'); try { return props.getProperties(); } finally { fbmPerfExit(perf, f); } },
+      getKeys: function () { var f = fbmPerfEnter(perf, 'props.getKeys'); try { return props.getKeys(); } finally { fbmPerfExit(perf, f); } },
+      setProperties: function (values, deleteOthers) { var f = fbmPerfEnter(perf, 'props.setProperties'); try { return props.setProperties(values, deleteOthers); } finally { fbmPerfExit(perf, f); } }
+    };
+  };
+  // Trace gọi thẳng PropertiesService nên bọc ở dịch vụ để đo cả trace; dịch vụ không cho thay (đối tượng chỉ đọc) thì lùi về bọc FbmSync.props và ghi lại để bảng không hiểu nhầm trace tốn 0.
+  try {
+    PropertiesService.getDocumentProperties = function () { return timed(originalService.call(PropertiesService)); };
+    perf.propsServiceWrapped = PropertiesService.getDocumentProperties !== originalService;
+  } catch (serviceError) { perf.propsServiceWrapped = false; }
+  if (perf.propsServiceWrapped) { perf.restore.push(function () { PropertiesService.getDocumentProperties = originalService; }); return; }
+  FbmSync.props = function () { return timed(originalProps.apply(FbmSync, arguments)); };
+  perf.restore.push(function () { FbmSync.props = originalProps; });
+}
+
+/** Thời gian chờ khóa điều phối tách riêng khỏi thời gian xử lý. */
+function fbmPerfWrapLock(perf) {
+  if (typeof FbmSync.orchestrationLock !== 'function') { return; }
+  var original = FbmSync.orchestrationLock;
+  FbmSync.orchestrationLock = function () {
+    var lock = original.apply(FbmSync, arguments);
+    return { tryLock: function (ms) { var f = fbmPerfEnter(perf, 'lock.tryLock'); try { return lock.tryLock(ms); } finally { fbmPerfExit(perf, f); } }, releaseLock: function () { return lock.releaseLock(); } };
+  };
+  perf.restore.push(function () { FbmSync.orchestrationLock = original; });
+}
+
+function fbmPerfEnter(perf, label) {
+  var parent = perf.stack.length ? perf.stack[perf.stack.length - 1].label : '(gốc)';
+  var frame = { label: label, at: Date.now(), childMs: 0 };
+  perf.stack.push(frame);
+  var edge = label + ' ← ' + parent;
+  perf.callers[edge] = Number(perf.callers[edge] || 0) + 1;
+  return frame;
+}
+
+function fbmPerfExit(perf, frame) {
+  var total = Date.now() - frame.at, bucket = perf.buckets[frame.label] || (perf.buckets[frame.label] = { n: 0, selfMs: 0, totalMs: 0 });
+  // Lỗi ném giữa chừng có thể để lại frame con chưa đóng; cắt stack về đúng frame này.
+  var index = perf.stack.lastIndexOf(frame);
+  if (index >= 0) { perf.stack.length = index; }
+  bucket.n += 1; bucket.selfMs += Math.max(0, total - frame.childMs); bucket.totalMs += total;
+  if (perf.stack.length) { perf.stack[perf.stack.length - 1].childMs += total; }
+}
+
+/** Đóng phiên đo: gỡ bọc, cộng vào bảng tổng theo lượt và loại lần gọi, ghi Cache một lần. */
+function devPerfEnd(perf, failed) {
+  if (!perf) { return; }
+  try { fbmPerfEndUnsafe(perf, failed); } catch (error) { fbmPerfRecordError('kết thúc', error); }
+}
+
+function fbmPerfEndUnsafe(perf, failed) {
+  perf.restore.reverse().forEach(function (undo) { undo(); });
+  var serverMs = Date.now() - perf.startedAt, store = perf.store, kind = perf.name === 'fbmContinueSync' || perf.name === 'fbmRelay' ? perf.name + ':' + (perf.kind || '?') : perf.name;
+  var runKey = perf.runId || '(không runId)';
+  if (!store.runs[runKey]) { store.runs[runKey] = { firstAt: perf.startedAt, kinds: {} }; store.order.push(runKey); }
+  while (store.order.length > 3) { delete store.runs[store.order.shift()]; }
+  var run = store.runs[runKey];
+  run.lastAt = Date.now();
+  var agg = run.kinds[kind] || (run.kinds[kind] = { calls: 0, failed: 0, serverMs: 0, maxServerMs: 0, minServerMs: 0, measuredMs: 0, buckets: {}, callers: {}, client: {} });
+  agg.calls += 1; agg.failed += failed ? 1 : 0; agg.serverMs += serverMs; agg.maxServerMs = Math.max(agg.maxServerMs, serverMs); agg.minServerMs = agg.minServerMs ? Math.min(agg.minServerMs, serverMs) : serverMs;
+  Object.keys(perf.buckets).forEach(function (label) {
+    var src = perf.buckets[label], dst = agg.buckets[label] || (agg.buckets[label] = { n: 0, selfMs: 0 });
+    dst.n += src.n; dst.selfMs += src.selfMs; agg.measuredMs += src.selfMs;
+  });
+  Object.keys(perf.callers).forEach(function (edge) { agg.callers[edge] = Number(agg.callers[edge] || 0) + perf.callers[edge]; });
+  if (perf.propsServiceWrapped === false) { agg.propsServiceNotWrapped = true; }
+  fbmPerfClientSegments(perf, run, kind);
+  store.client.lastKind = kind;
+  store.client.lastServerMs = serverMs;
+  var text = JSON.stringify(store);
+  fbmPerfCache().put(FBM_PERF_STORE_KEY, text, FBM_PERF_TTL_SECONDS);
+}
+
+/** Ghép mốc client mới (chưa xử lý ở lần gọi trước) thành các đoạn thời gian Sidebar/Extension. */
+function fbmPerfClientSegments(perf, run, kind) {
+  var store = perf.store, client = store.client, args = perf.args || {}, events = [], seen = {};
+  var add = function (list) { (Array.isArray(list) ? list : []).forEach(function (item) { if (!item || !item.stage || !item.at) { return; } var key = item.stage + '|' + item.at; if (seen[key]) { return; } seen[key] = true; events.push({ stage: String(item.stage), at: Number(item.at) }); }); };
+  add(args.clientTrace);
+  add(args.response && args.response.transport && args.response.transport.trace);
+  events = events.filter(function (item) { return item.at > Number(client.lastAt || 0); }).sort(function (a, b) { return a.at - b.at; });
+  events.forEach(function (event) {
+    FBM_PERF_CLIENT_SEGMENTS.forEach(function (segment) {
+      if (segment[2] !== event.stage || !client.lastStage[segment[1]] || client.lastStage[segment[1]] > event.at) { return; }
+      var ms = event.at - client.lastStage[segment[1]], targetKind = segment[3] ? client.lastKind || kind : kind, target = run.kinds[targetKind] || run.kinds[kind];
+      fbmPerfAddClient(target, segment[0], ms);
+      if (segment[0] === 'gas_roundtrip' && client.lastServerMs) { fbmPerfAddClient(target, 'gas_transit (khứ hồi − GAS tự đo)', Math.max(0, ms - client.lastServerMs)); }
+      client.lastStage[segment[1]] = 0;
+    });
+    client.lastStage[event.stage] = event.at;
+    client.lastAt = Math.max(Number(client.lastAt || 0), event.at);
+  });
+}
+
+function fbmPerfAddClient(agg, name, ms) {
+  var item = agg.client[name] || (agg.client[name] = { n: 0, ms: 0, maxMs: 0 });
+  item.n += 1; item.ms += ms; item.maxMs = Math.max(item.maxMs, ms);
+}
+
+/** Bật đo; xóa số liệu cũ để bảng chỉ chứa lượt chạy sắp tới. */
+function fbmPerfOn() { var cache = fbmPerfCache(); cache.remove(FBM_PERF_STORE_KEY); cache.put(FBM_PERF_FLAG_KEY, '1', FBM_PERF_TTL_SECONDS); return 'Đã bật đo thời gian đồng bộ FBM trong 6 giờ; số liệu cũ đã xóa.'; }
+function fbmPerfOff() { fbmPerfCache().remove(FBM_PERF_FLAG_KEY); return 'Đã tắt đo thời gian đồng bộ FBM; số liệu vẫn giữ tới khi Cache hết hạn.'; }
+
+/** Bảng đo đọc được bằng chữ: theo lượt, theo loại lần gọi, các ô xếp từ tốn nhất xuống. */
+function fbmPerfReport() {
+  var raw = fbmPerfCache().get(FBM_PERF_STORE_KEY);
+  if (!raw) { return 'Chưa có số liệu đo (chưa bật fbmPerfOn, chưa chạy lượt nào, hoặc Cache đã hết hạn).'; }
+  var store = JSON.parse(raw), lines = [], perfError = fbmPerfCache().get('FBM_PERF_ERROR');
+  if (perfError) { lines.push('!!! ' + perfError); }
+  store.order.forEach(function (runKey) {
+    var run = store.runs[runKey];
+    lines.push('=== Lượt ' + runKey + ' (' + Math.round((run.lastAt - run.firstAt) / 1000) + ' giây từ lần gọi đầu đến lần cuối) ===');
+    Object.keys(run.kinds).sort(function (a, b) { return run.kinds[b].serverMs - run.kinds[a].serverMs; }).forEach(function (kind) {
+      var agg = run.kinds[kind];
+      lines.push('-- ' + kind + ': ' + agg.calls + ' lần gọi' + (agg.failed ? ' (' + agg.failed + ' lỗi)' : '') + ', GAS tổng ' + agg.serverMs + ' ms, TB ' + Math.round(agg.serverMs / agg.calls) + ' ms (min ' + agg.minServerMs + ', max ' + agg.maxServerMs + '), chưa bọc ' + (agg.serverMs - agg.measuredMs) + ' ms' + (agg.propsServiceNotWrapped ? ' [PropertiesService của trace không bọc được]' : ''));
+      Object.keys(agg.client).forEach(function (name) { var c = agg.client[name]; lines.push('   [client] ' + name + ': ' + c.n + ' lần, TB ' + Math.round(c.ms / c.n) + ' ms, max ' + c.maxMs + ' ms, tổng ' + c.ms + ' ms'); });
+      Object.keys(agg.buckets).sort(function (a, b) { return agg.buckets[b].selfMs - agg.buckets[a].selfMs; }).forEach(function (label) {
+        var b = agg.buckets[label];
+        if (b.selfMs < agg.calls * 5 && b.selfMs < 50) { return; }
+        lines.push('   ' + label + ': ' + b.n + ' lần (' + (Math.round(b.n / agg.calls * 10) / 10) + '/lần gọi), tự thân ' + b.selfMs + ' ms, TB ' + Math.round(b.selfMs / agg.calls) + ' ms/lần gọi');
+      });
+      var hot = Object.keys(agg.callers).filter(function (edge) { return /^(props\.|stateRead|stateWrite|traceEvent|entityRead)/.test(edge); }).sort(function (a, b) { return agg.callers[b] - agg.callers[a]; }).slice(0, 14);
+      if (hot.length) { lines.push('   gọi bởi: ' + hot.map(function (edge) { return edge + ' ×' + agg.callers[edge]; }).join('; ')); }
+    });
+  });
+  return lines;
+}

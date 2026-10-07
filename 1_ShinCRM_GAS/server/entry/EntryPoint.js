@@ -20,6 +20,8 @@
  */
 function runEntryPoint(name, source, channel, fn) {
   var trace = typeof fbmTraceBoundary === 'function' && /^fbm/i.test(String(name || ''));
+  // Mốc đo DEV (server/dev/FbmPerfProbe.js); gỡ thư mục dev thì hàm không tồn tại và dòng này không làm gì. Tham số thứ năm là đối số gốc của cửa vào.
+  var perf = typeof devPerfBegin === 'function' ? devPerfBegin(name, arguments[4]) : null;
   var failed = false, result;
   if (trace) { fbmTraceBoundary('gas_entered', name); }
   try {
@@ -44,6 +46,7 @@ function runEntryPoint(name, source, channel, fn) {
       flushLog();
     } finally {
       if (trace) { fbmTraceBoundary('after_flush', name); if (!failed) { fbmTraceBoundary('gas_returned', name); } }
+      if (perf) { devPerfEnd(perf, failed); }
     }
   }
 }
