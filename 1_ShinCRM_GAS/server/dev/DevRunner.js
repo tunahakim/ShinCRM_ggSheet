@@ -20,7 +20,7 @@
 var DEV_RUNNER_ALLOWED = [
   'smokeTest', 'smokeDiag', 'setupSheets', 'verifySheets', 'measureDeleteRows', 'measureChunkRows', 'measureFirstPaint',
   'seedFakeData', 'seedFakeCategory', 'seedFakeCategoryMappings', 'wipeFakeData', 'fbmPrepareAltTest', 'fbmProbeAltState', 'fbmProbeStuckState', 'fbmProbePendingPushes', 'fbmScopeCreatedCustomer', 'fbmScopeDefaultCustomer', 'fbmSeedFakeDeletedCustomer', 'fbmEndFakeDeletedCustomer', 'fbmSeedConflict', 'fbmTamperConflictOpenedHash', 'fbmSeedActivityPush', 'fbmProbeCreateCustomer', 'fbmAllowTestCreateCustomer', 'fbmRequeueCreateCustomerConflict', 'fbmRequeueCreateCustomerPush', 'fbmAuditAltState',
-  'dumpColumnMap', 'dumpSettings', 'dumpSheetGrid', 'dumpRecentLog',
+  'dumpColumnMap', 'dumpSettings', 'dumpSheetGrid', 'dumpCoreSheetHead', 'dumpRecentLog',
   'devLogTraceOn', 'devLogTraceOff',
   'probeBadColumnCode', 'probeLogGate', 'probeDateText', 'probeSheetGrid', 'probeCellBudget',
   'probeEntityRead', 'probeCategoryRead', 'probeConfigRead', 'probeDirtyState', 'getReloadState', 'probeSelectionAndReload', 'reloadRecords', 'reloadConfig', 'renderAllManagedViews', 'renderAllManagedViewsIfAllowed',

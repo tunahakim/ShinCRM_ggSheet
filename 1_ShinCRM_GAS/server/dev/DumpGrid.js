@@ -38,3 +38,21 @@ function dumpSheetGrid() {
   console.log(text);
   return text;
 }
+
+/**
+ * In hàng mã cột và vài dòng dữ liệu đầu của Customer, Activity để soi cột bị gắn nhầm nhãn.
+ */
+function dumpCoreSheetHead() {
+  var file = shinOpenBook();
+  return ['Customer', 'Activity'].map(function (name) {
+    var sheet = file.getSheetByName(name);
+    var layout = SHEET_LAYOUT[name];
+    var lastCol = sheet.getLastColumn();
+    var codes = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    var count = Math.min(6, Math.max(0, sheet.getLastRow() - layout.firstDataRow + 1));
+    var data = count ? sheet.getRange(layout.firstDataRow, 1, count, lastCol).getDisplayValues() : [];
+    return name + ':\n' + codes.map(function (code, i) {
+      return '  ' + (i + 1) + ' ' + code + ' = ' + data.map(function (row) { return String(row[i]).slice(0, 24); }).join(' | ');
+    }).join('\n');
+  }).join('\n\n');
+}
