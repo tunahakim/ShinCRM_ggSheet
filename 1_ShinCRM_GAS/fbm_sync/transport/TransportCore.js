@@ -187,7 +187,7 @@ FbmSync.sessionGateStart = function (state, failedCursor) {
   }
   allowed = FbmSync.beginAutoLogin(current, cursor, { heartbeat: cursor.kind === 'heartbeat' });
   if (!allowed) {
-    var blocked = typeof FbmSync.autoLoginCanAttempt === 'function' ? FbmSync.autoLoginCanAttempt() : { code: 'AUTO_LOGIN_NOT_CONFIGURED' };
+    var blocked = typeof FbmSync.autoLoginCanAttempt === 'function' ? FbmSync.autoLoginCanAttempt(null, FbmSync.autoLoginAttemptOptions(current, cursor)) : { code: 'AUTO_LOGIN_NOT_CONFIGURED' };
     FbmSync.sessionGateBlock(current, blocked.code || 'AUTO_LOGIN_NOT_CONFIGURED', FbmSync.autoLoginBlockMessage(blocked.code, blocked));
     return null;
   }
