@@ -118,18 +118,22 @@ FbmSync.finishPushVerification = function (state, response) {
     state.cursor = { kind: 'push_scan', entity: entity, index: Number(cursor.index || 0) + 1 }; state.current = ''; state.message = 'Đã xác nhận ' + entity + ' ' + id + '.'; FbmSync.stateWrite(state);
     return FbmSync.nextPushRequest(state);
   }
+  // Ghi tên trường lệch kèm giá trị đã chuẩn hóa (cắt ngắn) để người dùng biết FBM nhận gì; đầy đủ hai bên xem ở màn xung đột.
+  var shortValue = function (text) { text = String(text === undefined || text === null ? '' : text); return '"' + (text.length > 40 ? text.slice(0, 40) + '…' : text) + '"'; };
+  var differingFields = FbmSync.diff(entity, local, values, FbmSync.stateCategoryGate(state)).map(function (item) { return item.field + ' (ShinCRM ' + shortValue(item.left) + ', FBM ' + shortValue(item.right) + ')'; });
+  var differing = differingFields.length ? ' ở trường ' + differingFields.join(', ') : '';
   if (previousHash && incomingHash === previousHash) {
     state.counts.skipped += 1;
     FbmSync.sheetSave(entity, [{ id: local.id, syncStatus: FbmSync.SYNC_STATUS.notApplied }], 'push');
     FbmSync.pendingPushClear(entity, id);
-    FbmSync.logPullRecord(entity, values, local, FbmSync.SYNC_STATUS.notApplied, 'FBM không đổi sau lần ghi; đọc xác nhận trực tiếp.');
+    FbmSync.logPullRecord(entity, values, local, FbmSync.SYNC_STATUS.notApplied, 'FBM không đổi sau lần ghi' + differing + '; đọc xác nhận trực tiếp.');
     state.cursor = { kind: 'push_scan', entity: entity, index: Number(cursor.index || 0) + 1 }; state.current = ''; state.message = 'FBM chưa áp dụng ' + entity + ' ' + id + '.'; FbmSync.stateWrite(state);
     return FbmSync.nextPushRequest(state);
   }
   // Sheet là nguồn của hàng đợi xung đột nên ghi trạng thái trước; khóa push nhả luôn vì dòng `xung đột chờ quyết` đã bị khóa đồng bộ.
   FbmSync.sheetSave(entity, [{ id: local.id, syncStatus: FbmSync.SYNC_STATUS.conflict }], 'push');
   FbmSync.pendingPushClear(entity, id);
-  FbmSync.logPullRecord(entity, values, local, FbmSync.SYNC_STATUS.conflict, 'Đọc xác nhận khác dữ liệu vừa ghi; chờ quyết định xung đột.');
+  FbmSync.logPullRecord(entity, values, local, FbmSync.SYNC_STATUS.conflict, 'Đọc xác nhận khác dữ liệu vừa ghi' + differing + '; chờ quyết định xung đột.');
   FbmSync.releasePushLock(state, entity, id);
   state.metadata.conflictCount = Number(state.metadata.conflictCount || 0) + 1;
   state.counts.conflict += 1; state.cursor = {}; state.current = ''; state.phase = 'conflict'; state.message = 'Đọc xác nhận khác dữ liệu vừa ghi; đã dừng để kiểm tra xung đột.'; FbmSync.stateWrite(state);

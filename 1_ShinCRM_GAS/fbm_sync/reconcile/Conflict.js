@@ -113,6 +113,11 @@ FbmSync.conflictView = function (read, remaining) {
 FbmSync.conflictOpened = function (rawResponse) {
   var state = FbmSync.stateRead(), read = FbmSync.conflictRefreshRead(state, 'open', rawResponse);
   if (read.failure) { return read.failure; }
+  // Hai bên đã khớp mọi trường thì không còn gì để người dùng chọn (gặp khi đọc xác nhận lệch nhưng bản đọc lại đã khớp); đóng luôn theo bản FBM thay vì để màn xung đột rỗng không lưu được.
+  if (!FbmSync.diff(read.entity, read.local, read.latest, read.gate).length) {
+    var settled = FbmSync.conflictSettle(state, read, FbmSync.preserveLocalFields(read.entity, read.local, read.latest), 'fbm', 'Xung đột ' + read.id + ' không còn trường lệch; đã tự đóng theo bản FBM.');
+    return Object.assign(settled, { conflict: null });
+  }
   state.metadata.conflictRefresh = { entity: read.entity, id: read.id, stage: 'review', openedHash: read.latestHash, choice: '' };
   state.message = 'Đang xem xung đột ' + read.id + '.';
   FbmSync.stateWrite(state);
@@ -161,6 +166,12 @@ FbmSync.confirmConflict = function (entity, id, choice, merged, rawResponse) {
       else if (pick.choice === 'manual') { record[localField] = pick.value === undefined || pick.value === null ? '' : pick.value; }
     });
   }
+  return FbmSync.conflictSettle(state, read, record, choice, 'Đã quyết conflict ' + entity + ' ' + read.id + ' theo ' + choice + '.');
+};
+
+/** Ghi quyết định xung đột với baseline là hash FBM vừa đọc lại; bước chốt và bước mở (khi không còn trường lệch) dùng chung. */
+FbmSync.conflictSettle = function (state, read, record, choice, message) {
+  var entity = read.entity;
   record.id = read.id;
   record.fbmId = read.local.fbmId;
   record.fbmHash = read.latestHash;
@@ -174,7 +185,7 @@ FbmSync.confirmConflict = function (entity, id, choice, merged, rawResponse) {
   delete state.metadata.pushFailures[entity + ':' + read.id];
   delete state.metadata.pushFailureDetails[entity + ':' + read.id];
   if (state.phase === 'conflict' && !remaining) { state.phase = 'done'; }
-  state.message = 'Đã quyết conflict ' + entity + ' ' + read.id + ' theo ' + choice + '.';
+  state.message = message;
   FbmSync.stateWrite(state);
   return { ok: true, entity: entity, id: read.id, choice: choice, syncStatus: record.syncStatus, remaining: remaining, status: FbmSync.statusView() };
 };

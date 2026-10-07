@@ -299,6 +299,21 @@ async function chay(so) {
   const cfEmpty = CF.openConflict();
   check(so, 'FBM-024: hàng đợi rỗng thì mở chế độ xung đột báo không còn xung đột, không phát request', [cfEmpty.empty, cfEmpty.request], [true, undefined]);
 
+  // FBM-053: đọc xác nhận lệch nhưng bản đọc lại đã khớp mọi trường thì không còn gì để người dùng chọn.
+  const sm = makeSync(), SM = sm.hop.FbmSync;
+  SM.masterEnabled = () => true;
+  const smState = SM.stateStart('', 'pull_customer', 0); smState.mode = 'read'; SM.readCategoryGate = () => cfGate; SM.stateWrite(smState);
+  SM.pullWrite('customer', [SM.customerRecord(fbmRow('F-1', 'ALT00001', 'Tên gốc 1'), {})]);
+  sm.local.customer[0].companyName = 'Tên Shin 1';
+  SM.pullWrite('customer', [SM.customerRecord(fbmRow('F-1', 'ALT00001', 'Tên FBM 1'), {})]);
+  const smDone = SM.stateStart('', 'checking_session', 0); smDone.phase = 'done'; SM.stateWrite(smDone);
+  SM.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+  const smOpen = SM.openConflict();
+  const smSame = SM.conflictOpened(gridResponse(smOpen.request.id, [fbmRow('F-1', 'ALT00001', 'Tên Shin 1')]));
+  check(so, 'FBM-053: đọc lại FBM thấy khớp ShinCRM mọi trường thì tự đóng xung đột (đã đồng bộ, baseline là hash FBM), không trả màn xung đột rỗng',
+    [smOpen.remaining, smSame.ok, smSame.conflict, sm.local.customer[0].syncStatus, sm.local.customer[0].fbmHash === SM.hash(SM.customerRecord(fbmRow('F-1', 'ALT00001', 'Tên Shin 1'), {}), 'customer', {}), smSame.remaining, SM.stateRead().metadata.conflictRefresh],
+    [1, true, null, 'đã đồng bộ', true, 0, null]);
+
   // FBM-033: bản ghi đầu hàng đợi không đọc được trên FBM thì rời hàng đợi, không chặn các xung đột phía sau.
   const un = makeSync(), UN = un.hop.FbmSync;
   UN.masterEnabled = () => true;
