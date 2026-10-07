@@ -25,6 +25,15 @@ var FBM_SYNC_RUN_SCHEMA = {
     confirmLabel: 'Đặt lại',
     cancelLabel: 'Quay lại'
   },
+  forceLogin: {
+    id: 'fbm-sync-force-login',
+    label: 'Hủy phiên cũ và đăng nhập',
+    confirmTitle: 'Hủy phiên cũ và đăng nhập FBM?',
+    confirmMessage: 'Nếu ai đó đang dùng FBM bằng tài khoản này ở máy khác, họ sẽ bị đăng xuất. Thường "phiên cũ" chỉ là phiên đã ngừng hoạt động mà FBM chưa nhả khóa đăng nhập.',
+    confirmLabel: 'Hủy phiên cũ',
+    cancelLabel: 'Quay lại',
+    failed: 'Không hủy được phiên cũ để đăng nhập.'
+  },
   awaitingMessage: 'Phiên có nhiều thay đổi; hãy xem kết quả rồi chấp thuận để tiếp tục.',
   phaseTitles: { done: 'Pipeline đã hoàn tất', error: 'Pipeline dừng vì lỗi', paused: 'Pipeline đã tạm dừng', running: 'Pipeline đang chạy' },
   pipeline: {

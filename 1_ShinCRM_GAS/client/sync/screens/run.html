@@ -34,8 +34,14 @@ function fbmSyncRunResetBlocks(status) {
   var schema = FBM_SYNC_RUN_SCHEMA.reset;
   return [Text({ text: String(status.message || status.lastError || '') }), Text({ className: FBM_SYNC_RUN_UI.classes.muted, text: schema.explain }), FBM_SYNC_RUN_UI.layout.actionRow(Button({ id: schema.id, label: schema.label, className: uiResolveActionClass('cancel', 'button'), disabled: !!FBM_SYNC_CLIENT.running }))];
 }
+/** Nút hủy phiên cũ chỉ hiện khi GAS mở qua `forceLoginOffered` (FBM vừa từ chối đăng nhập). */
+function fbmSyncRunForceLoginBlocks(status) {
+  if (!status || status.forceLoginOffered !== true) { return []; }
+  var schema = FBM_SYNC_RUN_SCHEMA.forceLogin;
+  return [FBM_SYNC_RUN_UI.layout.actionRow(Button({ id: schema.id, label: schema.label, className: uiResolveActionClass('cancel', 'button'), disabled: !!FBM_SYNC_CLIENT.running }))];
+}
 function fbmSyncRunDetailsBlocks(status) {
-  var reset = fbmSyncRunResetBlocks(status);
+  var reset = fbmSyncRunResetBlocks(status).concat(fbmSyncRunForceLoginBlocks(status));
   if (!fbmSyncRunHasSnapshot(status)) { return reset; }
   var awaiting = status.phase === 'awaiting_approval';
   return reset.concat(awaiting ? [Text({ className: FBM_SYNC_RUN_UI.classes.muted, text: FBM_SYNC_RUN_SCHEMA.awaitingMessage })] : []).concat([fbmSyncPipelineBlock(status, FBM_SYNC_RUN_SCHEMA.regions.pipeline), FBM_SYNC_RUN_UI.layout.liveStatus(FBM_SYNC_RUN_SCHEMA.regions.liveStatus, fbmSyncStatusBlocks(status, status.counts || {}))]);
