@@ -360,7 +360,7 @@ async function chay(so) {
   compactLookupFlow.hop.FbmSync.readCategoryGate = () => ({ map: compactLookupMap, names: compactLookupAllNames, namesBySource: compactLookupNames, valid: compactLookupValid, warnings: [] });
   compactLookupFlow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
   compactLookupFlow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-  compactLookupFlow.hop.FbmSync.start({ mode: 'read', origin: 'manual', scan: 'full' });
+  compactLookupFlow.hop.FbmSync.start({ mode: 'write', origin: 'manual', scan: 'full' });
   const compactContinue = (body) => {
     const requestId = compactLookupFlow.hop.FbmSync.stateRead().activeRequestId;
     return compactLookupFlow.hop.FbmSync.continue({ ok: true, status: 200, body: JSON.stringify(body), transport: { trace: [{ stage: 'executor_response_sent', requestId }] } });
@@ -396,7 +396,7 @@ async function chay(so) {
   const blockLookups = {};
   blockFlow.hop.FbmSync.SYNC_LOOKUPS.forEach((item) => { blockLookups[item.key] = { pairs: item.key === '@CAT_NGUON_KH' ? { HDDV: 'Hóa đơn đầu vào - đầu ra' } : { X: 'x' } }; });
   blockLookups['@CAT_CONG_VIEC'] = { pairs: {} };
-  blockFlow.hop.FbmSync.prepareCategoryGate({ metadata: {}, session: { lookups: blockLookups } });
+  blockFlow.hop.FbmSync.prepareCategoryGate({ mode: 'push', metadata: {}, session: { lookups: blockLookups } });
   const blockRows = blockLogs.filter((event) => event.action === 'category_block');
   check(so, 'mã danh mục bị chặn vào Sheet Log kèm tên FBM hiện tại; thiếu danh sách FBM là lỗi chặn cả chiều đẩy (tài liệu 09/03)',
     [blockRows.length, blockRows.map((event) => event.outcome).sort().join(','), blockRows.some((event) => event.recordId === 'HDDV' && /Hóa đơn đầu vào - đầu ra/.test(event.reason)), blockRows.some((event) => /@CAT_CONG_VIEC/.test(event.reason) && /toàn bộ chiều đẩy/.test(event.reason))],
@@ -769,14 +769,17 @@ async function chay(so) {
     ui.content.textContent.indexOf('Hoàn tất') >= 0
   ], [
     true, null, 'done', 2, 2, 3,
-     ['session_probe:user', 'authorize:customer', 'authorize:activity', 'completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH', 'completion:@CAT_CONG_VIEC', 'grid:customer', 'grid:activity', 'grid:activity'],
+     ['session_probe:user', 'authorize:customer', 'authorize:activity', 'grid:customer', 'grid:activity', 'grid:activity'],
     0, true, 4, true
   ]);
   const checkRun = await fullPipeline(false, 'check');
   check(so, 'nhóm 1.3: "Kiểm tra an toàn" nạp đủ 3 danh mục FBM trước khi đọc Customer', [checkRun.fullKinds.filter((kind) => kind.indexOf('completion:') === 0)], [['completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH', 'completion:@CAT_CONG_VIEC']]);
-  // Nhóm 1.3 (2A điểm 12) giả định chiều Lấy không dùng kết quả nạp danh mục; thực tế mã có tên FBM khác Category (categoryBlocks) bị chặn cả khi kéo về. Test này giữ hành vi hiện tại cho tới khi chủ dự án quyết (Câu hỏi đêm).
-  const renamedGate = { map: { '@CAT_CONG_VIECGọi điện': 'CV1' }, valid: { '@CAT_CONG_VIEC': { 'Gọi điện': true, CV1: true } }, blocked: { '@CAT_CONG_VIECCV1': 'Tên danh mục trên FBM khác Category: Gọi' } };
-  check(so, 'nhóm 1.3: chiều Lấy hiện có dùng kết quả nạp danh mục: giao dịch kéo về mang mã bị FBM đổi tên bị chặn', [checkRun.fullFlow.hop.FbmSync.validateIncomingCategories({ taskType: 'CV1' }, 'activity', renamedGate).map((item) => item.result.reason)], [['Tên danh mục trên FBM khác Category: Gọi']]);
+  // Nhóm 1.3 (2A điểm 12): chiều Lấy không nạp danh mục FBM nên không có mã bị chặn vì FBM đổi tên; phép kiểm từng bản ghi bằng Sheet Category vẫn chặn mã lạ.
+  const readCategoryState = fullFlow.hop.FbmSync.stateRead();
+  const unknownGate = { map: {}, valid: { '@CAT_CONG_VIEC': { 'Gọi điện': true, CV1: true } }, blocked: {} };
+  check(so, 'nhóm 1.3: lượt Lấy từ FBM → ShinCRM không phát request danh mục, không sinh mã danh mục bị chặn, mã lạ không có trong Category vẫn bị chặn theo từng bản ghi',
+    [fullKinds.filter((kind) => kind.indexOf('completion:') === 0).length, (readCategoryState.metadata.categoryBlocks || []).length, fullFlow.hop.FbmSync.validateIncomingCategories({ taskType: 'CV9' }, 'activity', unknownGate).length],
+    [0, 0, 1]);
   const traced = await fullPipeline(true), tracedActivityPropCalls = traced.fullActivityPropCalls;
   // Đợt 1 bước C: mỗi Sheet đọc một lần mỗi lần gọi; chỉ được đọc lại sau mỗi lần cửa ghi ghi đúng thực thể đó (bản chụp bị bỏ khi ghi).
   const sheetReadsWithinBudget = traced.fullActivitySheetReads.every((slice) => ['customer', 'activity', 'category'].every((key) => slice.reads[key] <= 1 + (slice.writes[key] || 0)));
@@ -813,9 +816,8 @@ async function chay(so) {
   check(so, 'phiên rỗng: Extension chỉ chuyển request đọc, không phát request ghi hoặc xóa và pipeline kết thúc', [
     readKinds, readKinds.length, readKinds.every((kind) => ['session_probe:user', 'authorize:customer', 'authorize:activity', 'completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH', 'completion:@CAT_CONG_VIEC', 'grid:customer'].indexOf(kind) >= 0), readStep.ok, readStep.request || null, readStep.status.phase, readFlow.hop.FbmSync.stateRead().counts.succeeded
   ], [[
-     'session_probe:user', 'authorize:customer', 'authorize:activity', 'completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH',
-    'completion:@CAT_CONG_VIEC', 'grid:customer'
-  ], 7, true, true, null, 'done', 0]);
+     'session_probe:user', 'authorize:customer', 'authorize:activity', 'grid:customer'
+  ], 4, true, true, null, 'done', 0]);
 
   const approval = workflowGas();
   approval.hop.FbmSync.runPreflight = () => ({ ok: true, issues: [], blocking: [], candidateCount: 11 });
