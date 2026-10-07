@@ -107,3 +107,19 @@ function fbmRequeueCreateCustomerConflict() {
   FbmSync.stateWrite(state);
   return fbmProbeCreateCustomer();
 }
+
+/** Dò FBM-044 trên DEV: ghi tạm state hỏng, đọc status như Sidebar, đặt lại, rồi trả nguyên state cũ. Không gửi request FBM. */
+function fbmProbeStuckState() {
+  var props = FbmSync.props(), original = props.getProperty(FbmSync.STATE_KEY), out = {};
+  try {
+    props.setProperty(FbmSync.STATE_KEY, '{"phase":"push"');
+    var stuck = fbmGetSyncStatus();
+    out.stuck = { code: stuck.code, resetOffered: stuck.resetOffered, phase: stuck.phase, message: stuck.message };
+    var reset = fbmResetSyncState();
+    out.reset = { ok: reset.ok !== false, phase: reset.phase, message: reset.message, stateAfter: props.getProperty(FbmSync.STATE_KEY) };
+  } finally {
+    if (original === null) { props.deleteProperty(FbmSync.STATE_KEY); } else { props.setProperty(FbmSync.STATE_KEY, original); }
+    out.restored = props.getProperty(FbmSync.STATE_KEY) === original;
+  }
+  return out;
+}
