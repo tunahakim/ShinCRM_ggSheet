@@ -59,8 +59,8 @@ DocumentProperties:
 Các điểm dưới đây thay cho câu tương ứng ở các mục sau; mục nào đã sửa theo đây thì ghi rõ.
 
 1. **Bắt tay phiên bản là việc đầu tiên của refactor.** GAS và Extension cài ở hai nơi (GAS trên Google, Extension trên máy chủ dự án), nên có thể lệch bản cài: push GAS mà chưa tải lại Extension, hoặc hai máy hai bản. Mỗi lượt quét GAS gửi mã phiên bản hợp đồng; Extension trả mã của nó; khác nhau thì GAS từ chối chạy, báo ở Sidebar và ghi Log "Extension trên máy này đang dùng bản cũ, hãy tải lại Extension", không ghi gì xuống Sheet. Mã phiên bản lấy từ nội dung tệp hợp đồng, test fail nếu sửa hợp đồng mà quên đổi mã. Áp cho mọi giao tiếp GAS–Extension, không riêng hash.
-2. **Hash: giai đoạn đầu GAS tự tính cả hai phía.** Extension chỉ lọc (bỏ bản ghi không thuộc khách của mình) và chiếu (bỏ cột không dùng), rồi chia gói gửi về. Lý do: Extension tính hFBM thì có hai bản code chuẩn hóa/hash, mà mục 11 đã bắt GAS tự tính hFBM khi đọc lại sau push; lệch một chi tiết (NFC/NFD tiếng Việt, khoảng trắng, định dạng ngày/số) là mọi bản ghi thành "đã đổi" hoặc "xung đột" mà không lỗi nào nổ. Ưu điểm của phương án cũ (gói về GAS nhỏ hơn 5–10 lần vì bản ghi không đổi chỉ gửi id + hash) là có thật nhưng chỉ đáng giá khi đo thấy GAS chậm hoặc gói quá nhiều.
-3. **Nếu đo thấy cần chuyển hash sang Extension:** một tệp JavaScript duy nhất chứa chuẩn hóa và hash, không gọi API riêng của Google hay Chrome; dùng y nguyên ở GAS và Extension, có test bắt hai bản giống từng byte; kèm bắt tay phiên bản (điểm 1) và mẫu thử chạy trước mỗi lượt bulk (mục 9.2).
+2. **Hash: giai đoạn đầu GAS tự tính cả hai phía.** Extension chỉ lọc (Customer: bỏ khách không thuộc ShinCRM; Activity bulk: giữ đúng các id giao dịch GAS gửi, vì tập bulk không có cột mã khách, xem 09/01) và chiếu (bỏ cột không dùng), rồi chia gói gửi về. Lý do: Extension tính hFBM thì có hai bản code chuẩn hóa/hash, mà mục 11 đã bắt GAS tự tính hFBM khi đọc lại sau push; lệch một chi tiết (NFC/NFD tiếng Việt, khoảng trắng, định dạng ngày/số) là mọi bản ghi thành "đã đổi" hoặc "xung đột" mà không lỗi nào nổ. Ưu điểm của phương án cũ (gói về GAS nhỏ hơn 5–10 lần vì bản ghi không đổi chỉ gửi id + hash) là có thật nhưng chỉ đáng giá khi đo thấy GAS chậm hoặc gói quá nhiều.
+3. **Phương án dự phòng: Extension so hash (ý chủ dự án, chưa làm).** GAS gửi Extension bảng id → hash ShinCRM hiện tại (hSHIN, khoảng 25 byte mỗi bản ghi); Extension tính hash FBM, chỉ gửi về bản ghi lệch, bản ghi mới và id không thấy; bản ghi không gửi về thì GAS hiểu là hai bên khớp và tự cập nhật hBASE. Lợi ích chỉ là bớt dữ liệu đi qua mạng và số lần gọi GAS, không phải bớt việc hash (GAS vẫn hash phía ShinCRM). Chưa làm vì số đo 2B.6 (gói GAS): GAS giải JSON và hash 20 MB, khoảng 50 nghìn bản ghi, dưới 0,7 giây, không vỡ bộ nhớ; ShinCRM chỉ có vài nghìn giao dịch nên Extension gửi về khoảng 1–2 MB, bớt được 1–2 lần gọi GAS mỗi lượt, không đáng để có hai bản code hash. Làm khi đo thấy số gói mỗi lượt quá nhiều. Khi làm: một tệp JavaScript duy nhất chứa chuẩn hóa và hash JavaScript duy nhất chứa chuẩn hóa và hash, không gọi API riêng của Google hay Chrome; dùng y nguyên ở GAS và Extension, có test bắt hai bản giống từng byte; kèm bắt tay phiên bản (điểm 1) và mẫu thử chạy trước mỗi lượt bulk (mục 9.2).
 4. **Không dựng DSL/trình thông dịch primitive tổng quát.** Extension có vài loại việc cố định, đặt tên rõ (quét Customer, quét Activity, sau này đăng nhập); GAS truyền tham số: danh sách trường lấy từ `SYNC_SCHEMA`, danh sách mã khách cần lọc, ngân sách gói. Danh sách trường vẫn chỉ định nghĩa một chỗ ở GAS.
 5. **Chỉ kết luận vắng mặt khi đã nhận đủ mọi gói của cùng một lượt quét.** GAS giữ dấu "lượt quét hoàn tất"; mất tab giữa chừng thì không đánh cờ vắng mặt.
 6. **Mất tab thì chạy lại cả lượt, không tiếp từ gói số N**, vì thứ tự bulk có thể khác giữa hai lần tải; dựa vào cửa ghi idempotent.
@@ -195,6 +195,18 @@ Extension và Sidebar cộng lại dưới 2% thời gian: thêm hay bớt việ
 | F | Chế độ thử tách hai danh sách: mã FBM (chiều lấy) và mã ShinCRM (chiều đẩy) | không tiết kiệm thời gian; chặn lỗi im lặng (mục 2A điểm 10) |
 
 Phải làm A trước B: nếu gom 50 khách mà mỗi lần gọi vẫn đọc/ghi state 83 lần thì lợi ích của B mất đi khi state phình theo gói.
+
+**Gói lớn trong một lần gọi GAS** (`fbmProbePayloadBudget`, 2026-10-07; bản ghi nhân bản từ 140 Activity thật của Sheet DEV, khoảng 420 B mỗi bản ghi, không gọi FBM). Chỉ đo phần GAS xử lý; thời gian truyền gói lớn từ Sidebar lên GAS chưa đo.
+
+| Gói | Bản ghi | Giải JSON | Hash và dựng bảng id → hash |
+|---|---|---|---|
+| 0,5 MB | 1.256 | 4 ms | 19 ms |
+| 1 MB | 2.508 | 6 ms | 29 ms |
+| 5 MB | 12.513 | 33 ms | 172 ms |
+| 10 MB | 25.000 | 72 ms | 367 ms |
+| 20 MB | 49.972 | 127 ms | 556 ms |
+
+Kết luận: bộ nhớ và việc hash ở GAS không phải điểm nghẽn ở mọi quy mô thấy trước; điểm nghẽn là số lần gọi GAS và số lần đọc/ghi DocumentProperties. Giới hạn 9 KB là của mỗi ô DocumentProperties (state lưu giữa các lần gọi), không liên quan kích thước gói; gói chỉ sống trong RAM của một lần gọi và không bao giờ cất vào DocumentProperties (mục 16.4).
 
 ## 3. Ranh giới GAS – Extension – Sidebar
 
@@ -446,7 +458,7 @@ FBM → Extension:
   bulk lớn
 
 Extension:
-  lọc theo mã khách, chiếu cột
+  giữ đúng các id giao dịch GAS gửi (ShinCRM đã biết), chiếu cột
 
 Extension → GAS:
   bản ghi đã chiếu theo chunk; GAS hash và phân loại changed, missing, fbmOnly
@@ -865,10 +877,10 @@ Số liệu làm căn cứ ở mục 2B.6. Mỗi đợt kết thúc bằng đo l
 
 **Đợt 4: phân tải Extension giai đoạn 2, Customer và Activity bằng một request (mục 6, 7, 9).** Thiết kế riêng, trình duyệt trước khi code; làm tiếp sau đợt 3 khi chủ dự án bảo.
 11. Customer: Extension gọi FBM một request lấy toàn bộ, lọc và chiếu các trường GAS yêu cầu (nguồn: `SYNC_SCHEMA`), chia chunk về GAS theo ngân sách (mục tiêu 512 KiB, trần cứng 768 KiB, đo trên JSON đã serialize, chính sách chunk định nghĩa một chỗ); GAS tính hash, phân loại, ghi từng chunk qua cửa ghi, chỉ tăng cursor sau khi ghi và state thành công (mục 14).
-12. Activity bulk: Extension gọi FBM một lần (hoặc theo cửa sổ ngày khi bulk vượt ngân sách), lọc theo mã khách GAS gửi, chiếu cột, chia chunk; GAS hash và đối soát (changed, missing, fbmOnly). Thay khoảng một request mỗi khách bằng một request; chính sách chọn `bulk` hay `windowed` do một module duy nhất sở hữu.
+12. Activity bulk: Extension gọi FBM một lần (hoặc theo cửa sổ ngày khi bulk vượt ngân sách), giữ đúng các id giao dịch ShinCRM đã biết do GAS gửi (bulk không có cột mã khách; giao dịch mới do lớp 2, lớp 3 bắt), chiếu cột, chia chunk; GAS hash và đối soát (changed, missing, fbmOnly). Thay khoảng một request mỗi khách bằng một request; chính sách chọn `bulk` hay `windowed` do một module duy nhất sở hữu.
 13. Luật vắng mặt chỉ kết luận khi đã nhận đủ mọi gói của cùng một lượt quét; mất tab thì chạy lại cả lượt; test mất tab, mất response, gói trùng (2A điểm 5–6).
 14. Không dựng DSL/trình thông dịch tổng quát (2A điểm 4): Extension có vài loại việc cố định, đặt tên rõ; GAS truyền tham số. Dọn parser, trường và test của DSL cũ (`jsonPaths`, `arrayFilters`, `arrayProjections`) khi không còn contract nào dùng.
-15. Chỉ khi số đo cho thấy cần: chuyển hash sang Extension bằng một tệp dùng chung cho GAS và Extension, có test vector chung (2A điểm 3).
+15. Chỉ khi số đo cho thấy số gói quá nhiều: phương án dự phòng Extension so hash (2A điểm 3) bằng một tệp dùng chung cho GAS và Extension, có test vector chung (2A điểm 3).
 
 **Đợt 5: dọn.**
 16. State V2 gọn (mục 15), đóng các lỗi mục 15A (FBM-005, 013, 016, 030, 031), bỏ nốt dữ liệu thừa trong state.
