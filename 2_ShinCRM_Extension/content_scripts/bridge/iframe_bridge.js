@@ -52,6 +52,8 @@ function isReadPlan(value) {
 function acceptReadPlan(data) {
   if (!isReadPlan(data.readPlan)) { return; }
   if (data.spreadsheetId && typeof readSpreadsheetId === 'function' && String(data.spreadsheetId) !== String(readSpreadsheetId())) { return; }
+  // Sidebar gửi kèm read plan ở mọi nhịp bắt tay; chỉ plan mới mới cần đọc lại ô, nếu không Extension bắn lại context mỗi giây.
+  if (JSON.stringify(data.readPlan) === JSON.stringify(CRM_READ_PLAN)) { return; }
   CRM_READ_PLAN = data.readPlan;
   if (typeof lastContextKey !== 'undefined') { lastContextKey = ''; }
 }
