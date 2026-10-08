@@ -211,7 +211,14 @@ async function chay(so) {
   check(so, 'cursor chỉ giữ stt_rec_kh, mã khách cha của giao dịch tra từ chỉ mục Sheet Customer, khách chưa có trên Sheet thì để trống', [maCha.A2, maCha.A1 || ''], ['ALT02', '']);
   builders.FbmSync.readLocal = docKhachCu;
   const rotationRows = Array.from({ length: builders.FbmSync.ACTIVITY_SUPPLEMENT_CUSTOMERS }, (_, i) => ({ stt_rec_kh: 'R' + i, ngay_gd: '2026-10-0' + (i % 9 + 1), datetime0: 'T' + i, xorder: i, ten_kh: 'Ten dai '.repeat(20) }));
-  check(so, 'vong xoay chi giu vi tri trang ke tiep, khong giu cac dong Customer; trang thieu thi quay ve dau', [builders.FbmSync.activityRotationNext(rotationRows), builders.FbmSync.activityRotationNext(rotationRows.slice(1))], [{ pageIndex: 1, pageValue: ['2026-10-03', 'T29', 29, 'R29'] }, { pageIndex: -1, pageValue: null }]);
+  check(so, 'vong xoay chi giu vi tri trang ke tiep, khong giu cac dong Customer; trang thieu thi quay ve dau', [builders.FbmSync.activityRotationNext(rotationRows), builders.FbmSync.activityRotationNext(rotationRows.slice(1))], [{ pageIndex: 1, pageValue: ['2026-10-03', 'T29', 29, 'R29'], pageItems: { firstPageItem: 'R0', lastPageItem: '29R29', lastRowCount: 0 } }, { pageIndex: -1, pageValue: null, pageItems: null }]);
+  // Chuỗi mong đợi lấy từ request chuyển trang do giao diện FBM gửi (bắt 2026-10-08). Dòng thứ hai mang ngày FBM thật trả cho A000080085 (18:00 UTC ngày 27): giao diện ghi 20260928, tức phải tính theo giờ Việt Nam.
+  const customerFields = builders.FbmSync.GRID_FIELDS.customer, dongFbm = builders.FbmSync.rowsToRecords('customer', JSON.stringify({ d: { TotalRowCount: 1312, ViewPage: { Fields: customerFields.map((AliasName) => ({ AliasName })) }, Rows: [
+    customerFields.map((field) => ({ stt_rec_kh: 'A000079388', ngay_gd: '/Date(1787101200000)/', datetime0: '/Date(1787156031523)/', xorder: '000000000345' })[field] || ''),
+    customerFields.map((field) => ({ stt_rec_kh: 'A000080085', ngay_gd: '/Date(1790532000000)/', datetime0: '/Date(1790298817497)/', xorder: '000000000311' })[field] || '')
+  ] } }));
+  check(so, 'mô tả trang đang đứng gửi FBM khớp đúng chuỗi giao diện FBM gửi khi chuyển trang Customer', builders.FbmSync.customerPageItems(dongFbm.rows, dongFbm.total),
+    { firstPageItem: '2026081920260819000000000345A000079388', lastPageItem: '2026092820260925000000000311A000080085', lastRowCount: 1312 });
   // Lượt dừng sớm (phân trang Customer hỏng) mà vẫn đánh vắng mặt thì mọi khách chưa quét tới bị đánh "không thấy bên FBM" (gặp thật: 1.262/1.312 khách).
   const marked = [];
   const savedMark = builders.FbmSync.markMissingAfterFullScan;
