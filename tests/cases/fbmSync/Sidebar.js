@@ -55,6 +55,8 @@ function taoBoTest() {
     'client/sync/screens/settings.html', 'client/sync/fbmSyncSettingsScreen.html',
     'client/sync/fbmSyncStatusScreen.html', 'client/sync/fbmSyncAuditScreen.html', 'client/sync/fbmSyncShell.html', 'client/ui/popupList.html', 'client/sync/fbmSync.html');
   hop.FBM_SYNC_CLIENT.active = true;
+  // Giữ bản thật của hai cửa chờ vì nhiều test bên dưới thay chúng bằng hàm giả.
+  hop.banThat = { extensionRequest: hop.fbmSyncExtensionRequest, continueServer: hop.fbmSyncContinueServer };
   return { hop, dom, screen: dom.root, content };
 }
 
@@ -536,6 +538,19 @@ async function chay(so) {
     [lastErrorPaint.phase, lastErrorPaint.message, lastErrorPaint.runId, lastErrorPaint.counts, lastErrorPaint.pipeline && lastErrorPaint.pipeline.steps.length],
     ['error', 'Mất kết nối tới GAS', 'run-017', gasSnapshot.counts, 1]);
   hop.fbmSyncExtensionRequest = savedExtensionRequest; hop.callServer = savedCallServer;
+  const hanCho = [], savedSetTimeout = hop.setTimeout, savedRunning = hop.FBM_SYNC_CLIENT.running;
+  hop.setTimeout = (fn, ms) => { hanCho.push(ms); return 0; };
+  hop.callServer = () => new Promise(() => {});
+  hop.FBM_SYNC_CLIENT.running = true;
+  const savedTop = hop.window.top;
+  hop.window.top = { postMessage: () => {} };
+  hop.SHEET_LINK_NONCE = hop.SHEET_LINK_NONCE || 'nonce-test'; hop.FBM_SYNC_RELAY_SESSION = hop.FBM_SYNC_RELAY_SESSION || 'phien-test';
+  hop.banThat.extensionRequest({ id: 'lo-1', meta: { kind: 'batch', extensionReplyMs: 47000, gasReplyMs: 390000, trace: { requestId: 'lo-1' } } }).catch((error) => hanCho.push(error.message));
+  hop.banThat.continueServer({ request: { meta: { gasReplyMs: 390000 } }, status: {} }, { id: 'lo-1' });
+  hop.window.top = savedTop;
+  hop.setTimeout = savedSetTimeout; hop.callServer = savedCallServer; hop.FBM_SYNC_CLIENT.running = savedRunning;
+  delete hop.FBM_SYNC_CLIENT.waiting['lo-1'];
+  check(so, 'Sidebar chờ Extension và chờ GAS đúng hạn GAS ghi trong envelope, không theo con số riêng của Sidebar', hanCho.filter((ms) => ms !== hop.FBM_SYNC_GAS_CONTINUE_WARN_MS), [47000, 390000]);
   hop.fbmSyncPaint = () => {};
   hop.FBM_SYNC_CLIENT.cancelRequested = true;
   const stoppingAction = hop.fbmSyncRunActionBlock({ phase: 'pull_customer', masterEnabled: true, enabled: true });

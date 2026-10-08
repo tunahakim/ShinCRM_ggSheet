@@ -223,7 +223,7 @@ async function chay(so) {
   check(so, 'relay config luu Spreadsheet ID', workerSource.indexOf('fbmSpreadsheetId: spreadsheetId') >= 0, true);
   check(so, 'relay config luu nhịp gas_poll va tuy chon startup', workerSource.indexOf('fbmPollMinutes') >= 0 && workerSource.indexOf('fbmRunOnStartup') >= 0 && workerSource.indexOf('config.extension') >= 0, true);
   check(so, 'service worker co quyen goi Sheets va Web App GAS', manifest.host_permissions.includes('https://docs.google.com/*') && manifest.host_permissions.includes('https://script.google.com/macros/*') && manifest.host_permissions.includes('https://script.googleusercontent.com/macros/*'), true);
-  check(so, 'manifest Extension dong bo cung phien ban phat hanh moi', [manifest.version, manifest.name], ['21.19', 'CRM Local Pro V21.19']);
+  check(so, 'manifest Extension dong bo cung phien ban phat hanh moi', [manifest.version, manifest.name], ['21.20', 'CRM Local Pro V21.20']);
   check(so, 'relay GAS co timeout va luu chan doan toi thieu', workerSource.indexOf('GAS_RELAY_TIMEOUT_MS') >= 0 && workerSource.indexOf('RELAY_TIMEOUT') >= 0 && workerSource.indexOf('fbmRelayLastStatus') >= 0, true);
   const sidebarSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'client', 'Sidebar.html'), 'utf8');
   const entryPointsSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'transport', 'EntryPoints.js'), 'utf8');
@@ -253,8 +253,8 @@ async function chay(so) {
   check(so, 'man dong bo hien thi ma va nguyen nhan preflight', syncStatusSource.indexOf('preflightIssues') >= 0 && syncStatusSource.indexOf('item.code') >= 0 && syncStatusSource.indexOf('item.message') >= 0, true);
   check(so, 'man dong bo hien thi chi tiet loi day kem HTTP', syncStatusSource.indexOf('pushFailureDetails') >= 0 && syncStatusSource.indexOf('detail.reason') >= 0 && syncStatusSource.indexOf('detail.status') >= 0, true);
   check(so, 'Sidebar chi chuyen nguyen response FBM', syncSource.indexOf('fbmSyncProjectFormResponse') < 0 && syncSource.indexOf('InternalValues') < 0 && syncSource.indexOf('function fbmSyncRelayResponse(response) { return response; }') >= 0, true);
-  check(so, 'Sidebar khong cat callback GAS som va giu cursor khi timeout', syncSource.indexOf('FBM_SYNC_GAS_CONTINUE_TIMEOUT_MS = 120000') >= 0 && syncSource.indexOf("code = 'GAS_CALLBACK_TIMEOUT'") >= 0 && syncSource.indexOf('Promise.race([callback, timeout])') >= 0 && syncSource.indexOf("error.code !== 'GAS_CALLBACK_TIMEOUT'") >= 0, true);
-  check(so, 'Sidebar: fbmContinueSync tat han 30 giay cua callServer de race 120 giay so huu han cho', syncSource.indexOf("callServer('fbmContinueSync', [response, FBM_SYNC_CLIENT.traceEvents.slice()], { timeoutMs: 0 })") >= 0, true);
+  check(so, 'Sidebar khong cat callback GAS som va giu cursor khi timeout', syncSource.indexOf("code = 'GAS_CALLBACK_TIMEOUT'") >= 0 && syncSource.indexOf('Promise.race([callback, timeout])') >= 0 && syncSource.indexOf("error.code !== 'GAS_CALLBACK_TIMEOUT'") >= 0, true);
+  check(so, 'Sidebar: fbmContinueSync tat han 30 giay cua callServer de race gasReplyMs so huu han cho', syncSource.indexOf("callServer('fbmContinueSync', [response, FBM_SYNC_CLIENT.traceEvents.slice()], { timeoutMs: 0 })") >= 0, true);
   (function () {
     const { catRuotScript } = require('../lib/load-gas');
     const file = path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'client', 'util', 'serverCall.html');
@@ -298,7 +298,7 @@ async function chay(so) {
   check(so, 'heartbeat coi GAS noop hop le la thanh cong va khong tim tab FBM', workerSource.indexOf("noteHeartbeatStatus('gas_noop'") >= 0 && workerSource.indexOf('if (!gasRequest.request)') >= 0, true);
   check(so, 'background relay dung DTO gon, khong gui traceTail/metadata Sidebar', workerSource.indexOf("kind: 'background_sync'") >= 0 && entryPointsSource.indexOf('fbmSyncRelayCompactResult') >= 0 && entryPointsSource.indexOf("body.kind === 'background_sync'") >= 0, true);
   check(so, 'background relay chi tiep tuc command GAS da cap tu heartbeat', workerSource.indexOf("command: 'start'") < 0 && workerSource.indexOf("command: 'continue'") >= 0 && entryPointsSource.indexOf('FbmSync.controlDispatch') >= 0, true);
-  check(so, 'executor co ping phien ban 21.19 va kenh execute moi', /EXECUTOR_VERSION\s*=\s*'21\.19'/.test(executorSource) && workerSource.indexOf("FBM_EXECUTOR_VERSION = '21.19'") >= 0 && executorSource.indexOf('FBM_PING_V2') >= 0 && executorSource.indexOf('FBM_EXECUTE_V2') >= 0, true);
+  check(so, 'executor co ping phien ban 21.20 va kenh execute moi', /EXECUTOR_VERSION\s*=\s*'21\.20'/.test(executorSource) && workerSource.indexOf("FBM_EXECUTOR_VERSION = '21.20'") >= 0 && executorSource.indexOf('FBM_PING_V2') >= 0 && executorSource.indexOf('FBM_EXECUTE_V2') >= 0, true);
   check(so, 'GAS la noi duy nhat kiem tra endpoint FBM', executorSource.indexOf('validateEndpoint(req.url)') < 0 && executorSource.indexOf('FBM_ENDPOINT_UNALLOWED') < 0, true);
   check(so, 'GAS chan endpoint thieu truoc cap envelope', fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'protocol', 'Protocol.js'), 'utf8').indexOf('validateEndpoint: function') >= 0 && fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'transport', 'TransportCore.js'), 'utf8').indexOf('validateEndpoint(item.url)') >= 0, true);
   check(so, 'GAS tu dung envelope heartbeat va relay co cong cap request', entryPointsSource.indexOf("body.kind === 'heartbeat_request'") >= 0 && fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'state', 'Scheduler.js'), 'utf8').indexOf('function fbmSyncHeartbeatRequest') >= 0 && fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'read', 'GridRead.js'), 'utf8').indexOf('FbmSync.heartbeatCustomerRequest') >= 0, true);
@@ -341,10 +341,10 @@ async function chay(so) {
   workerContext.clearTimeout = () => {};
   workerContext.setTimeout = (fn, ms) => { const timer = { fn, ms: Number(ms) }; waitTimers.push(timer); return timer; };
   workerContext.chrome.tabs.sendMessage = (tabId, message, done) => {
-    if (message.type === 'FBM_PING_V2') { done({ ready: true, version: '21.19' }); return; }
+    if (message.type === 'FBM_PING_V2') { done({ ready: true, version: '21.20' }); return; }
     if (message.type === 'FBM_EXECUTE_V2') { executeSentAt = virtualNow; done({ result: { ok: true, status: 200, body: '{}', transport: { trace: [] } } }); }
   };
-  const delayedSend = workerContext.sendToFbmTab(77, { id: 'delay-proof', url: 'https://fbo.com.vn:8888/service', method: 'POST', bodyText: '{}', meta: { waitMs: 1200 } });
+  const delayedSend = workerContext.sendToFbmTab(77, { id: 'delay-proof', url: 'https://fbo.com.vn:8888/service', method: 'POST', bodyText: '{}', meta: { waitMs: 1200, timeoutMs: 30000 } });
   await new Promise((resolve) => setImmediate(resolve));
   check(so, 'Extension chờ đủ waitMs trước khi gửi request FBM', [executeSentAt, waitTimers.some((timer) => timer.ms === 1200)], [0, true]);
   const delayTimer = waitTimers.find((timer) => timer.ms === 1200);
@@ -352,6 +352,26 @@ async function chay(so) {
   delayTimer.fn();
   await delayedSend;
   check(so, 'Extension chỉ gửi sau khi đồng hồ vượt đủ khoảng delay', executeSentAt, 2200);
+  const sentItems = [];
+  workerContext.chrome.tabs.sendMessage = (tabId, message, done) => {
+    if (message.type === 'FBM_PING_V2') { done({ ready: true, version: '21.20' }); return; }
+    if (message.type !== 'FBM_EXECUTE_V2') { return; }
+    sentItems.push(message.request);
+    if (message.request.id === 'loi-mang') { done({ error: 'Failed to fetch', code: 'FBM_TRANSPORT_UNAVAILABLE', trace: [{ stage: 'fetch_finished', requestId: 'lo-env' }] }); return; }
+    done({ result: { ok: true, status: 200, headers: { contentType: 'application/json' }, body: message.request.id === '1' ? 'x'.repeat(30) : 'ab', transport: { trace: [{ stage: 'fetch_finished', requestId: 'lo-env' }], captures: { payloadCookie: 'cookie-' + message.request.id } } } });
+  };
+  const loTransport = { captures: [], replacements: [] };
+  const loEnvelope = (ids, meta) => ({ protocol: 'shincrm-fbm', id: 'lo-env', meta: Object.assign({ kind: 'batch', timeoutMs: 30000, fetchMs: 10000, transport: loTransport }, meta), items: ids.map((id) => ({ id, url: 'https://fbo.com.vn:8888/service', bodyText: '{}', meta: { kind: 'activity_grid' } })) });
+  const loDung = await workerContext.sendToFbmTab(77, loEnvelope(['0', '1', '2'], { batch: { maxBytes: 20 } }));
+  check(so, 'Extension chạy lô lần lượt, mỗi phần tử mang transport và hạn fetch của lô, dừng ngay sau phần tử làm tổng thân vượt maxBytes, trả đúng thứ tự kèm mã hợp đồng', [
+    loDung.result.items.map((item) => item.id + ':' + item.body.length), sentItems.map((item) => item.id), sentItems[0].meta.transport === loTransport, sentItems[0].meta.fetchMs, loDung.result.transport.contract === workerContext.FBM_CONTRACT_VERSION, loDung.result.transport.captures.payloadCookie, loDung.result.transport.trace.length
+  ], [['0:2', '1:30'], ['0', '1'], true, 10000, true, 'cookie-1', 2]);
+  sentItems.length = 0;
+  const loMang = await workerContext.sendToFbmTab(77, loEnvelope(['0', 'loi-mang', '2'], {}));
+  check(so, 'một phần tử lỗi mạng thì Extension bỏ cả lô, trả lỗi transport như request đơn và không chạy phần tử sau', [loMang.result, loMang.code, sentItems.map((item) => item.id)], [undefined, 'FBM_TRANSPORT_UNAVAILABLE', ['0', 'loi-mang']]);
+  sentItems.length = 0;
+  const loHetHan = await workerContext.sendToFbmTab(77, loEnvelope(['0'], { timeoutMs: 0 }));
+  check(so, 'envelope hết hạn (hoặc GAS không cấp hạn) thì Extension báo lỗi transport hết hạn ngay, không gửi FBM', [loHetHan.code, sentItems.length], ['FBM_TRANSPORT_TIMEOUT', 0]);
   const localRelay = await workerContext.configureRelay({ url: 'https://script.google.com/macros/s/relay-test/exec', key: 'relay-key', spreadsheetId: 'sheet-test' });
   const unchangedRelay = await workerContext.configureRelay({ url: 'https://script.google.com/macros/s/relay-test/exec', key: 'relay-key', spreadsheetId: 'sheet-test' });
   const changedRelay = await workerContext.configureRelay({ url: 'https://script.google.com/macros/s/relay-test/exec', key: 'relay-key', spreadsheetId: 'sheet-test', extension: { pollMinutes: 6, runOnStartup: true } });

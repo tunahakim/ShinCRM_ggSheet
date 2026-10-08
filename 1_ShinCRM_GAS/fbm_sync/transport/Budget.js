@@ -34,6 +34,9 @@ FbmSync.budgetTimeoutMs = function (request) {
 /** Hạn GAS thu hồi request đang bay: Extension hết hạn, cộng đường về Sidebar và đường lên GAS. */
 FbmSync.budgetDeadlineAt = function (issuedAt, timeoutMs) { return Number(issuedAt) + Number(timeoutMs) + FbmSync.BUDGET.bridgeMs + FbmSync.BUDGET.gasTransitMs; };
 
+/** Sidebar chờ Extension trả envelope bấy nhiêu: hạn của Extension cộng đường postMessage qua cửa sổ Sheets. */
+FbmSync.budgetExtensionReplyMs = function (timeoutMs) { return Number(timeoutMs) + FbmSync.BUDGET.bridgeMs; };
+
 /** Bên gửi response lên GAS (Sidebar, relay nền) chờ bấy nhiêu: GAS không chạy quá trần nền tảng. */
 FbmSync.budgetGasReplyMs = function () { return FbmSync.BUDGET.gasHardMs + FbmSync.BUDGET.gasTransitMs; };
 

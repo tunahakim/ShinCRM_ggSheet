@@ -585,10 +585,10 @@ async function chay(so) {
   const truocCap = Date.now();
   const loEnvelope = waitFlow.hop.FbmSync.nextEnvelope({ items: ['STT1', 'STT2'].map((stt) => waitFlow.hop.FbmSync.activityGridRequest(stt, { type: 0, count: 100, gridPageIndex: -1, gridRefresh: false })), meta: { kind: 'batch', entity: 'activity' } });
   const loState = waitFlow.hop.FbmSync.stateRead(), B = waitFlow.hop.FbmSync.BUDGET;
-  check(so, 'GAS cấp envelope lô: hai phần tử, hạn Extension theo ngân sách, maxBytes, hạn Sidebar chờ GAS, deadlineAt thu hồi cộng đường về và đường lên', [
-    loEnvelope.items.length, loEnvelope.url, loEnvelope.meta.kind, loEnvelope.meta.timeoutMs, loEnvelope.meta.batch.maxBytes, loEnvelope.meta.gasReplyMs, loState.activeRequestId === loEnvelope.id,
+  check(so, 'GAS cấp envelope lô: hai phần tử, hạn Extension theo ngân sách, maxBytes, hạn Sidebar chờ GAS và chờ Extension, deadlineAt thu hồi cộng đường về và đường lên', [
+    loEnvelope.items.length, loEnvelope.url, loEnvelope.meta.kind, loEnvelope.meta.timeoutMs, loEnvelope.meta.batch.maxBytes, loEnvelope.meta.gasReplyMs, loEnvelope.meta.extensionReplyMs, loState.activeRequestId === loEnvelope.id,
     loState.deadlineAt >= truocCap + loEnvelope.meta.timeoutMs + B.bridgeMs + B.gasTransitMs && loState.deadlineAt <= Date.now() + loEnvelope.meta.timeoutMs + B.bridgeMs + B.gasTransitMs
-  ], [2, undefined, 'batch', B.tabReadyMs + 2 * B.fetchMs, B.batchMaxBytes, B.gasHardMs + B.gasTransitMs, true, true]);
+  ], [2, undefined, 'batch', B.tabReadyMs + 2 * B.fetchMs, B.batchMaxBytes, B.gasHardMs + B.gasTransitMs, B.tabReadyMs + 2 * B.fetchMs + B.bridgeMs, true, true]);
 
   const deadlineLogs = [];
   const deadlineFlow = workflowGas({ logEvent: (event) => deadlineLogs.push(event), LOG_ERROR: 'error' });
@@ -640,7 +640,7 @@ async function chay(so) {
   ], ['HEARTBEAT_NOOP', ['heartbeat_request'], 0, 0]);
 
   const noTabWorker = workerHarness([
-    { ok: true, request: { id: 'reserved-heartbeat', url: 'https://fbo.com.vn:8888/service', method: 'POST', bodyText: '{}' } },
+    { ok: true, request: { id: 'reserved-heartbeat', url: 'https://fbo.com.vn:8888/service', method: 'POST', bodyText: '{}', meta: { timeoutMs: 30000 } } },
     { ok: true, code: 'TRANSPORT_RECORDED', request: null }
   ], []);
   const noTabResult = await noTabWorker.context.fbmHeartbeatNow('workflow');
@@ -649,10 +649,10 @@ async function chay(so) {
   ], ['FBM_TAB_NOT_FOUND', [['heartbeat_request', '', ''], ['heartbeat_transport_failure', 'reserved-heartbeat', 'FBM_TAB_NOT_FOUND']], 0]);
 
   const autoOpenWorker = workerHarness([
-    { ok: true, request: { id: 'open-heartbeat', url: 'https://fbo.com.vn:8888/service', method: 'POST', bodyText: '{}', meta: { openFbmContext: { url: 'https://fbo.com.vn:8888/Main/zccrAccount.aspx', active: false } } } },
+    { ok: true, request: { id: 'open-heartbeat', url: 'https://fbo.com.vn:8888/service', method: 'POST', bodyText: '{}', meta: { timeoutMs: 30000, openFbmContext: { url: 'https://fbo.com.vn:8888/Main/zccrAccount.aspx', active: false } } } },
     { ok: true, code: 'HEARTBEAT_COMPLETE', request: null }
   ], [], (tabId, message) => {
-    if (message.type === 'FBM_PING_V2') { return { ready: true, version: '21.19' }; }
+    if (message.type === 'FBM_PING_V2') { return { ready: true, version: '21.20' }; }
     if (message.type === 'FBM_EXECUTE_V2') { return { result: { ok: true, status: 200, body: '{"d":{"TotalRowCount":12,"Rows":[]}}', transport: { trace: [{ stage: 'executor_response_sent', requestId: message.request.id }] } } }; }
     return null;
   });
@@ -661,10 +661,10 @@ async function chay(so) {
 
   const rawHeartbeat = '{"d":{"TotalRowCount":12,"Rows":[]}}';
   const completeWorker = workerHarness([
-    { ok: true, request: { id: 'heartbeat-envelope', url: 'https://fbo.com.vn:8888/service', method: 'POST', bodyText: '{"from":"gas"}' } },
+    { ok: true, request: { id: 'heartbeat-envelope', url: 'https://fbo.com.vn:8888/service', method: 'POST', bodyText: '{"from":"gas"}', meta: { timeoutMs: 30000, gasReplyMs: 390000 } } },
     { ok: true, code: 'HEARTBEAT_COMPLETE', request: null }
   ], [{ id: 17 }], (tabId, message) => {
-    if (message.type === 'FBM_PING_V2') { return { ready: true, version: '21.19' }; }
+    if (message.type === 'FBM_PING_V2') { return { ready: true, version: '21.20' }; }
     if (message.type === 'FBM_EXECUTE_V2') {
       return { result: { ok: true, status: 200, body: rawHeartbeat, transport: { trace: [{ stage: 'executor_response_sent', requestId: message.request.id }] } } };
     }

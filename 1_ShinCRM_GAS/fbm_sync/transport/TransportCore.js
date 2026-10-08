@@ -461,6 +461,7 @@ FbmSync.nextEnvelope = function (request) {
   }
   meta.timeoutMs = FbmSync.budgetTimeoutMs(request);
   meta.fetchMs = FbmSync.BUDGET.fetchMs;
+  meta.extensionReplyMs = FbmSync.budgetExtensionReplyMs(meta.timeoutMs);
   meta.gasReplyMs = FbmSync.budgetGasReplyMs();
   if (request.items) { meta.batch = { maxBytes: FbmSync.BUDGET.batchMaxBytes }; }
   if (FbmSync.stateWrite) {

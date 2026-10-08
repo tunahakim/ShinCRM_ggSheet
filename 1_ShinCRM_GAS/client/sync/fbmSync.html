@@ -1,11 +1,9 @@
 <script>
 /* Sidebar chỉ hiển thị tiến độ; GAS là nguồn state duy nhất. */
 var FBM_SYNC_CLIENT = { installed: false, active: false, waiting: {}, relayWaiters: {}, credentialWaiters: {}, credentialMetadataWaiters: {}, credentialClearWaiters: {}, running: false, cancelRequested: false, statusReady: false, mode: 'read', openedAt: 0, returnScreen: 'view', returnUi: null, relayConfigured: false, relayOpenId: 0, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0, conflict: null, traceEvents: [], subscreen: 'run', navOpen: false, resultsTab: 'summary', resultPages: {}, lastStatus: null, identityStatus: null, identityAction: '', identityLastAction: '', identityProbeSignature: '', identityInvalid: {}, identityDraft: { spreadsheetId: '', userId: '', username: '', accountName: '' }, accountSettingsDraft: {}, accountSettingsInvalid: {}, loginStatus: null, loginDraft: { username: '' }, loginPasswordMode: 'saved', loginPasswordFocused: false, loginPasswordTimer: null, pendingLoginEnvelope: null, configEdits: {}, accountNotices: { identity: null, accountSettings: null, login: null }, settingsNotices: { module: null, relay: null, extension: null, background: null, login: null }, syncSettings: null };
-/** Timeout cho một request Extension để phiên không treo vô hạn khi tab FBM/bridge mất kết nối. */
-var FBM_SYNC_REQUEST_TIMEOUT_MS = 20000;
 var FBM_SYNC_GAS_CONTINUE_WARN_MS = 5000;
-// Sau moc nay khong tiep tuc hien loading vo han; tu ket luan timeout, khong tu gui lai request ghi.
-var FBM_SYNC_GAS_CONTINUE_TIMEOUT_MS = 120000;
+/** Hạn chờ Extension và hạn chờ GAS do GAS cấp trong `meta` của envelope (ngân sách một lượt); Sidebar không giữ con số riêng nên không cắt sớm một lô dài. Envelope thiếu hạn thì hết hạn ngay và báo lỗi, không treo. */
+function fbmSyncBudgetMs(request, key) { return Math.max(0, Number(request && request.meta && request.meta[key] || 0)); }
 
 function fbmSyncClientTrace(stage, request, extra) {
   var meta = request && request.meta && request.meta.trace || {}, event = Object.assign({ at: Date.now(), stage: stage, runId: String(meta.runId || ''), requestId: String(meta.requestId || ''), operation: String(request && request.meta && request.meta.kind || ''), entity: String(request && request.meta && request.meta.entity || ''), recordId: String(request && request.meta && (request.meta.id || request.meta.shinId || request.meta.stt_rec_kh) || '') }, extra || {});
@@ -687,7 +685,7 @@ function fbmSyncExtensionRequest(request) {
     setTimeout(function () {
       if (!FBM_SYNC_CLIENT.waiting[id]) { return; }
       delete FBM_SYNC_CLIENT.waiting[id];
-      var error = new Error('Không nhận được phản hồi từ tab FBM sau 20 giây. Hãy kiểm tra tab FBM và Extension.');
+      var error = new Error('Không nhận được phản hồi từ tab FBM sau ' + Math.round(fbmSyncBudgetMs(request, 'extensionReplyMs') / 1000) + ' giây. Hãy kiểm tra tab FBM và Extension.');
       fbmSyncReportTransportFailure(request, error, 'FBM_TRANSPORT_TIMEOUT').then(function (reported) {
         if (reported && reported.request) {
           fbmSyncExtensionRequest(reported.request).then(resolve, reject);
@@ -695,7 +693,7 @@ function fbmSyncExtensionRequest(request) {
         }
         reject(error);
       });
-    }, FBM_SYNC_REQUEST_TIMEOUT_MS);
+    }, fbmSyncBudgetMs(request, 'extensionReplyMs'));
   });
 }
 /** Sidebar chỉ chuyển lỗi transport cùng reservation; GAS quyết định trạng thái/cursor. */
@@ -1470,11 +1468,11 @@ function fbmSyncContinueServer(status, response) {
     fbmSyncPaint(fbmSyncWaitingStatus(status, 'GAS đang xử lý phản hồi quá 5 giây. Có thể bấm Dừng đồng bộ; hệ sẽ không tự gửi lại lệnh ghi.'));
   }, FBM_SYNC_GAS_CONTINUE_WARN_MS);
   fbmSyncClientTrace('client_gas_call_started', status && status.request);
-  // Hạn chờ của bước này do race FBM_SYNC_GAS_CONTINUE_TIMEOUT_MS bên dưới sở hữu; hạn mặc định 30 giây của callServer sẽ cắt trước và hủy phiên đang chạy đúng.
+  // Hạn chờ của bước này do race gasReplyMs bên dưới sở hữu; hạn mặc định 30 giây của callServer sẽ cắt trước và hủy phiên đang chạy đúng.
   var callback = callServer('fbmContinueSync', [response, FBM_SYNC_CLIENT.traceEvents.slice()], { timeoutMs: 0 });
   // Race chi dung de hien chan doan; callback goc van duoc giu nguyen va khong bi gui lai.
   callback.catch(function () {});
-  var timeoutId;
+  var timeoutId, gasReplyMs = fbmSyncBudgetMs(status && status.request, 'gasReplyMs');
   var timeout = new Promise(function (resolve) {
     timeoutId = setTimeout(function () {
       if (!FBM_SYNC_CLIENT.running && !FBM_SYNC_CLIENT.cancelRequested) { resolve({ cancelled: true, status: status }); return; }
@@ -1488,7 +1486,7 @@ function fbmSyncContinueServer(status, response) {
         var trace = (matching.length ? matching : traceRows).slice(-1)[0] || (fallback.metadata && fallback.metadata.callbackTrace) || {};
         var diagnostic = Object.assign({}, fallback, { traceRequestId: requestId, traceStage: String(trace.stage || 'unknown') });
         var cursor = diagnostic.cursor || {};
-        var message = 'GAS_CALLBACK_TIMEOUT: GAS không trả kết quả sau 120 giây; cursor vẫn được giữ và hệ không tự gửi lại lệnh ghi.'
+        var message = 'GAS_CALLBACK_TIMEOUT: GAS không trả kết quả sau ' + Math.round(gasReplyMs / 1000) + ' giây; cursor vẫn được giữ và hệ không tự gửi lại lệnh ghi.'
           + ' Bước cuối: ' + String(trace.stage || 'unknown')
           + '; requestId=' + requestId
           + '; phase=' + String(diagnostic.phase || trace.phase || '')
@@ -1497,7 +1495,7 @@ function fbmSyncContinueServer(status, response) {
           + '; record=' + String(diagnostic.current || trace.current || '') + '.';
         resolve({ diagnosticTimeout: true, message: message, status: diagnostic });
       });
-    }, FBM_SYNC_GAS_CONTINUE_TIMEOUT_MS);
+    }, gasReplyMs);
   });
   return Promise.race([callback, timeout]).then(function (result) {
     clearTimeout(timer);
