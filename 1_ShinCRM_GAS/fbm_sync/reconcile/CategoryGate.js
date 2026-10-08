@@ -121,6 +121,32 @@ FbmSync.lookupPairs = function (response) {
   return out;
 };
 
+/** Ba danh mục FBM đi chung một lô: một lần gọi GAS thay cho ba (Tài liệu 09/01 "Lô request đọc độc lập"). */
+FbmSync.lookupBatchRequest = function () {
+  return { items: FbmSync.SYNC_LOOKUPS.map(function (lookup) { return FbmSync.completionRequest(lookup.controller, lookup.key); }), meta: { kind: 'batch', entity: 'category' } };
+};
+
+/**
+ * Nhận lô danh mục vào `state.session.lookups`; chỉ giữ mã Category đang dùng vì Rows đầy đủ có thể vượt trần một khóa state.
+ * Phần tử thiếu, lạ hoặc lỗi để danh mục đó trống nên `validateLookupGate` chặn cả chiều đẩy. Trả `false` khi có phần tử nghi phiên: caller đi đường probe, cursor giữ nguyên để dựng lại đúng lô.
+ */
+FbmSync.lookupBatchApply = function (state, rawResponse) {
+  var byId = {}, expectedBySource = FbmSync.readCategoryGate().namesBySource || {}, suspected = false;
+  (rawResponse && Array.isArray(rawResponse.items) ? rawResponse.items : []).forEach(function (item) { byId[String(item && item.id)] = item; });
+  state.session.lookups = {};
+  FbmSync.SYNC_LOOKUPS.forEach(function (lookup, position) {
+    var item = byId[String(position)], check = item ? FbmSync.protocol.assertSuccess(item) : { ok: false, code: 'FBM_BATCH_ITEM_MISSING' };
+    if (!check.ok) { suspected = suspected || check.code === 'SESSION_SUSPECTED'; state.session.lookups[lookup.key] = { error: String(check.code || 'FBM_ERROR') }; return; }
+    var pairs = FbmSync.lookupPairs(item), expected = expectedBySource[lookup.key] || {}, compact = {};
+    Object.keys(expected).forEach(function (code) { if (Object.prototype.hasOwnProperty.call(pairs, code)) { compact[code] = pairs[code]; } });
+    if (!Object.keys(expected).length && Object.keys(pairs).length) { compact.__FBM_LOOKUP_PRESENT__ = ''; }
+    state.session.lookups[lookup.key] = { pairs: compact };
+  });
+  state.metadata = state.metadata || {};
+  state.metadata.categoryCheck = { at: Date.now(), pushed: 0 };
+  return !suspected;
+};
+
 /**
  * Lượt có cần nạp danh mục FBM (`SYNC_LOOKUPS`) không. Chiều Lấy từ FBM → ShinCRM không nạp (2A điểm 12, chủ dự án chốt 2026-10-07): bản ghi kéo về vẫn kiểm theo từng bản ghi bằng Sheet Category; chỉ bỏ phép kiểm "FBM đã đổi tên danh mục", phép này còn ở chiều đẩy và "Kiểm tra an toàn".
  * Mỗi danh mục là một lần gọi GAS (khoảng 5 giây, đo 2026-10-07), nên bỏ nạp tiết kiệm khoảng 15 giây đầu mỗi lượt Lấy.
@@ -132,7 +158,7 @@ FbmSync.validateLookupGate = function (state, categoryGate) {
   var blocked = [], session = state && state.session && state.session.lookups || {};
   (FbmSync.SYNC_LOOKUPS || []).forEach(function (lookup) {
     var fbm = session[lookup.key], pairs = FbmSync.lookupPairs(fbm);
-    if (!Object.keys(pairs).length) { blocked.push({ source: lookup.key, reason: 'Không lấy được danh mục FBM.' }); return; }
+    if (!Object.keys(pairs).length) { blocked.push({ source: lookup.key, reason: 'Không lấy được danh mục FBM' + (fbm && fbm.error ? ' (' + fbm.error + ')' : '') + '.' }); return; }
     if (!categoryGate || !categoryGate.namesBySource) { return; }
     var expected = categoryGate.namesBySource[lookup.key] || {};
     Object.keys(expected).forEach(function (code) {

@@ -3,7 +3,7 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 /** Đọc companion và lookup một lần trước chiều đẩy; mismatch chỉ chặn push. */
 FbmSync.prepareCategoryGate = function (state) {
-  var gate = { map: {}, names: {}, valid: {}, warnings: [] }, blocks = [];
+  var gate = { map: {}, names: {}, valid: {}, warnings: [] }, blocks = [], logged = {};
   try {
     gate = FbmSync.readCategoryGate();
     blocks = FbmSync.needsFbmLookups(state) ? FbmSync.validateLookupGate(state, gate) : [];
@@ -11,11 +11,29 @@ FbmSync.prepareCategoryGate = function (state) {
     blocks = [{ source: 'Category', reason: 'Không đọc được bảng Category: ' + String(err && err.message || err) }];
   }
   state.metadata = state.metadata || {};
+  // Chiều đẩy kiểm lại danh mục giữa các lô: chỉ Log khối chặn mới để Log không lặp cùng một mã mỗi lô.
+  (state.metadata.categoryBlocks || []).forEach(function (block) { logged[FbmSync.categoryBlockKey(block)] = true; });
   state.metadata.categoryBlocks = blocks;
   FbmSync.stateCategoryGate(state, gate);
-  FbmSync.logCategoryBlocks(blocks);
+  FbmSync.logCategoryBlocks(blocks.filter(function (block) { return !logged[FbmSync.categoryBlockKey(block)]; }));
   if (state.session) { state.session.lookups = {}; }
   return blocks;
+};
+FbmSync.categoryBlockKey = function (block) { return [block.source, block.code || '', block.reason].join(''); };
+
+/** FBM có thể đổi danh mục giữa lượt: kiểm lại trước mỗi `pushBatchRecords` bản ghi đẩy hoặc khi lần đọc trước quá `lookupMaxAgeMs`. */
+FbmSync.pushLookupDue = function (state, now) {
+  var check = state.metadata && state.metadata.categoryCheck;
+  if (!check) { return true; }
+  return Number(check.pushed || 0) >= FbmSync.BUDGET.pushBatchRecords || Number(now || Date.now()) - Number(check.at || 0) >= FbmSync.BUDGET.lookupMaxAgeMs;
+};
+/** Đối chiếu lại Category bằng lô vừa đọc rồi quay về đúng dòng Sheet đang chờ đẩy; không lấy được danh mục thì `nextPushRequest` dừng `paused`. */
+FbmSync.continuePushLookup = function (state, cursor) {
+  FbmSync.prepareCategoryGate(state);
+  state.cursor = { kind: 'push_scan', entity: cursor.entity, index: Number(cursor.index || 0) };
+  FbmSync.stateWrite(state);
+  var next = FbmSync.nextPushRequest(state);
+  return { ok: true, request: next ? FbmSync.nextEnvelope(next) : null, status: FbmSync.statusView() };
 };
 /** Tài liệu 09/03: mã danh mục bị chặn phải vào Log kèm tên FBM hiện tại, không chỉ nằm trong state; thiếu danh sách FBM thì chặn cả chiều đẩy nên là lỗi. */
 FbmSync.logCategoryBlocks = function (blocks) {
@@ -335,6 +353,11 @@ FbmSync.nextPushRequest = function (state) {
       FbmSync.markPushError(state, candidate, { code: 'PUSH_CREATE_UNCONFIRMED', reason: 'Customer đang đẩy từ lần trước nhưng không còn Mã số thuế để tra trên FBM; không tự tạo lại. Kiểm tra trên FBM rồi bấm Mở lại bản ghi lỗi nếu cần tạo lại.' }, 'customer_create_recover');
       state.cursor.index = index + 1; FbmSync.stateWrite(state); continue;
     }
+    if (FbmSync.pushLookupDue(state)) {
+      state.cursor = { kind: 'push_lookup', entity: entity, index: index };
+      state.message = 'Đang kiểm lại danh mục FBM trước khi đẩy tiếp...'; FbmSync.stateWrite(state);
+      return FbmSync.lookupBatchRequest();
+    }
     var categoryErrors = FbmSync.validatePushCategories(candidate.record, entity, FbmSync.stateCategoryGate(state));
     if (categoryErrors.length) {
       FbmSync.markPushSkipped(state, candidate, FbmSync.SYNC_STATUS.unknownCategory, 'Bỏ qua ' + entity + ' ' + candidate.id + ': ' + categoryErrors[0].result.reason);
@@ -354,6 +377,7 @@ FbmSync.nextPushRequest = function (state) {
       request = candidate.kind === 'create' ? FbmSync.activityCreateRequest(candidate.record, FbmSync.stateCategoryGate(state)) : FbmSync.activityEditOpenRequest(candidate.record.fbmId);
     }
     FbmSync.lockRecordIn(state, entity, candidate.id, candidate.record.fbmHash || '', 'sync');
+    if (state.metadata.categoryCheck) { state.metadata.categoryCheck.pushed = Number(state.metadata.categoryCheck.pushed || 0) + 1; }
     state.phase = 'push'; state.entity = entity; state.current = candidate.id; state.cursor = { kind: 'push_wait', operation: request.meta.kind, entity: entity, index: index, candidate: typeof FbmSync.pushCandidateForState === 'function' ? FbmSync.pushCandidateForState(candidate) : candidate };
     state.message = 'Đang đẩy ' + (entity === 'customer' ? 'khách hàng' : 'giao dịch') + ' ' + candidate.id + '...'; FbmSync.stateWrite(state);
     // `09/04` bước 1: state chốt cursor trước, rồi ghi `đang đẩy`, rồi mới phát lệnh; ghi Sheet không được thì sheetSave ném lỗi và lệnh ghi FBM không được phát (FBM-002).

@@ -164,10 +164,10 @@ FbmSync.authContinue = function (entity, response) {
     FbmSync.stateWrite(state);
     return pullRequest;
   }
-  state.cursor = { kind: 'lookup', index: 0 };
+  state.cursor = { kind: 'lookup' };
   state.message = 'Đang kiểm tra danh mục FBM...';
   FbmSync.stateWrite(state);
-  return FbmSync.completionRequest(FbmSync.SYNC_LOOKUPS[0].controller, FbmSync.SYNC_LOOKUPS[0].key);
+  return FbmSync.lookupBatchRequest();
 };
 
 /** Tạo request trang Customer tiếp theo từ khóa cuối trang trước. */
@@ -591,18 +591,13 @@ FbmSync.continue = function (rawResponse) {
     FbmSync.stateWrite(state);
     return { ok: true, status: FbmSync.statusView() };
   }
-  // Write mode phải nạp danh mục trước khi dựng payload ghi.
-  if (cursor.kind === 'lookup') {
-    var lookup = FbmSync.SYNC_LOOKUPS[Number(cursor.index || 0)], lookupPairs = FbmSync.lookupPairs(response), categorySnapshot = typeof FbmSync.readCategoryGate === 'function' ? FbmSync.readCategoryGate() : { namesBySource: {} }, expectedCodes = categorySnapshot.namesBySource && categorySnapshot.namesBySource[lookup.key] || {}, compactLookup = {};
-    // Chỉ giữ các mã Category đang dùng; Rows đầy đủ có thể vượt trần một DocumentProperty.
-    Object.keys(expectedCodes).forEach(function (code) { if (Object.prototype.hasOwnProperty.call(lookupPairs, code)) { compactLookup[code] = lookupPairs[code]; } });
-    if (!Object.keys(expectedCodes).length && Object.keys(lookupPairs).length) { compactLookup.__FBM_LOOKUP_PRESENT__ = ''; }
-    state.session.lookups[lookup.key] = { pairs: compactLookup };
-    var lookupIndex = Number(cursor.index || 0) + 1;
-    if (lookupIndex < FbmSync.SYNC_LOOKUPS.length) {
-      state.cursor.index = lookupIndex; FbmSync.stateWrite(state);
-      return { ok: true, request: FbmSync.nextEnvelope(FbmSync.completionRequest(FbmSync.SYNC_LOOKUPS[lookupIndex].controller, FbmSync.SYNC_LOOKUPS[lookupIndex].key)), status: FbmSync.statusView() };
+  // Chế độ ghi phải nạp danh mục trước khi dựng payload ghi; chiều đẩy nạp lại giữa các lô (`push_lookup`).
+  if (cursor.kind === 'lookup' || cursor.kind === 'push_lookup') {
+    if (!FbmSync.lookupBatchApply(state, rawResponse)) {
+      var lookupProbe = FbmSync.sessionGateProbeRequest(state, cursor, 'Phản hồi FBM đáng ngờ khi đọc danh mục; chưa đối chiếu gì, đang probe lại phiên.');
+      return lookupProbe ? { ok: true, request: lookupProbe, status: FbmSync.statusView(), probing: true } : { ok: false, code: 'SESSION_PROBE_UNAVAILABLE', request: null, status: FbmSync.statusView(), error: state.lastError };
     }
+    if (cursor.kind === 'push_lookup') { return FbmSync.continuePushLookup(state, cursor); }
     if (state.mode === 'write' || state.mode === 'push') {
       // Category is user-owned configuration; sync only reads and validates it.
       state.message = 'Đã đọc danh mục FBM; đang đối chiếu Category...';
