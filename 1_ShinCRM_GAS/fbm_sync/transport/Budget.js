@@ -15,6 +15,8 @@ FbmSync.BUDGET = {
   // Đăng nhập là chuỗi fetch nối tiếp trong executor (trang gốc, salt, đơn vị, Login, trang tài khoản) rồi mở lại trang làm việc.
   loginFetches: 6,
   activityBatchCustomers: 50,
+  // Giao dịch của một khách đọc trong một trang: chuyển trang giao dịch cần mô tả trang đang đứng mà chưa có mẫu FBM để kiểm, nên khách chạm trần được báo lỗi thay vì đọc thiếu âm thầm.
+  activityCustomerRows: 1000,
   batchMaxBytes: 4 * 1024 * 1024,
   pushBatchRecords: 20,
   lookupMaxAgeMs: 300000,

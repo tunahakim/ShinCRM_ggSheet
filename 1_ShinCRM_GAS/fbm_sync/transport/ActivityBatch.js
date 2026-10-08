@@ -112,11 +112,9 @@ FbmSync.activityBatchContinue = function (state, cursor, rawResponse) {
     var grid = FbmSync.rowsToRecords('activity', FbmSync.protocol.parse(entry.item), state.metadata.activityFields);
     state.metadata.activityFields = grid.fields;
     grid.rows.forEach(function (row) { if (!FbmSync.isTemporaryRecord('activity', row)) { records.push(FbmSync.activityRecord(row, gate, parent)); } });
-    if (grid.rows.length > 0 && grid.rows.length >= Number(cursor.count || 100)) {
-      var last = grid.rows[grid.rows.length - 1], pageIndex = pages[entry.index] ? pages[entry.index][0] : -1;
-      finished -= 1;
-      nextPlan.push(entry.index);
-      nextPages[entry.index] = [FbmSync.gridNextPageIndex(pageIndex), FbmSync.gridPageValue([last.end_date || '', last.datetime0 || '', last.id || '', last.line_nbr || 0])];
+    // Trang đầy nghĩa là có thể còn giao dịch chưa đọc: báo lỗi khách để lượt này không đánh dấu "không thấy bên FBM" nhầm.
+    if (grid.rows.length >= Number(cursor.count || FbmSync.BUDGET.activityCustomerRows)) {
+      failed.push({ customer: parent.maKh || sttRec, code: 'FBM_ACTIVITY_PAGE_LIMIT', status: 0, reason: 'Khách có từ ' + grid.rows.length + ' giao dịch trở lên, vượt trần một lần đọc; đã ghi phần đã đọc, phần còn lại chưa đọc và giao dịch của khách không bị đánh dấu không thấy bên FBM.' });
     }
   }); } catch (shapeError) {
     if (shapeError && shapeError.code === 'FBM_GRID_SHAPE_CHANGED') { return { result: FbmSync.activityBatchMismatch(state, shapeError.message, shapeError.code) }; }

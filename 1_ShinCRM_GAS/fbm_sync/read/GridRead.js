@@ -50,7 +50,7 @@ FbmSync.gridRequest = function (entity, options) {
     type: Number(opt.type === undefined ? 0 : opt.type), count: Number(opt.count || (entity === 'customer' ? 2000 : 100)), language: 'v', controller: controller,
     // FBM biết chiều chuyển trang nhờ so `gridPageIndex` với `lastPageIndex` (trang đang đứng); ShinCRM chỉ đi tới nên trang đang đứng luôn là trang kế trừ 1.
     viewId: null, childObject: false, lastPageIndex: opt.lastPageIndex !== undefined ? opt.lastPageIndex : (Number(opt.gridPageIndex) > 0 ? Number(opt.gridPageIndex) - 1 : -1),
-    firstPageItem: opt.firstPageItem || '', lastPageItem: opt.lastPageItem || '', lastRowCount: Number(opt.lastRowCount || 0), memvars: [],
+    firstPageItem: opt.pageItems && opt.pageItems.firstPageItem || '', lastPageItem: opt.pageItems && opt.pageItems.lastPageItem || '', lastRowCount: Number(opt.pageItems && opt.pageItems.lastRowCount || 0), memvars: [],
     externalKey: opt.externalKey || [], gridPageIndex: opt.gridPageIndex === undefined ? -1 : opt.gridPageIndex,
     gridPageValue: opt.gridPageValue === undefined ? null : opt.gridPageValue, gridRefresh: !!opt.gridRefresh, filter: opt.filter || [],
     sortExpression: opt.sortExpression || (entity === 'customer' ? 'ngay_gd desc' : 'end_date desc, datetime0 desc, id, line_nbr'),
@@ -243,7 +243,7 @@ FbmSync.activityRotationCursor = function () {
   if (!raw) { return { pageIndex: -1, pageValue: null }; }
   try {
     var parsed = JSON.parse(raw);
-    return { pageIndex: parsed.pageIndex === undefined || parsed.pageIndex === null ? -1 : Number(parsed.pageIndex), pageValue: parsed.pageValue || null };
+    return { pageIndex: parsed.pageIndex === undefined || parsed.pageIndex === null ? -1 : Number(parsed.pageIndex), pageValue: parsed.pageValue || null, pageItems: parsed.pageItems || null };
   } catch (ignore) { return { pageIndex: -1, pageValue: null }; }
 };
 
@@ -251,7 +251,7 @@ FbmSync.activityRotationCursor = function () {
 FbmSync.activityRotationCustomerRequest = function () {
   var cursor = FbmSync.activityRotationCursor(), request = FbmSync.customerGridRequest({
     type: cursor.pageIndex < 0 ? 0 : 1, count: FbmSync.ACTIVITY_SUPPLEMENT_CUSTOMERS, gridPageIndex: cursor.pageIndex,
-    gridPageValue: cursor.pageValue, gridRefresh: false
+    gridPageValue: cursor.pageValue, pageItems: cursor.pageItems, gridRefresh: false
   });
   request.meta.kind = 'activity_rotation_customer_grid';
   return request;
@@ -286,22 +286,43 @@ FbmSync.gridNextPageIndex = function (pageIndex) {
 };
 
 /** Vị trí trang xoay tiếp theo tính từ trang vừa đọc; hết danh sách thì quay lại trang đầu. Tính ngay khi nhận trang để cursor chỉ mang vị trí này, không mang cả các dòng Customer. */
-FbmSync.activityRotationNext = function (rows) {
+FbmSync.activityRotationNext = function (rows, total) {
   var list = rows || [];
-  if (list.length < FbmSync.ACTIVITY_SUPPLEMENT_CUSTOMERS) { return { pageIndex: -1, pageValue: null }; }
-  var last = list[list.length - 1], pageIndex = FbmSync.activityRotationCursor().pageIndex;
-  return { pageIndex: FbmSync.gridNextPageIndex(pageIndex), pageValue: FbmSync.customerPageValue(last) };
+  if (list.length < FbmSync.ACTIVITY_SUPPLEMENT_CUSTOMERS) { return { pageIndex: -1, pageValue: null, pageItems: null }; }
+  var last = list[list.length - 1], cursor = FbmSync.activityRotationCursor();
+  return { pageIndex: FbmSync.gridNextPageIndex(cursor.pageIndex), pageValue: FbmSync.customerPageValue(last), pageItems: FbmSync.customerPageItems(list, total || cursor.pageItems && cursor.pageItems.lastRowCount) };
 };
 
 /** Lưu vị trí trang xoay do `activityRotationNext` tính. */
 FbmSync.activityRotationSave = function (next) {
-  FbmSync.props().setProperty('FBM_SYNC_ACTIVITY_ROTATION', JSON.stringify({ pageIndex: next.pageIndex, pageValue: next.pageValue }));
+  FbmSync.props().setProperty('FBM_SYNC_ACTIVITY_ROTATION', JSON.stringify({ pageIndex: next.pageIndex, pageValue: next.pageValue, pageItems: next.pageItems || null }));
 };
 /**
  * Trang đầu không kèm tiêu đề: FBM dùng `type: 1` với `gridPageIndex: -2` (mẫu bắt từ giao diện FBM trong RequestFBM).
  * Tiêu đề nặng khoảng 22,5 KB mỗi lần trong khi dữ liệu một khách chỉ vài KB, nên mỗi lượt chỉ lấy tiêu đề một lần (09/01 Kiến trúc và giao thức).
  */
 FbmSync.GRID_FIRST_PAGE_NO_HEADER = -2;
+/** FBM đặt máy chủ theo giờ Việt Nam (không đổi giờ theo mùa); ngày trong `firstPageItem`/`lastPageItem` là ngày theo giờ này. */
+FbmSync.FBM_SERVER_UTC_OFFSET_MS = 7 * 3600000;
+/** Ngày `yyyyMMdd` theo giờ máy chủ FBM từ Date hoặc chuỗi `/Date(ms)/`; giá trị khác trả chuỗi rỗng để FBM trả trang rỗng và lượt quét báo thiếu, không đoán ngày. */
+FbmSync.fbmDayKey = function (value) {
+  if (value === null || value === undefined || value === '') { return ''; }
+  var ms = Object.prototype.toString.call(value) === '[object Date]' ? value.getTime() : Number((String(value).match(/^\/Date\((-?\d+)/) || [])[1]);
+  return isFinite(ms) ? new Date(ms + FbmSync.FBM_SERVER_UTC_OFFSET_MS).toISOString().slice(0, 10).replace(/-/g, '') : '';
+};
+/**
+ * FBM chỉ trả trang Customer kế khi request mô tả trang đang đứng: dòng đầu, dòng cuối (ngày giao dịch + ngày tạo dạng `yyyyMMdd`, `xorder`, `stt_rec_kh`) và tổng số dòng; thiếu thì FBM trả trang rỗng.
+ * Kiểm trên FBM thật 2026-10-08 bằng request bắt từ giao diện FBM.
+ */
+FbmSync.customerPageItems = function (rows, total) {
+  var list = rows || [], item = function (row) { var value = row || {}; return FbmSync.fbmDayKey(value.ngay_gd) + FbmSync.fbmDayKey(value.datetime0) + String(value.xorder || '') + String(value.stt_rec_kh || ''); };
+  return { firstPageItem: item(list[0]), lastPageItem: item(list[list.length - 1]), lastRowCount: Number(total || 0) };
+};
+/** Đọc lại mô tả trang đang đứng từ body request đã dựng, để cursor mang theo khi dựng lại request. */
+FbmSync.gridPageItemsOf = function (body) {
+  var value = body || {};
+  return { firstPageItem: String(value.firstPageItem || ''), lastPageItem: String(value.lastPageItem || ''), lastRowCount: Number(value.lastRowCount || 0) };
+};
 /** Lấy AliasName metadata; fallback tên field để tránh hardcode schema. */
 FbmSync.gridFields = function (response) {
   var parsed = FbmSync.protocol.parse(response) || {};

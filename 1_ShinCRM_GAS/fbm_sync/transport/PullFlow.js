@@ -183,7 +183,8 @@ FbmSync.customerNext = function (state, rows, total) {
       var detailLast = rows[rows.length - 1];
       FbmSync.detailCursorWrite({
         pageIndex: FbmSync.gridNextPageIndex(cursor.pageIndex),
-        pageValue: FbmSync.customerPageValue(detailLast)
+        pageValue: FbmSync.customerPageValue(detailLast),
+        pageItems: FbmSync.customerPageItems(rows, total || cursor.pageItems && cursor.pageItems.lastRowCount)
       });
     }
     return null;
@@ -191,13 +192,14 @@ FbmSync.customerNext = function (state, rows, total) {
   if (!rows.length || rows.length < count || (total && Number(cursor.seen || 0) + rows.length >= total)) { return null; }
   var last = rows[rows.length - 1];
   cursor.pageIndex = FbmSync.gridNextPageIndex(cursor.pageIndex);
+  cursor.pageItems = FbmSync.customerPageItems(rows, total || cursor.pageItems && cursor.pageItems.lastRowCount);
   cursor.pageValue = state.scan === 'identity_check'
     ? FbmSync.gridPageValue([last.stt_rec_kh || ''])
     : FbmSync.customerPageValue(last);
   cursor.seen = Number(cursor.seen || 0) + rows.length;
   state.cursor = cursor;
   FbmSync.stateWrite(state);
-  return (state.scan === 'identity_check' ? FbmSync.identityCheckCustomerRequest : FbmSync.customerGridRequest)({ type: 1, count: count, gridPageIndex: cursor.pageIndex, gridPageValue: cursor.pageValue, gridRefresh: false });
+  return (state.scan === 'identity_check' ? FbmSync.identityCheckCustomerRequest : FbmSync.customerGridRequest)({ type: 1, count: count, gridPageIndex: cursor.pageIndex, gridPageValue: cursor.pageValue, pageItems: cursor.pageItems, gridRefresh: false });
 };
 
 /** Đếm khách đã nhận trong lượt quét; tổng lấy ở trang đầu vì FBM chỉ đếm `TotalRowCount` ở trang đầu, trang sau trả 0 (Nghiên cứu FBM ch03 mục 3.3). */
@@ -254,7 +256,7 @@ FbmSync.activityForCustomers = function (state, customerContexts, customerNext, 
     FbmSync.businessStepStart(state, 'pull_activity', { mode: state.mode, scan: state.scan, entity: 'activity' });
     FbmSync.businessStepStart(state, 'reconcile_activity', { mode: state.mode, scan: state.scan, entity: 'activity' });
   }
-  state.cursor = { kind: 'activity_grid', customers: contexts.map(function (item) { return item.sttRec; }), customerIndex: 0, batch: [], count: 100, customerNext: customerNext ? { pageIndex: customerNext.body.gridPageIndex, pageValue: customerNext.body.gridPageValue, count: customerNext.body.count } : null, customerSeen: Number(customerSeen || 0), afterActivity: afterActivity || null };
+  state.cursor = { kind: 'activity_grid', customers: contexts.map(function (item) { return item.sttRec; }), customerIndex: 0, batch: [], count: FbmSync.BUDGET.activityCustomerRows, customerNext: customerNext ? { pageIndex: customerNext.body.gridPageIndex, pageValue: customerNext.body.gridPageValue, pageItems: FbmSync.gridPageItemsOf(customerNext.body), count: customerNext.body.count } : null, customerSeen: Number(customerSeen || 0), afterActivity: afterActivity || null };
   state.message = 'Đang đọc giao dịch của khách hàng...';
   FbmSync.activityBatchPlan(state.cursor);
   FbmSync.activityPagesWrite(state, {});
@@ -307,7 +309,7 @@ FbmSync.beginCustomerPull = function (state) {
   var detailCursor = state.scan === 'detail' && typeof FbmSync.detailCursorRead === 'function' ? FbmSync.detailCursorRead() : null;
   var detailPageIndex = detailCursor ? Number(detailCursor.pageIndex || 0) : -1;
   var detailPageValue = detailCursor && Array.isArray(detailCursor.pageValue) ? detailCursor.pageValue : null;
-  state.cursor = { kind: 'customer_grid', type: detailPageIndex >= 0 ? 1 : 0, pageIndex: detailPageIndex, pageValue: detailPageValue, count: customerCount };
+  state.cursor = { kind: 'customer_grid', type: detailPageIndex >= 0 ? 1 : 0, pageIndex: detailPageIndex, pageValue: detailPageValue, pageItems: detailCursor && detailCursor.pageItems || null, count: customerCount };
   state.phase = 'pull_customer'; state.entity = 'customer'; state.message = 'Đang đọc khách hàng từ FBM...';
   FbmSync.stateWrite(state);
   return FbmSync.customerGridRequest({ type: 0, count: customerCount, gridPageIndex: -1, gridRefresh: false });
@@ -620,9 +622,9 @@ FbmSync.continue = function (rawResponse) {
       FbmSync.progressCustomersDone(state, customerGrid.rows.length);
       var identityNext = FbmSync.customerNext(state, customerGrid.rows, customerGrid.total);
       if (identityNext) {
-        state.cursor = { kind: 'customer_grid', type: 1, pageIndex: identityNext.body.gridPageIndex, pageValue: identityNext.body.gridPageValue, count: identityNext.body.count, seen: Number(state.cursor.seen || 0) };
+        state.cursor = { kind: 'customer_grid', type: 1, pageIndex: identityNext.body.gridPageIndex, pageValue: identityNext.body.gridPageValue, pageItems: FbmSync.gridPageItemsOf(identityNext.body), count: identityNext.body.count, seen: Number(state.cursor.seen || 0) };
         FbmSync.stateWrite(state);
-        return { ok: true, request: FbmSync.nextEnvelope(FbmSync.identityCheckCustomerRequest({ type: 1, count: identityNext.body.count, gridPageIndex: identityNext.body.gridPageIndex, gridPageValue: identityNext.body.gridPageValue, gridRefresh: false })), status: FbmSync.statusView(), imported: eligibleCustomerRows.length };
+        return { ok: true, request: FbmSync.nextEnvelope(identityNext), status: FbmSync.statusView(), imported: eligibleCustomerRows.length };
       }
       FbmSync.identityCheckFinish(state);
       state.cursor = {}; state.phase = 'done'; state.entity = ''; state.message = 'Đã kiểm tra liên kết Customer FBM.'; FbmSync.stateWrite(state);
@@ -636,7 +638,7 @@ FbmSync.continue = function (rawResponse) {
     var nextCustomer = FbmSync.customerNext(state, customerGrid.rows, customerGrid.total);
     var activityRequest = FbmSync.activityForCustomers(state, customerContexts, nextCustomer, state.cursor.seen);
     if (activityRequest) { return { ok: true, request: FbmSync.nextEnvelope(activityRequest), status: FbmSync.statusView(), imported: customerRecords.length }; }
-    if (nextCustomer) { state.cursor = { kind: 'customer_grid', type: 1, pageIndex: nextCustomer.body.gridPageIndex, pageValue: nextCustomer.body.gridPageValue, count: nextCustomer.body.count, seen: Number(state.cursor.customerSeen || 0) }; FbmSync.stateWrite(state); return { ok: true, request: FbmSync.nextEnvelope(nextCustomer), status: FbmSync.statusView() }; }
+    if (nextCustomer) { state.cursor = { kind: 'customer_grid', type: 1, pageIndex: nextCustomer.body.gridPageIndex, pageValue: nextCustomer.body.gridPageValue, pageItems: FbmSync.gridPageItemsOf(nextCustomer.body), count: nextCustomer.body.count, seen: Number(state.cursor.customerSeen || 0) }; FbmSync.stateWrite(state); return { ok: true, request: FbmSync.nextEnvelope(nextCustomer), status: FbmSync.statusView() }; }
     if (state.mode === 'write' && FbmSync.canWriteFbm(state.mode)) { if (FbmSync.stopPushOnConflicts && FbmSync.stopPushOnConflicts(state)) { return { ok: true, request: null, status: FbmSync.statusView() }; } state.cursor = { kind: 'push_scan', entity: 'customer', index: 0 }; state.phase = 'push'; FbmSync.stateWrite(state); return { ok: true, request: FbmSync.nextEnvelope(FbmSync.nextPushRequest(state)), status: FbmSync.statusView() }; }
     FbmSync.finishPullRun(state); return { ok: true, status: FbmSync.statusView() };
   }
@@ -648,8 +650,8 @@ FbmSync.continue = function (rawResponse) {
     var imported = batchStep.imported;
     if (cursor.customerNext) {
       // Cursor chỉ giữ vị trí trang Customer kế; request dựng lại ở đây cho state gọn.
-      var next = cursor.customerNext; state.cursor = { kind: 'customer_grid', type: 1, pageIndex: next.pageIndex, pageValue: next.pageValue, count: next.count, seen: Number(cursor.customerSeen || 0) }; state.phase = 'pull_customer'; state.entity = 'customer'; FbmSync.stateWrite(state);
-      return { ok: true, request: FbmSync.nextEnvelope(FbmSync.customerGridRequest({ type: 1, count: next.count, gridPageIndex: next.pageIndex, gridPageValue: next.pageValue, gridRefresh: false })), status: FbmSync.statusView() };
+      var next = cursor.customerNext; state.cursor = { kind: 'customer_grid', type: 1, pageIndex: next.pageIndex, pageValue: next.pageValue, pageItems: next.pageItems || null, count: next.count, seen: Number(cursor.customerSeen || 0) }; state.phase = 'pull_customer'; state.entity = 'customer'; FbmSync.stateWrite(state);
+      return { ok: true, request: FbmSync.nextEnvelope(FbmSync.customerGridRequest({ type: 1, count: next.count, gridPageIndex: next.pageIndex, gridPageValue: next.pageValue, pageItems: next.pageItems, gridRefresh: false })), status: FbmSync.statusView() };
     }
     if (cursor.afterActivity) {
       var supplementRequest = FbmSync.activitySupplementNext(state, cursor.afterActivity);
@@ -681,7 +683,7 @@ FbmSync.continue = function (rawResponse) {
     state.metadata.customerFields = supplementGrid.fields;
     FbmSync.stateWrite(state);
     var supplementContexts = supplementGrid.rows.filter(function (row) { return !FbmSync.isTemporaryRecord('customer', row); }).map(function (row) { return { sttRec: String(row.stt_rec_kh || '').trim(), maKh: String(row.ma_kh || '').trim() }; }).filter(function (item) { return item.sttRec; });
-    var afterKind = cursor.kind === 'activity_catchup_customer_grid' ? { kind: 'rotation' } : { kind: 'done', rotation: FbmSync.activityRotationNext(supplementGrid.rows) };
+    var afterKind = cursor.kind === 'activity_catchup_customer_grid' ? { kind: 'rotation' } : { kind: 'done', rotation: FbmSync.activityRotationNext(supplementGrid.rows, supplementGrid.total) };
     var supplementActivityRequest = FbmSync.activityForCustomers(state, supplementContexts, null, 0, afterKind);
     if (supplementActivityRequest) { return { ok: true, request: FbmSync.nextEnvelope(supplementActivityRequest), status: FbmSync.statusView() }; }
     var emptySupplement = FbmSync.activitySupplementNext(state, afterKind);

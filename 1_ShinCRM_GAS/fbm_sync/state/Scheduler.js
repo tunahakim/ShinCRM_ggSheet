@@ -12,13 +12,13 @@ FbmSync.detailCursorRead = function () {
     if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.pageValue) || parsed.pageValue.length < 4) { return null; }
     var pageIndex = Number(parsed.pageIndex);
     if (!isFinite(pageIndex) || pageIndex < 0) { return null; }
-    return { pageIndex: Math.floor(pageIndex), pageValue: parsed.pageValue.slice(0, 4).map(function (value) { return String(value === null || value === undefined ? '' : value); }) };
+    return { pageIndex: Math.floor(pageIndex), pageValue: parsed.pageValue.slice(0, 4).map(function (value) { return String(value === null || value === undefined ? '' : value); }), pageItems: parsed.pageItems || null };
   } catch (ignore) { return null; }
 };
 FbmSync.detailCursorWrite = function (cursor) {
   var value = cursor || {}, pageIndex = Number(value.pageIndex), pageValue = Array.isArray(value.pageValue) ? value.pageValue.slice(0, 4) : [];
   if (!isFinite(pageIndex) || pageIndex < 0 || pageValue.length < 4) { return null; }
-  var saved = { pageIndex: Math.floor(pageIndex), pageValue: pageValue.map(function (item) { return String(item === null || item === undefined ? '' : item); }) };
+  var saved = { pageIndex: Math.floor(pageIndex), pageValue: pageValue.map(function (item) { return String(item === null || item === undefined ? '' : item); }), pageItems: value.pageItems || null };
   FbmSync.props().setProperty(FbmSync.DETAIL_CURSOR_KEY, JSON.stringify(saved));
   return saved;
 };

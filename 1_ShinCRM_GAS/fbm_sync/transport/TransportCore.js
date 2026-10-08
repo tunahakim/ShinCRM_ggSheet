@@ -516,7 +516,7 @@ FbmSync.requestForCursor = function (state) {
   if (cursor.kind === 'identity_user_grid') { return FbmSync.sessionSystemRequest('identity_user_grid'); }
   if (cursor.kind === 'lookup' || cursor.kind === 'push_lookup') { return FbmSync.lookupBatchRequest(); }
   if (cursor.kind === 'customer_grid') {
-    return FbmSync.customerGridRequest({ type: Number(cursor.type || 0), count: Number(cursor.count || 2000), gridPageIndex: cursor.pageIndex === undefined ? -1 : cursor.pageIndex, gridPageValue: cursor.pageValue === undefined ? null : cursor.pageValue, gridRefresh: false });
+    return FbmSync.customerGridRequest({ type: Number(cursor.type || 0), count: Number(cursor.count || 2000), gridPageIndex: cursor.pageIndex === undefined ? -1 : cursor.pageIndex, gridPageValue: cursor.pageValue === undefined ? null : cursor.pageValue, pageItems: cursor.pageItems, gridRefresh: false });
   }
   if (cursor.kind === 'activity_grid') { return FbmSync.activityBatchRequest(state); }
   if (cursor.kind === 'activity_bulk_grid') {
