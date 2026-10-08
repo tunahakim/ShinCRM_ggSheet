@@ -293,6 +293,11 @@ FbmSync.activityRotationNext = function (rows) {
 FbmSync.activityRotationSave = function (next) {
   FbmSync.props().setProperty('FBM_SYNC_ACTIVITY_ROTATION', JSON.stringify({ pageIndex: next.pageIndex, pageValue: next.pageValue }));
 };
+/**
+ * Trang đầu không kèm tiêu đề: FBM dùng `type: 1` với `gridPageIndex: -2` (mẫu bắt từ giao diện FBM trong RequestFBM).
+ * Tiêu đề nặng khoảng 22,5 KB mỗi lần trong khi dữ liệu một khách chỉ vài KB, nên mỗi lượt chỉ lấy tiêu đề một lần (09/01 Kiến trúc và giao thức).
+ */
+FbmSync.GRID_FIRST_PAGE_NO_HEADER = -2;
 /** Lấy AliasName metadata; fallback tên field để tránh hardcode schema. */
 FbmSync.gridFields = function (response) {
   var parsed = FbmSync.protocol.parse(response) || {};
@@ -338,6 +343,12 @@ FbmSync.rowsToRecords = function (entity, response, knownFields) {
   var grid = FbmSync.gridRows(response);
   var fields = grid.fields.length ? grid.fields : (knownFields || []);
   FbmSync.validateGridFields(entity, fields);
+  // Trang không tiêu đề đọc cột theo vị trí đã lưu; số cột lệch nghĩa là FBM đã đổi cấu trúc nên dừng, không đoán, tránh ghi nhầm trường.
+  if (!grid.fields.length && grid.rows.some(function (row) { return !Array.isArray(row) || row.length !== fields.length; })) {
+    var shapeError = new Error('FBM trả dòng ' + entity + ' có số cột khác ' + fields.length + ' cột đã lưu từ tiêu đề; cấu trúc FBM có thể đã đổi, đã dừng để không ghi nhầm trường.');
+    shapeError.code = 'FBM_GRID_SHAPE_CHANGED';
+    throw shapeError;
+  }
   return { entity: entity, total: grid.total, fields: fields, rows: grid.rows.map(function (row) {
     var record = {};
     fields.forEach(function (field, index) { record[field] = FbmSync.fbDate(row[index]); });

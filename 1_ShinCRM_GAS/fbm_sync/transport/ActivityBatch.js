@@ -27,13 +27,20 @@ FbmSync.activityBatchPlan = function (cursor) {
   return plan;
 };
 
-/** Dựng lại lô từ cursor; cùng cursor luôn ra cùng lô nên chạy lại sau probe hoặc thử lại là idempotent. */
+/**
+ * Dựng lại lô từ cursor; cùng cursor luôn ra cùng lô nên chạy lại sau probe hoặc thử lại là idempotent.
+ * Chỉ khi lượt chưa có danh sách cột thì phần tử trang đầu đầu tiên lấy kèm tiêu đề; các phần tử khác đọc cột theo danh sách đó.
+ */
 FbmSync.activityBatchRequest = function (state) {
-  var cursor = state.cursor || {}, plan = cursor.batch || [], customers = cursor.customers || [], pages = FbmSync.activityPagesRead(state);
+  var cursor = state.cursor || {}, plan = cursor.batch || [], customers = cursor.customers || [], pages = FbmSync.activityPagesRead(state), count = Number(cursor.count || 100);
+  var needHeader = !(state.metadata && Array.isArray(state.metadata.activityFields) && state.metadata.activityFields.length);
   if (!plan.length) { return null; }
   return { items: plan.map(function (index) {
-    var page = pages[index];
-    return FbmSync.activityGridRequest(String(customers[index]), page ? { type: 1, count: Number(cursor.count || 100), gridPageIndex: page[0], gridPageValue: page[1], gridRefresh: false } : { type: 0, count: Number(cursor.count || 100), gridPageIndex: -1, gridRefresh: false });
+    var page = pages[index], options;
+    if (page) { options = { type: 1, count: count, gridPageIndex: page[0], gridPageValue: page[1], gridRefresh: false }; }
+    else if (needHeader) { needHeader = false; options = { type: 0, count: count, gridPageIndex: -1, gridRefresh: false }; }
+    else { options = { type: 1, count: count, gridPageIndex: FbmSync.GRID_FIRST_PAGE_NO_HEADER, gridRefresh: false }; }
+    return FbmSync.activityGridRequest(String(customers[index]), options);
   }), meta: { kind: 'batch', entity: 'activity' } };
 };
 
@@ -59,9 +66,9 @@ FbmSync.activityCustomerErrors = function (state, failed) {
   });
 };
 
-/** Lô lệch kế hoạch là lỗi hợp đồng của cả lô: dừng phiên, không ghi gì. */
-FbmSync.activityBatchMismatch = function (state, message) {
-  var code = 'FBM_BATCH_ITEM_MISMATCH', failed = FbmSync.stateFailRun(message, code).failed;
+/** Lô lệch kế hoạch hoặc lệch cấu trúc cột là lỗi của cả lô: dừng phiên, không ghi gì. */
+FbmSync.activityBatchMismatch = function (state, message, failureCode) {
+  var code = failureCode || 'FBM_BATCH_ITEM_MISMATCH', failed = FbmSync.stateFailRun(message, code).failed;
   state = FbmSync.stateRead();
   if (!failed) { state.phase = 'error'; state.lastFailureCode = code; state.lastError = message; state.message = message; FbmSync.stateWrite(state); }
   if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'activity_batch_mismatch', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(state.runId || ''), reason: message, detail: { code: code } }); }
@@ -87,7 +94,12 @@ FbmSync.activityBatchContinue = function (state, cursor, rawResponse) {
     return { result: probe ? { ok: true, request: probe, status: FbmSync.statusView(), probing: true } : { ok: false, code: 'SESSION_PROBE_UNAVAILABLE', request: null, status: FbmSync.statusView(), error: state.lastError } };
   }
   var gate = FbmSync.stateCategoryGate(state), parents = FbmSync.activityParentCodes(), pages = FbmSync.activityPagesRead(state), nextPlan = [], nextPages = {}, records = [], failed = [], finished = 0;
+  state.metadata = state.metadata || {};
   checks.forEach(function (entry) {
+    var fields = entry.check && entry.check.ok && !(state.metadata.activityFields || []).length ? FbmSync.gridFields(entry.item) : [];
+    if (fields.length) { state.metadata.activityFields = fields; }
+  });
+  try { checks.forEach(function (entry) {
     var sttRec = String(customers[entry.index] || ''), parent = { sttRec: sttRec, maKh: parents[sttRec] || '' };
     if (!entry.item) { nextPlan.push(entry.index); if (pages[entry.index]) { nextPages[entry.index] = pages[entry.index]; } return; }
     finished += 1;
@@ -95,6 +107,8 @@ FbmSync.activityBatchContinue = function (state, cursor, rawResponse) {
       failed.push({ customer: parent.maKh || sttRec, code: String(entry.check.code || 'FBM_ERROR'), status: Number(entry.check.status || 0), reason: String(entry.check.bug && (entry.check.bug.Message || entry.check.bug.message) || 'FBM trả lỗi khi đọc giao dịch của khách') });
       return;
     }
+    // Khách giữ tiêu đề bị lỗi thì cả lô chưa có danh sách cột: xếp lại các khách còn lại, lô sau sẽ có một khách lấy tiêu đề.
+    if (!(state.metadata.activityFields || []).length) { finished -= 1; nextPlan.push(entry.index); return; }
     var grid = FbmSync.rowsToRecords('activity', FbmSync.protocol.parse(entry.item), state.metadata.activityFields);
     state.metadata.activityFields = grid.fields;
     grid.rows.forEach(function (row) { if (!FbmSync.isTemporaryRecord('activity', row)) { records.push(FbmSync.activityRecord(row, gate, parent)); } });
@@ -104,7 +118,10 @@ FbmSync.activityBatchContinue = function (state, cursor, rawResponse) {
       nextPlan.push(entry.index);
       nextPages[entry.index] = [FbmSync.gridNextPageIndex(pageIndex), FbmSync.gridPageValue([last.end_date || '', last.datetime0 || '', last.id || '', last.line_nbr || 0])];
     }
-  });
+  }); } catch (shapeError) {
+    if (shapeError && shapeError.code === 'FBM_GRID_SHAPE_CHANGED') { return { result: FbmSync.activityBatchMismatch(state, shapeError.message, shapeError.code) }; }
+    throw shapeError;
+  }
   FbmSync.activityCustomerErrors(state, failed);
   state.cursor.batch = nextPlan;
   FbmSync.activityPagesWrite(state, nextPages);
