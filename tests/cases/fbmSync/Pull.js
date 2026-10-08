@@ -4,6 +4,7 @@ const { taoHopCat, napServer } = require("../../lib/load-gas");
 const { TEP_NEN } = require("../../lib/dung-hop");
 const fs = require("fs");
 const path = require("path");
+const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
 
 async function chay(so) {
   section("FBM sync — pull và identity");
@@ -46,7 +47,7 @@ async function chay(so) {
       stateWrite: (next) => { readFinishState = next; return next; },
       recoverStaleRun: (state) => ({ state, recovered: false }),
       responseRequestId: () => 'read-request',
-      protocol: { parse: (value) => value, assertSuccess: () => ({ ok: true }) },
+      protocol: { parse: (value) => value, assertSuccess: () => ({ ok: true }), contractMismatch: () => null },
       traceImport: () => {}, traceEvent: () => {}, traceResponse: () => ({}), applyTransportSession: () => false,
       rowsToRecords: () => ({ rows: [], fields: [], total: 0 }), isTemporaryRecord: () => false,
       pullWrite: () => ({ ok: true, written: 0, conflicts: 0, skipped: 0 }), previewRecords: () => {}, customerNext: () => null, activityForCustomers: () => null,
@@ -57,7 +58,7 @@ async function chay(so) {
     }
   });
   napServer(readFinish, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/write/SheetSave.js');
-  const readFinished = readFinish.FbmSync.continue({ transport: { trace: [{ requestId: 'read-request' }] } });
+  const readFinished = readFinish.FbmSync.continue({ transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'read-request' }] } });
   check(so, 'mode read ket thuc pull thi ghi missing vao Sheet va khong mo chieu push FBM', [readFinished.ok, readFinishState.phase, readFinishMissing, readFinishPushRequests], [true, 'done', 2, 0]);
   builders.FbmSync.stateRead = () => ({ session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: 'auth-c', activityAuthorized: 'auth-a' } });
   const gate = { map: { '@CAT_TINH_THANH\u001fHà Nội': 'HNI' }, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true, HNI: true } } };
@@ -251,7 +252,7 @@ async function chay(so) {
   const identityProbeStarted = builders.FbmSync.start({ mode: 'check', scan: 'identity_probe' });
   const identityUserRequest = identityProbeStarted.request;
   check(so, 'Identity probe chi doc User grid, khong lay Authorized thua', [identityProbeStarted.ok, identityUserRequest.meta.kind, identityFlowState.phase, identityFlowState.cursor.kind, identityUserRequest.body.controller], [true, 'identity_user_grid', 'checking_session', 'identity_user_grid', 'User']);
-  const identityProbeFinished = builders.FbmSync.continue({ d: { TotalRowCount: 1, Rows: [[2037, 'ANHLT', 'Le Tuan Anh']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] }, Authorized: true }, transport: { trace: [{ requestId: identityUserRequest.id }] } });
+  const identityProbeFinished = builders.FbmSync.continue({ d: { TotalRowCount: 1, Rows: [[2037, 'ANHLT', 'Le Tuan Anh']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] }, Authorized: true }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: identityUserRequest.id }] } });
   check(so, 'Identity probe nhan dien du ma so va ten day du, cho xac nhan luu', [identityProbeFinished.ok, identityFlowState.phase, identityFlowState.cursor, identityFlowState.metadata.identityProbe.userId, identityFlowState.metadata.identityProbe.accountName], [true, 'done', {}, '2037', 'Le Tuan Anh']);
   check(so, 'Identity probe thieu dong User thi fail ro rang', builders.FbmSync.identityUser({ d: { Rows: [], ViewPage: { Fields: [{ AliasName: 'id' }] } } }).code, 'IDENTITY_PROBE_INCOMPLETE');
 

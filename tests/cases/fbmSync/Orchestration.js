@@ -1,6 +1,7 @@
 /** Kiểm tra state, cursor và status điều phối. */
 const { section, check } = require("../../lib/assert");
 const { taoHopCat, napServer } = require("../../lib/load-gas");
+const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
 
 async function chay(so) {
   section("FBM sync — orchestration");
@@ -137,8 +138,8 @@ async function chay(so) {
    const dateEnvelope = orchestration.FbmSync.nextEnvelope({ url: 'https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage', body: { gridPageValue: [new Date('2026-09-09T00:00:00Z'), { nested: new Date('2026-09-10T00:00:00Z') }] }, meta: { kind: 'grid' } });
    check(so, 'request nghiep vu sau marker live khong bi thay bang probe', [dateEnvelope.meta.kind, orchestration.FbmSync.stateRead().cursor.kind, orchestration.FbmSync.stateRead().activeRequestId === dateEnvelope.id], ['grid', 'customer_grid', true]);
   check(so, 'envelope khong tra Date o cursor phan trang Activity', [dateEnvelope.body.gridPageValue[0], dateEnvelope.body.gridPageValue[1].nested], ['/Date(1788912000000)/', '/Date(1788998400000)/']);
-  check(so, 'response co trace bridge client van nhan dung reservation GAS', orchestration.FbmSync.responseRequestId({ transport: { trace: [{ requestId: 'gas-request-1' }, { stage: 'bridge_response_sent', clientRequestId: 'sidebar-waiter-1' }] } }), 'gas-request-1');
-  check(so, 'response co trace bridge cu van bo qua waiter id va nhan reservation GAS', orchestration.FbmSync.responseRequestId({ transport: { trace: [{ requestId: 'gas-request-2' }, { stage: 'bridge_response_sent', requestId: 'sidebar-waiter-2' }] } }), 'gas-request-2');
+  check(so, 'response co trace bridge client van nhan dung reservation GAS', orchestration.FbmSync.responseRequestId({ transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'gas-request-1' }, { stage: 'bridge_response_sent', clientRequestId: 'sidebar-waiter-1' }] } }), 'gas-request-1');
+  check(so, 'response co trace bridge cu van bo qua waiter id va nhan reservation GAS', orchestration.FbmSync.responseRequestId({ transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'gas-request-2' }, { stage: 'bridge_response_sent', requestId: 'sidebar-waiter-2' }] } }), 'gas-request-2');
   let blockedEndpoint = '';
   try { orchestration.FbmSync.nextEnvelope({ url: 'https://fbo.com.vn:8888/Main/undefined', body: {}, meta: { kind: 'legacy' } }); } catch (err) { blockedEndpoint = String(err && err.message || err); }
   check(so, 'endpoint legacy undefined bi chan truoc khi cap envelope', blockedEndpoint.indexOf('FBM_ENDPOINT_MISSING') >= 0, true);
@@ -148,7 +149,7 @@ async function chay(so) {
   check(so, 'trace client ghi theo lo mot lan', [orchestration.FbmSync.traceImport(traceEvents), propertyWrites - writesBeforeTraceImport], [2, 1]);
   check(so, 'trace client gui lai khong ghi lap', [orchestration.FbmSync.traceImport(traceEvents), propertyWrites - writesBeforeTraceImport], [0, 1]);
    orchestration.FbmSync.statePatch({ origin: 'manual', phase: 'pull_customer', cursor: { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 }, activeRequestId: dateEnvelope.id, deadlineAt: Date.now() + 60000, metadata: { sessionGate: {} }, session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-   const retrySlice = orchestration.FbmSync.continue({ ok: false, status: 503, body: '', transport: { trace: [{ requestId: dateEnvelope.id }] } });
+   const retrySlice = orchestration.FbmSync.continue({ ok: false, status: 503, body: '', transport: { contract: MA_HOP_DONG, trace: [{ requestId: dateEnvelope.id }] } });
     check(so, 'loi request nghiep vu fail-closed khong tu retry', [retrySlice && retrySlice.ok, retrySlice && retrySlice.code, retrySlice && retrySlice.request, orchestration.FbmSync.stateRead().phase, orchestration.FbmSync.stateRead().lastFailureCode], [false, 'TRANSPORT_ERROR', null, 'error', 'TRANSPORT_ERROR']);
   const missingRequestId = orchestration.FbmSync.continue({ ok: true, status: 200, body: '{"d":{}}' });
    check(so, 'response thieu requestId bi chan khong an nham reservation', [missingRequestId.ok, missingRequestId.code, orchestration.FbmSync.stateRead().activeRequestId], [false, 'STALE_RESPONSE', '']);
@@ -180,10 +181,10 @@ async function chay(so) {
   lookupHop.FbmSync.identityStatus = () => ({ status: 'BOUND' });
   const lookupErrorState = lookupHop.FbmSync.stateStart('', 'checking_session', 0);
   lookupErrorState.mode = 'write'; lookupErrorState.origin = 'manual'; lookupErrorState.phase = 'checking_session'; lookupErrorState.cursor = { kind: 'lookup', index: 0 }; lookupErrorState.activeRequestId = 'lookup-error-request'; lookupErrorState.session.identityVerified = true; lookupErrorState.session.sessionId = 'lookup-session'; lookupErrorState.session.identitySessionId = 'lookup-session'; lookupHop.FbmSync.stateWrite(lookupErrorState);
-  const lookupError = lookupHop.FbmSync.continue({ ok: false, status: 503, body: '', transport: { trace: [{ requestId: 'lookup-error-request' }] } });
+  const lookupError = lookupHop.FbmSync.continue({ ok: false, status: 503, body: '', transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'lookup-error-request' }] } });
   check(so, 'lookup loi transport hoac parse fail-closed khong tu dong di tiep', [lookupError.ok, lookupError.request, lookupHop.FbmSync.stateRead().phase, lookupHop.FbmSync.stateRead().cursor.kind], [false, null, 'error', 'lookup']);
   const lookupEmptyState = lookupHop.FbmSync.stateRead(); lookupEmptyState.runId = 'lookup-empty-run'; lookupEmptyState.phase = 'checking_session'; lookupEmptyState.cursor = { kind: 'lookup', index: 0 }; lookupEmptyState.activeRequestId = 'lookup-empty-request'; lookupEmptyState.session.identityVerified = true; lookupEmptyState.session.sessionId = 'lookup-session'; lookupEmptyState.session.identitySessionId = 'lookup-session'; lookupHop.FbmSync.stateWrite(lookupEmptyState);
-  const lookupEmpty = lookupHop.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"Rows":[]}}', transport: { trace: [{ requestId: 'lookup-empty-request' }] } });
+  const lookupEmpty = lookupHop.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"Rows":[]}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'lookup-empty-request' }] } });
   check(so, 'lookup thanh cong nhung khong co dong la ket qua hop le va di tiep', [lookupEmpty.ok, lookupEmpty.request && lookupEmpty.request.meta.kind, lookupHop.FbmSync.stateRead().phase, lookupHop.FbmSync.stateRead().metadata.categoryLookupFailed], [true, 'completion', 'checking_session', undefined]);
   orchestration.FbmSync.previewRecords('customer', [{ fbmCustomerCode: 'ALT00010', companyName: 'Test', fbmId: 'A1' }]);
   check(so, 'preview luu ma va ten Customer doc tu FBM', orchestration.FbmSync.previewRead().customers[0].code, 'ALT00010');
@@ -311,7 +312,7 @@ async function chay(so) {
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', scheduledScan: '' });
   heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
   const firstHeartbeatRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
-  const firstHeartbeat = heartbeat.fbmSyncHeartbeat({ d: { TotalRowCount: 2 }, transport: { trace: [{ requestId: firstHeartbeatRequest.request.id }] } });
+  const firstHeartbeat = heartbeat.fbmSyncHeartbeat({ d: { TotalRowCount: 2 }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: firstHeartbeatRequest.request.id }] } });
   check(so, 'heartbeat luu lan song va tong Customer dau tien', [heartbeat.FbmSync.stateRead().session.lastHeartbeatAt > 0, heartbeat.FbmSync.stateRead().session.customerTotal, firstHeartbeat.request], [true, 2, null]);
   heartbeat.FbmSync.statePatch({ session: { expired: true } });
    const blockedHeartbeatRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
@@ -324,17 +325,17 @@ async function chay(so) {
    heartbeat.FbmSync.statePatch({ session: { customerTotal: 2, cookie: 'userFHN_CRM_App', expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' }, scheduledScan: 'customer', phase: 'idle', runId: '', cursor: {}, activeRequestId: '', deadlineAt: 0 });
   const scheduledRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   check(so, 'heartbeat scheduled phai co reservation truoc khi nhan response', [scheduledRequest.ok, scheduledRequest.request.meta.kind], [true, 'heartbeat']);
-  const scheduledHeartbeat = heartbeat.fbmSyncHeartbeat({ d: { TotalRowCount: 2 }, transport: { trace: [{ requestId: scheduledRequest.request.id }] } });
+  const scheduledHeartbeat = heartbeat.fbmSyncHeartbeat({ d: { TotalRowCount: 2 }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: scheduledRequest.request.id }] } });
    check(so, 'heartbeat handoff bat dau full Customer bang probe User khi scheduler den han', [scheduledHeartbeat.ok, scheduledHeartbeat.request.meta.kind, scheduledHeartbeat.status.phase], [true, 'session_probe', 'checking_session']);
-   const continuedProbe = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: JSON.stringify({ d: { TotalRowCount: 1, Rows: [[2037, 'ANHLT', 'Le Tuan Anh']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] } } }), transport: { trace: [{ requestId: scheduledHeartbeat.request.id }], payloadCookie: 'userFHN_CRM_App' } });
+   const continuedProbe = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: JSON.stringify({ d: { TotalRowCount: 1, Rows: [[2037, 'ANHLT', 'Le Tuan Anh']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] } } }), transport: { contract: MA_HOP_DONG, trace: [{ requestId: scheduledHeartbeat.request.id }], payloadCookie: 'userFHN_CRM_App' } });
    check(so, 'probe User cua phien nen moi cap authorize Customer', [continuedProbe && continuedProbe.ok, continuedProbe && continuedProbe.request && continuedProbe.request.meta.kind, continuedProbe && continuedProbe.request && continuedProbe.request.meta.entity], [true, 'authorize', 'customer']);
-   const continuedBackground = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: JSON.stringify({ d: { Authorized: 'auth-customer' } }), transport: { trace: [{ requestId: continuedProbe && continuedProbe.request && continuedProbe.request.id || '' }], payloadCookie: 'userFHN_CRM_App' } });
+   const continuedBackground = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: JSON.stringify({ d: { Authorized: 'auth-customer' } }), transport: { contract: MA_HOP_DONG, trace: [{ requestId: continuedProbe && continuedProbe.request && continuedProbe.request.id || '' }], payloadCookie: 'userFHN_CRM_App' } });
    check(so, 'response authorize cua phien nen di qua continuation chung', [continuedBackground && continuedBackground.ok, continuedBackground && continuedBackground.request && continuedBackground.request.meta.kind, continuedBackground && continuedBackground.request && continuedBackground.request.meta.entity, heartbeat.FbmSync.stateRead().cursor.kind], [true, 'authorize', 'activity', 'authorize_activity']);
     heartbeat.FbmSync.statePatch({ runId: 'slice-run', origin: 'background', phase: 'pull_customer', cursor: { kind: 'customer_grid', type: 1, pageIndex: 3, pageValue: ['d', 't', 'x'], count: 2000 }, activeRequestId: 'slice-request', deadlineAt: Date.now() + 60000, session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' }, metadata: { sessionGate: {} } });
     const sliceEnded = heartbeat.FbmSync.limitRelayResult({ ok: true, request: { id: 'slice-next-request' }, status: heartbeat.FbmSync.statusView() }, heartbeat.FbmSync.RELAY_HOP_LIMIT);
    const resumedAfterSlice = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
    check(so, 'alarm dau moi lat relay phai probe User truoc khi tiep tuc cursor', [sliceEnded.code, resumedAfterSlice.ok, resumedAfterSlice.code, resumedAfterSlice.request.meta.kind], ['RELAY_SLICE_COMPLETE', true, 'SESSION_SLICE_PROBE_READY', 'session_probe']);
-   const resumedSliceProbe = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[2037,"ANHLT","Le Tuan Anh"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { trace: [{ requestId: resumedAfterSlice.request.id }] } });
+   const resumedSliceProbe = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[2037,"ANHLT","Le Tuan Anh"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: resumedAfterSlice.request.id }] } });
    check(so, 'probe dau lat dat thi moi cap lai cursor Customer dang do', [resumedSliceProbe.ok, resumedSliceProbe.sessionVerified, resumedSliceProbe.request.meta.kind, resumedSliceProbe.request.body.gridPageIndex], [true, true, 'grid', 3]);
   heartbeat.FbmSync.statePatch({ runId: 'slice-limit-run', phase: 'pull_customer', cursor: { kind: 'customer_grid', type: 1, pageIndex: 4, pageValue: ['e', 't', 'x'], count: 2000 }, activeRequestId: 'slice-request', deadlineAt: Date.now() + 60000 });
   const capped = heartbeat.FbmSync.limitRelayResult({ ok: true, request: { id: 'next-request' }, status: heartbeat.FbmSync.statusView() }, heartbeat.FbmSync.RELAY_HOP_LIMIT);
@@ -348,25 +349,25 @@ async function chay(so) {
    heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
    const changedRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   check(so, 'heartbeat thay doi tong Customer co reservation moi', [changedRequest.ok, changedRequest.request.meta.kind], [true, 'heartbeat']);
-  const changedHeartbeat = heartbeat.fbmSyncHeartbeat({ d: { TotalRowCount: 3 }, transport: { trace: [{ requestId: changedRequest.request.id }] } });
+  const changedHeartbeat = heartbeat.fbmSyncHeartbeat({ d: { TotalRowCount: 3 }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: changedRequest.request.id }] } });
    check(so, 'heartbeat tong Customer thay doi kich full Customer va probe lai', [changedHeartbeat.request.meta.kind, changedHeartbeat.status.phase], ['session_probe', 'checking_session']);
    heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { cookie: 'userFHN_CRM_App', expired: false }, scheduledScan: '' });
    heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
    const failedRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
-  const failedHeartbeat = heartbeat.fbmSyncHeartbeat({ ok: false, status: 500, body: '{"Message":"There was an error processing the request."}', transport: { trace: [{ requestId: failedRequest.request.id }] } });
+  const failedHeartbeat = heartbeat.fbmSyncHeartbeat({ ok: false, status: 500, body: '{"Message":"There was an error processing the request."}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: failedRequest.request.id }] } });
   check(so, 'heartbeat HTTP 500 dung phien va tra loi ro rang', [failedHeartbeat.ok, failedHeartbeat.code, heartbeat.FbmSync.stateRead().lastFailureCode], [false, 'TRANSPORT_ERROR', 'TRANSPORT_ERROR']);
    heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { cookie: 'userFHN_CRM_App', expired: false } });
    heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
    const emptyRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   check(so, 'heartbeat shape rong co reservation truoc khi phan loai', [emptyRequest.ok, emptyRequest.request.meta.kind], [true, 'heartbeat']);
-  const emptyHeartbeat = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{}}', transport: { trace: [{ requestId: emptyRequest.request.id }] } });
+  const emptyHeartbeat = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: emptyRequest.request.id }] } });
   check(so, 'heartbeat khong co shape Customer khong duoc suy ra het phien tu heartbeat', [emptyHeartbeat.ok, emptyHeartbeat.code, heartbeat.FbmSync.stateRead().session.expired], [false, 'HEARTBEAT_RESPONSE_INVALID', false]);
   const backgroundState = heartbeat.FbmSync.stateRead();
   backgroundState.runId = 'background-run'; backgroundState.origin = 'background'; backgroundState.phase = 'pull_customer'; backgroundState.entity = 'customer'; backgroundState.activeRequestId = 'background-request'; backgroundState.cursor = { kind: 'customer_grid', type: 0, pageIndex: 0, pageValue: null, count: 2000 }; backgroundState.metadata.manualPending = null;
   heartbeat.FbmSync.stateWrite(backgroundState);
   const manualRequest = heartbeat.FbmSync.start({ mode: 'read', manual: true });
   check(so, 'manual yeu cau dung phien nen sau response hien tai', [manualRequest.ok, manualRequest.code, heartbeat.FbmSync.stateRead().metadata.manualPending.mode], [false, 'SYNC_BACKGROUND_STOPPING', 'read']);
-  const stoppedBackground = heartbeat.FbmSync.continue({ d: { Rows: [] }, transport: { trace: [{ requestId: 'background-request' }] } });
+  const stoppedBackground = heartbeat.FbmSync.continue({ d: { Rows: [] }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'background-request' }] } });
   check(so, 'phien nen dung va san sang cho manual sau khi nhan response', [stoppedBackground.manualReady, heartbeat.FbmSync.stateRead().phase, heartbeat.FbmSync.stateRead().runId], [true, 'idle', '']);
   const preservedState = heartbeat.FbmSync.stateRead();
   preservedState.runId = 'preserve-run'; preservedState.phase = 'pull_customer'; preservedState.cursor = { kind: 'customer_grid', pageIndex: 4 }; preservedState.activeRequestId = 'preserve-request';
@@ -381,7 +382,7 @@ async function chay(so) {
   heartbeat.FbmSync.stateWrite(cancelledState);
   const pendingCancel = heartbeat.fbmSyncCancel();
   check(so, 'dung phien khi request dang bay giu reservation', [pendingCancel.code, heartbeat.FbmSync.stateRead().activeRequestId, heartbeat.FbmSync.stateRead().metadata.cancelPending], ['SYNC_CANCEL_PENDING', 'cancel-request', true]);
-  const stoppedAfterResponse = heartbeat.FbmSync.continue({ d: { Authorized: 'auth-customer' }, transport: { trace: [{ requestId: 'cancel-request' }] } });
+  const stoppedAfterResponse = heartbeat.FbmSync.continue({ d: { Authorized: 'auth-customer' }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'cancel-request' }] } });
   check(so, 'response hien tai duoc dong nhung khong cap request tiep', [stoppedAfterResponse.ok, stoppedAfterResponse.request, heartbeat.FbmSync.stateRead().phase, heartbeat.FbmSync.stateRead().activeRequestId], [true, null, 'paused', '']);
   const cancelWithoutFlight = heartbeat.fbmSyncCancel();
   check(so, 'dung phien khi khong con request bay giu man ket qua o trang thai tam dung ma khong khoa lich nen sau do', [cancelWithoutFlight.phase, cancelWithoutFlight.runId, cancelWithoutFlight.message.indexOf('kết quả và log') >= 0], ['paused', '', true]);

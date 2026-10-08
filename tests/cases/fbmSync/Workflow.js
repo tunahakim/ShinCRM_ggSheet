@@ -6,6 +6,7 @@ const { section, check } = require('../../lib/assert');
 const { taoHopCat, napServer } = require('../../lib/load-gas');
 const { WORKFLOWS, PIPELINE_CATALOG } = require('../../contracts/fbmSyncPipeline');
 const { taoBoTest } = require('./Sidebar');
+const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
 
 const ROOT = path.join(__dirname, '..', '..', '..');
 const EXECUTOR = path.join(ROOT, '2_ShinCRM_Extension', 'content_scripts', 'fbm_sync', 'executor.js');
@@ -125,7 +126,7 @@ function executorRaw(reply, requestId) {
     ok: result.ok === true,
     status: Number(result.status || 0),
     body: String(result.body || ''),
-    transport: { trace: [{ stage: 'executor_response_sent', requestId: String(requestId) }] }
+    transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId: String(requestId) }] }
   };
 }
 
@@ -231,7 +232,7 @@ async function chay(so) {
   const incompleteResult = incomplete.hop.FbmSync.continue({
     ok: true, status: 200,
     body: JSON.stringify({ d: { TotalRowCount: 1, Rows: [[2037]], ViewPage: { Fields: [{ AliasName: 'id' }] } } }),
-    transport: { trace: [{ stage: 'executor_response_sent', requestId: incompleteStarted.request.id }] }
+    transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId: incompleteStarted.request.id }] }
   });
   check(so, 'tu dong dien: FBM thieu nhan dien phai ket thuc loi ro rang, khong tu luu', [
     incompleteResult.ok, incompleteResult.code, incompleteResult.status.phase, incomplete.documentProperties.getProperty('FBM_SYNC_BINDING_V1')
@@ -261,7 +262,7 @@ async function chay(so) {
   const loginStarted = loginFlow.hop.FbmSync.loginTestRequest();
   const afterLogin = loginFlow.hop.FbmSync.loginTestResult({
     ok: true, status: 200, body: JSON.stringify({ d: true }),
-    transport: { captures: { payloadCookie: '461020379855cFHN_CRM_App' }, trace: [{ stage: 'executor_response_sent', requestId: loginStarted.request.id }] }
+    transport: { contract: MA_HOP_DONG, captures: { payloadCookie: '461020379855cFHN_CRM_App' }, trace: [{ stage: 'executor_response_sent', requestId: loginStarted.request.id }] }
   });
   const loginAuthorize = await sendThroughExecutor(afterLogin.request, JSON.stringify({ d: { Authorized: 'login-auth' } }));
   const afterAuthorize = loginFlow.hop.FbmSync.loginTestResult(executorRaw(loginAuthorize.reply, afterLogin.request.id));
@@ -275,12 +276,12 @@ async function chay(so) {
   const wrongLogin = workflowGas();
   wrongLogin.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
   const wrongStart = wrongLogin.hop.FbmSync.loginTestRequest('workflow-credential-ref');
-  const wrongAfterLogin = wrongLogin.hop.FbmSync.loginTestResult({ ok: true, status: 200, body: JSON.stringify({ d: true }), transport: { captures: { payloadCookie: '461020379855cFHN_CRM_App' }, trace: [{ stage: 'executor_response_sent', requestId: wrongStart.request.id }] } });
-  const wrongAuthorize = wrongLogin.hop.FbmSync.loginTestResult({ ok: true, status: 200, body: JSON.stringify({ d: { Authorized: 'wrong-auth' } }), transport: { trace: [{ stage: 'executor_response_sent', requestId: wrongAfterLogin.request.id }] } });
+  const wrongAfterLogin = wrongLogin.hop.FbmSync.loginTestResult({ ok: true, status: 200, body: JSON.stringify({ d: true }), transport: { contract: MA_HOP_DONG, captures: { payloadCookie: '461020379855cFHN_CRM_App' }, trace: [{ stage: 'executor_response_sent', requestId: wrongStart.request.id }] } });
+  const wrongAuthorize = wrongLogin.hop.FbmSync.loginTestResult({ ok: true, status: 200, body: JSON.stringify({ d: { Authorized: 'wrong-auth' } }), transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId: wrongAfterLogin.request.id }] } });
   const wrongDone = wrongLogin.hop.FbmSync.loginTestResult({
     ok: true, status: 200,
     body: JSON.stringify({ d: { TotalRowCount: 1, Rows: [[2038, 'OTHER', 'Tai khoan khac']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] } } }),
-    transport: { trace: [{ stage: 'executor_response_sent', requestId: wrongAuthorize.request.id }] }
+    transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId: wrongAuthorize.request.id }] }
   });
   check(so, 'dang nhap thu sai identity: khong coi la thanh cong va khong thay binding', [
     wrongDone.ok, wrongDone.code, wrongDone.status.phase, wrongLogin.hop.FbmSync.bindingRead().userId
@@ -363,7 +364,7 @@ async function chay(so) {
   compactLookupFlow.hop.FbmSync.start({ mode: 'write', origin: 'manual', scan: 'full' });
   const compactContinue = (body) => {
     const requestId = compactLookupFlow.hop.FbmSync.stateRead().activeRequestId;
-    return compactLookupFlow.hop.FbmSync.continue({ ok: true, status: 200, body: JSON.stringify(body), transport: { trace: [{ stage: 'executor_response_sent', requestId }] } });
+    return compactLookupFlow.hop.FbmSync.continue({ ok: true, status: 200, body: JSON.stringify(body), transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId }] } });
   };
   compactContinue({ d: { TotalRowCount: 1, Rows: [[2037, 'ANHLT', 'Le Tuan Anh']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] } } });
   compactContinue({ d: { Authorized: 'customer-auth' } });
@@ -537,7 +538,7 @@ async function chay(so) {
   let htmlResult = null;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const requestId = htmlFailureFlow.hop.FbmSync.stateRead().activeRequestId;
-    htmlResult = htmlFailureFlow.hop.FbmSync.continue({ ok: true, status: 200, body: '<html><h1>500 Internal Server Error</h1></html>', transport: { trace: [{ stage: 'executor_response_sent', requestId }] } });
+    htmlResult = htmlFailureFlow.hop.FbmSync.continue({ ok: true, status: 200, body: '<html><h1>500 Internal Server Error</h1></html>', transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId }] } });
     if (!htmlResult.request) { break; }
   }
   const htmlState = htmlFailureFlow.hop.FbmSync.stateRead();
@@ -656,10 +657,11 @@ async function chay(so) {
     return null;
   });
   const completeResult = await completeWorker.context.fbmHeartbeatNow('workflow');
-  check(so, 'alarm co tab: GAS cap envelope truoc, Extension chuyen response tho ve GAS va dung khi request null', [
+  check(so, 'alarm co tab: GAS cap envelope truoc, Extension chuyen response tho kem ma hop dong cua no ve GAS va dung khi request null', [
     completeResult.ok, completeWorker.relayCalls.map((item) => item.body.kind), completeWorker.relayCalls[1].body.response.body,
+    completeWorker.relayCalls[1].body.response.transport.contract,
     completeWorker.metrics().fbmTabQueries, completeWorker.metrics().fbmMessages
-  ], [true, ['heartbeat_request', 'heartbeat'], rawHeartbeat, 1, 2]);
+  ], [true, ['heartbeat_request', 'heartbeat'], rawHeartbeat, MA_HOP_DONG, 1, 2]);
 
   // Chạy cả pipeline Customer + Activity. `withTrace` nạp thêm Trace.js như GAS thật (có sổ bước nghiệp vụ thay cho dòng Log tóm tắt mỗi lát), dùng cho phép đếm lần gọi kho.
   async function fullPipeline(withTrace, mode) {
@@ -820,6 +822,39 @@ async function chay(so) {
      'session_probe:user', 'authorize:customer', 'authorize:activity', 'grid:customer'
   ], 4, true, true, null, 'done', 0]);
 
+  // Extension cũ không ghi mã hợp đồng vào response; trang Customer có khách thật vẫn không được đi tới cửa ghi Sheet.
+  const contractRun = async (contract) => {
+    const logs = [];
+    const flow = workflowGas({ logEvent: (event) => { logs.push(event); } });
+    let sheetWrites = 0;
+    flow.hop.FbmSync.prepareCategoryGate = () => ({ map: {} });
+    flow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
+    flow.hop.FbmSync.pullWrite = (entity, records) => { sheetWrites += records.length; return { ok: true, written: records.length, conflicts: 0, skipped: 0 }; };
+    flow.hop.FbmSync.markMissingAfterFullScan = () => { sheetWrites += 1; return { total: 0, written: 0 }; };
+    flow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+    const fields = ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ma_so_thue', 'ong_ba', 'dc_lh', 'dien_thoai', 'email', 'website', 'ten_dclh_tinh', 'ten_nguon_dm', 'ten_sp', 'ngay_gd', 'datetime0', 'xorder'];
+    let step = flow.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true }), last = step;
+    for (let hop = 0; step && step.request && hop < 12; hop += 1) {
+      const request = step.request, grid = request.meta.kind === 'grid';
+      let body = userResponse;
+      if (request.meta.kind === 'authorize') { body = JSON.stringify({ d: { Authorized: 'auth-' + request.meta.entity } }); }
+      if (grid) { body = gridResponse(fields, [row(fields, { stt_rec_kh: 'KH-REC-1', ma_kh: 'KH001', ten_kh: 'Khách thử' })], 1); }
+      const raw = executorRaw((await sendThroughExecutor(request, body)).reply, request.id);
+      if (grid) { raw.transport.contract = contract; }
+      step = flow.hop.FbmSync.continue(raw); last = step;
+      if (grid) { break; }
+    }
+    return { last, logs, sheetWrites, state: flow.hop.FbmSync.stateRead() };
+  };
+  const oldExtension = await contractRun(undefined), sameContract = await contractRun(MA_HOP_DONG);
+  const mismatchLog = oldExtension.logs.find((event) => event.action === 'extension_contract_mismatch') || {};
+  check(so, 'Extension lệch mã hợp đồng: GAS dừng phiên, không ghi Sheet, Sidebar nhận lỗi và Log ghi "Extension trên máy này đang dùng bản cũ, hãy tải lại Extension"', [
+    oldExtension.last.ok, oldExtension.last.code, oldExtension.last.request, oldExtension.sheetWrites,
+    oldExtension.last.status.phase, String(oldExtension.last.status.lastError || '').indexOf('Extension trên máy này đang dùng bản cũ, hãy tải lại Extension') >= 0,
+    mismatchLog.reason, mismatchLog.detail && mismatchLog.detail.received, oldExtension.state.activeRequestId,
+    sameContract.sheetWrites > 0
+  ], [false, 'FBM_EXTENSION_CONTRACT_MISMATCH', null, 0, 'error', true, 'Extension trên máy này đang dùng bản cũ, hãy tải lại Extension.', '(Extension không gửi mã)', '', true]);
+
   const approval = workflowGas();
   approval.hop.FbmSync.runPreflight = () => ({ ok: true, issues: [], blocking: [], candidateCount: 11 });
   const awaitingApproval = approval.hop.FbmSync.start({ mode: 'push', origin: 'manual', manual: true });
@@ -836,7 +871,7 @@ async function chay(so) {
   const stopPending = stopAfterResponse.hop.fbmSyncCancel();
   const stopped = stopAfterResponse.hop.FbmSync.continue({
     ok: true, status: 200, body: userResponse,
-    transport: { trace: [{ stage: 'executor_response_sent', requestId: stopStarted.request.id }] }
+    transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId: stopStarted.request.id }] }
   });
   check(so, 'cancel request doc dang bay: nhan response de dong lat roi dung, khong cap authorize Activity', [
     stopPending.code, stopped.ok, stopped.request || null, stopped.status.phase, stopAfterResponse.hop.FbmSync.stateRead().cursor.kind
@@ -849,7 +884,7 @@ async function chay(so) {
   masterOff.hop.FbmSync.setMasterEnabled(false);
   const masterStopped = masterOff.hop.FbmSync.continue({
     ok: true, status: 200, body: userResponse,
-    transport: { trace: [{ stage: 'executor_response_sent', requestId: masterStarted.request.id }] }
+    transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId: masterStarted.request.id }] }
   });
   check(so, 'master OFF request dang bay: chi chan envelope tiep theo va giu cursor de chan doan', [
     masterStopped.ok, masterStopped.request || null, masterStopped.status.phase, masterOff.hop.FbmSync.stateRead().cursor.kind
@@ -884,7 +919,7 @@ async function chay(so) {
 
   const stale = workflowGas();
   const staleStarted = stale.hop.FbmSync.start({ mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true });
-  const staleResult = stale.hop.FbmSync.continue({ ok: true, status: 200, body: userResponse, transport: { trace: [{ stage: 'executor_response_sent', requestId: 'old-request' }] } });
+  const staleResult = stale.hop.FbmSync.continue({ ok: true, status: 200, body: userResponse, transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId: 'old-request' }] } });
   check(so, 'response cu khong duoc phep mo bat ky buoc pipeline nao', [
     staleResult.ok, staleResult.code, stale.hop.FbmSync.stateRead().activeRequestId === staleStarted.request.id
   ], [false, 'STALE_RESPONSE', true]);

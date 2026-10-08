@@ -2,6 +2,7 @@
 const NHOM = [
   require("./fbmSync/Control"),
   require("./fbmSync/Protocol"),
+  require("./fbmSync/Contract"),
   require("./fbmSync/Builders"),
   require("./fbmSync/Pull"),
   require("./fbmSync/Reconcile"),
