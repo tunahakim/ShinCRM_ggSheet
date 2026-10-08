@@ -43,8 +43,10 @@ function fbmSyncRunForceLoginBlocks(status) {
 /** Băng cảnh báo chế độ thử, để người dùng luôn thấy lượt chạy đang bị giới hạn trong danh sách mã nào. */
 function fbmSyncRunTestModeBlocks() {
   var settings = FBM_SYNC_CLIENT.syncSettings || {}, schema = FBM_SYNC_RUN_SCHEMA.testMode;
-  if (settings.testMode === false || !Array.isArray(settings.testCodes)) { return []; }
-  return [Notice({ kind: 'warning', text: settings.testCodes.length ? schema.on + settings.testCodes.join(', ') + '.' : schema.empty })];
+  if (settings.testMode === false || !Array.isArray(settings.testFbmCodes) || !Array.isArray(settings.testShinCodes)) { return []; }
+  var list = function (codes) { return codes.length ? codes.join(', ') + '.' : schema.none; };
+  var text = settings.testFbmCodes.length || settings.testShinCodes.length ? schema.on + schema.fbm + list(settings.testFbmCodes) + schema.shin + list(settings.testShinCodes) : schema.empty;
+  return [Notice({ kind: 'warning', text: text })];
 }
 function fbmSyncRunDetailsBlocks(status) {
   var reset = fbmSyncRunTestModeBlocks().concat(fbmSyncRunResetBlocks(status), fbmSyncRunForceLoginBlocks(status));

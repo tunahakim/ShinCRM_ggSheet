@@ -537,7 +537,8 @@ function fbmSyncInstall() {
       var nextTestMode = target.getAttribute('aria-pressed') !== 'true';
       fbmSyncSetTargetState(target.id, { addClass: [uiSyncToggleClass('settings', nextTestMode)], removeClass: [uiSyncToggleClass('settings', !nextTestMode)], ariaPressed: nextTestMode });
       fbmSyncConfigSetDraftValue('module', 'testMode', nextTestMode);
-      fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.module.testCodesId, { disabled: !nextTestMode });
+      fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.module.testFbmCodesId, { disabled: !nextTestMode });
+      fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.module.testShinCodesId, { disabled: !nextTestMode });
     } else if (target.hasAttribute('data-sync-extension-startup')) {
       if (target.disabled) { return; }
       var startupEnabled = target.getAttribute('aria-pressed') !== 'true';
@@ -634,7 +635,7 @@ function fbmSyncInstall() {
     }
     var accountSettings = { 'fbm-account-customer-prefix': 'customerPrefix', 'fbm-account-customer-length': 'customerCodeLength', 'fbm-account-activity-since': 'activitySince' };
     if (accountSettings[id]) { FBM_SYNC_CLIENT.accountSettingsDraft[accountSettings[id]] = String(target.value || ''); fbmSyncConfigSetDraftValue('accountSettings', accountSettings[id], String(target.value || '')); if (FBM_SYNC_CLIENT.accountSettingsInvalid) { delete FBM_SYNC_CLIENT.accountSettingsInvalid[accountSettings[id]]; } }
-    var settingsInput = { 'fbm-extension-poll-minutes': 'extension.pollMinutes', 'fbm-sync-detail-count': 'background.detail.customersPerRun', 'fbm-sync-detail-delay-min': 'background.detail.minDelaySeconds', 'fbm-sync-detail-delay-max': 'background.detail.maxDelaySeconds', 'fbm-sync-login-retry-minutes': 'loginPolicy.retryMinutes', 'fbm-sync-setting-approval-threshold': 'module.approvalThreshold', 'fbm-sync-setting-test-codes': 'module.testCodes' };
+    var settingsInput = { 'fbm-extension-poll-minutes': 'extension.pollMinutes', 'fbm-sync-detail-count': 'background.detail.customersPerRun', 'fbm-sync-detail-delay-min': 'background.detail.minDelaySeconds', 'fbm-sync-detail-delay-max': 'background.detail.maxDelaySeconds', 'fbm-sync-login-retry-minutes': 'loginPolicy.retryMinutes', 'fbm-sync-setting-approval-threshold': 'module.approvalThreshold', 'fbm-sync-setting-test-fbm-codes': 'module.testFbmCodes', 'fbm-sync-setting-test-shin-codes': 'module.testShinCodes' };
     if (settingsInput[id]) {
       var configKey = settingsInput[id].split('.')[0] === 'module' ? 'module' : settingsInput[id].split('.')[0] === 'loginPolicy' ? 'loginPolicy' : settingsInput[id].split('.')[0];
       fbmSyncConfigSetDraftValue(configKey, settingsInput[id].split('.').slice(1).join('.'), String(target.value || ''));
@@ -1121,9 +1122,9 @@ function fbmSyncSaveSyncSettings(button) {
   if (button) { button.disabled = true; }
   var thresholdInput = document.getElementById('fbm-sync-setting-approval-threshold');
   var thresholdValue = thresholdInput ? String(thresholdInput.value || '').trim() : '';
-  var testCodesInput = document.getElementById(FBM_SYNC_SETTINGS_SCHEMA.module.testCodesId);
-  // GAS tách, bỏ trùng và kiểm ký tự của danh sách mã; client gửi nguyên chuỗi người dùng gõ.
-  var payload = { approvalThreshold: thresholdValue === '' ? '' : Number(thresholdValue), testMode: fbmSyncToggleValue(FBM_SYNC_SETTINGS_SCHEMA.module.testModeId), testCodes: testCodesInput ? String(testCodesInput.value || '') : '' };
+  var fbmCodesInput = document.getElementById(FBM_SYNC_SETTINGS_SCHEMA.module.testFbmCodesId), shinCodesInput = document.getElementById(FBM_SYNC_SETTINGS_SCHEMA.module.testShinCodesId);
+  // GAS tách, bỏ trùng, kiểm ký tự và kiểm đúng loại mã của từng ô; client gửi nguyên chuỗi người dùng gõ.
+  var payload = { approvalThreshold: thresholdValue === '' ? '' : Number(thresholdValue), testMode: fbmSyncToggleValue(FBM_SYNC_SETTINGS_SCHEMA.module.testModeId), testFbmCodes: fbmCodesInput ? String(fbmCodesInput.value || '') : '', testShinCodes: shinCodesInput ? String(shinCodesInput.value || '') : '' };
   var draft = fbmSyncConfigState('module').draft || {}, desiredMaster = draft.enabled !== false, currentMaster = fbmSyncConfigMasterEnabled();
   var masterSave = desiredMaster === currentMaster ? Promise.resolve({ ok: true }) : callServer('fbmSetMasterSwitch', [desiredMaster]);
   return masterSave.then(function (masterResult) {
