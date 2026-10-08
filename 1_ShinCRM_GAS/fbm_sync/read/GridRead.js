@@ -48,7 +48,8 @@ FbmSync.gridRequest = function (entity, options) {
   var controller = FbmSync.CONTROLLERS[entity];
   var payload = {
     type: Number(opt.type === undefined ? 0 : opt.type), count: Number(opt.count || (entity === 'customer' ? 2000 : 100)), language: 'v', controller: controller,
-    viewId: null, childObject: false, lastPageIndex: opt.lastPageIndex === undefined ? -1 : opt.lastPageIndex,
+    // FBM biết chiều chuyển trang nhờ so `gridPageIndex` với `lastPageIndex` (trang đang đứng); ShinCRM chỉ đi tới nên trang đang đứng luôn là trang kế trừ 1.
+    viewId: null, childObject: false, lastPageIndex: opt.lastPageIndex !== undefined ? opt.lastPageIndex : (Number(opt.gridPageIndex) > 0 ? Number(opt.gridPageIndex) - 1 : -1),
     firstPageItem: opt.firstPageItem || '', lastPageItem: opt.lastPageItem || '', lastRowCount: Number(opt.lastRowCount || 0), memvars: [],
     externalKey: opt.externalKey || [], gridPageIndex: opt.gridPageIndex === undefined ? -1 : opt.gridPageIndex,
     gridPageValue: opt.gridPageValue === undefined ? null : opt.gridPageValue, gridRefresh: !!opt.gridRefresh, filter: opt.filter || [],
@@ -275,10 +276,13 @@ FbmSync.gridPageValue = function (values) {
   });
 };
 
-/** Trang đầu là -1 nên không dùng `|| -1`: trang 0 là số hợp lệ, `0 || -1` làm lặp lại trang 0 mãi. */
+/**
+ * Trang thứ N có chỉ số N-1; trang đầu gửi -1 (hoặc -2 khi không lấy tiêu đề) nhưng thực chất là chỉ số 0, nên trang kế của trang đầu là 1.
+ * Gửi 0 kèm khóa trang thì FBM hiểu là quay về trang 1 và trả trang rỗng (Nghiên cứu FBM ch03 mục gridPageIndex, mẫu "Lấy trang khách hàng không có tiêu đề").
+ */
 FbmSync.gridNextPageIndex = function (pageIndex) {
   var index = pageIndex === null || pageIndex === undefined || pageIndex === '' ? -1 : Number(pageIndex);
-  return isFinite(index) && index >= 0 ? Math.floor(index) + 1 : 0;
+  return (isFinite(index) && index >= 0 ? Math.floor(index) : 0) + 1;
 };
 
 /** Vị trí trang xoay tiếp theo tính từ trang vừa đọc; hết danh sách thì quay lại trang đầu. Tính ngay khi nhận trang để cursor chỉ mang vị trí này, không mang cả các dòng Customer. */
