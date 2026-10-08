@@ -229,6 +229,24 @@ Kết luận: bộ nhớ và việc hash ở GAS không phải điểm nghẽn �
 
 **Đề xuất đưa vào đợt 2 (chờ chủ dự án):** (1) lượt đồng bộ ghi Sheet không vẽ lại View sau mỗi lần ghi mà đánh dấu và vẽ một lần cuối lượt, và cho tín hiệu reload/cấp mã đi qua một bộ đệm DocumentProperties dùng chung với core thay vì đọc thẳng (đụng core ShinCRM nên cần duyệt); (2) đo lại riêng lần lấy quyền Activity 29,8 giây đường truyền.
 
+### 2B.8. Số đo sau đợt 2 (2026-10-08, Sheet DEV, chế độ thử 20 khách, "Lấy từ FBM → ShinCRM", "tự vẽ View" tắt)
+
+Chuẩn bị: `fbmPerfOn`, `fbmPerfTestScopeOn`, `fbmPerfDropScopeActivities` (xóa 10 dòng Activity của khách thử để lượt Lấy ghi lại). Extension đã tải lại bản có mã hợp đồng; lượt chạy qua cổng phiên bản bình thường. Kết quả lượt: tiến trình 20/20 (100%), xử lý 78 bản ghi, ghi lại 10, 0 lỗi, 0 xung đột, 218 giây từ lần gọi đầu đến lần cuối.
+
+| Mỗi lần gọi Activity (20 lần) | 2B.7 lần đo 2 | Sau đợt 2 |
+|---|---|---|
+| GAS | 11,3 giây (3,4–32,2) | 5,3 giây (2,7–10,0) |
+| Khứ hồi | 14,2 giây | 7,5 giây (đường truyền 2,3 giây) |
+| Extension gọi FBM | — | 0,1 giây |
+| Đọc Sheet (`entityReadAll` Customer + Activity) | khoảng 4,3 giây | 3,4 giây (65% thời gian GAS) |
+| Cửa ghi `writeGateSave` | khoảng 15 giây mỗi lần ghi | 3 lần ghi, 4,6 giây tổng (khoảng 1,5 giây mỗi lần) |
+
+- Cửa ghi nhanh lên chủ yếu vì "tự vẽ View" tắt khi đo, không phải do code đợt 2; khi bật lại thì vẽ View vẫn chạy sau mỗi lần ghi. Đề xuất cũ ở 2B.7 (vẽ View một lần cuối lượt) vẫn còn giá trị.
+- `readCategoryGate` 2 lần mỗi lần gọi nhưng lần thứ hai lấy từ bản chụp Sheet (0,6 giây mỗi lần gọi là một lần đọc thật). `flushLog` 0,28 giây mỗi lần gọi (LOG_TRACE đang bật).
+- Đầu lượt: `fbmStartSync` 8,9 giây GAS (đọc Sheet 2,5 giây, `flushLog` ×5 1,8 giây, 9 lần `deleteProperty` reset dấu đã thấy 1,2 giây); lấy quyền Customer 2,8 giây khứ hồi; lưới Customer 6,9 giây khứ hồi (FBM 1,8 giây); lấy quyền Activity 10,5 giây khứ hồi, đường truyền 2,7 giây (con số 29,8 giây ở 2B.7 không lặp lại, coi là chập chờn mạng).
+- **Bất thường chưa rõ nguyên nhân:** lần gọi xử lý kết quả dò phiên mất 40,5 giây GAS, gần như toàn bộ là thời gian tự thân trong `withOrchestrationLock`, tức nằm ở hàm chưa được bộ đo bọc (khóa lấy được trong 0,08 giây). Trace chỉ giữ 60 sự kiện cuối nên không còn dấu. Giả thuyết: chờ một khóa khác hoặc Sheet bận vì Sidebar vừa nạp lại cùng lúc. Trước khi tối ưu ở đợt 3: bọc đo thêm các hàm cổng phiên và thời gian chờ khóa, đo lại đầu lượt.
+- Kết luận cho đợt 3: phần còn lại mỗi khách gần như cố định (đọc Sheet 3,4 giây + đường truyền 2,3 giây). Gom cả trang 50 khách vào một lần gọi GAS thì hai khoản này chỉ trả một lần cho cả gói.
+
 ## 3. Ranh giới GAS – Extension – Sidebar
 
 ### 3.1. GAS sở hữu
