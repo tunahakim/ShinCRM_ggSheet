@@ -156,6 +156,40 @@ Tiện thể ghi nhận, không phải phát hiện của phiên này nhưng kh�
 
 ---
 
+## Vấn đề 8 — Cấp mã mới làm Sidebar nạp lại toàn bộ dữ liệu (quy tắc lỗi thời)
+
+**Mức độ: cao về hiệu năng. Phát hiện ngày 2026-10-08 ở phiên refactor đồng bộ FBM, đọc code trực tiếp; chưa kiểm chứng trên Sheet DEV.**
+
+**Quan sát từ code.**
+- `writeGateRun` trả `configChanged: moi.length > 0` (`server/gate/WriteGate.js`), tức cứ có bản ghi mới cần cấp mã là coi như Config đổi.
+- `reloadDecisionForChange` (`server/state/ReloadDecision.js`) thấy `configChanged` thì bật `config` + `allCore` với lý do "Cấp mã mới đã làm đổi bộ đếm trong Config", và Sidebar nhận cờ `allCore` sẽ chạy lại `sidebarBoot`: nạp lại tất cả khách, Config, Category và toàn bộ Activity theo gói.
+- Nhưng bộ đếm mã đã chuyển khỏi sheet Config sang DocumentProperties (đầu tệp `server/gate/IdGate.js`: bộ đếm "không nằm trên sheet"). Cấp mã không còn làm Config đổi, nên cờ nạp toàn bộ ở đây là thừa.
+
+**Hệ quả.** Mỗi lượt đồng bộ Lấy có giao dịch hoặc khách mới, và có thể cả khi người dùng tạo một bản ghi mới trên Sidebar (chưa kiểm), đều khiến Sidebar nạp lại toàn bộ dữ liệu ở lần làm mới kế tiếp, thay vì chỉ nạp các bản ghi mới.
+
+**Hướng xử lý gợi ý.** Bỏ liên kết "cấp mã mới ⇒ Config đổi"; bản ghi mới chỉ vào danh sách mã đã đổi (`records`) như bản ghi sửa. Kiểm trước: tạo một khách mới bằng tay trên Sheet DEV, xem Sidebar nạp `reloadRecords` hay `sidebarBoot`.
+
+---
+
+## Vấn đề 9 — Sidebar chỉ biết dữ liệu đổi khi tình cờ gọi GAS việc khác
+
+**Mức độ: trung bình. Phát hiện ngày 2026-10-08, đọc code trực tiếp; điểm "nạp giữa lượt đồng bộ" là giả thuyết chưa kiểm chứng.**
+
+**Quan sát từ code.**
+- Không có nhịp hỏi định kỳ và không có tín hiệu đẩy: `CRM_RELOAD` (đánh thức từ Extension) chỉ có trong hàm dò DEV `ReloadMatrixProbe.js`, bản chạy thật không phát.
+- Sidebar chỉ thấy tín hiệu khi một lời gọi máy chủ "tự nhiên" trả về trạng thái reload (`sheetLinkObserveReloadPayload` trong `client/link/sheetLink.html`), thường là lúc dò ô chọn (`probeSelectionAndReload`).
+- Nạp theo tín hiệu: chỉ có danh sách mã thì `reloadRecords` (đọc cột mã Customer/Activity để tìm dòng, gửi đúng các dòng cần); có `allCore`/`config`/`schema` thì `sidebarBoot` nạp lại toàn bộ. Tín hiệu cộng dồn giữa các lần ghi nên nhiều lần ghi chỉ dẫn tới một lần nạp.
+- Phản hồi của `fbmContinueSync` không mang trạng thái reload, nên các lần ghi trong lượt đồng bộ không tự kích nạp; nhưng `client/ram/refresh.html` có nhánh "đang ở màn đồng bộ thì làm mới RAM mà không vẽ lại", tức làm mới vẫn có thể chạy giữa lượt nếu dò ô chọn thấy cờ.
+- Sau khi lượt đồng bộ xong, Sidebar không tự hỏi lại; người dùng không chọn ô nào thì RAM giữ bản cũ.
+
+**Liên quan số đo.** Lần đo 2026-10-08 (tài liệu refactor FBM mục 2B.7) có một lần gọi đồng bộ mất 29,8 giây đường truyền bất thường; giả thuyết là Sidebar chạy `sidebarBoot` (do Vấn đề 8) chen giữa lượt. Cần kiểm.
+
+**Hướng xử lý gợi ý.** Trong lúc lượt đồng bộ chạy thì hoãn làm mới RAM; lượt kết thúc (kể cả vì lỗi) thì Sidebar tự hỏi GAS một lần và nạp đúng các bản ghi đã đổi. Gộp với thiết kế tín hiệu rẻ ở Vấn đề 2.
+
+**Ngoài phạm vi tài liệu này.** Việc vẽ lại sheet View sau mỗi lần ghi trong lượt đồng bộ, và chi phí DocumentProperties của cửa ghi, do phiên refactor đồng bộ FBM xử lý (tài liệu refactor FBM mục 2B.7 và kế hoạch đợt 2).
+
+---
+
 ## Thứ tự công việc gợi ý
 
 Việc đầu tiên và không thể bỏ qua là chẩn đoán Vấn đề 1 bằng trigger `diagOnEdit`. Nếu thay đổi từ xa không bao giờ đến được server thì không nên viết một dòng Extension nào cả — móng phải xong trước.
