@@ -165,6 +165,21 @@ function selectionReadPlan() {
 }
 
 /**
+ * Sidebar chỉ báo mã lỗi một lần mỗi phiên; client không được ghi sheet nên GAS ghi hộ trong lượt selection sẵn có.
+ * Chỉ nhận mã dạng hằng để chuỗi lạ từ client không đi thẳng vào `Log`.
+ */
+function selectionLogReaderFailure(code) {
+  var value = String(code || '').trim();
+  if (!/^[A-Z_]{1,40}$/.test(value)) { return; }
+  logEvent({
+    source: 'sidebar',
+    action: 'extension_read',
+    outcome: LOG_WARN,
+    reason: 'Extension không đọc được dữ liệu Sheet (' + value + '); Sidebar chuyển sang hỏi GAS mã khách ở ô đang chọn, chậm hơn. Thường do Google đổi cấu trúc nội bộ của Sheets.'
+  });
+}
+
+/**
  * Một request bên ngoài cho cả selection và reload. GAS là nơi duy nhất quyết
  * định có cần đọc cột mã khách và có cần nạp RAM hay không; Sidebar chỉ truyền
  * context lần trước rồi thực thi output.
@@ -174,6 +189,7 @@ function probeSelectionAndReload(input) {
     var started = Date.now();
     var request = input || {};
     var requestId = selectionReloadRequestId(request);
+    selectionLogReaderFailure(request.extensionReadFailure);
     var context = selectionProbeContext();
     var snapshot = selectionSnapshotFromContext(context);
     var previous = request.previousSelectionContext || request.selectionContext || null;
