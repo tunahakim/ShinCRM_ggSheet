@@ -64,6 +64,8 @@ function ensureFbmTab(request) {
   });
 }
 var FBM_EXECUTOR_VERSION = '21.19';
+// Mã phiên bản hợp đồng GAS–Extension (tests/contracts/gasExtensionContract.js). Chỉ trả về cho GAS; GAS quyết định dừng khi lệch mã.
+var FBM_CONTRACT_VERSION = 'bb81fdb2c4aa';
 
 function addWorkerTrace(reply, request, stage, extra) {
   var event = Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {});
@@ -186,10 +188,19 @@ function sendToFbmTab(tabId, request) {
     return hydrateLoginRequest(request).then(function (readyRequest) {
       request = readyRequest;
       return waitForGenericRequestDelay(request).then(function () {
-        return sendTabMessage(tabId, { type: 'FBM_EXECUTE_V2', request: request }, 15000).then(function (reply) { return showFbmHomeAfterLogin(tabId, request, reply); });
+        return sendTabMessage(tabId, { type: 'FBM_EXECUTE_V2', request: request }, 15000).then(function (reply) { return showFbmHomeAfterLogin(tabId, request, stampContract(reply)); });
       });
     });
   });
+}
+
+/** Mọi response FBM về GAS (qua Sidebar hay nhịp nền) đều đi qua đây, nên đóng dấu mã hợp đồng ở đúng một chỗ. */
+function stampContract(reply) {
+  if (reply && reply.result && typeof reply.result === 'object') {
+    reply.result.transport = reply.result.transport || {};
+    reply.result.transport.contract = FBM_CONTRACT_VERSION;
+  }
+  return reply;
 }
 
 /** Đăng nhập chạy bằng fetch nên tab vẫn đứng ở trang lỗi/Login; GAS cấp địa chỉ màn hình làm việc, Extension chỉ mở và chờ tải xong trước khi trả kết quả để request kế tiếp không rơi vào tab đang tải. */
