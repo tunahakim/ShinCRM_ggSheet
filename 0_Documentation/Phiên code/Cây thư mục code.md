@@ -205,6 +205,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── schema\FbmFields.js      Field map, controller và trạng thái FBM.
     ├── SyncSchema.js             Khai 8 cột thuần đồng bộ. Tám cột này không được xuất hiện trong DATA_SCHEMA.
     ├── protocol\Protocol.js     Envelope và parse response.
+    ├── transportBudget.js     Ngân sách thời gian và kích thước kênh GAS–Sidebar–Extension (một nơi giữ con số).
     ├── transport\TransportCore.js Hợp đồng request và retry đọc an toàn.
     ├── transport\PushFlow.js    Điều phối chiều đẩy và khóa an toàn trước khi ghi FBM.
     ├── transport\PullFlow.js    Điều phối preflight, đọc Customer và đọc Activity.
