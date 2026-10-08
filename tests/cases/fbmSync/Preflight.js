@@ -9,9 +9,11 @@ async function chay(so) {
     category: { categories: {} },
     issues: []
   }) });
-  napServer(hop, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/report/Preflight.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
+  napServer(hop, 'server/gate/IdGate.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/report/Preflight.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
   const realReadLocal = hop.FbmSync.readLocal;
   hop.FbmSync.scriptSettings = () => ({ accountName: '' });
+  // Các ca khác không xét phạm vi thử; ca phạm vi thử tự đặt lại.
+  hop.FbmSync.testScopeCodes = () => null;
   hop.FbmSync.readCategoryGate = () => ({ valid: {} });
   hop.FbmSync.currentSpreadsheetId = () => 'sheet-a';
   hop.FbmSync.configValue = () => '';
@@ -49,9 +51,13 @@ async function chay(so) {
   check(so, 'preflight identity check được phép chạy để xử lý REBIND', [identityCheck.ok, identityCheck.blocking.some((item) => item.code === 'REBIND_REQUIRED')], [true, false]);
   {
     const savedScope = hop.FbmSync.testScopeCodes;
-    hop.FbmSync.testScopeCodes = () => [];
+    hop.FbmSync.testScopeCodes = () => ({ fbm: [], shin: ['CUS-000001'] });
     const emptyRead = hop.FbmSync.runPreflight({ mode: 'read' }), emptyIdentity = hop.FbmSync.runPreflight({ mode: 'check', scan: 'identity_check' });
-    check(so, 'Chế độ thử bật mà danh sách mã trống: chặn lượt đọc trước request FBM đầu tiên, lệnh kiểm liên kết vẫn chạy', [emptyRead.ok, emptyRead.blocking.some((item) => item.code === 'FBM_TEST_SCOPE_EMPTY'), emptyIdentity.blocking.some((item) => item.code === 'FBM_TEST_SCOPE_EMPTY')], [false, true, false]);
+    check(so, 'Chế độ thử bật mà danh sách mã FBM trống: chặn lượt lấy trước request FBM đầu tiên dù danh sách mã ShinCRM có mã, lệnh kiểm liên kết vẫn chạy', [emptyRead.ok, emptyRead.blocking.some((item) => item.code === 'FBM_TEST_SCOPE_EMPTY'), emptyIdentity.blocking.some((item) => item.code === 'FBM_TEST_SCOPE_EMPTY')], [false, true, false]);
+    hop.FbmSync.testScopeCodes = () => ({ fbm: ['ALT00010'], shin: [] });
+    const emptyPush = hop.FbmSync.runPreflight({ mode: 'push' }), fbmOnlyRead = hop.FbmSync.runPreflight({ mode: 'read' });
+    check(so, 'Chế độ thử: lượt đẩy cần danh sách mã ShinCRM, lượt lấy chỉ cần danh sách mã FBM',
+      [emptyPush.blocking.filter((item) => item.code === 'FBM_TEST_SCOPE_EMPTY').map((item) => item.message.indexOf('mã khách ShinCRM') >= 0), fbmOnlyRead.issues.some((item) => item.code === 'FBM_TEST_SCOPE_EMPTY')], [[true], false]);
     hop.FbmSync.testScopeCodes = () => null;
     check(so, 'Tắt chế độ thử: không có lỗi phạm vi thử trống', hop.FbmSync.runPreflight({ mode: 'read' }).issues.some((item) => item.code === 'FBM_TEST_SCOPE_EMPTY'), false);
     hop.FbmSync.testScopeCodes = savedScope;

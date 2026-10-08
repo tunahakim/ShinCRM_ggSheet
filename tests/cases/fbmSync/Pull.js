@@ -113,15 +113,15 @@ async function chay(so) {
   check(so, 'FBM-046: field ngày trống gửi null như form FBM, không gửi chuỗi rỗng', [emptyDate.OldValue, emptyDate.NewValue], [null, null]);
   check(so, 'fixture session giữ cookie và userId', [builders.FbmSync.stateRead().session.cookie, builders.FbmSync.stateRead().session.userId], ['461020379855cFHN_CRM_App', '2037']);
   check(so, 'Customer grid gắn điều kiện phân quyền theo userId trong payload cookie', builders.FbmSync.customerGridRequest({ type: 0 }).body.externalKey[0].Name, "stt_rec_kh in (select stt_rec_kh from dbo.zcFastBusiness$Function$GetCustomerValidate('2037')) and 1");
-  builders.FbmSync.testScopeCodes = () => ['ALT00010', 'CUS-020061'];
+  builders.FbmSync.testScopeCodes = () => ({ fbm: ['ALT00010', 'ALT00011'], shin: ['CUS-020061'] });
   const customerGridKeys = builders.FbmSync.customerGridRequest({ type: 0 }).body.externalKey;
-  check(so, 'Chế độ thử: grid Customer chỉ đọc khách có mã trong danh sách thử', [customerGridKeys.length, customerGridKeys[1] && customerGridKeys[1].Name, customerGridKeys[1] && customerGridKeys[1].Value], [2, "ma_kh in ('ALT00010','CUS-020061') and 1", 1]);
-  builders.FbmSync.testScopeCodes = () => [];
+  check(so, 'Chế độ thử: chiều lấy chỉ lọc grid Customer theo danh sách mã FBM, bỏ qua danh sách mã ShinCRM', [customerGridKeys.length, customerGridKeys[1] && customerGridKeys[1].Name, customerGridKeys[1] && customerGridKeys[1].Value], [2, "ma_kh in ('ALT00010','ALT00011') and 1", 1]);
+  builders.FbmSync.testScopeCodes = () => ({ fbm: [], shin: ['CUS-020061'] });
   const emptyScopeKeys = builders.FbmSync.customerGridRequest({ type: 0 }).body.externalKey;
   check(so, 'Chế độ thử với danh sách rỗng: grid Customer lọc ra không khách nào, không rơi thành quét toàn bộ', [emptyScopeKeys.length, emptyScopeKeys[1] && emptyScopeKeys[1].Name], [2, "ma_kh in ('') and 1"]);
   builders.FbmSync.testScopeCodes = () => null;
   check(so, 'Tắt chế độ thử: grid Customer chỉ còn điều kiện phân quyền', builders.FbmSync.customerGridRequest({ type: 0 }).body.externalKey.length, 1);
-  builders.FbmSync.testScopeCodes = () => ['ALT00010'];
+  builders.FbmSync.testScopeCodes = () => ({ fbm: ['ALT00010'], shin: [] });
 
   const bulkActivity = builders.FbmSync.activityBulkRequest({ type: 0 });
   check(so, 'Bulk Activity không gắn mốc thời gian hay Customer đơn lẻ', [bulkActivity.meta.kind, bulkActivity.body.externalKey.some((item) => item.Name === 'end_date' && item.Opr === '>='), bulkActivity.body.externalKey.some((item) => item.Name === 'stt_rec')], ['activity_bulk_grid', false, false]);
@@ -370,7 +370,7 @@ async function chay(so) {
   check(so, 'missing scan bo qua record dang user sua', [edges.FbmSync.markMissingAfterFullScan('customer', missingState).written, missingWrite], [0, false]);
   let missingBatch;
   const fullScanState = { mode: 'write', metadata: { seen: { customer: {} } }, locks: {} };
-  edges.FbmSync.scriptSettings = () => ({ testCodes: null });
+  edges.FbmSync.scriptSettings = () => ({ testFbmCodes: null, testShinCodes: null });
   edges.FbmSync.stateRead = () => fullScanState;
   edges.FbmSync.readLocal = () => [{ id: 'CUS-000011', fbmId: 'FBM-MISSING', recordStatus: 'active' }, { id: 'CUS-000012', fbmId: 'FBM-TOMBSTONE', recordStatus: 'deleted' }];
   edges.writeGateSave = (request) => { missingBatch = request; return { ok: true }; };
