@@ -1,7 +1,6 @@
 /* Cầu nối FBM: nhận request, fetch trong tab đăng nhập, trả response thô. */
 (function () {
-  var EXECUTOR_VERSION = '21.19';
-  var FETCH_TIMEOUT_MS = 10000;
+  var EXECUTOR_VERSION = '21.20';
   function traceEvent(trace, stage, request, extra) {
     trace.push(Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {}));
   }
@@ -238,15 +237,16 @@
       captureError.trace = trace;
       return Promise.reject(captureError);
     }
-    var controller = new AbortController();
-    var timer = setTimeout(function () { controller.abort(); }, FETCH_TIMEOUT_MS);
+    // Hạn một lần fetch do GAS cấp trong envelope (Tài liệu 09/01 "Ngân sách một lượt"); executor không giữ con số riêng.
+    var fetchMs = Math.max(0, Number(req.meta && req.meta.fetchMs || 0)), controller = new AbortController();
+    var timer = setTimeout(function () { controller.abort(); }, fetchMs);
     traceEvent(trace, 'fetch_started', req);
     return fetch(String(req.url || ''), { method: req.method || 'POST', headers: req.headers || { 'content-type': 'application/json; charset=UTF-8' }, body: sent, credentials: 'include', cache: 'no-store', signal: controller.signal }).then(function (response) {
       return readResponseText(response).then(function (body) { var captured = captureTransport(req, body); traceEvent(trace, 'fetch_finished', req, { httpStatus: response.status, responseLength: body.length }); return { ok: response.ok, status: response.status, headers: { contentType: response.headers.get('content-type') || '' }, body: body, transport: Object.assign({}, captured, { trace: trace }) }; });
     }).catch(function (err) {
       traceEvent(trace, 'fetch_finished', req, { error: String(err && err.message || err) });
       try { err.trace = trace; } catch (ignore) {}
-      if (err && err.name === 'AbortError') { throw new Error('FBM không phản hồi sau 10 giây.'); }
+      if (err && err.name === 'AbortError') { throw new Error('FBM không phản hồi sau ' + Math.round(fetchMs / 1000) + ' giây.'); }
       throw err;
     }).finally(function () { clearTimeout(timer); });
   }

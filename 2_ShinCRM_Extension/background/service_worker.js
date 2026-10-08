@@ -15,7 +15,7 @@ function findFbmTab() {
   return chrome.tabs.query({ url: ['https://fbo.com.vn:8888/*'] }).then(function (tabs) { return tabs && tabs.length ? tabs[0] : null; });
 }
 /** Đợi trang FBM sẵn sàng trước khi tiêm executor; không tự đổi URL hoặc quyết định nghiệp vụ. */
-function waitForFbmTabReady(tab) {
+function waitForFbmTabReady(tab, timeoutMs) {
   var target = tab || {}, tabId = Number(target.id || 0);
   if (!tabId || String(target.status || 'complete') === 'complete' || !chrome.tabs || !chrome.tabs.onUpdated || typeof chrome.tabs.onUpdated.addListener !== 'function') {
     return Promise.resolve(target);
@@ -30,7 +30,7 @@ function waitForFbmTabReady(tab) {
       var error = new Error('Tab FBM chưa tải xong trong thời gian an toàn.');
       error.code = 'FBM_TAB_NOT_READY';
       reject(error);
-    }, 15000);
+    }, Math.max(0, Number(timeoutMs || 0)));
     function finish(value) {
       if (settled) { return; }
       settled = true;
@@ -44,10 +44,22 @@ function waitForFbmTabReady(tab) {
     chrome.tabs.onUpdated.addListener(onUpdated);
   });
 }
+/**
+ * Hạn của một envelope do GAS cấp (`meta.timeoutMs`, Tài liệu 09/01 "Ngân sách một lượt"): tính một lần từ lúc Extension nhận envelope và dùng chung cho chờ tab, chờ executor và mọi phần tử của lô.
+ * Extension không giữ con số riêng; envelope thiếu hạn thì hạn bằng 0 và bị báo lỗi transport ngay chứ không chờ vô hạn.
+ */
+var envelopeDeadlines = new WeakMap();
+function envelopeDeadline(request) {
+  if (!request || typeof request !== 'object') { return Date.now(); }
+  if (!envelopeDeadlines.has(request)) { envelopeDeadlines.set(request, Date.now() + Math.max(0, Number(request.meta && request.meta.timeoutMs || 0))); }
+  return envelopeDeadlines.get(request);
+}
+function envelopeRemainingMs(request) { return Math.max(0, envelopeDeadline(request) - Date.now()); }
 /** GAS may explicitly request a background FBM tab; Extension only opens the supplied URL. */
 function ensureFbmTab(request) {
+  envelopeDeadline(request);
   return findFbmTab().then(function (tab) {
-    if (tab) { return waitForFbmTabReady(tab); }
+    if (tab) { return waitForFbmTabReady(tab, envelopeRemainingMs(request)); }
     var instruction = request && request.meta && request.meta.openFbmContext;
     if (!instruction || !instruction.url || !chrome.tabs || typeof chrome.tabs.create !== 'function') { return null; }
     // Dùng được cả Chrome API kiểu callback và kiểu Promise; không tạo tab lần hai.
@@ -60,12 +72,12 @@ function ensureFbmTab(request) {
         if (result && typeof result.then === 'function') { result.then(finish, fail); }
       } catch (error) { fail(error); }
     });
-    return created.then(function (newTab) { return newTab ? waitForFbmTabReady(newTab) : null; });
+    return created.then(function (newTab) { return newTab ? waitForFbmTabReady(newTab, envelopeRemainingMs(request)) : null; });
   });
 }
-var FBM_EXECUTOR_VERSION = '21.19';
+var FBM_EXECUTOR_VERSION = '21.20';
 // Mã phiên bản hợp đồng GAS–Extension (tests/contracts/gasExtensionContract.js). Chỉ trả về cho GAS; GAS quyết định dừng khi lệch mã.
-var FBM_CONTRACT_VERSION = 'bb81fdb2c4aa';
+var FBM_CONTRACT_VERSION = '614131883cce';
 
 function addWorkerTrace(reply, request, stage, extra) {
   var event = Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {});
@@ -181,17 +193,57 @@ function recoverSheetsBridges() {
   }).catch(function (error) { console.warn('Không dò được tab Google Sheet:', error); });
 }
 
-/** Kiểm tra đầu nhận rồi gửi request nghiệp vụ đúng một lần. */
+/** Kiểm tra đầu nhận rồi gửi request nghiệp vụ (hoặc lô) đúng một lần. */
 function sendToFbmTab(tabId, request) {
   if (!request || typeof request !== 'object') { return Promise.resolve({ error: 'GAS chưa cấp request FBM; đã chặn trước khi tìm tab.' }); }
+  var envelope = request;
   return ensureFbmExecutor(tabId).then(function () {
+    if (Array.isArray(envelope.items)) { return executeBatch(tabId, envelope).then(stampContract); }
     return hydrateLoginRequest(request).then(function (readyRequest) {
       request = readyRequest;
       return waitForGenericRequestDelay(request).then(function () {
-        return sendTabMessage(tabId, { type: 'FBM_EXECUTE_V2', request: request }, 15000).then(function (reply) { return showFbmHomeAfterLogin(tabId, request, stampContract(reply)); });
+        return sendTabExecute(tabId, request, envelope).then(function (reply) { return showFbmHomeAfterLogin(tabId, request, stampContract(reply)); });
       });
     });
   });
+}
+
+/** Gửi một request cho executor trong phần hạn còn lại của envelope; hết hạn thì là lỗi transport, không chờ thêm. */
+function sendTabExecute(tabId, request, envelope) {
+  var remaining = envelopeRemainingMs(envelope);
+  if (remaining <= 0) { return Promise.resolve({ error: 'Extension đã hết hạn chờ GAS cấp cho request này; tab FBM phản hồi quá chậm.', code: 'FBM_TRANSPORT_TIMEOUT' }); }
+  return sendTabMessage(tabId, { type: 'FBM_EXECUTE_V2', request: request }, remaining);
+}
+
+/**
+ * Lô request đọc độc lập (Tài liệu 09/01 "Lô request đọc độc lập"): chạy lần lượt trên cùng tab qua đúng đường request đơn, dừng khi tổng thân vượt `meta.batch.maxBytes`.
+ * Một phần tử lỗi vận chuyển thì bỏ cả lô và trả lỗi như request đơn: lỗi mạng chỉ có một lớp xử lý ở GAS; chạy lại an toàn vì GAS ghi idempotent. Extension không biết phần tử thuộc khách nào và không tự chạy lại.
+ */
+function executeBatch(tabId, envelope) {
+  var items = envelope.items, meta = envelope.meta || {}, maxBytes = Number(meta.batch && meta.batch.maxBytes || 0), results = [], traces = [], captured = {}, bytes = 0;
+  function itemRequest(item) {
+    return Object.assign({}, item, { meta: Object.assign({}, item.meta || {}, { transport: meta.transport, fetchMs: meta.fetchMs }) });
+  }
+  function finish() {
+    return { result: { ok: true, status: 200, items: results, transport: Object.assign({}, captured, { trace: traces }) } };
+  }
+  function next(index) {
+    if (index >= items.length || (maxBytes > 0 && bytes > maxBytes)) { return Promise.resolve(finish()); }
+    var request = itemRequest(items[index]);
+    return waitForGenericRequestDelay(request).then(function () { return sendTabExecute(tabId, request, envelope); }).then(function (reply) {
+      var result = reply && reply.result;
+      if (!result || reply.error) {
+        return { error: String(reply && reply.error || 'Tab FBM không trả kết quả cho một request trong lô.'), code: String(reply && reply.code || 'FBM_TRANSPORT_UNAVAILABLE'), trace: traces.concat(reply && reply.trace || []) };
+      }
+      var transport = result.transport || {};
+      traces = traces.concat(transport.trace || []);
+      if (transport.captures) { captured = { captures: transport.captures }; }
+      bytes += String(result.body || '').length;
+      results.push({ id: String(items[index].id), ok: result.ok, status: result.status, headers: result.headers, body: result.body });
+      return next(index + 1);
+    });
+  }
+  return next(0);
 }
 
 /** Mọi response FBM về GAS (qua Sidebar hay nhịp nền) đều đi qua đây, nên đóng dấu mã hợp đồng ở đúng một chỗ. */
@@ -275,6 +327,8 @@ function rawFbmReply(reply) {
 // GAS Web App có thể mất hơn 15 giây khi cold start hoặc đang chờ Spreadsheet lock.
 // Giữ giới hạn hữu hạn để alarm không treo vô hạn, nhưng đủ rộng cho redirect /exec.
 var GAS_RELAY_TIMEOUT_MS = 30000;
+// Lời gọi nộp response của một envelope chờ theo `meta.gasReplyMs` GAS ghi trong envelope đó, vì GAS có thể đang xử lý cả một lô; hạn trên chỉ cho lời gọi chưa gắn envelope (xin request heartbeat).
+function relayTimeoutFor(request) { return Number(request && request.meta && request.meta.gasReplyMs || 0) || GAS_RELAY_TIMEOUT_MS; }
 var relayConfigureFlight = null;
 
 /** Lưu dấu chẩn đoán relay tối thiểu để có thể kiểm tra khi không có Sidebar. */
@@ -298,9 +352,10 @@ function noteRelayStatus(status) {
   } catch (ignore) {}
 }
 
-function postRelay(url, key, body) {
+function postRelay(url, key, body, timeoutMs) {
+  var limitMs = Number(timeoutMs || 0) || GAS_RELAY_TIMEOUT_MS;
   var controller = typeof AbortController === 'function' ? new AbortController() : null;
-  var timer = controller ? setTimeout(function () { controller.abort(); }, GAS_RELAY_TIMEOUT_MS) : null;
+  var timer = controller ? setTimeout(function () { controller.abort(); }, limitMs) : null;
   var requestSentAt = Date.now();
   noteRelayStatus({ stage: 'request_sent', requestSentAt: requestSentAt, code: 'RELAY_REQUEST_SENT' });
   return fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'omit', redirect: 'follow', signal: controller && controller.signal, body: JSON.stringify(Object.assign({ key: key }, body)) }).then(function (response) {
@@ -320,7 +375,7 @@ function postRelay(url, key, body) {
     });
   }).catch(function (error) {
     var timeout = error && error.name === 'AbortError';
-    var message = timeout ? 'GAS relay không trả lời sau ' + GAS_RELAY_TIMEOUT_MS + ' ms.' : String(error && error.message || error || 'Lỗi fetch GAS relay.');
+    var message = timeout ? 'GAS relay không trả lời sau ' + limitMs + ' ms.' : String(error && error.message || error || 'Lỗi fetch GAS relay.');
     noteRelayStatus({ stage: 'failed', requestSentAt: requestSentAt, ok: false, code: timeout ? 'RELAY_TIMEOUT' : 'RELAY_FETCH_FAILED', error: message });
     throw new Error(message);
   }).finally(function () { if (timer) { clearTimeout(timer); } });
@@ -345,7 +400,7 @@ function relayHeartbeatTransportFailure(config, request, code, message) {
     requestId: String(request.id),
     code: String(code || 'FBM_TRANSPORT_UNAVAILABLE'),
     error: String(message || 'Extension không gửi được request tới tab FBM.').slice(0, 240)
-  });
+  }, relayTimeoutFor(request));
 }
 
 /** Chạy ngay một heartbeat để nghiệm thu; alarm 5 phút chỉ gọi lại đúng luồng này. */
@@ -388,7 +443,7 @@ function fbmHeartbeatNow(source) {
           }
           var raw = rawFbmReply(reply) || {};
           noteHeartbeatStatus('fbm_response_received', { source: origin, tabId: Number(tab.id || 0), ok: raw.ok === true, httpStatus: Number(raw.status || 0), responseLength: String(raw.body || '').length, error: String(raw.error || '').slice(0, 240) });
-          return relayHeartbeatToGas(tab.id, reply, 1).then(function (gasReply) {
+          return relayHeartbeatToGas(tab.id, reply, 1, gasRequest.request).then(function (gasReply) {
             noteHeartbeatStatus('gas_response_received', { source: origin, ok: !!(gasReply && gasReply.ok), code: String(gasReply && gasReply.code || '') });
             return gasReply && gasReply.ok === false ? Object.assign({ ok: false }, gasReply) : { ok: true, gas: gasReply || null };
           });
@@ -487,7 +542,7 @@ function relayScheduledRequests(tabId, config, gasReply, count) {
       payload: { requestId: next.id, code: String(code || 'FBM_TRANSPORT_UNAVAILABLE'), message: String(message || 'Extension không gửi được request tới tab FBM.').slice(0, 240) },
       spreadsheetId: config.spreadsheetId,
       hop: used + 1
-    }).then(function (failureReply) {
+    }, relayTimeoutFor(next)).then(function (failureReply) {
       return relayScheduledRequests(null, config, failureReply, used + 1);
     }).catch(function (relayError) {
       var relayMessage = String(relayError && relayError.message || relayError || 'Không thể báo lỗi transport lên GAS.').slice(0, 240);
@@ -506,7 +561,7 @@ function relayScheduledRequests(tabId, config, gasReply, count) {
         payload: { response: raw },
         spreadsheetId: config.spreadsheetId,
         hop: used + 1
-      }).then(function (nextReply) { return relayScheduledRequests(null, config, nextReply, used + 1); }).catch(function (error) {
+      }, relayTimeoutFor(next)).then(function (nextReply) { return relayScheduledRequests(null, config, nextReply, used + 1); }).catch(function (error) {
         return reportFailure('FBM_TRANSPORT_UNAVAILABLE', error && error.message || error);
       });
     });
@@ -516,13 +571,13 @@ function relayScheduledRequests(tabId, config, gasReply, count) {
 }
 
 /** Nộp heartbeat cho GAS và chạy tiếp các request đọc scheduler trả về. */
-function relayHeartbeatToGas(tabId, reply, hop) {
+function relayHeartbeatToGas(tabId, reply, hop, request) {
   return getRelayConfig().then(function (config) {
     if (!config) {
       noteRelayStatus({ ok: false, code: 'RELAY_CONFIG_MISSING', error: 'Thiếu URL hoặc khóa Web App GAS.' });
       return null;
     }
-    return postRelay(config.url, config.key, { kind: 'heartbeat', spreadsheetId: config.spreadsheetId, response: rawFbmReply(reply), hop: Number(hop || 1) }).then(function (gasReply) {
+    return postRelay(config.url, config.key, { kind: 'heartbeat', spreadsheetId: config.spreadsheetId, response: rawFbmReply(reply), hop: Number(hop || 1) }, relayTimeoutFor(request)).then(function (gasReply) {
       if (!gasReply || gasReply.ok === false) { return gasReply || { ok: false, code: 'GAS_HEARTBEAT_FAILED' }; }
       return relayScheduledRequests(tabId, config, gasReply, 0);
     });
