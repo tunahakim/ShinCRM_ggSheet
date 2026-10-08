@@ -190,6 +190,28 @@ Tiện thể ghi nhận, không phải phát hiện của phiên này nhưng kh�
 
 ---
 
+## Vấn đề 10 — Khi nào vẽ lại View và nạp lại RAM: thiết kế đã chốt hướng với chủ dự án (2026-10-08)
+
+**Nguồn:** thảo luận ở phiên refactor đồng bộ FBM, đọc code trực tiếp. Đây là đầu vào cho phiên reload; phiên đồng bộ không làm phần này.
+
+**Ranh giới.** Đồng bộ là việc của đồng bộ; vẽ lại View và nạp lại RAM Sidebar là các luồng riêng. Lượt đồng bộ không chờ các luồng đó và không tự làm thay chúng; nó chỉ ghi qua cửa ghi chung với nguồn `pull` (đã có).
+
+**Hiện trạng (code).** Mỗi lần ghi qua `writeGateSave`: `writeCommitAfterSuccess` đánh dấu tín hiệu trong khóa (`records`, `allViews`), sau khi nhả khóa `writeCommitRender` vẽ lại mọi sheet `!` nếu cài đặt "tự vẽ View" bật, và kết quả lưu chỉ trả về Sidebar sau khi vẽ xong. Cờ `allViews` được ghi trước khi vẽ và chỉ xóa sau khi vẽ thành công; đường vẽ bù đã có: `selectionRenderDirtyViews` (dò ô chọn) và `reloadCurrentSheet` (mở sheet View). Lượt đồng bộ ghi N lần thì vẽ N lần.
+
+**Thiết kế đã chốt hướng.**
+1. Phân loại thay đổi theo nguồn, quyết ở một chỗ (`reloadDecisionForChange`, đã nhận `source`, đã có nhánh `views.action: 'defer'`):
+   - người dùng chủ động (lưu từ Sidebar, gõ ô, sửa bộ lọc sheet quản trị qua `onEdit`): vẽ View;
+   - từ nơi khác (lượt đồng bộ đang chạy, đồng bộ ngầm, máy khác): không vẽ, chỉ để cờ bẩn; Sidebar hiện "View chưa cập nhật N thay đổi · Làm mới". Vẽ khi người dùng bấm Làm mới, khi có thao tác chủ động (lần vẽ đó vẽ toàn bộ dữ liệu hiện có nên gồm cả phần đồng bộ đã ghi), hoặc khi luồng vẽ thấy lượt đồng bộ đã kết thúc.
+   - Lượt chết giữa chừng: cờ bẩn còn, dòng báo còn, không có View cũ mà không ai biết.
+2. Kênh `/bind` chỉ là chuông "có gì đó đổi". Không parse nội dung để đoán ai sửa (định dạng nội bộ Google, nghiên cứu 2026.09.20 Phần IV cố ý không giải mã `"c"`); nguồn thay đổi do GAS trả lời.
+3. Mỗi lần vẽ không bắt người dùng chờ: đo riêng thời gian vẽ; lưu xong trả kết quả ngay, vẽ ở lời gọi riêng ngay sau đó; chỉ vẽ những View liên quan tới bản ghi vừa đổi thay vì mọi sheet `!`.
+4. Thay đổi từ máy khác (Vấn đề 1): chẩn đoán vì sao `onEdit` không ghi nhận trước; nếu trigger không đáng tin thì cân nhắc thời điểm sửa cuối của tệp (`getLastUpdated`) làm nguồn sự thật thứ hai (cần kiểm chứng); không biết bản ghi nào đổi thì Làm mới nạp lại cả thực thể.
+5. Sửa Vấn đề 8 (cấp mã mới không bật cờ nạp toàn bộ) và Vấn đề 9 (Sidebar không nạp lại giữa lượt đồng bộ; xong lượt tự hỏi GAS một lần).
+
+**Đã làm ở phiên đồng bộ, phiên reload dùng lại:** một bộ đệm DocumentProperties dùng chung (tài liệu refactor FBM mục 18 bước 3a): `reloadStateRead` và tín hiệu đọc kho một lần mỗi lần gọi thay vì khoảng 150 lần mỗi lần ghi. Không đổi quyết định reload.
+
+---
+
 ## Thứ tự công việc gợi ý
 
 Việc đầu tiên và không thể bỏ qua là chẩn đoán Vấn đề 1 bằng trigger `diagOnEdit`. Nếu thay đổi từ xa không bao giờ đến được server thì không nên viết một dòng Extension nào cả — móng phải xong trước.

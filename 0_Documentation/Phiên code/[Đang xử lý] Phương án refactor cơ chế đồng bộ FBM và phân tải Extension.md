@@ -1,4 +1,4 @@
-# [Chờ xử lý] Phương án refactor cơ chế đồng bộ FBM và phân tải Extension
+# [Đang xử lý] Phương án refactor cơ chế đồng bộ FBM và phân tải Extension
 
 > Trạng thái: tài liệu thảo luận, chưa phải hợp đồng chính thức.
 >
@@ -879,14 +879,15 @@ Số liệu làm căn cứ ở mục 2B.6. Mỗi đợt kết thúc bằng đo l
    - Bỏ nạp danh mục FBM (`SYNC_LOOKUPS`) ở chiều Lấy từ FBM → ShinCRM (đã làm); giữ ở "Kiểm tra an toàn", chiều đẩy và hai chiều. Chiều đẩy chỉ nạp danh mục bản ghi cần và gom một lần gọi: chuyển sang đợt 3 (cùng cơ chế gói nhiều request FBM trong một lần gọi GAS).
 3. **Đo lại:** lượt 20 khách (kỳ vọng GAS mỗi khách Activity 5,0 giây xuống khoảng 1,3 giây; đầu lượt 80–90 giây xuống dưới 40 giây) và một lượt có giao dịch mới để đo nhánh ghi Sheet (chưa đo được ở 2B.6). Ghi vào mục 2B.7, trình, dừng chờ.
 
-**Đợt 2: các quyết định đã chốt, không đổi hợp đồng GAS–Extension.**
+**Đợt 2: các quyết định đã chốt, không đổi hợp đồng GAS–Extension.** Chủ dự án duyệt đợt 2, 3, 4 ngày 2026-10-08 và giao Claude tự quyết các điểm mục 19; làm liên tục, không dừng chờ duyệt thiết kế. Vẽ lại View và nạp lại RAM Sidebar là luồng riêng thuộc phiên reload (`[Chờ xử lý] Các lỗi của GAS trong việc phát hiện thạy đổi sheet.md`), phiên này không đổi.
+3a. **Một bộ đệm DocumentProperties dùng chung cho cả repo (2B.7).** Cửa ghi chung của lõi tốn khoảng 150 lần đọc kho mỗi lần ghi vì `reloadStateRead` đọc từng khóa (khoảng 11 khóa) và bị gọi 10–15 lần mỗi lần ghi (đánh dấu tín hiệu đọc lại thứ vừa ghi; vẽ View đính kèm trạng thái vào kết quả). Bộ đệm của bước A chuyển thành cửa dùng chung ở `server/state/`, mọi chỗ đọc/ghi kho đi qua nó: đọc cả kho một lần mỗi lần gọi; đồng bộ FBM vẫn ghi gộp trong khóa điều phối, lõi ghi thẳng ngay để tín hiệu nằm trong kho trước khi nhả khóa tài liệu. Không đổi quyết định reload.
 4. Chế độ thử tách hai danh sách mã FBM / mã ShinCRM (2A điểm 10): `fbm_sync/state/SyncSettings.js`, `fbm_sync/read/GridRead.js`, UI `client/schema/sync/screens/settings.html`, tài liệu 09/07, test.
 5. "Xác thực" mặc định của khách kéo từ FBM lấy từ ô Config (2A điểm 11): bỏ chuỗi cứng ở `fbm_sync/reconcile/Identity.js:247`; preflight báo lỗi rõ nếu giá trị không còn trong Category.
 6. Thu gọn state (cursor chỉ giữ vị trí, đưa `preview`/`preflight` ra khỏi state), bỏ phân trang Customer bên FBM, sửa mẫu số tiến trình (2B.3–2B.5); test chốt cả state một trang đầy cộng `lastError` dài nhất dưới khoảng 70% `FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT`.
 7. Bắt tay phiên bản GAS–Extension (2A điểm 1): GAS gửi mã phiên bản hợp đồng, Extension trả mã của nó, lệch thì GAS từ chối chạy, báo Sidebar và Log, không ghi Sheet; mã lấy từ nội dung tệp hợp đồng, test fail nếu sửa hợp đồng mà quên đổi mã.
 8. Đo lại sau đợt 2 (trang 50 khách), trình, dừng chờ.
 
-**Đợt 3: phân tải Extension giai đoạn 1, nhiều khách trong một lần gọi GAS.** Thiết kế trình chủ dự án duyệt trước khi code.
+**Đợt 3: phân tải Extension giai đoạn 1, nhiều khách trong một lần gọi GAS.** Đã duyệt; thiết kế ghi quyết định rồi code tiếp.
 9. Bản thiết kế gồm (mục 2B.5 điểm 1–3, 2A điểm 6–7, mục 14):
    - hợp đồng gói Extension → GAS: Extension gọi FBM từng khách (khoảng 0,1 giây mỗi khách), gom gói, gửi một lần; Extension chỉ gọi, trích xuất kỹ thuật, lọc, chiếu, chia chunk theo mục 3.2; GAS vẫn sở hữu hash, phân loại, ghi (mục 3.1);
    - ngân sách gói đo bằng số liệu đợt 1: dung lượng, thời gian GAS mỗi gói, trần 6 phút một lần gọi GAS, hạn chờ Sidebar thống nhất giữa Sidebar, Extension và GAS (FBM-005, FBM-016, FBM-031);
@@ -896,7 +897,7 @@ Số liệu làm căn cứ ở mục 2B.6. Mỗi đợt kết thúc bằng đo l
    - test chứng minh số lần đọc Sheet và ghi state không tăng theo số khách trong gói.
 10. Code theo thiết kế đã duyệt, đo một trang 50 khách, rồi một lượt toàn bộ khi chủ dự án đồng ý. Dự báo chưa đo: gói 50 khách khoảng 10 giây, 1.312 khách khoảng 5–6 phút.
 
-**Đợt 4: phân tải Extension giai đoạn 2, Customer và Activity bằng một request (mục 6, 7, 9).** Thiết kế riêng, trình duyệt trước khi code; làm tiếp sau đợt 3 khi chủ dự án bảo.
+**Đợt 4: phân tải Extension giai đoạn 2, Customer và Activity bằng một request (mục 6, 7, 9).** Đã duyệt; thiết kế riêng ghi quyết định rồi code tiếp ngay sau đợt 3.
 11. Customer: Extension gọi FBM một request lấy toàn bộ, lọc và chiếu các trường GAS yêu cầu (nguồn: `SYNC_SCHEMA`), chia chunk về GAS theo ngân sách (mục tiêu 512 KiB, trần cứng 768 KiB, đo trên JSON đã serialize, chính sách chunk định nghĩa một chỗ); GAS tính hash, phân loại, ghi từng chunk qua cửa ghi, chỉ tăng cursor sau khi ghi và state thành công (mục 14).
 12. Activity bulk: Extension gọi FBM một lần (hoặc theo cửa sổ ngày khi bulk vượt ngân sách), giữ đúng các id giao dịch ShinCRM đã biết do GAS gửi (bulk không có cột mã khách; giao dịch mới do lớp 2, lớp 3 bắt), chiếu cột, chia chunk; GAS hash và đối soát (changed, missing, fbmOnly). Thay khoảng một request mỗi khách bằng một request; chính sách chọn `bulk` hay `windowed` do một module duy nhất sở hữu.
 13. Luật vắng mặt chỉ kết luận khi đã nhận đủ mọi gói của cùng một lượt quét; mất tab thì chạy lại cả lượt; test mất tab, mất response, gói trùng (2A điểm 5–6).
