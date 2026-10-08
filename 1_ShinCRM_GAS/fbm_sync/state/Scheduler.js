@@ -302,6 +302,8 @@ function fbmSyncHeartbeatLocked(rawResponse, options) {
   if (!state.activeRequestId || !responseRequestId || responseRequestId !== String(state.activeRequestId)) {
     return { ok: false, code: 'STALE_RESPONSE', request: null, status: FbmSync.statusView(), error: 'Response heartbeat không còn thuộc request đang chờ.' };
   }
+  var contractStop = FbmSync.contractGate(rawResponse);
+  if (contractStop) { return contractStop; }
   // Heartbeat không được tự suy ra phiên từ shape dữ liệu. Lỗi HTTP/parse đi qua
   // continuation chung để 401/403 được probe và mọi lỗi khác fail-closed.
   if (!result.ok) { return FbmSync.continue(rawResponse); }

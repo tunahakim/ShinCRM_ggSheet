@@ -3,6 +3,8 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 FbmSync.protocol = {
   version: 1,
+  // Mã phiên bản hợp đồng GAS–Extension (tests/contracts/gasExtensionContract.js). Extension trả mã của nó trong mỗi response; khác mã thì GAS dừng phiên (09.01).
+  contract: 'bb81fdb2c4aa',
   /** Chặn request bị ghép thiếu endpoint trước khi nó tới Extension/FBM. */
   validateEndpoint: function (url) {
     var value = String(url === null || url === undefined ? '' : url).trim();
@@ -13,7 +15,12 @@ FbmSync.protocol = {
   },
   /** Tạo envelope có id để ghép đúng response với request. */
   request: function (id, url, body, meta) {
-    return { protocol: 'shincrm-fbm', version: 1, id: String(id), url: url, method: 'POST', headers: { 'content-type': 'application/json; charset=UTF-8' }, body: body, bodyText: FbmSync.protocol.json(body), meta: meta || {} };
+    return { protocol: 'shincrm-fbm', version: 1, contract: FbmSync.protocol.contract, id: String(id), url: url, method: 'POST', headers: { 'content-type': 'application/json; charset=UTF-8' }, body: body, bodyText: FbmSync.protocol.json(body), meta: meta || {} };
+  },
+  /** Mã phiên bản Extension ghi trong response; Extension cũ không ghi thì coi là lệch. */
+  contractMismatch: function (raw) {
+    var received = String(raw && raw.transport && raw.transport.contract || '');
+    return received === FbmSync.protocol.contract ? null : { code: 'FBM_EXTENSION_CONTRACT_MISMATCH', message: 'Extension trên máy này đang dùng bản cũ, hãy tải lại Extension.', expected: FbmSync.protocol.contract, received: received };
   },
   /** Serialize đúng wire format FBM; Extension chỉ chuyển nguyên chuỗi này qua fetch. */
   json: function (value) { return JSON.stringify(value === undefined ? null : value).replace(/\//g, '\\/'); },

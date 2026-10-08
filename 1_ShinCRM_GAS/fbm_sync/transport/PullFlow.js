@@ -369,6 +369,22 @@ FbmSync.activityBulkNext = function (state, grid) {
 };
 
 /** Tiếp tục đúng một bước từ response Extension và lưu cursor trước khi trả về. */
+/**
+ * Response từ Extension lệch mã hợp đồng thì dừng phiên trước mọi xử lý: Extension khác bản có thể đọc envelope sai mà vẫn trả HTTP 200, xử lý tiếp sẽ ghi dữ liệu sai xuống Sheet.
+ * Trả `null` khi khớp mã.
+ */
+FbmSync.contractGate = function (rawResponse) {
+  var mismatch = FbmSync.protocol.contractMismatch(rawResponse);
+  if (!mismatch) { return null; }
+  var before = FbmSync.stateRead(), failed = FbmSync.stateFailRun(mismatch.message, mismatch.code).failed, state = FbmSync.stateRead();
+  // Heartbeat và đăng nhập nền không có phiên đồng bộ nên `stateFailRun` bỏ qua; vẫn phải nhả request đang chờ, không thì mọi lượt sau kẹt REQUEST_IN_FLIGHT.
+  if (!failed) { state.phase = 'error'; state.lastFailureCode = mismatch.code; state.retryable = false; state.lastError = mismatch.message; state.message = mismatch.message; }
+  state.activeRequestId = ''; state.deadlineAt = 0;
+  FbmSync.stateWrite(state);
+  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'extension_contract_mismatch', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(before.runId || ''), reason: mismatch.message, detail: { code: mismatch.code, expected: mismatch.expected, received: mismatch.received || '(Extension không gửi mã)' } }); }
+  return { ok: false, code: mismatch.code, request: null, error: mismatch.message, status: FbmSync.statusView() };
+};
+
 FbmSync.continue = function (rawResponse) {
   // Tiến đúng một bước cursor và lưu state trước khi trả request kế tiếp.
   var state = FbmSync.stateRead();
@@ -382,6 +398,8 @@ FbmSync.continue = function (rawResponse) {
   if (!state.activeRequestId || !responseRequestId || responseRequestId !== String(state.activeRequestId)) {
     return { ok: false, code: 'STALE_RESPONSE', request: null, status: FbmSync.statusView(), error: 'Response FBM đã cũ hoặc phiên đã bị dừng; không tiếp tục cursor.' };
   }
+  var contractStop = FbmSync.contractGate(rawResponse);
+  if (contractStop) { return contractStop; }
   var completedRequestId = String(state.activeRequestId);
   state.activeRequestId = '';
   state.deadlineAt = 0;
