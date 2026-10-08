@@ -170,36 +170,37 @@ FbmSync.authContinue = function (entity, response) {
   return FbmSync.lookupBatchRequest();
 };
 
-/** Tạo request trang Customer tiếp theo từ khóa cuối trang trước. */
-FbmSync.customerNext = function (state, rows, total) {
-  var cursor = state.cursor || {}, count = Number(cursor.count || 2000);
-  var seenAfterPage = Number(cursor.seen || 0) + rows.length;
-  if (state.scan === 'detail' && !rows.length && typeof FbmSync.detailCursorClear === 'function') { FbmSync.detailCursorClear(); }
+/** Mô tả trang Customer vừa nhận để dựng con trỏ trang kế: số dòng, dòng đầu, dòng cuối và khóa trang. Kiểm tra liên kết sắp theo `stt_rec_kh` nên khóa trang chỉ có cột đó. */
+FbmSync.customerPageOf = function (rows, identityOrder) {
+  var list = rows || [], last = list[list.length - 1] || {};
+  return { length: list.length, firstItem: FbmSync.customerPageItem(list[0]), lastItem: FbmSync.customerPageItem(last), lastValue: identityOrder ? FbmSync.gridPageValue([last.stt_rec_kh || '']) : FbmSync.customerPageValue(last) };
+};
+
+/**
+ * Chuyển cursor sang trang Customer kế tiếp; trả `false` khi đã hết trang hoặc quét chi tiết đã đủ giới hạn khách của lượt (khi đó lưu vị trí cho lượt sau).
+ * `total` là tổng FBM báo ở trang đầu; trang sau FBM trả 0 nên mô tả trang giữ tổng của trang trước.
+ */
+FbmSync.customerNext = function (state, page, total) {
+  var cursor = state.cursor || {}, count = Number(cursor.count || 2000), length = Number(page && page.length || 0), seenAfterPage = Number(cursor.seen || 0) + length;
+  var pageItems = { firstPageItem: page.firstItem, lastPageItem: page.lastItem, lastRowCount: Number(total || cursor.pageItems && cursor.pageItems.lastRowCount || 0) };
+  if (state.scan === 'detail' && !length && typeof FbmSync.detailCursorClear === 'function') { FbmSync.detailCursorClear(); }
   if (state.scan === 'detail' && seenAfterPage >= Number(state.detailCustomerLimit || 50)) {
-    var exhausted = !rows.length || rows.length < count || (total && seenAfterPage >= total);
+    var exhausted = !length || length < count || (total && seenAfterPage >= total);
     if (exhausted) {
       if (typeof FbmSync.detailCursorClear === 'function') { FbmSync.detailCursorClear(); }
     } else if (typeof FbmSync.detailCursorWrite === 'function') {
-      var detailLast = rows[rows.length - 1];
-      FbmSync.detailCursorWrite({
-        pageIndex: FbmSync.gridNextPageIndex(cursor.pageIndex),
-        pageValue: FbmSync.customerPageValue(detailLast),
-        pageItems: FbmSync.customerPageItems(rows, total || cursor.pageItems && cursor.pageItems.lastRowCount)
-      });
+      FbmSync.detailCursorWrite({ pageIndex: FbmSync.gridNextPageIndex(cursor.pageIndex), pageValue: page.lastValue, pageItems: pageItems });
     }
-    return null;
+    return false;
   }
-  if (!rows.length || rows.length < count || (total && Number(cursor.seen || 0) + rows.length >= total)) { return null; }
-  var last = rows[rows.length - 1];
+  if (!length || length < count || (total && seenAfterPage >= total)) { return false; }
+  cursor.type = 1;
   cursor.pageIndex = FbmSync.gridNextPageIndex(cursor.pageIndex);
-  cursor.pageItems = FbmSync.customerPageItems(rows, total || cursor.pageItems && cursor.pageItems.lastRowCount);
-  cursor.pageValue = state.scan === 'identity_check'
-    ? FbmSync.gridPageValue([last.stt_rec_kh || ''])
-    : FbmSync.customerPageValue(last);
-  cursor.seen = Number(cursor.seen || 0) + rows.length;
+  cursor.pageItems = pageItems;
+  cursor.pageValue = page.lastValue;
+  cursor.seen = seenAfterPage;
   state.cursor = cursor;
-  FbmSync.stateWrite(state);
-  return (state.scan === 'identity_check' ? FbmSync.identityCheckCustomerRequest : FbmSync.customerGridRequest)({ type: 1, count: count, gridPageIndex: cursor.pageIndex, gridPageValue: cursor.pageValue, pageItems: cursor.pageItems, gridRefresh: false });
+  return true;
 };
 
 /** Đếm khách đã nhận trong lượt quét; tổng lấy ở trang đầu vì FBM chỉ đếm `TotalRowCount` ở trang đầu, trang sau trả 0 (Nghiên cứu FBM ch03 mục 3.3). */
@@ -209,7 +210,8 @@ FbmSync.customerScanRecord = function (state, grid, firstPage) {
   scan.seen = Number(scan.seen || 0) + (grid && grid.rows ? grid.rows.length : 0);
   state.metadata.customerScan = scan;
   // Mẫu số tiến trình là số khách của lượt: FBM đã lọc theo phạm vi thử nên `TotalRowCount` chính là số mã thử; quét chi tiết chỉ đi tới giới hạn khách mỗi lượt.
-  if (firstPage) { state.progress = { done: 0, total: state.scan === 'detail' ? Math.min(scan.total, Number(state.detailCustomerLimit || scan.total)) : scan.total }; }
+  // Quét chi tiết tiếp từ trang giữa thì FBM không báo tổng (trang sau trả 0), mẫu số là giới hạn khách của lượt.
+  if (firstPage) { state.progress = { done: 0, total: state.scan === 'detail' ? (scan.total ? Math.min(scan.total, Number(state.detailCustomerLimit || scan.total)) : Number(state.detailCustomerLimit || 0)) : scan.total }; }
 };
 
 /** Tử số tiến trình: số khách đã xử lý xong (đã quét hết giao dịch, hoặc không có giao dịch để quét). */
@@ -250,6 +252,8 @@ FbmSync.finishPullRun = function (state) {
 
 /** Khởi tạo cursor Activity cho danh sách Customer vừa đọc. */
 FbmSync.activityForCustomers = function (state, customerContexts, customerNext, customerSeen, afterActivity) {
+  // Không truyền danh sách khách: đọc giao dịch của mọi khách đã thấy trong lượt quét, lấy dần từ hàng đợi để cursor không phình theo số khách.
+  var queued = customerContexts === null;
   var contexts = (customerContexts || []).map(function (item) { return typeof item === 'string' ? { sttRec: item, maKh: '' } : { sttRec: String(item.sttRec || item.stt_rec_kh || ''), maKh: String(item.maKh || item.ma_kh || '') }; }).filter(function (item) { return item.sttRec; });
   state.phase = 'pull_activity'; state.entity = 'activity';
   if (typeof FbmSync.businessStepStart === 'function') {
@@ -257,6 +261,7 @@ FbmSync.activityForCustomers = function (state, customerContexts, customerNext, 
     FbmSync.businessStepStart(state, 'reconcile_activity', { mode: state.mode, scan: state.scan, entity: 'activity' });
   }
   state.cursor = { kind: 'activity_grid', customers: contexts.map(function (item) { return item.sttRec; }), customerIndex: 0, batch: [], count: FbmSync.BUDGET.activityCustomerRows, customerNext: customerNext ? { pageIndex: customerNext.body.gridPageIndex, pageValue: customerNext.body.gridPageValue, pageItems: FbmSync.gridPageItemsOf(customerNext.body), count: customerNext.body.count } : null, customerSeen: Number(customerSeen || 0), afterActivity: afterActivity || null };
+  if (queued) { state.cursor.queueFrom = 0; }
   state.message = 'Đang đọc giao dịch của khách hàng...';
   FbmSync.activityBatchPlan(state.cursor);
   FbmSync.activityPagesWrite(state, {});
@@ -305,14 +310,14 @@ FbmSync.beginCustomerPull = function (state) {
     state.metadata.seen.customer = { initialized: true };
     state.metadata.seen.activity = { initialized: true };
   }
-  var customerCount = state.scan === 'detail' ? Math.max(1, Math.min(FbmSync.CUSTOMER_PAGE_ROWS, Number(state.detailCustomerLimit || FbmSync.CUSTOMER_PAGE_ROWS))) : FbmSync.CUSTOMER_PAGE_ROWS;
+  var customerCount = state.scan === 'detail' ? Math.max(1, Math.min(FbmSync.CUSTOMER_PAGE_ROWS, Number(state.detailCustomerLimit || FbmSync.CUSTOMER_PAGE_ROWS))) : FbmSync.BUDGET.scanCustomerRows;
   var detailCursor = state.scan === 'detail' && typeof FbmSync.detailCursorRead === 'function' ? FbmSync.detailCursorRead() : null;
   var detailPageIndex = detailCursor ? Number(detailCursor.pageIndex || 0) : -1;
   var detailPageValue = detailCursor && Array.isArray(detailCursor.pageValue) ? detailCursor.pageValue : null;
-  state.cursor = { kind: 'customer_grid', type: detailPageIndex >= 0 ? 1 : 0, pageIndex: detailPageIndex, pageValue: detailPageValue, pageItems: detailCursor && detailCursor.pageItems || null, count: customerCount };
+  FbmSync.scanJobOpen(state, { entity: 'customer', type: detailPageIndex >= 0 ? 1 : 0, pageIndex: detailPageIndex, pageValue: detailPageValue, pageItems: detailCursor && detailCursor.pageItems || null, count: customerCount, seen: 0 });
   state.phase = 'pull_customer'; state.entity = 'customer'; state.message = 'Đang đọc khách hàng từ FBM...';
   FbmSync.stateWrite(state);
-  return FbmSync.customerGridRequest({ type: 0, count: customerCount, gridPageIndex: -1, gridRefresh: false });
+  return FbmSync.scanJobRequest(state);
 };
 
 /** Khởi tạo quét bulk Activity; tập đã thấy nằm trong bitmap phân mảnh của GAS. */
@@ -366,6 +371,53 @@ FbmSync.activityBulkNext = function (state, grid) {
   state.message = 'Đã đọc xong bulk giao dịch FBM.';
   FbmSync.stateWrite(state);
   return null;
+};
+
+/** Sau khi đọc xong khách (và giao dịch nếu có): chế độ hai chiều chuyển sang đẩy, chế độ lấy chốt lượt. */
+FbmSync.pullFinishOrPush = function (state, extra) {
+  var result = Object.assign({ ok: true, status: null }, extra || {});
+  if (state.mode === 'write' && FbmSync.canWriteFbm(state.mode)) {
+    if (FbmSync.stopPushOnConflicts && FbmSync.stopPushOnConflicts(state)) { result.request = null; result.status = FbmSync.statusView(); return result; }
+    state.cursor = { kind: 'push_scan', entity: 'customer', index: 0 }; state.phase = 'push'; state.entity = 'customer'; FbmSync.stateWrite(state);
+    result.request = FbmSync.nextEnvelope(FbmSync.nextPushRequest(state)); result.status = FbmSync.statusView();
+    return result;
+  }
+  FbmSync.finishPullRun(state);
+  result.status = FbmSync.statusView();
+  return result;
+};
+
+/**
+ * Nhận một gói Customer của việc quét: ghi qua cửa ghi, rồi mới tăng cursor (ghi lỗi thì lần sau xin lại đúng gói). Hết gói của trang thì xin trang kế đến khi đủ tổng FBM báo; hết trang thì đọc giao dịch của các khách đã thấy.
+ * Gói đầu của trang lưu dòng đầu; mỗi gói lưu khóa của dòng cuối, vì trang kế cần cả hai mà gói cuối có thể không còn dòng nào.
+ */
+FbmSync.customerScanChunk = function (state, cursor, rawResponse) {
+  var accepted = FbmSync.scanJobAccept(state, cursor, rawResponse), grid;
+  if (accepted.result) { return accepted.result; }
+  var chunk = accepted.chunk;
+  // Gói không ghép được cột (thiếu cột, trùng cột) thì dừng phiên như gói lạ: không đoán cột theo vị trí, không ghi gì.
+  try { grid = FbmSync.rowsToRecords('customer', FbmSync.protocol.parse(rawResponse)); } catch (shapeError) { return FbmSync.scanJobMismatch(state, String(shapeError && shapeError.message || shapeError)); }
+  var gate = FbmSync.stateCategoryGate(state), records = grid.rows.filter(function (row) { return !FbmSync.isTemporaryRecord('customer', row); }).map(function (row) { return FbmSync.customerRecord(row, gate); });
+  FbmSync.pullRecords('customer', records, state.mode);
+  FbmSync.previewRecords('customer', records);
+  state = FbmSync.stateRead(); cursor = state.cursor;
+  FbmSync.customerScanRecord(state, { total: chunk.totalRowCount, rows: grid.rows }, Number(cursor.page || 0) === 0 && chunk.index === 0);
+  if (chunk.index === 0) { cursor.pageFirst = FbmSync.customerPageItem(grid.rows[0]); FbmSync.scanJobOversize(state, 'customer', chunk.oversize); }
+  if (grid.rows.length) { var lastRow = grid.rows[grid.rows.length - 1]; cursor.pageLast = FbmSync.customerPageItem(lastRow); cursor.pageLastValue = FbmSync.customerPageValue(lastRow); }
+  if (!FbmSync.scanJobAdvance(cursor, chunk)) {
+    FbmSync.stateWrite(state);
+    return { ok: true, request: FbmSync.nextEnvelope(FbmSync.scanJobRequest(state)), status: FbmSync.statusView(), imported: records.length };
+  }
+  var scanTotal = Number(state.metadata.customerScan && state.metadata.customerScan.total || 0);
+  if (FbmSync.customerNext(state, { length: chunk.rowCount, firstItem: cursor.pageFirst || '', lastItem: cursor.pageLast || '', lastValue: cursor.pageLastValue || [] }, scanTotal)) {
+    cursor.page = Number(cursor.page || 0) + 1; cursor.attempt = 0; cursor.restarts = 0;
+    FbmSync.scanJobOpen(state, cursor);
+    FbmSync.stateWrite(state);
+    return { ok: true, request: FbmSync.nextEnvelope(FbmSync.scanJobRequest(state)), status: FbmSync.statusView(), imported: records.length };
+  }
+  var activityRequest = FbmSync.activityForCustomers(state, null, null, 0);
+  if (activityRequest) { return { ok: true, request: FbmSync.nextEnvelope(activityRequest), status: FbmSync.statusView(), imported: records.length }; }
+  return FbmSync.pullFinishOrPush(state, { imported: records.length });
 };
 
 /** Tiếp tục đúng một bước từ response Extension và lưu cursor trước khi trả về. */
@@ -611,36 +663,22 @@ FbmSync.continue = function (rawResponse) {
     FbmSync.stateWrite(state);
     return { ok: true, request: FbmSync.nextEnvelope(customerRequest), status: FbmSync.statusView() };
   }
-  // Customer là grid cha; mỗi trang xong sẽ mở Activity con của trang đó.
-  if (cursor.kind === 'customer_grid') {
-    var customerGrid = FbmSync.rowsToRecords('customer', response, state.metadata && state.metadata.customerFields), categoryGate = FbmSync.stateCategoryGate(state), eligibleCustomerRows = customerGrid.rows.filter(function (row) { return !FbmSync.isTemporaryRecord('customer', row); }), customerRecords = eligibleCustomerRows.map(function (row) { return FbmSync.customerRecord(row, categoryGate); });
+  // Danh sách toàn bộ khách đi bằng việc quét; kiểm tra liên kết vẫn đọc grid thường theo `stt_rec_kh`.
+  if (cursor.kind === 'scan_job') { return FbmSync.customerScanChunk(state, cursor, rawResponse); }
+  if (cursor.kind === 'customer_grid' && state.scan === 'identity_check') {
+    var customerGrid = FbmSync.rowsToRecords('customer', response, state.metadata && state.metadata.customerFields), eligibleCustomerRows = customerGrid.rows.filter(function (row) { return !FbmSync.isTemporaryRecord('customer', row); });
     state.metadata.customerFields = customerGrid.fields;
     FbmSync.customerScanRecord(state, customerGrid, Number(cursor.pageIndex) < 0);
-    FbmSync.stateWrite(state);
-    if (state.scan === 'identity_check') {
-      FbmSync.identityCheckPage(state, eligibleCustomerRows);
-      FbmSync.progressCustomersDone(state, customerGrid.rows.length);
-      var identityNext = FbmSync.customerNext(state, customerGrid.rows, customerGrid.total);
-      if (identityNext) {
-        state.cursor = { kind: 'customer_grid', type: 1, pageIndex: identityNext.body.gridPageIndex, pageValue: identityNext.body.gridPageValue, pageItems: FbmSync.gridPageItemsOf(identityNext.body), count: identityNext.body.count, seen: Number(state.cursor.seen || 0) };
-        FbmSync.stateWrite(state);
-        return { ok: true, request: FbmSync.nextEnvelope(identityNext), status: FbmSync.statusView(), imported: eligibleCustomerRows.length };
-      }
-      FbmSync.identityCheckFinish(state);
-      state.cursor = {}; state.phase = 'done'; state.entity = ''; state.message = 'Đã kiểm tra liên kết Customer FBM.'; FbmSync.stateWrite(state);
-      return { ok: true, status: FbmSync.statusView(), imported: eligibleCustomerRows.length };
+    FbmSync.identityCheckPage(state, eligibleCustomerRows);
+    FbmSync.progressCustomersDone(state, customerGrid.rows.length);
+    if (FbmSync.customerNext(state, FbmSync.customerPageOf(customerGrid.rows, true), customerGrid.total)) {
+      var identityCursor = state.cursor;
+      FbmSync.stateWrite(state);
+      return { ok: true, request: FbmSync.nextEnvelope(FbmSync.identityCheckCustomerRequest({ type: 1, count: identityCursor.count, gridPageIndex: identityCursor.pageIndex, gridPageValue: identityCursor.pageValue, pageItems: identityCursor.pageItems, gridRefresh: false })), status: FbmSync.statusView(), imported: eligibleCustomerRows.length };
     }
-    FbmSync.pullRecords('customer', customerRecords, state.mode);
-    state = FbmSync.stateRead();
-    FbmSync.previewRecords('customer', customerRecords);
-    var customerContexts = eligibleCustomerRows.map(function (row) { return { sttRec: String(row.stt_rec_kh || '').trim(), maKh: String(row.ma_kh || '').trim() }; }).filter(function (item) { return item.sttRec; });
-    FbmSync.progressCustomersDone(state, customerGrid.rows.length - customerContexts.length);
-    var nextCustomer = FbmSync.customerNext(state, customerGrid.rows, customerGrid.total);
-    var activityRequest = FbmSync.activityForCustomers(state, customerContexts, nextCustomer, state.cursor.seen);
-    if (activityRequest) { return { ok: true, request: FbmSync.nextEnvelope(activityRequest), status: FbmSync.statusView(), imported: customerRecords.length }; }
-    if (nextCustomer) { state.cursor = { kind: 'customer_grid', type: 1, pageIndex: nextCustomer.body.gridPageIndex, pageValue: nextCustomer.body.gridPageValue, pageItems: FbmSync.gridPageItemsOf(nextCustomer.body), count: nextCustomer.body.count, seen: Number(state.cursor.customerSeen || 0) }; FbmSync.stateWrite(state); return { ok: true, request: FbmSync.nextEnvelope(nextCustomer), status: FbmSync.statusView() }; }
-    if (state.mode === 'write' && FbmSync.canWriteFbm(state.mode)) { if (FbmSync.stopPushOnConflicts && FbmSync.stopPushOnConflicts(state)) { return { ok: true, request: null, status: FbmSync.statusView() }; } state.cursor = { kind: 'push_scan', entity: 'customer', index: 0 }; state.phase = 'push'; FbmSync.stateWrite(state); return { ok: true, request: FbmSync.nextEnvelope(FbmSync.nextPushRequest(state)), status: FbmSync.statusView() }; }
-    FbmSync.finishPullRun(state); return { ok: true, status: FbmSync.statusView() };
+    FbmSync.identityCheckFinish(state);
+    state.cursor = {}; state.phase = 'done'; state.entity = ''; state.message = 'Đã kiểm tra liên kết Customer FBM.'; FbmSync.stateWrite(state);
+    return { ok: true, status: FbmSync.statusView(), imported: eligibleCustomerRows.length };
   }
   // Activity của cả trang Customer đi theo lô; trang quét xong mới quay lại trang Customer kế.
   if (cursor.kind === 'activity_grid') {

@@ -23,15 +23,27 @@ FbmSync.BUDGET = {
   // Mỗi bản ghi lỗi đã tốn ít nhất một lần gọi FBM; chạm trần là lỗi hệ thống (danh mục, quyền, cấu hình) nên dừng chiều đẩy. Ba con số cùng giữ khóa lỗi đẩy dưới 9.000 byte.
   pushFailuresMax: 20,
   pushFailureDetailsMax: 10,
-  pushFailureReasonChars: 160
+  pushFailureReasonChars: 160,
+  // Việc quét (scan job): một request FBM lấy cả danh sách nên chờ lâu hơn request thường (bulk giao dịch đo khoảng 19 giây).
+  scanFetchMs: 60000,
+  // Số dòng mỗi request lấy danh sách toàn bộ khách; FBM báo nhiều hơn thì chuyển trang đến đủ, đặt nhỏ hay lớn chỉ khác số trang.
+  scanCustomerRows: 10000,
+  // Gói trả về GAS đo bằng byte UTF-8 của JSON đã serialize; trần cứng dưới giới hạn khoảng 1 MB của đường relay.
+  chunkTargetBytes: 512 * 1024,
+  chunkMaxBytes: 768 * 1024,
+  // Mất tab hoặc Extension mất việc quét thì chạy lại cả việc; quá số lần này là lỗi hệ thống, dừng và báo.
+  scanJobRestarts: 2
 };
+
+/** Hạn một lần fetch theo loại request; executor đọc từ `meta.fetchMs`, không giữ con số riêng. */
+FbmSync.budgetFetchMs = function (meta) { return String(meta && meta.kind || '') === 'scan_job' ? FbmSync.BUDGET.scanFetchMs : FbmSync.BUDGET.fetchMs; };
 
 /** Hạn Extension phải trả một envelope: chờ tab một lần, cộng mỗi request một lần fetch và thời gian chờ GAS yêu cầu. */
 FbmSync.budgetTimeoutMs = function (request) {
   var budget = FbmSync.BUDGET, items = request && request.items ? request.items : [request || {}], total = budget.tabReadyMs;
   items.forEach(function (item) {
     var meta = item && item.meta || {}, fetches = String(meta.kind || '') === 'login' ? budget.loginFetches : 1;
-    total += Math.max(0, Number(meta.waitMs || 0)) + budget.fetchMs * fetches;
+    total += Math.max(0, Number(meta.waitMs || 0)) + FbmSync.budgetFetchMs(meta) * fetches;
   });
   if (request && request.meta && request.meta.afterLoginUrl) { total += budget.tabReadyMs; }
   return total;

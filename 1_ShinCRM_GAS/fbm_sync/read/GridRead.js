@@ -316,9 +316,10 @@ FbmSync.fbmDayKey = function (value) {
  * Kiểm trên FBM thật 2026-10-08 bằng request bắt từ giao diện FBM.
  */
 FbmSync.customerPageItems = function (rows, total) {
-  var list = rows || [], item = function (row) { var value = row || {}; return FbmSync.fbmDayKey(value.ngay_gd) + FbmSync.fbmDayKey(value.datetime0) + String(value.xorder || '') + String(value.stt_rec_kh || ''); };
-  return { firstPageItem: item(list[0]), lastPageItem: item(list[list.length - 1]), lastRowCount: Number(total || 0) };
+  var list = rows || [];
+  return { firstPageItem: FbmSync.customerPageItem(list[0]), lastPageItem: FbmSync.customerPageItem(list[list.length - 1]), lastRowCount: Number(total || 0) };
 };
+FbmSync.customerPageItem = function (row) { var value = row || {}; return FbmSync.fbmDayKey(value.ngay_gd) + FbmSync.fbmDayKey(value.datetime0) + String(value.xorder || '') + String(value.stt_rec_kh || ''); };
 /** Đọc lại mô tả trang đang đứng từ body request đã dựng, để cursor mang theo khi dựng lại request. */
 FbmSync.gridPageItemsOf = function (body) {
   var value = body || {};
@@ -341,7 +342,7 @@ FbmSync.gridRows = function (response) {
 };
 /** Kiểm metadata đủ để ghép rows; thiếu AliasName thì dừng thay vì đoán theo index. */
 FbmSync.validateGridFields = function (entity, fields) {
-  var required = entity === 'customer' ? ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ma_so_thue', 'ong_ba', 'dc_lh', 'dien_thoai', 'email', 'website', 'ten_dclh_tinh', 'ten_nguon_dm', 'ngay_gd', 'datetime0', 'xorder'] : ['id', 'ten_cv', 'details', 'end_date', 'owner', 'datetime0', 'line_nbr'];
+  var required = FbmSync.scanFields(entity);
   var seen = {};
   (fields || []).forEach(function (field) { if (seen[field]) { throw new Error('FBM trả AliasName trùng: ' + field); } seen[field] = true; });
   var missing = required.filter(function (field) { return !seen[field]; });

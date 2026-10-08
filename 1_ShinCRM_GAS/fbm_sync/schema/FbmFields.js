@@ -74,6 +74,23 @@ FbmSync.PULL_OVERWRITE_FIELDS = {
   activity: ['enteredBy']
 };
 
+/* Cột grid mang giá trị của một trường fingerprint khi tên khác: grid trả tên hiển thị, form và fingerprint dùng mã. */
+FbmSync.GRID_COLUMN_OF = {
+  customer: { dc_lh_tinh: 'ten_dclh_tinh', nguon_dm: 'ten_nguon_dm' },
+  activity: { ma_cv: 'ten_cv' }
+};
+/* Cột kỹ thuật một lượt quét cần ngoài fingerprint: định danh, trường FBM ghi đè, sort key của con trỏ trang; Customer thêm `ten_cv` để so giao dịch cuối. */
+FbmSync.SCAN_KEY_FIELDS = {
+  customer: ['stt_rec_kh', 'ma_kh', 'ten_cv', 'ngay_gd', 'datetime0', 'xorder'],
+  activity: ['owner', 'datetime0', 'line_nbr']
+};
+/** Danh sách cột của một lượt quét, nguồn duy nhất cho chiếu cột ở Extension và kiểm metadata grid; thêm trường fingerprint là tự có cột. */
+FbmSync.scanFields = function (entity) {
+  var columnOf = FbmSync.GRID_COLUMN_OF[entity] || {}, fields = [];
+  (FbmSync.FINGERPRINT_FIELDS[entity] || []).map(function (alias) { return columnOf[alias] || alias; }).concat(FbmSync.SCAN_KEY_FIELDS[entity] || []).forEach(function (field) { if (fields.indexOf(field) < 0) { fields.push(field); } });
+  return fields;
+};
+
 FbmSync.AUTH_VARS = {
   customer: [
     { Name: 'recordID', Type: 'String', Value: '' },

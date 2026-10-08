@@ -460,7 +460,7 @@ FbmSync.nextEnvelope = function (request) {
     return FbmSync.sessionGateFailClosed(pendingState, gateError);
   }
   meta.timeoutMs = FbmSync.budgetTimeoutMs(request);
-  meta.fetchMs = FbmSync.BUDGET.fetchMs;
+  meta.fetchMs = FbmSync.budgetFetchMs(meta);
   meta.extensionReplyMs = FbmSync.budgetExtensionReplyMs(meta.timeoutMs);
   meta.gasReplyMs = FbmSync.budgetGasReplyMs();
   if (request.items) { meta.batch = { maxBytes: FbmSync.BUDGET.batchMaxBytes }; }
@@ -518,6 +518,7 @@ FbmSync.requestForCursor = function (state) {
   if (cursor.kind === 'customer_grid') {
     return FbmSync.customerGridRequest({ type: Number(cursor.type || 0), count: Number(cursor.count || 2000), gridPageIndex: cursor.pageIndex === undefined ? -1 : cursor.pageIndex, gridPageValue: cursor.pageValue === undefined ? null : cursor.pageValue, pageItems: cursor.pageItems, gridRefresh: false });
   }
+  if (cursor.kind === 'scan_job') { return FbmSync.scanJobRequest(state); }
   if (cursor.kind === 'activity_grid') { return FbmSync.activityBatchRequest(state); }
   if (cursor.kind === 'activity_bulk_grid') {
     return FbmSync.activityBulkRequest({ type: Number(cursor.type || 0), count: Number(cursor.count || 100), gridPageIndex: cursor.pageIndex === undefined ? -1 : cursor.pageIndex, gridPageValue: cursor.pageValue === undefined ? null : cursor.pageValue, gridRefresh: false, transport: cursor.transport });
@@ -526,7 +527,7 @@ FbmSync.requestForCursor = function (state) {
 };
 /** Chỉ retry request đọc; request ghi không được lặp vì phản hồi có thể đã tới FBM. */
 FbmSync.retryRead = function (state, failure) {
-  var safeKinds = ['authorize_customer', 'authorize_activity', 'identity_user_grid', 'login_identity_authorize', 'login_identity_user', 'lookup', 'push_lookup', 'customer_grid', 'activity_grid', 'activity_bulk_grid'], cursor = state && state.cursor || {}, limit = Number(state && state.retryLimit || 2), attempt = Number(state && state.retryCount || 0), request;
+  var safeKinds = ['authorize_customer', 'authorize_activity', 'identity_user_grid', 'login_identity_authorize', 'login_identity_user', 'lookup', 'push_lookup', 'customer_grid', 'scan_job', 'activity_grid', 'activity_bulk_grid'], cursor = state && state.cursor || {}, limit = Number(state && state.retryLimit || 2), attempt = Number(state && state.retryCount || 0), request;
   if (!failure || failure.retryable !== true || safeKinds.indexOf(cursor.kind) < 0 || attempt >= limit) { return null; }
   request = FbmSync.requestForCursor(state);
   if (!request) { return null; }

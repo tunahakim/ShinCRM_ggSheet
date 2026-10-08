@@ -19,8 +19,27 @@ FbmSync.activityPagesWrite = function (state, pages) {
   if (typeof props.deleteProperty === 'function') { props.deleteProperty(FbmSync.ACTIVITY_PAGES_KEY); } else { props.setProperty(FbmSync.ACTIVITY_PAGES_KEY, ''); }
 };
 
-/** Lấp kế hoạch lô bằng khách chưa quét của trang Customer, tối đa `activityBatchCustomers`. */
+/**
+ * Hàng đợi khách cần đọc giao dịch của lượt quét: khách đã thấy trong lượt (bitmap `customer`), lấy theo số CUS tăng dần từ `queueFrom`.
+ * Cursor chỉ giữ vị trí và tối đa một lô mã khách, nên state không phình theo số khách; khách mới tạo trong lượt có số lớn hơn mốc của bitmap nên vẫn được đọc.
+ */
+FbmSync.activityQueueRefill = function (cursor) {
+  var hasSeen = FbmSync.seenStoreReader('customer'), from = Number(cursor.queueFrom), picked = [];
+  FbmSync.readLocal('customer').forEach(function (record) {
+    var index = FbmSync.seenStoreIndex('customer', record), fbmId = String(record && record.fbmId || '').trim();
+    if (index < from || !fbmId || String(record.recordStatus || 'active') === 'deleted' || FbmSync.isTemporaryRecord('customer', record) || !hasSeen(record)) { return; }
+    picked.push({ index: index, sttRec: fbmId });
+  });
+  picked.sort(function (a, b) { return a.index - b.index; });
+  picked = picked.slice(0, FbmSync.BUDGET.activityBatchCustomers);
+  cursor.customers = picked.map(function (item) { return item.sttRec; });
+  cursor.customerIndex = 0;
+  cursor.queueFrom = picked.length ? picked[picked.length - 1].index + 1 : -1;
+};
+
+/** Lấp kế hoạch lô bằng khách chưa quét, tối đa `activityBatchCustomers`; hết danh sách mà còn hàng đợi thì lấy lô mã khách kế tiếp. */
 FbmSync.activityBatchPlan = function (cursor) {
+  if (!(cursor.batch || []).length && Number(cursor.customerIndex || 0) >= (cursor.customers || []).length && cursor.queueFrom !== undefined && Number(cursor.queueFrom) >= 0) { FbmSync.activityQueueRefill(cursor); }
   var plan = (cursor.batch || []).slice(), customers = cursor.customers || [], next = Number(cursor.customerIndex || 0);
   while (plan.length < FbmSync.BUDGET.activityBatchCustomers && next < customers.length) { plan.push(next); next += 1; }
   cursor.batch = plan; cursor.customerIndex = next;
