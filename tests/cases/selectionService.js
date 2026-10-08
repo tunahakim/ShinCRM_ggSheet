@@ -197,6 +197,17 @@ function chay(so) {
   const sameNext = hop.probeSelectionAndReload({ previousSelectionContext: sameDuringRead.selection, previousCustomerId: sameDuringRead.customerId });
   check(so, 'R11 signal cùng mã được dọn sau request kế tiếp', [sameNext.payload.mode, sameNext.reload.records], ['records', []]);
 
+  const logged = [];
+  const logEventGoc = hop.logEvent;
+  hop.logEvent = (entry) => { logged.push(entry); };
+  hop.probeSelectionAndReload({ extensionReadFailure: 'LIVE_GRID_NOT_FOUND' });
+  hop.probeSelectionAndReload({ extensionReadFailure: '=HYPERLINK("x")' });
+  hop.probeSelectionAndReload({});
+  hop.logEvent = logEventGoc;
+  check(so, 'Sidebar báo Extension đọc hỏng thì GAS ghi đúng một dòng cảnh báo, bỏ chuỗi lạ không phải mã hằng',
+    [logged.length, logged[0] && logged[0].action, logged[0] && logged[0].outcome === hop.LOG_WARN, logged[0] && logged[0].reason.indexOf('LIVE_GRID_NOT_FOUND') >= 0],
+    [1, 'extension_read', true, true]);
+
   const calls = [];
   hop.runEntryPoint = function (name, source, channel, fn) {
     calls.push([name, source, channel]);

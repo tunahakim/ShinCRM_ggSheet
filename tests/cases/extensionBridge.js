@@ -130,13 +130,20 @@ async function chay(so) {
   hop._onMessage({
     origin: 'https://abc-123.googleusercontent.com',
     source: dung.source,
-    data: { action: 'CRM_HANDSHAKE', nonce: 'nonce-kiem-thu' }
+    data: { action: 'CRM_HANDSHAKE', nonce: 'nonce-kiem-thu', readPlan: JSON.parse(JSON.stringify(readPlan)) }
   });
-  check(so, 'nhịp bắt tay lặp lại không ép gửi CRM_CONTEXT thừa mỗi giây', hop.lastContextKey, 'ảnh vừa gửi');
+  check(so, 'nhịp bắt tay lặp lại kèm cùng read plan như Sidebar thật không ép gửi CRM_CONTEXT thừa mỗi giây', hop.lastContextKey, 'ảnh vừa gửi');
+
+  hop._onMessage({
+    origin: 'https://abc-123.googleusercontent.com',
+    source: dung.source,
+    data: { action: 'CRM_HANDSHAKE', nonce: 'nonce-kiem-thu', readPlan: { Customer: [Object.assign({}, readPlan.Customer[0], { headerAddress: 'B1', valueAddressTemplate: 'B{row}' })] } }
+  });
+  check(so, 'read plan đổi thật thì Extension đọc lại ô theo plan mới', [hop.lastContextKey, hop.CRM_READ_PLAN.Customer[0].headerAddress], ['', 'B1']);
 
   hop.sendContextToSidebar({ spreadsheetId: 'sheet-1', sheetName: 'Customer', cellRef: 'A4' });
   check(so, 'CRM_CONTEXT mang cùng nonce nên sidebar không loại tin hợp lệ',
-    [dung.sent[3].data.action, dung.sent[3].data.nonce, dung.sent[3].data.sessionId, dung.sent[3].data.spreadsheetId, dung.sent[3].targetOrigin],
+    [dung.sent[dung.sent.length - 1].data.action, dung.sent[dung.sent.length - 1].data.nonce, dung.sent[dung.sent.length - 1].data.sessionId, dung.sent[dung.sent.length - 1].data.spreadsheetId, dung.sent[dung.sent.length - 1].targetOrigin],
     ['CRM_CONTEXT', 'nonce-kiem-thu', dung.sent[0].data.sessionId, 'sheet-1', 'https://abc-123.googleusercontent.com']);
 
   const la = nguonTin();

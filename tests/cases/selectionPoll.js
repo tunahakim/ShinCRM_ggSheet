@@ -172,6 +172,62 @@ async function chay(so) {
   check(so, 'read plan lệch hàng 1 fail-open để GAS tự xác nhận',
     Array.from(stalePlan._timers.values()).some((item) => item.delay === 1000), true);
 
+  const plan = { Customer: [{ token: 'id', headerAddress: 'A1', expectedValue: '@CUS_MA_KH', valueAddressTemplate: 'A{row}' }] };
+  const gasSelection = (customerId, cellRef) => ({ ok: true, reload: { revision: 0 }, selection: { spreadsheetId: 'sheet-1', gid: '1', sheetName: 'Customer', cellRef, row: 4, col: 3, rowEnd: 4, colEnd: 3, customerId } });
+  const readerDown = dungHopPoll(); batDau(readerDown); readerDown._calls = [];
+  readerDown.SHEET_LINK_READ_PLAN = plan;
+  readerDown.SHEET_LINK_LAST_ACK = 5000; readerDown._clock.now = 5001;
+  readerDown.Store = { hasCustomer: (id) => id === 'CUS-000004' || id === 'CUS-000005' };
+  const pickedDown = [];
+  readerDown.ACTIONS.setCurrentCustomer = (input) => { pickedDown.push(input.pick); };
+  let nextGas = gasSelection('CUS-000004', 'C4');
+  readerDown.callServer = (name, args, options) => { readerDown._calls.push({ name, args, options }); return syncValue(nextGas); };
+  const downContext = { action: 'CRM_CONTEXT', nonce: readerDown.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq: 1, sheetName: 'Customer', cellRef: 'C4', hint: 'canvasClick', readStatus: 'unavailable', readReason: 'LIVE_GRID_NOT_FOUND', headerComplete: false, rawHeaderRow: [], reads: [] };
+  readerDown.sheetLinkOnMessage({ origin: readerDown.SHEET_LINK_ORIGIN, data: downContext });
+  check(so, 'Extension sống nhưng đọc hỏng: click ô đặt wake theo nhịp đổi vị trí một giây, không chờ ba giây',
+    [runTimer(readerDown, 1000), readerDown._calls.length], [1000, 1]);
+  check(so, 'Extension đọc hỏng: Sidebar mở khách do GAS đọc thay và báo Log mã lỗi',
+    [pickedDown, readerDown._calls[0].args[0].extensionReadFailure], [['CUS-000004'], 'LIVE_GRID_NOT_FOUND']);
+  check(so, 'Extension đọc hỏng: băng cảnh báo hiện câu riêng, không nhầm với thiếu Extension',
+    [readerDown._banner.hidden, readerDown._banner.textContent], [false, readerDown.SELECTION_POLL_BANNER_TEXT.readerDown]);
+  nextGas = gasSelection('CUS-000005', 'C5');
+  // syncValue chạy đồng bộ nên mốc "đang bay" được gán sau khi lượt đã xong; Promise thật tự dọn mốc này.
+  readerDown.SHEET_LINK_SELECTION_PENDING = null;
+  readerDown.sheetLinkOnMessage({ origin: readerDown.SHEET_LINK_ORIGIN, data: Object.assign({}, downContext, { seq: 2, cellRef: 'C5' }) });
+  runTimer(readerDown, 1000);
+  check(so, 'Extension đọc hỏng: lần click sau vẫn mở đúng khách nhưng chỉ báo Log một lần mỗi phiên',
+    [pickedDown, readerDown._calls[1].args[0].extensionReadFailure], [['CUS-000004', 'CUS-000005'], '']);
+
+  const readerResend = dungHopPoll(); batDau(readerResend); readerResend._calls = [];
+  readerResend.SHEET_LINK_READ_PLAN = plan;
+  readerResend.SHEET_LINK_LAST_ACK = 5000; readerResend._clock.now = 5001;
+  readerResend.Store = { hasCustomer: (id) => id === 'CUS-000004' };
+  const pickedResend = [];
+  readerResend.ACTIONS.setCurrentCustomer = (input) => { pickedResend.push(input.pick); };
+  let finishProbe = null;
+  readerResend.callServer = (name, args, options) => { readerResend._calls.push({ name, args, options }); return { then: (ok) => { finishProbe = ok; return { then: () => null }; } }; };
+  readerResend.sheetLinkOnMessage({ origin: readerResend.SHEET_LINK_ORIGIN, data: Object.assign({}, downContext, { nonce: readerResend.SHEET_LINK_NONCE }) });
+  runTimer(readerResend, 1000);
+  readerResend.sheetLinkOnMessage({ origin: readerResend.SHEET_LINK_ORIGIN, data: Object.assign({}, downContext, { nonce: readerResend.SHEET_LINK_NONCE, seq: 2, hint: '' }) });
+  finishProbe(gasSelection('CUS-000004', 'C4'));
+  check(so, 'Extension gửi lại cùng vị trí trong lúc GAS đang đọc thì câu trả lời GAS vẫn được áp',
+    pickedResend, ['CUS-000004']);
+
+  const readerOk = dungHopPoll(); batDau(readerOk); readerOk._calls = [];
+  readerOk.SHEET_LINK_READ_PLAN = plan;
+  readerOk.SHEET_LINK_LAST_ACK = 5000; readerOk._clock.now = 5001;
+  readerOk.Store = { hasCustomer: () => true };
+  const pickedOk = [];
+  readerOk.ACTIONS.setCurrentCustomer = (input) => { pickedOk.push(input.pick); };
+  readerOk.callServer = (name, args, options) => { readerOk._calls.push({ name, args, options }); return syncValue(gasSelection('CUS-000009', 'A4')); };
+  readerOk.sheetLinkOnMessage({
+    origin: readerOk.SHEET_LINK_ORIGIN,
+    data: { action: 'CRM_CONTEXT', nonce: readerOk.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq: 1, sheetName: 'Customer', cellRef: 'A4', hint: 'canvasClick', readStatus: 'ok', readReason: '', headerComplete: true, rawHeaderRow: [{ address: 'A1', column: 1, value: '@CUS_MA_KH' }], reads: [{ token: 'id', status: 'ok', matched: true, value: 'CUS-000004' }] }
+  });
+  runTimer(readerOk, 3000);
+  check(so, 'Extension tự đọc được thì giữ quyền chọn khách, selection GAS không đè, không báo Log, không hiện băng',
+    [pickedOk, readerOk._calls.length, readerOk._calls[0].args[0].extensionReadFailure, readerOk._banner.hidden], [['CUS-000004'], 1, '', true]);
+
   const writeResponse = dungHopPoll(); batDau(writeResponse); writeResponse._calls = [];
   writeResponse.sheetLinkObserveReloadPayload({ reload: { revision: 3, records: ['CUS-1'] } }, 'saveRecord');
   writeResponse.sheetLinkObserveReloadPayload({ reload: { revision: 4, records: ['CUS-2'] } }, 'deleteRecords');
