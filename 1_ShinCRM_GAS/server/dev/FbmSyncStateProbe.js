@@ -11,7 +11,7 @@ function fbmSyncProbeJsonBytes(value) {
 }
 
 function fbmSyncStateProbe() {
-  var props = PropertiesService.getDocumentProperties(), values = typeof props.getProperties === 'function' ? props.getProperties() : {}, properties = [], totalBytes = 0;
+  var props = documentProps(), values = typeof props.getProperties === 'function' ? props.getProperties() : {}, properties = [], totalBytes = 0;
   Object.keys(values || {}).forEach(function (key) {
     var bytes = fbmSyncProbeBytes(values[key]);
     totalBytes += bytes;

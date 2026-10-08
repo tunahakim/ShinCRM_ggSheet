@@ -15,7 +15,7 @@ function shinRangeTouchesColumn(range, column) {
 function shinHeaderSnapshotKey(sheetName) { return 'SHIN_HEADER_SNAPSHOT_' + String(sheetName || ''); }
 
 function shinHeaderSnapshotRead(sheet) {
-  var raw = PropertiesService.getDocumentProperties().getProperty(shinHeaderSnapshotKey(sheet.getName()));
+  var raw = documentProps().getProperty(shinHeaderSnapshotKey(sheet.getName()));
   if (!raw) { return null; }
   try { var parsed = JSON.parse(raw); return Array.isArray(parsed) ? parsed : null; } catch (ignore) { return null; }
 }
@@ -29,7 +29,7 @@ function shinHeaderValues(sheet) {
 }
 
 function shinHeaderSnapshotWrite(sheet) {
-  PropertiesService.getDocumentProperties().setProperty(shinHeaderSnapshotKey(sheet.getName()), JSON.stringify(shinHeaderValues(sheet)));
+  documentProps().setProperty(shinHeaderSnapshotKey(sheet.getName()), JSON.stringify(shinHeaderValues(sheet)));
 }
 
 function shinHeaderRangeHasValidCode(sheet, range, event, validCode) {

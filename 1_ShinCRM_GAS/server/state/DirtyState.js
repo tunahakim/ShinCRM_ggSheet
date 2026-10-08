@@ -1,7 +1,7 @@
 /**
  * Đọc khối trạng thái bẩn (dirty state — dấu hiệu cho biết chỗ nào cần vẽ lại hoặc nạp lại). Tài liệu 07 Phần 2.
  *
- * Khối này sống ở `PropertiesService.getDocumentProperties()` chứ không ở RAM, vì nó phải sống sót giữa các lần gọi máy chủ — mỗi lần gọi Apps Script là một lượt chạy mới, không nhớ gì lượt trước — và phải chung cho mọi phiên làm việc trên cùng một tệp.
+ * Khối này sống ở DocumentProperties (qua `documentProps()`, server/state/DocumentStore.js) chứ không ở RAM, vì nó phải sống sót giữa các lần gọi máy chủ — mỗi lần gọi Apps Script là một lượt chạy mới, không nhớ gì lượt trước — và phải chung cho mọi phiên làm việc trên cùng một tệp.
  *
  * Ba khóa: `dirtyViewSheets` (sheet quản trị cần vẽ lại), `dirtyRecords` (mã bản ghi bị sửa tay thẳng trên sheet kho), `dirtyConfig` (`Config` hoặc `Category` đã đổi). Thêm một cờ bẩn toàn bộ, dùng khi danh sách bản ghi vượt ngưỡng.
  *
@@ -52,7 +52,7 @@ function dirtyStateRead() {
   var empty = { viewSheets: [], records: [], config: false, all: false };
 
   try {
-    var props = PropertiesService.getDocumentProperties();
+    var props = documentProps();
     var category = props.getProperty(DIRTY_KEYS.category) === 'true';
     var config = props.getProperty(DIRTY_KEYS.config) === 'true';
     return {
@@ -76,7 +76,7 @@ function reloadStateRead() {
     allCore: false, allViews: false, all: false
   };
   try {
-    var props = PropertiesService.getDocumentProperties();
+    var props = documentProps();
     var allCore = props.getProperty(DIRTY_KEYS.allCore) === 'true' || props.getProperty(DIRTY_KEYS.all) === 'true';
     var category = props.getProperty(DIRTY_KEYS.category) === 'true';
     var config = props.getProperty(DIRTY_KEYS.config) === 'true';
@@ -146,7 +146,7 @@ function dirtyStateRecordIdsAfterRevision(props, revision) {
 }
 
 function dirtyStateMarkSignal(mark) {
-  var props = PropertiesService.getDocumentProperties();
+  var props = documentProps();
   var state = reloadStateRead();
   var hasRecords = !!(mark.records && mark.records.length);
   var explicitReadyAt = mark.recordsReadyAt !== undefined && mark.recordsReadyAt !== null;
@@ -286,7 +286,7 @@ function dirtyStateMarkAll() {
 
 /** Xóa đúng các cờ đã xử lý; gọi không tham số để xóa toàn bộ trạng thái. */
 function dirtyStateClear(options) {
-  var props = PropertiesService.getDocumentProperties();
+  var props = documentProps();
   var opts = options || {};
   if (opts.expectedRevision !== undefined && reloadStateRead().revision !== Number(opts.expectedRevision)) {
     return dirtyStateRead();
@@ -309,7 +309,7 @@ function dirtyStateClear(options) {
 function dirtyStateClearViewSheet(sheetName, expectedRevision) {
   var target = String(sheetName === null || sheetName === undefined ? '' : sheetName).trim();
   if (expectedRevision !== undefined && reloadStateRead().revision !== Number(expectedRevision)) { return dirtyStateRead(); }
-  var props = PropertiesService.getDocumentProperties();
+  var props = documentProps();
   var remaining = dirtyStateRead().viewSheets.filter(function (name) { return name !== target; });
   dirtyStateWriteList(props, DIRTY_KEYS.viewSheets, remaining);
   return dirtyStateRead();
@@ -319,7 +319,7 @@ function dirtyStateClearRecords(recordIds, expectedRevision) {
   if (expectedRevision !== undefined && reloadStateRead().revision !== Number(expectedRevision)) { return dirtyStateRead(); }
   var remove = {};
   (Array.isArray(recordIds) ? recordIds : [recordIds]).forEach(function (id) { remove[String(id || '').trim()] = true; });
-  var props = PropertiesService.getDocumentProperties();
+  var props = documentProps();
   var remaining = dirtyStateRead().records.filter(function (id) { return !remove[id]; });
   dirtyStateWriteList(props, DIRTY_KEYS.records, remaining);
   if (!remaining.length) {
@@ -333,7 +333,7 @@ function dirtyStateClearRecords(recordIds, expectedRevision) {
 }
 
 function dirtyStateClearConfig() {
-  var props = PropertiesService.getDocumentProperties();
+  var props = documentProps();
   props.deleteProperty(DIRTY_KEYS.config);
   return dirtyStateRead();
 }

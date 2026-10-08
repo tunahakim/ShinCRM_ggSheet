@@ -80,10 +80,10 @@ function fbmPerfWrap(perf, owner, key, label) {
   perf.restore.push(function () { owner[key] = original; });
 }
 
-/** DocumentProperties: đo từng lần getProperty/setProperty thật, vì đó là thứ bị nghi tốn thời gian nhất. */
+/** DocumentProperties: đo từng lần gọi kho thật (lõi lẫn đồng bộ), bọc ở cửa kho dùng chung nên lần đọc trúng bản đọc trong bộ nhớ không bị tính. */
 function fbmPerfWrapProps(perf) {
-  if (typeof FbmSync.props !== 'function') { return; }
-  var originalProps = FbmSync.props, originalService = PropertiesService.getDocumentProperties;
+  if (typeof documentStoreReal !== 'function') { return; }
+  var originalReal = documentStoreReal;
   var timed = function (props) {
     return {
       getProperty: function (key) { var f = fbmPerfEnter(perf, 'props.getProperty'); try { return props.getProperty(key); } finally { fbmPerfExit(perf, f); } },
@@ -94,14 +94,9 @@ function fbmPerfWrapProps(perf) {
       setProperties: function (values, deleteOthers) { var f = fbmPerfEnter(perf, 'props.setProperties'); try { return props.setProperties(values, deleteOthers); } finally { fbmPerfExit(perf, f); } }
     };
   };
-  // Trace gọi thẳng PropertiesService nên bọc ở dịch vụ để đo cả trace; dịch vụ không cho thay (đối tượng chỉ đọc) thì lùi về bọc FbmSync.props và ghi lại để bảng không hiểu nhầm trace tốn 0.
-  try {
-    PropertiesService.getDocumentProperties = function () { return timed(originalService.call(PropertiesService)); };
-    perf.propsServiceWrapped = PropertiesService.getDocumentProperties !== originalService;
-  } catch (serviceError) { perf.propsServiceWrapped = false; }
-  if (perf.propsServiceWrapped) { perf.restore.push(function () { PropertiesService.getDocumentProperties = originalService; }); return; }
-  FbmSync.props = function () { return timed(originalProps.apply(FbmSync, arguments)); };
-  perf.restore.push(function () { FbmSync.props = originalProps; });
+  documentStoreReal = function () { return timed(originalReal()); };
+  perf.propsServiceWrapped = true;
+  perf.restore.push(function () { documentStoreReal = originalReal; });
 }
 
 /** Thời gian chờ khóa điều phối tách riêng khỏi thời gian xử lý. */

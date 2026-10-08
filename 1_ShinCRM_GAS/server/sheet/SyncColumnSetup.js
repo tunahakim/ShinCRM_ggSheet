@@ -9,7 +9,7 @@ function ensureColumnsThroughWriteGate(source, columnsForSheet) {
   var commit = null;
   if (typeof LockService !== 'undefined' && LockService.getDocumentLock) {
     lock = LockService.getDocumentLock();
-    if (!lock.tryLock(SETTINGS.LOCK_WAIT_MS)) { throw new Error('Hệ thống bận. Vui lòng thử lại!'); }
+    if (!documentStoreTryLock(lock, SETTINGS.LOCK_WAIT_MS)) { throw new Error('Hệ thống bận. Vui lòng thử lại!'); }
   }
   try {
     ['Customer', 'Activity'].forEach(function (sheetName) {

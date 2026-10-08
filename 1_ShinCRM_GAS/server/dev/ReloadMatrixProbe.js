@@ -18,14 +18,14 @@ function reloadMatrixProbePropKeys() {
 }
 
 function reloadMatrixProbeSnapshotProperties(keys) {
-  var props = PropertiesService.getDocumentProperties();
+  var props = documentProps();
   var snapshot = {};
   keys.forEach(function (key) { snapshot[key] = props.getProperty(key); });
   return snapshot;
 }
 
 function reloadMatrixProbeRestoreProperties(snapshot) {
-  var props = PropertiesService.getDocumentProperties();
+  var props = documentProps();
   Object.keys(snapshot || {}).forEach(function (key) {
     if (snapshot[key] === null || snapshot[key] === undefined) { props.deleteProperty(key); }
     else { props.setProperty(key, snapshot[key]); }
@@ -33,7 +33,7 @@ function reloadMatrixProbeRestoreProperties(snapshot) {
 }
 
 function reloadMatrixProbeSnapshotViewProperties(book) {
-  var props = PropertiesService.getDocumentProperties();
+  var props = documentProps();
   var snapshot = {};
   book.getSheets().filter(function (sheet) { return sheet.getName().charAt(0) === '!'; }).forEach(function (sheet) {
     [viewRevisionKey(sheet), viewInputSignatureKey(sheet)].forEach(function (key) {
@@ -353,7 +353,7 @@ function reloadMatrixProbe() {
       if (customerRows) { customer.sheet.getRange(customerStartRow, 1, customerRows, customer.columnMap.lastColumn).clearContent(); }
       SpreadsheetApp.flush();
       if (temporaryView) { book.deleteSheet(book.getSheetByName(RELOAD_MATRIX_PROBE_VIEW)); }
-      temporaryViewPropertyKeys.forEach(function (key) { PropertiesService.getDocumentProperties().deleteProperty(key); });
+      temporaryViewPropertyKeys.forEach(function (key) { documentProps().deleteProperty(key); });
       if (extraInvalidColumn) { customer.sheet.deleteColumn(customer.sheet.getMaxColumns()); }
       renderAllManagedViews();
       reloadMatrixProbeRestoreProperties(propSnapshot);
@@ -385,7 +385,7 @@ function reloadPayloadProbe() {
     var deferred = probeSelectionAndReload({ requestId: 'dev-r11-defer', previousCustomerId: '' });
     reloadMatrixProbeAssert(report, 'R11 DEV defer không đọc payload', deferred.decision.ram.action === 'defer' && deferred.payload === null && deferred.reload.records.indexOf(id) >= 0, JSON.stringify({ action: deferred.decision.ram.action, waitMs: deferred.waitMs, payload: deferred.payload }));
 
-    PropertiesService.getDocumentProperties().setProperty(DIRTY_KEYS.recordsReadyAt, String(Date.now() - 1));
+    documentProps().setProperty(DIRTY_KEYS.recordsReadyAt, String(Date.now() - 1));
     var ready = probeSelectionAndReload({ requestId: 'dev-r11-ready', previousCustomerId: '' });
     reloadMatrixProbeAssert(report, 'R11 DEV ready trả payload cùng response', ready.payload && ready.payload.mode === 'records' && ready.processedRevision === deferred.observedRevision && ready.reload.records.length === 0, JSON.stringify({ mode: ready.payload && ready.payload.mode, processedRevision: ready.processedRevision, observedRevision: ready.observedRevision, records: ready.reload.records }));
     report.push('R11 DEV hoàn tất: GAS tự quyết định defer/reload và trả payload trong cùng request.');

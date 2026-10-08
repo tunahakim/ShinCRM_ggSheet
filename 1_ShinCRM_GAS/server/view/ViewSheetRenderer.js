@@ -164,30 +164,30 @@ function viewRevisionKey(sheet) {
 }
 
 function viewRevisionRead(sheet) {
-  try { return Number(PropertiesService.getDocumentProperties().getProperty(viewRevisionKey(sheet))) || 0; }
+  try { return Number(documentProps().getProperty(viewRevisionKey(sheet))) || 0; }
   catch (khongDocDuoc) { return 0; }
 }
 
 function viewRevisionBump(sheet) {
   try {
     var next = viewRevisionRead(sheet) + 1;
-    PropertiesService.getDocumentProperties().setProperty(viewRevisionKey(sheet), String(next));
+    documentProps().setProperty(viewRevisionKey(sheet), String(next));
     return next;
   } catch (khongGhiDuoc) {
-    try { PropertiesService.getDocumentProperties().deleteProperty(viewInputSignatureKey(sheet)); } catch (khongXoaDuoc) {}
+    try { documentProps().deleteProperty(viewInputSignatureKey(sheet)); } catch (khongXoaDuoc) {}
     return 0;
   }
 }
 
 function viewInputSignatureRead(sheet) {
-  try { return PropertiesService.getDocumentProperties().getProperty(viewInputSignatureKey(sheet)) || ''; }
+  try { return documentProps().getProperty(viewInputSignatureKey(sheet)) || ''; }
   catch (khongDocDuoc) { return ''; }
 }
 
 /** Không làm hỏng lượt vẽ đã ghi xong chỉ vì kho thuộc tính tạm thời không nhận được dấu vân tay. */
 function viewInputSignatureWrite(sheet) {
   try {
-    PropertiesService.getDocumentProperties().setProperty(viewInputSignatureKey(sheet), viewInputSignature(sheet));
+    documentProps().setProperty(viewInputSignatureKey(sheet), viewInputSignature(sheet));
     return true;
   } catch (khongGhiDuoc) {
     return false;
@@ -327,7 +327,7 @@ function renderViewSheet(sheetName) {
   var sheet = book.getSheetByName(name);
   if (!sheet) { throw new Error('Không tìm thấy sheet quản trị "' + name + '".'); }
   var lock = LockService.getDocumentLock();
-  if (!lock.tryLock(SETTINGS.LOCK_WAIT_MS)) { throw new Error('Hệ thống bận. Vui lòng thử lại!'); }
+  if (!documentStoreTryLock(lock, SETTINGS.LOCK_WAIT_MS)) { throw new Error('Hệ thống bận. Vui lòng thử lại!'); }
   try {
     return viewRenderSheetLocked(book, sheet, name);
   } finally {
@@ -395,7 +395,7 @@ function renderViewIfDirty(sheetName) {
   var sheet = book.getSheetByName(name);
   if (!sheet || name.charAt(0) !== '!') { throw new Error('Không tìm thấy sheet quản trị "' + name + '".'); }
   var lock = LockService.getDocumentLock();
-  if (!lock.tryLock(SETTINGS.LOCK_WAIT_MS)) { throw new Error('Hệ thống bận. Vui lòng thử lại!'); }
+  if (!documentStoreTryLock(lock, SETTINGS.LOCK_WAIT_MS)) { throw new Error('Hệ thống bận. Vui lòng thử lại!'); }
   try {
     var state = dirtyStateRead();
     var inputChanged = viewInputSignatureRead(sheet) !== viewInputSignature(sheet);
@@ -418,7 +418,7 @@ function inspectViewState(sheetName, knownRevision) {
     var sheet = book.getSheetByName(name);
     if (!sheet || name.charAt(0) !== '!') { throw new Error('Không tìm thấy sheet quản trị "' + name + '".'); }
     var lock = LockService.getDocumentLock();
-    if (!lock.tryLock(SETTINGS.LOCK_WAIT_MS)) { throw new Error('Hệ thống bận. Vui lòng thử lại!'); }
+    if (!documentStoreTryLock(lock, SETTINGS.LOCK_WAIT_MS)) { throw new Error('Hệ thống bận. Vui lòng thử lại!'); }
     try {
       var state = dirtyStateRead();
       var reload = typeof reloadStateRead === 'function' ? reloadStateRead() : state;

@@ -216,7 +216,7 @@ function resetConfigToDefaults() {
   }
   writeCommitAssertAvailable();
   var lock = LockService.getDocumentLock();
-  if (!lock.tryLock(SETTINGS.LOCK_WAIT_MS)) { throw new Error('Hệ thống bận. Vui lòng thử lại!'); }
+  if (!documentStoreTryLock(lock, SETTINGS.LOCK_WAIT_MS)) { throw new Error('Hệ thống bận. Vui lòng thử lại!'); }
   var file;
   var result;
   var views = [];

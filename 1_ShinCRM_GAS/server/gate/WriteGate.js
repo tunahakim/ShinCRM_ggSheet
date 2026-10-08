@@ -534,7 +534,7 @@ function writeGateSave(yeuCau) {
   writeCommitAssertAvailable();
 
   var khoa = LockService.getDocumentLock();
-  if (!khoa.tryLock(SETTINGS.LOCK_WAIT_MS)) {
+  if (!documentStoreTryLock(khoa, SETTINGS.LOCK_WAIT_MS)) {
     throw new Error('Hệ thống bận. Vui lòng thử lại!');
   }
 

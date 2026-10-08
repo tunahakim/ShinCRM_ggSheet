@@ -64,7 +64,7 @@ function idGateMaxOnSheet(context) {
  */
 function idGateCounterRead(entity) {
   var key = idGateCounterKey(entity);
-  var raw = PropertiesService.getDocumentProperties().getProperty(key);
+  var raw = documentProps().getProperty(key);
   if (raw !== null) {
     if (!/^\d+$/.test(String(raw))) {
       throw new Error('Bộ đếm cấp mã ' + key + ' trong Document Properties hỏng (giá trị "' + raw + '"). Đã dừng cấp mã để không cấp trùng; báo người phụ trách kỹ thuật sửa giá trị này.');
@@ -77,7 +77,7 @@ function idGateCounterRead(entity) {
 
 /** Nhận bộ đếm từ nơi lưu đời cũ, chỉ khi kho mới chưa có khóa; kho mới đã có thì giữ nguyên để không kéo bộ đếm lùi. */
 function idGateAdoptCounter(entity, value) {
-  var key = idGateCounterKey(entity), props = PropertiesService.getDocumentProperties();
+  var key = idGateCounterKey(entity), props = documentProps();
   if (props.getProperty(key) !== null) { return false; }
   props.setProperty(key, String(idGateNumberOf(value)));
   return true;
@@ -117,7 +117,7 @@ function idGateIssue(entity, soLuong, context) {
   var ra = [];
   for (var i = 0; i < can; i++) { ra.push(idGateFormat(entity, batDau + i)); }
 
-  PropertiesService.getDocumentProperties().setProperty(idGateCounterKey(entity), String(batDau + can - 1));
+  documentProps().setProperty(idGateCounterKey(entity), String(batDau + can - 1));
   return ra;
 }
 

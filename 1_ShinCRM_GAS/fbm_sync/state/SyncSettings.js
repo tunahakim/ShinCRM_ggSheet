@@ -21,7 +21,7 @@ function fbmSyncTestCodesParse(raw) {
 
 function fbmSyncSettingsProps() {
   if (typeof FbmSync.props === 'function') { return FbmSync.props(); }
-  if (typeof PropertiesService !== 'undefined' && PropertiesService.getDocumentProperties) { return PropertiesService.getDocumentProperties(); }
+  if (typeof documentProps === 'function') { return documentProps(); }
   return null;
 }
 

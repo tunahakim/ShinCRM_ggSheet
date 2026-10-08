@@ -68,7 +68,7 @@ FbmSync.orchestrationLock = function () {
 };
 FbmSync.withOrchestrationLock = function (work) {
   var lock = FbmSync.orchestrationLock(), waitMs = typeof SETTINGS !== 'undefined' && SETTINGS && SETTINGS.LOCK_WAIT_MS ? SETTINGS.LOCK_WAIT_MS : 10000;
-  if (!lock.tryLock(waitMs)) { return { ok: false, code: 'BUSY', request: null, message: 'GAS đang xử lý một lượt đồng bộ khác; chưa thay đổi state.', status: typeof FbmSync.statusView === 'function' ? FbmSync.statusView() : null }; }
+  if (!documentStoreTryLock(lock, waitMs)) { return { ok: false, code: 'BUSY', request: null, message: 'GAS đang xử lý một lượt đồng bộ khác; chưa thay đổi state.', status: typeof FbmSync.statusView === 'function' ? FbmSync.statusView() : null }; }
   // State ghi gộp trước khi nhả khóa, để lượt chờ khóa đọc được bản hoàn chỉnh (PropertyBuffer.js).
   try { return FbmSync.withPropertyBuffer(work); } finally { lock.releaseLock(); }
 };

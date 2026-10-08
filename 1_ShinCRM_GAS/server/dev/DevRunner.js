@@ -74,7 +74,7 @@ function doGet(e) {
   }
 
   var lock = LockService.getScriptLock();
-  if (!lock.tryLock(30000)) {
+  if (!documentStoreTryLock(lock, 30000)) {
     return reply('LOI\nĐang có lượt chạy khác giữ khóa. Thử lại sau.');
   }
 

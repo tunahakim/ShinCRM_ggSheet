@@ -338,7 +338,7 @@ function logTrimRows(sheet) {
  * Dòng nào ô `Lúc` rỗng hoặc không theo khuôn thì **dừng lại**, không xóa. Không đoán được ngày của một dòng thì không có quyền xóa nó.
  */
 function logTrimAge(sheet) {
-  var props = PropertiesService.getDocumentProperties();
+  var props = documentProps();
   var today = Utilities.formatDate(new Date(), LOG_TIMEZONE, 'yyyy-MM-dd');
   if (props.getProperty(LOG_CLEANUP_KEY) === today) { return; }
   props.setProperty(LOG_CLEANUP_KEY, today);

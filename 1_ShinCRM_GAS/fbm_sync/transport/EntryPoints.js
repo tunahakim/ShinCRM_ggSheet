@@ -94,7 +94,7 @@ function fbmSyncRelayConfig() {
   var props = PropertiesService.getScriptProperties(), key = String(props.getProperty('FBM_SYNC_KEY') || '');
   if (!key) {
     var lock = LockService.getScriptLock();
-    lock.waitLock(10000);
+    documentStoreWaitLock(lock, 10000);
     try {
       key = String(props.getProperty('FBM_SYNC_KEY') || '');
       if (!key) { key = Utilities.getUuid(); props.setProperty('FBM_SYNC_KEY', key); }
@@ -112,7 +112,7 @@ function fbmSyncRelayConfig() {
 /** Đổi khóa relay nguyên tử; Sidebar phải nhận ACK Extension trước khi coi là hoàn tất. */
 function fbmSyncRotateRelayKey() {
   var lock = LockService.getScriptLock();
-  lock.waitLock(10000);
+  documentStoreWaitLock(lock, 10000);
   try {
     var key = Utilities.getUuid();
     PropertiesService.getScriptProperties().setProperty('FBM_SYNC_KEY', key);

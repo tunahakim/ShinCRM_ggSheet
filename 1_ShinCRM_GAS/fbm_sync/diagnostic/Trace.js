@@ -68,28 +68,6 @@ FbmSync.traceEvent = function (stage, extra) {
   return event;
 };
 
-/*
- * Legacy implementation intentionally replaced above. Keep this marker close to
- * traceEvent so future edits do not reintroduce one PropertiesService write per
- * imported client event.
- */
-/* FbmSync.traceEvent = function (stage, extra) {
-  var event = FbmSync.traceContext(extra), props, rows;
-  event.at = Date.now();
-  event.stage = String(stage || '');
-  try {
-    props = PropertiesService.getDocumentProperties();
-    rows = JSON.parse(props.getProperty(FbmSync.TRACE_KEY) || '[]');
-    if (!Array.isArray(rows)) { rows = []; }
-    rows.push(event);
-    props.setProperty(FbmSync.TRACE_KEY, JSON.stringify(rows.slice(-FbmSync.TRACE_LIMIT)));
-  } catch (ignore) {
-    // Trace không được làm hỏng nghiệp vụ; execution log vẫn giữ mốc lỗi nếu có.
-    try { if (typeof console !== 'undefined' && console.warn) { console.warn('FBM trace write failed: ' + event.stage); } } catch (ignoreConsole) {}
-  }
-  return event;
-}; */
-
 FbmSync.traceRead = function (limit) {
   var rows = [], take = Math.max(1, Math.min(Number(limit || 20), FbmSync.TRACE_LIMIT));
   try { rows = JSON.parse(FbmSync.props().getProperty(FbmSync.TRACE_KEY) || '[]'); } catch (ignore) { rows = []; }

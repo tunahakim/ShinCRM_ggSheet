@@ -175,7 +175,7 @@ FbmSync.schedulerClaim = function (kind, now) {
   var due = Number(props.getProperty(item[0]) || 0);
   if (due && due > at) { return { ok: false, code: 'NOT_DUE', nextRunAt: due }; }
   var lock = FbmSync.orchestrationLock();
-  if (!lock.tryLock(SETTINGS.LOCK_WAIT_MS)) { return { ok: false, code: 'BUSY' }; }
+  if (!documentStoreTryLock(lock, SETTINGS.LOCK_WAIT_MS)) { return { ok: false, code: 'BUSY' }; }
   try {
     var state = FbmSync.stateRead();
     if (typeof FbmSync.recoverStaleRun === 'function') { state = FbmSync.recoverStaleRun(state).state; }
@@ -246,7 +246,7 @@ function fbmSyncHeartbeatRequest(options) {
     if (identity.blocking) { return { ok: true, noop: true, code: identity.status && identity.status.status === 'UNBOUND' ? 'FBM_IDENTITY_UNBOUND' : 'REBIND_REQUIRED', request: null, message: identity.message, status: FbmSync.statusView() }; }
   }
   var lock = FbmSync.orchestrationLock(), waitMs = typeof SETTINGS !== 'undefined' && SETTINGS && SETTINGS.LOCK_WAIT_MS ? SETTINGS.LOCK_WAIT_MS : 10000;
-  if (!lock.tryLock(waitMs)) { return fbmSyncLockResult('BUSY', 'GAS đang bận; chưa cấp request heartbeat mới.'); }
+  if (!documentStoreTryLock(lock, waitMs)) { return fbmSyncLockResult('BUSY', 'GAS đang bận; chưa cấp request heartbeat mới.'); }
   try {
     var state = FbmSync.stateRead(), session = state.session || {}, cursor = state.cursor || {}, now = Date.now();
     var activePhase = FbmSync.ACTIVE_PHASES && FbmSync.ACTIVE_PHASES.indexOf(String(state.phase || '')) >= 0;
@@ -289,7 +289,7 @@ FbmSync.heartbeatRequest = fbmSyncHeartbeatRequest;
 function fbmSyncHeartbeat(rawResponse, options) {
   if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED', status: FbmSync.statusView() }; }
   var lock = FbmSync.orchestrationLock(), waitMs = typeof SETTINGS !== 'undefined' && SETTINGS && SETTINGS.LOCK_WAIT_MS ? SETTINGS.LOCK_WAIT_MS : 10000;
-  if (!lock.tryLock(waitMs)) { return fbmSyncLockResult('BUSY', 'GAS đang bận; chưa nhận response heartbeat.'); }
+  if (!documentStoreTryLock(lock, waitMs)) { return fbmSyncLockResult('BUSY', 'GAS đang bận; chưa nhận response heartbeat.'); }
   // Đường nền tự giữ khóa nên không đi qua controlDispatchLocked; dùng chung ranh giới lát để lỗi và Log xử lý như đường Sidebar.
   try { return FbmSync.runSlice(function () { return fbmSyncHeartbeatLocked(rawResponse, options || {}); }); } finally { lock.releaseLock(); }
 }
@@ -361,7 +361,7 @@ function fbmSyncHeartbeatLocked(rawResponse, options) {
 /** Thu hồi reservation khi Extension không thể gửi envelope tới tab FBM. */
 function fbmSyncHeartbeatTransportFailure(payload) {
   var value = payload || {}, requestId = String(value.requestId || ''), lock = FbmSync.orchestrationLock(), waitMs = typeof SETTINGS !== 'undefined' && SETTINGS && SETTINGS.LOCK_WAIT_MS ? SETTINGS.LOCK_WAIT_MS : 10000;
-  if (!lock.tryLock(waitMs)) { return fbmSyncLockResult('BUSY', 'GAS đang bận; chưa ghi nhận lỗi cầu nối.'); }
+  if (!documentStoreTryLock(lock, waitMs)) { return fbmSyncLockResult('BUSY', 'GAS đang bận; chưa ghi nhận lỗi cầu nối.'); }
   try {
     var state = FbmSync.stateRead();
     if (!requestId || String(state.activeRequestId || '') !== requestId) {

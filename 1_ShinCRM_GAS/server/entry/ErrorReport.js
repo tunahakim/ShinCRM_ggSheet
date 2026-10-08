@@ -37,7 +37,7 @@ function errorMessage(err) {
  */
 function errorPendingPush(message) {
   try {
-    var props = PropertiesService.getDocumentProperties();
+    var props = documentProps();
     var list = [];
 
     try {
@@ -64,7 +64,7 @@ function errorPendingPush(message) {
  */
 function takePendingMessages() {
   try {
-    var props = PropertiesService.getDocumentProperties();
+    var props = documentProps();
     var raw = props.getProperty(ERROR_PENDING_KEY);
     if (!raw) { return []; }
 
