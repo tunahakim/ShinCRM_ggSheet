@@ -24,14 +24,14 @@ FbmSync.syncEntityLabel = function (entity, phase) {
 };
 /** Chỉ đưa dữ liệu render sang Sidebar; state nội bộ có lookup, cursor form và khóa vẫn ở GAS. */
 FbmSync.statusMetadata = function (metadata) {
-  var data = metadata || {}, keys = ['audit', 'categoryBlocks', 'identityBlocks', 'identityProbe', 'identityCheck', 'activityBulkMissing', 'activityBulkMissingCount', 'customerErrors', 'preflightIssues', 'pushFailures', 'pushFailureDetails', 'callbackTrace'];
+  var data = metadata || {}, keys = ['audit', 'categoryBlocks', 'identityBlocks', 'identityProbe', 'identityCheck', 'activityBulkMissing', 'activityBulkMissingCount', 'customerErrors', 'preflightIssues', 'callbackTrace'];
   var out = keys.reduce(function (result, key) {
     if (data[key] !== undefined) { result[key] = data[key]; }
     return result;
   }, {});
   // Hàng đợi xung đột nằm trên Sheet; Sidebar chỉ nhận số đếm, bản ghi cụ thể đến khi người dùng mở chế độ xung đột.
   out.conflictCount = Number(data.conflictCount || 0);
-  var failures = data.pushFailures && typeof data.pushFailures === 'object' ? data.pushFailures : {}, failureKeys = Object.keys(failures), details = data.pushFailureDetails && typeof data.pushFailureDetails === 'object' ? data.pushFailureDetails : {};
+  var store = FbmSync.pushFailuresRead(), failures = store.hashes, failureKeys = Object.keys(failures), details = store.details;
   out.pushFailureCount = failureKeys.length;
   out.pushFailures = {};
   out.pushFailureDetails = {};

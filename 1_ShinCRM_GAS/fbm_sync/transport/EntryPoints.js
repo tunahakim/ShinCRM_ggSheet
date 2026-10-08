@@ -58,7 +58,7 @@ function fbmSetAutoLogin(enabled) { return FbmSync.loginConfigSetEnabled(enabled
 
 /** Mở lại toàn bộ nhóm lỗi sau khi người dùng đã sửa nguyên nhân; không lặp request FBM tại đây. */
 function fbmSyncRetryPushFailures() {
-  var state = FbmSync.stateRead(), failures = state.metadata && state.metadata.pushFailures || {}, details = state.metadata && state.metadata.pushFailureDetails || {}, keys = Object.keys(failures), byEntity = { customer: [], activity: [] }, recordsByEntity = { customer: {}, activity: {} }, reset = [], missing = [];
+  var state = FbmSync.stateRead(), failures = FbmSync.pushFailuresRead().hashes, keys = Object.keys(failures), byEntity = { customer: [], activity: [] }, recordsByEntity = { customer: {}, activity: {} }, reset = [], missing = [];
   if (!keys.length) { return { ok: false, code: 'PUSH_FAILURES_NOT_FOUND', message: 'Không có nhóm bản ghi lỗi đẩy cần mở lại.' }; }
   ['customer', 'activity'].forEach(function (entity) {
     (FbmSync.readLocal(entity) || []).forEach(function (record) { recordsByEntity[entity][String(record && record.id || '')] = record; });
@@ -72,10 +72,10 @@ function fbmSyncRetryPushFailures() {
   ['customer', 'activity'].forEach(function (entity) {
     if (!byEntity[entity].length) { return; }
     FbmSync.sheetSave(entity, byEntity[entity], 'pull');
-    byEntity[entity].forEach(function (record) { var key = entity + ':' + record.id; reset.push(key); delete failures[key]; delete details[key]; });
+    byEntity[entity].forEach(function (record) { reset.push(entity + ':' + record.id); });
   });
-  state.metadata.pushFailures = failures;
-  state.metadata.pushFailureDetails = details;
+  // Bản ghi không còn trên Sheet thì dấu chặn gửi lại vô nghĩa; giữ lại thì nó chiếm chỗ của cầu dao lỗi đẩy mãi mãi.
+  FbmSync.pushFailuresRemove(reset.concat(missing));
   state.message = 'Đã mở lại ' + reset.length + ' bản ghi lỗi; hãy chạy lại phiên Ghi thật để gửi theo hàng đợi.';
   FbmSync.stateWrite(state);
   if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'push_retry_batch_enabled', outcome: typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', reason: 'Người dùng chủ động mở lại nhóm bản ghi lỗi đẩy.', detail: { total: keys.length, reset: reset.length, missing: missing.length } }); }

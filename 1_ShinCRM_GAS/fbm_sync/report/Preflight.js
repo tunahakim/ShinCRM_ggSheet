@@ -83,7 +83,7 @@ FbmSync.preflightCandidates = function (issues, mode) {
     FbmSync.preflightIssue(issues, 'FBM_LOCAL_CONFLICT_CHECK_FAILED', 'error', 'fbm_sync', 'Không kiểm tra được conflict cục bộ: ' + String(localConflictError && localConflictError.message || localConflictError), mode === 'write');
   }
   try {
-    var savedState = typeof FbmSync.stateRead === 'function' ? FbmSync.stateRead() : {}, savedFailures = savedState.metadata && savedState.metadata.pushFailures || {}, savedDetails = savedState.metadata && savedState.metadata.pushFailureDetails || {};
+    var savedStore = FbmSync.pushFailuresRead(), savedFailures = savedStore.hashes, savedDetails = savedStore.details;
     Object.keys(savedFailures).forEach(function (key) {
       var detail = savedDetails[key] || {}, reason = detail.reason || 'Bản ghi đã từng lỗi đẩy; hệ đang chặn gửi lại khi dữ liệu local chưa đổi.';
       FbmSync.preflightIssue(issues, 'FBM_PREVIOUS_PUSH_FAILURE', 'error', String(key).split(':')[0] || 'fbm_sync', 'Bản ghi ' + key + ' có lỗi đẩy trước đó: ' + reason, mode === 'write');

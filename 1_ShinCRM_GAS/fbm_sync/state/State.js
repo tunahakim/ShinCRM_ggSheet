@@ -172,7 +172,7 @@ FbmSync.seenStoreReader = function (scope) {
 
 /** Tạo state rỗng với đủ field để các phiên cũ vẫn đọc được. */
 FbmSync.stateDefault = function () {
-  return { version: 1, runId: '', origin: 'manual', mode: 'read', scan: 'full', scheduledScan: '', activitySince: '', phase: 'idle', entity: '', cursor: {}, activeRequestId: '', loginForceOffered: false, identityTarget: null, lastProgressAt: 0, deadlineAt: 0, session: { customerAuthorized: '', activityAuthorized: '', cookie: '', userId: '', accountUsername: '', accountName: '', lookups: {}, expired: false, identityVerified: false, identitySessionId: '', identityVerifiedAt: 0, sessionId: '', lastHeartbeatAt: 0, customerTotal: null }, metadata: { categoryBlocks: [], preflightIssues: [], seen: { customer: {}, activity: {} }, conflictCount: 0, conflictRefresh: null, pushSucceeded: 0, pushFailures: {}, pushFailureDetails: {}, callbackTrace: null, manualPending: null, sessionGate: null }, counts: { total: 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 }, progress: { done: 0, total: 0 }, current: '', message: '', startedAt: 0, updatedAt: 0, lastError: '', lastFailureCode: '', retryable: false, retryCount: 0, retryLimit: 2, locks: {} };
+  return { version: 1, runId: '', origin: 'manual', mode: 'read', scan: 'full', scheduledScan: '', activitySince: '', phase: 'idle', entity: '', cursor: {}, activeRequestId: '', loginForceOffered: false, identityTarget: null, lastProgressAt: 0, deadlineAt: 0, session: { customerAuthorized: '', activityAuthorized: '', cookie: '', userId: '', accountUsername: '', accountName: '', lookups: {}, expired: false, identityVerified: false, identitySessionId: '', identityVerifiedAt: 0, sessionId: '', lastHeartbeatAt: 0, customerTotal: null }, metadata: { categoryBlocks: [], preflightIssues: [], seen: { customer: {}, activity: {} }, conflictCount: 0, conflictRefresh: null, pushSucceeded: 0, callbackTrace: null, manualPending: null, sessionGate: null }, counts: { total: 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 }, progress: { done: 0, total: 0 }, current: '', message: '', startedAt: 0, updatedAt: 0, lastError: '', lastFailureCode: '', retryable: false, retryCount: 0, retryLimit: 2, locks: {} };
 };
 
 /** Lấy kho state cấp tài liệu, dùng chung giữa các lần gọi GAS. */
@@ -191,13 +191,51 @@ FbmSync.pendingPushSet = function (entity, id, value) {
   return value || null;
 };
 FbmSync.pendingPushClear = function (entity, id) { return FbmSync.pendingPushSet(entity, id, null); };
+
+/**
+ * Bản ghi đẩy lỗi: `hashes` là hash lúc lỗi, chặn gửi lại khi dữ liệu chưa đổi; `details` chỉ để Sidebar hiển thị, bản đầy đủ nằm ở Log.
+ * Ở khóa riêng vì state phiên chỉ 9 KB. Khóa này có trần cố định vì chiều đẩy dừng khi chạm `pushFailuresMax` (`pushFailuresGuard`), chi tiết chỉ giữ `pushFailureDetailsMax` mục mới nhất với lý do cắt ngắn.
+ */
+FbmSync.PUSH_FAILURES_KEY = 'FBM_SYNC_PUSH_FAILURES_V1';
+FbmSync.pushFailuresRead = function () {
+  var stored = FbmSync.documentPropertyJson(FbmSync.PUSH_FAILURES_KEY, 'bản ghi đẩy lỗi') || {};
+  return { hashes: stored.hashes || {}, details: stored.details || {} };
+};
+FbmSync.pushFailuresWrite = function (store) {
+  var budget = FbmSync.BUDGET, details = {}, keys = Object.keys(store.details || {}).filter(function (key) { return store.hashes[key] !== undefined; });
+  keys.slice(-budget.pushFailureDetailsMax).forEach(function (key) { details[key] = Object.assign({}, store.details[key], { reason: String(store.details[key] && store.details[key].reason || '').slice(0, budget.pushFailureReasonChars) }); });
+  var write = FbmSync.documentPropertySet(FbmSync.PUSH_FAILURES_KEY, JSON.stringify({ hashes: store.hashes, details: details }), 'push_failures');
+  if (!write.ok) { throw write.error; }
+};
+/** Lỗi mới đưa xuống cuối để `details` luôn giữ các lỗi gần nhất. */
+FbmSync.pushFailureAdd = function (key, hash, detail) {
+  var store = FbmSync.pushFailuresRead();
+  store.hashes[key] = hash;
+  delete store.details[key];
+  store.details[key] = detail;
+  FbmSync.pushFailuresWrite(store);
+};
+FbmSync.pushFailuresRemove = function (keys) {
+  var store = FbmSync.pushFailuresRead(), removed = false;
+  (keys || []).forEach(function (key) { if (store.hashes[key] !== undefined || store.details[key] !== undefined) { delete store.hashes[key]; delete store.details[key]; removed = true; } });
+  if (removed) { FbmSync.pushFailuresWrite(store); }
+};
+/** State ghi trước khi có khóa riêng còn hai map trong metadata: chuyển sang khóa riêng một lần để không mất dấu chặn gửi lại. */
+FbmSync.pushFailuresMigrate = function (metadata) {
+  var hashes = metadata.pushFailures || {}, details = metadata.pushFailureDetails || {};
+  delete metadata.pushFailures; delete metadata.pushFailureDetails;
+  if (!Object.keys(hashes).length) { return; }
+  var store = FbmSync.pushFailuresRead();
+  Object.keys(hashes).forEach(function (key) { store.hashes[key] = hashes[key]; if (details[key] !== undefined) { store.details[key] = details[key]; } });
+  FbmSync.pushFailuresWrite(store);
+};
 /** Đọc state và tự bù field thiếu từ mặc định. */
 FbmSync.stateRead = function () {
   var fallback = FbmSync.stateDefault();
   var parsed = FbmSync.documentPropertyJson(FbmSync.STATE_KEY, 'state đồng bộ');
   if (!parsed) { return fallback; }
   var metadata = parsed.metadata || {};
-  return Object.assign(fallback, parsed, { counts: Object.assign(fallback.counts, parsed.counts || {}), session: Object.assign(fallback.session, parsed.session || {}), metadata: Object.assign(fallback.metadata, metadata, { seen: Object.assign(fallback.metadata.seen, metadata.seen || {}), conflictCount: Number(metadata.conflictCount || 0), pushSucceeded: Number(metadata.pushSucceeded || 0), preflightIssues: Array.isArray(metadata.preflightIssues) ? metadata.preflightIssues : [], pushFailures: Object.assign(fallback.metadata.pushFailures, metadata.pushFailures || {}), pushFailureDetails: Object.assign(fallback.metadata.pushFailureDetails, metadata.pushFailureDetails || {}), callbackTrace: metadata.callbackTrace || null, manualPending: metadata.manualPending || null }), progress: Object.assign(fallback.progress, parsed.progress || {}), locks: parsed.locks || {} });
+  return Object.assign(fallback, parsed, { counts: Object.assign(fallback.counts, parsed.counts || {}), session: Object.assign(fallback.session, parsed.session || {}), metadata: Object.assign(fallback.metadata, metadata, { seen: Object.assign(fallback.metadata.seen, metadata.seen || {}), conflictCount: Number(metadata.conflictCount || 0), pushSucceeded: Number(metadata.pushSucceeded || 0), preflightIssues: Array.isArray(metadata.preflightIssues) ? metadata.preflightIssues : [], callbackTrace: metadata.callbackTrace || null, manualPending: metadata.manualPending || null }), progress: Object.assign(fallback.progress, parsed.progress || {}), locks: parsed.locks || {} });
 };
 /** Ghi state, cập nhật timestamp và giữ cấu trúc nhất quán. */
 FbmSync.stateWrite = function (state) {
@@ -212,8 +250,7 @@ FbmSync.stateWrite = function (state) {
   delete next.metadata.conflicts;
   // State ghi trước FBM-042 còn bản sao map Category; giữ lại thì mọi lần ghi (kể cả đóng phiên lỗi) đều vượt 9 KB và Sidebar kẹt.
   delete next.metadata.categoryGate;
-  next.metadata.pushFailures = Object.assign({}, FbmSync.stateDefault().metadata.pushFailures, next.metadata.pushFailures || {});
-  next.metadata.pushFailureDetails = Object.assign({}, FbmSync.stateDefault().metadata.pushFailureDetails, next.metadata.pushFailureDetails || {});
+  FbmSync.pushFailuresMigrate(next.metadata);
   next.metadata.manualPending = next.metadata.manualPending || null;
   next.metadata.callbackTrace = next.metadata.callbackTrace || null;
   // Bản xem trước và kết quả preflight đầy đủ không ở trong state: state chỉ giữ thứ cần để chạy tiếp, vì một khóa kho chỉ chứa 9 KB.

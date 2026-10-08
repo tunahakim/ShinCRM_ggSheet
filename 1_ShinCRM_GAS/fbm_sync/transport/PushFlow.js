@@ -233,18 +233,13 @@ FbmSync.markPushError = function (state, candidate, failure, operation) {
   var detail = FbmSync.pushFailureDetail(failure);
   state.counts.error += 1;
   state.message = 'Lỗi đẩy ' + String(candidate && candidate.entity || '') + ':' + String(candidate && candidate.id || '') + ': ' + detail.reason;
-  state.metadata = state.metadata || {};
-  state.metadata.pushFailures = state.metadata.pushFailures || {};
-  state.metadata.pushFailureDetails = state.metadata.pushFailureDetails || {};
   var gate = FbmSync.stateCategoryGate(state), localHash = typeof FbmSync.hash === 'function' ? FbmSync.hash(candidate.record || {}, candidate.entity, gate) : '';
-  state.metadata.pushFailures[candidate.entity + ':' + String(candidate.id || '')] = localHash;
-  state.metadata.pushFailureDetails[candidate.entity + ':' + String(candidate.id || '')] = detail;
+  FbmSync.pushFailureAdd(candidate.entity + ':' + String(candidate.id || ''), localHash, Object.assign({}, detail, { requestKind: String(operation || candidate.kind || '') }));
   // Lệnh tạo đã có thể tới FBM thì giữ `đang đẩy` để không bị tạo lại (FBM-027); lỗi ở bước mở form thì lệnh lưu chưa phát nên an toàn để đẩy lại.
   var waitingForMarker = candidate.kind === 'recover' || candidate.kind === 'stuck' || (candidate.kind === 'create' && operation !== 'customer_create_open');
   var failedStatus = detail.code === FbmSync.PUSH_RECORD_NOT_FOUND ? FbmSync.SYNC_STATUS.missing : FbmSync.SYNC_STATUS.error;
   FbmSync.sheetSave(candidate.entity, [{ id: candidate.id, syncStatus: waitingForMarker ? FbmSync.SYNC_STATUS.pushing : failedStatus }], 'push');
   FbmSync.logPushRecord(candidate, operation || candidate.kind, typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', detail.reason, { syncStatus: failedStatus, failureCode: detail.code, httpStatus: detail.status, fieldName: detail.fieldName });
-  state.metadata.pushFailureDetails[candidate.entity + ':' + String(candidate.id || '')].requestKind = String(operation || candidate.kind || '');
   if (typeof FbmSync.businessStepAdd === 'function') { FbmSync.businessStepAdd(state, 'push_' + String(candidate.entity || ''), { errors: 1 }); }
   if (!waitingForMarker) { FbmSync.releasePushLock(state, candidate.entity, candidate.id); }
 };
@@ -314,6 +309,18 @@ FbmSync.stopPushOnConflicts = function (state) {
   return true;
 };
 
+/** Cầu dao lỗi đẩy: chạm `pushFailuresMax` thì dừng cả chiều đẩy, đến khi người dùng sửa nguyên nhân và mở lại các bản ghi lỗi. */
+FbmSync.pushFailuresGuard = function (state) {
+  var count = Object.keys(FbmSync.pushFailuresRead().hashes).length;
+  if (count < FbmSync.BUDGET.pushFailuresMax) { return false; }
+  var message = 'Đã có ' + count + ' bản ghi đẩy lỗi chưa xử lý; dừng chiều đẩy để không tốn thêm lượt gọi FBM. Xem tab Lỗi và Log, sửa nguyên nhân rồi bấm "Mở lại bản ghi lỗi".';
+  state.phase = 'paused'; state.entity = ''; state.current = ''; state.cursor = {}; state.retryable = false;
+  state.lastFailureCode = 'PUSH_FAILURES_LIMIT'; state.lastError = message; state.message = message;
+  FbmSync.stateWrite(state);
+  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'push_failures_limit', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(state.runId || ''), reason: message, detail: { count: count, max: FbmSync.BUDGET.pushFailuresMax } }); }
+  return true;
+};
+
 /** Tạo request kế tiếp của queue push từ state, không giữ queue trong Extension. */
 FbmSync.nextPushRequest = function (state) {
   var globalCategoryBlock = state.metadata && (state.metadata.categoryLookupFailed || (state.metadata.categoryBlocks || []).some(function (block) { return !block.code; }));
@@ -327,6 +334,7 @@ FbmSync.nextPushRequest = function (state) {
     FbmSync.businessStepAdd(state, pushStep, { candidateCount: candidates.length });
   }
   for (var at = 0; at < candidates.length; at += 1) {
+    if (FbmSync.pushFailuresGuard(state)) { return null; }
     var candidate = candidates[at], index = candidate.position;
     candidate.entity = entity;
     if (candidate.kind === 'stuck') {
@@ -443,9 +451,7 @@ FbmSync.continuePush = function (state, response) {
     throw new Error('Không nhận diện được bước push: ' + cursor.operation);
   }
   state = FbmSync.stateRead();
-  state.metadata = state.metadata || {};
-  state.metadata.pushFailures = state.metadata.pushFailures || {};
-  delete state.metadata.pushFailures[cursor.entity + ':' + String(candidate.id || '')];
+  FbmSync.pushFailuresRemove([cursor.entity + ':' + String(candidate.id || '')]);
   cursor.operation = cursor.entity === 'customer' ? 'customer_verify' : 'activity_verify';
   state.cursor = cursor; state.message = 'Đã ghi ' + cursor.entity + ' ' + candidate.id + '; đang đọc xác nhận FBM...'; FbmSync.stateWrite(state);
   return cursor.entity === 'customer' ? FbmSync.customerEditOpenRequest(pushed.fbmId) : FbmSync.activityEditOpenRequest(pushed.fbmId);

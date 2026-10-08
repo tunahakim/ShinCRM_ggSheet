@@ -180,10 +180,7 @@ FbmSync.conflictSettle = function (state, read, record, choice, message) {
   var remaining = FbmSync.conflictQueue().length;
   state.metadata.conflictRefresh = null;
   state.metadata.conflictCount = remaining;
-  state.metadata.pushFailures = state.metadata.pushFailures || {};
-  state.metadata.pushFailureDetails = state.metadata.pushFailureDetails || {};
-  delete state.metadata.pushFailures[entity + ':' + read.id];
-  delete state.metadata.pushFailureDetails[entity + ':' + read.id];
+  FbmSync.pushFailuresRemove([entity + ':' + read.id]);
   if (state.phase === 'conflict' && !remaining) { state.phase = 'done'; }
   state.message = message;
   FbmSync.stateWrite(state);

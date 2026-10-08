@@ -77,7 +77,7 @@ FbmSync.pushCandidates = function (entity) {
   try {
     state = FbmSync.stateRead();
     categoryGate = FbmSync.stateCategoryGate(state);
-    pushFailures = state.metadata && state.metadata.pushFailures || {};
+    pushFailures = FbmSync.pushFailuresRead().hashes;
   } catch (ignore) {}
   try { settings = typeof FbmSync.scriptSettings === 'function' ? FbmSync.scriptSettings() : {}; } catch (ignoreSettings) {}
   if (entity === 'activity') {

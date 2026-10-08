@@ -17,7 +17,11 @@ FbmSync.BUDGET = {
   activityBatchCustomers: 50,
   batchMaxBytes: 4 * 1024 * 1024,
   pushBatchRecords: 20,
-  lookupMaxAgeMs: 300000
+  lookupMaxAgeMs: 300000,
+  // Mỗi bản ghi lỗi đã tốn ít nhất một lần gọi FBM; chạm trần là lỗi hệ thống (danh mục, quyền, cấu hình) nên dừng chiều đẩy. Ba con số cùng giữ khóa lỗi đẩy dưới 9.000 byte.
+  pushFailuresMax: 20,
+  pushFailureDetailsMax: 10,
+  pushFailureReasonChars: 160
 };
 
 /** Hạn Extension phải trả một envelope: chờ tab một lần, cộng mỗi request một lần fetch và thời gian chờ GAS yêu cầu. */
