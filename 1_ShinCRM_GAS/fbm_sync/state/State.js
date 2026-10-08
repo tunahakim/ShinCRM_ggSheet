@@ -297,7 +297,8 @@ FbmSync.recoverStaleRun = function (state, now) {
   var current = state || FbmSync.stateRead(), at = Number(now || Date.now());
   if (!current.runId || FbmSync.ACTIVE_PHASES.indexOf(String(current.phase || '')) < 0) { return { state: current, recovered: false }; }
   var updated = Number(current.updatedAt || current.startedAt || 0), age = updated ? at - updated : FbmSync.STALE_RUN_MS + 1;
-  if (age <= FbmSync.STALE_RUN_MS) { return { state: current, recovered: false }; }
+  // Request đang bay còn trong hạn ngân sách (một lô có thể chạy lâu hơn mốc chung) thì chưa phải phiên kẹt.
+  if (age <= FbmSync.STALE_RUN_MS || (current.activeRequestId && at < Number(current.deadlineAt || 0))) { return { state: current, recovered: false }; }
   var cursor = current.cursor || {}, waitingWrite = cursor.kind === 'push_wait';
   var message = waitingWrite
     ? 'Phiên ghi FBM không nhận được phản hồi quá thời gian an toàn; không tự ghi lại để tránh trùng dữ liệu.'

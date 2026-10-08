@@ -4,7 +4,7 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 FbmSync.protocol = {
   version: 1,
   // Mã phiên bản hợp đồng GAS–Extension (tests/contracts/gasExtensionContract.js). Extension trả mã của nó trong mỗi response; khác mã thì GAS dừng phiên (09.01).
-  contract: 'bb81fdb2c4aa',
+  contract: '614131883cce',
   /** Chặn request bị ghép thiếu endpoint trước khi nó tới Extension/FBM. */
   validateEndpoint: function (url) {
     var value = String(url === null || url === undefined ? '' : url).trim();
@@ -16,6 +16,21 @@ FbmSync.protocol = {
   /** Tạo envelope có id để ghép đúng response với request. */
   request: function (id, url, body, meta) {
     return { protocol: 'shincrm-fbm', version: 1, contract: FbmSync.protocol.contract, id: String(id), url: url, method: 'POST', headers: { 'content-type': 'application/json; charset=UTF-8' }, body: body, bodyText: FbmSync.protocol.json(body), meta: meta || {} };
+  },
+  /**
+   * Lô request đọc độc lập (09/01 "Lô request đọc độc lập"). Id phần tử là thứ tự trong lô: Extension chạy lần lượt và chỉ được dừng sớm, nên response hợp lệ luôn là `0..k-1`.
+   * `meta` phần tử chỉ mang thứ Extension cần để chạy và ghi vết; transport dùng chung nằm ở `meta` của lô.
+   */
+  batch: function (id, items, meta) {
+    var trace = meta && meta.trace || {};
+    return {
+      protocol: 'shincrm-fbm', version: 1, contract: FbmSync.protocol.contract, id: String(id), meta: meta || {},
+      items: (items || []).map(function (item, index) {
+        var itemMeta = { kind: String(item.meta && item.meta.kind || ''), trace: { runId: trace.runId, requestId: trace.requestId, item: index } };
+        if (item.meta && Number(item.meta.waitMs || 0) > 0) { itemMeta.waitMs = Number(item.meta.waitMs); }
+        return { id: String(index), url: item.url, method: 'POST', headers: { 'content-type': 'application/json; charset=UTF-8' }, body: item.body, bodyText: FbmSync.protocol.json(item.body), meta: itemMeta };
+      })
+    };
   },
   /** Mã phiên bản Extension ghi trong response; Extension cũ không ghi thì coi là lệch. */
   contractMismatch: function (raw) {

@@ -12,7 +12,7 @@ function fbmTraceBoundary(stage, name, error) {
   FbmSync.traceEvent(stage, { operation: String(name || ''), error: error ? String(error && error.message || error) : '', stack: error && error.stack ? String(error.stack) : '' });
 }
 /** Mở/đóng bộ đệm DocumentProperties của một lần gọi; `runEntryPoint` gọi qua tên toàn cục để lõi không phụ thuộc FbmSync. */
-function fbmCallBegin() { if (typeof FbmSync.propertyBufferBegin === 'function') { FbmSync.propertyBufferBegin(); } }
+function fbmCallBegin() { var outermost = typeof FbmSync.propertyBufferBegin === 'function' && FbmSync.propertyBufferBegin(); if (outermost && typeof FbmSync.budgetCallBegin === 'function') { FbmSync.budgetCallBegin(); } }
 function fbmCallEnd() { if (typeof FbmSync.propertyBufferEnd === 'function') { FbmSync.propertyBufferEnd(); } }
 /** Chuẩn hóa toàn bộ kết quả công khai trước khi qua google.script.run; không để Date lọt ra callback. */
 function fbmPublicResult(result) {

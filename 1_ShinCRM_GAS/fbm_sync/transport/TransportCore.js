@@ -370,8 +370,7 @@ FbmSync.nextEnvelope = function (request) {
     return null;
   }
   var pendingState = FbmSync.stateRead ? FbmSync.stateRead() : {};
-  var sliceDeadline = Number(pendingState.deadlineAt || FbmSync._sliceDeadlineAt || 0);
-  if (sliceDeadline > 0 && Date.now() >= sliceDeadline) { return FbmSync.pauseForRuntimeLimit(pendingState); }
+  if (FbmSync.budgetCallExhausted()) { return FbmSync.pauseForRuntimeLimit(pendingState); }
   if (pendingState.metadata && pendingState.metadata.cancelPending === true) {
     pendingState.phase = 'paused';
     pendingState.activeRequestId = '';
@@ -426,11 +425,13 @@ FbmSync.nextEnvelope = function (request) {
   } catch (gateError) {
     return FbmSync.sessionGateFailClosed(pendingState, gateError);
   }
-  var endpoint = FbmSync.protocol.validateEndpoint(request.url);
-  if (!endpoint.ok) {
-    if (FbmSync.traceEvent) { FbmSync.traceEvent('request_blocked', { operation: request.meta && request.meta.kind || '', endpoint: request.url, code: endpoint.code }); }
-    throw new Error(endpoint.message + ' (' + endpoint.code + ')');
-  }
+  (request.items || [request]).forEach(function (item) {
+    var endpoint = FbmSync.protocol.validateEndpoint(item.url);
+    if (!endpoint.ok) {
+      if (FbmSync.traceEvent) { FbmSync.traceEvent('request_blocked', { operation: item.meta && item.meta.kind || '', endpoint: item.url, code: endpoint.code }); }
+      throw new Error(endpoint.message + ' (' + endpoint.code + ')');
+    }
+  });
   // Một lượt relay có thể dựng nhiều envelope trong cùng một mili-giây. Bộ đếm
   // trong vùng tên GAS giữ các ID đó khác nhau trong cùng một lượt chạy.
   var now = Date.now(), sequence = Number(FbmSync._requestIdAt || 0) === now ? Number(FbmSync._requestIdSequence || 0) + 1 : 0;
@@ -458,14 +459,18 @@ FbmSync.nextEnvelope = function (request) {
   } catch (gateError) {
     return FbmSync.sessionGateFailClosed(pendingState, gateError);
   }
+  meta.timeoutMs = FbmSync.budgetTimeoutMs(request);
+  meta.fetchMs = FbmSync.BUDGET.fetchMs;
+  meta.gasReplyMs = FbmSync.budgetGasReplyMs();
+  if (request.items) { meta.batch = { maxBytes: FbmSync.BUDGET.batchMaxBytes }; }
   if (FbmSync.stateWrite) {
     state.activeRequestId = id;
     state.lastProgressAt = Date.now();
-    state.deadlineAt = Date.now() + 120000;
+    state.deadlineAt = FbmSync.budgetDeadlineAt(state.lastProgressAt, meta.timeoutMs);
     FbmSync.stateWrite(state);
-    FbmSync._sliceDeadlineAt = 0;
   }
-  if (FbmSync.traceEvent) { FbmSync.traceEvent('response_built', { requestId: id, operation: meta.kind, entity: meta.entity, recordId: meta.id || meta.shinId || meta.stt_rec_kh }); }
+  if (FbmSync.traceEvent) { FbmSync.traceEvent('response_built', { requestId: id, operation: meta.kind, entity: meta.entity, recordId: meta.id || meta.shinId || meta.stt_rec_kh, items: request.items ? request.items.length : undefined }); }
+  if (request.items) { return FbmSync.protocol.batch(id, request.items.map(function (item) { return { url: item.url, body: FbmSync.transportValue(item.body), meta: item.meta }; }), FbmSync.transportValue(meta)); }
   return FbmSync.protocol.request(id, request.url, FbmSync.transportValue(request.body), FbmSync.transportValue(meta));
 };
 /** Lấy requestId từ trace transport mà GAS đã yêu cầu Extension giữ lại. */

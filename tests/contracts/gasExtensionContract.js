@@ -11,14 +11,20 @@ const path = require('path');
 const CONTRACT = {
   // GAS → Extension: envelope một request FBM. Extension chỉ đọc các trường này và không suy luận nghiệp vụ.
   request: {
-    fields: ['protocol', 'version', 'contract', 'id', 'url', 'method', 'headers', 'body', 'bodyText', 'meta'],
-    meta: ['kind', 'trace', 'transport', 'waitMs', 'force', 'credentialRef', 'openFbmContext', 'afterLoginUrl'],
-    transport: ['captures', 'replacements']
+    fields: ['protocol', 'version', 'contract', 'id', 'url', 'method', 'headers', 'body', 'bodyText', 'meta', 'items'],
+    meta: ['kind', 'trace', 'transport', 'waitMs', 'force', 'credentialRef', 'openFbmContext', 'afterLoginUrl', 'timeoutMs', 'fetchMs', 'gasReplyMs', 'batch'],
+    transport: ['captures', 'replacements'],
+    // Lô request đọc độc lập (`meta.kind = 'batch'`): Extension chạy lần lượt, dừng khi tổng thân vượt `batch.maxBytes`.
+    batch: ['maxBytes'],
+    item: ['id', 'url', 'method', 'headers', 'body', 'bodyText', 'meta'],
+    itemMeta: ['kind', 'waitMs', 'trace']
   },
   // Extension → GAS: response FBM thô. `transport.contract` là mã phiên bản Extension đang chạy.
   response: {
-    fields: ['ok', 'status', 'headers', 'body', 'transport'],
-    transport: ['contract', 'trace', 'captures', 'loginStage', 'loginBlocked']
+    fields: ['ok', 'status', 'headers', 'body', 'transport', 'items'],
+    transport: ['contract', 'trace', 'captures', 'loginStage', 'loginBlocked'],
+    // Response lô chỉ gồm phần tử đã chạy, đúng thứ tự gửi.
+    item: ['id', 'ok', 'status', 'headers', 'body']
   },
   // Extension → Web App GAS (nhịp nền).
   relay: {

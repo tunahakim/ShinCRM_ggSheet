@@ -39,7 +39,7 @@ function makeSync() {
     'fbm_sync/reconcile/CategoryGate.js',
     'fbm_sync/write/PushCandidates.js',
     'fbm_sync/write/RequestBuilders.js',
-    'fbm_sync/transport/TransportCore.js',
+    'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js',
     'fbm_sync/transport/PushFlow.js',
     'fbm_sync/transport/PullFlow.js',
     'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');

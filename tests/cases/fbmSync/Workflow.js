@@ -61,7 +61,7 @@ function workflowGas(options) {
     'fbm_sync/write/PushCandidates.js',
     'fbm_sync/write/RequestBuilders.js',
     'fbm_sync/auth/AutoLogin.js',
-    'fbm_sync/transport/TransportCore.js',
+    'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js',
     'fbm_sync/transport/PushFlow.js',
     'fbm_sync/transport/PullFlow.js',
     'fbm_sync/transport/EntryPoints.js',
@@ -581,10 +581,24 @@ async function chay(so) {
   waitFlow.hop.FbmSync.statePatch({ scan: 'detail', backgroundDetail: { minDelaySeconds: 0.5, maxDelaySeconds: 2 }, phase: 'pull_customer', cursor: { kind: 'customer_grid' } });
   const delayed = waitFlow.hop.FbmSync.nextEnvelope(waitFlow.hop.FbmSync.customerGridRequest({ type: 0, count: 50, gridPageIndex: -1, gridRefresh: false }));
   check(so, 'GAS cấp waitMs transport cho lượt detail trong đúng khoảng cấu hình', [delayed.meta.waitMs >= 500, delayed.meta.waitMs <= 2000], [true, true]);
+  waitFlow.hop.FbmSync.statePatch({ scan: 'full', backgroundDetail: null, activeRequestId: '', deadlineAt: 0 });
+  const truocCap = Date.now();
+  const loEnvelope = waitFlow.hop.FbmSync.nextEnvelope({ items: ['STT1', 'STT2'].map((stt) => waitFlow.hop.FbmSync.activityGridRequest(stt, { type: 0, count: 100, gridPageIndex: -1, gridRefresh: false })), meta: { kind: 'batch', entity: 'activity' } });
+  const loState = waitFlow.hop.FbmSync.stateRead(), B = waitFlow.hop.FbmSync.BUDGET;
+  check(so, 'GAS cấp envelope lô: hai phần tử, hạn Extension theo ngân sách, maxBytes, hạn Sidebar chờ GAS, deadlineAt thu hồi cộng đường về và đường lên', [
+    loEnvelope.items.length, loEnvelope.url, loEnvelope.meta.kind, loEnvelope.meta.timeoutMs, loEnvelope.meta.batch.maxBytes, loEnvelope.meta.gasReplyMs, loState.activeRequestId === loEnvelope.id,
+    loState.deadlineAt >= truocCap + loEnvelope.meta.timeoutMs + B.bridgeMs + B.gasTransitMs && loState.deadlineAt <= Date.now() + loEnvelope.meta.timeoutMs + B.bridgeMs + B.gasTransitMs
+  ], [2, undefined, 'batch', B.tabReadyMs + 2 * B.fetchMs, B.batchMaxBytes, B.gasHardMs + B.gasTransitMs, true, true]);
 
   const deadlineLogs = [];
   const deadlineFlow = workflowGas({ logEvent: (event) => deadlineLogs.push(event), LOG_ERROR: 'error' });
   deadlineFlow.hop.FbmSync.statePatch({ runId: 'runtime-limit', phase: 'pull_customer', cursor: { kind: 'customer_grid', pageIndex: 4, pageValue: ['2026-09-20', 'CUS-000004'] }, activeRequestId: '', deadlineAt: Date.now() - 1 });
+  // FBM-031: hạn của request vừa nhận đã qua nhưng lời gọi GAS mới bắt đầu thì vẫn cấp request kế; trần tính từ lúc lời gọi bắt đầu.
+  deadlineFlow.hop.FbmSync.budgetCallBegin(Date.now());
+  const notBlockedByRequestDeadline = deadlineFlow.hop.FbmSync.nextEnvelope(deadlineFlow.hop.FbmSync.customerGridRequest({ type: 1, count: 3, gridPageIndex: 5, gridRefresh: false }));
+  check(so, 'trần thời gian GAS tính từ lúc lời gọi bắt đầu, không từ hạn request vừa nhận', [!!notBlockedByRequestDeadline, deadlineFlow.hop.FbmSync.stateRead().lastFailureCode], [true, '']);
+  deadlineFlow.hop.FbmSync.statePatch({ phase: 'pull_customer', cursor: { kind: 'customer_grid', pageIndex: 4, pageValue: ['2026-09-20', 'CUS-000004'] }, activeRequestId: '', deadlineAt: 0 });
+  deadlineFlow.hop.FbmSync.budgetCallBegin(Date.now() - deadlineFlow.hop.FbmSync.BUDGET.gasSoftMs - 1);
   const blockedByDeadline = deadlineFlow.hop.FbmSync.nextEnvelope(deadlineFlow.hop.FbmSync.customerGridRequest({ type: 1, count: 3, gridPageIndex: 5, gridRefresh: false }));
   const deadlineState = deadlineFlow.hop.FbmSync.stateRead();
   const deadlineStatus = deadlineFlow.hop.FbmSync.statusView();

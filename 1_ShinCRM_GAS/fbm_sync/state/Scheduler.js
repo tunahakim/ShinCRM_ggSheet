@@ -250,7 +250,7 @@ function fbmSyncHeartbeatRequest(options) {
   try {
     var state = FbmSync.stateRead(), session = state.session || {}, cursor = state.cursor || {}, now = Date.now();
     var activePhase = FbmSync.ACTIVE_PHASES && FbmSync.ACTIVE_PHASES.indexOf(String(state.phase || '')) >= 0;
-    if (state.activeRequestId && now - Number(state.lastProgressAt || 0) < 120000) {
+    if (state.activeRequestId && now < Number(state.deadlineAt || 0)) {
       return fbmSyncLockResult('REQUEST_IN_FLIGHT', 'Đã có request FBM đang chờ response; không cấp request heartbeat chồng.');
     }
     var gate = typeof FbmSync.sessionGateMeta === 'function' ? FbmSync.sessionGateMeta(state) : {}, waitingResult = typeof FbmSync.sessionGateWaitRequest === 'function' ? FbmSync.sessionGateWaitRequest(state, now) : null;
