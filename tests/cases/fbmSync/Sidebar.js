@@ -370,8 +370,8 @@ async function chay(so) {
   const nextRunPatched = hop.fbmSyncPatchLiveStatus(content, nextRunChecking, 'run');
   const nextMarkers = Array.from(content.querySelectorAll('.shin-sync-pipeline-marker')).map((node) => node.textContent);
   check(so, 'lượt mới vá lại cả pipeline cũ đã hoàn tất, không để trạng thái kiểm tra đi với sáu dấu hoàn tất', [nextRunPatched, content.querySelector('.shin-sync-pipeline') === previousPipeline, content.querySelector('.shin-sync-pipeline-title').textContent, nextMarkers], [true, true, 'Pipeline đang chạy', ['●', '○', '○', '○', '○', '○']]);
-  render(hop, content, hop.fbmSyncRenderRun, Object.assign({}, nextRunChecking, { counts: { total: 10, completed: 2 } }));
-  const progressPatched = hop.fbmSyncPatchLiveStatus(content, Object.assign({}, nextRunChecking, { counts: { total: 10, completed: 7 } }), 'run');
+  render(hop, content, hop.fbmSyncRenderRun, Object.assign({}, nextRunChecking, { progress: { total: 10, done: 2 } }));
+  const progressPatched = hop.fbmSyncPatchLiveStatus(content, Object.assign({}, nextRunChecking, { progress: { total: 10, done: 7 } }), 'run');
   check(so, 'vá trạng thái đang chạy cũng cập nhật thanh tiến độ, không giữ số đếm của snapshot cũ', [progressPatched, content.querySelector('.shin-sync-progress-label').textContent, content.querySelector('#fbm-sync-progress-track').getAttribute('aria-valuenow'), content.querySelector('#fbm-sync-progress-fill').style.width], [true, 'Tiến trình: 7/10 (70%)', '70', '70%']);
 
   hop.FBM_SYNC_CLIENT.resultsTab = 'summary';

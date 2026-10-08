@@ -410,7 +410,7 @@ async function chay(so) {
   const pushState = compactLookupFlow.hop.FbmSync.stateRead();
   pushState.metadata.categoryBlocks = [];
   pushState.metadata.categoryLookupFailed = false;
-  compactLookupFlow.hop.FbmSync.previewRecords(pushState, 'activity', [{ customerId: 'CUS-1', workDate: '2026-09-20', taskType: 'GD', content: 'x'.repeat(4000) }]);
+  compactLookupFlow.hop.FbmSync.previewRecords('activity', [{ customerId: 'CUS-1', workDate: '2026-09-20', taskType: 'GD', content: 'x'.repeat(4000) }]);
   pushState.mode = 'write'; pushState.phase = 'push'; pushState.entity = 'activity'; pushState.cursor = { kind: 'push_scan', entity: 'activity', index: 0 };
   compactLookupFlow.hop.FbmSync.stateWrite(pushState);
   compactLookupFlow.hop.FbmSync.pushCandidates = () => [{ kind: 'edit', id: 'ACT-QUOTA', position: 0, record: { id: 'ACT-QUOTA', fbmId: 'FBM-ACT-QUOTA', taskType: 'CODE-3', content: 'Nội dung', workDate: '2026-09-20', customerId: 'CUS-1', customerFbmCode: 'ALT00001', fbmSyncPermission: 'Cho phép', fbmHash: 'old' } }];
@@ -431,7 +431,7 @@ async function chay(so) {
     pushWaitState.cursor.kind,
     pushWaitState.cursor.candidate && Object.prototype.hasOwnProperty.call(pushWaitState.cursor.candidate, 'categoryGate'),
     pushWaitState.cursor.candidate && Object.prototype.hasOwnProperty.call(pushWaitState.cursor.candidate, 'record'),
-    pushWaitState.metadata.preview.activities[0].content.length,
+    compactLookupFlow.hop.FbmSync.previewRead().activities[0].content.length,
     String(pushRawState).indexOf('x'.repeat(4000)),
     Object.prototype.hasOwnProperty.call(pushWaitState.metadata, 'categoryGate'),
     pushState.cursor.kind,
@@ -453,11 +453,12 @@ async function chay(so) {
   compactLookupFlow.hop.FbmSync.continuePush(createState, { d: { ClientScript: "_ma_kh_auto = 'ALT00099';" } });
   check(so, 'candidate compact giữ mã Customer tự sinh cho nhánh khôi phục', compactLookupFlow.hop.FbmSync.stateRead().cursor.candidate.autoCode, 'ALT00099');
   compactLookupFlow.documentProperties.setProperty('FBM_SYNC_STATE_V1', pushRawState);
-  const previewOverflow = compactLookupFlow.hop.FbmSync.stateRead();
-  previewOverflow.metadata.preview = { customers: Array.from({ length: 50 }, () => ({ code: 'C', name: 'N'.repeat(160), fbmId: 'F' })), activities: Array.from({ length: 50 }, () => ({ customerCode: 'C', date: '2026', type: 'GD', content: 'A'.repeat(160) })), truncated: false };
-  compactLookupFlow.hop.FbmSync.stateWrite(previewOverflow);
-  const compactPreviewState = compactLookupFlow.hop.FbmSync.stateRead();
-  check(so, 'preview quá lớn tự cắt và giữ state nghiệp vụ trong quota', [compactPreviewState.metadata.preview.truncated, Buffer.byteLength(compactLookupFlow.documentProperties.data.FBM_SYNC_STATE_V1, 'utf8') <= compactLookupFlow.hop.FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT], [true, true]);
+  // Chữ có dấu 3 byte: mười khách đủ dài là vượt trần một khóa; bản xem trước phải tự bỏ bớt dòng chứ không làm hỏng lần ghi.
+  compactLookupFlow.hop.FbmSync.previewClear();
+  compactLookupFlow.hop.FbmSync.previewRecords('customer', Array.from({ length: 10 }, () => ({ fbmCustomerCode: 'Ữ'.repeat(80), companyName: 'Ữ'.repeat(160), fbmId: 'Ữ'.repeat(80) })));
+  const previewRaw = compactLookupFlow.documentProperties.data[compactLookupFlow.hop.FbmSync.PREVIEW_KEY] || '';
+  check(so, 'preview quá lớn tự cắt dưới trần khóa riêng và không nằm trong state', [compactLookupFlow.hop.FbmSync.previewRead().truncated, previewRaw.length > 0 && Buffer.byteLength(previewRaw, 'utf8') <= compactLookupFlow.hop.FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT, String(compactLookupFlow.documentProperties.data.FBM_SYNC_STATE_V1).indexOf('preview')], [true, true, -1]);
+  compactLookupFlow.hop.FbmSync.previewClear();
   const probeState = compactLookupFlow.hop.FbmSync.stateRead();
   compactLookupFlow.documentProperties.setProperty('FBM_SYNC_PENDING_PUSHES_V1', 'x'.repeat(42));
   const probe = compactLookupFlow.hop.fbmSyncStateProbe();

@@ -11,7 +11,7 @@ async function chay(so) {
   const builders = taoHopCat({
     FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {},
     FBM_VERIFY_STATUS_CONFIG_NAME: 'FBM_VERIFY_STATUS_DEFAULT', configGet: (name, fallback) => name === 'FBM_VERIFY_STATUS_DEFAULT' ? verifyDefault : fallback,
-    PropertiesService: { getDocumentProperties: () => ({ getProperty: () => '', setProperty: () => {} }) }
+    PropertiesService: { getDocumentProperties: () => ({ getProperty: () => '', setProperty: () => {}, deleteProperty: () => {} }) }
   });
   napServer(builders, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/write/SheetSave.js');
   check(so, 'mode tach quyen ghi Sheet khoi quyen ghi FBM', [
@@ -172,7 +172,42 @@ async function chay(so) {
   const nextCustomerPage = builders.FbmSync.customerGridRequest({ type: 1, count: pageRows, gridPageIndex: 7, gridPageValue: ['2026-10-07', '2026-10-07T00:00:00', 'X'.repeat(20)], gridRefresh: false });
   builders.FbmSync.activityForCustomers(pageState, fullPage, nextCustomerPage, 0);
   const cursorBytes = Buffer.byteLength(JSON.stringify(pageState.cursor));
-  check(so, 'cursor Activity cua mot trang Customer day voi ma dai nhat van duoi nua tran DocumentProperty va khong chep doi danh sach ma', [cursorBytes < builders.FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT / 2, pageState.cursor.customerIds, pageState.cursor.customerContexts.length], [true, undefined, pageRows]);
+  check(so, 'cursor Activity cua mot trang Customer day voi ma dai nhat van duoi nua tran DocumentProperty va khong chep doi danh sach ma', [cursorBytes < builders.FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT / 2, pageState.cursor.customerIds, pageState.cursor.customers.length], [true, undefined, pageRows]);
+  // Cả state (không chỉ cursor) của một trang đầy cộng lastError dài nhất phải chừa khoảng trống dưới trần một khóa kho: nhánh lỗi ghi thêm lastError mà chạm trần thì lỗi quota che mất lỗi thật.
+  const khoState = {};
+  const stateHop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => ({ getProperty: (k) => khoState[k] === undefined ? null : khoState[k], setProperty: (k, v) => { khoState[k] = String(v); }, deleteProperty: (k) => { delete khoState[k]; } }) } });
+  napServer(stateHop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/state/State.js');
+  const macDinh = stateHop.FbmSync.stateDefault();
+  const loiDaiNhat = 'Đ'.repeat(240);
+  stateHop.FbmSync.stateWrite(Object.assign(macDinh, {
+    runId: 'run-dai', phase: 'pull_activity', entity: 'activity', cursor: pageState.cursor, lastError: loiDaiNhat, message: loiDaiNhat, lastFailureCode: 'FBM_DOCUMENT_PROPERTIES_QUOTA',
+    session: Object.assign(macDinh.session, { cookie: 'c'.repeat(300), userId: 'u'.repeat(20), accountUsername: 'tai-khoan', accountName: 'Tên tài khoản FBM' }),
+    metadata: Object.assign(macDinh.metadata, {
+      customerFields: Array.from({ length: 30 }, (_, i) => 'truong_' + i), activityFields: Array.from({ length: 20 }, (_, i) => 'truong_gd_' + i),
+      businessSteps: { run: { at: 1, detail: 'b'.repeat(1400) } }, preflightIssues: [{ code: 'FBM_X', severity: 'warn', scope: 'fbm_sync', message: 'Cảnh báo '.repeat(40), blocking: false }],
+      customerScan: { total: 1312, seen: 50 },
+      // Hai thứ này từng nằm trong state và đẩy nó lên 8,9/9 KB; cửa ghi state phải bỏ chúng.
+      preview: { customers: Array.from({ length: 10 }, () => ({ code: 'M'.repeat(32), name: 'Tên khách '.repeat(16), fbmId: 'A100000000' })), activities: [], truncated: true },
+      preflight: { ok: true, issues: [{ code: 'FBM_X', message: 'Cảnh báo '.repeat(40) }], hashSummary: { checked: 1312 } }
+    })
+  }));
+  const stateBytes = Buffer.byteLength(khoState[stateHop.FbmSync.STATE_KEY] || '');
+  check(so, 'state một trang Customer đầy cộng lastError dài nhất dưới 70% trần một khóa kho, không chứa bản xem trước và preflight đầy đủ',
+    [stateBytes > 0 && stateBytes < stateHop.FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT * 0.7 ? 'dưới 70%' : stateBytes + ' byte'], ['dưới 70%']);
+  // Mẫu số tiến trình là số khách của lượt (FBM đã lọc theo phạm vi), tử số là số khách đã quét xong; số bản ghi nhận được không chen vào.
+  const tienTrinh = { scan: 'full', mode: 'read', metadata: {}, counts: { completed: 0 } };
+  builders.FbmSync.customerScanRecord(tienTrinh, { total: 50, rows: Array.from({ length: 50 }, () => ({})) }, true);
+  builders.FbmSync.progressCustomersDone(tienTrinh, 3);
+  tienTrinh.counts.completed = 1312;
+  const chiTiet = { scan: 'detail', detailCustomerLimit: 20, mode: 'read', metadata: {} };
+  builders.FbmSync.customerScanRecord(chiTiet, { total: 1312, rows: [] }, true);
+  check(so, 'tiến trình lượt 50 khách là x/50 theo khách đã quét xong, quét chi tiết lấy giới hạn khách mỗi lượt làm mẫu số', [tienTrinh.progress, chiTiet.progress.total], [{ done: 3, total: 50 }, 20]);
+  // Cursor chỉ giữ stt_rec_kh; mã FBM của khách cha tra từ Sheet Customer, khách chưa có trên Sheet thì để trống chứ không đoán.
+  const docKhachCu = builders.FbmSync.readLocal;
+  builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-A2', fbmId: 'A2', fbmCustomerCode: 'ALT02' }] : [];
+  const cursorGon = { customers: ['A1', 'A2'] };
+  check(so, 'cursor chỉ giữ stt_rec_kh, mã khách cha của giao dịch tra từ Sheet Customer', [builders.FbmSync.cursorCustomer(cursorGon, 1, true), builders.FbmSync.cursorCustomer(cursorGon, 0, true), builders.FbmSync.cursorCustomer(cursorGon, 2, true)], [{ sttRec: 'A2', maKh: 'ALT02' }, { sttRec: 'A1', maKh: '' }, null]);
+  builders.FbmSync.readLocal = docKhachCu;
   const rotationRows = Array.from({ length: builders.FbmSync.ACTIVITY_SUPPLEMENT_CUSTOMERS }, (_, i) => ({ stt_rec_kh: 'R' + i, ngay_gd: '2026-10-0' + (i % 9 + 1), datetime0: 'T' + i, xorder: i, ten_kh: 'Ten dai '.repeat(20) }));
   check(so, 'vong xoay chi giu vi tri trang ke tiep, khong giu cac dong Customer; trang thieu thi quay ve dau', [builders.FbmSync.activityRotationNext(rotationRows), builders.FbmSync.activityRotationNext(rotationRows.slice(1))], [{ pageIndex: 0, pageValue: ['2026-10-03', 'T29', 29, 'R29'] }, { pageIndex: -1, pageValue: null }]);
   // Lượt dừng sớm (phân trang Customer hỏng) mà vẫn đánh vắng mặt thì mọi khách chưa quét tới bị đánh "không thấy bên FBM" (gặp thật: 1.262/1.312 khách).

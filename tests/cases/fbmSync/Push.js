@@ -68,9 +68,8 @@ async function chay(so) {
   const restarted = orchestration.FbmSync.start({ mode: 'read' });
   check(so, 'run stale duoc thay bang phien moi va probe lai', [restarted.ok, restarted.resumed, restarted.request.meta.kind, orchestration.FbmSync.stateRead().runId === 'old-run'], [true, undefined, 'session_probe', false]);
   check(so, 'FBM-051: sản phẩm không đồng bộ nên phiên chỉ tải ba danh mục FBM, không tải crdmsp', orchestration.FbmSync.SYNC_LOOKUPS.map((item) => item.key + ':' + item.controller), ['@CAT_TINH_THANH:crProvinceCity', '@CAT_NGUON_KH:crLeadSource', '@CAT_CONG_VIEC:crJob']);
-  const previewState = { metadata: {} };
-  orchestration.FbmSync.previewRecords(previewState, 'customer', [{ fbmCustomerCode: 'ALT00010', companyName: 'Test', fbmId: 'A1' }]);
-  check(so, 'preview luu ma va ten Customer doc tu FBM', previewState.metadata.preview.customers[0].code, 'ALT00010');
+  orchestration.FbmSync.previewRecords('customer', [{ fbmCustomerCode: 'ALT00010', companyName: 'Test', fbmId: 'A1' }]);
+  check(so, 'preview luu ma va ten Customer doc tu FBM', orchestration.FbmSync.previewRead().customers[0].code, 'ALT00010');
   const pullStatus = orchestration.FbmSync.stateRead();
   pullStatus.phase = 'pull_customer'; pullStatus.entity = 'customer'; pullStatus.mode = 'read'; orchestration.FbmSync.stateWrite(pullStatus);
   const pullView = orchestration.FbmSync.statusView();
