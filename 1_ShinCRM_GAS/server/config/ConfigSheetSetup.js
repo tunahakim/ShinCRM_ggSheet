@@ -150,6 +150,11 @@ function configValidationList(values, note) {
 
 function configParamValueValidation(item) {
   if (item.options && item.options.length) { return configValidationList(item.options, item.note); }
+  if (item.categorySource) {
+    var category = shinOpenSheet('Category'), column = columnIndex(readColumnMap('Category'), item.categorySource);
+    var range = category.getRange(SHEET_FIRST_DATA_ROW, column, Math.max(1, category.getMaxRows() - SHEET_FIRST_DATA_ROW + 1), 1);
+    return SpreadsheetApp.newDataValidation().requireValueInRange(range, true).setAllowInvalid(false).setHelpText(item.note).build();
+  }
   var builder = SpreadsheetApp.newDataValidation().setAllowInvalid(false).setHelpText(item.note);
   if (item.type === 'NUMBER') {
     return builder.requireNumberGreaterThanOrEqualTo(item.minimum === undefined ? 0 : item.minimum).build();

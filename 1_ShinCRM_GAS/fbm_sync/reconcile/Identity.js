@@ -243,9 +243,19 @@ FbmSync.markMissingAfterFullScan = function (entity, state) {
   return { written: missing.length, result: saved };
 };
 
+/**
+ * Giá trị "Xác thực" cho khách mới kéo từ FBM, đọc từ ô Config. FBM không có trường này nên chỉ gán lúc tạo khách mới; khách đã có giữ giá trị của mình.
+ * Preflight đã chặn ô trống hoặc giá trị không còn trong Category; ô trống mà vẫn tới đây thì ném lỗi chứ không ghi chuỗi đoán.
+ */
+FbmSync.pullVerifyStatus = function () {
+  var value = String(configGet(FBM_VERIFY_STATUS_CONFIG_NAME, '') || '').trim();
+  if (!value) { var error = new Error('Chưa chọn giá trị Xác thực mặc định cho khách kéo từ FBM (Config ' + FBM_VERIFY_STATUS_CONFIG_NAME + ').'); error.code = 'FBM_VERIFY_STATUS_DEFAULT_MISSING'; throw error; }
+  return value;
+};
+
 /** Đổi record Customer FBM sang schema nội bộ của Sheet. */
 FbmSync.customerRecord = function (fbm, categoryGate) {
-  var record = { companyName: fbm.ten_kh || '', taxNumber: fbm.ma_so_thue || '', phone: fbm.dien_thoai || '', email: fbm.email || '', address: fbm.dc_lh || '', province: fbm.ten_dclh_tinh || fbm.dc_lh_tinh || '', website: fbm.website || '', contactPerson: fbm.ong_ba || '', leadSource: fbm.ten_nguon_dm || fbm.nguon_dm || '', verifyStatus: 'Chưa xác thực', fbmSyncPermission: FbmSync.pullDefaultPermission(), fbmCustomerCode: fbm.ma_kh || '', fbmId: fbm.stt_rec_kh || '', syncedAt: new Date(), syncStatus: FbmSync.SYNC_STATUS.synced };
+  var record = { companyName: fbm.ten_kh || '', taxNumber: fbm.ma_so_thue || '', phone: fbm.dien_thoai || '', email: fbm.email || '', address: fbm.dc_lh || '', province: fbm.ten_dclh_tinh || fbm.dc_lh_tinh || '', website: fbm.website || '', contactPerson: fbm.ong_ba || '', leadSource: fbm.ten_nguon_dm || fbm.nguon_dm || '', fbmSyncPermission: FbmSync.pullDefaultPermission(), fbmCustomerCode: fbm.ma_kh || '', fbmId: fbm.stt_rec_kh || '', syncedAt: new Date(), syncStatus: FbmSync.SYNC_STATUS.synced };
   record.fbmHash = FbmSync.hash(fbm, 'customer', categoryGate);
   return record;
 };

@@ -5,6 +5,8 @@ var CONFIG_PARAM_OWNER_SYSTEM = 'system';
 var SORT_LEVEL_OPTIONS = ['Tăng dần (A → Z)', 'Giảm dần (Z → A)'];
 /** Nguồn log đang có trong bản ShinCRM độc lập; `all` và tổ hợp hiện tại là lựa chọn vận hành, không phải nguồn mới. */
 var LOG_TRACE_SOURCE_OPTIONS = ['off', 'all', 'core', 'sidebar', 'fbm_sync', 'core,sidebar'];
+/** Giá trị "Xác thực" gán cho khách mới kéo từ FBM; FBM không có trường này nên ShinCRM phải tự chọn. */
+var FBM_VERIFY_STATUS_CONFIG_NAME = 'FBM_VERIFY_STATUS_DEFAULT';
 
 /**
  * Danh mục theo thứ tự gieo xuống sheet.
@@ -43,6 +45,17 @@ function configParamCatalog() {
       note: 'Tên người dùng ShinCRM, tự điền vào cột "Người tạo trên FBM" của giao dịch tạo mới.\n\n'
         + 'Gõ đúng tên đầy đủ của tài khoản FBM (ví dụ: Lê Tuấn Anh) để giao dịch chưa đồng bộ và đã đồng bộ hiện cùng một tên; giao dịch đã đồng bộ luôn lấy tên người tạo thật trên FBM.\n'
         + 'Để trống = cột này trống cho tới khi giao dịch được đồng bộ FBM.'
+    },
+    {
+      name: FBM_VERIFY_STATUS_CONFIG_NAME,
+      owner: CONFIG_PARAM_OWNER_USER,
+      type: 'TEXT',
+      // Ô chọn lấy thẳng từ cột Category của trường "Xác thực", nên đổi tên giá trị ở Category thì danh sách chọn đổi theo.
+      categorySource: DATA_SCHEMA.customer.verifyStatus.source,
+      defaultValue: '',
+      note: 'Giá trị cột "Xác thực" gán cho khách mới kéo từ FBM về (khách đã có trong ShinCRM giữ nguyên giá trị đang có).\n\n'
+        + 'Chọn một giá trị trong danh mục Xác thực ở sheet Category.\n'
+        + 'Để trống hoặc giá trị không còn trong Category thì lượt "Lấy từ FBM" bị chặn trước khi ghi.'
     }
   ];
 }

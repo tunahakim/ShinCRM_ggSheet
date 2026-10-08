@@ -115,8 +115,8 @@ FbmSync.pullWrite = function (entity, records) {
     if (!current) {
       // Mã lạ không được tạo dòng thiếu dữ liệu; người dùng bổ sung Category rồi chạy lại.
       if (categoryErrors.length) { skipped += 1; FbmSync.logPullRecord(entity, incoming, null, FbmSync.SYNC_STATUS.unknownCategory, 'Mã danh mục lạ; chưa tạo bản ghi mới.'); return; }
-      // Chỉ bản ghi mới nhận giá trị mặc định này; record đã có không bị xóa quan hệ cha.
-      writes.push(entity === 'customer' ? Object.assign({ parentCompanyName: '' }, incoming) : incoming);
+      // Chỉ bản ghi mới nhận các giá trị mặc định này; record đã có không bị xóa quan hệ cha và giữ Xác thực của mình.
+      writes.push(entity === 'customer' ? Object.assign({ parentCompanyName: '' }, incoming, { verifyStatus: FbmSync.pullVerifyStatus() }) : incoming);
       FbmSync.logPullRecord(entity, incoming, null, FbmSync.SYNC_STATUS.synced, 'Tạo bản ghi mới từ FBM; cửa ghi sẽ cấp mã nội bộ và ngày tạo.');
       return;
     }

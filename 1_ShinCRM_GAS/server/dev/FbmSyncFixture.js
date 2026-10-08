@@ -21,6 +21,20 @@ function fbmPrepareAltTest() {
   return { ok: true, customerCode: 'ALT00010', deleted: false, writesToFbm: 0, cases: cases };
 }
 
+/** Gieo dòng Config mới (nếu thiếu) rồi chọn giá trị Xác thực mặc định (ưu tiên giá trị "chưa xác thực" của danh mục DEV), để chiều lấy trên DEV không bị preflight chặn. */
+function fbmDevSetVerifyStatusDefault() {
+  setupSheets();
+  var values = categoryReadAll().categories[DATA_SCHEMA.customer.verifyStatus.source] || [];
+  var value = values.filter(function (item) { return String(item).normalize('NFC').toLowerCase().indexOf('chưa'.normalize('NFC')) === 0; })[0] || values[0] || '';
+  var map = readColumnMap('Config'), sheet = shinOpenSheet('Config'), first = SHEET_LAYOUT.Config.firstDataRow, last = sheet.getLastRow();
+  var names = sheet.getRange(first, columnIndex(map, '@CFG_THAM_SO'), Math.max(1, last - first + 1), 1).getValues().map(function (row) { return String(row[0] || '').trim(); });
+  var at = names.indexOf(FBM_VERIFY_STATUS_CONFIG_NAME);
+  if (at < 0 || !value) { return { ok: false, row: at, value: value }; }
+  sheet.getRange(first + at, columnIndex(map, '@CFG_THAM_SO_GIA_TRI')).setValue(value);
+  resetSettingsCache();
+  return { ok: true, row: first + at, value: configGet(FBM_VERIFY_STATUS_CONFIG_NAME, '') };
+}
+
 var FBM_FAKE_DELETED_CODE = 'ALTFAKE01';
 // Phạm vi live chủ dự án cho phép trên DEV: khách FBM ALT00010 và khách đã tạo thật CUS-020061.
 var FBM_DEV_DEFAULT_TEST_CODES = ['ALT00010', 'CUS-020061'];

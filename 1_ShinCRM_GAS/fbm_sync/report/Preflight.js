@@ -150,6 +150,7 @@ FbmSync.preflightEvaluate = function (options) {
     var missingScope = FbmSync.testScopeMissing(FbmSync.testScopeCodes(), mode);
     if (missingScope.length) { FbmSync.preflightIssue(issues, 'FBM_TEST_SCOPE_EMPTY', 'error', 'fbm_sync', 'Chế độ thử đang bật nhưng danh sách ' + missingScope.join(' và ') + ' còn trống. Vào Cài đặt phiên, thêm mã hoặc tắt chế độ thử rồi chạy lại.', true); }
   }
+  if (mode === 'read' || mode === 'write') { FbmSync.preflightVerifyStatus(issues, params, core.category); }
   var candidateReport = FbmSync.preflightCandidates(issues, writeMode ? 'write' : mode);
   var local = null;
   try { local = FbmSync.preflightLocalScan(candidateReport.gate || {}); } catch (localError) {
@@ -175,4 +176,12 @@ FbmSync.logPreflight = function (result) {
     logEvent({ source: 'fbm_sync', action: 'preflight_issue', outcome: item.blocking ? (typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error') : (typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn'), entity: String(item.scope || ''), reason: String(item.message || code) + (group.count > 1 ? ' (và ' + (group.count - 1) + ' vấn đề cùng loại)' : ''), detail: { code: code, blocking: !!item.blocking, count: group.count, messages: group.messages } });
   });
   return order.length;
+};
+
+/** Chiều lấy cần giá trị Xác thực mặc định hợp lệ trước khi ghi khách mới; thiếu thì dừng lượt, không ghi giá trị sai. */
+FbmSync.preflightVerifyStatus = function (issues, params, category) {
+  var value = String(params && params[FBM_VERIFY_STATUS_CONFIG_NAME] || '').trim(), source = DATA_SCHEMA.customer.verifyStatus.source;
+  var allowed = category && category.categories && category.categories[source] || [];
+  if (!value) { FbmSync.preflightIssue(issues, 'FBM_VERIFY_STATUS_DEFAULT_MISSING', 'error', 'Config', 'Chưa chọn giá trị Xác thực mặc định cho khách kéo từ FBM. Vào sheet Config, chọn ô ' + FBM_VERIFY_STATUS_CONFIG_NAME + ' rồi chạy lại.', true); return; }
+  if (allowed.indexOf(value) < 0) { FbmSync.preflightIssue(issues, 'FBM_VERIFY_STATUS_DEFAULT_INVALID', 'error', 'Config', 'Giá trị Xác thực mặc định "' + value + '" không còn trong danh mục Xác thực ở sheet Category. Vào sheet Config, chọn lại ô ' + FBM_VERIFY_STATUS_CONFIG_NAME + ' rồi chạy lại.', true); }
 };
