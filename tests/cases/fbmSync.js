@@ -12,6 +12,7 @@ const NHOM = [
   require("./fbmSync/Audit"),
   require("./fbmSync/UserJourneys"),
   require("./fbmSync/Workflow"),
+  require("./fbmSync/ScanJob"),
   require("./fbmSync/Settings")
 ];
 
