@@ -267,12 +267,13 @@ FbmSync.customerPageValue = function (row) {
 };
 
 /**
- * Khóa trang gửi lại FBM phải đúng dạng FBM trả về: `rowsToRecords` đã đổi ngày sang Date, gửi Date (thành chuỗi ISO) thì FBM trả trang kế rỗng và lượt quét dừng ở trang đầu.
+ * Khóa trang gửi lại FBM phải ở dạng `/Date(ms)/` (gửi Date thành chuỗi ISO thì FBM trả trang kế rỗng) và cộng thêm lệch giờ máy chủ như giao diện FBM:
+ * FBM đọc ngày gửi lên như giờ UTC, gửi nguyên ms FBM trả thì mốc lùi 7 giờ, khách cùng ngày với dòng cuối trang bị bỏ qua âm thầm và vùng khách chung một ngày (khách chưa có giao dịch) trả trang rỗng (gặp thật 2026-10-08: dừng ở 1.000/1.312).
  * So kiểu bằng `toString` vì Date tạo ở ngữ cảnh khác không qua được `instanceof`.
  */
 FbmSync.gridPageValue = function (values) {
   return values.map(function (value) {
-    return Object.prototype.toString.call(value) === '[object Date]' ? '/Date(' + value.getTime() + ')/' : value;
+    return Object.prototype.toString.call(value) === '[object Date]' ? '/Date(' + (value.getTime() + FbmSync.FBM_SERVER_UTC_OFFSET_MS) + ')/' : value;
   });
 };
 
