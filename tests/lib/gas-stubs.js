@@ -45,6 +45,7 @@ function taoStubsGas(options) {
   const daLog = [];
   const daConsole = [];
   const khoa = { dem: 0, demNha: 0, dangGiu: false, chanKhoa: chon.chanKhoa === true, msCuoi: 0 };
+  const khoDem = { doc: 0, ghi: 0 };
 
   return {
     SpreadsheetApp: gia.SpreadsheetApp,
@@ -115,10 +116,13 @@ function taoStubsGas(options) {
     },
 
     PropertiesService: {
+      // `khoDem` đếm lệnh gọi kho thật, để chứng minh bản đọc trong một lần gọi (server/state/DocumentStore.js) thật sự gom được lệnh đọc.
       getDocumentProperties: () => ({
-        getProperty: (key) => (Object.prototype.hasOwnProperty.call(props, key) ? props[key] : null),
-        setProperty: (key, value) => { props[key] = String(value); },
-        deleteProperty: (key) => { delete props[key]; }
+        getProperty: (key) => { khoDem.doc += 1; return Object.prototype.hasOwnProperty.call(props, key) ? props[key] : null; },
+        getProperties: () => { khoDem.doc += 1; return Object.assign({}, props); },
+        setProperty: (key, value) => { khoDem.ghi += 1; props[key] = String(value); },
+        setProperties: (values) => { khoDem.ghi += 1; Object.keys(values).forEach((key) => { props[key] = String(values[key]); }); },
+        deleteProperty: (key) => { khoDem.ghi += 1; delete props[key]; }
       }),
       getUserProperties: () => ({
         getProperty: (key) => (Object.prototype.hasOwnProperty.call(userProps, key) ? userProps[key] : null),
@@ -133,6 +137,7 @@ function taoStubsGas(options) {
     _daLog: daLog,
     _daConsole: daConsole,
     _props: props,
+    _khoDem: khoDem,
     _userProps: userProps,
     _khoa: khoa
   };

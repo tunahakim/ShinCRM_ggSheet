@@ -21,7 +21,7 @@ async function chay(so) {
   identity.FbmSync.readLocal = () => { identityLocalReads += 1; return []; };
   bindingData[identity.FbmSync.BINDING_KEY] = JSON.stringify({ spreadsheetId: 'sheet-binding-test', userId: '2037', username: 'anhlt', accountName: 'Le Tuan Anh' });
   const boundStatus = identity.FbmSync.identityStatus();
-  check(so, 'đợt 1 bước C: đã liên kết thì xem trạng thái liên kết (Sidebar mở) không đọc Sheet Customer/Activity', [boundStatus.status, identityLocalReads], ['BOUND', 0]);
+  check(so, 'bản chụp Sheet: đã liên kết thì xem trạng thái liên kết (Sidebar mở) không đọc Sheet Customer/Activity', [boundStatus.status, identityLocalReads], ['BOUND', 0]);
   const clearedBinding = identity.FbmSync.bindingWrite({});
   check(so, 'lưu liên kết rỗng xóa binding và khóa mọi đồng bộ thường', [clearedBinding.ok, clearedBinding.code, bindingData[identity.FbmSync.BINDING_KEY], clearedBinding.identityStatus.status], [true, 'IDENTITY_BINDING_CLEARED', undefined, 'UNBOUND']);
   bindingData[identity.FbmSync.BINDING_KEY] = JSON.stringify({ spreadsheetId: 'sheet-binding-test', userId: '2037', username: 'anhlt', accountName: 'Le Tuan Anh' });
@@ -387,7 +387,7 @@ async function chay(so) {
   const cancelWithoutFlight = heartbeat.fbmSyncCancel();
   check(so, 'dung phien khi khong con request bay giu man ket qua o trang thai tam dung ma khong khoa lich nen sau do', [cancelWithoutFlight.phase, cancelWithoutFlight.runId, cancelWithoutFlight.message.indexOf('kết quả và log') >= 0], ['paused', '', true]);
 
-  // Bộ đệm DocumentProperties (đợt 1 bước A): lượt khác ghi trong lúc chờ khóa phải được thấy; lỗi giữa chừng vẫn lưu phần đã ghi và giữ lỗi gốc.
+  // Bộ đệm DocumentProperties: lượt khác ghi trong lúc chờ khóa phải được thấy; lỗi giữa chừng vẫn lưu phần đã ghi và giữ lỗi gốc.
   const bufferData = {};
   const bufferStore = {
     getProperty: (key) => Object.prototype.hasOwnProperty.call(bufferData, key) ? bufferData[key] : null,
@@ -405,20 +405,20 @@ async function chay(so) {
   bufferData.k = 'v2';
   const secondScope = fs.withPropertyBuffer(() => fs.props().getProperty('k'));
   fs.propertyBufferEnd();
-  check(so, 'đợt 1 bước A: lấy khóa lần sau trong cùng lần gọi đọc lại kho, thấy giá trị lượt khác vừa ghi', [firstScope, secondScope], ['v1', 'v2']);
+  check(so, 'bộ đệm kho FBM: lấy khóa lần sau trong cùng lần gọi đọc lại kho, thấy giá trị lượt khác vừa ghi', [firstScope, secondScope], ['v1', 'v2']);
   bufferData.gone = 'x';
   let workError = null;
   try {
     fs.withPropertyBuffer(() => {
       fs.props().setProperty('k', 'v3');
       fs.props().deleteProperty('gone');
-      check(so, 'đợt 1 bước A: trong khóa, ghi chỉ chờ, kho chưa đổi', [bufferData.k, bufferData.gone], ['v2', 'x']);
+      check(so, 'bộ đệm kho FBM: trong khóa, ghi chỉ chờ, kho chưa đổi', [bufferData.k, bufferData.gone], ['v2', 'x']);
       throw new Error('work-failed');
     });
   } catch (err) { workError = err.message; }
-  check(so, 'đợt 1 bước A: phần việc lỗi giữa chừng vẫn ghi gộp phần đã ghi và ném nguyên lỗi gốc', [workError, bufferData.k, 'gone' in bufferData, fs.propertyBuffer.lockDepth], ['work-failed', 'v3', false, 0]);
+  check(so, 'bộ đệm kho FBM: phần việc lỗi giữa chừng vẫn ghi gộp phần đã ghi và ném nguyên lỗi gốc', [workError, bufferData.k, 'gone' in bufferData, buffered.DOCUMENT_STORE.lockDepth], ['work-failed', 'v3', false, 0]);
 
-  // Bản chụp Sheet (đợt 1 bước C): đọc một lần mỗi lần gọi, cửa ghi bỏ bản chụp, lần gọi sau đọc lại Category.
+  // Bản chụp Sheet: đọc một lần mỗi lần gọi, cửa ghi bỏ bản chụp, lần gọi sau đọc lại Category.
   const sheetRows = { customer: [['CUS-1', 'Cũ']] }, sheetReadCount = { customer: 0, category: 0 };
   let categoryName = 'Hà Nội';
   const sheetHop = taoHopCat({
@@ -440,9 +440,9 @@ async function chay(so) {
   ss.propertyBufferBegin();
   const secondCategory = ss.readCategoryGate().names.HN;
   ss.propertyBufferEnd();
-  check(so, 'đợt 1 bước C: trong một lần gọi đọc Sheet Customer một lần, cửa ghi bỏ bản chụp nên đọc sau khi ghi thấy giá trị mới',
+  check(so, 'bản chụp Sheet: trong một lần gọi đọc Sheet Customer một lần, cửa ghi bỏ bản chụp nên đọc sau khi ghi thấy giá trị mới',
     [namesBefore, readsBeforeSave, nameAfterSave, sheetReadCount.customer], [['Cũ', 'Cũ'], 1, 'Mới', 2]);
-  check(so, 'đợt 1 bước C: Category đọc một lần mỗi lần gọi, sửa Category giữa hai lần gọi thì lần gọi sau thấy giá trị mới',
+  check(so, 'bản chụp Sheet: Category đọc một lần mỗi lần gọi, sửa Category giữa hai lần gọi thì lần gọi sau thấy giá trị mới',
     [firstCategory, secondCategory, sheetReadCount.category], [['Hà Nội', 'Hà Nội'], 'Hà Nội mới', 2]);
 }
 

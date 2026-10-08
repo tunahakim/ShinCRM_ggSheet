@@ -78,6 +78,10 @@ function capBangChoPhepDongBo(hopCat) {
 }
 
 function napServer(hopCat, ...duongDans) {
+  // Trên GAS mọi tệp chung một không gian tên; cửa kho DocumentProperties là phụ thuộc của gần như mọi tệp server nên luôn nạp trước, như bản thật.
+  if (typeof hopCat.documentProps !== 'function' && duongDans.indexOf('server/state/DocumentStore.js') < 0) {
+    vm.runInContext(docTep('server/state/DocumentStore.js'), hopCat, { filename: 'server/state/DocumentStore.js' });
+  }
   duongDans.forEach((duongDan) => {
     if (duongDan.indexOf('fbm_sync/') === 0) { capBangChoPhepDongBo(hopCat); }
     vm.runInContext(docTep(duongDan), hopCat, { filename: duongDan });
