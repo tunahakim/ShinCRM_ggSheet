@@ -20,7 +20,9 @@ var FBM_PERF_FBM_FUNCTIONS = [
   'businessStepStart', 'businessStepAdd', 'businessStepFinish',
   'customerScanRecord', 'customerNext', 'activityForCustomers', 'finishPullRun', 'beginCustomerPull',
   'runPreflight', 'preflightEvaluate', 'preflightLocalScan', 'preflightHashSummary', 'preflightCandidates', 'preflightPushPermissions', 'logPreflight', 'identityPreflight', 'pushCandidates',
-  'continueSessionGate', 'sessionGateResponseStarted', 'applyTransportSession', 'authContinue', 'lookupPairs'
+  'continueSessionGate', 'sessionGateResponseStarted', 'applyTransportSession', 'authContinue', 'lookupPairs',
+  'sessionGateStart', 'sessionGateWaitRequest', 'sessionGateHandleFailure', 'sessionGateProbeRequest', 'sessionGateResumeProbeRequest', 'sessionGateHandleProbeFailure', 'sessionGateTransportRetry', 'sessionGateRecordFailure', 'sessionGateResumeAfterWaitProbe',
+  'activityBatchContinue', 'activityBatchRequest', 'activityParentCodes', 'activityPagesRead', 'activityCustomerErrors'
 ];
 var FBM_PERF_PROTOCOL_FUNCTIONS = ['parse', 'assertSuccess', 'isLiveSessionResponse'];
 /** Hàm toàn cục của lõi ShinCRM mà đồng bộ gọi tới: đọc Sheet, cửa ghi, Log. */

@@ -14,7 +14,7 @@ async function chay(so) {
     FBM_VERIFY_STATUS_CONFIG_NAME: 'FBM_VERIFY_STATUS_DEFAULT', configGet: (name, fallback) => name === 'FBM_VERIFY_STATUS_DEFAULT' ? verifyDefault : fallback,
     PropertiesService: { getDocumentProperties: () => ({ getProperty: () => '', setProperty: () => {}, deleteProperty: () => {} }) }
   });
-  napServer(builders, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/write/SheetSave.js');
+  napServer(builders, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/write/SheetSave.js');
   check(so, 'mode tach quyen ghi Sheet khoi quyen ghi FBM', [
     builders.FbmSync.canWriteSheet('check'), builders.FbmSync.canWriteFbm('check'),
     builders.FbmSync.canWriteSheet('read'), builders.FbmSync.canWriteFbm('read'),
@@ -42,6 +42,7 @@ async function chay(so) {
   let readFinishMissing = 0;
   let readFinishPushRequests = 0;
   const readFinish = taoHopCat({
+    PropertiesService: { getDocumentProperties: () => ({ getProperty: () => null, getProperties: () => ({}), setProperty: () => {}, setProperties: () => {}, deleteProperty: () => {} }) },
     FbmSync: {
       stateRead: () => readFinishState,
       stateWrite: (next) => { readFinishState = next; return next; },
@@ -57,7 +58,7 @@ async function chay(so) {
       statusView: () => ({ phase: readFinishState.phase, mode: readFinishState.mode })
     }
   });
-  napServer(readFinish, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/write/SheetSave.js');
+  napServer(readFinish, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/write/SheetSave.js');
   const readFinished = readFinish.FbmSync.continue({ transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'read-request' }] } });
   check(so, 'mode read ket thuc pull thi ghi missing vao Sheet va khong mo chieu push FBM', [readFinished.ok, readFinishState.phase, readFinishMissing, readFinishPushRequests], [true, 'done', 2, 0]);
   builders.FbmSync.stateRead = () => ({ session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: 'auth-c', activityAuthorized: 'auth-a' } });
@@ -193,7 +194,7 @@ async function chay(so) {
     })
   }));
   const stateBytes = Buffer.byteLength(khoState[stateHop.FbmSync.STATE_KEY] || '');
-  check(so, 'state một trang Customer đầy cộng lastError dài nhất dưới 70% trần một khóa kho, không chứa bản xem trước và preflight đầy đủ',
+  check(so, 'state một trang Customer đầy (cả lô giao dịch của trang) cộng lastError dài nhất dưới 70% trần một khóa kho, không chứa bản xem trước và preflight đầy đủ',
     [stateBytes > 0 && stateBytes < stateHop.FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT * 0.7 ? 'dưới 70%' : stateBytes + ' byte'], ['dưới 70%']);
   // Mẫu số tiến trình là số khách của lượt (FBM đã lọc theo phạm vi), tử số là số khách đã quét xong; số bản ghi nhận được không chen vào.
   const tienTrinh = { scan: 'full', mode: 'read', metadata: {}, counts: { completed: 0 } };
@@ -206,8 +207,8 @@ async function chay(so) {
   // Cursor chỉ giữ stt_rec_kh; mã FBM của khách cha tra từ Sheet Customer, khách chưa có trên Sheet thì để trống chứ không đoán.
   const docKhachCu = builders.FbmSync.readLocal;
   builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-A2', fbmId: 'A2', fbmCustomerCode: 'ALT02' }] : [];
-  const cursorGon = { customers: ['A1', 'A2'] };
-  check(so, 'cursor chỉ giữ stt_rec_kh, mã khách cha của giao dịch tra từ Sheet Customer', [builders.FbmSync.cursorCustomer(cursorGon, 1, true), builders.FbmSync.cursorCustomer(cursorGon, 0, true), builders.FbmSync.cursorCustomer(cursorGon, 2, true)], [{ sttRec: 'A2', maKh: 'ALT02' }, { sttRec: 'A1', maKh: '' }, null]);
+  const maCha = builders.FbmSync.activityParentCodes();
+  check(so, 'cursor chỉ giữ stt_rec_kh, mã khách cha của giao dịch tra từ chỉ mục Sheet Customer, khách chưa có trên Sheet thì để trống', [maCha.A2, maCha.A1 || ''], ['ALT02', '']);
   builders.FbmSync.readLocal = docKhachCu;
   const rotationRows = Array.from({ length: builders.FbmSync.ACTIVITY_SUPPLEMENT_CUSTOMERS }, (_, i) => ({ stt_rec_kh: 'R' + i, ngay_gd: '2026-10-0' + (i % 9 + 1), datetime0: 'T' + i, xorder: i, ten_kh: 'Ten dai '.repeat(20) }));
   check(so, 'vong xoay chi giu vi tri trang ke tiep, khong giu cac dong Customer; trang thieu thi quay ve dau', [builders.FbmSync.activityRotationNext(rotationRows), builders.FbmSync.activityRotationNext(rotationRows.slice(1))], [{ pageIndex: 0, pageValue: ['2026-10-03', 'T29', 29, 'R29'] }, { pageIndex: -1, pageValue: null }]);

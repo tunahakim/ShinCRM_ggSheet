@@ -505,7 +505,7 @@ FbmSync.limitRelayResult = function (result, hop) {
 };
 /** Dựng lại request đọc từ cursor; không lưu payload/cookie để retry không làm lộ bí mật. */
 FbmSync.requestForCursor = function (state) {
-  var cursor = state && state.cursor || {}, lookup, customerId, pageType;
+  var cursor = state && state.cursor || {}, lookup;
   if (cursor.kind === 'heartbeat') { return FbmSync.sessionSystemRequest('heartbeat'); }
   if (cursor.kind === 'login') { return FbmSync.sessionSystemRequest('login', { credentialRef: cursor.credentialRef, testOnly: false }); }
   if (cursor.kind === 'login_identity_authorize') { return FbmSync.sessionSystemRequest('authorize', { entity: 'customer' }); }
@@ -521,12 +521,7 @@ FbmSync.requestForCursor = function (state) {
   if (cursor.kind === 'customer_grid') {
     return FbmSync.customerGridRequest({ type: Number(cursor.type || 0), count: Number(cursor.count || 2000), gridPageIndex: cursor.pageIndex === undefined ? -1 : cursor.pageIndex, gridPageValue: cursor.pageValue === undefined ? null : cursor.pageValue, gridRefresh: false });
   }
-  if (cursor.kind === 'activity_grid') {
-    customerId = (FbmSync.cursorCustomer(cursor, cursor.customerIndex) || {}).sttRec;
-    if (!customerId) { return null; }
-    pageType = Number(cursor.pageIndex || -1) < 0 ? 0 : 1;
-    return FbmSync.activityGridRequest(customerId, { type: pageType, count: Number(cursor.count || 100), gridPageIndex: cursor.pageIndex === undefined ? -1 : cursor.pageIndex, gridPageValue: cursor.pageValue === undefined ? null : cursor.pageValue, gridRefresh: false });
-  }
+  if (cursor.kind === 'activity_grid') { return FbmSync.activityBatchRequest(state); }
   if (cursor.kind === 'activity_bulk_grid') {
     return FbmSync.activityBulkRequest({ type: Number(cursor.type || 0), count: Number(cursor.count || 100), gridPageIndex: cursor.pageIndex === undefined ? -1 : cursor.pageIndex, gridPageValue: cursor.pageValue === undefined ? null : cursor.pageValue, gridRefresh: false, transport: cursor.transport });
   }

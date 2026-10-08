@@ -55,7 +55,7 @@ function workflowGas(options) {
     'fbm_sync/reconcile/Identity.js',
     'fbm_sync/reconcile/CategoryGate.js',
     'fbm_sync/reconcile/Fingerprint.js',
-    'fbm_sync/reconcile/Pull.js',
+    'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/Conflict.js',
     'fbm_sync/report/Report.js',
     'fbm_sync/read/GridRead.js',
     'fbm_sync/write/PushCandidates.js',
@@ -63,7 +63,7 @@ function workflowGas(options) {
     'fbm_sync/auth/AutoLogin.js',
     'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js',
     'fbm_sync/transport/PushFlow.js',
-    'fbm_sync/transport/PullFlow.js',
+    'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ActivityBatch.js',
     'fbm_sync/transport/EntryPoints.js',
     'server/service/FbmSyncService.js',
     'server/dev/FbmSyncStateProbe.js'
@@ -128,6 +128,18 @@ function executorRaw(reply, requestId) {
     body: String(result.body || ''),
     transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId: String(requestId) }] }
   };
+}
+
+/** Chạy lô như service worker: từng phần tử qua executor thật với hạn fetch của lô; `itemReply` trả `{ body }` hoặc `{ raw }` để giả lỗi HTTP một khách. */
+async function sendBatchThroughExecutor(envelope, itemReply) {
+  const items = [];
+  for (const item of envelope.items) {
+    const reply = itemReply(item);
+    if (reply.raw) { items.push(Object.assign({ id: item.id }, reply.raw)); continue; }
+    const result = (await sendThroughExecutor(Object.assign({}, item, { meta: Object.assign({}, item.meta, { fetchMs: envelope.meta.fetchMs }) }), reply.body)).reply.result || {};
+    items.push({ id: item.id, ok: result.ok === true, status: Number(result.status || 0), headers: result.headers || {}, body: String(result.body || '') });
+  }
+  return { ok: true, status: 200, items, transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId: String(envelope.id) }] } };
 }
 
 function relayResponse(value) {
@@ -678,8 +690,9 @@ async function chay(so) {
   ], [true, ['heartbeat_request', 'heartbeat'], rawHeartbeat, MA_HOP_DONG, 1, 2]);
 
   // Chạy cả pipeline Customer + Activity. `withTrace` nạp thêm Trace.js như GAS thật (có sổ bước nghiệp vụ thay cho dòng Log tóm tắt mỗi lát), dùng cho phép đếm lần gọi kho.
-  async function fullPipeline(withTrace, mode) {
-    const fullLogs = [], fullWrites = [], fullLocal = { customer: [], activity: [] };
+  async function fullPipeline(withTrace, mode, options) {
+    const soKhach = options && options.customers || 2, khachLoi = options && options.failing || {};
+    const fullLogs = [], fullWrites = [], fullLocal = { customer: [], activity: (options && options.localActivity || []).slice() };
     // Đếm mọi lần gọi kho DocumentProperties để chốt đợt 1 bước A: một lát Activity không được đọc/ghi kho theo số sự kiện.
     const fullProps = properties(), fullPropCalls = { count: 0 }, fullSheetReads = { customer: 0, activity: 0, category: 0 };
     ['getProperty', 'setProperty', 'deleteProperty', 'getProperties'].forEach((name) => { const original = fullProps[name]; fullProps[name] = function () { fullPropCalls.count += 1; return original.apply(this, arguments); }; });
@@ -717,21 +730,26 @@ async function chay(so) {
     fullFlow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
     const fullCustomerFields = fullFlow.hop.FbmSync.GRID_FIELDS.customer;
     const fullActivityFields = fullFlow.hop.FbmSync.GRID_FIELDS.activity;
-    const customerRows = [
-      row(fullCustomerFields, { stt_rec_kh: 'FBM-C1', ma_kh: 'ALT00001', ten_kh: 'Cong ty 1', ma_so_thue: '010001', ong_ba: 'A', dc_lh: 'Ha Noi', dien_thoai: '0901', email: 'c1@example.test', ngay_gd: '2026-09-20', datetime0: '2026-09-20T01:00:00', xorder: 1 }),
-      row(fullCustomerFields, { stt_rec_kh: 'FBM-C2', ma_kh: 'ALT00002', ten_kh: 'Cong ty 2', ma_so_thue: '010002', ong_ba: 'B', dc_lh: 'Ha Noi', dien_thoai: '0902', email: 'c2@example.test', ngay_gd: '2026-09-20', datetime0: '2026-09-20T02:00:00', xorder: 2 })
-    ];
-    const activityRows = {
-      'FBM-C1': [row(fullActivityFields, { id: 'FBM-A1', details: 'Goi dien 1', end_date: '2026-09-20', owner: 'Owner 1', datetime0: '2026-09-20T03:00:00', line_nbr: 1 })],
-      'FBM-C2': [row(fullActivityFields, { id: 'FBM-A2', details: 'Goi dien 2', end_date: '2026-09-20', owner: 'Owner 2', datetime0: '2026-09-20T04:00:00', line_nbr: 1 })]
-    };
+    const gio = (i, base) => new Date(Date.UTC(2026, 8, 20, base, 0, 0) + (i - 1) * 60000).toISOString().slice(0, 19);
+    const so2 = (i) => String(i).padStart(2, '0');
+    const customerRows = Array.from({ length: soKhach }, (_, k) => k + 1).map((i) => row(fullCustomerFields, { stt_rec_kh: 'FBM-C' + i, ma_kh: 'ALT' + String(i).padStart(5, '0'), ten_kh: 'Cong ty ' + i, ma_so_thue: '0100' + so2(i), ong_ba: String.fromCharCode(65 + (i - 1) % 26), dc_lh: 'Ha Noi', dien_thoai: '09' + so2(i), email: 'c' + i + '@example.test', ngay_gd: '2026-09-20', datetime0: gio(i, 1), xorder: i }));
+    const activityRows = Object.fromEntries(customerRows.map((_, k) => k + 1).map((i) => ['FBM-C' + i, [row(fullActivityFields, { id: 'FBM-A' + i, details: 'Goi dien ' + i, end_date: '2026-09-20', owner: 'Owner ' + i, datetime0: gio(i, 3), line_nbr: 1 })]]));
+    const fullKinds = [], fullStatuses = [], fullActivityPropCalls = [], fullActivitySheetReads = [], fullBatches = [];
+    let fullStep = null;
+    // `rounds` chạy lại cả lượt trên cùng Sheet; `loseTab` làm lượt đầu mất tab FBM ngay ở lô giao dịch đầu tiên.
+    for (let round = 0; round < (options && options.rounds || 1); round += 1) {
     fullFlow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-    let fullStep = fullFlow.hop.FbmSync.start({ mode: mode || 'read', origin: 'manual', manual: true });
-    const fullKinds = [], fullStatuses = [], fullActivityPropCalls = [], fullActivitySheetReads = [];
+    fullStep = fullFlow.hop.FbmSync.start({ mode: mode || 'read', origin: 'manual', manual: true });
     for (let hop = 0; fullStep && fullStep.request && hop < 20; hop += 1) {
       const request = fullStep.request;
       const kind = String(request.meta && request.meta.kind || '');
       fullKinds.push(kind + ':' + String(request.meta && (request.meta.entity || request.meta.field) || ''));
+      if (kind === 'batch') { fullBatches.push(request); }
+      if (kind === 'batch' && round === 0 && options && options.loseTab) {
+        fullStep = fullFlow.hop.FbmSync.controlDispatchLocked('transport_failure', { requestId: request.id, code: 'FBM_TRANSPORT_UNAVAILABLE', message: 'Mất tab FBM' });
+        fullStatuses.push(fullStep.status);
+        continue;
+      }
       let body;
       if (kind === 'session_probe' || kind === 'identity_user_grid') {
         body = userResponse;
@@ -741,19 +759,21 @@ async function chay(so) {
         body = JSON.stringify({ d: [['CODE', 'Ten danh muc']] });
       } else if (kind === 'grid' && request.meta.entity === 'customer') {
         body = gridResponse(fullCustomerFields, customerRows, customerRows.length);
-      } else if (kind === 'grid' && request.meta.entity === 'activity') {
-        const key = request.body.externalKey && request.body.externalKey[0] && request.body.externalKey[0].Value;
-        body = gridResponse(fullActivityFields, activityRows[key] || [], (activityRows[key] || []).length);
-      } else {
+      } else if (kind !== 'batch') {
         throw new Error('Ca mô phỏng pipeline gặp request không mong đợi: ' + kind);
       }
-      const throughExtension = await sendThroughExecutor(request, body);
-      if (kind === 'grid' && request.meta.entity === 'activity') {
+      let raw = kind === 'batch' ? await sendBatchThroughExecutor(request, (item) => {
+        const key = item.body.externalKey && item.body.externalKey[0] && item.body.externalKey[0].Value;
+        if (khachLoi[key]) { return { raw: khachLoi[key] }; }
+        return { body: gridResponse(fullActivityFields, activityRows[key] || [], (activityRows[key] || []).length) };
+      }) : executorRaw((await sendThroughExecutor(request, body)).reply, request.id);
+      if (kind === 'batch' && options && options.editBatch) { raw = options.editBatch(raw, fullBatches.length); }
+      if (kind === 'batch') {
         // Đi đúng đường của fbmContinueSync (bộ đệm một lần gọi, khóa điều phối) để đếm số lần gọi kho của một lát Activity.
         const callsBefore = fullPropCalls.count, readsBefore = Object.assign({}, fullSheetReads), writesBefore = fullWrites.length;
         fullFlow.hop.FbmSync.propertyBufferBegin();
         const before = fullFlow.hop.FbmSync.statusView();
-        fullStep = fullFlow.hop.FbmSync.controlDispatchLocked('continue', { response: executorRaw(throughExtension.reply, request.id) });
+        fullStep = fullFlow.hop.FbmSync.controlDispatchLocked('continue', { response: raw });
         if (withTrace) { fullFlow.hop.FbmSync.traceEvent('engine_after', { operation: 'fbmContinueSync' }); }
         if (fullStep.status && fullFlow.hop.FbmSync.shouldLogStatus(before, fullStep.status)) { fullFlow.hop.FbmSync.logStatus(fullStep.status, 'slice'); }
         fullFlow.hop.FbmSync.propertyBufferEnd();
@@ -765,13 +785,14 @@ async function chay(so) {
         continue;
       }
       const before = fullFlow.hop.FbmSync.statusView();
-      fullStep = fullFlow.hop.FbmSync.continue(executorRaw(throughExtension.reply, request.id));
+      fullStep = fullFlow.hop.FbmSync.continue(raw);
       fullStatuses.push(fullStep.status);
       if (fullStep.status && fullFlow.hop.FbmSync.shouldLogStatus(before, fullStep.status)) {
         fullFlow.hop.FbmSync.logStatus(fullStep.status, 'slice');
       }
     }
-    return { fullFlow, fullLogs, fullWrites, fullLocal, fullStep, fullKinds, fullStatuses, fullActivityPropCalls, fullActivitySheetReads };
+    }
+    return { fullFlow, fullLogs, fullWrites, fullLocal, fullStep, fullKinds, fullStatuses, fullActivityPropCalls, fullActivitySheetReads, fullBatches };
   }
   const { fullFlow, fullLogs, fullWrites, fullLocal, fullStep, fullKinds, fullStatuses } = await fullPipeline(false);
   const fullFinal = fullFlow.hop.FbmSync.statusView();
@@ -785,8 +806,8 @@ async function chay(so) {
     fullSummaryLog.detail && fullSummaryLog.detail.runId === fullFinal.runId, fullSummaryLog.detail && fullSummaryLog.detail.counts && fullSummaryLog.detail.counts.succeeded,
     ui.content.textContent.indexOf('Hoàn tất') >= 0
   ], [
-    true, null, 'done', 2, 2, 3,
-     ['session_probe:user', 'authorize:customer', 'authorize:activity', 'grid:customer', 'grid:activity', 'grid:activity'],
+    true, null, 'done', 2, 2, 2,
+     ['session_probe:user', 'authorize:customer', 'authorize:activity', 'grid:customer', 'batch:activity'],
     0, true, 4, true
   ]);
   const checkRun = await fullPipeline(false, 'check');
@@ -801,10 +822,52 @@ async function chay(so) {
   // Đợt 1 bước C: mỗi Sheet đọc một lần mỗi lần gọi; chỉ được đọc lại sau mỗi lần cửa ghi ghi đúng thực thể đó (bản chụp bị bỏ khi ghi).
   const sheetReadsWithinBudget = traced.fullActivitySheetReads.every((slice) => ['customer', 'activity', 'category'].every((key) => slice.reads[key] <= 1 + (slice.writes[key] || 0)));
   check(so, 'đợt 1 bước C: mỗi lát Activity đọc mỗi Sheet (Customer, Activity, Category) một lần, chỉ đọc lại sau khi cửa ghi ghi đúng Sheet đó',
-    [traced.fullActivitySheetReads.length >= 2, sheetReadsWithinBudget, traced.fullActivitySheetReads.map((slice) => slice.reads)], [true, true, traced.fullActivitySheetReads.map((slice) => slice.reads)]);
+    [traced.fullActivitySheetReads.length >= 1, sheetReadsWithinBudget, traced.fullActivitySheetReads.map((slice) => slice.reads)], [true, true, traced.fullActivitySheetReads.map((slice) => slice.reads)]);
   const lastActivitySlice = tracedActivityPropCalls.length - 1;
   check(so, 'đợt 1 bước A: mỗi lát Activity gọi kho DocumentProperties không quá ' + FBM_ACTIVITY_SLICE_PROPERTY_CALLS_MAX + ' lần, lát kết thúc lượt cộng thêm ' + FBM_SEEN_STORE_RESET_DELETES + ' lần xóa dấu đã thấy (trước refactor: 83)',
-    [tracedActivityPropCalls.length >= 2, tracedActivityPropCalls.every((count, index) => count <= FBM_ACTIVITY_SLICE_PROPERTY_CALLS_MAX + (index === lastActivitySlice ? FBM_SEEN_STORE_RESET_DELETES : 0)), tracedActivityPropCalls], [true, true, tracedActivityPropCalls]);
+    [tracedActivityPropCalls.length >= 1, tracedActivityPropCalls.every((count, index) => count <= FBM_ACTIVITY_SLICE_PROPERTY_CALLS_MAX + (index === lastActivitySlice ? FBM_SEEN_STORE_RESET_DELETES : 0)), tracedActivityPropCalls], [true, true, tracedActivityPropCalls]);
+  // Lô giao dịch: chi phí cố định của một lần gọi GAS không tăng theo số khách trong lô.
+  const lo5 = await fullPipeline(true, 'read', { customers: 5 }), lo50 = await fullPipeline(true, 'read', { customers: 50 });
+  const chiPhiLo = (run) => [run.fullActivitySheetReads.length, run.fullActivitySheetReads[0].reads, run.fullActivitySheetReads[0].writes, run.fullActivityPropCalls[0]];
+  check(so, 'lô 5 khách và lô 50 khách: cùng một lần gọi GAS cho cả trang, cùng số lần đọc mỗi Sheet, cùng số lần ghi Sheet Activity, cùng số lần gọi kho; đủ giao dịch của mọi khách',
+    [chiPhiLo(lo5), lo5.fullLocal.activity.length, lo50.fullLocal.activity.length, lo50.fullBatches.length, lo50.fullBatches[0].items.length, lo50.fullStep.status.phase], [chiPhiLo(lo50), 5, 50, 1, 50, 'done']);
+  // Một khách lỗi HTTP giữa lô: khách khác vẫn ghi; giao dịch đã có của khách lỗi không bị đánh "không thấy bên FBM" vì chưa được quét.
+  const loiHttp = { ok: false, status: 500, headers: {}, body: JSON.stringify({ d: { Bugs: { Message: 'Lỗi máy chủ FBM' } } }) };
+  const giaoDichCu = { id: 'ACT-000099', fbmId: 'FBM-A3', recordStatus: 'active', syncStatus: 'đã đồng bộ' };
+  const coKhachLoi = await fullPipeline(false, 'read', { customers: 5, failing: { 'FBM-C3': loiHttp }, localActivity: [giaoDichCu] });
+  const khachLoiStatus = coKhachLoi.fullFlow.hop.FbmSync.statusView(), khachLoiLog = coKhachLoi.fullLogs.find((event) => event.action === 'activity_customer_failed') || {};
+  const khachLoiUi = taoBoTest();
+  const khachLoiTheLoi = JSON.stringify(khachLoiUi.hop.fbmSyncRecordIssueBlocks(khachLoiStatus.metadata));
+  check(so, 'khách lỗi giữa lô: các khách khác vẫn ghi, lượt kết thúc "done" kèm số khách lỗi, Log và Sidebar có mã khách, lượt không đánh giao dịch "không thấy bên FBM"', [
+    khachLoiStatus.phase, coKhachLoi.fullLocal.activity.filter((item) => item.fbmId !== 'FBM-A3').map((item) => item.fbmId).sort(), (coKhachLoi.fullLocal.activity.find((item) => item.id === 'ACT-000099') || {}).syncStatus,
+    khachLoiLog.detail && khachLoiLog.detail.customer, khachLoiLog.detail && khachLoiLog.detail.status, String(khachLoiLog.reason || '').indexOf('Lỗi máy chủ FBM') >= 0,
+    coKhachLoi.fullLogs.some((event) => event.action === 'activity_missing_skipped'), khachLoiStatus.metadata.customerErrors.total,
+    khachLoiStatus.message.indexOf('1 khách lỗi khi đọc giao dịch') >= 0, khachLoiTheLoi.indexOf('Khách lỗi giao dịch ALT00003') >= 0
+  ], ['done', ['FBM-A1', 'FBM-A2', 'FBM-A4', 'FBM-A5'], 'đã đồng bộ', 'ALT00003', 500, true, true, 1, true, true]);
+  // Một phần tử nghi phiên (401) giữa lô: cả lô không ghi, đi probe; cursor giữ nguyên nên dựng lại đúng lô.
+  const nghiPhien = await fullPipeline(false, 'read', { customers: 5, failing: { 'FBM-C3': { ok: false, status: 401, headers: {}, body: '' } } });
+  const nghiState = nghiPhien.fullFlow.hop.FbmSync.stateRead(), nghiResume = nghiPhien.fullFlow.hop.FbmSync.sessionGateMeta(nghiState).resumeCursor || {};
+  const khoaLo = (request) => (request && request.items || []).map((item) => item.body.externalKey[0].Value);
+  check(so, 'phần tử nghi phiên giữa lô: không ghi giao dịch nào của lô, request kế là probe phiên, cursor giữ dựng lại đúng lô cũ', [
+    nghiPhien.fullWrites.filter((item) => item.entity === 'activity').length, nghiPhien.fullKinds.slice(-2), nghiState.lastFailureCode,
+    khoaLo(nghiPhien.fullFlow.hop.FbmSync.requestForCursor(Object.assign({}, nghiState, { cursor: nghiResume })))
+  ], [0, ['batch:activity', 'session_probe:user'], 'SESSION_SUSPECTED_LIVE', khoaLo(nghiPhien.fullBatches[0])]);
+  // Response lô lệch kế hoạch: id lạ là lỗi hợp đồng cả lô; phần tử thiếu (Extension dừng vì trần dung lượng) xếp lại lô sau.
+  const idLa = await fullPipeline(false, 'read', { customers: 5, editBatch: (raw) => Object.assign(raw, { items: raw.items.map((item, index) => index === 1 ? Object.assign({}, item, { id: '99' }) : item) }) });
+  const idLaState = idLa.fullFlow.hop.FbmSync.stateRead();
+  const thieu = await fullPipeline(false, 'read', { customers: 5, editBatch: (raw, lan) => lan === 1 ? Object.assign(raw, { items: raw.items.slice(0, 3) }) : raw });
+  check(so, 'lô có id lạ thì dừng phiên FBM_BATCH_ITEM_MISMATCH, không ghi giao dịch, Log ghi; lô thiếu phần tử thì phần thiếu được xếp lại lô sau và đủ giao dịch', [
+    idLaState.phase, idLaState.lastFailureCode, idLa.fullWrites.filter((item) => item.entity === 'activity').length, idLa.fullLogs.some((event) => event.action === 'activity_batch_mismatch'),
+    thieu.fullBatches.map(khoaLo), thieu.fullLocal.activity.length, thieu.fullStep.status.phase
+  ], ['error', 'FBM_BATCH_ITEM_MISMATCH', 0, true, [['FBM-C1', 'FBM-C2', 'FBM-C3', 'FBM-C4', 'FBM-C5'], ['FBM-C4', 'FBM-C5']], 5, 'done']);
+  // Chạy lại: ghi lại cùng lô không tạo dòng trùng; mất tab giữa lượt thì lượt mới quét lại từ đầu, không đánh vắng mặt nhầm.
+  const chayLai = await fullPipeline(false, 'read', { customers: 5, rounds: 2 });
+  const matTab = await fullPipeline(false, 'read', { customers: 5, rounds: 2, loseTab: true });
+  const daDanhVang = (run) => run.fullLocal.activity.concat(run.fullLocal.customer).filter((item) => item.syncStatus === 'không thấy bên FBM').length;
+  check(so, 'chạy lại cùng lô không tạo dòng trùng; mất tab ở lô đầu thì lượt đó dừng lỗi, lượt sau quét lại cả lượt, không trùng dòng và không đánh vắng mặt nhầm', [
+    chayLai.fullLocal.customer.length, chayLai.fullLocal.activity.length, daDanhVang(chayLai), chayLai.fullStep.status.phase,
+    matTab.fullStatuses.some((status) => status && status.phase === 'error'), matTab.fullLocal.customer.length, matTab.fullLocal.activity.length, daDanhVang(matTab), matTab.fullStep.status.phase, matTab.fullBatches.length
+  ], [5, 5, 0, 'done', true, 5, 5, 0, 'done', 2]);
 
   const readFlow = workflowGas();
   readFlow.hop.FbmSync.prepareCategoryGate = () => ({ map: {} });
