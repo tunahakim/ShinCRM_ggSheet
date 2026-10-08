@@ -352,7 +352,7 @@ async function chay(so) {
   const batchRows = [1, 2, 3].map((index) => ({ ngay_gd: '2026-09-16', datetime0: String(index), xorder: String(index), stt_rec_kh: 'CUS-' + index }));
   const secondBatchRequest = batchLimitFlow.hop.FbmSync.customerNext(batchLimitFlow.hop.FbmSync.stateRead(), batchRows, 10);
   const batchCursor = batchLimitFlow.hop.FbmSync.detailCursorRead();
-  check(so, 'Số Customer mỗi lượt = 3 được áp dụng và cursor đến Customer thứ 4', [batchState.detailCustomerLimit, firstBatchRequest.body.count, secondBatchRequest, batchCursor.pageIndex, batchCursor.pageValue[2]], [3, 3, null, 0, '3']);
+  check(so, 'Số Customer mỗi lượt = 3 được áp dụng và cursor đến Customer thứ 4', [batchState.detailCustomerLimit, firstBatchRequest.body.count, secondBatchRequest, batchCursor.pageIndex, batchCursor.pageValue[2]], [3, 3, null, 1, '3']);
   // Chiều đẩy kiểm lại danh mục FBM giữa các lô: FBM đổi tên một mã giữa lượt thì chỉ bản ghi dùng mã đó bị chặn.
   const categoryPushRun = (options) => {
     const flow = workflowGas(), F = flow.hop.FbmSync, logs = [], sheetSaves = [], fbmNames = { WEB: 'Web', HDDV: 'Hóa đơn dịch vụ' }, lookupAt = [], issued = [];
@@ -851,7 +851,7 @@ async function chay(so) {
         // FBM phân trang keyset: trang kế bắt đầu sau dòng có đúng bốn giá trị khóa đã gửi, ngày ở dạng `/Date(ms)/`; khóa lệch thì trả trang rỗng. Chỉ trang đầu báo `TotalRowCount` (Nghiên cứu FBM ch03 mục 3.3, ch04 mục 4.10).
         const pageSize = Number(request.body.count), pageValue = request.body.gridPageValue, khoa = ['ngay_gd', 'datetime0', 'xorder', 'stt_rec_kh'].map((field) => fullCustomerFields.indexOf(field));
         const pageStart = pageValue ? customerRows.findIndex((item) => JSON.stringify(khoa.map((index) => item[index])) === JSON.stringify(pageValue)) + 1 || customerRows.length : 0;
-        customerPageIndexes.push(request.body.gridPageIndex);
+        customerPageIndexes.push([request.body.gridPageIndex, request.body.lastPageIndex]);
         body = gridResponse(fullCustomerFields, customerRows.slice(pageStart, pageStart + pageSize), pageStart ? 0 : customerRows.length);
       } else if (kind !== 'batch') {
         throw new Error('Ca mô phỏng pipeline gặp request không mong đợi: ' + kind);
@@ -963,7 +963,7 @@ async function chay(so) {
   const nhieuTrang = await fullPipeline(false, 'read', { customers: 120 });
   check(so, 'quét toàn bộ nhiều trang Customer: số trang tăng dần, khóa trang đúng dạng FBM, ghi đủ khách và giao dịch, phiên kết thúc done; cả lượt chỉ một khách lấy kèm tiêu đề cột', [
     nhieuTrang.activityItemTypes.filter((type) => type === 0).length, nhieuTrang.activityItemTypes.length, nhieuTrang.customerPageIndexes, nhieuTrang.fullLocal.customer.length, nhieuTrang.fullLocal.activity.length, nhieuTrang.fullStep.status.phase, nhieuTrang.fullStep.status.lastFailureCode || ''
-  ], [1, 120, [-1, 0, 1], 120, 120, 'done', '']);
+  ], [1, 120, [[-1, -1], [1, 0], [2, 1]], 120, 120, 'done', '']);
   const tieuDeLoi = await fullPipeline(false, 'read', { customers: 5, failing: { 'FBM-C1': loiHttp } });
   check(so, 'khách giữ tiêu đề cột bị lỗi: các khách còn lại xếp sang lô sau, lô sau có đúng một khách lấy tiêu đề, đủ giao dịch của khách còn lại', [
     tieuDeLoi.fullBatches.map(khoaLo), tieuDeLoi.activityItemTypes, tieuDeLoi.fullLocal.activity.map((item) => item.fbmId).sort(), tieuDeLoi.fullStep.status.phase
