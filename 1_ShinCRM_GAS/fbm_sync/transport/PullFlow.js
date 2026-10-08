@@ -182,7 +182,7 @@ FbmSync.customerNext = function (state, rows, total) {
     } else if (typeof FbmSync.detailCursorWrite === 'function') {
       var detailLast = rows[rows.length - 1];
       FbmSync.detailCursorWrite({
-        pageIndex: Number(cursor.pageIndex || -1) + 1,
+        pageIndex: FbmSync.gridNextPageIndex(cursor.pageIndex),
         pageValue: FbmSync.customerPageValue(detailLast)
       });
     }
@@ -190,9 +190,9 @@ FbmSync.customerNext = function (state, rows, total) {
   }
   if (!rows.length || rows.length < count || (total && Number(cursor.seen || 0) + rows.length >= total)) { return null; }
   var last = rows[rows.length - 1];
-  cursor.pageIndex = Number(cursor.pageIndex || -1) + 1;
+  cursor.pageIndex = FbmSync.gridNextPageIndex(cursor.pageIndex);
   cursor.pageValue = state.scan === 'identity_check'
-    ? [last.stt_rec_kh || '']
+    ? FbmSync.gridPageValue([last.stt_rec_kh || ''])
     : FbmSync.customerPageValue(last);
   cursor.seen = Number(cursor.seen || 0) + rows.length;
   state.cursor = cursor;
@@ -336,8 +336,8 @@ FbmSync.activityBulkNext = function (state, grid) {
   if (rows.length && rows.length >= count && (!total || cursor.seen < total)) {
     var last = rows[rows.length - 1];
     if (!cursor.transport && typeof FbmSync.activityBulkProjection === 'function') { cursor.transport = FbmSync.activityBulkProjection(grid.fields); }
-    cursor.type = 1; cursor.pageIndex = Number(cursor.pageIndex || -1) + 1;
-    cursor.pageValue = [last.end_date || '', last.datetime0 || '', last.id || '', last.line_nbr || 0];
+    cursor.type = 1; cursor.pageIndex = FbmSync.gridNextPageIndex(cursor.pageIndex);
+    cursor.pageValue = FbmSync.gridPageValue([last.end_date || '', last.datetime0 || '', last.id || '', last.line_nbr || 0]);
     state.cursor = cursor; FbmSync.stateWrite(state);
     return FbmSync.activityBulkRequest({ type: 1, count: count, gridPageIndex: cursor.pageIndex, gridPageValue: cursor.pageValue, gridRefresh: false, transport: cursor.transport });
   }

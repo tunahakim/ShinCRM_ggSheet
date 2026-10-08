@@ -9,15 +9,15 @@ FbmSync.DETAIL_CURSOR_KEY = 'FBM_SYNC_DETAIL_CURSOR_V1';
 FbmSync.detailCursorRead = function () {
   try {
     var raw = FbmSync.props().getProperty(FbmSync.DETAIL_CURSOR_KEY), parsed = raw ? JSON.parse(raw) : null;
-    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.pageValue) || parsed.pageValue.length < 3) { return null; }
+    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.pageValue) || parsed.pageValue.length < 4) { return null; }
     var pageIndex = Number(parsed.pageIndex);
     if (!isFinite(pageIndex) || pageIndex < 0) { return null; }
-    return { pageIndex: Math.floor(pageIndex), pageValue: parsed.pageValue.slice(0, 3).map(function (value) { return String(value === null || value === undefined ? '' : value); }) };
+    return { pageIndex: Math.floor(pageIndex), pageValue: parsed.pageValue.slice(0, 4).map(function (value) { return String(value === null || value === undefined ? '' : value); }) };
   } catch (ignore) { return null; }
 };
 FbmSync.detailCursorWrite = function (cursor) {
-  var value = cursor || {}, pageIndex = Number(value.pageIndex), pageValue = Array.isArray(value.pageValue) ? value.pageValue.slice(0, 3) : [];
-  if (!isFinite(pageIndex) || pageIndex < 0 || pageValue.length < 3) { return null; }
+  var value = cursor || {}, pageIndex = Number(value.pageIndex), pageValue = Array.isArray(value.pageValue) ? value.pageValue.slice(0, 4) : [];
+  if (!isFinite(pageIndex) || pageIndex < 0 || pageValue.length < 4) { return null; }
   var saved = { pageIndex: Math.floor(pageIndex), pageValue: pageValue.map(function (item) { return String(item === null || item === undefined ? '' : item); }) };
   FbmSync.props().setProperty(FbmSync.DETAIL_CURSOR_KEY, JSON.stringify(saved));
   return saved;

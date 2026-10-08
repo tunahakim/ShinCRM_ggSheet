@@ -242,7 +242,7 @@ FbmSync.activityRotationCursor = function () {
   if (!raw) { return { pageIndex: -1, pageValue: null }; }
   try {
     var parsed = JSON.parse(raw);
-    return { pageIndex: Number(parsed.pageIndex || -1), pageValue: parsed.pageValue || null };
+    return { pageIndex: parsed.pageIndex === undefined || parsed.pageIndex === null ? -1 : Number(parsed.pageIndex), pageValue: parsed.pageValue || null };
   } catch (ignore) { return { pageIndex: -1, pageValue: null }; }
 };
 
@@ -262,7 +262,23 @@ FbmSync.activityRotationCustomerRequest = function () {
  */
 FbmSync.customerPageValue = function (row) {
   var last = row || {};
-  return [last.ngay_gd || '', last.datetime0 || '', last.xorder || '', last.stt_rec_kh || ''];
+  return FbmSync.gridPageValue([last.ngay_gd || '', last.datetime0 || '', last.xorder || '', last.stt_rec_kh || '']);
+};
+
+/**
+ * Khóa trang gửi lại FBM phải đúng dạng FBM trả về: `rowsToRecords` đã đổi ngày sang Date, gửi Date (thành chuỗi ISO) thì FBM trả trang kế rỗng và lượt quét dừng ở trang đầu.
+ * So kiểu bằng `toString` vì Date tạo ở ngữ cảnh khác không qua được `instanceof`.
+ */
+FbmSync.gridPageValue = function (values) {
+  return values.map(function (value) {
+    return Object.prototype.toString.call(value) === '[object Date]' ? '/Date(' + value.getTime() + ')/' : value;
+  });
+};
+
+/** Trang đầu là -1 nên không dùng `|| -1`: trang 0 là số hợp lệ, `0 || -1` làm lặp lại trang 0 mãi. */
+FbmSync.gridNextPageIndex = function (pageIndex) {
+  var index = pageIndex === null || pageIndex === undefined || pageIndex === '' ? -1 : Number(pageIndex);
+  return isFinite(index) && index >= 0 ? Math.floor(index) + 1 : 0;
 };
 
 /** Vị trí trang xoay tiếp theo tính từ trang vừa đọc; hết danh sách thì quay lại trang đầu. Tính ngay khi nhận trang để cursor chỉ mang vị trí này, không mang cả các dòng Customer. */
@@ -270,7 +286,7 @@ FbmSync.activityRotationNext = function (rows) {
   var list = rows || [];
   if (list.length < FbmSync.ACTIVITY_SUPPLEMENT_CUSTOMERS) { return { pageIndex: -1, pageValue: null }; }
   var last = list[list.length - 1], pageIndex = FbmSync.activityRotationCursor().pageIndex;
-  return { pageIndex: Number(pageIndex < 0 ? 0 : pageIndex + 1), pageValue: FbmSync.customerPageValue(last) };
+  return { pageIndex: FbmSync.gridNextPageIndex(pageIndex), pageValue: FbmSync.customerPageValue(last) };
 };
 
 /** Lưu vị trí trang xoay do `activityRotationNext` tính. */

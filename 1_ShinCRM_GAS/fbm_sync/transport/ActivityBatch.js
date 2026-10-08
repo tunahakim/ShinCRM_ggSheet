@@ -102,7 +102,7 @@ FbmSync.activityBatchContinue = function (state, cursor, rawResponse) {
       var last = grid.rows[grid.rows.length - 1], pageIndex = pages[entry.index] ? pages[entry.index][0] : -1;
       finished -= 1;
       nextPlan.push(entry.index);
-      nextPages[entry.index] = [Number(pageIndex || -1) + 1, [last.end_date || '', last.datetime0 || '', last.id || '', last.line_nbr || 0]];
+      nextPages[entry.index] = [FbmSync.gridNextPageIndex(pageIndex), FbmSync.gridPageValue([last.end_date || '', last.datetime0 || '', last.id || '', last.line_nbr || 0])];
     }
   });
   FbmSync.activityCustomerErrors(state, failed);
