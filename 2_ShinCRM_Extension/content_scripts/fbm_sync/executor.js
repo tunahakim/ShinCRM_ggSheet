@@ -1,6 +1,6 @@
 /* Cầu nối FBM: nhận request, fetch trong tab đăng nhập, trả response thô. */
 (function () {
-  var EXECUTOR_VERSION = '21.20';
+  var EXECUTOR_VERSION = '21.21';
   function traceEvent(trace, stage, request, extra) {
     trace.push(Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {}));
   }
@@ -217,6 +217,52 @@
       return String.fromCharCode.apply(null, bytes);
     });
   }
+  /**
+   * Việc quét (Tài liệu 09/01 "Việc quét"): gọi FBM một lần, giữ cột GAS liệt kê, cắt dòng thành gói nhỏ hơn trần đường relay và giữ trong RAM của tab theo `jobId`; `scan_chunk` trả gói từ RAM, không gọi FBM lại.
+   * Mỗi tab giữ một việc, việc mới thay việc cũ. Tab tải lại thì mất việc và GAS nhận `FBM_SCAN_JOB_GONE`. Extension không hiểu nghiệp vụ: không đổi giá trị ô, không chọn dòng ngoài danh sách id GAS gửi.
+   */
+  var scanJob = null;
+  function utf8Length(text) { return new TextEncoder().encode(text).length; }
+  /** Byte của đoạn văn bản khi nằm trong chuỗi `body` của response JSON (đã thoát ký tự), vì trần đo trên gói đã serialize. */
+  function quotedLength(text) { return utf8Length(JSON.stringify(String(text))) - 2; }
+  function gridData(text) {
+    var parsed = JSON.parse(String(text || '')), data = parsed && parsed.d !== undefined ? parsed.d : parsed;
+    if (typeof data === 'string') { data = JSON.parse(data); }
+    return data && Array.isArray(data.Rows) && data.ViewPage && Array.isArray(data.ViewPage.Fields) ? data : null;
+  }
+  /** Chiếu cột và cắt gói; một dòng không bao giờ bị cắt đôi, dòng riêng nó đã vượt trần thì không gửi mà báo id trong `oversize`. */
+  function scanChunks(data, job) {
+    var names = data.ViewPage.Fields.map(function (field) { return String(field && (field.AliasName || field.aliasName || field.Name || field.name) || ''); });
+    var wanted = (job.fields || []).filter(function (name) { return names.indexOf(name) >= 0; }), positions = wanted.map(function (name) { return names.indexOf(name); });
+    var idPosition = wanted.indexOf(String(job.idField || '')), keep = Array.isArray(job.keepIds) ? {} : null, total = Number(data.TotalRowCount || 0);
+    if (keep) { job.keepIds.forEach(function (id) { keep[String(id)] = true; }); }
+    var fieldsText = JSON.stringify(wanted.map(function (name) { return { AliasName: name }; }));
+    var shell = function (rowsText) { return '{"d":{"Rows":[' + rowsText + '],"ViewPage":{"Fields":' + fieldsText + '},"TotalRowCount":' + total + '}}'; };
+    // Phần cố định của một gói: thân rỗng, khối `job` và dấu vết vận chuyển; dư 4 KiB cho trace, mã hợp đồng và wrapper relay.
+    var fixed = quotedLength(shell('')) + utf8Length(JSON.stringify({ ok: true, status: 200, headers: { contentType: 'application/json; charset=utf-8' }, body: '', job: { jobId: job.jobId, chunkIndex: 0, chunkCount: 0, rowCount: 0, keptCount: 0, totalRowCount: total, oversize: [] } })) + 4096;
+    var target = Number(job.chunkTargetBytes || 0), max = Number(job.chunkMaxBytes || 0), chunks = [], current = [], size = fixed, oversize = [], kept = 0;
+    data.Rows.forEach(function (row) {
+      var values = Array.isArray(row) ? row : [];
+      if (keep && !keep[String(values[positions[idPosition]])]) { return; }
+      var text = JSON.stringify(positions.map(function (position) { return values[position] === undefined ? null : values[position]; })), bytes = quotedLength(text) + 1;
+      kept += 1;
+      if (fixed + bytes > max) { oversize.push(idPosition >= 0 ? String(values[positions[idPosition]]) : ''); return; }
+      if (current.length && size + bytes > target) { chunks.push(shell(current.join(','))); current = []; size = fixed; }
+      current.push(text); size += bytes;
+    });
+    if (current.length || !chunks.length) { chunks.push(shell(current.join(','))); }
+    return { chunks: chunks, rowCount: data.Rows.length, keptCount: kept, totalRowCount: total, oversize: oversize };
+  }
+  function scanChunkResult(chunkIndex, trace, request) {
+    var job = scanJob, index = Number(chunkIndex);
+    if (!job || !request.meta.job || String(request.meta.job.jobId || '') !== job.jobId || !(index >= 0 && index < job.chunks.length)) {
+      var gone = new Error('Tab FBM không còn giữ việc quét này (tab đã tải lại hoặc Extension đã khởi động lại); GAS sẽ chạy lại việc quét.');
+      gone.code = 'FBM_SCAN_JOB_GONE'; gone.trace = trace;
+      throw gone;
+    }
+    traceEvent(trace, 'scan_chunk_sent', request, { responseLength: job.chunks[index].length });
+    return { ok: true, status: 200, headers: { contentType: 'application/json; charset=utf-8' }, body: job.chunks[index], job: { jobId: job.jobId, chunkIndex: index, chunkCount: job.chunks.length, rowCount: job.rowCount, keptCount: job.keptCount, totalRowCount: job.totalRowCount, oversize: index === 0 ? job.oversize : [] }, transport: { trace: trace } };
+  }
   function execute(request) {
     if (!request || typeof request !== 'object') {
       var missing = new Error('GAS chưa cấp request FBM; executor chỉ là cầu nối.');
@@ -227,6 +273,8 @@
     var req = request, trace = [];
     traceEvent(trace, 'executor_started', req);
     if (req.meta && req.meta.kind === 'login') { return executeLogin(req, trace); }
+    if (req.meta && req.meta.kind === 'scan_chunk') { return Promise.resolve().then(function () { return scanChunkResult(req.meta.job && req.meta.job.chunkIndex, trace, req); }); }
+    if (req.meta && req.meta.kind === 'scan_job') { scanJob = null; }
     var sent = applyTransportReplacements(req, requestBody(req));
     var transportInstructions = req.transport || req.meta && req.meta.transport || {};
     var replacements = Array.isArray(transportInstructions.replacements) ? transportInstructions.replacements : [];
@@ -242,7 +290,22 @@
     var timer = setTimeout(function () { controller.abort(); }, fetchMs);
     traceEvent(trace, 'fetch_started', req);
     return fetch(String(req.url || ''), { method: req.method || 'POST', headers: req.headers || { 'content-type': 'application/json; charset=UTF-8' }, body: sent, credentials: 'include', cache: 'no-store', signal: controller.signal }).then(function (response) {
-      return readResponseText(response).then(function (body) { var captured = captureTransport(req, body); traceEvent(trace, 'fetch_finished', req, { httpStatus: response.status, responseLength: body.length }); return { ok: response.ok, status: response.status, headers: { contentType: response.headers.get('content-type') || '' }, body: body, transport: Object.assign({}, captured, { trace: trace }) }; });
+      return readResponseText(response).then(function (body) {
+        var captured = captureTransport(req, body);
+        traceEvent(trace, 'fetch_finished', req, { httpStatus: response.status, responseLength: body.length });
+        var data = null;
+        // Response không phải grid (lỗi HTTP, trang đăng nhập, Bugs của FBM) đi nguyên về GAS để cổng phiên phân loại như request thường.
+        if (req.meta && req.meta.kind === 'scan_job' && response.ok) { try { data = gridData(body); } catch (ignoreParse) { data = null; } }
+        if (data) {
+          var cut = scanChunks(data, req.meta.job || {});
+          scanJob = { jobId: String(req.meta.job.jobId || ''), chunks: cut.chunks, rowCount: cut.rowCount, keptCount: cut.keptCount, totalRowCount: cut.totalRowCount, oversize: cut.oversize };
+          traceEvent(trace, 'scan_job_cut', req, { responseLength: body.length, code: 'chunks:' + cut.chunks.length });
+          var first = scanChunkResult(0, trace, req);
+          first.transport = Object.assign({}, captured, first.transport);
+          return first;
+        }
+        return { ok: response.ok, status: response.status, headers: { contentType: response.headers.get('content-type') || '' }, body: body, transport: Object.assign({}, captured, { trace: trace }) };
+      });
     }).catch(function (err) {
       traceEvent(trace, 'fetch_finished', req, { error: String(err && err.message || err) });
       try { err.trace = trace; } catch (ignore) {}

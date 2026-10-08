@@ -75,9 +75,9 @@ function ensureFbmTab(request) {
     return created.then(function (newTab) { return newTab ? waitForFbmTabReady(newTab, envelopeRemainingMs(request)) : null; });
   });
 }
-var FBM_EXECUTOR_VERSION = '21.20';
+var FBM_EXECUTOR_VERSION = '21.21';
 // Mã phiên bản hợp đồng GAS–Extension (tests/contracts/gasExtensionContract.js). Chỉ trả về cho GAS; GAS quyết định dừng khi lệch mã.
-var FBM_CONTRACT_VERSION = '614131883cce';
+var FBM_CONTRACT_VERSION = '4bc9726236ef';
 
 function addWorkerTrace(reply, request, stage, extra) {
   var event = Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {});
