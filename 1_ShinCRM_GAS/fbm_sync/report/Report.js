@@ -24,7 +24,7 @@ FbmSync.syncEntityLabel = function (entity, phase) {
 };
 /** Chỉ đưa dữ liệu render sang Sidebar; state nội bộ có lookup, cursor form và khóa vẫn ở GAS. */
 FbmSync.statusMetadata = function (metadata) {
-  var data = metadata || {}, keys = ['audit', 'categoryBlocks', 'identityBlocks', 'identityProbe', 'identityCheck', 'activityBulkMissing', 'activityBulkMissingCount', 'preflight', 'preflightIssues', 'preview', 'pushFailures', 'pushFailureDetails', 'callbackTrace'];
+  var data = metadata || {}, keys = ['audit', 'categoryBlocks', 'identityBlocks', 'identityProbe', 'identityCheck', 'activityBulkMissing', 'activityBulkMissingCount', 'preflightIssues', 'pushFailures', 'pushFailureDetails', 'callbackTrace'];
   var out = keys.reduce(function (result, key) {
     if (data[key] !== undefined) { result[key] = data[key]; }
     return result;
@@ -102,10 +102,11 @@ FbmSync.pipelineView = function (state) {
 FbmSync.statusView = function () {
   var state = FbmSync.stateRead();
   var metadata = FbmSync.statusMetadata(state.metadata);
+  metadata.preview = FbmSync.previewRead();
   if (typeof FbmSync.traceRead === 'function') { metadata.traceTail = FbmSync.traceRead(20); }
   var enabled = typeof FbmSync.masterEnabled === 'function' ? FbmSync.masterEnabled() : true;
   var background = typeof FbmSync.backgroundEnabled === 'function' ? FbmSync.backgroundEnabled() : true;
-  return { ok: true, enabled: enabled, masterEnabled: enabled, backgroundEnabled: background, runId: state.runId, mode: state.mode, scan: state.scan || 'full', scheduledScan: state.scheduledScan ? state.scheduledScan : '', login: typeof FbmSync.loginConfigPublic === 'function' ? FbmSync.loginConfigPublic() : null, phase: state.phase, label: FbmSync.statusLabel(state.phase), direction: FbmSync.syncDirection(state), entity: state.entity, entityLabel: FbmSync.syncEntityLabel(state.entity, state.phase), pipeline: FbmSync.pipelineView(state), cursor: FbmSync.statusCursor(state.cursor), session: { customer: !!state.session.customerAuthorized, activity: !!state.session.activityAuthorized, expired: state.session.expired === true, lastHeartbeatAt: Number(state.session.lastHeartbeatAt || 0) }, metadata: metadata, counts: state.counts, current: state.current, message: state.message, startedAt: state.startedAt, updatedAt: state.updatedAt, nextRunAt: state.nextRunAt, lastError: state.lastError, lastFailureCode: state.lastFailureCode || '', retryable: state.retryable === true, forceLoginOffered: state.loginForceOffered === true && (!FbmSync.ACTIVE_PHASES || FbmSync.ACTIVE_PHASES.indexOf(String(state.phase || '')) < 0) };
+  return { ok: true, enabled: enabled, masterEnabled: enabled, backgroundEnabled: background, runId: state.runId, mode: state.mode, scan: state.scan || 'full', scheduledScan: state.scheduledScan ? state.scheduledScan : '', login: typeof FbmSync.loginConfigPublic === 'function' ? FbmSync.loginConfigPublic() : null, phase: state.phase, label: FbmSync.statusLabel(state.phase), direction: FbmSync.syncDirection(state), entity: state.entity, entityLabel: FbmSync.syncEntityLabel(state.entity, state.phase), pipeline: FbmSync.pipelineView(state), cursor: FbmSync.statusCursor(state.cursor), session: { customer: !!state.session.customerAuthorized, activity: !!state.session.activityAuthorized, expired: state.session.expired === true, lastHeartbeatAt: Number(state.session.lastHeartbeatAt || 0) }, metadata: metadata, counts: state.counts, progress: state.progress, current: state.current, message: state.message, startedAt: state.startedAt, updatedAt: state.updatedAt, nextRunAt: state.nextRunAt, lastError: state.lastError, lastFailureCode: state.lastFailureCode || '', retryable: state.retryable === true, forceLoginOffered: state.loginForceOffered === true && (!FbmSync.ACTIVE_PHASES || FbmSync.ACTIVE_PHASES.indexOf(String(state.phase || '')) < 0) };
 };
 
 /**
@@ -170,28 +171,37 @@ FbmSync.logTransportError = function (message, action) {
   status.phase = 'error'; status.lastError = status.lastError || reason; status.message = status.lastError;
   return status;
 };
-/** Keep a bounded read-only preview for live verification without writing Sheet data. */
-FbmSync.previewRecords = function (state, entity, records) {
-  state.metadata = state.metadata || {};
-  state.metadata.preview = state.metadata.preview || { customers: [], activities: [], truncated: false };
-  state.metadata.preview.customers = state.metadata.preview.customers || [];
-  state.metadata.preview.activities = state.metadata.preview.activities || [];
-  var target = entity === 'customer' ? state.metadata.preview.customers : state.metadata.preview.activities;
-  // Preview nằm trong state bền vững; không được giữ nguyên nội dung Activity
-  // (có thể dài 4.000 ký tự) vì một bản ghi cũng đủ đẩy state qua trần 9 KB.
-  var limit = entity === 'customer' ? 10 : 10, clip = function (value, length) {
+FbmSync.PREVIEW_KEY = 'FBM_SYNC_PREVIEW_V1';
+FbmSync.PREVIEW_LIMIT = 10;
+FbmSync.previewEmpty = function () { return { customers: [], activities: [], truncated: false }; };
+FbmSync.previewRead = function () { return Object.assign(FbmSync.previewEmpty(), FbmSync.documentPropertyJson(FbmSync.PREVIEW_KEY, 'bản xem trước') || {}); };
+FbmSync.previewClear = function () { FbmSync.documentPropertySet(FbmSync.PREVIEW_KEY, JSON.stringify(FbmSync.previewEmpty()), 'preview'); };
+
+/**
+ * Bản xem trước của lượt (vài khách, vài giao dịch đầu, nội dung cắt ngắn) để người dùng nhìn khi kiểm tra; nằm ở khóa riêng, không ở state, vì state chỉ giữ thứ cần để chạy tiếp và một khóa kho chỉ chứa 9 KB.
+ * Gần chạm trần thì bỏ bớt dòng; ghi hỏng thì `documentPropertySet` đã ghi Log, lượt vẫn chạy tiếp vì bản xem trước không phải dữ liệu nghiệp vụ.
+ */
+FbmSync.previewRecords = function (entity, records) {
+  var preview = FbmSync.previewRead(), target = entity === 'customer' ? preview.customers : preview.activities, before = target.length;
+  // Nội dung Activity có thể dài 4.000 ký tự; giữ nguyên thì một bản ghi cũng đủ chạm trần khóa.
+  var clip = function (value, length) {
     var text = String(value === null || value === undefined ? '' : value);
     return text.length > length ? text.slice(0, length) + '...' : text;
   };
   (records || []).forEach(function (record) {
-    if (target.length >= limit) { state.metadata.preview.truncated = true; return; }
+    if (target.length >= FbmSync.PREVIEW_LIMIT) { preview.truncated = true; return; }
     if (entity === 'customer') {
       target.push({ code: clip(record.fbmCustomerCode, 80), name: clip(record.companyName, 160), fbmId: clip(record.fbmId, 80) });
     } else {
       target.push({ customerCode: clip(record.customerId, 80), date: clip(record.workDate, 40), type: clip(record.taskType, 80), content: clip(record.content, 160) });
     }
   });
-  return state;
+  if (target.length === before) { return preview; }
+  // Đếm byte UTF-8 (kho tính theo byte, chữ có dấu chiếm 2–3 byte).
+  var bytes = function () { return encodeURIComponent(JSON.stringify(preview)).replace(/%[0-9A-F]{2}/g, 'x').length; };
+  while (bytes() > FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT && (preview.activities.length || preview.customers.length)) { preview.truncated = true; (preview.activities.length ? preview.activities : preview.customers).pop(); }
+  FbmSync.documentPropertySet(FbmSync.PREVIEW_KEY, JSON.stringify(preview), 'preview');
+  return preview;
 };
 /** API tương thích cho caller GAS cũ. */
 function fbmSyncStatus() { return FbmSync.statusView(); }

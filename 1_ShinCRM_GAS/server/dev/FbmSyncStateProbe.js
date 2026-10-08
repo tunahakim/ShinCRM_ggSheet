@@ -77,7 +77,7 @@ function fbmProbePreflightTiming() {
 /** Vị trí con trỏ của phiên đang chạy, chỉ đọc, để đo tốc độ quét Activity theo khách mà không chạm state. */
 function fbmProbeCursorPosition() {
   var state = FbmSync.stateRead(), cursor = state.cursor || {};
-  return { at: new Date().toISOString(), phase: state.phase, kind: cursor.kind, customerIndex: cursor.customerIndex, pageCustomers: (cursor.customerContexts || []).length, customerSeen: cursor.customerSeen, seen: cursor.seen, activityPage: cursor.pageIndex, updatedAt: state.updatedAt, counts: state.counts };
+  return { at: new Date().toISOString(), phase: state.phase, kind: cursor.kind, customerIndex: cursor.customerIndex, pageCustomers: (cursor.customers || []).length, customerSeen: cursor.customerSeen, seen: cursor.seen, activityPage: cursor.pageIndex, updatedAt: state.updatedAt, counts: state.counts };
 }
 
 /** Đo các phép đọc mà mỗi lượt xử lý một khách Activity phải làm, chỉ đọc, chạy được khi phiên thật đang chạy. */

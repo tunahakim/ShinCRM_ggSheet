@@ -13,7 +13,7 @@ FbmSync.SEEN_SHARD_HEX_LENGTH = 8000;
 FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT = 9000;
 FbmSync.documentPropertySet = function (key, value, context) {
   var text = String(value === null || value === undefined ? '' : value), bytes = text.length;
-  // State cũ chỉ để ghi chi tiết Log khi ghi hỏng, nên chỉ đọc ở nhánh hỏng; đọc ở mỗi lần ghi từng tốn một lần gọi DocumentProperties (đợt 1 bước A).
+  // State cũ chỉ để ghi chi tiết Log khi ghi hỏng, nên chỉ đọc ở nhánh hỏng; đọc ở mỗi lần ghi từng tốn một lần gọi DocumentProperties.
   var previous = null, loadPrevious = function () {
     try { previous = key === FbmSync.STATE_KEY ? JSON.parse(FbmSync.props().getProperty(key) || 'null') : null; } catch (ignorePrevious) { previous = null; }
   };
@@ -172,7 +172,7 @@ FbmSync.seenStoreReader = function (scope) {
 
 /** Tạo state rỗng với đủ field để các phiên cũ vẫn đọc được. */
 FbmSync.stateDefault = function () {
-  return { version: 1, runId: '', origin: 'manual', mode: 'read', scan: 'full', scheduledScan: '', activitySince: '', phase: 'idle', entity: '', cursor: {}, activeRequestId: '', loginForceOffered: false, identityTarget: null, lastProgressAt: 0, deadlineAt: 0, session: { customerAuthorized: '', activityAuthorized: '', cookie: '', userId: '', accountUsername: '', accountName: '', lookups: {}, expired: false, identityVerified: false, identitySessionId: '', identityVerifiedAt: 0, sessionId: '', lastHeartbeatAt: 0, customerTotal: null }, metadata: { categoryBlocks: [], preflight: null, preflightIssues: [], seen: { customer: {}, activity: {} }, conflictCount: 0, conflictRefresh: null, pushSucceeded: 0, pushFailures: {}, pushFailureDetails: {}, callbackTrace: null, manualPending: null, sessionGate: null, preview: { customers: [], activities: [], truncated: false } }, counts: { total: 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 }, current: '', message: '', startedAt: 0, updatedAt: 0, lastError: '', lastFailureCode: '', retryable: false, retryCount: 0, retryLimit: 2, locks: {} };
+  return { version: 1, runId: '', origin: 'manual', mode: 'read', scan: 'full', scheduledScan: '', activitySince: '', phase: 'idle', entity: '', cursor: {}, activeRequestId: '', loginForceOffered: false, identityTarget: null, lastProgressAt: 0, deadlineAt: 0, session: { customerAuthorized: '', activityAuthorized: '', cookie: '', userId: '', accountUsername: '', accountName: '', lookups: {}, expired: false, identityVerified: false, identitySessionId: '', identityVerifiedAt: 0, sessionId: '', lastHeartbeatAt: 0, customerTotal: null }, metadata: { categoryBlocks: [], preflightIssues: [], seen: { customer: {}, activity: {} }, conflictCount: 0, conflictRefresh: null, pushSucceeded: 0, pushFailures: {}, pushFailureDetails: {}, callbackTrace: null, manualPending: null, sessionGate: null }, counts: { total: 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 }, progress: { done: 0, total: 0 }, current: '', message: '', startedAt: 0, updatedAt: 0, lastError: '', lastFailureCode: '', retryable: false, retryCount: 0, retryLimit: 2, locks: {} };
 };
 
 /** Lấy kho state cấp tài liệu, dùng chung giữa các lần gọi GAS. */
@@ -197,24 +197,7 @@ FbmSync.stateRead = function () {
   var parsed = FbmSync.documentPropertyJson(FbmSync.STATE_KEY, 'state đồng bộ');
   if (!parsed) { return fallback; }
   var metadata = parsed.metadata || {};
-  return Object.assign(fallback, parsed, { counts: Object.assign(fallback.counts, parsed.counts || {}), session: Object.assign(fallback.session, parsed.session || {}), metadata: Object.assign(fallback.metadata, metadata, { seen: Object.assign(fallback.metadata.seen, metadata.seen || {}), conflictCount: Number(metadata.conflictCount || 0), pushSucceeded: Number(metadata.pushSucceeded || 0), preflightIssues: Array.isArray(metadata.preflightIssues) ? metadata.preflightIssues : [], pushFailures: Object.assign(fallback.metadata.pushFailures, metadata.pushFailures || {}), pushFailureDetails: Object.assign(fallback.metadata.pushFailureDetails, metadata.pushFailureDetails || {}), callbackTrace: metadata.callbackTrace || null, manualPending: metadata.manualPending || null, preview: Object.assign(fallback.metadata.preview, metadata.preview || {}) }), locks: parsed.locks || {} });
-};
-/** Bỏ preview tùy chọn trước khi bỏ state nghiệp vụ khi gần chạm trần property. */
-FbmSync.compactStatePreview = function (state) {
-  var value = state || {}, metadata = value.metadata || {}, preview = metadata.preview;
-  if (!preview || typeof preview !== 'object') { return value; }
-  var bytes = function () {
-    var raw = '';
-    try { raw = JSON.stringify(value); } catch (ignore) { return Number.MAX_SAFE_INTEGER; }
-    try { if (typeof Utilities !== 'undefined' && Utilities.newBlob) { return Utilities.newBlob(raw).getBytes().length; } } catch (ignoreBytes) {}
-    return raw.length;
-  };
-  if (bytes() <= FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT) { return value; }
-  preview.truncated = true;
-  while (bytes() > FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT && Array.isArray(preview.activities) && preview.activities.length) { preview.activities.pop(); }
-  while (bytes() > FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT && Array.isArray(preview.customers) && preview.customers.length) { preview.customers.pop(); }
-  if (bytes() > FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT) { preview.activities = []; preview.customers = []; }
-  return value;
+  return Object.assign(fallback, parsed, { counts: Object.assign(fallback.counts, parsed.counts || {}), session: Object.assign(fallback.session, parsed.session || {}), metadata: Object.assign(fallback.metadata, metadata, { seen: Object.assign(fallback.metadata.seen, metadata.seen || {}), conflictCount: Number(metadata.conflictCount || 0), pushSucceeded: Number(metadata.pushSucceeded || 0), preflightIssues: Array.isArray(metadata.preflightIssues) ? metadata.preflightIssues : [], pushFailures: Object.assign(fallback.metadata.pushFailures, metadata.pushFailures || {}), pushFailureDetails: Object.assign(fallback.metadata.pushFailureDetails, metadata.pushFailureDetails || {}), callbackTrace: metadata.callbackTrace || null, manualPending: metadata.manualPending || null }), progress: Object.assign(fallback.progress, parsed.progress || {}), locks: parsed.locks || {} });
 };
 /** Ghi state, cập nhật timestamp và giữ cấu trúc nhất quán. */
 FbmSync.stateWrite = function (state) {
@@ -233,14 +216,16 @@ FbmSync.stateWrite = function (state) {
   next.metadata.pushFailureDetails = Object.assign({}, FbmSync.stateDefault().metadata.pushFailureDetails, next.metadata.pushFailureDetails || {});
   next.metadata.manualPending = next.metadata.manualPending || null;
   next.metadata.callbackTrace = next.metadata.callbackTrace || null;
-  next.metadata.preview = Object.assign(FbmSync.stateDefault().metadata.preview, next.metadata.preview || {});
+  // Bản xem trước và kết quả preflight đầy đủ không ở trong state: state chỉ giữ thứ cần để chạy tiếp, vì một khóa kho chỉ chứa 9 KB.
+  delete next.metadata.preview;
+  delete next.metadata.preflight;
   next.counts = Object.assign(FbmSync.stateDefault().counts, next.counts || {});
+  next.progress = Object.assign(FbmSync.stateDefault().progress, next.progress || {});
   next.updatedAt = Date.now();
   // Cửa ghi state là chỗ duy nhất thấy mọi đường kết thúc phiên, nên sổ bước nghiệp vụ được đóng tại đây chứ không rải ở từng lệnh.
   if (FbmSync.TERMINAL_PHASES.indexOf(String(next.phase || '')) >= 0 && typeof FbmSync.businessFinishOpenSteps === 'function') {
     FbmSync.businessFinishOpenSteps(next, next.phase, { error: String(next.lastError || next.message || '') });
   }
-  FbmSync.compactStatePreview(next);
   var stateWrite = FbmSync.documentPropertySet(FbmSync.STATE_KEY, JSON.stringify(next), 'state');
   if (stateWrite.ok) { return next; }
   // Đóng phiên mà ghi hỏng thì phiên đứng mãi ở pha đang chạy và màn đồng bộ kẹt (FBM-044); lát giữa chừng thì vẫn ném để phiên chuyển sang lỗi.
@@ -298,6 +283,7 @@ FbmSync.stateStart = function (entity, phase, total) {
   var now = Date.now(), previous = FbmSync.stateRead(), userLocks = {}, freshSession = FbmSync.stateDefault().session;
   Object.keys(previous.locks || {}).forEach(function (key) { if (previous.locks[key] && previous.locks[key].owner === 'user') { userLocks[key] = previous.locks[key]; } });
   ['customer', 'activity', 'activity_bulk'].forEach(function (scope) { FbmSync.seenStoreClear(scope); });
+  if (typeof FbmSync.previewClear === 'function') { FbmSync.previewClear(); }
   // Phiên cũ chưa tới phase kết thúc mà bị phiên mới thay thì các bước của nó phải được đóng trước khi metadata bị xóa.
   if (typeof FbmSync.businessFinishOpenSteps === 'function') { FbmSync.businessFinishOpenSteps(previous, 'paused', { error: 'Phiên mới đã bắt đầu thay phiên này.' }); }
   // Mỗi run phải xác nhận phiên sống lại; cookie và marker của run trước không
