@@ -297,3 +297,34 @@ function fbmProbePayloadBudget() {
   }
   return lines;
 }
+
+/** Tách chi phí một lần đọc Sheet của đồng bộ thành: dựng bối cảnh, `getValues`, chuyển ô (riêng ô ngày) để biết tối ưu chỗ nào. Chỉ đọc. */
+function fbmProbeSheetReadCost() {
+  return ['customer', 'activity'].map(function (entity) {
+    var fields = {};
+    [DATA_SCHEMA, SYNC_SCHEMA].forEach(function (schema) { var part = schema[entity] || {}; Object.keys(part).forEach(function (name) { fields[name] = part[name]; }); });
+    var t0 = Date.now(), context = entityReadContext(entity, fields), t1 = Date.now();
+    var block = sheetGridReadBlock(context.sheet, SHEET_FIRST_DATA_ROW, context.rowCount, context.columnMap.lastColumn), t2 = Date.now();
+    var dateCells = 0, dateMs = 0, otherMs = 0;
+    block.forEach(function (raw) {
+      context.indexes.forEach(function (at, k) {
+        var spec = context.specs[k], a = Date.now();
+        entityReadCell(raw[at], spec, context.timezone);
+        if (spec.type === 'DATE') { dateCells += 1; dateMs += Date.now() - a; } else { otherMs += Date.now() - a; }
+      });
+    });
+    var t3 = Date.now(), full = entityReadAllCombined(entity, [DATA_SCHEMA, SYNC_SCHEMA]), t4 = Date.now(), lech = 0, soNgay = 0;
+    block.forEach(function (raw) { context.indexes.forEach(function (at, k) { var spec = context.specs[k]; if (spec.type !== 'DATE' || !dateTextIsDate(raw[at]) || isNaN(raw[at].getTime())) { return; } soNgay += 1; if (dateToText(raw[at], spec.precision, context.timezone) !== Utilities.formatDate(raw[at], context.timezone, dateTextFormatOf(spec.precision))) { lech += 1; } }); });
+    return entity + ': ' + block.length + ' dòng x ' + context.columnMap.lastColumn + ' cột Sheet, ' + context.names.length + ' trường đọc | bối cảnh ' + (t1 - t0) + ' ms | getValues ' + (t2 - t1) + ' ms | chuyển ô ' + (t3 - t2) + ' ms (ô ngày ' + dateCells + ' ô ~' + dateMs + ' ms, ô khác ~' + otherMs + ' ms) | entityReadAllCombined trọn ' + (t4 - t3) + ' ms, ' + full.rows.length + ' bản ghi | so với Utilities.formatDate: ' + lech + '/' + soNgay + ' ô ngày lệch';
+  }).concat(['Múi giờ tệp: ' + shinOpenBook().getSpreadsheetTimeZone() + ' | múi giờ script: ' + Session.getScriptTimeZone() + ' | 10.000 lần ghép giờ địa phương: ' + (function () { var a = Date.now(), d = new Date(); for (var i = 0; i < 10000; i += 1) { dateTextLocal(d, 'minute'); } return Date.now() - a; })() + ' ms']).join('\n');
+}
+
+/** Đặt múi giờ tệp Sheet DEV trùng múi giờ script để đổi ô ngày đi đường nhanh (`dateTextLocal`); chỉ đổi khi hai múi giờ cùng giờ ở các mốc thử, không thì báo và giữ nguyên. */
+function fbmDevAlignSheetTimezone() {
+  var book = shinOpenBook(), before = book.getSpreadsheetTimeZone(), script = Session.getScriptTimeZone();
+  if (before === script) { return 'Múi giờ tệp đã trùng script: ' + script; }
+  var moc = [new Date(Date.UTC(1976, 0, 1)), new Date(Date.UTC(1999, 0, 1)), new Date(Date.UTC(2026, 6, 1))], lech = moc.filter(function (d) { return Utilities.formatDate(d, before, 'Z') !== Utilities.formatDate(d, script, 'Z'); });
+  if (lech.length) { return 'Không đổi: ' + before + ' và ' + script + ' khác giờ ở ' + lech.length + ' mốc thử.'; }
+  book.setSpreadsheetTimeZone(script);
+  return 'Đã đổi múi giờ tệp từ ' + before + ' sang ' + book.getSpreadsheetTimeZone();
+}
