@@ -247,6 +247,23 @@ Chuẩn bị: `fbmPerfOn`, `fbmPerfTestScopeOn`, `fbmPerfDropScopeActivities` (x
 - **Bất thường chưa rõ nguyên nhân:** lần gọi xử lý kết quả dò phiên mất 40,5 giây GAS, gần như toàn bộ là thời gian tự thân trong `withOrchestrationLock`, tức nằm ở hàm chưa được bộ đo bọc (khóa lấy được trong 0,08 giây). Trace chỉ giữ 60 sự kiện cuối nên không còn dấu. Giả thuyết: chờ một khóa khác hoặc Sheet bận vì Sidebar vừa nạp lại cùng lúc. Trước khi tối ưu ở đợt 3: bọc đo thêm các hàm cổng phiên và thời gian chờ khóa, đo lại đầu lượt.
 - Kết luận cho đợt 3: phần còn lại mỗi khách gần như cố định (đọc Sheet 3,4 giây + đường truyền 2,3 giây). Gom cả trang 50 khách vào một lần gọi GAS thì hai khoản này chỉ trả một lần cho cả gói.
 
+### 2B.9. Số đo sau đợt 3 (2026-10-08, Sheet DEV, chế độ thử 20 khách, "Lấy từ FBM → ShinCRM", "tự vẽ View" tắt)
+
+Chuẩn bị giống 2B.8 (`fbmPerfOn`, `fbmPerfTestScopeOn`, `fbmPerfDropScopeActivities` xóa 10 dòng Activity), Extension 21.20. Kết quả lượt: 20 khách, nhận 78 bản ghi FBM, ghi lại 10, 0 lỗi, 0 xung đột; **52 giây từ lần gọi đầu đến lần cuối (2B.8: 218 giây)**.
+
+**Đo 20 khách thay vì 50 (lựa chọn tạm, tự quyết):** chế độ thử giữ tối đa `TEST_CODES_MAX` = 20 mã, còn Sidebar chạy tay chỉ có quét toàn bộ (1.312 khách, cần chủ dự án đồng ý). Chi phí lô 50 khách so với lô 5 khách đã chốt bằng test offline (cùng số lần đọc Sheet, ghi state, ghi Sheet; checklist nhóm 3.3). Số đo thật 50 khách để cho lượt toàn bộ khi chủ dự án đồng ý.
+
+| Giao dịch của 20 khách | 2B.8 (mỗi khách một lần gọi) | Sau đợt 3 (một lô) |
+|---|---|---|
+| Số lần gọi GAS | 20 | 1 |
+| GAS | 20 × 5,3 giây ≈ 106 giây | 9,0 giây cả lô |
+| Extension gọi FBM | 0,1 giây mỗi khách | 20 request, tổng 1,8 giây (0,09 giây mỗi request) |
+| Đường truyền GAS | 20 × 2,3 giây | khoảng 2,5 giây một lần |
+
+- Trong 9,0 giây của lô: `flushLog` 2,1 giây (6 lần, LOG_TRACE đang bật), đọc Sheet 1,8 giây (một lần cho cả lô), cửa ghi `writeGateSave` 1,8 giây (một lần ghi 10 dòng, trong đó 9 `setProperty` của core), `readCategoryGate` 0,6 giây.
+- Đầu lượt không đổi so với 2B.8: `fbmStartSync` 9,6 giây GAS (đọc Sheet 5,7 giây), dò phiên 2 lần khứ hồi 16,4 giây, lấy quyền Activity 8,2 giây khứ hồi, lưới Customer 10,3 giây khứ hồi (GAS 7,4 giây, phần lớn đọc Sheet 4,9 giây). Đây là phần lớn của 52 giây; đợt 4 (Customer một request) và việc giảm `flushLog` khi tắt LOG_TRACE ở production sẽ chạm vào đây.
+- Kết luận: mục tiêu đợt 3 đạt; chi phí giao dịch không còn tăng theo số khách mà theo số lô (50 khách mỗi lô). Dự báo lượt 1.312 khách: 27 lô × khoảng 12–15 giây ≈ 6 phút cộng đầu lượt, cần đo thật khi chủ dự án đồng ý.
+
 ## 3. Ranh giới GAS – Extension – Sidebar
 
 ### 3.1. GAS sở hữu
@@ -939,7 +956,7 @@ Các điểm sau vẫn cần duyệt lại khi bắt đầu phiên refactor:
 - cách migration state đang có request dở;
 - cách phát hiện và xử lý snapshot thay đổi giữa lúc Extension đọc bulk;
 - phạm vi chính xác của các trường được coi là conflict ngoài khóa kỹ thuật.
-- **FBM đổi danh mục giữa lúc đang đẩy (chủ dự án nêu 2026-10-07).** Tài liệu 09/03 chốt "kiểm một lần mỗi phiên, không phải mỗi lát": danh mục FBM chỉ nạp và đối soát lúc mở phiên đẩy, các bản ghi sau đó không kiểm lại. FBM không chặn mã sai ở server, nên nếu FBM sửa danh mục giữa lúc đẩy (phiên 100 bản ghi hiện mất khoảng 12 phút) thì bản ghi đẩy sau đó có thể mang mã không còn hợp lệ; tài liệu và code chưa nhắc trường hợp này. Đề xuất chờ chốt: chiều đẩy nạp lại các danh mục FBM mà gói cần (Customer hai danh mục, Activity một danh mục) ở đầu mỗi gói đẩy (không phải mỗi bản ghi, khi gom gói thì một lần gọi cho cả gói), mã nào không còn khớp thì chặn các bản ghi dùng mã đó trong gói; khung rủi ro co lại bằng một gói thay vì cả phiên.
+- ~~FBM đổi danh mục giữa lúc đang đẩy~~: đã chốt và làm ở đợt 3 (nhóm 3.4): chiều đẩy đọc lại lô danh mục sau `pushBatchRecords` bản ghi hoặc khi quá `lookupMaxAgeMs`; luật ở 09/03 "Kiểm danh mục đầu phiên".
 
 Riêng các điểm sau đã được định hướng rõ trong cuộc thảo luận:
 
