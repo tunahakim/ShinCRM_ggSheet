@@ -253,7 +253,8 @@ tests\
 │   ├── khung-gia.js              Khung sidebar giả cho bộ máy vẽ: bốn vùng, chỉ ba khả năng getElementById/innerHTML/hidden. Thay innerHTML một vùng thì phần tử con bị xóa nội dung, đúng như trình duyệt.
 │   └── strip-comments.js         Bỏ chú thích trước khi quét mã, để docstring được phép nhắc tên mà mã thì không.
 ├── contracts\
-│   └── fbmSyncPipeline.js         Charter use case đồng bộ FBM độc lập với code: trigger và kết quả quan sát được theo tài liệu 09.
+│   ├── fbmSyncPipeline.js         Charter use case đồng bộ FBM độc lập với code: trigger và kết quả quan sát được theo tài liệu 09.
+│   └── gasExtensionContract.js    Hợp đồng dữ liệu GAS–Extension và cách tính mã phiên bản hợp đồng.
     └── cases\
     ├── unsavedChanges.js         Kiểm dirty guard Sidebar, modal, khóa async, scope form lõi/FBM và password.
     ├── textNormalize.js          Hai bản sinh đôi server và client cho cùng kết quả trên một bảng ca dùng chung.
@@ -310,6 +311,7 @@ tests\
     ├── fbmSync\FunctionTrace.js  Kiểm log bắt đầu/kết thúc hàm, tóm tắt payload và che dữ liệu bí mật.
     ├── fbmSync\
     │   ├── Protocol.js            Kiểm envelope, lỗi transport, fingerprint và đối soát ba chiều.
+    │   ├── Contract.js            Mã phiên bản hợp đồng GAS–Extension hai bên công bố khớp mã tính từ hợp đồng.
     │   ├── Builders.js            Kiểm builder/parser request Customer và Activity.
     │   ├── Pull.js                Kiểm pull Customer/Activity, marker, missing và bảo toàn trường nội bộ.
     │   ├── Reconcile.js           Kiểm identity, MST, hash, conflict và trạng thái đồng bộ.
