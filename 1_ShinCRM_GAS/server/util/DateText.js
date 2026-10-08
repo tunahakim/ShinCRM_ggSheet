@@ -44,6 +44,20 @@ function dateTextFormatOf(precision) {
 }
 
 /**
+ * `Utilities.formatDate` tốn khoảng 0,6 ms mỗi ô (đo trên Google 2026-10-08: 8.112 ô ngày của Activity mất 5,2 giây, gần hết thời gian một lần đọc Sheet). Khi múi giờ cần in trùng múi giờ script thì giờ địa phương của `Date` đã là giờ đó, nên ghép chuỗi từ `getFullYear`/`getHours`... cho cùng kết quả mà không gọi dịch vụ Google; khác múi giờ thì vẫn đi đường `Utilities`.
+ */
+var DATE_TEXT_SCRIPT_TIMEZONE = null;
+function dateTextScriptTimezone() {
+  if (DATE_TEXT_SCRIPT_TIMEZONE === null) { DATE_TEXT_SCRIPT_TIMEZONE = Session.getScriptTimeZone(); }
+  return DATE_TEXT_SCRIPT_TIMEZONE;
+}
+function dateTextLocal(value, precision) {
+  var pad = function (n) { return n < 10 ? '0' + n : String(n); };
+  var day = value.getFullYear() + '-' + pad(value.getMonth() + 1) + '-' + pad(value.getDate());
+  return precision === 'day' ? day : day + ' ' + pad(value.getHours()) + ':' + pad(value.getMinutes());
+}
+
+/**
  * Giá trị một ô kiểu DATE thành chuỗi để gửi sang client. Ô rỗng trả về chuỗi rỗng.
  *
  * **Hàm này không phán xét dữ liệu.** Ô đáng lẽ là ngày mà lại chứa chữ thì nó trả về đúng chữ đó đã cắt khoảng trắng, không ném lỗi. Hai lý do. Một, đây là đường nạp: một ô gõ lạ ở khách thứ chín trăm không được phép làm sập cả lượt mở sidebar, vì lúc đó người dùng mất luôn đường vào để mà sửa. Hai, giá trị lạ hiện lên form là thứ nhìn thấy được và sửa được, còn một lượt nạp vỡ chỉ để lại một câu báo lỗi không chỉ ra ô nào. Việc bắt lỗi giá trị thuộc cửa ghi và phép tự kiểm, không thuộc hàm đổi khuôn.
@@ -57,6 +71,7 @@ function dateToText(value, precision, timezone) {
 
   if (dateTextIsDate(value)) {
     if (isNaN(value.getTime())) { return ''; }
+    if ((timezone || DATE_TEXT_TIMEZONE) === dateTextScriptTimezone()) { return dateTextLocal(value, precision); }
     return Utilities.formatDate(value, timezone || DATE_TEXT_TIMEZONE, format);
   }
 
