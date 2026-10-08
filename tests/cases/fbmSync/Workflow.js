@@ -853,7 +853,9 @@ async function chay(so) {
         const pageSize = Number(request.body.count), pageValue = request.body.gridPageValue, khoa = ['ngay_gd', 'datetime0', 'xorder', 'stt_rec_kh'].map((field) => fullCustomerFields.indexOf(field));
         // Trang sau chỉ có dữ liệu khi request mô tả đúng dòng cuối trang đang đứng và tổng số dòng, như FBM thật (yyyyMMdd theo giờ Việt Nam).
         const ngayFbm = (value) => new Date(Number(String(value).match(/\d+/)[0]) + 7 * 3600000).toISOString().slice(0, 10).replace(/-/g, '');
-        const keyIndex = pageValue ? customerRows.findIndex((item) => JSON.stringify(khoa.map((index) => item[index])) === JSON.stringify(pageValue)) : -1, keyRow = customerRows[keyIndex];
+        // FBM đọc ngày trong khóa trang như giờ UTC: khóa chỉ khớp khi ngày đã cộng 7 giờ như giao diện FBM gửi.
+        const gioMayChu = (value) => '/Date(' + (Number(String(value).match(/\d+/)[0]) + 7 * 3600000) + ')/';
+        const keyIndex = pageValue ? customerRows.findIndex((item) => JSON.stringify(khoa.map((index, k) => (k < 2 ? gioMayChu(item[index]) : item[index]))) === JSON.stringify(pageValue)) : -1, keyRow = customerRows[keyIndex];
         const moTaDung = keyRow && request.body.lastPageItem === ngayFbm(keyRow[khoa[0]]) + ngayFbm(keyRow[khoa[1]]) + keyRow[khoa[2]] + keyRow[khoa[3]] && request.body.lastRowCount === customerRows.length;
         const pageStart = !pageValue ? 0 : moTaDung ? keyIndex + 1 : customerRows.length;
         customerPageIndexes.push([request.body.gridPageIndex, request.body.lastPageIndex]);
