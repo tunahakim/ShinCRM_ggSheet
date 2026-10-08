@@ -70,6 +70,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   └── TextNormalize.js      Chuẩn hóa văn bản trước khi so sánh. Có một bản sinh đôi ở client\util\ — hai bản phải giống nhau từng dòng.
 │   ├── state\
 │   │   ├── ReloadDecision.js    Hàm thuần nhận thay đổi, ReloadState, chính sách và localDraft tùy chọn rồi trả quyết định signal, reload RAM và render view.
+│   │   ├── DocumentStore.js      Cửa duy nhất vào DocumentProperties và khóa: bản đọc theo một lần gọi, lõi ghi thẳng, đồng bộ FBM ghi gộp trong khóa điều phối; lấy khóa xong thì đọc lại kho.
 │   │   ├── DirtyState.js         Cờ "sheet đã lệch so với RAM", giữ ở DocumentProperties. Đọc không bao giờ ném lỗi, vì nó đi kèm mọi lượt trả về.
 │   │   └── UserPrefs.js          Ba núm chọn của sidebar, giữ ở UserProperties. Chiều đọc không bao giờ ném vì nó nằm trên đường nạp lõi; chiều ghi ném ngay vì giá trị lạ ở đó là code gọi sai.
 │   ├── gate\                     Các cửa ghi có kỷ luật, cùng họ với LogGate: tập trung điểm vào theo từng bề mặt, kiểm rồi mới ghi, hậu xử lý reload dùng chung.
@@ -210,7 +211,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── transport\EntryPoints.js Entry point cho Sidebar, DEV runner và Web App relay.
     ├── control\ControlPort.js  Cổng lệnh trung lập và DTO thông báo; adapter kênh không chứa nghiệp vụ.
     ├── state\State.js            DocumentProperties, cursor và progress.
-    ├── state\PropertyBuffer.js   Cửa duy nhất `FbmSync.props()` vào DocumentProperties: bộ đệm theo lần gọi, ghi gộp trước khi nhả khóa, trace ghi một lần; bản chụp Sheet Customer/Activity/Category của lần gọi.
+    ├── state\PropertyBuffer.js   Phần riêng của đồng bộ FBM trên `server/state/DocumentStore.js`: `FbmSync.props()` ghi gộp trước khi nhả khóa điều phối, trace ghi một lần; bản chụp Sheet Customer/Activity/Category của lần gọi.
     ├── state\SyncSettings.js     Tham số vận hành FBM trong DocumentProperties, migration Config một lần.
     ├── state\AccountSettings.js  Cấu hình gắn tài khoản FBM: tiền tố/độ dài mã khách và mốc Activity; migration Config một lần.
     ├── state\RecordLocks.js      Khóa bản ghi và kiểm tra revision.
@@ -273,6 +274,7 @@ tests\
     ├── configRead.js             Khóa trùng thì chặn, còn khối sắp xếp thì thứ tự hàng là nghĩa.
     ├── idGate.js                 Bộ đếm cấp mã ở Document Properties: di chuyển một lần từ Config, khóa đã có thì thắng, giá trị hỏng thì dừng chứ không về 0.
     ├── dirtyState.js             Khối trạng thái bẩn KHÔNG BAO GIỜ được ném, kể cả khi tệp thuộc tính hỏng hoặc đọc dở dang.
+    ├── documentStore.js          Cửa kho dùng chung: một lần ghi khách mới đọc kho thật tối đa 3 lần, tín hiệu reload vào kho trước khi nhả khóa, không tệp nào gọi thẳng kho hay khóa.
     ├── reloadDecision.js         Bảng luật thuần dùng chung cho signal, reload RAM, localDraft và render toàn bộ view.
     ├── reloadGates.js             Cổng ghi/xóa phát signal sau đọc lại thành công và chứng minh render không phụ thuộc Sidebar.
     ├── userPrefs.js              Ba núm chọn phía máy chủ: giá trị lạ đều rơi về ngầm định, và ghi một núm KHÔNG được để lại dấu vết nào ở DocumentProperties.
