@@ -100,8 +100,8 @@ async function chay(so) {
 
   const failedRecord = { id: 'C-FAIL', fbmId: 'FBM-FAIL', fbmCustomerCode: 'ALT00010', companyName: 'Cũ', fbmSyncPermission: 'Cho phép', syncStatus: edges.FbmSync.SYNC_STATUS.error };
   const failedHash = edges.FbmSync.hash(failedRecord, 'customer', {});
-  const failedState = { metadata: { pushFailures: { 'customer:C-FAIL': failedHash } } };
-  edges.FbmSync.stateRead = () => failedState;
+  edges.FbmSync.stateRead = () => ({ metadata: {} });
+  edges.FbmSync.pushFailuresRead = () => ({ hashes: { 'customer:C-FAIL': failedHash }, details: {} });
   edges.FbmSync.readLocal = () => [failedRecord];
   check(so, 'push loi cung hash khong bi lap lai', edges.FbmSync.pushCandidates('customer').length, 0);
   edges.FbmSync.readLocal = () => [Object.assign({}, failedRecord, { companyName: 'Đã sửa' })];

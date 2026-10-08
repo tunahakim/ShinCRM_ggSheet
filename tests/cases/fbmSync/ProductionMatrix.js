@@ -198,7 +198,7 @@ async function chay(so) {
   stuck.F.recordIssuesFlush();
   const stuckState = stuck.F.stateRead(), stuckLog = stuck.run.logs.find((event) => event.action === 'push_record_issue');
   check(so, 'FBM-027: Activity "đang đẩy" chưa có ID FBM không được gửi lại lệnh tạo; giữ "đang đẩy", phiên báo lỗi và Log có ID bản ghi',
-    [stuckRequest, stuck.run.local.activity[0].syncStatus, stuckState.phase, stuckState.counts.error, Object.keys(stuckState.metadata.pushFailures), /ACT-STUCK/.test(JSON.stringify(stuckLog)), /Mở lại bản ghi lỗi/.test(JSON.stringify(stuckLog))],
+    [stuckRequest, stuck.run.local.activity[0].syncStatus, stuckState.phase, stuckState.counts.error, Object.keys(stuck.F.pushFailuresRead().hashes), /ACT-STUCK/.test(JSON.stringify(stuckLog)), /Mở lại bản ghi lỗi/.test(JSON.stringify(stuckLog))],
     [null, 'đang đẩy', 'done', 1, ['activity:ACT-STUCK'], true, true]);
 
   const lostCustomer = Object.assign(editCustomer('N'), { id: 'CUS-LOST', fbmId: '', fbmCustomerCode: '', taxNumber: '0101234567', syncStatus: 'đang đẩy', fbmHash: '' });

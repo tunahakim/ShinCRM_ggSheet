@@ -365,6 +365,8 @@ async function chay(so) {
     ['pushConfigErrors', 'pushOwnerError'].forEach((name) => { F[name] = () => ''; });
     F.pushEligibilityErrors = () => [];
     F.isRecordLocked = () => false;
+    // Mỗi lệnh đẩy giả lập đều lỗi để đi tiếp hàng đợi; nâng trần cầu dao để không cắt ngang 25 bản ghi.
+    if (!(options && options.realBreaker)) { F.BUDGET = Object.assign({}, F.BUDGET, { pushFailuresMax: 100 }); }
     F.validatePushCategories = (record, entity, gate) => {
       const reason = gate.blocked['@CAT_NGUON_KH\u001f' + record.leadCode];
       return reason ? [{ result: { ok: false, reason } }] : [];
@@ -379,7 +381,7 @@ async function chay(so) {
     for (let guard = 0; envelope && guard < 60; guard += 1) {
       if (envelope.meta.kind !== 'batch') {
         const current = F.stateRead(); issued.push(current.cursor.candidate.id);
-        lastStep = F.continueAfterPushError(current, current.cursor, { reason: 'Giả lập FBM từ chối để đi tiếp hàng đợi', code: 'FBM_ERROR' });
+        lastStep = F.continueAfterPushError(current, current.cursor, { reason: options && options.longReason ? 'FBM từ chối trường địa chỉ liên hệ của khách. '.repeat(30) : 'Giả lập FBM từ chối để đi tiếp hàng đợi', code: 'FBM_ERROR' });
         envelope = lastStep.request; continue;
       }
       lookupAt.push(F.stateRead().cursor.index);
@@ -414,6 +416,21 @@ async function chay(so) {
     lookupLost.logs.filter((event) => event.action === 'category_block' && event.outcome === 'error').map((event) => event.reason),
     (lookupLost.lastStep.status.metadata.categoryBlocks || []).map((block) => block.source + ': ' + block.reason)
   ], [20, 'paused', null, 'paused', ['@CAT_NGUON_KH: Không lấy được danh mục FBM (TRANSPORT_ERROR). Bỏ toàn bộ chiều đẩy kỳ này.'], ['@CAT_NGUON_KH: Không lấy được danh mục FBM (TRANSPORT_ERROR).']]);
+  const breaker = categoryPushRun({ realBreaker: true, longReason: true }), breakerState = breaker.F.stateRead();
+  const breakerStoreText = breaker.F.props().getProperty(breaker.F.PUSH_FAILURES_KEY), breakerStore = JSON.parse(breakerStoreText);
+  check(so, 'bản ghi đẩy lỗi chạm pushFailuresMax thì dừng paused, không gửi thêm lệnh FBM, Sidebar thấy tổng và lý do, Log ghi lỗi; khóa lỗi đẩy vẫn dưới 9.000 byte dù lý do dài', [
+    breaker.issued.length, breakerState.phase, breakerState.lastFailureCode, breaker.lastStep.request, breaker.lastStep.status.metadata.pushFailureCount,
+    /20 bản ghi đẩy lỗi/.test(breaker.lastStep.status.message), breaker.logs.filter((event) => event.action === 'push_failures_limit' && event.outcome === 'error').length,
+    Buffer.byteLength(breakerStoreText, 'utf8') <= 9000, Object.keys(breakerStore.details).length, Object.keys(breakerStore.details).slice(-1)[0],
+    breaker.F.props().getProperty('FBM_SYNC_STATE_V1').indexOf('pushFailure') < 0
+  ], [breaker.F.BUDGET.pushFailuresMax, 'paused', 'PUSH_FAILURES_LIMIT', null, 20, true, 1, true, breaker.F.BUDGET.pushFailureDetailsMax, 'customer:C-20', true]);
+  const legacy = workflowGas(), legacyF = legacy.hop.FbmSync, legacyState = legacyF.stateStart('', 'done', 0);
+  legacyState.metadata.pushFailures = { 'customer:C-OLD': 'abc12345' };
+  legacyState.metadata.pushFailureDetails = { 'customer:C-OLD': { reason: 'Lỗi cũ', code: 'HTTP_ERROR' } };
+  legacyF.stateWrite(legacyState);
+  check(so, 'state cũ còn map lỗi đẩy trong metadata thì chuyển sang khóa riêng một lần, không mất dấu chặn gửi lại', [
+    legacyF.pushFailuresRead().hashes['customer:C-OLD'], legacyF.pushFailuresRead().details['customer:C-OLD'].reason, legacyF.props().getProperty('FBM_SYNC_STATE_V1').indexOf('pushFailure') < 0
+  ], ['abc12345', 'Lỗi cũ', true]);
   const dueState = { metadata: { categoryCheck: { at: 1000, pushed: 3 } } }, dueBudget = renamed.F.BUDGET;
   check(so, 'danh mục đọc quá lookupMaxAgeMs thì phải đọc lại trước bản ghi đẩy kế, kể cả khi chưa đủ pushBatchRecords', [
     renamed.F.pushLookupDue(dueState, 1000 + dueBudget.lookupMaxAgeMs - 1), renamed.F.pushLookupDue(dueState, 1000 + dueBudget.lookupMaxAgeMs), renamed.F.pushLookupDue({ metadata: {} }, 1000)

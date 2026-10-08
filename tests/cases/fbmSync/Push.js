@@ -172,20 +172,21 @@ async function chay(so) {
   const errorState = { counts: { error: 0 }, metadata: { pushFailures: {} }, locks: {} };
   push.FbmSync.unlockRecord = () => ({ locks: {} });
   push.FbmSync.markPushError(errorState, { entity: 'customer', id: 'C-ERR', record: { id: 'C-ERR', companyName: 'Lỗi' } }, 'FBM từ chối', 'customer_edit_save');
-  check(so, 'push loi luu hash local de chan lap lai', errorState.metadata.pushFailures['customer:C-ERR'], push.FbmSync.hash({ id: 'C-ERR', companyName: 'Lỗi' }, 'customer', {}));
-  check(so, 'push loi luu nguyen nhan hien thi rieng voi hash', errorState.metadata.pushFailureDetails['customer:C-ERR'].reason, 'FBM từ chối');
-  check(so, 'push loi luu dung buoc request gay loi', errorState.metadata.pushFailureDetails['customer:C-ERR'].requestKind, 'customer_edit_save');
+  check(so, 'push loi luu hash local de chan lap lai', push.FbmSync.pushFailuresRead().hashes['customer:C-ERR'], push.FbmSync.hash({ id: 'C-ERR', companyName: 'Lỗi' }, 'customer', {}));
+  check(so, 'push loi luu nguyen nhan hien thi rieng voi hash', push.FbmSync.pushFailuresRead().details['customer:C-ERR'].reason, 'FBM từ chối');
+  check(so, 'push loi luu dung buoc request gay loi', push.FbmSync.pushFailuresRead().details['customer:C-ERR'].requestKind, 'customer_edit_save');
   let retryPatch;
   push.FbmSync.readLocal = (entity) => entity === 'activity'
     ? [{ id: 'ACT-FAIL', fbmId: '174813', syncStatus: push.FbmSync.SYNC_STATUS.error, content: 'Nội dung cũ' }]
     : [];
   push.writeGateSave = (request) => { retryPatch = request.records; return { ok: true }; };
   const retryState = push.FbmSync.stateStart('', 'done', 0);
-  retryState.metadata.pushFailures = { 'activity:ACT-FAIL': 'failed-hash' };
+  retryState.metadata.pushFailures = { 'activity:ACT-FAIL': 'failed-hash', 'activity:ACT-GONE': 'gone-hash' };
   retryState.metadata.pushFailureDetails = { 'activity:ACT-FAIL': { reason: 'HTTP 500' } };
   push.FbmSync.stateWrite(retryState);
   const retryEnabled = push.fbmSyncRetryPushFailures();
-  check(so, 'retry push mo lai ca lo cung payload khong doi du lieu', [retryEnabled.ok, retryPatch[0].syncStatus, push.FbmSync.stateRead().metadata.pushFailures['activity:ACT-FAIL']], [true, push.FbmSync.SYNC_STATUS.pending, undefined]);
+  check(so, 'retry push mo lai ca lo cung payload khong doi du lieu', [retryEnabled.ok, retryPatch[0].syncStatus, push.FbmSync.pushFailuresRead().hashes['activity:ACT-FAIL']], [true, push.FbmSync.SYNC_STATUS.pending, undefined]);
+  check(so, 'mở lại bản ghi lỗi xóa luôn dấu lỗi của bản ghi không còn trên Sheet, để nó không chiếm chỗ cầu dao lỗi đẩy', [retryEnabled.missing, Object.keys(push.FbmSync.pushFailuresRead().hashes)], [2, []]);
   push.FbmSync.pushCandidates = () => [
     { kind: 'edit', id: 'C-ERR', position: 0, record: { id: 'C-ERR', fbmId: 'A-ERR', fbmHash: 'h-err' } },
     { kind: 'edit', id: 'C-NEXT', position: 1, record: { id: 'C-NEXT', fbmId: 'A-NEXT', fbmHash: 'h-next' } }
@@ -237,7 +238,7 @@ async function chay(so) {
   bugState.activeRequestId = 'test-bug-request'; bugState.cursor = { kind: 'push_wait', operation: 'customer_edit_save', entity: 'customer', index: 0, candidate: { entity: 'customer', id: 'C-ERR', record: { id: 'C-ERR', fbmId: 'A-ERR', fbmHash: 'h-err' } } };
   push.FbmSync.stateWrite(bugState);
   const bugResult = push.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"Bugs":{"Message":"Sai du lieu"}}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'test-bug-request' }] } });
-  check(so, 'Bugs HTTP 200 danh dau loi record va khong retry request da gui', [bugResult.continued, push.FbmSync.stateRead().counts.error, push.FbmSync.stateRead().metadata.pushFailures['customer:C-ERR'] !== undefined], [true, 1, true]);
+  check(so, 'Bugs HTTP 200 danh dau loi record va khong retry request da gui', [bugResult.continued, push.FbmSync.stateRead().counts.error, push.FbmSync.pushFailuresRead().hashes['customer:C-ERR'] !== undefined], [true, 1, true]);
   pushed.FbmSync.readLocal = (entity) => entity === 'customer'
     ? [{ id: 'CUS-NEW', fbmId: '', fbmCustomerCode: '', fbmSyncPermission: 'Chỉ lấy từ FBM' }]
     : [];
@@ -397,7 +398,7 @@ async function chay(so) {
   let lostPatch;
   push.writeGateSave = (request) => { lostPatch = request.records[0]; return { ok: true }; };
   const lost = push.FbmSync.continueAfterPushError(push.FbmSync.stateRead(), push.FbmSync.stateRead().cursor, 'Mất phản hồi');
-  check(so, 'Activity mat phan hoi giu dang day va khoa cho marker', [lost.continued, lost.request, lostPatch.syncStatus, push.FbmSync.stateRead().counts.error, !!push.FbmSync.stateRead().metadata.pushFailures['activity:ACT-NEW'], push.FbmSync.stateRead().locks['activity:ACT-NEW'].owner], [true, null, push.FbmSync.SYNC_STATUS.pushing, 1, true, 'sync']);
+  check(so, 'Activity mat phan hoi giu dang day va khoa cho marker', [lost.continued, lost.request, lostPatch.syncStatus, push.FbmSync.stateRead().counts.error, !!push.FbmSync.pushFailuresRead().hashes['activity:ACT-NEW'], push.FbmSync.stateRead().locks['activity:ACT-NEW'].owner], [true, null, push.FbmSync.SYNC_STATUS.pushing, 1, true, 'sync']);
 }
 
 module.exports = { chay };
