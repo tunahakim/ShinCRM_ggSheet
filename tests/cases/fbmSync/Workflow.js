@@ -821,7 +821,7 @@ async function chay(so) {
     const so2 = (i) => String(i).padStart(2, '0');
     const customerRows = Array.from({ length: soKhach }, (_, k) => k + 1).map((i) => row(fullCustomerFields, { stt_rec_kh: 'FBM-C' + i, ma_kh: 'ALT' + String(i).padStart(5, '0'), ten_kh: 'Cong ty ' + i, ma_so_thue: '0100' + so2(i), ong_ba: String.fromCharCode(65 + (i - 1) % 26), dc_lh: 'Ha Noi', dien_thoai: '09' + so2(i), email: 'c' + i + '@example.test', ngay_gd: '/Date(' + Date.UTC(2026, 8, 20) + ')/', datetime0: gio(i, 1), xorder: i }));
     const activityRows = Object.fromEntries(customerRows.map((_, k) => k + 1).map((i) => ['FBM-C' + i, [row(fullActivityFields, { id: 'FBM-A' + i, details: 'Goi dien ' + i, end_date: '2026-09-20', owner: 'Owner ' + i, datetime0: gio(i, 3), line_nbr: 1 })]]));
-    const customerPageIndexes = [], fullKinds = [], fullStatuses = [], fullActivityPropCalls = [], fullActivitySheetReads = [], fullBatches = [], fullLookupFields = [];
+    const customerPageIndexes = [], activityItemTypes = [], fullKinds = [], fullStatuses = [], fullActivityPropCalls = [], fullActivitySheetReads = [], fullBatches = [], fullLookupFields = [];
     let fullStep = null;
     // `rounds` chạy lại cả lượt trên cùng Sheet; `loseTab` làm lượt đầu mất tab FBM ngay ở lô giao dịch đầu tiên.
     for (let round = 0; round < (options && options.rounds || 1); round += 1) {
@@ -860,7 +860,12 @@ async function chay(so) {
         if (/GetCompletionList/.test(item.url)) { return { body: JSON.stringify({ d: [['CODE', 'Ten danh muc']] }) }; }
         const key = item.body.externalKey && item.body.externalKey[0] && item.body.externalKey[0].Value;
         if (khachLoi[key]) { return { raw: khachLoi[key] }; }
-        return { body: gridResponse(fullActivityFields, activityRows[key] || [], (activityRows[key] || []).length) };
+        // FBM chỉ trả tiêu đề cột khi `type: 0`; trang không tiêu đề chỉ có `Rows`.
+        activityItemTypes.push(item.body.type);
+        const dongs = (activityRows[key] || []).map((dong) => options && options.cutColumn === key ? dong.slice(1) : dong);
+        const body = JSON.parse(gridResponse(fullActivityFields, dongs, dongs.length));
+        if (item.body.type !== 0) { delete body.d.ViewPage; }
+        return { body: JSON.stringify(body) };
       }) : executorRaw((await sendThroughExecutor(request, body)).reply, request.id);
       if (activityBatch && options && options.editBatch) { raw = options.editBatch(raw, fullBatches.length); }
       if (activityBatch) {
@@ -887,7 +892,7 @@ async function chay(so) {
       }
     }
     }
-    return { customerPageIndexes, fullFlow, fullLogs, fullWrites, fullLocal, fullStep, fullKinds, fullStatuses, fullActivityPropCalls, fullActivitySheetReads, fullBatches, fullLookupFields };
+    return { customerPageIndexes, activityItemTypes, fullFlow, fullLogs, fullWrites, fullLocal, fullStep, fullKinds, fullStatuses, fullActivityPropCalls, fullActivitySheetReads, fullBatches, fullLookupFields };
   }
   const { fullFlow, fullLogs, fullWrites, fullLocal, fullStep, fullKinds, fullStatuses } = await fullPipeline(false);
   const fullFinal = fullFlow.hop.FbmSync.statusView();
@@ -956,9 +961,18 @@ async function chay(so) {
     thieu.fullBatches.map(khoaLo), thieu.fullLocal.activity.length, thieu.fullStep.status.phase
   ], ['error', 'FBM_BATCH_ITEM_MISMATCH', 0, true, [['FBM-C1', 'FBM-C2', 'FBM-C3', 'FBM-C4', 'FBM-C5'], ['FBM-C4', 'FBM-C5']], 5, 'done']);
   const nhieuTrang = await fullPipeline(false, 'read', { customers: 120 });
-  check(so, 'quét toàn bộ nhiều trang Customer: số trang tăng dần, khóa trang đúng dạng FBM, ghi đủ khách và giao dịch, phiên kết thúc done', [
-    nhieuTrang.customerPageIndexes, nhieuTrang.fullLocal.customer.length, nhieuTrang.fullLocal.activity.length, nhieuTrang.fullStep.status.phase, nhieuTrang.fullStep.status.lastFailureCode || ''
-  ], [[-1, 0, 1], 120, 120, 'done', '']);
+  check(so, 'quét toàn bộ nhiều trang Customer: số trang tăng dần, khóa trang đúng dạng FBM, ghi đủ khách và giao dịch, phiên kết thúc done; cả lượt chỉ một khách lấy kèm tiêu đề cột', [
+    nhieuTrang.activityItemTypes.filter((type) => type === 0).length, nhieuTrang.activityItemTypes.length, nhieuTrang.customerPageIndexes, nhieuTrang.fullLocal.customer.length, nhieuTrang.fullLocal.activity.length, nhieuTrang.fullStep.status.phase, nhieuTrang.fullStep.status.lastFailureCode || ''
+  ], [1, 120, [-1, 0, 1], 120, 120, 'done', '']);
+  const tieuDeLoi = await fullPipeline(false, 'read', { customers: 5, failing: { 'FBM-C1': loiHttp } });
+  check(so, 'khách giữ tiêu đề cột bị lỗi: các khách còn lại xếp sang lô sau, lô sau có đúng một khách lấy tiêu đề, đủ giao dịch của khách còn lại', [
+    tieuDeLoi.fullBatches.map(khoaLo), tieuDeLoi.activityItemTypes, tieuDeLoi.fullLocal.activity.map((item) => item.fbmId).sort(), tieuDeLoi.fullStep.status.phase
+  ], [[['FBM-C1', 'FBM-C2', 'FBM-C3', 'FBM-C4', 'FBM-C5'], ['FBM-C2', 'FBM-C3', 'FBM-C4', 'FBM-C5']], [1, 1, 1, 1, 0, 1, 1, 1], ['FBM-A2', 'FBM-A3', 'FBM-A4', 'FBM-A5'], 'done']);
+  const lechCot = await fullPipeline(false, 'read', { customers: 5, cutColumn: 'FBM-C3' });
+  check(so, 'trang không tiêu đề có số cột khác tiêu đề đã lưu: dừng phiên FBM_GRID_SHAPE_CHANGED, không ghi giao dịch nào, Sidebar và Log đều báo', [
+    lechCot.fullLocal.activity.length, lechCot.fullStep.status.phase, lechCot.fullStep.status.lastFailureCode, lechCot.fullStep.status.message.indexOf('số cột khác 11 cột') >= 0,
+    lechCot.fullLogs.some((event) => event.action === 'activity_batch_mismatch' && event.detail.code === 'FBM_GRID_SHAPE_CHANGED')
+  ], [0, 'error', 'FBM_GRID_SHAPE_CHANGED', true, true]);
   // Chạy lại: ghi lại cùng lô không tạo dòng trùng; mất tab giữa lượt thì lượt mới quét lại từ đầu, không đánh vắng mặt nhầm.
   const chayLai = await fullPipeline(false, 'read', { customers: 5, rounds: 2 });
   const matTab = await fullPipeline(false, 'read', { customers: 5, rounds: 2, loseTab: true });
