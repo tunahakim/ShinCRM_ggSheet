@@ -73,8 +73,22 @@ function capBangChoPhepDongBo(hopCat) {
   if (hopCat.FBM_SYNC_PERMISSION_OPTIONS) { return; }
   const rieng = taoHopCat({});
   vm.runInContext(docTep('server/data/DataSchema.js'), rieng, { filename: 'server/data/DataSchema.js' });
+  vm.runInContext(docTep('server/config/ConfigParams.js'), rieng, { filename: 'server/config/ConfigParams.js' });
   hopCat.FBM_SYNC_PERMISSION_OPTIONS = rieng.FBM_SYNC_PERMISSION_OPTIONS;
   hopCat.fbmSyncPermissionValues = rieng.fbmSyncPermissionValues;
+  capOXacThucMacDinh(hopCat, rieng.FBM_VERIFY_STATUS_CONFIG_NAME);
+}
+
+/** Giá trị ô Config "Xác thực mặc định cho khách kéo từ FBM" của tệp thử; test cần giá trị khác thì tự gán `configGet`. */
+const XAC_THUC_MAC_DINH_THU = 'Chưa xác thực';
+
+/**
+ * Tệp thật luôn có ô Config này (preflight chặn khi trống), nên hộp cát chỉ nạp vài tệp đồng bộ cũng được cấp sẵn tên ô và một `configGet` chỉ trả giá trị cho đúng ô đó.
+ * Hộp cát đã có `configGet` riêng thì giữ nguyên.
+ */
+function capOXacThucMacDinh(hopCat, ten) {
+  if (!hopCat.FBM_VERIFY_STATUS_CONFIG_NAME) { hopCat.FBM_VERIFY_STATUS_CONFIG_NAME = ten; }
+  if (typeof hopCat.configGet !== 'function') { hopCat.configGet = (name, fallback) => name === ten ? XAC_THUC_MAC_DINH_THU : (fallback === undefined ? '' : fallback); }
 }
 
 function napServer(hopCat, ...duongDans) {

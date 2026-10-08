@@ -7,8 +7,10 @@ const path = require("path");
 
 async function chay(so) {
   section("FBM sync — pull và identity");
+  let verifyDefault = 'Chưa xác thực';
   const builders = taoHopCat({
     FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {},
+    FBM_VERIFY_STATUS_CONFIG_NAME: 'FBM_VERIFY_STATUS_DEFAULT', configGet: (name, fallback) => name === 'FBM_VERIFY_STATUS_DEFAULT' ? verifyDefault : fallback,
     PropertiesService: { getDocumentProperties: () => ({ getProperty: () => '', setProperty: () => {} }) }
   });
   napServer(builders, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/write/SheetSave.js');
@@ -264,6 +266,22 @@ async function chay(so) {
   const newPullResult = builders.FbmSync.pullWrite('customer', [builders.FbmSync.customerRecord({ stt_rec_kh: 'NEW-C', ma_kh: 'ALT00012', ten_kh: 'Khách mới', ma_so_thue: '001' }, gate)]);
   check(so, 'Customer pull mới ghi cả định danh baseline và quyền đẩy qua cửa ghi', [newPullResult.written, newPullWrite.source, newPullWrite.schemas.length, newPullWrite.records[0].fbmId, newPullWrite.records[0].fbmHash !== '', newPullWrite.records[0].parentCompanyName, newPullWrite.records[0].fbmSyncPermission, dirtyMarkCalls], [1, 'pull', 2, 'NEW-C', true, '', builders.FbmSync.pullDefaultPermission(), 0]);
   check(so, 'Pull gộp nội dung và trạng thái vào một lượt cửa ghi', newPullCalls, 1);
+  // Đổi tên giá trị ở Category rồi chọn lại ô Config: khách mới mang đúng tên mới, không còn chuỗi gõ cứng nào.
+  verifyDefault = 'Đã kiểm tra tên mới';
+  builders.FbmSync.pullWrite('customer', [builders.FbmSync.customerRecord({ stt_rec_kh: 'NEW-V', ma_kh: 'ALT00013', ten_kh: 'Khách đổi tên', ma_so_thue: '002' }, gate)]);
+  check(so, 'khách mới kéo từ FBM mang giá trị Xác thực đang chọn ở Config', newPullWrite.records[0].verifyStatus, 'Đã kiểm tra tên mới');
+  const oldVerify = builders.FbmSync.customerRecord({ stt_rec_kh: 'OLD-V', ma_kh: 'ALT00014', ten_kh: 'Cũ', ma_so_thue: '003' }, gate);
+  builders.FbmSync.readLocal = () => [Object.assign({}, oldVerify, { id: 'CUS-OLD', fbmHash: oldVerify.fbmHash, syncStatus: 'đã đồng bộ', verifyStatus: 'Đã xác minh tay' })];
+  newPullWrite = null;
+  builders.FbmSync.pullWrite('customer', [builders.FbmSync.customerRecord({ stt_rec_kh: 'OLD-V', ma_kh: 'ALT00014', ten_kh: 'Cũ đổi tên', ma_so_thue: '003' }, gate)]);
+  check(so, 'khách đã có giữ giá trị Xác thực của mình khi lấy từ FBM', [newPullWrite && newPullWrite.records[0].companyName, newPullWrite && newPullWrite.records[0].verifyStatus], ['Cũ đổi tên', 'Đã xác minh tay']);
+  verifyDefault = '';
+  builders.FbmSync.readLocal = () => [];
+  newPullCalls = 0;
+  let verifyMissing = null;
+  try { builders.FbmSync.pullWrite('customer', [builders.FbmSync.customerRecord({ stt_rec_kh: 'NEW-E', ma_kh: 'ALT00015', ten_kh: 'Khách thiếu Config', ma_so_thue: '004' }, gate)]); } catch (error) { verifyMissing = error; }
+  check(so, 'ô Xác thực mặc định trống thì chiều lấy dừng, không ghi khách mới', [verifyMissing && verifyMissing.code, newPullCalls], ['FBM_VERIFY_STATUS_DEFAULT_MISSING', 0]);
+  verifyDefault = 'Chưa xác thực';
   const pullLogs = [];
   builders.logEvent = (event) => pullLogs.push(event);
   builders.FbmSync.readLocal = () => [];

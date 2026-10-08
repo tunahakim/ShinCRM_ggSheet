@@ -369,6 +369,7 @@ function taoBook(tenSheets) {
       const rule = { criteria: '', values: [], allowInvalid: true, helpText: '' };
       const builder = {
         requireValueInList(values, showDropdown) { rule.criteria = 'VALUE_IN_LIST'; rule.values = values.slice(); rule.showDropdown = showDropdown !== false; return builder; },
+        requireValueInRange(range, showDropdown) { rule.criteria = 'VALUE_IN_RANGE'; rule.values = [range]; rule.showDropdown = showDropdown !== false; return builder; },
         requireNumberGreaterThanOrEqualTo(value) { rule.criteria = 'NUMBER_GREATER_THAN_OR_EQUAL_TO'; rule.values = [value]; return builder; },
         requireDate() { rule.criteria = 'DATE'; rule.values = []; return builder; },
         setAllowInvalid(value) { rule.allowInvalid = value; return builder; },

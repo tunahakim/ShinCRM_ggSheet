@@ -45,9 +45,9 @@ function chay(so) {
     return ghiLoiNap(so, 'nạp được server/sheet/SetupSheets.js', err);
   }
 
-  check(so, 'danh mục chỉ còn ba tham số người dùng; bộ đếm cấp mã đã chuyển sang Document Properties',
+  check(so, 'danh mục có bốn tham số người dùng; bộ đếm cấp mã đã chuyển sang Document Properties',
     nen.hop.configParamNames(),
-    [nen.hop.LOG_TRACE_CONFIG_NAME, nen.hop.CELL_BUDGET_CONFIG_NAME, nen.hop.WRITE_GATE_CREATOR_CONFIG_NAME]);
+    [nen.hop.LOG_TRACE_CONFIG_NAME, nen.hop.CELL_BUDGET_CONFIG_NAME, nen.hop.WRITE_GATE_CREATOR_CONFIG_NAME, nen.hop.FBM_VERIFY_STATUS_CONFIG_NAME]);
 
   // Một dòng tham số không có lời giải thích là một cái tên mà chủ dự án vẫn phải đi đoán giá trị hợp lệ — tức là phép gieo chỉ làm được một nửa việc nó hứa.
   check(so, 'mỗi tham số trong danh mục đều có ghi chú giải thích',
@@ -64,11 +64,11 @@ function chay(so) {
 
   check(so, 'gieo xong thì tham số người dùng để trống',
     nen.hop.configParams(),
-    { LOG_TRACE: 'off', CELL_BUDGET: '', USER_NAME: '' });
+    { LOG_TRACE: 'off', CELL_BUDGET: '', USER_NAME: '', FBM_VERIFY_STATUS_DEFAULT: '' });
 
-  check(so, 'ba tên nằm ngay hàng dữ liệu đầu, không chừa khoảng trắng',
+  check(so, 'các tên nằm ngay hàng dữ liệu đầu, không chừa khoảng trắng',
     docKhoiThamSo(nen),
-    [[4, 'LOG_TRACE', 'off'], [5, 'CELL_BUDGET', ''], [6, 'USER_NAME', '']]);
+    [[4, 'LOG_TRACE', 'off'], [5, 'CELL_BUDGET', ''], [6, 'USER_NAME', ''], [7, 'FBM_VERIFY_STATUS_DEFAULT', '']]);
 
   // Các lệnh ghi khung và khối tham số được gom theo vùng; thay đổi catalog không làm tách nhỏ lệnh.
   check(so, 'cả lượt dựng tốn 6 lệnh ghi theo vùng', nen.dem.setValues, 6);
@@ -85,11 +85,11 @@ function chay(so) {
 
   check(so, 'chạy lại không đụng ô giá trị người dùng đã gõ',
     docKhoiThamSo(lai),
-    [[4, 'LOG_TRACE', 'all'], [5, 'CELL_BUDGET', ''], [6, 'USER_NAME', '']]);
+    [[4, 'LOG_TRACE', 'all'], [5, 'CELL_BUDGET', ''], [6, 'USER_NAME', ''], [7, 'FBM_VERIFY_STATUS_DEFAULT', '']]);
 
   check(so, 'chạy lại không thêm dòng trùng tên, nên configParams không ném lỗi',
     lai.hop.configParams(),
-    { LOG_TRACE: 'all', CELL_BUDGET: '', USER_NAME: '' });
+    { LOG_TRACE: 'all', CELL_BUDGET: '', USER_NAME: '', FBM_VERIFY_STATUS_DEFAULT: '' });
 
   check(so, 'chạy lại mà không thiếu tên nào thì không tốn lệnh ghi nào cho khối tham số', lai.dem.setValues, 5);
 
@@ -104,7 +104,7 @@ function chay(so) {
 
   check(so, 'khối sắp xếp dài hơn không đẩy tên tham số xuống dưới khoảng trắng',
     docKhoiThamSo(lech),
-    [[4, 'LOG_TRACE', 'off'], [5, 'CELL_BUDGET', ''], [6, 'USER_NAME', '']]);
+    [[4, 'LOG_TRACE', 'off'], [5, 'CELL_BUDGET', ''], [6, 'USER_NAME', ''], [7, 'FBM_VERIFY_STATUS_DEFAULT', '']]);
 
   section('Sheet đã có tên lạ và một tên trong danh mục nằm giữa khối');
 
@@ -115,7 +115,7 @@ function chay(so) {
 
   check(so, 'tên đã có giữ nguyên chỗ và giá trị, chỉ tên còn thiếu được nối vào cuối',
     docKhoiThamSo(tron),
-    [[4, 'GHI_CHU_RIENG', 'của tôi'], [5, 'CELL_BUDGET', '900000'], [6, 'MOT_TEN_LA', '7'], [7, 'LOG_TRACE', 'off'], [8, 'USER_NAME', '']]);
+    [[4, 'GHI_CHU_RIENG', 'của tôi'], [5, 'CELL_BUDGET', '900000'], [6, 'MOT_TEN_LA', '7'], [7, 'LOG_TRACE', 'off'], [8, 'USER_NAME', ''], [9, 'FBM_VERIFY_STATUS_DEFAULT', '']]);
 
   check(so, 'thiếu tên chỉ tốn một lệnh ghi cho khối tham số', tron.dem.setValues, 6);
 
@@ -127,7 +127,7 @@ function chay(so) {
 
   checkContains(so, 'nghiệm thu báo đạt sau khi dựng khung', dongDat, '✅ ĐẠT');
   checkContains(so, 'nghiệm thu kể tên từng tham số kèm giá trị đang mang', dongDat,
-    'Config, khối tham số — đủ 3 tên: LOG_TRACE = "off", CELL_BUDGET = (trống, dùng mặc định), USER_NAME = (trống, dùng mặc định)');
+    'Config, khối tham số — đủ 4 tên: LOG_TRACE = "off", CELL_BUDGET = (trống, dùng mặc định), USER_NAME = (trống, dùng mặc định), FBM_VERIFY_STATUS_DEFAULT = (trống, dùng mặc định)');
 
   section('Di chuyển bộ đếm cũ và hướng dẫn nhập Config');
 
@@ -230,9 +230,9 @@ function chay(so) {
   const resetResult = reset.hop.resetConfigToDefaults();
   check(so, 'reset Config không đụng bộ đếm cấp mã trong Document Properties',
     [resetResult.counters, reset.hop.idGateCounterValues()], [undefined, { customer: 7, activity: 9 }]);
-  check(so, 'reset xóa cấu hình người dùng và gieo lại đúng ba tham số',
+  check(so, 'reset xóa cấu hình người dùng và gieo lại đúng bốn tham số',
     [reset.hop.configReadAll().sheetSchema, reset.hop.configReadAll().sort, reset.hop.configParams()],
-    [{}, [], { LOG_TRACE: 'off', CELL_BUDGET: '', USER_NAME: '' }]);
+    [{}, [], { LOG_TRACE: 'off', CELL_BUDGET: '', USER_NAME: '', FBM_VERIFY_STATUS_DEFAULT: '' }]);
   check(so, 'reset không sửa bản ghi Customer và đánh dấu Config cùng mọi view bẩn',
     [reset.Customer.sheet.getRange(4, 2).getValue(), reset.hop.dirtyStateRead(), reset.stubs._khoa.dangGiu],
     ['Giữ nguyên khách', { viewSheets: ['!Lead'], records: [], config: true, all: false }, false]);
