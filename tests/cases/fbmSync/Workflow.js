@@ -353,6 +353,71 @@ async function chay(so) {
   const secondBatchRequest = batchLimitFlow.hop.FbmSync.customerNext(batchLimitFlow.hop.FbmSync.stateRead(), batchRows, 10);
   const batchCursor = batchLimitFlow.hop.FbmSync.detailCursorRead();
   check(so, 'Số Customer mỗi lượt = 3 được áp dụng và cursor đến Customer thứ 4', [batchState.detailCustomerLimit, firstBatchRequest.body.count, secondBatchRequest, batchCursor.pageIndex, batchCursor.pageValue[2]], [3, 3, null, 0, '3']);
+  // Chiều đẩy kiểm lại danh mục FBM giữa các lô: FBM đổi tên một mã giữa lượt thì chỉ bản ghi dùng mã đó bị chặn.
+  const categoryPushRun = (options) => {
+    const flow = workflowGas(), F = flow.hop.FbmSync, logs = [], sheetSaves = [], fbmNames = { WEB: 'Web', HDDV: 'Hóa đơn dịch vụ' }, lookupAt = [], issued = [];
+    flow.hop.logEvent = (event) => logs.push(event);
+    F.readCategoryGate = () => ({ map: {}, names: {}, valid: {}, warnings: [], namesBySource: { '@CAT_TINH_THANH': {}, '@CAT_NGUON_KH': { WEB: 'Web', HDDV: 'Hóa đơn dịch vụ' }, '@CAT_CONG_VIEC': {} } });
+    F.pushCandidates = (entity) => entity !== 'customer' ? [] : Array.from({ length: 25 }, (_, index) => {
+      const id = 'C-' + String(index + 1).padStart(2, '0');
+      return { kind: 'edit', id, position: index, record: { id, fbmId: 'F-' + id, fbmHash: 'h', leadCode: ['C-03', 'C-22', 'C-23'].indexOf(id) >= 0 ? 'HDDV' : 'WEB' } };
+    });
+    ['pushConfigErrors', 'pushOwnerError'].forEach((name) => { F[name] = () => ''; });
+    F.pushEligibilityErrors = () => [];
+    F.isRecordLocked = () => false;
+    F.validatePushCategories = (record, entity, gate) => {
+      const reason = gate.blocked['@CAT_NGUON_KH\u001f' + record.leadCode];
+      return reason ? [{ result: { ok: false, reason } }] : [];
+    };
+    F.customerEditOpenRequest = (fbmId) => ({ url: 'https://fbm.test/edit', body: { id: fbmId }, meta: { kind: 'customer_edit_open' } });
+    flow.hop.writeGateSave = (input) => { sheetSaves.push(...input.records); return { ok: true }; };
+    const verified = { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' };
+    const state = F.stateStart('', 'push', 0);
+    state.mode = 'push'; state.phase = 'push'; state.entity = 'customer'; state.session = verified; state.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
+    F.stateWrite(state);
+    let envelope = F.nextEnvelope(F.nextPushRequest(F.stateRead())), lastStep = null;
+    for (let guard = 0; envelope && guard < 60; guard += 1) {
+      if (envelope.meta.kind !== 'batch') {
+        const current = F.stateRead(); issued.push(current.cursor.candidate.id);
+        lastStep = F.continueAfterPushError(current, current.cursor, { reason: 'Giả lập FBM từ chối để đi tiếp hàng đợi', code: 'FBM_ERROR' });
+        envelope = lastStep.request; continue;
+      }
+      lookupAt.push(F.stateRead().cursor.index);
+      if (lookupAt.length === 2) { fbmNames.HDDV = 'Hóa đơn đầu vào'; }
+      const items = [0, 1, 2].map((id) => (lookupAt.length === 2 && options && options.failSecond && id === 1)
+        ? { id: String(id), ok: false, status: 500, body: '' }
+        : { id: String(id), ok: true, status: 200, body: JSON.stringify({ d: id === 1 ? Object.keys(fbmNames).map((code) => [code, fbmNames[code]]) : [['X', 'x']] }) });
+      lastStep = F.continue({ ok: true, status: 200, items, transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId: envelope.id }] } });
+      envelope = lastStep.request;
+    }
+    return { F, logs, sheetSaves, lookupAt, issued, lastStep };
+  };
+  const renamed = categoryPushRun();
+  const unknownStatus = renamed.F.SYNC_STATUS.unknownCategory;
+  check(so, 'FBM đổi tên một mã giữa hai lô đẩy: lô danh mục đọc lại đúng chỗ dừng, bản ghi dùng mã đó bị chặn và vào Log, bản ghi khác vẫn đẩy', [
+    renamed.lookupAt,
+    renamed.issued,
+    renamed.sheetSaves.filter((row) => row.syncStatus === unknownStatus).map((row) => row.id),
+    renamed.logs.filter((event) => event.action === 'category_block').map((event) => event.recordId + ':' + event.outcome),
+    renamed.F.stateRead().phase
+  ], [
+    [0, 20],
+    Array.from({ length: 21 }, (_, index) => 'C-' + String(index + 1).padStart(2, '0')).concat(['C-24', 'C-25']),
+    ['C-22', 'C-23'],
+    ['HDDV:warn'],
+    'done'
+  ]);
+  const lookupLost = categoryPushRun({ failSecond: true });
+  const lostState = lookupLost.F.stateRead();
+  check(so, 'giữa lượt đẩy không lấy được danh mục FBM thì dừng paused, không đẩy tiếp, Sidebar thấy lý do và Log ghi lỗi', [
+    lookupLost.issued.length, lostState.phase, lookupLost.lastStep.request, lookupLost.lastStep.status.phase,
+    lookupLost.logs.filter((event) => event.action === 'category_block' && event.outcome === 'error').map((event) => event.reason),
+    (lookupLost.lastStep.status.metadata.categoryBlocks || []).map((block) => block.source + ': ' + block.reason)
+  ], [20, 'paused', null, 'paused', ['@CAT_NGUON_KH: Không lấy được danh mục FBM (TRANSPORT_ERROR). Bỏ toàn bộ chiều đẩy kỳ này.'], ['@CAT_NGUON_KH: Không lấy được danh mục FBM (TRANSPORT_ERROR).']]);
+  const dueState = { metadata: { categoryCheck: { at: 1000, pushed: 3 } } }, dueBudget = renamed.F.BUDGET;
+  check(so, 'danh mục đọc quá lookupMaxAgeMs thì phải đọc lại trước bản ghi đẩy kế, kể cả khi chưa đủ pushBatchRecords', [
+    renamed.F.pushLookupDue(dueState, 1000 + dueBudget.lookupMaxAgeMs - 1), renamed.F.pushLookupDue(dueState, 1000 + dueBudget.lookupMaxAgeMs), renamed.F.pushLookupDue({ metadata: {} }, 1000)
+  ], [false, true, true]);
   const compactLookupFlow = workflowGas();
   const compactLookupNames = {}, compactLookupMap = {}, compactLookupValid = {}, compactLookupAllNames = {};
   const liveCategoryCounts = [63, 11, 12, 17];
@@ -374,28 +439,30 @@ async function chay(so) {
   compactLookupFlow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
   compactLookupFlow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   compactLookupFlow.hop.FbmSync.start({ mode: 'write', origin: 'manual', scan: 'full' });
-  const compactContinue = (body) => {
+  const compactContinue = (body, items) => {
     const requestId = compactLookupFlow.hop.FbmSync.stateRead().activeRequestId;
-    return compactLookupFlow.hop.FbmSync.continue({ ok: true, status: 200, body: JSON.stringify(body), transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId }] } });
+    return compactLookupFlow.hop.FbmSync.continue(Object.assign({ ok: true, status: 200, transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId }] } }, items ? { items } : { body: JSON.stringify(body) }));
   };
   compactContinue({ d: { TotalRowCount: 1, Rows: [[2037, 'ANHLT', 'Le Tuan Anh']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] } } });
   compactContinue({ d: { Authorized: 'customer-auth' } });
   compactContinue({ d: { Authorized: 'activity-auth' } });
-  let compactLast = null;
-  let compactPairValue = '';
-  compactLookupFlow.hop.FbmSync.SYNC_LOOKUPS.forEach((item, index) => {
+  // Chụp state ngay trước khi đối chiếu Category: đó là lúc danh mục FBM còn nằm trong state.
+  let compactLookupSnapshot = '';
+  const compactPrepare = compactLookupFlow.hop.FbmSync.prepareCategoryGate;
+  compactLookupFlow.hop.FbmSync.prepareCategoryGate = (state) => { compactLookupSnapshot = JSON.stringify(state); return compactPrepare(state); };
+  const compactLast = compactContinue(null, compactLookupFlow.hop.FbmSync.SYNC_LOOKUPS.map((item, index) => {
     const rows = Object.keys(compactLookupNames[item.key]).map((code) => [code, compactLookupNames[item.key][code]]);
     rows.push(...Array.from({ length: 700 }, (_, rowIndex) => ['NOISE-' + index + '-' + rowIndex, 'Tên dài để mô phỏng danh mục lớn']));
-    compactLast = compactContinue({ d: { TotalRowCount: rows.length, Rows: rows } });
-    if (index === 0) { const lookup = compactLookupFlow.hop.FbmSync.stateRead().session.lookups['@CAT_TINH_THANH']; compactPairValue = lookup && lookup.pairs && lookup.pairs['CODE-0']; }
-  });
+    return { id: String(index), ok: true, status: 200, body: JSON.stringify({ d: { TotalRowCount: rows.length, Rows: rows } }) };
+  }));
+  const compactPairValue = JSON.parse(compactLookupSnapshot).session.lookups['@CAT_TINH_THANH'].pairs['CODE-0'];
   const compactState = compactLookupFlow.hop.FbmSync.stateRead();
-  const compactStateBytes = Buffer.byteLength(JSON.stringify(compactState), 'utf8');
+  const compactStateBytes = Buffer.byteLength(compactLookupSnapshot, 'utf8');
   check(so, 'lookup lớn không chép map Category vào state; gate dựng lại từ Sheet Category vẫn đủ mã (FBM-042)', [
     compactLast.request && compactLast.request.meta.kind,
     compactStateBytes < compactLookupFlow.hop.FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT,
     compactPairValue,
-    JSON.stringify(compactState).indexOf('NOISE-') < 0,
+    compactLookupSnapshot.indexOf('NOISE-') < 0,
     Object.prototype.hasOwnProperty.call(compactState.metadata, 'categoryGate'),
     JSON.stringify(compactState).indexOf('categoryGateOfRun') < 0,
     Object.keys(compactLookupFlow.hop.FbmSync.stateCategoryGate(compactState).map || {}).length,
@@ -482,6 +549,7 @@ async function chay(so) {
   ], [true, true, 'push_wait', false, true, true, 2, true, 'FBM_SYNC_STATE_V1', true]);
   const orderFlow = workflowGas();
   const orderState = orderFlow.hop.FbmSync.stateStart('', 'push', 0);
+  orderState.metadata.categoryCheck = { at: Date.now(), pushed: 0 };
   orderState.mode = 'write'; orderState.phase = 'push'; orderState.entity = 'activity';
   orderState.cursor = { kind: 'push_scan', entity: 'activity', index: 0 };
   orderFlow.hop.FbmSync.stateWrite(orderState);
@@ -503,6 +571,7 @@ async function chay(so) {
   // FBM-045: bước nạp Category gọi nextPushRequest rồi tự ghi lại object state của nó; khóa phải đặt trên chính object đó.
   const aliasFlow = workflowGas();
   const aliasState = aliasFlow.hop.FbmSync.stateStart('', 'push', 0);
+  aliasState.metadata.categoryCheck = { at: Date.now(), pushed: 0 };
   aliasState.mode = 'push'; aliasState.phase = 'push'; aliasState.entity = 'customer'; aliasState.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
   aliasFlow.hop.FbmSync.stateWrite(aliasState);
   aliasFlow.hop.FbmSync.pushCandidates = () => [{ kind: 'edit', id: 'CUS-ALIAS', position: 0, record: { id: 'CUS-ALIAS', fbmId: 'FBM-CUS-ALIAS', fbmHash: 'h0', fbmSyncPermission: 'Cho phép' } }];
@@ -518,6 +587,7 @@ async function chay(so) {
   // FBM-002: không ghi được `đang đẩy` xuống Sheet thì không phát lệnh ghi FBM.
   const pushingFlow = workflowGas();
   const pushingState = pushingFlow.hop.FbmSync.stateStart('', 'push', 0);
+  pushingState.metadata.categoryCheck = { at: Date.now(), pushed: 0 };
   pushingState.mode = 'write'; pushingState.phase = 'push'; pushingState.entity = 'activity';
   pushingState.cursor = { kind: 'push_scan', entity: 'activity', index: 0 };
   pushingFlow.hop.FbmSync.stateWrite(pushingState);
@@ -734,7 +804,7 @@ async function chay(so) {
     const so2 = (i) => String(i).padStart(2, '0');
     const customerRows = Array.from({ length: soKhach }, (_, k) => k + 1).map((i) => row(fullCustomerFields, { stt_rec_kh: 'FBM-C' + i, ma_kh: 'ALT' + String(i).padStart(5, '0'), ten_kh: 'Cong ty ' + i, ma_so_thue: '0100' + so2(i), ong_ba: String.fromCharCode(65 + (i - 1) % 26), dc_lh: 'Ha Noi', dien_thoai: '09' + so2(i), email: 'c' + i + '@example.test', ngay_gd: '2026-09-20', datetime0: gio(i, 1), xorder: i }));
     const activityRows = Object.fromEntries(customerRows.map((_, k) => k + 1).map((i) => ['FBM-C' + i, [row(fullActivityFields, { id: 'FBM-A' + i, details: 'Goi dien ' + i, end_date: '2026-09-20', owner: 'Owner ' + i, datetime0: gio(i, 3), line_nbr: 1 })]]));
-    const fullKinds = [], fullStatuses = [], fullActivityPropCalls = [], fullActivitySheetReads = [], fullBatches = [];
+    const fullKinds = [], fullStatuses = [], fullActivityPropCalls = [], fullActivitySheetReads = [], fullBatches = [], fullLookupFields = [];
     let fullStep = null;
     // `rounds` chạy lại cả lượt trên cùng Sheet; `loseTab` làm lượt đầu mất tab FBM ngay ở lô giao dịch đầu tiên.
     for (let round = 0; round < (options && options.rounds || 1); round += 1) {
@@ -744,8 +814,11 @@ async function chay(so) {
       const request = fullStep.request;
       const kind = String(request.meta && request.meta.kind || '');
       fullKinds.push(kind + ':' + String(request.meta && (request.meta.entity || request.meta.field) || ''));
-      if (kind === 'batch') { fullBatches.push(request); }
-      if (kind === 'batch' && round === 0 && options && options.loseTab) {
+      // Lô danh mục chỉ cần đi qua executor; số đo chi phí và các ca phá lô chỉ nhắm lô giao dịch.
+      const activityBatch = kind === 'batch' && request.meta.entity === 'activity';
+      if (kind === 'batch' && request.meta.entity === 'category') { fullLookupFields.push(request.items.map((item) => item.body.controller)); }
+      if (activityBatch) { fullBatches.push(request); }
+      if (activityBatch && round === 0 && options && options.loseTab) {
         fullStep = fullFlow.hop.FbmSync.controlDispatchLocked('transport_failure', { requestId: request.id, code: 'FBM_TRANSPORT_UNAVAILABLE', message: 'Mất tab FBM' });
         fullStatuses.push(fullStep.status);
         continue;
@@ -763,12 +836,13 @@ async function chay(so) {
         throw new Error('Ca mô phỏng pipeline gặp request không mong đợi: ' + kind);
       }
       let raw = kind === 'batch' ? await sendBatchThroughExecutor(request, (item) => {
+        if (/GetCompletionList/.test(item.url)) { return { body: JSON.stringify({ d: [['CODE', 'Ten danh muc']] }) }; }
         const key = item.body.externalKey && item.body.externalKey[0] && item.body.externalKey[0].Value;
         if (khachLoi[key]) { return { raw: khachLoi[key] }; }
         return { body: gridResponse(fullActivityFields, activityRows[key] || [], (activityRows[key] || []).length) };
       }) : executorRaw((await sendThroughExecutor(request, body)).reply, request.id);
-      if (kind === 'batch' && options && options.editBatch) { raw = options.editBatch(raw, fullBatches.length); }
-      if (kind === 'batch') {
+      if (activityBatch && options && options.editBatch) { raw = options.editBatch(raw, fullBatches.length); }
+      if (activityBatch) {
         // Đi đúng đường của fbmContinueSync (bộ đệm một lần gọi, khóa điều phối) để đếm số lần gọi kho của một lát Activity.
         const callsBefore = fullPropCalls.count, readsBefore = Object.assign({}, fullSheetReads), writesBefore = fullWrites.length;
         fullFlow.hop.FbmSync.propertyBufferBegin();
@@ -792,7 +866,7 @@ async function chay(so) {
       }
     }
     }
-    return { fullFlow, fullLogs, fullWrites, fullLocal, fullStep, fullKinds, fullStatuses, fullActivityPropCalls, fullActivitySheetReads, fullBatches };
+    return { fullFlow, fullLogs, fullWrites, fullLocal, fullStep, fullKinds, fullStatuses, fullActivityPropCalls, fullActivitySheetReads, fullBatches, fullLookupFields };
   }
   const { fullFlow, fullLogs, fullWrites, fullLocal, fullStep, fullKinds, fullStatuses } = await fullPipeline(false);
   const fullFinal = fullFlow.hop.FbmSync.statusView();
@@ -811,7 +885,7 @@ async function chay(so) {
     0, true, 4, true
   ]);
   const checkRun = await fullPipeline(false, 'check');
-  check(so, 'nhóm 1.3: "Kiểm tra an toàn" nạp đủ 3 danh mục FBM trước khi đọc Customer', [checkRun.fullKinds.filter((kind) => kind.indexOf('completion:') === 0)], [['completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH', 'completion:@CAT_CONG_VIEC']]);
+  check(so, '"Kiểm tra an toàn" nạp đủ 3 danh mục FBM trong một lô, một lần gọi GAS, trước khi đọc Customer', [checkRun.fullKinds.filter((kind) => kind.indexOf('completion:') === 0 || kind === 'batch:category'), checkRun.fullLookupFields, checkRun.fullKinds.indexOf('batch:category') < checkRun.fullKinds.indexOf('grid:customer')], [['batch:category'], [['crProvinceCity', 'crLeadSource', 'crJob']], true]);
   // Nhóm 1.3 (2A điểm 12): chiều Lấy không nạp danh mục FBM nên không có mã bị chặn vì FBM đổi tên; phép kiểm từng bản ghi bằng Sheet Category vẫn chặn mã lạ.
   const readCategoryState = fullFlow.hop.FbmSync.stateRead();
   const unknownGate = { map: {}, valid: { '@CAT_CONG_VIEC': { 'Gọi điện': true, CV1: true } }, blocked: {} };

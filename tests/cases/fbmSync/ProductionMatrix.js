@@ -160,6 +160,8 @@ async function chay(so) {
     const st = F.stateStart('', 'push', 0);
     st.mode = 'write'; st.phase = 'push'; 
     st.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
+    // Lượt đẩy luôn bắt đầu sau lô danh mục vừa đọc.
+    st.metadata.categoryCheck = { at: Date.now(), pushed: 0 };
     F.stateWrite(st);
     return { run, F };
   }
