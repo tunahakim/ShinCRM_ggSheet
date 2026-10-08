@@ -38,6 +38,16 @@ function chay(so) {
   check(so, 'ô chứa số cũng đi qua thành chuỗi', hop.dateToText(2026, 'day'), '2026');
 
   checkThrows(so, 'precision lạ thì ném lỗi có nêu chỗ phải sửa', () => hop.dateToText(moc, 'giây'), 'DataSchema');
+
+  // Utilities.formatDate tốn khoảng 0,6 ms mỗi ô trên Google; đọc Sheet nghìn dòng mà mỗi ô ngày gọi nó thì một lần đọc mất vài giây.
+  const goc = hop.Utilities.formatDate;
+  let soLanGoi = 0;
+  hop.Utilities.formatDate = function () { soLanGoi += 1; return goc.apply(this, arguments); };
+  const cungMuiGio = [hop.dateToText(moc, 'day', 'Asia/Ho_Chi_Minh'), hop.dateToText(moc, 'minute', 'Asia/Ho_Chi_Minh'), hop.dateToText(new Date(2026, 11, 9, 0, 5), 'minute')];
+  const lanGoiCungMuiGio = soLanGoi;
+  hop.dateToText(moc, 'day', 'Europe/London');
+  hop.Utilities.formatDate = goc;
+  check(so, 'múi giờ trùng múi giờ script thì đổi ngày không gọi Utilities.formatDate, kết quả giữ nguyên; khác múi giờ vẫn gọi', [cungMuiGio, lanGoiCungMuiGio, soLanGoi], [['2026-01-05', '2026-01-05 07:30', '2026-12-09 00:05'], 0, 1]);
   checkThrows(so, 'thiếu precision cũng ném lỗi chứ không đoán', () => hop.dateToText(moc, undefined), 'precision');
 
   // Vì sao `dateTextIsDate` không dùng `instanceof`: hộp cát `vm` là một vùng chạy (realm) khác, nên nó có `Date` riêng và
