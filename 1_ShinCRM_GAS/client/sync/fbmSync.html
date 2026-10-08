@@ -424,7 +424,8 @@ function fbmSyncPaintHeaderState(status) {
 function fbmSyncProgressData(status, count) {
   var phase = String(status.phase || ''), active = ['checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'].indexOf(phase) >= 0;
   var waitingForResponse = active && status.cursor && status.cursor.kind === 'push_wait';
-  var total = Math.max(0, Number(count.total || 0)), completed = Math.max(0, Number(count.completed || 0));
+  // Thanh tiến trình đếm theo khách của lượt (GAS sở hữu `progress`); số bản ghi nhận/ghi nằm ở dòng đếm riêng.
+  var progress = status.progress || {}, total = Math.max(0, Number(progress.total || 0)), completed = Math.min(total, Math.max(0, Number(progress.done || 0)));
   var determinate = total > 0;
   var percent = determinate ? Math.min(100, Math.round(completed * 100 / total)) : 0;
   return { active: active, waitingForResponse: waitingForResponse, determinate: determinate, percent: percent, label: determinate ? 'Tiến trình: ' + completed + '/' + total + ' (' + percent + '%)' + (waitingForResponse ? ' · đang chờ phản hồi' : '') : (active ? 'Tiến trình: đang xử lý…' : '') };
