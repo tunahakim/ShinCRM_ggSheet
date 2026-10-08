@@ -17,7 +17,7 @@ FbmSync.scriptSettings = function () {
   }
   var accountName = typeof FbmSync.bindingAccountName === 'function' ? FbmSync.bindingAccountName() : '';
   var accountSettings = typeof FbmSync.accountSettingsRead === 'function' ? FbmSync.accountSettingsRead() : {};
-  var testCodes = typeof FbmSync.testScopeCodes === 'function' ? FbmSync.testScopeCodes() : null;
+  var testScope = typeof FbmSync.testScopeCodes === 'function' ? FbmSync.testScopeCodes() : null;
   var activitySince = currentState.runId && currentState.activitySince !== undefined ? currentState.activitySince : accountSettings.activitySince;
   return {
     baseUrl: 'https://fbo.com.vn:8888',
@@ -29,7 +29,9 @@ FbmSync.scriptSettings = function () {
     customerPrefix: String(accountSettings.customerPrefix || ''),
     customerCodeLength: String(accountSettings.customerCodeLength || ''),
     activitySince: String(activitySince || ''),
-    testCodes: testCodes
+    // Chiều lấy lọc grid FBM chỉ theo mã FBM; chiều đẩy lọc theo mã ShinCRM ở `inTestScope`.
+    testFbmCodes: testScope ? testScope.fbm : null,
+    testShinCodes: testScope ? testScope.shin : null
   };
 };
 /** Đổi chuỗi /Date(ms)/ của .NET, giữ nguyên giá trị khác. */
@@ -57,9 +59,9 @@ FbmSync.gridRequest = function (entity, options) {
   if (entity === 'customer' && cfg.userId) {
     payload.externalKey.push({ Name: "stt_rec_kh in (select stt_rec_kh from dbo.zcFastBusiness$Function$GetCustomerValidate('" + cfg.userId + "')) and 1", Opr: '=', Value: 1, Type: 'String', Ignore: false });
   }
-  if (entity === 'customer' && cfg.testCodes && opt.includeTestCustomer !== false) {
+  if (entity === 'customer' && cfg.testFbmCodes && opt.includeTestCustomer !== false) {
     // Danh sách rỗng thành điều kiện không khớp ai, để chế độ thử không bao giờ rơi thành quét toàn bộ. Mã đã qua TEST_CODE_PATTERN nên không có dấu nháy.
-    var inList = cfg.testCodes.length ? cfg.testCodes.map(function (code) { return "'" + code + "'"; }).join(',') : "''";
+    var inList = cfg.testFbmCodes.length ? cfg.testFbmCodes.map(function (code) { return "'" + code + "'"; }).join(',') : "''";
     payload.externalKey.push({ Name: 'ma_kh in (' + inList + ') and 1', Opr: '=', Value: 1, Type: 'String', Ignore: false });
   }
   if (entity === 'customer' && payload.type === 0 && cfg.userId) {

@@ -31,6 +31,12 @@ function idGateFormat(entity, so) {
   return ID_GATE_PREFIXES[entity] + text;
 }
 
+/** Mã có đúng khuôn do cổng này cấp không (tiền tố + đủ chữ số). Nơi khác cần phân biệt mã ShinCRM với mã ngoài thì hỏi ở đây. */
+function idGateMatches(entity, value) {
+  var prefix = ID_GATE_PREFIXES[entity], text = String(value === null || value === undefined ? '' : value).trim();
+  return !!prefix && text.length === prefix.length + ID_GATE_DIGITS && text.indexOf(prefix) === 0 && /^\d+$/.test(text.slice(prefix.length));
+}
+
 /**
  * Nhặt phần số của một mã bất kỳ. Không có chữ số nào thì trả về 0.
  *

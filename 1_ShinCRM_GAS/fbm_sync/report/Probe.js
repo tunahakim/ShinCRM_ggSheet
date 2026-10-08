@@ -2,7 +2,7 @@
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 function fbmProbeAltState() {
-  var settings = FbmSync.scriptSettings(), code = settings.testCodes;
+  var settings = FbmSync.scriptSettings(), code = settings.testShinCodes;
   var customers = FbmSync.readLocal('customer');
   var customerIds = {};
   var selectedCustomers = customers.filter(function (record) {

@@ -111,12 +111,12 @@ FbmSync.pushCandidates = function (entity) {
   });
 };
 
-/** Khi bật chế độ thử, chỉ ghi khách có mã FBM hoặc mã ShinCRM nằm trong danh sách (khách mới chưa có mã FBM thì cho phép bằng mã ShinCRM); Activity theo khách cha. Tắt chế độ thử thì mở hết. */
+/** Khi bật chế độ thử, chiều đẩy chỉ ghi khách có mã ShinCRM trong danh sách mã ShinCRM; Activity theo khách cha. Tắt chế độ thử thì mở hết. */
 FbmSync.inTestScope = function (customer, settings) {
-  var codes = settings && settings.testCodes;
+  var codes = settings && settings.testShinCodes;
   if (!codes) { return true; }
   if (!customer) { return false; }
-  return codes.indexOf(String(customer.fbmCustomerCode || '').trim()) >= 0 || codes.indexOf(String(customer.id || '').trim()) >= 0;
+  return codes.indexOf(String(customer.id || '').trim()) >= 0;
 };
 
 /** Lệnh tạo đã phát nhưng chưa biết FBM có lưu hay không; bản ghi sửa (đã có ID FBM) gửi lại không sinh trùng nên không thuộc nhóm này. */

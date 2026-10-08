@@ -26,9 +26,9 @@ var FBM_FAKE_DELETED_CODE = 'ALTFAKE01';
 var FBM_DEV_DEFAULT_TEST_CODES = ['ALT00010', 'CUS-020061'];
 /** Đặt phạm vi thử qua đúng cửa lưu cài đặt mà Sidebar dùng, để dò DEV không có đường tắt riêng. */
 function fbmDevSetTestCodes(codes) {
-  var saved = FbmSync.syncSettingsSave(Object.assign({}, FbmSync.syncSettingsRead(), { testMode: true, testCodes: codes }));
+  var saved = FbmSync.syncSettingsSave(Object.assign({ testMode: true }, FbmSync.testCodesSplit(codes)));
   if (!saved.ok) { throw new Error(saved.message); }
-  return saved.settings.testCodes;
+  return saved.settings.testFbmCodes.concat(saved.settings.testShinCodes);
 }
 /** Dò luồng "mã bị xóa" (FBM-048): nhân bản khách ALT00010 thành dòng mang ID/mã FBM không tồn tại và tạm thu phạm vi live về mã giả. Chỉ đọc form FBM, không ghi FBM. */
 function fbmSeedFakeDeletedCustomer() {
@@ -50,7 +50,7 @@ function fbmEndFakeDeletedCustomer() {
   var fakes = FbmSync.readLocal('customer').filter(function (record) { return String(record.fbmCustomerCode || '').trim() === FBM_FAKE_DELETED_CODE; });
   if (fakes.length) { FbmSync.sheetSave('customer', fakes.map(function (record) { return { id: record.id, recordStatus: 'deleted' }; }), 'pull'); }
   fbmDevSetTestCodes(FBM_DEV_DEFAULT_TEST_CODES);
-  return { ok: true, softDeleted: fakes.map(function (record) { return record.id + ': ' + record.syncStatus; }), scope: FbmSync.scriptSettings().testCodes };
+  return { ok: true, softDeleted: fakes.map(function (record) { return record.id + ': ' + record.syncStatus; }), scope: FbmSync.scriptSettings().testFbmCodes.concat(FbmSync.scriptSettings().testShinCodes) };
 }
 /** Dò luồng xung đột (G10.7): sửa Website của ALT00010 bên ShinCRM và thay baseline bằng giá trị giả, nên lượt kéo thấy cả hai phía khác baseline và khác nhau. Không ghi FBM. */
 function fbmSeedConflict() {
@@ -94,7 +94,7 @@ function fbmProbeCreateCustomer() {
     syncStatus: record.syncStatus || '', recordStatus: record.recordStatus || '', fbmSyncPermission: record.fbmSyncPermission || '',
     permission: FbmSync.syncPermission(record, 'customer'), eligibilityErrors: FbmSync.pushEligibilityErrors(record, 'customer'),
     categoryErrors: FbmSync.validatePushCategories(record, 'customer', gate), canonical: FbmSync.canonical('customer', record, gate),
-    scope: FbmSync.scriptSettings().testCodes, candidates: FbmSync.pushCandidates('customer').map(function (item) { return item.kind + ':' + item.id; })
+    scope: FbmSync.scriptSettings().testFbmCodes.concat(FbmSync.scriptSettings().testShinCodes), candidates: FbmSync.pushCandidates('customer').map(function (item) { return item.kind + ':' + item.id; })
   };
 }
 /** Mở phạm vi ghi thử cho đúng khách được phép tạo thật, cạnh mã FBM `ALT00010`. */
@@ -143,12 +143,12 @@ function fbmScopeCreatedCustomer() {
   var code = record ? String(record.fbmCustomerCode || '').trim() : '';
   if (!code) { return { ok: false, reason: FBM_TEST_CREATE_CUSTOMER_ID + ' chưa có mã FBM trên Sheet DEV.' }; }
   fbmDevSetTestCodes([code]);
-  return { ok: true, scope: FbmSync.scriptSettings().testCodes };
+  return { ok: true, scope: FbmSync.scriptSettings().testFbmCodes.concat(FbmSync.scriptSettings().testShinCodes) };
 }
 /** Trả phạm vi live về mặc định của DEV. */
 function fbmScopeDefaultCustomer() {
   fbmDevSetTestCodes(FBM_DEV_DEFAULT_TEST_CODES);
-  return { ok: true, scope: FbmSync.scriptSettings().testCodes };
+  return { ok: true, scope: FbmSync.scriptSettings().testFbmCodes.concat(FbmSync.scriptSettings().testShinCodes) };
 }
 
 /**

@@ -213,17 +213,17 @@ function fbmPerfReport() {
 
 /** Phạm vi đo có giới hạn: bật chế độ thử với tối đa `FbmSync.TEST_CODES_MAX` mã FBM (`fbmCustomerCode`, vì bộ lọc chiều lấy so với `ma_kh` bên FBM chứ không so với mã ShinCRM). Ưu tiên khách đã có giao dịch trong Sheet Activity để đo cả nhánh ghi Sheet, bù bằng khách cuối Sheet Customer đã có FBM ID. Chỉ đọc FBM nên an toàn; cất cài đặt cũ để `fbmPerfTestScopeOff` trả lại. */
 function fbmPerfTestScopeOn() {
-  var before = FbmSync.syncSettingsRead(), codes = [], withActivity = {};
+  var before = FbmSync.syncSettingsRead(), codes = [], shinCodes = [], withActivity = {};
   FbmSync.readLocal('activity').forEach(function (record) { var id = String(record.customerId || '').trim(); if (id) { withActivity[id] = true; } });
   var customers = FbmSync.readLocal('customer').filter(function (record) { return String(record.fbmId || '').trim() && FbmSync.TEST_CODE_PATTERN.test(String(record.fbmCustomerCode || '').trim()); });
   var ordered = customers.filter(function (record) { return withActivity[String(record.id || '').trim()]; }).concat(customers.slice().reverse());
   ordered.forEach(function (record) {
-    var id = String(record.fbmCustomerCode).trim();
-    if (codes.length < FbmSync.TEST_CODES_MAX && codes.indexOf(id) < 0) { codes.push(id); }
+    var id = String(record.fbmCustomerCode).trim(), shinId = String(record.id || '').trim();
+    if (codes.length < FbmSync.TEST_CODES_MAX && codes.indexOf(id) < 0) { codes.push(id); if (idGateMatches('customer', shinId)) { shinCodes.push(shinId); } }
   });
-  if (!fbmPerfCache().get('FBM_PERF_PREVIOUS_SETTINGS')) { fbmPerfCache().put('FBM_PERF_PREVIOUS_SETTINGS', JSON.stringify({ testMode: before.testMode, testCodes: before.testCodes }), FBM_PERF_TTL_SECONDS); }
-  var saved = FbmSync.syncSettingsSave({ testMode: true, testCodes: codes });
-  return saved.ok ? 'Đã bật chế độ thử với ' + codes.length + ' mã (' + Object.keys(withActivity).length + ' khách có giao dịch trong Sheet).' : 'LỖI ' + saved.code + ': ' + saved.message;
+  if (!fbmPerfCache().get('FBM_PERF_PREVIOUS_SETTINGS')) { fbmPerfCache().put('FBM_PERF_PREVIOUS_SETTINGS', JSON.stringify({ testMode: before.testMode, testFbmCodes: before.testFbmCodes, testShinCodes: before.testShinCodes }), FBM_PERF_TTL_SECONDS); }
+  var saved = FbmSync.syncSettingsSave({ testMode: true, testFbmCodes: codes, testShinCodes: shinCodes });
+  return saved.ok ? 'Đã bật chế độ thử với ' + codes.length + ' mã FBM và ' + shinCodes.length + ' mã ShinCRM (' + Object.keys(withActivity).length + ' khách có giao dịch trong Sheet).' : 'LỖI ' + saved.code + ': ' + saved.message;
 }
 function fbmPerfTestScopeOff() {
   var raw = fbmPerfCache().get('FBM_PERF_PREVIOUS_SETTINGS');
@@ -241,7 +241,7 @@ var FBM_PERF_DROP_ACTIVITY_ROWS = 10;
  */
 function fbmPerfDropScopeActivities() {
   var settings = FbmSync.syncSettingsRead(), customers = {};
-  if (!settings.testMode || !(settings.testCodes || []).length) { return 'LỖI: chế độ thử chưa bật; chạy fbmPerfTestScopeOn trước.'; }
+  if (!settings.testMode || !settings.testShinCodes.length) { return 'LỖI: chế độ thử chưa bật; chạy fbmPerfTestScopeOn trước.'; }
   FbmSync.readLocal('customer').forEach(function (customer) { customers[String(customer.id || '')] = customer; });
   var targets = {}, picked = 0;
   FbmSync.readLocal('activity').forEach(function (record) {
