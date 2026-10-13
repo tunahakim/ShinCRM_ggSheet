@@ -63,7 +63,7 @@ function workflowGas(options) {
     'fbm_sync/auth/AutoLogin.js',
     'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js',
     'fbm_sync/transport/PushFlow.js',
-    'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/ActivityBatch.js',
+    'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js',
     'fbm_sync/transport/EntryPoints.js',
     'server/service/FbmSyncService.js',
     'server/dev/FbmSyncStateProbe.js'

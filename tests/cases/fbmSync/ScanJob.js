@@ -8,7 +8,7 @@ const KHOA_TRANG = ['ngay_gd', 'datetime0', 'xorder', 'stt_rec_kh'];
 /** Một Sheet DEV giả, một tab FBM giả giữ RAM giữa các request, và FBM giả phân trang keyset như bản thật. */
 function scanHarness(options) {
   const opt = options || {};
-  const logs = [], writes = [], local = { customer: (opt.localCustomers || []).slice(), activity: [] };
+  const logs = [], writes = [], local = { customer: (opt.localCustomers || []).slice(), activity: (opt.localActivities || []).slice() };
   const flow = workflowGas({
     logEvent: (event) => logs.push(event),
     LOG_OK: 'ok', LOG_WARN: 'warn', LOG_ERROR: 'error', LOG_CONFLICT: 'conflict',
@@ -60,12 +60,12 @@ function scanHarness(options) {
   };
   const tab = executorSession();
   // `tabCalls`: số request không phải `scan_chunk` đã qua tab; FBM bị gọi đúng bằng số này thì `scan_chunk` không gọi lại FBM.
-  const trace = { kinds: [], jobs: [], errors: [], statuses: [], tabCalls: 0 };
+  const trace = { kinds: [], jobs: [], errors: [], statuses: [], tabCalls: 0, activityCustomers: [] };
   /** Chạy lượt tới khi GAS không cấp request; `hooks.beforeSend` giả mất tab, `hooks.edit` sửa response, `hooks.afterError` quyết định request kế khi GAS ném lỗi. */
   async function run(hooks) {
     const h = hooks || {};
     F.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-    let step = F.start({ mode: 'read', origin: 'manual', manual: true });
+    let step = F.start({ mode: 'read', origin: 'manual', manual: true, pack: h.pack });
     for (let hop = 0; step && step.request && hop < 200; hop += 1) {
       const request = step.request, kind = String(request.meta && request.meta.kind || '');
       trace.kinds.push(kind + (kind === 'scan_chunk' ? ':' + request.meta.job.chunkIndex : ''));
@@ -74,14 +74,17 @@ function scanHarness(options) {
       if (kind === 'batch') {
         raw = await sendBatchThroughExecutor(request, (item) => {
           const key = item.body.externalKey && item.body.externalKey[0] && item.body.externalKey[0].Value;
-          const body = JSON.parse(gridResponse(activityFields, [row(activityFields, { id: 'A-' + key, details: 'Gọi ' + key, end_date: '2026-09-20', owner: 'Owner', datetime0: '2026-09-20T03:00:00', line_nbr: 1 })], 1));
+          trace.activityCustomers.push(key);
+          const acts = (opt.activityFor ? opt.activityFor(key) : [{ id: 'A-' + key, details: 'Gọi ' + key, end_date: '2026-09-20', owner: 'Owner', datetime0: '2026-09-20T03:00:00', line_nbr: 1 }]).map((values) => row(activityFields, values));
+          const body = JSON.parse(gridResponse(activityFields, acts, acts.length));
           if (item.body.type !== 0) { delete body.d.ViewPage; }
           return { body: JSON.stringify(body) };
         });
       } else {
         const body = kind === 'session_probe' || kind === 'identity_user_grid' ? USER_RESPONSE
           : kind === 'authorize' ? JSON.stringify({ d: { Authorized: 'auth-' + request.meta.entity } })
-          : kind === 'scan_job' ? customerPage(request.body) : '';
+          : kind === 'scan_job' ? customerPage(request.body)
+          : kind === 'activity_bulk_grid' ? gridResponse(activityFields, [], 0) : '';
         if (kind !== 'scan_chunk') { trace.tabCalls += 1; }
         const sent = await tab.send(h.rewrite ? h.rewrite(request, trace) : request, body);
         if (sent.reply && sent.reply.error) {
@@ -262,4 +265,4 @@ async function chay(so) {
   ], [6, 'FBM_SCAN_INCOMPLETE', 'đã đồng bộ']);
 }
 
-module.exports = { chay };
+module.exports = { chay, scanHarness };
