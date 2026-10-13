@@ -230,7 +230,7 @@ async function chay(so) {
   check(so, 'relay config luu Spreadsheet ID', workerSource.indexOf('fbmSpreadsheetId: spreadsheetId') >= 0, true);
   check(so, 'relay config luu nhịp gas_poll va tuy chon startup', workerSource.indexOf('fbmPollMinutes') >= 0 && workerSource.indexOf('fbmRunOnStartup') >= 0 && workerSource.indexOf('config.extension') >= 0, true);
   check(so, 'service worker co quyen goi Sheets va Web App GAS', manifest.host_permissions.includes('https://docs.google.com/*') && manifest.host_permissions.includes('https://script.google.com/macros/*') && manifest.host_permissions.includes('https://script.googleusercontent.com/macros/*'), true);
-  check(so, 'manifest Extension dong bo cung phien ban phat hanh moi', [manifest.version, manifest.name], ['21.22', 'CRM Local Pro V21.22']);
+  check(so, 'manifest Extension dong bo cung phien ban phat hanh moi', [manifest.version, manifest.name], ['21.23', 'CRM Local Pro V21.23']);
   check(so, 'relay GAS co timeout va luu chan doan toi thieu', workerSource.indexOf('GAS_RELAY_TIMEOUT_MS') >= 0 && workerSource.indexOf('RELAY_TIMEOUT') >= 0 && workerSource.indexOf('fbmRelayLastStatus') >= 0, true);
   const sidebarSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'client', 'Sidebar.html'), 'utf8');
   const entryPointsSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'transport', 'EntryPoints.js'), 'utf8');
@@ -343,19 +343,20 @@ async function chay(so) {
   vm.runInContext(workerSource, workerContext, { filename: WORKER_FILE });
   let virtualNow = 1000;
   const waitTimers = [], sentAt = [];
+  let onSend = null;
   workerContext.Date = class extends Date { static now() { return virtualNow; } };
   workerContext.clearTimeout = () => {};
   workerContext.setTimeout = (fn, ms) => { const timer = { fn, ms: Number(ms), fired: false }; waitTimers.push(timer); return timer; };
   workerContext.chrome.tabs.sendMessage = (tabId, message, done) => {
     if (message.type === 'FBM_PING_V2') { done({ ready: true, version: '21.21' }); return; }
-    if (message.type === 'FBM_EXECUTE_V2') { sentAt.push(message.request.id + '@' + virtualNow); done({ result: { ok: true, status: 200, body: '{}', transport: { trace: [] } } }); }
+    if (message.type === 'FBM_EXECUTE_V2') { sentAt.push(message.request.id + '@' + virtualNow); if (onSend) { onSend(message.request.id); } done({ result: { ok: true, status: 200, body: '{}', transport: { trace: [] } } }); }
   };
-  // Đồng hồ giả: chỉ bắn hẹn giờ khoảng nghỉ (hàm `resolve` của Promise, nhận một tham số; hẹn giờ hết hạn ping/tin nhắn tab là hàm không tham số), dời đồng hồ đúng bằng thời gian chờ.
+  // Đồng hồ giả: chỉ bắn hẹn giờ khoảng nghỉ (hàm `wake`; hẹn giờ hết hạn ping/tin nhắn tab là hàm khác), dời đồng hồ đúng bằng thời gian chờ.
   const chayHet = async (promise) => {
     let done = false; promise.then(() => { done = true; });
     while (!done) {
       await new Promise((resolve) => setImmediate(resolve));
-      const timer = waitTimers.find((item) => !item.fired && item.fn.length === 1);
+      const timer = waitTimers.find((item) => !item.fired && item.fn.name === 'wake');
       if (timer) { timer.fired = true; virtualNow += timer.ms; timer.fn(); }
     }
     return promise;
@@ -367,11 +368,32 @@ async function chay(so) {
   await chayHet(workerContext.sendToFbmTab(77, gapEnvelope('lo', 'batch', ['0', '1', '2'])));
   await chayHet(workerContext.sendToFbmTab(77, gapEnvelope('goi', 'scan_chunk')));
   check(so, 'Khoảng cách 1 giây giữa hai request FBM: request đầu không chờ, lần sau chỉ chờ phần còn thiếu, mỗi phần tử trong lô cách nhau đủ 1 giây, lấy gói từ RAM tab không chờ',
-    [sentAt, waitTimers.filter((item) => item.fn.length === 1).map((item) => item.ms)], [['dau@1000', '0@2000', '1@3000', '2@4000', 'goi@4000'], [700, 1000, 1000]]);
+    [sentAt, waitTimers.filter((item) => item.fn.name === 'wake').map((item) => item.ms)], [['dau@1000', '0@2000', '1@3000', '2@4000', 'goi@4000'], [700, 1000, 1000]]);
   gap.maxMs = 0; gap.minMs = 0; sentAt.length = 0;
   const truocMacDinh = waitTimers.length;
   await chayHet(workerContext.sendToFbmTab(77, gapEnvelope('lo0', 'batch', ['0', '1'])));
-  check(so, 'Khoảng cách mặc định 0: không hẹn giờ nghỉ, gửi liền', [sentAt, waitTimers.slice(truocMacDinh).filter((item) => item.fn.length === 1).length], [['0@4000', '1@4000'], 0]);
+  check(so, 'Khoảng cách mặc định 0: không hẹn giờ nghỉ, gửi liền', [sentAt, waitTimers.slice(truocMacDinh).filter((item) => item.fn.name === 'wake').length], [['0@4000', '1@4000'], 0]);
+  gap.maxMs = 1000; gap.minMs = 1000; sentAt.length = 0;
+  // Bấm Dừng lúc lô đang nghỉ trước phần tử kế: không chờ hết khoảng nghỉ, không gửi thêm, trả phần đã đọc.
+  const loNghi = workerContext.sendToFbmTab(77, gapEnvelope('dungNghi', 'batch', ['0', '1', '2', '3']));
+  for (;;) { await new Promise((resolve) => setImmediate(resolve)); if (sentAt.length >= 1) { break; } const timer = waitTimers.find((item) => !item.fired && item.fn.name === 'wake'); if (timer) { timer.fired = true; virtualNow += timer.ms; timer.fn(); } }
+  for (let i = 0; i < 5; i += 1) { await new Promise((resolve) => setImmediate(resolve)); }
+  const dangNghi = waitTimers.filter((item) => !item.fired && item.fn.name === 'wake').length;
+  workerContext.fbmCancelBatch();
+  const ketQuaNghi = await loNghi;
+  check(so, 'Bấm Dừng khi lô đang nghỉ trước phần tử kế: cắt khoảng nghỉ, không gửi thêm request FBM, trả đúng phần đã đọc',
+    [dangNghi, sentAt.map((item) => item.split('@')[0]), ketQuaNghi.result.items.map((item) => item.id)], [1, ['0'], ['0']]);
+  sentAt.length = 0; virtualNow += 5000;
+  onSend = (id) => { if (id === '1') { workerContext.fbmCancelBatch(); } };
+  const ketQuaGoi = await chayHet(workerContext.sendToFbmTab(77, gapEnvelope('dungGoi', 'batch', ['0', '1', '2', '3'])));
+  onSend = null;
+  check(so, 'Bấm Dừng khi lô đang gọi FBM: request đang gọi chạy xong và được trả về, phần tử sau không gửi',
+    [sentAt.map((item) => item.split('@')[0]), ketQuaGoi.result.items.map((item) => item.id)], [['0', '1'], ['0', '1']]);
+  sentAt.length = 0; virtualNow += 5000;
+  workerContext.fbmCancelBatch();
+  virtualNow += 10;
+  const ketQuaSau = await chayHet(workerContext.sendToFbmTab(77, gapEnvelope('loSau', 'batch', ['0', '1'])));
+  check(so, 'Lệnh Dừng cũ không chặn lô mở sau nó', ketQuaSau.result.items.map((item) => item.id), ['0', '1']);
   workerContext.Date = Date;
   const sentItems = [];
   workerContext.chrome.tabs.sendMessage = (tabId, message, done) => {

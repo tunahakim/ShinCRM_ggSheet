@@ -37,13 +37,13 @@ const CONTRACT = {
   },
   // Extension → Web App GAS (nhịp nền).
   relay: {
-    kinds: ['heartbeat_request', 'heartbeat', 'heartbeat_transport_failure', 'background_sync'],
+    kinds: ['heartbeat_request', 'heartbeat', 'heartbeat_transport_failure', 'background_sync', 'transport_probe'],
     commands: ['continue', 'transport_failure']
   },
   // Sidebar ↔ Extension qua postMessage.
   bridge: {
-    toExtension: ['CRM_HANDSHAKE', 'CRM_FBM_CONFIG', 'CRM_FBM_REQUEST', 'CRM_FBM_CREDENTIALS', 'CRM_FBM_CREDENTIAL_METADATA', 'CRM_FBM_CREDENTIAL_CLEAR'],
-    toSidebar: ['CRM_HANDSHAKE_ACK', 'CRM_FBM_CONFIG_ACK', 'CRM_FBM_RESPONSE', 'CRM_FBM_CREDENTIALS_RESULT', 'CRM_FBM_CREDENTIAL_METADATA_RESULT', 'CRM_FBM_CREDENTIAL_CLEAR_RESULT']
+    toExtension: ['CRM_HANDSHAKE', 'CRM_FBM_CONFIG', 'CRM_FBM_REQUEST', 'CRM_FBM_CREDENTIALS', 'CRM_FBM_CREDENTIAL_METADATA', 'CRM_FBM_CREDENTIAL_CLEAR', 'CRM_FBM_CANCEL', 'CRM_FBM_TRANSPORT_PROBE'],
+    toSidebar: ['CRM_HANDSHAKE_ACK', 'CRM_FBM_CONFIG_ACK', 'CRM_FBM_RESPONSE', 'CRM_FBM_CREDENTIALS_RESULT', 'CRM_FBM_CREDENTIAL_METADATA_RESULT', 'CRM_FBM_CREDENTIAL_CLEAR_RESULT', 'CRM_FBM_TRANSPORT_PROBE_RESULT']
   }
 };
 

@@ -480,7 +480,12 @@ async function chay(so) {
   hop.fbmSyncPaint = (status) => paints.push(status);
   hop.FBM_SYNC_CLIENT.lastStatus = { phase: 'idle', counts: {} };
   hop.callServer = () => Promise.reject(new Error('GAS_TEST_FAILURE'));
+  const cancelPosts = [];
+  hop.SHEET_LINK_NONCE = 'nonce-dung'; hop.FBM_SYNC_RELAY_SESSION = 'phien-dung';
+  hop.window.top = { postMessage: (message, origin) => cancelPosts.push({ message, origin }) };
   await hop.fbmSyncCancel();
+  hop.window.top = { postMessage() {} };
+  check(so, 'Bấm Dừng báo ngay Extension dừng lô đang chạy, đúng phiên Extension và chỉ gửi cho trang Sheet', cancelPosts.map((item) => [item.message.action, item.message.nonce, item.message.sessionId, item.origin]), [['CRM_FBM_CANCEL', 'nonce-dung', 'phien-dung', 'https://docs.google.com']]);
   hop.fbmSyncRetryPushFailures().catch(() => {});
   await new Promise((resolve) => setTimeout(resolve, 0));
   check(so, 'Cancel thất bại vẫn hiện lỗi trên UI', paints.some((item) => String(item.message).indexOf('GAS_TEST_FAILURE') >= 0), true);
