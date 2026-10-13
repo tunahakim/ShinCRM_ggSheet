@@ -70,7 +70,7 @@ FbmSync.pipelineCurrentStep = function (state, definition) {
   if (kind === 'login_identity_authorize') { return available.session ? 'session' : 'login'; }
   if (kind === 'identity_user_grid' || kind === 'login_identity_user') { return available.identity ? 'identity' : 'session'; }
   if (kind === 'customer_grid' || kind === 'activity_rotation_customer_grid') { return available.customer ? 'customer' : ''; }
-  if (kind === 'activity_grid' || kind === 'activity_bulk_grid') { return available.activity ? 'activity' : ''; }
+  if (kind === 'activity_grid' || kind === 'activity_recheck' || (kind === 'scan_job' && cursor.entity === 'activity')) { return available.activity ? 'activity' : ''; }
   if (kind === 'push_scan') { return available.record ? 'record' : ''; }
   if (/(?:customer|activity)_(?:create|edit)_open$/.test(kind)) { return available.form ? 'form' : ''; }
   if (kind === 'push_wait') {

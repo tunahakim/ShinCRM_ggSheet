@@ -368,6 +368,8 @@ function fbmSyncHeartbeatTransportFailure(payload) {
       return { ok: false, code: 'STALE_RESPONSE', request: null, status: FbmSync.statusView(), error: 'Lỗi cầu nối không còn thuộc request đang chờ.' };
     }
     var failureCode = String(value.code || 'FBM_TRANSPORT_UNAVAILABLE'), failureMessage = String(value.message || 'Extension không gửi được request tới tab FBM.').slice(0, 240), retry;
+    var scanWindows = FbmSync.ACTIVITY_WINDOW_CODES.indexOf(failureCode) >= 0 ? FbmSync.activityScanToWindows(state, failureCode, failureMessage) : null;
+    if (scanWindows) { return scanWindows; }
     var scanRestart = typeof FbmSync.scanJobRestart === 'function' ? FbmSync.scanJobRestart(state, failureCode, failureMessage) : null;
     if (scanRestart) { return scanRestart; }
     try { retry = typeof FbmSync.sessionGateTransportRetry === 'function' ? FbmSync.sessionGateTransportRetry(state, requestId, failureCode, failureMessage) : null; }

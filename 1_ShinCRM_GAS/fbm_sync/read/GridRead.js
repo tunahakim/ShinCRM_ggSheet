@@ -122,29 +122,17 @@ FbmSync.activityGridRequest = function (sttRec, options) {
   delete opt.includeHistory;
   return FbmSync.gridRequest('activity', opt);
 };
-/** Dựng request bulk Activity theo mốc thời gian; không gắn một Customer cụ thể. */
+/** Dựng request Activity của mọi khách theo mốc thời gian; không gắn một Customer cụ thể. */
 FbmSync.activityBulkRequest = function (options) {
   var opt = Object.assign({}, options || {});
   opt.filter = FbmSync.activitySinceFilters(opt);
   delete opt.includeHistory;
-  var transport = opt.transport;
-  delete opt.transport;
-  var request = FbmSync.gridRequest('activity', opt);
-  request.meta.kind = 'activity_bulk_grid';
-  request.meta.scan = 'bulk_activity';
-  if (transport && Array.isArray(transport.arrayProjections)) { request.meta.transport = transport; }
-  return request;
+  return FbmSync.gridRequest('activity', opt);
 };
 
-/** Dựng chỉ dẫn cột generic sau khi GAS đã đọc AliasName của trang đầu. */
-FbmSync.activityBulkProjection = function (fields) {
-  var required = ['id', 'ten_cv', 'details', 'end_date', 'owner', 'datetime0', 'line_nbr'], optional = ['ma_kh', 'ma_cv'], names = required.concat(optional), positions = [], requiredFound = 0, source = fields || [];
-  names.forEach(function (name) {
-    var index = source.map(function (field) { return String(field || '').toLowerCase(); }).indexOf(name);
-    if (index >= 0) { positions.push(index); if (required.indexOf(name) >= 0) { requiredFound += 1; } }
-  });
-  if (requiredFound < required.length) { return null; }
-  return { arrayProjections: [{ paths: ['d.Rows', 'd.ViewPage.Fields'], indices: positions }] };
+/** Đọc đích danh một giao dịch theo FBM ID, có tiêu đề cột; không lọc mốc ngày vì đang hỏi giao dịch đó còn hay không. */
+FbmSync.activityByIdRequest = function (fbmId) {
+  return FbmSync.gridRequest('activity', { type: 0, count: 20, gridPageIndex: -1, gridRefresh: false, externalKey: [{ Name: 'id', Opr: '=', Value: String(fbmId || ''), Type: 'String', Ignore: false }] });
 };
 
 /** Dựng request đọc lại đúng bản ghi đang xử lý conflict trước khi chốt. */
@@ -157,24 +145,13 @@ FbmSync.conflictRefreshRequest = function (entity, item) {
     customerRequest.meta.kind = 'conflict_refresh_grid'; customerRequest.meta.entity = 'customer'; customerRequest.meta.conflictId = String(target.id || '');
     return customerRequest;
   }
-  var activityRequest = FbmSync.gridRequest('activity', { type: 0, count: 20, gridPageIndex: -1, gridRefresh: false, externalKey: [{ Name: 'id', Opr: '=', Value: fbmId, Type: 'String', Ignore: false }] });
+  var activityRequest = FbmSync.activityByIdRequest(fbmId);
   activityRequest.meta.kind = 'conflict_refresh_grid'; activityRequest.meta.entity = 'activity'; activityRequest.meta.conflictId = String(target.id || '');
   return activityRequest;
 };
-/** Trả ID local vắng khỏi bulk FBM; tombstone và dòng tạm không bị chạm. */
-FbmSync.activityBulkMissing = function (localRecords, seenFbmIds) {
-  var seen = seenFbmIds || {}, missing = [];
-  (localRecords || []).forEach(function (record) {
-    var id = String(record && record.fbmId || '').trim();
-    if (!id || seen[id] || String(record.recordStatus || 'active') === 'deleted' || FbmSync.isTemporaryRecord('activity', record) || (typeof FbmSync.activitySinceAllows === 'function' && !FbmSync.activitySinceAllows(record))) { return; }
-    missing.push({ id: record.id, fbmId: id, syncStatus: FbmSync.SYNC_STATUS.missing });
-  });
-  return missing;
-};
-
 /** Ghi trạng thái Activity vắng theo lô; state chỉ giữ tổng và mẫu nhỏ, không giữ toàn bộ danh sách. */
 FbmSync.writeActivityBulkMissing = function (localRecords) {
-  var local = localRecords || [], hasSeen = FbmSync.seenStoreReader('activity_bulk'), batchSize = typeof SETTINGS !== 'undefined' && SETTINGS.CHUNK_ROWS ? Number(SETTINGS.CHUNK_ROWS) : 2000;
+  var local = localRecords || [], hasSeen = FbmSync.seenStoreReader(FbmSync.ACTIVITY_BULK_STORE), batchSize = typeof SETTINGS !== 'undefined' && SETTINGS.CHUNK_ROWS ? Number(SETTINGS.CHUNK_ROWS) : 2000;
   var batch = [], sample = [], total = 0, written = 0;
   function flush() {
     if (!batch.length) { return; }
@@ -183,7 +160,7 @@ FbmSync.writeActivityBulkMissing = function (localRecords) {
   }
   local.forEach(function (record) {
     var fbmId = String(record && record.fbmId || '').trim();
-    if (!fbmId || hasSeen(record) || String(record.recordStatus || 'active') === 'deleted' || FbmSync.isTemporaryRecord('activity', record) || (typeof FbmSync.activitySinceAllows === 'function' && !FbmSync.activitySinceAllows(record))) { return; }
+    if (!FbmSync.activityBulkTracked(record) || hasSeen(record)) { return; }
     var item = { id: record.id, fbmId: fbmId, syncStatus: FbmSync.SYNC_STATUS.missing };
     total += 1; if (sample.length < 20) { sample.push(item); }
     batch.push({ id: record.id, syncStatus: FbmSync.SYNC_STATUS.missing });

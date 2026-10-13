@@ -393,7 +393,7 @@ FbmSync.nextEnvelope = function (request) {
     }
     // Mọi request nghiệp vụ và authorize đầu lượt phải qua probe User.
     // Probe là request hệ thống nên không quay lại nhánh này.
-    var gateCursorKinds = ['customer_grid', 'activity_grid', 'activity_bulk_grid', 'lookup', 'push_lookup', 'push_scan', 'push_wait'];
+    var gateCursorKinds = ['customer_grid', 'activity_grid', 'activity_recheck', 'lookup', 'push_lookup', 'push_scan', 'push_wait'];
     var requestKind = String(request.meta && request.meta.kind || ''), cursorNeedsGate = gateCursorKinds.indexOf(String(pendingState.cursor && pendingState.cursor.kind || '')) >= 0 && String(pendingState.cursor && pendingState.cursor.kind || '') !== 'push_wait';
     // Mọi request không thuộc nhóm hệ thống đều phải qua cổng; không cho
     // caller né cổng bằng cách đặt một tên meta.kind lạ.
@@ -518,14 +518,12 @@ FbmSync.requestForCursor = function (state) {
   }
   if (cursor.kind === 'scan_job') { return FbmSync.scanJobRequest(state); }
   if (cursor.kind === 'activity_grid') { return FbmSync.activityBatchRequest(state); }
-  if (cursor.kind === 'activity_bulk_grid') {
-    return FbmSync.activityBulkRequest({ type: Number(cursor.type || 0), count: Number(cursor.count || 100), gridPageIndex: cursor.pageIndex === undefined ? -1 : cursor.pageIndex, gridPageValue: cursor.pageValue === undefined ? null : cursor.pageValue, gridRefresh: false, transport: cursor.transport });
-  }
+  if (cursor.kind === 'activity_recheck') { return FbmSync.activityRecheckRequest(state); }
   return null;
 };
 /** Chỉ retry request đọc; request ghi không được lặp vì phản hồi có thể đã tới FBM. */
 FbmSync.retryRead = function (state, failure) {
-  var safeKinds = ['authorize_customer', 'authorize_activity', 'identity_user_grid', 'login_identity_authorize', 'login_identity_user', 'lookup', 'push_lookup', 'customer_grid', 'scan_job', 'activity_grid', 'activity_bulk_grid'], cursor = state && state.cursor || {}, limit = Number(state && state.retryLimit || 2), attempt = Number(state && state.retryCount || 0), request;
+  var safeKinds = ['authorize_customer', 'authorize_activity', 'identity_user_grid', 'login_identity_authorize', 'login_identity_user', 'lookup', 'push_lookup', 'customer_grid', 'scan_job', 'activity_grid', 'activity_recheck'], cursor = state && state.cursor || {}, limit = Number(state && state.retryLimit || 2), attempt = Number(state && state.retryCount || 0), request;
   if (!failure || failure.retryable !== true || safeKinds.indexOf(cursor.kind) < 0 || attempt >= limit) { return null; }
   request = FbmSync.requestForCursor(state);
   if (!request) { return null; }

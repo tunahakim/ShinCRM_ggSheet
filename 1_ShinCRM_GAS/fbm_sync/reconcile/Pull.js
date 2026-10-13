@@ -214,7 +214,6 @@ FbmSync.pullWrite = function (entity, records) {
         return record;
       });
       FbmSync.seenStoreMark(entity, savedRecords, sourceRecords);
-      if (state.cursor && state.cursor.kind === 'activity_bulk_grid') { FbmSync.seenStoreMark('activity_bulk', savedRecords, sourceRecords); }
     }
     if (saved.ok && pendingClears.length && typeof FbmSync.pendingPushClear === 'function') { pendingClears.forEach(function (item) { FbmSync.pendingPushClear(item.entity, item.id); }); }
   }

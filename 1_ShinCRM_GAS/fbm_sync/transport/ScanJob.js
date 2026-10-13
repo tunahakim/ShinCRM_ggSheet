@@ -28,9 +28,11 @@ FbmSync.scanJobRequest = function (state) {
     var cfg = FbmSync.scriptSettings();
     return { url: cfg.baseUrl + FbmSync.ENDPOINTS.grid, body: {}, meta: { kind: 'scan_chunk', entity: cursor.entity, job: { jobId: cursor.jobId, chunkIndex: Number(cursor.next || 0) } } };
   }
-  var request = FbmSync.customerGridRequest({ type: Number(cursor.type || 0), count: Number(cursor.count || budget.scanCustomerRows), gridPageIndex: cursor.pageIndex === undefined ? -1 : cursor.pageIndex, gridPageValue: cursor.pageValue || null, pageItems: cursor.pageItems || null, gridRefresh: false });
-  request.meta.kind = 'scan_job';
-  request.meta.job = { jobId: cursor.jobId, fields: FbmSync.scanFields(cursor.entity), idField: FbmSync.SCAN_ID_FIELDS[cursor.entity], keepIds: null, chunkTargetBytes: budget.chunkTargetBytes, chunkMaxBytes: budget.chunkMaxBytes };
+  var activity = cursor.entity === 'activity';
+  var request = activity ? FbmSync.activityScanRequest(cursor) : FbmSync.customerGridRequest({ type: Number(cursor.type || 0), count: Number(cursor.count || budget.scanCustomerRows), gridPageIndex: cursor.pageIndex === undefined ? -1 : cursor.pageIndex, gridPageValue: cursor.pageValue || null, pageItems: cursor.pageItems || null, gridRefresh: false });
+  request.meta.kind = 'scan_job'; request.meta.entity = cursor.entity;
+  // Giao dịch chỉ giữ id đã có trên Sheet: lưới giao dịch không có cột khách nên dòng lạ không ghép được khách cha.
+  request.meta.job = { jobId: cursor.jobId, fields: FbmSync.scanFields(cursor.entity), idField: FbmSync.SCAN_ID_FIELDS[cursor.entity], keepIds: activity ? FbmSync.activityKeepIds(FbmSync.readLocal('activity')) : null, chunkTargetBytes: budget.chunkTargetBytes, chunkMaxBytes: budget.chunkMaxBytes, maxResponseBytes: budget.scanMaxResponseBytes };
   return request;
 };
 
@@ -72,12 +74,12 @@ FbmSync.scanJobAdvance = function (cursor, chunk) {
   return cursor.next >= cursor.chunkCount;
 };
 
-/** Dòng mà riêng nó đã vượt trần một gói không về GAS: ghi Log từng dòng; lượt quét thiếu dòng nên không gắn cờ "không thấy". */
+/** Dòng mà riêng nó đã vượt trần một gói không về GAS: ghi Log từng dòng; dòng đó không bị gắn cờ "không thấy". */
 FbmSync.scanJobOversize = function (state, entity, ids) {
   if (!ids.length) { return; }
   state.metadata.scanOversize = Number(state.metadata.scanOversize || 0) + ids.length;
   if (typeof logEvent !== 'function') { return; }
-  ids.forEach(function (id) { logEvent({ source: 'fbm_sync', action: 'scan_row_oversize', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(state.runId || ''), reason: 'Một dòng ' + entity + ' FBM lớn hơn trần một gói nên không chuyển được về ShinCRM; lượt này không gắn cờ "không thấy bên FBM".', detail: { entity: entity, fbmId: String(id || '') } }); });
+  ids.forEach(function (id) { logEvent({ source: 'fbm_sync', action: 'scan_row_oversize', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(state.runId || ''), reason: 'Một dòng ' + entity + ' FBM lớn hơn trần một gói nên không chuyển được về ShinCRM; dòng này không bị gắn cờ "không thấy bên FBM".', detail: { entity: entity, fbmId: String(id || '') } }); });
 };
 
 /**
