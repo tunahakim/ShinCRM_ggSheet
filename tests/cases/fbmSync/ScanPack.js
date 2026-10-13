@@ -84,6 +84,20 @@ async function chay(so) {
     vangEnd.status.phase, vang.trace.activityCustomers, trangThai('A-GONE-1'), trangThai('A-GONE-10')
   ], ['done', ['FBM-C1', 'FBM-C2'], vang.F.SYNC_STATUS.missing, 'đã đồng bộ']);
 
+  // Hai chiều: phần đọc xong phải gắn cờ "không thấy" trước khi sang bước đẩy, như chiều Lấy.
+  const haiChieu = scanHarness({ customers: 6, budget: { activityTopScanQuietStreak: 2 } });
+  await haiChieu.run({ pack: 'all' });
+  const chaHai = haiChieu.local.customer.find((item) => item.fbmId === 'FBM-C1').id;
+  haiChieu.local.activity.push({ id: 'ACT-900003', customerId: chaHai, fbmId: 'A-GONE-2C', workDate: '2026-09-01', taskType: '', syncStatus: 'đã đồng bộ' });
+  haiChieu.local.customer.push({ id: 'CUS-900001', fbmId: 'FBM-GONE', fbmCustomerCode: 'ALT-GONE', syncStatus: 'đã đồng bộ' });
+  const pushAt = [];
+  haiChieu.F.canWriteFbm = () => true;
+  // Danh mục FBM của chiều đẩy không thuộc phần đang kiểm; harness việc quét không giả lập nó.
+  haiChieu.F.needsFbmLookups = () => false;
+  haiChieu.F.nextPushRequest = (state) => { pushAt.push([haiChieu.local.activity.find((item) => item.fbmId === 'A-GONE-2C').syncStatus, haiChieu.local.customer.find((item) => item.id === 'CUS-900001').syncStatus]); state.phase = 'done'; haiChieu.F.stateWrite(state); return null; };
+  await haiChieu.run({ pack: 'quick', startOptions: { mode: 'write' } });
+  check(so, 'Đồng bộ hai chiều: giao dịch đã xóa bên FBM của khách đã đọc và khách không còn bên FBM bị gắn "không thấy bên FBM" trước khi sang bước đẩy', pushAt, [[haiChieu.F.SYNC_STATUS.missing, haiChieu.F.SYNC_STATUS.missing]]);
+
   // Mỗi gói chạy đúng thao tác của nó.
   const nhanh = await sauLuotDau({ customers: 6, budget: { activityTopScanQuietStreak: 2 } }, 'quick', null);
   const ky = await sauLuotDau({ customers: 6, budget: { activityTopScanQuietStreak: 2 } }, 'deep', null);
