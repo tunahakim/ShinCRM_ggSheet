@@ -28,9 +28,9 @@ FbmSync.BUDGET = {
   scanFetchMs: 60000,
   // Số dòng mỗi request lấy danh sách toàn bộ khách; FBM báo nhiều hơn thì chuyển trang đến đủ, đặt nhỏ hay lớn chỉ khác số trang.
   scanCustomerRows: 10000,
-  // Gói trả về GAS đo bằng byte UTF-8 của JSON đã serialize; trần cứng dưới giới hạn khoảng 1 MB của đường relay.
-  chunkTargetBytes: 512 * 1024,
-  chunkMaxBytes: 768 * 1024,
+  // Gói trả về GAS đo bằng byte UTF-8 của JSON đã serialize. Đo thật 2026-10-13: cả đường Sidebar lẫn relay nền qua 20 MB; trần cứng giữ ở một phần tư mức đó để chừa mạng chậm và giới hạn số dòng GAS xử lý trong một lần gọi.
+  chunkTargetBytes: 4 * 1024 * 1024,
+  chunkMaxBytes: 5 * 1024 * 1024,
   // Mất tab hoặc Extension mất việc quét thì chạy lại cả việc; quá số lần này là lỗi hệ thống, dừng và báo.
   scanJobRestarts: 2,
   // Trần ô "khoảng cách giữa hai request tới FBM"; Extension cũng không chờ quá con số này cho một request.
