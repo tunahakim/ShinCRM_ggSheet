@@ -213,8 +213,10 @@ function fbmSyncPrepareRelayForSidebarOpen() {
 function fbmSyncNotifyBridgeReady() {
   var sessionId = String(typeof SHEET_LINK_EXTENSION_SESSION === 'undefined' ? '' : SHEET_LINK_EXTENSION_SESSION || '');
   if (sessionId && sessionId !== FBM_SYNC_RELAY_SESSION) {
+    var reloaded = !!FBM_SYNC_RELAY_SESSION;
     FBM_SYNC_RELAY_SESSION = sessionId;
     FBM_SYNC_CLIENT.relayConfigured = false;
+    if (reloaded) { fbmSyncResendRelayConfig(); }
   }
   if (FBM_SYNC_BRIDGE_WAITERS.length) {
     var waiters = FBM_SYNC_BRIDGE_WAITERS.splice(0, FBM_SYNC_BRIDGE_WAITERS.length);
@@ -250,11 +252,7 @@ function fbmSyncConfigureRelay() {
     return fbmSyncWaitForBridge().then(function (ready) {
       if (!ready) { throw new Error('Chưa nhận được Extension để gửi cấu hình kết nối. Hãy tải lại Extension rồi mở lại Sidebar.'); }
       return fbmSyncConfigureRelay();
-    }).catch(function (error) {
-      if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('relay', 'error', 'Không gửi được cấu hình kết nối tới Extension: ' + String(error && error.message || error)); }
-      fbmSyncPaintError(error, 'Không gửi được cấu hình kết nối tới Extension.');
-      return null;
-    });
+    }).catch(fbmSyncRelayFailed);
   }
   if (FBM_SYNC_RELAY_CONFIGURE_FLIGHT) { return FBM_SYNC_RELAY_CONFIGURE_FLIGHT; }
   if (typeof callServer !== 'function') { return Promise.resolve(null); }
@@ -265,14 +263,29 @@ function fbmSyncConfigureRelay() {
     return fbmSyncPostRelayConfig(config, true).then(function (saved) {
       if (!saved) { throw new Error('Extension không xác nhận đã lưu cấu hình kết nối.'); }
       FBM_SYNC_CLIENT.relayConfigured = true;
+      FBM_SYNC_CLIENT.relayConfig = config;
       if (typeof fbmSyncConfigFinishEdit === 'function') { fbmSyncConfigFinishEdit('relay'); }
       return config;
     });
-  }).catch(function (error) {
-    if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('relay', 'error', 'Không gửi được cấu hình kết nối tới Extension: ' + String(error && error.message || error)); }
-    fbmSyncPaintError(error, 'Không gửi được cấu hình kết nối tới Extension.');
-    return null;
-  }).finally(function () {
+  }).catch(fbmSyncRelayFailed).finally(function () {
+    FBM_SYNC_RELAY_CONFIGURE_FLIGHT = null;
+  });
+}
+function fbmSyncRelayFailed(error) {
+  if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('relay', 'error', 'Không gửi được cấu hình kết nối tới Extension: ' + String(error && error.message || error)); }
+  fbmSyncPaintError(error, 'Không gửi được cấu hình kết nối tới Extension.');
+  return null;
+}
+/** Tải lại Extension làm đổi phiên kết nối nên Sidebar mất xác nhận, dù Extension vẫn giữ cấu hình đã lưu. Gửi lại bản Sidebar đang giữ để lấy lại ACK; không gọi GAS vì cấu hình không đổi. Chưa có bản nào (lần gửi đầu chưa xong) thì để lần gửi đầu tự lo. */
+function fbmSyncResendRelayConfig() {
+  var config = FBM_SYNC_CLIENT.relayConfig;
+  if (!config || FBM_SYNC_RELAY_CONFIGURE_FLIGHT) { return Promise.resolve(null); }
+  return FBM_SYNC_RELAY_CONFIGURE_FLIGHT = fbmSyncPostRelayConfig(config, true).then(function (saved) {
+    if (!saved) { throw new Error('Extension không xác nhận đã lưu cấu hình kết nối.'); }
+    FBM_SYNC_CLIENT.relayConfigured = true;
+    if (FBM_SYNC_CLIENT.lastStatus) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); }
+    return config;
+  }).catch(fbmSyncRelayFailed).finally(function () {
     FBM_SYNC_RELAY_CONFIGURE_FLIGHT = null;
   });
 }
@@ -1342,6 +1355,7 @@ function fbmSyncRotateRelay() {
   return callServer('fbmRotateRelayKey').then(function (config) {
     return fbmSyncPostRelayConfig(config, true).then(function () {
       FBM_SYNC_CLIENT.relayConfigured = true;
+      FBM_SYNC_CLIENT.relayConfig = config;
       if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('relay', 'success', 'Đã đổi cấu hình kết nối và Extension đã xác nhận lưu khóa mới.'); }
       var status = FBM_SYNC_CLIENT.lastStatus || {};
       return fbmSyncPaint(Object.assign({}, status, { message: 'Đã đổi khóa relay và Extension đã xác nhận lưu khóa mới.' }));
