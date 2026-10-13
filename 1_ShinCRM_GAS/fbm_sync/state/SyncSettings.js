@@ -174,5 +174,5 @@ FbmSync.scope = function () {
   return { codes: settings.scopeCodes.slice(), fbm: resolved.fbm, shin: resolved.shin, notFound: resolved.lines.filter(function (line) { return line.status === 'not_found'; }).map(function (line) { return line.code; }) };
 };
 
-/** Lượt có giới hạn phạm vi không quét toàn bộ khách nên không được suy ra vắng mặt. Chỉ đọc cờ, không đổi mã ra khách. */
+/** Công tắc phạm vi đang bật hay tắt; chỉ đọc cờ, không đổi mã ra khách. */
 FbmSync.scopeLimited = function () { return FbmSync.syncSettingsRead().scopeLimited !== false; };
