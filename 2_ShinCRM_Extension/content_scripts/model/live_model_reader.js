@@ -206,14 +206,19 @@
     return { row: Number(match[2]), column: column };
   }
 
-  /** Ô chỉ có mặt khi ít nhất một lưới giữ nó; các lưới cùng giữ ô mà khác giá trị là `conflict`. */
+  /**
+   * Ô chỉ có mặt khi ít nhất một lưới giữ giá trị của nó; các lưới cùng giữ mà khác giá trị là `conflict`.
+   * Bản sao vùng đang hiện tạo sẵn ô giữ chỗ chưa có giá trị trước khi vẽ xong; lưới đầy đủ ghi ô trống là
+   * chuỗi rỗng, nên giá trị `undefined`/`null` nghĩa là lưới này chưa biết ô đó, không phải ô trống.
+   */
   function readCell(grids, row, column) {
     var result = { present: false, value: '', conflict: false };
     grids.forEach(function (live) {
       var line = ownValue(live.grid, String(row - 1));
       var cell = isNode(line) ? ownValue(line, String(column - 1)) : undefined;
-      if (!isNode(cell)) { return; }
-      var value = cellValue(cell, live.valueKey);
+      var raw = isNode(cell) ? ownValue(cell, live.valueKey) : undefined;
+      if (raw === undefined || raw === null) { return; }
+      var value = String(raw);
       if (!result.present) { result.present = true; result.value = value; }
       else if (value !== result.value) { result.conflict = true; }
     });
