@@ -46,7 +46,7 @@ function fbmGetSyncStatus() { return runEntryPoint('fbmGetSyncStatus', 'sidebar'
   // Kho state hỏng thì đọc status cũng hỏng; trả snapshot "kẹt" kèm nút đặt lại thay vì ném, nếu không người dùng không có lối thoát (FBM-044).
   try { result = typeof FbmSync.withOrchestrationLock === 'function' ? FbmSync.withOrchestrationLock(read) : read(); } catch (error) { if (!FbmSync.stateStorageError(error)) { throw error; } return FbmSync.stateStuckView(error); }
   if (result && result.code === 'BUSY') { result = FbmSync.controlDispatch('status', {}); }
-  if (recovered.recovered && result && result.lastFailureCode === 'SYNC_STALE_RUN' && before.lastFailureCode !== result.lastFailureCode) { FbmSync.logStatus(result, 'stale_run'); }
+  if (recovered.recovered && result && ['SYNC_STALE_RUN', 'SYNC_STATE_MIGRATED'].indexOf(String(result.lastFailureCode || '')) >= 0) { FbmSync.logStatus(result, 'stale_run'); }
   return result;
 }, {}); }
 /** Ghi lỗi cầu nối do Sidebar phát hiện trước khi có response FBM. */

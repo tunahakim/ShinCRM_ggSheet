@@ -1511,7 +1511,7 @@ function fbmSyncContinueServer(status, response) {
         var traceRows = traceResult && (traceResult.trace || traceResult) || [];
         if (!Array.isArray(traceRows)) { traceRows = []; }
         var matching = traceRows.filter(function (item) { return !requestId || String(item && item.requestId || '') === requestId; });
-        var trace = (matching.length ? matching : traceRows).slice(-1)[0] || (fallback.metadata && fallback.metadata.callbackTrace) || {};
+        var trace = (matching.length ? matching : traceRows).slice(-1)[0] || {};
         var diagnostic = Object.assign({}, fallback, { traceRequestId: requestId, traceStage: String(trace.stage || 'unknown') });
         var cursor = diagnostic.cursor || {};
         var message = 'GAS_CALLBACK_TIMEOUT: GAS không trả kết quả sau ' + Math.round(gasReplyMs / 1000) + ' giây; cursor vẫn được giữ và hệ không tự gửi lại lệnh ghi.'

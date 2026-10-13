@@ -520,7 +520,7 @@ FbmSync.requestForCursor = function (state) {
 };
 /** Chỉ retry request đọc; request ghi không được lặp vì phản hồi có thể đã tới FBM. */
 FbmSync.retryRead = function (state, failure) {
-  var safeKinds = ['authorize_customer', 'authorize_activity', 'identity_user_grid', 'login_identity_authorize', 'login_identity_user', 'lookup', 'push_lookup', 'customer_grid', 'scan_job', 'activity_grid', 'activity_recheck'], cursor = state && state.cursor || {}, limit = Number(state && state.retryLimit || 2), attempt = Number(state && state.retryCount || 0), request;
+  var safeKinds = ['authorize_customer', 'authorize_activity', 'identity_user_grid', 'login_identity_authorize', 'login_identity_user', 'lookup', 'push_lookup', 'customer_grid', 'scan_job', 'activity_grid', 'activity_recheck'], cursor = state && state.cursor || {}, limit = FbmSync.BUDGET.readRetryLimit, attempt = Number(state && state.retryCount || 0), request;
   if (!failure || failure.retryable !== true || safeKinds.indexOf(cursor.kind) < 0 || attempt >= limit) { return null; }
   request = FbmSync.requestForCursor(state);
   if (!request) { return null; }
