@@ -50,7 +50,7 @@ var sheetLinkInstalled = false;
 var SHEET_LINK_ORIGIN = 'https://docs.google.com';
 var SHEET_LINK_CODE_PATTERN = /^[A-Z]{2,4}-?[0-9]{6}$/;
 // Lỗi của cả bộ đọc live model, khác lỗi một ô chưa tải; `LIVE_GRID_SEARCHING` chỉ là lượt dò đầu trang nên không tính.
-var SHEET_LINK_READER_DOWN_REASONS = ['LIVE_GRID_NOT_FOUND', 'READER_ERROR', 'LIVE_MODEL_TIMEOUT'];
+var SHEET_LINK_READER_DOWN_REASONS = ['LIVE_GRID_NOT_FOUND', 'LIVE_GRID_CONFLICT', 'READER_ERROR', 'LIVE_MODEL_TIMEOUT'];
 
 function sheetLinkNonceMake() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
