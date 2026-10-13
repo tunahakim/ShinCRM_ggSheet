@@ -131,6 +131,14 @@ function chay(so) {
   check(so, 'hai lưới hợp lệ cho hai giá trị khác nhau ở cùng ô thì fail-closed LIVE_GRID_CONFLICT, không chọn bên nào',
     [xungDot.status, xungDot.reason, xungDot.reads[0].status], ['unavailable', 'LIVE_GRID_CONFLICT', 'unavailable']);
 
+  const giuCho = napReader(trang({ 0: CUSTOMER[0], 1: [undefined], 2: [null] }));
+  giuCho.request(base);
+  giuCho.flush();
+  const quaGiuCho = giuCho.request(Object.assign({}, base, { requestId: 'placeholder-2' }));
+  const oTrongQuaGiuCho = giuCho.request(Object.assign({}, base, { requestId: 'placeholder-3', row: 3 }));
+  check(so, 'ô giữ chỗ chưa có giá trị trong bản sao vùng đang hiện không bị coi là lệch với lưới đầy đủ, ô trống thật vẫn đọc là rỗng',
+    [quaGiuCho.status, quaGiuCho.reads[0].value, oTrongQuaGiuCho.status, oTrongQuaGiuCho.reads[0].value], ['ok', 'KH000006', 'ok', '']);
+
   const chiBanSao = napReader({ Ve: { copy: { ji: '9', dc: { ea: { ea: banSao({ 0: CUSTOMER[0], 3: CUSTOMER[3] }) } } } } });
   chiBanSao.request(base);
   chiBanSao.flush();
