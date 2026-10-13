@@ -56,7 +56,18 @@ async function callGas(functionName) {
   return text;
 }
 
-/** Đẩy code lên và nâng bản triển khai lên phiên bản mới. Cùng một deploymentId nên địa chỉ gọi không đổi. */
+/** Mã bản triển khai Web App mà Extension gọi ở lượt nền, đọc từ đúng hằng GAS để không giữ bản sao. */
+function relayDeploymentId() {
+  const source = fs.readFileSync(path.join(GAS_DIR, 'fbm_sync', 'transport', 'EntryPoints.js'), 'utf8');
+  const match = source.match(/var FBM_SYNC_RELAY_WEB_APP_URL = 'https:\/\/script\.google\.com\/macros\/s\/([^/']+)\/exec';/);
+  if (!match) { throw new Error('Không đọc được FBM_SYNC_RELAY_WEB_APP_URL trong fbm_sync/transport/EntryPoints.js.'); }
+  return match[1];
+}
+
+/**
+ * Đẩy code lên và nâng bản triển khai lên phiên bản mới. Cùng một deploymentId nên địa chỉ gọi không đổi.
+ * Nâng luôn bản relay của lượt nền: quên nâng thì lượt nền chạy code cũ trong khi lượt chạy tay chạy code mới.
+ */
 function pushAndRedeploy(deploymentId) {
   const clasp = (args) => execFileSync('npx', ['clasp'].concat(args), {
     cwd: GAS_DIR,
@@ -69,7 +80,9 @@ function pushAndRedeploy(deploymentId) {
   clasp(['push', '--force']);
   process.stdout.write('xong. Nâng bản triển khai… ');
   const out = clasp(['update-deployment', deploymentId, '--description', '"Cua chay ham luc phat trien"']);
-  process.stdout.write(out.trim() + '\n\n');
+  process.stdout.write(out.trim() + '\n');
+  const relay = clasp(['update-deployment', relayDeploymentId(), '--description', '"Dong bo FBM Sidebar UI"']);
+  process.stdout.write('Relay lượt nền: ' + relay.trim() + '\n\n');
 }
 
 async function main() {
