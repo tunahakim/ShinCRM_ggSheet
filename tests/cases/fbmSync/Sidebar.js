@@ -494,8 +494,12 @@ async function chay(so) {
   check(so, 'Cancel khi request đang bay giữ relay đến response cuối thay vì bỏ dở state', [hop.FBM_SYNC_CLIENT.running, hop.FBM_SYNC_CLIENT.cancelRequested], [true, true]);
   hop.fbmSyncExtensionRequest = () => Promise.resolve({});
   hop.fbmSyncContinueServer = () => Promise.resolve({ ok: true, request: null, status: { phase: 'paused' } });
+  const stopPaints = [];
+  hop.fbmSyncPaint = (status) => { stopPaints.push({ phase: status && (status.status || status).phase, cancelling: hop.FBM_SYNC_CLIENT.cancelRequested }); };
   await hop.fbmSyncLoop({ request: { meta: { entity: 'customer' } } });
+  const lastStopPaint = stopPaints[stopPaints.length - 1] || {};
   check(so, 'response cuối sau Cancel chuyển client về trạng thái đã dừng', [hop.FBM_SYNC_CLIENT.running, hop.FBM_SYNC_CLIENT.cancelRequested], [false, false]);
+  check(so, 'Dừng xong thì lần vẽ cuối đã hạ cờ đang dừng, nút không kẹt ở "Đang dừng…" chờ lần hỏi trạng thái sau', [lastStopPaint.phase, lastStopPaint.cancelling], ['paused', false]);
 
   // FBM-044: GAS báo kho state hỏng thì màn Chạy hiện lý do, lời giải thích và nút đặt lại; status thường không có nút.
   hop.FBM_SYNC_CLIENT.running = false;
