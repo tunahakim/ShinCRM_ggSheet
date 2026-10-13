@@ -993,14 +993,6 @@ Không dùng Drive/database index trong phương án này.
 
 ## 20. Trạng thái hiện tại
 
-Đã điều chỉnh phương án ngày 2026-10-07 (mục 2A), sửa lỗi cursor phình và preflight đọc lặp ngoài refactor, ghi hiện trạng và số đo ở mục 2B; giai đoạn 1 (đo bằng `server/dev/FbmPerfProbe.js`) xong, kết quả ở mục 2B.6 và kế hoạch ở mục 18, đang chờ chủ dự án chốt. Refactor làm ở branch riêng tách từ `main` sau khi gộp `feature/fbm-sync`. Chưa có hành động nào sau đây:
+Cập nhật 2026-10-13: đợt 1–4 và nhóm 5.1 (state mang `schemaVersion` 2, lượt dở của bản cũ dừng và báo chạy lại) đã xong; nhóm 4.5b và 5.2 bỏ có lý do; các điểm ở mục 19 đã chốt. Tiến độ, bằng chứng test và thử phá nằm duy nhất ở `2026.10.07 Checklist refactor đồng bộ FBM và phân tải Extension.md`; tài liệu 09 đã cập nhật theo từng nhóm. Bộ test offline đạt toàn bộ, GAS DEV đã đẩy, Extension 21.25 đã commit.
 
-- chưa sửa Tài liệu 09;
-- chưa sửa code GAS;
-- chưa sửa code Extension;
-- chưa xóa DSL cũ;
-- chưa migration state;
-- chưa viết test refactor;
-- chưa push GAS hoặc Extension.
-
-Khi quay lại công việc, phải bắt đầu bằng việc đọc tệp này và checklist đang làm, sau đó xác nhận lại các điểm “chưa nên tự coi là đã chốt” trước khi sửa hợp đồng chính thức.
+Còn lại chỉ là việc cần chủ dự án: tải lại Extension 21.25 rồi F5 Sheet, kiểm chứng live với `ALT00010`, kiểm múi giờ Sheet production trước khi nạp dữ liệu thật.
