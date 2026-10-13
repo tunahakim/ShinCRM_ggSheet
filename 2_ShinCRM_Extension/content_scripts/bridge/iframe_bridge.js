@@ -149,6 +149,20 @@ window.addEventListener('message', function (event) {
     });
     return;
   }
+  if (data && data.action === 'CRM_FBM_CANCEL') {
+    if (!isAllowedSidebarOrigin(event.origin) || String(data.nonce || '') !== sidebarNonce || !isCurrentExtensionSession(data)) { return; }
+    sendRequestToWorker({ type: 'FBM_CANCEL_BATCH' }, function (error) { if (error && console && console.warn) { console.warn('Không báo được lệnh dừng cho Extension:', error); } });
+    return;
+  }
+  if (data && data.action === 'CRM_FBM_TRANSPORT_PROBE') {
+    if (!isAllowedSidebarOrigin(event.origin) || event.source !== sidebarWindow || String(data.nonce || '') !== sidebarNonce || !isCurrentExtensionSession(data)) { return; }
+    sendRequestToWorker({ type: 'FBM_TRANSPORT_PROBE', route: String(data.route || ''), sizeBytes: Number(data.sizeBytes || 0), timeoutMs: Number(data.timeoutMs || 0) }, function (error, reply) {
+      try {
+        event.source.postMessage({ action: 'CRM_FBM_TRANSPORT_PROBE_RESULT', nonce: sidebarNonce, sessionId: extensionSessionId, id: String(data.id || ''), result: error ? null : reply, code: error ? bridgeErrorCode(error) : (reply && reply.code || ''), error: error ? bridgeErrorMessage(error) : (reply && reply.error || '') }, event.origin);
+      } catch (ignoreProbeAck) {}
+    });
+    return;
+  }
   if (data && data.action === 'CRM_FBM_REQUEST') {
     // Chuyển nguyên request qua service worker; bridge không phân tích response FBM.
     if (!isAllowedSidebarOrigin(event.origin) || String(data.nonce || '') !== sidebarNonce || !isCurrentExtensionSession(data)) { return; }

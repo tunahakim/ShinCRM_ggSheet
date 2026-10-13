@@ -77,7 +77,7 @@ function ensureFbmTab(request) {
 }
 var FBM_EXECUTOR_VERSION = '21.21';
 // Mã phiên bản hợp đồng GAS–Extension (tests/contracts/gasExtensionContract.js). Chỉ trả về cho GAS; GAS quyết định dừng khi lệch mã.
-var FBM_CONTRACT_VERSION = '5cce7f060aa5';
+var FBM_CONTRACT_VERSION = 'd90ed1d95988';
 
 function addWorkerTrace(reply, request, stage, extra) {
   var event = Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {});
@@ -190,8 +190,24 @@ function waitForFbmGap(request) {
   if (!callsFbm(request) || !isFinite(maxMs) || maxMs <= 0 || !FBM_LAST_FETCH_END_AT) { return Promise.resolve(); }
   var waitMs = Math.min(FBM_REQUEST_GAP_CAP_MS, minMs + Math.random() * (maxMs - minMs)) - (Date.now() - FBM_LAST_FETCH_END_AT);
   if (waitMs <= 0) { return Promise.resolve(); }
-  return new Promise(function (resolve) { setTimeout(resolve, Math.round(waitMs)); });
+  return new Promise(function (resolve) {
+    var timer = setTimeout(wake, Math.round(waitMs));
+    function wake() { clearTimeout(timer); if (fbmGapWake === wake) { fbmGapWake = null; } resolve(); }
+    fbmGapWake = wake;
+  });
 }
+
+/**
+ * Người dùng bấm Dừng (Tài liệu 09/01 "Lô request đọc độc lập"): lô đang chạy trả phần đã đọc sau request FBM đang gọi, không chạy hết lô. Request đang gọi FBM không bị cắt vì không biết FBM đã nhận hay chưa.
+ * Lệnh dừng là một mốc thời gian, nên lệnh cũ không chặn lô mở sau nó.
+ */
+var FBM_CANCEL_AT = 0, fbmGapWake = null;
+function fbmCancelBatch() {
+  FBM_CANCEL_AT = Date.now();
+  if (fbmGapWake) { fbmGapWake(); }
+  return { ok: true };
+}
+function fbmCancelledSince(since) { return since > 0 && FBM_CANCEL_AT >= since; }
 
 /** Tự phục hồi các tab Sheets đang mở; lỗi một tab không làm worker ngừng nhận message. */
 function recoverSheetsBridges() {
@@ -216,8 +232,9 @@ function sendToFbmTab(tabId, request) {
 }
 
 /** Cửa duy nhất gửi request cho executor: nghỉ đủ khoảng cách với request FBM trước, rồi gửi trong phần hạn còn lại của envelope; hết hạn thì là lỗi transport, không chờ thêm. */
-function sendTabExecute(tabId, request, envelope) {
+function sendTabExecute(tabId, request, envelope, cancelSince) {
   return waitForFbmGap(request).then(function () {
+    if (fbmCancelledSince(cancelSince)) { return { cancelled: true }; }
     var remaining = envelopeRemainingMs(envelope);
     if (remaining <= 0) { return { error: 'Extension đã hết hạn chờ GAS cấp cho request này; tab FBM phản hồi quá chậm.', code: 'FBM_TRANSPORT_TIMEOUT' }; }
     return sendTabMessage(tabId, { type: 'FBM_EXECUTE_V2', request: request }, remaining).finally(function () {
@@ -231,7 +248,7 @@ function sendTabExecute(tabId, request, envelope) {
  * Một phần tử lỗi vận chuyển thì bỏ cả lô và trả lỗi như request đơn: lỗi mạng chỉ có một lớp xử lý ở GAS; chạy lại an toàn vì GAS ghi idempotent. Extension không biết phần tử thuộc khách nào và không tự chạy lại.
  */
 function executeBatch(tabId, envelope) {
-  var items = envelope.items, meta = envelope.meta || {}, maxBytes = Number(meta.batch && meta.batch.maxBytes || 0), results = [], traces = [], captured = {}, bytes = 0;
+  var items = envelope.items, meta = envelope.meta || {}, maxBytes = Number(meta.batch && meta.batch.maxBytes || 0), results = [], traces = [], captured = {}, bytes = 0, startedAt = Date.now();
   function itemRequest(item) {
     return Object.assign({}, item, { meta: Object.assign({}, item.meta || {}, { transport: meta.transport, fetchMs: meta.fetchMs, requestGap: meta.requestGap }) });
   }
@@ -241,7 +258,9 @@ function executeBatch(tabId, envelope) {
   function next(index) {
     if (index >= items.length || (maxBytes > 0 && bytes > maxBytes)) { return Promise.resolve(finish()); }
     var request = itemRequest(items[index]);
-    return sendTabExecute(tabId, request, envelope).then(function (reply) {
+    // Phần tử đầu không nhận lệnh dừng: lô rỗng là lỗi lệch hợp đồng ở GAS.
+    return sendTabExecute(tabId, request, envelope, index > 0 ? startedAt : 0).then(function (reply) {
+      if (reply && reply.cancelled) { return finish(); }
       var result = reply && reply.result;
       if (!result || reply.error) {
         return { error: String(reply && reply.error || 'Tab FBM không trả kết quả cho một request trong lô.'), code: String(reply && reply.code || 'FBM_TRANSPORT_UNAVAILABLE'), trace: traces.concat(reply && reply.trace || []) };
@@ -475,6 +494,23 @@ function fbmHeartbeatNow(source) {
 }
 if (typeof globalThis !== 'undefined') { globalThis.fbmHeartbeatNow = fbmHeartbeatNow; }
 
+/**
+ * Đo trần đường truyền gói lớn bằng gói đệm vô nghĩa, không chạm FBM: `sidebar` trả gói về Sidebar để Sidebar gửi GAS (đường lượt chạy tay), `relay` gửi gói thẳng lên Web App (đường lượt nền).
+ * Chỉ trả về thời gian và câu trả lời của GAS, không trả lại gói.
+ */
+function fbmTransportProbe(message) {
+  var sizeBytes = Math.max(0, Math.round(Number(message && message.sizeBytes || 0))), startedAt = Date.now();
+  var padding = new Array(sizeBytes + 1).join('x');
+  if (message && message.route === 'sidebar') { return Promise.resolve({ ok: true, padding: padding, buildMs: Date.now() - startedAt }); }
+  return getRelayConfig().then(function (config) {
+    if (!config) { return { ok: false, code: 'RELAY_CONFIG_MISSING', error: 'Extension chưa có cấu hình relay của file này.' }; }
+    var sentAt = Date.now();
+    return postRelay(config.url, config.key, { kind: 'transport_probe', spreadsheetId: config.spreadsheetId, sizeBytes: sizeBytes, padding: padding }, Number(message.timeoutMs || 0)).then(function (reply) {
+      return { ok: !!reply && reply.ok !== false, ms: Date.now() - sentAt, code: reply && reply.code || '', error: reply && reply.error || '', receivedBytes: reply && reply.receivedBytes || 0 };
+    });
+  }).catch(function (error) { return { ok: false, code: 'RELAY_FETCH_FAILED', error: String(error && error.message || error), ms: Date.now() - startedAt }; });
+}
+
 /** Đọc một relay config duy nhất; thiếu config thì không được chạm tab FBM. */
 function getRelayConfig() {
   if (!chrome.storage || !chrome.storage.local || !chrome.storage.local.get) { return Promise.resolve(null); }
@@ -617,6 +653,14 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     var config = message.config || {};
     if (!chrome.storage || !chrome.storage.local) { sendResponse({ ok: false, error: 'Extension không có kho cấu hình.' }); return false; }
     configureRelay(config).then(sendResponse);
+    return true;
+  }
+  if (message && message.type === 'FBM_CANCEL_BATCH') {
+    sendResponse(fbmCancelBatch());
+    return false;
+  }
+  if (message && message.type === 'FBM_TRANSPORT_PROBE') {
+    fbmTransportProbe(message).then(sendResponse);
     return true;
   }
   if (message && message.type === 'FBM_HEARTBEAT_NOW') {
