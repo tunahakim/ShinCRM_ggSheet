@@ -224,29 +224,38 @@ FbmSync.findCustomerByIdentity = function (localById, localByCode, incoming, loc
   return null;
 };
 
-/** Đánh dấu bản ghi local vắng khỏi một lượt quét full; không suy ra xóa FBM. */
-FbmSync.markMissingAfterFullScan = function (entity, state) {
+/**
+ * Chỗ duy nhất gắn cờ "không thấy bên FBM" sau một thao tác đọc đầy đủ; không suy ra xóa FBM. Mọi thao tác đọc (danh sách khách, giao dịch theo khách, toàn bộ giao dịch) đều đi qua đây nên luật bỏ qua, bộ đếm và Log không lệch giữa các chiều chạy.
+ * `seen` là bộ đánh dấu "đã thấy" của thao tác đọc toàn bộ giao dịch; bỏ trống là kho "đã thấy" của lượt quét theo khách, khi đó giao dịch chỉ xét trong các khách đã đọc (09/02 Phần 8). Kho "đã thấy" của lượt quét theo khách được xóa ở đây; kho của thao tác toàn bộ giao dịch do bên gọi xóa.
+ * Ghi theo gói `CHUNK_ROWS` dòng để một lượt nhiều bản ghi vắng không vượt một lần qua cửa ghi.
+ */
+FbmSync.markMissingAfterFullScan = function (entity, state, seen) {
   var canWriteSheet = state && (typeof FbmSync.canWriteSheet === 'function' ? FbmSync.canWriteSheet(state.mode) : state.mode === 'read' || state.mode === 'write');
-  if (!state || !canWriteSheet || (typeof FbmSync.scopeLimited === 'function' && FbmSync.scopeLimited())) { return { written: 0, skipped: true }; }
-  // Đọc giao dịch theo một phần khách chỉ kết luận được về giao dịch của chính các khách đó (09/02 Phần 8).
-  var local = FbmSync.readLocal(entity), missing = [], stillMissing = 0, parentRead = entity === 'activity' ? FbmSync.seenStoreReader(FbmSync.ACTIVITY_READ_STORE) : null;
+  if (!state || !canWriteSheet || (typeof FbmSync.scopeLimited === 'function' && FbmSync.scopeLimited())) { return { written: 0, missing: 0, sample: [], skipped: true }; }
+  var local = FbmSync.readLocal(entity), missing = [], sample = [], stillMissing = 0, written = 0, batchSize = typeof SETTINGS !== 'undefined' && SETTINGS.CHUNK_ROWS ? Number(SETTINGS.CHUNK_ROWS) : 2000;
+  var hasSeen = seen || function (record) { return FbmSync.seenStoreHas(entity, record); };
+  var parentRead = entity === 'activity' && !seen ? FbmSync.seenStoreReader(FbmSync.ACTIVITY_READ_STORE) : null;
   local.forEach(function (record) {
     var fbmId = String(record.fbmId || '').trim();
     if (parentRead && !parentRead({ id: record.customerId })) { return; }
     var lock = state.locks && state.locks[entity + ':' + String(record.id || '')];
-    if (!fbmId || FbmSync.seenStoreHas(entity, record) || String(record.recordStatus || 'active') === 'deleted' || (lock && lock.owner === 'user') || (entity === 'activity' && typeof FbmSync.activitySinceAllows === 'function' && !FbmSync.activitySinceAllows(record))) { return; }
+    if (!fbmId || hasSeen(record) || String(record.recordStatus || 'active') === 'deleted' || FbmSync.isTemporaryRecord(entity, record) || (lock && lock.owner === 'user') || (entity === 'activity' && typeof FbmSync.activitySinceAllows === 'function' && !FbmSync.activitySinceAllows(record))) { return; }
     // Dòng đã mang cờ từ lượt trước: không ghi lại và không Log lại mỗi lượt, nhưng vẫn đếm vì lượt này vẫn không thấy nó.
     if (String(record.syncStatus || '') === FbmSync.SYNC_STATUS.missing) { stillMissing += 1; return; }
     missing.push({ id: record.id, syncStatus: FbmSync.SYNC_STATUS.missing });
+    if (sample.length < 20) { sample.push({ id: record.id, fbmId: fbmId }); }
     if (FbmSync.logPullRecord) { FbmSync.logPullRecord(entity, { fbmId: fbmId }, record, FbmSync.SYNC_STATUS.missing, 'Không thấy ID trong lượt quét FBM; không suy ra xóa.'); }
   });
   var countKey = entity === 'activity' ? 'missingActivity' : 'missingCustomer';
   state.counts = state.counts || {};
   state.counts[countKey] = Number(state.counts[countKey] || 0) + missing.length + stillMissing;
-  if (!missing.length) { FbmSync.seenStoreClear(entity); return { written: 0 }; }
-  var saved = FbmSync.sheetSave(entity, missing, 'pull');
-  FbmSync.seenStoreClear(entity);
-  return { written: missing.length, result: saved };
+  for (var start = 0; start < missing.length; start += batchSize) {
+    var batch = missing.slice(start, start + batchSize);
+    FbmSync.sheetSave(entity, batch, 'pull');
+    written += batch.length;
+  }
+  if (!seen) { FbmSync.seenStoreClear(entity); }
+  return { written: written, missing: missing.length + stillMissing, sample: sample };
 };
 
 /**

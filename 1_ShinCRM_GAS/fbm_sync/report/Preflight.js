@@ -135,7 +135,7 @@ FbmSync.runPreflight = function (options) {
 
 /** Thân preflight; chỉ đọc Sheet nên chạy trong một bản chụp. */
 FbmSync.preflightEvaluate = function (options) {
-  var opt = options || {}, mode = opt.mode === 'write' || opt.mode === 'push' ? opt.mode : opt.mode === 'check' ? 'check' : 'read', writeMode = mode === 'write' || mode === 'push', core = typeof shinCorePreflight === 'function' ? shinCorePreflight({ mode: writeMode ? 'write' : mode }) : { issues: [], params: {}, category: { categories: {} } }, issues = (core.issues || []).slice(), params = core.params || {};
+  var opt = options || {}, mode = FbmSync.modeOf(opt.mode), writeMode = FbmSync.canWriteFbm(mode), core = typeof shinCorePreflight === 'function' ? shinCorePreflight({ mode: writeMode ? 'write' : mode }) : { issues: [], params: {}, category: { categories: {} } }, issues = (core.issues || []).slice(), params = core.params || {};
   if (typeof FbmSync.identityPreflight === 'function') {
     // Both identity actions are recovery tools: they must remain usable when
     // existing FBM IDs require a rebind. Ordinary read/write/background runs

@@ -228,10 +228,9 @@ FbmSync.activityRecheckContinue = function (state, cursor, rawResponse) {
 
 /** Lớp 1 đã nhận đủ: gắn cờ "không thấy", ghi Log một dòng tổng, rồi chốt lượt (gói quét) hoặc sang phần bổ sung (lượt lấy giao dịch chạy nền). */
 FbmSync.activityBulkEnd = function (state, extra) {
-  // Ghi state của lời gọi trước khi gắn cờ: bước gắn cờ đọc lại state từ kho nên thay đổi chưa ghi (dòng quá lớn, số khoảng ngày) sẽ mất.
+  // Ghi state của lời gọi trước khi gắn cờ: bước gắn cờ đọc mốc giao dịch từ state trong kho.
   FbmSync.stateWrite(state);
-  var missing = FbmSync.writeActivityBulkMissing(FbmSync.readLocal('activity'));
-  state = FbmSync.stateRead();
+  var marked = FbmSync.markMissingAfterFullScan('activity', state, FbmSync.seenStoreReader(FbmSync.ACTIVITY_BULK_STORE)), missing = { total: Number(marked.missing || 0), sample: marked.sample || [] };
   state.metadata.activityBulkMissing = missing.sample;
   state.metadata.activityBulkMissingCount = missing.total;
   state.metadata.activityBulk = Object.assign({ windows: 0 }, state.metadata.activityBulk || {}, { missing: missing.total });
@@ -263,6 +262,6 @@ FbmSync.activityBulkSupplement = function (state) {
     return rotationRequest;
   }
   state.cursor = {}; state.phase = 'done'; state.entity = '';
-  state.message = 'Đã đọc xong toàn bộ giao dịch FBM.';
+  state.message = FbmSync.runDoneMessage(state);
   return null;
 };

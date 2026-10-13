@@ -8,6 +8,8 @@ FbmSync.ACTIVE_PHASES = ['checking_session', 'waiting_session', 'pull_customer',
 FbmSync.TERMINAL_PHASES = ['done', 'error', 'paused', 'conflict'];
 FbmSync.DONE_MESSAGE = 'Đồng bộ hoàn tất.';
 /** Quyền ghi được tách theo đích; mode không được kiêm thêm một cờ ẩn ngoài UI. */
+/** Chế độ chạy hợp lệ từ lựa chọn của người dùng hoặc lịch nền; giá trị lạ về `read` (chỉ lấy về), không bao giờ thành chế độ có đẩy. */
+FbmSync.modeOf = function (mode) { return mode === 'write' || mode === 'push' || mode === 'check' ? mode : 'read'; };
 FbmSync.canWriteSheet = function (mode) { return mode === 'read' || mode === 'write'; };
 FbmSync.canWriteFbm = function (mode) { return mode === 'push' || mode === 'write'; };
 /**

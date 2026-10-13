@@ -40,7 +40,7 @@ FbmSync.start = function (options) {
   if (typeof fbmEnsureSyncColumns === 'function') { fbmEnsureSyncColumns(opt.origin === 'background' ? 'background' : 'pull'); }
   var state = FbmSync.stateStart('', 'checking_session', 0);
   state.origin = opt.origin === 'background' ? 'background' : 'manual';
-  state.mode = opt.mode === 'write' || opt.mode === 'push' ? opt.mode : opt.mode === 'check' ? 'check' : 'read';
+  state.mode = FbmSync.modeOf(opt.mode);
   state.scan = opt.scan === 'activity_bulk' ? 'activity_bulk' : opt.scan === 'identity_check' ? 'identity_check' : opt.scan === 'identity_probe' ? 'identity_probe' : opt.scan === 'detail' ? 'detail' : 'full';
   if (typeof FbmSync.businessStepStart === 'function') {
     FbmSync.businessStepStart(state, 'run', { mode: state.mode, scan: state.scan, origin: state.origin });
@@ -74,7 +74,7 @@ FbmSync.start = function (options) {
     // A large push requires an explicit human approval before GAS gives out
     // even the first FBM request. The candidate count comes from the same
     // server-side preflight that will guard the actual push.
-    if ((state.mode === 'write' || state.mode === 'push') && Number(preflight.candidateCount || 0) > 0 && Number(preflight.candidateCount || 0) >= FbmSync.approvalThreshold()) {
+    if (FbmSync.canWriteFbm(state.mode) && Number(preflight.candidateCount || 0) > 0 && Number(preflight.candidateCount || 0) >= FbmSync.approvalThreshold()) {
       state.phase = 'awaiting_approval';
       state.entity = '';
       state.cursor = { kind: 'push_approval', candidateCount: Number(preflight.candidateCount || 0) };
@@ -131,7 +131,7 @@ FbmSync.authContinue = function (entity, response) {
   if (!auth) { throw new Error('FBM không trả mã authorized cho ' + entity + '.'); }
   if (identity.userId) { state.session.userId = identity.userId; }
   if (identity.accountName) { state.session.accountName = identity.accountName; }
-  if ((state.mode === 'write' || state.mode === 'push') && typeof FbmSync.identityPreflight === 'function') {
+  if (FbmSync.canWriteFbm(state.mode) && typeof FbmSync.identityPreflight === 'function') {
     var identityCheck = FbmSync.identityStatus({ userId: state.session.userId, accountName: state.session.accountName });
     if (identityCheck.status === 'REBIND_REQUIRED') {
       state.phase = 'error'; state.lastFailureCode = 'REBIND_REQUIRED'; state.lastError = 'Liên kết tài khoản FBM không khớp; chiều ghi đã bị dừng.'; state.message = state.lastError; FbmSync.stateWrite(state);
@@ -252,7 +252,10 @@ FbmSync.pullMarkMissing = function (state) {
       return false;
     }
     FbmSync.markMissingAfterFullScan('customer', state);
-    if (customerErrors) {
+    if (state.metadata && state.metadata.activityBulk) {
+      // Lớp 1 của lượt này đã gắn cờ trên toàn bộ giao dịch; gắn lại theo khách đã đọc chỉ đếm trùng cùng một bản ghi.
+      FbmSync.seenStoreClear('activity');
+    } else if (customerErrors) {
       // Giao dịch của khách lỗi chưa được quét; đánh "không thấy bên FBM" lúc này là đánh sai.
       if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'activity_missing_skipped', outcome: typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn', cycleId: String(state.runId || ''), reason: customerErrors + ' khách lỗi khi đọc giao dịch nên lượt này không đánh dấu giao dịch "không thấy bên FBM".', detail: { customerErrors: customerErrors } }); }
     } else {
@@ -304,7 +307,7 @@ FbmSync.activitySupplementNext = function (state, afterActivity) {
   }
   if (after.kind === 'done') { FbmSync.activityRotationSave(after.rotation || FbmSync.activityRotationNext([])); }
   state.cursor = {};
-  state.phase = 'done'; state.entity = ''; state.message = FbmSync.DONE_MESSAGE; FbmSync.stateWrite(state);
+  state.phase = 'done'; state.entity = ''; state.message = FbmSync.runDoneMessage(state); FbmSync.stateWrite(state);
   return null;
 };
 
@@ -345,7 +348,7 @@ FbmSync.beginCustomerPull = function (state) {
 /** Sau khi đọc xong khách (và giao dịch nếu có): chế độ hai chiều chuyển sang đẩy, chế độ lấy chốt lượt. */
 FbmSync.pullFinishOrPush = function (state, extra) {
   var result = Object.assign({ ok: true, status: null }, extra || {});
-  if (state.mode === 'write' && FbmSync.canWriteFbm(state.mode)) {
+  if (FbmSync.canWriteSheet(state.mode) && FbmSync.canWriteFbm(state.mode)) {
     if (FbmSync.stopPushOnConflicts && FbmSync.stopPushOnConflicts(state)) { result.request = null; result.status = FbmSync.statusView(); return result; }
     if (!FbmSync.pullMarkMissing(state)) { result.request = null; result.status = FbmSync.statusView(); return result; }
     state.cursor = { kind: 'push_scan', entity: 'customer', index: 0 }; state.phase = 'push'; state.entity = 'customer'; FbmSync.stateWrite(state);
@@ -624,7 +627,7 @@ FbmSync.continue = function (rawResponse) {
       return lookupProbe ? { ok: true, request: lookupProbe, status: FbmSync.statusView(), probing: true } : { ok: false, code: 'SESSION_PROBE_UNAVAILABLE', request: null, status: FbmSync.statusView(), error: state.lastError };
     }
     if (cursor.kind === 'push_lookup') { return FbmSync.continuePushLookup(state, cursor); }
-    if (state.mode === 'write' || state.mode === 'push') {
+    if (FbmSync.canWriteFbm(state.mode)) {
       // Category is user-owned configuration; sync only reads and validates it.
       state.message = 'Đã đọc danh mục FBM; đang đối chiếu Category...';
     }

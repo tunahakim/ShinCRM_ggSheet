@@ -149,27 +149,6 @@ FbmSync.conflictRefreshRequest = function (entity, item) {
   activityRequest.meta.kind = 'conflict_refresh_grid'; activityRequest.meta.entity = 'activity'; activityRequest.meta.conflictId = String(target.id || '');
   return activityRequest;
 };
-/** Ghi trạng thái Activity vắng theo lô; state chỉ giữ tổng và mẫu nhỏ, không giữ toàn bộ danh sách. */
-FbmSync.writeActivityBulkMissing = function (localRecords) {
-  var local = localRecords || [], hasSeen = FbmSync.seenStoreReader(FbmSync.ACTIVITY_BULK_STORE), batchSize = typeof SETTINGS !== 'undefined' && SETTINGS.CHUNK_ROWS ? Number(SETTINGS.CHUNK_ROWS) : 2000;
-  var batch = [], sample = [], total = 0, written = 0;
-  function flush() {
-    if (!batch.length) { return; }
-    FbmSync.sheetSave('activity', batch, 'pull');
-    written += batch.length; batch = [];
-  }
-  local.forEach(function (record) {
-    var fbmId = String(record && record.fbmId || '').trim();
-    if (!FbmSync.activityBulkTracked(record) || hasSeen(record)) { return; }
-    var item = { id: record.id, fbmId: fbmId, syncStatus: FbmSync.SYNC_STATUS.missing };
-    total += 1; if (sample.length < 20) { sample.push(item); }
-    batch.push({ id: record.id, syncStatus: FbmSync.SYNC_STATUS.missing });
-    if (batch.length >= batchSize) { flush(); }
-  });
-  flush();
-  return { total: total, written: written, sample: sample };
-};
-
 FbmSync.FALLBACK_TIME_ZONE_OFFSET_MS = 7 * 60 * 60 * 1000;
 /** Chuẩn hóa ngày Activity về khóa yyyy-MM-dd theo múi giờ dự án (Asia/Ho_Chi_Minh). */
 FbmSync.activityDateKey = function (value) {
