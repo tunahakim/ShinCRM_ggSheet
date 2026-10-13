@@ -55,7 +55,7 @@ FbmSync.backgroundScheduleDefault = function () {
     heartbeat: { enabled: true, minutes: 5, priority: 100 },
     customerFull: { enabled: true, minutes: 8 * 60, priority: 10 },
     activityFull: { enabled: false, minutes: 24 * 60, priority: 20 },
-    detail: { enabled: false, minutes: 60, priority: 30, customersPerRun: 50, minDelaySeconds: 0.5, maxDelaySeconds: 2 }
+    detail: { enabled: false, minutes: 60, priority: 30, customersPerRun: 50 }
   };
 };
 FbmSync.backgroundScheduleRead = function () {
@@ -70,10 +70,8 @@ FbmSync.backgroundScheduleRead = function () {
       fallback[kind].enabled = item.enabled !== false;
       fallback[kind].minutes = isFinite(minutes) ? Math.max(1, Math.min(7 * 24 * 60, Math.round(minutes))) : fallback[kind].minutes;
       if (kind === 'detail') {
-        var batch = Number(item.customersPerRun), minDelay = Number(item.minDelaySeconds), maxDelay = Number(item.maxDelaySeconds);
+        var batch = Number(item.customersPerRun);
         fallback.detail.customersPerRun = isFinite(batch) ? Math.max(1, Math.min(50, Math.floor(batch))) : fallback.detail.customersPerRun;
-        fallback.detail.minDelaySeconds = isFinite(minDelay) ? Math.max(0, Math.min(60, minDelay)) : fallback.detail.minDelaySeconds;
-        fallback.detail.maxDelaySeconds = isFinite(maxDelay) ? Math.max(fallback.detail.minDelaySeconds, Math.min(60, maxDelay)) : fallback.detail.maxDelaySeconds;
       }
     });
   } catch (ignore) {}
@@ -91,10 +89,9 @@ FbmSync.backgroundScheduleSave = function (input) {
     if (!isFinite(minutes) || minutes < 1 || minutes > 7 * 24 * 60) { throw new Error('Chu kỳ ' + kind + ' phải từ 1 phút đến 7 ngày.'); }
     saved[kind] = { enabled: item.enabled === undefined ? current[kind].enabled : item.enabled === true, minutes: Math.round(minutes), priority: current[kind].priority };
     if (kind === 'detail') {
-      var batch = item.customersPerRun === undefined ? current.detail.customersPerRun : Number(item.customersPerRun), minDelay = item.minDelaySeconds === undefined ? current.detail.minDelaySeconds : Number(item.minDelaySeconds), maxDelay = item.maxDelaySeconds === undefined ? current.detail.maxDelaySeconds : Number(item.maxDelaySeconds);
+      var batch = item.customersPerRun === undefined ? current.detail.customersPerRun : Number(item.customersPerRun);
       if (!isFinite(batch) || batch < 1 || batch > 50 || Math.floor(batch) !== batch) { throw new Error('Detail batch must be an integer from 1 to 50.'); }
-      if (!isFinite(minDelay) || minDelay < 0 || minDelay > 60 || !isFinite(maxDelay) || maxDelay < minDelay || maxDelay > 60) { throw new Error('Request delay must be between 0 and 60 seconds.'); }
-      saved.detail.customersPerRun = Math.floor(batch); saved.detail.minDelaySeconds = minDelay; saved.detail.maxDelaySeconds = maxDelay;
+      saved.detail.customersPerRun = Math.floor(batch);
     }
   });
   saved.enabled = enabled; saved.direction = direction;

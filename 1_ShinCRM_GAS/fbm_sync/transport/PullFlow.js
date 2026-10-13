@@ -49,8 +49,10 @@ FbmSync.start = function (options) {
   state.identityTarget = state.scan === 'identity_check' && typeof FbmSync.identityCheckTarget === 'function' ? FbmSync.identityCheckTarget(opt.identity) : null;
   var accountSettings = typeof FbmSync.accountSettingsRead === 'function' ? FbmSync.accountSettingsRead() : {};
   state.activitySince = String(accountSettings && accountSettings.activitySince || '').trim();
+  // Chụp đầu lượt như mốc giao dịch: đổi cài đặt giữa chừng chỉ áp từ lượt sau, và không phải đọc lại DocumentProperties mỗi envelope.
+  state.requestGap = typeof FbmSync.requestGapMs === 'function' ? FbmSync.requestGapMs(FbmSync.syncSettingsRead()) : null;
   if (state.scan === 'activity_bulk') { state.mode = 'read'; }
-  if (state.origin === 'background') { state.backgroundDetail = opt.detail || null; state.detailCustomerLimit = state.scan === 'detail' ? Math.max(1, Math.min(50, Math.floor(Number(opt.detail && opt.detail.customersPerRun || 50)))) : 0; }
+  if (state.origin === 'background') { state.detailCustomerLimit = state.scan === 'detail' ? Math.max(1, Math.min(50, Math.floor(Number(opt.detail && opt.detail.customersPerRun || 50)))) : 0; }
   if (typeof FbmSync.runPreflight === 'function') {
     var preflight = FbmSync.runPreflight({ mode: state.mode, origin: state.origin, scan: state.scan });
     state.metadata = state.metadata || {};

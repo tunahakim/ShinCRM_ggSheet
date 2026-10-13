@@ -4,7 +4,7 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 FbmSync.protocol = {
   version: 1,
   // Mã phiên bản hợp đồng GAS–Extension (tests/contracts/gasExtensionContract.js). Extension trả mã của nó trong mỗi response; khác mã thì GAS dừng phiên (09.01).
-  contract: '4bc9726236ef',
+  contract: '5cce7f060aa5',
   /** Chặn request bị ghép thiếu endpoint trước khi nó tới Extension/FBM. */
   validateEndpoint: function (url) {
     var value = String(url === null || url === undefined ? '' : url).trim();
@@ -27,7 +27,6 @@ FbmSync.protocol = {
       protocol: 'shincrm-fbm', version: 1, contract: FbmSync.protocol.contract, id: String(id), meta: meta || {},
       items: (items || []).map(function (item, index) {
         var itemMeta = { kind: String(item.meta && item.meta.kind || ''), trace: { runId: trace.runId, requestId: trace.requestId, item: index } };
-        if (item.meta && Number(item.meta.waitMs || 0) > 0) { itemMeta.waitMs = Number(item.meta.waitMs); }
         return { id: String(index), url: item.url, method: 'POST', headers: { 'content-type': 'application/json; charset=UTF-8' }, body: item.body, bodyText: FbmSync.protocol.json(item.body), meta: itemMeta };
       })
     };

@@ -32,18 +32,20 @@ FbmSync.BUDGET = {
   chunkTargetBytes: 512 * 1024,
   chunkMaxBytes: 768 * 1024,
   // Mất tab hoặc Extension mất việc quét thì chạy lại cả việc; quá số lần này là lỗi hệ thống, dừng và báo.
-  scanJobRestarts: 2
+  scanJobRestarts: 2,
+  // Trần ô "khoảng cách giữa hai request tới FBM"; Extension cũng không chờ quá con số này cho một request.
+  requestGapMaxSeconds: 60
 };
 
 /** Hạn một lần fetch theo loại request; executor đọc từ `meta.fetchMs`, không giữ con số riêng. */
 FbmSync.budgetFetchMs = function (meta) { return String(meta && meta.kind || '') === 'scan_job' ? FbmSync.BUDGET.scanFetchMs : FbmSync.BUDGET.fetchMs; };
 
-/** Hạn Extension phải trả một envelope: chờ tab một lần, cộng mỗi request một lần fetch và thời gian chờ GAS yêu cầu. */
-FbmSync.budgetTimeoutMs = function (request) {
-  var budget = FbmSync.BUDGET, items = request && request.items ? request.items : [request || {}], total = budget.tabReadyMs;
+/** Hạn Extension phải trả một envelope: chờ tab một lần, cộng mỗi request một lần fetch và khoảng nghỉ dài nhất trước nó; lấy gói từ RAM tab không gọi FBM nên không có khoảng nghỉ. */
+FbmSync.budgetTimeoutMs = function (request, requestGap) {
+  var budget = FbmSync.BUDGET, items = request && request.items ? request.items : [request || {}], total = budget.tabReadyMs, gapMs = Math.max(0, Number(requestGap && requestGap.maxMs || 0));
   items.forEach(function (item) {
     var meta = item && item.meta || {}, fetches = String(meta.kind || '') === 'login' ? budget.loginFetches : 1;
-    total += Math.max(0, Number(meta.waitMs || 0)) + FbmSync.budgetFetchMs(meta) * fetches;
+    total += (String(meta.kind || '') === 'scan_chunk' ? 0 : gapMs) + FbmSync.budgetFetchMs(meta) * fetches;
   });
   if (request && request.meta && request.meta.afterLoginUrl) { total += budget.tabReadyMs; }
   return total;

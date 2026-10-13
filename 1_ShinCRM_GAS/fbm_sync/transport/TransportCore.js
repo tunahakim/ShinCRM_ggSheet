@@ -444,10 +444,8 @@ FbmSync.nextEnvelope = function (request) {
   // Extension chỉ có bộ lọc generic; GAS quyết định rõ dữ liệu phụ trợ cần lấy từ tab.
   var defaultTransport = FbmSync.payloadCookieTransport();
   meta.transport = Object.assign(defaultTransport, meta.transport || {});
-  if (state.scan === 'detail' && state.backgroundDetail) {
-    var detail = state.backgroundDetail, minDelay = Math.max(0, Number(detail.minDelaySeconds || 0)), maxDelay = Math.max(minDelay, Number(detail.maxDelaySeconds === undefined ? minDelay : detail.maxDelaySeconds));
-    if (isFinite(minDelay) && isFinite(maxDelay) && maxDelay > 0) { meta.waitMs = Math.round((minDelay + Math.random() * (maxDelay - minDelay)) * 1000); }
-  }
+  var requestGap = state.requestGap && Number(state.requestGap.maxMs) > 0 ? { minMs: Number(state.requestGap.minMs || 0), maxMs: Number(state.requestGap.maxMs) } : null;
+  if (requestGap) { meta.requestGap = requestGap; }
   try {
     var sessionPolicy = FbmSync.sessionGatePolicy();
     if (sessionPolicy.autoOpenTab) {
@@ -459,7 +457,7 @@ FbmSync.nextEnvelope = function (request) {
   } catch (gateError) {
     return FbmSync.sessionGateFailClosed(pendingState, gateError);
   }
-  meta.timeoutMs = FbmSync.budgetTimeoutMs(request);
+  meta.timeoutMs = FbmSync.budgetTimeoutMs(request, requestGap);
   meta.fetchMs = FbmSync.budgetFetchMs(meta);
   meta.extensionReplyMs = FbmSync.budgetExtensionReplyMs(meta.timeoutMs);
   meta.gasReplyMs = FbmSync.budgetGasReplyMs();

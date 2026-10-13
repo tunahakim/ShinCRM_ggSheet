@@ -4,14 +4,16 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 FbmSync.SYNC_SETTINGS_KEY = 'FBM_SYNC_SETTINGS_V1';
 // Chế độ thử mặc định bật: tệp mới chưa ai cấu hình thì không được quét và ghi toàn bộ khách thật.
 // Hai danh sách mã thử vì hai chiều lọc theo hai loại mã: chiều lấy lọc grid FBM theo mã FBM (`ma_kh`), chiều đẩy lọc Sheet theo mã ShinCRM. Trộn chung một ô từng làm chiều lấy bỏ qua mã ShinCRM mà không báo gì.
-FbmSync.SYNC_SETTINGS_DEFAULT = { approvalThreshold: 10, testMode: true, testFbmCodes: [], testShinCodes: [] };
+FbmSync.SYNC_SETTINGS_DEFAULT = { approvalThreshold: 10, testMode: true, testFbmCodes: [], testShinCodes: [], requestGapMinSeconds: 0, requestGapMaxSeconds: 0 };
+// Khoảng nghỉ ngẫu nhiên giữa hai request liên tiếp tới FBM, áp cho mọi lượt; mặc định 0 vì FBM chưa giới hạn tốc độ (Tài liệu 09/07 "Tham số phiên FBM").
+FbmSync.REQUEST_GAP_KEYS = ['requestGapMinSeconds', 'requestGapMaxSeconds'];
 FbmSync.TEST_CODE_LISTS = { testFbmCodes: 'mã khách FBM', testShinCodes: 'mã khách ShinCRM' };
 // Mã thử đi thẳng vào điều kiện SQL của grid FBM, nên chỉ nhận ký tự an toàn; dấu nháy không có đường lọt vào.
 FbmSync.TEST_CODE_PATTERN = /^[A-Za-z0-9._-]{1,32}$/;
 FbmSync.TEST_CODES_MAX = 20;
 
 function fbmSyncSettingsCloneDefault() {
-  return { approvalThreshold: FbmSync.SYNC_SETTINGS_DEFAULT.approvalThreshold, testMode: FbmSync.SYNC_SETTINGS_DEFAULT.testMode, testFbmCodes: [], testShinCodes: [] };
+  return { approvalThreshold: FbmSync.SYNC_SETTINGS_DEFAULT.approvalThreshold, testMode: FbmSync.SYNC_SETTINGS_DEFAULT.testMode, testFbmCodes: [], testShinCodes: [], requestGapMinSeconds: FbmSync.SYNC_SETTINGS_DEFAULT.requestGapMinSeconds, requestGapMaxSeconds: FbmSync.SYNC_SETTINGS_DEFAULT.requestGapMaxSeconds };
 }
 
 /** Nhận mảng hoặc chuỗi ngăn bởi dấu phẩy, khoảng trắng, xuống dòng; bỏ trùng, giữ thứ tự người dùng nhập. */
@@ -40,6 +42,11 @@ function fbmSyncSettingsNormalize(input, allowDefaults) {
   Object.keys(FbmSync.TEST_CODE_LISTS).forEach(function (key) {
     if (allowDefaults || source[key] !== undefined) { result[key] = source[key] === undefined ? [] : fbmSyncTestCodesParse(source[key]); }
   });
+  FbmSync.REQUEST_GAP_KEYS.forEach(function (key) {
+    var value = source[key];
+    if (value === undefined || value === null || value === '') { if (allowDefaults) { result[key] = FbmSync.SYNC_SETTINGS_DEFAULT[key]; } return; }
+    result[key] = Number(value);
+  });
   return result;
 }
 
@@ -61,6 +68,10 @@ function fbmSyncSettingsValidate(input) {
     return { ok: false, code: 'FBM_APPROVAL_THRESHOLD_INVALID', message: 'Ngưỡng yêu cầu chấp thuận phải là số nguyên không âm.' };
   }
   normalized.approvalThreshold = threshold;
+  var gapMin = normalized.requestGapMinSeconds, gapMax = normalized.requestGapMaxSeconds, gapCap = FbmSync.BUDGET.requestGapMaxSeconds;
+  if (!isFinite(gapMin) || !isFinite(gapMax) || gapMin < 0 || gapMax < gapMin || gapMax > gapCap) {
+    return { ok: false, code: 'FBM_REQUEST_GAP_INVALID', field: 'requestGap', message: 'Khoảng cách giữa hai request tới FBM: tối thiểu từ 0, tối đa không nhỏ hơn tối thiểu và không quá ' + gapCap + ' giây.' };
+  }
   var keys = Object.keys(FbmSync.TEST_CODE_LISTS);
   for (var i = 0; i < keys.length; i += 1) {
     var key = keys[i], label = FbmSync.TEST_CODE_LISTS[key], codes = normalized[key];
@@ -131,6 +142,12 @@ FbmSync.syncSettingsSave = function (input) {
   else { props.setProperty(FbmSync.SYNC_SETTINGS_KEY, JSON.stringify(check.settings)); saved = { ok: true }; }
   if (!saved.ok) { return { ok: false, code: saved.code, message: saved.message }; }
   return { ok: true, settings: check.settings, previous: previous };
+};
+
+/** Khoảng nghỉ gửi kèm envelope theo mili-giây; Extension chọn ngẫu nhiên trong khoảng này trước mỗi request FBM. */
+FbmSync.requestGapMs = function (settings) {
+  var source = settings || {};
+  return { minMs: Math.round(Number(source.requestGapMinSeconds || 0) * 1000), maxMs: Math.round(Number(source.requestGapMaxSeconds || 0) * 1000) };
 };
 
 FbmSync.syncSettingsPublic = function () {
