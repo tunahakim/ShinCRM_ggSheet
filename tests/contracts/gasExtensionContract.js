@@ -12,15 +12,17 @@ const CONTRACT = {
   // GAS → Extension: envelope một request FBM. Extension chỉ đọc các trường này và không suy luận nghiệp vụ.
   request: {
     fields: ['protocol', 'version', 'contract', 'id', 'url', 'method', 'headers', 'body', 'bodyText', 'meta', 'items'],
-    meta: ['kind', 'trace', 'transport', 'waitMs', 'force', 'credentialRef', 'openFbmContext', 'afterLoginUrl', 'timeoutMs', 'fetchMs', 'gasReplyMs', 'batch', 'job'],
+    meta: ['kind', 'trace', 'transport', 'requestGap', 'force', 'credentialRef', 'openFbmContext', 'afterLoginUrl', 'timeoutMs', 'fetchMs', 'gasReplyMs', 'batch', 'job'],
     transport: ['captures', 'replacements'],
+    // Khoảng nghỉ ngẫu nhiên Extension chờ trước mỗi request gọi FBM (kể cả từng phần tử của lô), tính từ lúc request FBM trước kết thúc.
+    requestGap: ['minMs', 'maxMs'],
     // Lô request đọc độc lập (`meta.kind = 'batch'`): Extension chạy lần lượt, dừng khi tổng thân vượt `batch.maxBytes`.
     batch: ['maxBytes'],
     // Việc quét: `scan_job` gọi FBM một lần, chiếu cột, cắt gói và giữ trong RAM tab; `scan_chunk` trả gói theo số thứ tự, không gọi FBM.
     scanKinds: ['scan_job', 'scan_chunk'],
     job: ['jobId', 'fields', 'idField', 'keepIds', 'chunkTargetBytes', 'chunkMaxBytes', 'chunkIndex'],
     item: ['id', 'url', 'method', 'headers', 'body', 'bodyText', 'meta'],
-    itemMeta: ['kind', 'waitMs', 'trace']
+    itemMeta: ['kind', 'trace']
   },
   // Extension → GAS: response FBM thô. `transport.contract` là mã phiên bản Extension đang chạy.
   response: {

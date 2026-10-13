@@ -7,14 +7,14 @@ function chay(so) {
   const props = { getProperty: (key) => data[key] || null, setProperty: (key, value) => { data[key] = String(value); } };
   const settingsLog = [];
   const hop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => props }, configGet: (name, fallback) => legacy[name] === undefined ? fallback : legacy[name], logEvent: (event) => { settingsLog.push(event); } });
-  napServer(hop, 'server/gate/IdGate.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js', 'fbm_sync/reconcile/Fingerprint.js');
+  napServer(hop, 'server/gate/IdGate.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js', 'fbm_sync/reconcile/Fingerprint.js');
   const first = hop.FbmSync.accountSettingsRead();
   const syncFirst = hop.FbmSync.syncSettingsRead();
   const writesAfterMigration = Object.keys(data).length;
   legacy.FBM_MA_KH_PREFIX = 'CHANGED-'; legacy.FBM_SYNC_APPROVAL_THRESHOLD = '99';
   const second = hop.FbmSync.accountSettingsRead();
   const syncSecond = hop.FbmSync.syncSettingsRead();
-  check(so, 'migration tach cau hinh tai khoan FBM khoi tham so phien', [Object.keys(first).sort(), first.customerPrefix, first.customerCodeLength, first.activitySince, writesAfterMigration, Object.keys(second).sort(), second.customerPrefix, Object.keys(syncFirst).sort(), syncSecond.approvalThreshold], [['activitySince', 'customerCodeLength', 'customerPrefix'], 'KH-', '8', '2026-01-01', 2, ['activitySince', 'customerCodeLength', 'customerPrefix'], 'KH-', ['approvalThreshold', 'testFbmCodes', 'testMode', 'testShinCodes'], 12]);
+  check(so, 'migration tach cau hinh tai khoan FBM khoi tham so phien', [Object.keys(first).sort(), first.customerPrefix, first.customerCodeLength, first.activitySince, writesAfterMigration, Object.keys(second).sort(), second.customerPrefix, Object.keys(syncFirst).sort(), syncSecond.approvalThreshold], [['activitySince', 'customerCodeLength', 'customerPrefix'], 'KH-', '8', '2026-01-01', 2, ['activitySince', 'customerCodeLength', 'customerPrefix'], 'KH-', ['approvalThreshold', 'requestGapMaxSeconds', 'requestGapMinSeconds', 'testFbmCodes', 'testMode', 'testShinCodes'], 12]);
   check(so, 'luu cau hinh tai khoan FBM hop le', [hop.FbmSync.accountSettingsSave({ customerPrefix: 'ALT', customerCodeLength: '8', activitySince: '2026-02-01' }).ok, hop.FbmSync.accountSettingsRead()], [true, { customerPrefix: 'ALT', customerCodeLength: '8', activitySince: '2026-02-01' }]);
   const invalidAccount = hop.FbmSync.accountSettingsSave({ customerPrefix: 'ALT', customerCodeLength: '', activitySince: '2026-02-31' });
   check(so, 'cau hinh tai khoan FBM chan cap thieu va ngay sai', [invalidAccount.ok, invalidAccount.code], [false, 'FBM_CUSTOMER_CODE_CONFIG_INCOMPLETE']);
@@ -29,7 +29,7 @@ function chay(so) {
   const invalidText = hop.FbmSync.syncSettingsSave({ approvalThreshold: 'khong-phai-so' });
   check(so, 'nguong phe duyet khong phai so bi tu choi', [invalidText.ok, invalidText.code], [false, 'FBM_APPROVAL_THRESHOLD_INVALID']);
   const saved = hop.FbmSync.syncSettingsSave({ approvalThreshold: 0 });
-  check(so, 'luu nguong phe duyet hop le va cho phep nguong 0', [saved.ok, Object.keys(saved.settings), saved.settings.approvalThreshold, hop.FbmSync.syncSettingsRead().approvalThreshold], [true, ['approvalThreshold', 'testMode', 'testFbmCodes', 'testShinCodes'], 0, 0]);
+  check(so, 'luu nguong phe duyet hop le va cho phep nguong 0', [saved.ok, Object.keys(saved.settings), saved.settings.approvalThreshold, hop.FbmSync.syncSettingsRead().approvalThreshold], [true, ['approvalThreshold', 'testMode', 'testFbmCodes', 'testShinCodes', 'requestGapMinSeconds', 'requestGapMaxSeconds'], 0, 0]);
 
   check(so, 'Chế độ thử mặc định bật với hai danh sách rỗng, nên tệp chưa cấu hình không quét toàn bộ', [hop.FbmSync.SYNC_SETTINGS_DEFAULT.testMode, hop.FbmSync.SYNC_SETTINGS_DEFAULT.testFbmCodes, hop.FbmSync.SYNC_SETTINGS_DEFAULT.testShinCodes], [true, [], []]);
   const codes = hop.FbmSync.syncSettingsSave({ approvalThreshold: 0, testMode: true, testFbmCodes: 'ALT00010, ALT00011\nALT00010', testShinCodes: 'CUS-020061' });
@@ -70,7 +70,7 @@ function chay(so) {
     LOG_ERROR: 'error',
     configGet: () => ''
   });
-  napServer(quotaHop, 'server/gate/IdGate.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js');
+  napServer(quotaHop, 'server/gate/IdGate.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js');
   quotaHop.FbmSync.stateWrite({ runId: 'before-quota', cursor: { pageIndex: 2, pageValue: ['2026-09-20', 'CUS-000002'] }, metadata: { customerErrors: { total: 1, recent: [{ customer: 'CUS-000001', reason: 'x'.repeat(200) }] } }, locks: { 'customer:CUS-000001': { owner: 'sync', revision: 'r1' } } });
   const previousState = quotaData.FBM_SYNC_STATE_V1;
   quotaFull = true;
@@ -85,7 +85,7 @@ function chay(so) {
   const brokenData = { FBM_ACCOUNT_SETTINGS_V1: '{"customerPrefix":"ALT"', FBM_SYNC_SETTINGS_V1: '{"approvalThreshold":' };
   const brokenProps = { getProperty: (key) => brokenData[key] || null, setProperty: (key, value) => { brokenData[key] = String(value); } };
   const brokenHop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => brokenProps }, configGet: () => 'LEGACY-' });
-  napServer(brokenHop, 'server/gate/IdGate.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js');
+  napServer(brokenHop, 'server/gate/IdGate.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js');
   const brokenCode = (work) => { try { work(); return 'không ném'; } catch (error) { return error.code; } };
   check(so, 'FBM-025: cài đặt tài khoản/đồng bộ JSON hỏng thì ném FBM_DOCUMENT_PROPERTY_CORRUPT, không rơi về giá trị cũ rồi ghi đè cài đặt người dùng',
     [brokenCode(() => brokenHop.FbmSync.accountSettingsRead()), brokenCode(() => brokenHop.FbmSync.syncSettingsRead()), brokenData.FBM_ACCOUNT_SETTINGS_V1, brokenData.FBM_SYNC_SETTINGS_V1],

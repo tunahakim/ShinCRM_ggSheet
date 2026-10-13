@@ -216,7 +216,7 @@ async function chay(so) {
 
   hop.FBM_SYNC_CLIENT.subscreen = 'settings';
   hop.FBM_SYNC_CLIENT.loginStatus = { enabled: true, autoOpenTab: false, retryEnabled: true, retryMinutes: 30 };
-  hop.FBM_SYNC_CLIENT.syncSettings = { extension: { pollMinutes: 5, runOnStartup: true }, background: { direction: 'read', heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: true, minutes: 30 }, detail: { enabled: false, minutes: 60, customersPerRun: 50, minDelaySeconds: 0.5, maxDelaySeconds: 2 } } };
+  hop.FBM_SYNC_CLIENT.syncSettings = { extension: { pollMinutes: 5, runOnStartup: true }, background: { direction: 'read', heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: true, minutes: 30 }, detail: { enabled: false, minutes: 60, customersPerRun: 50} } };
   hop.FBM_SYNC_CLIENT.lastStatus = idle();
   hop.fbmSyncPaint(idle());
   const settingsRoot = content.children[0];

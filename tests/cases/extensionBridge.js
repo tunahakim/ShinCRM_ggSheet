@@ -230,7 +230,7 @@ async function chay(so) {
   check(so, 'relay config luu Spreadsheet ID', workerSource.indexOf('fbmSpreadsheetId: spreadsheetId') >= 0, true);
   check(so, 'relay config luu nhịp gas_poll va tuy chon startup', workerSource.indexOf('fbmPollMinutes') >= 0 && workerSource.indexOf('fbmRunOnStartup') >= 0 && workerSource.indexOf('config.extension') >= 0, true);
   check(so, 'service worker co quyen goi Sheets va Web App GAS', manifest.host_permissions.includes('https://docs.google.com/*') && manifest.host_permissions.includes('https://script.google.com/macros/*') && manifest.host_permissions.includes('https://script.googleusercontent.com/macros/*'), true);
-  check(so, 'manifest Extension dong bo cung phien ban phat hanh moi', [manifest.version, manifest.name], ['21.21', 'CRM Local Pro V21.21']);
+  check(so, 'manifest Extension dong bo cung phien ban phat hanh moi', [manifest.version, manifest.name], ['21.22', 'CRM Local Pro V21.22']);
   check(so, 'relay GAS co timeout va luu chan doan toi thieu', workerSource.indexOf('GAS_RELAY_TIMEOUT_MS') >= 0 && workerSource.indexOf('RELAY_TIMEOUT') >= 0 && workerSource.indexOf('fbmRelayLastStatus') >= 0, true);
   const sidebarSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'client', 'Sidebar.html'), 'utf8');
   const entryPointsSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'transport', 'EntryPoints.js'), 'utf8');
@@ -342,22 +342,37 @@ async function chay(so) {
   vm.createContext(workerContext);
   vm.runInContext(workerSource, workerContext, { filename: WORKER_FILE });
   let virtualNow = 1000;
-  const waitTimers = [];
-  let executeSentAt = 0;
+  const waitTimers = [], sentAt = [];
+  workerContext.Date = class extends Date { static now() { return virtualNow; } };
   workerContext.clearTimeout = () => {};
-  workerContext.setTimeout = (fn, ms) => { const timer = { fn, ms: Number(ms) }; waitTimers.push(timer); return timer; };
+  workerContext.setTimeout = (fn, ms) => { const timer = { fn, ms: Number(ms), fired: false }; waitTimers.push(timer); return timer; };
   workerContext.chrome.tabs.sendMessage = (tabId, message, done) => {
     if (message.type === 'FBM_PING_V2') { done({ ready: true, version: '21.21' }); return; }
-    if (message.type === 'FBM_EXECUTE_V2') { executeSentAt = virtualNow; done({ result: { ok: true, status: 200, body: '{}', transport: { trace: [] } } }); }
+    if (message.type === 'FBM_EXECUTE_V2') { sentAt.push(message.request.id + '@' + virtualNow); done({ result: { ok: true, status: 200, body: '{}', transport: { trace: [] } } }); }
   };
-  const delayedSend = workerContext.sendToFbmTab(77, { id: 'delay-proof', url: 'https://fbo.com.vn:8888/service', method: 'POST', bodyText: '{}', meta: { waitMs: 1200, timeoutMs: 30000 } });
-  await new Promise((resolve) => setImmediate(resolve));
-  check(so, 'Extension chờ đủ waitMs trước khi gửi request FBM', [executeSentAt, waitTimers.some((timer) => timer.ms === 1200)], [0, true]);
-  const delayTimer = waitTimers.find((timer) => timer.ms === 1200);
-  virtualNow += delayTimer.ms;
-  delayTimer.fn();
-  await delayedSend;
-  check(so, 'Extension chỉ gửi sau khi đồng hồ vượt đủ khoảng delay', executeSentAt, 2200);
+  // Đồng hồ giả: chỉ bắn hẹn giờ khoảng nghỉ (hàm `resolve` của Promise, nhận một tham số; hẹn giờ hết hạn ping/tin nhắn tab là hàm không tham số), dời đồng hồ đúng bằng thời gian chờ.
+  const chayHet = async (promise) => {
+    let done = false; promise.then(() => { done = true; });
+    while (!done) {
+      await new Promise((resolve) => setImmediate(resolve));
+      const timer = waitTimers.find((item) => !item.fired && item.fn.length === 1);
+      if (timer) { timer.fired = true; virtualNow += timer.ms; timer.fn(); }
+    }
+    return promise;
+  };
+  const gap = { minMs: 1000, maxMs: 1000 };
+  const gapEnvelope = (id, kind, ids) => ({ protocol: 'shincrm-fbm', id, meta: { kind, timeoutMs: 30000, fetchMs: 10000, requestGap: gap, job: { jobId: 'j', chunkIndex: 1 } }, url: 'https://fbo.com.vn:8888/service', bodyText: '{}', items: ids && ids.map((itemId) => ({ id: itemId, url: 'https://fbo.com.vn:8888/service', bodyText: '{}', meta: { kind: 'activity_grid' } })) });
+  await chayHet(workerContext.sendToFbmTab(77, gapEnvelope('dau', 'grid')));
+  virtualNow += 300;
+  await chayHet(workerContext.sendToFbmTab(77, gapEnvelope('lo', 'batch', ['0', '1', '2'])));
+  await chayHet(workerContext.sendToFbmTab(77, gapEnvelope('goi', 'scan_chunk')));
+  check(so, 'Khoảng cách 1 giây giữa hai request FBM: request đầu không chờ, lần sau chỉ chờ phần còn thiếu, mỗi phần tử trong lô cách nhau đủ 1 giây, lấy gói từ RAM tab không chờ',
+    [sentAt, waitTimers.filter((item) => item.fn.length === 1).map((item) => item.ms)], [['dau@1000', '0@2000', '1@3000', '2@4000', 'goi@4000'], [700, 1000, 1000]]);
+  gap.maxMs = 0; gap.minMs = 0; sentAt.length = 0;
+  const truocMacDinh = waitTimers.length;
+  await chayHet(workerContext.sendToFbmTab(77, gapEnvelope('lo0', 'batch', ['0', '1'])));
+  check(so, 'Khoảng cách mặc định 0: không hẹn giờ nghỉ, gửi liền', [sentAt, waitTimers.slice(truocMacDinh).filter((item) => item.fn.length === 1).length], [['0@4000', '1@4000'], 0]);
+  workerContext.Date = Date;
   const sentItems = [];
   workerContext.chrome.tabs.sendMessage = (tabId, message, done) => {
     if (message.type === 'FBM_PING_V2') { done({ ready: true, version: '21.21' }); return; }

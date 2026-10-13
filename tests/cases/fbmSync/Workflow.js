@@ -352,7 +352,7 @@ async function chay(so) {
     activityFull: { enabled: false, minutes: 1440 },
     detail: { enabled: true, minutes: 60, customersPerRun: 50, minDelaySeconds: 0.5, maxDelaySeconds: 2 }
   });
-  check(so, 'Lịch nền lưu chiều hai chiều và batch detail cùng khoảng delay', [directionSchedule.schedule.direction, directionSchedule.schedule.detail.enabled, directionSchedule.schedule.detail.customersPerRun, directionSchedule.schedule.detail.minDelaySeconds, directionSchedule.schedule.detail.maxDelaySeconds, scheduleFlow.hop.FbmSync.backgroundEnabled()], ['write', true, 50, 0.5, 2, true]);
+  check(so, 'Lịch nền lưu chiều hai chiều và số khách mỗi phiên; khoảng nghỉ cũ của lịch nền bị bỏ, không còn lưu', [directionSchedule.schedule.direction, directionSchedule.schedule.detail.enabled, directionSchedule.schedule.detail.customersPerRun, 'minDelaySeconds' in directionSchedule.schedule.detail, 'maxDelaySeconds' in scheduleFlow.hop.FbmSync.backgroundScheduleRead().detail, scheduleFlow.hop.FbmSync.backgroundEnabled()], ['write', true, 50, false, false, true]);
   const detailCursor = scheduleFlow.hop.FbmSync.detailCursorWrite({ pageIndex: 1, pageValue: ['2026-09-16', '2026-09-16T10:00:00', '50', 'CUS-50'] });
   check(so, 'Cursor detail được lưu bền vững chỉ với đủ bốn giá trị khóa trang', [detailCursor.pageIndex, scheduleFlow.hop.FbmSync.detailCursorRead().pageValue.join('|')], [1, '2026-09-16|2026-09-16T10:00:00|50|CUS-50']);
   const detailState = { scan: 'detail', detailCustomerLimit: 50, cursor: { pageIndex: 1, count: 50, seen: 0 } };
@@ -693,11 +693,27 @@ async function chay(so) {
   scheduleFlow.hop.FbmSync.accountSettingsSave({ customerPrefix: 'ALT', customerCodeLength: '8', activitySince: '2026-01-01' });
   const bulkProjectionRequest = scheduleFlow.hop.FbmSync.activityBulkRequest({ type: 1, count: 100, gridPageIndex: 1, gridPageValue: ['2026-01-01'], transport: bulkProjection });
   check(so, 'GAS cap chi dan loc cot generic cho bulk Activity, khong hardcode o Extension', [bulkProjection.arrayProjections[0].indices.join(','), bulkProjectionRequest.meta.transport.arrayProjections[0].paths.join('|'), bulkProjectionRequest.body.filter], ['0,3,4,5,6,7,8,1,2', 'd.Rows|d.ViewPage.Fields', ['end_date:>=01/01/2026']]);
-  const waitFlow = workflowGas();
-  waitFlow.hop.FbmSync.statePatch({ scan: 'detail', backgroundDetail: { minDelaySeconds: 0.5, maxDelaySeconds: 2 }, phase: 'pull_customer', cursor: { kind: 'customer_grid' } });
-  const delayed = waitFlow.hop.FbmSync.nextEnvelope(waitFlow.hop.FbmSync.customerGridRequest({ type: 0, count: 50, gridPageIndex: -1, gridRefresh: false }));
-  check(so, 'GAS cấp waitMs transport cho lượt detail trong đúng khoảng cấu hình', [delayed.meta.waitMs >= 500, delayed.meta.waitMs <= 2000], [true, true]);
-  waitFlow.hop.FbmSync.statePatch({ scan: 'full', backgroundDetail: null, activeRequestId: '', deadlineAt: 0 });
+  const waitFlow = workflowGas({ extraFiles: ['server/gate/IdGate.js', 'fbm_sync/state/SyncSettings.js'] });
+  waitFlow.hop.FbmSync.syncSettingsSave({ testMode: false });
+  waitFlow.hop.FbmSync.syncSettingsSave({ requestGapMinSeconds: 1, requestGapMaxSeconds: 3 });
+  waitFlow.hop.FbmSync.start({ mode: 'read' });
+  waitFlow.hop.FbmSync.syncSettingsSave({ requestGapMinSeconds: 5, requestGapMaxSeconds: 9 });
+  waitFlow.hop.FbmSync.statePatch({ phase: 'pull_customer', cursor: { kind: 'customer_grid' }, activeRequestId: '', deadlineAt: 0 });
+  const gapGrid = waitFlow.hop.FbmSync.nextEnvelope(waitFlow.hop.FbmSync.customerGridRequest({ type: 0, count: 50, gridPageIndex: -1, gridRefresh: false }));
+  waitFlow.hop.FbmSync.statePatch({ activeRequestId: '', deadlineAt: 0 });
+  const gapChunk = waitFlow.hop.FbmSync.nextEnvelope({ url: 'https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage', body: '', meta: { kind: 'scan_chunk', job: { jobId: 'j', chunkIndex: 1 } } });
+  const gapBudget = waitFlow.hop.FbmSync.BUDGET;
+  check(so, 'Lượt chạy tay chụp khoảng cách giữa hai request FBM vào state đầu lượt và gửi kèm mọi envelope; đổi cài đặt giữa lượt chỉ áp lượt sau; hạn Extension cộng khoảng nghỉ dài nhất, trừ gói lấy từ RAM tab',
+    [JSON.stringify(waitFlow.hop.FbmSync.stateRead().requestGap), JSON.stringify(gapGrid.meta.requestGap), gapGrid.meta.timeoutMs, gapChunk.meta.timeoutMs],
+    ['{"minMs":1000,"maxMs":3000}', '{"minMs":1000,"maxMs":3000}', gapBudget.tabReadyMs + gapBudget.fetchMs + 3000, gapBudget.tabReadyMs + gapBudget.fetchMs]);
+  const gapInvalid = waitFlow.hop.FbmSync.syncSettingsSave({ requestGapMinSeconds: 4, requestGapMaxSeconds: 2 });
+  const gapTooLong = waitFlow.hop.FbmSync.syncSettingsSave({ requestGapMinSeconds: 0, requestGapMaxSeconds: gapBudget.requestGapMaxSeconds + 1 });
+  check(so, 'Khoảng cách request FBM: tối đa nhỏ hơn tối thiểu hoặc vượt trần bị từ chối', [gapInvalid.code, gapTooLong.code], ['FBM_REQUEST_GAP_INVALID', 'FBM_REQUEST_GAP_INVALID']);
+  waitFlow.hop.FbmSync.syncSettingsSave({ requestGapMinSeconds: 0, requestGapMaxSeconds: 0 });
+  waitFlow.hop.FbmSync.statePatch({ scan: 'full', requestGap: null, activeRequestId: '', deadlineAt: 0 });
+  const gapNone = waitFlow.hop.FbmSync.nextEnvelope(waitFlow.hop.FbmSync.customerGridRequest({ type: 0, count: 50, gridPageIndex: -1, gridRefresh: false }));
+  check(so, 'Mặc định 0 giây: envelope không mang khoảng nghỉ', gapNone.meta.requestGap, undefined);
+  waitFlow.hop.FbmSync.statePatch({ activeRequestId: '', deadlineAt: 0 });
   const truocCap = Date.now();
   const loEnvelope = waitFlow.hop.FbmSync.nextEnvelope({ items: ['STT1', 'STT2'].map((stt) => waitFlow.hop.FbmSync.activityGridRequest(stt, { type: 0, count: 100, gridPageIndex: -1, gridRefresh: false })), meta: { kind: 'batch', entity: 'activity' } });
   const loState = waitFlow.hop.FbmSync.stateRead(), B = waitFlow.hop.FbmSync.BUDGET;

@@ -442,19 +442,33 @@ async function chay(so) {
 
   hop.FBM_SYNC_CLIENT.syncSettings = { accountName: 'A', approvalThreshold: 10 };
   render(hop, content, hop.fbmSyncRenderSettings, idle);
-  hop.FBM_SYNC_CLIENT.syncSettings = { background: { direction: 'read', enabled: true, heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false, minutes: 30 }, detail: { enabled: true, minutes: 60, customersPerRun: 50, minDelaySeconds: 0.5, maxDelaySeconds: 2 } } };
+  hop.FBM_SYNC_CLIENT.syncSettings = { background: { direction: 'read', enabled: true, heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false, minutes: 30 }, detail: { enabled: true, minutes: 60, customersPerRun: 50 } } };
   const backgroundBlocks = hop.fbmSyncSettingsBackgroundBlocks(hop.FBM_SYNC_CLIENT.syncSettings);
   const backgroundToggleIndex = backgroundBlocks.findIndex((node) => node && node.elements && node.elements.some((child) => child && child.id === 'fbm-sync-background-switch'));
   const directionIndex = backgroundBlocks.findIndex((node) => node && node.elements && node.elements.some((child) => child && child.id === 'fbm-sync-background-direction'));
   const firstScheduleRow = backgroundBlocks.find((node) => node && String(node.className || '').indexOf('shin-sync-schedule-row') >= 0);
   const detailBlock = backgroundBlocks.find((node) => node && String(node.className || '').indexOf('shin-sync-detail-controls') >= 0);
-  check(so, 'background layout order and detail groups', [backgroundToggleIndex < directionIndex, backgroundBlocks[backgroundToggleIndex].role, backgroundBlocks[directionIndex].className.indexOf('shin-sync-direction-row') >= 0, firstScheduleRow.role, firstScheduleRow.elements[1].className, detailBlock.role, detailBlock.elements.length, detailBlock.elements[0].className, detailBlock.elements[1].elements[0].className, detailBlock.elements[1].elements[1].className], [true, 'row', true, 'row', 'shin-kv-label', 'box', 2, 'shin-row-group shin-sync-detail-field', 'shin-sync-detail-label', 'shin-sync-detail-inputs']);
+  check(so, 'background layout order and detail groups', [backgroundToggleIndex < directionIndex, backgroundBlocks[backgroundToggleIndex].role, backgroundBlocks[directionIndex].className.indexOf('shin-sync-direction-row') >= 0, firstScheduleRow.role, firstScheduleRow.elements[1].className, detailBlock.role, detailBlock.elements.length, detailBlock.elements[0].className], [true, 'row', true, 'row', 'shin-kv-label', 'box', 1, 'shin-row-group shin-sync-detail-field']);
+  const moduleBlocks = hop.fbmSyncSettingsModuleBlocks({ approvalThreshold: 10, requestGapMinSeconds: 1, requestGapMaxSeconds: 3 }, true);
+  const gapBlock = moduleBlocks.find((node) => node && node.elements && node.elements[1] && String(node.elements[1].className || '').indexOf('shin-sync-detail-inputs') >= 0);
+  const gapInputs = gapBlock ? gapBlock.elements[1].elements.map((field) => field.elements[1]) : [];
+  check(so, 'Khoảng cách request FBM nằm ở cài đặt chung, không còn ở lịch nền', [!!gapBlock, gapInputs.map((input) => input.id), gapInputs.map((input) => String(input.value)), JSON.stringify(backgroundBlocks).indexOf('delay') >= 0], [true, ['fbm-sync-setting-request-gap-min', 'fbm-sync-setting-request-gap-max'], ['1', '3'], false]);
   const loginPolicyBlocks = hop.fbmSyncSettingsLoginBlocks({ enabled: true, autoOpenTab: false, retryEnabled: true, retryMinutes: 30 });
   const loginPolicyChildren = loginPolicyBlocks.find((node) => node && node.id === 'fbm-sync-login-policy-children');
   const retryGroup = loginPolicyChildren.elements[1];
   const loginParent = loginPolicyBlocks.find((node) => node && node.id === 'fbm-sync-login-policy-parent-row');
   check(so, 'login policy groups retry interval under retry toggle', [loginParent.role, loginPolicyChildren.role, retryGroup.className, retryGroup.elements.length, retryGroup.elements[0].role, retryGroup.elements[0].elements[1].id, retryGroup.elements[1].className, retryGroup.elements[1].elements[1].id], ['row', 'box', 'shin-row-group shin-sync-login-policy-retry-group', 2, 'row', 'fbm-sync-policy-retry', 'shin-form-field', 'fbm-sync-login-retry-minutes']);
   check(so, 'Settings render được relay và tham số phiên', dom.document.getElementById('fbm-sync-setting-approval-threshold').value === '10' && content.textContent.indexOf('Kết nối Extension') >= 0, true);
+  hop.FBM_SYNC_CLIENT.syncSettings = { approvalThreshold: 10, testMode: true, testFbmCodes: ['ALT00010'], testShinCodes: [], requestGapMinSeconds: 0, requestGapMaxSeconds: 0 };
+  render(hop, content, hop.fbmSyncRenderSettings, idle);
+  dom.document.getElementById('fbm-sync-setting-request-gap-min').value = '1';
+  dom.document.getElementById('fbm-sync-setting-request-gap-max').value = '2.5';
+  const gapSaves = [], gapCallServer = hop.callServer, gapStatusOnce = hop.fbmSyncStatusOnce;
+  hop.callServer = (name, args) => { if (name === 'fbmSaveSyncSettings') { gapSaves.push(args[0]); } return Promise.resolve({ ok: true, settings: args && args[0] }); };
+  hop.fbmSyncStatusOnce = () => Promise.resolve(null);
+  await hop.fbmSyncSaveSyncSettings(null);
+  hop.callServer = gapCallServer; hop.fbmSyncStatusOnce = gapStatusOnce;
+  check(so, 'Lưu cài đặt chung gửi kèm khoảng cách request FBM người dùng vừa nhập', [gapSaves.length, gapSaves[0] && gapSaves[0].requestGapMinSeconds, gapSaves[0] && gapSaves[0].requestGapMaxSeconds], [1, '1', '2.5']);
 
   hop.FBM_SYNC_CLIENT.subscreen = 'account';
   hop.FBM_SYNC_CLIENT.loginStatus = { configured: false, enabled: true };
