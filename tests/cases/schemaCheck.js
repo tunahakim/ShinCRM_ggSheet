@@ -106,7 +106,7 @@ function chay(so) {
     });
   });
 
-  check(so, 'đúng tám cột thuần đồng bộ trong SYNC_SCHEMA', maDongBo.length, 8);
+  check(so, 'Đúng chín cột thuần đồng bộ trong SYNC_SCHEMA, Activity có cột Đồng bộ lúc', [maDongBo.length, maDongBo.indexOf('@ACT_SYNC_LUC') >= 0], [9, true]);
   check(so, 'không một cột đồng bộ nào lọt vào DATA_SCHEMA', lotVao, []);
 
   section('schemaCheckUi — tên hành động, tên slot và đường dẫn trường của UI_SCHEMA');
