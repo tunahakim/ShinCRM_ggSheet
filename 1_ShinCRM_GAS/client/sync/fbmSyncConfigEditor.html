@@ -22,9 +22,7 @@ var FBM_SYNC_CONFIG_UI_SCHEMA = {
       'heartbeat.minutes': 'heartbeat.enabled',
       'customerFull.minutes': 'customerFull.enabled',
       'activityFull.minutes': 'activityFull.enabled',
-      'detail.customersPerRun': 'detail.enabled',
-      'detail.minDelaySeconds': 'detail.enabled',
-      'detail.maxDelaySeconds': 'detail.enabled'
+      'detail.customersPerRun': 'detail.enabled'
     }
   },
   loginPolicy: {
@@ -257,7 +255,7 @@ function fbmSyncConfigStartEdit(key) {
     draft = { customerPrefix: String(account.customerPrefix || ''), customerCodeLength: String(account.customerCodeLength || ''), activitySince: String(account.activitySince || '') };
     FBM_SYNC_CLIENT.accountSettingsDraft = fbmSyncConfigClone(draft);
   } else if (key === 'module') {
-    draft = { approvalThreshold: settings.approvalThreshold === undefined ? FBM_SYNC_SETTINGS_SCHEMA.defaults.approvalThreshold : settings.approvalThreshold, enabled: fbmSyncConfigMasterEnabled(), testMode: settings.testMode !== false, testFbmCodes: (settings.testFbmCodes || []).join(', '), testShinCodes: (settings.testShinCodes || []).join(', ') };
+    draft = { approvalThreshold: settings.approvalThreshold === undefined ? FBM_SYNC_SETTINGS_SCHEMA.defaults.approvalThreshold : settings.approvalThreshold, enabled: fbmSyncConfigMasterEnabled(), testMode: settings.testMode !== false, testFbmCodes: (settings.testFbmCodes || []).join(', '), testShinCodes: (settings.testShinCodes || []).join(', '), requestGapMinSeconds: settings.requestGapMinSeconds === undefined ? 0 : settings.requestGapMinSeconds, requestGapMaxSeconds: settings.requestGapMaxSeconds === undefined ? 0 : settings.requestGapMaxSeconds };
   } else if (key === 'relay') {
     draft = {};
   } else if (key === 'extension') {
@@ -287,7 +285,7 @@ function fbmSyncConfigSave(key, target) {
 var FBM_SYNC_CONFIG_UNSAVED_FIELDS = {
   connection: { 'identity.spreadsheetId': 'fbm-identity-spreadsheet', 'identity.userId': 'fbm-identity-user', 'identity.username': 'fbm-identity-username', 'identity.accountName': 'fbm-identity-account', loginUsername: 'fbm-login-username', password: 'fbm-login-password' },
   accountSettings: { customerPrefix: 'fbm-account-customer-prefix', customerCodeLength: 'fbm-account-customer-length', activitySince: 'fbm-account-activity-since' },
-  module: { enabled: 'fbm-sync-settings-master-switch', approvalThreshold: 'fbm-sync-setting-approval-threshold', testMode: 'fbm-sync-setting-test-mode', testFbmCodes: 'fbm-sync-setting-test-fbm-codes', testShinCodes: 'fbm-sync-setting-test-shin-codes' },
+  module: { enabled: 'fbm-sync-settings-master-switch', approvalThreshold: 'fbm-sync-setting-approval-threshold', testMode: 'fbm-sync-setting-test-mode', testFbmCodes: 'fbm-sync-setting-test-fbm-codes', testShinCodes: 'fbm-sync-setting-test-shin-codes', requestGapMinSeconds: 'fbm-sync-setting-request-gap-min', requestGapMaxSeconds: 'fbm-sync-setting-request-gap-max' },
   relay: {},
   extension: { pollMinutes: 'fbm-extension-poll-minutes', runOnStartup: 'fbm-sync-run-on-startup' },
   background: {
@@ -296,7 +294,7 @@ var FBM_SYNC_CONFIG_UNSAVED_FIELDS = {
     'customerFull.minutes': 'fbm-sync-process-customerFull-minutes', 'customerFull.enabled': 'fbm-sync-process-customerFull',
     'activityFull.minutes': 'fbm-sync-process-activityFull-minutes', 'activityFull.enabled': 'fbm-sync-process-activityFull',
     'detail.minutes': 'fbm-sync-process-detail-minutes', 'detail.enabled': 'fbm-sync-process-detail',
-    'detail.customersPerRun': 'fbm-sync-detail-count', 'detail.minDelaySeconds': 'fbm-sync-detail-delay-min', 'detail.maxDelaySeconds': 'fbm-sync-detail-delay-max'
+    'detail.customersPerRun': 'fbm-sync-detail-count'
   },
   loginPolicy: { enabled: 'fbm-sync-policy-auto-login', autoOpenTab: 'fbm-sync-policy-auto-open', retryEnabled: 'fbm-sync-policy-retry', retryMinutes: 'fbm-sync-login-retry-minutes' }
 };

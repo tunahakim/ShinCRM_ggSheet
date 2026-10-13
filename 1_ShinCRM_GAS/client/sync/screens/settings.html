@@ -49,11 +49,7 @@ function fbmSyncSettingsBackgroundBlocks(settings) {
   var rows = process.map(function (item) { var spec = background[item[0]] || { enabled: item[3], minutes: item[2] }, toggleDisabled = fbmSyncConfigControlDisabled('background', item[0] + '.enabled'), minutesDisabled = fbmSyncConfigControlDisabled('background', item[0] + '.minutes'), toggleId = backgroundSchema.processPrefix + item[0], minutesId = toggleId + backgroundSchema.minutesSuffix; return FBM_SYNC_SETTINGS_UI.layout.scheduleRow(FBM_SYNC_SETTINGS_UI.classes.scheduleRow, StandaloneControl({ id: toggleId, kind: 'toggle', pressed: spec.enabled !== false, className: spec.enabled !== false ? FBM_SYNC_SETTINGS_UI.classes.toggleOn : FBM_SYNC_SETTINGS_UI.classes.toggleOff, data: { 'sync-process-toggle': item[0] }, disabled: toggleDisabled, ariaLabel: backgroundSchema.toggleAria + item[1] }), Text({ className: FBM_SYNC_SETTINGS_UI.classes.kvLabel, text: item[1] }), StandaloneControl({ id: minutesId, kind: 'input', inputType: 'number', value: spec.minutes || item[2], placeholder: backgroundSchema.minutesPlaceholder, data: { 'sync-process-minutes': item[0] }, disabled: minutesDisabled, ariaLabel: backgroundSchema.minutesAria + item[1] })); });
   var detail = background.detail || {}, detailSchema = FBM_SYNC_SETTINGS_SCHEMA.background.detail;
   var detailControls = FBM_SYNC_SETTINGS_UI.layout.detailControls(FBM_SYNC_SETTINGS_UI.classes.detailControls, [
-    FBM_SYNC_SETTINGS_UI.layout.detailField(FBM_SYNC_SETTINGS_UI.classes.detailField, Text({ className: FBM_SYNC_SETTINGS_UI.classes.detailLabel, text: detailSchema.countLabel }), StandaloneControl({ id: detailSchema.countId, kind: 'input', inputType: 'number', value: detail.customersPerRun || FBM_SYNC_SETTINGS_SCHEMA.defaults.detailCustomers, placeholder: detailSchema.countPlaceholder, disabled: fbmSyncConfigControlDisabled('background', 'detail.customersPerRun'), ariaLabel: detailSchema.countLabel })),
-    FBM_SYNC_SETTINGS_UI.layout.detailField(FBM_SYNC_SETTINGS_UI.classes.detailField, Text({ className: FBM_SYNC_SETTINGS_UI.classes.detailLabel, text: detailSchema.delayLabel }), FBM_SYNC_SETTINGS_UI.layout.detailInputs(FBM_SYNC_SETTINGS_UI.classes.detailInputs, [
-      FBM_SYNC_SETTINGS_UI.layout.detailField(FBM_SYNC_SETTINGS_UI.classes.detailInput, Text({ className: FBM_SYNC_SETTINGS_UI.classes.detailInputLabel, text: detailSchema.minLabel }), StandaloneControl({ id: detailSchema.minId, kind: 'input', inputType: 'number', value: detail.minDelaySeconds === undefined ? FBM_SYNC_SETTINGS_SCHEMA.defaults.detailMinDelay : detail.minDelaySeconds, placeholder: detailSchema.minPlaceholder, disabled: fbmSyncConfigControlDisabled('background', 'detail.minDelaySeconds'), ariaLabel: detailSchema.minLabel })),
-      FBM_SYNC_SETTINGS_UI.layout.detailField(FBM_SYNC_SETTINGS_UI.classes.detailInput, Text({ className: FBM_SYNC_SETTINGS_UI.classes.detailInputLabel, text: detailSchema.maxLabel }), StandaloneControl({ id: detailSchema.maxId, kind: 'input', inputType: 'number', value: detail.maxDelaySeconds === undefined ? FBM_SYNC_SETTINGS_SCHEMA.defaults.detailMaxDelay : detail.maxDelaySeconds, placeholder: detailSchema.maxPlaceholder, disabled: fbmSyncConfigControlDisabled('background', 'detail.maxDelaySeconds'), ariaLabel: detailSchema.maxLabel }))
-    ]))
+    FBM_SYNC_SETTINGS_UI.layout.detailField(FBM_SYNC_SETTINGS_UI.classes.detailField, Text({ className: FBM_SYNC_SETTINGS_UI.classes.detailLabel, text: detailSchema.countLabel }), StandaloneControl({ id: detailSchema.countId, kind: 'input', inputType: 'number', value: detail.customersPerRun || FBM_SYNC_SETTINGS_SCHEMA.defaults.detailCustomers, placeholder: detailSchema.countPlaceholder, disabled: fbmSyncConfigControlDisabled('background', 'detail.customersPerRun'), ariaLabel: detailSchema.countLabel }))
   ]);
   return FBM_SYNC_SETTINGS_UI.layout.background({
     notice: fbmSyncSettingsNoticeBlocks('background', fbmSyncSettingsSchedulerNotice(FBM_SYNC_CLIENT.lastStatus)),
@@ -97,7 +93,7 @@ function fbmSyncSetBackgroundDependencyState(parentEnabled) {
     fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.background.processPrefix + kind, { disabled: fbmSyncConfigControlDisabled('background', kind + '.enabled') });
     fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.background.processPrefix + kind + FBM_SYNC_SETTINGS_SCHEMA.background.minutesSuffix, { disabled: fbmSyncConfigControlDisabled('background', kind + '.minutes') });
   });
-  FBM_SYNC_SETTINGS_SCHEMA.defaults.detailSuffixes.forEach(function (suffix) { fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.defaults.detailFieldPrefix + suffix, { disabled: fbmSyncConfigControlDisabled('background', 'detail.' + (suffix === 'count' ? 'customersPerRun' : suffix === 'delay-min' ? 'minDelaySeconds' : 'maxDelaySeconds')) }); });
+  FBM_SYNC_SETTINGS_SCHEMA.defaults.detailSuffixes.forEach(function (suffix) { fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.defaults.detailFieldPrefix + suffix, { disabled: fbmSyncConfigControlDisabled('background', 'detail.' + ('customersPerRun')) }); });
   fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.defaults.backgroundSwitchId, { disabled: fbmSyncConfigControlDisabled('background', 'enabled') });
   return parentEnabled !== true;
 }
@@ -109,12 +105,20 @@ function fbmSyncSettingsModuleBlocks(settings, enabled) {
     notice: fbmSyncSettingsNoticeBlocks('module'),
     threshold: StandaloneField(moduleSchema.thresholdLabel, { id: moduleSchema.thresholdId, kind: 'input', inputType: 'number', value: draft.approvalThreshold === undefined ? moduleSchema.thresholdPlaceholder : draft.approvalThreshold, placeholder: moduleSchema.thresholdPlaceholder, disabled: fbmSyncConfigControlDisabled('module', 'approvalThreshold') || !parentEnabled, ariaLabel: moduleSchema.thresholdLabel }),
     help: Text({ className: FBM_SYNC_SETTINGS_UI.classes.muted, text: moduleSchema.thresholdHelp }),
+    requestGap: FBM_SYNC_SETTINGS_UI.layout.detailField(FBM_SYNC_SETTINGS_UI.classes.detailField, Text({ className: FBM_SYNC_SETTINGS_UI.classes.detailLabel, text: moduleSchema.requestGapLabel }), FBM_SYNC_SETTINGS_UI.layout.detailInputs(FBM_SYNC_SETTINGS_UI.classes.detailInputs, [
+      fbmSyncSettingsRequestGapField(draft, 'requestGapMinSeconds', moduleSchema.requestGapMinLabel, moduleSchema.requestGapMinId, parentEnabled),
+      fbmSyncSettingsRequestGapField(draft, 'requestGapMaxSeconds', moduleSchema.requestGapMaxLabel, moduleSchema.requestGapMaxId, parentEnabled)
+    ])),
+    requestGapHelp: Text({ className: FBM_SYNC_SETTINGS_UI.classes.muted, text: moduleSchema.requestGapHelp }),
     testMode: FBM_SYNC_SETTINGS_UI.layout.toggle(FBM_SYNC_SETTINGS_UI.classes.toggleRow, Text({ className: FBM_SYNC_SETTINGS_UI.classes.toggleCopy, text: moduleSchema.testModeLabel }), StandaloneControl({ id: moduleSchema.testModeId, kind: 'toggle', pressed: draft.testMode !== false, className: draft.testMode !== false ? FBM_SYNC_SETTINGS_UI.classes.toggleOn : FBM_SYNC_SETTINGS_UI.classes.toggleOff, data: { 'sync-test-mode-draft': true }, disabled: fbmSyncConfigControlDisabled('module', 'testMode'), ariaLabel: moduleSchema.testModeLabel })),
     testFbmCodes: fbmSyncSettingsTestCodesField(draft, 'testFbmCodes', moduleSchema.testFbmCodesLabel, moduleSchema.testFbmCodesId, moduleSchema.testFbmCodesPlaceholder),
     testShinCodes: fbmSyncSettingsTestCodesField(draft, 'testShinCodes', moduleSchema.testShinCodesLabel, moduleSchema.testShinCodesId, moduleSchema.testShinCodesPlaceholder),
     testHelp: Text({ className: FBM_SYNC_SETTINGS_UI.classes.muted, text: moduleSchema.testHelp }),
     actions: fbmSyncConfigButtonRow('module', { edit: moduleSchema.edit, save: moduleSchema.save }, { id: moduleSchema.saveId, disabled: !!FBM_SYNC_CLIENT.running })
   });
+}
+function fbmSyncSettingsRequestGapField(draft, key, label, id, parentEnabled) {
+  return FBM_SYNC_SETTINGS_UI.layout.detailField(FBM_SYNC_SETTINGS_UI.classes.detailInput, Text({ className: FBM_SYNC_SETTINGS_UI.classes.detailInputLabel, text: label }), StandaloneControl({ id: id, kind: 'input', inputType: 'number', value: draft[key] === undefined ? 0 : draft[key], placeholder: FBM_SYNC_SETTINGS_SCHEMA.module.requestGapPlaceholder, disabled: fbmSyncConfigControlDisabled('module', key) || !parentEnabled, ariaLabel: FBM_SYNC_SETTINGS_SCHEMA.module.requestGapLabel + ' — ' + label }));
 }
 /** Một ô danh sách mã thử; hai ô chỉ khác nhãn, khóa draft và id. */
 function fbmSyncSettingsTestCodesField(draft, key, label, id, placeholder) {
@@ -170,8 +174,6 @@ function fbmSyncPatchSettings(panel, status) {
     if (minutes && activeId !== minutes.id) { minutes.disabled = fbmSyncConfigControlDisabled('background', kind + '.minutes'); }
   });
   patchValue(FBM_SYNC_SETTINGS_SCHEMA.background.detail.countId, background.detail && background.detail.customersPerRun);
-  patchValue(FBM_SYNC_SETTINGS_SCHEMA.background.detail.minId, background.detail && background.detail.minDelaySeconds);
-  patchValue(FBM_SYNC_SETTINGS_SCHEMA.background.detail.maxId, background.detail && background.detail.maxDelaySeconds);
   var extension = settings.extension || {};
   patchValue(FBM_SYNC_SETTINGS_SCHEMA.extension.pollId, extension.pollMinutes);
   patchToggle(FBM_SYNC_SETTINGS_SCHEMA.defaults.startupId, extension.runOnStartup !== false, fbmSyncConfigControlDisabled('extension', 'runOnStartup'));
@@ -182,6 +184,8 @@ function fbmSyncPatchSettings(panel, status) {
   patchValue(FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryMinutesId, login.retryMinutes);
   fbmSyncSetLoginPolicyDependencyState(loginEnabled);
   patchValue(FBM_SYNC_SETTINGS_SCHEMA.module.thresholdId, settings.approvalThreshold);
+  patchValue(FBM_SYNC_SETTINGS_SCHEMA.module.requestGapMinId, settings.requestGapMinSeconds);
+  patchValue(FBM_SYNC_SETTINGS_SCHEMA.module.requestGapMaxId, settings.requestGapMaxSeconds);
   fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.module.thresholdId, { disabled: !fbmSyncConfigIsEditing('module') || !!FBM_SYNC_CLIENT.running || fbmSyncConfigDraftValue('module', 'enabled', masterEnabled) !== true });
   fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.module.saveId, { disabled: !!FBM_SYNC_CLIENT.running });
   if (masterEnabled) { fbmSyncSetTargetState(FBM_SYNC_UI_SCHEMA.shell.ids.body, { disabledDescendants: false, except: [FBM_SYNC_UI_SCHEMA.shell.ids.master] }); }
