@@ -3,7 +3,7 @@ var FbmSync = (typeof FbmSync === 'undefined' || !FbmSync) ? {} : FbmSync;
 
 /** Cột metadata riêng của đồng bộ; lõi chỉ nhận DATA_SCHEMA, không đọc ngược SYNC_SCHEMA. */
 
-/** Cột sync đặt sau cột lõi; Activity giữ ít cột vì mã khách là khóa tra cứu. */
+/** Cột sync đặt sau cột lõi; Activity không có mã hiển thị vì mã khách là khóa tra cứu. */
 var SYNC_SCHEMA = {
 
   customer: {
@@ -17,7 +17,8 @@ var SYNC_SCHEMA = {
   activity: {
     fbmId: { code: '@ACT_FBM_ID', type: 'TEXT', label: 'FBM ID' },
     fbmHash: { code: '@ACT_HASH_FBM', type: 'TEXT', label: 'Dấu vân FBM' },
-    syncStatus: { code: '@ACT_SYNC_TT', type: 'TEXT', label: 'Tình trạng đồng bộ' }
+    syncStatus: { code: '@ACT_SYNC_TT', type: 'TEXT', label: 'Tình trạng đồng bộ' },
+    syncedAt: { code: '@ACT_SYNC_LUC', type: 'DATE', label: 'Đồng bộ lúc', precision: 'minute' }
   }
 
 };
