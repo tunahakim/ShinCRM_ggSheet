@@ -266,6 +266,20 @@ Chuẩn bị giống 2B.8 (`fbmPerfOn`, `fbmPerfTestScopeOn`, `fbmPerfDropScopeA
 - Lượt toàn bộ đo thật (2026-10-08, lần chạy thứ năm sau khi sửa chuyển trang Customer): 1.312/1.312 khách, đã xử lý 4.021 bản ghi, 57 ghi, 0 lỗi, 0 xung đột, hoàn tất. Giao dịch 27 lô, GAS tổng 291,6 giây (trung bình 10,8 giây, lớn nhất 25,5 giây), khứ hồi phía client 335 giây; lưới Customer 26 trang, GAS tổng 113,9 giây (trung bình 4,4 giây), khứ hồi 178 giây; cộng lại khoảng 8,5 phút, chậm hơn dự báo 6 phút. Điểm nặng nhất là `entityReadAll` trong lô giao dịch: 184 giây, 1,8 lần đọc mỗi lần gọi, khoảng 6,8 giây mỗi lần gọi và tăng theo số dòng Sheet; kế đến `writeGateSave` 31 giây, `readCategoryGate` 21,8 giây. Bộ đo DEV báo "Đối số quá lớn" lúc kết thúc (kho số đo chạm trần kích thước), 2/27 lần gọi mỗi loại thiếu số đo phía client.
 - Sau lượt toàn bộ: đo riêng một lần đọc Sheet (`fbmProbeSheetReadCost`) thấy `getValues` chỉ 0,3–0,7 giây, phần còn lại là `Utilities.formatDate` khoảng 0,6 ms mỗi ô ngày (Activity 8.112 ô, Customer 3.936 ô). Đã sửa: `dateToText` ghép chuỗi từ giờ địa phương của `Date` khi múi giờ tệp trùng múi giờ script; Sheet DEV có múi giờ tệp `Asia/Bangkok` khác tên script nên đã đổi sang `Asia/Ho_Chi_Minh`. Sau sửa: Activity 2.704 dòng đọc 0,9 giây, Customer 1.312 dòng 0,8 giây, 0 ô lệch.
 
+### 2B.10. Số đo sau đợt 4 (2026-10-13, Sheet DEV, "Lấy từ FBM → ShinCRM", Mức quét "Quét toàn bộ", phạm vi không giới hạn)
+
+Chủ dự án bấm chạy; `fbmPerfOn`, LOG_TRACE bật. Kết quả lượt: 1.314/1.314 khách, đọc 4.034 bản ghi, 0 ghi (Sheet đã khớp), 1 khách "không thấy bên FBM" (khách đã chuyển cho người khác trên công ty), 0 lỗi, 0 xung đột, hoàn tất. **347 giây từ lần gọi đầu đến lần cuối (2B.9: khoảng 8,5 phút).**
+
+| Lượt toàn bộ | 2B.9 (sau đợt 3) | Sau đợt 4 |
+|---|---|---|
+| Danh sách khách | 26 trang, 26 lần gọi GAS, GAS 113,9 giây, khứ hồi 178 giây | 1 request FBM (1,8 giây), 1 lần gọi GAS 4,1 giây, khứ hồi 8,8 giây |
+| Giao dịch | 27 lô, GAS 291,6 giây | 27 lô, GAS 120,2 giây (trung bình 4,5 giây, lớn nhất 8,6 giây) |
+| Request FBM giao dịch | một mỗi khách | 1.314, trung bình 0,07 giây, tổng 96 giây trong Extension |
+| Đường truyền GAS | | khoảng 2,7 giây mỗi lần gọi |
+
+- Mục tiêu đợt 4 đạt: danh sách khách từ 26 trang còn một request; lượt toàn bộ nhanh hơn khoảng 40%. Gói "Quét toàn bộ" vẫn phải đọc giao dịch của từng khách nên 1.314 request giao dịch là bản chất của gói, không phải thừa.
+- Trong 120 giây GAS của 27 lô giao dịch: `entityReadAll` 59 giây (2 lần đọc Sheet mỗi lần gọi, khoảng 1,1 giây mỗi lần), `readCategoryGate` 27,7 giây (1,8 lần mỗi lần gọi, khoảng 0,56 giây mỗi lần), `canonical` 8,4 giây, `flushLog` 3,8 giây. Hai việc đầu lặp lại ở mọi lô dù 22/27 lô không có bản ghi nào phải ghi; đây là chỗ còn lại đáng tối ưu nếu cần (đọc Sheet một lần mỗi lời gọi, dựng ánh xạ Category một lần mỗi lời gọi), chưa làm trong đợt này.
+
 ## 3. Ranh giới GAS – Extension – Sidebar
 
 ### 3.1. GAS sở hữu
