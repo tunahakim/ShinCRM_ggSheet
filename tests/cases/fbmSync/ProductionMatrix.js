@@ -130,6 +130,21 @@ async function chay(so) {
   const bulkWrites = bulk.writes.slice(beforeBulkWrites);
   check(so, 'missing Activity lon hon 2000 dong duoc cat thanh hai lan cua ghi', [missing.total, missing.written, bulkWrites.length, bulkWrites[0].records.length, bulkWrites[1].records.length], [2500, 2500, 2, 2000, 500]);
 
+  // Phạm vi "Chỉ khách chỉ định": khách và giao dịch trong phạm vi mà FBM không trả là vắng thật; khách ngoài phạm vi không được xét.
+  const phamVi = makeSync();
+  phamVi.local.customer.push({ id: 'CUS-000001', fbmId: 'FC-1', fbmCustomerCode: 'ALT1', recordStatus: 'active', syncStatus: 'đã đồng bộ' }, { id: 'CUS-000002', fbmId: 'FC-2', fbmCustomerCode: 'ALT2', recordStatus: 'active', syncStatus: 'đã đồng bộ' });
+  phamVi.local.activity.push({ id: 'ACT-000001', customerId: 'CUS-000001', fbmId: 'FA-1', workDate: '2026-09-19', recordStatus: 'active', syncStatus: 'đã đồng bộ' }, { id: 'ACT-000002', customerId: 'CUS-000002', fbmId: 'FA-2', workDate: '2026-09-19', recordStatus: 'active', syncStatus: 'đã đồng bộ' });
+  phamVi.hop.FbmSync.scopeLimited = () => true;
+  phamVi.hop.FbmSync.scope = () => ({ codes: ['ALT1'], fbm: ['ALT1'], shin: ['CUS-000001'], notFound: [] });
+  phamVi.hop.FbmSync.seenStoreBegin('customer', phamVi.local.customer);
+  phamVi.hop.FbmSync.seenStoreBegin('activity_bulk', phamVi.local.activity);
+  const phamViState = phamVi.hop.FbmSync.stateRead();
+  phamViState.mode = 'read';
+  phamVi.hop.FbmSync.markMissingAfterFullScan('customer', phamViState);
+  phamVi.hop.FbmSync.markMissingAfterFullScan('activity', phamViState, phamVi.hop.FbmSync.seenStoreReader('activity_bulk'));
+  const coVang = phamVi.writes.flatMap((item) => item.records || []).filter((item) => item.syncStatus === phamVi.hop.FbmSync.SYNC_STATUS.missing).map((item) => item.id).sort();
+  check(so, 'Phạm vi khách chỉ định: khách và giao dịch trong phạm vi vắng bên FBM bị gắn cờ, khách và giao dịch ngoài phạm vi không bị xét', [coVang, phamViState.counts.missingCustomer, phamViState.counts.missingActivity], [['ACT-000001', 'CUS-000001'], 1, 1]);
+
   const retry = makeSync();
   const retryState = retry.hop.FbmSync.stateStart('', 'pull_customer', 0);
   retryState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 4, pageValue: ['x', 'y', 'z'], count: 2000 };
