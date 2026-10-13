@@ -435,7 +435,7 @@ Relay:
   dữ liệu tạm của lượt hiện tại, tối đa 768 KiB theo đề xuất ban đầu
 ```
 
-Các con số này chưa phải hợp đồng cuối. Khi refactor phải đo bằng test và gom thành một policy dùng chung, không khai riêng cho Customer, Activity và `fbmOnly`.
+Các con số này chưa phải hợp đồng cuối. Khi refactor phải đo bằng test và gom thành một policy dùng chung, không khai riêng cho Customer, Activity và `fbmOnly`. Đo thật 2026-10-13: trần "khoảng 1 MB" không đúng, cả hai đường qua 20 MB; con số chốt 4 MiB/5 MiB ở `FbmSync.BUDGET` và 09/01 mục Việc quét.
 
 ## 6. Customer: một request tới FBM, nhiều chunk về GAS
 
