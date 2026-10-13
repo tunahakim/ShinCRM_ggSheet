@@ -519,7 +519,7 @@ function fbmSyncInstall() {
     } else { waiter.resolve(data.result); }
   });
   document.addEventListener('click', function (event) {
-    var target = event.target && event.target.closest ? event.target.closest('#fbm-sync-back, #fbm-sync-module-menu, #fbm-sync-master-switch, #fbm-sync-settings-master-switch, #fbm-sync-start, #fbm-sync-approve, #fbm-sync-rotate-relay, #fbm-sync-cancel, #fbm-sync-reset-state, #fbm-sync-force-login, #fbm-sync-open-conflicts, #fbm-sync-conflict-back, #fbm-sync-check-identity, #fbm-sync-probe-identity, #fbm-sync-confirm-identity, #fbm-sync-save-identity, #fbm-sync-auto-login, #fbm-sync-login-edit, #fbm-sync-login-save, #fbm-sync-login-delete, #fbm-sync-login-test, #fbm-sync-open-login-policy, #fbm-sync-save-extension, #fbm-sync-save-background, #fbm-sync-save-login-policy, #fbm-sync-save-settings, [data-sync-config-action], [data-sync-screen], [data-sync-results-tab], [data-sync-background-draft], [data-sync-master-draft], [data-sync-test-mode-draft], [data-sync-extension-startup], [data-sync-process-toggle], [data-sync-login-policy], [data-sync-page], #fbm-sync-conflict-save, [data-fbm-push-retry-all]') : null;
+    var target = event.target && event.target.closest ? event.target.closest('#fbm-sync-back, #fbm-sync-module-menu, #fbm-sync-master-switch, #fbm-sync-settings-master-switch, #fbm-sync-start, #fbm-sync-approve, #fbm-sync-rotate-relay, #fbm-sync-cancel, #fbm-sync-reset-state, #fbm-sync-force-login, #fbm-sync-open-conflicts, #fbm-sync-conflict-back, #fbm-sync-check-identity, #fbm-sync-probe-identity, #fbm-sync-confirm-identity, #fbm-sync-save-identity, #fbm-sync-auto-login, #fbm-sync-login-edit, #fbm-sync-login-save, #fbm-sync-login-delete, #fbm-sync-login-test, #fbm-sync-open-login-policy, #fbm-sync-save-extension, #fbm-sync-save-background, #fbm-sync-save-login-policy, #fbm-sync-save-settings, [data-sync-config-action], [data-sync-screen], [data-sync-results-tab], [data-sync-background-draft], [data-sync-master-draft], [data-sync-scope-limited-draft], [data-sync-extension-startup], [data-sync-process-toggle], [data-sync-login-policy], [data-sync-page], #fbm-sync-conflict-save, [data-fbm-push-retry-all]') : null;
     if (!target) { return; }
     event.preventDefault();
     if (typeof unsavedChangesGuardTransition === 'function' && unsavedChangesGuardTransition({ source: 'fbm', target: target }, function () { return fbmSyncDispatchClickTarget(target); })) { return; }
@@ -544,13 +544,12 @@ function fbmSyncInstall() {
       fbmSyncSetTargetState(target.id, { addClass: [uiSyncToggleClass('settings', nextMaster)], removeClass: [uiSyncToggleClass('settings', !nextMaster)], ariaPressed: nextMaster, childText: { [uiSyncToggleLabelSelector('shell')]: nextMaster ? 'ON' : 'OFF' } });
       fbmSyncConfigSetDraftValue('module', 'enabled', nextMaster);
       [FBM_SYNC_SETTINGS_SCHEMA.module.thresholdId, FBM_SYNC_SETTINGS_SCHEMA.module.requestGapMinId, FBM_SYNC_SETTINGS_SCHEMA.module.requestGapMaxId].forEach(function (id) { fbmSyncSetTargetState(id, { disabled: !nextMaster }); });
-    } else if (target.hasAttribute('data-sync-test-mode-draft')) {
+    } else if (target.hasAttribute('data-sync-scope-limited-draft')) {
       if (target.disabled) { return; }
-      var nextTestMode = target.getAttribute('aria-pressed') !== 'true';
-      fbmSyncSetTargetState(target.id, { addClass: [uiSyncToggleClass('settings', nextTestMode)], removeClass: [uiSyncToggleClass('settings', !nextTestMode)], ariaPressed: nextTestMode });
-      fbmSyncConfigSetDraftValue('module', 'testMode', nextTestMode);
-      fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.module.testFbmCodesId, { disabled: !nextTestMode });
-      fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.module.testShinCodesId, { disabled: !nextTestMode });
+      var nextScopeLimited = target.getAttribute('aria-pressed') !== 'true';
+      fbmSyncSetTargetState(target.id, { addClass: [uiSyncToggleClass('settings', nextScopeLimited)], removeClass: [uiSyncToggleClass('settings', !nextScopeLimited)], ariaPressed: nextScopeLimited });
+      fbmSyncConfigSetDraftValue('module', 'scopeLimited', nextScopeLimited);
+      fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.module.scopeCodesId, { disabled: !nextScopeLimited });
     } else if (target.hasAttribute('data-sync-extension-startup')) {
       if (target.disabled) { return; }
       var startupEnabled = target.getAttribute('aria-pressed') !== 'true';
@@ -647,7 +646,7 @@ function fbmSyncInstall() {
     }
     var accountSettings = { 'fbm-account-customer-prefix': 'customerPrefix', 'fbm-account-customer-length': 'customerCodeLength', 'fbm-account-activity-since': 'activitySince' };
     if (accountSettings[id]) { FBM_SYNC_CLIENT.accountSettingsDraft[accountSettings[id]] = String(target.value || ''); fbmSyncConfigSetDraftValue('accountSettings', accountSettings[id], String(target.value || '')); if (FBM_SYNC_CLIENT.accountSettingsInvalid) { delete FBM_SYNC_CLIENT.accountSettingsInvalid[accountSettings[id]]; } }
-    var settingsInput = { 'fbm-extension-poll-minutes': 'extension.pollMinutes', 'fbm-sync-detail-count': 'background.detail.customersPerRun', 'fbm-sync-login-retry-minutes': 'loginPolicy.retryMinutes', 'fbm-sync-setting-approval-threshold': 'module.approvalThreshold', 'fbm-sync-setting-test-fbm-codes': 'module.testFbmCodes', 'fbm-sync-setting-test-shin-codes': 'module.testShinCodes', 'fbm-sync-setting-request-gap-min': 'module.requestGapMinSeconds', 'fbm-sync-setting-request-gap-max': 'module.requestGapMaxSeconds' };
+    var settingsInput = { 'fbm-extension-poll-minutes': 'extension.pollMinutes', 'fbm-sync-detail-count': 'background.detail.customersPerRun', 'fbm-sync-login-retry-minutes': 'loginPolicy.retryMinutes', 'fbm-sync-setting-approval-threshold': 'module.approvalThreshold', 'fbm-sync-setting-scope-codes': 'module.scopeCodes', 'fbm-sync-setting-request-gap-min': 'module.requestGapMinSeconds', 'fbm-sync-setting-request-gap-max': 'module.requestGapMaxSeconds' };
     if (settingsInput[id]) {
       var configKey = settingsInput[id].split('.')[0] === 'module' ? 'module' : settingsInput[id].split('.')[0] === 'loginPolicy' ? 'loginPolicy' : settingsInput[id].split('.')[0];
       fbmSyncConfigSetDraftValue(configKey, settingsInput[id].split('.').slice(1).join('.'), String(target.value || ''));
@@ -1139,9 +1138,9 @@ function fbmSyncSaveSyncSettings(button) {
   if (button) { button.disabled = true; }
   var thresholdInput = document.getElementById('fbm-sync-setting-approval-threshold');
   var thresholdValue = thresholdInput ? String(thresholdInput.value || '').trim() : '';
-  var fbmCodesInput = document.getElementById(FBM_SYNC_SETTINGS_SCHEMA.module.testFbmCodesId), shinCodesInput = document.getElementById(FBM_SYNC_SETTINGS_SCHEMA.module.testShinCodesId);
-  // GAS tách, bỏ trùng, kiểm ký tự và kiểm đúng loại mã của từng ô; client gửi nguyên chuỗi người dùng gõ.
-  var payload = { approvalThreshold: thresholdValue === '' ? '' : Number(thresholdValue), testMode: fbmSyncToggleValue(FBM_SYNC_SETTINGS_SCHEMA.module.testModeId), testFbmCodes: fbmCodesInput ? String(fbmCodesInput.value || '') : '', testShinCodes: shinCodesInput ? String(shinCodesInput.value || '') : '', requestGapMinSeconds: fbmSyncControlValue(FBM_SYNC_SETTINGS_SCHEMA.module.requestGapMinId), requestGapMaxSeconds: fbmSyncControlValue(FBM_SYNC_SETTINGS_SCHEMA.module.requestGapMaxId) };
+  var scopeCodesInput = document.getElementById(FBM_SYNC_SETTINGS_SCHEMA.module.scopeCodesId);
+  // GAS tách, bỏ trùng, kiểm ký tự và đổi mã ra khách; client gửi nguyên chuỗi người dùng gõ.
+  var payload = { approvalThreshold: thresholdValue === '' ? '' : Number(thresholdValue), scopeLimited: fbmSyncToggleValue(FBM_SYNC_SETTINGS_SCHEMA.module.scopeLimitedId), scopeCodes: scopeCodesInput ? String(scopeCodesInput.value || '') : '', requestGapMinSeconds: fbmSyncControlValue(FBM_SYNC_SETTINGS_SCHEMA.module.requestGapMinId), requestGapMaxSeconds: fbmSyncControlValue(FBM_SYNC_SETTINGS_SCHEMA.module.requestGapMaxId) };
   var draft = fbmSyncConfigState('module').draft || {}, desiredMaster = draft.enabled !== false, currentMaster = fbmSyncConfigMasterEnabled();
   var masterSave = desiredMaster === currentMaster ? Promise.resolve({ ok: true }) : callServer('fbmSetMasterSwitch', [desiredMaster]);
   return masterSave.then(function (masterResult) {
@@ -1151,7 +1150,8 @@ function fbmSyncSaveSyncSettings(button) {
     if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không lưu được cài đặt chung.'); }
     FBM_SYNC_CLIENT.syncSettings = Object.assign({}, FBM_SYNC_CLIENT.syncSettings || {}, result.settings || payload);
     if (typeof fbmSyncConfigFinishEdit === 'function') { fbmSyncConfigFinishEdit('module'); }
-    if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('module', 'success', 'Đã lưu cài đặt chung.'); }
+    var scopeText = fbmSyncSettingsScopeLinesText(result.scopeLines);
+    if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('module', 'success', 'Đã lưu cài đặt chung.' + (scopeText ? ' ' + scopeText : '')); }
     return fbmSyncStatusOnce();
   }).then(function () { return fbmSyncPaint(Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { message: 'Đã lưu cài đặt chung.' })); }).catch(function (error) { if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('module', 'error', 'Không lưu được cài đặt chung: ' + String(error && error.message || error)); } fbmSyncPaintError(error, 'Không lưu được cài đặt chung.'); return null; }).finally(function () { if (button) { button.disabled = false; } });
 }

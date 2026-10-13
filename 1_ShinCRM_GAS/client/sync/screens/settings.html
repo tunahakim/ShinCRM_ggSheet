@@ -110,20 +110,22 @@ function fbmSyncSettingsModuleBlocks(settings, enabled) {
       fbmSyncSettingsRequestGapField(draft, 'requestGapMaxSeconds', moduleSchema.requestGapMaxLabel, moduleSchema.requestGapMaxId, parentEnabled)
     ])),
     requestGapHelp: Text({ className: FBM_SYNC_SETTINGS_UI.classes.muted, text: moduleSchema.requestGapHelp }),
-    testMode: FBM_SYNC_SETTINGS_UI.layout.toggle(FBM_SYNC_SETTINGS_UI.classes.toggleRow, Text({ className: FBM_SYNC_SETTINGS_UI.classes.toggleCopy, text: moduleSchema.testModeLabel }), StandaloneControl({ id: moduleSchema.testModeId, kind: 'toggle', pressed: draft.testMode !== false, className: draft.testMode !== false ? FBM_SYNC_SETTINGS_UI.classes.toggleOn : FBM_SYNC_SETTINGS_UI.classes.toggleOff, data: { 'sync-test-mode-draft': true }, disabled: fbmSyncConfigControlDisabled('module', 'testMode'), ariaLabel: moduleSchema.testModeLabel })),
-    testFbmCodes: fbmSyncSettingsTestCodesField(draft, 'testFbmCodes', moduleSchema.testFbmCodesLabel, moduleSchema.testFbmCodesId, moduleSchema.testFbmCodesPlaceholder),
-    testShinCodes: fbmSyncSettingsTestCodesField(draft, 'testShinCodes', moduleSchema.testShinCodesLabel, moduleSchema.testShinCodesId, moduleSchema.testShinCodesPlaceholder),
-    testHelp: Text({ className: FBM_SYNC_SETTINGS_UI.classes.muted, text: moduleSchema.testHelp }),
+    scopeLimited: FBM_SYNC_SETTINGS_UI.layout.toggle(FBM_SYNC_SETTINGS_UI.classes.toggleRow, Text({ className: FBM_SYNC_SETTINGS_UI.classes.toggleCopy, text: moduleSchema.scopeLimitedLabel }), StandaloneControl({ id: moduleSchema.scopeLimitedId, kind: 'toggle', pressed: draft.scopeLimited !== false, className: draft.scopeLimited !== false ? FBM_SYNC_SETTINGS_UI.classes.toggleOn : FBM_SYNC_SETTINGS_UI.classes.toggleOff, data: { 'sync-scope-limited-draft': true }, disabled: fbmSyncConfigControlDisabled('module', 'scopeLimited'), ariaLabel: moduleSchema.scopeLimitedLabel })),
+    scopeCodes: StandaloneField(moduleSchema.scopeCodesLabel, { id: moduleSchema.scopeCodesId, kind: 'textarea', value: Array.isArray(draft.scopeCodes) ? draft.scopeCodes.join('\n') : String(draft.scopeCodes || ''), placeholder: moduleSchema.scopeCodesPlaceholder, disabled: fbmSyncConfigControlDisabled('module', 'scopeCodes') || draft.scopeLimited === false, ariaLabel: moduleSchema.scopeCodesLabel }),
+    scopeHelp: Text({ className: FBM_SYNC_SETTINGS_UI.classes.muted, text: moduleSchema.scopeHelp }),
     actions: fbmSyncConfigButtonRow('module', { edit: moduleSchema.edit, save: moduleSchema.save }, { id: moduleSchema.saveId, disabled: !!FBM_SYNC_CLIENT.running })
   });
 }
 function fbmSyncSettingsRequestGapField(draft, key, label, id, parentEnabled) {
   return FBM_SYNC_SETTINGS_UI.layout.detailField(FBM_SYNC_SETTINGS_UI.classes.detailInput, Text({ className: FBM_SYNC_SETTINGS_UI.classes.detailInputLabel, text: label }), StandaloneControl({ id: id, kind: 'input', inputType: 'number', value: draft[key] === undefined ? 0 : draft[key], placeholder: FBM_SYNC_SETTINGS_SCHEMA.module.requestGapPlaceholder, disabled: fbmSyncConfigControlDisabled('module', key) || !parentEnabled, ariaLabel: FBM_SYNC_SETTINGS_SCHEMA.module.requestGapLabel + ' — ' + label }));
 }
-/** Một ô danh sách mã thử; hai ô chỉ khác nhãn, khóa draft và id. */
-function fbmSyncSettingsTestCodesField(draft, key, label, id, placeholder) {
-  var value = draft[key];
-  return StandaloneField(label, { id: id, kind: 'input', inputType: 'text', value: Array.isArray(value) ? value.join(', ') : String(value || ''), placeholder: placeholder, disabled: fbmSyncConfigControlDisabled('module', key) || draft.testMode === false, ariaLabel: label });
+/** Kết quả đổi mã ra khách của từng dòng, GAS trả khi lưu danh sách; Sidebar chỉ ghép chữ. */
+function fbmSyncSettingsScopeLinesText(lines) {
+  var schema = FBM_SYNC_SETTINGS_SCHEMA.module.scopeLine;
+  return (lines || []).map(function (line) {
+    if (line.status === 'matched') { return line.code + schema.matched + (line.kind === 'shin' ? (line.fbmCode || line.customerId) : line.customerId); }
+    return line.code + (line.status === 'fbm_new' ? schema.fbmNew : schema.notFound);
+  }).join('; ');
 }
 function fbmSyncRenderSettings(panel, status) {
   var settings = FBM_SYNC_CLIENT.syncSettings || {}, loginPolicy = FBM_SYNC_CLIENT.loginStatus || {};
