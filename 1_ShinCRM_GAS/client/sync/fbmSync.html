@@ -1534,8 +1534,8 @@ function fbmSyncContinueServer(status, response) {
 /** Chạy chuỗi request GAS -> Extension cho tới khi hết cursor. */
 function fbmSyncLoop(status) {
   if (!FBM_SYNC_CLIENT.running && !FBM_SYNC_CLIENT.cancelRequested) { return fbmSyncStatusOnce(); }
-  fbmSyncPaint(status);
   if (!status || !status.request) {
+    // Hạ cờ trước khi vẽ: vẽ trong lúc `cancelRequested` còn bật thì nút kẹt ở "Đang dừng…" tới lần hỏi trạng thái kế tiếp.
     FBM_SYNC_CLIENT.running = false;
     FBM_SYNC_CLIENT.cancelRequested = false;
     // A terminal response without a request is a transport error; never leave Sidebar silent.
@@ -1546,9 +1546,12 @@ function fbmSyncLoop(status) {
     } else if (status.ok === false) {
       var terminal = status.status && typeof status.status === 'object' ? status.status : {};
       fbmSyncPaint(Object.assign({}, terminal, { phase: 'error', label: 'Error', message: String(status.error || status.message || status.code || 'Sync failed.'), lastError: String(status.error || status.message || status.code || 'SYNC_TERMINAL_FAILURE'), counts: terminal.counts || {} }));
+    } else {
+      fbmSyncPaint(status);
     }
     return status;
   }
+  fbmSyncPaint(status);
   // Nhãn đối tượng lấy từ GAS (theo state.entity), không đoán từ meta của request: builder nào thiếu meta.entity sẽ hiện nhầm (FBM-006).
   var entityLabel = String((status.status || status).entityLabel || '').trim().toLowerCase();
   fbmSyncPaint(fbmSyncWaitingStatus(status, 'Đang chờ tab FBM trả dữ liệu' + (entityLabel ? ' ' + entityLabel : '') + '...'));
