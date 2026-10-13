@@ -204,14 +204,49 @@
       });
     });
   }
+  /** Việc quét vượt trần cỡ response: không gửi gì về GAS ngoài mã lỗi, GAS tự chia nhỏ theo khoảng ngày. */
+  function responseTooLarge(maxBytes) {
+    var error = new Error('Response FBM vượt ' + Math.round(maxBytes / 1048576) + ' MB của một lần quét.');
+    error.code = 'FBM_SCAN_TOO_LARGE';
+    return error;
+  }
+  /** Có trần thì đọc dần và dừng ngay khi vượt, để tab không phải giữ cả response khổng lồ rồi mới biết. */
+  function readResponseBytes(response, maxBytes) {
+    var limit = Number(maxBytes || 0);
+    if (!(limit > 0) || !response.body || typeof response.body.getReader !== 'function') {
+      return response.arrayBuffer().then(function (buffer) {
+        if (limit > 0 && buffer.byteLength > limit) { throw responseTooLarge(limit); }
+        return new Uint8Array(buffer);
+      });
+    }
+    var reader = response.body.getReader(), parts = [], total = 0;
+    function pump() {
+      return reader.read().then(function (step) {
+        if (step.done) {
+          var bytes = new Uint8Array(total), offset = 0;
+          parts.forEach(function (part) { bytes.set(part, offset); offset += part.length; });
+          return bytes;
+        }
+        total += step.value.length;
+        if (total > limit) { try { reader.cancel(); } catch (ignore) {} throw responseTooLarge(limit); }
+        parts.push(step.value);
+        return pump();
+      });
+    }
+    return pump();
+  }
   /** Thực thi fetch và luôn trả body dạng text để GAS tự parse. */
   /** Giai ma ca response gzip bi FBM tra tho, tranh GAS nhan chuoi 1F 8B. */
-  function readResponseText(response) {
-    return response.arrayBuffer().then(function (buffer) {
-      var bytes = new Uint8Array(buffer), gzip = bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b;
+  function readResponseText(response, maxBytes) {
+    var limit = Number(maxBytes || 0);
+    return readResponseBytes(response, limit).then(function (bytes) {
+      var gzip = bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b;
       if (gzip && typeof DecompressionStream === 'function') {
         var stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
-        return new Response(stream).text();
+        return new Response(stream).text().then(function (text) {
+          if (limit > 0 && text.length > limit) { throw responseTooLarge(limit); }
+          return text;
+        });
       }
       if (typeof TextDecoder === 'function') { return new TextDecoder('utf-8').decode(bytes); }
       return String.fromCharCode.apply(null, bytes);
@@ -290,12 +325,19 @@
     var timer = setTimeout(function () { controller.abort(); }, fetchMs);
     traceEvent(trace, 'fetch_started', req);
     return fetch(String(req.url || ''), { method: req.method || 'POST', headers: req.headers || { 'content-type': 'application/json; charset=UTF-8' }, body: sent, credentials: 'include', cache: 'no-store', signal: controller.signal }).then(function (response) {
-      return readResponseText(response).then(function (body) {
+      var scanLimit = req.meta && req.meta.kind === 'scan_job' && req.meta.job ? req.meta.job.maxResponseBytes : 0;
+      return readResponseText(response, scanLimit).then(function (body) {
         var captured = captureTransport(req, body);
         traceEvent(trace, 'fetch_finished', req, { httpStatus: response.status, responseLength: body.length });
         var data = null;
         // Response không phải grid (lỗi HTTP, trang đăng nhập, Bugs của FBM) đi nguyên về GAS để cổng phiên phân loại như request thường.
         if (req.meta && req.meta.kind === 'scan_job' && response.ok) { try { data = gridData(body); } catch (ignoreParse) { data = null; } }
+        // Response không phải grid mà lớn hơn một gói thì không gửi nguyên về GAS (vượt trần đường truyền); trang đăng nhập hay Bugs của FBM vốn nhỏ nên vẫn đi nguyên.
+        if (req.meta && req.meta.kind === 'scan_job' && !data && body.length > Number(req.meta.job && req.meta.job.chunkMaxBytes || 0)) {
+          var unparseable = new Error('Response FBM của việc quét không đọc được dạng bảng (' + Math.round(body.length / 1048576) + ' MB).');
+          unparseable.code = 'FBM_SCAN_UNPARSEABLE';
+          throw unparseable;
+        }
         if (data) {
           var cut = scanChunks(data, req.meta.job || {});
           scanJob = { jobId: String(req.meta.job.jobId || ''), chunks: cut.chunks, rowCount: cut.rowCount, keptCount: cut.keptCount, totalRowCount: cut.totalRowCount, oversize: cut.oversize };
@@ -309,7 +351,11 @@
     }).catch(function (err) {
       traceEvent(trace, 'fetch_finished', req, { error: String(err && err.message || err) });
       try { err.trace = trace; } catch (ignore) {}
-      if (err && err.name === 'AbortError') { throw new Error('FBM không phản hồi sau ' + Math.round(fetchMs / 1000) + ' giây.'); }
+      if (err && err.name === 'AbortError') {
+        var timeout = new Error('FBM không phản hồi sau ' + Math.round(fetchMs / 1000) + ' giây.');
+        timeout.code = 'FBM_FETCH_TIMEOUT'; timeout.trace = trace;
+        throw timeout;
+      }
       throw err;
     }).finally(function () { clearTimeout(timer); });
   }

@@ -77,7 +77,7 @@ function ensureFbmTab(request) {
 }
 var FBM_EXECUTOR_VERSION = '21.21';
 // Mã phiên bản hợp đồng GAS–Extension (tests/contracts/gasExtensionContract.js). Chỉ trả về cho GAS; GAS quyết định dừng khi lệch mã.
-var FBM_CONTRACT_VERSION = 'd90ed1d95988';
+var FBM_CONTRACT_VERSION = '24e64684554a';
 
 function addWorkerTrace(reply, request, stage, extra) {
   var event = Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {});

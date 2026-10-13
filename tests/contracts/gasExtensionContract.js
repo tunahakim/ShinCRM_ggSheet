@@ -20,7 +20,7 @@ const CONTRACT = {
     batch: ['maxBytes'],
     // Việc quét: `scan_job` gọi FBM một lần, chiếu cột, cắt gói và giữ trong RAM tab; `scan_chunk` trả gói theo số thứ tự, không gọi FBM.
     scanKinds: ['scan_job', 'scan_chunk'],
-    job: ['jobId', 'fields', 'idField', 'keepIds', 'chunkTargetBytes', 'chunkMaxBytes', 'chunkIndex'],
+    job: ['jobId', 'fields', 'idField', 'keepIds', 'chunkTargetBytes', 'chunkMaxBytes', 'maxResponseBytes', 'chunkIndex'],
     item: ['id', 'url', 'method', 'headers', 'body', 'bodyText', 'meta'],
     itemMeta: ['kind', 'trace']
   },
@@ -32,8 +32,8 @@ const CONTRACT = {
     item: ['id', 'ok', 'status', 'headers', 'body'],
     // Gói của việc quét giữ dạng response grid FBM; `job` cho GAS đối chiếu với cursor trước khi ghi.
     job: ['jobId', 'chunkIndex', 'chunkCount', 'rowCount', 'keptCount', 'totalRowCount', 'oversize'],
-    // Tab không còn giữ việc quét (tải lại, Extension khởi động lại): GAS chạy lại cả việc.
-    codes: ['FBM_SCAN_JOB_GONE']
+    // Tab không còn giữ việc quét (tải lại, Extension khởi động lại): GAS chạy lại cả việc. Quá trần cỡ, không đọc được dạng bảng hoặc hết hạn fetch: GAS chia giao dịch theo khoảng ngày.
+    codes: ['FBM_SCAN_JOB_GONE', 'FBM_SCAN_TOO_LARGE', 'FBM_SCAN_UNPARSEABLE', 'FBM_FETCH_TIMEOUT']
   },
   // Extension → Web App GAS (nhịp nền).
   relay: {
