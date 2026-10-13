@@ -111,6 +111,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │       ├── FbmSyncStateProbe.js  Đo byte từng DocumentProperties và từng nhánh state FBM mà không trả giá trị nhạy cảm.
 │       ├── MeasureLog.js         Đo chi phí thật của deleteRows trên sheet Log lớn. Con số trong tài liệu 10 đến từ đây.
 │       ├── MeasureChunk.js       Đo đường nạp trên dữ liệu đang có, không ghi ô nào: measureFirstPaint đo thời gian tới khung hình đầu, measureChunkRows so các cỡ gói.
+│       ├── TransportProbe.js     Đo trần đường truyền gói lớn của việc quét bằng gói đệm (đường Sidebar và đường relay nền), ghi cỡ và thời gian vào Log; không chạm FBM. Cặp với client/dev/transportProbe.html; EntryPoints.js chỉ gọi nếu hàm còn tồn tại.
 │       ├── LogTraceSwitch.js     Bật/tắt tham số LOG_TRACE ở sheet Config: devLogTraceOn ghi "all", devLogTraceOff xóa trắng. Tra cột theo mã hàng 1 nên không gõ sai khối.
 │       └── SeedFake.js           Sinh dữ liệu giả cho Customer, Activity, Category và ĐỂ LẠI trên sheet để mở ra xem được. Mọi cột @ lõi khai đều có giá trị. Xóa bằng wipeFakeData.
 │
@@ -129,6 +130,8 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── fbmSyncStatusScreen.html Block trạng thái và tiến trình riêng của phiên.
 │   │   ├── fbmSyncSettingsScreen.html Block nhận diện tài khoản được màn Tài khoản FBM tái sử dụng; không còn checkbox ghi.
 │   │   └── fbmSyncAuditScreen.html Block preview, audit và chi tiết lỗi/xung đột.
+│   ├── dev\                      CHỈ DÙNG LÚC PHÁT TRIỂN — xóa cùng server/dev/ và gỡ dòng include tương ứng trong Sidebar.html.
+│   │   └── transportProbe.html    Lệnh đo trần đường truyền gói lớn, kích từ Console tab Google Sheet; cặp với server/dev/TransportProbe.js.
 │   ├── link\                     Cầu nối ô đang chọn: ưu tiên postMessage an toàn từ Extension, khi vắng mới mở đường dò máy chủ có nhịp và luật dừng.
 │   │   ├── sheetLink.html        Tai nghe CRM_CONTEXT thô từ Extension: đối chiếu reads với Store rồi bật followSelection. Bắt tay có tiếng đáp, đèn sống chết suy từ ACK chứ không suy từ im lặng.
 │   │   └── selectionPoll.html    Máy trạng thái dự phòng khi vắng Extension: nhịp dò 2/6 giây, bốn luật dừng, đèn sét bốn trạng thái và băng cảnh báo sau ba giây ân hạn.
