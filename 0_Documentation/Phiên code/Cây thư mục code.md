@@ -322,6 +322,7 @@ tests\
     │   ├── Orchestration.js       Kiểm state, cursor, resume, preflight và luồng nhiều lát.
     │   ├── Workflow.js             Chạy contract xuyên GAS -> executor Extension -> GAS với fixture FBM, cùng các cổng fail-closed cấp pipeline.
     │   ├── ScanJob.js              Kiểm việc quét: cắt gói dưới trần, chuyển trang, gói trùng/lạ, mất response, mất tab, ghi lỗi, lượt thiếu dòng.
+    │   ├── RelayResend.js          Kiểm Sidebar gửi lại cấu hình relay đang giữ khi Extension được tải lại, không gọi GAS.
     │   ├── Push.js                Kiểm cổng ghi, khóa, owner, builder ghi và xử lý lỗi push.
     │   ├── Audit.js               Kiểm log, báo cáo, fixture an toàn và các ranh giới không ghi/xóa.
     │   ├── ProductionMatrix.js    Ma trận nhiều Customer/Activity, phân trang, cắt lô missing, retry mạng và idempotency.
