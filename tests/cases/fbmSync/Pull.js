@@ -30,6 +30,17 @@ async function chay(so) {
   const readModeResult = builders.FbmSync.pullRecords('customer', [{ id: 'CUS-000001' }], 'read');
   check(so, 'mode read ghi ket qua pull vao ShinCRM nhung khong co quyen ghi FBM', [readModeResult.written, readModeSheetWrites, readModeState.counts.succeeded, builders.FbmSync.canWriteFbm('read')], [1, 1, 1, false]);
   builders.FbmSync.pullWrite = realPullWrite;
+  readModeState = { mode: 'check', counts: builders.FbmSync.countsDefault(), metadata: {} };
+  builders.FbmSync.pullRecords('customer', [{ id: 'CUS-000001' }, { id: 'CUS-000002' }], 'check');
+  check(so, 'Lượt chỉ kiểm tra đếm bản ghi đã đọc nhưng không tính chúng là bỏ qua', [readModeState.counts.completed, readModeState.counts.skipped], [2, 0]);
+  const loiKhach = { customerErrors: { total: 2, recent: [] } };
+  check(so, 'Thông báo kết thúc lượt Hai chiều giữ ghi chú khách lỗi khi đọc giao dịch như lượt Lấy, và không đếm lỗi đọc thành lỗi đẩy', [
+    builders.FbmSync.runDoneMessage({ mode: 'write', scan: 'full', counts: Object.assign(builders.FbmSync.countsDefault(), { error: 2 }), metadata: loiKhach }),
+    builders.FbmSync.runDoneMessage({ mode: 'read', scan: 'full', counts: Object.assign(builders.FbmSync.countsDefault(), { error: 2 }), metadata: loiKhach })
+  ], [
+    'Đồng bộ hoàn tất; không có bản ghi nào được đẩy. Có 2 khách lỗi khi đọc giao dịch (xem danh sách lỗi); lượt này chưa đánh dấu giao dịch "không thấy bên FBM".',
+    'Đồng bộ hoàn tất. Có 2 khách lỗi khi đọc giao dịch (xem danh sách lỗi); lượt này chưa đánh dấu giao dịch "không thấy bên FBM".'
+  ]);
   const transportSource = fs.readFileSync(path.join(__dirname, '..', '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'transport', 'TransportCore.js'), 'utf8');
   check(so, 'khong con co ghi FBM an ngoai mode va cac cong an theo co cu', transportSource.indexOf('FBM_SYNC_ALLOW_WRITES') < 0 && transportSource.indexOf('writeAllowed') < 0, true);
 
@@ -55,6 +66,7 @@ async function chay(so) {
       canWriteSheet: (mode) => mode === 'read' || mode === 'write', canWriteFbm: (mode) => mode === 'push' || mode === 'write',
       markMissingAfterFullScan: () => { readFinishMissing += 1; return { written: 0 }; },
       stopPushOnConflicts: () => false, nextPushRequest: () => { readFinishPushRequests += 1; return {}; },
+      runDoneMessage: () => 'Đồng bộ hoàn tất.',
       statusView: () => ({ phase: readFinishState.phase, mode: readFinishState.mode })
     }
   });
@@ -436,6 +448,14 @@ async function chay(so) {
   edges.writeGateSave = (request) => { missingBatch = request; return { ok: true }; };
   const missingResult = edges.FbmSync.markMissingAfterFullScan('customer', fullScanState);
   check(so, 'Customer vang chi danh dau missing va bo qua tombstone', [missingResult.written, missingBatch.records.length, missingBatch.records[0].id, missingBatch.records[0].syncStatus], [1, 1, 'CUS-000011', edges.FbmSync.SYNC_STATUS.missing]);
+  edges.FbmSync.seenStoreClear('customer');
+  // Dòng đã mang cờ từ lượt trước vẫn được đếm nhưng không bị ghi lại; dòng mới mất thì ghi và đếm.
+  const daCoCoState = { mode: 'read', metadata: { seen: { customer: {} } }, locks: {}, counts: edges.FbmSync.countsDefault() };
+  let daCoCoBatch = null;
+  edges.FbmSync.readLocal = () => [{ id: 'CUS-000013', fbmId: 'FBM-MAT-TRUOC', recordStatus: 'active', syncStatus: edges.FbmSync.SYNC_STATUS.missing }, { id: 'CUS-000014', fbmId: 'FBM-MAT-MOI', recordStatus: 'active', syncStatus: edges.FbmSync.SYNC_STATUS.synced }];
+  edges.writeGateSave = (request) => { daCoCoBatch = request; return { ok: true }; };
+  const daCoCo = edges.FbmSync.markMissingAfterFullScan('customer', daCoCoState);
+  check(so, 'Khách đã mang cờ "không thấy bên FBM" không bị ghi lại mỗi lượt nhưng vẫn được đếm cùng khách mới mất', [daCoCo.written, daCoCoBatch.records.map((item) => item.id), daCoCoState.counts.missingCustomer, daCoCoState.counts.missingActivity], [1, ['CUS-000014'], 2, 0]);
   edges.FbmSync.seenStoreClear('customer');
   const newRecordState = { mode: 'read', cursor: { kind: 'customer_grid' }, metadata: { seen: { customer: { initialized: true }, activity: {} } }, locks: {} };
   let newLocalRecords = [];

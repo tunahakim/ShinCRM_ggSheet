@@ -295,8 +295,8 @@ async function chay(so) {
   hop.FBM_SYNC_CLIENT.resultPages = {};
   hop.fbmSyncPaint(Object.assign(idle(), { metadata: { traceTail: Array.from({ length: 21 }, (_, index) => ({ stage: String(index) })) } }));
   const resultTabsNode = content.querySelector('.shin-sync-tab-row');
-  hop.fbmSyncPaint(Object.assign(idle(), { counts: { completed: 9, succeeded: 8 }, metadata: { traceTail: Array.from({ length: 21 }, (_, index) => ({ stage: String(index) })) } }));
-  check(so, 'snapshot GAS vá Kết quả tại chỗ, giữ nguyên hàng tab', [content.querySelector('.shin-sync-tab-row') === resultTabsNode, content.textContent.indexOf('Đã xử lý 9') >= 0], [true, true]);
+  hop.fbmSyncPaint(Object.assign(idle(), { runId: 'run-ket-qua', counts: { completed: 9, succeeded: 8 }, metadata: { traceTail: Array.from({ length: 21 }, (_, index) => ({ stage: String(index) })) } }));
+  check(so, 'snapshot GAS vá Kết quả tại chỗ, giữ nguyên hàng tab', [content.querySelector('.shin-sync-tab-row') === resultTabsNode, content.textContent.indexOf('Đọc từ FBM: 9') >= 0], [true, true]);
   const resultTabs = ['summary', 'conflict', 'errors', 'log', 'audit'];
   const resultTabDescriptions = { summary: 'Tóm tắt kết quả phiên', conflict: 'Các thay đổi chờ xử lý', errors: 'Bản ghi cần xem lại', log: 'Nhật ký hoạt động', audit: 'Kết quả kiểm tra dữ liệu thử nghiệm' };
   resultTabs.forEach((tab) => {

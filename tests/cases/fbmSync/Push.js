@@ -352,7 +352,7 @@ async function chay(so) {
   const markerClean = push.FbmSync.continuePush(push.FbmSync.stateRead(), { d: { Controller: 'zccrAccountTask', Row: verifyRow } });
   const markerCleanDetails = markerClean && markerClean.body.memvars.filter((item) => item.Name === 'details')[0];
   check(so, 'G12: lệnh tạo Activity xác nhận xong mà FBM còn dấu #SC thì gửi ngay lệnh sửa Edit theo ID FBM với nội dung sạch', [markerClean && markerClean.body.action, markerClean && markerClean.body.values[0], markerCleanDetails && markerCleanDetails.OldValue, markerCleanDetails && markerCleanDetails.NewValue, push.FbmSync.stateRead().cursor.operation], ['Edit', '42', 'Noi dung #SC-ACT-VERIFY', 'Noi dung', 'activity_marker_clean']);
-  check(so, 'Activity chỉ tính thành công sau khi đọc xác nhận khớp hash', [push.FbmSync.stateRead().counts.succeeded, push.FbmSync.pendingPushGet('activity', verifyRecord.id), pushLogs.some((event) => event.action === 'push_record')], [1, null, false]);
+  check(so, 'Activity chỉ tính đã đẩy sau khi đọc xác nhận khớp hash', [push.FbmSync.stateRead().counts.pushed, push.FbmSync.pendingPushGet('activity', verifyRecord.id), pushLogs.some((event) => event.action === 'push_record')], [1, null, false]);
   const cleanWrites = [];
   push.writeGateSave = (request) => { cleanWrites.push(request); return { ok: true }; };
   push.FbmSync.recordIssues = {};
@@ -390,7 +390,7 @@ async function chay(so) {
   const recoveryParsed = push.FbmSync.rowsToRecords('customer', { d: { Fields: customerFields.map((Name) => ({ AliasName: Name })), Rows: [customerRow], TotalRowCount: 1 } });
   check(so, 'fixture recovery doc dung stt_rec_kh va ma_kh', [recoveryParsed.rows[0].stt_rec_kh, recoveryParsed.rows[0].ma_kh], ['FBM-CREATE', 'ALT00020']);
   push.FbmSync.continuePush(push.FbmSync.stateRead(), { d: { Fields: customerFields.map((Name) => ({ AliasName: Name })), Rows: [customerRow], TotalRowCount: 1 } });
-  check(so, 'Customer create recovery doi chieu exact va vach ID baseline', [push._recoveryPatch.fbmId, push._recoveryPatch.fbmCustomerCode, push._recoveryPatch.syncStatus, push.FbmSync.stateRead().counts.succeeded], ['FBM-CREATE', 'ALT00020', push.FbmSync.SYNC_STATUS.synced, 1]);
+  check(so, 'Customer create recovery doi chieu exact va vach ID baseline', [push._recoveryPatch.fbmId, push._recoveryPatch.fbmCustomerCode, push._recoveryPatch.syncStatus, push.FbmSync.stateRead().counts.pushed], ['FBM-CREATE', 'ALT00020', push.FbmSync.SYNC_STATUS.synced, 1]);
   const lostState = push.FbmSync.stateStart('', 'push', 0);
   lostState.locks['activity:ACT-NEW'] = { owner: 'sync', revision: 'h-create' };
   lostState.cursor = { kind: 'push_wait', entity: 'activity', index: 0, operation: 'activity_create', candidate: activityCandidate };

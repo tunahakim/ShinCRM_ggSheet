@@ -90,13 +90,14 @@ async function chay(so) {
   const chaHai = haiChieu.local.customer.find((item) => item.fbmId === 'FBM-C1').id;
   haiChieu.local.activity.push({ id: 'ACT-900003', customerId: chaHai, fbmId: 'A-GONE-2C', workDate: '2026-09-01', taskType: '', syncStatus: 'đã đồng bộ' });
   haiChieu.local.customer.push({ id: 'CUS-900001', fbmId: 'FBM-GONE', fbmCustomerCode: 'ALT-GONE', syncStatus: 'đã đồng bộ' });
-  const pushAt = [];
+  const pushAt = [], pushCounts = [];
   haiChieu.F.canWriteFbm = () => true;
   // Danh mục FBM của chiều đẩy không thuộc phần đang kiểm; harness việc quét không giả lập nó.
   haiChieu.F.needsFbmLookups = () => false;
-  haiChieu.F.nextPushRequest = (state) => { pushAt.push([haiChieu.local.activity.find((item) => item.fbmId === 'A-GONE-2C').syncStatus, haiChieu.local.customer.find((item) => item.id === 'CUS-900001').syncStatus]); state.phase = 'done'; haiChieu.F.stateWrite(state); return null; };
+  haiChieu.F.nextPushRequest = (state) => { pushCounts.push([state.counts.missingCustomer, state.counts.missingActivity]); pushAt.push([haiChieu.local.activity.find((item) => item.fbmId === 'A-GONE-2C').syncStatus, haiChieu.local.customer.find((item) => item.id === 'CUS-900001').syncStatus]); state.phase = 'done'; haiChieu.F.stateWrite(state); return null; };
   await haiChieu.run({ pack: 'quick', startOptions: { mode: 'write' } });
   check(so, 'Đồng bộ hai chiều: giao dịch đã xóa bên FBM của khách đã đọc và khách không còn bên FBM bị gắn "không thấy bên FBM" trước khi sang bước đẩy', pushAt, [[haiChieu.F.SYNC_STATUS.missing, haiChieu.F.SYNC_STATUS.missing]]);
+  check(so, 'Đồng bộ hai chiều: bộ đếm phiên có số khách và giao dịch "không thấy bên FBM" để thẻ Trạng thái phiên hiện', pushCounts, [[1, 1]]);
 
   // Mỗi gói chạy đúng thao tác của nó.
   const nhanh = await sauLuotDau({ customers: 6, budget: { activityTopScanQuietStreak: 2 } }, 'quick', null);

@@ -46,7 +46,7 @@ function taoBoTest() {
   };
   hop.fbmSyncPaintError = null;
   napClient(hop,
-    'client/ui/icons.html', 'client/ui/uiClassMap.html', 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html', 'client/ui/renderEngine.html',
+    'client/ui/icons.html', 'client/ui/uiClassMap.html', 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html', 'client/ui/renderEngine.html', 'client/util/valueText.html',
     'client/schema/sync/screens/run.html', 'client/schema/sync/screens/account.html', 'client/schema/sync/screens/results.html', 'client/schema/sync/screens/settings.html', 'client/schema/sync/screens/index.html',
     'client/schema/sync/results/status.html', 'client/schema/sync/results/issues.html', 'client/schema/sync/results/audit.html', 'client/schema/sync/results/conflict.html',
     'client/sync/fbmSyncUiSchema.html', 'client/sync/fbmSyncConfigEditor.html',
@@ -363,6 +363,22 @@ async function chay(so) {
   check(so, 'snapshot nen khong doi trang thai moi sau khi dropdown dong', [hop.FBM_SYNC_CLIENT.deferredPaint, hop.FBM_SYNC_CLIENT.lastStatus.label], [null, 'Snapshot nền đến trong lúc chọn loại đồng bộ']);
   hop.fbmSyncPaint(active);
   const runFirstNode = content.children[0];
+  check(so, 'Thẻ Trạng thái phiên tách kết quả lượt thành từng dòng, số có dấu chấm nghìn, có số không thấy bên FBM theo khách và giao dịch; dòng đẩy chỉ ở chiều có đẩy', [
+    hop.fbmSyncStatusResultLines({ runId: 'r1', canPush: true }, { completed: 1445, succeeded: 3, pushed: 1, missingCustomer: 0, missingActivity: 2 }),
+    hop.fbmSyncStatusResultLines({ runId: 'r1', canPush: false }, { completed: 5 }).map((line) => line.split(':')[0]),
+    hop.fbmSyncStatusResultLines({ runId: '' }, { completed: 5 })
+  ], [
+    ['Đọc từ FBM: 1.445', 'Ghi vào Sheet: 3', 'Đẩy lên FBM: 1', 'Không thấy bên FBM: 0 khách, 2 giao dịch', 'Xung đột: 0', 'Lỗi: 0', 'Bỏ qua: 0'],
+    ['Đọc từ FBM', 'Ghi vào Sheet', 'Không thấy bên FBM', 'Xung đột', 'Lỗi', 'Bỏ qua'],
+    []
+  ]);
+  check(so, 'Thẻ Trạng thái phiên hiện thông tin lượt từng dòng; dòng Đang xử lý chỉ có khi lượt còn chạy', [
+    hop.fbmSyncStatusInfoLines({ phase: 'done', direction: 'Hai chiều', scanPack: 'quick', session: { customer: true, activity: false }, entityLabel: 'Tổng hợp' }),
+    hop.fbmSyncStatusInfoLines({ phase: 'pull_activity', direction: 'FBM → ShinCRM', scanPack: '', entityLabel: 'Giao dịch', current: 'CUS-000001' })
+  ], [
+    ['Chiều chạy: Hai chiều', 'Mức quét: Quét nhanh', 'Phiên FBM: khách hàng đã xác nhận, giao dịch chưa có'],
+    ['Chiều chạy: FBM → ShinCRM', 'Đang xử lý: Giao dịch CUS-000001']
+  ]);
   const patchedLiveStatus = hop.fbmSyncPatchLiveStatus(content, Object.assign({}, active, { label: 'Đang đối soát', counts: { completed: 4, succeeded: 3 } }), 'run');
   check(so, 'trạng thái đang chạy được cập nhật tại chỗ, không dựng lại màn hình', [patchedLiveStatus, content.children[0] === runFirstNode, content.textContent.indexOf('Đang đối soát') >= 0], [true, true, true]);
   const previousFinished = { phase: 'done', mode: 'read', counts: {}, pipeline: { kind: 'read', title: 'Pipeline đã hoàn tất', steps: [{ id: 'session', label: 'Kiểm tra phiên FBM', state: 'done' }, { id: 'category', label: 'Category', state: 'done' }, { id: 'customer', label: 'Đọc Customer', state: 'done' }, { id: 'activity', label: 'Đọc Activity', state: 'done' }, { id: 'reconcile', label: 'Đối soát', state: 'done' }, { id: 'sheet', label: 'Cập nhật Sheet', state: 'done' }] } };

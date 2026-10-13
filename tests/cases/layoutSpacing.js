@@ -141,7 +141,7 @@ function chay(so) {
     [true, true, true, true, true, true, true, true]);
   check(so, 'Sync status, pipeline, results và conflict không dùng margin để cộng sibling spacing',
     [shell.indexOf('.shin-sync-phase { margin') === -1,
-      shell.indexOf('.shin-sync-operation, .shin-sync-count, .shin-sync-current, .shin-sync-message { margin') === -1,
+      shell.indexOf('.shin-sync-item, .shin-sync-message { margin') === -1,
       shell.indexOf('.shin-sync-progress { display:flex; flex-direction:column; gap:var(--shin-gap-1); }') === -1,
       shell.indexOf('.shin-sync-pipeline { display:flex; flex-direction:column; gap:var(--shin-gap-1);') === -1,
       shell.indexOf('.shin-sync-pipeline-step { display:flex;') === -1,
