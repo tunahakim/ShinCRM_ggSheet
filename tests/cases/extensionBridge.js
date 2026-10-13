@@ -16,16 +16,20 @@ function payloadCookieCapturePattern() {
   return hop.FbmSync.PAYLOAD_COOKIE_CAPTURE_PATTERN;
 }
 
+/** `runtime` mặc định còn `id` như Extension đang sống; truyền `id: undefined` để giả bản cầu nối bị bỏ lại sau khi tải lại Extension. */
 function napBridge(runtime) {
   let onMessage = null;
   const hop = {
     console: { log() {} },
     Date,
-    chrome: runtime ? { runtime } : undefined,
+    chrome: { runtime: Object.assign({ id: 'shincrm-test' }, runtime || {}) },
     setTimeout,
     window: {
       addEventListener(name, fn) {
         if (name === 'message') { onMessage = fn; }
+      },
+      removeEventListener(name, fn) {
+        if (name === 'message' && onMessage === fn) { onMessage = null; hop._removed = true; }
       }
     }
   };
@@ -183,6 +187,16 @@ async function chay(so) {
   invalidBridge._onMessage({ origin: 'https://abc-123.googleusercontent.com', source: unavailable.source, data: { action: 'CRM_FBM_CONFIG', nonce: 'nonce-loi', sessionId: 'phien-cu', id: 'config-cu', config: {} } });
   check(so, 'bridge cu bo qua message khac session thay vi chen ACK', unavailable.sent.length, ignoredBefore);
 
+  // Tải lại Extension: bản cầu nối cũ còn trong trang nhưng mất quyền gọi worker. Nó phải im lặng hẳn để Sidebar chỉ thấy phiên của bản mới.
+  const sapBo = { id: 'shincrm-test', onMessage: { addListener() {} }, sendMessage() {} };
+  const cauCu = napBridge(sapBo), kenhCu = nguonTin(), batTayCu = cauCu._onMessage;
+  batTayCu({ origin: 'https://abc-123.googleusercontent.com', source: kenhCu.source, data: { action: 'CRM_HANDSHAKE', nonce: 'nonce-cu' } });
+  const daDapTruoc = kenhCu.sent.length;
+  cauCu.chrome.runtime.id = undefined;
+  batTayCu({ origin: 'https://abc-123.googleusercontent.com', source: kenhCu.source, data: { action: 'CRM_HANDSHAKE', nonce: 'nonce-cu' } });
+  cauCu.sendContextToSidebar({ sheetName: 'Customer' });
+  check(so, 'Extension vừa tải lại: bản cầu nối cũ không đáp bắt tay, không bắn ảnh chụp sang Sidebar và tự gỡ bộ nghe, nên Sidebar không nhận hai phiên luân phiên', [daDapTruoc, kenhCu.sent.length, cauCu._removed === true], [1, 1, true]);
+
   const workerSource = fs.readFileSync(WORKER_FILE, 'utf8');
   const executorSource = fs.readFileSync(EXECUTOR_FILE, 'utf8');
   const pullFlowSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'transport', 'PullFlow.js'), 'utf8');
@@ -234,7 +248,7 @@ async function chay(so) {
   check(so, 'relay config luu Spreadsheet ID', workerSource.indexOf('fbmSpreadsheetId: spreadsheetId') >= 0, true);
   check(so, 'relay config luu nhịp gas_poll va tuy chon startup', workerSource.indexOf('fbmPollMinutes') >= 0 && workerSource.indexOf('fbmRunOnStartup') >= 0 && workerSource.indexOf('config.extension') >= 0, true);
   check(so, 'service worker co quyen goi Sheets va Web App GAS', manifest.host_permissions.includes('https://docs.google.com/*') && manifest.host_permissions.includes('https://script.google.com/macros/*') && manifest.host_permissions.includes('https://script.googleusercontent.com/macros/*'), true);
-  check(so, 'manifest Extension dong bo cung phien ban phat hanh moi', [manifest.version, manifest.name], ['21.24', 'CRM Local Pro V21.24']);
+  check(so, 'manifest Extension dong bo cung phien ban phat hanh moi', [manifest.version, manifest.name], ['21.25', 'CRM Local Pro V21.25']);
   check(so, 'relay GAS co timeout va luu chan doan toi thieu', workerSource.indexOf('GAS_RELAY_TIMEOUT_MS') >= 0 && workerSource.indexOf('RELAY_TIMEOUT') >= 0 && workerSource.indexOf('fbmRelayLastStatus') >= 0, true);
   const sidebarSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'client', 'Sidebar.html'), 'utf8');
   const entryPointsSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'transport', 'EntryPoints.js'), 'utf8');
