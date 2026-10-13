@@ -75,6 +75,18 @@ function sendRequestToWorker(message, done, attempt) {
   }
 }
 
+/**
+ * Tải lại Extension không gỡ được content script đã chạy: bản cũ vẫn nằm trong trang cạnh bản mới worker vừa nạp, nhưng mất quyền gọi worker.
+ * Nếu bản cũ còn đáp bắt tay thì Sidebar nhận hai phiên luân phiên và gửi cấu hình relay vào bản cũ ("Extension context invalidated"), nên bản cũ phải tự im lặng hẳn.
+ */
+function bridgeContextAlive() {
+  try { return typeof chrome !== 'undefined' && !!(chrome.runtime && chrome.runtime.id); } catch (contextError) { return false; }
+}
+function bridgeRetire() {
+  window.removeEventListener('message', bridgeOnMessage);
+  sidebarWindow = null; sidebarOrigin = ''; sidebarNonce = '';
+}
+
 function isInvalidatedExtensionError(error) {
   return !!(error && /Extension context invalidated/i.test(String(error.message || error)));
 }
@@ -110,7 +122,8 @@ function bridgeErrorMessage(error) {
 }
 
 // 1. Bắt tay: kiểm origin, ghi nhớ đích, đáp tiếng kèm đúng nonce.
-window.addEventListener('message', function (event) {
+function bridgeOnMessage(event) {
+  if (!bridgeContextAlive()) { bridgeRetire(); return; }
   var data = event.data;
   if (data && data.action === 'CRM_FBM_CONFIG') {
     if (!isAllowedSidebarOrigin(event.origin) || event.source !== sidebarWindow || String(data.nonce || '') !== sidebarNonce || !isCurrentExtensionSession(data)) { return; }
@@ -217,10 +230,12 @@ window.addEventListener('message', function (event) {
     sidebarOrigin = '';
     sidebarNonce = '';
   }
-});
+}
+window.addEventListener('message', bridgeOnMessage);
 
 // 2. Bắn ảnh chụp trạng thái sang Sidebar. Sidebar tự quyết dùng trường nào.
 function sendContextToSidebar(context) {
+  if (!bridgeContextAlive()) { bridgeRetire(); return; }
   if (!sidebarWindow || !sidebarOrigin || !sidebarNonce) return;
   try {
       context.action = 'CRM_CONTEXT';
