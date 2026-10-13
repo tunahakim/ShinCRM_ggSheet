@@ -10,7 +10,7 @@ FbmSync.controlDispatch = function (command, payload) {
   var input = payload || {}, name = String(command || '');
   switch (name) {
     case 'start':
-      return FbmSync.start({ mode: input.mode || 'read', scan: input.scan, origin: input.origin || 'manual', manual: input.manual !== false });
+      return FbmSync.start({ mode: input.mode || 'read', scan: input.scan, pack: input.pack, origin: input.origin || 'manual', manual: input.manual !== false });
     case 'continue':
       return FbmSync.limitRelayResult ? FbmSync.limitRelayResult(FbmSync.continue(input.response), input.hop) : FbmSync.continue(input.response);
     case 'transport_failure':

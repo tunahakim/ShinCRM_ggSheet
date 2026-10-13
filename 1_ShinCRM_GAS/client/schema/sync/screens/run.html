@@ -4,8 +4,17 @@ var FBM_SYNC_RUN_SCHEMA = {
   id: 'run',
   label: 'Chạy đồng bộ',
   rootId: 'fbm-sync-run-root',
-  regions: { action: 'fbm-sync-run-action-region', details: 'fbm-sync-run-details-region', pipeline: 'fbm-sync-pipeline-region', liveStatus: 'fbm-sync-live-status-region' },
+  regions: { pack: 'fbm-sync-run-pack-region', action: 'fbm-sync-run-action-region', details: 'fbm-sync-run-details-region', pipeline: 'fbm-sync-pipeline-region', liveStatus: 'fbm-sync-live-status-region' },
   mode: { id: 'fbm-sync-mode', label: 'Loại đồng bộ', kind: 'menu' },
+  // Gói phát hiện thay đổi bên FBM; chiều đẩy không đọc FBM để phát hiện thay đổi nên không có mức quét.
+  pack: {
+    id: 'fbm-sync-pack', label: 'Mức quét', kind: 'menu', defaultValue: 'quick', modes: ['read', 'write'],
+    options: [
+      { value: 'quick', label: 'Quét nhanh', hint: 'Bắt khách mới, sửa khách và giao dịch mới gần đây. Bỏ sót giao dịch thêm lùi ngày ở khách ít hoạt động, sửa hoặc xóa giao dịch cũ.' },
+      { value: 'deep', label: 'Quét kỹ', hint: 'Như Quét nhanh, thêm lấy toàn bộ giao dịch để bắt sửa và xóa giao dịch cũ. Vẫn bỏ sót giao dịch thêm lùi ngày ở khách ít hoạt động.' },
+      { value: 'all', label: 'Quét toàn bộ', hint: 'Đọc giao dịch của mọi khách trong phạm vi: không bỏ sót gì nhưng lâu nhất.' }
+    ]
+  },
   cardTitle: 'Chọn loại đồng bộ',
   action: {
     ids: { start: 'fbm-sync-start', cancel: 'fbm-sync-cancel', approve: 'fbm-sync-approve' },

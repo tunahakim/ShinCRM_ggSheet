@@ -40,6 +40,25 @@ function fbmSyncRunForceLoginBlocks(status) {
   var schema = FBM_SYNC_RUN_SCHEMA.forceLogin;
   return [FBM_SYNC_RUN_UI.layout.actionRow(Button({ id: schema.id, label: schema.label, className: uiResolveActionClass('cancel', 'button'), disabled: !!FBM_SYNC_CLIENT.running }))];
 }
+/** Mức quét chỉ hiện với chiều có đọc FBM; dòng mô tả theo lựa chọn để người dùng biết gói đó bắt được gì và bỏ sót gì. */
+function fbmSyncRunPackBlocks() {
+  var schema = FBM_SYNC_RUN_SCHEMA.pack;
+  if (schema.modes.indexOf(String(FBM_SYNC_CLIENT.mode || '')) < 0) { return []; }
+  var chosen = schema.options.filter(function (option) { return option.value === FBM_SYNC_CLIENT.pack; })[0] || schema.options[0];
+  return [
+    StandaloneField(schema.label, { id: schema.id, kind: schema.kind, options: schema.options.map(function (option) { return { value: option.value, label: option.label }; }), value: chosen.value, disabled: !!FBM_SYNC_CLIENT.running, ariaLabel: schema.label }),
+    Text({ className: FBM_SYNC_RUN_UI.classes.muted, text: chosen.hint })
+  ];
+}
+/** Gói gửi kèm lệnh chạy; chiều không có mức quét gửi rỗng để GAS dùng gói mặc định. */
+function fbmSyncRunPack(mode) {
+  return FBM_SYNC_RUN_SCHEMA.pack.modes.indexOf(String(mode || '')) >= 0 ? String(FBM_SYNC_CLIENT.pack || FBM_SYNC_RUN_SCHEMA.pack.defaultValue) : '';
+}
+function fbmSyncPatchRunPack() {
+  if (!RENDER_INDEX.nodes[FBM_SYNC_RUN_SCHEMA.regions.pack]) { return false; }
+  fbmSyncRenderTarget(FBM_SYNC_RUN_SCHEMA.regions.pack, fbmSyncRunPackBlocks());
+  return true;
+}
 /** Băng cảnh báo phạm vi giới hạn, để người dùng luôn thấy lượt chạy chỉ chạy cho những khách nào. */
 function fbmSyncRunScopeBlocks() {
   var settings = FBM_SYNC_CLIENT.syncSettings || {}, schema = FBM_SYNC_RUN_SCHEMA.scope;
@@ -62,6 +81,7 @@ function fbmSyncRenderRun(panel, status) {
   status = status || {};
   return fbmSyncAppendBox(panel, FBM_SYNC_RUN_UI.rootClass, FBM_SYNC_RUN_SCHEMA.rootId, FBM_SYNC_RUN_UI.layout.screen({
     mode: StandaloneField(FBM_SYNC_RUN_SCHEMA.mode.label, { id: FBM_SYNC_RUN_SCHEMA.mode.id, kind: FBM_SYNC_RUN_SCHEMA.mode.kind, options: FBM_SYNC_UI_SCHEMA.modes, value: FBM_SYNC_CLIENT.mode, disabled: !!FBM_SYNC_CLIENT.running, ariaLabel: FBM_SYNC_RUN_SCHEMA.mode.label }),
+    pack: fbmSyncRunPackBlocks(),
     action: FBM_SYNC_RUN_UI.layout.actionRow(fbmSyncRunActionBlock(status)),
     settings: fbmSyncRunBackgroundSettingsBlock(status),
     details: fbmSyncRunDetailsBlocks(status)
@@ -71,6 +91,7 @@ function fbmSyncPatchRun(panel, status) {
   if (!panel || !RENDER_INDEX.nodes[FBM_SYNC_RUN_SCHEMA.rootId]) { return false; }
   fbmSyncRenderTarget(FBM_SYNC_RUN_SCHEMA.regions.action, [FBM_SYNC_RUN_UI.layout.actionStack([FBM_SYNC_RUN_UI.layout.actionRow(fbmSyncRunActionBlock(status)), fbmSyncRunBackgroundSettingsBlock(status)])]);
   fbmSyncRenderTarget(FBM_SYNC_RUN_SCHEMA.regions.details, fbmSyncRunDetailsBlocks(status));
+  fbmSyncPatchRunPack();
   return true;
 }
 function fbmSyncRunHasSnapshot(status) {

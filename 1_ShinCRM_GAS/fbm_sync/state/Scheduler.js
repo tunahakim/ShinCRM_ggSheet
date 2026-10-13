@@ -53,9 +53,9 @@ FbmSync.backgroundScheduleDefault = function () {
     enabled: true,
     direction: 'read',
     heartbeat: { enabled: true, minutes: 5, priority: 100 },
-    customerFull: { enabled: true, minutes: 8 * 60, priority: 10 },
-    activityFull: { enabled: false, minutes: 24 * 60, priority: 20 },
-    detail: { enabled: false, minutes: 60, priority: 30, customersPerRun: 50 }
+    customerFull: { enabled: true, minutes: 60, priority: 10 },
+    activityFull: { enabled: false, minutes: 8 * 60, priority: 20 },
+    detail: { enabled: false, minutes: 30, priority: 30, customersPerRun: 30 }
   };
 };
 FbmSync.backgroundScheduleRead = function () {

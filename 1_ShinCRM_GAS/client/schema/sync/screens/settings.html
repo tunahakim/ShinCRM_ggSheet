@@ -19,12 +19,12 @@ var FBM_SYNC_SETTINGS_SCHEMA = {
     directions: [{ value: 'read', label: 'FBM → ShinCRM' }, { value: 'push', label: 'ShinCRM → FBM' }, { value: 'write', label: 'Đồng bộ hai chiều' }],
     processes: [
       { key: 'heartbeat', label: 'Giữ phiên FBM', minutes: 5, enabled: true },
-      { key: 'customerFull', label: 'Quét toàn bộ Customer', minutes: 480, enabled: true },
-      { key: 'activityFull', label: 'Quét toàn bộ Activity', minutes: 1440, enabled: false },
-      { key: 'detail', label: 'Quét chi tiết Customer và Activity', minutes: 60, enabled: false }
+      { key: 'customerFull', label: 'Quét nhanh', minutes: 60, enabled: true },
+      { key: 'activityFull', label: 'Lấy toàn bộ giao dịch', minutes: 480, enabled: false },
+      { key: 'detail', label: 'Vòng xoay giao dịch', minutes: 30, enabled: false }
     ],
     detail: {
-      countLabel: 'Số lượng Customer mỗi phiên', countId: 'fbm-sync-detail-count', countPlaceholder: '50'
+      countLabel: 'Số khách mỗi lượt vòng xoay', countId: 'fbm-sync-detail-count', countPlaceholder: '30'
     },
     edit: 'Sửa lịch nền', save: 'Lưu lịch nền', saveId: 'fbm-sync-save-background', processPrefix: 'fbm-sync-process-', minutesSuffix: '-minutes', minutesPlaceholder: 'phút', toggleAria: 'Bật ', minutesAria: 'Chu kỳ '
   },
@@ -38,6 +38,6 @@ var FBM_SYNC_SETTINGS_SCHEMA = {
   module: { thresholdLabel: 'Ngưỡng yêu cầu chấp thuận', thresholdId: 'fbm-sync-setting-approval-threshold', thresholdPlaceholder: '10', edit: 'Sửa cài đặt chung', save: 'Lưu cài đặt chung', saveId: 'fbm-sync-save-settings', enabledOn: 'Module đồng bộ đang bật', enabledOff: 'Module đồng bộ đang tắt', enabledAria: 'Bật hoặc tắt module đồng bộ FBM trong cài đặt', requestGapLabel: 'Khoảng cách giữa 2 request tới FBM (giây)', requestGapMinLabel: 'Tối thiểu', requestGapMinId: 'fbm-sync-setting-request-gap-min', requestGapMaxLabel: 'Tối đa', requestGapMaxId: 'fbm-sync-setting-request-gap-max', requestGapPlaceholder: '0', requestGapHelp: 'Trước mỗi request tới FBM, Extension nghỉ ngẫu nhiên trong khoảng này, tính từ lúc request trước xong. Áp cho cả lượt chạy tay và lịch nền. Để 0 và 0 thì gửi liền.', thresholdHelp: 'Số bản ghi ghi lên FBM từ ngưỡng này trở lên sẽ dừng để bạn chấp thuận trước request ghi đầu tiên. Nhập 0 nếu mọi lượt ghi đều phải chờ duyệt.', scopeLimitedLabel: 'Phạm vi đồng bộ: chỉ khách chỉ định', scopeLimitedId: 'fbm-sync-setting-scope-limited', scopeCodesLabel: 'Danh sách khách chỉ định', scopeCodesId: 'fbm-sync-setting-scope-codes', scopeCodesPlaceholder: 'ALT00010', scopeHelp: 'Khi bật, mọi lượt đồng bộ chỉ chạy cho các khách trong danh sách; tắt thì đọc và ghi toàn bộ khách mà tài khoản FBM được xem. Mỗi dòng một mã, nhập mã khách FBM hay mã khách ShinCRM đều được: GAS tự đổi ra khách nên lượt hai chiều chạy cả hai chiều cho khách đó. Activity đi theo khách. Bật mà danh sách trống thì lượt đồng bộ bị chặn.', scopeLine: { matched: ' → ', fbmNew: ': mã FBM chưa có trên Sheet, sẽ lấy về nếu FBM có', notFound: ': mã ShinCRM không tìm thấy' } },
   relay: { edit: 'Sửa cấu hình kết nối', save: 'Lưu cấu hình kết nối', rotateId: 'fbm-sync-rotate-relay' },
   notice: { relayOk: 'Extension đã nhận cấu hình relay của file này.', relayMissing: 'Chưa xác nhận Extension đã nhận cấu hình relay.', scheduler: 'scheduler', heartbeat: 'Heartbeat', warningKind: 'warning', infoKind: 'info', errorKind: 'error' },
-  defaults: { pollMinutes: 5, detailCustomers: 50, retryMinutes: 30, approvalThreshold: 10, processKeys: ['heartbeat', 'customerFull', 'activityFull', 'detail'], detailSuffixes: ['count'], detailFieldPrefix: 'fbm-sync-detail-', startupId: 'fbm-sync-run-on-startup', masterId: 'fbm-sync-settings-master-switch', backgroundSwitchId: 'fbm-sync-background-switch', policyPrefix: 'fbm-sync-policy-', loginRetryId: 'fbm-sync-login-retry-minutes', thresholdPrefix: 'fbm-sync-setting-', processMinutesSuffix: '-minutes', extensionPrefix: 'fbm-extension-' }
+  defaults: { pollMinutes: 5, detailCustomers: 30, retryMinutes: 30, approvalThreshold: 10, processKeys: ['heartbeat', 'customerFull', 'activityFull', 'detail'], detailSuffixes: ['count'], detailFieldPrefix: 'fbm-sync-detail-', startupId: 'fbm-sync-run-on-startup', masterId: 'fbm-sync-settings-master-switch', backgroundSwitchId: 'fbm-sync-background-switch', policyPrefix: 'fbm-sync-policy-', loginRetryId: 'fbm-sync-login-retry-minutes', thresholdPrefix: 'fbm-sync-setting-', processMinutesSuffix: '-minutes', extensionPrefix: 'fbm-extension-' }
 };
 </script>
