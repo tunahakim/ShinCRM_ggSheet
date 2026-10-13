@@ -100,3 +100,14 @@ function fbmProbeStateMetadataSizes() {
   Object.keys(state).forEach(function (key) { if (key !== 'metadata') { out['state.' + key] = fbmSyncProbeJsonBytes(state[key]); } });
   return out;
 }
+
+/** Giao dịch trên Sheet của một khách kèm trạng thái đồng bộ, chỉ đọc, để soi vì sao giao dịch bị xóa bên FBM không bị gắn cờ. */
+function fbmProbeCustomerActivities(customerId) {
+  var id = String(customerId || 'CUS-020075'), customer = FbmSync.readLocal('customer').filter(function (record) { return record.id === id; })[0] || null;
+  return {
+    customer: customer && { id: customer.id, fbmId: customer.fbmId, fbmCustomerCode: customer.fbmCustomerCode, syncStatus: customer.syncStatus },
+    activities: FbmSync.readLocal('activity').filter(function (record) { return record.customerId === id; }).map(function (record) {
+      return { id: record.id, fbmId: record.fbmId, workDate: record.workDate, syncStatus: record.syncStatus, recordStatus: record.recordStatus, title: String(record.title || record.details || '').slice(0, 40) };
+    })
+  };
+}

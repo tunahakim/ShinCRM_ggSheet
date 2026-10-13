@@ -231,6 +231,19 @@ FbmSync.progressCustomersDone = function (state, count) {
 FbmSync.finishPullRun = function (state) {
   var customerErrors = Number(state.metadata && state.metadata.customerErrors && state.metadata.customerErrors.total || 0), fullScan = FbmSync.canWriteSheet(state.mode) && state.scan !== 'detail';
   state.cursor = {}; state.entity = '';
+  if (!FbmSync.pullMarkMissing(state)) { return false; }
+  state.phase = 'done';
+  state.message = customerErrors ? FbmSync.DONE_MESSAGE + ' Có ' + customerErrors + ' khách lỗi khi đọc giao dịch (xem danh sách lỗi)' + (fullScan ? '; lượt này chưa đánh dấu giao dịch "không thấy bên FBM".' : '.') : FbmSync.DONE_MESSAGE;
+  FbmSync.stateWrite(state);
+  return true;
+};
+
+/**
+ * Gắn cờ "không thấy bên FBM" sau phần đọc của một lượt; chiều Lấy gọi ở cuối lượt, chiều Hai chiều gọi trước khi sang đẩy, nên hai chiều không có đường bỏ sót bước này.
+ * Trả false khi lượt nhận thiếu khách: phiên đã chuyển lỗi `FBM_SCAN_INCOMPLETE` và không được đi tiếp.
+ */
+FbmSync.pullMarkMissing = function (state) {
+  var customerErrors = Number(state.metadata && state.metadata.customerErrors && state.metadata.customerErrors.total || 0), fullScan = FbmSync.canWriteSheet(state.mode) && state.scan !== 'detail';
   if (fullScan) {
     var scan = state.metadata && state.metadata.customerScan || {}, total = Number(scan.total || 0), seen = Number(scan.seen || 0);
     if (seen < total || (!total && seen > 0)) {
@@ -248,9 +261,6 @@ FbmSync.finishPullRun = function (state) {
       FbmSync.markMissingAfterFullScan('activity', state);
     }
   }
-  state.phase = 'done';
-  state.message = customerErrors ? FbmSync.DONE_MESSAGE + ' Có ' + customerErrors + ' khách lỗi khi đọc giao dịch (xem danh sách lỗi)' + (fullScan ? '; lượt này chưa đánh dấu giao dịch "không thấy bên FBM".' : '.') : FbmSync.DONE_MESSAGE;
-  FbmSync.stateWrite(state);
   return true;
 };
 
@@ -339,6 +349,7 @@ FbmSync.pullFinishOrPush = function (state, extra) {
   var result = Object.assign({ ok: true, status: null }, extra || {});
   if (state.mode === 'write' && FbmSync.canWriteFbm(state.mode)) {
     if (FbmSync.stopPushOnConflicts && FbmSync.stopPushOnConflicts(state)) { result.request = null; result.status = FbmSync.statusView(); return result; }
+    if (!FbmSync.pullMarkMissing(state)) { result.request = null; result.status = FbmSync.statusView(); return result; }
     state.cursor = { kind: 'push_scan', entity: 'customer', index: 0 }; state.phase = 'push'; state.entity = 'customer'; FbmSync.stateWrite(state);
     result.request = FbmSync.nextEnvelope(FbmSync.nextPushRequest(state)); result.status = FbmSync.statusView();
     return result;
@@ -665,13 +676,7 @@ FbmSync.continue = function (rawResponse) {
       if (supplementRequest) { return { ok: true, request: FbmSync.nextEnvelope(supplementRequest), status: FbmSync.statusView() }; }
       return { ok: true, status: FbmSync.statusView(), imported: imported };
     }
-    if (state.mode === 'write' && FbmSync.canWriteFbm(state.mode)) {
-      if (FbmSync.stopPushOnConflicts && FbmSync.stopPushOnConflicts(state)) { return { ok: true, request: null, status: FbmSync.statusView(), imported: imported }; }
-      state.cursor = { kind: 'push_scan', entity: 'customer', index: 0 }; state.phase = 'push'; state.entity = 'customer'; FbmSync.stateWrite(state);
-      return { ok: true, request: FbmSync.nextEnvelope(FbmSync.nextPushRequest(state)), status: FbmSync.statusView(), imported: imported };
-    }
-    FbmSync.finishPullRun(state);
-    return { ok: true, status: FbmSync.statusView(), imported: imported };
+    return FbmSync.pullFinishOrPush(state, { imported: imported });
   }
   if (cursor.kind === 'activity_catchup_customer_grid' || cursor.kind === 'activity_rotation_customer_grid') {
     var supplementGrid = FbmSync.rowsToRecords('customer', response, state.metadata && state.metadata.customerFields);
