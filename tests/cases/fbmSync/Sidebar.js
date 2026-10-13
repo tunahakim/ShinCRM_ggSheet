@@ -457,14 +457,18 @@ async function chay(so) {
   check(so, 'Results không hiện tiêu đề chi tiết bản ghi khi chỉ có cảnh báo preflight', preflightOnly.textContent.indexOf('Chi tiết bản ghi') >= 0, false);
 
   hop.FBM_SYNC_CLIENT.syncSettings = { accountName: 'A', approvalThreshold: 10 };
+  const growBefore = hop.inputsGrowAll; let growCalls = 0;
+  hop.inputsGrowAll = () => { growCalls += 1; return 0; };
   render(hop, content, hop.fbmSyncRenderSettings, idle);
+  hop.inputsGrowAll = growBefore;
+  check(so, 'Màn Cài đặt Đồng bộ vẽ xong thì kéo lại chiều cao ô nhiều dòng, để danh sách khách chỉ định hiện đủ dòng ngay sau khi lưu mà không cần gõ phím', growCalls > 0, true);
   hop.FBM_SYNC_CLIENT.syncSettings = { background: { direction: 'read', enabled: true, heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false, minutes: 30 }, detail: { enabled: true, minutes: 60, customersPerRun: 50 } } };
   const backgroundBlocks = hop.fbmSyncSettingsBackgroundBlocks(hop.FBM_SYNC_CLIENT.syncSettings);
   const backgroundToggleIndex = backgroundBlocks.findIndex((node) => node && node.elements && node.elements.some((child) => child && child.id === 'fbm-sync-background-switch'));
   const directionIndex = backgroundBlocks.findIndex((node) => node && node.elements && node.elements.some((child) => child && child.id === 'fbm-sync-background-direction'));
   const firstScheduleRow = backgroundBlocks.find((node) => node && String(node.className || '').indexOf('shin-sync-schedule-row') >= 0);
   const detailBlock = backgroundBlocks.find((node) => node && String(node.className || '').indexOf('shin-sync-detail-controls') >= 0);
-  check(so, 'background layout order and detail groups', [backgroundToggleIndex < directionIndex, backgroundBlocks[backgroundToggleIndex].role, backgroundBlocks[directionIndex].className.indexOf('shin-sync-direction-row') >= 0, firstScheduleRow.role, firstScheduleRow.elements[1].className, detailBlock.role, detailBlock.elements.length, detailBlock.elements[0].className], [true, 'row', true, 'row', 'shin-kv-label', 'box', 1, 'shin-row-group shin-sync-detail-field']);
+  check(so, 'background layout order and detail groups', [backgroundToggleIndex < directionIndex, backgroundBlocks[backgroundToggleIndex].role, backgroundBlocks[directionIndex].className.indexOf('shin-sync-direction-row') >= 0, firstScheduleRow.role, firstScheduleRow.elements[1].className, detailBlock.role, detailBlock.elements.length, detailBlock.elements[0].className], [true, 'row', true, 'row', 'shin-kv-label', 'box', 2, 'shin-row-group shin-sync-detail-field']);
   const moduleBlocks = hop.fbmSyncSettingsModuleBlocks({ approvalThreshold: 10, requestGapMinSeconds: 1, requestGapMaxSeconds: 3 }, true);
   const gapBlock = moduleBlocks.find((node) => node && node.elements && node.elements[1] && String(node.elements[1].className || '').indexOf('shin-sync-detail-inputs') >= 0);
   const gapInputs = gapBlock ? gapBlock.elements[1].elements.map((field) => field.elements[1]) : [];
@@ -508,8 +512,8 @@ async function chay(so) {
   hop.fbmSyncSetSettingsNotice = (card, kind, text) => { savedNotices.push([card, kind, text]); };
   await hop.fbmSyncSaveSyncSettings(null);
   hop.callServer = gapCallServer; hop.fbmSyncStatusOnce = gapStatusOnce; hop.fbmSyncSetSettingsNotice = noticeSetter;
-  check(so, 'Lưu cài đặt chung gửi nguyên danh sách khách chỉ định cùng công tắc phạm vi, rồi hiện kết quả đổi mã từng dòng GAS trả về',
-    [gapSaves[0] && gapSaves[0].scopeLimited, gapSaves[0] && gapSaves[0].scopeCodes, savedNotices.map((item) => item.slice(0, 2)), /ALT00010 → CUS-020061; ALT00099: mã FBM chưa có trên Sheet/.test(savedNotices[0] && savedNotices[0][2])],
+  check(so, 'Lưu cài đặt chung gửi nguyên danh sách khách chỉ định cùng công tắc phạm vi, rồi hiện kết quả đổi mã GAS trả về, mỗi mã một dòng',
+    [gapSaves[0] && gapSaves[0].scopeLimited, gapSaves[0] && gapSaves[0].scopeCodes, savedNotices.map((item) => item.slice(0, 2)), /\nALT00010 → CUS-020061\nALT00099: mã FBM chưa có trên Sheet/.test(savedNotices[0] && savedNotices[0][2])],
     [true, 'ALT00010' + String.fromCharCode(10) + 'CUS-020061', [['module', 'success']], true]);
   check(so, 'Lưu cài đặt chung gửi kèm khoảng cách request FBM người dùng vừa nhập', [gapSaves.length, gapSaves[0] && gapSaves[0].requestGapMinSeconds, gapSaves[0] && gapSaves[0].requestGapMaxSeconds], [1, '1', '2.5']);
 
