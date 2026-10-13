@@ -21,7 +21,7 @@ async function luotKy(ngay, doi, options, hooks) {
   });
   const h = scanHarness(opt);
   await h.run({ pack: 'all' });
-  if (doi) { doi(fbm); }
+  if (doi) { doi(fbm, h); }
   ['activityCustomers', 'kinds', 'jobs', 'errors', 'rechecks', 'bulkFilters'].forEach((key) => { h.trace[key].length = 0; });
   h.logs.length = 0;
   const end = await h.run(Object.assign({ pack: 'deep', beforeSend: (request) => { if (request.meta.kind === 'scan_job' && request.meta.entity === 'activity') { fbm.lan += 1; } } }, hooks || {}));
@@ -94,6 +94,15 @@ async function chay(so) {
     docLaiLoi.state.phase, docLaiLoi.act(5).syncStatus === docLaiLoi.h.F.SYNC_STATUS.missing, (docLaiLoi.state.metadata.customerErrors || { total: 0 }).total, docLaiLoi.log('activity_customer_failed').length
   ], ['done', false, 1, 1]);
 
+  // Lượt nền lấy toàn bộ giao dịch kết thúc ở bước bổ sung (tìm khách có giao dịch mới, xoay vòng khách): thông báo cuối lượt dựng cùng chỗ với lượt thủ công nên không mất ghi chú khách lỗi.
+  const nenLoi = scanHarness({ customers: 1 });
+  const nenState = nenLoi.F.stateStart('', 'pull_activity', 0);
+  Object.assign(nenState, { mode: 'read', scan: 'activity_bulk', origin: 'background' });
+  nenState.metadata.customerErrors = { total: 2, recent: [] };
+  nenLoi.F.activitySupplementNext(nenState, {});
+  const nenXong = nenLoi.F.stateRead();
+  check(so, 'Lượt nền lấy toàn bộ giao dịch có khách lỗi khi đọc: thông báo cuối lượt trên Sidebar nêu số khách lỗi, không chỉ ghi ở Log', [nenXong.phase, String(nenXong.message || '').indexOf('2 khách lỗi khi đọc giao dịch') >= 0], ['done', true]);
+
   // Hết hạn fetch khi lấy cả khoảng cũng chia cửa sổ; lỗi mạng chung không đổi cách lấy.
   const hetHan = await luotKy(ngayCuaSo, null, {}, { fail: (request) => (request.meta.kind === 'scan_job' && request.meta.entity === 'activity' && !(request.body.filter || []).some((item) => /<=|>=\d{2}\/\d{2}\/\d{4}/.test(item)) ? 'FBM_FETCH_TIMEOUT' : '') });
   const mang = await luotKy(ngayCuaSo, null, {}, { fail: (request) => (request.meta.kind === 'scan_job' && request.meta.entity === 'activity' ? 'FBM_TRANSPORT_UNAVAILABLE' : '') });
@@ -113,6 +122,21 @@ async function chay(so) {
   check(so, 'Lượt nền lấy toàn bộ giao dịch: không đọc danh sách khách, chốt "không thấy" rồi mới sang request tìm khách có giao dịch mới', [
     nen.h.trace.kinds.filter((kind) => kind === 'scan_job').length, nen.log('activity_bulk_done').length, nen.act(2).syncStatus, sauBulk[0]
   ], [0, 1, nen.h.F.SYNC_STATUS.missing, 'activity_catchup_customer_grid']);
+
+  // Lớp 1 gắn cờ qua cùng chỗ với lượt quét theo khách: số vào thẻ kết quả đúng một lần, dòng người dùng đang sửa không bị gắn cờ, lượt sau không ghi lại dòng đã mang cờ.
+  const lop1 = await luotKy(['2026-09-20', '2026-09-20', '2026-09-20', '2026-09-20', '2026-09-20', '2026-09-20'], (fbm, h) => {
+    fbm.list = fbm.list.filter((item) => ['A-FBM-C1', 'A-FBM-C4', 'A-FBM-C5'].indexOf(item.id) < 0);
+    const s = h.F.stateRead(), dangSua = h.local.activity.find((item) => item.fbmId === 'A-FBM-C4');
+    s.locks = Object.assign({}, s.locks, { ['activity:' + dangSua.id]: { owner: 'user' } });
+    h.F.stateWrite(s);
+  });
+  const demLan1 = lop1.state.counts.missingActivity;
+  const daMangCo = [lop1.act(1).id, lop1.act(5).id], docTheoKhach = lop1.h.trace.activityCustomers.slice(), ghiTruoc = lop1.h.writes.length;
+  await lop1.h.run({ pack: 'deep' });
+  const ghiLaiC5 = lop1.h.writes.slice(ghiTruoc).filter((item) => item.entity === 'activity').flatMap((item) => item.records || []).filter((item) => daMangCo.indexOf(item.id) >= 0).length;
+  check(so, 'Quét kỹ: giao dịch FBM đã xóa được đếm đúng một lần vào "Không thấy bên FBM" kể cả khi khách của nó vừa được đọc theo khách, giao dịch người dùng đang sửa không bị gắn cờ, lượt sau vẫn đếm nhưng không ghi lại dòng đã mang cờ', [
+    lop1.state.phase, docTheoKhach.indexOf('FBM-C1') >= 0, demLan1, lop1.act(1).syncStatus === lop1.h.F.SYNC_STATUS.missing, lop1.act(5).syncStatus === lop1.h.F.SYNC_STATUS.missing, lop1.act(4).syncStatus === lop1.h.F.SYNC_STATUS.missing, lop1.h.F.stateRead().counts.missingActivity, ghiLaiC5
+  ], ['done', true, 2, true, true, false, 2, 0]);
 
   // Sheet chưa có giao dịch FBM nào: Quét kỹ không gọi FBM lấy toàn bộ giao dịch.
   const trong = scanHarness({ customers: 2, activityFor: () => [] });

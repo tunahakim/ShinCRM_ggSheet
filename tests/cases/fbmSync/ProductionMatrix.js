@@ -124,7 +124,9 @@ async function chay(so) {
   bulk.hop.FbmSync.seenStoreBegin('activity_bulk', bulkLocal);
   bulk.hop.FbmSync.seenStoreMark('activity_bulk', bulkLocal, bulkLocal.slice(0, 5));
   const beforeBulkWrites = bulk.writes.length;
-  const missing = bulk.hop.FbmSync.writeActivityBulkMissing(bulkLocal);
+  const bulkState = bulk.hop.FbmSync.stateRead();
+  bulkState.mode = 'read';
+  const marked = bulk.hop.FbmSync.markMissingAfterFullScan('activity', bulkState, bulk.hop.FbmSync.seenStoreReader('activity_bulk')), missing = { total: marked.missing, written: marked.written };
   const bulkWrites = bulk.writes.slice(beforeBulkWrites);
   check(so, 'missing Activity lon hon 2000 dong duoc cat thanh hai lan cua ghi', [missing.total, missing.written, bulkWrites.length, bulkWrites[0].records.length, bulkWrites[1].records.length], [2500, 2500, 2, 2000, 500]);
 

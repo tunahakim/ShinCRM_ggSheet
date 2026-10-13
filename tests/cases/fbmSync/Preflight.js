@@ -10,7 +10,7 @@ async function chay(so) {
     category: coreXacThuc.category,
     issues: []
   }) });
-  napServer(hop, 'server/gate/IdGate.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/report/Preflight.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
+  napServer(hop, 'server/gate/IdGate.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/state/State.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/report/Preflight.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
   const realReadLocal = hop.FbmSync.readLocal;
   hop.FbmSync.scriptSettings = () => ({ accountName: '' });
   // Các ca khác không xét phạm vi thử; ca phạm vi thử tự đặt lại.
