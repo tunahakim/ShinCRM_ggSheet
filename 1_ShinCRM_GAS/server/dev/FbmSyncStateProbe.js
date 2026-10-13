@@ -107,7 +107,7 @@ function fbmProbeCustomerActivities(customerId) {
   return {
     customer: customer && { id: customer.id, fbmId: customer.fbmId, fbmCustomerCode: customer.fbmCustomerCode, syncStatus: customer.syncStatus },
     activities: FbmSync.readLocal('activity').filter(function (record) { return record.customerId === id; }).map(function (record) {
-      return { id: record.id, fbmId: record.fbmId, workDate: record.workDate, syncStatus: record.syncStatus, recordStatus: record.recordStatus, title: String(record.title || record.details || '').slice(0, 40) };
+      return { id: record.id, fbmId: record.fbmId, workDate: record.workDate, syncStatus: record.syncStatus, syncedAt: record.syncedAt, recordStatus: record.recordStatus, title: String(record.title || record.details || '').slice(0, 40) };
     })
   };
 }
