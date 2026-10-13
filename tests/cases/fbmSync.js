@@ -13,7 +13,8 @@ const NHOM = [
   require("./fbmSync/UserJourneys"),
   require("./fbmSync/Workflow"),
   require("./fbmSync/ScanJob"),
-  require("./fbmSync/Settings")
+  require("./fbmSync/Settings"),
+  require("./fbmSync/RelayResend")
 ];
 
 async function chay(so) { for (const nhom of NHOM) { await nhom.chay(so); } }
