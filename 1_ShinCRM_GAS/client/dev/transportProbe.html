@@ -1,0 +1,81 @@
+<script>
+/**
+ * Lệnh đo trần đường truyền gói lớn (cặp với `server/dev/TransportProbe.js`): gói đệm vô nghĩa, không chạm FBM.
+ * Sidebar nằm trong iframe lồng nên không gõ lệnh trực tiếp được; dán dòng sau vào Console của tab Google Sheet (khung trên cùng):
+ *   (function g(w){for(var i=0;i<w.frames.length;i++){try{w.frames[i].postMessage({action:'CRM_DEV_TRANSPORT_PROBE'},'*');}catch(e){}g(w.frames[i]);}})(window)
+ * Kết quả hiện ở thẻ Kết nối Extension trong Cài đặt, ghi vào Sheet Log và gửi lại khung trên cùng dưới dạng `CRM_DEV_TRANSPORT_PROBE_RESULT`.
+ * Xóa tệp này cùng dòng include trong `client/Sidebar.html` khi xóa `server/dev/`.
+ */
+var DEV_TRANSPORT_PROBE = { running: false, waiters: {} };
+
+window.addEventListener('message', function (event) {
+  var data = event.data;
+  if (event.origin !== 'https://docs.google.com' || !data) { return; }
+  if (data.action === 'CRM_FBM_TRANSPORT_PROBE_RESULT') {
+    var waiter = DEV_TRANSPORT_PROBE.waiters[String(data.id || '')];
+    if (!waiter || String(data.nonce || '') !== SHEET_LINK_NONCE) { return; }
+    delete DEV_TRANSPORT_PROBE.waiters[String(data.id || '')];
+    waiter(data.result || { ok: false, code: data.code || 'TRANSPORT_PROBE_NO_RESULT', error: data.error || 'Extension không trả kết quả đo.' });
+    return;
+  }
+  if (data.action === 'CRM_DEV_TRANSPORT_PROBE') {
+    var source = event.source;
+    devTransportProbeRun().then(function (report) {
+      try { source.postMessage({ action: 'CRM_DEV_TRANSPORT_PROBE_RESULT', report: report }, 'https://docs.google.com'); } catch (ignore) {}
+    });
+  }
+});
+
+function devTransportProbeRun() {
+  if (DEV_TRANSPORT_PROBE.running) { return Promise.resolve({ ok: false, error: 'Đang đo dở, chờ lượt trước xong.' }); }
+  DEV_TRANSPORT_PROBE.running = true;
+  fbmSyncSetSettingsNotice('extension', 'info', 'Đang đo đường truyền gói lớn...');
+  var results = [];
+  return callServer('fbmTransportProbePlan').then(function (plan) {
+    return devTransportProbeRoute('sidebar', plan, results).then(function () { return devTransportProbeRoute('relay', plan, results); });
+  }).then(function () {
+    return callServer('fbmTransportProbeReport', [results]);
+  }).then(function (report) {
+    var failed = results.some(function (item) { return !item.ok; });
+    fbmSyncSetSettingsNotice('extension', failed ? 'warning' : 'success', (report.lines || []).join(' | '));
+    return { ok: true, lines: report.lines, results: results };
+  }).catch(function (error) {
+    var message = 'Không đo được đường truyền: ' + String(error && error.message || error);
+    fbmSyncSetSettingsNotice('extension', 'error', message);
+    fbmSyncLogClientError(error, message, 'transport_probe');
+    return { ok: false, error: message, results: results };
+  }).finally(function () { DEV_TRANSPORT_PROBE.running = false; });
+}
+
+/** Đo lần lượt từng cỡ của một đường; lỗi ở cỡ nào thì dừng đường đó vì cỡ lớn hơn chắc chắn cũng lỗi. */
+function devTransportProbeRoute(route, plan, results) {
+  return (plan.sizesBytes || []).reduce(function (chain, sizeBytes) {
+    return chain.then(function (stopped) {
+      if (stopped) { return true; }
+      return devTransportProbeOne(route, sizeBytes, plan.timeoutMs).then(function (item) { results.push(item); return !item.ok; });
+    });
+  }, Promise.resolve(false));
+}
+
+function devTransportProbeOne(route, sizeBytes, timeoutMs) {
+  var startedAt = Date.now();
+  var fail = function (error) { return { route: route, sizeBytes: sizeBytes, ok: false, ms: Date.now() - startedAt, code: String(error && error.code || 'TRANSPORT_PROBE_FAILED'), error: String(error && error.message || error) }; };
+  return devTransportProbeExtension(route, sizeBytes, timeoutMs).then(function (reply) {
+    if (!reply || reply.ok === false) { return fail({ code: reply && reply.code, message: reply && reply.error || 'Extension báo lỗi.' }); }
+    if (route === 'relay') { return { route: route, sizeBytes: sizeBytes, ok: true, ms: Number(reply.ms || 0) }; }
+    return callServer('fbmTransportProbe', [{ sizeBytes: sizeBytes, padding: reply.padding }], { timeoutMs: timeoutMs }).then(function (gas) {
+      if (!gas || gas.ok === false) { return fail({ code: gas && gas.code, message: gas && gas.error || 'GAS không nhận gói.' }); }
+      return { route: route, sizeBytes: sizeBytes, ok: true, ms: Date.now() - startedAt };
+    }, fail);
+  }, fail);
+}
+
+function devTransportProbeExtension(route, sizeBytes, timeoutMs) {
+  return new Promise(function (resolve) {
+    var id = 'probe-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+    var timer = setTimeout(function () { delete DEV_TRANSPORT_PROBE.waiters[id]; resolve({ ok: false, code: 'TRANSPORT_PROBE_TIMEOUT', error: 'Extension không trả kết quả đo sau ' + Math.round(timeoutMs / 1000) + ' giây.' }); }, timeoutMs);
+    DEV_TRANSPORT_PROBE.waiters[id] = function (reply) { clearTimeout(timer); resolve(reply); };
+    window.top.postMessage({ action: 'CRM_FBM_TRANSPORT_PROBE', id: id, nonce: SHEET_LINK_NONCE, sessionId: FBM_SYNC_RELAY_SESSION, route: route, sizeBytes: sizeBytes, timeoutMs: timeoutMs }, 'https://docs.google.com');
+  });
+}
+</script>

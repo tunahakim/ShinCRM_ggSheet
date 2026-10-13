@@ -687,6 +687,11 @@ function syncScreenClose() {
   return restored;
 }
 /** Chuyển một envelope sang tab FBM và chờ response thô. */
+/** Báo Extension dừng lô đang chạy sau request FBM đang gọi, kể cả lô của lượt nền; GAS vẫn nhận response cuối rồi mới đóng phiên. */
+function fbmSyncCancelExtensionBatch() {
+  if (!SHEET_LINK_NONCE || !FBM_SYNC_RELAY_SESSION) { return; }
+  (window.top === window ? window : window.top).postMessage({ action: 'CRM_FBM_CANCEL', nonce: SHEET_LINK_NONCE, sessionId: FBM_SYNC_RELAY_SESSION }, 'https://docs.google.com');
+}
 function fbmSyncExtensionRequest(request) {
   fbmSyncInstall();
   return new Promise(function (resolve, reject) {
@@ -1395,6 +1400,7 @@ function fbmSyncCancel() {
   var keepRelay = FBM_SYNC_CLIENT.running === true;
   FBM_SYNC_CLIENT.cancelRequested = keepRelay;
   if (!keepRelay) { FBM_SYNC_CLIENT.running = false; }
+  fbmSyncCancelExtensionBatch();
   return callServer('fbmCancelSync').then(function (result) {
     var pending = result && result.code === 'SYNC_CANCEL_PENDING';
     if (!pending) {
