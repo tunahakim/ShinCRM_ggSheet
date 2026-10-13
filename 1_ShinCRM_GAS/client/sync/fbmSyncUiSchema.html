@@ -1,12 +1,14 @@
 <script>
 /* Cổng tương thích cho code Sync cũ: schema chính thức nằm ở client/schema/sync/screens/. */
-function fbmSyncAppendBlock(parent, node, ctx) { return renderBlockInto(parent, node, ctx || {}); }
-function fbmSyncReplaceBlocks(parent, nodes, ctx) { return renderReplaceChildren(parent, nodes || [], ctx || {}); }
+/** Màn Đồng bộ vẽ ngoài `dispatch` nên không có lượt `inputsGrowAll` sau vẽ; thiếu bước này ô nhiều dòng vừa vẽ lại (ví dụ danh sách khách chỉ định sau khi lưu) đứng ở một dòng tới khi gõ phím. */
+function fbmSyncGrown(result) { if (typeof inputsGrowAll === 'function' && typeof document !== 'undefined') { inputsGrowAll(); } return result; }
+function fbmSyncAppendBlock(parent, node, ctx) { return fbmSyncGrown(renderBlockInto(parent, node, ctx || {})); }
+function fbmSyncReplaceBlocks(parent, nodes, ctx) { return fbmSyncGrown(renderReplaceChildren(parent, nodes || [], ctx || {})); }
 function fbmSyncRenderTarget(id, elements) {
   var target = RENDER_INDEX.nodes[id];
   if (!target) { throw new Error('Vùng Đồng bộ FBM "' + id + '" chưa được khai bằng Block.'); }
   target.elements = Array.isArray(elements) ? elements : [];
-  return renderTarget(id);
+  return fbmSyncGrown(renderTarget(id));
 }
 function fbmSyncSetTargetState(id, state) { return renderTargetState(id, state || {}); }
 function fbmSyncAppendBox(parent, className, id, elements, data) { return fbmSyncAppendBlock(parent, Box({ id: id || null, className: className || '', elements: elements || [], data: data || null })); }

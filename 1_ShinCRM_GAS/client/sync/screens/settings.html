@@ -49,7 +49,8 @@ function fbmSyncSettingsBackgroundBlocks(settings) {
   var rows = process.map(function (item) { var spec = background[item[0]] || { enabled: item[3], minutes: item[2] }, toggleDisabled = fbmSyncConfigControlDisabled('background', item[0] + '.enabled'), minutesDisabled = fbmSyncConfigControlDisabled('background', item[0] + '.minutes'), toggleId = backgroundSchema.processPrefix + item[0], minutesId = toggleId + backgroundSchema.minutesSuffix; return FBM_SYNC_SETTINGS_UI.layout.scheduleRow(FBM_SYNC_SETTINGS_UI.classes.scheduleRow, StandaloneControl({ id: toggleId, kind: 'toggle', pressed: spec.enabled !== false, className: spec.enabled !== false ? FBM_SYNC_SETTINGS_UI.classes.toggleOn : FBM_SYNC_SETTINGS_UI.classes.toggleOff, data: { 'sync-process-toggle': item[0] }, disabled: toggleDisabled, ariaLabel: backgroundSchema.toggleAria + item[1] }), Text({ className: FBM_SYNC_SETTINGS_UI.classes.kvLabel, text: item[1] }), StandaloneControl({ id: minutesId, kind: 'input', inputType: 'number', value: spec.minutes || item[2], placeholder: backgroundSchema.minutesPlaceholder, data: { 'sync-process-minutes': item[0] }, disabled: minutesDisabled, ariaLabel: backgroundSchema.minutesAria + item[1] })); });
   var detail = background.detail || {}, detailSchema = FBM_SYNC_SETTINGS_SCHEMA.background.detail;
   var detailControls = FBM_SYNC_SETTINGS_UI.layout.detailControls(FBM_SYNC_SETTINGS_UI.classes.detailControls, [
-    FBM_SYNC_SETTINGS_UI.layout.detailField(FBM_SYNC_SETTINGS_UI.classes.detailField, Text({ className: FBM_SYNC_SETTINGS_UI.classes.detailLabel, text: detailSchema.countLabel }), StandaloneControl({ id: detailSchema.countId, kind: 'input', inputType: 'number', value: detail.customersPerRun || FBM_SYNC_SETTINGS_SCHEMA.defaults.detailCustomers, placeholder: detailSchema.countPlaceholder, disabled: fbmSyncConfigControlDisabled('background', 'detail.customersPerRun'), ariaLabel: detailSchema.countLabel }))
+    FBM_SYNC_SETTINGS_UI.layout.detailField(FBM_SYNC_SETTINGS_UI.classes.detailField, Text({ className: FBM_SYNC_SETTINGS_UI.classes.detailLabel, text: detailSchema.countLabel }), StandaloneControl({ id: detailSchema.countId, kind: 'input', inputType: 'number', value: detail.customersPerRun || FBM_SYNC_SETTINGS_SCHEMA.defaults.detailCustomers, placeholder: detailSchema.countPlaceholder, disabled: fbmSyncConfigControlDisabled('background', 'detail.customersPerRun'), ariaLabel: detailSchema.countLabel })),
+    Text({ className: FBM_SYNC_SETTINGS_UI.classes.muted, text: detailSchema.countHelp })
   ]);
   return FBM_SYNC_SETTINGS_UI.layout.background({
     notice: fbmSyncSettingsNoticeBlocks('background', fbmSyncSettingsSchedulerNotice(FBM_SYNC_CLIENT.lastStatus)),
@@ -125,7 +126,7 @@ function fbmSyncSettingsScopeLinesText(lines) {
   return (lines || []).map(function (line) {
     if (line.status === 'matched') { return line.code + schema.matched + (line.kind === 'shin' ? (line.fbmCode || line.customerId) : line.customerId); }
     return line.code + (line.status === 'fbm_new' ? schema.fbmNew : schema.notFound);
-  }).join('; ');
+  }).join('\n');
 }
 function fbmSyncRenderSettings(panel, status) {
   var settings = FBM_SYNC_CLIENT.syncSettings || {}, loginPolicy = FBM_SYNC_CLIENT.loginStatus || {};

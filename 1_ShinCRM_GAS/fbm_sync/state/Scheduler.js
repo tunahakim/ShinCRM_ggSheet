@@ -90,7 +90,7 @@ FbmSync.backgroundScheduleSave = function (input) {
     saved[kind] = { enabled: item.enabled === undefined ? current[kind].enabled : item.enabled === true, minutes: Math.round(minutes), priority: current[kind].priority };
     if (kind === 'detail') {
       var batch = item.customersPerRun === undefined ? current.detail.customersPerRun : Number(item.customersPerRun);
-      if (!isFinite(batch) || batch < 1 || batch > 50 || Math.floor(batch) !== batch) { throw new Error('Detail batch must be an integer from 1 to 50.'); }
+      if (!isFinite(batch) || batch < 1 || batch > 50 || Math.floor(batch) !== batch) { throw new Error('Số khách mỗi lượt vòng xoay phải là số nguyên từ 1 đến 50 (một trang khách FBM); muốn xoay nhanh hơn thì rút ngắn chu kỳ.'); }
       saved.detail.customersPerRun = Math.floor(batch);
     }
   });
