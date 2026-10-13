@@ -114,10 +114,10 @@ FbmSync.threeWay = function (base, shin, fbm, entity, categoryGate) {
   return { hBASE: hBase, hSHIN: hShin, hFBM: hFbm, unchanged: hShin === hBase && hFbm === hBase, shinChanged: hShin !== hBase, fbmChanged: hFbm !== hBase, conflict: hShin !== hBase && hFbm !== hBase && hShin !== hFbm };
 };
 
-/** Trả về các field khác nhau để màn hình conflict không phải đoán từ ba hash. */
-FbmSync.diff = function (entity, left, right, categoryGate) {
+/** Trả về các field khác nhau để màn hình conflict không phải đoán từ ba hash; `only` giới hạn trường cần so mà vẫn dùng chung bước chuẩn hóa với hash. */
+FbmSync.diff = function (entity, left, right, categoryGate, only) {
   var a = FbmSync.canonical(entity, left || {}, categoryGate), b = FbmSync.canonical(entity, right || {}, categoryGate), fields = [];
-  Object.keys(a).sort().forEach(function (field) { if (a[field] !== b[field]) { fields.push({ field: field, left: a[field], right: b[field] }); } });
+  Object.keys(a).sort().forEach(function (field) { if ((!only || only.indexOf(field) >= 0) && a[field] !== b[field]) { fields.push({ field: field, left: a[field], right: b[field] }); } });
   return fields;
 };
 

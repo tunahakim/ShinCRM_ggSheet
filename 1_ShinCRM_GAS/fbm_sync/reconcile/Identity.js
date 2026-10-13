@@ -228,9 +228,11 @@ FbmSync.findCustomerByIdentity = function (localById, localByCode, incoming, loc
 FbmSync.markMissingAfterFullScan = function (entity, state) {
   var canWriteSheet = state && (typeof FbmSync.canWriteSheet === 'function' ? FbmSync.canWriteSheet(state.mode) : state.mode === 'read' || state.mode === 'write');
   if (!state || !canWriteSheet || (typeof FbmSync.scopeLimited === 'function' && FbmSync.scopeLimited())) { return { written: 0, skipped: true }; }
-  var local = FbmSync.readLocal(entity), missing = [];
+  // Đọc giao dịch theo một phần khách chỉ kết luận được về giao dịch của chính các khách đó (09/02 Phần 8).
+  var local = FbmSync.readLocal(entity), missing = [], parentRead = entity === 'activity' ? FbmSync.seenStoreReader(FbmSync.ACTIVITY_READ_STORE) : null;
   local.forEach(function (record) {
     var fbmId = String(record.fbmId || '').trim();
+    if (parentRead && !parentRead({ id: record.customerId })) { return; }
     var lock = state.locks && state.locks[entity + ':' + String(record.id || '')];
     if (!fbmId || FbmSync.seenStoreHas(entity, record) || String(record.recordStatus || 'active') === 'deleted' || (lock && lock.owner === 'user') || (entity === 'activity' && typeof FbmSync.activitySinceAllows === 'function' && !FbmSync.activitySinceAllows(record))) { return; }
     missing.push({ id: record.id, syncStatus: FbmSync.SYNC_STATUS.missing });

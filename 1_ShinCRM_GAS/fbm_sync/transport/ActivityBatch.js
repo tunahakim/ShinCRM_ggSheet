@@ -24,10 +24,10 @@ FbmSync.activityPagesWrite = function (state, pages) {
  * Cursor chỉ giữ vị trí và tối đa một lô mã khách, nên state không phình theo số khách; khách mới tạo trong lượt có số lớn hơn mốc của bitmap nên vẫn được đọc.
  */
 FbmSync.activityQueueRefill = function (cursor) {
-  var hasSeen = FbmSync.seenStoreReader('customer'), from = Number(cursor.queueFrom), picked = [];
+  var hasSeen = FbmSync.seenStoreReader('customer'), hasDue = cursor.layer === 'due' ? FbmSync.seenStoreReader(FbmSync.ACTIVITY_DUE_STORE) : null, from = Number(cursor.queueFrom), picked = [];
   FbmSync.readLocal('customer').forEach(function (record) {
     var index = FbmSync.seenStoreIndex('customer', record), fbmId = String(record && record.fbmId || '').trim();
-    if (index < from || !fbmId || String(record.recordStatus || 'active') === 'deleted' || FbmSync.isTemporaryRecord('customer', record) || !hasSeen(record)) { return; }
+    if (index < from || !fbmId || String(record.recordStatus || 'active') === 'deleted' || FbmSync.isTemporaryRecord('customer', record) || !hasSeen(record) || (hasDue && !hasDue(record))) { return; }
     picked.push({ index: index, sttRec: fbmId });
   });
   picked.sort(function (a, b) { return a.index - b.index; });
@@ -39,7 +39,9 @@ FbmSync.activityQueueRefill = function (cursor) {
 
 /** Lấp kế hoạch lô bằng khách chưa quét, tối đa `activityBatchCustomers`; hết danh sách mà còn hàng đợi thì lấy lô mã khách kế tiếp. */
 FbmSync.activityBatchPlan = function (cursor) {
-  if (!(cursor.batch || []).length && Number(cursor.customerIndex || 0) >= (cursor.customers || []).length && cursor.queueFrom !== undefined && Number(cursor.queueFrom) >= 0) { FbmSync.activityQueueRefill(cursor); }
+  var drained = !(cursor.batch || []).length && Number(cursor.customerIndex || 0) >= (cursor.customers || []).length;
+  if (drained && cursor.layer === 'top') { FbmSync.activityTopRefill(cursor); }
+  else if (drained && cursor.queueFrom !== undefined && Number(cursor.queueFrom) >= 0) { FbmSync.activityQueueRefill(cursor); }
   var plan = (cursor.batch || []).slice(), customers = cursor.customers || [], next = Number(cursor.customerIndex || 0);
   while (plan.length < FbmSync.BUDGET.activityBatchCustomers && next < customers.length) { plan.push(next); next += 1; }
   cursor.batch = plan; cursor.customerIndex = next;
@@ -112,7 +114,7 @@ FbmSync.activityBatchContinue = function (state, cursor, rawResponse) {
     var probe = FbmSync.sessionGateProbeRequest(state, cursor, 'Phản hồi FBM đáng ngờ trong lô giao dịch; chưa ghi gì, đang probe lại phiên.');
     return { result: probe ? { ok: true, request: probe, status: FbmSync.statusView(), probing: true } : { ok: false, code: 'SESSION_PROBE_UNAVAILABLE', request: null, status: FbmSync.statusView(), error: state.lastError } };
   }
-  var gate = FbmSync.stateCategoryGate(state), parents = FbmSync.activityParentCodes(), pages = FbmSync.activityPagesRead(state), nextPlan = [], nextPages = {}, records = [], failed = [], finished = 0;
+  var gate = FbmSync.stateCategoryGate(state), parents = FbmSync.activityParentCodes(), pages = FbmSync.activityPagesRead(state), nextPlan = [], nextPages = {}, records = [], failed = [], finished = 0, isFresh = FbmSync.activityFreshIndex(), outcomes = [];
   state.metadata = state.metadata || {};
   checks.forEach(function (entry) {
     var fields = entry.check && entry.check.ok && !(state.metadata.activityFields || []).length ? FbmSync.gridFields(entry.item) : [];
@@ -124,13 +126,17 @@ FbmSync.activityBatchContinue = function (state, cursor, rawResponse) {
     finished += 1;
     if (!entry.check.ok) {
       failed.push({ customer: parent.maKh || sttRec, code: String(entry.check.code || 'FBM_ERROR'), status: Number(entry.check.status || 0), reason: String(entry.check.bug && (entry.check.bug.Message || entry.check.bug.message) || 'FBM trả lỗi khi đọc giao dịch của khách') });
+      outcomes.push({ sttRec: sttRec, fresh: null });
       return;
     }
     // Khách giữ tiêu đề bị lỗi thì cả lô chưa có danh sách cột: xếp lại các khách còn lại, lô sau sẽ có một khách lấy tiêu đề.
     if (!(state.metadata.activityFields || []).length) { finished -= 1; nextPlan.push(entry.index); return; }
     var grid = FbmSync.rowsToRecords('activity', FbmSync.protocol.parse(entry.item), state.metadata.activityFields);
     state.metadata.activityFields = grid.fields;
-    grid.rows.forEach(function (row) { if (!FbmSync.isTemporaryRecord('activity', row)) { records.push(FbmSync.activityRecord(row, gate, parent)); } });
+    var customerRecords = grid.rows.filter(function (row) { return !FbmSync.isTemporaryRecord('activity', row); }).map(function (row) { return FbmSync.activityRecord(row, gate, parent); });
+    records = records.concat(customerRecords);
+    // Khách chạm trần một lần đọc chưa được đọc đủ: không vào tập "đã đọc" để giao dịch của khách không bị gắn cờ "không thấy".
+    outcomes.push({ sttRec: sttRec, fresh: isFresh(customerRecords), complete: grid.rows.length < Number(cursor.count || FbmSync.BUDGET.activityCustomerRows) });
     // Trang đầy nghĩa là có thể còn giao dịch chưa đọc: báo lỗi khách để lượt này không đánh dấu "không thấy bên FBM" nhầm.
     if (grid.rows.length >= Number(cursor.count || FbmSync.BUDGET.activityCustomerRows)) {
       failed.push({ customer: parent.maKh || sttRec, code: 'FBM_ACTIVITY_PAGE_LIMIT', status: 0, reason: 'Khách có từ ' + grid.rows.length + ' giao dịch trở lên, vượt trần một lần đọc; đã ghi phần đã đọc, phần còn lại chưa đọc và giao dịch của khách không bị đánh dấu không thấy bên FBM.' });
@@ -149,6 +155,9 @@ FbmSync.activityBatchContinue = function (state, cursor, rawResponse) {
     FbmSync.previewRecords('activity', records);
   }
   FbmSync.progressCustomersDone(state, finished);
+  FbmSync.activityReadMark(outcomes.filter(function (item) { return item.complete; }).map(function (item) { return item.sttRec; }), outcomes.filter(function (item) { return item.fresh; }).map(function (item) { return item.sttRec; }), outcomes.map(function (item) { return item.sttRec; }));
+  if (state.cursor.layer === 'top') { FbmSync.activityTopAccount(state.cursor, outcomes); }
+  if (state.cursor.layer) { FbmSync.activityLayerProgress(state, false); }
   FbmSync.activityBatchPlan(state.cursor);
   var request = FbmSync.activityBatchRequest(state);
   FbmSync.stateWrite(state);

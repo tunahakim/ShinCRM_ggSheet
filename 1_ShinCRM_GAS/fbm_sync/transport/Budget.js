@@ -17,6 +17,8 @@ FbmSync.BUDGET = {
   activityBatchCustomers: 50,
   // Giao dịch của một khách đọc trong một trang: chuyển trang giao dịch cần mô tả trang đang đứng mà chưa có mẫu FBM để kiểm, nên khách chạm trần được báo lỗi thay vì đọc thiếu âm thầm.
   activityCustomerRows: 1000,
+  // Quét từ khách mới nhất xuống dừng sau chừng này khách liên tiếp không có giao dịch mới (chủ dự án chốt); Log `activity_top_scan` ghi vị trí sâu nhất để chỉnh theo số đo thật.
+  activityTopScanQuietStreak: 20,
   batchMaxBytes: 4 * 1024 * 1024,
   pushBatchRecords: 20,
   lookupMaxAgeMs: 300000,

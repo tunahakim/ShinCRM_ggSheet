@@ -46,6 +46,8 @@ FbmSync.start = function (options) {
     FbmSync.businessStepStart(state, 'run', { mode: state.mode, scan: state.scan, origin: state.origin });
     FbmSync.businessStepStart(state, 'preflight_hash', { mode: state.mode, scan: state.scan, origin: state.origin });
   }
+  // Gói chụp vào state đầu lượt: đổi `Mức quét` khi lượt đang chạy chỉ áp từ lượt sau.
+  state.scanPack = state.scan === 'full' ? FbmSync.scanPackOf(opt.pack) : '';
   state.identityTarget = state.scan === 'identity_check' && typeof FbmSync.identityCheckTarget === 'function' ? FbmSync.identityCheckTarget(opt.identity) : null;
   var accountSettings = typeof FbmSync.accountSettingsRead === 'function' ? FbmSync.accountSettingsRead() : {};
   state.activitySince = String(accountSettings && accountSettings.activitySince || '').trim();
@@ -264,11 +266,20 @@ FbmSync.activityForCustomers = function (state, customerContexts, customerNext, 
   }
   state.cursor = { kind: 'activity_grid', customers: contexts.map(function (item) { return item.sttRec; }), customerIndex: 0, batch: [], count: FbmSync.BUDGET.activityCustomerRows, customerNext: customerNext ? { pageIndex: customerNext.body.gridPageIndex, pageValue: customerNext.body.gridPageValue, pageItems: FbmSync.gridPageItemsOf(customerNext.body), count: customerNext.body.count } : null, customerSeen: Number(customerSeen || 0), afterActivity: afterActivity || null };
   if (queued) { state.cursor.queueFrom = 0; }
+  // Gói Quét nhanh, Quét kỹ chỉ đọc khách lệch giao dịch cuối rồi quét từ khách mới nhất xuống; Quét toàn bộ và quét chi tiết đọc mọi khách đã thấy.
+  if (queued && state.scan === 'full' && state.scanPack !== 'all') { state.cursor.layer = 'due'; FbmSync.activityLayerProgress(state, false); }
   state.message = 'Đang đọc giao dịch của khách hàng...';
   FbmSync.activityBatchPlan(state.cursor);
   FbmSync.activityPagesWrite(state, {});
   FbmSync.stateWrite(state);
   return FbmSync.activityBatchRequest(state);
+};
+
+/** Hết một lớp đọc giao dịch theo khách thì sang lớp kế; gói Quét kỹ thêm lớp 1 sau cùng, lớp 1 xong mới chốt lượt hoặc sang chiều đẩy. Trả `null` khi gói không còn thao tác đọc nào. */
+FbmSync.activityLayersAfter = function (state) {
+  var request = FbmSync.activityLayerNext(state, state.cursor);
+  if (request) { return request; }
+  return state.scanPack === 'deep' ? FbmSync.beginActivityBulkPull(state) : null;
 };
 
 /** Chuyển tiếp sau một batch Activity bổ sung mà không làm mất cursor GAS. */
@@ -312,6 +323,7 @@ FbmSync.beginCustomerPull = function (state) {
     state.metadata.seen.customer = { initialized: true };
     state.metadata.seen.activity = { initialized: true };
   }
+  FbmSync.activityLayersBegin();
   var customerCount = state.scan === 'detail' ? Math.max(1, Math.min(FbmSync.CUSTOMER_PAGE_ROWS, Number(state.detailCustomerLimit || FbmSync.CUSTOMER_PAGE_ROWS))) : FbmSync.BUDGET.scanCustomerRows;
   var detailCursor = state.scan === 'detail' && typeof FbmSync.detailCursorRead === 'function' ? FbmSync.detailCursorRead() : null;
   var detailPageIndex = detailCursor ? Number(detailCursor.pageIndex || 0) : -1;
@@ -355,6 +367,8 @@ FbmSync.activityBulkNext = function (state, grid) {
   state.metadata.activityBulkMissing = missingResult.sample;
   state.metadata.activityBulkMissingCount = missingResult.total;
   FbmSync.seenStoreClear('activity_bulk');
+  // Trong gói Quét kỹ, lớp 2 và 3 đã chạy trước lớp 1 nên không quét bù khách sau bulk.
+  if (state.scan === 'full') { state.cursor = { kind: 'activity_bulk_done', seen: cursor.seen }; FbmSync.stateWrite(state); return null; }
   var catchupRequest = typeof FbmSync.activityCatchupCustomerRequest === 'function' ? FbmSync.activityCatchupCustomerRequest() : null;
   if (catchupRequest) {
     state.cursor = { kind: 'activity_catchup_customer_grid', seen: cursor.seen };
@@ -403,6 +417,7 @@ FbmSync.customerScanChunk = function (state, cursor, rawResponse) {
   FbmSync.pullRecords('customer', records, state.mode);
   FbmSync.previewRecords('customer', records);
   state = FbmSync.stateRead(); cursor = state.cursor;
+  if (state.scan === 'full' && state.scanPack !== 'all') { FbmSync.activityDueMark(state, grid.rows.filter(function (row) { return !FbmSync.isTemporaryRecord('customer', row); })); }
   FbmSync.customerScanRecord(state, { total: chunk.totalRowCount, rows: grid.rows }, Number(cursor.page || 0) === 0 && chunk.index === 0);
   if (chunk.index === 0) { cursor.pageFirst = FbmSync.customerPageItem(grid.rows[0]); FbmSync.scanJobOversize(state, 'customer', chunk.oversize); }
   if (grid.rows.length) { var lastRow = grid.rows[grid.rows.length - 1]; cursor.pageLast = FbmSync.customerPageItem(lastRow); cursor.pageLastValue = FbmSync.customerPageValue(lastRow); }
@@ -418,6 +433,7 @@ FbmSync.customerScanChunk = function (state, cursor, rawResponse) {
     return { ok: true, request: FbmSync.nextEnvelope(FbmSync.scanJobRequest(state)), status: FbmSync.statusView(), imported: records.length };
   }
   var activityRequest = FbmSync.activityForCustomers(state, null, null, 0);
+  if (!activityRequest && state.cursor.layer) { activityRequest = FbmSync.activityLayersAfter(state); state = FbmSync.stateRead(); }
   if (activityRequest) { return { ok: true, request: FbmSync.nextEnvelope(activityRequest), status: FbmSync.statusView(), imported: records.length }; }
   return FbmSync.pullFinishOrPush(state, { imported: records.length });
 };
@@ -693,6 +709,11 @@ FbmSync.continue = function (rawResponse) {
       var next = cursor.customerNext; state.cursor = { kind: 'customer_grid', type: 1, pageIndex: next.pageIndex, pageValue: next.pageValue, pageItems: next.pageItems || null, count: next.count, seen: Number(cursor.customerSeen || 0) }; state.phase = 'pull_customer'; state.entity = 'customer'; FbmSync.stateWrite(state);
       return { ok: true, request: FbmSync.nextEnvelope(FbmSync.customerGridRequest({ type: 1, count: next.count, gridPageIndex: next.pageIndex, gridPageValue: next.pageValue, pageItems: next.pageItems, gridRefresh: false })), status: FbmSync.statusView() };
     }
+    if (state.cursor && state.cursor.layer) {
+      var layerRequest = FbmSync.activityLayersAfter(state);
+      if (layerRequest) { return { ok: true, request: FbmSync.nextEnvelope(layerRequest), status: FbmSync.statusView(), imported: imported }; }
+      state = FbmSync.stateRead();
+    }
     if (cursor.afterActivity) {
       var supplementRequest = FbmSync.activitySupplementNext(state, cursor.afterActivity);
       if (supplementRequest) { return { ok: true, request: FbmSync.nextEnvelope(supplementRequest), status: FbmSync.statusView() }; }
@@ -715,6 +736,7 @@ FbmSync.continue = function (rawResponse) {
     FbmSync.previewRecords('activity', bulkRecords);
     var bulkRequest = FbmSync.activityBulkNext(state, bulkGrid);
     if (bulkRequest) { return { ok: true, request: FbmSync.nextEnvelope(bulkRequest), status: FbmSync.statusView(), imported: bulkRecords.length }; }
+    if (state.scan === 'full') { return FbmSync.pullFinishOrPush(state, { imported: bulkRecords.length, missing: Number(state.metadata.activityBulkMissingCount || 0) }); }
     state.cursor = {}; state.phase = 'done'; state.entity = ''; state.message = 'Đã đọc xong bulk giao dịch FBM.'; FbmSync.stateWrite(state);
     return { ok: true, status: FbmSync.statusView(), imported: bulkRecords.length, missing: Number(state.metadata.activityBulkMissingCount || 0) };
   }
