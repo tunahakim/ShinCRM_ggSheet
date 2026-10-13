@@ -130,6 +130,33 @@ async function chay(so) {
   const bulkWrites = bulk.writes.slice(beforeBulkWrites);
   check(so, 'missing Activity lon hon 2000 dong duoc cat thanh hai lan cua ghi', [missing.total, missing.written, bulkWrites.length, bulkWrites[0].records.length, bulkWrites[1].records.length], [2500, 2500, 2, 2000, 500]);
 
+  // Cuối lượt gắn cờ vắng mặt ghi hai Sheet (khách, giao dịch) bằng hai cửa ghi, không gộp được vì mỗi Sheet một cửa. Cửa thứ hai hỏng thì lượt ném lỗi; lượt chạy lại không ghi lại khách đã gắn cờ và không đếm trùng.
+  const haiCua = makeSync();
+  haiCua.local.customer.push({ id: 'CUS-000001', fbmId: 'FC-1', recordStatus: 'active', syncStatus: 'đã đồng bộ' }, { id: 'CUS-000002', fbmId: 'FC-2', recordStatus: 'active', syncStatus: 'đã đồng bộ' });
+  haiCua.local.activity.push({ id: 'ACT-000001', customerId: 'CUS-000002', fbmId: 'FA-1', workDate: '2026-09-19', recordStatus: 'active', syncStatus: 'đã đồng bộ' });
+  const haiCuaLuot = () => {
+    const F = haiCua.hop.FbmSync, st = F.stateRead();
+    Object.assign(st, { mode: 'read', scan: 'full', counts: F.countsDefault() });
+    st.metadata.customerScan = { total: 1, seen: 1 };
+    F.seenStoreBegin('customer', haiCua.local.customer); F.seenStoreMark('customer', haiCua.local.customer, [{ fbmId: 'FC-2' }]);
+    F.seenStoreBegin('activity', haiCua.local.activity);
+    F.seenStoreBeginExact(F.ACTIVITY_READ_STORE); F.seenStoreMark(F.ACTIVITY_READ_STORE, haiCua.local.customer, [{ fbmId: 'FC-2' }]);
+    return st;
+  };
+  const ghiThat = haiCua.hop.writeGateSave;
+  haiCua.hop.writeGateSave = (request) => { if (request.entity === 'activity') { throw new Error('Sheet Activity đang bận'); } return ghiThat(request); };
+  const luot1 = haiCuaLuot();
+  let loiLuot1 = '';
+  try { haiCua.hop.FbmSync.pullMarkMissing(luot1); } catch (error) { loiLuot1 = error.message; }
+  haiCua.hop.writeGateSave = ghiThat;
+  const ghiLuot1 = haiCua.writes.map((item) => item.entity + ':' + item.records.map((record) => record.id).join(','));
+  const luot2 = haiCuaLuot(), truocLuot2 = haiCua.writes.length;
+  haiCua.hop.FbmSync.pullMarkMissing(luot2);
+  const ghiLuot2 = haiCua.writes.slice(truocLuot2).map((item) => item.entity + ':' + item.records.map((record) => record.id).join(','));
+  check(so, 'Gắn cờ vắng mặt: cửa ghi giao dịch hỏng sau khi khách đã gắn cờ thì lượt ném lỗi; lượt chạy lại chỉ ghi giao dịch, khách đã gắn cờ không ghi lại và vẫn đếm đúng một', [
+    loiLuot1, ghiLuot1, ghiLuot2, luot2.counts.missingCustomer, luot2.counts.missingActivity
+  ], ['Sheet Activity đang bận', ['customer:CUS-000001'], ['activity:ACT-000001'], 1, 1]);
+
   // Phạm vi "Chỉ khách chỉ định": khách và giao dịch trong phạm vi mà FBM không trả là vắng thật; khách ngoài phạm vi không được xét.
   const phamVi = makeSync();
   phamVi.local.customer.push({ id: 'CUS-000001', fbmId: 'FC-1', fbmCustomerCode: 'ALT1', recordStatus: 'active', syncStatus: 'đã đồng bộ' }, { id: 'CUS-000002', fbmId: 'FC-2', fbmCustomerCode: 'ALT2', recordStatus: 'active', syncStatus: 'đã đồng bộ' });
@@ -148,7 +175,6 @@ async function chay(so) {
   const retry = makeSync();
   const retryState = retry.hop.FbmSync.stateStart('', 'pull_customer', 0);
   retryState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 4, pageValue: ['x', 'y', 'z'], count: 2000 };
-  retryState.retryLimit = 2;
   retry.hop.FbmSync.stateWrite(retryState);
   const transient = { ok: false, status: 500, body: '{"Message":"server busy"}' };
   const retry1 = retry.hop.FbmSync.retryRead(retry.hop.FbmSync.stateRead(), retry.hop.FbmSync.protocol.classifyFailure(transient));

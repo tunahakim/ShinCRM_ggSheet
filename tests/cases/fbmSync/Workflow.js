@@ -41,6 +41,7 @@ function workflowGas(options) {
     PropertiesService: { getDocumentProperties: () => documentProperties, getScriptProperties: () => scriptProperties },
     Utilities: { getUuid: () => 'workflow-uuid', newBlob: (value) => ({ getBytes: () => Buffer.from(String(value), 'utf8') }) },
     shinOpenBook: () => ({ getId: () => 'sheet-workflow' }),
+    LOG_OK: 'ok', LOG_ERROR: 'error', LOG_CONFLICT: 'conflict',
     logEvent: () => {},
     logTrace: () => {},
     runEntryPoint: (name, source, channel, fn) => fn()
@@ -1190,6 +1191,23 @@ async function chay(so) {
   check(so, 'reload sau khi callback dừng bị mất thu hồi phiên treo và không còn nút Dừng đồng bộ', [
     reloadedStatus.phase, reloadedStatus.lastFailureCode, reloadedStatus.runId, reloaded.hop.FbmSync.stateRead().activeRequestId
   ], ['error', 'SYNC_STALE_RUN', 'cancelled-orphan', 'orphan-request']);
+
+  // State do bản cũ ghi (chưa có schemaVersion) mà đang giữa lượt: dù request còn trong hạn, lượt phải dừng và báo chạy lại, dấu chờ đẩy ở khóa riêng còn nguyên.
+  for (const [phase, cursorKind] of [['pull_activity', 'activity_grid'], ['awaiting_approval', 'push_plan'], ['push', 'push_wait']]) {
+    const nhatKy = [];
+    const cu = workflowGas({ logEvent: (row) => nhatKy.push(row) });
+    const legacy = cu.hop.FbmSync.stateDefault();
+    delete legacy.schemaVersion; legacy.version = 1;
+    Object.assign(legacy, { runId: 'legacy-run', phase, cursor: { kind: cursorKind }, activeRequestId: 'req-dang-bay', deadlineAt: Date.now() + 60000, updatedAt: Date.now(), startedAt: Date.now() });
+    cu.documentProperties.setProperty(cu.hop.FbmSync.STATE_KEY, JSON.stringify(legacy));
+    cu.documentProperties.setProperty('FBM_SYNC_PENDING_PUSHES_V1', JSON.stringify({ 'customer:CUS-000001': { hash: 'h-cho' } }));
+    const trangThai = cu.hop.fbmGetSyncStatus();
+    const luu = JSON.parse(cu.documentProperties.getProperty(cu.hop.FbmSync.STATE_KEY));
+    check(so, 'Lượt dở do bản cũ ghi (' + phase + ') bị dừng, báo chạy lại ở Sidebar và Log, giữ dấu chờ đẩy, state ghi lại theo phiên bản mới', [
+      trangThai.phase, trangThai.lastFailureCode, /chạy lại lượt/.test(String(trangThai.lastError || '')), luu.schemaVersion, luu.version, cu.documentProperties.getProperty('FBM_SYNC_PENDING_PUSHES_V1'),
+      nhatKy.some((row) => /chạy lại lượt/.test(JSON.stringify(row)))
+    ], ['error', 'SYNC_STATE_MIGRATED', true, cu.hop.FbmSync.STATE_SCHEMA_VERSION, undefined, JSON.stringify({ 'customer:CUS-000001': { hash: 'h-cho' } }), true]);
+  }
 }
 
 module.exports = { chay, workflowGas, executorSession, executorRaw, sendBatchThroughExecutor, gridResponse, row };
