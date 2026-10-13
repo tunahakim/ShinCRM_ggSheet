@@ -694,7 +694,7 @@ async function chay(so) {
   const bulkProjectionRequest = scheduleFlow.hop.FbmSync.activityBulkRequest({ type: 1, count: 100, gridPageIndex: 1, gridPageValue: ['2026-01-01'], transport: bulkProjection });
   check(so, 'GAS cap chi dan loc cot generic cho bulk Activity, khong hardcode o Extension', [bulkProjection.arrayProjections[0].indices.join(','), bulkProjectionRequest.meta.transport.arrayProjections[0].paths.join('|'), bulkProjectionRequest.body.filter], ['0,3,4,5,6,7,8,1,2', 'd.Rows|d.ViewPage.Fields', ['end_date:>=01/01/2026']]);
   const waitFlow = workflowGas({ extraFiles: ['server/gate/IdGate.js', 'fbm_sync/state/SyncSettings.js'] });
-  waitFlow.hop.FbmSync.syncSettingsSave({ testMode: false });
+  waitFlow.hop.FbmSync.syncSettingsSave({ scopeLimited: false });
   waitFlow.hop.FbmSync.syncSettingsSave({ requestGapMinSeconds: 1, requestGapMaxSeconds: 3 });
   waitFlow.hop.FbmSync.start({ mode: 'read' });
   waitFlow.hop.FbmSync.syncSettingsSave({ requestGapMinSeconds: 5, requestGapMaxSeconds: 9 });

@@ -31,7 +31,7 @@ async function chay(so) {
   check(so, 'nghiệm thu ghi từng case vào Log', audit.FbmSyncLog.length >= 6, true);
   const probe = taoHopCat({ FbmSync: {} });
   napServer(probe, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/report/Probe.js');
-  probe.FbmSync.scriptSettings = () => ({ testShinCodes: ['CUS-ALT'] });
+  probe.FbmSync.scope = () => ({ codes: ['CUS-ALT'], fbm: [], shin: ['CUS-ALT'], notFound: [] });
   probe.FbmSync.readLocal = (entity) => entity === 'customer'
     ? [{ id: 'CUS-ALT', fbmCustomerCode: 'ALT00010' }, { id: 'CUS-OTHER', fbmCustomerCode: 'ALT00011' }]
     : [];

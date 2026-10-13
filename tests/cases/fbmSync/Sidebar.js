@@ -459,15 +459,28 @@ async function chay(so) {
   const loginParent = loginPolicyBlocks.find((node) => node && node.id === 'fbm-sync-login-policy-parent-row');
   check(so, 'login policy groups retry interval under retry toggle', [loginParent.role, loginPolicyChildren.role, retryGroup.className, retryGroup.elements.length, retryGroup.elements[0].role, retryGroup.elements[0].elements[1].id, retryGroup.elements[1].className, retryGroup.elements[1].elements[1].id], ['row', 'box', 'shin-row-group shin-sync-login-policy-retry-group', 2, 'row', 'fbm-sync-policy-retry', 'shin-form-field', 'fbm-sync-login-retry-minutes']);
   check(so, 'Settings render được relay và tham số phiên', dom.document.getElementById('fbm-sync-setting-approval-threshold').value === '10' && content.textContent.indexOf('Kết nối Extension') >= 0, true);
-  hop.FBM_SYNC_CLIENT.syncSettings = { approvalThreshold: 10, testMode: true, testFbmCodes: ['ALT00010'], testShinCodes: [], requestGapMinSeconds: 0, requestGapMaxSeconds: 0 };
+  hop.FBM_SYNC_CLIENT.syncSettings = { approvalThreshold: 10, scopeLimited: true, scopeCodes: ['ALT00010', 'CUS-020061'], requestGapMinSeconds: 0, requestGapMaxSeconds: 0 };
   render(hop, content, hop.fbmSyncRenderSettings, idle);
+  const scopeBox = dom.document.getElementById('fbm-sync-setting-scope-codes');
+  check(so, 'Cài đặt chung có một ô danh sách khách chỉ định, mỗi dòng một mã, không còn hai ô mã thử theo chiều',
+    [scopeBox && scopeBox.tagName.toLowerCase(), scopeBox && scopeBox.textContent, !!dom.document.getElementById('fbm-sync-setting-scope-limited'), !!dom.document.getElementById('fbm-sync-setting-test-fbm-codes'), !!dom.document.getElementById('fbm-sync-setting-test-shin-codes')],
+    ['textarea', 'ALT00010' + String.fromCharCode(10) + 'CUS-020061', true, false, false]);
+  scopeBox.value = scopeBox.textContent;
+  const scopeBanner = JSON.stringify(hop.fbmSyncRunScopeBlocks());
+  check(so, 'Màn Chạy hiện băng cảnh báo phạm vi giới hạn kèm đúng danh sách khách chỉ định', [scopeBanner.indexOf('warning') >= 0, scopeBanner.indexOf('ALT00010, CUS-020061') >= 0], [true, true]);
   dom.document.getElementById('fbm-sync-setting-request-gap-min').value = '1';
   dom.document.getElementById('fbm-sync-setting-request-gap-max').value = '2.5';
   const gapSaves = [], gapCallServer = hop.callServer, gapStatusOnce = hop.fbmSyncStatusOnce;
-  hop.callServer = (name, args) => { if (name === 'fbmSaveSyncSettings') { gapSaves.push(args[0]); } return Promise.resolve({ ok: true, settings: args && args[0] }); };
+  const scopeLines = [{ code: 'ALT00010', kind: 'fbm', status: 'matched', customerId: 'CUS-020061', fbmCode: 'ALT00010' }, { code: 'ALT00099', kind: 'fbm', status: 'fbm_new', customerId: '', fbmCode: 'ALT00099' }];
+  hop.callServer = (name, args) => { if (name === 'fbmSaveSyncSettings') { gapSaves.push(args[0]); } return Promise.resolve({ ok: true, settings: args && args[0], scopeLines: scopeLines }); };
   hop.fbmSyncStatusOnce = () => Promise.resolve(null);
+  const savedNotices = [], noticeSetter = hop.fbmSyncSetSettingsNotice;
+  hop.fbmSyncSetSettingsNotice = (card, kind, text) => { savedNotices.push([card, kind, text]); };
   await hop.fbmSyncSaveSyncSettings(null);
-  hop.callServer = gapCallServer; hop.fbmSyncStatusOnce = gapStatusOnce;
+  hop.callServer = gapCallServer; hop.fbmSyncStatusOnce = gapStatusOnce; hop.fbmSyncSetSettingsNotice = noticeSetter;
+  check(so, 'Lưu cài đặt chung gửi nguyên danh sách khách chỉ định cùng công tắc phạm vi, rồi hiện kết quả đổi mã từng dòng GAS trả về',
+    [gapSaves[0] && gapSaves[0].scopeLimited, gapSaves[0] && gapSaves[0].scopeCodes, savedNotices.map((item) => item.slice(0, 2)), /ALT00010 → CUS-020061; ALT00099: mã FBM chưa có trên Sheet/.test(savedNotices[0] && savedNotices[0][2])],
+    [true, 'ALT00010' + String.fromCharCode(10) + 'CUS-020061', [['module', 'success']], true]);
   check(so, 'Lưu cài đặt chung gửi kèm khoảng cách request FBM người dùng vừa nhập', [gapSaves.length, gapSaves[0] && gapSaves[0].requestGapMinSeconds, gapSaves[0] && gapSaves[0].requestGapMaxSeconds], [1, '1', '2.5']);
 
   hop.FBM_SYNC_CLIENT.subscreen = 'account';

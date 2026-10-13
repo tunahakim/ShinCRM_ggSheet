@@ -248,8 +248,8 @@ async function chay(so) {
     : [{ id: 'ACT-NEW', customerId: 'CUS-PARENT', fbmId: '', fbmSyncPermission: pushed.FbmSync.pullDefaultPermission(), taskType: 'Goi', content: 'Noi dung', workDate: '2026-09-09' }];
   check(so, 'Activity moi co Customer cha lien ket duoc dua vao queue', pushed.FbmSync.pushCandidates('activity').length, 1);
   {
-    const allow = pushed.FbmSync.pullDefaultPermission(), savedSettings = pushed.FbmSync.scriptSettings;
-    pushed.FbmSync.scriptSettings = () => ({ testFbmCodes: ['ALT00010', 'ALT00999'], testShinCodes: ['CUS-ALT', 'CUS-NEW'] });
+    const allow = pushed.FbmSync.pullDefaultPermission(), savedScope = pushed.FbmSync.scope;
+    pushed.FbmSync.scope = () => ({ codes: ['ALT00010', 'CUS-NEW'], fbm: ['ALT00010'], shin: ['CUS-ALT', 'CUS-NEW'], notFound: [] });
     pushed.FbmSync.readLocal = (entity) => entity === 'customer'
       ? [
         { id: 'CUS-ALT', fbmId: 'FBM-ALT', fbmCustomerCode: 'ALT00010', fbmSyncPermission: allow, syncStatus: pushed.FbmSync.SYNC_STATUS.pending },
@@ -261,13 +261,13 @@ async function chay(so) {
         { id: 'ACT-ALT', customerId: 'CUS-ALT', fbmId: '', fbmSyncPermission: allow, taskType: 'Goi', content: 'A', workDate: '2026-10-07' },
         { id: 'ACT-THAT', customerId: 'CUS-THAT', fbmId: '', fbmSyncPermission: allow, taskType: 'Goi', content: 'B', workDate: '2026-10-07' }
       ];
-    check(so, 'Phạm vi thử chiều đẩy chỉ nhận danh sách mã ShinCRM: CUS-THAT mang mã FBM nằm trong danh sách mã FBM vẫn bị chặn, Activity của nó cũng bị chặn',
+    check(so, 'Phạm vi giới hạn: chiều đẩy chỉ xét khách GAS đã đổi ra từ danh sách (khách ghép cặp và khách mới chưa có mã FBM), khách ngoài danh sách và Activity của nó bị chặn',
       [pushed.FbmSync.pushCandidates('customer').map((c) => c.kind + ':' + c.id), pushed.FbmSync.pushCandidates('activity').map((c) => c.id)],
       [['edit:CUS-ALT', 'create:CUS-NEW'], ['ACT-ALT']]);
-    pushed.FbmSync.scriptSettings = savedSettings;
+    pushed.FbmSync.scope = savedScope;
   }
   const transportState = push.FbmSync.stateStart('', 'read', 0);
-  push.FbmSync.scriptSettings = () => ({ baseUrl: 'https://fbm.test', testShinCodes: ['CUS-ALT'], cookie: 'cookie' });
+  push.FbmSync.scriptSettings = () => ({ baseUrl: 'https://fbm.test', cookie: 'cookie' });
   transportState.phase = 'pull_customer'; transportState.activeRequestId = 'test-transport-request'; transportState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 3, pageValue: ['x'] };
   push.FbmSync.stateWrite(transportState);
   const http500 = push.FbmSync.continue({ ok: false, status: 500, body: '{"Message":"server"}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'test-transport-request' }] } });
@@ -379,7 +379,7 @@ async function chay(so) {
   const createCandidate = { entity: 'customer', kind: 'create', id: createLocal.id, autoCode: 'ALT00020', record: createLocal };
   push.FbmSync.readLocal = (entity) => entity === 'customer' ? [createLocal] : [];
   push.FbmSync.pushCandidates = pushCandidatesImpl;
-  push.FbmSync.scriptSettings = () => ({ accountName: 'Owner', baseUrl: 'https://fbm.test', cookie: 'cookie', customerAuthorized: '1.test', testShinCodes: ['CUS-ALT'] });
+  push.FbmSync.scriptSettings = () => ({ accountName: 'Owner', baseUrl: 'https://fbm.test', cookie: 'cookie', customerAuthorized: '1.test' });
   push.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const createState = push.FbmSync.stateStart('', 'push', 0); createState.session = { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' }; createState.activeRequestId = 'test-create-request'; createState.cursor = { kind: 'push_wait', entity: 'customer', index: 0, operation: 'customer_create_save', candidate: createCandidate }; push.FbmSync.stateWrite(createState);
   const recoveryStart = push.FbmSync.continue({ ok: false, status: 500, body: '{"Message":"timeout"}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'test-create-request' }] } });

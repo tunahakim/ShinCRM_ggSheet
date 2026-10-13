@@ -14,7 +14,7 @@ function chay(so) {
   legacy.FBM_MA_KH_PREFIX = 'CHANGED-'; legacy.FBM_SYNC_APPROVAL_THRESHOLD = '99';
   const second = hop.FbmSync.accountSettingsRead();
   const syncSecond = hop.FbmSync.syncSettingsRead();
-  check(so, 'migration tach cau hinh tai khoan FBM khoi tham so phien', [Object.keys(first).sort(), first.customerPrefix, first.customerCodeLength, first.activitySince, writesAfterMigration, Object.keys(second).sort(), second.customerPrefix, Object.keys(syncFirst).sort(), syncSecond.approvalThreshold], [['activitySince', 'customerCodeLength', 'customerPrefix'], 'KH-', '8', '2026-01-01', 2, ['activitySince', 'customerCodeLength', 'customerPrefix'], 'KH-', ['approvalThreshold', 'requestGapMaxSeconds', 'requestGapMinSeconds', 'testFbmCodes', 'testMode', 'testShinCodes'], 12]);
+  check(so, 'migration tach cau hinh tai khoan FBM khoi tham so phien', [Object.keys(first).sort(), first.customerPrefix, first.customerCodeLength, first.activitySince, writesAfterMigration, Object.keys(second).sort(), second.customerPrefix, Object.keys(syncFirst).sort(), syncSecond.approvalThreshold], [['activitySince', 'customerCodeLength', 'customerPrefix'], 'KH-', '8', '2026-01-01', 2, ['activitySince', 'customerCodeLength', 'customerPrefix'], 'KH-', ['approvalThreshold', 'requestGapMaxSeconds', 'requestGapMinSeconds', 'scopeCodes', 'scopeLimited'], 12]);
   check(so, 'luu cau hinh tai khoan FBM hop le', [hop.FbmSync.accountSettingsSave({ customerPrefix: 'ALT', customerCodeLength: '8', activitySince: '2026-02-01' }).ok, hop.FbmSync.accountSettingsRead()], [true, { customerPrefix: 'ALT', customerCodeLength: '8', activitySince: '2026-02-01' }]);
   const invalidAccount = hop.FbmSync.accountSettingsSave({ customerPrefix: 'ALT', customerCodeLength: '', activitySince: '2026-02-31' });
   check(so, 'cau hinh tai khoan FBM chan cap thieu va ngay sai', [invalidAccount.ok, invalidAccount.code], [false, 'FBM_CUSTOMER_CODE_CONFIG_INCOMPLETE']);
@@ -29,28 +29,39 @@ function chay(so) {
   const invalidText = hop.FbmSync.syncSettingsSave({ approvalThreshold: 'khong-phai-so' });
   check(so, 'nguong phe duyet khong phai so bi tu choi', [invalidText.ok, invalidText.code], [false, 'FBM_APPROVAL_THRESHOLD_INVALID']);
   const saved = hop.FbmSync.syncSettingsSave({ approvalThreshold: 0 });
-  check(so, 'luu nguong phe duyet hop le va cho phep nguong 0', [saved.ok, Object.keys(saved.settings), saved.settings.approvalThreshold, hop.FbmSync.syncSettingsRead().approvalThreshold], [true, ['approvalThreshold', 'testMode', 'testFbmCodes', 'testShinCodes', 'requestGapMinSeconds', 'requestGapMaxSeconds'], 0, 0]);
+  check(so, 'luu nguong phe duyet hop le va cho phep nguong 0', [saved.ok, Object.keys(saved.settings), saved.settings.approvalThreshold, hop.FbmSync.syncSettingsRead().approvalThreshold], [true, ['approvalThreshold', 'scopeLimited', 'scopeCodes', 'requestGapMinSeconds', 'requestGapMaxSeconds'], 0, 0]);
 
-  check(so, 'Chế độ thử mặc định bật với hai danh sách rỗng, nên tệp chưa cấu hình không quét toàn bộ', [hop.FbmSync.SYNC_SETTINGS_DEFAULT.testMode, hop.FbmSync.SYNC_SETTINGS_DEFAULT.testFbmCodes, hop.FbmSync.SYNC_SETTINGS_DEFAULT.testShinCodes], [true, [], []]);
-  const codes = hop.FbmSync.syncSettingsSave({ approvalThreshold: 0, testMode: true, testFbmCodes: 'ALT00010, ALT00011\nALT00010', testShinCodes: 'CUS-020061' });
-  check(so, 'Hai danh sách mã thử nhận chuỗi ngăn bởi phẩy/xuống dòng, bỏ trùng, giữ thứ tự', [codes.ok, codes.settings.testFbmCodes, hop.FbmSync.testScopeCodes()], [true, ['ALT00010', 'ALT00011'], { fbm: ['ALT00010', 'ALT00011'], shin: ['CUS-020061'] }]);
-  const quoteCode = hop.FbmSync.syncSettingsSave({ approvalThreshold: 0, testMode: true, testFbmCodes: ["ALT'1", 'Mã có dấu'] });
-  check(so, 'Mã thử có dấu nháy hoặc ký tự lạ bị từ chối trước khi ghi, nên không lọt vào điều kiện grid FBM', [quoteCode.ok, quoteCode.code, hop.FbmSync.testScopeCodes().fbm], [false, 'FBM_TEST_CODE_INVALID', ['ALT00010', 'ALT00011']]);
+  const sheetCustomers = [{ id: 'CUS-020061', fbmCustomerCode: 'ALT00010' }, { id: 'CUS-020062', fbmCustomerCode: '' }];
+  hop.FbmSync.readLocal = (entity) => entity === 'customer' ? sheetCustomers.map((item) => Object.assign({}, item)) : [];
+  check(so, 'Phạm vi mặc định giới hạn với danh sách rỗng, nên tệp chưa cấu hình không quét toàn bộ', [hop.FbmSync.SYNC_SETTINGS_DEFAULT.scopeLimited, hop.FbmSync.SYNC_SETTINGS_DEFAULT.scopeCodes], [true, []]);
+  const byFbm = hop.FbmSync.syncSettingsSave({ approvalThreshold: 0, scopeLimited: true, scopeCodes: 'ALT00010\nALT00010, ALT00099' });
+  const scopeByFbm = hop.FbmSync.scope();
+  hop.FbmSync.syncSettingsSave({ scopeCodes: 'CUS-020061' });
+  const scopeByShin = hop.FbmSync.scope();
+  check(so, 'Khách đã ghép cặp nhập bằng mã FBM hay mã ShinCRM đều vào cả hai chiều (lấy lọc grid theo mã FBM, đẩy lọc theo mã ShinCRM), nên lượt hai chiều chạy đủ hai chiều cho khách đó',
+    [byFbm.ok, byFbm.settings.scopeCodes, [scopeByFbm.fbm, scopeByFbm.shin], [scopeByShin.fbm, scopeByShin.shin]],
+    [true, ['ALT00010', 'ALT00099'], [['ALT00010', 'ALT00099'], ['CUS-020061']], [['ALT00010'], ['CUS-020061']]]);
+  check(so, 'Lưu danh sách trả kết quả đổi mã từng dòng: mã → khách, mã FBM chưa có trên Sheet', byFbm.scopeLines.map((line) => [line.code, line.status, line.customerId]), [['ALT00010', 'matched', 'CUS-020061'], ['ALT00099', 'fbm_new', '']]);
+  const newShin = hop.FbmSync.syncSettingsSave({ scopeCodes: 'CUS-020062' }).settings && hop.FbmSync.scope();
+  check(so, 'Khách mới tạo ở ShinCRM chưa có mã FBM: chỉ vào chiều ghi, grid Customer lọc ra rỗng chứ không quét toàn bộ', [newShin.fbm, newShin.shin], [[], ['CUS-020062']]);
   const logBefore = settingsLog.length;
-  const shinInFbm = hop.FbmSync.syncSettingsSave({ testFbmCodes: 'ALT00010, CUS-020061' });
-  const fbmInShin = hop.FbmSync.syncSettingsSave({ testShinCodes: 'ALT00010' });
-  const wrongKindLog = settingsLog.slice(logBefore).map((event) => [event.action, event.reason, event.detail.field]);
-  check(so, 'Nhập mã ShinCRM vào ô mã FBM (hoặc ngược lại) bị từ chối, thông báo nêu đúng mã sai và ô đúng, kèm dòng Log, danh sách cũ giữ nguyên',
-    [shinInFbm.ok, shinInFbm.code, String(shinInFbm.message).indexOf('CUS-020061') >= 0 && String(shinInFbm.message).indexOf('ô mã khách ShinCRM') >= 0, fbmInShin.ok, fbmInShin.code, String(fbmInShin.message).indexOf('ALT00010') >= 0, wrongKindLog, hop.FbmSync.testScopeCodes()],
-    [false, 'FBM_TEST_CODE_WRONG_KIND', true, false, 'FBM_TEST_CODE_WRONG_KIND', true, [['sync_settings_save', 'FBM_TEST_CODE_WRONG_KIND', 'testFbmCodes'], ['sync_settings_save', 'FBM_TEST_CODE_WRONG_KIND', 'testShinCodes']], { fbm: ['ALT00010', 'ALT00011'], shin: ['CUS-020061'] }]);
-  const tooMany = hop.FbmSync.syncSettingsSave({ approvalThreshold: 0, testMode: true, testFbmCodes: Array.from({ length: hop.FbmSync.TEST_CODES_MAX + 1 }, (_, i) => 'A' + i) });
-  check(so, 'Danh sách mã thử vượt trần bị từ chối', [tooMany.ok, tooMany.code], [false, 'FBM_TEST_CODES_TOO_MANY']);
-  hop.FbmSync.syncSettingsSave({ approvalThreshold: 0, testMode: false, testFbmCodes: ['ALT00010'], testShinCodes: [] });
-  check(so, 'Tắt chế độ thử thì phạm vi là null (chạy toàn bộ) dù danh sách còn mã', hop.FbmSync.testScopeCodes(), null);
+  const missing = hop.FbmSync.syncSettingsSave({ scopeCodes: 'ALT00010, CUS-029999' });
+  check(so, 'Mã ShinCRM không có trên Sheet Customer bị từ chối lưu, nêu đúng mã, có dòng Log, danh sách đang lưu giữ nguyên',
+    [missing.ok, missing.code, String(missing.message).indexOf('CUS-029999') >= 0, settingsLog.slice(logBefore).map((event) => [event.action, event.reason]), hop.FbmSync.syncSettingsRead().scopeCodes],
+    [false, 'FBM_SCOPE_CODE_NOT_FOUND', true, [['sync_settings_save', 'FBM_SCOPE_CODE_NOT_FOUND']], ['CUS-020062']]);
+  const quoteCode = hop.FbmSync.syncSettingsSave({ scopeCodes: ["ALT'1", 'Mã có dấu'] });
+  check(so, 'Mã có dấu nháy hoặc ký tự lạ bị từ chối trước khi ghi, nên không lọt vào điều kiện grid FBM', [quoteCode.ok, quoteCode.code, hop.FbmSync.syncSettingsRead().scopeCodes], [false, 'FBM_SCOPE_CODE_INVALID', ['CUS-020062']]);
+  const tooMany = hop.FbmSync.syncSettingsSave({ scopeCodes: Array.from({ length: hop.FbmSync.SCOPE_CODES_MAX + 1 }, (_, i) => 'A' + i) });
+  check(so, 'Danh sách khách chỉ định vượt 40 mã bị từ chối', [hop.FbmSync.SCOPE_CODES_MAX, tooMany.ok, tooMany.code], [40, false, 'FBM_SCOPE_CODES_TOO_MANY']);
+  hop.FbmSync.syncSettingsSave({ scopeLimited: false, scopeCodes: ['ALT00010'] });
+  check(so, 'Bỏ giới hạn thì phạm vi là null (đọc và ghi toàn bộ) dù danh sách còn mã', [hop.FbmSync.scope(), hop.FbmSync.scopeLimited()], [null, false]);
   hop.FbmSync.syncSettingsSave({ approvalThreshold: 3 });
-  check(so, 'Lưu riêng ngưỡng chấp thuận giữ nguyên công tắc và danh sách mã thử đang lưu', [hop.FbmSync.syncSettingsRead().testMode, hop.FbmSync.syncSettingsRead().testFbmCodes], [false, ['ALT00010']]);
-  data.FBM_SYNC_SETTINGS_V1 = JSON.stringify({ approvalThreshold: 3, testMode: true, testCodes: ['ALT00010', 'CUS-020061'] });
-  check(so, 'Bản lưu cũ một danh sách được tách theo khuôn mã ShinCRM khi đọc', hop.FbmSync.testScopeCodes(), { fbm: ['ALT00010'], shin: ['CUS-020061'] });
+  check(so, 'Lưu riêng ngưỡng chấp thuận giữ nguyên công tắc phạm vi và danh sách đang lưu', [hop.FbmSync.syncSettingsRead().scopeLimited, hop.FbmSync.syncSettingsRead().scopeCodes], [false, ['ALT00010']]);
+  data.FBM_SYNC_SETTINGS_V1 = JSON.stringify({ approvalThreshold: 3, testMode: true, testFbmCodes: ['ALT00010'], testShinCodes: ['CUS-020061', 'CUS-020062'], testCodes: ['ALT00010'] });
+  const merged = hop.FbmSync.syncSettingsRead();
+  check(so, 'Bản lưu cũ (chế độ thử, các danh sách mã thử) gộp thành một danh sách bỏ trùng, công tắc chuyển sang giới hạn phạm vi, kho ghi lại không còn khóa cũ',
+    [merged.scopeLimited, merged.scopeCodes, Object.keys(JSON.parse(data.FBM_SYNC_SETTINGS_V1)).sort()],
+    [true, ['ALT00010', 'CUS-020061', 'CUS-020062'], ['approvalThreshold', 'requestGapMaxSeconds', 'requestGapMinSeconds', 'scopeCodes', 'scopeLimited']]);
 
   const quotaData = {};
   let quotaFull = false;
