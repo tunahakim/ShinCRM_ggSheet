@@ -20,6 +20,19 @@ FbmSync.logPullRecord = function (entity, incoming, current, statusAfter, reason
   return FbmSync.recordIssueAdd('pull', entity, status, String(current && current.id || incoming && (incoming.fbmId || incoming.id) || ''), reason, outcome);
 };
 
+/**
+ * So hai mã FBM theo thứ tự tạo: mã toàn chữ số so như số (độ dài trước, rồi chuỗi), mã khác coi là hòa để giữ nguyên thứ tự nhận.
+ *
+ * Không so chuỗi thô vì `99999` đứng sau `100000`; không dùng `Number` vì mã dài có thể vượt độ chính xác số thực.
+ */
+FbmSync.compareFbmId = function (a, b) {
+  var left = String(a || '').trim(), right = String(b || '').trim();
+  if (!/^\d+$/.test(left) || !/^\d+$/.test(right)) { return 0; }
+  left = left.replace(/^0+(?=\d)/, ''); right = right.replace(/^0+(?=\d)/, '');
+  if (left.length !== right.length) { return left.length - right.length; }
+  return left < right ? -1 : left > right ? 1 : 0;
+};
+
 /** Pull chỉ ghi record mới/thay đổi an toàn; không bao giờ xóa. */
 FbmSync.pullWrite = function (entity, records) {
   // Pull không ghi đè thay đổi cục bộ; chỉ đánh dấu pending hoặc conflict.
@@ -47,6 +60,8 @@ FbmSync.pullWrite = function (entity, records) {
     var linked = FbmSync.linkActivityCustomers(records, FbmSync.readLocal('customer'), categoryGate);
     records = linked.records;
     orphaned = linked.orphaned + Number(linked.blocked || 0);
+    // FBM trả mới nhất trước, còn cửa ghi cấp `ACT-` theo thứ tự mảng này. Sắp cũ trước để mã ShinCRM tăng theo thứ tự nhập thật, nếu không giao dịch cùng ngày sẽ xếp ngược FBM. Chỉ chạy ở đây, một chỗ cấp mã cho mọi đường kéo.
+    records = records.slice().sort(function (a, b) { return FbmSync.compareFbmId(a.fbmId, b.fbmId); });
   }
   var local = {}, localById = {}, localByCode = {}, localByTaxNumber = {}, ownedFixes = {};
   localRecords.forEach(function (record) {
