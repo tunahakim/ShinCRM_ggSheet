@@ -5,26 +5,26 @@ const { section, check, ghiLoiNap } = require('../lib/assert');
 
 const FILE = path.join(__dirname, '..', '..', '2_ShinCRM_Extension', 'content_scripts', 'model', 'live_model_reader.js');
 
-/** Tên thuộc tính cố ý khác bản Google thật: bộ đọc phải tự dò, không được dựa vào tên rút gọn nào. */
-function napReader(trixApp) {
+/** Tên biến toàn cục và thuộc tính cố ý khác bản Google thật: bộ đọc phải tự dò từ `window`, không dựa vào tên rút gọn nào. */
+function napReader(globals) {
   let onMessage = null;
   const sent = [];
   const timers = [];
+  const window = Object.assign({
+    addEventListener(name, fn) { if (name === 'message') { onMessage = fn; } },
+    postMessage(data, targetOrigin) { sent.push({ data, targetOrigin }); }
+  }, globals);
   const hop = {
     console,
     WeakSet,
     location: { origin: 'https://docs.google.com' },
     setTimeout(fn) { timers.push(fn); return timers.length; },
-    window: {
-      trixApp,
-      addEventListener(name, fn) { if (name === 'message') { onMessage = fn; } },
-      postMessage(data, targetOrigin) { sent.push({ data, targetOrigin }); }
-    }
+    window
   };
   vm.createContext(hop);
   vm.runInContext(fs.readFileSync(FILE, 'utf8'), hop, { filename: FILE });
   hop.request = (data) => {
-    onMessage({ source: hop.window, origin: 'https://docs.google.com', data });
+    onMessage({ source: window, origin: 'https://docs.google.com', data });
     return sent[sent.length - 1].data;
   };
   hop.flush = () => { while (timers.length) { timers.shift()(); } };
@@ -32,31 +32,39 @@ function napReader(trixApp) {
   return hop;
 }
 
-function cell(value) {
-  return value === undefined ? {} : { vv: value, khac: 'x' };
+function grid(rows, key) {
+  return rows.map((row) => row.map((value) => (value === undefined ? {} : { [key || 'vv']: value, khac: 'x' })));
 }
 
-function grid(rows) {
-  return rows.map((row) => row.map(cell));
+/** Bản sao vùng đang hiện: đánh số theo hàng thật nhưng chỉ có vài hàng, giá trị ở thuộc tính khác lưới đầy đủ. */
+function banSao(rows) {
+  const copy = [];
+  Object.keys(rows).forEach((index) => { copy[index] = rows[index].map((value) => ({ dv: value })); });
+  return copy;
 }
 
-/** Bảng lưới khóa theo gid như Google; gid 10 là một sheet View cũng có cột mã khách và dài hơn. */
-function trixVoiHaiSheet() {
+function sheet(gid, rows) {
+  return { idx: gid, ea: { ea: grid(rows) } };
+}
+
+const CUSTOMER = [['@CUS_MA_KH', '@CUS_TEN_CT'], ['KH000006', 'Công ty 6'], ['', 'Công ty trống'], ['KH000008', 'Công ty 8']];
+const VIEW = [['@CUS_MA_KH'], ['KH999999'], ['KH999998'], ['KH999997'], ['KH999996'], ['KH999995']];
+
+/** Sheet đang mở nằm ở một ô cố định; sheet khác (View, dài hơn, cũng có cột mã) nằm trong danh sách. */
+function trang(copyRows) {
   return {
-    lop: {
-      bang: {
-        9: { aa: { bb: grid([['@CUS_MA_KH', '@CUS_TEN_CT'], ['KH000006', 'Công ty 6'], ['', 'Công ty trống']]) } },
-        10: { aa: { bb: grid([['@CUS_MA_KH'], ['KH999999'], ['KH999998'], ['KH999997'], ['KH999996']]) } }
-      }
-    }
+    Ap: { act: { slot: sheet('9', CUSTOMER) }, list: [{ wrap: sheet('10', VIEW) }] },
+    Ve: { copy: { ji: '9', dc: { ea: { ea: banSao(copyRows || { 0: CUSTOMER[0], 3: CUSTOMER[3] }) } } } }
   };
 }
 
 function chay(so) {
-  section('Extension live model reader — tự dò lưới theo gid, header động, fail-closed');
+  section('Extension live model reader — tự dò lưới theo object mang gid, đối chiếu mọi lưới, fail-closed');
   let hop;
+  let globals;
   try {
-    hop = napReader(trixVoiHaiSheet());
+    globals = trang();
+    hop = napReader(globals);
   } catch (err) {
     return ghiLoiNap(so, 'nạp live_model_reader.js', err);
   }
@@ -71,38 +79,66 @@ function chay(so) {
     row: 2,
     readPlan: { Customer: [{ token: 'id', headerAddress: 'A1', expectedValue: '@CUS_MA_KH', valueAddressTemplate: 'A{row}' }] }
   };
+  const ask = (patch) => hop.request(Object.assign({}, base, patch));
 
   const dangDo = hop.request(base);
   check(so, 'lần đọc đầu trả unavailable trong lúc dò, không đoán giá trị',
     [dangDo.status, dangDo.reason, dangDo.reads.length], ['unavailable', 'LIVE_GRID_SEARCHING', 0]);
 
   hop.flush();
-  const docDuoc = hop.request(Object.assign({}, base, { requestId: 'live-2' }));
-  check(so, 'dò xong thì đọc thô theo địa chỉ, không tạo customerId',
+  const docDuoc = ask({ requestId: 'live-2' });
+  check(so, 'dò từ biến toàn cục bất kỳ (không cần trixApp) rồi đọc thô theo địa chỉ, không tạo customerId',
     [docDuoc.status, docDuoc.reads[0].value, Object.prototype.hasOwnProperty.call(docDuoc, 'customerId'), hop.sent[1].targetOrigin],
     ['ok', 'KH000006', false, 'https://docs.google.com']);
-  check(so, 'đọc lưới của đúng gid đang mở, không lấy lưới sheet khác dài hơn có cùng cột mã',
-    docDuoc.reads[0].value, 'KH000006');
 
-  const sheetKhac = hop.request(Object.assign({}, base, { requestId: 'live-3', gid: '10', sheetName: '!View', row: 3, readPlan: { '!': base.readPlan.Customer } }));
-  check(so, 'đổi sheet thì cùng đường dẫn điền gid mới, đọc đúng lưới của sheet đó',
-    [sheetKhac.status, sheetKhac.reads[0].value], ['ok', 'KH999998']);
+  const quaBanSao = ask({ requestId: 'live-3', row: 4 });
+  check(so, 'hàng có cả ở lưới đầy đủ và bản sao vùng đang hiện, hai bên cùng giá trị thì nhận',
+    [quaBanSao.status, quaBanSao.reads[0].value], ['ok', 'KH000008']);
 
-  const oTrong = hop.request(Object.assign({}, base, { requestId: 'live-4', row: 3 }));
+  const oTrong = ask({ requestId: 'live-4', row: 3 });
   check(so, 'ô trống trả reads rỗng thay vì suy đoán mã',
     [oTrong.status, oTrong.reads[0].value, Object.prototype.hasOwnProperty.call(oTrong, 'customerId')], ['ok', '', false]);
 
-  const lech = hop.request(Object.assign({}, base, { requestId: 'live-5', readPlan: { Customer: [{ token: 'id', headerAddress: 'B1', expectedValue: '@CUS_MA_KH', valueAddressTemplate: 'B{row}' }] } }));
+  const sheetKhac = ask({ requestId: 'live-5', gid: '10', sheetName: '!View', row: 3, readPlan: { '!': base.readPlan.Customer } });
+  hop.flush();
+  const docView = ask({ requestId: 'live-6', gid: '10', sheetName: '!View', row: 3, readPlan: { '!': base.readPlan.Customer } });
+  check(so, 'gid khác dò riêng và đọc đúng lưới của sheet đó, không lấy lưới Customer',
+    [sheetKhac.reason, docView.status, docView.reads[0].value], ['LIVE_GRID_SEARCHING', 'ok', 'KH999998']);
+
+  const lech = ask({ requestId: 'live-7', readPlan: { Customer: [{ token: 'id', headerAddress: 'B1', expectedValue: '@CUS_MA_KH', valueAddressTemplate: 'B{row}' }] } });
   check(so, 'giá trị kỳ vọng không nằm ở địa chỉ khai báo bị trả về rõ ràng',
     [lech.status, lech.reason, lech.reads[0].status], ['mismatch', 'READ_PLAN_MISMATCH', 'mismatch']);
 
-  const thieuCot = hop.request(Object.assign({}, base, { requestId: 'live-6', readPlan: { Customer: [{ token: 'id', headerAddress: 'A1', expectedValue: '@KHONG_CO', valueAddressTemplate: 'A{row}' }] } }));
+  const thieuCot = ask({ requestId: 'live-8', readPlan: { Customer: [{ token: 'id', headerAddress: 'A1', expectedValue: '@KHONG_CO', valueAddressTemplate: 'A{row}' }] } });
   hop.flush();
-  const sauThieuCot = hop.request(Object.assign({}, base, { requestId: 'live-7' }));
-  check(so, 'một sheet thiếu cột mã không làm mất đường đã dò của các sheet khác',
+  const sauThieuCot = ask({ requestId: 'live-9' });
+  check(so, 'readPlan nêu cột chưa có không làm mất đường đã dò của sheet',
     [thieuCot.status, sauThieuCot.status, sauThieuCot.reads[0].value], ['unavailable', 'ok', 'KH000006']);
 
-  const trung = napReader({ lop: { bang: { 9: { aa: { bb: grid([['@CUS_MA_KH', '@CUS_MA_KH'], ['KH000001', 'KH000002']]) } } } } });
+  // Google đổi sheet đang mở: ô cố định giờ giữ View, lưới Customer dời vào danh sách.
+  globals.Ap.list.push({ wrap: globals.Ap.act.slot });
+  hop.window.Ap.act.slot = hop.window.Ap.list[0].wrap;
+  const sauDoiSheet = ask({ requestId: 'live-10', row: 2 });
+  hop.flush();
+  const daDoLai = ask({ requestId: 'live-11', row: 2 });
+  check(so, 'đổi sheet làm ô cố định mang gid khác thì không đọc lưới đó, dò lại và tìm Customer ở chỗ mới',
+    [sauDoiSheet.reads.length ? sauDoiSheet.reads[0].value : '', daDoLai.status, daDoLai.reads[0].value], ['', 'ok', 'KH000006']);
+
+  const lechBanSao = napReader(trang({ 0: CUSTOMER[0], 1: ['KH777777'] }));
+  lechBanSao.request(base);
+  lechBanSao.flush();
+  const xungDot = lechBanSao.request(Object.assign({}, base, { requestId: 'conflict-2' }));
+  check(so, 'hai lưới hợp lệ cho hai giá trị khác nhau ở cùng ô thì fail-closed LIVE_GRID_CONFLICT, không chọn bên nào',
+    [xungDot.status, xungDot.reason, xungDot.reads[0].status], ['unavailable', 'LIVE_GRID_CONFLICT', 'unavailable']);
+
+  const chiBanSao = napReader({ Ve: { copy: { ji: '9', dc: { ea: { ea: banSao({ 0: CUSTOMER[0], 3: CUSTOMER[3] }) } } } } });
+  chiBanSao.request(base);
+  chiBanSao.flush();
+  const ngoaiVung = chiBanSao.request(Object.assign({}, base, { requestId: 'copy-2', row: 2 }));
+  check(so, 'chỉ còn bản sao vùng đang hiện thì hàng ngoài vùng trả unavailable, không mượn hàng khác',
+    [ngoaiVung.status, ngoaiVung.reads[0].status, ngoaiVung.reads[0].value], ['unavailable', 'unavailable', '']);
+
+  const trung = napReader({ Ap: { slot: sheet('9', [['@CUS_MA_KH', '@CUS_MA_KH'], ['KH000001', 'KH000002']]) } });
   trung.request(base);
   trung.flush();
   const trungDoc = trung.request(Object.assign({}, base, { requestId: 'dup-2' }));
@@ -110,17 +146,23 @@ function chay(so) {
     [trungDoc.rawHeaderRow[0].address, trungDoc.rawHeaderRow[1].address, Object.prototype.hasOwnProperty.call(trungDoc, 'customerId')],
     ['A1', 'B1', false]);
 
-  const khongLuoi = napReader({ lop: { bang: { 10: { aa: { bb: grid([['@CUS_MA_KH'], ['KH999999']]) } } } } });
-  khongLuoi.request(base);
-  khongLuoi.flush();
-  const khongThay = khongLuoi.request(Object.assign({}, base, { requestId: 'none-2' }));
-  check(so, 'không có lưới nào gắn với gid đang mở thì trả LIVE_GRID_NOT_FOUND, không mượn lưới sheet khác',
+  const xaQua = napReader({ Ap: { slot: { idx: '9', a: { b: { c: { d: grid(CUSTOMER) } } } } }, Bp: { wrap: sheet('10', VIEW) } });
+  xaQua.request(base);
+  xaQua.flush();
+  const khongThay = xaQua.request(Object.assign({}, base, { requestId: 'none-2' }));
+  check(so, 'lưới cách object mang gid quá ba tầng hoặc thuộc gid khác thì LIVE_GRID_NOT_FOUND, không mượn',
     [khongThay.status, khongThay.reason, khongThay.reads.length], ['unavailable', 'LIVE_GRID_NOT_FOUND', 0]);
 
+  const soGid = napReader({ Ap: { slot: { idx: 9, ea: { ea: grid(CUSTOMER) } } } });
+  soGid.request(base);
+  soGid.flush();
+  const gidSo = soGid.request(Object.assign({}, base, { requestId: 'num-2' }));
+  check(so, 'chỉ nhận gid dạng chuỗi đúng tuyệt đối, số trùng giá trị không đủ làm object sheet',
+    [gidSo.status, gidSo.reason], ['unavailable', 'LIVE_GRID_NOT_FOUND']);
+
   let getterDaChay = 0;
-  const coGetter = trixVoiHaiSheet();
-  Object.defineProperty(coGetter, 'nguyHiem', { enumerable: true, get() { getterDaChay += 1; return { 9: {} }; } });
-  const docGetter = napReader(coGetter);
+  const docGetter = napReader(trang());
+  Object.defineProperty(docGetter.window, 'nguyHiem', { enumerable: true, get() { getterDaChay += 1; return { idx: '9' }; } });
   docGetter.request(base);
   docGetter.flush();
   const quaGetter = docGetter.request(Object.assign({}, base, { requestId: 'getter-2' }));
