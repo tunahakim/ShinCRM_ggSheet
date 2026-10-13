@@ -14,7 +14,7 @@ async function chay(so) {
     FBM_VERIFY_STATUS_CONFIG_NAME: 'FBM_VERIFY_STATUS_DEFAULT', configGet: (name, fallback) => name === 'FBM_VERIFY_STATUS_DEFAULT' ? verifyDefault : fallback,
     PropertiesService: { getDocumentProperties: () => ({ getProperty: () => '', setProperty: () => {}, deleteProperty: () => {} }) }
   });
-  napServer(builders, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/write/SheetSave.js');
+  napServer(builders, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
   check(so, 'mode tach quyen ghi Sheet khoi quyen ghi FBM', [
     builders.FbmSync.canWriteSheet('check'), builders.FbmSync.canWriteFbm('check'),
     builders.FbmSync.canWriteSheet('read'), builders.FbmSync.canWriteFbm('read'),
@@ -58,7 +58,7 @@ async function chay(so) {
       statusView: () => ({ phase: readFinishState.phase, mode: readFinishState.mode })
     }
   });
-  napServer(readFinish, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/write/SheetSave.js');
+  napServer(readFinish, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
   const readFinished = readFinish.FbmSync.continue({ job: { jobId: 'read-run:customer:0:0', chunkIndex: 0, chunkCount: 1, rowCount: 0, totalRowCount: 0, oversize: [] }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'read-request' }] } });
   check(so, 'mode read ket thuc pull thi ghi missing vao Sheet va khong mo chieu push FBM', [readFinished.ok, readFinishState.phase, readFinishMissing, readFinishPushRequests], [true, 'done', 2, 0]);
   builders.FbmSync.stateRead = () => ({ session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: 'auth-c', activityAuthorized: 'auth-a' } });
@@ -128,19 +128,16 @@ async function chay(so) {
   builders.FbmSync.scope = () => ({ fbm: ['ALT00010'], shin: [] });
 
   const bulkActivity = builders.FbmSync.activityBulkRequest({ type: 0 });
-  check(so, 'Bulk Activity không gắn mốc thời gian hay Customer đơn lẻ', [bulkActivity.meta.kind, bulkActivity.body.externalKey.some((item) => item.Name === 'end_date' && item.Opr === '>='), bulkActivity.body.externalKey.some((item) => item.Name === 'stt_rec')], ['activity_bulk_grid', false, false]);
+  check(so, 'Request giao dịch mọi khách không gắn mốc thời gian vào externalKey hay Customer đơn lẻ', [bulkActivity.body.controller, bulkActivity.body.externalKey.some((item) => item.Name === 'end_date' && item.Opr === '>='), bulkActivity.body.externalKey.some((item) => item.Name === 'stt_rec')], ['zccrAccountTask', false, false]);
   builders.FbmSync.accountSettingsRead = () => ({ activitySince: '2024-10-07' });
   const activitySinceBulk = builders.FbmSync.activityBulkRequest({ type: 0 });
   const activitySinceCustomer = builders.FbmSync.activityGridRequest('CUS-FBM-1', { type: 0 });
   const activityHistory = builders.FbmSync.activityBulkRequest({ type: 0, includeHistory: true });
   check(so, 'Mốc Activity dùng filter FBM đúng định dạng cho bulk và từng Customer', [activitySinceBulk.body.filter, activitySinceCustomer.body.filter, activitySinceCustomer.body.externalKey[0].Name, activityHistory.body.filter], [['end_date:>=07/10/2024'], ['end_date:>=07/10/2024'], 'stt_rec', []]);
   check(so, 'Mốc Activity đổi ngày không hợp lệ thì không tự gắn filter', builders.FbmSync.activitySinceFilterDate('2024-02-31'), '');
-  const activityMissing = builders.FbmSync.activityBulkMissing([{ id: 'A-1', fbmId: 'F-1', recordStatus: 'active' }, { id: 'A-2', fbmId: 'F-2', recordStatus: 'deleted' }, { id: 'TMP-3', fbmId: 'F-3', recordStatus: 'active' }], { 'F-1': true });
-  check(so, 'Bulk Activity chỉ trả dòng active vắng ID FBM', [activityMissing.length, activityMissing[0] && activityMissing[0].id, activityMissing[0] && activityMissing[0].syncStatus], [0, undefined, undefined]);
-  const activityMissingOnly = builders.FbmSync.activityBulkMissing([{ id: 'A-1', fbmId: 'F-1', recordStatus: 'active' }, { id: 'A-2', fbmId: 'F-2', recordStatus: 'deleted' }, { id: 'A-4', fbmId: 'F-4', recordStatus: 'active' }, { id: 'TMP-3', fbmId: 'TMP-F-3', recordStatus: 'active' }], { 'F-1': true });
-  check(so, 'Bulk Activity vắng được đánh dấu missing khi ID không xuất hiện', [activityMissingOnly.length, activityMissingOnly[0].id, activityMissingOnly[0].syncStatus], [1, 'A-4', builders.FbmSync.SYNC_STATUS.missing]);
-  const activityMissingBeforeSince = builders.FbmSync.activityBulkMissing([{ id: 'A-OLD', fbmId: 'F-OLD', workDate: '2024-10-06', recordStatus: 'active' }, { id: 'A-SINCE', fbmId: 'F-SINCE', workDate: '2024-10-07', recordStatus: 'active' }], {});
-  check(so, 'Activity trước mốc không bị đánh dấu missing còn đúng ngày mốc thì vẫn kiểm tra', [activityMissingBeforeSince.length, activityMissingBeforeSince[0] && activityMissingBeforeSince[0].id], [1, 'A-SINCE']);
+  const tracked = (records) => records.filter(builders.FbmSync.activityBulkTracked).map((record) => record.id);
+  check(so, 'Lấy toàn bộ giao dịch chỉ theo dõi giao dịch có FBM ID còn hiệu lực: bỏ tombstone, dòng tạm, dòng chưa có FBM ID', tracked([{ id: 'A-1', fbmId: 'F-1', recordStatus: 'active' }, { id: 'A-2', fbmId: 'F-2', recordStatus: 'deleted' }, { id: 'TMP-3', fbmId: 'F-3', recordStatus: 'active' }, { id: 'A-4', fbmId: 'F-4', recordStatus: 'active' }, { id: 'A-5', fbmId: 'TMP-F-5', recordStatus: 'active' }, { id: 'A-6', fbmId: '', recordStatus: 'active' }]), ['A-1', 'A-4']);
+  check(so, 'Giao dịch trước mốc không được theo dõi (không gửi id, không bị gắn cờ không thấy) còn đúng ngày mốc thì vẫn theo dõi', tracked([{ id: 'A-OLD', fbmId: 'F-OLD', workDate: '2024-10-06', recordStatus: 'active' }, { id: 'A-SINCE', fbmId: 'F-SINCE', workDate: '2024-10-07', recordStatus: 'active' }]), ['A-SINCE']);
   const lookupState = { session: { lookups: { '@CAT_TINH_THANH': [['HNI', 'Hà Nội']], '@CAT_NGUON_KH': [['HNI', 'Nguồn khác']], '@CAT_CONG_VIEC': [['HNI', 'Công việc khác']], '@CAT_SAN_PHAM': [['HNI', 'Sản phẩm khác']] } } };
   const lookupGate = { namesBySource: { '@CAT_TINH_THANH': { HNI: 'Hà Nội' }, '@CAT_NGUON_KH': { HNI: 'Nguồn khác' }, '@CAT_CONG_VIEC': { HNI: 'Công việc khác' }, '@CAT_SAN_PHAM': { HNI: 'Sản phẩm khác' } } };
   check(so, 'lookup danh mục không lẫn mã trùng giữa các nguồn', builders.FbmSync.validateLookupGate(lookupState, lookupGate).length, 0);
@@ -150,12 +147,7 @@ async function chay(so) {
   builders.FbmSync.stateWrite = (next) => { bulkState = next; return next; };
   builders.FbmSync.readLocal = () => [{ id: 'ACT-000001', fbmId: 'F-LOCAL', recordStatus: 'active' }];
   const bulkStart = builders.FbmSync.beginActivityBulkPull(bulkState);
-  bulkState.cursor.count = 1;
-  check(so, 'Bulk Activity khoi tao cursor ben vung va request khong gan Customer', [bulkState.cursor.kind, bulkStart.meta.kind, bulkStart.body.externalKey.some((item) => item.Name === 'stt_rec')], ['activity_bulk_grid', 'activity_bulk_grid', false]);
-  const bulkNext = builders.FbmSync.activityBulkNext(bulkState, { rows: [{ id: 'F-1', end_date: '2026-09-09', datetime0: '2026-09-09T01:00:00', line_nbr: 1 }], total: 2 });
-  check(so, 'Bulk Activity tiep tuc bang composite key ma khong nhet ID vao cursor', [bulkNext.meta.kind, bulkNext.body.type, bulkNext.body.gridPageValue, bulkState.cursor.seenIds], ['activity_bulk_grid', 1, ['2026-09-09', '2026-09-09T01:00:00', 'F-1', 1], undefined]);
-  const bulkDone = builders.FbmSync.activityBulkNext(bulkState, { rows: [{ id: 'F-2', end_date: '2026-09-10', datetime0: '2026-09-10T01:00:00', line_nbr: 1 }], total: 2 });
-  check(so, 'Bulk Activity ket thuc, luu ID local vang va chuyen sang vong xoay Customer', [bulkDone && bulkDone.meta.kind, bulkState.cursor.kind, bulkState.metadata.activityBulkMissing.length, bulkState.metadata.activityBulkMissing[0].fbmId], ['activity_rotation_customer_grid', 'activity_rotation_customer_grid', 1, 'F-LOCAL']);
+  check(so, 'Lấy toàn bộ giao dịch mở một việc quét chỉ giữ FBM ID đã có trên Sheet, có trần cỡ response, không gắn Customer; cursor không mang danh sách id', [bulkState.cursor.kind, bulkState.cursor.entity, bulkStart.meta.kind, bulkStart.meta.job.keepIds, bulkStart.meta.job.maxResponseBytes, bulkStart.body.externalKey.some((item) => item.Name === 'stt_rec'), JSON.stringify(bulkState.cursor).indexOf('F-LOCAL')], ['scan_job', 'activity', 'scan_job', ['F-LOCAL'], 64 * 1024 * 1024, false, -1]);
   const finishedSupplementState = { cursor: { kind: 'activity_grid' }, phase: 'pull_activity', entity: 'activity', metadata: {}, session: {} };
   check(so, 'Trang thai done xoa cursor Activity da ket thuc', [builders.FbmSync.activitySupplementNext(finishedSupplementState, { kind: 'done', rows: [] }), finishedSupplementState.phase, finishedSupplementState.cursor], [null, 'done', {}]);
 

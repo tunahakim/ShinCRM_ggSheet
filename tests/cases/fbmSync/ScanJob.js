@@ -58,24 +58,50 @@ function scanHarness(options) {
     const start = !pageValue ? 0 : moTaDung ? keyIndex + 1 : rows.length;
     return gridResponse(customerFields, rows.slice(start, start + Number(body.count)), start ? 0 : total);
   };
+  /** Giao dịch FBM của một khách; mặc định một giao dịch mỗi khách. */
+  const actsOf = (key) => (opt.activityFor ? opt.activityFor(key) : [{ id: 'A-' + key, details: 'Gọi ' + key, end_date: '2026-09-20', owner: 'Owner', datetime0: '2026-09-20T03:00:00', line_nbr: 1 }]);
+  /** Toàn bộ giao dịch bên FBM: mặc định đúng các giao dịch đọc theo từng khách, để lấy toàn bộ và đọc theo khách nhìn thấy cùng một FBM. */
+  const fbmActivities = () => (opt.fbmActivities ? opt.fbmActivities() : rows.flatMap((item) => actsOf(item[customerFields.indexOf('stt_rec_kh')])));
+  const ngayLoc = (text) => { const m = String(text).match(/(\d{2})\/(\d{2})\/(\d{4})/); return m[3] + '-' + m[2] + '-' + m[1]; };
+  /** FBM lọc `end_date` theo đúng mẫu thật: `>=` và `<=` đều lấy ngày biên; `fbmRowCap` giả FBM trả ít dòng hơn tổng nó báo. */
+  const activityBulk = (body) => {
+    let list = fbmActivities();
+    (body.filter || []).forEach((filter) => {
+      const lower = String(filter).match(/>=(\d{2}\/\d{2}\/\d{4})/), upper = String(filter).match(/<=(\d{2}\/\d{2}\/\d{4})/);
+      list = list.filter((item) => (!lower || String(item.end_date).slice(0, 10) >= ngayLoc(lower[1])) && (!upper || String(item.end_date).slice(0, 10) <= ngayLoc(upper[1])));
+    });
+    trace.bulkFilters.push((body.filter || []).join('|'));
+    const total = list.length;
+    if (opt.fbmRowCap) { list = list.slice(0, opt.fbmRowCap); }
+    return gridResponse(activityFields, list.map((values) => row(activityFields, values)), total);
+  };
   const tab = executorSession();
   // `tabCalls`: số request không phải `scan_chunk` đã qua tab; FBM bị gọi đúng bằng số này thì `scan_chunk` không gọi lại FBM.
-  const trace = { kinds: [], jobs: [], errors: [], statuses: [], tabCalls: 0, activityCustomers: [] };
+  const trace = { kinds: [], jobs: [], errors: [], statuses: [], tabCalls: 0, activityCustomers: [], rechecks: [], bulkFilters: [] };
   /** Chạy lượt tới khi GAS không cấp request; `hooks.beforeSend` giả mất tab, `hooks.edit` sửa response, `hooks.afterError` quyết định request kế khi GAS ném lỗi. */
   async function run(hooks) {
     const h = hooks || {};
     F.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-    let step = F.start({ mode: 'read', origin: 'manual', manual: true, pack: h.pack });
+    let step = F.start(Object.assign({ mode: 'read', origin: 'manual', manual: true, pack: h.pack }, h.startOptions || {}));
     for (let hop = 0; step && step.request && hop < 200; hop += 1) {
       const request = step.request, kind = String(request.meta && request.meta.kind || '');
-      trace.kinds.push(kind + (kind === 'scan_chunk' ? ':' + request.meta.job.chunkIndex : ''));
+      trace.kinds.push(kind + (kind === 'scan_chunk' ? ':' + request.meta.job.chunkIndex : '') + (kind === 'scan_job' && request.meta.entity === 'activity' ? ':activity' : ''));
       if (h.beforeSend) { h.beforeSend(request, tab, trace); }
+      // `hooks.fail` giả Extension báo lỗi vận chuyển (hết hạn fetch...) cho request đó thay vì gửi qua tab.
+      const fakeFail = h.fail && h.fail(request, trace);
+      if (fakeFail) {
+        trace.errors.push(fakeFail);
+        step = F.controlDispatchLocked('transport_failure', { requestId: request.id, code: fakeFail, message: 'Lỗi giả lập ' + fakeFail });
+        trace.statuses.push(step.status);
+        continue;
+      }
       let raw;
       if (kind === 'batch') {
         raw = await sendBatchThroughExecutor(request, (item) => {
-          const key = item.body.externalKey && item.body.externalKey[0] && item.body.externalKey[0].Value;
-          trace.activityCustomers.push(key);
-          const acts = (opt.activityFor ? opt.activityFor(key) : [{ id: 'A-' + key, details: 'Gọi ' + key, end_date: '2026-09-20', owner: 'Owner', datetime0: '2026-09-20T03:00:00', line_nbr: 1 }]).map((values) => row(activityFields, values));
+          const key = item.body.externalKey && item.body.externalKey[0] && item.body.externalKey[0].Value, byId = item.body.externalKey[0].Name === 'id';
+          (byId ? trace.rechecks : trace.activityCustomers).push(key);
+          if (byId && opt.recheckFail && opt.recheckFail(key)) { return { status: 500, body: JSON.stringify({ Bugs: [{ Message: 'Lỗi giả lập' }] }) }; }
+          const acts = (byId ? fbmActivities().filter((item) => item.id === key) : actsOf(key)).map((values) => row(activityFields, values));
           const body = JSON.parse(gridResponse(activityFields, acts, acts.length));
           if (item.body.type !== 0) { delete body.d.ViewPage; }
           return { body: JSON.stringify(body) };
@@ -83,8 +109,7 @@ function scanHarness(options) {
       } else {
         const body = kind === 'session_probe' || kind === 'identity_user_grid' ? USER_RESPONSE
           : kind === 'authorize' ? JSON.stringify({ d: { Authorized: 'auth-' + request.meta.entity } })
-          : kind === 'scan_job' ? customerPage(request.body)
-          : kind === 'activity_bulk_grid' ? gridResponse(activityFields, [], 0) : '';
+          : kind === 'scan_job' ? (request.meta.entity === 'activity' ? activityBulk(request.body) : customerPage(request.body)) : '';
         if (kind !== 'scan_chunk') { trace.tabCalls += 1; }
         const sent = await tab.send(h.rewrite ? h.rewrite(request, trace) : request, body);
         if (sent.reply && sent.reply.error) {

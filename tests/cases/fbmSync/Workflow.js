@@ -63,7 +63,7 @@ function workflowGas(options) {
     'fbm_sync/auth/AutoLogin.js',
     'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js',
     'fbm_sync/transport/PushFlow.js',
-    'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js',
+    'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js',
     'fbm_sync/transport/EntryPoints.js',
     'server/service/FbmSyncService.js',
     'server/dev/FbmSyncStateProbe.js'
@@ -689,10 +689,8 @@ async function chay(so) {
   scheduleFlow.hop.FbmSync.backgroundScheduleSave({ heartbeat: { enabled: true, minutes: 5 }, customer: { enabled: true, minutes: 60 }, activity: { enabled: true, minutes: 30 } });
   const startup = scheduleFlow.hop.FbmSync.heartbeatRequest({ source: 'startup' });
   check(so, 'Chrome startup co the hoi GAS ngay mot luot theo cau hinh', [startup.ok, startup.code, startup.request && startup.request.meta.kind], [true, 'HEARTBEAT_REQUEST_READY', 'heartbeat']);
-  const bulkProjection = scheduleFlow.hop.FbmSync.activityBulkProjection(['id', 'ma_kh', 'ma_cv', 'ten_cv', 'details', 'end_date', 'owner', 'datetime0', 'line_nbr']);
   scheduleFlow.hop.FbmSync.accountSettingsSave({ customerPrefix: 'ALT', customerCodeLength: '8', activitySince: '2026-01-01' });
-  const bulkProjectionRequest = scheduleFlow.hop.FbmSync.activityBulkRequest({ type: 1, count: 100, gridPageIndex: 1, gridPageValue: ['2026-01-01'], transport: bulkProjection });
-  check(so, 'GAS cap chi dan loc cot generic cho bulk Activity, khong hardcode o Extension', [bulkProjection.arrayProjections[0].indices.join(','), bulkProjectionRequest.meta.transport.arrayProjections[0].paths.join('|'), bulkProjectionRequest.body.filter], ['0,3,4,5,6,7,8,1,2', 'd.Rows|d.ViewPage.Fields', ['end_date:>=01/01/2026']]);
+  check(so, 'Request giao dịch mọi khách gắn mốc activitySince của tài khoản', scheduleFlow.hop.FbmSync.activityBulkRequest({ type: 0, count: 100, gridPageIndex: -1 }).body.filter, ['end_date:>=01/01/2026']);
   const waitFlow = workflowGas({ extraFiles: ['server/gate/IdGate.js', 'fbm_sync/state/SyncSettings.js'] });
   waitFlow.hop.FbmSync.syncSettingsSave({ scopeLimited: false });
   waitFlow.hop.FbmSync.syncSettingsSave({ requestGapMinSeconds: 1, requestGapMaxSeconds: 3 });
