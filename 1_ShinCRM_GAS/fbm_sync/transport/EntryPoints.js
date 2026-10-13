@@ -194,6 +194,9 @@ function fbmSyncRelayHandle(body) {
     result = fbmSyncHeartbeatTransportFailure({ requestId: body.requestId, code: body.code, message: body.error || body.message });
   } else if (body.kind === 'heartbeat') {
     result = fbmSyncHeartbeat(body.response, { hop: Number(body.hop || 0) });
+  } else if (body.kind === 'transport_probe' && typeof fbmTransportProbeRelay === 'function') {
+    // Hàm đo chỉ có khi còn thư mục server/dev; gỡ thư mục thì loại tin này rơi về nhánh từ chối bên dưới.
+    result = fbmTransportProbeRelay(body);
   } else {
     result = { ok: false, code: 'RELAY_KIND_UNSUPPORTED', error: 'Relay chỉ nhận các nhịp nền do GAS quy định.', request: null };
   }
