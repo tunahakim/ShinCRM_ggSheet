@@ -468,6 +468,20 @@ async function chay(so) {
   scopeBox.value = scopeBox.textContent;
   const scopeBanner = JSON.stringify(hop.fbmSyncRunScopeBlocks());
   check(so, 'Màn Chạy hiện băng cảnh báo phạm vi giới hạn kèm đúng danh sách khách chỉ định', [scopeBanner.indexOf('warning') >= 0, scopeBanner.indexOf('ALT00010, CUS-020061') >= 0], [true, true]);
+  const packSchema = hop.FBM_SYNC_RUN_SCHEMA.pack, packView = (mode, pack) => {
+    hop.FBM_SYNC_CLIENT.mode = mode; hop.FBM_SYNC_CLIENT.pack = pack;
+    render(hop, content, hop.fbmSyncRenderRun, idle);
+    const shown = content.textContent.indexOf(packSchema.label) >= 0;
+    return [shown, shown ? content.textContent.indexOf(packSchema.options.find((option) => option.value === (pack || 'quick')).hint) >= 0 : false];
+  };
+  check(so, 'Mức quét hiện ở Lấy và Hai chiều với dòng mô tả đúng gói đang chọn, ẩn ở Đẩy và Kiểm tra an toàn', [packView('read', 'quick'), packView('write', 'deep'), packView('read', 'all'), packView('push', 'deep')[0], packView('check', 'deep')[0]], [[true, true], [true, true], [true, true], false, false]);
+  check(so, 'Mức quét có đúng ba gói theo thứ tự, mặc định Quét nhanh', [packSchema.options.map((option) => option.label), hop.fbmSyncRunPack('read').length > 0, packSchema.defaultValue], [['Quét nhanh', 'Quét kỹ', 'Quét toàn bộ'], true, 'quick']);
+  const packStarts = [], packCallServer = hop.callServer;
+  hop.callServer = (name, args) => { if (name === 'fbmStartSync') { packStarts.push([args[0], args[2]]); } return Promise.resolve({ ok: true }); };
+  hop.FBM_SYNC_CLIENT.pack = 'deep';
+  await hop.fbmSyncStartServer('write', 0); await hop.fbmSyncStartServer('push', 0);
+  hop.callServer = packCallServer; hop.FBM_SYNC_CLIENT.mode = 'read'; hop.FBM_SYNC_CLIENT.pack = 'quick';
+  check(so, 'Bắt đầu đồng bộ gửi Mức quét đã chọn cho Hai chiều, gửi rỗng cho Đẩy', packStarts, [['write', 'deep'], ['push', '']]);
   dom.document.getElementById('fbm-sync-setting-request-gap-min').value = '1';
   dom.document.getElementById('fbm-sync-setting-request-gap-max').value = '2.5';
   const gapSaves = [], gapCallServer = hop.callServer, gapStatusOnce = hop.fbmSyncStatusOnce;

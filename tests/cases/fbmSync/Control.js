@@ -33,6 +33,9 @@ async function chay(so) {
     ['start', { mode: 'read', scan: undefined, origin: 'background', manual: true }],
     ['continue', { status: 200 }]
   ]);
+  hop.FbmSync.controlDispatch('start', { mode: 'write', pack: 'deep' });
+  check(so, 'Lệnh chạy từ Sidebar mang Mức quét đã chọn tới GAS', calls[2] && calls[2][1] && calls[2][1].pack, 'deep');
+  calls.splice(2, 1);
   hop.FbmSync.controlDispatch('set_master_switch', { enabled: false });
   hop.FbmSync.controlDispatch('set_background_switch', { enabled: false });
   check(so, 'control port chuyển đúng công tắc tổng và lịch nền', calls.slice(2), [['master', false], ['background', false]]);

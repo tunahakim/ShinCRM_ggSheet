@@ -338,7 +338,7 @@ async function chay(so) {
   const scheduleFlow = workflowGas();
   check(so, 'cau hinh Extension mac dinh mot nhip 5 phut va startup bat', [scheduleFlow.hop.FbmSync.extensionConfigPublic().pollMinutes, scheduleFlow.hop.FbmSync.extensionConfigPublic().runOnStartup], [5, true]);
   const scheduleDefaults = scheduleFlow.hop.FbmSync.backgroundScheduleDefault();
-  check(so, 'lịch nền mặc định đúng bốn tiến trình và tải nhẹ', [scheduleDefaults.heartbeat.minutes, scheduleDefaults.customerFull.enabled, scheduleDefaults.customerFull.minutes, scheduleDefaults.activityFull.enabled, scheduleDefaults.activityFull.minutes, scheduleDefaults.detail.enabled], [5, true, 480, false, 1440, false]);
+  check(so, 'Lịch nền mặc định theo bảng tiến trình: Giữ phiên 5 phút, Quét nhanh 60 phút bật, Lấy toàn bộ giao dịch 8 giờ tắt, Vòng xoay 30 phút 30 khách tắt', [scheduleDefaults.heartbeat.minutes, scheduleDefaults.customerFull.enabled, scheduleDefaults.customerFull.minutes, scheduleDefaults.activityFull.enabled, scheduleDefaults.activityFull.minutes, scheduleDefaults.detail.enabled, scheduleDefaults.detail.minutes, scheduleDefaults.detail.customersPerRun], [5, true, 60, false, 480, false, 30, 30]);
   const savedExtension = scheduleFlow.hop.FbmSync.extensionConfigSave({ pollMinutes: 15, runOnStartup: false });
   check(so, 'cau hinh Extension cho phep doi nhip nhung khong doi lich nghiep vu', [savedExtension.ok, savedExtension.pollMinutes, savedExtension.runOnStartup, scheduleFlow.hop.FbmSync.backgroundSchedulePublic().heartbeat.minutes], [true, 15, false, 5]);
   const savedSchedule = scheduleFlow.hop.FbmSync.backgroundScheduleSave({ heartbeat: { enabled: false, minutes: 10 }, customer: { enabled: true, minutes: 60 }, activity: { enabled: false, minutes: 30 } });
