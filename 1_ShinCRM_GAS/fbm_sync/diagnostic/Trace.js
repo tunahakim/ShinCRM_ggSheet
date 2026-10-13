@@ -147,7 +147,7 @@ FbmSync.businessStepSummary = function (values) {
     localRecords: 'bản ghi ShinCRM', baselineComparable: 'bản ghi có baseline', changed: 'bản ghi khác baseline', unchanged: 'bản ghi giống baseline',
     newRecords: 'bản ghi chưa liên kết FBM', withoutBaseline: 'bản ghi thiếu baseline', candidateCount: 'ứng viên đẩy', received: 'bản ghi FBM đã nhận',
     written: 'bản ghi đã ghi Sheet', updated: 'bản ghi đã cập nhật', created: 'bản ghi đã tạo', lookups: 'danh mục Category đã đọc', skipped: 'bản ghi bỏ qua', conflict: 'xung đột',
-    errors: 'lỗi', sheetWriteBatches: 'lần ghi Sheet', verified: 'bản ghi FBM đã xác nhận', pushed: 'bản ghi đã đẩy'
+    errors: 'lỗi', sheetWriteBatches: 'lần ghi Sheet', verified: 'bản ghi FBM đã xác nhận', pushed: 'bản ghi đã đẩy', missing: 'bản ghi không thấy bên FBM'
   }, source = values || [], parts = [];
   Object.keys(labels).forEach(function (key) {
     if (source[key] !== undefined) { parts.push(Number(source[key] || 0) + ' ' + labels[key]); }
@@ -236,7 +236,7 @@ FbmSync.businessFinishOpenSteps = function (state, phase, result) {
     FbmSync.businessStepFinish(current, key, key === failing ? 'error' : 'stopped', key === failing ? { error: error } : { failedStep: failing });
   });
   if (steps.run && !steps.run.finishedAt) {
-    FbmSync.businessStepFinish(current, 'run', outcome, { received: Number(current.counts && current.counts.completed || 0), written: Number(current.counts && current.counts.succeeded || 0), errors: Number(current.counts && current.counts.error || 0), conflict: Number(current.counts && current.counts.conflict || 0), skipped: Number(current.counts && current.counts.skipped || 0), error: error });
+    FbmSync.businessStepFinish(current, 'run', outcome, { received: Number(current.counts && current.counts.completed || 0), written: Number(current.counts && current.counts.succeeded || 0), pushed: Number(current.counts && current.counts.pushed || 0), missing: Number(current.counts && current.counts.missingCustomer || 0) + Number(current.counts && current.counts.missingActivity || 0), errors: Number(current.counts && current.counts.error || 0), conflict: Number(current.counts && current.counts.conflict || 0), skipped: Number(current.counts && current.counts.skipped || 0), error: error });
   }
   return current;
 };

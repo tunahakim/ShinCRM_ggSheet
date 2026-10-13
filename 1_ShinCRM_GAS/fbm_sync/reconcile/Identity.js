@@ -229,15 +229,20 @@ FbmSync.markMissingAfterFullScan = function (entity, state) {
   var canWriteSheet = state && (typeof FbmSync.canWriteSheet === 'function' ? FbmSync.canWriteSheet(state.mode) : state.mode === 'read' || state.mode === 'write');
   if (!state || !canWriteSheet || (typeof FbmSync.scopeLimited === 'function' && FbmSync.scopeLimited())) { return { written: 0, skipped: true }; }
   // Đọc giao dịch theo một phần khách chỉ kết luận được về giao dịch của chính các khách đó (09/02 Phần 8).
-  var local = FbmSync.readLocal(entity), missing = [], parentRead = entity === 'activity' ? FbmSync.seenStoreReader(FbmSync.ACTIVITY_READ_STORE) : null;
+  var local = FbmSync.readLocal(entity), missing = [], stillMissing = 0, parentRead = entity === 'activity' ? FbmSync.seenStoreReader(FbmSync.ACTIVITY_READ_STORE) : null;
   local.forEach(function (record) {
     var fbmId = String(record.fbmId || '').trim();
     if (parentRead && !parentRead({ id: record.customerId })) { return; }
     var lock = state.locks && state.locks[entity + ':' + String(record.id || '')];
     if (!fbmId || FbmSync.seenStoreHas(entity, record) || String(record.recordStatus || 'active') === 'deleted' || (lock && lock.owner === 'user') || (entity === 'activity' && typeof FbmSync.activitySinceAllows === 'function' && !FbmSync.activitySinceAllows(record))) { return; }
+    // Dòng đã mang cờ từ lượt trước: không ghi lại và không Log lại mỗi lượt, nhưng vẫn đếm vì lượt này vẫn không thấy nó.
+    if (String(record.syncStatus || '') === FbmSync.SYNC_STATUS.missing) { stillMissing += 1; return; }
     missing.push({ id: record.id, syncStatus: FbmSync.SYNC_STATUS.missing });
     if (FbmSync.logPullRecord) { FbmSync.logPullRecord(entity, { fbmId: fbmId }, record, FbmSync.SYNC_STATUS.missing, 'Không thấy ID trong lượt quét FBM; không suy ra xóa.'); }
   });
+  var countKey = entity === 'activity' ? 'missingActivity' : 'missingCustomer';
+  state.counts = state.counts || {};
+  state.counts[countKey] = Number(state.counts[countKey] || 0) + missing.length + stillMissing;
   if (!missing.length) { FbmSync.seenStoreClear(entity); return { written: 0 }; }
   var saved = FbmSync.sheetSave(entity, missing, 'pull');
   FbmSync.seenStoreClear(entity);

@@ -7,6 +7,30 @@ FbmSync.STALE_RUN_MS = 2 * 60 * 1000;
 FbmSync.ACTIVE_PHASES = ['checking_session', 'waiting_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'];
 FbmSync.TERMINAL_PHASES = ['done', 'error', 'paused', 'conflict'];
 FbmSync.DONE_MESSAGE = 'Đồng bộ hoàn tất.';
+/** Quyền ghi được tách theo đích; mode không được kiêm thêm một cờ ẩn ngoài UI. */
+FbmSync.canWriteSheet = function (mode) { return mode === 'read' || mode === 'write'; };
+FbmSync.canWriteFbm = function (mode) { return mode === 'push' || mode === 'write'; };
+/**
+ * Bộ đếm của một lượt, chỗ định nghĩa duy nhất. `succeeded` là bản ghi ghi vào Sheet từ FBM, `pushed` là bản ghi FBM đã đọc xác nhận sau khi đẩy; hai số tách riêng vì Sidebar hiện riêng.
+ * `missingCustomer`/`missingActivity` là bản ghi mang cờ "không thấy bên FBM" sau lượt quét đủ, kể cả bản ghi đã mang cờ từ lượt trước.
+ */
+/**
+ * Thông báo kết thúc lượt cho mọi chiều chạy. Lượt Hai chiều kết thúc ở bước đẩy nên ghi chú của phần đọc (khách lỗi khi đọc giao dịch) phải dựng cùng chỗ, không thì mất.
+ * Số liệu chi tiết nằm ở `counts`; câu này chỉ nêu kết luận và việc người dùng cần xem.
+ */
+FbmSync.runDoneMessage = function (state) {
+  var counts = state.counts || {}, metadata = state.metadata || {};
+  var customerErrors = Number(metadata.customerErrors && metadata.customerErrors.total || 0), pushErrors = Math.max(0, Number(counts.error || 0) - customerErrors), markerCleanFailed = Number(metadata.markerCleanFailed || 0);
+  var head = pushErrors > 0 ? 'Đồng bộ hoàn tất nhưng có ' + pushErrors + ' lỗi đẩy; xem Chi tiết bản ghi.'
+    : Number(counts.pushed || 0) > 0 ? 'Đồng bộ hoàn tất; bản ghi vừa đẩy đã được FBM xác nhận.'
+      : FbmSync.canWriteFbm(state.mode) ? 'Đồng bộ hoàn tất; không có bản ghi nào được đẩy.'
+        : FbmSync.DONE_MESSAGE;
+  var fullScan = FbmSync.canWriteSheet(state.mode) && state.scan !== 'detail';
+  return head
+    + (customerErrors ? ' Có ' + customerErrors + ' khách lỗi khi đọc giao dịch (xem danh sách lỗi)' + (fullScan ? '; lượt này chưa đánh dấu giao dịch "không thấy bên FBM".' : '.') : '')
+    + (markerCleanFailed > 0 ? ' Có ' + markerCleanFailed + ' giao dịch chưa bỏ được dấu #SC trên FBM; xem Log.' : '');
+};
+FbmSync.countsDefault = function () { return { total: 0, completed: 0, succeeded: 0, pushed: 0, missingCustomer: 0, missingActivity: 0, error: 0, conflict: 0, skipped: 0 }; };
 FbmSync.SEEN_SHARD_HEX_LENGTH = 8000;
 // Apps Script giới hạn một giá trị DocumentProperties khoảng 9 KB. Chặn trước
 // khi gọi setProperty để không đẩy một JSON dở dang vào kho state.
@@ -177,7 +201,7 @@ FbmSync.seenStoreReader = function (scope) {
 
 /** Tạo state rỗng với đủ field để các phiên cũ vẫn đọc được. */
 FbmSync.stateDefault = function () {
-  return { version: 1, runId: '', origin: 'manual', mode: 'read', scan: 'full', scanPack: '', scheduledScan: '', activitySince: '', requestGap: null, phase: 'idle', entity: '', cursor: {}, activeRequestId: '', loginForceOffered: false, identityTarget: null, lastProgressAt: 0, deadlineAt: 0, session: { customerAuthorized: '', activityAuthorized: '', cookie: '', userId: '', accountUsername: '', accountName: '', lookups: {}, expired: false, identityVerified: false, identitySessionId: '', identityVerifiedAt: 0, sessionId: '', lastHeartbeatAt: 0, customerTotal: null }, metadata: { categoryBlocks: [], preflightIssues: [], seen: { customer: {}, activity: {} }, conflictCount: 0, conflictRefresh: null, pushSucceeded: 0, callbackTrace: null, manualPending: null, sessionGate: null }, counts: { total: 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 }, progress: { done: 0, total: 0 }, current: '', message: '', startedAt: 0, updatedAt: 0, lastError: '', lastFailureCode: '', retryable: false, retryCount: 0, retryLimit: 2, locks: {} };
+  return { version: 1, runId: '', origin: 'manual', mode: 'read', scan: 'full', scanPack: '', scheduledScan: '', activitySince: '', requestGap: null, phase: 'idle', entity: '', cursor: {}, activeRequestId: '', loginForceOffered: false, identityTarget: null, lastProgressAt: 0, deadlineAt: 0, session: { customerAuthorized: '', activityAuthorized: '', cookie: '', userId: '', accountUsername: '', accountName: '', lookups: {}, expired: false, identityVerified: false, identitySessionId: '', identityVerifiedAt: 0, sessionId: '', lastHeartbeatAt: 0, customerTotal: null }, metadata: { categoryBlocks: [], preflightIssues: [], seen: { customer: {}, activity: {} }, conflictCount: 0, conflictRefresh: null, callbackTrace: null, manualPending: null, sessionGate: null }, counts: FbmSync.countsDefault(), progress: { done: 0, total: 0 }, current: '', message: '', startedAt: 0, updatedAt: 0, lastError: '', lastFailureCode: '', retryable: false, retryCount: 0, retryLimit: 2, locks: {} };
 };
 
 /** Lấy kho state cấp tài liệu, dùng chung giữa các lần gọi GAS. */
@@ -240,7 +264,7 @@ FbmSync.stateRead = function () {
   var parsed = FbmSync.documentPropertyJson(FbmSync.STATE_KEY, 'state đồng bộ');
   if (!parsed) { return fallback; }
   var metadata = parsed.metadata || {};
-  return Object.assign(fallback, parsed, { counts: Object.assign(fallback.counts, parsed.counts || {}), session: Object.assign(fallback.session, parsed.session || {}), metadata: Object.assign(fallback.metadata, metadata, { seen: Object.assign(fallback.metadata.seen, metadata.seen || {}), conflictCount: Number(metadata.conflictCount || 0), pushSucceeded: Number(metadata.pushSucceeded || 0), preflightIssues: Array.isArray(metadata.preflightIssues) ? metadata.preflightIssues : [], callbackTrace: metadata.callbackTrace || null, manualPending: metadata.manualPending || null }), progress: Object.assign(fallback.progress, parsed.progress || {}), locks: parsed.locks || {} });
+  return Object.assign(fallback, parsed, { counts: Object.assign(fallback.counts, parsed.counts || {}), session: Object.assign(fallback.session, parsed.session || {}), metadata: Object.assign(fallback.metadata, metadata, { seen: Object.assign(fallback.metadata.seen, metadata.seen || {}), conflictCount: Number(metadata.conflictCount || 0), preflightIssues: Array.isArray(metadata.preflightIssues) ? metadata.preflightIssues : [], callbackTrace: metadata.callbackTrace || null, manualPending: metadata.manualPending || null }), progress: Object.assign(fallback.progress, parsed.progress || {}), locks: parsed.locks || {} });
 };
 /** Ghi state, cập nhật timestamp và giữ cấu trúc nhất quán. */
 FbmSync.stateWrite = function (state) {
@@ -248,7 +272,7 @@ FbmSync.stateWrite = function (state) {
   next.session = Object.assign(FbmSync.stateDefault().session, next.session || {});
   next.session.lookups = Object.assign({}, FbmSync.stateDefault().session.lookups, next.session.lookups || {});
   next.metadata = Object.assign(FbmSync.stateDefault().metadata, next.metadata || {});
-  next.metadata.pushSucceeded = Number(next.metadata.pushSucceeded || 0);
+  delete next.metadata.pushSucceeded;
   next.metadata.seen = Object.assign(FbmSync.stateDefault().metadata.seen, next.metadata.seen || {});
   // State cũ còn mảng `conflicts` thì bỏ ở lần ghi kế tiếp; hàng đợi xung đột nay đọc từ Sheet (FBM-024).
   next.metadata.conflictCount = Number(next.metadata.conflictCount || 0);
@@ -331,7 +355,7 @@ FbmSync.stateStart = function (entity, phase, total) {
   // Mỗi run phải xác nhận phiên sống lại; cookie và marker của run trước không
   // được dùng làm bằng chứng live cho request đầu tiên của run mới.
   // Số xung đột phản ánh các dòng Sheet đang chờ quyết nên đi theo sang phiên mới; preflight đếm lại từ Sheet.
-  var next = FbmSync.stateWrite({ runId: now.toString(36), entity: entity || '', phase: phase || 'checking_session', cursor: {}, session: freshSession, counts: { total: Number(total) || 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 }, metadata: { conflictCount: Number(previous.metadata && previous.metadata.conflictCount || 0) }, current: '', message: '', startedAt: now, updatedAt: now, lastError: '', lastFailureCode: '', retryable: false, retryCount: 0, retryLimit: 2, locks: userLocks });
+  var next = FbmSync.stateWrite({ runId: now.toString(36), entity: entity || '', phase: phase || 'checking_session', cursor: {}, session: freshSession, counts: Object.assign(FbmSync.countsDefault(), { total: Number(total) || 0 }), metadata: { conflictCount: Number(previous.metadata && previous.metadata.conflictCount || 0) }, current: '', message: '', startedAt: now, updatedAt: now, lastError: '', lastFailureCode: '', retryable: false, retryCount: 0, retryLimit: 2, locks: userLocks });
   return next;
 };
 /** Thu hoi state dang chay nhung khong con caller; khong retry lenh ghi dang mo. */

@@ -1,14 +1,26 @@
 <script>
 /* Snapshot trạng thái dùng các Block chung; chỉ thay vùng đọc để không làm chớp control. */
-function fbmSyncLiveStatusValue(status, count, field) {
-  status = status || {}; count = count || {};
+function fbmSyncStatusLine(label, value) { return label + FBM_SYNC_STATUS_SCHEMA.labelSeparator + value; }
+/** Thông tin lượt, mỗi ý một dòng; ý nào không có giá trị thì không hiện. */
+function fbmSyncStatusInfoLines(status) {
+  var schema = FBM_SYNC_STATUS_SCHEMA, lines = [], active = fbmSyncProgressData(status, {}).active;
+  lines.push(fbmSyncStatusLine(schema.info.direction, String(status.direction || schema.directionFallback)));
+  var pack = (FBM_SYNC_RUN_SCHEMA.pack.options || []).filter(function (option) { return option.value === status.scanPack; })[0];
+  if (pack) { lines.push(fbmSyncStatusLine(schema.info.pack, pack.label)); }
+  if (status.session) { lines.push(fbmSyncStatusLine(schema.info.session, schema.session.customer + (status.session.customer ? schema.session.confirmed : schema.session.absent) + schema.session.separator + schema.session.activity + (status.session.activity ? schema.session.confirmed : schema.session.absent))); }
+  if (active && (status.entityLabel || status.current)) { lines.push(fbmSyncStatusLine(schema.info.current, [status.entityLabel, status.current].filter(function (part) { return !!part; }).join(' '))); }
+  return lines;
+}
+/** Kết quả lượt theo bộ đếm GAS; chưa có lượt nào thì không hiện. Dòng đẩy chỉ hiện ở chiều có đẩy. */
+function fbmSyncStatusResultLines(status, count) {
   var schema = FBM_SYNC_STATUS_SCHEMA;
-  if (field === 'phase') { return status.label || status.phase || schema.phaseFallback; }
-  if (field === 'operation') { return schema.operationPrefix + String(status.direction || schema.operationFallback) + schema.operationSeparator + String(status.entityLabel || schema.entityFallback); }
-  if (field === 'session') { return status.session ? schema.sessionCustomer + (status.session.customer ? schema.confirmed : schema.absent) + schema.sessionActivity + (status.session.activity ? schema.confirmed : schema.absent) : ''; }
-  if (field === 'count') { return schema.count.completed + Number(count.completed || 0) + schema.count.succeeded + Number(count.succeeded || 0) + schema.count.error + Number(count.error || 0) + schema.count.conflict + Number(count.conflict || 0) + schema.count.skipped + Number(count.skipped || 0); }
-  if (field === 'current') { return String(status.current || ''); }
-  return String(status.message || '');
+  if (!status.runId) { return []; }
+  return schema.results.filter(function (item) { return !item.pushOnly || status.canPush; }).map(function (item) {
+    var value = item.parts
+      ? item.parts.map(function (part) { return valueTextNumber(Number(count[part.key] || 0)) + part.unit; }).join(schema.session.separator)
+      : valueTextNumber(Number(count[item.key] || 0));
+    return fbmSyncStatusLine(item.label, value);
+  });
 }
 function fbmSyncProgressBlocks(status, count) {
   var data = fbmSyncProgressData(status || {}, count || {});
@@ -17,12 +29,14 @@ function fbmSyncProgressBlocks(status, count) {
 }
 function fbmSyncStatusBlocks(status, count) {
   status = status || {}; count = count || {};
-  var schema = FBM_SYNC_STATUS_SCHEMA, classes = FBM_SYNC_STATUS_UI.classes, fields = [['phase', classes.phase], ['operation', classes.operation], ['session', classes.session], ['count', classes.count], ['current', classes.current], ['message', status.phase === 'error' ? classes.error : classes.message]];
-  var elements = fields.map(function (item) {
-    var value = fbmSyncLiveStatusValue(status, count, item[0]);
-    return value ? Text({ className: item[1], text: value }) : null;
-  }).filter(function (node) { return !!node; });
-  elements.splice(4, 0, fbmSyncProgressBlocks(status, count));
+  var schema = FBM_SYNC_STATUS_SCHEMA, classes = FBM_SYNC_STATUS_UI.classes;
+  var item = function (text) { return Text({ className: classes.item, text: text }); };
+  var results = fbmSyncStatusResultLines(status, count);
+  var elements = [Text({ className: classes.phase, text: status.label || status.phase || schema.phaseFallback })]
+    .concat(fbmSyncStatusInfoLines(status).map(item))
+    .concat([fbmSyncProgressBlocks(status, count)])
+    .concat(results.length ? [Text({ className: classes.heading, text: schema.resultsTitle })].concat(results.map(item)) : []);
+  if (status.message) { elements.push(Text({ className: status.phase === 'error' ? classes.error : classes.message, text: String(status.message) })); }
   return [FBM_SYNC_STATUS_UI.layout.card(elements)];
 }
 function fbmSyncPatchStatusBlocks(panel, status, targetId) {

@@ -1,7 +1,10 @@
 <style>
 .shin-sync-module-title { color:var(--shin-text); }
 .shin-sync-phase { color:var(--shin-primary); }
-.shin-sync-operation, .shin-sync-count, .shin-sync-current, .shin-sync-message { color:var(--shin-text-soft); font-size:var(--shin-text-sm); overflow-wrap:anywhere; }
+.shin-sync-item, .shin-sync-message { color:var(--shin-text-soft); font-size:var(--shin-text-sm); overflow-wrap:anywhere; }
+.shin-sync-item { display:flex; gap:var(--shin-gap-1); }
+.shin-sync-item::before { content:'•'; flex:none; }
+.shin-sync-heading { color:var(--shin-text); font-size:var(--shin-text-sm); font-weight:700; }
 .shin-sync-progress { min-width:0; }
 .shin-sync-progress-label { color:var(--shin-text-soft); font-size:var(--shin-text-sm); }
 .shin-sync-summary-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--shin-gap-2); }

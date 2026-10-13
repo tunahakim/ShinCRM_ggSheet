@@ -1,16 +1,22 @@
 <script>
+/* Thẻ Trạng thái phiên: mỗi ý một dòng. `info` là thông tin lượt, `results` là bộ đếm `counts` của GAS theo thứ tự hiện. */
 var FBM_SYNC_STATUS_SCHEMA = {
   regions: { progressLabel: 'fbm-sync-progress-label', progressTrack: 'fbm-sync-progress-track', progressFill: 'fbm-sync-progress-fill', liveStatus: 'fbm-sync-live-status-region' },
   title: 'Trạng thái phiên',
   phaseFallback: 'Sẵn sàng',
-  operationFallback: 'Chưa xác định',
-  operationPrefix: 'Luồng: ',
-  operationSeparator: ' · Đối tượng: ',
-  entityFallback: 'Tổng hợp',
-  sessionCustomer: 'Customer: ',
-  sessionActivity: ' · Activity: ',
-  confirmed: 'Đã xác nhận',
-  absent: 'Chưa có',
-  count: { completed: 'Đã xử lý ', succeeded: ' · thành công ', error: ' · lỗi ', conflict: ' · xung đột ', skipped: ' · hoãn ' },
+  resultsTitle: 'Kết quả lượt',
+  labelSeparator: ': ',
+  info: { direction: 'Chiều chạy', pack: 'Mức quét', session: 'Phiên FBM', current: 'Đang xử lý' },
+  directionFallback: 'Chưa xác định',
+  session: { customer: 'khách hàng ', activity: 'giao dịch ', confirmed: 'đã xác nhận', absent: 'chưa có', separator: ', ' },
+  results: [
+    { key: 'completed', label: 'Đọc từ FBM' },
+    { key: 'succeeded', label: 'Ghi vào Sheet' },
+    { key: 'pushed', label: 'Đẩy lên FBM', pushOnly: true },
+    { key: 'missing', label: 'Không thấy bên FBM', parts: [{ key: 'missingCustomer', unit: ' khách' }, { key: 'missingActivity', unit: ' giao dịch' }] },
+    { key: 'conflict', label: 'Xung đột' },
+    { key: 'error', label: 'Lỗi' },
+    { key: 'skipped', label: 'Bỏ qua' }
+  ]
 };
 </script>

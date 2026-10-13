@@ -104,7 +104,7 @@ FbmSync.finishCustomerCreateRecovery = function (state, response) {
   if (incomingHash !== sentHash || localHash !== sentHash) { throw new Error('CREATE_RECOVERY_MISMATCH: Customer tìm thấy không khớp chính xác dữ liệu đã gửi.'); }
   var patch = { id: local.id, fbmId: incoming.fbmId, fbmCustomerCode: incoming.fbmCustomerCode, fbmHash: incomingHash, syncStatus: FbmSync.SYNC_STATUS.synced, syncedAt: new Date() };
   FbmSync.sheetSave('customer', [patch], 'push');
-  state.metadata.pushSucceeded = Number(state.metadata.pushSucceeded || 0) + 1; state.counts.succeeded += 1;
+  state.counts.pushed += 1;
   if (typeof FbmSync.businessStepAdd === 'function') { FbmSync.businessStepAdd(state, 'push_customer', { verified: 1, pushed: 1, written: 1, sheetWriteBatches: 1 }); }
   FbmSync.releasePushLock(state, 'customer', local.id); state.cursor = { kind: 'push_scan', entity: 'customer', index: Number(cursor.index || 0) + 1 }; state.current = ''; state.message = 'Đã xác nhận Customer tạo thành công sau khi mất phản hồi.'; FbmSync.stateWrite(state); return FbmSync.nextPushRequest(state);
 };
@@ -132,8 +132,7 @@ FbmSync.finishPushVerification = function (state, response) {
     FbmSync.sheetSave(entity, [{ id: local.id, fbmHash: incomingHash, syncStatus: status, syncedAt: new Date() }], 'push');
     FbmSync.pendingPushClear(entity, id);
     FbmSync.logPushRecord(candidate, cursor.operation, typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', status === FbmSync.SYNC_STATUS.synced ? 'FBM đã xác nhận đúng dữ liệu vừa ghi.' : 'FBM đã xác nhận; ShinCRM đã sửa tiếp nên chờ lượt đẩy mới.', { hPUSH: sentHash, hFBM: incomingHash, syncStatus: status });
-    state.metadata.pushSucceeded = Number(state.metadata.pushSucceeded || 0) + 1;
-    state.counts.succeeded += 1;
+    state.counts.pushed += 1;
     if (typeof FbmSync.businessStepAdd === 'function') { FbmSync.businessStepAdd(state, 'push_' + entity, { verified: 1, pushed: 1, written: 1, sheetWriteBatches: 1 }); }
     // G12: dấu #SC chỉ cần tới lúc có ID FBM nên bỏ ngay bằng một lệnh sửa dựng từ form vừa đọc, không mở form thêm. ShinCRM đã sửa tiếp thì để lệnh đẩy kế tiếp (không mang dấu) bỏ hộ.
     if (markerLeft && status === FbmSync.SYNC_STATUS.synced) {
@@ -396,14 +395,7 @@ FbmSync.nextPushRequest = function (state) {
     state.cursor = { kind: 'push_scan', entity: 'activity', index: 0 }; state.entity = 'activity'; FbmSync.stateWrite(state); return FbmSync.nextPushRequest(state);
   }
   state.phase = 'done'; state.entity = ''; state.current = '';
-  var pushSucceeded = Number(state.metadata && state.metadata.pushSucceeded || 0), markerCleanFailed = Number(state.metadata && state.metadata.markerCleanFailed || 0);
-  state.message = (Number(state.counts.error || 0) > 0
-    ? 'Đồng bộ hoàn tất nhưng có ' + Number(state.counts.error || 0) + ' lỗi đẩy; xem Chi tiết bản ghi.'
-    : pushSucceeded > 0
-      ? 'Đồng bộ hoàn tất; bản ghi vừa đẩy đã được FBM xác nhận.'
-      : (state.mode === 'write' || state.mode === 'push')
-        ? 'Đồng bộ hoàn tất; không có bản ghi nào được đẩy.'
-        : FbmSync.DONE_MESSAGE) + (markerCleanFailed > 0 ? ' Có ' + markerCleanFailed + ' giao dịch chưa bỏ được dấu #SC trên FBM; xem Log.' : '');
+  state.message = FbmSync.runDoneMessage(state);
   state.cursor = {}; FbmSync.stateWrite(state); return null;
 };
 

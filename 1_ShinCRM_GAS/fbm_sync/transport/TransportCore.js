@@ -27,9 +27,6 @@ FbmSync.setMasterEnabled = function (enabled) {
   return { ok: true, enabled: value, status: typeof FbmSync.statusView === 'function' ? FbmSync.statusView() : null };
 };
 
-/** Quyền ghi được tách theo đích; mode không được kiêm thêm một cờ ẩn ngoài UI. */
-FbmSync.canWriteSheet = function (mode) { return mode === 'read' || mode === 'write'; };
-FbmSync.canWriteFbm = function (mode) { return mode === 'push' || mode === 'write'; };
 // Alias tạm cho caller cũ trong module push; ý nghĩa duy nhất là quyền ghi FBM.
 FbmSync.writeEnabled = function (mode) { return FbmSync.canWriteFbm(mode); };
 // FBM có thể đặt dấu nháy trong script trang dưới dạng \" hoặc ". GAS cấp pattern,

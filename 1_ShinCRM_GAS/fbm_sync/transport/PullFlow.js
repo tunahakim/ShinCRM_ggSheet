@@ -107,7 +107,6 @@ FbmSync.pullRecords = function (entity, records, mode) {
   state.counts.total = Math.max(Number(state.counts.total || 0), Number(state.counts.completed || 0));
   if (typeof FbmSync.businessStepAdd === 'function') { FbmSync.businessStepAdd(state, pullStep, { received: count }); }
   if (!FbmSync.canWriteSheet(mode)) {
-    state.counts.skipped += count;
     state.message = 'Đã đọc ' + count + ' bản ghi (chế độ không ghi Sheet).';
     if (typeof FbmSync.businessStepAdd === 'function') { FbmSync.businessStepAdd(state, reconcileStep, { received: count, skipped: count }); }
     FbmSync.stateWrite(state);
@@ -229,11 +228,10 @@ FbmSync.progressCustomersDone = function (state, count) {
  * Thiếu tổng hoặc nhận chưa đủ thì phiên kết thúc lỗi `FBM_SCAN_INCOMPLETE` để Sidebar và Log đều thấy; dữ liệu đã đọc vẫn giữ.
  */
 FbmSync.finishPullRun = function (state) {
-  var customerErrors = Number(state.metadata && state.metadata.customerErrors && state.metadata.customerErrors.total || 0), fullScan = FbmSync.canWriteSheet(state.mode) && state.scan !== 'detail';
   state.cursor = {}; state.entity = '';
   if (!FbmSync.pullMarkMissing(state)) { return false; }
   state.phase = 'done';
-  state.message = customerErrors ? FbmSync.DONE_MESSAGE + ' Có ' + customerErrors + ' khách lỗi khi đọc giao dịch (xem danh sách lỗi)' + (fullScan ? '; lượt này chưa đánh dấu giao dịch "không thấy bên FBM".' : '.') : FbmSync.DONE_MESSAGE;
+  state.message = FbmSync.runDoneMessage(state);
   FbmSync.stateWrite(state);
   return true;
 };
