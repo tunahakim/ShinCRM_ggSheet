@@ -113,6 +113,14 @@ async function chay(so) {
   builders.writeGateSave = (request) => { ownerWrite = request; return { ok: true }; };
   builders.FbmSync.pullWrite('activity', [Object.assign({}, ownerIncoming)]);
   check(so, 'Người tạo trên FBM: lượt kéo ghi owner FBM vào enteredBy khi nội dung không đổi, không đổi trạng thái đồng bộ', [ownerIncoming.enteredBy, ownerWrite && ownerWrite.records.length, ownerWrite && ownerWrite.records[0].id, ownerWrite && ownerWrite.records[0].enteredBy, ownerWrite && ownerWrite.records[0].syncStatus], ['Sale Cũ', 1, 'ACT-10', 'Sale Cũ', undefined]);
+  // FBM trả mới nhất trước; cửa ghi cấp ACT- theo thứ tự mảng ghi, nên lô phải được sắp theo mã FBM tăng dần (thứ tự nhập thật) trước khi ghi. Mã đổi độ dài (99999 → 100000) phải so như số.
+  const fbmOrderIncoming = (fbmId, day) => builders.FbmSync.activityRecord({ id: fbmId, ma_kh: 'ALT99999', end_date: day, ten_cv: 'Gọi', details: 'GD ' + fbmId }, gate);
+  let orderWrite = null;
+  builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmCustomerCode: 'ALT99999' }] : [];
+  builders.writeGateSave = (request) => { orderWrite = request; return { ok: true }; };
+  builders.FbmSync.pullWrite('activity', [fbmOrderIncoming('177397', '/Date(1791828000000)/'), fbmOrderIncoming('177396', '/Date(1791828000000)/'), fbmOrderIncoming('177388', '/Date(1791828000000)/'), fbmOrderIncoming('177398', '/Date(1791655200000)/'), fbmOrderIncoming('100000', '/Date(1791828000000)/'), fbmOrderIncoming('99999', '/Date(1791828000000)/')]);
+  check(so, 'Pull Activity mới: lô FBM trả mới nhất trước vẫn được ghi theo mã FBM tăng dần (số, không phải chuỗi) để ACT- tăng theo thứ tự nhập thật', orderWrite && orderWrite.records.map((record) => record.fbmId), ['99999', '100000', '177388', '177396', '177397', '177398']);
+  check(so, 'FbmSync.compareFbmId: toàn chữ số so như số, mã không phải số coi là hòa', [builders.FbmSync.compareFbmId('99999', '100000'), builders.FbmSync.compareFbmId('177397', '177396'), builders.FbmSync.compareFbmId('7', '007'), builders.FbmSync.compareFbmId('FBM-9', '12')], [-1, 1, 0, 0]);
   builders.FbmSync.scriptSettings = settingsBeforeMarker;
   delete gate.map['@CAT_CONG_VIECGọi']; delete gate.valid['@CAT_CONG_VIEC'];
   const edit = builders.FbmSync.customerEditRequest({ fbmId: 'A1', companyName: 'Đổi tên' }, { stt_rec_kh: 'A1', ma_kh: 'ALT00010', ten_kh: 'Cũ', dien_thoai: '0123' }, gate);
