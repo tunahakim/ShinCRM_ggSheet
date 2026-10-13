@@ -145,10 +145,12 @@ FbmSync.preflightEvaluate = function (options) {
     if (identity.blocking) { FbmSync.preflightIssue(issues, identity.status && identity.status.status === 'UNBOUND' ? 'FBM_IDENTITY_UNBOUND' : 'REBIND_REQUIRED', 'error', 'Identity', identity.message, true); }
     else if (identity.status && identity.status.status === 'REBIND_REQUIRED') { FbmSync.preflightIssue(issues, 'REBIND_REQUIRED', 'warn', 'Identity', identity.message, false); }
   }
-  // Hai lệnh kiểm liên kết chỉ đọc toàn bộ để đối chiếu danh tính, không ghi bản ghi nào, nên không cần phạm vi thử.
-  if (opt.scan !== 'identity_check' && opt.scan !== 'identity_probe' && typeof FbmSync.testScopeCodes === 'function') {
-    var missingScope = FbmSync.testScopeMissing(FbmSync.testScopeCodes(), mode);
-    if (missingScope.length) { FbmSync.preflightIssue(issues, 'FBM_TEST_SCOPE_EMPTY', 'error', 'fbm_sync', 'Chế độ thử đang bật nhưng danh sách ' + missingScope.join(' và ') + ' còn trống. Vào Cài đặt phiên, thêm mã hoặc tắt chế độ thử rồi chạy lại.', true); }
+  // Hai lệnh kiểm liên kết chỉ đọc toàn bộ để đối chiếu danh tính, không ghi bản ghi nào, nên không cần phạm vi khách chỉ định.
+  if (opt.scan !== 'identity_check' && opt.scan !== 'identity_probe' && typeof FbmSync.scope === 'function') {
+    var scope = FbmSync.scope();
+    if (scope && !scope.codes.length) { FbmSync.preflightIssue(issues, 'FBM_SCOPE_EMPTY', 'error', 'fbm_sync', 'Phạm vi đồng bộ đang là "Chỉ khách chỉ định" nhưng danh sách khách chỉ định còn trống. Vào Cài đặt phiên, thêm mã khách hoặc bỏ giới hạn rồi chạy lại.', true); }
+    // Khách bị xóa khỏi Sheet sau khi lưu danh sách: lượt vẫn chạy cho phần còn lại nhưng phải báo, không bỏ qua im lặng.
+    if (scope && scope.notFound.length) { FbmSync.preflightIssue(issues, 'FBM_SCOPE_CODE_NOT_FOUND', 'warn', 'fbm_sync', 'Mã khách ShinCRM trong danh sách khách chỉ định không còn trên Sheet Customer, lượt này bỏ qua: ' + scope.notFound.join(', ') + '.', false); }
   }
   if (mode === 'read' || mode === 'write') { FbmSync.preflightVerifyStatus(issues, params, core.category); }
   var candidateReport = FbmSync.preflightCandidates(issues, writeMode ? 'write' : mode);

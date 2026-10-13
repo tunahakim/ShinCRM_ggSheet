@@ -2,22 +2,23 @@
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 FbmSync.SYNC_SETTINGS_KEY = 'FBM_SYNC_SETTINGS_V1';
-// Chế độ thử mặc định bật: tệp mới chưa ai cấu hình thì không được quét và ghi toàn bộ khách thật.
-// Hai danh sách mã thử vì hai chiều lọc theo hai loại mã: chiều lấy lọc grid FBM theo mã FBM (`ma_kh`), chiều đẩy lọc Sheet theo mã ShinCRM. Trộn chung một ô từng làm chiều lấy bỏ qua mã ShinCRM mà không báo gì.
-FbmSync.SYNC_SETTINGS_DEFAULT = { approvalThreshold: 10, testMode: true, testFbmCodes: [], testShinCodes: [], requestGapMinSeconds: 0, requestGapMaxSeconds: 0 };
+// Phạm vi mặc định giới hạn: tệp mới chưa ai cấu hình thì không được quét và ghi toàn bộ khách thật.
+// Một danh sách khách chỉ định nhận cả mã FBM lẫn mã ShinCRM; GAS đổi mã ra khách nên lượt hai chiều chạy cả hai chiều cho khách nhập bằng một loại mã (Tài liệu 09/07 "Tham số phiên FBM").
+FbmSync.SYNC_SETTINGS_DEFAULT = { approvalThreshold: 10, scopeLimited: true, scopeCodes: [], requestGapMinSeconds: 0, requestGapMaxSeconds: 0 };
 // Khoảng nghỉ ngẫu nhiên giữa hai request liên tiếp tới FBM, áp cho mọi lượt; mặc định 0 vì FBM chưa giới hạn tốc độ (Tài liệu 09/07 "Tham số phiên FBM").
 FbmSync.REQUEST_GAP_KEYS = ['requestGapMinSeconds', 'requestGapMaxSeconds'];
-FbmSync.TEST_CODE_LISTS = { testFbmCodes: 'mã khách FBM', testShinCodes: 'mã khách ShinCRM' };
-// Mã thử đi thẳng vào điều kiện SQL của grid FBM, nên chỉ nhận ký tự an toàn; dấu nháy không có đường lọt vào.
-FbmSync.TEST_CODE_PATTERN = /^[A-Za-z0-9._-]{1,32}$/;
-FbmSync.TEST_CODES_MAX = 20;
+// Mã đi thẳng vào điều kiện SQL của grid FBM, nên chỉ nhận ký tự an toàn; dấu nháy không có đường lọt vào.
+FbmSync.SCOPE_CODE_PATTERN = /^[A-Za-z0-9._-]{1,32}$/;
+FbmSync.SCOPE_CODES_MAX = 40;
+// Bản lưu cũ: `testMode` là `scopeLimited`, các danh sách mã thử gộp thành một danh sách.
+FbmSync.SCOPE_LEGACY_LISTS = ['testCodes', 'testFbmCodes', 'testShinCodes'];
 
 function fbmSyncSettingsCloneDefault() {
-  return { approvalThreshold: FbmSync.SYNC_SETTINGS_DEFAULT.approvalThreshold, testMode: FbmSync.SYNC_SETTINGS_DEFAULT.testMode, testFbmCodes: [], testShinCodes: [], requestGapMinSeconds: FbmSync.SYNC_SETTINGS_DEFAULT.requestGapMinSeconds, requestGapMaxSeconds: FbmSync.SYNC_SETTINGS_DEFAULT.requestGapMaxSeconds };
+  return { approvalThreshold: FbmSync.SYNC_SETTINGS_DEFAULT.approvalThreshold, scopeLimited: FbmSync.SYNC_SETTINGS_DEFAULT.scopeLimited, scopeCodes: [], requestGapMinSeconds: FbmSync.SYNC_SETTINGS_DEFAULT.requestGapMinSeconds, requestGapMaxSeconds: FbmSync.SYNC_SETTINGS_DEFAULT.requestGapMaxSeconds };
 }
 
 /** Nhận mảng hoặc chuỗi ngăn bởi dấu phẩy, khoảng trắng, xuống dòng; bỏ trùng, giữ thứ tự người dùng nhập. */
-function fbmSyncTestCodesParse(raw) {
+function fbmSyncScopeCodesParse(raw) {
   var list = Array.isArray(raw) ? raw : String(raw === null || raw === undefined ? '' : raw).split(/[\s,;]+/), seen = {}, result = [];
   list.forEach(function (item) { var code = String(item === null || item === undefined ? '' : item).trim(); if (code && !seen[code]) { seen[code] = true; result.push(code); } });
   return result;
@@ -34,31 +35,18 @@ function fbmSyncSettingsNormalize(input, allowDefaults) {
   var raw = source.approvalThreshold;
   var threshold = raw === '' || raw === null || raw === undefined ? (allowDefaults ? FbmSync.SYNC_SETTINGS_DEFAULT.approvalThreshold : NaN) : Number(raw);
   if (isFinite(threshold)) { result.approvalThreshold = Math.floor(threshold); }
-  if (allowDefaults || source.testMode !== undefined) { result.testMode = source.testMode === undefined ? FbmSync.SYNC_SETTINGS_DEFAULT.testMode : source.testMode !== false; }
-  // Bản lưu cũ chỉ có một danh sách `testCodes`: tách theo khuôn mã ShinCRM, phần còn lại coi là mã FBM.
-  if (source.testCodes !== undefined && source.testFbmCodes === undefined && source.testShinCodes === undefined) {
-    source = Object.assign({}, source, FbmSync.testCodesSplit(source.testCodes));
-  }
-  Object.keys(FbmSync.TEST_CODE_LISTS).forEach(function (key) {
-    if (allowDefaults || source[key] !== undefined) { result[key] = source[key] === undefined ? [] : fbmSyncTestCodesParse(source[key]); }
-  });
+  var limited = source.scopeLimited !== undefined ? source.scopeLimited : source.testMode;
+  if (allowDefaults || limited !== undefined) { result.scopeLimited = limited === undefined ? FbmSync.SYNC_SETTINGS_DEFAULT.scopeLimited : limited !== false; }
+  var legacy = source.scopeCodes === undefined ? FbmSync.SCOPE_LEGACY_LISTS.filter(function (key) { return source[key] !== undefined; }) : [];
+  if (source.scopeCodes !== undefined) { result.scopeCodes = fbmSyncScopeCodesParse(source.scopeCodes); }
+  else if (legacy.length) { result.scopeCodes = fbmSyncScopeCodesParse(legacy.reduce(function (all, key) { return all.concat(fbmSyncScopeCodesParse(source[key])); }, [])); }
+  else if (allowDefaults) { result.scopeCodes = []; }
   FbmSync.REQUEST_GAP_KEYS.forEach(function (key) {
     var value = source[key];
     if (value === undefined || value === null || value === '') { if (allowDefaults) { result[key] = FbmSync.SYNC_SETTINGS_DEFAULT[key]; } return; }
     result[key] = Number(value);
   });
   return result;
-}
-
-/** Tách một danh sách mã trộn thành hai danh sách theo khuôn mã khách ShinCRM. */
-FbmSync.testCodesSplit = function (raw) {
-  var codes = fbmSyncTestCodesParse(raw);
-  return { testFbmCodes: codes.filter(function (code) { return !idGateMatches('customer', code); }), testShinCodes: codes.filter(function (code) { return idGateMatches('customer', code); }) };
-};
-
-/** Mã sai loại của một danh sách: ô mã ShinCRM chỉ nhận đúng khuôn mã khách ShinCRM; ô mã FBM không nhận mã có khuôn ShinCRM. */
-function fbmSyncTestCodesWrongKind(key, codes) {
-  return codes.filter(function (code) { return key === 'testShinCodes' ? !idGateMatches('customer', code) : idGateMatches('customer', code); });
 }
 
 function fbmSyncSettingsValidate(input) {
@@ -72,21 +60,12 @@ function fbmSyncSettingsValidate(input) {
   if (!isFinite(gapMin) || !isFinite(gapMax) || gapMin < 0 || gapMax < gapMin || gapMax > gapCap) {
     return { ok: false, code: 'FBM_REQUEST_GAP_INVALID', field: 'requestGap', message: 'Khoảng cách giữa hai request tới FBM: tối thiểu từ 0, tối đa không nhỏ hơn tối thiểu và không quá ' + gapCap + ' giây.' };
   }
-  var keys = Object.keys(FbmSync.TEST_CODE_LISTS);
-  for (var i = 0; i < keys.length; i += 1) {
-    var key = keys[i], label = FbmSync.TEST_CODE_LISTS[key], codes = normalized[key];
-    var badCodes = codes.filter(function (code) { return !FbmSync.TEST_CODE_PATTERN.test(code); });
-    if (badCodes.length) {
-      return { ok: false, code: 'FBM_TEST_CODE_INVALID', field: key, message: 'Danh sách ' + label + ': mã thử chỉ gồm chữ không dấu, số, dấu chấm, gạch ngang hoặc gạch dưới, dài tối đa 32 ký tự. Mã sai: ' + badCodes.join(', ') + '.' };
-    }
-    var wrongKind = fbmSyncTestCodesWrongKind(key, codes);
-    if (wrongKind.length) {
-      var hint = key === 'testShinCodes' ? 'Mã khách ShinCRM có dạng ' + idGateFormat('customer', 1) + '; mã khác hãy nhập vào ô mã khách FBM.' : 'Đây là mã khách ShinCRM; hãy nhập vào ô mã khách ShinCRM.';
-      return { ok: false, code: 'FBM_TEST_CODE_WRONG_KIND', field: key, message: 'Danh sách ' + label + ' có mã sai loại: ' + wrongKind.join(', ') + '. ' + hint };
-    }
-    if (codes.length > FbmSync.TEST_CODES_MAX) {
-      return { ok: false, code: 'FBM_TEST_CODES_TOO_MANY', field: key, message: 'Danh sách ' + label + ' tối đa ' + FbmSync.TEST_CODES_MAX + ' mã; muốn chạy rộng hơn thì tắt chế độ thử.' };
-    }
+  var badCodes = normalized.scopeCodes.filter(function (code) { return !FbmSync.SCOPE_CODE_PATTERN.test(code); });
+  if (badCodes.length) {
+    return { ok: false, code: 'FBM_SCOPE_CODE_INVALID', field: 'scopeCodes', message: 'Danh sách khách chỉ định: mỗi mã chỉ gồm chữ không dấu, số, dấu chấm, gạch ngang hoặc gạch dưới, dài tối đa 32 ký tự. Mã sai: ' + badCodes.join(', ') + '.' };
+  }
+  if (normalized.scopeCodes.length > FbmSync.SCOPE_CODES_MAX) {
+    return { ok: false, code: 'FBM_SCOPE_CODES_TOO_MANY', field: 'scopeCodes', message: 'Danh sách khách chỉ định tối đa ' + FbmSync.SCOPE_CODES_MAX + ' mã; muốn chạy rộng hơn thì tắt giới hạn phạm vi.' };
   }
   return { ok: true, settings: normalized };
 }
@@ -128,8 +107,14 @@ FbmSync.syncSettingsRead = function () {
 };
 
 FbmSync.syncSettingsSave = function (input) {
-  // Gộp lên bản đang lưu: bên gọi chỉ gửi vài trường thì các trường còn lại giữ nguyên, không bị mặc định đè mất danh sách mã thử.
-  var previous = FbmSync.syncSettingsRead(), check = fbmSyncSettingsValidate(Object.assign({}, previous, input || {}));
+  // Gộp lên bản đang lưu: bên gọi chỉ gửi vài trường thì các trường còn lại giữ nguyên, không bị mặc định đè mất danh sách khách chỉ định.
+  var previous = FbmSync.syncSettingsRead(), check = fbmSyncSettingsValidate(Object.assign({}, previous, input || {})), scopeLines = null;
+  // Đổi mã ra khách chỉ khi người dùng gửi danh sách: mã ShinCRM không có trên Sheet thì từ chối, danh sách đang lưu giữ nguyên.
+  if (check.ok && input && input.scopeCodes !== undefined) {
+    scopeLines = FbmSync.scopeResolve(check.settings.scopeCodes).lines;
+    var notFound = scopeLines.filter(function (line) { return line.status === 'not_found'; }).map(function (line) { return line.code; });
+    if (notFound.length) { check = { ok: false, code: 'FBM_SCOPE_CODE_NOT_FOUND', field: 'scopeCodes', message: 'Không tìm thấy mã khách ShinCRM trên Sheet Customer: ' + notFound.join(', ') + '. Danh sách đang lưu giữ nguyên.', scopeLines: scopeLines }; }
+  }
   if (!check.ok) {
     // Từ chối phải để lại dấu ở Log, không chỉ hiện ở Sidebar.
     if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'sync_settings_save', outcome: typeof LOG_ERROR === 'undefined' ? 'error' : LOG_ERROR, reason: check.code, detail: { field: check.field || '', message: check.message } }); }
@@ -141,7 +126,7 @@ FbmSync.syncSettingsSave = function (input) {
   if (typeof FbmSync.documentPropertySet === 'function') { saved = FbmSync.documentPropertySet(FbmSync.SYNC_SETTINGS_KEY, JSON.stringify(check.settings), 'sync_settings'); }
   else { props.setProperty(FbmSync.SYNC_SETTINGS_KEY, JSON.stringify(check.settings)); saved = { ok: true }; }
   if (!saved.ok) { return { ok: false, code: saved.code, message: saved.message }; }
-  return { ok: true, settings: check.settings, previous: previous };
+  return { ok: true, settings: check.settings, previous: previous, scopeLines: scopeLines };
 };
 
 /** Khoảng nghỉ gửi kèm envelope theo mili-giây; Extension chọn ngẫu nhiên trong khoảng này trước mỗi request FBM. */
@@ -154,17 +139,40 @@ FbmSync.syncSettingsPublic = function () {
   return FbmSync.syncSettingsRead();
 };
 
-/** Phạm vi thử của lượt chạy: `null` khi tắt chế độ thử (chạy toàn bộ), ngược lại `{ fbm, shin }` — mảng rỗng nghĩa là chiều đó chưa được chạy. */
-FbmSync.testScopeCodes = function () {
-  var settings = FbmSync.syncSettingsRead();
-  return settings.testMode === false ? null : { fbm: settings.testFbmCodes.slice(), shin: settings.testShinCodes.slice() };
+/**
+ * Đổi danh sách mã ra khách: mã khớp khuôn cổng cấp mã ShinCRM tra theo mã khách, mã khác tra theo cột mã FBM, nên không mã nào mang hai nghĩa.
+ * `fbm` lọc grid Customer (gồm cả mã FBM chưa có trên Sheet, tức khách mới bên FBM); `shin` lọc chiều ghi. Khách đã ghép cặp nhập mã nào cũng vào cả hai.
+ * Đọc Sheet Customer qua bản chụp của lần gọi, nên gọi nhiều lần trong một lời gọi GAS không đọc lại Sheet.
+ */
+FbmSync.scopeResolve = function (codes) {
+  var byId = {}, byFbm = {}, fbm = [], shin = [], lines = [];
+  var add = function (list, value) { if (value && list.indexOf(value) < 0) { list.push(value); } };
+  FbmSync.readLocal('customer').forEach(function (customer) {
+    var id = String(customer.id || '').trim(), fbmCode = String(customer.fbmCustomerCode || '').trim();
+    if (id) { byId[id] = customer; }
+    if (fbmCode) { byFbm[fbmCode] = customer; }
+  });
+  (codes || []).forEach(function (code) {
+    var kind = idGateMatches('customer', code) ? 'shin' : 'fbm', customer = kind === 'shin' ? byId[code] : byFbm[code];
+    if (!customer) {
+      if (kind === 'fbm') { add(fbm, code); }
+      lines.push({ code: code, kind: kind, status: kind === 'shin' ? 'not_found' : 'fbm_new', customerId: '', fbmCode: kind === 'fbm' ? code : '' });
+      return;
+    }
+    var customerId = String(customer.id || '').trim(), fbmCode = String(customer.fbmCustomerCode || '').trim();
+    add(shin, customerId); add(fbm, fbmCode);
+    lines.push({ code: code, kind: kind, status: 'matched', customerId: customerId, fbmCode: fbmCode });
+  });
+  return { fbm: fbm, shin: shin, lines: lines };
 };
 
-/** Danh sách thử còn trống mà chế độ chạy cần: lấy cần mã FBM, đẩy cần mã ShinCRM, hai chiều cần cả hai. */
-FbmSync.testScopeMissing = function (scope, mode) {
-  if (!scope) { return []; }
-  var missing = [];
-  if (mode !== 'push' && !scope.fbm.length) { missing.push(FbmSync.TEST_CODE_LISTS.testFbmCodes); }
-  if ((mode === 'write' || mode === 'push') && !scope.shin.length) { missing.push(FbmSync.TEST_CODE_LISTS.testShinCodes); }
-  return missing;
+/** Phạm vi của lượt chạy: `null` khi không giới hạn (đọc và ghi toàn bộ), ngược lại `{ codes, fbm, shin, notFound }`; danh sách rỗng lọc ra rỗng chứ không rơi thành toàn bộ. */
+FbmSync.scope = function () {
+  var settings = FbmSync.syncSettingsRead();
+  if (settings.scopeLimited === false) { return null; }
+  var resolved = FbmSync.scopeResolve(settings.scopeCodes);
+  return { codes: settings.scopeCodes.slice(), fbm: resolved.fbm, shin: resolved.shin, notFound: resolved.lines.filter(function (line) { return line.status === 'not_found'; }).map(function (line) { return line.code; }) };
 };
+
+/** Lượt có giới hạn phạm vi không quét toàn bộ khách nên không được suy ra vắng mặt. Chỉ đọc cờ, không đổi mã ra khách. */
+FbmSync.scopeLimited = function () { return FbmSync.syncSettingsRead().scopeLimited !== false; };

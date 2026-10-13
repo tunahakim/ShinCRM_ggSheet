@@ -73,13 +73,12 @@ FbmSync.extractAutoCustomerCode = function (response) {
 FbmSync.pushCandidates = function (entity) {
   var records = FbmSync.readLocal(entity), customers = {}, state = {}, pushFailures = {};
   var categoryGate = {};
-  var settings = {};
+  var scope = typeof FbmSync.scope === 'function' ? FbmSync.scope() : null;
   try {
     state = FbmSync.stateRead();
     categoryGate = FbmSync.stateCategoryGate(state);
     pushFailures = FbmSync.pushFailuresRead().hashes;
   } catch (ignore) {}
-  try { settings = typeof FbmSync.scriptSettings === 'function' ? FbmSync.scriptSettings() : {}; } catch (ignoreSettings) {}
   if (entity === 'activity') {
     FbmSync.readLocal('customer').forEach(function (customer) { customers[String(customer.id || '')] = customer; });
   }
@@ -89,7 +88,7 @@ FbmSync.pushCandidates = function (entity) {
     if (String(record.recordStatus || 'active') === 'deleted') { return false; }
     if (FbmSync.isConflictPending(record)) { return false; }
     var customer = entity === 'activity' ? customers[String(record.customerId || '')] : null;
-    if (!FbmSync.inTestScope(entity === 'customer' ? record : customer, settings)) { return false; }
+    if (!FbmSync.inScope(entity === 'customer' ? record : customer, scope)) { return false; }
     if (entity === 'activity' && !FbmSync.activityParentReady(customer)) { return false; }
     if (!FbmSync.syncPermission(record, entity, customer).push) { return false; }
     var status = String(record.syncStatus || ''), failureKey = entity + ':' + String(record.id || '');
@@ -111,12 +110,10 @@ FbmSync.pushCandidates = function (entity) {
   });
 };
 
-/** Khi bật chế độ thử, chiều đẩy chỉ ghi khách có mã ShinCRM trong danh sách mã ShinCRM; Activity theo khách cha. Tắt chế độ thử thì mở hết. */
-FbmSync.inTestScope = function (customer, settings) {
-  var codes = settings && settings.testShinCodes;
-  if (!codes) { return true; }
-  if (!customer) { return false; }
-  return codes.indexOf(String(customer.id || '').trim()) >= 0;
+/** Khách thuộc phạm vi chiều ghi; Activity xét theo khách cha. */
+FbmSync.inScope = function (customer, scope) {
+  if (!scope) { return true; }
+  return !!customer && scope.shin.indexOf(String(customer.id || '').trim()) >= 0;
 };
 
 /** Lệnh tạo đã phát nhưng chưa biết FBM có lưu hay không; bản ghi sửa (đã có ID FBM) gửi lại không sinh trùng nên không thuộc nhóm này. */

@@ -17,7 +17,6 @@ FbmSync.scriptSettings = function () {
   }
   var accountName = typeof FbmSync.bindingAccountName === 'function' ? FbmSync.bindingAccountName() : '';
   var accountSettings = typeof FbmSync.accountSettingsRead === 'function' ? FbmSync.accountSettingsRead() : {};
-  var testScope = typeof FbmSync.testScopeCodes === 'function' ? FbmSync.testScopeCodes() : null;
   var activitySince = currentState.runId && currentState.activitySince !== undefined ? currentState.activitySince : accountSettings.activitySince;
   return {
     baseUrl: 'https://fbo.com.vn:8888',
@@ -28,10 +27,7 @@ FbmSync.scriptSettings = function () {
     accountName: accountName,
     customerPrefix: String(accountSettings.customerPrefix || ''),
     customerCodeLength: String(accountSettings.customerCodeLength || ''),
-    activitySince: String(activitySince || ''),
-    // Chiều lấy lọc grid FBM chỉ theo mã FBM; chiều đẩy lọc theo mã ShinCRM ở `inTestScope`.
-    testFbmCodes: testScope ? testScope.fbm : null,
-    testShinCodes: testScope ? testScope.shin : null
+    activitySince: String(activitySince || '')
   };
 };
 /** Đổi chuỗi /Date(ms)/ của .NET, giữ nguyên giá trị khác. */
@@ -60,9 +56,10 @@ FbmSync.gridRequest = function (entity, options) {
   if (entity === 'customer' && cfg.userId) {
     payload.externalKey.push({ Name: "stt_rec_kh in (select stt_rec_kh from dbo.zcFastBusiness$Function$GetCustomerValidate('" + cfg.userId + "')) and 1", Opr: '=', Value: 1, Type: 'String', Ignore: false });
   }
-  if (entity === 'customer' && cfg.testFbmCodes && opt.includeTestCustomer !== false) {
-    // Danh sách rỗng thành điều kiện không khớp ai, để chế độ thử không bao giờ rơi thành quét toàn bộ. Mã đã qua TEST_CODE_PATTERN nên không có dấu nháy.
-    var inList = cfg.testFbmCodes.length ? cfg.testFbmCodes.map(function (code) { return "'" + code + "'"; }).join(',') : "''";
+  var scope = entity === 'customer' && opt.includeScope !== false && typeof FbmSync.scope === 'function' ? FbmSync.scope() : null;
+  if (scope) {
+    // Danh sách rỗng thành điều kiện không khớp ai, để phạm vi giới hạn không bao giờ rơi thành quét toàn bộ. Mã đã qua SCOPE_CODE_PATTERN nên không có dấu nháy.
+    var inList = scope.fbm.length ? scope.fbm.map(function (code) { return "'" + code + "'"; }).join(',') : "''";
     payload.externalKey.push({ Name: 'ma_kh in (' + inList + ') and 1', Opr: '=', Value: 1, Type: 'String', Ignore: false });
   }
   if (entity === 'customer' && payload.type === 0 && cfg.userId) {
@@ -88,7 +85,7 @@ FbmSync.identityUserRequest = function () {
 };
 /** Request Customer tối thiểu do GAS cấp để kiểm tra phiên nền; Extension không được tự dựng request này. */
 FbmSync.heartbeatCustomerRequest = function () {
-  var request = FbmSync.customerGridRequest({ type: 0, count: 1, gridPageIndex: -1, gridPageValue: null, gridRefresh: false, includeTestCustomer: false });
+  var request = FbmSync.customerGridRequest({ type: 0, count: 1, gridPageIndex: -1, gridPageValue: null, gridRefresh: false, includeScope: false });
   // Heartbeat chỉ kiểm tra phiên, không lọc dữ liệu theo cấu hình quét/test và không giữ cursor quét.
   request.body.externalKey = [];
   request.body.memvars = [];
@@ -99,7 +96,7 @@ FbmSync.heartbeatCustomerRequest = function () {
 };
 /** Request Customer full-scan dùng riêng cho kiểm tra liên kết Spreadsheet/FBM. */
 FbmSync.identityCheckCustomerRequest = function (options) {
-  var opt = Object.assign({ includeTestCustomer: false, sortExpression: 'stt_rec_kh' }, options || {});
+  var opt = Object.assign({ includeScope: false, sortExpression: 'stt_rec_kh' }, options || {});
   return FbmSync.customerGridRequest(opt);
 };
 /** Đổi mốc YYYY-MM-DD sang định dạng filter ngày mà grid FBM nhận. */
@@ -156,7 +153,7 @@ FbmSync.conflictRefreshRequest = function (entity, item) {
   if (!fbmId) { return null; }
   if (entity === 'customer') {
     // Đọc đích danh theo ID FBM; phạm vi thử đã xét lúc bản ghi vào hàng đợi. Gắn thêm lọc mã khách thử thì khách mới tạo (mã khác ALT00010) bị coi là không còn trên FBM (FBM-052).
-    var customerRequest = FbmSync.customerGridRequest({ type: 0, count: 20, gridPageIndex: -1, gridRefresh: false, includeTestCustomer: false, externalKey: [{ Name: 'stt_rec_kh', Opr: '=', Value: fbmId, Type: 'String', Ignore: false }] });
+    var customerRequest = FbmSync.customerGridRequest({ type: 0, count: 20, gridPageIndex: -1, gridRefresh: false, includeScope: false, externalKey: [{ Name: 'stt_rec_kh', Opr: '=', Value: fbmId, Type: 'String', Ignore: false }] });
     customerRequest.meta.kind = 'conflict_refresh_grid'; customerRequest.meta.entity = 'customer'; customerRequest.meta.conflictId = String(target.id || '');
     return customerRequest;
   }

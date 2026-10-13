@@ -226,9 +226,8 @@ FbmSync.findCustomerByIdentity = function (localById, localByCode, incoming, loc
 
 /** Đánh dấu bản ghi local vắng khỏi một lượt quét full; không suy ra xóa FBM. */
 FbmSync.markMissingAfterFullScan = function (entity, state) {
-  var settings = typeof FbmSync.scriptSettings === 'function' ? FbmSync.scriptSettings() : {};
   var canWriteSheet = state && (typeof FbmSync.canWriteSheet === 'function' ? FbmSync.canWriteSheet(state.mode) : state.mode === 'read' || state.mode === 'write');
-  if (!state || !canWriteSheet || settings.testFbmCodes) { return { written: 0, skipped: true }; }
+  if (!state || !canWriteSheet || (typeof FbmSync.scopeLimited === 'function' && FbmSync.scopeLimited())) { return { written: 0, skipped: true }; }
   var local = FbmSync.readLocal(entity), missing = [];
   local.forEach(function (record) {
     var fbmId = String(record.fbmId || '').trim();

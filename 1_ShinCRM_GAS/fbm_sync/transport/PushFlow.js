@@ -84,7 +84,7 @@ FbmSync.customerCreateRecoveryRequest = function (state, cursor) {
   state.cursor = { kind: 'push_wait', operation: 'customer_create_recover', entity: 'customer', index: Number(cursor.index || 0), candidate: FbmSync.pushCandidateForState(candidate) };
   state.message = 'Đang kiểm tra Customer vừa tạo sau khi mất phản hồi; không gửi lại lệnh ghi.';
   FbmSync.stateWrite(state);
-  return FbmSync.customerGridRequest({ type: 0, count: 20, gridPageIndex: -2, gridRefresh: false, includeTestCustomer: false, filter: ['ma_so_thue:**' + taxNumber] });
+  return FbmSync.customerGridRequest({ type: 0, count: 20, gridPageIndex: -2, gridRefresh: false, includeScope: false, filter: ['ma_so_thue:**' + taxNumber] });
 };
 /**
  * Đối chiếu đúng một dòng Customer sau create mất response rồi vá ID/baseline.
