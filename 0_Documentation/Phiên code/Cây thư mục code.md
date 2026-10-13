@@ -223,6 +223,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── state\RecordLocks.js      Khóa bản ghi và kiểm tra revision.
     ├── state\Scheduler.js        Lịch heartbeat/quét, không gọi FBM trực tiếp.
     ├── read\GridRead.js          Grid metadata, phân trang và category request.
+    ├── read\ActivityLayers.js    Chọn khách cần đọc giao dịch theo gói quét: lớp 2 so giao dịch cuối, lớp 3 quét từ khách mới nhất xuống; tập khách và thứ tự ở khóa riêng theo số CUS.
     ├── write\RequestBuilders.js  Builder Customer/Activity create/edit.
     ├── write\PushCandidates.js   Chọn record local và kiểm điều kiện trước khi đẩy.
     ├── write\SheetSave.js        Cửa ghi Sheet duy nhất của module đồng bộ; ghi thất bại thì ném lỗi.
@@ -325,6 +326,7 @@ tests\
     │   ├── Orchestration.js       Kiểm state, cursor, resume, preflight và luồng nhiều lát.
     │   ├── Workflow.js             Chạy contract xuyên GAS -> executor Extension -> GAS với fixture FBM, cùng các cổng fail-closed cấp pipeline.
     │   ├── ScanJob.js              Kiểm việc quét: cắt gói dưới trần, chuyển trang, gói trùng/lạ, mất response, mất tab, ghi lỗi, lượt thiếu dòng.
+    │   ├── ScanPack.js             Kiểm gói quét: so giao dịch cuối, dừng sau chuỗi khách im lặng, gắn cờ "không thấy" chỉ trong khách đã đọc, mỗi gói đúng thao tác.
     │   ├── RelayResend.js          Kiểm Sidebar gửi lại cấu hình relay đang giữ khi Extension được tải lại, không gọi GAS.
     │   ├── Push.js                Kiểm cổng ghi, khóa, owner, builder ghi và xử lý lỗi push.
     │   ├── Audit.js               Kiểm log, báo cáo, fixture an toàn và các ranh giới không ghi/xóa.
