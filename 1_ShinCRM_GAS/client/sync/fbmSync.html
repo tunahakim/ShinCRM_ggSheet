@@ -568,7 +568,7 @@ function fbmSyncInstall() {
       fbmSyncConfigSetDraftValue('loginPolicy', policy === 'auto-login' ? 'enabled' : policy === 'auto-open' ? 'autoOpenTab' : 'retryEnabled', policyEnabled);
       if ((policy === 'auto-login' || policy === 'retry') && typeof fbmSyncSetLoginPolicyDependencyState === 'function') { fbmSyncSetLoginPolicyDependencyState(fbmSyncConfigDraftValue('loginPolicy', 'enabled', true) === true); }
     } else if (target.hasAttribute('data-sync-page')) { var pageSpec = String(target.getAttribute('data-sync-page') || '').split(':'); FBM_SYNC_CLIENT.resultPages[pageSpec[0]] = Math.max(0, Number(FBM_SYNC_CLIENT.resultPages[pageSpec[0]] || 0) + Number(pageSpec[1] || 0)); fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus);
-    } else if (target.hasAttribute('data-sync-results-tab')) { FBM_SYNC_CLIENT.resultsTab = target.getAttribute('data-sync-results-tab'); fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus);
+    } else if (target.hasAttribute('data-sync-results-tab')) { FBM_SYNC_CLIENT.resultsTab = target.getAttribute('data-sync-results-tab'); fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); fbmSyncConflictTabLoad();
     } else if (target.id === 'fbm-sync-open-login-policy') {
       FBM_SYNC_CLIENT.navOpen = false;
       fbmSyncSetScreen('settings');
@@ -750,6 +750,13 @@ function fbmSyncStatusOnce(freshOpen) {
   });
 }
 /** Mở bản ghi đầu hàng đợi xung đột: GAS cấp request đọc FBM, Extension chạy, GAS tính diff và trả DTO một bản ghi để Sidebar giữ trong RAM. */
+/** Mở tab Xung đột khi còn xung đột mà chưa có bản ghi trong RAM thì đọc bản ghi đầu, cùng đường với nút "Mở xử lý xung đột"; không thì tab chỉ hiện số đếm mà không có gì để xử lý. */
+function fbmSyncConflictTabLoad() {
+  var count = Number(FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.lastStatus.metadata && FBM_SYNC_CLIENT.lastStatus.metadata.conflictCount || 0);
+  if (FBM_SYNC_CLIENT.resultsTab !== 'conflict' || FBM_SYNC_CLIENT.conflict || !count || FBM_SYNC_CLIENT.conflictOpening) { return null; }
+  FBM_SYNC_CLIENT.conflictOpening = true;
+  return fbmSyncOpenConflict().catch(function (error) { fbmSyncPaintError(error, 'Không mở được bản ghi xung đột.'); }).then(function () { FBM_SYNC_CLIENT.conflictOpening = false; });
+}
 function fbmSyncOpenConflict() {
   return callServer('fbmOpenConflict').then(function (opened) {
     if (!opened || opened.ok === false) { throw new Error(opened && (opened.message || opened.code) || 'Không mở được chế độ xử lý xung đột.'); }
