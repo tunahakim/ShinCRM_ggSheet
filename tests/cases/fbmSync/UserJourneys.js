@@ -305,6 +305,20 @@ async function chay(so) {
     click(dom, button);
     check(so, 'kết quả chuyển đúng tab và đổi mô tả body ' + tab, [hop.FBM_SYNC_CLIENT.resultsTab, content.querySelector('#fbm-sync-results-tab-description-region').textContent, content.querySelector('.shin-sync-tab-row') === resultTabsNode], [tab, resultTabDescriptions[tab], true]);
   });
+  // Mở tab Xung đột từ hàng tab khi còn xung đột phải tự đọc bản ghi đầu, như nút "Mở xử lý xung đột"; bấm lại lúc đang đọc không gọi thêm.
+  const realOpenConflict = hop.fbmSyncOpenConflict;
+  let conflictOpens = 0;
+  hop.fbmSyncOpenConflict = () => { conflictOpens += 1; return new Promise(() => {}); };
+  const conflictTab = dom.document.createElement('button');
+  conflictTab.setAttribute('data-sync-results-tab', 'conflict');
+  hop.FBM_SYNC_CLIENT.conflict = null; hop.FBM_SYNC_CLIENT.conflictOpening = false;
+  hop.FBM_SYNC_CLIENT.lastStatus = Object.assign(idle(), { metadata: { conflictCount: 0 } });
+  click(dom, conflictTab);
+  const opensWithoutConflict = conflictOpens;
+  hop.FBM_SYNC_CLIENT.lastStatus = Object.assign(idle(), { metadata: { conflictCount: 1 } });
+  click(dom, conflictTab); click(dom, conflictTab);
+  check(so, 'Mở tab Xung đột khi còn xung đột thì tự đọc bản ghi đầu đúng một lần; không còn xung đột thì không gọi', [opensWithoutConflict, conflictOpens], [0, 1]);
+  hop.fbmSyncOpenConflict = realOpenConflict; hop.FBM_SYNC_CLIENT.conflictOpening = false;
   const page = dom.document.createElement('button');
   page.setAttribute('data-sync-page', 'log:1');
   click(dom, page);
