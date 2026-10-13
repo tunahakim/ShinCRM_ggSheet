@@ -77,7 +77,7 @@ function ensureFbmTab(request) {
 }
 var FBM_EXECUTOR_VERSION = '21.21';
 // Mã phiên bản hợp đồng GAS–Extension (tests/contracts/gasExtensionContract.js). Chỉ trả về cho GAS; GAS quyết định dừng khi lệch mã.
-var FBM_CONTRACT_VERSION = '4bc9726236ef';
+var FBM_CONTRACT_VERSION = '5cce7f060aa5';
 
 function addWorkerTrace(reply, request, stage, extra) {
   var event = Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {});
@@ -178,10 +178,19 @@ function ensureSheetsBridge(tabId) {
   });
 }
 
-function waitForGenericRequestDelay(request) {
-  var value = request || {}, meta = value.meta || {}, waitMs = Number(meta.waitMs !== undefined ? meta.waitMs : value.waitMs || 0);
-  if (!isFinite(waitMs) || waitMs <= 0) { return Promise.resolve(); }
-  return new Promise(function (resolve) { setTimeout(resolve, Math.min(60000, Math.round(waitMs))); });
+/**
+ * Khoảng nghỉ giữa hai request liên tiếp tới FBM (Tài liệu 09/07 "Tham số phiên FBM"): GAS cấp khoảng [minMs, maxMs] trong envelope, Extension chọn ngẫu nhiên và chỉ chờ phần còn thiếu tính từ lúc request FBM trước kết thúc.
+ * Mốc chỉ sống trong RAM service worker: Chrome tắt worker khi rảnh khoảng 30 giây thì mất mốc, chấp nhận vì lúc đó đã nghỉ lâu. Lấy gói từ RAM tab (`scan_chunk`) không gọi FBM nên không chờ và không dời mốc.
+ */
+var FBM_LAST_FETCH_END_AT = 0;
+var FBM_REQUEST_GAP_CAP_MS = 60000;
+function callsFbm(request) { return String(request && request.meta && request.meta.kind || '') !== 'scan_chunk'; }
+function waitForFbmGap(request) {
+  var gap = request && request.meta && request.meta.requestGap || {}, minMs = Math.max(0, Number(gap.minMs || 0)), maxMs = Math.max(minMs, Number(gap.maxMs || 0));
+  if (!callsFbm(request) || !isFinite(maxMs) || maxMs <= 0 || !FBM_LAST_FETCH_END_AT) { return Promise.resolve(); }
+  var waitMs = Math.min(FBM_REQUEST_GAP_CAP_MS, minMs + Math.random() * (maxMs - minMs)) - (Date.now() - FBM_LAST_FETCH_END_AT);
+  if (waitMs <= 0) { return Promise.resolve(); }
+  return new Promise(function (resolve) { setTimeout(resolve, Math.round(waitMs)); });
 }
 
 /** Tự phục hồi các tab Sheets đang mở; lỗi một tab không làm worker ngừng nhận message. */
@@ -201,18 +210,20 @@ function sendToFbmTab(tabId, request) {
     if (Array.isArray(envelope.items)) { return executeBatch(tabId, envelope).then(stampContract); }
     return hydrateLoginRequest(request).then(function (readyRequest) {
       request = readyRequest;
-      return waitForGenericRequestDelay(request).then(function () {
-        return sendTabExecute(tabId, request, envelope).then(function (reply) { return showFbmHomeAfterLogin(tabId, request, stampContract(reply)); });
-      });
+      return sendTabExecute(tabId, request, envelope).then(function (reply) { return showFbmHomeAfterLogin(tabId, request, stampContract(reply)); });
     });
   });
 }
 
-/** Gửi một request cho executor trong phần hạn còn lại của envelope; hết hạn thì là lỗi transport, không chờ thêm. */
+/** Cửa duy nhất gửi request cho executor: nghỉ đủ khoảng cách với request FBM trước, rồi gửi trong phần hạn còn lại của envelope; hết hạn thì là lỗi transport, không chờ thêm. */
 function sendTabExecute(tabId, request, envelope) {
-  var remaining = envelopeRemainingMs(envelope);
-  if (remaining <= 0) { return Promise.resolve({ error: 'Extension đã hết hạn chờ GAS cấp cho request này; tab FBM phản hồi quá chậm.', code: 'FBM_TRANSPORT_TIMEOUT' }); }
-  return sendTabMessage(tabId, { type: 'FBM_EXECUTE_V2', request: request }, remaining);
+  return waitForFbmGap(request).then(function () {
+    var remaining = envelopeRemainingMs(envelope);
+    if (remaining <= 0) { return { error: 'Extension đã hết hạn chờ GAS cấp cho request này; tab FBM phản hồi quá chậm.', code: 'FBM_TRANSPORT_TIMEOUT' }; }
+    return sendTabMessage(tabId, { type: 'FBM_EXECUTE_V2', request: request }, remaining).finally(function () {
+      if (callsFbm(request)) { FBM_LAST_FETCH_END_AT = Date.now(); }
+    });
+  });
 }
 
 /**
@@ -222,7 +233,7 @@ function sendTabExecute(tabId, request, envelope) {
 function executeBatch(tabId, envelope) {
   var items = envelope.items, meta = envelope.meta || {}, maxBytes = Number(meta.batch && meta.batch.maxBytes || 0), results = [], traces = [], captured = {}, bytes = 0;
   function itemRequest(item) {
-    return Object.assign({}, item, { meta: Object.assign({}, item.meta || {}, { transport: meta.transport, fetchMs: meta.fetchMs }) });
+    return Object.assign({}, item, { meta: Object.assign({}, item.meta || {}, { transport: meta.transport, fetchMs: meta.fetchMs, requestGap: meta.requestGap }) });
   }
   function finish() {
     return { result: { ok: true, status: 200, items: results, transport: Object.assign({}, captured, { trace: traces }) } };
@@ -230,7 +241,7 @@ function executeBatch(tabId, envelope) {
   function next(index) {
     if (index >= items.length || (maxBytes > 0 && bytes > maxBytes)) { return Promise.resolve(finish()); }
     var request = itemRequest(items[index]);
-    return waitForGenericRequestDelay(request).then(function () { return sendTabExecute(tabId, request, envelope); }).then(function (reply) {
+    return sendTabExecute(tabId, request, envelope).then(function (reply) {
       var result = reply && reply.result;
       if (!result || reply.error) {
         return { error: String(reply && reply.error || 'Tab FBM không trả kết quả cho một request trong lô.'), code: String(reply && reply.code || 'FBM_TRANSPORT_UNAVAILABLE'), trace: traces.concat(reply && reply.trace || []) };
