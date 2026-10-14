@@ -1,4 +1,4 @@
-# [Đang xử lý] Phương án refactor cơ chế đồng bộ FBM và phân tải Extension
+# [Đã xử lý] Phương án refactor cơ chế đồng bộ FBM và phân tải Extension
 
 > Trạng thái: tài liệu thảo luận, chưa phải hợp đồng chính thức.
 >
