@@ -136,7 +136,8 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   └── transportProbe.html    Lệnh đo trần đường truyền gói lớn, kích từ Console tab Google Sheet; cặp với server/dev/TransportProbe.js.
 │   ├── link\                     Cầu nối ô đang chọn: ưu tiên postMessage an toàn từ Extension, khi vắng mới mở đường dò máy chủ có nhịp và luật dừng.
 │   │   ├── sheetLink.html        Tai nghe CRM_CONTEXT thô từ Extension: đối chiếu reads với Store rồi bật followSelection. Bắt tay có tiếng đáp, đèn sống chết suy từ ACK chứ không suy từ im lặng.
-│   │   └── selectionPoll.html    Máy trạng thái dự phòng khi vắng Extension: nhịp dò 2/6 giây, bốn luật dừng, đèn sét bốn trạng thái và băng cảnh báo sau ba giây ân hạn.
+│   │   ├── selectionPoll.html    Máy trạng thái dự phòng khi vắng Extension: nhịp dò 2/6 giây, bốn luật dừng, đèn sét bốn trạng thái và băng cảnh báo sau ba giây ân hạn.
+│   │   └── changeSignal.html     Khi nào hỏi GAS sau tín hiệu kênh /bind, tab hiện lại, mạng nối lại; watchdog kênh im quá ngưỡng.
 │   ├── ram\                      Kho dữ liệu trong RAM của sidebar, và đường nhận dữ liệu từ máy chủ.
 │   │   ├── store.html            Kho runtime cùng mười đường tra duy nhất được chạm vào nó. Không đường nào nhận tham số chế độ xem.
 │   │   ├── ingest.html           Chỗ DUY NHẤT biết hình dạng đường truyền { fields, rows }. Bung thành object đúng một lần ở đây.
@@ -310,7 +311,8 @@ tests\
     ├── formScreen.js             Bốn cái hỏng-trong-im-lặng của ba màn form: tiêu đề suy sai vì bản ghi mới đã có mã xem trước, ô kế tục không có dấu, form giao dịch thiếu bản ghi khách, và đóng form lồng thì rơi thẳng về màn xem.
     ├── actions.js                Bảng mười lăm hành động: một tên rơi khỏi bảng là nút bấm không làm gì, ba cửa mở form phải khóa khi khách đã xóa mềm, và việc chặng sau phải ném lỗi đọc được chứ không im.
     ├── extensionBridge.js        Nonce của cầu nối Extension phải đi trọn từ bắt tay tới CRM_CONTEXT; origin lạ không được chiếm kênh đang dùng.
-    ├── selectionPoll.js          Đồng hồ giả khóa luật ACK loại trừ mọi vòng gọi, bốn điều kiện dừng, chống vòng chồng và thang nhịp 2/6 giây.
+    ├── selectionPoll.js          Đồng hồ giả khóa luật ACK loại trừ mọi vòng gọi, bốn điều kiện dừng, chống vòng chồng, thang nhịp 2/6 giây, lịch hỏi sau tín hiệu kênh và watchdog.
+    ├── bindWatcher.js            XHR giả khóa bộ lọc danh sách đen khung /bind, chỉ bắt GET /bind và con trỏ không đọc lại.
     ├── triggers.js               Trigger sửa sheet quản trị làm mới ngay; sửa kho đánh dấu mọi sheet quản trị cần làm mới.
     ├── menu.js                   Trigger đơn chỉ dựng menu; trigger cài đặt mở Sidebar, không tạo trùng và không bật alert khi lỗi.
     ├── fbmSync.js                Điều phối các nhóm kiểm thử đồng bộ FBM; không chứa logic nghiệp vụ của từng nhóm.
@@ -383,5 +385,6 @@ The client UI uses `client/ui/popupList.html` as the shared popup primitive. `se
     tests/cases/fbmSync/Settings.js  Kiểm migration và validation tham số phiên trong DocumentProperties.
 ```
 2_ShinCRM_Extension/content_scripts/model/live_model_reader.js Đọc mã khách từ lưới live của Sheets trong MAIN world; mã cột do Sidebar truyền, lỗi thì đóng an toàn.
+2_ShinCRM_Extension/content_scripts/model/bind_watcher.js Nghe kênh đẩy /bind của Sheets trong MAIN world, xếp mỗi khung thành tín hiệu hoặc nhịp sống.
 2_ShinCRM_Extension/content_scripts/fbm_sync/executor.js Fetch trong tab FBM.
 ```
