@@ -29,3 +29,63 @@ function formulaProbeRemove() {
     return name + ': đã xóa';
   });
 }
+
+/** Đo từng khúc của đường trigger, lời dò Sidebar, tô tab và đọc công thức để biết chi phí nằm ở đâu trước khi sửa. Tăng revision thật trên Sheet DEV. */
+function measureReloadCosts() {
+  var out = [];
+  var time = function (label, fn) {
+    var t = Date.now();
+    var result = fn();
+    out.push(label + ': ' + (Date.now() - t) + ' ms');
+    return result;
+  };
+  var book = time('shinOpenBook', function () { return shinOpenBook(); });
+  var views = time('shinViewSheetNames', function () { return shinViewSheetNames(book); });
+  out.push('Sheet !: ' + views.join(', '));
+  time('reloadStateRead', function () { return reloadStateRead(); });
+  var customer = book.getSheetByName(ENTITY_SHEETS.customer);
+  var idColumn = selectionColumnIndex(customer, DATA_SCHEMA.customer.id.code);
+  var firstId = customer.getRange(SHEET_FIRST_DATA_ROW, idColumn).getValue();
+  time('shinReloadDecision (ghi signal một khách)', function () {
+    return shinReloadDecision({ source: 'edit', surface: 'record', entity: 'customer', recordIds: [firstId] });
+  });
+  views.forEach(function (name) { time('renderViewSheet ' + name, function () { return renderViewSheet(name); }); });
+  time('selectionProbeContext + snapshot', function () { return selectionSnapshotFromContext(selectionProbeContext()); });
+  time('probeSelectionAndReload lần 1 (còn signal)', function () { return probeSelectionAndReload({}); });
+  var seen = reloadStateRead().revision;
+  time('probeSelectionAndReload lần 2 (đã thấy revision, không gì bẩn)', function () { return probeSelectionAndReload({ lastSeenRevision: seen }); });
+  if (views.length) {
+    var view = book.getSheetByName(views[0]);
+    var original = view.getTabColor();
+    time('setTabColor cam ' + views[0], function () { view.setTabColor('#ff9900'); SpreadsheetApp.flush(); });
+    time('setTabColor trả màu ' + views[0], function () { view.setTabColor(original); SpreadsheetApp.flush(); });
+    time('getTabColor', function () { return view.getTabColor(); });
+    var rows = Math.max(view.getLastRow() - SHEET_FIRST_DATA_ROW + 1, 1);
+    time('getFormulas ' + rows + ' dòng x ' + view.getLastColumn() + ' cột trên ' + views[0], function () {
+      return view.getRange(SHEET_FIRST_DATA_ROW, 1, rows, Math.max(view.getLastColumn(), 1)).getFormulas();
+    });
+  }
+  return out;
+}
+
+/** Đo tô màu tab cho năm sheet trong một lượt với một lần flush; dùng sheet tạm không có dấu ! để bộ vẽ không chạm. */
+function measureTabColorBatch() {
+  var book = shinOpenBook();
+  var sheets = [1, 2, 3, 4, 5].map(function (i) { return book.insertSheet('__TabColorProbe' + i); });
+  try {
+    SpreadsheetApp.flush();
+    var t = Date.now();
+    sheets.forEach(function (sheet) { sheet.setTabColor('#ff9900'); });
+    SpreadsheetApp.flush();
+    var paint = Date.now() - t;
+    t = Date.now();
+    var colors = sheets.map(function (sheet) { return sheet.getTabColor(); });
+    var read = Date.now() - t;
+    t = Date.now();
+    sheets.forEach(function (sheet) { sheet.setTabColor(null); });
+    SpreadsheetApp.flush();
+    return ['Tô cam 5 sheet + 1 flush: ' + paint + ' ms', 'Đọc màu 5 sheet: ' + read + ' ms (' + colors.join(',') + ')', 'Trả màu 5 sheet + 1 flush: ' + (Date.now() - t) + ' ms'];
+  } finally {
+    sheets.forEach(function (sheet) { book.deleteSheet(sheet); });
+  }
+}
