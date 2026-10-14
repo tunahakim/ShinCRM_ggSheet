@@ -320,7 +320,7 @@ function sheetLinkApplyViewDecision(result) {
   state.renderRequestedRevision = revision;
   var run = function () { return sheetLinkSyncView(view.sheetName); };
   var message = 'Đang cập nhật sheet ' + view.sheetName + '…';
-  return typeof sidebarBusyRun === 'function' ? sidebarBusyRun(message, run) : run();
+  return typeof sidebarBusyRun === 'function' ? sidebarBusyRun(message, run, { block: false }) : run();
 }
 
 function sheetLinkParseNameBox(value) {
@@ -464,7 +464,7 @@ function sheetLinkApplyDecisionResult(result, options) {
   }
   if (result.payload && typeof refreshReloadPayload === 'function') {
     var payloadWork = function () { return refreshReloadPayload(result.payload); };
-    var payloadRun = typeof sidebarBusyRun === 'function' ? sidebarBusyRun('Đang đồng bộ dữ liệu vừa thay đổi…', payloadWork, { progress: true }) : payloadWork();
+    var payloadRun = typeof sidebarBusyRun === 'function' ? sidebarBusyRun('Đang đồng bộ dữ liệu vừa thay đổi…', payloadWork, { progress: true, block: true }) : payloadWork();
     var payloadDone = function (value) {
       if (value && stateRevision) {
         SHEET_LINK_LAST_SEEN_REVISION = Math.max(SHEET_LINK_LAST_SEEN_REVISION, Number(result.processedRevision || stateRevision));
@@ -487,7 +487,7 @@ function sheetLinkApplyDecisionResult(result, options) {
     return { deferred: true, waitMs: waitMs, reload: state, decision: decision };
   }
   var refresh = function () { return sheetLinkApplyDirtyData(state, decision); };
-  var work = typeof sidebarBusyRun === 'function' ? sidebarBusyRun('Đang đồng bộ dữ liệu vừa thay đổi…', refresh, { progress: true }) : refresh();
+  var work = typeof sidebarBusyRun === 'function' ? sidebarBusyRun('Đang đồng bộ dữ liệu vừa thay đổi…', refresh, { progress: true, block: true }) : refresh();
   if (!work || typeof work.then !== 'function') {
     if (sheetLinkReloadWorkSucceeded(work) && state && state.revision) {
       SHEET_LINK_LAST_SEEN_REVISION = Math.max(SHEET_LINK_LAST_SEEN_REVISION, sheetLinkWorkRevision(work, state));
@@ -636,7 +636,7 @@ function sheetLinkSyncView(sheetName, options) {
   return request;
 }
 
-/** Rời ô cấu hình chỉ hỏi trạng thái; chỉ thay đổi thật mới bật overlay và làm mới view. */
+/** Rời ô cấu hình chỉ hỏi trạng thái; chỉ thay đổi thật mới làm mới view. */
 function sheetLinkInspectView(sheetName) {
   var state = sheetLinkViewState(sheetName);
   if (state.pending) { return state.pending; }
@@ -655,7 +655,8 @@ function sheetLinkInspectView(sheetName) {
       return dataWork && typeof dataWork.then === 'function' ? dataWork.then(afterData) : afterData();
     };
     var message = refreshData ? 'Đang cập nhật dữ liệu và sheet ' + sheetName + '…' : 'Đang cập nhật sheet ' + sheetName + '…';
-    return typeof sidebarBusyRun === 'function' ? sidebarBusyRun(message, sync) : sync();
+    // Chỉ phần nạp RAM cần khóa; vẽ view chỉ ghi ra Sheet.
+    return typeof sidebarBusyRun === 'function' ? sidebarBusyRun(message, sync, { block: refreshData }) : sync();
   });
   var request = work.then(function (result) {
     settled = true;

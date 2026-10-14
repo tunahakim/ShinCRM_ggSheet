@@ -138,7 +138,7 @@ function saveFlowSubmit() {
       SAVE_FLOW.dangGui = false;
       throw err;
     });
-  });
+  }, { block: true });
 }
 
 /* Provider dirty cho form lõi: dùng lại đúng bộ thu thập của luồng lưu, chỉ chạy khi dirty guard hỏi. */

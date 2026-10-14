@@ -51,7 +51,7 @@ async function sidebarBoot(options) {
   // Automatic full-core reloads must refresh RAM without changing the user's current surface.
   var preserveView = !!(options && options.preserveView === true);
   callTimingReset(Date.now());
-  var finishBusy = typeof sidebarBusyBegin === 'function' ? sidebarBusyBegin('Đang nạp dữ liệu ShinCRM…') : null;
+  var finishBusy = typeof sidebarBusyBegin === 'function' ? sidebarBusyBegin('Đang nạp dữ liệu ShinCRM…', { block: true }) : null;
   bootClearStartupWarning();
   if (typeof sheetLinkSetRamReady === 'function') { sheetLinkSetRamReady(false); }
 

@@ -118,11 +118,12 @@ ACTIONS.setActivityView = function (payload) {
 /* ─── Sheet quản trị và nạp lại ─── */
 
 ACTIONS.renderActiveViewSheet = function () {
+  // Khóa vì người dùng vừa bấm: chặn bấm lần hai gửi thêm một lượt vẽ.
   return sidebarBusyRun('Đang cập nhật sheet quản trị…', function () {
     return callServer('shinRenderCurrentView', ['sidebar']).then(function (result) {
       return typeof sheetLinkViewApplyResult === 'function' && result ? sheetLinkViewApplyResult(result.sheetName, result) : result;
     });
-  });
+  }, { block: true });
 };
 
 /** Nạp lại từ đầu. Đóng hết form trước khi gọi, vì `sidebarBoot` dọn sạch `Store` và một form đang mở sẽ trỏ vào bản ghi vừa bị bỏ. */
@@ -140,7 +141,7 @@ function actionsManualReload(serverName, message) {
       return typeof refreshManualSheetApply === 'function' ? refreshManualSheetApply(result) : result;
     });
   };
-  return typeof sidebarBusyRun === 'function' ? sidebarBusyRun(message, work) : work();
+  return typeof sidebarBusyRun === 'function' ? sidebarBusyRun(message, work, { block: true }) : work();
 }
 
 ACTIONS.reloadCurrentSheet = function () {

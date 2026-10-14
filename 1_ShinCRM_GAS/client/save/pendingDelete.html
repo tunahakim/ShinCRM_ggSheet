@@ -119,7 +119,7 @@ function pendingDeleteFire() {
       if (typeof dispatchError === 'function') { dispatchError(err); }
       return null;
     });
-  });
+  }, { block: true });
 }
 
 /** Bỏ mặt nạ của một lô mã. Tách ra vì cả đường thành công và đường thất bại đều phải làm đúng việc này. */
