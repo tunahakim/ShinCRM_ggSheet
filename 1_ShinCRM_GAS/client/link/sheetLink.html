@@ -290,7 +290,9 @@ function sheetLinkViewApplyResult(sheetName, result) {
     state.metaReady = true;
     if (state.watch && !sheetLinkViewControlCell(state, state.watch.row, state.watch.col)) { state.watch = null; }
   }
-  if (result.ok && !result.skipped && SHEET_LINK_VIEW_NOTICE_SHEET === sheetName) { sheetLinkSetViewNotice(''); }
+  // GAS trả `ok: false` khi lượt thử gần nhất ở đúng đầu vào này đã hỏng: sheet vẫn cũ, người dùng sửa xong thì bấm làm mới.
+  if (result.ok === false) { sheetLinkSetViewNotice(sheetName); }
+  else if (result.ok && !result.skipped && SHEET_LINK_VIEW_NOTICE_SHEET === sheetName) { sheetLinkSetViewNotice(''); }
   return result;
 }
 
@@ -627,6 +629,7 @@ function sheetLinkSyncView(sheetName, options) {
   }, function (err) {
     settled = true;
     state.pending = null;
+    sheetLinkSetViewNotice(sheetName);
     throw err;
   });
   if (!settled) { state.pending = request; }
