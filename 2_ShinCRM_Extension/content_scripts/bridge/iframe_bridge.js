@@ -35,6 +35,9 @@ var sidebarOrigin = '';
 var sidebarNonce = '';
 var extensionSessionId = Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 var CRM_READ_PLAN = null;
+// Khoảng gộp nhịp sống của kênh `/bind`, do Sidebar gửi trong bắt tay (`SETTINGS` của GAS); chưa nhận thì chuyển mọi nhịp.
+var channelAliveMs = 0;
+var channelAliveSentAt = 0;
 
 function isReadPlan(value) {
   if (!value || typeof value !== 'object') { return false; }
@@ -84,6 +87,7 @@ function bridgeContextAlive() {
 }
 function bridgeRetire() {
   window.removeEventListener('message', bridgeOnMessage);
+  window.removeEventListener('message', bridgeOnBindEvent);
   sidebarWindow = null; sidebarOrigin = ''; sidebarNonce = '';
 }
 
@@ -216,6 +220,7 @@ function bridgeOnMessage(event) {
   sidebarOrigin = event.origin;
   sidebarNonce = nonce;
   acceptReadPlan(data);
+  if (Number(data.channelAliveMs) > 0) { channelAliveMs = Number(data.channelAliveMs); }
   if (newChannel && typeof lastContextKey !== 'undefined') { lastContextKey = ''; }
 
   try {
@@ -233,7 +238,38 @@ function bridgeOnMessage(event) {
 }
 window.addEventListener('message', bridgeOnMessage);
 
-// 2. Bắn ảnh chụp trạng thái sang Sidebar. Sidebar tự quyết dùng trường nào.
+/**
+ * 2. Tín hiệu kênh `/bind` từ `bind_watcher.js` (MAIN world cùng trang) sang Sidebar.
+ * Có thể đổi và kênh vừa mở thì chuyển ngay dưới dạng `CRM_RELOAD` không mang revision — Sidebar tự gom và hỏi GAS.
+ * Nhịp sống chỉ để Sidebar biết kênh còn thông, nên gộp tối đa một tin mỗi `channelAliveMs` để không ngập cầu nối.
+ */
+function bridgeOnBindEvent(event) {
+  if (event.source !== window || event.origin !== location.origin) { return; }
+  var data = event.data;
+  if (!data || data.source !== 'SHINCRM_EXTENSION' || data.action !== 'CRM_BIND_EVENT') { return; }
+  if (!bridgeContextAlive()) { bridgeRetire(); return; }
+  if (!sidebarWindow || !sidebarOrigin || !sidebarNonce) { return; }
+  var message = { nonce: sidebarNonce, sessionId: extensionSessionId };
+  if (data.kind === 'alive') {
+    var now = Date.now();
+    if (channelAliveMs > 0 && now - channelAliveSentAt < channelAliveMs) { return; }
+    channelAliveSentAt = now;
+    message.action = 'CRM_CHANNEL_ALIVE';
+  } else {
+    message.action = 'CRM_RELOAD';
+    message.signal = data.kind === 'open' ? 'channel-open' : 'channel';
+  }
+  try {
+    sidebarWindow.postMessage(message, sidebarOrigin);
+  } catch (err) {
+    sidebarWindow = null;
+    sidebarOrigin = '';
+    sidebarNonce = '';
+  }
+}
+window.addEventListener('message', bridgeOnBindEvent);
+
+// 3. Bắn ảnh chụp trạng thái sang Sidebar. Sidebar tự quyết dùng trường nào.
 function sendContextToSidebar(context) {
   if (!bridgeContextAlive()) { bridgeRetire(); return; }
   if (!sidebarWindow || !sidebarOrigin || !sidebarNonce) return;

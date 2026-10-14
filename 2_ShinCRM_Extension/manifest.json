@@ -16,7 +16,7 @@
   "content_scripts": [
     {
       "matches": ["https://docs.google.com/spreadsheets/*"],
-      "js": ["content_scripts/model/live_model_reader.js"],
+      "js": ["content_scripts/model/live_model_reader.js", "content_scripts/model/bind_watcher.js"],
       "run_at": "document_start",
       "world": "MAIN"
     },
