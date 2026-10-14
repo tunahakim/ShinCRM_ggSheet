@@ -57,6 +57,14 @@ function shinRangeTouchesCodedFilter(sheet, range) {
   });
 }
 
+/** Cột module (mã @ có thật trên sheet kho nhưng ngoài DATA_SCHEMA): sheet `!` đọc được cột đó dù RAM không giữ. */
+function shinRangeTouchesViewSource(sheet, range) {
+  var first = range.getColumn();
+  return sheet.getRange(1, first, 1, range.getLastColumn() - first + 1).getValues()[0].some(function (value) {
+    return shinViewCodeIsValid(String(value === null || value === undefined ? '' : value).trim());
+  });
+}
+
 function shinViewCodeIsValid(code) {
   var value = String(code || '').trim();
   if (!/^@(CUS|ACT)_/.test(value)) { return false; }
@@ -165,7 +173,9 @@ function shinOnEdit(event) {
     }
     var entity = name === ENTITY_SHEETS.customer ? 'customer' : name === ENTITY_SHEETS.activity ? 'activity' : '';
     if (!entity || range.getRow() < SHEET_FIRST_DATA_ROW) { return; }
-    if (!shinDefaultCodeIsValid(sheet, entity, range.getColumn(), range.getLastColumn())) { return; }
+    if (!shinDefaultCodeIsValid(sheet, entity, range.getColumn(), range.getLastColumn())) {
+      return shinRangeTouchesViewSource(sheet, range) ? shinReloadDecision({ source: 'edit', surface: 'view-source' }) : undefined;
+    }
     var column = selectionColumnIndex(sheet, DATA_SCHEMA[entity].id.code);
     if (!column) { return; }
     var last = range.getLastRow();

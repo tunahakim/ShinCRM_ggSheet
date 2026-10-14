@@ -109,6 +109,16 @@ function chay(so) {
     [[], false, false, false, false, false]);
 
   clearState();
+  const moduleColumn = invalidColumn + 1;
+  nen.sheet('Customer').getRange(1, moduleColumn).setValue('@CUS_MODULE_DIEM');
+  ghiO(nen, 'Customer', 4, '@CUS_MA_KH', 'KH000009');
+  hop.shinOnEdit({ range: eventRange(nen.sheet('Customer'), 4, moduleColumn) });
+  const moduleState = hop.reloadStateRead();
+  check(so, 'sửa ô Customer dưới cột module @CUS_* ngoài DATA_SCHEMA chỉ làm view cũ: không records, không allCore, không schema',
+    [moduleState.records, moduleState.allCore, moduleState.schema, moduleState.category, moduleState.config, (moduleState.viewsStaleRevision > 0)],
+    [[], false, false, false, false, true]);
+
+  clearState();
   ghiO(nen, 'Activity', 4, '@ACT_MA_GD', 'GD000001');
   hop.shinOnEdit({ range: eventRange(nen.sheet('Activity'), 4, 1) });
   check(so, 'sửa dữ liệu Activity dưới cột mã hợp lệ đánh dấu đúng mã giao dịch', hop.dirtyStateRead().records, ['GD000001']);

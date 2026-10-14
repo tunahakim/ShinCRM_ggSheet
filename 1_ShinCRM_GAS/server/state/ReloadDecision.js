@@ -88,6 +88,13 @@ function reloadDecisionForChange(input) {
     return decision;
   }
 
+  if (surface === 'view-source') {
+    decision.kind = 'view-source';
+    decision.signal.allViews = true;
+    decision.reason = 'Cột @ ngoài DATA_SCHEMA trên sheet kho đổi: RAM không giữ cột đó nên chỉ làm view cũ.';
+    return decision;
+  }
+
   if (surface === 'view-data' || change.viewData === true) {
     return reloadDecisionBlank('Dữ liệu sinh ở sheet quản trị không phải nguồn sự thật.');
   }
