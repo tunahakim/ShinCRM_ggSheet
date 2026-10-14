@@ -268,6 +268,7 @@ function viewRenderSheetLocked(book, sheet, name) {
   var lastColumn = sheet.getLastColumn();
   if (lastColumn < 1) {
     viewRenderedWrite(name, expectedReloadRevision);
+    viewTabTintRestoreLocked(sheet, name);
     viewInputSignatureWrite(sheet);
     var emptyRevision = viewRevisionBump(sheet);
     return { ok: true, sheetName: name, viewMeta: viewInputMetaFromHeader([], emptyRevision), rows: 0, reload: reloadStateRead() };
@@ -341,6 +342,7 @@ function viewRenderSheetLocked(book, sheet, name) {
   viewClearErrorNotes(sheet, writable);
   SpreadsheetApp.flush();
   viewRenderedWrite(name, expectedReloadRevision);
+  viewTabTintRestoreLocked(sheet, name);
   viewInputSignatureWrite(sheet);
   var revision = viewRevisionBump(sheet);
   return { ok: true, sheetName: name, viewMeta: viewInputMetaFromHeader(header, revision), rows: rows.length, reload: reloadStateRead() };

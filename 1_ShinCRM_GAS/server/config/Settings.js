@@ -77,7 +77,9 @@ var SETTINGS = {
   POSITION_WAKE_MS: 1000,
   EDIT_SETTLE_MS: 3000,
   HANDSHAKE_PING_MS: 1000,
-  EXTENSION_ACK_TIMEOUT_MS: 3000
+  EXTENSION_ACK_TIMEOUT_MS: 3000,
+  /** Màu tab sheet quản trị đang cũ (dữ liệu đã đổi nhưng sheet chưa vẽ lại). Cam để khác các màu nhóm sheet thường dùng. */
+  VIEW_STALE_TAB_COLOR: '#ff9900'
 };
 
 /**

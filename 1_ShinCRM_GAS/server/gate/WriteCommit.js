@@ -3,8 +3,8 @@
  *
  * Các cửa nghiệp vụ vẫn giữ luật riêng của mình, nhưng không được tự dựng
  * ReloadDecision hoặc tự ghi DirtyState. Tệp này không ghi dữ liệu nguồn và
- * không vẽ sheet quản trị: dữ liệu đổi chỉ làm view cũ, Sidebar vẽ khi có
- * người xem. Gọi trong document lock của cửa ghi để hai lượt ghi không cùng
+ * không vẽ sheet quản trị: dữ liệu đổi chỉ làm view cũ (tab tô cam), Sidebar
+ * vẽ khi có người xem. Gọi trong document lock của cửa ghi để hai lượt ghi không cùng
  * đọc một revision cũ.
  */
 
@@ -30,6 +30,7 @@ function writeCommitAssertAvailable() {
   if (typeof dirtyStateMarkDecision !== 'function') { missing.push('DirtyState'); }
   if (typeof reloadStateRead !== 'function') { missing.push('reloadStateRead'); }
   if (typeof writeCommitAfterSuccess !== 'function') { missing.push('WriteCommit'); }
+  if (typeof viewTabTintStaleLocked !== 'function') { missing.push('ViewTabTint'); }
   if (missing.length) {
     throw new Error('Thiếu hậu xử lý bắt buộc của cửa ghi: ' + missing.join(', ') + '. Không ghi dữ liệu để tránh mất signal reload.');
   }
@@ -41,6 +42,7 @@ function writeCommitAfterSuccess(input) {
 
   var decision = reloadDecisionForChange(writeCommitCopy(input));
   dirtyStateMarkDecision(decision);
+  viewTabTintStaleLocked();
 
   return {
     reloadDecision: decision,

@@ -57,3 +57,13 @@ function viewProbeAutoRender() {
   }
 }
 
+
+/** In cờ tô cam đã lưu và màu tab thật của từng sheet quản trị, để nghiệm thu tab cam mà không phải nhìn ảnh. */
+function viewProbeTabTint() {
+  var report = ['viewsStaleRevision: ' + reloadStateRead().viewsStaleRevision + ' · đã vẽ: ' + JSON.stringify(viewRenderedRead()), 'Cờ tô: ' + JSON.stringify(viewTabTintRead())];
+  shinOpenBook().getSheets().forEach(function (sheet) {
+    if (sheet.getName().charAt(0) !== '!') { return; }
+    report.push(sheet.getName() + ' (id ' + sheet.getSheetId() + '): màu tab ' + (sheet.getTabColor() || 'không màu'));
+  });
+  return report;
+}

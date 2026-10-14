@@ -88,16 +88,20 @@ function shinDefaultCodeIsValid(sheet, entity, firstColumn, lastColumn) {
   });
 }
 
+/** Sheet ngoài bốn sheet kho không có schema: thiếu ảnh chụp hàng 1 ở đó không được coi thận trọng là đổi schema, nếu không mỗi lần gõ hàng 1 của sheet nháp là một lượt nạp lại toàn bộ. */
 function shinSchemaEditNeedsReload(sheet, range, event) {
-  var valid = shinDefaultCodeMap(sheet, sheet.getName().toLowerCase()) || {};
+  var valid = shinDefaultCodeMap(sheet, sheet.getName().toLowerCase());
+  if (!valid) { return false; }
   return shinHeaderRangeHasValidCode(sheet, range, event, function (value) {
     return !!valid[String(value === null || value === undefined ? '' : value).trim()];
   });
 }
 
+/** Quyết định cần vẽ thì tô cam sau lượt vẽ (trong `shinRenderForDecision`), để không tô rồi trả màu ngay cho chính sheet vừa vẽ. */
 function shinReloadDecision(input) {
   var decision = reloadDecisionForChange(input || {});
   dirtyStateMarkDecision(decision);
+  if (!decision.views || decision.views.action !== 'render') { viewTabTintStale(); }
   return decision;
 }
 
@@ -105,7 +109,11 @@ function shinReloadDecision(input) {
 function shinRenderForDecision(decision) {
   var views = decision && decision.views;
   if (!views || views.action !== 'render') { return decision; }
-  return renderAllManagedViews(views.mode === 'sheet' ? [views.sheetName] : undefined);
+  try {
+    return renderAllManagedViews(views.mode === 'sheet' ? [views.sheetName] : undefined);
+  } finally {
+    viewTabTintStale();
+  }
 }
 
 /** Sắp xếp chung trong Config là bộ điều khiển của mọi sheet quản trị chưa khai sắp xếp riêng. */
@@ -176,6 +184,8 @@ function shinOnChange(event) {
     var book = shinOpenBook();
     var active = book.getActiveSheet();
     var name = active && typeof active.getName === 'function' ? active.getName() : '';
+    // Vết để biết thao tác nào của người dùng sinh loại nào (nhất là `OTHER`); chỉ ra sheet khi `LOG_TRACE` bật.
+    logTrace({ source: 'core', action: 'shinOnChange', outcome: LOG_OK, reason: 'changeType ' + type, detail: { changeType: type, sheetName: name } });
 
     // Sheet `!` mới chưa có revision đã vẽ nên tự là sheet cũ; Sidebar vẽ khi có người mở nó. Xóa sheet không làm sheet nào khác cũ.
     if (type === 'INSERT_GRID') {
