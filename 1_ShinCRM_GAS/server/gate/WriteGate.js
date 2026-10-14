@@ -488,7 +488,8 @@ function writeGateRun(entity, records, source, fields, batDau) {
     fields: doc.fields,
     rows: doc.rows,
     recordIds: plans.map(function (plan) { return String(plan.id || '').trim(); }).filter(function (id) { return !!id; }),
-    configChanged: moi.length > 0,
+    // Cấp mã mới chỉ đổi bộ đếm (DocumentProperties), không đổi Config; Sidebar nhận bộ đếm mới qua đây để mã xem trước trên form khách mới đúng.
+    counters: moi.length ? idGateCounterValues() : undefined,
     ms: ms
   };
 }
@@ -548,8 +549,7 @@ function writeGateSave(yeuCau) {
         source: source,
         surface: 'record',
         entity: entity,
-        recordIds: result.recordIds,
-        configChanged: result.configChanged
+        recordIds: result.recordIds
       });
       result.reloadDecision = commit.reloadDecision;
       result.dirty = commit.dirty;

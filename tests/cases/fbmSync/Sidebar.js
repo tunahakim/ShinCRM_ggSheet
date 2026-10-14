@@ -11,6 +11,8 @@ function taoBoTest() {
   const footer = dom.document.createElement('div'); footer.id = 'sidebar-footer'; footer.hidden = true; dom.root.appendChild(footer);
 
   const hop = taoHopCat({ document: dom.document, window: { top: null, innerWidth: 300, innerHeight: 800, confirm: () => true, addEventListener: () => {} } });
+  // Hằng của sheetLink.html, bộ test fbmSync không nạp tệp đó.
+  hop.SHEET_LINK_ORIGIN = 'https://docs.google.com';
   hop.FBM_SYNC_CLIENT = {
     active: true, running: false, statusReady: true, mode: 'read', resultPages: {}, resultsTab: 'summary', identityStatus: {},
     subscreen: 'run',
@@ -714,6 +716,20 @@ async function chay(so) {
   hop.fbmSyncWaitForIdentityBackground = waitForIdentityBackground;
   check(so, 'Kiểm tra liên kết sau khi chờ phiên nền vẫn giữ binding đã chọn', resumedIdentityArgs, [{ spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' }]);
 
+  const originHop = taoBoTest().hop;
+  let messageListener = null;
+  originHop.window.addEventListener = (type, fn) => { if (type === 'message') { messageListener = fn; } };
+  originHop.fbmSyncInstall();
+  originHop.SHEET_LINK_NONCE = 'nonce-origin';
+  originHop.FBM_SYNC_RELAY_SESSION = 'relay-1';
+  originHop.clearTimeout = clearTimeout;
+  const relaySettled = [];
+  originHop.FBM_SYNC_CLIENT.relayWaiters['ack-1'] = { timer: null, resolve: () => relaySettled.push('resolve'), reject: () => relaySettled.push('reject') };
+  const ack = { action: 'CRM_FBM_CONFIG_ACK', nonce: originHop.SHEET_LINK_NONCE, sessionId: 'relay-1', id: 'ack-1', ok: true };
+  messageListener({ origin: 'https://evil.example', data: ack });
+  check(so, 'message từ origin lạ mang lệnh Extension đúng nonce không làm đổi FBM_SYNC_CLIENT', [relaySettled, !!originHop.FBM_SYNC_CLIENT.relayWaiters['ack-1']], [[], true]);
+  messageListener({ origin: originHop.SHEET_LINK_ORIGIN, data: ack });
+  check(so, 'cùng message từ origin Google Sheets thì được nhận', [relaySettled, !!originHop.FBM_SYNC_CLIENT.relayWaiters['ack-1']], [['resolve'], false]);
   const nav = dom.document.createElement('nav'); nav.id = 'fbm-sync-nav'; nav.className = 'shin-popup-list'; nav.hidden = false; dom.root.appendChild(nav);
   hop.fbmSyncInstall();
   const inputField = dom.document.createElement('div'); inputField.id = 'fbm-identity-user-field'; inputField.className = 'shin-form-field is-invalid';

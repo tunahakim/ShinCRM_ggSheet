@@ -11,7 +11,7 @@ function taoKenh(ackOk) {
   hop.window.top = {
     postMessage: (msg) => {
       posts.push(msg);
-      setTimeout(() => listeners.forEach((fn) => fn({ data: { action: 'CRM_FBM_CONFIG_ACK', nonce: hop.SHEET_LINK_NONCE, sessionId: msg.sessionId, id: msg.id, ok: ackOk(posts.length), error: 'Extension từ chối' } })), 0);
+      setTimeout(() => listeners.forEach((fn) => fn({ origin: hop.SHEET_LINK_ORIGIN, data: { action: 'CRM_FBM_CONFIG_ACK', nonce: hop.SHEET_LINK_NONCE, sessionId: msg.sessionId, id: msg.id, ok: ackOk(posts.length), error: 'Extension từ chối' } })), 0);
     }
   };
   hop.setTimeout = setTimeout; hop.clearTimeout = clearTimeout;

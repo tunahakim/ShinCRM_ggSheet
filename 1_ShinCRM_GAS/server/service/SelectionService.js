@@ -95,7 +95,7 @@ function selectionRemainingRevision(state) {
 function selectionPayloadFromReload(result) {
   if (!result || result.ok === false) { return null; }
   if (result.reloadMode === 'records') {
-    return { mode: 'records', customer: result.customer, activity: result.activity, affectedCustomerIds: result.affectedCustomerIds || [], removedRecordIds: result.removedRecordIds || [] };
+    return { mode: 'records', customer: result.customer, activity: result.activity, affectedCustomerIds: result.affectedCustomerIds || [], removedRecordIds: result.removedRecordIds || [], counters: result.counters };
   }
   if (result.reloadMode === 'category') {
     return { mode: 'category', categories: result.categories || {}, warnings: result.warnings || [] };

@@ -176,6 +176,8 @@ function reloadRecords(recordIds, expectedRevision, options) {
       activity: { fields: activities.fields, rows: activities.rows },
       affectedCustomerIds: Object.keys(customerIds),
       removedRecordIds: removedRecordIds,
+      // Bản ghi có thể do máy khác vừa cấp mã; gửi bộ đếm để mã xem trước của Sidebar này không tụt lại.
+      counters: idGateCounterValues(),
       processedRevision: latest ? latest.revision : 0,
       revisionMatched: requestWasSuperseded ? false : revisionMatches,
       supersededRevision: requestWasSuperseded ? requestedRevision : undefined,
@@ -277,6 +279,7 @@ function reloadEntityAll(entity, expectedRevision) {
     entity: entity,
     customer: entity === 'customer' ? result : undefined,
     activity: entity === 'activity' ? result : undefined,
+    counters: idGateCounterValues(),
     processedRevision: latest.revision,
     revisionMatched: revisionMatched,
     reload: latest,

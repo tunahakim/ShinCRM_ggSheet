@@ -172,6 +172,21 @@ function chay(so) {
     [hop.dirtyStateRead(), hop.reloadStateRead().viewsStaleRevision > 0, rendered],
     [{ records: [], config: true, all: false }, true, []]);
 
+  const realRun = hop.runEntryPoint;
+  const realOpen = hop.shinOpenBook;
+  const realProps = hop.documentProps;
+  const onChangeCalls = [];
+  hop.runEntryPoint = () => { onChangeCalls.push('runEntryPoint'); return null; };
+  hop.shinOpenBook = () => { onChangeCalls.push('shinOpenBook'); return realOpen(); };
+  hop.documentProps = () => { onChangeCalls.push('documentProps'); return realProps(); };
+  ['EDIT', 'FORMAT', 'edit'].forEach((changeType) => hop.shinOnChange({ changeType }));
+  check(so, 'onChange loại EDIT/FORMAT trả về trước runEntryPoint, không mở bảng tính, không đọc DocumentProperties', onChangeCalls, []);
+  hop.shinOnChange({ changeType: 'OTHER' });
+  check(so, 'onChange loại khác vẫn vào runEntryPoint', onChangeCalls, ['runEntryPoint']);
+  hop.runEntryPoint = realRun;
+  hop.shinOpenBook = realOpen;
+  hop.documentProps = realProps;
+
   const triggerList = [
     { getHandlerFunction: () => 'shinOnEdit' },
     { getHandlerFunction: () => 'shinOnChange' },

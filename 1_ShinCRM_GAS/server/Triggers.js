@@ -178,9 +178,11 @@ function shinOnEdit(event) {
   return result;
 }
 
+/** `EDIT` đã có `shinOnEdit` lo, `FORMAT` không đổi dữ liệu: hai loại này chiếm gần hết lượt onChange nên trả về trước khi khởi động lượt chạy và mở bảng tính. */
 function shinOnChange(event) {
+  var type = String(event && event.changeType || '').toUpperCase();
+  if (type === 'EDIT' || type === 'FORMAT') { return null; }
   return runEntryPoint('shinOnChange', 'core', ERROR_CHANNEL_THROW, function () {
-    var type = String(event && event.changeType || '').toUpperCase();
     var book = shinOpenBook();
     var active = book.getActiveSheet();
     var name = active && typeof active.getName === 'function' ? active.getName() : '';

@@ -90,6 +90,7 @@ function saveFlowInvalidMessage(invalid) {
 function saveFlowApply(entity, res) {
   var recs = ingestUnpack(res.fields, res.rows);
   recs.forEach(function (r) { Store.upsertRecord(entity, r); });
+  if (typeof refreshCountersApply === 'function') { refreshCountersApply(res.counters); }
 
   return recs[0] || null;
 }

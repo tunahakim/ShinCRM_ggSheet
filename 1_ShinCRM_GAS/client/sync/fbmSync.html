@@ -471,6 +471,8 @@ function fbmSyncInstall() {
   FBM_SYNC_CLIENT.installed = true;
   if (typeof PopupList !== 'undefined' && typeof PopupList.install === 'function') { PopupList.install(); }
   window.addEventListener('message', function (event) {
+    // Nonce chỉ chống nhầm phiên; trang khác nhúng hoặc mở Sidebar vẫn gửi được message, nên phải chặn theo origin trước.
+    if (!event || event.origin !== SHEET_LINK_ORIGIN) { return; }
     var data = event.data || {};
     if (data.action === 'CRM_FBM_CONFIG_ACK' && data.nonce === SHEET_LINK_NONCE) {
       if (String(data.sessionId || '') !== FBM_SYNC_RELAY_SESSION) { return; }

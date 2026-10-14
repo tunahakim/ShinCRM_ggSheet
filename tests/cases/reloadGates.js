@@ -46,9 +46,10 @@ function chay(so) {
 
   const newEnv = taoHop();
   const newSaved = newEnv.hop.writeGateSave({ entity: 'customer', records: [{ companyName: 'Khách mới', phone: '0987000115' }], source: 'pull' });
-  check(so, 'cấp mã mới phát cả signal Config và fallback full core',
-    [newSaved.configChanged, newSaved.reloadDecision.ram.mode, newSaved.dirty.config, newSaved.dirty.records.length],
-    [true, 'fullCore', true, 0]);
+  check(so, 'cấp mã mới chỉ phát signal bản ghi đó, không nâng config và allCore; phản hồi mang bộ đếm mới',
+    [newSaved.reloadDecision.ram.mode, newSaved.dirty.config, newEnv.hop.reloadStateRead().allCore, newSaved.dirty.records, newSaved.counters],
+    ['records', false, false, newSaved.recordIds, newEnv.hop.idGateCounterValues()]);
+  check(so, 'lưu chỉ sửa bản ghi cũ không gửi bộ đếm', batchSaved.counters, undefined);
 
   const pushedEnv = taoHop();
   const pushed = pushedEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000222' }], source: 'push' });

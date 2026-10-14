@@ -47,6 +47,28 @@ async function chay(so) {
     [hop.Store.customers.KH3, hop.Store.activitiesByCustomer.KH1.some((record) => record.id === 'GD3')],
     [undefined, false]);
 
+  let counterHop;
+  try {
+    counterHop = taoHopCat({
+      Store: { config: { counters: { customer: 12, activity: 34 } }, customers: {}, activitiesByCustomer: {}, upsertRecord(entity, record) { this.customers[record.id] = record; }, removeRecord() {} },
+      ingestUnpack: (fields, rows) => rows.map((row) => fields.reduce((record, field, i) => { record[field] = row[i]; return record; }, {})),
+      ScreenState: { screen: 'view', currentCustomerId: '', formStack: [] },
+      SCREEN_VIEW: 'view',
+      screenViewDropStale: () => null,
+      screenViewRender: () => ({})
+    });
+    napClient(counterHop, 'client/ram/refresh.html');
+    napClient(counterHop, 'client/schema/fieldLogic.html');
+    napClient(counterHop, 'client/save/saveFlow.html');
+  } catch (err) { return ghiLoiNap(so, 'nạp refresh + saveFlow + fieldLogic', err); }
+  const truocLuu = counterHop.fieldLogicNextCode('customer', 'CUS-');
+  counterHop.saveFlowApply('customer', { fields: ['id'], rows: [['CUS-000013']], counters: { customer: 13, activity: 34 } });
+  const sauLuu = counterHop.fieldLogicNextCode('customer', 'CUS-');
+  counterHop.refreshReloadPayload({ mode: 'records', customer: { fields: ['id'], rows: [['CUS-000014']] }, activity: { fields: ['id', 'customerId'], rows: [] }, affectedCustomerIds: ['CUS-000014'], counters: { customer: 14, activity: 34 } });
+  check(so, 'mã xem trước trên form khách mới tăng đúng một bậc sau phản hồi lưu và sau payload reloadRecords',
+    [truocLuu, sauLuu, counterHop.fieldLogicNextCode('customer', 'CUS-'), counterHop.fieldLogicNextCode('activity', 'ACT-')],
+    ['CUS-000013', 'CUS-000014', 'CUS-000015', 'ACT-000035']);
+
   const entityHop = taoHopCat({
     Store: {
       customers: { KH1: { id: 'KH1' }, KH2: { id: 'KH2' } },

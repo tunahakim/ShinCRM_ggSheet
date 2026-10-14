@@ -11,8 +11,16 @@ function refreshLocalDraftIds() {
   return out;
 }
 
+/** Bộ đếm cấp mã đi kèm payload bản ghi; chỉ dùng để vẽ mã xem trước, nên ghi đè thẳng mà không vẽ lại màn. */
+function refreshCountersApply(counters) {
+  if (!counters || typeof counters !== 'object' || !Store.config) { return false; }
+  Store.config.counters = Object.assign({}, Store.config.counters || {}, counters);
+  return true;
+}
+
 function refreshRecordsApply(result, requestedIds) {
   if (!result || !result.ok) { return { ok: false, applied: false }; }
+  refreshCountersApply(result.counters);
   var ids = (requestedIds || []).map(function (id) { return String(id || ''); });
   var affectedCustomerIds = result.affectedCustomerIds || ids;
   var customers = ingestUnpack(result.customer.fields, result.customer.rows);
@@ -101,7 +109,8 @@ function refreshReloadPayload(payload) {
       customer: payload.customer || { fields: [], rows: [] },
       activity: payload.activity || { fields: [], rows: [] },
       affectedCustomerIds: payload.affectedCustomerIds || [],
-      removedRecordIds: payload.removedRecordIds || []
+      removedRecordIds: payload.removedRecordIds || [],
+      counters: payload.counters
     }, payload.affectedCustomerIds || []);
     return payload;
   }
@@ -151,6 +160,7 @@ function refreshEntityApply(entity, result) {
   if (!result || !result.ok) { return result; }
   var block = result[entity];
   if (!block) { return result; }
+  refreshCountersApply(result.counters);
   var records = ingestUnpack(block.fields, block.rows);
   var seen = {};
   var affectedCustomerIds = [];
