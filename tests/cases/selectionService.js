@@ -249,7 +249,7 @@ function chay(so) {
     [typeof hop.probeSelectionFull, typeof hop.probeSelectionCheap, calls, typeof finalViewReport[finalViewReport.length - 1]],
     ['undefined', 'undefined', [['viewProbeSelection', 'sidebar', 'throw']], 'string']);
 
-  section('SelectionService — sheet xem tự do: đọc cột mã, chỉ đọc, trả plan cho Sidebar');
+  section('SelectionService — sheet xem tự do: GAS đọc hộ cột mã khi không có Extension, chỉ đọc');
   const tuDo = (ten, hang1, dong) => {
     const sheet = nen.book.insertSheet(ten);
     hang1.forEach((ma, i) => sheet.getRange(1, i + 1).setValue(ma));
@@ -262,27 +262,22 @@ function chay(so) {
   const demTuDo = JSON.stringify(nen.dem);
   Object.assign(state, { sheetName: 'Bao cao', row: 5, col: 1, rowEnd: 5, colEnd: 1 });
   const baoCao = hop.probeSelectionAndReload({});
-  check(so, 'sheet tự do có cả hai mã: đọc @CUS_MA_KH trước, trả plan đủ hai cột theo đúng tên sheet',
-    [baoCao.customerId, baoCao.sheetPlan],
-    ['CUS-000005', { sheetName: 'Bao cao', items: [
-      { token: 'Bao cao:@CUS_MA_KH', headerAddress: 'B1', expectedValue: '@CUS_MA_KH', valueAddressTemplate: 'B{row}' },
-      { token: 'Bao cao:@ACT_MA_KH', headerAddress: 'C1', expectedValue: '@ACT_MA_KH', valueAddressTemplate: 'C{row}' }] }]);
+  check(so, 'sheet tự do có cả hai mã: đọc @CUS_MA_KH trước, không trả plan (plan sheet tự do do Sidebar dựng)', [baoCao.customerId, baoCao.sheetPlan], ['CUS-000005', undefined]);
   Object.assign(state, { sheetName: 'Chi giao dich', row: 4, rowEnd: 4 });
   check(so, 'sheet tự do thiếu @CUS_MA_KH thì đọc @ACT_MA_KH', hop.probeSelectionAndReload({}).customerId, 'CUS-000041');
   state.sheetName = 'Trung ma';
   const trung = hop.probeSelectionAndReload({});
-  check(so, 'sheet tự do có @CUS_MA_KH bị nhân đôi: không đoán cột, dùng @ACT_MA_KH',
-    [trung.customerId, trung.sheetPlan.items.map((item) => item.expectedValue)], ['CUS-000043', ['@ACT_MA_KH']]);
+  check(so, 'sheet tự do có @CUS_MA_KH bị nhân đôi: không đoán cột, dùng @ACT_MA_KH', trung.customerId, 'CUS-000043');
   state.sheetName = 'Khong ma';
   const khongMa = hop.probeSelectionAndReload({});
-  check(so, 'sheet tự do không có cột mã: mã rỗng, plan rỗng để Sidebar nhớ không hỏi lại', [khongMa.customerId, khongMa.sheetPlan], ['', { sheetName: 'Khong ma', items: [] }]);
+  check(so, 'sheet tự do không có cột mã: mã rỗng, không lấy nhầm ô trông giống mã', khongMa.customerId, '');
   Object.assign(state, { sheetName: 'Bao cao', row: 5, rowEnd: 5 });
   const truoc = hop.probeSelectionAndReload({});
   const dungYen = hop.probeSelectionAndReload({ previousSelectionContext: truoc.selection, previousCustomerId: 'CUS-CU' });
   const canDoc = hop.probeSelectionAndReload({ previousSelectionContext: truoc.selection, previousCustomerId: 'CUS-CU', needsSelection: true });
-  check(so, 'vị trí không đổi thì không đọc và không trả plan; Sidebar báo needsSelection (Extension đọc hỏng) thì GAS đọc thay',
-    [dungYen.customerId, dungYen.sheetPlan, canDoc.customerId, canDoc.selection.customerIdChanged, canDoc.sheetPlan.items.length], ['CUS-CU', null, 'CUS-000005', true, 2]);
-  check(so, 'sheet kho và sheet ! không trả plan sheet tự do', [hop.selectionIsFreeSheet('Customer'), hop.selectionIsFreeSheet('Config'), hop.selectionIsFreeSheet('!Lead'), hop.selectionIsFreeSheet('Bao cao')], [false, false, false, true]);
+  check(so, 'vị trí không đổi thì không đọc; Sidebar báo needsSelection (Extension đọc hỏng ở sheet kho) thì GAS đọc thay',
+    [dungYen.customerId, canDoc.customerId, canDoc.selection.customerIdChanged], ['CUS-CU', 'CUS-000005', true]);
+  check(so, 'chỉ sheet ngoài kho và ngoài ! mới là sheet tự do', [hop.selectionIsFreeSheet('Customer'), hop.selectionIsFreeSheet('Config'), hop.selectionIsFreeSheet('!Lead'), hop.selectionIsFreeSheet('Bao cao')], [false, false, false, true]);
   check(so, 'mọi lời hỏi trên sheet tự do không ghi ô nào: bộ đếm lệnh ghi của tệp giả không đổi', JSON.parse(JSON.stringify(nen.dem)), JSON.parse(demTuDo));
 
   return so;

@@ -136,36 +136,25 @@ function selectionPlanItem(key, code, column, withValue) {
   return { token: key + ':' + code, headerAddress: letters + '1', expectedValue: code, valueAddressTemplate: withValue ? letters + '{row}' : '' };
 }
 
-/** Sheet xem tự do: mọi sheet ngoài bốn sheet kho và sheet `!`. GAS chỉ đọc sheet này, không bao giờ ghi. */
+/** Sheet xem tự do: mọi sheet ngoài bốn sheet kho và sheet `!`. GAS chỉ đọc hộ ô mã khi Extension không đọc được, không bao giờ ghi. */
 function selectionIsFreeSheet(sheetName) {
   var name = String(sheetName || '');
   return !!name && name.charAt(0) !== '!' && [ENTITY_SHEETS.customer, ENTITY_SHEETS.activity, 'Category', 'Config'].indexOf(name) < 0;
 }
 
-/**
- * Read plan của một sheet xem tự do, dựng từ đúng một lần đọc hàng 1: cột mã khách trước, cột mã khách của giao dịch sau, nên mục đầu tiên là cột GAS dùng để đọc mã. Mã thiếu hoặc bị nhân đôi thì bỏ, không đoán.
- *
- * Plan về Sidebar trong lời hỏi để Extension đọc tiếp được các lần nhấp sau mà không cần GAS; mảng rỗng nghĩa là sheet không có cột mã, Sidebar nhớ để không hỏi lại.
- */
-function selectionFreeSheetPlan(sheet, sheetName) {
+/** Cột mã khách của sheet xem tự do, từ đúng một lần đọc hàng 1: `@CUS_MA_KH` trước, thiếu thì `@ACT_MA_KH`. Mã thiếu hoặc bị nhân đôi thì bỏ, không đoán. Chỉ dùng khi không có Extension đọc. */
+function selectionFreeSheetColumn(sheet) {
   var lastColumn = sheet.getLastColumn();
-  if (lastColumn < 1) { return []; }
+  if (lastColumn < 1) { return 0; }
   var header = sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(function (value) {
     return String(value === null || value === undefined ? '' : value).trim();
   });
-  return [DATA_SCHEMA.customer.id.code, DATA_SCHEMA.activity.customerId.code].map(function (code) {
-    var first = header.indexOf(code);
-    if (first < 0 || header.indexOf(code, first + 1) >= 0) { return null; }
-    return selectionPlanItem(sheetName, code, first + 1, true);
-  }).filter(Boolean);
-}
-
-/** Ngược của `selectionColumnLetters` cho địa chỉ dạng `AB1`. */
-function selectionColumnNumber(address) {
-  var letters = String(address || '').replace(/[^A-Z]/g, '');
-  var column = 0;
-  for (var i = 0; i < letters.length; i++) { column = column * 26 + letters.charCodeAt(i) - 64; }
-  return column;
+  var codes = [DATA_SCHEMA.customer.id.code, DATA_SCHEMA.activity.customerId.code];
+  for (var i = 0; i < codes.length; i++) {
+    var first = header.indexOf(codes[i]);
+    if (first >= 0 && header.indexOf(codes[i], first + 1) < 0) { return first + 1; }
+  }
+  return 0;
 }
 
 /** Kế hoạch đọc thô: Extension chỉ đọc đúng địa chỉ và trả giá trị, không biết token có ý nghĩa gì. */
@@ -245,8 +234,7 @@ function probeSelectionAndReload(input) {
     var previousCustomerId = String(request.previousCustomerId || (previous && previous.customerId) || '').trim();
     // Extension đọc hỏng thì vị trí Sidebar gửi lên đã là vị trí mới, so vị trí sẽ không thấy đổi; cờ `needsSelection` bắt GAS đọc thay.
     var readSelection = positionChanged || request.needsSelection === true;
-    var sheetPlan = readSelection && context.sheet && selectionIsFreeSheet(snapshot.sheetName) ? selectionFreeSheetPlan(context.sheet, snapshot.sheetName) : null;
-    var customerId = readSelection ? selectionCustomerId(context, snapshot, sheetPlan) : previousCustomerId;
+    var customerId = readSelection ? selectionCustomerId(context, snapshot) : previousCustomerId;
     var state = reloadStateRead();
     var decision = typeof reloadDecisionForState === 'function'
       ? reloadDecisionForState({
@@ -306,7 +294,6 @@ function probeSelectionAndReload(input) {
       dirty: dirtyStateRead(),
       decision: ready && reloadResult ? Object.assign({}, decision, { executed: true, resultMode: reloadResult.reloadMode }) : decision,
       payload: payload,
-      sheetPlan: sheetPlan ? { sheetName: snapshot.sheetName, items: sheetPlan } : null,
       view: selectionViewDecision(selection.sheetName, latest),
       observedRevision: state ? Number(state.revision || 0) : 0,
       processedRevision: processedRevision,
@@ -319,8 +306,8 @@ function probeSelectionAndReload(input) {
   });
 }
 
-/** Đổi dòng đang chọn thành mã khách bằng cách đọc đúng cột mã của chính sheet đó. Sheet xem tự do dùng plan đã dựng trong cùng lời hỏi (`freePlan`) để không đọc hàng 1 hai lần. */
-function selectionCustomerId(context, snapshot, freePlan) {
+/** Đổi dòng đang chọn thành mã khách bằng cách đọc đúng cột mã của chính sheet đó. */
+function selectionCustomerId(context, snapshot) {
   if (!snapshot.sheetName || snapshot.row < SHEET_FIRST_DATA_ROW || !context.sheet) { return ''; }
 
   var column = 0;
@@ -329,8 +316,7 @@ function selectionCustomerId(context, snapshot, freePlan) {
   } else if (snapshot.sheetName === ENTITY_SHEETS.activity) {
     column = selectionColumnIndex(context.sheet, DATA_SCHEMA.activity.customerId.code);
   } else if (selectionIsFreeSheet(snapshot.sheetName)) {
-    var items = freePlan || selectionFreeSheetPlan(context.sheet, snapshot.sheetName);
-    column = items.length ? selectionColumnNumber(items[0].headerAddress) : 0;
+    column = selectionFreeSheetColumn(context.sheet);
   }
   if (!column) { return ''; }
   var value = context.sheet.getRange(snapshot.row, column).getValue();

@@ -175,43 +175,38 @@ async function chay(so) {
   check(so, 'Extension đọc hỏng: lần click sau vẫn mở đúng khách nhưng chỉ báo Log một lần mỗi phiên',
     [pickedDown, readerDown._calls[1].args[0].extensionReadFailure], [['CUS-000004', 'CUS-000005'], '']);
 
-  // Sheet xem tự do: Sidebar chưa biết sheet có cột mã hay không thì hỏi GAS đúng một lần, nhớ plan GAS trả về rồi để Extension đọc tiếp.
-  const freePlanItems = [{ token: 'Bao cao:@CUS_MA_KH', headerAddress: 'B1', expectedValue: '@CUS_MA_KH', valueAddressTemplate: 'B{row}' }];
+  // Sheet xem tự do: Sidebar chép mẫu `!` thành khóa theo tên sheet để Extension dò lưới; không hỏi GAS, không báo bộ đọc hỏng.
+  const mauView = [
+    { token: '!:@CUS_MA_KH', headerAddress: 'A1', expectedValue: '@CUS_MA_KH', valueAddressTemplate: 'A{row}' },
+    { token: '!:@ACT_MA_KH', headerAddress: 'B1', expectedValue: '@ACT_MA_KH', valueAddressTemplate: 'B{row}' }];
+  const planCoBan = Object.assign({ Activity: [], Category: [], Config: [], '!': mauView }, plan);
   const free = dungHopPoll(); batDau(free); free._calls = [];
-  free.SHEET_LINK_READ_PLAN = Object.assign({ Activity: [], Category: [], Config: [], '!': [] }, plan);
+  free.SHEET_LINK_READ_PLAN = JSON.parse(JSON.stringify(planCoBan));
   free.SHEET_LINK_LAST_ACK = 5000; free._clock.now = 5001;
   free.Store = { hasCustomer: (id) => /^CUS-00000[4-6]$/.test(id) };
   const pickedFree = [];
   free.ACTIONS.setCurrentCustomer = (input) => { pickedFree.push(input.pick); };
-  let freeReply = { ok: true, reload: { revision: 0 }, sheetPlan: { sheetName: 'Bao cao', items: freePlanItems }, selection: { spreadsheetId: 'sheet-1', gid: '9', sheetName: 'Bao cao', cellRef: 'C4', row: 4, col: 3, rowEnd: 4, colEnd: 3, customerId: 'CUS-000004' } };
-  free.callServer = (name, args, options) => { free._calls.push({ name, args, options }); return syncValue(freeReply); };
-  const freeContext = (seq, row, extra) => Object.assign({ action: 'CRM_CONTEXT', nonce: free.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq, gid: '9', sheetName: 'Bao cao', cellRef: 'C' + row, row, col: 3, readStatus: 'unavailable', readReason: 'LIVE_GRID_NOT_FOUND', rawHeaderRow: [], reads: [] }, extra || {});
-  check(so, 'sheet tự do chưa phân loại: sheetLinkPlanForSheet trả mảng rỗng và được coi là chưa phân loại',
-    [free.sheetLinkPlanForSheet('Bao cao'), free.sheetLinkSheetUnclassified('Bao cao'), free.sheetLinkSheetUnclassified('Customer'), free.sheetLinkSheetUnclassified('!lead')], [[], true, false, false]);
+  free.callServer = (name, args, options) => { free._calls.push({ name, args, options }); return syncValue({ ok: true, reload: { revision: 0 } }); };
+  const freeContext = (seq, row, extra) => Object.assign({ action: 'CRM_CONTEXT', nonce: free.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq, gid: '9', sheetName: 'Bao cao', cellRef: 'C' + row, row, col: 3, readStatus: 'unavailable', readReason: 'LIVE_GRID_SEARCHING', rawHeaderRow: [], reads: [] }, extra || {});
+  check(so, 'chỉ sheet ngoài kho và ngoài ! là sheet tự do',
+    [free.sheetLinkIsFreeSheet('Bao cao'), free.sheetLinkIsFreeSheet('Customer'), free.sheetLinkIsFreeSheet('Category'), free.sheetLinkIsFreeSheet('!lead')], [true, false, false, false]);
   free.sheetLinkOnMessage({ origin: free.SHEET_LINK_ORIGIN, data: freeContext(1, 4) });
-  check(so, 'sheet tự do chưa phân loại: đúng một lời hỏi sau nhịp đổi vị trí, mang needsSelection, không báo Log hỏng bộ đọc',
-    [runTimer(free, 1000), free._calls.length, free._calls[0].args[0].needsSelection, free._calls[0].args[0].extensionReadFailure], [1000, 1, true, '']);
-  check(so, 'sheet tự do: Sidebar nhớ plan GAS trả về theo đúng tên sheet và mở khách GAS đọc thay',
-    [free.sheetLinkPlanForSheet('Bao cao'), free.sheetLinkSheetUnclassified('Bao cao'), pickedFree], [freePlanItems, false, ['CUS-000004']]);
-
-  free.SHEET_LINK_SELECTION_PENDING = null; free._calls = [];
-  free.sheetLinkOnMessage({ origin: free.SHEET_LINK_ORIGIN, data: freeContext(2, 5, { readStatus: 'ok', readReason: '', rawHeaderRow: [{ address: 'B1', column: 2, value: '@CUS_MA_KH' }], reads: [{ token: 'Bao cao:@CUS_MA_KH', status: 'ok', matched: true, value: 'CUS-000005' }] }) });
-  check(so, 'sheet tự do có plan, Extension đọc ok: 0 lời hỏi, 0 hẹn giờ đánh thức, mở đúng khách Extension đọc',
-    [free._calls.length, runTimer(free, 1000), pickedFree], [0, null, ['CUS-000004', 'CUS-000005']]);
-
-  freeReply = Object.assign({}, freeReply, { sheetPlan: { sheetName: 'Bao cao', items: freePlanItems }, selection: Object.assign({}, freeReply.selection, { cellRef: 'C6', row: 6, customerId: 'CUS-000006' }) });
-  free.sheetLinkOnMessage({ origin: free.SHEET_LINK_ORIGIN, data: freeContext(3, 6) });
-  check(so, 'sheet tự do có plan, Extension đọc hỏng ở vị trí mới: đúng một lời hỏi mang extensionReadFailure và needsSelection',
-    [runTimer(free, 1000), free._calls.length, free._calls[0].args[0].extensionReadFailure, free._calls[0].args[0].needsSelection, pickedFree[2]], [1000, 1, 'LIVE_GRID_NOT_FOUND', true, 'CUS-000006']);
-
-  free.SHEET_LINK_SELECTION_PENDING = null; free._calls = [];
-  freeReply = { ok: true, reload: { revision: 0 }, sheetPlan: { sheetName: 'Ghi chu', items: [] }, selection: { spreadsheetId: 'sheet-1', gid: '10', sheetName: 'Ghi chu', cellRef: 'A4', row: 4, col: 1, rowEnd: 4, colEnd: 1, customerId: '' } };
-  free.sheetLinkOnMessage({ origin: free.SHEET_LINK_ORIGIN, data: freeContext(4, 4, { gid: '10', sheetName: 'Ghi chu', cellRef: 'A4', col: 1 }) });
-  runTimer(free, 1000);
-  free.SHEET_LINK_SELECTION_PENDING = null;
-  free.sheetLinkOnMessage({ origin: free.SHEET_LINK_ORIGIN, data: freeContext(5, 7, { gid: '10', sheetName: 'Ghi chu', cellRef: 'A7', col: 1 }) });
-  check(so, 'sheet không có cột mã: hỏi GAS đúng một lần, nhớ plan rỗng, lần đổi vị trí sau không hỏi và không hẹn giờ',
-    [free._calls.length, free.sheetLinkSheetUnclassified('Ghi chu'), runTimer(free, 1000)], [1, false, null]);
+  check(so, 'sheet tự do lần đầu: plan có khóa đúng tên sheet chép từ mẫu !, 0 lời hỏi GAS, 0 hẹn giờ, không băng cảnh báo',
+    [free.sheetLinkPlanForSheet('Bao cao'), free._calls.length, runTimer(free, 1000), free._banner.hidden], [mauView, 0, null, true]);
+  free.sheetLinkOnMessage({ origin: free.SHEET_LINK_ORIGIN, data: freeContext(2, 5, { readStatus: 'ok', readReason: '', rawHeaderRow: [{ address: 'C1', column: 3, value: '@CUS_MA_KH' }], reads: [{ token: '!:@CUS_MA_KH', status: 'ok', matched: true, value: 'CUS-000005' }] }) });
+  check(so, 'sheet tự do có hàng 1: plan chỉ giữ mã có thật, đúng cột theo hàng 1; mẫu ! không đổi; mở đúng khách, 0 lời hỏi',
+    [free.sheetLinkPlanForSheet('Bao cao'), free.SHEET_LINK_READ_PLAN['!'], pickedFree, free._calls.length],
+    [[{ token: '!:@CUS_MA_KH', headerAddress: 'C1', expectedValue: '@CUS_MA_KH', valueAddressTemplate: 'C{row}' }], mauView, ['CUS-000005'], 0]);
+  free.sheetLinkOnMessage({ origin: free.SHEET_LINK_ORIGIN, data: freeContext(3, 5, { readStatus: 'ok', readReason: '', rawHeaderRow: [{ address: 'C1', column: 3, value: '@CUS_MA_KH' }, { address: 'AB1', column: 28, value: '@ACT_MA_KH' }], reads: [] }) });
+  check(so, 'sheet tự do được thêm cột mã sau đó: plan dựng lại từ mẫu ! nên có thêm mã mới, đúng cột AB',
+    free.sheetLinkPlanForSheet('Bao cao').map((item) => item.valueAddressTemplate), ['C{row}', 'AB{row}']);
+  free.sheetLinkOnMessage({ origin: free.SHEET_LINK_ORIGIN, data: freeContext(4, 6, { gid: '10', sheetName: 'Ghi chu', readReason: 'LIVE_GRID_NOT_FOUND' }) });
+  free.sheetLinkOnMessage({ origin: free.SHEET_LINK_ORIGIN, data: freeContext(5, 7, { gid: '10', sheetName: 'Ghi chu', readReason: 'LIVE_GRID_NOT_FOUND' }) });
+  check(so, 'sheet tự do không có cột mã (Extension không tìm thấy lưới): đổi vị trí 0 lời hỏi, 0 hẹn giờ, không báo bộ đọc hỏng, giữ khách đang xem',
+    [free._calls.length, runTimer(free, 1000), free._banner.hidden, free.sheetLinkReaderFailureInput(), pickedFree], [0, null, true, '', ['CUS-000005']]);
+  free.sheetLinkApplyCoreHints({ spreadsheetId: 'sheet-1', selectionHints: { readPlan: JSON.parse(JSON.stringify(planCoBan)) } });
+  check(so, 'nạp core xong thì bỏ khóa sheet tự do cũ, lần ghé sau chép lại từ mẫu mới',
+    [Object.prototype.hasOwnProperty.call(free.SHEET_LINK_READ_PLAN, 'Bao cao'), free.SHEET_LINK_FREE_SHEETS, free.sheetLinkIsFreeSheet('Bao cao')], [false, {}, true]);
 
   free.SHEET_LINK_SELECTION_PENDING = { then: () => null };
   free.sheetLinkProbeSelectionAndReload('position', { needsSelection: true });

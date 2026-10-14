@@ -41,6 +41,7 @@ var SHEET_LINK_PREVIOUS_CUSTOMER_ID = '';
 var SHEET_LINK_SELECTION_PENDING = null;
 var SHEET_LINK_SELECTION_WAKE_QUEUED = false;
 var SHEET_LINK_SELECTION_WAKE_NEEDS_READ = false;
+var SHEET_LINK_FREE_SHEETS = {};
 var SHEET_LINK_CONTEXT_GENERATION = 0;
 var SHEET_LINK_LAST_SEEN_REVISION = 0;
 var SHEET_LINK_PING_TIMER = null;
@@ -97,21 +98,52 @@ function sheetLinkSetReadPlan(plan) {
   }
 }
 
+/**
+ * Sheet xem tự do: mọi sheet ngoài các sheet kho (có khóa riêng trong plan GAS gửi) và sheet `!`.
+ * Extension chỉ nhận plan theo đúng tên sheet hoặc khóa `!`, nên Sidebar chép mẫu `!` thành khóa theo tên sheet tự do; `SHEET_LINK_FREE_SHEETS` nhớ khóa nào do Sidebar thêm để không nhầm với sheet kho.
+ */
+function sheetLinkIsFreeSheet(sheetName) {
+  var name = String(sheetName || '');
+  if (!name || name.charAt(0) === '!' || !SHEET_LINK_READ_PLAN) { return false; }
+  return SHEET_LINK_FREE_SHEETS[name] === true || !Object.prototype.hasOwnProperty.call(SHEET_LINK_READ_PLAN, name);
+}
+
+/** Đổi số cột thành chữ cột kiểu A, Z, AA. */
+function sheetLinkColumnLetters(column) {
+  var value = Number(column || 0);
+  var letters = '';
+  while (value > 0) { letters = String.fromCharCode(65 + ((value - 1) % 26)) + letters; value = Math.floor((value - 1) / 26); }
+  return letters;
+}
+
+/**
+ * Sửa read plan theo hàng 1 Extension vừa gửi, cho sheet `!` (khóa chung `!`) và sheet xem tự do (khóa theo tên, chép từ mẫu `!`).
+ * Sheet tự do lần đầu xuất hiện thì thêm khóa từ mẫu `!` để Extension dò lưới bằng chính các mã cột trong mẫu; mã cột lấy từ `DATA_SCHEMA` qua GAS, Sidebar không gõ cứng.
+ * Sheet tự do đã có hàng 1 thì chỉ giữ mục có mã thật ở hàng 1, để thiếu một trong hai mã không làm cả lượt đọc thành lệch.
+ */
 function sheetLinkRefreshViewReadPlan(context) {
-  if (!context || String(context.sheetName || '').indexOf('!') !== 0 || !Array.isArray(context.rawHeaderRow) || !SHEET_LINK_READ_PLAN || !Array.isArray(SHEET_LINK_READ_PLAN['!'])) { return; }
-  var headers = context.rawHeaderRow;
-  var dynamic = SHEET_LINK_READ_PLAN['!'].map(function (item) {
-    var match = headers.filter(function (header) { return String(header.value || '').trim() === String(item.expectedValue || '').trim(); })[0];
-    if (!match) { return item; }
-    var column = Number(match.column || 0);
-    var letters = '';
-    while (column > 0) { letters = String.fromCharCode(65 + ((column - 1) % 26)) + letters; column = Math.floor((column - 1) / 26); }
-    return Object.assign({}, item, { headerAddress: match.address, valueAddressTemplate: letters + '{row}' });
-  });
-  if (JSON.stringify(dynamic) !== JSON.stringify(SHEET_LINK_READ_PLAN['!'])) {
-    var next = Object.assign({}, SHEET_LINK_READ_PLAN, { '!': dynamic });
-    sheetLinkSetReadPlan(next);
+  var name = String(context && context.sheetName || '');
+  if (!name || !SHEET_LINK_READ_PLAN || !Array.isArray(SHEET_LINK_READ_PLAN['!'])) { return; }
+  var free = sheetLinkIsFreeSheet(name);
+  if (!free && name.charAt(0) !== '!') { return; }
+  var key = free ? name : '!';
+  var current = Array.isArray(SHEET_LINK_READ_PLAN[key]) ? SHEET_LINK_READ_PLAN[key] : SHEET_LINK_READ_PLAN['!'];
+  var headers = Array.isArray(context.rawHeaderRow) ? context.rawHeaderRow : [];
+  var dynamic = current;
+  if (headers.length) {
+    var template = free ? SHEET_LINK_READ_PLAN['!'] : current;
+    dynamic = template.map(function (item) {
+      var match = headers.filter(function (header) { return String(header.value || '').trim() === String(item.expectedValue || '').trim(); })[0];
+      if (!match) { return free ? null : item; }
+      var letters = sheetLinkColumnLetters(match.column);
+      return Object.assign({}, item, { headerAddress: match.address, valueAddressTemplate: letters + '{row}' });
+    }).filter(Boolean);
   }
+  if (free && !SHEET_LINK_FREE_SHEETS[name]) { SHEET_LINK_FREE_SHEETS[name] = true; }
+  else if (JSON.stringify(dynamic) === JSON.stringify(SHEET_LINK_READ_PLAN[key])) { return; }
+  var next = Object.assign({}, SHEET_LINK_READ_PLAN);
+  next[key] = dynamic;
+  sheetLinkSetReadPlan(next);
 }
 
 /** Đồng bộ hint cột từ payload core; dùng lại sau mỗi fullCore để schema mới không giữ map cũ. */
@@ -119,6 +151,7 @@ function sheetLinkApplyCoreHints(core) {
   if (!core || !core.selectionHints || typeof sheetLinkSetReadPlan !== 'function') { return; }
   sheetLinkSetSpreadsheetId(core.spreadsheetId);
   SHEET_LINK_SCHEMA = core.schema || SHEET_LINK_SCHEMA;
+  SHEET_LINK_FREE_SHEETS = {};
   sheetLinkSetReadPlan(core.selectionHints.readPlan || null);
 }
 
@@ -127,10 +160,11 @@ function sheetLinkSetRamReady(ready) { SHEET_LINK_RAM_READY = ready === true; }
 
 /**
  * Ghi kết quả đọc của Extension cho sheet có read plan; trả true khi Extension đã tự đọc được.
- * Sheet không có read plan không cần mã khách nên không đổi tình trạng bộ đọc.
+ * Sheet không có read plan không cần mã khách nên không đổi tình trạng bộ đọc. Sheet xem tự do cũng vậy: Extension không tìm thấy lưới ở đó thường chỉ vì sheet không có cột mã, nên không hỏi GAS và không báo bộ đọc hỏng; bộ đọc hỏng thật vẫn lộ ra ở sheet kho.
  */
 function sheetLinkRecordExtensionRead(context) {
-  if (!sheetLinkPlanForSheet(context && context.sheetName).length) { return !sheetLinkSheetUnclassified(context && context.sheetName); }
+  var sheetName = context && context.sheetName;
+  if (!sheetLinkPlanForSheet(sheetName).length || sheetLinkIsFreeSheet(sheetName)) { return true; }
   var next = { status: String(context.readStatus || ''), reason: String(context.readReason || '') };
   var changed = next.status !== SHEET_LINK_EXTENSION_READ.status || next.reason !== SHEET_LINK_EXTENSION_READ.reason;
   SHEET_LINK_EXTENSION_READ = next;
@@ -300,26 +334,6 @@ function sheetLinkParseNameBox(value) {
     return { row: 1, col: columnNumber(parts[0]), rowEnd: 0, colEnd: columnNumber(parts[1]) };
   }
   return null;
-}
-
-/**
- * Sheet xem tự do chưa biết có cột mã khách hay không: Extension chưa có plan nên không đọc được, phải hỏi GAS một lần. GAS trả plan của sheet đó (`sheetPlan`, rỗng nếu không có cột mã) và Sidebar nhớ đến hết phiên hoặc tới lượt nạp core sau.
- * Bốn sheet kho luôn có khóa trong plan GAS gửi, sheet `!` dùng khóa `!`, nên chỉ sheet tự do mới có thể chưa phân loại.
- */
-function sheetLinkSheetUnclassified(sheetName) {
-  var name = String(sheetName || '');
-  return !!SHEET_LINK_READ_PLAN && !!name && name.charAt(0) !== '!' && !Object.prototype.hasOwnProperty.call(SHEET_LINK_READ_PLAN, name);
-}
-
-/** Nhận plan sheet tự do từ GAS rồi gửi lại Extension; Extension gửi lại vị trí hiện tại kèm giá trị đọc được. */
-function sheetLinkStoreSheetPlan(sheetPlan) {
-  if (!SHEET_LINK_READ_PLAN || !sheetPlan || !Array.isArray(sheetPlan.items)) { return; }
-  var name = String(sheetPlan.sheetName || '');
-  if (!name || name.charAt(0) === '!') { return; }
-  if (JSON.stringify(SHEET_LINK_READ_PLAN[name]) === JSON.stringify(sheetPlan.items)) { return; }
-  var next = Object.assign({}, SHEET_LINK_READ_PLAN);
-  next[name] = sheetPlan.items;
-  sheetLinkSetReadPlan(next);
 }
 
 function sheetLinkPlanForSheet(sheetName) {
@@ -504,7 +518,6 @@ function sheetLinkProbeSelectionAndReload(reason, options) {
     silent: SHEET_LINK_SHOW_PROBE_PROGRESS_DEBUG !== true
   });
   var settled = request.then(function (result) {
-    if (result && result.sheetPlan) { sheetLinkStoreSheetPlan(result.sheetPlan); }
     // Extension chỉ giữ quyền chọn khách khi tự đọc được ở sheet đang đứng; đọc hỏng hoặc sheet chưa có plan thì mã do GAS đọc thay mới là nguồn đúng.
     var extensionOwnsContext = sheetLinkExtensionAlive() && !!SHEET_LINK_LAST_CONTEXT && sheetLinkPlanForSheet(SHEET_LINK_LAST_CONTEXT.sheetName).length > 0 && SHEET_LINK_EXTENSION_READ.status === 'ok';
     var contextIsCurrent = contextGeneration === SHEET_LINK_CONTEXT_GENERATION;
