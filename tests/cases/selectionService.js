@@ -280,6 +280,27 @@ function chay(so) {
   check(so, 'chỉ sheet ngoài kho và ngoài ! mới là sheet tự do', [hop.selectionIsFreeSheet('Customer'), hop.selectionIsFreeSheet('Config'), hop.selectionIsFreeSheet('!Lead'), hop.selectionIsFreeSheet('Bao cao')], [false, false, false, true]);
   check(so, 'mọi lời hỏi trên sheet tự do không ghi ô nào: bộ đếm lệnh ghi của tệp giả không đổi', JSON.parse(JSON.stringify(nen.dem)), JSON.parse(demTuDo));
 
+  section('SelectionService — lời hỏi rẻ: Extension đã đọc được vị trí thì GAS không chạm bảng tính');
+  const daBiet = hop.probeSelectionAndReload({}).selection;
+  const goc = { app: hop.SpreadsheetApp, mo: hop.shinOpenBook, sheet: nen.book.getActiveSheet };
+  const cham = [];
+  const camCham = (ten) => function () { cham.push(ten); throw new Error('lời hỏi rẻ chạm ' + ten); };
+  hop.SpreadsheetApp = new Proxy({}, { get: (_, ten) => camCham('SpreadsheetApp.' + String(ten)) });
+  hop.shinOpenBook = camCham('shinOpenBook');
+  nen.book.getActiveSheet = camCham('getActiveSheet');
+  let re;
+  try {
+    re = hop.probeSelectionAndReload({ skipPosition: true, previousSelectionContext: daBiet, previousCustomerId: 'CUS-EXT', reason: 'signal' });
+  } catch (err) {
+    re = { loi: err.message };
+  }
+  Object.assign(hop, { SpreadsheetApp: goc.app, shinOpenBook: goc.mo });
+  nen.book.getActiveSheet = goc.sheet;
+  check(so, 'skipPosition: không gọi SpreadsheetApp, giữ mã khách Extension đọc, không trả vị trí, vẫn quyết định sheet theo vị trí Sidebar gửi',
+    [cham, re.loi, re.ok, re.customerId, re.selection, !!re.view], [[], undefined, true, 'CUS-EXT', null, true]);
+  const reCanDoc = hop.probeSelectionAndReload({ skipPosition: true, needsSelection: true, previousSelectionContext: daBiet, previousCustomerId: 'CUS-EXT' });
+  check(so, 'skipPosition kèm needsSelection (Extension đọc hỏng) thì GAS vẫn mở bảng tính đọc thay', [reCanDoc.customerId, reCanDoc.selection && reCanDoc.selection.customerIdChanged], ['CUS-000005', true]);
+
   return so;
 }
 

@@ -35,6 +35,22 @@ function selectionSnapshotFromContext(context) {
   };
 }
 
+/** Vị trí Sidebar đã biết, dùng khi lời hỏi không mở bảng tính; chỉ lấy trường vị trí để không mang ngược mã khách cũ vào ảnh chụp. */
+function selectionKnownSnapshot(previous) {
+  var value = previous || {};
+  return {
+    spreadsheetId: String(value.spreadsheetId || ''),
+    gid: String(value.gid || ''),
+    sheetName: String(value.sheetName || ''),
+    cellRef: String(value.cellRef || ''),
+    row: Number(value.row) || 0,
+    col: Number(value.col) || 0,
+    rowEnd: Number(value.rowEnd) || 0,
+    colEnd: Number(value.colEnd) || 0,
+    selectionKind: String(value.selectionKind || 'none')
+  };
+}
+
 function selectionProbeReply(snapshot, started, customerId) {
   var reply = {
     ok: true,
@@ -227,13 +243,15 @@ function probeSelectionAndReload(input) {
     var requestId = selectionReloadRequestId(request);
     selectionLogReaderFailure(request.extensionReadFailure);
     selectionLogChannelSilence(request.channelSilence);
-    var context = selectionProbeContext();
-    var snapshot = selectionSnapshotFromContext(context);
     var previous = request.previousSelectionContext || request.selectionContext || null;
-    var positionChanged = selectionContextPositionChanged(previous, snapshot);
     var previousCustomerId = String(request.previousCustomerId || (previous && previous.customerId) || '').trim();
+    // Extension đã đọc được vị trí và mã khách thì GAS không mở bảng tính: vị trí Sidebar gửi lên là nguồn đúng, lời hỏi chỉ còn việc reload.
+    var readPosition = request.skipPosition !== true || request.needsSelection === true;
+    var context = readPosition ? selectionProbeContext() : null;
+    var snapshot = context ? selectionSnapshotFromContext(context) : selectionKnownSnapshot(previous);
+    var positionChanged = context ? selectionContextPositionChanged(previous, snapshot) : false;
     // Extension đọc hỏng thì vị trí Sidebar gửi lên đã là vị trí mới, so vị trí sẽ không thấy đổi; cờ `needsSelection` bắt GAS đọc thay.
-    var readSelection = positionChanged || request.needsSelection === true;
+    var readSelection = !!context && (positionChanged || request.needsSelection === true);
     var customerId = readSelection ? selectionCustomerId(context, snapshot) : previousCustomerId;
     var state = reloadStateRead();
     var decision = typeof reloadDecisionForState === 'function'
@@ -288,7 +306,7 @@ function probeSelectionAndReload(input) {
     return {
       ok: true,
       requestId: requestId,
-      selection: selection,
+      selection: context ? selection : null,
       customerId: customerId,
       reload: latest,
       dirty: dirtyStateRead(),

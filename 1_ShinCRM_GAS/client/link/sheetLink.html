@@ -164,12 +164,14 @@ function sheetLinkSetRamReady(ready) { SHEET_LINK_RAM_READY = ready === true; }
  */
 function sheetLinkRecordExtensionRead(context) {
   var sheetName = context && context.sheetName;
-  if (!sheetLinkPlanForSheet(sheetName).length || sheetLinkIsFreeSheet(sheetName)) { return true; }
-  var next = { status: String(context.readStatus || ''), reason: String(context.readReason || '') };
+  if (!sheetLinkPlanForSheet(sheetName).length) { return true; }
+  var free = sheetLinkIsFreeSheet(sheetName);
+  // Sheet tự do không có cột mã là ca thường chứ không phải bộ đọc hỏng: vẫn ghi trạng thái để biết ai giữ vị trí, nhưng bỏ lý do để không bật băng cảnh báo và không đánh thức GAS.
+  var next = { status: String(context.readStatus || ''), reason: free ? '' : String(context.readReason || '') };
   var changed = next.status !== SHEET_LINK_EXTENSION_READ.status || next.reason !== SHEET_LINK_EXTENSION_READ.reason;
   SHEET_LINK_EXTENSION_READ = next;
   if (changed && typeof selectionPollPaint === 'function') { selectionPollPaint(); }
-  return next.status === 'ok';
+  return free || next.status === 'ok';
 }
 
 /** Extension sống nhưng bộ đọc live model hỏng cả lưới, thường do Google đổi cấu trúc nội bộ của Sheets. */
@@ -493,6 +495,11 @@ function sheetLinkTakeQueuedWake() {
 }
 
 /** Hỏi selection + ReloadState trong đúng một round-trip; GAS tự quyết định đọc mã và scope RAM. */
+/** Extension chỉ giữ quyền chọn khách khi tự đọc được ở sheet đang đứng; đọc hỏng hoặc sheet chưa có plan thì mã do GAS đọc thay mới là nguồn đúng. */
+function sheetLinkExtensionOwnsContext() {
+  return sheetLinkExtensionAlive() && !!SHEET_LINK_LAST_CONTEXT && sheetLinkPlanForSheet(SHEET_LINK_LAST_CONTEXT.sheetName).length > 0 && SHEET_LINK_EXTENSION_READ.status === 'ok';
+}
+
 function sheetLinkProbeSelectionAndReload(reason, options) {
   if (!SHEET_LINK_RAM_READY || typeof callServer !== 'function') { return null; }
   if (SHEET_LINK_SELECTION_PENDING) {
@@ -510,6 +517,7 @@ function sheetLinkProbeSelectionAndReload(reason, options) {
     localDraft: sheetLinkLocalDraftInput(),
     reason: reason || 'wake',
     needsSelection: opts.needsSelection === true,
+    skipPosition: sheetLinkExtensionOwnsContext(),
     forceImmediate: opts.forceImmediate === true,
     extensionReadFailure: sheetLinkReaderFailureInput(),
     channelSilence: typeof changeSignalDeadReportInput === 'function' && changeSignalDeadReportInput()
@@ -518,8 +526,7 @@ function sheetLinkProbeSelectionAndReload(reason, options) {
     silent: SHEET_LINK_SHOW_PROBE_PROGRESS_DEBUG !== true
   });
   var settled = request.then(function (result) {
-    // Extension chỉ giữ quyền chọn khách khi tự đọc được ở sheet đang đứng; đọc hỏng hoặc sheet chưa có plan thì mã do GAS đọc thay mới là nguồn đúng.
-    var extensionOwnsContext = sheetLinkExtensionAlive() && !!SHEET_LINK_LAST_CONTEXT && sheetLinkPlanForSheet(SHEET_LINK_LAST_CONTEXT.sheetName).length > 0 && SHEET_LINK_EXTENSION_READ.status === 'ok';
+    var extensionOwnsContext = sheetLinkExtensionOwnsContext();
     var contextIsCurrent = contextGeneration === SHEET_LINK_CONTEXT_GENERATION;
     if (result && result.selection && contextIsCurrent && !extensionOwnsContext) {
       SHEET_LINK_SELECTION_CONTEXT = Object.assign({}, result.selection);

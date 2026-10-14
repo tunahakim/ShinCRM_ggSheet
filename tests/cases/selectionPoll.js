@@ -208,6 +208,17 @@ async function chay(so) {
   check(so, 'nạp core xong thì bỏ khóa sheet tự do cũ, lần ghé sau chép lại từ mẫu mới',
     [Object.prototype.hasOwnProperty.call(free.SHEET_LINK_READ_PLAN, 'Bao cao'), free.SHEET_LINK_FREE_SHEETS, free.sheetLinkIsFreeSheet('Bao cao')], [false, {}, true]);
 
+  // Lời hỏi rẻ: Extension đang đọc được ở sheet hiện tại thì Sidebar bảo GAS khỏi mở bảng tính.
+  const hoiRe = () => { free._calls = []; free.SHEET_LINK_SELECTION_PENDING = null; free.sheetLinkProbeSelectionAndReload('signal', { silent: true }); return free._calls[0].args[0].skipPosition; };
+  const reKhongMa = hoiRe();
+  free.sheetLinkOnMessage({ origin: free.SHEET_LINK_ORIGIN, data: freeContext(6, 5, { readStatus: 'ok', readReason: '', rawHeaderRow: [{ address: 'C1', column: 3, value: '@CUS_MA_KH' }], reads: [{ token: '!:@CUS_MA_KH', status: 'ok', matched: true, value: 'CUS-000005' }] }) });
+  const reDocDuoc = hoiRe();
+  free._clock.now = 5001 + 60000;
+  const reExtChet = hoiRe();
+  free._clock.now = 5001;
+  check(so, 'skipPosition chỉ bật khi Extension còn sống và đọc được mã ở sheet đang đứng; sheet không mã hoặc Extension mất tín hiệu thì GAS tự đọc vị trí',
+    [reKhongMa, reDocDuoc, reExtChet], [false, true, false]);
+
   free.SHEET_LINK_SELECTION_PENDING = { then: () => null };
   free.sheetLinkProbeSelectionAndReload('position', { needsSelection: true });
   check(so, 'lời đánh thức xếp hàng khi lời hỏi trước còn bay giữ cờ needsSelection đúng một lần',
