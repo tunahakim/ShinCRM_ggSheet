@@ -12,7 +12,7 @@ var RELOAD_MATRIX_PROBE_VIEW = '!__CRM_RELOAD_MATRIX_PROBE';
 function reloadMatrixProbePropKeys() {
   return [
     DIRTY_KEYS.records, DIRTY_KEYS.config, DIRTY_KEYS.all,
-    DIRTY_KEYS.category, DIRTY_KEYS.schema, DIRTY_KEYS.allCore, DIRTY_KEYS.viewsStaleRevision, DIRTY_KEYS.viewRendered,
+    DIRTY_KEYS.category, DIRTY_KEYS.schema, DIRTY_KEYS.allCore, DIRTY_KEYS.viewsStaleRevision, VIEW_LEDGER_KEY,
     DIRTY_KEYS.revision, DIRTY_KEYS.changedAt, DIRTY_KEYS.recordsReadyAt, DIRTY_KEYS.recordRevisionLog
   ];
 }
@@ -30,17 +30,6 @@ function reloadMatrixProbeRestoreProperties(snapshot) {
     if (snapshot[key] === null || snapshot[key] === undefined) { props.deleteProperty(key); }
     else { props.setProperty(key, snapshot[key]); }
   });
-}
-
-function reloadMatrixProbeSnapshotViewProperties(book) {
-  var props = documentProps();
-  var snapshot = {};
-  book.getSheets().filter(function (sheet) { return sheet.getName().charAt(0) === '!'; }).forEach(function (sheet) {
-    [viewRevisionKey(sheet), viewInputSignatureKey(sheet)].forEach(function (key) {
-      snapshot[key] = props.getProperty(key);
-    });
-  });
-  return snapshot;
 }
 
 function reloadMatrixProbeSnapshotUserPrefs() {
@@ -172,7 +161,6 @@ function reloadMatrixProbe() {
   }
 
   var propSnapshot = reloadMatrixProbeSnapshotProperties(reloadMatrixProbePropKeys());
-  var viewPropSnapshot = reloadMatrixProbeSnapshotViewProperties(book);
   var userPrefsSnapshot = reloadMatrixProbeSnapshotUserPrefs();
   // Probe phải bắt đầu từ scope sạch; dirty cũ trên Sheet DEV không được làm đổi mode của ca Customer được kiểm.
   dirtyStateClear();
@@ -181,7 +169,6 @@ function reloadMatrixProbe() {
   var customerStartRow = SHEET_FIRST_DATA_ROW + customer.rowCount;
   var activityStartRow = SHEET_FIRST_DATA_ROW + activity.rowCount;
   var temporaryView = null;
-  var temporaryViewPropertyKeys = [];
   var extraInvalidColumn = false;
   var report = [];
 
@@ -192,7 +179,6 @@ function reloadMatrixProbe() {
 
     temporaryView = createViewSheet(RELOAD_MATRIX_PROBE_VIEW);
     var viewSheet = book.getSheetByName(RELOAD_MATRIX_PROBE_VIEW);
-    temporaryViewPropertyKeys = [viewRevisionKey(viewSheet), viewInputSignatureKey(viewSheet)];
     var viewHeaderLast = viewSheet.getLastColumn();
     viewSheet.getRange(1, viewHeaderLast + 1, 3, 1).setValues([['DEV_RELOAD_ORDINARY'], ['Cột thường của probe'], ['']]);
     var expectedViews = reloadMatrixProbeManagedViewCount(book);
@@ -353,11 +339,9 @@ function reloadMatrixProbe() {
       if (customerRows) { customer.sheet.getRange(customerStartRow, 1, customerRows, customer.columnMap.lastColumn).clearContent(); }
       SpreadsheetApp.flush();
       if (temporaryView) { book.deleteSheet(book.getSheetByName(RELOAD_MATRIX_PROBE_VIEW)); }
-      temporaryViewPropertyKeys.forEach(function (key) { documentProps().deleteProperty(key); });
       if (extraInvalidColumn) { customer.sheet.deleteColumn(customer.sheet.getMaxColumns()); }
       renderAllManagedViews();
       reloadMatrixProbeRestoreProperties(propSnapshot);
-      reloadMatrixProbeRestoreProperties(viewPropSnapshot);
       reloadMatrixProbeRestoreUserPrefs(userPrefsSnapshot);
       resetSettingsCache();
     } catch (cleanupError) {

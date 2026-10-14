@@ -132,10 +132,10 @@ function selectionPayloadFromReload(result) {
 function selectionViewDecision(sheetName, state) {
   var name = String(sheetName || '').trim();
   if (name.charAt(0) !== '!') { return reloadDecisionForView({ sheetName: name }); }
-  var rendered = viewRenderedRead()[name];
+  var entry = viewLedgerEntry(name);
   var staleRevision = state ? state.viewsStaleRevision : 0;
-  var prefs = reloadDecisionViewStale(staleRevision, rendered) ? userPrefsRead() : {};
-  return reloadDecisionForView({ sheetName: name, viewsStaleRevision: staleRevision, renderedRevision: rendered, autoRenderView: prefs.autoRenderView });
+  var prefs = viewLedgerStale(entry, staleRevision) ? userPrefsRead() : {};
+  return reloadDecisionForView({ sheetName: name, viewsStaleRevision: staleRevision, entry: entry, autoRenderView: prefs.autoRenderView, now: Date.now() });
 }
 
 function selectionColumnLetters(column) {

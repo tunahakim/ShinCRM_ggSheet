@@ -33,7 +33,7 @@ function viewTabTintStaleLocked(book, options) {
   var staleRevision = Number(reloadStateRead().viewsStaleRevision) || 0;
   var state = viewTabTintRead();
   if (staleRevision <= state.staleRevision) { return 0; }
-  var rendered = viewRenderedRead();
+  var ledger = viewLedgerRead();
   var tinted = 0;
   var spreadsheet = book || shinOpenBook();
   var viewing = options && options.fromSidebar ? viewTabTintViewingSheet(spreadsheet) : '';
@@ -41,7 +41,7 @@ function viewTabTintStaleLocked(book, options) {
     var name = sheet.getName();
     if (name.charAt(0) !== '!' || name === viewing) { return; }
     var id = String(sheet.getSheetId());
-    if (Object.prototype.hasOwnProperty.call(state.sheets, id) || !reloadDecisionViewStale(staleRevision, rendered[name])) { return; }
+    if (Object.prototype.hasOwnProperty.call(state.sheets, id) || !viewLedgerStale(ledger[name], staleRevision)) { return; }
     state.sheets[id] = sheet.getTabColor() || '';
     sheet.setTabColor(SETTINGS.VIEW_STALE_TAB_COLOR);
     tinted += 1;

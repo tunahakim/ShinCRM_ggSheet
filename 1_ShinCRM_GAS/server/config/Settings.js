@@ -91,7 +91,9 @@ var SETTINGS = {
   /** Bật để thấy thanh tiến trình ở mọi lời hỏi GAS, kể cả lời hỏi nền (kênh báo thay đổi, nhịp an toàn, chuyển sheet), phục vụ nghiệm thu. Tắt (`false`) thì lời hỏi nền chạy im lặng đúng tài liệu 05. Đổi xong đẩy lên bằng `node tests/gas.js probeSelectionAndReload --push` rồi tải lại tab Sheet. */
   SHOW_PROBE_PROGRESS_DEBUG: true,
   /** Màu tab sheet quản trị đang cũ (dữ liệu đã đổi nhưng sheet chưa vẽ lại). Cam để khác các màu nhóm sheet thường dùng. */
-  VIEW_STALE_TAB_COLOR: '#ff9900'
+  VIEW_STALE_TAB_COLOR: '#ff9900',
+  /** Lượt vẽ sheet quản trị hỏng thì không tự thử lại với cùng dữ liệu và cùng ô điều khiển, để lỗi không tự đánh thức thành vòng lặp; quá khoảng này thì thử lại một lần, phòng lỗi tạm của Google. Bấm làm mới luôn thử ngay. */
+  VIEW_FAILED_RETRY_MS: 600000
 };
 
 /**

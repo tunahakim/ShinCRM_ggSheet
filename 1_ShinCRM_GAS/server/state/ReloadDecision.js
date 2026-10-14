@@ -269,20 +269,15 @@ function reloadDecisionForState(input) {
   return decision;
 }
 
-/** Sheet chưa từng vẽ (không có revision đã vẽ) cũng là cũ. */
-function reloadDecisionViewStale(viewsStaleRevision, renderedRevision) {
-  if (renderedRevision === undefined || renderedRevision === null || renderedRevision === '') { return true; }
-  return Number(renderedRevision) < Number(viewsStaleRevision || 0);
-}
-
 /**
- * Quyết định cho sheet `!` người dùng đang xem: cũ và công tắc bật thì Sidebar
- * gọi vẽ, công tắc tắt thì chỉ báo. Sheet khác hoặc view còn mới thì không làm gì.
+ * Quyết định cho sheet `!` người dùng đang xem, theo sổ trạng thái (`entry`): cũ và cần thử thì Sidebar gọi vẽ nếu công tắc bật, tắt thì chỉ báo.
+ * Cũ mà lượt hỏng ở đúng dữ liệu này chưa đến hạn thử lại thì chỉ báo: thử lại lúc này cho ra đúng lỗi cũ và tự đánh thức lần nữa.
  */
 function reloadDecisionForView(input) {
   var view = input || {};
   var sheetName = String(view.sheetName || '').trim();
   if (sheetName.charAt(0) !== '!') { return { sheetName: sheetName, stale: false, action: 'none' }; }
-  var stale = reloadDecisionViewStale(view.viewsStaleRevision, view.renderedRevision);
-  return { sheetName: sheetName, stale: stale, action: !stale ? 'none' : view.autoRenderView === false ? 'notify' : 'render' };
+  var stale = viewLedgerStale(view.entry || null, view.viewsStaleRevision);
+  var attempt = stale && viewLedgerDataNeedsAttempt(view.entry || null, view.viewsStaleRevision, Number(view.now) || 0);
+  return { sheetName: sheetName, stale: stale, action: !stale ? 'none' : !attempt || view.autoRenderView === false ? 'notify' : 'render' };
 }

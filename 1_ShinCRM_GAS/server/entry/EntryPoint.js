@@ -12,6 +12,49 @@
  */
 
 /**
+ * Cửa vào Sidebar tự gọi, không do người bấm. Lỗi của các cửa này ghi Log theo chuyển trạng thái: lần đầu gặp lỗi (đủ stack), lần lỗi đổi nội dung, và một dòng khi hết lỗi.
+ * Vì sao: mỗi dòng Log là một lần ghi Sheet, kênh báo thay đổi đánh thức Sidebar hỏi lại; ghi lỗi trùng ở mỗi lần là tự nuôi vòng lặp. Sidebar vẫn nhận lỗi mỗi lần nên không có lỗi im lặng.
+ * Không gồm cửa vào FBM: luật đồng bộ FBM đòi mọi lỗi vào Log.
+ */
+var ENTRY_POINT_LOG_ON_CHANGE = ['probeSelectionAndReload', 'getReloadState', 'reloadRecords', 'inspectViewState', 'renderViewIfDirty'];
+var ENTRY_FAILURES_KEY = 'entryFailures';
+
+function entryFailuresRead() {
+  try {
+    var parsed = JSON.parse(documentProps().getProperty(ENTRY_FAILURES_KEY) || '{}');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch (khongDocDuoc) {
+    return {};
+  }
+}
+
+function entryFailuresWrite(map) {
+  if (Object.keys(map).length) { documentProps().setProperty(ENTRY_FAILURES_KEY, JSON.stringify(map)); }
+  else { documentProps().deleteProperty(ENTRY_FAILURES_KEY); }
+}
+
+/** Lỗi này có cần ghi Log không. Không ghi được sổ thì vẫn ghi Log: thà thừa một dòng còn hơn mất lỗi. */
+function entryFailureIsNew(name, message) {
+  if (ENTRY_POINT_LOG_ON_CHANGE.indexOf(name) < 0) { return true; }
+  var map = entryFailuresRead();
+  if (map[name] === message) { return false; }
+  map[name] = message;
+  try { entryFailuresWrite(map); } catch (khongGhiDuocSo) { return true; }
+  return true;
+}
+
+/** Lượt thành công sau lượt hỏng: ghi một dòng hết lỗi rồi quên lỗi. Kho thuộc tính đã đọc ở đầu lời gọi nên lượt thành công thường không tốn thêm lệnh nào. */
+function entryFailureRecover(name, source) {
+  if (ENTRY_POINT_LOG_ON_CHANGE.indexOf(name) < 0) { return; }
+  var map = entryFailuresRead();
+  if (!Object.prototype.hasOwnProperty.call(map, name)) { return; }
+  var previous = map[name];
+  delete map[name];
+  entryFailuresWrite(map);
+  logEvent({ source: source, action: name, outcome: LOG_OK, reason: 'Đã hết lỗi: ' + previous });
+}
+
+/**
  * Chạy phần ruột của một cửa vào trong vỏ bọc chuẩn.
  *
  * `name` là tên hành động ghi vào cột `Hành động` của sheet `Log`. `source` là nguồn theo bảng ở tài liệu 10 Phần 3. `channel` là kênh hiển thị theo bảng ở tài liệu 10 Phần 8, một trong `alert`, `throw`, `pending`.
@@ -30,17 +73,21 @@ function runEntryPoint(name, source, channel, fn) {
   if (trace) { fbmTraceBoundary('gas_entered', name); }
   try {
     result = fn();
+    // Kết quả `ok: false` là cửa vào báo lại lỗi cũ chứ chưa hết lỗi.
+    if (!(result && result.ok === false)) { entryFailureRecover(name, source); }
     return result;
   } catch (err) {
     failed = true;
     if (trace) { fbmTraceBoundary('gas_failed', name, err); }
-    logEvent({
-      source: source,
-      action: name,
-      outcome: LOG_ERROR,
-      reason: errorMessage(err),
-      detail: { stack: err && err.stack ? String(err.stack) : '(không có stack)' }
-    });
+    if (entryFailureIsNew(name, errorMessage(err))) {
+      logEvent({
+        source: source,
+        action: name,
+        outcome: LOG_ERROR,
+        reason: errorMessage(err),
+        detail: { stack: err && err.stack ? String(err.stack) : '(không có stack)' }
+      });
+    }
 
     reportError(err, channel);
     throw err;

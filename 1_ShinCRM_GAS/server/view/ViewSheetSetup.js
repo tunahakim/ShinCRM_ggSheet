@@ -69,11 +69,14 @@ function prepareViewSheet(sheetName) {
     sheet.getRange(2, column).setValue(control.label);
     sheet.getRange(3, column).setNote(control.note);
   });
+  var filterColumns = [];
   header.forEach(function (code, index) {
     if (!/^@(CUS|ACT)_/.test(code)) { return; }
+    filterColumns.push(index + 1);
     var cell = sheet.getRange(3, index + 1);
     if (!cell.getNote()) { cell.setNote(FILTER_QUICK_REFERENCE); }
   });
+  viewFormatFilterRowText(sheet, filterColumns);
 
   var lastSortRow = SHEET_FIRST_DATA_ROW + VIEW_SORT_MAX_LEVELS - 1;
   sheetGridEnsureRoom(sheet, lastSortRow, 0);

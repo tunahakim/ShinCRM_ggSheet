@@ -24,7 +24,6 @@ Object.defineProperties(DIRTY_KEYS, {
   allCore: { value: 'dirtyAllCore', enumerable: false },
   entities: { value: 'dirtyEntities', enumerable: false },
   viewsStaleRevision: { value: 'viewsStaleRevision', enumerable: false },
-  viewRendered: { value: 'viewRenderedRevisions', enumerable: false },
   revision: { value: 'reloadRevision', enumerable: false },
   changedAt: { value: 'reloadChangedAt', enumerable: false },
   recordsReadyAt: { value: 'dirtyRecordsReadyAt', enumerable: false },
@@ -233,27 +232,6 @@ function dirtyStateMarkAllViews() {
   return dirtyStateMarkSignal({ allViews: true });
 }
 
-/** Revision đã dùng để vẽ từng sheet quản trị, theo tên sheet. Theo tên chứ không theo sheetId để lời hỏi của Sidebar biết sheet đang xem cũ hay mới mà không phải mở bảng tính; đổi tên sheet chỉ làm sheet đó bị coi là cũ và vẽ lại một lần. */
-function viewRenderedRead() {
-  try {
-    var parsed = JSON.parse(documentProps().getProperty(DIRTY_KEYS.viewRendered) || '{}');
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
-  } catch (khongDocDuoc) {
-    return {};
-  }
-}
-
-/** Chỉ gọi sau `flush` của lượt vẽ và trong DocumentLock, với revision đọc lúc bắt đầu vẽ. */
-function viewRenderedWrite(sheetName, revision) {
-  var map = viewRenderedRead();
-  map[String(sheetName)] = Number(revision) || 0;
-  documentProps().setProperty(DIRTY_KEYS.viewRendered, JSON.stringify(map));
-}
-
-function viewIsStale(sheetName) {
-  return reloadDecisionViewStale(reloadStateRead().viewsStaleRevision, viewRenderedRead()[String(sheetName)]);
-}
-
 function dirtyStateWriteList(props, key, values) {
   var unique = [];
   var seen = {};
@@ -376,7 +354,7 @@ function dirtyStateRestoreFullReload(state) {
 function probeDirtyState() {
   var state = dirtyStateRead();
   var report = [
-    'viewsStaleRevision: ' + reloadStateRead().viewsStaleRevision + ' · đã vẽ: ' + JSON.stringify(viewRenderedRead()),
+    'viewsStaleRevision: ' + reloadStateRead().viewsStaleRevision + ' · sổ sheet quản trị: ' + JSON.stringify(viewLedgerRead()),
     'dirtyRecords: ' + (state.records.length ? state.records.length + ' mã' : 'rỗng'),
     'dirtyConfig: ' + state.config,
     'dirtyAll: ' + state.all
