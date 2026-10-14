@@ -98,6 +98,9 @@ function chay(so) {
   try { allViews.nen.hop.renderViewSheet('!Chăm sóc'); } catch (ignore) {}
   check(so, '(c) lượt vẽ ném lỗi thì sheet vẫn cũ', allViews.nen.hop.viewIsStale('!Chăm sóc'), true);
   secondView.getRange(3, 2).setValue('');
+  check(so, 'sửa lại ô lọc vừa làm hỏng lượt vẽ thì đường lấy metadata (controlsOnly) vẽ lại ngay, sheet thành mới',
+    [allViews.nen.hop.renderViewIfDirty('!Chăm sóc', { controlsOnly: true }).skipped, allViews.nen.hop.viewIsStale('!Chăm sóc')], [undefined, false]);
+  allViews.nen.hop.dirtyStateMarkRecordChange('customer', ['KH0002']);
   check(so, 'đường lấy metadata (controlsOnly) không vẽ sheet cũ khi bộ điều khiển không đổi, sheet vẫn cũ',
     [allViews.nen.hop.renderViewIfDirty('!Chăm sóc', { controlsOnly: true }).skipped, allViews.nen.hop.viewIsStale('!Chăm sóc')], [true, true]);
   check(so, 'renderViewIfDirty vẽ sheet cũ dù bộ điều khiển không đổi, rồi lần sau bỏ qua',
@@ -117,12 +120,14 @@ function chay(so) {
     [formula.view.getRange(4, 1, 2, 3).getValues(), formula.nen.dem.setValues - writesBefore, formula.view.getRange(3, 2).getNote().indexOf('⛔ ShinCRM:') === 0,
       formula.view.getRange(3, 2).getNote().indexOf('B5') >= 0, formula.nen.hop.viewIsStale('!Lead')],
     [beforeFormula, 0, true, true, true]);
-  checkThrows(so, 'đường Sidebar renderViewIfDirty gặp công thức cũng dừng với lỗi chỉ đúng ô', () => formula.nen.hop.renderViewIfDirty('!Lead'), 'ô B5');
-  check(so, 'lỗi công thức qua đường Sidebar được ghi vào Log',
-    (() => { const log = formula.nen.book.getSheetByName('Log'); return !!log && log.getLastRow() > 0 && JSON.stringify(log.getRange(1, 1, log.getLastRow(), 9).getValues()).indexOf('ô B5') >= 0; })(), true);
+  const sidebarAgain = formula.nen.hop.renderViewIfDirty('!Lead');
+  check(so, 'đường Sidebar sau lượt hỏng vì công thức: không thử lại, trả lỗi cũ chỉ đúng ô kèm metadata, không ghi Sheet',
+    [sidebarAgain.ok, sidebarAgain.skipped, sidebarAgain.error.indexOf('ô B5') >= 0, sidebarAgain.viewMeta.filterColumns, formula.nen.dem.setValues - writesBefore],
+    [false, true, true, [1, 2], 0]);
   formula.view.getRange(5, 2).setValue('');
-  formula.nen.hop.renderViewSheet('!Lead');
-  check(so, 'gỡ công thức thì lần vẽ sau chạy được và tự gỡ note ⛔', [formula.view.getRange(3, 2).getNote(), formula.nen.hop.viewIsStale('!Lead')], ['', false]);
+  const afterBlocker = formula.nen.hop.renderViewIfDirty('!Lead');
+  check(so, 'gỡ công thức ở ô chặn thì đường Sidebar tự vẽ lại (dấu vân tay không đổi) và tự gỡ note ⛔',
+    [afterBlocker.ok, afterBlocker.skipped, formula.view.getRange(3, 2).getNote(), formula.nen.hop.viewIsStale('!Lead')], [true, undefined, '', false]);
 
   check(so, 'metadata chỉ nhận cột có mã @ ở hàng lọc', result.viewMeta.filterColumns, [1, 2, 3, 4, 5]);
   base.view.getRange(3, 6).setValue('chữ dưới cột thường');
@@ -130,7 +135,7 @@ function chay(so) {
 
   check(so, 'đầu vào không đổi thì chỉ đọc metadata, không vẽ thừa', base.nen.hop.renderViewIfDirty('!Lead').skipped, true);
   base.view.getRange(3, 2).setValue('Hai');
-  const beforeRender = base.nen.hop.inspectViewState('!Lead', base.nen.hop.viewInputMeta(base.view).revision);
+  const beforeRender = base.nen.hop.inspectViewState('!Lead', base.nen.hop.viewLedgerEntry('!Lead').revision);
   check(so, 'cửa kiểm nhẹ nhận ra đầu vào đổi nhưng chưa tự vẽ', [beforeRender.changed, beforeRender.needsRender], [false, true]);
   const afterFilter = base.nen.hop.renderViewIfDirty('!Lead');
   check(so, 'hàng lọc đổi trước khi trigger chạy vẫn bị dấu vân tay phát hiện và dựng view mới',
@@ -164,6 +169,10 @@ function chay(so) {
     ['VALUE_IN_LIST', 'VALUE_IN_LIST', null]);
   check(so, 'chuẩn bị lần hai không thêm cột điều khiển trùng',
     base.nen.hop.prepareViewSheet('!Lead').addedColumns, []);
+  const fresh = taoNen(['@CUS_MA_KH', 'Ghi chú thường', '@ACT_NGAY_LAM_VIEC']);
+  fresh.nen.hop.prepareViewSheet('!Lead');
+  check(so, 'chuẩn bị view đặt khuôn chữ cho hàng lọc dưới cột @ trước lượt vẽ đầu, không đụng cột thường và cột điều khiển',
+    [3, 4, 5, 1].map((column) => fresh.view.getRange(3, column).getNumberFormat() === fresh.nen.hop.COLUMN_FORMAT_TEXT), [true, false, true, false]);
 
   base.view.getRange(14, 1, 1, 2).setValues([['@CUS_TEN_CTY', 'Tăng dần (A → Z)']]);
   check(so, 'parser cục bộ dùng cùng trần 10 cấp nên bỏ qua hàng 14',
@@ -240,6 +249,71 @@ function chay(so) {
       created.hop.DATA_SCHEMA.activity.content.code, created.hop.DATA_SCHEMA.activity.priority.code, created.hop.DATA_SCHEMA.activity.dueAt.code]]);
 }
 
+function demLog(nen, text) {
+  const log = nen.book.getSheetByName('Log');
+  if (!log || log.getLastRow() < 1) { return 0; }
+  return log.getRange(1, 1, log.getLastRow(), 9).getValues().filter((row) => JSON.stringify(row).indexOf(text) >= 0).length;
+}
+
+/** Vòng điều khiển phải hội tụ: lượt vẽ hỏng không được tự thử lại, ghi note, ghi Log ở mỗi lần Sidebar bị đánh thức. */
+function chaySoTrangThai(so) {
+  section('ViewLedger — lượt vẽ hỏng không tự đánh thức thành vòng lặp');
+  let t;
+  try { t = taoNen(['@CUS_MA_KH', '@CUS_TEN_CTY', '@ACT_NGAY_LAM_VIEC']); } catch (err) { return ghiLoiNap(so, 'nạp ViewLedger', err); }
+  const hop = t.nen.hop;
+  gieoHaiKhach(t.nen);
+  gieoHaiGiaoDich(t.nen);
+  hop.renderViewSheet('!Lead');
+  let notes = 0;
+  const realNote = hop.viewSetErrorNote;
+  hop.viewSetErrorNote = function () { notes += 1; return realNote.apply(null, arguments); };
+
+  t.view.getRange(3, 2).setValue('60..50');
+  checkThrows(so, 'lượt tự động đầu tiên gặp ô lọc sai thì báo lỗi chỉ đúng ô', () => hop.renderViewIfDirty('!Lead'), 'B3');
+  check(so, 'lượt hỏng đầu tiên ghi một note ⛔ và một dòng Log', [notes, demLog(t.nen, '60..50')], [1, 1]);
+
+  const writes = t.nen.dem.setValues;
+  const again = hop.renderViewIfDirty('!Lead');
+  const inspect = hop.inspectViewState('!Lead', hop.viewLedgerEntry('!Lead').revision);
+  check(so, 'đánh thức lại với cùng dữ liệu và ô điều khiển: không thử, không note, không Log, không ghi Sheet; trả lỗi cũ kèm metadata để Sidebar thôi xin vẽ',
+    [again.ok, again.skipped, !!again.error, !!again.viewMeta, inspect.needsRender, notes, demLog(t.nen, '60..50'), t.nen.dem.setValues - writes],
+    [false, true, true, true, false, 1, 1, 0]);
+
+  hop.dirtyStateMarkRecordChange('customer', ['KH0001']);
+  checkThrows(so, 'dữ liệu kho đổi thì thử lại và vẫn báo lỗi cho Sidebar', () => hop.renderViewIfDirty('!Lead'), 'B3');
+  check(so, 'lỗi y hệt lượt trước: không ghi note lần hai, không thêm dòng Log', [notes, demLog(t.nen, '60..50')], [1, 1]);
+
+  const entry = hop.viewLedgerEntry('!Lead');
+  hop.viewLedgerWrite('!Lead', Object.assign({}, entry, { at: entry.at - hop.SETTINGS.VIEW_FAILED_RETRY_MS }));
+  checkThrows(so, 'lượt hỏng quá VIEW_FAILED_RETRY_MS thì tự thử lại một lần', () => hop.renderViewIfDirty('!Lead'), 'B3');
+  check(so, 'thử lại vẫn hỏng đúng lỗi cũ: lượt kế tiếp lại bỏ qua', hop.renderViewIfDirty('!Lead').skipped, true);
+  checkThrows(so, 'bấm làm mới luôn thử dù sổ nói đầu vào này đã hỏng', () => hop.renderViewSheet('!Lead'), 'B3');
+
+  t.view.getRange(3, 2).setValue('70..80');
+  checkThrows(so, 'lỗi khác nội dung là chuyển trạng thái', () => hop.renderViewIfDirty('!Lead'), 'B3');
+  check(so, 'lỗi mới thì ghi note mới và một dòng Log mới', [notes, demLog(t.nen, '70..80')], [2, 1]);
+
+  t.view.getRange(3, 2).setValue('');
+  const fixed = hop.renderViewIfDirty('!Lead');
+  check(so, 'sửa ô lọc thì vẽ lại, gỡ note ⛔, sheet mới; Log ghi một dòng hết lỗi',
+    [fixed.ok, fixed.rows, t.view.getRange(3, 2).getNote(), hop.viewIsStale('!Lead'), demLog(t.nen, 'Đã hết lỗi')], [true, 2, '', false, 1]);
+  let clears = 0;
+  const realClear = hop.viewClearErrorNotes;
+  hop.viewClearErrorNotes = function () { clears += 1; return realClear.apply(null, arguments); };
+  hop.dirtyStateMarkRecordChange('customer', ['KH0001']);
+  hop.renderViewIfDirty('!Lead');
+  hop.viewClearErrorNotes = realClear;
+  check(so, 'vẽ thành công liên tiếp không dò gỡ note lần nữa', clears, 0);
+
+  // Ô lọc bị Sheets tự đổi thành ngày trước khi hàng lọc có khuôn chữ.
+  t.view.getRange(3, 3).setValue(new Date(2026, 2, 3));
+  const dated = hop.renderViewIfDirty('!Lead');
+  check(so, 'ô lọc kiểu ngày lọc đúng ngày người gõ, được ghi lại thành chữ, hàng lọc có khuôn chữ',
+    [dated.ok, dated.rows, t.view.getRange(4, 1).getValue(), t.view.getRange(3, 3).getValue(), t.view.getRange(3, 3).getNumberFormat()],
+    [true, 1, 'KH0002', '2026-03-03', hop.COLUMN_FORMAT_TEXT]);
+  check(so, 'ghi lại chữ không đổi dấu vân tay nên không sinh lượt vẽ thứ hai', hop.renderViewIfDirty('!Lead', { controlsOnly: true }).skipped, true);
+}
+
 function chayTabCam(so) {
   section('ViewTabTint — tab cam khi sheet quản trị cũ, trả màu khi vẽ xong');
   let base;
@@ -298,4 +372,4 @@ function chayTabCam(so) {
     [tatNum, [base.view.getTabColor(), care.getTabColor()]], [['#ff9900', '#ff9900'], ['#ff9900', '#ff9900']]);
 }
 
-module.exports = { chay: (so) => { chay(so); chayTabCam(so); } };
+module.exports = { chay: (so) => { chay(so); chaySoTrangThai(so); chayTabCam(so); } };

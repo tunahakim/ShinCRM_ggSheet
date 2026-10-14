@@ -630,6 +630,10 @@ async function chayView(so) {
   notify.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: 'Customer', row: 4, col: 1 });
   check(so, 'view.action = notify hiện dòng báo, không vẽ; vẽ thủ công xong thì dòng báo mất; rời sheet ! thì dòng báo mất',
     [shown, afterRefresh, notify._viewNotice.hidden], [[false, '!Lead', 0], true, true]);
+  notify.SHEET_LINK_LAST_SHEET = '!Lead';
+  notify.sheetLinkViewApplyResult('!Lead', { ok: false, skipped: true, sheetName: '!Lead', error: 'ô B3', viewMeta: { revision: 2, filterColumns: [2], sortColumns: [] } });
+  check(so, 'GAS trả lượt thử gần nhất đã hỏng (ok:false) thì hiện dòng báo sheet cũ và thôi xin lấy metadata',
+    [notify._viewNotice.hidden, notify.SHEET_LINK_VIEW_NOTICE_SHEET, notify.sheetLinkViewState('!Lead').needsSync], [false, '!Lead', false]);
   const sidebarHtml = fs.readFileSync(path.join(GAS_DIR, 'client', 'Sidebar.html'), 'utf8');
   const noticeHost = (sidebarHtml.match(/<div id="shin-view-stale"[\s\S]*?<\/div>/) || [''])[0];
   const actionsHtml = fs.readFileSync(path.join(GAS_DIR, 'client', 'ui', 'actions.html'), 'utf8');

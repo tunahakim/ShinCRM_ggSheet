@@ -95,11 +95,11 @@ function chay(so) {
   const bao = nen.hop.probeDirtyState();
   check(so, 'probeDirtyState in đúng bốn dòng',
     bao,
-    ['viewsStaleRevision: 0 · đã vẽ: {}', 'dirtyRecords: 2 mã', 'dirtyConfig: true', 'dirtyAll: false']);
+    ['viewsStaleRevision: 0 · sổ sheet quản trị: {}', 'dirtyRecords: 2 mã', 'dirtyConfig: true', 'dirtyAll: false']);
 
   check(so, 'probeDirtyState trên tệp mới nói rõ là rỗng chứ in ra khoảng trắng',
     nenRong.hop.probeDirtyState(),
-    ['viewsStaleRevision: 0 · đã vẽ: {}', 'dirtyRecords: rỗng', 'dirtyConfig: false', 'dirtyAll: false']);
+    ['viewsStaleRevision: 0 · sổ sheet quản trị: {}', 'dirtyRecords: rỗng', 'dirtyConfig: false', 'dirtyAll: false']);
 
   const ghi = dungHop({ sheets: ['Config', 'Log'] });
   check(so, 'đánh dấu mã bản ghi hợp nhất và bỏ mã rỗng',
@@ -165,15 +165,17 @@ function chay(so) {
     true);
 
   const stale = dungHop({ sheets: ['Config', 'Log'], props: { reloadRevision: '7' } }).hop;
-  stale.viewRenderedWrite('!Lead', 7);
-  stale.viewRenderedWrite('!Chăm sóc', 7);
+  stale.viewLedgerWrite('!Lead', { data: 7, ok: true });
+  stale.viewLedgerWrite('!Chăm sóc', { data: 7, ok: true });
   const afterRecord = stale.dirtyStateMarkRecordChange('customer', ['KH0001']);
   check(so, 'signal dữ liệu kho nâng mốc cũ bằng đúng revision vừa tăng, mọi sheet đã vẽ trước đó thành cũ',
     [afterRecord.revision, afterRecord.viewsStaleRevision, stale.viewIsStale('!Lead'), stale.viewIsStale('!Chăm sóc')],
     [8, 8, true, true]);
-  stale.viewRenderedWrite('!Lead', 8);
+  stale.viewLedgerWrite('!Lead', { data: 8, ok: true });
   check(so, 'vẽ một sheet chỉ làm sheet đó mới, sheet khác vẫn cũ',
     [stale.viewIsStale('!Lead'), stale.viewIsStale('!Chăm sóc')], [false, true]);
+  stale.viewLedgerWrite('!Lead', { data: 8, ok: false, error: 'lỗi lọc', at: 0 });
+  check(so, 'lượt thử hỏng ở đúng dữ liệu mới nhất vẫn là sheet cũ (tab giữ cam, Sidebar báo)', stale.viewIsStale('!Lead'), true);
   check(so, 'sheet chưa từng vẽ là cũ kể cả khi chưa có signal nào',
     dungHop({ sheets: ['Config', 'Log'] }).hop.viewIsStale('!Mới'), true);
   const onlyRecords = dungHop({ sheets: ['Config', 'Log'], props: { reloadRevision: '3', viewsStaleRevision: '2' } }).hop;

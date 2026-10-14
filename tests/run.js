@@ -22,6 +22,7 @@ const NHOM_CA = [
   require('./cases/settings'),
   require('./cases/logMask'),
   require('./cases/logGate'),
+  require('./cases/entryPoint'),
   require('./cases/dateText'),
   require('./cases/sheetGrid'),
   require('./cases/cellBudget'),

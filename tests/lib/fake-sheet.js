@@ -242,6 +242,7 @@ function taoSheet(ten, dem, luoi) {
           dem.getFormulas = (dem.getFormulas || 0) + 1;
           return ra;
         },
+        getFormula() { return (formulas[row - 1] || [])[col - 1] || ''; },
         getNote() { return oRong((notes[row - 1] || [])[col - 1]); },
         setDataValidation(rule) {
           for (let r = 0; r < soDong; r += 1) {

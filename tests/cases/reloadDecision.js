@@ -80,15 +80,25 @@ function chay(so) {
     [viewData.kind, viewData.signal.records, viewData.signal.allViews, viewData.views.action],
     ['none', [], false, 'none']);
 
+  const okAt8 = { data: 8, ok: true };
   check(so, 'view đang xem: cũ + núm bật → render; cũ + núm tắt → notify; mới → none; chưa từng vẽ → cũ; sheet không ! → none',
     [
-      hop.reloadDecisionForView({ sheetName: '!Lead', viewsStaleRevision: 9, renderedRevision: 8, autoRenderView: true }).action,
-      hop.reloadDecisionForView({ sheetName: '!Lead', viewsStaleRevision: 9, renderedRevision: 8, autoRenderView: false }).action,
-      hop.reloadDecisionForView({ sheetName: '!Lead', viewsStaleRevision: 9, renderedRevision: 9, autoRenderView: false }).action,
+      hop.reloadDecisionForView({ sheetName: '!Lead', viewsStaleRevision: 9, entry: okAt8, autoRenderView: true }).action,
+      hop.reloadDecisionForView({ sheetName: '!Lead', viewsStaleRevision: 9, entry: okAt8, autoRenderView: false }).action,
+      hop.reloadDecisionForView({ sheetName: '!Lead', viewsStaleRevision: 9, entry: { data: 9, ok: true }, autoRenderView: false }).action,
       hop.reloadDecisionForView({ sheetName: '!Mới', viewsStaleRevision: 0 }).stale,
       hop.reloadDecisionForView({ sheetName: 'Customer', viewsStaleRevision: 9 }).action
     ],
     ['render', 'notify', 'none', true, 'none']);
+  const failedAt9 = { data: 9, ok: false, error: 'lỗi lọc', at: 1000 };
+  const retryMs = hop.SETTINGS.VIEW_FAILED_RETRY_MS;
+  check(so, 'lượt vẽ hỏng ở đúng dữ liệu này: chỉ báo, không xin vẽ lại dù núm bật; dữ liệu đổi hoặc quá hạn thử lại thì xin vẽ',
+    [
+      hop.reloadDecisionForView({ sheetName: '!Lead', viewsStaleRevision: 9, entry: failedAt9, autoRenderView: true, now: 1000 + retryMs - 1 }),
+      hop.reloadDecisionForView({ sheetName: '!Lead', viewsStaleRevision: 10, entry: failedAt9, autoRenderView: true, now: 1001 }).action,
+      hop.reloadDecisionForView({ sheetName: '!Lead', viewsStaleRevision: 9, entry: failedAt9, autoRenderView: true, now: 1000 + retryMs }).action
+    ],
+    [{ sheetName: '!Lead', stale: true, action: 'notify' }, 'render', 'render']);
 }
 
 module.exports = { chay };

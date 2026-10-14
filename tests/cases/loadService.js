@@ -316,6 +316,7 @@ const TEP_RENDER = [
   'server/gate/FieldLogic.js',
   'server/gate/IdGate.js',
   'server/gate/WriteCommit.js',
+  'server/view/ViewLedger.js',
   'server/view/ViewTabTint.js',
   'server/gate/WriteGate.js',
   'server/gate/DeleteGate.js',
