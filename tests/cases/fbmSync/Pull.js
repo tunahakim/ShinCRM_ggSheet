@@ -113,6 +113,17 @@ async function chay(so) {
   builders.writeGateSave = (request) => { ownerWrite = request; return { ok: true }; };
   builders.FbmSync.pullWrite('activity', [Object.assign({}, ownerIncoming)]);
   check(so, 'Người tạo trên FBM: lượt kéo ghi owner FBM vào enteredBy khi nội dung không đổi, không đổi trạng thái đồng bộ', [ownerIncoming.enteredBy, ownerWrite && ownerWrite.records.length, ownerWrite && ownerWrite.records[0].id, ownerWrite && ownerWrite.records[0].enteredBy, ownerWrite && ownerWrite.records[0].syncStatus], ['Sale Cũ', 1, 'ACT-10', 'Sale Cũ', undefined]);
+  // Người dùng lỡ xóa mã khách ở dòng giao dịch: quan hệ cha đứng ngoài fingerprint nên hash không lộ; lượt kéo phải nối lại theo FBM và để dấu ở Log, nếu không ngày giao dịch cuối của khách lệch FBM mãi.
+  const linkIncoming = builders.FbmSync.activityRecord({ id: 'FBM-11', ma_kh: 'ALT99999', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi', details: 'Nội dung', owner: 'Sale Cũ' }, gate);
+  let linkWrite = null;
+  const linkLogged = [];
+  const recordIssueAddBefore = builders.FbmSync.recordIssueAdd;
+  builders.FbmSync.recordIssueAdd = (stage, entity, status, id, reason) => { linkLogged.push(id + '|' + reason); return null; };
+  builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmCustomerCode: 'ALT99999' }] : [{ id: 'ACT-11', fbmId: 'FBM-11', customerId: '', content: 'Nội dung', taskType: 'Gọi', workDate: '/Date(1757386800000)/', enteredBy: 'Sale Cũ', fbmHash: linkIncoming.fbmHash, syncStatus: builders.FbmSync.SYNC_STATUS.synced }];
+  builders.writeGateSave = (request) => { linkWrite = request; return { ok: true }; };
+  builders.FbmSync.pullWrite('activity', [Object.assign({}, linkIncoming)]);
+  builders.FbmSync.recordIssueAdd = recordIssueAddBefore;
+  check(so, 'Giao dịch mất mã khách trên Sheet: lượt kéo nối lại vào khách ShinCRM theo FBM, ghi một dòng Log, không đổi nội dung hay trạng thái đồng bộ', [linkWrite && linkWrite.records.length, linkWrite && linkWrite.records[0].id, linkWrite && linkWrite.records[0].customerId, linkWrite && linkWrite.records[0].syncStatus, linkLogged.filter((line) => /ACT-11\|.*KH-1/.test(line)).length], [1, 'ACT-11', 'KH-1', undefined, 1]);
   // FBM trả mới nhất trước; cửa ghi cấp ACT- theo thứ tự mảng ghi, nên lô phải được sắp theo mã FBM tăng dần (thứ tự nhập thật) trước khi ghi. Mã đổi độ dài (99999 → 100000) phải so như số.
   const fbmOrderIncoming = (fbmId, day) => builders.FbmSync.activityRecord({ id: fbmId, ma_kh: 'ALT99999', end_date: day, ten_cv: 'Gọi', details: 'GD ' + fbmId }, gate);
   let orderWrite = null;
