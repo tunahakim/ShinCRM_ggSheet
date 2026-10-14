@@ -20,6 +20,8 @@ var SHEET_LINK_NONCE = '';
 var SHEET_LINK_SEQ = 0;
 var SHEET_LINK_SPREADSHEET_ID = '';
 var SHEET_LINK_READ_PLAN = null;
+/** Hàng dữ liệu đầu tiên, GAS gửi kèm read plan. 0 = chưa biết thì không phân loại hàng trống/không tìm thấy. */
+var SHEET_LINK_FIRST_DATA_ROW = 0;
 var SHEET_LINK_SCHEMA = null;
 var SHEET_LINK_LAST_ACK = 0;
 var SHEET_LINK_EXTENSION_SESSION = '';
@@ -153,6 +155,7 @@ function sheetLinkApplyCoreHints(core) {
   SHEET_LINK_SCHEMA = core.schema || SHEET_LINK_SCHEMA;
   SHEET_LINK_FREE_SHEETS = {};
   sheetLinkSetReadPlan(core.selectionHints.readPlan || null);
+  SHEET_LINK_FIRST_DATA_ROW = Number(core.selectionHints.firstDataRow) || 0;
 }
 
 /** Context chỉ được giải mã sau khi Customer đã vào RAM. */
@@ -756,10 +759,44 @@ function sheetLinkApplyCustomerContext(ctx) {
   if (!Prefs.followSelection || ScreenState.screen !== SCREEN_VIEW || (typeof FBM_SYNC_CLIENT !== 'undefined' && FBM_SYNC_CLIENT.active)) { return false; }
 
   var ma = sheetLinkCustomerIdFromContext(ctx);
-  if (!ma || ma === ScreenState.currentCustomerId) { return false; }
+  if (ma) {
+    if (ma === ScreenState.currentCustomerId) { return false; }
+    ACTIONS.setCurrentCustomer({ pick: ma });
+    return true;
+  }
 
-  ACTIONS.setCurrentCustomer({ pick: ma });
+  var miss = sheetLinkSelectionMiss(ctx);
+  if (!miss || JSON.stringify(miss) === JSON.stringify(ScreenState.selectionMiss)) { return false; }
+  screenViewSetSelectionMiss(miss);
   return true;
+}
+
+/**
+ * Hàng dữ liệu vừa nhấp không ra khách trong RAM: `{ kind: 'notFound', code }` khi ô mã có giá trị, `{ kind: 'empty' }` khi ô mã trống. Trả `null` khi không chắc — hàng tiêu đề, sheet không có cột mã, bộ đọc chưa thấy ô — để màn giữ khách đang xem thay vì báo sai.
+ *
+ * Ô trống thường không có trong lưới Extension đọc được (`unavailable`), nên ca "trống" phần lớn đến từ GAS đọc thay (`customerCell`).
+ */
+function sheetLinkSelectionMiss(ctx) {
+  if (!ctx) { return null; }
+  if (!Array.isArray(ctx.reads)) {
+    if (ctx.customerCell === 'empty') { return { kind: 'empty' }; }
+    var gasCode = String(ctx.customerId || '').trim().toUpperCase();
+    return ctx.customerCell === 'value' && gasCode ? { kind: 'notFound', code: gasCode } : null;
+  }
+  var coordinates = sheetLinkParseNameBox(ctx.cellRef);
+  var row = coordinates ? coordinates.row : Number(ctx.row) || 0;
+  if (!SHEET_LINK_FIRST_DATA_ROW || row < SHEET_LINK_FIRST_DATA_ROW || ctx.readReason === 'LIVE_GRID_CONFLICT') { return null; }
+  // Sheet xem tự do không đánh thức GAS khi Extension đọc hụt, nên ô mã vắng khỏi lưới dưới một cột mã đúng tiêu đề được coi là ô trống. Sheet kho để GAS đọc thay rồi mới báo, tránh báo "trống" cho một hàng có khách mà lưới chưa nạp tới.
+  var absentIsEmpty = sheetLinkIsFreeSheet(ctx.sheetName);
+  var cells = ctx.reads.filter(function (read) {
+    return read && read.valueAddress && read.matched === true && (read.status === 'ok' || (absentIsEmpty && read.status === 'unavailable' && !String(read.value || '').trim()));
+  });
+  if (!cells.length) { return null; }
+  for (var i = 0; i < cells.length; i++) {
+    var code = String(cells[i].value || '').trim().toUpperCase();
+    if (code) { return { kind: 'notFound', code: code }; }
+  }
+  return { kind: 'empty' };
 }
 
 function sheetLinkCustomerIdFromContext(ctx) {

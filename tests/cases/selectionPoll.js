@@ -325,6 +325,51 @@ async function chay(so) {
   syncOpen.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: 'Customer', row: 4, col: 1, reads: [{ status: 'ok', matched: true, value: 'KH-SYNC' }] });
   check(so, 'click ô khi đang ở module Đồng bộ không vẽ đè màn chính', syncOpen._picked, []);
 
+  // Nhấp hàng không ra khách: báo đúng lý do thay vì giữ khách của hàng trước.
+  const missHop = (sheetName) => {
+    const h = dungHopPoll(); batDau(h);
+    h.SHEET_LINK_FIRST_DATA_ROW = 4; h.SHEET_LINK_LAST_SHEET = sheetName;
+    h.Store.hasCustomer = (id) => id === 'CUS-000001';
+    h._picked = []; h._misses = [];
+    h.ACTIONS.setCurrentCustomer = ({ pick }) => { h._picked.push(pick); };
+    h.screenViewSetSelectionMiss = (miss) => { h._misses.push(miss); h.ScreenState.selectionMiss = miss; };
+    h.callServer = () => new Promise(() => {});
+    return h;
+  };
+  const codeRead = (status, value) => ({ token: 'Customer:@CUS_MA_KH', status, matched: true, valueAddress: 'A5', value });
+  const notFound = missHop('Customer');
+  notFound.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: 'Customer', cellRef: 'A5', row: 5, col: 1, reads: [codeRead('ok', 'cus-999999')] });
+  check(so, 'nhấp hàng có mã chưa có trong RAM báo không tìm thấy đúng mã, không đổi khách', [notFound._misses, notFound._picked], [[{ kind: 'notFound', code: 'CUS-999999' }], []]);
+  notFound.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: 'Customer', cellRef: 'A6', row: 6, col: 1, reads: [codeRead('ok', 'CUS-999999')] });
+  check(so, 'nhấp lại hàng cùng mã thiếu không vẽ lại lần hai', notFound._misses.length, 1);
+
+  const header = missHop('Customer');
+  header.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: 'Customer', cellRef: 'A1', row: 1, col: 1, reads: [codeRead('ok', '@CUS_MA_KH')] });
+  check(so, 'nhấp hàng tiêu đề giữ khách đang xem, không báo không tìm thấy', [header._misses, header._picked], [[], []]);
+
+  const dataEmpty = missHop('Customer');
+  dataEmpty.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: 'Customer', cellRef: 'A7', row: 7, col: 1, readStatus: 'unavailable', reads: [codeRead('unavailable', '')] });
+  check(so, 'sheet kho: ô mã vắng khỏi lưới Extension chưa báo trống, chờ GAS đọc thay', dataEmpty._misses, []);
+  dataEmpty.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', gid: '1', sheetName: 'Customer', row: 7, col: 1, rowEnd: 7, colEnd: 1, customerId: '', customerIdChanged: true, customerCell: 'empty' }, { fromProbe: true });
+  check(so, 'GAS đọc thay thấy ô mã trống thì báo hàng không có khách', dataEmpty._misses, [{ kind: 'empty' }]);
+
+  const gasMiss = missHop('Customer');
+  gasMiss.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', gid: '1', sheetName: 'Customer', row: 2, col: 1, rowEnd: 2, colEnd: 1, customerId: '', customerIdChanged: true, customerCell: '' }, { fromProbe: true });
+  check(so, 'GAS không có ô mã để đọc (hàng tiêu đề, sheet không cột mã) thì giữ khách đang xem', gasMiss._misses, []);
+  gasMiss.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', gid: '1', sheetName: 'Customer', row: 9, col: 1, rowEnd: 9, colEnd: 1, customerId: 'CUS-777777', customerIdChanged: true, customerCell: 'value' }, { fromProbe: true });
+  check(so, 'GAS đọc được mã chưa có trong RAM thì báo không tìm thấy', gasMiss._misses, [{ kind: 'notFound', code: 'CUS-777777' }]);
+
+  const freeEmpty = missHop('Nháp');
+  freeEmpty.SHEET_LINK_READ_PLAN = { Customer: [], '!': [] };
+  freeEmpty.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: 'Nháp', cellRef: 'C7', row: 7, col: 3, readStatus: 'unavailable', reads: [codeRead('unavailable', '')] });
+  check(so, 'sheet tự do: ô mã vắng dưới cột mã đúng tiêu đề là hàng không có khách', freeEmpty._misses, [{ kind: 'empty' }]);
+
+  const missForm = missHop('Customer'); missForm.ScreenState.screen = 'customerForm';
+  missForm.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: 'Customer', cellRef: 'A5', row: 5, col: 1, reads: [codeRead('ok', 'CUS-999999')] });
+  const missSync = missHop('Customer'); missSync.FBM_SYNC_CLIENT = { active: true };
+  missSync.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: 'Customer', cellRef: 'A5', row: 5, col: 1, reads: [codeRead('ok', 'CUS-999999')] });
+  check(so, 'form đang mở hoặc đang đồng bộ FBM thì nhấp hàng không ra khách không đổi màn', [missForm._misses, missSync._misses], [[], []]);
+
   const taiLai = dungHopPoll(); batDau(taiLai); taiLai.SHEET_LINK_SEQ = 99;
   taiLai.sheetLinkOnMessage({ origin: taiLai.SHEET_LINK_ORIGIN, data: { action: 'CRM_HANDSHAKE_ACK', nonce: taiLai.SHEET_LINK_NONCE, sessionId: 'extension-moi' } });
   taiLai.sheetLinkOnMessage({ origin: taiLai.SHEET_LINK_ORIGIN, data: { action: 'CRM_CONTEXT', nonce: taiLai.SHEET_LINK_NONCE, sessionId: 'extension-moi', spreadsheetId: 'sheet-1', seq: 1, sheetName: 'Customer', row: 4, col: 1 } });

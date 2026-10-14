@@ -75,7 +75,9 @@ function refreshDecideAndRender(context) {
 
   // Reload records của khách khác không cần làm nhấp nháy màn đang xem. Các
   // scope cấu hình/full core và reload trọn thực thể thì luôn ảnh hưởng màn.
-  if (mode === 'records') {
+  // Mã vừa báo "không tìm thấy" có thể chính là khách lượt nạp này mang về.
+  var missResolved = !!(screenState && screenState.screen === SCREEN_VIEW && typeof screenViewResolveSelectionMiss === 'function' && screenViewResolveSelectionMiss());
+  if (mode === 'records' && !missResolved) {
     var top = typeof screenStateTop === 'function' ? screenStateTop() : null;
     var formRecordId = top && top.record ? String(top.record.id || '').trim() : '';
     var related = (currentCustomerId && affectedCustomers.indexOf(currentCustomerId) >= 0)

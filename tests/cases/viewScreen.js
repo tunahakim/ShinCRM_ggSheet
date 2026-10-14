@@ -80,7 +80,7 @@ function chay(so) {
   const banGhi = hop.screenViewRecords();
   check(so, 'bản ghi cho lượt vẽ có cả khóa search dù rỗng, để hộp gợi ý có đúng một chỗ đổ kết quả vào',
     [Object.keys(banGhi).sort(), Array.isArray(banGhi.search), banGhi.search.length],
-    [['customer', 'search'], true, 0]);
+    [['customer', 'search', 'selectionMiss'], true, 0]);
   section('viewScreen — vẽ cả màn, vẽ lại một card, và đổi khách');
 
   const els = hop.document._els;
@@ -143,6 +143,35 @@ function chay(so) {
     [hop.ScreenState.formStack.length, hop.ScreenState.screen, hop.Prefs.activityView,
       els['sidebar-info'].innerHTML.indexOf('Thép Việt Đức') > 0],
     [0, 'view', 'all', true]);
+
+  section('viewScreen — nhấp hàng không ra khách');
+
+  hop.screenViewSetSelectionMiss({ kind: 'notFound', code: 'CUS-999999' });
+  check(so, 'mã chưa có trong RAM: bỏ khách đang xem, khối thông tin chung và card lịch sử nói đúng mã và lý do có thể đang chờ nạp',
+    [hop.ScreenState.currentCustomerId,
+      els['sidebar-info'].innerHTML.indexOf('Không tìm thấy thông tin của khách CUS-999999. Có thể khách vừa được thêm, đang chờ nạp.') > 0,
+      els['sidebar-body'].innerHTML.indexOf('Không tìm thấy thông tin của khách CUS-999999') > 0],
+    ['', true, true]);
+
+  check(so, 'mã vẫn chưa có trong RAM thì lượt nạp sau không tự chuyển khách', hop.screenViewResolveSelectionMiss(), '');
+  hop.Store.upsertRecord('customer', Object.assign({}, KHACH[0], { id: 'CUS-999999', companyName: 'Khách vừa thêm' }));
+  check(so, 'lượt nạp mang khách vừa thêm về thì tự chuyển sang khách đó và bỏ câu báo',
+    [hop.screenViewResolveSelectionMiss(), hop.ScreenState.currentCustomerId, hop.ScreenState.selectionMiss],
+    ['CUS-999999', 'CUS-999999', null]);
+
+  hop.screenViewSetSelectionMiss({ kind: 'empty' });
+  check(so, 'hàng không có mã khách: báo hàng này không có khách nào',
+    els['sidebar-info'].innerHTML.indexOf('Hàng này không có khách nào.') > 0, true);
+  hop.screenViewSetCustomer('CUS-000001');
+  check(so, 'chọn khách bằng đường khác thì câu báo hàng trống mất', [hop.ScreenState.selectionMiss, els['sidebar-info'].innerHTML.indexOf('Công ty Thép Hòa Phát') > 0], [null, true]);
+
+  hop.screenStateOpenForm('activityForm', 'activity', {});
+  check(so, 'đang mở form thì báo hàng không ra khách bị bỏ qua, khách đang gõ dở giữ nguyên',
+    [hop.screenViewSetSelectionMiss({ kind: 'empty' }), hop.ScreenState.currentCustomerId, hop.ScreenState.selectionMiss], [null, 'CUS-000001', null]);
+  hop.screenViewGo();
+
+  check(so, 'câu báo không có khách do slot đọc từ `ctx.records`, không đọc `ScreenState`',
+    /ScreenState/.test(stripComments(catRuotScript(docTep('client/ui/slots.html'), 'slots'))), false);
 
   check(so, 'tệp màn không tự chạm DOM và không tự gọi máy chủ — mọi đường vẽ đi qua engine, `[RÀNG BUỘC CỨNG]` tài liệu 04 Phần 6',
     /google\.script|document\./.test(stripComments(catRuotScript(docTep('client/screen/viewScreen.html'), 'viewScreen'))), false);

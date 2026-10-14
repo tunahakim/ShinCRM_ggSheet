@@ -27,7 +27,7 @@ function screenViewDeleted() {
 
 /** Bản ghi cho lượt vẽ. `search` có mặt sẵn dù rỗng, để hộp gợi ý có đúng một khóa để đổ kết quả vào rồi vẽ lại vùng của nó. */
 function screenViewRecords() {
-  return { customer: screenViewCustomer(), search: [] };
+  return { customer: screenViewCustomer(), selectionMiss: ScreenState.selectionMiss, search: [] };
 }
 
 /** Nhãn ngắn của nấc lọc lịch sử, hiển thị ngay trên tiêu đề card. */
@@ -96,5 +96,19 @@ function screenViewSetCustomer(id) {
   screenStateSetCustomer(id);
   if (ScreenState.screen !== SCREEN_VIEW) { return null; }
   return screenViewRender();
+}
+
+/** Hàng vừa nhấp không ra khách: báo đúng lý do thay vì giữ khách của hàng trước. Cùng luật không giật màn khi form đang mở như `screenViewSetCustomer`. */
+function screenViewSetSelectionMiss(miss) {
+  if (ScreenState.screen !== SCREEN_VIEW) { return null; }
+  screenStateSetSelectionMiss(miss);
+  return screenViewRender();
+}
+
+/** Mã vừa báo "không tìm thấy" nay đã có trong RAM (khách vừa thêm, lượt nạp tới sau): chuyển sang khách đó. Trả mã khi đã chuyển; người gọi lo việc vẽ. */
+function screenViewResolveSelectionMiss() {
+  var miss = ScreenState.selectionMiss;
+  if (!miss || miss.kind !== 'notFound' || !miss.code || !Store.hasCustomer(miss.code)) { return ''; }
+  return screenStateSetCustomer(miss.code);
 }
 </script>

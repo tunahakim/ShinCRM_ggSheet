@@ -255,7 +255,8 @@ function probeSelectionAndReload(input) {
     var positionChanged = context ? selectionContextPositionChanged(previous, snapshot) : false;
     // Extension đọc hỏng thì vị trí Sidebar gửi lên đã là vị trí mới, so vị trí sẽ không thấy đổi; cờ `needsSelection` bắt GAS đọc thay.
     var readSelection = !!context && (positionChanged || request.needsSelection === true);
-    var customerId = readSelection ? selectionCustomerId(context, snapshot) : previousCustomerId;
+    var customerCell = readSelection ? selectionCustomerCell(context, snapshot) : null;
+    var customerId = customerCell ? customerCell.value : previousCustomerId;
     var state = reloadStateRead();
     var decision = typeof reloadDecisionForState === 'function'
       ? reloadDecisionForState({
@@ -269,7 +270,8 @@ function probeSelectionAndReload(input) {
     var selection = Object.assign({}, snapshot, {
       positionChanged: positionChanged,
       customerId: customerId,
-      customerIdChanged: readSelection && customerId !== previousCustomerId
+      customerIdChanged: readSelection && customerId !== previousCustomerId,
+      customerCell: customerCell && customerCell.read ? (customerId ? 'value' : 'empty') : ''
     });
     var payload = null;
     var processedRevision = 0;
@@ -331,7 +333,13 @@ function probeSelectionAndReload(input) {
 
 /** Đổi dòng đang chọn thành mã khách bằng cách đọc đúng cột mã của chính sheet đó. */
 function selectionCustomerId(context, snapshot) {
-  if (!snapshot.sheetName || snapshot.row < SHEET_FIRST_DATA_ROW || !context.sheet) { return ''; }
+  return selectionCustomerCell(context, snapshot).value;
+}
+
+/** Ô mã khách của dòng đang chọn: `read` false khi không có ô nào để đọc (hàng tiêu đề, sheet không có cột mã), để Sidebar phân biệt "hàng trống mã" với "chỗ này không có khách". */
+function selectionCustomerCell(context, snapshot) {
+  var none = { read: false, value: '' };
+  if (!snapshot.sheetName || snapshot.row < SHEET_FIRST_DATA_ROW || !context.sheet) { return none; }
 
   var column = 0;
   if (snapshot.sheetName === ENTITY_SHEETS.customer || snapshot.sheetName.charAt(0) === '!') {
@@ -341,9 +349,9 @@ function selectionCustomerId(context, snapshot) {
   } else if (selectionIsFreeSheet(snapshot.sheetName)) {
     column = selectionFreeSheetColumn(context.sheet);
   }
-  if (!column) { return ''; }
+  if (!column) { return none; }
   var value = context.sheet.getRange(snapshot.row, column).getValue();
-  return String(value === null || value === undefined ? '' : value).trim();
+  return { read: true, value: String(value === null || value === undefined ? '' : value).trim() };
 }
 
 /** Nghiệm thu trên Google: chọn hàng dữ liệu và hàng tiêu đề để đối chiếu mã khách cùng thời gian thật. */

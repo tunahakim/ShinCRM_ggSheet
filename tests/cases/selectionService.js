@@ -93,10 +93,10 @@ function chay(so) {
   // đọc mã khách khi vị trí thay đổi; Sidebar truyền lại context trước đó.
   hop.dirtyStateClear();
   let customerReads = 0;
-  const readCustomerId = hop.selectionCustomerId;
-  hop.selectionCustomerId = function (context, snapshot) {
+  const readCustomerCell = hop.selectionCustomerCell;
+  hop.selectionCustomerCell = function (context, snapshot) {
     customerReads += 1;
-    return readCustomerId(context, snapshot);
+    return readCustomerCell(context, snapshot);
   };
   state.sheetName = 'Customer';
   state.row = 4;
@@ -108,6 +108,8 @@ function chay(so) {
     [firstProbe.selection.positionChanged, firstProbe.customerId, customerReads],
     [true, 'CUS-000004', 1]);
 
+  check(so, 'GAS báo đã đọc được ô mã của hàng dữ liệu để Sidebar phân biệt hàng trống với chỗ không có ô mã',
+    [firstProbe.selection.customerCell, hop.selectionCustomerCell({ sheet: {} }, { sheetName: 'Customer', row: 1 })], ['value', { read: false, value: '' }]);
   const readsBeforeStable = customerReads;
   const stableProbe = hop.probeSelectionAndReload({ previousSelectionContext: firstProbe.selection, previousCustomerId: firstProbe.customerId });
   check(so, 'vị trí không đổi trả mã cũ và không đọc lại ô mã khách',

@@ -14,6 +14,14 @@ function slotEmpty(chu) {
   return [Empty(chu)];
 }
 
+/** Câu báo khi màn không có khách: hàng vừa nhấp có mã nhưng RAM chưa có, hàng trống mã, hoặc chưa chọn gì. Đọc `ctx.records.selectionMiss`, không đọc `ScreenState`. */
+function slotNoCustomerText(ctx) {
+  var miss = ctx && ctx.records ? ctx.records.selectionMiss : null;
+  if (miss && miss.kind === 'notFound') { return 'Không tìm thấy thông tin của khách ' + miss.code + '. Có thể khách vừa được thêm, đang chờ nạp.'; }
+  if (miss && miss.kind === 'empty') { return 'Hàng này không có khách nào.'; }
+  return 'Chưa chọn khách hàng nào.';
+}
+
 /** Mã khách của ngữ cảnh đang vẽ. Lấy từ bản ghi trong `ctx` chứ không đọc `ScreenState`, để slot kiểm được offline. */
 function slotCustomerId(ctx) {
   var ban = ctx && ctx.records ? ctx.records.customer : null;
@@ -91,7 +99,7 @@ function slotActivityRow(a) {
  */
 SLOTS.activityList = function (ctx) {
   var id = slotCustomerId(ctx);
-  if (!id) { return slotEmpty('Chưa chọn khách hàng nào.'); }
+  if (!id) { return slotEmpty(slotNoCustomerText(ctx)); }
   if (Store.activityState === STORE_LOADING) { return slotEmpty('Đang nạp lịch sử làm việc…'); }
 
   var list = slotFilterActivities(Store.getActivities(id), Prefs.activityView);
@@ -149,7 +157,7 @@ function slotInfoRow(trai, phai) {
  */
 SLOTS.infoBarContent = function (ctx) {
   var ban = ctx && ctx.records ? ctx.records.customer : null;
-  if (!ban || !ban.id) { return slotEmpty('Chưa chọn khách hàng nào.'); }
+  if (!ban || !ban.id) { return slotEmpty(slotNoCustomerText(ctx)); }
 
   var dong = [Text({ text: ban.companyName || '(chưa có tên)', className: 'shin-info-name' })];
   if ((ban.recordStatus || STORE_ACTIVE) === STORE_DELETED) {

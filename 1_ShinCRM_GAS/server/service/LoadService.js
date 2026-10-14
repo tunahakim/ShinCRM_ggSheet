@@ -418,7 +418,8 @@ function loadCore(options) {
       settings: SETTINGS,
       spreadsheetId: book.getId(),
       selectionHints: typeof selectionReadPlan === 'function' ? {
-        readPlan: selectionReadPlan()
+        readPlan: selectionReadPlan(),
+        firstDataRow: SHEET_FIRST_DATA_ROW
       } : null,
       schema: DATA_SCHEMA,
       config: config,

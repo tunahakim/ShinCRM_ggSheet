@@ -19,7 +19,8 @@ var SCREEN_VIEW = 'view';
 var ScreenState = {
   currentCustomerId: '',
   screen: SCREEN_VIEW,
-  formStack: []
+  formStack: [],
+  selectionMiss: null
 };
 
 /** Về trạng thái trắng. Dùng lúc nạp lại từ đầu, và trong bộ kiểm để mỗi ca chạy trên trạng thái sạch. */
@@ -27,12 +28,27 @@ function screenStateReset() {
   ScreenState.currentCustomerId = '';
   ScreenState.screen = SCREEN_VIEW;
   ScreenState.formStack = [];
+  ScreenState.selectionMiss = null;
 }
 
 /** Đổi khách đang xem. Không dọn ngăn xếp form: đổi khách lúc đang gõ dở là ca của nguồn-chọn, và cấm hay cho phép là quyết định của hành động, không phải của chỗ giữ số. */
 function screenStateSetCustomer(id) {
   ScreenState.currentCustomerId = String(id === null || id === undefined ? '' : id);
+  ScreenState.selectionMiss = null;
   return ScreenState.currentCustomerId;
+}
+
+/**
+ * Hàng người dùng vừa nhấp không dẫn tới khách nào trong RAM: `{ kind: 'notFound', code }` hoặc `{ kind: 'empty' }`. Bỏ khách đang xem để màn không giữ khách của hàng trước — người dùng sẽ tưởng hàng mới là khách cũ.
+ *
+ * Chọn khách bằng bất kỳ đường nào (`screenStateSetCustomer`) đều xóa trạng thái này, nên không có hai chủ cùng nói "đang xem ai".
+ */
+function screenStateSetSelectionMiss(miss) {
+  ScreenState.currentCustomerId = '';
+  ScreenState.selectionMiss = miss && (miss.kind === 'notFound' || miss.kind === 'empty')
+    ? { kind: miss.kind, code: miss.kind === 'notFound' ? String(miss.code || '') : '' }
+    : null;
+  return ScreenState.selectionMiss;
 }
 
 /** Đỉnh ngăn xếp — form đang hiện — hoặc `null` khi đang ở màn `view`. */

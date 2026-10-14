@@ -144,6 +144,17 @@ async function chay(so) {
   check(so, 'payload reload trực tiếp cũng không vẽ đè shell Đồng bộ',
     [syncRender.screen, syncRender.rendered, syncRefreshHop._viewRendered, syncRefreshHop._syncPainted],
     ['sync', false, undefined, { phase: 'idle' }]);
+
+  const missRefreshHop = taoHopCat({
+    ScreenState: { screen: 'view', currentCustomerId: '', formStack: [], selectionMiss: { kind: 'notFound', code: 'CUS-NEW' } },
+    SCREEN_VIEW: 'view',
+    screenViewResolveSelectionMiss: () => { missRefreshHop.ScreenState.currentCustomerId = 'CUS-NEW'; return 'CUS-NEW'; },
+    screenViewRender: () => 'vẽ'
+  });
+  napClient(missRefreshHop, 'client/ram/refresh.html');
+  const missRender = missRefreshHop.refreshDecideAndRender({ ok: true, applied: true, mode: 'records', affectedCustomerIds: ['CUS-OTHER'] });
+  check(so, 'lượt nạp records mang về khách vừa báo không tìm thấy thì vẽ lại màn dù danh sách ảnh hưởng không có khách đang xem',
+    [missRender.rendered, missRefreshHop.ScreenState.currentCustomerId], [true, 'CUS-NEW']);
 }
 
 module.exports = { chay };
