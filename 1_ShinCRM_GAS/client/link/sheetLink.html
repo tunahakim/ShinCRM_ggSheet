@@ -407,6 +407,15 @@ function sheetLinkCancelDirtyCheck() {
   SHEET_LINK_RELOAD_TIMER = null;
 }
 
+/**
+ * Rời sheet kho chỉ đáng một lời hỏi ngay khi còn việc chờ: tín hiệu chưa hỏi, lượt nạp đang hoãn chờ debounce, hoặc lời hỏi đang bay. Không có gì chờ mà kênh sống thì thay đổi nào chưa tới sẽ tự đến qua kênh; hỏi thêm chỉ tốn một lượt GAS. Kênh chết hoặc vắng Extension thì không biết có việc chờ hay không nên vẫn hỏi.
+ */
+function sheetLinkLeaveNeedsFlush() {
+  if (SHEET_LINK_RELOAD_TIMER !== null || SHEET_LINK_SELECTION_PENDING || SHEET_LINK_DATA_PENDING) { return true; }
+  if (typeof changeSignalPending !== 'function' || !sheetLinkExtensionAlive() || changeSignalChannelDead()) { return true; }
+  return changeSignalPending();
+}
+
 /** Extension không đọc được mã ở vị trí mới: hỏi GAS đọc thay sau khi vị trí đứng yên `POSITION_WAKE_MS`, để lướt qua nhiều ô chỉ sinh một lời hỏi. */
 function sheetLinkScheduleWake() {
   if (!SHEET_LINK_RAM_READY || typeof setTimeout !== 'function') { return null; }
@@ -707,8 +716,9 @@ function sheetLinkApplyContext(ctx, options) {
       if (leavingDataSheet && typeof callServer === 'function') {
         // Rời sheet thắng debounce: hủy timer còn lại để không tạo thêm một
         // lượt hỏi sau khi lượt reload tức thời đã hoàn tất.
+        var flush = sheetLinkLeaveNeedsFlush();
         sheetLinkCancelDirtyCheck();
-        queue(function () { return sheetLinkSyncDirtyData({ forceImmediate: true }); });
+        if (flush) { queue(function () { return changeSignalFlush(function () { return sheetLinkSyncDirtyData({ forceImmediate: true }); }); }); }
       }
       else if (SHEET_LINK_DATA_PENDING) { queue(function () { return SHEET_LINK_DATA_PENDING; }); }
 

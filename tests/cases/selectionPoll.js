@@ -140,6 +140,28 @@ async function chay(so) {
   check(so, 'Extension đọc được: keydown, canvasClick, đổi vị trí, chọn vùng đều không hỏi GAS và không đặt hẹn giờ đánh thức',
     [quiet._calls.length, quiet._timers.size - timersBefore], [0, 0]);
 
+  // Rời sheet kho chỉ hỏi ngay khi còn việc chờ; kênh sống và không có gì chờ thì không tốn lượt GAS.
+  const roiKho = async (setup) => {
+    const h = dungHopPoll(); batDau(h); h._calls = [];
+    h.SHEET_LINK_READ_PLAN = plan;
+    h.SHEET_LINK_LAST_ACK = 5000; h._clock.now = 5001;
+    h.Store = { hasCustomer: () => true };
+    h.callServer = (name, args, options) => { h._calls.push(name); return syncValue({ ok: true, reload: { revision: 0 } }); };
+    const tin = (seq, sheetName, cellRef, row) => ({ action: 'CRM_CONTEXT', nonce: h.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq, sheetName, cellRef, row, col: 1, readStatus: 'ok', readReason: '', headerComplete: true, rawHeaderRow: [{ address: 'A1', column: 1, value: '@CUS_MA_KH' }], reads: [{ token: 'id', status: 'ok', matched: true, value: 'CUS-000004' }] });
+    h.sheetLinkOnMessage({ origin: h.SHEET_LINK_ORIGIN, data: tin(1, 'Customer', 'A4', 4) });
+    await new Promise((resolve) => setImmediate(resolve));
+    h._calls = [];
+    if (setup) { setup(h); }
+    h.sheetLinkOnMessage({ origin: h.SHEET_LINK_ORIGIN, data: tin(2, 'Bao cao', 'A1', 1) });
+    await new Promise((resolve) => setImmediate(resolve));
+    return { calls: h._calls.length, hen: Array.from(h._timers.values()).filter((item) => item.delay === 4000 || item.delay === 12000).map((item) => item.delay).sort() };
+  };
+  check(so, 'rời Customer khi kênh sống và không có tín hiệu chờ: không hỏi GAS', (await roiKho()).calls, 0);
+  check(so, 'rời Customer khi còn tín hiệu chờ: hỏi ngay một lượt thay mốc đầu, giữ mốc sau để tự xét',
+    await roiKho((h) => h.sheetLinkOnMessage({ origin: h.SHEET_LINK_ORIGIN, data: { action: 'CRM_RELOAD', nonce: h.SHEET_LINK_NONCE, signal: 'channel' } })), { calls: 1, hen: [12000] });
+  check(so, 'rời Customer khi kênh chết hoặc còn lượt nạp hoãn: vẫn hỏi ngay',
+    [(await roiKho((h) => { h.CHANGE_SIGNAL.dead = true; })).calls, (await roiKho((h) => { h.SHEET_LINK_RELOAD_TIMER = 99; })).calls], [1, 1]);
+
   const appFocus = dungHopPoll(); batDau(appFocus); appFocus._calls = [];
   appFocus.SHEET_LINK_LAST_ACK = 5000; appFocus._clock.now = 5001;
   appFocus.selectionPollWake();

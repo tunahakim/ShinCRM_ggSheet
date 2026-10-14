@@ -42,16 +42,30 @@ function changeSignalOnFrame(now) {
 }
 
 /** Hỏi theo tín hiệu và ghi lại lời hỏi đó có thấy revision tăng không, để mốc sau biết còn cần hỏi. */
-function changeSignalAskTracked() {
+function changeSignalAskTracked(askNow) {
   var ask = { startedAt: Date.now(), revisionBefore: Number(SHEET_LINK_LAST_SEEN_REVISION) || 0, settled: false, advanced: false };
   CHANGE_SIGNAL.lastAsk = ask;
-  var work = changeSignalAsk('channel-signal');
+  var work = askNow ? askNow() : changeSignalAsk('channel-signal');
   Promise.resolve(work).then(function (result) {
     var seen = result && result.reload ? Number(result.reload.revision) || 0 : 0;
     ask.advanced = !!result && Math.max(seen, Number(SHEET_LINK_LAST_SEEN_REVISION) || 0) > ask.revisionBefore;
     ask.settled = true;
   }, function () { ask.settled = true; });
   return work;
+}
+
+/** Còn mốc hỏi nào đang hẹn: có tín hiệu chưa được hỏi hết. */
+function changeSignalPending() {
+  return CHANGE_SIGNAL.timers.some(function (timer) { return timer !== undefined && timer !== null; });
+}
+
+/** Hỏi ngay thay cho mốc đầu đang hẹn (rời sheet kho). Mốc sau vẫn giữ và tự xét có cần không, vì lúc này trigger có thể chưa ghi xong. */
+function changeSignalFlush(askNow) {
+  if (CHANGE_SIGNAL.timers[0] !== undefined && CHANGE_SIGNAL.timers[0] !== null) {
+    clearTimeout(CHANGE_SIGNAL.timers[0]);
+    CHANGE_SIGNAL.timers[0] = null;
+  }
+  return changeSignalAskTracked(askNow);
 }
 
 /** Mốc sau của lịch trễ: bỏ khi lời hỏi trước đã xong, đã thấy revision tăng và không có tín hiệu nào đến sau lúc nó bắt đầu. */
