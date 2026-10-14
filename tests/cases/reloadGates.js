@@ -9,28 +9,29 @@ function taoHop() {
   hop.shinViewSheetNames = () => ['!Lead', '!Chăm sóc'];
   hop.rendered = 0;
   hop.renderedWhileLocked = false;
-  hop.renderAllManagedViewsIfAllowed = () => { hop.rendered += 1; hop.renderedWhileLocked = nen.stubs._khoa.dangGiu; return { ok: true, rendered: 2 }; };
+  hop.renderAllManagedViews = () => { hop.rendered += 1; return { ok: true }; };
+  hop.renderViewSheet = () => { hop.rendered += 1; return { ok: true }; };
   return { nen, hop };
 }
 
 function chay(so) {
-  section('Cổng ghi/xóa — mọi ghi thành công đều phát signal và render độc lập Sidebar');
+  section('Cổng ghi/xóa — mọi ghi thành công đều phát signal, làm view cũ và không tự vẽ');
 
   let env;
   try { env = taoHop(); } catch (err) { return ghiLoiNap(so, 'dựng hộp cát reload gate', err); }
 
   const saved = env.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000111' }], source: 'pull' });
-  check(so, 'writeGateSave pull phát signal bản ghi + allViews và render sau lock',
-    [saved.ok, saved.recordIds, saved.reloadDecision.kind, saved.dirty.records, saved.dirty.allViews, env.hop.rendered],
-    [true, ['KH000001'], 'records', ['KH000001'], true, 1]);
-  check(so, 'signal tăng một revision và renderer chạy sau khi nhả document lock',
-    [env.hop.reloadStateRead().revision, env.hop.renderedWhileLocked, env.nen.stubs._khoa.dangGiu],
-    [1, false, false]);
+  check(so, 'writeGateSave pull phát signal bản ghi, làm mọi view cũ và không gọi bộ vẽ',
+    [saved.ok, saved.recordIds, saved.reloadDecision.kind, saved.dirty.records, (saved.dirty.viewsStaleRevision === saved.dirty.revision), env.hop.rendered],
+    [true, ['KH000001'], 'records', ['KH000001'], true, 0]);
+  check(so, 'signal tăng một revision và nhả document lock',
+    [env.hop.reloadStateRead().revision, env.nen.stubs._khoa.dangGiu],
+    [1, false]);
 
   const userEnv = taoHop();
   const userSaved = userEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000112' }], source: 'user' });
   check(so, 'writeGateSave user cũng dùng signal chung',
-    [userSaved.ok, userSaved.reloadDecision.kind, userSaved.dirty.records, userSaved.dirty.allViews],
+    [userSaved.ok, userSaved.reloadDecision.kind, userSaved.dirty.records, (userSaved.dirty.viewsStaleRevision === userSaved.dirty.revision)],
     [true, 'records', ['KH000001'], true]);
 
   const batchEnv = taoHop();
@@ -52,14 +53,14 @@ function chay(so) {
   const pushedEnv = taoHop();
   const pushed = pushedEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000222' }], source: 'push' });
   check(so, 'writeGateSave push dùng cùng cổng signal với pull',
-    [pushed.ok, pushed.reloadDecision.kind, pushed.dirty.records, pushed.dirty.allViews, pushedEnv.hop.rendered],
-    [true, 'records', ['KH000001'], true, 1]);
+    [pushed.ok, pushed.reloadDecision.kind, pushed.dirty.records, (pushed.dirty.viewsStaleRevision === pushed.dirty.revision), pushedEnv.hop.rendered],
+    [true, 'records', ['KH000001'], true, 0]);
 
   const backgroundEnv = taoHop();
   const background = backgroundEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000333' }], source: 'background' });
-  check(so, 'writeGateSave background không cần Sidebar vẫn phát signal và render',
-    [background.ok, background.reloadDecision.kind, background.dirty.records, background.dirty.allViews, backgroundEnv.hop.rendered],
-    [true, 'records', ['KH000001'], true, 1]);
+  check(so, 'writeGateSave background không cần Sidebar vẫn phát signal, không vẽ',
+    [background.ok, background.reloadDecision.kind, background.dirty.records, (background.dirty.viewsStaleRevision === background.dirty.revision), backgroundEnv.hop.rendered],
+    [true, 'records', ['KH000001'], true, 0]);
 
   const statusEnv = taoHop();
   napServer(statusEnv.hop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/SyncSchema.js', 'server/sheet/SyncColumnSetup.js');
@@ -73,33 +74,34 @@ function chay(so) {
       source: 'push',
       schemas: [statusEnv.hop.DATA_SCHEMA, statusEnv.hop.SYNC_SCHEMA]
     });
-    return [statusName, savedStatus.reloadDecision.kind, savedStatus.dirty.records, savedStatus.dirty.allViews, savedStatus.viewRender.ok];
+    return [statusName, savedStatus.reloadDecision.kind, savedStatus.dirty.records, (savedStatus.dirty.viewsStaleRevision === savedStatus.dirty.revision)];
   });
-  check(so, 'push chỉ đổi trạng thái pending/notApplied/conflict/missing/error vẫn phát dirty record và render view',
+  check(so, 'push chỉ đổi trạng thái pending/notApplied/conflict/missing/error vẫn phát dirty record và làm view cũ',
     statusResults,
-    statusNames.map((statusName) => [statusName, 'records', ['KH000001'], true, true]));
+    statusNames.map((statusName) => [statusName, 'records', ['KH000001'], true]));
 
   const schemaEnv = taoHop();
   napServer(schemaEnv.hop, 'fbm_sync/SyncSchema.js', 'server/sheet/SyncColumnSetup.js');
   schemaEnv.hop.shinViewSheetNames = () => ['!Lead'];
   schemaEnv.hop.rendered = 0;
-  schemaEnv.hop.renderAllManagedViewsIfAllowed = () => { schemaEnv.hop.rendered += 1; return { ok: true }; };
+  schemaEnv.hop.renderAllManagedViews = () => { schemaEnv.hop.rendered += 1; return { ok: true }; };
   const schema = schemaEnv.hop.fbmEnsureSyncColumns('background');
-  check(so, 'bổ sung cột sync bằng GAS phát signal schema/allCore/allViews qua cổng schema',
-    [schema.ok, schema.changed, schema.reload.kind, schemaEnv.hop.reloadStateRead().schema, schemaEnv.hop.reloadStateRead().allCore, schemaEnv.hop.reloadStateRead().allViews, schemaEnv.hop.rendered],
-    [true, true, 'schema', true, true, true, 1]);
+  const schemaState = schemaEnv.hop.reloadStateRead();
+  check(so, 'bổ sung cột sync bằng GAS phát signal schema/allCore và làm view cũ qua cổng schema, không vẽ',
+    [schema.ok, schema.changed, schema.reload.kind, schemaState.schema, schemaState.allCore, schemaState.viewsStaleRevision === schemaState.revision, schemaEnv.hop.rendered],
+    [true, true, 'schema', true, true, true, 0]);
 
   const deletedEnv = taoHop();
   const deleted = deletedEnv.hop.deleteGateRemove({ entity: 'customer', ids: ['KH000001'] });
-  check(so, 'DeleteGate hard delete cũng phát signal cho mã biến mất và render',
-    [deleted.ok, deleted.hard, deleted.recordIds, deleted.reloadDecision.kind, deleted.dirty.records, deleted.dirty.allViews, deletedEnv.hop.rendered],
-    [true, ['KH000001'], ['KH000001'], 'records', ['KH000001'], true, 1]);
+  check(so, 'DeleteGate hard delete cũng phát signal cho mã biến mất, không vẽ',
+    [deleted.ok, deleted.hard, deleted.recordIds, deleted.reloadDecision.kind, deleted.dirty.records, (deleted.dirty.viewsStaleRevision === deleted.dirty.revision), deletedEnv.hop.rendered],
+    [true, ['KH000001'], ['KH000001'], 'records', ['KH000001'], true, 0]);
 
   const softEnv = taoHop();
   softEnv.hop.beforeHardDelete = () => ({ allowed: false, reason: 'FBM còn giữ bản ghi' });
   const softDeleted = softEnv.hop.deleteGateRemove({ entity: 'customer', ids: ['KH000001'] });
   check(so, 'DeleteGate soft delete cũng phát signal cho mã bị đổi trạng thái',
-    [softDeleted.ok, softDeleted.soft.rows.length, softDeleted.recordIds, softDeleted.reloadDecision.kind, softDeleted.dirty.records, softDeleted.dirty.allViews],
+    [softDeleted.ok, softDeleted.soft.rows.length, softDeleted.recordIds, softDeleted.reloadDecision.kind, softDeleted.dirty.records, (softDeleted.dirty.viewsStaleRevision === softDeleted.dirty.revision)],
     [true, 1, ['KH000001'], 'records', ['KH000001'], true]);
 
   const failedEnv = taoHop();
@@ -112,13 +114,6 @@ function chay(so) {
   check(so, 'ghi thất bại không phát signal thành công và không render',
     [invalid.ok, invalid.reloadDecision, invalid.dirty, failedEnv.hop.rendered],
     [false, undefined, undefined, 0]);
-
-  const renderErrorEnv = taoHop();
-  renderErrorEnv.hop.renderAllManagedViewsIfAllowed = () => { throw new Error('view tạm thời không ghi được'); };
-  const renderError = renderErrorEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000444' }], source: 'background' });
-  check(so, 'renderer lỗi không làm lần ghi nguồn thành thất bại và vẫn giữ cờ view',
-    [renderError.ok, renderError.viewRender.ok, renderError.dirty.allViews, renderError.dirty.records],
-    [true, false, true, ['KH000001']]);
 
   const missingCommitEnv = taoHop();
   missingCommitEnv.hop.reloadDecisionForChange = undefined;

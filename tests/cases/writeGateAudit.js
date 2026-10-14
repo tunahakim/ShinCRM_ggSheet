@@ -158,10 +158,10 @@ function chay(so) {
   const noDirectReload = ['server/gate/WriteGate.js', 'server/gate/DeleteGate.js', 'server/config/ConfigSheetSetup.js', 'server/sheet/SyncColumnSetup.js'];
   noDirectReload.forEach((file) => {
     const source = stripNonCode(fs.readFileSync(path.join(GAS_DIR, file), 'utf8'));
-    check(so, file + ' không tự gọi ReloadDecision/DirtyState/renderer', [
+    check(so, file + ' không tự gọi ReloadDecision/DirtyState và không vẽ sheet quản trị', [
       /reloadDecisionForChange\s*\(/.test(source),
       /dirtyStateMarkDecision\s*\(/.test(source),
-      /renderAllManagedViewsIfAllowed\s*\(/.test(source)
+      /render(?:AllManagedViews|ViewSheet|ViewIfDirty)\s*\(/.test(source)
     ], [false, false, false]);
   });
 

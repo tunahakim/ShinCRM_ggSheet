@@ -64,11 +64,22 @@ function chay(so) {
   state.sheetName = '!Lead';
   state.row = 7;
   const rendered = [];
-  hop.renderViewIfDirty = (sheetName) => { rendered.push(sheetName); };
+  hop.viewRenderIfStale = (sheetName) => { rendered.push(sheetName); };
   const viewReport = hop.viewProbeSelection();
   check(so, 'polling trên sheet quản trị đọc trực tiếp cột mã sau khi render',
     [rendered, viewReport.some((line) => line.indexOf('customerId="CUS-000007"') >= 0)],
     [['!Lead'], true]);
+
+  hop.dirtyStateMarkAllViews();
+  const staleOn = hop.probeSelectionAndReload({}).view;
+  hop.userPrefsWrite('autoRenderView', false);
+  const staleOff = hop.probeSelectionAndReload({}).view;
+  hop.viewRenderedWrite('!Lead', hop.reloadStateRead().revision);
+  const fresh = hop.probeSelectionAndReload({}).view;
+  hop.userPrefsWrite('autoRenderView', true);
+  check(so, 'lời hỏi mang trạng thái sheet ! đang xem: cũ + núm bật → render, cũ + núm tắt → notify, đã vẽ → none; lời hỏi không tự vẽ',
+    [staleOn.sheetName, staleOn.action, staleOff.action, fresh.action, rendered],
+    ['!Lead', 'render', 'notify', 'none', ['!Lead']]);
 
   state.sheetName = 'Customer';
   state.row = 6;

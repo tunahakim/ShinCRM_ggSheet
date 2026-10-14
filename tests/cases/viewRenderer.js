@@ -67,54 +67,60 @@ function chay(so) {
   const secondView = allViews.nen.book.insertSheet('!Chăm sóc');
   secondView.getRange(1, 1, 1, 2).setValues([['@CUS_MA_KH', '@CUS_TEN_CTY']]);
   secondView.getRange(3, 2).setValue('60..50');
-  allViews.nen.hop.dirtyStateMarkAllViews(['!Lead', '!Chăm sóc']);
-  const managed = allViews.nen.hop.renderAllManagedViewsIfAllowed();
+  const managed = allViews.nen.hop.renderAllManagedViews();
   const managedByName = {};
-  managed.rendered.forEach((item) => { managedByName[item.sheetName] = item; });
+  managed.results.forEach((item) => { managedByName[item.sheetName] = item; });
   check(so, 'renderer thử tiếp mọi view và trả kết quả từng sheet khi một view lỗi',
     [managed.ok, managedByName['!Lead'].ok, managedByName['!Chăm sóc'].ok, managed.failed.length],
     [false, true, false, 1]);
-  check(so, 'view không active vẫn được vẽ, cờ view lỗi và allViews vẫn còn',
-    [allViews.view.getRange(4, 1).getValue(), allViews.nen.hop.reloadStateRead().viewSheets, allViews.nen.hop.reloadStateRead().allViews],
-    ['KH0002', ['!Chăm sóc'], true]);
+  check(so, 'view lỗi vẫn cũ, view vẽ được thành mới, lỗi được ghi vào Log',
+    [allViews.view.getRange(4, 1).getValue(), allViews.nen.hop.viewIsStale('!Lead'), allViews.nen.hop.viewIsStale('!Chăm sóc'),
+      allViews.nen.hop.LOG_BUFFER.some((line) => JSON.stringify(line).indexOf('renderView') >= 0)],
+    ['KH0002', false, true, true]);
   secondView.getRange(3, 2).setValue('');
-  allViews.nen.hop.dirtyStateMarkAllViews(['!Lead', '!Chăm sóc']);
-  const complete = allViews.nen.hop.renderAllManagedViewsIfAllowed();
-  check(so, 'mọi view thành công thì xóa allViews và toàn bộ cờ view',
-    [complete.ok, complete.failed.length, allViews.nen.hop.reloadStateRead().viewSheets, allViews.nen.hop.reloadStateRead().allViews],
-    [true, 0, [], false]);
+  allViews.nen.hop.renderAllManagedViews(['!Chăm sóc']);
 
-  const userA = taoNen(['@CUS_MA_KH']);
-  const userB = taoNen(['@CUS_MA_KH']);
-  const userBDocument = userA.nen.stubs.PropertiesService.getDocumentProperties();
-  const userBProperties = userB.nen.stubs.PropertiesService.getUserProperties();
-  userB.nen.hop.PropertiesService = {
-    getDocumentProperties: () => userBDocument,
-    getUserProperties: () => userBProperties
+  // Mô hình cũ/mới theo revision từng sheet.
+  allViews.nen.hop.dirtyStateMarkRecordChange('customer', ['KH0001']);
+  check(so, 'signal dữ liệu kho làm mọi view thành cũ', [allViews.nen.hop.viewIsStale('!Lead'), allViews.nen.hop.viewIsStale('!Chăm sóc')], [true, true]);
+  allViews.nen.hop.renderViewSheet('!Lead');
+  check(so, '(a) vẽ sheet A sau signal: A mới, B vẫn cũ', [allViews.nen.hop.viewIsStale('!Lead'), allViews.nen.hop.viewIsStale('!Chăm sóc')], [false, true]);
+  const realGuard = allViews.nen.hop.viewAssertNoFormulas;
+  allViews.nen.hop.viewAssertNoFormulas = function () {
+    allViews.nen.hop.dirtyStateMarkRecordChange('customer', ['KH0002']);
+    return realGuard.apply(null, arguments);
   };
-  userA.nen.hop.userPrefsWrite('autoRenderView', false);
-  userA.nen.hop.dirtyStateMarkAllViews(['!Lead']);
-  const userASkipped = userA.nen.hop.renderAllManagedViewsIfAllowed();
-  const userBRendered = userB.nen.hop.renderAllManagedViewsIfAllowed();
-  check(so, 'hai user co prefs auto render khac nhau khong xoa dirty dung chung sai cach',
-    [userASkipped.skipped, userASkipped.dirty.allViews, userB.nen.hop.userPrefsRead().autoRenderView,
-      userBRendered.ok, userA.nen.hop.reloadStateRead().allViews],
-    [true, true, true, true, false]);
+  const midRender = allViews.nen.hop.renderViewSheet('!Chăm sóc');
+  allViews.nen.hop.viewAssertNoFormulas = realGuard;
+  check(so, '(b) revision tăng giữa lúc vẽ: lượt vẽ vẫn ghi xong nhưng sheet vẫn cũ',
+    [midRender.ok, allViews.nen.hop.viewIsStale('!Chăm sóc'), allViews.nen.hop.viewIsStale('!Lead')], [true, true, true]);
+  secondView.getRange(3, 2).setValue('60..50');
+  try { allViews.nen.hop.renderViewSheet('!Chăm sóc'); } catch (ignore) {}
+  check(so, '(c) lượt vẽ ném lỗi thì sheet vẫn cũ', allViews.nen.hop.viewIsStale('!Chăm sóc'), true);
+  secondView.getRange(3, 2).setValue('');
+  check(so, 'renderViewIfDirty vẽ sheet cũ dù bộ điều khiển không đổi, rồi lần sau bỏ qua',
+    [allViews.nen.hop.renderViewIfDirty('!Chăm sóc').skipped, allViews.nen.hop.renderViewIfDirty('!Chăm sóc').skipped], [undefined, true]);
 
-  const policy = taoNen(['@CUS_MA_KH']);
-  policy.nen.hop.userPrefsWrite('autoRenderView', false);
-  policy.nen.hop.dirtyStateMarkAllViews(['!Lead']);
-  const skipped = policy.nen.hop.renderAllManagedViewsIfAllowed();
-  check(so, 'tắt auto render thì không vẽ nhưng giữ cờ allViews',
-    [skipped.skipped, skipped.ok, skipped.dirty.allViews], [true, true, true]);
-  const reenabled = policy.nen.hop.userPrefsWrite('autoRenderView', true);
-  check(so, 'bật lại auto render lập tức vẽ hết view đang bẩn',
-    [reenabled.viewRender.ok, reenabled.viewRender.rendered[0].ok, policy.nen.hop.reloadStateRead().allViews], [true, true, false]);
-  policy.nen.hop.userPrefsWrite('autoRenderView', false);
-  policy.nen.hop.dirtyStateMarkAllViews(['!Lead']);
-  const forced = policy.nen.hop.renderAllManagedViewsIfAllowed({ policyBypass: true });
-  check(so, 'lệnh điều khiển trực tiếp bypass công tắc tự động',
-    [forced.ok, forced.rendered[0].ok, policy.nen.hop.reloadStateRead().allViews], [true, true, false]);
+  // Bộ vẽ không được xóa công thức người dùng đặt trong cột ShinCRM tự vẽ.
+  const formula = taoNen(['@CUS_MA_KH', '@CUS_TEN_CTY', 'Ghi chú thường']);
+  gieoHaiKhach(formula.nen);
+  formula.nen.hop.renderViewSheet('!Lead');
+  formula.view.getRange(5, 2).setFormula('=UPPER(A5)');
+  formula.view.getRange(4, 3).setValue('ghi chú tay');
+  const beforeFormula = formula.view.getRange(4, 1, 2, 3).getValues();
+  const writesBefore = formula.nen.dem.setValues;
+  formula.nen.hop.dirtyStateMarkRecordChange('customer', ['KH0001']);
+  checkThrows(so, 'gặp công thức trong cột @ từ hàng 4 thì dừng với lỗi chỉ đúng ô', () => formula.nen.hop.renderViewSheet('!Lead'), 'ô B5');
+  check(so, 'không xóa hay ghi ô nào của sheet, gắn note ⛔ ở ô hàng lọc của cột đó, sheet vẫn cũ',
+    [formula.view.getRange(4, 1, 2, 3).getValues(), formula.nen.dem.setValues - writesBefore, formula.view.getRange(3, 2).getNote().indexOf('⛔ ShinCRM:') === 0,
+      formula.view.getRange(3, 2).getNote().indexOf('B5') >= 0, formula.nen.hop.viewIsStale('!Lead')],
+    [beforeFormula, 0, true, true, true]);
+  checkThrows(so, 'đường Sidebar renderViewIfDirty gặp công thức cũng dừng với lỗi chỉ đúng ô', () => formula.nen.hop.renderViewIfDirty('!Lead'), 'ô B5');
+  check(so, 'lỗi công thức qua đường Sidebar được ghi vào Log',
+    (() => { const log = formula.nen.book.getSheetByName('Log'); return !!log && log.getLastRow() > 0 && JSON.stringify(log.getRange(1, 1, log.getLastRow(), 9).getValues()).indexOf('ô B5') >= 0; })(), true);
+  formula.view.getRange(5, 2).setValue('');
+  formula.nen.hop.renderViewSheet('!Lead');
+  check(so, 'gỡ công thức thì lần vẽ sau chạy được và tự gỡ note ⛔', [formula.view.getRange(3, 2).getNote(), formula.nen.hop.viewIsStale('!Lead')], ['', false]);
 
   check(so, 'metadata chỉ nhận cột có mã @ ở hàng lọc', result.viewMeta.filterColumns, [1, 2, 3, 4, 5]);
   base.view.getRange(3, 6).setValue('chữ dưới cột thường');

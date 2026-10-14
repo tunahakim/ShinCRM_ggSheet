@@ -63,7 +63,7 @@ function chay(so) {
   check(so, 'khối activity chỉ báo số hàng và cỡ gói, không mang bản ghi nào', Object.keys(rong.activity).sort(), ['chunkRows', 'total']);
   check(so, 'cỡ gói lấy đúng từ SETTINGS chứ không gõ cứng ở đây', rong.activity.chunkRows, hop.SETTINGS.CHUNK_ROWS);
   check(so, 'bảy danh mục thật đều có khóa dù chưa ai gõ giá trị', Object.keys(rong.categories).length, 7);
-  check(so, 'khối trạng thái bẩn có mặt trong MỌI phản hồi, kể cả phản hồi rỗng', Object.keys(rong.dirty).sort(), ['all', 'config', 'records', 'viewSheets']);
+  check(so, 'khối trạng thái bẩn có mặt trong MỌI phản hồi, kể cả phản hồi rỗng', Object.keys(rong.dirty).sort(), ['all', 'config', 'records']);
   check(so, 'gói lõi mang cả bảng khai để client dựng Schema', Object.keys(rong.schema).sort(), ['activity', 'customer']);
   check(so, 'gói lõi mang read plan tọa độ do GAS tính',
     rong.selectionHints && Object.keys(rong.selectionHints.readPlan).sort(),
@@ -83,10 +83,10 @@ function chay(so) {
   check(so, 'LOG_TRACE off không hiện cảnh báo bật log',
     tatVet.warnings.some((warning) => warning.indexOf('LOG_TRACE đang bật') >= 0), false);
 
-  const coDirty = dungNap(null, { dirtyViewSheets: '["!Lead"]', dirtyRecords: '["KH0001"]', dirtyConfig: 'true', dirtyAll: 'true' }).hop.loadCore();
-  check(so, 'nạp toàn bộ tiêu thụ cờ dữ liệu cũ nhưng giữ cờ sheet quản trị để sheet vẫn được vẽ lại',
-    coDirty.dirty,
-    { viewSheets: ['!Lead'], records: [], config: false, all: false });
+  const coDirty = dungNap(null, { viewsStaleRevision: '4', dirtyRecords: '["KH0001"]', dirtyConfig: 'true', dirtyAll: 'true' }).hop.loadCore();
+  check(so, 'nạp toàn bộ tiêu thụ cờ dữ liệu cũ nhưng giữ mốc cũ của sheet quản trị để sheet vẫn được vẽ lại',
+    [coDirty.dirty, coDirty.reload.viewsStaleRevision],
+    [{ records: [], config: false, all: false }, 4]);
 
   // Bản ghi được nhận dạng bằng mã; hàng trắng giữa vùng dữ liệu không lọt vào RAM.
   ghiKhach(nen, hangDau, 'KH0001', 'Công ty Một');
@@ -114,7 +114,7 @@ function chay(so) {
     Object.keys(bao).sort(), ['blocked', 'budget', 'dirty', 'ms', 'ok', 'pendingMessages', 'reload', 'selection'].sort());
   check(so, 'gói bị chặn vẫn mang bảng thủ phạm để người dùng biết dọn sheet nào',
     bao.budget.sheets.length > 0, true);
-  check(so, 'gói bị chặn vẫn mang khối trạng thái bẩn', Object.keys(bao.dirty).sort(), ['all', 'config', 'records', 'viewSheets']);
+  check(so, 'gói bị chặn vẫn mang khối trạng thái bẩn', Object.keys(bao.dirty).sort(), ['all', 'config', 'records']);
 
   // Reload theo scope: một mã Activity kéo theo Customer cha và toàn bộ lịch sử
   // của Customer đó, nhưng không kéo bản ghi của Customer khác.
@@ -207,13 +207,13 @@ function chay(so) {
     sheet.getRange(1, 1, 1, 2).setValues([['@CUS_MA_KH', '@CUS_TEN_CTY']]);
   });
   ghiKhach(managed, managed.hop.SHEET_FIRST_DATA_ROW, 'KH-MANAGED', 'Khách quản trị');
-  managed.hop.dirtyStateMarkAllViews(['!Lead', '!Chăm sóc']);
+  managed.hop.dirtyStateMarkAllViews();
   managed.book.setActiveSheet(managedLead);
   const managedCurrent = managed.hop.reloadCurrentSheet();
-  check(so, 'reloadCurrentSheet ở view quản trị vẽ view active rồi đối chiếu allViews để vẽ toàn bộ view',
-    [managedCurrent.target, managedCurrent.viewRender.rendered.map((item) => item.sheetName).sort(), managed.hop.reloadStateRead().allViews,
-      managedLead.getRange(4, 1).getValue(), managedCare.getRange(4, 1).getValue()],
-    ['view', ['!Chăm sóc', '!Lead'], false, 'KH-MANAGED', 'KH-MANAGED']);
+  check(so, 'reloadCurrentSheet ở view quản trị chỉ vẽ view active, view khác vẫn cũ chờ người xem',
+    [managedCurrent.target, managedLead.getRange(4, 1).getValue(), managedCare.getRange(4, 1).getValue(),
+      managed.hop.viewIsStale('!Lead'), managed.hop.viewIsStale('!Chăm sóc')],
+    ['view', 'KH-MANAGED', '', false, true]);
 
   const emptyScope = scopeHop.reloadRecords([]);
   check(so, 'reloadRecords scope rỗng trả quyết định fullCore rõ ràng', emptyScope.reloadMode, 'fullCore');
@@ -232,7 +232,7 @@ function chayGoi(so, nen, hop, hangDau) {
   check(so, 'sheet giao dịch trắng thì gói đầu đã là gói cuối, không ném lỗi',
     [rong.rows.length, rong.done, rong.nextCursor, rong.total], [0, true, null, 0]);
   check(so, 'gói rỗng vẫn gửi đủ bảng tên trường và khối trạng thái bẩn',
-    [rong.fields.length, Object.keys(rong.dirty).length], [13, 4]);
+    [rong.fields.length, Object.keys(rong.dirty).length], [13, 3]);
 
   // Năm giao dịch, cỡ gói vặn xuống 2 để chứng minh con trỏ đi đúng đường mà không phải dựng 1.000 hàng.
   for (let i = 0; i < 5; i++) {

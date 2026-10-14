@@ -53,6 +53,7 @@ function taoSheet(ten, dem, luoi) {
   const cells = [];
   const formats = [];
   const notes = [];
+  const formulas = [];
   const validations = [];
   let frozenRows = 0;
   let maxRows = (luoi && luoi.rows) || 1000;
@@ -70,6 +71,11 @@ function taoSheet(ten, dem, luoi) {
   const layDongKhuon = (i) => {
     while (formats.length <= i) { formats.push([]); }
     return formats[i];
+  };
+
+  const layDongCongThuc = (i) => {
+    while (formulas.length <= i) { formulas.push([]); }
+    return formulas[i];
   };
 
   const layDongNote = (i) => {
@@ -114,7 +120,7 @@ function taoSheet(ten, dem, luoi) {
 
     insertColumnsBefore(beforeColumn, howMany) {
       const them = howMany === undefined ? 1 : howMany;
-      [cells, formats, notes, validations].forEach((matrix) => {
+      [cells, formats, notes, formulas, validations].forEach((matrix) => {
         matrix.forEach((row) => {
           if (!Array.isArray(row)) { return; }
           row.splice(beforeColumn - 1, 0, ...Array(them).fill(''));
@@ -127,7 +133,7 @@ function taoSheet(ten, dem, luoi) {
 
     deleteColumn(column) {
       if (maxCols <= 1) { throw new Error('deleteColumn: sheet phải còn ít nhất một cột.'); }
-      [cells, formats, notes, validations].forEach((matrix) => {
+      [cells, formats, notes, formulas, validations].forEach((matrix) => {
         matrix.forEach((row) => { if (Array.isArray(row)) { row.splice(column - 1, 1); } });
       });
       maxCols -= 1;
@@ -196,7 +202,7 @@ function taoSheet(ten, dem, luoi) {
             }
             const dich = layDong(row - 1 + r);
             const khuonDong = formats[row - 1 + r] || [];
-            dong.forEach((o, c) => { dich[col - 1 + c] = epTheoKhuon(o, khuonDong[col - 1 + c] || KHUON_GENERAL); });
+            dong.forEach((o, c) => { dich[col - 1 + c] = epTheoKhuon(o, khuonDong[col - 1 + c] || KHUON_GENERAL); layDongCongThuc(row - 1 + r)[col - 1 + c] = ''; });
           });
           dem.setValues += 1;
           return range;
@@ -205,16 +211,30 @@ function taoSheet(ten, dem, luoi) {
         getValue() { return oRong((cells[row - 1] || [])[col - 1]); },
         setValue(v) {
           layDong(row - 1)[col - 1] = epTheoKhuon(v, (formats[row - 1] || [])[col - 1] || KHUON_GENERAL);
+          layDongCongThuc(row - 1)[col - 1] = '';
           dem.setValues += 1;
           return range;
         },
         clearContent() {
           for (let r = 0; r < soDong; r += 1) {
             const dich = layDong(row - 1 + r);
-            for (let c = 0; c < soCot; c += 1) { dich[col - 1 + c] = ''; }
+            for (let c = 0; c < soCot; c += 1) { dich[col - 1 + c] = ''; layDongCongThuc(row - 1 + r)[col - 1 + c] = ''; }
           }
           dem.setValues += 1;
           return range;
+        },
+        /** Công thức giữ riêng khỏi giá trị: thử nghiệm tự đặt giá trị hiển thị nếu cần, vì tệp giả không tính công thức. */
+        setFormula(formula) { layDongCongThuc(row - 1)[col - 1] = String(formula || ''); return range; },
+        getFormulas() {
+          const ra = [];
+          for (let r = 0; r < soDong; r += 1) {
+            const nguon = formulas[row - 1 + r] || [];
+            const dong = [];
+            for (let c = 0; c < soCot; c += 1) { dong.push(nguon[col - 1 + c] || ''); }
+            ra.push(dong);
+          }
+          dem.getFormulas = (dem.getFormulas || 0) + 1;
+          return ra;
         },
         getNote() { return oRong((notes[row - 1] || [])[col - 1]); },
         setDataValidation(rule) {
