@@ -42,7 +42,8 @@ function writeCommitAfterSuccess(input) {
 
   var decision = reloadDecisionForChange(writeCommitCopy(input));
   dirtyStateMarkDecision(decision);
-  viewTabTintStaleLocked();
+  // 'user' và 'delete' là hai nguồn ghi do người đứng trước Sidebar bấm.
+  viewTabTintStaleLocked(null, { fromSidebar: input && (input.source === 'user' || input.source === 'delete') });
 
   return {
     reloadDecision: decision,

@@ -24,16 +24,22 @@ function viewTabTintWrite(state) {
   documentProps().setProperty(VIEW_TAB_TINT_KEY, JSON.stringify(state));
 }
 
-/** Gọi trong DocumentLock, sau khi signal đã ghi. Trả về số sheet vừa tô. */
-function viewTabTintStaleLocked(book) {
+/**
+ * Gọi trong DocumentLock, sau khi signal đã ghi. Trả về số sheet vừa tô.
+ *
+ * `fromSidebar`: lượt ghi do người đang mở Sidebar bấm. Nếu công tắc tự làm mới của người đó bật thì sheet `!` họ đang đứng được Sidebar vẽ lại ngay, nên không tô để tab không đổi màu hai lần mỗi lần lưu. Lượt ghi nền (trigger, đồng bộ) không biết ai đang xem nên vẫn tô mọi sheet cũ.
+ */
+function viewTabTintStaleLocked(book, options) {
   var staleRevision = Number(reloadStateRead().viewsStaleRevision) || 0;
   var state = viewTabTintRead();
   if (staleRevision <= state.staleRevision) { return 0; }
   var rendered = viewRenderedRead();
   var tinted = 0;
-  (book || shinOpenBook()).getSheets().forEach(function (sheet) {
+  var spreadsheet = book || shinOpenBook();
+  var viewing = options && options.fromSidebar ? viewTabTintViewingSheet(spreadsheet) : '';
+  spreadsheet.getSheets().forEach(function (sheet) {
     var name = sheet.getName();
-    if (name.charAt(0) !== '!') { return; }
+    if (name.charAt(0) !== '!' || name === viewing) { return; }
     var id = String(sheet.getSheetId());
     if (Object.prototype.hasOwnProperty.call(state.sheets, id) || !reloadDecisionViewStale(staleRevision, rendered[name])) { return; }
     state.sheets[id] = sheet.getTabColor() || '';
@@ -43,6 +49,14 @@ function viewTabTintStaleLocked(book) {
   state.staleRevision = staleRevision;
   viewTabTintWrite(state);
   return tinted;
+}
+
+/** Sheet `!` người dùng hiện tại đang đứng, nếu công tắc tự làm mới của họ bật; rỗng nếu không. */
+function viewTabTintViewingSheet(book) {
+  if (userPrefsRead().autoRenderView === false) { return ''; }
+  var active = book.getActiveSheet();
+  var name = active ? active.getName() : '';
+  return name.charAt(0) === '!' ? name : '';
 }
 
 /** Bản tự lấy khóa cho trigger, nơi signal được ghi ngoài khóa. */

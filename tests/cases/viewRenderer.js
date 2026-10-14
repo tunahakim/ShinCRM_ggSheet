@@ -280,6 +280,22 @@ function chayTabCam(so) {
   const before = base.nen.book.getSheets().map((sheet) => sheet._tabColors.length);
   check(so, 'không có signal mới thì lượt tô không quét sheet nào',
     [hop.viewTabTintStale(), base.nen.book.getSheets().map((sheet) => sheet._tabColors.length)], [0, before]);
+
+  // Lưu từ Sidebar khi đứng ở sheet ! và công tắc bật: sheet đang xem sẽ được vẽ ngay nên không tô.
+  hop.renderAllManagedViews();
+  base.nen.book.setActiveSheet(base.view);
+  const luuSidebar = (source) => hop.writeCommitAfterSuccess({ source: source, surface: 'record', entity: 'customer', recordIds: ['KH0001'] });
+  luuSidebar('user');
+  check(so, 'lưu từ Sidebar, công tắc bật: không tô sheet ! đang xem, vẫn tô sheet ! khác', [base.view.getTabColor(), care.getTabColor()], [null, '#ff9900']);
+  hop.renderAllManagedViews();
+  hop.userPrefsWrite('autoRenderView', false);
+  luuSidebar('user');
+  const tatNum = [base.view.getTabColor(), care.getTabColor()];
+  hop.userPrefsWrite('autoRenderView', true);
+  hop.renderAllManagedViews();
+  luuSidebar('pull');
+  check(so, 'công tắc tắt, hoặc lượt ghi nền (đồng bộ) thì tô cả sheet đang đứng',
+    [tatNum, [base.view.getTabColor(), care.getTabColor()]], [['#ff9900', '#ff9900'], ['#ff9900', '#ff9900']]);
 }
 
 module.exports = { chay: (so) => { chay(so); chayTabCam(so); } };
