@@ -82,8 +82,11 @@ ACTIONS.toggleFollowSelection = function () {
   return actionsPrefSend(kq);
 };
 
+/** Bật lại công tắc thì sheet `!` đang xem nếu cũ được vẽ ngay. Lời hỏi chạy sau khi núm đã ghi xong vì GAS đọc núm từ UserProperties. */
 ACTIONS.toggleAutoRenderView = function () {
-  return actionsPrefSend(prefsToggle('autoRenderView'));
+  var sent = actionsPrefSend(prefsToggle('autoRenderView'));
+  if (Prefs.autoRenderView !== true || typeof sheetLinkOnAutoRenderOn !== 'function') { return sent; }
+  return sent.then(function (value) { sheetLinkOnAutoRenderOn(); return value; });
 };
 
 /** Mở hoặc đóng hộp tìm khách. Hộp tìm là món đồ cố định ngoài bốn vùng nên mở nó không phải một lượt vẽ — DOM vẫn do `client/ui/search.html` tự chạm, tệp này chỉ gọi tên việc. */
@@ -117,7 +120,7 @@ ACTIONS.setActivityView = function (payload) {
 ACTIONS.renderActiveViewSheet = function () {
   return sidebarBusyRun('Đang cập nhật sheet quản trị…', function () {
     return callServer('shinRenderCurrentView', ['sidebar']).then(function (result) {
-      return result;
+      return typeof sheetLinkViewApplyResult === 'function' && result ? sheetLinkViewApplyResult(result.sheetName, result) : result;
     });
   });
 };

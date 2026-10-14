@@ -222,6 +222,7 @@ function selectionPollVisibilityChanged() {
   }
   selectionPollWake();
   selectionPollScheduleSafety();
+  if (typeof sheetLinkOnVisible === 'function') { sheetLinkOnVisible(); }
 }
 
 function selectionPollInstall() {

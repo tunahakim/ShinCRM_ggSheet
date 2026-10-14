@@ -88,6 +88,11 @@ function refreshDecideAndRender(context) {
 }
 
 /** Áp dụng payload đã được GAS đọc trong chính request probe; không gọi thêm API reload. */
+/** Lượt đồng bộ FBM đang chạy ghi kho liên tục; áp payload giữa lượt chỉ để lượt ghi sau đè, nên RAM chờ lượt kết thúc rồi nhận một lần. */
+function refreshDeferredBySync() {
+  return typeof FBM_SYNC_CLIENT !== 'undefined' && !!FBM_SYNC_CLIENT && FBM_SYNC_CLIENT.running === true;
+}
+
 function refreshReloadPayload(payload) {
   if (!payload || !payload.mode) { return null; }
   if (payload.mode === 'records') {

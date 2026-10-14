@@ -391,13 +391,17 @@ function viewProbeRenderCurrent() {
   return report;
 }
 
-/** Sidebar gọi khi có người xem sheet: vẽ nếu sheet cũ hoặc bộ điều khiển đổi mà trigger chưa vẽ (trigger lỗi, sửa từ máy khác khi trigger chưa chạy). */
-function renderViewIfDirty(sheetName) {
-  return runEntryPoint('renderViewIfDirty', 'sidebar', 'throw', function () { return viewRenderIfStale(sheetName); });
+/**
+ * Sidebar gọi khi có người xem sheet: vẽ nếu sheet cũ hoặc bộ điều khiển đổi mà trigger chưa vẽ (trigger lỗi, sửa từ máy khác khi trigger chưa chạy).
+ * `controlsOnly`: đường lấy metadata hàng điều khiển chỉ vẽ khi bộ điều khiển đổi; sheet cũ thì để lời hỏi `probeSelectionAndReload` quyết theo núm người dùng, không vẽ lén khi núm tắt.
+ */
+function renderViewIfDirty(sheetName, options) {
+  return runEntryPoint('renderViewIfDirty', 'sidebar', 'throw', function () { return viewRenderIfStale(sheetName, options); });
 }
 
 /** Phần ruột không bọc cửa vào, cho đường nội bộ và probe DEV. */
-function viewRenderIfStale(sheetName) {
+function viewRenderIfStale(sheetName, options) {
+  var controlsOnly = !!(options && options.controlsOnly);
   var name = String(sheetName || '').trim();
   var book = shinOpenBook();
   var sheet = book.getSheetByName(name);
@@ -405,7 +409,7 @@ function viewRenderIfStale(sheetName) {
   var lock = LockService.getDocumentLock();
   if (!documentStoreTryLock(lock, SETTINGS.LOCK_WAIT_MS)) { throw new Error('Hệ thống bận. Vui lòng thử lại!'); }
   try {
-    if (viewIsStale(name) || viewInputSignatureRead(sheet) !== viewInputSignature(sheet)) {
+    if ((!controlsOnly && viewIsStale(name)) || viewInputSignatureRead(sheet) !== viewInputSignature(sheet)) {
       return viewRenderSheetLocked(book, sheet, name);
     }
     return { ok: true, skipped: true, sheetName: name, viewMeta: viewInputMeta(sheet), reload: reloadStateRead() };
@@ -431,7 +435,8 @@ function inspectViewState(sheetName, knownRevision) {
         ok: true,
         sheetName: name,
         changed: revision !== (Number(knownRevision) || 0),
-        needsRender: viewIsStale(name) || viewInputSignatureRead(sheet) !== viewInputSignature(sheet),
+        // Chỉ bộ điều khiển đổi; sheet cũ do lời hỏi probe quyết theo núm người dùng.
+        needsRender: viewInputSignatureRead(sheet) !== viewInputSignature(sheet),
         dirty: reload,
         reload: reload,
         revision: revision,

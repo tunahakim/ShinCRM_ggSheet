@@ -75,6 +75,12 @@
 
     <div id="shin-extension-warning" class="shin-extension-warning" hidden></div>
 
+    <!-- Dòng báo sheet quản trị đang xem đã cũ khi công tắc tự động làm mới tắt; `sheetLinkSetViewNotice` sở hữu ẩn/hiện. Cùng khuôn chữ + nút như thanh hoàn tác. -->
+    <div id="shin-view-stale" class="shin-undo" hidden>
+      <span class="shin-undo-text">View chưa cập nhật</span>
+      <button type="button" class="shin-undo-btn" data-action="renderActiveViewSheet">Làm mới</button>
+    </div>
+
   </div>
 
   <div id="shin-busy-overlay" class="shin-busy-overlay" aria-hidden="true" hidden></div>

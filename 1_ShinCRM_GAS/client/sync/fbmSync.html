@@ -12,12 +12,19 @@ function fbmSyncClientTrace(stage, request, extra) {
   return event;
 }
 
+/** Chỗ duy nhất đổi cờ lượt chạy: lượt kết thúc theo đường nào (xong, lỗi, hủy) cũng báo Sidebar đúng một lần để RAM và sheet quản trị bắt kịp phần đã hoãn. */
+function fbmSyncSetRunning(on) {
+  var was = FBM_SYNC_CLIENT.running === true;
+  FBM_SYNC_CLIENT.running = on === true;
+  if (was && !FBM_SYNC_CLIENT.running && typeof sheetLinkSyncFinished === 'function') { sheetLinkSyncFinished(); }
+}
+
 /** Cất màn hiện tại trước khi FBM dùng chung bốn vùng render của Sidebar. */
 function fbmSyncCaptureReturnScreen() {
   FBM_SYNC_CLIENT.returnScreen = typeof ScreenState !== 'undefined' && ScreenState.screen ? ScreenState.screen : 'view';
   if (FBM_SYNC_CLIENT.returnScreen !== 'view' && typeof screenFormStash === 'function') { screenFormStash(); }
   FBM_SYNC_CLIENT.returnUi = {};
-  ['shin-search', 'shin-undo', 'shin-extension-warning'].forEach(function (id) {
+  ['shin-search', 'shin-undo', 'shin-extension-warning', 'shin-view-stale'].forEach(function (id) {
     var el = document.getElementById(id);
     if (el) { FBM_SYNC_CLIENT.returnUi[id] = el.hidden; el.hidden = true; }
   });
@@ -684,6 +691,8 @@ function syncScreenClose() {
     if (el) { el.hidden = !!savedUi[id]; }
   });
   FBM_SYNC_CLIENT.returnUi = null;
+  // Dòng báo view cũ có thể đổi trong lúc màn FBM mở; vẽ lại theo chủ sở hữu thay vì trả trạng thái đã cất.
+  if (typeof sheetLinkSetViewNotice === 'function') { sheetLinkSetViewNotice(SHEET_LINK_VIEW_NOTICE_SHEET); }
   return restored;
 }
 /** Chuyển một envelope sang tab FBM và chờ response thô. */
@@ -917,10 +926,10 @@ function fbmSyncCheckIdentity() {
     fbmSyncPaintError(null, 'Cần đủ Spreadsheet ID, mã user, username và tên tài khoản FBM trước khi kiểm tra liên kết.');
     return Promise.resolve(null);
   }
-  FBM_SYNC_CLIENT.running = true;
+  fbmSyncSetRunning(true);
   return fbmSyncRequireBridge('identity_check').then(function (missing) {
     if (!missing) { return fbmSyncCheckIdentityStart(identityTarget); }
-    FBM_SYNC_CLIENT.running = false;
+    fbmSyncSetRunning(false);
     fbmSyncSetAccountNotice('identity', 'error', 'Kiểm tra liên kết không thành công: ' + missing.message);
     fbmSyncPaint(missing);
     return missing;
@@ -939,7 +948,7 @@ function fbmSyncCheckIdentityStart(identityTarget) {
     var launch = started && started.code === 'SYNC_BACKGROUND_STOPPING' ? fbmSyncWaitForIdentityBackground(function () { return callServer('fbmStartIdentityCheck', [identityTarget]); }, 0) : Promise.resolve(started);
     return launch.then(function (next) { if (!next || next.ok === false) { throw new Error(next && (next.message || next.code) || 'Không bắt đầu được kiểm tra liên kết.'); } ownRun = true; return fbmSyncLoop(next); });
   }).then(function (value) {
-    FBM_SYNC_CLIENT.running = false; FBM_SYNC_CLIENT.identityAction = '';
+    fbmSyncSetRunning(false); FBM_SYNC_CLIENT.identityAction = '';
     var snapshot = value && (value.status || value) || FBM_SYNC_CLIENT.lastStatus || {}, result = snapshot.metadata && snapshot.metadata.identityCheck;
     // Phiên dừng/lỗi ở GAS (vd. cổng đăng nhập chặn) đã có Log phía GAS: hiện đúng lý do GAS, không ghi thêm dòng lỗi chung chung che lý do thật.
     var stopReason = !result && ['paused', 'error'].indexOf(String(snapshot.phase || '')) >= 0 ? String(snapshot.lastError || snapshot.message || '') : '';
@@ -957,7 +966,7 @@ function fbmSyncCheckIdentityStart(identityTarget) {
     fbmSyncPaint(Object.assign({}, snapshot, { label: 'Đã kiểm tra liên kết', message: summary }));
     return fbmSyncLoadIdentityStatus().then(function () { return value; });
   }).catch(function (error) {
-    FBM_SYNC_CLIENT.running = false; FBM_SYNC_CLIENT.identityAction = '';
+    fbmSyncSetRunning(false); FBM_SYNC_CLIENT.identityAction = '';
     var reason = String(error && error.message || error);
     fbmSyncSetAccountNotice('identity', 'error', 'Kiểm tra liên kết không thành công: ' + reason);
     var trace = FBM_SYNC_CLIENT.traceEvents.slice();
@@ -971,10 +980,10 @@ function fbmSyncCheckIdentityStart(identityTarget) {
 }
 function fbmSyncProbeIdentity() {
   if (FBM_SYNC_CLIENT.running) { return Promise.resolve(null); }
-  FBM_SYNC_CLIENT.running = true;
+  fbmSyncSetRunning(true);
   return fbmSyncRequireBridge('identity_probe').then(function (missing) {
     if (!missing) { return fbmSyncProbeIdentityStart(); }
-    FBM_SYNC_CLIENT.running = false;
+    fbmSyncSetRunning(false);
     fbmSyncPaint(missing);
     return missing;
   });
@@ -991,8 +1000,8 @@ function fbmSyncProbeIdentityStart() {
   return callServer('fbmStartIdentityProbe').then(function (started) {
     var launch = started && started.code === 'SYNC_BACKGROUND_STOPPING' ? fbmSyncWaitForIdentityBackground(function () { return callServer('fbmStartIdentityProbe'); }, 0) : Promise.resolve(started);
     return launch.then(function (next) { if (!next || next.ok === false) { throw new Error(next && (next.message || next.code) || 'Không lấy được nhận diện tài khoản FBM.'); } ownRun = true; return fbmSyncLoop(next); });
-  }).then(function (value) { FBM_SYNC_CLIENT.running = false; FBM_SYNC_CLIENT.identityAction = ''; return value; }).catch(function (error) {
-    FBM_SYNC_CLIENT.running = false; FBM_SYNC_CLIENT.identityAction = '';
+  }).then(function (value) { fbmSyncSetRunning(false); FBM_SYNC_CLIENT.identityAction = ''; return value; }).catch(function (error) {
+    fbmSyncSetRunning(false); FBM_SYNC_CLIENT.identityAction = '';
     var reason = String(error && error.message || error);
     return fbmSyncLogClientError(error, reason, 'identity_probe').then(function () {
       return ownRun && (!error || (error.code !== 'GAS_CALLBACK_TIMEOUT' && !error.transportReported)) ? callServer('fbmCancelSync').catch(function () { return null; }) : null;
@@ -1382,12 +1391,12 @@ function fbmSyncRotateRelay() {
   });
 }
 function fbmSyncApprovePush() {
-  FBM_SYNC_CLIENT.running = true;
+  fbmSyncSetRunning(true);
   return callServer('fbmApprovePush').then(function (started) {
     if (!started || started.ok === false) { throw new Error(started && (started.message || started.code) || 'Không chấp thuận được phiên ghi.'); }
     return fbmSyncLoop(started);
-  }).then(function (value) { FBM_SYNC_CLIENT.running = false; return value; }).catch(function (error) {
-    FBM_SYNC_CLIENT.running = false;
+  }).then(function (value) { fbmSyncSetRunning(false); return value; }).catch(function (error) {
+    fbmSyncSetRunning(false);
     fbmSyncLogClientError(error, 'Không tiếp tục được phiên ghi.', 'approve_push');
     fbmSyncPaint(fbmSyncClientErrorStatus(String(error && error.message || error)));
     return null;
@@ -1407,7 +1416,7 @@ function fbmSyncStartServer(mode, attempt) {
 function fbmSyncCancel() {
   var keepRelay = FBM_SYNC_CLIENT.running === true;
   FBM_SYNC_CLIENT.cancelRequested = keepRelay;
-  if (!keepRelay) { FBM_SYNC_CLIENT.running = false; }
+  if (!keepRelay) { fbmSyncSetRunning(false); }
   fbmSyncCancelExtensionBatch();
   return callServer('fbmCancelSync').then(function (result) {
     var pending = result && result.code === 'SYNC_CANCEL_PENDING';
@@ -1417,7 +1426,7 @@ function fbmSyncCancel() {
     return fbmSyncPaint(result);
   }).catch(function (error) {
     FBM_SYNC_CLIENT.cancelRequested = false;
-    FBM_SYNC_CLIENT.running = false;
+    fbmSyncSetRunning(false);
     return fbmSyncPaintError(error, 'Không dừng được phiên đồng bộ trên GAS.');
   });
 }
@@ -1550,7 +1559,7 @@ function fbmSyncLoop(status) {
   if (!FBM_SYNC_CLIENT.running && !FBM_SYNC_CLIENT.cancelRequested) { return fbmSyncStatusOnce(); }
   if (!status || !status.request) {
     // Hạ cờ trước khi vẽ: vẽ trong lúc `cancelRequested` còn bật thì nút kẹt ở "Đang dừng…" tới lần hỏi trạng thái kế tiếp.
-    FBM_SYNC_CLIENT.running = false;
+    fbmSyncSetRunning(false);
     FBM_SYNC_CLIENT.cancelRequested = false;
     // A terminal response without a request is a transport error; never leave Sidebar silent.
     if (!status) {
@@ -1579,10 +1588,10 @@ function fbmSyncLoop(status) {
 function fbmSyncRun(mode) {
   if (!fbmSyncStatusReady()) { return Promise.resolve(null); }
   if (FBM_SYNC_CLIENT.running) { return Promise.resolve(null); }
-  FBM_SYNC_CLIENT.running = true;
+  fbmSyncSetRunning(true);
   return fbmSyncRequireBridge('sync_run').then(function (missing) {
     if (!missing) { return fbmSyncRunStart(mode); }
-    FBM_SYNC_CLIENT.running = false;
+    fbmSyncSetRunning(false);
     fbmSyncPaint(missing);
     return missing;
   });
@@ -1597,14 +1606,14 @@ function fbmSyncRunStart(mode) {
       return fbmSyncWaitForBackgroundStop(mode || 'read', 0);
     }
     if (!started || !started.ok) {
-      FBM_SYNC_CLIENT.running = false;
+      fbmSyncSetRunning(false);
       if (started && started.status) { fbmSyncPaint(started.status); }
       return started || { ok: false };
     }
     return fbmSyncLoop(started);
   });
-  return work.then(function (value) { FBM_SYNC_CLIENT.running = false; return value; }, function (err) {
-    FBM_SYNC_CLIENT.running = false;
+  return work.then(function (value) { fbmSyncSetRunning(false); return value; }, function (err) {
+    fbmSyncSetRunning(false);
     var reason = err && err.message ? err.message : String(err);
     if (err && err.code === 'GAS_CALLBACK_TIMEOUT') {
       var diagnostic = err.diagnostic || {};
