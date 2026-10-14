@@ -97,6 +97,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── SortSpec.js            Chuẩn hóa cấu hình sắp xếp của sheet quản lý.
 │   │   ├── ViewSheetRenderer.js   Vẽ lại vùng dữ liệu sheet quản lý theo bộ lọc và sắp xếp.
 │   │   ├── ViewSheetSetup.js      Tạo sheet quản trị từ DATA_SCHEMA, bổ sung cột điều khiển, ghi chú và validation.
+│   │   ├── ViewLedger.js          Sổ trạng thái mỗi sheet quản trị: lượt thử gần nhất (dữ liệu, ô điều khiển, kết quả); quyết sheet cũ và có cần thử lại.
 │   │   └── ViewTabTint.js         Tô cam tab sheet quản trị đang cũ, trả màu người dùng đặt khi vẽ xong.
 │   ├── Triggers.js                Trigger đánh dấu dữ liệu bẩn và chuẩn bị sheet quản trị.
 │   └── dev\                      CHỈ DÙNG LÚC PHÁT TRIỂN — xóa cả thư mục này trước khi Sheet mang dữ liệu khách hàng thật.
@@ -275,6 +276,7 @@ tests\
     ├── settings.js               SETTINGS và khối tham số Config, kể cả ca sheet chưa có dòng nào.
     ├── logMask.js                Luật che bí mật. Sai một lần là bí mật ra sheet, không thu lại được.
     ├── logGate.js                Kỷ luật bộ đệm, "cả lượt một lệnh ghi", và hai trần cắt log.
+    ├── entryPoint.js             Cửa vào Sidebar tự gọi ghi Log theo chuyển trạng thái lỗi.
     ├── dateText.js               Hai dạng chuỗi thời gian, và ba luật im lặng khi sai: ô rỗng, ô gõ lạ, precision gõ sai.
     ├── sheetGrid.js              Lưới là hữu hạn, setValues không tự nới, và ca rỗng là ca thường xuyên chứ không phải ngoại lệ.
     ├── cellBudget.js             Cái bẫy gõ "500.000" thành 500, và bảng thủ phạm phải sắp giảm dần.
