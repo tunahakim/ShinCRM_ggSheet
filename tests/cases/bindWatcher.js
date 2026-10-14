@@ -49,6 +49,8 @@ async function chay(so) {
   check(so, 'loại 0 mang khóa "c" (nội dung ô) là tín hiệu', ca('60\n[[8,[[0,1760000000002,{"c":[["A1","x"]]}]]]]\n'), ['signal']);
   check(so, 'khóa "c" (nội dung ô) thắng mọi loại: khung loại 10 mang "c" vẫn là tín hiệu', ca('60\n[[16,[[10,1760000000011,{"c":[["A1","x"]]}]]]]\n'), ['signal']);
   check(so, 'loại 1 là tín hiệu', ca('40\n[[9,[[1,1760000000003,"abc"]]]]\n'), ['signal']);
+  check(so, 'loại 1 chỉ chở THUMBNAIL (ảnh thu nhỏ, mẫu đo live) là nhịp sống', ca('43\n[[30,[1,1791971258040,{"THUMBNAIL":true}]]]\n'), ['alive']);
+  check(so, 'loại 1 chở THUMBNAIL kèm trường khác vẫn là tín hiệu', ca('60\n[[31,[1,1791971258041,{"THUMBNAIL":true,"x":1}]]]\n'), ['signal']);
   check(so, 'loại lạ 99 là tín hiệu', ca('40\n[[10,[[99,1760000000004,"abc"]]]]\n'), ['signal']);
   check(so, 'khung nhiễu lẫn khung loại lạ trong cùng gói là tín hiệu', ca('[[11,[[10,1760000000005,"a"]]],[12,[[1,1760000000006,"b"]]]]'), ['signal']);
   check(so, 'khung cắt dở không nhận dạng được là tín hiệu', ca('35\n[[13,[[0,17600'), ['signal']);

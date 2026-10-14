@@ -7,7 +7,9 @@
  * Phải chạy MAIN world ở `document_start`: Sheets giữ tham chiếu `XMLHttpRequest` ngay khi nạp, vá
  * muộn là vô nghĩa. Vá prototype nên sống qua mọi lần Sheets tự mở lại kênh (khoảng 140 giây/lần).
  *
- * Bộ lọc là danh sách đen: chỉ bỏ `noop`, loại `10` (con trỏ người khác) và loại `14` (hiện diện).
+ * Bộ lọc là danh sách đen: chỉ bỏ `noop`, loại `10` (con trỏ người khác), loại `14` (hiện diện) và khung loại `1`
+ * chỉ chở `{"THUMBNAIL":true}` (Google vẽ lại ảnh thu nhỏ của tệp, vài phút một lần). Loại `1` còn chở thứ khác
+ * nên chỉ bỏ đúng dạng payload đó, không bỏ cả loại.
  * Có khóa `"c"`, loại lạ hay khung cắt dở không nhận dạng được đều là `signal` — báo nhầm chỉ tốn một
  * lời hỏi, bỏ sót là Sidebar giữ dữ liệu cũ. Không tách khung theo số độ dài đứng đầu: số đó đếm byte
  * UTF-8 còn chuỗi JavaScript đếm UTF-16, tiếng Việt sẽ làm lệch con trỏ; quét regex thì không lệch.
@@ -21,7 +23,7 @@
 (function () {
   var SOURCE = 'SHINCRM_EXTENSION';
   var ACTION = 'CRM_BIND_EVENT';
-  var NOISE_TYPES = { '10': true, '14': true, noop: true };
+  var NOISE_TYPES = { '10': true, '14': true, noop: true, thumbnail: true };
   var XHR = window.XMLHttpRequest;
   if (!XHR || !XHR.prototype || XHR.prototype.__shinBindWatched) { return; }
 
@@ -40,9 +42,9 @@
   function isNoise(chunk) {
     if (hasChange(chunk)) { return false; }
     var found = [];
-    var pattern = /\[\s*"noop"\s*\]|\[\s*(\d+)\s*,\s*\d{10,}\s*,/g;
+    var pattern = /\[\s*"noop"\s*\]|(\[\s*1\s*,\s*\d{10,}\s*,\s*\{\s*"THUMBNAIL"\s*:\s*true\s*\}\s*\])|\[\s*(\d+)\s*,\s*\d{10,}\s*,/g;
     var match;
-    while ((match = pattern.exec(chunk)) !== null) { found.push(match[1] === undefined ? 'noop' : match[1]); }
+    while ((match = pattern.exec(chunk)) !== null) { found.push(match[1] !== undefined ? 'thumbnail' : match[2] === undefined ? 'noop' : match[2]); }
     if (!found.length) { return false; }
     for (var i = 0; i < found.length; i++) {
       if (!NOISE_TYPES[found[i]]) { return false; }
