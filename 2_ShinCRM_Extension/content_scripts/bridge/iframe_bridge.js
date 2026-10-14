@@ -258,6 +258,8 @@ function bridgeOnBindEvent(event) {
   } else {
     message.action = 'CRM_RELOAD';
     message.signal = data.kind === 'open' ? 'channel-open' : 'channel';
+    if (data.kind === 'open') { message.sameSession = data.sameSession === true; }
+    else { message.firstChunk = data.firstChunk === true; message.hasChange = data.hasChange === true; }
   }
   try {
     sidebarWindow.postMessage(message, sidebarOrigin);

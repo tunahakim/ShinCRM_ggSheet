@@ -8,6 +8,7 @@ const WATCHER_FILE = path.join(__dirname, '..', '..', '2_ShinCRM_Extension', 'co
 /** XHR giả: `responseText` lớn dần như kênh đẩy thật; `day()` bơm thêm khung rồi bắn `progress`. */
 function napWatcher() {
   const posted = [];
+  const facts = [];
   function FakeXHR() { this.listeners = {}; this.responseText = ''; this.readyState = 0; this.sent = false; }
   FakeXHR.prototype.open = function () { this.opened = true; };
   FakeXHR.prototype.send = function () { this.sent = true; };
@@ -18,10 +19,10 @@ function napWatcher() {
     location: { origin: 'https://docs.google.com' },
     window: null
   };
-  hop.window = { XMLHttpRequest: FakeXHR, postMessage: (data, origin) => posted.push({ kind: data.kind, source: data.source, action: data.action, origin }) };
+  hop.window = { XMLHttpRequest: FakeXHR, postMessage: (data, origin) => { posted.push({ kind: data.kind, source: data.source, action: data.action, origin }); facts.push({ kind: data.kind, sameSession: data.sameSession, firstChunk: data.firstChunk, hasChange: data.hasChange }); } };
   vm.createContext(hop);
   vm.runInContext(fs.readFileSync(WATCHER_FILE, 'utf8'), hop, { filename: WATCHER_FILE });
-  return { FakeXHR, posted, hop };
+  return { FakeXHR, posted, facts, hop };
 }
 
 function moKenh(w, method, url) {
@@ -66,6 +67,22 @@ async function chay(so) {
   const binder = moKenh(w, 'GET', '/spreadsheets/d/abc/binder');
   binder.day('[[0,[[1,1760000000010,"x"]]]]');
   check(so, 'POST /bind (gửi lên) và URL khác đều bị bỏ qua', w.posted.length, 0);
+
+  const n = napWatcher();
+  const dau = moKenh(n, 'GET', '/spreadsheets/d/abc/bind?VER=8&SID=AAA&RID=rpc&TYPE=xmlhttp');
+  dau.day('12\n[[1,["noop"]]]\n');
+  dau.day('60\n[[2,[[0,1760000000002,{"c":[["A1","x"]]}]]]]\n');
+  check(so, 'kênh đầu tiên: sameSession false; khung đầu và khung mang "c" có đánh dấu firstChunk/hasChange đúng',
+    n.facts, [{ kind: 'open', sameSession: false, firstChunk: undefined, hasChange: undefined }, { kind: 'alive', sameSession: undefined, firstChunk: true, hasChange: false }, { kind: 'signal', sameSession: undefined, firstChunk: false, hasChange: true }]);
+  n.facts.length = 0;
+  const noiLai = moKenh(n, 'GET', '/spreadsheets/d/abc/bind?VER=8&SID=AAA&RID=rpc&TYPE=xmlhttp');
+  noiLai.day('40\n[[3,[[1,1760000000003,"abc"]]]]\n');
+  check(so, 'kênh mới cùng SID dù kênh cũ chưa kết thúc: báo sameSession true; khung đầu loại 1 là tín hiệu mang firstChunk, không mang thay đổi',
+    n.facts, [{ kind: 'open', sameSession: true, firstChunk: undefined, hasChange: undefined }, { kind: 'signal', sameSession: undefined, firstChunk: true, hasChange: false }]);
+  n.facts.length = 0;
+  moKenh(n, 'GET', '/spreadsheets/d/abc/bind?VER=8&SID=BBB&RID=rpc&TYPE=xmlhttp');
+  moKenh(n);
+  check(so, 'SID khác hoặc không có SID thì sameSession false', n.facts.map((f) => f.sameSession), [false, false]);
 
   const lai = w.FakeXHR.prototype.send;
   vm.runInContext(fs.readFileSync(WATCHER_FILE, 'utf8'), w.hop, { filename: WATCHER_FILE });
