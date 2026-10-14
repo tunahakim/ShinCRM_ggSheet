@@ -72,13 +72,12 @@ function deleteGateRemove(yeuCau) {
   try {
     result = deleteGateRun(entity, ids, batDau);
     if (result && result.ok && result.recordIds && result.recordIds.length) {
-      // Phát signal trước khi nhả khóa; renderer chỉ chạy sau khi khóa đã được trả.
+      // Phát signal trước khi nhả khóa để hai lượt ghi không cùng đọc một revision cũ.
       commit = writeCommitAfterSuccess({
         source: 'delete',
         surface: 'record',
         entity: entity,
-        recordIds: result.recordIds,
-        render: false
+        recordIds: result.recordIds
       });
       result.reloadDecision = commit.reloadDecision;
       result.dirty = commit.dirty;
@@ -87,7 +86,6 @@ function deleteGateRemove(yeuCau) {
     try { SpreadsheetApp.flush(); } finally { khoa.releaseLock(); }
   }
 
-  if (commit && result) { result.viewRender = writeCommitRender(commit); }
   return result;
 }
 

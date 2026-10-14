@@ -11,8 +11,8 @@ var RELOAD_MATRIX_PROBE_VIEW = '!__CRM_RELOAD_MATRIX_PROBE';
 
 function reloadMatrixProbePropKeys() {
   return [
-    DIRTY_KEYS.viewSheets, DIRTY_KEYS.records, DIRTY_KEYS.config, DIRTY_KEYS.all,
-    DIRTY_KEYS.category, DIRTY_KEYS.schema, DIRTY_KEYS.allCore, DIRTY_KEYS.allViews,
+    DIRTY_KEYS.records, DIRTY_KEYS.config, DIRTY_KEYS.all,
+    DIRTY_KEYS.category, DIRTY_KEYS.schema, DIRTY_KEYS.allCore, DIRTY_KEYS.viewsStaleRevision, DIRTY_KEYS.viewRendered,
     DIRTY_KEYS.revision, DIRTY_KEYS.changedAt, DIRTY_KEYS.recordsReadyAt, DIRTY_KEYS.recordRevisionLog
   ];
 }

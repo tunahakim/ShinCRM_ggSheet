@@ -229,27 +229,22 @@ function resetConfigToDefaults() {
   try {
     file = shinOpenBook();
     result = prepareConfigSheet(file, { reset: true });
-    views = file.getSheets().map(function (sheet) { return sheet.getName(); }).filter(function (name) { return name.charAt(0) === '!'; });
+    views = shinViewSheetNames(file);
     SpreadsheetApp.flush();
     commit = writeCommitAfterSuccess({
       source: 'user',
       surface: 'config',
-      entity: 'config',
-      viewSheetNames: views,
-      render: false
+      entity: 'config'
     });
   } finally {
     try { SpreadsheetApp.flush(); } finally { lock.releaseLock(); }
   }
-
-  var viewRender = commit ? writeCommitRender(commit) : null;
 
   return {
     ok: true,
     viewSheets: views,
     params: configUserParams(configParams()),
     reload: commit && commit.reloadDecision,
-    viewRender: viewRender,
     dirty: commit && commit.dirty
   };
 }

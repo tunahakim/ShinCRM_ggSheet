@@ -2,9 +2,10 @@
  * Hậu xử lý chung của mọi lượt ghi Sheet đã được xác nhận.
  *
  * Các cửa nghiệp vụ vẫn giữ luật riêng của mình, nhưng không được tự dựng
- * ReloadDecision, tự ghi DirtyState hoặc tự gọi renderer. Tệp này không ghi
- * dữ liệu nguồn. Khi cửa gọi đang giữ document lock, hãy dùng `render: false`
- * để ghi signal trong cùng khóa rồi gọi `writeCommitRender()` sau khi nhả khóa.
+ * ReloadDecision hoặc tự ghi DirtyState. Tệp này không ghi dữ liệu nguồn và
+ * không vẽ sheet quản trị: dữ liệu đổi chỉ làm view cũ, Sidebar vẽ khi có
+ * người xem. Gọi trong document lock của cửa ghi để hai lượt ghi không cùng
+ * đọc một revision cũ.
  */
 
 function writeCommitCopy(input) {
@@ -12,13 +13,6 @@ function writeCommitCopy(input) {
   var copy = {};
   Object.keys(source).forEach(function (key) { copy[key] = source[key]; });
   copy.writeSucceeded = true;
-  if (!Array.isArray(copy.viewSheetNames) && typeof shinViewSheetNames === 'function' && typeof shinOpenBook === 'function') {
-    copy.viewSheetNames = shinViewSheetNames(shinOpenBook());
-  }
-  if (copy.autoRenderView === undefined) {
-    var prefs = typeof userPrefsRead === 'function' ? userPrefsRead() : { autoRenderView: true };
-    copy.autoRenderView = prefs.autoRenderView !== false;
-  }
   return copy;
 }
 
@@ -42,37 +36,14 @@ function writeCommitAssertAvailable() {
   return true;
 }
 
-/**
- * Phát signal và render sau một lượt ghi thành công.
- *
- * Renderer chạy sau khi cửa ghi đã nhả khóa. Lỗi renderer không phủ nhận việc
- * dữ liệu nguồn đã ghi thành công; cờ bẩn được giữ lại để lượt sau xử lý tiếp,
- * tránh caller tự thử lại và ghi trùng bản ghi.
- */
-function writeCommitRender(commit) {
-  var prepared = commit || {};
-  var decision = prepared.reloadDecision;
-  if (!decision || !decision.views || decision.views.action !== 'render' || typeof renderAllManagedViewsIfAllowed !== 'function') {
-    return null;
-  }
-
-  try {
-    return renderAllManagedViewsIfAllowed({ policyBypass: decision.views.policyBypass === true });
-  } catch (error) {
-    return { ok: false, error: String(error && error.message || error), dirty: typeof reloadStateRead === 'function' ? reloadStateRead() : prepared.dirty };
-  }
-}
-
 function writeCommitAfterSuccess(input) {
   writeCommitAssertAvailable();
 
   var decision = reloadDecisionForChange(writeCommitCopy(input));
-  var dirty = dirtyStateMarkDecision(decision);
-  var viewRender = input && input.render === false ? null : writeCommitRender({ reloadDecision: decision, dirty: dirty });
+  dirtyStateMarkDecision(decision);
 
   return {
     reloadDecision: decision,
-    viewRender: viewRender,
-    dirty: typeof reloadStateRead === 'function' ? reloadStateRead() : dirty
+    dirty: reloadStateRead()
   };
 }

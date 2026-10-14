@@ -1,9 +1,5 @@
 /** Trigger cài đặt cho dữ liệu kho và sheet quản trị. */
 
-function shinViewSheetNames(book) {
-  return book.getSheets().map(function (sheet) { return sheet.getName(); }).filter(function (name) { return name.charAt(0) === '!'; });
-}
-
 function shinRangeTouchesRow(range, row) {
   return range.getRow() <= row && range.getLastRow() >= row;
 }
@@ -100,20 +96,25 @@ function shinSchemaEditNeedsReload(sheet, range, event) {
 }
 
 function shinReloadDecision(input) {
-  var change = input || {};
-  change.viewSheetNames = change.viewSheetNames || shinViewSheetNames(shinOpenBook());
-  var decision = reloadDecisionForChange(change);
+  var decision = reloadDecisionForChange(input || {});
   dirtyStateMarkDecision(decision);
   return decision;
 }
 
-function shinRenderAllViewsAfterSignal(options) {
-  if (typeof renderAllManagedViewsIfAllowed === 'function') { return renderAllManagedViewsIfAllowed(options); }
-  if (typeof renderAllViewSheets === 'function') { return renderAllViewSheets(); }
-  if (typeof renderViewIfDirty === 'function') {
-    return shinViewSheetNames(shinOpenBook()).map(function (name) { return renderViewIfDirty(name); });
-  }
-  return null;
+/** Trigger chỉ vẽ khi người dùng sửa bộ điều khiển và không đọc công tắc người dùng; dữ liệu kho đổi chỉ làm view cũ để Sidebar vẽ khi có người xem. */
+function shinRenderForDecision(decision) {
+  var views = decision && decision.views;
+  if (!views || views.action !== 'render') { return decision; }
+  return renderAllManagedViews(views.mode === 'sheet' ? [views.sheetName] : undefined);
+}
+
+/** Sắp xếp chung trong Config là bộ điều khiển của mọi sheet quản trị chưa khai sắp xếp riêng. */
+function shinConfigSortTouched(sheet, range) {
+  var first = range.getColumn();
+  return sheet.getRange(1, first, 1, range.getLastColumn() - first + 1).getValues()[0].some(function (value) {
+    var code = String(value === null || value === undefined ? '' : value).trim();
+    return code === '@CFG_SORT_COL' || code === '@CFG_SORT_LEVEL';
+  });
 }
 
 /** Chỉ ba vùng cấu hình của sheet quản trị được phép kích hoạt một lượt làm mới tự động. */
@@ -141,22 +142,18 @@ function shinOnEdit(event) {
     var name = sheet.getName();
     if (name.charAt(0) === '!') {
       if (shinViewEditNeedsRender(sheet, range, event)) {
-        var viewDecision = shinReloadDecision({ source: 'edit', surface: 'view-control', viewControl: true });
-        if (viewDecision.views.action === 'render') { return shinRenderAllViewsAfterSignal({ policyBypass: viewDecision.views.policyBypass === true }); }
+        return shinRenderForDecision(shinReloadDecision({ source: 'edit', surface: 'view-control', sheetName: name }));
       }
       return;
     }
     if (shinSchemaEditNeedsReload(sheet, range, event)) {
-      var schemaDecision = shinReloadDecision({ source: 'edit', surface: 'schema', schema: true });
-      if (schemaDecision.views.action === 'render') { return shinRenderAllViewsAfterSignal(); }
-      return schemaDecision;
+      return shinReloadDecision({ source: 'edit', surface: 'schema', schema: true });
     }
     if (name === 'Config' || name === 'Category') {
       if (range.getRow() < SHEET_FIRST_DATA_ROW) { return; }
       if (!shinDefaultCodeIsValid(sheet, name.toLowerCase(), range.getColumn(), range.getLastColumn())) { return; }
-      var configDecision = shinReloadDecision({ source: 'edit', surface: name.toLowerCase(), entity: name.toLowerCase() });
-      if (configDecision.views.action === 'render') { return shinRenderAllViewsAfterSignal(); }
-      return configDecision;
+      var configSort = name === 'Config' && shinConfigSortTouched(sheet, range);
+      return shinRenderForDecision(shinReloadDecision({ source: 'edit', surface: name.toLowerCase(), entity: name.toLowerCase(), configSort: configSort }));
     }
     var entity = name === ENTITY_SHEETS.customer ? 'customer' : name === ENTITY_SHEETS.activity ? 'activity' : '';
     if (!entity || range.getRow() < SHEET_FIRST_DATA_ROW) { return; }
@@ -165,9 +162,7 @@ function shinOnEdit(event) {
     if (!column) { return; }
     var last = range.getLastRow();
     var ids = sheet.getRange(range.getRow(), column, last - range.getRow() + 1, 1).getValues().map(function (row) { return row[0]; });
-    var recordDecision = shinReloadDecision({ source: 'edit', surface: 'record', entity: entity, recordIds: ids });
-    if (recordDecision.views.action === 'render') { return shinRenderAllViewsAfterSignal(); }
-    return recordDecision;
+    return shinReloadDecision({ source: 'edit', surface: 'record', entity: entity, recordIds: ids });
     });
   } finally {
     if (shinRangeTouchesRow(range, 1)) { shinHeaderSnapshotWrite(sheet); }
@@ -182,16 +177,12 @@ function shinOnChange(event) {
     var active = book.getActiveSheet();
     var name = active && typeof active.getName === 'function' ? active.getName() : '';
 
+    // Sheet `!` mới chưa có revision đã vẽ nên tự là sheet cũ; Sidebar vẽ khi có người mở nó. Xóa sheet không làm sheet nào khác cũ.
     if (type === 'INSERT_GRID') {
-      book.getSheets().filter(function (sheet) { return sheet.getName().charAt(0) === '!'; }).forEach(function (sheet) { prepareViewSheet(sheet.getName()); });
-      var inserted = shinReloadDecision({ source: 'change', surface: 'view-control', viewControl: true });
-      return inserted.views.action === 'render' ? shinRenderAllViewsAfterSignal({ policyBypass: inserted.views.policyBypass === true }) : inserted;
+      shinViewSheetNames(book).forEach(function (sheetName) { prepareViewSheet(sheetName); });
+      return null;
     }
-
-    if (type === 'REMOVE_GRID') {
-      var removed = shinReloadDecision({ source: 'change', surface: 'view-control', viewControl: true });
-      return removed.views.action === 'render' ? shinRenderAllViewsAfterSignal({ policyBypass: removed.views.policyBypass === true }) : removed;
-    }
+    if (type === 'REMOVE_GRID') { return null; }
 
     // onChange không có range đáng tin cậy. Với thêm/xóa hàng/cột, đánh dấu
     // bảo thủ theo sheet đang active; nếu không xác định được thì dùng full core.
@@ -204,11 +195,11 @@ function shinOnChange(event) {
       } else if (name === 'Config') {
         structural = shinReloadDecision({ source: 'change', surface: 'config', entity: 'config' });
       } else if (name && name.charAt(0) === '!') {
-        structural = shinReloadDecision({ source: 'change', surface: 'view-control', viewControl: true });
+        structural = shinReloadDecision({ source: 'change', surface: 'view-control', sheetName: name });
       } else {
         structural = shinReloadDecision({ source: 'change', surface: 'structure', structure: true, allCore: true });
       }
-      return structural.views.action === 'render' ? shinRenderAllViewsAfterSignal({ policyBypass: structural.views.policyBypass === true }) : structural;
+      return shinRenderForDecision(structural);
     }
 
     return null;

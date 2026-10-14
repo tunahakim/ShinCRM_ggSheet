@@ -88,7 +88,7 @@ function selectionReloadRequestId(input) {
 
 function selectionRemainingRevision(state) {
   if (!state) { return 0; }
-  var hasDirty = !!(state.records && state.records.length) || !!(state.category || state.config || state.schema || state.allCore || state.allViews || (state.viewSheets && state.viewSheets.length));
+  var hasDirty = !!(state.records && state.records.length) || !!(state.category || state.config || state.schema || state.allCore);
   return hasDirty ? Number(state.revision || 0) : 0;
 }
 
@@ -109,10 +109,14 @@ function selectionPayloadFromReload(result) {
   return null;
 }
 
-function selectionRenderDirtyViews(state) {
-  if (!state || !(state.allViews || (state.viewSheets && state.viewSheets.length))) { return null; }
-  if (typeof renderAllManagedViewsIfAllowed === 'function') { return renderAllManagedViewsIfAllowed(); }
-  return null;
+/** Trạng thái sheet `!` đang xem cho Sidebar, tính từ DocumentProperties chứ không đọc Sheet; núm người dùng chỉ đọc khi sheet cũ. Sidebar tự gọi vẽ bằng lời gọi riêng để lời hỏi không bị chậm vì vẽ. */
+function selectionViewDecision(sheetName, state) {
+  var name = String(sheetName || '').trim();
+  if (name.charAt(0) !== '!') { return reloadDecisionForView({ sheetName: name }); }
+  var rendered = viewRenderedRead()[name];
+  var staleRevision = state ? state.viewsStaleRevision : 0;
+  var prefs = reloadDecisionViewStale(staleRevision, rendered) ? userPrefsRead() : {};
+  return reloadDecisionForView({ sheetName: name, viewsStaleRevision: staleRevision, renderedRevision: rendered, autoRenderView: prefs.autoRenderView });
 }
 
 function selectionColumnLetters(column) {
@@ -211,7 +215,6 @@ function probeSelectionAndReload(input) {
       customerId: customerId,
       customerIdChanged: positionChanged && customerId !== previousCustomerId
     });
-    var viewRender = selectionRenderDirtyViews(state);
     var payload = null;
     var processedRevision = 0;
     var revisionMatched = true;
@@ -256,7 +259,7 @@ function probeSelectionAndReload(input) {
       dirty: dirtyStateRead(),
       decision: ready && reloadResult ? Object.assign({}, decision, { executed: true, resultMode: reloadResult.reloadMode }) : decision,
       payload: payload,
-      viewRender: viewRender,
+      view: selectionViewDecision(selection.sheetName, latest),
       observedRevision: state ? Number(state.revision || 0) : 0,
       processedRevision: processedRevision,
       remainingRevision: selectionRemainingRevision(latest),
@@ -294,7 +297,7 @@ function viewProbeSelection() {
     var context = selectionProbeContext();
     var snapshot = selectionSnapshotFromContext(context);
     if (snapshot.sheetName && snapshot.sheetName.charAt(0) === '!') {
-      renderViewIfDirty(snapshot.sheetName);
+      viewRenderIfStale(snapshot.sheetName);
     }
     var full = selectionProbeReply(snapshot, started, selectionCustomerId(context, snapshot));
     var report = [];

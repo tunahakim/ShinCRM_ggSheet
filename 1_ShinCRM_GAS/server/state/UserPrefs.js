@@ -85,14 +85,7 @@ function userPrefsWrite(name, value) {
       detail: { num: name, giaTri: luu }
     });
 
-    var viewRender = null;
-    if (name === 'autoRenderView' && value === true && typeof renderAllManagedViewsIfAllowed === 'function') {
-      var reload = typeof reloadStateRead === 'function' ? reloadStateRead() : dirtyStateRead();
-      if (reload.allViews || (reload.viewSheets && reload.viewSheets.length)) {
-        viewRender = renderAllManagedViewsIfAllowed();
-      }
-    }
-    return { ok: true, prefs: userPrefsRead(), reload: reloadStateRead(), dirty: dirtyStateRead(), viewRender: viewRender };
+    return { ok: true, prefs: userPrefsRead(), reload: reloadStateRead(), dirty: dirtyStateRead() };
   });
 }
 

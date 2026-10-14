@@ -3,16 +3,17 @@
  *
  * Khối này sống ở DocumentProperties (qua `documentProps()`, server/state/DocumentStore.js) chứ không ở RAM, vì nó phải sống sót giữa các lần gọi máy chủ — mỗi lần gọi Apps Script là một lượt chạy mới, không nhớ gì lượt trước — và phải chung cho mọi phiên làm việc trên cùng một tệp.
  *
- * Ba khóa: `dirtyViewSheets` (sheet quản trị cần vẽ lại), `dirtyRecords` (mã bản ghi bị sửa tay thẳng trên sheet kho), `dirtyConfig` (`Config` hoặc `Category` đã đổi). Thêm một cờ bẩn toàn bộ, dùng khi danh sách bản ghi vượt ngưỡng.
+ * Hai khóa: `dirtyRecords` (mã bản ghi bị sửa tay thẳng trên sheet kho), `dirtyConfig` (`Config` hoặc `Category` đã đổi). Thêm một cờ bẩn toàn bộ, dùng khi danh sách bản ghi vượt ngưỡng.
+ *
+ * Sheet quản trị không có cờ bẩn: dữ liệu kho đổi chỉ nâng `viewsStaleRevision`, mỗi sheet vẽ xong ghi revision đã dùng để vẽ. Sheet cũ khi revision đó nhỏ hơn mốc cũ, nên mỗi sheet tự sạch khi được vẽ mà không xóa dấu của sheet khác, và revision tăng giữa lúc vẽ vẫn để sheet cũ.
  *
  * Chiều ghi nằm cùng module để mọi đường kích hoạt dùng chung luật hợp nhất và ngưỡng, thay vì tự thao tác JSON ở từng trigger/cửa ghi.
  *
  * Vì sao chiều đọc phải có **ngay từ bây giờ**, dù chưa có gì ghi vào: tài liệu 07 Phần 2 và tài liệu 05 Phần 12 đều là ràng buộc cứng rằng **mọi phản hồi của máy chủ đính kèm khối này**. Đó là cơ chế duy nhất giữ hệ thống khỏi phải polling (hỏi lặp theo chu kỳ). Nếu bây giờ phản hồi không mang khối đó, thì đường nhận dữ liệu bên client sẽ được viết theo một hình dạng thiếu, và tới chặng làm mới thì mọi chỗ nhận phản hồi phải sửa lại một lượt — đúng loại việc mà sửa sót một chỗ thì không có gì báo.
  */
 
-/** Ba khóa của `DocumentProperties`, cộng cờ bẩn toàn bộ. Khai một chỗ để chiều ghi ở chặng sau không gõ lại chuỗi khóa. */
+/** Khóa của `DocumentProperties`, cộng cờ bẩn toàn bộ. Khai một chỗ để chiều ghi ở chặng sau không gõ lại chuỗi khóa. */
 var DIRTY_KEYS = {
-  viewSheets: 'dirtyViewSheets',
   records: 'dirtyRecords',
   config: 'dirtyConfig',
   all: 'dirtyAll'
@@ -21,7 +22,8 @@ Object.defineProperties(DIRTY_KEYS, {
   category: { value: 'dirtyCategory', enumerable: false },
   schema: { value: 'dirtySchema', enumerable: false },
   allCore: { value: 'dirtyAllCore', enumerable: false },
-  allViews: { value: 'dirtyAllViews', enumerable: false },
+  viewsStaleRevision: { value: 'viewsStaleRevision', enumerable: false },
+  viewRendered: { value: 'viewRenderedRevisions', enumerable: false },
   revision: { value: 'reloadRevision', enumerable: false },
   changedAt: { value: 'reloadChangedAt', enumerable: false },
   recordsReadyAt: { value: 'dirtyRecordsReadyAt', enumerable: false },
@@ -42,21 +44,20 @@ function dirtyStateList(props, key) {
 }
 
 /**
- * Khối trạng thái bẩn hiện tại. Trả về `{ viewSheets, records, config, all }`.
+ * Khối trạng thái bẩn hiện tại. Trả về `{ records, config, all }`.
  *
  * **Không bao giờ ném lỗi.** Cùng lý do như `logTraceCoversSource`: hàm này nằm trên đường phản hồi của *mọi* lời gọi máy chủ, nên nó hỏng là mọi thứ hỏng. Không đọc được thì trả về khối rỗng, và khối rỗng là chiều an toàn — nó chỉ có nghĩa "không biết có gì bẩn", dẫn tới việc không vẽ lại gì cả, chứ không dẫn tới việc ghi đè dữ liệu nào.
  *
  * Đọc `JSON.parse` có đường đỡ vì khóa này người ta xóa và sửa được bằng tay khi gỡ lỗi, và một dấu ngoặc thiếu không được phép làm sập lượt mở sidebar.
  */
 function dirtyStateRead() {
-  var empty = { viewSheets: [], records: [], config: false, all: false };
+  var empty = { records: [], config: false, all: false };
 
   try {
     var props = documentProps();
     var category = props.getProperty(DIRTY_KEYS.category) === 'true';
     var config = props.getProperty(DIRTY_KEYS.config) === 'true';
     return {
-      viewSheets: dirtyStateList(props, DIRTY_KEYS.viewSheets),
       records: dirtyStateList(props, DIRTY_KEYS.records),
       config: config || category,
       all: props.getProperty(DIRTY_KEYS.allCore) === 'true' || props.getProperty(DIRTY_KEYS.all) === 'true'
@@ -72,8 +73,8 @@ function dirtyStateRead() {
  */
 function reloadStateRead() {
   var empty = {
-    revision: 0, changedAt: 0, recordsReadyAt: 0, viewSheets: [], records: [], category: false, config: false, schema: false,
-    allCore: false, allViews: false, all: false
+    revision: 0, changedAt: 0, recordsReadyAt: 0, records: [], category: false, config: false, schema: false,
+    allCore: false, all: false, viewsStaleRevision: 0
   };
   try {
     var props = documentProps();
@@ -81,20 +82,18 @@ function reloadStateRead() {
     var category = props.getProperty(DIRTY_KEYS.category) === 'true';
     var config = props.getProperty(DIRTY_KEYS.config) === 'true';
     var schema = props.getProperty(DIRTY_KEYS.schema) === 'true';
-    var allViews = props.getProperty(DIRTY_KEYS.allViews) === 'true';
     var revision = Number(props.getProperty(DIRTY_KEYS.revision) || 0);
     return {
       revision: isFinite(revision) && revision >= 0 ? revision : 0,
       changedAt: Number(props.getProperty(DIRTY_KEYS.changedAt) || 0) || 0,
       recordsReadyAt: Number(props.getProperty(DIRTY_KEYS.recordsReadyAt) || 0) || 0,
-      viewSheets: dirtyStateList(props, DIRTY_KEYS.viewSheets),
       records: dirtyStateList(props, DIRTY_KEYS.records),
       category: category,
       config: config,
       schema: schema,
       allCore: allCore,
-      allViews: allViews,
-      all: allCore
+      all: allCore,
+      viewsStaleRevision: Number(props.getProperty(DIRTY_KEYS.viewsStaleRevision) || 0) || 0
     };
   } catch (khongDocDuocProps) {
     return empty;
@@ -164,11 +163,8 @@ function dirtyStateMarkSignal(mark) {
     props.deleteProperty(DIRTY_KEYS.records);
     props.deleteProperty(DIRTY_KEYS.recordsReadyAt);
   }
-  if (mark.allViews) { props.setProperty(DIRTY_KEYS.allViews, 'true'); }
-  if (mark.viewSheets && mark.viewSheets.length) {
-    dirtyStateWriteList(props, DIRTY_KEYS.viewSheets, state.viewSheets.concat(mark.viewSheets));
-  }
   var bumpedRevision = dirtyStateBumpRevision(props);
+  if (mark.allViews) { props.setProperty(DIRTY_KEYS.viewsStaleRevision, String(bumpedRevision)); }
   if (hasRecords && !mark.allCore) { dirtyStateRecordRevisionLogAppend(props, bumpedRevision, mark.records); }
   // Tính mốc debounce sau cùng một mốc changedAt của signal. Nếu một lần ghi
   // ô phát thêm onEdit trong lúc xử lý, signal cuối vẫn có đủ ba giây trọn vẹn.
@@ -194,13 +190,13 @@ function dirtyStateMarkSignal(mark) {
   return reloadStateRead();
 }
 
-/** Ghi phần signal do ReloadDecision trả về; không để từng trigger/cửa ghi tự dựng mark riêng. */
+/** Ghi phần signal do ReloadDecision trả về; không để từng trigger/cửa ghi tự dựng mark riêng. Không có signal thì trả `null` mà không đọc DocumentProperties, vì trigger sửa bộ điều khiển view đi qua đây mỗi lần gõ. */
 function dirtyStateMarkDecision(decision) {
   var signal = decision && decision.signal;
-  if (!signal) { return reloadStateRead(); }
+  if (!signal) { return null; }
   var records = Array.isArray(signal.records) ? signal.records : [];
   var hasSignal = records.length || signal.category || signal.config || signal.schema || signal.allCore || signal.allViews;
-  if (!hasSignal) { return reloadStateRead(); }
+  if (!hasSignal) { return null; }
   return dirtyStateMarkSignal({
     records: records,
     category: signal.category === true,
@@ -208,7 +204,6 @@ function dirtyStateMarkDecision(decision) {
     schema: signal.schema === true,
     allCore: signal.allCore === true,
     allViews: signal.allViews === true,
-    viewSheets: signal.viewSheets || [],
     recordsReadyAt: signal.recordsReadyAt,
     recordsDebounceMs: signal.recordsDebounceMs
   });
@@ -220,8 +215,30 @@ function dirtyStateMarkRecordChange(entity, recordIds) {
   return dirtyStateMarkSignal({ records: recordIds || [], allViews: true, recordsReadyAt: 0 });
 }
 
-function dirtyStateMarkAllViews(sheetNames) {
-  return dirtyStateMarkSignal({ allViews: true, viewSheets: sheetNames || [] });
+/** Làm mọi sheet quản trị thành cũ mà không đổi dữ liệu RAM nào. */
+function dirtyStateMarkAllViews() {
+  return dirtyStateMarkSignal({ allViews: true });
+}
+
+/** Revision đã dùng để vẽ từng sheet quản trị, theo tên sheet. Theo tên chứ không theo sheetId để lời hỏi của Sidebar biết sheet đang xem cũ hay mới mà không phải mở bảng tính; đổi tên sheet chỉ làm sheet đó bị coi là cũ và vẽ lại một lần. */
+function viewRenderedRead() {
+  try {
+    var parsed = JSON.parse(documentProps().getProperty(DIRTY_KEYS.viewRendered) || '{}');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch (khongDocDuoc) {
+    return {};
+  }
+}
+
+/** Chỉ gọi sau `flush` của lượt vẽ và trong DocumentLock, với revision đọc lúc bắt đầu vẽ. */
+function viewRenderedWrite(sheetName, revision) {
+  var map = viewRenderedRead();
+  map[String(sheetName)] = Number(revision) || 0;
+  documentProps().setProperty(DIRTY_KEYS.viewRendered, JSON.stringify(map));
+}
+
+function viewIsStale(sheetName) {
+  return reloadDecisionViewStale(reloadStateRead().viewsStaleRevision, viewRenderedRead()[String(sheetName)]);
 }
 
 function dirtyStateWriteList(props, key, values) {
@@ -236,19 +253,6 @@ function dirtyStateWriteList(props, key, values) {
   if (unique.length) { props.setProperty(key, JSON.stringify(unique)); }
   else { props.deleteProperty(key); }
   return unique;
-}
-
-/** Đánh dấu một sheet quản trị cần vẽ lại, không lặp tên sheet. */
-function dirtyStateMarkViewSheet(sheetName) {
-  var name = String(sheetName === null || sheetName === undefined ? '' : sheetName).trim();
-  if (!name) { return dirtyStateRead(); }
-  dirtyStateMarkSignal({ viewSheets: [name] });
-  return dirtyStateRead();
-}
-
-function dirtyStateMarkViewSheets(sheetNames) {
-  dirtyStateMarkSignal({ viewSheets: sheetNames || [] });
-  return dirtyStateRead();
 }
 
 /** Đánh dấu các mã bản ghi; vượt ngưỡng thì bỏ danh sách và bật cờ toàn bộ. */
@@ -273,11 +277,6 @@ function dirtyStateMarkSchema() {
   return dirtyStateRead();
 }
 
-function dirtyStateMarkAllViewsOnly(sheetNames) {
-  dirtyStateMarkSignal({ allViews: true, viewSheets: sheetNames || [] });
-  return dirtyStateRead();
-}
-
 /** Đánh dấu mọi dữ liệu cần nạp lại. */
 function dirtyStateMarkAll() {
   dirtyStateMarkSignal({ allCore: true, allViews: true });
@@ -293,25 +292,14 @@ function dirtyStateClear(options) {
   }
   var clearOptions = Object.keys(opts).filter(function (key) { return key !== 'expectedRevision'; });
   if (!clearOptions.length) {
-    [DIRTY_KEYS.viewSheets, DIRTY_KEYS.records, DIRTY_KEYS.recordsReadyAt, DIRTY_KEYS.category, DIRTY_KEYS.config, DIRTY_KEYS.schema, DIRTY_KEYS.allCore, DIRTY_KEYS.allViews, DIRTY_KEYS.all].forEach(function (key) { props.deleteProperty(key); });
+    [DIRTY_KEYS.records, DIRTY_KEYS.recordsReadyAt, DIRTY_KEYS.category, DIRTY_KEYS.config, DIRTY_KEYS.schema, DIRTY_KEYS.allCore, DIRTY_KEYS.all].forEach(function (key) { props.deleteProperty(key); });
   } else {
-    if (opts.viewSheets) { props.deleteProperty(DIRTY_KEYS.viewSheets); }
     if (opts.records) { props.deleteProperty(DIRTY_KEYS.records); props.deleteProperty(DIRTY_KEYS.recordsReadyAt); props.deleteProperty(DIRTY_KEYS.recordRevisionLog); }
     if (opts.config) { props.deleteProperty(DIRTY_KEYS.config); }
     if (opts.category) { props.deleteProperty(DIRTY_KEYS.category); }
     if (opts.schema) { props.deleteProperty(DIRTY_KEYS.schema); }
     if (opts.allCore || opts.all) { props.deleteProperty(DIRTY_KEYS.allCore); props.deleteProperty(DIRTY_KEYS.all); props.deleteProperty(DIRTY_KEYS.recordsReadyAt); props.deleteProperty(DIRTY_KEYS.recordRevisionLog); }
-    if (opts.allViews) { props.deleteProperty(DIRTY_KEYS.allViews); }
   }
-  return dirtyStateRead();
-}
-
-function dirtyStateClearViewSheet(sheetName, expectedRevision) {
-  var target = String(sheetName === null || sheetName === undefined ? '' : sheetName).trim();
-  if (expectedRevision !== undefined && reloadStateRead().revision !== Number(expectedRevision)) { return dirtyStateRead(); }
-  var props = documentProps();
-  var remaining = dirtyStateRead().viewSheets.filter(function (name) { return name !== target; });
-  dirtyStateWriteList(props, DIRTY_KEYS.viewSheets, remaining);
   return dirtyStateRead();
 }
 
@@ -366,7 +354,7 @@ function dirtyStateRestoreFullReload(state) {
 function probeDirtyState() {
   var state = dirtyStateRead();
   var report = [
-    'dirtyViewSheets: ' + (state.viewSheets.length ? state.viewSheets.join(', ') : 'rỗng'),
+    'viewsStaleRevision: ' + reloadStateRead().viewsStaleRevision + ' · đã vẽ: ' + JSON.stringify(viewRenderedRead()),
     'dirtyRecords: ' + (state.records.length ? state.records.length + ' mã' : 'rỗng'),
     'dirtyConfig: ' + state.config,
     'dirtyAll: ' + state.all

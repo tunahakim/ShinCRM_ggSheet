@@ -5,6 +5,12 @@
  * phải truyền phân loại đã xác nhận; Sidebar truyền thêm localDraft khi cần
  * bảo vệ bản nháp. Nhờ vậy RAM và renderer dùng cùng một bảng luật nhưng
  * không biến hàm quyết định thành một cửa ghi ẩn.
+ *
+ * Sheet quản trị vẽ khi có người xem: dữ liệu kho đổi chỉ làm view cũ
+ * (`signal.allViews`). Trigger chỉ vẽ khi người dùng sửa bộ điều khiển: hàng
+ * 1/hàng 3/cột sắp xếp của một sheet `!` thì vẽ đúng sheet đó, cột sắp xếp
+ * chung trong Config thì vẽ mọi sheet `!`. Hai nhánh này bỏ qua công tắc
+ * người dùng vì đó là lệnh trực tiếp.
  */
 
 var RELOAD_DECISION_DEBOUNCE_MS = 3000;
@@ -13,8 +19,8 @@ function reloadDecisionBlank(reason) {
   return {
     kind: 'none',
     ram: { action: 'none', mode: 'none', recordIds: [], deferredRecordIds: [], waitMs: 0, flushOnLeave: false, reason: reason || '' },
-    views: { action: 'none', mode: 'none', immediate: false, policyBypass: false, reason: reason || '' },
-    signal: { records: [], category: false, config: false, schema: false, allCore: false, allViews: false, viewSheets: [] },
+    views: { action: 'none', mode: 'none', sheetName: '', reason: reason || '' },
+    signal: { records: [], category: false, config: false, schema: false, allCore: false, allViews: false },
     notifySidebar: false,
     reason: reason || ''
   };
@@ -37,12 +43,6 @@ function reloadDecisionDraftIds(localDraft) {
   if (!localDraft) { return []; }
   if (Array.isArray(localDraft)) { return reloadDecisionIds(localDraft); }
   return reloadDecisionIds(localDraft.recordIds || localDraft.ids || localDraft.id);
-}
-
-function reloadDecisionViewSheets(decision, input) {
-  var names = input && Array.isArray(input.viewSheetNames) ? input.viewSheetNames : [];
-  decision.signal.viewSheets = reloadDecisionIds(names);
-  return decision;
 }
 
 function reloadDecisionWithRam(decision, mode, ids, input, reason) {
@@ -77,15 +77,13 @@ function reloadDecisionForChange(input) {
   var entity = String(change.entity || '').trim().toLowerCase();
   var decision = reloadDecisionBlank('Không có thay đổi thuộc phạm vi reload.');
   var ids = reloadDecisionIds(change.recordIds || change.ids);
-  var autoRender = change.autoRenderView !== false;
   var source = String(change.source || '').trim().toLowerCase();
   var isViewControl = surface === 'view-control' || change.viewControl === true;
 
   if (isViewControl) {
+    var sheetName = String(change.sheetName || '').trim();
     decision.kind = 'view-control';
-    decision.signal.allViews = true;
-    reloadDecisionViewSheets(decision, change);
-    decision.views = { action: 'render', mode: 'all', immediate: true, policyBypass: true, reason: 'Thay đổi điều khiển trực tiếp sheet quản trị.' };
+    if (sheetName) { decision.views = { action: 'render', mode: 'sheet', sheetName: sheetName, reason: 'Thay đổi điều khiển trực tiếp sheet quản trị.' }; }
     decision.reason = 'Thay đổi điều khiển view.';
     return decision;
   }
@@ -99,8 +97,6 @@ function reloadDecisionForChange(input) {
     decision.signal.allCore = true;
     decision.signal.allViews = true;
     reloadDecisionWithRam(decision, 'fullCore', [], change, 'Thay đổi cấu trúc cần nạp lại full core.');
-    decision.views = { action: autoRender ? 'render' : 'defer', mode: 'all', immediate: autoRender, policyBypass: false, reason: 'Thay đổi cấu trúc có thể làm lệch schema hoặc dữ liệu.' };
-    reloadDecisionViewSheets(decision, change);
     decision.notifySidebar = true;
     decision.reason = 'Thay đổi cấu trúc.';
     return decision;
@@ -112,8 +108,6 @@ function reloadDecisionForChange(input) {
     decision.signal.allCore = true;
     decision.signal.allViews = true;
     reloadDecisionWithRam(decision, 'fullCore', [], change, 'Schema đổi nên phải nạp lại full core.');
-    decision.views = { action: autoRender ? 'render' : 'defer', mode: 'all', immediate: autoRender, policyBypass: false, reason: 'Schema ảnh hưởng mọi view.' };
-    reloadDecisionViewSheets(decision, change);
     decision.notifySidebar = true;
     decision.reason = 'Schema đổi.';
     return decision;
@@ -124,8 +118,6 @@ function reloadDecisionForChange(input) {
     decision.signal.category = true;
     decision.signal.allViews = true;
     reloadDecisionWithRam(decision, 'category', [], change, 'Category đổi.');
-    decision.views = { action: autoRender ? 'render' : 'defer', mode: 'all', immediate: autoRender, policyBypass: false, reason: 'Category có thể ảnh hưởng filter và dữ liệu hiển thị.' };
-    reloadDecisionViewSheets(decision, change);
     decision.notifySidebar = true;
     decision.reason = 'Category đổi.';
     return decision;
@@ -139,8 +131,7 @@ function reloadDecisionForChange(input) {
     reloadDecisionWithRam(decision, configNeedsFullCore ? 'fullCore' : 'config', [], change, configNeedsFullCore
       ? 'Config ảnh hưởng Schema nên phải nạp lại full core.'
       : 'Config đổi, nạp riêng toàn bộ khối Config.');
-    decision.views = { action: autoRender ? 'render' : 'defer', mode: 'all', immediate: autoRender, policyBypass: false, reason: 'Config có thể ảnh hưởng mọi view.' };
-    reloadDecisionViewSheets(decision, change);
+    if (change.configSort === true) { decision.views = { action: 'render', mode: 'all', sheetName: '', reason: 'Sắp xếp chung trong Config là bộ điều khiển của mọi sheet quản trị.' }; }
     decision.notifySidebar = true;
     decision.reason = 'Config đổi.';
     return decision;
@@ -155,15 +146,12 @@ function reloadDecisionForChange(input) {
     if (change.configChanged === true) {
       decision.signal.config = true;
       decision.signal.allCore = true;
-      decision.signal.allViews = true;
       reloadDecisionWithRam(decision, 'fullCore', [], change, 'Cấp mã mới đã làm đổi bộ đếm trong Config.');
     }
     if (source !== 'edit' && change.appliedByCaller === true && !decision.ram.deferredRecordIds.length) {
       decision.ram.action = 'none';
       decision.ram.reason = 'Bên gọi đã áp dụng bản ghi đọc lại vào RAM.';
     }
-    decision.views = { action: autoRender ? 'render' : 'defer', mode: 'all', immediate: autoRender, policyBypass: false, reason: 'Nguồn Customer/Activity đổi.' };
-    reloadDecisionViewSheets(decision, change);
     decision.notifySidebar = true;
     decision.reason = 'Customer/Activity đổi.';
     return decision;
@@ -248,4 +236,22 @@ function reloadDecisionForState(input) {
   }
 
   return decision;
+}
+
+/** Sheet chưa từng vẽ (không có revision đã vẽ) cũng là cũ. */
+function reloadDecisionViewStale(viewsStaleRevision, renderedRevision) {
+  if (renderedRevision === undefined || renderedRevision === null || renderedRevision === '') { return true; }
+  return Number(renderedRevision) < Number(viewsStaleRevision || 0);
+}
+
+/**
+ * Quyết định cho sheet `!` người dùng đang xem: cũ và công tắc bật thì Sidebar
+ * gọi vẽ, công tắc tắt thì chỉ báo. Sheet khác hoặc view còn mới thì không làm gì.
+ */
+function reloadDecisionForView(input) {
+  var view = input || {};
+  var sheetName = String(view.sheetName || '').trim();
+  if (sheetName.charAt(0) !== '!') { return { sheetName: sheetName, stale: false, action: 'none' }; }
+  var stale = reloadDecisionViewStale(view.viewsStaleRevision, view.renderedRevision);
+  return { sheetName: sheetName, stale: stale, action: !stale ? 'none' : view.autoRenderView === false ? 'notify' : 'render' };
 }

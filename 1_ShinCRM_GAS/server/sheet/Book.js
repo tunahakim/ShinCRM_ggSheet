@@ -52,3 +52,8 @@ function shinOpenSheet(sheetName) {
   }
   return sheet;
 }
+
+/** Tên mọi sheet quản trị (bắt đầu bằng `!`) theo thứ tự tab. */
+function shinViewSheetNames(book) {
+  return book.getSheets().map(function (sheet) { return sheet.getName(); }).filter(function (name) { return name.charAt(0) === '!'; });
+}

@@ -29,16 +29,12 @@ function ensureColumnsThroughWriteGate(source, columnsForSheet) {
       commit = writeCommitAfterSuccess({
         source: source === 'background' ? 'background' : (source || 'pull'),
         surface: 'schema',
-        schema: true,
-        viewSheetNames: typeof shinViewSheetNames === 'function' ? shinViewSheetNames(book) : [],
-        render: false
+        schema: true
       });
     }
   } finally {
     if (lock) { lock.releaseLock(); }
   }
 
-  var reload = commit && commit.reloadDecision;
-  var viewRender = commit ? writeCommitRender(commit) : null;
-  return { ok: true, changed: changed, report: report, reload: reload, viewRender: viewRender, dirty: commit && commit.dirty };
+  return { ok: true, changed: changed, report: report, reload: commit && commit.reloadDecision, dirty: commit && commit.dirty };
 }

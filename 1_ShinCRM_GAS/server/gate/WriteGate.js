@@ -549,8 +549,7 @@ function writeGateSave(yeuCau) {
         surface: 'record',
         entity: entity,
         recordIds: result.recordIds,
-        configChanged: result.configChanged,
-        render: false
+        configChanged: result.configChanged
       });
       result.reloadDecision = commit.reloadDecision;
       result.dirty = commit.dirty;
@@ -560,7 +559,6 @@ function writeGateSave(yeuCau) {
     try { SpreadsheetApp.flush(); } finally { khoa.releaseLock(); }
   }
 
-  if (commit && result) { result.viewRender = writeCommitRender(commit); }
   return result;
 }
 

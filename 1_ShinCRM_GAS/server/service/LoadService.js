@@ -326,14 +326,7 @@ function reloadCurrentSheet(expectedRevision) {
     }
     if (name && name.charAt(0) === '!' && typeof renderViewSheet === 'function') {
       result = renderViewSheet(name);
-      var remaining = reloadStateRead();
-      var otherViews = null;
-      if (remaining.allViews || remaining.viewSheets.length) {
-        otherViews = typeof renderAllManagedViewsIfAllowed === 'function'
-          ? renderAllManagedViewsIfAllowed()
-          : null;
-      }
-      return { ok: true, target: 'view', sheetName: name, view: result, viewRender: otherViews, reload: reloadStateRead(), dirty: dirtyStateRead() };
+      return { ok: true, target: 'view', sheetName: name, view: result, reload: reloadStateRead(), dirty: dirtyStateRead() };
     }
     throw new Error('Sheet hiện tại "' + name + '" không thuộc Customer, Activity, Category, Config hoặc sheet quản trị.');
   });

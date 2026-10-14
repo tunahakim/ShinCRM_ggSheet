@@ -54,7 +54,9 @@ function shinRenderCurrentView(source) {
 
 function shinRenderAllViews() {
   return runEntryPoint('shinRenderAllViews', 'core', ERROR_CHANNEL_ALERT, function () {
-    return renderAllViewSheets();
+    var result = renderAllManagedViews();
+    if (!result.ok) { throw new Error(result.failed.map(function (item) { return item.error; }).join('\n')); }
+    return result;
   });
 }
 

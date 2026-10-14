@@ -221,6 +221,30 @@ function viewClearErrorNotes(sheet, columns) {
   });
 }
 
+/**
+ * Ô công thức trong vùng bộ vẽ ghi sẽ bị xóa mất ở lần vẽ, nên dừng trước khi chạm bất kỳ ô nào. Note đặt ở ô hàng lọc của cột đó (chỉ rõ ô công thức) để lần vẽ thành công sau tự gỡ, giống lỗi cú pháp lọc.
+ */
+function viewAssertNoFormulas(sheet, name, spans) {
+  var rows = sheet.getLastRow() - SHEET_FIRST_DATA_ROW + 1;
+  if (rows < 1) { return; }
+  var found = null;
+  spans.some(function (span) {
+    var formulas = sheet.getRange(SHEET_FIRST_DATA_ROW, span[0], rows, span[1]).getFormulas();
+    for (var r = 0; r < formulas.length && !found; r++) {
+      for (var c = 0; c < formulas[r].length; c++) {
+        if (formulas[r][c]) { found = { row: SHEET_FIRST_DATA_ROW + r, column: span[0] + c, formula: formulas[r][c] }; break; }
+      }
+    }
+    return !!found;
+  });
+  if (!found) { return; }
+  var cell = viewColumnA1(found.column, found.row);
+  var hint = 'Ô ' + cell + ' có công thức ' + found.formula + ' nằm trong cột ShinCRM tự vẽ. Chuyển công thức sang cột không có mã @ hoặc sang sheet khác.';
+  viewSetErrorNote(sheet, found.column, hint);
+  SpreadsheetApp.flush();
+  throw new Error('Sheet "' + name + '", ô ' + cell + ': ' + hint + ' Sheet chưa được vẽ lại.');
+}
+
 function viewColumnSpans(columns) {
   var sorted = columns.slice().sort(function (a, b) { return a - b; });
   var spans = [];
@@ -232,8 +256,9 @@ function viewColumnSpans(columns) {
   return spans;
 }
 
+/** Revision đọc lúc bắt đầu là revision được ghi nhận đã vẽ; signal mới đến giữa lượt vẽ để sheet vẫn cũ. */
 function viewRenderSheetLocked(book, sheet, name) {
-  var expectedReloadRevision = typeof reloadStateRead === 'function' ? reloadStateRead().revision : undefined;
+  var expectedReloadRevision = reloadStateRead().revision;
   var config = configReadAll();
   var customerContext = entityReadContext('customer');
   var activityContext = entityReadContext('activity');
@@ -242,7 +267,7 @@ function viewRenderSheetLocked(book, sheet, name) {
   var sourceFieldByCode = viewSourceFieldMaps(fieldByCode, sourceHeaders);
   var lastColumn = sheet.getLastColumn();
   if (lastColumn < 1) {
-    dirtyStateClearViewSheet(name, expectedReloadRevision);
+    viewRenderedWrite(name, expectedReloadRevision);
     viewInputSignatureWrite(sheet);
     var emptyRevision = viewRevisionBump(sheet);
     return { ok: true, sheetName: name, viewMeta: viewInputMetaFromHeader([], emptyRevision), rows: 0, reload: reloadStateRead() };
@@ -296,6 +321,7 @@ function viewRenderSheetLocked(book, sheet, name) {
   viewSortRows(rows, specs);
 
   var spans = viewColumnSpans(writable);
+  viewAssertNoFormulas(sheet, name, spans);
   var oldLast = Math.max(sheet.getLastRow(), SHEET_FIRST_DATA_ROW - 1);
   var oldRows = oldLast - SHEET_FIRST_DATA_ROW + 1;
   var formatRows = Math.max(oldRows, rows.length);
@@ -314,7 +340,7 @@ function viewRenderSheetLocked(book, sheet, name) {
   }
   viewClearErrorNotes(sheet, writable);
   SpreadsheetApp.flush();
-  dirtyStateClearViewSheet(name, expectedReloadRevision);
+  viewRenderedWrite(name, expectedReloadRevision);
   viewInputSignatureWrite(sheet);
   var revision = viewRevisionBump(sheet);
   return { ok: true, sheetName: name, viewMeta: viewInputMetaFromHeader(header, revision), rows: rows.length, reload: reloadStateRead() };
@@ -335,19 +361,15 @@ function renderViewSheet(sheetName) {
   }
 }
 
-function renderAllViewSheets() {
-  var book = shinOpenBook();
-  return book.getSheets().filter(function (sheet) { return sheet.getName().charAt(0) === '!'; }).map(function (sheet) { return renderViewSheet(sheet.getName()); });
-}
-
-/** Đường vẽ độc lập với Sidebar: dùng cho trigger, pull, push và đồng bộ nền. */
-function renderAllManagedViews() {
-  var book = shinOpenBook();
-  var names = book.getSheets().map(function (sheet) { return sheet.getName(); }).filter(function (name) { return name.charAt(0) === '!'; });
+/** Vẽ nhiều sheet quản trị, sheet lỗi không chặn sheet sau. Không truyền tên thì vẽ mọi sheet `!`. Không đọc công tắc người dùng: chỉ gọi khi người dùng sửa bộ điều khiển. */
+function renderAllManagedViews(sheetNames) {
+  var names = Array.isArray(sheetNames) ? sheetNames : shinViewSheetNames(shinOpenBook());
   var results = names.map(function (name) {
     try {
       return renderViewSheet(name);
     } catch (error) {
+      // Sheet lỗi không chặn sheet sau, nhưng không được im lặng: note trên sheet báo tại chỗ, Log giữ vết khi không ai đứng ở sheet đó.
+      logEvent({ source: 'core', action: 'renderView', outcome: LOG_WARN, reason: errorMessage(error), detail: { sheetName: name } });
       return { ok: false, sheetName: name, error: String(error && error.message || error), reload: reloadStateRead() };
     }
   });
@@ -361,26 +383,6 @@ function renderAllManagedViews() {
   };
 }
 
-/** Vẽ toàn bộ view khi chính sách cho phép; nếu tắt thì giữ cờ bẩn để lần bật sau xử lý. */
-function renderAllManagedViewsIfAllowed(options) {
-  var opts = options || {};
-  var prefs = typeof userPrefsRead === 'function' ? userPrefsRead() : { autoRenderView: true };
-  if (prefs.autoRenderView === false && opts.policyBypass !== true) { return { ok: true, skipped: true, reason: 'autoRenderView=false', dirty: reloadStateRead() }; }
-  var expectedReloadRevision = typeof reloadStateRead === 'function' ? reloadStateRead().revision : undefined;
-  var result = renderAllManagedViews();
-  if (result.ok === true) {
-    dirtyStateClear({ allViews: true, viewSheets: true, expectedRevision: expectedReloadRevision });
-  }
-  return {
-    ok: result.ok === true,
-    skipped: false,
-    rendered: result.results,
-    failed: result.failed,
-    dirty: reloadStateRead(),
-    reload: reloadStateRead()
-  };
-}
-
 function viewProbeRenderCurrent() {
   var sheet = shinOpenBook().getActiveSheet();
   var result = renderViewSheet(sheet.getName());
@@ -389,7 +391,13 @@ function viewProbeRenderCurrent() {
   return report;
 }
 
+/** Sidebar gọi khi có người xem sheet: vẽ nếu sheet cũ hoặc bộ điều khiển đổi mà trigger chưa vẽ (trigger lỗi, sửa từ máy khác khi trigger chưa chạy). */
 function renderViewIfDirty(sheetName) {
+  return runEntryPoint('renderViewIfDirty', 'sidebar', 'throw', function () { return viewRenderIfStale(sheetName); });
+}
+
+/** Phần ruột không bọc cửa vào, cho đường nội bộ và probe DEV. */
+function viewRenderIfStale(sheetName) {
   var name = String(sheetName || '').trim();
   var book = shinOpenBook();
   var sheet = book.getSheetByName(name);
@@ -397,10 +405,7 @@ function renderViewIfDirty(sheetName) {
   var lock = LockService.getDocumentLock();
   if (!documentStoreTryLock(lock, SETTINGS.LOCK_WAIT_MS)) { throw new Error('Hệ thống bận. Vui lòng thử lại!'); }
   try {
-    var state = dirtyStateRead();
-    var inputChanged = viewInputSignatureRead(sheet) !== viewInputSignature(sheet);
-    var reload = typeof reloadStateRead === 'function' ? reloadStateRead() : state;
-    if (reload.allViews || reload.all || reload.config || reload.viewSheets.indexOf(name) >= 0 || inputChanged) {
+    if (viewIsStale(name) || viewInputSignatureRead(sheet) !== viewInputSignature(sheet)) {
       return viewRenderSheetLocked(book, sheet, name);
     }
     return { ok: true, skipped: true, sheetName: name, viewMeta: viewInputMeta(sheet), reload: reloadStateRead() };
@@ -420,14 +425,13 @@ function inspectViewState(sheetName, knownRevision) {
     var lock = LockService.getDocumentLock();
     if (!documentStoreTryLock(lock, SETTINGS.LOCK_WAIT_MS)) { throw new Error('Hệ thống bận. Vui lòng thử lại!'); }
     try {
-      var state = dirtyStateRead();
-      var reload = typeof reloadStateRead === 'function' ? reloadStateRead() : state;
+      var reload = reloadStateRead();
       var revision = viewRevisionRead(sheet);
       return {
         ok: true,
         sheetName: name,
         changed: revision !== (Number(knownRevision) || 0),
-        needsRender: reload.allViews || reload.all || reload.config || reload.viewSheets.indexOf(name) >= 0 || viewInputSignatureRead(sheet) !== viewInputSignature(sheet),
+        needsRender: viewIsStale(name) || viewInputSignatureRead(sheet) !== viewInputSignature(sheet),
         dirty: reload,
         reload: reload,
         revision: revision,
