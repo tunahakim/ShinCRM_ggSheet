@@ -130,6 +130,44 @@ function selectionColumnLetters(column) {
   return letters;
 }
 
+/** Một mục read plan gửi Extension: ô tiêu đề để xác nhận đúng cột, và mẫu địa chỉ ô giá trị theo hàng đang chọn. */
+function selectionPlanItem(key, code, column, withValue) {
+  var letters = selectionColumnLetters(column);
+  return { token: key + ':' + code, headerAddress: letters + '1', expectedValue: code, valueAddressTemplate: withValue ? letters + '{row}' : '' };
+}
+
+/** Sheet xem tự do: mọi sheet ngoài bốn sheet kho và sheet `!`. GAS chỉ đọc sheet này, không bao giờ ghi. */
+function selectionIsFreeSheet(sheetName) {
+  var name = String(sheetName || '');
+  return !!name && name.charAt(0) !== '!' && [ENTITY_SHEETS.customer, ENTITY_SHEETS.activity, 'Category', 'Config'].indexOf(name) < 0;
+}
+
+/**
+ * Read plan của một sheet xem tự do, dựng từ đúng một lần đọc hàng 1: cột mã khách trước, cột mã khách của giao dịch sau, nên mục đầu tiên là cột GAS dùng để đọc mã. Mã thiếu hoặc bị nhân đôi thì bỏ, không đoán.
+ *
+ * Plan về Sidebar trong lời hỏi để Extension đọc tiếp được các lần nhấp sau mà không cần GAS; mảng rỗng nghĩa là sheet không có cột mã, Sidebar nhớ để không hỏi lại.
+ */
+function selectionFreeSheetPlan(sheet, sheetName) {
+  var lastColumn = sheet.getLastColumn();
+  if (lastColumn < 1) { return []; }
+  var header = sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(function (value) {
+    return String(value === null || value === undefined ? '' : value).trim();
+  });
+  return [DATA_SCHEMA.customer.id.code, DATA_SCHEMA.activity.customerId.code].map(function (code) {
+    var first = header.indexOf(code);
+    if (first < 0 || header.indexOf(code, first + 1) >= 0) { return null; }
+    return selectionPlanItem(sheetName, code, first + 1, true);
+  }).filter(Boolean);
+}
+
+/** Ngược của `selectionColumnLetters` cho địa chỉ dạng `AB1`. */
+function selectionColumnNumber(address) {
+  var letters = String(address || '').replace(/[^A-Z]/g, '');
+  var column = 0;
+  for (var i = 0; i < letters.length; i++) { column = column * 26 + letters.charCodeAt(i) - 64; }
+  return column;
+}
+
 /** Kế hoạch đọc thô: Extension chỉ đọc đúng địa chỉ và trả giá trị, không biết token có ý nghĩa gì. */
 function selectionReadPlan() {
   var definitions = [
@@ -153,13 +191,7 @@ function selectionReadPlan() {
       codes.forEach(function (code) {
         var column = Number(map.map[code] || 0);
         if (!column) { return; }
-        var letters = selectionColumnLetters(column);
-        plan[key].push({
-          token: key + ':' + code,
-          headerAddress: letters + '1',
-          expectedValue: code,
-          valueAddressTemplate: definition.entity ? letters + '{row}' : ''
-        });
+        plan[key].push(selectionPlanItem(key, code, column, !!definition.entity));
       });
     } catch (ignore) {
       // Client thiếu plan phải fail-open và hỏi GAS; không đoán cột.
@@ -211,7 +243,10 @@ function probeSelectionAndReload(input) {
     var previous = request.previousSelectionContext || request.selectionContext || null;
     var positionChanged = selectionContextPositionChanged(previous, snapshot);
     var previousCustomerId = String(request.previousCustomerId || (previous && previous.customerId) || '').trim();
-    var customerId = positionChanged ? selectionCustomerId(context, snapshot) : previousCustomerId;
+    // Extension đọc hỏng thì vị trí Sidebar gửi lên đã là vị trí mới, so vị trí sẽ không thấy đổi; cờ `needsSelection` bắt GAS đọc thay.
+    var readSelection = positionChanged || request.needsSelection === true;
+    var sheetPlan = readSelection && context.sheet && selectionIsFreeSheet(snapshot.sheetName) ? selectionFreeSheetPlan(context.sheet, snapshot.sheetName) : null;
+    var customerId = readSelection ? selectionCustomerId(context, snapshot, sheetPlan) : previousCustomerId;
     var state = reloadStateRead();
     var decision = typeof reloadDecisionForState === 'function'
       ? reloadDecisionForState({
@@ -225,7 +260,7 @@ function probeSelectionAndReload(input) {
     var selection = Object.assign({}, snapshot, {
       positionChanged: positionChanged,
       customerId: customerId,
-      customerIdChanged: positionChanged && customerId !== previousCustomerId
+      customerIdChanged: readSelection && customerId !== previousCustomerId
     });
     var payload = null;
     var processedRevision = 0;
@@ -271,6 +306,7 @@ function probeSelectionAndReload(input) {
       dirty: dirtyStateRead(),
       decision: ready && reloadResult ? Object.assign({}, decision, { executed: true, resultMode: reloadResult.reloadMode }) : decision,
       payload: payload,
+      sheetPlan: sheetPlan ? { sheetName: snapshot.sheetName, items: sheetPlan } : null,
       view: selectionViewDecision(selection.sheetName, latest),
       observedRevision: state ? Number(state.revision || 0) : 0,
       processedRevision: processedRevision,
@@ -283,20 +319,19 @@ function probeSelectionAndReload(input) {
   });
 }
 
-/** Đổi dòng đang chọn thành mã khách bằng cách đọc đúng cột mã của chính sheet đó. */
-function selectionCustomerId(context, snapshot) {
-  if (!snapshot.sheetName || snapshot.row < SHEET_FIRST_DATA_ROW) { return ''; }
+/** Đổi dòng đang chọn thành mã khách bằng cách đọc đúng cột mã của chính sheet đó. Sheet xem tự do dùng plan đã dựng trong cùng lời hỏi (`freePlan`) để không đọc hàng 1 hai lần. */
+function selectionCustomerId(context, snapshot, freePlan) {
+  if (!snapshot.sheetName || snapshot.row < SHEET_FIRST_DATA_ROW || !context.sheet) { return ''; }
 
-  var code = '';
+  var column = 0;
   if (snapshot.sheetName === ENTITY_SHEETS.customer || snapshot.sheetName.charAt(0) === '!') {
-    code = DATA_SCHEMA.customer.id.code;
+    column = selectionColumnIndex(context.sheet, DATA_SCHEMA.customer.id.code);
   } else if (snapshot.sheetName === ENTITY_SHEETS.activity) {
-    code = DATA_SCHEMA.activity.customerId.code;
-  } else {
-    return '';
+    column = selectionColumnIndex(context.sheet, DATA_SCHEMA.activity.customerId.code);
+  } else if (selectionIsFreeSheet(snapshot.sheetName)) {
+    var items = freePlan || selectionFreeSheetPlan(context.sheet, snapshot.sheetName);
+    column = items.length ? selectionColumnNumber(items[0].headerAddress) : 0;
   }
-
-  var column = selectionColumnIndex(context.sheet, code);
   if (!column) { return ''; }
   var value = context.sheet.getRange(snapshot.row, column).getValue();
   return String(value === null || value === undefined ? '' : value).trim();

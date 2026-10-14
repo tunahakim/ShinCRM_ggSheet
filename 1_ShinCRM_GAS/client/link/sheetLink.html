@@ -40,6 +40,7 @@ var SHEET_LINK_SELECTION_CONTEXT = null;
 var SHEET_LINK_PREVIOUS_CUSTOMER_ID = '';
 var SHEET_LINK_SELECTION_PENDING = null;
 var SHEET_LINK_SELECTION_WAKE_QUEUED = false;
+var SHEET_LINK_SELECTION_WAKE_NEEDS_READ = false;
 var SHEET_LINK_CONTEXT_GENERATION = 0;
 var SHEET_LINK_LAST_SEEN_REVISION = 0;
 var SHEET_LINK_PING_TIMER = null;
@@ -129,7 +130,7 @@ function sheetLinkSetRamReady(ready) { SHEET_LINK_RAM_READY = ready === true; }
  * Sheet không có read plan không cần mã khách nên không đổi tình trạng bộ đọc.
  */
 function sheetLinkRecordExtensionRead(context) {
-  if (!sheetLinkPlanForSheet(context && context.sheetName).length) { return true; }
+  if (!sheetLinkPlanForSheet(context && context.sheetName).length) { return !sheetLinkSheetUnclassified(context && context.sheetName); }
   var next = { status: String(context.readStatus || ''), reason: String(context.readReason || '') };
   var changed = next.status !== SHEET_LINK_EXTENSION_READ.status || next.reason !== SHEET_LINK_EXTENSION_READ.reason;
   SHEET_LINK_EXTENSION_READ = next;
@@ -301,6 +302,26 @@ function sheetLinkParseNameBox(value) {
   return null;
 }
 
+/**
+ * Sheet xem tự do chưa biết có cột mã khách hay không: Extension chưa có plan nên không đọc được, phải hỏi GAS một lần. GAS trả plan của sheet đó (`sheetPlan`, rỗng nếu không có cột mã) và Sidebar nhớ đến hết phiên hoặc tới lượt nạp core sau.
+ * Bốn sheet kho luôn có khóa trong plan GAS gửi, sheet `!` dùng khóa `!`, nên chỉ sheet tự do mới có thể chưa phân loại.
+ */
+function sheetLinkSheetUnclassified(sheetName) {
+  var name = String(sheetName || '');
+  return !!SHEET_LINK_READ_PLAN && !!name && name.charAt(0) !== '!' && !Object.prototype.hasOwnProperty.call(SHEET_LINK_READ_PLAN, name);
+}
+
+/** Nhận plan sheet tự do từ GAS rồi gửi lại Extension; Extension gửi lại vị trí hiện tại kèm giá trị đọc được. */
+function sheetLinkStoreSheetPlan(sheetPlan) {
+  if (!SHEET_LINK_READ_PLAN || !sheetPlan || !Array.isArray(sheetPlan.items)) { return; }
+  var name = String(sheetPlan.sheetName || '');
+  if (!name || name.charAt(0) === '!') { return; }
+  if (JSON.stringify(SHEET_LINK_READ_PLAN[name]) === JSON.stringify(sheetPlan.items)) { return; }
+  var next = Object.assign({}, SHEET_LINK_READ_PLAN);
+  next[name] = sheetPlan.items;
+  sheetLinkSetReadPlan(next);
+}
+
 function sheetLinkPlanForSheet(sheetName) {
   if (!SHEET_LINK_READ_PLAN) { return []; }
   if (Array.isArray(SHEET_LINK_READ_PLAN[sheetName])) { return SHEET_LINK_READ_PLAN[sheetName]; }
@@ -369,7 +390,7 @@ function sheetLinkScheduleWake() {
   if (SHEET_LINK_WAKE_TIMER !== null && typeof clearTimeout === 'function') { clearTimeout(SHEET_LINK_WAKE_TIMER); }
   SHEET_LINK_WAKE_TIMER = setTimeout(function () {
     SHEET_LINK_WAKE_TIMER = null;
-    sheetLinkProbeSelectionAndReload('position');
+    sheetLinkProbeSelectionAndReload('position', { needsSelection: true });
   }, sheetLinkMs('POSITION_WAKE_MS', 1000));
   return SHEET_LINK_WAKE_TIMER;
 }
@@ -450,12 +471,20 @@ function sheetLinkApplyDecisionResult(result, options) {
   });
 }
 
+/** Lời đánh thức xếp hàng khi lời hỏi trước còn bay phải giữ cờ đọc vị trí, nếu không GAS so vị trí thấy không đổi và trả mã khách cũ. */
+function sheetLinkTakeQueuedWake() {
+  var needsSelection = SHEET_LINK_SELECTION_WAKE_NEEDS_READ;
+  SHEET_LINK_SELECTION_WAKE_NEEDS_READ = false;
+  return needsSelection ? { needsSelection: true } : undefined;
+}
+
 /** Hỏi selection + ReloadState trong đúng một round-trip; GAS tự quyết định đọc mã và scope RAM. */
 function sheetLinkProbeSelectionAndReload(reason, options) {
   if (!SHEET_LINK_RAM_READY || typeof callServer !== 'function') { return null; }
   if (SHEET_LINK_SELECTION_PENDING) {
     // Chỉ giữ tín hiệu đánh thức; GAS vẫn tự đọc ReloadState mới nhất.
     SHEET_LINK_SELECTION_WAKE_QUEUED = true;
+    if (options && options.needsSelection === true) { SHEET_LINK_SELECTION_WAKE_NEEDS_READ = true; }
     return SHEET_LINK_SELECTION_PENDING;
   }
   var opts = options || {};
@@ -466,6 +495,7 @@ function sheetLinkProbeSelectionAndReload(reason, options) {
     lastSeenRevision: SHEET_LINK_LAST_SEEN_REVISION,
     localDraft: sheetLinkLocalDraftInput(),
     reason: reason || 'wake',
+    needsSelection: opts.needsSelection === true,
     forceImmediate: opts.forceImmediate === true,
     extensionReadFailure: sheetLinkReaderFailureInput(),
     channelSilence: typeof changeSignalDeadReportInput === 'function' && changeSignalDeadReportInput()
@@ -474,8 +504,9 @@ function sheetLinkProbeSelectionAndReload(reason, options) {
     silent: opts.silent === true || SHEET_LINK_SHOW_PROBE_PROGRESS_DEBUG !== true
   });
   var settled = request.then(function (result) {
-    // Extension chỉ giữ quyền chọn khách khi tự đọc được; đọc hỏng thì mã do GAS đọc thay mới là nguồn đúng.
-    var extensionOwnsContext = sheetLinkExtensionAlive() && !!SHEET_LINK_LAST_CONTEXT && SHEET_LINK_EXTENSION_READ.status === 'ok';
+    if (result && result.sheetPlan) { sheetLinkStoreSheetPlan(result.sheetPlan); }
+    // Extension chỉ giữ quyền chọn khách khi tự đọc được ở sheet đang đứng; đọc hỏng hoặc sheet chưa có plan thì mã do GAS đọc thay mới là nguồn đúng.
+    var extensionOwnsContext = sheetLinkExtensionAlive() && !!SHEET_LINK_LAST_CONTEXT && sheetLinkPlanForSheet(SHEET_LINK_LAST_CONTEXT.sheetName).length > 0 && SHEET_LINK_EXTENSION_READ.status === 'ok';
     var contextIsCurrent = contextGeneration === SHEET_LINK_CONTEXT_GENERATION;
     if (result && result.selection && contextIsCurrent && !extensionOwnsContext) {
       SHEET_LINK_SELECTION_CONTEXT = Object.assign({}, result.selection);
@@ -497,7 +528,7 @@ function sheetLinkProbeSelectionAndReload(reason, options) {
     SHEET_LINK_SELECTION_PENDING = null;
     if (SHEET_LINK_SELECTION_WAKE_QUEUED) {
       SHEET_LINK_SELECTION_WAKE_QUEUED = false;
-      var followUp = sheetLinkProbeSelectionAndReload('queued-wake');
+      var followUp = sheetLinkProbeSelectionAndReload('queued-wake', sheetLinkTakeQueuedWake());
       if (followUp && typeof followUp.then === 'function') {
         return followUp.then(function () { return result; });
       }
@@ -508,7 +539,7 @@ function sheetLinkProbeSelectionAndReload(reason, options) {
     SHEET_LINK_SELECTION_PENDING = null;
     if (SHEET_LINK_SELECTION_WAKE_QUEUED) {
       SHEET_LINK_SELECTION_WAKE_QUEUED = false;
-      sheetLinkProbeSelectionAndReload('queued-wake');
+      sheetLinkProbeSelectionAndReload('queued-wake', sheetLinkTakeQueuedWake());
     }
     if (typeof selectionPollResetSafety === 'function') { selectionPollResetSafety(); }
     throw error;
