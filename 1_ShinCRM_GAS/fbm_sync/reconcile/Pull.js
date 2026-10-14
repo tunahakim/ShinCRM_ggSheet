@@ -216,14 +216,17 @@ FbmSync.pullWrite = function (entity, records) {
     FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.synced, 'Chỉ FBM thay đổi; cập nhật nội dung ShinCRM.');
   });
   var result = { ok: true, written: 0, conflicts: conflicts, skipped: skipped + orphaned, sheetWriteBatches: 0 };
+  // Dòng chỉ được sửa trường FBM sở hữu vẫn là dữ liệu đổi trên Sheet, nên tính vào số đã ghi; không thì Log báo "0 bản ghi đã ghi Sheet" cạnh một lần ghi thật.
+  var ownedOnly = 0;
   Object.keys(ownedFixes).forEach(function (id) {
-    var patch = writes.concat(statusWrites).filter(function (item) { return String(item.id) === id; })[0];
+    var written = writes.filter(function (item) { return String(item.id) === id; })[0], patch = written || statusWrites.filter(function (item) { return String(item.id) === id; })[0];
+    if (!written) { ownedOnly += 1; }
     if (patch) { Object.assign(patch, ownedFixes[id]); } else { statusWrites.push(Object.assign({ id: id }, ownedFixes[id])); }
   });
   var allWrites = writes.concat(statusWrites);
   if (allWrites.length) {
     var saved = FbmSync.sheetSave(entity, allWrites, 'pull');
-    result.written = writes.length; result.sheetWriteBatches = 1;
+    result.written = writes.length + ownedOnly; result.sheetWriteBatches = 1;
     if (saved.rows && saved.fields) {
       var savedRecords = saved.rows.map(function (row) {
         var record = {};

@@ -271,6 +271,8 @@ FbmSync.activityForCustomers = function (state, customerContexts, customerNext, 
   var queued = customerContexts === null;
   var contexts = (customerContexts || []).map(function (item) { return typeof item === 'string' ? { sttRec: item, maKh: '' } : { sttRec: String(item.sttRec || item.stt_rec_kh || ''), maKh: String(item.maKh || item.ma_kh || '') }; }).filter(function (item) { return item.sttRec; });
   state.phase = 'pull_activity'; state.entity = 'activity';
+  // Không còn trang khách kế thì chặng đọc khách đã xong; còn trang thì khách và giao dịch đọc xen kẽ, bước khách đóng sau.
+  if (!customerNext && typeof FbmSync.businessFinishSteps === 'function') { FbmSync.businessFinishSteps(state, FbmSync.BUSINESS_PULL_STEPS.customer); }
   if (typeof FbmSync.businessStepStart === 'function') {
     FbmSync.businessStepStart(state, 'pull_activity', { mode: state.mode, scan: state.scan, entity: 'activity' });
     FbmSync.businessStepStart(state, 'reconcile_activity', { mode: state.mode, scan: state.scan, entity: 'activity' });
@@ -351,6 +353,7 @@ FbmSync.pullFinishOrPush = function (state, extra) {
   if (FbmSync.canWriteSheet(state.mode) && FbmSync.canWriteFbm(state.mode)) {
     if (FbmSync.stopPushOnConflicts && FbmSync.stopPushOnConflicts(state)) { result.request = null; result.status = FbmSync.statusView(); return result; }
     if (!FbmSync.pullMarkMissing(state)) { result.request = null; result.status = FbmSync.statusView(); return result; }
+    if (typeof FbmSync.businessFinishSteps === 'function') { FbmSync.businessFinishSteps(state, FbmSync.BUSINESS_PULL_STEPS.customer.concat(FbmSync.BUSINESS_PULL_STEPS.activity)); }
     state.cursor = { kind: 'push_scan', entity: 'customer', index: 0 }; state.phase = 'push'; state.entity = 'customer'; FbmSync.stateWrite(state);
     result.request = FbmSync.nextEnvelope(FbmSync.nextPushRequest(state)); result.status = FbmSync.statusView();
     return result;

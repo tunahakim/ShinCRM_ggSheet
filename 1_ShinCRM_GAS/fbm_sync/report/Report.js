@@ -123,11 +123,13 @@ FbmSync.recordIssueAdd = function (direction, entity, status, id, reason, outcom
   return group;
 };
 /** Ghi mỗi nhóm thành một dòng Log rồi xóa bộ gom; gọi ở ranh giới lát, kể cả khi lát ném lỗi. */
-FbmSync.recordIssuesFlush = function () {
+FbmSync.recordIssuesFlush = function (state) {
   var groups = FbmSync.recordIssues, keys = Object.keys(groups);
   FbmSync.recordIssues = {};
   if (!keys.length || typeof logEvent !== 'function') { return 0; }
-  var state = FbmSync.stateRead(), cycleId = String(state.runId || state.metadata && state.metadata.businessRunId || '');
+  // Gọi từ cửa ghi state thì nhận luôn state đang ghi: đọc lại kho lúc đó trả bản cũ và tốn một lần đọc.
+  state = state || FbmSync.stateRead();
+  var cycleId = String(state.runId || state.metadata && state.metadata.businessRunId || '');
   keys.forEach(function (key) {
     var group = groups[key], more = group.count - group.ids.length;
     logEvent({ source: 'fbm_sync', action: group.direction + '_record_issue', outcome: group.outcome, entity: group.entity, recordId: group.count === 1 ? (group.ids[0] || '') : '', cycleId: cycleId, reason: group.reason + ' — ' + group.count + ' bản ghi' + (group.ids.length ? ': ' + group.ids.join(', ') : '') + (more > 0 ? ' và ' + more + ' bản ghi khác' : ''), detail: { status: group.status, count: group.count, ids: group.ids } });

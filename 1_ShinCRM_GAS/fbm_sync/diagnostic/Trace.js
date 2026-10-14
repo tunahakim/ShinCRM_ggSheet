@@ -129,6 +129,11 @@ FbmSync.BUSINESS_STEPS = {
   push_customer: { action: 'push_customer', label: 'quét và đẩy Customer ShinCRM lên FBM' },
   push_activity: { action: 'push_activity', label: 'quét và đẩy Activity ShinCRM lên FBM' }
 };
+/** Các bước của chiều Lấy theo đối tượng, đóng cùng nhau khi chặng của đối tượng đó xong. */
+FbmSync.BUSINESS_PULL_STEPS = {
+  customer: ['pull_customer', 'reconcile_customer'],
+  activity: ['pull_activity', 'reconcile_activity']
+};
 
 FbmSync.businessStepDefinition = function (key) {
   return FbmSync.BUSINESS_STEPS[String(key || '')] || { action: String(key || 'business_step'), label: String(key || 'bước nghiệp vụ') };
@@ -214,6 +219,19 @@ FbmSync.businessStepFinish = function (state, key, outcome, result) {
   return true;
 };
 
+/**
+ * Đóng các bước đã xong khi luồng chuyển chặng (hết danh sách khách, sang chiều đẩy), để dòng "Hoàn thành" nằm đúng chỗ trong Log thay vì dồn về cuối phiên.
+ * Vấn đề theo bản ghi của chặng vừa qua được nhả trước, nên dòng cảnh báo bản ghi luôn đứng trước dòng đóng bước của nó.
+ */
+FbmSync.businessFinishSteps = function (state, keys) {
+  var steps = state && state.metadata && state.metadata.businessSteps || {};
+  var open = (keys || []).filter(function (key) { return steps[key] && !steps[key].finishedAt; });
+  if (!open.length) { return 0; }
+  if (typeof FbmSync.recordIssuesFlush === 'function') { FbmSync.recordIssuesFlush(state); }
+  open.forEach(function (key) { FbmSync.businessStepFinish(state, key, 'ok', {}); });
+  return open.length;
+};
+
 /** Bước đang làm khi phiên lỗi: bước được mở/cộng số gần nhất; thiếu thì lấy bước mở muộn nhất còn mở. */
 FbmSync.businessFailingStep = function (state) {
   var metadata = state && state.metadata || {}, steps = metadata.businessSteps || {}, active = String(metadata.businessActiveStep || ''), latest = '';
@@ -229,6 +247,8 @@ FbmSync.businessFailingStep = function (state) {
  * (xong, lỗi, hủy, thu hồi phiên treo) đều đóng đúng một lần; `stateStart` gọi thêm cho phiên cũ bị phiên mới thay.
  */
 FbmSync.businessFinishOpenSteps = function (state, phase, result) {
+  // Vấn đề theo bản ghi của lát cuối nhả trước khi đóng bước, nếu không chúng rơi xuống dưới dòng "Hoàn thành phiên đồng bộ".
+  if (typeof FbmSync.recordIssuesFlush === 'function') { FbmSync.recordIssuesFlush(state); }
   var current = state || {}, steps = current.metadata && current.metadata.businessSteps || {}, terminal = String(phase || current.phase || ''), outcome = terminal === 'error' ? 'error' : terminal === 'paused' || terminal === 'conflict' ? 'paused' : 'ok', error = String(result && result.error || ''), failing = outcome === 'error' ? FbmSync.businessFailingStep(current) : '';
   Object.keys(steps).forEach(function (key) {
     if (key === 'run' || steps[key].finishedAt) { return; }
