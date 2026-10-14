@@ -6,6 +6,8 @@
  *
  * Lịch hỏi sau tín hiệu (`CHANGE_SIGNAL_DELAYS_MS`): mốc đầu tính từ tín hiệu **đầu** của đợt, để luồng tín hiệu liên tục (người khác đang gõ) không đẩy lùi lời hỏi mãi; các mốc sau tính từ tín hiệu **cuối**, để thay đổi cuối đợt vẫn được hỏi sau khi trigger ghi xong.
  *
+ * Mốc sau chỉ hỏi khi còn lý do: có tín hiệu mới đến sau lúc lời hỏi trước bắt đầu, hoặc lời hỏi trước chưa thấy revision tăng (trigger chưa ghi xong), hoặc lời hỏi trước lỗi. Lời hỏi trước đã nạp trọn thay đổi mà không có gì mới thì mốc sau chỉ tốn một lượt GAS vô ích.
+ *
  * Watchdog: tab hiện, mạng có, Extension sống mà kênh im quá `CHANNEL_SILENCE_MS` thì coi kênh chết — Sidebar hiện trạng thái, nhịp hỏi an toàn chuyển sang nhịp ngắn, GAS ghi `Log` một lần mỗi phiên. Có tin lại thì về như cũ. Vắng Extension thì không xét kênh: đường dò selection riêng đã lo.
  */
 
@@ -14,7 +16,11 @@ var CHANGE_SIGNAL = {
   timers: [],
   lastFrameAt: 0,
   dead: false,
-  deadReported: false
+  deadReported: false,
+  resumed: false,
+  lastSignalAt: 0,
+  /** Lời hỏi theo tín hiệu gần nhất: `{ startedAt, revisionBefore, settled, advanced }`. */
+  lastAsk: null
 };
 
 function changeSignalDelays() {
@@ -35,9 +41,48 @@ function changeSignalOnFrame(now) {
   if (typeof selectionPollResetSafety === 'function') { selectionPollResetSafety(); }
 }
 
-/** `CRM_RELOAD` từ kênh: xếp lời hỏi theo lịch trễ. */
-function changeSignalReceive() {
+/** Hỏi theo tín hiệu và ghi lại lời hỏi đó có thấy revision tăng không, để mốc sau biết còn cần hỏi. */
+function changeSignalAskTracked() {
+  var ask = { startedAt: Date.now(), revisionBefore: Number(SHEET_LINK_LAST_SEEN_REVISION) || 0, settled: false, advanced: false };
+  CHANGE_SIGNAL.lastAsk = ask;
+  var work = changeSignalAsk('channel-signal');
+  Promise.resolve(work).then(function (result) {
+    var seen = result && result.reload ? Number(result.reload.revision) || 0 : 0;
+    ask.advanced = !!result && Math.max(seen, Number(SHEET_LINK_LAST_SEEN_REVISION) || 0) > ask.revisionBefore;
+    ask.settled = true;
+  }, function () { ask.settled = true; });
+  return work;
+}
+
+/** Mốc sau của lịch trễ: bỏ khi lời hỏi trước đã xong, đã thấy revision tăng và không có tín hiệu nào đến sau lúc nó bắt đầu. */
+function changeSignalFollowUpNeeded() {
+  var ask = CHANGE_SIGNAL.lastAsk;
+  if (!ask || !ask.settled || !ask.advanced) { return true; }
+  return CHANGE_SIGNAL.lastSignalAt >= ask.startedAt;
+}
+
+/**
+ * Google tự gửi lại yêu cầu kênh định kỳ trong cùng phiên (`sameSession`): phiên giữ thứ tự tin nên không lọt thay đổi. Lần mở đó và khung đầu không mang khóa `"c"` của nó chỉ chứng tỏ kênh sống. Phiên mới (kênh cũ chết, mạng đứt) hoặc Extension cũ không gửi các sự thật này thì vẫn là tín hiệu như cũ.
+ *
+ * Cạm bẫy: một thay đổi thật nằm ở khung đầu mà không mang `"c"` sẽ bị bỏ; nhịp hỏi an toàn `RELOAD_SAFETY_POLL_MS` vẫn vớt.
+ */
+function changeSignalIsResume(message) {
+  var msg = message || {};
+  if (msg.signal === 'channel-open') {
+    CHANGE_SIGNAL.resumed = msg.sameSession === true;
+    return CHANGE_SIGNAL.resumed;
+  }
+  if (msg.firstChunk !== true) { return false; }
+  var resumed = CHANGE_SIGNAL.resumed === true;
+  CHANGE_SIGNAL.resumed = false;
+  return resumed && msg.hasChange === false;
+}
+
+/** `CRM_RELOAD` từ kênh: xếp lời hỏi theo lịch trễ, trừ lần kênh tự nối lại. */
+function changeSignalReceive(message) {
   changeSignalOnFrame();
+  if (changeSignalIsResume(message)) { return; }
+  CHANGE_SIGNAL.lastSignalAt = Date.now();
   if (!SHEET_LINK_RAM_READY || typeof setTimeout !== 'function') { return; }
   changeSignalDelays().forEach(function (delay, index) {
     var pending = CHANGE_SIGNAL.timers[index] !== undefined && CHANGE_SIGNAL.timers[index] !== null;
@@ -45,7 +90,8 @@ function changeSignalReceive() {
     if (pending) { clearTimeout(CHANGE_SIGNAL.timers[index]); }
     CHANGE_SIGNAL.timers[index] = setTimeout(function () {
       CHANGE_SIGNAL.timers[index] = null;
-      changeSignalAsk('channel-signal');
+      if (index > 0 && !changeSignalFollowUpNeeded()) { return; }
+      changeSignalAskTracked();
     }, delay);
   });
 }

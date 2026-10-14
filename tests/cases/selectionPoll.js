@@ -459,6 +459,42 @@ async function chayKenhBaoThayDoi(so) {
     [burst._calls, bayNhieuNhat], [['probeSelectionAndReload', 'probeSelectionAndReload'], 1]);
   traLoi.shift()();
 
+  // Mốc 12 giây chỉ hỏi khi còn lý do; lời hỏi mốc đầu đã nạp trọn thì bỏ.
+  const mocSau = async (revisionSau, tinHieuGiuaChung) => {
+    const h = dungHopPoll(); batDau(h);
+    h.SHEET_LINK_LAST_SEEN_REVISION = 10;
+    h.callServer = (name) => { h._calls.push(name); return Promise.resolve({ ok: true, reload: { revision: revisionSau } }); };
+    const tin = () => h.sheetLinkOnMessage({ origin: h.SHEET_LINK_ORIGIN, data: { action: 'CRM_RELOAD', nonce: h.SHEET_LINK_NONCE, signal: 'channel' } });
+    tin();
+    h._clock.now += 4000; runTimer(h, 4000);
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+    if (tinHieuGiuaChung) { h._clock.now += 1000; tin(); }
+    runTimer(h, 12000);
+    await new Promise((resolve) => setImmediate(resolve));
+    return h._calls.length;
+  };
+  check(so, 'lời hỏi mốc đầu đã thấy revision tăng và không có tín hiệu mới: mốc 12 giây không gọi GAS', await mocSau(11, false), 1);
+  check(so, 'lời hỏi mốc đầu chưa thấy revision tăng (trigger chậm): mốc 12 giây vẫn hỏi', await mocSau(10, false), 2);
+  check(so, 'có tín hiệu mới sau khi lời hỏi mốc đầu bắt đầu: mốc 12 giây vẫn hỏi', await mocSau(11, true), 2);
+
+  // Kênh tự gửi lại yêu cầu trong cùng phiên không phải thay đổi; phiên mới hoặc Extension cũ vẫn là tín hiệu.
+  const noiLai = (messages) => {
+    const h = dungHopPoll(); batDau(h);
+    messages.forEach((m) => h.sheetLinkOnMessage({ origin: h.SHEET_LINK_ORIGIN, data: Object.assign({ action: 'CRM_RELOAD', nonce: h.SHEET_LINK_NONCE }, m) }));
+    return Array.from(h._timers.values()).filter((item) => item.delay === 4000 || item.delay === 12000).length;
+  };
+  check(so, 'kênh nối lại cùng phiên và khung đầu không mang thay đổi: không hẹn hỏi GAS',
+    noiLai([{ signal: 'channel-open', sameSession: true }, { signal: 'channel', firstChunk: true, hasChange: false }]), 0);
+  check(so, 'khung đầu sau lần nối lại mang thay đổi thật vẫn hẹn hỏi GAS',
+    noiLai([{ signal: 'channel-open', sameSession: true }, { signal: 'channel', firstChunk: true, hasChange: true }]), 2);
+  check(so, 'phiên kênh mới (kênh cũ chết) thì lần mở kênh vẫn là tín hiệu',
+    noiLai([{ signal: 'channel-open', sameSession: false }]), 2);
+  check(so, 'Extension cũ không gửi sameSession/firstChunk thì giữ hành vi cũ: mở kênh và khung lạ đều là tín hiệu',
+    [noiLai([{ signal: 'channel-open' }]), noiLai([{ signal: 'channel' }])], [2, 2]);
+  check(so, 'chỉ khung đầu của lần nối lại được bỏ; khung thứ hai không mang dấu thay đổi vẫn là tín hiệu',
+    noiLai([{ signal: 'channel-open', sameSession: true }, { signal: 'channel', firstChunk: true, hasChange: false }, { signal: 'channel', firstChunk: false, hasChange: false }]), 2);
+
   const lanh = dungHopPoll(); batDau(lanh);
   lanh.SHEET_LINK_RAM_READY = false;
   lanh.sheetLinkOnMessage({ origin: lanh.SHEET_LINK_ORIGIN, data: { action: 'CRM_RELOAD', nonce: lanh.SHEET_LINK_NONCE } });

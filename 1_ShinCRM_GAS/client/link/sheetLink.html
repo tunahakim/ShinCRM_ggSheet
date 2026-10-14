@@ -231,7 +231,7 @@ function sheetLinkOnMessage(event) {
   if (data.action === 'CRM_RELOAD' || data.action === 'CRM_CHANNEL_ALIVE') {
     if (data.nonce !== SHEET_LINK_NONCE) { return; }
     if (SHEET_LINK_EXTENSION_SESSION && String(data.sessionId || '') !== SHEET_LINK_EXTENSION_SESSION) { return; }
-    if (data.action === 'CRM_RELOAD') { changeSignalReceive(); } else { changeSignalOnFrame(); }
+    if (data.action === 'CRM_RELOAD') { changeSignalReceive(data); } else { changeSignalOnFrame(); }
     return;
   }
 
