@@ -13,7 +13,8 @@
 /** Số lời gọi máy chủ đang chờ. */
 var progressPending = 0;
 var SIDEBAR_BUSY = { next: 0, operations: [] };
-var SIDEBAR_BUSY_PROGRESS_MIN_MS = 120;
+/** Dải mở bằng `progress: true` chạy tối thiểu bằng một lượt trượt của `shin-loading-slide` (1,1 s, `client/style/components.html`). Lượt nạp nền nhận dữ liệu ngay trong lời hỏi im lặng nên phần còn lại chỉ vài mili giây; ngắn hơn một lượt trượt thì thanh chưa kịp vào khung đã tắt và người dùng không biết Sidebar vừa đổi dữ liệu. */
+var SIDEBAR_BUSY_PROGRESS_MIN_MS = 1100;
 
 /** Bật dải nếu đang có việc, tắt nếu không. Đọc lại thẻ mỗi lần thay vì giữ tham chiếu, vì tệp này nạp trước khi thân trang có thẻ. */
 function progressPaint() {
