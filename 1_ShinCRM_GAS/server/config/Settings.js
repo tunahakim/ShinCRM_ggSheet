@@ -78,9 +78,9 @@ var SETTINGS = {
   HANDSHAKE_PING_MS: 1000,
   EXTENSION_ACK_TIMEOUT_MS: 3000,
   /**
-   * Kênh `/bind`: Extension nghe kênh đẩy của Google Sheets và báo Sidebar "có thể vừa đổi". Tín hiệu đến gần như tức thì nhưng trigger GAS cần vài giây mới ghi xong signal, nên Sidebar hỏi theo lịch trễ tính từ tín hiệu cuối: mốc đầu bù thời gian trigger ghi signal, mốc sau bù trigger xếp hàng. Hỏi ngay lúc nhận gói gần như luôn nhận "không có gì" rồi không ai hỏi lại.
+   * Kênh `/bind`: Extension nghe kênh đẩy của Google Sheets và báo Sidebar "có thể vừa đổi". Tín hiệu đến gần như tức thì nhưng trigger GAS cần vài giây mới ghi xong signal, nên Sidebar hỏi theo lịch trễ tính từ tín hiệu cuối: mốc đầu bù thời gian trigger ghi signal, mốc sau bù trigger xếp hàng. Hỏi ngay lúc nhận gói gần như luôn nhận "không có gì" rồi không ai hỏi lại. Đo trên Sheet DEV: trigger ghi signal 2,6–3,8 giây sau gói đầu, nên mốc đầu 5 giây chừa khoảng 1 giây cho trigger chậm; mốc đầu sát số đo thì lần chậm nhất lọt sang mốc 12 giây.
    */
-  CHANGE_SIGNAL_DELAYS_MS: [4000, 12000],
+  CHANGE_SIGNAL_DELAYS_MS: [5000, 12000],
   /** Cầu nối Extension gộp nhịp sống của kênh, tối đa một tin mỗi khoảng này. Phải nhỏ hơn nhiều so với `CHANNEL_SILENCE_MS`. */
   CHANNEL_ALIVE_RELAY_MS: 20000,
   /** Kênh im quá ngưỡng này (tab hiện, mạng có) thì coi là chết. Google gửi `noop` khoảng 33 giây/lần và mở lại kênh khoảng 140 giây/lần, 180 giây phủ được một lần mở lại cộng một nhịp. */
