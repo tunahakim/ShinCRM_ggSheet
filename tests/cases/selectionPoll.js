@@ -121,6 +121,7 @@ async function chay(so) {
   visibleSafetyTimer.fn();
   check(so, 'cờ nghiệm thu loading tắt: safety request chạy im lặng (tài liệu 05)', safetyVisibleProbe._calls[0].options.silent, true);
   safetyVisibleProbe._calls = [];
+  safetyVisibleProbe.SHEET_LINK_SELECTION_PENDING = null;
   safetyVisibleProbe.sheetLinkProbeSelectionAndReload('position', { needsSelection: true });
   check(so, 'cờ nghiệm thu loading tắt: lời hỏi đổi vị trí cũng im lặng', [safetyVisibleProbe._calls.length, safetyVisibleProbe._calls[0].options.silent], [1, true]);
 
