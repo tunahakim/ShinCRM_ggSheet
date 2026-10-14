@@ -60,6 +60,7 @@ async function sidebarBoot(options) {
     dispatchInstall();
     selectionPollInstall();
     sheetLinkInstall();
+    changeSignalInstall();
     if (typeof fbmSyncPrepareRelayForSidebarOpen === 'function') { fbmSyncPrepareRelayForSidebarOpen(); }
     selectionPollSetReady(false);
 

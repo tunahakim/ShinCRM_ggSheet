@@ -183,6 +183,17 @@ function selectionLogReaderFailure(code) {
   });
 }
 
+/** Sidebar báo kênh báo thay đổi im quá ngưỡng; Sidebar tự giữ cờ một lần mỗi phiên. */
+function selectionLogChannelSilence(silent) {
+  if (silent !== true) { return; }
+  logEvent({
+    source: 'sidebar',
+    action: 'change_channel',
+    outcome: LOG_WARN,
+    reason: 'Sidebar không nhận được tin nào từ kênh báo thay đổi của Google Sheets quá ngưỡng CHANNEL_SILENCE_MS; chuyển sang tự kiểm tra định kỳ nhịp ngắn, dữ liệu sửa trên Sheet đến Sidebar chậm hơn. Thường do Extension cũ chưa tải lại hoặc Google đổi kênh.'
+  });
+}
+
 /**
  * Một request bên ngoài cho cả selection và reload. GAS là nơi duy nhất quyết
  * định có cần đọc cột mã khách và có cần nạp RAM hay không; Sidebar chỉ truyền
@@ -194,6 +205,7 @@ function probeSelectionAndReload(input) {
     var request = input || {};
     var requestId = selectionReloadRequestId(request);
     selectionLogReaderFailure(request.extensionReadFailure);
+    selectionLogChannelSilence(request.channelSilence);
     var context = selectionProbeContext();
     var snapshot = selectionSnapshotFromContext(context);
     var previous = request.previousSelectionContext || request.selectionContext || null;

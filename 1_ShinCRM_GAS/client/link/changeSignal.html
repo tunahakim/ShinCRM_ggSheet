@@ -1,0 +1,85 @@
+<script>
+/**
+ * Tín hiệu "Sheet có thể vừa đổi" và canh sức sống của kênh báo thay đổi.
+ *
+ * Nguồn tín hiệu: Extension nghe kênh `/bind` của Google Sheets (`CRM_RELOAD`), tab hiện lại, mạng nối lại. Mọi nguồn chỉ đánh thức lời hỏi chung `sheetLinkProbeSelectionAndReload`; lời hỏi đó đã tự đảm bảo không hai lượt song song và gộp tín hiệu đến lúc bận thành một lượt sau. Tệp này chỉ quyết **khi nào** hỏi, GAS vẫn quyết có gì để nạp.
+ *
+ * Lịch hỏi sau tín hiệu (`CHANGE_SIGNAL_DELAYS_MS`): mốc đầu tính từ tín hiệu **đầu** của đợt, để luồng tín hiệu liên tục (người khác đang gõ) không đẩy lùi lời hỏi mãi; các mốc sau tính từ tín hiệu **cuối**, để thay đổi cuối đợt vẫn được hỏi sau khi trigger ghi xong.
+ *
+ * Watchdog: tab hiện, mạng có, Extension sống mà kênh im quá `CHANNEL_SILENCE_MS` thì coi kênh chết — Sidebar hiện trạng thái, nhịp hỏi an toàn chuyển sang nhịp ngắn, GAS ghi `Log` một lần mỗi phiên. Có tin lại thì về như cũ. Vắng Extension thì không xét kênh: đường dò selection riêng đã lo.
+ */
+
+var CHANGE_SIGNAL = {
+  installed: false,
+  timers: [],
+  lastFrameAt: 0,
+  dead: false,
+  deadReported: false
+};
+
+function changeSignalDelays() {
+  var delays = typeof SETTINGS !== 'undefined' && SETTINGS && Array.isArray(SETTINGS.CHANGE_SIGNAL_DELAYS_MS) ? SETTINGS.CHANGE_SIGNAL_DELAYS_MS : [];
+  return delays.map(function (value) { return Math.max(0, Number(value) || 0); });
+}
+
+function changeSignalAsk(reason) {
+  return sheetLinkProbeSelectionAndReload(reason, { silent: true });
+}
+
+/** Tin bất kỳ từ kênh (tín hiệu hoặc nhịp sống) đều chứng tỏ kênh còn thông. */
+function changeSignalOnFrame(now) {
+  CHANGE_SIGNAL.lastFrameAt = now === undefined ? Date.now() : now;
+  if (!CHANGE_SIGNAL.dead) { return; }
+  CHANGE_SIGNAL.dead = false;
+  if (typeof selectionPollPaint === 'function') { selectionPollPaint(); }
+  if (typeof selectionPollResetSafety === 'function') { selectionPollResetSafety(); }
+}
+
+/** `CRM_RELOAD` từ kênh: xếp lời hỏi theo lịch trễ. */
+function changeSignalReceive() {
+  changeSignalOnFrame();
+  if (!SHEET_LINK_RAM_READY || typeof setTimeout !== 'function') { return; }
+  changeSignalDelays().forEach(function (delay, index) {
+    var pending = CHANGE_SIGNAL.timers[index] !== undefined && CHANGE_SIGNAL.timers[index] !== null;
+    if (pending && index === 0) { return; }
+    if (pending) { clearTimeout(CHANGE_SIGNAL.timers[index]); }
+    CHANGE_SIGNAL.timers[index] = setTimeout(function () {
+      CHANGE_SIGNAL.timers[index] = null;
+      changeSignalAsk('channel-signal');
+    }, delay);
+  });
+}
+
+/** Gọi theo nhịp bắt tay. Thời gian tab ẩn, mất mạng hoặc vắng Extension không tính vào khoảng im. */
+function changeSignalWatchdog(now) {
+  var at = now === undefined ? Date.now() : now;
+  var paused = (typeof document !== 'undefined' && document.hidden)
+    || (typeof navigator !== 'undefined' && navigator && navigator.onLine === false)
+    || !sheetLinkExtensionAlive(at);
+  if (paused || !CHANGE_SIGNAL.lastFrameAt) {
+    CHANGE_SIGNAL.lastFrameAt = at;
+    return;
+  }
+  if (CHANGE_SIGNAL.dead || at - CHANGE_SIGNAL.lastFrameAt <= sheetLinkMs('CHANNEL_SILENCE_MS', 180000)) { return; }
+  CHANGE_SIGNAL.dead = true;
+  if (typeof selectionPollPaint === 'function') { selectionPollPaint(); }
+  if (typeof selectionPollResetSafety === 'function') { selectionPollResetSafety(); }
+}
+
+function changeSignalChannelDead() {
+  return CHANGE_SIGNAL.dead === true;
+}
+
+/** Báo GAS ghi `Log` một lần mỗi phiên Sidebar, đi kèm lời hỏi kế tiếp. */
+function changeSignalDeadReportInput() {
+  if (!CHANGE_SIGNAL.dead || CHANGE_SIGNAL.deadReported) { return false; }
+  CHANGE_SIGNAL.deadReported = true;
+  return true;
+}
+
+function changeSignalInstall() {
+  if (CHANGE_SIGNAL.installed) { return; }
+  CHANGE_SIGNAL.installed = true;
+  window.addEventListener('online', function () { changeSignalAsk('online'); });
+}
+</script>

@@ -75,9 +75,19 @@ var SETTINGS = {
   SELECTION_POLL_MS: 2000,
   SELECTION_POLL_IDLE_MS: 6000,
   POSITION_WAKE_MS: 1000,
-  EDIT_SETTLE_MS: 3000,
   HANDSHAKE_PING_MS: 1000,
   EXTENSION_ACK_TIMEOUT_MS: 3000,
+  /**
+   * Kênh `/bind`: Extension nghe kênh đẩy của Google Sheets và báo Sidebar "có thể vừa đổi". Tín hiệu đến gần như tức thì nhưng trigger GAS cần vài giây mới ghi xong signal, nên Sidebar hỏi theo lịch trễ tính từ tín hiệu cuối: mốc đầu bù thời gian trigger ghi signal, mốc sau bù trigger xếp hàng. Hỏi ngay lúc nhận gói gần như luôn nhận "không có gì" rồi không ai hỏi lại.
+   */
+  CHANGE_SIGNAL_DELAYS_MS: [4000, 12000],
+  /** Cầu nối Extension gộp nhịp sống của kênh, tối đa một tin mỗi khoảng này. Phải nhỏ hơn nhiều so với `CHANNEL_SILENCE_MS`. */
+  CHANNEL_ALIVE_RELAY_MS: 20000,
+  /** Kênh im quá ngưỡng này (tab hiện, mạng có) thì coi là chết. Google gửi `noop` khoảng 33 giây/lần và mở lại kênh khoảng 140 giây/lần, 180 giây phủ được một lần mở lại cộng một nhịp. */
+  CHANNEL_SILENCE_MS: 180000,
+  /** Nhịp hỏi an toàn khi kênh sống (chỉ để vớt thứ kênh bỏ sót) và khi kênh chết (thay kênh). */
+  RELOAD_SAFETY_POLL_MS: 60000,
+  RELOAD_SAFETY_POLL_DEAD_MS: 15000,
   /** Màu tab sheet quản trị đang cũ (dữ liệu đã đổi nhưng sheet chưa vẽ lại). Cam để khác các màu nhóm sheet thường dùng. */
   VIEW_STALE_TAB_COLOR: '#ff9900'
 };

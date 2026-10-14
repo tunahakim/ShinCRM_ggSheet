@@ -36,7 +36,6 @@ var SHEET_LINK_DATA_PENDING = null;
 var SHEET_LINK_RELOAD_TIMER = null;
 var SHEET_LINK_RELOAD_CHECKING = null;
 var SHEET_LINK_WAKE_TIMER = null;
-var SHEET_LINK_WAKE_REASON = '';
 var SHEET_LINK_SELECTION_CONTEXT = null;
 var SHEET_LINK_PREVIOUS_CUSTOMER_ID = '';
 var SHEET_LINK_SELECTION_PENDING = null;
@@ -79,18 +78,21 @@ function sheetLinkSetSpreadsheetId(id) {
   SHEET_LINK_SPREADSHEET_ID = String(id || '');
 }
 
-/** Gửi read plan dạng tọa độ; Extension không được nhận luật reload hay ý nghĩa token. */
+/** Tin bắt tay mang read plan dạng tọa độ và khoảng gộp nhịp sống của kênh; Extension không được nhận luật reload hay ý nghĩa token. */
+function sheetLinkHandshakeMessage() {
+  return {
+    action: 'CRM_HANDSHAKE',
+    nonce: SHEET_LINK_NONCE,
+    spreadsheetId: SHEET_LINK_SPREADSHEET_ID,
+    readPlan: SHEET_LINK_READ_PLAN,
+    channelAliveMs: sheetLinkMs('CHANNEL_ALIVE_RELAY_MS', 0)
+  };
+}
+
 function sheetLinkSetReadPlan(plan) {
   SHEET_LINK_READ_PLAN = plan && typeof plan === 'object' ? plan : null;
   if (window.top !== window) {
-    try {
-      window.top.postMessage({
-        action: 'CRM_HANDSHAKE',
-        nonce: SHEET_LINK_NONCE,
-        spreadsheetId: SHEET_LINK_SPREADSHEET_ID,
-        readPlan: SHEET_LINK_READ_PLAN
-      }, SHEET_LINK_ORIGIN);
-    } catch (err) {}
+    try { window.top.postMessage(sheetLinkHandshakeMessage(), SHEET_LINK_ORIGIN); } catch (err) {}
   }
 }
 
@@ -156,17 +158,13 @@ function sheetLinkExtensionAlive(now) {
 function sheetLinkHandshakePing() {
   if (window.top !== window) {
     try {
-      window.top.postMessage({
-        action: 'CRM_HANDSHAKE',
-        nonce: SHEET_LINK_NONCE,
-        spreadsheetId: SHEET_LINK_SPREADSHEET_ID,
-        readPlan: SHEET_LINK_READ_PLAN
-      }, SHEET_LINK_ORIGIN);
+      window.top.postMessage(sheetLinkHandshakeMessage(), SHEET_LINK_ORIGIN);
     } catch (err) {
       // Extension chưa cài hoặc trang chưa sẵn sàng — không sao, ping lại ở nhịp sau.
     }
   }
   if (typeof selectionPollHeartbeat === 'function') { selectionPollHeartbeat(); }
+  if (typeof changeSignalWatchdog === 'function') { changeSignalWatchdog(); }
 }
 
 function sheetLinkOnMessage(event) {
@@ -189,19 +187,11 @@ function sheetLinkOnMessage(event) {
     return;
   }
 
-  // GAS/Extension chỉ dùng event này để đánh thức Sidebar; dữ liệu thật vẫn
-  // phải đọc lại qua getReloadState và API reload có guard revision.
-  if (data.action === 'CRM_RELOAD') {
+  // Kênh `/bind`: chỉ đánh thức, không mang revision hay dữ liệu; lời hỏi GAS mới là nguồn đúng.
+  if (data.action === 'CRM_RELOAD' || data.action === 'CRM_CHANNEL_ALIVE') {
     if (data.nonce !== SHEET_LINK_NONCE) { return; }
     if (SHEET_LINK_EXTENSION_SESSION && String(data.sessionId || '') !== SHEET_LINK_EXTENSION_SESSION) { return; }
-    if (SHEET_LINK_SPREADSHEET_ID && data.spreadsheetId && data.spreadsheetId !== SHEET_LINK_SPREADSHEET_ID) { return; }
-    if (!SHEET_LINK_RAM_READY) { return; }
-    var revision = Number(data.revision || 0);
-    if (revision && revision <= SHEET_LINK_LAST_SEEN_REVISION) { return; }
-    var wake = sheetLinkSyncDirtyData();
-    if (wake && typeof wake.then === 'function') {
-      wake.then(null, function (err) { if (typeof console !== 'undefined' && console.warn) { console.warn(err); } });
-    }
+    if (data.action === 'CRM_RELOAD') { changeSignalReceive(); } else { changeSignalOnFrame(); }
     return;
   }
 
@@ -222,17 +212,12 @@ function sheetLinkOnMessage(event) {
 
   var previousPosition = sheetLinkPositionKey(SHEET_LINK_LAST_CONTEXT || {});
   sheetLinkRefreshViewReadPlan(data);
-  var shouldWake = sheetLinkContextMayAffectReload(data);
   var positionChanged = previousPosition !== sheetLinkPositionKey(data);
   // Extension gửi lại cùng vị trí khi nhận lại read plan; chỉ vị trí mới mới làm cũ câu trả lời selection GAS đang bay.
   if (positionChanged) { SHEET_LINK_CONTEXT_GENERATION += 1; }
   var applied = sheetLinkApplyContext(data);
-  var hasInteraction = data.hint === 'keyboardHint' || data.hint === 'keydown' || data.hint === 'canvasClick';
-  // Extension không đọc được mã ở vị trí mới thì GAS phải đọc thay, với nhịp của đổi vị trí chứ không phải nhịp chờ sửa ô.
-  var needsServerSelection = positionChanged && !sheetLinkRecordExtensionRead(data);
-  if (needsServerSelection || (shouldWake && (hasInteraction || positionChanged))) {
-    sheetLinkScheduleWake(needsServerSelection || !hasInteraction ? 'position' : data.hint, data);
-  }
+  // Nhấp, gõ hay đổi vị trí không đánh thức GAS: thay đổi dữ liệu đến qua kênh `/bind`. Chỉ khi Extension không đọc được mã ở vị trí mới thì GAS phải đọc thay.
+  if (positionChanged && !sheetLinkRecordExtensionRead(data)) { sheetLinkScheduleWake(); }
   if (applied && typeof applied.then === 'function') {
     applied.then(null, function (err) {
       // Context arrives from the background bridge; never interrupt the user with an alert.
@@ -322,77 +307,6 @@ function sheetLinkPlanForSheet(sheetName) {
   return String(sheetName || '').indexOf('!') === 0 && Array.isArray(SHEET_LINK_READ_PLAN['!']) ? SHEET_LINK_READ_PLAN['!'] : [];
 }
 
-function sheetLinkExpectedCodes(sheetName, plans) {
-  var codes = plans.map(function (item) { return String(item.expectedValue || '').trim(); }).filter(Boolean);
-  if (SHEET_LINK_SCHEMA) {
-    var append = function (entity) {
-      var fields = SHEET_LINK_SCHEMA[entity] || {};
-      Object.keys(fields).forEach(function (name) { if (fields[name] && fields[name].code) { codes.push(String(fields[name].code).trim()); } });
-    };
-    if (sheetName === 'Customer') { append('customer'); }
-    else if (sheetName === 'Activity') { append('activity'); }
-    else if (String(sheetName || '').indexOf('!') === 0) { append('customer'); append('activity'); }
-  }
-  return codes.filter(function (code, index, array) { return array.indexOf(code) === index; });
-}
-
-function sheetLinkPlanColumn(address) {
-  var match = String(address || '').toUpperCase().match(/^([A-Z]+)1$/);
-  if (!match) { return 0; }
-  var result = 0;
-  for (var i = 0; i < match[1].length; i++) { result = result * 26 + match[1].charCodeAt(i) - 64; }
-  return result;
-}
-
-function sheetLinkRelevantHeaders(context, plans, coordinates) {
-  var current = Array.isArray(context.rawHeaderRow) ? context.rawHeaderRow : [];
-  var previous = SHEET_LINK_LAST_CONTEXT && Array.isArray(SHEET_LINK_LAST_CONTEXT.rawHeaderRow) ? SHEET_LINK_LAST_CONTEXT.rawHeaderRow : [];
-  var expectedCodes = sheetLinkExpectedCodes(context.sheetName, plans);
-  var columns = current.concat(previous).map(function (item) { return Number(item && item.column || 0); }).filter(function (column, index, array) { return column > 0 && array.indexOf(column) === index; });
-  columns = columns.filter(function (column) { return coordinates.colEnd === 0 || (column >= coordinates.col && column <= coordinates.colEnd); });
-  if (!columns.length) { return false; }
-  return columns.some(function (column) {
-    return current.concat(previous).some(function (item) { return Number(item && item.column || 0) === column && expectedCodes.indexOf(String(item.value || '').trim()) >= 0; });
-  });
-}
-
-/** Chỉ là tối ưu vận chuyển; GAS vẫn xác nhận onEdit/dirty/scope trong request. */
-function sheetLinkContextMayAffectReload(context) {
-  var value = context || {};
-  var plans = sheetLinkPlanForSheet(value.sheetName);
-  if (!plans.length) {
-    var knownSheet = value.sheetName === 'Customer' || value.sheetName === 'Activity' || value.sheetName === 'Category' || value.sheetName === 'Config' || String(value.sheetName || '').indexOf('!') === 0;
-    if (!knownSheet) { return false; }
-    if (value.headerComplete === false || !Array.isArray(value.rawHeaderRow)) { return true; }
-    var knownCoordinates = sheetLinkParseNameBox(value.cellRef);
-    if (!knownCoordinates) { return true; }
-    var knownCodes = sheetLinkExpectedCodes(value.sheetName, plans);
-    // Chưa có schema/read plan thì Sidebar chưa đủ dữ liệu để loại request an toàn.
-    if (!knownCodes.length && !SHEET_LINK_SCHEMA) { return true; }
-    var knownColumns = value.rawHeaderRow.map(function (item) {
-      return knownCodes.indexOf(String(item.value || '').trim()) >= 0 ? Number(item.column || 0) : 0;
-    }).filter(function (column) { return column > 0; });
-    if (!knownColumns.length) { return false; }
-    if (knownCoordinates.row === 1 || knownCoordinates.rowEnd === 0) {
-      return sheetLinkRelevantHeaders(value, plans, knownCoordinates);
-    }
-    return knownCoordinates.colEnd === 0 || knownColumns.some(function (column) {
-      return column >= knownCoordinates.col && column <= knownCoordinates.colEnd;
-    });
-  }
-  if (value.headerComplete === false || !Array.isArray(value.rawHeaderRow)) { return true; }
-  var coordinates = sheetLinkParseNameBox(value.cellRef);
-  if (!coordinates) { return true; }
-  if (coordinates.row === 1 || coordinates.rowEnd === 0) { return sheetLinkRelevantHeaders(value, plans, coordinates); }
-  var expectedCodes = sheetLinkExpectedCodes(value.sheetName, plans);
-  var columns = value.rawHeaderRow.map(function (item) { return expectedCodes.indexOf(String(item.value || '').trim()) >= 0 ? Number(item.column || 0) : 0; }).filter(function (column) { return column > 0; });
-  // Có read plan nhưng hàng 1 không khớp là metadata lệch/chưa chắc chắn;
-  // phải hỏi GAS thay vì âm thầm bỏ mất signal. Sheet trắng đã biết là trắng
-  // được xử lý ở nhánh không có plan phía trên.
-  if (!columns.length) { return true; }
-  return coordinates.colEnd === 0 || columns.some(function (column) { return column >= coordinates.col && column <= coordinates.colEnd; });
-}
-
 function sheetLinkReloadState(payload) {
   if (!payload) { return {}; }
   return payload.reload || payload.dirty || payload;
@@ -449,19 +363,14 @@ function sheetLinkCancelDirtyCheck() {
   SHEET_LINK_RELOAD_TIMER = null;
 }
 
-/** Một request đánh thức GAS sau khi hint cuối đã yên một giây. */
-function sheetLinkScheduleWake(reason, context) {
+/** Extension không đọc được mã ở vị trí mới: hỏi GAS đọc thay sau khi vị trí đứng yên `POSITION_WAKE_MS`, để lướt qua nhiều ô chỉ sinh một lời hỏi. */
+function sheetLinkScheduleWake() {
   if (!SHEET_LINK_RAM_READY || typeof setTimeout !== 'function') { return null; }
-  SHEET_LINK_WAKE_REASON = reason || 'hint';
   if (SHEET_LINK_WAKE_TIMER !== null && typeof clearTimeout === 'function') { clearTimeout(SHEET_LINK_WAKE_TIMER); }
-  var coordinates = sheetLinkParseNameBox(context && context.cellRef);
-  var range = coordinates && (coordinates.rowEnd !== coordinates.row || coordinates.colEnd !== coordinates.col || coordinates.rowEnd === 0);
-  var editHint = reason === 'keyboardHint' || reason === 'keydown' || reason === 'canvasClick' || range;
-  var delay = sheetLinkMs(editHint ? 'EDIT_SETTLE_MS' : 'POSITION_WAKE_MS', editHint ? 3000 : 1000);
   SHEET_LINK_WAKE_TIMER = setTimeout(function () {
     SHEET_LINK_WAKE_TIMER = null;
-    sheetLinkProbeSelectionAndReload(SHEET_LINK_WAKE_REASON);
-  }, delay);
+    sheetLinkProbeSelectionAndReload('position');
+  }, sheetLinkMs('POSITION_WAKE_MS', 1000));
   return SHEET_LINK_WAKE_TIMER;
 }
 
@@ -558,7 +467,8 @@ function sheetLinkProbeSelectionAndReload(reason, options) {
     localDraft: sheetLinkLocalDraftInput(),
     reason: reason || 'wake',
     forceImmediate: opts.forceImmediate === true,
-    extensionReadFailure: sheetLinkReaderFailureInput()
+    extensionReadFailure: sheetLinkReaderFailureInput(),
+    channelSilence: typeof changeSignalDeadReportInput === 'function' && changeSignalDeadReportInput()
   };
   var request = callServer('probeSelectionAndReload', [input], {
     silent: opts.silent === true || SHEET_LINK_SHOW_PROBE_PROGRESS_DEBUG !== true
@@ -769,10 +679,9 @@ function sheetLinkReplayContext() {
   return SHEET_LINK_LAST_CONTEXT ? sheetLinkApplyContext(SHEET_LINK_LAST_CONTEXT) : sheetLinkProbeSelectionAndReload('sidebar-open', { silent: true });
 }
 
-/** Tab hiện lại khi đang đứng ở sheet `!`: view có thể đã cũ trong lúc tab ẩn. Sheet khác thì RAM đã có kênh đánh thức riêng. */
+/** Tab hiện lại: trình duyệt có thể đã bỏ đói kênh `/bind` khi tab ẩn, nên hỏi một lần cho cả RAM lẫn sheet `!` đang xem. */
 function sheetLinkOnVisible() {
-  if (SHEET_LINK_LAST_SHEET.charAt(0) !== '!') { return null; }
-  return sheetLinkProbeSelectionAndReload('visible', { silent: true });
+  return changeSignalAsk('visible');
 }
 
 /** Công tắc tự động làm mới vừa bật: chỉ sheet `!` đang xem mới cần hỏi; sheet khác vẽ khi có người xem. */

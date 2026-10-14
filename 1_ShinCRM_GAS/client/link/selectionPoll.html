@@ -10,7 +10,8 @@ var SELECTION_POLL_STABLE_LIMIT = 3;
 var SELECTION_POLL_BANNER_ID = 'shin-extension-warning';
 var SELECTION_POLL_BANNER_TEXT = {
   missing: 'Thiếu Extension — sidebar tự dò, chậm hơn',
-  readerDown: 'Extension không đọc được dữ liệu Sheet — sidebar hỏi máy chủ, chậm hơn'
+  readerDown: 'Extension không đọc được dữ liệu Sheet — sidebar hỏi máy chủ, chậm hơn',
+  channelDead: 'Mất kênh báo thay đổi của Sheet — sidebar tự kiểm tra định kỳ, chậm hơn'
 };
 var SELECTION_POLL = {
   installed: false,
@@ -134,8 +135,10 @@ function selectionPollClearSafety() {
   }
 }
 
+/** Kênh `/bind` sống thì nhịp an toàn chỉ vớt thứ kênh bỏ sót; kênh chết thì nhịp này thay kênh nên phải ngắn. */
 function selectionPollSafetyMs() {
-  return selectionPollMs('RELOAD_SAFETY_POLL_MS', 60000);
+  var dead = typeof changeSignalChannelDead === 'function' && changeSignalChannelDead();
+  return dead ? selectionPollMs('RELOAD_SAFETY_POLL_DEAD_MS', 15000) : selectionPollMs('RELOAD_SAFETY_POLL_MS', 60000);
 }
 
 function selectionPollScheduleSafety() {
@@ -161,13 +164,14 @@ function selectionPollPaint() {
   var state = selectionPollExtensionState();
   var missing = state === 'missing';
   var readerDown = !missing && typeof sheetLinkExtensionReaderDown === 'function' && sheetLinkExtensionReaderDown();
+  var channelDead = !missing && !readerDown && typeof changeSignalChannelDead === 'function' && changeSignalChannelDead();
   var on = typeof Prefs !== 'undefined' && Prefs && Prefs.followSelection === true;
   var bolt = document.querySelector ? document.querySelector('[data-action="toggleFollowSelection"]') : null;
   var banner = document.getElementById ? document.getElementById(SELECTION_POLL_BANNER_ID) : null;
 
   if (banner) {
-    banner.hidden = !(missing || readerDown);
-    banner.textContent = SELECTION_POLL_BANNER_TEXT[readerDown ? 'readerDown' : 'missing'];
+    banner.hidden = !(missing || readerDown || channelDead);
+    banner.textContent = SELECTION_POLL_BANNER_TEXT[readerDown ? 'readerDown' : (channelDead ? 'channelDead' : 'missing')];
   }
   if (!bolt) { return; }
 
