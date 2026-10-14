@@ -93,7 +93,7 @@ async function chay(so) {
   hop._clock.now = 4000; hop.selectionPollClearTimer(); hop.selectionPollTick();
   await new Promise((resolve) => setImmediate(resolve));
   check(so, 'fallback không có Extension gọi đúng một request GAS', hop._calls, ['probeSelectionAndReload']);
-  check(so, 'fallback probe chạy silent, chỉ payload thật mới hiện loading', hop._options[0].silent, true);
+  check(so, 'cờ nghiệm thu loading bật: lời hỏi nền fallback cũng hiện loading ngay khi gửi', hop._options[0].silent, false);
   check(so, 'fallback giữ nhịp nhanh khi vị trí thay đổi', runTimer(hop, 2000), 2000);
 
   const chong = dungHopPoll(); batDau(chong); chong._clock.now = 4000; chong.selectionPollClearTimer();
@@ -112,14 +112,17 @@ async function chay(so) {
   safety._calls = [];
   safety.callServer = (name, args, options) => { safety._calls.push({ name, args, options }); return syncValue({ ok: true, reload: { revision: 0 }, selection: { spreadsheetId: 'sheet-1', gid: '1', sheetName: 'Customer', row: 4, col: 1, rowEnd: 4, colEnd: 1, customerId: '' } }); };
   safetyTimer.fn();
-  check(so, 'safety request chạy silent không bật loading', [safety._calls[0].name, safety._calls[0].options.silent], ['probeSelectionAndReload', true]);
+  check(so, 'cờ nghiệm thu loading bật: safety request hiện loading ngay khi gửi', [safety._calls[0].name, safety._calls[0].options.silent], ['probeSelectionAndReload', false]);
 
-  const safetyVisibleProbe = dungHopPoll(); batDau(safetyVisibleProbe); safetyVisibleProbe.SHEET_LINK_SHOW_PROBE_PROGRESS_DEBUG = true;
+  const safetyVisibleProbe = dungHopPoll(); batDau(safetyVisibleProbe); safetyVisibleProbe.SHEET_LINK_SHOW_PROBE_PROGRESS_DEBUG = false;
   safetyVisibleProbe._calls = [];
   safetyVisibleProbe.callServer = (name, args, options) => { safetyVisibleProbe._calls.push({ name, args, options }); return syncValue({ ok: true, reload: { revision: 0 }, selection: { spreadsheetId: 'sheet-1', gid: '1', sheetName: 'Customer', row: 4, col: 1, rowEnd: 4, colEnd: 1, customerId: '' } }); };
   const visibleSafetyTimer = Array.from(safetyVisibleProbe._timers.values()).find((item) => item.delay === 60000);
   visibleSafetyTimer.fn();
-  check(so, 'safety request vẫn silent dù cờ nghiệm thu loading đang bật', safetyVisibleProbe._calls[0].options.silent, true);
+  check(so, 'cờ nghiệm thu loading tắt: safety request chạy im lặng (tài liệu 05)', safetyVisibleProbe._calls[0].options.silent, true);
+  safetyVisibleProbe._calls = [];
+  safetyVisibleProbe.sheetLinkProbeSelectionAndReload('position', { needsSelection: true });
+  check(so, 'cờ nghiệm thu loading tắt: lời hỏi đổi vị trí cũng im lặng', [safetyVisibleProbe._calls.length, safetyVisibleProbe._calls[0].options.silent], [1, true]);
 
   const plan = { Customer: [{ token: 'id', headerAddress: 'A1', expectedValue: '@CUS_MA_KH', valueAddressTemplate: 'A{row}' }] };
   const quiet = dungHopPoll(); batDau(quiet); quiet._calls = [];
