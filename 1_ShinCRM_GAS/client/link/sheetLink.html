@@ -106,6 +106,18 @@ function sheetLinkSetReadPlan(plan) {
  * Sheet xem tự do: mọi sheet ngoài các sheet kho (có khóa riêng trong plan GAS gửi) và sheet `!`.
  * Extension chỉ nhận plan theo đúng tên sheet hoặc khóa `!`, nên Sidebar chép mẫu `!` thành khóa theo tên sheet tự do; `SHEET_LINK_FREE_SHEETS` nhớ khóa nào do Sidebar thêm để không nhầm với sheet kho.
  */
+/** Hàng tiêu đề (trên hàng dữ liệu đầu) của sheet có cột mã khách hoặc sheet `!`: chắc chắn không có khách, nên báo như hàng trống thay vì giữ khách của hàng trước. Sheet xem tự do không có quy ước hàng tiêu đề nên không xét. */
+function sheetLinkIsHeaderRow(ctx) {
+  var name = String(ctx && ctx.sheetName || '');
+  var plan = SHEET_LINK_READ_PLAN && !sheetLinkIsFreeSheet(name) ? SHEET_LINK_READ_PLAN[name] : null;
+  // Sheet có cột mã khách là sheet mà bản đồ đọc khai ô giá trị theo hàng (Customer, Activity); Category, Config không có khách nên không xét.
+  var known = name.charAt(0) === '!' || (Array.isArray(plan) && plan.some(function (item) { return item && item.valueAddressTemplate; }));
+  if (!known || !SHEET_LINK_FIRST_DATA_ROW) { return false; }
+  var coordinates = sheetLinkParseNameBox(ctx.cellRef);
+  var row = coordinates ? coordinates.row : Number(ctx.row) || 0;
+  return row > 0 && row < SHEET_LINK_FIRST_DATA_ROW;
+}
+
 function sheetLinkIsFreeSheet(sheetName) {
   var name = String(sheetName || '');
   if (!name || name.charAt(0) === '!' || !SHEET_LINK_READ_PLAN) { return false; }
@@ -790,6 +802,7 @@ function sheetLinkApplyCustomerContext(ctx) {
  */
 function sheetLinkSelectionMiss(ctx) {
   if (!ctx) { return null; }
+  if (sheetLinkIsHeaderRow(ctx)) { return { kind: 'empty' }; }
   if (!Array.isArray(ctx.reads)) {
     if (ctx.customerCell === 'empty') { return { kind: 'empty' }; }
     var gasCode = String(ctx.customerId || '').trim().toUpperCase();
