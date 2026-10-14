@@ -54,7 +54,7 @@ function dungHopPoll() {
     clearInterval: (id) => intervals.delete(id),
     Prefs: { followSelection: true }, SAVE_FLOW: { dangGui: false },
     ScreenState: { screen: 'view', currentCustomerId: '' }, SCREEN_VIEW: 'view',
-    SETTINGS: { SELECTION_POLL_MS: 2000, SELECTION_POLL_IDLE_MS: 6000, POSITION_WAKE_MS: 1000, EDIT_SETTLE_MS: 3000, HANDSHAKE_PING_MS: 1000, EXTENSION_ACK_TIMEOUT_MS: 3000, RELOAD_SAFETY_POLL_MS: 60000 },
+    SETTINGS: { SELECTION_POLL_MS: 2000, SELECTION_POLL_IDLE_MS: 6000, POSITION_WAKE_MS: 1000, HANDSHAKE_PING_MS: 1000, EXTENSION_ACK_TIMEOUT_MS: 3000, RELOAD_SAFETY_POLL_MS: 60000, RELOAD_SAFETY_POLL_DEAD_MS: 15000, CHANGE_SIGNAL_DELAYS_MS: [4000, 12000], CHANNEL_ALIVE_RELAY_MS: 20000, CHANNEL_SILENCE_MS: 180000 },
     ACTIONS: { setCurrentCustomer: () => null }
   });
   hop.Store = { hasCustomer: () => false };
@@ -66,14 +66,14 @@ function dungHopPoll() {
     hop._options.push(options || {});
     return syncValue({ ok: true, spreadsheetId: 'sheet-1', gid: '1', sheetName: 'Customer', row: 4, col: 1, rowEnd: 4, colEnd: 1, customerId: '', reload: { revision: 0 } });
   };
-  napClient(hop, 'client/ram/refresh.html', 'client/link/sheetLink.html', 'client/link/selectionPoll.html');
+  napClient(hop, 'client/ram/refresh.html', 'client/link/sheetLink.html', 'client/link/selectionPoll.html', 'client/link/changeSignal.html');
   // Các phép kiểm request giữ hợp đồng bàn giao im lặng; bản chạy DEV trực quan bật cờ này ở runtime.
   hop.SHEET_LINK_SHOW_PROBE_PROGRESS_DEBUG = true;
   return hop;
 }
 
 function batDau(hop) {
-  hop.selectionPollInstall(); hop.sheetLinkInstall(); hop.SHEET_LINK_SPREADSHEET_ID = 'sheet-1'; hop.selectionPollSetReady(true);
+  hop.selectionPollInstall(); hop.sheetLinkInstall(); hop.changeSignalInstall(); hop.SHEET_LINK_SPREADSHEET_ID = 'sheet-1'; hop.selectionPollSetReady(true);
 }
 
 function runTimer(hop, delay) {
@@ -121,59 +121,31 @@ async function chay(so) {
   visibleSafetyTimer.fn();
   check(so, 'safety request vẫn silent dù cờ nghiệm thu loading đang bật', safetyVisibleProbe._calls[0].options.silent, true);
 
-  const wake = dungHopPoll(); batDau(wake); wake._calls = [];
-  wake.callServer = (name, args, options) => { wake._calls.push({ name, args, options }); return syncValue({ ok: true, reload: { revision: 0 }, selection: { spreadsheetId: 'sheet-1', gid: '1', sheetName: 'Customer', row: 4, col: 1, rowEnd: 4, colEnd: 1, customerId: '' } }); };
-  const ctx = { action: 'CRM_CONTEXT', nonce: wake.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq: 1, sheetName: 'Customer', row: 4, col: 1, rowEnd: 4, colEnd: 1, hint: 'keydown' };
-  wake.sheetLinkOnMessage({ origin: wake.SHEET_LINK_ORIGIN, data: ctx });
-  wake.sheetLinkOnMessage({ origin: wake.SHEET_LINK_ORIGIN, data: Object.assign({}, ctx, { seq: 2 }) });
-  const wakeTimer = Array.from(wake._timers.values()).find((item) => item.delay === 3000);
-  check(so, 'keydown liên tiếp chỉ giữ một timer debounce ba giây', [Boolean(wakeTimer), wake._timers.size >= 2], [true, true]);
-  wakeTimer.fn();
-  check(so, 'hết debounce chỉ hỏi GAS một request và loading debug bật', [wake._calls.length, wake._calls[0].name, wake._calls[0].options.silent], [1, 'probeSelectionAndReload', false]);
+  const plan = { Customer: [{ token: 'id', headerAddress: 'A1', expectedValue: '@CUS_MA_KH', valueAddressTemplate: 'A{row}' }] };
+  const quiet = dungHopPoll(); batDau(quiet); quiet._calls = [];
+  quiet.SHEET_LINK_READ_PLAN = plan;
+  quiet.SHEET_LINK_LAST_ACK = 5000; quiet._clock.now = 5001;
+  quiet.Store = { hasCustomer: () => true };
+  quiet.callServer = (name, args, options) => { quiet._calls.push({ name, args, options }); return syncValue({ ok: true, reload: { revision: 0 } }); };
+  const timersBefore = quiet._timers.size;
+  const okContext = (seq, cellRef, row, hint) => ({ action: 'CRM_CONTEXT', nonce: quiet.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq, sheetName: 'Customer', cellRef, row, col: 1, hint, readStatus: 'ok', readReason: '', headerComplete: true, rawHeaderRow: [{ address: 'A1', column: 1, value: '@CUS_MA_KH' }], reads: [{ token: 'id', status: 'ok', matched: true, value: 'CUS-00000' + row }] });
+  quiet.sheetLinkOnMessage({ origin: quiet.SHEET_LINK_ORIGIN, data: okContext(1, 'A4', 4, 'keydown') });
+  quiet.sheetLinkOnMessage({ origin: quiet.SHEET_LINK_ORIGIN, data: okContext(2, 'A4', 4, 'keyboardHint') });
+  quiet.sheetLinkOnMessage({ origin: quiet.SHEET_LINK_ORIGIN, data: okContext(3, 'A5', 5, 'canvasClick') });
+  quiet.sheetLinkOnMessage({ origin: quiet.SHEET_LINK_ORIGIN, data: okContext(4, 'A1:A9', 9, '') });
+  check(so, 'Extension đọc được: keydown, canvasClick, đổi vị trí, chọn vùng đều không hỏi GAS và không đặt hẹn giờ đánh thức',
+    [quiet._calls.length, quiet._timers.size - timersBefore], [0, 0]);
 
   const appFocus = dungHopPoll(); batDau(appFocus); appFocus._calls = [];
   appFocus.SHEET_LINK_LAST_ACK = 5000; appFocus._clock.now = 5001;
   appFocus.selectionPollWake();
   check(so, 'focus/chuyển app không tự gọi GAS khi Extension còn sống', appFocus._calls, []);
   appFocus._documentListeners.visibilitychange();
-  check(so, 'visibilitychange không tự gọi GAS lần thứ hai', appFocus._calls, []);
+  check(so, 'tab hiện lại sinh đúng một lời hỏi qua cổng chung, kể cả khi Extension sống', appFocus._calls, ['probeSelectionAndReload']);
+  appFocus.SHEET_LINK_SELECTION_PENDING = null;
+  appFocus._windowListeners.online();
+  check(so, 'mạng nối lại sinh đúng một lời hỏi qua cổng chung', appFocus._calls, ['probeSelectionAndReload', 'probeSelectionAndReload']);
 
-  const irrelevant = dungHopPoll(); batDau(irrelevant); irrelevant._calls = [];
-  irrelevant.sheetLinkOnMessage({
-    origin: irrelevant.SHEET_LINK_ORIGIN,
-    data: { action: 'CRM_CONTEXT', nonce: irrelevant.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq: 1, sheetName: 'Blank', cellRef: 'A4', rawHeaderRow: [], headerComplete: true }
-  });
-  check(so, 'context sheet trắng không đặt wake request',
-    [irrelevant._calls.length, Array.from(irrelevant._timers.values()).some((item) => item.delay === 1000)], [0, false]);
-
-  const knownBlank = dungHopPoll(); batDau(knownBlank); knownBlank._calls = [];
-  knownBlank.SHEET_LINK_SCHEMA = { customer: { id: { code: '@CUS_MA_KH' } } };
-  knownBlank.sheetLinkOnMessage({
-    origin: knownBlank.SHEET_LINK_ORIGIN,
-    data: { action: 'CRM_CONTEXT', nonce: knownBlank.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq: 1, sheetName: 'Customer', cellRef: 'A4', rawHeaderRow: [], headerComplete: true }
-  });
-  check(so, 'sheet mặc định không có mã @ không đặt wake request',
-    [knownBlank._calls.length, Array.from(knownBlank._timers.values()).some((item) => item.delay === 1000)], [0, false]);
-
-  const wholeRows = dungHopPoll(); batDau(wholeRows); wholeRows._calls = [];
-  wholeRows.SHEET_LINK_READ_PLAN = { Customer: [{ token: 'id', headerAddress: 'A1', expectedValue: '@CUS_MA_KH', valueAddressTemplate: 'A{row}' }] };
-  wholeRows.sheetLinkOnMessage({
-    origin: wholeRows.SHEET_LINK_ORIGIN,
-    data: { action: 'CRM_CONTEXT', nonce: wholeRows.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq: 1, sheetName: 'Customer', cellRef: '5:7', rawHeaderRow: [{ address: 'A1', column: 1, value: '@CUS_MA_KH' }], headerComplete: true }
-  });
-  check(so, 'selection nguyên hàng vẫn đặt wake khi sheet có cột mã',
-    Array.from(wholeRows._timers.values()).some((item) => item.delay === 3000), true);
-
-  const stalePlan = dungHopPoll(); batDau(stalePlan); stalePlan._calls = [];
-  stalePlan.SHEET_LINK_READ_PLAN = { Customer: [{ token: 'id', headerAddress: 'A1', expectedValue: '@CUS_MA_KH', valueAddressTemplate: 'A{row}' }] };
-  stalePlan.sheetLinkOnMessage({
-    origin: stalePlan.SHEET_LINK_ORIGIN,
-    data: { action: 'CRM_CONTEXT', nonce: stalePlan.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq: 1, sheetName: 'Customer', cellRef: 'A4', rawHeaderRow: [], headerComplete: true }
-  });
-  check(so, 'read plan lệch hàng 1 fail-open để GAS tự xác nhận',
-    Array.from(stalePlan._timers.values()).some((item) => item.delay === 1000), true);
-
-  const plan = { Customer: [{ token: 'id', headerAddress: 'A1', expectedValue: '@CUS_MA_KH', valueAddressTemplate: 'A{row}' }] };
   const gasSelection = (customerId, cellRef) => ({ ok: true, reload: { revision: 0 }, selection: { spreadsheetId: 'sheet-1', gid: '1', sheetName: 'Customer', cellRef, row: 4, col: 3, rowEnd: 4, colEnd: 3, customerId } });
   const readerDown = dungHopPoll(); batDau(readerDown); readerDown._calls = [];
   readerDown.SHEET_LINK_READ_PLAN = plan;
@@ -225,21 +197,13 @@ async function chay(so) {
     origin: readerOk.SHEET_LINK_ORIGIN,
     data: { action: 'CRM_CONTEXT', nonce: readerOk.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq: 1, sheetName: 'Customer', cellRef: 'A4', hint: 'canvasClick', readStatus: 'ok', readReason: '', headerComplete: true, rawHeaderRow: [{ address: 'A1', column: 1, value: '@CUS_MA_KH' }], reads: [{ token: 'id', status: 'ok', matched: true, value: 'CUS-000004' }] }
   });
-  runTimer(readerOk, 3000);
-  check(so, 'Extension tự đọc được thì giữ quyền chọn khách, selection GAS không đè, không báo Log, không hiện băng',
-    [pickedOk, readerOk._calls.length, readerOk._calls[0].args[0].extensionReadFailure, readerOk._banner.hidden], [['CUS-000004'], 1, '', true]);
+  check(so, 'Extension tự đọc được thì giữ quyền chọn khách, không hỏi GAS, không hiện băng',
+    [pickedOk, readerOk._calls.length, readerOk._banner.hidden], [['CUS-000004'], 0, true]);
 
   const writeResponse = dungHopPoll(); batDau(writeResponse); writeResponse._calls = [];
   writeResponse.sheetLinkObserveReloadPayload({ reload: { revision: 3, records: ['CUS-1'] } }, 'saveRecord');
   writeResponse.sheetLinkObserveReloadPayload({ reload: { revision: 4, records: ['CUS-2'] } }, 'deleteRecords');
   check(so, 'save/delete đã trả kết quả thì không probe reload lần hai', writeResponse._calls, []);
-
-  const relevant = dungHopPoll(); batDau(relevant); relevant._calls = [];
-  relevant.sheetLinkOnMessage({
-    origin: relevant.SHEET_LINK_ORIGIN,
-    data: { action: 'CRM_CONTEXT', nonce: relevant.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq: 1, sheetName: 'Customer', cellRef: 'A4', rawHeaderRow: [], headerComplete: false }
-  });
-  check(so, 'context cột reload hợp lệ vẫn đặt wake debounce', Array.from(relevant._timers.values()).some((item) => item.delay === 1000), true);
 
   const queuedWake = dungHopPoll(); batDau(queuedWake);
   let releaseFirstProbe;
@@ -363,6 +327,78 @@ async function chay(so) {
     data: { action: 'CRM_RELOAD', nonce: failedEvent.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', revision: 9 }
   });
   check(so, 'CRM_RELOAD không đánh dấu revision trước khi công việc thành công', failedEvent.SHEET_LINK_LAST_SEEN_REVISION, 0);
+
+  await chayKenhBaoThayDoi(so);
+}
+
+/** Tín hiệu kênh `/bind` dồn dập: hẹn giờ theo lịch trễ, mọi lời hỏi qua cổng chung, không bao giờ song song. */
+async function chayKenhBaoThayDoi(so) {
+  const burst = dungHopPoll(); batDau(burst);
+  let dangBay = 0; let bayNhieuNhat = 0; const traLoi = [];
+  burst.callServer = (name) => {
+    burst._calls.push(name);
+    dangBay += 1; bayNhieuNhat = Math.max(bayNhieuNhat, dangBay);
+    return new Promise((resolve) => traLoi.push(() => { dangBay -= 1; resolve({ ok: true, reload: { revision: 0 } }); }));
+  };
+  const lichKenh = () => Array.from(burst._timers.values()).filter((item) => item.delay === 4000 || item.delay === 12000);
+  const tinHieu = () => burst.sheetLinkOnMessage({ origin: burst.SHEET_LINK_ORIGIN, data: { action: 'CRM_RELOAD', nonce: burst.SHEET_LINK_NONCE, signal: 'channel' } });
+  tinHieu();
+  const moc4000 = lichKenh().find((item) => item.delay === 4000);
+  for (let i = 0; i < 9; i++) { burst._clock.now += 200; tinHieu(); }
+  check(so, '10 tín hiệu trong 2 giây chỉ giữ hai hẹn giờ; mốc đầu vẫn là hẹn giờ của tín hiệu đầu tiên',
+    [lichKenh().map((item) => item.delay).sort(), lichKenh().find((item) => item.delay === 4000) === moc4000, burst._calls.length], [[12000, 4000], true, 0]);
+  runTimer(burst, 4000);
+  tinHieu();
+  check(so, 'tín hiệu đến lúc lời hỏi mốc đầu đang bay thì mở lại mốc đầu, không gọi GAS song song', [burst._calls.length, lichKenh().length], [1, 2]);
+  runTimer(burst, 4000);
+  runTimer(burst, 12000);
+  check(so, 'các mốc chín trong lúc lời hỏi đang bay chỉ gộp thành tín hiệu chờ', [burst._calls.length, burst.SHEET_LINK_SELECTION_WAKE_QUEUED], [1, true]);
+  traLoi.shift()();
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+  check(so, 'lời hỏi xong thì đúng một lượt nối tiếp, cả đợt không lúc nào có hai lời hỏi cùng bay',
+    [burst._calls, bayNhieuNhat], [['probeSelectionAndReload', 'probeSelectionAndReload'], 1]);
+  traLoi.shift()();
+
+  const lanh = dungHopPoll(); batDau(lanh);
+  lanh.SHEET_LINK_RAM_READY = false;
+  lanh.sheetLinkOnMessage({ origin: lanh.SHEET_LINK_ORIGIN, data: { action: 'CRM_RELOAD', nonce: lanh.SHEET_LINK_NONCE } });
+  lanh.SHEET_LINK_RAM_READY = true;
+  lanh.sheetLinkOnMessage({ origin: lanh.SHEET_LINK_ORIGIN, data: { action: 'CRM_RELOAD', nonce: 'nonce-la' } });
+  lanh.sheetLinkOnMessage({ origin: lanh.SHEET_LINK_ORIGIN, data: { action: 'CRM_CHANNEL_ALIVE', nonce: lanh.SHEET_LINK_NONCE } });
+  check(so, 'chưa nạp RAM, sai nonce hoặc chỉ là nhịp sống thì không hẹn giờ hỏi GAS',
+    Array.from(lanh._timers.values()).filter((item) => item.delay === 4000 || item.delay === 12000).length, 0);
+
+  const canh = dungHopPoll(); batDau(canh);
+  const inputs = [];
+  canh.callServer = (name, args) => { if (name === 'probeSelectionAndReload') { inputs.push(args[0].channelSilence); } return syncValue({ ok: true, reload: { revision: 0 } }); };
+  const nhip = (now) => { canh._clock.now = now; canh.SHEET_LINK_LAST_ACK = now; canh.changeSignalWatchdog(now); };
+  const nhipAnToan = () => Array.from(canh._timers.values()).filter((item) => item.delay === 15000 || item.delay === 60000).map((item) => item.delay);
+  nhip(10000);
+  nhip(10000 + 180000);
+  check(so, 'im đúng ngưỡng CHANNEL_SILENCE_MS thì chưa coi kênh chết', canh.changeSignalChannelDead(), false);
+  nhip(10000 + 180001);
+  check(so, 'kênh im quá ngưỡng khi tab hiện, mạng có, Extension sống: coi kênh chết, hiện băng, nhịp an toàn rút ngắn',
+    [canh.changeSignalChannelDead(), canh._banner.hidden, canh._banner.textContent, nhipAnToan()],
+    [true, false, canh.SELECTION_POLL_BANNER_TEXT.channelDead, [15000]]);
+  canh.sheetLinkProbeSelectionAndReload('safety');
+  canh.SHEET_LINK_SELECTION_PENDING = null;
+  canh.sheetLinkProbeSelectionAndReload('safety');
+  check(so, 'GAS chỉ được báo ghi Log kênh im một lần mỗi phiên', inputs, [true, false]);
+  canh.sheetLinkOnMessage({ origin: canh.SHEET_LINK_ORIGIN, data: { action: 'CRM_CHANNEL_ALIVE', nonce: canh.SHEET_LINK_NONCE } });
+  check(so, 'có tin lại từ kênh thì hết chết, ẩn băng, nhịp an toàn về bình thường',
+    [canh.changeSignalChannelDead(), canh._banner.hidden, nhipAnToan()], [false, true, [60000]]);
+
+  const an = dungHopPoll(); batDau(an);
+  const nhipAn = (now) => { an._clock.now = now; an.SHEET_LINK_LAST_ACK = now; an.changeSignalWatchdog(now); };
+  nhipAn(1000);
+  an.document.hidden = true; nhipAn(500000);
+  an.document.hidden = false; nhipAn(501000);
+  an.navigator = { onLine: false }; nhipAn(900000);
+  an.navigator = { onLine: true }; nhipAn(901000);
+  an._clock.now = 2000000; an.SHEET_LINK_LAST_ACK = 0; an.changeSignalWatchdog(2000000);
+  an.SHEET_LINK_LAST_ACK = 2001000; an.changeSignalWatchdog(2001000);
+  check(so, 'thời gian tab ẩn, mất mạng hoặc vắng Extension không tính vào khoảng im', an.changeSignalChannelDead(), false);
 }
 
 /** Hộp cát cho phần sheet quản trị: ghi lại từng lời gọi máy chủ kèm lý do lời hỏi, trả câu trả lời dựng theo tên hàm. */
@@ -407,17 +443,10 @@ async function chayView(so) {
   const visible = dungHopView();
   visible.SHEET_LINK_LAST_SHEET = '!Lead';
   visible._documentListeners.visibilitychange();
-  const visibleOther = dungHopView();
-  visibleOther.SHEET_LINK_LAST_SHEET = 'Customer';
-  visibleOther._documentListeners.visibilitychange();
-  const revision = dungHopView();
-  revision.SHEET_LINK_LAST_SHEET = '!Lead';
-  revision.sheetLinkOnMessage({ origin: revision.SHEET_LINK_ORIGIN, data: { action: 'CRM_RELOAD', nonce: revision.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', revision: 9 } });
   await new Promise((resolve) => setImmediate(resolve));
-  check(so, 'mở Sidebar, đổi sang sheet !, tab hiện lại, revision mới: mỗi sự kiện sinh đúng một lời hỏi probeSelectionAndReload',
-    [open, enter, visible, revision].map((hop) => tenGoi(hop, 'probeSelectionAndReload').map((item) => item.reason)),
-    [['sidebar-open'], ['view-enter'], ['visible'], ['dirty-state']]);
-  check(so, 'tab hiện lại ở sheet không ! khi Extension sống thì không gọi GAS', visibleOther._log, []);
+  check(so, 'mở Sidebar, đổi sang sheet !, tab hiện lại: mỗi sự kiện sinh đúng một lời hỏi probeSelectionAndReload',
+    [open, enter, visible].map((hop) => tenGoi(hop, 'probeSelectionAndReload').map((item) => item.reason)),
+    [['sidebar-open'], ['view-enter'], ['visible']]);
   check(so, 'vào sheet ! không gọi bộ vẽ riêng ngoài quyết định của lời hỏi', tenGoi(enter, 'renderViewIfDirty'), []);
   enter.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: '!Lead', row: 5, col: 1 });
   check(so, 'nhấp tiếp trên sheet ! chưa có metadata chỉ lấy metadata với controlsOnly, không vẽ sheet cũ',

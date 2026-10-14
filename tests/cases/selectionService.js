@@ -219,6 +219,26 @@ function chay(so) {
     [logged.length, logged[0] && logged[0].action, logged[0] && logged[0].outcome === hop.LOG_WARN, logged[0] && logged[0].reason.indexOf('LIVE_GRID_NOT_FOUND') >= 0],
     [1, 'extension_read', true, true]);
 
+  const channelLogged = [];
+  hop.logEvent = (entry) => { channelLogged.push(entry); };
+  hop.probeSelectionAndReload({ channelSilence: true });
+  hop.probeSelectionAndReload({ channelSilence: false });
+  hop.probeSelectionAndReload({ reason: 'channel-signal' });
+  hop.logEvent = logEventGoc;
+  check(so, 'Sidebar báo kênh báo thay đổi im thì GAS ghi đúng một dòng cảnh báo change_channel',
+    channelLogged.map((entry) => [entry.action, entry.outcome === hop.LOG_WARN]), [['change_channel', true]]);
+
+  const demTruoc = JSON.stringify(nen.dem);
+  const normalLogged = [];
+  hop.logEvent = (entry) => { normalLogged.push(entry); };
+  const logWritesTruoc = hop.logGateWriteCount();
+  ['channel-signal', 'visible', 'online', 'safety'].forEach((reason) => { hop.probeSelectionAndReload({ reason }); });
+  hop.logEvent = logEventGoc;
+  check(so, 'lời hỏi thay đổi khi không có gì bẩn không ghi Sheet, không ghi Log',
+    [JSON.parse(demTruoc), normalLogged.length, hop.logGateWriteCount() - logWritesTruoc], [JSON.parse(JSON.stringify(nen.dem)), 0, 0]);
+  check(so, 'phép đếm ghi Sheet giả thật sự tăng khi có ghi (chống phép kiểm rỗng)',
+    (ghiO(nen, 'Customer', 9, '@CUS_MA_KH', 'CUS-000009'), nen.dem.setValues > JSON.parse(demTruoc).setValues), true);
+
   const calls = [];
   hop.runEntryPoint = function (name, source, channel, fn) {
     calls.push([name, source, channel]);

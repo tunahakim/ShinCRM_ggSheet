@@ -18,24 +18,29 @@ function payloadCookieCapturePattern() {
 
 /** `runtime` mặc định còn `id` như Extension đang sống; truyền `id: undefined` để giả bản cầu nối bị bỏ lại sau khi tải lại Extension. */
 function napBridge(runtime) {
-  let onMessage = null;
+  const listeners = [];
   const hop = {
     console: { log() {} },
     Date,
     chrome: { runtime: Object.assign({ id: 'shincrm-test' }, runtime || {}) },
     setTimeout,
+    location: { origin: 'https://docs.google.com' },
     window: {
       addEventListener(name, fn) {
-        if (name === 'message') { onMessage = fn; }
+        if (name === 'message') { listeners.push(fn); }
       },
       removeEventListener(name, fn) {
-        if (name === 'message' && onMessage === fn) { onMessage = null; hop._removed = true; }
+        const at = listeners.indexOf(fn);
+        if (name === 'message' && at >= 0) { listeners.splice(at, 1); if (fn === hop._onMessage) { hop._removed = true; } }
       }
     }
   };
   vm.createContext(hop);
   vm.runInContext(fs.readFileSync(BRIDGE_FILE, 'utf8'), hop, { filename: BRIDGE_FILE });
-  hop._onMessage = onMessage;
+  // Thứ tự đăng ký trong tệp: tin của Sidebar trước, tín hiệu kênh `/bind` sau.
+  hop._onMessage = listeners[0];
+  hop._onBindEvent = listeners[1];
+  hop._listeners = listeners;
   return hop;
 }
 
@@ -123,6 +128,31 @@ async function chay(so) {
   check(so, 'ACK trả đúng nonce về đúng origin đã bắt tay',
     [dung.sent[0].data.action, dung.sent[0].data.nonce, Boolean(dung.sent[0].data.sessionId), dung.sent[0].targetOrigin, hop.lastContextKey],
     ['CRM_HANDSHAKE_ACK', 'nonce-kiem-thu', true, 'https://abc-123.googleusercontent.com', '']);
+
+  const kenh = napBridge();
+  const kenhSidebar = nguonTin();
+  let dongHo = 1000000;
+  kenh.Date = { now: () => dongHo };
+  const tinKenh = (kind, nguon) => kenh._onBindEvent({ source: nguon || kenh.window, origin: kenh.location.origin, data: { source: 'SHINCRM_EXTENSION', action: 'CRM_BIND_EVENT', kind } });
+  tinKenh('signal');
+  check(so, 'tín hiệu kênh đến trước bắt tay thì không gửi đi đâu', kenhSidebar.sent.length, 0);
+  kenh._onMessage({ origin: 'https://abc-123.googleusercontent.com', source: kenhSidebar.source, data: { action: 'CRM_HANDSHAKE', nonce: 'nonce-kenh', channelAliveMs: 20000 } });
+  kenhSidebar.sent.length = 0;
+  for (let i = 0; i < 20; i++) { tinKenh('alive'); dongHo += 50; }
+  check(so, '20 nhịp sống trong 1 giây chỉ chuyển một CRM_CHANNEL_ALIVE về đúng origin Sidebar',
+    kenhSidebar.sent.map((item) => [item.data.action, item.data.nonce, item.targetOrigin]), [['CRM_CHANNEL_ALIVE', 'nonce-kenh', 'https://abc-123.googleusercontent.com']]);
+  dongHo += 20000; tinKenh('alive');
+  check(so, 'hết khoảng gộp thì nhịp sống kế tiếp được chuyển', kenhSidebar.sent.length, 2);
+  kenhSidebar.sent.length = 0;
+  tinKenh('signal'); tinKenh('signal'); tinKenh('open');
+  check(so, 'mỗi tín hiệu và mỗi lần kênh mở đều chuyển CRM_RELOAD, không mang revision',
+    kenhSidebar.sent.map((item) => [item.data.action, item.data.signal, 'revision' in item.data, Boolean(item.data.sessionId)]),
+    [['CRM_RELOAD', 'channel', false, true], ['CRM_RELOAD', 'channel', false, true], ['CRM_RELOAD', 'channel-open', false, true]]);
+  kenhSidebar.sent.length = 0;
+  tinKenh('signal', {});
+  kenh._onBindEvent({ source: kenh.window, origin: 'https://evil.example', data: { source: 'SHINCRM_EXTENSION', action: 'CRM_BIND_EVENT', kind: 'signal' } });
+  kenh._onBindEvent({ source: kenh.window, origin: kenh.location.origin, data: { source: 'KHAC', action: 'CRM_BIND_EVENT', kind: 'signal' } });
+  check(so, 'tin không phải từ chính trang Sheets hoặc sai nguồn thì bỏ qua', kenhSidebar.sent.length, 0);
 
   const readPlan = { Customer: [{ token: 'id', headerAddress: 'A1', expectedValue: '@CUS_MA_KH', valueAddressTemplate: 'A{row}' }] };
   hop._onMessage({
