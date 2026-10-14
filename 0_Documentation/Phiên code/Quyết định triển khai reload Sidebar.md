@@ -17,7 +17,7 @@ Các yêu cầu phải đạt:
 
 1. GAS là nơi duy nhất biết một giá trị có thực sự được ghi, cột có mã hợp lệ hay không, mã bản ghi nào bị ảnh hưởng và scope reload nào an toàn.
 2. Mọi ghi thành công vào `Customer` hoặc `Activity` qua `onEdit`, `WriteGate`, `DeleteGate`, pull, push hoặc background đều phát signal dirty chung.
-3. Sheet quản trị được GAS quyết định và vẽ độc lập, không phụ thuộc Sidebar, Extension, focus hay sheet đang active.
+3. Sheet quản trị vẽ khi có người xem: dữ liệu kho đổi chỉ làm view cũ, Sidebar gọi vẽ khi người dùng mở sheet `!` đó; trigger chỉ vẽ ngay khi người dùng sửa bộ điều khiển view. Nguồn chuẩn: tài liệu 07 Phần 8.
 4. Sidebar nhận schema và dữ liệu thô từ Extension, tự phân tích Name Box/hàng 1 để quyết định có cần đánh thức GAS hay không; Sidebar không tự quyết định dirty state, scope reload hay API nghiệp vụ.
 5. Khi có Extension hoặc không có Extension, click vào ô vẫn phải lấy được mã khách để đổi khách đang xem.
 6. Tránh nhiều request nối tiếp chỉ để lấy context selection; khi có thể, một request GAS phải trả cả selection và quyết định reload.
@@ -33,10 +33,10 @@ GAS giữ nguồn sự thật và state bền vững:
 - `WriteGate`/`DeleteGate` xử lý mọi ghi do GAS;
 - `ReloadDecision` phân loại thay đổi và tạo output;
 - `DirtyState` giữ `revision`, `changedAt`, các scope bẩn;
-- `renderAllManagedViewsIfAllowed` vẽ sheet quản trị;
+- bộ vẽ sheet quản trị (vẽ khi có người xem, tài liệu 07 Phần 8);
 - các API reload thực thi nạp RAM theo scope.
 
-GAS không được chờ Sidebar để vẽ view và không được coi Extension là nguồn sự thật.
+GAS không được coi Extension là nguồn sự thật.
 
 ### 3.2. Extension
 
@@ -165,7 +165,7 @@ Ví dụ:
 
 Mỗi `onEdit` mới cập nhật lại mốc cuối. Rời `Customer` hoặc `Activity` là ngoại lệ đã chốt: Sidebar reload ngay và hủy timer còn lại.
 
-Hai mốc không áp dụng giống nhau cho sheet quản trị. `onEdit`/`onChange`/cửa ghi phải để GAS quyết định và vẽ view theo chính sách ngay; Sidebar debounce chỉ phục vụ RAM Sidebar.
+Hai mốc chỉ phục vụ RAM Sidebar. Sheet quản trị theo luật vẽ khi có người xem ở tài liệu 07 Phần 8.
 
 ## 6. Không có Extension
 
@@ -216,35 +216,18 @@ Nếu bản nháp Sidebar trùng mã đang bẩn, GAS trả `defer` cho mã đó
 
 ## 8. Sheet quản trị
 
-Sheet quản trị được xử lý chủ động, không chờ Sidebar polling:
-
-```text
-onEdit/onChange hoặc WriteGate/DeleteGate
-        ↓
-ReloadDecision trên GAS
-        ↓
-DirtyState
-        ↓
-renderAllManagedViewsIfAllowed()
-```
-
-Các trường hợp chính:
-
-- Customer/Activity đổi ở cột mã hợp lệ: vẽ toàn bộ view sau signal, nếu chính sách cho phép.
-- Category/Config đổi: vẽ toàn bộ view sau signal.
-- Hàng 1 sheet quản trị chỉ vẽ khi trước hoặc sau thay đổi có ít nhất một giá trị mã `@` hợp lệ; đổi giá trị thường sang giá trị thường không vẽ. Sửa một ô hay cả vùng đều đối chiếu từng ô trước/sau.
-- Thay đổi cấu trúc qua `onChange`: đánh dấu scope bảo thủ và vẽ lại view cần thiết.
-- `autoRenderView=false`: không vẽ tự động, nhưng giữ cờ; khi bật lại, GAS vẽ toàn bộ ngay.
-
-Sidebar safety polling không phải là cơ chế quyết định vẽ view. Nó chỉ giúp RAM Sidebar phát hiện signal khi không có event đánh thức đủ nhanh.
+Luật cũ "vẽ mọi view ngay sau signal hoặc sau khi lưu" đã bỏ (chủ dự án duyệt 2026-10-14). Nguồn chuẩn hiện tại là tài liệu 07 Phần 8 (vẽ khi có người xem, dấu báo view cũ và phục hồi) và bảng phân loại ở 07A.
 
 ## 9. `onChange`
 
 `onChange` là trigger Spreadsheet cho thay đổi cấu trúc như thêm/xóa hàng, cột hoặc sheet. Event thường không có range chính xác, nên xử lý bảo thủ:
 
-- thêm/xóa hàng hoặc cột ở Customer/Activity: `allCore` + `allViews`;
-- thêm/xóa sheet hoặc thay đổi cấu trúc schema: `schema` + `allCore` + `allViews`;
-- thay đổi cấu trúc sheet quản trị: `allViews`.
+- thêm/xóa hàng hoặc `OTHER` (sắp xếp) ở Customer/Activity: `entities: [thực thể]` + `allViews`, nạp trọn riêng sheet đó; ở Category/Config: `category`/`config` + `allViews`;
+- thêm/xóa cột ở Customer/Activity: `allCore` + `allViews`;
+- thêm sheet `!` mới tự là cũ, xóa sheet không làm sheet khác cũ;
+- thêm/xóa hàng, cột trên sheet quản trị: vẽ đúng sheet đó.
+
+Bảng đầy đủ ở 07A.
 
 `onChange` không thay thế `onEdit`, không dùng để xác định thay đổi giá trị ô thông thường.
 
@@ -278,8 +261,8 @@ Trên Spreadsheet DEV phải chứng minh:
 7. Keydown, Enter và Esc không tự tạo dirty nếu GAS không có signal.
 8. Không có Extension, fallback selection probe kèm kiểm tra reload; không có request kiểm tra dư.
 9. Safety polling phát hiện signal nền sau tối đa `n` phút khi không có wake request khác.
-10. Sheet quản trị được vẽ ngay từ `onEdit`, `onChange` hoặc cửa ghi, kể cả khi Sidebar đóng.
-11. `autoRenderView=false` giữ cờ và bật lại thì GAS vẽ ngay.
+10. Sheet quản trị theo tiêu chí ở tài liệu 07 Phần 8: dữ liệu kho đổi chỉ làm view cũ, vẽ khi có người mở sheet đó.
+11. `autoRenderView=false` thì mở sheet cũ chỉ báo, không tự vẽ.
 12. Ghi thật thất bại không làm mất dirty state.
 13. Nhiều Sidebar không ghi đè context selection của nhau.
 
