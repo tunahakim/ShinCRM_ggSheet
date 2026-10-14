@@ -71,7 +71,13 @@ FbmSync.FINGERPRINT_FIELDS = {
 /* Trường FBM sở hữu, đứng ngoài fingerprint nên hash không lộ khi chúng đổi; lượt kéo luôn ghi đè theo FBM (09/03, 09/04 Phần 6). */
 FbmSync.PULL_OVERWRITE_FIELDS = {
   customer: ['fbmCustomerCode'],
-  activity: ['enteredBy']
+  // customerId đã được đổi sang mã Customer ShinCRM trước khi so; FBM thắng để dòng lỡ xóa hoặc gõ sai mã khách tự nối lại, nếu không ngày giao dịch cuối của khách lệch FBM mãi.
+  activity: ['enteredBy', 'customerId']
+};
+
+/* Ghi đè trường FBM sở hữu nào là sửa dữ liệu người dùng làm hỏng, cần để lại dấu ở Log; trường còn lại ghi đè lặng lẽ vì chỉ là thông tin hiển thị. */
+FbmSync.PULL_OVERWRITE_LOGGED = {
+  customerId: 'Giao dịch mất hoặc lệch mã khách so với FBM; đã nối lại vào khách '
 };
 
 /* Cột grid mang giá trị của một trường fingerprint khi tên khác: grid trả tên hiển thị, form và fingerprint dùng mã. */

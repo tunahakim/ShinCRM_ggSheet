@@ -144,7 +144,9 @@ FbmSync.pullWrite = function (entity, records) {
     // Trường FBM sở hữu đứng ngoài fingerprint nên hash không lộ khi chúng đổi; ghi đè riêng: ma_kh để Activity mới còn nối được Customer cha (FBM-054), người tạo để hiện đúng người tạo trên FBM.
     (FbmSync.PULL_OVERWRITE_FIELDS[entity] || []).forEach(function (field) {
       var value = String(incoming[field] || '').trim();
-      if (value && value !== String(current[field] || '')) { (ownedFixes[current.id] = ownedFixes[current.id] || {})[field] = value; }
+      if (!value || value === String(current[field] || '')) { return; }
+      (ownedFixes[current.id] = ownedFixes[current.id] || {})[field] = value;
+      if (FbmSync.PULL_OVERWRITE_LOGGED[field]) { FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.synced, FbmSync.PULL_OVERWRITE_LOGGED[field] + value + '.', { issue: true }); }
     });
     if (identityMatched) {
       writes.push(Object.assign({}, mergedIncoming, { id: current.id, fbmId: key, fbmCustomerCode: incoming.fbmCustomerCode || current.fbmCustomerCode, fbmHash: FbmSync.hash(incoming, entity, categoryGate), syncStatus: FbmSync.SYNC_STATUS.synced, syncedAt: new Date() }));
