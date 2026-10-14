@@ -85,8 +85,8 @@ var SETTINGS = {
   CHANNEL_ALIVE_RELAY_MS: 20000,
   /** Kênh im quá ngưỡng này (tab hiện, mạng có) thì coi là chết. Google gửi `noop` khoảng 33 giây/lần và mở lại kênh khoảng 140 giây/lần, 180 giây phủ được một lần mở lại cộng một nhịp. */
   CHANNEL_SILENCE_MS: 180000,
-  /** Nhịp hỏi an toàn khi kênh sống (chỉ để vớt thứ kênh bỏ sót) và khi kênh chết (thay kênh). */
-  RELOAD_SAFETY_POLL_MS: 60000,
+  /** Nhịp hỏi an toàn khi kênh sống (chỉ để vớt thứ kênh bỏ sót) và khi kênh chết (thay kênh). Kênh sống để 5 phút vì mỗi lượt là một lần chạy GAS 1,5–2,7 giây: 60 giây là khoảng 60 lượt mỗi giờ cho mỗi Sidebar dù không ai sửa gì. Đánh đổi: thay đổi kênh bỏ sót có thể trễ tới 5 phút. */
+  RELOAD_SAFETY_POLL_MS: 300000,
   RELOAD_SAFETY_POLL_DEAD_MS: 15000,
   /** Màu tab sheet quản trị đang cũ (dữ liệu đã đổi nhưng sheet chưa vẽ lại). Cam để khác các màu nhóm sheet thường dùng. */
   VIEW_STALE_TAB_COLOR: '#ff9900'
