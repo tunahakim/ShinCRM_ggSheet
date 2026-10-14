@@ -55,6 +55,8 @@ function taoSheet(ten, dem, luoi) {
   const notes = [];
   const formulas = [];
   const validations = [];
+  const tabColors = [];
+  let tabColor = null;
   let frozenRows = 0;
   let maxRows = (luoi && luoi.rows) || 1000;
   let maxCols = (luoi && luoi.cols) || 26;
@@ -92,6 +94,10 @@ function taoSheet(ten, dem, luoi) {
     getName: () => ten,
     getSheetId: () => Array.from(ten).reduce((sum, ch) => sum + ch.charCodeAt(0), 0),
     getActiveRange: () => null,
+    /** Google trả `null` khi tab không màu. `_tabColors` giữ lịch sử từng lần đặt màu để test đếm lời gọi. */
+    getTabColor: () => tabColor,
+    setTabColor(color) { tabColor = color || null; tabColors.push(color); return sheet; },
+    _tabColors: tabColors,
 
     /** Dòng cuối có nội dung. Trả về 0 khi sheet trắng, đúng như Google. */
     getLastRow() {

@@ -240,4 +240,46 @@ function chay(so) {
       created.hop.DATA_SCHEMA.activity.content.code, created.hop.DATA_SCHEMA.activity.priority.code, created.hop.DATA_SCHEMA.activity.dueAt.code]]);
 }
 
-module.exports = { chay };
+function chayTabCam(so) {
+  section('ViewTabTint — tab cam khi sheet quản trị cũ, trả màu khi vẽ xong');
+  let base;
+  try {
+    base = taoNen(['@CUS_MA_KH', '@CUS_TEN_CTY']);
+  } catch (err) { return ghiLoiNap(so, 'nạp ViewTabTint', err); }
+  const hop = base.nen.hop;
+  gieoHaiKhach(base.nen);
+  const care = base.nen.book.insertSheet('!Chăm sóc');
+  care.getRange(1, 1, 1, 2).setValues([['@CUS_MA_KH', '@CUS_TEN_CTY']]);
+  hop.renderAllManagedViews();
+  care.setTabColor('#00ff00');
+  const ghi = () => hop.writeCommitAfterSuccess({ source: 'sidebar', surface: 'record', entity: 'customer', recordIds: ['KH0001'] });
+
+  ghi();
+  check(so, 'chuyển sạch sang cũ: mọi sheet ! tô cam một lần, sheet kho không bị chạm',
+    [base.view.getTabColor(), care.getTabColor(), base.view._tabColors.length, care._tabColors.length, base.nen.book.getSheetByName('Customer')._tabColors.length],
+    ['#ff9900', '#ff9900', 1, 2, 0]);
+  ghi();
+  check(so, 'signal thứ hai khi sheet vẫn cũ không gọi setTabColor', [base.view._tabColors.length, care._tabColors.length], [1, 2]);
+
+  hop.renderViewSheet('!Lead');
+  check(so, 'vẽ xong trả "không màu" cho sheet vừa vẽ, sheet chưa vẽ giữ cam',
+    [base.view.getTabColor(), base.view._tabColors.length, care.getTabColor()], [null, 2, '#ff9900']);
+
+  const realGuard = hop.viewAssertNoFormulas;
+  hop.viewAssertNoFormulas = function () { hop.dirtyStateMarkRecordChange('customer', ['KH0002']); return realGuard.apply(this, arguments); };
+  hop.renderViewSheet('!Chăm sóc');
+  hop.viewAssertNoFormulas = realGuard;
+  check(so, 'signal đến giữa lượt vẽ để sheet vẫn cũ thì không trả màu', [hop.viewIsStale('!Chăm sóc'), care.getTabColor()], [true, '#ff9900']);
+  hop.renderViewSheet('!Chăm sóc');
+  check(so, 'vẽ lại xong trả đúng màu người dùng tự đặt', care.getTabColor(), '#00ff00');
+
+  hop.dirtyStateMarkRecordChange('customer', ['KH0001']);
+  const tinted = hop.viewTabTintStale();
+  check(so, 'đường trigger (tự lấy khóa) tô lại sheet cũ sau khi đã trả màu và nhả khóa',
+    [tinted, base.view.getTabColor(), care.getTabColor(), base.nen.stubs._khoa.dangGiu], [2, '#ff9900', '#ff9900', false]);
+  const before = base.nen.book.getSheets().map((sheet) => sheet._tabColors.length);
+  check(so, 'không có signal mới thì lượt tô không quét sheet nào',
+    [hop.viewTabTintStale(), base.nen.book.getSheets().map((sheet) => sheet._tabColors.length)], [0, before]);
+}
+
+module.exports = { chay: (so) => { chay(so); chayTabCam(so); } };

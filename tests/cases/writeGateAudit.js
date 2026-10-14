@@ -23,7 +23,8 @@ const RUNTIME_WRITERS = {
   'server/sheet/SetupSheets.js': 'infrastructure/setup',
   'server/sheet/SyncColumnSetup.js': 'sync/schema',
   'server/view/ViewSheetRenderer.js': 'view/renderer',
-  'server/view/ViewSheetSetup.js': 'view/setup'
+  'server/view/ViewSheetSetup.js': 'view/setup',
+  'server/view/ViewTabTint.js': 'view/tab-tint'
 };
 
 const MUTATOR_NAMES = [
@@ -36,7 +37,7 @@ const MUTATOR_NAMES = [
   'setFontLine', 'setFontLines', 'setFontSize', 'setFontSizes',
   'setFontStyle', 'setFontStyles', 'setBackground', 'setBackgrounds',
   'setBorder', 'setHorizontalAlignment', 'setHorizontalAlignments',
-  'setVerticalAlignment', 'setVerticalAlignments', 'setTextDirection', 'setTextDirections',
+  'setVerticalAlignment', 'setVerticalAlignments', 'setTextDirection', 'setTextDirections', 'setTabColor',
   'setTextRotation', 'setTextRotations', 'setWrap', 'setWraps',
   'setWrapStrategy', 'setWrapStrategies', 'setShowHyperlink', 'setShowHyperlinks',
   'setFrozenRows', 'setFrozenColumns', 'setHiddenGridlines', 'setTabColor',

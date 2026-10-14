@@ -52,6 +52,11 @@ function chay(so) {
   });
   check(so, 'sửa hàng 1 ở đủ bốn sheet mặc định luôn phát schema, full core và toàn bộ view', schemaResults,
     defaultSheets.map((name) => [name, true, true, true]));
+  clearState();
+  const scratch = nen.book.insertSheet('Nháp');
+  scratch.getRange(1, 1).setValue('x');
+  hop.shinOnEdit({ range: eventRange(scratch, 1, 1), value: 'x' });
+  check(so, 'gõ hàng 1 của sheet ngoài hệ thống chưa có ảnh chụp hàng 1 không phát signal', hop.reloadStateRead().viewsStaleRevision, 0);
 
   clearState();
   defaultSheets.forEach((name) => {
