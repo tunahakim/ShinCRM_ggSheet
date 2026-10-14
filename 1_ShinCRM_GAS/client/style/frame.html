@@ -124,9 +124,12 @@ html, body {
 /* Popup dùng chung cho tìm kiếm, dropdown, customer picker và menu module. Mỗi controller chỉ chọn kiểu neo/rộng riêng. */
 /* Vùng 3 — Khối thông tin chung. Cao theo nội dung, **nền trắng như một card**: đây là khối chữ to nhất và quan trọng nhất
    của cả sidebar, nên nó đứng cùng hạng với card chứ không phải một dải phụ màu xám. Cỡ chữ và màu chữ của ruột khối thì ở
-   `client/style/slots.html`, cùng chỗ với slot dựng ra nó. */
+   `client/style/slots.html`, cùng chỗ với slot dựng ra nó. Nội dung cao hơn khung (câu báo dài) thì khối tự co và cuộn bên trong;
+   chỉ khối này co được vì thân đặt gốc co giãn bằng 0, nên thân dài không bao giờ bóp khối thông tin. */
 #sidebar-info {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: var(--shin-gap-1);
@@ -147,7 +150,7 @@ html, body {
    Các card giữ cùng trục trái/phải nhờ `scrollbar-gutter: stable both-edges` ở chính vùng cuộn. Không đặt padding ngang
    riêng ở đây, vì một lớp lề nữa sẽ cộng dồn với gutter và làm card lệch hoặc mất bề ngang cần thiết. */
 #sidebar-body {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   display: flex;
   flex-direction: column;
   gap: var(--shin-gap-2);
