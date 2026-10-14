@@ -23,7 +23,7 @@ var DEV_RUNNER_ALLOWED = [
   'dumpColumnMap', 'dumpSettings', 'dumpSheetGrid', 'dumpCoreSheetHead', 'dumpRecentLog',
   'devLogTraceOn', 'devLogTraceOff', 'formulaProbeCreate', 'formulaProbeRemove', 'measureReloadCosts', 'measureTabColorBatch',
   'probeBadColumnCode', 'probeLogGate', 'probeDateText', 'probeSheetGrid', 'probeCellBudget',
-  'probeEntityRead', 'probeCategoryRead', 'probeConfigRead', 'probeDirtyState', 'getReloadState', 'probeSelectionAndReload', 'measureProbeCheap', 'measureProbeFull', 'reloadRecords', 'reloadConfig', 'renderAllManagedViews', 'renderAllManagedViewsIfAllowed',
+  'probeEntityRead', 'probeCategoryRead', 'probeConfigRead', 'probeDirtyState', 'getReloadState', 'probeSelectionAndReload', 'measureProbeCheap', 'measureProbeFull', 'measureEntitySignal', 'reloadRecords', 'reloadConfig', 'renderAllManagedViews', 'renderAllManagedViewsIfAllowed',
   'probeErrorReport', 'probeEntryPoint', 'probeLoadAll', 'probeSidebarTemplate', 'probeClientTiming',
   'probeSaveGate', 'probeIdGate', 'viewProbeSelection', 'viewProbeRenderCurrent', 'viewProbeCreateRender', 'viewProbeAutoRender', 'viewProbeTabTint',
   'probeTriggerState', 'shinInstallTriggers', 'shinInstallSidebarOpenTrigger', 'reloadMatrixProbe', 'reloadPayloadProbe',

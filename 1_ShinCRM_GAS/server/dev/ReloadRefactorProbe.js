@@ -104,3 +104,19 @@ function measureProbeFull() {
   probeSelectionAndReload({ lastSeenRevision: seen, previousCustomerId: 'CUS-DO' });
   return 'probe đọc vị trí: ' + (Date.now() - t) + ' ms';
 }
+
+/** Giả một lượt sắp xếp trên Customer (onChange `OTHER`, sheet active của lượt chạy là sheet đầu) rồi đo lời hỏi nạp trọn thực thể trên dữ liệu thật. */
+function measureEntitySignal() {
+  var out = [];
+  var active = shinOpenBook().getActiveSheet().getName();
+  out.push('Sheet active: ' + active);
+  shinOnChange({ changeType: 'OTHER' });
+  var state = reloadStateRead();
+  out.push('Sau OTHER: entities ' + JSON.stringify(state.entities) + ', allCore ' + state.allCore + ', revision ' + state.revision);
+  var t = Date.now();
+  var probe = probeSelectionAndReload({ lastSeenRevision: state.revision - 1, skipPosition: true, previousSelectionContext: { sheetName: active } });
+  var block = probe.payload && probe.payload[probe.payload.entity];
+  out.push('Lời hỏi: ' + (Date.now() - t) + ' ms, mode ' + (probe.payload && probe.payload.mode) + ' ' + (probe.payload && probe.payload.entity) + ', ' + (block ? block.rows.length : 0) + ' dòng');
+  out.push('Sau lời hỏi: entities ' + JSON.stringify(reloadStateRead().entities) + ', remainingRevision ' + probe.remainingRevision);
+  return out;
+}
