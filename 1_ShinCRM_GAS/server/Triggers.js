@@ -179,7 +179,14 @@ function shinOnEdit(event) {
     var column = selectionColumnIndex(sheet, DATA_SCHEMA[entity].id.code);
     if (!column) { return; }
     var last = range.getLastRow();
-    var ids = sheet.getRange(range.getRow(), column, last - range.getRow() + 1, 1).getValues().map(function (row) { return row[0]; });
+    var ids = sheet.getRange(range.getRow(), column, last - range.getRow() + 1, 1).getValues().map(function (row) { return String(row[0] === null || row[0] === undefined ? '' : row[0]).trim(); });
+    // Xóa trắng ô mã thì trigger chỉ thấy ô rỗng sau sửa: một ô đơn còn `oldValue` để đánh dấu đúng mã cũ, vùng nhiều ô thì không biết mã nào đã mất nên nạp trọn thực thể.
+    if (shinRangeTouchesColumn(range, column) && ids.indexOf('') >= 0) {
+      var single = range.getRow() === last && range.getColumn() === range.getLastColumn();
+      var oldId = single && event && event.oldValue !== undefined && event.oldValue !== null ? String(event.oldValue).trim() : '';
+      if (oldId) { ids = [oldId]; }
+      else { return shinReloadDecision({ source: 'edit', surface: 'entity', entities: [entity] }); }
+    }
     return shinReloadDecision({ source: 'edit', surface: 'record', entity: entity, recordIds: ids });
     });
   } finally {

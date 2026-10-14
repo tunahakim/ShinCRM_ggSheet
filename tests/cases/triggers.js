@@ -118,6 +118,22 @@ function chay(so) {
     [moduleState.records, moduleState.allCore, moduleState.schema, moduleState.category, moduleState.config, (moduleState.viewsStaleRevision > 0)],
     [[], false, false, false, false, true]);
 
+  const cotMa = hop.selectionColumnIndex(nen.sheet('Customer'), '@CUS_MA_KH');
+  ghiO(nen, 'Customer', 4, '@CUS_MA_KH', 'KH000004');
+  nen.sheet('Customer').getRange(5, cotMa).setValue('');
+  clearState();
+  hop.shinOnEdit({ range: eventRange(nen.sheet('Customer'), 5, cotMa), oldValue: 'KH000777' });
+  const xoaMotO = hop.reloadStateRead();
+  clearState();
+  hop.shinOnEdit({ range: eventRange(nen.sheet('Customer'), 4, cotMa, 2, 3) });
+  const xoaVung = hop.reloadStateRead();
+  clearState();
+  hop.shinOnEdit({ range: eventRange(nen.sheet('Customer'), 4, cotMa) });
+  const suaThuong = hop.reloadStateRead();
+  check(so, 'xóa trắng ô mã khách: ô đơn đánh dấu đúng mã cũ từ oldValue; vùng nhiều dòng có mã rỗng nạp trọn Customer; ô mã còn giá trị vẫn đánh dấu theo mã',
+    [xoaMotO.records, xoaMotO.entities, xoaVung.records, xoaVung.entities, xoaVung.allCore, suaThuong.records, suaThuong.entities],
+    [['KH000777'], [], [], ['customer'], false, ['KH000004'], []]);
+
   clearState();
   ghiO(nen, 'Activity', 4, '@ACT_MA_GD', 'GD000001');
   hop.shinOnEdit({ range: eventRange(nen.sheet('Activity'), 4, 1) });
