@@ -89,3 +89,18 @@ function measureTabColorBatch() {
     sheets.forEach(function (sheet) { book.deleteSheet(sheet); });
   }
 }
+
+/** Đo lời hỏi rẻ và lời hỏi đọc vị trí, mỗi hàm là lời gọi đầu tiên của một lượt chạy mới để tính cả phí mở bảng tính lần đầu. */
+function measureProbeCheap() {
+  var seen = reloadStateRead().revision;
+  var t = Date.now();
+  probeSelectionAndReload({ skipPosition: true, lastSeenRevision: seen, previousSelectionContext: { sheetName: ENTITY_SHEETS.customer, row: SHEET_FIRST_DATA_ROW, col: 1 }, previousCustomerId: 'CUS-DO' });
+  return 'probe skipPosition: ' + (Date.now() - t) + ' ms';
+}
+
+function measureProbeFull() {
+  var seen = reloadStateRead().revision;
+  var t = Date.now();
+  probeSelectionAndReload({ lastSeenRevision: seen, previousCustomerId: 'CUS-DO' });
+  return 'probe đọc vị trí: ' + (Date.now() - t) + ' ms';
+}
