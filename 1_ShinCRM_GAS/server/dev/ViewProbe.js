@@ -67,3 +67,13 @@ function viewProbeTabTint() {
   });
   return report;
 }
+
+/** Dọn khóa DocumentProperties của hai sổ cũ đã thay bằng `viewLedger`; không còn code nào đọc chúng. Chạy lại an toàn. */
+function viewWipeLegacyKeys() {
+  var props = documentProps();
+  var keys = Object.keys(props.getProperties() || {}).filter(function (key) {
+    return key === 'viewRenderedRevisions' || key.indexOf('shinViewInput:') === 0 || key.indexOf('shinViewRevision:') === 0;
+  });
+  keys.forEach(function (key) { props.deleteProperty(key); });
+  return { ok: true, deleted: keys };
+}
