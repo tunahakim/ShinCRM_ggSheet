@@ -1,6 +1,8 @@
 /** Ba đường UI có DOM riêng: phát click, menu nổi và khối thu gọn. */
 
-const { napClient, taoHopCat } = require('../lib/load-gas');
+const fs = require('fs');
+const path = require('path');
+const { napClient, taoHopCat, GAS_DIR } = require('../lib/load-gas');
 const { domGia } = require('../lib/dom-gia');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 
@@ -61,8 +63,8 @@ async function chay(so) {
   moKhoa();
   check(so, 'dispatchBusy khôi phục đúng trạng thái sau khi xong', [nutBan.disabled, nhan.textContent], [false, 'Lưu']);
 
-  const moToanBo = hop.sidebarBusyBegin('Đang lưu khách hàng…');
-  const moLong = hop.sidebarBusyBegin('Đang đồng bộ dữ liệu…');
+  const moToanBo = hop.sidebarBusyBegin('Đang lưu khách hàng…', { block: true });
+  const moLong = hop.sidebarBusyBegin('Đang đồng bộ dữ liệu…', { block: true });
   check(so, 'trạng thái bận lồng nhau khóa toàn gốc, đẩy lời báo vào luồng và phủ từ dưới lời báo',
     [dom.root.getAttribute('inert'), dom.root.getAttribute('aria-busy'), overlay.hidden, notice.hidden, notice.textContent, overlay.style.top],
     ['', 'true', false, false, 'Đang đồng bộ dữ liệu…', '81px']);
@@ -81,6 +83,10 @@ async function chay(so) {
   check(so, 'cùng component có thể chỉ khóa dưới thanh loading mà không dựng dòng thông báo',
     [dom.root.hasAttribute('inert'), overlay.hidden, notice.hidden, overlay.style.top], [true, false, true, '53px']);
   blockOnly();
+  let thieuKhaiBao = '';
+  try { hop.sidebarBusyBegin('Đang lưu…'); } catch (err) { thieuKhaiBao = err.message; }
+  check(so, 'không khai báo block thì ném lỗi chứ không tự chọn khóa hay không, và không để lại trạng thái bận',
+    [thieuKhaiBao.indexOf('block') >= 0, dom.root.hasAttribute('inert'), hop.sidebarBusyActive()], [true, false, false]);
 
   const focus = dom.document.createElement('input');
   focus.id = 'o-can-focus';
@@ -182,4 +188,50 @@ async function chay(so) {
   check(so, 'collapseApply không hiện nút khi nội dung vừa khung', [hop.collapseApply(vuaNoi), vua.children.length], ['fit', 1]);
 }
 
-module.exports = { chay };
+/** Đọc đủ đối số của mỗi lời gọi `ten(` trong một tệp, đếm ngoặc để lời gọi trải nhiều dòng vẫn lấy trọn. */
+function loiGoiTrongTep(text, ten) {
+  const ketQua = [];
+  const re = new RegExp('(?<![\\w.]|function )' + ten + '\\(', 'g');
+  let m;
+  while ((m = re.exec(text))) {
+    let sau = 0;
+    let i = m.index + m[0].length - 1;
+    for (; i < text.length; i += 1) {
+      if (text[i] === '(') { sau += 1; }
+      else if (text[i] === ')') { sau -= 1; if (sau === 0) { break; } }
+    }
+    ketQua.push(text.slice(m.index, i + 1));
+  }
+  return ketQua;
+}
+
+/** Mỗi chỗ gọi trạng thái bận phải tự quyết khóa hay không; mặc định nào cũng có lúc quyết sai thay người gọi (Tài liệu 04 Phần 3). */
+function chayKhaiBaoKhoa(so) {
+  section('Trạng thái bận — mọi chỗ gọi khai báo khóa');
+  const clientDir = path.join(GAS_DIR, 'client');
+  const tep = [];
+  (function duyet(dir) {
+    fs.readdirSync(dir, { withFileTypes: true }).forEach((muc) => {
+      const day = path.join(dir, muc.name);
+      if (muc.isDirectory()) { duyet(day); } else if (muc.name.endsWith('.html')) { tep.push(day); }
+    });
+  })(clientDir);
+  const thieu = [];
+  const goi = {};
+  tep.forEach((day) => {
+    const text = fs.readFileSync(day, 'utf8');
+    const ten = path.relative(clientDir, day).split(path.sep).join('/');
+    ['sidebarBusyRun', 'sidebarBusyBegin'].forEach((ham) => {
+      loiGoiTrongTep(text, ham).forEach((call) => {
+        if (ten === 'ui/progress.html' && call === 'sidebarBusyBegin(message, options)') { return; }
+        (goi[ten] = goi[ten] || []).push(call);
+        if (!/\bblock\s*:/.test(call)) { thieu.push(ten + ': ' + call.slice(0, 80)); }
+      });
+    });
+  });
+  check(so, 'mọi lời gọi sidebarBusyRun/sidebarBusyBegin trong client khai báo block', [thieu, Object.keys(goi).length >= 5], [[], true]);
+  const veView = (goi['link/sheetLink.html'] || []).filter((call) => /sidebarBusyRun\(message, run,/.test(call));
+  check(so, 'tự vẽ sheet quản trị theo quyết định lời hỏi không khóa Sidebar (chỉ ghi ra Sheet)', veView.map((call) => /block:\s*false/.test(call)), [true]);
+}
+
+module.exports = { chay: async (so) => { await chay(so); chayKhaiBaoKhoa(so); } };
