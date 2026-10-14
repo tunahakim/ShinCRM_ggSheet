@@ -96,7 +96,8 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── FilterParser.js        Phân tích điều kiện lọc từ sheet quản lý.
 │   │   ├── SortSpec.js            Chuẩn hóa cấu hình sắp xếp của sheet quản lý.
 │   │   ├── ViewSheetRenderer.js   Vẽ lại vùng dữ liệu sheet quản lý theo bộ lọc và sắp xếp.
-│   │   └── ViewSheetSetup.js      Tạo sheet quản trị từ DATA_SCHEMA, bổ sung cột điều khiển, ghi chú và validation.
+│   │   ├── ViewSheetSetup.js      Tạo sheet quản trị từ DATA_SCHEMA, bổ sung cột điều khiển, ghi chú và validation.
+│   │   └── ViewTabTint.js         Tô cam tab sheet quản trị đang cũ, trả màu người dùng đặt khi vẽ xong.
 │   ├── Triggers.js                Trigger đánh dấu dữ liệu bẩn và chuẩn bị sheet quản trị.
 │   └── dev\                      CHỈ DÙNG LÚC PHÁT TRIỂN — xóa cả thư mục này trước khi Sheet mang dữ liệu khách hàng thật.
 │       ├── DevRunner.js          Cửa web chạy một hàm trong danh sách trắng. Mở một địa chỉ chạy code dưới quyền chủ tệp.
