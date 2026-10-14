@@ -21,7 +21,7 @@ var DEV_RUNNER_ALLOWED = [
   'smokeTest', 'smokeDiag', 'setupSheets', 'verifySheets', 'measureDeleteRows', 'measureChunkRows', 'measureFirstPaint',
   'seedFakeData', 'seedFakeCategory', 'seedFakeCategoryMappings', 'wipeFakeData', 'fbmPrepareAltTest', 'fbmProbeAltState', 'fbmPerfOn', 'fbmPerfOff', 'fbmPerfReport', 'fbmPerfTestScopeOn', 'fbmPerfTestScopeOff', 'fbmDevSetVerifyStatusDefault', 'fbmProbePayloadBudget', 'fbmPerfDropScopeActivities', 'fbmProbeStuckState', 'fbmProbePendingPushes', 'fbmScopeCreatedCustomer', 'fbmScopeDefaultCustomer', 'fbmSeedFakeDeletedCustomer', 'fbmEndFakeDeletedCustomer', 'fbmSeedConflict', 'fbmTamperConflictOpenedHash', 'fbmSeedActivityPush', 'fbmProbeCreateCustomer', 'fbmAllowTestCreateCustomer', 'fbmRequeueCreateCustomerConflict', 'fbmRequeueCreateCustomerPush', 'fbmAuditAltState', 'fbmProbePreflightTiming', 'fbmProbeCursorPosition', 'fbmProbeActivityStepTiming', 'fbmProbeStateMetadataSizes', 'fbmProbeCustomerActivities', 'fbmProbeSheetReadCost', 'fbmDevAlignSheetTimezone', 'fbmRepairFalseMissing', 'fbmRepairFalseMissingApply',
   'dumpColumnMap', 'dumpSettings', 'dumpSheetGrid', 'dumpCoreSheetHead', 'dumpRecentLog',
-  'devLogTraceOn', 'devLogTraceOff',
+  'devLogTraceOn', 'devLogTraceOff', 'formulaProbeCreate', 'formulaProbeRemove',
   'probeBadColumnCode', 'probeLogGate', 'probeDateText', 'probeSheetGrid', 'probeCellBudget',
   'probeEntityRead', 'probeCategoryRead', 'probeConfigRead', 'probeDirtyState', 'getReloadState', 'probeSelectionAndReload', 'reloadRecords', 'reloadConfig', 'renderAllManagedViews', 'renderAllManagedViewsIfAllowed',
   'probeErrorReport', 'probeEntryPoint', 'probeLoadAll', 'probeSidebarTemplate', 'probeClientTiming',
