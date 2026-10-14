@@ -1208,6 +1208,36 @@ async function chay(so) {
       nhatKy.some((row) => /chạy lại lượt/.test(JSON.stringify(row)))
     ], ['error', 'SYNC_STATE_MIGRATED', true, cu.hop.FbmSync.STATE_SCHEMA_VERSION, undefined, JSON.stringify({ 'customer:CUS-000001': { hash: 'h-cho' } }), true]);
   }
+  // Sổ bước trong Log phải theo đúng thứ tự xảy ra: bước đã xong đóng ngay khi luồng chuyển chặng, vấn đề theo bản ghi đứng trước dòng đóng bước và dòng đóng phiên.
+  const soBuoc = (mode) => {
+    const nhatKy = [], ghi = (row) => nhatKy.push(row.action);
+    const luong = workflowGas({ logEvent: ghi, logTrace: ghi });
+    // Bộ dựng chung không nạp sổ bước vì các ca khác không xét Log theo bước.
+    napServer(luong.hop, 'fbm_sync/diagnostic/Trace.js');
+    const F = luong.hop.FbmSync, st = F.stateStart('', 'pull_customer', 0);
+    st.mode = mode;
+    ['run', 'pull_customer', 'reconcile_customer'].forEach((key) => F.businessStepStart(st, key, { mode }));
+    return { nhatKy, F, st };
+  };
+  const conTrang = soBuoc('read');
+  conTrang.F.activityForCustomers(conTrang.st, [{ sttRec: 'S1', maKh: 'K1' }], { body: { gridPageIndex: 1, gridPageValue: [], pageItems: null, count: 50 } }, 50);
+  const hetKhach = soBuoc('read');
+  hetKhach.F.activityForCustomers(hetKhach.st, [{ sttRec: 'S1', maKh: 'K1' }], null, 0);
+  hetKhach.F.recordIssueAdd('pull', 'activity', 'synced', 'ACT-1', 'Nối lại mã khách', 'warn');
+  hetKhach.st.phase = 'done'; hetKhach.F.stateWrite(hetKhach.st);
+  const viTri = (log, action) => log.indexOf(action);
+  check(so, 'Log sổ bước: còn trang khách thì bước khách để mở; hết danh sách thì bước khách đóng trước khi bước giao dịch mở; cảnh báo bản ghi đứng trước dòng đóng phiên', [
+    !conTrang.st.metadata.businessSteps.pull_customer.finishedAt,
+    viTri(hetKhach.nhatKy, 'reconcile_customer_finished') >= 0 && viTri(hetKhach.nhatKy, 'reconcile_customer_finished') < viTri(hetKhach.nhatKy, 'pull_activity_started'),
+    viTri(hetKhach.nhatKy, 'pull_record_issue') >= 0 && viTri(hetKhach.nhatKy, 'pull_record_issue') < viTri(hetKhach.nhatKy, 'reconcile_activity_finished'),
+    viTri(hetKhach.nhatKy, 'reconcile_activity_finished') < viTri(hetKhach.nhatKy, 'sync_session_finished')
+  ], [true, true, true, true]);
+  const sangDay = soBuoc('write');
+  ['pull_activity', 'reconcile_activity'].forEach((key) => sangDay.F.businessStepStart(sangDay.st, key, {}));
+  sangDay.F.stopPushOnConflicts = () => false; sangDay.F.pullMarkMissing = () => true;
+  sangDay.F.nextPushRequest = (state) => { sangDay.F.businessStepStart(state, 'push_customer', {}); return null; };
+  sangDay.F.pullFinishOrPush(sangDay.st, {});
+  check(so, 'Log sổ bước: lượt hai chiều đóng mọi bước Lấy trước khi mở bước đẩy', ['pull_customer_finished', 'reconcile_customer_finished', 'pull_activity_finished', 'reconcile_activity_finished'].every((action) => viTri(sangDay.nhatKy, action) >= 0 && viTri(sangDay.nhatKy, action) < viTri(sangDay.nhatKy, 'push_customer_started')), true);
 }
 
 module.exports = { chay, workflowGas, executorSession, executorRaw, sendBatchThroughExecutor, gridResponse, row };

@@ -121,9 +121,9 @@ async function chay(so) {
   builders.FbmSync.recordIssueAdd = (stage, entity, status, id, reason) => { linkLogged.push(id + '|' + reason); return null; };
   builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmCustomerCode: 'ALT99999' }] : [{ id: 'ACT-11', fbmId: 'FBM-11', customerId: '', content: 'Nội dung', taskType: 'Gọi', workDate: '/Date(1757386800000)/', enteredBy: 'Sale Cũ', fbmHash: linkIncoming.fbmHash, syncStatus: builders.FbmSync.SYNC_STATUS.synced }];
   builders.writeGateSave = (request) => { linkWrite = request; return { ok: true }; };
-  builders.FbmSync.pullWrite('activity', [Object.assign({}, linkIncoming)]);
+  const linkResult = builders.FbmSync.pullWrite('activity', [Object.assign({}, linkIncoming)]);
   builders.FbmSync.recordIssueAdd = recordIssueAddBefore;
-  check(so, 'Giao dịch mất mã khách trên Sheet: lượt kéo nối lại vào khách ShinCRM theo FBM, ghi một dòng Log, không đổi nội dung hay trạng thái đồng bộ', [linkWrite && linkWrite.records.length, linkWrite && linkWrite.records[0].id, linkWrite && linkWrite.records[0].customerId, linkWrite && linkWrite.records[0].syncStatus, linkLogged.filter((line) => /ACT-11\|.*KH-1/.test(line)).length], [1, 'ACT-11', 'KH-1', undefined, 1]);
+  check(so, 'Giao dịch mất mã khách trên Sheet: lượt kéo nối lại vào khách ShinCRM theo FBM, ghi một dòng Log, tính vào số bản ghi đã ghi Sheet, không đổi nội dung hay trạng thái đồng bộ', [linkResult && linkResult.written, linkWrite && linkWrite.records.length, linkWrite && linkWrite.records[0].id, linkWrite && linkWrite.records[0].customerId, linkWrite && linkWrite.records[0].syncStatus, linkLogged.filter((line) => /ACT-11\|.*KH-1/.test(line)).length], [1, 1, 'ACT-11', 'KH-1', undefined, 1]);
   // FBM trả mới nhất trước; cửa ghi cấp ACT- theo thứ tự mảng ghi, nên lô phải được sắp theo mã FBM tăng dần (thứ tự nhập thật) trước khi ghi. Mã đổi độ dài (99999 → 100000) phải so như số.
   const fbmOrderIncoming = (fbmId, day) => builders.FbmSync.activityRecord({ id: fbmId, ma_kh: 'ALT99999', end_date: day, ten_cv: 'Gọi', details: 'GD ' + fbmId }, gate);
   let orderWrite = null;
