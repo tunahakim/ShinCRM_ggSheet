@@ -56,3 +56,17 @@ function dumpCoreSheetHead() {
     }).join('\n');
   }).join('\n\n');
 }
+
+/** Liệt kê dải ô có tên. ShinCRM không dùng dải có tên nào, nên mọi dải ở đây đều là rác do thao tác tay trên Name Box. */
+function dumpNamedRanges() {
+  return shinOpenBook().getNamedRanges().map(function (item) {
+    return item.getName() + ' → ' + item.getRange().getSheet().getName() + '!' + item.getRange().getA1Notation();
+  });
+}
+
+/** Xóa mọi dải ô có tên. Chỉ xóa tên, không chạm giá trị ô. */
+function wipeNamedRanges() {
+  var removed = dumpNamedRanges();
+  shinOpenBook().getNamedRanges().forEach(function (item) { item.remove(); });
+  return ['Đã xóa ' + removed.length + ' dải ô có tên:'].concat(removed);
+}
