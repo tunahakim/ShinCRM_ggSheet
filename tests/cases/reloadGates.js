@@ -128,6 +128,43 @@ function chay(so) {
       }
     }()),
     { threw: true, value: '', locked: false });
+
+  section('saveRecord — hỏi khóa đồng bộ FBM và ghi trong cùng một lời gọi, cùng một lần giữ khóa điều phối');
+  let saveEnv;
+  try {
+    saveEnv = taoHop();
+    napServer(saveEnv.hop, 'server/service/SaveService.js', 'server/service/FbmSyncService.js');
+  } catch (err) { return ghiLoiNap(so, 'nạp SaveService', err); }
+  const sh = saveEnv.hop;
+  const nhatKy = [];
+  let giuKhoa = false;
+  let traLoiKhoa = { ok: true };
+  sh.selectionSnapshot = () => null;
+  sh.FbmSync = { withOrchestrationLock: (work) => { nhatKy.push('lock'); giuKhoa = true; try { return work(); } finally { giuKhoa = false; nhatKy.push('unlock'); } } };
+  sh.fbmSyncSaveAllowed = (entity, id, revision) => { nhatKy.push(['check', entity, id, revision, giuKhoa]); return traLoiKhoa; };
+  const ghiGoc = sh.writeGateSave;
+  sh.writeGateSave = function (req) { nhatKy.push(['write', giuKhoa]); return ghiGoc.apply(this, arguments); };
+
+  const ok = sh.saveRecord('customer', { id: 'KH000001', phone: '0987000111', fbmHash: 'h1' });
+  check(so, 'sửa bản ghi cũ: kiểm tra rồi ghi, cả hai bên trong khóa điều phối, rồi mới nhả khóa',
+    [ok.ok, nhatKy, saveEnv.nen.Customer.sheet.getRange(4, saveEnv.nen.Customer.codes.indexOf('@CUS_SDT') + 1).getValue()],
+    [true, ['lock', ['check', 'customer', 'KH000001', 'h1', true], ['write', true], 'unlock'], '0987000111']);
+
+  nhatKy.length = 0;
+  traLoiKhoa = { ok: false, code: 'RECORD_BUSY', message: 'Bản ghi đang được đồng bộ; hãy lưu lại sau khi đồng bộ xong.' };
+  const chan = sh.saveRecord('customer', { id: 'KH000001', phone: '0987000222', fbmHash: 'h1' });
+  check(so, 'đồng bộ đang khóa bản ghi: trả blocked kèm câu báo, không ghi Sheet',
+    [chan.ok, chan.blocked, chan.code, chan.message, nhatKy.some((item) => item[0] === 'write'), saveEnv.nen.Customer.sheet.getRange(4, saveEnv.nen.Customer.codes.indexOf('@CUS_SDT') + 1).getValue()],
+    [false, true, 'RECORD_BUSY', traLoiKhoa.message, false, '0987000111']);
+
+  nhatKy.length = 0;
+  sh.FbmSync.withOrchestrationLock = () => ({ ok: false, code: 'BUSY', message: 'GAS đang xử lý một lượt đồng bộ khác; chưa thay đổi state.' });
+  const ban = sh.saveRecord('customer', { id: 'KH000001', phone: '0987000333' });
+  check(so, 'không lấy được khóa điều phối: trả blocked, không kiểm tra, không ghi', [ban.blocked, ban.code, nhatKy], [true, 'BUSY', []]);
+
+  const moi = sh.saveRecord('customer', { companyName: 'Công ty Mới', leadSource: 'Tự tìm', verifyStatus: 'Đã xác thực', fbmSyncPermission: 'Cho phép' });
+  check(so, 'thêm bản ghi mới ghi thẳng, không hỏi khóa đồng bộ (chưa có mã nên không thể đang đồng bộ)', nhatKy, [['write', false]]);
+  void moi;
 }
 
 module.exports = { chay };

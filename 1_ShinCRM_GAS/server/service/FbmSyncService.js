@@ -76,10 +76,20 @@ function fbmGetRelayConfig() { return runEntryPoint('fbmGetRelayConfig', 'sideba
 function fbmRotateRelayKey() { return runEntryPoint('fbmRotateRelayKey', 'sidebar', 'throw', function () { return fbmSyncRotateRelayKey(); }); }
 /** Khóa record khi người dùng bắt đầu sửa. */
 function fbmBeginEdit(entity, id, revision) { return runEntryPoint('fbmBeginEdit', 'sidebar', 'throw', function () { return FbmSync.withOrchestrationLock(function () { return fbmSyncEditBegin(entity, id, revision); }); }); }
+/**
+ * Lưu form sửa bản ghi: hỏi khóa đồng bộ rồi chạy `write` trong cùng một lần giữ khóa điều phối, để không lượt đồng bộ nào chen vào giữa lúc hỏi và lúc ghi. Thứ tự khóa điều phối rồi khóa tài liệu (bên trong `write`) trùng thứ tự của lượt đồng bộ nên hai bên không chờ chéo nhau. Bị chặn hoặc không lấy được khóa thì trả `blocked: true` kèm câu báo, không gọi `write`.
+ */
+function fbmSaveGuarded(entity, id, revision, write) {
+  var ra = FbmSync.withOrchestrationLock(function () {
+    var allowed = fbmSyncSaveAllowed(entity, id, revision);
+    if (allowed && allowed.ok === false) { return { ok: false, blocked: true, entity: entity, code: allowed.code, message: allowed.message }; }
+    return write();
+  });
+  if (ra && ra.ok === false && ra.code === 'BUSY') { ra.blocked = true; }
+  return ra;
+}
 /** Mở khóa record khi người dùng kết thúc sửa. */
 function fbmEndEdit(entity, id) { return runEntryPoint('fbmEndEdit', 'sidebar', 'throw', function () { return FbmSync.withOrchestrationLock(function () { return fbmSyncEditEnd(entity, id); }); }); }
-/** Kiểm tra revision trước khi lưu form. */
-function fbmCheckSave(entity, id, revision) { return runEntryPoint('fbmCheckSave', 'sidebar', 'throw', function () { return FbmSync.withOrchestrationLock(function () { return fbmSyncSaveAllowed(entity, id, revision); }); }); }
 function fbmOpenConflict() { return runEntryPoint('fbmOpenConflict', 'sidebar', 'throw', function () { return FbmSync.controlDispatchLocked('open_conflict', {}); }); }
 function fbmConflictOpened(response) { return runEntryPoint('fbmConflictOpened', 'sidebar', 'throw', function () { return FbmSync.controlDispatchLocked('conflict_opened', { response: response }); }); }
 function fbmPrepareConflictResolution(entity, id, choice) { return runEntryPoint('fbmPrepareConflictResolution', 'sidebar', 'throw', function () { return FbmSync.controlDispatchLocked('prepare_conflict', { entity: entity, id: id, choice: choice }); }); }
