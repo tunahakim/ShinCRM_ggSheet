@@ -49,8 +49,10 @@ var SHEET_LINK_LAST_SEEN_REVISION = 0;
 var SHEET_LINK_PING_TIMER = null;
 var SHEET_LINK_EXTENSION_READ = { status: '', reason: '' };
 var SHEET_LINK_READER_FAILURE_REPORTED = false;
-// Bật tạm thời để nghiệm thu thấy mọi lời hỏi GAS, kể cả lời hỏi nền im lặng (kênh báo thay đổi, nhịp an toàn): cờ bật thì thắng `silent`. Tắt sau khi chủ dự án kiểm tra xong; tắt thì mọi lời hỏi chạy im lặng đúng tài liệu 05.
-var SHEET_LINK_SHOW_PROBE_PROGRESS_DEBUG = true;
+/** Công tắc `SETTINGS.SHOW_PROBE_PROGRESS_DEBUG`; chưa nạp `SETTINGS` thì chạy im lặng. */
+function sheetLinkShowProbeProgress() {
+  return typeof SETTINGS !== 'undefined' && !!SETTINGS && SETTINGS.SHOW_PROBE_PROGRESS_DEBUG === true;
+}
 var sheetLinkInstalled = false;
 
 var SHEET_LINK_ORIGIN = 'https://docs.google.com';
@@ -539,7 +541,7 @@ function sheetLinkProbeSelectionAndReload(reason, options) {
     channelSilence: typeof changeSignalDeadReportInput === 'function' && changeSignalDeadReportInput()
   };
   var request = callServer('probeSelectionAndReload', [input], {
-    silent: SHEET_LINK_SHOW_PROBE_PROGRESS_DEBUG !== true
+    silent: !sheetLinkShowProbeProgress()
   });
   var settled = request.then(function (result) {
     var extensionOwnsContext = sheetLinkExtensionOwnsContext();

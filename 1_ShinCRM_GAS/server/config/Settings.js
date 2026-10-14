@@ -88,6 +88,8 @@ var SETTINGS = {
   /** Nhịp hỏi an toàn khi kênh sống (chỉ để vớt thứ kênh bỏ sót) và khi kênh chết (thay kênh). Kênh sống để 5 phút vì mỗi lượt là một lần chạy GAS 1,5–2,7 giây: 60 giây là khoảng 60 lượt mỗi giờ cho mỗi Sidebar dù không ai sửa gì. Đánh đổi: thay đổi kênh bỏ sót có thể trễ tới 5 phút. */
   RELOAD_SAFETY_POLL_MS: 300000,
   RELOAD_SAFETY_POLL_DEAD_MS: 15000,
+  /** Bật để thấy thanh tiến trình ở mọi lời hỏi GAS, kể cả lời hỏi nền (kênh báo thay đổi, nhịp an toàn, chuyển sheet), phục vụ nghiệm thu. Tắt (`false`) thì lời hỏi nền chạy im lặng đúng tài liệu 05. Đổi xong đẩy lên bằng `node tests/gas.js probeSelectionAndReload --push` rồi tải lại tab Sheet. */
+  SHOW_PROBE_PROGRESS_DEBUG: true,
   /** Màu tab sheet quản trị đang cũ (dữ liệu đã đổi nhưng sheet chưa vẽ lại). Cam để khác các màu nhóm sheet thường dùng. */
   VIEW_STALE_TAB_COLOR: '#ff9900'
 };

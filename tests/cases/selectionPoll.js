@@ -68,7 +68,7 @@ function dungHopPoll() {
   };
   napClient(hop, 'client/ram/refresh.html', 'client/link/sheetLink.html', 'client/link/selectionPoll.html', 'client/link/changeSignal.html');
   // Các phép kiểm request giữ hợp đồng bàn giao im lặng; bản chạy DEV trực quan bật cờ này ở runtime.
-  hop.SHEET_LINK_SHOW_PROBE_PROGRESS_DEBUG = true;
+  hop.SETTINGS.SHOW_PROBE_PROGRESS_DEBUG = true;
   return hop;
 }
 
@@ -88,7 +88,7 @@ async function chay(so) {
   try { hop = dungHopPoll(); } catch (err) { return ghiLoiNap(so, 'nạp máy trạng thái polling', err); }
 
   batDau(hop);
-  check(so, 'probe selection debug hiện loading', hop.SHEET_LINK_SHOW_PROBE_PROGRESS_DEBUG, true);
+  check(so, 'probe selection debug hiện loading', hop.sheetLinkShowProbeProgress(), true);
   check(so, 'mouseenter Sidebar không còn là tín hiệu đánh thức', hop._rootListeners.mouseenter, undefined);
   hop._clock.now = 4000; hop.selectionPollClearTimer(); hop.selectionPollTick();
   await new Promise((resolve) => setImmediate(resolve));
@@ -114,7 +114,7 @@ async function chay(so) {
   safetyTimer.fn();
   check(so, 'cờ nghiệm thu loading bật: safety request hiện loading ngay khi gửi', [safety._calls[0].name, safety._calls[0].options.silent], ['probeSelectionAndReload', false]);
 
-  const safetyVisibleProbe = dungHopPoll(); batDau(safetyVisibleProbe); safetyVisibleProbe.SHEET_LINK_SHOW_PROBE_PROGRESS_DEBUG = false;
+  const safetyVisibleProbe = dungHopPoll(); batDau(safetyVisibleProbe); safetyVisibleProbe.SETTINGS.SHOW_PROBE_PROGRESS_DEBUG = false;
   safetyVisibleProbe._calls = [];
   safetyVisibleProbe.callServer = (name, args, options) => { safetyVisibleProbe._calls.push({ name, args, options }); return syncValue({ ok: true, reload: { revision: 0 }, selection: { spreadsheetId: 'sheet-1', gid: '1', sheetName: 'Customer', row: 4, col: 1, rowEnd: 4, colEnd: 1, customerId: '' } }); };
   const visibleSafetyTimer = Array.from(safetyVisibleProbe._timers.values()).find((item) => item.delay === 60000);
