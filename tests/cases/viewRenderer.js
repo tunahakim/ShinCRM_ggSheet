@@ -98,6 +98,8 @@ function chay(so) {
   try { allViews.nen.hop.renderViewSheet('!Chăm sóc'); } catch (ignore) {}
   check(so, '(c) lượt vẽ ném lỗi thì sheet vẫn cũ', allViews.nen.hop.viewIsStale('!Chăm sóc'), true);
   secondView.getRange(3, 2).setValue('');
+  check(so, 'đường lấy metadata (controlsOnly) không vẽ sheet cũ khi bộ điều khiển không đổi, sheet vẫn cũ',
+    [allViews.nen.hop.renderViewIfDirty('!Chăm sóc', { controlsOnly: true }).skipped, allViews.nen.hop.viewIsStale('!Chăm sóc')], [true, true]);
   check(so, 'renderViewIfDirty vẽ sheet cũ dù bộ điều khiển không đổi, rồi lần sau bỏ qua',
     [allViews.nen.hop.renderViewIfDirty('!Chăm sóc').skipped, allViews.nen.hop.renderViewIfDirty('!Chăm sóc').skipped], [undefined, true]);
 

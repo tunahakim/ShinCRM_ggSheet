@@ -35,11 +35,12 @@ function dungHopPoll() {
   const rootListeners = {};
   let nextTimer = 1;
   const banner = { hidden: true };
+  const viewNotice = { hidden: true };
   const root = { addEventListener: (name, fn) => { rootListeners[name] = fn; } };
   const document = {
     hidden: false,
     addEventListener: (name, fn) => { documentListeners[name] = fn; },
-    getElementById: (id) => id === 'sidebar-root' ? root : (id === 'shin-extension-warning' ? banner : null),
+    getElementById: (id) => ({ 'sidebar-root': root, 'shin-extension-warning': banner, 'shin-view-stale': viewNotice })[id] || null,
     querySelector: () => null
   };
   const window = { addEventListener: (name, fn) => { windowListeners[name] = fn; } };
@@ -59,7 +60,7 @@ function dungHopPoll() {
   hop.Store = { hasCustomer: () => false };
   hop._clock = clock; hop._timers = timers; hop._intervals = intervals;
   hop._documentListeners = documentListeners; hop._windowListeners = windowListeners; hop._rootListeners = rootListeners;
-  hop._banner = banner; hop._calls = []; hop._options = [];
+  hop._banner = banner; hop._viewNotice = viewNotice; hop._calls = []; hop._options = [];
   hop.callServer = (name, args, options) => {
     hop._calls.push(name);
     hop._options.push(options || {});
@@ -364,4 +365,121 @@ async function chay(so) {
   check(so, 'CRM_RELOAD không đánh dấu revision trước khi công việc thành công', failedEvent.SHEET_LINK_LAST_SEEN_REVISION, 0);
 }
 
-module.exports = { chay };
+/** Hộp cát cho phần sheet quản trị: ghi lại từng lời gọi máy chủ kèm lý do lời hỏi, trả câu trả lời dựng theo tên hàm. */
+function dungHopView(answers) {
+  const hop = dungHopPoll(); batDau(hop);
+  hop.SHEET_LINK_LAST_ACK = 5000; hop._clock.now = 5001;
+  hop._log = [];
+  hop._answers = answers || {};
+  hop.callServer = (name, args) => {
+    hop._log.push({ name, reason: name === 'probeSelectionAndReload' ? args[0].reason : '', options: name === 'renderViewIfDirty' ? args[1] : null });
+    const answer = hop._answers[name];
+    return Promise.resolve(typeof answer === 'function' ? answer(args) : (answer || { ok: true, reload: { revision: 0 } }));
+  };
+  return hop;
+}
+
+function tenGoi(hop, name) { return hop._log.filter((item) => item.name === name); }
+
+async function chayView(so) {
+  section('Sidebar — vẽ sheet quản trị khi có người xem');
+  const fs = require('fs');
+  const path = require('path');
+  const { GAS_DIR } = require('../lib/load-gas');
+  const probeRender = { ok: true, reload: { revision: 5 }, selection: { spreadsheetId: 'sheet-1', gid: '2', sheetName: '!Lead', row: 4, col: 1, rowEnd: 4, colEnd: 1 }, view: { sheetName: '!Lead', stale: true, action: 'render' } };
+  const drawn = { ok: true, sheetName: '!Lead', rows: 3, viewMeta: { revision: 2, filterColumns: [2], sortColumns: [] } };
+
+  const once = dungHopView({ probeSelectionAndReload: probeRender, renderViewIfDirty: drawn });
+  await once.sheetLinkProbeSelectionAndReload('wake');
+  await once.sheetLinkProbeSelectionAndReload('wake');
+  check(so, 'view.action = render: Sidebar gọi renderViewIfDirty đúng một lần cho hai phản hồi cùng revision, không kèm controlsOnly',
+    [tenGoi(once, 'probeSelectionAndReload').length, tenGoi(once, 'renderViewIfDirty').length, tenGoi(once, 'renderViewIfDirty')[0].options], [2, 1, {}]);
+  once._answers.probeSelectionAndReload = Object.assign({}, probeRender, { reload: { revision: 6 } });
+  await once.sheetLinkProbeSelectionAndReload('wake');
+  check(so, 'revision mới thì được xin vẽ lần nữa', tenGoi(once, 'renderViewIfDirty').length, 2);
+
+  // Bốn thời điểm đều đi qua đúng một lời hỏi chung.
+  const open = dungHopView();
+  await open.sheetLinkReplayContext();
+  const enter = dungHopView({ renderViewIfDirty: drawn });
+  enter.SHEET_LINK_LAST_SHEET = 'Customer';
+  await enter.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: '!Lead', row: 4, col: 1 });
+  const visible = dungHopView();
+  visible.SHEET_LINK_LAST_SHEET = '!Lead';
+  visible._documentListeners.visibilitychange();
+  const visibleOther = dungHopView();
+  visibleOther.SHEET_LINK_LAST_SHEET = 'Customer';
+  visibleOther._documentListeners.visibilitychange();
+  const revision = dungHopView();
+  revision.SHEET_LINK_LAST_SHEET = '!Lead';
+  revision.sheetLinkOnMessage({ origin: revision.SHEET_LINK_ORIGIN, data: { action: 'CRM_RELOAD', nonce: revision.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', revision: 9 } });
+  await new Promise((resolve) => setImmediate(resolve));
+  check(so, 'mở Sidebar, đổi sang sheet !, tab hiện lại, revision mới: mỗi sự kiện sinh đúng một lời hỏi probeSelectionAndReload',
+    [open, enter, visible, revision].map((hop) => tenGoi(hop, 'probeSelectionAndReload').map((item) => item.reason)),
+    [['sidebar-open'], ['view-enter'], ['visible'], ['dirty-state']]);
+  check(so, 'tab hiện lại ở sheet không ! khi Extension sống thì không gọi GAS', visibleOther._log, []);
+  check(so, 'vào sheet ! không gọi bộ vẽ riêng ngoài quyết định của lời hỏi', tenGoi(enter, 'renderViewIfDirty'), []);
+  enter.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: '!Lead', row: 5, col: 1 });
+  check(so, 'nhấp tiếp trên sheet ! chưa có metadata chỉ lấy metadata với controlsOnly, không vẽ sheet cũ',
+    tenGoi(enter, 'renderViewIfDirty').map((item) => item.options), [{ controlsOnly: true }]);
+
+  // Núm tắt: dòng báo hiện, bấm Làm mới vẽ xong thì mất; rời sheet cũng mất.
+  const notify = dungHopView({ probeSelectionAndReload: Object.assign({}, probeRender, { view: { sheetName: '!Lead', stale: true, action: 'notify' } }) });
+  notify.SHEET_LINK_LAST_SHEET = '!Lead';
+  await notify.sheetLinkProbeSelectionAndReload('wake');
+  const shown = [notify._viewNotice.hidden, notify.SHEET_LINK_VIEW_NOTICE_SHEET, tenGoi(notify, 'renderViewIfDirty').length];
+  notify.sheetLinkViewApplyResult('!Lead', { ok: true, sheetName: '!Lead', rows: 3 });
+  const afterRefresh = notify._viewNotice.hidden;
+  await notify.sheetLinkProbeSelectionAndReload('wake');
+  notify.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: 'Customer', row: 4, col: 1 });
+  check(so, 'view.action = notify hiện dòng báo, không vẽ; vẽ thủ công xong thì dòng báo mất; rời sheet ! thì dòng báo mất',
+    [shown, afterRefresh, notify._viewNotice.hidden], [[false, '!Lead', 0], true, true]);
+  const sidebarHtml = fs.readFileSync(path.join(GAS_DIR, 'client', 'Sidebar.html'), 'utf8');
+  const noticeHost = (sidebarHtml.match(/<div id="shin-view-stale"[\s\S]*?<\/div>/) || [''])[0];
+  const actionsHtml = fs.readFileSync(path.join(GAS_DIR, 'client', 'ui', 'actions.html'), 'utf8');
+  check(so, 'dòng báo dùng khuôn chữ + nút dùng chung, nút gọi action làm mới thủ công sẵn có và action đó áp kết quả vào trạng thái view',
+    [noticeHost.indexOf('View chưa cập nhật') >= 0, noticeHost.indexOf('data-action="renderActiveViewSheet"') >= 0, noticeHost.indexOf('class="shin-undo"') >= 0,
+      /renderActiveViewSheet[\s\S]*?sheetLinkViewApplyResult/.test(actionsHtml)], [true, true, true, true]);
+
+  // Công tắc tự động làm mới.
+  const viewSchema = fs.readFileSync(path.join(GAS_DIR, 'client', 'schema', 'screens', 'view.html'), 'utf8');
+  const switchOn = dungHopView();
+  switchOn.SHEET_LINK_LAST_SHEET = '!Lead';
+  await switchOn.sheetLinkOnAutoRenderOn();
+  const switchOther = dungHopView();
+  switchOther.SHEET_LINK_LAST_SHEET = 'Customer';
+  switchOther.sheetLinkOnAutoRenderOn();
+  check(so, 'nhãn công tắc theo 03; bật núm khi đứng ở sheet ! hỏi GAS một lần, đứng ở sheet khác thì không gọi',
+    [viewSchema.indexOf("label: 'Tự động làm mới sheet quản trị', action: 'toggleAutoRenderView'") >= 0,
+      tenGoi(switchOn, 'probeSelectionAndReload').map((item) => item.reason), switchOther._log],
+    [true, ['auto-render-on'], []]);
+  check(so, 'bật núm chờ ghi UserProperties xong mới hỏi GAS',
+    /toggleAutoRenderView[\s\S]*?sent\.then\(function \(value\) \{ sheetLinkOnAutoRenderOn\(\)/.test(actionsHtml), true);
+
+  // Lượt đồng bộ đang chạy: hoãn payload và vẽ, giữ mốc revision.
+  const syncing = dungHopView({ probeSelectionAndReload: Object.assign({}, probeRender, { reload: { revision: 12, records: ['KH1'] }, processedRevision: 12, payload: { mode: 'records' } }), renderViewIfDirty: drawn });
+  syncing.FBM_SYNC_CLIENT = { running: true, active: false };
+  syncing._payloads = [];
+  syncing.refreshReloadPayload = (payload) => { syncing._payloads.push(payload.mode); return payload; };
+  syncing.SHEET_LINK_LAST_SEEN_REVISION = 3;
+  await syncing.sheetLinkProbeSelectionAndReload('dirty-state');
+  check(so, 'lượt đồng bộ đang chạy: payload reload bị hoãn, không vẽ view, SHEET_LINK_LAST_SEEN_REVISION giữ nguyên',
+    [syncing._payloads, tenGoi(syncing, 'renderViewIfDirty').length, syncing.SHEET_LINK_LAST_SEEN_REVISION], [[], 0, 3]);
+  syncing.FBM_SYNC_CLIENT.running = false;
+  await syncing.sheetLinkSyncFinished();
+  check(so, 'lượt kết thúc hỏi lại sync-finished và nhận phần đã hoãn',
+    [tenGoi(syncing, 'probeSelectionAndReload').map((item) => item.reason), syncing._payloads, syncing.SHEET_LINK_LAST_SEEN_REVISION, tenGoi(syncing, 'renderViewIfDirty').length],
+    [['dirty-state', 'sync-finished'], ['records'], 12, 1]);
+
+  const fbm = taoHopCat({ console });
+  napClient(fbm, 'client/sync/fbmSync.html');
+  const finished = [];
+  fbm.sheetLinkSyncFinished = () => finished.push(1);
+  fbm.fbmSyncSetRunning(true); fbm.fbmSyncSetRunning(false); fbm.fbmSyncSetRunning(false);
+  const fbmSource = fs.readFileSync(path.join(GAS_DIR, 'client', 'sync', 'fbmSync.html'), 'utf8');
+  const directWrites = (fbmSource.match(/FBM_SYNC_CLIENT\.running\s*=[^=]/g) || []).length;
+  check(so, 'mọi nhánh kết thúc lượt (xong, lỗi, hủy) đi qua một cửa đổi cờ: chuyển chạy → dừng gọi sync-finished đúng một lần, dừng → dừng không gọi',
+    [finished.length, directWrites], [1, 1]);
+}
+
+module.exports = { chay: async (so) => { await chay(so); await chayView(so); } };
