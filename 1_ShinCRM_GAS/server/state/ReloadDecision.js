@@ -20,7 +20,7 @@ function reloadDecisionBlank(reason) {
     kind: 'none',
     ram: { action: 'none', mode: 'none', recordIds: [], deferredRecordIds: [], waitMs: 0, flushOnLeave: false, reason: reason || '' },
     views: { action: 'none', mode: 'none', sheetName: '', reason: reason || '' },
-    signal: { records: [], category: false, config: false, schema: false, allCore: false, allViews: false },
+    signal: { records: [], entities: [], category: false, config: false, schema: false, allCore: false, allViews: false },
     notifySidebar: false,
     reason: reason || ''
   };
@@ -51,7 +51,8 @@ function reloadDecisionWithRam(decision, mode, ids, input, reason) {
   var draft = {};
   draftIds.forEach(function (id) { draft[id] = true; });
   var deferred = normalized.filter(function (id) { return draft[id]; });
-  var fullCoreBlocked = mode === 'fullCore' && draftIds.length > 0;
+  // Nạp trọn thực thể thay mọi bản ghi của nó như full core, nên bản nháp chặn cả hai.
+  var fullCoreBlocked = (mode === 'fullCore' || mode === 'entity') && draftIds.length > 0;
   var action = deferred.length || fullCoreBlocked ? 'defer' : 'reload';
   decision.ram = {
     action: action,
@@ -60,11 +61,15 @@ function reloadDecisionWithRam(decision, mode, ids, input, reason) {
     deferredRecordIds: fullCoreBlocked ? draftIds : deferred,
     waitMs: input && input.source === 'edit' && mode === 'records' && input.forceImmediate !== true ? RELOAD_DECISION_DEBOUNCE_MS : 0,
     flushOnLeave: !!(input && input.source === 'edit' && mode === 'records'),
-    reason: fullCoreBlocked ? 'Bảo vệ bản nháp Sidebar trước khi nạp full core.' : (deferred.length ? 'Bảo vệ bản nháp Sidebar của mã đang sửa.' : reason)
+    reason: fullCoreBlocked ? 'Bảo vệ bản nháp Sidebar trước khi nạp trọn dữ liệu.' : (deferred.length ? 'Bảo vệ bản nháp Sidebar của mã đang sửa.' : reason)
   };
   if (mode === 'records' && normalized.length && input && input.source === 'edit') {
     decision.signal.recordsDebounceMs = input.forceImmediate === true ? 0 : RELOAD_DECISION_DEBOUNCE_MS;
   }
+}
+
+function reloadDecisionEntities(values) {
+  return reloadDecisionIds(values).filter(function (entity) { return entity === 'customer' || entity === 'activity'; });
 }
 
 function reloadDecisionForChange(input) {
@@ -106,6 +111,18 @@ function reloadDecisionForChange(input) {
     reloadDecisionWithRam(decision, 'fullCore', [], change, 'Thay đổi cấu trúc cần nạp lại full core.');
     decision.notifySidebar = true;
     decision.reason = 'Thay đổi cấu trúc.';
+    return decision;
+  }
+
+  var entities = reloadDecisionEntities(change.entities);
+  if (surface === 'entity' && entities.length) {
+    decision.kind = 'entity';
+    decision.signal.entities = entities;
+    decision.signal.allViews = true;
+    reloadDecisionWithRam(decision, entities.length === 1 ? 'entity' : 'fullCore', [], change, 'Sheet kho có thể đổi vị trí hoặc số hàng nên nạp trọn thực thể đó.');
+    if (entities.length === 1) { decision.ram.entity = entities[0]; }
+    decision.notifySidebar = true;
+    decision.reason = 'Thực thể đổi trọn.';
     return decision;
   }
 
@@ -186,6 +203,18 @@ function reloadDecisionForState(input) {
     reloadDecisionWithRam(decision, 'fullCore', [], common, 'ReloadState yêu cầu nạp full core.');
     decision.notifySidebar = true;
     decision.reason = 'ReloadState yêu cầu nạp full core.';
+    return decision;
+  }
+
+  var stateEntities = reloadDecisionEntities(state.entities);
+  // Một thực thể đứng riêng nạp trọn thực thể đó; đi cùng scope khác thì dùng full core cho cùng một revision nhất quán, như Category đi cùng records.
+  if (stateEntities.length) {
+    var alone = stateEntities.length === 1 && !state.config && !state.category && !(state.records && state.records.length);
+    decision.kind = alone ? 'state-entity' : 'state-full-core';
+    reloadDecisionWithRam(decision, alone ? 'entity' : 'fullCore', [], common, alone ? 'ReloadState yêu cầu nạp trọn ' + stateEntities[0] + '.' : 'ReloadState có thực thể cần nạp trọn cùng scope khác.');
+    if (alone) { decision.ram.entity = stateEntities[0]; }
+    decision.notifySidebar = true;
+    decision.reason = decision.ram.reason;
     return decision;
   }
 

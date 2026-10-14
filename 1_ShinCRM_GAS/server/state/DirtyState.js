@@ -22,6 +22,7 @@ Object.defineProperties(DIRTY_KEYS, {
   category: { value: 'dirtyCategory', enumerable: false },
   schema: { value: 'dirtySchema', enumerable: false },
   allCore: { value: 'dirtyAllCore', enumerable: false },
+  entities: { value: 'dirtyEntities', enumerable: false },
   viewsStaleRevision: { value: 'viewsStaleRevision', enumerable: false },
   viewRendered: { value: 'viewRenderedRevisions', enumerable: false },
   revision: { value: 'reloadRevision', enumerable: false },
@@ -73,7 +74,7 @@ function dirtyStateRead() {
  */
 function reloadStateRead() {
   var empty = {
-    revision: 0, changedAt: 0, recordsReadyAt: 0, records: [], category: false, config: false, schema: false,
+    revision: 0, changedAt: 0, recordsReadyAt: 0, records: [], entities: [], category: false, config: false, schema: false,
     allCore: false, all: false, viewsStaleRevision: 0
   };
   try {
@@ -88,6 +89,7 @@ function reloadStateRead() {
       changedAt: Number(props.getProperty(DIRTY_KEYS.changedAt) || 0) || 0,
       recordsReadyAt: Number(props.getProperty(DIRTY_KEYS.recordsReadyAt) || 0) || 0,
       records: dirtyStateList(props, DIRTY_KEYS.records),
+      entities: dirtyStateEntityList(props),
       category: category,
       config: config,
       schema: schema,
@@ -98,6 +100,13 @@ function reloadStateRead() {
   } catch (khongDocDuocProps) {
     return empty;
   }
+}
+
+/** Thực thể cần nạp trọn (sắp xếp, thêm/xóa hàng trên sheet kho). Chỉ nhận hai thực thể có sheet riêng; khóa hỏng thì coi như không có. */
+function dirtyStateEntityList(props) {
+  return dirtyStateList(props, DIRTY_KEYS.entities).filter(function (entity, index, list) {
+    return (entity === 'customer' || entity === 'activity') && list.indexOf(entity) === index;
+  });
 }
 
 function dirtyStateBumpRevision(props) {
@@ -154,6 +163,7 @@ function dirtyStateMarkSignal(mark) {
   if (hasRecords) {
     dirtyStateWriteList(props, DIRTY_KEYS.records, state.records.concat(mark.records));
   }
+  if (mark.entities && mark.entities.length) { dirtyStateWriteList(props, DIRTY_KEYS.entities, state.entities.concat(mark.entities)); }
   if (mark.category) { props.setProperty(DIRTY_KEYS.category, 'true'); }
   if (mark.config) { props.setProperty(DIRTY_KEYS.config, 'true'); }
   if (mark.schema) { props.setProperty(DIRTY_KEYS.schema, 'true'); }
@@ -162,6 +172,7 @@ function dirtyStateMarkSignal(mark) {
     props.setProperty(DIRTY_KEYS.all, 'true');
     props.deleteProperty(DIRTY_KEYS.records);
     props.deleteProperty(DIRTY_KEYS.recordsReadyAt);
+    props.deleteProperty(DIRTY_KEYS.entities);
   }
   var bumpedRevision = dirtyStateBumpRevision(props);
   if (mark.allViews) { props.setProperty(DIRTY_KEYS.viewsStaleRevision, String(bumpedRevision)); }
@@ -195,10 +206,12 @@ function dirtyStateMarkDecision(decision) {
   var signal = decision && decision.signal;
   if (!signal) { return null; }
   var records = Array.isArray(signal.records) ? signal.records : [];
-  var hasSignal = records.length || signal.category || signal.config || signal.schema || signal.allCore || signal.allViews;
+  var entities = Array.isArray(signal.entities) ? signal.entities : [];
+  var hasSignal = records.length || entities.length || signal.category || signal.config || signal.schema || signal.allCore || signal.allViews;
   if (!hasSignal) { return null; }
   return dirtyStateMarkSignal({
     records: records,
+    entities: entities,
     category: signal.category === true,
     config: signal.config === true,
     schema: signal.schema === true,
@@ -292,9 +305,10 @@ function dirtyStateClear(options) {
   }
   var clearOptions = Object.keys(opts).filter(function (key) { return key !== 'expectedRevision'; });
   if (!clearOptions.length) {
-    [DIRTY_KEYS.records, DIRTY_KEYS.recordsReadyAt, DIRTY_KEYS.category, DIRTY_KEYS.config, DIRTY_KEYS.schema, DIRTY_KEYS.allCore, DIRTY_KEYS.all].forEach(function (key) { props.deleteProperty(key); });
+    [DIRTY_KEYS.records, DIRTY_KEYS.recordsReadyAt, DIRTY_KEYS.entities, DIRTY_KEYS.category, DIRTY_KEYS.config, DIRTY_KEYS.schema, DIRTY_KEYS.allCore, DIRTY_KEYS.all].forEach(function (key) { props.deleteProperty(key); });
   } else {
     if (opts.records) { props.deleteProperty(DIRTY_KEYS.records); props.deleteProperty(DIRTY_KEYS.recordsReadyAt); props.deleteProperty(DIRTY_KEYS.recordRevisionLog); }
+    if (opts.entities) { props.deleteProperty(DIRTY_KEYS.entities); }
     if (opts.config) { props.deleteProperty(DIRTY_KEYS.config); }
     if (opts.category) { props.deleteProperty(DIRTY_KEYS.category); }
     if (opts.schema) { props.deleteProperty(DIRTY_KEYS.schema); }
@@ -320,6 +334,14 @@ function dirtyStateClearRecords(recordIds, expectedRevision) {
   return dirtyStateRead();
 }
 
+/** Xóa cờ nạp trọn của một thực thể; nạp tay Customer không được xóa cờ của Activity. */
+function dirtyStateClearEntity(entity, expectedRevision) {
+  if (expectedRevision !== undefined && expectedRevision !== null && expectedRevision !== '' && reloadStateRead().revision !== Number(expectedRevision)) { return dirtyStateRead(); }
+  var props = documentProps();
+  dirtyStateWriteList(props, DIRTY_KEYS.entities, dirtyStateEntityList(props).filter(function (item) { return item !== entity; }));
+  return dirtyStateRead();
+}
+
 function dirtyStateClearConfig() {
   var props = documentProps();
   props.deleteProperty(DIRTY_KEYS.config);
@@ -329,7 +351,7 @@ function dirtyStateClearConfig() {
 /** Nhận phần trạng thái mà một lượt nạp toàn bộ sắp xử lý; cờ phát sinh sau thời điểm này vẫn được giữ lại. */
 function dirtyStateTakeFullReload() {
   var state = reloadStateRead();
-  dirtyStateClear({ records: true, category: true, config: true, schema: true, allCore: true, all: true });
+  dirtyStateClear({ records: true, entities: true, category: true, config: true, schema: true, allCore: true, all: true });
   var consumed = { records: state.records, config: state.config || state.category, all: state.allCore };
   Object.defineProperties(consumed, {
     category: { value: state.category, enumerable: false },

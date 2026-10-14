@@ -350,7 +350,7 @@ function sheetLinkReloadState(payload) {
 }
 
 function sheetLinkDirtyNeedsData(dirty) {
-  return !!(dirty && (dirty.allCore || dirty.all || dirty.schema || dirty.config || dirty.category || (dirty.records && dirty.records.length)));
+  return !!(dirty && (dirty.allCore || dirty.all || dirty.schema || dirty.config || dirty.category || (dirty.records && dirty.records.length) || (dirty.entities && dirty.entities.length)));
 }
 
 function sheetLinkApplyDirtyData(dirty, decision) {
@@ -362,6 +362,10 @@ function sheetLinkApplyDirtyData(dirty, decision) {
   if ((dirty.allCore || dirty.all || dirty.schema || dirty.config || mode === 'fullCore') && typeof sidebarBoot === 'function') {
     if (localDraftIds.length) { return { deferred: true, reason: 'Sidebar đang giữ bản nháp, chưa nạp lại full core.' }; }
     return sidebarBoot({ preserveView: true });
+  }
+  if (mode === 'entity' && decision.ram.entity && typeof refreshEntity === 'function') {
+    if (localDraftIds.length) { return { deferred: true, reason: 'Sidebar đang giữ bản nháp, chưa nạp trọn ' + decision.ram.entity + '.' }; }
+    return refreshEntity(decision.ram.entity, dirty.revision);
   }
   if (dirty.category && typeof refreshCategory === 'function') {
     var categoryWork = refreshCategory(dirty.revision);
@@ -494,12 +498,12 @@ function sheetLinkTakeQueuedWake() {
   return needsSelection ? { needsSelection: true } : undefined;
 }
 
-/** Hỏi selection + ReloadState trong đúng một round-trip; GAS tự quyết định đọc mã và scope RAM. */
 /** Extension chỉ giữ quyền chọn khách khi tự đọc được ở sheet đang đứng; đọc hỏng hoặc sheet chưa có plan thì mã do GAS đọc thay mới là nguồn đúng. */
 function sheetLinkExtensionOwnsContext() {
   return sheetLinkExtensionAlive() && !!SHEET_LINK_LAST_CONTEXT && sheetLinkPlanForSheet(SHEET_LINK_LAST_CONTEXT.sheetName).length > 0 && SHEET_LINK_EXTENSION_READ.status === 'ok';
 }
 
+/** Hỏi selection + ReloadState trong đúng một round-trip; GAS tự quyết định đọc mã và scope RAM. */
 function sheetLinkProbeSelectionAndReload(reason, options) {
   if (!SHEET_LINK_RAM_READY || typeof callServer !== 'function') { return null; }
   if (SHEET_LINK_SELECTION_PENDING) {

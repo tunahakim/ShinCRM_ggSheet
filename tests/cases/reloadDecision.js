@@ -48,7 +48,7 @@ function chay(so) {
   const categoryAndRecords = hop.reloadDecisionForState({ reloadState: hop.reloadStateRead() });
   check(so, 'Category và records cùng revision được gom vào full core',
     [categoryAndRecords.kind, categoryAndRecords.ram.mode, categoryAndRecords.signal],
-    ['state-full-core', 'fullCore', { records: [], category: false, config: false, schema: false, allCore: false, allViews: false }]);
+    ['state-full-core', 'fullCore', { records: [], entities: [], category: false, config: false, schema: false, allCore: false, allViews: false }]);
 
   const config = hop.reloadDecisionForChange({ entity: 'config', surface: 'config' });
   check(so, 'Config dùng scope riêng và làm mọi view cũ, không vẽ',

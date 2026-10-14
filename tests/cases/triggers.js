@@ -197,6 +197,22 @@ function chay(so) {
   hop.shinOpenBook = realOpen;
   hop.documentProps = realProps;
 
+  const doiCauTruc = (sheetName, changeType) => {
+    clearState();
+    nen.book.setActiveSheet(nen.sheet(sheetName));
+    hop.shinOnChange({ changeType });
+    const st = hop.reloadStateRead();
+    return [sheetName, changeType, st.entities, st.allCore, st.category, st.config, st.viewsStaleRevision > 0];
+  };
+  check(so, 'onChange OTHER (sắp xếp) và thêm/xóa hàng trên sheet kho nạp riêng sheet đó, không allCore; thêm cột trên Customer vẫn full core',
+    [doiCauTruc('Customer', 'OTHER'), doiCauTruc('Activity', 'OTHER'), doiCauTruc('Category', 'OTHER'), doiCauTruc('Config', 'OTHER'),
+      doiCauTruc('Customer', 'INSERT_ROW'), doiCauTruc('Activity', 'REMOVE_ROW'), doiCauTruc('Customer', 'INSERT_COLUMN'), doiCauTruc('Log', 'OTHER')],
+    [['Customer', 'OTHER', ['customer'], false, false, false, true], ['Activity', 'OTHER', ['activity'], false, false, false, true],
+      ['Category', 'OTHER', [], false, true, false, true], ['Config', 'OTHER', [], false, false, true, true],
+      ['Customer', 'INSERT_ROW', ['customer'], false, false, false, true], ['Activity', 'REMOVE_ROW', ['activity'], false, false, false, true],
+      ['Customer', 'INSERT_COLUMN', [], true, false, false, true], ['Log', 'OTHER', [], false, false, false, false]]);
+  clearState();
+
   const triggerList = [
     { getHandlerFunction: () => 'shinOnEdit' },
     { getHandlerFunction: () => 'shinOnChange' },

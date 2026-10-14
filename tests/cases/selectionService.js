@@ -280,6 +280,24 @@ function chay(so) {
   check(so, 'chỉ sheet ngoài kho và ngoài ! mới là sheet tự do', [hop.selectionIsFreeSheet('Customer'), hop.selectionIsFreeSheet('Config'), hop.selectionIsFreeSheet('!Lead'), hop.selectionIsFreeSheet('Bao cao')], [false, false, false, true]);
   check(so, 'mọi lời hỏi trên sheet tự do không ghi ô nào: bộ đếm lệnh ghi của tệp giả không đổi', JSON.parse(JSON.stringify(nen.dem)), JSON.parse(demTuDo));
 
+  section('SelectionService — signal entities nạp trọn đúng một thực thể trong cùng lời hỏi');
+  hop.dirtyStateClear();
+  hop.dirtyStateMarkDecision(hop.reloadDecisionForChange({ source: 'change', surface: 'entity', entities: ['customer'] }));
+  const truocEntity = hop.reloadStateRead();
+  const traEntity = hop.probeSelectionAndReload({ lastSeenRevision: 0 });
+  const payloadIds = traEntity.payload && traEntity.payload.customer ? traEntity.payload.customer.rows.map((row) => row[traEntity.payload.customer.fields.indexOf('id')]) : [];
+  check(so, 'signal entities [customer]: lời hỏi trả payload mode entity đọc trọn Customer, không đụng Activity, xóa signal khi revision khớp',
+    [truocEntity.entities, truocEntity.allCore, traEntity.decision.ram.mode, traEntity.payload && traEntity.payload.mode, traEntity.payload && traEntity.payload.entity, payloadIds.indexOf('CUS-000004') >= 0, traEntity.payload && traEntity.payload.activity, hop.reloadStateRead().entities, traEntity.remainingRevision],
+    [['customer'], false, 'entity', 'entity', 'customer', true, undefined, [], 0]);
+  hop.dirtyStateMarkDecision(hop.reloadDecisionForChange({ source: 'change', surface: 'entity', entities: ['activity'] }));
+  hop.dirtyStateMarkCategory();
+  check(so, 'thực thể đi cùng scope khác (Category) thì gom full core cho cùng một revision', hop.reloadDecisionForState({ reloadState: hop.reloadStateRead() }).ram.mode, 'fullCore');
+  hop.dirtyStateClear();
+  hop.dirtyStateMarkDecision(hop.reloadDecisionForChange({ source: 'change', surface: 'entity', entities: ['customer'] }));
+  check(so, 'nạp trọn thực thể bị chặn khi Sidebar giữ bản nháp, như full core',
+    hop.reloadDecisionForState({ reloadState: hop.reloadStateRead(), localDraft: { recordIds: ['CUS-000004'] } }).ram.action, 'defer');
+  hop.dirtyStateClear();
+
   section('SelectionService — lời hỏi rẻ: Extension đã đọc được vị trí thì GAS không chạm bảng tính');
   const daBiet = hop.probeSelectionAndReload({}).selection;
   const goc = { app: hop.SpreadsheetApp, mo: hop.shinOpenBook, sheet: nen.book.getActiveSheet };

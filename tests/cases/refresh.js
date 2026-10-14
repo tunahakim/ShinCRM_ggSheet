@@ -105,6 +105,11 @@ async function chay(so) {
   check(so, 'nạp thủ công Activity thay toàn bộ lịch sử và dọn giao dịch cũ',
     [entityHop.Store.activitiesByCustomer.KH1.map((record) => record.id), entityHop.Store.activitiesByCustomer.KH2],
     [['GD9'], undefined]);
+  entityHop.sidebarBoot = () => { throw new Error('payload nạp trọn thực thể không được khởi động lại Sidebar'); };
+  entityHop.refreshReloadPayload({ mode: 'entity', entity: 'customer', customer: { fields: ['id', 'companyName'], rows: [['KH3', 'Khách mới'], ['KH1', 'Tên mới']] }, counters: { customer: 3 } });
+  check(so, 'payload mode entity từ lời hỏi áp bằng refreshEntityApply: thay trọn Customer, không gọi sidebarBoot, giữ Activity',
+    [Object.keys(entityHop.Store.customers).sort(), entityHop.Store.customers.KH3.companyName, entityHop.Store.activitiesByCustomer.KH1.map((record) => record.id)],
+    [['KH1', 'KH3'], 'Khách mới', ['GD9']]);
 
   const configHop = taoHopCat({
     Store: { categories: {}, config: {}, customers: {}, activitiesByCustomer: {} },

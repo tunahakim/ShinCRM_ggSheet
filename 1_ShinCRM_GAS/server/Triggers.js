@@ -206,11 +206,18 @@ function shinOnChange(event) {
     }
     if (type === 'REMOVE_GRID') { return null; }
 
-    // onChange không có range đáng tin cậy. Với thêm/xóa hàng/cột, đánh dấu
-    // bảo thủ theo sheet đang active; nếu không xác định được thì dùng full core.
+    // onChange không có range đáng tin cậy nên đánh dấu bảo thủ theo sheet đang active. Thêm/xóa hàng và `OTHER` (sắp xếp, có thể chỉ trên một phần cột) trên Customer/Activity nạp trọn đúng thực thể đó; thêm/xóa cột có thể đổi schema nên vẫn full core.
+    var entity = name === ENTITY_SHEETS.customer ? 'customer' : name === ENTITY_SHEETS.activity ? 'activity' : '';
+    if (type === 'OTHER') {
+      if (entity) { return shinReloadDecision({ source: 'change', surface: 'entity', entities: [entity] }); }
+      if (name === 'Category' || name === 'Config') { return shinReloadDecision({ source: 'change', surface: name.toLowerCase(), entity: name.toLowerCase() }); }
+      return null;
+    }
     if (['INSERT_ROW', 'REMOVE_ROW', 'INSERT_COLUMN', 'REMOVE_COLUMN'].indexOf(type) >= 0) {
       var structural;
-      if (name === ENTITY_SHEETS.customer || name === ENTITY_SHEETS.activity) {
+      if (entity && (type === 'INSERT_ROW' || type === 'REMOVE_ROW')) {
+        structural = shinReloadDecision({ source: 'change', surface: 'entity', entities: [entity] });
+      } else if (entity) {
         structural = shinReloadDecision({ source: 'change', surface: 'structure', structure: true, allCore: true });
       } else if (name === 'Category') {
         structural = shinReloadDecision({ source: 'change', surface: 'category', entity: 'category' });

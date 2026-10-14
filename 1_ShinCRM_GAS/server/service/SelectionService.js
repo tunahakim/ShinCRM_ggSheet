@@ -104,7 +104,7 @@ function selectionReloadRequestId(input) {
 
 function selectionRemainingRevision(state) {
   if (!state) { return 0; }
-  var hasDirty = !!(state.records && state.records.length) || !!(state.category || state.config || state.schema || state.allCore);
+  var hasDirty = !!(state.records && state.records.length) || !!(state.entities && state.entities.length) || !!(state.category || state.config || state.schema || state.allCore);
   return hasDirty ? Number(state.revision || 0) : 0;
 }
 
@@ -112,6 +112,9 @@ function selectionPayloadFromReload(result) {
   if (!result || result.ok === false) { return null; }
   if (result.reloadMode === 'records') {
     return { mode: 'records', customer: result.customer, activity: result.activity, affectedCustomerIds: result.affectedCustomerIds || [], removedRecordIds: result.removedRecordIds || [], counters: result.counters };
+  }
+  if (result.reloadMode === 'customer' || result.reloadMode === 'activity') {
+    return { mode: 'entity', entity: result.reloadMode, customer: result.customer, activity: result.activity, counters: result.counters };
   }
   if (result.reloadMode === 'category') {
     return { mode: 'category', categories: result.categories || {}, warnings: result.warnings || [] };
@@ -285,6 +288,8 @@ function probeSelectionAndReload(input) {
       var expectedRevision = state && state.revision ? state.revision : undefined;
       if (ram.mode === 'records' && typeof reloadRecords === 'function') {
         reloadResult = reloadRecords(ram.recordIds || [], expectedRevision, { internal: true });
+      } else if (ram.mode === 'entity' && typeof reloadEntityAll === 'function') {
+        reloadResult = reloadEntityAll(ram.entity, expectedRevision);
       } else if (ram.mode === 'category' && typeof reloadCategory === 'function') {
         reloadResult = reloadCategory(expectedRevision, { internal: true });
       } else if (ram.mode === 'config' && typeof reloadConfig === 'function') {

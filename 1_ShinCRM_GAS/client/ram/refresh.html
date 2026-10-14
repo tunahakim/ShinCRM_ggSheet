@@ -114,6 +114,12 @@ function refreshReloadPayload(payload) {
     }, payload.affectedCustomerIds || []);
     return payload;
   }
+  if (payload.mode === 'entity') {
+    var entityResult = { ok: true, counters: payload.counters, processedRevision: payload.processedRevision };
+    entityResult[payload.entity] = payload[payload.entity];
+    refreshEntityApply(payload.entity, entityResult);
+    return payload;
+  }
   if (payload.mode === 'category') {
     refreshCategoryApply({ ok: true, categories: payload.categories || {} });
     return payload;
@@ -236,6 +242,13 @@ function refreshCategory(expectedRevision) {
     }
     refreshCategoryApply(result);
     return result;
+  });
+}
+
+/** Nạp trọn một thực thể khi ReloadState đòi (sắp xếp, thêm/xóa hàng trên sheet kho); dùng chung cửa với nút nạp lại thủ công. */
+function refreshEntity(entity, expectedRevision) {
+  return callServer(entity === 'activity' ? 'reloadActivity' : 'reloadCustomer', [expectedRevision]).then(function (result) {
+    return refreshEntityApply(entity, result);
   });
 }
 

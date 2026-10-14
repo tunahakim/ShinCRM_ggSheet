@@ -51,7 +51,7 @@ function loadMergeRecordIds(left, right) {
 }
 
 function loadStateNeedsFullCore(state) {
-  return !!(state && (state.allCore || state.all || state.schema || state.config));
+  return !!(state && (state.allCore || state.all || state.schema || state.config || (state.entities && state.entities.length)));
 }
 
 function reloadRecords(recordIds, expectedRevision, options) {
@@ -272,6 +272,7 @@ function reloadEntityAll(entity, expectedRevision) {
   var idAt = result.fields.indexOf('id');
   var ids = result.rows.map(function (row) { return String(idAt >= 0 ? row[idAt] || '' : '').trim(); }).filter(function (id) { return !!id; });
   if (revisionMatched && ids.length) { dirtyStateClearRecords(ids, expectedRevision); }
+  if (revisionMatched) { dirtyStateClearEntity(entity, expectedRevision); }
   var latest = reloadStateRead();
   return {
     ok: true,
