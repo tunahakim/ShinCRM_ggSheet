@@ -147,11 +147,13 @@ function chay(so) {
   section('viewScreen — nhấp hàng không ra khách');
 
   hop.screenViewSetSelectionMiss({ kind: 'notFound', code: 'CUS-999999' });
-  check(so, 'mã chưa có trong RAM: bỏ khách đang xem, khối thông tin chung và card lịch sử nói đúng mã và lý do có thể đang chờ nạp',
+  check(so, 'mã chưa có trong RAM: bỏ khách đang xem, khối thông tin chung báo đúng mã bằng khung cảnh báo, ẩn card ghi chú và lịch sử',
     [hop.ScreenState.currentCustomerId,
       els['sidebar-info'].innerHTML.indexOf('Không tìm thấy thông tin của khách CUS-999999. Có thể khách vừa được thêm, đang chờ nạp.') > 0,
-      els['sidebar-body'].innerHTML.indexOf('Không tìm thấy thông tin của khách CUS-999999') > 0],
-    ['', true, true]);
+      els['sidebar-info'].innerHTML.indexOf('shin-notice-warning') > 0,
+      els['sidebar-body'].innerHTML],
+    ['', true, true, '']);
+  check(so, 'không có khách thì vẽ lại riêng card lịch sử bỏ qua, không ném lỗi thiếu card', hop.screenViewActivityCard(), null);
 
   check(so, 'mã vẫn chưa có trong RAM thì lượt nạp sau không tự chuyển khách', hop.screenViewResolveSelectionMiss(), '');
   hop.Store.upsertRecord('customer', Object.assign({}, KHACH[0], { id: 'CUS-999999', companyName: 'Khách vừa thêm' }));
@@ -160,8 +162,9 @@ function chay(so) {
     ['CUS-999999', 'CUS-999999', null]);
 
   hop.screenViewSetSelectionMiss({ kind: 'empty' });
-  check(so, 'hàng không có mã khách: báo hàng này không có khách nào',
-    els['sidebar-info'].innerHTML.indexOf('Hàng này không có khách nào.') > 0, true);
+  check(so, 'hàng không có mã khách: báo hàng này không có khách nào bằng khung thông tin, ẩn card ghi chú và lịch sử',
+    [els['sidebar-info'].innerHTML.indexOf('Hàng này không có khách nào.') > 0, els['sidebar-info'].innerHTML.indexOf('shin-notice-pending') > 0, els['sidebar-body'].innerHTML],
+    [true, true, '']);
   hop.screenViewSetCustomer('CUS-000001');
   check(so, 'chọn khách bằng đường khác thì câu báo hàng trống mất', [hop.ScreenState.selectionMiss, els['sidebar-info'].innerHTML.indexOf('Công ty Thép Hòa Phát') > 0], [null, true]);
 

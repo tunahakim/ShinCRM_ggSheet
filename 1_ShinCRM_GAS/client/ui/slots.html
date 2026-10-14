@@ -22,6 +22,12 @@ function slotNoCustomerText(ctx) {
   return 'Chưa chọn khách hàng nào.';
 }
 
+/** Không có khách thì câu báo là nội dung chính của màn (card ghi chú và lịch sử đã ẩn), nên dùng khung thông báo nổi bật thay cho dòng chữ nhạt. Mã có mà RAM chưa có là cảnh báo; hàng trống hoặc chưa chọn là thông tin. */
+function slotNoCustomerNotice(ctx) {
+  var miss = ctx && ctx.records ? ctx.records.selectionMiss : null;
+  return [Notice({ kind: miss && miss.kind === 'notFound' ? 'warning' : 'info', text: slotNoCustomerText(ctx) })];
+}
+
 /** Mã khách của ngữ cảnh đang vẽ. Lấy từ bản ghi trong `ctx` chứ không đọc `ScreenState`, để slot kiểm được offline. */
 function slotCustomerId(ctx) {
   var ban = ctx && ctx.records ? ctx.records.customer : null;
@@ -157,7 +163,7 @@ function slotInfoRow(trai, phai) {
  */
 SLOTS.infoBarContent = function (ctx) {
   var ban = ctx && ctx.records ? ctx.records.customer : null;
-  if (!ban || !ban.id) { return slotEmpty(slotNoCustomerText(ctx)); }
+  if (!ban || !ban.id) { return slotNoCustomerNotice(ctx); }
 
   var dong = [Text({ text: ban.companyName || '(chưa có tên)', className: 'shin-info-name' })];
   if ((ban.recordStatus || STORE_ACTIVE) === STORE_DELETED) {

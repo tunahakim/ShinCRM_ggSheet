@@ -51,7 +51,11 @@ function screenViewSyncActivityLabel() {
  */
 function screenViewRender() {
   screenViewSyncActivityLabel();
-  return renderScreen(screenBuild(UI_SCHEMA.view, 'view'), { records: screenViewRecords() });
+  var records = screenViewRecords();
+  var man = screenBuild(UI_SCHEMA.view, 'view');
+  // Card ghi chú và lịch sử chỉ có nghĩa khi có khách; không có khách thì câu báo ở khối thông tin chung là nội dung duy nhất.
+  if (!records.customer) { man = Object.assign({}, man, { body: [] }); }
+  return renderScreen(man, { records: records });
 }
 
 /**
@@ -82,7 +86,7 @@ function screenViewGo() {
  * Đang mở form thì bỏ qua chứ không ném lỗi: card đó không có trên màn, và nấc mới sẽ hiện đúng khi quay về màn xem.
  */
 function screenViewActivityCard() {
-  if (ScreenState.screen !== SCREEN_VIEW) { return null; }
+  if (ScreenState.screen !== SCREEN_VIEW || !screenViewCustomer()) { return null; }
   screenViewSyncActivityLabel();
   return renderTarget(SCREEN_VIEW_HISTORY_ID);
 }
