@@ -108,8 +108,12 @@ function chay(so) {
     [firstProbe.selection.positionChanged, firstProbe.customerId, customerReads],
     [true, 'CUS-000004', 1]);
 
-  check(so, 'GAS báo đã đọc được ô mã của hàng dữ liệu để Sidebar phân biệt hàng trống với chỗ không có ô mã',
-    [firstProbe.selection.customerCell, hop.selectionCustomerCell({ sheet: {} }, { sheetName: 'Customer', row: 1 })], ['value', { read: false, value: '' }]);
+  check(so, 'một luật cho mọi hàng: GAS đọc ô mã ở cả hàng tiêu đề, chỗ không có cột mã trả rỗng, chỉ không đọc khi không có vị trí',
+    [firstProbe.selection.customerCell,
+      hop.selectionCustomerCell({ sheet: { getLastColumn: () => 1, getRange: (r) => ({ getValues: () => [['@CUS_MA_KH']], getValue: () => (r === 1 ? '@CUS_MA_KH' : '') }) } }, { sheetName: 'Customer', row: 1 }),
+      hop.selectionCustomerCell({ sheet: { getLastColumn: () => 0 } }, { sheetName: 'Category', row: 5 }),
+      hop.selectionCustomerCell({ sheet: {} }, { sheetName: '', row: 0 })],
+    ['value', { read: true, value: '@CUS_MA_KH' }, { read: true, value: '' }, { read: false, value: '' }]);
   const readsBeforeStable = customerReads;
   const stableProbe = hop.probeSelectionAndReload({ previousSelectionContext: firstProbe.selection, previousCustomerId: firstProbe.customerId });
   check(so, 'vị trí không đổi trả mã cũ và không đọc lại ô mã khách',

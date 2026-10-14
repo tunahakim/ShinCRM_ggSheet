@@ -336,10 +336,9 @@ function selectionCustomerId(context, snapshot) {
   return selectionCustomerCell(context, snapshot).value;
 }
 
-/** Ô mã khách của dòng đang chọn: `read` false khi không có ô nào để đọc (hàng tiêu đề, sheet không có cột mã), để Sidebar phân biệt "hàng trống mã" với "chỗ này không có khách". */
+/** Ô mã khách của dòng đang chọn, một luật cho mọi sheet và mọi hàng: đọc đúng ô ở cột mã của hàng đó; chỗ không có cột mã thì giá trị rỗng. `read` false chỉ khi không có vị trí để đọc. Sidebar tra giá trị trong RAM: có thì hiện khách, không có thì báo không tìm thấy, rỗng thì báo rỗng. */
 function selectionCustomerCell(context, snapshot) {
-  var none = { read: false, value: '' };
-  if (!snapshot.sheetName || snapshot.row < SHEET_FIRST_DATA_ROW || !context.sheet) { return none; }
+  if (!snapshot.sheetName || snapshot.row < 1 || !context.sheet) { return { read: false, value: '' }; }
 
   var column = 0;
   if (snapshot.sheetName === ENTITY_SHEETS.customer || snapshot.sheetName.charAt(0) === '!') {
@@ -349,7 +348,7 @@ function selectionCustomerCell(context, snapshot) {
   } else if (selectionIsFreeSheet(snapshot.sheetName)) {
     column = selectionFreeSheetColumn(context.sheet);
   }
-  if (!column) { return none; }
+  if (!column) { return { read: true, value: '' }; }
   var value = context.sheet.getRange(snapshot.row, column).getValue();
   return { read: true, value: String(value === null || value === undefined ? '' : value).trim() };
 }

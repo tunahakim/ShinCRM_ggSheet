@@ -21,7 +21,6 @@ var SHEET_LINK_SEQ = 0;
 var SHEET_LINK_SPREADSHEET_ID = '';
 var SHEET_LINK_READ_PLAN = null;
 /** Hàng dữ liệu đầu tiên, GAS gửi kèm read plan. 0 = chưa biết thì không phân loại hàng trống/không tìm thấy. */
-var SHEET_LINK_FIRST_DATA_ROW = 0;
 var SHEET_LINK_SCHEMA = null;
 var SHEET_LINK_LAST_ACK = 0;
 var SHEET_LINK_EXTENSION_SESSION = '';
@@ -56,7 +55,6 @@ function sheetLinkShowProbeProgress() {
 var sheetLinkInstalled = false;
 
 var SHEET_LINK_ORIGIN = 'https://docs.google.com';
-var SHEET_LINK_CODE_PATTERN = /^[A-Z]{2,4}-?[0-9]{6}$/;
 // Lỗi của cả bộ đọc live model, khác lỗi một ô chưa tải; `LIVE_GRID_SEARCHING` chỉ là lượt dò đầu trang nên không tính.
 var SHEET_LINK_READER_DOWN_REASONS = ['LIVE_GRID_NOT_FOUND', 'LIVE_GRID_CONFLICT', 'READER_ERROR', 'LIVE_MODEL_TIMEOUT'];
 
@@ -106,18 +104,6 @@ function sheetLinkSetReadPlan(plan) {
  * Sheet xem tự do: mọi sheet ngoài các sheet kho (có khóa riêng trong plan GAS gửi) và sheet `!`.
  * Extension chỉ nhận plan theo đúng tên sheet hoặc khóa `!`, nên Sidebar chép mẫu `!` thành khóa theo tên sheet tự do; `SHEET_LINK_FREE_SHEETS` nhớ khóa nào do Sidebar thêm để không nhầm với sheet kho.
  */
-/** Hàng tiêu đề (trên hàng dữ liệu đầu) của sheet có cột mã khách hoặc sheet `!`: chắc chắn không có khách, nên báo như hàng trống thay vì giữ khách của hàng trước. Sheet xem tự do không có quy ước hàng tiêu đề nên không xét. */
-function sheetLinkIsHeaderRow(ctx) {
-  var name = String(ctx && ctx.sheetName || '');
-  var plan = SHEET_LINK_READ_PLAN && !sheetLinkIsFreeSheet(name) ? SHEET_LINK_READ_PLAN[name] : null;
-  // Sheet có cột mã khách là sheet mà bản đồ đọc khai ô giá trị theo hàng (Customer, Activity); Category, Config không có khách nên không xét.
-  var known = name.charAt(0) === '!' || (Array.isArray(plan) && plan.some(function (item) { return item && item.valueAddressTemplate; }));
-  if (!known || !SHEET_LINK_FIRST_DATA_ROW) { return false; }
-  var coordinates = sheetLinkParseNameBox(ctx.cellRef);
-  var row = coordinates ? coordinates.row : Number(ctx.row) || 0;
-  return row > 0 && row < SHEET_LINK_FIRST_DATA_ROW;
-}
-
 function sheetLinkIsFreeSheet(sheetName) {
   var name = String(sheetName || '');
   if (!name || name.charAt(0) === '!' || !SHEET_LINK_READ_PLAN) { return false; }
@@ -169,7 +155,6 @@ function sheetLinkApplyCoreHints(core) {
   SHEET_LINK_SCHEMA = core.schema || SHEET_LINK_SCHEMA;
   SHEET_LINK_FREE_SHEETS = {};
   sheetLinkSetReadPlan(core.selectionHints.readPlan || null);
-  SHEET_LINK_FIRST_DATA_ROW = Number(core.selectionHints.firstDataRow) || 0;
 }
 
 /** Context chỉ được giải mã sau khi Customer đã vào RAM. */
@@ -796,32 +781,35 @@ function sheetLinkApplyCustomerContext(ctx) {
 }
 
 /**
- * Hàng dữ liệu vừa nhấp không ra khách trong RAM: `{ kind: 'notFound', code }` khi ô mã có giá trị, `{ kind: 'empty' }` khi ô mã trống. Trả `null` khi không chắc — hàng tiêu đề, sheet không có cột mã, bộ đọc chưa thấy ô — để màn giữ khách đang xem thay vì báo sai.
+ * Giá trị ô mã khách của hàng đang chọn, một luật cho mọi sheet và mọi hàng: chuỗi mã (rỗng là ô trống hoặc chỗ không có cột mã), hoặc `null` khi chưa biết.
  *
- * Ô trống thường không có trong lưới Extension đọc được (`unavailable`), nên ca "trống" phần lớn đến từ GAS đọc thay (`customerCell`).
+ * "Chưa biết" không phải ngoại lệ nghiệp vụ mà là chưa có giá trị để tra: Extension không thấy ô (lưới chưa nạp tới, xung đột lưới) thì chờ GAS đọc thay, vì hàng có khách mà lưới chưa nạp cũng trông như ô trống. Sheet xem tự do không đánh thức GAS khi Extension đọc hụt, nên ô vắng khỏi lưới ở đó là ô trống.
  */
-function sheetLinkSelectionMiss(ctx) {
+function sheetLinkSelectionCode(ctx) {
   if (!ctx) { return null; }
-  if (sheetLinkIsHeaderRow(ctx)) { return { kind: 'empty' }; }
   if (!Array.isArray(ctx.reads)) {
-    if (ctx.customerCell === 'empty') { return { kind: 'empty' }; }
-    var gasCode = String(ctx.customerId || '').trim().toUpperCase();
-    return ctx.customerCell === 'value' && gasCode ? { kind: 'notFound', code: gasCode } : null;
+    if (ctx.customerCell !== 'value' && ctx.customerCell !== 'empty') { return null; }
+    return ctx.customerCell === 'value' ? String(ctx.customerId || '').trim().toUpperCase() : '';
   }
-  var coordinates = sheetLinkParseNameBox(ctx.cellRef);
-  var row = coordinates ? coordinates.row : Number(ctx.row) || 0;
-  if (!SHEET_LINK_FIRST_DATA_ROW || row < SHEET_LINK_FIRST_DATA_ROW || ctx.readReason === 'LIVE_GRID_CONFLICT') { return null; }
-  // Sheet xem tự do không đánh thức GAS khi Extension đọc hụt, nên ô mã vắng khỏi lưới dưới một cột mã đúng tiêu đề được coi là ô trống. Sheet kho để GAS đọc thay rồi mới báo, tránh báo "trống" cho một hàng có khách mà lưới chưa nạp tới.
+  if (ctx.readReason === 'LIVE_GRID_CONFLICT') { return null; }
+  var cells = ctx.reads.filter(function (read) { return read && read.valueAddress && read.matched === true; });
+  // Không có ô mã nào: Extension đọc trọn (`ok`) thì chỗ này không có cột mã; đọc hỏng thì chưa biết.
+  if (!cells.length) { return ctx.readStatus === 'ok' ? '' : null; }
   var absentIsEmpty = sheetLinkIsFreeSheet(ctx.sheetName);
-  var cells = ctx.reads.filter(function (read) {
-    return read && read.valueAddress && read.matched === true && (read.status === 'ok' || (absentIsEmpty && read.status === 'unavailable' && !String(read.value || '').trim()));
-  });
-  if (!cells.length) { return null; }
+  var unknown = false;
   for (var i = 0; i < cells.length; i++) {
     var code = String(cells[i].value || '').trim().toUpperCase();
-    if (code) { return { kind: 'notFound', code: code }; }
+    if (cells[i].status === 'ok' && code) { return code; }
+    if (cells[i].status !== 'ok' && !(absentIsEmpty && cells[i].status === 'unavailable' && !code)) { unknown = true; }
   }
-  return { kind: 'empty' };
+  return unknown ? null : '';
+}
+
+/** Mã có mà RAM chưa có: `{ kind: 'notFound', code }`; ô rỗng: `{ kind: 'empty' }`; chưa biết: `null`. */
+function sheetLinkSelectionMiss(ctx) {
+  var code = sheetLinkSelectionCode(ctx);
+  if (code === null) { return null; }
+  return code ? { kind: 'notFound', code: code } : { kind: 'empty' };
 }
 
 function sheetLinkCustomerIdFromContext(ctx) {
@@ -835,8 +823,6 @@ function sheetLinkCustomerIdFromContext(ctx) {
   var direct = String(ctx.customerId || '').trim().toUpperCase();
   if (direct && Store.hasCustomer(direct)) { return direct; }
 
-  var text = String(ctx.cellText || '').trim().toUpperCase();
-  if (SHEET_LINK_CODE_PATTERN.test(text) && Store.hasCustomer(text)) { return text; }
   return '';
 }
 </script>
