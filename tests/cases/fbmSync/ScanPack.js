@@ -106,7 +106,7 @@ async function chay(so) {
   const la = await sauLuotDau({ customers: 6, budget: { activityTopScanQuietStreak: 2 } }, 'gõ nhầm', null);
   const loai = (run) => Array.from(new Set(run.h.trace.kinds.map((kind) => (kind === 'scan_job:activity' ? kind : kind.split(':')[0])).filter((kind) => kind === 'batch' || kind === 'scan_job:activity' || kind === 'scan_job')));
   check(so, 'Quét nhanh: danh sách khách rồi đọc giao dịch theo khách, không lấy toàn bộ giao dịch', [nhanh.end.status.phase, nhanh.state.scanPack, loai(nhanh), nhanh.h.trace.activityCustomers.length], ['done', 'quick', ['scan_job', 'batch'], 2]);
-  check(so, 'Quét kỹ: như Quét nhanh rồi lấy toàn bộ giao dịch (lớp 1) mới chốt lượt', [ky.end.status.phase, ky.state.scanPack, loai(ky), ky.h.trace.activityCustomers.length, ky.h.trace.kinds[ky.h.trace.kinds.length - 1]], ['done', 'deep', ['scan_job', 'batch', 'scan_job:activity'], 2, 'scan_job:activity']);
+  check(so, 'Quét kỹ: như Quét nhanh rồi lấy toàn bộ giao dịch (lớp 1) mới chốt lượt', [ky.end.status.phase, ky.state.scanPack, loai(ky), ky.h.trace.activityCustomers.length, ky.h.trace.kinds.slice(-2)], ['done', 'deep', ['scan_job', 'batch', 'scan_job:activity'], 2, ['scan_job:activity', 'customer_count']]);
   check(so, 'Quét toàn bộ: đọc giao dịch của mọi khách dù giao dịch cuối đều khớp', [toanBo.end.status.phase, toanBo.state.scanPack, loai(toanBo), toanBo.h.trace.activityCustomers.length], ['done', 'all', ['scan_job', 'batch'], 6]);
   check(so, 'Gói lạ về Quét nhanh chứ không về Quét toàn bộ', [la.state.scanPack, la.h.trace.activityCustomers.length], ['quick', 2]);
 

@@ -41,17 +41,18 @@ function scanHarness(options) {
   Object.assign(F.BUDGET, opt.budget || {});
   const customerFields = F.GRID_FIELDS.customer.concat(['ghi_chu_noi_bo']), activityFields = F.GRID_FIELDS.activity;
   const so2 = (i) => String(i).padStart(2, '0');
-  const rows = Array.from({ length: opt.customers || 12 }, (_, k) => k + 1).map((i) => row(customerFields, {
+  const khach = (i) => row(customerFields, {
     stt_rec_kh: 'FBM-C' + i, ma_kh: 'ALT' + String(i).padStart(5, '0'), ten_kh: 'Công ty Thử Nghiệm Số ' + i + ' ' + 'x'.repeat(opt.nameLength || 0), ma_so_thue: '0100' + so2(i),
     ong_ba: 'Anh ' + i, dc_lh: 'Hà Nội', dien_thoai: '09' + so2(i), email: 'c' + i + '@example.test', ghi_chu_noi_bo: 'không được về GAS',
     ngay_gd: '/Date(' + Date.UTC(2026, 8, 20) + ')/', datetime0: '/Date(' + (Date.UTC(2026, 8, 20, 1) + i * 60000) + ')/', xorder: i
-  }));
+  });
+  const rows = Array.from({ length: opt.customers || 12 }, (_, k) => k + 1).map(khach);
   const khoa = KHOA_TRANG.map((field) => customerFields.indexOf(field));
   const ngayFbm = (value) => new Date(Number(String(value).match(/\d+/)[0]) + 7 * 3600000).toISOString().slice(0, 10).replace(/-/g, '');
   const gioMayChu = (value) => '/Date(' + (Number(String(value).match(/\d+/)[0]) + 7 * 3600000) + ')/';
-  const total = rows.length + Number(opt.totalExtra || 0);
-  /** FBM chỉ trả trang kế khi request mô tả đúng dòng cuối trang trước; chỉ trang đầu báo tổng. */
+  /** FBM chỉ trả trang kế khi request mô tả đúng dòng cuối trang trước; chỉ trang đầu báo tổng. Thiếu bộ lọc khách của người dùng thì FBM đếm cả khách của người khác. */
   const customerPage = (body) => {
+    const total = rows.length + Number(opt.totalExtra || 0) + ((body.externalKey || []).some((item) => /GetCustomerValidate/.test(item.Name)) ? 0 : 3);
     const pageValue = body.gridPageValue;
     const keyIndex = pageValue ? rows.findIndex((item) => JSON.stringify(khoa.map((index, k) => (k < 2 ? gioMayChu(item[index]) : item[index]))) === JSON.stringify(pageValue)) : -1, keyRow = rows[keyIndex];
     const moTaDung = keyRow && body.lastPageItem === ngayFbm(keyRow[khoa[0]]) + ngayFbm(keyRow[khoa[1]]) + keyRow[khoa[2]] + keyRow[khoa[3]] && body.lastRowCount === total;
@@ -109,7 +110,8 @@ function scanHarness(options) {
       } else {
         const body = kind === 'session_probe' || kind === 'identity_user_grid' ? USER_RESPONSE
           : kind === 'authorize' ? JSON.stringify({ d: { Authorized: 'auth-' + request.meta.entity } })
-          : kind === 'scan_job' ? (request.meta.entity === 'activity' ? activityBulk(request.body) : customerPage(request.body)) : '';
+          : kind === 'scan_job' ? (request.meta.entity === 'activity' ? activityBulk(request.body) : customerPage(request.body))
+          : kind === 'customer_count' ? customerPage(request.body) : '';
         if (kind !== 'scan_chunk') { trace.tabCalls += 1; }
         const sent = await tab.send(h.rewrite ? h.rewrite(request, trace) : request, body);
         if (sent.reply && sent.reply.error) {
@@ -136,7 +138,7 @@ function scanHarness(options) {
     }
     return step;
   }
-  return { flow, F, logs, writes, local, tab, trace, run, rows, customerFields };
+  return { flow, F, logs, writes, local, tab, trace, run, rows, customerFields, themKhach: (i) => rows.push(khach(i)) };
 }
 
 /** Request `scan_job` dựng tay để kiểm executor riêng, không qua GAS. */

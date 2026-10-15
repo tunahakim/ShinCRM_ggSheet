@@ -128,9 +128,9 @@ async function chay(so) {
   // Lượt nền chỉ lấy toàn bộ giao dịch gồm đúng lớp 1 (09/02 Phần 3): chốt "không thấy" rồi kết thúc, không đọc thêm khách nào.
   const nen = await luotKy(['2026-09-20', '2026-09-20'], (fbm) => { fbm.list = fbm.list.filter((item) => item.id !== 'A-FBM-C2'); }, {}, { startOptions: { scan: 'activity_bulk' }, afterError: () => null });
   const sauBulk = nen.h.trace.kinds.slice(nen.h.trace.kinds.indexOf('scan_job:activity') + 1);
-  check(so, 'Lượt lấy toàn bộ giao dịch chạy nền kết thúc ngay sau lớp 1, không cấp request Customer nào sau lớp 1', [
-    nen.state.phase, nen.log('activity_bulk_done').length, nen.act(2).syncStatus, sauBulk.filter((kind) => /customer/i.test(kind))
-  ], ['done', 1, nen.h.F.SYNC_STATUS.missing, []]);
+  check(so, 'Lượt lấy toàn bộ giao dịch chạy nền kết thúc ngay sau lớp 1: sau lớp 1 chỉ còn đúng một request đếm khách, không đọc khách nào', [
+    nen.state.phase, nen.log('activity_bulk_done').length, nen.act(2).syncStatus, sauBulk
+  ], ['done', 1, nen.h.F.SYNC_STATUS.missing, ['customer_count']]);
 
   // Lớp 1 gắn cờ qua cùng chỗ với lượt quét theo khách: số vào thẻ kết quả đúng một lần, dòng người dùng đang sửa không bị gắn cờ, lượt sau không ghi lại dòng đã mang cờ.
   const lop1 = await luotKy(['2026-09-20', '2026-09-20', '2026-09-20', '2026-09-20', '2026-09-20', '2026-09-20'], (fbm, h) => {

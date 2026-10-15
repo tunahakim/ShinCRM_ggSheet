@@ -64,7 +64,7 @@ function workflowGas(options) {
     'fbm_sync/auth/AutoLogin.js',
     'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js',
     'fbm_sync/transport/PushFlow.js',
-    'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js',
+    'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js',
     'fbm_sync/transport/EntryPoints.js',
     'server/service/FbmSyncService.js',
     'server/dev/FbmSyncStateProbe.js'
@@ -883,7 +883,7 @@ async function chay(so) {
         body = JSON.stringify({ d: [['CODE', 'Ten danh muc']] });
       } else if (kind === 'scan_chunk') {
         body = '';
-      } else if ((kind === 'grid' || kind === 'scan_job') && request.meta.entity === 'customer') {
+      } else if ((kind === 'grid' || kind === 'scan_job' || kind === 'customer_count') && request.meta.entity === 'customer') {
         // FBM phân trang keyset: trang kế bắt đầu sau dòng có đúng bốn giá trị khóa đã gửi, ngày ở dạng `/Date(ms)/`; khóa lệch thì trả trang rỗng. Chỉ trang đầu báo `TotalRowCount` (Nghiên cứu FBM ch03 mục 3.3, ch04 mục 4.10).
         const pageSize = Number(request.body.count), pageValue = request.body.gridPageValue, khoa = ['ngay_gd', 'datetime0', 'xorder', 'stt_rec_kh'].map((field) => fullCustomerFields.indexOf(field));
         // Trang sau chỉ có dữ liệu khi request mô tả đúng dòng cuối trang đang đứng và tổng số dòng, như FBM thật (yyyyMMdd theo giờ Việt Nam).
@@ -949,7 +949,7 @@ async function chay(so) {
     ui.content.textContent.indexOf('Hoàn tất') >= 0
   ], [
     true, null, 'done', 2, 2, 2,
-     ['session_probe:user', 'authorize:customer', 'authorize:activity', 'scan_job:customer', 'batch:activity'],
+     ['session_probe:user', 'authorize:customer', 'authorize:activity', 'scan_job:customer', 'batch:activity', 'customer_count:customer'],
     0, true, 4, true
   ]);
   const checkRun = await fullPipeline(false, 'check');
@@ -1055,10 +1055,10 @@ async function chay(so) {
     readStep = readFlow.hop.FbmSync.continue(executorRaw(throughExtension.reply, request.id));
   }
   check(so, 'phiên rỗng: Extension chỉ chuyển request đọc, không phát request ghi hoặc xóa và pipeline kết thúc', [
-    readKinds, readKinds.length, readKinds.every((kind) => ['session_probe:user', 'authorize:customer', 'authorize:activity', 'completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH', 'completion:@CAT_CONG_VIEC', 'scan_job:customer'].indexOf(kind) >= 0), readStep.ok, readStep.request || null, readStep.status.phase, readFlow.hop.FbmSync.stateRead().counts.succeeded
+    readKinds, readKinds.length, readKinds.every((kind) => ['session_probe:user', 'authorize:customer', 'authorize:activity', 'completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH', 'completion:@CAT_CONG_VIEC', 'scan_job:customer', 'customer_count:customer'].indexOf(kind) >= 0), readStep.ok, readStep.request || null, readStep.status.phase, readFlow.hop.FbmSync.stateRead().counts.succeeded
   ], [[
-     'session_probe:user', 'authorize:customer', 'authorize:activity', 'scan_job:customer'
-  ], 4, true, true, null, 'done', 0]);
+     'session_probe:user', 'authorize:customer', 'authorize:activity', 'scan_job:customer', 'customer_count:customer'
+  ], 5, true, true, null, 'done', 0]);
 
   // Extension cũ không ghi mã hợp đồng vào response; trang Customer có khách thật vẫn không được đi tới cửa ghi Sheet.
   const contractRun = async (contract) => {
