@@ -26,25 +26,20 @@ async function chay(so) {
   const local = (records) => ({ day: '2026-09-20', records });
   const hai = local([giaoDich('CUS-000001', 'F1', '2026-09-20', 'Gọi điện'), giaoDich('CUS-000001', 'F2', '2026-09-20', 'Gặp mặt')]);
   check(so, 'Cùng ngày có hai công việc: FBM hiện công việc nào trong hai thì vẫn khớp, công việc khác thì lệch ở công việc', [
-    F.lastActivityDiff({ ngay_gd: ngayFbm(2026, 9, 20), ten_cv: 'Gọi điện' }, hai, gate, ''),
-    F.lastActivityDiff({ ngay_gd: ngayFbm(2026, 9, 20), ten_cv: 'Gặp mặt' }, hai, gate, ''),
-    F.lastActivityDiff({ ngay_gd: ngayFbm(2026, 9, 20), ten_cv: 'Báo giá' }, hai, gate, '')
+    F.lastActivityDiff({ ngay_gd: ngayFbm(2026, 9, 20), ten_cv: 'Gọi điện' }, hai, gate),
+    F.lastActivityDiff({ ngay_gd: ngayFbm(2026, 9, 20), ten_cv: 'Gặp mặt' }, hai, gate),
+    F.lastActivityDiff({ ngay_gd: ngayFbm(2026, 9, 20), ten_cv: 'Báo giá' }, hai, gate)
   ], [[], [], ['ma_cv']]);
 
   const coNoiBo = scanHarness({ customers: 1, localActivities: [giaoDich('CUS-000001', 'F1', '2026-09-20', 'Gọi điện'), { id: 'ACT-NB', customerId: 'CUS-000001', fbmId: '', workDate: '2026-12-01', taskType: 'Gọi điện' }] }).F;
   const chiMuc = coNoiBo.lastActivityIndex(gate)['CUS-000001'];
   check(so, 'Giao dịch nội bộ ngày tương lai (chưa có FBM ID) không che phát sinh FBM: mốc so vẫn là ngày của giao dịch có FBM ID, FBM báo ngày mới hơn thì lệch', [
-    chiMuc.day, chiMuc.records.length, coNoiBo.lastActivityDiff({ ngay_gd: ngayFbm(2026, 9, 25), ten_cv: 'Gọi điện' }, chiMuc, gate, '')
+    chiMuc.day, chiMuc.records.length, coNoiBo.lastActivityDiff({ ngay_gd: ngayFbm(2026, 9, 25), ten_cv: 'Gọi điện' }, chiMuc, gate)
   ], ['2026-09-20', 1, ['end_date']]);
 
   check(so, 'Ngày giao dịch cuối 01/01/1999 là chưa có giao dịch: khớp với khách chưa có giao dịch FBM, lệch với khách đã có', [
-    F.lastActivityDiff({ ngay_gd: ngayFbm(1999, 1, 1), ten_cv: '' }, undefined, gate, ''),
-    F.lastActivityDiff({ ngay_gd: ngayFbm(1999, 1, 1), ten_cv: '' }, hai, gate, '')
-  ], [[], ['end_date']]);
-
-  check(so, 'Giao dịch cuối bên FBM nằm trước mốc giao dịch đã cấu hình thì không đọc khách đó; ShinCRM có giao dịch trong mốc mà FBM lùi về trước mốc thì vẫn đọc', [
-    F.lastActivityDiff({ ngay_gd: ngayFbm(2025, 1, 5), ten_cv: '' }, undefined, gate, '2026-01-01'),
-    F.lastActivityDiff({ ngay_gd: ngayFbm(2025, 1, 5), ten_cv: '' }, hai, gate, '2026-01-01')
+    F.lastActivityDiff({ ngay_gd: ngayFbm(1999, 1, 1), ten_cv: '' }, undefined, gate),
+    F.lastActivityDiff({ ngay_gd: ngayFbm(1999, 1, 1), ten_cv: '' }, hai, gate)
   ], [[], ['end_date']]);
 
   const goc = { ten_kh: 'Công ty A', ma_so_thue: '0101', ngay_gd: ngayFbm(2026, 9, 20), ten_cv: 'Gọi điện' };

@@ -270,12 +270,12 @@ async function chay(so) {
   const loginActionRow = hop.fbmSyncLoginActionBlocks()[0];
   check(so, 'Nút đăng nhập thử dùng RowGroup và không nhân bản nút lưu connection', [loginActionRow.role, loginActionRow.className, loginActionRow.elements.length, loginActionRow.elements[0].role], ['box', 'shin-row-group', 1, 'button']);
   hop.fbmSyncConfigFinishEdit('login');
-  hop.FBM_SYNC_CLIENT.syncSettings = { account: { customerPrefix: 'ALT', customerCodeLength: '8', activitySince: '2026-01-01' } };
+  hop.FBM_SYNC_CLIENT.syncSettings = { account: { customerPrefix: 'ALT', customerCodeLength: '8' } };
   render(hop, content, hop.fbmSyncRenderAccount, idle);
-  check(so, 'Account hien cau hinh ma khach FBM va moc Activity tren FBM tu GAS', [dom.document.getElementById('fbm-account-customer-prefix').value, dom.document.getElementById('fbm-account-customer-length').value, dom.document.getElementById('fbm-account-activity-since').value, content.textContent.indexOf('Mốc ngày Activity trên FBM') >= 0, content.textContent.indexOf('end_date') >= 0, content.textContent.indexOf('không bị coi là bản ghi mất') >= 0], ['ALT', '8', '2026-01-01', true, true, true]);
-  hop.FBM_SYNC_CLIENT.accountSettingsInvalid = { customerPrefix: false, customerCodeLength: true, activitySince: false };
+  check(so, 'Account hien cau hinh ma khach FBM tu GAS, khong con o moc ngay Activity', [dom.document.getElementById('fbm-account-customer-prefix').value, dom.document.getElementById('fbm-account-customer-length').value, dom.document.getElementById('fbm-account-activity-since'), content.textContent.indexOf('Mốc ngày Activity') >= 0], ['ALT', '8', null, false]);
+  hop.FBM_SYNC_CLIENT.accountSettingsInvalid = { customerPrefix: false, customerCodeLength: true };
   const invalidAccountFields = hop.fbmSyncAccountSettingsBlocks().filter((node) => node && node.role === 'box' && node.className.indexOf('shin-form-field') >= 0);
-  check(so, 'Cau hinh ma khach FBM dung StandaloneField va to do o thieu', [invalidAccountFields.length, invalidAccountFields[0].className, invalidAccountFields[1].className, invalidAccountFields[2].className], [3, 'shin-form-field', 'shin-form-field is-invalid', 'shin-form-field']);
+  check(so, 'Cau hinh ma khach FBM dung StandaloneField va to do o thieu', [invalidAccountFields.length, invalidAccountFields[0].className, invalidAccountFields[1].className], [2, 'shin-form-field', 'shin-form-field is-invalid']);
   hop.FBM_SYNC_CLIENT.accountSettingsInvalid = {};
   hop.fbmSyncConfigStartEdit('identity');
   const identityBlock = hop.fbmSyncIdentityBlock(idle);

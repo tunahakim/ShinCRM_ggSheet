@@ -681,8 +681,6 @@ async function chay(so) {
   scheduleFlow.hop.FbmSync.backgroundScheduleSave({ heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: true, minutes: 30 } });
   const startup = scheduleFlow.hop.FbmSync.heartbeatRequest({ source: 'startup' });
   check(so, 'Chrome startup co the hoi GAS ngay mot luot theo cau hinh', [startup.ok, startup.code, startup.request && startup.request.meta.kind], [true, 'HEARTBEAT_REQUEST_READY', 'heartbeat']);
-  scheduleFlow.hop.FbmSync.accountSettingsSave({ customerPrefix: 'ALT', customerCodeLength: '8', activitySince: '2026-01-01' });
-  check(so, 'Request giao dịch mọi khách gắn mốc activitySince của tài khoản', scheduleFlow.hop.FbmSync.activityBulkRequest({ type: 0, count: 100, gridPageIndex: -1 }).body.filter, ['end_date:>=01/01/2026']);
   const waitFlow = workflowGas({ extraFiles: ['server/gate/IdGate.js', 'fbm_sync/state/SyncSettings.js'] });
   waitFlow.hop.FbmSync.syncSettingsSave({ scopeLimited: false });
   waitFlow.hop.FbmSync.syncSettingsSave({ requestGapMinSeconds: 1, requestGapMaxSeconds: 3 });

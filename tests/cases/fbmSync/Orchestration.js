@@ -125,12 +125,10 @@ async function chay(so) {
    const restartedConflict = orchestration.FbmSync.start({ mode: 'read' });
    check(so, 'bam Dong bo ngay khi phase conflict phai probe lai phien; so xung dot ton dong van hien', [restartedConflict.ok, restartedConflict.request.meta.kind, restartedConflict.status.metadata.conflictCount, restartedConflict.status.counts.conflict], [true, 'session_probe', 1, 0]);
   orchestration.FbmSync.stateWrite(orchestration.FbmSync.stateStart('', 'idle', 0));
-  orchestration.FbmSync.accountSettingsRead = () => ({ activitySince: '2024-10-07' });
   const bulkStarted = orchestration.FbmSync.start({ mode: 'read', scan: 'activity_bulk' });
-  orchestration.FbmSync.accountSettingsRead = () => ({ activitySince: '2025-01-01' });
   const bulkSnapshotState = orchestration.FbmSync.stateRead();
   const bulkSnapshotRequest = orchestration.FbmSync.activityBulkRequest({ type: 0 });
-   check(so, 'start bulk Activity probe User truoc request bulk va chup moc theo phien', [bulkStarted.request.meta.kind, bulkSnapshotState.scan, bulkSnapshotState.activitySince, bulkSnapshotRequest.body.filter], ['session_probe', 'activity_bulk', '2024-10-07', ['end_date:>=07/10/2024']]);
+   check(so, 'start bulk Activity probe User truoc request bulk; request lấy toàn bộ giao dịch không lọc ngày', [bulkStarted.request.meta.kind, bulkSnapshotState.scan, bulkSnapshotRequest.body.filter], ['session_probe', 'activity_bulk', []]);
    check(so, 'probe User khong mang authorized cu', [started.request.body.authorized, started.request.body.controller], [undefined, 'User']);
   check(so, 'envelope mang runId/requestId va GAS luu moc response', [Boolean(started.request.meta.trace.runId), Boolean(started.request.meta.trace.requestId), orchestration.FbmSync.stateRead().activeRequestId === bulkStarted.request.meta.trace.requestId, orchestration.FbmSync.traceRead(5).some((item) => item.stage === 'response_built')], [true, true, true, true]);
    orchestration.FbmSync.statePatch({ activeRequestId: '', deadlineAt: 0, phase: 'pull_customer', cursor: { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 }, session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
