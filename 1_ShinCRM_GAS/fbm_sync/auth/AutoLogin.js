@@ -408,7 +408,7 @@ FbmSync.beginAutoLogin = function (state, failedCursor, options) {
   gate.probeRetryCount = 0;
   var resumeCursor = failedCursor && failedCursor.kind === 'session_probe' && gate.resumeCursor ? gate.resumeCursor : (failedCursor || {});
   FbmSync.autoLoginMarkAttempt();
-  state.cursor = { kind: 'login', credentialRef: allowed.credentialRef, purpose: 'auto', manual: attempt.manual, resumeCursor: Object.assign({}, resumeCursor), resumePhase: String(gate.resumePhase || state.phase || ''), resumeEntity: String(gate.resumeEntity || state.entity || ''), resumeHeartbeat: opt.heartbeat === true };
+  state.cursor = { kind: 'login', credentialRef: allowed.credentialRef, purpose: 'auto', manual: attempt.manual, resumeCursor: Object.assign({}, resumeCursor), resumePhase: String(gate.resumePhase || state.phase || ''), resumeEntity: String(gate.resumeEntity || state.entity || ''), resumeHeartbeat: opt.heartbeat === true || resumeCursor.kind === 'heartbeat' };
   state.phase = 'checking_session'; state.entity = ''; state.session.expired = true; state.message = 'Phiên FBM hết hạn; đang thử đăng nhập lại tự động...'; state.lastFailureCode = 'AUTO_LOGIN_STARTED';
   if (typeof FbmSync.businessStepStart === 'function') { FbmSync.businessStepStart(state, 'auto_login', { mode: state.mode, scan: state.scan }); }
   FbmSync.sessionIdentityClear(state);

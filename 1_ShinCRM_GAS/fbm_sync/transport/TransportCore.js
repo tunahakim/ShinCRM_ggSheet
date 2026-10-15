@@ -278,6 +278,17 @@ FbmSync.sessionGateResumeProbeRequest = function (state, resumeCursor, reason) {
   FbmSync.stateWrite(current);
   return FbmSync.sessionSystemEnvelope('session_probe');
 };
+/**
+ * Dấu "phiên hết hạn" còn lại từ lượt đã kết thúc: người dùng có thể đã tự đăng nhập trên tab FBM từ đó, nên không gửi thẳng login (09/06 không đăng nhập lại khi phiên còn hợp lệ).
+ * Xóa dấu và cờ cổng của lượt cũ rồi probe: phiên sống thì chạy tiếp cursor chờ, không thì cổng đăng nhập theo chu kỳ chờ.
+ */
+FbmSync.sessionGateStaleProbeRequest = function (state, resumeCursor) {
+  var current = state || FbmSync.stateRead(), gate = FbmSync.sessionGateMeta(current);
+  current.session = current.session || {};
+  current.session.expired = false;
+  gate.probeOnly = false; gate.loginAttempted = false; gate.probeRetryCount = 0;
+  return FbmSync.sessionGateResumeProbeRequest(current, resumeCursor, 'Lượt trước báo phiên FBM hết hạn; đang kiểm tra lại phiên trước khi chạy tiếp...');
+};
 /** Xử lý probe không đạt; chỉ probe được phép khởi động auto-login, tối đa một lần. */
 FbmSync.sessionGateHandleProbeFailure = function (state, cursor, response) {
   var current = state || FbmSync.stateRead(), gate = FbmSync.sessionGateMeta(current), suspicious = FbmSync.protocol.isSessionSuspicious(response);

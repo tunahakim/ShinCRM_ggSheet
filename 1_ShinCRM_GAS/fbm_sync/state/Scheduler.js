@@ -239,6 +239,11 @@ function fbmSyncHeartbeatRequest(options) {
     state = FbmSync.stateRead();
     state.cursor = { kind: 'heartbeat' };
     state.relayHop = 0;
+    // Dấu "phiên hết hạn" của lượt đã kết thúc không còn đáng tin: cổng phiên probe trước rồi mới quyết định (09/06).
+    if (state.session && state.session.expired === true && !FbmSync.runInProgress(state)) {
+      var staleProbe = FbmSync.sessionGateStaleProbeRequest(state, { kind: 'heartbeat' });
+      return staleProbe ? { ok: true, code: 'SESSION_PROBE_REQUEST_READY', request: staleProbe, status: FbmSync.statusView() } : { ok: false, code: 'SESSION_PROBE_UNAVAILABLE', request: null, status: FbmSync.statusView() };
+    }
     FbmSync.stateWrite(state);
     var heartbeatRequest = FbmSync.sessionSystemRequest('heartbeat'), heartbeatEnvelope = FbmSync.nextEnvelope(heartbeatRequest), currentState = FbmSync.stateRead();
     return { ok: true, code: typeof FbmSync.sessionGateRequestCode === 'function' ? FbmSync.sessionGateRequestCode(heartbeatEnvelope, currentState) : 'HEARTBEAT_REQUEST_READY', request: heartbeatEnvelope, status: FbmSync.statusView() };
