@@ -259,33 +259,18 @@ async function chay(so) {
   napServer(scheduler, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/state/Scheduler.js');
   const schedule = scheduler.FbmSync.schedule();
   check(so, 'Lấy toàn bộ giao dịch chạy nền mặc định tắt với chu kỳ 8 giờ', [schedule.activityMinutes, schedulerData.FBM_SYNC_NEXT_ACTIVITY_SCAN !== undefined], [480, true]);
-  schedulerData.FBM_SYNC_NEXT_CUSTOMER_SCAN = '1000';
-  const claimed = scheduler.FbmSync.schedulerClaim('customer', 1000);
-  check(so, 'scheduler claim mot ky Customer va doi marker', [claimed.ok, claimed.kind, scheduler.FbmSync.stateRead().scheduledScan, Number(schedulerData.FBM_SYNC_NEXT_CUSTOMER_SCAN) > 1000], [true, 'customer', 'customer', true]);
-  const notDue = scheduler.FbmSync.schedulerClaim('customer', 1001);
-  check(so, 'scheduler khong tao ky Customer thu hai khi marker chua den', [notDue.ok, notDue.code], [false, 'NOT_DUE']);
-  const active = scheduler.FbmSync.stateRead();
-  active.phase = 'pull_customer'; active.runId = 'busy'; scheduler.FbmSync.stateWrite(active);
-  schedulerData.FBM_SYNC_NEXT_ACTIVITY_SCAN = '1000';
-  const busy = scheduler.FbmSync.schedulerClaim('activity', 1000);
-  check(so, 'scheduler bo qua khi dang co phien', [busy.ok, busy.code], [false, 'SYNC_ALREADY_RUNNING']);
-  active.updatedAt = Date.now() - scheduler.FbmSync.STALE_RUN_MS - 1;
-  schedulerData[scheduler.FbmSync.STATE_KEY] = JSON.stringify(active);
-  schedulerData.FBM_SYNC_NEXT_ACTIVITY_SCAN = String(Date.now() - 1);
-  const staleClaim = scheduler.FbmSync.schedulerClaim('activity', Date.now());
-  check(so, 'scheduler thu hoi phien cu va nhan ky moi', [staleClaim.ok, staleClaim.kind, scheduler.FbmSync.stateRead().lastFailureCode], [true, 'activity', 'SYNC_STALE_RUN']);
-  const supervised = scheduler.FbmSync.stateStart('activity', 'push', 1);
-  supervised.cursor = { kind: 'push_wait', operation: 'activity_edit_save' }; supervised.current = 'ACT-1'; supervised.lastProgressAt = Date.now() - scheduler.FbmSync.STALE_RUN_MS - 1;
-  scheduler.FbmSync.stateWrite(supervised);
-  const supervisorResult = scheduler.FbmSync.supervise(Date.now());
-  check(so, 'Supervisor danh dau phien ghi treo va khong tu retry', [supervisorResult.stale, scheduler.FbmSync.stateRead().phase, scheduler.FbmSync.stateRead().lastFailureCode], [true, 'error', 'SUPERVISOR_TIMEOUT_AT_PUSH']);
-  schedulerData.FBM_SYNC_NEXT_HEARTBEAT = '0';
-  const errorClaim = scheduler.FbmSync.schedulerClaim('heartbeat', Date.now());
-  check(so, 'Scheduler khong ghi de loi phien push da treo', [errorClaim.ok, errorClaim.code, scheduler.FbmSync.stateRead().phase, scheduler.FbmSync.stateRead().lastFailureCode], [false, 'SYNC_ERROR_REQUIRES_MANUAL_RESTART', 'error', 'SUPERVISOR_TIMEOUT_AT_PUSH']);
-  scheduler.FbmSync.statePatch({ runId: '', phase: 'paused', cursor: {}, activeRequestId: '', scheduledScan: '' });
-  schedulerData.FBM_SYNC_NEXT_CUSTOMER_SCAN = '0';
-  const claimAfterManualCancel = scheduler.FbmSync.schedulerClaim('customer', Date.now());
-  check(so, 'phien da dung khong tu tiep tuc nhung khong khoa lich nen cua ky sau', [claimAfterManualCancel.ok, claimAfterManualCancel.kind, scheduler.FbmSync.stateRead().scheduledScan], [true, 'customer', 'customer']);
+  // Trigger hẹn giờ phía GAS của thiết kế cũ còn sót trên project: gọi tới thì tự gỡ mọi trigger cũ, ghi một dòng Log, không đụng state hay lịch nền.
+  const triggers = ['fbmHeartbeatTrigger', 'fbmSupervisorTrigger', 'shinOnEdit', 'fbmCustomerScanTrigger'].map((name) => ({ getHandlerFunction: () => name }));
+  const deleted = [], legacyLogs = [];
+  scheduler.ScriptApp = { getProjectTriggers: () => triggers.filter((trigger) => deleted.indexOf(trigger) < 0), deleteTrigger: (trigger) => deleted.push(trigger) };
+  scheduler.logEvent = (entry) => legacyLogs.push(entry);
+  const stateBeforeLegacy = JSON.stringify(scheduler.FbmSync.stateRead()), markersBeforeLegacy = JSON.stringify(schedulerData);
+  scheduler.fbmHeartbeatTrigger();
+  scheduler.fbmSupervisorTrigger();
+  check(so, 'Trigger hẹn giờ cũ còn sót tự gỡ hết trigger cũ ở lần chạy đầu, giữ trigger khác, ghi một dòng Log, không đổi state và mốc lịch nền', [deleted.map((trigger) => trigger.getHandlerFunction()).join(','), legacyLogs.length, legacyLogs[0] && legacyLogs[0].action, JSON.stringify(scheduler.FbmSync.stateRead()) === stateBeforeLegacy, JSON.stringify(schedulerData) === markersBeforeLegacy], ['fbmHeartbeatTrigger,fbmSupervisorTrigger,fbmCustomerScanTrigger', 1, 'legacy_trigger_removed', true, true]);
+  // Nhịp nền chỉ do alarm `gas_poll` của Extension (09/02): code đồng bộ không được cài trigger hẹn giờ nào.
+  const fbmSources = require('fs').readdirSync(require('path').join(__dirname, '../../../1_ShinCRM_GAS/fbm_sync'), { recursive: true }).filter((file) => /\.js$/.test(file)).map((file) => require('fs').readFileSync(require('path').join(__dirname, '../../../1_ShinCRM_GAS/fbm_sync', file), 'utf8'));
+  check(so, 'Code đồng bộ FBM không cài trigger hẹn giờ nào phía GAS', fbmSources.filter((source) => /newTrigger\(|timeBased\(/.test(source)).length, 0);
 
   const heartbeatData = {};
   const heartbeatPropertyApi = { getProperty: (key) => heartbeatData[key] || null, setProperty: (key, value) => { heartbeatData[key] = String(value); } };
