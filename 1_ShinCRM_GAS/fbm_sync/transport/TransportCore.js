@@ -279,14 +279,15 @@ FbmSync.sessionGateResumeProbeRequest = function (state, resumeCursor, reason) {
   return FbmSync.sessionSystemEnvelope('session_probe');
 };
 /**
- * Dấu "phiên hết hạn" còn lại từ lượt đã kết thúc: người dùng có thể đã tự đăng nhập trên tab FBM từ đó (09/06 không đăng nhập lại khi phiên còn hợp lệ).
+ * Dấu "phiên hết hạn" và cờ cổng phiên còn lại từ lượt đã kết thúc: người dùng có thể đã tự đăng nhập trên tab FBM từ đó (09/06 không đăng nhập lại khi phiên còn hợp lệ).
  * Không tốn request hỏi riêng: bỏ dấu và cờ cổng của lượt cũ, request việc thật của lượt mới tự nhận diện phiên; phiên chết thì cổng đăng nhập theo chu kỳ chờ như mọi response khác.
+ * Cờ "đã thử đăng nhập" chỉ chặn lặp đăng nhập trong một lượt; để sót sang lần hỏi sau thì phiên chết lần nữa bị dừng nhầm thay vì đăng nhập lại. Giãn cách giữa các lần đăng nhập do chu kỳ thử lại giữ, không do cờ này.
  * Chỉ sửa state trong bộ nhớ; nơi gọi tự ghi.
  */
 FbmSync.sessionGateForgetStale = function (state) {
-  if (!state || !state.session || state.session.expired !== true) { return; }
+  if (!state) { return; }
   var gate = FbmSync.sessionGateMeta(state);
-  state.session.expired = false;
+  if (state.session) { state.session.expired = false; }
   gate.probeOnly = false; gate.loginAttempted = false; gate.probeRetryCount = 0;
 };
 /**
