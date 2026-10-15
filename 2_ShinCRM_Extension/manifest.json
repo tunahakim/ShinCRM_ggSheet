@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "CRM Local Pro V21.26",
-  "version": "21.26",
+  "name": "CRM Local Pro V21.27",
+  "version": "21.27",
   "description": "CRM Google Sheet - Local Mode (No Server Lag)",
   "permissions": ["activeTab", "scripting", "tabs", "alarms", "storage"],
   "host_permissions": [
