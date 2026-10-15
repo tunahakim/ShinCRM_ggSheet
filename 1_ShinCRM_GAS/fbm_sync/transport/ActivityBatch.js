@@ -24,10 +24,10 @@ FbmSync.activityPagesWrite = function (state, pages) {
  * Cursor chỉ giữ vị trí và tối đa một lô mã khách, nên state không phình theo số khách; khách mới tạo trong lượt có số lớn hơn mốc của bitmap nên vẫn được đọc.
  */
 FbmSync.activityQueueRefill = function (cursor) {
-  var hasSeen = FbmSync.seenStoreReader('customer'), hasDue = cursor.layer === 'due' ? FbmSync.seenStoreReader(FbmSync.ACTIVITY_DUE_STORE) : null, from = Number(cursor.queueFrom), picked = [];
+  var hasSeen = FbmSync.seenStoreReader('customer'), hasDue = cursor.layer === 'due' ? FbmSync.seenStoreReader(FbmSync.ACTIVITY_DUE_STORE) : null, from = Number(cursor.queueFrom), picked = [], pullAllowed = FbmSync.pullAllowedReader('customer');
   FbmSync.readLocal('customer').forEach(function (record) {
     var index = FbmSync.seenStoreIndex('customer', record), fbmId = String(record && record.fbmId || '').trim();
-    if (index < from || !fbmId || String(record.recordStatus || 'active') === 'deleted' || FbmSync.isTemporaryRecord('customer', record) || !hasSeen(record) || (hasDue && !hasDue(record))) { return; }
+    if (index < from || !fbmId || !pullAllowed(record) || String(record.recordStatus || 'active') === 'deleted' || FbmSync.isTemporaryRecord('customer', record) || !hasSeen(record) || (hasDue && !hasDue(record))) { return; }
     picked.push({ index: index, sttRec: fbmId });
   });
   picked.sort(function (a, b) { return a.index - b.index; });

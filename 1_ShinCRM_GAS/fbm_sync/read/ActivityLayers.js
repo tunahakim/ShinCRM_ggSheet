@@ -75,8 +75,9 @@ FbmSync.lastActivityDiff = function (row, last, categoryGate, since) {
 
 /** Lớp 2 trên một gói danh sách khách đã ghi xuống Sheet: đánh dấu khách lệch giao dịch cuối, nối thứ tự cho lớp 3. Log một dòng tóm tắt, không một dòng mỗi khách vì lượt đầu mọi khách đều lệch. */
 FbmSync.activityDueMark = function (state, rows) {
-  var gate = FbmSync.stateCategoryGate(state), customers = FbmSync.readLocal('customer'), byFbmId = {}, last = FbmSync.lastActivityIndex(gate), due = [], order = [], fieldCounts = {}, sample = [];
-  customers.forEach(function (record) { var id = String(record.fbmId || '').trim(); if (id) { byFbmId[id] = record; } });
+  var gate = FbmSync.stateCategoryGate(state), customers = FbmSync.readLocal('customer'), byFbmId = {}, last = FbmSync.lastActivityIndex(gate), due = [], order = [], fieldCounts = {}, sample = [], pullAllowed = FbmSync.pullAllowedReader('customer');
+  // Khách chặn chiều lấy về không vào lớp 2 lẫn thứ tự lớp 3.
+  customers.forEach(function (record) { var id = String(record.fbmId || '').trim(); if (id && pullAllowed(record)) { byFbmId[id] = record; } });
   rows.forEach(function (row) {
     var local = byFbmId[String(row.stt_rec_kh || '').trim()], index = local ? FbmSync.seenStoreIndex(FbmSync.ACTIVITY_DUE_STORE, local) : -1;
     if (index < 0) { return; }
@@ -116,8 +117,8 @@ FbmSync.activityFreshIndex = function () {
  * Lô không dài quá số khách còn thiếu để đủ chuỗi im lặng, nên lượt dừng đúng sau `activityTopScanQuietStreak` khách liên tiếp không có gì mới, không đọc dư.
  */
 FbmSync.activityTopRefill = function (cursor) {
-  var streak = FbmSync.BUDGET.activityTopScanQuietStreak, order = FbmSync.topOrderAll(), byIndex = {}, hasTried = FbmSync.seenStoreReader(FbmSync.ACTIVITY_TRIED_STORE), hasRead = FbmSync.seenStoreReader(FbmSync.ACTIVITY_READ_STORE), hasFresh = FbmSync.seenStoreReader(FbmSync.ACTIVITY_FRESH_STORE);
-  FbmSync.readLocal('customer').forEach(function (record) { var index = FbmSync.seenStoreIndex(FbmSync.ACTIVITY_READ_STORE, record); if (index >= 0 && String(record.fbmId || '').trim()) { byIndex[index] = record; } });
+  var streak = FbmSync.BUDGET.activityTopScanQuietStreak, order = FbmSync.topOrderAll(), byIndex = {}, hasTried = FbmSync.seenStoreReader(FbmSync.ACTIVITY_TRIED_STORE), hasRead = FbmSync.seenStoreReader(FbmSync.ACTIVITY_READ_STORE), hasFresh = FbmSync.seenStoreReader(FbmSync.ACTIVITY_FRESH_STORE), pullAllowed = FbmSync.pullAllowedReader('customer');
+  FbmSync.readLocal('customer').forEach(function (record) { var index = FbmSync.seenStoreIndex(FbmSync.ACTIVITY_READ_STORE, record); if (index >= 0 && String(record.fbmId || '').trim() && pullAllowed(record)) { byIndex[index] = record; } });
   var pos = Number(cursor.topPos || 0), quiet = Number(cursor.topQuiet || 0), picked = [], positions = [];
   while (pos < order.length && quiet < streak) {
     var record = byIndex[order[pos]];

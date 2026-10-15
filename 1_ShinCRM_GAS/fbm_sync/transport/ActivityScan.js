@@ -10,12 +10,16 @@ FbmSync.ACTIVITY_BULK_STORE = 'activity_bulk';
 FbmSync.ACTIVITY_WINDOW_CODES = ['FBM_SCAN_TOO_LARGE', 'FBM_SCAN_UNPARSEABLE', 'FBM_FETCH_TIMEOUT'];
 
 /** Giao dịch tầng này theo dõi: có FBM ID, không phải tombstone, dòng tạm hay nằm trước mốc `activitySince`. Một chỗ cho cả danh sách id gửi Extension lẫn luật "không thấy". */
-FbmSync.activityBulkTracked = function (record) {
-  return !!String(record && record.fbmId || '').trim() && String(record.recordStatus || 'active') !== 'deleted' && !FbmSync.isTemporaryRecord('activity', record) && FbmSync.activitySinceAllows(record);
+/** Bộ lọc giao dịch lớp 1 theo dõi; giao dịch của khách chặn chiều lấy về không vào tập id gửi FBM nên cũng không bao giờ bị gắn cờ "không thấy". */
+FbmSync.activityBulkTracker = function () {
+  var pullAllowed = FbmSync.pullAllowedReader('activity');
+  return function (record) {
+    return !!String(record && record.fbmId || '').trim() && String(record.recordStatus || 'active') !== 'deleted' && !FbmSync.isTemporaryRecord('activity', record) && FbmSync.activitySinceAllows(record) && pullAllowed(record);
+  };
 };
 
 FbmSync.activityKeepIds = function (local) {
-  return (local || []).filter(FbmSync.activityBulkTracked).map(function (record) { return String(record.fbmId).trim(); });
+  return (local || []).filter(FbmSync.activityBulkTracker()).map(function (record) { return String(record.fbmId).trim(); });
 };
 
 /** Khóa ngày cộng số ngày, theo lịch UTC để không lệch vì giờ mùa hè hay múi giờ máy chạy. */
@@ -55,7 +59,7 @@ FbmSync.beginActivityBulkPull = function (state) {
   var local = FbmSync.readLocal('activity');
   state.metadata = state.metadata || {};
   state.metadata.activityBulk = { windows: 0, missing: 0 };
-  if (!local.some(FbmSync.activityBulkTracked)) {
+  if (!local.some(FbmSync.activityBulkTracker())) {
     state.cursor = { kind: 'activity_bulk_done' };
     if (state.scan !== 'full') { FbmSync.activityBulkRunDone(state); }
     return null;
@@ -69,9 +73,9 @@ FbmSync.beginActivityBulkPull = function (state) {
 
 /** Ngày sớm nhất của giao dịch đang theo dõi, làm mốc cửa sổ; không đọc được ngày nào thì lấy hôm nay (một cửa sổ mở hai đầu). */
 FbmSync.activityWindowStart = function () {
-  var first = '';
+  var first = '', tracked = FbmSync.activityBulkTracker();
   FbmSync.readLocal('activity').forEach(function (record) {
-    if (!FbmSync.activityBulkTracked(record)) { return; }
+    if (!tracked(record)) { return; }
     var key = FbmSync.activityDateKey(record.workDate);
     if (key && (!first || key < first)) { first = key; }
   });
@@ -164,9 +168,10 @@ FbmSync.activityScanChunk = function (state, cursor, rawResponse) {
 FbmSync.activityRecheckNext = function (state) {
   var cursor = state.cursor, hasSeen = FbmSync.seenStoreReader(FbmSync.ACTIVITY_BULK_STORE), from = Number(cursor.recheckFrom || 0), picked = [];
   if (!(cursor.recheck || []).length) {
+    var tracked = FbmSync.activityBulkTracker();
     FbmSync.readLocal('activity').forEach(function (record) {
       var index = FbmSync.seenStoreIndex(FbmSync.ACTIVITY_BULK_STORE, record);
-      if (index >= from && FbmSync.activityBulkTracked(record) && !hasSeen(record)) { picked.push(index); }
+      if (index >= from && tracked(record) && !hasSeen(record)) { picked.push(index); }
     });
     picked.sort(function (a, b) { return a - b; });
     cursor.recheck = picked.slice(0, FbmSync.BUDGET.activityBatchCustomers);
