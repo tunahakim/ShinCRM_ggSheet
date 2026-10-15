@@ -10,8 +10,8 @@ Branch: tạo `feature/fbm-background-chain` từ `main`.
 
 Hai bước này là phần sót của thiết kế 2026-09-10 (commit 8fbb6a7): "đuổi kịp" tìm tối đa 30 khách có ngày giao dịch cuối mới hơn giao dịch mới nhất của cả Sheet, và "xoay 30 khách" với cursor riêng. Chúng đã được thay bằng lớp 2/3 trong Quét nhanh (`read/ActivityLayers.js`) và tiến trình Vòng xoay; chủ dự án đồng ý gỡ.
 
-- [ ] [Tự động] Gỡ `activityBulkSupplement` (`transport/ActivityScan.js`), `activitySupplementNext` và nhánh `activity_catchup_customer_grid`/`activity_rotation_customer_grid` (`transport/PullFlow.js`), `activityCatchupCustomerRequest`, `activityRotationCursor`, `activityRotationCustomerRequest`, `activityRotationNext`, `activityRotationSave`, `ACTIVITY_SUPPLEMENT_CUSTOMERS` (`read/GridRead.js`); bỏ khóa `FBM_SYNC_ACTIVITY_ROTATION` khỏi bảng khóa 09/01.
-- [ ] [Tự động] Test: lượt lấy toàn bộ giao dịch chạy nền kết thúc ngay sau lớp 1, không cấp request Customer nào sau lớp 1.
+- [x] [Tự động] Gỡ `activityBulkSupplement` (`transport/ActivityScan.js`), `activitySupplementNext` và nhánh `activity_catchup_customer_grid`/`activity_rotation_customer_grid` (`transport/PullFlow.js`), `activityCatchupCustomerRequest`, `activityRotationCursor`, `activityRotationCustomerRequest`, `activityRotationNext`, `activityRotationSave`, `ACTIVITY_SUPPLEMENT_CUSTOMERS` (`read/GridRead.js`); bỏ khóa `FBM_SYNC_ACTIVITY_ROTATION` khỏi bảng khóa 09/01. Bằng chứng: `grep` không còn tên nào trong `1_ShinCRM_GAS/` và `tests/`.
+- [x] [Tự động] Test: lượt lấy toàn bộ giao dịch chạy nền kết thúc ngay sau lớp 1, không cấp request Customer nào sau lớp 1. Test `ActivityScan.js`: "Lượt lấy toàn bộ giao dịch chạy nền kết thúc ngay sau lớp 1, không cấp request Customer nào sau lớp 1".
 
 ## 2. Luật "cho phép đồng bộ" ở bước gắn cờ vắng và bước chọn khách để đọc
 

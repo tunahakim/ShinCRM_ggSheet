@@ -179,8 +179,6 @@ async function chay(so) {
   builders.FbmSync.readLocal = () => [{ id: 'ACT-000001', fbmId: 'F-LOCAL', recordStatus: 'active' }];
   const bulkStart = builders.FbmSync.beginActivityBulkPull(bulkState);
   check(so, 'Lấy toàn bộ giao dịch mở một việc quét chỉ giữ FBM ID đã có trên Sheet, có trần cỡ response, không gắn Customer; cursor không mang danh sách id', [bulkState.cursor.kind, bulkState.cursor.entity, bulkStart.meta.kind, bulkStart.meta.job.keepIds, bulkStart.meta.job.maxResponseBytes, bulkStart.body.externalKey.some((item) => item.Name === 'stt_rec'), JSON.stringify(bulkState.cursor).indexOf('F-LOCAL')], ['scan_job', 'activity', 'scan_job', ['F-LOCAL'], 64 * 1024 * 1024, false, -1]);
-  const finishedSupplementState = { cursor: { kind: 'activity_grid' }, phase: 'pull_activity', entity: 'activity', metadata: {}, session: {} };
-  check(so, 'Trang thai done xoa cursor Activity da ket thuc', [builders.FbmSync.activitySupplementNext(finishedSupplementState, { kind: 'done', rows: [] }), finishedSupplementState.phase, finishedSupplementState.cursor], [null, 'done', {}]);
 
   // Danh sách khách lấy trọn bằng việc quét; cursor không mang danh sách khách nên state không phình theo số khách (lỗi thật: 1.312 khách làm state 76 KB).
   let pageState = { mode: 'read', scan: 'full', phase: 'lookup', metadata: {}, session: {}, cursor: {} };
@@ -233,8 +231,6 @@ async function chay(so) {
   const maCha = builders.FbmSync.activityParentCodes();
   check(so, 'cursor chỉ giữ stt_rec_kh, mã khách cha của giao dịch tra từ chỉ mục Sheet Customer, khách chưa có trên Sheet thì để trống', [maCha.A2, maCha.A1 || ''], ['ALT02', '']);
   builders.FbmSync.readLocal = docKhachCu;
-  const rotationRows = Array.from({ length: builders.FbmSync.ACTIVITY_SUPPLEMENT_CUSTOMERS }, (_, i) => ({ stt_rec_kh: 'R' + i, ngay_gd: '2026-10-0' + (i % 9 + 1), datetime0: 'T' + i, xorder: i, ten_kh: 'Ten dai '.repeat(20) }));
-  check(so, 'vong xoay chi giu vi tri trang ke tiep, khong giu cac dong Customer; trang thieu thi quay ve dau', [builders.FbmSync.activityRotationNext(rotationRows), builders.FbmSync.activityRotationNext(rotationRows.slice(1))], [{ pageIndex: 1, pageValue: ['2026-10-03', 'T29', 29, 'R29'], pageItems: { firstPageItem: 'R0', lastPageItem: '29R29', lastRowCount: 0 } }, { pageIndex: -1, pageValue: null, pageItems: null }]);
   // Chuỗi mong đợi lấy từ request chuyển trang do giao diện FBM gửi (bắt 2026-10-08). Dòng thứ hai mang ngày FBM thật trả cho A000080085 (18:00 UTC ngày 27): giao diện ghi 20260928, tức phải tính theo giờ Việt Nam.
   const customerFields = builders.FbmSync.GRID_FIELDS.customer, dongFbm = builders.FbmSync.rowsToRecords('customer', JSON.stringify({ d: { TotalRowCount: 1312, ViewPage: { Fields: customerFields.map((AliasName) => ({ AliasName })) }, Rows: [
     customerFields.map((field) => ({ stt_rec_kh: 'A000079388', ngay_gd: '/Date(1787101200000)/', datetime0: '/Date(1787156031523)/', xorder: '000000000345' })[field] || ''),
@@ -258,9 +254,6 @@ async function chay(so) {
     [scanRun([{ total: 1312, rows: rowsOf(50) }, { total: 0, rows: [] }]), scanRun([{ total: 0, rows: rowsOf(50) }]), scanRun([{ total: 60, rows: rowsOf(50) }, { total: 0, rows: rowsOf(10) }]), scanRun([{ total: 0, rows: [] }])],
     [['error', 'FBM_SCAN_INCOMPLETE', []], ['error', 'FBM_SCAN_INCOMPLETE', []], ['done', '', ['customer', 'activity']], ['done', '', ['customer', 'activity']]]);
   builders.FbmSync.markMissingAfterFullScan = savedMark;
-  builders.FbmSync.readLocal = (entity) => entity === 'activity' ? [{ id: 'A-NEW', fbmId: 'F-NEW', workDate: '2026-09-10' }] : [];
-  const catchup = builders.FbmSync.activityCatchupCustomerRequest();
-  check(so, 'Lop catchup tao Customer grid theo ngay_gd moi hon Activity local', [catchup.meta.kind, catchup.meta.activityMaxDate, catchup.body.externalKey.some((item) => item.Name === 'ngay_gd' && item.Opr === '>')], ['activity_catchup_customer_grid', '2026-09-10', true]);
 
   const identityCheckState = { session: { userId: '2037', accountName: 'ANHLT' }, metadata: {} };
   builders.FbmSync.readLocal = () => [{ id: 'CUS-1', fbmId: 'FBM-1', fbmCustomerCode: 'ALT00010' }, { id: 'CUS-2', fbmId: 'FBM-2', fbmCustomerCode: 'ALT00011' }];

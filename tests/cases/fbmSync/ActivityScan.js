@@ -94,12 +94,12 @@ async function chay(so) {
     docLaiLoi.state.phase, docLaiLoi.act(5).syncStatus === docLaiLoi.h.F.SYNC_STATUS.missing, (docLaiLoi.state.metadata.customerErrors || { total: 0 }).total, docLaiLoi.log('activity_customer_failed').length
   ], ['done', false, 1, 1]);
 
-  // Lượt nền lấy toàn bộ giao dịch kết thúc ở bước bổ sung (tìm khách có giao dịch mới, xoay vòng khách): thông báo cuối lượt dựng cùng chỗ với lượt thủ công nên không mất ghi chú khách lỗi.
+  // Lượt nền lấy toàn bộ giao dịch kết thúc ngay sau lớp 1: thông báo cuối lượt dựng cùng chỗ với lượt thủ công nên không mất ghi chú khách lỗi.
   const nenLoi = scanHarness({ customers: 1 });
   const nenState = nenLoi.F.stateStart('', 'pull_activity', 0);
   Object.assign(nenState, { mode: 'read', scan: 'activity_bulk', origin: 'background' });
   nenState.metadata.customerErrors = { total: 2, recent: [] };
-  nenLoi.F.activitySupplementNext(nenState, {});
+  nenLoi.F.activityBulkRunDone(nenState);
   const nenXong = nenLoi.F.stateRead();
   check(so, 'Lượt nền lấy toàn bộ giao dịch có khách lỗi khi đọc: thông báo cuối lượt trên Sidebar nêu số khách lỗi, không chỉ ghi ở Log', [nenXong.phase, String(nenXong.message || '').indexOf('2 khách lỗi khi đọc giao dịch') >= 0], ['done', true]);
 
@@ -116,12 +116,12 @@ async function chay(so) {
     thieu.state.phase, thieu.state.lastFailureCode, thieu.log('activity_bulk_window').length, thieu.log('activity_bulk_failed').length, thieu.act(5).syncStatus === thieu.h.F.SYNC_STATUS.missing, String(thieu.state.lastError || '').length > 0
   ], ['error', 'FBM_SCAN_INCOMPLETE', 1, 1, false, true]);
 
-  // Lượt nền chỉ lấy toàn bộ giao dịch: sau khi chốt "không thấy" thì sang tìm khách có giao dịch mới hơn mốc trên Sheet.
+  // Lượt nền chỉ lấy toàn bộ giao dịch gồm đúng lớp 1 (09/02 Phần 3): chốt "không thấy" rồi kết thúc, không đọc thêm khách nào.
   const nen = await luotKy(['2026-09-20', '2026-09-20'], (fbm) => { fbm.list = fbm.list.filter((item) => item.id !== 'A-FBM-C2'); }, {}, { startOptions: { scan: 'activity_bulk' }, afterError: () => null });
   const sauBulk = nen.h.trace.kinds.slice(nen.h.trace.kinds.indexOf('scan_job:activity') + 1);
-  check(so, 'Lượt nền lấy toàn bộ giao dịch: không đọc danh sách khách, chốt "không thấy" rồi mới sang request tìm khách có giao dịch mới', [
-    nen.h.trace.kinds.filter((kind) => kind === 'scan_job').length, nen.log('activity_bulk_done').length, nen.act(2).syncStatus, sauBulk[0]
-  ], [0, 1, nen.h.F.SYNC_STATUS.missing, 'activity_catchup_customer_grid']);
+  check(so, 'Lượt lấy toàn bộ giao dịch chạy nền kết thúc ngay sau lớp 1, không cấp request Customer nào sau lớp 1', [
+    nen.state.phase, nen.log('activity_bulk_done').length, nen.act(2).syncStatus, sauBulk.filter((kind) => /customer/i.test(kind))
+  ], ['done', 1, nen.h.F.SYNC_STATUS.missing, []]);
 
   // Lớp 1 gắn cờ qua cùng chỗ với lượt quét theo khách: số vào thẻ kết quả đúng một lần, dòng người dùng đang sửa không bị gắn cờ, lượt sau không ghi lại dòng đã mang cờ.
   const lop1 = await luotKy(['2026-09-20', '2026-09-20', '2026-09-20', '2026-09-20', '2026-09-20', '2026-09-20'], (fbm, h) => {
