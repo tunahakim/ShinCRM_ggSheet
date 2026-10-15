@@ -56,7 +56,7 @@ function fbmSyncSettingsBackgroundBlocks(settings) {
     notice: fbmSyncSettingsNoticeBlocks('background', fbmSyncSettingsSchedulerNotice(FBM_SYNC_CLIENT.lastStatus)),
     switch: FBM_SYNC_SETTINGS_UI.layout.toggle(FBM_SYNC_SETTINGS_UI.classes.toggleRow, Text({ className: FBM_SYNC_SETTINGS_UI.classes.toggleCopy, text: FBM_SYNC_SETTINGS_SCHEMA.background.switchLabel }), StandaloneControl({ id: FBM_SYNC_SETTINGS_SCHEMA.background.switchId, kind: 'toggle', pressed: parentEnabled, className: parentEnabled ? FBM_SYNC_SETTINGS_UI.classes.toggleOn : FBM_SYNC_SETTINGS_UI.classes.toggleOff, data: { 'sync-background-draft': true }, disabled: fbmSyncConfigControlDisabled('background', 'enabled'), ariaLabel: FBM_SYNC_SETTINGS_SCHEMA.background.switchLabel })),
     direction: FBM_SYNC_SETTINGS_UI.layout.inlineField(uiClassJoin(FBM_SYNC_SETTINGS_UI.classes.inlineFieldRow, FBM_SYNC_SETTINGS_UI.classes.directionRow), Text({ className: FBM_SYNC_SETTINGS_UI.classes.formLabel, text: FBM_SYNC_SETTINGS_SCHEMA.background.directionLabel }), StandaloneControl({ id: FBM_SYNC_SETTINGS_SCHEMA.background.directionId, kind: 'menu', options: directionOptions, value: direction, disabled: fbmSyncConfigControlDisabled('background', 'direction'), ariaLabel: FBM_SYNC_SETTINGS_SCHEMA.background.directionLabel })),
-    processes: rows,
+    processes: rows.concat([Text({ className: FBM_SYNC_SETTINGS_UI.classes.muted, text: backgroundSchema.processesHelp })]),
     detail: detailControls,
     actions: fbmSyncConfigButtonRow('background', { edit: FBM_SYNC_SETTINGS_SCHEMA.background.edit, save: FBM_SYNC_SETTINGS_SCHEMA.background.save }, { id: FBM_SYNC_SETTINGS_SCHEMA.background.saveId, disabled: !!FBM_SYNC_CLIENT.running })
   });
