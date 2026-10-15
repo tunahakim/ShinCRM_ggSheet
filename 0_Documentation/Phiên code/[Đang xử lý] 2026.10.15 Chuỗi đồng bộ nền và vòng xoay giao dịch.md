@@ -11,7 +11,7 @@ Branch: tạo `feature/fbm-background-chain` từ `main`.
 Hai bước này là phần sót của thiết kế 2026-09-10 (commit 8fbb6a7): "đuổi kịp" tìm tối đa 30 khách có ngày giao dịch cuối mới hơn giao dịch mới nhất của cả Sheet, và "xoay 30 khách" với cursor riêng. Chúng đã được thay bằng lớp 2/3 trong Quét nhanh (`read/ActivityLayers.js`) và tiến trình Vòng xoay; chủ dự án đồng ý gỡ.
 
 - [x] [Tự động] Gỡ `activityBulkSupplement` (`transport/ActivityScan.js`), `activitySupplementNext` và nhánh `activity_catchup_customer_grid`/`activity_rotation_customer_grid` (`transport/PullFlow.js`), `activityCatchupCustomerRequest`, `activityRotationCursor`, `activityRotationCustomerRequest`, `activityRotationNext`, `activityRotationSave`, `ACTIVITY_SUPPLEMENT_CUSTOMERS` (`read/GridRead.js`); bỏ khóa `FBM_SYNC_ACTIVITY_ROTATION` khỏi bảng khóa 09/01. Bằng chứng: `grep` không còn tên nào trong `1_ShinCRM_GAS/` và `tests/`.
-- [x] [Tự động] Test: lượt lấy toàn bộ giao dịch chạy nền kết thúc ngay sau lớp 1, không cấp request Customer nào sau lớp 1. Test `ActivityScan.js`: "Lượt lấy toàn bộ giao dịch chạy nền kết thúc ngay sau lớp 1, không cấp request Customer nào sau lớp 1".
+- [x] [Tự động] Test: lượt lấy toàn bộ giao dịch chạy nền kết thúc ngay sau lớp 1, không cấp request Customer nào sau lớp 1. Test `ActivityScan.js`: "Lượt lấy toàn bộ giao dịch chạy nền kết thúc ngay sau lớp 1: sau lớp 1 chỉ còn đúng một request đếm khách, không đọc khách nào" (request đếm của mục 3 là request Customer duy nhất được phép).
 
 ## 2. Luật "cho phép đồng bộ" ở bước gắn cờ vắng và bước chọn khách để đọc
 
@@ -22,10 +22,10 @@ Hiện bước ghi và bước đẩy đã đúng; hai bước dưới quên xé
 
 ## 3. Bước đếm khách và số khách mốc
 
-- [ ] [Tự động] Một hàm dựng request đếm khách từ chính hàm dựng request lấy danh sách toàn bộ khách (cùng phạm vi, cùng bộ lọc), chỉ khác `count: 1`; bỏ `heartbeatCustomerRequest` dạng không lọc phạm vi.
-- [ ] [Tự động] Số khách mốc lưu bền ở khóa DocumentProperties riêng (không trong state, vì `stateStart` xóa `session`), chỉ ghi khi lượt lấy danh sách toàn bộ khách đọc đầy đủ, bằng `TotalRowCount` của request đó; thêm khóa vào bảng 09/01.
-- [ ] [Tự động] Một hàm "đếm khách, lệch mốc thì chạy Quét nhanh rồi đếm lại" dùng ở cuối mọi tiến trình, cuối lượt chạy tay và làm thân của Giữ phiên. Test: FBM không đổi thì sau Quét nhanh bước đếm khớp và lượt kết thúc; tổng FBM tăng giữa hai lần đếm thì Quét nhanh chạy thêm đúng một lần rồi kết thúc; chưa có mốc thì Quét nhanh chạy.
-- [ ] [Tự động] Thử phá: cho bước đếm dùng bộ lọc khác bộ lọc lấy danh sách thì test "FBM không đổi thì kết thúc" đỏ.
+- [x] [Tự động] Một hàm dựng request đếm khách từ chính hàm dựng request lấy danh sách toàn bộ khách (cùng phạm vi, cùng bộ lọc), chỉ khác `count: 1`; bỏ `heartbeatCustomerRequest` dạng không lọc phạm vi. Đã làm: `customerCountRequest` (`transport/CustomerCount.js`) gọi `customerListRequest` (`transport/ScanJob.js`), cũng là hàm `scanJobRequest` dùng; Giữ phiên dùng cùng request. Bằng chứng là test thử phá ở dòng cuối mục này.
+- [x] [Tự động] Số khách mốc lưu bền ở khóa DocumentProperties riêng (không trong state, vì `stateStart` xóa `session`), chỉ ghi khi lượt lấy danh sách toàn bộ khách đọc đầy đủ, bằng `TotalRowCount` của request đó; thêm khóa vào bảng 09/01. Khóa `FBM_SYNC_CUSTOMER_BASELINE_V1`, ghi trong `pullMarkMissing` khi `scan === 'full'`. Test `CustomerCount.js`: "FBM không đổi: sau Quét nhanh chỉ một request đếm, số đếm khớp mốc vừa ghi và lượt kết thúc, không quét lại" (mốc bằng 12).
+- [x] [Tự động] Một hàm "đếm khách, lệch mốc thì chạy Quét nhanh rồi đếm lại" dùng ở cuối mọi tiến trình, cuối lượt chạy tay và làm thân của Giữ phiên. Test: FBM không đổi thì sau Quét nhanh bước đếm khớp và lượt kết thúc; tổng FBM tăng giữa hai lần đếm thì Quét nhanh chạy thêm đúng một lần rồi kết thúc; chưa có mốc thì Quét nhanh chạy. Test `CustomerCount.js`: "FBM không đổi: sau Quét nhanh chỉ một request đếm, ...", "Tổng khách FBM tăng giữa hai lần đếm: chạy thêm đúng một Quét nhanh, ...", "Chưa có số khách mốc: lượt lấy toàn bộ giao dịch đếm xong thì chạy Quét nhanh để lấy mốc, ...". Bước đếm chỉ gắn vào lượt ở chiều có ghi Sheet (`countTailMark`); Giữ phiên chiều Chỉ đẩy chỉ giữ phiên.
+- [x] [Tự động] Thử phá: cho bước đếm dùng bộ lọc khác bộ lọc lấy danh sách thì test "FBM không đổi thì kết thúc" đỏ. Đã thử: request đếm bỏ bộ lọc khách của người dùng (FBM giả trả thêm 3 khách người khác) thì cả 3 test `CustomerCount.js` đỏ.
 
 ## 4. Chuỗi trong một lần hỏi
 
