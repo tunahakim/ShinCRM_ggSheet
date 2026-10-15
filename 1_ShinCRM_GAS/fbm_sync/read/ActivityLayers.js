@@ -174,3 +174,53 @@ FbmSync.activityLayerNext = function (state, cursor) {
   }
   return null;
 };
+
+/**
+ * Lớp 4 — Vòng xoay: khách trên Sheet theo số CUS tăng dần, bắt đầu sau khách cuối đã ghi xong ở phiên trước, hết danh sách thì quay về số nhỏ nhất (09/02 "Chuỗi trong một lần hỏi" mục 9).
+ * Chỉ khách đã có mã FBM, chưa xóa, cho phép lấy về, thuộc phạm vi và không mang cờ "không thấy bên FBM". Không đọc danh sách khách FBM: khách mới và thông tin khách là việc của Quét nhanh.
+ */
+FbmSync.activityRotationRing = function (start) {
+  var pullAllowed = FbmSync.pullAllowedReader('customer'), scope = typeof FbmSync.scope === 'function' ? FbmSync.scope() : null, list = [];
+  FbmSync.readLocal('customer').forEach(function (record) {
+    var index = FbmSync.seenStoreIndex('customer', record), fbmId = String(record && record.fbmId || '').trim();
+    if (index < 0 || !fbmId || String(record.recordStatus || 'active') === 'deleted' || FbmSync.isTemporaryRecord('customer', record) || String(record.syncStatus || '') === FbmSync.SYNC_STATUS.missing || !pullAllowed(record) || !FbmSync.inScope(record, scope)) { return; }
+    list.push({ index: index, sttRec: fbmId });
+  });
+  list.sort(function (a, b) { return a.index - b.index; });
+  return list.filter(function (item) { return item.index > start; }).concat(list.filter(function (item) { return item.index <= start; }));
+};
+
+/**
+ * Mở phiên Vòng xoay: đọc giao dịch của N khách theo lô `activityBatchCustomers`. Không có khách nào đủ điều kiện thì phiên xong ngay, không đọc FBM.
+ */
+FbmSync.activityRotationBegin = function (state) {
+  var start = FbmSync.detailCursorRead(), limit = Math.max(1, Number(state.detailCustomerLimit || FbmSync.backgroundScheduleDefault().detail.customersPerRun)), total = Math.min(limit, FbmSync.activityRotationRing(start).length);
+  state.phase = 'pull_activity'; state.entity = 'activity';
+  if (typeof FbmSync.businessStepStart === 'function') {
+    FbmSync.businessStepStart(state, 'pull_activity', { mode: state.mode, scan: state.scan, entity: 'activity' });
+    FbmSync.businessStepStart(state, 'reconcile_activity', { mode: state.mode, scan: state.scan, entity: 'activity' });
+  }
+  state.progress = { done: 0, total: total };
+  state.cursor = { kind: 'activity_grid', customers: [], customerIndex: 0, batch: [], count: FbmSync.BUDGET.activityCustomerRows, customerNext: null, customerSeen: 0, rotation: { start: start, limit: limit, taken: 0, last: -1 } };
+  state.message = 'Đang đọc giao dịch của ' + total + ' khách theo vòng xoay...';
+  FbmSync.activityBatchPlan(state.cursor);
+  FbmSync.activityPagesWrite(state, {});
+  FbmSync.stateWrite(state);
+  var request = FbmSync.activityBatchRequest(state);
+  if (!request) { FbmSync.finishPullRun(state); }
+  return request;
+};
+
+/**
+ * Lô trước đã ghi xong (kế hoạch lô rỗng mới gọi tới đây) nên lưu cursor bền bằng khách cuối của lô đó, rồi lấy lô kế đến khi đủ N. Phiên bị kẹt giữa lô thì phiên sau đọc lại đúng lô đó và vẫn đủ N khách.
+ * Khách đọc lỗi đã có dòng Log `activity_customer_failed` và hiện ở Sidebar; cursor vẫn đi qua để một khách hỏng không chặn cả vòng.
+ */
+FbmSync.activityRotationRefill = function (cursor) {
+  var rotation = cursor.rotation, taken = Number(rotation.taken || 0);
+  if (Number(rotation.last) >= 0) { FbmSync.detailCursorWrite(rotation.last); }
+  var ring = FbmSync.activityRotationRing(Number(rotation.start)), end = Math.min(Number(rotation.limit), ring.length, taken + FbmSync.BUDGET.activityBatchCustomers), picked = ring.slice(taken, Math.max(taken, end));
+  cursor.customers = picked.map(function (item) { return item.sttRec; });
+  cursor.customerIndex = 0;
+  rotation.taken = taken + picked.length;
+  rotation.last = picked.length ? picked[picked.length - 1].index : -1;
+};

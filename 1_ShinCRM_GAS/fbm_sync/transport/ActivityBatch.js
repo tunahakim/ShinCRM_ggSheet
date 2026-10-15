@@ -41,6 +41,7 @@ FbmSync.activityQueueRefill = function (cursor) {
 FbmSync.activityBatchPlan = function (cursor) {
   var drained = !(cursor.batch || []).length && Number(cursor.customerIndex || 0) >= (cursor.customers || []).length;
   if (drained && cursor.layer === 'top') { FbmSync.activityTopRefill(cursor); }
+  else if (drained && cursor.rotation) { FbmSync.activityRotationRefill(cursor); }
   else if (drained && cursor.queueFrom !== undefined && Number(cursor.queueFrom) >= 0) { FbmSync.activityQueueRefill(cursor); }
   var plan = (cursor.batch || []).slice(), customers = cursor.customers || [], next = Number(cursor.customerIndex || 0);
   while (plan.length < FbmSync.BUDGET.activityBatchCustomers && next < customers.length) { plan.push(next); next += 1; }

@@ -6,27 +6,13 @@ FbmSync.BACKGROUND_SCHEDULE_KEY = 'FBM_SYNC_BACKGROUND_SCHEDULE_V1';
 FbmSync.DETAIL_CURSOR_KEY = 'FBM_SYNC_DETAIL_CURSOR_V1';
 /** Mốc đến hạn của từng tiến trình nền, mỗi tiến trình đúng một khóa. */
 FbmSync.SCHEDULE_MARKER_KEYS = { customerFull: 'FBM_SYNC_NEXT_CUSTOMER_FULL_SCAN', activityFull: 'FBM_SYNC_NEXT_ACTIVITY_FULL_SCAN', detail: 'FBM_SYNC_NEXT_DETAIL_SCAN', heartbeat: 'FBM_SYNC_NEXT_HEARTBEAT' };
-/** Cursor detail phải sống qua nhiều lượt scheduler, nhưng chỉ chứa khóa trang FBM, không chứa dữ liệu bản ghi. */
+/** Cursor Vòng xoay: số CUS của khách cuối cùng đã ghi xong giao dịch (09/02 "Chuỗi trong một lần hỏi" mục 7 và 9); `-1` khi chưa có, phiên bắt đầu từ khách số nhỏ nhất. Giá trị kiểu cũ (khóa trang FBM) không có `cus` nên cũng là `-1`. */
 FbmSync.detailCursorRead = function () {
-  try {
-    var raw = FbmSync.props().getProperty(FbmSync.DETAIL_CURSOR_KEY), parsed = raw ? JSON.parse(raw) : null;
-    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.pageValue) || parsed.pageValue.length < 4) { return null; }
-    var pageIndex = Number(parsed.pageIndex);
-    if (!isFinite(pageIndex) || pageIndex < 0) { return null; }
-    return { pageIndex: Math.floor(pageIndex), pageValue: parsed.pageValue.slice(0, 4).map(function (value) { return String(value === null || value === undefined ? '' : value); }), pageItems: parsed.pageItems || null };
-  } catch (ignore) { return null; }
+  var parsed = FbmSync.documentPropertyJson(FbmSync.DETAIL_CURSOR_KEY, 'cursor Vòng xoay'), cus = parsed ? Number(parsed.cus) : NaN;
+  return isFinite(cus) && cus >= 0 ? Math.floor(cus) : -1;
 };
-FbmSync.detailCursorWrite = function (cursor) {
-  var value = cursor || {}, pageIndex = Number(value.pageIndex), pageValue = Array.isArray(value.pageValue) ? value.pageValue.slice(0, 4) : [];
-  if (!isFinite(pageIndex) || pageIndex < 0 || pageValue.length < 4) { return null; }
-  var saved = { pageIndex: Math.floor(pageIndex), pageValue: pageValue.map(function (item) { return String(item === null || item === undefined ? '' : item); }), pageItems: value.pageItems || null };
-  FbmSync.props().setProperty(FbmSync.DETAIL_CURSOR_KEY, JSON.stringify(saved));
-  return saved;
-};
-FbmSync.detailCursorClear = function () {
-  var props = FbmSync.props();
-  if (props && typeof props.deleteProperty === 'function') { props.deleteProperty(FbmSync.DETAIL_CURSOR_KEY); }
-  else if (props) { props.setProperty(FbmSync.DETAIL_CURSOR_KEY, ''); }
+FbmSync.detailCursorWrite = function (cus) {
+  FbmSync.props().setProperty(FbmSync.DETAIL_CURSOR_KEY, JSON.stringify({ cus: Math.floor(Number(cus)), at: Date.now() }));
 };
 /** Công tắc lịch nền chỉ có một nơi lưu là cờ `enabled` của lịch nền; không giữ cờ riêng để hai nơi không lệch nhau. */
 FbmSync.backgroundEnabled = function () { return FbmSync.backgroundScheduleRead().enabled !== false; };
@@ -72,7 +58,7 @@ FbmSync.backgroundScheduleRead = function () {
       fallback[kind].minutes = isFinite(minutes) ? Math.max(1, Math.min(7 * 24 * 60, Math.round(minutes))) : fallback[kind].minutes;
       if (kind === 'detail') {
         var batch = Number(item.customersPerRun);
-        fallback.detail.customersPerRun = isFinite(batch) ? Math.max(1, Math.min(50, Math.floor(batch))) : fallback.detail.customersPerRun;
+        fallback.detail.customersPerRun = isFinite(batch) && batch >= 1 ? Math.floor(batch) : fallback.detail.customersPerRun;
       }
     });
   } catch (ignore) {}
@@ -89,7 +75,7 @@ FbmSync.backgroundScheduleSave = function (input) {
     saved[kind] = { enabled: item.enabled === undefined ? current[kind].enabled : item.enabled === true, minutes: Math.round(minutes), priority: current[kind].priority };
     if (kind === 'detail') {
       var batch = item.customersPerRun === undefined ? current.detail.customersPerRun : Number(item.customersPerRun);
-      if (!isFinite(batch) || batch < 1 || batch > 50 || Math.floor(batch) !== batch) { throw new Error('Số khách mỗi lượt vòng xoay phải là số nguyên từ 1 đến 50 (một trang khách FBM); muốn xoay nhanh hơn thì rút ngắn chu kỳ.'); }
+      if (!isFinite(batch) || batch < 1 || Math.floor(batch) !== batch) { throw new Error('Số khách mỗi lượt vòng xoay phải là số nguyên từ 1 trở lên.'); }
       saved.detail.customersPerRun = Math.floor(batch);
     }
   });

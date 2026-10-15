@@ -56,7 +56,7 @@ FbmSync.startRun = function (options) {
   state.requestGap = typeof FbmSync.requestGapMs === 'function' ? FbmSync.requestGapMs(FbmSync.syncSettingsRead()) : null;
   if (state.scan === 'activity_bulk') { state.mode = 'read'; }
   FbmSync.countTailMark(state);
-  if (state.origin === 'background') { state.detailCustomerLimit = state.scan === 'detail' ? Math.max(1, Math.min(50, Math.floor(Number(opt.detail && opt.detail.customersPerRun || 50)))) : 0; }
+  if (state.origin === 'background') { state.detailCustomerLimit = state.scan === 'detail' ? Math.max(1, Math.floor(Number(opt.detail && opt.detail.customersPerRun || FbmSync.backgroundScheduleDefault().detail.customersPerRun))) : 0; }
   if (typeof FbmSync.runPreflight === 'function') {
     var preflight = FbmSync.runPreflight({ mode: state.mode, origin: state.origin, scan: state.scan });
     state.metadata = state.metadata || {};
@@ -181,23 +181,10 @@ FbmSync.customerPageOf = function (rows, identityOrder) {
   return { length: list.length, firstItem: FbmSync.customerPageItem(list[0]), lastItem: FbmSync.customerPageItem(last), lastValue: identityOrder ? FbmSync.gridPageValue([last.stt_rec_kh || '']) : FbmSync.customerPageValue(last) };
 };
 
-/**
- * Chuyển cursor sang trang Customer kế tiếp; trả `false` khi đã hết trang hoặc quét chi tiết đã đủ giới hạn khách của lượt (khi đó lưu vị trí cho lượt sau).
- * `total` là tổng FBM báo ở trang đầu; trang sau FBM trả 0 nên mô tả trang giữ tổng của trang trước.
- */
+/** Chuyển cursor sang trang Customer kế tiếp; trả `false` khi đã hết trang. `total` là tổng FBM báo ở trang đầu; trang sau FBM trả 0 nên mô tả trang giữ tổng của trang trước. */
 FbmSync.customerNext = function (state, page, total) {
   var cursor = state.cursor || {}, count = Number(cursor.count || 2000), length = Number(page && page.length || 0), seenAfterPage = Number(cursor.seen || 0) + length;
   var pageItems = { firstPageItem: page.firstItem, lastPageItem: page.lastItem, lastRowCount: Number(total || cursor.pageItems && cursor.pageItems.lastRowCount || 0) };
-  if (state.scan === 'detail' && !length && typeof FbmSync.detailCursorClear === 'function') { FbmSync.detailCursorClear(); }
-  if (state.scan === 'detail' && seenAfterPage >= Number(state.detailCustomerLimit || 50)) {
-    var exhausted = !length || length < count || (total && seenAfterPage >= total);
-    if (exhausted) {
-      if (typeof FbmSync.detailCursorClear === 'function') { FbmSync.detailCursorClear(); }
-    } else if (typeof FbmSync.detailCursorWrite === 'function') {
-      FbmSync.detailCursorWrite({ pageIndex: FbmSync.gridNextPageIndex(cursor.pageIndex), pageValue: page.lastValue, pageItems: pageItems });
-    }
-    return false;
-  }
   if (!length || length < count || (total && seenAfterPage >= total)) { return false; }
   cursor.type = 1;
   cursor.pageIndex = FbmSync.gridNextPageIndex(cursor.pageIndex);
@@ -214,9 +201,8 @@ FbmSync.customerScanRecord = function (state, grid, firstPage) {
   var scan = firstPage ? { total: Number(grid && grid.total || 0), seen: 0 } : (state.metadata.customerScan || { total: 0, seen: 0 });
   scan.seen = Number(scan.seen || 0) + (grid && grid.rows ? grid.rows.length : 0);
   state.metadata.customerScan = scan;
-  // Mẫu số tiến trình là số khách của lượt: FBM đã lọc theo phạm vi thử nên `TotalRowCount` chính là số mã thử; quét chi tiết chỉ đi tới giới hạn khách mỗi lượt.
-  // Quét chi tiết tiếp từ trang giữa thì FBM không báo tổng (trang sau trả 0), mẫu số là giới hạn khách của lượt.
-  if (firstPage) { state.progress = { done: 0, total: state.scan === 'detail' ? (scan.total ? Math.min(scan.total, Number(state.detailCustomerLimit || scan.total)) : Number(state.detailCustomerLimit || 0)) : scan.total }; }
+  // Mẫu số tiến trình là số khách của lượt: FBM đã lọc theo phạm vi thử nên `TotalRowCount` chính là số mã thử.
+  if (firstPage) { state.progress = { done: 0, total: scan.total }; }
 };
 
 /** Tử số tiến trình: số khách đã xử lý xong (đã quét hết giao dịch, hoặc không có giao dịch để quét). */
@@ -310,7 +296,7 @@ FbmSync.beginCustomerPull = function (state) {
     return FbmSync.nextPushRequest(state);
   }
   FbmSync.prepareCategoryGate(state);
-  if (typeof FbmSync.businessStepStart === 'function') {
+  if (typeof FbmSync.businessStepStart === 'function' && state.scan !== 'detail') {
     FbmSync.businessStepStart(state, 'pull_customer', { mode: state.mode, scan: state.scan, entity: 'customer' });
     FbmSync.businessStepStart(state, 'reconcile_customer', { mode: state.mode, scan: state.scan, entity: 'customer' });
   }
@@ -323,11 +309,8 @@ FbmSync.beginCustomerPull = function (state) {
     state.metadata.seen.activity = { initialized: true };
   }
   FbmSync.activityLayersBegin();
-  var customerCount = state.scan === 'detail' ? Math.max(1, Math.min(FbmSync.CUSTOMER_PAGE_ROWS, Number(state.detailCustomerLimit || FbmSync.CUSTOMER_PAGE_ROWS))) : FbmSync.BUDGET.scanCustomerRows;
-  var detailCursor = state.scan === 'detail' && typeof FbmSync.detailCursorRead === 'function' ? FbmSync.detailCursorRead() : null;
-  var detailPageIndex = detailCursor ? Number(detailCursor.pageIndex || 0) : -1;
-  var detailPageValue = detailCursor && Array.isArray(detailCursor.pageValue) ? detailCursor.pageValue : null;
-  FbmSync.scanJobOpen(state, { entity: 'customer', type: detailPageIndex >= 0 ? 1 : 0, pageIndex: detailPageIndex, pageValue: detailPageValue, pageItems: detailCursor && detailCursor.pageItems || null, count: customerCount, seen: 0 });
+  if (state.scan === 'detail') { return FbmSync.activityRotationBegin(state); }
+  FbmSync.scanJobOpen(state, { entity: 'customer', type: 0, pageIndex: -1, pageValue: null, pageItems: null, count: FbmSync.BUDGET.scanCustomerRows, seen: 0 });
   state.phase = 'pull_customer'; state.entity = 'customer'; state.message = 'Đang đọc khách hàng từ FBM...';
   FbmSync.stateWrite(state);
   return FbmSync.scanJobRequest(state);
