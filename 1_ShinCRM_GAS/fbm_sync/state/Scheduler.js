@@ -119,31 +119,93 @@ FbmSync.ensureScheduleMarkers = function (now) {
     if (!Number(props.getProperty(key) || 0)) { props.setProperty(key, String(at + schedule[kind].minutes * 60 * 1000)); }
   });
 };
-/** Chọn một tiến trình đến hạn sau khi Extension đã hỏi GAS; không tạo request song song. */
+/** Tiến trình bật và đã đến hạn, chưa chạy trong chuỗi này, theo ưu tiên: Quét nhanh, Lấy toàn bộ giao dịch, Vòng xoay, cuối cùng Giữ phiên. */
+FbmSync.scheduleDueKinds = function (now, ran) {
+  var props = FbmSync.props(), schedule = FbmSync.backgroundScheduleRead(), skip = ran || [];
+  return Object.keys(FbmSync.SCHEDULE_MARKER_KEYS).filter(function (kind) {
+    return schedule[kind].enabled && skip.indexOf(kind) < 0 && Number(props.getProperty(FbmSync.SCHEDULE_MARKER_KEYS[kind]) || 0) <= now;
+  }).sort(function (a, b) { return schedule[a].priority - schedule[b].priority; });
+};
+/** Mốc kế tiếp = mốc cũ + đủ số chu kỳ để vượt giờ hiện tại: bám nhịp tròn, không trôi theo giờ chạy xong và không cộng dồn nợ. Mốc chưa tới (Giữ phiên chạy lúc mở Chrome) thì giữ nguyên. */
+FbmSync.scheduleMarkerAdvance = function (kind, now) {
+  var key = FbmSync.SCHEDULE_MARKER_KEYS[kind], cycle = FbmSync.backgroundScheduleRead()[kind].minutes * 60 * 1000, old = Number(FbmSync.props().getProperty(key) || 0), at = Number(now || Date.now());
+  var next = !old ? at + cycle : old > at ? old : old + (Math.floor((at - old) / cycle) + 1) * cycle;
+  FbmSync.props().setProperty(key, String(next));
+  return next;
+};
+FbmSync.scheduleNextAt = function () {
+  var props = FbmSync.props(), schedule = FbmSync.backgroundScheduleRead();
+  var times = Object.keys(FbmSync.SCHEDULE_MARKER_KEYS).filter(function (kind) { return schedule[kind].enabled; }).map(function (kind) { return Number(props.getProperty(FbmSync.SCHEDULE_MARKER_KEYS[kind]) || 0); }).filter(function (at) { return at > 0; });
+  return times.length ? Math.min.apply(null, times) : 0;
+};
+/**
+ * Mở chuỗi nền của lần hỏi này: chọn tiến trình đến hạn đầu tiên, chưa dời mốc nào (mốc chỉ dời khi tiến trình chạy xong).
+ * Chuỗi nằm trong state (`chain`) để lượt chuyền bị cắt lát thì lần hỏi sau chạy tiếp. Chuỗi còn sót mà không còn lượt nào chạy là chuỗi đã gãy (lỗi, lượt tay chen ngang) nên bị thay bằng chuỗi mới; tiến trình dở chạy lại vì mốc của nó chưa dời.
+ */
 FbmSync.schedulerPickDue = function (now, options) {
-  var at = Number(now || Date.now()), opt = options || {}, props = FbmSync.props(), schedule = FbmSync.backgroundScheduleRead(), state = FbmSync.stateRead();
+  var at = Number(now || Date.now()), opt = options || {}, schedule = FbmSync.backgroundScheduleRead(), state = FbmSync.stateRead();
   FbmSync.ensureScheduleMarkers(at);
   if (!FbmSync.masterEnabled() || schedule.enabled === false) { return { ok: false, code: 'BACKGROUND_DISABLED' }; }
   if (state.runId && ['idle', 'done', 'error'].indexOf(String(state.phase || '')) < 0) { return { ok: false, code: 'SYNC_ALREADY_RUNNING' }; }
   if (state.scheduledScan) { return { ok: true, kind: String(state.scheduledScan), existing: true }; }
-  var candidates = ['customerFull', 'activityFull', 'detail', 'heartbeat'].map(function (kind) {
-    var item = schedule[kind], key = FbmSync.SCHEDULE_MARKER_KEYS[kind];
-    return { kind: kind, key: key, due: Number(props.getProperty(key) || 0), enabled: item.enabled, priority: item.priority, minutes: item.minutes };
-  }).filter(function (item) { return item.enabled && item.due <= at; }).sort(function (a, b) { return a.priority - b.priority || a.due - b.due; });
-  // Chrome startup is an explicit user-visible option. It may cause one immediate
-  // session check, but never creates a second timer or a burst of catch-up work.
-  if (!candidates.length && opt.startup === true && FbmSync.extensionConfigRead().runOnStartup !== false && schedule.heartbeat.enabled) {
-    candidates.push({ kind: 'heartbeat', key: FbmSync.SCHEDULE_MARKER_KEYS.heartbeat, due: at, priority: schedule.heartbeat.priority, minutes: schedule.heartbeat.minutes });
+  var due = FbmSync.scheduleDueKinds(at, []);
+  // Mở Chrome là tùy chọn người dùng thấy được: được một lần Giữ phiên ngay, không sinh loạt việc bù.
+  if (!due.length && opt.startup === true && FbmSync.extensionConfigRead().runOnStartup !== false && schedule.heartbeat.enabled) { due = ['heartbeat']; }
+  if (!due.length) {
+    if (state.chain) { state.chain = null; FbmSync.stateWrite(state); }
+    return { ok: false, code: 'NO_PROCESS_DUE' };
   }
-  if (!candidates.length) { return { ok: false, code: 'NO_PROCESS_DUE' }; }
-  var chosen = candidates[0], next = at + chosen.minutes * 60 * 1000;
-  props.setProperty(chosen.key, String(next));
-  state.scheduledScan = chosen.kind;
-  state.nextRunAt = next;
+  state.scheduledScan = due[0];
   state.scheduledDirection = schedule.direction;
-  state.message = 'Đã chọn tiến trình nền ' + chosen.kind + '; chờ request heartbeat hiện tại hoàn tất.';
+  state.chain = { current: due[0], ran: [], direction: schedule.direction, startedAt: at };
+  state.message = 'Đã chọn tiến trình nền ' + due[0] + '; chờ request heartbeat hiện tại hoàn tất.';
   FbmSync.stateWrite(state);
-  return { ok: true, kind: chosen.kind, nextRunAt: next };
+  return { ok: true, kind: due[0] };
+};
+/** Mở một tiến trình của chuỗi. Giữ phiên chỉ là request đếm mang cursor `heartbeat`; các tiến trình khác là một lượt nền thường, tự kết thúc bằng bước đếm. */
+FbmSync.chainStart = function (kind) {
+  var state = FbmSync.stateRead(), schedule = FbmSync.backgroundScheduleRead(), direction = state.chain && state.chain.direction || schedule.direction;
+  state.chain = Object.assign({ ran: [], direction: direction }, state.chain || {}, { current: kind });
+  if (kind === 'heartbeat') {
+    state.scheduledScan = 'heartbeat'; state.scheduledDirection = direction; state.cursor = { kind: 'heartbeat' };
+    FbmSync.stateWrite(state);
+    return { ok: true, request: FbmSync.nextEnvelope(FbmSync.sessionSystemRequest('heartbeat')), status: FbmSync.statusView() };
+  }
+  state.scheduledScan = '';
+  FbmSync.stateWrite(state);
+  var options = { mode: direction, scan: kind === 'activityFull' ? 'activity_bulk' : kind === 'detail' ? 'detail' : 'full', origin: 'background' };
+  if (kind === 'detail') { options.detail = schedule.detail; }
+  return FbmSync.start(options);
+};
+/**
+ * Tiến trình hiện tại của chuỗi vừa chạy xong: dời mốc của nó rồi mở tiến trình đến hạn kế tiếp chưa chạy trong chuỗi.
+ * Mỗi tiến trình theo lịch chạy tối đa một lần mỗi chuỗi nên chuỗi luôn dừng dù chu kỳ ngắn hơn thời gian chạy; Quét nhanh do bước đếm gọi nằm trong lượt của tiến trình đang chạy nên không tính.
+ */
+FbmSync.chainAdvance = function () {
+  for (var guard = 0; guard <= Object.keys(FbmSync.SCHEDULE_MARKER_KEYS).length; guard += 1) {
+    var state = FbmSync.stateRead(), chain = state.chain, at = Date.now();
+    if (!chain || !chain.current) { return null; }
+    FbmSync.scheduleMarkerAdvance(chain.current, at);
+    chain.ran = (chain.ran || []).concat([chain.current]); chain.current = '';
+    var next = FbmSync.masterEnabled() && FbmSync.backgroundEnabled() ? FbmSync.scheduleDueKinds(at, chain.ran)[0] : '';
+    state.chain = next ? chain : null; state.scheduledScan = ''; state.nextRunAt = FbmSync.scheduleNextAt();
+    FbmSync.stateWrite(state);
+    if (!next) { return null; }
+    var started = FbmSync.chainStart(next);
+    // Tiến trình xong ngay không cần request (không có gì để đọc) thì xét tiếp; dừng lỗi thì chuỗi gãy và lần hỏi sau chạy lại.
+    if (started && started.request) { return started; }
+    var after = FbmSync.stateRead();
+    if (after.phase !== 'done' || !after.chain || after.chain.current !== next) { return started; }
+  }
+  return null;
+};
+/** Cuối mỗi lượt nền (sau bước đếm): lượt xong thì chuỗi chạy tiếp tiến trình kế. Lượt tay, lượt lỗi hay tạm dừng không đẩy chuỗi. */
+FbmSync.chainTail = function (result) {
+  if (!result || result.request) { return result; }
+  var state = FbmSync.stateRead();
+  if (state.origin !== 'background' || state.phase !== 'done' || !state.chain || !state.chain.current) { return result; }
+  var next = FbmSync.chainAdvance();
+  return Object.assign({}, result, { ok: true, request: next && next.request || null, status: FbmSync.statusView() });
 };
 
 function fbmSyncLockResult(code, message) {
@@ -182,8 +244,7 @@ function fbmSyncHeartbeatRequest(options) {
     if (Number(options && options.hop || 0) >= Number(FbmSync.RELAY_HOP_LIMIT || 20)) {
       return { ok: true, code: 'RELAY_SLICE_COMPLETE', request: null, status: FbmSync.statusView() };
     }
-    // Select and reserve one due business process before checking the session.
-    // This prevents a technical poll from starting work on every heartbeat.
+    // Chọn tiến trình đến hạn trước khi kiểm phiên, để nhịp hỏi kỹ thuật không tự mở việc mỗi lần.
     var picked = FbmSync.schedulerPickDue(now, { startup: source === 'startup' });
     if (!picked.ok) {
       return { ok: true, noop: true, code: picked.code || 'NO_PROCESS_DUE', request: null, status: FbmSync.statusView() };
@@ -212,7 +273,7 @@ function fbmSyncHeartbeatLocked(rawResponse, options) {
   var state = FbmSync.stateRead(), cursor = state.cursor || {}, responseRequestId = FbmSync.responseRequestId ? FbmSync.responseRequestId(rawResponse) : '', result = FbmSync.protocol.assertSuccess(rawResponse), request = null, started = null;
   // Sau heartbeat, mọi request của phiên nền dùng đúng bộ xử lý continuation chung.
   // Worker chỉ chuyển envelope nên không cần và không được biết cursor nào đang chạy.
-  if (cursor.kind !== 'heartbeat') { return FbmSync.continue(rawResponse); }
+  if (cursor.kind !== 'heartbeat') { return FbmSync.continueRun(rawResponse); }
   if (!state.activeRequestId || !responseRequestId || responseRequestId !== String(state.activeRequestId)) {
     return { ok: false, code: 'STALE_RESPONSE', request: null, status: FbmSync.statusView(), error: 'Response heartbeat không còn thuộc request đang chờ.' };
   }
@@ -220,7 +281,7 @@ function fbmSyncHeartbeatLocked(rawResponse, options) {
   if (contractStop) { return contractStop; }
   // Heartbeat không được tự suy ra phiên từ shape dữ liệu. Lỗi HTTP/parse đi qua
   // continuation chung để 401/403 được probe và mọi lỗi khác fail-closed.
-  if (!result.ok) { return FbmSync.continue(rawResponse); }
+  if (!result.ok) { return FbmSync.continueRun(rawResponse); }
   state.activeRequestId = '';
   state.deadlineAt = 0;
   state.lastProgressAt = Date.now();
@@ -263,11 +324,11 @@ function fbmSyncHeartbeatLocked(rawResponse, options) {
     state.scheduledScan = ''; FbmSync.stateWrite(state);
     started = FbmSync.recountStart(heartbeatDirection, 'background');
     request = started && started.request ? started.request : null;
-  } else if (result.ok && state.phase === 'idle' && ['customer', 'activity', 'customerFull', 'activityFull', 'detail'].indexOf(state.scheduledScan) >= 0 && typeof FbmSync.start === 'function') {
-    var schedule = FbmSync.backgroundScheduleRead(), scan = state.scheduledScan === 'activity' || state.scheduledScan === 'activityFull' ? 'activity_bulk' : state.scheduledScan === 'detail' ? 'detail' : 'full';
-    var backgroundStart = { mode: state.scheduledDirection || schedule.direction || 'read', scan: scan, origin: 'background' };
-    if (scan === 'detail') { backgroundStart.detail = schedule.detail; }
-    started = FbmSync.start(backgroundStart);
+  } else if (result.ok && state.chain && state.scheduledScan && state.scheduledScan === state.chain.current) {
+    started = FbmSync.chainTail(FbmSync.chainStart(state.scheduledScan));
+    request = started && started.request ? started.request : null;
+  } else if (result.ok && state.chain && state.chain.current === 'heartbeat') {
+    started = FbmSync.chainAdvance();
     request = started && started.request ? started.request : null;
   }
   var status = FbmSync.statusView();

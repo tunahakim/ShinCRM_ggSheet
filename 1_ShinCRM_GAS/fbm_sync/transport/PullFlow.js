@@ -402,7 +402,12 @@ FbmSync.contractGate = function (rawResponse) {
 };
 
 /** Tiến đúng một bước cursor và lưu state trước khi trả request kế tiếp; lượt vừa xong thì nối bước đếm (`runTail`). */
-FbmSync.continue = function (rawResponse) { return FbmSync.runTail(FbmSync.continueStep(rawResponse)); };
+/** Giữ phiên giữa chuỗi nền về qua cổng `continue` chung của Extension như mọi response sau request đầu, nên cursor `heartbeat` phải về đúng bộ xử lý heartbeat. */
+FbmSync.continue = function (rawResponse) {
+  if (String((FbmSync.stateRead().cursor || {}).kind || '') === 'heartbeat') { return fbmSyncHeartbeatLocked(rawResponse, {}); }
+  return FbmSync.continueRun(rawResponse);
+};
+FbmSync.continueRun = function (rawResponse) { return FbmSync.chainTail(FbmSync.runTail(FbmSync.continueStep(rawResponse))); };
 FbmSync.continueStep = function (rawResponse) {
   var state = FbmSync.stateRead();
   if (typeof FbmSync.recoverStaleRun === 'function') {
