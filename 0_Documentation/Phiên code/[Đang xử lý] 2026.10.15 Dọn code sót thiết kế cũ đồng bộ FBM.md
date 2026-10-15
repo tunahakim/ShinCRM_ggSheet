@@ -31,7 +31,7 @@ Branch `feature/fbm-legacy-cleanup`. Mục tiêu: gỡ code, khóa và nhánh c�
 
 ## Cần chủ dự án quyết
 
-- [ ] Lớp 4 "vòng xoay giao dịch" (09/02 Phần 8) đang có hai bản cài đặt với hai con trỏ riêng: tiến trình nền `detail` (`FBM_SYNC_DETAIL_CURSOR_V1`, N khách mỗi lượt theo lịch) và vòng xoay 30 khách chạy kèm cuối mỗi lượt lấy giao dịch (`FBM_SYNC_ACTIVITY_ROTATION`, sau lớp bắt kịp). Tài liệu chỉ mô tả một vòng xoay theo lịch. Nếu bản chạy kèm là sót thiết kế cũ thì gỡ sẽ bớt khoảng 30 khách đọc giao dịch mỗi lượt; chưa gỡ vì đổi hành vi đọc FBM.
+- [ ] Tiến trình nền "Lấy toàn bộ giao dịch" (8 giờ, scan `activity_bulk`) sau lớp 1 còn chạy kèm hai bước: tìm khách có giao dịch mới hơn mốc trên Sheet (catch-up) và vòng xoay 30 khách với con trỏ riêng `FBM_SYNC_ACTIVITY_ROTATION`. 09/02 chỉ giao cho tiến trình này lớp 1; lớp 4 đã là tiến trình "Vòng xoay giao dịch" (`detail`, 30 phút, con trỏ `FBM_SYNC_DETAIL_CURSOR_V1`). Lớp 1 đã đọc mọi giao dịch trong mốc ngày nên hai bước chạy kèm không bắt thêm được gì. Đề xuất gỡ cả hai; chi phí tiết kiệm nhỏ (vài request mỗi 8 giờ), lợi chính là còn một vòng xoay, một con trỏ.
 
 ## Bàn giao
 
