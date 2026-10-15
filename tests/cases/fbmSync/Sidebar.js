@@ -471,9 +471,9 @@ async function chay(so) {
   const firstScheduleRow = backgroundBlocks.find((node) => node && String(node.className || '').indexOf('shin-sync-schedule-row') >= 0);
   const detailBlock = backgroundBlocks.find((node) => node && String(node.className || '').indexOf('shin-sync-detail-controls') >= 0);
   check(so, 'background layout order and detail groups', [backgroundToggleIndex < directionIndex, backgroundBlocks[backgroundToggleIndex].role, backgroundBlocks[directionIndex].className.indexOf('shin-sync-direction-row') >= 0, firstScheduleRow.role, firstScheduleRow.elements[1].className, detailBlock.role, detailBlock.elements.length, detailBlock.elements[0].className], [true, 'row', true, 'row', 'shin-kv-label', 'box', 2, 'shin-row-group shin-sync-detail-field']);
-  const backgroundTexts = JSON.stringify(backgroundBlocks), lastScheduleRow = backgroundBlocks.map((node) => node && String(node.className || '').indexOf('shin-sync-schedule-row') >= 0).lastIndexOf(true);
-  check(so, 'Lịch đồng bộ nền: ngay dưới các công tắc tiến trình có dòng giải thích tắt chỉ bỏ lịch định kỳ, bước đếm vẫn gọi Quét nhanh và chu kỳ không ngắn hơn Chu kỳ hỏi GAS; dòng giải thích Vòng xoay không còn trần 50', [
-    String(backgroundBlocks[lastScheduleRow + 1] && backgroundBlocks[lastScheduleRow + 1].text || ''), backgroundTexts.indexOf('đến 50') < 0 && backgroundTexts.indexOf('quá 50') < 0, backgroundTexts.indexOf('không giới hạn trên') >= 0
+  const backgroundTexts = JSON.stringify(backgroundBlocks), detailIndex = backgroundBlocks.indexOf(detailBlock);
+  check(so, 'Lịch đồng bộ nền: dòng giải thích công tắc tiến trình nằm dưới nhóm số khách Vòng xoay, ngay trên nút lưu; dòng giải thích Vòng xoay không còn trần 50', [
+    String(backgroundBlocks[detailIndex + 1] && backgroundBlocks[detailIndex + 1].text || ''), backgroundTexts.indexOf('đến 50') < 0 && backgroundTexts.indexOf('quá 50') < 0, backgroundTexts.indexOf('không giới hạn trên') >= 0
   ], [hop.FBM_SYNC_SETTINGS_SCHEMA.background.processesHelp, true, true]);
   const moduleBlocks = hop.fbmSyncSettingsModuleBlocks({ approvalThreshold: 10, requestGapMinSeconds: 1, requestGapMaxSeconds: 3 }, true);
   const gapBlock = moduleBlocks.find((node) => node && node.elements && node.elements[1] && String(node.elements[1].className || '').indexOf('shin-sync-detail-inputs') >= 0);
