@@ -57,6 +57,15 @@ Hiện bước ghi và bước đẩy đã đúng; hai bước dưới quên xé
 - [x] [Tự động] Sửa lỗi thứ năm gặp trên DEV 2026-10-16: tự đăng nhập thành công lúc 00:17, lần hỏi nền 00:32 phiên lại chết thì dừng `SESSION_PROBE_FAILED_AFTER_LOGIN` thay vì đăng nhập lại, vì cờ "đã thử đăng nhập" của lượt trước còn sót. Lần hỏi nền không còn lượt dở nay bỏ cờ này cùng dấu hết hạn (09/06). Test `AutoLogin` "Lượt trước đã tự đăng nhập thành công, lần hỏi nền sau phiên lại chết: request đếm khách nhận Authorized:false, probe xác nhận rồi cấp lệnh đăng nhập mới, không dừng SESSION_PROBE_FAILED_AFTER_LOGIN" (đỏ trước khi sửa). Bộ đầy đủ đạt 2456, 0 lỗi.
 - [ ] [Cần kiểm chứng thật] Chủ dự án tải lại Extension (executor 21.22); lượt nền chế độ ghi qua được bước Category và chạy hết Quét nhanh.
 
+## 8. Mỗi lần hỏi nền là một lượt mới (chủ dự án chốt 2026-10-16)
+
+Nguồn chuẩn: 09/02 Phần 3 "Mỗi lần hỏi nền là một lượt mới", 09/06 đoạn tự đăng nhập, 09/01 bảng "Ba kết quả của một lượt đăng nhập". Lý do: các đường "chạy tiếp lượt dở qua nhiều lần hỏi" sinh ra lỗi kẹt 50 phút, cờ đăng nhập sót và kiểm tra tài khoản cũ 50 phút trên DEV 2026-10-16. Giới hạn 20 request mỗi lần hỏi (`RELAY_HOP_LIMIT`, commit 400964a) do phiên code cũ tự đặt, không có trong tài liệu.
+
+- [ ] [Tự động] Bỏ giới hạn 20 request mỗi lần hỏi và cơ chế lát relay (`RELAY_HOP_LIMIT`, `limitRelayResult`, `fbmSyncRelayCap`, `sliceProbePending`); không thêm chốt thời gian cho cả lượt. Test: một lượt nền cần hơn 20 request chạy hết trong một lần hỏi.
+- [ ] [Tự động] Lần hỏi nền gặp lượt dở không còn request đang chờ trong hạn: kết thúc lượt `SYNC_ABANDONED_RUN` có Log rồi mở lượt mới bằng bước kiểm tra tài khoản; không gửi lại request của lượt cũ (bỏ `SYNC_RESUME_REQUEST_READY`). Lệnh ghi mất response vẫn kết thúc `SYNC_STALE_WRITE` và giữ khóa. Test cho cả hai nhánh.
+- [ ] [Tự động] Bỏ trạng thái "chờ phiên cũ" (`waiting_session`, `sessionGateWaitRequest`, `sessionGateResumeAfterWaitProbe`, trần `AUTO_LOGIN_MAX_BLOCK_WAITS`): FBM báo còn giữ phiên cũ thì lượt kết thúc, ghi Log, chu kỳ thử lại giữ giãn cách. Test: lần hỏi sau khi hết chu kỳ mở lượt mới bằng probe User, phiên sống thì chạy việc, không gửi lệnh đăng nhập.
+- [ ] [Cần kiểm chứng thật] Chủ dự án để chạy nền chế độ ghi trên DEV: một lượt có hơn 20 request chạy liền tới cuối trong một lần hỏi, Log không có `RELAY_SLICE_COMPLETE`.
+
 ## Bàn giao
 
 - [x] [Tự động] `node tests/run.js` đạt, 0 lỗi; thử phá test chuỗi (cho mỗi lần hỏi chỉ chạy một tiến trình) thấy đỏ rồi khôi phục. Đạt 2454, 0 lỗi; thử phá chuỗi đã làm ở mục 4 (2 test `BackgroundChain.js` đỏ).
