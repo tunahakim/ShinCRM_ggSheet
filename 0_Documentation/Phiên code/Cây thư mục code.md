@@ -333,9 +333,10 @@ tests\
     │   ├── Preflight.js            Kiểm cổng điều kiện trước khi cấp request push và identity probe.
     │   ├── Orchestration.js       Kiểm state, cursor, resume, preflight và luồng nhiều lát.
     │   ├── Workflow.js             Chạy contract xuyên GAS -> executor Extension -> GAS với fixture FBM, cùng các cổng fail-closed cấp pipeline.
-    │   ├── ScanJob.js              Kiểm việc quét: cắt gói dưới trần, chuyển trang, gói trùng/lạ, mất response, mất tab, ghi lỗi, lượt thiếu dòng.
+    │   ├── ScanJob.js              Kiểm việc quét: cắt gói dưới trần, chuyển trang, gói trùng/lạ, mất response, mất tab, ghi lỗi, lượt thiếu dòng; harness chạy lượt tay và lần hỏi nền qua FBM giả.
     │   ├── ActivityScan.js         Kiểm lấy toàn bộ giao dịch: giữ id, gắn cờ chỉ khi đủ, chia khoảng không chồng ngày biên, đọc lại theo id, executor dừng đọc khi quá trần.
     │   ├── CustomerCount.js        Kiểm bước đếm khách: FBM không đổi thì dừng sau một lần đếm, tổng tăng thì Quét nhanh đúng một lần, chưa có mốc thì Quét nhanh.
+    │   ├── BackgroundChain.js      Kiểm chuỗi nền nhiều lần hỏi bằng đồng hồ giả: hết bỏ đói, mỗi tiến trình một lần mỗi chuỗi, lượt tay chen ngang không dời mốc.
     │   ├── ScanPack.js             Kiểm gói quét: so giao dịch cuối, dừng sau chuỗi khách im lặng, gắn cờ "không thấy" chỉ trong khách đã đọc, mỗi gói đúng thao tác.
     │   ├── RelayResend.js          Kiểm Sidebar gửi lại cấu hình relay đang giữ khi Extension được tải lại, không gọi GAS.
     │   ├── Push.js                Kiểm cổng ghi, khóa, owner, builder ghi và xử lý lỗi push.
