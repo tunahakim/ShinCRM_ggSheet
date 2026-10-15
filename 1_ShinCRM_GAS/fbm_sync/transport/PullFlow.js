@@ -269,7 +269,7 @@ FbmSync.activityForCustomers = function (state, customerContexts, customerNext, 
   }
   state.cursor = { kind: 'activity_grid', customers: contexts.map(function (item) { return item.sttRec; }), customerIndex: 0, batch: [], count: FbmSync.BUDGET.activityCustomerRows, customerNext: customerNext ? { pageIndex: customerNext.body.gridPageIndex, pageValue: customerNext.body.gridPageValue, pageItems: FbmSync.gridPageItemsOf(customerNext.body), count: customerNext.body.count } : null, customerSeen: Number(customerSeen || 0) };
   if (queued) { state.cursor.queueFrom = 0; }
-  // Gói Quét nhanh, Quét kỹ chỉ đọc khách lệch giao dịch cuối rồi quét từ khách mới nhất xuống; Quét toàn bộ và quét chi tiết đọc mọi khách đã thấy.
+  // Gói Quét nhanh, Quét kỹ chỉ đọc khách lệch giao dịch cuối rồi quét từ khách mới nhất xuống; Quét toàn bộ đọc mọi khách đã thấy.
   if (queued && state.scan === 'full' && state.scanPack !== 'all') { state.cursor.layer = 'due'; FbmSync.activityLayerProgress(state, false); }
   state.message = 'Đang đọc giao dịch của khách hàng...';
   FbmSync.activityBatchPlan(state.cursor);
