@@ -70,6 +70,15 @@ async function chay(so) {
   tat.F.customerBaselineWrite(11);
   const tatLan = await tat.hoi(10);
   check(so, 'Tắt Quét nhanh mà tổng khách FBM khác số khách mốc: Giữ phiên vẫn chạy Quét nhanh, nhận đủ 12 khách và ghi mốc mới', [tatLan.xong, dem(tat.trace.kinds, 'scan_job'), tat.local.customer.length, tat.F.customerBaselineRead()], [['heartbeat'], 1, 12, 12]);
+
+  // Lượt trước đã kết thúc ở trạng thái tạm dừng (tự đăng nhập bị FBM từ chối) hoặc xung đột: lần hỏi sau vẫn mở chuỗi mới (09/06: chạy nền tự thử lại theo chu kỳ).
+  const ketThuc = [];
+  for (const phase of ['paused', 'conflict']) {
+    const dung = chuoiHarness({ heartbeat: { enabled: false }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false }, detail: { enabled: false } });
+    dung.F.statePatch({ runId: 'luot-truoc', phase, origin: 'background', cursor: {}, activeRequestId: '', deadlineAt: 0, lastFailureCode: 'AUTO_LOGIN_FAILED' });
+    ketThuc.push((await dung.hoi(60)).xong);
+  }
+  check(so, 'Lượt trước dừng ở "tạm dừng" hoặc "xung đột": lần hỏi sau vẫn chạy Quét nhanh đến hạn, không bị coi là lượt đang chạy', ketThuc, [['customerFull'], ['customerFull']]);
 }
 
 module.exports = { chay };
