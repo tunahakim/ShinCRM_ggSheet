@@ -48,6 +48,7 @@ Hiện bước ghi và bước đẩy đã đúng; hai bước dưới quên xé
 ## 7. Bỏ hẳn mốc ngày Activity (chủ dự án chốt 2026-10-15)
 
 - [x] [Tự động] Xóa ô `Mốc ngày Activity trên FBM`, khóa `activitySince` trong `FBM_ACCOUNT_SETTINGS_V1`, bộ lọc `end_date` ở mọi lớp và luật ngoài phạm vi theo mốc; tài liệu 09/01, 02, 05, 06, 07, 08 và 02 Kiến trúc cập nhật cùng lượt. Test `Pull.js`: "Request giao dịch mọi khách và từng khách không gắn bộ lọc ngày", "Full scan gắn cờ missing cho mọi giao dịch vắng bên FBM kể cả ngày cũ; tombstone thì không"; `Settings.js`: "Kho cũ còn mốc ngày Activity: lần đọc trả cấu hình không có mốc và ghi lại kho không còn khóa đó"; `Sidebar.js`: "Account hien cau hinh ma khach FBM tu GAS, khong con o moc ngay Activity". Bộ đầy đủ đạt 2451, 0 lỗi.
+- [x] [Tự động] Sửa lỗi gặp trên DEV 2026-10-15: lượt nền dừng "tạm dừng" vì tự đăng nhập bị từ chối thì lịch nền bị coi là "đang chạy" mãi và không mở lượt mới. Luật "lượt còn dở" gom về `FbmSync.runInProgress` (`state/State.js`), dùng ở bước chọn tiến trình, bước nhận response Giữ phiên và cổng bắt đầu lượt. Test `BackgroundChain.js`: "Lượt trước dừng ở \"tạm dừng\" hoặc \"xung đột\": lần hỏi sau vẫn chạy Quét nhanh đến hạn, không bị coi là lượt đang chạy" (đỏ trước khi sửa). Bộ đầy đủ đạt 2452, 0 lỗi.
 
 ## Bàn giao
 
