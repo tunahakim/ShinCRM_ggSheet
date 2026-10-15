@@ -35,7 +35,7 @@ Branch `feature/fbm-legacy-cleanup`. Mục tiêu: gỡ code, khóa và nhánh c�
 
 ## Bàn giao
 
-- [ ] `node tests/run.js` đạt toàn bộ; thử phá các test mới thấy đỏ rồi khôi phục.
-- [ ] Đẩy GAS DEV (`node tests/gas.js smokeTest --push`).
+- [x] `node tests/run.js` đạt 2442/0; thử phá test công tắc lịch nền (3 đỏ) và test kênh Extension (2 đỏ) rồi khôi phục.
+- [x] Đẩy GAS DEV (`node tests/gas.js smokeTest --push`); `fbmGetBackgroundSwitch` trên DEV đọc từ lịch nền.
 - [ ] [Cần kiểm chứng thật] Chủ dự án tải lại Extension, mở Sheet DEV: công tắc "Bật lịch đồng bộ nền" bật/tắt có tác dụng, lượt nền vẫn chạy bình thường.
 - [ ] Đổi tên tệp này sang `[Đã xử lý]`.
