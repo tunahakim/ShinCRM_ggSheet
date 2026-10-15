@@ -1,6 +1,5 @@
 /** Lịch nền nghiệp vụ ở GAS: Extension hỏi theo alarm `gas_poll`, GAS chọn tiến trình đến hạn theo mốc lưu trong DocumentProperties (09/02). */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
-FbmSync.RELAY_HOP_LIMIT = 20;
 FbmSync.EXTENSION_CONFIG_KEY = 'FBM_SYNC_EXTENSION_CONFIG_V1';
 FbmSync.BACKGROUND_SCHEDULE_KEY = 'FBM_SYNC_BACKGROUND_SCHEDULE_V1';
 FbmSync.DETAIL_CURSOR_KEY = 'FBM_SYNC_DETAIL_CURSOR_V1';
@@ -215,21 +214,8 @@ function fbmSyncHeartbeatRequest(options) {
     if (state.activeRequestId && now < Number(state.deadlineAt || 0)) {
       return fbmSyncLockResult('REQUEST_IN_FLIGHT', 'Đã có request FBM đang chờ response; không cấp request heartbeat chồng.');
     }
-    var gate = typeof FbmSync.sessionGateMeta === 'function' ? FbmSync.sessionGateMeta(state) : {}, waitingResult = typeof FbmSync.sessionGateWaitRequest === 'function' ? FbmSync.sessionGateWaitRequest(state, now) : null;
-    if (waitingResult && waitingResult.handled) { return waitingResult; }
-    if (state.runId && activePhase && !(typeof FbmSync.sessionGateCursorIsInternal === 'function' && FbmSync.sessionGateCursorIsInternal(state))) {
-      if (gate.sliceProbePending === true && state.cursor && state.cursor.kind !== 'session_probe') {
-        gate.sliceProbePending = false;
-        var sliceProbe = FbmSync.sessionGateResumeProbeRequest(state, state.cursor, 'Đang probe lại phiên FBM ở đầu lát relay mới...');
-        return sliceProbe ? { ok: true, code: 'SESSION_SLICE_PROBE_READY', request: sliceProbe, status: FbmSync.statusView(), probingSlice: true } : { ok: false, code: 'SESSION_PROBE_UNAVAILABLE', request: null, status: FbmSync.statusView() };
-      }
-      var resumed = FbmSync.requestForCursor(state);
-      if (!resumed) { return fbmSyncLockResult('SYNC_RESUME_UNAVAILABLE', 'Phiên đồng bộ đang chạy nhưng GAS không dựng lại được request từ cursor.'); }
-      return { ok: true, code: 'SYNC_RESUME_REQUEST_READY', request: FbmSync.nextEnvelope(resumed), status: FbmSync.statusView(), resumed: true };
-    }
-    if (Number(options && options.hop || 0) >= Number(FbmSync.RELAY_HOP_LIMIT || 20)) {
-      return { ok: true, code: 'RELAY_SLICE_COMPLETE', request: null, status: FbmSync.statusView() };
-    }
+    // Lượt dở không còn request nào chờ trong hạn (Extension bị tắt giữa chừng, response mất): kết thúc có Log rồi mở lượt mới, không gửi lại request của lượt cũ (09/02 Phần 3 "Mỗi lần hỏi nền là một lượt mới").
+    if (state.runId && activePhase) { FbmSync.recoverStaleRun(state, now, { abandoned: true }); }
     // Chọn tiến trình đến hạn trước, để nhịp hỏi kỹ thuật không tự mở việc mỗi lần.
     var picked = FbmSync.schedulerPickDue(now, { startup: source === 'startup' });
     if (!picked.ok) {
@@ -238,7 +224,6 @@ function fbmSyncHeartbeatRequest(options) {
     // Đọc lại sau khi chọn: ghi bản đọc trước đó sẽ xóa mất tiến trình vừa chọn và lịch nền không bao giờ khởi động.
     state = FbmSync.stateRead();
     state.cursor = { kind: 'heartbeat' };
-    state.relayHop = 0;
     // Dấu "phiên hết hạn" của lượt đã kết thúc không còn đáng tin: bỏ dấu, response của request đếm khách quyết định phiên sống hay chết (09/06).
     if (!FbmSync.runInProgress(state)) { FbmSync.sessionGateForgetStale(state); }
     FbmSync.stateWrite(state);
@@ -281,7 +266,6 @@ function fbmSyncHeartbeatLocked(rawResponse, options) {
   state.deadlineAt = 0;
   state.lastProgressAt = Date.now();
   if (typeof FbmSync.sessionGateResponseStarted === 'function') { FbmSync.sessionGateResponseStarted(state); }
-  state.relayHop = Number(options && options.hop || 0) + 1;
   FbmSync.stateWrite(state);
   var countTotal = FbmSync.customerCountTotal(rawResponse);
   if ((FbmSync.protocol.hasHeartbeatData && !FbmSync.protocol.hasHeartbeatData(rawResponse)) || countTotal === null) {
@@ -303,16 +287,6 @@ function fbmSyncHeartbeatLocked(rawResponse, options) {
   state.cursor = {};
   FbmSync.stateWrite(state);
   state = FbmSync.stateRead();
-  if (result.ok && Number(options && options.hop || 0) >= Number(FbmSync.RELAY_HOP_LIMIT || 20)) {
-    state.relayHop = 0;
-    if (String(state.origin || '') === 'background' && state.runId && state.cursor && state.cursor.kind) {
-      var heartbeatGate = typeof FbmSync.sessionGateMeta === 'function' ? FbmSync.sessionGateMeta(state) : {};
-      heartbeatGate.sliceProbePending = true;
-    }
-    state.message = 'Đã hết lát heartbeat an toàn; lượt sau sẽ tiếp tục từ cursor đã lưu.';
-    FbmSync.stateWrite(state);
-    return { ok: true, code: 'RELAY_SLICE_COMPLETE', request: null, status: FbmSync.statusView() };
-  }
   if (result.ok && FbmSync.runInProgress(state) && !(state.metadata && state.metadata.manualPending)) {
     request = FbmSync.requestForCursor(state);
   } else if (result.ok && state.scheduledScan === 'recount') {

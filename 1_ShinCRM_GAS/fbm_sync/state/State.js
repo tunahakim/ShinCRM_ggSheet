@@ -360,23 +360,27 @@ FbmSync.stateStart = function (entity, phase, total) {
 /**
  * Thu hồi state đang chạy mà không còn bên gọi; không gửi lại lệnh ghi đang mở.
  * Lượt dở do bản cũ tạo (thiếu `schemaVersion` hiện hành) cũng dừng tại đây, kể cả khi đang chờ duyệt: cursor cũ không được chạy tiếp mù; dấu chờ đẩy và hash nằm ở khóa riêng nên còn nguyên cho lượt chạy lại.
+ * `abandoned`: lần hỏi nền gặp lượt dở không còn request chờ trong hạn thì kết thúc ngay, không đợi mốc 2 phút, vì lượt nền không bao giờ được nối lại qua lần hỏi (09/02 Phần 3).
  */
-FbmSync.recoverStaleRun = function (state, now) {
-  var current = state || FbmSync.stateRead(), at = Number(now || Date.now());
+FbmSync.recoverStaleRun = function (state, now, options) {
+  var current = state || FbmSync.stateRead(), at = Number(now || Date.now()), abandoned = !!(options && options.abandoned);
   var legacy = Number(current.schemaVersion || 1) < FbmSync.STATE_SCHEMA_VERSION;
   if (!current.runId || FbmSync.ACTIVE_PHASES.concat(legacy ? ['awaiting_approval'] : []).indexOf(String(current.phase || '')) < 0) { return { state: current, recovered: false }; }
   var updated = Number(current.updatedAt || current.startedAt || 0), age = updated ? at - updated : FbmSync.STALE_RUN_MS + 1;
   // Request đang bay còn trong hạn ngân sách (một lô có thể chạy lâu hơn mốc chung) thì chưa phải phiên kẹt.
-  if (!legacy && (age <= FbmSync.STALE_RUN_MS || (current.activeRequestId && at < Number(current.deadlineAt || 0)))) { return { state: current, recovered: false }; }
+  var inFlight = !!current.activeRequestId && at < Number(current.deadlineAt || 0);
+  if (!legacy && (inFlight || (!abandoned && age <= FbmSync.STALE_RUN_MS))) { return { state: current, recovered: false }; }
   var cursor = current.cursor || {}, waitingWrite = cursor.kind === 'push_wait';
   var message = legacy
     ? (waitingWrite ? 'Phiên ghi FBM đang dở được tạo bởi bản cũ; đã dừng và không tự ghi lại để tránh trùng dữ liệu. Hãy chạy lại lượt.' : 'Phiên đồng bộ đang dở được tạo bởi bản cũ; đã dừng, hãy chạy lại lượt.')
     : waitingWrite
     ? 'Phiên ghi FBM không nhận được phản hồi quá thời gian an toàn; không tự ghi lại để tránh trùng dữ liệu.'
+    : abandoned
+    ? 'Lượt đồng bộ trước bị bỏ dở (không còn request nào chờ phản hồi); đã kết thúc, lượt mới chạy lại từ đầu.'
     : 'Phiên đồng bộ không nhận được phản hồi quá thời gian an toàn; đã tự dừng, có thể chạy lại.';
   current.phase = 'error';
   current.schemaVersion = FbmSync.STATE_SCHEMA_VERSION;
-  current.lastFailureCode = legacy ? 'SYNC_STATE_MIGRATED' : (waitingWrite ? 'SYNC_STALE_WRITE' : 'SYNC_STALE_RUN');
+  current.lastFailureCode = legacy ? 'SYNC_STATE_MIGRATED' : (waitingWrite ? 'SYNC_STALE_WRITE' : abandoned ? 'SYNC_ABANDONED_RUN' : 'SYNC_STALE_RUN');
   current.retryable = false;
   current.lastError = message;
   current.message = message;
@@ -385,7 +389,10 @@ FbmSync.recoverStaleRun = function (state, now) {
     Object.keys(current.locks || {}).forEach(function (key) { if (current.locks[key] && current.locks[key].owner === 'user') { kept[key] = current.locks[key]; } });
     current.locks = kept;
   }
-  return { state: FbmSync.stateWrite(current), recovered: true, waitingWrite: waitingWrite };
+  var written = FbmSync.stateWrite(current);
+  // Lượt bị thu hồi có thể không còn bước nào đang mở để tự ghi Log kết thúc, nên ghi riêng một dòng: không có lỗi im lặng.
+  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'stale_run', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(current.runId || ''), reason: message, detail: { code: current.lastFailureCode, runId: String(current.runId || ''), cursor: String(cursor.kind || '') } }); }
+  return { state: written, recovered: true, waitingWrite: waitingWrite };
 };
 /**
  * Chuyển phiên đang chạy sang lỗi, giữ cursor và khóa ghi như thu hồi phiên treo. Gọi khi một lát ném exception hoặc client báo lỗi,

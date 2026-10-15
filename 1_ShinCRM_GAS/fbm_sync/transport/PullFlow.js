@@ -534,8 +534,6 @@ FbmSync.continueStep = function (rawResponse) {
       return { ok: true, request: null, status: FbmSync.statusView() };
     }
     var gateMeta = FbmSync.sessionGateMeta(state), resume = gateMeta.resumeCursor && gateMeta.resumeCursor.kind ? gateMeta.resumeCursor : { kind: 'authorize_customer' };
-    var waitedResume = typeof FbmSync.sessionGateResumeAfterWaitProbe === 'function' ? FbmSync.sessionGateResumeAfterWaitProbe(state) : null;
-    if (waitedResume) { return waitedResume; }
     if (gateMeta.probeOnly === true) {
       gateMeta.probeOnly = false;
       state.cursor = {}; state.phase = 'error'; state.entity = '';
