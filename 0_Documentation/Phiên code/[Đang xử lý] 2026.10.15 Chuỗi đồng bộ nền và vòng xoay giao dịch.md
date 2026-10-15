@@ -47,7 +47,7 @@ Hiện bước ghi và bước đẩy đã đúng; hai bước dưới quên xé
 
 ## Bàn giao
 
-- [ ] [Tự động] `node tests/run.js` đạt, 0 lỗi; thử phá test chuỗi (cho mỗi lần hỏi chỉ chạy một tiến trình) thấy đỏ rồi khôi phục.
-- [ ] [Tự động] Đẩy GAS DEV `node tests/gas.js smokeTest --push`.
+- [x] [Tự động] `node tests/run.js` đạt, 0 lỗi; thử phá test chuỗi (cho mỗi lần hỏi chỉ chạy một tiến trình) thấy đỏ rồi khôi phục. Đạt 2454, 0 lỗi; thử phá chuỗi đã làm ở mục 4 (2 test `BackgroundChain.js` đỏ).
+- [x] [Tự động] Đẩy GAS DEV `node tests/gas.js smokeTest --push`. Đã đẩy ngày 2026-10-15.
 - [ ] [Cần kiểm chứng thật] Chủ dự án để Sheet DEV chạy nền vài giờ: Sheet `Log` có Lấy toàn bộ giao dịch và Vòng xoay chạy, không có lỗi `SYNC_STALE_RUN`.
 - [ ] Đổi tên tệp sang `[Đã xử lý]`, gộp branch vào `main`.
