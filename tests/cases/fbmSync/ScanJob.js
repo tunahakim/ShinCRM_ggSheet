@@ -272,6 +272,19 @@ async function chay(so) {
     strayEnd.status.phase, strayEnd.status.lastFailureCode, stray.writes.filter((item) => item.entity === 'customer').length, stray.logs.some((event) => event.action === 'scan_job_mismatch' && event.outcome === 'error'), String(strayEnd.status.lastError || '').indexOf('không khớp việc quét') >= 0
   ], ['error', 'FBM_SCAN_JOB_MISMATCH', 1, true, true]);
 
+  // Phiên chết giữa lượt (đăng nhập ở thiết bị khác): FBM trả HTTP 200 nhưng Authorized:false, Rows:null và tab không có khối việc quét. Gặp thật 2026-10-16.
+  const deadSession = scanHarness({ customers: 12, budget: { chunkTargetBytes: 6000 } });
+  let deadSent = false;
+  const deadEnd = await deadSession.run({ edit: (raw, request) => {
+    if (deadSent || request.meta.kind !== 'scan_job') { return raw; }
+    deadSent = true;
+    return { ok: true, status: 200, body: '{"d":{"TotalRowCount":0,"Rows":null,"ViewPage":null,"Authorized":false}}', transport: raw.transport };
+  } });
+  const deadAfterScan = deadSession.trace.kinds[deadSession.trace.kinds.indexOf('scan_job') + 1];
+  check(so, 'Việc quét nhận Authorized:false (phiên chết): request kế là probe phiên, không báo FBM_SCAN_JOB_MISMATCH, không ghi khách nào từ response đó', [
+    deadSent, deadAfterScan, deadSession.logs.some((event) => event.action === 'scan_job_mismatch'), String(deadEnd.status.lastFailureCode || '') === 'FBM_SCAN_JOB_MISMATCH'
+  ], [true, 'session_probe', false, false]);
+
   // Mất tab giữa việc quét: chạy lại cả việc với jobId mới, không đếm trùng khách; mất quá số lần cho phép thì dừng lỗi.
   const lostTab = scanHarness({ customers: 12, budget: { chunkTargetBytes: 6000 } });
   let reloads = 0;
