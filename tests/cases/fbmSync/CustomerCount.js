@@ -16,9 +16,10 @@ async function chay(so) {
   const tang = scanHarness({ customers: 12 });
   let daThem = false;
   const sauTang = await tang.run({ pack: 'quick', beforeSend: (request) => { if (request.meta.kind === 'customer_count' && !daThem) { daThem = true; tang.themKhach(13); } } });
-  check(so, 'Tổng khách FBM tăng giữa hai lần đếm: chạy thêm đúng một Quét nhanh, nhận khách mới, đếm lại khớp rồi dừng', [
+  check(so, 'Lượt chạy tay, tổng khách FBM tăng giữa hai lần đếm: Sidebar hiện "Số khách FBM vừa đổi, quét thêm một lần...", chạy thêm đúng một Quét nhanh, nhận khách mới, đếm lại khớp rồi dừng', [
+    tang.F.stateRead().origin, tang.trace.statuses.some((status) => status && status.message === 'Số khách FBM vừa đổi, quét thêm một lần...'),
     sauTang.status.phase, dem(tang, 'scan_job'), dem(tang, 'customer_count'), tang.local.customer.length, tang.F.customerBaselineRead(), tang.logs.filter((item) => item.action === 'customer_count_changed').length
-  ], ['done', 2, 2, 13, 13, 1]);
+  ], ['manual', true, 'done', 2, 2, 13, 13, 1]);
 
   const chuaMoc = scanHarness({ customers: 12 });
   await chuaMoc.run({ pack: 'quick' });
