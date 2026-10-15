@@ -116,6 +116,15 @@ async function chay(so) {
     thieu.state.phase, thieu.state.lastFailureCode, thieu.log('activity_bulk_window').length, thieu.log('activity_bulk_failed').length, thieu.act(5).syncStatus === thieu.h.F.SYNC_STATUS.missing, String(thieu.state.lastError || '').length > 0
   ], ['error', 'FBM_SCAN_INCOMPLETE', 1, 1, false, true]);
 
+  // Bước chọn khách đọc giao dịch theo luật cho phép đồng bộ: khách "Chờ đồng bộ" lệch giao dịch cuối không tốn request đọc; khách "Cho phép" lệch y hệt vẫn được đọc.
+  const choDb = scanHarness({ customers: 4, budget: { activityTopScanQuietStreak: 1 } });
+  await choDb.run({ pack: 'all' });
+  choDb.local.customer.forEach((item) => { item.fbmSyncPermission = item.fbmId === 'FBM-C2' ? 'Chờ đồng bộ' : 'Cho phép'; });
+  ['FBM-C2', 'FBM-C3'].forEach((key) => { const cus = choDb.local.customer.find((item) => item.fbmId === key); choDb.local.activity = choDb.local.activity.filter((item) => item.customerId !== cus.id); });
+  choDb.trace.activityCustomers.length = 0;
+  await choDb.run({ pack: 'quick' });
+  check(so, 'Khách "Chờ đồng bộ" lệch ngày giao dịch cuối không sinh request đọc giao dịch; khách "Cho phép" lệch y hệt vẫn được đọc', [choDb.F.stateRead().phase, choDb.trace.activityCustomers.indexOf('FBM-C2'), choDb.trace.activityCustomers.indexOf('FBM-C3') >= 0], ['done', -1, true]);
+
   // Lượt nền chỉ lấy toàn bộ giao dịch gồm đúng lớp 1 (09/02 Phần 3): chốt "không thấy" rồi kết thúc, không đọc thêm khách nào.
   const nen = await luotKy(['2026-09-20', '2026-09-20'], (fbm) => { fbm.list = fbm.list.filter((item) => item.id !== 'A-FBM-C2'); }, {}, { startOptions: { scan: 'activity_bulk' }, afterError: () => null });
   const sauBulk = nen.h.trace.kinds.slice(nen.h.trace.kinds.indexOf('scan_job:activity') + 1);

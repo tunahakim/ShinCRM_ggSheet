@@ -17,8 +17,8 @@ Hai bước này là phần sót của thiết kế 2026-09-10 (commit 8fbb6a7):
 
 Hiện bước ghi và bước đẩy đã đúng; hai bước dưới quên xét ô cho phép, trái 09/05.
 
-- [ ] [Tự động] `markMissingAfterFullScan` (`reconcile/Identity.js`) bỏ qua bản ghi mà `syncPermission` (`reconcile/CategoryGate.js`, có luật kế thừa từ khách) trả `pull: false`. Test: khách `Không đồng bộ` vắng bên FBM không bị gắn cờ; giao dịch `Cho phép` của khách `Cấm đồng bộ` vắng bên FBM không bị gắn cờ; khách `Cho phép` vắng thì vẫn bị gắn `không thấy bên FBM`.
-- [ ] [Tự động] Bước chọn khách để đọc giao dịch (lớp 2 `activityDueMark`, lớp 3 `activityTopRefill`, hàng đợi `ActivityBatch.js`, Vòng xoay) bỏ qua khách `pull: false`; lấy toàn bộ giao dịch không đưa giao dịch của khách đó vào tập id theo dõi. Test: khách `Chờ đồng bộ` lệch ngày giao dịch cuối không sinh request đọc giao dịch.
+- [x] [Tự động] `markMissingAfterFullScan` (`reconcile/Identity.js`) bỏ qua bản ghi mà `syncPermission` (`reconcile/CategoryGate.js`, có luật kế thừa từ khách) trả `pull: false`. Test: khách `Không đồng bộ` vắng bên FBM không bị gắn cờ; giao dịch `Cho phép` của khách `Cấm đồng bộ` vắng bên FBM không bị gắn cờ; khách `Cho phép` vắng thì vẫn bị gắn `không thấy bên FBM`. Test `Pull.js`: "Gắn cờ vắng theo quyền: khách \"Không đồng bộ\" vắng bên FBM không bị gắn cờ; ..." (thử phá bộ lọc quyền thì đỏ).
+- [ ] [Tự động] Bước chọn khách để đọc giao dịch (lớp 2 `activityDueMark`, lớp 3 `activityTopRefill`, hàng đợi `ActivityBatch.js`, Vòng xoay) bỏ qua khách `pull: false`; lấy toàn bộ giao dịch không đưa giao dịch của khách đó vào tập id theo dõi. Test: khách `Chờ đồng bộ` lệch ngày giao dịch cuối không sinh request đọc giao dịch. Đã xong lớp 2, lớp 3, hàng đợi và tập id lớp 1 qua `pullAllowedReader` (`reconcile/CategoryGate.js`), test `ActivityScan.js`: "Khách \"Chờ đồng bộ\" lệch ngày giao dịch cuối không sinh request đọc giao dịch; ..."; Vòng xoay dùng cùng bộ lọc khi làm mục 5 rồi mới tick.
 
 ## 3. Bước đếm khách và số khách mốc
 

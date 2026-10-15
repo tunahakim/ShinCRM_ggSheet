@@ -166,7 +166,7 @@ async function chay(so) {
   const activityHistory = builders.FbmSync.activityBulkRequest({ type: 0, includeHistory: true });
   check(so, 'Mốc Activity dùng filter FBM đúng định dạng cho bulk và từng Customer', [activitySinceBulk.body.filter, activitySinceCustomer.body.filter, activitySinceCustomer.body.externalKey[0].Name, activityHistory.body.filter], [['end_date:>=07/10/2024'], ['end_date:>=07/10/2024'], 'stt_rec', []]);
   check(so, 'Mốc Activity đổi ngày không hợp lệ thì không tự gắn filter', builders.FbmSync.activitySinceFilterDate('2024-02-31'), '');
-  const tracked = (records) => records.filter(builders.FbmSync.activityBulkTracked).map((record) => record.id);
+  const tracked = (records) => records.filter(builders.FbmSync.activityBulkTracker()).map((record) => record.id);
   check(so, 'Lấy toàn bộ giao dịch chỉ theo dõi giao dịch có FBM ID còn hiệu lực: bỏ tombstone, dòng tạm, dòng chưa có FBM ID', tracked([{ id: 'A-1', fbmId: 'F-1', recordStatus: 'active' }, { id: 'A-2', fbmId: 'F-2', recordStatus: 'deleted' }, { id: 'TMP-3', fbmId: 'F-3', recordStatus: 'active' }, { id: 'A-4', fbmId: 'F-4', recordStatus: 'active' }, { id: 'A-5', fbmId: 'TMP-F-5', recordStatus: 'active' }, { id: 'A-6', fbmId: '', recordStatus: 'active' }]), ['A-1', 'A-4']);
   check(so, 'Giao dịch trước mốc không được theo dõi (không gửi id, không bị gắn cờ không thấy) còn đúng ngày mốc thì vẫn theo dõi', tracked([{ id: 'A-OLD', fbmId: 'F-OLD', workDate: '2024-10-06', recordStatus: 'active' }, { id: 'A-SINCE', fbmId: 'F-SINCE', workDate: '2024-10-07', recordStatus: 'active' }]), ['A-SINCE']);
   const lookupState = { session: { lookups: { '@CAT_TINH_THANH': [['HNI', 'Hà Nội']], '@CAT_NGUON_KH': [['HNI', 'Nguồn khác']], '@CAT_CONG_VIEC': [['HNI', 'Công việc khác']], '@CAT_SAN_PHAM': [['HNI', 'Sản phẩm khác']] } } };
@@ -490,6 +490,15 @@ async function chay(so) {
   edges.writeGateSave = (request) => { activityMissingBatch = request; return { ok: true }; };
   const activityMissingResult = edges.FbmSync.markMissingAfterFullScan('activity', fullScanState);
   check(so, 'Activity truoc moc khong bi danh dau missing trong full scan', [activityMissingResult.written, activityMissingBatch.records[0].id, activityMissingBatch.records[0].syncStatus, activityMissingBatch.records.length], [1, 'ACT-000021', edges.FbmSync.SYNC_STATUS.missing, 1]);
+  // Bước gắn cờ vắng theo luật cho phép đồng bộ (09/02 Phần 3): bản ghi chặn chiều lấy về, kể cả giao dịch kế thừa từ khách cha, vắng bên FBM cũng không bị gắn cờ.
+  const quyenKhach = [{ id: 'CUS-000031', fbmId: 'FBM-KDB', recordStatus: 'active', fbmSyncPermission: 'Không đồng bộ' }, { id: 'CUS-000032', fbmId: 'FBM-CP', recordStatus: 'active', fbmSyncPermission: 'Cho phép' }, { id: 'CUS-000033', fbmId: 'FBM-CAM', recordStatus: 'active', fbmSyncPermission: 'Cấm đồng bộ' }];
+  const quyenGd = [{ id: 'ACT-000031', fbmId: 'ACT-CHA-CAM', customerId: 'CUS-000033', workDate: '2025-01-01', recordStatus: 'active', fbmSyncPermission: 'Cho phép' }, { id: 'ACT-000032', fbmId: 'ACT-CHA-CP', customerId: 'CUS-000032', workDate: '2025-01-01', recordStatus: 'active', fbmSyncPermission: 'Cho phép' }];
+  const quyenGhi = [];
+  edges.FbmSync.readLocal = (entity) => entity === 'customer' ? quyenKhach : quyenGd;
+  edges.writeGateSave = (request) => { quyenGhi.push(request.entity + ':' + request.records.map((item) => item.id).join(',')); return { ok: true }; };
+  edges.FbmSync.markMissingAfterFullScan('customer', { mode: 'read', metadata: {}, locks: {} }, () => false);
+  edges.FbmSync.markMissingAfterFullScan('activity', { mode: 'read', metadata: {}, locks: {} }, () => false);
+  check(so, 'Gắn cờ vắng theo quyền: khách "Không đồng bộ" vắng bên FBM không bị gắn cờ; giao dịch "Cho phép" của khách "Cấm đồng bộ" vắng không bị gắn cờ; khách "Cho phép" vắng vẫn bị gắn "không thấy bên FBM"', quyenGhi, ['customer:CUS-000032', 'activity:ACT-000032']);
   let activityPullWrite;
   edges.FbmSync.stateRead = () => ({ metadata: { seen: { customer: {}, activity: {} } }, locks: {} });
   edges.FbmSync.stateWrite = () => {};
