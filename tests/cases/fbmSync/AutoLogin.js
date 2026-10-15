@@ -63,6 +63,19 @@ async function chay(so) {
   const userResponse = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[2037,"ANHLT","Le Tuan Anh"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: authorizeResponse.request.id }] } });
   check(so, 'chi identity khop moi tiep tuc heartbeat', [userResponse.ok, userResponse.code, userResponse.request.meta.kind, heartbeat.FbmSync.stateRead().session.accountUsername, heartbeat.FbmSync.stateRead().session.accountName], [true, 'AUTO_LOGIN_OK', 'heartbeat', 'ANHLT', 'Le Tuan Anh']);
 
+  // Phiên chết lần nữa ở lần hỏi nền sau (gặp thật 2026-10-16: đăng nhập 00:17, 00:32 phiên lại chết): cờ "đã thử đăng nhập" của lượt trước không được chặn lần đăng nhập mới.
+  heartbeat.FbmSync.statePatch({ phase: 'done', cursor: {}, activeRequestId: '', deadlineAt: 0 });
+  const loginLeftover = heartbeat.FbmSync.stateRead().metadata.sessionGate.loginAttempted;
+  const againConfig = JSON.parse(heartbeatData.FBM_LOGIN_CONFIG_V1);
+  againConfig.lastAttemptAt = 0; againConfig.nextRetryAt = 0;
+  heartbeatData.FBM_LOGIN_CONFIG_V1 = JSON.stringify(againConfig);
+  heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
+  const againCount = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+  const againProbe = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{"TotalRowCount":0,"Rows":null,"ViewPage":null,"Authorized":false}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: againCount.request.id }] } });
+  const againLogin = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{"TotalRowCount":0,"Rows":null,"ViewPage":null,"Authorized":false}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: againProbe.request && againProbe.request.id }] } });
+  check(so, 'Lượt trước đã tự đăng nhập thành công, lần hỏi nền sau phiên lại chết: request đếm khách nhận Authorized:false, probe xác nhận rồi cấp lệnh đăng nhập mới, không dừng SESSION_PROBE_FAILED_AFTER_LOGIN', [
+    loginLeftover, againCount.request.meta.kind, againProbe.request && againProbe.request.meta.kind, againLogin.code || '', againLogin.request && againLogin.request.meta.kind
+  ], [true, 'heartbeat', 'session_probe', '', 'login']);
   let identityUserRequests = 0;
   const identityUserBuilder = heartbeat.FbmSync.identityUserRequest;
   heartbeat.FbmSync.identityUserRequest = function () { identityUserRequests += 1; return identityUserBuilder(); };
