@@ -45,6 +45,10 @@ Hiện bước ghi và bước đẩy đã đúng; hai bước dưới quên xé
 - [x] [Tự động] Giữ hành vi hiện có (`manualPending`, `SYNC_BACKGROUND_STOPPING`); nút hiện `Đang dừng đồng bộ nền...` và khóa trong lúc chờ; lượt tay kết thúc bằng bước đếm, lệch thì hiện `Số khách FBM vừa đổi, quét thêm một lần...`. Test `Sidebar.js`: "Bấm chạy tay khi lượt nền đang chạy: nút khóa và hiện \"Đang dừng đồng bộ nền...\" trong lúc chờ; lượt tay xong thì nút mở lại"; `CustomerCount.js`: "Lượt chạy tay, tổng khách FBM tăng giữa hai lần đếm: Sidebar hiện \"Số khách FBM vừa đổi, quét thêm một lần...\", ..."; mốc không dời khi lượt tay chen ngang: `BackgroundChain.js` (mục 4).
 - [x] [Tự động] UI `Cài đặt phiên`: ô số khách vòng xoay không giới hạn 50, dòng giải thích công tắc tiến trình và chu kỳ không ngắn hơn `Chu kỳ hỏi GAS` (09/08). Ô trống hoặc số sai gửi nguyên để GAS từ chối lưu, không thay bằng 50. Test `Sidebar.js`: "Lịch đồng bộ nền: ngay dưới các công tắc tiến trình có dòng giải thích ...; dòng giải thích Vòng xoay không còn trần 50"; `Workflow.js`: "Số khách mỗi phiên Vòng xoay không còn trần 50: lưu 300 đọc lại 300; 0 bị từ chối".
 
+## 7. Bỏ hẳn mốc ngày Activity (chủ dự án chốt 2026-10-15)
+
+- [x] [Tự động] Xóa ô `Mốc ngày Activity trên FBM`, khóa `activitySince` trong `FBM_ACCOUNT_SETTINGS_V1`, bộ lọc `end_date` ở mọi lớp và luật ngoài phạm vi theo mốc; tài liệu 09/01, 02, 05, 06, 07, 08 và 02 Kiến trúc cập nhật cùng lượt. Test `Pull.js`: "Request giao dịch mọi khách và từng khách không gắn bộ lọc ngày", "Full scan gắn cờ missing cho mọi giao dịch vắng bên FBM kể cả ngày cũ; tombstone thì không"; `Settings.js`: "Kho cũ còn mốc ngày Activity: lần đọc trả cấu hình không có mốc và ghi lại kho không còn khóa đó"; `Sidebar.js`: "Account hien cau hinh ma khach FBM tu GAS, khong con o moc ngay Activity". Bộ đầy đủ đạt 2451, 0 lỗi.
+
 ## Bàn giao
 
 - [x] [Tự động] `node tests/run.js` đạt, 0 lỗi; thử phá test chuỗi (cho mỗi lần hỏi chỉ chạy một tiến trình) thấy đỏ rồi khôi phục. Đạt 2454, 0 lỗi; thử phá chuỗi đã làm ở mục 4 (2 test `BackgroundChain.js` đỏ).
