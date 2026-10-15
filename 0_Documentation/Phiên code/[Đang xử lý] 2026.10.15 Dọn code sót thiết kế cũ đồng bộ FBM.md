@@ -35,6 +35,14 @@ Branch `feature/fbm-legacy-cleanup`. Mục tiêu: gỡ code, khóa và nhánh c�
 - [ ] Chủ dự án chốt lại lớp 4: số nhập ở lịch nền là tổng số khách một phiên vòng xoay phải quét (ví dụ 140, không giới hạn 50); phiên đọc lần lượt từng lô `BUDGET.activityBatchCustomers` (50) như đồng bộ tay đến khi đủ số đó mới dừng. Code hiện chặn số này trong 1–50 và chỉ đọc một trang mỗi phiên; 09/02 và 08 đang ghi theo cách cũ.
 - [ ] Lịch nền bị bỏ đói khi nhịp hỏi của Extension (`pollMinutes`, cho chỉnh tới 60 phút) không ngắn hơn chu kỳ của tiến trình ưu tiên cao: mỗi lần hỏi GAS chỉ chọn một tiến trình, ví dụ hỏi 60 phút với Quét nhanh 60 phút thì lần hỏi nào Quét nhanh cũng đến hạn, Lấy toàn bộ giao dịch và Vòng xoay không bao giờ chạy. Đề xuất: lượt nền xong thì GAS chọn ngay tiến trình đến hạn kế tiếp trong cùng lần hỏi (chạy nối đuôi tới khi hết việc đến hạn), kèm test mô phỏng nhiều lần hỏi.
 
+## Lỗi phát hiện khi thiết kế lại lịch nền
+
+- [ ] Gắn cờ "không thấy bên FBM" không xét ô cho phép đồng bộ (`markMissingAfterFullScan`, `reconcile/Identity.js`): khách hoặc giao dịch mang `Chờ đồng bộ`/`Không đồng bộ`/`Cấm đồng bộ`, và giao dịch của khách mang ba giá trị đó, vẫn bị gắn cờ khi vắng bên FBM, trái 05 Phần 9 và luật kế thừa Phần 10.
+- [ ] Các đường đọc giao dịch (lớp 2/3, `detail`, lấy toàn bộ giao dịch) vẫn gửi request đọc giao dịch của khách đứng ngoài đồng bộ; ghi về Sheet đã bị chặn nên chỉ tốn request.
+- [ ] Con trỏ `FBM_SYNC_DETAIL_CURSOR_V1` tiến qua 50 khách ngay khi ghi xong danh sách khách, trước khi đọc và ghi giao dịch của họ (`customerNext`, `transport/PullFlow.js`); lượt lỗi giữa phần giao dịch thì phiên sau bỏ qua giao dịch của 50 khách đó. Con trỏ phải là khách cuối cùng đã ghi xong giao dịch vào ShinCRM.
+- [ ] Mốc tiến trình nền được dời ngay lúc chọn (`pickDue`), nên lượt nền bị lượt tay chen ngang thì phải chờ hết cả chu kỳ mới chạy lại.
+- [ ] Giữ phiên đếm khách không lọc phạm vi (`heartbeatCustomerRequest`), Quét nhanh có lọc phạm vi, nên hai con số lệch định nghĩa; số khách lưu lại (`session.customerTotal`) bị xóa mỗi lần mở lượt mới (`stateStart`).
+
 ## Bàn giao
 
 - [x] `node tests/run.js` đạt 2442/0; thử phá test công tắc lịch nền (3 đỏ) và test kênh Extension (2 đỏ) rồi khôi phục.
