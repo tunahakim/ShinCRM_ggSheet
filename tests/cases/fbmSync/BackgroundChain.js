@@ -71,6 +71,12 @@ async function chay(so) {
   const tatLan = await tat.hoi(10);
   check(so, 'Tắt Quét nhanh mà tổng khách FBM khác số khách mốc: Giữ phiên vẫn chạy Quét nhanh, nhận đủ 12 khách và ghi mốc mới', [tatLan.xong, dem(tat.trace.kinds, 'scan_job'), tat.local.customer.length, tat.F.customerBaselineRead()], [['heartbeat'], 1, 12, 12]);
 
+  // Chuỗi mở bằng chính request đầu của tiến trình đến hạn, không tốn request đếm khách chỉ để mở phiên.
+  const moThang = chuoiHarness({ heartbeat: { enabled: false }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false }, detail: { enabled: false } });
+  moThang.trace.kinds.length = 0;
+  const moThangLan = await moThang.hoi(60);
+  check(so, 'Chỉ Quét nhanh đến hạn: request đầu tiên của lần hỏi là request của lượt Quét nhanh, không có request Giữ phiên nào', [moThangLan.xong, moThang.trace.kinds[0] !== 'heartbeat', moThang.trace.kinds.indexOf('heartbeat') < 0], [['customerFull'], true, true]);
+
   // Lượt trước đã kết thúc ở trạng thái tạm dừng (tự đăng nhập bị FBM từ chối) hoặc xung đột: lần hỏi sau vẫn mở chuỗi mới (09/06: chạy nền tự thử lại theo chu kỳ).
   const ketThuc = [];
   for (const phase of ['paused', 'conflict']) {
