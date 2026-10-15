@@ -269,6 +269,7 @@ function fbmSyncHeartbeatLocked(rawResponse, options) {
   // Worker chỉ chuyển envelope nên không cần và không được biết cursor nào đang chạy.
   if (cursor.kind !== 'heartbeat') { return FbmSync.continueRun(rawResponse); }
   if (!state.activeRequestId || !responseRequestId || responseRequestId !== String(state.activeRequestId)) {
+    FbmSync.logStaleResponse(state, responseRequestId, 'heartbeat_stale_response');
     return { ok: false, code: 'STALE_RESPONSE', request: null, status: FbmSync.statusView(), error: 'Response heartbeat không còn thuộc request đang chờ.' };
   }
   var contractStop = FbmSync.contractGate(rawResponse);

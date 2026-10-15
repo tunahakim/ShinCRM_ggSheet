@@ -398,6 +398,7 @@ FbmSync.continueStep = function (rawResponse) {
   }
   var cursor = state.cursor || {}, response, responseRequestId = FbmSync.responseRequestId ? FbmSync.responseRequestId(rawResponse) : '';
   if (!state.activeRequestId || !responseRequestId || responseRequestId !== String(state.activeRequestId)) {
+    FbmSync.logStaleResponse(state, responseRequestId);
     return { ok: false, code: 'STALE_RESPONSE', request: null, status: FbmSync.statusView(), error: 'Response FBM đã cũ hoặc phiên đã bị dừng; không tiếp tục cursor.' };
   }
   var contractStop = FbmSync.contractGate(rawResponse);

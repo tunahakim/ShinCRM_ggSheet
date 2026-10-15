@@ -159,6 +159,15 @@ FbmSync.shouldLogStatus = function (before, after) {
   var phase = String(after.phase || '');
   return phase === 'error' || phase === 'done' || phase === 'paused' || phase === 'conflict' || !before || String(before.phase || '') !== phase || String(before.entity || '') !== String(after.entity || '');
 };
+/**
+ * Response bị bỏ vì không thuộc request đang chờ: không đổi state (lượt đang chạy vẫn là của request khác) nhưng phải có dòng Log, vì response bị bỏ lặp lại là lượt kẹt không ai thấy.
+ * Chỉ ghi mã request, không ghi nội dung response.
+ */
+FbmSync.logStaleResponse = function (state, responseRequestId, action) {
+  if (typeof logEvent !== 'function') { return; }
+  var current = state || {};
+  logEvent({ source: 'fbm_sync', action: action || 'stale_response', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(current.runId || ''), reason: 'Bỏ response FBM vì không thuộc request đang chờ; lượt giữ nguyên cursor và chờ lần hỏi sau.', detail: { code: 'STALE_RESPONSE', runId: String(current.runId || ''), phase: String(current.phase || ''), cursor: String(current.cursor && current.cursor.kind || ''), activeRequestId: String(current.activeRequestId || ''), responseRequestId: String(responseRequestId || '') } });
+};
 /** Ghi lỗi vận chuyển khi Sidebar không nhận được response từ Extension. */
 FbmSync.logTransportError = function (message, action) {
   var reason = String(message || 'Không nhận được phản hồi từ Extension.'), before = FbmSync.stateRead();
