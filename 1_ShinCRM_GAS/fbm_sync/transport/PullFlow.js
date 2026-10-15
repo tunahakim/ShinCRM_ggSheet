@@ -506,7 +506,6 @@ FbmSync.continue = function (rawResponse) {
     }
     return { ok: false, code: String(success.code || 'FBM_ERROR'), status: FbmSync.statusView(), error: success.bug };
   }
-  state.retryCount = 0;
   state.retryable = false;
   state.lastFailureCode = '';
   FbmSync.stateWrite(state);

@@ -3,10 +3,6 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 /** API bắt đầu phiên cho Sidebar hoặc DEV runner. */
 function fbmSyncStart(mode) { return FbmSync.start({ mode: mode }); }
-/** Chỉ quét Customer FBM để kiểm tra liên kết, không ghi Sheet/FBM và không đọc Activity. */
-function fbmSyncStartIdentityCheck(identity) { return FbmSync.controlDispatch('start', { mode: 'check', scan: 'identity_check', identity: identity || null, origin: 'manual', manual: true }); }
-/** Chỉ lấy nhận diện từ authorize để Sidebar tự điền; không quét Customer và không ghi. */
-function fbmSyncStartIdentityProbe() { return FbmSync.controlDispatch('start', { mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true }); }
 /** Người dùng chấp thuận phiên push lớn; chỉ sau đó mới cấp request authorize đầu tiên. */
 function fbmSyncApprovePush() {
   var state = FbmSync.stateRead();
@@ -23,18 +19,12 @@ function fbmSyncApprovePush() {
   if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'push_batch_approved', outcome: typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', reason: 'Người dùng chấp thuận phiên có hơn 10 bản ghi thay đổi.', detail: { candidateCount: Number(state.metadata.approvalCount || 0) } }); }
   return { ok: true, request: FbmSync.sessionSystemEnvelope('authorize', { entity: 'customer' }), status: FbmSync.statusView() };
 }
-/** Khoi tao rieng pipeline bulk Activity de nghiem thu scheduler ma khong phai cho trigger 8 gio. */
+/** Khởi tạo riêng pipeline bulk Activity để nghiệm thu trên DEV mà không phải chờ lịch nền đến hạn. */
 function fbmSyncStartActivityBulk() { return FbmSync.start({ mode: 'read', scan: 'activity_bulk' }); }
 /** Lệnh chẩn đoán chỉ đọc điều kiện local theo mode hiện đang lưu, không mở request FBM. */
 function fbmSyncPreflight() { var state = FbmSync.stateRead(); return typeof FbmSync.runPreflight === 'function' ? FbmSync.runPreflight({ mode: state.mode || 'read', scan: state.scan || 'full' }) : { ok: true, issues: [] }; }
 /** API nhận response Extension và trả request kế tiếp. */
 function fbmSyncContinue(rawResponse) { return FbmSync.continue(rawResponse); }
-/** Tính lại baseline nội bộ mà không mở phiên hoặc gọi request FBM. */
-function fbmSyncRecalculateBaseline(entity) { return FbmSync.recalculateBaseline(entity || 'customer'); }
-/** Đọc trạng thái liên kết an toàn; không trả bí mật phiên FBM. */
-function fbmSyncIdentityStatus(runtime) { return FbmSync.identityStatus(runtime || {}); }
-/** Lưu liên kết sau khi Sidebar đã cho người dùng xác nhận nhận diện từ phiên FBM. */
-function fbmSyncSaveIdentityBinding(binding) { return FbmSync.bindingWrite(binding || {}); }
 /** Dừng phiên lỗi; chỉ nhả khóa sync, giữ khóa user đang sửa. */
 function fbmSyncCancel() {
   var state = FbmSync.stateRead(), locks = state.locks || {}, kept = {}, failed = String(state.phase || '') === 'error';
@@ -53,7 +43,6 @@ function fbmSyncCancel() {
   return FbmSync.stateWrite(state);
 }
 function fbmGetLoginConfig() { return FbmSync.loginConfigPublic(); }
-function fbmSaveLoginConfig(config) { return FbmSync.loginConfigSave(config || {}); }
 function fbmSetAutoLogin(enabled) { return FbmSync.loginConfigSetEnabled(enabled === true); }
 
 /** Mở lại toàn bộ nhóm lỗi sau khi người dùng đã sửa nguyên nhân; không lặp request FBM tại đây. */

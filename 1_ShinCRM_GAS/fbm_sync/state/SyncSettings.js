@@ -10,8 +10,6 @@ FbmSync.REQUEST_GAP_KEYS = ['requestGapMinSeconds', 'requestGapMaxSeconds'];
 // Mã đi thẳng vào điều kiện SQL của grid FBM, nên chỉ nhận ký tự an toàn; dấu nháy không có đường lọt vào.
 FbmSync.SCOPE_CODE_PATTERN = /^[A-Za-z0-9._-]{1,32}$/;
 FbmSync.SCOPE_CODES_MAX = 40;
-// Bản lưu cũ: `testMode` là `scopeLimited`, các danh sách mã thử gộp thành một danh sách.
-FbmSync.SCOPE_LEGACY_LISTS = ['testCodes', 'testFbmCodes', 'testShinCodes'];
 
 function fbmSyncSettingsCloneDefault() {
   return { approvalThreshold: FbmSync.SYNC_SETTINGS_DEFAULT.approvalThreshold, scopeLimited: FbmSync.SYNC_SETTINGS_DEFAULT.scopeLimited, scopeCodes: [], requestGapMinSeconds: FbmSync.SYNC_SETTINGS_DEFAULT.requestGapMinSeconds, requestGapMaxSeconds: FbmSync.SYNC_SETTINGS_DEFAULT.requestGapMaxSeconds };
@@ -35,11 +33,9 @@ function fbmSyncSettingsNormalize(input, allowDefaults) {
   var raw = source.approvalThreshold;
   var threshold = raw === '' || raw === null || raw === undefined ? (allowDefaults ? FbmSync.SYNC_SETTINGS_DEFAULT.approvalThreshold : NaN) : Number(raw);
   if (isFinite(threshold)) { result.approvalThreshold = Math.floor(threshold); }
-  var limited = source.scopeLimited !== undefined ? source.scopeLimited : source.testMode;
+  var limited = source.scopeLimited;
   if (allowDefaults || limited !== undefined) { result.scopeLimited = limited === undefined ? FbmSync.SYNC_SETTINGS_DEFAULT.scopeLimited : limited !== false; }
-  var legacy = source.scopeCodes === undefined ? FbmSync.SCOPE_LEGACY_LISTS.filter(function (key) { return source[key] !== undefined; }) : [];
   if (source.scopeCodes !== undefined) { result.scopeCodes = fbmSyncScopeCodesParse(source.scopeCodes); }
-  else if (legacy.length) { result.scopeCodes = fbmSyncScopeCodesParse(legacy.reduce(function (all, key) { return all.concat(fbmSyncScopeCodesParse(source[key])); }, [])); }
   else if (allowDefaults) { result.scopeCodes = []; }
   FbmSync.REQUEST_GAP_KEYS.forEach(function (key) {
     var value = source[key];

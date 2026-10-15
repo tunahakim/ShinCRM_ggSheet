@@ -361,8 +361,8 @@
   }
   /** Chỉ nhận message đúng loại, giữ channel mở cho Promise fetch. */
   function onFbmMessage(message, sender, sendResponse) {
-    if (message && (message.type === 'FBM_PING_V2' || message.type === 'FBM_PING')) { sendResponse({ ready: true, version: EXECUTOR_VERSION }); return false; }
-    if (!message || (message.type !== 'FBM_EXECUTE_V2' && message.type !== 'FBM_EXECUTE')) { return false; }
+    if (message && message.type === 'FBM_PING_V2') { sendResponse({ ready: true, version: EXECUTOR_VERSION }); return false; }
+    if (!message || message.type !== 'FBM_EXECUTE_V2') { return false; }
     execute(message.request).then(function (result) { sendResponse({ result: result }); }, function (err) { sendResponse({ error: String(err && err.message || err), code: String(err && err.code || 'FBM_TRANSPORT_UNAVAILABLE'), trace: err && err.trace || [] }); });
     return true;
   }

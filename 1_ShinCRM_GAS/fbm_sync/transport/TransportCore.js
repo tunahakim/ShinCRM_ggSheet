@@ -27,8 +27,6 @@ FbmSync.setMasterEnabled = function (enabled) {
   return { ok: true, enabled: value, status: typeof FbmSync.statusView === 'function' ? FbmSync.statusView() : null };
 };
 
-// Alias tạm cho caller cũ trong module push; ý nghĩa duy nhất là quyền ghi FBM.
-FbmSync.writeEnabled = function (mode) { return FbmSync.canWriteFbm(mode); };
 // FBM có thể đặt dấu nháy trong script trang dưới dạng \" hoặc ". GAS cấp pattern,
 // Extension chỉ áp dụng nguyên trạng nên không được để hai nơi tự giữ pattern riêng.
 FbmSync.PAYLOAD_COOKIE_CAPTURE_PATTERN = String.raw`\\?['"]cookie\\?['"]\s*[:=]\s*\\?['"]([^'"\\]+FHN_CRM_App)\\?['"]`;
@@ -518,17 +516,3 @@ FbmSync.requestForCursor = function (state) {
   if (cursor.kind === 'activity_recheck') { return FbmSync.activityRecheckRequest(state); }
   return null;
 };
-/** Chỉ retry request đọc; request ghi không được lặp vì phản hồi có thể đã tới FBM. */
-FbmSync.retryRead = function (state, failure) {
-  var safeKinds = ['authorize_customer', 'authorize_activity', 'identity_user_grid', 'login_identity_authorize', 'login_identity_user', 'lookup', 'push_lookup', 'customer_grid', 'scan_job', 'activity_grid', 'activity_recheck'], cursor = state && state.cursor || {}, limit = FbmSync.BUDGET.readRetryLimit, attempt = Number(state && state.retryCount || 0), request;
-  if (!failure || failure.retryable !== true || safeKinds.indexOf(cursor.kind) < 0 || attempt >= limit) { return null; }
-  request = FbmSync.requestForCursor(state);
-  if (!request) { return null; }
-  state.retryCount = attempt + 1;
-  state.retryable = true;
-  state.message = 'Lỗi tạm thời khi đọc FBM; đang thử lại lần ' + state.retryCount + '/' + limit + '...';
-  FbmSync.stateWrite(state);
-  return request;
-};
-/** Cập nhật state dùng chung cho các bước orchestration. */
-FbmSync.saveStatus = function (patch) { return FbmSync.stateWrite(Object.assign(FbmSync.stateRead(), patch || {})); };

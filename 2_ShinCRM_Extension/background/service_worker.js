@@ -663,10 +663,6 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     fbmTransportProbe(message).then(sendResponse);
     return true;
   }
-  if (message && message.type === 'FBM_HEARTBEAT_NOW') {
-    fbmHeartbeatNow(message.source || 'manual').then(sendResponse);
-    return true;
-  }
   if (!message || message.type !== 'FBM_EXECUTE_REQUEST') { return false; }
   var requestId = String(message.id || '');
   var existingFlight = requestId && fbmRequestFlights[requestId];

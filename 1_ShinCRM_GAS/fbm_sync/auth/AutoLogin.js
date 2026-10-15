@@ -3,8 +3,6 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 FbmSync.LOGIN_CONFIG_KEY = 'FBM_LOGIN_CONFIG_V1';
 FbmSync.AUTO_LOGIN_LAST_ATTEMPT_KEY = 'FBM_AUTO_LOGIN_LAST_ATTEMPT_V1';
-// Không thử dồn dập và tuyệt đối không ép logout phiên đang dùng ở máy khác.
-FbmSync.AUTO_LOGIN_RETRY_MS = 30 * 60 * 1000;
 FbmSync.AUTO_LOGIN_MAX_BLOCK_WAITS = 3;
 
 /** Chỉ nhận diện đúng thông báo FBM giữ khóa phiên; không coi mọi login lỗi là bị chặn. */

@@ -127,5 +127,3 @@ FbmSync.protocol = {
   }
 };
 
-/** API tương thích cho caller cần parse response trực tiếp. */
-function fbmSyncProtocolParse(raw) { return FbmSync.protocol.parse(raw); }

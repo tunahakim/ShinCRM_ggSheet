@@ -325,12 +325,6 @@ async function chay(so) {
   builders.writeGateSave = () => { ambiguousWrite = true; return { ok: true }; };
   const ambiguousResult = builders.FbmSync.pullWrite('customer', [taxIncoming]);
   check(so, 'Customer trùng MST nhiều dòng thì fail-closed không tạo bản ghi', [ambiguousResult.written, ambiguousResult.skipped, ambiguousWrite, taxState.metadata.identityBlocks[0].reason], [0, 1, false, 'duplicate_tax_number']);
-  let baselineWrite;
-  builders.FbmSync.stateRead = () => ({ metadata: {} });
-  builders.FbmSync.readLocal = () => [{ id: 'CUS-BASE', fbmId: 'FBM-BASE', companyName: 'Baseline' }];
-  builders.writeGateSave = (request) => { baselineWrite = request; return { ok: true }; };
-  const baselineResult = builders.FbmSync.recalculateBaseline('customer');
-  check(so, 'tinh lai baseline chi ghi cot sync noi bo', [baselineResult.ok, baselineResult.written, baselineWrite.records[0].fbmHash !== '', baselineWrite.source], [true, 1, true, 'pull']);
   let newPullWrite, newPullCalls = 0, dirtyMarkCalls = 0;
   builders.FbmSync.stateRead = () => ({ metadata: {} });
   builders.FbmSync.readLocal = () => [];

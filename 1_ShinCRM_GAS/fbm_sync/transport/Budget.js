@@ -22,8 +22,6 @@ FbmSync.BUDGET = {
   batchMaxBytes: 4 * 1024 * 1024,
   pushBatchRecords: 20,
   lookupMaxAgeMs: 300000,
-  // Số lần thử lại một request đọc gặp lỗi tạm thời; request ghi không bao giờ thử lại.
-  readRetryLimit: 2,
   // Mỗi bản ghi lỗi đã tốn ít nhất một lần gọi FBM; chạm trần là lỗi hệ thống (danh mục, quyền, cấu hình) nên dừng chiều đẩy. Ba con số cùng giữ khóa lỗi đẩy dưới 9.000 byte.
   pushFailuresMax: 20,
   pushFailureDetailsMax: 10,
