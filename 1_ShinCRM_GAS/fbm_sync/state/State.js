@@ -204,7 +204,7 @@ FbmSync.seenStoreReader = function (scope) {
 
 /** Tạo state rỗng với đủ field để các phiên cũ vẫn đọc được. */
 FbmSync.stateDefault = function () {
-  return { schemaVersion: FbmSync.STATE_SCHEMA_VERSION, runId: '', origin: 'manual', mode: 'read', scan: 'full', scanPack: '', scheduledScan: '', activitySince: '', requestGap: null, phase: 'idle', entity: '', cursor: {}, activeRequestId: '', loginForceOffered: false, identityTarget: null, lastProgressAt: 0, deadlineAt: 0, session: { customerAuthorized: '', activityAuthorized: '', cookie: '', userId: '', accountUsername: '', accountName: '', lookups: {}, expired: false, identityVerified: false, identitySessionId: '', identityVerifiedAt: 0, sessionId: '', lastHeartbeatAt: 0, customerTotal: null }, metadata: { categoryBlocks: [], preflightIssues: [], seen: { customer: {}, activity: {} }, conflictCount: 0, conflictRefresh: null, manualPending: null, sessionGate: null }, counts: FbmSync.countsDefault(), progress: { done: 0, total: 0 }, current: '', message: '', startedAt: 0, updatedAt: 0, lastError: '', lastFailureCode: '', retryable: false, retryCount: 0, locks: {} };
+  return { schemaVersion: FbmSync.STATE_SCHEMA_VERSION, runId: '', origin: 'manual', mode: 'read', scan: 'full', scanPack: '', scheduledScan: '', activitySince: '', requestGap: null, phase: 'idle', entity: '', cursor: {}, activeRequestId: '', loginForceOffered: false, identityTarget: null, lastProgressAt: 0, deadlineAt: 0, session: { customerAuthorized: '', activityAuthorized: '', cookie: '', userId: '', accountUsername: '', accountName: '', lookups: {}, expired: false, identityVerified: false, identitySessionId: '', identityVerifiedAt: 0, sessionId: '', lastHeartbeatAt: 0, customerTotal: null }, metadata: { categoryBlocks: [], preflightIssues: [], seen: { customer: {}, activity: {} }, conflictCount: 0, conflictRefresh: null, manualPending: null, sessionGate: null }, counts: FbmSync.countsDefault(), progress: { done: 0, total: 0 }, current: '', message: '', startedAt: 0, updatedAt: 0, lastError: '', lastFailureCode: '', retryable: false, locks: {} };
 };
 
 /** Lấy kho state cấp tài liệu, dùng chung giữa các lần gọi GAS. */
@@ -252,15 +252,6 @@ FbmSync.pushFailuresRemove = function (keys) {
   (keys || []).forEach(function (key) { if (store.hashes[key] !== undefined || store.details[key] !== undefined) { delete store.hashes[key]; delete store.details[key]; removed = true; } });
   if (removed) { FbmSync.pushFailuresWrite(store); }
 };
-/** State ghi trước khi có khóa riêng còn hai map trong metadata: chuyển sang khóa riêng một lần để không mất dấu chặn gửi lại. */
-FbmSync.pushFailuresMigrate = function (metadata) {
-  var hashes = metadata.pushFailures || {}, details = metadata.pushFailureDetails || {};
-  delete metadata.pushFailures; delete metadata.pushFailureDetails;
-  if (!Object.keys(hashes).length) { return; }
-  var store = FbmSync.pushFailuresRead();
-  Object.keys(hashes).forEach(function (key) { store.hashes[key] = hashes[key]; if (details[key] !== undefined) { store.details[key] = details[key]; } });
-  FbmSync.pushFailuresWrite(store);
-};
 /** Đọc state và tự bù field thiếu từ mặc định. */
 FbmSync.stateRead = function () {
   var fallback = FbmSync.stateDefault();
@@ -283,11 +274,11 @@ FbmSync.stateWrite = function (state) {
   delete next.metadata.conflicts;
   // State ghi trước FBM-042 còn bản sao map Category; giữ lại thì mọi lần ghi (kể cả đóng phiên lỗi) đều vượt 9 KB và Sidebar kẹt.
   delete next.metadata.categoryGate;
-  FbmSync.pushFailuresMigrate(next.metadata);
   next.metadata.manualPending = next.metadata.manualPending || null;
-  // Hai trường đã bỏ: dấu vết callback không còn ai ghi, trần thử lại đọc từ BUDGET.
+  // Trường đã bỏ: dấu vết callback không còn ai ghi; trần và bộ đếm thử lại đọc vì lỗi đọc dừng lượt, lượt sau chạy lại.
   delete next.metadata.callbackTrace;
   delete next.retryLimit;
+  delete next.retryCount;
   // Bản xem trước và kết quả preflight đầy đủ không ở trong state: state chỉ giữ thứ cần để chạy tiếp, vì một khóa kho chỉ chứa 9 KB.
   delete next.metadata.preview;
   delete next.metadata.preflight;
@@ -361,7 +352,7 @@ FbmSync.stateStart = function (entity, phase, total) {
   // Mỗi run phải xác nhận phiên sống lại; cookie và marker của run trước không
   // được dùng làm bằng chứng live cho request đầu tiên của run mới.
   // Số xung đột phản ánh các dòng Sheet đang chờ quyết nên đi theo sang phiên mới; preflight đếm lại từ Sheet.
-  var next = FbmSync.stateWrite({ runId: now.toString(36), entity: entity || '', phase: phase || 'checking_session', cursor: {}, session: freshSession, counts: Object.assign(FbmSync.countsDefault(), { total: Number(total) || 0 }), metadata: { conflictCount: Number(previous.metadata && previous.metadata.conflictCount || 0) }, current: '', message: '', startedAt: now, updatedAt: now, lastError: '', lastFailureCode: '', retryable: false, retryCount: 0, locks: userLocks });
+  var next = FbmSync.stateWrite({ runId: now.toString(36), entity: entity || '', phase: phase || 'checking_session', cursor: {}, session: freshSession, counts: Object.assign(FbmSync.countsDefault(), { total: Number(total) || 0 }), metadata: { conflictCount: Number(previous.metadata && previous.metadata.conflictCount || 0) }, current: '', message: '', startedAt: now, updatedAt: now, lastError: '', lastFailureCode: '', retryable: false, locks: userLocks });
   return next;
 };
 /**
