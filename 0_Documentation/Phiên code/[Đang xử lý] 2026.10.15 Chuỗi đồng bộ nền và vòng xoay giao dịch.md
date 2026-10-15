@@ -18,7 +18,7 @@ Hai bước này là phần sót của thiết kế 2026-09-10 (commit 8fbb6a7):
 Hiện bước ghi và bước đẩy đã đúng; hai bước dưới quên xét ô cho phép, trái 09/05.
 
 - [x] [Tự động] `markMissingAfterFullScan` (`reconcile/Identity.js`) bỏ qua bản ghi mà `syncPermission` (`reconcile/CategoryGate.js`, có luật kế thừa từ khách) trả `pull: false`. Test: khách `Không đồng bộ` vắng bên FBM không bị gắn cờ; giao dịch `Cho phép` của khách `Cấm đồng bộ` vắng bên FBM không bị gắn cờ; khách `Cho phép` vắng thì vẫn bị gắn `không thấy bên FBM`. Test `Pull.js`: "Gắn cờ vắng theo quyền: khách \"Không đồng bộ\" vắng bên FBM không bị gắn cờ; ..." (thử phá bộ lọc quyền thì đỏ).
-- [ ] [Tự động] Bước chọn khách để đọc giao dịch (lớp 2 `activityDueMark`, lớp 3 `activityTopRefill`, hàng đợi `ActivityBatch.js`, Vòng xoay) bỏ qua khách `pull: false`; lấy toàn bộ giao dịch không đưa giao dịch của khách đó vào tập id theo dõi. Test: khách `Chờ đồng bộ` lệch ngày giao dịch cuối không sinh request đọc giao dịch. Đã xong lớp 2, lớp 3, hàng đợi và tập id lớp 1 qua `pullAllowedReader` (`reconcile/CategoryGate.js`), test `ActivityScan.js`: "Khách \"Chờ đồng bộ\" lệch ngày giao dịch cuối không sinh request đọc giao dịch; ..."; Vòng xoay dùng cùng bộ lọc khi làm mục 5 rồi mới tick.
+- [x] [Tự động] Bước chọn khách để đọc giao dịch (lớp 2 `activityDueMark`, lớp 3 `activityTopRefill`, hàng đợi `ActivityBatch.js`, Vòng xoay) bỏ qua khách `pull: false`; lấy toàn bộ giao dịch không đưa giao dịch của khách đó vào tập id theo dõi. Test: khách `Chờ đồng bộ` lệch ngày giao dịch cuối không sinh request đọc giao dịch. Đã xong lớp 2, lớp 3, hàng đợi và tập id lớp 1 qua `pullAllowedReader` (`reconcile/CategoryGate.js`), test `ActivityScan.js`: "Khách \"Chờ đồng bộ\" lệch ngày giao dịch cuối không sinh request đọc giao dịch; ..."; Vòng xoay dùng cùng bộ lọc trong `activityRotationRing` (`read/ActivityLayers.js`), test `Rotation.js`: "Khách thiếu mã FBM, đã xóa, không thấy bên FBM hoặc \"Chờ đồng bộ\" bị bỏ qua; Vòng xoay vẫn đọc đủ 5 khách đủ điều kiện".
 
 ## 3. Bước đếm khách và số khách mốc
 
@@ -37,8 +37,8 @@ Hiện bước ghi và bước đẩy đã đúng; hai bước dưới quên xé
 
 ## 5. Vòng xoay đọc đủ N khách
 
-- [ ] [Tự động] `customersPerRun` bỏ giới hạn 1–50 (`Scheduler.js`, `PullFlow.js`), chỉ yêu cầu số nguyên từ 1; phiên đọc theo lô `BUDGET.activityBatchCustomers` đến khi đủ N.
-- [ ] [Tự động] Cursor `FBM_SYNC_DETAIL_CURSOR_V1` là khách cuối cùng đã ghi xong giao dịch, lưu sau mỗi lô (hiện `customerNext` lưu cursor ngay khi ghi xong trang khách, trước khi đọc giao dịch). Test: lỗi giữa lô giao dịch thì phiên sau bắt đầu từ sau khách cuối đã ghi xong và vẫn đọc đủ N.
+- [x] [Tự động] `customersPerRun` bỏ giới hạn 1–50 (`Scheduler.js`, `PullFlow.js`), chỉ yêu cầu số nguyên từ 1; phiên đọc theo lô `BUDGET.activityBatchCustomers` đến khi đủ N. Đã làm: Vòng xoay đi theo khách trên Sheet theo số CUS (`activityRotationBegin`/`activityRotationRefill` trong `read/ActivityLayers.js`), không còn đọc trang khách FBM. Test `Workflow.js`: "Số khách mỗi phiên Vòng xoay không còn trần 50: ..."; `Rotation.js`: "Vòng xoay 5 khách, lô 2 khách: đọc đúng CUS 1–5 theo thứ tự trong 3 lô, ...", "Phiên sau nối tiếp từ CUS 6; hết danh sách thì quay về CUS nhỏ nhất và vẫn đọc đủ 5 khách".
+- [x] [Tự động] Cursor `FBM_SYNC_DETAIL_CURSOR_V1` là khách cuối cùng đã ghi xong giao dịch, lưu sau mỗi lô (hiện `customerNext` lưu cursor ngay khi ghi xong trang khách, trước khi đọc giao dịch). Test: lỗi giữa lô giao dịch thì phiên sau bắt đầu từ sau khách cuối đã ghi xong và vẫn đọc đủ N. Đã làm: cursor là `{cus}`, ghi khi lô trước đã ghi xong (kế hoạch lô rỗng); cursor kiểu khóa trang cũ đọc thành -1. Test `Rotation.js`: "Lỗi vận chuyển ở lô chứa CUS 8: phiên dừng lỗi, cursor giữ CUS 7; phiên sau đọc lại từ CUS 8 và đủ 5 khách"; thử phá (ghi cursor ngay khi chọn lô) thì test này đỏ.
 
 ## 6. Lượt tay chen ngang lượt nền
 
