@@ -13,7 +13,7 @@ FbmSync.startRun = function (options) {
   if (typeof FbmSync.recoverStaleRun === 'function') { current = FbmSync.recoverStaleRun(current).state; }
   // Tạm dừng là điểm dừng để người dùng chạy lại, không phải cursor đang chạy;
   // lần bấm mới phải tạo request FBM mới, tránh vẽ lại preview cũ.
-  if (current.runId && ['idle', 'done', 'error', 'paused', 'conflict'].indexOf(current.phase) < 0) {
+  if (FbmSync.runInProgress(current)) {
     if (opt.manual === true && String(current.origin || '') === 'background') {
       current.metadata = current.metadata || {};
       current.metadata.manualPending = { mode: opt.mode || 'read', requestedAt: Date.now() };

@@ -132,7 +132,7 @@ FbmSync.schedulerPickDue = function (now, options) {
   var at = Number(now || Date.now()), opt = options || {}, schedule = FbmSync.backgroundScheduleRead(), state = FbmSync.stateRead();
   FbmSync.ensureScheduleMarkers(at);
   if (!FbmSync.masterEnabled() || schedule.enabled === false) { return { ok: false, code: 'BACKGROUND_DISABLED' }; }
-  if (state.runId && ['idle', 'done', 'error'].indexOf(String(state.phase || '')) < 0) { return { ok: false, code: 'SYNC_ALREADY_RUNNING' }; }
+  if (FbmSync.runInProgress(state)) { return { ok: false, code: 'SYNC_ALREADY_RUNNING' }; }
   if (state.scheduledScan) { return { ok: true, kind: String(state.scheduledScan), existing: true }; }
   var due = FbmSync.scheduleDueKinds(at, []);
   // Mở Chrome là tùy chọn người dùng thấy được: được một lần Giữ phiên ngay, không sinh loạt việc bù.
@@ -304,7 +304,7 @@ function fbmSyncHeartbeatLocked(rawResponse, options) {
     FbmSync.stateWrite(state);
     return { ok: true, code: 'RELAY_SLICE_COMPLETE', request: null, status: FbmSync.statusView() };
   }
-  if (result.ok && state.runId && ['idle', 'done', 'error'].indexOf(state.phase) < 0 && !(state.metadata && state.metadata.manualPending)) {
+  if (result.ok && FbmSync.runInProgress(state) && !(state.metadata && state.metadata.manualPending)) {
     request = FbmSync.requestForCursor(state);
   } else if (result.ok && state.scheduledScan === 'recount') {
     state.scheduledScan = ''; FbmSync.stateWrite(state);

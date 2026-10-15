@@ -7,6 +7,8 @@ FbmSync.STALE_RUN_MS = 2 * 60 * 1000;
 FbmSync.STATE_SCHEMA_VERSION = 2;
 FbmSync.ACTIVE_PHASES = ['checking_session', 'waiting_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'];
 FbmSync.TERMINAL_PHASES = ['done', 'error', 'paused', 'conflict'];
+/** Lượt còn dở (đang chạy hoặc chờ chấp thuận). Lượt đã kết thúc ở bất kỳ trạng thái cuối nào, kể cả tạm dừng vì tự đăng nhập bị từ chối, không chặn lịch nền mở lượt mới. */
+FbmSync.runInProgress = function (state) { return !!(state && state.runId) && ['idle'].concat(FbmSync.TERMINAL_PHASES).indexOf(String(state.phase || '')) < 0; };
 FbmSync.DONE_MESSAGE = 'Đồng bộ hoàn tất.';
 /** Quyền ghi được tách theo đích; mode không được kiêm thêm một cờ ẩn ngoài UI. */
 /** Chế độ chạy hợp lệ từ lựa chọn của người dùng hoặc lịch nền; giá trị lạ về `read` (chỉ lấy về), không bao giờ thành chế độ có đẩy. */
