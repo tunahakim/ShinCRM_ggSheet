@@ -51,8 +51,10 @@ async function chay(so) {
   heartbeat.FbmSync.stateStart('', 'idle', 0);
   heartbeat.FbmSync.statePatch({ session: { expired: true } });
   heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
-  const autoLoginRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
-  check(so, 'heartbeat het phien cap login request mot lan', [autoLoginRequest.ok, autoLoginRequest.code, autoLoginRequest.request.meta.kind, autoLoginRequest.request.meta.testOnly], [true, 'AUTO_LOGIN_REQUEST_READY', 'login', false]);
+  // Dấu hết hạn còn từ lượt trước không đủ để đăng nhập: probe trước, FBM báo chưa xác thực mới cấp login (09/06).
+  const staleProbe = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+  const autoLoginRequest = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{"Authorized":false,"Rows":[]}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: staleProbe.request.id }] } });
+  check(so, 'heartbeat con dau het phien: probe truoc, FBM bao chua xac thuc thi cap login request mot lan', [staleProbe.request.meta.kind, autoLoginRequest.ok, autoLoginRequest.request && autoLoginRequest.request.meta.kind, autoLoginRequest.request && autoLoginRequest.request.meta.testOnly], ['session_probe', true, 'login', false]);
   const loginResponse = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":true}', transport: { contract: MA_HOP_DONG, payloadCookie: '461020379855cFHN_CRM_App', trace: [{ requestId: autoLoginRequest.request.id }] } });
   check(so, 'login adapter thanh cong van phai authorize truoc', [loginResponse.ok, loginResponse.request.meta.kind, loginResponse.request.meta.entity], [true, 'authorize', 'customer']);
   const authorizeResponse = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{"Authorized":"auth-customer"}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: loginResponse.request.id }] } });
@@ -132,15 +134,19 @@ async function chay(so) {
   heartbeatData.FBM_LOGIN_CONFIG_V1 = JSON.stringify(savedConfig);
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: true, cookie: '' } });
   heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
-  const failedLoginRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+  const failedLoginProbe = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+  const failedLoginRequest = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{"Authorized":false,"Rows":[]}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: failedLoginProbe.request.id }] } });
   const failedLogin = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":false}', transport: { contract: MA_HOP_DONG }, trace: [{ requestId: failedLoginRequest.request.id }] });
   check(so, 'login heartbeat that bai tam dung va khong lap ngay', [failedLogin.ok, failedLogin.code, failedLogin.request, heartbeat.FbmSync.stateRead().phase, gateLogs.some((event) => event.action === 'login_failure')], [false, 'AUTO_LOGIN_FAILED', null, 'paused', true]);
-  const throttledAfterFailure = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
-  check(so, 'login that bai khong tu chay khi chua den lich', [throttledAfterFailure.ok, throttledAfterFailure.code, throttledAfterFailure.request], [true, 'AUTO_LOGIN_THROTTLED', null]);
+  // Trong chu kỳ chờ, lần hỏi sau chỉ probe phiên (người dùng có thể đã tự đăng nhập); probe báo chưa xác thực thì không đăng nhập lại.
+  const throttledProbe = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+  const throttledAfterFailure = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{"Authorized":false,"Rows":[]}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: throttledProbe.request.id }] } });
+  check(so, 'login that bai khong tu chay khi chua den lich', [throttledProbe.request && throttledProbe.request.meta.kind, throttledAfterFailure.ok, throttledAfterFailure.code, throttledAfterFailure.request], ['session_probe', false, 'AUTO_LOGIN_THROTTLED', null]);
   heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
   heartbeat.FbmSync.statePatch({ scheduledScan: 'heartbeat' });
-  const throttledDue = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
-  check(so, 'login that bai bi throttle toi da mot lan moi 30 phut khi den lich', [throttledDue.ok, throttledDue.code, throttledDue.request], [true, 'AUTO_LOGIN_THROTTLED', null]);
+  const throttledDueProbe = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+  const throttledDue = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{"Authorized":false,"Rows":[]}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: throttledDueProbe.request.id }] } });
+  check(so, 'login that bai bi throttle toi da mot lan moi 30 phut khi den lich', [throttledDueProbe.request && throttledDueProbe.request.meta.kind, throttledDue.ok, throttledDue.code, throttledDue.request], ['session_probe', false, 'AUTO_LOGIN_THROTTLED', null]);
 
   const expiredConfig = JSON.parse(heartbeatData.FBM_LOGIN_CONFIG_V1);
   expiredConfig.lastAttemptAt = Date.now() - 31 * 60 * 1000;
