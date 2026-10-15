@@ -318,7 +318,6 @@ FbmSync.heartbeatCustomerTotal = function (rawResponse) {
   return isFinite(number) && number >= 0 ? number : null;
 };
 
-function fbmHeartbeat(rawResponse) { return fbmSyncHeartbeat(rawResponse); }
 /**
  * Handler của các trigger hẹn giờ phía GAS ở thiết kế cũ. Nhịp nền nay chỉ do alarm `gas_poll` của Extension (09/02), GAS không cài trigger hẹn giờ nào cho đồng bộ.
  * Google không tự gỡ trigger đã cài khi code đổi, nên tên hàm phải còn: trigger sót gọi tới thì tự xóa mọi trigger cũ và ghi Log, không làm việc nghiệp vụ nào. Bỏ tên hàm thì trigger sót báo lỗi "không tìm thấy hàm" mãi.

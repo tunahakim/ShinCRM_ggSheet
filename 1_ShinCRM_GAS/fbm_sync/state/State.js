@@ -1,7 +1,6 @@
 /** Trạng thái bền vững của phiên sync trong DocumentProperties. */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 FbmSync.STATE_KEY = 'FBM_SYNC_STATE_V1';
-FbmSync.LOCK_KEY = 'FBM_SYNC_RECORD_LOCKS_V1';
 // Request FBM thuong ket thuc trong vai giay; state im qua lau la phien bi bo roi.
 FbmSync.STALE_RUN_MS = 2 * 60 * 1000;
 /** Phiên bản logic của state trong cùng khóa kho. State thiếu số này là bản cũ: lượt đang dở của nó bị dừng ở `recoverStaleRun`, không chạy tiếp mù trên cấu trúc cũ. */
@@ -411,14 +410,6 @@ FbmSync.stateFailRun = function (reason, code) {
   state.message = state.lastError;
   return { state: FbmSync.stateWrite(state), failed: true };
 };
-/** Đóng hoặc chuyển phase với thông báo cuối. */
-FbmSync.stateFinish = function (phase, message) { return FbmSync.statePatch({ phase: phase || 'done', message: message || '', current: '' }); };
-/** Cộng dồn một bộ đếm, không cho âm. */
-FbmSync.stateCount = function (name, amount) {
-  var state = FbmSync.stateRead();
-  state.counts[name] = Math.max(0, Number(state.counts[name] || 0) + (Number(amount) || 1));
-  return FbmSync.stateWrite(state);
-};
 /** Khóa một record khi Sidebar đang sửa hoặc sync chuẩn bị ghi. */
 FbmSync.lockRecord = function (entity, id, revision, owner) {
   return FbmSync.stateWrite(FbmSync.lockRecordIn(FbmSync.stateRead(), entity, id, revision, owner));
@@ -437,6 +428,3 @@ FbmSync.unlockRecord = function (entity, id) {
 };
 /** Kiểm tra nhanh record có đang bị khóa hay không. */
 FbmSync.isRecordLocked = function (entity, id) { var state = FbmSync.stateRead(); return !!state.locks[String(entity) + ':' + String(id)]; };
-
-/** Tương thích với caller cũ cần snapshot state trực tiếp. */
-function getSyncStatus() { return FbmSync.stateRead(); }

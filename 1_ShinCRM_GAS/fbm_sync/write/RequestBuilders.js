@@ -150,8 +150,6 @@ FbmSync.activityEditRequest = function (record, oldValues, categoryGate) {
   return { url: FbmSync.scriptSettings().baseUrl + FbmSync.ENDPOINTS.dir, body: FbmSync.formEnvelope('activity', 'Edit', [String(FbmSync.value(record, 'fbmId', FbmSync.value(record, 'id', 0)))], form.memvars), meta: { kind: 'activity_edit_save', id: String(FbmSync.value(record, 'fbmId', FbmSync.value(record, 'id', 0))) } };
 };
 
-/** Bước bootstrap riêng của luồng tạo Customer hai bước. */
-FbmSync.customerCreateAuthorizeRequest = function () { return FbmSync.sessionSystemRequest('authorize', { entity: 'customer' }); };
 /** Chuẩn hóa field Customer và tạo memvars cho New/Edit. */
 FbmSync.customerValues = function (record, oldValues, categoryGate) {
   var value = function (name, aliases, fallback) { return FbmSync.fieldValue(record, oldValues, name, aliases, fallback); };
