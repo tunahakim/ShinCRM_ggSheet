@@ -320,7 +320,7 @@ function fbmSyncCaptureActiveAccountDraft() {
   if (FBM_SYNC_CLIENT.subscreen !== 'account') { return null; }
   var activeIsAccountInput = !!active && /^fbm-(?:identity|login|account)-/.test(String(active.id || ''));
   var snapshot = { values: {}, activeId: activeIsAccountInput ? active.id : '', selectionStart: activeIsAccountInput ? Number(active.selectionStart || 0) : 0, selectionEnd: activeIsAccountInput ? Number(active.selectionEnd || 0) : 0 };
-  ['fbm-identity-spreadsheet', 'fbm-identity-user', 'fbm-identity-username', 'fbm-identity-account', 'fbm-login-username', 'fbm-login-password', 'fbm-account-customer-prefix', 'fbm-account-customer-length', 'fbm-account-activity-since'].forEach(function (id) {
+  ['fbm-identity-spreadsheet', 'fbm-identity-user', 'fbm-identity-username', 'fbm-identity-account', 'fbm-login-username', 'fbm-login-password', 'fbm-account-customer-prefix', 'fbm-account-customer-length'].forEach(function (id) {
     var input = document.getElementById(id);
     if (input) { snapshot.values[id] = String(input.value || ''); }
   });
@@ -348,9 +348,9 @@ function fbmSyncCaptureAccountDraft() {
   });
   var username = document.getElementById('fbm-login-username');
   if (username) { FBM_SYNC_CLIENT.loginDraft.username = String(username.value || ''); }
-  ['customer-prefix', 'customer-length', 'activity-since'].forEach(function (name) {
+  ['customer-prefix', 'customer-length'].forEach(function (name) {
     var input = document.getElementById('fbm-account-' + name);
-    if (input) { FBM_SYNC_CLIENT.accountSettingsDraft[name === 'customer-prefix' ? 'customerPrefix' : name === 'customer-length' ? 'customerCodeLength' : 'activitySince'] = String(input.value || ''); }
+    if (input) { FBM_SYNC_CLIENT.accountSettingsDraft[name === 'customer-prefix' ? 'customerPrefix' : 'customerCodeLength'] = String(input.value || ''); }
   });
 }
 /** Tránh phá DOM input khi callback nền trả status trong lúc người dùng đang gõ. */
@@ -654,7 +654,7 @@ function fbmSyncInstall() {
       FBM_SYNC_CLIENT.pendingLoginEnvelope = null;
       fbmSyncClearIdentityInvalidField(id.replace('fbm-identity-', ''));
     }
-    var accountSettings = { 'fbm-account-customer-prefix': 'customerPrefix', 'fbm-account-customer-length': 'customerCodeLength', 'fbm-account-activity-since': 'activitySince' };
+    var accountSettings = { 'fbm-account-customer-prefix': 'customerPrefix', 'fbm-account-customer-length': 'customerCodeLength' };
     if (accountSettings[id]) { FBM_SYNC_CLIENT.accountSettingsDraft[accountSettings[id]] = String(target.value || ''); fbmSyncConfigSetDraftValue('accountSettings', accountSettings[id], String(target.value || '')); if (FBM_SYNC_CLIENT.accountSettingsInvalid) { delete FBM_SYNC_CLIENT.accountSettingsInvalid[accountSettings[id]]; } }
     var settingsInput = { 'fbm-extension-poll-minutes': 'extension.pollMinutes', 'fbm-sync-detail-count': 'background.detail.customersPerRun', 'fbm-sync-login-retry-minutes': 'loginPolicy.retryMinutes', 'fbm-sync-setting-approval-threshold': 'module.approvalThreshold', 'fbm-sync-setting-scope-codes': 'module.scopeCodes', 'fbm-sync-setting-request-gap-min': 'module.requestGapMinSeconds', 'fbm-sync-setting-request-gap-max': 'module.requestGapMaxSeconds' };
     if (settingsInput[id]) {
@@ -1075,8 +1075,8 @@ function fbmSyncSaveIdentityManual(button) {
 }
 function fbmSyncSaveAccountSettings(button) {
   if (button) { button.disabled = true; }
-  var prefix = document.getElementById('fbm-account-customer-prefix'), length = document.getElementById('fbm-account-customer-length'), since = document.getElementById('fbm-account-activity-since');
-  var payload = { customerPrefix: String(prefix && prefix.value || '').trim(), customerCodeLength: String(length && length.value || '').trim(), activitySince: String(since && since.value || '').trim() };
+  var prefix = document.getElementById('fbm-account-customer-prefix'), length = document.getElementById('fbm-account-customer-length');
+  var payload = { customerPrefix: String(prefix && prefix.value || '').trim(), customerCodeLength: String(length && length.value || '').trim() };
   var incomplete = (!!payload.customerPrefix && !payload.customerCodeLength) || (!payload.customerPrefix && !!payload.customerCodeLength);
   if (incomplete) {
     FBM_SYNC_CLIENT.accountSettingsInvalid = { customerPrefix: !payload.customerPrefix, customerCodeLength: !payload.customerCodeLength };

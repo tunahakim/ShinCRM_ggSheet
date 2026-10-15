@@ -20,7 +20,6 @@ var FBM_SYNC_ACCOUNT_SCHEMA = {
     fields: [
       { key: 'customerPrefix', label: 'Tiền tố mã khách FBM', id: 'fbm-account-customer-prefix', placeholder: 'Ví dụ: ALT', inputType: 'text', help: 'Tiền tố của ma_kh do FBM tự sinh khi tạo Customer mới; chỉ kiểm tra mã FBM trả về, không phải mã CUS- của ShinCRM.' },
       { key: 'customerCodeLength', label: 'Độ dài mã khách FBM', id: 'fbm-account-customer-length', placeholder: 'Ví dụ: 8', inputType: 'number', help: 'Độ dài đầy đủ của ma_kh FBM tự sinh. Nhập cùng tiền tố; để trống cả hai nếu không tạo Customer mới trên FBM.' },
-      { key: 'activitySince', label: 'Mốc ngày Activity trên FBM', id: 'fbm-account-activity-since', placeholder: 'YYYY-MM-DD', inputType: 'text', help: 'Khi quét FBM, Activity có ngày làm việc (end_date) trước mốc này sẽ bị bỏ qua và không bị coi là bản ghi mất. Để trống để quét toàn bộ Activity.' }
     ],
     edit: 'Sửa cấu hình FBM', save: 'Lưu cấu hình FBM', saveId: 'fbm-sync-save-account-settings'
   },
