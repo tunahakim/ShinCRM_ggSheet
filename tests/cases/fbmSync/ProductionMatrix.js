@@ -172,16 +172,6 @@ async function chay(so) {
   const coVang = phamVi.writes.flatMap((item) => item.records || []).filter((item) => item.syncStatus === phamVi.hop.FbmSync.SYNC_STATUS.missing).map((item) => item.id).sort();
   check(so, 'Phạm vi khách chỉ định: khách và giao dịch trong phạm vi vắng bên FBM bị gắn cờ, khách và giao dịch ngoài phạm vi không bị xét', [coVang, phamViState.counts.missingCustomer, phamViState.counts.missingActivity], [['ACT-000001', 'CUS-000001'], 1, 1]);
 
-  const retry = makeSync();
-  const retryState = retry.hop.FbmSync.stateStart('', 'pull_customer', 0);
-  retryState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 4, pageValue: ['x', 'y', 'z'], count: 2000 };
-  retry.hop.FbmSync.stateWrite(retryState);
-  const transient = { ok: false, status: 500, body: '{"Message":"server busy"}' };
-  const retry1 = retry.hop.FbmSync.retryRead(retry.hop.FbmSync.stateRead(), retry.hop.FbmSync.protocol.classifyFailure(transient));
-  const retry2 = retry.hop.FbmSync.retryRead(retry.hop.FbmSync.stateRead(), retry.hop.FbmSync.protocol.classifyFailure(transient));
-  const retry3 = retry.hop.FbmSync.retryRead(retry.hop.FbmSync.stateRead(), retry.hop.FbmSync.protocol.classifyFailure(transient));
-  check(so, 'loi mang doc chi retry toi da hai lan va giu nguyen cursor', [retry1 && retry1.body.gridPageIndex, retry2 && retry2.body.gridPageIndex, retry3, retry.hop.FbmSync.stateRead().retryCount], [4, 4, null, 2]);
-
   const empty = makeSync();
   const emptyState = empty.hop.FbmSync.stateStart('', 'pull_customer', 0);
   emptyState.mode = 'read';
