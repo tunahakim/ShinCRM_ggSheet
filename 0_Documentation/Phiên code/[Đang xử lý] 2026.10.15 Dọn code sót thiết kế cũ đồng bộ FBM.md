@@ -31,7 +31,8 @@ Branch `feature/fbm-legacy-cleanup`. Mục tiêu: gỡ code, khóa và nhánh c�
 
 ## Cần chủ dự án quyết
 
-- [ ] Tiến trình nền "Lấy toàn bộ giao dịch" (8 giờ, scan `activity_bulk`) sau lớp 1 còn chạy kèm hai bước: tìm khách có giao dịch mới hơn mốc trên Sheet (catch-up) và vòng xoay 30 khách với con trỏ riêng `FBM_SYNC_ACTIVITY_ROTATION`. 09/02 chỉ giao cho tiến trình này lớp 1; lớp 4 đã là tiến trình "Vòng xoay giao dịch" (`detail`, 30 phút, con trỏ `FBM_SYNC_DETAIL_CURSOR_V1`). Lớp 1 đã đọc mọi giao dịch trong mốc ngày nên hai bước chạy kèm không bắt thêm được gì. Đề xuất gỡ cả hai; chi phí tiết kiệm nhỏ (vài request mỗi 8 giờ), lợi chính là còn một vòng xoay, một con trỏ.
+- [ ] Tiến trình nền "Lấy toàn bộ giao dịch" (8 giờ, scan `activity_bulk`) sau lớp 1 còn chạy kèm lớp 2 (tìm khách có ngày giao dịch mới hơn mốc trên Sheet, tối đa 30 khách) và một vòng xoay 30 khách với con trỏ riêng `FBM_SYNC_ACTIVITY_ROTATION`; số 30 viết cứng `ACTIVITY_SUPPLEMENT_CUSTOMERS`. Lớp 1 không trả mã khách nên chỉ cập nhật giao dịch đã có trên Sheet; giao dịch mới phải đọc theo từng khách, nên hai bước kèm có tác dụng thật, nhưng vòng xoay kèm trùng việc với tiến trình "Vòng xoay giao dịch" (`detail`, con trỏ `FBM_SYNC_DETAIL_CURSOR_V1`).
+- [ ] Chủ dự án chốt lại lớp 4: số nhập ở lịch nền là tổng số khách một phiên vòng xoay phải quét (ví dụ 140, không giới hạn 50); phiên đọc lần lượt từng lô `BUDGET.activityBatchCustomers` (50) như đồng bộ tay đến khi đủ số đó mới dừng. Code hiện chặn số này trong 1–50 và chỉ đọc một trang mỗi phiên; 09/02 và 08 đang ghi theo cách cũ.
 
 ## Bàn giao
 
