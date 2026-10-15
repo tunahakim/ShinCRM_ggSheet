@@ -92,7 +92,7 @@ FbmSync.sessionSystemRequest = function (kind, value) {
   else if (kind === 'authorize') { request = FbmSync.authorizeRequest(value && value.entity || value || 'customer'); }
   else if (kind === 'session_probe') { request = FbmSync.identityUserRequest(); request.meta.kind = 'session_probe'; }
   else if (kind === 'identity_user_grid') { request = FbmSync.identityUserRequest(); }
-  else if (kind === 'heartbeat') { request = FbmSync.heartbeatCustomerRequest(); }
+  else if (kind === 'heartbeat') { request = FbmSync.customerCountRequest('heartbeat'); }
   else { return null; }
   request.meta = Object.assign({}, request.meta || {}, { systemRequest: true });
   if (options.requireIdentityProbe === true) { request.meta.requireIdentityProbe = true; }
@@ -388,7 +388,7 @@ FbmSync.nextEnvelope = function (request) {
     }
     // Mọi request nghiệp vụ và authorize đầu lượt phải qua probe User.
     // Probe là request hệ thống nên không quay lại nhánh này.
-    var gateCursorKinds = ['customer_grid', 'activity_grid', 'activity_recheck', 'lookup', 'push_lookup', 'push_scan', 'push_wait'];
+    var gateCursorKinds = ['customer_count', 'customer_grid', 'activity_grid', 'activity_recheck', 'lookup', 'push_lookup', 'push_scan', 'push_wait'];
     var requestKind = String(request.meta && request.meta.kind || ''), cursorNeedsGate = gateCursorKinds.indexOf(String(pendingState.cursor && pendingState.cursor.kind || '')) >= 0 && String(pendingState.cursor && pendingState.cursor.kind || '') !== 'push_wait';
     // Mọi request không thuộc nhóm hệ thống đều phải qua cổng; không cho
     // caller né cổng bằng cách đặt một tên meta.kind lạ.
@@ -512,6 +512,7 @@ FbmSync.requestForCursor = function (state) {
     return FbmSync.customerGridRequest({ type: Number(cursor.type || 0), count: Number(cursor.count || 2000), gridPageIndex: cursor.pageIndex === undefined ? -1 : cursor.pageIndex, gridPageValue: cursor.pageValue === undefined ? null : cursor.pageValue, pageItems: cursor.pageItems, gridRefresh: false });
   }
   if (cursor.kind === 'scan_job') { return FbmSync.scanJobRequest(state); }
+  if (cursor.kind === 'customer_count') { return FbmSync.customerCountRequest(); }
   if (cursor.kind === 'activity_grid') { return FbmSync.activityBatchRequest(state); }
   if (cursor.kind === 'activity_recheck') { return FbmSync.activityRecheckRequest(state); }
   return null;

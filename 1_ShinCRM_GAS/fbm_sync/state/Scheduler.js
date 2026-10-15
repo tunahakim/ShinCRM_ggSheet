@@ -188,11 +188,11 @@ function fbmSyncHeartbeatRequest(options) {
     if (!picked.ok) {
       return { ok: true, noop: true, code: picked.code || 'NO_PROCESS_DUE', request: null, status: FbmSync.statusView() };
     }
-    // Customer/Activity runs start only after this one session heartbeat.
+    // Đọc lại sau khi chọn: ghi bản đọc trước đó sẽ xóa mất tiến trình vừa chọn và lịch nền không bao giờ khởi động.
+    state = FbmSync.stateRead();
     state.cursor = { kind: 'heartbeat' };
     state.relayHop = 0;
     FbmSync.stateWrite(state);
-    if (typeof FbmSync.heartbeatCustomerRequest !== 'function') { return { ok: false, code: 'HEARTBEAT_REQUEST_UNAVAILABLE', request: null, status: FbmSync.statusView() }; }
     var heartbeatRequest = FbmSync.sessionSystemRequest('heartbeat'), heartbeatEnvelope = FbmSync.nextEnvelope(heartbeatRequest), currentState = FbmSync.stateRead();
     return { ok: true, code: typeof FbmSync.sessionGateRequestCode === 'function' ? FbmSync.sessionGateRequestCode(heartbeatEnvelope, currentState) : 'HEARTBEAT_REQUEST_READY', request: heartbeatEnvelope, status: FbmSync.statusView() };
   } finally { lock.releaseLock(); }
@@ -227,7 +227,8 @@ function fbmSyncHeartbeatLocked(rawResponse, options) {
   if (typeof FbmSync.sessionGateResponseStarted === 'function') { FbmSync.sessionGateResponseStarted(state); }
   state.relayHop = Number(options && options.hop || 0) + 1;
   FbmSync.stateWrite(state);
-  if (FbmSync.protocol.hasHeartbeatData && !FbmSync.protocol.hasHeartbeatData(rawResponse)) {
+  var countTotal = FbmSync.customerCountTotal(rawResponse);
+  if ((FbmSync.protocol.hasHeartbeatData && !FbmSync.protocol.hasHeartbeatData(rawResponse)) || countTotal === null) {
     state.phase = 'error'; state.cursor = {}; state.lastFailureCode = 'HEARTBEAT_RESPONSE_INVALID'; state.lastError = 'Heartbeat FBM không trả dữ liệu Customer đúng định dạng; đã dừng để probe phiên ở lượt sau.'; state.message = state.lastError; state.retryable = false; state.scheduledScan = '';
     FbmSync.stateWrite(state);
     if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.lastError, 'heartbeat_invalid_response'); }
@@ -235,17 +236,13 @@ function fbmSyncHeartbeatLocked(rawResponse, options) {
   }
   state.session = state.session || {};
   state.session.lastHeartbeatAt = Date.now();
-  if (result.ok) {
-    var total = FbmSync.heartbeatCustomerTotal(rawResponse);
-    var previousTotal = state.session.customerTotal;
-    if (total !== null) {
-      state.session.customerTotal = total;
-      if (previousTotal !== null && previousTotal !== undefined && Number(previousTotal) !== total && state.phase === 'idle') {
-        state.scheduledScan = 'customerFull';
-        state.message = 'Tổng số Customer FBM đã đổi; chuẩn bị quét lại Customer.';
-      }
-    }
-    if (state.phase === 'idle' && !state.lastError && state.scheduledScan === 'heartbeat') { state.scheduledScan = ''; state.message = 'Heartbeat FBM OK.'; }
+  var heartbeatDirection = state.scheduledDirection || FbmSync.backgroundScheduleRead().direction;
+  // Thân của Giữ phiên là bước đếm: lệch mốc thì Quét nhanh chạy ngay dù công tắc Quét nhanh tắt; chiều Chỉ đẩy chỉ giữ phiên (09/02 mục 8).
+  // Các tiến trình khác tự kết thúc bằng bước đếm, nên ở đây request đếm chỉ mở phiên cho chúng.
+  if (state.scheduledScan === 'heartbeat') {
+    var recount = FbmSync.customerCountApplies(heartbeatDirection) && FbmSync.customerCountChanged(countTotal);
+    state.scheduledScan = recount ? 'recount' : '';
+    state.message = recount ? FbmSync.RECOUNT_MESSAGE : 'Heartbeat FBM OK.';
   }
   state.cursor = {};
   FbmSync.stateWrite(state);
@@ -262,6 +259,10 @@ function fbmSyncHeartbeatLocked(rawResponse, options) {
   }
   if (result.ok && state.runId && ['idle', 'done', 'error'].indexOf(state.phase) < 0 && !(state.metadata && state.metadata.manualPending)) {
     request = FbmSync.requestForCursor(state);
+  } else if (result.ok && state.scheduledScan === 'recount') {
+    state.scheduledScan = ''; FbmSync.stateWrite(state);
+    started = FbmSync.recountStart(heartbeatDirection, 'background');
+    request = started && started.request ? started.request : null;
   } else if (result.ok && state.phase === 'idle' && ['customer', 'activity', 'customerFull', 'activityFull', 'detail'].indexOf(state.scheduledScan) >= 0 && typeof FbmSync.start === 'function') {
     var schedule = FbmSync.backgroundScheduleRead(), scan = state.scheduledScan === 'activity' || state.scheduledScan === 'activityFull' ? 'activity_bulk' : state.scheduledScan === 'detail' ? 'detail' : 'full';
     var backgroundStart = { mode: state.scheduledDirection || schedule.direction || 'read', scan: scan, origin: 'background' };
@@ -307,16 +308,6 @@ function fbmSyncHeartbeatTransportFailure(payload) {
   } finally { lock.releaseLock(); }
 }
 FbmSync.heartbeatTransportFailure = fbmSyncHeartbeatTransportFailure;
-
-/** Đọc TotalRowCount của request heartbeat mà không phụ thuộc shape response. */
-FbmSync.heartbeatCustomerTotal = function (rawResponse) {
-  var parsed = FbmSync.protocol.parse(rawResponse) || {}, data = parsed.d || parsed;
-  if (typeof data === 'string') { data = FbmSync.protocol.parse(data) || {}; }
-  var value = data && (data.TotalRowCount !== undefined ? data.TotalRowCount : data.totalRowCount);
-  if (value === undefined || value === null || value === '') { return null; }
-  var number = Number(value);
-  return isFinite(number) && number >= 0 ? number : null;
-};
 
 /**
  * Handler của các trigger hẹn giờ phía GAS ở thiết kế cũ. Nhịp nền nay chỉ do alarm `gas_poll` của Extension (09/02), GAS không cài trigger hẹn giờ nào cho đồng bộ.

@@ -21,6 +21,12 @@ FbmSync.scanJobOpen = function (state, cursor) {
   return cursor;
 };
 
+/** Request lấy danh sách toàn bộ khách tại vị trí trang của cursor; bước "Đếm khách" dựng từ chính hàm này với `count: 1` nên hai bên luôn cùng phạm vi, cùng bộ lọc. */
+FbmSync.customerListRequest = function (cursor) {
+  var value = cursor || {};
+  return FbmSync.customerGridRequest({ type: Number(value.type || 0), count: Number(value.count || FbmSync.BUDGET.scanCustomerRows), gridPageIndex: value.pageIndex === undefined ? -1 : value.pageIndex, gridPageValue: value.pageValue || null, pageItems: value.pageItems || null, gridRefresh: false });
+};
+
 /** Dựng request cho đúng vị trí cursor: chưa nhận gói nào thì gọi FBM, đã có thì xin gói kế từ RAM của tab. */
 FbmSync.scanJobRequest = function (state) {
   var cursor = state.cursor || {}, budget = FbmSync.BUDGET;
@@ -29,7 +35,7 @@ FbmSync.scanJobRequest = function (state) {
     return { url: cfg.baseUrl + FbmSync.ENDPOINTS.grid, body: {}, meta: { kind: 'scan_chunk', entity: cursor.entity, job: { jobId: cursor.jobId, chunkIndex: Number(cursor.next || 0) } } };
   }
   var activity = cursor.entity === 'activity';
-  var request = activity ? FbmSync.activityScanRequest(cursor) : FbmSync.customerGridRequest({ type: Number(cursor.type || 0), count: Number(cursor.count || budget.scanCustomerRows), gridPageIndex: cursor.pageIndex === undefined ? -1 : cursor.pageIndex, gridPageValue: cursor.pageValue || null, pageItems: cursor.pageItems || null, gridRefresh: false });
+  var request = activity ? FbmSync.activityScanRequest(cursor) : FbmSync.customerListRequest(cursor);
   request.meta.kind = 'scan_job'; request.meta.entity = cursor.entity;
   // Giao dịch chỉ giữ id đã có trên Sheet: lưới giao dịch không có cột khách nên dòng lạ không ghép được khách cha.
   request.meta.job = { jobId: cursor.jobId, fields: FbmSync.scanFields(cursor.entity), idField: FbmSync.SCAN_ID_FIELDS[cursor.entity], keepIds: activity ? FbmSync.activityKeepIds(FbmSync.readLocal('activity')) : null, chunkTargetBytes: budget.chunkTargetBytes, chunkMaxBytes: budget.chunkMaxBytes, maxResponseBytes: budget.scanMaxResponseBytes };

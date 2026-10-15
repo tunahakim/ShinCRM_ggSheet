@@ -1,8 +1,9 @@
 /** Dieu phoi preflight va chieu doc tu FBM. */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
-/** Mở phiên, kiểm tra khóa phiên và trả về request đầu tiên. */
-FbmSync.start = function (options) {
+/** Mở phiên, kiểm tra khóa phiên và trả về request đầu tiên; lượt xong ngay ở bước mở vẫn kết thúc bằng bước đếm. */
+FbmSync.start = function (options) { return FbmSync.runTail(FbmSync.startRun(options)); };
+FbmSync.startRun = function (options) {
   // Mỗi call chỉ trả một request; ngữ cảnh nhiều bước nằm trong DocumentProperties.
   var opt = options || {};
   if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) {
@@ -54,6 +55,7 @@ FbmSync.start = function (options) {
   // Chụp đầu lượt như mốc giao dịch: đổi cài đặt giữa chừng chỉ áp từ lượt sau, và không phải đọc lại DocumentProperties mỗi envelope.
   state.requestGap = typeof FbmSync.requestGapMs === 'function' ? FbmSync.requestGapMs(FbmSync.syncSettingsRead()) : null;
   if (state.scan === 'activity_bulk') { state.mode = 'read'; }
+  FbmSync.countTailMark(state);
   if (state.origin === 'background') { state.detailCustomerLimit = state.scan === 'detail' ? Math.max(1, Math.min(50, Math.floor(Number(opt.detail && opt.detail.customersPerRun || 50)))) : 0; }
   if (typeof FbmSync.runPreflight === 'function') {
     var preflight = FbmSync.runPreflight({ mode: state.mode, origin: state.origin, scan: state.scan });
@@ -252,6 +254,8 @@ FbmSync.pullMarkMissing = function (state) {
       return false;
     }
     FbmSync.markMissingAfterFullScan('customer', state);
+    // Số khách mốc của bước đếm chỉ ghi ở đây: lượt đã đọc đủ danh sách toàn bộ khách.
+    if (state.scan === 'full') { FbmSync.customerBaselineWrite(total); }
     if (state.metadata && state.metadata.activityBulk) {
       // Lớp 1 của lượt này đã gắn cờ trên toàn bộ giao dịch; gắn lại theo khách đã đọc chỉ đếm trùng cùng một bản ghi.
       FbmSync.seenStoreClear('activity');
@@ -397,8 +401,9 @@ FbmSync.contractGate = function (rawResponse) {
   return { ok: false, code: mismatch.code, request: null, error: mismatch.message, status: FbmSync.statusView() };
 };
 
-FbmSync.continue = function (rawResponse) {
-  // Tiến đúng một bước cursor và lưu state trước khi trả request kế tiếp.
+/** Tiến đúng một bước cursor và lưu state trước khi trả request kế tiếp; lượt vừa xong thì nối bước đếm (`runTail`). */
+FbmSync.continue = function (rawResponse) { return FbmSync.runTail(FbmSync.continueStep(rawResponse)); };
+FbmSync.continueStep = function (rawResponse) {
   var state = FbmSync.stateRead();
   if (typeof FbmSync.recoverStaleRun === 'function') {
     var recovered = FbmSync.recoverStaleRun(state);
@@ -496,6 +501,8 @@ FbmSync.continue = function (rawResponse) {
     var completedGate = FbmSync.continueSessionGate(state, cursor, rawResponse);
     if (completedGate) { return completedGate; }
   }
+
+  if (cursor.kind === 'customer_count') { return FbmSync.customerCountContinue(state, rawResponse); }
 
   // Probe User là bước hệ thống của cổng: đối chiếu đủ bốn định danh rồi
   // mới trả lại cursor nghiệp vụ ban đầu. Không gọi logic Customer tại đây.

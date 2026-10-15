@@ -82,17 +82,6 @@ FbmSync.identityUserRequest = function () {
     meta: { kind: 'identity_user_grid', entity: 'user' }
   };
 };
-/** Request Customer tối thiểu do GAS cấp để kiểm tra phiên nền; Extension không được tự dựng request này. */
-FbmSync.heartbeatCustomerRequest = function () {
-  var request = FbmSync.customerGridRequest({ type: 0, count: 1, gridPageIndex: -1, gridPageValue: null, gridRefresh: false, includeScope: false });
-  // Heartbeat chỉ kiểm tra phiên, không lọc dữ liệu theo cấu hình quét/test và không giữ cursor quét.
-  request.body.externalKey = [];
-  request.body.memvars = [];
-  request.body.sortExpression = null;
-  request.meta.kind = 'heartbeat';
-  request.meta.entity = 'customer';
-  return request;
-};
 /** Request Customer full-scan dùng riêng cho kiểm tra liên kết Spreadsheet/FBM. */
 FbmSync.identityCheckCustomerRequest = function (options) {
   var opt = Object.assign({ includeScope: false, sortExpression: 'stt_rec_kh' }, options || {});
