@@ -79,54 +79,54 @@ function scanHarness(options) {
   const tab = executorSession();
   // `tabCalls`: số request không phải `scan_chunk` đã qua tab; FBM bị gọi đúng bằng số này thì `scan_chunk` không gọi lại FBM.
   const trace = { kinds: [], jobs: [], errors: [], statuses: [], tabCalls: 0, activityCustomers: [], rechecks: [], bulkFilters: [] };
+  /** Đưa một request qua tab FBM giả như Extension: trả `{ fail: mã }` khi Extension báo lỗi vận chuyển, hoặc `{ raw }` để nộp GAS. Hook như `run`. */
+  async function deliver(request, h) {
+    const kind = String(request.meta && request.meta.kind || '');
+    trace.kinds.push(kind + (kind === 'scan_chunk' ? ':' + request.meta.job.chunkIndex : '') + (kind === 'scan_job' && request.meta.entity === 'activity' ? ':activity' : ''));
+    if (h.beforeSend) { h.beforeSend(request, tab, trace); }
+    // `hooks.fail` giả Extension báo lỗi vận chuyển (hết hạn fetch...) cho request đó thay vì gửi qua tab.
+    const fakeFail = h.fail && h.fail(request, trace);
+    if (fakeFail) { trace.errors.push(fakeFail); return { fail: fakeFail, message: 'Lỗi giả lập ' + fakeFail }; }
+    let raw;
+    if (kind === 'batch') {
+      raw = await sendBatchThroughExecutor(request, (item) => {
+        const key = item.body.externalKey && item.body.externalKey[0] && item.body.externalKey[0].Value, byId = item.body.externalKey[0].Name === 'id';
+        (byId ? trace.rechecks : trace.activityCustomers).push(key);
+        if (byId && opt.recheckFail && opt.recheckFail(key)) { return { status: 500, body: JSON.stringify({ Bugs: [{ Message: 'Lỗi giả lập' }] }) }; }
+        const acts = (byId ? fbmActivities().filter((item) => item.id === key) : actsOf(key)).map((values) => row(activityFields, values));
+        const body = JSON.parse(gridResponse(activityFields, acts, acts.length));
+        if (item.body.type !== 0) { delete body.d.ViewPage; }
+        return { body: JSON.stringify(body) };
+      });
+    } else {
+      const body = kind === 'session_probe' || kind === 'identity_user_grid' ? USER_RESPONSE
+        : kind === 'authorize' ? JSON.stringify({ d: { Authorized: 'auth-' + request.meta.entity } })
+        : kind === 'scan_job' ? (request.meta.entity === 'activity' ? activityBulk(request.body) : customerPage(request.body))
+        : kind === 'customer_count' || kind === 'heartbeat' ? customerPage(request.body) : '';
+      if (kind !== 'scan_chunk') { trace.tabCalls += 1; }
+      const sent = await tab.send(h.rewrite ? h.rewrite(request, trace) : request, body);
+      if (sent.reply && sent.reply.error) { trace.errors.push(sent.reply.code); return { fail: sent.reply.code, message: sent.reply.error }; }
+      raw = executorRaw(sent.reply, request.id);
+      if (raw.job) { trace.jobs.push(Object.assign({}, raw.job)); }
+      if (h.edit) { raw = h.edit(raw, request, trace) || raw; }
+    }
+    return { raw };
+  }
   /** Chạy lượt tới khi GAS không cấp request; `hooks.beforeSend` giả mất tab, `hooks.edit` sửa response, `hooks.afterError` quyết định request kế khi GAS ném lỗi. */
   async function run(hooks) {
     const h = hooks || {};
     F.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
     let step = F.start(Object.assign({ mode: 'read', origin: 'manual', manual: true, pack: h.pack }, h.startOptions || {}));
     for (let hop = 0; step && step.request && hop < 200; hop += 1) {
-      const request = step.request, kind = String(request.meta && request.meta.kind || '');
-      trace.kinds.push(kind + (kind === 'scan_chunk' ? ':' + request.meta.job.chunkIndex : '') + (kind === 'scan_job' && request.meta.entity === 'activity' ? ':activity' : ''));
-      if (h.beforeSend) { h.beforeSend(request, tab, trace); }
-      // `hooks.fail` giả Extension báo lỗi vận chuyển (hết hạn fetch...) cho request đó thay vì gửi qua tab.
-      const fakeFail = h.fail && h.fail(request, trace);
-      if (fakeFail) {
-        trace.errors.push(fakeFail);
-        step = F.controlDispatchLocked('transport_failure', { requestId: request.id, code: fakeFail, message: 'Lỗi giả lập ' + fakeFail });
+      const sent = await deliver(step.request, h);
+      if (sent.fail) {
+        step = F.controlDispatchLocked('transport_failure', { requestId: step.request.id, code: sent.fail, message: sent.message });
         trace.statuses.push(step.status);
         continue;
       }
-      let raw;
-      if (kind === 'batch') {
-        raw = await sendBatchThroughExecutor(request, (item) => {
-          const key = item.body.externalKey && item.body.externalKey[0] && item.body.externalKey[0].Value, byId = item.body.externalKey[0].Name === 'id';
-          (byId ? trace.rechecks : trace.activityCustomers).push(key);
-          if (byId && opt.recheckFail && opt.recheckFail(key)) { return { status: 500, body: JSON.stringify({ Bugs: [{ Message: 'Lỗi giả lập' }] }) }; }
-          const acts = (byId ? fbmActivities().filter((item) => item.id === key) : actsOf(key)).map((values) => row(activityFields, values));
-          const body = JSON.parse(gridResponse(activityFields, acts, acts.length));
-          if (item.body.type !== 0) { delete body.d.ViewPage; }
-          return { body: JSON.stringify(body) };
-        });
-      } else {
-        const body = kind === 'session_probe' || kind === 'identity_user_grid' ? USER_RESPONSE
-          : kind === 'authorize' ? JSON.stringify({ d: { Authorized: 'auth-' + request.meta.entity } })
-          : kind === 'scan_job' ? (request.meta.entity === 'activity' ? activityBulk(request.body) : customerPage(request.body))
-          : kind === 'customer_count' ? customerPage(request.body) : '';
-        if (kind !== 'scan_chunk') { trace.tabCalls += 1; }
-        const sent = await tab.send(h.rewrite ? h.rewrite(request, trace) : request, body);
-        if (sent.reply && sent.reply.error) {
-          trace.errors.push(sent.reply.code);
-          step = F.controlDispatchLocked('transport_failure', { requestId: request.id, code: sent.reply.code, message: sent.reply.error });
-          trace.statuses.push(step.status);
-          continue;
-        }
-        raw = executorRaw(sent.reply, request.id);
-        if (raw.job) { trace.jobs.push(Object.assign({}, raw.job)); }
-        if (h.edit) { raw = h.edit(raw, request, trace) || raw; }
-      }
       const before = F.statusView();
       try {
-        step = F.controlDispatchLocked('continue', { response: raw });
+        step = F.controlDispatchLocked('continue', { response: sent.raw });
       } catch (error) {
         trace.errors.push(String(error && error.message || error));
         if (!h.afterError) { throw error; }
@@ -138,7 +138,18 @@ function scanHarness(options) {
     }
     return step;
   }
-  return { flow, F, logs, writes, local, tab, trace, run, rows, customerFields, themKhach: (i) => rows.push(khach(i)) };
+  /** Một lần Extension hỏi GAS theo alarm `gas_poll`: request đầu nộp qua cổng heartbeat, các request sau qua cổng continue, cắt ở `RELAY_HOP_LIMIT` như relay thật. */
+  async function poll(hooks) {
+    const h = hooks || {}, hop = flow.hop;
+    let step = hop.fbmSyncHeartbeatRequest({ source: h.source || 'alarm', hop: 0 });
+    for (let used = 0; step && step.request && used < 200; used += 1) {
+      const request = step.request, sent = await deliver(request, h);
+      if (sent.fail) { step = F.controlDispatchLocked('transport_failure', { requestId: request.id, code: sent.fail, message: sent.message, hop: used + 1 }); continue; }
+      step = used === 0 ? hop.fbmSyncHeartbeat(sent.raw, { hop: 1 }) : F.controlDispatchLocked('continue', { response: sent.raw, hop: used + 1 });
+    }
+    return step;
+  }
+  return { flow, F, logs, writes, local, tab, trace, run, poll, rows, customerFields, themKhach: (i) => rows.push(khach(i)) };
 }
 
 /** Request `scan_job` dựng tay để kiểm executor riêng, không qua GAS. */
