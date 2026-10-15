@@ -258,7 +258,7 @@ async function chay(so) {
   const scheduler = taoHopCat({ FbmSync: {}, SETTINGS: { LOCK_WAIT_MS: 1 }, PropertiesService: { getDocumentProperties: () => schedulerPropertyApi }, LockService: { getDocumentLock: () => ({ tryLock: () => true, releaseLock: () => {} }) } });
   napServer(scheduler, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/state/Scheduler.js');
   const schedule = scheduler.FbmSync.schedule();
-  check(so, 'Lấy toàn bộ giao dịch chạy nền mặc định tắt với chu kỳ 8 giờ', [schedule.activityMinutes, schedulerData.FBM_SYNC_NEXT_ACTIVITY_SCAN !== undefined], [480, true]);
+  check(so, 'Lấy toàn bộ giao dịch chạy nền mặc định tắt với chu kỳ 8 giờ', [schedule.activityMinutes, schedulerData.FBM_SYNC_NEXT_ACTIVITY_FULL_SCAN !== undefined], [480, true]);
   // Trigger hẹn giờ phía GAS của thiết kế cũ còn sót trên project: gọi tới thì tự gỡ mọi trigger cũ, ghi một dòng Log, không đụng state hay lịch nền.
   const triggers = ['fbmHeartbeatTrigger', 'fbmSupervisorTrigger', 'shinOnEdit', 'fbmCustomerScanTrigger'].map((name) => ({ getHandlerFunction: () => name }));
   const deleted = [], legacyLogs = [];

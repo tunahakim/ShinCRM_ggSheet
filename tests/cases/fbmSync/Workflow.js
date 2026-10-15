@@ -342,8 +342,14 @@ async function chay(so) {
   check(so, 'Lịch nền mặc định theo bảng tiến trình: Giữ phiên 5 phút, Quét nhanh 60 phút bật, Lấy toàn bộ giao dịch 8 giờ tắt, Vòng xoay 30 phút 30 khách tắt', [scheduleDefaults.heartbeat.minutes, scheduleDefaults.customerFull.enabled, scheduleDefaults.customerFull.minutes, scheduleDefaults.activityFull.enabled, scheduleDefaults.activityFull.minutes, scheduleDefaults.detail.enabled, scheduleDefaults.detail.minutes, scheduleDefaults.detail.customersPerRun], [5, true, 60, false, 480, false, 30, 30]);
   const savedExtension = scheduleFlow.hop.FbmSync.extensionConfigSave({ pollMinutes: 15, runOnStartup: false });
   check(so, 'cau hinh Extension cho phep doi nhip nhung khong doi lich nghiep vu', [savedExtension.ok, savedExtension.pollMinutes, savedExtension.runOnStartup, scheduleFlow.hop.FbmSync.backgroundSchedulePublic().heartbeat.minutes], [true, 15, false, 5]);
-  const savedSchedule = scheduleFlow.hop.FbmSync.backgroundScheduleSave({ heartbeat: { enabled: false, minutes: 10 }, customer: { enabled: true, minutes: 60 }, activity: { enabled: false, minutes: 30 } });
-  check(so, 'GAS luu cong tac va chu ky tung tien trinh nen', [savedSchedule.ok, savedSchedule.schedule.heartbeat.enabled, savedSchedule.schedule.heartbeat.minutes, savedSchedule.schedule.activity.enabled], [true, false, 10, false]);
+  const savedSchedule = scheduleFlow.hop.FbmSync.backgroundScheduleSave({ heartbeat: { enabled: false, minutes: 10 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false, minutes: 30 } });
+  check(so, 'GAS luu cong tac va chu ky tung tien trinh nen', [savedSchedule.ok, savedSchedule.schedule.heartbeat.enabled, savedSchedule.schedule.heartbeat.minutes, savedSchedule.schedule.activityFull.enabled], [true, false, 10, false]);
+  // Công tắc lịch nền chỉ có một nơi lưu: tắt qua cổng điều khiển thì card cũng thấy tắt và lịch nền không cấp việc, bật lại từ card thì cổng điều khiển cũng thấy bật.
+  const switchOff = scheduleFlow.hop.FbmSync.setBackgroundEnabled(false);
+  const offCard = scheduleFlow.hop.FbmSync.backgroundSchedulePublic().enabled;
+  const offPick = scheduleFlow.hop.FbmSync.schedulerPickDue(Date.now() + 7 * 24 * 3600 * 1000);
+  scheduleFlow.hop.FbmSync.backgroundScheduleSave({ enabled: true });
+  check(so, 'công tắc lịch nền chỉ một nơi lưu, tắt ở cổng điều khiển thì card và lịch nền cùng tắt', [switchOff.enabled, offCard, offPick.code, scheduleFlow.hop.FbmSync.backgroundEnabled(), scheduleFlow.documentProperties.getProperty('FBM_SYNC_BACKGROUND_ENABLED')], [false, false, 'BACKGROUND_DISABLED', true, null]);
   const disabledSchedule = scheduleFlow.hop.FbmSync.backgroundScheduleSave({ enabled: false });
   check(so, 'luu lich nen dong bo ca cong tac lich va co BACKGROUND_SWITCH_KEY', [disabledSchedule.ok, disabledSchedule.schedule.enabled, scheduleFlow.hop.FbmSync.backgroundEnabled()], [true, false, false]);
   const directionSchedule = scheduleFlow.hop.FbmSync.backgroundScheduleSave({
@@ -662,8 +668,8 @@ async function chay(so) {
   check(so, 'HTML lỗi qua continuation bị fail-closed, giữ cursor và ghi Log lỗi', [htmlStarted.request.meta.kind, htmlResult.ok, htmlResult.request || null, htmlState.phase, htmlState.lastFailureCode, htmlState.cursor.kind, htmlLogs.length, htmlLogs[0] && htmlLogs[0].action], ['identity_user_grid', false, null, 'error', 'PARSE_ERROR', 'identity_user_grid', 1, 'business_request_failed']);
   scheduleFlow.hop.FbmSync.identityPreflight = () => ({ blocking: false, status: { status: 'BOUND' }, message: '' });
   const now = Date.now();
-  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_CUSTOMER_SCAN', String(now - 1));
-  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_ACTIVITY_SCAN', String(now - 1));
+  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_CUSTOMER_FULL_SCAN', String(now - 1));
+  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_ACTIVITY_FULL_SCAN', String(now - 1));
   scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_HEARTBEAT', String(now - 1));
   const pickedCustomer = scheduleFlow.hop.FbmSync.schedulerPickDue(now);
   check(so, 'scheduler GAS uu tien Customer khi Customer va Activity cung den han', [pickedCustomer.ok, pickedCustomer.kind, scheduleFlow.hop.FbmSync.stateRead().scheduledScan], [true, 'customerFull', 'customerFull']);
@@ -673,21 +679,21 @@ async function chay(so) {
   const blockedOverlap = scheduleFlow.hop.FbmSync.schedulerPickDue(now + 1);
   check(so, 'scheduler GAS khong cap tien trinh song song khi A dang chay', [blockedOverlap.ok, blockedOverlap.code], [false, 'SYNC_ALREADY_RUNNING']);
   scheduleFlow.hop.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', scheduledScan: '' });
-  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_CUSTOMER_SCAN', String(now + 60000));
-  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_ACTIVITY_SCAN', String(now + 60000));
+  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_CUSTOMER_FULL_SCAN', String(now + 60000));
+  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_ACTIVITY_FULL_SCAN', String(now + 60000));
   scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_HEARTBEAT', String(now + 60000));
   const noDue = scheduleFlow.hop.FbmSync.heartbeatRequest({ source: 'alarm' });
   check(so, 'scheduler GAS khong cap heartbeat khi khong co lich den han', [noDue.ok, noDue.code, noDue.request], [true, 'NO_PROCESS_DUE', null]);
   scheduleFlow.hop.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, scheduledScan: '' });
-  scheduleFlow.hop.FbmSync.backgroundScheduleSave({ heartbeat: { enabled: true, minutes: 5 }, customer: { enabled: true, minutes: 60 }, activity: { enabled: true, minutes: 30 } });
-  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_CUSTOMER_SCAN', String(now + 60000));
-  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_ACTIVITY_SCAN', String(now + 60000));
+  scheduleFlow.hop.FbmSync.backgroundScheduleSave({ heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: true, minutes: 30 } });
+  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_CUSTOMER_FULL_SCAN', String(now + 60000));
+  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_ACTIVITY_FULL_SCAN', String(now + 60000));
   scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_HEARTBEAT', String(now - 1));
   const heartbeatLowest = scheduleFlow.hop.FbmSync.schedulerPickDue(now);
   check(so, 'scheduler GAS chi chon giu phien khi khong co tien trinh du lieu den han', [heartbeatLowest.ok, heartbeatLowest.kind], [true, 'heartbeat']);
-  check(so, 'cau hinh scheduler tu choi chu ky ngoai gioi han', [scheduleFlow.hop.FbmSync.extensionConfigSave({ pollMinutes: 0 }).ok, (() => { try { scheduleFlow.hop.FbmSync.backgroundScheduleSave({ customer: { minutes: 0 } }); return false; } catch (ignore) { return true; } })()], [false, true]);
+  check(so, 'cau hinh scheduler tu choi chu ky ngoai gioi han', [scheduleFlow.hop.FbmSync.extensionConfigSave({ pollMinutes: 0 }).ok, (() => { try { scheduleFlow.hop.FbmSync.backgroundScheduleSave({ customerFull: { minutes: 0 } }); return false; } catch (ignore) { return true; } })()], [false, true]);
   scheduleFlow.hop.FbmSync.extensionConfigSave({ pollMinutes: 15, runOnStartup: true });
-  scheduleFlow.hop.FbmSync.backgroundScheduleSave({ heartbeat: { enabled: true, minutes: 5 }, customer: { enabled: true, minutes: 60 }, activity: { enabled: true, minutes: 30 } });
+  scheduleFlow.hop.FbmSync.backgroundScheduleSave({ heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: true, minutes: 30 } });
   const startup = scheduleFlow.hop.FbmSync.heartbeatRequest({ source: 'startup' });
   check(so, 'Chrome startup co the hoi GAS ngay mot luot theo cau hinh', [startup.ok, startup.code, startup.request && startup.request.meta.kind], [true, 'HEARTBEAT_REQUEST_READY', 'heartbeat']);
   scheduleFlow.hop.FbmSync.accountSettingsSave({ customerPrefix: 'ALT', customerCodeLength: '8', activitySince: '2026-01-01' });
