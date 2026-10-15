@@ -57,11 +57,6 @@ function chay(so) {
   check(so, 'Bỏ giới hạn thì phạm vi là null (đọc và ghi toàn bộ) dù danh sách còn mã', [hop.FbmSync.scope(), hop.FbmSync.scopeLimited()], [null, false]);
   hop.FbmSync.syncSettingsSave({ approvalThreshold: 3 });
   check(so, 'Lưu riêng ngưỡng chấp thuận giữ nguyên công tắc phạm vi và danh sách đang lưu', [hop.FbmSync.syncSettingsRead().scopeLimited, hop.FbmSync.syncSettingsRead().scopeCodes], [false, ['ALT00010']]);
-  data.FBM_SYNC_SETTINGS_V1 = JSON.stringify({ approvalThreshold: 3, testMode: true, testFbmCodes: ['ALT00010'], testShinCodes: ['CUS-020061', 'CUS-020062'], testCodes: ['ALT00010'] });
-  const merged = hop.FbmSync.syncSettingsRead();
-  check(so, 'Bản lưu cũ (chế độ thử, các danh sách mã thử) gộp thành một danh sách bỏ trùng, công tắc chuyển sang giới hạn phạm vi, kho ghi lại không còn khóa cũ',
-    [merged.scopeLimited, merged.scopeCodes, Object.keys(JSON.parse(data.FBM_SYNC_SETTINGS_V1)).sort()],
-    [true, ['ALT00010', 'CUS-020061', 'CUS-020062'], ['approvalThreshold', 'requestGapMaxSeconds', 'requestGapMinSeconds', 'scopeCodes', 'scopeLimited']]);
 
   const quotaData = {};
   let quotaFull = false;

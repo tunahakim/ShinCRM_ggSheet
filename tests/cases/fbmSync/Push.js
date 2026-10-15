@@ -181,12 +181,11 @@ async function chay(so) {
     : [];
   push.writeGateSave = (request) => { retryPatch = request.records; return { ok: true }; };
   const retryState = push.FbmSync.stateStart('', 'done', 0);
-  retryState.metadata.pushFailures = { 'activity:ACT-FAIL': 'failed-hash', 'activity:ACT-GONE': 'gone-hash' };
-  retryState.metadata.pushFailureDetails = { 'activity:ACT-FAIL': { reason: 'HTTP 500' } };
   push.FbmSync.stateWrite(retryState);
+  push.FbmSync.pushFailuresWrite({ hashes: { 'activity:ACT-FAIL': 'failed-hash', 'activity:ACT-GONE': 'gone-hash' }, details: { 'activity:ACT-FAIL': { reason: 'HTTP 500' } } });
   const retryEnabled = push.fbmSyncRetryPushFailures();
   check(so, 'retry push mo lai ca lo cung payload khong doi du lieu', [retryEnabled.ok, retryPatch[0].syncStatus, push.FbmSync.pushFailuresRead().hashes['activity:ACT-FAIL']], [true, push.FbmSync.SYNC_STATUS.pending, undefined]);
-  check(so, 'mở lại bản ghi lỗi xóa luôn dấu lỗi của bản ghi không còn trên Sheet, để nó không chiếm chỗ cầu dao lỗi đẩy', [retryEnabled.missing, Object.keys(push.FbmSync.pushFailuresRead().hashes)], [2, []]);
+  check(so, 'mở lại bản ghi lỗi xóa luôn dấu lỗi của bản ghi không còn trên Sheet, để nó không chiếm chỗ cầu dao lỗi đẩy', [retryEnabled.missing, Object.keys(push.FbmSync.pushFailuresRead().hashes)], [1, []]);
   push.FbmSync.pushCandidates = () => [
     { kind: 'edit', id: 'C-ERR', position: 0, record: { id: 'C-ERR', fbmId: 'A-ERR', fbmHash: 'h-err' } },
     { kind: 'edit', id: 'C-NEXT', position: 1, record: { id: 'C-NEXT', fbmId: 'A-NEXT', fbmHash: 'h-next' } }

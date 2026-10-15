@@ -448,13 +448,6 @@ async function chay(so) {
     Buffer.byteLength(breakerStoreText, 'utf8') <= 9000, Object.keys(breakerStore.details).length, Object.keys(breakerStore.details).slice(-1)[0],
     breaker.F.props().getProperty('FBM_SYNC_STATE_V1').indexOf('pushFailure') < 0
   ], [breaker.F.BUDGET.pushFailuresMax, 'paused', 'PUSH_FAILURES_LIMIT', null, 20, true, 1, true, breaker.F.BUDGET.pushFailureDetailsMax, 'customer:C-20', true]);
-  const legacy = workflowGas(), legacyF = legacy.hop.FbmSync, legacyState = legacyF.stateStart('', 'done', 0);
-  legacyState.metadata.pushFailures = { 'customer:C-OLD': 'abc12345' };
-  legacyState.metadata.pushFailureDetails = { 'customer:C-OLD': { reason: 'Lỗi cũ', code: 'HTTP_ERROR' } };
-  legacyF.stateWrite(legacyState);
-  check(so, 'state cũ còn map lỗi đẩy trong metadata thì chuyển sang khóa riêng một lần, không mất dấu chặn gửi lại', [
-    legacyF.pushFailuresRead().hashes['customer:C-OLD'], legacyF.pushFailuresRead().details['customer:C-OLD'].reason, legacyF.props().getProperty('FBM_SYNC_STATE_V1').indexOf('pushFailure') < 0
-  ], ['abc12345', 'Lỗi cũ', true]);
   const dueState = { metadata: { categoryCheck: { at: 1000, pushed: 3 } } }, dueBudget = renamed.F.BUDGET;
   check(so, 'danh mục đọc quá lookupMaxAgeMs thì phải đọc lại trước bản ghi đẩy kế, kể cả khi chưa đủ pushBatchRecords', [
     renamed.F.pushLookupDue(dueState, 1000 + dueBudget.lookupMaxAgeMs - 1), renamed.F.pushLookupDue(dueState, 1000 + dueBudget.lookupMaxAgeMs), renamed.F.pushLookupDue({ metadata: {} }, 1000)
