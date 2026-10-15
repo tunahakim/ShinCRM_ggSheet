@@ -57,7 +57,8 @@ FbmSync.beginActivityBulkPull = function (state) {
   state.metadata.activityBulk = { windows: 0, missing: 0 };
   if (!local.some(FbmSync.activityBulkTracked)) {
     state.cursor = { kind: 'activity_bulk_done' };
-    return state.scan === 'full' ? null : FbmSync.activityBulkSupplement(state);
+    if (state.scan !== 'full') { FbmSync.activityBulkRunDone(state); }
+    return null;
   }
   FbmSync.seenStoreBegin(FbmSync.ACTIVITY_BULK_STORE, local);
   FbmSync.scanJobOpen(state, { entity: 'activity', page: 0, window: false });
@@ -226,7 +227,7 @@ FbmSync.activityRecheckContinue = function (state, cursor, rawResponse) {
   return FbmSync.activityBulkEnd(FbmSync.stateRead(), { imported: imported });
 };
 
-/** Lớp 1 đã nhận đủ: gắn cờ "không thấy", ghi Log một dòng tổng, rồi chốt lượt (gói quét) hoặc sang phần bổ sung (lượt lấy giao dịch chạy nền). */
+/** Lớp 1 đã nhận đủ: gắn cờ "không thấy", ghi Log một dòng tổng, rồi chốt lượt (gói quét) hoặc kết thúc lượt lấy toàn bộ giao dịch chạy nền. */
 FbmSync.activityBulkEnd = function (state, extra) {
   // Ghi state của lời gọi trước khi gắn cờ: bước gắn cờ đọc mốc giao dịch từ state trong kho.
   FbmSync.stateWrite(state);
@@ -242,26 +243,13 @@ FbmSync.activityBulkEnd = function (state, extra) {
     FbmSync.stateWrite(state);
     return FbmSync.pullFinishOrPush(state, result);
   }
-  var request = FbmSync.activityBulkSupplement(state);
-  FbmSync.stateWrite(state);
-  return Object.assign({ ok: true, request: request ? FbmSync.nextEnvelope(request) : null, status: FbmSync.statusView() }, result);
+  FbmSync.activityBulkRunDone(state);
+  return Object.assign({ ok: true, request: null, status: FbmSync.statusView() }, result);
 };
 
-/** Lượt lấy giao dịch chạy nền: sau lớp 1 tìm khách có giao dịch mới hơn mốc trên Sheet, rồi xoay vòng khách để bắt giao dịch tạo lùi ngày; hết thì chốt lượt. */
-FbmSync.activityBulkSupplement = function (state) {
-  var catchupRequest = typeof FbmSync.activityCatchupCustomerRequest === 'function' ? FbmSync.activityCatchupCustomerRequest() : null;
-  if (catchupRequest) {
-    state.cursor = { kind: 'activity_catchup_customer_grid' };
-    state.message = 'Đang tìm Customer có giao dịch mới hơn mốc local...';
-    return catchupRequest;
-  }
-  var rotationRequest = typeof FbmSync.activityRotationCustomerRequest === 'function' ? FbmSync.activityRotationCustomerRequest() : null;
-  if (rotationRequest) {
-    state.cursor = { kind: 'activity_rotation_customer_grid' };
-    state.message = 'Đang xoay 30 Customer để bắt giao dịch tạo lùi ngày...';
-    return rotationRequest;
-  }
+/** Lượt "Lấy toàn bộ giao dịch" chỉ gồm lớp 1 (09/02 Phần 3): xong lớp 1 là xong lượt; giao dịch mới thuộc lớp 2, 3 của Quét nhanh và lớp 4 của Vòng xoay. */
+FbmSync.activityBulkRunDone = function (state) {
   state.cursor = {}; state.phase = 'done'; state.entity = '';
   state.message = FbmSync.runDoneMessage(state);
-  return null;
+  FbmSync.stateWrite(state);
 };

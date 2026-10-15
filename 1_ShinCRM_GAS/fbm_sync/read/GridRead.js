@@ -3,7 +3,6 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 // Một trang Customer kéo theo danh sách khách chờ quét Activity nằm trong cursor; trang nhỏ để state luôn dưới trần một DocumentProperty dù tổng số khách là bao nhiêu.
 FbmSync.CUSTOMER_PAGE_ROWS = 50;
-FbmSync.ACTIVITY_SUPPLEMENT_CUSTOMERS = 30;
 
 /** Đọc cấu hình runtime; token ưu tiên state của phiên hiện tại. */
 FbmSync.scriptSettings = function () {
@@ -165,51 +164,6 @@ FbmSync.activityDateKey = function (value) {
   return match ? match[1] + '-' + ('0' + match[2]).slice(-2) + '-' + ('0' + match[3]).slice(-2) : '';
 };
 
-/** Tìm mốc Activity local mới nhất; không có mốc thì bỏ qua lượt quét bù. */
-FbmSync.activityLocalMaxDate = function () {
-  var latest = '';
-  if (typeof FbmSync.readLocal !== 'function') { return latest; }
-  (FbmSync.readLocal('activity') || []).forEach(function (record) {
-    if (!String(record && record.fbmId || '').trim()) { return; }
-    var key = FbmSync.activityDateKey(record && record.workDate);
-    if (key && key > latest) { latest = key; }
-  });
-  return latest;
-};
-
-/** Lớp 2: tìm Customer có ngày giao dịch mới hơn Activity local mới nhất. */
-FbmSync.activityCatchupCustomerRequest = function () {
-  var maxDate = FbmSync.activityLocalMaxDate();
-  if (!maxDate) { return null; }
-  var request = FbmSync.customerGridRequest({
-    type: 0, count: FbmSync.ACTIVITY_SUPPLEMENT_CUSTOMERS, gridPageIndex: -1, gridRefresh: false,
-    externalKey: [{ Name: 'ngay_gd', Opr: '>', Value: maxDate, Type: 'Date', Ignore: false }]
-  });
-  request.meta.kind = 'activity_catchup_customer_grid';
-  request.meta.activityMaxDate = maxDate;
-  return request;
-};
-
-/** Đọc cursor xoay Customer từ DocumentProperties, không giữ trong Extension. */
-FbmSync.activityRotationCursor = function () {
-  var props = FbmSync.props(), raw = props.getProperty('FBM_SYNC_ACTIVITY_ROTATION');
-  if (!raw) { return { pageIndex: -1, pageValue: null }; }
-  try {
-    var parsed = JSON.parse(raw);
-    return { pageIndex: parsed.pageIndex === undefined || parsed.pageIndex === null ? -1 : Number(parsed.pageIndex), pageValue: parsed.pageValue || null, pageItems: parsed.pageItems || null };
-  } catch (ignore) { return { pageIndex: -1, pageValue: null }; }
-};
-
-/** Lớp 3: lấy một trang Customer theo cursor xoay đã lưu. */
-FbmSync.activityRotationCustomerRequest = function () {
-  var cursor = FbmSync.activityRotationCursor(), request = FbmSync.customerGridRequest({
-    type: cursor.pageIndex < 0 ? 0 : 1, count: FbmSync.ACTIVITY_SUPPLEMENT_CUSTOMERS, gridPageIndex: cursor.pageIndex,
-    gridPageValue: cursor.pageValue, pageItems: cursor.pageItems, gridRefresh: false
-  });
-  request.meta.kind = 'activity_rotation_customer_grid';
-  return request;
-};
-
 /**
  * Con trỏ trang kế của grid Customer (keyset): bốn giá trị sort key của dòng cuối trang, theo tài liệu Nghiên cứu FBM ch04 mục 4.10.
  * Thiếu `stt_rec_kh` thì FBM trả trang kế rỗng và lượt quét tưởng đã hết khách (gặp thật 2026-10-07: dừng ở 50/1.312 khách).
@@ -239,18 +193,6 @@ FbmSync.gridNextPageIndex = function (pageIndex) {
   return (isFinite(index) && index >= 0 ? Math.floor(index) : 0) + 1;
 };
 
-/** Vị trí trang xoay tiếp theo tính từ trang vừa đọc; hết danh sách thì quay lại trang đầu. Tính ngay khi nhận trang để cursor chỉ mang vị trí này, không mang cả các dòng Customer. */
-FbmSync.activityRotationNext = function (rows, total) {
-  var list = rows || [];
-  if (list.length < FbmSync.ACTIVITY_SUPPLEMENT_CUSTOMERS) { return { pageIndex: -1, pageValue: null, pageItems: null }; }
-  var last = list[list.length - 1], cursor = FbmSync.activityRotationCursor();
-  return { pageIndex: FbmSync.gridNextPageIndex(cursor.pageIndex), pageValue: FbmSync.customerPageValue(last), pageItems: FbmSync.customerPageItems(list, total || cursor.pageItems && cursor.pageItems.lastRowCount) };
-};
-
-/** Lưu vị trí trang xoay do `activityRotationNext` tính. */
-FbmSync.activityRotationSave = function (next) {
-  FbmSync.props().setProperty('FBM_SYNC_ACTIVITY_ROTATION', JSON.stringify({ pageIndex: next.pageIndex, pageValue: next.pageValue, pageItems: next.pageItems || null }));
-};
 /**
  * Trang đầu không kèm tiêu đề: FBM dùng `type: 1` với `gridPageIndex: -2` (mẫu bắt từ giao diện FBM trong RequestFBM).
  * Tiêu đề nặng khoảng 22,5 KB mỗi lần trong khi dữ liệu một khách chỉ vài KB, nên mỗi lượt chỉ lấy tiêu đề một lần (09/01 Kiến trúc và giao thức).
