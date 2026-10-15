@@ -243,7 +243,7 @@ FbmSync.markMissingAfterFullScan = function (entity, state, seen) {
     if (!pullAllowed(record)) { return; }
     if (scope && scope.shin.indexOf(String(entity === 'activity' ? record.customerId : record.id || '').trim()) < 0) { return; }
     var lock = state.locks && state.locks[entity + ':' + String(record.id || '')];
-    if (!fbmId || hasSeen(record) || String(record.recordStatus || 'active') === 'deleted' || FbmSync.isTemporaryRecord(entity, record) || (lock && lock.owner === 'user') || (entity === 'activity' && typeof FbmSync.activitySinceAllows === 'function' && !FbmSync.activitySinceAllows(record))) { return; }
+    if (!fbmId || hasSeen(record) || String(record.recordStatus || 'active') === 'deleted' || FbmSync.isTemporaryRecord(entity, record) || (lock && lock.owner === 'user')) { return; }
     // Dòng đã mang cờ từ lượt trước: không ghi lại và không Log lại mỗi lượt, nhưng vẫn đếm vì lượt này vẫn không thấy nó.
     if (String(record.syncStatus || '') === FbmSync.SYNC_STATUS.missing) { stillMissing += 1; return; }
     missing.push({ id: record.id, syncStatus: FbmSync.SYNC_STATUS.missing });

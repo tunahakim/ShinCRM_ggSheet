@@ -9,12 +9,12 @@ FbmSync.ACTIVITY_BULK_STORE = 'activity_bulk';
 // Mã lỗi Extension báo khi một request lấy cả khoảng thời gian là quá sức; lỗi phiên và lỗi mạng khác không đổi cách lấy.
 FbmSync.ACTIVITY_WINDOW_CODES = ['FBM_SCAN_TOO_LARGE', 'FBM_SCAN_UNPARSEABLE', 'FBM_FETCH_TIMEOUT'];
 
-/** Giao dịch tầng này theo dõi: có FBM ID, không phải tombstone, dòng tạm hay nằm trước mốc `activitySince`. Một chỗ cho cả danh sách id gửi Extension lẫn luật "không thấy". */
+/** Giao dịch tầng này theo dõi: có FBM ID, không phải tombstone hay dòng tạm. Một chỗ cho cả danh sách id gửi Extension lẫn luật "không thấy". */
 /** Bộ lọc giao dịch lớp 1 theo dõi; giao dịch của khách chặn chiều lấy về không vào tập id gửi FBM nên cũng không bao giờ bị gắn cờ "không thấy". */
 FbmSync.activityBulkTracker = function () {
   var pullAllowed = FbmSync.pullAllowedReader('activity');
   return function (record) {
-    return !!String(record && record.fbmId || '').trim() && String(record.recordStatus || 'active') !== 'deleted' && !FbmSync.isTemporaryRecord('activity', record) && FbmSync.activitySinceAllows(record) && pullAllowed(record);
+    return !!String(record && record.fbmId || '').trim() && String(record.recordStatus || 'active') !== 'deleted' && !FbmSync.isTemporaryRecord('activity', record) && pullAllowed(record);
   };
 };
 
@@ -28,7 +28,7 @@ FbmSync.dayKeyAdd = function (key, days) {
   return new Date(Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]) + Number(days))).toISOString().slice(0, 10);
 };
 
-/** Cửa sổ thứ `windowIndex`: cửa sổ đầu không chặn dưới (chỉ mốc `activitySince`), cửa sổ chứa hôm nay không chặn trên, để giao dịch ngày tương lai hay đổi về trước ngày sớm nhất vẫn nằm trong một cửa sổ. */
+/** Cửa sổ thứ `windowIndex`: cửa sổ đầu không chặn dưới, cửa sổ chứa hôm nay không chặn trên, để giao dịch ngày tương lai hay đổi về trước ngày sớm nhất vẫn nằm trong một cửa sổ. */
 FbmSync.activityWindow = function (cursor) {
   var days = FbmSync.BUDGET.activityWindowDays, index = Number(cursor.windowIndex || 0), start = String(cursor.windowStart || '');
   var to = FbmSync.dayKeyAdd(start, (index + 1) * days - 1), last = to >= FbmSync.activityDateKey(new Date());
@@ -37,14 +37,13 @@ FbmSync.activityWindow = function (cursor) {
 
 /** Bộ lọc ngày của cửa sổ theo đúng mẫu FBM: hai đầu đều lấy ngày biên, nên cửa sổ sau bắt đầu từ ngày kế ngày cuối cửa sổ trước. */
 FbmSync.activityWindowFilters = function (cursor) {
-  var window = FbmSync.activityWindow(cursor), since = String(FbmSync.scriptSettings().activitySince || '').trim();
-  var lower = FbmSync.activitySinceFilterDate(window.from || since), upper = FbmSync.activitySinceFilterDate(window.to);
+  var window = FbmSync.activityWindow(cursor), lower = FbmSync.fbmFilterDate(window.from), upper = FbmSync.fbmFilterDate(window.to);
   if (lower && upper) { return ['end_date:>=' + lower + '\u0000<=' + upper + '\u0000']; }
   if (lower) { return ['end_date:>=' + lower]; }
   return upper ? ['end_date:<=' + upper] : [];
 };
 
-/** Request FBM của việc quét giao dịch; cursor chế độ cửa sổ thì lọc theo cửa sổ, không thì lấy cả khoảng từ mốc `activitySince`. */
+/** Request FBM của việc quét giao dịch; cursor chế độ cửa sổ thì lọc theo cửa sổ, không thì lấy mọi giao dịch. */
 FbmSync.activityScanRequest = function (cursor) {
   return FbmSync.activityBulkRequest({ type: 0, count: FbmSync.BUDGET.scanActivityRows, gridPageIndex: -1, gridRefresh: false, filter: cursor.window ? FbmSync.activityWindowFilters(cursor) : [] });
 };
@@ -234,7 +233,7 @@ FbmSync.activityRecheckContinue = function (state, cursor, rawResponse) {
 
 /** Lớp 1 đã nhận đủ: gắn cờ "không thấy", ghi Log một dòng tổng, rồi chốt lượt (gói quét) hoặc kết thúc lượt lấy toàn bộ giao dịch chạy nền. */
 FbmSync.activityBulkEnd = function (state, extra) {
-  // Ghi state của lời gọi trước khi gắn cờ: bước gắn cờ đọc mốc giao dịch từ state trong kho.
+  // Ghi state của lời gọi trước khi gắn cờ: bước gắn cờ đọc state trong kho.
   FbmSync.stateWrite(state);
   var marked = FbmSync.markMissingAfterFullScan('activity', state, FbmSync.seenStoreReader(FbmSync.ACTIVITY_BULK_STORE)), missing = { total: Number(marked.missing || 0), sample: marked.sample || [] };
   state.metadata.activityBulkMissing = missing.sample;

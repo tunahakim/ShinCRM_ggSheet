@@ -62,13 +62,12 @@ FbmSync.lastActivityIndex = function (categoryGate) {
  * Trường lệch giữa giao dịch cuối FBM báo trên dòng khách và giao dịch cuối trên ShinCRM; rỗng là khớp.
  * Công việc khớp khi nằm trong tập công việc của ngày đó: một ngày nhiều giao dịch khác công việc thì không biết FBM hiện giao dịch nào, so bằng sẽ đọc lại khách đó mọi lượt.
  */
-FbmSync.lastActivityDiff = function (row, last, categoryGate, since) {
+FbmSync.lastActivityDiff = function (row, last, categoryGate) {
   var fbm = { end_date: row.ngay_gd, ten_cv: row.ten_cv }, date = FbmSync.isDate(row.ngay_gd) ? row.ngay_gd : FbmSync.fbDate(row.ngay_gd);
   if (!FbmSync.isDate(date) || isNaN(date.getTime())) { return ['end_date']; }
   // 01/01/1999 là "chưa có giao dịch" (kiểm trên FBM thật 2026-10-09: 326/326 khách mang ngày này có 0 giao dịch).
   if (FbmSync.isEmptyFbmDate(date)) { return last ? ['end_date'] : []; }
   var day = FbmSync.canonical('activity', fbm, categoryGate).end_date;
-  if (since && day < since && (!last || last.day < since)) { return []; }
   if (!last || last.day !== day) { return ['end_date']; }
   return last.records.some(function (record) { return !FbmSync.diff('activity', fbm, record, categoryGate, FbmSync.LAST_ACTIVITY_FIELDS).length; }) ? [] : ['ma_cv'];
 };
@@ -82,7 +81,7 @@ FbmSync.activityDueMark = function (state, rows) {
     var local = byFbmId[String(row.stt_rec_kh || '').trim()], index = local ? FbmSync.seenStoreIndex(FbmSync.ACTIVITY_DUE_STORE, local) : -1;
     if (index < 0) { return; }
     order.push(index);
-    var fields = FbmSync.lastActivityDiff(row, last[String(local.id)], gate, String(state.activitySince || ''));
+    var fields = FbmSync.lastActivityDiff(row, last[String(local.id)], gate);
     if (!fields.length) { return; }
     due.push({ fbmId: local.fbmId });
     fields.forEach(function (field) { fieldCounts[field] = Number(fieldCounts[field] || 0) + 1; });

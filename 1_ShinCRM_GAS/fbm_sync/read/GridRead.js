@@ -16,7 +16,6 @@ FbmSync.scriptSettings = function () {
   }
   var accountName = typeof FbmSync.bindingAccountName === 'function' ? FbmSync.bindingAccountName() : '';
   var accountSettings = typeof FbmSync.accountSettingsRead === 'function' ? FbmSync.accountSettingsRead() : {};
-  var activitySince = currentState.runId && currentState.activitySince !== undefined ? currentState.activitySince : accountSettings.activitySince;
   return {
     baseUrl: 'https://fbo.com.vn:8888',
     cookie: cookie,
@@ -25,8 +24,7 @@ FbmSync.scriptSettings = function () {
     userId: userId,
     accountName: accountName,
     customerPrefix: String(accountSettings.customerPrefix || ''),
-    customerCodeLength: String(accountSettings.customerCodeLength || ''),
-    activitySince: String(activitySince || '')
+    customerCodeLength: String(accountSettings.customerCodeLength || '')
   };
 };
 /** Đổi chuỗi /Date(ms)/ của .NET, giữ nguyên giá trị khác. */
@@ -87,38 +85,25 @@ FbmSync.identityCheckCustomerRequest = function (options) {
   var opt = Object.assign({ includeScope: false, sortExpression: 'stt_rec_kh' }, options || {});
   return FbmSync.customerGridRequest(opt);
 };
-/** Đổi mốc YYYY-MM-DD sang định dạng filter ngày mà grid FBM nhận. */
-FbmSync.activitySinceFilterDate = function (value) {
+/** Đổi ngày YYYY-MM-DD sang định dạng filter ngày mà grid FBM nhận; ngày không hợp lệ trả rỗng. */
+FbmSync.fbmFilterDate = function (value) {
   var match = String(value || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) { return ''; }
   var date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
   if (date.getUTCFullYear() !== Number(match[1]) || date.getUTCMonth() !== Number(match[2]) - 1 || date.getUTCDate() !== Number(match[3])) { return ''; }
   return match[3] + '/' + match[2] + '/' + match[1];
 };
-/** Gắn bộ lọc mốc Activity vào mọi request đọc grid, trừ request chủ động lấy lịch sử. */
-FbmSync.activitySinceFilters = function (options) {
-  var opt = options || {}, filters = Array.isArray(opt.filter) ? opt.filter.slice() : [], cfg = FbmSync.scriptSettings();
-  var since = String(cfg.activitySince || '').trim(), filterDate = FbmSync.activitySinceFilterDate(since);
-  var hasEndDateFilter = filters.some(function (item) { return /^end_date\s*:/i.test(String(item || '').trim()); });
-  if (filterDate && opt.includeHistory !== true && !hasEndDateFilter) { filters.push('end_date:>=' + filterDate); }
-  return filters;
-};
 /** Tạo request Activity luôn gắn với stt_rec của Customer. */
 FbmSync.activityGridRequest = function (sttRec, options) {
   var opt = Object.assign({}, options || {}, { externalKey: [{ Name: 'stt_rec', Opr: '=', Value: String(sttRec || ''), Type: 'String', Ignore: false }] });
-  opt.filter = FbmSync.activitySinceFilters(opt);
-  delete opt.includeHistory;
   return FbmSync.gridRequest('activity', opt);
 };
-/** Dựng request Activity của mọi khách theo mốc thời gian; không gắn một Customer cụ thể. */
+/** Dựng request Activity của mọi khách; không gắn một Customer cụ thể. */
 FbmSync.activityBulkRequest = function (options) {
-  var opt = Object.assign({}, options || {});
-  opt.filter = FbmSync.activitySinceFilters(opt);
-  delete opt.includeHistory;
-  return FbmSync.gridRequest('activity', opt);
+  return FbmSync.gridRequest('activity', Object.assign({}, options || {}));
 };
 
-/** Đọc đích danh một giao dịch theo FBM ID, có tiêu đề cột; không lọc mốc ngày vì đang hỏi giao dịch đó còn hay không. */
+/** Đọc đích danh một giao dịch theo FBM ID, có tiêu đề cột; dùng để hỏi giao dịch đó còn hay không. */
 FbmSync.activityByIdRequest = function (fbmId) {
   return FbmSync.gridRequest('activity', { type: 0, count: 20, gridPageIndex: -1, gridRefresh: false, externalKey: [{ Name: 'id', Opr: '=', Value: String(fbmId || ''), Type: 'String', Ignore: false }] });
 };

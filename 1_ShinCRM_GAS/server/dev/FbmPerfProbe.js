@@ -16,7 +16,7 @@ var FBM_PERF_FBM_FUNCTIONS = [
   'withOrchestrationLock', 'nextEnvelope', 'requestForCursor',
   'rowsToRecords', 'customerRecord', 'activityRecord', 'isTemporaryRecord', 'stateCategoryGate', 'readCategoryGate',
   'pullRecords', 'pullWrite', 'readLocal', 'seenStoreBegin', 'seenStoreMark', 'seenStoreHas', 'sheetSave', 'previewRecords',
-  'hash', 'threeWay', 'canonical', 'activitySinceAllows',
+  'hash', 'threeWay', 'canonical',
   'businessStepStart', 'businessStepAdd', 'businessStepFinish',
   'customerScanRecord', 'customerNext', 'activityForCustomers', 'finishPullRun', 'beginCustomerPull',
   'runPreflight', 'preflightEvaluate', 'preflightLocalScan', 'preflightHashSummary', 'preflightCandidates', 'preflightPushPermissions', 'logPreflight', 'identityPreflight', 'pushCandidates',
