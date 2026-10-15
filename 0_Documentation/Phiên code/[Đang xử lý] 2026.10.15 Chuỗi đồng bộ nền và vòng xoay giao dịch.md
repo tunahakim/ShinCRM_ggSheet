@@ -42,8 +42,8 @@ Hiện bước ghi và bước đẩy đã đúng; hai bước dưới quên xé
 
 ## 6. Lượt tay chen ngang lượt nền
 
-- [ ] [Tự động] Giữ hành vi hiện có (`manualPending`, `SYNC_BACKGROUND_STOPPING`); nút hiện `Đang dừng đồng bộ nền...` và khóa trong lúc chờ; lượt tay kết thúc bằng bước đếm, lệch thì hiện `Số khách FBM vừa đổi, quét thêm một lần...`.
-- [ ] [Tự động] UI `Cài đặt phiên`: ô số khách vòng xoay không giới hạn 50, dòng giải thích công tắc tiến trình và chu kỳ không ngắn hơn `Chu kỳ hỏi GAS` (09/08).
+- [x] [Tự động] Giữ hành vi hiện có (`manualPending`, `SYNC_BACKGROUND_STOPPING`); nút hiện `Đang dừng đồng bộ nền...` và khóa trong lúc chờ; lượt tay kết thúc bằng bước đếm, lệch thì hiện `Số khách FBM vừa đổi, quét thêm một lần...`. Test `Sidebar.js`: "Bấm chạy tay khi lượt nền đang chạy: nút khóa và hiện \"Đang dừng đồng bộ nền...\" trong lúc chờ; lượt tay xong thì nút mở lại"; `CustomerCount.js`: "Lượt chạy tay, tổng khách FBM tăng giữa hai lần đếm: Sidebar hiện \"Số khách FBM vừa đổi, quét thêm một lần...\", ..."; mốc không dời khi lượt tay chen ngang: `BackgroundChain.js` (mục 4).
+- [x] [Tự động] UI `Cài đặt phiên`: ô số khách vòng xoay không giới hạn 50, dòng giải thích công tắc tiến trình và chu kỳ không ngắn hơn `Chu kỳ hỏi GAS` (09/08). Ô trống hoặc số sai gửi nguyên để GAS từ chối lưu, không thay bằng 50. Test `Sidebar.js`: "Lịch đồng bộ nền: ngay dưới các công tắc tiến trình có dòng giải thích ...; dòng giải thích Vòng xoay không còn trần 50"; `Workflow.js`: "Số khách mỗi phiên Vòng xoay không còn trần 50: lưu 300 đọc lại 300; 0 bị từ chối".
 
 ## Bàn giao
 
