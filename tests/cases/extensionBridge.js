@@ -352,7 +352,7 @@ async function chay(so) {
   check(so, 'heartbeat coi GAS noop hop le la thanh cong va khong tim tab FBM', workerSource.indexOf("noteHeartbeatStatus('gas_noop'") >= 0 && workerSource.indexOf('if (!gasRequest.request)') >= 0, true);
   check(so, 'background relay dung DTO gon, khong gui traceTail/metadata Sidebar', workerSource.indexOf("kind: 'background_sync'") >= 0 && entryPointsSource.indexOf('fbmSyncRelayCompactResult') >= 0 && entryPointsSource.indexOf("body.kind === 'background_sync'") >= 0, true);
   check(so, 'background relay chi tiep tuc command GAS da cap tu heartbeat', workerSource.indexOf("command: 'start'") < 0 && workerSource.indexOf("command: 'continue'") >= 0 && entryPointsSource.indexOf('FbmSync.controlDispatch') >= 0, true);
-  check(so, 'executor co ping phien ban 21.21 va kenh execute moi', /EXECUTOR_VERSION\s*=\s*'21\.21'/.test(executorSource) && workerSource.indexOf("FBM_EXECUTOR_VERSION = '21.21'") >= 0 && executorSource.indexOf('FBM_PING_V2') >= 0 && executorSource.indexOf('FBM_EXECUTE_V2') >= 0, true);
+  check(so, 'executor co ping phien ban 21.22 va kenh execute moi', /EXECUTOR_VERSION\s*=\s*'21\.22'/.test(executorSource) && workerSource.indexOf("FBM_EXECUTOR_VERSION = '21.22'") >= 0 && executorSource.indexOf('FBM_PING_V2') >= 0 && executorSource.indexOf('FBM_EXECUTE_V2') >= 0, true);
   check(so, 'executor chi nghe kenh V2, kenh FBM_PING/FBM_EXECUTE doi cu da go', [executorSource.indexOf("'FBM_PING'"), executorSource.indexOf("'FBM_EXECUTE'")], [-1, -1]);
   check(so, 'GAS la noi duy nhat kiem tra endpoint FBM', executorSource.indexOf('validateEndpoint(req.url)') < 0 && executorSource.indexOf('FBM_ENDPOINT_UNALLOWED') < 0, true);
   check(so, 'GAS chan endpoint thieu truoc cap envelope', fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'protocol', 'Protocol.js'), 'utf8').indexOf('validateEndpoint: function') >= 0 && fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'transport', 'TransportCore.js'), 'utf8').indexOf('validateEndpoint(item.url)') >= 0, true);
@@ -397,7 +397,7 @@ async function chay(so) {
   workerContext.clearTimeout = () => {};
   workerContext.setTimeout = (fn, ms) => { const timer = { fn, ms: Number(ms), fired: false }; waitTimers.push(timer); return timer; };
   workerContext.chrome.tabs.sendMessage = (tabId, message, done) => {
-    if (message.type === 'FBM_PING_V2') { done({ ready: true, version: '21.21' }); return; }
+    if (message.type === 'FBM_PING_V2') { done({ ready: true, version: '21.22' }); return; }
     if (message.type === 'FBM_EXECUTE_V2') { sentAt.push(message.request.id + '@' + virtualNow); if (onSend) { onSend(message.request.id); } done({ result: { ok: true, status: 200, body: '{}', transport: { trace: [] } } }); }
   };
   // Đồng hồ giả: chỉ bắn hẹn giờ khoảng nghỉ (hàm `wake`; hẹn giờ hết hạn ping/tin nhắn tab là hàm khác), dời đồng hồ đúng bằng thời gian chờ.
@@ -446,7 +446,7 @@ async function chay(so) {
   workerContext.Date = Date;
   const sentItems = [];
   workerContext.chrome.tabs.sendMessage = (tabId, message, done) => {
-    if (message.type === 'FBM_PING_V2') { done({ ready: true, version: '21.21' }); return; }
+    if (message.type === 'FBM_PING_V2') { done({ ready: true, version: '21.22' }); return; }
     if (message.type !== 'FBM_EXECUTE_V2') { return; }
     sentItems.push(message.request);
     if (message.request.id === 'loi-mang') { done({ error: 'Failed to fetch', code: 'FBM_TRANSPORT_UNAVAILABLE', trace: [{ stage: 'fetch_finished', requestId: 'lo-env' }] }); return; }
