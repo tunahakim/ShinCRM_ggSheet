@@ -160,74 +160,6 @@ FbmSync.schedulerPickDue = function (now, options) {
   FbmSync.stateWrite(state);
   return { ok: true, kind: chosen.kind, nextRunAt: next };
 };
-/** Nhận quyền một lượt scheduler bằng khóa tài liệu; không giữ công việc trong RAM. */
-FbmSync.schedulerClaim = function (kind, now) {
-  var configured = FbmSync.backgroundScheduleRead(), names = { heartbeat: ['FBM_SYNC_NEXT_HEARTBEAT', configured.heartbeat.minutes * 60 * 1000], customerFull: ['FBM_SYNC_NEXT_CUSTOMER_FULL_SCAN', configured.customerFull.minutes * 60 * 1000], activityFull: ['FBM_SYNC_NEXT_ACTIVITY_FULL_SCAN', configured.activityFull.minutes * 60 * 1000], detail: ['FBM_SYNC_NEXT_DETAIL_SCAN', configured.detail.minutes * 60 * 1000], customer: ['FBM_SYNC_NEXT_CUSTOMER_SCAN', configured.customerFull.minutes * 60 * 1000], activity: ['FBM_SYNC_NEXT_ACTIVITY_SCAN', configured.activityFull.minutes * 60 * 1000] };
-  var item = names[String(kind || '')], props = FbmSync.props(), at = Number(now || Date.now());
-  if (!item) { return { ok: false, code: 'UNKNOWN_SCHEDULE' }; }
-    var configuredKind = String(kind) === 'customer' ? 'customerFull' : String(kind) === 'activity' ? 'activityFull' : String(kind);
-    if (configuredKind !== 'heartbeat' && configured[configuredKind] && configured[configuredKind].enabled === false) { return { ok: false, code: 'PROCESS_DISABLED', message: 'Tiến trình nền ' + String(kind) + ' đang tắt.' }; }
-  if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED', message: 'Đồng bộ đang tắt; scheduler không mở kỳ mới.', status: FbmSync.statusView() }; }
-   if (!FbmSync.backgroundEnabled() || configured.enabled === false) { return { ok: false, code: 'BACKGROUND_DISABLED', message: 'Đồng bộ nền đang tắt.', status: FbmSync.statusView() }; }
-  var due = Number(props.getProperty(item[0]) || 0);
-  if (due && due > at) { return { ok: false, code: 'NOT_DUE', nextRunAt: due }; }
-  var lock = FbmSync.orchestrationLock();
-  if (!documentStoreTryLock(lock, SETTINGS.LOCK_WAIT_MS)) { return { ok: false, code: 'BUSY' }; }
-  try {
-    var state = FbmSync.stateRead();
-    if (typeof FbmSync.recoverStaleRun === 'function') { state = FbmSync.recoverStaleRun(state).state; }
-    // Phiên lỗi, đặc biệt push_wait, phải giữ nguyên nguyên nhân để người dùng xử lý;
-    // scheduler không được ghi đè message hoặc biến nó thành một lượt đang chờ.
-    if (state.runId && String(state.phase || '') === 'error' && ['SYNC_STALE_WRITE', 'SUPERVISOR_TIMEOUT_AT_PUSH'].indexOf(String(state.lastFailureCode || '')) >= 0) {
-      return { ok: false, code: 'SYNC_ERROR_REQUIRES_MANUAL_RESTART', status: FbmSync.statusView() };
-    }
-    if (state.runId && ['idle', 'done', 'error'].indexOf(state.phase) < 0) { return { ok: false, code: 'SYNC_ALREADY_RUNNING', nextRunAt: due }; }
-    due = Number(props.getProperty(item[0]) || 0);
-    if (due && due > at) { return { ok: false, code: 'NOT_DUE', nextRunAt: due }; }
-    var next = at + item[1];
-    props.setProperty(item[0], String(next));
-    state.scheduledScan = String(kind);
-    state.scheduledDirection = configured.direction;
-    state.nextRunAt = next;
-    state.message = 'Đã nhận lượt scheduler ' + String(kind) + '; chờ Extension chuyển request.';
-    FbmSync.stateWrite(state);
-    return { ok: true, kind: String(kind), nextRunAt: next, status: FbmSync.statusView() };
-  } finally { lock.releaseLock(); }
-};
-/** Cài lại ba trigger sync, xóa bản cũ cùng handler trước. */
-function fbmInstallScheduler() {
-  var names = ['fbmHeartbeatTrigger', 'fbmCustomerScanTrigger', 'fbmActivityScanTrigger', 'fbmSupervisorTrigger'];
-  ScriptApp.getProjectTriggers().forEach(function (trigger) { if (names.indexOf(trigger.getHandlerFunction()) >= 0) { ScriptApp.deleteTrigger(trigger); } });
-  // GAS không tự gọi FBM và không cần một trigger cho từng tiến trình.
-  // Extension chỉ hỏi GAS bằng một alarm; trigger này chỉ thu hồi phiên bị treo.
-  ScriptApp.newTrigger('fbmSupervisorTrigger').timeBased().everyMinutes(1).create();
-  return FbmSync.schedule();
-}
-
-/** Giám sát độc lập state; chỉ kết luận phiên treo và fail-closed, không gửi lại request ghi. */
-FbmSync.supervise = function (now) {
-  var state = FbmSync.stateRead(), at = Number(now || Date.now()), active = FbmSync.ACTIVE_PHASES.indexOf(String(state.phase || '')) >= 0;
-  if (!active || !state.runId) { return { ok: true, monitored: false, status: FbmSync.statusView() }; }
-  var last = Number(state.lastProgressAt || state.updatedAt || state.startedAt || 0), age = last ? at - last : FbmSync.STALE_RUN_MS + 1;
-  if (age <= FbmSync.STALE_RUN_MS) { return { ok: true, monitored: true, stale: false, ageMs: Math.max(0, age), status: FbmSync.statusView() }; }
-  var current = state, waitingWrite = current.cursor && current.cursor.kind === 'push_wait';
-  current.phase = 'error';
-  current.lastFailureCode = waitingWrite ? 'SUPERVISOR_TIMEOUT_AT_PUSH' : 'SUPERVISOR_TIMEOUT_AT_' + String((current.cursor && current.cursor.kind) || current.phase || 'UNKNOWN').toUpperCase();
-  current.retryable = false;
-  current.lastError = waitingWrite
-    ? 'Phiên ghi FBM không nhận được phản hồi quá thời gian an toàn; Supervisor đã dừng và không tự ghi lại.'
-    : 'Phiên đồng bộ không nhận được phản hồi quá thời gian an toàn; Supervisor đã dừng phiên.';
-  current.message = current.lastError;
-  if (!waitingWrite) {
-    var kept = {};
-    Object.keys(current.locks || {}).forEach(function (key) { if (current.locks[key] && current.locks[key].owner === 'user') { kept[key] = current.locks[key]; } });
-    current.locks = kept;
-  }
-  FbmSync.stateWrite(current);
-  if (FbmSync.traceEvent) { FbmSync.traceEvent('supervisor_timeout', { runId: current.runId, requestId: current.activeRequestId, error: current.lastError }); }
-  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'supervisor_timeout', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', entity: current.entity || '', recordId: current.current || '', reason: current.lastError, detail: { code: current.lastFailureCode, ageMs: age, cursor: current.cursor && current.cursor.kind || '', operation: current.cursor && current.cursor.operation || '' } }); }
-  return { ok: false, monitored: true, stale: true, status: FbmSync.statusView() };
-};
 
 function fbmSyncLockResult(code, message) {
   return { ok: false, code: String(code || 'BUSY'), request: null, message: String(message || 'GAS đang xử lý một request khác; chưa cấp request FBM mới.'), status: FbmSync.statusView() };
@@ -402,14 +334,27 @@ FbmSync.heartbeatCustomerTotal = function (rawResponse) {
 };
 
 function fbmHeartbeat(rawResponse) { return fbmSyncHeartbeat(rawResponse); }
-/** Trigger chỉ ghi marker; Extension mới là nơi gửi request heartbeat. */
-function fbmHeartbeatTrigger() { return FbmSync.schedulerClaim('heartbeat'); }
-/** Đánh dấu đến lịch quét Customer để Sidebar/Extension tiếp tục. */
-function fbmCustomerScanTrigger() { return FbmSync.schedulerClaim('customer'); }
-/** Đánh dấu đến lịch quét Activity để Sidebar/Extension tiếp tục. */
-function fbmActivityScanTrigger() { return FbmSync.schedulerClaim('activity'); }
-/** Trigger này không gọi FBM; chỉ kiểm tra execution trước đã bỏ rơi hay chưa. */
-function fbmSupervisorTrigger() {
-  var run = function () { return FbmSync.supervise(); };
-  return typeof runEntryPoint === 'function' ? runEntryPoint('fbmSupervisorTrigger', 'fbm_sync', 'throw', run) : run();
+/**
+ * Handler của các trigger hẹn giờ phía GAS ở thiết kế cũ. Nhịp nền nay chỉ do alarm `gas_poll` của Extension (09/02), GAS không cài trigger hẹn giờ nào cho đồng bộ.
+ * Google không tự gỡ trigger đã cài khi code đổi, nên tên hàm phải còn: trigger sót gọi tới thì tự xóa mọi trigger cũ và ghi Log, không làm việc nghiệp vụ nào. Bỏ tên hàm thì trigger sót báo lỗi "không tìm thấy hàm" mãi.
+ */
+FbmSync.LEGACY_TRIGGER_HANDLERS = ['fbmHeartbeatTrigger', 'fbmCustomerScanTrigger', 'fbmActivityScanTrigger', 'fbmSupervisorTrigger'];
+FbmSync.removeLegacyTriggers = function () {
+  var removed = [];
+  ScriptApp.getProjectTriggers().forEach(function (trigger) {
+    var handler = trigger.getHandlerFunction();
+    if (FbmSync.LEGACY_TRIGGER_HANDLERS.indexOf(handler) >= 0) { ScriptApp.deleteTrigger(trigger); removed.push(handler); }
+  });
+  if (removed.length && typeof logEvent === 'function') {
+    logEvent({ source: 'fbm_sync', action: 'legacy_trigger_removed', outcome: typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', reason: 'Đã gỡ ' + removed.length + ' trigger hẹn giờ của thiết kế cũ (' + removed.join(', ') + '); nhịp nền chỉ còn do Extension hỏi GAS.' });
+  }
+  return { ok: true, removed: removed };
+};
+function fbmLegacyTriggerEntry(name) {
+  var run = function () { return FbmSync.removeLegacyTriggers(); };
+  return typeof runEntryPoint === 'function' ? runEntryPoint(name, 'fbm_sync', 'throw', run) : run();
 }
+function fbmHeartbeatTrigger() { return fbmLegacyTriggerEntry('fbmHeartbeatTrigger'); }
+function fbmCustomerScanTrigger() { return fbmLegacyTriggerEntry('fbmCustomerScanTrigger'); }
+function fbmActivityScanTrigger() { return fbmLegacyTriggerEntry('fbmActivityScanTrigger'); }
+function fbmSupervisorTrigger() { return fbmLegacyTriggerEntry('fbmSupervisorTrigger'); }
