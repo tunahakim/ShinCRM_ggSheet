@@ -75,8 +75,8 @@ FbmSync.protocol = {
     var status = Number(response && response.status || 0);
     return status === 401 || status === 403;
   },
-  /** FBM có thể trả JSON HTTP 200 nhưng báo chưa xác thực bằng Authorized:false. */
-  isUnauthenticatedSessionProbeResponse: function (response) {
+  /** FBM có thể trả JSON HTTP 200 nhưng báo chưa xác thực bằng Authorized:false và không có dòng dữ liệu, cả ở probe lẫn request nghiệp vụ. */
+  isUnauthenticatedResponse: function (response) {
     var status = Number(response && response.status || 0), parsed, data, rows;
     if (status !== 200) { return false; }
     parsed = FbmSync.protocol.parse(response) || {};
@@ -100,7 +100,8 @@ FbmSync.protocol = {
     var httpStatus = Number(response && typeof response === 'object' ? response.status || 0 : 0);
     // FBM dùng 401 để báo phiên hết hạn; phải đi qua session gate trước khi
     // áp dụng luật retry chung của lỗi vận chuyển.
-    if (FbmSync.protocol.isSessionSuspicious(response)) {
+    // Request nghiệp vụ nhận "chưa xác thực" (phiên chết, ví dụ đăng nhập ở thiết bị khác) cũng chỉ là đáng ngờ: probe mới được kết luận.
+    if (FbmSync.protocol.isSessionSuspicious(response) || FbmSync.protocol.isUnauthenticatedResponse(response)) {
       return { code: 'SESSION_SUSPECTED', retryable: false, status: httpStatus, bug: { FieldName: '$SESSION', Message: 'Phản hồi FBM đáng ngờ; cần probe lại phiên.' } };
     }
     if (httpStatus >= 400) {

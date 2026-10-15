@@ -295,7 +295,7 @@ FbmSync.sessionGateForgetStale = function (state) {
  */
 FbmSync.sessionGateHandleProbeFailure = function (state, cursor, response) {
   var current = state || FbmSync.stateRead(), gate = FbmSync.sessionGateMeta(current), suspicious = FbmSync.protocol.isSessionSuspicious(response);
-  if (gate.probeOnly === true && FbmSync.protocol.isUnauthenticatedSessionProbeResponse(response)) { gate.probeOnly = false; }
+  if (gate.probeOnly === true && FbmSync.protocol.isUnauthenticatedResponse(response)) { gate.probeOnly = false; }
   if (suspicious && Number(gate.probeRetryCount || 0) < 1) {
     gate.probeRetryCount = 1;
     current.message = 'Phản hồi FBM đáng ngờ; đang probe lại phiên đúng một lần.';

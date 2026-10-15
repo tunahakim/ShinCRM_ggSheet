@@ -439,7 +439,8 @@ FbmSync.continueStep = function (rawResponse) {
     return probeFailure;
   }
   // Phân loại trên wrapper HTTP gốc; parse trước sẽ làm mất status và biến lỗi vận chuyển thành Bugs giả.
-  var success = FbmSync.protocol.assertSuccess(rawResponse);
+  // Probe nhận "chưa xác thực" là kết luận phiên chết, đi tiếp nhánh identity bên dưới để vào cổng đăng nhập, không phải dấu hiệu đáng ngờ cần probe nữa.
+  var success = cursor.kind === 'session_probe' && FbmSync.protocol.isUnauthenticatedResponse(rawResponse) ? { ok: true } : FbmSync.protocol.assertSuccess(rawResponse);
   if (!success.ok) {
     if (success.code === 'SESSION_SUSPECTED' && cursor.kind !== 'push_wait' && cursor.kind !== 'session_probe') {
       var suspicionProbe = FbmSync.sessionGateProbeRequest(state, cursor, 'Phản hồi FBM đáng ngờ; request nghiệp vụ đã dừng để probe lại phiên.');
@@ -496,7 +497,7 @@ FbmSync.continueStep = function (rawResponse) {
   if (cursor.kind === 'session_probe') {
     var probedIdentity = FbmSync.identityUser(response);
     if (!probedIdentity.ok) {
-      if (typeof FbmSync.protocol.isUnauthenticatedSessionProbeResponse === 'function' && FbmSync.protocol.isUnauthenticatedSessionProbeResponse(rawResponse)) {
+      if (typeof FbmSync.protocol.isUnauthenticatedResponse === 'function' && FbmSync.protocol.isUnauthenticatedResponse(rawResponse)) {
         var probeRecovery = FbmSync.sessionGateHandleProbeFailure(state, cursor, rawResponse);
         if (probeRecovery && probeRecovery.request) { return probeRecovery; }
         if (probeRecovery) { return probeRecovery; }
