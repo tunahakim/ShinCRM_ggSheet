@@ -23,7 +23,7 @@ var FBM_SYNC_SETTINGS_SCHEMA = {
       { key: 'activityFull', label: 'Lấy toàn bộ giao dịch', minutes: 480, enabled: false },
       { key: 'detail', label: 'Vòng xoay giao dịch', minutes: 30, enabled: false }
     ],
-    processesHelp: 'Tắt một tiến trình chỉ bỏ lịch chạy định kỳ của nó; bước đếm khách vẫn gọi Quét nhanh khi số khách FBM đổi. GAS chỉ chạy khi Extension hỏi nên chu kỳ thực tế không ngắn hơn Chu kỳ hỏi GAS.',
+    processesHelp: 'Tắt chỉ bỏ lịch định kỳ; Quét nhanh vẫn chạy khi số khách FBM đổi. Chu kỳ thực tế không ngắn hơn Chu kỳ hỏi GAS.',
     detail: {
       countLabel: 'Số khách mỗi lượt vòng xoay', countId: 'fbm-sync-detail-count', countPlaceholder: '30', countHelp: 'Mỗi lượt Vòng xoay giao dịch đọc tiếp N khách kế tiếp trên Sheet (số nguyên từ 1, không giới hạn trên) theo từng lô rồi lấy toàn bộ giao dịch của họ; lượt sau đọc N khách tiếp theo, hết danh sách thì quay lại đầu. Ví dụ 30 khách mỗi 30 phút thì khoảng 1.300 khách được xoay hết một vòng trong gần một ngày.'
     },
