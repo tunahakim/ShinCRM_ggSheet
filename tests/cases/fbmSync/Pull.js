@@ -223,9 +223,7 @@ async function chay(so) {
   builders.FbmSync.customerScanRecord(tienTrinh, { total: 50, rows: Array.from({ length: 50 }, () => ({})) }, true);
   builders.FbmSync.progressCustomersDone(tienTrinh, 3);
   tienTrinh.counts.completed = 1312;
-  const chiTiet = { scan: 'detail', detailCustomerLimit: 20, mode: 'read', metadata: {} };
-  builders.FbmSync.customerScanRecord(chiTiet, { total: 1312, rows: [] }, true);
-  check(so, 'tiến trình lượt 50 khách là x/50 theo khách đã quét xong, quét chi tiết lấy giới hạn khách mỗi lượt làm mẫu số', [tienTrinh.progress, chiTiet.progress.total], [{ done: 3, total: 50 }, 20]);
+  check(so, 'tiến trình lượt 50 khách là x/50 theo khách đã quét xong', tienTrinh.progress, { done: 3, total: 50 });
   // Cursor chỉ giữ stt_rec_kh; mã FBM của khách cha tra từ Sheet Customer, khách chưa có trên Sheet thì để trống chứ không đoán.
   const docKhachCu = builders.FbmSync.readLocal;
   builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-A2', fbmId: 'A2', fbmCustomerCode: 'ALT02' }] : [];

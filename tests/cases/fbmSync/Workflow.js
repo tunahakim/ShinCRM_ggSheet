@@ -360,23 +360,15 @@ async function chay(so) {
     detail: { enabled: true, minutes: 60, customersPerRun: 50, minDelaySeconds: 0.5, maxDelaySeconds: 2 }
   });
   check(so, 'Lịch nền lưu chiều hai chiều và số khách mỗi phiên; khoảng nghỉ cũ của lịch nền bị bỏ, không còn lưu', [directionSchedule.schedule.direction, directionSchedule.schedule.detail.enabled, directionSchedule.schedule.detail.customersPerRun, 'minDelaySeconds' in directionSchedule.schedule.detail, 'maxDelaySeconds' in scheduleFlow.hop.FbmSync.backgroundScheduleRead().detail, scheduleFlow.hop.FbmSync.backgroundEnabled()], ['write', true, 50, false, false, true]);
-  const detailCursor = scheduleFlow.hop.FbmSync.detailCursorWrite({ pageIndex: 1, pageValue: ['2026-09-16', '2026-09-16T10:00:00', '50', 'CUS-50'] });
-  check(so, 'Cursor detail được lưu bền vững chỉ với đủ bốn giá trị khóa trang', [detailCursor.pageIndex, scheduleFlow.hop.FbmSync.detailCursorRead().pageValue.join('|')], [1, '2026-09-16|2026-09-16T10:00:00|50|CUS-50']);
-  const detailState = { scan: 'detail', detailCustomerLimit: 50, cursor: { pageIndex: 1, count: 50, seen: 0 } };
-  const detailRows = Array.from({ length: 50 }, (_, index) => ({ ngay_gd: '2026-09-16', datetime0: String(index), xorder: String(index), stt_rec_kh: 'CUS-' + (index + 1) }));
-  const detailNext = scheduleFlow.hop.FbmSync.customerNext(detailState, scheduleFlow.hop.FbmSync.customerPageOf(detailRows), 120);
-  check(so, 'Trang detail đủ batch không đánh dấu hết danh sách và lưu trang kế tiếp', [detailNext, scheduleFlow.hop.FbmSync.detailCursorRead().pageIndex, scheduleFlow.hop.FbmSync.detailCursorRead().pageValue[2]], [false, 2, '49']);
-  scheduleFlow.hop.FbmSync.customerNext({ scan: 'detail', detailCustomerLimit: 50, cursor: { pageIndex: 2, count: 50, seen: 0 } }, scheduleFlow.hop.FbmSync.customerPageOf([]), 120);
-  check(so, 'Trang detail rỗng xóa cursor để lượt sau bắt đầu lại an toàn', scheduleFlow.hop.FbmSync.detailCursorRead(), null);
-  const batchLimitFlow = workflowGas();
-  batchLimitFlow.hop.FbmSync.prepareCategoryGate = () => ({ map: {}, valid: {}, warnings: [] });
-  batchLimitFlow.hop.FbmSync.start({ mode: 'read', origin: 'background', scan: 'detail', detail: { customersPerRun: 3 } });
-  const batchState = batchLimitFlow.hop.FbmSync.stateRead();
-  const firstBatchRequest = batchLimitFlow.hop.FbmSync.beginCustomerPull(batchLimitFlow.hop.FbmSync.stateRead());
-  const batchRows = [1, 2, 3].map((index) => ({ ngay_gd: '2026-09-16', datetime0: String(index), xorder: String(index), stt_rec_kh: 'CUS-' + index }));
-  const secondBatchRequest = batchLimitFlow.hop.FbmSync.customerNext(batchLimitFlow.hop.FbmSync.stateRead(), batchLimitFlow.hop.FbmSync.customerPageOf(batchRows), 10);
-  const batchCursor = batchLimitFlow.hop.FbmSync.detailCursorRead();
-  check(so, 'Số Customer mỗi lượt = 3 được áp dụng và cursor đến Customer thứ 4', [batchState.detailCustomerLimit, firstBatchRequest.body.count, secondBatchRequest, batchCursor.pageIndex, batchCursor.pageValue[2]], [3, 3, false, 1, '3']);
+  const cursorTruoc = scheduleFlow.hop.FbmSync.detailCursorRead();
+  scheduleFlow.documentProperties.setProperty(scheduleFlow.hop.FbmSync.DETAIL_CURSOR_KEY, JSON.stringify({ pageIndex: 1, pageValue: ['2026-09-16', '2026-09-16T10:00:00', '50', 'CUS-50'] }));
+  const cursorKieuCu = scheduleFlow.hop.FbmSync.detailCursorRead();
+  scheduleFlow.hop.FbmSync.detailCursorWrite(42);
+  check(so, 'Cursor Vòng xoay là số CUS: chưa có hoặc còn kiểu khóa trang FBM cũ thì là -1 (bắt đầu từ CUS nhỏ nhất), ghi 42 đọc lại 42', [cursorTruoc, cursorKieuCu, scheduleFlow.hop.FbmSync.detailCursorRead()], [-1, -1, 42]);
+  const nhieuKhach = scheduleFlow.hop.FbmSync.backgroundScheduleSave({ detail: { enabled: true, minutes: 60, customersPerRun: 300 } });
+  let loiSoKhach = '';
+  try { scheduleFlow.hop.FbmSync.backgroundScheduleSave({ detail: { enabled: true, minutes: 60, customersPerRun: 0 } }); } catch (error) { loiSoKhach = error.message; }
+  check(so, 'Số khách mỗi phiên Vòng xoay không còn trần 50: lưu 300 đọc lại 300; 0 bị từ chối', [nhieuKhach.schedule.detail.customersPerRun, scheduleFlow.hop.FbmSync.backgroundScheduleRead().detail.customersPerRun, loiSoKhach], [300, 300, 'Số khách mỗi lượt vòng xoay phải là số nguyên từ 1 trở lên.']);
   // Chiều đẩy kiểm lại danh mục FBM giữa các lô: FBM đổi tên một mã giữa lượt thì chỉ bản ghi dùng mã đó bị chặn.
   const categoryPushRun = (options) => {
     const flow = workflowGas(), F = flow.hop.FbmSync, logs = [], sheetSaves = [], fbmNames = { WEB: 'Web', HDDV: 'Hóa đơn dịch vụ' }, lookupAt = [], issued = [];

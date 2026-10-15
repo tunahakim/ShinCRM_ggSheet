@@ -17,6 +17,7 @@ const NHOM = [
   require("./fbmSync/ActivityScan"),
   require("./fbmSync/CustomerCount"),
   require("./fbmSync/BackgroundChain"),
+  require("./fbmSync/Rotation"),
   require("./fbmSync/Settings"),
   require("./fbmSync/RelayResend")
 ];
