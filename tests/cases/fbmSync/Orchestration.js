@@ -315,15 +315,20 @@ async function chay(so) {
    check(so, 'probe User cua phien nen moi cap authorize Customer', [continuedProbe && continuedProbe.ok, continuedProbe && continuedProbe.request && continuedProbe.request.meta.kind, continuedProbe && continuedProbe.request && continuedProbe.request.meta.entity], [true, 'authorize', 'customer']);
    const continuedBackground = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: JSON.stringify({ d: { Authorized: 'auth-customer' } }), transport: { contract: MA_HOP_DONG, trace: [{ requestId: continuedProbe && continuedProbe.request && continuedProbe.request.id || '' }], payloadCookie: 'userFHN_CRM_App' } });
    check(so, 'response authorize cua phien nen di qua continuation chung', [continuedBackground && continuedBackground.ok, continuedBackground && continuedBackground.request && continuedBackground.request.meta.kind, continuedBackground && continuedBackground.request && continuedBackground.request.meta.entity, heartbeat.FbmSync.stateRead().cursor.kind], [true, 'authorize', 'activity', 'authorize_activity']);
-    heartbeat.FbmSync.statePatch({ runId: 'slice-run', origin: 'background', phase: 'pull_customer', cursor: { kind: 'customer_grid', type: 1, pageIndex: 3, pageValue: ['d', 't', 'x'], count: 2000 }, activeRequestId: 'slice-request', deadlineAt: Date.now() + 60000, session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' }, metadata: { sessionGate: {} } });
-    const sliceEnded = heartbeat.FbmSync.limitRelayResult({ ok: true, request: { id: 'slice-next-request' }, status: heartbeat.FbmSync.statusView() }, heartbeat.FbmSync.RELAY_HOP_LIMIT);
-   const resumedAfterSlice = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
-   check(so, 'alarm dau moi lat relay phai probe User truoc khi tiep tuc cursor', [sliceEnded.code, resumedAfterSlice.ok, resumedAfterSlice.code, resumedAfterSlice.request.meta.kind], ['RELAY_SLICE_COMPLETE', true, 'SESSION_SLICE_PROBE_READY', 'session_probe']);
-   const resumedSliceProbe = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[2037,"ANHLT","Le Tuan Anh"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: resumedAfterSlice.request.id }] } });
-   check(so, 'probe dau lat dat thi moi cap lai cursor Customer dang do', [resumedSliceProbe.ok, resumedSliceProbe.sessionVerified, resumedSliceProbe.request.meta.kind, resumedSliceProbe.request.body.gridPageIndex], [true, true, 'grid', 3]);
-  heartbeat.FbmSync.statePatch({ runId: 'slice-limit-run', phase: 'pull_customer', cursor: { kind: 'customer_grid', type: 1, pageIndex: 4, pageValue: ['e', 't', 'x'], count: 2000 }, activeRequestId: 'slice-request', deadlineAt: Date.now() + 60000 });
-  const capped = heartbeat.FbmSync.limitRelayResult({ ok: true, request: { id: 'next-request' }, status: heartbeat.FbmSync.statusView() }, heartbeat.FbmSync.RELAY_HOP_LIMIT);
-   check(so, 'dat gioi han hop thu hoi reservation nhung giu cursor de alarm sau tiep tuc', [capped.code, capped.request, heartbeat.FbmSync.stateRead().activeRequestId, heartbeat.FbmSync.stateRead().cursor.pageIndex], ['RELAY_SLICE_COMPLETE', null, '', 4]);
+  // Mỗi lần hỏi nền là một lượt mới (09/02 Phần 3): lượt dở không còn request chờ trong hạn thì kết thúc có Log, lượt mới mở bằng probe User, không gửi lại trang Customer đang dở.
+  const abandonLogs = [];
+  heartbeat.logEvent = (entry) => abandonLogs.push(entry);
+  heartbeat.FbmSync.statePatch({ runId: 'abandoned-run', origin: 'background', phase: 'pull_customer', cursor: { kind: 'customer_grid', type: 1, pageIndex: 3, pageValue: ['d', 't', 'x'], count: 2000 }, activeRequestId: 'lost-request', deadlineAt: Date.now() - 1000, scheduledScan: 'customerFull', chain: { current: 'customerFull', ran: [], direction: 'read' }, session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' }, metadata: { sessionGate: {} } });
+  const afterAbandon = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+  const abandonState = heartbeat.FbmSync.stateRead();
+  check(so, 'Lần hỏi nền gặp lượt dở không còn request chờ: lượt cũ kết thúc SYNC_ABANDONED_RUN có dòng Log lỗi, lượt mới mở bằng probe User, không gửi lại trang Customer đang dở', [
+    abandonLogs.some((entry) => JSON.stringify(entry).indexOf('SYNC_ABANDONED_RUN') >= 0), afterAbandon.ok, afterAbandon.request && afterAbandon.request.meta.kind, abandonState.runId !== 'abandoned-run'
+  ], [true, true, 'session_probe', true]);
+  heartbeat.FbmSync.statePatch({ runId: 'write-lost-run', origin: 'background', phase: 'push', cursor: { kind: 'push_wait', entity: 'customer' }, activeRequestId: 'write-request', deadlineAt: Date.now() - 1000, scheduledScan: '', chain: null, locks: { 'customer:1': { owner: 'push' } } });
+  heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+  const lostWrite = heartbeat.FbmSync.stateRead();
+  check(so, 'Lần hỏi nền gặp lệnh ghi mất response: kết thúc SYNC_STALE_WRITE, giữ khóa bản ghi, không gửi lại lệnh ghi', [lostWrite.lastFailureCode, Object.keys(lostWrite.locks || {}).length, lostWrite.phase], ['SYNC_STALE_WRITE', 1, 'error']);
+  delete heartbeat.logEvent;
   const activeState = heartbeat.FbmSync.stateRead();
   activeState.phase = 'pull_customer'; activeState.runId = 'heartbeat-run'; activeState.cursor = { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 }; activeState.activeRequestId = 'in-flight-request'; activeState.deadlineAt = Date.now() + 60000;
   heartbeat.FbmSync.stateWrite(activeState);

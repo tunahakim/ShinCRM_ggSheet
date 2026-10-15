@@ -39,6 +39,13 @@ async function chay(so) {
   const lanCuoi = tamLan[7];
   check(so, 'Trong một chuỗi các tiến trình chạy theo ưu tiên Quét nhanh, Lấy toàn bộ giao dịch, Vòng xoay, Giữ phiên, mỗi tiến trình đúng một lần', lanCuoi, ['customerFull', 'activityFull', 'detail', 'heartbeat']);
 
+  // Mỗi lần hỏi nền là một lượt mới (09/02 Phần 3): không còn giới hạn số request mỗi lần hỏi, lượt dài chạy liền tới cuối.
+  const dai = chuoiHarness({ heartbeat: { enabled: false }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false }, detail: { enabled: false } }, { customers: 60, budget: { chunkTargetBytes: 600 } });
+  const daiLan = await dai.hoi(60);
+  check(so, 'Lượt nền cần hơn 20 request chạy hết trong một lần hỏi: Quét nhanh xong, không còn request chờ, không lượt nào bị cắt', [
+    dai.trace.kinds.length > 20, daiLan.xong.indexOf('customerFull') >= 0, daiLan.end.request || null, dai.F.stateRead().phase, dai.local.customer.length
+  ], [true, true, null, 'done', 60]);
+
   const giuPhien = chuoiHarness({ heartbeat: { enabled: true, minutes: 1 }, customerFull: { enabled: false }, activityFull: { enabled: false }, detail: { enabled: false } });
   const giuPhienLan = [];
   for (let i = 0; i < 3; i += 1) { giuPhienLan.push((await giuPhien.hoi(10)).xong); }

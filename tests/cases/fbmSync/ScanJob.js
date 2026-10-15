@@ -138,7 +138,7 @@ function scanHarness(options) {
     }
     return step;
   }
-  /** Một lần Extension hỏi GAS theo alarm `gas_poll`: request đầu nộp qua cổng heartbeat, các request sau qua cổng continue, cắt ở `RELAY_HOP_LIMIT` như relay thật. */
+  /** Một lần Extension hỏi GAS theo alarm `gas_poll`: request đầu nộp qua cổng heartbeat, các request sau qua cổng continue tới khi GAS trả `request: null` như relay thật; trần 200 vòng chỉ để test không treo. */
   async function poll(hooks) {
     const h = hooks || {}, hop = flow.hop;
     let step = hop.fbmSyncHeartbeatRequest({ source: h.source || 'alarm', hop: 0 });

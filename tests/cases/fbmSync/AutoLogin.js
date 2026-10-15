@@ -21,9 +21,8 @@ async function chay(so) {
   check(so, 'hết phiên tạo request login và giữ cursor cũ', [login.meta.kind, hop.FbmSync.stateRead().cursor.kind, hop.FbmSync.stateRead().cursor.resumeCursor.pageIndex], ['login', 'login', 2]);
   check(so, 'auto-login chỉ thử lại một lần trong 30 phút', hop.FbmSync.autoLoginCanAttempt(Date.now() + 1000).code, 'AUTO_LOGIN_THROTTLED');
   // Chủ dự án chốt 2026-10-07: chu kỳ chờ chỉ dành cho chạy nền; người bấm chạy phải được thử ngay hoặc nhận hướng dẫn.
-  const waitProbe = { sessionGate: { blockedSessionProbe: true } };
-  const attemptKinds = [['manual', 'r1', 'session_probe', {}], ['manual', 'r1', 'customer_grid', {}], ['manual', 'r1', 'heartbeat', {}], ['manual', 'r1', 'session_probe', waitProbe], ['manual', '', 'session_probe', {}], ['background', 'r1', 'session_probe', {}]].map(([origin, runId, kind, metadata]) => hop.FbmSync.autoLoginAttemptOptions({ origin, runId, metadata }, { kind }).manual);
-  check(so, 'lượt bấm tay (kể cả bước kiểm tra phiên đầu lượt) được bỏ qua chu kỳ chờ; heartbeat, probe sau chu kỳ chờ phiên cũ, lúc không có lượt chạy và chạy nền vẫn chịu chu kỳ', [hop.FbmSync.autoLoginCanAttempt(Date.now() + 1000, { manual: true }).ok, attemptKinds], [true, [true, true, false, false, false, false]]);
+  const attemptKinds = [['manual', 'r1', 'session_probe', {}], ['manual', 'r1', 'customer_grid', {}], ['manual', 'r1', 'heartbeat', {}], ['manual', '', 'session_probe', {}], ['background', 'r1', 'session_probe', {}]].map(([origin, runId, kind, metadata]) => hop.FbmSync.autoLoginAttemptOptions({ origin, runId, metadata }, { kind }).manual);
+  check(so, 'lượt bấm tay (kể cả bước kiểm tra phiên đầu lượt) được bỏ qua chu kỳ chờ; heartbeat, lúc không có lượt chạy và chạy nền vẫn chịu chu kỳ', [hop.FbmSync.autoLoginCanAttempt(Date.now() + 1000, { manual: true }).ok, attemptKinds], [true, [true, true, false, false, false]]);
   hop.FbmSync.statePatch({ origin: 'background', cursor: { kind: 'customer_grid' } });
   const backgroundThrottled = hop.FbmSync.beginAutoLogin(hop.FbmSync.stateRead(), { kind: 'customer_grid' });
   hop.FbmSync.statePatch({ origin: 'manual', runId: 'manual-run' });
@@ -290,26 +289,32 @@ async function chay(so) {
   heartbeat.FbmSync.loginConfigPolicySave({ enabled: true, autoOpenTab: false, retryEnabled: true, retryMinutes: 1 });
   heartbeat.FbmSync.statePatch({ runId: 'blocked-session-run', origin: 'background', phase: 'checking_session', cursor: { kind: 'login', purpose: 'auto', testOnly: false, resumeCursor: { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 }, resumePhase: 'pull_customer', resumeEntity: 'customer' }, activeRequestId: '', deadlineAt: 0, session: { expired: true, identityVerified: false, sessionId: '', identitySessionId: '' }, metadata: { sessionGate: {} } });
   const blockedAuto = heartbeat.FbmSync.loginAdapterContinue(heartbeat.FbmSync.stateRead(), heartbeat.FbmSync.stateRead().cursor, { ok: true, status: 200, body: 'Đã đăng nhập. Hủy phiên làm việc trước' });
-  check(so, 'FBM chan vi con phien cu duoc tach khoi sai mat khau va khong tat auto-login', [blockedAuto.code, heartbeat.FbmSync.stateRead().phase, heartbeat.FbmSync.stateRead().cursor.kind, heartbeat.FbmSync.loginConfigPublic().enabled], ['LOGIN_SESSION_BLOCKED', 'waiting_session', 'session_wait', true]);
-  const waitingBeforeRetry = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
-  check(so, 'bi chan vi con phien thi dung trong chu ky cho va khong login lai ngay', [waitingBeforeRetry.ok, waitingBeforeRetry.code, waitingBeforeRetry.request], [true, 'AUTO_LOGIN_WAITING_SESSION', null]);
+  check(so, 'FBM chặn vì còn phiên cũ: tách khỏi sai mật khẩu, không tắt tự đăng nhập, lượt kết thúc tạm dừng chứ không giữ lượt chờ', [blockedAuto.code, heartbeat.FbmSync.stateRead().phase, heartbeat.FbmSync.stateRead().cursor.kind, heartbeat.FbmSync.loginConfigPublic().enabled, heartbeat.FbmSync.runInProgress(heartbeat.FbmSync.stateRead())], ['LOGIN_SESSION_BLOCKED', 'paused', undefined, true, false]);
+  // Lần hỏi nền sau là lượt mới: response báo chưa xác thực thì probe; chưa hết chu kỳ thử lại thì lượt kết thúc, không gửi lệnh đăng nhập.
+  const unauthBody = '{"d":{"TotalRowCount":0,"Rows":null,"ViewPage":null,"Authorized":false}}';
+  // Lần đăng nhập vừa bị chặn được ghi là lần thử gần nhất (thực tế do beginAutoLogin ghi trước khi gửi lệnh).
+  const justTried = JSON.parse(heartbeatData.FBM_LOGIN_CONFIG_V1);
+  justTried.lastAttemptAt = Date.now();
+  heartbeatData.FBM_LOGIN_CONFIG_V1 = JSON.stringify(justTried);
+  heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
+  const withinCycle = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+  const withinCycleProbe = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: unauthBody, transport: { contract: MA_HOP_DONG, trace: [{ requestId: withinCycle.request.id }] } });
+  const withinCycleEnd = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: unauthBody, transport: { contract: MA_HOP_DONG, trace: [{ requestId: withinCycleProbe.request && withinCycleProbe.request.id }] } });
+  check(so, 'Chưa hết chu kỳ thử lại: lượt nền mới thấy phiên chết thì kết thúc AUTO_LOGIN_THROTTLED, không gửi lệnh đăng nhập', [withinCycle.request.meta.kind, withinCycleProbe.request && withinCycleProbe.request.meta.kind, withinCycleEnd.code, withinCycleEnd.request, heartbeat.FbmSync.runInProgress(heartbeat.FbmSync.stateRead())], ['heartbeat', 'session_probe', 'AUTO_LOGIN_THROTTLED', null, false]);
   const blockedConfig = JSON.parse(heartbeatData.FBM_LOGIN_CONFIG_V1);
   blockedConfig.lastAttemptAt = Date.now() - 61 * 1000;
   blockedConfig.nextRetryAt = 0;
   heartbeatData.FBM_LOGIN_CONFIG_V1 = JSON.stringify(blockedConfig);
-  // Mô phỏng đã hết đúng chu kỳ chờ của cổng; cấu hình retry và mốc khóa phiên là hai đồng hồ riêng.
-  heartbeat.FbmSync.statePatch({ metadata: { sessionGate: { blockedSession: true, blockedWaitCount: 1, blockedNextProbeAt: Date.now() - 1, resumeCursor: { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 }, resumePhase: 'pull_customer', resumeEntity: 'customer' } } });
-  const blockedProbe = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
-  check(so, 'het chu ky cho thi probe truoc khi thu login lai', [blockedProbe.ok, blockedProbe.request && blockedProbe.request.meta.kind], [true, 'session_probe']);
-  const blockedLive = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[2037,"ANHLT","Le Tuan Anh"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: blockedProbe.request.id }] } });
-  check(so, 'probe thay phien cu da song lai thi tiep tuc cursor khong login lai', [blockedLive.ok, blockedLive.blockedSessionResumed, blockedLive.request && blockedLive.request.meta.kind], [true, true, 'grid']);
-  heartbeat.FbmSync.statePatch({ runId: 'blocked-dead-run', origin: 'background', phase: 'waiting_session', cursor: { kind: 'session_wait' }, activeRequestId: '', deadlineAt: 0, session: { expired: true, identityVerified: false, sessionId: '', identitySessionId: '' }, metadata: { sessionGate: { blockedSession: true, blockedWaitCount: 1, blockedNextProbeAt: 0, resumeCursor: { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 }, resumePhase: 'pull_customer', resumeEntity: 'customer' } } });
-  const deadProbe = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
-  const deadProbeResult = heartbeat.fbmSyncHeartbeat({ ok: false, status: 500, body: '\ufffd\ufffd\ufffd', transport: { contract: MA_HOP_DONG, trace: [{ requestId: deadProbe.request.id }] } });
-  check(so, 'probe xac nhan phien da chet moi cap login moi sau khi bi chan', [deadProbe.request.meta.kind, deadProbeResult.ok, deadProbeResult.request && deadProbeResult.request.meta.kind], ['session_probe', true, 'login']);
-  heartbeat.FbmSync.statePatch({ runId: 'blocked-cap-run', origin: 'background', phase: 'checking_session', cursor: { kind: 'login', purpose: 'auto', testOnly: false, resumeCursor: { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 }, resumePhase: 'pull_customer', resumeEntity: 'customer' }, activeRequestId: '', deadlineAt: 0, session: { expired: true }, metadata: { sessionGate: { blockedWaitCount: heartbeat.FbmSync.AUTO_LOGIN_MAX_BLOCK_WAITS - 1, blockedSession: true } } });
-  const blockedCap = heartbeat.FbmSync.loginAdapterContinue(heartbeat.FbmSync.stateRead(), heartbeat.FbmSync.stateRead().cursor, { ok: true, status: 200, body: 'Đã đăng nhập. Hủy phiên làm việc trước' });
-  check(so, 'bi chan qua tran cho thi dung va bao can nguoi dung xu ly', [blockedCap.code, heartbeat.FbmSync.stateRead().phase, blockedCap.request], ['LOGIN_SESSION_BLOCKED_TIMEOUT', 'error', null]);
+  heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
+  const afterCycle = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+  const afterCycleLive = heartbeat.fbmSyncHeartbeat({ d: { TotalRowCount: 2 }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: afterCycle.request.id }] } });
+  check(so, 'Hết chu kỳ thử lại mà người dùng đã tự đăng nhập: lượt mới chạy luôn việc (số khách lệch mốc thì mở Quét nhanh bằng probe User), không gửi lệnh đăng nhập', [afterCycle.request.meta.kind, afterCycleLive.ok, afterCycleLive.request && afterCycleLive.request.meta.kind], ['heartbeat', true, 'session_probe']);
+  heartbeat.FbmSync.statePatch({ phase: 'done', cursor: {}, activeRequestId: '', deadlineAt: 0, scheduledScan: '', chain: null });
+  heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
+  const afterCycleDead = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+  const afterCycleProbe = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: unauthBody, transport: { contract: MA_HOP_DONG, trace: [{ requestId: afterCycleDead.request.id }] } });
+  const afterCycleLogin = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: unauthBody, transport: { contract: MA_HOP_DONG, trace: [{ requestId: afterCycleProbe.request && afterCycleProbe.request.id }] } });
+  check(so, 'Hết chu kỳ thử lại mà phiên vẫn chết: lượt mới probe xác nhận rồi cấp lệnh đăng nhập', [afterCycleProbe.request && afterCycleProbe.request.meta.kind, afterCycleLogin.ok, afterCycleLogin.request && afterCycleLogin.request.meta.kind], ['session_probe', true, 'login']);
   const policy = heartbeat.FbmSync.loginConfigPolicySave({ enabled: true, autoOpenTab: true, retryEnabled: false, retryMinutes: 45 });
   check(so, 'chinh sach auto-login chi luu mot noi va cong khai dung metadata', [policy.ok, policy.autoOpenTab, policy.retryEnabled, policy.retryMinutes, heartbeat.FbmSync.loginConfigRead().envelope.ciphertext], [true, true, false, 45, 'ciphertext-long-enough']);
   const credentialUpdate = heartbeat.FbmSync.loginConfigSave({ credentialRef: 'cred-heartbeat-456', envelope: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'anhlt' } });
