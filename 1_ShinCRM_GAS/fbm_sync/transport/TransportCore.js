@@ -279,19 +279,23 @@ FbmSync.sessionGateResumeProbeRequest = function (state, resumeCursor, reason) {
   return FbmSync.sessionSystemEnvelope('session_probe');
 };
 /**
- * Dấu "phiên hết hạn" còn lại từ lượt đã kết thúc: người dùng có thể đã tự đăng nhập trên tab FBM từ đó, nên không gửi thẳng login (09/06 không đăng nhập lại khi phiên còn hợp lệ).
- * Xóa dấu và cờ cổng của lượt cũ rồi probe: phiên sống thì chạy tiếp cursor chờ, không thì cổng đăng nhập theo chu kỳ chờ.
+ * Dấu "phiên hết hạn" còn lại từ lượt đã kết thúc: người dùng có thể đã tự đăng nhập trên tab FBM từ đó (09/06 không đăng nhập lại khi phiên còn hợp lệ).
+ * Không tốn request hỏi riêng: bỏ dấu và cờ cổng của lượt cũ, request việc thật của lượt mới tự nhận diện phiên; phiên chết thì cổng đăng nhập theo chu kỳ chờ như mọi response khác.
+ * Chỉ sửa state trong bộ nhớ; nơi gọi tự ghi.
  */
-FbmSync.sessionGateStaleProbeRequest = function (state, resumeCursor) {
-  var current = state || FbmSync.stateRead(), gate = FbmSync.sessionGateMeta(current);
-  current.session = current.session || {};
-  current.session.expired = false;
+FbmSync.sessionGateForgetStale = function (state) {
+  if (!state || !state.session || state.session.expired !== true) { return; }
+  var gate = FbmSync.sessionGateMeta(state);
+  state.session.expired = false;
   gate.probeOnly = false; gate.loginAttempted = false; gate.probeRetryCount = 0;
-  return FbmSync.sessionGateResumeProbeRequest(current, resumeCursor, 'Lượt trước báo phiên FBM hết hạn; đang kiểm tra lại phiên trước khi chạy tiếp...');
 };
-/** Xử lý probe không đạt; chỉ probe được phép khởi động auto-login, tối đa một lần. */
+/**
+ * Xử lý probe không đạt; chỉ probe được phép khởi động auto-login, tối đa một lần.
+ * Probe sau request nghiệp vụ đáng ngờ mà FBM trả lời rõ "chưa xác thực" là phiên đã chết thật (người dùng đăng nhập nơi khác): đi cổng đăng nhập theo chu kỳ chờ như probe đầu lượt, không dừng lỗi chờ lượt sau.
+ */
 FbmSync.sessionGateHandleProbeFailure = function (state, cursor, response) {
   var current = state || FbmSync.stateRead(), gate = FbmSync.sessionGateMeta(current), suspicious = FbmSync.protocol.isSessionSuspicious(response);
+  if (gate.probeOnly === true && FbmSync.protocol.isUnauthenticatedSessionProbeResponse(response)) { gate.probeOnly = false; }
   if (suspicious && Number(gate.probeRetryCount || 0) < 1) {
     gate.probeRetryCount = 1;
     current.message = 'Phản hồi FBM đáng ngờ; đang probe lại phiên đúng một lần.';

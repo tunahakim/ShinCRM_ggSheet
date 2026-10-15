@@ -144,7 +144,7 @@ FbmSync.schedulerPickDue = function (now, options) {
   state.scheduledScan = due[0];
   state.scheduledDirection = schedule.direction;
   state.chain = { current: due[0], ran: [], direction: schedule.direction, startedAt: at };
-  state.message = 'Đã chọn tiến trình nền ' + due[0] + '; chờ request heartbeat hiện tại hoàn tất.';
+  state.message = 'Đã chọn tiến trình nền ' + due[0] + '.';
   FbmSync.stateWrite(state);
   return { ok: true, kind: due[0] };
 };
@@ -230,7 +230,7 @@ function fbmSyncHeartbeatRequest(options) {
     if (Number(options && options.hop || 0) >= Number(FbmSync.RELAY_HOP_LIMIT || 20)) {
       return { ok: true, code: 'RELAY_SLICE_COMPLETE', request: null, status: FbmSync.statusView() };
     }
-    // Chọn tiến trình đến hạn trước khi kiểm phiên, để nhịp hỏi kỹ thuật không tự mở việc mỗi lần.
+    // Chọn tiến trình đến hạn trước, để nhịp hỏi kỹ thuật không tự mở việc mỗi lần.
     var picked = FbmSync.schedulerPickDue(now, { startup: source === 'startup' });
     if (!picked.ok) {
       return { ok: true, noop: true, code: picked.code || 'NO_PROCESS_DUE', request: null, status: FbmSync.statusView() };
@@ -239,12 +239,15 @@ function fbmSyncHeartbeatRequest(options) {
     state = FbmSync.stateRead();
     state.cursor = { kind: 'heartbeat' };
     state.relayHop = 0;
-    // Dấu "phiên hết hạn" của lượt đã kết thúc không còn đáng tin: cổng phiên probe trước rồi mới quyết định (09/06).
-    if (state.session && state.session.expired === true && !FbmSync.runInProgress(state)) {
-      var staleProbe = FbmSync.sessionGateStaleProbeRequest(state, { kind: 'heartbeat' });
-      return staleProbe ? { ok: true, code: 'SESSION_PROBE_REQUEST_READY', request: staleProbe, status: FbmSync.statusView() } : { ok: false, code: 'SESSION_PROBE_UNAVAILABLE', request: null, status: FbmSync.statusView() };
-    }
+    // Dấu "phiên hết hạn" của lượt đã kết thúc không còn đáng tin: bỏ dấu, response của request đếm khách quyết định phiên sống hay chết (09/06).
+    if (!FbmSync.runInProgress(state)) { FbmSync.sessionGateForgetStale(state); }
     FbmSync.stateWrite(state);
+    // Chuỗi mở bằng chính request đầu của tiến trình đến hạn; chỉ Giữ phiên (và Quét nhanh do bước đếm gọi) mới mở bằng request đếm khách.
+    if (state.chain && state.scheduledScan && state.scheduledScan === state.chain.current && state.scheduledScan !== 'heartbeat') {
+      var opened = FbmSync.chainTail(FbmSync.chainStart(state.scheduledScan)), openedRequest = opened && opened.request || null;
+      if (!openedRequest) { return { ok: !!(opened && opened.ok), code: opened && opened.code || 'CHAIN_START_EMPTY', request: null, status: FbmSync.statusView(), error: opened && opened.error }; }
+      return { ok: true, code: 'CHAIN_REQUEST_READY', request: openedRequest.protocol ? openedRequest : FbmSync.nextEnvelope(openedRequest), status: FbmSync.statusView() };
+    }
     var heartbeatRequest = FbmSync.sessionSystemRequest('heartbeat'), heartbeatEnvelope = FbmSync.nextEnvelope(heartbeatRequest), currentState = FbmSync.stateRead();
     return { ok: true, code: typeof FbmSync.sessionGateRequestCode === 'function' ? FbmSync.sessionGateRequestCode(heartbeatEnvelope, currentState) : 'HEARTBEAT_REQUEST_READY', request: heartbeatEnvelope, status: FbmSync.statusView() };
   } finally { lock.releaseLock(); }
