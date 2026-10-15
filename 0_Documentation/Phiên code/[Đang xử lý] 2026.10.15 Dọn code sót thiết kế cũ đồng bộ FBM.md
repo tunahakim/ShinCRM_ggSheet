@@ -31,7 +31,7 @@ Branch `feature/fbm-legacy-cleanup`. Mục tiêu: gỡ code, khóa và nhánh c�
 
 ## Cần chủ dự án quyết
 
-- [ ] Gỡ hai bước chạy kèm sau lớp 1 của tiến trình "Lấy toàn bộ giao dịch" (`activityBulkSupplement`: tìm tối đa 30 khách có ngày giao dịch mới hơn mốc Sheet, rồi xoay 30 khách với con trỏ `FBM_SYNC_ACTIVITY_ROTATION`). Đây là bản cài đặt đời cũ của lớp 2 và lớp 4; bản hiện hành là lớp 2/3 trong `read/ActivityLayers.js` (chạy ở Quét nhanh, so trên cả danh sách khách, không giới hạn 30) và tiến trình `detail` cho lớp 4. Chủ dự án đồng ý hướng gỡ 2026-10-15.
+- [ ] Gỡ hai bước chạy kèm sau lớp 1 của tiến trình "Lấy toàn bộ giao dịch" (`activityBulkSupplement`: tìm tối đa 30 khách có ngày giao dịch mới hơn mốc Sheet, rồi xoay 30 khách với con trỏ `FBM_SYNC_ACTIVITY_ROTATION`). Đây là bản cài đặt đời cũ của lớp 2 và lớp 4; bản hiện hành là lớp 2/3 trong `read/ActivityLayers.js` (chạy ở Quét nhanh, so trên cả danh sách khách, không giới hạn 30) và tiến trình `detail` cho lớp 4. Chờ chủ dự án đồng ý.
 - [ ] Chủ dự án chốt lại lớp 4: số nhập ở lịch nền là tổng số khách một phiên vòng xoay phải quét (ví dụ 140, không giới hạn 50); phiên đọc lần lượt từng lô `BUDGET.activityBatchCustomers` (50) như đồng bộ tay đến khi đủ số đó mới dừng. Code hiện chặn số này trong 1–50 và chỉ đọc một trang mỗi phiên; 09/02 và 08 đang ghi theo cách cũ.
 
 ## Bàn giao
