@@ -64,7 +64,7 @@ FbmSync.controlDispatch = function (command, payload) {
     case 'confirm_conflict':
       return FbmSync.confirmConflict(input.entity, input.id, input.choice, input.merged, input.response);
     case 'transport_error':
-      return FbmSync.logTransportError(input.message, input.action);
+      return FbmSync.logTransportError(input.message, input.action, input.runId);
     default:
       throw new Error('SYNC_COMMAND_UNKNOWN: ' + name);
   }
