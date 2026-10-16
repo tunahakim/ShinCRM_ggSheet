@@ -1,5 +1,4 @@
 const { dungHop } = require('../lib/dung-hop');
-const { trongLanChay } = require('../lib/load-gas');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 
 function chay(so) {
@@ -20,8 +19,8 @@ function chay(so) {
     source: 'edit', entity: 'customer', surface: 'record', recordIds: [' KH1 ', 'KH1', 'KH2']
   });
   check(so, 'sửa tay Customer gom mã, nạp ngay không chờ, làm mọi view cũ nhưng không vẽ',
-    [edit.kind, edit.signal.records, edit.signal.allViews, edit.ram.action, edit.ram.mode, 'waitMs' in edit.ram, edit.views.action, edit.notifySidebar],
-    ['records', ['KH1', 'KH2'], true, 'reload', 'records', false, 'none', true]);
+    [edit.kind, edit.signal.records, edit.signal.recordEntity, edit.signal.allViews, edit.ram.action, edit.ram.mode, 'waitMs' in edit.ram, edit.views.action, edit.notifySidebar],
+    ['records', ['KH1', 'KH2'], 'customer', true, 'reload', 'records', false, 'none', true]);
 
   const draft = hop.reloadDecisionForChange({
     source: 'edit', entity: 'customer', surface: 'record', recordIds: ['KH1', 'KH2'],
@@ -43,12 +42,33 @@ function chay(so) {
     [category.kind, category.ram.mode, category.signal.category, category.signal.allViews, category.views.action],
     ['category', 'category', true, true, 'none']);
 
-  hop.dirtyStateClear();
-  trongLanChay(hop, () => { hop.dirtyStateMarkCategory(); hop.dirtyStateMarkRecords(['KH1']); });
-  const categoryAndRecords = hop.reloadDecisionForState({ reloadState: hop.reloadStateRead() });
-  check(so, 'Category và records cùng revision được gom vào full core',
-    [categoryAndRecords.kind, categoryAndRecords.ram.mode, categoryAndRecords.signal],
-    ['state-full-core', 'fullCore', { records: [], entities: [], category: false, config: false, schema: false, allCore: false, allViews: false }]);
+  section('ReloadDecision — kế hoạch nạp từ sổ nhật ký, theo revision riêng của từng Sidebar');
+
+  const so10 = { rev: 12, floor: 7, changedAt: 0, entries: [
+    { r: 8, t: 0, customer: ['KH-CU'] }, { r: 9, t: 0, config: true },
+    { r: 10, t: 0, customer: true }, { r: 11, t: 0, customer: ['KH-A'] }, { r: 12, t: 0, activity: ['GD-B'] }] };
+  const tu7 = hop.reloadDecisionForState({ journal: so10, lastSeenRevision: 7 });
+  check(so, 'Sidebar ở 7: gộp mọi dòng sau 7, mỗi phần lấy mức cao nhất (Customer cả sheet bao mã A, Activity chỉ mã B, Config), không nạp lõi',
+    [tu7.kind, tu7.ram.mode, tu7.ram.plan.core, tu7.ram.plan.customer, tu7.ram.plan.activity, tu7.ram.plan.config, tu7.ram.plan.category],
+    ['state-parts', 'parts', false, true, ['GD-B'], true, false]);
+  const tu10 = hop.reloadDecisionForState({ journal: so10, lastSeenRevision: 10 });
+  check(so, 'Sidebar khác ở 10 trên cùng sổ: chỉ nhận mã A và mã B; sổ không bị lời hỏi trước làm đổi (hai Sidebar không giành tín hiệu)',
+    [tu10.ram.plan.customer, tu10.ram.plan.activity, tu10.ram.plan.config, so10.entries.length], [['KH-A'], ['GD-B'], false, 5]);
+  check(so, 'Sidebar đã thấy revision mới nhất thì không nạp gì',
+    hop.reloadDecisionForState({ journal: so10, lastSeenRevision: 12 }).ram.action, 'none');
+  const sau = { rev: 1300, floor: 1200, changedAt: 0, entries: [{ r: 1300, t: 0, customer: ['KH1'] }] };
+  check(so, 'Sidebar tụt dưới floor (sổ đã cắt mất các dòng nó chưa thấy) thì nạp lõi một lần',
+    [hop.reloadDecisionForState({ journal: sau, lastSeenRevision: 700 }).ram.mode, hop.reloadDecisionForState({ journal: sau, lastSeenRevision: 1200 }).ram.mode],
+    ['fullCore', 'parts']);
+  check(so, 'dòng sổ có core thì nạp lõi dù các dòng khác chỉ là mã',
+    hop.reloadDecisionForState({ journal: { rev: 2, floor: 0, entries: [{ r: 1, customer: ['KH1'] }, { r: 2, core: true }] }, lastSeenRevision: 0 }).kind, 'state-full-core');
+  const catRec = hop.reloadDecisionForState({ journal: { rev: 2, floor: 0, entries: [{ r: 1, category: true }, { r: 2, customer: ['KH1'] }] }, lastSeenRevision: 0 });
+  check(so, 'Category và bản ghi cùng lúc: nạp từng phần, không nâng lên lõi',
+    [catRec.ram.mode, catRec.ram.plan.category, catRec.ram.plan.customer], ['parts', true, ['KH1']]);
+  check(so, 'dòng sổ chỉ làm view cũ (không phần dữ liệu) thì Sidebar không nạp',
+    hop.reloadDecisionForState({ journal: { rev: 1, floor: 0, entries: [{ r: 1, t: 0 }] }, lastSeenRevision: 0 }).ram.action, 'none');
+  const nhapCaSheet = hop.reloadDecisionForState({ journal: { rev: 1, floor: 0, entries: [{ r: 1, customer: true }] }, lastSeenRevision: 0, localDraft: { recordIds: ['KH9'] } });
+  check(so, 'đang có bản nháp mà phần cần nạp thay cả sheet thì hoãn, như nạp lõi', nhapCaSheet.ram.action, 'defer');
 
   const config = hop.reloadDecisionForChange({ entity: 'config', surface: 'config' });
   check(so, 'Config dùng scope riêng và làm mọi view cũ, không vẽ',

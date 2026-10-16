@@ -59,9 +59,9 @@ function chay(so) {
   // Chiều ghi.
   const ghi = dungHop();
   const ra = ghi.hop.userPrefsWrite('activityView', 'all');
-  check(so, 'ghi xong trả về cả khối núm và khối trạng thái bẩn, không trả riêng núm vừa ghi',
-    [ra.ok, ra.prefs, Object.keys(ra.dirty).sort()],
-    [true, { followSelection: true, autoRenderView: true, activityView: 'all' }, ['all', 'config', 'records']]);
+  check(so, 'ghi xong trả về cả khối núm và trạng thái nạp lại, không trả riêng núm vừa ghi',
+    [ra.ok, ra.prefs, Object.keys(ra.reload).sort()],
+    [true, { followSelection: true, autoRenderView: true, activityView: 'all' }, ['changedAt', 'floor', 'revision', 'viewsStaleRevision']]);
 
   check(so, 'giá trị vào kho UserProperties dưới dạng chuỗi', ghi.userProps.prefActivityView, 'all');
   check(so, 'ghi núm chọn không chạm DocumentProperties — hai kho là hai kho',

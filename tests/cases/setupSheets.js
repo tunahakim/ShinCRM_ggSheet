@@ -235,8 +235,8 @@ function chay(so) {
     [reset.hop.configReadAll().sheetSchema, reset.hop.configReadAll().sort, reset.hop.configParams()],
     [{}, [], { LOG_TRACE: 'off', CELL_BUDGET: '', USER_NAME: '', FBM_VERIFY_STATUS_DEFAULT: '' }]);
   check(so, 'reset không sửa bản ghi Customer và đánh dấu Config cùng mọi view cũ',
-    [reset.Customer.sheet.getRange(4, 2).getValue(), reset.hop.dirtyStateRead(), reset.hop.reloadStateRead().viewsStaleRevision === reset.hop.reloadStateRead().revision, reset.stubs._khoa.dangGiu],
-    ['Giữ nguyên khách', { records: [], config: true, all: false }, true, false]);
+    [reset.Customer.sheet.getRange(4, 2).getValue(), reset.hop.reloadJournalRead().entries.slice(-1)[0].config, reset.hop.reloadStateRead().viewsStaleRevision === reset.hop.reloadStateRead().revision, reset.stubs._khoa.dangGiu],
+    ['Giữ nguyên khách', true, true, false]);
 
   // Xóa ô tên để giả cảnh người dùng lỡ tay quét trắng một dòng. Không gọi `resetSettingsCache` ở đây là cố ý: chính `verifySheets` phải tự xóa, nếu không nó sẽ báo về sheet lúc nó đọc lần trước.
   thu.Config.sheet.getRange(4, thu.Config.cotTen).setValue('');

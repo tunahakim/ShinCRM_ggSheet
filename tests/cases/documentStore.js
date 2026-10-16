@@ -46,13 +46,13 @@ function chay(so) {
   signalEnv.hop.LockService.getDocumentLock = () => {
     const khoa = layKhoa();
     const nha = khoa.releaseLock;
-    khoa.releaseLock = () => { revisionLucNha = signalEnv.stubs._props.reloadRevision || null; return nha(); };
+    khoa.releaseLock = () => { revisionLucNha = signalEnv.stubs._props.reloadJournal ? JSON.parse(signalEnv.stubs._props.reloadJournal).rev : null; return nha(); };
     return khoa;
   };
   signalEnv.hop.documentStoreBegin();
   trongLanChay(signalEnv.hop, () => signalEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000111' }], source: 'pull' }));
   signalEnv.hop.documentStoreEnd();
-  check(so, 'cửa kho: tín hiệu reload của lõi đã ở kho thật trước khi nhả khóa tài liệu', revisionLucNha, '1');
+  check(so, 'cửa kho: tín hiệu reload của lõi đã ở kho thật trước khi nhả khóa tài liệu', revisionLucNha, 1);
 
   // Quét chống tái phạm: chỉ cửa kho được gọi thẳng DocumentProperties và lấy khóa.
   const viPham = cacTepJs(GAS, GAS).filter((tep) => NGOAI_LE.indexOf(tep) < 0).filter((tep) => {

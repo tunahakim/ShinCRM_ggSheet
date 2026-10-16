@@ -1,5 +1,5 @@
 const { dungHop, ghiO, TEP_NEN } = require('../lib/dung-hop');
-const { trongLanChay } = require('../lib/load-gas');
+const { trongLanChay, dongSoCuoi } = require('../lib/load-gas');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 const fs = require('fs');
 const path = require('path');
@@ -36,7 +36,14 @@ function chay(so) {
   hop.runEntryPoint = (name, source, channel, fn) => trongLanChay(hop, fn);
   hop.userPrefsRead = () => { throw new Error('Trigger không được đọc núm người dùng'); };
   // Xóa cả mốc cũ của view để `viewsStaleRevision > 0` nghĩa là signal sau lần xóa đã làm view cũ.
-  const clearState = () => { hop.dirtyStateClear(); hop.documentProps().deleteProperty('viewsStaleRevision'); };
+  const clearState = () => { hop.documentProps().deleteProperty('reloadJournal'); hop.documentProps().deleteProperty('viewsStaleRevision'); };
+  // Dòng sổ của lần chạy vừa rồi (sau clearState), kèm mốc view; phần không đổi thì danh sách rỗng hoặc false.
+  const trangThai = () => {
+    const state = hop.reloadStateRead();
+    const entry = dongSoCuoi(hop);
+    const ids = (part) => (Array.isArray(entry[part]) ? entry[part] : []);
+    return { customer: ids('customer'), activity: ids('activity'), customerAll: entry.customer === true, entities: ['customer', 'activity'].filter((part) => entry[part] === true), category: !!entry.category, config: !!entry.config, core: !!entry.core, revision: state.revision, viewsStaleRevision: state.viewsStaleRevision };
+  };
 
   hop.shinOnEdit({ range: eventRange(lead, 3, 2) });
   hop.shinOnEdit({ range: eventRange(lead, 4, 3) });
@@ -48,8 +55,8 @@ function chay(so) {
   const schemaResults = defaultSheets.map((name) => {
     clearState();
     hop.shinOnEdit({ range: eventRange(nen.sheet(name), 1, 1) });
-    const state = hop.reloadStateRead();
-    return [name, state.schema, state.allCore, (state.viewsStaleRevision > 0)];
+    const state = trangThai();
+    return [name, state.core, state.core, (state.viewsStaleRevision > 0)];
   });
   check(so, 'sửa hàng 1 ở đủ bốn sheet mặc định luôn phát schema, full core và toàn bộ view', schemaResults,
     defaultSheets.map((name) => [name, true, true, true]));
@@ -57,7 +64,7 @@ function chay(so) {
   const scratch = nen.book.insertSheet('Nháp');
   scratch.getRange(1, 1).setValue('x');
   hop.shinOnEdit({ range: eventRange(scratch, 1, 1), value: 'x' });
-  check(so, 'gõ hàng 1 của sheet ngoài hệ thống chưa có ảnh chụp hàng 1 không phát signal', hop.reloadStateRead().viewsStaleRevision, 0);
+  check(so, 'gõ hàng 1 của sheet ngoài hệ thống chưa có ảnh chụp hàng 1 không phát signal', trangThai().viewsStaleRevision, 0);
 
   clearState();
   defaultSheets.forEach((name) => {
@@ -68,11 +75,10 @@ function chay(so) {
   nen.sheet('Customer').getRange(1, ordinarySchemaColumn).setValue('Ghi chu');
   clearState();
   hop.shinOnEdit({ range: eventRange(nen.sheet('Customer'), 1, ordinarySchemaColumn), oldValue: 'Ghi chu', value: 'Khac' });
-  const ordinarySchemaState = hop.reloadStateRead();
+  const ordinarySchemaState = trangThai();
   check(so, 'sua mot o hang 1 thuong khong phat schema khi oldValue va value deu khong hop le',
-    [ordinarySchemaState.records, ordinarySchemaState.category, ordinarySchemaState.config,
-      ordinarySchemaState.schema, ordinarySchemaState.allCore, (ordinarySchemaState.viewsStaleRevision > 0), ordinarySchemaState.all],
-    [[], false, false, false, false, false, false]);
+    [ordinarySchemaState.customer, ordinarySchemaState.category, ordinarySchemaState.config, ordinarySchemaState.core, (ordinarySchemaState.viewsStaleRevision > 0)],
+    [[], false, false, false, false]);
 
   const schemaCell = nen.sheet('Customer').getRange(1, 1);
   const schemaCode = schemaCell.getValue();
@@ -80,65 +86,63 @@ function chay(so) {
   clearState();
   hop.shinOnEdit({ range: eventRange(nen.sheet('Customer'), 1, 1), oldValue: schemaCode, value: 'Ma khach' });
   check(so, 'doi ma @ hop le thanh gia tri thuong van phat schema',
-    [hop.reloadStateRead().schema, hop.reloadStateRead().allCore, (hop.reloadStateRead().viewsStaleRevision > 0)],
+    [trangThai().core, trangThai().core, (trangThai().viewsStaleRevision > 0)],
     [true, true, true]);
   schemaCell.setValue(schemaCode);
   clearState();
   hop.shinOnEdit({ range: eventRange(nen.sheet('Customer'), 1, 1), oldValue: '', value: schemaCode });
-  check(so, 'them ma @ hop le vao hang 1 van phat schema', hop.reloadStateRead().schema, true);
+  check(so, 'them ma @ hop le vao hang 1 van phat schema', trangThai().core, true);
   schemaCell.setValue('');
   clearState();
   hop.shinOnEdit({ range: eventRange(nen.sheet('Customer'), 1, 1), oldValue: schemaCode });
-  check(so, 'xoa ma @ hop le o hang 1 van phat schema', hop.reloadStateRead().schema, true);
+  check(so, 'xoa ma @ hop le o hang 1 van phat schema', trangThai().core, true);
   schemaCell.setValue(schemaCode);
   clearState();
 
-  const defaultNoopState = hop.reloadStateRead();
+  const defaultNoopState = trangThai();
   check(so, 'hàng 2 và hàng 3 của bốn sheet mặc định chỉ là nhãn/ghi chú nên không tạo dirty',
-    [defaultNoopState.records, defaultNoopState.category, defaultNoopState.config,
-      defaultNoopState.schema, defaultNoopState.allCore, (defaultNoopState.viewsStaleRevision > 0)],
-    [[], false, false, false, false, false]);
+    [defaultNoopState.customer, defaultNoopState.category, defaultNoopState.config, defaultNoopState.core, (defaultNoopState.viewsStaleRevision > 0)],
+    [[], false, false, false, false]);
 
   clearState();
   const invalidColumn = Object.keys(hop.DATA_SCHEMA.customer).length + 1;
   nen.sheet('Customer').getRange(1, invalidColumn).setValue('Cột thường');
   hop.shinOnEdit({ range: eventRange(nen.sheet('Customer'), 4, invalidColumn) });
-  const invalidDataState = hop.reloadStateRead();
+  const invalidDataState = trangThai();
   check(so, 'sửa dữ liệu Customer dưới cột không có mã hợp lệ không phát dirty',
-    [invalidDataState.records, invalidDataState.category, invalidDataState.config,
-      invalidDataState.schema, invalidDataState.allCore, (invalidDataState.viewsStaleRevision > 0)],
-    [[], false, false, false, false, false]);
+    [invalidDataState.customer, invalidDataState.category, invalidDataState.config, invalidDataState.core, (invalidDataState.viewsStaleRevision > 0)],
+    [[], false, false, false, false]);
 
   clearState();
   const moduleColumn = invalidColumn + 1;
   nen.sheet('Customer').getRange(1, moduleColumn).setValue('@CUS_MODULE_DIEM');
   ghiO(nen, 'Customer', 4, '@CUS_MA_KH', 'KH000009');
   hop.shinOnEdit({ range: eventRange(nen.sheet('Customer'), 4, moduleColumn) });
-  const moduleState = hop.reloadStateRead();
+  const moduleState = trangThai();
   check(so, 'sửa ô Customer dưới cột module @CUS_* ngoài DATA_SCHEMA chỉ làm view cũ: không records, không allCore, không schema',
-    [moduleState.records, moduleState.allCore, moduleState.schema, moduleState.category, moduleState.config, (moduleState.viewsStaleRevision > 0)],
-    [[], false, false, false, false, true]);
+    [moduleState.customer, moduleState.core, moduleState.category, moduleState.config, (moduleState.viewsStaleRevision > 0)],
+    [[], false, false, false, true]);
 
   const cotMa = hop.selectionColumnIndex(nen.sheet('Customer'), '@CUS_MA_KH');
   ghiO(nen, 'Customer', 4, '@CUS_MA_KH', 'KH000004');
   nen.sheet('Customer').getRange(5, cotMa).setValue('');
   clearState();
   hop.shinOnEdit({ range: eventRange(nen.sheet('Customer'), 5, cotMa), oldValue: 'KH000777' });
-  const xoaMotO = hop.reloadStateRead();
+  const xoaMotO = trangThai();
   clearState();
   hop.shinOnEdit({ range: eventRange(nen.sheet('Customer'), 4, cotMa, 2, 3) });
-  const xoaVung = hop.reloadStateRead();
+  const xoaVung = trangThai();
   clearState();
   hop.shinOnEdit({ range: eventRange(nen.sheet('Customer'), 4, cotMa) });
-  const suaThuong = hop.reloadStateRead();
+  const suaThuong = trangThai();
   check(so, 'xóa trắng ô mã khách: ô đơn đánh dấu đúng mã cũ từ oldValue; vùng nhiều dòng có mã rỗng nạp trọn Customer; ô mã còn giá trị vẫn đánh dấu theo mã',
-    [xoaMotO.records, xoaMotO.entities, xoaVung.records, xoaVung.entities, xoaVung.allCore, suaThuong.records, suaThuong.entities],
-    [['KH000777'], [], [], ['customer'], false, ['KH000004'], []]);
+    [xoaMotO.customer, xoaMotO.customerAll, xoaVung.customer, xoaVung.customerAll, xoaVung.core, suaThuong.customer, suaThuong.customerAll],
+    [['KH000777'], false, [], true, false, ['KH000004'], false]);
 
   clearState();
   ghiO(nen, 'Activity', 4, '@ACT_MA_GD', 'GD000001');
   hop.shinOnEdit({ range: eventRange(nen.sheet('Activity'), 4, 1) });
-  check(so, 'sửa dữ liệu Activity dưới cột mã hợp lệ đánh dấu đúng mã giao dịch', hop.dirtyStateRead().records, ['GD000001']);
+  check(so, 'sửa dữ liệu Activity dưới cột mã hợp lệ đánh dấu đúng mã giao dịch', trangThai().activity, ['GD000001']);
 
   rendered.length = 0;
   hop.shinOnEdit({ range: eventRange(lead, 1, 1) });
@@ -159,7 +163,7 @@ function chay(so) {
   customerHeader.setValue('Nhan thuong');
   clearState();
   hop.shinOnEdit({ range: eventRange(nen.sheet('Customer'), 1, 1) });
-  check(so, 'sua mot o hang 1 tu ma hop le sang thuong van phat schema', hop.reloadStateRead().schema, true);
+  check(so, 'sua mot o hang 1 tu ma hop le sang thuong van phat schema', trangThai().core, true);
   customerHeader.setValue(customerCodeBeforeRange);
   hop.shinHeaderSnapshotWrite(nen.sheet('Customer'));
 
@@ -167,9 +171,9 @@ function chay(so) {
   ghiO(nen, 'Customer', 4, '@CUS_MA_KH', 'KH000001');
   rendered.length = 0;
   hop.shinOnEdit({ range: eventRange(nen.sheet('Customer'), 4, 2) });
-  const dirty = hop.reloadStateRead();
+  const dirty = trangThai();
   check(so, 'sửa trực tiếp kho đánh dấu bản ghi, làm mọi view cũ và không gọi bộ vẽ',
-    [dirty.records, dirty.viewsStaleRevision === dirty.revision, rendered],
+    [dirty.customer, dirty.viewsStaleRevision === dirty.revision, rendered],
     [['KH000001'], true, []]);
 
   const config = nen.sheet('Config');
@@ -181,23 +185,23 @@ function chay(so) {
   rendered.length = 0;
   hop.shinOnEdit({ range: eventRange(config, 4, configParamColumn) });
   check(so, 'sửa tham số Config đánh dấu nạp lại cấu hình và làm mọi view cũ, không vẽ',
-    [hop.dirtyStateRead(), hop.reloadStateRead().viewsStaleRevision > 0, rendered],
-    [{ records: [], config: true, all: false }, true, []]);
+    [trangThai().config, trangThai().customer, trangThai().viewsStaleRevision > 0, rendered],
+    [true, [], true, []]);
 
   [configSortColumn, configLevelColumn].forEach((column) => {
     clearState();
     hop.shinOnEdit({ range: eventRange(config, 4, column) });
   });
   check(so, 'sửa @CFG_SORT_COL hoặc @CFG_SORT_LEVEL trong Config vẽ mọi sheet quản trị, kể cả khi không đọc núm người dùng',
-    [configSortColumn > 0, configLevelColumn > 0, rendered, hop.dirtyStateRead().config],
+    [configSortColumn > 0, configLevelColumn > 0, rendered, trangThai().config],
     [true, true, ['ALL', 'ALL'], true]);
 
   clearState();
   rendered.length = 0;
   hop.shinOnEdit({ range: eventRange(nen.sheet('Category'), 4, 2) });
   check(so, 'sửa Category đánh dấu nạp lại danh mục và làm mọi view cũ, không vẽ',
-    [hop.dirtyStateRead(), hop.reloadStateRead().viewsStaleRevision > 0, rendered],
-    [{ records: [], config: true, all: false }, true, []]);
+    [trangThai().category, trangThai().config, trangThai().customer, trangThai().viewsStaleRevision > 0, rendered],
+    [true, false, [], true, []]);
 
   const realRun = hop.runEntryPoint;
   const realOpen = hop.shinOpenBook;
@@ -218,8 +222,8 @@ function chay(so) {
     clearState();
     nen.book.setActiveSheet(nen.sheet(sheetName));
     hop.shinOnChange({ changeType });
-    const st = hop.reloadStateRead();
-    return [sheetName, changeType, st.entities, st.allCore, st.category, st.config, st.viewsStaleRevision > 0];
+    const st = trangThai();
+    return [sheetName, changeType, st.entities, st.core, st.category, st.config, st.viewsStaleRevision > 0];
   };
   check(so, 'onChange OTHER (sắp xếp) và thêm/xóa hàng trên sheet kho nạp riêng sheet đó, không allCore; thêm cột trên Customer vẫn full core',
     [doiCauTruc('Customer', 'OTHER'), doiCauTruc('Activity', 'OTHER'), doiCauTruc('Category', 'OTHER'), doiCauTruc('Config', 'OTHER'),

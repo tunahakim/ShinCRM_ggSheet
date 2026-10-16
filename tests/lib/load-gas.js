@@ -140,4 +140,9 @@ function trongLanChay(hopCat, fn) {
   try { return fn(); } finally { hopCat.dirtyStateBasketEnd(); }
 }
 
-module.exports = { GAS_DIR, taoHopCat, napServer, napClient, napRieng, catRuotScript, docTep, trongLanChay };
+/** Dòng sổ nhật ký nạp lại mới nhất (rỗng nếu chưa có), để ca kiểm xem một lần chạy đã báo đổi phần nào. */
+function dongSoCuoi(hopCat) {
+  return hopCat.reloadJournalRead().entries.slice(-1)[0] || {};
+}
+
+module.exports = { GAS_DIR, taoHopCat, napServer, napClient, napRieng, catRuotScript, docTep, trongLanChay, dongSoCuoi };

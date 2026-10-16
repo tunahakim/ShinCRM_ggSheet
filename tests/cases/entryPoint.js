@@ -47,16 +47,18 @@ function chay(so) {
 
   section('EntryPoint — giỏ thay đổi: một lần chạy một tín hiệu, đổ cả khi lỗi');
   const rev = () => hop.reloadStateRead().revision;
+  const mark = (id) => hop.dirtyStateMarkSignal({ customer: [id] });
+  const dongCuoi = () => hop.reloadJournalRead().entries.slice(-1)[0] || {};
   const truoc = rev();
-  goi('fbmContinueSync', () => { hop.dirtyStateMarkRecords(['KH0001']); hop.dirtyStateMarkRecords(['KH0002']); hop.dirtyStateMarkRecords(['KH0003']); });
-  check(so, 'cửa vào ghi ba lô trong một lần chạy chỉ tăng một revision, đủ ba mã', [rev() - truoc, hop.reloadStateRead().records], [1, ['KH0001', 'KH0002', 'KH0003']]);
+  goi('fbmContinueSync', () => { mark('KH0001'); mark('KH0002'); mark('KH0003'); });
+  check(so, 'cửa vào ghi ba lô trong một lần chạy chỉ tăng một revision, đủ ba mã', [rev() - truoc, dongCuoi().customer], [1, ['KH0001', 'KH0002', 'KH0003']]);
   const truocLoi = rev();
-  checkThrows(so, 'lần chạy lỗi sau khi đã ghi vẫn ném lỗi gốc', () => goi('fbmContinueSync', () => { hop.dirtyStateMarkRecords(['KH0004']); throw new Error('lỗi D'); }), 'lỗi D');
-  check(so, 'lần chạy lỗi sau khi đã ghi vẫn đổ giỏ: Sidebar được báo phần đã ghi', [rev() - truocLoi, hop.reloadStateRead().records.indexOf('KH0004') >= 0], [1, true]);
+  checkThrows(so, 'lần chạy lỗi sau khi đã ghi vẫn ném lỗi gốc', () => goi('fbmContinueSync', () => { mark('KH0004'); throw new Error('lỗi D'); }), 'lỗi D');
+  check(so, 'lần chạy lỗi sau khi đã ghi vẫn đổ giỏ: Sidebar được báo phần đã ghi', [rev() - truocLoi, (dongCuoi().customer || []).indexOf('KH0004') >= 0], [1, true]);
   const truocRong = rev();
   goi('fbmContinueSync', () => ({ ok: true }));
   check(so, 'lần chạy không ghi gì không tăng revision', rev() - truocRong, 0);
-  checkThrows(so, 'đánh dấu ngoài cửa vào ném lỗi', () => hop.dirtyStateMarkRecords(['KH0005']), 'ngoài runEntryPoint');
+  checkThrows(so, 'đánh dấu ngoài cửa vào ném lỗi', () => mark('KH0005'), 'ngoài runEntryPoint');
 }
 
 module.exports = { chay };

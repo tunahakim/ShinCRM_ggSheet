@@ -64,7 +64,7 @@ async function chay(so) {
   const truocLuu = counterHop.fieldLogicNextCode('customer', 'CUS-');
   counterHop.saveFlowApply('customer', { fields: ['id'], rows: [['CUS-000013']], counters: { customer: 13, activity: 34 } });
   const sauLuu = counterHop.fieldLogicNextCode('customer', 'CUS-');
-  counterHop.refreshReloadPayload({ mode: 'records', customer: { fields: ['id'], rows: [['CUS-000014']] }, activity: { fields: ['id', 'customerId'], rows: [] }, affectedCustomerIds: ['CUS-000014'], counters: { customer: 14, activity: 34 } });
+  counterHop.refreshReloadPayload({ parts: [{ mode: 'records', customer: { fields: ['id'], rows: [['CUS-000014']] }, activity: { fields: ['id', 'customerId'], rows: [] }, affectedCustomerIds: ['CUS-000014'], counters: { customer: 14, activity: 34 } }] });
   check(so, 'mã xem trước trên form khách mới tăng đúng một bậc sau phản hồi lưu và sau payload reloadRecords',
     [truocLuu, sauLuu, counterHop.fieldLogicNextCode('customer', 'CUS-'), counterHop.fieldLogicNextCode('activity', 'ACT-')],
     ['CUS-000013', 'CUS-000014', 'CUS-000015', 'ACT-000035']);
@@ -106,7 +106,7 @@ async function chay(so) {
     [entityHop.Store.activitiesByCustomer.KH1.map((record) => record.id), entityHop.Store.activitiesByCustomer.KH2],
     [['GD9'], undefined]);
   entityHop.sidebarBoot = () => { throw new Error('payload nạp trọn thực thể không được khởi động lại Sidebar'); };
-  entityHop.refreshReloadPayload({ mode: 'entity', entity: 'customer', customer: { fields: ['id', 'companyName'], rows: [['KH3', 'Khách mới'], ['KH1', 'Tên mới']] }, counters: { customer: 3 } });
+  entityHop.refreshReloadPayload({ parts: [{ mode: 'entity', entity: 'customer', customer: { fields: ['id', 'companyName'], rows: [['KH3', 'Khách mới'], ['KH1', 'Tên mới']] }, counters: { customer: 3 } }] });
   check(so, 'payload mode entity từ lời hỏi áp bằng refreshEntityApply: thay trọn Customer, không gọi sidebarBoot, giữ Activity',
     [Object.keys(entityHop.Store.customers).sort(), entityHop.Store.customers.KH3.companyName, entityHop.Store.activitiesByCustomer.KH1.map((record) => record.id)],
     [['KH1', 'KH3'], 'Khách mới', ['GD9']]);

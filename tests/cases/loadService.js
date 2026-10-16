@@ -13,7 +13,7 @@
 const { dungHop, ghiO } = require('../lib/dung-hop');
 const { trongLanChay } = require('../lib/load-gas');
 const { formatDateGia } = require('../lib/gas-stubs');
-const { section, check, ghiLoiNap } = require('../lib/assert');
+const { section, check, checkThrows, ghiLoiNap } = require('../lib/assert');
 
 const NAM_SHEET = ['Customer', 'Activity', 'Category', 'Config', 'Log'];
 
@@ -57,14 +57,14 @@ function chay(so) {
   const rong = hop.loadCore();
   check(so, 'gói lõi có đúng bộ khóa tài liệu 05 chốt, không thiếu không thừa',
     Object.keys(rong).sort(),
-    ['activity', 'blocked', 'budget', 'categories', 'config', 'customer', 'dirty', 'ms', 'ok', 'pendingMessages', 'prefs', 'processedRevision', 'reload', 'schema', 'selection', 'selectionHints', 'settings', 'spreadsheetId', 'warnings'].sort());
+    ['activity', 'blocked', 'budget', 'categories', 'config', 'customer', 'ms', 'ok', 'pendingMessages', 'prefs', 'processedRevision', 'reload', 'schema', 'selection', 'selectionHints', 'settings', 'spreadsheetId', 'warnings'].sort());
   check(so, 'sheet trắng nạp trót lọt và không bị chặn', [rong.ok, rong.blocked], [true, false]);
   check(so, 'gói lõi mang id tệp để client lọc tin postMessage đúng tệp', rong.spreadsheetId, nen.book.getId());
   check(so, 'không khách nào mà vẫn gửi đủ bảng tên trường', [rong.customer.rows.length, rong.customer.fields.length], [0, 20]);
   check(so, 'khối activity chỉ báo số hàng và cỡ gói, không mang bản ghi nào', Object.keys(rong.activity).sort(), ['chunkRows', 'total']);
   check(so, 'cỡ gói lấy đúng từ SETTINGS chứ không gõ cứng ở đây', rong.activity.chunkRows, hop.SETTINGS.CHUNK_ROWS);
   check(so, 'bảy danh mục thật đều có khóa dù chưa ai gõ giá trị', Object.keys(rong.categories).length, 7);
-  check(so, 'khối trạng thái bẩn có mặt trong MỌI phản hồi, kể cả phản hồi rỗng', Object.keys(rong.dirty).sort(), ['all', 'config', 'records']);
+  check(so, 'trạng thái nạp lại có mặt trong MỌI phản hồi, kể cả phản hồi rỗng', Object.keys(rong.reload).sort(), ['changedAt', 'floor', 'revision', 'viewsStaleRevision']);
   check(so, 'gói lõi mang cả bảng khai để client dựng Schema', Object.keys(rong.schema).sort(), ['activity', 'customer']);
   check(so, 'gói lõi mang read plan tọa độ do GAS tính',
     rong.selectionHints && Object.keys(rong.selectionHints.readPlan).sort(),
@@ -84,10 +84,21 @@ function chay(so) {
   check(so, 'LOG_TRACE off không hiện cảnh báo bật log',
     tatVet.warnings.some((warning) => warning.indexOf('LOG_TRACE đang bật') >= 0), false);
 
-  const coDirty = dungNap(null, { viewsStaleRevision: '4', dirtyRecords: '["KH0001"]', dirtyConfig: 'true', dirtyAll: 'true' }).hop.loadCore();
-  check(so, 'nạp toàn bộ tiêu thụ cờ dữ liệu cũ nhưng giữ mốc cũ của sheet quản trị để sheet vẫn được vẽ lại',
-    [coDirty.dirty, coDirty.reload.viewsStaleRevision],
-    [{ records: [], config: false, all: false }, 4]);
+  const coSo = dungNap(null, { viewsStaleRevision: '4', reloadJournal: JSON.stringify({ rev: 6, floor: 0, changedAt: 1, entries: [{ r: 6, t: 1, customer: ['KH0001'] }] }) });
+  const goiSo = coSo.hop.loadCore();
+  check(so, 'nạp lõi không đụng sổ (không tiêu tín hiệu của Sidebar khác), trả processedRevision là revision sổ, giữ mốc cũ của view',
+    [goiSo.processedRevision, coSo.hop._props.reloadJournal === JSON.stringify({ rev: 6, floor: 0, changedAt: 1, entries: [{ r: 6, t: 1, customer: ['KH0001'] }] }), goiSo.reload.viewsStaleRevision],
+    [6, true, 4]);
+  const chenLoi = dungNap();
+  const docKhach = chenLoi.hop.entityReadAll;
+  let daChen = false;
+  chenLoi.hop.entityReadAll = function () {
+    if (!daChen) { daChen = true; chenLoi.hop.reloadJournalAppend({ customer: ['KH-CHEN'] }); }
+    return docKhach.apply(this, arguments);
+  };
+  const goiChen = chenLoi.hop.loadCore();
+  check(so, 'thay đổi ghi trong lúc nạp lõi đọc Sheet: processedRevision là revision trước khi đọc, nên Sidebar vẫn nhận dòng mới ở lời hỏi sau',
+    [daChen, goiChen.processedRevision, chenLoi.hop.reloadStateRead().revision], [true, 0, 1]);
 
   // Bản ghi được nhận dạng bằng mã; hàng trắng giữa vùng dữ liệu không lọt vào RAM.
   ghiKhach(nen, hangDau, 'KH0001', 'Công ty Một');
@@ -112,10 +123,10 @@ function chay(so) {
   const bao = chan.hop.loadCore();
   check(so, 'vượt trần thì blocked mang TÊN LÝ DO chứ không phải true', bao.blocked, 'cellBudget');
   check(so, 'gói bị chặn chỉ có các khóa điều khiển, và KHÔNG có customer — bằng chứng là chưa đọc ô dữ liệu nào',
-    Object.keys(bao).sort(), ['blocked', 'budget', 'dirty', 'ms', 'ok', 'pendingMessages', 'reload', 'selection'].sort());
+    Object.keys(bao).sort(), ['blocked', 'budget', 'ms', 'ok', 'pendingMessages', 'reload', 'selection'].sort());
   check(so, 'gói bị chặn vẫn mang bảng thủ phạm để người dùng biết dọn sheet nào',
     bao.budget.sheets.length > 0, true);
-  check(so, 'gói bị chặn vẫn mang khối trạng thái bẩn', Object.keys(bao.dirty).sort(), ['all', 'config', 'records']);
+  check(so, 'gói bị chặn vẫn mang trạng thái nạp lại', typeof bao.reload.revision, 'number');
 
   // Reload theo scope: một mã Activity kéo theo Customer cha và toàn bộ lịch sử
   // của Customer đó, nhưng không kéo bản ghi của Customer khác.
@@ -139,61 +150,26 @@ function chay(so) {
     [activityOnly.affectedCustomerIds, activityOnly.customer.rows.map((row) => row[0]), activityOnly.activity.rows.map((row) => row[0]).sort()],
     [['KH-SCOPE-1'], ['KH-SCOPE-1'], ['GD-SCOPE-1', 'GD-SCOPE-2']]);
 
-  const stale = dungNap(null, { reloadRevision: '9', dirtyRecords: '["KH-SCOPE-1","KH-SCOPE-2"]' });
-  ghiKhach(stale, stale.hop.SHEET_FIRST_DATA_ROW, 'KH-SCOPE-1', 'Khách stale 1');
-  ghiKhach(stale, stale.hop.SHEET_FIRST_DATA_ROW + 1, 'KH-SCOPE-2', 'Khách stale 2');
-  const staleReload = stale.hop.reloadRecords(['KH-SCOPE-1'], 8);
-  check(so, 'reloadRecords tự hợp nhất scope dirty mới hơn thay vì đọc hụt mã thứ hai',
-    [staleReload.revisionMatched, staleReload.customer.rows.map((row) => row[0]).sort(), staleReload.processedRevision, staleReload.dirty.records],
-    [false, ['KH-SCOPE-1', 'KH-SCOPE-2'], 9, []]);
-
-  // Two independent sandboxes share document dirty state but must both be able
-  // to consume the same revision; the first clear cannot erase the second reply.
-  const sharedA = dungNap();
-  const sharedB = dungNap();
-  ghiKhach(sharedA, sharedA.hop.SHEET_FIRST_DATA_ROW, 'KH-SHARED', 'Shared A');
-  ghiKhach(sharedB, sharedB.hop.SHEET_FIRST_DATA_ROW, 'KH-SHARED', 'Shared B');
-  const sharedDocumentProperties = sharedA.hop.PropertiesService.getDocumentProperties();
-  const sharedUserPropertiesB = sharedB.hop.PropertiesService.getUserProperties();
-  sharedB.hop.PropertiesService = {
-    getDocumentProperties: () => sharedDocumentProperties,
-    getUserProperties: () => sharedUserPropertiesB
-  };
-  trongLanChay(sharedA.hop, () => sharedA.hop.dirtyStateMarkRecords(['KH-SHARED']));
-  const sharedRevision = sharedA.hop.reloadStateRead().revision;
-  const sharedFirst = sharedA.hop.reloadRecords(['KH-SHARED'], sharedRevision);
-  const sharedSecond = sharedB.hop.reloadRecords(['KH-SHARED'], sharedRevision);
-  check(so, 'hai sandbox doc cung revision khong lam sandbox thu hai mat tin hieu',
-    [sharedFirst.revisionMatched, sharedSecond.revisionMatched,
-      sharedFirst.customer.rows[0][0], sharedSecond.customer.rows[0][0], sharedA.hop.reloadStateRead().records],
-    [true, true, 'KH-SHARED', 'KH-SHARED', []]);
-
   const category = dungNap();
   category.Category.sheet.getRange(category.hop.SHEET_FIRST_DATA_ROW, 1).setValue('Giá trị thử');
-  trongLanChay(category.hop, () => category.hop.dirtyStateMarkCategory());
-  const categoryReload = category.hop.reloadCategory(category.hop.reloadStateRead().revision);
-  check(so, 'reloadCategory trả danh mục và xóa đúng dirtyCategory',
-    [categoryReload.reloadMode, categoryReload.categories[category.Category.codes[0]], categoryReload.revisionMatched, categoryReload.reload.category, categoryReload.dirty.config],
-    ['category', ['Giá trị thử'], true, false, false]);
-
-  trongLanChay(category.hop, () => category.hop.dirtyStateMarkConfig());
-  const configRevision = category.hop.reloadStateRead().revision;
-  const configReload = category.hop.reloadConfig(configRevision);
+  const categoryReload = category.hop.reloadCategory();
+  check(so, 'reloadCategory trả danh mục kèm trạng thái nạp lại',
+    [categoryReload.reloadMode, categoryReload.categories[category.Category.codes[0]], typeof categoryReload.reload.revision],
+    ['category', ['Giá trị thử'], 'number']);
+  const configReload = category.hop.reloadConfig();
   check(so, 'reloadConfig trả payload Config riêng và ReloadState',
-    [configReload.reloadMode, !!configReload.config, configReload.config && !!configReload.config.params, !!configReload.reload, configReload.revisionMatched, configReload.dirty.config],
-    ['config', true, true, true, true, false]);
-
-  trongLanChay(category.hop, () => category.hop.dirtyStateMarkConfig());
-  const staleConfig = category.hop.reloadConfig(category.hop.reloadStateRead().revision - 1);
-  check(so, 'reloadConfig không xóa cờ khi revision đã đổi',
-    [staleConfig.reloadMode, staleConfig.revisionMatched, staleConfig.dirty.config], ['config', false, true]);
+    [configReload.reloadMode, !!configReload.config, configReload.config && !!configReload.config.params, !!configReload.reload],
+    ['config', true, true, true]);
+  const truocNap = category.hop._props.reloadJournal;
+  category.hop.reloadRecords(['KH-X']);
+  category.hop.reloadEntityAll('customer');
+  check(so, 'các hàm nạp chỉ đọc, không ghi sổ', category.hop._props.reloadJournal, truocNap);
 
   const manual = dungNap();
   ghiKhach(manual, manual.hop.SHEET_FIRST_DATA_ROW, 'KH-MANUAL', 'Khách thủ công');
   ghiGiaoDich(manual, manual.hop.SHEET_FIRST_DATA_ROW, 'GD-MANUAL', 'KH-MANUAL', '2026-09-10');
-  trongLanChay(manual.hop, () => manual.hop.dirtyStateMarkRecords(['KH-MANUAL', 'GD-MANUAL']));
-  const manualCustomer = manual.hop.reloadCustomer(manual.hop.reloadStateRead().revision);
-  const manualActivity = manual.hop.reloadActivity(manual.hop.reloadStateRead().revision);
+  const manualCustomer = manual.hop.reloadCustomer();
+  const manualActivity = manual.hop.reloadActivity();
   check(so, 'nạp thủ công Customer và Activity trả đúng scope riêng, không fallback full core',
     [manualCustomer.reloadMode, manualCustomer.customer.rows.length, manualActivity.reloadMode, manualActivity.activity.rows.length],
     ['customer', 1, 'activity', 1]);
@@ -221,11 +197,7 @@ function chay(so) {
       managed.hop.viewIsStale('!Lead'), managed.hop.viewIsStale('!Chăm sóc')],
     ['view', 'KH-MANAGED', '', false, true]);
 
-  const emptyScope = scopeHop.reloadRecords([]);
-  check(so, 'reloadRecords scope rỗng trả quyết định fullCore rõ ràng', emptyScope.reloadMode, 'fullCore');
-  scopeHop.SETTINGS.DIRTY_RECORD_LIMIT = 1;
-  const wideScope = scopeHop.reloadRecords(['KH-SCOPE-1', 'KH-SCOPE-2']);
-  check(so, 'reloadRecords scope vượt ngưỡng trả quyết định fullCore', wideScope.reloadMode, 'fullCore');
+  checkThrows(so, 'reloadRecords không mã thì ném lỗi: không có đường nạp rỗng giả làm thành công', () => scopeHop.reloadRecords([]), 'ít nhất một mã');
 
   return chayGoi(so, nen, hop, hangDau);
 }
@@ -237,8 +209,8 @@ function chayGoi(so, nen, hop, hangDau) {
   const rong = hop.loadActivityChunk(null);
   check(so, 'sheet giao dịch trắng thì gói đầu đã là gói cuối, không ném lỗi',
     [rong.rows.length, rong.done, rong.nextCursor, rong.total], [0, true, null, 0]);
-  check(so, 'gói rỗng vẫn gửi đủ bảng tên trường và khối trạng thái bẩn',
-    [rong.fields.length, Object.keys(rong.dirty).length], [13, 3]);
+  check(so, 'gói rỗng vẫn gửi đủ bảng tên trường và trạng thái nạp lại',
+    [rong.fields.length, typeof rong.reload.revision], [13, 'number']);
 
   // Năm giao dịch, cỡ gói vặn xuống 2 để chứng minh con trỏ đi đúng đường mà không phải dựng 1.000 hàng.
   for (let i = 0; i < 5; i++) {

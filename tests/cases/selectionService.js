@@ -92,7 +92,6 @@ function chay(so) {
 
   // Một request duy nhất trả selection + ReloadState + quyết định. GAS chỉ
   // đọc mã khách khi vị trí thay đổi; Sidebar truyền lại context trước đó.
-  hop.dirtyStateClear();
   let customerReads = 0;
   const readCustomerCell = hop.selectionCustomerCell;
   hop.selectionCustomerCell = function (context, snapshot) {
@@ -127,82 +126,81 @@ function chay(so) {
     [movedProbe.selection.positionChanged, movedProbe.customerId, customerReads],
     [true, 'CUS-000006', readsBeforeStable + 1]);
 
+  // Sidebar giữ revision đã thấy và chỉ nâng lên processedRevision sau khi áp gói (07A bất biến 4); `seen` đóng vai Sidebar đó.
+  let seen = hop.reloadStateRead().revision;
+  const hoi = (extra, prev) => {
+    const reply = hop.probeSelectionAndReload(Object.assign({ lastSeenRevision: seen, previousSelectionContext: prev.selection, previousCustomerId: prev.customerId }, extra));
+    if (reply.payload) { seen = reply.processedRevision; }
+    return reply;
+  };
+  const maKhach = (part) => part.customer.rows.map((row) => row[0]);
+
   // Không chờ theo thời gian và không hoãn theo lượt đồng bộ: lời hỏi ngay sau thay đổi nhận payload trong cùng phản hồi, kể cả khi Sidebar còn gửi cờ đồng bộ cũ.
-  trongLanChay(hop, () => hop.dirtyStateMarkSignal({ records: ['CUS-000004'], allViews: false }));
-  const ready = hop.probeSelectionAndReload({ requestId: 'r11-ready', syncRunning: true, previousSelectionContext: movedProbe.selection, previousCustomerId: movedProbe.customerId });
-  check(so, 'lời hỏi ngay sau sửa nhận payload records và dọn dirty, không defer, không waitMs',
-    [ready.requestId, ready.decision.ram.action, ready.payload.mode, ready.payload.customer.rows.length, ready.processedRevision > 0, ready.reload.records, 'waitMs' in ready],
-    ['r11-ready', 'reload', 'records', 1, true, [], false]);
+  trongLanChay(hop, () => hop.dirtyStateMarkSignal({ customer: ['CUS-000004'] }));
+  const ready = hoi({ requestId: 'r11-ready', syncRunning: true }, movedProbe);
+  check(so, 'lời hỏi ngay sau sửa nhận gói một phần records, không defer, không waitMs; processedRevision là revision sổ',
+    [ready.requestId, ready.decision.ram.action, ready.payload.parts.map((part) => part.mode), ready.payload.parts[0].customer.rows.length, ready.processedRevision, ready.reload.revision, 'waitMs' in ready],
+    ['r11-ready', 'reload', ['records'], 1, ready.reload.revision, ready.reload.revision, false]);
+  check(so, 'lời hỏi lại cùng revision không nhận gói nào: sổ không bị tiêu, Sidebar tự biết đã thấy',
+    hoi({}, ready).payload, null);
 
-  trongLanChay(hop, () => hop.dirtyStateMarkSchema());
-  const fullCore = hop.probeSelectionAndReload({ requestId: 'r11-core', previousSelectionContext: ready.selection, previousCustomerId: ready.customerId });
+  trongLanChay(hop, () => hop.dirtyStateMarkSignal({ core: true }));
+  const fullCore = hoi({ requestId: 'r11-core' }, ready);
   check(so, 'R11 full core mang Activity trong cùng payload',
-    [fullCore.requestId, fullCore.payload.mode, Array.isArray(fullCore.payload.core.activity.rows), fullCore.payload.core.activity.fields.length > 0],
-    ['r11-core', 'fullCore', true, true]);
+    [fullCore.requestId, fullCore.payload.parts.map((part) => part.mode), Array.isArray(fullCore.payload.parts[0].core.activity.rows), fullCore.payload.parts[0].core.activity.fields.length > 0],
+    ['r11-core', ['fullCore'], true, true]);
 
-  trongLanChay(hop, () => hop.dirtyStateMarkCategory());
-  const categoryPayload = hop.probeSelectionAndReload({ requestId: 'r11-category', previousSelectionContext: fullCore.selection, previousCustomerId: fullCore.customerId });
-  check(so, 'R11 Category trả payload Category riêng',
-    [categoryPayload.requestId, categoryPayload.payload && categoryPayload.payload.mode, categoryPayload.decision.ram.mode],
-    ['r11-category', 'category', 'category']);
+  trongLanChay(hop, () => hop.dirtyStateMarkSignal({ category: true }));
+  const categoryPayload = hoi({ requestId: 'r11-category' }, fullCore);
+  check(so, 'R11 Category trả đúng một phần Category',
+    [categoryPayload.requestId, categoryPayload.payload.parts.map((part) => part.mode), categoryPayload.decision.ram.mode],
+    ['r11-category', ['category'], 'parts']);
 
-  hop.dirtyStateClear();
-  trongLanChay(hop, () => hop.dirtyStateMarkConfig());
-  const configPayload = hop.probeSelectionAndReload({ requestId: 'r11-config', previousSelectionContext: categoryPayload.selection, previousCustomerId: categoryPayload.customerId });
-  check(so, 'R11 Config trả payload Config riêng trong cùng request',
-    [configPayload.requestId, configPayload.payload && configPayload.payload.mode, !!(configPayload.payload && configPayload.payload.config), configPayload.decision.ram.mode, configPayload.reload.config],
-    ['r11-config', 'config', true, 'config', false]);
+  trongLanChay(hop, () => hop.dirtyStateMarkSignal({ config: true }));
+  const configPayload = hoi({ requestId: 'r11-config' }, categoryPayload);
+  check(so, 'R11 Config trả đúng một phần Config trong cùng request',
+    [configPayload.requestId, configPayload.payload.parts.map((part) => part.mode), !!configPayload.payload.parts[0].config],
+    ['r11-config', ['config'], true]);
+
+  // Sidebar tụt lại nhiều lượt: Config, Category và mã khách gộp trong một lời gọi, mỗi phần một mức, không nạp lõi (V29).
+  trongLanChay(hop, () => hop.dirtyStateMarkSignal({ config: true }));
+  trongLanChay(hop, () => hop.dirtyStateMarkSignal({ category: true }));
+  trongLanChay(hop, () => hop.dirtyStateMarkSignal({ customer: ['CUS-000004'] }));
+  const gop = hoi({}, configPayload);
+  check(so, 'R11 ba dòng sổ khác loại gộp thành một gói ba phần, Config trước dữ liệu',
+    [gop.payload.parts.map((part) => part.mode), gop.processedRevision], [['config', 'category', 'records'], hop.reloadStateRead().revision]);
 
   // R11 A-E: một lần chạy GAS ghi năm mã thành một tín hiệu, một revision, một payload.
-  hop.dirtyStateClear();
   const burstIds = ['KH-A', 'KH-B', 'KH-C', 'KH-D', 'KH-E'];
   burstIds.forEach((id, i) => { ghiO(nen, 'Customer', 10 + i, '@CUS_MA_KH', id); ghiO(nen, 'Customer', 10 + i, '@CUS_TEN_CTY', id); });
   const burstRevision = hop.reloadStateRead().revision;
-  trongLanChay(hop, () => { burstIds.forEach((id) => { hop.dirtyStateMarkSignal({ records: [id], allViews: false }); }); });
-  const burstReady = hop.probeSelectionAndReload({ previousSelectionContext: categoryPayload.selection, previousCustomerId: categoryPayload.customerId });
+  trongLanChay(hop, () => { burstIds.forEach((id) => { hop.dirtyStateMarkSignal({ customer: [id] }); }); });
+  const burstReady = hoi({}, gop);
   check(so, 'R11 A-E năm lần ghi trong một lần chạy: một revision, một payload gồm toàn bộ mã',
-    [burstReady.processedRevision - burstRevision, burstReady.payload.mode, burstReady.payload.customer.rows.map((row) => row[0]).filter((id) => burstIds.indexOf(id) >= 0).sort(), burstReady.reload.records],
-    [1, 'records', burstIds.slice().sort(), []]);
+    [burstReady.processedRevision - burstRevision, burstReady.payload.parts.map((part) => part.mode), maKhach(burstReady.payload.parts[0]).filter((id) => burstIds.indexOf(id) >= 0).sort()],
+    [1, ['records'], burstIds.slice().sort()]);
 
-  // R11 F trong lúc đang đọc A-E: revision mới không bị xóa; request kế tiếp nhận riêng F.
+  // Lưu chen giữa: một lần ghi khác vào sổ trong lúc lời hỏi đang đọc Sheet. Gói hiện tại chỉ hứa tới revision lúc bắt đầu; dòng mới lời hỏi sau nhận.
   ghiO(nen, 'Customer', 20, '@CUS_MA_KH', 'KH-F');
   ghiO(nen, 'Customer', 20, '@CUS_TEN_CTY', 'KH-F');
   ghiO(nen, 'Customer', 21, '@CUS_MA_KH', 'KH-NEW');
   ghiO(nen, 'Customer', 21, '@CUS_TEN_CTY', 'KH-NEW');
-  trongLanChay(hop, () => hop.dirtyStateMarkRecords(['KH-F']));
+  trongLanChay(hop, () => hop.dirtyStateMarkSignal({ customer: ['KH-F'] }));
   const duringRevision = hop.reloadStateRead().revision;
   const readRows = hop.entityReadRowsAt;
   let injected = false;
   hop.entityReadRowsAt = function (context, rows) {
-    if (!injected) { injected = true; hop.dirtyStateApplySignal({ records: ['KH-NEW'] }); }
+    if (!injected) { injected = true; hop.reloadJournalAppend({ customer: ['KH-NEW'] }); }
     return readRows(context, rows);
   };
-  const duringRead = hop.probeSelectionAndReload({ previousSelectionContext: burstReady.selection, previousCustomerId: burstReady.customerId });
+  const duringRead = hoi({}, burstReady);
   hop.entityReadRowsAt = readRows;
-  check(so, 'R11 signal F phát sinh trong lúc đọc không bị mất',
-    [duringRead.revisionMatched, duringRead.processedRevision, duringRead.reload.records, duringRead.remainingRevision > 0],
-    [false, duringRevision, ['KH-NEW'], true]);
-  const afterDuringRead = hop.probeSelectionAndReload({ previousSelectionContext: duringRead.selection, previousCustomerId: duringRead.customerId });
-  check(so, 'R11 request kế tiếp nhận payload của signal mới',
-    [afterDuringRead.payload.mode, afterDuringRead.payload.customer.rows.map((row) => row[0]), afterDuringRead.reload.records],
-    ['records', ['KH-NEW'], []]);
-
-  ghiO(nen, 'Customer', 22, '@CUS_MA_KH', 'KH-SAME');
-  ghiO(nen, 'Customer', 22, '@CUS_TEN_CTY', 'KH-SAME');
-  trongLanChay(hop, () => hop.dirtyStateMarkRecords(['KH-SAME']));
-  const sameRevision = hop.reloadStateRead().revision;
-  injected = false;
-  hop.entityReadRowsAt = function (context, rows) {
-    if (!injected) { injected = true; hop.dirtyStateApplySignal({ records: ['KH-SAME'] }); }
-    return readRows(context, rows);
-  };
-  const sameDuringRead = hop.probeSelectionAndReload({ previousSelectionContext: afterDuringRead.selection, previousCustomerId: afterDuringRead.customerId });
-  hop.entityReadRowsAt = readRows;
-  check(so, 'R11 cùng mã phát sinh lại trong lúc đọc vẫn giữ signal mới',
-    [sameDuringRead.revisionMatched, sameDuringRead.processedRevision, sameDuringRead.reload.records],
-    [false, sameRevision, ['KH-SAME']]);
-  const sameNext = hop.probeSelectionAndReload({ previousSelectionContext: sameDuringRead.selection, previousCustomerId: sameDuringRead.customerId });
-  check(so, 'R11 signal cùng mã được dọn sau request kế tiếp', [sameNext.payload.mode, sameNext.reload.records], ['records', []]);
+  check(so, 'R11 lưu chen giữa lúc đọc: processedRevision dừng ở revision lúc bắt đầu, dòng mới còn nguyên trong sổ',
+    [duringRead.processedRevision, maKhach(duringRead.payload.parts[0]), hop.reloadStateRead().revision, hop.reloadJournalRead().entries.slice(-1)[0].customer],
+    [duringRevision, ['KH-F'], duringRevision + 1, ['KH-NEW']]);
+  const afterDuringRead = hoi({}, duringRead);
+  check(so, 'R11 lời hỏi kế tiếp nhận đúng thay đổi chen giữa',
+    [afterDuringRead.payload.parts.map((part) => part.mode), maKhach(afterDuringRead.payload.parts[0])], [['records'], ['KH-NEW']]);
 
   const logged = [];
   const logEventGoc = hop.logEvent;
@@ -277,25 +275,22 @@ function chay(so) {
   check(so, 'mọi lời hỏi trên sheet tự do không ghi ô nào: bộ đếm lệnh ghi của tệp giả không đổi', JSON.parse(JSON.stringify(nen.dem)), JSON.parse(demTuDo));
 
   section('SelectionService — signal entities nạp trọn đúng một thực thể trong cùng lời hỏi');
-  hop.dirtyStateClear();
+  const truocEntity = hop.reloadStateRead().revision;
   trongLanChay(hop, () => hop.dirtyStateMarkDecision(hop.reloadDecisionForChange({ source: 'change', surface: 'entity', entities: ['customer'] })));
-  const truocEntity = hop.reloadStateRead();
-  const traEntity = hop.probeSelectionAndReload({ lastSeenRevision: 0 });
-  const payloadIds = traEntity.payload && traEntity.payload.customer ? traEntity.payload.customer.rows.map((row) => row[traEntity.payload.customer.fields.indexOf('id')]) : [];
-  check(so, 'signal entities [customer]: lời hỏi trả payload mode entity đọc trọn Customer, không đụng Activity, xóa signal khi revision khớp',
-    [truocEntity.entities, truocEntity.allCore, traEntity.decision.ram.mode, traEntity.payload && traEntity.payload.mode, traEntity.payload && traEntity.payload.entity, payloadIds.indexOf('CUS-000004') >= 0, traEntity.payload && traEntity.payload.activity, hop.reloadStateRead().entities, traEntity.remainingRevision],
-    [['customer'], false, 'entity', 'entity', 'customer', true, undefined, [], 0]);
-  trongLanChay(hop, () => hop.dirtyStateMarkDecision(hop.reloadDecisionForChange({ source: 'change', surface: 'entity', entities: ['activity'] })));
-  trongLanChay(hop, () => hop.dirtyStateMarkCategory());
-  check(so, 'thực thể đi cùng scope khác (Category) thì gom full core cho cùng một revision', hop.reloadDecisionForState({ reloadState: hop.reloadStateRead() }).ram.mode, 'fullCore');
-  hop.dirtyStateClear();
+  const traEntity = hop.probeSelectionAndReload({ lastSeenRevision: truocEntity });
+  const entityPart = traEntity.payload ? traEntity.payload.parts[0] : {};
+  const payloadIds = entityPart.customer ? entityPart.customer.rows.map((row) => row[entityPart.customer.fields.indexOf('id')]) : [];
+  check(so, 'signal entities [customer]: lời hỏi trả đúng một phần entity đọc trọn Customer, không đụng Activity',
+    [traEntity.decision.ram.mode, traEntity.payload.parts.length, entityPart.mode, entityPart.entity, payloadIds.indexOf('CUS-000004') >= 0, entityPart.activity],
+    ['parts', 1, 'entity', 'customer', true, undefined]);
+  const truocDraft = hop.reloadStateRead().revision;
   trongLanChay(hop, () => hop.dirtyStateMarkDecision(hop.reloadDecisionForChange({ source: 'change', surface: 'entity', entities: ['customer'] })));
   check(so, 'nạp trọn thực thể bị chặn khi Sidebar giữ bản nháp, như full core',
-    hop.reloadDecisionForState({ reloadState: hop.reloadStateRead(), localDraft: { recordIds: ['CUS-000004'] } }).ram.action, 'defer');
-  hop.dirtyStateClear();
+    hop.probeSelectionAndReload({ lastSeenRevision: truocDraft, localDraft: { recordIds: ['CUS-000004'] } }).decision.ram.action, 'defer');
 
   section('SelectionService — lời hỏi rẻ: Extension đã đọc được vị trí thì GAS không chạm bảng tính');
-  const daBiet = hop.probeSelectionAndReload({}).selection;
+  const daThay = hop.reloadStateRead().revision;
+  const daBiet = hop.probeSelectionAndReload({ lastSeenRevision: daThay }).selection;
   const goc = { app: hop.SpreadsheetApp, mo: hop.shinOpenBook, sheet: nen.book.getActiveSheet };
   const cham = [];
   const camCham = (ten) => function () { cham.push(ten); throw new Error('lời hỏi rẻ chạm ' + ten); };
@@ -304,7 +299,7 @@ function chay(so) {
   nen.book.getActiveSheet = camCham('getActiveSheet');
   let re;
   try {
-    re = hop.probeSelectionAndReload({ skipPosition: true, previousSelectionContext: daBiet, previousCustomerId: 'CUS-EXT', reason: 'signal' });
+    re = hop.probeSelectionAndReload({ skipPosition: true, lastSeenRevision: daThay, previousSelectionContext: daBiet, previousCustomerId: 'CUS-EXT', reason: 'signal' });
   } catch (err) {
     re = { loi: err.message };
   }

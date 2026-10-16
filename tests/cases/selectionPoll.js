@@ -276,8 +276,8 @@ async function chay(so) {
     [pickedOk, readerOk._calls.length, readerOk._banner.hidden], [['CUS-000004'], 0, true]);
 
   const writeResponse = dungHopPoll(); batDau(writeResponse); writeResponse._calls = [];
-  writeResponse.sheetLinkObserveReloadPayload({ reload: { revision: 3, records: ['CUS-1'] } }, 'saveRecord');
-  writeResponse.sheetLinkObserveReloadPayload({ reload: { revision: 4, records: ['CUS-2'] } }, 'deleteRecords');
+  writeResponse.sheetLinkObserveReloadPayload({ reload: { revision: 3 } }, 'saveRecord');
+  writeResponse.sheetLinkObserveReloadPayload({ reload: { revision: 4 } }, 'deleteRecords');
   check(so, 'save/delete đã trả kết quả thì không probe reload lần hai', writeResponse._calls, []);
 
   const queuedWake = dungHopPoll(); batDau(queuedWake);
@@ -408,24 +408,20 @@ async function chay(so) {
   taiLai.sheetLinkOnMessage({ origin: taiLai.SHEET_LINK_ORIGIN, data: { action: 'CRM_CONTEXT', nonce: taiLai.SHEET_LINK_NONCE, sessionId: 'extension-cu', spreadsheetId: 'sheet-1', seq: 200, sheetName: 'Customer', row: 5, col: 1 } });
   check(so, 'Extension tải lại đặt lại seq và bỏ context của phiên cũ', [seqSauContextMoi, taiLai.SHEET_LINK_SEQ], [1, 1]);
 
-  const successfulReload = dungHopPoll(); batDau(successfulReload);
-  successfulReload.SHEET_LINK_LAST_SEEN_REVISION = 0;
-  successfulReload.refreshDirtyRecords = (ids, revision) => syncValue({ ok: true, ids, processedRevision: revision });
-  await successfulReload.sheetLinkApplyDecisionResult({
-    reload: { revision: 7, records: ['KH1'] },
-    decision: { ram: { action: 'reload', mode: 'records', waitMs: 0 } }
-  });
-  check(so, 'chỉ ghi nhận revision sau khi reload Store thành công', successfulReload.SHEET_LINK_LAST_SEEN_REVISION, 7);
+  const noPayload = dungHopPoll(); batDau(noPayload);
+  noPayload.SHEET_LINK_LAST_SEEN_REVISION = 3;
+  await noPayload.sheetLinkApplyDecisionResult({ reload: { revision: 7 }, decision: { ram: { action: 'defer' } }, processedRevision: 0 });
+  check(so, 'không có gói (hoãn vì bản nháp, hoặc không gì mới) thì giữ nguyên revision đã thấy để lời hỏi sau nhận đủ', noPayload.SHEET_LINK_LAST_SEEN_REVISION, 3);
 
   const directPayload = dungHopPoll(); batDau(directPayload);
   directPayload.SHEET_LINK_LAST_SEEN_REVISION = 0;
   directPayload._payloads = [];
-  directPayload.refreshReloadPayload = (payload) => { directPayload._payloads.push(payload.mode); return payload; };
+  directPayload.refreshReloadPayload = (payload) => { directPayload._payloads.push(payload.parts.map((part) => part.mode).join('+')); return payload; };
   directPayload.callServer = (name) => { directPayload._calls.push(name); return syncValue({ ok: true }); };
   await directPayload.sheetLinkApplyDecisionResult({
-    reload: { revision: 10, records: ['KH1'] },
+    reload: { revision: 10 },
     processedRevision: 10,
-    payload: { mode: 'records', customer: { fields: [], rows: [] }, activity: { fields: [], rows: [] } }
+    payload: { parts: [{ mode: 'records', customer: { fields: [], rows: [] }, activity: { fields: [], rows: [] } }] }
   });
   check(so, 'payload probe được Sidebar áp dụng trực tiếp, không gọi reloadRecords lần hai',
     [directPayload._payloads, directPayload._calls, directPayload.SHEET_LINK_LAST_SEEN_REVISION],
@@ -433,21 +429,32 @@ async function chay(so) {
 
   directPayload._payloads = [];
   await directPayload.sheetLinkApplyDecisionResult({
-    reload: { revision: 9, records: ['KH-OLD'] },
+    reload: { revision: 10 },
     processedRevision: 9,
-    payload: { mode: 'records', customer: { fields: [], rows: [] }, activity: { fields: [], rows: [] } }
+    payload: { parts: [{ mode: 'records', customer: { fields: [], rows: [] }, activity: { fields: [], rows: [] } }] }
   });
   check(so, 'response payload cũ về muộn không ghi đè revision đã áp dụng',
     [directPayload._payloads, directPayload.SHEET_LINK_LAST_SEEN_REVISION], [[], 10]);
 
   const failedReload = dungHopPoll(); batDau(failedReload);
   failedReload.SHEET_LINK_LAST_SEEN_REVISION = 0;
-  failedReload.refreshDirtyRecords = () => syncValue({ ok: false, error: 'reload failed' });
-  await failedReload.sheetLinkApplyDecisionResult({
-    reload: { revision: 8, records: ['KH2'] },
-    decision: { ram: { action: 'reload', mode: 'records', waitMs: 0 } }
-  });
-  check(so, 'reload lỗi không đánh dấu revision đã xử lý', failedReload.SHEET_LINK_LAST_SEEN_REVISION, 0);
+  failedReload.refreshReloadPayload = () => null;
+  await failedReload.sheetLinkApplyDecisionResult({ reload: { revision: 8 }, processedRevision: 8, payload: { parts: [{ mode: 'fullCore', core: { ok: false } }] } });
+  check(so, 'gói áp không thành công không đánh dấu revision đã xử lý', failedReload.SHEET_LINK_LAST_SEEN_REVISION, 0);
+
+  // Rời ô điều khiển sheet `!`: chỉ so revision sổ với revision đã thấy rồi hỏi GAS một lời; Sidebar không tự chọn API nạp.
+  const inspect = dungHopPoll(); batDau(inspect);
+  inspect._synced = [];
+  inspect.sheetLinkSyncDirtyData = (opts) => { inspect._synced.push(opts.reason); return syncValue({ ok: true }); };
+  inspect.callServer = (name) => syncValue(name === 'inspectViewState' ? { reload: { revision: 5 }, changed: false, needsRender: false } : { ok: true });
+  inspect.sheetLinkViewState('!Lead').metaReady = true;
+  inspect.SHEET_LINK_LAST_SEEN_REVISION = 5;
+  await inspect.sheetLinkInspectView('!Lead');
+  const inspectDaThay = inspect._synced.slice();
+  inspect.SHEET_LINK_LAST_SEEN_REVISION = 4;
+  await inspect.sheetLinkInspectView('!Lead');
+  check(so, 'rời ô điều khiển sheet !: sổ không có gì mới thì không nạp; có revision mới thì một lời hỏi GAS',
+    [inspectDaThay, inspect._synced], [[], ['view-inspect']]);
 
   const failedEvent = dungHopPoll(); batDau(failedEvent);
   failedEvent.SHEET_LINK_LAST_SEEN_REVISION = 0;
@@ -656,11 +663,11 @@ async function chayView(so) {
     /toggleAutoRenderView[\s\S]*?sent\.then\(function \(value\) \{ sheetLinkOnAutoRenderOn\(\)/.test(actionsHtml), true);
 
   // Lượt đồng bộ đang chạy không còn là lý do hoãn: mỗi lần chạy GAS có thay đổi phát một tín hiệu, Sidebar áp ngay và vẽ view cùng lúc.
-  const syncing = dungHopView({ probeSelectionAndReload: Object.assign({}, probeRender, { reload: { revision: 12, records: ['KH1'] }, processedRevision: 12, payload: { mode: 'records' } }), renderViewIfDirty: drawn });
+  const syncing = dungHopView({ probeSelectionAndReload: Object.assign({}, probeRender, { reload: { revision: 12 }, processedRevision: 12, payload: { parts: [{ mode: 'records' }] } }), renderViewIfDirty: drawn });
   syncing.FBM_SYNC_CLIENT = { running: true, active: false };
   syncing._payloads = [];
   syncing._busy = [];
-  syncing.refreshReloadPayload = (payload) => { syncing._payloads.push(payload.mode); return payload; };
+  syncing.refreshReloadPayload = (payload) => { syncing._payloads.push(payload.parts.map((part) => part.mode).join('+')); return payload; };
   syncing.sidebarBusyRun = (message, work, options) => { syncing._busy.push(options); return work(); };
   syncing.SHEET_LINK_LAST_SEEN_REVISION = 3;
   await syncing.sheetLinkProbeSelectionAndReload('dirty-state');

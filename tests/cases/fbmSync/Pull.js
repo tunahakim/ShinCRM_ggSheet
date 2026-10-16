@@ -314,7 +314,7 @@ async function chay(so) {
   let newPullWrite, newPullCalls = 0, dirtyMarkCalls = 0;
   builders.FbmSync.stateRead = () => ({ metadata: {} });
   builders.FbmSync.readLocal = () => [];
-  builders.dirtyStateMarkRecords = () => { dirtyMarkCalls += 1; };
+  builders.dirtyStateMarkSignal = () => { dirtyMarkCalls += 1; };
   builders.writeGateSave = (request) => { newPullCalls += 1; newPullWrite = request; return { ok: true, fields: ['id'], rows: [['CUS-NEW']] }; };
   const newPullResult = builders.FbmSync.pullWrite('customer', [builders.FbmSync.customerRecord({ stt_rec_kh: 'NEW-C', ma_kh: 'ALT00012', ten_kh: 'Khách mới', ma_so_thue: '001' }, gate)]);
   check(so, 'Customer pull mới ghi cả định danh baseline và quyền đẩy qua cửa ghi', [newPullResult.written, newPullWrite.source, newPullWrite.schemas.length, newPullWrite.records[0].fbmId, newPullWrite.records[0].fbmHash !== '', newPullWrite.records[0].parentCompanyName, newPullWrite.records[0].fbmSyncPermission, dirtyMarkCalls], [1, 'pull', 2, 'NEW-C', true, '', builders.FbmSync.pullDefaultPermission(), 0]);

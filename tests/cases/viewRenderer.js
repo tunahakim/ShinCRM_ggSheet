@@ -82,13 +82,13 @@ function chay(so) {
   allViews.nen.hop.renderAllManagedViews(['!Chăm sóc']);
 
   // Mô hình cũ/mới theo revision từng sheet.
-  trongLanChay(allViews.nen.hop, () => allViews.nen.hop.dirtyStateMarkSignal({ records: ['KH0001'], allViews: true }));
+  trongLanChay(allViews.nen.hop, () => allViews.nen.hop.dirtyStateMarkSignal({ customer: ['KH0001'], allViews: true }));
   check(so, 'signal dữ liệu kho làm mọi view thành cũ', [allViews.nen.hop.viewIsStale('!Lead'), allViews.nen.hop.viewIsStale('!Chăm sóc')], [true, true]);
   allViews.nen.hop.renderViewSheet('!Lead');
   check(so, '(a) vẽ sheet A sau signal: A mới, B vẫn cũ', [allViews.nen.hop.viewIsStale('!Lead'), allViews.nen.hop.viewIsStale('!Chăm sóc')], [false, true]);
   const realGuard = allViews.nen.hop.viewAssertNoFormulas;
   allViews.nen.hop.viewAssertNoFormulas = function () {
-    allViews.nen.hop.dirtyStateApplySignal({ records: ['KH0002'], allViews: true });
+    allViews.nen.hop.reloadJournalAppend({ customer: ['KH0002'], allViews: true });
     return realGuard.apply(null, arguments);
   };
   const midRender = allViews.nen.hop.renderViewSheet('!Chăm sóc');
@@ -101,7 +101,7 @@ function chay(so) {
   secondView.getRange(3, 2).setValue('');
   check(so, 'sửa lại ô lọc vừa làm hỏng lượt vẽ thì đường lấy metadata (controlsOnly) vẽ lại ngay, sheet thành mới',
     [allViews.nen.hop.renderViewIfDirty('!Chăm sóc', { controlsOnly: true }).skipped, allViews.nen.hop.viewIsStale('!Chăm sóc')], [undefined, false]);
-  trongLanChay(allViews.nen.hop, () => allViews.nen.hop.dirtyStateMarkSignal({ records: ['KH0002'], allViews: true }));
+  trongLanChay(allViews.nen.hop, () => allViews.nen.hop.dirtyStateMarkSignal({ customer: ['KH0002'], allViews: true }));
   check(so, 'đường lấy metadata (controlsOnly) không vẽ sheet cũ khi bộ điều khiển không đổi, sheet vẫn cũ',
     [allViews.nen.hop.renderViewIfDirty('!Chăm sóc', { controlsOnly: true }).skipped, allViews.nen.hop.viewIsStale('!Chăm sóc')], [true, true]);
   check(so, 'renderViewIfDirty vẽ sheet cũ dù bộ điều khiển không đổi, rồi lần sau bỏ qua',
@@ -115,7 +115,7 @@ function chay(so) {
   formula.view.getRange(4, 3).setValue('ghi chú tay');
   const beforeFormula = formula.view.getRange(4, 1, 2, 3).getValues();
   const writesBefore = formula.nen.dem.setValues;
-  trongLanChay(formula.nen.hop, () => formula.nen.hop.dirtyStateMarkSignal({ records: ['KH0001'], allViews: true }));
+  trongLanChay(formula.nen.hop, () => formula.nen.hop.dirtyStateMarkSignal({ customer: ['KH0001'], allViews: true }));
   checkThrows(so, 'gặp công thức trong cột @ từ hàng 4 thì dừng với lỗi chỉ đúng ô', () => formula.nen.hop.renderViewSheet('!Lead'), 'ô B5');
   check(so, 'không xóa hay ghi ô nào của sheet, gắn note ⛔ ở ô hàng lọc của cột đó, sheet vẫn cũ',
     [formula.view.getRange(4, 1, 2, 3).getValues(), formula.nen.dem.setValues - writesBefore, formula.view.getRange(3, 2).getNote().indexOf('⛔ ShinCRM:') === 0,
@@ -280,7 +280,7 @@ function chaySoTrangThai(so) {
     [again.ok, again.skipped, !!again.error, !!again.viewMeta, inspect.needsRender, notes, demLog(t.nen, '60..50'), t.nen.dem.setValues - writes],
     [false, true, true, true, false, 1, 1, 0]);
 
-  trongLanChay(hop, () => hop.dirtyStateMarkSignal({ records: ['KH0001'], allViews: true }));
+  trongLanChay(hop, () => hop.dirtyStateMarkSignal({ customer: ['KH0001'], allViews: true }));
   checkThrows(so, 'dữ liệu kho đổi thì thử lại và vẫn báo lỗi cho Sidebar', () => hop.renderViewIfDirty('!Lead'), 'B3');
   check(so, 'lỗi y hệt lượt trước: không ghi note lần hai, không thêm dòng Log', [notes, demLog(t.nen, '60..50')], [1, 1]);
 
@@ -301,7 +301,7 @@ function chaySoTrangThai(so) {
   let clears = 0;
   const realClear = hop.viewClearErrorNotes;
   hop.viewClearErrorNotes = function () { clears += 1; return realClear.apply(null, arguments); };
-  trongLanChay(hop, () => hop.dirtyStateMarkSignal({ records: ['KH0001'], allViews: true }));
+  trongLanChay(hop, () => hop.dirtyStateMarkSignal({ customer: ['KH0001'], allViews: true }));
   hop.renderViewIfDirty('!Lead');
   hop.viewClearErrorNotes = realClear;
   check(so, 'vẽ thành công liên tiếp không dò gỡ note lần nữa', clears, 0);
@@ -341,14 +341,14 @@ function chayTabCam(so) {
     [base.view.getTabColor(), base.view._tabColors.length, care.getTabColor()], [null, 2, '#ff9900']);
 
   const realGuard = hop.viewAssertNoFormulas;
-  hop.viewAssertNoFormulas = function () { hop.dirtyStateApplySignal({ records: ['KH0002'], allViews: true }); return realGuard.apply(this, arguments); };
+  hop.viewAssertNoFormulas = function () { hop.reloadJournalAppend({ customer: ['KH0002'], allViews: true }); return realGuard.apply(this, arguments); };
   hop.renderViewSheet('!Chăm sóc');
   hop.viewAssertNoFormulas = realGuard;
   check(so, 'signal đến giữa lượt vẽ để sheet vẫn cũ thì không trả màu', [hop.viewIsStale('!Chăm sóc'), care.getTabColor()], [true, '#ff9900']);
   hop.renderViewSheet('!Chăm sóc');
   check(so, 'vẽ lại xong trả đúng màu người dùng tự đặt', care.getTabColor(), '#00ff00');
 
-  trongLanChay(hop, () => hop.dirtyStateMarkSignal({ records: ['KH0001'], allViews: true }));
+  trongLanChay(hop, () => hop.dirtyStateMarkSignal({ customer: ['KH0001'], allViews: true }));
   check(so, 'đổ giỏ cuối lần chạy (tự lấy khóa) tô lại sheet cũ sau khi đã trả màu và nhả khóa',
     [base.view.getTabColor(), care.getTabColor(), base.nen.stubs._khoa.dangGiu], ['#ff9900', '#ff9900', false]);
   const before = base.nen.book.getSheets().map((sheet) => sheet._tabColors.length);
