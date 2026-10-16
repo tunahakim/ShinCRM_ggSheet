@@ -13,8 +13,8 @@ function chuoiHarness(lich, options) {
   vm.runInContext('Date.now = function () { return __now(); };', h.flow.hop);
   h.F.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   h.F.backgroundScheduleSave(Object.assign({ enabled: true, direction: 'read', confirmLow: true }, lich));
-  const xong = [], advance = h.F.scheduleMarkerAdvance;
-  h.F.scheduleMarkerAdvance = function (kind) { xong.push(kind); return advance.apply(this, arguments); };
+  const xong = [], advance = h.F.scheduleMarkDone;
+  h.F.scheduleMarkDone = function (kind) { xong.push(kind); return advance.apply(this, arguments); };
   /** Hỏi một lần sau `phut` phút; mỗi request FBM tốn `moiRequest` mili-giây. Trả các tiến trình chạy xong trong lần hỏi đó. */
   async function hoi(phut, moiRequest, hooks) {
     clock.now += phut * PHUT; xong.length = 0;
@@ -36,8 +36,8 @@ async function chay(so) {
   check(so, 'Hỏi 60 phút một lần trong 8 lần: Quét nhanh và Vòng xoay chạy ở cả 8 lần, Lấy toàn bộ giao dịch chạy ít nhất một lần, Giữ phiên chạy sau cùng mỗi lần, không lần nào dừng lỗi', [
     tamLan.filter((list) => list.indexOf('customerFull') >= 0).length, tamLan.filter((list) => list.indexOf('detail') >= 0).length, tamLan.some((list) => list.indexOf('activityFull') >= 0), tamLan.every((list) => list[list.length - 1] === 'heartbeat'), doi.F.stateRead().phase, doi.F.stateRead().chain
   ], [8, 8, true, true, 'done', null]);
-  const lanCuoi = tamLan[7];
-  check(so, 'Trong một chuỗi các tiến trình chạy theo ưu tiên Quét nhanh, Lấy toàn bộ giao dịch, Vòng xoay, Giữ phiên, mỗi tiến trình đúng một lần', lanCuoi, ['customerFull', 'activityFull', 'detail', 'heartbeat']);
+  const lanDau = tamLan[0];
+  check(so, 'Trong một chuỗi các tiến trình chạy theo ưu tiên Quét nhanh, Lấy toàn bộ giao dịch, Vòng xoay, Giữ phiên, mỗi tiến trình đúng một lần (lần hỏi đầu: chưa tiến trình nào từng chạy xong nên cả bốn đến hạn)', lanDau, ['customerFull', 'activityFull', 'detail', 'heartbeat']);
 
   // Mỗi lần hỏi nền là một lượt mới (09/02 Phần 3): không còn giới hạn số request mỗi lần hỏi, lượt dài chạy liền tới cuối.
   const dai = chuoiHarness({ heartbeat: { enabled: false }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false }, detail: { enabled: false } }, { customers: 60, budget: { chunkTargetBytes: 600 } });
@@ -50,8 +50,8 @@ async function chay(so) {
   const giuPhienLan = [], vetGiuPhien = [];
   giuPhien.flow.hop.logTrace = (entry) => vetGiuPhien.push(entry);
   for (let i = 0; i < 3; i += 1) { giuPhienLan.push((await giuPhien.hoi(10)).xong); }
-  check(so, 'Hỏi 10 phút một lần, Giữ phiên chu kỳ 1 phút: mỗi lần hỏi Giữ phiên chạy đúng một lần, mốc kế tiếp bám nhịp 1 phút sau giờ hiện tại', [
-    giuPhienLan.map((list) => dem(list, 'heartbeat')), Number(giuPhien.flow.documentProperties.getProperty('FBM_SYNC_NEXT_HEARTBEAT')) > giuPhien.clock.now, Number(giuPhien.flow.documentProperties.getProperty('FBM_SYNC_NEXT_HEARTBEAT')) - giuPhien.clock.now <= PHUT
+  check(so, 'Hỏi 10 phút một lần, Giữ phiên chu kỳ 1 phút: mỗi lần hỏi Giữ phiên chạy đúng một lần, giờ chạy xong ghi là chính lúc vừa chạy xong', [
+    giuPhienLan.map((list) => dem(list, 'heartbeat')), Number(giuPhien.flow.documentProperties.getProperty('FBM_SYNC_DONE_HEARTBEAT')) <= giuPhien.clock.now, giuPhien.clock.now - Number(giuPhien.flow.documentProperties.getProperty('FBM_SYNC_DONE_HEARTBEAT')) < PHUT
   ], [[1, 1, 1], true, true]);
   check(so, 'LOG_TRACE: mỗi lần Giữ phiên chạy xong ghi một dòng vết heartbeat_ok kèm số khách FBM báo, lệch số khách thì nói sẽ chạy Quét nhanh', vetGiuPhien.filter((v) => v.action === 'heartbeat_ok').map((v) => [v.source, v.reason]), [['fbm_sync', 'Giữ phiên FBM OK, FBM báo 15 khách; số khách lệch nên chạy Quét nhanh.'], ['fbm_sync', 'Giữ phiên FBM OK, FBM báo 12 khách.'], ['fbm_sync', 'Giữ phiên FBM OK, FBM báo 12 khách.']]);
 
@@ -61,18 +61,18 @@ async function chay(so) {
   const chamLan = await cham.hoi(5, 30000);
   check(so, 'Vòng xoay chu kỳ 1 phút mà mỗi lần chạy mất hơn 3 phút: chuỗi vẫn dừng, Vòng xoay chạy đúng một lần trong lần hỏi', [cham.clock.now - batDau >= 3 * PHUT, dem(chamLan.xong, 'detail'), chamLan.end.request || null, cham.F.stateRead().phase, cham.F.stateRead().chain], [true, 1, null, 'done', null]);
 
-  // Lượt tay chen ngang lượt nền: lượt nền dừng sau response đang chờ, mốc không dời, lần hỏi kế tiếp chạy lại.
+  // Lượt tay chen ngang lượt nền: lượt nền dừng sau response đang chờ, không ghi giờ chạy xong, lần hỏi kế tiếp chạy lại.
   const chen = chuoiHarness({ heartbeat: { enabled: false }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false }, detail: { enabled: false } });
-  const mocTruoc = chen.flow.documentProperties.getProperty('FBM_SYNC_NEXT_CUSTOMER_FULL_SCAN');
+  const mocTruoc = chen.flow.documentProperties.getProperty('FBM_SYNC_DONE_CUSTOMER_FULL_SCAN');
   let daChen = false;
   const chenLan = await chen.hoi(60, 1000, { beforeSend: (request) => {
     chen.clock.now += 1000;
     if (!daChen && request.meta.kind === 'scan_job') { daChen = true; chen.F.controlDispatchLocked('start', { mode: 'read', pack: 'quick', manual: true }); }
   } });
-  const mocSauChen = chen.flow.documentProperties.getProperty('FBM_SYNC_NEXT_CUSTOMER_FULL_SCAN');
+  const mocSauChen = chen.flow.documentProperties.getProperty('FBM_SYNC_DONE_CUSTOMER_FULL_SCAN');
   chen.F.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, metadata: {} });
   const chayLai = await chen.hoi(1);
-  check(so, 'Lượt nền bị lượt tay chen ngang: lượt nền dừng, mốc Quét nhanh không dời; lần hỏi kế tiếp chạy lại Quét nhanh và dời mốc', [daChen, chenLan.xong, mocSauChen === mocTruoc, chayLai.xong, chen.flow.documentProperties.getProperty('FBM_SYNC_NEXT_CUSTOMER_FULL_SCAN') !== mocTruoc], [true, [], true, ['customerFull'], true]);
+  check(so, 'Lượt nền bị lượt tay chen ngang: lượt nền dừng, không ghi giờ chạy xong của Quét nhanh; lần hỏi kế tiếp chạy lại Quét nhanh và ghi giờ chạy xong', [daChen, chenLan.xong, mocSauChen === mocTruoc, chayLai.xong, chen.flow.documentProperties.getProperty('FBM_SYNC_DONE_CUSTOMER_FULL_SCAN') !== mocTruoc], [true, [], true, ['customerFull'], true]);
 
   // Công tắc từng tiến trình chỉ bật/tắt lịch hẹn: tắt Quét nhanh, số khách FBM đổi thì Giữ phiên vẫn gọi Quét nhanh.
   const tat = chuoiHarness({ heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: false }, activityFull: { enabled: false }, detail: { enabled: false } });

@@ -39,7 +39,8 @@ async function chay(so) {
   const resumed = hop.FbmSync.loginResumeRequest(hop.FbmSync.stateRead());
   check(so, 'login resume chưa có marker phải quay lại probe User trước request nghiệp vụ', [resumed.meta.kind, hop.FbmSync.stateRead().cursor.kind, hop.FbmSync.stateRead().session.expired], ['session_probe', 'session_probe', false]);
   check(so, 'login test không coi Login.aspx là thành công', hop.FbmSync.protocol.isSessionExpired({ ok: true, status: 200, body: '<form action="Login.aspx"></form>' }), true);
-  const heartbeatData = {};
+  // Các tiến trình khác vừa chạy xong nên chưa đến hạn: lần hỏi nào đến hạn chỉ là Giữ phiên.
+  const heartbeatData = { FBM_SYNC_DONE_CUSTOMER_FULL_SCAN: String(Date.now()), FBM_SYNC_DONE_ACTIVITY_FULL_SCAN: String(Date.now()), FBM_SYNC_DONE_DETAIL_SCAN: String(Date.now()) };
   const heartbeatProps = { getProperty: (key) => heartbeatData[key] || null, setProperty: (key, value) => { heartbeatData[key] = String(value); } };
   const heartbeat = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => heartbeatProps, getScriptProperties: () => heartbeatProps }, LockService: { getDocumentLock: () => ({ tryLock: () => true, releaseLock: () => {} }) }, shinOpenBook: () => ({ getId: () => 'sheet-test' }) });
   napServer(heartbeat, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
@@ -49,7 +50,7 @@ async function chay(so) {
   heartbeat.FbmSync.loginConfigSave({ credentialRef: 'cred-heartbeat-123', enabled: true, envelope: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'anhlt', database: 'FHN_CRM_App', unit: 'CTY' } });
   heartbeat.FbmSync.stateStart('', 'idle', 0);
   heartbeat.FbmSync.statePatch({ session: { expired: true } });
-  heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
+  heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
   // Dấu hết hạn còn từ lượt trước không đủ để đăng nhập: gửi luôn request đếm khách, response báo chưa xác thực mới đi cổng đăng nhập (09/06).
   const staleCount = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   const staleProbe = heartbeat.fbmSyncHeartbeat({ ok: false, status: 401, body: '', transport: { contract: MA_HOP_DONG, trace: [{ requestId: staleCount.request.id }] } });
@@ -68,7 +69,7 @@ async function chay(so) {
   const againConfig = JSON.parse(heartbeatData.FBM_LOGIN_CONFIG_V1);
   againConfig.lastAttemptAt = 0; againConfig.nextRetryAt = 0;
   heartbeatData.FBM_LOGIN_CONFIG_V1 = JSON.stringify(againConfig);
-  heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
+  heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
   const againCount = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   const againProbe = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{"TotalRowCount":0,"Rows":null,"ViewPage":null,"Authorized":false}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: againCount.request.id }] } });
   const againLogin = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{"TotalRowCount":0,"Rows":null,"ViewPage":null,"Authorized":false}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: againProbe.request && againProbe.request.id }] } });
@@ -151,7 +152,7 @@ async function chay(so) {
   savedConfig.lastAttemptAt = Date.now() - 31 * 60 * 1000;
   heartbeatData.FBM_LOGIN_CONFIG_V1 = JSON.stringify(savedConfig);
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: true, cookie: '' } });
-  heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
+  heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
   const failedLoginProbe = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   const failedLoginRequest = phienChet(failedLoginProbe);
   const failedLogin = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":false}', transport: { contract: MA_HOP_DONG }, trace: [{ requestId: failedLoginRequest.request.id }] });
@@ -160,7 +161,7 @@ async function chay(so) {
   const throttledProbe = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   const throttledAfterFailure = phienChet(throttledProbe);
   check(so, 'login that bai khong tu chay khi chua den lich', [throttledProbe.request && throttledProbe.request.meta.kind, throttledAfterFailure.ok, throttledAfterFailure.code, throttledAfterFailure.request], ['heartbeat', false, 'AUTO_LOGIN_THROTTLED', null]);
-  heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
+  heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
   heartbeat.FbmSync.statePatch({ scheduledScan: 'heartbeat' });
   const throttledDueProbe = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   const throttledDue = phienChet(throttledDueProbe);
@@ -296,7 +297,7 @@ async function chay(so) {
   const justTried = JSON.parse(heartbeatData.FBM_LOGIN_CONFIG_V1);
   justTried.lastAttemptAt = Date.now();
   heartbeatData.FBM_LOGIN_CONFIG_V1 = JSON.stringify(justTried);
-  heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
+  heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
   const withinCycle = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   const withinCycleProbe = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: unauthBody, transport: { contract: MA_HOP_DONG, trace: [{ requestId: withinCycle.request.id }] } });
   const withinCycleEnd = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: unauthBody, transport: { contract: MA_HOP_DONG, trace: [{ requestId: withinCycleProbe.request && withinCycleProbe.request.id }] } });
@@ -305,12 +306,12 @@ async function chay(so) {
   blockedConfig.lastAttemptAt = Date.now() - 61 * 1000;
   blockedConfig.nextRetryAt = 0;
   heartbeatData.FBM_LOGIN_CONFIG_V1 = JSON.stringify(blockedConfig);
-  heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
+  heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
   const afterCycle = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   const afterCycleLive = heartbeat.fbmSyncHeartbeat({ d: { TotalRowCount: 2 }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: afterCycle.request.id }] } });
   check(so, 'Hết chu kỳ thử lại mà người dùng đã tự đăng nhập: lượt mới chạy luôn việc (số khách lệch mốc thì mở Quét nhanh bằng probe User), không gửi lệnh đăng nhập', [afterCycle.request.meta.kind, afterCycleLive.ok, afterCycleLive.request && afterCycleLive.request.meta.kind], ['heartbeat', true, 'session_probe']);
   heartbeat.FbmSync.statePatch({ phase: 'done', cursor: {}, activeRequestId: '', deadlineAt: 0, scheduledScan: '', chain: null });
-  heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
+  heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
   const afterCycleDead = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   const afterCycleProbe = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: unauthBody, transport: { contract: MA_HOP_DONG, trace: [{ requestId: afterCycleDead.request.id }] } });
   const afterCycleLogin = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: unauthBody, transport: { contract: MA_HOP_DONG, trace: [{ requestId: afterCycleProbe.request && afterCycleProbe.request.id }] } });
