@@ -9,4 +9,4 @@
 
 | Tệp | Nội dung |
 |---|---|
-| `ch16-activity-owner-lookup.md` | Tra khách đang giữ một giao dịch qua câu lọc `externalKey` trên grid khách; đường `GetCompletionList` với bảng giao dịch đã thử và bị chặn |
+| `ch16-activity-owner-lookup.md` | Tra khách đang giữ một giao dịch qua câu lọc `externalKey` trên grid khách; đường `GetCompletionList` với bảng giao dịch đã thử và bị chặn; request không kèm điều kiện quyền thấy cả khách thuộc quyền người khác |

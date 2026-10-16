@@ -73,11 +73,29 @@ Kết luận: `GetCompletionList` không cho trỏ vào bảng giao dịch (có 
 
 - Đây là hành vi FBM chấp nhận, không phải tính năng FBM cam kết. FBM nâng cấp có thể chặn; bên dùng phải coi lỗi hoặc kết quả lạ là "không biết", không suy ra giao dịch đã mất.
 - Giá trị đưa vào `Name` là chuỗi SQL ghép tay: chỉ đưa id toàn chữ số, không bao giờ đưa chuỗi người dùng nhập.
-- Request mẫu ở 16.3 **không** kèm điều kiện `GetCustomerValidate` mà web FBM tự gửi khi tải danh sách khách. Khách trả về trong các lần thử là khách của chính tài khoản thử, nên chưa biết request không kèm điều kiện này có trả khách thuộc quyền người khác hay không (16.7).
+- Request mẫu ở 16.3 **không** kèm điều kiện `GetCustomerValidate` mà web FBM tự gửi khi tải danh sách khách. Khách trả về trong các lần thử là khách của chính tài khoản thử, kết quả với khách thuộc quyền người khác ở 16.8.
 - Mỗi lần gửi request lỗi (HTTP 500) là một lỗi trên máy chủ thật của công ty; thử biến thể mới thì làm ít và có chủ đích.
 
 ### 16.7 Câu hỏi còn mở
 
-- Request ở 16.3, không kèm `GetCustomerValidate`, có trả về khách đang thuộc quyền tài khoản khác không. Cách thử chỉ đọc: lấy id một giao dịch của khách người khác đang quản lý (ví dụ do đồng nghiệp cho biết), chạy request 16.3, xem có ra một dòng không. Cùng câu hỏi cho request lọc thẳng `stt_rec_kh = '<mã khách của người khác>'`.
-
 - Có đường nào khác trả cặp "id giao dịch – khách" hàng loạt (ví dụ cột sắp xếp, khóa trang `firstPageItem`/`lastPageItem` của grid giao dịch khi `sortExpression` có `stt_rec`) hay không.
+
+### 16.8 Kết quả thử 2026-10-16: request không kèm điều kiện quyền thấy khách thuộc quyền người khác
+
+Thử chỉ đọc bằng phiên của một tài khoản nhân viên, với một khách đang thuộc tài khoản nhân viên khác (đã nghỉ việc, tài khoản được giao lại). Mã giả là chuỗi bịa ra, chắc chắn không tồn tại.
+
+| Ca | Câu lọc | Kết quả |
+|---|---|---|
+| Khách của chính tài khoản thử | `stt_rec_kh = '<mã khách>'` | 1 dòng |
+| Mã khách giả | `stt_rec_kh = '<mã giả>'` | 0 dòng |
+| Khách thuộc quyền tài khoản khác | `stt_rec_kh = '<mã khách>'` | 1 dòng |
+| Như trên, thêm điều kiện quyền | thêm `stt_rec_kh in (select stt_rec_kh from dbo.zcFastBusiness$Function$GetCustomerValidate('<USER_ID>'))` | 0 dòng |
+| Giao dịch của khách thuộc quyền tài khoản khác | request 16.3 với id giao dịch | 1 dòng, đúng khách đang giữ |
+| Giao dịch của khách chính tài khoản thử | request 16.3 | 1 dòng, đúng khách |
+| Id giao dịch giả | request 16.3 | 0 dòng |
+
+Kết luận:
+
+- Bỏ điều kiện `GetCustomerValidate` thì grid khách trả cả khách thuộc quyền tài khoản khác; điều kiện quyền là do web FBM tự thêm, máy chủ không tự áp.
+- Vì vậy 0 dòng ở request không kèm điều kiện quyền nghĩa là khách hoặc giao dịch không còn bên FBM (với tài khoản đang dùng); 1 dòng ở request không kèm điều kiện nhưng 0 dòng ở request kèm điều kiện nghĩa là khách còn nhưng đã ra khỏi quyền tài khoản.
+- Cạm bẫy 16.6 vẫn giữ: đây là hành vi quan sát được, không phải cam kết của FBM.
