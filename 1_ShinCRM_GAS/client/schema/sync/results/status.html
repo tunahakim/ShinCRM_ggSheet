@@ -14,6 +14,7 @@ var FBM_SYNC_STATUS_SCHEMA = {
     { key: 'succeeded', label: 'Ghi vào Sheet' },
     { key: 'pushed', label: 'Đẩy lên FBM', pushOnly: true },
     { key: 'missing', label: 'Không thấy bên FBM', parts: [{ key: 'missingCustomer', unit: ' khách' }, { key: 'missingActivity', unit: ' giao dịch' }] },
+    { key: 'transferred', label: 'Đã chuyển cho người khác', parts: [{ key: 'transferredCustomer', unit: ' khách' }, { key: 'transferredActivity', unit: ' giao dịch' }] },
     { key: 'conflict', label: 'Xung đột' },
     { key: 'error', label: 'Lỗi' },
     { key: 'skipped', label: 'Bỏ qua' }
