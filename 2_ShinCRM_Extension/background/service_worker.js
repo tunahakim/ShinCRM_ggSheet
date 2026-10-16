@@ -406,8 +406,10 @@ function postRelay(url, key, body, timeoutMs) {
   }).catch(function (error) {
     var timeout = error && error.name === 'AbortError';
     var message = timeout ? 'GAS relay không trả lời sau ' + limitMs + ' ms.' : String(error && error.message || error || 'Lỗi fetch GAS relay.');
-    noteRelayStatus({ stage: 'failed', requestSentAt: requestSentAt, ok: false, code: timeout ? 'RELAY_TIMEOUT' : 'RELAY_FETCH_FAILED', error: message });
-    throw new Error(message);
+    var code = timeout ? 'RELAY_TIMEOUT' : 'RELAY_FETCH_FAILED', failure = new Error(message);
+    noteRelayStatus({ stage: 'failed', requestSentAt: requestSentAt, ok: false, code: code, error: message });
+    failure.code = code;
+    throw failure;
   }).finally(function () { if (timer) { clearTimeout(timer); } });
 }
 
@@ -420,9 +422,9 @@ var fbmHeartbeatFlight = null;
  */
 var FBM_WORKER_STARTED_AT = Date.now();
 var FBM_CHAIN_TRAIL_KEY = 'fbmChainTrail';
-function noteChainStep(stage, request, hop) {
+function noteChainStep(stage, request, hop, code) {
   if (!chrome.storage || !chrome.storage.local || !chrome.storage.local.set) { return; }
-  var trail = { at: Date.now(), stage: String(stage || ''), requestId: String(request && request.id || ''), hop: Number(hop || 0), workerStartedAt: FBM_WORKER_STARTED_AT };
+  var trail = { at: Date.now(), stage: String(stage || ''), requestId: String(request && request.id || ''), hop: Number(hop || 0), workerStartedAt: FBM_WORKER_STARTED_AT, code: String(code || '') };
   try { chrome.storage.local.set({ fbmChainTrail: trail }); } catch (ignore) {}
 }
 function readChainTrail() {
@@ -601,7 +603,10 @@ function configureRelay(config) {
  */
 function relayScheduledRequests(tabId, config, gasReply, count) {
   var next = gasReply && gasReply.request, used = Number(count || 0);
-  if (!next || !config || !config.url || !config.key) { noteChainStep('chain_finished', null, used); return Promise.resolve(gasReply); }
+  if (!next || !config || !config.url || !config.key) {
+    if (gasReply && gasReply.ok === false) { noteChainStep('gas_reply_failed', null, used, gasReply.code || gasReply.error || 'GAS_REPLY_FAILED'); } else { noteChainStep('chain_finished', null, used); }
+    return Promise.resolve(gasReply);
+  }
   noteChainStep('gas_request_received', next, used);
   function reportFailure(code, message) {
     noteChainStep('failure_sent', next, used + 1);
@@ -614,6 +619,7 @@ function relayScheduledRequests(tabId, config, gasReply, count) {
     }, relayTimeoutFor(next)).then(function (failureReply) {
       return relayScheduledRequests(null, config, failureReply, used + 1);
     }).catch(function (relayError) {
+      noteChainStep('gas_reply_failed', next, used + 1, relayError && relayError.code || 'GAS_RELAY_FAILED');
       var relayMessage = String(relayError && relayError.message || relayError || 'Không thể báo lỗi transport lên GAS.').slice(0, 240);
       noteRelayStatus({ stage: 'failed', ok: false, code: 'GAS_RELAY_FAILED', error: relayMessage });
       return { ok: false, code: 'GAS_RELAY_FAILED', error: relayMessage, request: null };
@@ -633,6 +639,7 @@ function relayScheduledRequests(tabId, config, gasReply, count) {
         spreadsheetId: config.spreadsheetId,
         hop: used + 1
       }, relayTimeoutFor(next)).then(function (nextReply) { return relayScheduledRequests(null, config, nextReply, used + 1); }).catch(function (error) {
+        noteChainStep('gas_reply_failed', next, used + 1, error && error.code || 'GAS_RELAY_FAILED');
         return reportFailure('FBM_TRANSPORT_UNAVAILABLE', error && error.message || error);
       });
     });
@@ -650,8 +657,15 @@ function relayHeartbeatToGas(tabId, reply, hop, request) {
     }
     noteChainStep('gas_response_sent', request, hop);
     return postRelay(config.url, config.key, { kind: 'heartbeat', spreadsheetId: config.spreadsheetId, response: rawFbmReply(reply), hop: Number(hop || 1) }, relayTimeoutFor(request)).then(function (gasReply) {
-      if (!gasReply || gasReply.ok === false) { return gasReply || { ok: false, code: 'GAS_HEARTBEAT_FAILED' }; }
+      if (!gasReply || gasReply.ok === false) {
+        // Lượt dừng ở đây phải để lại dấu: thiếu dấu thì hộp đen đứng ở "đã gửi kết quả về GAS" và Log đổ lỗi nhầm cho worker.
+        noteChainStep('gas_reply_failed', request, hop, gasReply && (gasReply.code || gasReply.error) || 'GAS_HEARTBEAT_FAILED');
+        return gasReply || { ok: false, code: 'GAS_HEARTBEAT_FAILED' };
+      }
       return relayScheduledRequests(tabId, config, gasReply, 0);
+    }, function (error) {
+      noteChainStep('gas_reply_failed', request, hop, error && error.code || 'GAS_RELAY_FAILED');
+      throw error;
     });
   }).catch(function (error) { var message = String(error && error.message || error); console.warn('Không relay được heartbeat cho GAS:', message); return { ok: false, code: 'GAS_RELAY_FAILED', error: message }; });
 }
