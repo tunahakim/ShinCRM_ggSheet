@@ -65,6 +65,19 @@ async function chay(so) {
   const badJson = relayPost('{"key":"relay-test-key", hỏng');
   check(so, 'FBM-034: khóa sai hoặc JSON hỏng bị từ chối mà không ghi Log (người lạ không đẩy trôi được Log thật) và câu trả về không trích nội dung gửi lên', [intruder.error, badJson.error, JSON.stringify(badJson).indexOf('relay-test-key') < 0, relayLog.lines.length, relayLog.flushes], ['unauthorized', 'invalid_json', true, 2, 3]);
 
+  // GAS bận lúc Extension mang kết quả FBM về thì kết quả mất; phải có dòng Log nói thẳng. Bận lúc cấp request mới thì chưa mất gì, không ghi.
+  const busyReply = () => ({ ok: false, code: 'BUSY', request: null, message: 'GAS đang bận', status: {} });
+  relay.fbmSyncHeartbeatRequest = busyReply;
+  relay.fbmSyncHeartbeat = busyReply;
+  relay.FbmSync = Object.assign(relay.FbmSync || {}, { controlDispatchLocked: busyReply });
+  const linesBeforeBusy = relayLog.lines.length;
+  relayPost({ key: 'relay-test-key', spreadsheetId: 'sheet-relay-test', kind: 'heartbeat_request' });
+  const busyAsk = relayLog.lines.slice(linesBeforeBusy).filter((line) => line.action === 'relay_busy_dropped').length;
+  const busyHeartbeat = relayPost({ key: 'relay-test-key', spreadsheetId: 'sheet-relay-test', kind: 'heartbeat', response: {}, hop: 2 });
+  relayPost({ key: 'relay-test-key', spreadsheetId: 'sheet-relay-test', command: 'continue', payload: {}, hop: 6 });
+  const dropped = relayLog.lines.slice(linesBeforeBusy).filter((line) => line.action === 'relay_busy_dropped');
+  check(so, 'GAS bận bỏ kết quả FBM Extension gửi về (Giữ phiên hay chuỗi nền) thì có dòng Log lỗi nêu GAS bận và lượt sẽ chờ tới hạn; bận lúc cấp request mới thì không ghi', [busyAsk, busyHeartbeat.code, dropped.length, dropped.map((line) => line.outcome).join(','), dropped[0] && dropped[0].reason.indexOf('GAS đang bận') >= 0, dropped.map((line) => line.detail.kind + '@' + line.detail.hop).join(',')], [0, 'BUSY', 2, 'error,error', true, 'heartbeat@2,continue@6']);
+
   const props = { data: {} };
   let propertyWrites = 0;
   const propertyApi = { getProperty: (key) => props.data[key] || null, setProperty: (key, value) => { propertyWrites += 1; props.data[key] = String(value); } };
@@ -347,6 +360,10 @@ async function chay(so) {
   heartbeat.FbmSync.logContextNote({ runId: 'r', origin: 'manual', phase: 'pull_customer', scan: 'full', chain: { current: 'heartbeat' } });
   const ctxManual = heartbeat.FbmSync.logContextText();
   check(so, 'Lượt trong Log: Giữ phiên là Nền dù lượt trước bấm tay; Quét nhanh do Giữ phiên gọi ghi cả hai; tiến trình nền ghi tên nó; lượt bấm tay ghi Tay và kiểu quét, không ghi chuỗi nền sót', [ctxHeartbeat, ctxRecount, ctxDetail, ctxManual], ['Nền · Giữ phiên FBM', 'Nền · Giữ phiên FBM · Quét nhanh', 'Nền · Vòng xoay giao dịch', 'Tay · Quét nhanh']);
+  heartbeat.FbmSync.statePatch({ chain: { current: 'detail', ran: [] } });
+  heartbeat.FbmSync.stateStart('', 'checking_session', 0, { origin: 'background', mode: 'read', scan: 'detail' });
+  const openedRead = heartbeat.FbmSync.stateRead();
+  check(so, 'Mở lượt ghi ngay nguồn và kiểu quét: đọc lại kho giữa chừng (preflight) vẫn thấy lượt nền Vòng xoay, nhãn Log không thành Tay · Quét nhanh', [openedRead.origin, openedRead.scan, heartbeat.FbmSync.logContextText()], ['background', 'detail', 'Nền · Vòng xoay giao dịch']);
   const leftOpenLogs = [];
   heartbeat.logEvent = (entry) => leftOpenLogs.push(entry);
   heartbeat.FbmSync.statePatch({ runId: 'left-open-run', origin: 'background', phase: 'pull_customer', cursor: { kind: 'scan_job' }, activeRequestId: 'in-flight', deadlineAt: Date.now() + 60000 });
