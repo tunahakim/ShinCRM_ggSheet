@@ -27,6 +27,23 @@ const RUNTIME_WRITERS = {
   'server/view/ViewTabTint.js': 'view/tab-tint'
 };
 
+/**
+ * Quan hệ của mỗi writer với bản đọc Sheet chung (tài liệu 06 Phần 2): `drop` = chạm giá trị, hàng mã hoặc số dòng của sheet kho nên phải bỏ bản đọc; `format` = chỉ đặt khuôn, chữ đậm, cố định hàng trên sheet kho, hàng mã đi qua `SheetHeader.js`; `none` = không chạm sheet kho.
+ */
+const READ_COPY_RELATION = {
+  'server/config/ConfigSheetSetup.js': 'drop',
+  'server/gate/DeleteGate.js': 'drop',
+  'server/gate/WriteGate.js': 'drop',
+  'server/log/LogGate.js': 'none',
+  'server/sheet/SheetGrid.js': 'format',
+  'server/sheet/SheetHeader.js': 'drop',
+  'server/sheet/SetupSheets.js': 'format',
+  'server/sheet/SyncColumnSetup.js': 'format',
+  'server/view/ViewSheetRenderer.js': 'none',
+  'server/view/ViewSheetSetup.js': 'none',
+  'server/view/ViewTabTint.js': 'none'
+};
+
 const MUTATOR_NAMES = [
   'setValue', 'setValues', 'clear', 'clearContent', 'clearDataValidations',
   'clearContents', 'clearFormats', 'clearNotes', 'clearFormat', 'clearNote',
@@ -130,6 +147,10 @@ function chay(so) {
 
   check(so, 'mọi file runtime có mutator đều nằm trong inventory cửa ghi', violations, []);
   check(so, 'inventory không bỏ sót file có mutator', writers.slice().sort(), Object.keys(RUNTIME_WRITERS).slice().sort());
+
+  check(so, 'mỗi writer có khai quan hệ với bản đọc Sheet chung', Object.keys(READ_COPY_RELATION).sort(), Object.keys(RUNTIME_WRITERS).sort());
+  check(so, 'writer chạm giá trị, hàng mã hoặc số dòng sheet kho đều bỏ bản đọc Sheet chung', Object.keys(READ_COPY_RELATION).filter((file) => READ_COPY_RELATION[file] === 'drop'
+    && !/\bsheetReadCopyDrop\s*\(/.test(stripNonCode(fs.readFileSync(path.join(GAS_DIR, file), 'utf8')))), []);
 
   const syncViolations = [];
   files.filter((file) => file.startsWith('fbm_sync/')).forEach((file) => {
