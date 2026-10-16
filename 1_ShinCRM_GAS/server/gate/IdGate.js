@@ -52,7 +52,7 @@ function idGateMaxOnSheet(context) {
   var values = entityReadIdColumn(context);
   var max = 0;
   for (var i = 0; i < values.length; i++) {
-    var so = idGateNumberOf(values[i][0]);
+    var so = idGateNumberOf(values[i]);
     if (so > max) { max = so; }
   }
   return max;

@@ -32,15 +32,10 @@ function entityRowCount(entity) {
 }
 
 /**
- * Cột mã của thực thể, đọc một lần cho mỗi `context` rồi nhớ trên chính `context`: cửa ghi tìm dòng theo mã và cửa cấp mã tìm số lớn nhất cùng dùng một lần đọc.
- *
- * Cạm bẫy: bản nhớ sống cùng `context`, giống `rowCount`; sau khi ghi thêm hay xóa dòng thì dựng `context` mới chứ không đọc lại cột mã từ `context` cũ.
+ * Giá trị thô cột mã của mọi dòng dữ liệu (mảng một chiều), qua bản đọc Sheet chung: cửa ghi tìm dòng theo mã, kiểm trùng và cửa cấp mã tìm số lớn nhất cùng dùng một lần đọc.
  */
 function entityReadIdColumn(context) {
-  if (!context.idColumn) {
-    context.idColumn = context.rowCount > 0 ? context.sheet.getRange(SHEET_FIRST_DATA_ROW, context.indexes[context.idAt] + 1, context.rowCount, 1).getValues() : [];
-  }
-  return context.idColumn;
+  return sheetReadColumnValues(context.sheet, context.indexes[context.idAt] + 1, SHEET_FIRST_DATA_ROW);
 }
 
 /**
@@ -104,7 +99,16 @@ function entityReadCell(value, field, timezone) {
  * **Không đảo thứ tự trong gói.** Luật nạp ngược của tài liệu 05 Phần 4 nói về **gói nào đọc trước**, và việc chọn gói là của `LoadService.gs`. Trong một gói, hàng vẫn xếp từ trên xuống để giữ thứ tự đọc ổn định.
  */
 function entityReadRange(context, firstRow, rowCount) {
-  var block = sheetGridReadBlock(context.sheet, firstRow, rowCount, context.columnMap.lastColumn);
+  return entityReadRecords(context, sheetGridReadBlock(context.sheet, firstRow, rowCount, context.columnMap.lastColumn));
+}
+
+/** Như `entityReadRange` nhưng cho một tập dòng bất kỳ, qua bản đọc Sheet chung (gộp dòng gần nhau vào một lệnh, dòng đã có thì không đọc lại). Thứ tự bản ghi theo thứ tự `rowNumbers`. */
+function entityReadRows(context, rowNumbers) {
+  return entityReadRecords(context, sheetReadRows(context.sheet, rowNumbers));
+}
+
+/** Đổi các dòng giá trị thô thành bản ghi của đường nạp, bỏ dòng không có mã. */
+function entityReadRecords(context, block) {
   var rows = [];
   var blankRows = 0;
 

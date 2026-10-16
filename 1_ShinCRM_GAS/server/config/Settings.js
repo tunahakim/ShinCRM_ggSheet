@@ -28,6 +28,12 @@ var SETTINGS = {
    * Bản cũ **không có** phép xóa và không có Hoàn tác, nên con số này không có tiền lệ nào để dựa vào. 5.000 là khoảng đủ để mắt đọc xong dòng "Đã xóa — Hoàn tác" và tay kịp với tới nút, và đủ ngắn để không ai ngồi chờ nó. Đây là con số quy ước của loại thông báo này ở phần lớn phần mềm, không phải con số đo được.
    */
   UNDO_DELAY_MS: 5000,
+  /**
+   * Hai dòng cần đọc cách nhau không quá ngần này dòng thì bản đọc Sheet chung đọc chung một lệnh (kể cả các dòng giữa), xa hơn thì đọc riêng. Tài liệu 06 Phần 2 "Bản đọc Sheet của một lần gọi".
+   *
+   * Đo trên GAS DEV 2026-10-17 (`measureSheetReadGap`): một lệnh `getValues` lạnh tốn 70–130 ms dù 1 hay 100 dòng, mỗi dòng thêm chỉ 0,2–0,4 ms; hòa vốn khoảng 100 ms / 0,3 ms ≈ 300 dòng.
+   */
+  SHEET_READ_MERGE_GAP_ROWS: 300,
   /** Hạn giữ log, tính theo ngày. Tài liệu 10 Phần 6. */
   LOG_RETENTION_DAYS: 30,
   /** Trần số dòng của sheet `Log`. Tài liệu 10 Phần 6. */
