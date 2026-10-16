@@ -1,9 +1,10 @@
 /** Cầu nối khóa record giữa Sidebar và cửa ghi đồng bộ. */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
+/** Chỉ đọc dòng của bản ghi đang hỏi: hỏi ở mỗi lần mở form và mỗi lần lưu, đọc cả sheet là tốn vài giây cho một ô. */
 FbmSync.recordHasConflict = function (entity, id) {
-  if (typeof FbmSync.readLocal !== 'function') { return false; }
-  var target = String(id || '');
-  return (FbmSync.readLocal(entity) || []).some(function (record) { return String(record && record.id || '') === target && String(record && record.syncStatus || '') === FbmSync.SYNC_STATUS.conflict; });
+  if (typeof FbmSync.readLocalRecord !== 'function') { return false; }
+  var record = FbmSync.readLocalRecord(entity, id);
+  return !!record && String(record.syncStatus || '') === FbmSync.SYNC_STATUS.conflict;
 };
 /** Đánh dấu record bắt đầu được người dùng chỉnh sửa, không ghi đè khóa sync khác revision. */
 FbmSync.editBegin = function (entity, id, revision) {

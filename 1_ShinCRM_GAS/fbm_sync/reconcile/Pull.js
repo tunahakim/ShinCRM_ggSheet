@@ -1,9 +1,17 @@
 /** Reconcile chieu pull va ghi thay doi an toan vao ShinCRM. */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
-/** Đọc dữ liệu cục bộ kèm cột sync qua bản chụp của lần gọi (`FbmSync.sheetCacheRead`). Bản chụp giữ dòng thô, mỗi lần gọi vẫn dựng record mới nên bên gọi sửa record không làm bẩn lần đọc sau. */
+/** Đọc dữ liệu cục bộ kèm cột sync qua bản đọc Sheet chung của lần gọi: nhiều kiểm tra cùng gọi chỉ tốn một lần đọc Sheet, và cửa ghi sửa bản đọc sau khi ghi nên không có đường đọc dữ liệu cũ. Mỗi lần gọi dựng record mới nên bên gọi sửa record không làm bẩn lần đọc sau. */
 FbmSync.readLocal = function (entity) {
-  var block = FbmSync.sheetCacheRead(entity, function () { return typeof entityReadAllCombined === 'function' ? entityReadAllCombined(entity, [DATA_SCHEMA, SYNC_SCHEMA]) : entityReadAll(entity); });
+  return FbmSync.recordsOfBlock(entityReadAllCombined(entity, [DATA_SCHEMA, SYNC_SCHEMA]));
+};
+
+/** Một bản ghi cục bộ theo mã, chỉ đọc cột mã và dòng của nó; không có thì trả `null`. */
+FbmSync.readLocalRecord = function (entity, id) {
+  return FbmSync.recordsOfBlock(entityReadRecordById(entity, [DATA_SCHEMA, SYNC_SCHEMA], id))[0] || null;
+};
+
+FbmSync.recordsOfBlock = function (block) {
   return block.rows.map(function (row) {
     var record = {};
     block.fields.forEach(function (field, index) { record[field] = row[index]; });

@@ -77,13 +77,16 @@ function fbmRotateRelayKey() { return runEntryPoint('fbmRotateRelayKey', 'sideba
 /** Khóa record khi người dùng bắt đầu sửa. */
 function fbmBeginEdit(entity, id, revision) { return runEntryPoint('fbmBeginEdit', 'sidebar', 'throw', function () { return FbmSync.withOrchestrationLock(function () { return fbmSyncEditBegin(entity, id, revision); }); }); }
 /**
- * Lưu form sửa bản ghi: hỏi khóa đồng bộ rồi chạy `write` trong cùng một lần giữ khóa điều phối, để không lượt đồng bộ nào chen vào giữa lúc hỏi và lúc ghi. Thứ tự khóa điều phối rồi khóa tài liệu (bên trong `write`) trùng thứ tự của lượt đồng bộ nên hai bên không chờ chéo nhau. Bị chặn hoặc không lấy được khóa thì trả `blocked: true` kèm câu báo, không gọi `write`.
+ * Lưu form sửa bản ghi: hỏi khóa đồng bộ rồi chạy `write` trong cùng một lần giữ khóa điều phối, để không lượt đồng bộ nào chen vào giữa lúc hỏi và lúc ghi. Thứ tự khóa điều phối rồi khóa tài liệu trùng thứ tự của lượt đồng bộ nên hai bên không chờ chéo nhau. Bị chặn hoặc không lấy được khóa thì trả `blocked: true` kèm câu báo, không gọi `write`.
+ * Hỏi và ghi nằm trong cùng một lần giữ khóa tài liệu: cầm khóa là bỏ bản đọc Sheet, nên hỏi ở ngoài thì dòng và cột mã vừa đọc bị đọc lại khi cửa ghi cầm khóa.
  */
 function fbmSaveGuarded(entity, id, revision, write) {
   var ra = FbmSync.withOrchestrationLock(function () {
-    var allowed = fbmSyncSaveAllowed(entity, id, revision);
-    if (allowed && allowed.ok === false) { return { ok: false, blocked: true, entity: entity, code: allowed.code, message: allowed.message }; }
-    return write();
+    return documentLockRun(function () {
+      var allowed = fbmSyncSaveAllowed(entity, id, revision);
+      if (allowed && allowed.ok === false) { return { ok: false, blocked: true, entity: entity, code: allowed.code, message: allowed.message }; }
+      return write();
+    });
   });
   if (ra && ra.ok === false && ra.code === 'BUSY') { ra.blocked = true; }
   return ra;

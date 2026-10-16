@@ -29,13 +29,11 @@ FbmSync.categoryMapFromRows = function (rows) {
   return map;
 };
 
-/** Đọc cặp danh mục thật/companion, một lần mỗi lần gọi qua bản chụp Sheet; lần gọi sau đọc lại nên sửa Category có hiệu lực ngay. */
-FbmSync.readCategoryGate = function () { return FbmSync.sheetCacheRead('category', FbmSync.readCategoryGateSheet); };
-
-FbmSync.readCategoryGateSheet = function () {
+/** Đọc cặp danh mục thật/companion qua bản đọc Sheet chung: trong một lần gọi chỉ tốn một lần đọc Sheet; lần gọi sau đọc lại nên sửa Category có hiệu lực ngay. */
+FbmSync.readCategoryGate = function () {
   if (typeof shinOpenSheet !== 'function' || typeof CATEGORY_COLUMNS === 'undefined') { return { map: {}, names: {}, valid: {}, warnings: [] }; }
   var sheet = shinOpenSheet('Category'), columns = readColumnMap('Category'), codes = CATEGORY_COLUMNS.map(function (pair) { return pair[0]; });
-  var rows = sheetGridReadBlock(sheet, SHEET_FIRST_DATA_ROW, sheetGridDataRowCount(sheet, SHEET_FIRST_DATA_ROW), columns.lastColumn);
+  var rows = sheetReadDataRows(sheet, SHEET_FIRST_DATA_ROW);
   var entries = [], names = {}, warnings = [];
   codes.forEach(function (source) {
     if (typeof categoryIsCompanion === 'function' && categoryIsCompanion(source)) { return; }

@@ -151,7 +151,7 @@ function entityReadFieldBlock(context, firstRow, rowCount, fieldNames) {
   });
 }
 
-/** Đọc các dòng đã xác định, gộp các dòng liền nhau để không tạo một request cho từng mã. */
+/** Đọc các dòng đã xác định (bỏ dòng ngoài vùng dữ liệu, bỏ trùng), qua bản đọc Sheet chung. */
 function entityReadRowsAt(context, rowNumbers) {
   var positions = (Array.isArray(rowNumbers) ? rowNumbers : []).map(function (row) { return Number(row); })
     .filter(function (row) { return row >= SHEET_FIRST_DATA_ROW && row < SHEET_FIRST_DATA_ROW + context.rowCount; });
@@ -162,25 +162,13 @@ function entityReadRowsAt(context, rowNumbers) {
     return true;
   }).sort(function (a, b) { return a - b; });
 
-  var rows = [];
-  var blankRows = 0;
-  var start = 0;
-  while (start < positions.length) {
-    var end = start;
-    while (end + 1 < positions.length && positions[end + 1] === positions[end] + 1) { end += 1; }
-    var block = entityReadRange(context, positions[start], positions[end] - positions[start] + 1);
-    rows = rows.concat(block.rows);
-    blankRows += block.blankRows;
-    start = end + 1;
-  }
-
-  return { entity: context.entity, fields: context.names, rows: rows, blankRows: blankRows };
+  return entityReadRows(context, positions);
 }
 
 /** Đọc trọn một thực thể trong một lượt. Dùng cho `customer`, thứ tài liệu 05 Phần 4 yêu cầu nạp hết ngay ở `loadCore`. */
 function entityReadAll(entity, schema) {
   var context = entityReadContext(entity, schema);
-  return entityReadRange(context, SHEET_FIRST_DATA_ROW, context.rowCount);
+  return entityReadRecords(context, sheetReadDataRows(context.sheet, SHEET_FIRST_DATA_ROW));
 }
 
 /**
@@ -188,9 +176,22 @@ function entityReadAll(entity, schema) {
  * Tầng đọc chỉ biết cách hợp nhất khai báo; nó không biết module nào sở hữu schema đó.
  */
 function entityReadAllCombined(entity, schemas) {
-  var danhSach = Array.isArray(schemas) ? schemas : [];
+  return entityReadAll(entity, entityReadCombinedFields(entity, schemas));
+}
+
+/** Bản ghi mang mã `id` với tập schema mở rộng: tìm dòng qua cột mã rồi đọc đúng dòng đó, qua bản đọc Sheet chung. `rows` rỗng khi không có mã. */
+function entityReadRecordById(entity, schemas, id) {
+  var context = entityReadContext(entity, entityReadCombinedFields(entity, schemas));
+  var target = String(id === null || id === undefined ? '' : id).trim();
+  var at = target ? entityReadIdColumn(context).map(function (value) { return String(value).trim(); }).indexOf(target) : -1;
+  if (at < 0) { return { entity: entity, fields: context.names, rows: [], blankRows: 0 }; }
+  return entityReadRows(context, [SHEET_FIRST_DATA_ROW + at]);
+}
+
+/** Hợp nhất khai báo trường của thực thể từ các schema; không có trường nào thì trả `undefined` để dùng schema mặc định. */
+function entityReadCombinedFields(entity, schemas) {
   var fields = {};
-  danhSach.forEach(function (schema) {
+  (Array.isArray(schemas) ? schemas : []).forEach(function (schema) {
     var phan = schema && schema[entity];
     if (!phan) { return; }
     Object.keys(phan).forEach(function (name) {
@@ -198,9 +199,7 @@ function entityReadAllCombined(entity, schemas) {
       fields[name] = phan[name];
     });
   });
-  if (!Object.keys(fields).length) { return entityReadAll(entity); }
-
-  return entityReadAll(entity, fields);
+  return Object.keys(fields).length ? fields : undefined;
 }
 
 /** Phép nghiệm thu chạy được trên Google: đọc thử cả hai thực thể trên tệp thật và in ra bảng tên trường cùng vài hàng đầu. */
