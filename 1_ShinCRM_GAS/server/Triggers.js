@@ -17,11 +17,12 @@ function shinHeaderSnapshotRead(sheet) {
 }
 
 function shinHeaderValues(sheet) {
-  var lastColumn = sheet.getLastColumn();
-  if (lastColumn < 1) { return []; }
-  return sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(function (value) {
-    return String(value === null || value === undefined ? '' : value).trim();
-  });
+  return sheetReadHeader(sheet);
+}
+
+/** Mã hàng 1 trong dải cột của vùng sửa, lấy từ bản đọc chung: một lần sửa đi qua nhiều phép kiểm, mỗi phép tự đọc hàng 1 là mỗi phép một lệnh gọi Sheet. */
+function shinHeaderSlice(sheet, firstColumn, lastColumn) {
+  return sheetReadHeader(sheet).slice(firstColumn - 1, lastColumn);
 }
 
 function shinHeaderSnapshotWrite(sheet) {
@@ -59,10 +60,7 @@ function shinRangeTouchesCodedFilter(sheet, range) {
 
 /** Cột module (mã @ có thật trên sheet kho nhưng ngoài DATA_SCHEMA): sheet `!` đọc được cột đó dù RAM không giữ. */
 function shinRangeTouchesViewSource(sheet, range) {
-  var first = range.getColumn();
-  return sheet.getRange(1, first, 1, range.getLastColumn() - first + 1).getValues()[0].some(function (value) {
-    return shinViewCodeIsValid(String(value === null || value === undefined ? '' : value).trim());
-  });
+  return shinHeaderSlice(sheet, range.getColumn(), range.getLastColumn()).some(shinViewCodeIsValid);
 }
 
 function shinViewCodeIsValid(code) {
@@ -91,9 +89,7 @@ function shinDefaultCodeMap(sheet, entity) {
 function shinDefaultCodeIsValid(sheet, entity, firstColumn, lastColumn) {
   var valid = shinDefaultCodeMap(sheet, entity);
   if (!valid) { return false; }
-  return sheet.getRange(1, firstColumn, 1, lastColumn - firstColumn + 1).getValues()[0].some(function (value) {
-    return !!valid[String(value === null || value === undefined ? '' : value).trim()];
-  });
+  return shinHeaderSlice(sheet, firstColumn, lastColumn).some(function (code) { return !!valid[code]; });
 }
 
 /** Sheet ngoài bốn sheet kho không có schema: thiếu ảnh chụp hàng 1 ở đó không được coi thận trọng là đổi schema, nếu không mỗi lần gõ hàng 1 của sheet nháp là một lượt nạp lại toàn bộ. */
@@ -123,9 +119,7 @@ function shinRenderForDecision(decision) {
 
 /** Sắp xếp chung trong Config là bộ điều khiển của mọi sheet quản trị chưa khai sắp xếp riêng. */
 function shinConfigSortTouched(sheet, range) {
-  var first = range.getColumn();
-  return sheet.getRange(1, first, 1, range.getLastColumn() - first + 1).getValues()[0].some(function (value) {
-    var code = String(value === null || value === undefined ? '' : value).trim();
+  return shinHeaderSlice(sheet, range.getColumn(), range.getLastColumn()).some(function (code) {
     return code === '@CFG_SORT_COL' || code === '@CFG_SORT_LEVEL';
   });
 }

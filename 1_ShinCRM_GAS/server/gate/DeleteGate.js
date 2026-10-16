@@ -63,7 +63,8 @@ function deleteGateRemove(yeuCau) {
   writeCommitAssertAvailable();
 
   return documentLockRun(function () {
-    var result = deleteGateRun(entity, ids, batDau);
+    var result;
+    try { result = deleteGateRun(entity, ids, batDau); } finally { sheetReadCopyDrop(ENTITY_SHEETS[entity]); }
     if (result && result.ok && result.recordIds && result.recordIds.length) {
       result.reloadDecision = writeCommitAfterSuccess({
         source: 'delete',
@@ -114,6 +115,8 @@ function deleteGateRun(entity, ids, batDau) {
   writeGateRanges(hard.map(function (o) { return o.row; })).reverse().forEach(function (dai) {
     context.sheet.deleteRows(dai[0], dai.length);
   });
+  // Bối cảnh đọc lại bên dưới phải thấy số dòng sau khi xóa.
+  sheetReadCopyDrop(context.sheetName);
 
   SpreadsheetApp.flush();
 

@@ -553,7 +553,9 @@ function writeGateSave(yeuCau) {
   writeCommitAssertAvailable();
 
   return documentLockRun(function () {
-    var result = writeGateRun(entity, records, source, fields, batDau);
+    var result;
+    // Lỗi giữa chừng vẫn có thể đã ghi một phần, nên bỏ bản đọc của sheet trong mọi trường hợp.
+    try { result = writeGateRun(entity, records, source, fields, batDau); } finally { sheetReadCopyDrop(ENTITY_SHEETS[entity]); }
     if (result && result.ok && result.changedIds && result.changedIds.length) {
       result.reloadDecision = writeCommitAfterSuccess({
         source: source,

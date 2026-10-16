@@ -128,7 +128,7 @@ function probeDateText() {
   var report = [];
   var moc = new Date(2026, 0, 5, 7, 30, 45);
   var muiGioScript = Session.getScriptTimeZone();
-  var muiGioTep = shinOpenBook().getSpreadsheetTimeZone();
+  var muiGioTep = sheetReadTimezone();
 
   report.push('Múi giờ script: ' + muiGioScript + ' — múi giờ tệp Sheet: ' + muiGioTep + ' — dự phòng: ' + DATE_TEXT_TIMEZONE);
   report.push(muiGioScript === muiGioTep ? '  Hai múi giờ bằng nhau: đúng.' : '  ⚠ HAI MÚI GIỜ LỆCH NHAU. Mọi mốc nửa đêm sẽ rơi sang ngày hôm trước. Sửa appsscript.json cho khớp múi giờ tệp.');

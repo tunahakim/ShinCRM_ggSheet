@@ -35,7 +35,7 @@ function sheetGridEnsureRoom(sheet, endRow, slack) {
  * Đây là chỗ **duy nhất** trả lời câu hỏi đó, vì `getLastRow()` trả về `0` ở sheet trắng hoàn toàn và trả về `3` ở sheet đã có ba hàng tiêu đề mà chưa có dữ liệu — hai con số khác nhau cho cùng một tình huống "chưa có bản ghi nào". Phép trừ này viết lại ở mỗi hàm đọc là mỗi hàm đọc có một cơ hội trừ sai một.
  */
 function sheetGridDataRowCount(sheet, firstDataRow) {
-  var lastRow = sheet.getLastRow();
+  var lastRow = sheetReadLastRow(sheet);
   if (lastRow < firstDataRow) { return 0; }
   return lastRow - firstDataRow + 1;
 }

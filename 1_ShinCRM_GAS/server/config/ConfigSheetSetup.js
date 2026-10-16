@@ -77,6 +77,7 @@ function configMigrateLegacyCounters(sheet) {
   [keyColumns[0], valueColumns[0]].sort(function (a, b) { return b - a; }).forEach(function (column) {
     sheet.deleteColumn(column);
   });
+  sheetReadCopyDrop(sheet.getName());
   return { found: true, values: values, removedColumns: 2 };
 }
 
@@ -199,6 +200,7 @@ function prepareConfigSheet(file, options) {
 
   configWriteFrame(sheet);
   if (opts.reset) {
+    sheetReadCopyDrop('Config');
     var rows = sheet.getMaxRows() - SHEET_FIRST_DATA_ROW + 1;
     if (rows > 0) {
       sheet.getRange(SHEET_FIRST_DATA_ROW, 1, rows, CONFIG_COLUMNS.length).clearContent();
@@ -209,7 +211,8 @@ function prepareConfigSheet(file, options) {
     }
   }
 
-  var seeded = seedConfigParams(file, opts.reset === true);
+  var seeded;
+  try { seeded = seedConfigParams(file, opts.reset === true); } finally { sheetReadCopyDrop('Config'); }
   configApplyGuidance(sheet, seeded.rows);
   return { sheet: sheet, migration: migration, seeded: seeded };
 }

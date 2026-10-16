@@ -67,7 +67,7 @@ function entityReadContext(entity, schema) {
     sheetName: sheetName,
     sheet: sheet,
     columnMap: columnMap,
-    timezone: shinOpenBook().getSpreadsheetTimeZone(),
+    timezone: sheetReadTimezone(),
     names: names,
     specs: names.map(function (name) { return fields[name]; }),
     indexes: names.map(function (name) { return columnIndex(columnMap, fields[name].code) - 1; }),

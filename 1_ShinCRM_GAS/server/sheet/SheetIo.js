@@ -21,15 +21,11 @@ function readColumnMap(sheetName) {
     throw new Error('Không có khai hình dáng cho sheet "' + sheetName + '" trong SHEET_LAYOUT.');
   }
 
-  var sheet = shinOpenSheet(sheetName);
-  var lastColumn = sheet.getLastColumn();
+  var headerRow = sheetReadHeader(shinOpenSheet(sheetName));
+  var lastColumn = headerRow.length;
   if (lastColumn < 1) {
     throw new Error('Sheet "' + sheetName + '" chưa có cột nào. Chạy setupSheets trước.');
   }
-
-  var headerRow = sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(function (cell) {
-    return cell === null || cell === undefined ? '' : String(cell).trim();
-  });
 
   var map = {};
   var duplicates = [];

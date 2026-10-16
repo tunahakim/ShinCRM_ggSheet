@@ -63,6 +63,7 @@ function sheetEnsureHeader(sheet, columns, headerRows) {
   });
   // Một lệnh ghi cho cả khối tiêu đề, theo luật gộp lệnh ghi của tài liệu 06. Ô của cột lạ được ghi lại đúng giá trị vừa đọc.
   sheet.getRange(1, 1, labelRows, total).setValues(rows);
+  sheetReadCopyDrop(sheet.getName());
 
   return {
     appended: appended,

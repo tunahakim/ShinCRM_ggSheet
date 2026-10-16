@@ -69,13 +69,10 @@ function selectionProbeReply(snapshot, started, customerId) {
 
 /** Tìm đúng một cột theo mã. Không đoán khi mã thiếu hoặc bị nhân đôi. */
 function selectionColumnIndex(sheet, code) {
-  var lastColumn = sheet.getLastColumn();
-  if (lastColumn < 1) { return 0; }
-
-  var header = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
+  var header = sheetReadHeader(sheet);
   var found = 0;
   for (var i = 0; i < header.length; i++) {
-    if (String(header[i] === null || header[i] === undefined ? '' : header[i]).trim() !== code) { continue; }
+    if (header[i] !== code) { continue; }
     if (found) { return 0; }
     found = i + 1;
   }

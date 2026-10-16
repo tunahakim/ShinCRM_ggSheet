@@ -124,7 +124,7 @@ var VIEW_FILTER_ROW = 3;
 function viewTimezoneReader() {
   var timezone = null;
   return function () {
-    if (timezone === null) { timezone = shinOpenBook().getSpreadsheetTimeZone(); }
+    if (timezone === null) { timezone = sheetReadTimezone(); }
     return timezone;
   };
 }

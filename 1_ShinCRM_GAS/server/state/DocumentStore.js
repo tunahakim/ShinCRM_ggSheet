@@ -23,10 +23,11 @@ var DOCUMENT_LOCK_BUSY_MESSAGE = 'Hệ thống bận. Vui lòng thử lại!';
 
 function documentStoreReal() { return PropertiesService.getDocumentProperties(); }
 function documentStoreActive() { return DOCUMENT_STORE.lockDepth > 0 || DOCUMENT_STORE.callDepth > 0 || DOCUMENT_STORE.docLockDepth > 0; }
-function documentStoreClear() { DOCUMENT_STORE.loaded = false; DOCUMENT_STORE.values = {}; DOCUMENT_STORE.dirty = {}; }
+function documentStoreClear() { DOCUMENT_STORE.loaded = false; DOCUMENT_STORE.values = {}; DOCUMENT_STORE.dirty = {}; sheetReadCopyClear(); }
 
-/** Bỏ bản đọc nhưng giữ phần đang chờ ghi gộp; lần đọc sau nạp lại kho thật rồi phủ phần chờ lên. */
+/** Bỏ bản đọc nhưng giữ phần đang chờ ghi gộp; lần đọc sau nạp lại kho thật rồi phủ phần chờ lên. Bản đọc Sheet kho bỏ cùng lúc (tài liệu 06 Phần 2). */
 function documentStoreRefresh() {
+  sheetReadCopyRefresh();
   var keep = {};
   Object.keys(DOCUMENT_STORE.dirty).forEach(function (key) { keep[key] = DOCUMENT_STORE.values[key]; });
   DOCUMENT_STORE.values = keep;

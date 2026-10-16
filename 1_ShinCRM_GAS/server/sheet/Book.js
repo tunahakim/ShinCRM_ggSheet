@@ -46,7 +46,7 @@ function shinOpenBook() {
 
 /** Lấy một sheet theo tên, ném lỗi nói rõ tên nào thiếu thay vì trả về null cho bên gọi tự đoán. */
 function shinOpenSheet(sheetName) {
-  var sheet = shinOpenBook().getSheetByName(sheetName);
+  var sheet = sheetReadSheet(sheetName);
   if (!sheet) {
     throw new Error('Không thấy sheet "' + sheetName + '" trong tệp. Chạy setupSheets trước.');
   }
