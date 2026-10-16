@@ -14,7 +14,7 @@ FbmSync.readLocal = function (entity) {
 /** Chỉ trạng thái người dùng cần xử lý mới vào bộ gom Log; `detail.issue` đánh dấu bản ghi bỏ qua vì dữ liệu hỏng. */
 FbmSync.logPullRecord = function (entity, incoming, current, statusAfter, reason, detail) {
   var status = String(statusAfter || ''), sync = FbmSync.SYNC_STATUS;
-  var issue = (detail && detail.issue === true) || [sync.conflict, sync.error, sync.notApplied, sync.unknownCategory, sync.missing].indexOf(status) >= 0;
+  var issue = (detail && detail.issue === true) || [sync.conflict, sync.error, sync.notApplied, sync.unknownCategory, sync.missing, sync.transferred].indexOf(status) >= 0;
   if (!issue) { return null; }
   var outcome = status === sync.conflict ? (typeof LOG_CONFLICT !== 'undefined' ? LOG_CONFLICT : 'conflict') : status === sync.error ? (typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error') : (typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn');
   return FbmSync.recordIssueAdd('pull', entity, status, String(current && current.id || incoming && (incoming.fbmId || incoming.id) || ''), reason, outcome);
@@ -40,15 +40,8 @@ FbmSync.pullWrite = function (entity, records) {
   var state = FbmSync.stateRead();
   var orphaned = 0;
   var categoryGate = FbmSync.stateCategoryGate(state);
-  var sourceRecords = records;
   var localRecords = FbmSync.readLocal(entity);
   state.metadata = state.metadata || {};
-  state.metadata.seen = state.metadata.seen || { customer: {}, activity: {} };
-  if (!state.metadata.seen[entity] || state.metadata.seen[entity].initialized !== true) {
-    FbmSync.seenStoreBegin(entity, localRecords);
-    state.metadata.seen[entity] = { initialized: true };
-  }
-  FbmSync.seenStoreMark(entity, localRecords, sourceRecords);
   if (entity === 'activity') {
     var linked = FbmSync.linkActivityCustomers(records, FbmSync.readLocal('customer'), categoryGate);
     records = linked.records;
@@ -220,14 +213,6 @@ FbmSync.pullWrite = function (entity, records) {
   if (allWrites.length) {
     var saved = FbmSync.sheetSave(entity, allWrites, 'pull');
     result.written = writes.length + ownedOnly; result.sheetWriteBatches = 1;
-    if (saved.rows && saved.fields) {
-      var savedRecords = saved.rows.map(function (row) {
-        var record = {};
-        saved.fields.forEach(function (field, index) { record[field] = row[index]; });
-        return record;
-      });
-      FbmSync.seenStoreMark(entity, savedRecords, sourceRecords);
-    }
     if (saved.ok && pendingClears.length && typeof FbmSync.pendingPushClear === 'function') { pendingClears.forEach(function (item) { FbmSync.pendingPushClear(item.entity, item.id); }); }
   }
   if (typeof FbmSync.stateWrite === 'function') { FbmSync.stateWrite(state); }

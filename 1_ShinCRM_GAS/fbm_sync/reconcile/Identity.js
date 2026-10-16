@@ -225,44 +225,6 @@ FbmSync.findCustomerByIdentity = function (localById, localByCode, incoming, loc
 };
 
 /**
- * Chỗ duy nhất gắn cờ "không thấy bên FBM" sau một thao tác đọc đầy đủ; không suy ra xóa FBM. Mọi thao tác đọc (danh sách khách, giao dịch theo khách, toàn bộ giao dịch) đều đi qua đây nên luật bỏ qua, bộ đếm và Log không lệch giữa các chiều chạy.
- * `seen` là bộ đánh dấu "đã thấy" của thao tác đọc toàn bộ giao dịch; bỏ trống là kho "đã thấy" của lượt quét theo khách, khi đó giao dịch chỉ xét trong các khách đã đọc (09/02 Phần 8). Kho "đã thấy" của lượt quét theo khách được xóa ở đây; kho của thao tác toàn bộ giao dịch do bên gọi xóa.
- * Phạm vi "Chỉ khách chỉ định": danh sách khách FBM đã lọc theo mã nên khách trong phạm vi mà vắng là vắng thật, còn khách ngoài phạm vi không được xét; giao dịch chỉ xét của khách trong phạm vi.
- * Ghi theo gói `CHUNK_ROWS` dòng để một lượt nhiều bản ghi vắng không vượt một lần qua cửa ghi.
- */
-FbmSync.markMissingAfterFullScan = function (entity, state, seen) {
-  var canWriteSheet = state && (typeof FbmSync.canWriteSheet === 'function' ? FbmSync.canWriteSheet(state.mode) : state.mode === 'read' || state.mode === 'write');
-  if (!state || !canWriteSheet) { return { written: 0, missing: 0, sample: [], skipped: true }; }
-  var scope = typeof FbmSync.scope === 'function' ? FbmSync.scope() : null;
-  var local = FbmSync.readLocal(entity), missing = [], sample = [], stillMissing = 0, written = 0, batchSize = typeof SETTINGS !== 'undefined' && SETTINGS.CHUNK_ROWS ? Number(SETTINGS.CHUNK_ROWS) : 2000;
-  var hasSeen = seen || function (record) { return FbmSync.seenStoreHas(entity, record); };
-  var parentRead = entity === 'activity' && !seen ? FbmSync.seenStoreReader(FbmSync.ACTIVITY_READ_STORE) : null, pullAllowed = FbmSync.pullAllowedReader(entity);
-  local.forEach(function (record) {
-    var fbmId = String(record.fbmId || '').trim();
-    if (parentRead && !parentRead({ id: record.customerId })) { return; }
-    if (!pullAllowed(record)) { return; }
-    if (scope && scope.shin.indexOf(String(entity === 'activity' ? record.customerId : record.id || '').trim()) < 0) { return; }
-    var lock = state.locks && state.locks[entity + ':' + String(record.id || '')];
-    if (!fbmId || hasSeen(record) || String(record.recordStatus || 'active') === 'deleted' || FbmSync.isTemporaryRecord(entity, record) || (lock && lock.owner === 'user')) { return; }
-    // Dòng đã mang cờ từ lượt trước: không ghi lại và không Log lại mỗi lượt, nhưng vẫn đếm vì lượt này vẫn không thấy nó.
-    if (String(record.syncStatus || '') === FbmSync.SYNC_STATUS.missing) { stillMissing += 1; return; }
-    missing.push({ id: record.id, syncStatus: FbmSync.SYNC_STATUS.missing });
-    if (sample.length < 20) { sample.push({ id: record.id, fbmId: fbmId }); }
-    if (FbmSync.logPullRecord) { FbmSync.logPullRecord(entity, { fbmId: fbmId }, record, FbmSync.SYNC_STATUS.missing, 'Không thấy ID trong lượt quét FBM; không suy ra xóa.'); }
-  });
-  var countKey = entity === 'activity' ? 'missingActivity' : 'missingCustomer';
-  state.counts = state.counts || {};
-  state.counts[countKey] = Number(state.counts[countKey] || 0) + missing.length + stillMissing;
-  for (var start = 0; start < missing.length; start += batchSize) {
-    var batch = missing.slice(start, start + batchSize);
-    FbmSync.sheetSave(entity, batch, 'pull');
-    written += batch.length;
-  }
-  if (!seen) { FbmSync.seenStoreClear(entity); }
-  return { written: written, missing: missing.length + stillMissing, sample: sample };
-};
-
-/**
  * Giá trị "Xác thực" cho khách mới kéo từ FBM, đọc từ ô Config. FBM không có trường này nên chỉ gán lúc tạo khách mới; khách đã có giữ giá trị của mình.
  * Preflight đã chặn ô trống hoặc giá trị không còn trong Category; ô trống mà vẫn tới đây thì ném lỗi chứ không ghi chuỗi đoán.
  */
@@ -281,20 +243,21 @@ FbmSync.customerRecord = function (fbm, categoryGate) {
 /** Đổi record Activity FBM sang schema nội bộ của Sheet. */
 FbmSync.activityRecord = function (fbm, categoryGate, parent) {
   var parentCode = fbm.ma_kh || (parent && (parent.ma_kh || parent.maKh)) || '';
-  var details = fbm.details || '', record = { customerId: parentCode, customerFbmCode: parentCode, workDate: fbm.end_date || '', taskType: fbm.ten_cv || fbm.ma_cv || '', content: FbmSync.stripActivityMarker(details), markerId: FbmSync.activityMarkerId(details), owner: fbm.owner || '', enteredBy: fbm.owner || '', fbmSyncPermission: FbmSync.pullDefaultPermission(), fbmId: fbm.id || '', syncedAt: new Date(), syncStatus: FbmSync.SYNC_STATUS.synced };
+  // `customerFbmId` là `stt_rec_kh` của khách vừa đọc, khóa nối khách cha; mã khách `ma_kh` chỉ để hiển thị vì có thể đổi hoặc trùng.
+  var details = fbm.details || '', record = { customerId: parentCode, customerFbmCode: parentCode, customerFbmId: String(parent && parent.sttRec || '').trim(), workDate: fbm.end_date || '', taskType: fbm.ten_cv || fbm.ma_cv || '', content: FbmSync.stripActivityMarker(details), markerId: FbmSync.activityMarkerId(details), owner: fbm.owner || '', enteredBy: fbm.owner || '', fbmSyncPermission: FbmSync.pullDefaultPermission(), fbmId: fbm.id || '', syncedAt: new Date(), syncStatus: FbmSync.SYNC_STATUS.synced };
   record.fbmHash = FbmSync.hash(fbm, 'activity', categoryGate);
   return record;
 };
 
-/** Nối Activity FBM vào mã Customer nội bộ và giữ hash ổn định sau khi đổi khóa ngoại. */
+/** Nối Activity FBM vào mã Customer nội bộ theo `stt_rec_kh` của khách đã đọc (09/05 Phần 9), không qua `ma_kh`, và giữ hash ổn định sau khi đổi khóa ngoại. */
 FbmSync.linkActivityCustomers = function (records, customers, categoryGate) {
   var byFbm = {}, orphaned = 0, blocked = 0;
   (customers || []).forEach(function (customer) {
-    var code = String(customer.fbmCustomerCode || '').trim();
-    if (code) { byFbm[code] = customer; }
+    var fbmId = String(customer.fbmId || '').trim();
+    if (fbmId) { byFbm[fbmId] = customer; }
   });
   var linked = (records || []).map(function (record) {
-    var customerCode = String(record.customerFbmCode || record.customerId || '').trim(), customer = byFbm[customerCode];
+    var customerCode = String(record.customerFbmCode || '').trim(), customer = byFbm[String(record.customerFbmId || '').trim()];
     if (!customer) {
       orphaned += 1;
       if (FbmSync.logPullRecord) { FbmSync.logPullRecord('activity', record, null, FbmSync.SYNC_STATUS.skipped, 'Không tìm thấy Customer cha trong ShinCRM.', { issue: true }); }

@@ -34,37 +34,78 @@ FbmSync.fbDate = function (value) {
   if (match) { return new Date(Number(match[1])); }
   return value;
 };
-/** Tạo một trang grid; type 0 lấy metadata, type 1 tiếp tục theo cursor. */
-FbmSync.gridRequest = function (entity, options) {
-  var cfg = FbmSync.scriptSettings();
-  var opt = options || {};
-  var controller = FbmSync.CONTROLLERS[entity];
-  var payload = {
-    type: Number(opt.type === undefined ? 0 : opt.type), count: Number(opt.count || (entity === 'customer' ? 2000 : 100)), language: 'v', controller: controller,
-    // FBM biết chiều chuyển trang nhờ so `gridPageIndex` với `lastPageIndex` (trang đang đứng); ShinCRM chỉ đi tới nên trang đang đứng luôn là trang kế trừ 1.
-    viewId: null, childObject: false, lastPageIndex: opt.lastPageIndex !== undefined ? opt.lastPageIndex : (Number(opt.gridPageIndex) > 0 ? Number(opt.gridPageIndex) - 1 : -1),
-    firstPageItem: opt.pageItems && opt.pageItems.firstPageItem || '', lastPageItem: opt.pageItems && opt.pageItems.lastPageItem || '', lastRowCount: Number(opt.pageItems && opt.pageItems.lastRowCount || 0), memvars: [],
-    externalKey: opt.externalKey || [], gridPageIndex: opt.gridPageIndex === undefined ? -1 : opt.gridPageIndex,
-    gridPageValue: opt.gridPageValue === undefined ? null : opt.gridPageValue, gridRefresh: !!opt.gridRefresh, filter: opt.filter || [],
-    sortExpression: opt.sortExpression || (entity === 'customer' ? 'ngay_gd desc' : 'end_date desc, datetime0 desc, id, line_nbr'),
-    // Khi GAS chưa có payload cookie, để transport generic của Extension lấy từ trang FBM theo chỉ dẫn envelope.
-    cookie: cfg.cookie || '{{FBM_PAYLOAD_COOKIE}}', query: null, parameter: null, variable: ''
+// Mã khách FBM (`stt_rec_kh`) đi vào câu lọc ghép tay nên chỉ nhận chữ, số, `-` và `_` (không có dấu nháy hay khoảng trắng); id giao dịch chỉ nhận chữ số.
+FbmSync.STT_REC_PATTERN = /^[A-Za-z0-9_-]+$/;
+FbmSync.ACTIVITY_ID_PATTERN = /^\d+$/;
+
+(function () {
+  /** Khung payload grid chung; điều kiện quyền của Customer không nằm ở đây mà ở `gridRequest`, để chỉ hàm tra không lọc quyền dựng được request khách thiếu điều kiện này. */
+  function gridPayload(entity, opt, cfg) {
+    return {
+      type: Number(opt.type === undefined ? 0 : opt.type), count: Number(opt.count || (entity === 'customer' ? 2000 : 100)), language: 'v', controller: FbmSync.CONTROLLERS[entity],
+      // FBM biết chiều chuyển trang nhờ so `gridPageIndex` với `lastPageIndex` (trang đang đứng); ShinCRM chỉ đi tới nên trang đang đứng luôn là trang kế trừ 1.
+      viewId: null, childObject: false, lastPageIndex: opt.lastPageIndex !== undefined ? opt.lastPageIndex : (Number(opt.gridPageIndex) > 0 ? Number(opt.gridPageIndex) - 1 : -1),
+      firstPageItem: opt.pageItems && opt.pageItems.firstPageItem || '', lastPageItem: opt.pageItems && opt.pageItems.lastPageItem || '', lastRowCount: Number(opt.pageItems && opt.pageItems.lastRowCount || 0), memvars: [],
+      externalKey: (opt.externalKey || []).slice(), gridPageIndex: opt.gridPageIndex === undefined ? -1 : opt.gridPageIndex,
+      gridPageValue: opt.gridPageValue === undefined ? null : opt.gridPageValue, gridRefresh: !!opt.gridRefresh, filter: opt.filter || [],
+      sortExpression: opt.sortExpression || (entity === 'customer' ? 'ngay_gd desc' : 'end_date desc, datetime0 desc, id, line_nbr'),
+      // Khi GAS chưa có payload cookie, để transport generic của Extension lấy từ trang FBM theo chỉ dẫn envelope.
+      cookie: cfg.cookie || '{{FBM_PAYLOAD_COOKIE}}', query: null, parameter: null, variable: ''
+    };
+  }
+
+  /** Tạo một trang grid; type 0 lấy metadata, type 1 tiếp tục theo cursor. */
+  FbmSync.gridRequest = function (entity, options) {
+    var cfg = FbmSync.scriptSettings(), opt = options || {}, payload = gridPayload(entity, opt, cfg);
+    if (entity === 'customer') {
+      // Thiếu mã người dùng mà vẫn gửi thì FBM trả mọi khách mình đọc được, kể cả khách người khác; chỉ hàm tra mã khách không lọc quyền được bỏ điều kiện này.
+      if (!/^[A-Za-z0-9_-]+$/.test(String(cfg.userId || ''))) { var missingUser = new Error('thiếu mã người dùng FBM nên không dựng request đọc khách; kiểm tra lại tab FBM rồi chạy lại.'); missingUser.code = 'FBM_USER_ID_MISSING'; throw missingUser; }
+      payload.externalKey.push({ Name: "stt_rec_kh in (select stt_rec_kh from dbo.zcFastBusiness$Function$GetCustomerValidate('" + cfg.userId + "')) and 1", Opr: '=', Value: 1, Type: 'String', Ignore: false });
+    }
+    var scope = entity === 'customer' && opt.includeScope !== false && typeof FbmSync.scope === 'function' ? FbmSync.scope() : null;
+    if (scope) {
+      // Danh sách rỗng thành điều kiện không khớp ai, để phạm vi giới hạn không bao giờ rơi thành quét toàn bộ. Mã đã qua SCOPE_CODE_PATTERN nên không có dấu nháy.
+      var inList = scope.fbm.length ? scope.fbm.map(function (code) { return "'" + code + "'"; }).join(',') : "''";
+      payload.externalKey.push({ Name: 'ma_kh in (' + inList + ') and 1', Opr: '=', Value: 1, Type: 'String', Ignore: false });
+    }
+    if (entity === 'customer' && payload.type === 0) {
+      payload.memvars = [{ Name: 'user_id', OldValue: null, NewValue: '' }];
+    }
+    return { url: cfg.baseUrl + FbmSync.ENDPOINTS.grid, body: payload, meta: { kind: 'grid', entity: entity } };
   };
-  if (entity === 'customer') {
-    // Thiếu mã người dùng mà vẫn gửi thì FBM trả mọi khách mình đọc được, kể cả khách người khác; chỉ hàm tra mã khách không lọc quyền được bỏ điều kiện này.
-    if (!/^[A-Za-z0-9_-]+$/.test(String(cfg.userId || ''))) { var missingUser = new Error('thiếu mã người dùng FBM nên không dựng request đọc khách; kiểm tra lại tab FBM rồi chạy lại.'); missingUser.code = 'FBM_USER_ID_MISSING'; throw missingUser; }
-    payload.externalKey.push({ Name: "stt_rec_kh in (select stt_rec_kh from dbo.zcFastBusiness$Function$GetCustomerValidate('" + cfg.userId + "')) and 1", Opr: '=', Value: 1, Type: 'String', Ignore: false });
-  }
-  var scope = entity === 'customer' && opt.includeScope !== false && typeof FbmSync.scope === 'function' ? FbmSync.scope() : null;
-  if (scope) {
-    // Danh sách rỗng thành điều kiện không khớp ai, để phạm vi giới hạn không bao giờ rơi thành quét toàn bộ. Mã đã qua SCOPE_CODE_PATTERN nên không có dấu nháy.
-    var inList = scope.fbm.length ? scope.fbm.map(function (code) { return "'" + code + "'"; }).join(',') : "''";
-    payload.externalKey.push({ Name: 'ma_kh in (' + inList + ') and 1', Opr: '=', Value: 1, Type: 'String', Ignore: false });
-  }
-  if (entity === 'customer' && payload.type === 0) {
+
+  /**
+   * Tra mã khách không lọc quyền (09/05 Phần 9, Nghiên cứu FBM ch16): `activity` hỏi khách đang giữ giao dịch có id này, `customer` hỏi khách này còn tồn tại không. Mỗi request một mã.
+   * Không kèm điều kiện quyền và phạm vi nên kết quả chỉ được đọc qua `ownerLookupParse`, chỉ lấy `stt_rec_kh`. Mã sai định dạng thì không dựng request (trả `null`), vì mã đi thẳng vào câu SQL.
+   */
+  FbmSync.ownerLookupRequest = function (kind, value) {
+    var text = String(value === null || value === undefined ? '' : value).trim(), key;
+    if (kind === 'activity' && FbmSync.ACTIVITY_ID_PATTERN.test(text)) { key = { Name: "stt_rec_kh in (select stt_rec from sysevents where id = '" + text + "') and 1", Opr: '=', Value: 1, Type: 'String', Ignore: false }; }
+    else if (kind === 'customer' && FbmSync.STT_REC_PATTERN.test(text)) { key = { Name: 'stt_rec_kh', Opr: '=', Value: text, Type: 'String', Ignore: false }; }
+    else { return null; }
+    var cfg = FbmSync.scriptSettings(), payload = gridPayload('customer', { type: 0, count: 20, gridPageIndex: -1, gridRefresh: false, externalKey: [key] }, cfg);
     payload.memvars = [{ Name: 'user_id', OldValue: null, NewValue: '' }];
-  }
-  return { url: cfg.baseUrl + FbmSync.ENDPOINTS.grid, body: payload, meta: { kind: 'grid', entity: entity } };
+    return { url: cfg.baseUrl + FbmSync.ENDPOINTS.grid, body: payload, meta: { kind: 'owner_lookup', entity: 'customer' } };
+  };
+})();
+
+/** Đọc kết quả tra không lọc quyền: chỉ trả danh sách `stt_rec_kh`, không giữ cột nào khác của khách có thể không thuộc quyền mình. Lỗi FBM hoặc lưới lạ trả `ok: false` để bên gọi báo lỗi, không suy ra vắng. */
+FbmSync.ownerLookupParse = function (item) {
+  var check = FbmSync.protocol.assertSuccess(item);
+  if (!check.ok) { return { ok: false, code: String(check.code || 'FBM_ERROR'), status: Number(check.status || 0), reason: String(check.bug && (check.bug.Message || check.bug.message) || 'FBM trả lỗi khi tra mã khách') }; }
+  // Chỉ cần đúng cột `stt_rec_kh`; không đòi đủ cột của danh sách khách vì kết quả không được ghi.
+  var grid = FbmSync.gridRows(FbmSync.protocol.parse(item)), column = grid.fields.indexOf('stt_rec_kh');
+  if (column < 0) { return { ok: false, code: 'FBM_GRID_SHAPE_CHANGED', status: 0, reason: 'FBM trả kết quả tra mã khách không có cột stt_rec_kh.' }; }
+  return { ok: true, sttRecs: grid.rows.map(function (row) { return String(Array.isArray(row) ? row[column] || '' : '').trim(); }).filter(Boolean) };
+};
+
+/** Phần tử đọc khách của một lô cửa ghi: lọc theo quyền như danh sách khách và theo đúng các mã của lô. Mã sai định dạng không vào câu lọc; lô không còn mã nào thì không dựng. */
+FbmSync.customerBatchRequest = function (sttRecs) {
+  var list = (sttRecs || []).map(function (value) { return String(value || '').trim(); }).filter(function (value) { return FbmSync.STT_REC_PATTERN.test(value); });
+  if (!list.length) { return null; }
+  var request = FbmSync.customerGridRequest({ type: 0, count: Math.max(20, list.length), gridPageIndex: -1, gridRefresh: false, externalKey: [{ Name: 'stt_rec_kh in (' + list.map(function (value) { return "'" + value + "'"; }).join(',') + ') and 1', Opr: '=', Value: 1, Type: 'String', Ignore: false }] });
+  request.meta.kind = 'customer_batch';
+  return request;
 };
 /** Tạo request grid Customer theo cursor hiện tại. */
 FbmSync.customerGridRequest = function (options) { return FbmSync.gridRequest('customer', options); };
