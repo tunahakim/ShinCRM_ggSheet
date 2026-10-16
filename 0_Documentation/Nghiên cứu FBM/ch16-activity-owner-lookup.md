@@ -51,7 +51,7 @@ Kết luận: một id giao dịch → một request → đúng một khách, t�
 
 ### 16.4 Gom nhiều id một request
 
-Đổi điều kiện thành `where id in ('<id1>','<id2>',...)`. Kỳ vọng ra **tập khách** đang giữ các giao dịch đó, không ra từng cặp: grid khách mỗi khách một dòng, không có cột giao dịch. Muốn biết giao dịch nào của khách nào thì đọc giao dịch của từng khách trong tập. Chưa chạy thử (đoạn thử B5 của phiên "Một cửa ghi chiều lấy về FBM").
+Đổi điều kiện thành `where id in ('<id1>','<id2>',...)`. Kỳ vọng ra **tập khách** đang giữ các giao dịch đó, không ra từng cặp: grid khách mỗi khách một dòng, không có cột giao dịch. Muốn biết giao dịch nào của khách nào thì đọc giao dịch của từng khách trong tập. Chưa chạy thử. Phiên "Một cửa ghi chiều lấy về FBM" chọn hỏi mỗi id một request để ra đúng cặp, nên không cần thử biến thể này.
 
 ### 16.5 Đường đã thử và bị chặn: `GetCompletionList` với bảng giao dịch
 
@@ -73,10 +73,11 @@ Kết luận: `GetCompletionList` không cho trỏ vào bảng giao dịch (có 
 
 - Đây là hành vi FBM chấp nhận, không phải tính năng FBM cam kết. FBM nâng cấp có thể chặn; bên dùng phải coi lỗi hoặc kết quả lạ là "không biết", không suy ra giao dịch đã mất.
 - Giá trị đưa vào `Name` là chuỗi SQL ghép tay: chỉ đưa id toàn chữ số, không bao giờ đưa chuỗi người dùng nhập.
-- Grid khách luôn kèm điều kiện `GetCustomerValidate` của tài khoản đang đăng nhập (web FBM tự gửi). Chủ mới nằm ngoài quyền xem của tài khoản thì không được trả về, không phân biệt được với giao dịch bị xóa.
+- Request mẫu ở 16.3 **không** kèm điều kiện `GetCustomerValidate` mà web FBM tự gửi khi tải danh sách khách. Khách trả về trong các lần thử là khách của chính tài khoản thử, nên chưa biết request không kèm điều kiện này có trả khách thuộc quyền người khác hay không (16.7).
 - Mỗi lần gửi request lỗi (HTTP 500) là một lỗi trên máy chủ thật của công ty; thử biến thể mới thì làm ít và có chủ đích.
 
 ### 16.7 Câu hỏi còn mở
 
-- Gom nhiều id trong `id in (...)` có trả đúng tập khách không, và dài tối đa bao nhiêu id một request (16.4).
+- Request ở 16.3, không kèm `GetCustomerValidate`, có trả về khách đang thuộc quyền tài khoản khác không. Cách thử chỉ đọc: lấy id một giao dịch của khách người khác đang quản lý (ví dụ do đồng nghiệp cho biết), chạy request 16.3, xem có ra một dòng không. Cùng câu hỏi cho request lọc thẳng `stt_rec_kh = '<mã khách của người khác>'`.
+
 - Có đường nào khác trả cặp "id giao dịch – khách" hàng loạt (ví dụ cột sắp xếp, khóa trang `firstPageItem`/`lastPageItem` của grid giao dịch khi `sortExpression` có `stt_rec`) hay không.
