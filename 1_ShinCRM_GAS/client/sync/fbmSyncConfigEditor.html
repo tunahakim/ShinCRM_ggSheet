@@ -252,7 +252,7 @@ function fbmSyncConfigStartEdit(key) {
     FBM_SYNC_CLIENT.loginPasswordFocused = false;
   } else if (key === 'accountSettings') {
     var account = settings.account || {};
-    draft = { customerPrefix: String(account.customerPrefix || ''), customerCodeLength: String(account.customerCodeLength || ''), activitySince: String(account.activitySince || '') };
+    draft = { customerPrefix: String(account.customerPrefix || ''), customerCodeLength: String(account.customerCodeLength || '') };
     FBM_SYNC_CLIENT.accountSettingsDraft = fbmSyncConfigClone(draft);
   } else if (key === 'module') {
     draft = { approvalThreshold: settings.approvalThreshold === undefined ? FBM_SYNC_SETTINGS_SCHEMA.defaults.approvalThreshold : settings.approvalThreshold, enabled: fbmSyncConfigMasterEnabled(), scopeLimited: settings.scopeLimited !== false, scopeCodes: (settings.scopeCodes || []).join('\n'), requestGapMinSeconds: settings.requestGapMinSeconds === undefined ? 0 : settings.requestGapMinSeconds, requestGapMaxSeconds: settings.requestGapMaxSeconds === undefined ? 0 : settings.requestGapMaxSeconds };
@@ -284,7 +284,7 @@ function fbmSyncConfigSave(key, target) {
 /* Ánh xạ control của từng card về path trong snapshot. Đây là hợp đồng nội bộ của editor, không đưa vào screen schema. */
 var FBM_SYNC_CONFIG_UNSAVED_FIELDS = {
   connection: { 'identity.spreadsheetId': 'fbm-identity-spreadsheet', 'identity.userId': 'fbm-identity-user', 'identity.username': 'fbm-identity-username', 'identity.accountName': 'fbm-identity-account', loginUsername: 'fbm-login-username', password: 'fbm-login-password' },
-  accountSettings: { customerPrefix: 'fbm-account-customer-prefix', customerCodeLength: 'fbm-account-customer-length', activitySince: 'fbm-account-activity-since' },
+  accountSettings: { customerPrefix: 'fbm-account-customer-prefix', customerCodeLength: 'fbm-account-customer-length' },
   module: { enabled: 'fbm-sync-settings-master-switch', approvalThreshold: 'fbm-sync-setting-approval-threshold', scopeLimited: 'fbm-sync-setting-scope-limited', scopeCodes: 'fbm-sync-setting-scope-codes', requestGapMinSeconds: 'fbm-sync-setting-request-gap-min', requestGapMaxSeconds: 'fbm-sync-setting-request-gap-max' },
   relay: {},
   extension: { pollMinutes: 'fbm-extension-poll-minutes', runOnStartup: 'fbm-sync-run-on-startup' },

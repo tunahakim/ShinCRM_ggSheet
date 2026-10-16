@@ -3,7 +3,6 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 // Một trang Customer kéo theo danh sách khách chờ quét Activity nằm trong cursor; trang nhỏ để state luôn dưới trần một DocumentProperty dù tổng số khách là bao nhiêu.
 FbmSync.CUSTOMER_PAGE_ROWS = 50;
-FbmSync.ACTIVITY_SUPPLEMENT_CUSTOMERS = 30;
 
 /** Đọc cấu hình runtime; token ưu tiên state của phiên hiện tại. */
 FbmSync.scriptSettings = function () {
@@ -17,7 +16,6 @@ FbmSync.scriptSettings = function () {
   }
   var accountName = typeof FbmSync.bindingAccountName === 'function' ? FbmSync.bindingAccountName() : '';
   var accountSettings = typeof FbmSync.accountSettingsRead === 'function' ? FbmSync.accountSettingsRead() : {};
-  var activitySince = currentState.runId && currentState.activitySince !== undefined ? currentState.activitySince : accountSettings.activitySince;
   return {
     baseUrl: 'https://fbo.com.vn:8888',
     cookie: cookie,
@@ -26,8 +24,7 @@ FbmSync.scriptSettings = function () {
     userId: userId,
     accountName: accountName,
     customerPrefix: String(accountSettings.customerPrefix || ''),
-    customerCodeLength: String(accountSettings.customerCodeLength || ''),
-    activitySince: String(activitySince || '')
+    customerCodeLength: String(accountSettings.customerCodeLength || '')
   };
 };
 /** Đổi chuỗi /Date(ms)/ của .NET, giữ nguyên giá trị khác. */
@@ -83,54 +80,30 @@ FbmSync.identityUserRequest = function () {
     meta: { kind: 'identity_user_grid', entity: 'user' }
   };
 };
-/** Request Customer tối thiểu do GAS cấp để kiểm tra phiên nền; Extension không được tự dựng request này. */
-FbmSync.heartbeatCustomerRequest = function () {
-  var request = FbmSync.customerGridRequest({ type: 0, count: 1, gridPageIndex: -1, gridPageValue: null, gridRefresh: false, includeScope: false });
-  // Heartbeat chỉ kiểm tra phiên, không lọc dữ liệu theo cấu hình quét/test và không giữ cursor quét.
-  request.body.externalKey = [];
-  request.body.memvars = [];
-  request.body.sortExpression = null;
-  request.meta.kind = 'heartbeat';
-  request.meta.entity = 'customer';
-  return request;
-};
 /** Request Customer full-scan dùng riêng cho kiểm tra liên kết Spreadsheet/FBM. */
 FbmSync.identityCheckCustomerRequest = function (options) {
   var opt = Object.assign({ includeScope: false, sortExpression: 'stt_rec_kh' }, options || {});
   return FbmSync.customerGridRequest(opt);
 };
-/** Đổi mốc YYYY-MM-DD sang định dạng filter ngày mà grid FBM nhận. */
-FbmSync.activitySinceFilterDate = function (value) {
+/** Đổi ngày YYYY-MM-DD sang định dạng filter ngày mà grid FBM nhận; ngày không hợp lệ trả rỗng. */
+FbmSync.fbmFilterDate = function (value) {
   var match = String(value || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) { return ''; }
   var date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
   if (date.getUTCFullYear() !== Number(match[1]) || date.getUTCMonth() !== Number(match[2]) - 1 || date.getUTCDate() !== Number(match[3])) { return ''; }
   return match[3] + '/' + match[2] + '/' + match[1];
 };
-/** Gắn bộ lọc mốc Activity vào mọi request đọc grid, trừ request chủ động lấy lịch sử. */
-FbmSync.activitySinceFilters = function (options) {
-  var opt = options || {}, filters = Array.isArray(opt.filter) ? opt.filter.slice() : [], cfg = FbmSync.scriptSettings();
-  var since = String(cfg.activitySince || '').trim(), filterDate = FbmSync.activitySinceFilterDate(since);
-  var hasEndDateFilter = filters.some(function (item) { return /^end_date\s*:/i.test(String(item || '').trim()); });
-  if (filterDate && opt.includeHistory !== true && !hasEndDateFilter) { filters.push('end_date:>=' + filterDate); }
-  return filters;
-};
 /** Tạo request Activity luôn gắn với stt_rec của Customer. */
 FbmSync.activityGridRequest = function (sttRec, options) {
   var opt = Object.assign({}, options || {}, { externalKey: [{ Name: 'stt_rec', Opr: '=', Value: String(sttRec || ''), Type: 'String', Ignore: false }] });
-  opt.filter = FbmSync.activitySinceFilters(opt);
-  delete opt.includeHistory;
   return FbmSync.gridRequest('activity', opt);
 };
-/** Dựng request Activity của mọi khách theo mốc thời gian; không gắn một Customer cụ thể. */
+/** Dựng request Activity của mọi khách; không gắn một Customer cụ thể. */
 FbmSync.activityBulkRequest = function (options) {
-  var opt = Object.assign({}, options || {});
-  opt.filter = FbmSync.activitySinceFilters(opt);
-  delete opt.includeHistory;
-  return FbmSync.gridRequest('activity', opt);
+  return FbmSync.gridRequest('activity', Object.assign({}, options || {}));
 };
 
-/** Đọc đích danh một giao dịch theo FBM ID, có tiêu đề cột; không lọc mốc ngày vì đang hỏi giao dịch đó còn hay không. */
+/** Đọc đích danh một giao dịch theo FBM ID, có tiêu đề cột; dùng để hỏi giao dịch đó còn hay không. */
 FbmSync.activityByIdRequest = function (fbmId) {
   return FbmSync.gridRequest('activity', { type: 0, count: 20, gridPageIndex: -1, gridRefresh: false, externalKey: [{ Name: 'id', Opr: '=', Value: String(fbmId || ''), Type: 'String', Ignore: false }] });
 };
@@ -165,51 +138,6 @@ FbmSync.activityDateKey = function (value) {
   return match ? match[1] + '-' + ('0' + match[2]).slice(-2) + '-' + ('0' + match[3]).slice(-2) : '';
 };
 
-/** Tìm mốc Activity local mới nhất; không có mốc thì bỏ qua lượt quét bù. */
-FbmSync.activityLocalMaxDate = function () {
-  var latest = '';
-  if (typeof FbmSync.readLocal !== 'function') { return latest; }
-  (FbmSync.readLocal('activity') || []).forEach(function (record) {
-    if (!String(record && record.fbmId || '').trim()) { return; }
-    var key = FbmSync.activityDateKey(record && record.workDate);
-    if (key && key > latest) { latest = key; }
-  });
-  return latest;
-};
-
-/** Lớp 2: tìm Customer có ngày giao dịch mới hơn Activity local mới nhất. */
-FbmSync.activityCatchupCustomerRequest = function () {
-  var maxDate = FbmSync.activityLocalMaxDate();
-  if (!maxDate) { return null; }
-  var request = FbmSync.customerGridRequest({
-    type: 0, count: FbmSync.ACTIVITY_SUPPLEMENT_CUSTOMERS, gridPageIndex: -1, gridRefresh: false,
-    externalKey: [{ Name: 'ngay_gd', Opr: '>', Value: maxDate, Type: 'Date', Ignore: false }]
-  });
-  request.meta.kind = 'activity_catchup_customer_grid';
-  request.meta.activityMaxDate = maxDate;
-  return request;
-};
-
-/** Đọc cursor xoay Customer từ DocumentProperties, không giữ trong Extension. */
-FbmSync.activityRotationCursor = function () {
-  var props = FbmSync.props(), raw = props.getProperty('FBM_SYNC_ACTIVITY_ROTATION');
-  if (!raw) { return { pageIndex: -1, pageValue: null }; }
-  try {
-    var parsed = JSON.parse(raw);
-    return { pageIndex: parsed.pageIndex === undefined || parsed.pageIndex === null ? -1 : Number(parsed.pageIndex), pageValue: parsed.pageValue || null, pageItems: parsed.pageItems || null };
-  } catch (ignore) { return { pageIndex: -1, pageValue: null }; }
-};
-
-/** Lớp 3: lấy một trang Customer theo cursor xoay đã lưu. */
-FbmSync.activityRotationCustomerRequest = function () {
-  var cursor = FbmSync.activityRotationCursor(), request = FbmSync.customerGridRequest({
-    type: cursor.pageIndex < 0 ? 0 : 1, count: FbmSync.ACTIVITY_SUPPLEMENT_CUSTOMERS, gridPageIndex: cursor.pageIndex,
-    gridPageValue: cursor.pageValue, pageItems: cursor.pageItems, gridRefresh: false
-  });
-  request.meta.kind = 'activity_rotation_customer_grid';
-  return request;
-};
-
 /**
  * Con trỏ trang kế của grid Customer (keyset): bốn giá trị sort key của dòng cuối trang, theo tài liệu Nghiên cứu FBM ch04 mục 4.10.
  * Thiếu `stt_rec_kh` thì FBM trả trang kế rỗng và lượt quét tưởng đã hết khách (gặp thật 2026-10-07: dừng ở 50/1.312 khách).
@@ -239,18 +167,6 @@ FbmSync.gridNextPageIndex = function (pageIndex) {
   return (isFinite(index) && index >= 0 ? Math.floor(index) : 0) + 1;
 };
 
-/** Vị trí trang xoay tiếp theo tính từ trang vừa đọc; hết danh sách thì quay lại trang đầu. Tính ngay khi nhận trang để cursor chỉ mang vị trí này, không mang cả các dòng Customer. */
-FbmSync.activityRotationNext = function (rows, total) {
-  var list = rows || [];
-  if (list.length < FbmSync.ACTIVITY_SUPPLEMENT_CUSTOMERS) { return { pageIndex: -1, pageValue: null, pageItems: null }; }
-  var last = list[list.length - 1], cursor = FbmSync.activityRotationCursor();
-  return { pageIndex: FbmSync.gridNextPageIndex(cursor.pageIndex), pageValue: FbmSync.customerPageValue(last), pageItems: FbmSync.customerPageItems(list, total || cursor.pageItems && cursor.pageItems.lastRowCount) };
-};
-
-/** Lưu vị trí trang xoay do `activityRotationNext` tính. */
-FbmSync.activityRotationSave = function (next) {
-  FbmSync.props().setProperty('FBM_SYNC_ACTIVITY_ROTATION', JSON.stringify({ pageIndex: next.pageIndex, pageValue: next.pageValue, pageItems: next.pageItems || null }));
-};
 /**
  * Trang đầu không kèm tiêu đề: FBM dùng `type: 1` với `gridPageIndex: -2` (mẫu bắt từ giao diện FBM trong RequestFBM).
  * Tiêu đề nặng khoảng 22,5 KB mỗi lần trong khi dữ liệu một khách chỉ vài KB, nên mỗi lượt chỉ lấy tiêu đề một lần (09/01 Kiến trúc và giao thức).

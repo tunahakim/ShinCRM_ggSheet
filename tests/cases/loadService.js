@@ -132,6 +132,11 @@ function chay(so) {
     [scoped.reloadMode, scoped.customer.rows.map((row) => row[0]), scoped.activity.rows.map((row) => row[0]).sort(), scoped.removedRecordIds, scoped.affectedCustomerIds.sort()],
     ['records', ['KH-SCOPE-1'], ['GD-SCOPE-1', 'GD-SCOPE-2'], ['KH-MISSING'], ['KH-MISSING', 'KH-SCOPE-1']]);
   check(so, 'reloadRecords chuẩn hóa chuỗi và loại mã trùng trước khi đọc', scoped.removedRecordIds, ['KH-MISSING']);
+  // Sidebar coi khách nằm trong affectedCustomerIds mà vắng trong payload là khách đã bị xóa.
+  const activityOnly = scopeHop.reloadRecords(['GD-SCOPE-2']);
+  check(so, 'chỉ Activity đổi thì payload vẫn mang Customer cha, nếu không Sidebar xóa khách khỏi RAM',
+    [activityOnly.affectedCustomerIds, activityOnly.customer.rows.map((row) => row[0]), activityOnly.activity.rows.map((row) => row[0]).sort()],
+    [['KH-SCOPE-1'], ['KH-SCOPE-1'], ['GD-SCOPE-1', 'GD-SCOPE-2']]);
 
   const stale = dungNap(null, { reloadRevision: '9', dirtyRecords: '["KH-SCOPE-1","KH-SCOPE-2"]' });
   ghiKhach(stale, stale.hop.SHEET_FIRST_DATA_ROW, 'KH-SCOPE-1', 'Khách stale 1');

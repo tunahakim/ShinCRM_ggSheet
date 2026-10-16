@@ -270,12 +270,12 @@ async function chay(so) {
   const loginActionRow = hop.fbmSyncLoginActionBlocks()[0];
   check(so, 'Nút đăng nhập thử dùng RowGroup và không nhân bản nút lưu connection', [loginActionRow.role, loginActionRow.className, loginActionRow.elements.length, loginActionRow.elements[0].role], ['box', 'shin-row-group', 1, 'button']);
   hop.fbmSyncConfigFinishEdit('login');
-  hop.FBM_SYNC_CLIENT.syncSettings = { account: { customerPrefix: 'ALT', customerCodeLength: '8', activitySince: '2026-01-01' } };
+  hop.FBM_SYNC_CLIENT.syncSettings = { account: { customerPrefix: 'ALT', customerCodeLength: '8' } };
   render(hop, content, hop.fbmSyncRenderAccount, idle);
-  check(so, 'Account hien cau hinh ma khach FBM va moc Activity tren FBM tu GAS', [dom.document.getElementById('fbm-account-customer-prefix').value, dom.document.getElementById('fbm-account-customer-length').value, dom.document.getElementById('fbm-account-activity-since').value, content.textContent.indexOf('Mốc ngày Activity trên FBM') >= 0, content.textContent.indexOf('end_date') >= 0, content.textContent.indexOf('không bị coi là bản ghi mất') >= 0], ['ALT', '8', '2026-01-01', true, true, true]);
-  hop.FBM_SYNC_CLIENT.accountSettingsInvalid = { customerPrefix: false, customerCodeLength: true, activitySince: false };
+  check(so, 'Account hien cau hinh ma khach FBM tu GAS, khong con o moc ngay Activity', [dom.document.getElementById('fbm-account-customer-prefix').value, dom.document.getElementById('fbm-account-customer-length').value, dom.document.getElementById('fbm-account-activity-since'), content.textContent.indexOf('Mốc ngày Activity') >= 0], ['ALT', '8', null, false]);
+  hop.FBM_SYNC_CLIENT.accountSettingsInvalid = { customerPrefix: false, customerCodeLength: true };
   const invalidAccountFields = hop.fbmSyncAccountSettingsBlocks().filter((node) => node && node.role === 'box' && node.className.indexOf('shin-form-field') >= 0);
-  check(so, 'Cau hinh ma khach FBM dung StandaloneField va to do o thieu', [invalidAccountFields.length, invalidAccountFields[0].className, invalidAccountFields[1].className, invalidAccountFields[2].className], [3, 'shin-form-field', 'shin-form-field is-invalid', 'shin-form-field']);
+  check(so, 'Cau hinh ma khach FBM dung StandaloneField va to do o thieu', [invalidAccountFields.length, invalidAccountFields[0].className, invalidAccountFields[1].className], [2, 'shin-form-field', 'shin-form-field is-invalid']);
   hop.FBM_SYNC_CLIENT.accountSettingsInvalid = {};
   hop.fbmSyncConfigStartEdit('identity');
   const identityBlock = hop.fbmSyncIdentityBlock(idle);
@@ -471,6 +471,10 @@ async function chay(so) {
   const firstScheduleRow = backgroundBlocks.find((node) => node && String(node.className || '').indexOf('shin-sync-schedule-row') >= 0);
   const detailBlock = backgroundBlocks.find((node) => node && String(node.className || '').indexOf('shin-sync-detail-controls') >= 0);
   check(so, 'background layout order and detail groups', [backgroundToggleIndex < directionIndex, backgroundBlocks[backgroundToggleIndex].role, backgroundBlocks[directionIndex].className.indexOf('shin-sync-direction-row') >= 0, firstScheduleRow.role, firstScheduleRow.elements[1].className, detailBlock.role, detailBlock.elements.length, detailBlock.elements[0].className], [true, 'row', true, 'row', 'shin-kv-label', 'box', 2, 'shin-row-group shin-sync-detail-field']);
+  const backgroundTexts = JSON.stringify(backgroundBlocks), detailIndex = backgroundBlocks.indexOf(detailBlock);
+  check(so, 'Lịch đồng bộ nền: dòng giải thích công tắc tiến trình nằm dưới nhóm số khách Vòng xoay, ngay trên nút lưu; dòng giải thích Vòng xoay không còn trần 50', [
+    String(backgroundBlocks[detailIndex + 1] && backgroundBlocks[detailIndex + 1].text || ''), backgroundTexts.indexOf('đến 50') < 0 && backgroundTexts.indexOf('quá 50') < 0, backgroundTexts.indexOf('không giới hạn trên') >= 0
+  ], [hop.FBM_SYNC_SETTINGS_SCHEMA.background.processesHelp, true, true]);
   const moduleBlocks = hop.fbmSyncSettingsModuleBlocks({ approvalThreshold: 10, requestGapMinSeconds: 1, requestGapMaxSeconds: 3 }, true);
   const gapBlock = moduleBlocks.find((node) => node && node.elements && node.elements[1] && String(node.elements[1].className || '').indexOf('shin-sync-detail-inputs') >= 0);
   const gapInputs = gapBlock ? gapBlock.elements[1].elements.map((field) => field.elements[1]) : [];
@@ -628,6 +632,14 @@ async function chay(so) {
   const stoppingAction = hop.fbmSyncRunActionBlock({ phase: 'pull_customer', masterEnabled: true, enabled: true });
   check(so, 'Sidebar khóa nút và báo đang dừng trong lúc chờ response cuối', [stoppingAction.disabled, stoppingAction.label.indexOf('Đang dừng') >= 0], [true, true]);
   hop.FBM_SYNC_CLIENT.cancelRequested = false;
+  // Bấm chạy tay khi lượt nền đang chạy: GAS báo SYNC_BACKGROUND_STOPPING, Sidebar chờ lượt nền nhả cursor rồi mới mở lượt tay.
+  const savedStartServer = hop.fbmSyncStartServer, savedWaitStop = hop.fbmSyncWaitForBackgroundStop;
+  let nutKhiCho = null;
+  hop.fbmSyncStartServer = () => Promise.resolve({ ok: false, code: 'SYNC_BACKGROUND_STOPPING', status: { phase: 'pull_activity', masterEnabled: true, enabled: true } });
+  hop.fbmSyncWaitForBackgroundStop = () => { const nut = hop.fbmSyncRunActionBlock({ phase: 'pull_activity', masterEnabled: true, enabled: true }); nutKhiCho = [nut.disabled, nut.label]; return Promise.resolve({ ok: true }); };
+  await hop.fbmSyncRunStart('read');
+  hop.fbmSyncStartServer = savedStartServer; hop.fbmSyncWaitForBackgroundStop = savedWaitStop;
+  check(so, 'Bấm chạy tay khi lượt nền đang chạy: nút khóa và hiện "Đang dừng đồng bộ nền..." trong lúc chờ; lượt tay xong thì nút mở lại', [nutKhiCho, hop.FBM_SYNC_CLIENT.backgroundStopping, hop.fbmSyncRunActionBlock({ phase: 'idle', masterEnabled: true, enabled: true }).disabled], [[true, 'Đang dừng đồng bộ nền...'], false, false]);
   hop.fbmSyncPaint = cancelPaint;
 
   const loginButton = dom.document.createElement('button');

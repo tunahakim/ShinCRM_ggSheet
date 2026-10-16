@@ -64,7 +64,7 @@ function workflowGas(options) {
     'fbm_sync/auth/AutoLogin.js',
     'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js',
     'fbm_sync/transport/PushFlow.js',
-    'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js',
+    'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js',
     'fbm_sync/transport/EntryPoints.js',
     'server/service/FbmSyncService.js',
     'server/dev/FbmSyncStateProbe.js'
@@ -148,16 +148,21 @@ function executorRaw(reply, requestId) {
   };
 }
 
-/** Chạy lô như service worker: từng phần tử qua executor thật với hạn fetch của lô; `itemReply` trả `{ body }` hoặc `{ raw }` để giả lỗi HTTP một khách. */
+/**
+ * Chạy lô như service worker: từng phần tử qua executor thật với hạn fetch của lô; `itemReply` trả `{ body }` hoặc `{ raw }` để giả lỗi HTTP một khách.
+ * Vết của lô là vết executor thật trả về, như `executeBatch`; không tự điền mã lô, để test bắt được executor đóng dấu sai mã request.
+ */
 async function sendBatchThroughExecutor(envelope, itemReply) {
   const items = [];
+  let trace = [];
   for (const item of envelope.items) {
     const reply = itemReply(item);
-    if (reply.raw) { items.push(Object.assign({ id: item.id }, reply.raw)); continue; }
+    if (reply.raw) { items.push(Object.assign({ id: item.id }, reply.raw)); trace = trace.concat([{ stage: 'executor_response_sent', requestId: String(item.meta.trace.requestId) }]); continue; }
     const result = (await sendThroughExecutor(Object.assign({}, item, { meta: Object.assign({}, item.meta, { fetchMs: envelope.meta.fetchMs }) }), reply.body)).reply.result || {};
+    trace = trace.concat(result.transport && result.transport.trace || []);
     items.push({ id: item.id, ok: result.ok === true, status: Number(result.status || 0), headers: result.headers || {}, body: String(result.body || '') });
   }
-  return { ok: true, status: 200, items, transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId: String(envelope.id) }] } };
+  return { ok: true, status: 200, items, transport: { contract: MA_HOP_DONG, trace } };
 }
 
 function relayResponse(value) {
@@ -360,23 +365,15 @@ async function chay(so) {
     detail: { enabled: true, minutes: 60, customersPerRun: 50, minDelaySeconds: 0.5, maxDelaySeconds: 2 }
   });
   check(so, 'Lịch nền lưu chiều hai chiều và số khách mỗi phiên; khoảng nghỉ cũ của lịch nền bị bỏ, không còn lưu', [directionSchedule.schedule.direction, directionSchedule.schedule.detail.enabled, directionSchedule.schedule.detail.customersPerRun, 'minDelaySeconds' in directionSchedule.schedule.detail, 'maxDelaySeconds' in scheduleFlow.hop.FbmSync.backgroundScheduleRead().detail, scheduleFlow.hop.FbmSync.backgroundEnabled()], ['write', true, 50, false, false, true]);
-  const detailCursor = scheduleFlow.hop.FbmSync.detailCursorWrite({ pageIndex: 1, pageValue: ['2026-09-16', '2026-09-16T10:00:00', '50', 'CUS-50'] });
-  check(so, 'Cursor detail được lưu bền vững chỉ với đủ bốn giá trị khóa trang', [detailCursor.pageIndex, scheduleFlow.hop.FbmSync.detailCursorRead().pageValue.join('|')], [1, '2026-09-16|2026-09-16T10:00:00|50|CUS-50']);
-  const detailState = { scan: 'detail', detailCustomerLimit: 50, cursor: { pageIndex: 1, count: 50, seen: 0 } };
-  const detailRows = Array.from({ length: 50 }, (_, index) => ({ ngay_gd: '2026-09-16', datetime0: String(index), xorder: String(index), stt_rec_kh: 'CUS-' + (index + 1) }));
-  const detailNext = scheduleFlow.hop.FbmSync.customerNext(detailState, scheduleFlow.hop.FbmSync.customerPageOf(detailRows), 120);
-  check(so, 'Trang detail đủ batch không đánh dấu hết danh sách và lưu trang kế tiếp', [detailNext, scheduleFlow.hop.FbmSync.detailCursorRead().pageIndex, scheduleFlow.hop.FbmSync.detailCursorRead().pageValue[2]], [false, 2, '49']);
-  scheduleFlow.hop.FbmSync.customerNext({ scan: 'detail', detailCustomerLimit: 50, cursor: { pageIndex: 2, count: 50, seen: 0 } }, scheduleFlow.hop.FbmSync.customerPageOf([]), 120);
-  check(so, 'Trang detail rỗng xóa cursor để lượt sau bắt đầu lại an toàn', scheduleFlow.hop.FbmSync.detailCursorRead(), null);
-  const batchLimitFlow = workflowGas();
-  batchLimitFlow.hop.FbmSync.prepareCategoryGate = () => ({ map: {}, valid: {}, warnings: [] });
-  batchLimitFlow.hop.FbmSync.start({ mode: 'read', origin: 'background', scan: 'detail', detail: { customersPerRun: 3 } });
-  const batchState = batchLimitFlow.hop.FbmSync.stateRead();
-  const firstBatchRequest = batchLimitFlow.hop.FbmSync.beginCustomerPull(batchLimitFlow.hop.FbmSync.stateRead());
-  const batchRows = [1, 2, 3].map((index) => ({ ngay_gd: '2026-09-16', datetime0: String(index), xorder: String(index), stt_rec_kh: 'CUS-' + index }));
-  const secondBatchRequest = batchLimitFlow.hop.FbmSync.customerNext(batchLimitFlow.hop.FbmSync.stateRead(), batchLimitFlow.hop.FbmSync.customerPageOf(batchRows), 10);
-  const batchCursor = batchLimitFlow.hop.FbmSync.detailCursorRead();
-  check(so, 'Số Customer mỗi lượt = 3 được áp dụng và cursor đến Customer thứ 4', [batchState.detailCustomerLimit, firstBatchRequest.body.count, secondBatchRequest, batchCursor.pageIndex, batchCursor.pageValue[2]], [3, 3, false, 1, '3']);
+  const cursorTruoc = scheduleFlow.hop.FbmSync.detailCursorRead();
+  scheduleFlow.documentProperties.setProperty(scheduleFlow.hop.FbmSync.DETAIL_CURSOR_KEY, JSON.stringify({ pageIndex: 1, pageValue: ['2026-09-16', '2026-09-16T10:00:00', '50', 'CUS-50'] }));
+  const cursorKieuCu = scheduleFlow.hop.FbmSync.detailCursorRead();
+  scheduleFlow.hop.FbmSync.detailCursorWrite(42);
+  check(so, 'Cursor Vòng xoay là số CUS: chưa có hoặc còn kiểu khóa trang FBM cũ thì là -1 (bắt đầu từ CUS nhỏ nhất), ghi 42 đọc lại 42', [cursorTruoc, cursorKieuCu, scheduleFlow.hop.FbmSync.detailCursorRead()], [-1, -1, 42]);
+  const nhieuKhach = scheduleFlow.hop.FbmSync.backgroundScheduleSave({ detail: { enabled: true, minutes: 60, customersPerRun: 300 } });
+  let loiSoKhach = '';
+  try { scheduleFlow.hop.FbmSync.backgroundScheduleSave({ detail: { enabled: true, minutes: 60, customersPerRun: 0 } }); } catch (error) { loiSoKhach = error.message; }
+  check(so, 'Số khách mỗi phiên Vòng xoay không còn trần 50: lưu 300 đọc lại 300; 0 bị từ chối', [nhieuKhach.schedule.detail.customersPerRun, scheduleFlow.hop.FbmSync.backgroundScheduleRead().detail.customersPerRun, loiSoKhach], [300, 300, 'Số khách mỗi lượt vòng xoay phải là số nguyên từ 1 trở lên.']);
   // Chiều đẩy kiểm lại danh mục FBM giữa các lô: FBM đổi tên một mã giữa lượt thì chỉ bản ghi dùng mã đó bị chặn.
   const categoryPushRun = (options) => {
     const flow = workflowGas(), F = flow.hop.FbmSync, logs = [], sheetSaves = [], fbmNames = { WEB: 'Web', HDDV: 'Hóa đơn dịch vụ' }, lookupAt = [], issued = [];
@@ -689,8 +686,6 @@ async function chay(so) {
   scheduleFlow.hop.FbmSync.backgroundScheduleSave({ heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: true, minutes: 30 } });
   const startup = scheduleFlow.hop.FbmSync.heartbeatRequest({ source: 'startup' });
   check(so, 'Chrome startup co the hoi GAS ngay mot luot theo cau hinh', [startup.ok, startup.code, startup.request && startup.request.meta.kind], [true, 'HEARTBEAT_REQUEST_READY', 'heartbeat']);
-  scheduleFlow.hop.FbmSync.accountSettingsSave({ customerPrefix: 'ALT', customerCodeLength: '8', activitySince: '2026-01-01' });
-  check(so, 'Request giao dịch mọi khách gắn mốc activitySince của tài khoản', scheduleFlow.hop.FbmSync.activityBulkRequest({ type: 0, count: 100, gridPageIndex: -1 }).body.filter, ['end_date:>=01/01/2026']);
   const waitFlow = workflowGas({ extraFiles: ['server/gate/IdGate.js', 'fbm_sync/state/SyncSettings.js'] });
   waitFlow.hop.FbmSync.syncSettingsSave({ scopeLimited: false });
   waitFlow.hop.FbmSync.syncSettingsSave({ requestGapMinSeconds: 1, requestGapMaxSeconds: 3 });
@@ -782,7 +777,7 @@ async function chay(so) {
     { ok: true, request: { id: 'open-heartbeat', url: 'https://fbo.com.vn:8888/service', method: 'POST', bodyText: '{}', meta: { timeoutMs: 30000, openFbmContext: { url: 'https://fbo.com.vn:8888/Main/zccrAccount.aspx', active: false } } } },
     { ok: true, code: 'HEARTBEAT_COMPLETE', request: null }
   ], [], (tabId, message) => {
-    if (message.type === 'FBM_PING_V2') { return { ready: true, version: '21.21' }; }
+    if (message.type === 'FBM_PING_V2') { return { ready: true, version: '21.22' }; }
     if (message.type === 'FBM_EXECUTE_V2') { return { result: { ok: true, status: 200, body: '{"d":{"TotalRowCount":12,"Rows":[]}}', transport: { trace: [{ stage: 'executor_response_sent', requestId: message.request.id }] } } }; }
     return null;
   });
@@ -794,7 +789,7 @@ async function chay(so) {
     { ok: true, request: { id: 'heartbeat-envelope', url: 'https://fbo.com.vn:8888/service', method: 'POST', bodyText: '{"from":"gas"}', meta: { timeoutMs: 30000, gasReplyMs: 390000 } } },
     { ok: true, code: 'HEARTBEAT_COMPLETE', request: null }
   ], [{ id: 17 }], (tabId, message) => {
-    if (message.type === 'FBM_PING_V2') { return { ready: true, version: '21.21' }; }
+    if (message.type === 'FBM_PING_V2') { return { ready: true, version: '21.22' }; }
     if (message.type === 'FBM_EXECUTE_V2') {
       return { result: { ok: true, status: 200, body: rawHeartbeat, transport: { trace: [{ stage: 'executor_response_sent', requestId: message.request.id }] } } };
     }
@@ -883,7 +878,7 @@ async function chay(so) {
         body = JSON.stringify({ d: [['CODE', 'Ten danh muc']] });
       } else if (kind === 'scan_chunk') {
         body = '';
-      } else if ((kind === 'grid' || kind === 'scan_job') && request.meta.entity === 'customer') {
+      } else if ((kind === 'grid' || kind === 'scan_job' || kind === 'customer_count') && request.meta.entity === 'customer') {
         // FBM phân trang keyset: trang kế bắt đầu sau dòng có đúng bốn giá trị khóa đã gửi, ngày ở dạng `/Date(ms)/`; khóa lệch thì trả trang rỗng. Chỉ trang đầu báo `TotalRowCount` (Nghiên cứu FBM ch03 mục 3.3, ch04 mục 4.10).
         const pageSize = Number(request.body.count), pageValue = request.body.gridPageValue, khoa = ['ngay_gd', 'datetime0', 'xorder', 'stt_rec_kh'].map((field) => fullCustomerFields.indexOf(field));
         // Trang sau chỉ có dữ liệu khi request mô tả đúng dòng cuối trang đang đứng và tổng số dòng, như FBM thật (yyyyMMdd theo giờ Việt Nam).
@@ -949,7 +944,7 @@ async function chay(so) {
     ui.content.textContent.indexOf('Hoàn tất') >= 0
   ], [
     true, null, 'done', 2, 2, 2,
-     ['session_probe:user', 'authorize:customer', 'authorize:activity', 'scan_job:customer', 'batch:activity'],
+     ['session_probe:user', 'authorize:customer', 'authorize:activity', 'scan_job:customer', 'batch:activity', 'customer_count:customer'],
     0, true, 4, true
   ]);
   const checkRun = await fullPipeline(false, 'check');
@@ -1055,10 +1050,10 @@ async function chay(so) {
     readStep = readFlow.hop.FbmSync.continue(executorRaw(throughExtension.reply, request.id));
   }
   check(so, 'phiên rỗng: Extension chỉ chuyển request đọc, không phát request ghi hoặc xóa và pipeline kết thúc', [
-    readKinds, readKinds.length, readKinds.every((kind) => ['session_probe:user', 'authorize:customer', 'authorize:activity', 'completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH', 'completion:@CAT_CONG_VIEC', 'scan_job:customer'].indexOf(kind) >= 0), readStep.ok, readStep.request || null, readStep.status.phase, readFlow.hop.FbmSync.stateRead().counts.succeeded
+    readKinds, readKinds.length, readKinds.every((kind) => ['session_probe:user', 'authorize:customer', 'authorize:activity', 'completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH', 'completion:@CAT_CONG_VIEC', 'scan_job:customer', 'customer_count:customer'].indexOf(kind) >= 0), readStep.ok, readStep.request || null, readStep.status.phase, readFlow.hop.FbmSync.stateRead().counts.succeeded
   ], [[
-     'session_probe:user', 'authorize:customer', 'authorize:activity', 'scan_job:customer'
-  ], 4, true, true, null, 'done', 0]);
+     'session_probe:user', 'authorize:customer', 'authorize:activity', 'scan_job:customer', 'customer_count:customer'
+  ], 5, true, true, null, 'done', 0]);
 
   // Extension cũ không ghi mã hợp đồng vào response; trang Customer có khách thật vẫn không được đi tới cửa ghi Sheet.
   const contractRun = async (contract) => {
@@ -1157,10 +1152,16 @@ async function chay(so) {
 
   const stale = workflowGas();
   const staleStarted = stale.hop.FbmSync.start({ mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true });
+  const staleLogs = [];
+  stale.hop.logEvent = (event) => staleLogs.push(event);
   const staleResult = stale.hop.FbmSync.continue({ ok: true, status: 200, body: userResponse, transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId: 'old-request' }] } });
   check(so, 'response cu khong duoc phep mo bat ky buoc pipeline nao', [
     staleResult.ok, staleResult.code, stale.hop.FbmSync.stateRead().activeRequestId === staleStarted.request.id
   ], [false, 'STALE_RESPONSE', true]);
+  const staleLog = staleLogs.find((event) => event.action === 'stale_response') || {};
+  check(so, 'Response bị bỏ vì không thuộc request đang chờ: có dòng Log lỗi ghi mã request đang chờ và mã response, không ghi nội dung response', [
+    staleLog.outcome, staleLog.detail && staleLog.detail.responseRequestId, staleLog.detail && staleLog.detail.activeRequestId === staleStarted.request.id, JSON.stringify(staleLog).indexOf('ANHLT') < 0
+  ], ['error', 'old-request', true, true]);
 
   const manualTransport = workflowGas();
   const manualStarted = manualTransport.hop.FbmSync.start({ mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true });

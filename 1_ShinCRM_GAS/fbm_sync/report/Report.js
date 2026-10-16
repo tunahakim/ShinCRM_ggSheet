@@ -52,7 +52,7 @@ FbmSync.pipelineDefinition = function (state) {
     return { kind: 'login_test', steps: [{ id: 'login', label: 'Đăng nhập FBM' }, { id: 'session', label: 'Kiểm tra phiên' }, { id: 'identity', label: 'Xác minh tài khoản' }] };
   }
   if (scan === 'activity_bulk') { return { kind: 'activity_bulk', steps: [{ id: 'session', label: 'Kiểm tra phiên FBM' }, { id: 'category', label: 'Category' }, { id: 'activity', label: 'Đọc Activity' }, { id: 'reconcile', label: 'Đối soát' }, { id: 'sheet', label: 'Cập nhật Sheet' }] }; }
-  if (scan === 'detail') { return { kind: 'detail', steps: [{ id: 'session', label: 'Kiểm tra phiên FBM' }, { id: 'category', label: 'Category' }, { id: 'customer', label: 'Đọc Customer theo lô' }, { id: 'activity', label: 'Đọc Activity chi tiết' }, { id: 'reconcile', label: 'Đối soát' }] }; }
+  if (scan === 'detail') { return { kind: 'detail', steps: [{ id: 'session', label: 'Kiểm tra phiên FBM' }, { id: 'category', label: 'Category' }, { id: 'activity', label: 'Đọc Activity theo vòng xoay' }, { id: 'reconcile', label: 'Đối soát' }] }; }
   if (mode === 'push') { return { kind: 'push', steps: [{ id: 'session', label: 'Kiểm tra phiên FBM' }, { id: 'category', label: 'Category' }, { id: 'record', label: 'Kiểm tra bản ghi' }, { id: 'form', label: 'Mở form FBM' }, { id: 'write', label: 'Ghi FBM' }, { id: 'verify', label: 'Đọc xác nhận' }, { id: 'baseline', label: 'Cập nhật baseline' }] }; }
   var pull = [{ id: 'session', label: 'Kiểm tra phiên FBM' }, { id: 'category', label: 'Category' }, { id: 'customer', label: 'Đọc Customer' }, { id: 'activity', label: 'Đọc Activity' }, { id: 'reconcile', label: 'Đối soát' }];
   if (mode !== 'check') { pull.push({ id: 'sheet', label: 'Cập nhật Sheet' }); }
@@ -69,7 +69,7 @@ FbmSync.pipelineCurrentStep = function (state, definition) {
   if (kind === 'lookup') { return available.category ? 'category' : ''; }
   if (kind === 'login_identity_authorize') { return available.session ? 'session' : 'login'; }
   if (kind === 'identity_user_grid' || kind === 'login_identity_user') { return available.identity ? 'identity' : 'session'; }
-  if (kind === 'customer_grid' || kind === 'activity_rotation_customer_grid') { return available.customer ? 'customer' : ''; }
+  if (kind === 'customer_grid') { return available.customer ? 'customer' : ''; }
   if (kind === 'activity_grid' || kind === 'activity_recheck' || (kind === 'scan_job' && cursor.entity === 'activity')) { return available.activity ? 'activity' : ''; }
   if (kind === 'push_scan') { return available.record ? 'record' : ''; }
   if (/(?:customer|activity)_(?:create|edit)_open$/.test(kind)) { return available.form ? 'form' : ''; }
@@ -158,6 +158,15 @@ FbmSync.shouldLogStatus = function (before, after) {
   if (!after) { return false; }
   var phase = String(after.phase || '');
   return phase === 'error' || phase === 'done' || phase === 'paused' || phase === 'conflict' || !before || String(before.phase || '') !== phase || String(before.entity || '') !== String(after.entity || '');
+};
+/**
+ * Response bị bỏ vì không thuộc request đang chờ: không đổi state (lượt đang chạy vẫn là của request khác) nhưng phải có dòng Log, vì response bị bỏ lặp lại là lượt kẹt không ai thấy.
+ * Chỉ ghi mã request, không ghi nội dung response.
+ */
+FbmSync.logStaleResponse = function (state, responseRequestId, action) {
+  if (typeof logEvent !== 'function') { return; }
+  var current = state || {};
+  logEvent({ source: 'fbm_sync', action: action || 'stale_response', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(current.runId || ''), reason: 'Bỏ response FBM vì không thuộc request đang chờ; lượt giữ nguyên cursor và chờ lần hỏi sau.', detail: { code: 'STALE_RESPONSE', runId: String(current.runId || ''), phase: String(current.phase || ''), cursor: String(current.cursor && current.cursor.kind || ''), activeRequestId: String(current.activeRequestId || ''), responseRequestId: String(responseRequestId || '') } });
 };
 /** Ghi lỗi vận chuyển khi Sidebar không nhận được response từ Extension. */
 FbmSync.logTransportError = function (message, action) {

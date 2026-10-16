@@ -1,8 +1,10 @@
 /* Cầu nối FBM: nhận request, fetch trong tab đăng nhập, trả response thô. */
 (function () {
-  var EXECUTOR_VERSION = '21.21';
+  var EXECUTOR_VERSION = '21.22';
+  /** Mã request trong vết là mã GAS cấp (`meta.trace.requestId`); phần tử lô có `id` chỉ là thứ tự trong lô, dùng nó thì GAS coi response là cũ và bỏ. */
   function traceEvent(trace, stage, request, extra) {
-    trace.push(Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {}));
+    var reservation = request && request.meta && request.meta.trace && request.meta.trace.requestId;
+    trace.push(Object.assign({ at: Date.now(), stage: stage, requestId: String(reservation || request && request.id || '') }, extra || {}));
   }
   function requestBody(req) {
     if (typeof req.bodyText === 'string') { return req.bodyText; }

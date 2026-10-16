@@ -9,13 +9,17 @@ FbmSync.ACTIVITY_BULK_STORE = 'activity_bulk';
 // Mã lỗi Extension báo khi một request lấy cả khoảng thời gian là quá sức; lỗi phiên và lỗi mạng khác không đổi cách lấy.
 FbmSync.ACTIVITY_WINDOW_CODES = ['FBM_SCAN_TOO_LARGE', 'FBM_SCAN_UNPARSEABLE', 'FBM_FETCH_TIMEOUT'];
 
-/** Giao dịch tầng này theo dõi: có FBM ID, không phải tombstone, dòng tạm hay nằm trước mốc `activitySince`. Một chỗ cho cả danh sách id gửi Extension lẫn luật "không thấy". */
-FbmSync.activityBulkTracked = function (record) {
-  return !!String(record && record.fbmId || '').trim() && String(record.recordStatus || 'active') !== 'deleted' && !FbmSync.isTemporaryRecord('activity', record) && FbmSync.activitySinceAllows(record);
+/** Giao dịch tầng này theo dõi: có FBM ID, không phải tombstone hay dòng tạm. Một chỗ cho cả danh sách id gửi Extension lẫn luật "không thấy". */
+/** Bộ lọc giao dịch lớp 1 theo dõi; giao dịch của khách chặn chiều lấy về không vào tập id gửi FBM nên cũng không bao giờ bị gắn cờ "không thấy". */
+FbmSync.activityBulkTracker = function () {
+  var pullAllowed = FbmSync.pullAllowedReader('activity');
+  return function (record) {
+    return !!String(record && record.fbmId || '').trim() && String(record.recordStatus || 'active') !== 'deleted' && !FbmSync.isTemporaryRecord('activity', record) && pullAllowed(record);
+  };
 };
 
 FbmSync.activityKeepIds = function (local) {
-  return (local || []).filter(FbmSync.activityBulkTracked).map(function (record) { return String(record.fbmId).trim(); });
+  return (local || []).filter(FbmSync.activityBulkTracker()).map(function (record) { return String(record.fbmId).trim(); });
 };
 
 /** Khóa ngày cộng số ngày, theo lịch UTC để không lệch vì giờ mùa hè hay múi giờ máy chạy. */
@@ -24,7 +28,7 @@ FbmSync.dayKeyAdd = function (key, days) {
   return new Date(Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]) + Number(days))).toISOString().slice(0, 10);
 };
 
-/** Cửa sổ thứ `windowIndex`: cửa sổ đầu không chặn dưới (chỉ mốc `activitySince`), cửa sổ chứa hôm nay không chặn trên, để giao dịch ngày tương lai hay đổi về trước ngày sớm nhất vẫn nằm trong một cửa sổ. */
+/** Cửa sổ thứ `windowIndex`: cửa sổ đầu không chặn dưới, cửa sổ chứa hôm nay không chặn trên, để giao dịch ngày tương lai hay đổi về trước ngày sớm nhất vẫn nằm trong một cửa sổ. */
 FbmSync.activityWindow = function (cursor) {
   var days = FbmSync.BUDGET.activityWindowDays, index = Number(cursor.windowIndex || 0), start = String(cursor.windowStart || '');
   var to = FbmSync.dayKeyAdd(start, (index + 1) * days - 1), last = to >= FbmSync.activityDateKey(new Date());
@@ -33,14 +37,13 @@ FbmSync.activityWindow = function (cursor) {
 
 /** Bộ lọc ngày của cửa sổ theo đúng mẫu FBM: hai đầu đều lấy ngày biên, nên cửa sổ sau bắt đầu từ ngày kế ngày cuối cửa sổ trước. */
 FbmSync.activityWindowFilters = function (cursor) {
-  var window = FbmSync.activityWindow(cursor), since = String(FbmSync.scriptSettings().activitySince || '').trim();
-  var lower = FbmSync.activitySinceFilterDate(window.from || since), upper = FbmSync.activitySinceFilterDate(window.to);
+  var window = FbmSync.activityWindow(cursor), lower = FbmSync.fbmFilterDate(window.from), upper = FbmSync.fbmFilterDate(window.to);
   if (lower && upper) { return ['end_date:>=' + lower + '\u0000<=' + upper + '\u0000']; }
   if (lower) { return ['end_date:>=' + lower]; }
   return upper ? ['end_date:<=' + upper] : [];
 };
 
-/** Request FBM của việc quét giao dịch; cursor chế độ cửa sổ thì lọc theo cửa sổ, không thì lấy cả khoảng từ mốc `activitySince`. */
+/** Request FBM của việc quét giao dịch; cursor chế độ cửa sổ thì lọc theo cửa sổ, không thì lấy mọi giao dịch. */
 FbmSync.activityScanRequest = function (cursor) {
   return FbmSync.activityBulkRequest({ type: 0, count: FbmSync.BUDGET.scanActivityRows, gridPageIndex: -1, gridRefresh: false, filter: cursor.window ? FbmSync.activityWindowFilters(cursor) : [] });
 };
@@ -55,9 +58,10 @@ FbmSync.beginActivityBulkPull = function (state) {
   var local = FbmSync.readLocal('activity');
   state.metadata = state.metadata || {};
   state.metadata.activityBulk = { windows: 0, missing: 0 };
-  if (!local.some(FbmSync.activityBulkTracked)) {
+  if (!local.some(FbmSync.activityBulkTracker())) {
     state.cursor = { kind: 'activity_bulk_done' };
-    return state.scan === 'full' ? null : FbmSync.activityBulkSupplement(state);
+    if (state.scan !== 'full') { FbmSync.activityBulkRunDone(state); }
+    return null;
   }
   FbmSync.seenStoreBegin(FbmSync.ACTIVITY_BULK_STORE, local);
   FbmSync.scanJobOpen(state, { entity: 'activity', page: 0, window: false });
@@ -68,9 +72,9 @@ FbmSync.beginActivityBulkPull = function (state) {
 
 /** Ngày sớm nhất của giao dịch đang theo dõi, làm mốc cửa sổ; không đọc được ngày nào thì lấy hôm nay (một cửa sổ mở hai đầu). */
 FbmSync.activityWindowStart = function () {
-  var first = '';
+  var first = '', tracked = FbmSync.activityBulkTracker();
   FbmSync.readLocal('activity').forEach(function (record) {
-    if (!FbmSync.activityBulkTracked(record)) { return; }
+    if (!tracked(record)) { return; }
     var key = FbmSync.activityDateKey(record.workDate);
     if (key && (!first || key < first)) { first = key; }
   });
@@ -163,9 +167,10 @@ FbmSync.activityScanChunk = function (state, cursor, rawResponse) {
 FbmSync.activityRecheckNext = function (state) {
   var cursor = state.cursor, hasSeen = FbmSync.seenStoreReader(FbmSync.ACTIVITY_BULK_STORE), from = Number(cursor.recheckFrom || 0), picked = [];
   if (!(cursor.recheck || []).length) {
+    var tracked = FbmSync.activityBulkTracker();
     FbmSync.readLocal('activity').forEach(function (record) {
       var index = FbmSync.seenStoreIndex(FbmSync.ACTIVITY_BULK_STORE, record);
-      if (index >= from && FbmSync.activityBulkTracked(record) && !hasSeen(record)) { picked.push(index); }
+      if (index >= from && tracked(record) && !hasSeen(record)) { picked.push(index); }
     });
     picked.sort(function (a, b) { return a - b; });
     cursor.recheck = picked.slice(0, FbmSync.BUDGET.activityBatchCustomers);
@@ -226,9 +231,9 @@ FbmSync.activityRecheckContinue = function (state, cursor, rawResponse) {
   return FbmSync.activityBulkEnd(FbmSync.stateRead(), { imported: imported });
 };
 
-/** Lớp 1 đã nhận đủ: gắn cờ "không thấy", ghi Log một dòng tổng, rồi chốt lượt (gói quét) hoặc sang phần bổ sung (lượt lấy giao dịch chạy nền). */
+/** Lớp 1 đã nhận đủ: gắn cờ "không thấy", ghi Log một dòng tổng, rồi chốt lượt (gói quét) hoặc kết thúc lượt lấy toàn bộ giao dịch chạy nền. */
 FbmSync.activityBulkEnd = function (state, extra) {
-  // Ghi state của lời gọi trước khi gắn cờ: bước gắn cờ đọc mốc giao dịch từ state trong kho.
+  // Ghi state của lời gọi trước khi gắn cờ: bước gắn cờ đọc state trong kho.
   FbmSync.stateWrite(state);
   var marked = FbmSync.markMissingAfterFullScan('activity', state, FbmSync.seenStoreReader(FbmSync.ACTIVITY_BULK_STORE)), missing = { total: Number(marked.missing || 0), sample: marked.sample || [] };
   state.metadata.activityBulkMissing = missing.sample;
@@ -242,26 +247,13 @@ FbmSync.activityBulkEnd = function (state, extra) {
     FbmSync.stateWrite(state);
     return FbmSync.pullFinishOrPush(state, result);
   }
-  var request = FbmSync.activityBulkSupplement(state);
-  FbmSync.stateWrite(state);
-  return Object.assign({ ok: true, request: request ? FbmSync.nextEnvelope(request) : null, status: FbmSync.statusView() }, result);
+  FbmSync.activityBulkRunDone(state);
+  return Object.assign({ ok: true, request: null, status: FbmSync.statusView() }, result);
 };
 
-/** Lượt lấy giao dịch chạy nền: sau lớp 1 tìm khách có giao dịch mới hơn mốc trên Sheet, rồi xoay vòng khách để bắt giao dịch tạo lùi ngày; hết thì chốt lượt. */
-FbmSync.activityBulkSupplement = function (state) {
-  var catchupRequest = typeof FbmSync.activityCatchupCustomerRequest === 'function' ? FbmSync.activityCatchupCustomerRequest() : null;
-  if (catchupRequest) {
-    state.cursor = { kind: 'activity_catchup_customer_grid' };
-    state.message = 'Đang tìm Customer có giao dịch mới hơn mốc local...';
-    return catchupRequest;
-  }
-  var rotationRequest = typeof FbmSync.activityRotationCustomerRequest === 'function' ? FbmSync.activityRotationCustomerRequest() : null;
-  if (rotationRequest) {
-    state.cursor = { kind: 'activity_rotation_customer_grid' };
-    state.message = 'Đang xoay 30 Customer để bắt giao dịch tạo lùi ngày...';
-    return rotationRequest;
-  }
+/** Lượt "Lấy toàn bộ giao dịch" chỉ gồm lớp 1 (09/02 Phần 3): xong lớp 1 là xong lượt; giao dịch mới thuộc lớp 2, 3 của Quét nhanh và lớp 4 của Vòng xoay. */
+FbmSync.activityBulkRunDone = function (state) {
   state.cursor = {}; state.phase = 'done'; state.entity = '';
   state.message = FbmSync.runDoneMessage(state);
-  return null;
+  FbmSync.stateWrite(state);
 };

@@ -217,7 +217,8 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── transport\PushFlow.js    Điều phối chiều đẩy và khóa an toàn trước khi ghi FBM.
     ├── transport\PullFlow.js    Điều phối preflight, đọc Customer và đọc Activity.
     ├── transport\ScanJob.js     Việc quét: cấp scan_job/scan_chunk, đối chiếu gói với cursor, chạy lại khi tab mất việc.
-    ├── transport\ActivityScan.js Lấy toàn bộ giao dịch bằng việc quét giữ id đã biết: chia khoảng ngày khi quá lớn, đọc lại theo id trước khi gắn cờ "không thấy", phần bổ sung của lượt nền.
+    ├── transport\CustomerCount.js Bước đếm khách cuối lượt và thân Giữ phiên: số khách mốc, request đếm cùng bộ lọc với lượt lấy danh sách, lệch mốc thì chạy Quét nhanh.
+    ├── transport\ActivityScan.js Lấy toàn bộ giao dịch bằng việc quét giữ id đã biết: chia khoảng ngày khi quá lớn, đọc lại theo id trước khi gắn cờ "không thấy".
     ├── transport\ActivityBatch.js Lô giao dịch nhiều khách một lần gọi GAS: kế hoạch lô trong cursor, vị trí trang ở khóa riêng, lỗi từng khách.
     ├── transport\EntryPoints.js Entry point cho Sidebar, DEV runner và Web App relay.
     ├── control\ControlPort.js  Cổng lệnh trung lập và DTO thông báo; adapter kênh không chứa nghiệp vụ.
@@ -228,7 +229,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── state\RecordLocks.js      Khóa bản ghi và kiểm tra revision.
     ├── state\Scheduler.js        Lịch heartbeat/quét, không gọi FBM trực tiếp.
     ├── read\GridRead.js          Grid metadata, phân trang và category request.
-    ├── read\ActivityLayers.js    Chọn khách cần đọc giao dịch theo gói quét: lớp 2 so giao dịch cuối, lớp 3 quét từ khách mới nhất xuống; tập khách và thứ tự ở khóa riêng theo số CUS.
+    ├── read\ActivityLayers.js    Chọn khách cần đọc giao dịch theo gói quét: lớp 2 so giao dịch cuối, lớp 3 quét từ khách mới nhất xuống, lớp 4 Vòng xoay đi theo số CUS; tập khách và thứ tự ở khóa riêng theo số CUS.
     ├── write\RequestBuilders.js  Builder Customer/Activity create/edit.
     ├── write\PushCandidates.js   Chọn record local và kiểm điều kiện trước khi đẩy.
     ├── write\SheetSave.js        Cửa ghi Sheet duy nhất của module đồng bộ; ghi thất bại thì ném lỗi.
@@ -332,8 +333,11 @@ tests\
     │   ├── Preflight.js            Kiểm cổng điều kiện trước khi cấp request push và identity probe.
     │   ├── Orchestration.js       Kiểm state, cursor, resume, preflight và luồng nhiều lát.
     │   ├── Workflow.js             Chạy contract xuyên GAS -> executor Extension -> GAS với fixture FBM, cùng các cổng fail-closed cấp pipeline.
-    │   ├── ScanJob.js              Kiểm việc quét: cắt gói dưới trần, chuyển trang, gói trùng/lạ, mất response, mất tab, ghi lỗi, lượt thiếu dòng.
+    │   ├── ScanJob.js              Kiểm việc quét: cắt gói dưới trần, chuyển trang, gói trùng/lạ, mất response, mất tab, ghi lỗi, lượt thiếu dòng; harness chạy lượt tay và lần hỏi nền qua FBM giả.
     │   ├── ActivityScan.js         Kiểm lấy toàn bộ giao dịch: giữ id, gắn cờ chỉ khi đủ, chia khoảng không chồng ngày biên, đọc lại theo id, executor dừng đọc khi quá trần.
+    │   ├── CustomerCount.js        Kiểm bước đếm khách: FBM không đổi thì dừng sau một lần đếm, tổng tăng thì Quét nhanh đúng một lần, chưa có mốc thì Quét nhanh.
+    │   ├── BackgroundChain.js      Kiểm chuỗi nền nhiều lần hỏi bằng đồng hồ giả: hết bỏ đói, mỗi tiến trình một lần mỗi chuỗi, lượt tay chen ngang không dời mốc.
+    │   ├── Rotation.js             Kiểm Vòng xoay: đọc đủ N khách Sheet theo số CUS, theo lô, quay vòng, bỏ khách không đủ điều kiện, cursor chỉ qua lô đã ghi xong.
     │   ├── ScanPack.js             Kiểm gói quét: so giao dịch cuối, dừng sau chuỗi khách im lặng, gắn cờ "không thấy" chỉ trong khách đã đọc, mỗi gói đúng thao tác.
     │   ├── RelayResend.js          Kiểm Sidebar gửi lại cấu hình relay đang giữ khi Extension được tải lại, không gọi GAS.
     │   ├── Push.js                Kiểm cổng ghi, khóa, owner, builder ghi và xử lý lỗi push.

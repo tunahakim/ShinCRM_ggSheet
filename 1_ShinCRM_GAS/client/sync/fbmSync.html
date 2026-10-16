@@ -1,6 +1,6 @@
 <script>
 /* Sidebar chỉ hiển thị tiến độ; GAS là nguồn state duy nhất. */
-var FBM_SYNC_CLIENT = { installed: false, active: false, waiting: {}, relayWaiters: {}, credentialWaiters: {}, credentialMetadataWaiters: {}, credentialClearWaiters: {}, running: false, cancelRequested: false, statusReady: false, mode: 'read', pack: 'quick', openedAt: 0, returnScreen: 'view', returnUi: null, relayConfigured: false, relayOpenId: 0, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0, conflict: null, traceEvents: [], subscreen: 'run', navOpen: false, resultsTab: 'summary', resultPages: {}, lastStatus: null, identityStatus: null, identityAction: '', identityLastAction: '', identityProbeSignature: '', identityInvalid: {}, identityDraft: { spreadsheetId: '', userId: '', username: '', accountName: '' }, accountSettingsDraft: {}, accountSettingsInvalid: {}, loginStatus: null, loginDraft: { username: '' }, loginPasswordMode: 'saved', loginPasswordFocused: false, loginPasswordTimer: null, pendingLoginEnvelope: null, configEdits: {}, accountNotices: { identity: null, accountSettings: null, login: null }, settingsNotices: { module: null, relay: null, extension: null, background: null, login: null }, syncSettings: null };
+var FBM_SYNC_CLIENT = { installed: false, backgroundStopping: false, active: false, waiting: {}, relayWaiters: {}, credentialWaiters: {}, credentialMetadataWaiters: {}, credentialClearWaiters: {}, running: false, cancelRequested: false, statusReady: false, mode: 'read', pack: 'quick', openedAt: 0, returnScreen: 'view', returnUi: null, relayConfigured: false, relayOpenId: 0, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0, conflict: null, traceEvents: [], subscreen: 'run', navOpen: false, resultsTab: 'summary', resultPages: {}, lastStatus: null, identityStatus: null, identityAction: '', identityLastAction: '', identityProbeSignature: '', identityInvalid: {}, identityDraft: { spreadsheetId: '', userId: '', username: '', accountName: '' }, accountSettingsDraft: {}, accountSettingsInvalid: {}, loginStatus: null, loginDraft: { username: '' }, loginPasswordMode: 'saved', loginPasswordFocused: false, loginPasswordTimer: null, pendingLoginEnvelope: null, configEdits: {}, accountNotices: { identity: null, accountSettings: null, login: null }, settingsNotices: { module: null, relay: null, extension: null, background: null, login: null }, syncSettings: null };
 var FBM_SYNC_GAS_CONTINUE_WARN_MS = 5000;
 /** Hạn chờ Extension và hạn chờ GAS do GAS cấp trong `meta` của envelope (ngân sách một lượt); Sidebar không giữ con số riêng nên không cắt sớm một lô dài. Envelope thiếu hạn thì hết hạn ngay và báo lỗi, không treo. */
 function fbmSyncBudgetMs(request, key) { return Math.max(0, Number(request && request.meta && request.meta[key] || 0)); }
@@ -320,7 +320,7 @@ function fbmSyncCaptureActiveAccountDraft() {
   if (FBM_SYNC_CLIENT.subscreen !== 'account') { return null; }
   var activeIsAccountInput = !!active && /^fbm-(?:identity|login|account)-/.test(String(active.id || ''));
   var snapshot = { values: {}, activeId: activeIsAccountInput ? active.id : '', selectionStart: activeIsAccountInput ? Number(active.selectionStart || 0) : 0, selectionEnd: activeIsAccountInput ? Number(active.selectionEnd || 0) : 0 };
-  ['fbm-identity-spreadsheet', 'fbm-identity-user', 'fbm-identity-username', 'fbm-identity-account', 'fbm-login-username', 'fbm-login-password', 'fbm-account-customer-prefix', 'fbm-account-customer-length', 'fbm-account-activity-since'].forEach(function (id) {
+  ['fbm-identity-spreadsheet', 'fbm-identity-user', 'fbm-identity-username', 'fbm-identity-account', 'fbm-login-username', 'fbm-login-password', 'fbm-account-customer-prefix', 'fbm-account-customer-length'].forEach(function (id) {
     var input = document.getElementById(id);
     if (input) { snapshot.values[id] = String(input.value || ''); }
   });
@@ -348,9 +348,9 @@ function fbmSyncCaptureAccountDraft() {
   });
   var username = document.getElementById('fbm-login-username');
   if (username) { FBM_SYNC_CLIENT.loginDraft.username = String(username.value || ''); }
-  ['customer-prefix', 'customer-length', 'activity-since'].forEach(function (name) {
+  ['customer-prefix', 'customer-length'].forEach(function (name) {
     var input = document.getElementById('fbm-account-' + name);
-    if (input) { FBM_SYNC_CLIENT.accountSettingsDraft[name === 'customer-prefix' ? 'customerPrefix' : name === 'customer-length' ? 'customerCodeLength' : 'activitySince'] = String(input.value || ''); }
+    if (input) { FBM_SYNC_CLIENT.accountSettingsDraft[name === 'customer-prefix' ? 'customerPrefix' : 'customerCodeLength'] = String(input.value || ''); }
   });
 }
 /** Tránh phá DOM input khi callback nền trả status trong lúc người dùng đang gõ. */
@@ -654,7 +654,7 @@ function fbmSyncInstall() {
       FBM_SYNC_CLIENT.pendingLoginEnvelope = null;
       fbmSyncClearIdentityInvalidField(id.replace('fbm-identity-', ''));
     }
-    var accountSettings = { 'fbm-account-customer-prefix': 'customerPrefix', 'fbm-account-customer-length': 'customerCodeLength', 'fbm-account-activity-since': 'activitySince' };
+    var accountSettings = { 'fbm-account-customer-prefix': 'customerPrefix', 'fbm-account-customer-length': 'customerCodeLength' };
     if (accountSettings[id]) { FBM_SYNC_CLIENT.accountSettingsDraft[accountSettings[id]] = String(target.value || ''); fbmSyncConfigSetDraftValue('accountSettings', accountSettings[id], String(target.value || '')); if (FBM_SYNC_CLIENT.accountSettingsInvalid) { delete FBM_SYNC_CLIENT.accountSettingsInvalid[accountSettings[id]]; } }
     var settingsInput = { 'fbm-extension-poll-minutes': 'extension.pollMinutes', 'fbm-sync-detail-count': 'background.detail.customersPerRun', 'fbm-sync-login-retry-minutes': 'loginPolicy.retryMinutes', 'fbm-sync-setting-approval-threshold': 'module.approvalThreshold', 'fbm-sync-setting-scope-codes': 'module.scopeCodes', 'fbm-sync-setting-request-gap-min': 'module.requestGapMinSeconds', 'fbm-sync-setting-request-gap-max': 'module.requestGapMaxSeconds' };
     if (settingsInput[id]) {
@@ -1075,8 +1075,8 @@ function fbmSyncSaveIdentityManual(button) {
 }
 function fbmSyncSaveAccountSettings(button) {
   if (button) { button.disabled = true; }
-  var prefix = document.getElementById('fbm-account-customer-prefix'), length = document.getElementById('fbm-account-customer-length'), since = document.getElementById('fbm-account-activity-since');
-  var payload = { customerPrefix: String(prefix && prefix.value || '').trim(), customerCodeLength: String(length && length.value || '').trim(), activitySince: String(since && since.value || '').trim() };
+  var prefix = document.getElementById('fbm-account-customer-prefix'), length = document.getElementById('fbm-account-customer-length');
+  var payload = { customerPrefix: String(prefix && prefix.value || '').trim(), customerCodeLength: String(length && length.value || '').trim() };
   var incomplete = (!!payload.customerPrefix && !payload.customerCodeLength) || (!payload.customerPrefix && !!payload.customerCodeLength);
   if (incomplete) {
     FBM_SYNC_CLIENT.accountSettingsInvalid = { customerPrefix: !payload.customerPrefix, customerCodeLength: !payload.customerCodeLength };
@@ -1143,7 +1143,9 @@ function fbmSyncSaveBackgroundSettings(button) {
   ['heartbeat', 'customerFull', 'activityFull', 'detail'].forEach(function (kind) { var input = document.getElementById('fbm-sync-process-' + kind + '-minutes'); var toggle = document.getElementById('fbm-sync-process-' + kind); schedule[kind] = { minutes: Number(input && input.value || 1), enabled: !!toggle && toggle.getAttribute('aria-pressed') === 'true' }; });
   schedule.direction = fbmSyncControlValue('fbm-sync-background-direction') || 'read';
   schedule.enabled = fbmSyncToggleValue('fbm-sync-background-switch');
-  schedule.detail = { enabled: schedule.detail.enabled, minutes: schedule.detail.minutes, customersPerRun: Number(document.getElementById('fbm-sync-detail-count') && document.getElementById('fbm-sync-detail-count').value || 50) };
+  // Ô trống hay số sai vẫn gửi nguyên để GAS từ chối lưu bằng thông báo, không lặng lẽ thay bằng số mặc định.
+  var detailCount = document.getElementById('fbm-sync-detail-count');
+  schedule.detail = { enabled: schedule.detail.enabled, minutes: schedule.detail.minutes, customersPerRun: detailCount ? Number(detailCount.value) : schedule.detail.customersPerRun };
   return callServer('fbmSaveBackgroundSchedule', [schedule]).then(function (result) {
     if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không lưu được lịch đồng bộ nền.'); }
     FBM_SYNC_CLIENT.syncSettings = FBM_SYNC_CLIENT.syncSettings || {}; FBM_SYNC_CLIENT.syncSettings.background = result.schedule || schedule;
@@ -1469,6 +1471,7 @@ function fbmSyncWaitForBackgroundStop(mode, attempt) {
   }).then(function (status) {
     var snapshot = status && (status.status || status) || {};
     if (snapshot.phase === 'idle' && !snapshot.runId) {
+      FBM_SYNC_CLIENT.backgroundStopping = false;
       return fbmSyncStartServer(mode, 0).then(function (started) {
         if (!started || !started.ok) { throw new Error(started && (started.message || started.code) || 'Không mở được phiên thủ công sau khi dừng phiên nền.'); }
         return fbmSyncLoop(started);
@@ -1604,7 +1607,10 @@ function fbmSyncRunStart(mode) {
   FBM_SYNC_CLIENT.viewEpoch += 1;
   fbmSyncPaint({ phase: 'checking_session', label: 'Đang chuẩn bị đồng bộ', direction: 'Kết nối FBM', entityLabel: 'Chuẩn bị phiên', message: 'Đang chuẩn bị phiên đồng bộ...', counts: {} });
   var work = fbmSyncStartServer(mode || 'read', 0).then(function (started) {
+    // Lượt nền dừng sau response đang chạy; trong lúc chờ nút chạy khóa và báo đang dừng để người dùng không bấm Dừng nhầm vào lượt nền.
     if (started && started.code === 'SYNC_BACKGROUND_STOPPING') {
+      FBM_SYNC_CLIENT.backgroundStopping = true;
+      if (started.status) { fbmSyncPaint(started.status); }
       return fbmSyncWaitForBackgroundStop(mode || 'read', 0);
     }
     if (!started || !started.ok) {
@@ -1614,7 +1620,8 @@ function fbmSyncRunStart(mode) {
     }
     return fbmSyncLoop(started);
   });
-  return work.then(function (value) { fbmSyncSetRunning(false); return value; }, function (err) {
+  return work.then(function (value) { FBM_SYNC_CLIENT.backgroundStopping = false; fbmSyncSetRunning(false); return value; }, function (err) {
+    FBM_SYNC_CLIENT.backgroundStopping = false;
     fbmSyncSetRunning(false);
     var reason = err && err.message ? err.message : String(err);
     if (err && err.code === 'GAS_CALLBACK_TIMEOUT') {

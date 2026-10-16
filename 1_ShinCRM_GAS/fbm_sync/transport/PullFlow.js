@@ -1,8 +1,9 @@
 /** Dieu phoi preflight va chieu doc tu FBM. */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
-/** Mở phiên, kiểm tra khóa phiên và trả về request đầu tiên. */
-FbmSync.start = function (options) {
+/** Mở phiên, kiểm tra khóa phiên và trả về request đầu tiên; lượt xong ngay ở bước mở vẫn kết thúc bằng bước đếm. */
+FbmSync.start = function (options) { return FbmSync.runTail(FbmSync.startRun(options)); };
+FbmSync.startRun = function (options) {
   // Mỗi call chỉ trả một request; ngữ cảnh nhiều bước nằm trong DocumentProperties.
   var opt = options || {};
   if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) {
@@ -12,7 +13,7 @@ FbmSync.start = function (options) {
   if (typeof FbmSync.recoverStaleRun === 'function') { current = FbmSync.recoverStaleRun(current).state; }
   // Tạm dừng là điểm dừng để người dùng chạy lại, không phải cursor đang chạy;
   // lần bấm mới phải tạo request FBM mới, tránh vẽ lại preview cũ.
-  if (current.runId && ['idle', 'done', 'error', 'paused', 'conflict'].indexOf(current.phase) < 0) {
+  if (FbmSync.runInProgress(current)) {
     if (opt.manual === true && String(current.origin || '') === 'background') {
       current.metadata = current.metadata || {};
       current.metadata.manualPending = { mode: opt.mode || 'read', requestedAt: Date.now() };
@@ -49,12 +50,11 @@ FbmSync.start = function (options) {
   // Gói chụp vào state đầu lượt: đổi `Mức quét` khi lượt đang chạy chỉ áp từ lượt sau.
   state.scanPack = state.scan === 'full' ? FbmSync.scanPackOf(opt.pack) : '';
   state.identityTarget = state.scan === 'identity_check' && typeof FbmSync.identityCheckTarget === 'function' ? FbmSync.identityCheckTarget(opt.identity) : null;
-  var accountSettings = typeof FbmSync.accountSettingsRead === 'function' ? FbmSync.accountSettingsRead() : {};
-  state.activitySince = String(accountSettings && accountSettings.activitySince || '').trim();
-  // Chụp đầu lượt như mốc giao dịch: đổi cài đặt giữa chừng chỉ áp từ lượt sau, và không phải đọc lại DocumentProperties mỗi envelope.
+  // Chụp đầu lượt như mức quét: đổi cài đặt giữa chừng chỉ áp từ lượt sau, và không phải đọc lại DocumentProperties mỗi envelope.
   state.requestGap = typeof FbmSync.requestGapMs === 'function' ? FbmSync.requestGapMs(FbmSync.syncSettingsRead()) : null;
   if (state.scan === 'activity_bulk') { state.mode = 'read'; }
-  if (state.origin === 'background') { state.detailCustomerLimit = state.scan === 'detail' ? Math.max(1, Math.min(50, Math.floor(Number(opt.detail && opt.detail.customersPerRun || 50)))) : 0; }
+  FbmSync.countTailMark(state);
+  if (state.origin === 'background') { state.detailCustomerLimit = state.scan === 'detail' ? Math.max(1, Math.floor(Number(opt.detail && opt.detail.customersPerRun || FbmSync.backgroundScheduleDefault().detail.customersPerRun))) : 0; }
   if (typeof FbmSync.runPreflight === 'function') {
     var preflight = FbmSync.runPreflight({ mode: state.mode, origin: state.origin, scan: state.scan });
     state.metadata = state.metadata || {};
@@ -179,23 +179,10 @@ FbmSync.customerPageOf = function (rows, identityOrder) {
   return { length: list.length, firstItem: FbmSync.customerPageItem(list[0]), lastItem: FbmSync.customerPageItem(last), lastValue: identityOrder ? FbmSync.gridPageValue([last.stt_rec_kh || '']) : FbmSync.customerPageValue(last) };
 };
 
-/**
- * Chuyển cursor sang trang Customer kế tiếp; trả `false` khi đã hết trang hoặc quét chi tiết đã đủ giới hạn khách của lượt (khi đó lưu vị trí cho lượt sau).
- * `total` là tổng FBM báo ở trang đầu; trang sau FBM trả 0 nên mô tả trang giữ tổng của trang trước.
- */
+/** Chuyển cursor sang trang Customer kế tiếp; trả `false` khi đã hết trang. `total` là tổng FBM báo ở trang đầu; trang sau FBM trả 0 nên mô tả trang giữ tổng của trang trước. */
 FbmSync.customerNext = function (state, page, total) {
   var cursor = state.cursor || {}, count = Number(cursor.count || 2000), length = Number(page && page.length || 0), seenAfterPage = Number(cursor.seen || 0) + length;
   var pageItems = { firstPageItem: page.firstItem, lastPageItem: page.lastItem, lastRowCount: Number(total || cursor.pageItems && cursor.pageItems.lastRowCount || 0) };
-  if (state.scan === 'detail' && !length && typeof FbmSync.detailCursorClear === 'function') { FbmSync.detailCursorClear(); }
-  if (state.scan === 'detail' && seenAfterPage >= Number(state.detailCustomerLimit || 50)) {
-    var exhausted = !length || length < count || (total && seenAfterPage >= total);
-    if (exhausted) {
-      if (typeof FbmSync.detailCursorClear === 'function') { FbmSync.detailCursorClear(); }
-    } else if (typeof FbmSync.detailCursorWrite === 'function') {
-      FbmSync.detailCursorWrite({ pageIndex: FbmSync.gridNextPageIndex(cursor.pageIndex), pageValue: page.lastValue, pageItems: pageItems });
-    }
-    return false;
-  }
   if (!length || length < count || (total && seenAfterPage >= total)) { return false; }
   cursor.type = 1;
   cursor.pageIndex = FbmSync.gridNextPageIndex(cursor.pageIndex);
@@ -212,9 +199,8 @@ FbmSync.customerScanRecord = function (state, grid, firstPage) {
   var scan = firstPage ? { total: Number(grid && grid.total || 0), seen: 0 } : (state.metadata.customerScan || { total: 0, seen: 0 });
   scan.seen = Number(scan.seen || 0) + (grid && grid.rows ? grid.rows.length : 0);
   state.metadata.customerScan = scan;
-  // Mẫu số tiến trình là số khách của lượt: FBM đã lọc theo phạm vi thử nên `TotalRowCount` chính là số mã thử; quét chi tiết chỉ đi tới giới hạn khách mỗi lượt.
-  // Quét chi tiết tiếp từ trang giữa thì FBM không báo tổng (trang sau trả 0), mẫu số là giới hạn khách của lượt.
-  if (firstPage) { state.progress = { done: 0, total: state.scan === 'detail' ? (scan.total ? Math.min(scan.total, Number(state.detailCustomerLimit || scan.total)) : Number(state.detailCustomerLimit || 0)) : scan.total }; }
+  // Mẫu số tiến trình là số khách của lượt: FBM đã lọc theo phạm vi thử nên `TotalRowCount` chính là số mã thử.
+  if (firstPage) { state.progress = { done: 0, total: scan.total }; }
 };
 
 /** Tử số tiến trình: số khách đã xử lý xong (đã quét hết giao dịch, hoặc không có giao dịch để quét). */
@@ -252,6 +238,8 @@ FbmSync.pullMarkMissing = function (state) {
       return false;
     }
     FbmSync.markMissingAfterFullScan('customer', state);
+    // Số khách mốc của bước đếm chỉ ghi ở đây: lượt đã đọc đủ danh sách toàn bộ khách.
+    if (state.scan === 'full') { FbmSync.customerBaselineWrite(total); }
     if (state.metadata && state.metadata.activityBulk) {
       // Lớp 1 của lượt này đã gắn cờ trên toàn bộ giao dịch; gắn lại theo khách đã đọc chỉ đếm trùng cùng một bản ghi.
       FbmSync.seenStoreClear('activity');
@@ -266,7 +254,7 @@ FbmSync.pullMarkMissing = function (state) {
 };
 
 /** Khởi tạo cursor Activity cho danh sách Customer vừa đọc. */
-FbmSync.activityForCustomers = function (state, customerContexts, customerNext, customerSeen, afterActivity) {
+FbmSync.activityForCustomers = function (state, customerContexts, customerNext, customerSeen) {
   // Không truyền danh sách khách: đọc giao dịch của mọi khách đã thấy trong lượt quét, lấy dần từ hàng đợi để cursor không phình theo số khách.
   var queued = customerContexts === null;
   var contexts = (customerContexts || []).map(function (item) { return typeof item === 'string' ? { sttRec: item, maKh: '' } : { sttRec: String(item.sttRec || item.stt_rec_kh || ''), maKh: String(item.maKh || item.ma_kh || '') }; }).filter(function (item) { return item.sttRec; });
@@ -277,9 +265,9 @@ FbmSync.activityForCustomers = function (state, customerContexts, customerNext, 
     FbmSync.businessStepStart(state, 'pull_activity', { mode: state.mode, scan: state.scan, entity: 'activity' });
     FbmSync.businessStepStart(state, 'reconcile_activity', { mode: state.mode, scan: state.scan, entity: 'activity' });
   }
-  state.cursor = { kind: 'activity_grid', customers: contexts.map(function (item) { return item.sttRec; }), customerIndex: 0, batch: [], count: FbmSync.BUDGET.activityCustomerRows, customerNext: customerNext ? { pageIndex: customerNext.body.gridPageIndex, pageValue: customerNext.body.gridPageValue, pageItems: FbmSync.gridPageItemsOf(customerNext.body), count: customerNext.body.count } : null, customerSeen: Number(customerSeen || 0), afterActivity: afterActivity || null };
+  state.cursor = { kind: 'activity_grid', customers: contexts.map(function (item) { return item.sttRec; }), customerIndex: 0, batch: [], count: FbmSync.BUDGET.activityCustomerRows, customerNext: customerNext ? { pageIndex: customerNext.body.gridPageIndex, pageValue: customerNext.body.gridPageValue, pageItems: FbmSync.gridPageItemsOf(customerNext.body), count: customerNext.body.count } : null, customerSeen: Number(customerSeen || 0) };
   if (queued) { state.cursor.queueFrom = 0; }
-  // Gói Quét nhanh, Quét kỹ chỉ đọc khách lệch giao dịch cuối rồi quét từ khách mới nhất xuống; Quét toàn bộ và quét chi tiết đọc mọi khách đã thấy.
+  // Gói Quét nhanh, Quét kỹ chỉ đọc khách lệch giao dịch cuối rồi quét từ khách mới nhất xuống; Quét toàn bộ đọc mọi khách đã thấy.
   if (queued && state.scan === 'full' && state.scanPack !== 'all') { state.cursor.layer = 'due'; FbmSync.activityLayerProgress(state, false); }
   state.message = 'Đang đọc giao dịch của khách hàng...';
   FbmSync.activityBatchPlan(state.cursor);
@@ -295,24 +283,6 @@ FbmSync.activityLayersAfter = function (state) {
   return state.scanPack === 'deep' ? FbmSync.beginActivityBulkPull(state) : null;
 };
 
-/** Chuyển tiếp sau một batch Activity bổ sung mà không làm mất cursor GAS. */
-FbmSync.activitySupplementNext = function (state, afterActivity) {
-  var after = afterActivity || {};
-  if (after.kind === 'rotation') {
-    var rotation = FbmSync.activityRotationCustomerRequest();
-    if (rotation) {
-      state.cursor = { kind: 'activity_rotation_customer_grid', seen: Number(state.cursor && state.cursor.seen || 0), seenIds: state.cursor && state.cursor.seenIds || {} };
-      state.message = 'Đang xoay 30 Customer để bắt giao dịch tạo lùi ngày...';
-      FbmSync.stateWrite(state);
-      return rotation;
-    }
-  }
-  if (after.kind === 'done') { FbmSync.activityRotationSave(after.rotation || FbmSync.activityRotationNext([])); }
-  state.cursor = {};
-  state.phase = 'done'; state.entity = ''; state.message = FbmSync.runDoneMessage(state); FbmSync.stateWrite(state);
-  return null;
-};
-
 /** Chuyển từ lookup sang grid Customer, kể cả khi lookup chỉ đọc bị lỗi. */
 FbmSync.beginCustomerPull = function (state) {
   if (state.scan === 'activity_bulk') { return FbmSync.beginActivityBulkPull(state); }
@@ -324,7 +294,7 @@ FbmSync.beginCustomerPull = function (state) {
     return FbmSync.nextPushRequest(state);
   }
   FbmSync.prepareCategoryGate(state);
-  if (typeof FbmSync.businessStepStart === 'function') {
+  if (typeof FbmSync.businessStepStart === 'function' && state.scan !== 'detail') {
     FbmSync.businessStepStart(state, 'pull_customer', { mode: state.mode, scan: state.scan, entity: 'customer' });
     FbmSync.businessStepStart(state, 'reconcile_customer', { mode: state.mode, scan: state.scan, entity: 'customer' });
   }
@@ -337,11 +307,8 @@ FbmSync.beginCustomerPull = function (state) {
     state.metadata.seen.activity = { initialized: true };
   }
   FbmSync.activityLayersBegin();
-  var customerCount = state.scan === 'detail' ? Math.max(1, Math.min(FbmSync.CUSTOMER_PAGE_ROWS, Number(state.detailCustomerLimit || FbmSync.CUSTOMER_PAGE_ROWS))) : FbmSync.BUDGET.scanCustomerRows;
-  var detailCursor = state.scan === 'detail' && typeof FbmSync.detailCursorRead === 'function' ? FbmSync.detailCursorRead() : null;
-  var detailPageIndex = detailCursor ? Number(detailCursor.pageIndex || 0) : -1;
-  var detailPageValue = detailCursor && Array.isArray(detailCursor.pageValue) ? detailCursor.pageValue : null;
-  FbmSync.scanJobOpen(state, { entity: 'customer', type: detailPageIndex >= 0 ? 1 : 0, pageIndex: detailPageIndex, pageValue: detailPageValue, pageItems: detailCursor && detailCursor.pageItems || null, count: customerCount, seen: 0 });
+  if (state.scan === 'detail') { return FbmSync.activityRotationBegin(state); }
+  FbmSync.scanJobOpen(state, { entity: 'customer', type: 0, pageIndex: -1, pageValue: null, pageItems: null, count: FbmSync.BUDGET.scanCustomerRows, seen: 0 });
   state.phase = 'pull_customer'; state.entity = 'customer'; state.message = 'Đang đọc khách hàng từ FBM...';
   FbmSync.stateWrite(state);
   return FbmSync.scanJobRequest(state);
@@ -415,8 +382,14 @@ FbmSync.contractGate = function (rawResponse) {
   return { ok: false, code: mismatch.code, request: null, error: mismatch.message, status: FbmSync.statusView() };
 };
 
+/** Tiến đúng một bước cursor và lưu state trước khi trả request kế tiếp; lượt vừa xong thì nối bước đếm (`runTail`). */
+/** Giữ phiên giữa chuỗi nền về qua cổng `continue` chung của Extension như mọi response sau request đầu, nên cursor `heartbeat` phải về đúng bộ xử lý heartbeat. */
 FbmSync.continue = function (rawResponse) {
-  // Tiến đúng một bước cursor và lưu state trước khi trả request kế tiếp.
+  if (String((FbmSync.stateRead().cursor || {}).kind || '') === 'heartbeat') { return fbmSyncHeartbeatLocked(rawResponse, {}); }
+  return FbmSync.continueRun(rawResponse);
+};
+FbmSync.continueRun = function (rawResponse) { return FbmSync.chainTail(FbmSync.runTail(FbmSync.continueStep(rawResponse))); };
+FbmSync.continueStep = function (rawResponse) {
   var state = FbmSync.stateRead();
   if (typeof FbmSync.recoverStaleRun === 'function') {
     var recovered = FbmSync.recoverStaleRun(state);
@@ -425,6 +398,7 @@ FbmSync.continue = function (rawResponse) {
   }
   var cursor = state.cursor || {}, response, responseRequestId = FbmSync.responseRequestId ? FbmSync.responseRequestId(rawResponse) : '';
   if (!state.activeRequestId || !responseRequestId || responseRequestId !== String(state.activeRequestId)) {
+    FbmSync.logStaleResponse(state, responseRequestId);
     return { ok: false, code: 'STALE_RESPONSE', request: null, status: FbmSync.statusView(), error: 'Response FBM đã cũ hoặc phiên đã bị dừng; không tiếp tục cursor.' };
   }
   var contractStop = FbmSync.contractGate(rawResponse);
@@ -465,7 +439,8 @@ FbmSync.continue = function (rawResponse) {
     return probeFailure;
   }
   // Phân loại trên wrapper HTTP gốc; parse trước sẽ làm mất status và biến lỗi vận chuyển thành Bugs giả.
-  var success = FbmSync.protocol.assertSuccess(rawResponse);
+  // Probe nhận "chưa xác thực" là kết luận phiên chết, đi tiếp nhánh identity bên dưới để vào cổng đăng nhập, không phải dấu hiệu đáng ngờ cần probe nữa.
+  var success = cursor.kind === 'session_probe' && FbmSync.protocol.isUnauthenticatedResponse(rawResponse) ? { ok: true } : FbmSync.protocol.assertSuccess(rawResponse);
   if (!success.ok) {
     if (success.code === 'SESSION_SUSPECTED' && cursor.kind !== 'push_wait' && cursor.kind !== 'session_probe') {
       var suspicionProbe = FbmSync.sessionGateProbeRequest(state, cursor, 'Phản hồi FBM đáng ngờ; request nghiệp vụ đã dừng để probe lại phiên.');
@@ -515,12 +490,14 @@ FbmSync.continue = function (rawResponse) {
     if (completedGate) { return completedGate; }
   }
 
+  if (cursor.kind === 'customer_count') { return FbmSync.customerCountContinue(state, rawResponse); }
+
   // Probe User là bước hệ thống của cổng: đối chiếu đủ bốn định danh rồi
   // mới trả lại cursor nghiệp vụ ban đầu. Không gọi logic Customer tại đây.
   if (cursor.kind === 'session_probe') {
     var probedIdentity = FbmSync.identityUser(response);
     if (!probedIdentity.ok) {
-      if (typeof FbmSync.protocol.isUnauthenticatedSessionProbeResponse === 'function' && FbmSync.protocol.isUnauthenticatedSessionProbeResponse(rawResponse)) {
+      if (typeof FbmSync.protocol.isUnauthenticatedResponse === 'function' && FbmSync.protocol.isUnauthenticatedResponse(rawResponse)) {
         var probeRecovery = FbmSync.sessionGateHandleProbeFailure(state, cursor, rawResponse);
         if (probeRecovery && probeRecovery.request) { return probeRecovery; }
         if (probeRecovery) { return probeRecovery; }
@@ -557,8 +534,6 @@ FbmSync.continue = function (rawResponse) {
       return { ok: true, request: null, status: FbmSync.statusView() };
     }
     var gateMeta = FbmSync.sessionGateMeta(state), resume = gateMeta.resumeCursor && gateMeta.resumeCursor.kind ? gateMeta.resumeCursor : { kind: 'authorize_customer' };
-    var waitedResume = typeof FbmSync.sessionGateResumeAfterWaitProbe === 'function' ? FbmSync.sessionGateResumeAfterWaitProbe(state) : null;
-    if (waitedResume) { return waitedResume; }
     if (gateMeta.probeOnly === true) {
       gateMeta.probeOnly = false;
       state.cursor = {}; state.phase = 'error'; state.entity = '';
@@ -674,23 +649,7 @@ FbmSync.continue = function (rawResponse) {
       if (layerRequest) { return { ok: true, request: FbmSync.nextEnvelope(layerRequest), status: FbmSync.statusView(), imported: imported }; }
       state = FbmSync.stateRead();
     }
-    if (cursor.afterActivity) {
-      var supplementRequest = FbmSync.activitySupplementNext(state, cursor.afterActivity);
-      if (supplementRequest) { return { ok: true, request: FbmSync.nextEnvelope(supplementRequest), status: FbmSync.statusView() }; }
-      return { ok: true, status: FbmSync.statusView(), imported: imported };
-    }
     return FbmSync.pullFinishOrPush(state, { imported: imported });
-  }
-  if (cursor.kind === 'activity_catchup_customer_grid' || cursor.kind === 'activity_rotation_customer_grid') {
-    var supplementGrid = FbmSync.rowsToRecords('customer', response, state.metadata && state.metadata.customerFields);
-    state.metadata.customerFields = supplementGrid.fields;
-    FbmSync.stateWrite(state);
-    var supplementContexts = supplementGrid.rows.filter(function (row) { return !FbmSync.isTemporaryRecord('customer', row); }).map(function (row) { return { sttRec: String(row.stt_rec_kh || '').trim(), maKh: String(row.ma_kh || '').trim() }; }).filter(function (item) { return item.sttRec; });
-    var afterKind = cursor.kind === 'activity_catchup_customer_grid' ? { kind: 'rotation' } : { kind: 'done', rotation: FbmSync.activityRotationNext(supplementGrid.rows, supplementGrid.total) };
-    var supplementActivityRequest = FbmSync.activityForCustomers(state, supplementContexts, null, 0, afterKind);
-    if (supplementActivityRequest) { return { ok: true, request: FbmSync.nextEnvelope(supplementActivityRequest), status: FbmSync.statusView() }; }
-    var emptySupplement = FbmSync.activitySupplementNext(state, afterKind);
-    return { ok: true, request: emptySupplement ? FbmSync.nextEnvelope(emptySupplement) : null, status: FbmSync.statusView() };
   }
   state.phase = 'error'; state.lastError = 'Không nhận diện được cursor đồng bộ.'; FbmSync.stateWrite(state);
   return { ok: false, status: FbmSync.statusView(), error: state.lastError };

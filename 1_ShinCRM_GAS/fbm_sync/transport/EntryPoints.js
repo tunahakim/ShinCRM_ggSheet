@@ -140,18 +140,6 @@ function fbmSyncRelayCompactResult(result) {
   };
 }
 
-/** Giới hạn số round-trip trong một lượt relay; cursor vẫn nằm ở GAS để lượt sau tiếp tục. */
-function fbmSyncRelayCap(result, hop) {
-  var limit = Number(FbmSync.RELAY_HOP_LIMIT || 20), value = result || {};
-  if (Number(hop || 0) >= limit && value.request) {
-    if (typeof FbmSync.limitRelayResult === 'function') { return FbmSync.limitRelayResult(value, hop); }
-    value.request = null;
-    value.code = 'RELAY_HOP_LIMIT';
-    value.message = 'Đã tạm dừng sau ' + limit + ' request; cursor vẫn được giữ ở GAS.';
-  }
-  return value;
-}
-
 /**
  * Cổng HTTP Extension gọi cho nhịp nền, chạy cả khi Sidebar đóng; bắt buộc khóa trước khi xử lý.
  * Phải đi qua `runEntryPoint` như mọi cửa vào: Log chỉ nằm trong bộ đệm RAM tới khi cửa vào xả, và exception phải có dòng Log cùng tin chờ hiện ở Sidebar lần mở sau (FBM-034).
@@ -189,6 +177,6 @@ function fbmSyncRelayHandle(body) {
   } else {
     result = { ok: false, code: 'RELAY_KIND_UNSUPPORTED', error: 'Relay chỉ nhận các nhịp nền do GAS quy định.', request: null };
   }
-  if (body.kind === 'heartbeat_request' || body.kind === 'heartbeat' || body.kind === 'heartbeat_transport_failure' || body.kind === 'background_sync') { result = fbmSyncRelayCompactResult(result); result = fbmSyncRelayCap(result, body.hop); }
+  if (body.kind === 'heartbeat_request' || body.kind === 'heartbeat' || body.kind === 'heartbeat_transport_failure' || body.kind === 'background_sync') { result = fbmSyncRelayCompactResult(result); }
   return result;
 }

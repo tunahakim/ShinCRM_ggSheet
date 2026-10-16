@@ -191,6 +191,17 @@ FbmSync.syncPermission = function (record, entity, customer) {
   return result;
 };
 
+/**
+ * Bộ lọc "được lấy từ FBM" dùng chung cho bước gắn cờ "không thấy" và bước chọn khách đọc giao dịch (09/02 Phần 3): bản ghi người dùng đã chặn chiều lấy về thì vắng bên FBM cũng không được gắn cờ, không tốn request đọc.
+ * Giao dịch kế thừa quyền của khách cha nên tra bảng khách một lần cho cả lượt, không tra lại theo từng dòng.
+ */
+FbmSync.pullAllowedReader = function (entity) {
+  if (entity !== 'activity') { return function (record) { return FbmSync.syncPermission(record, 'customer').pull; }; }
+  var byId = {};
+  FbmSync.readLocal('customer').forEach(function (customer) { byId[String(customer.id || '').trim()] = customer; });
+  return function (record) { return FbmSync.syncPermission(record, 'activity', byId[String(record.customerId || '').trim()]).pull; };
+};
+
 /** Activity chỉ được đẩy khi Customer cha đã liên kết đủ hai mã FBM. */
 FbmSync.activityParentReady = function (customer) {
   return !!customer && !!String(customer.fbmId || '').trim() && !!String(customer.fbmCustomerCode || '').trim();

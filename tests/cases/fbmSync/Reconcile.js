@@ -20,7 +20,6 @@ async function chay(so) {
   check(so, 'conflict map Activity end_date ve workDate noi bo', edges.FbmSync.conflictLocalField('activity', 'end_date'), 'workDate');
   check(so, 'conflict map Customer ten_kh ve companyName noi bo', edges.FbmSync.conflictLocalField('customer', 'ten_kh'), 'companyName');
   edges.PropertiesService = { getDocumentProperties: () => ({ getProperty: () => '' }) };
-  edges.FbmSync.accountSettingsRead = () => ({ activitySince: '2024-10-07' });
   const refresh = edges.FbmSync.conflictRefreshRequest('activity', { id: 'ACT-1', fbmId: '174813' });
   check(so, 'conflict dựng request đọc lại đúng Activity FBM, không bị giới hạn bởi mốc', [refresh.meta.kind, refresh.meta.entity, refresh.body.externalKey[0].Name, refresh.body.externalKey[0].Value, refresh.body.filter], ['conflict_refresh_grid', 'activity', 'id', '174813', []]);
   edges.FbmSync.scope = () => ({ fbm: ['ALT00010'], shin: [] });

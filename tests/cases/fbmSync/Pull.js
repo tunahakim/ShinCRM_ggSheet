@@ -14,7 +14,7 @@ async function chay(so) {
     FBM_VERIFY_STATUS_CONFIG_NAME: 'FBM_VERIFY_STATUS_DEFAULT', configGet: (name, fallback) => name === 'FBM_VERIFY_STATUS_DEFAULT' ? verifyDefault : fallback,
     PropertiesService: { getDocumentProperties: () => ({ getProperty: () => '', setProperty: () => {}, deleteProperty: () => {} }) }
   });
-  napServer(builders, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
+  napServer(builders, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
   check(so, 'mode tach quyen ghi Sheet khoi quyen ghi FBM', [
     builders.FbmSync.canWriteSheet('check'), builders.FbmSync.canWriteFbm('check'),
     builders.FbmSync.canWriteSheet('read'), builders.FbmSync.canWriteFbm('read'),
@@ -70,8 +70,9 @@ async function chay(so) {
       statusView: () => ({ phase: readFinishState.phase, mode: readFinishState.mode })
     }
   });
-  napServer(readFinish, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
-  const readFinished = readFinish.FbmSync.continue({ job: { jobId: 'read-run:customer:0:0', chunkIndex: 0, chunkCount: 1, rowCount: 0, totalRowCount: 0, oversize: [] }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'read-request' }] } });
+  napServer(readFinish, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
+  // Chỉ kiểm chặng chính của lượt; bước đếm cuối lượt có test riêng.
+  const readFinished = readFinish.FbmSync.continueStep({ job: { jobId: 'read-run:customer:0:0', chunkIndex: 0, chunkCount: 1, rowCount: 0, totalRowCount: 0, oversize: [] }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'read-request' }] } });
   check(so, 'mode read ket thuc pull thi ghi missing vao Sheet va khong mo chieu push FBM', [readFinished.ok, readFinishState.phase, readFinishMissing, readFinishPushRequests], [true, 'done', 2, 0]);
   builders.FbmSync.stateRead = () => ({ session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: 'auth-c', activityAuthorized: 'auth-a' } });
   const gate = { map: { '@CAT_TINH_THANH\u001fHà Nội': 'HNI' }, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true, HNI: true } } };
@@ -160,15 +161,11 @@ async function chay(so) {
 
   const bulkActivity = builders.FbmSync.activityBulkRequest({ type: 0 });
   check(so, 'Request giao dịch mọi khách không gắn mốc thời gian vào externalKey hay Customer đơn lẻ', [bulkActivity.body.controller, bulkActivity.body.externalKey.some((item) => item.Name === 'end_date' && item.Opr === '>='), bulkActivity.body.externalKey.some((item) => item.Name === 'stt_rec')], ['zccrAccountTask', false, false]);
-  builders.FbmSync.accountSettingsRead = () => ({ activitySince: '2024-10-07' });
-  const activitySinceBulk = builders.FbmSync.activityBulkRequest({ type: 0 });
-  const activitySinceCustomer = builders.FbmSync.activityGridRequest('CUS-FBM-1', { type: 0 });
-  const activityHistory = builders.FbmSync.activityBulkRequest({ type: 0, includeHistory: true });
-  check(so, 'Mốc Activity dùng filter FBM đúng định dạng cho bulk và từng Customer', [activitySinceBulk.body.filter, activitySinceCustomer.body.filter, activitySinceCustomer.body.externalKey[0].Name, activityHistory.body.filter], [['end_date:>=07/10/2024'], ['end_date:>=07/10/2024'], 'stt_rec', []]);
-  check(so, 'Mốc Activity đổi ngày không hợp lệ thì không tự gắn filter', builders.FbmSync.activitySinceFilterDate('2024-02-31'), '');
-  const tracked = (records) => records.filter(builders.FbmSync.activityBulkTracked).map((record) => record.id);
+  const activityCustomer = builders.FbmSync.activityGridRequest('CUS-FBM-1', { type: 0 });
+  check(so, 'Request giao dịch mọi khách và từng khách không gắn bộ lọc ngày', [bulkActivity.body.filter, activityCustomer.body.filter, activityCustomer.body.externalKey[0].Name], [[], [], 'stt_rec']);
+  check(so, 'Đổi ngày cửa sổ sang filter FBM: ngày hợp lệ ra DD/MM/YYYY, ngày không hợp lệ ra rỗng', [builders.FbmSync.fbmFilterDate('2024-10-07'), builders.FbmSync.fbmFilterDate('2024-02-31')], ['07/10/2024', '']);
+  const tracked = (records) => records.filter(builders.FbmSync.activityBulkTracker()).map((record) => record.id);
   check(so, 'Lấy toàn bộ giao dịch chỉ theo dõi giao dịch có FBM ID còn hiệu lực: bỏ tombstone, dòng tạm, dòng chưa có FBM ID', tracked([{ id: 'A-1', fbmId: 'F-1', recordStatus: 'active' }, { id: 'A-2', fbmId: 'F-2', recordStatus: 'deleted' }, { id: 'TMP-3', fbmId: 'F-3', recordStatus: 'active' }, { id: 'A-4', fbmId: 'F-4', recordStatus: 'active' }, { id: 'A-5', fbmId: 'TMP-F-5', recordStatus: 'active' }, { id: 'A-6', fbmId: '', recordStatus: 'active' }]), ['A-1', 'A-4']);
-  check(so, 'Giao dịch trước mốc không được theo dõi (không gửi id, không bị gắn cờ không thấy) còn đúng ngày mốc thì vẫn theo dõi', tracked([{ id: 'A-OLD', fbmId: 'F-OLD', workDate: '2024-10-06', recordStatus: 'active' }, { id: 'A-SINCE', fbmId: 'F-SINCE', workDate: '2024-10-07', recordStatus: 'active' }]), ['A-SINCE']);
   const lookupState = { session: { lookups: { '@CAT_TINH_THANH': [['HNI', 'Hà Nội']], '@CAT_NGUON_KH': [['HNI', 'Nguồn khác']], '@CAT_CONG_VIEC': [['HNI', 'Công việc khác']], '@CAT_SAN_PHAM': [['HNI', 'Sản phẩm khác']] } } };
   const lookupGate = { namesBySource: { '@CAT_TINH_THANH': { HNI: 'Hà Nội' }, '@CAT_NGUON_KH': { HNI: 'Nguồn khác' }, '@CAT_CONG_VIEC': { HNI: 'Công việc khác' }, '@CAT_SAN_PHAM': { HNI: 'Sản phẩm khác' } } };
   check(so, 'lookup danh mục không lẫn mã trùng giữa các nguồn', builders.FbmSync.validateLookupGate(lookupState, lookupGate).length, 0);
@@ -179,8 +176,6 @@ async function chay(so) {
   builders.FbmSync.readLocal = () => [{ id: 'ACT-000001', fbmId: 'F-LOCAL', recordStatus: 'active' }];
   const bulkStart = builders.FbmSync.beginActivityBulkPull(bulkState);
   check(so, 'Lấy toàn bộ giao dịch mở một việc quét chỉ giữ FBM ID đã có trên Sheet, có trần cỡ response, không gắn Customer; cursor không mang danh sách id', [bulkState.cursor.kind, bulkState.cursor.entity, bulkStart.meta.kind, bulkStart.meta.job.keepIds, bulkStart.meta.job.maxResponseBytes, bulkStart.body.externalKey.some((item) => item.Name === 'stt_rec'), JSON.stringify(bulkState.cursor).indexOf('F-LOCAL')], ['scan_job', 'activity', 'scan_job', ['F-LOCAL'], 64 * 1024 * 1024, false, -1]);
-  const finishedSupplementState = { cursor: { kind: 'activity_grid' }, phase: 'pull_activity', entity: 'activity', metadata: {}, session: {} };
-  check(so, 'Trang thai done xoa cursor Activity da ket thuc', [builders.FbmSync.activitySupplementNext(finishedSupplementState, { kind: 'done', rows: [] }), finishedSupplementState.phase, finishedSupplementState.cursor], [null, 'done', {}]);
 
   // Danh sách khách lấy trọn bằng việc quét; cursor không mang danh sách khách nên state không phình theo số khách (lỗi thật: 1.312 khách làm state 76 KB).
   let pageState = { mode: 'read', scan: 'full', phase: 'lookup', metadata: {}, session: {}, cursor: {} };
@@ -224,17 +219,13 @@ async function chay(so) {
   builders.FbmSync.customerScanRecord(tienTrinh, { total: 50, rows: Array.from({ length: 50 }, () => ({})) }, true);
   builders.FbmSync.progressCustomersDone(tienTrinh, 3);
   tienTrinh.counts.completed = 1312;
-  const chiTiet = { scan: 'detail', detailCustomerLimit: 20, mode: 'read', metadata: {} };
-  builders.FbmSync.customerScanRecord(chiTiet, { total: 1312, rows: [] }, true);
-  check(so, 'tiến trình lượt 50 khách là x/50 theo khách đã quét xong, quét chi tiết lấy giới hạn khách mỗi lượt làm mẫu số', [tienTrinh.progress, chiTiet.progress.total], [{ done: 3, total: 50 }, 20]);
+  check(so, 'tiến trình lượt 50 khách là x/50 theo khách đã quét xong', tienTrinh.progress, { done: 3, total: 50 });
   // Cursor chỉ giữ stt_rec_kh; mã FBM của khách cha tra từ Sheet Customer, khách chưa có trên Sheet thì để trống chứ không đoán.
   const docKhachCu = builders.FbmSync.readLocal;
   builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-A2', fbmId: 'A2', fbmCustomerCode: 'ALT02' }] : [];
   const maCha = builders.FbmSync.activityParentCodes();
   check(so, 'cursor chỉ giữ stt_rec_kh, mã khách cha của giao dịch tra từ chỉ mục Sheet Customer, khách chưa có trên Sheet thì để trống', [maCha.A2, maCha.A1 || ''], ['ALT02', '']);
   builders.FbmSync.readLocal = docKhachCu;
-  const rotationRows = Array.from({ length: builders.FbmSync.ACTIVITY_SUPPLEMENT_CUSTOMERS }, (_, i) => ({ stt_rec_kh: 'R' + i, ngay_gd: '2026-10-0' + (i % 9 + 1), datetime0: 'T' + i, xorder: i, ten_kh: 'Ten dai '.repeat(20) }));
-  check(so, 'vong xoay chi giu vi tri trang ke tiep, khong giu cac dong Customer; trang thieu thi quay ve dau', [builders.FbmSync.activityRotationNext(rotationRows), builders.FbmSync.activityRotationNext(rotationRows.slice(1))], [{ pageIndex: 1, pageValue: ['2026-10-03', 'T29', 29, 'R29'], pageItems: { firstPageItem: 'R0', lastPageItem: '29R29', lastRowCount: 0 } }, { pageIndex: -1, pageValue: null, pageItems: null }]);
   // Chuỗi mong đợi lấy từ request chuyển trang do giao diện FBM gửi (bắt 2026-10-08). Dòng thứ hai mang ngày FBM thật trả cho A000080085 (18:00 UTC ngày 27): giao diện ghi 20260928, tức phải tính theo giờ Việt Nam.
   const customerFields = builders.FbmSync.GRID_FIELDS.customer, dongFbm = builders.FbmSync.rowsToRecords('customer', JSON.stringify({ d: { TotalRowCount: 1312, ViewPage: { Fields: customerFields.map((AliasName) => ({ AliasName })) }, Rows: [
     customerFields.map((field) => ({ stt_rec_kh: 'A000079388', ngay_gd: '/Date(1787101200000)/', datetime0: '/Date(1787156031523)/', xorder: '000000000345' })[field] || ''),
@@ -258,9 +249,6 @@ async function chay(so) {
     [scanRun([{ total: 1312, rows: rowsOf(50) }, { total: 0, rows: [] }]), scanRun([{ total: 0, rows: rowsOf(50) }]), scanRun([{ total: 60, rows: rowsOf(50) }, { total: 0, rows: rowsOf(10) }]), scanRun([{ total: 0, rows: [] }])],
     [['error', 'FBM_SCAN_INCOMPLETE', []], ['error', 'FBM_SCAN_INCOMPLETE', []], ['done', '', ['customer', 'activity']], ['done', '', ['customer', 'activity']]]);
   builders.FbmSync.markMissingAfterFullScan = savedMark;
-  builders.FbmSync.readLocal = (entity) => entity === 'activity' ? [{ id: 'A-NEW', fbmId: 'F-NEW', workDate: '2026-09-10' }] : [];
-  const catchup = builders.FbmSync.activityCatchupCustomerRequest();
-  check(so, 'Lop catchup tao Customer grid theo ngay_gd moi hon Activity local', [catchup.meta.kind, catchup.meta.activityMaxDate, catchup.body.externalKey.some((item) => item.Name === 'ngay_gd' && item.Opr === '>')], ['activity_catchup_customer_grid', '2026-09-10', true]);
 
   const identityCheckState = { session: { userId: '2037', accountName: 'ANHLT' }, metadata: {} };
   builders.FbmSync.readLocal = () => [{ id: 'CUS-1', fbmId: 'FBM-1', fbmCustomerCode: 'ALT00010' }, { id: 'CUS-2', fbmId: 'FBM-2', fbmCustomerCode: 'ALT00011' }];
@@ -485,7 +473,6 @@ async function chay(so) {
   const newRecordMissing = edges.FbmSync.markMissingAfterFullScan('customer', newRecordState);
   check(so, 'record vua pull duoc danh dau seen sau khi cua ghi cap ma', [newRecordMissing.written, newRecordWrites], [0, 1]);
   let activityMissingBatch;
-  edges.FbmSync.accountSettingsRead = () => ({ activitySince: '2024-10-07' });
   edges.FbmSync.activityDateKey = (value) => {
     const text = String(value || '');
     const match = text.match(/^\/Date\((-?\d+)/);
@@ -496,7 +483,16 @@ async function chay(so) {
     : [];
   edges.writeGateSave = (request) => { activityMissingBatch = request; return { ok: true }; };
   const activityMissingResult = edges.FbmSync.markMissingAfterFullScan('activity', fullScanState);
-  check(so, 'Activity truoc moc khong bi danh dau missing trong full scan', [activityMissingResult.written, activityMissingBatch.records[0].id, activityMissingBatch.records[0].syncStatus, activityMissingBatch.records.length], [1, 'ACT-000021', edges.FbmSync.SYNC_STATUS.missing, 1]);
+  check(so, 'Full scan gắn cờ missing cho mọi giao dịch vắng bên FBM kể cả ngày cũ; tombstone thì không', [activityMissingResult.written, activityMissingBatch.records.map((record) => record.id), activityMissingBatch.records.every((record) => record.syncStatus === edges.FbmSync.SYNC_STATUS.missing)], [2, ['ACT-000020', 'ACT-000021'], true]);
+  // Bước gắn cờ vắng theo luật cho phép đồng bộ (09/02 Phần 3): bản ghi chặn chiều lấy về, kể cả giao dịch kế thừa từ khách cha, vắng bên FBM cũng không bị gắn cờ.
+  const quyenKhach = [{ id: 'CUS-000031', fbmId: 'FBM-KDB', recordStatus: 'active', fbmSyncPermission: 'Không đồng bộ' }, { id: 'CUS-000032', fbmId: 'FBM-CP', recordStatus: 'active', fbmSyncPermission: 'Cho phép' }, { id: 'CUS-000033', fbmId: 'FBM-CAM', recordStatus: 'active', fbmSyncPermission: 'Cấm đồng bộ' }];
+  const quyenGd = [{ id: 'ACT-000031', fbmId: 'ACT-CHA-CAM', customerId: 'CUS-000033', workDate: '2025-01-01', recordStatus: 'active', fbmSyncPermission: 'Cho phép' }, { id: 'ACT-000032', fbmId: 'ACT-CHA-CP', customerId: 'CUS-000032', workDate: '2025-01-01', recordStatus: 'active', fbmSyncPermission: 'Cho phép' }];
+  const quyenGhi = [];
+  edges.FbmSync.readLocal = (entity) => entity === 'customer' ? quyenKhach : quyenGd;
+  edges.writeGateSave = (request) => { quyenGhi.push(request.entity + ':' + request.records.map((item) => item.id).join(',')); return { ok: true }; };
+  edges.FbmSync.markMissingAfterFullScan('customer', { mode: 'read', metadata: {}, locks: {} }, () => false);
+  edges.FbmSync.markMissingAfterFullScan('activity', { mode: 'read', metadata: {}, locks: {} }, () => false);
+  check(so, 'Gắn cờ vắng theo quyền: khách "Không đồng bộ" vắng bên FBM không bị gắn cờ; giao dịch "Cho phép" của khách "Cấm đồng bộ" vắng không bị gắn cờ; khách "Cho phép" vắng vẫn bị gắn "không thấy bên FBM"', quyenGhi, ['customer:CUS-000032', 'activity:ACT-000032']);
   let activityPullWrite;
   edges.FbmSync.stateRead = () => ({ metadata: { seen: { customer: {}, activity: {} } }, locks: {} });
   edges.FbmSync.stateWrite = () => {};

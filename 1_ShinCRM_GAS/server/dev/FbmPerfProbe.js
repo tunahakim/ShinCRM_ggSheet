@@ -12,16 +12,16 @@ var FBM_PERF_TTL_SECONDS = 21600;
 var FBM_PERF_FBM_FUNCTIONS = [
   'stateRead', 'stateWrite', 'documentPropertySet', 'documentPropertyJson', 'compactStatePreview', 'stateWriteMinimal',
   'traceEvent', 'traceImport', 'traceAppend', 'traceContext', 'traceRead',
-  'statusView', 'recoverStaleRun', 'shouldLogStatus', 'logStatus', 'recordIssuesFlush', 'limitRelayResult', 'transportValue',
+  'statusView', 'recoverStaleRun', 'shouldLogStatus', 'logStatus', 'recordIssuesFlush', 'transportValue',
   'withOrchestrationLock', 'nextEnvelope', 'requestForCursor',
   'rowsToRecords', 'customerRecord', 'activityRecord', 'isTemporaryRecord', 'stateCategoryGate', 'readCategoryGate',
   'pullRecords', 'pullWrite', 'readLocal', 'seenStoreBegin', 'seenStoreMark', 'seenStoreHas', 'sheetSave', 'previewRecords',
-  'hash', 'threeWay', 'canonical', 'activitySinceAllows',
+  'hash', 'threeWay', 'canonical',
   'businessStepStart', 'businessStepAdd', 'businessStepFinish',
   'customerScanRecord', 'customerNext', 'activityForCustomers', 'finishPullRun', 'beginCustomerPull',
   'runPreflight', 'preflightEvaluate', 'preflightLocalScan', 'preflightHashSummary', 'preflightCandidates', 'preflightPushPermissions', 'logPreflight', 'identityPreflight', 'pushCandidates',
   'continueSessionGate', 'sessionGateResponseStarted', 'applyTransportSession', 'authContinue', 'lookupPairs',
-  'sessionGateStart', 'sessionGateWaitRequest', 'sessionGateHandleFailure', 'sessionGateProbeRequest', 'sessionGateResumeProbeRequest', 'sessionGateHandleProbeFailure', 'sessionGateTransportRetry', 'sessionGateRecordFailure', 'sessionGateResumeAfterWaitProbe',
+  'sessionGateStart', 'sessionGateHandleFailure', 'sessionGateProbeRequest', 'sessionGateResumeProbeRequest', 'sessionGateHandleProbeFailure', 'sessionGateTransportRetry', 'sessionGateRecordFailure', 'sessionGateResumeAfterWaitProbe',
   'activityBatchContinue', 'activityBatchRequest', 'activityParentCodes', 'activityPagesRead', 'activityCustomerErrors'
 ];
 var FBM_PERF_PROTOCOL_FUNCTIONS = ['parse', 'assertSuccess', 'isLiveSessionResponse'];

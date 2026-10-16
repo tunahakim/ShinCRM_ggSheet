@@ -62,26 +62,26 @@ FbmSync.lastActivityIndex = function (categoryGate) {
  * Trường lệch giữa giao dịch cuối FBM báo trên dòng khách và giao dịch cuối trên ShinCRM; rỗng là khớp.
  * Công việc khớp khi nằm trong tập công việc của ngày đó: một ngày nhiều giao dịch khác công việc thì không biết FBM hiện giao dịch nào, so bằng sẽ đọc lại khách đó mọi lượt.
  */
-FbmSync.lastActivityDiff = function (row, last, categoryGate, since) {
+FbmSync.lastActivityDiff = function (row, last, categoryGate) {
   var fbm = { end_date: row.ngay_gd, ten_cv: row.ten_cv }, date = FbmSync.isDate(row.ngay_gd) ? row.ngay_gd : FbmSync.fbDate(row.ngay_gd);
   if (!FbmSync.isDate(date) || isNaN(date.getTime())) { return ['end_date']; }
   // 01/01/1999 là "chưa có giao dịch" (kiểm trên FBM thật 2026-10-09: 326/326 khách mang ngày này có 0 giao dịch).
   if (FbmSync.isEmptyFbmDate(date)) { return last ? ['end_date'] : []; }
   var day = FbmSync.canonical('activity', fbm, categoryGate).end_date;
-  if (since && day < since && (!last || last.day < since)) { return []; }
   if (!last || last.day !== day) { return ['end_date']; }
   return last.records.some(function (record) { return !FbmSync.diff('activity', fbm, record, categoryGate, FbmSync.LAST_ACTIVITY_FIELDS).length; }) ? [] : ['ma_cv'];
 };
 
 /** Lớp 2 trên một gói danh sách khách đã ghi xuống Sheet: đánh dấu khách lệch giao dịch cuối, nối thứ tự cho lớp 3. Log một dòng tóm tắt, không một dòng mỗi khách vì lượt đầu mọi khách đều lệch. */
 FbmSync.activityDueMark = function (state, rows) {
-  var gate = FbmSync.stateCategoryGate(state), customers = FbmSync.readLocal('customer'), byFbmId = {}, last = FbmSync.lastActivityIndex(gate), due = [], order = [], fieldCounts = {}, sample = [];
-  customers.forEach(function (record) { var id = String(record.fbmId || '').trim(); if (id) { byFbmId[id] = record; } });
+  var gate = FbmSync.stateCategoryGate(state), customers = FbmSync.readLocal('customer'), byFbmId = {}, last = FbmSync.lastActivityIndex(gate), due = [], order = [], fieldCounts = {}, sample = [], pullAllowed = FbmSync.pullAllowedReader('customer');
+  // Khách chặn chiều lấy về không vào lớp 2 lẫn thứ tự lớp 3.
+  customers.forEach(function (record) { var id = String(record.fbmId || '').trim(); if (id && pullAllowed(record)) { byFbmId[id] = record; } });
   rows.forEach(function (row) {
     var local = byFbmId[String(row.stt_rec_kh || '').trim()], index = local ? FbmSync.seenStoreIndex(FbmSync.ACTIVITY_DUE_STORE, local) : -1;
     if (index < 0) { return; }
     order.push(index);
-    var fields = FbmSync.lastActivityDiff(row, last[String(local.id)], gate, String(state.activitySince || ''));
+    var fields = FbmSync.lastActivityDiff(row, last[String(local.id)], gate);
     if (!fields.length) { return; }
     due.push({ fbmId: local.fbmId });
     fields.forEach(function (field) { fieldCounts[field] = Number(fieldCounts[field] || 0) + 1; });
@@ -116,8 +116,8 @@ FbmSync.activityFreshIndex = function () {
  * Lô không dài quá số khách còn thiếu để đủ chuỗi im lặng, nên lượt dừng đúng sau `activityTopScanQuietStreak` khách liên tiếp không có gì mới, không đọc dư.
  */
 FbmSync.activityTopRefill = function (cursor) {
-  var streak = FbmSync.BUDGET.activityTopScanQuietStreak, order = FbmSync.topOrderAll(), byIndex = {}, hasTried = FbmSync.seenStoreReader(FbmSync.ACTIVITY_TRIED_STORE), hasRead = FbmSync.seenStoreReader(FbmSync.ACTIVITY_READ_STORE), hasFresh = FbmSync.seenStoreReader(FbmSync.ACTIVITY_FRESH_STORE);
-  FbmSync.readLocal('customer').forEach(function (record) { var index = FbmSync.seenStoreIndex(FbmSync.ACTIVITY_READ_STORE, record); if (index >= 0 && String(record.fbmId || '').trim()) { byIndex[index] = record; } });
+  var streak = FbmSync.BUDGET.activityTopScanQuietStreak, order = FbmSync.topOrderAll(), byIndex = {}, hasTried = FbmSync.seenStoreReader(FbmSync.ACTIVITY_TRIED_STORE), hasRead = FbmSync.seenStoreReader(FbmSync.ACTIVITY_READ_STORE), hasFresh = FbmSync.seenStoreReader(FbmSync.ACTIVITY_FRESH_STORE), pullAllowed = FbmSync.pullAllowedReader('customer');
+  FbmSync.readLocal('customer').forEach(function (record) { var index = FbmSync.seenStoreIndex(FbmSync.ACTIVITY_READ_STORE, record); if (index >= 0 && String(record.fbmId || '').trim() && pullAllowed(record)) { byIndex[index] = record; } });
   var pos = Number(cursor.topPos || 0), quiet = Number(cursor.topQuiet || 0), picked = [], positions = [];
   while (pos < order.length && quiet < streak) {
     var record = byIndex[order[pos]];
@@ -172,4 +172,54 @@ FbmSync.activityLayerNext = function (state, cursor) {
     logEvent({ source: 'fbm_sync', action: 'activity_top_scan', outcome: typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', cycleId: String(state.runId || ''), reason: 'Quét từ khách mới nhất xuống dừng ở khách thứ ' + Number(cursor.topPos || 0) + (Number(cursor.topQuiet || 0) >= streak ? ' sau ' + streak + ' khách liên tiếp không có gì mới' : ' vì hết danh sách') + '; giao dịch mới sâu nhất ở khách thứ ' + Number(cursor.topDeepest || 0) + '.', detail: { depth: Number(cursor.topPos || 0), deepestFresh: Number(cursor.topDeepest || 0), quiet: Number(cursor.topQuiet || 0), streak: streak } });
   }
   return null;
+};
+
+/**
+ * Lớp 4 — Vòng xoay: khách trên Sheet theo số CUS tăng dần, bắt đầu sau khách cuối đã ghi xong ở phiên trước, hết danh sách thì quay về số nhỏ nhất (09/02 "Chuỗi trong một lần hỏi" mục 9).
+ * Chỉ khách đã có mã FBM, chưa xóa, cho phép lấy về, thuộc phạm vi và không mang cờ "không thấy bên FBM". Không đọc danh sách khách FBM: khách mới và thông tin khách là việc của Quét nhanh.
+ */
+FbmSync.activityRotationRing = function (start) {
+  var pullAllowed = FbmSync.pullAllowedReader('customer'), scope = typeof FbmSync.scope === 'function' ? FbmSync.scope() : null, list = [];
+  FbmSync.readLocal('customer').forEach(function (record) {
+    var index = FbmSync.seenStoreIndex('customer', record), fbmId = String(record && record.fbmId || '').trim();
+    if (index < 0 || !fbmId || String(record.recordStatus || 'active') === 'deleted' || FbmSync.isTemporaryRecord('customer', record) || String(record.syncStatus || '') === FbmSync.SYNC_STATUS.missing || !pullAllowed(record) || !FbmSync.inScope(record, scope)) { return; }
+    list.push({ index: index, sttRec: fbmId });
+  });
+  list.sort(function (a, b) { return a.index - b.index; });
+  return list.filter(function (item) { return item.index > start; }).concat(list.filter(function (item) { return item.index <= start; }));
+};
+
+/**
+ * Mở phiên Vòng xoay: đọc giao dịch của N khách theo lô `activityBatchCustomers`. Không có khách nào đủ điều kiện thì phiên xong ngay, không đọc FBM.
+ */
+FbmSync.activityRotationBegin = function (state) {
+  var start = FbmSync.detailCursorRead(), limit = Math.max(1, Number(state.detailCustomerLimit || FbmSync.backgroundScheduleDefault().detail.customersPerRun)), total = Math.min(limit, FbmSync.activityRotationRing(start).length);
+  state.phase = 'pull_activity'; state.entity = 'activity';
+  if (typeof FbmSync.businessStepStart === 'function') {
+    FbmSync.businessStepStart(state, 'pull_activity', { mode: state.mode, scan: state.scan, entity: 'activity' });
+    FbmSync.businessStepStart(state, 'reconcile_activity', { mode: state.mode, scan: state.scan, entity: 'activity' });
+  }
+  state.progress = { done: 0, total: total };
+  state.cursor = { kind: 'activity_grid', customers: [], customerIndex: 0, batch: [], count: FbmSync.BUDGET.activityCustomerRows, customerNext: null, customerSeen: 0, rotation: { start: start, limit: limit, taken: 0, last: -1 } };
+  state.message = 'Đang đọc giao dịch của ' + total + ' khách theo vòng xoay...';
+  FbmSync.activityBatchPlan(state.cursor);
+  FbmSync.activityPagesWrite(state, {});
+  FbmSync.stateWrite(state);
+  var request = FbmSync.activityBatchRequest(state);
+  if (!request) { FbmSync.finishPullRun(state); }
+  return request;
+};
+
+/**
+ * Lô trước đã ghi xong (kế hoạch lô rỗng mới gọi tới đây) nên lưu cursor bền bằng khách cuối của lô đó, rồi lấy lô kế đến khi đủ N. Phiên bị kẹt giữa lô thì phiên sau đọc lại đúng lô đó và vẫn đủ N khách.
+ * Khách đọc lỗi đã có dòng Log `activity_customer_failed` và hiện ở Sidebar; cursor vẫn đi qua để một khách hỏng không chặn cả vòng.
+ */
+FbmSync.activityRotationRefill = function (cursor) {
+  var rotation = cursor.rotation, taken = Number(rotation.taken || 0);
+  if (Number(rotation.last) >= 0) { FbmSync.detailCursorWrite(rotation.last); }
+  var ring = FbmSync.activityRotationRing(Number(rotation.start)), end = Math.min(Number(rotation.limit), ring.length, taken + FbmSync.BUDGET.activityBatchCustomers), picked = ring.slice(taken, Math.max(taken, end));
+  cursor.customers = picked.map(function (item) { return item.sttRec; });
+  cursor.customerIndex = 0;
+  rotation.taken = taken + picked.length;
+  rotation.last = picked.length ? picked[picked.length - 1].index : -1;
 };
