@@ -18,7 +18,7 @@ function reloadDecisionBlank(reason) {
     kind: 'none',
     ram: { action: 'none', mode: 'none', recordIds: [], deferredRecordIds: [], reason: reason || '' },
     views: { action: 'none', mode: 'none', sheetName: '', reason: reason || '' },
-    signal: { records: [], entities: [], category: false, config: false, schema: false, allCore: false, allViews: false },
+    signal: { records: [], recordEntity: '', entities: [], category: false, config: false, schema: false, allCore: false, allViews: false },
     notifySidebar: false,
     reason: reason || ''
   };
@@ -43,14 +43,15 @@ function reloadDecisionDraftIds(localDraft) {
   return reloadDecisionIds(localDraft.recordIds || localDraft.ids || localDraft.id);
 }
 
-function reloadDecisionWithRam(decision, mode, ids, input, reason) {
+/** `replacesWholeSheet`: kế hoạch nạp có phần thay cả một sheet, nên bản nháp chặn như nạp trọn. */
+function reloadDecisionWithRam(decision, mode, ids, input, reason, replacesWholeSheet) {
   var normalized = reloadDecisionIds(ids);
   var draftIds = reloadDecisionDraftIds(input && input.localDraft);
   var draft = {};
   draftIds.forEach(function (id) { draft[id] = true; });
   var deferred = normalized.filter(function (id) { return draft[id]; });
   // Nạp trọn thực thể thay mọi bản ghi của nó như full core, nên bản nháp chặn cả hai.
-  var fullCoreBlocked = (mode === 'fullCore' || mode === 'entity') && draftIds.length > 0;
+  var fullCoreBlocked = (mode === 'fullCore' || mode === 'entity' || replacesWholeSheet === true) && draftIds.length > 0;
   var action = deferred.length || fullCoreBlocked ? 'defer' : 'reload';
   decision.ram = {
     action: action,
@@ -145,6 +146,7 @@ function reloadDecisionForChange(input) {
     decision.signal.config = true;
     decision.signal.allViews = true;
     var configNeedsFullCore = change.configAffectsSchema === true || change.forceFullCore === true;
+    if (configNeedsFullCore) { decision.signal.allCore = true; }
     reloadDecisionWithRam(decision, configNeedsFullCore ? 'fullCore' : 'config', [], change, configNeedsFullCore
       ? 'Config ảnh hưởng Schema nên phải nạp lại full core.'
       : 'Config đổi, nạp riêng toàn bộ khối Config.');
@@ -158,6 +160,7 @@ function reloadDecisionForChange(input) {
   if (isRecordSurface && (entity === 'customer' || entity === 'activity') && ids.length) {
     decision.kind = 'records';
     decision.signal.records = ids;
+    decision.signal.recordEntity = entity;
     decision.signal.allViews = true;
     reloadDecisionWithRam(decision, 'records', ids, change, 'Customer/Activity đổi.');
     if (source !== 'edit' && change.appliedByCaller === true && !decision.ram.deferredRecordIds.length) {
@@ -173,88 +176,45 @@ function reloadDecisionForChange(input) {
 }
 
 /**
- * Tính phần quyết định dành cho Sidebar từ ReloadState đã có sẵn. Hàm này chỉ
- * đọc input, không ghi lại signal; signal chỉ được phát bởi trigger/cửa ghi.
- * `lastSeenRevision` ngăn một wake request lặp lại nạp cùng một revision.
+ * Kế hoạch nạp cho một Sidebar từ sổ nhật ký (07A mục 4): gộp các dòng có revision lớn hơn revision Sidebar đã thấy, mỗi phần lấy mức cao nhất. Tụt dưới `floor` thì nạp lõi, vì không còn biết thay đổi nào đã bị cắt khỏi sổ.
+ * Không nâng lên nạp lõi chỉ vì hai phần cùng đổi: mỗi phần nạp riêng trong cùng một lời gọi.
+ */
+function reloadPlanFromJournal(journal, lastSeenRevision) {
+  var lastSeen = Number(lastSeenRevision || 0);
+  var plan = { revision: journal.rev, core: false, customer: null, activity: null, category: false, config: false };
+  if (lastSeen >= journal.rev) { return plan; }
+  if (lastSeen < journal.floor) { plan.core = true; return plan; }
+  journal.entries.forEach(function (entry) {
+    if (Number(entry.r) <= lastSeen) { return; }
+    RELOAD_RECORD_PARTS.forEach(function (part) { plan[part] = reloadJournalMergePart(plan[part], entry[part]); });
+    RELOAD_FLAG_PARTS.forEach(function (part) { if (entry[part] === true) { plan[part] = true; } });
+  });
+  return plan;
+}
+
+/** Kế hoạch không có phần nào cần nạp (revision tăng chỉ vì view cũ). */
+function reloadPlanEmpty(plan) {
+  return !plan.core && !plan.customer && !plan.activity && !plan.category && !plan.config;
+}
+
+/**
+ * Quyết định dành cho Sidebar từ sổ nhật ký. Hàm thuần: không ghi signal, không đọc kho; bên gọi truyền sổ đã đọc và `lastSeenRevision` của chính Sidebar đó.
+ * `ram.mode`: `fullCore` khi phải nạp lõi, `parts` khi nạp từng phần theo `ram.plan`.
  */
 function reloadDecisionForState(input) {
   var change = input || {};
-  var state = change.reloadState || change.state || {};
-  var revision = Number(state.revision || 0);
-  var lastSeen = Number(change.lastSeenRevision || 0);
   var decision = reloadDecisionBlank('Không có signal mới cho Sidebar.');
-  if (revision && lastSeen >= revision && change.forceReload !== true) { return decision; }
-
-  var common = {
-    source: 'sidebar',
-    localDraft: change.localDraft
-  };
-
-  if (state.allCore || state.all || state.schema) {
-    decision.kind = 'state-full-core';
-    reloadDecisionWithRam(decision, 'fullCore', [], common, 'ReloadState yêu cầu nạp full core.');
-    decision.notifySidebar = true;
-    decision.reason = 'ReloadState yêu cầu nạp full core.';
-    return decision;
-  }
-
-  var stateEntities = reloadDecisionEntities(state.entities);
-  // Một thực thể đứng riêng nạp trọn thực thể đó; đi cùng scope khác thì dùng full core cho cùng một revision nhất quán, như Category đi cùng records.
-  if (stateEntities.length) {
-    var alone = stateEntities.length === 1 && !state.config && !state.category && !(state.records && state.records.length);
-    decision.kind = alone ? 'state-entity' : 'state-full-core';
-    reloadDecisionWithRam(decision, alone ? 'entity' : 'fullCore', [], common, alone ? 'ReloadState yêu cầu nạp trọn ' + stateEntities[0] + '.' : 'ReloadState có thực thể cần nạp trọn cùng scope khác.');
-    if (alone) { decision.ram.entity = stateEntities[0]; }
-    decision.notifySidebar = true;
-    decision.reason = decision.ram.reason;
-    return decision;
-  }
-
-  if (state.config && ((state.records && state.records.length) || state.category)) {
-    decision.kind = 'state-full-core';
-    reloadDecisionWithRam(decision, 'fullCore', [], common, 'Config cùng revision với scope khác nên dùng payload full core nhất quán.');
-    decision.notifySidebar = true;
-    decision.reason = 'ReloadState có Config cùng scope khác.';
-    return decision;
-  }
-
-  if (state.config) {
-    decision.kind = 'state-config';
-    reloadDecisionWithRam(decision, 'config', [], common, 'ReloadState yêu cầu nạp Config.');
-    decision.notifySidebar = true;
-    decision.reason = 'ReloadState yêu cầu nạp Config.';
-    return decision;
-  }
-
-  var ids = reloadDecisionIds(state.records);
-
-  // Category and record signals share one revision. A category-only response
-  // would clear one scope while making the client mark the whole revision as
-  // seen, stranding the records. Use the coherent full-core payload instead.
-  if (state.category && ids.length) {
-    decision.kind = 'state-full-core';
-    reloadDecisionWithRam(decision, 'fullCore', [], common, 'ReloadState co Category va ma ban ghi cung revision.');
-    decision.notifySidebar = true;
-    decision.reason = 'ReloadState co Category va records cung revision.';
-    return decision;
-  }
-
-  if (state.category) {
-    decision.kind = 'state-category';
-    reloadDecisionWithRam(decision, 'category', [], common, 'ReloadState yêu cầu nạp Category.');
-    decision.notifySidebar = true;
-    decision.reason = 'ReloadState yêu cầu nạp Category.';
-    return decision;
-  }
-
-  if (ids.length) {
-    decision.kind = 'state-records';
-    reloadDecisionWithRam(decision, 'records', ids, common, 'ReloadState có mã Customer/Activity cần nạp.');
-    decision.notifySidebar = true;
-    decision.reason = 'ReloadState có mã Customer/Activity cần nạp.';
-    return decision;
-  }
-
+  if (!change.journal) { return decision; }
+  var plan = reloadPlanFromJournal(change.journal, change.lastSeenRevision);
+  if (reloadPlanEmpty(plan)) { return decision; }
+  var common = { source: 'sidebar', localDraft: change.localDraft };
+  var ids = plan.core ? [] : [].concat(Array.isArray(plan.customer) ? plan.customer : [], Array.isArray(plan.activity) ? plan.activity : []);
+  var reason = plan.core ? 'Sổ nhật ký yêu cầu nạp lõi.' : 'Sổ nhật ký có phần dữ liệu cần nạp.';
+  reloadDecisionWithRam(decision, plan.core ? 'fullCore' : 'parts', ids, common, reason, plan.customer === true || plan.activity === true);
+  decision.ram.plan = plan;
+  decision.kind = plan.core ? 'state-full-core' : 'state-parts';
+  decision.notifySidebar = true;
+  decision.reason = decision.ram.reason;
   return decision;
 }
 

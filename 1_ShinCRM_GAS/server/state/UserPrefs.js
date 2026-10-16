@@ -34,7 +34,7 @@ function userPrefsOne(props, name) {
 /**
  * Cả ba núm. Trả về `{ followSelection, autoRenderView, activityView }`.
  *
- * **Không bao giờ ném lỗi**, cùng lý do như `dirtyStateRead`: hàm này nằm trên đường nạp lõi, nên nó hỏng là cả lượt mở sidebar hỏng. Không đọc được thì trả về ba ngầm định, và ba ngầm định là chiều an toàn — chúng chỉ đổi *khi nào vẽ* và *xem phần nào*, không đổi dữ liệu nào.
+ * **Không bao giờ ném lỗi**, vì: hàm này nằm trên đường nạp lõi, nên nó hỏng là cả lượt mở sidebar hỏng. Không đọc được thì trả về ba ngầm định, và ba ngầm định là chiều an toàn — chúng chỉ đổi *khi nào vẽ* và *xem phần nào*, không đổi dữ liệu nào.
  */
 function userPrefsRead() {
   var out = {};
@@ -85,7 +85,7 @@ function userPrefsWrite(name, value) {
       detail: { num: name, giaTri: luu }
     });
 
-    return { ok: true, prefs: userPrefsRead(), reload: reloadStateRead(), dirty: dirtyStateRead() };
+    return { ok: true, prefs: userPrefsRead(), reload: reloadStateRead() };
   });
 }
 

@@ -36,20 +36,20 @@ function measureReloadJournalBaseline() {
   var customerId = firstId('customer');
   out.push('Mã thử: ' + customerId);
   reloadJournalProbeMeasure(out, 'Đổ giỏ tín hiệu một khách', function () {
-    dirtyStateMarkSignal({ records: [customerId], allViews: true, fromSidebar: true });
+    dirtyStateMarkSignal({ customer: [customerId], allViews: true, fromSidebar: true });
     dirtyStateBasketFlush();
   });
-  reloadJournalProbeMeasure(out, 'Đổ giỏ tín hiệu một khách lần 2 (cờ đã có)', function () {
-    dirtyStateMarkSignal({ records: [customerId], allViews: true, fromSidebar: true });
+  reloadJournalProbeMeasure(out, 'Đổ giỏ tín hiệu một khách lần 2', function () {
+    dirtyStateMarkSignal({ customer: [customerId], allViews: true, fromSidebar: true });
     dirtyStateBasketFlush();
   });
-  reloadJournalProbeMeasure(out, 'Gỡ cờ của loadCore khi kho đang bẩn', function () { dirtyStateTakeFullReload(); });
-  reloadJournalProbeMeasure(out, 'Gỡ cờ của loadCore khi kho sạch', function () { dirtyStateTakeFullReload(); });
-  var revision = reloadStateRead().revision;
-  reloadJournalProbeMeasure(out, 'reloadRecords một khách', function () { reloadRecords([customerId], revision); });
-  reloadJournalProbeMeasure(out, 'reloadEntityAll customer', function () { reloadEntityAll('customer', revision); });
-  reloadJournalProbeMeasure(out, 'reloadCategory', function () { reloadCategory(revision); });
-  reloadJournalProbeMeasure(out, 'reloadConfig', function () { reloadConfig(revision); });
-  reloadJournalProbeMeasure(out, 'loadCore', function () { loadCore({}); });
+  var journal = reloadJournalRead();
+  out.push('Sổ: revision ' + journal.rev + ', floor ' + journal.floor + ', ' + journal.entries.length + ' dòng, ' + JSON.stringify(journal).length + ' ký tự');
+  reloadJournalProbeMeasure(out, 'reloadRecords một khách', function () { reloadRecords([customerId], { internal: true }); });
+  reloadJournalProbeMeasure(out, 'reloadEntityAll customer', function () { reloadEntityAll('customer'); });
+  reloadJournalProbeMeasure(out, 'reloadCategory', function () { reloadCategory({ internal: true }); });
+  reloadJournalProbeMeasure(out, 'reloadConfig', function () { reloadConfig({ internal: true }); });
+  reloadJournalProbeMeasure(out, 'loadCore', function () { loadCore({ internal: true }); });
+  reloadJournalProbeMeasure(out, 'Lời hỏi nạp một khách (kế hoạch từng phần)', function () { probeSelectionAndReload({ lastSeenRevision: journal.rev - 1, skipPosition: true }); });
   return out;
 }

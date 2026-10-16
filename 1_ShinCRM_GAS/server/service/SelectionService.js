@@ -66,7 +66,7 @@ function selectionProbeReply(snapshot, started, customerId) {
   };
 
   if (customerId !== undefined) { reply.customerId = customerId; }
-  reply.dirty = dirtyStateRead();
+  reply.reload = reloadStateRead();
   reply.ms = Date.now() - started;
   return reply;
 }
@@ -102,13 +102,15 @@ function selectionReloadRequestId(input) {
   return 'selection-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
 }
 
-function selectionRemainingRevision(state) {
-  if (!state) { return 0; }
-  var hasDirty = !!(state.records && state.records.length) || !!(state.entities && state.entities.length) || !!(state.category || state.config || state.schema || state.allCore);
-  return hasDirty ? Number(state.revision || 0) : 0;
+function selectionPayloadFromReload(result) {
+  if (!result || result.ok === false) { return null; }
+  var parts = result.parts.map(selectionPayloadPart);
+  // Thiếu một phần là cả gói không có: Sidebar giữ revision cũ và lời hỏi sau nạp lại đủ, thay vì nâng revision trên một gói hụt.
+  return parts.length && parts.every(function (part) { return !!part; }) ? { parts: parts } : null;
 }
 
-function selectionPayloadFromReload(result) {
+/** Một phần của gói nạp, theo đúng hình dạng Sidebar áp cho từng loại. */
+function selectionPayloadPart(result) {
   if (!result || result.ok === false) { return null; }
   if (result.reloadMode === 'records') {
     return { mode: 'records', customer: result.customer, activity: result.activity, affectedCustomerIds: result.affectedCustomerIds || [], removedRecordIds: result.removedRecordIds || [], counters: result.counters };
@@ -257,65 +259,29 @@ function probeSelectionAndReload(input) {
     var readSelection = !!context && (positionChanged || request.needsSelection === true);
     var customerCell = readSelection ? selectionCustomerCell(context, snapshot) : null;
     var customerId = customerCell ? customerCell.value : previousCustomerId;
-    var state = reloadStateRead();
-    var decision = typeof reloadDecisionForState === 'function'
-      ? reloadDecisionForState({
-        reloadState: state,
-        lastSeenRevision: request.lastSeenRevision,
-        localDraft: request.localDraft,
-        reason: request.reason
-      })
-      : reloadDecisionBlank('Chưa có bộ quyết định reload.');
+    var journal = reloadJournalRead();
+    var decision = reloadDecisionForState({ journal: journal, lastSeenRevision: request.lastSeenRevision, localDraft: request.localDraft });
     var selection = Object.assign({}, snapshot, {
       positionChanged: positionChanged,
       customerId: customerId,
       customerIdChanged: readSelection && customerId !== previousCustomerId,
       customerCell: customerCell && customerCell.read ? (customerId ? 'value' : 'empty') : ''
     });
-    var payload = null;
-    var processedRevision = 0;
-    var revisionMatched = true;
-    var reloadResult = null;
-    var ram = decision && decision.ram;
-    var ready = !!ram && ram.action === 'reload';
-    if (ready) {
-      var expectedRevision = state && state.revision ? state.revision : undefined;
-      if (ram.mode === 'records' && typeof reloadRecords === 'function') {
-        reloadResult = reloadRecords(ram.recordIds || [], expectedRevision, { internal: true });
-      } else if (ram.mode === 'entity' && typeof reloadEntityAll === 'function') {
-        reloadResult = reloadEntityAll(ram.entity, expectedRevision);
-      } else if (ram.mode === 'category' && typeof reloadCategory === 'function') {
-        reloadResult = reloadCategory(expectedRevision, { internal: true });
-      } else if (ram.mode === 'config' && typeof reloadConfig === 'function') {
-        reloadResult = reloadConfig(expectedRevision, { internal: true });
-      } else if (ram.mode === 'fullCore' && typeof loadCore === 'function') {
-        reloadResult = loadCore({ internal: true, preserveDirty: true, expectedRevision: expectedRevision });
-        if (reloadResult && reloadResult.ok === true) { reloadResult.reloadMode = 'fullCore'; }
-      }
-      payload = selectionPayloadFromReload(reloadResult);
-      revisionMatched = reloadResult && reloadResult.revisionMatched !== undefined ? reloadResult.revisionMatched !== false : true;
-      processedRevision = reloadResult && reloadResult.processedRevision !== undefined ? Number(reloadResult.processedRevision || 0) : 0;
-      if (revisionMatched === false && state && state.revision) {
-        // The loader may report the newest observed state for diagnostics, but
-        // this response only processed the revision captured at request start.
-        processedRevision = Number(state.revision);
-      }
-    }
-    var latest = reloadResult && reloadResult.reload ? reloadResult.reload : reloadStateRead();
+    var ram = decision.ram;
+    var ready = ram.action === 'reload';
+    // Revision của sổ lúc bắt đầu là mốc Sidebar được nâng tới sau khi áp gói; thay đổi ghi trong lúc đọc là dòng mới, lời hỏi sau sẽ thấy.
+    var payload = ready ? selectionPayloadFromReload(reloadByPlan(ram.plan)) : null;
+    var latest = reloadStateRead();
     return {
       ok: true,
       requestId: requestId,
       selection: context ? selection : null,
       customerId: customerId,
       reload: latest,
-      dirty: dirtyStateRead(),
-      decision: ready && reloadResult ? Object.assign({}, decision, { executed: true, resultMode: reloadResult.reloadMode }) : decision,
+      decision: decision,
       payload: payload,
       view: selectionViewDecision(selection.sheetName, latest),
-      observedRevision: state ? Number(state.revision || 0) : 0,
-      processedRevision: processedRevision,
-      remainingRevision: selectionRemainingRevision(latest),
-      revisionMatched: revisionMatched,
+      processedRevision: payload ? journal.rev : 0,
       ms: Date.now() - started
     };
   });

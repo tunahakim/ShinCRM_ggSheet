@@ -73,9 +73,19 @@ function documentStoreFacade(defer) {
       DOCUMENT_STORE.values[key] = null;
       return this;
     },
+    /** Ghi thẳng thì gửi một lệnh cho cả khối thay vì một lệnh mỗi khóa. */
     setProperties: function (values) {
       var self = this;
-      Object.keys(values || {}).forEach(function (key) { self.setProperty(key, values[key]); });
+      var keys = Object.keys(values || {});
+      var store = documentStoreReal();
+      if (deferNow() || typeof store.setProperties !== 'function') {
+        keys.forEach(function (key) { self.setProperty(key, values[key]); });
+        return this;
+      }
+      var texts = {};
+      keys.forEach(function (key) { texts[key] = String(values[key]); });
+      if (keys.length) { store.setProperties(texts, false); }
+      keys.forEach(function (key) { DOCUMENT_STORE.values[key] = texts[key]; delete DOCUMENT_STORE.dirty[key]; });
       return this;
     },
     getProperties: function () {

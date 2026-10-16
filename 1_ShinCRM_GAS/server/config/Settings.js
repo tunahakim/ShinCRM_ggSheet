@@ -68,8 +68,12 @@ var SETTINGS = {
    */
   CHUNK_ROWS_FALLBACK: [500, 200],
 
-  /** Số mã tối đa giữ trong dirtyRecords trước khi chuyển sang cờ bẩn toàn bộ. */
-  DIRTY_RECORD_LIMIT: 500,
+  /** Sổ nhật ký nạp lại (07A mục 4): số dòng tối đa và dung lượng tối đa (ký tự JSON, dưới 9KB mỗi khóa của Google). Vượt thì cắt dòng cũ nhất; Sidebar tụt dưới phần đã cắt thì nạp lõi một lần. */
+  RELOAD_JOURNAL_MAX_ENTRIES: 100,
+  RELOAD_JOURNAL_MAX_BYTES: 8000,
+
+  /** Số mã tối đa của một phần (Customer hoặc Activity) trong một dòng sổ hoặc một lượt nạp; vượt thì phần đó nạp cả sheet. 100 mã khoảng 1,1KB, giữ chỗ cho các dòng khác trong sổ. */
+  RELOAD_JOURNAL_PART_IDS: 100,
 
   /** Chu kỳ lịch nền (phút) dưới mức này thì Sidebar hỏi xác nhận trước khi lưu, trừ Giữ phiên. Không chặn: chỉ nhắc rằng Quét nhanh, Lấy toàn bộ giao dịch, Vòng xoay chạy dày thì tốn hạn mức FBM và GAS. Tài liệu 09/08 "Màn hình Cài đặt phiên". */
   FBM_SCHEDULE_LOW_MINUTES: 30,

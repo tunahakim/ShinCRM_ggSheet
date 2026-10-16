@@ -29,7 +29,6 @@ function saveRecord(entity, record) {
 
     // Đổ giỏ trước khi trả để phản hồi mang revision đã gồm lượt lưu này; Sidebar đã áp bản đọc lại nên không phải hỏi nạp thêm.
     dirtyStateBasketFlush();
-    ra.dirty = dirtyStateRead();
     ra.reload = reloadStateRead();
     ra.selection = selectionSnapshot();
     ra.ms = Date.now() - batDau;
@@ -50,7 +49,6 @@ function deleteRecords(entity, ids) {
     var ra = deleteGateRemove({ entity: entity, ids: ids });
 
     dirtyStateBasketFlush();
-    ra.dirty = dirtyStateRead();
     ra.reload = reloadStateRead();
     ra.selection = selectionSnapshot();
     ra.ms = Date.now() - batDau;

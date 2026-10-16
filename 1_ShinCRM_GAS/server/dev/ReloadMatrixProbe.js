@@ -9,12 +9,26 @@
 
 var RELOAD_MATRIX_PROBE_VIEW = '!__CRM_RELOAD_MATRIX_PROBE';
 
+/** Không khôi phục sổ nạp lại và mốc view: sổ chỉ ghi thêm, trả về bản cũ thì Sidebar đang mở nhớ revision lớn hơn và bỏ lỡ thay đổi; dòng thừa của fixture chỉ làm Sidebar nạp thêm một lần. */
 function reloadMatrixProbePropKeys() {
-  return [
-    DIRTY_KEYS.records, DIRTY_KEYS.config, DIRTY_KEYS.all,
-    DIRTY_KEYS.category, DIRTY_KEYS.schema, DIRTY_KEYS.allCore, DIRTY_KEYS.viewsStaleRevision, VIEW_LEDGER_KEY,
-    DIRTY_KEYS.revision, DIRTY_KEYS.changedAt, DIRTY_KEYS.recordRevisionLog
-  ];
+  return [VIEW_LEDGER_KEY];
+}
+
+/** Dòng sổ cuối đọc theo hình dạng các ca kiểm: mã bản ghi, cờ từng phần. Mỗi ca so revision trước/sau nên dòng cuối là dòng của chính ca đó. */
+function reloadMatrixProbeState() {
+  var journal = reloadJournalRead();
+  var entry = journal.entries[journal.entries.length - 1] || {};
+  var ids = [];
+  RELOAD_RECORD_PARTS.forEach(function (part) { if (Array.isArray(entry[part])) { ids = ids.concat(entry[part]); } });
+  return {
+    revision: journal.rev,
+    records: ids,
+    entities: RELOAD_RECORD_PARTS.filter(function (part) { return entry[part] === true; }),
+    category: entry.category === true,
+    config: entry.config === true,
+    schema: entry.core === true,
+    allCore: entry.core === true
+  };
 }
 
 function reloadMatrixProbeSnapshotProperties(keys) {
@@ -111,11 +125,10 @@ function reloadMatrixProbeFindDataColumn(context, preferredName) {
 }
 
 function reloadMatrixProbeFindInvalidColumn(context) {
-  var valid = {};
-  Object.keys(DATA_SCHEMA[context.entity]).forEach(function (name) { valid[DATA_SCHEMA[context.entity][name].code] = true; });
+  // Cột mang mã @ (kể cả cột đồng bộ, cột module ngoài DATA_SCHEMA) vẫn làm view cũ theo luật; ca này cần cột nhãn thường.
   for (var i = 0; i < context.columnMap.headerRow.length; i++) {
-    var code = context.columnMap.headerRow[i];
-    if (code && !valid[code]) { return { column: i + 1, inserted: false }; }
+    var code = String(context.columnMap.headerRow[i] || '');
+    if (code && code.charAt(0) !== '@') { return { column: i + 1, inserted: false }; }
   }
   var next = context.columnMap.lastColumn + 1;
   if (next > context.sheet.getMaxColumns()) {
@@ -165,8 +178,6 @@ function reloadMatrixProbe() {
 
   var propSnapshot = reloadMatrixProbeSnapshotProperties(reloadMatrixProbePropKeys());
   var userPrefsSnapshot = reloadMatrixProbeSnapshotUserPrefs();
-  // Probe phải bắt đầu từ scope sạch; dirty cũ trên Sheet DEV không được làm đổi mode của ca Customer được kiểm.
-  dirtyStateClear();
   var customerRows = 0;
   var activityRows = 0;
   var customerStartRow = SHEET_FIRST_DATA_ROW + customer.rowCount;
@@ -205,46 +216,46 @@ function reloadMatrixProbe() {
     var customerEdit = reloadMatrixProbeFindDataColumn(customer, 'companyName');
     var activityEdit = reloadMatrixProbeFindDataColumn(activity, 'content');
 
-    var before = reloadStateRead();
+    var before = reloadMatrixProbeState();
     reloadMatrixProbeWriteEvent(customer.sheet, customerStartRow, customerEdit.column, 'DEV reload customer edit');
-    var after = reloadStateRead();
+    var after = reloadMatrixProbeState();
     reloadMatrixProbeAssert(report, 'Customer cột @ hợp lệ phát records + allViews', after.revision > before.revision && after.records.indexOf(customerIds[0]) >= 0, JSON.stringify({ revision: after.revision, records: after.records }));
     var customerReloadProbe = probeSelectionAndReload({ lastSeenRevision: before.revision, previousCustomerId: '' });
     reloadMatrixProbeAssert(report, 'Customer cột @ nạp ngay ở lời hỏi kế tiếp, không chờ', customerReloadProbe.decision.ram.action === 'reload'
-      && customerReloadProbe.decision.ram.mode === 'records' && !!customerReloadProbe.payload, JSON.stringify({
+      && customerReloadProbe.decision.ram.mode === 'parts' && !!customerReloadProbe.payload, JSON.stringify({
         action: customerReloadProbe.decision.ram.action,
         mode: customerReloadProbe.decision.ram.mode,
         reloadAfterProbe: customerReloadProbe.reload
       }));
 
-    var batchBefore = reloadStateRead();
+    var batchBefore = reloadMatrixProbeState();
     var batchValues = [];
     for (var batchAt = 0; batchAt < customerRows; batchAt++) { batchValues.push(['DEV reload batch ' + (batchAt + 1)]); }
     reloadMatrixProbeWriteRangeEvent(customer.sheet, customerStartRow, customerEdit.column, batchValues);
-    var batchAfter = reloadStateRead();
+    var batchAfter = reloadMatrixProbeState();
     reloadMatrixProbeAssert(report, 'Vùng Customer nhiều hàng gom đủ mã', batchAfter.revision > batchBefore.revision && customerIds.every(function (id) { return batchAfter.records.indexOf(id) >= 0; }), JSON.stringify({ revisionDelta: batchAfter.revision - batchBefore.revision, records: batchAfter.records }));
 
-    var activityBefore = reloadStateRead();
+    var activityBefore = reloadMatrixProbeState();
     var activityResult = reloadMatrixProbeWriteEvent(activity.sheet, activityStartRow, activityEdit.column, 'DEV reload activity edit');
-    var activityAfter = reloadStateRead();
+    var activityAfter = reloadMatrixProbeState();
     reloadMatrixProbeAssert(report, 'Activity cột @ hợp lệ phát đúng mã', activityAfter.revision > activityBefore.revision && activityAfter.records.indexOf(activityIds[0]) >= 0, JSON.stringify({ column: activityEdit.column, code: activityEdit.name, expectedId: activityIds[0], revisionBefore: activityBefore.revision, revisionAfter: activityAfter.revision, records: activityAfter.records, decision: activityResult && activityResult.kind, ram: activityResult && activityResult.ram }));
 
     var invalidInfo = reloadMatrixProbeFindInvalidColumn(customer);
     var invalidColumn = invalidInfo.column;
     extraInvalidColumn = invalidInfo.inserted === true;
-    var invalidBefore = reloadStateRead();
+    var invalidBefore = reloadMatrixProbeState();
     reloadMatrixProbeWriteEvent(customer.sheet, customerStartRow, invalidColumn, 'DEV invalid column');
-    var invalidAfter = reloadStateRead();
-    reloadMatrixProbeAssert(report, 'Customer cột không hợp lệ không phát signal/debounce', invalidAfter.revision === invalidBefore.revision, JSON.stringify({ before: invalidBefore.revision, after: invalidAfter.revision }));
+    var invalidAfter = reloadMatrixProbeState();
+    reloadMatrixProbeAssert(report, 'Customer cột không hợp lệ không phát signal/debounce', invalidAfter.revision === invalidBefore.revision, JSON.stringify({ before: invalidBefore.revision, after: invalidAfter.revision, column: invalidColumn, code: customer.columnMap.headerRow[invalidColumn - 1] || '', entry: reloadJournalRead().entries.slice(-1)[0] }));
 
-    var row2Before = reloadStateRead();
+    var row2Before = reloadMatrixProbeState();
     reloadMatrixProbeWriteEvent(customer.sheet, 2, customerEdit.column, 'DEV row 2');
-    var row2After = reloadStateRead();
+    var row2After = reloadMatrixProbeState();
     reloadMatrixProbeAssert(report, 'Customer hàng 2 không reload', row2After.revision === row2Before.revision, 'revision=' + row2After.revision);
 
-    var row3Before = reloadStateRead();
+    var row3Before = reloadMatrixProbeState();
     reloadMatrixProbeWriteEvent(customer.sheet, 3, customerEdit.column, 'DEV row 3');
-    var row3After = reloadStateRead();
+    var row3After = reloadMatrixProbeState();
     reloadMatrixProbeAssert(report, 'Customer hàng 3 ghi chú không reload', row3After.revision === row3Before.revision, 'revision=' + row3After.revision);
 
     var schemaMap = readColumnMap('Customer');
@@ -252,48 +263,49 @@ function reloadMatrixProbe() {
     var schemaOld = schemaRange.getValues();
     schemaRange.setValues([[schemaOld[0][1], schemaOld[0][0]]]);
     SpreadsheetApp.flush();
-    var schemaBefore = reloadStateRead();
+    var schemaBefore = reloadMatrixProbeState();
     var schemaResult = shinOnEdit({ range: schemaRange });
+    dirtyStateBasketFlush();
     SpreadsheetApp.flush();
-    var schemaAfter = reloadStateRead();
+    var schemaAfter = reloadMatrixProbeState();
     schemaRange.setValues(schemaOld);
     SpreadsheetApp.flush();
-    reloadMatrixProbeAssert(report, 'Customer hàng 1 phát schema + fullCore + vẽ toàn bộ view', schemaAfter.revision > schemaBefore.revision && schemaAfter.schema === true && schemaAfter.allCore === true && reloadMatrixProbeRenderedAll(schemaResult, expectedViews), JSON.stringify({ revision: schemaAfter.revision, schema: schemaAfter.schema, allCore: schemaAfter.allCore, rendered: schemaResult && schemaResult.rendered && schemaResult.rendered.length }));
+    reloadMatrixProbeAssert(report, 'Customer hàng 1 phát schema + fullCore + làm mọi view cũ', schemaAfter.revision > schemaBefore.revision && schemaAfter.schema === true && schemaAfter.allCore === true && reloadStateRead().viewsStaleRevision === schemaAfter.revision, JSON.stringify({ revision: schemaAfter.revision, schema: schemaAfter.schema, allCore: schemaAfter.allCore, rendered: schemaResult && schemaResult.rendered && schemaResult.rendered.length }));
     report.push('Schema map sau khi khôi phục: ' + Object.keys(schemaMap.map).length + ' mã.');
-    dirtyStateClear();
 
     var categoryCell = reloadMatrixProbeFindCategoryCell(book.getSheetByName('Category'));
     var categorySnapshot = reloadMatrixProbeSnapshotCell(categoryCell.cell);
-    var categoryBefore = reloadStateRead();
+    var categoryBefore = reloadMatrixProbeState();
     categoryCell.cell.setValue(String(categorySnapshot.value || '') + ' ');
     SpreadsheetApp.flush();
     var categoryResult = shinOnEdit({ range: categoryCell.cell, oldValue: categorySnapshot.value, value: String(categorySnapshot.value || '') + ' ' });
+    dirtyStateBasketFlush();
     SpreadsheetApp.flush();
-    var categoryAfter = reloadStateRead();
+    var categoryAfter = reloadMatrixProbeState();
     reloadMatrixProbeRestoreCell(categoryCell.cell, categorySnapshot);
     SpreadsheetApp.flush();
     resetSettingsCache();
-    reloadMatrixProbeAssert(report, 'Category cột @ phát dirtyCategory + vẽ toàn bộ view', categoryAfter.revision > categoryBefore.revision && categoryAfter.category === true && reloadMatrixProbeRenderedAll(categoryResult, expectedViews), JSON.stringify({ revision: categoryAfter.revision, category: categoryAfter.category, rendered: categoryResult && categoryResult.rendered && categoryResult.rendered.length }));
-    dirtyStateClear();
+    reloadMatrixProbeAssert(report, 'Category cột @ phát phần Category + làm mọi view cũ', categoryAfter.revision > categoryBefore.revision && categoryAfter.category === true && reloadStateRead().viewsStaleRevision === categoryAfter.revision, JSON.stringify({ revision: categoryAfter.revision, category: categoryAfter.category, rendered: categoryResult && categoryResult.rendered && categoryResult.rendered.length }));
 
     var configCell = reloadMatrixProbeFindConfigCell(book.getSheetByName('Config'));
     var configSnapshot = reloadMatrixProbeSnapshotCell(configCell.cell);
-    var configBefore = reloadStateRead();
+    var configBefore = reloadMatrixProbeState();
     var configValue = String(configSnapshot.value === null || configSnapshot.value === undefined ? '' : configSnapshot.value) + ' ';
     configCell.cell.setValue(configValue);
     SpreadsheetApp.flush();
     var configResult = shinOnEdit({ range: configCell.cell, oldValue: configSnapshot.value, value: configValue });
+    dirtyStateBasketFlush();
     SpreadsheetApp.flush();
-    var configAfter = reloadStateRead();
+    var configAfter = reloadMatrixProbeState();
     reloadMatrixProbeRestoreCell(configCell.cell, configSnapshot);
     SpreadsheetApp.flush();
     resetSettingsCache();
-    reloadMatrixProbeAssert(report, 'Config cột @ phát dirtyConfig + mode config + vẽ toàn bộ view', configAfter.revision > configBefore.revision && configAfter.config === true && configAfter.allCore === false && reloadMatrixProbeRenderedAll(configResult, expectedViews), JSON.stringify({ revision: configAfter.revision, config: configAfter.config, allCore: configAfter.allCore, rendered: configResult && configResult.rendered && configResult.rendered.length }));
+    reloadMatrixProbeAssert(report, 'Config cột @ phát phần Config + làm mọi view cũ', configAfter.revision > configBefore.revision && configAfter.config === true && configAfter.allCore === false && reloadStateRead().viewsStaleRevision === configAfter.revision, JSON.stringify({ revision: configAfter.revision, config: configAfter.config, allCore: configAfter.allCore, rendered: configResult && configResult.rendered && configResult.rendered.length }));
 
     var viewOrdinaryColumn = viewSheet.getLastColumn();
-    var viewRow1Before = reloadStateRead();
+    var viewRow1Before = reloadMatrixProbeState();
     var viewRow1Result = reloadMatrixProbeWriteEvent(viewSheet, 1, viewOrdinaryColumn, 'DEV_RELOAD_ORDINARY_2');
-    var viewRow1After = reloadStateRead();
+    var viewRow1After = reloadMatrixProbeState();
     reloadMatrixProbeAssert(report, 'Sheet quản trị hàng 1 cột thường không vẽ', viewRow1After.revision === viewRow1Before.revision, JSON.stringify({ revision: viewRow1After.revision, rendered: viewRow1Result && viewRow1Result.rendered && viewRow1Result.rendered.length }));
 
     var viewValidHeaderColumn = viewSheet.getRange(1, 1, 1, viewSheet.getLastColumn()).getValues()[0].indexOf(DATA_SCHEMA.customer.id.code) + 1;
@@ -302,30 +314,31 @@ function reloadMatrixProbe() {
     // Giữ nguyên mã hợp lệ để phép thử chỉ kiểm nhánh phân loại hàng 1, không
     // làm thay đổi cấu hình dữ liệu của view tạm trong lúc renderer chạy.
     var viewValidHeaderTarget = viewValidHeaderSnapshot.value || DATA_SCHEMA.customer.id.code;
-    var viewValidRow1Before = reloadStateRead();
+    var viewValidRow1Before = reloadMatrixProbeState();
     viewValidHeaderCell.setValue(viewValidHeaderTarget);
     SpreadsheetApp.flush();
     var viewValidRow1Result = shinOnEdit({ range: viewValidHeaderCell, oldValue: viewValidHeaderSnapshot.value, value: viewValidHeaderTarget });
+    dirtyStateBasketFlush();
     SpreadsheetApp.flush();
-    var viewValidRow1After = reloadStateRead();
+    var viewValidRow1After = reloadMatrixProbeState();
     reloadMatrixProbeRestoreCell(viewValidHeaderCell, viewValidHeaderSnapshot);
     SpreadsheetApp.flush();
-    reloadMatrixProbeAssert(report, 'Sheet quản trị hàng 1 mã cột hợp lệ vẽ toàn bộ view', reloadMatrixProbeRenderedAll(viewValidRow1Result, expectedViews), JSON.stringify({ revisionBefore: viewValidRow1Before.revision, revisionAfter: viewValidRow1After.revision, rendered: viewValidRow1Result && viewValidRow1Result.rendered && viewValidRow1Result.rendered.length, failed: viewValidRow1Result && viewValidRow1Result.failed }));
+    reloadMatrixProbeAssert(report, 'Sheet quản trị hàng 1 mã cột hợp lệ vẽ đúng sheet bị sửa', reloadMatrixProbeRenderedAll(viewValidRow1Result, 1), JSON.stringify({ revisionBefore: viewValidRow1Before.revision, revisionAfter: viewValidRow1After.revision, rendered: viewValidRow1Result && viewValidRow1Result.rendered && viewValidRow1Result.rendered.length, failed: viewValidRow1Result && viewValidRow1Result.failed }));
 
     var viewValidColumn = viewSheet.getRange(1, 1, 1, viewSheet.getLastColumn()).getValues()[0].indexOf(DATA_SCHEMA.customer.id.code) + 1;
-    var viewRow3Before = reloadStateRead();
+    var viewRow3Before = reloadMatrixProbeState();
     var viewRow3Result = reloadMatrixProbeWriteEvent(viewSheet, 3, viewValidColumn, '<>""');
-    var viewRow3After = reloadStateRead();
-    reloadMatrixProbeAssert(report, 'Sheet quản trị hàng 3 dưới cột @ vẽ toàn bộ view', reloadMatrixProbeRenderedAll(viewRow3Result, expectedViews), JSON.stringify({ revisionBefore: viewRow3Before.revision, revisionAfter: viewRow3After.revision, rendered: viewRow3Result && viewRow3Result.rendered && viewRow3Result.rendered.length }));
+    var viewRow3After = reloadMatrixProbeState();
+    reloadMatrixProbeAssert(report, 'Sheet quản trị hàng 3 dưới cột @ vẽ đúng sheet bị sửa', reloadMatrixProbeRenderedAll(viewRow3Result, 1), JSON.stringify({ revisionBefore: viewRow3Before.revision, revisionAfter: viewRow3After.revision, rendered: viewRow3Result && viewRow3Result.rendered && viewRow3Result.rendered.length }));
 
-    var viewOrdinaryBefore = reloadStateRead();
+    var viewOrdinaryBefore = reloadMatrixProbeState();
     reloadMatrixProbeWriteEvent(viewSheet, 3, viewOrdinaryColumn, 'DEV filter thường');
-    var viewOrdinaryAfter = reloadStateRead();
+    var viewOrdinaryAfter = reloadMatrixProbeState();
     reloadMatrixProbeAssert(report, 'Sheet quản trị hàng 3 dưới cột thường không vẽ', viewOrdinaryAfter.revision === viewOrdinaryBefore.revision, 'revision=' + viewOrdinaryAfter.revision);
 
-    var viewDataBefore = reloadStateRead();
+    var viewDataBefore = reloadMatrixProbeState();
     reloadMatrixProbeWriteEvent(viewSheet, SHEET_FIRST_DATA_ROW, viewOrdinaryColumn, 'DEV output edit');
-    var viewDataAfter = reloadStateRead();
+    var viewDataAfter = reloadMatrixProbeState();
     reloadMatrixProbeAssert(report, 'Sheet quản trị hàng 4 cột dữ liệu sinh không vẽ', viewDataAfter.revision === viewDataBefore.revision, 'revision=' + viewDataAfter.revision);
 
     report.push('Hoàn tất: tất cả ca probe reload đều đạt.');
@@ -353,18 +366,16 @@ function reloadPayloadProbe() {
   var snapshot = reloadMatrixProbeSnapshotProperties(propKeys);
   var report = [];
   try {
-    // Cô lập dirty state để ca R11 luôn kiểm đúng records/defer, không bị scope
-    // allCore còn lại từ một lượt nghiệm thu khác trên cùng Sheet DEV.
-    dirtyStateClear();
     var context = entityReadContext('customer');
     var keys = entityReadFieldBlock(context, SHEET_FIRST_DATA_ROW, context.rowCount, ['id']);
     var id = keys.length ? String(keys[0][0] || '').trim() : '';
     if (!id) { throw new Error('DEV không có mã Customer để kiểm payload.'); }
 
-    dirtyStateMarkSignal({ records: [id], allViews: false });
+    dirtyStateMarkSignal({ customer: [id], allViews: false });
     var observed = dirtyStateBasketFlush().revision;
-    var ready = probeSelectionAndReload({ requestId: 'dev-r11-ready', previousCustomerId: '' });
-    reloadMatrixProbeAssert(report, 'R11 DEV lời hỏi ngay sau thay đổi trả payload cùng response', ready.payload && ready.payload.mode === 'records' && ready.processedRevision === observed && ready.reload.records.length === 0, JSON.stringify({ mode: ready.payload && ready.payload.mode, processedRevision: ready.processedRevision, observed: observed, records: ready.reload.records }));
+    var ready = probeSelectionAndReload({ requestId: 'dev-r11-ready', previousCustomerId: '', lastSeenRevision: observed - 1 });
+    var parts = ready.payload ? ready.payload.parts : [];
+    reloadMatrixProbeAssert(report, 'R11 DEV lời hỏi ngay sau thay đổi trả payload cùng response', parts.length === 1 && parts[0].mode === 'records' && ready.processedRevision === observed, JSON.stringify({ modes: parts.map(function (part) { return part.mode; }), processedRevision: ready.processedRevision, observed: observed }));
     report.push('R11 DEV hoàn tất: GAS tự quyết định nạp và trả payload trong cùng request.');
     return report;
   } finally {

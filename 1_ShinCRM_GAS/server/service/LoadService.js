@@ -15,19 +15,10 @@
 /** Nguồn ghi log của mọi đường trong tệp này. Sidebar gọi qua `google.script.run` nên theo bảng ở tài liệu 10 Phần 8, nguồn là `sidebar` và kênh báo lỗi là ném lại cho `withFailureHandler`. */
 var LOAD_SOURCE = 'sidebar';
 
-function getDirtyState() {
-  return runEntryPoint('getDirtyState', LOAD_SOURCE, 'throw', function () {
-    var started = Date.now();
-    var state = reloadStateRead();
-    return { ok: true, reload: state, dirty: dirtyStateRead(), decision: reloadDecisionForState({ reloadState: state }), selection: selectionSnapshot(), ms: Date.now() - started };
-  });
-}
-
 function getReloadState() {
   return runEntryPoint('getReloadState', LOAD_SOURCE, 'throw', function () {
     var started = Date.now();
-    var state = reloadStateRead();
-    return { ok: true, reload: state, dirty: dirtyStateRead(), decision: reloadDecisionForState({ reloadState: state }), selection: selectionSnapshot(), ms: Date.now() - started };
+    return { ok: true, reload: reloadStateRead(), selection: selectionSnapshot(), ms: Date.now() - started };
   });
 }
 
@@ -45,66 +36,12 @@ function loadNormalizeRecordIds(recordIds) {
   return out;
 }
 
-/** Hợp nhất scope caller với dirty state mới hơn để một request không đọc hụt mã vừa phát sinh. */
-function loadMergeRecordIds(left, right) {
-  return loadNormalizeRecordIds((left || []).concat(right || []));
-}
-
-function loadStateNeedsFullCore(state) {
-  return !!(state && (state.allCore || state.all || state.schema || state.config || (state.entities && state.entities.length)));
-}
-
-function reloadRecords(recordIds, expectedRevision, options) {
+/** Nạp đúng các mã (lẫn Customer và Activity); mã Activity kéo theo khách cha và mọi giao dịch của khách đó, vì Sidebar coi giao dịch vắng trong payload là đã xóa. */
+function reloadRecords(recordIds, options) {
   var execute = function () {
     var started = Date.now();
     var ids = loadNormalizeRecordIds(recordIds);
-    var requestedRevisionValue = expectedRevision === undefined || expectedRevision === null || expectedRevision === ''
-      ? null : Number(expectedRevision);
-    var requestedRevision = requestedRevisionValue !== null && isFinite(requestedRevisionValue) ? requestedRevisionValue : null;
-    var observed = typeof reloadStateRead === 'function' ? reloadStateRead() : null;
-    var observedRecordsAtStart = observed && Array.isArray(observed.records) ? observed.records.slice() : [];
-    var requestWasSuperseded = requestedRevision !== null && observed && observed.revision !== requestedRevision;
-
-    // The Sidebar may have sent this request just before another onEdit/write
-    // advanced ReloadState. The server owns the dirty scope, so include the
-    // newer records here instead of making the client reconstruct the union.
-    if (requestWasSuperseded && observed) {
-      if (loadStateNeedsFullCore(observed)) {
-        return {
-          ok: true,
-          reloadMode: 'fullCore',
-          reason: 'ReloadState mới hơn yêu cầu nạp full core.',
-          supersededRevision: requestedRevision,
-          processedRevision: observed.revision,
-          revisionMatched: false,
-          reload: observed,
-          dirty: dirtyStateRead(),
-          selection: selectionSnapshot(),
-          ms: Date.now() - started
-        };
-      }
-      ids = loadMergeRecordIds(ids, observed.records);
-      // Clear only against the revision whose complete dirty scope is now read.
-      // `revisionMatched` below still reports that the caller's revision was old.
-      expectedRevision = observed.revision;
-    }
-
-    if (!ids.length || ids.length > SETTINGS.DIRTY_RECORD_LIMIT) {
-      var fullState = typeof reloadStateRead === 'function' ? reloadStateRead() : null;
-      return {
-        ok: true,
-        reloadMode: 'fullCore',
-        reason: !ids.length ? 'Không có mã hợp lệ để xác định scope reload.' : 'Scope reload vượt ngưỡng an toàn.',
-        processedRevision: fullState ? fullState.revision : 0,
-        supersededRevision: requestWasSuperseded ? requestedRevision : undefined,
-        revisionMatched: requestWasSuperseded ? false : true,
-        reload: fullState,
-        dirty: dirtyStateRead(),
-        selection: selectionSnapshot(),
-        ms: Date.now() - started
-      };
-    }
-
+    if (!ids.length) { throw new Error('Nạp lại bản ghi cần ít nhất một mã.'); }
     var customerContext = entityReadContext('customer');
     var activityContext = entityReadContext('activity');
     var customerFirstRow = SHEET_FIRST_DATA_ROW;
@@ -147,22 +84,6 @@ function reloadRecords(recordIds, expectedRevision, options) {
     var customers = entityReadRowsAt(customerContext, customerRowsAt);
     var activities = entityReadRowsAt(activityContext, activityRowsAt);
     var removedRecordIds = ids.filter(function (id) { return !existingCustomerIds[id] && !existingActivityIds[id]; });
-    var current = typeof reloadStateRead === 'function' ? reloadStateRead() : null;
-    var revisionMatches = expectedRevision === undefined || expectedRevision === null || expectedRevision === ''
-      || (current && current.revision === Number(expectedRevision));
-    if (revisionMatches) {
-      dirtyStateClearRecords(ids, expectedRevision);
-    } else if (current && typeof dirtyStateClearRecords === 'function') {
-      // Keep records first seen after this read began. Distinct newer IDs can be
-      // cleared from the old revision; an ID reused by a newer write is kept,
-      // which is conservative and may cause one safe duplicate reload.
-      var newerIds = typeof dirtyStateRecordIdsAfterRevision === 'function'
-        ? dirtyStateRecordIdsAfterRevision(documentProps(), expectedRevision)
-        : current.records.filter(function (id) { return observedRecordsAtStart.indexOf(id) < 0; });
-      var clearable = ids.filter(function (id) { return newerIds.indexOf(id) < 0; });
-      if (clearable.length) { dirtyStateClearRecords(clearable); }
-    }
-    var latest = typeof reloadStateRead === 'function' ? reloadStateRead() : current;
     return {
       ok: true,
       reloadMode: 'records',
@@ -172,11 +93,7 @@ function reloadRecords(recordIds, expectedRevision, options) {
       removedRecordIds: removedRecordIds,
       // Bản ghi có thể do máy khác vừa cấp mã; gửi bộ đếm để mã xem trước của Sidebar này không tụt lại.
       counters: idGateCounterValues(),
-      processedRevision: latest ? latest.revision : 0,
-      revisionMatched: requestWasSuperseded ? false : revisionMatches,
-      supersededRevision: requestWasSuperseded ? requestedRevision : undefined,
-      reload: latest,
-      dirty: dirtyStateRead(),
+      reload: reloadStateRead(),
       selection: selectionSnapshot(),
       ms: Date.now() - started
     };
@@ -184,25 +101,17 @@ function reloadRecords(recordIds, expectedRevision, options) {
   return options && options.internal === true ? execute() : runEntryPoint('reloadRecords', LOAD_SOURCE, 'throw', execute);
 }
 
-/** Nạp riêng Category; chỉ xóa cờ Category khi revision không đổi trong lúc đọc. */
-function reloadCategory(expectedRevision, options) {
+/** Nạp riêng Category. */
+function reloadCategory(options) {
   var execute = function () {
     var started = Date.now();
     var result = categoryReadAll();
-    var current = reloadStateRead();
-    var revisionMatches = expectedRevision === undefined || expectedRevision === null || expectedRevision === ''
-      || current.revision === Number(expectedRevision);
-    if (revisionMatches) { dirtyStateClear({ category: true, expectedRevision: expectedRevision }); }
-    var latest = reloadStateRead();
     return {
       ok: true,
       reloadMode: 'category',
       categories: result.categories,
       warnings: result.warnings,
-      processedRevision: latest.revision,
-      revisionMatched: revisionMatches,
-      reload: latest,
-      dirty: dirtyStateRead(),
+      reload: reloadStateRead(),
       selection: selectionSnapshot(),
       ms: Date.now() - started
     };
@@ -210,41 +119,18 @@ function reloadCategory(expectedRevision, options) {
   return options && options.internal === true ? execute() : runEntryPoint('reloadCategory', LOAD_SOURCE, 'throw', execute);
 }
 
-/** Nạp riêng toàn bộ Config; chỉ nâng full core khi ReloadState đã có scope khác cần đồng bộ cùng revision. */
-function reloadConfig(expectedRevision, options) {
+/** Nạp riêng toàn bộ Config. */
+function reloadConfig(options) {
   var execute = function () {
     var started = Date.now();
-    var current = reloadStateRead();
-    if (current.allCore || current.all || current.schema || (current.records && current.records.length) || current.category) {
-      return {
-        ok: true,
-        reloadMode: 'fullCore',
-        reason: 'ReloadState có scope khác cùng revision, Config cần đi cùng full core.',
-        processedRevision: current.revision,
-        expectedRevision: expectedRevision === undefined || expectedRevision === null || expectedRevision === '' ? null : Number(expectedRevision),
-        reload: current,
-        dirty: dirtyStateRead(),
-        selection: selectionSnapshot(),
-        ms: Date.now() - started
-      };
-    }
     resetSettingsCache();
     var config = configReadAll();
     config.params = configUserParams(configParams());
-    var revisionMatches = expectedRevision === undefined || expectedRevision === null || expectedRevision === ''
-      || current.revision === Number(expectedRevision);
-    if (revisionMatches) { dirtyStateClear({ config: true, expectedRevision: expectedRevision }); }
-    var latest = reloadStateRead();
     return {
       ok: true,
       reloadMode: 'config',
       config: config,
-      reason: 'Nạp riêng toàn bộ Config sau khi revision được GAS xác nhận.',
-      processedRevision: latest.revision,
-      expectedRevision: expectedRevision === undefined || expectedRevision === null || expectedRevision === '' ? null : Number(expectedRevision),
-      revisionMatched: revisionMatches,
-      reload: latest,
-      dirty: dirtyStateRead(),
+      reload: reloadStateRead(),
       selection: selectionSnapshot(),
       ms: Date.now() - started
     };
@@ -253,21 +139,12 @@ function reloadConfig(expectedRevision, options) {
 }
 
 /** Nạp trọn một sheet dữ liệu theo yêu cầu thủ công; không suy diễn từ trạng thái màn hình của Sidebar. */
-function reloadEntityAll(entity, expectedRevision) {
+function reloadEntityAll(entity) {
   var started = Date.now();
   if (entity !== 'customer' && entity !== 'activity') {
     throw new Error('Chỉ nạp thủ công được Customer hoặc Activity, nhận được: ' + entity + '.');
   }
-
   var result = entityReadAll(entity);
-  var current = reloadStateRead();
-  var revisionMatched = expectedRevision === undefined || expectedRevision === null || expectedRevision === ''
-    || current.revision === Number(expectedRevision);
-  var idAt = result.fields.indexOf('id');
-  var ids = result.rows.map(function (row) { return String(idAt >= 0 ? row[idAt] || '' : '').trim(); }).filter(function (id) { return !!id; });
-  if (revisionMatched && ids.length) { dirtyStateClearRecords(ids, expectedRevision); }
-  if (revisionMatched) { dirtyStateClearEntity(entity, expectedRevision); }
-  var latest = reloadStateRead();
   return {
     ok: true,
     reloadMode: entity,
@@ -275,56 +152,75 @@ function reloadEntityAll(entity, expectedRevision) {
     customer: entity === 'customer' ? result : undefined,
     activity: entity === 'activity' ? result : undefined,
     counters: idGateCounterValues(),
-    processedRevision: latest.revision,
-    revisionMatched: revisionMatched,
-    reload: latest,
-    dirty: dirtyStateRead(),
+    reload: reloadStateRead(),
     selection: selectionSnapshot(),
     ms: Date.now() - started
   };
 }
 
-function reloadCustomer(expectedRevision) {
+/**
+ * Chạy một kế hoạch nạp của sổ nhật ký trong cùng lời gọi (07A mục 4): nạp lõi, hoặc từng phần đổi bằng các hàm nạp riêng. Thứ tự Config, Category trước dữ liệu để Sidebar áp bản ghi với cấu hình mới.
+ * Một thực thể nạp cả sheet thì mã của thực thể đó không đọc lại; mã của thực thể kia vẫn nạp theo mã.
+ */
+function reloadByPlan(plan) {
+  if (plan.core) {
+    var core = loadCore({ internal: true, withActivity: true });
+    core.reloadMode = 'fullCore';
+    return { ok: core.ok !== false, reloadMode: 'fullCore', parts: [core] };
+  }
+  var parts = [];
+  if (plan.config) { parts.push(reloadConfig({ internal: true })); }
+  if (plan.category) { parts.push(reloadCategory({ internal: true })); }
+  var ids = [];
+  RELOAD_RECORD_PARTS.forEach(function (entity) {
+    if (plan[entity] === true) { parts.push(reloadEntityAll(entity)); }
+    else if (Array.isArray(plan[entity])) { ids = ids.concat(plan[entity]); }
+  });
+  if (ids.length) { parts.push(reloadRecords(ids, { internal: true })); }
+  return { ok: true, reloadMode: 'parts', parts: parts };
+}
+
+function reloadCustomer() {
   return runEntryPoint('reloadCustomer', LOAD_SOURCE, 'throw', function () {
-    return reloadEntityAll('customer', expectedRevision);
+    return reloadEntityAll('customer');
   });
 }
 
-function reloadActivity(expectedRevision) {
+function reloadActivity() {
   return runEntryPoint('reloadActivity', LOAD_SOURCE, 'throw', function () {
-    return reloadEntityAll('activity', expectedRevision);
+    return reloadEntityAll('activity');
   });
 }
 
 /** Xác định sheet hiện tại ở GAS rồi chọn đúng API; client không được tự đoán theo màn đang mở. */
-function reloadCurrentSheet(expectedRevision) {
+function reloadCurrentSheet() {
   return runEntryPoint('reloadCurrentSheet', LOAD_SOURCE, 'throw', function () {
     var sheet = shinOpenBook().getActiveSheet();
     var name = sheet && typeof sheet.getName === 'function' ? sheet.getName() : '';
     var result;
     if (name === ENTITY_SHEETS.customer) {
-      result = reloadEntityAll('customer', expectedRevision);
+      result = reloadEntityAll('customer');
       result.target = 'customer';
       return result;
     }
     if (name === ENTITY_SHEETS.activity) {
-      result = reloadEntityAll('activity', expectedRevision);
+      result = reloadEntityAll('activity');
       result.target = 'activity';
       return result;
     }
     if (name === 'Category') {
-      result = reloadCategory(expectedRevision);
+      result = reloadCategory();
       result.target = 'category';
       return result;
     }
     if (name === 'Config') {
-      result = reloadConfig(expectedRevision);
+      result = reloadConfig();
       result.target = 'config';
       return result;
     }
     if (name && name.charAt(0) === '!' && typeof renderViewSheet === 'function') {
       result = renderViewSheet(name);
-      return { ok: true, target: 'view', sheetName: name, view: result, reload: reloadStateRead(), dirty: dirtyStateRead() };
+      return { ok: true, target: 'view', sheetName: name, view: result, reload: reloadStateRead() };
     }
     throw new Error('Sheet hiện tại "' + name + '" không thuộc Customer, Activity, Category, Config hoặc sheet quản trị.');
   });
@@ -333,7 +229,7 @@ function reloadCurrentSheet(expectedRevision) {
 /**
  * Nạp phần lõi. Đây là lời gọi đầu tiên của mỗi lượt mở sidebar.
  *
- * Trả về `{ ok: true, blocked: false, settings, schema, config, categories, customer, activity, prefs, budget, dirty, warnings, pendingMessages, ms }` ở đường bình thường, hoặc gói rút gọn vẫn có `pendingMessages` khi vượt trần ngân sách ô.
+ * Trả về `{ ok: true, blocked: false, settings, schema, config, categories, customer, activity, prefs, budget, reload, warnings, pendingMessages, ms }` ở đường bình thường, hoặc gói rút gọn vẫn có `pendingMessages` khi vượt trần ngân sách ô.
  *
  * **Đo ngân sách ô là việc đầu tiên, trước khi đọc một ô dữ liệu nào.** Vượt trần thì dừng ngay tại đó. Phép đo không đọc ô nào nên nó gần như miễn phí, còn đọc dữ liệu trong một tệp đã quá ì là cách chắc nhất để lượt chạy chết ở giữa đường — và chết ở giữa đường thì người dùng thấy sidebar treo, không thấy nguyên nhân.
  *
@@ -355,26 +251,19 @@ function loadCore(options) {
         detail: { total: budget.total, ceiling: budget.ceiling, sheets: budget.sheets }
       });
 
-      return { ok: true, blocked: 'cellBudget', budget: budget, reload: reloadStateRead(), dirty: dirtyStateRead(), selection: selectionSnapshot(), pendingMessages: takePendingMessages(), ms: Date.now() - batDau };
+      return { ok: true, blocked: 'cellBudget', budget: budget, reload: reloadStateRead(), selection: selectionSnapshot(), pendingMessages: takePendingMessages(), ms: Date.now() - batDau };
     }
 
-    var consumedDirty = opts.preserveDirty === true ? null : dirtyStateTakeFullReload();
-    var config;
-    var danhMuc;
-    var khach;
-    var soGiaoDich;
-    try {
-      resetSettingsCache();
-      config = configReadAll();
-      config.params = configUserParams(configParams());
-      danhMuc = categoryReadAll();
-      khach = entityReadAll('customer');
-      soGiaoDich = entityRowCount('activity');
-      var activityAll = opts.preserveDirty === true ? entityReadAll('activity') : null;
-    } catch (err) {
-      if (consumedDirty) { dirtyStateRestoreFullReload(consumedDirty); }
-      throw err;
-    }
+    // Revision đọc trước mọi ô dữ liệu: thay đổi ghi trong lúc đọc mang revision lớn hơn nên lời hỏi sau của Sidebar tự thấy.
+    var processed = reloadStateRead().revision;
+    resetSettingsCache();
+    var config = configReadAll();
+    config.params = configUserParams(configParams());
+    var danhMuc = categoryReadAll();
+    var khach = entityReadAll('customer');
+    var soGiaoDich = entityRowCount('activity');
+    // Nạp lõi từ lời hỏi nạp lại trả trọn Activity trong cùng gói; lượt mở Sidebar thì Activity xuống luồng nạp nền theo gói.
+    var activityAll = opts.withActivity === true ? entityReadAll('activity') : null;
     var ms = Date.now() - batDau;
 
     var warnings = danhMuc.warnings.slice();
@@ -399,13 +288,6 @@ function loadCore(options) {
       }
     });
 
-    if (opts.preserveDirty === true && opts.expectedRevision !== undefined && opts.expectedRevision !== null && opts.expectedRevision !== ''
-      && reloadStateRead().revision === Number(opts.expectedRevision)) {
-      dirtyStateClear({ records: true, category: true, config: true, schema: true, allCore: true, all: true, expectedRevision: opts.expectedRevision });
-    }
-    var processed = opts.preserveDirty === true
-      ? (opts.expectedRevision === undefined || opts.expectedRevision === null || opts.expectedRevision === '' ? reloadStateRead().revision : Number(opts.expectedRevision))
-      : consumedDirty.revision;
     return {
       ok: true,
       blocked: false,
@@ -423,7 +305,6 @@ function loadCore(options) {
       prefs: userPrefsRead(),
       budget: budget,
       reload: reloadStateRead(),
-      dirty: dirtyStateRead(),
       selection: selectionSnapshot(),
       warnings: warnings,
       pendingMessages: takePendingMessages(),
@@ -447,7 +328,7 @@ function loadChunkRows(requested) {
 /**
  * Nạp một gói `activity`, đi từ hàng cuối ngược lên.
  *
- * `cursor` là `null` ở lần gọi đầu, còn các lần sau truyền lại `nextCursor` của phản hồi trước. `chunkRows` là cỡ gói client xin cho riêng lời gọi này; bỏ trống thì dùng `SETTINGS.CHUNK_ROWS`. Trả về `{ ok, fields, rows, done, nextCursor, total, chunkRows, dirty, ms }`.
+ * `cursor` là `null` ở lần gọi đầu, còn các lần sau truyền lại `nextCursor` của phản hồi trước. `chunkRows` là cỡ gói client xin cho riêng lời gọi này; bỏ trống thì dùng `SETTINGS.CHUNK_ROWS`. Trả về `{ ok, fields, rows, done, nextCursor, total, chunkRows, reload, ms }`.
  *
  * **Con trỏ mang số hàng chứ không mang số thứ tự gói.** Nếu client chỉ gửi "cho tôi gói thứ ba" thì hai gói liền nhau có thể đọc lệch nhau khi số hàng đổi giữa hai lần gọi — mà giữa hai lần gọi thì người dùng hoàn toàn có thể vừa thêm một dòng thẳng trên sheet. Số hàng cuối của gói là thứ tự nó nói ra, không phải thứ suy diễn từ trạng thái mà máy chủ không còn nhớ.
  *
@@ -465,7 +346,7 @@ function loadActivityChunk(cursor, chunkRows) {
     var coGoi = loadChunkRows(chunkRows);
 
     if (context.rowCount <= 0 || endRow < firstDataRow) {
-      return { ok: true, fields: context.names, rows: [], done: true, nextCursor: null, total: context.rowCount, chunkRows: coGoi, reload: reloadStateRead(), dirty: dirtyStateRead(), selection: selectionSnapshot(), ms: Date.now() - batDau };
+      return { ok: true, fields: context.names, rows: [], done: true, nextCursor: null, total: context.rowCount, chunkRows: coGoi, reload: reloadStateRead(), selection: selectionSnapshot(), ms: Date.now() - batDau };
     }
 
     var startRow = Math.max(firstDataRow, endRow - coGoi + 1);
@@ -494,7 +375,6 @@ function loadActivityChunk(cursor, chunkRows) {
       total: context.rowCount,
       chunkRows: coGoi,
       reload: reloadStateRead(),
-      dirty: dirtyStateRead(),
       selection: selectionSnapshot(),
       ms: ms
     };
@@ -539,7 +419,7 @@ function probeLoadAll() {
 
   report.push('activity: ' + soBanGhi + ' bản ghi qua ' + soGoi + ' gói');
   report.push('Tổng cả lượt: ' + (Date.now() - batDau) + ' ms');
-  report.push('Trạng thái bẩn: ' + JSON.stringify(core.dirty));
+  report.push('Trạng thái nạp lại: ' + JSON.stringify(core.reload));
   report.push('Cảnh báo: ' + (core.warnings.length ? core.warnings.join(' / ') : 'không có'));
 
   report.forEach(function (line) { Logger.log(line); });

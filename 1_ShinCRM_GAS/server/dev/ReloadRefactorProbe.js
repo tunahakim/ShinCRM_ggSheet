@@ -111,12 +111,11 @@ function measureEntitySignal() {
   var active = shinOpenBook().getActiveSheet().getName();
   out.push('Sheet active: ' + active);
   shinOnChange({ changeType: 'OTHER' });
-  var state = reloadStateRead();
-  out.push('Sau OTHER: entities ' + JSON.stringify(state.entities) + ', allCore ' + state.allCore + ', revision ' + state.revision);
+  var journal = reloadJournalRead();
+  out.push('Sau OTHER: dòng sổ cuối ' + JSON.stringify(journal.entries[journal.entries.length - 1] || null) + ', revision ' + journal.rev);
   var t = Date.now();
-  var probe = probeSelectionAndReload({ lastSeenRevision: state.revision - 1, skipPosition: true, previousSelectionContext: { sheetName: active } });
-  var block = probe.payload && probe.payload[probe.payload.entity];
-  out.push('Lời hỏi: ' + (Date.now() - t) + ' ms, mode ' + (probe.payload && probe.payload.mode) + ' ' + (probe.payload && probe.payload.entity) + ', ' + (block ? block.rows.length : 0) + ' dòng');
-  out.push('Sau lời hỏi: entities ' + JSON.stringify(reloadStateRead().entities) + ', remainingRevision ' + probe.remainingRevision);
+  var probe = probeSelectionAndReload({ lastSeenRevision: journal.rev - 1, skipPosition: true, previousSelectionContext: { sheetName: active } });
+  var parts = probe.payload ? probe.payload.parts : [];
+  out.push('Lời hỏi: ' + (Date.now() - t) + ' ms, phần ' + JSON.stringify(parts.map(function (part) { var block = part.entity && part[part.entity]; return part.mode + (part.entity ? ' ' + part.entity : '') + (block ? ' ' + block.rows.length + ' dòng' : ''); })));
   return out;
 }
