@@ -71,6 +71,9 @@ var SETTINGS = {
   /** Số mã tối đa giữ trong dirtyRecords trước khi chuyển sang cờ bẩn toàn bộ. */
   DIRTY_RECORD_LIMIT: 500,
 
+  /** Chu kỳ lịch nền (phút) dưới mức này thì Sidebar hỏi xác nhận trước khi lưu, trừ Giữ phiên. Không chặn: chỉ nhắc rằng Quét nhanh, Lấy toàn bộ giao dịch, Vòng xoay chạy dày thì tốn hạn mức FBM và GAS. Tài liệu 09/08 "Màn hình Cài đặt phiên". */
+  FBM_SCHEDULE_LOW_MINUTES: 30,
+
   /** Nhịp dò chọn ô khi Extension vắng mặt. Chỉ cần khi không có Extension — có Extension thì tin tới liền, không dò. */
   SELECTION_POLL_MS: 2000,
   SELECTION_POLL_IDLE_MS: 6000,
