@@ -255,8 +255,8 @@ async function chay(so) {
   const schedulerPropertyApi = { getProperty: (key) => schedulerData[key] || null, setProperty: (key, value) => { schedulerData[key] = String(value); } };
   const scheduler = taoHopCat({ FbmSync: {}, SETTINGS: { LOCK_WAIT_MS: 1 }, PropertiesService: { getDocumentProperties: () => schedulerPropertyApi }, LockService: { getDocumentLock: () => ({ tryLock: () => true, releaseLock: () => {} }) } });
   napServer(scheduler, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/state/Scheduler.js');
-  const schedule = scheduler.FbmSync.schedule();
-  check(so, 'Lấy toàn bộ giao dịch chạy nền mặc định tắt với chu kỳ 8 giờ', [schedule.activityMinutes, schedulerData.FBM_SYNC_NEXT_ACTIVITY_FULL_SCAN !== undefined], [480, true]);
+  const schedule = scheduler.FbmSync.backgroundScheduleRead();
+  check(so, 'Lấy toàn bộ giao dịch chạy nền mặc định chu kỳ 8 giờ; chưa từng chạy xong thì đến hạn ngay', [schedule.activityFull.minutes, scheduler.FbmSync.scheduleDueAt('activityFull')], [480, 0]);
   // Trigger hẹn giờ phía GAS của thiết kế cũ còn sót trên project: gọi tới thì tự gỡ mọi trigger cũ, ghi một dòng Log, không đụng state hay lịch nền.
   const triggers = ['fbmHeartbeatTrigger', 'fbmSupervisorTrigger', 'shinOnEdit', 'fbmCustomerScanTrigger'].map((name) => ({ getHandlerFunction: () => name }));
   const deleted = [], legacyLogs = [];
@@ -285,7 +285,9 @@ async function chay(so) {
   heartbeat.FbmSync.setMasterEnabled(true);
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0 });
   heartbeat.FbmSync.identityPreflight = () => ({ blocking: false, status: { status: 'BOUND' }, message: '' });
-  heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
+  // Các tiến trình khác vừa chạy xong nên chưa đến hạn: lần hỏi nào đến hạn chỉ là Giữ phiên.
+  ['CUSTOMER_FULL_SCAN', 'ACTIVITY_FULL_SCAN', 'DETAIL_SCAN'].forEach((key) => { heartbeatData['FBM_SYNC_DONE_' + key] = String(Date.now()); });
+  heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
   const heartbeatRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   check(so, 'Giữ phiên cấp request đếm khách (cùng hàm dựng request lấy danh sách khách, count 1) để capture generic khi chưa biết cookie', [heartbeatRequest.ok, heartbeatRequest.code, heartbeatRequest.request.meta.kind, heartbeatRequest.request.body.type, heartbeatRequest.request.body.count, heartbeatRequest.request.body.sortExpression, heartbeatRequest.request.bodyText.indexOf('{{FBM_PAYLOAD_COOKIE}}') >= 0], [true, 'HEARTBEAT_REQUEST_READY', 'heartbeat', 0, 1, heartbeat.FbmSync.customerListRequest({}).body.sortExpression, true]);
   const overlappingHeartbeat = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
@@ -295,7 +297,7 @@ async function chay(so) {
   const staleTransportFailure = heartbeat.FbmSync.heartbeatTransportFailure({ requestId: heartbeatRequest.request.id, code: 'FBM_TAB_NOT_FOUND' });
   check(so, 'transport failure cũ không đụng reservation mới', [staleTransportFailure.ok, staleTransportFailure.code], [false, 'STALE_RESPONSE']);
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', scheduledScan: '' });
-  heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
+  heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
   heartbeatData.FBM_SYNC_CUSTOMER_BASELINE_V1 = JSON.stringify({ total: 2 });
   const firstHeartbeatRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   const firstHeartbeat = heartbeat.fbmSyncHeartbeat({ d: { TotalRowCount: 2 }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: firstHeartbeatRequest.request.id }] } });
@@ -305,7 +307,7 @@ async function chay(so) {
    check(so, 'GAS khong tu dang nhap khi khong co tien trinh den han', heartbeat.FbmSync.stateRead().phase, 'idle');
    check(so, 'GAS tra request:null khi khong co tien trinh den han', [blockedHeartbeatRequest.ok, blockedHeartbeatRequest.code, blockedHeartbeatRequest.request], [true, 'NO_PROCESS_DUE', null]);
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', session: { cookie: '', expired: false, lastHeartbeatAt: 0 } });
-   heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
+   heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
    const missingCookieRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   check(so, 'cookie chua capture khong bi coi la logout', [missingCookieRequest.ok, missingCookieRequest.code, missingCookieRequest.request.meta.kind], [true, 'HEARTBEAT_REQUEST_READY', 'heartbeat']);
    heartbeat.FbmSync.statePatch({ session: { cookie: 'userFHN_CRM_App', expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' }, scheduledScan: 'customerFull', chain: { current: 'customerFull', ran: [], direction: 'read' }, phase: 'idle', runId: '', cursor: {}, activeRequestId: '', deadlineAt: 0 });
@@ -335,18 +337,18 @@ async function chay(so) {
   const overlapDuringSync = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   check(so, 'heartbeat khong ghi de cursor phien Customer dang chay', [overlapDuringSync.ok, overlapDuringSync.code, overlapDuringSync.request], [false, 'REQUEST_IN_FLIGHT', null]);
    heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { cookie: 'userFHN_CRM_App', expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' }, scheduledScan: '' });
-   heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
+   heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
    const changedRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   check(so, 'heartbeat thay doi tong Customer co reservation moi', [changedRequest.ok, changedRequest.request.meta.kind], [true, 'heartbeat']);
   const changedHeartbeat = heartbeat.fbmSyncHeartbeat({ d: { TotalRowCount: 3 }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: changedRequest.request.id }] } });
    check(so, 'heartbeat tong Customer thay doi kich full Customer va probe lai', [changedHeartbeat.request.meta.kind, changedHeartbeat.status.phase], ['session_probe', 'checking_session']);
    heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { cookie: 'userFHN_CRM_App', expired: false }, scheduledScan: '' });
-   heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
+   heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
    const failedRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   const failedHeartbeat = heartbeat.fbmSyncHeartbeat({ ok: false, status: 500, body: '{"Message":"There was an error processing the request."}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: failedRequest.request.id }] } });
   check(so, 'heartbeat HTTP 500 dung phien va tra loi ro rang', [failedHeartbeat.ok, failedHeartbeat.code, heartbeat.FbmSync.stateRead().lastFailureCode], [false, 'TRANSPORT_ERROR', 'TRANSPORT_ERROR']);
    heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { cookie: 'userFHN_CRM_App', expired: false } });
-   heartbeatData.FBM_SYNC_NEXT_HEARTBEAT = String(Date.now() - 1000);
+   heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
    const emptyRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   check(so, 'heartbeat shape rong co reservation truoc khi phan loai', [emptyRequest.ok, emptyRequest.request.meta.kind], [true, 'heartbeat']);
   const emptyHeartbeat = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: emptyRequest.request.id }] } });

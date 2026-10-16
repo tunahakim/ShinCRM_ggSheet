@@ -45,7 +45,7 @@ async function testConnectionSaveValidation(so) {
 
   spreadsheet.value = 'sheet-a'; dom.document.getElementById('fbm-identity-user').value = '';
   await hop.fbmSyncSaveConnection(button);
-  check(so, 'client chặn identity thiếu trường trước khi gọi GAS', [calls.length, button.disabled, notices[0] && notices[0].area], [0, false, 'identity']);
+  check(so, 'client chặn identity thiếu trường trước khi gọi GAS, chỉ hiện ở card, không ghi Log', [calls.length, button.disabled, notices[0] && notices[0].area, logs.length, errors.length], [0, false, 'identity', 0, 0]);
 
   dom.document.getElementById('fbm-identity-user').value = 'user-a'; username.value = 'USERA'; password.value = '';
   await hop.fbmSyncSaveConnection(button);
@@ -116,7 +116,7 @@ async function testConnectionSaveValidation(so) {
   await hop.fbmSyncDeleteLoginCredential(button);
   check(so, 'xoa vault loi khong duoc bao thanh cong va khong ghi GAS nua', failedDeleteOrder, ['extension']);
   check(so, 'client cho lưu identity lệch và giữ credential đã lưu khi password để trống', [calls.length, calls[2] && calls[2].args[0].credential.mode, password.value], [5, 'preserve', '']);
-  check(so, 'mọi lỗi lưu kết nối đều hiện Sidebar và ghi Sheet Log', [errors.length, logs.length >= errors.length, logs.every((item) => item.name === 'fbmLogSyncError')], [4, true, true]);
+  check(so, 'mọi lỗi hệ thống khi lưu kết nối đều hiện Sidebar và ghi Sheet Log (lỗi nhập sai không tính)', [errors.length, logs.length >= errors.length, logs.every((item) => item.name === 'fbmLogSyncError')], [2, true, true]);
 }
 
 async function chay(so) {

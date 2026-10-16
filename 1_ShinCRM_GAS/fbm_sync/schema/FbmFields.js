@@ -20,7 +20,7 @@ FbmSync.ENDPOINTS = {
 FbmSync.PHASES = ['idle', 'checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push', 'paused', 'conflict', 'error', 'done'];
 FbmSync.SYNC_STATUS = {
   notPushed: 'chưa đẩy', pending: 'chờ đối soát', pushing: 'đang đẩy', pushed: 'đã đẩy chờ xác nhận', synced: 'đã đồng bộ',
-  missing: 'không thấy bên FBM', conflict: 'xung đột chờ quyết', error: 'đẩy lỗi', notApplied: 'đẩy không ăn',
+  missing: 'không thấy bên FBM', transferred: 'đã chuyển cho người khác', conflict: 'xung đột chờ quyết', error: 'đẩy lỗi', notApplied: 'đẩy không ăn',
   skipped: 'không đủ điều kiện đẩy', unknownCategory: 'mã danh mục lạ'
 };
 
@@ -125,6 +125,14 @@ FbmSync.ACTIVITY_MARKER_RE = /\s+#SC-([A-Za-z0-9_-]+)\s*$/;
 /** Đọc field an toàn, phân biệt null/undefined với giá trị 0 hoặc false. */
 FbmSync.value = function (record, key, fallback) {
   return record && record[key] !== undefined && record[key] !== null ? record[key] : (fallback === undefined ? '' : fallback);
+};
+
+/**
+ * Bản ghi vắng hoặc đã chuyển cho người khác, và giao dịch của khách mang hai trạng thái đó, không được đẩy: người dùng không còn quyền với bản ghi bên FBM, đẩy chỉ sinh lỗi hoặc ghi nhầm sang bản ghi của người khác (09/05 Phần 9). Sửa trên Sheet vẫn giữ; cửa ghi chiều lấy về xét lại khi bản ghi được thấy lại.
+ */
+FbmSync.isPushFrozen = function (record, parent) {
+  var frozen = [FbmSync.SYNC_STATUS.missing, FbmSync.SYNC_STATUS.transferred];
+  return frozen.indexOf(String(record && record.syncStatus || '')) >= 0 || (!!parent && frozen.indexOf(String(parent.syncStatus || '')) >= 0);
 };
 
 /** Mã tạm TMP- đứng ngoài mọi kỳ quét để không bị đẩy nhầm lên FBM. */

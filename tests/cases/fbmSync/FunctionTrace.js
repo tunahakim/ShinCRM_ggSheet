@@ -126,14 +126,21 @@ function chay(so) {
   const client = dungState();
   napServer(client.nen, 'fbm_sync/report/Report.js');
   client.nen.FbmSync.statusView = () => ({ phase: client.nen.FbmSync.stateRead().phase, lastError: client.nen.FbmSync.stateRead().lastError });
+  const maPhien = String(client.nen.FbmSync.stateRead().runId || '');
+  const truocLa = client.dong.length;
+  client.nen.FbmSync.logTransportError('Lỗi lưu cài đặt', 'save_connection');
+  client.nen.FbmSync.logTransportError('Lỗi của vòng chạy cũ', 'sync_run', 'ma-phien-khac');
+  check(so, 'Sidebar báo lỗi không kèm đúng mã phiên đang chạy: phiên giữ nguyên, mỗi lỗi một dòng Log nguồn sidebar đúng tên thao tác',
+    [maPhien !== '', client.nen.FbmSync.stateRead().phase, client.dong.slice(truocLa).map((e) => e.source + '|' + e.action + '|' + e.reason)],
+    [true, 'pull_customer', ['sidebar|save_connection|Lỗi lưu cài đặt', 'sidebar|sync_run|Lỗi của vòng chạy cũ']]);
   const truocClient = client.dong.length;
-  client.nen.FbmSync.logTransportError('Extension không trả response');
+  client.nen.FbmSync.logTransportError('Extension không trả response', 'sync_run', maPhien);
   check(so, 'Sidebar báo lỗi khi phiên đang chạy: phiên chuyển error, bước đang chạy đóng với đúng lý do',
     [client.nen.FbmSync.stateRead().phase, client.dong.slice(truocClient).filter((e) => e.outcome === 'error').map((e) => e.detail.step).join(','), client.dong.slice(truocClient)[0].reason.indexOf('Extension không trả response') >= 0],
     ['error', 'pull_customer,run', true]);
   const truocLan2 = client.dong.length;
-  client.nen.FbmSync.logTransportError('Extension không trả response');
-  client.nen.FbmSync.logTransportError('Lỗi khác sau khi phiên đã dừng');
+  client.nen.FbmSync.logTransportError('Extension không trả response', 'sync_run', maPhien);
+  client.nen.FbmSync.logTransportError('Lỗi khác sau khi phiên đã dừng', 'sync_run', maPhien);
   check(so, 'Sidebar báo lỗi khi phiên đã lỗi: lỗi trùng không ghi lại, lỗi mới vẫn có một dòng Log',
     client.dong.slice(truocLan2).map((e) => e.outcome + '|' + e.reason), ['error|Sidebar báo lỗi phiên đồng bộ: Lỗi khác sau khi phiên đã dừng']);
   // FBM-009/FBM-020: lỗi theo bản ghi gom trong RAM, xả ra Sheet Log ở ranh giới lát, kể cả khi lát bị exception.

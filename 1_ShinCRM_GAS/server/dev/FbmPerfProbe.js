@@ -18,11 +18,11 @@ var FBM_PERF_FBM_FUNCTIONS = [
   'pullRecords', 'pullWrite', 'readLocal', 'seenStoreBegin', 'seenStoreMark', 'seenStoreHas', 'sheetSave', 'previewRecords',
   'hash', 'threeWay', 'canonical',
   'businessStepStart', 'businessStepAdd', 'businessStepFinish',
-  'customerScanRecord', 'customerNext', 'activityForCustomers', 'finishPullRun', 'beginCustomerPull',
+  'customerScanRecord', 'customerNext', 'customerScanEnd', 'activityStagesContinue', 'finishPullRun', 'beginCustomerPull',
   'runPreflight', 'preflightEvaluate', 'preflightLocalScan', 'preflightHashSummary', 'preflightCandidates', 'preflightPushPermissions', 'logPreflight', 'identityPreflight', 'pushCandidates',
   'continueSessionGate', 'sessionGateResponseStarted', 'applyTransportSession', 'authContinue', 'lookupPairs',
   'sessionGateStart', 'sessionGateHandleFailure', 'sessionGateProbeRequest', 'sessionGateResumeProbeRequest', 'sessionGateHandleProbeFailure', 'sessionGateTransportRetry', 'sessionGateRecordFailure', 'sessionGateResumeAfterWaitProbe',
-  'activityBatchContinue', 'activityBatchRequest', 'activityParentCodes', 'activityPagesRead', 'activityCustomerErrors'
+  'activityBatchContinue', 'activityBatchRequest', 'gateReadContinue', 'gateLookupContinue', 'gateFlagWrite', 'readListAdd', 'activityCustomerErrors'
 ];
 var FBM_PERF_PROTOCOL_FUNCTIONS = ['parse', 'assertSuccess', 'isLiveSessionResponse'];
 /** Hàm toàn cục của lõi ShinCRM mà đồng bộ gọi tới: đọc Sheet, cửa ghi, Log. */

@@ -174,6 +174,25 @@ async function sendBatchThroughExecutor(envelope, itemReply) {
   return { ok: true, status: 200, items, transport: { contract: MA_HOP_DONG, trace } };
 }
 
+/**
+ * FBM giả cho các phần tử cửa ghi không phải giao dịch: phần tử đọc thông tin khách của lô (`stt_rec_kh in ('…')`) và hai kiểu tra mã khách không lọc quyền. Trả `null` khi phần tử là giao dịch.
+ * `ctx`: `fields`, `rows` (dòng khách dạng mảng theo `fields`), `gone` (mã khách FBM không còn trả trong quyền), `owners` (id giao dịch → `stt_rec_kh` đang giữ), `exists` (mã khách còn tồn tại ngoài quyền).
+ */
+function gateItemReply(item, ctx) {
+  const keys = item.body.externalKey || [], sttIndex = ctx.fields.indexOf('stt_rec_kh');
+  const batchKey = keys.find((k) => /^stt_rec_kh in \('/.test(k.Name)), ownerKey = keys.find((k) => /sysevents/.test(k.Name)), existKey = keys.find((k) => k.Name === 'stt_rec_kh' && k.Opr === '=');
+  if (batchKey) {
+    const ids = batchKey.Name.match(/'([^']+)'/g).map((text) => text.slice(1, -1)), gone = ctx.gone || [];
+    const dongKhach = ctx.rows.filter((dong) => ids.indexOf(dong[sttIndex]) >= 0 && gone.indexOf(dong[sttIndex]) < 0);
+    return { body: gridResponse(ctx.fields, dongKhach, dongKhach.length) };
+  }
+  if (!ownerKey && !existKey) { return null; }
+  // `fail`: FBM trả lỗi nghiệp vụ cho request tra mã này.
+  if (ctx.fail && ctx.fail(item)) { return { body: JSON.stringify({ d: { Bugs: { FieldName: 'stt_rec_kh', Message: 'Lỗi tra giả lập' } } }) }; }
+  const found = ownerKey ? (ctx.owners || {})[ownerKey.Name.match(/id = '(\d+)'/)[1]] : (ctx.exists || []).indexOf(existKey.Value) >= 0 ? existKey.Value : '';
+  return { body: JSON.stringify({ d: { TotalRowCount: found ? 1 : 0, ViewPage: { Fields: [{ AliasName: 'stt_rec_kh' }] }, Rows: found ? [[found]] : [] } }) };
+}
+
 function relayResponse(value) {
   const body = JSON.stringify(value);
   return { ok: true, status: 200, headers: { get: () => 'application/json' }, text: () => Promise.resolve(body) };
@@ -396,9 +415,36 @@ async function chay(so) {
     check(so, 'Lịch nền: người dùng xác nhận thì lưu, chu kỳ 0 được giữ là 0 khi đọc lại',
       [dongY.ok, F.backgroundScheduleRead().heartbeat.minutes, F.backgroundScheduleRead().customerFull.minutes], [true, 0, 5]);
     const now = Date.UTC(2026, 9, 16, 8, 0);
-    F.scheduleMarkerAdvance('heartbeat', now);
-    check(so, 'Chu kỳ 0: chạy xong thì mốc là chính giờ chạy xong, lần hỏi kế tiếp đến hạn ngay',
-      [Number(F.props().getProperty(F.SCHEDULE_MARKER_KEYS.heartbeat)), F.scheduleDueKinds(now + 1, []).indexOf('heartbeat') >= 0], [now, true]);
+    F.scheduleMarkDone('heartbeat', now);
+    {
+      const hop = workflowGas().hop, vet = [];
+      hop.logTrace = (entry) => vet.push(entry);
+      hop.FbmSync.backgroundScheduleSave({ heartbeat: { enabled: true, minutes: '5' }, customerFull: { enabled: true, minutes: '60' }, activityFull: { enabled: false }, detail: { enabled: false } });
+      hop.FbmSync.scheduleMarkDone('heartbeat', Date.now()); hop.FbmSync.scheduleMarkDone('customerFull', Date.now());
+      const hoi = hop.FbmSync.schedulerPickDue(Date.now() + 60000);
+      check(so, 'LOG_TRACE: lần Extension hỏi mà chưa có việc ghi một dòng vết nói tiến trình nào sớm nhất và còn bao lâu',
+        [hoi.code, vet.map((v) => [v.source, v.action, v.reason])], ['NO_PROCESS_DUE', [['fbm_sync', 'schedule_idle', 'Extension hỏi lịch nền: chưa có tiến trình đến hạn; sớm nhất là Giữ phiên FBM, còn 4 phút.']]]);
+    }
+    {
+      const G = workflowGas().hop.FbmSync, T = Date.UTC(2026, 9, 16, 9, 0), PHUT = 60000;
+      G.backgroundScheduleSave({ heartbeat: { enabled: false }, customerFull: { enabled: true, minutes: '30' }, activityFull: { enabled: false }, detail: { enabled: false }, confirmLow: true });
+      const chuaTungChay = G.scheduleDueKinds(T, []);
+      G.scheduleMarkDone('customerFull', T);
+      check(so, 'Lịch nền: chưa từng chạy xong thì đến hạn ngay; chu kỳ tính từ giờ chạy xong, 29 phút sau chưa đến hạn, 30 phút sau đến hạn',
+        [chuaTungChay, G.scheduleDueKinds(T + 29 * PHUT, []), G.scheduleDueKinds(T + 30 * PHUT, [])], [['customerFull'], [], ['customerFull']]);
+      G.backgroundScheduleSave({ customerFull: { enabled: true, minutes: '60' } });
+      const sau60 = [G.props().getProperty(G.SCHEDULE_DONE_KEYS.customerFull), G.scheduleDueKinds(T + 30 * PHUT, [])];
+      G.backgroundScheduleSave({ customerFull: { enabled: true, minutes: '10' }, confirmLow: true });
+      check(so, 'Lịch nền: lưu cài đặt không đụng giờ chạy xong; đổi chu kỳ có hiệu lực ngay tính từ lần chạy xong cũ',
+        [sau60, G.scheduleDueKinds(T + 10 * PHUT, [])], [[String(T), []], ['customerFull']]);
+      G.statePatch({ runId: 'conflict-run', origin: 'background', phase: 'conflict', scheduledScan: '', chain: { current: 'customerFull', ran: [], direction: 'read' } });
+      G.props().setProperty(G.SCHEDULE_DONE_KEYS.customerFull, '1');
+      G.chainTail({ ok: true, request: null });
+      check(so, 'Lịch nền: lượt nền dừng ở xung đột vẫn tính là chạy xong (không chạy lại mỗi lần hỏi), chuỗi dừng chờ người dùng',
+        [Number(G.props().getProperty(G.SCHEDULE_DONE_KEYS.customerFull)) > 1, G.stateRead().chain, G.stateRead().phase], [true, null, 'conflict']);
+    }
+    check(so, 'Chu kỳ 0: ghi giờ chạy xong, lần hỏi kế tiếp đến hạn ngay',
+      [Number(F.props().getProperty(F.SCHEDULE_DONE_KEYS.heartbeat)), F.scheduleDueKinds(now + 1, []).indexOf('heartbeat') >= 0], [now, true]);
   }
   // Chiều đẩy kiểm lại danh mục FBM giữa các lô: FBM đổi tên một mã giữa lượt thì chỉ bản ghi dùng mã đó bị chặn.
   const categoryPushRun = (options) => {
@@ -684,9 +730,10 @@ async function chay(so) {
   check(so, 'HTML lỗi qua continuation bị fail-closed, giữ cursor và ghi Log lỗi', [htmlStarted.request.meta.kind, htmlResult.ok, htmlResult.request || null, htmlState.phase, htmlState.lastFailureCode, htmlState.cursor.kind, htmlLogs.length, htmlLogs[0] && htmlLogs[0].action], ['identity_user_grid', false, null, 'error', 'PARSE_ERROR', 'identity_user_grid', 1, 'business_request_failed']);
   scheduleFlow.hop.FbmSync.identityPreflight = () => ({ blocking: false, status: { status: 'BOUND' }, message: '' });
   const now = Date.now();
-  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_CUSTOMER_FULL_SCAN', String(now - 1));
-  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_ACTIVITY_FULL_SCAN', String(now - 1));
-  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_HEARTBEAT', String(now - 1));
+  scheduleFlow.documentProperties.setProperty('FBM_SYNC_DONE_DETAIL_SCAN', String(now));
+  scheduleFlow.documentProperties.setProperty('FBM_SYNC_DONE_CUSTOMER_FULL_SCAN', '1');
+  scheduleFlow.documentProperties.setProperty('FBM_SYNC_DONE_ACTIVITY_FULL_SCAN', '1');
+  scheduleFlow.documentProperties.setProperty('FBM_SYNC_DONE_HEARTBEAT', '1');
   const pickedCustomer = scheduleFlow.hop.FbmSync.schedulerPickDue(now);
   check(so, 'scheduler GAS uu tien Customer khi Customer va Activity cung den han', [pickedCustomer.ok, pickedCustomer.kind, scheduleFlow.hop.FbmSync.stateRead().scheduledScan], [true, 'customerFull', 'customerFull']);
   const duplicateReservation = scheduleFlow.hop.FbmSync.schedulerPickDue(now + 1);
@@ -695,16 +742,16 @@ async function chay(so) {
   const blockedOverlap = scheduleFlow.hop.FbmSync.schedulerPickDue(now + 1);
   check(so, 'scheduler GAS khong cap tien trinh song song khi A dang chay', [blockedOverlap.ok, blockedOverlap.code], [false, 'SYNC_ALREADY_RUNNING']);
   scheduleFlow.hop.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', scheduledScan: '' });
-  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_CUSTOMER_FULL_SCAN', String(now + 60000));
-  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_ACTIVITY_FULL_SCAN', String(now + 60000));
-  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_HEARTBEAT', String(now + 60000));
+  scheduleFlow.documentProperties.setProperty('FBM_SYNC_DONE_CUSTOMER_FULL_SCAN', String(now));
+  scheduleFlow.documentProperties.setProperty('FBM_SYNC_DONE_ACTIVITY_FULL_SCAN', String(now));
+  scheduleFlow.documentProperties.setProperty('FBM_SYNC_DONE_HEARTBEAT', String(now));
   const noDue = scheduleFlow.hop.FbmSync.heartbeatRequest({ source: 'alarm' });
   check(so, 'scheduler GAS khong cap heartbeat khi khong co lich den han', [noDue.ok, noDue.code, noDue.request], [true, 'NO_PROCESS_DUE', null]);
   scheduleFlow.hop.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, scheduledScan: '' });
   scheduleFlow.hop.FbmSync.backgroundScheduleSave({ heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: true, minutes: 30 } });
-  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_CUSTOMER_FULL_SCAN', String(now + 60000));
-  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_ACTIVITY_FULL_SCAN', String(now + 60000));
-  scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_HEARTBEAT', String(now - 1));
+  scheduleFlow.documentProperties.setProperty('FBM_SYNC_DONE_CUSTOMER_FULL_SCAN', String(now));
+  scheduleFlow.documentProperties.setProperty('FBM_SYNC_DONE_ACTIVITY_FULL_SCAN', String(now));
+  scheduleFlow.documentProperties.setProperty('FBM_SYNC_DONE_HEARTBEAT', '1');
   const heartbeatLowest = scheduleFlow.hop.FbmSync.schedulerPickDue(now);
   check(so, 'scheduler GAS chi chon giu phien khi khong co tien trinh du lieu den han', [heartbeatLowest.ok, heartbeatLowest.kind], [true, 'heartbeat']);
   check(so, 'cau hinh scheduler tu choi chu ky ngoai gioi han', [scheduleFlow.hop.FbmSync.extensionConfigSave({ pollMinutes: 0 }).ok, scheduleFlow.hop.FbmSync.backgroundScheduleSave({ customerFull: { minutes: 10081 } }).invalid[0].field], [false, 'customerFull.minutes']);
@@ -921,7 +968,9 @@ async function chay(so) {
       }
       let raw = kind === 'batch' ? await sendBatchThroughExecutor(request, (item) => {
         if (/GetCompletionList/.test(item.url)) { return { body: JSON.stringify({ d: [['CODE', 'Ten danh muc']] }) }; }
-        const key = item.body.externalKey && item.body.externalKey[0] && item.body.externalKey[0].Value;
+        const gateReply = gateItemReply(item, { fields: fullCustomerFields, rows: customerRows, gone: options && options.goneCustomers, owners: options && options.owners, exists: options && options.exists });
+        if (gateReply) { return gateReply; }
+        const key = item.body.externalKey[0].Value;
         if (khachLoi[key]) { return { raw: khachLoi[key] }; }
         // FBM chỉ trả tiêu đề cột khi `type: 0`; trang không tiêu đề chỉ có `Rows`.
         activityItemTypes.push(item.body.type);
@@ -992,8 +1041,8 @@ async function chay(so) {
   // Lô giao dịch: chi phí cố định của một lần gọi GAS không tăng theo số khách trong lô.
   const lo5 = await fullPipeline(true, 'read', { customers: 5 }), lo50 = await fullPipeline(true, 'read', { customers: 50 });
   const chiPhiLo = (run) => [run.fullActivitySheetReads.length, run.fullActivitySheetReads[0].reads, run.fullActivitySheetReads[0].writes, run.fullActivityPropCalls[0]];
-  check(so, 'lô 5 khách và lô 50 khách: cùng một lần gọi GAS cho cả trang, cùng số lần đọc mỗi Sheet, cùng số lần ghi Sheet Activity, cùng số lần gọi kho; đủ giao dịch của mọi khách',
-    [chiPhiLo(lo5), lo5.fullLocal.activity.length, lo50.fullLocal.activity.length, lo50.fullBatches.length, lo50.fullBatches[0].items.length, lo50.fullStep.status.phase], [chiPhiLo(lo50), 5, 50, 1, 50, 'done']);
+  check(so, 'lô 5 khách và lô 50 khách: cùng một lần gọi GAS cho cả lô, cùng số lần đọc mỗi Sheet, cùng số lần ghi Sheet, cùng số lần gọi kho; lô 50 khách gồm một phần tử đọc thông tin khách và 50 phần tử giao dịch',
+    [chiPhiLo(lo5), lo5.fullLocal.activity.length, lo50.fullLocal.activity.length, lo50.fullBatches.length, lo50.fullBatches[0].items.length, lo50.fullStep.status.phase], [chiPhiLo(lo50), 5, 50, 1, 51, 'done']);
   // Một khách lỗi HTTP giữa lô: khách khác vẫn ghi; giao dịch đã có của khách lỗi không bị đánh "không thấy bên FBM" vì chưa được quét.
   const loiHttp = { ok: false, status: 500, headers: {}, body: JSON.stringify({ d: { Bugs: { Message: 'Lỗi máy chủ FBM' } } }) };
   const giaoDichCu = { id: 'ACT-000099', fbmId: 'FBM-A3', recordStatus: 'active', syncStatus: 'đã đồng bộ' };
@@ -1004,25 +1053,26 @@ async function chay(so) {
   check(so, 'khách lỗi giữa lô: các khách khác vẫn ghi, lượt kết thúc "done" kèm số khách lỗi, Log và Sidebar có mã khách, lượt không đánh giao dịch "không thấy bên FBM"', [
     khachLoiStatus.phase, coKhachLoi.fullLocal.activity.filter((item) => item.fbmId !== 'FBM-A3').map((item) => item.fbmId).sort(), (coKhachLoi.fullLocal.activity.find((item) => item.id === 'ACT-000099') || {}).syncStatus,
     khachLoiLog.detail && khachLoiLog.detail.customer, khachLoiLog.detail && khachLoiLog.detail.status, String(khachLoiLog.reason || '').indexOf('Lỗi máy chủ FBM') >= 0,
-    coKhachLoi.fullLogs.some((event) => event.action === 'activity_missing_skipped'), khachLoiStatus.metadata.customerErrors.total,
+    khachLoiStatus.metadata.customerErrors.total,
     khachLoiStatus.message.indexOf('1 khách lỗi khi đọc giao dịch') >= 0, khachLoiTheLoi.indexOf('Khách lỗi giao dịch ALT00003') >= 0
-  ], ['done', ['FBM-A1', 'FBM-A2', 'FBM-A4', 'FBM-A5'], 'đã đồng bộ', 'ALT00003', 500, true, true, 1, true, true]);
+  ], ['done', ['FBM-A1', 'FBM-A2', 'FBM-A4', 'FBM-A5'], 'đã đồng bộ', 'ALT00003', 500, true, 1, true, true]);
   // Một phần tử nghi phiên (401) giữa lô: cả lô không ghi, đi probe; cursor giữ nguyên nên dựng lại đúng lô.
   const nghiPhien = await fullPipeline(false, 'read', { customers: 5, failing: { 'FBM-C3': { ok: false, status: 401, headers: {}, body: '' } } });
   const nghiState = nghiPhien.fullFlow.hop.FbmSync.stateRead(), nghiResume = nghiPhien.fullFlow.hop.FbmSync.sessionGateMeta(nghiState).resumeCursor || {};
-  const khoaLo = (request) => (request && request.items || []).map((item) => item.body.externalKey[0].Value);
+  // Chỉ phần tử giao dịch (khóa `stt_rec`); phần tử đầu đọc thông tin khách của lô.
+  const khoaLo = (request) => (request && request.items || []).filter((item) => item.body.externalKey[0].Name === 'stt_rec').map((item) => item.body.externalKey[0].Value);
   check(so, 'phần tử nghi phiên giữa lô: không ghi giao dịch nào của lô, request kế là probe phiên, cursor giữ dựng lại đúng lô cũ', [
     nghiPhien.fullWrites.filter((item) => item.entity === 'activity').length, nghiPhien.fullKinds.slice(-2), nghiState.lastFailureCode,
     khoaLo(nghiPhien.fullFlow.hop.FbmSync.requestForCursor(Object.assign({}, nghiState, { cursor: nghiResume })))
   ], [0, ['batch:activity', 'session_probe:user'], 'SESSION_SUSPECTED_LIVE', khoaLo(nghiPhien.fullBatches[0])]);
-  // Response lô lệch kế hoạch: id lạ là lỗi hợp đồng cả lô; phần tử thiếu (Extension dừng vì trần dung lượng) xếp lại lô sau.
+  // Response lô lệch kế hoạch: id lạ hay thiếu phần tử (Extension dừng vì trần dung lượng) đều là lỗi hợp đồng cả lô, vì thiếu phần tử thì không biết khách nào vắng thật.
   const idLa = await fullPipeline(false, 'read', { customers: 5, editBatch: (raw) => Object.assign(raw, { items: raw.items.map((item, index) => index === 1 ? Object.assign({}, item, { id: '99' }) : item) }) });
   const idLaState = idLa.fullFlow.hop.FbmSync.stateRead();
   const thieu = await fullPipeline(false, 'read', { customers: 5, editBatch: (raw, lan) => lan === 1 ? Object.assign(raw, { items: raw.items.slice(0, 3) }) : raw });
-  check(so, 'lô có id lạ thì dừng phiên FBM_BATCH_ITEM_MISMATCH, không ghi giao dịch, Log ghi; lô thiếu phần tử thì phần thiếu được xếp lại lô sau và đủ giao dịch', [
+  check(so, 'lô có id lạ hoặc thiếu phần tử thì dừng phiên FBM_BATCH_ITEM_MISMATCH, không ghi khách hay giao dịch nào, Log ghi', [
     idLaState.phase, idLaState.lastFailureCode, idLa.fullWrites.filter((item) => item.entity === 'activity').length, idLa.fullLogs.some((event) => event.action === 'activity_batch_mismatch'),
-    thieu.fullBatches.map(khoaLo), thieu.fullLocal.activity.length, thieu.fullStep.status.phase
-  ], ['error', 'FBM_BATCH_ITEM_MISMATCH', 0, true, [['FBM-C1', 'FBM-C2', 'FBM-C3', 'FBM-C4', 'FBM-C5'], ['FBM-C4', 'FBM-C5']], 5, 'done']);
+    thieu.fullBatches.map(khoaLo), thieu.fullLocal.customer.length + thieu.fullLocal.activity.length, thieu.fullStep.status.phase, thieu.fullStep.status.lastFailureCode
+  ], ['error', 'FBM_BATCH_ITEM_MISMATCH', 0, true, [['FBM-C1', 'FBM-C2', 'FBM-C3', 'FBM-C4', 'FBM-C5']], 0, 'error', 'FBM_BATCH_ITEM_MISMATCH']);
   const nhieuTrang = await fullPipeline(false, 'read', { customers: 120, scanCustomerRows: 50 });
   check(so, 'quét toàn bộ nhiều trang Customer: số trang tăng dần, khóa trang đúng dạng FBM, ghi đủ khách và giao dịch, phiên kết thúc done; cả lượt chỉ một khách lấy kèm tiêu đề cột', [
     nhieuTrang.activityItemTypes.filter((type) => type === 0).length, nhieuTrang.activityItemTypes.length, nhieuTrang.customerPageIndexes, nhieuTrang.fullLocal.customer.length, nhieuTrang.fullLocal.activity.length, nhieuTrang.fullStep.status.phase, nhieuTrang.fullStep.status.lastFailureCode || ''
@@ -1036,7 +1086,7 @@ async function chay(so) {
     tranGiaoDich.fullLocal.activity.map((item) => [item.fbmId, item.recordStatus]), tranGiaoDich.fullStep.status.phase, tranGiaoDich.fullStep.status.metadata.customerErrors.recent.map((item) => item.code),
     tranGiaoDich.fullLogs.filter((event) => /activity_customer_failed|activity_missing/.test(event.action)).map((event) => [event.action, event.detail && event.detail.code || ''])
   ], [[['FBM-A-CU', 'active'], ['FBM-A1', null], ['FBM-A2', null], ['FBM-A3', null]], 'done', ['FBM_ACTIVITY_PAGE_LIMIT', 'FBM_ACTIVITY_PAGE_LIMIT', 'FBM_ACTIVITY_PAGE_LIMIT'],
-    [['activity_customer_failed', 'FBM_ACTIVITY_PAGE_LIMIT'], ['activity_customer_failed', 'FBM_ACTIVITY_PAGE_LIMIT'], ['activity_customer_failed', 'FBM_ACTIVITY_PAGE_LIMIT'], ['activity_missing_skipped', '']]]);
+    [['activity_customer_failed', 'FBM_ACTIVITY_PAGE_LIMIT'], ['activity_customer_failed', 'FBM_ACTIVITY_PAGE_LIMIT'], ['activity_customer_failed', 'FBM_ACTIVITY_PAGE_LIMIT']]]);
   const lechCot = await fullPipeline(false, 'read', { customers: 5, cutColumn: 'FBM-C3' });
   check(so, 'trang không tiêu đề có số cột khác tiêu đề đã lưu: dừng phiên FBM_GRID_SHAPE_CHANGED, không ghi giao dịch nào, Sidebar và Log đều báo', [
     lechCot.fullLocal.activity.length, lechCot.fullStep.status.phase, lechCot.fullStep.status.lastFailureCode, lechCot.fullStep.status.message.indexOf('số cột khác 11 cột') >= 0,
@@ -1055,7 +1105,6 @@ async function chay(so) {
   readFlow.hop.FbmSync.prepareCategoryGate = () => ({ map: {} });
   readFlow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
   readFlow.hop.FbmSync.pullWrite = () => ({ ok: true, written: 0, conflicts: 0, skipped: 0 });
-  readFlow.hop.FbmSync.markMissingAfterFullScan = () => ({ total: 0, written: 0 });
   readFlow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   let readStep = readFlow.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true });
   const readKinds = [];
@@ -1089,7 +1138,6 @@ async function chay(so) {
     flow.hop.FbmSync.prepareCategoryGate = () => ({ map: {} });
     flow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
     flow.hop.FbmSync.pullWrite = (entity, records) => { sheetWrites += records.length; return { ok: true, written: records.length, conflicts: 0, skipped: 0 }; };
-    flow.hop.FbmSync.markMissingAfterFullScan = () => { sheetWrites += 1; return { total: 0, written: 0 }; };
     flow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
     const fields = ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ma_so_thue', 'ong_ba', 'dc_lh', 'dien_thoai', 'email', 'website', 'ten_dclh_tinh', 'ten_nguon_dm', 'ten_sp', 'ten_cv', 'ngay_gd', 'datetime0', 'xorder'];
     let step = flow.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true }), last = step;
@@ -1111,8 +1159,11 @@ async function chay(so) {
     oldExtension.last.ok, oldExtension.last.code, oldExtension.last.request, oldExtension.sheetWrites,
     oldExtension.last.status.phase, String(oldExtension.last.status.lastError || '').indexOf('Extension trên máy này đang dùng bản cũ, hãy tải lại Extension') >= 0,
     mismatchLog.reason, mismatchLog.detail && mismatchLog.detail.received, oldExtension.state.activeRequestId,
-    sameContract.sheetWrites > 0
+    sameContract.last.ok
   ], [false, 'FBM_EXTENSION_CONTRACT_MISMATCH', null, 0, 'error', true, 'Extension trên máy này đang dùng bản cũ, hãy tải lại Extension.', '(Extension không gửi mã)', '', true]);
+  check(so, 'Danh sách toàn bộ khách chỉ đánh dấu: lượt chỉ qua trang danh sách khách thì không ghi Sheet lần nào, request kế là lô cửa ghi đọc chi tiết khách vừa đánh dấu', [
+    sameContract.sheetWrites, sameContract.last.request && sameContract.last.request.meta.kind, sameContract.last.request && sameContract.last.request.items.length
+  ], [0, 'batch', 2]);
 
   const approval = workflowGas();
   approval.hop.FbmSync.runPreflight = () => ({ ok: true, issues: [], blocking: [], candidateCount: 11 });
@@ -1246,24 +1297,23 @@ async function chay(so) {
     return { nhatKy, F, st };
   };
   const conTrang = soBuoc('read');
-  conTrang.F.activityForCustomers(conTrang.st, [{ sttRec: 'S1', maKh: 'K1' }], { body: { gridPageIndex: 1, gridPageValue: [], pageItems: null, count: 50 } }, 50);
   const hetKhach = soBuoc('read');
-  hetKhach.F.activityForCustomers(hetKhach.st, [{ sttRec: 'S1', maKh: 'K1' }], null, 0);
+  hetKhach.F.gateOpen(hetKhach.st, { layer: 'list' }, 'Đang đọc chi tiết');
   hetKhach.F.recordIssueAdd('pull', 'activity', 'synced', 'ACT-1', 'Nối lại mã khách', 'warn');
   hetKhach.st.phase = 'done'; hetKhach.F.stateWrite(hetKhach.st);
   const viTri = (log, action) => log.indexOf(action);
-  check(so, 'Log sổ bước: còn trang khách thì bước khách để mở; hết danh sách thì bước khách đóng trước khi bước giao dịch mở; cảnh báo bản ghi đứng trước dòng đóng phiên', [
+  check(so, 'Log sổ bước: đang quét danh sách thì bước khách để mở; cửa ghi mở bước giao dịch và giữ bước khách mở vì khách được ghi cùng lô; cảnh báo bản ghi đứng trước dòng đóng phiên', [
     !conTrang.st.metadata.businessSteps.pull_customer.finishedAt,
-    viTri(hetKhach.nhatKy, 'reconcile_customer_finished') >= 0 && viTri(hetKhach.nhatKy, 'reconcile_customer_finished') < viTri(hetKhach.nhatKy, 'pull_activity_started'),
+    viTri(hetKhach.nhatKy, 'pull_activity_started') >= 0 && viTri(hetKhach.nhatKy, 'reconcile_customer_finished') > viTri(hetKhach.nhatKy, 'pull_activity_started'),
     viTri(hetKhach.nhatKy, 'pull_record_issue') >= 0 && viTri(hetKhach.nhatKy, 'pull_record_issue') < viTri(hetKhach.nhatKy, 'reconcile_activity_finished'),
     viTri(hetKhach.nhatKy, 'reconcile_activity_finished') < viTri(hetKhach.nhatKy, 'sync_session_finished')
   ], [true, true, true, true]);
   const sangDay = soBuoc('write');
   ['pull_activity', 'reconcile_activity'].forEach((key) => sangDay.F.businessStepStart(sangDay.st, key, {}));
-  sangDay.F.stopPushOnConflicts = () => false; sangDay.F.pullMarkMissing = () => true;
+  sangDay.F.stopPushOnConflicts = () => false;
   sangDay.F.nextPushRequest = (state) => { sangDay.F.businessStepStart(state, 'push_customer', {}); return null; };
   sangDay.F.pullFinishOrPush(sangDay.st, {});
   check(so, 'Log sổ bước: lượt hai chiều đóng mọi bước Lấy trước khi mở bước đẩy', ['pull_customer_finished', 'reconcile_customer_finished', 'pull_activity_finished', 'reconcile_activity_finished'].every((action) => viTri(sangDay.nhatKy, action) >= 0 && viTri(sangDay.nhatKy, action) < viTri(sangDay.nhatKy, 'push_customer_started')), true);
 }
 
-module.exports = { chay, workflowGas, executorSession, executorRaw, sendBatchThroughExecutor, gridResponse, row };
+module.exports = { chay, workflowGas, executorSession, executorRaw, sendBatchThroughExecutor, gateItemReply, gridResponse, row };

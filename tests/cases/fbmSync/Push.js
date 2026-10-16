@@ -265,6 +265,24 @@ async function chay(so) {
       [['edit:CUS-ALT', 'create:CUS-NEW'], ['ACT-ALT']]);
     pushed.FbmSync.scope = savedScope;
   }
+  {
+    // 09/05 Phần 9: bản ghi vắng hoặc đã chuyển cho người khác, và giao dịch của khách mang hai trạng thái đó, sửa trên Sheet cũng không được đẩy.
+    const allow = pushed.FbmSync.pullDefaultPermission(), sync = pushed.FbmSync.SYNC_STATUS;
+    pushed.FbmSync.readLocal = (entity) => entity === 'customer'
+      ? [
+        { id: 'CUS-MAT', fbmId: 'FBM-MAT', fbmCustomerCode: 'ALT00011', fbmHash: 'cu', fbmSyncPermission: allow, syncStatus: sync.missing, companyName: 'Sửa khi vắng' },
+        { id: 'CUS-CHUYEN', fbmId: 'FBM-CHUYEN', fbmCustomerCode: 'ALT00012', fbmHash: 'cu', fbmSyncPermission: allow, syncStatus: sync.transferred, companyName: 'Sửa khi đã chuyển' },
+        { id: 'CUS-OK', fbmId: 'FBM-OK', fbmCustomerCode: 'ALT00013', fbmHash: 'cu', fbmSyncPermission: allow, syncStatus: sync.synced, companyName: 'Sửa bình thường' }
+      ]
+      : [
+        { id: 'ACT-CUA-CHUYEN', customerId: 'CUS-CHUYEN', fbmId: '', fbmSyncPermission: allow, taskType: 'Goi', content: 'Mới dưới khách đã chuyển', workDate: '2026-10-16' },
+        { id: 'ACT-MAT', customerId: 'CUS-OK', fbmId: '200001', fbmHash: 'cu', fbmSyncPermission: allow, syncStatus: sync.missing, taskType: 'Goi', content: 'Sửa khi vắng', workDate: '2026-10-16' },
+        { id: 'ACT-OK', customerId: 'CUS-OK', fbmId: '', fbmSyncPermission: allow, taskType: 'Goi', content: 'Mới', workDate: '2026-10-16' }
+      ];
+    check(so, 'Đóng băng: bản ghi mang "không thấy bên FBM" hoặc "đã chuyển cho người khác" và giao dịch của khách đã chuyển không vào danh sách đẩy dù đã sửa',
+      [pushed.FbmSync.pushCandidates('customer').map((c) => c.id), pushed.FbmSync.pushCandidates('activity').map((c) => c.id)],
+      [['CUS-OK'], ['ACT-OK']]);
+  }
   const transportState = push.FbmSync.stateStart('', 'read', 0);
   push.FbmSync.scriptSettings = () => ({ baseUrl: 'https://fbm.test', cookie: 'cookie' });
   transportState.phase = 'pull_customer'; transportState.activeRequestId = 'test-transport-request'; transportState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 3, pageValue: ['x'] };
@@ -378,7 +396,7 @@ async function chay(so) {
   const createCandidate = { entity: 'customer', kind: 'create', id: createLocal.id, autoCode: 'ALT00020', record: createLocal };
   push.FbmSync.readLocal = (entity) => entity === 'customer' ? [createLocal] : [];
   push.FbmSync.pushCandidates = pushCandidatesImpl;
-  push.FbmSync.scriptSettings = () => ({ accountName: 'Owner', baseUrl: 'https://fbm.test', cookie: 'cookie', customerAuthorized: '1.test' });
+  push.FbmSync.scriptSettings = () => ({ accountName: 'Owner', userId: '2037', baseUrl: 'https://fbm.test', cookie: 'cookie', customerAuthorized: '1.test' });
   push.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const createState = push.FbmSync.stateStart('', 'push', 0); createState.session = { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' }; createState.activeRequestId = 'test-create-request'; createState.cursor = { kind: 'push_wait', entity: 'customer', index: 0, operation: 'customer_create_save', candidate: createCandidate }; push.FbmSync.stateWrite(createState);
   const recoveryStart = push.FbmSync.continue({ ok: false, status: 500, body: '{"Message":"timeout"}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'test-create-request' }] } });

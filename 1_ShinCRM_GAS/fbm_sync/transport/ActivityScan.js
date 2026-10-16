@@ -1,7 +1,7 @@
 /**
- * Lấy toàn bộ giao dịch ShinCRM đã biết (Tài liệu 09/02 Phần 8 lớp 1, 09/05 "Chỉ kết luận vắng mặt khi lượt quét đầy đủ"): một việc quét chỉ giữ các FBM ID đang có trên Sheet, GAS đối soát từng gói, chỉ gắn cờ "không thấy" sau khi đã nhận đủ.
- * Lưới giao dịch FBM không có cột khách, nên khách cha của mỗi dòng tra từ chính giao dịch đó trên Sheet; vì vậy tầng này chỉ đối soát giao dịch đã biết, giao dịch mới thuộc lớp 2 và 3.
- * Quá lớn, hết hạn fetch, không parse được hoặc FBM trả thiếu dòng thì ngay trong lượt chia cửa sổ ngày. Giao dịch có thể đổi ngày giữa hai cửa sổ nên ở chế độ cửa sổ, ứng viên "không thấy" được đọc lại theo id trước khi gắn cờ.
+ * Lấy toàn bộ giao dịch ShinCRM đã biết (Tài liệu 09/02 Phần 8 lớp 1): chỉ đánh dấu, không ghi Sheet. Giao dịch sửa, mang cờ cần xét lại hoặc vắng thì khách cha theo Sheet vào danh sách đọc; cửa ghi đọc lại khách đó, tra mã rồi mới ghi hoặc gắn cờ.
+ * Lưới giao dịch FBM không có cột khách, nên khách cha của mỗi dòng tra từ chính giao dịch đó trên Sheet; giao dịch mới thuộc lớp 2 và 3.
+ * Quá lớn, hết hạn fetch, không parse được hoặc FBM trả thiếu dòng thì ngay trong lượt chia cửa sổ ngày. Giao dịch đổi ngày giữa hai cửa sổ có thể bị coi là vắng; khi đó chỉ tốn một lần đọc khách cha, không gắn cờ nhầm vì cờ do cửa ghi quyết.
  */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
@@ -9,8 +9,7 @@ FbmSync.ACTIVITY_BULK_STORE = 'activity_bulk';
 // Mã lỗi Extension báo khi một request lấy cả khoảng thời gian là quá sức; lỗi phiên và lỗi mạng khác không đổi cách lấy.
 FbmSync.ACTIVITY_WINDOW_CODES = ['FBM_SCAN_TOO_LARGE', 'FBM_SCAN_UNPARSEABLE', 'FBM_FETCH_TIMEOUT'];
 
-/** Giao dịch tầng này theo dõi: có FBM ID, không phải tombstone hay dòng tạm. Một chỗ cho cả danh sách id gửi Extension lẫn luật "không thấy". */
-/** Bộ lọc giao dịch lớp 1 theo dõi; giao dịch của khách chặn chiều lấy về không vào tập id gửi FBM nên cũng không bao giờ bị gắn cờ "không thấy". */
+/** Giao dịch được theo dõi: có FBM ID, không phải tombstone hay dòng tạm, khách cha cho phép lấy về. Một chỗ cho lớp 1 lẫn bước đối chiếu vắng mặt của cửa ghi. */
 FbmSync.activityBulkTracker = function () {
   var pullAllowed = FbmSync.pullAllowedReader('activity');
   return function (record) {
@@ -58,11 +57,7 @@ FbmSync.beginActivityBulkPull = function (state) {
   var local = FbmSync.readLocal('activity');
   state.metadata = state.metadata || {};
   state.metadata.activityBulk = { windows: 0, missing: 0 };
-  if (!local.some(FbmSync.activityBulkTracker())) {
-    state.cursor = { kind: 'activity_bulk_done' };
-    if (state.scan !== 'full') { FbmSync.activityBulkRunDone(state); }
-    return null;
-  }
+  if (!local.some(FbmSync.activityBulkTracker())) { return null; }
   FbmSync.seenStoreBegin(FbmSync.ACTIVITY_BULK_STORE, local);
   FbmSync.scanJobOpen(state, { entity: 'activity', page: 0, window: false });
   state.message = 'Đang lấy toàn bộ giao dịch đã có trên ShinCRM từ FBM...';
@@ -104,31 +99,28 @@ FbmSync.activityScanToWindows = function (state, code, message) {
   return { ok: true, request: FbmSync.nextEnvelope(FbmSync.scanJobRequest(state)), status: FbmSync.statusView() };
 };
 
-/** Mã FBM của khách cha cho từng giao dịch đã biết, tra qua giao dịch trên Sheet rồi khách trên Sheet. */
-FbmSync.activityParentByFbmId = function (local) {
-  var codes = {}, parents = {};
-  FbmSync.readLocal('customer').forEach(function (customer) { codes[String(customer.id || '').trim()] = String(customer.fbmCustomerCode || '').trim(); });
-  (local || []).forEach(function (record) {
-    var fbmId = String(record.fbmId || '').trim();
-    if (fbmId) { parents[fbmId] = { maKh: codes[String(record.customerId || '').trim()] || '' }; }
-  });
+/** Khách cha theo Sheet của các giao dịch đã biết, theo FBM ID giao dịch; `stt_rec_kh` của khách cha là mã vào danh sách đọc. */
+FbmSync.activityParentSttIndex = function (local) {
+  var stt = {}, parents = {};
+  FbmSync.readLocal('customer').forEach(function (customer) { stt[String(customer.id || '').trim()] = String(customer.fbmId || '').trim(); });
+  (local || []).forEach(function (record) { var fbmId = String(record.fbmId || '').trim(); if (fbmId) { parents[fbmId] = stt[String(record.customerId || '').trim()] || ''; } });
   return parents;
 };
 
-/** Đối soát một nhóm dòng FBM của giao dịch đã biết qua cửa ghi chung và đánh dấu đã thấy. Trả số bản ghi đã đưa vào cửa ghi. */
+/** Một nhóm dòng FBM của giao dịch đã biết: đánh dấu đã thấy; giao dịch sửa (dấu vân khác) hoặc mang cờ cần xét lại thì khách cha vào danh sách đọc. Không ghi Sheet. Trả số khách được thêm. */
 FbmSync.activityBulkAccept = function (state, rows, seenIds) {
-  var local = FbmSync.readLocal('activity'), parents = FbmSync.activityParentByFbmId(local), gate = FbmSync.stateCategoryGate(state);
-  var records = rows.filter(function (row) { return !FbmSync.isTemporaryRecord('activity', row); }).map(function (row) { return FbmSync.activityRecord(row, gate, parents[String(row.id || '').trim()] || {}); });
+  var local = FbmSync.readLocal('activity'), byFbmId = {}, parents = FbmSync.activityParentSttIndex(local), gate = FbmSync.stateCategoryGate(state), tracked = FbmSync.activityBulkTracker(), marked = [];
+  local.forEach(function (record) { var fbmId = String(record.fbmId || '').trim(); if (fbmId && tracked(record)) { byFbmId[fbmId] = record; } });
+  rows.filter(function (row) { return !FbmSync.isTemporaryRecord('activity', row); }).forEach(function (row) {
+    var fbmId = String(row.id || '').trim(), record = byFbmId[fbmId];
+    if (record && (FbmSync.readAgainStatus(record) || String(record.fbmHash || '') !== FbmSync.hash(row, 'activity', gate))) { marked.push(parents[fbmId]); }
+  });
   FbmSync.seenStoreMark(FbmSync.ACTIVITY_BULK_STORE, local, rows.concat((seenIds || []).map(function (id) { return { id: id }; })));
-  if (records.length) {
-    FbmSync.pullRecords('activity', records, state.mode);
-    FbmSync.previewRecords('activity', records);
-  }
-  return records.length;
+  return FbmSync.readListAdd(marked);
 };
 
 /**
- * Nhận một gói của việc quét giao dịch: ghi qua cửa ghi rồi mới tăng cursor. Hết gói thì sang cửa sổ kế, đọc lại ứng viên theo id (chế độ cửa sổ) hoặc chốt "không thấy".
+ * Nhận một gói của việc quét giao dịch: đánh dấu rồi mới tăng cursor. Hết gói thì sang cửa sổ kế, hết cửa sổ thì đánh dấu khách cha của giao dịch vắng.
  * FBM trả ít dòng hơn tổng nó báo nghĩa là một lần lấy không đủ: chuyển sang cửa sổ, không ghi gói thiếu.
  */
 FbmSync.activityScanChunk = function (state, cursor, rawResponse) {
@@ -155,105 +147,20 @@ FbmSync.activityScanChunk = function (state, cursor, rawResponse) {
     return { ok: true, request: FbmSync.nextEnvelope(FbmSync.scanJobRequest(state)), status: FbmSync.statusView(), imported: imported };
   }
   state.metadata.activityBulk = { windows: cursor.window ? Number(cursor.windowIndex || 0) + 1 : 0, missing: 0 };
-  if (cursor.window) {
-    state.cursor = { kind: 'activity_recheck', recheckFrom: 0, recheck: [] };
-    var recheck = FbmSync.activityRecheckNext(state);
-    if (recheck) { return { ok: true, request: FbmSync.nextEnvelope(recheck), status: FbmSync.statusView(), imported: imported }; }
-  }
   return FbmSync.activityBulkEnd(state, { imported: imported });
 };
 
-/** Ứng viên "không thấy" kế tiếp theo số ACT tăng dần, tối đa một lô; cursor chỉ giữ số ACT nên state không phình theo số ứng viên. */
-FbmSync.activityRecheckNext = function (state) {
-  var cursor = state.cursor, hasSeen = FbmSync.seenStoreReader(FbmSync.ACTIVITY_BULK_STORE), from = Number(cursor.recheckFrom || 0), picked = [];
-  if (!(cursor.recheck || []).length) {
-    var tracked = FbmSync.activityBulkTracker();
-    FbmSync.readLocal('activity').forEach(function (record) {
-      var index = FbmSync.seenStoreIndex(FbmSync.ACTIVITY_BULK_STORE, record);
-      if (index >= from && tracked(record) && !hasSeen(record)) { picked.push(index); }
-    });
-    picked.sort(function (a, b) { return a - b; });
-    cursor.recheck = picked.slice(0, FbmSync.BUDGET.activityBatchCustomers);
-    cursor.recheckFrom = cursor.recheck.length ? cursor.recheck[cursor.recheck.length - 1] + 1 : from;
-  }
-  FbmSync.stateWrite(state);
-  return FbmSync.activityRecheckRequest(state);
-};
-
-/** Lô đọc lại theo id dựng từ cursor; cùng cursor ra cùng lô nên thử lại sau probe là idempotent. */
-FbmSync.activityRecheckRequest = function (state) {
-  var plan = state.cursor && state.cursor.recheck || [], byIndex = {};
-  if (!plan.length) { return null; }
-  FbmSync.readLocal('activity').forEach(function (record) { byIndex[FbmSync.seenStoreIndex(FbmSync.ACTIVITY_BULK_STORE, record)] = String(record.fbmId || '').trim(); });
-  return { items: plan.map(function (index) { return FbmSync.activityByIdRequest(byIndex[index] || ''); }), meta: { kind: 'batch', entity: 'activity' } };
-};
-
-/**
- * Nhận lô đọc lại: giao dịch FBM còn thì đối soát và coi là đã thấy; FBM trả lỗi cho một giao dịch thì không kết luận được nên cũng coi là đã thấy và báo lỗi; giao dịch FBM trả rỗng mới là "không thấy".
- * Phần tử nghi phiên thì cả lô không ghi và đi đường probe; phần tử Extension chưa chạy (bấm Dừng) ở lại lô sau.
- */
-FbmSync.activityRecheckContinue = function (state, cursor, rawResponse) {
-  var plan = cursor.recheck || [], items = rawResponse && rawResponse.items, received = {}, bad = '';
-  if (!Array.isArray(items) || !items.length) { return FbmSync.activityBatchMismatch(state, 'Response đọc lại giao dịch không phải lô hoặc lô rỗng dù GAS đã cấp lô; Extension hoặc Sidebar đang chạy bản lệch hợp đồng.'); }
-  items.forEach(function (item) {
-    var id = String(item && item.id);
-    if (!/^\d+$/.test(id) || Number(id) >= plan.length || received[id]) { bad = bad || id; }
-    received[id] = item;
-  });
-  if (bad) { return FbmSync.activityBatchMismatch(state, 'Lô đọc lại giao dịch trả phần tử "' + bad + '" không có trong kế hoạch hoặc bị trùng; đã dừng và không ghi gì.'); }
-  var checks = plan.map(function (index, position) { var item = received[String(position)]; return { index: index, item: item, check: item ? FbmSync.protocol.assertSuccess(item) : null }; });
-  if (checks.some(function (entry) { return entry.check && entry.check.code === 'SESSION_SUSPECTED'; })) {
-    var probe = FbmSync.sessionGateProbeRequest(state, cursor, 'Phản hồi FBM đáng ngờ khi đọc lại giao dịch; chưa ghi gì, đang probe lại phiên.');
-    return probe ? { ok: true, request: probe, status: FbmSync.statusView(), probing: true } : { ok: false, code: 'SESSION_PROBE_UNAVAILABLE', request: null, status: FbmSync.statusView(), error: state.lastError };
-  }
-  var fbmIdOf = {}, rows = [], unsure = [], failed = [], pending = [];
-  FbmSync.readLocal('activity').forEach(function (record) { fbmIdOf[FbmSync.seenStoreIndex(FbmSync.ACTIVITY_BULK_STORE, record)] = String(record.fbmId || '').trim(); });
-  try { checks.forEach(function (entry) {
-    var fbmId = fbmIdOf[entry.index] || '';
-    if (!entry.item) { pending.push(entry.index); return; }
-    if (!entry.check.ok) {
-      unsure.push(fbmId);
-      failed.push({ customer: 'giao dịch ' + fbmId, code: String(entry.check.code || 'FBM_ERROR'), status: Number(entry.check.status || 0), reason: 'FBM trả lỗi khi đọc lại một giao dịch không thấy trong các khoảng ngày; giao dịch này không bị gắn cờ "không thấy bên FBM". ' + String(entry.check.bug && (entry.check.bug.Message || entry.check.bug.message) || '') });
-      return;
-    }
-    rows = rows.concat(FbmSync.rowsToRecords('activity', FbmSync.protocol.parse(entry.item)).rows);
-  }); } catch (shapeError) {
-    if (shapeError && shapeError.code === 'FBM_GRID_SHAPE_CHANGED') { return FbmSync.activityBatchMismatch(state, shapeError.message, shapeError.code); }
-    throw shapeError;
-  }
-  FbmSync.activityCustomerErrors(state, failed);
-  state.cursor.recheck = pending;
-  FbmSync.stateWrite(state);
-  var imported = FbmSync.activityBulkAccept(state, rows, unsure);
-  state = FbmSync.stateRead();
-  var request = FbmSync.activityRecheckNext(state);
-  if (request) { return { ok: true, request: FbmSync.nextEnvelope(request), status: FbmSync.statusView(), imported: imported }; }
-  return FbmSync.activityBulkEnd(FbmSync.stateRead(), { imported: imported });
-};
-
-/** Lớp 1 đã nhận đủ: gắn cờ "không thấy", ghi Log một dòng tổng, rồi chốt lượt (gói quét) hoặc kết thúc lượt lấy toàn bộ giao dịch chạy nền. */
+/** Lớp 1 đã nhận đủ: khách cha của giao dịch đã biết mà FBM không trả vào danh sách đọc, ghi Log một dòng tổng, rồi sang chặng kế. */
 FbmSync.activityBulkEnd = function (state, extra) {
-  // Ghi state của lời gọi trước khi gắn cờ: bước gắn cờ đọc state trong kho.
-  FbmSync.stateWrite(state);
-  var marked = FbmSync.markMissingAfterFullScan('activity', state, FbmSync.seenStoreReader(FbmSync.ACTIVITY_BULK_STORE)), missing = { total: Number(marked.missing || 0), sample: marked.sample || [] };
-  state.metadata.activityBulkMissing = missing.sample;
-  state.metadata.activityBulkMissingCount = missing.total;
-  state.metadata.activityBulk = Object.assign({ windows: 0 }, state.metadata.activityBulk || {}, { missing: missing.total });
+  var hasSeen = FbmSync.seenStoreReader(FbmSync.ACTIVITY_BULK_STORE), tracked = FbmSync.activityBulkTracker(), local = FbmSync.readLocal('activity'), parents = FbmSync.activityParentSttIndex(local), absent = [], sample = [];
+  local.forEach(function (record) {
+    if (!tracked(record) || hasSeen(record)) { return; }
+    absent.push(parents[String(record.fbmId).trim()]);
+    if (sample.length < 20) { sample.push({ id: String(record.id || ''), fbmId: String(record.fbmId || '') }); }
+  });
   FbmSync.seenStoreClear(FbmSync.ACTIVITY_BULK_STORE);
-  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'activity_bulk_done', outcome: missing.total ? (typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn') : (typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok'), cycleId: String(state.runId || ''), reason: 'Đã đối soát toàn bộ giao dịch ShinCRM đã biết với FBM' + (state.metadata.activityBulk.windows ? ' theo ' + state.metadata.activityBulk.windows + ' khoảng ngày' : ' trong một lần lấy') + '; ' + missing.total + ' giao dịch không còn thấy bên FBM.', detail: state.metadata.activityBulk }); }
-  var result = Object.assign({}, extra || {}, { missing: missing.total });
-  if (state.scan === 'full') {
-    state.cursor = { kind: 'activity_bulk_done' };
-    FbmSync.stateWrite(state);
-    return FbmSync.pullFinishOrPush(state, result);
-  }
-  FbmSync.activityBulkRunDone(state);
-  return Object.assign({ ok: true, request: null, status: FbmSync.statusView() }, result);
-};
-
-/** Lượt "Lấy toàn bộ giao dịch" chỉ gồm lớp 1 (09/02 Phần 3): xong lớp 1 là xong lượt; giao dịch mới thuộc lớp 2, 3 của Quét nhanh và lớp 4 của Vòng xoay. */
-FbmSync.activityBulkRunDone = function (state) {
-  state.cursor = {}; state.phase = 'done'; state.entity = '';
-  state.message = FbmSync.runDoneMessage(state);
-  FbmSync.stateWrite(state);
+  var added = FbmSync.readListAdd(absent);
+  state.metadata.activityBulk = Object.assign({ windows: 0 }, state.metadata.activityBulk || {}, { absent: absent.length, sample: sample });
+  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'activity_bulk_done', outcome: typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', cycleId: String(state.runId || ''), reason: 'Đã đối chiếu toàn bộ giao dịch ShinCRM đã biết với FBM' + (state.metadata.activityBulk.windows ? ' theo ' + state.metadata.activityBulk.windows + ' khoảng ngày' : ' trong một lần lấy') + '; ' + absent.length + ' giao dịch FBM không trả, ' + added + ' khách được đánh dấu để đọc chi tiết.', detail: state.metadata.activityBulk }); }
+  return FbmSync.activityStagesContinue(state, Object.assign({}, extra || {}));
 };

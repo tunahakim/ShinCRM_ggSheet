@@ -91,6 +91,18 @@ function capOXacThucMacDinh(hopCat, ten) {
   if (typeof hopCat.configGet !== 'function') { hopCat.configGet = (name, fallback) => name === ten ? XAC_THUC_MAC_DINH_THU : (fallback === undefined ? '' : fallback); }
 }
 
+/** Mã người dùng FBM của phiên thử; test cần nhánh thiếu mã thì tự gán `scriptSettings`. */
+const MA_NGUOI_DUNG_THU = '2037';
+
+/**
+ * Tệp thật luôn có mã người dùng sau bước kiểm phiên, và request đọc khách thiếu mã thì không dựng được. Hộp cát dựng phiên giả không qua bước đó nên được cấp sẵn mã thử khi phiên giả để trống.
+ */
+function capMaNguoiDungThu(hopCat) {
+  const goc = hopCat.FbmSync && hopCat.FbmSync.scriptSettings;
+  if (typeof goc !== 'function') { return; }
+  hopCat.FbmSync.scriptSettings = function () { const cfg = goc.apply(this, arguments); if (!cfg.userId) { cfg.userId = MA_NGUOI_DUNG_THU; } return cfg; };
+}
+
 function napServer(hopCat, ...duongDans) {
   // Trên GAS mọi tệp chung một không gian tên; cửa kho DocumentProperties là phụ thuộc của gần như mọi tệp server nên luôn nạp trước, như bản thật.
   if (typeof hopCat.documentProps !== 'function' && duongDans.indexOf('server/state/DocumentStore.js') < 0) {
@@ -99,6 +111,7 @@ function napServer(hopCat, ...duongDans) {
   duongDans.forEach((duongDan) => {
     if (duongDan.indexOf('fbm_sync/') === 0) { capBangChoPhepDongBo(hopCat); }
     vm.runInContext(docTep(duongDan), hopCat, { filename: duongDan });
+    if (duongDan === 'fbm_sync/read/GridRead.js') { capMaNguoiDungThu(hopCat); }
   });
   return hopCat;
 }

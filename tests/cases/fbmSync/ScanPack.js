@@ -1,10 +1,10 @@
 /** Gói quét và hai lớp phát hiện giao dịch mới: lớp 2 so giao dịch cuối trên danh sách khách, lớp 3 quét từ khách mới nhất xuống dừng sau chuỗi khách im lặng. */
 const { section, check } = require('../../lib/assert');
-const { scanHarness } = require('./ScanJob');
+const { scanHarness, gdSo } = require('./ScanJob');
 
 const ngayFbm = (y, m, d) => '/Date(' + Date.UTC(y, m - 1, d) + ')/';
 const giaoDich = (customer, fbmId, workDate, taskType) => ({ id: 'ACT-' + fbmId, customerId: customer, fbmId, workDate, taskType });
-const macDinh = (key) => ({ id: 'A-' + key, details: 'Gọi ' + key, end_date: '2026-09-20', owner: 'Owner', datetime0: '2026-09-20T03:00:00', line_nbr: 1 });
+const macDinh = (key) => ({ id: gdSo(key), details: 'Gọi ' + key, end_date: '2026-09-20', owner: 'Owner', datetime0: '2026-09-20T03:00:00', line_nbr: 1 });
 
 /** Lượt đầu "Quét toàn bộ" để Sheet có đủ khách và giao dịch, rồi chạy lượt cần kiểm trên đúng dữ liệu đó. */
 async function sauLuotDau(options, pack, activityFor) {
@@ -47,10 +47,10 @@ async function chay(so) {
     F.hash(Object.assign({}, goc, { ngay_gd: ngayFbm(2026, 10, 1), ten_cv: 'Báo giá' }), 'customer', gate) === F.hash(goc, 'customer', gate), true);
 
   // Lớp 3 trên lượt thật: 30 khách, giao dịch cuối đều khớp nên lớp 2 không chọn ai; chuỗi im lặng 5, lô 3 khách; khách thứ 3 có giao dịch mới.
-  const lop3 = await sauLuotDau({ customers: 30, budget: { activityTopScanQuietStreak: 5, activityBatchCustomers: 3 } }, 'quick', (key) => (key === 'FBM-C3' ? [macDinh(key), Object.assign(macDinh(key), { id: 'A-NEW', details: 'Mới' })] : [macDinh(key)]));
+  const lop3 = await sauLuotDau({ customers: 30, budget: { activityTopScanQuietStreak: 5, activityBatchCustomers: 3 } }, 'quick', (key) => (key === 'FBM-C3' ? [macDinh(key), Object.assign(macDinh(key), { id: '899001', details: 'Mới' })] : [macDinh(key)]));
   const topLog = lop3.h.logs.find((event) => event.action === 'activity_top_scan');
   check(so, 'Quét từ khách mới nhất xuống dừng đúng sau 5 khách liên tiếp không có gì mới tính từ khách có giao dịch mới: đọc 8/30 khách theo thứ tự, ghi giao dịch mới, Log ghi vị trí sâu nhất, tiến trình chốt 8/8 chứ không 8/30', [
-    lop3.end.status.phase, lop3.h.trace.activityCustomers, lop3.h.local.activity.some((item) => item.fbmId === 'A-NEW'), topLog && topLog.detail.depth, topLog && topLog.detail.deepestFresh, lop3.state.scanPack, lop3.h.logs.some((event) => event.action === 'activity_due'), lop3.state.progress
+    lop3.end.status.phase, lop3.h.trace.activityCustomers, lop3.h.local.activity.some((item) => item.fbmId === '899001'), topLog && topLog.detail.depth, topLog && topLog.detail.deepestFresh, lop3.state.scanPack, lop3.h.logs.some((event) => event.action === 'read_list_mark'), lop3.state.progress
   ], ['done', ['FBM-C1', 'FBM-C2', 'FBM-C3', 'FBM-C4', 'FBM-C5', 'FBM-C6', 'FBM-C7', 'FBM-C8'], true, 8, 3, 'quick', false, { done: 8, total: 8 }]);
 
   // Lớp 2 rồi lớp 3: khách thứ 20 có giao dịch cuối FBM khác ShinCRM thì được đọc dù nằm sâu, và lớp 3 không đọc lại khách đó.
@@ -61,35 +61,35 @@ async function chay(so) {
   lop2.local.activity.filter((item) => item.customerId === c20.id).forEach((item) => { item.workDate = '2026-09-10'; });
   lop2.trace.activityCustomers.length = 0; lop2.logs.length = 0;
   const lop2End = await lop2.run({ pack: 'quick' });
-  const dueLog = lop2.logs.find((event) => event.action === 'activity_due');
-  check(so, 'Khách nằm sâu có giao dịch cuối FBM khác ShinCRM được đọc ở lớp 2, lớp 3 đọc 3 khách đầu rồi dừng và không đọc lại khách đã đọc; Log nêu trường lệch', [
-    lop2End.status.phase, lop2.trace.activityCustomers, dueLog && dueLog.detail.count, dueLog && dueLog.detail.fields, doiNgay.h.trace.activityCustomers
-  ], ['done', ['FBM-C20', 'FBM-C1', 'FBM-C2', 'FBM-C3'], 1, { end_date: 1 }, ['FBM-C1', 'FBM-C2', 'FBM-C3']]);
+  const dueLog = lop2.logs.find((event) => event.action === 'read_list_mark');
+  check(so, 'Khách nằm sâu có giao dịch cuối FBM khác ShinCRM được đọc ở lớp 2, lớp 3 đọc 3 khách đầu rồi dừng và không đọc lại khách đã đọc; Log nêu lý do đánh dấu', [
+    lop2End.status.phase, lop2.trace.activityCustomers, dueLog && dueLog.detail.count, dueLog && dueLog.detail.reasons, doiNgay.h.trace.activityCustomers
+  ], ['done', ['FBM-C20', 'FBM-C1', 'FBM-C2', 'FBM-C3'], 1, { activity: 1 }, ['FBM-C1', 'FBM-C2', 'FBM-C3']]);
 
   // Đọc giao dịch theo một phần khách: giao dịch ShinCRM không còn bên FBM chỉ bị gắn cờ khi khách cha đã được đọc trong lượt.
   const vang = scanHarness({ customers: 12, budget: { activityTopScanQuietStreak: 2 } });
   await vang.run({ pack: 'all' });
   const cha = (fbmId) => vang.local.customer.find((item) => item.fbmId === fbmId).id;
-  vang.local.activity.push({ id: 'ACT-900001', customerId: cha('FBM-C1'), fbmId: 'A-GONE-1', workDate: '2026-09-01', taskType: '', syncStatus: 'đã đồng bộ' });
-  vang.local.activity.push({ id: 'ACT-900002', customerId: cha('FBM-C10'), fbmId: 'A-GONE-10', workDate: '2026-09-01', taskType: '', syncStatus: 'đã đồng bộ' });
+  vang.local.activity.push({ id: 'ACT-900001', customerId: cha('FBM-C1'), fbmId: '700001', workDate: '2026-09-01', taskType: '', syncStatus: 'đã đồng bộ' });
+  vang.local.activity.push({ id: 'ACT-900002', customerId: cha('FBM-C10'), fbmId: '700010', workDate: '2026-09-01', taskType: '', syncStatus: 'đã đồng bộ' });
   vang.trace.activityCustomers.length = 0;
   const vangEnd = await vang.run({ pack: 'quick' });
   const trangThai = (fbmId) => vang.local.activity.find((item) => item.fbmId === fbmId).syncStatus;
   check(so, 'Quét nhanh chỉ đọc 2 khách đầu: giao dịch không còn bên FBM của khách đã đọc bị gắn "không thấy bên FBM", của khách chưa đọc thì giữ nguyên', [
-    vangEnd.status.phase, vang.trace.activityCustomers, trangThai('A-GONE-1'), trangThai('A-GONE-10')
+    vangEnd.status.phase, vang.trace.activityCustomers, trangThai('700001'), trangThai('700010')
   ], ['done', ['FBM-C1', 'FBM-C2'], vang.F.SYNC_STATUS.missing, 'đã đồng bộ']);
 
   // Hai chiều: phần đọc xong phải gắn cờ "không thấy" trước khi sang bước đẩy, như chiều Lấy.
   const haiChieu = scanHarness({ customers: 6, budget: { activityTopScanQuietStreak: 2 } });
   await haiChieu.run({ pack: 'all' });
   const chaHai = haiChieu.local.customer.find((item) => item.fbmId === 'FBM-C1').id;
-  haiChieu.local.activity.push({ id: 'ACT-900003', customerId: chaHai, fbmId: 'A-GONE-2C', workDate: '2026-09-01', taskType: '', syncStatus: 'đã đồng bộ' });
+  haiChieu.local.activity.push({ id: 'ACT-900003', customerId: chaHai, fbmId: '700002', workDate: '2026-09-01', taskType: '', syncStatus: 'đã đồng bộ' });
   haiChieu.local.customer.push({ id: 'CUS-900001', fbmId: 'FBM-GONE', fbmCustomerCode: 'ALT-GONE', syncStatus: 'đã đồng bộ' });
   const pushAt = [], pushCounts = [];
   haiChieu.F.canWriteFbm = () => true;
   // Danh mục FBM của chiều đẩy không thuộc phần đang kiểm; harness việc quét không giả lập nó.
   haiChieu.F.needsFbmLookups = () => false;
-  haiChieu.F.nextPushRequest = (state) => { pushCounts.push([state.counts.missingCustomer, state.counts.missingActivity]); pushAt.push([haiChieu.local.activity.find((item) => item.fbmId === 'A-GONE-2C').syncStatus, haiChieu.local.customer.find((item) => item.id === 'CUS-900001').syncStatus]); state.phase = 'done'; haiChieu.F.stateWrite(state); return null; };
+  haiChieu.F.nextPushRequest = (state) => { pushCounts.push([state.counts.missingCustomer, state.counts.missingActivity]); pushAt.push([haiChieu.local.activity.find((item) => item.fbmId === '700002').syncStatus, haiChieu.local.customer.find((item) => item.id === 'CUS-900001').syncStatus]); state.phase = 'done'; haiChieu.F.stateWrite(state); return null; };
   await haiChieu.run({ pack: 'quick', startOptions: { mode: 'write' } });
   check(so, 'Đồng bộ hai chiều: giao dịch đã xóa bên FBM của khách đã đọc và khách không còn bên FBM bị gắn "không thấy bên FBM" trước khi sang bước đẩy', pushAt, [[haiChieu.F.SYNC_STATUS.missing, haiChieu.F.SYNC_STATUS.missing]]);
   check(so, 'Đồng bộ hai chiều: bộ đếm phiên có số khách và giao dịch "không thấy bên FBM" để thẻ Trạng thái phiên hiện', pushCounts, [[1, 1]]);

@@ -49,8 +49,8 @@ function fbmGetSyncStatus() { return runEntryPoint('fbmGetSyncStatus', 'sidebar'
   if (recovered.recovered && result && ['SYNC_STALE_RUN', 'SYNC_STATE_MIGRATED'].indexOf(String(result.lastFailureCode || '')) >= 0) { FbmSync.logStatus(result, 'stale_run'); }
   return result;
 }, {}); }
-/** Ghi lỗi cầu nối do Sidebar phát hiện trước khi có response FBM. */
-function fbmLogSyncError(message, clientTrace) { return runEntryPoint('fbmLogSyncError', 'sidebar', 'throw', function () { if (FbmSync.traceImport) { FbmSync.traceImport(clientTrace); } fbmTraceBoundary('gas_entered', 'fbmLogSyncError'); return FbmSync.logTransportError(message); }, { message: message, clientTrace: clientTrace }); }
+/** Sidebar báo lỗi: `runId` chỉ có khi lỗi thuộc phiên Sidebar đang tự chạy, GAS mới dừng phiên đó; `action` là tên thao tác ghi vào Log. */
+function fbmLogSyncError(message, clientTrace, action, runId) { return runEntryPoint('fbmLogSyncError', 'sidebar', 'throw', function () { if (FbmSync.traceImport) { FbmSync.traceImport(clientTrace); } fbmTraceBoundary('gas_entered', 'fbmLogSyncError'); return FbmSync.logTransportError(message, action, runId); }, { message: message, clientTrace: clientTrace, action: action, runId: runId }); }
 /** Nhận nốt dấu vết Sidebar sau callback cuối của phiên thành công. */
 function fbmLogSyncTrace(clientTrace) { return runEntryPoint('fbmLogSyncTrace', 'sidebar', 'throw', function () { if (FbmSync.traceImport) { FbmSync.traceImport(clientTrace); } return { ok: true, imported: Array.isArray(clientTrace) ? clientTrace.length : 0 }; }, { clientTrace: clientTrace }); }
 /** Thu hồi đúng reservation khi Sidebar không chuyển được envelope tới tab FBM. */

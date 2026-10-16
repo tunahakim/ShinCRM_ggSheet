@@ -3,8 +3,11 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 FbmSync.EXTENSION_CONFIG_KEY = 'FBM_SYNC_EXTENSION_CONFIG_V1';
 FbmSync.BACKGROUND_SCHEDULE_KEY = 'FBM_SYNC_BACKGROUND_SCHEDULE_V1';
 FbmSync.DETAIL_CURSOR_KEY = 'FBM_SYNC_DETAIL_CURSOR_V1';
-/** Mốc đến hạn của từng tiến trình nền, mỗi tiến trình đúng một khóa. */
-FbmSync.SCHEDULE_MARKER_KEYS = { customerFull: 'FBM_SYNC_NEXT_CUSTOMER_FULL_SCAN', activityFull: 'FBM_SYNC_NEXT_ACTIVITY_FULL_SCAN', detail: 'FBM_SYNC_NEXT_DETAIL_SCAN', heartbeat: 'FBM_SYNC_NEXT_HEARTBEAT' };
+/**
+ * Giờ chạy xong gần nhất của từng tiến trình nền, mỗi tiến trình đúng một khóa. Đến hạn khi giờ hiện tại >= giờ chạy xong + chu kỳ.
+ * Chỉ ghi khi tiến trình chạy hết lượt (kể cả khi vài bản ghi lỗi hay xung đột); lượt hỏng giữa chừng không ghi gì nên tiến trình vẫn quá hạn và lần Extension hỏi sau chạy lại — đó là cơ chế tự phục hồi. Chưa từng chạy xong thì đến hạn ngay.
+ */
+FbmSync.SCHEDULE_DONE_KEYS = { customerFull: 'FBM_SYNC_DONE_CUSTOMER_FULL_SCAN', activityFull: 'FBM_SYNC_DONE_ACTIVITY_FULL_SCAN', detail: 'FBM_SYNC_DONE_DETAIL_SCAN', heartbeat: 'FBM_SYNC_DONE_HEARTBEAT' };
 /** Cursor Vòng xoay: số CUS của khách cuối cùng đã ghi xong giao dịch (09/02 "Chuỗi trong một lần hỏi" mục 7 và 9); `-1` khi chưa có, phiên bắt đầu từ khách số nhỏ nhất. Giá trị kiểu cũ (khóa trang FBM) không có `cus` nên cũng là `-1`. */
 FbmSync.detailCursorRead = function () {
   var parsed = FbmSync.documentPropertyJson(FbmSync.DETAIL_CURSOR_KEY, 'cursor Vòng xoay'), cus = parsed ? Number(parsed.cus) : NaN;
@@ -103,7 +106,6 @@ FbmSync.backgroundScheduleSave = function (input) {
   }
   saved.enabled = enabled; saved.direction = direction;
   FbmSync.props().setProperty(FbmSync.BACKGROUND_SCHEDULE_KEY, JSON.stringify(saved));
-  if (typeof FbmSync.schedule === 'function') { FbmSync.schedule(); }
   return { ok: true, schedule: saved };
 };
 FbmSync.extensionConfigPublic = function () {
@@ -114,53 +116,59 @@ FbmSync.backgroundSchedulePublic = function () {
   var value = FbmSync.backgroundScheduleRead();
   return { enabled: value.enabled !== false, direction: value.direction, heartbeat: value.heartbeat, customerFull: value.customerFull, activityFull: value.activityFull, detail: value.detail };
 };
-/** Ghi thời điểm dự kiến cho các tiến trình nghiệp vụ. */
-FbmSync.schedule = function () {
-  var props = FbmSync.props(), at = Date.now(), schedule = FbmSync.backgroundScheduleRead();
-  Object.keys(FbmSync.SCHEDULE_MARKER_KEYS).forEach(function (kind) { props.setProperty(FbmSync.SCHEDULE_MARKER_KEYS[kind], String(at + schedule[kind].minutes * 60 * 1000)); });
-  return { heartbeatMinutes: schedule.heartbeat.minutes, customerMinutes: schedule.customerFull.minutes, activityMinutes: schedule.activityFull.minutes, detailMinutes: schedule.detail.minutes, direction: schedule.direction };
-};
-FbmSync.ensureScheduleMarkers = function (now) {
-  var props = FbmSync.props(), at = Number(now || Date.now()), schedule = FbmSync.backgroundScheduleRead();
-  Object.keys(FbmSync.SCHEDULE_MARKER_KEYS).forEach(function (kind) {
-    var key = FbmSync.SCHEDULE_MARKER_KEYS[kind];
-    if (!Number(props.getProperty(key) || 0)) { props.setProperty(key, String(at + schedule[kind].minutes * 60 * 1000)); }
-  });
+/** Giờ đến hạn của một tiến trình; `0` là chưa từng chạy xong nên đến hạn ngay. Đọc chu kỳ hiện hành nên đổi chu kỳ là có hiệu lực ngay, không cần đặt lại mốc. */
+FbmSync.scheduleDueAt = function (kind, schedule, props) {
+  var done = Number((props || FbmSync.props()).getProperty(FbmSync.SCHEDULE_DONE_KEYS[kind]) || 0);
+  return done ? done + (schedule || FbmSync.backgroundScheduleRead())[kind].minutes * 60 * 1000 : 0;
 };
 /** Tiến trình bật và đã đến hạn, chưa chạy trong chuỗi này, theo ưu tiên: Quét nhanh, Lấy toàn bộ giao dịch, Vòng xoay, cuối cùng Giữ phiên. */
 FbmSync.scheduleDueKinds = function (now, ran) {
   var props = FbmSync.props(), schedule = FbmSync.backgroundScheduleRead(), skip = ran || [];
-  return Object.keys(FbmSync.SCHEDULE_MARKER_KEYS).filter(function (kind) {
-    return schedule[kind].enabled && skip.indexOf(kind) < 0 && Number(props.getProperty(FbmSync.SCHEDULE_MARKER_KEYS[kind]) || 0) <= now;
+  return Object.keys(FbmSync.SCHEDULE_DONE_KEYS).filter(function (kind) {
+    return schedule[kind].enabled && skip.indexOf(kind) < 0 && FbmSync.scheduleDueAt(kind, schedule, props) <= now;
   }).sort(function (a, b) { return schedule[a].priority - schedule[b].priority; });
 };
-/** Mốc kế tiếp = mốc cũ + đủ số chu kỳ để vượt giờ hiện tại: bám nhịp tròn, không trôi theo giờ chạy xong và không cộng dồn nợ. Mốc chưa tới (Giữ phiên chạy lúc mở Chrome) thì giữ nguyên. */
-FbmSync.scheduleMarkerAdvance = function (kind, now) {
-  var key = FbmSync.SCHEDULE_MARKER_KEYS[kind], cycle = FbmSync.backgroundScheduleRead()[kind].minutes * 60 * 1000, old = Number(FbmSync.props().getProperty(key) || 0), at = Number(now || Date.now());
-  // Chu kỳ 0: chạy ở mọi lần hỏi, mốc mới là chính giờ chạy xong.
-  var next = !cycle ? at : !old ? at + cycle : old > at ? old : old + (Math.floor((at - old) / cycle) + 1) * cycle;
-  FbmSync.props().setProperty(key, String(next));
-  return next;
+/** Tiến trình vừa chạy hết lượt: ghi giờ chạy xong. Chỉ đường kết thúc thành công gọi hàm này. */
+FbmSync.scheduleMarkDone = function (kind, now) {
+  var at = Number(now || Date.now());
+  FbmSync.props().setProperty(FbmSync.SCHEDULE_DONE_KEYS[kind], String(at));
+  return at;
+};
+/** Dòng vết của lịch nền: chỉ ra Sheet `Log` khi `LOG_TRACE` phủ `fbm_sync`, để biết mỗi lần Extension hỏi GAS đã quyết gì. */
+FbmSync.scheduleTrace = function (action, reason, detail) {
+  if (typeof logTrace === 'function') { logTrace({ source: 'fbm_sync', action: action, outcome: 'trace', reason: reason, detail: detail || {} }); }
+};
+/** Câu "sớm nhất là X, còn N phút" cho dòng vết lần hỏi chưa có việc. */
+FbmSync.scheduleNextText = function (now) {
+  var props = FbmSync.props(), schedule = FbmSync.backgroundScheduleRead(), best = '', bestAt = 0;
+  Object.keys(FbmSync.SCHEDULE_DONE_KEYS).forEach(function (kind) {
+    var at = FbmSync.scheduleDueAt(kind, schedule, props);
+    if (schedule[kind].enabled && (!best || at < bestAt)) { best = kind; bestAt = at; }
+  });
+  return best ? 'sớm nhất là ' + FbmSync.SCHEDULE_LABELS[best] + ', còn ' + Math.max(0, Math.ceil((bestAt - now) / 60000)) + ' phút' : 'không có tiến trình nào đang bật';
 };
 FbmSync.scheduleNextAt = function () {
   var props = FbmSync.props(), schedule = FbmSync.backgroundScheduleRead();
-  var times = Object.keys(FbmSync.SCHEDULE_MARKER_KEYS).filter(function (kind) { return schedule[kind].enabled; }).map(function (kind) { return Number(props.getProperty(FbmSync.SCHEDULE_MARKER_KEYS[kind]) || 0); }).filter(function (at) { return at > 0; });
+  var times = Object.keys(FbmSync.SCHEDULE_DONE_KEYS).filter(function (kind) { return schedule[kind].enabled; }).map(function (kind) { return FbmSync.scheduleDueAt(kind, schedule, props); });
   return times.length ? Math.min.apply(null, times) : 0;
 };
 /**
- * Mở chuỗi nền của lần hỏi này: chọn tiến trình đến hạn đầu tiên, chưa dời mốc nào (mốc chỉ dời khi tiến trình chạy xong).
- * Chuỗi nằm trong state (`chain`) để lượt chuyền bị cắt lát thì lần hỏi sau chạy tiếp. Chuỗi còn sót mà không còn lượt nào chạy là chuỗi đã gãy (lỗi, lượt tay chen ngang) nên bị thay bằng chuỗi mới; tiến trình dở chạy lại vì mốc của nó chưa dời.
+ * Mở chuỗi nền của lần hỏi này: chọn tiến trình đến hạn đầu tiên, chưa ghi giờ chạy xong nào (chỉ ghi khi tiến trình chạy hết lượt).
+ * Chuỗi nằm trong state (`chain`) để lượt chuyền bị cắt lát thì lần hỏi sau chạy tiếp. Chuỗi còn sót mà không còn lượt nào chạy là chuỗi đã gãy (lỗi, lượt tay chen ngang) nên bị thay bằng chuỗi mới; tiến trình dở chạy lại vì chưa có giờ chạy xong mới.
  */
 FbmSync.schedulerPickDue = function (now, options) {
   var at = Number(now || Date.now()), opt = options || {}, schedule = FbmSync.backgroundScheduleRead(), state = FbmSync.stateRead();
-  FbmSync.ensureScheduleMarkers(at);
   if (!FbmSync.masterEnabled() || schedule.enabled === false) { return { ok: false, code: 'BACKGROUND_DISABLED' }; }
-  if (FbmSync.runInProgress(state)) { return { ok: false, code: 'SYNC_ALREADY_RUNNING' }; }
+  if (FbmSync.runInProgress(state)) {
+    FbmSync.scheduleTrace('schedule_skip', 'Extension hỏi lịch nền: đang có lượt chạy, không mở thêm.', { phase: String(state.phase || '') });
+    return { ok: false, code: 'SYNC_ALREADY_RUNNING' };
+  }
   if (state.scheduledScan) { return { ok: true, kind: String(state.scheduledScan), existing: true }; }
   var due = FbmSync.scheduleDueKinds(at, []);
   // Mở Chrome là tùy chọn người dùng thấy được: được một lần Giữ phiên ngay, không sinh loạt việc bù.
   if (!due.length && opt.startup === true && FbmSync.extensionConfigRead().runOnStartup !== false && schedule.heartbeat.enabled) { due = ['heartbeat']; }
   if (!due.length) {
+    FbmSync.scheduleTrace('schedule_idle', 'Extension hỏi lịch nền: chưa có tiến trình đến hạn; ' + FbmSync.scheduleNextText(at) + '.');
     if (state.chain) { state.chain = null; FbmSync.stateWrite(state); }
     return { ok: false, code: 'NO_PROCESS_DUE' };
   }
@@ -187,14 +195,14 @@ FbmSync.chainStart = function (kind) {
   return FbmSync.start(options);
 };
 /**
- * Tiến trình hiện tại của chuỗi vừa chạy xong: dời mốc của nó rồi mở tiến trình đến hạn kế tiếp chưa chạy trong chuỗi.
+ * Tiến trình hiện tại của chuỗi vừa chạy xong: ghi giờ chạy xong của nó rồi mở tiến trình đến hạn kế tiếp chưa chạy trong chuỗi.
  * Mỗi tiến trình theo lịch chạy tối đa một lần mỗi chuỗi nên chuỗi luôn dừng dù chu kỳ ngắn hơn thời gian chạy; Quét nhanh do bước đếm gọi nằm trong lượt của tiến trình đang chạy nên không tính.
  */
 FbmSync.chainAdvance = function () {
-  for (var guard = 0; guard <= Object.keys(FbmSync.SCHEDULE_MARKER_KEYS).length; guard += 1) {
+  for (var guard = 0; guard <= Object.keys(FbmSync.SCHEDULE_DONE_KEYS).length; guard += 1) {
     var state = FbmSync.stateRead(), chain = state.chain, at = Date.now();
     if (!chain || !chain.current) { return null; }
-    FbmSync.scheduleMarkerAdvance(chain.current, at);
+    FbmSync.scheduleMarkDone(chain.current, at);
     chain.ran = (chain.ran || []).concat([chain.current]); chain.current = '';
     var next = FbmSync.masterEnabled() && FbmSync.backgroundEnabled() ? FbmSync.scheduleDueKinds(at, chain.ran)[0] : '';
     state.chain = next ? chain : null; state.scheduledScan = ''; state.nextRunAt = FbmSync.scheduleNextAt();
@@ -212,7 +220,14 @@ FbmSync.chainAdvance = function () {
 FbmSync.chainTail = function (result) {
   if (!result || result.request) { return result; }
   var state = FbmSync.stateRead();
-  if (state.origin !== 'background' || state.phase !== 'done' || !state.chain || !state.chain.current) { return result; }
+  if (state.origin !== 'background' || !state.chain || !state.chain.current) { return result; }
+  // Lượt dừng ở xung đột đã chạy hết phần đọc, chỉ chờ người dùng chọn: tính là chạy xong để lần hỏi sau không chạy lại liên tục; chuỗi dừng tới khi xung đột được xử lý.
+  if (state.phase === 'conflict') {
+    FbmSync.scheduleMarkDone(state.chain.current, Date.now());
+    state.chain = null; state.scheduledScan = ''; state.nextRunAt = FbmSync.scheduleNextAt(); FbmSync.stateWrite(state);
+    return result;
+  }
+  if (state.phase !== 'done') { return result; }
   var next = FbmSync.chainAdvance();
   return Object.assign({}, result, { ok: true, request: next && next.request || null, status: FbmSync.statusView() });
 };
@@ -308,6 +323,7 @@ function fbmSyncHeartbeatLocked(rawResponse, options) {
     state.scheduledScan = recount ? 'recount' : '';
     state.message = recount ? FbmSync.RECOUNT_MESSAGE : 'Heartbeat FBM OK.';
   }
+  FbmSync.scheduleTrace('heartbeat_ok', 'Giữ phiên FBM OK, FBM báo ' + countTotal + ' khách' + (state.scheduledScan === 'recount' ? '; số khách lệch nên chạy Quét nhanh.' : '.'), { customers: countTotal });
   state.cursor = {};
   FbmSync.stateWrite(state);
   state = FbmSync.stateRead();

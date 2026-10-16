@@ -1,6 +1,11 @@
 /** Kiểm tra protocol, fingerprint và đối soát ba chiều. */
 const { section, check } = require("../../lib/assert");
 const { taoHopCat, napServer } = require("../../lib/load-gas");
+const fs = require("fs");
+const path = require("path");
+
+/** Tập trạng thái đồng bộ đọc thẳng từ 09/05 Phần 10, để code và tài liệu không lệch nhau âm thầm. */
+const DOC_SYNC_STATUS = fs.readFileSync(path.join(__dirname, "../../../0_Documentation/00. Tài liệu chính thức/09. Đồng bộ FBM/05. Xóa, vắng mặt và cờ đồng bộ.md"), "utf8").split(/\r?\n/).filter((line) => /^chưa đẩy · /.test(line))[0].split(" · ").map((item) => item.trim());
 
 async function chay(so) {
   section("FBM sync — protocol và fingerprint");
@@ -17,7 +22,7 @@ async function chay(so) {
   check(so, 'HTTP 401 va 403 chi la phien dang ngo, khong tu ket luan het phien', [hop.FbmSync.protocol.classifyFailure({ ok: false, status: 401, body: '{"d":{"Bugs":{"Message":"Login"}}}' }).code, hop.FbmSync.protocol.classifyFailure({ ok: false, status: 403, body: 'forbidden' }).code], ['SESSION_SUSPECTED', 'SESSION_SUSPECTED']);
   check(so, 'hop dong phien song chi dat khi HTTP 200 JSON co khoa d', [hop.FbmSync.protocol.isLiveSessionResponse({ ok: true, status: 200, body: '{"d":{}}' }), hop.FbmSync.protocol.isLiveSessionResponse({ ok: true, status: 200, body: '{"x":1}' }), hop.FbmSync.protocol.isLiveSessionResponse({ ok: false, status: 500, body: '\ufffd\ufffd\ufffd' })], [true, false, false]);
   check(so, 'probe HTTP 200 JSON Authorized false va khong co User la chua dang nhap', hop.FbmSync.protocol.isUnauthenticatedResponse({ ok: true, status: 200, body: JSON.stringify({ d: { TotalRowCount: 0, Rows: null, ViewPage: null, Authorized: false } }) }), true);
-  check(so, 'SYNC_STATUS co du 11 gia tri hop dong', Object.keys(hop.FbmSync.SYNC_STATUS).length, 11);
+  check(so, 'SYNC_STATUS đúng 12 giá trị của 09/05 Phần 10', Object.keys(hop.FbmSync.SYNC_STATUS).map((key) => hop.FbmSync.SYNC_STATUS[key]).sort(), DOC_SYNC_STATUS.slice().sort());
   check(so, 'parse response FBM va doc Bugs', parsed.d.Bugs.Message, 'bad');
   check(so, 'Bugs khong bi coi la thanh cong', hop.FbmSync.protocol.assertSuccess(parsed).ok, false);
   check(so, 'response hong JSON bi chan', hop.FbmSync.protocol.assertSuccess('{not-json}').ok, false);

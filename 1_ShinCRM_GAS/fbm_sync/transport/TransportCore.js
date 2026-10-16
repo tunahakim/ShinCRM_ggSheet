@@ -368,7 +368,7 @@ FbmSync.nextEnvelope = function (request) {
     }
     // Mọi request nghiệp vụ và authorize đầu lượt phải qua probe User.
     // Probe là request hệ thống nên không quay lại nhánh này.
-    var gateCursorKinds = ['customer_count', 'customer_grid', 'activity_grid', 'activity_recheck', 'lookup', 'push_lookup', 'push_scan', 'push_wait'];
+    var gateCursorKinds = ['customer_count', 'customer_grid', 'activity_grid','lookup', 'push_lookup', 'push_scan', 'push_wait'];
     var requestKind = String(request.meta && request.meta.kind || ''), cursorNeedsGate = gateCursorKinds.indexOf(String(pendingState.cursor && pendingState.cursor.kind || '')) >= 0 && String(pendingState.cursor && pendingState.cursor.kind || '') !== 'push_wait';
     // Mọi request không thuộc nhóm hệ thống đều phải qua cổng; không cho
     // caller né cổng bằng cách đặt một tên meta.kind lạ.
@@ -478,6 +478,5 @@ FbmSync.requestForCursor = function (state) {
   if (cursor.kind === 'scan_job') { return FbmSync.scanJobRequest(state); }
   if (cursor.kind === 'customer_count') { return FbmSync.customerCountRequest(); }
   if (cursor.kind === 'activity_grid') { return FbmSync.activityBatchRequest(state); }
-  if (cursor.kind === 'activity_recheck') { return FbmSync.activityRecheckRequest(state); }
   return null;
 };

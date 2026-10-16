@@ -150,8 +150,27 @@ async function testSharedShellLifecycle(so) {
   check(so, 'cờ active lệch với DOM vẫn cho phép icon Đồng bộ tự gắn lại shell', remountStatus, hop.FBM_SYNC_CLIENT.lastStatus);
 }
 
+async function testOwnRunId(so) {
+  // Chỉ phiên Sidebar tự khởi chạy mới được báo kèm mã phiên; lượt mới bắt đầu thì quên mã cũ để lỗi trước khi GAS cấp mã không dừng nhầm phiên nền.
+  const { hop } = taoBoTest();
+  const runIdCalls = [];
+  hop.callServer = (name, args) => { runIdCalls.push({ name, args }); return Promise.resolve({}); };
+  hop.fbmSyncSetRunning(true);
+  await hop.fbmSyncLoop({ ok: true, runId: 'run-7', phase: 'done' });
+  const maSoHuu = hop.FBM_SYNC_CLIENT.ownRunId;
+  await hop.fbmSyncLogClientError(new Error('Extension không trả response'), '', 'sync_run', hop.FBM_SYNC_CLIENT.ownRunId);
+  await hop.fbmSyncLogClientError(new Error('Lỗi lưu cài đặt'), '', 'connection_save');
+  hop.fbmSyncSetRunning(true);
+  const maSauKhiBatDauLai = hop.FBM_SYNC_CLIENT.ownRunId;
+  hop.fbmSyncSetRunning(false);
+  check(so, 'Sidebar báo lỗi phiên của chính mình kèm mã phiên, lỗi thao tác khác không kèm mã; lượt mới bắt đầu thì quên mã cũ',
+    [maSoHuu, runIdCalls.filter((c) => c.name === 'fbmLogSyncError').map((c) => c.args[2] + '|' + c.args[3]), maSauKhiBatDauLai],
+    ['run-7', ['sync_run|run-7', 'connection_save|'], '']);
+}
+
 async function chay(so) {
   await testSharedShellLifecycle(so);
+  await testOwnRunId(so);
   section('FBM sync — Sidebar UI smoke');
   let bo;
   try { bo = taoBoTest(); } catch (error) { return ghiLoiNap(so, 'nạp renderer Sidebar Đồng bộ FBM', error); }
@@ -370,8 +389,8 @@ async function chay(so) {
     hop.fbmSyncStatusResultLines({ runId: 'r1', canPush: false }, { completed: 5 }).map((line) => line.split(':')[0]),
     hop.fbmSyncStatusResultLines({ runId: '' }, { completed: 5 })
   ], [
-    ['Đọc từ FBM: 1.445', 'Ghi vào Sheet: 3', 'Đẩy lên FBM: 1', 'Không thấy bên FBM: 0 khách, 2 giao dịch', 'Xung đột: 0', 'Lỗi: 0', 'Bỏ qua: 0'],
-    ['Đọc từ FBM', 'Ghi vào Sheet', 'Không thấy bên FBM', 'Xung đột', 'Lỗi', 'Bỏ qua'],
+    ['Đọc từ FBM: 1.445', 'Ghi vào Sheet: 3', 'Đẩy lên FBM: 1', 'Không thấy bên FBM: 0 khách, 2 giao dịch', 'Đã chuyển cho người khác: 0 khách, 0 giao dịch', 'Xung đột: 0', 'Lỗi: 0', 'Bỏ qua: 0'],
+    ['Đọc từ FBM', 'Ghi vào Sheet', 'Không thấy bên FBM', 'Đã chuyển cho người khác', 'Xung đột', 'Lỗi', 'Bỏ qua'],
     []
   ]);
   check(so, 'Thẻ Trạng thái phiên hiện thông tin lượt từng dòng; dòng Đang xử lý chỉ có khi lượt còn chạy', [
@@ -644,11 +663,17 @@ async function chay(so) {
 
   const loginButton = dom.document.createElement('button');
   dom.document.getElementById('fbm-login-username').value = 'anhlt';
+  const nhapSaiCalls = [], paintsTruoc = paints.length, callServerTruoc = hop.callServer;
+  hop.callServer = (name, args) => { nhapSaiCalls.push(name); return callServerTruoc(name, args); };
   await hop.fbmSyncSaveLoginConfig(loginButton);
-  check(so, 'Lưu connection thiếu mật khẩu báo lỗi rõ ràng', paints.some((item) => String(item.message).toLowerCase().indexOf('username') >= 0), true);
+  const thongBaoLuu = Object.assign({}, hop.FBM_SYNC_CLIENT.accountNotices.login);
   const testButton = dom.document.createElement('button');
   await hop.fbmSyncTestLogin(testButton);
-  check(so, 'Đăng nhập thử thiếu thông tin báo lỗi rõ ràng', paints.some((item) => String(item.message).indexOf('username') >= 0), true);
+  const thongBaoThu = Object.assign({}, hop.FBM_SYNC_CLIENT.accountNotices.login);
+  hop.callServer = callServerTruoc;
+  check(so, 'Lỗi nhập sai (thiếu mật khẩu, đăng nhập thử thiếu thông tin) chỉ hiện ở card đăng nhập: không ghi Log, không tô lỗi cả màn đồng bộ',
+    [thongBaoLuu.kind, String(thongBaoLuu.message).indexOf('username') >= 0, thongBaoThu.kind, nhapSaiCalls.indexOf('fbmLogSyncError'), paints.slice(paintsTruoc).some((item) => item.phase === 'error')],
+    ['error', true, 'error', -1, false]);
 
   const loginPassword = dom.document.getElementById('fbm-login-password');
   const loginUsername = dom.document.getElementById('fbm-login-username');
@@ -706,6 +731,8 @@ async function chay(so) {
   hop.sheetLinkHandshakePing = () => {};
   const absentCalls = [];
   hop.callServer = (name) => { absentCalls.push(name); return Promise.resolve({}); };
+  hop.FBM_SYNC_CLIENT.identityStatus = { status: 'BOUND', binding: { spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' } };
+  hop.fbmSyncWaitForBridge = () => Promise.resolve(false);
   await hop.fbmSyncCheckIdentity();
   check(so, 'Kiểm tra liên kết khi Extension vắng thật thì báo Sidebar, ghi Log và không gọi GAS khởi chạy', [hop.FBM_SYNC_CLIENT.accountNotices.identity.kind, absentCalls.indexOf('fbmLogSyncError') >= 0, absentCalls.indexOf('fbmStartIdentityCheck') < 0, hop.FBM_SYNC_CLIENT.running], ['error', true, true, false]);
   hop.sheetLinkExtensionAlive = () => true;

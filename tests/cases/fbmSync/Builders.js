@@ -24,9 +24,9 @@ async function chay(so) {
   check(so, 'Activity tạo mới dùng type lưu form', activity.body.type, 1);
   check(so, 'Activity sửa mở form dùng type đọc form', builders.FbmSync.activityEditOpenRequest('174813').body.type, 0);
   check(so, 'Activity không đẩy product nội bộ lên FBM', activity.body.memvars.filter((item) => item.Name === 'ma_sp')[0].NewValue, '');
-  const linkedActivity = builders.FbmSync.linkActivityCustomers([{ customerId: 'ALT99999', fbmHash: 'old' }], [{ id: 'KH-1', fbmCustomerCode: 'ALT99999' }]);
-  check(so, 'Activity FBM nối về mã Customer nội bộ', [linkedActivity.records[0].customerId, linkedActivity.orphaned], ['KH-1', 0]);
-  const stoppedActivity = builders.FbmSync.linkActivityCustomers([{ customerId: 'ALT-STOP', fbmHash: 'old' }], [{ id: 'KH-STOP', fbmCustomerCode: 'ALT-STOP', fbmSyncPermission: 'Cấm đồng bộ' }]);
+  const linkedActivity = builders.FbmSync.linkActivityCustomers([{ customerFbmId: 'A9', customerFbmCode: 'ALT-OLD', fbmHash: 'old' }], [{ id: 'KH-2', fbmId: 'A8', fbmCustomerCode: 'ALT-OLD' }, { id: 'KH-1', fbmId: 'A9', fbmCustomerCode: 'ALT99999' }]);
+  check(so, 'Khách cha của giao dịch nối theo stt_rec_kh của khách được đọc, không theo ma_kh', [linkedActivity.records[0].customerId, linkedActivity.orphaned], ['KH-1', 0]);
+  const stoppedActivity = builders.FbmSync.linkActivityCustomers([{ customerFbmId: 'A-STOP', fbmHash: 'old' }], [{ id: 'KH-STOP', fbmId: 'A-STOP', fbmCustomerCode: 'ALT-STOP', fbmSyncPermission: 'Cấm đồng bộ' }]);
   check(so, 'Customer ngừng đồng bộ chặn Activity con ở chiều pull', [stoppedActivity.records.length, stoppedActivity.blocked], [0, 1]);
   const activityWithParent = builders.FbmSync.activityRecord({ id: 7, details: 'Gọi', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi điện' }, gate, { maKh: 'ALT99999' });
   check(so, 'Activity giữ mã Customer cha khi grid không trả ma_kh', activityWithParent.customerFbmCode, 'ALT99999');
