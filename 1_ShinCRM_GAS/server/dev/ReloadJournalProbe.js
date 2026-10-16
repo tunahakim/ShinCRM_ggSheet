@@ -53,3 +53,28 @@ function measureReloadJournalBaseline() {
   reloadJournalProbeMeasure(out, 'Lời hỏi nạp một khách (kế hoạch từng phần)', function () { probeSelectionAndReload({ lastSeenRevision: journal.rev - 1, skipPosition: true }); });
   return out;
 }
+
+/** Tách lượt đổ giỏ thành từng đoạn (cầm khóa + bỏ bản đọc, ghi sổ, tô tab, nhả khóa) để biết lần cầm khóa thứ hai của lượt lưu (V26) và lệnh ghi trạng thái tô tab (V6) tốn bao nhiêu. Tăng revision thật trên Sheet DEV. */
+function measureBasketFlushBreakdown() {
+  var out = [];
+  for (var round = 1; round <= 3; round++) {
+    var counter = {};
+    var restore = reloadJournalProbeCountStore(counter);
+    var times = {};
+    var mark = function (label, fn) { var started = Date.now(); var value = fn(); times[label] = Date.now() - started; return value; };
+    try {
+      var lock = LockService.getDocumentLock();
+      mark('cầm khóa', function () { return documentStoreTryLock(lock, SETTINGS.LOCK_WAIT_MS); });
+      var flushMark = dirtyStateBlankMark();
+      flushMark.customer = ['DEV-FLUSH-' + round];
+      flushMark.allViews = true;
+      flushMark.fromSidebar = true;
+      mark('ghi sổ (kèm nạp lại kho)', function () { return reloadJournalAppend(flushMark); });
+      mark('đọc núm người dùng', function () { return userPrefsRead(); });
+      mark('tô tab (cả đoạn)', function () { return viewTabTintStaleLocked(null, { fromSidebar: true }); });
+      mark('nhả khóa', function () { lock.releaseLock(); return true; });
+    } finally { restore(); }
+    out.push('Lượt ' + round + ': ' + JSON.stringify(times) + ' · lệnh kho ' + JSON.stringify(counter));
+  }
+  return out;
+}
