@@ -1,9 +1,9 @@
 /**
  * Tô cam tab sheet quản trị đang cũ, để người mở bảng tính lúc Sidebar đóng vẫn thấy view chưa cập nhật; vẽ xong thì trả lại màu người dùng tự đặt (kể cả "không màu").
  *
- * Ranh giới: chỉ gọi từ điểm commit signal (trigger và cửa ghi) và từ lượt vẽ; `DirtyState`/`ReloadDecision` không chạm Sheet nên không gọi tệp này. Cờ "đã tô" và màu cũ là đọc–sửa–ghi chung với lượt vẽ, nên mọi thao tác chạy trong DocumentLock.
+ * Ranh giới: chỉ gọi từ lượt đổ giỏ thay đổi (`dirtyStateBasketFlush`) và từ lượt vẽ, luôn trong khóa tài liệu (`documentLockRun`): cờ "đã tô" và màu cũ là đọc–sửa–ghi chung với lượt vẽ. `ReloadDecision` không chạm Sheet nên không gọi tệp này.
  *
- * Chi phí: chỉ quét danh sách sheet khi `viewsStaleRevision` tăng so với lần quét trước, và chỉ gọi `setTabColor` cho sheet cũ chưa tô — signal thứ hai liên tiếp không tô lại. Tệp này không tự `flush`: cửa ghi flush trước khi nhả khóa, trigger được Apps Script flush khi kết thúc.
+ * Chi phí: chỉ quét danh sách sheet khi `viewsStaleRevision` tăng so với lần quét trước, và chỉ gọi `setTabColor` cho sheet cũ chưa tô — signal thứ hai liên tiếp không tô lại. Tệp này không tự `flush` và không tự gửi kho: người giữ khóa làm cả hai trước khi nhả, nên trạng thái tô tab đi chung một lệnh ghi với sổ nạp lại.
  *
  * Màu cũ lưu theo `sheetId` để đổi tên sheet lúc đang cam vẫn trả đúng màu.
  */

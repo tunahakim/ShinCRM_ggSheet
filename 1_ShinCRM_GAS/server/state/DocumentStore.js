@@ -3,19 +3,26 @@
  *
  * Vì sao có: mỗi lệnh gọi kho mất 10–50 ms, trong khi một lần ghi Sheet từng đọc lại cùng các khóa hàng trăm lần.
  * Luật:
- * - Bản đọc chỉ sống trong một lần gọi (`runEntryPoint` mở/đóng) hoặc trong khóa điều phối của đồng bộ; ngoài đó `documentProps()` là kho thật.
+ * - Bản đọc chỉ sống trong một lần gọi (`runEntryPoint` mở/đóng), trong khóa tài liệu hoặc trong khóa điều phối của đồng bộ; ngoài đó `documentProps()` là kho thật.
  * - Lần đọc đầu lấy cả kho bằng một `getProperties()`; khóa không có trong bản đó nghĩa là chưa có.
- * - `documentProps()` ghi thẳng xuống kho (write-through) rồi cập nhật bản đọc: lõi cần tín hiệu reload và bộ đếm mã nằm trong kho trước khi nhả khóa tài liệu.
- * - Chỉ đồng bộ FBM dùng kiểu ghi gộp (`documentPropsDeferred()` trong `withDocumentStoreDeferred`): ghi chờ và được ghi một lần trước khi nhả khóa điều phối, nên lượt khác chỉ thấy bản hoàn chỉnh.
+ * - Khóa tài liệu chỉ có một người giữ là `documentLockRun`: code nghiệp vụ khai "việc này cần khóa", không tự cầm/trả. Lần chạy đang cầm thì gọi lồng chỉ chạy tiếp (khóa của Google không tái nhập, tự cầm lại là tự chờ chính mình tới hết giờ). Trả khóa luôn qua `SpreadsheetApp.flush()` (tài liệu 06 Phần 2) rồi gửi kho.
+ * - Trong khóa tài liệu, `documentProps()` ghi chờ và người giữ khóa gửi mọi khóa đã ghi bằng một `setProperties` ngay trước khi nhả: mỗi module vẫn tự ghi khóa của mình, kho chỉ nhận một lệnh, và lượt chờ khóa chỉ thấy bản đã ghi xong. Ngoài khóa tài liệu thì ghi thẳng.
+ * - Đồng bộ FBM ghi gộp riêng (`documentPropsDeferred()` trong `withDocumentStoreDeferred`): ghi chờ tới lúc nhả khóa điều phối (khóa script), kể cả khi đang lồng trong khóa tài liệu. Mỗi khóa chờ ghi gắn với lớp khóa của nó, nên nhả khóa tài liệu không gửi sớm phần của đồng bộ.
  * - Vừa lấy được khóa (khóa tài liệu hoặc khóa điều phối) thì gọi `documentStoreRefresh()` để bỏ bản đọc: tiến trình khác có thể vừa ghi trong lúc chờ khóa; đọc-sửa-ghi trên bản cũ là mất tín hiệu của họ. Phần đang chờ ghi gộp được giữ.
  * - Bản đọc giữ chuỗi chứ không giữ object, nên người đọc sửa object mà không ghi thì không làm bẩn bản đọc.
- * Cạm bẫy: gọi thẳng `PropertiesService.getDocumentProperties()` ở chỗ khác là đọc trượt bản đọc và thấy giá trị cũ; test chặn việc này.
- * GAS bị cắt giữa chừng (trần 6 phút) thì `finally` không chạy, phần ghi gộp chưa ghi bị mất; chấp nhận vì cửa ghi FBM idempotent, lượt sau chạy lại đúng khách đang xử lý.
+ * Cạm bẫy: gọi thẳng `PropertiesService.getDocumentProperties()` hay `LockService.getDocumentLock()` ở chỗ khác là đọc trượt bản đọc hoặc tự khóa chính mình; test chặn việc này.
+ * GAS bị cắt giữa chừng (trần 6 phút) thì `finally` không chạy, phần ghi chờ chưa gửi bị mất; chấp nhận vì cửa ghi FBM idempotent (lượt sau chạy lại đúng khách đang xử lý) và bộ đếm cấp mã tự nhảy theo số lớn nhất trên sheet (`idGateIssue`).
  */
-var DOCUMENT_STORE = { lockDepth: 0, callDepth: 0, loaded: false, values: {}, dirty: {} };
+var DOCUMENT_STORE = { lockDepth: 0, callDepth: 0, docLockDepth: 0, loaded: false, values: {}, dirty: {} };
+
+/** Lớp khóa của một khóa chờ ghi: gửi lúc nhả khóa tài liệu, hay lúc nhả khóa điều phối của đồng bộ. */
+var DOCUMENT_STORE_DIRTY_DOC = 'doc';
+var DOCUMENT_STORE_DIRTY_COORD = 'coord';
+
+var DOCUMENT_LOCK_BUSY_MESSAGE = 'Hệ thống bận. Vui lòng thử lại!';
 
 function documentStoreReal() { return PropertiesService.getDocumentProperties(); }
-function documentStoreActive() { return DOCUMENT_STORE.lockDepth > 0 || DOCUMENT_STORE.callDepth > 0; }
+function documentStoreActive() { return DOCUMENT_STORE.lockDepth > 0 || DOCUMENT_STORE.callDepth > 0 || DOCUMENT_STORE.docLockDepth > 0; }
 function documentStoreClear() { DOCUMENT_STORE.loaded = false; DOCUMENT_STORE.values = {}; DOCUMENT_STORE.dirty = {}; }
 
 /** Bỏ bản đọc nhưng giữ phần đang chờ ghi gộp; lần đọc sau nạp lại kho thật rồi phủ phần chờ lên. */
@@ -26,7 +33,7 @@ function documentStoreRefresh() {
   DOCUMENT_STORE.loaded = false;
 }
 
-/** Cửa duy nhất để lấy khóa (khóa tài liệu hay khóa script): lấy được thì bỏ bản đọc ngay, nên không có chỗ nào lấy khóa mà quên đọc lại. Trả `false` khi hết giờ chờ. */
+/** Cửa duy nhất để lấy khóa (khóa tài liệu qua `documentLockRun`, khóa điều phối của đồng bộ): lấy được thì bỏ bản đọc ngay, nên không có chỗ nào lấy khóa mà quên đọc lại. Trả `false` khi hết giờ chờ. */
 function documentStoreTryLock(lock, waitMs) {
   if (!lock.tryLock(waitMs)) { return false; }
   documentStoreRefresh();
@@ -37,6 +44,53 @@ function documentStoreTryLock(lock, waitMs) {
 function documentStoreWaitLock(lock, waitMs) {
   lock.waitLock(waitMs);
   documentStoreRefresh();
+}
+
+/**
+ * Người giữ khóa tài liệu duy nhất: chạy `work` trong khóa; lần chạy chưa cầm thì cầm, đang cầm thì chạy tiếp. Hết giờ chờ thì ném `busyMessage` và không chạy gì.
+ * Trả khóa luôn qua `documentLockSettle` kể cả khi `work` ném lỗi, vì phần đã ghi trước lỗi phải nằm thật trong Sheet và kho. Không giữ khóa suốt lần chạy: mỗi việc ghi cầm một lần ngắn, để một lần chạy đồng bộ dài không chặn Sidebar lưu.
+ */
+function documentLockRun(work, busyMessage) {
+  if (DOCUMENT_STORE.docLockDepth > 0) {
+    DOCUMENT_STORE.docLockDepth += 1;
+    try { return work(); } finally { DOCUMENT_STORE.docLockDepth -= 1; }
+  }
+  var lock = LockService.getDocumentLock();
+  if (!documentStoreTryLock(lock, SETTINGS.LOCK_WAIT_MS)) { throw new Error(busyMessage || DOCUMENT_LOCK_BUSY_MESSAGE); }
+  DOCUMENT_STORE.docLockDepth = 1;
+  var failed = null;
+  try {
+    return work();
+  } catch (error) {
+    failed = error;
+    throw error;
+  } finally {
+    try {
+      documentLockSettle();
+    } catch (settleError) {
+      // Lỗi gốc giữ quyền ném, nhưng lỗi lúc chốt ghi phải đi kèm để không thành lỗi im lặng.
+      if (!failed) { throw settleError; }
+      failed.message = String(failed.message || failed) + ' (Kèm lỗi khi ghi trước lúc nhả khóa: ' + String((settleError && settleError.message) || settleError) + ')';
+    } finally {
+      DOCUMENT_STORE.docLockDepth = 0;
+      lock.releaseLock();
+      if (!documentStoreActive()) { documentStoreClear(); }
+    }
+  }
+}
+
+/** Trước khi nhả khóa tài liệu: `flush` Sheet (tài liệu 06 Phần 2 `[RÀNG BUỘC CỨNG]`) rồi gửi các khóa kho đã ghi trong khóa. Gửi kho hỏng thì bỏ phần chưa gửi khỏi bản đọc, để không ai đọc giá trị chưa có thật trong kho. */
+function documentLockSettle() {
+  var error = null;
+  try { SpreadsheetApp.flush(); } catch (flushError) { error = flushError; }
+  try {
+    documentStoreFlush(DOCUMENT_STORE_DIRTY_DOC);
+  } catch (storeError) {
+    Object.keys(DOCUMENT_STORE.dirty).forEach(function (key) { if (DOCUMENT_STORE.dirty[key] === DOCUMENT_STORE_DIRTY_DOC) { delete DOCUMENT_STORE.dirty[key]; } });
+    documentStoreRefresh();
+    error = error || storeError;
+  }
+  if (error) { throw error; }
 }
 
 /** Nạp cả kho một lần; giá trị đã có trong bản đọc (vừa ghi hoặc đang chờ ghi) được giữ đè lên. Kho giả trong test có thể thiếu `getProperties`. */
@@ -50,9 +104,12 @@ function documentStoreLoad() {
   return true;
 }
 
-/** Dựng mặt kho có bản đọc. `defer` = ghi chờ khi đang trong khóa điều phối; không thì ghi thẳng. Giá trị `null` trong bản đọc nghĩa là khóa chưa có hoặc đã xóa. */
+/** Dựng mặt kho có bản đọc. `defer` = mặt của đồng bộ, ghi chờ tới lúc nhả khóa điều phối; mọi mặt ghi chờ trong khóa tài liệu; ngoài hai khóa thì ghi thẳng. Giá trị `null` trong bản đọc nghĩa là khóa chưa có hoặc đã xóa. */
 function documentStoreFacade(defer) {
-  function deferNow() { return defer && DOCUMENT_STORE.lockDepth > 0; }
+  function deferLayer() {
+    if (defer && DOCUMENT_STORE.lockDepth > 0) { return DOCUMENT_STORE_DIRTY_COORD; }
+    return DOCUMENT_STORE.docLockDepth > 0 ? DOCUMENT_STORE_DIRTY_DOC : '';
+  }
   return {
     getProperty: function (key) {
       var values = DOCUMENT_STORE.values;
@@ -64,12 +121,14 @@ function documentStoreFacade(defer) {
     },
     setProperty: function (key, value) {
       var text = String(value);
-      if (deferNow()) { DOCUMENT_STORE.dirty[key] = true; } else { documentStoreReal().setProperty(key, text); delete DOCUMENT_STORE.dirty[key]; }
+      var layer = deferLayer();
+      if (layer) { DOCUMENT_STORE.dirty[key] = layer; } else { documentStoreReal().setProperty(key, text); delete DOCUMENT_STORE.dirty[key]; }
       DOCUMENT_STORE.values[key] = text;
       return this;
     },
     deleteProperty: function (key) {
-      if (deferNow()) { DOCUMENT_STORE.dirty[key] = true; } else { documentStoreReal().deleteProperty(key); delete DOCUMENT_STORE.dirty[key]; }
+      var layer = deferLayer();
+      if (layer) { DOCUMENT_STORE.dirty[key] = layer; } else { documentStoreReal().deleteProperty(key); delete DOCUMENT_STORE.dirty[key]; }
       DOCUMENT_STORE.values[key] = null;
       return this;
     },
@@ -78,7 +137,7 @@ function documentStoreFacade(defer) {
       var self = this;
       var keys = Object.keys(values || {});
       var store = documentStoreReal();
-      if (deferNow() || typeof store.setProperties !== 'function') {
+      if (deferLayer() || typeof store.setProperties !== 'function') {
         keys.forEach(function (key) { self.setProperty(key, values[key]); });
         return this;
       }
@@ -100,22 +159,23 @@ function documentStoreFacade(defer) {
 var DOCUMENT_STORE_THROUGH = documentStoreFacade(false);
 var DOCUMENT_STORE_DEFERRED = documentStoreFacade(true);
 
-/** Kho cho mọi code: trong một lần gọi là kho có bản đọc và ghi thẳng, ngoài đó là kho thật. */
+/** Kho cho mọi code: trong một lần gọi là kho có bản đọc (ghi chờ trong khóa tài liệu, ghi thẳng ngoài khóa), ngoài đó là kho thật. */
 function documentProps() { return documentStoreActive() ? DOCUMENT_STORE_THROUGH : documentStoreReal(); }
 
-/** Kho cho đồng bộ FBM: như `documentProps()` nhưng trong khóa điều phối thì ghi chờ tới lúc nhả khóa. */
+/** Kho cho đồng bộ FBM: như `documentProps()` nhưng trong khóa điều phối thì ghi chờ tới lúc nhả khóa đó. */
 function documentPropsDeferred() { return documentStoreActive() ? DOCUMENT_STORE_DEFERRED : documentStoreReal(); }
 
-/** Ghi mọi khóa chờ ghi: một lần `setProperties`, cộng một lần xóa cho mỗi khóa bị xóa. Lỗi ném nguyên để bên gọi (đồng bộ FBM) ghi Log theo ngữ cảnh của nó. */
-function documentStoreFlush() {
-  var keys = Object.keys(DOCUMENT_STORE.dirty), batch = {}, removed = [];
+/** Gửi các khóa chờ ghi của một lớp (`layer`; bỏ trống là mọi lớp): một lần `setProperties`, cộng một lần xóa cho mỗi khóa bị xóa. Lỗi ném nguyên để bên gọi ghi Log theo ngữ cảnh của nó. */
+function documentStoreFlush(layer) {
+  var keys = Object.keys(DOCUMENT_STORE.dirty).filter(function (key) { return !layer || DOCUMENT_STORE.dirty[key] === layer; });
+  var batch = {}, removed = [];
   if (!keys.length) { return 0; }
   keys.forEach(function (key) { if (DOCUMENT_STORE.values[key] === null) { removed.push(key); } else { batch[key] = DOCUMENT_STORE.values[key]; } });
   var store = documentStoreReal();
   // Kho giả trong test có thể thiếu `setProperties`; kho thật của Google luôn có.
   if (typeof store.setProperties === 'function') { if (Object.keys(batch).length) { store.setProperties(batch, false); } } else { Object.keys(batch).forEach(function (key) { store.setProperty(key, batch[key]); }); }
   removed.forEach(function (key) { store.deleteProperty(key); });
-  DOCUMENT_STORE.dirty = {};
+  keys.forEach(function (key) { delete DOCUMENT_STORE.dirty[key]; });
   return keys.length;
 }
 
@@ -141,7 +201,7 @@ function withDocumentStoreDeferred(work, onFlushError) {
 
 /** Mở bản đọc cho một lần gọi; trả `true` nếu đây là lớp ngoài cùng. */
 function documentStoreBegin() {
-  if (DOCUMENT_STORE.callDepth === 0 && DOCUMENT_STORE.lockDepth === 0) { documentStoreClear(); }
+  if (DOCUMENT_STORE.callDepth === 0 && DOCUMENT_STORE.lockDepth === 0 && DOCUMENT_STORE.docLockDepth === 0) { documentStoreClear(); }
   DOCUMENT_STORE.callDepth += 1;
   return DOCUMENT_STORE.callDepth === 1;
 }
@@ -150,5 +210,5 @@ function documentStoreBegin() {
 function documentStoreEnd() {
   if (DOCUMENT_STORE.callDepth > 1) { DOCUMENT_STORE.callDepth -= 1; return; }
   DOCUMENT_STORE.callDepth = 0;
-  if (DOCUMENT_STORE.lockDepth === 0) { documentStoreClear(); }
+  if (DOCUMENT_STORE.lockDepth === 0 && DOCUMENT_STORE.docLockDepth === 0) { documentStoreClear(); }
 }

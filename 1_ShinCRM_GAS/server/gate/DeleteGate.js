@@ -62,29 +62,18 @@ function deleteGateRemove(yeuCau) {
   }
   writeCommitAssertAvailable();
 
-  var khoa = LockService.getDocumentLock();
-  if (!documentStoreTryLock(khoa, SETTINGS.LOCK_WAIT_MS)) {
-    throw new Error('Hệ thống bận. Vui lòng thử lại!');
-  }
-
-  var result;
-  var commit = null;
-  try {
-    result = deleteGateRun(entity, ids, batDau);
+  return documentLockRun(function () {
+    var result = deleteGateRun(entity, ids, batDau);
     if (result && result.ok && result.recordIds && result.recordIds.length) {
-      commit = writeCommitAfterSuccess({
+      result.reloadDecision = writeCommitAfterSuccess({
         source: 'delete',
         surface: 'record',
         entity: entity,
         recordIds: result.recordIds
-      });
-      result.reloadDecision = commit.reloadDecision;
+      }).reloadDecision;
     }
-  } finally {
-    try { SpreadsheetApp.flush(); } finally { khoa.releaseLock(); }
-  }
-
-  return result;
+    return result;
+  });
 }
 
 /**

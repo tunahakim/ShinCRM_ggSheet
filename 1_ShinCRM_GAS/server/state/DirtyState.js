@@ -136,17 +136,11 @@ function dirtyStateBasketFlush() {
   var mark = DIRTY_STATE_BASKET.mark;
   if (!mark) { return null; }
   DIRTY_STATE_BASKET.mark = null;
-  var lock = LockService.getDocumentLock();
-  if (!documentStoreTryLock(lock, SETTINGS.LOCK_WAIT_MS)) {
-    throw new Error('Hệ thống bận, chưa ghi được tín hiệu nạp lại cho thay đổi vừa lưu. Bấm Nạp lại để Sidebar thấy dữ liệu mới.');
-  }
-  try {
+  return documentLockRun(function () {
     var state = reloadJournalAppend(mark);
     viewTabTintStaleLocked(null, { fromSidebar: mark.fromSidebar === true });
     return state;
-  } finally {
-    lock.releaseLock();
-  }
+  }, 'Hệ thống bận, chưa ghi được tín hiệu nạp lại cho thay đổi vừa lưu. Bấm Nạp lại để Sidebar thấy dữ liệu mới.');
 }
 
 /** Giỏ rỗng của một lần chạy: mã theo từng thực thể, cờ cả sheet, cờ cấu hình. */

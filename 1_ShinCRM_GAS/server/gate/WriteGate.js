@@ -555,29 +555,17 @@ function writeGateSave(yeuCau) {
   }
   writeCommitAssertAvailable();
 
-  var khoa = LockService.getDocumentLock();
-  if (!documentStoreTryLock(khoa, SETTINGS.LOCK_WAIT_MS)) {
-    throw new Error('Hệ thống bận. Vui lòng thử lại!');
-  }
-
-  var result;
-  var commit = null;
-  try {
-    result = writeGateRun(entity, records, source, fields, batDau);
+  return documentLockRun(function () {
+    var result = writeGateRun(entity, records, source, fields, batDau);
     if (result && result.ok && result.changedIds && result.changedIds.length) {
-      commit = writeCommitAfterSuccess({
+      result.reloadDecision = writeCommitAfterSuccess({
         source: source,
         surface: 'record',
         entity: entity,
         recordIds: result.changedIds
-      });
-      result.reloadDecision = commit.reloadDecision;
+      }).reloadDecision;
     }
-  } finally {
-    // `flush` rồi mới nhả khóa, tài liệu 06 Phần 2 `[RÀNG BUỘC CỨNG]`. Bọc lồng nhau để `flush` có ném lỗi thì khóa vẫn được nhả.
-    try { SpreadsheetApp.flush(); } finally { khoa.releaseLock(); }
-  }
-
-  return result;
+    return result;
+  });
 }
 

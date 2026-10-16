@@ -220,25 +220,20 @@ function resetConfigToDefaults() {
     throw new Error('Thiếu WriteCommit; không ghi Config để tránh mất signal reload.');
   }
   writeCommitAssertAvailable();
-  var lock = LockService.getDocumentLock();
-  if (!documentStoreTryLock(lock, SETTINGS.LOCK_WAIT_MS)) { throw new Error('Hệ thống bận. Vui lòng thử lại!'); }
   var file;
   var result;
   var views = [];
   var commit = null;
-  try {
+  documentLockRun(function () {
     file = shinOpenBook();
     result = prepareConfigSheet(file, { reset: true });
     views = shinViewSheetNames(file);
-    SpreadsheetApp.flush();
     commit = writeCommitAfterSuccess({
       source: 'user',
       surface: 'config',
       entity: 'config'
     });
-  } finally {
-    try { SpreadsheetApp.flush(); } finally { lock.releaseLock(); }
-  }
+  });
 
   return {
     ok: true,

@@ -367,13 +367,7 @@ function viewOpenLocked(sheetName, work) {
   var name = String(sheetName || '').trim();
   var sheet = name.charAt(0) === '!' ? shinOpenBook().getSheetByName(name) : null;
   if (!sheet) { throw new Error(name.charAt(0) === '!' ? 'Không tìm thấy sheet quản trị "' + name + '".' : 'Sheet quản trị phải có tên bắt đầu bằng !.'); }
-  var lock = LockService.getDocumentLock();
-  if (!documentStoreTryLock(lock, SETTINGS.LOCK_WAIT_MS)) { throw new Error('Hệ thống bận. Vui lòng thử lại!'); }
-  try {
-    return work(sheet, name);
-  } finally {
-    lock.releaseLock();
-  }
+  return documentLockRun(function () { return work(sheet, name); });
 }
 
 /** Người dùng yêu cầu vẽ (bấm làm mới, menu, tạo sheet): luôn thử, kể cả khi sổ nói đầu vào này đã hỏng. */

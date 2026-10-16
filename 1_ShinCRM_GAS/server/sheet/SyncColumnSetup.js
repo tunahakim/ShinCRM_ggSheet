@@ -5,13 +5,8 @@ function ensureColumnsThroughWriteGate(source, columnsForSheet) {
   }
   writeCommitAssertAvailable();
   var book = shinOpenBook(), report = [], changed = false;
-  var lock = null;
   var commit = null;
-  if (typeof LockService !== 'undefined' && LockService.getDocumentLock) {
-    lock = LockService.getDocumentLock();
-    if (!documentStoreTryLock(lock, SETTINGS.LOCK_WAIT_MS)) { throw new Error('Hệ thống bận. Vui lòng thử lại!'); }
-  }
-  try {
+  documentLockRun(function () {
     ['Customer', 'Activity'].forEach(function (sheetName) {
       var sheet = book.getSheetByName(sheetName), expected = columnsForSheet(sheetName);
       if (!sheet || !expected.length) { return; }
@@ -24,7 +19,6 @@ function ensureColumnsThroughWriteGate(source, columnsForSheet) {
       changed = true;
       report.push(sheetName + ': thêm ' + missing.length + ' cột');
     });
-    if (typeof SpreadsheetApp !== 'undefined' && SpreadsheetApp.flush) { SpreadsheetApp.flush(); }
     if (changed) {
       commit = writeCommitAfterSuccess({
         source: source === 'background' ? 'background' : (source || 'pull'),
@@ -32,9 +26,7 @@ function ensureColumnsThroughWriteGate(source, columnsForSheet) {
         schema: true
       });
     }
-  } finally {
-    if (lock) { lock.releaseLock(); }
-  }
+  });
 
   return { ok: true, changed: changed, report: report, reload: commit && commit.reloadDecision };
 }
