@@ -57,8 +57,8 @@ function chay(so) {
   check(so, 'đổ giỏ chỉ một lệnh ghi kho (sổ và mốc view cùng một lệnh), không lệnh xóa nào',
     [dem.setProperties || 0, dem.setProperty || 0, dem.deleteProperty || 0], [1, 0, 0]);
   trongLanChay(gio.hop, () => gio.hop.dirtyStateMarkSignal({ customer: ['KH0003'], allViews: true }));
-  check(so, 'dấu allViews nâng mốc cũ của view bằng revision vừa ghi, cùng lệnh ghi sổ (lệnh thứ hai là trạng thái tô tab)',
-    [gio.hop.reloadStateRead().viewsStaleRevision, dem.setProperties, dem.deleteProperty || 0], [3, 2, 0]);
+  check(so, 'dấu allViews nâng mốc cũ của view bằng revision vừa ghi; sổ và trạng thái tô tab đi chung một lệnh ghi lúc nhả khóa',
+    [gio.hop.reloadStateRead().viewsStaleRevision, dem.setProperties, dem.setProperty || 0, dem.deleteProperty || 0, !!gio.props.viewTabTint], [3, 2, 0, 0, true]);
 
   checkThrows(so, 'đánh dấu ngoài lần chạy (thiếu runEntryPoint) ném lỗi to, không im lặng mất dấu',
     () => dungHop({ sheets: ['Config', 'Log'] }).hop.dirtyStateMarkSignal({ customer: ['KH0001'] }), 'ngoài runEntryPoint');

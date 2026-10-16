@@ -54,6 +54,54 @@ function chay(so) {
   signalEnv.hop.documentStoreEnd();
   check(so, 'cửa kho: tín hiệu reload của lõi đã ở kho thật trước khi nhả khóa tài liệu', revisionLucNha, 1);
 
+  section('Người giữ khóa tài liệu — một chỗ cầm, gọi lồng không tự khóa, trả khóa luôn qua flush rồi gửi kho');
+
+  const giu = dungHop({ sheets: ['Config', 'Log'] });
+  const thuTu = [];
+  const flushGoc = giu.hop.SpreadsheetApp.flush;
+  giu.hop.SpreadsheetApp.flush = () => { thuTu.push('flush'); return flushGoc(); };
+  const layKhoaGiu = giu.hop.LockService.getDocumentLock;
+  giu.hop.LockService.getDocumentLock = () => {
+    const khoa = layKhoaGiu();
+    const nha = khoa.releaseLock;
+    khoa.releaseLock = () => { thuTu.push('nha:' + (giu.stubs._props.khoaA || '-') + (giu.stubs._props.khoaB || '-')); return nha(); };
+    return khoa;
+  };
+  const dem = giu.stubs._khoDem;
+  const ghiTruoc = dem.ghi;
+  let trongKhoKhiDangGiu = null;
+  const ra = giu.hop.documentLockRun(() => {
+    giu.hop.documentProps().setProperty('khoaA', '1');
+    giu.hop.documentLockRun(() => { giu.hop.documentProps().setProperty('khoaB', '2'); });
+    trongKhoKhiDangGiu = [giu.stubs._props.khoaA, giu.hop.documentProps().getProperty('khoaB')];
+    return 'xong';
+  });
+  check(so, 'người giữ khóa: gọi lồng chạy tiếp, chỉ cầm khóa một lần (khóa Google không tái nhập)', [ra, giu.stubs._khoa.dem, giu.stubs._khoa.demNha], ['xong', 1, 1]);
+  check(so, 'người giữ khóa: trong khóa, ghi kho chờ (kho thật chưa có) nhưng đọc lại trong lần chạy thấy ngay', trongKhoKhiDangGiu, [undefined, '2']);
+  check(so, 'người giữ khóa: trước khi nhả thì flush Sheet rồi gửi mọi khóa đã ghi bằng đúng một lệnh kho', [thuTu, dem.ghi - ghiTruoc], [['flush', 'nha:12'], 1]);
+
+  const loiGiu = dungHop({ sheets: ['Config', 'Log'] });
+  let loiRa = null;
+  try { loiGiu.hop.documentLockRun(() => { loiGiu.hop.documentProps().setProperty('khoaA', 'truoc-loi'); throw new Error('lỗi giữa chừng'); }); } catch (e) { loiRa = e.message; }
+  check(so, 'người giữ khóa: việc ném lỗi thì phần đã ghi trước lỗi vẫn được gửi, khóa vẫn nhả, lỗi gốc ném ra',
+    [loiRa, loiGiu.stubs._props.khoaA, loiGiu.stubs._khoa.dangGiu], ['lỗi giữa chừng', 'truoc-loi', false]);
+
+  const ban = dungHop({ sheets: ['Config', 'Log'] });
+  ban.stubs._khoa.chanKhoa = true;
+  let daChay = false;
+  let banRa = null;
+  try { ban.hop.documentLockRun(() => { daChay = true; }, 'Bận riêng.'); } catch (e) { banRa = e.message; }
+  check(so, 'người giữ khóa: hết giờ chờ thì ném câu bận của bên gọi và không chạy việc', [banRa, daChay], ['Bận riêng.', false]);
+
+  const lop = dungHop({ sheets: ['Config', 'Log'] });
+  lop.hop.withDocumentStoreDeferred(() => {
+    lop.hop.documentPropsDeferred().setProperty('dongBo', 'x');
+    lop.hop.documentLockRun(() => { lop.hop.documentProps().setProperty('loi', 'y'); });
+    check(so, 'người giữ khóa: nhả khóa tài liệu chỉ gửi phần ghi trong khóa đó, phần chờ của khóa điều phối đồng bộ vẫn chờ',
+      [lop.stubs._props.loi, lop.stubs._props.dongBo], ['y', undefined]);
+  });
+  check(so, 'người giữ khóa: phần của đồng bộ được gửi khi nhả khóa điều phối', lop.stubs._props.dongBo, 'x');
+
   // Quét chống tái phạm: chỉ cửa kho được gọi thẳng DocumentProperties và lấy khóa.
   const viPham = cacTepJs(GAS, GAS).filter((tep) => NGOAI_LE.indexOf(tep) < 0).filter((tep) => {
     // Bỏ chú thích: docstring được phép nhắc tên hàm cũ (ví dụ con số `waitLock(15000)` của bản cũ trong Settings.js).
@@ -61,6 +109,14 @@ function chay(so) {
     return /getDocumentProperties\s*\(/.test(nguon) || /\.(tryLock|waitLock)\s*\(/.test(nguon);
   });
   check(so, 'cửa kho: không tệp GAS nào gọi thẳng getDocumentProperties() hoặc tryLock/waitLock ngoài server/state/DocumentStore.js', viPham, []);
+
+  // Khóa tài liệu chỉ cầm qua documentLockRun. Ngoại lệ: khóa điều phối của đồng bộ chỉ lùi về khóa tài liệu khi môi trường không có khóa script (Google luôn có).
+  const NGOAI_LE_KHOA = NGOAI_LE.concat(['fbm_sync/state/State.js']);
+  const tuCamKhoa = cacTepJs(GAS, GAS).filter((tep) => NGOAI_LE_KHOA.indexOf(tep) < 0).filter((tep) => {
+    const nguon = fs.readFileSync(path.join(GAS, tep), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    return /getDocumentLock\s*\(/.test(nguon);
+  });
+  check(so, 'người giữ khóa: không tệp GAS nào tự lấy khóa tài liệu ngoài documentLockRun', tuCamKhoa, []);
 }
 
 module.exports = { chay };

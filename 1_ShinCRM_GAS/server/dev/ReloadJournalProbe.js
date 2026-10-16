@@ -54,7 +54,7 @@ function measureReloadJournalBaseline() {
   return out;
 }
 
-/** Tách lượt đổ giỏ thành từng đoạn (cầm khóa + bỏ bản đọc, ghi sổ, tô tab, nhả khóa) để biết lần cầm khóa thứ hai của lượt lưu (V26) và lệnh ghi trạng thái tô tab (V6) tốn bao nhiêu. Tăng revision thật trên Sheet DEV. */
+/** Tách lượt đổ giỏ thành từng đoạn (ghi sổ, đọc núm, tô tab, phần cầm–flush–gửi kho–nhả của người giữ khóa) để biết lần cầm khóa thứ hai của lượt lưu (V26) và số lệnh kho (V6). Tăng revision thật trên Sheet DEV. */
 function measureBasketFlushBreakdown() {
   var out = [];
   for (var round = 1; round <= 3; round++) {
@@ -63,16 +63,21 @@ function measureBasketFlushBreakdown() {
     var times = {};
     var mark = function (label, fn) { var started = Date.now(); var value = fn(); times[label] = Date.now() - started; return value; };
     try {
-      var lock = LockService.getDocumentLock();
-      mark('cầm khóa', function () { return documentStoreTryLock(lock, SETTINGS.LOCK_WAIT_MS); });
       var flushMark = dirtyStateBlankMark();
       flushMark.customer = ['DEV-FLUSH-' + round];
       flushMark.allViews = true;
       flushMark.fromSidebar = true;
-      mark('ghi sổ (kèm nạp lại kho)', function () { return reloadJournalAppend(flushMark); });
-      mark('đọc núm người dùng', function () { return userPrefsRead(); });
-      mark('tô tab (cả đoạn)', function () { return viewTabTintStaleLocked(null, { fromSidebar: true }); });
-      mark('nhả khóa', function () { lock.releaseLock(); return true; });
+      var inside = 0;
+      mark('cả lượt trong người giữ khóa', function () {
+        return documentLockRun(function () {
+          var started = Date.now();
+          mark('ghi sổ (kèm nạp lại kho)', function () { return reloadJournalAppend(flushMark); });
+          mark('đọc núm người dùng', function () { return userPrefsRead(); });
+          mark('tô tab (cả đoạn)', function () { return viewTabTintStaleLocked(null, { fromSidebar: true }); });
+          inside = Date.now() - started;
+        });
+      });
+      times['cầm + flush + gửi kho + nhả'] = times['cả lượt trong người giữ khóa'] - inside;
     } finally { restore(); }
     out.push('Lượt ' + round + ': ' + JSON.stringify(times) + ' · lệnh kho ' + JSON.stringify(counter));
   }
