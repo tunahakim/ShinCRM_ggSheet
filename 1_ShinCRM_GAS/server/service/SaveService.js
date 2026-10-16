@@ -27,8 +27,8 @@ function saveRecord(entity, record) {
     var write = function () { return writeGateSave({ entity: entity, records: [record], source: 'user' }); };
     var ra = id ? fbmSaveGuarded(entity, id, record.fbmHash || '', write) : write();
 
-    // Đổ giỏ trước khi trả để phản hồi mang revision đã gồm lượt lưu này; Sidebar đã áp bản đọc lại nên không phải hỏi nạp thêm.
-    dirtyStateBasketFlush();
+    // Ghi nhận thay đổi trước khi trả để phản hồi mang revision đã gồm lượt lưu này; Sidebar đã áp bản đọc lại nên không phải hỏi nạp thêm.
+    recordChangesAfterWrite();
     ra.reload = reloadStateRead();
     ra.ms = Date.now() - batDau;
     return ra;
@@ -47,7 +47,7 @@ function deleteRecords(entity, ids) {
     var batDau = Date.now();
     var ra = deleteGateRemove({ entity: entity, ids: ids });
 
-    dirtyStateBasketFlush();
+    recordChangesAfterWrite();
     ra.reload = reloadStateRead();
     ra.ms = Date.now() - batDau;
     return ra;

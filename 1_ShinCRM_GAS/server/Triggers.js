@@ -105,7 +105,7 @@ function shinSchemaEditNeedsReload(sheet, range, event) {
   });
 }
 
-/** Dấu vào giỏ của lần chạy; `runEntryPoint` đổ giỏ (kèm tô tab cũ) ở cuối. */
+/** Ghi dấu vào danh sách thay đổi chờ ghi nhận của lần chạy; `runEntryPoint` ghi nhận ở cuối (kèm tô cam sheet vừa thành cũ). */
 function shinReloadDecision(input) {
   var decision = reloadDecisionForChange(input || {});
   dirtyStateMarkDecision(decision);
@@ -116,8 +116,8 @@ function shinReloadDecision(input) {
 function shinRenderForDecision(decision) {
   var views = decision && decision.views;
   if (!views || views.action !== 'render') { return decision; }
-  // Đổ giỏ trước khi vẽ: sheet vẽ ghi revision đã dùng, đổ sau lượt vẽ sẽ làm chính sheet vừa vẽ thành cũ.
-  dirtyStateBasketFlush();
+  // Ghi nhận thay đổi trước khi vẽ: sheet vẽ ghi revision đã dùng, ghi nhận sau lượt vẽ sẽ làm chính sheet vừa vẽ thành cũ.
+  recordChangesAfterWrite();
   return renderAllManagedViews(views.mode === 'sheet' ? [views.sheetName] : undefined);
 }
 
@@ -205,7 +205,9 @@ function shinOnChange(event) {
 
     // Sheet `!` mới chưa có revision đã vẽ nên tự là sheet cũ; Sidebar vẽ khi có người mở nó. Xóa sheet không làm sheet nào khác cũ.
     if (type === 'INSERT_GRID') {
-      shinViewSheetNames(book).forEach(function (sheetName) { prepareViewSheet(sheetName); });
+      var viewNames = shinViewSheetNames(book);
+      viewNames.forEach(function (sheetName) { prepareViewSheet(sheetName); });
+      viewTabColorSyncUnrendered(viewNames);
       return null;
     }
     if (type === 'REMOVE_GRID') { return null; }
@@ -215,6 +217,8 @@ function shinOnChange(event) {
     if (type === 'OTHER') {
       if (entity) { return shinReloadDecision({ source: 'change', surface: 'entity', entities: [entity] }); }
       if (name === 'Category' || name === 'Config') { return shinReloadDecision({ source: 'change', surface: name.toLowerCase(), entity: name.toLowerCase() }); }
+      // Đổi tên sheet cũng báo `OTHER`: tên `!` mới chưa có trong sổ vẽ view nên là sheet cũ.
+      if (name.charAt(0) === '!') { viewTabColorSyncUnrendered([name]); }
       return null;
     }
     if (['INSERT_ROW', 'REMOVE_ROW', 'INSERT_COLUMN', 'REMOVE_COLUMN'].indexOf(type) >= 0) {

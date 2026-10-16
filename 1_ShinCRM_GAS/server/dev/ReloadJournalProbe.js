@@ -35,13 +35,13 @@ function measureReloadJournalBaseline() {
   };
   var customerId = firstId('customer');
   out.push('Mã thử: ' + customerId);
-  reloadJournalProbeMeasure(out, 'Đổ giỏ tín hiệu một khách', function () {
+  reloadJournalProbeMeasure(out, 'Ghi nhận tín hiệu một khách', function () {
     dirtyStateMarkSignal({ customer: [customerId], allViews: true, fromSidebar: true });
-    dirtyStateBasketFlush();
+    recordChangesAfterWrite();
   });
-  reloadJournalProbeMeasure(out, 'Đổ giỏ tín hiệu một khách lần 2', function () {
+  reloadJournalProbeMeasure(out, 'Ghi nhận tín hiệu một khách lần 2', function () {
     dirtyStateMarkSignal({ customer: [customerId], allViews: true, fromSidebar: true });
-    dirtyStateBasketFlush();
+    recordChangesAfterWrite();
   });
   var journal = reloadJournalRead();
   out.push('Sổ: revision ' + journal.rev + ', floor ' + journal.floor + ', ' + journal.entries.length + ' dòng, ' + JSON.stringify(journal).length + ' ký tự');
@@ -54,7 +54,7 @@ function measureReloadJournalBaseline() {
   return out;
 }
 
-/** Tách lượt đổ giỏ thành từng đoạn (ghi sổ, đọc núm, tô tab, phần cầm–flush–gửi kho–nhả của người giữ khóa) để biết lần cầm khóa thứ hai của lượt lưu (V26) và số lệnh kho (V6). Tăng revision thật trên Sheet DEV. */
+/** Tách bước ghi nhận thay đổi thành từng đoạn (tính sheet đang mới, ghi sổ, tô tab, phần cầm–flush–gửi kho–nhả của người giữ khóa) để biết lần cầm khóa thứ hai của lượt lưu (V26) và số lệnh kho (V6). Tăng revision thật trên Sheet DEV. */
 function measureBasketFlushBreakdown() {
   var out = [];
   for (var round = 1; round <= 3; round++) {
@@ -71,9 +71,9 @@ function measureBasketFlushBreakdown() {
       mark('cả lượt trong người giữ khóa', function () {
         return documentLockRun(function () {
           var started = Date.now();
+          var turningStale = mark('tính sheet đang mới từ sổ vẽ view', function () { return viewLedgerFreshNames(); });
           mark('ghi sổ (kèm nạp lại kho)', function () { return reloadJournalAppend(flushMark); });
-          mark('đọc núm người dùng', function () { return userPrefsRead(); });
-          mark('tô tab (cả đoạn)', function () { return viewTabTintStaleLocked(null, { fromSidebar: true }); });
+          mark('tô tab (' + turningStale.length + ' sheet vừa thành cũ)', function () { return viewTabColorSyncNames(turningStale, { fromSidebar: true }); });
           inside = Date.now() - started;
         });
       });

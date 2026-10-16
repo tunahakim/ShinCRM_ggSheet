@@ -61,3 +61,10 @@ function viewLedgerControlsNeedAttempt(entry, sheet, input, now) {
 function viewIsStale(sheetName) {
   return viewLedgerStale(viewLedgerEntry(sheetName), reloadStateRead().viewsStaleRevision);
 }
+
+/** Tên các sheet đang mới theo sổ, chỉ đọc kho: bước ghi nhận thay đổi gọi trước khi nâng mốc view cũ để biết đúng những sheet sắp thành cũ mà không quét danh sách tab. */
+function viewLedgerFreshNames() {
+  var ledger = viewLedgerRead();
+  var staleRevision = reloadStateRead().viewsStaleRevision;
+  return Object.keys(ledger).filter(function (name) { return !viewLedgerStale(ledger[name], staleRevision); });
+}

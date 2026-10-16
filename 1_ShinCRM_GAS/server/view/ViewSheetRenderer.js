@@ -355,11 +355,12 @@ function viewAttemptLocked(sheet, name, input, timezone) {
       SpreadsheetApp.flush();
     }
     viewLedgerWrite(name, { data: data, input: input, ok: false, error: message, at: Date.now(), revision: revision, blocker: error && error.viewBlocker || null });
+    viewTabColorSync([sheet]);
     if (error && typeof error === 'object') { error.viewRepeated = repeated; }
     throw error;
   }
   viewLedgerWrite(name, { data: data, input: input, ok: true, error: '', at: Date.now(), revision: revision + 1, blocker: null });
-  viewTabTintRestoreLocked(sheet, name);
+  viewTabColorSync([sheet]);
   return { ok: true, sheetName: name, viewMeta: viewInputMetaFromHeader(drawn.header, revision + 1), rows: drawn.rows, reload: reloadStateRead() };
 }
 

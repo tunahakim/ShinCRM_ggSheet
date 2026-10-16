@@ -1,7 +1,7 @@
 /**
  * Hậu xử lý chung của mọi lượt ghi Sheet đã được xác nhận.
  *
- * Các cửa nghiệp vụ vẫn giữ luật riêng của mình, nhưng không được tự dựng ReloadDecision hoặc tự ghi DirtyState. Tệp này chỉ bỏ dấu vào giỏ thay đổi của lần chạy (`DirtyState.js`); `runEntryPoint` đổ giỏ một lần ở cuối, nên một lần chạy ghi nhiều lô vẫn chỉ phát một tín hiệu. Không vẽ sheet quản trị: dữ liệu đổi chỉ làm view cũ (tab tô cam lúc đổ giỏ), Sidebar vẽ khi có người xem.
+ * Các cửa nghiệp vụ vẫn giữ luật riêng của mình, nhưng không được tự dựng ReloadDecision hoặc tự ghi DirtyState. Tệp này chỉ ghi dấu vào danh sách thay đổi chờ ghi nhận của lần chạy (`DirtyState.js`); `runEntryPoint` ghi nhận một lần ở cuối, nên một lần chạy ghi nhiều lô vẫn chỉ phát một tín hiệu. Không vẽ sheet quản trị: dữ liệu đổi chỉ làm view cũ (tab tô cam lúc đổ giỏ), Sidebar vẽ khi có người xem.
  */
 
 function writeCommitCopy(input) {

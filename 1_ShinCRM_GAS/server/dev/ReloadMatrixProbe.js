@@ -77,8 +77,8 @@ function reloadMatrixProbeWriteEvent(sheet, row, column, value) {
   cell.setValue(value);
   SpreadsheetApp.flush();
   var result = shinOnEdit({ range: cell, oldValue: oldValue, value: value });
-  // Trigger thật là một lần chạy riêng; hàm dò chạy lồng trong cửa vào của DEV runner nên phải tự đổ giỏ.
-  dirtyStateBasketFlush();
+  // Trigger thật là một lần chạy riêng; hàm dò chạy lồng trong cửa vào của DEV runner nên phải tự ghi nhận thay đổi.
+  recordChangesAfterWrite();
   SpreadsheetApp.flush();
   reloadMatrixProbeRestoreCell(cell, before);
   SpreadsheetApp.flush();
@@ -93,7 +93,7 @@ function reloadMatrixProbeWriteRangeEvent(sheet, row, column, values) {
   range.setValues(values);
   SpreadsheetApp.flush();
   var result = shinOnEdit({ range: range });
-  dirtyStateBasketFlush();
+  recordChangesAfterWrite();
   SpreadsheetApp.flush();
   range.setValues(before);
   SpreadsheetApp.flush();
@@ -265,7 +265,7 @@ function reloadMatrixProbe() {
     SpreadsheetApp.flush();
     var schemaBefore = reloadMatrixProbeState();
     var schemaResult = shinOnEdit({ range: schemaRange });
-    dirtyStateBasketFlush();
+    recordChangesAfterWrite();
     SpreadsheetApp.flush();
     var schemaAfter = reloadMatrixProbeState();
     schemaRange.setValues(schemaOld);
@@ -279,7 +279,7 @@ function reloadMatrixProbe() {
     categoryCell.cell.setValue(String(categorySnapshot.value || '') + ' ');
     SpreadsheetApp.flush();
     var categoryResult = shinOnEdit({ range: categoryCell.cell, oldValue: categorySnapshot.value, value: String(categorySnapshot.value || '') + ' ' });
-    dirtyStateBasketFlush();
+    recordChangesAfterWrite();
     SpreadsheetApp.flush();
     var categoryAfter = reloadMatrixProbeState();
     reloadMatrixProbeRestoreCell(categoryCell.cell, categorySnapshot);
@@ -294,7 +294,7 @@ function reloadMatrixProbe() {
     configCell.cell.setValue(configValue);
     SpreadsheetApp.flush();
     var configResult = shinOnEdit({ range: configCell.cell, oldValue: configSnapshot.value, value: configValue });
-    dirtyStateBasketFlush();
+    recordChangesAfterWrite();
     SpreadsheetApp.flush();
     var configAfter = reloadMatrixProbeState();
     reloadMatrixProbeRestoreCell(configCell.cell, configSnapshot);
@@ -318,7 +318,7 @@ function reloadMatrixProbe() {
     viewValidHeaderCell.setValue(viewValidHeaderTarget);
     SpreadsheetApp.flush();
     var viewValidRow1Result = shinOnEdit({ range: viewValidHeaderCell, oldValue: viewValidHeaderSnapshot.value, value: viewValidHeaderTarget });
-    dirtyStateBasketFlush();
+    recordChangesAfterWrite();
     SpreadsheetApp.flush();
     var viewValidRow1After = reloadMatrixProbeState();
     reloadMatrixProbeRestoreCell(viewValidHeaderCell, viewValidHeaderSnapshot);
@@ -372,7 +372,7 @@ function reloadPayloadProbe() {
     if (!id) { throw new Error('DEV không có mã Customer để kiểm payload.'); }
 
     dirtyStateMarkSignal({ customer: [id], allViews: false });
-    var observed = dirtyStateBasketFlush().revision;
+    var observed = recordChangesAfterWrite().revision;
     var ready = probeSelectionAndReload({ requestId: 'dev-r11-ready', previousCustomerId: '', lastSeenRevision: observed - 1 });
     var parts = ready.payload ? ready.payload.parts : [];
     reloadMatrixProbeAssert(report, 'R11 DEV lời hỏi ngay sau thay đổi trả payload cùng response', parts.length === 1 && parts[0].mode === 'records' && ready.processedRevision === observed, JSON.stringify({ modes: parts.map(function (part) { return part.mode; }), processedRevision: ready.processedRevision, observed: observed }));

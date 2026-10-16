@@ -84,7 +84,7 @@ function doGet(e) {
       return reply('LOI\nHàm "' + name + '" có trong danh sách trắng nhưng không tìm thấy trong code đã đẩy lên.');
     }
     var started = new Date().getTime();
-    // Bọc như mọi cửa vào: hàm dò có ghi thì cần giỏ thay đổi của lần chạy.
+    // Bọc như mọi cửa vào: hàm dò có ghi thì cần danh sách thay đổi chờ ghi nhận của lần chạy.
     var result = runEntryPoint('dev:' + name, 'core', ERROR_CHANNEL_THROW, function () { return scope[name](); });
     var elapsed = new Date().getTime() - started;
     return reply('OK\nHàm: ' + name + '\nHết: ' + elapsed + ' ms\n\n' + devFormatResult(result));
