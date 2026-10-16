@@ -40,7 +40,7 @@ function scanHarness(options) {
   });
   const F = flow.hop.FbmSync;
   F.prepareCategoryGate = () => ({ map: {}, names: {}, valid: {}, warnings: [] });
-  F.readCategoryGateSheet = () => ({ map: {}, names: {}, namesBySource: {}, valid: {}, warnings: [] });
+  F.readCategoryGate = () => ({ map: {}, names: {}, namesBySource: {}, valid: {}, warnings: [] });
   F.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
   Object.assign(F.BUDGET, opt.budget || {});
   const customerFields = F.GRID_FIELDS.customer.concat(['ghi_chu_noi_bo']), activityFields = F.GRID_FIELDS.activity;

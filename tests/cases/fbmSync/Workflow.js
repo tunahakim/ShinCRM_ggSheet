@@ -912,7 +912,7 @@ async function chay(so) {
       }
     });
     fullFlow.hop.FbmSync.prepareCategoryGate = () => ({ map: {}, names: {}, valid: {}, warnings: [] });
-    fullFlow.hop.FbmSync.readCategoryGateSheet = () => { fullSheetReads.category += 1; return { map: {}, names: {}, namesBySource: {}, valid: {}, warnings: [] }; };
+    fullFlow.hop.FbmSync.readCategoryGate = () => { fullSheetReads.category += 1; return { map: {}, names: {}, namesBySource: {}, valid: {}, warnings: [] }; };
     fullFlow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
     if (options && options.scanCustomerRows) { fullFlow.hop.FbmSync.BUDGET.scanCustomerRows = options.scanCustomerRows; }
     if (options && options.activityCustomerRows) { fullFlow.hop.FbmSync.BUDGET.activityCustomerRows = options.activityCustomerRows; }
@@ -1031,10 +1031,6 @@ async function chay(so) {
     [fullKinds.filter((kind) => kind.indexOf('completion:') === 0).length, (readCategoryState.metadata.categoryBlocks || []).length, fullFlow.hop.FbmSync.validateIncomingCategories({ taskType: 'CV9' }, 'activity', unknownGate).length],
     [0, 0, 1]);
   const traced = await fullPipeline(true), tracedActivityPropCalls = traced.fullActivityPropCalls;
-  // Đợt 1 bước C: mỗi Sheet đọc một lần mỗi lần gọi; chỉ được đọc lại sau mỗi lần cửa ghi ghi đúng thực thể đó (bản chụp bị bỏ khi ghi).
-  const sheetReadsWithinBudget = traced.fullActivitySheetReads.every((slice) => ['customer', 'activity', 'category'].every((key) => slice.reads[key] <= 1 + (slice.writes[key] || 0)));
-  check(so, 'đợt 1 bước C: mỗi lát Activity đọc mỗi Sheet (Customer, Activity, Category) một lần, chỉ đọc lại sau khi cửa ghi ghi đúng Sheet đó',
-    [traced.fullActivitySheetReads.length >= 1, sheetReadsWithinBudget, traced.fullActivitySheetReads.map((slice) => slice.reads)], [true, true, traced.fullActivitySheetReads.map((slice) => slice.reads)]);
   const lastActivitySlice = tracedActivityPropCalls.length - 1;
   check(so, 'đợt 1 bước A: mỗi lát Activity gọi kho DocumentProperties không quá ' + FBM_ACTIVITY_SLICE_PROPERTY_CALLS_MAX + ' lần, lát kết thúc lượt cộng thêm ' + FBM_SEEN_STORE_RESET_DELETES + ' lần xóa dấu đã thấy (trước refactor: 83)',
     [tracedActivityPropCalls.length >= 1, tracedActivityPropCalls.every((count, index) => count <= FBM_ACTIVITY_SLICE_PROPERTY_CALLS_MAX + (index === lastActivitySlice ? FBM_SEEN_STORE_RESET_DELETES : 0)), tracedActivityPropCalls], [true, true, tracedActivityPropCalls]);

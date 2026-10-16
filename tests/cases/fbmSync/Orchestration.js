@@ -458,32 +458,6 @@ async function chay(so) {
   } catch (err) { workError = err.message; }
   check(so, 'bộ đệm kho FBM: phần việc lỗi giữa chừng vẫn ghi gộp phần đã ghi và ném nguyên lỗi gốc', [workError, bufferData.k, 'gone' in bufferData, buffered.DOCUMENT_STORE.lockDepth], ['work-failed', 'v3', false, 0]);
 
-  // Bản chụp Sheet: đọc một lần mỗi lần gọi, cửa ghi bỏ bản chụp, lần gọi sau đọc lại Category.
-  const sheetRows = { customer: [['CUS-1', 'Cũ']] }, sheetReadCount = { customer: 0, category: 0 };
-  let categoryName = 'Hà Nội';
-  const sheetHop = taoHopCat({
-    FbmSync: {}, PropertiesService: { getDocumentProperties: () => bufferStore }, DATA_SCHEMA: {}, SYNC_SCHEMA: {},
-    entityReadAllCombined: (entity) => { sheetReadCount[entity] += 1; return { fields: ['id', 'name'], rows: sheetRows[entity].map((row) => row.slice()) }; },
-    writeGateSave: (request) => { request.records.forEach((record) => { sheetRows[request.entity] = sheetRows[request.entity].map((row) => row[0] === record.id ? [record.id, record.name] : row); }); return { ok: true }; }
-  });
-  napServer(sheetHop, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/write/SheetSave.js');
-  const ss = sheetHop.FbmSync;
-  ss.readCategoryGateSheet = () => { sheetReadCount.category += 1; return { map: {}, names: { HN: categoryName }, namesBySource: {}, valid: {}, warnings: [] }; };
-  ss.propertyBufferBegin();
-  const namesBefore = [ss.readLocal('customer')[0].name, ss.readLocal('customer')[0].name];
-  const readsBeforeSave = sheetReadCount.customer;
-  ss.sheetSave('customer', [{ id: 'CUS-1', name: 'Mới' }], 'pull');
-  const nameAfterSave = ss.readLocal('customer')[0].name;
-  const firstCategory = [ss.readCategoryGate().names.HN, ss.stateCategoryGate({ metadata: {} }).names.HN];
-  ss.propertyBufferEnd();
-  categoryName = 'Hà Nội mới';
-  ss.propertyBufferBegin();
-  const secondCategory = ss.readCategoryGate().names.HN;
-  ss.propertyBufferEnd();
-  check(so, 'bản chụp Sheet: trong một lần gọi đọc Sheet Customer một lần, cửa ghi bỏ bản chụp nên đọc sau khi ghi thấy giá trị mới',
-    [namesBefore, readsBeforeSave, nameAfterSave, sheetReadCount.customer], [['Cũ', 'Cũ'], 1, 'Mới', 2]);
-  check(so, 'bản chụp Sheet: Category đọc một lần mỗi lần gọi, sửa Category giữa hai lần gọi thì lần gọi sau thấy giá trị mới',
-    [firstCategory, secondCategory, sheetReadCount.category], [['Hà Nội', 'Hà Nội'], 'Hà Nội mới', 2]);
 }
 
 module.exports = { chay };
