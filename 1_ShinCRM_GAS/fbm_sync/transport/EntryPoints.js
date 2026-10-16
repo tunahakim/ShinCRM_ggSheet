@@ -177,6 +177,19 @@ function fbmSyncRelayHandle(body) {
   } else {
     result = { ok: false, code: 'RELAY_KIND_UNSUPPORTED', error: 'Relay chỉ nhận các nhịp nền do GAS quy định.', request: null };
   }
+  fbmSyncRelayNoteDropped(body, result);
   if (body.kind === 'heartbeat_request' || body.kind === 'heartbeat' || body.kind === 'heartbeat_transport_failure' || body.kind === 'background_sync') { result = fbmSyncRelayCompactResult(result); }
   return result;
+}
+
+/**
+ * Extension mang kết quả FBM (hoặc lỗi cầu nối) về mà GAS bận không giữ được khóa thì kết quả đó mất: Extension không gửi lại, lượt nằm chờ tới hạn rồi mới bị đóng.
+ * Phải có dòng Log ngay lúc bỏ, không thì Log về sau chỉ thấy "lượt bị bỏ dở" mà không biết vì sao. GAS bận khi cấp request mới thì không ghi: chưa mất gì, nhịp sau hỏi lại.
+ */
+function fbmSyncRelayNoteDropped(body, result) {
+  if (!result || result.code !== 'BUSY') { return; }
+  var carriesReply = body.kind === 'heartbeat' || body.kind === 'heartbeat_transport_failure' || body.command === 'continue' || body.command === 'transport_failure';
+  if (!carriesReply) { return; }
+  var waitSeconds = Math.round((typeof SETTINGS !== 'undefined' && SETTINGS && SETTINGS.LOCK_WAIT_MS ? SETTINGS.LOCK_WAIT_MS : 10000) / 1000);
+  logEvent({ source: 'fbm_sync', action: 'relay_busy_dropped', outcome: LOG_ERROR, reason: 'GAS đang bận việc khác quá ' + waitSeconds + ' giây nên không nhận được kết quả FBM Extension vừa gửi về; lượt này sẽ chờ tới hạn rồi bị đóng và chạy lại ở nhịp sau.', detail: { kind: String(body.kind || body.command || ''), hop: Number(body.hop || 0) } });
 }
