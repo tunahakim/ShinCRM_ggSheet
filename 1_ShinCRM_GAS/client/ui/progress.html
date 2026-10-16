@@ -85,7 +85,8 @@ function sidebarBusyBegin(message, options) {
   var operation = { id: ++SIDEBAR_BUSY.next, message: message === null || message === undefined ? '' : String(message), block: opts.block, done: false, progressDone: !showProgress };
   if (showProgress) { progressBegin(); }
   SIDEBAR_BUSY.operations.push(operation);
-  if (document.activeElement && document.activeElement.blur) { document.activeElement.blur(); }
+  // Lượt nền không chặn thì không được cướp con trỏ của người đang gõ.
+  if (opts.block && document.activeElement && document.activeElement.blur) { document.activeElement.blur(); }
   sidebarBusyPaint();
 
   return function () {

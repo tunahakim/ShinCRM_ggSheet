@@ -12,11 +12,9 @@ function fbmSyncClientTrace(stage, request, extra) {
   return event;
 }
 
-/** Chỗ duy nhất đổi cờ lượt chạy: lượt kết thúc theo đường nào (xong, lỗi, hủy) cũng báo Sidebar đúng một lần để RAM và sheet quản trị bắt kịp phần đã hoãn. */
+/** Chỗ duy nhất đổi cờ lượt chạy (chỉ cho giao diện đồng bộ). Nạp lại RAM không phụ thuộc cờ này: mỗi lần chạy GAS có thay đổi phát một tín hiệu qua kênh báo thay đổi. */
 function fbmSyncSetRunning(on) {
-  var was = FBM_SYNC_CLIENT.running === true;
   FBM_SYNC_CLIENT.running = on === true;
-  if (was && !FBM_SYNC_CLIENT.running && typeof sheetLinkSyncFinished === 'function') { sheetLinkSyncFinished(); }
 }
 
 /** Cất màn hiện tại trước khi FBM dùng chung bốn vùng render của Sidebar. */
