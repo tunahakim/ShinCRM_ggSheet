@@ -1,12 +1,12 @@
-/** Lấy toàn bộ giao dịch (lớp 1): việc quét chỉ giữ id đã có trên Sheet, quá lớn thì chia cửa sổ ngày trong lượt, ứng viên "không thấy" của chế độ cửa sổ được đọc lại theo id trước khi gắn cờ. */
+/** Lấy toàn bộ giao dịch (lớp 1): việc quét chỉ giữ id đã có trên Sheet, quá lớn thì chia cửa sổ ngày trong lượt; lớp 1 không ghi Sheet, chỉ đánh dấu khách cha của giao dịch sửa hoặc vắng để cửa ghi đọc lại. */
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { section, check } = require('../../lib/assert');
-const { scanHarness } = require('./ScanJob');
+const { scanHarness, gdSo } = require('./ScanJob');
 
 const EXECUTOR = path.join(__dirname, '..', '..', '..', '2_ShinCRM_Extension', 'content_scripts', 'fbm_sync', 'executor.js');
-const gd = (i, endDate, extra) => Object.assign({ id: 'A-FBM-C' + i, details: 'Gọi FBM-C' + i, end_date: endDate, owner: 'Owner', datetime0: endDate + 'T03:00:00', line_nbr: 1 }, extra || {});
+const gd = (i, endDate, extra) => Object.assign({ id: gdSo('FBM-C' + i), details: 'Gọi FBM-C' + i, end_date: endDate, owner: 'Owner', datetime0: endDate + 'T03:00:00', line_nbr: 1 }, extra || {});
 
 /**
  * Lượt đầu "Quét toàn bộ" để Sheet có đủ khách và giao dịch, rồi đổi FBM bằng `doi` và chạy lượt "Quét kỹ".
@@ -17,15 +17,15 @@ async function luotKy(ngay, doi, options, hooks) {
   const xem = () => (fbm.moi ? fbm.moi(fbm.lan) : fbm.list);
   const opt = Object.assign({ customers: ngay.length, budget: { activityTopScanQuietStreak: 1 } }, options || {}, {
     fbmActivities: () => { const list = xem(); return list; },
-    activityFor: (key) => xem().filter((item) => item.id === 'A-' + key)
+    activityFor: (key) => xem().filter((item) => item.id === gdSo(key))
   });
   const h = scanHarness(opt);
   await h.run({ pack: 'all' });
   if (doi) { doi(fbm, h); }
-  ['activityCustomers', 'kinds', 'jobs', 'errors', 'rechecks', 'bulkFilters'].forEach((key) => { h.trace[key].length = 0; });
+  ['activityCustomers', 'kinds', 'jobs', 'errors', 'lookups', 'bulkFilters'].forEach((key) => { h.trace[key].length = 0; });
   h.logs.length = 0;
-  const end = await h.run(Object.assign({ pack: 'deep', beforeSend: (request) => { if (request.meta.kind === 'scan_job' && request.meta.entity === 'activity') { fbm.lan += 1; } } }, hooks || {}));
-  const act = (i) => h.local.activity.find((item) => item.fbmId === 'A-FBM-C' + i) || {};
+  const end = await h.run(Object.assign({ pack: 'deep', beforeSend: (request) => { if (request.meta.kind === 'scan_job' && request.meta.entity === 'activity') { fbm.lan += 1; fbm.sauLop1 = h.trace.activityCustomers.length; fbm.lop1 = { writes: h.writes.length, lookups: h.trace.lookups.length }; } if (request.meta.kind === 'batch' && fbm.lop1 && !fbm.lop1.het) { fbm.lop1.het = { writes: h.writes.length, lookups: h.trace.lookups.length }; } } }, hooks || {}));
+  const act = (i) => h.local.activity.find((item) => String(item.fbmId) === gdSo('FBM-C' + i)) || {};
   const jobs = h.trace.jobs.filter((job) => /:activity:/.test(job.jobId));
   return { h, end, fbm, act, jobs, state: h.F.stateRead(), log: (action) => h.logs.filter((event) => event.action === action) };
 }
@@ -50,22 +50,24 @@ async function chay(so) {
 
   // Một lần lấy: FBM có thêm giao dịch lạ, một giao dịch sửa nội dung, một giao dịch đã xóa.
   const mot = await luotKy(['2026-09-20', '2026-09-20', '2026-09-20', '2026-09-20', '2026-09-20', '2026-09-20'], (fbm) => {
-    fbm.list = fbm.list.filter((item) => item.id !== 'A-FBM-C5').map((item) => (item.id === 'A-FBM-C6' ? Object.assign({}, item, { details: 'Đã sửa trên FBM' }) : item));
-    fbm.list.push(Object.assign(gd(99, '2026-09-21'), { id: 'A-LA' }));
+    fbm.list = fbm.list.filter((item) => item.id !== gdSo('C5')).map((item) => (item.id === gdSo('C6') ? Object.assign({}, item, { details: 'Đã sửa trên FBM' }) : item));
+    fbm.list.push(Object.assign(gd(99, '2026-09-21'), { id: '899099' }));
   });
-  check(so, 'Lấy toàn bộ giao dịch giữ đúng id có trên Sheet: FBM trả 6 dòng (có 1 giao dịch lạ) thì chỉ 5 về GAS, giao dịch lạ không vào Sheet; sửa trên FBM được đối soát; giao dịch đã xóa bị gắn cờ "không thấy" sau khi nhận đủ', [
-    mot.state.phase, mot.jobs.map((job) => [job.rowCount, job.keptCount]), mot.act(6).content, mot.act(5).syncStatus, mot.h.local.activity.some((item) => item.fbmId === 'A-LA'), mot.h.trace.activityCustomers.indexOf('FBM-C6') < 0 && mot.h.trace.activityCustomers.indexOf('FBM-C5') < 0, mot.log('activity_bulk_done').length
-  ], ['done', [[6, 5]], 'Đã sửa trên FBM', mot.h.F.SYNC_STATUS.missing, false, true, 1]);
+  const sauLop1 = mot.h.trace.activityCustomers.slice(mot.fbm.sauLop1).sort();
+  check(so, 'Lấy toàn bộ giao dịch giữ đúng id có trên Sheet: FBM trả 6 dòng (có 1 giao dịch lạ) thì chỉ 5 về GAS, giao dịch lạ không vào Sheet; giao dịch sửa và giao dịch vắng đưa khách cha vào danh sách đọc, cửa ghi đọc lại hai khách đó, cập nhật nội dung sửa, tra mã một lần rồi mới gắn cờ "không thấy"', [
+    mot.state.phase, mot.jobs.map((job) => [job.rowCount, job.keptCount]), mot.act(6).content, mot.act(5).syncStatus, mot.h.local.activity.some((item) => String(item.fbmId) === '899099'), sauLop1, mot.h.trace.lookups.length, mot.log('activity_bulk_done').length
+  ], ['done', [[6, 5]], 'Đã sửa trên FBM', mot.h.F.SYNC_STATUS.missing, false, ['FBM-C5', 'FBM-C6'], 1, 1]);
+  check(so, 'Lớp 1 thấy giao dịch sửa và giao dịch vắng: từ lúc lấy toàn bộ giao dịch tới lô cửa ghi đầu tiên không có lần ghi Sheet nào và không request tra mã nào', [mot.fbm.lop1.het.writes - mot.fbm.lop1.writes, mot.fbm.lop1.het.lookups - mot.fbm.lop1.lookups], [0, 0]);
 
-  // Ghi Sheet lỗi ở gói thứ hai: lượt dừng trước khi nhận đủ nên không giao dịch nào bị gắn cờ.
+  // Ghi Sheet lỗi ở lô cửa ghi sau lớp 1 (lượt chỉ lấy toàn bộ giao dịch, để cả bốn khách cha chung một lô): lượt dừng trước bước tra mã nên giao dịch vắng của lô không bị gắn cờ.
   let hongGhi = false;
   const ghiLoi = await luotKy(['2026-09-20', '2026-09-20', '2026-09-20', '2026-09-20'], (fbm) => {
     hongGhi = true;
-    fbm.list = fbm.list.filter((item) => item.id !== 'A-FBM-C1').map((item) => Object.assign({}, item, { details: item.details + ' ' + 'x'.repeat(3000) }));
-  }, { budget: { activityTopScanQuietStreak: 1, chunkTargetBytes: 6000 }, failWrite: (request) => hongGhi && request.entity === 'activity' && (request.records || []).some((record) => /Gọi FBM-C4/.test(JSON.stringify(record))) }, { afterError: () => null });
-  check(so, 'Ghi Sheet lỗi giữa việc quét giao dịch: chưa nhận đủ gói thì giao dịch vắng không bị gắn cờ "không thấy"', [
-    ghiLoi.jobs.length && ghiLoi.jobs[0].chunkCount > 1, ghiLoi.h.trace.errors.length > 0, ghiLoi.act(1).syncStatus === ghiLoi.h.F.SYNC_STATUS.missing
-  ], [true, true, false]);
+    fbm.list = fbm.list.filter((item) => item.id !== gdSo('C3')).map((item) => Object.assign({}, item, { details: item.details + ' ' + 'x'.repeat(3000) }));
+  }, { budget: { activityTopScanQuietStreak: 1, chunkTargetBytes: 6000 }, failWrite: (request) => hongGhi && request.entity === 'activity' && (request.records || []).some((record) => /Gọi FBM-C4/.test(JSON.stringify(record))) }, { startOptions: { scan: 'activity_bulk' }, afterError: () => null });
+  check(so, 'Ghi Sheet lỗi ở lô cửa ghi chứa khách cha của giao dịch vắng: lượt dừng lỗi, giao dịch vắng trong lô đó không bị gắn cờ "không thấy" vì cờ chỉ ghi sau khi ghi dữ liệu xong', [
+    ghiLoi.jobs.length && ghiLoi.jobs[0].chunkCount > 1, ghiLoi.state.phase, ghiLoi.act(3).syncStatus === ghiLoi.h.F.SYNC_STATUS.missing, ghiLoi.h.trace.lookups.length
+  ], [true, 'error', false, 0]);
 
   // Quá trần cỡ response: chia cửa sổ 90 ngày trong lượt; hai cửa sổ liền nhau không nhận trùng giao dịch ngày biên.
   const ngayCuaSo = ['2026-03-01', '2026-05-29', '2026-05-30', '2026-08-01', '2026-09-20', '2026-09-25'];
@@ -76,30 +78,25 @@ async function chay(so) {
     cuaSo.state.phase, cuaSo.h.trace.errors[0], cuaSo.log('activity_bulk_window').length, cuaSo.h.trace.bulkFilters[0], loc.length >= 3
   ], ['done', 'FBM_SCAN_TOO_LARGE', 1, '', true]);
   check(so, 'Hai cửa sổ liền nhau không chồng ngày biên: cửa sổ đầu đến 29/05, cửa sổ sau từ 30/05; tổng dòng giữ lại qua các cửa sổ đúng 6, không giao dịch nào bị gắn cờ', [
-    loc[0], loc[1].indexOf('end_date:>=30/05/2026'), cuaSo.jobs.reduce((sum, job) => sum + job.keptCount, 0), cuaSo.h.local.activity.filter((item) => item.syncStatus === cuaSo.h.F.SYNC_STATUS.missing).length, cuaSo.h.trace.rechecks.length
+    loc[0], loc[1].indexOf('end_date:>=30/05/2026'), cuaSo.jobs.reduce((sum, job) => sum + job.keptCount, 0), cuaSo.h.local.activity.filter((item) => item.syncStatus === cuaSo.h.F.SYNC_STATUS.missing).length, cuaSo.h.trace.lookups.length
   ], ['end_date:<=29/05/2026', 0, 6, 0, 0]);
 
-  // Chế độ cửa sổ: giao dịch đổi ngày giữa hai cửa sổ lọt cả hai, nên được đọc lại theo id; giao dịch đã xóa thật mới bị gắn cờ, FBM lỗi khi đọc lại thì không kết luận.
+  // Chế độ cửa sổ: giao dịch đổi ngày giữa hai cửa sổ lọt cả hai, nên khách cha được đọc lại và thấy nó; giao dịch đã xóa thật mới bị gắn cờ sau bước tra mã.
   const doiNgay = await luotKy(ngayCuaSo, (fbm) => {
     dai(fbm);
-    const goc = fbm.list.filter((item) => item.id !== 'A-FBM-C5');
-    fbm.moi = (lan) => goc.map((item) => (item.id === 'A-FBM-C2' ? Object.assign({}, item, { end_date: lan <= 2 ? '2026-06-10' : '2026-05-20' }) : item));
+    const goc = fbm.list.filter((item) => item.id !== gdSo('C5'));
+    fbm.moi = (lan) => goc.map((item) => (item.id === gdSo('C2') ? Object.assign({}, item, { end_date: lan <= 2 ? '2026-06-10' : '2026-05-20' }) : item));
   }, { budget: { activityTopScanQuietStreak: 1, scanMaxResponseBytes: 9000 } });
-  check(so, 'Chế độ cửa sổ: giao dịch đổi ngày giữa hai cửa sổ không bị gắn cờ vì được đọc lại theo id; giao dịch đã xóa sau khi đọc lại mới bị gắn cờ', [
-    doiNgay.state.phase, doiNgay.h.trace.rechecks.slice().sort(), doiNgay.act(2).syncStatus === doiNgay.h.F.SYNC_STATUS.missing, doiNgay.act(5).syncStatus
-  ], ['done', ['A-FBM-C2', 'A-FBM-C5'], false, doiNgay.h.F.SYNC_STATUS.missing]);
-
-  const docLaiLoi = await luotKy(ngayCuaSo, (fbm) => { dai(fbm); fbm.list = fbm.list.filter((item) => item.id !== 'A-FBM-C5'); }, { budget: { activityTopScanQuietStreak: 1, scanMaxResponseBytes: 9000 }, recheckFail: (id) => id === 'A-FBM-C5' });
-  check(so, 'FBM lỗi khi đọc lại một ứng viên: không gắn cờ "không thấy", lỗi lên Sidebar (danh sách lỗi) và Sheet Log', [
-    docLaiLoi.state.phase, docLaiLoi.act(5).syncStatus === docLaiLoi.h.F.SYNC_STATUS.missing, (docLaiLoi.state.metadata.customerErrors || { total: 0 }).total, docLaiLoi.log('activity_customer_failed').length
-  ], ['done', false, 1, 1]);
+  check(so, 'Chế độ cửa sổ: giao dịch đổi ngày giữa hai cửa sổ không bị gắn cờ vì khách cha được đọc lại và còn giao dịch đó; giao dịch đã xóa bị gắn cờ sau đúng một lần tra mã', [
+    doiNgay.state.phase, doiNgay.h.trace.lookups.length, doiNgay.act(2).syncStatus === doiNgay.h.F.SYNC_STATUS.missing, doiNgay.act(5).syncStatus
+  ], ['done', 1, false, doiNgay.h.F.SYNC_STATUS.missing]);
 
   // Lượt nền lấy toàn bộ giao dịch kết thúc ngay sau lớp 1: thông báo cuối lượt dựng cùng chỗ với lượt thủ công nên không mất ghi chú khách lỗi.
   const nenLoi = scanHarness({ customers: 1 });
   const nenState = nenLoi.F.stateStart('', 'pull_activity', 0);
   Object.assign(nenState, { mode: 'read', scan: 'activity_bulk', origin: 'background' });
   nenState.metadata.customerErrors = { total: 2, recent: [] };
-  nenLoi.F.activityBulkRunDone(nenState);
+  nenLoi.F.finishPullRun(nenState);
   const nenXong = nenLoi.F.stateRead();
   check(so, 'Lượt nền lấy toàn bộ giao dịch có khách lỗi khi đọc: thông báo cuối lượt trên Sidebar nêu số khách lỗi, không chỉ ghi ở Log', [nenXong.phase, String(nenXong.message || '').indexOf('2 khách lỗi khi đọc giao dịch') >= 0], ['done', true]);
 
@@ -111,7 +108,7 @@ async function chay(so) {
   ], ['done', 1, 'error', 'FBM_TRANSPORT_UNAVAILABLE', 0, 0]);
 
   // FBM trả ít dòng hơn tổng nó báo: lấy cả khoảng thì chia cửa sổ; một cửa sổ vẫn thiếu thì dừng lỗi, không gắn cờ.
-  const thieu = await luotKy(ngayCuaSo, (fbm) => { fbm.list = fbm.list.filter((item) => item.id !== 'A-FBM-C5'); }, { fbmRowCap: 1 });
+  const thieu = await luotKy(ngayCuaSo, (fbm) => { fbm.list = fbm.list.filter((item) => item.id !== gdSo('C5')); }, { fbmRowCap: 1 });
   check(so, 'FBM trả thiếu dòng: chuyển sang cửa sổ, cửa sổ vẫn thiếu thì dừng lỗi FBM_SCAN_INCOMPLETE báo Sidebar và Log, không giao dịch nào bị gắn cờ', [
     thieu.state.phase, thieu.state.lastFailureCode, thieu.log('activity_bulk_window').length, thieu.log('activity_bulk_failed').length, thieu.act(5).syncStatus === thieu.h.F.SYNC_STATUS.missing, String(thieu.state.lastError || '').length > 0
   ], ['error', 'FBM_SCAN_INCOMPLETE', 1, 1, false, true]);
@@ -125,17 +122,17 @@ async function chay(so) {
   await choDb.run({ pack: 'quick' });
   check(so, 'Khách "Chờ đồng bộ" lệch ngày giao dịch cuối không sinh request đọc giao dịch; khách "Cho phép" lệch y hệt vẫn được đọc', [choDb.F.stateRead().phase, choDb.trace.activityCustomers.indexOf('FBM-C2'), choDb.trace.activityCustomers.indexOf('FBM-C3') >= 0], ['done', -1, true]);
 
-  // Lượt nền chỉ lấy toàn bộ giao dịch gồm đúng lớp 1 (09/02 Phần 3): chốt "không thấy" rồi kết thúc, không đọc thêm khách nào.
-  const nen = await luotKy(['2026-09-20', '2026-09-20'], (fbm) => { fbm.list = fbm.list.filter((item) => item.id !== 'A-FBM-C2'); }, {}, { startOptions: { scan: 'activity_bulk' }, afterError: () => null });
+  // Lượt nền chỉ lấy toàn bộ giao dịch gồm lớp 1 rồi danh sách đọc (09/02 Phần 8): cờ "không thấy" chỉ ghi ở cửa ghi sau bước tra mã.
+  const nen = await luotKy(['2026-09-20', '2026-09-20'], (fbm) => { fbm.list = fbm.list.filter((item) => item.id !== gdSo('C2')); }, {}, { startOptions: { scan: 'activity_bulk' }, afterError: () => null });
   const sauBulk = nen.h.trace.kinds.slice(nen.h.trace.kinds.indexOf('scan_job:activity') + 1);
-  check(so, 'Lượt lấy toàn bộ giao dịch chạy nền kết thúc ngay sau lớp 1: sau lớp 1 chỉ còn đúng một request đếm khách, không đọc khách nào', [
+  check(so, 'Lượt lấy toàn bộ giao dịch chạy nền: sau lớp 1 chỉ đọc lại khách cha của giao dịch vắng trong một lô, tra mã một lần, rồi một request đếm khách', [
     nen.state.phase, nen.log('activity_bulk_done').length, nen.act(2).syncStatus, sauBulk
-  ], ['done', 1, nen.h.F.SYNC_STATUS.missing, ['customer_count']]);
+  ], ['done', 1, nen.h.F.SYNC_STATUS.missing, ['batch', 'batch', 'customer_count']]);
 
   // Lớp 1 gắn cờ qua cùng chỗ với lượt quét theo khách: số vào thẻ kết quả đúng một lần, dòng người dùng đang sửa không bị gắn cờ, lượt sau không ghi lại dòng đã mang cờ.
   const lop1 = await luotKy(['2026-09-20', '2026-09-20', '2026-09-20', '2026-09-20', '2026-09-20', '2026-09-20'], (fbm, h) => {
-    fbm.list = fbm.list.filter((item) => ['A-FBM-C1', 'A-FBM-C4', 'A-FBM-C5'].indexOf(item.id) < 0);
-    const s = h.F.stateRead(), dangSua = h.local.activity.find((item) => item.fbmId === 'A-FBM-C4');
+    fbm.list = fbm.list.filter((item) => ['C1', 'C4', 'C5'].map(gdSo).indexOf(item.id) < 0);
+    const s = h.F.stateRead(), dangSua = h.local.activity.find((item) => String(item.fbmId) === gdSo('C4'));
     s.locks = Object.assign({}, s.locks, { ['activity:' + dangSua.id]: { owner: 'user' } });
     h.F.stateWrite(s);
   });

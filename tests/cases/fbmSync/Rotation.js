@@ -1,10 +1,10 @@
 /** Vòng xoay: đọc giao dịch của đủ N khách trên Sheet theo số CUS, theo lô, nối tiếp phiên trước và quay vòng; cursor bền chỉ đi qua lô đã ghi xong. */
 const { section, check } = require('../../lib/assert');
-const { scanHarness } = require('./ScanJob');
+const { scanHarness, gdSo } = require('./ScanJob');
 
 /** Sheet có 12 khách sau một lượt Quét nhanh; lô Vòng xoay 2 khách để thấy rõ việc chia lô. */
-async function vongHarness() {
-  const h = scanHarness({ customers: 12, budget: { activityBatchCustomers: 2 } });
+async function vongHarness(options) {
+  const h = scanHarness(Object.assign({ customers: 12, budget: { activityBatchCustomers: 2 } }, options || {}));
   await h.run();
   const fbmOf = (cus) => h.local.customer.find((item) => item.id === 'CUS-' + String(cus).padStart(6, '0')).fbmId;
   /** Một phiên Vòng xoay N khách; trả danh sách số CUS đã đọc giao dịch theo đúng thứ tự gửi. */
@@ -29,17 +29,18 @@ async function chay(so) {
   const hai = await deu.xoay(5), ba = await deu.xoay(5);
   check(so, 'Phiên sau nối tiếp từ CUS 6; hết danh sách thì quay về CUS nhỏ nhất và vẫn đọc đủ 5 khách', [hai.doc, ba.doc, deu.F.detailCursorRead()], [[6, 7, 8, 9, 10], [11, 12, 1, 2, 3], 3]);
 
-  // Khách không đủ điều kiện bị bỏ qua mà không trừ vào N: thiếu mã FBM, đã xóa, mang cờ "không thấy bên FBM", không cho phép lấy về.
+  // Khách không đủ điều kiện bị bỏ qua mà không trừ vào N: thiếu mã FBM, đã xóa, mang cờ "không thấy bên FBM" hoặc "đã chuyển cho người khác", không cho phép lấy về.
   const loc = await vongHarness();
   loc.local.customer.forEach((item) => {
     const cus = Number(String(item.id).slice(4));
     if (cus === 2) { item.fbmId = ''; }
     if (cus === 3) { item.recordStatus = 'deleted'; }
     if (cus === 4) { item.syncStatus = loc.F.SYNC_STATUS.missing; }
+    if (cus === 8) { item.syncStatus = loc.F.SYNC_STATUS.transferred; }
     item.fbmSyncPermission = cus === 6 ? 'Chờ đồng bộ' : 'Cho phép';
   });
   const locDoc = await loc.xoay(5);
-  check(so, 'Khách thiếu mã FBM, đã xóa, không thấy bên FBM hoặc "Chờ đồng bộ" bị bỏ qua; Vòng xoay vẫn đọc đủ 5 khách đủ điều kiện', locDoc.doc, [1, 5, 7, 8, 9]);
+  check(so, 'Khách thiếu mã FBM, đã xóa, mang "không thấy bên FBM" hoặc "đã chuyển cho người khác", hoặc "Chờ đồng bộ" bị bỏ qua; Vòng xoay vẫn đọc đủ 5 khách đủ điều kiện', locDoc.doc, [1, 5, 7, 9, 10]);
 
   // Lỗi giữa lô: cursor bền chỉ ghi khi cả lô đã ghi xong, phiên sau đọc lại đúng lô hỏng và vẫn đủ N khách.
   const loi = await vongHarness();
@@ -49,6 +50,19 @@ async function chay(so) {
   const loiDoc = await loi.xoay(5, { fail: (request) => { if (daHong || request.meta.kind !== 'batch' || JSON.stringify(request).indexOf(hong) < 0) { return ''; } daHong = true; return 'SYNC_TRANSPORT_FAILED'; } });
   const cursorSauLoi = loi.F.detailCursorRead(), phaseSauLoi = loi.F.stateRead().phase;
   const sau = await loi.xoay(5);
+  // Ghi Sheet lỗi ở lô chứa CUS 8: cursor chỉ tiến sau khi ghi xong lô.
+  let hongGhi = false, hongMa = '';
+  const ghi = await vongHarness({
+    failWrite: (request) => hongGhi && JSON.stringify(request.records || []).indexOf(hongMa) >= 0,
+    activityFor: (key) => [{ id: gdSo(key), details: (hongMa ? 'Sửa trên FBM ' : 'Gọi ') + key, end_date: '2026-09-20', owner: 'Owner', datetime0: '2026-09-20T03:00:00', line_nbr: 1 }]
+  });
+  await ghi.xoay(5);
+  hongMa = ghi.fbmOf(8); hongGhi = true;
+  await ghi.xoay(5, { afterError: () => null });
+  const cursorGhiLoi = ghi.F.detailCursorRead(), phaseGhiLoi = ghi.F.stateRead().phase;
+  hongGhi = false;
+  const ghiSau = await ghi.xoay(5);
+  check(so, 'Ghi Sheet lỗi ở lô chứa CUS 8: phiên dừng lỗi, cursor giữ CUS 7; phiên sau đọc lại từ CUS 8', [phaseGhiLoi, cursorGhiLoi, ghiSau.doc[0]], ['error', 7, 8]);
   check(so, 'Lỗi vận chuyển ở lô chứa CUS 8: phiên dừng lỗi, cursor giữ CUS 7; phiên sau đọc lại từ CUS 8 và đủ 5 khách', [loiDoc.doc.indexOf(9) < 0, phaseSauLoi, cursorSauLoi, sau.doc], [true, 'error', 7, [8, 9, 10, 11, 12]]);
 }
 

@@ -62,9 +62,8 @@ async function chay(so) {
       protocol: { parse: (value) => value, assertSuccess: () => ({ ok: true }), contractMismatch: () => null },
       traceImport: () => {}, traceEvent: () => {}, traceResponse: () => ({}), applyTransportSession: () => false,
       rowsToRecords: () => ({ rows: [], fields: [], total: 0 }), isTemporaryRecord: () => false, customerPageItem: () => '', customerPageValue: () => [], seenStoreReader: () => () => true, seenStoreMark: () => {}, readLocal: () => [],
-      pullWrite: () => ({ ok: true, written: 0, conflicts: 0, skipped: 0 }), previewRecords: () => {}, customerNext: () => false, activityForCustomers: () => null,
+      pullWrite: () => ({ ok: true, written: 0, conflicts: 0, skipped: 0 }), previewRecords: () => {}, customerNext: () => false,
       canWriteSheet: (mode) => mode === 'read' || mode === 'write', canWriteFbm: (mode) => mode === 'push' || mode === 'write',
-      markMissingAfterFullScan: () => { readFinishMissing += 1; return { written: 0 }; },
       stopPushOnConflicts: () => false, nextPushRequest: () => { readFinishPushRequests += 1; return {}; },
       runDoneMessage: () => 'Đồng bộ hoàn tất.',
       statusView: () => ({ phase: readFinishState.phase, mode: readFinishState.mode })
@@ -72,8 +71,12 @@ async function chay(so) {
   });
   napServer(readFinish, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
   // Chỉ kiểm chặng chính của lượt; bước đếm cuối lượt có test riêng.
+  readFinish.FbmSync.customerAbsentMark = () => { readFinishMissing += 1; };
+  readFinish.FbmSync.readListClear = () => {};
+  readFinish.FbmSync.customerBaselineWrite = () => {};
+  readFinish.FbmSync.activityStageNext = () => null;
   const readFinished = readFinish.FbmSync.continueStep({ job: { jobId: 'read-run:customer:0:0', chunkIndex: 0, chunkCount: 1, rowCount: 0, totalRowCount: 0, oversize: [] }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'read-request' }] } });
-  check(so, 'mode read ket thuc pull thi ghi missing vao Sheet va khong mo chieu push FBM', [readFinished.ok, readFinishState.phase, readFinishMissing, readFinishPushRequests], [true, 'done', 2, 0]);
+  check(so, 'Lượt Lấy hết danh sách khách thì gắn khách vắng vào danh sách đọc một lần, không mở chiều đẩy', [readFinished.ok, readFinishState.phase, readFinishMissing, readFinishPushRequests], [true, 'done', 1, 0]);
   builders.FbmSync.stateRead = () => ({ session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: 'auth-c', activityAuthorized: 'auth-a' } });
   const gate = { map: { '@CAT_TINH_THANH\u001fHà Nội': 'HNI' }, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true, HNI: true } } };
   builders.FbmSync.readCategoryGate = () => gate;
@@ -82,24 +85,24 @@ async function chay(so) {
   let recoveryState = { session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: 'auth-c', activityAuthorized: 'auth-a' }, metadata: {}, locks: { 'activity:ACT-9': { owner: 'sync' } } };
   builders.FbmSync.stateRead = () => recoveryState;
   builders.FbmSync.stateWrite = (next) => { recoveryState = next; return next; };
-  builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmCustomerCode: 'ALT99999' }] : [{ id: 'ACT-9', fbmId: '', customerId: 'KH-1', syncStatus: builders.FbmSync.SYNC_STATUS.pushing }];
+  builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmId: 'S9', fbmCustomerCode: 'ALT99999' }] : [{ id: 'ACT-9', fbmId: '', customerId: 'KH-1', syncStatus: builders.FbmSync.SYNC_STATUS.pushing }];
   builders.writeGateSave = (request) => { recoveryWrite = request; return { ok: true }; };
-  const recovered = builders.FbmSync.pullWrite('activity', [builders.FbmSync.activityRecord({ id: 77, ma_kh: 'ALT99999', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi', details: 'Nội dung #SC-ACT-9' }, gate)], 'write');
+  const recovered = builders.FbmSync.pullWrite('activity', [builders.FbmSync.activityRecord({ id: 77, ma_kh: 'ALT99999', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi', details: 'Nội dung #SC-ACT-9' }, gate, { sttRec: 'S9' })], 'write');
   check(so, 'Activity marker recovery vá FBM ID không tạo dòng mới', [recovered.written, recoveryWrite.records[0].id, recoveryWrite.records[0].fbmId, recoveryState.locks['activity:ACT-9']], [1, 'ACT-9', '77', undefined]);
   let markerConflictWrite, markerState = { session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: 'auth-c', activityAuthorized: 'auth-a' }, metadata: { seen: { customer: {}, activity: {} } }, locks: {}, counts: { conflict: 0 } };
   builders.FbmSync.stateRead = () => markerState;
   builders.FbmSync.stateWrite = (next) => { markerState = next; return next; };
-  builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmCustomerCode: 'ALT99999' }] : [{ id: 'ACT-9', fbmId: 'OLD-FBM', customerId: 'KH-1', content: 'Nội dung cũ', taskType: 'Gọi', workDate: '/Date(1757386800000)/', fbmHash: 'old-hash' }];
+  builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmId: 'S9', fbmCustomerCode: 'ALT99999' }] : [{ id: 'ACT-9', fbmId: 'OLD-FBM', customerId: 'KH-1', content: 'Nội dung cũ', taskType: 'Gọi', workDate: '/Date(1757386800000)/', fbmHash: 'old-hash' }];
   builders.writeGateSave = (request) => { markerConflictWrite = request; return { ok: true }; };
-  const markerConflict = builders.FbmSync.pullWrite('activity', [builders.FbmSync.activityRecord({ id: 'NEW-FBM', ma_kh: 'ALT99999', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi', details: 'Nội dung mới #SC-ACT-9' }, gate)]);
+  const markerConflict = builders.FbmSync.pullWrite('activity', [builders.FbmSync.activityRecord({ id: 'NEW-FBM', ma_kh: 'ALT99999', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi', details: 'Nội dung mới #SC-ACT-9' }, gate, { sttRec: 'S9' })]);
   check(so, 'Activity marker trỏ FBM ID khác ghi trạng thái xung đột chờ quyết lên Sheet, không cất bản ghi vào state', [markerConflict.conflicts, 'conflicts' in markerState.metadata, markerConflictWrite.records[0].syncStatus, Object.keys(markerState.locks)], [1, false, builders.FbmSync.SYNC_STATUS.conflict, []]);
   // G12: giao dịch đã đồng bộ của chính tài khoản mà FBM còn dấu #SC thì xếp đẩy sửa để bỏ dấu; của tài khoản khác thì không đụng.
   const settingsBeforeMarker = builders.FbmSync.scriptSettings;
   gate.map['@CAT_CONG_VIECGọi'] = 'GOI'; gate.valid['@CAT_CONG_VIEC'] = { 'Gọi': true, GOI: true };
-  const markedIncoming = builders.FbmSync.activityRecord({ id: 'FBM-9', ma_kh: 'ALT99999', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi', details: 'Nội dung #SC-ACT-9', owner: 'Chủ tài khoản' }, gate);
+  const markedIncoming = builders.FbmSync.activityRecord({ id: 'FBM-9', ma_kh: 'ALT99999', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi', details: 'Nội dung #SC-ACT-9', owner: 'Chủ tài khoản' }, gate, { sttRec: 'S9' });
   let markedWrite = null;
   builders.FbmSync.scriptSettings = () => ({ accountName: 'Chủ tài khoản' });
-  builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmCustomerCode: 'ALT99999' }] : [{ id: 'ACT-9', fbmId: 'FBM-9', customerId: 'KH-1', content: 'Nội dung', taskType: 'Gọi', workDate: '/Date(1757386800000)/', enteredBy: 'Chủ tài khoản', fbmHash: markedIncoming.fbmHash, syncStatus: builders.FbmSync.SYNC_STATUS.synced }];
+  builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmId: 'S9', fbmCustomerCode: 'ALT99999' }] : [{ id: 'ACT-9', fbmId: 'FBM-9', customerId: 'KH-1', content: 'Nội dung', taskType: 'Gọi', workDate: '/Date(1757386800000)/', enteredBy: 'Chủ tài khoản', fbmHash: markedIncoming.fbmHash, syncStatus: builders.FbmSync.SYNC_STATUS.synced }];
   builders.writeGateSave = (request) => { markedWrite = request; return { ok: true }; };
   builders.FbmSync.pullWrite('activity', [Object.assign({}, markedIncoming)]);
   const ownMarked = markedWrite && markedWrite.records[0].syncStatus;
@@ -108,27 +111,27 @@ async function chay(so) {
   builders.FbmSync.pullWrite('activity', [Object.assign({}, markedIncoming)]);
   check(so, 'G12: lượt kéo xếp "chờ đối soát" cho giao dịch của mình còn dấu #SC trên FBM, không đụng giao dịch tài khoản khác', [ownMarked, markedWrite && markedWrite.records[0].syncStatus], [builders.FbmSync.SYNC_STATUS.pending, null]);
   // Người tạo trên FBM đứng ngoài fingerprint: nội dung không đổi thì hash không lộ, lượt kéo vẫn phải ghi tên người tạo xuống ShinCRM.
-  const ownerIncoming = builders.FbmSync.activityRecord({ id: 'FBM-10', ma_kh: 'ALT99999', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi', details: 'Nội dung', owner: 'Sale Cũ' }, gate);
+  const ownerIncoming = builders.FbmSync.activityRecord({ id: 'FBM-10', ma_kh: 'ALT99999', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi', details: 'Nội dung', owner: 'Sale Cũ' }, gate, { sttRec: 'S9' });
   let ownerWrite = null;
-  builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmCustomerCode: 'ALT99999' }] : [{ id: 'ACT-10', fbmId: 'FBM-10', customerId: 'KH-1', content: 'Nội dung', taskType: 'Gọi', workDate: '/Date(1757386800000)/', enteredBy: '', fbmHash: ownerIncoming.fbmHash, syncStatus: builders.FbmSync.SYNC_STATUS.synced }];
+  builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmId: 'S9', fbmCustomerCode: 'ALT99999' }] : [{ id: 'ACT-10', fbmId: 'FBM-10', customerId: 'KH-1', content: 'Nội dung', taskType: 'Gọi', workDate: '/Date(1757386800000)/', enteredBy: '', fbmHash: ownerIncoming.fbmHash, syncStatus: builders.FbmSync.SYNC_STATUS.synced }];
   builders.writeGateSave = (request) => { ownerWrite = request; return { ok: true }; };
   builders.FbmSync.pullWrite('activity', [Object.assign({}, ownerIncoming)]);
   check(so, 'Người tạo trên FBM: lượt kéo ghi owner FBM vào enteredBy khi nội dung không đổi, không đổi trạng thái đồng bộ', [ownerIncoming.enteredBy, ownerWrite && ownerWrite.records.length, ownerWrite && ownerWrite.records[0].id, ownerWrite && ownerWrite.records[0].enteredBy, ownerWrite && ownerWrite.records[0].syncStatus], ['Sale Cũ', 1, 'ACT-10', 'Sale Cũ', undefined]);
   // Người dùng lỡ xóa mã khách ở dòng giao dịch: quan hệ cha đứng ngoài fingerprint nên hash không lộ; lượt kéo phải nối lại theo FBM và để dấu ở Log, nếu không ngày giao dịch cuối của khách lệch FBM mãi.
-  const linkIncoming = builders.FbmSync.activityRecord({ id: 'FBM-11', ma_kh: 'ALT99999', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi', details: 'Nội dung', owner: 'Sale Cũ' }, gate);
+  const linkIncoming = builders.FbmSync.activityRecord({ id: 'FBM-11', ma_kh: 'ALT99999', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi', details: 'Nội dung', owner: 'Sale Cũ' }, gate, { sttRec: 'S9' });
   let linkWrite = null;
   const linkLogged = [];
   const recordIssueAddBefore = builders.FbmSync.recordIssueAdd;
   builders.FbmSync.recordIssueAdd = (stage, entity, status, id, reason) => { linkLogged.push(id + '|' + reason); return null; };
-  builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmCustomerCode: 'ALT99999' }] : [{ id: 'ACT-11', fbmId: 'FBM-11', customerId: '', content: 'Nội dung', taskType: 'Gọi', workDate: '/Date(1757386800000)/', enteredBy: 'Sale Cũ', fbmHash: linkIncoming.fbmHash, syncStatus: builders.FbmSync.SYNC_STATUS.synced }];
+  builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmId: 'S9', fbmCustomerCode: 'ALT99999' }] : [{ id: 'ACT-11', fbmId: 'FBM-11', customerId: '', content: 'Nội dung', taskType: 'Gọi', workDate: '/Date(1757386800000)/', enteredBy: 'Sale Cũ', fbmHash: linkIncoming.fbmHash, syncStatus: builders.FbmSync.SYNC_STATUS.synced }];
   builders.writeGateSave = (request) => { linkWrite = request; return { ok: true }; };
   const linkResult = builders.FbmSync.pullWrite('activity', [Object.assign({}, linkIncoming)]);
   builders.FbmSync.recordIssueAdd = recordIssueAddBefore;
   check(so, 'Giao dịch mất mã khách trên Sheet: lượt kéo nối lại vào khách ShinCRM theo FBM, ghi một dòng Log, tính vào số bản ghi đã ghi Sheet, không đổi nội dung hay trạng thái đồng bộ', [linkResult && linkResult.written, linkWrite && linkWrite.records.length, linkWrite && linkWrite.records[0].id, linkWrite && linkWrite.records[0].customerId, linkWrite && linkWrite.records[0].syncStatus, linkLogged.filter((line) => /ACT-11\|.*KH-1/.test(line)).length], [1, 1, 'ACT-11', 'KH-1', undefined, 1]);
   // FBM trả mới nhất trước; cửa ghi cấp ACT- theo thứ tự mảng ghi, nên lô phải được sắp theo mã FBM tăng dần (thứ tự nhập thật) trước khi ghi. Mã đổi độ dài (99999 → 100000) phải so như số.
-  const fbmOrderIncoming = (fbmId, day) => builders.FbmSync.activityRecord({ id: fbmId, ma_kh: 'ALT99999', end_date: day, ten_cv: 'Gọi', details: 'GD ' + fbmId }, gate);
+  const fbmOrderIncoming = (fbmId, day) => builders.FbmSync.activityRecord({ id: fbmId, ma_kh: 'ALT99999', end_date: day, ten_cv: 'Gọi', details: 'GD ' + fbmId }, gate, { sttRec: 'S9' });
   let orderWrite = null;
-  builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmCustomerCode: 'ALT99999' }] : [];
+  builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmId: 'S9', fbmCustomerCode: 'ALT99999' }] : [];
   builders.writeGateSave = (request) => { orderWrite = request; return { ok: true }; };
   builders.FbmSync.pullWrite('activity', [fbmOrderIncoming('177397', '/Date(1791828000000)/'), fbmOrderIncoming('177396', '/Date(1791828000000)/'), fbmOrderIncoming('177388', '/Date(1791828000000)/'), fbmOrderIncoming('177398', '/Date(1791655200000)/'), fbmOrderIncoming('100000', '/Date(1791828000000)/'), fbmOrderIncoming('99999', '/Date(1791828000000)/')]);
   check(so, 'Pull Activity mới: lô FBM trả mới nhất trước vẫn được ghi theo mã FBM tăng dần (số, không phải chuỗi) để ACT- tăng theo thứ tự nhập thật', orderWrite && orderWrite.records.map((record) => record.fbmId), ['99999', '100000', '177388', '177396', '177397', '177398']);
@@ -186,13 +189,12 @@ async function chay(so) {
   builders.FbmSync.readLocal = () => [];
   const firstPage = builders.FbmSync.beginCustomerPull(pageState);
   check(so, 'quét toàn bộ lấy cả danh sách khách bằng một việc quét có số dòng mỗi request theo cấu hình, Extension cắt gói', [pageState.cursor.kind, pageState.cursor.count, firstPage.meta.kind, firstPage.body.count, firstPage.meta.job.chunkMaxBytes], ['scan_job', builders.FbmSync.BUDGET.scanCustomerRows, 'scan_job', builders.FbmSync.BUDGET.scanCustomerRows, builders.FbmSync.BUDGET.chunkMaxBytes]);
-  // Cursor Activity giữ tối đa một lô mã khách của hàng đợi. stt_rec_kh của FBM là 'A' + 9 chữ số; ma_kh lấy dài tối đa 32 ký tự như luật mã thử.
+  // Cursor cửa ghi giữ tối đa một lô mã khách. stt_rec_kh của FBM là 'A' + 9 chữ số.
   const pageRows = builders.FbmSync.BUDGET.activityBatchCustomers;
-  const fullPage = Array.from({ length: pageRows }, (_, i) => ({ sttRec: 'A' + String(100000000 + i), maKh: 'M'.repeat(32) }));
-  const nextCustomerPage = builders.FbmSync.customerGridRequest({ type: 1, count: pageRows, gridPageIndex: 7, gridPageValue: ['2026-10-07', '2026-10-07T00:00:00', 'X'.repeat(20)], gridRefresh: false });
-  builders.FbmSync.activityForCustomers(pageState, fullPage, nextCustomerPage, 0);
+  const fullPage = Array.from({ length: pageRows }, (_, i) => ({ sttRec: 'A' + String(100000000 + i) }));
+  pageState.cursor = { kind: 'activity_grid', layer: 'list', customers: fullPage.map((item) => item.sttRec), batchId: 'b'.repeat(40) };
   const cursorBytes = Buffer.byteLength(JSON.stringify(pageState.cursor));
-  check(so, 'cursor Activity cua mot trang Customer day voi ma dai nhat van duoi nua tran DocumentProperty va khong chep doi danh sach ma', [cursorBytes < builders.FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT / 2, pageState.cursor.customerIds, pageState.cursor.customers.length], [true, undefined, pageRows]);
+  check(so, 'cursor một lô cửa ghi đầy vẫn dưới nửa trần DocumentProperty và không chép đôi danh sách mã', [cursorBytes < builders.FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT / 2, pageState.cursor.customerIds, pageState.cursor.customers.length], [true, undefined, pageRows]);
   // Cả state (không chỉ cursor) của một trang đầy cộng lastError dài nhất phải chừa khoảng trống dưới trần một khóa kho: nhánh lỗi ghi thêm lastError mà chạm trần thì lỗi quota che mất lỗi thật.
   const khoState = {};
   const stateHop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => ({ getProperty: (k) => khoState[k] === undefined ? null : khoState[k], setProperty: (k, v) => { khoState[k] = String(v); }, deleteProperty: (k) => { delete khoState[k]; } }) } });
@@ -220,12 +222,6 @@ async function chay(so) {
   builders.FbmSync.progressCustomersDone(tienTrinh, 3);
   tienTrinh.counts.completed = 1312;
   check(so, 'tiến trình lượt 50 khách là x/50 theo khách đã quét xong', tienTrinh.progress, { done: 3, total: 50 });
-  // Cursor chỉ giữ stt_rec_kh; mã FBM của khách cha tra từ Sheet Customer, khách chưa có trên Sheet thì để trống chứ không đoán.
-  const docKhachCu = builders.FbmSync.readLocal;
-  builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-A2', fbmId: 'A2', fbmCustomerCode: 'ALT02' }] : [];
-  const maCha = builders.FbmSync.activityParentCodes();
-  check(so, 'cursor chỉ giữ stt_rec_kh, mã khách cha của giao dịch tra từ chỉ mục Sheet Customer, khách chưa có trên Sheet thì để trống', [maCha.A2, maCha.A1 || ''], ['ALT02', '']);
-  builders.FbmSync.readLocal = docKhachCu;
   // Chuỗi mong đợi lấy từ request chuyển trang do giao diện FBM gửi (bắt 2026-10-08). Dòng thứ hai mang ngày FBM thật trả cho A000080085 (18:00 UTC ngày 27): giao diện ghi 20260928, tức phải tính theo giờ Việt Nam.
   const customerFields = builders.FbmSync.GRID_FIELDS.customer, dongFbm = builders.FbmSync.rowsToRecords('customer', JSON.stringify({ d: { TotalRowCount: 1312, ViewPage: { Fields: customerFields.map((AliasName) => ({ AliasName })) }, Rows: [
     customerFields.map((field) => ({ stt_rec_kh: 'A000079388', ngay_gd: '/Date(1787101200000)/', datetime0: '/Date(1787156031523)/', xorder: '000000000345' })[field] || ''),
@@ -239,16 +235,18 @@ async function chay(so) {
   ] } })).rows[0];
   check(so, 'khóa trang Customer cộng 7 giờ vào ngày như giao diện FBM gửi, chuỗi mô tả trang vẫn là ngày Việt Nam', [builders.FbmSync.customerPageValue(dongChuaGd), builders.FbmSync.customerPageItems([dongChuaGd], 1312).lastPageItem],
     [['/Date(915148800000)/', '/Date(1751298801493)/', '000000010624', 'A000069569'], '1999010120250630000000010624A000069569']);
-  // Lượt dừng sớm (phân trang Customer hỏng) mà vẫn đánh vắng mặt thì mọi khách chưa quét tới bị đánh "không thấy bên FBM" (gặp thật: 1.262/1.312 khách).
+  // Lượt dừng sớm (phân trang Customer hỏng) mà vẫn xét khách vắng thì mọi khách chưa quét tới bị coi là vắng (gặp thật: 1.262/1.312 khách).
   const marked = [];
-  const savedMark = builders.FbmSync.markMissingAfterFullScan;
-  builders.FbmSync.markMissingAfterFullScan = (entity) => { marked.push(entity); return { written: 0 }; };
-  const scanRun = (pages) => { const st = { mode: 'read', scan: 'full', phase: 'pull_activity', metadata: {}, session: {}, cursor: {} }; pages.forEach((grid, i) => builders.FbmSync.customerScanRecord(st, grid, i === 0)); marked.length = 0; builders.FbmSync.finishPullRun(st); return [st.phase, st.lastFailureCode || '', marked.slice()]; };
+  const savedScanEnd = { absent: builders.FbmSync.customerAbsentMark, baseline: builders.FbmSync.customerBaselineWrite, stages: builders.FbmSync.activityStagesContinue };
+  builders.FbmSync.customerAbsentMark = () => { marked.push('vắng'); };
+  builders.FbmSync.customerBaselineWrite = () => { marked.push('mốc'); };
+  builders.FbmSync.activityStagesContinue = () => { marked.push('cửa ghi'); return { ok: true }; };
+  const scanRun = (pages) => { const st = { mode: 'read', scan: 'full', phase: 'pull_customer', metadata: {}, session: {}, cursor: {} }; pages.forEach((grid, i) => builders.FbmSync.customerScanRecord(st, grid, i === 0)); marked.length = 0; builders.FbmSync.customerScanEnd(st); return [st.phase, st.lastFailureCode || '', marked.slice()]; };
   const rowsOf = (n) => Array.from({ length: n }, () => ({}));
-  check(so, 'chỉ đánh không thấy bên FBM khi đã nhận đủ số khách FBM báo ở trang đầu; dừng ở 50/1312 hoặc FBM không báo tổng thì phiên lỗi FBM_SCAN_INCOMPLETE và không đánh',
+  check(so, 'chỉ xét khách vắng và sang cửa ghi khi đã nhận đủ số khách FBM báo ở trang đầu; dừng ở 50/1312 hoặc FBM không báo tổng thì phiên lỗi FBM_SCAN_INCOMPLETE, chưa ghi gì',
     [scanRun([{ total: 1312, rows: rowsOf(50) }, { total: 0, rows: [] }]), scanRun([{ total: 0, rows: rowsOf(50) }]), scanRun([{ total: 60, rows: rowsOf(50) }, { total: 0, rows: rowsOf(10) }]), scanRun([{ total: 0, rows: [] }])],
-    [['error', 'FBM_SCAN_INCOMPLETE', []], ['error', 'FBM_SCAN_INCOMPLETE', []], ['done', '', ['customer', 'activity']], ['done', '', ['customer', 'activity']]]);
-  builders.FbmSync.markMissingAfterFullScan = savedMark;
+    [['error', 'FBM_SCAN_INCOMPLETE', []], ['error', 'FBM_SCAN_INCOMPLETE', []], ['pull_customer', '', ['mốc', 'vắng', 'cửa ghi']], ['pull_customer', '', ['mốc', 'vắng', 'cửa ghi']]]);
+  builders.FbmSync.customerAbsentMark = savedScanEnd.absent; builders.FbmSync.customerBaselineWrite = savedScanEnd.baseline; builders.FbmSync.activityStagesContinue = savedScanEnd.stages;
 
   const identityCheckState = { session: { userId: '2037', accountName: 'ANHLT' }, metadata: {} };
   builders.FbmSync.readLocal = () => [{ id: 'CUS-1', fbmId: 'FBM-1', fbmCustomerCode: 'ALT00010' }, { id: 'CUS-2', fbmId: 'FBM-2', fbmCustomerCode: 'ALT00011' }];
@@ -435,80 +433,23 @@ async function chay(so) {
   const lockedPull = edges.FbmSync.pullWrite('customer', [edges.FbmSync.customerRecord({ stt_rec_kh: 'FBM-LOCK', ma_kh: 'ALT00010', ten_kh: 'Mới' }, {})]);
   check(so, 'pull khong ghi record dang bi user khoa', [lockedPull.written, lockedPull.skipped, lockedWrite], [0, 1, false]);
 
-  let missingWrite = false;
-  const missingState = { mode: 'write', metadata: { seen: { customer: {} } }, locks: { 'customer:CUS-000011': { owner: 'user' } } };
-  edges.FbmSync.stateRead = () => missingState;
-  edges.FbmSync.readLocal = () => [{ id: 'CUS-000011', fbmId: 'FBM-MISSING', recordStatus: 'active' }];
-  edges.writeGateSave = () => { missingWrite = true; return { ok: true }; };
-  check(so, 'missing scan bo qua record dang user sua', [edges.FbmSync.markMissingAfterFullScan('customer', missingState).written, missingWrite], [0, false]);
-  let missingBatch;
-  const fullScanState = { mode: 'write', metadata: { seen: { customer: {} } }, locks: {} };
-  edges.FbmSync.scope = () => null;
-  edges.FbmSync.stateRead = () => fullScanState;
-  edges.FbmSync.readLocal = () => [{ id: 'CUS-000011', fbmId: 'FBM-MISSING', recordStatus: 'active' }, { id: 'CUS-000012', fbmId: 'FBM-TOMBSTONE', recordStatus: 'deleted' }];
-  edges.writeGateSave = (request) => { missingBatch = request; return { ok: true }; };
-  const missingResult = edges.FbmSync.markMissingAfterFullScan('customer', fullScanState);
-  check(so, 'Customer vang chi danh dau missing va bo qua tombstone', [missingResult.written, missingBatch.records.length, missingBatch.records[0].id, missingBatch.records[0].syncStatus], [1, 1, 'CUS-000011', edges.FbmSync.SYNC_STATUS.missing]);
-  edges.FbmSync.seenStoreClear('customer');
-  // Dòng đã mang cờ từ lượt trước vẫn được đếm nhưng không bị ghi lại; dòng mới mất thì ghi và đếm.
-  const daCoCoState = { mode: 'read', metadata: { seen: { customer: {} } }, locks: {}, counts: edges.FbmSync.countsDefault() };
-  let daCoCoBatch = null;
-  edges.FbmSync.readLocal = () => [{ id: 'CUS-000013', fbmId: 'FBM-MAT-TRUOC', recordStatus: 'active', syncStatus: edges.FbmSync.SYNC_STATUS.missing }, { id: 'CUS-000014', fbmId: 'FBM-MAT-MOI', recordStatus: 'active', syncStatus: edges.FbmSync.SYNC_STATUS.synced }];
-  edges.writeGateSave = (request) => { daCoCoBatch = request; return { ok: true }; };
-  const daCoCo = edges.FbmSync.markMissingAfterFullScan('customer', daCoCoState);
-  check(so, 'Khách đã mang cờ "không thấy bên FBM" không bị ghi lại mỗi lượt nhưng vẫn được đếm cùng khách mới mất', [daCoCo.written, daCoCoBatch.records.map((item) => item.id), daCoCoState.counts.missingCustomer, daCoCoState.counts.missingActivity], [1, ['CUS-000014'], 2, 0]);
-  edges.FbmSync.seenStoreClear('customer');
-  const newRecordState = { mode: 'read', cursor: { kind: 'customer_grid' }, metadata: { seen: { customer: { initialized: true }, activity: {} } }, locks: {} };
-  let newLocalRecords = [];
-  let newRecordWrites = 0;
-  edges.FbmSync.stateRead = () => newRecordState;
-  edges.FbmSync.stateWrite = () => newRecordState;
-  edges.FbmSync.readLocal = () => newLocalRecords;
-  edges.writeGateSave = () => {
-    newRecordWrites += 1;
-    newLocalRecords = [{ id: 'CUS-000777', fbmId: 'FBM-NEW', recordStatus: 'active' }];
-    return { ok: true, fields: ['id', 'fbmId', 'recordStatus'], rows: [['CUS-000777', 'FBM-NEW', 'active']] };
-  };
-  edges.FbmSync.pullWrite('customer', [edges.FbmSync.customerRecord({ stt_rec_kh: 'FBM-NEW', ma_kh: 'ALT00777', ten_kh: 'Mới' }, {})]);
-  const newRecordMissing = edges.FbmSync.markMissingAfterFullScan('customer', newRecordState);
-  check(so, 'record vua pull duoc danh dau seen sau khi cua ghi cap ma', [newRecordMissing.written, newRecordWrites], [0, 1]);
-  let activityMissingBatch;
-  edges.FbmSync.activityDateKey = (value) => {
-    const text = String(value || '');
-    const match = text.match(/^\/Date\((-?\d+)/);
-    return match ? new Date(Number(match[1])).toISOString().slice(0, 10) : text.slice(0, 10);
-  };
-  edges.FbmSync.readLocal = (entity) => entity === 'activity'
-    ? [{ id: 'ACT-000020', fbmId: 'ACT-OLD', workDate: '2024-10-06', recordStatus: 'active' }, { id: 'ACT-000021', fbmId: 'ACT-MISSING', workDate: '2024-10-07', recordStatus: 'active' }, { id: 'ACT-000022', fbmId: 'ACT-TOMBSTONE', workDate: '2024-10-08', recordStatus: 'deleted' }]
-    : [];
-  edges.writeGateSave = (request) => { activityMissingBatch = request; return { ok: true }; };
-  const activityMissingResult = edges.FbmSync.markMissingAfterFullScan('activity', fullScanState);
-  check(so, 'Full scan gắn cờ missing cho mọi giao dịch vắng bên FBM kể cả ngày cũ; tombstone thì không', [activityMissingResult.written, activityMissingBatch.records.map((record) => record.id), activityMissingBatch.records.every((record) => record.syncStatus === edges.FbmSync.SYNC_STATUS.missing)], [2, ['ACT-000020', 'ACT-000021'], true]);
-  // Bước gắn cờ vắng theo luật cho phép đồng bộ (09/02 Phần 3): bản ghi chặn chiều lấy về, kể cả giao dịch kế thừa từ khách cha, vắng bên FBM cũng không bị gắn cờ.
-  const quyenKhach = [{ id: 'CUS-000031', fbmId: 'FBM-KDB', recordStatus: 'active', fbmSyncPermission: 'Không đồng bộ' }, { id: 'CUS-000032', fbmId: 'FBM-CP', recordStatus: 'active', fbmSyncPermission: 'Cho phép' }, { id: 'CUS-000033', fbmId: 'FBM-CAM', recordStatus: 'active', fbmSyncPermission: 'Cấm đồng bộ' }];
-  const quyenGd = [{ id: 'ACT-000031', fbmId: 'ACT-CHA-CAM', customerId: 'CUS-000033', workDate: '2025-01-01', recordStatus: 'active', fbmSyncPermission: 'Cho phép' }, { id: 'ACT-000032', fbmId: 'ACT-CHA-CP', customerId: 'CUS-000032', workDate: '2025-01-01', recordStatus: 'active', fbmSyncPermission: 'Cho phép' }];
-  const quyenGhi = [];
-  edges.FbmSync.readLocal = (entity) => entity === 'customer' ? quyenKhach : quyenGd;
-  edges.writeGateSave = (request) => { quyenGhi.push(request.entity + ':' + request.records.map((item) => item.id).join(',')); return { ok: true }; };
-  edges.FbmSync.markMissingAfterFullScan('customer', { mode: 'read', metadata: {}, locks: {} }, () => false);
-  edges.FbmSync.markMissingAfterFullScan('activity', { mode: 'read', metadata: {}, locks: {} }, () => false);
-  check(so, 'Gắn cờ vắng theo quyền: khách "Không đồng bộ" vắng bên FBM không bị gắn cờ; giao dịch "Cho phép" của khách "Cấm đồng bộ" vắng không bị gắn cờ; khách "Cho phép" vắng vẫn bị gắn "không thấy bên FBM"', quyenGhi, ['customer:CUS-000032', 'activity:ACT-000032']);
   let activityPullWrite;
   edges.FbmSync.stateRead = () => ({ metadata: { seen: { customer: {}, activity: {} } }, locks: {} });
   edges.FbmSync.stateWrite = () => {};
-  edges.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-ACT', fbmCustomerCode: 'ALT00014' }] : [];
+  edges.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-ACT', fbmId: 'S14', fbmCustomerCode: 'ALT00014' }] : [];
   edges.writeGateSave = (request) => { activityPullWrite = request; return { ok: true }; };
-  const newActivity = edges.FbmSync.activityRecord({ id: 88, ma_kh: 'ALT00014', ten_cv: 'Gọi', details: 'Nội dung', end_date: '/Date(1757386800000)/' }, gate);
+  const newActivity = edges.FbmSync.activityRecord({ id: 88, ma_kh: 'ALT00014', ten_cv: 'Gọi', details: 'Nội dung', end_date: '/Date(1757386800000)/' }, gate, { sttRec: 'S14' });
   const activityPull = edges.FbmSync.pullWrite('activity', [newActivity]);
   check(so, 'Activity pull moi noi dung vao Customer noi bo va cho phep day', [activityPull.written, activityPullWrite.records[0].customerId, activityPullWrite.records[0].fbmId, activityPullWrite.records[0].fbmSyncPermission], [1, 'CUS-ACT', 88, edges.FbmSync.pullDefaultPermission()]);
-  edges.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-ACT', fbmCustomerCode: 'ALT00014' }] : [];
-  const orphanActivity = edges.FbmSync.activityRecord({ id: 89, ma_kh: 'ALT00014', ten_cv: 'Gọi', details: 'Mồ côi #SC-ACT-UNKNOWN', end_date: '/Date(1757386800000)/' }, gate);
+  edges.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-ACT', fbmId: 'S14', fbmCustomerCode: 'ALT00014' }] : [];
+  const orphanActivity = edges.FbmSync.activityRecord({ id: 89, ma_kh: 'ALT00014', ten_cv: 'Gọi', details: 'Mồ côi #SC-ACT-UNKNOWN', end_date: '/Date(1757386800000)/' }, gate, { sttRec: 'S14' });
   const orphanActivityResult = edges.FbmSync.pullWrite('activity', [orphanActivity]);
   check(so, 'Activity marker mo coi khong tao dong moi', orphanActivityResult.written, 0);
-  const invalidActivity = edges.FbmSync.activityRecord({ id: 90, ma_kh: 'ALT00014', ten_cv: 'Gọi', details: 'Thiếu ngày', end_date: '' }, gate);
+  const invalidActivity = edges.FbmSync.activityRecord({ id: 90, ma_kh: 'ALT00014', ten_cv: 'Gọi', details: 'Thiếu ngày', end_date: '' }, gate, { sttRec: 'S14' });
   const invalidActivityResult = edges.FbmSync.pullWrite('activity', [invalidActivity]);
   check(so, 'Activity thieu ngay bi chan an toan', invalidActivityResult.written, 0);
 
+  edges.FbmSync.scope = () => null;
   const failedRecord = { id: 'C-FAIL', fbmId: 'FBM-FAIL', fbmCustomerCode: 'ALT00010', companyName: 'Cũ', fbmSyncPermission: 'Cho phép', syncStatus: edges.FbmSync.SYNC_STATUS.error };
   const failedHash = edges.FbmSync.hash(failedRecord, 'customer', {});
   edges.FbmSync.stateRead = () => ({ metadata: {} });

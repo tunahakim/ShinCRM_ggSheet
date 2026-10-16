@@ -69,7 +69,7 @@ function customer(id, code, name) {
 }
 
 function activity(id, customerCode, content) {
-  return { fbmId: id, customerFbmCode: customerCode, workDate: '2026-09-19', taskType: 'Gọi điện', content, owner: 'Le Tuan Anh', fbmSyncPermission: 'Cho phép', syncStatus: 'đã đồng bộ' };
+  return { fbmId: id, customerFbmCode: customerCode, customerFbmId: 'FBM-C' + Number(customerCode.slice(3)), workDate: '2026-09-19', taskType: 'Gọi điện', content, owner: 'Le Tuan Anh', fbmSyncPermission: 'Cho phép', syncStatus: 'đã đồng bộ' };
 }
 
 async function chay(so) {
@@ -114,63 +114,54 @@ async function chay(so) {
   const nextPage = sync.hop.FbmSync.scanJobRequest(pageNextState);
   check(so, 'cursor Customer nhieu trang dung composite key bốn giá trị kèm stt_rec_kh (Nghiên cứu FBM ch04 mục 4.10) va trang ke tiep là chỉ số 1, đang đứng ở chỉ số 0', [hasNextPage, nextPage.meta.kind, nextPage.body.type, nextPage.body.gridPageIndex, nextPage.body.lastPageIndex, nextPage.body.gridPageValue], [true, 'scan_job', 1, 1, 0, ['2026-09-18', '2026-09-18T01:00:00', 2, 'FBM-C2']]);
 
+  // Cửa ghi gắn cờ hàng loạt (khách chuyển quyền kéo theo mọi giao dịch): cắt theo gói CHUNK_ROWS dòng, đếm đủ.
   const bulkLocal = [];
-  for (let index = 0; index < 2505; index += 1) {
+  for (let index = 0; index < 2500; index += 1) {
     const id = 'ACT-' + String(index).padStart(6, '0');
-    bulkLocal.push({ id, fbmId: 'FBM-' + id, workDate: '2026-09-19', recordStatus: 'active', syncStatus: 'đã đồng bộ' });
+    bulkLocal.push({ id, fbmId: String(700000 + index), workDate: '2026-09-19', recordStatus: 'active', syncStatus: 'đã đồng bộ' });
   }
   const bulk = makeSync();
   bulk.local.activity.push(...bulkLocal);
-  bulk.hop.FbmSync.seenStoreBegin('activity_bulk', bulkLocal);
-  bulk.hop.FbmSync.seenStoreMark('activity_bulk', bulkLocal, bulkLocal.slice(0, 5));
   const beforeBulkWrites = bulk.writes.length;
   const bulkState = bulk.hop.FbmSync.stateRead();
-  bulkState.mode = 'read';
-  const marked = bulk.hop.FbmSync.markMissingAfterFullScan('activity', bulkState, bulk.hop.FbmSync.seenStoreReader('activity_bulk')), missing = { total: marked.missing, written: marked.written };
+  const bulkWritten = bulk.hop.FbmSync.gateFlagWrite(bulkState, 'activity', bulkLocal.map((record) => ({ record, status: bulk.hop.FbmSync.SYNC_STATUS.missing, reason: 'thử' })));
   const bulkWrites = bulk.writes.slice(beforeBulkWrites);
-  check(so, 'missing Activity lon hon 2000 dong duoc cat thanh hai lan cua ghi', [missing.total, missing.written, bulkWrites.length, bulkWrites[0].records.length, bulkWrites[1].records.length], [2500, 2500, 2, 2000, 500]);
+  check(so, 'Cửa ghi gắn cờ 2.500 giao dịch được cắt thành hai lần qua cửa ghi Sheet (2.000 và 500), đếm đủ 2.500', [bulkWritten, bulkState.counts.missingActivity, bulkWrites.length, bulkWrites[0].records.length, bulkWrites[1].records.length], [2500, 2500, 2, 2000, 500]);
 
-  // Cuối lượt gắn cờ vắng mặt ghi hai Sheet (khách, giao dịch) bằng hai cửa ghi, không gộp được vì mỗi Sheet một cửa. Cửa thứ hai hỏng thì lượt ném lỗi; lượt chạy lại không ghi lại khách đã gắn cờ và không đếm trùng.
+  // Cờ ghi hai Sheet (khách, giao dịch) bằng hai lần qua cửa ghi. Lần thứ hai hỏng thì lượt ném lỗi; lần chạy lại không ghi lại khách đã mang cờ nhưng vẫn đếm đúng một.
   const haiCua = makeSync();
-  haiCua.local.customer.push({ id: 'CUS-000001', fbmId: 'FC-1', recordStatus: 'active', syncStatus: 'đã đồng bộ' }, { id: 'CUS-000002', fbmId: 'FC-2', recordStatus: 'active', syncStatus: 'đã đồng bộ' });
-  haiCua.local.activity.push({ id: 'ACT-000001', customerId: 'CUS-000002', fbmId: 'FA-1', workDate: '2026-09-19', recordStatus: 'active', syncStatus: 'đã đồng bộ' });
+  haiCua.local.customer.push({ id: 'CUS-000001', fbmId: 'FC-1', recordStatus: 'active', syncStatus: 'đã đồng bộ' });
+  haiCua.local.activity.push({ id: 'ACT-000001', customerId: 'CUS-000001', fbmId: '700001', workDate: '2026-09-19', recordStatus: 'active', syncStatus: 'đã đồng bộ' });
   const haiCuaLuot = () => {
-    const F = haiCua.hop.FbmSync, st = F.stateRead();
-    Object.assign(st, { mode: 'read', scan: 'full', counts: F.countsDefault() });
-    st.metadata.customerScan = { total: 1, seen: 1 };
-    F.seenStoreBegin('customer', haiCua.local.customer); F.seenStoreMark('customer', haiCua.local.customer, [{ fbmId: 'FC-2' }]);
-    F.seenStoreBegin('activity', haiCua.local.activity);
-    F.seenStoreBeginExact(F.ACTIVITY_READ_STORE); F.seenStoreMark(F.ACTIVITY_READ_STORE, haiCua.local.customer, [{ fbmId: 'FC-2' }]);
+    const F = haiCua.hop.FbmSync, st = F.stateRead(), co = F.SYNC_STATUS.missing;
+    st.counts = F.countsDefault();
+    F.gateFlagWrite(st, 'customer', [{ record: haiCua.local.customer[0], status: co, reason: 'thử' }]);
+    F.gateFlagWrite(st, 'activity', [{ record: haiCua.local.activity[0], status: co, reason: 'thử' }]);
     return st;
   };
   const ghiThat = haiCua.hop.writeGateSave;
   haiCua.hop.writeGateSave = (request) => { if (request.entity === 'activity') { throw new Error('Sheet Activity đang bận'); } return ghiThat(request); };
-  const luot1 = haiCuaLuot();
   let loiLuot1 = '';
-  try { haiCua.hop.FbmSync.pullMarkMissing(luot1); } catch (error) { loiLuot1 = error.message; }
+  try { haiCuaLuot(); } catch (error) { loiLuot1 = error.message; }
   haiCua.hop.writeGateSave = ghiThat;
   const ghiLuot1 = haiCua.writes.map((item) => item.entity + ':' + item.records.map((record) => record.id).join(','));
-  const luot2 = haiCuaLuot(), truocLuot2 = haiCua.writes.length;
-  haiCua.hop.FbmSync.pullMarkMissing(luot2);
+  const truocLuot2 = haiCua.writes.length, luot2 = haiCuaLuot();
   const ghiLuot2 = haiCua.writes.slice(truocLuot2).map((item) => item.entity + ':' + item.records.map((record) => record.id).join(','));
-  check(so, 'Gắn cờ vắng mặt: cửa ghi giao dịch hỏng sau khi khách đã gắn cờ thì lượt ném lỗi; lượt chạy lại chỉ ghi giao dịch, khách đã gắn cờ không ghi lại và vẫn đếm đúng một', [
+  check(so, 'Gắn cờ ở cửa ghi: lần ghi giao dịch hỏng sau khi khách đã mang cờ thì lượt ném lỗi; lần chạy lại chỉ ghi giao dịch, khách đã mang cờ không ghi lại và vẫn đếm đúng một', [
     loiLuot1, ghiLuot1, ghiLuot2, luot2.counts.missingCustomer, luot2.counts.missingActivity
   ], ['Sheet Activity đang bận', ['customer:CUS-000001'], ['activity:ACT-000001'], 1, 1]);
 
-  // Phạm vi "Chỉ khách chỉ định": khách và giao dịch trong phạm vi mà FBM không trả là vắng thật; khách ngoài phạm vi không được xét.
+  // Phạm vi "Chỉ khách chỉ định": khách trong phạm vi mà danh sách FBM không trả vào danh sách đọc để cửa ghi xét; khách ngoài phạm vi không được xét.
   const phamVi = makeSync();
-  phamVi.local.customer.push({ id: 'CUS-000001', fbmId: 'FC-1', fbmCustomerCode: 'ALT1', recordStatus: 'active', syncStatus: 'đã đồng bộ' }, { id: 'CUS-000002', fbmId: 'FC-2', fbmCustomerCode: 'ALT2', recordStatus: 'active', syncStatus: 'đã đồng bộ' });
-  phamVi.local.activity.push({ id: 'ACT-000001', customerId: 'CUS-000001', fbmId: 'FA-1', workDate: '2026-09-19', recordStatus: 'active', syncStatus: 'đã đồng bộ' }, { id: 'ACT-000002', customerId: 'CUS-000002', fbmId: 'FA-2', workDate: '2026-09-19', recordStatus: 'active', syncStatus: 'đã đồng bộ' });
+  phamVi.local.customer.push({ id: 'CUS-000001', fbmId: 'FC-1', fbmCustomerCode: 'ALT1', recordStatus: 'active', syncStatus: 'đã đồng bộ', fbmSyncPermission: 'Cho phép' }, { id: 'CUS-000002', fbmId: 'FC-2', fbmCustomerCode: 'ALT2', recordStatus: 'active', syncStatus: 'đã đồng bộ', fbmSyncPermission: 'Cho phép' });
   phamVi.hop.FbmSync.scopeLimited = () => true;
   phamVi.hop.FbmSync.scope = () => ({ codes: ['ALT1'], fbm: ['ALT1'], shin: ['CUS-000001'], notFound: [] });
+  phamVi.hop.FbmSync.readListClear();
   phamVi.hop.FbmSync.seenStoreBegin('customer', phamVi.local.customer);
-  phamVi.hop.FbmSync.seenStoreBegin('activity_bulk', phamVi.local.activity);
   const phamViState = phamVi.hop.FbmSync.stateRead();
   phamViState.mode = 'read';
-  phamVi.hop.FbmSync.markMissingAfterFullScan('customer', phamViState);
-  phamVi.hop.FbmSync.markMissingAfterFullScan('activity', phamViState, phamVi.hop.FbmSync.seenStoreReader('activity_bulk'));
-  const coVang = phamVi.writes.flatMap((item) => item.records || []).filter((item) => item.syncStatus === phamVi.hop.FbmSync.SYNC_STATUS.missing).map((item) => item.id).sort();
-  check(so, 'Phạm vi khách chỉ định: khách và giao dịch trong phạm vi vắng bên FBM bị gắn cờ, khách và giao dịch ngoài phạm vi không bị xét', [coVang, phamViState.counts.missingCustomer, phamViState.counts.missingActivity], [['ACT-000001', 'CUS-000001'], 1, 1]);
+  const vaoDanhSach = phamVi.hop.FbmSync.customerAbsentMark(phamViState), docTrongLuot = phamVi.hop.FbmSync.seenStoreReader(phamVi.hop.FbmSync.READ_LIST_STORE);
+  check(so, 'Phạm vi khách chỉ định: khách trong phạm vi vắng ở danh sách FBM vào danh sách đọc, khách ngoài phạm vi không vào, không ghi cờ nào trước cửa ghi', [vaoDanhSach, docTrongLuot(phamVi.local.customer[0]), docTrongLuot(phamVi.local.customer[1]), phamVi.writes.length], [1, true, false, 0]);
 
   const empty = makeSync();
   const emptyState = empty.hop.FbmSync.stateStart('', 'pull_customer', 0);
@@ -443,9 +434,9 @@ async function chay(so) {
   AC.stateWrite(acState);
   const acGate = AC.stateCategoryGate(acState);
   AC.pullWrite('customer', [customer('FBM-C1', 'ALT00001', 'Công ty 1')]);
-  AC.pullRecords('activity', [AC.activityRecord(fbmActivity('Nội dung gốc', '/Date(1757386800000)/'), acGate)], 'read');
+  AC.pullRecords('activity', [AC.activityRecord(fbmActivity('Nội dung gốc', '/Date(1757386800000)/'), acGate, { sttRec: 'FBM-C1' })], 'read');
   ac.local.activity[0].content = 'Nội dung Shin';
-  const acPull = AC.pullRecords('activity', [AC.activityRecord(fbmActivity('Nội dung FBM', '/Date(1757473200000)/'), acGate)], 'read');
+  const acPull = AC.pullRecords('activity', [AC.activityRecord(fbmActivity('Nội dung FBM', '/Date(1757473200000)/'), acGate, { sttRec: 'FBM-C1' })], 'read');
   const acDone = AC.stateRead(); acDone.phase = 'done'; AC.stateWrite(acDone);
   AC.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const acOpen = AC.openConflict();

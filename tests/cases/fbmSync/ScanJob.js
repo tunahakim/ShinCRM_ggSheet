@@ -1,12 +1,15 @@
 /** Việc quét Customer: Extension gọi FBM một lần và cắt gói, GAS nhận từng gói theo cursor; kiểm cả nhánh gói trùng, gói lạ, mất response, mất tab, ghi lỗi và lượt thiếu dòng. */
 const { section, check } = require('../../lib/assert');
-const { workflowGas, executorSession, executorRaw, sendBatchThroughExecutor, gridResponse, row } = require('./Workflow');
+const { workflowGas, executorSession, executorRaw, sendBatchThroughExecutor, gateItemReply, gridResponse, row } = require('./Workflow');
 const { napServer } = require('../../lib/load-gas');
 
 const USER_RESPONSE = JSON.stringify({ d: { TotalRowCount: 1, Rows: [[2037, 'ANHLT', 'Le Tuan Anh']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] } } });
 const KHOA_TRANG = ['ngay_gd', 'datetime0', 'xorder', 'stt_rec_kh'];
 
 /** Một Sheet DEV giả, một tab FBM giả giữ RAM giữa các request, và FBM giả phân trang keyset như bản thật. */
+/** Id giao dịch FBM giả của khách `FBM-C<i>`: dạng số như FBM thật. */
+const gdSo = (key) => String(800000 + Number(String(key).replace(/\D/g, '') || 0));
+
 function scanHarness(options) {
   const opt = options || {};
   const logs = [], writes = [], local = { customer: (opt.localCustomers || []).slice(), activity: (opt.localActivities || []).slice() };
@@ -61,7 +64,8 @@ function scanHarness(options) {
     return gridResponse(customerFields, rows.slice(start, start + Number(body.count)), start ? 0 : total);
   };
   /** Giao dịch FBM của một khách; mặc định một giao dịch mỗi khách. */
-  const actsOf = (key) => (opt.activityFor ? opt.activityFor(key) : [{ id: 'A-' + key, details: 'Gọi ' + key, end_date: '2026-09-20', owner: 'Owner', datetime0: '2026-09-20T03:00:00', line_nbr: 1 }]);
+  // Id giao dịch FBM thật luôn là số; cửa ghi chỉ hỏi khách đang giữ một giao dịch khi id toàn chữ số.
+  const actsOf = (key) => (opt.activityFor ? opt.activityFor(key) : [{ id: gdSo(key), details: 'Gọi ' + key, end_date: '2026-09-20', owner: 'Owner', datetime0: '2026-09-20T03:00:00', line_nbr: 1 }]);
   /** Toàn bộ giao dịch bên FBM: mặc định đúng các giao dịch đọc theo từng khách, để lấy toàn bộ và đọc theo khách nhìn thấy cùng một FBM. */
   const fbmActivities = () => (opt.fbmActivities ? opt.fbmActivities() : rows.flatMap((item) => actsOf(item[customerFields.indexOf('stt_rec_kh')])));
   const ngayLoc = (text) => { const m = String(text).match(/(\d{2})\/(\d{2})\/(\d{4})/); return m[3] + '-' + m[2] + '-' + m[1]; };
@@ -79,7 +83,7 @@ function scanHarness(options) {
   };
   const tab = executorSession();
   // `tabCalls`: số request không phải `scan_chunk` đã qua tab; FBM bị gọi đúng bằng số này thì `scan_chunk` không gọi lại FBM.
-  const trace = { kinds: [], jobs: [], errors: [], statuses: [], tabCalls: 0, activityCustomers: [], rechecks: [], bulkFilters: [] };
+  const trace = { kinds: [], jobs: [], errors: [], statuses: [], tabCalls: 0, activityCustomers: [], lookups: [], bulkFilters: [] };
   /** Đưa một request qua tab FBM giả như Extension: trả `{ fail: mã }` khi Extension báo lỗi vận chuyển, hoặc `{ raw }` để nộp GAS. Hook như `run`. */
   async function deliver(request, h) {
     const kind = String(request.meta && request.meta.kind || '');
@@ -91,10 +95,16 @@ function scanHarness(options) {
     let raw;
     if (kind === 'batch') {
       raw = await sendBatchThroughExecutor(request, (item) => {
-        const key = item.body.externalKey && item.body.externalKey[0] && item.body.externalKey[0].Value, byId = item.body.externalKey[0].Name === 'id';
-        (byId ? trace.rechecks : trace.activityCustomers).push(key);
-        if (byId && opt.recheckFail && opt.recheckFail(key)) { return { status: 500, body: JSON.stringify({ Bugs: [{ Message: 'Lỗi giả lập' }] }) }; }
-        const acts = (byId ? fbmActivities().filter((item) => item.id === key) : actsOf(key)).map((values) => row(activityFields, values));
+        const gateReply = gateItemReply(item, { fields: customerFields, rows: rows.filter((dong) => !opt.goneCustomers || opt.goneCustomers.indexOf(dong[customerFields.indexOf('stt_rec_kh')]) < 0), owners: opt.owners, exists: opt.exists, fail: opt.lookupFail });
+        if (gateReply) {
+          // `lookups` chỉ đếm request tra mã khách đang giữ giao dịch hoặc khách còn tồn tại, không đếm phần khách của lô.
+          const names = item.body.externalKey.map((k) => k.Name).join('|');
+          if (!/stt_rec_kh in \('/.test(names)) { trace.lookups.push(names); }
+          return gateReply;
+        }
+        const key = item.body.externalKey[0].Value;
+        trace.activityCustomers.push(key);
+        const acts = actsOf(key).map((values) => row(activityFields, values));
         const body = JSON.parse(gridResponse(activityFields, acts, acts.length));
         if (item.body.type !== 0) { delete body.d.ViewPage; }
         return { body: JSON.stringify(body) };
@@ -221,20 +231,19 @@ async function chay(so) {
   const pagedNames = paged.writes.filter((item) => item.entity === 'customer').flatMap((item) => item.records || []).map((item) => JSON.stringify(item));
   check(so, 'Cột FBM ngoài danh sách GAS xin không về tới cửa ghi', pagedNames.some((text) => text.indexOf('không được về GAS') >= 0), false);
 
-  // Ghi Sheet lỗi ở gói thứ hai: cursor không tăng, lần sau xin lại đúng gói đó và lượt vẫn đủ khách, không trùng.
+  // Ghi Sheet lỗi ở bước ghi của lô đầu: cursor không tiến, lần sau dựng lại đúng lô đó và lượt vẫn đủ khách, không trùng.
   let failOnce = true;
-  const writeFail = scanHarness({ customers: 12, budget: { chunkTargetBytes: 6000 }, failWrite: (request) => request.entity === 'customer' && writeFail.writes.filter((item) => item.entity === 'customer').length === 1 && failOnce && !(failOnce = false) });
-  let cursorAfterError = null, retryRequest = null;
-  const writeFailEnd = await writeFail.run({ afterError: (F) => {
-    const state = F.stateRead();
-    cursorAfterError = { next: state.cursor.next, chunkCount: state.cursor.chunkCount };
-    retryRequest = F.requestForCursor(state);
-    return { request: F.nextEnvelope(retryRequest) };
-  } });
-  const writeFailIds = writeFail.local.customer.map((item) => item.fbmId);
-  check(so, 'Ghi Sheet lỗi giữa việc quét: cursor đứng ở gói vừa lỗi, request kế xin lại đúng gói đó từ RAM tab, lượt đủ 12 khách không trùng', [
-    writeFail.trace.errors.length, cursorAfterError, retryRequest && retryRequest.meta.kind, retryRequest && retryRequest.meta.job.chunkIndex, writeFailEnd.status.phase, writeFailIds.length, new Set(writeFailIds).size, writeFail.tab.fetches() === writeFail.trace.tabCalls
-  ], [1, { next: 1, chunkCount: writeFail.trace.jobs[0].chunkCount }, 'scan_chunk', 1, 'done', 12, 12, true]);
+  const writeFail = scanHarness({ customers: 12, budget: { chunkTargetBytes: 6000 }, failWrite: (request) => request.entity === 'activity' && failOnce && !(failOnce = false) });
+  let retryRequest = null, firstBatch = null;
+  const khoaLo = (request) => (request && request.items || []).map((item) => item.body.externalKey.map((k) => k.Name + '=' + k.Value).join('|'));
+  const writeFailEnd = await writeFail.run({
+    beforeSend: (request) => { if (request.meta.kind === 'batch' && !firstBatch) { firstBatch = request; } },
+    afterError: (F) => { retryRequest = F.requestForCursor(F.stateRead()); return { request: F.nextEnvelope(retryRequest) }; }
+  });
+  const writeFailIds = writeFail.local.customer.map((item) => item.fbmId), writeFailActs = writeFail.local.activity.map((item) => item.fbmId);
+  check(so, 'Ghi Sheet lỗi ở bước ghi của lô: cursor không tiến, request kế dựng lại đúng lô đó, lượt đủ 12 khách và 12 giao dịch không trùng', [
+    !!retryRequest && JSON.stringify(khoaLo(retryRequest)) === JSON.stringify(khoaLo(firstBatch)), writeFailEnd.status.phase, writeFailIds.length, new Set(writeFailIds).size, writeFailActs.length, new Set(writeFailActs).size
+  ], [true, 'done', 12, 12, 12, 12]);
 
   // Mất response của một gói: GAS dựng lại request từ cursor là xin gói đang chờ từ RAM, không gọi lại FBM.
   const lost = scanHarness({ customers: 12, budget: { chunkTargetBytes: 6000 } });
@@ -269,9 +278,9 @@ async function chay(so) {
     if (request.meta.kind !== 'scan_chunk') { return raw; }
     return Object.assign({}, raw, { job: Object.assign({}, raw.job, { jobId: 'viec-khac' }) });
   } });
-  check(so, 'Gói lạ khác jobId: phiên error FBM_SCAN_JOB_MISMATCH, chỉ gói đầu đã ghi, Log ghi scan_job_mismatch, Sidebar có lời lỗi', [
+  check(so, 'Gói lạ khác jobId: phiên error FBM_SCAN_JOB_MISMATCH, không ghi khách nào vì danh sách chỉ đánh dấu, Log ghi scan_job_mismatch, Sidebar có lời lỗi', [
     strayEnd.status.phase, strayEnd.status.lastFailureCode, stray.writes.filter((item) => item.entity === 'customer').length, stray.logs.some((event) => event.action === 'scan_job_mismatch' && event.outcome === 'error'), String(strayEnd.status.lastError || '').indexOf('không khớp việc quét') >= 0
-  ], ['error', 'FBM_SCAN_JOB_MISMATCH', 1, true, true]);
+  ], ['error', 'FBM_SCAN_JOB_MISMATCH', 0, true, true]);
 
   // Phiên chết giữa lượt (đăng nhập ở thiết bị khác): FBM trả HTTP 200 nhưng Authorized:false, Rows:null và tab không có khối việc quét. Gặp thật 2026-10-16.
   const deadSession = scanHarness({ customers: 12, budget: { chunkTargetBytes: 6000 } });
@@ -307,9 +316,9 @@ async function chay(so) {
   // Lượt thiếu dòng (FBM báo tổng lớn hơn số dòng trả về, hoặc dòng vượt trần không về GAS): không gắn cờ khách nào, phiên lỗi FBM_SCAN_INCOMPLETE.
   const incomplete = scanHarness({ customers: 12, totalExtra: 3, localCustomers: [Object.assign({}, staleCustomer)] });
   const incompleteEnd = await incomplete.run();
-  check(so, 'FBM báo 15 khách mà chỉ trả 12: phiên error FBM_SCAN_INCOMPLETE, khách vắng không bị gắn "không thấy bên FBM", 12 khách đã đọc vẫn được ghi, Log ghi lỗi', [
+  check(so, 'FBM báo 15 khách mà chỉ trả 12: phiên error FBM_SCAN_INCOMPLETE trước cửa ghi, khách vắng không bị gắn "không thấy bên FBM", chưa ghi khách nào, Log ghi lỗi', [
     incompleteEnd.status.phase, incompleteEnd.status.lastFailureCode, incomplete.local.customer.find((item) => item.fbmId === 'FBM-CU').syncStatus, incomplete.local.customer.length, incomplete.logs.some((event) => event.outcome === 'error' && JSON.stringify(event).indexOf('chỉ nhận 12/15 khách') >= 0)
-  ], ['error', 'FBM_SCAN_INCOMPLETE', 'đã đồng bộ', 13, true]);
+  ], ['error', 'FBM_SCAN_INCOMPLETE', 'đã đồng bộ', 1, true]);
   const tooBig = scanHarness({ customers: 6, nameLength: 9000, budget: { chunkTargetBytes: 6000, chunkMaxBytes: 12000 }, localCustomers: [Object.assign({}, staleCustomer)] });
   const tooBigEnd = await tooBig.run();
   check(so, 'Dòng khách vượt trần một gói: Log ghi scan_row_oversize từng dòng, lượt thiếu dòng nên FBM_SCAN_INCOMPLETE và không gắn cờ', [
@@ -330,4 +339,4 @@ async function chay(so) {
   ], [0, 'error', 'FBM_USER_ID_MISSING', true, true, null]);
 }
 
-module.exports = { chay, scanHarness };
+module.exports = { chay, scanHarness, gdSo };
