@@ -361,8 +361,12 @@ FbmSync.stateReset = function (now) {
 };
 /** Ghi một phần state mà không làm mất field đang có. */
 FbmSync.statePatch = function (patch) { return FbmSync.stateWrite(Object.assign(FbmSync.stateRead(), patch || {})); };
-/** Mở phiên mới và xóa cursor/đếm của phiên trước. */
-FbmSync.stateStart = function (entity, phase, total) {
+/**
+ * Mở phiên mới và xóa cursor/đếm của phiên trước.
+ * Nguồn, chế độ và kiểu quét ghi ngay ở lần ghi đầu: gán sau vào bản trong RAM thì ai đọc lại kho giữa chừng (preflight, nhãn lượt của Log) thấy phiên mặc định `manual`/`full`.
+ */
+FbmSync.stateStart = function (entity, phase, total, identity) {
+  var who = identity || {};
   var now = Date.now(), previous = FbmSync.stateRead(), userLocks = {}, freshSession = FbmSync.stateDefault().session;
   Object.keys(previous.locks || {}).forEach(function (key) { if (previous.locks[key] && previous.locks[key].owner === 'user') { userLocks[key] = previous.locks[key]; } });
   ['customer', 'activity', 'activity_bulk'].forEach(function (scope) { FbmSync.seenStoreClear(scope); });
@@ -374,7 +378,7 @@ FbmSync.stateStart = function (entity, phase, total) {
   // Mỗi run phải xác nhận phiên sống lại; cookie và marker của run trước không
   // được dùng làm bằng chứng live cho request đầu tiên của run mới.
   // Số xung đột phản ánh các dòng Sheet đang chờ quyết nên đi theo sang phiên mới; preflight đếm lại từ Sheet.
-  var next = FbmSync.stateWrite({ runId: now.toString(36), entity: entity || '', phase: phase || 'checking_session', cursor: {}, session: freshSession, counts: Object.assign(FbmSync.countsDefault(), { total: Number(total) || 0 }), metadata: { conflictCount: Number(previous.metadata && previous.metadata.conflictCount || 0) }, chain: previous.chain || null, current: '', message: '', startedAt: now, updatedAt: now, lastError: '', lastFailureCode: '', retryable: false, locks: userLocks });
+  var next = FbmSync.stateWrite({ runId: now.toString(36), entity: entity || '', phase: phase || 'checking_session', cursor: {}, session: freshSession, counts: Object.assign(FbmSync.countsDefault(), { total: Number(total) || 0 }), metadata: { conflictCount: Number(previous.metadata && previous.metadata.conflictCount || 0) }, chain: previous.chain || null, origin: who.origin || 'manual', mode: who.mode || 'read', scan: who.scan || 'full', current: '', message: '', startedAt: now, updatedAt: now, lastError: '', lastFailureCode: '', retryable: false, locks: userLocks });
   return next;
 };
 /**

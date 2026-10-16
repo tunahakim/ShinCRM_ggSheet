@@ -39,10 +39,11 @@ FbmSync.startRun = function (options) {
     if (!initialRequest) { return { ok: false, code: 'SYNC_ALREADY_RUNNING', status: FbmSync.statusView() }; }
   }
   if (typeof fbmEnsureSyncColumns === 'function') { fbmEnsureSyncColumns(opt.origin === 'background' ? 'background' : 'pull'); }
-  var state = FbmSync.stateStart('', 'checking_session', 0);
-  state.origin = opt.origin === 'background' ? 'background' : 'manual';
-  state.mode = FbmSync.modeOf(opt.mode);
-  state.scan = opt.scan === 'activity_bulk' ? 'activity_bulk' : opt.scan === 'identity_check' ? 'identity_check' : opt.scan === 'identity_probe' ? 'identity_probe' : opt.scan === 'detail' ? 'detail' : 'full';
+  var state = FbmSync.stateStart('', 'checking_session', 0, {
+    origin: opt.origin === 'background' ? 'background' : 'manual',
+    mode: FbmSync.modeOf(opt.mode),
+    scan: opt.scan === 'activity_bulk' ? 'activity_bulk' : opt.scan === 'identity_check' ? 'identity_check' : opt.scan === 'identity_probe' ? 'identity_probe' : opt.scan === 'detail' ? 'detail' : 'full'
+  });
   if (typeof FbmSync.businessStepStart === 'function') {
     FbmSync.businessStepStart(state, 'run', { mode: state.mode, scan: state.scan, origin: state.origin });
     FbmSync.businessStepStart(state, 'preflight_hash', { mode: state.mode, scan: state.scan, origin: state.origin });
