@@ -34,6 +34,8 @@ function chay(so) {
   const mot = dungHop({ sheets: ['Config', 'Log', 'Customer'] });
   const { ghiO } = require('../lib/dung-hop');
   ghiO(mot, 'Customer', 4, '@CUS_MA_KH', 'CUS-000009');
+  // Cửa ghi luôn chạy trong một lần gọi, nơi bản đọc Sheet chung nhớ cột mã.
+  mot.hop.documentStoreBegin();
   const ctxMot = mot.hop.entityReadContext('customer');
   const cotMa = ctxMot.indexes[ctxMot.idAt] + 1;
   let lanDocCotMa = 0;
@@ -41,6 +43,7 @@ function chay(so) {
   ctxMot.sheet.getRange = function (row, col, rows, cols) { if (col === cotMa && cols === 1 && rows === ctxMot.rowCount) { lanDocCotMa += 1; } return layVung.apply(null, arguments); };
   const dong = mot.hop.writeGateRowById(ctxMot);
   const maMoi = mot.hop.idGateIssue('customer', 1, ctxMot);
+  mot.hop.documentStoreEnd();
   check(so, 'cửa ghi tìm dòng rồi cấp mã mới chỉ đọc cột mã một lần, lưới an toàn vẫn nhảy qua số lớn nhất trên sheet',
     [lanDocCotMa, dong['CUS-000009'], maMoi[0] > 'CUS-000009'], [1, 4, true]);
 

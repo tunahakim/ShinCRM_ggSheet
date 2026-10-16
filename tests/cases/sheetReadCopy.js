@@ -83,6 +83,59 @@ function chay(so) {
   });
   check(so, 'cửa xóa: xóa hẳn một dòng rồi đọc lại dòng xóa mềm đúng, số dòng sau đó giảm một', sauXoa, [true, ['KH000001'], 1, 3]);
 
+  section('Bản đọc Sheet chung — đọc tập dòng, cửa ghi sửa bản đọc, gộp lệnh ghi');
+
+  const nenDong = taoHop();
+  ghiO(nenDong, 'Customer', 6, '@CUS_MA_KH', 'KH000003');
+  ghiO(nenDong, 'Customer', 7, '@CUS_MA_KH', 'KH000004');
+  ghiO(nenDong, 'Customer', 20, '@CUS_MA_KH', 'KH000020');
+  const hd = nenDong.hop;
+  const sheetDong = nenDong.Customer.sheet;
+  const doc = { n: 0 };
+  const layVung = sheetDong.getRange.bind(sheetDong);
+  sheetDong.getRange = function (row, col, rows, cols) { if (row >= hd.SHEET_FIRST_DATA_ROW && cols > 1) { doc.n += 1; } return layVung.apply(null, arguments); };
+  const nguongCu = hd.SETTINGS.SHEET_READ_MERGE_GAP_ROWS;
+  hd.SETTINGS.SHEET_READ_MERGE_GAP_ROWS = 3;
+  const cotMa = nenDong.Customer.codes.indexOf('@CUS_MA_KH');
+  const docDong = trongLanGoi(hd, () => {
+    const lan1 = hd.sheetReadRows(sheetDong, [20, 4, 7]).map((row) => row[cotMa]);
+    const lenh1 = doc.n;
+    hd.sheetReadRows(sheetDong, [5, 6, 20]);
+    return [lan1, lenh1, doc.n];
+  });
+  hd.SETTINGS.SHEET_READ_MERGE_GAP_ROWS = nguongCu;
+  check(so, 'đọc tập dòng: dòng cách nhau không quá ngưỡng gộp một lệnh (4..7), dòng xa đọc riêng (20); dòng đã có (kể cả dòng giữa) không đọc lại; đúng thứ tự xin',
+    docDong, [['KH000020', 'KH000001', 'KH000004'], 2, 2]);
+
+  doc.n = 0;
+  // Đọc và lưu trong cùng một khóa: bản đọc lấy ngoài khóa bị bỏ lúc cầm khóa.
+  const sauLuu = trongLanGoi(hd, () => hd.documentLockRun(() => {
+    hd.sheetReadDataRows(sheetDong, hd.SHEET_FIRST_DATA_ROW);
+    const truoc = doc.n;
+    const kq = hd.writeGateSave({ entity: 'customer', records: [{ id: 'KH000002', phone: '0987000999' }], source: 'pull' });
+    const sauGhi = doc.n;
+    const cotPhone = nenDong.Customer.codes.indexOf(hd.DATA_SCHEMA.customer.phone.code);
+    const phone = hd.sheetReadRows(sheetDong, [5])[0][cotPhone];
+    hd.sheetReadDataRows(sheetDong, hd.SHEET_FIRST_DATA_ROW);
+    return [kq.ok, truoc, sauGhi - truoc, String(phone).replace(/^'/, ''), doc.n - sauGhi];
+  }));
+  check(so, 'đã có cả sheet: cửa ghi chụp trước không tốn lệnh, chỉ đọc lại đúng dòng vừa ghi; sau đó bản đọc mang giá trị mới và đọc cả sheet không tốn lệnh nào',
+    sauLuu, [true, 1, 1, '0987000999', 0]);
+
+  const nenGop = taoHop();
+  ghiO(nenGop, 'Customer', 6, '@CUS_MA_KH', 'KH000003');
+  const gop = trongLanGoi(nenGop.hop, () => {
+    const truoc = nenGop.dem.setValues;
+    nenGop.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000002', phone: '0987000001' }, { id: 'KH000001', phone: '0987000002' }], source: 'pull' });
+    const lienNhau = nenGop.dem.setValues - truoc;
+    nenGop.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000003' }, { id: 'KH000003', phone: '0987000004' }], source: 'pull' });
+    return [lienNhau, nenGop.dem.setValues - truoc - lienNhau];
+  });
+  check(so, 'gộp ghi: hai bản ghi dòng liền nhau cùng tập cột ghi một lệnh; hai dòng cách nhau thì mỗi dòng một lệnh, không ghi đè dòng giữa', gop, [1, 2]);
+  const cotPhoneGop = nenGop.Customer.codes.indexOf(nenGop.hop.DATA_SCHEMA.customer.phone.code) + 1;
+  check(so, 'gộp ghi: mỗi dòng nhận đúng giá trị của bản ghi mình, dòng giữa giữ nguyên',
+    [4, 5, 6].map((row) => String(nenGop.Customer.sheet.getRange(row, cotPhoneGop).getValue()).replace(/^'/, '')), ['0987000003', '0987000001', '0987000004']);
+
   const tz = { n: 0 };
   const goc = nen.book.getSpreadsheetTimeZone.bind(nen.book);
   nen.book.getSpreadsheetTimeZone = () => { tz.n += 1; return goc(); };
