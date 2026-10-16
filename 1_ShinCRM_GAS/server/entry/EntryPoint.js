@@ -68,6 +68,7 @@ function runEntryPoint(name, source, channel, fn) {
   var failed = false, result;
   // Bản đọc DocumentProperties sống đúng một lần gọi (server/state/DocumentStore.js): mở đầu tiên, đóng cuối cùng (sau `flushLog`). Phạm vi riêng của đồng bộ FBM (gom trace) mở trước mốc trace đầu tiên để mốc đó cũng được gom.
   documentStoreBegin();
+  dirtyStateBasketBegin();
   var buffered = trace && typeof fbmCallBegin === 'function';
   if (buffered) { fbmCallBegin(); }
   if (trace) { fbmTraceBoundary('gas_entered', name); }
@@ -92,6 +93,13 @@ function runEntryPoint(name, source, channel, fn) {
     reportError(err, channel);
     throw err;
   } finally {
+    // Đổ giỏ thay đổi trước khi nhả log, kể cả khi lần chạy đã lỗi sau khi ghi một phần: dữ liệu đã xuống Sheet thì Sidebar phải được báo. Đổ hỏng thì ghi Log và báo người dùng; lần chạy đang thành công thì thành lỗi.
+    try {
+      dirtyStateBasketEnd();
+    } catch (basketErr) {
+      logEvent({ source: source, action: name, outcome: LOG_ERROR, reason: errorMessage(basketErr), detail: { stack: basketErr && basketErr.stack ? String(basketErr.stack) : '(không có stack)' } });
+      if (!failed) { failed = true; reportError(basketErr, channel); throw basketErr; }
+    }
     if (trace) { fbmTraceBoundary('before_flush', name); }
     try {
       flushLog();
