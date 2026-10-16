@@ -166,7 +166,7 @@ function fbmSyncRelayHandle(body) {
     if (body.hop !== undefined && commandPayload.hop === undefined) { commandPayload = Object.assign({}, commandPayload, { hop: Number(body.hop || 0) }); }
     result = FbmSync.controlDispatchLocked(String(body.command), commandPayload);
   } else if (body.kind === 'heartbeat_request') {
-    result = fbmSyncHeartbeatRequest({ source: body.source || 'alarm', hop: Number(body.hop || 0) });
+    result = fbmSyncHeartbeatRequest({ source: body.source || 'alarm', hop: Number(body.hop || 0), extensionTrail: body.trail });
   } else if (body.kind === 'heartbeat_transport_failure') {
     result = fbmSyncHeartbeatTransportFailure({ requestId: body.requestId, code: body.code, message: body.error || body.message });
   } else if (body.kind === 'heartbeat') {

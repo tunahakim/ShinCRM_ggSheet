@@ -254,7 +254,7 @@ function fbmSyncHeartbeatRequest(options) {
       return fbmSyncLockResult('REQUEST_IN_FLIGHT', 'Đã có request FBM đang chờ response; không cấp request heartbeat chồng.');
     }
     // Lượt dở không còn request nào chờ trong hạn (Extension bị tắt giữa chừng, response mất): kết thúc có Log rồi mở lượt mới, không gửi lại request của lượt cũ (09/02 Phần 3 "Mỗi lần hỏi nền là một lượt mới").
-    if (state.runId && activePhase) { FbmSync.recoverStaleRun(state, now, { abandoned: true }); }
+    if (state.runId && activePhase) { FbmSync.recoverStaleRun(state, now, { abandoned: true, extensionTrail: opt.extensionTrail }); }
     // Chọn tiến trình đến hạn trước, để nhịp hỏi kỹ thuật không tự mở việc mỗi lần.
     var picked = FbmSync.schedulerPickDue(now, { startup: source === 'startup' });
     if (!picked.ok) {

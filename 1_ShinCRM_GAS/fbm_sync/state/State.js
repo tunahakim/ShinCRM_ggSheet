@@ -393,9 +393,35 @@ FbmSync.recoverStaleRun = function (state, now, options) {
     current.locks = kept;
   }
   var written = FbmSync.stateWrite(current);
+  var trailText = abandoned ? FbmSync.extensionTrailText(options && options.extensionTrail, at) : '';
   // Lượt bị thu hồi có thể không còn bước nào đang mở để tự ghi Log kết thúc, nên ghi riêng một dòng: không có lỗi im lặng.
-  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'stale_run', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(current.runId || ''), reason: message, detail: { code: current.lastFailureCode, runId: String(current.runId || ''), cursor: String(cursor.kind || '') } }); }
+  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'stale_run', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(current.runId || ''), reason: message + (trailText ? ' ' + trailText : ''), detail: { code: current.lastFailureCode, runId: String(current.runId || ''), cursor: String(cursor.kind || ''), extensionTrail: FbmSync.extensionTrailSafe(options && options.extensionTrail) } }); }
   return { state: written, recovered: true, waitingWrite: waitingWrite };
+};
+/** Tên bước của hộp đen Extension. Bước lạ (Extension bản khác) vẫn được ghi nhưng không dịch, để không đoán bừa. */
+FbmSync.EXTENSION_TRAIL_STAGES = {
+  gas_request_received: 'đã nhận request từ GAS, chưa gửi sang tab FBM',
+  fbm_tab_sent: 'đã gửi request sang tab FBM, chưa nhận lại kết quả',
+  fbm_tab_replied: 'tab FBM đã trả kết quả, chưa gửi về GAS',
+  gas_response_sent: 'đã gửi kết quả về GAS, chưa nhận trả lời',
+  failure_sent: 'đang báo lỗi vận chuyển về GAS',
+  chain_finished: 'Extension coi lượt đã kết thúc'
+};
+/** Chỉ giữ tên bước, mã request, số hop và mốc giờ từ hộp đen: Extension là nguồn ngoài, không chép nguyên văn vào Log. */
+FbmSync.extensionTrailSafe = function (trail) {
+  if (!trail || typeof trail !== 'object') { return null; }
+  return { stage: String(trail.stage || '').slice(0, 40), requestId: String(trail.requestId || '').slice(0, 80), hop: Number(trail.hop || 0), at: Number(trail.at || 0), workerStartedAt: Number(trail.workerStartedAt || 0), currentWorkerStartedAt: Number(trail.currentWorkerStartedAt || 0) };
+};
+/** Câu tiếng người cho dòng Log lượt bị bỏ dở: Extension dừng ở bước nào, và phần chạy nền của nó có bị Chrome tắt rồi dựng lại sau bước đó không. */
+FbmSync.extensionTrailText = function (trail, now) {
+  var t = FbmSync.extensionTrailSafe(trail);
+  if (!t || !t.stage) { return 'Hộp đen Extension: không có (Extension bản cũ hoặc chưa ghi được bước nào).'; }
+  var ago = t.at ? Math.max(0, Math.round((Number(now || Date.now()) - t.at) / 60000)) : -1;
+  var text = 'Hộp đen Extension: bước cuối' + (ago >= 0 ? ' (cách đây ' + ago + ' phút)' : '') + ' là ' + (FbmSync.EXTENSION_TRAIL_STAGES[t.stage] || t.stage) + (t.requestId ? ', request ' + t.requestId : '') + '.';
+  if (t.workerStartedAt && t.currentWorkerStartedAt) {
+    text += t.currentWorkerStartedAt > t.workerStartedAt ? ' Phần chạy nền của Extension đã bị Chrome tắt và dựng lại sau bước đó.' : ' Phần chạy nền của Extension vẫn chạy liền, không bị Chrome tắt.';
+  }
+  return text;
 };
 /**
  * Chuyển phiên đang chạy sang lỗi, giữ cursor và khóa ghi như thu hồi phiên treo. Gọi khi một lát ném exception hoặc client báo lỗi,
