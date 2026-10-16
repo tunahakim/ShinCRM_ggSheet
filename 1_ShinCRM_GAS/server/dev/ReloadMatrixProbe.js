@@ -13,7 +13,7 @@ function reloadMatrixProbePropKeys() {
   return [
     DIRTY_KEYS.records, DIRTY_KEYS.config, DIRTY_KEYS.all,
     DIRTY_KEYS.category, DIRTY_KEYS.schema, DIRTY_KEYS.allCore, DIRTY_KEYS.viewsStaleRevision, VIEW_LEDGER_KEY,
-    DIRTY_KEYS.revision, DIRTY_KEYS.changedAt, DIRTY_KEYS.recordsReadyAt, DIRTY_KEYS.recordRevisionLog
+    DIRTY_KEYS.revision, DIRTY_KEYS.changedAt, DIRTY_KEYS.recordRevisionLog
   ];
 }
 
@@ -63,6 +63,8 @@ function reloadMatrixProbeWriteEvent(sheet, row, column, value) {
   cell.setValue(value);
   SpreadsheetApp.flush();
   var result = shinOnEdit({ range: cell, oldValue: oldValue, value: value });
+  // Trigger thật là một lần chạy riêng; hàm dò chạy lồng trong cửa vào của DEV runner nên phải tự đổ giỏ.
+  dirtyStateBasketFlush();
   SpreadsheetApp.flush();
   reloadMatrixProbeRestoreCell(cell, before);
   SpreadsheetApp.flush();
@@ -77,6 +79,7 @@ function reloadMatrixProbeWriteRangeEvent(sheet, row, column, values) {
   range.setValues(values);
   SpreadsheetApp.flush();
   var result = shinOnEdit({ range: range });
+  dirtyStateBasketFlush();
   SpreadsheetApp.flush();
   range.setValues(before);
   SpreadsheetApp.flush();
@@ -206,16 +209,11 @@ function reloadMatrixProbe() {
     reloadMatrixProbeWriteEvent(customer.sheet, customerStartRow, customerEdit.column, 'DEV reload customer edit');
     var after = reloadStateRead();
     reloadMatrixProbeAssert(report, 'Customer cột @ hợp lệ phát records + allViews', after.revision > before.revision && after.records.indexOf(customerIds[0]) >= 0, JSON.stringify({ revision: after.revision, records: after.records }));
-    var customerReloadStateBeforeProbe = reloadStateRead();
     var customerReloadProbe = probeSelectionAndReload({ lastSeenRevision: before.revision, previousCustomerId: '' });
-    reloadMatrixProbeAssert(report, 'Customer cột @ có mốc sẵn sàng reload sau 3 giây', customerReloadProbe.decision.ram.mode === 'records'
-      && customerReloadStateBeforeProbe.recordsReadyAt >= customerReloadStateBeforeProbe.changedAt + 3000
-      && customerReloadStateBeforeProbe.records.indexOf(customerIds[0]) >= 0, JSON.stringify({
+    reloadMatrixProbeAssert(report, 'Customer cột @ nạp ngay ở lời hỏi kế tiếp, không chờ', customerReloadProbe.decision.ram.action === 'reload'
+      && customerReloadProbe.decision.ram.mode === 'records' && !!customerReloadProbe.payload, JSON.stringify({
+        action: customerReloadProbe.decision.ram.action,
         mode: customerReloadProbe.decision.ram.mode,
-        waitMs: customerReloadProbe.waitMs,
-        changedAt: customerReloadStateBeforeProbe.changedAt,
-        recordsReadyAt: customerReloadStateBeforeProbe.recordsReadyAt,
-        recordsBeforeProbe: customerReloadStateBeforeProbe.records,
         reloadAfterProbe: customerReloadProbe.reload
       }));
 
@@ -225,7 +223,6 @@ function reloadMatrixProbe() {
     reloadMatrixProbeWriteRangeEvent(customer.sheet, customerStartRow, customerEdit.column, batchValues);
     var batchAfter = reloadStateRead();
     reloadMatrixProbeAssert(report, 'Vùng Customer nhiều hàng gom đủ mã', batchAfter.revision > batchBefore.revision && customerIds.every(function (id) { return batchAfter.records.indexOf(id) >= 0; }), JSON.stringify({ revisionDelta: batchAfter.revision - batchBefore.revision, records: batchAfter.records }));
-    report.push('Ghi chú: debounce một lượt sau edit cuối là hành vi Sidebar; probe GAS xác nhận mỗi vùng trả waitMs=3000, không giả vờ đo số lượt reload client.');
 
     var activityBefore = reloadStateRead();
     var activityResult = reloadMatrixProbeWriteEvent(activity.sheet, activityStartRow, activityEdit.column, 'DEV reload activity edit');
@@ -364,15 +361,11 @@ function reloadPayloadProbe() {
     var id = keys.length ? String(keys[0][0] || '').trim() : '';
     if (!id) { throw new Error('DEV không có mã Customer để kiểm payload.'); }
 
-    // Dùng một khoảng dư đủ lớn cho ca defer; thời gian GAS đọc selection/Sheet không được làm trôi qua mốc ba giây của probe.
-    dirtyStateMarkSignal({ records: [id], allViews: false, recordsReadyAt: Date.now() + 30000 });
-    var deferred = probeSelectionAndReload({ requestId: 'dev-r11-defer', previousCustomerId: '' });
-    reloadMatrixProbeAssert(report, 'R11 DEV defer không đọc payload', deferred.decision.ram.action === 'defer' && deferred.payload === null && deferred.reload.records.indexOf(id) >= 0, JSON.stringify({ action: deferred.decision.ram.action, waitMs: deferred.waitMs, payload: deferred.payload }));
-
-    documentProps().setProperty(DIRTY_KEYS.recordsReadyAt, String(Date.now() - 1));
+    dirtyStateMarkSignal({ records: [id], allViews: false });
+    var observed = dirtyStateBasketFlush().revision;
     var ready = probeSelectionAndReload({ requestId: 'dev-r11-ready', previousCustomerId: '' });
-    reloadMatrixProbeAssert(report, 'R11 DEV ready trả payload cùng response', ready.payload && ready.payload.mode === 'records' && ready.processedRevision === deferred.observedRevision && ready.reload.records.length === 0, JSON.stringify({ mode: ready.payload && ready.payload.mode, processedRevision: ready.processedRevision, observedRevision: ready.observedRevision, records: ready.reload.records }));
-    report.push('R11 DEV hoàn tất: GAS tự quyết định defer/reload và trả payload trong cùng request.');
+    reloadMatrixProbeAssert(report, 'R11 DEV lời hỏi ngay sau thay đổi trả payload cùng response', ready.payload && ready.payload.mode === 'records' && ready.processedRevision === observed && ready.reload.records.length === 0, JSON.stringify({ mode: ready.payload && ready.payload.mode, processedRevision: ready.processedRevision, observed: observed, records: ready.reload.records }));
+    report.push('R11 DEV hoàn tất: GAS tự quyết định nạp và trả payload trong cùng request.');
     return report;
   } finally {
     reloadMatrixProbeRestoreProperties(snapshot);

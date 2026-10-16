@@ -1,4 +1,5 @@
 const { dungHop } = require('../lib/dung-hop');
+const { trongLanChay } = require('../lib/load-gas');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 
 function chay(so) {
@@ -18,9 +19,9 @@ function chay(so) {
   const edit = hop.reloadDecisionForChange({
     source: 'edit', entity: 'customer', surface: 'record', recordIds: [' KH1 ', 'KH1', 'KH2']
   });
-  check(so, 'sửa Customer hợp lệ gom mã, debounce RAM, làm mọi view cũ nhưng không vẽ',
-    [edit.kind, edit.signal.records, edit.signal.allViews, edit.ram.action, edit.ram.mode, edit.ram.waitMs, edit.ram.flushOnLeave, edit.views.action, edit.notifySidebar],
-    ['records', ['KH1', 'KH2'], true, 'reload', 'records', 3000, true, 'none', true]);
+  check(so, 'sửa tay Customer gom mã, nạp ngay không chờ, làm mọi view cũ nhưng không vẽ',
+    [edit.kind, edit.signal.records, edit.signal.allViews, edit.ram.action, edit.ram.mode, 'waitMs' in edit.ram, edit.views.action, edit.notifySidebar],
+    ['records', ['KH1', 'KH2'], true, 'reload', 'records', false, 'none', true]);
 
   const draft = hop.reloadDecisionForChange({
     source: 'edit', entity: 'customer', surface: 'record', recordIds: ['KH1', 'KH2'],
@@ -43,8 +44,7 @@ function chay(so) {
     ['category', 'category', true, true, 'none']);
 
   hop.dirtyStateClear();
-  hop.dirtyStateMarkCategory();
-  hop.dirtyStateMarkRecords(['KH1']);
+  trongLanChay(hop, () => { hop.dirtyStateMarkCategory(); hop.dirtyStateMarkRecords(['KH1']); });
   const categoryAndRecords = hop.reloadDecisionForState({ reloadState: hop.reloadStateRead() });
   check(so, 'Category và records cùng revision được gom vào full core',
     [categoryAndRecords.kind, categoryAndRecords.ram.mode, categoryAndRecords.signal],

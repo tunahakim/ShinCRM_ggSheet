@@ -12,11 +12,9 @@ function fbmSyncClientTrace(stage, request, extra) {
   return event;
 }
 
-/** Chỗ duy nhất đổi cờ lượt chạy: lượt kết thúc theo đường nào (xong, lỗi, hủy) cũng báo Sidebar đúng một lần để RAM và sheet quản trị bắt kịp phần đã hoãn. */
+/** Chỗ duy nhất đổi cờ lượt chạy (chỉ cho giao diện đồng bộ). Nạp lại RAM không phụ thuộc cờ này: mỗi lần chạy GAS có thay đổi phát một tín hiệu qua kênh báo thay đổi. */
 function fbmSyncSetRunning(on) {
-  var was = FBM_SYNC_CLIENT.running === true;
   FBM_SYNC_CLIENT.running = on === true;
-  if (was && !FBM_SYNC_CLIENT.running && typeof sheetLinkSyncFinished === 'function') { sheetLinkSyncFinished(); }
 }
 
 /** Cất màn hiện tại trước khi FBM dùng chung bốn vùng render của Sidebar. */
@@ -1137,23 +1135,43 @@ function fbmSyncSaveExtensionSettings(button) {
     return fbmSyncPaint(Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { message: 'Đã lưu nhịp hỏi GAS của Extension.' }));
   }).catch(function (error) { if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('extension', 'error', 'Không lưu được nhịp hỏi GAS của Extension: ' + String(error && error.message || error)); } fbmSyncPaintError(error, 'Không lưu được nhịp hỏi GAS của Extension.'); return null; }).finally(function () { if (button) { button.disabled = false; } });
 }
-function fbmSyncSaveBackgroundSettings(button) {
+/**
+ * Lưu card lịch nền. Ô gửi nguyên chuỗi người dùng gõ, kể cả ô trống: GAS kiểm và trả `invalid` để tô đỏ đúng ô như form bản ghi, không lặng lẽ thay bằng số mặc định.
+ * Chu kỳ thấp thì GAS trả `SCHEDULE_LOW_CONFIRM` mà chưa lưu; người dùng đồng ý thì gửi lại kèm `confirmLow`.
+ */
+function fbmSyncSaveBackgroundSettings(button, confirmLow) {
   if (button) { button.disabled = true; }
-  var schedule = {};
-  ['heartbeat', 'customerFull', 'activityFull', 'detail'].forEach(function (kind) { var input = document.getElementById('fbm-sync-process-' + kind + '-minutes'); var toggle = document.getElementById('fbm-sync-process-' + kind); schedule[kind] = { minutes: Number(input && input.value || 1), enabled: !!toggle && toggle.getAttribute('aria-pressed') === 'true' }; });
+  var fieldIds = FBM_SYNC_CONFIG_UNSAVED_FIELDS.background, schedule = {};
+  ['heartbeat', 'customerFull', 'activityFull', 'detail'].forEach(function (kind) { var input = document.getElementById(fieldIds[kind + '.minutes']); var toggle = document.getElementById(fieldIds[kind + '.enabled']); schedule[kind] = { minutes: input ? String(input.value) : undefined, enabled: toggle ? toggle.getAttribute('aria-pressed') === 'true' : undefined }; });
   schedule.direction = fbmSyncControlValue('fbm-sync-background-direction') || 'read';
   schedule.enabled = fbmSyncToggleValue('fbm-sync-background-switch');
-  // Ô trống hay số sai vẫn gửi nguyên để GAS từ chối lưu bằng thông báo, không lặng lẽ thay bằng số mặc định.
-  var detailCount = document.getElementById('fbm-sync-detail-count');
-  schedule.detail = { enabled: schedule.detail.enabled, minutes: schedule.detail.minutes, customersPerRun: detailCount ? Number(detailCount.value) : schedule.detail.customersPerRun };
+  var detailCount = document.getElementById(fieldIds['detail.customersPerRun']);
+  schedule.detail.customersPerRun = detailCount ? String(detailCount.value) : undefined;
+  schedule.confirmLow = confirmLow === true;
+  fieldInvalidClear(Object.keys(fieldIds).map(function (path) { return fieldIds[path]; }));
+  var reenable = true;
   return callServer('fbmSaveBackgroundSchedule', [schedule]).then(function (result) {
+    if (result && result.code === 'SCHEDULE_INVALID') {
+      fieldInvalidPaint((result.invalid || []).map(function (item) { return fieldIds[item.field]; }));
+      var message = fieldInvalidMessage(result.invalid);
+      fbmSyncSetSettingsNotice('background', 'error', message);
+      return { ok: false, message: message };
+    }
+    if (result && result.code === 'SCHEDULE_LOW_CONFIRM') {
+      return uiDecisionOpen({ title: 'Chu kỳ lịch nền thấp', message: result.message, cancelLabel: 'Quay lại sửa', confirmLabel: 'Vẫn lưu' }).then(function (go) {
+        if (!go) { return { ok: false, message: result.message }; }
+        reenable = false;
+        return fbmSyncSaveBackgroundSettings(button, true);
+      });
+    }
     if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không lưu được lịch đồng bộ nền.'); }
-    FBM_SYNC_CLIENT.syncSettings = FBM_SYNC_CLIENT.syncSettings || {}; FBM_SYNC_CLIENT.syncSettings.background = result.schedule || schedule;
-    FBM_SYNC_CLIENT.lastStatus = Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { backgroundEnabled: (result.schedule || schedule).enabled !== false });
+    FBM_SYNC_CLIENT.syncSettings = FBM_SYNC_CLIENT.syncSettings || {}; FBM_SYNC_CLIENT.syncSettings.background = result.schedule;
+    FBM_SYNC_CLIENT.lastStatus = Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { backgroundEnabled: result.schedule.enabled !== false });
     if (typeof fbmSyncConfigFinishEdit === 'function') { fbmSyncConfigFinishEdit('background'); }
     if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('background', 'success', 'Đã lưu lịch đồng bộ nền.'); }
-    return fbmSyncPaint(Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { message: 'Đã lưu lịch đồng bộ nền.' }));
-  }).catch(function (error) { if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('background', 'error', 'Không lưu được lịch đồng bộ nền: ' + String(error && error.message || error)); } fbmSyncPaintError(error, 'Không lưu được lịch đồng bộ nền.'); return null; }).finally(function () { if (button) { button.disabled = false; } });
+    fbmSyncPaint(Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { message: 'Đã lưu lịch đồng bộ nền.' }));
+    return { ok: true };
+  }).catch(function (error) { if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('background', 'error', 'Không lưu được lịch đồng bộ nền: ' + String(error && error.message || error)); } fbmSyncPaintError(error, 'Không lưu được lịch đồng bộ nền.'); return { ok: false, message: String(error && error.message || error) }; }).finally(function () { if (button && reenable) { button.disabled = false; } });
 }
 function fbmSyncSaveSyncSettings(button) {
   if (button) { button.disabled = true; }

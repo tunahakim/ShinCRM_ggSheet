@@ -30,6 +30,13 @@ function properties() {
   };
 }
 
+/** Hằng số `SETTINGS` của code thật, để ngưỡng trong test luôn khớp file cấu hình. */
+function settingsThat() {
+  const settings = taoHopCat({});
+  napServer(settings, 'server/config/Settings.js');
+  return settings.SETTINGS;
+}
+
 function workflowGas(options) {
   const opt = options || {};
   const documentProperties = opt.documentProperties || properties();
@@ -44,7 +51,9 @@ function workflowGas(options) {
     LOG_OK: 'ok', LOG_ERROR: 'error', LOG_CONFLICT: 'conflict',
     logEvent: () => {},
     logTrace: () => {},
-    runEntryPoint: (name, source, channel, fn) => fn()
+    runEntryPoint: (name, source, channel, fn) => fn(),
+    // Chỉ lấy hằng số `SETTINGS` thật, không nạp cả Settings.js vì nó kéo theo đường đọc sheet Config.
+    SETTINGS: settingsThat()
   }, opt));
   napServer(hop,
     'fbm_sync/schema/FbmFields.js',
@@ -371,9 +380,26 @@ async function chay(so) {
   scheduleFlow.hop.FbmSync.detailCursorWrite(42);
   check(so, 'Cursor Vòng xoay là số CUS: chưa có hoặc còn kiểu khóa trang FBM cũ thì là -1 (bắt đầu từ CUS nhỏ nhất), ghi 42 đọc lại 42', [cursorTruoc, cursorKieuCu, scheduleFlow.hop.FbmSync.detailCursorRead()], [-1, -1, 42]);
   const nhieuKhach = scheduleFlow.hop.FbmSync.backgroundScheduleSave({ detail: { enabled: true, minutes: 60, customersPerRun: 300 } });
-  let loiSoKhach = '';
-  try { scheduleFlow.hop.FbmSync.backgroundScheduleSave({ detail: { enabled: true, minutes: 60, customersPerRun: 0 } }); } catch (error) { loiSoKhach = error.message; }
-  check(so, 'Số khách mỗi phiên Vòng xoay không còn trần 50: lưu 300 đọc lại 300; 0 bị từ chối', [nhieuKhach.schedule.detail.customersPerRun, scheduleFlow.hop.FbmSync.backgroundScheduleRead().detail.customersPerRun, loiSoKhach], [300, 300, 'Số khách mỗi lượt vòng xoay phải là số nguyên từ 1 trở lên.']);
+  const loiSoKhach = scheduleFlow.hop.FbmSync.backgroundScheduleSave({ detail: { enabled: true, minutes: 60, customersPerRun: 0 } });
+  check(so, 'Số khách mỗi phiên Vòng xoay không còn trần 50: lưu 300 đọc lại 300; 0 bị từ chối', [nhieuKhach.schedule.detail.customersPerRun, scheduleFlow.hop.FbmSync.backgroundScheduleRead().detail.customersPerRun, loiSoKhach], [300, 300, { ok: false, code: 'SCHEDULE_INVALID', invalid: [{ field: 'detail.customersPerRun', reason: 'Số khách mỗi lượt vòng xoay phải là số nguyên từ 1 trở lên.' }], message: 'Chưa lưu lịch đồng bộ nền.' }]);
+  {
+    const F = workflowGas().hop.FbmSync, truoc = JSON.stringify(F.backgroundScheduleRead());
+    const trong = F.backgroundScheduleSave({ heartbeat: { enabled: true, minutes: '' }, customerFull: { enabled: true, minutes: '1.5' }, detail: { enabled: true, minutes: 60, customersPerRun: ' ' } });
+    check(so, 'Lịch nền: ô trống hoặc không phải số nguyên không ngầm thay số nào, trả đủ từng ô sai để Sidebar tô đỏ và không lưu gì',
+      [trong.code, trong.invalid, JSON.stringify(F.backgroundScheduleRead()) === truoc],
+      ['SCHEDULE_INVALID', [{ field: 'heartbeat.minutes', reason: 'Chưa nhập chu kỳ Giữ phiên FBM.' }, { field: 'customerFull.minutes', reason: 'Chu kỳ Quét nhanh phải là số nguyên từ 0 đến 10080 phút.' }, { field: 'detail.customersPerRun', reason: 'Chưa nhập số khách mỗi lượt vòng xoay.' }], true]);
+    const thap = F.backgroundScheduleSave({ heartbeat: { enabled: true, minutes: '0' }, customerFull: { enabled: true, minutes: '5' }, activityFull: { enabled: false, minutes: '1' } });
+    check(so, 'Lịch nền: tiến trình khác Giữ phiên đang bật mà chu kỳ dưới 30 phút thì hỏi lại, chưa lưu; Giữ phiên 0 và tiến trình tắt không bị hỏi',
+      [thap.code, /Quét nhanh 5 phút/.test(thap.message), /Giữ phiên|Lấy toàn bộ/.test(thap.message), JSON.stringify(F.backgroundScheduleRead()) === truoc],
+      ['SCHEDULE_LOW_CONFIRM', true, false, true]);
+    const dongY = F.backgroundScheduleSave({ heartbeat: { enabled: true, minutes: '0' }, customerFull: { enabled: true, minutes: '5' }, confirmLow: true });
+    check(so, 'Lịch nền: người dùng xác nhận thì lưu, chu kỳ 0 được giữ là 0 khi đọc lại',
+      [dongY.ok, F.backgroundScheduleRead().heartbeat.minutes, F.backgroundScheduleRead().customerFull.minutes], [true, 0, 5]);
+    const now = Date.UTC(2026, 9, 16, 8, 0);
+    F.scheduleMarkerAdvance('heartbeat', now);
+    check(so, 'Chu kỳ 0: chạy xong thì mốc là chính giờ chạy xong, lần hỏi kế tiếp đến hạn ngay',
+      [Number(F.props().getProperty(F.SCHEDULE_MARKER_KEYS.heartbeat)), F.scheduleDueKinds(now + 1, []).indexOf('heartbeat') >= 0], [now, true]);
+  }
   // Chiều đẩy kiểm lại danh mục FBM giữa các lô: FBM đổi tên một mã giữa lượt thì chỉ bản ghi dùng mã đó bị chặn.
   const categoryPushRun = (options) => {
     const flow = workflowGas(), F = flow.hop.FbmSync, logs = [], sheetSaves = [], fbmNames = { WEB: 'Web', HDDV: 'Hóa đơn dịch vụ' }, lookupAt = [], issued = [];
@@ -681,7 +707,7 @@ async function chay(so) {
   scheduleFlow.documentProperties.setProperty('FBM_SYNC_NEXT_HEARTBEAT', String(now - 1));
   const heartbeatLowest = scheduleFlow.hop.FbmSync.schedulerPickDue(now);
   check(so, 'scheduler GAS chi chon giu phien khi khong co tien trinh du lieu den han', [heartbeatLowest.ok, heartbeatLowest.kind], [true, 'heartbeat']);
-  check(so, 'cau hinh scheduler tu choi chu ky ngoai gioi han', [scheduleFlow.hop.FbmSync.extensionConfigSave({ pollMinutes: 0 }).ok, (() => { try { scheduleFlow.hop.FbmSync.backgroundScheduleSave({ customerFull: { minutes: 0 } }); return false; } catch (ignore) { return true; } })()], [false, true]);
+  check(so, 'cau hinh scheduler tu choi chu ky ngoai gioi han', [scheduleFlow.hop.FbmSync.extensionConfigSave({ pollMinutes: 0 }).ok, scheduleFlow.hop.FbmSync.backgroundScheduleSave({ customerFull: { minutes: 10081 } }).invalid[0].field], [false, 'customerFull.minutes']);
   scheduleFlow.hop.FbmSync.extensionConfigSave({ pollMinutes: 15, runOnStartup: true });
   scheduleFlow.hop.FbmSync.backgroundScheduleSave({ heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: true, minutes: 30 } });
   const startup = scheduleFlow.hop.FbmSync.heartbeatRequest({ source: 'startup' });

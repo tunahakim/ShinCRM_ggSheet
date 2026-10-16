@@ -263,8 +263,7 @@ function probeSelectionAndReload(input) {
         reloadState: state,
         lastSeenRevision: request.lastSeenRevision,
         localDraft: request.localDraft,
-        reason: request.reason,
-        forceImmediate: request.forceImmediate === true
+        reason: request.reason
       })
       : reloadDecisionBlank('Chưa có bộ quyết định reload.');
     var selection = Object.assign({}, snapshot, {
@@ -278,19 +277,7 @@ function probeSelectionAndReload(input) {
     var revisionMatched = true;
     var reloadResult = null;
     var ram = decision && decision.ram;
-    var waitMs = ram ? Number(ram.waitMs) : 0;
-    if (!isFinite(waitMs) || waitMs < 0) { waitMs = 0; }
-    if (ram && ram.action === 'reload' && waitMs > 0) {
-      decision = Object.assign({}, decision, { ram: Object.assign({}, ram, { action: 'defer' }) });
-      ram = decision.ram;
-    }
-    // Đọc payload là tiêu dấu bẩn, nên lượt đồng bộ đang chạy phía Sidebar phải hoãn ở đây: đọc rồi để Sidebar bỏ thì lời hỏi lúc xong lượt không còn gì để nạp.
-    if (ram && ram.action === 'reload' && request.syncRunning === true && request.forceImmediate !== true) {
-      decision = Object.assign({}, decision, { ram: Object.assign({}, ram, { action: 'defer', waitMs: 0, reason: 'Lượt đồng bộ đang chạy; nạp một lần khi lượt kết thúc.' }) });
-      ram = decision.ram;
-    }
-    var deferred = ram && ram.action === 'defer';
-    var ready = !deferred && ram && ram.action === 'reload' && waitMs <= 0;
+    var ready = !!ram && ram.action === 'reload';
     if (ready) {
       var expectedRevision = state && state.revision ? state.revision : undefined;
       if (ram.mode === 'records' && typeof reloadRecords === 'function') {
@@ -329,8 +316,6 @@ function probeSelectionAndReload(input) {
       processedRevision: processedRevision,
       remainingRevision: selectionRemainingRevision(latest),
       revisionMatched: revisionMatched,
-      readyAt: state && state.recordsReadyAt ? Number(state.recordsReadyAt) : 0,
-      waitMs: waitMs,
       ms: Date.now() - started
     };
   });

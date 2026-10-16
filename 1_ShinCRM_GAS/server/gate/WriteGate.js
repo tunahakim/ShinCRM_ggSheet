@@ -396,6 +396,17 @@ function writeGateWriteExisting(cu, context, colOf, nameAt, laCotChu) {
   });
 }
 
+/** Giá trị trường RAM hiện có trên Sheet của các bản ghi, theo mã: một lần đọc vùng bao từ dòng nhỏ nhất đến lớn nhất, đi qua cùng bộ đổi kiểu với `writeGateReadBack` để so được với bản đọc lại. */
+function writeGateRowSnapshot(plans, context) {
+  var snap = {};
+  if (!plans.length) { return snap; }
+  var rows = plans.map(function (plan) { return plan.row; });
+  var first = Math.min.apply(null, rows);
+  var last = Math.max.apply(null, rows);
+  entityReadRange(context, first, last - first + 1).rows.forEach(function (row) { snap[String(row[context.idAt]).trim()] = JSON.stringify(row); });
+  return snap;
+}
+
 /**
  * Đọc lại đúng những dòng vừa ghi, trả về đúng hình dạng của đường nạp: `{ fields, rows }`.
  *
@@ -468,11 +479,17 @@ function writeGateRun(entity, records, source, fields, batDau) {
     });
   });
 
+  // Chụp giá trị cũ của bản ghi sửa có chạm trường RAM, để chỉ bản ghi đổi thật mới báo Sidebar nạp lại.
+  var touched = cu.filter(function (plan) { return Object.keys(plan.values).some(function (ten) { return context.names.indexOf(ten) >= 0; }); });
+  var before = writeGateRowSnapshot(touched, context);
+
   writeGateWriteNew(moi, context, colOf, nameAt, laCotChu);
   writeGateWriteExisting(cu, context, colOf, nameAt, laCotChu);
   SpreadsheetApp.flush();
 
   var doc = writeGateReadBack(plans, context);
+  var after = {};
+  doc.rows.forEach(function (row) { after[String(row[context.idAt]).trim()] = JSON.stringify(row); });
   var ms = Date.now() - batDau;
 
   logEvent({
@@ -488,6 +505,10 @@ function writeGateRun(entity, records, source, fields, batDau) {
     fields: doc.fields,
     rows: doc.rows,
     recordIds: plans.map(function (plan) { return String(plan.id || '').trim(); }).filter(function (id) { return !!id; }),
+    // Bản ghi mới, hoặc bản ghi sửa có trường RAM khác giá trị cũ. Ghi lại y hệt hoặc chỉ ghi cột đồng bộ (ngoài RAM) không vào đây.
+    changedIds: moi.map(function (plan) { return String(plan.id || '').trim(); }).concat(touched.filter(function (plan) {
+      return after[plan.id] !== before[plan.id];
+    }).map(function (plan) { return plan.id; })).filter(function (id) { return !!id; }),
     // Cấp mã mới chỉ đổi bộ đếm (DocumentProperties), không đổi Config; Sidebar nhận bộ đếm mới qua đây để mã xem trước trên form khách mới đúng.
     counters: moi.length ? idGateCounterValues() : undefined,
     ms: ms
@@ -543,16 +564,14 @@ function writeGateSave(yeuCau) {
   var commit = null;
   try {
     result = writeGateRun(entity, records, source, fields, batDau);
-    if (result && result.ok && result.recordIds && result.recordIds.length) {
-      // Ghi signal trong chính document lock để hai lượt ghi không cùng đọc một revision cũ.
+    if (result && result.ok && result.changedIds && result.changedIds.length) {
       commit = writeCommitAfterSuccess({
         source: source,
         surface: 'record',
         entity: entity,
-        recordIds: result.recordIds
+        recordIds: result.changedIds
       });
       result.reloadDecision = commit.reloadDecision;
-      result.dirty = commit.dirty;
     }
   } finally {
     // `flush` rồi mới nhả khóa, tài liệu 06 Phần 2 `[RÀNG BUỘC CỨNG]`. Bọc lồng nhau để `flush` có ném lỗi thì khóa vẫn được nhả.

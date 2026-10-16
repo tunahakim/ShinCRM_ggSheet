@@ -13,12 +13,10 @@
  * người dùng vì đó là lệnh trực tiếp.
  */
 
-var RELOAD_DECISION_DEBOUNCE_MS = 3000;
-
 function reloadDecisionBlank(reason) {
   return {
     kind: 'none',
-    ram: { action: 'none', mode: 'none', recordIds: [], deferredRecordIds: [], waitMs: 0, flushOnLeave: false, reason: reason || '' },
+    ram: { action: 'none', mode: 'none', recordIds: [], deferredRecordIds: [], reason: reason || '' },
     views: { action: 'none', mode: 'none', sheetName: '', reason: reason || '' },
     signal: { records: [], entities: [], category: false, config: false, schema: false, allCore: false, allViews: false },
     notifySidebar: false,
@@ -59,13 +57,8 @@ function reloadDecisionWithRam(decision, mode, ids, input, reason) {
     mode: mode,
     recordIds: normalized,
     deferredRecordIds: fullCoreBlocked ? draftIds : deferred,
-    waitMs: input && input.source === 'edit' && mode === 'records' && input.forceImmediate !== true ? RELOAD_DECISION_DEBOUNCE_MS : 0,
-    flushOnLeave: !!(input && input.source === 'edit' && mode === 'records'),
     reason: fullCoreBlocked ? 'Bảo vệ bản nháp Sidebar trước khi nạp trọn dữ liệu.' : (deferred.length ? 'Bảo vệ bản nháp Sidebar của mã đang sửa.' : reason)
   };
-  if (mode === 'records' && normalized.length && input && input.source === 'edit') {
-    decision.signal.recordsDebounceMs = input.forceImmediate === true ? 0 : RELOAD_DECISION_DEBOUNCE_MS;
-  }
 }
 
 function reloadDecisionEntities(values) {
@@ -194,8 +187,7 @@ function reloadDecisionForState(input) {
 
   var common = {
     source: 'sidebar',
-    localDraft: change.localDraft,
-    forceImmediate: change.forceImmediate === true
+    localDraft: change.localDraft
   };
 
   if (state.allCore || state.all || state.schema) {
@@ -258,9 +250,6 @@ function reloadDecisionForState(input) {
   if (ids.length) {
     decision.kind = 'state-records';
     reloadDecisionWithRam(decision, 'records', ids, common, 'ReloadState có mã Customer/Activity cần nạp.');
-    var readyAt = Number(state.recordsReadyAt || 0);
-    decision.ram.waitMs = common.forceImmediate ? 0 : Math.max(0, readyAt - Date.now());
-    decision.ram.flushOnLeave = false;
     decision.notifySidebar = true;
     decision.reason = 'ReloadState có mã Customer/Activity cần nạp.';
     return decision;

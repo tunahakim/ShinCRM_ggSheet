@@ -105,11 +105,10 @@ function shinSchemaEditNeedsReload(sheet, range, event) {
   });
 }
 
-/** Quyết định cần vẽ thì tô cam sau lượt vẽ (trong `shinRenderForDecision`), để không tô rồi trả màu ngay cho chính sheet vừa vẽ. */
+/** Dấu vào giỏ của lần chạy; `runEntryPoint` đổ giỏ (kèm tô tab cũ) ở cuối. */
 function shinReloadDecision(input) {
   var decision = reloadDecisionForChange(input || {});
   dirtyStateMarkDecision(decision);
-  if (!decision.views || decision.views.action !== 'render') { viewTabTintStale(); }
   return decision;
 }
 
@@ -117,11 +116,9 @@ function shinReloadDecision(input) {
 function shinRenderForDecision(decision) {
   var views = decision && decision.views;
   if (!views || views.action !== 'render') { return decision; }
-  try {
-    return renderAllManagedViews(views.mode === 'sheet' ? [views.sheetName] : undefined);
-  } finally {
-    viewTabTintStale();
-  }
+  // Đổ giỏ trước khi vẽ: sheet vẽ ghi revision đã dùng, đổ sau lượt vẽ sẽ làm chính sheet vừa vẽ thành cũ.
+  dirtyStateBasketFlush();
+  return renderAllManagedViews(views.mode === 'sheet' ? [views.sheetName] : undefined);
 }
 
 /** Sắp xếp chung trong Config là bộ điều khiển của mọi sheet quản trị chưa khai sắp xếp riêng. */

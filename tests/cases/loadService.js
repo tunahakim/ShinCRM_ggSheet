@@ -11,6 +11,7 @@
  */
 
 const { dungHop, ghiO } = require('../lib/dung-hop');
+const { trongLanChay } = require('../lib/load-gas');
 const { formatDateGia } = require('../lib/gas-stubs');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 
@@ -158,7 +159,7 @@ function chay(so) {
     getDocumentProperties: () => sharedDocumentProperties,
     getUserProperties: () => sharedUserPropertiesB
   };
-  sharedA.hop.dirtyStateMarkRecords(['KH-SHARED']);
+  trongLanChay(sharedA.hop, () => sharedA.hop.dirtyStateMarkRecords(['KH-SHARED']));
   const sharedRevision = sharedA.hop.reloadStateRead().revision;
   const sharedFirst = sharedA.hop.reloadRecords(['KH-SHARED'], sharedRevision);
   const sharedSecond = sharedB.hop.reloadRecords(['KH-SHARED'], sharedRevision);
@@ -169,20 +170,20 @@ function chay(so) {
 
   const category = dungNap();
   category.Category.sheet.getRange(category.hop.SHEET_FIRST_DATA_ROW, 1).setValue('Giá trị thử');
-  category.hop.dirtyStateMarkCategory();
+  trongLanChay(category.hop, () => category.hop.dirtyStateMarkCategory());
   const categoryReload = category.hop.reloadCategory(category.hop.reloadStateRead().revision);
   check(so, 'reloadCategory trả danh mục và xóa đúng dirtyCategory',
     [categoryReload.reloadMode, categoryReload.categories[category.Category.codes[0]], categoryReload.revisionMatched, categoryReload.reload.category, categoryReload.dirty.config],
     ['category', ['Giá trị thử'], true, false, false]);
 
-  category.hop.dirtyStateMarkConfig();
+  trongLanChay(category.hop, () => category.hop.dirtyStateMarkConfig());
   const configRevision = category.hop.reloadStateRead().revision;
   const configReload = category.hop.reloadConfig(configRevision);
   check(so, 'reloadConfig trả payload Config riêng và ReloadState',
     [configReload.reloadMode, !!configReload.config, configReload.config && !!configReload.config.params, !!configReload.reload, configReload.revisionMatched, configReload.dirty.config],
     ['config', true, true, true, true, false]);
 
-  category.hop.dirtyStateMarkConfig();
+  trongLanChay(category.hop, () => category.hop.dirtyStateMarkConfig());
   const staleConfig = category.hop.reloadConfig(category.hop.reloadStateRead().revision - 1);
   check(so, 'reloadConfig không xóa cờ khi revision đã đổi',
     [staleConfig.reloadMode, staleConfig.revisionMatched, staleConfig.dirty.config], ['config', false, true]);
@@ -190,7 +191,7 @@ function chay(so) {
   const manual = dungNap();
   ghiKhach(manual, manual.hop.SHEET_FIRST_DATA_ROW, 'KH-MANUAL', 'Khách thủ công');
   ghiGiaoDich(manual, manual.hop.SHEET_FIRST_DATA_ROW, 'GD-MANUAL', 'KH-MANUAL', '2026-09-10');
-  manual.hop.dirtyStateMarkRecords(['KH-MANUAL', 'GD-MANUAL']);
+  trongLanChay(manual.hop, () => manual.hop.dirtyStateMarkRecords(['KH-MANUAL', 'GD-MANUAL']));
   const manualCustomer = manual.hop.reloadCustomer(manual.hop.reloadStateRead().revision);
   const manualActivity = manual.hop.reloadActivity(manual.hop.reloadStateRead().revision);
   check(so, 'nạp thủ công Customer và Activity trả đúng scope riêng, không fallback full core',
@@ -212,7 +213,7 @@ function chay(so) {
     sheet.getRange(1, 1, 1, 2).setValues([['@CUS_MA_KH', '@CUS_TEN_CTY']]);
   });
   ghiKhach(managed, managed.hop.SHEET_FIRST_DATA_ROW, 'KH-MANAGED', 'Khách quản trị');
-  managed.hop.dirtyStateMarkAllViews();
+  trongLanChay(managed.hop, () => managed.hop.dirtyStateMarkSignal({ allViews: true }));
   managed.book.setActiveSheet(managedLead);
   const managedCurrent = managed.hop.reloadCurrentSheet();
   check(so, 'reloadCurrentSheet ở view quản trị chỉ vẽ view active, view khác vẫn cũ chờ người xem',

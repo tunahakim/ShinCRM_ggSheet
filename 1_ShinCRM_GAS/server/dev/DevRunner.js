@@ -19,7 +19,7 @@
  */
 var DEV_RUNNER_ALLOWED = [
   'smokeTest', 'smokeDiag', 'setupSheets', 'verifySheets', 'measureDeleteRows', 'measureChunkRows', 'measureFirstPaint',
-  'seedFakeData', 'seedFakeCategory', 'seedFakeCategoryMappings', 'wipeFakeData', 'fbmPrepareAltTest', 'fbmProbeAltState', 'fbmPerfOn', 'fbmPerfOff', 'fbmPerfReport', 'fbmPerfTestScopeOn', 'fbmPerfTestScopeOff', 'fbmDevSetVerifyStatusDefault', 'fbmProbePayloadBudget', 'fbmPerfDropScopeActivities', 'fbmProbeStuckState', 'fbmProbePendingPushes', 'fbmScopeCreatedCustomer', 'fbmScopeDefaultCustomer', 'fbmSeedFakeDeletedCustomer', 'fbmEndFakeDeletedCustomer', 'fbmSeedConflict', 'fbmTamperConflictOpenedHash', 'fbmSeedActivityPush', 'fbmProbeCreateCustomer', 'fbmAllowTestCreateCustomer', 'fbmRequeueCreateCustomerConflict', 'fbmRequeueCreateCustomerPush', 'fbmAuditAltState', 'fbmProbePreflightTiming', 'fbmProbeCursorPosition', 'fbmProbeActivityStepTiming', 'fbmProbeStateMetadataSizes', 'fbmProbeCustomerActivities', 'fbmProbeSheetReadCost', 'fbmDevAlignSheetTimezone', 'fbmRepairFalseMissing', 'fbmRepairFalseMissingApply',
+  'seedFakeData', 'seedFakeCategory', 'seedFakeCategoryMappings', 'wipeFakeData', 'fbmPrepareAltTest', 'fbmProbeAltState', 'fbmPerfOn', 'fbmPerfOff', 'fbmPerfReport', 'fbmPerfTestScopeOn', 'fbmPerfTestScopeOff', 'fbmDevSetVerifyStatusDefault', 'fbmProbePayloadBudget', 'fbmPerfDropScopeActivities', 'fbmProbeStuckState', 'fbmProbePendingPushes', 'fbmScopeCreatedCustomer', 'fbmScopeDefaultCustomer', 'fbmSeedFakeDeletedCustomer', 'fbmEndFakeDeletedCustomer', 'fbmSeedConflict', 'fbmTamperConflictOpenedHash', 'fbmSeedActivityPush', 'fbmProbeCreateCustomer', 'fbmAllowTestCreateCustomer', 'fbmRequeueCreateCustomerConflict', 'fbmRequeueCreateCustomerPush', 'fbmAuditAltState', 'fbmProbePreflightTiming', 'fbmProbeCursorPosition', 'fbmProbeActivityStepTiming', 'fbmProbeStateMetadataSizes', 'fbmProbeCustomerActivities', 'fbmProbeScheduleMarkers', 'fbmProbeSheetReadCost', 'fbmDevAlignSheetTimezone', 'fbmRepairFalseMissing', 'fbmRepairFalseMissingApply',
   'dumpColumnMap', 'dumpSettings', 'dumpSheetGrid', 'dumpNamedRanges', 'wipeNamedRanges', 'dumpCoreSheetHead', 'dumpRecentLog',
   'devLogTraceOn', 'devLogTraceOff', 'formulaProbeCreate', 'formulaProbeRemove', 'measureReloadCosts', 'measureTabColorBatch',
   'probeBadColumnCode', 'probeLogGate', 'probeDateText', 'probeSheetGrid', 'probeCellBudget',
@@ -84,7 +84,8 @@ function doGet(e) {
       return reply('LOI\nHàm "' + name + '" có trong danh sách trắng nhưng không tìm thấy trong code đã đẩy lên.');
     }
     var started = new Date().getTime();
-    var result = scope[name]();
+    // Bọc như mọi cửa vào: hàm dò có ghi thì cần giỏ thay đổi của lần chạy.
+    var result = runEntryPoint('dev:' + name, 'core', ERROR_CHANNEL_THROW, function () { return scope[name](); });
     var elapsed = new Date().getTime() - started;
     return reply('OK\nHàm: ' + name + '\nHết: ' + elapsed + ' ms\n\n' + devFormatResult(result));
   } catch (loi) {

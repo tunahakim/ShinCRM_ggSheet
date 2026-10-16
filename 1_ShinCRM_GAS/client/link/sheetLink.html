@@ -34,7 +34,6 @@ var SHEET_LINK_VIEW_STATES = {};
 var SHEET_LINK_VIEW_NOTICE_SHEET = '';
 var SHEET_LINK_VIEW_NOTICE_ID = 'shin-view-stale';
 var SHEET_LINK_DATA_PENDING = null;
-var SHEET_LINK_RELOAD_TIMER = null;
 var SHEET_LINK_RELOAD_CHECKING = null;
 var SHEET_LINK_WAKE_TIMER = null;
 var SHEET_LINK_SELECTION_CONTEXT = null;
@@ -320,7 +319,7 @@ function sheetLinkApplyViewDecision(result) {
   state.renderRequestedRevision = revision;
   var run = function () { return sheetLinkSyncView(view.sheetName); };
   var message = 'Đang cập nhật sheet ' + view.sheetName + '…';
-  return typeof sidebarBusyRun === 'function' ? sidebarBusyRun(message, run, { block: false }) : run();
+  return typeof sidebarBusyRun === 'function' ? sidebarBusyRun(message, run, { block: false, progress: true }) : run();
 }
 
 function sheetLinkParseNameBox(value) {
@@ -388,31 +387,11 @@ function sheetLinkApplyDirtyData(dirty, decision) {
   return null;
 }
 
-function sheetLinkScheduleDirtyCheck(delayMs, forceImmediate) {
-  if (SHEET_LINK_RELOAD_TIMER !== null && typeof clearTimeout === 'function') { clearTimeout(SHEET_LINK_RELOAD_TIMER); }
-  SHEET_LINK_RELOAD_TIMER = null;
-  if (typeof setTimeout !== 'function' || !SHEET_LINK_RAM_READY) { return null; }
-  SHEET_LINK_RELOAD_TIMER = setTimeout(function () {
-    SHEET_LINK_RELOAD_TIMER = null;
-    if (typeof sheetLinkProbeSelectionAndReload === 'function') {
-      sheetLinkProbeSelectionAndReload('ready-at', { forceImmediate: forceImmediate === true });
-    } else {
-      sheetLinkSyncDirtyData({ forceImmediate: forceImmediate === true });
-    }
-  }, Math.max(0, Number(delayMs) || 0));
-  return SHEET_LINK_RELOAD_TIMER;
-}
-
-function sheetLinkCancelDirtyCheck() {
-  if (SHEET_LINK_RELOAD_TIMER !== null && typeof clearTimeout === 'function') { clearTimeout(SHEET_LINK_RELOAD_TIMER); }
-  SHEET_LINK_RELOAD_TIMER = null;
-}
-
 /**
- * Rời sheet kho chỉ đáng một lời hỏi ngay khi còn việc chờ: tín hiệu chưa hỏi, lượt nạp đang hoãn chờ debounce, hoặc lời hỏi đang bay. Không có gì chờ mà kênh sống thì thay đổi nào chưa tới sẽ tự đến qua kênh; hỏi thêm chỉ tốn một lượt GAS. Kênh chết hoặc vắng Extension thì không biết có việc chờ hay không nên vẫn hỏi.
+ * Rời sheet kho chỉ đáng một lời hỏi ngay khi còn việc chờ: tín hiệu chưa hỏi hoặc lời hỏi đang bay. Không có gì chờ mà kênh sống thì thay đổi nào chưa tới sẽ tự đến qua kênh; hỏi thêm chỉ tốn một lượt GAS. Kênh chết hoặc vắng Extension thì không biết có việc chờ hay không nên vẫn hỏi.
  */
 function sheetLinkLeaveNeedsFlush() {
-  if (SHEET_LINK_RELOAD_TIMER !== null || SHEET_LINK_SELECTION_PENDING || SHEET_LINK_DATA_PENDING) { return true; }
+  if (SHEET_LINK_SELECTION_PENDING || SHEET_LINK_DATA_PENDING) { return true; }
   if (typeof changeSignalPending !== 'function' || !sheetLinkExtensionAlive() || changeSignalChannelDead()) { return true; }
   return changeSignalPending();
 }
@@ -458,10 +437,10 @@ function sheetLinkApplyDecisionResult(result, options) {
   if (stateRevision && stateRevision <= SHEET_LINK_LAST_SEEN_REVISION && opts.forceReload !== true) {
     return result;
   }
-  // GAS đã tiêu dấu bẩn khi đọc payload, nên payload về là phải áp, kể cả khi lượt đồng bộ vừa bắt đầu sau lúc gửi lời hỏi; hoãn do GAS quyết từ cờ `syncRunning`.
+  // GAS đã tiêu dấu bẩn khi đọc payload, nên payload về là phải áp. Lượt nạp do tín hiệu chỉ hiện thanh loading, không chặn người đang thao tác.
   if (result.payload && typeof refreshReloadPayload === 'function') {
     var payloadWork = function () { return refreshReloadPayload(result.payload); };
-    var payloadRun = typeof sidebarBusyRun === 'function' ? sidebarBusyRun('Đang đồng bộ dữ liệu vừa thay đổi…', payloadWork, { progress: true, block: true }) : payloadWork();
+    var payloadRun = typeof sidebarBusyRun === 'function' ? sidebarBusyRun('Đang đồng bộ dữ liệu vừa thay đổi…', payloadWork, { progress: true, block: false }) : payloadWork();
     var payloadDone = function (value) {
       if (value && stateRevision) {
         SHEET_LINK_LAST_SEEN_REVISION = Math.max(SHEET_LINK_LAST_SEEN_REVISION, Number(result.processedRevision || stateRevision));
@@ -474,17 +453,11 @@ function sheetLinkApplyDecisionResult(result, options) {
   if (!decision || !decision.ram || decision.ram.action === 'none') {
     return result;
   }
-  var waitMs = Number(decision.ram.waitMs);
-  if (!isFinite(waitMs) || waitMs < 0) { waitMs = 0; }
-  if (decision.ram.action === 'defer' && waitMs === 0 && opts.forceImmediate !== true) {
+  if (decision.ram.action === 'defer') {
     return { deferred: true, reason: decision.ram.reason, reload: state, decision: decision };
   }
-  if (waitMs > 0 && opts.forceImmediate !== true) {
-    sheetLinkScheduleDirtyCheck(waitMs, false);
-    return { deferred: true, waitMs: waitMs, reload: state, decision: decision };
-  }
   var refresh = function () { return sheetLinkApplyDirtyData(state, decision); };
-  var work = typeof sidebarBusyRun === 'function' ? sidebarBusyRun('Đang đồng bộ dữ liệu vừa thay đổi…', refresh, { progress: true, block: true }) : refresh();
+  var work = typeof sidebarBusyRun === 'function' ? sidebarBusyRun('Đang đồng bộ dữ liệu vừa thay đổi…', refresh, { progress: true, block: false }) : refresh();
   if (!work || typeof work.then !== 'function') {
     if (sheetLinkReloadWorkSucceeded(work) && state && state.revision) {
       SHEET_LINK_LAST_SEEN_REVISION = Math.max(SHEET_LINK_LAST_SEEN_REVISION, sheetLinkWorkRevision(work, state));
@@ -532,8 +505,6 @@ function sheetLinkProbeSelectionAndReload(reason, options) {
     reason: reason || 'wake',
     needsSelection: opts.needsSelection === true,
     skipPosition: sheetLinkExtensionOwnsContext(),
-    forceImmediate: opts.forceImmediate === true,
-    syncRunning: typeof refreshDeferredBySync === 'function' && refreshDeferredBySync(),
     extensionReadFailure: sheetLinkReaderFailureInput(),
     channelSilence: typeof changeSignalDeadReportInput === 'function' && changeSignalDeadReportInput()
   };
@@ -550,7 +521,6 @@ function sheetLinkProbeSelectionAndReload(reason, options) {
     }
     var applied = sheetLinkApplyDecisionResult(result, opts);
     var applyView = function () {
-      if (typeof refreshDeferredBySync === 'function' && refreshDeferredBySync()) { return result; }
       var drawn = sheetLinkApplyViewDecision(result);
       return drawn && typeof drawn.then === 'function' ? drawn.then(function () { return result; }) : result;
     };
@@ -653,8 +623,8 @@ function sheetLinkInspectView(sheetName) {
       return dataWork && typeof dataWork.then === 'function' ? dataWork.then(afterData) : afterData();
     };
     var message = refreshData ? 'Đang cập nhật dữ liệu và sheet ' + sheetName + '…' : 'Đang cập nhật sheet ' + sheetName + '…';
-    // Chỉ phần nạp RAM cần khóa; vẽ view chỉ ghi ra Sheet.
-    return typeof sidebarBusyRun === 'function' ? sidebarBusyRun(message, sync, { block: refreshData }) : sync();
+    // Người dùng chỉ rời ô cấu hình, không chờ kết quả thao tác của mình: thanh loading, không chặn.
+    return typeof sidebarBusyRun === 'function' ? sidebarBusyRun(message, sync, { block: false, progress: true }) : sync();
   });
   var request = work.then(function (result) {
     settled = true;
@@ -711,15 +681,10 @@ function sheetLinkApplyContext(ctx, options) {
 
     if (viewState && changedSheet) {
       // Sheet cũ hay mới và có được tự vẽ do GAS quyết trong lời hỏi chung. Metadata hàng điều khiển về cùng lượt vẽ, hoặc lấy lười ở lần nhấp sau (`needsSync`).
-      if (leavingDataSheet) { sheetLinkCancelDirtyCheck(); }
-      if (!fromProbe) { queue(function () { return sheetLinkProbeSelectionAndReload('view-enter', { forceImmediate: leavingDataSheet }); }); }
+      if (!fromProbe) { queue(function () { return sheetLinkProbeSelectionAndReload('view-enter'); }); }
     } else {
       if (leavingDataSheet && typeof callServer === 'function') {
-        // Rời sheet thắng debounce: hủy timer còn lại để không tạo thêm một
-        // lượt hỏi sau khi lượt reload tức thời đã hoàn tất.
-        var flush = sheetLinkLeaveNeedsFlush();
-        sheetLinkCancelDirtyCheck();
-        if (flush) { queue(function () { return changeSignalFlush(function () { return sheetLinkSyncDirtyData({ forceImmediate: true }); }); }); }
+        if (sheetLinkLeaveNeedsFlush()) { queue(function () { return changeSignalFlush(function () { return sheetLinkSyncDirtyData(); }); }); }
       }
       else if (SHEET_LINK_DATA_PENDING) { queue(function () { return SHEET_LINK_DATA_PENDING; }); }
 
@@ -757,11 +722,6 @@ function sheetLinkOnVisible() {
 function sheetLinkOnAutoRenderOn() {
   if (SHEET_LINK_LAST_SHEET.charAt(0) !== '!') { return null; }
   return sheetLinkProbeSelectionAndReload('auto-render-on');
-}
-
-/** Lượt đồng bộ FBM kết thúc (xong, lỗi, hủy): hỏi lại đúng một lần để RAM và sheet `!` đang xem bắt kịp phần đã hoãn. */
-function sheetLinkSyncFinished() {
-  return sheetLinkProbeSelectionAndReload('sync-finished', { silent: true });
 }
 
 function sheetLinkApplyCustomerContext(ctx) {

@@ -59,17 +59,6 @@ function viewTabTintViewingSheet(book) {
   return name.charAt(0) === '!' ? name : '';
 }
 
-/** Bản tự lấy khóa cho trigger, nơi signal được ghi ngoài khóa. */
-function viewTabTintStale() {
-  var lock = LockService.getDocumentLock();
-  if (!documentStoreTryLock(lock, SETTINGS.LOCK_WAIT_MS)) { throw new Error('Hệ thống bận, chưa tô được tab sheet quản trị đang cũ.'); }
-  try {
-    return viewTabTintStaleLocked();
-  } finally {
-    lock.releaseLock();
-  }
-}
-
 /** Gọi trong DocumentLock sau khi lượt vẽ đã ghi revision. Signal đến giữa lượt vẽ để sheet vẫn cũ thì giữ cam. */
 function viewTabTintRestoreLocked(sheet, name) {
   if (viewIsStale(name)) { return false; }

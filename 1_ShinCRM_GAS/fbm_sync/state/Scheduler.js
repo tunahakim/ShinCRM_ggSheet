@@ -54,7 +54,7 @@ FbmSync.backgroundScheduleRead = function () {
     ['customerFull', 'activityFull', 'heartbeat', 'detail'].forEach(function (kind) {
       var item = parsed && parsed[kind] || {}, minutes = Number(item.minutes);
       fallback[kind].enabled = item.enabled !== false;
-      fallback[kind].minutes = isFinite(minutes) ? Math.max(1, Math.min(7 * 24 * 60, Math.round(minutes))) : fallback[kind].minutes;
+      fallback[kind].minutes = isFinite(minutes) ? Math.max(0, Math.min(FbmSync.SCHEDULE_MAX_MINUTES, Math.round(minutes))) : fallback[kind].minutes;
       if (kind === 'detail') {
         var batch = Number(item.customersPerRun);
         fallback.detail.customersPerRun = isFinite(batch) && batch >= 1 ? Math.floor(batch) : fallback.detail.customersPerRun;
@@ -63,21 +63,44 @@ FbmSync.backgroundScheduleRead = function () {
   } catch (ignore) {}
   return fallback;
 };
+/** Trần chu kỳ lịch nền: 7 ngày, tính bằng phút. */
+FbmSync.SCHEDULE_MAX_MINUTES = 7 * 24 * 60;
+/** Tên tiến trình trong câu báo lỗi và câu xác nhận, đúng nhãn ở `Cài đặt phiên` (09/02 Phần 3). */
+FbmSync.SCHEDULE_LABELS = { heartbeat: 'Giữ phiên FBM', customerFull: 'Quét nhanh', activityFull: 'Lấy toàn bộ giao dịch', detail: 'Vòng xoay giao dịch' };
+/** Số nguyên không âm từ ô người dùng gõ. Ô trống là thiếu, không ngầm thay bằng số nào: `Number('')` bằng 0 nên phải xét chuỗi trước. Trả `{ value }` hoặc `{ reason }`. */
+FbmSync.scheduleWholeNumber = function (raw, min, max, label, unit) {
+  var text = raw === null || raw === undefined ? '' : String(raw).trim();
+  if (text === '') { return { reason: 'Chưa nhập ' + label + '.' }; }
+  var n = Number(text);
+  if (!isFinite(n) || Math.floor(n) !== n || n < min || n > max) { return { reason: label.charAt(0).toUpperCase() + label.slice(1) + ' phải là số nguyên từ ' + min + (max < Infinity ? ' đến ' + max : ' trở lên') + unit + '.' }; }
+  return { value: n };
+};
+/**
+ * Lưu lịch nền. Ô sai trả `{ ok: false, invalid: [{ field, reason }] }` (cùng hình dạng cửa ghi bản ghi) để Sidebar tô đỏ đúng ô; `field` là đường dẫn trong lịch, ví dụ `heartbeat.minutes`.
+ * Tiến trình khác Giữ phiên đang bật mà chu kỳ dưới `SETTINGS.FBM_SCHEDULE_LOW_MINUTES` thì trả `SCHEDULE_LOW_CONFIRM` kèm câu hỏi, chưa lưu; Sidebar hỏi người dùng rồi gửi lại với `confirmLow: true`.
+ */
 FbmSync.backgroundScheduleSave = function (input) {
-  var current = FbmSync.backgroundScheduleRead(), value = input || {}, saved = {};
+  var current = FbmSync.backgroundScheduleRead(), value = input || {}, saved = {}, invalid = [], low = [];
   var direction = value.direction === undefined ? current.direction : String(value.direction || '');
   if (['read', 'push', 'write'].indexOf(direction) < 0) { throw new Error('Invalid background sync direction.'); }
   var enabled = value.enabled === undefined ? current.enabled !== false : value.enabled === true;
-  ['customerFull', 'activityFull', 'heartbeat', 'detail'].forEach(function (kind) {
-    var item = value[kind] || {}, minutes = item.minutes === undefined ? current[kind].minutes : Number(item.minutes);
-    if (!isFinite(minutes) || minutes < 1 || minutes > 7 * 24 * 60) { throw new Error('Chu kỳ ' + kind + ' phải từ 1 phút đến 7 ngày.'); }
-    saved[kind] = { enabled: item.enabled === undefined ? current[kind].enabled : item.enabled === true, minutes: Math.round(minutes), priority: current[kind].priority };
+  var lowMinutes = Number(SETTINGS.FBM_SCHEDULE_LOW_MINUTES);
+  ['heartbeat', 'customerFull', 'activityFull', 'detail'].forEach(function (kind) {
+    var item = value[kind] || {}, label = FbmSync.SCHEDULE_LABELS[kind];
+    var minutes = item.minutes === undefined ? { value: current[kind].minutes } : FbmSync.scheduleWholeNumber(item.minutes, 0, FbmSync.SCHEDULE_MAX_MINUTES, 'chu kỳ ' + label, ' phút');
+    if (minutes.reason) { invalid.push({ field: kind + '.minutes', reason: minutes.reason }); }
+    saved[kind] = { enabled: item.enabled === undefined ? current[kind].enabled : item.enabled === true, minutes: minutes.value, priority: current[kind].priority };
+    if (!minutes.reason && kind !== 'heartbeat' && saved[kind].enabled && minutes.value < lowMinutes) { low.push(label + ' ' + minutes.value + ' phút'); }
     if (kind === 'detail') {
-      var batch = item.customersPerRun === undefined ? current.detail.customersPerRun : Number(item.customersPerRun);
-      if (!isFinite(batch) || batch < 1 || Math.floor(batch) !== batch) { throw new Error('Số khách mỗi lượt vòng xoay phải là số nguyên từ 1 trở lên.'); }
-      saved.detail.customersPerRun = Math.floor(batch);
+      var batch = item.customersPerRun === undefined ? { value: current.detail.customersPerRun } : FbmSync.scheduleWholeNumber(item.customersPerRun, 1, Infinity, 'số khách mỗi lượt vòng xoay', '');
+      if (batch.reason) { invalid.push({ field: 'detail.customersPerRun', reason: batch.reason }); }
+      saved.detail.customersPerRun = batch.value;
     }
   });
+  if (invalid.length) { return { ok: false, code: 'SCHEDULE_INVALID', invalid: invalid, message: 'Chưa lưu lịch đồng bộ nền.' }; }
+  if (low.length && value.confirmLow !== true) {
+    return { ok: false, code: 'SCHEDULE_LOW_CONFIRM', message: 'Chu kỳ dưới ' + lowMinutes + ' phút sẽ chạy dày, tốn hạn mức FBM và GAS: ' + low.join(', ') + '. Vẫn lưu?' };
+  }
   saved.enabled = enabled; saved.direction = direction;
   FbmSync.props().setProperty(FbmSync.BACKGROUND_SCHEDULE_KEY, JSON.stringify(saved));
   if (typeof FbmSync.schedule === 'function') { FbmSync.schedule(); }
@@ -114,7 +137,8 @@ FbmSync.scheduleDueKinds = function (now, ran) {
 /** Mốc kế tiếp = mốc cũ + đủ số chu kỳ để vượt giờ hiện tại: bám nhịp tròn, không trôi theo giờ chạy xong và không cộng dồn nợ. Mốc chưa tới (Giữ phiên chạy lúc mở Chrome) thì giữ nguyên. */
 FbmSync.scheduleMarkerAdvance = function (kind, now) {
   var key = FbmSync.SCHEDULE_MARKER_KEYS[kind], cycle = FbmSync.backgroundScheduleRead()[kind].minutes * 60 * 1000, old = Number(FbmSync.props().getProperty(key) || 0), at = Number(now || Date.now());
-  var next = !old ? at + cycle : old > at ? old : old + (Math.floor((at - old) / cycle) + 1) * cycle;
+  // Chu kỳ 0: chạy ở mọi lần hỏi, mốc mới là chính giờ chạy xong.
+  var next = !cycle ? at : !old ? at + cycle : old > at ? old : old + (Math.floor((at - old) / cycle) + 1) * cycle;
   FbmSync.props().setProperty(key, String(next));
   return next;
 };

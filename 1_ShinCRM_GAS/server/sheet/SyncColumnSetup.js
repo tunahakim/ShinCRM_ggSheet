@@ -36,5 +36,5 @@ function ensureColumnsThroughWriteGate(source, columnsForSheet) {
     if (lock) { lock.releaseLock(); }
   }
 
-  return { ok: true, changed: changed, report: report, reload: commit && commit.reloadDecision, dirty: commit && commit.dirty };
+  return { ok: true, changed: changed, report: report, reload: commit && commit.reloadDecision };
 }

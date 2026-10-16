@@ -26,7 +26,6 @@ Object.defineProperties(DIRTY_KEYS, {
   viewsStaleRevision: { value: 'viewsStaleRevision', enumerable: false },
   revision: { value: 'reloadRevision', enumerable: false },
   changedAt: { value: 'reloadChangedAt', enumerable: false },
-  recordsReadyAt: { value: 'dirtyRecordsReadyAt', enumerable: false },
   recordRevisionLog: { value: 'dirtyRecordRevisionLog', enumerable: false }
 });
 
@@ -73,7 +72,7 @@ function dirtyStateRead() {
  */
 function reloadStateRead() {
   var empty = {
-    revision: 0, changedAt: 0, recordsReadyAt: 0, records: [], entities: [], category: false, config: false, schema: false,
+    revision: 0, changedAt: 0, records: [], entities: [], category: false, config: false, schema: false,
     allCore: false, all: false, viewsStaleRevision: 0
   };
   try {
@@ -86,7 +85,6 @@ function reloadStateRead() {
     return {
       revision: isFinite(revision) && revision >= 0 ? revision : 0,
       changedAt: Number(props.getProperty(DIRTY_KEYS.changedAt) || 0) || 0,
-      recordsReadyAt: Number(props.getProperty(DIRTY_KEYS.recordsReadyAt) || 0) || 0,
       records: dirtyStateList(props, DIRTY_KEYS.records),
       entities: dirtyStateEntityList(props),
       category: category,
@@ -152,13 +150,67 @@ function dirtyStateRecordIdsAfterRevision(props, revision) {
   return Object.keys(seen);
 }
 
+/**
+ * Giỏ thay đổi của một lần chạy GAS: mọi cửa ghi chỉ bỏ dấu vào giỏ, `runEntryPoint` đổ giỏ một lần ở cuối (kể cả khi lần chạy lỗi sau khi đã ghi), nên một lần chạy dù ghi bao nhiêu lần cũng chỉ tăng revision một lần và Sidebar chỉ nạp một lần.
+ * Đánh dấu ngoài `runEntryPoint` thì ném lỗi: dấu không có giỏ là dấu không bao giờ được đổ, Sidebar sẽ giữ RAM cũ mà không ai biết.
+ * Cạm bẫy: GAS bị cắt ở trần 6 phút thì `finally` không chạy và dấu trong giỏ mất; các lượt chạy dài (đồng bộ FBM) phải tự dừng trước trần như hiện nay.
+ */
+var DIRTY_STATE_BASKET = { depth: 0, mark: null };
+
+function dirtyStateBasketBegin() {
+  if (DIRTY_STATE_BASKET.depth === 0) { DIRTY_STATE_BASKET.mark = null; }
+  DIRTY_STATE_BASKET.depth += 1;
+}
+
+/** Đóng giỏ; lớp ngoài cùng đổ giỏ. Đổ hỏng thì vẫn đóng giỏ rồi ném lỗi để cửa vào ghi Log và báo người dùng. */
+function dirtyStateBasketEnd() {
+  if (DIRTY_STATE_BASKET.depth > 1) { DIRTY_STATE_BASKET.depth -= 1; return null; }
+  try {
+    return dirtyStateBasketFlush();
+  } finally {
+    DIRTY_STATE_BASKET.depth = 0;
+    DIRTY_STATE_BASKET.mark = null;
+  }
+}
+
+/**
+ * Đổ giỏ ngay: ghi một tín hiệu cho mọi thay đổi đã gom rồi tô tab sheet quản trị cũ. Giỏ rỗng thì không làm gì.
+ * Ngoài cuối lần chạy, chỉ gọi ở chỗ phải đọc kết quả tín hiệu trong cùng lần chạy (trả trạng thái nạp kèm phản hồi lưu, vẽ sheet quản trị theo lệnh trigger); gọi giữa một chuỗi ghi là tách một lần chạy thành nhiều tín hiệu.
+ */
+function dirtyStateBasketFlush() {
+  var mark = DIRTY_STATE_BASKET.mark;
+  if (!mark) { return null; }
+  DIRTY_STATE_BASKET.mark = null;
+  var lock = LockService.getDocumentLock();
+  if (!documentStoreTryLock(lock, SETTINGS.LOCK_WAIT_MS)) {
+    throw new Error('Hệ thống bận, chưa ghi được tín hiệu nạp lại cho thay đổi vừa lưu. Bấm Nạp lại để Sidebar thấy dữ liệu mới.');
+  }
+  try {
+    var state = dirtyStateApplySignal(mark);
+    viewTabTintStaleLocked(null, { fromSidebar: mark.fromSidebar === true });
+    return state;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** Bỏ một dấu vào giỏ của lần chạy hiện tại. */
 function dirtyStateMarkSignal(mark) {
+  if (DIRTY_STATE_BASKET.depth === 0) {
+    throw new Error('Đánh dấu nạp lại ngoài runEntryPoint: không có giỏ thay đổi để đổ, Sidebar sẽ không biết dữ liệu đã đổi. Bọc cửa vào bằng runEntryPoint.');
+  }
+  var basket = DIRTY_STATE_BASKET.mark || { records: [], entities: [], category: false, config: false, schema: false, allCore: false, allViews: false, fromSidebar: false };
+  basket.records = basket.records.concat(mark.records || []);
+  basket.entities = basket.entities.concat(mark.entities || []);
+  ['category', 'config', 'schema', 'allCore', 'allViews', 'fromSidebar'].forEach(function (key) { if (mark[key] === true) { basket[key] = true; } });
+  DIRTY_STATE_BASKET.mark = basket;
+}
+
+/** Ghi một tín hiệu xuống DocumentProperties: một lần tăng revision. Chỉ `dirtyStateBasketFlush` gọi, trong khóa tài liệu. */
+function dirtyStateApplySignal(mark) {
   var props = documentProps();
   var state = reloadStateRead();
   var hasRecords = !!(mark.records && mark.records.length);
-  var explicitReadyAt = mark.recordsReadyAt !== undefined && mark.recordsReadyAt !== null;
-  var readyAt = explicitReadyAt ? Number(mark.recordsReadyAt) || 0 : 0;
-  var debounceMs = Number(mark.recordsDebounceMs) || 0;
   if (hasRecords) {
     dirtyStateWriteList(props, DIRTY_KEYS.records, state.records.concat(mark.records));
   }
@@ -170,25 +222,11 @@ function dirtyStateMarkSignal(mark) {
     props.setProperty(DIRTY_KEYS.allCore, 'true');
     props.setProperty(DIRTY_KEYS.all, 'true');
     props.deleteProperty(DIRTY_KEYS.records);
-    props.deleteProperty(DIRTY_KEYS.recordsReadyAt);
     props.deleteProperty(DIRTY_KEYS.entities);
   }
   var bumpedRevision = dirtyStateBumpRevision(props);
   if (mark.allViews) { props.setProperty(DIRTY_KEYS.viewsStaleRevision, String(bumpedRevision)); }
   if (hasRecords && !mark.allCore) { dirtyStateRecordRevisionLogAppend(props, bumpedRevision, mark.records); }
-  // Tính mốc debounce sau cùng một mốc changedAt của signal. Nếu một lần ghi
-  // ô phát thêm onEdit trong lúc xử lý, signal cuối vẫn có đủ ba giây trọn vẹn.
-  if (hasRecords && !mark.allCore) {
-    var changedAt = reloadStateRead().changedAt;
-    if (explicitReadyAt) {
-      if (readyAt > 0) { props.setProperty(DIRTY_KEYS.recordsReadyAt, String(readyAt)); }
-      else { props.deleteProperty(DIRTY_KEYS.recordsReadyAt); }
-    } else if (debounceMs > 0) {
-      props.setProperty(DIRTY_KEYS.recordsReadyAt, String(changedAt + debounceMs));
-    } else {
-      props.deleteProperty(DIRTY_KEYS.recordsReadyAt);
-    }
-  }
   var next = reloadStateRead();
   var limit = Number(SETTINGS.DIRTY_RECORD_LIMIT) || 500;
   if (!next.allCore && next.records.length > limit) {
@@ -200,15 +238,15 @@ function dirtyStateMarkSignal(mark) {
   return reloadStateRead();
 }
 
-/** Ghi phần signal do ReloadDecision trả về; không để từng trigger/cửa ghi tự dựng mark riêng. Không có signal thì trả `null` mà không đọc DocumentProperties, vì trigger sửa bộ điều khiển view đi qua đây mỗi lần gõ. */
-function dirtyStateMarkDecision(decision) {
+/** Bỏ phần signal do ReloadDecision trả về vào giỏ; không để từng trigger/cửa ghi tự dựng mark riêng. Không có signal thì không làm gì, vì trigger sửa bộ điều khiển view đi qua đây mỗi lần gõ. `fromSidebar`: lượt ghi do người đứng trước Sidebar bấm, xem `viewTabTintStaleLocked`. */
+function dirtyStateMarkDecision(decision, fromSidebar) {
   var signal = decision && decision.signal;
-  if (!signal) { return null; }
+  if (!signal) { return false; }
   var records = Array.isArray(signal.records) ? signal.records : [];
   var entities = Array.isArray(signal.entities) ? signal.entities : [];
   var hasSignal = records.length || entities.length || signal.category || signal.config || signal.schema || signal.allCore || signal.allViews;
-  if (!hasSignal) { return null; }
-  return dirtyStateMarkSignal({
+  if (!hasSignal) { return false; }
+  dirtyStateMarkSignal({
     records: records,
     entities: entities,
     category: signal.category === true,
@@ -216,20 +254,9 @@ function dirtyStateMarkDecision(decision) {
     schema: signal.schema === true,
     allCore: signal.allCore === true,
     allViews: signal.allViews === true,
-    recordsReadyAt: signal.recordsReadyAt,
-    recordsDebounceMs: signal.recordsDebounceMs
+    fromSidebar: fromSidebar === true
   });
-}
-
-/** Một cổng tín hiệu dùng chung cho mọi nguồn ghi thành công xuống Customer/Activity. */
-function dirtyStateMarkRecordChange(entity, recordIds) {
-  if (entity !== 'customer' && entity !== 'activity') { return reloadStateRead(); }
-  return dirtyStateMarkSignal({ records: recordIds || [], allViews: true, recordsReadyAt: 0 });
-}
-
-/** Làm mọi sheet quản trị thành cũ mà không đổi dữ liệu RAM nào. */
-function dirtyStateMarkAllViews() {
-  return dirtyStateMarkSignal({ allViews: true });
+  return true;
 }
 
 function dirtyStateWriteList(props, key, values) {
@@ -283,14 +310,14 @@ function dirtyStateClear(options) {
   }
   var clearOptions = Object.keys(opts).filter(function (key) { return key !== 'expectedRevision'; });
   if (!clearOptions.length) {
-    [DIRTY_KEYS.records, DIRTY_KEYS.recordsReadyAt, DIRTY_KEYS.entities, DIRTY_KEYS.category, DIRTY_KEYS.config, DIRTY_KEYS.schema, DIRTY_KEYS.allCore, DIRTY_KEYS.all].forEach(function (key) { props.deleteProperty(key); });
+    [DIRTY_KEYS.records, DIRTY_KEYS.entities, DIRTY_KEYS.category, DIRTY_KEYS.config, DIRTY_KEYS.schema, DIRTY_KEYS.allCore, DIRTY_KEYS.all].forEach(function (key) { props.deleteProperty(key); });
   } else {
-    if (opts.records) { props.deleteProperty(DIRTY_KEYS.records); props.deleteProperty(DIRTY_KEYS.recordsReadyAt); props.deleteProperty(DIRTY_KEYS.recordRevisionLog); }
+    if (opts.records) { props.deleteProperty(DIRTY_KEYS.records); props.deleteProperty(DIRTY_KEYS.recordRevisionLog); }
     if (opts.entities) { props.deleteProperty(DIRTY_KEYS.entities); }
     if (opts.config) { props.deleteProperty(DIRTY_KEYS.config); }
     if (opts.category) { props.deleteProperty(DIRTY_KEYS.category); }
     if (opts.schema) { props.deleteProperty(DIRTY_KEYS.schema); }
-    if (opts.allCore || opts.all) { props.deleteProperty(DIRTY_KEYS.allCore); props.deleteProperty(DIRTY_KEYS.all); props.deleteProperty(DIRTY_KEYS.recordsReadyAt); props.deleteProperty(DIRTY_KEYS.recordRevisionLog); }
+    if (opts.allCore || opts.all) { props.deleteProperty(DIRTY_KEYS.allCore); props.deleteProperty(DIRTY_KEYS.all); props.deleteProperty(DIRTY_KEYS.recordRevisionLog); }
   }
   return dirtyStateRead();
 }
@@ -303,7 +330,6 @@ function dirtyStateClearRecords(recordIds, expectedRevision) {
   var remaining = dirtyStateRead().records.filter(function (id) { return !remove[id]; });
   dirtyStateWriteList(props, DIRTY_KEYS.records, remaining);
   if (!remaining.length) {
-    props.deleteProperty(DIRTY_KEYS.recordsReadyAt);
     props.deleteProperty(DIRTY_KEYS.recordRevisionLog);
   } else if (expectedRevision !== undefined && expectedRevision !== null && expectedRevision !== '') {
     var keepLog = dirtyStateRecordRevisionLogRead(props).filter(function (entry) { return Number(entry.revision) > Number(expectedRevision); });

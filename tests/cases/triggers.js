@@ -1,4 +1,5 @@
 const { dungHop, ghiO, TEP_NEN } = require('../lib/dung-hop');
+const { trongLanChay } = require('../lib/load-gas');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 const fs = require('fs');
 const path = require('path');
@@ -32,7 +33,7 @@ function chay(so) {
   lead.getRange(1, 1, 1, 5).setValues([['@CUS_MA_KH', '@CUS_TEN_CTY', '@VIEW_SORT_COL', '@VIEW_SORT_LEVEL', 'Ghi chú thường']]);
   const rendered = [];
   hop.renderAllManagedViews = (names) => { rendered.push(names ? names.join(',') : 'ALL'); return { ok: true }; };
-  hop.runEntryPoint = (name, source, channel, fn) => fn();
+  hop.runEntryPoint = (name, source, channel, fn) => trongLanChay(hop, fn);
   hop.userPrefsRead = () => { throw new Error('Trigger không được đọc núm người dùng'); };
   // Xóa cả mốc cũ của view để `viewsStaleRevision > 0` nghĩa là signal sau lần xóa đã làm view cũ.
   const clearState = () => { hop.dirtyStateClear(); hop.documentProps().deleteProperty('viewsStaleRevision'); };

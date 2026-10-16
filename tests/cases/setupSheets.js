@@ -7,6 +7,7 @@
  */
 
 const { dungHop, ghiO, TEP_NEN } = require('../lib/dung-hop');
+const { trongLanChay } = require('../lib/load-gas');
 const { section, check, checkContains, checkThrows, ghiLoiNap } = require('../lib/assert');
 
 /** `SetupSheets.js` không nằm trong bộ tệp nền, vì chỉ tệp ca kiểm này cần nó. */
@@ -206,7 +207,7 @@ function chay(so) {
 
   const giu = dungKhung([['ID_COUNTER_ACTIVITY', 29]]);
   giu.hop.setupSheets();
-  giu.hop.resetConfigToDefaults();
+  trongLanChay(giu.hop, () => giu.hop.resetConfigToDefaults());
   check(so, 'dựng hoặc khôi phục Config chốt dòng bộ đếm đời cũ vào Document Properties trước khi quét trắng khối tham số',
     [giu.props.ID_COUNTER_ACTIVITY, giu.props.ID_COUNTER_CUSTOMER, giu.hop.configParams().ID_COUNTER_ACTIVITY], ['29', '0', undefined]);
 
@@ -227,7 +228,7 @@ function chay(so) {
   reset.stubs._props.ID_COUNTER_CUSTOMER = '7';
   reset.stubs._props.ID_COUNTER_ACTIVITY = '9';
   reset.hop.resetSettingsCache();
-  const resetResult = reset.hop.resetConfigToDefaults();
+  const resetResult = trongLanChay(reset.hop, () => reset.hop.resetConfigToDefaults());
   check(so, 'reset Config không đụng bộ đếm cấp mã trong Document Properties',
     [resetResult.counters, reset.hop.idGateCounterValues()], [undefined, { customer: 7, activity: 9 }]);
   check(so, 'reset xóa cấu hình người dùng và gieo lại đúng bốn tham số',

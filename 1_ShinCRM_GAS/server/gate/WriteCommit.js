@@ -1,11 +1,7 @@
 /**
  * Hậu xử lý chung của mọi lượt ghi Sheet đã được xác nhận.
  *
- * Các cửa nghiệp vụ vẫn giữ luật riêng của mình, nhưng không được tự dựng
- * ReloadDecision hoặc tự ghi DirtyState. Tệp này không ghi dữ liệu nguồn và
- * không vẽ sheet quản trị: dữ liệu đổi chỉ làm view cũ (tab tô cam), Sidebar
- * vẽ khi có người xem. Gọi trong document lock của cửa ghi để hai lượt ghi không cùng
- * đọc một revision cũ.
+ * Các cửa nghiệp vụ vẫn giữ luật riêng của mình, nhưng không được tự dựng ReloadDecision hoặc tự ghi DirtyState. Tệp này chỉ bỏ dấu vào giỏ thay đổi của lần chạy (`DirtyState.js`); `runEntryPoint` đổ giỏ một lần ở cuối, nên một lần chạy ghi nhiều lô vẫn chỉ phát một tín hiệu. Không vẽ sheet quản trị: dữ liệu đổi chỉ làm view cũ (tab tô cam lúc đổ giỏ), Sidebar vẽ khi có người xem.
  */
 
 function writeCommitCopy(input) {
@@ -30,7 +26,6 @@ function writeCommitAssertAvailable() {
   if (typeof dirtyStateMarkDecision !== 'function') { missing.push('DirtyState'); }
   if (typeof reloadStateRead !== 'function') { missing.push('reloadStateRead'); }
   if (typeof writeCommitAfterSuccess !== 'function') { missing.push('WriteCommit'); }
-  if (typeof viewTabTintStaleLocked !== 'function') { missing.push('ViewTabTint'); }
   if (missing.length) {
     throw new Error('Thiếu hậu xử lý bắt buộc của cửa ghi: ' + missing.join(', ') + '. Không ghi dữ liệu để tránh mất signal reload.');
   }
@@ -41,12 +36,7 @@ function writeCommitAfterSuccess(input) {
   writeCommitAssertAvailable();
 
   var decision = reloadDecisionForChange(writeCommitCopy(input));
-  dirtyStateMarkDecision(decision);
   // 'user' và 'delete' là hai nguồn ghi do người đứng trước Sidebar bấm.
-  viewTabTintStaleLocked(null, { fromSidebar: input && (input.source === 'user' || input.source === 'delete') });
-
-  return {
-    reloadDecision: decision,
-    dirty: reloadStateRead()
-  };
+  dirtyStateMarkDecision(decision, !!input && (input.source === 'user' || input.source === 'delete'));
+  return { reloadDecision: decision };
 }

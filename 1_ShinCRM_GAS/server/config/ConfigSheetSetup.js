@@ -244,7 +244,6 @@ function resetConfigToDefaults() {
     ok: true,
     viewSheets: views,
     params: configUserParams(configParams()),
-    reload: commit && commit.reloadDecision,
-    dirty: commit && commit.dirty
+    reload: commit && commit.reloadDecision
   };
 }
