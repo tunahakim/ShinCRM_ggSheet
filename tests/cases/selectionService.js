@@ -87,8 +87,8 @@ function chay(so) {
   state.col = 3;
   state.rowEnd = 6;
   state.colEnd = 3;
-  const snapshot = hop.selectionSnapshot();
-  check(so, 'snapshot dùng gắn vào phản hồi không tự mang dirty, ms hay ok', Object.keys(snapshot).sort(), ['cellRef', 'col', 'colEnd', 'gid', 'row', 'rowEnd', 'selectionKind', 'sheetName', 'spreadsheetId'].sort());
+  const snapshot = hop.selectionSnapshotFromContext(hop.selectionProbeContext());
+  check(so, 'ảnh chụp vị trí chỉ mang tọa độ, không tự mang dirty, ms hay ok', Object.keys(snapshot).sort(), ['cellRef', 'col', 'colEnd', 'gid', 'row', 'rowEnd', 'selectionKind', 'sheetName', 'spreadsheetId'].sort());
 
   // Một request duy nhất trả selection + ReloadState + quyết định. GAS chỉ
   // đọc mã khách khi vị trí thay đổi; Sidebar truyền lại context trước đó.
@@ -309,6 +309,21 @@ function chay(so) {
     [cham, re.loi, re.ok, re.customerId, re.selection, !!re.view], [[], undefined, true, 'CUS-EXT', null, true]);
   const reCanDoc = hop.probeSelectionAndReload({ skipPosition: true, needsSelection: true, previousSelectionContext: daBiet, previousCustomerId: 'CUS-EXT' });
   check(so, 'skipPosition kèm needsSelection (Extension đọc hỏng) thì GAS vẫn mở bảng tính đọc thay', [reCanDoc.customerId, reCanDoc.selection && reCanDoc.selection.customerIdChanged], ['CUS-000005', true]);
+
+  // Chụp vị trí tốn 0,1–0,3 giây mỗi lần; Sidebar chỉ đọc vị trí ở probeSelectionAndReload nên phản hồi khác không được chụp.
+  const fs = require('fs');
+  const path = require('path');
+  const gocGas = path.join(__dirname, '..', '..', '1_ShinCRM_GAS');
+  const quet = (thuMuc) => fs.readdirSync(thuMuc, { withFileTypes: true }).flatMap((muc) => {
+    const day = path.join(thuMuc, muc.name);
+    if (muc.isDirectory()) { return muc.name === 'dev' ? [] : quet(day); }
+    return muc.name.endsWith('.js') ? [path.relative(gocGas, day).split(path.sep).join('/')] : [];
+  });
+  const chupNgoai = quet(gocGas).filter((tep) => tep !== 'server/service/SelectionService.js').filter((tep) => {
+    const nguon = fs.readFileSync(path.join(gocGas, tep), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    return /selectionProbeContext\s*\(|selectionSnapshotFromContext\s*\(|getActiveRange\s*\(/.test(nguon);
+  });
+  check(so, 'chỉ SelectionService.js chụp vị trí ô đang chọn (phản hồi lưu, xóa, nạp không chụp)', chupNgoai, []);
 
   return so;
 }

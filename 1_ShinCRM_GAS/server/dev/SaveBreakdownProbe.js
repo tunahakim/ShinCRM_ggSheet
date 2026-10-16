@@ -28,7 +28,7 @@ var SAVE_BREAKDOWN_PROBE_PARTS = [
   'documentLockRun', 'documentLockSettle',
   'entityReadContext', 'writeGateRowById', 'writeGateSelectCatalog', 'writeGateUniqueCheck', 'idGateIssue',
   'writeGateRowSnapshot', 'writeGateWriteNew', 'writeGateWriteExisting', 'writeGateReadBack', 'logEvent',
-  'dirtyStateBasketFlush', 'reloadStateRead', 'selectionSnapshot'
+  'dirtyStateBasketFlush', 'reloadStateRead'
 ];
 
 function measureSaveBreakdown() {

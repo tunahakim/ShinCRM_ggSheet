@@ -30,7 +30,6 @@ function saveRecord(entity, record) {
     // Đổ giỏ trước khi trả để phản hồi mang revision đã gồm lượt lưu này; Sidebar đã áp bản đọc lại nên không phải hỏi nạp thêm.
     dirtyStateBasketFlush();
     ra.reload = reloadStateRead();
-    ra.selection = selectionSnapshot();
     ra.ms = Date.now() - batDau;
     return ra;
   });
@@ -50,7 +49,6 @@ function deleteRecords(entity, ids) {
 
     dirtyStateBasketFlush();
     ra.reload = reloadStateRead();
-    ra.selection = selectionSnapshot();
     ra.ms = Date.now() - batDau;
     return ra;
   });

@@ -153,7 +153,6 @@ function chay(so) {
   const nhatKy = [];
   let giuKhoa = false;
   let traLoiKhoa = { ok: true };
-  sh.selectionSnapshot = () => null;
   sh.FbmSync = { withOrchestrationLock: (work) => { nhatKy.push('lock'); giuKhoa = true; try { return work(); } finally { giuKhoa = false; nhatKy.push('unlock'); } } };
   sh.fbmSyncSaveAllowed = (entity, id, revision) => { nhatKy.push(['check', entity, id, revision, giuKhoa]); return traLoiKhoa; };
   const ghiGoc = sh.writeGateSave;

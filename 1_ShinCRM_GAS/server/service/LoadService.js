@@ -18,7 +18,7 @@ var LOAD_SOURCE = 'sidebar';
 function getReloadState() {
   return runEntryPoint('getReloadState', LOAD_SOURCE, 'throw', function () {
     var started = Date.now();
-    return { ok: true, reload: reloadStateRead(), selection: selectionSnapshot(), ms: Date.now() - started };
+    return { ok: true, reload: reloadStateRead(), ms: Date.now() - started };
   });
 }
 
@@ -94,7 +94,6 @@ function reloadRecords(recordIds, options) {
       // Bản ghi có thể do máy khác vừa cấp mã; gửi bộ đếm để mã xem trước của Sidebar này không tụt lại.
       counters: idGateCounterValues(),
       reload: reloadStateRead(),
-      selection: selectionSnapshot(),
       ms: Date.now() - started
     };
   };
@@ -112,7 +111,6 @@ function reloadCategory(options) {
       categories: result.categories,
       warnings: result.warnings,
       reload: reloadStateRead(),
-      selection: selectionSnapshot(),
       ms: Date.now() - started
     };
   };
@@ -131,7 +129,6 @@ function reloadConfig(options) {
       reloadMode: 'config',
       config: config,
       reload: reloadStateRead(),
-      selection: selectionSnapshot(),
       ms: Date.now() - started
     };
   };
@@ -153,7 +150,6 @@ function reloadEntityAll(entity) {
     activity: entity === 'activity' ? result : undefined,
     counters: idGateCounterValues(),
     reload: reloadStateRead(),
-    selection: selectionSnapshot(),
     ms: Date.now() - started
   };
 }
@@ -251,7 +247,7 @@ function loadCore(options) {
         detail: { total: budget.total, ceiling: budget.ceiling, sheets: budget.sheets }
       });
 
-      return { ok: true, blocked: 'cellBudget', budget: budget, reload: reloadStateRead(), selection: selectionSnapshot(), pendingMessages: takePendingMessages(), ms: Date.now() - batDau };
+      return { ok: true, blocked: 'cellBudget', budget: budget, reload: reloadStateRead(), pendingMessages: takePendingMessages(), ms: Date.now() - batDau };
     }
 
     // Revision đọc trước mọi ô dữ liệu: thay đổi ghi trong lúc đọc mang revision lớn hơn nên lời hỏi sau của Sidebar tự thấy.
@@ -305,7 +301,6 @@ function loadCore(options) {
       prefs: userPrefsRead(),
       budget: budget,
       reload: reloadStateRead(),
-      selection: selectionSnapshot(),
       warnings: warnings,
       pendingMessages: takePendingMessages(),
       ms: ms
@@ -346,7 +341,7 @@ function loadActivityChunk(cursor, chunkRows) {
     var coGoi = loadChunkRows(chunkRows);
 
     if (context.rowCount <= 0 || endRow < firstDataRow) {
-      return { ok: true, fields: context.names, rows: [], done: true, nextCursor: null, total: context.rowCount, chunkRows: coGoi, reload: reloadStateRead(), selection: selectionSnapshot(), ms: Date.now() - batDau };
+      return { ok: true, fields: context.names, rows: [], done: true, nextCursor: null, total: context.rowCount, chunkRows: coGoi, reload: reloadStateRead(), ms: Date.now() - batDau };
     }
 
     var startRow = Math.max(firstDataRow, endRow - coGoi + 1);
@@ -375,7 +370,6 @@ function loadActivityChunk(cursor, chunkRows) {
       total: context.rowCount,
       chunkRows: coGoi,
       reload: reloadStateRead(),
-      selection: selectionSnapshot(),
       ms: ms
     };
   });

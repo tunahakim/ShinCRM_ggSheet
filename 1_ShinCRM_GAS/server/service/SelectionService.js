@@ -2,16 +2,12 @@
  * Hai đường đọc ô đang chọn khi không có Extension. Đường rẻ chỉ trả tọa độ; đường đầy đủ tra thêm mã khách và luôn đóng an toàn khi không chắc chắn.
  */
 
+/** Mở bảng tính và hỏi vùng đang chọn tốn 0,1–0,3 giây, nên chỉ lời hỏi vị trí trong tệp này gọi; phản hồi lưu, xóa, nạp không chụp vị trí vì Sidebar không đọc ở đó. */
 function selectionProbeContext() {
   var book = shinOpenBook();
   var sheet = typeof book.getActiveSheet === 'function' ? book.getActiveSheet() : null;
   var range = sheet && typeof sheet.getActiveRange === 'function' ? sheet.getActiveRange() : null;
   return { book: book, sheet: sheet, range: range };
-}
-
-/** Ảnh chụp vị trí dùng chung cho mọi phản hồi máy chủ; không tự bọc cửa vào và không đọc trạng thái bẩn. */
-function selectionSnapshot() {
-  return selectionSnapshotFromContext(selectionProbeContext());
 }
 
 function selectionSnapshotFromContext(context) {
