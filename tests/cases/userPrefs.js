@@ -47,14 +47,9 @@ function chay(so) {
   check(so, 'PropertiesService gãy hẳn thì trả ba ngầm định chứ không ném — đây là chiều an toàn',
     gay.hop.userPrefsRead(), { followSelection: true, autoRenderView: true, activityView: 'active' });
 
-  const nua = dungHop();
-  nua.hop.PropertiesService = {
-    getUserProperties: function () {
-      return { getProperty: function (key) { if (key === 'prefAutoRenderView') { throw new Error('Khóa này đọc không được'); } return null; } };
-    }
-  };
-  check(so, 'gãy giữa lượt đọc cũng ra ba ngầm định, không ra khối nửa vời',
-    nua.hop.userPrefsRead(), { followSelection: true, autoRenderView: true, activityView: 'active' });
+  const motLan = dungHop({ userProps: { prefFollowSelection: 'false' } });
+  motLan.hop.userPrefsRead();
+  check(so, 'đọc cả ba núm bằng đúng một lệnh kho UserProperties', motLan.stubs._khoDem.userDoc, 1);
 
   // Chiều ghi.
   const ghi = dungHop();
@@ -64,6 +59,7 @@ function chay(so) {
     [true, { followSelection: true, autoRenderView: true, activityView: 'all' }, ['changedAt', 'floor', 'revision', 'viewsStaleRevision']]);
 
   check(so, 'giá trị vào kho UserProperties dưới dạng chuỗi', ghi.userProps.prefActivityView, 'all');
+  check(so, 'ghi xong trả khối dựng từ lần đọc trước khi ghi, không đọc lại kho', ghi.stubs._khoDem.userDoc, 1);
   check(so, 'ghi núm chọn không chạm DocumentProperties — hai kho là hai kho',
     Object.keys(ghi.props).filter((k) => k.indexOf('pref') === 0), []);
 

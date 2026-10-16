@@ -18,9 +18,9 @@ var USER_PREFS = {
  *
  * Cả hai kiểu đối xử với giá trị lạ giống nhau — về ngầm định — nên luật phát biểu được thành một câu. Chỉ `userPrefsWrite` ghi vào kho này và nó kiểm trước khi ghi, nên giá trị lạ chỉ xuất hiện khi có người sửa tay `UserProperties`.
  */
-function userPrefsOne(props, name) {
+function userPrefsOne(values, name) {
   var khai = USER_PREFS[name];
-  var raw = props.getProperty(khai.key);
+  var raw = values[khai.key];
   if (raw === null || raw === undefined || raw === '') { return khai.fallback; }
 
   if (khai.type === 'bool') {
@@ -37,16 +37,19 @@ function userPrefsOne(props, name) {
  * **Không bao giờ ném lỗi**, vì: hàm này nằm trên đường nạp lõi, nên nó hỏng là cả lượt mở sidebar hỏng. Không đọc được thì trả về ba ngầm định, và ba ngầm định là chiều an toàn — chúng chỉ đổi *khi nào vẽ* và *xem phần nào*, không đổi dữ liệu nào.
  */
 function userPrefsRead() {
-  var out = {};
-  var names = Object.keys(USER_PREFS);
-
+  var values;
   try {
-    var props = PropertiesService.getUserProperties();
-    names.forEach(function (name) { out[name] = userPrefsOne(props, name); });
+    values = PropertiesService.getUserProperties().getProperties() || {};
   } catch (khongDocDuocProps) {
-    names.forEach(function (name) { out[name] = USER_PREFS[name].fallback; });
+    values = {};
   }
+  return userPrefsFromValues(values);
+}
 
+/** Cả ba núm từ bảng khóa–giá trị đã đọc một lần (`getProperties`), để đọc và ghi dùng chung một lần đọc kho. */
+function userPrefsFromValues(values) {
+  var out = {};
+  Object.keys(USER_PREFS).forEach(function (name) { out[name] = userPrefsOne(values, name); });
   return out;
 }
 
@@ -75,7 +78,10 @@ function userPrefsWrite(name, value) {
       luu = value;
     }
 
-    PropertiesService.getUserProperties().setProperty(khai.key, luu);
+    var props = PropertiesService.getUserProperties();
+    var values = props.getProperties() || {};
+    props.setProperty(khai.key, luu);
+    values[khai.key] = luu;
 
     logTrace({
       source: 'sidebar',
@@ -85,7 +91,7 @@ function userPrefsWrite(name, value) {
       detail: { num: name, giaTri: luu }
     });
 
-    return { ok: true, prefs: userPrefsRead(), reload: reloadStateRead() };
+    return { ok: true, prefs: userPrefsFromValues(values), reload: reloadStateRead() };
   });
 }
 

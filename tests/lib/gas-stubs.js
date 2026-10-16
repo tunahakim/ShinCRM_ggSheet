@@ -45,7 +45,7 @@ function taoStubsGas(options) {
   const daLog = [];
   const daConsole = [];
   const khoa = { dem: 0, demNha: 0, dangGiu: false, chanKhoa: chon.chanKhoa === true, msCuoi: 0 };
-  const khoDem = { doc: 0, ghi: 0 };
+  const khoDem = { doc: 0, ghi: 0, userDoc: 0 };
 
   return {
     SpreadsheetApp: gia.SpreadsheetApp,
@@ -125,7 +125,8 @@ function taoStubsGas(options) {
         deleteProperty: (key) => { khoDem.ghi += 1; delete props[key]; }
       }),
       getUserProperties: () => ({
-        getProperty: (key) => (Object.prototype.hasOwnProperty.call(userProps, key) ? userProps[key] : null),
+        getProperty: (key) => { khoDem.userDoc += 1; return Object.prototype.hasOwnProperty.call(userProps, key) ? userProps[key] : null; },
+        getProperties: () => { khoDem.userDoc += 1; return Object.assign({}, userProps); },
         setProperty: (key, value) => { userProps[key] = String(value); },
         deleteProperty: (key) => { delete userProps[key]; }
       })
