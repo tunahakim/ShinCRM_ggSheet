@@ -111,3 +111,10 @@ function fbmProbeCustomerActivities(customerId) {
     })
   };
 }
+
+/** Mốc lịch nền và các cờ quyết định lần hỏi nền có chạy hay không. */
+function fbmProbeScheduleMarkers() {
+  var props = FbmSync.props(), state = FbmSync.stateRead(), now = Date.now(), markers = {};
+  Object.keys(FbmSync.SCHEDULE_MARKER_KEYS).forEach(function (kind) { var at = Number(props.getProperty(FbmSync.SCHEDULE_MARKER_KEYS[kind]) || 0); markers[kind] = { at: at ? new Date(at).toISOString() : '', dueInMin: at ? Math.round((at - now) / 60000) : null }; });
+  return { now: new Date(now).toISOString(), master: FbmSync.masterEnabled(), background: FbmSync.backgroundEnabled(), markers: markers, phase: state.phase, origin: state.origin, scheduledScan: state.scheduledScan, chain: state.chain, activeRequestId: state.activeRequestId, deadlineAt: state.deadlineAt ? new Date(Number(state.deadlineAt)).toISOString() : '', failureCode: state.failureCode, message: state.message, sessionExpired: state.session && state.session.expired, due: FbmSync.scheduleDueKinds(now, []), trace: (function () { try { return JSON.parse(props.getProperty('FBM_SYNC_TRACE_V1') || '[]').slice(-25).map(function (t) { return new Date(Number(t.at)).toISOString().slice(11, 19) + ' ' + t.stage + ' ' + (t.operation || '') + ' ' + (t.code || t.failureCode || ''); }); } catch (e) { return String(e); } })() };
+}
