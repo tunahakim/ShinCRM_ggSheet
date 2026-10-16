@@ -349,42 +349,13 @@ function sheetLinkPlanForSheet(sheetName) {
 
 function sheetLinkReloadState(payload) {
   if (!payload) { return {}; }
-  return payload.reload || payload.dirty || payload;
+  return payload.reload || payload;
 }
 
-function sheetLinkDirtyNeedsData(dirty) {
-  return !!(dirty && (dirty.allCore || dirty.all || dirty.schema || dirty.config || dirty.category || (dirty.records && dirty.records.length) || (dirty.entities && dirty.entities.length)));
-}
-
-function sheetLinkApplyDirtyData(dirty, decision) {
-  if (!sheetLinkDirtyNeedsData(dirty)) { return null; }
-  var localDraftIds = typeof refreshLocalDraftIds === 'function' ? refreshLocalDraftIds() : [];
-  var draft = {};
-  localDraftIds.forEach(function (id) { draft[id] = true; });
-  var mode = decision && decision.ram ? decision.ram.mode : '';
-  if ((dirty.allCore || dirty.all || dirty.schema || dirty.config || mode === 'fullCore') && typeof sidebarBoot === 'function') {
-    if (localDraftIds.length) { return { deferred: true, reason: 'Sidebar đang giữ bản nháp, chưa nạp lại full core.' }; }
-    return sidebarBoot({ preserveView: true });
-  }
-  if (mode === 'entity' && decision.ram.entity && typeof refreshEntity === 'function') {
-    if (localDraftIds.length) { return { deferred: true, reason: 'Sidebar đang giữ bản nháp, chưa nạp trọn ' + decision.ram.entity + '.' }; }
-    return refreshEntity(decision.ram.entity, dirty.revision);
-  }
-  if (dirty.category && typeof refreshCategory === 'function') {
-    var categoryWork = refreshCategory(dirty.revision);
-    if (dirty.records && dirty.records.length && typeof refreshDirtyRecords === 'function') {
-      var categoryRecords = dirty.records.filter(function (id) { return !draft[String(id || '').trim()]; });
-      if (!categoryRecords.length) { return categoryWork; }
-      return categoryWork.then(function () { return refreshDirtyRecords(categoryRecords, dirty.revision); });
-    }
-    return categoryWork;
-  }
-  if (dirty.records && dirty.records.length && typeof refreshDirtyRecords === 'function') {
-    var ready = dirty.records.filter(function (id) { return !draft[String(id || '').trim()]; });
-    if (!ready.length) { return { deferred: true, reason: 'Các mã bẩn đều đang có bản nháp Sidebar.' }; }
-    return refreshDirtyRecords(ready, dirty.revision);
-  }
-  return null;
+/** Sổ nhật ký đã có revision mới hơn revision Sidebar này đã nạp: chỉ GAS biết đổi gì, nên việc của Sidebar là hỏi GAS. */
+function sheetLinkReloadIsNewer(state) {
+  var revision = Number(state && state.revision || 0);
+  return revision > SHEET_LINK_LAST_SEEN_REVISION;
 }
 
 /**
@@ -412,66 +383,21 @@ function sheetLinkLocalDraftInput() {
   return { recordIds: ids };
 }
 
-/** Chỉ coi revision đã xử lý sau khi công việc nạp thực sự thành công. */
-function sheetLinkReloadWorkSucceeded(value) {
-  return !!value && value.deferred !== true && value.reloadFailed !== true && value.ok !== false;
-}
-
-function sheetLinkWorkRevision(value, fallbackState) {
-  var candidates = [
-    value && value.processedRevision,
-    value && value.reload && value.reload.revision,
-    fallbackState && fallbackState.revision
-  ];
-  return candidates.reduce(function (highest, candidate) {
-    var revision = Number(candidate || 0);
-    return isFinite(revision) && revision > highest ? revision : highest;
-  }, 0);
-}
-
-function sheetLinkApplyDecisionResult(result, options) {
-  if (!result) { return null; }
-  var state = sheetLinkReloadState(result);
-  var stateRevision = Number(state && state.revision || 0);
-  var opts = options || {};
-  if (stateRevision && stateRevision <= SHEET_LINK_LAST_SEEN_REVISION && opts.forceReload !== true) {
-    return result;
-  }
-  // GAS đã tiêu dấu bẩn khi đọc payload, nên payload về là phải áp. Lượt nạp do tín hiệu chỉ hiện thanh loading, không chặn người đang thao tác.
-  if (result.payload && typeof refreshReloadPayload === 'function') {
-    var payloadWork = function () { return refreshReloadPayload(result.payload); };
-    var payloadRun = typeof sidebarBusyRun === 'function' ? sidebarBusyRun('Đang đồng bộ dữ liệu vừa thay đổi…', payloadWork, { progress: true, block: false }) : payloadWork();
-    var payloadDone = function (value) {
-      if (value && stateRevision) {
-        SHEET_LINK_LAST_SEEN_REVISION = Math.max(SHEET_LINK_LAST_SEEN_REVISION, Number(result.processedRevision || stateRevision));
-      }
-      return value || result;
-    };
-    return payloadRun && typeof payloadRun.then === 'function' ? payloadRun.then(payloadDone) : payloadDone(payloadRun);
-  }
-  var decision = result.decision || (typeof reloadDecisionForState === 'function' ? reloadDecisionForState({ reloadState: state }) : null);
-  if (!decision || !decision.ram || decision.ram.action === 'none') {
-    return result;
-  }
-  if (decision.ram.action === 'defer') {
-    return { deferred: true, reason: decision.ram.reason, reload: state, decision: decision };
-  }
-  var refresh = function () { return sheetLinkApplyDirtyData(state, decision); };
-  var work = typeof sidebarBusyRun === 'function' ? sidebarBusyRun('Đang đồng bộ dữ liệu vừa thay đổi…', refresh, { progress: true, block: false }) : refresh();
-  if (!work || typeof work.then !== 'function') {
-    if (sheetLinkReloadWorkSucceeded(work) && state && state.revision) {
-      SHEET_LINK_LAST_SEEN_REVISION = Math.max(SHEET_LINK_LAST_SEEN_REVISION, sheetLinkWorkRevision(work, state));
-    }
-    return work;
-  }
-  return work.then(function (value) {
-    // Chỉ ghi nhận revision sau khi Store đã nhận dữ liệu. Nếu reload thất bại
-    // hoặc bị hoãn vì bản nháp, lần hỏi sau vẫn phải thấy signal cũ.
-    if (sheetLinkReloadWorkSucceeded(value) && state && state.revision) {
-      SHEET_LINK_LAST_SEEN_REVISION = Math.max(SHEET_LINK_LAST_SEEN_REVISION, sheetLinkWorkRevision(value, state));
-    }
-    return value;
-  });
+/**
+ * Áp kết quả lời hỏi: gói mới hơn revision đã thấy thì áp rồi nâng revision đã thấy lên đúng revision GAS đã xử lý (07A bất biến 4). Không gói (không có gì mới, hoặc hoãn vì bản nháp) thì giữ nguyên revision để lời hỏi sau nhận lại đủ.
+ * Lượt nạp do tín hiệu chỉ hiện thanh loading, không chặn người đang thao tác.
+ */
+function sheetLinkApplyDecisionResult(result) {
+  if (!result || !result.payload || typeof refreshReloadPayload !== 'function') { return result; }
+  // Hai lời hỏi bay song song: phản hồi về muộn mang dữ liệu đọc trước gói đã áp, áp vào sẽ ghi đè RAM bằng dữ liệu cũ.
+  if ((Number(result.processedRevision) || 0) <= SHEET_LINK_LAST_SEEN_REVISION) { return result; }
+  var payloadWork = function () { return refreshReloadPayload(result.payload); };
+  var payloadRun = typeof sidebarBusyRun === 'function' ? sidebarBusyRun('Đang đồng bộ dữ liệu vừa thay đổi…', payloadWork, { progress: true, block: false }) : payloadWork();
+  var payloadDone = function (value) {
+    if (value) { SHEET_LINK_LAST_SEEN_REVISION = Math.max(SHEET_LINK_LAST_SEEN_REVISION, Number(result.processedRevision) || 0); }
+    return value || result;
+  };
+  return payloadRun && typeof payloadRun.then === 'function' ? payloadRun.then(payloadDone) : payloadDone(payloadRun);
 }
 
 /** Lời đánh thức xếp hàng khi lời hỏi trước còn bay phải giữ cờ đọc vị trí, nếu không GAS so vị trí thấy không đổi và trả mã khách cũ. */
@@ -569,9 +495,7 @@ function sheetLinkSyncDirtyData(options) {
 function sheetLinkObserveReloadPayload(payload, serverName) {
   if (!payload || payload.reloadObservation === false || !SHEET_LINK_RAM_READY || serverName === 'getReloadState' || serverName === 'reloadRecords' || serverName === 'probeSelectionAndReload' || serverName === 'saveRecord' || serverName === 'deleteRecords') { return null; }
   var state = sheetLinkReloadState(payload);
-  var revision = Number(state && state.revision || 0);
-  if (!revision || revision <= SHEET_LINK_LAST_SEEN_REVISION) { return null; }
-  if (!sheetLinkDirtyNeedsData(state)) { return null; }
+  if (!sheetLinkReloadIsNewer(state)) { return null; }
   if (SHEET_LINK_RELOAD_CHECKING) { return SHEET_LINK_RELOAD_CHECKING; }
   var check = sheetLinkSyncDirtyData();
   SHEET_LINK_RELOAD_CHECKING = check;
@@ -612,13 +536,12 @@ function sheetLinkInspectView(sheetName) {
   var settled = false;
   var work = callServer('inspectViewState', [sheetName, state.revision], { silent: true }).then(function (result) {
     if (!result) { return result; }
-    var dirty = sheetLinkReloadState(result);
-    var refreshData = sheetLinkDirtyNeedsData(dirty);
+    var refreshData = sheetLinkReloadIsNewer(sheetLinkReloadState(result));
     var refreshView = !state.metaReady || result.changed || result.needsRender;
     if (!refreshData && !refreshView) { return result; }
 
     var sync = function () {
-      var dataWork = sheetLinkApplyDirtyData(dirty);
+      var dataWork = refreshData ? sheetLinkSyncDirtyData({ reason: 'view-inspect' }) : null;
       var afterData = function () { return refreshView ? sheetLinkSyncView(sheetName, { controlsOnly: true }) : result; };
       return dataWork && typeof dataWork.then === 'function' ? dataWork.then(afterData) : afterData();
     };

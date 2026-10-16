@@ -97,8 +97,16 @@ function refreshDecideAndRender(context) {
   return { rendered: false, reason: 'Không có renderer cho màn hình hiện tại.' };
 }
 
-/** Áp dụng payload đã được GAS đọc trong chính request probe; không gọi thêm API reload. */
+/** Áp dụng gói GAS đọc trong chính lời hỏi: các phần theo đúng thứ tự GAS xếp (cấu hình trước dữ liệu); không gọi thêm API reload. */
 function refreshReloadPayload(payload) {
+  if (!payload || !Array.isArray(payload.parts) || !payload.parts.length) { return null; }
+  var applied = payload.parts.map(refreshReloadPart);
+  // Một phần không áp được thì trả null để Sidebar không nâng revision đã thấy (07A bất biến 4).
+  return applied.every(function (part) { return !!part; }) ? payload : null;
+}
+
+/** Một phần của gói nạp. */
+function refreshReloadPart(payload) {
   if (!payload || !payload.mode) { return null; }
   if (payload.mode === 'records') {
     refreshRecordsApply({
@@ -213,49 +221,4 @@ function refreshFullCore(result) {
   });
 }
 
-function refreshDirtyRecords(ids, expectedRevision, retryDepth) {
-  return callServer('reloadRecords', [ids, expectedRevision]).then(function (result) {
-    if (result && result.reloadMode === 'fullCore') {
-      return refreshFullCore(result);
-    }
-    refreshRecordsApply(result, ids);
-    // The server keeps a newer signal when the revision changed during the read.
-    // Follow that signal immediately a bounded number of times so a concurrent
-    // write is not stranded, without introducing a periodic ReloadState poll.
-    var state = typeof sheetLinkReloadState === 'function' ? sheetLinkReloadState(result) : null;
-    var nextIds = state && Array.isArray(state.records) ? state.records : [];
-    var depth = Number(retryDepth) || 0;
-    if (result && result.revisionMatched === false && nextIds.length && depth < 2) {
-      return refreshDirtyRecords(nextIds, state.revision, depth + 1);
-    }
-    return result;
-  });
-}
-
-function refreshCategory(expectedRevision) {
-  return callServer('reloadCategory', [expectedRevision]).then(function (result) {
-    if (result && result.reloadMode === 'fullCore') {
-      return refreshFullCore(result);
-    }
-    refreshCategoryApply(result);
-    return result;
-  });
-}
-
-/** Nạp trọn một thực thể khi ReloadState đòi (sắp xếp, thêm/xóa hàng trên sheet kho); dùng chung cửa với nút nạp lại thủ công. */
-function refreshEntity(entity, expectedRevision) {
-  return callServer(entity === 'activity' ? 'reloadActivity' : 'reloadCustomer', [expectedRevision]).then(function (result) {
-    return refreshEntityApply(entity, result);
-  });
-}
-
-function refreshConfig(expectedRevision) {
-  return callServer('reloadConfig', [expectedRevision]).then(function (result) {
-    if (result && result.reloadMode === 'fullCore') {
-      return refreshFullCore(result);
-    }
-    refreshConfigApply(result);
-    return result;
-  });
-}
 </script>
