@@ -159,8 +159,7 @@ async function chay(so) {
   check(so, 'rời Customer khi kênh sống và không có tín hiệu chờ: không hỏi GAS', (await roiKho()).calls, 0);
   check(so, 'rời Customer khi còn tín hiệu chờ: hỏi ngay một lượt thay mốc đầu, giữ mốc sau để tự xét',
     await roiKho((h) => h.sheetLinkOnMessage({ origin: h.SHEET_LINK_ORIGIN, data: { action: 'CRM_RELOAD', nonce: h.SHEET_LINK_NONCE, signal: 'channel' } })), { calls: 1, hen: [12000] });
-  check(so, 'rời Customer khi kênh chết hoặc còn lượt nạp hoãn: vẫn hỏi ngay',
-    [(await roiKho((h) => { h.CHANGE_SIGNAL.dead = true; })).calls, (await roiKho((h) => { h.SHEET_LINK_RELOAD_TIMER = 99; })).calls], [1, 1]);
+  check(so, 'rời Customer khi kênh chết: vẫn hỏi ngay', (await roiKho((h) => { h.CHANGE_SIGNAL.dead = true; })).calls, 1);
 
   const appFocus = dungHopPoll(); batDau(appFocus); appFocus._calls = [];
   appFocus.SHEET_LINK_LAST_ACK = 5000; appFocus._clock.now = 5001;
@@ -575,7 +574,7 @@ function dungHopView(answers) {
   hop._log = [];
   hop._answers = answers || {};
   hop.callServer = (name, args) => {
-    hop._log.push({ name, reason: name === 'probeSelectionAndReload' ? args[0].reason : '', syncRunning: name === 'probeSelectionAndReload' ? args[0].syncRunning : null, options: name === 'renderViewIfDirty' ? args[1] : null });
+    hop._log.push({ name, reason: name === 'probeSelectionAndReload' ? args[0].reason : '', input: name === 'probeSelectionAndReload' ? args[0] : null, options: name === 'renderViewIfDirty' ? args[1] : null });
     const answer = hop._answers[name];
     return Promise.resolve(typeof answer === 'function' ? answer(args) : (answer || { ok: true, reload: { revision: 0 } }));
   };
@@ -656,30 +655,29 @@ async function chayView(so) {
   check(so, 'bật núm chờ ghi UserProperties xong mới hỏi GAS',
     /toggleAutoRenderView[\s\S]*?sent\.then\(function \(value\) \{ sheetLinkOnAutoRenderOn\(\)/.test(actionsHtml), true);
 
-  // Lượt đồng bộ đang chạy: GAS quyết hoãn từ cờ syncRunning; payload đã về thì GAS đã tiêu dấu bẩn nên Sidebar phải áp, chỉ hoãn vẽ view.
+  // Lượt đồng bộ đang chạy không còn là lý do hoãn: mỗi lần chạy GAS có thay đổi phát một tín hiệu, Sidebar áp ngay và vẽ view cùng lúc.
   const syncing = dungHopView({ probeSelectionAndReload: Object.assign({}, probeRender, { reload: { revision: 12, records: ['KH1'] }, processedRevision: 12, payload: { mode: 'records' } }), renderViewIfDirty: drawn });
   syncing.FBM_SYNC_CLIENT = { running: true, active: false };
   syncing._payloads = [];
+  syncing._busy = [];
   syncing.refreshReloadPayload = (payload) => { syncing._payloads.push(payload.mode); return payload; };
+  syncing.sidebarBusyRun = (message, work, options) => { syncing._busy.push(options); return work(); };
   syncing.SHEET_LINK_LAST_SEEN_REVISION = 3;
   await syncing.sheetLinkProbeSelectionAndReload('dirty-state');
-  check(so, 'lượt đồng bộ đang chạy: lời hỏi báo syncRunning cho GAS; payload đã về vẫn được áp (bỏ là mất dữ liệu vì GAS đã xóa dấu bẩn), không vẽ view',
-    [tenGoi(syncing, 'probeSelectionAndReload').map((item) => item.syncRunning), syncing._payloads, tenGoi(syncing, 'renderViewIfDirty').length, syncing.SHEET_LINK_LAST_SEEN_REVISION], [[true], ['records'], 0, 12]);
-  syncing.FBM_SYNC_CLIENT.running = false;
-  await syncing.sheetLinkSyncFinished();
-  check(so, 'lượt kết thúc hỏi lại sync-finished với syncRunning tắt và vẽ view đã hoãn',
-    [tenGoi(syncing, 'probeSelectionAndReload').map((item) => item.reason + ':' + item.syncRunning), tenGoi(syncing, 'renderViewIfDirty').length],
-    [['dirty-state:true', 'sync-finished:false'], 1]);
+  check(so, 'lượt đồng bộ đang chạy: lời hỏi không gửi cờ syncRunning/forceImmediate, payload áp ngay và view vẽ cùng lượt',
+    [tenGoi(syncing, 'probeSelectionAndReload').map((item) => ['syncRunning' in item.input, 'forceImmediate' in item.input]), syncing._payloads, tenGoi(syncing, 'renderViewIfDirty').length, syncing.SHEET_LINK_LAST_SEEN_REVISION],
+    [[[false, false]], ['records'], 1, 12]);
+  check(so, 'payload và lượt vẽ view từ lời hỏi tín hiệu gọi sidebarBusyRun với block: false, progress: true (thanh loading vẫn chạy, không chặn người đang thao tác)',
+    syncing._busy.map((item) => [item.block, item.progress]), [[false, true], [false, true]]);
 
   const fbm = taoHopCat({ console });
   napClient(fbm, 'client/sync/fbmSync.html');
-  const finished = [];
-  fbm.sheetLinkSyncFinished = () => finished.push(1);
-  fbm.fbmSyncSetRunning(true); fbm.fbmSyncSetRunning(false); fbm.fbmSyncSetRunning(false);
+  fbm.fbmSyncSetRunning(true); fbm.fbmSyncSetRunning(false);
   const fbmSource = fs.readFileSync(path.join(GAS_DIR, 'client', 'sync', 'fbmSync.html'), 'utf8');
-  const directWrites = (fbmSource.match(/FBM_SYNC_CLIENT\.running\s*=[^=]/g) || []).length;
-  check(so, 'mọi nhánh kết thúc lượt (xong, lỗi, hủy) đi qua một cửa đổi cờ: chuyển chạy → dừng gọi sync-finished đúng một lần, dừng → dừng không gọi',
-    [finished.length, directWrites], [1, 1]);
+  const sidebarSources = ['client/link/sheetLink.html', 'client/ram/refresh.html', 'client/sync/fbmSync.html'].map((rel) => fs.readFileSync(path.join(GAS_DIR, rel), 'utf8')).join(' ');
+  check(so, 'cờ lượt chạy đổi qua một cửa và không còn đường hoãn nạp theo đồng bộ phía Sidebar (sync-finished, refreshDeferredBySync, hẹn giờ debounce)',
+    [fbm.FBM_SYNC_CLIENT.running, (fbmSource.match(/FBM_SYNC_CLIENT\.running\s*=[^=]/g) || []).length, /sheetLinkSyncFinished|refreshDeferredBySync|SHEET_LINK_RELOAD_TIMER|forceImmediate|syncRunning/.test(sidebarSources)],
+    [false, 1, false]);
 }
 
 module.exports = { chay: async (so) => { await chay(so); await chayView(so); } };
