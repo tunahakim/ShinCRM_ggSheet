@@ -106,7 +106,9 @@ FbmSync.loginConfigPolicySave = function (input) {
 
 /** Lượt người dùng bấm chạy thì không chịu chu kỳ chờ: chu kỳ chỉ để chạy nền không thử dồn dập, còn người bấm cần được thử ngay hoặc nhận hướng dẫn (chủ dự án chốt 2026-10-07). Lượt nền và heartbeat do máy tự gọi nên vẫn chịu chu kỳ. Cạm bẫy: mọi lượt chạy đều mở đầu bằng `session_probe`, nên không được loại theo loại cursor đó mà phải nhìn nguồn lượt. Mỗi lượt bấm vẫn chỉ thử một lần vì đăng nhập hỏng thì lượt kết thúc. */
 FbmSync.autoLoginAttemptOptions = function (state, cursor) {
-  var kind = String(cursor && cursor.kind || '');
+  // Probe chỉ là bước kiểm tra: việc thật là cursor nó sẽ trả về. Giữ phiên đi qua probe mà bị tính là lượt tay thì đăng nhập không chịu chu kỳ chờ.
+  var target = cursor && cursor.kind === 'session_probe' ? FbmSync.sessionGateMeta(state).resumeCursor || {} : cursor;
+  var kind = String(target && target.kind || '');
   return { manual: String(state && state.origin || '') === 'manual' && !!(state && state.runId) && kind !== 'heartbeat' };
 };
 

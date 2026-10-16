@@ -107,11 +107,25 @@ FbmSync.withOrchestrationLock = function (work) {
  * trước khi nhả khóa (nhả khóa rồi mới ghi thì một lát khác có thể chen vào giữa). Đường Sidebar và đường nền dùng chung hàm này.
  */
 FbmSync.runSlice = function (work) {
-  var failure = null;
-  try { return work(); } catch (error) { failure = error; throw error; } finally {
+  var failure = null, result;
+  try { result = work(); } catch (error) { failure = error; throw error; } finally {
     if (typeof FbmSync.recordIssuesFlush === 'function') { FbmSync.recordIssuesFlush(); }
     if (failure) { FbmSync.controlFailRun(failure); }
   }
+  return FbmSync.runLeftOpenClose(result);
+};
+/**
+ * Lát trả lời không kèm request trong khi lượt còn ở phase đang chạy và không request nào đang chờ: không ai còn đẩy lượt đi tiếp (Extension hết việc, Sidebar không có gì để gửi).
+ * Đóng lượt ngay ở đây, có Log ghi rõ lỗi thuộc GAS, thay vì để lượt treo tới lần hỏi nền sau rồi bị ghi nhầm là Extension bỏ dở.
+ */
+FbmSync.runLeftOpenClose = function (result) {
+  if (!result || typeof result !== 'object' || result.request) { return result; }
+  var state = FbmSync.stateRead();
+  if (!state.runId || state.activeRequestId || FbmSync.ACTIVE_PHASES.indexOf(String(state.phase || '')) < 0) { return result; }
+  var phase = String(state.phase || ''), cursorKind = String(state.cursor && state.cursor.kind || '');
+  FbmSync.stateFailRun('GAS trả lời hết việc trong khi lượt vẫn mở (phase ' + phase + ', cursor ' + (cursorKind || 'trống') + '); đã đóng lượt để lịch nền chạy lại ở lần hỏi sau.', 'RUN_LEFT_OPEN');
+  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'run_left_open', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(state.runId || ''), reason: 'Lỗi GAS: trả lời hết việc trong khi lượt vẫn mở (phase ' + phase + ', cursor ' + (cursorKind || 'trống') + '); đã đóng lượt.' }); }
+  return Object.assign({}, result, { ok: false, code: 'RUN_LEFT_OPEN', status: FbmSync.statusView(), error: FbmSync.stateRead().lastError });
 };
 
 /** Ghi phiên lỗi sau exception của lát. Lỗi gốc luôn được ném lại ở chỗ gọi; ghi state hỏng thì chỉ thêm một dòng Log, không thay lỗi gốc. */
@@ -405,7 +419,7 @@ FbmSync.EXTENSION_TRAIL_STAGES = {
   fbm_tab_replied: 'tab FBM đã trả kết quả, chưa gửi về GAS',
   gas_response_sent: 'đã gửi kết quả về GAS, chưa nhận trả lời',
   failure_sent: 'đang báo lỗi vận chuyển về GAS',
-  chain_finished: 'Extension coi lượt đã kết thúc'
+  chain_finished: 'Extension đã chạy hết lượt vì GAS trả lời không còn request tiếp'
 };
 /** Chỉ giữ tên bước, mã request, số hop và mốc giờ từ hộp đen: Extension là nguồn ngoài, không chép nguyên văn vào Log. */
 FbmSync.extensionTrailSafe = function (trail) {
@@ -418,6 +432,8 @@ FbmSync.extensionTrailText = function (trail, now) {
   if (!t || !t.stage) { return 'Hộp đen Extension: không có (Extension bản cũ hoặc chưa ghi được bước nào).'; }
   var ago = t.at ? Math.max(0, Math.round((Number(now || Date.now()) - t.at) / 60000)) : -1;
   var text = 'Hộp đen Extension: bước cuối' + (ago >= 0 ? ' (cách đây ' + ago + ' phút)' : '') + ' là ' + (FbmSync.EXTENSION_TRAIL_STAGES[t.stage] || t.stage) + (t.requestId ? ', request ' + t.requestId : '') + '.';
+  // Extension đã chạy hết lượt thì service worker ngủ rồi dựng lại sau đó là bình thường: lượt còn mở là do GAS, nói "bị Chrome tắt" ở đây là đổ lỗi sai chỗ.
+  if (t.stage === 'chain_finished') { return text + ' Lượt còn mở là lỗi phía GAS, không phải Extension bỏ dở.'; }
   if (t.workerStartedAt && t.currentWorkerStartedAt) {
     text += t.currentWorkerStartedAt > t.workerStartedAt ? ' Phần chạy nền của Extension đã bị Chrome tắt và dựng lại sau bước đó.' : ' Phần chạy nền của Extension vẫn chạy liền, không bị Chrome tắt.';
   }

@@ -214,31 +214,35 @@ FbmSync.sessionGateHandleFailure = function (state, cursor, failure) {
   if (!envelope) { return { ok: false, code: String(state.lastFailureCode || 'FBM_SESSION_GATE_FAILED'), request: null, status: FbmSync.statusView(), error: state.lastError }; }
   return { ok: true, request: envelope, status: FbmSync.statusView(), autoLogin: true };
 };
-/** Tạo probe hệ thống sau một response nghiệp vụ đáng ngờ; không retry nghiệp vụ. */
-FbmSync.sessionGateProbeRequest = function (state, failedCursor, reason) {
-  var current = state || FbmSync.stateRead(), gate = FbmSync.sessionGateMeta(current);
-  gate.resumeCursor = Object.assign({}, failedCursor || {});
-  gate.probeOnly = true;
-  gate.probeRetryCount = 0;
-  current.cursor = { kind: 'session_probe' };
-  current.phase = 'checking_session';
-  current.entity = '';
-  current.message = String(reason || 'Đang probe lại phiên FBM để xác minh phản hồi đáng ngờ.');
-  FbmSync.stateWrite(current);
-  return FbmSync.nextEnvelope(FbmSync.sessionSystemRequest('session_probe'));
-};
-/** Ép probe ở đầu một lượt/lát mới rồi mới trả lại cursor nghiệp vụ. */
-FbmSync.sessionGateResumeProbeRequest = function (state, resumeCursor, reason) {
-  var current = state || FbmSync.stateRead(), gate = FbmSync.sessionGateMeta(current), resume = Object.assign({}, resumeCursor || current.cursor || {});
-  gate.resumeCursor = resume;
+/**
+ * Chuyển state sang bước probe phiên và ghi lại chỗ quay về: cursor, phase và entity luôn đi cùng nhau.
+ * Thiếu phase thì sau probe hay đăng nhập, việc không thuộc lượt nào (Giữ phiên) bị trả về `checking_session` — một phase đang chạy — và lượt treo không request nào chờ.
+ */
+FbmSync.sessionGateEnterProbe = function (current, resumeCursor, message) {
+  var gate = FbmSync.sessionGateMeta(current);
+  gate.resumeCursor = Object.assign({}, resumeCursor || {});
   gate.resumePhase = String(current.phase || 'checking_session');
   gate.resumeEntity = String(current.entity || '');
   current.cursor = { kind: 'session_probe' };
   current.phase = 'checking_session';
   current.entity = '';
+  current.message = String(message);
+  return gate;
+};
+/** Tạo probe hệ thống sau một response nghiệp vụ đáng ngờ; không retry nghiệp vụ. */
+FbmSync.sessionGateProbeRequest = function (state, failedCursor, reason) {
+  var current = state || FbmSync.stateRead(), gate = FbmSync.sessionGateEnterProbe(current, failedCursor, reason || 'Đang probe lại phiên FBM để xác minh phản hồi đáng ngờ.');
+  gate.probeOnly = true;
+  gate.probeRetryCount = 0;
+  FbmSync.stateWrite(current);
+  return FbmSync.nextEnvelope(FbmSync.sessionSystemRequest('session_probe'));
+};
+/** Ép probe ở đầu một lượt/lát mới rồi mới trả lại cursor nghiệp vụ. */
+FbmSync.sessionGateResumeProbeRequest = function (state, resumeCursor, reason) {
+  var current = state || FbmSync.stateRead();
+  FbmSync.sessionGateEnterProbe(current, resumeCursor || current.cursor, reason || 'Đang kiểm tra lại phiên FBM trước khi tiếp tục lát mới...');
   current.activeRequestId = '';
   current.deadlineAt = 0;
-  current.message = String(reason || 'Đang kiểm tra lại phiên FBM trước khi tiếp tục lát mới...');
   FbmSync.stateWrite(current);
   return FbmSync.sessionSystemEnvelope('session_probe');
 };
@@ -377,13 +381,7 @@ FbmSync.nextEnvelope = function (request) {
     if (requestKind !== 'session_probe' && !internalLogin && !loginFlowOwnsSystemRequest && !FbmSync.sessionIdentityIsVerified(pendingState) && requestNeedsGate) {
       var gate = FbmSync.sessionGateMeta(pendingState), originalCursor = Object.assign({}, pendingState.cursor || {});
       if (originalCursor.kind !== 'session_probe') {
-        gate.resumeCursor = originalCursor;
-        gate.resumePhase = String(pendingState.phase || 'checking_session');
-        gate.resumeEntity = String(pendingState.entity || '');
-        pendingState.cursor = { kind: 'session_probe' };
-        pendingState.phase = 'checking_session';
-        pendingState.entity = '';
-        pendingState.message = 'Đang kiểm tra tab và tài khoản FBM...';
+        FbmSync.sessionGateEnterProbe(pendingState, originalCursor, 'Đang kiểm tra tab và tài khoản FBM...');
         FbmSync.stateWrite(pendingState);
         request = FbmSync.sessionSystemRequest('session_probe');
       }
