@@ -29,5 +29,18 @@ Kỳ vọng với đồng bộ sau khi có cả phiên này và phiên Một c�
 ## Việc cần làm
 
 - [x] Viết lại 07A trước khi code (chủ dự án duyệt 2026-10-16; 07A bất biến 1a–1d, mục 3, ma trận dòng sửa tay/Sidebar/Pull, mục 6, 6.1; đồng bộ 05, 05A, 07): thay dòng "Pull/push/background" và mọi luật hoãn riêng lẻ bằng luật chung ở trên; sửa 09 nếu có đoạn nhắc hoãn nạp khi đồng bộ chạy. Trình chủ dự án duyệt trước khi code.
-- [ ] Liệt kê mọi cửa vào của GAS (lời gọi Sidebar, trigger, relay Extension, API) và mọi chỗ đang tự đánh dấu bẩn (`WriteCommit`, `Triggers`, các bên truyền `recordsDebounceMs`/`recordsReadyAt`); ghi kết quả vào tệp này rồi tách thành các mục `[Tự động]`/`[Cần kiểm chứng thật]`.
+- [x] Liệt kê cửa vào GAS và chỗ đánh dấu bẩn (2026-10-16):
+  - Cửa vào chung đã có: `runEntryPoint` (`server/entry/EntryPoint.js`), bọc lời gọi Sidebar (`LoadService`, `SaveService`, `SelectionService`, `UserPrefs`, `ViewSheetRenderer`, `ClientTiming`, `FbmSyncService`), trigger `shinOnEdit`/`shinOnChange`, menu, `doPost` relay Extension. Chưa rõ bọc: các hàm `fbm*` khai trong `fbm_sync/transport/EntryPoints.js` mà Sidebar gọi thẳng.
+  - Mọi dấu bẩn đi qua `dirtyStateMarkSignal` → `dirtyStateBumpRevision` (`DirtyState.js`). Nguồn: `shinReloadDecision` (`Triggers.js`), `writeCommitAfterSuccess` (`WriteCommit.js`, gọi từ `WriteGate`, `DeleteGate`, `ConfigSheetSetup`, `SyncColumnSetup`), `dirtyStateRestoreFullReload` (`LoadService`). FBM gọi `FbmSync.sheetSave` nhiều lần trong một lần chạy (`Pull.js`, `Identity.js`, `Conflict.js`, `PushFlow.js`, `EntryPoints.js`), mỗi lần tăng revision riêng.
+  - Cửa ghi không so giá trị cũ: mọi mã trong kế hoạch ghi đều được đánh dấu.
+  - RAM chỉ giữ trường `DATA_SCHEMA` (`entityReadFields`); cột đồng bộ (`SYNC_SCHEMA`: `fbmId`, `fbmHash`, `syncStatus`...) không nằm trong RAM.
+  - Chờ theo thời gian: `RELOAD_DECISION_DEBOUNCE_MS`, `waitMs`, `flushOnLeave`, `recordsDebounceMs` (`ReloadDecision.js`), `recordsReadyAt` (`DirtyState.js`), `waitMs`/`readyAt` (`SelectionService.js`), `sheetLinkScheduleDirtyCheck` (`sheetLink.html`).
+  - Hoãn theo đồng bộ phía Sidebar: `refreshDeferredBySync` (`refresh.html`), `syncRunning`, nhánh `applyView`, `sheetLinkSyncFinished` (`sheetLink.html`), `fbmSyncSetRunning` (`fbmSync.html`), nhánh `request.syncRunning` (`SelectionService.js`).
+  - Lớp phủ chặn khi áp payload nạp: `sheetLink.html` hai chỗ `sidebarBusyRun(..., { progress: true, block: true })`; chế độ thanh loading không chặn là `{ block: false, progress: true }`.
+- [ ] [Tự động] Giỏ thay đổi: `runEntryPoint` mở giỏ đầu lần chạy và đổ một lần trong `finally` (kể cả khi lỗi sau khi đã ghi); `dirtyStateMarkDecision` chỉ bỏ vào giỏ; không có giỏ thì ném lỗi. Test: một lần chạy gọi cửa ghi nhiều lần chỉ tăng revision một lần; lỗi sau khi ghi vẫn tăng revision; đánh dấu ngoài lần chạy ném lỗi.
+- [ ] [Tự động] Mọi hàm `fbm*` Sidebar gọi thẳng mà có ghi đều đi qua `runEntryPoint`.
+- [ ] [Tự động] Chỉ bản ghi đổi giá trị ở trường `DATA_SCHEMA` mới vào giỏ: cửa ghi so giá trị trước khi đánh dấu; ghi chỉ cột đồng bộ hoặc ghi lại y hệt không tạo dấu. Test: lượt kéo FBM ghi lại bản ghi không đổi thì revision giữ nguyên.
+- [ ] [Tự động] Bỏ chờ theo thời gian (server và client mục trên). Test: sửa tay Customer rồi hỏi ngay thì nạp, không `defer`; `defer` chỉ còn khi trùng bản nháp.
+- [ ] [Tự động] Bỏ hoãn theo đồng bộ phía Sidebar và GAS (mục trên). Test: lời hỏi lúc lượt đồng bộ chạy vẫn nạp; Sidebar không gửi `syncRunning`.
+- [ ] [Tự động] Áp payload nạp do tín hiệu dùng thanh loading không chặn. Test: payload từ lời hỏi tín hiệu gọi `sidebarBusyRun` với `block: false`.
 - [ ] `node tests/run.js` đạt; đẩy GAS DEV; chủ dự án nghiệm thu trên Sheet DEV (chạy nền: Sheet đang xem cập nhật theo lô, chỉ có thanh loading, không lớp phủ); đổi tên tệp sang `[Đã xử lý]`.
