@@ -58,6 +58,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── Book.js               Mở đúng tệp Sheet. Tách riêng vì đường mở khi có người ngồi trước máy khác đường mở lúc chạy tự động.
 │   │   ├── SheetHeader.js        Cửa duy nhất đặt hàng tiêu đề: đối chiếu theo mã, mã thiếu nối vào cuối, không đổi chỗ cột đã có (FBM-056).
 │   │   ├── SheetIo.js            Đọc hàng 1 thành bảng tra "mã cột → số cột". Mọi thao tác cột đi qua đây, không ai được đếm cột bằng tay.
+│   │   ├── SheetReadCopy.js      Bản đọc chung của bốn sheet kho cho một lần gọi GAS (hàng mã, số dòng, đối tượng sheet, múi giờ); bỏ khi vừa cầm khóa, cùng chỗ bỏ bản đọc kho.
 │   │   ├── SheetGrid.js          Sự thật về lưới: đếm hàng dữ liệu, đọc một khối ô, nới lưới trước khi ghi. Ra đời từ lỗi thật làm sheet Log co xuống 7 hàng rồi tắt log trong im lặng.
 │   │   ├── CellBudget.js         Đo tổng số ô cả tệp và so với trần ở Config. Vượt trần thì chặn hẳn lượt nạp, kèm bảng chỉ mặt sheet nào phình to.
 │   │   ├── EntityRead.js         Đọc bản ghi Customer và Activity ra dạng { fields, rows } truyền được sang client. Bỏ hàng không có mã và đếm số hàng đã bỏ.
@@ -107,7 +108,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │       ├── ReloadRefactorProbe.js Probe DEV thử công thức mảng cho bộ đọc Extension và đo chi phí trigger, lời dò, tô màu tab.
 │       ├── ReloadJournalProbe.js Probe DEV đếm lệnh DocumentProperties và đo thời gian của tín hiệu nạp lại và từng mức nạp (trước/sau sổ nhật ký).
 │       ├── SaveBreakdownProbe.js Probe DEV tách một lần lưu khách từ Sidebar thành từng đoạn (khóa, đọc, kiểm, ghi, đọc lại, ghi nhận thay đổi) để tìm chỗ tốn thời gian.
-│       ├── SheetReadGapProbe.js Probe DEV đo phí cố định một lệnh đọc Sheet và phí mỗi dòng, ra ngưỡng gộp dòng của bản đọc Sheet.
+│       ├── SheetReadGapProbe.js Probe DEV đo phí cố định một lệnh đọc Sheet và phí mỗi dòng, ra ngưỡng gộp dòng của bản đọc Sheet; so `loadCore` và một lần sửa ô khi tắt và bật bản đọc.
 │       ├── DevToken.js           Thẻ bí mật của cửa trên. Không vào git, nhưng CÓ đẩy lên Google.
 │       ├── Smoke.js              Phép thử nhanh: mở được tệp Sheet không, đọc được gì.
 │       ├── DumpGrid.js           Đo lưới từng sheet: bao nhiêu hàng, bao nhiêu cột, còn chỗ ghi thêm bao nhiêu hàng.
@@ -293,6 +294,7 @@ tests\
     ├── configRead.js             Khóa trùng thì chặn, còn khối sắp xếp thì thứ tự hàng là nghĩa.
     ├── idGate.js                 Bộ đếm cấp mã ở Document Properties: di chuyển một lần từ Config, khóa đã có thì thắng, giá trị hỏng thì dừng chứ không về 0.
     ├── dirtyState.js             Khối trạng thái bẩn KHÔNG BAO GIỜ được ném, kể cả khi tệp thuộc tính hỏng hoặc đọc dở dang.
+    ├── sheetReadCopy.js          Bản đọc Sheet chung: chỉ nhớ trong một lần gọi, bỏ khi cầm khóa, cửa ghi và cửa xóa bỏ để lần đọc sau thấy số dòng mới.
     ├── documentStore.js          Cửa kho dùng chung: một lần ghi khách mới đọc kho thật tối đa 3 lần, tín hiệu reload vào kho trước khi nhả khóa, không tệp nào gọi thẳng kho hay khóa.
     ├── reloadDecision.js         Bảng luật thuần dùng chung cho signal, reload RAM, localDraft và render toàn bộ view.
     ├── reloadGates.js             Cổng ghi/xóa phát signal sau đọc lại thành công và chứng minh render không phụ thuộc Sidebar.

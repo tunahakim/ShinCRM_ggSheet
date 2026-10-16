@@ -66,3 +66,46 @@ function measureSheetReadPrefetch() {
   out.push('Customer dòng ' + q + ': đọc 1 ô lạnh ' + oneCell + ' ms, rồi cả dòng ' + (Date.now() - started) + ' ms');
   return out;
 }
+
+/**
+ * So `loadCore` và một lần sửa ô (gọi `shinOnEdit` với sự kiện dựng tay trên ô ghi chú khách đầu tiên, giá trị không đổi) giữa hai chế độ trong cùng lần chạy: tắt bản đọc chung (mọi lần đọc hàng mã, số dòng, múi giờ đi thẳng Sheet như trước) và bật. Đếm số lần đọc hàng mã thật sự chạm Sheet. Lần sửa ô chỉ đánh dấu bản ghi đó cần nạp lại, không ghi Sheet.
+ */
+function measureSheetReadCopy() {
+  var global = Function('return this')();
+  var originalSlot = global.sheetReadCopySlot;
+  var originalHeader = global.sheetReadHeader;
+  var sheet = shinOpenSheet(ENTITY_SHEETS.customer);
+  var noteCol = selectionColumnIndex(sheet, DATA_SCHEMA.customer.note.code);
+  var cell = sheet.getRange(SHEET_FIRST_DATA_ROW, noteCol);
+  var value = cell.getValue();
+  var out = [];
+  [['tắt bản đọc', true], ['bật bản đọc', false]].forEach(function (mode) {
+    for (var round = 1; round <= 3; round++) {
+      var reads = 0;
+      if (mode[1]) { global.sheetReadCopySlot = function () { return null; }; }
+      global.sheetReadHeader = function (target) {
+        var slot = global.sheetReadCopySlotOf(target);
+        if (!(slot && slot.header)) { reads += 1; }
+        return originalHeader(target);
+      };
+      try {
+        // Cửa chạy hàm DEV đã mở một lần gọi bao ngoài; xóa bản đọc trước mỗi phép đo để giống một lần gọi mới.
+        documentStoreClear();
+        var started = Date.now();
+        var core = loadCore();
+        var loadMs = Date.now() - started;
+        var loadReads = reads;
+        reads = 0;
+        documentStoreClear();
+        started = Date.now();
+        shinOnEdit({ range: cell, value: value, oldValue: value });
+        var editMs = Date.now() - started;
+        out.push(mode[0] + ' lượt ' + round + ': loadCore ' + loadMs + ' ms (máy chủ ' + core.ms + ' ms, đọc hàng mã ' + loadReads + ' lần) · sửa ô ' + editMs + ' ms (đọc hàng mã ' + reads + ' lần)');
+      } finally {
+        global.sheetReadCopySlot = originalSlot;
+        global.sheetReadHeader = originalHeader;
+      }
+    }
+  });
+  return out;
+}
