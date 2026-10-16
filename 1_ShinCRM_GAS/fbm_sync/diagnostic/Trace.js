@@ -261,4 +261,26 @@ FbmSync.businessFinishOpenSteps = function (state, phase, result) {
   return current;
 };
 
+/**
+ * Mọi dòng Log nguồn fbm_sync mang "lượt": ai chạy (Tay hay Nền) và tiến trình nào, để lọc Log theo Giữ phiên hay lượt bấm tay khi debug.
+ * Lấy từ bản state vừa đọc hoặc ghi trong lời gọi này nên không tốn thêm lần đọc kho. Đăng ký lúc chạy vì thư mục fbm_sync nạp trước server/log.
+ */
+FbmSync.logContextNote = function (state) {
+  FbmSync._logContextState = state || null;
+  if (!FbmSync._logContextRegistered && typeof logRegisterContext === 'function') { logRegisterContext('fbm_sync', FbmSync.logContextText); FbmSync._logContextRegistered = true; }
+};
+/** Lượt đang chạy thì nguồn theo lượt; không có lượt thì chuỗi nền đang mở (Giữ phiên) là Nền. Quét nhanh do bước đếm của Giữ phiên gọi hiện thành "Giữ phiên FBM · Quét nhanh". */
+FbmSync.logContextText = function () {
+  var state = FbmSync._logContextState;
+  if (!state) { return ''; }
+  var labels = FbmSync.SCHEDULE_LABELS || {}, chain = state.chain || {}, running = FbmSync.runInProgress(state);
+  var background = running ? state.origin === 'background' : !!chain.current || state.origin === 'background';
+  var parts = [background ? 'Nền' : 'Tay'];
+  if (background && chain.current) { parts.push(labels[chain.current] || chain.current); }
+  var scans = FbmSync.SCHEDULE_SCANS || {}, runKind = '';
+  if (running) { Object.keys(scans).forEach(function (kind) { if (scans[kind] === state.scan && !runKind) { runKind = kind; } }); }
+  if (running && runKind !== chain.current) { parts.push(labels[runKind] || String(state.scan || '')); }
+  return parts.join(' · ');
+};
+
 function fbmSyncTrace() { return FbmSync.traceRead(60); }

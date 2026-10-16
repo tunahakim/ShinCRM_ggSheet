@@ -45,6 +45,9 @@ var LOG_RUN_HAS_ERROR = false;
 /** Số thứ tự tăng dần, để hai dòng cùng một giây vẫn giữ đúng thứ tự xảy ra sau khi sắp lại. */
 var LOG_SEQ = 0;
 
+/** Ngữ cảnh theo nguồn: hàm trả một câu ngắn gắn vào cột Chi tiết kỹ thuật của mọi dòng thuộc nguồn đó (khóa `luot`). Module đăng ký lúc chạy, không lúc nạp tệp, vì Apps Script nạp tệp theo tên và nhiều module nạp trước tệp này. */
+var LOG_SOURCE_CONTEXT = {};
+
 /** Đếm số lệnh `setValues` mà tệp này đã gọi. Chỉ dùng cho phép nghiệm thu "một lượt chỉ tốn một lệnh ghi" — không có nó thì luật đó là lời hứa không đo được. */
 var LOG_WRITE_CALLS = 0;
 
@@ -85,7 +88,7 @@ function logPush(entry, isTrace) {
       recordId: safe.recordId,
       reason: safe.reason,
       cycleId: safe.cycleId,
-      detail: safe.detail
+      detail: logWithContext(safe.source, safe.detail)
     };
 
     console.log('[ShinCRM] ' + line.at + ' ' + String(line.source) + ' ' + String(line.action) + ' ' + String(line.outcome) + ' — ' + String(line.reason));
@@ -109,6 +112,22 @@ function logPush(entry, isTrace) {
   } catch (khongDemDuoc) {
     console.error('logPush thất bại: ' + (khongDemDuoc && khongDemDuoc.stack ? khongDemDuoc.stack : khongDemDuoc));
   }
+}
+
+/** Đăng ký ngữ cảnh cho một nguồn; đăng ký lại thì thay hàm cũ. */
+function logRegisterContext(source, provider) {
+  LOG_SOURCE_CONTEXT[String(source)] = provider;
+}
+
+/** Gắn ngữ cảnh của nguồn vào `detail`. Hàm ngữ cảnh hỏng thì ghi rõ trong chính dòng đó, không làm mất dòng (luật 2 của tệp). */
+function logWithContext(source, detail) {
+  var provider = LOG_SOURCE_CONTEXT[String(source)];
+  if (typeof provider !== 'function') { return detail; }
+  var context;
+  try { context = provider(); } catch (hong) { context = 'không đọc được ngữ cảnh: ' + String(hong && hong.message || hong); }
+  if (!context) { return detail; }
+  if (detail && typeof detail === 'object' && !Array.isArray(detail)) { return Object.assign({ luot: context }, detail); }
+  return detail === undefined || detail === null || detail === '' ? { luot: context } : { luot: context, detail: detail };
 }
 
 /** Đệm một dòng luôn ghi. Bốn khóa bắt buộc: `source`, `action`, `outcome`, `reason`. Bốn khóa tùy chọn: `entity`, `recordId`, `cycleId`, `detail`. */

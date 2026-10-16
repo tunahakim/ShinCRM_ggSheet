@@ -70,6 +70,8 @@ FbmSync.backgroundScheduleRead = function () {
 FbmSync.SCHEDULE_MAX_MINUTES = 7 * 24 * 60;
 /** Tên tiến trình trong câu báo lỗi và câu xác nhận, đúng nhãn ở `Cài đặt phiên` (09/02 Phần 3). */
 FbmSync.SCHEDULE_LABELS = { heartbeat: 'Giữ phiên FBM', customerFull: 'Quét nhanh', activityFull: 'Lấy toàn bộ giao dịch', detail: 'Vòng xoay giao dịch' };
+/** Kiểu quét của lượt mà mỗi tiến trình nền mở; Giữ phiên không mở lượt nào. */
+FbmSync.SCHEDULE_SCANS = { customerFull: 'full', activityFull: 'activity_bulk', detail: 'detail' };
 /** Số nguyên không âm từ ô người dùng gõ. Ô trống là thiếu, không ngầm thay bằng số nào: `Number('')` bằng 0 nên phải xét chuỗi trước. Trả `{ value }` hoặc `{ reason }`. */
 FbmSync.scheduleWholeNumber = function (raw, min, max, label, unit) {
   var text = raw === null || raw === undefined ? '' : String(raw).trim();
@@ -190,7 +192,7 @@ FbmSync.chainStart = function (kind) {
   }
   state.scheduledScan = '';
   FbmSync.stateWrite(state);
-  var options = { mode: direction, scan: kind === 'activityFull' ? 'activity_bulk' : kind === 'detail' ? 'detail' : 'full', origin: 'background' };
+  var options = { mode: direction, scan: FbmSync.SCHEDULE_SCANS[kind] || 'full', origin: 'background' };
   if (kind === 'detail') { options.detail = schedule.detail; }
   return FbmSync.start(options);
 };

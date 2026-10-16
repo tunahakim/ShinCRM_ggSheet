@@ -274,7 +274,9 @@ FbmSync.stateRead = function () {
   var parsed = FbmSync.documentPropertyJson(FbmSync.STATE_KEY, 'state đồng bộ');
   if (!parsed) { return fallback; }
   var metadata = parsed.metadata || {};
-  return Object.assign(fallback, parsed, { schemaVersion: Number(parsed.schemaVersion || 1), counts: Object.assign(fallback.counts, parsed.counts || {}), session: Object.assign(fallback.session, parsed.session || {}), metadata: Object.assign(fallback.metadata, metadata, { conflictCount: Number(metadata.conflictCount || 0), preflightIssues: Array.isArray(metadata.preflightIssues) ? metadata.preflightIssues : [], manualPending: metadata.manualPending || null }), progress: Object.assign(fallback.progress, parsed.progress || {}), locks: parsed.locks || {} });
+  var read = Object.assign(fallback, parsed, { schemaVersion: Number(parsed.schemaVersion || 1), counts: Object.assign(fallback.counts, parsed.counts || {}), session: Object.assign(fallback.session, parsed.session || {}), metadata: Object.assign(fallback.metadata, metadata, { conflictCount: Number(metadata.conflictCount || 0), preflightIssues: Array.isArray(metadata.preflightIssues) ? metadata.preflightIssues : [], manualPending: metadata.manualPending || null }), progress: Object.assign(fallback.progress, parsed.progress || {}), locks: parsed.locks || {} });
+  if (typeof FbmSync.logContextNote === 'function') { FbmSync.logContextNote(read); }
+  return read;
 };
 /** Ghi state, cập nhật timestamp và giữ cấu trúc nhất quán. */
 FbmSync.stateWrite = function (state) {
@@ -306,6 +308,7 @@ FbmSync.stateWrite = function (state) {
   if (FbmSync.TERMINAL_PHASES.indexOf(String(next.phase || '')) >= 0 && typeof FbmSync.businessFinishOpenSteps === 'function') {
     FbmSync.businessFinishOpenSteps(next, next.phase, { error: String(next.lastError || next.message || '') });
   }
+  if (typeof FbmSync.logContextNote === 'function') { FbmSync.logContextNote(next); }
   var stateWrite = FbmSync.documentPropertySet(FbmSync.STATE_KEY, JSON.stringify(next), 'state');
   if (stateWrite.ok) { return next; }
   // Đóng phiên mà ghi hỏng thì phiên đứng mãi ở pha đang chạy và màn đồng bộ kẹt (FBM-044); lát giữa chừng thì vẫn ném để phiên chuyển sang lỗi.
@@ -419,12 +422,13 @@ FbmSync.EXTENSION_TRAIL_STAGES = {
   fbm_tab_replied: 'tab FBM đã trả kết quả, chưa gửi về GAS',
   gas_response_sent: 'đã gửi kết quả về GAS, chưa nhận trả lời',
   failure_sent: 'đang báo lỗi vận chuyển về GAS',
-  chain_finished: 'Extension đã chạy hết lượt vì GAS trả lời không còn request tiếp'
+  chain_finished: 'Extension đã chạy hết lượt vì GAS trả lời không còn request tiếp',
+  gas_reply_failed: 'GAS trả lời lỗi hoặc Extension không gọi được GAS, Extension dừng lượt'
 };
 /** Chỉ giữ tên bước, mã request, số hop và mốc giờ từ hộp đen: Extension là nguồn ngoài, không chép nguyên văn vào Log. */
 FbmSync.extensionTrailSafe = function (trail) {
   if (!trail || typeof trail !== 'object') { return null; }
-  return { stage: String(trail.stage || '').slice(0, 40), requestId: String(trail.requestId || '').slice(0, 80), hop: Number(trail.hop || 0), at: Number(trail.at || 0), workerStartedAt: Number(trail.workerStartedAt || 0), currentWorkerStartedAt: Number(trail.currentWorkerStartedAt || 0) };
+  return { stage: String(trail.stage || '').slice(0, 40), requestId: String(trail.requestId || '').slice(0, 80), hop: Number(trail.hop || 0), at: Number(trail.at || 0), workerStartedAt: Number(trail.workerStartedAt || 0), currentWorkerStartedAt: Number(trail.currentWorkerStartedAt || 0), code: String(trail.code || '').replace(/[^A-Za-z0-9_ .:-]/g, '').slice(0, 60) };
 };
 /** Câu tiếng người cho dòng Log lượt bị bỏ dở: Extension dừng ở bước nào, và phần chạy nền của nó có bị Chrome tắt rồi dựng lại sau bước đó không. */
 FbmSync.extensionTrailText = function (trail, now) {
@@ -434,6 +438,7 @@ FbmSync.extensionTrailText = function (trail, now) {
   var text = 'Hộp đen Extension: bước cuối' + (ago >= 0 ? ' (cách đây ' + ago + ' phút)' : '') + ' là ' + (FbmSync.EXTENSION_TRAIL_STAGES[t.stage] || t.stage) + (t.requestId ? ', request ' + t.requestId : '') + '.';
   // Extension đã chạy hết lượt thì service worker ngủ rồi dựng lại sau đó là bình thường: lượt còn mở là do GAS, nói "bị Chrome tắt" ở đây là đổ lỗi sai chỗ.
   if (t.stage === 'chain_finished') { return text + ' Lượt còn mở là lỗi phía GAS, không phải Extension bỏ dở.'; }
+  if (t.stage === 'gas_reply_failed') { return text + ' Mã lỗi: ' + (t.code || 'không rõ') + '.'; }
   if (t.workerStartedAt && t.currentWorkerStartedAt) {
     text += t.currentWorkerStartedAt > t.workerStartedAt ? ' Phần chạy nền của Extension đã bị Chrome tắt và dựng lại sau bước đó.' : ' Phần chạy nền của Extension vẫn chạy liền, không bị Chrome tắt.';
   }
