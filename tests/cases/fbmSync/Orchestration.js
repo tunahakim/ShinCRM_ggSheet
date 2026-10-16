@@ -321,11 +321,19 @@ async function chay(so) {
   const abandonLogs = [];
   heartbeat.logEvent = (entry) => abandonLogs.push(entry);
   heartbeat.FbmSync.statePatch({ runId: 'abandoned-run', origin: 'background', phase: 'pull_customer', cursor: { kind: 'customer_grid', type: 1, pageIndex: 3, pageValue: ['d', 't', 'x'], count: 2000 }, activeRequestId: 'lost-request', deadlineAt: Date.now() - 1000, scheduledScan: 'customerFull', chain: { current: 'customerFull', ran: [], direction: 'read' }, session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' }, metadata: { sessionGate: {} } });
-  const afterAbandon = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+  const afterAbandon = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm', extensionTrail: { stage: 'fbm_tab_sent', requestId: 'lost-request', hop: 3, at: Date.now() - 5 * 60000, workerStartedAt: 100, currentWorkerStartedAt: 200, cookie: 'bi-mat-khong-duoc-chep' } });
   const abandonState = heartbeat.FbmSync.stateRead();
   check(so, 'Lần hỏi nền gặp lượt dở không còn request chờ: lượt cũ kết thúc SYNC_ABANDONED_RUN có dòng Log lỗi, lượt mới mở bằng probe User, không gửi lại trang Customer đang dở', [
     abandonLogs.some((entry) => JSON.stringify(entry).indexOf('SYNC_ABANDONED_RUN') >= 0), afterAbandon.ok, afterAbandon.request && afterAbandon.request.meta.kind, abandonState.runId !== 'abandoned-run'
   ], [true, true, 'session_probe', true]);
+  const staleLine = abandonLogs.find((entry) => entry.action === 'stale_run') || {};
+  check(so, 'Dòng Log lượt bị bỏ dở mang hộp đen Extension: bước cuối, cách đây bao lâu, worker có bị Chrome tắt; không chép trường lạ từ Extension', [
+    String(staleLine.reason).indexOf('Hộp đen Extension: bước cuối (cách đây 5 phút) là đã gửi request sang tab FBM, chưa nhận lại kết quả, request lost-request.') >= 0,
+    String(staleLine.reason).indexOf('đã bị Chrome tắt và dựng lại') >= 0, JSON.stringify(staleLine).indexOf('bi-mat-khong-duoc-chep') < 0
+  ], [true, true, true]);
+  check(so, 'Hộp đen Extension: không có hộp đen thì nói rõ, worker chạy liền thì nói không bị tắt', [
+    heartbeat.FbmSync.extensionTrailText(null, Date.now()), heartbeat.FbmSync.extensionTrailText({ stage: 'gas_response_sent', at: 1000, workerStartedAt: 50, currentWorkerStartedAt: 50 }, 1000)
+  ], ['Hộp đen Extension: không có (Extension bản cũ hoặc chưa ghi được bước nào).', 'Hộp đen Extension: bước cuối (cách đây 0 phút) là đã gửi kết quả về GAS, chưa nhận trả lời. Phần chạy nền của Extension vẫn chạy liền, không bị Chrome tắt.']);
   heartbeat.FbmSync.statePatch({ runId: 'write-lost-run', origin: 'background', phase: 'push', cursor: { kind: 'push_wait', entity: 'customer' }, activeRequestId: 'write-request', deadlineAt: Date.now() - 1000, scheduledScan: '', chain: null, locks: { 'customer:1': { owner: 'push' } } });
   heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   const lostWrite = heartbeat.FbmSync.stateRead();
