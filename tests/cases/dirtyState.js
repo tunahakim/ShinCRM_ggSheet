@@ -7,7 +7,8 @@
  */
 
 const { dungHop } = require('../lib/dung-hop');
-const { section, check } = require('../lib/assert');
+const { section, check, checkThrows } = require('../lib/assert');
+const { trongLanChay } = require('../lib/load-gas');
 
 function chay(so) {
   section('Trạng thái bẩn — khối này không được phép ném lỗi, vì nó nằm trên mọi đường phản hồi');
@@ -103,25 +104,61 @@ function chay(so) {
 
   const ghi = dungHop({ sheets: ['Config', 'Log'] });
   check(so, 'đánh dấu mã bản ghi hợp nhất và bỏ mã rỗng',
-    ghi.hop.dirtyStateMarkRecords(['KH0001', 'KH0001', '', 'KH0002']).records,
+    trongLanChay(ghi.hop, () => ghi.hop.dirtyStateMarkRecords(['KH0001', 'KH0001', '', 'KH0002'])) && ghi.hop.dirtyStateRead().records,
     ['KH0001', 'KH0002']);
-  check(so, 'đánh dấu Config bật đúng cờ',
-    ghi.hop.dirtyStateMarkConfig().config, true);
+  trongLanChay(ghi.hop, () => ghi.hop.dirtyStateMarkConfig());
+  check(so, 'đánh dấu Config bật đúng cờ', ghi.hop.dirtyStateRead().config, true);
   check(so, 'vượt ngưỡng chuyển sang cờ toàn bộ và bỏ danh sách mã',
     (function () {
       const hop = dungHop({ sheets: ['Config', 'Log'] }).hop;
       hop.SETTINGS.DIRTY_RECORD_LIMIT = 2;
-      return hop.dirtyStateMarkRecords(['A', 'B', 'C']);
+      trongLanChay(hop, () => hop.dirtyStateMarkRecords(['A', 'B', 'C']));
+      return hop.dirtyStateRead();
     }()),
     { records: [], config: false, all: true });
   check(so, 'xóa cờ theo nhóm không đụng nhóm còn lại',
     (function () {
       const hop = dungHop({ sheets: ['Config', 'Log'] }).hop;
-      hop.dirtyStateMarkConfig();
-      hop.dirtyStateMarkAll();
+      trongLanChay(hop, () => { hop.dirtyStateMarkConfig(); hop.dirtyStateMarkAll(); });
       return hop.dirtyStateClear({ all: true });
     }()),
     { records: [], config: true, all: false });
+
+  section('Giỏ thay đổi — một lần chạy GAS phát đúng một tín hiệu');
+
+  const gio = dungHop({ sheets: ['Config', 'Log'], props: { reloadRevision: '4' } }).hop;
+  trongLanChay(gio, () => {
+    gio.dirtyStateMarkRecords(['KH0001']);
+    gio.dirtyStateMarkRecords(['KH0002']);
+    gio.dirtyStateMarkConfig();
+    check(so, 'trong lần chạy, dấu nằm trong giỏ, chưa tăng revision', gio.reloadStateRead().revision, 4);
+  });
+  check(so, 'một lần chạy đánh dấu ba lần chỉ tăng revision một lần, đủ mọi dấu',
+    [gio.reloadStateRead().revision, gio.reloadStateRead().records, gio.reloadStateRead().config], [5, ['KH0001', 'KH0002'], true]);
+
+  const ngoai = dungHop({ sheets: ['Config', 'Log'] }).hop;
+  checkThrows(so, 'đánh dấu ngoài lần chạy (thiếu runEntryPoint) ném lỗi to, không im lặng mất dấu',
+    () => ngoai.dirtyStateMarkRecords(['KH0001']), 'ngoài runEntryPoint');
+
+  const loi = dungHop({ sheets: ['Config', 'Log'], props: { reloadRevision: '1' } }).hop;
+  let daNem = false;
+  try {
+    trongLanChay(loi, () => { loi.dirtyStateMarkRecords(['KH0009']); throw new Error('lỗi sau khi đã ghi'); });
+  } catch (e) { daNem = true; }
+  check(so, 'lần chạy lỗi sau khi đã ghi vẫn đổ giỏ: Sidebar vẫn được báo phần đã xuống Sheet',
+    [daNem, loi.reloadStateRead().revision, loi.reloadStateRead().records], [true, 2, ['KH0009']]);
+
+  const long = dungHop({ sheets: ['Config', 'Log'], props: { reloadRevision: '1' } }).hop;
+  trongLanChay(long, () => {
+    trongLanChay(long, () => long.dirtyStateMarkRecords(['KH0001']));
+    check(so, 'cửa vào lồng trong cửa vào không đổ giỏ ở lớp trong', long.reloadStateRead().revision, 1);
+    long.dirtyStateMarkRecords(['KH0002']);
+  });
+  check(so, 'lớp ngoài cùng đổ một lần cho cả hai lớp', [long.reloadStateRead().revision, long.reloadStateRead().records], [2, ['KH0001', 'KH0002']]);
+
+  const rong = dungHop({ sheets: ['Config', 'Log'], props: { reloadRevision: '3' } }).hop;
+  trongLanChay(rong, () => rong.dirtyStateMarkDecision({ signal: { records: [] } }));
+  check(so, 'lần chạy không có thay đổi không tăng revision', rong.reloadStateRead().revision, 3);
 
   check(so, 'lượt nạp toàn bộ nhận ba cờ dữ liệu nhưng giữ nguyên mốc cũ của sheet quản trị',
     (function () {
@@ -141,16 +178,19 @@ function chay(so) {
   check(so, 'lượt nạp lõi thất bại trả lại cờ đã nhận mà không xóa cờ mới phát sinh',
     (function () {
       const hop = dungHop({ sheets: ['Config', 'Log'], props: { dirtyRecords: '["KH0001"]', dirtyConfig: 'true' } }).hop;
-      const consumed = hop.dirtyStateTakeFullReload();
-      hop.dirtyStateMarkRecords(['KH0002']);
-      return hop.dirtyStateRestoreFullReload(consumed);
+      trongLanChay(hop, () => {
+        const consumed = hop.dirtyStateTakeFullReload();
+        hop.dirtyStateMarkRecords(['KH0002']);
+        hop.dirtyStateRestoreFullReload(consumed);
+      });
+      return hop.dirtyStateRead();
     }()),
     { records: ['KH0002', 'KH0001'], config: true, all: false });
 
   const revision = dungHop({ sheets: ['Config', 'Log'], props: { reloadRevision: '7', reloadChangedAt: '1234', dirtyRecords: '["KH0001"]' } });
   check(so, 'reloadStateRead giữ revision, changedAt và scope records',
     revision.hop.reloadStateRead(),
-    { revision: 7, changedAt: 1234, recordsReadyAt: 0, records: ['KH0001'], entities: [], category: false, config: false, schema: false, allCore: false, all: false, viewsStaleRevision: 0 });
+    { revision: 7, changedAt: 1234, records: ['KH0001'], entities: [], category: false, config: false, schema: false, allCore: false, all: false, viewsStaleRevision: 0 });
   check(so, 'clear records sai revision không được xóa signal',
     revision.hop.dirtyStateClearRecords(['KH0001'], 6).records,
     ['KH0001']);
@@ -158,16 +198,11 @@ function chay(so) {
     revision.hop.dirtyStateClearRecords(['KH0001'], 7).records,
     []);
 
-  const debounce = dungHop({ sheets: ['Config', 'Log'] }).hop;
-  const debounceState = debounce.dirtyStateMarkDecision({ signal: { records: ['CUS-DEBOUNCE'], recordsDebounceMs: 3000 } });
-  check(so, 'mốc reload bản ghi được tính đúng ba giây từ changedAt của signal',
-    debounceState.recordsReadyAt >= debounceState.changedAt + 3000,
-    true);
-
   const stale = dungHop({ sheets: ['Config', 'Log'], props: { reloadRevision: '7' } }).hop;
   stale.viewLedgerWrite('!Lead', { data: 7, ok: true });
   stale.viewLedgerWrite('!Chăm sóc', { data: 7, ok: true });
-  const afterRecord = stale.dirtyStateMarkRecordChange('customer', ['KH0001']);
+  trongLanChay(stale, () => stale.dirtyStateMarkSignal({ records: ['KH0001'], allViews: true }));
+  const afterRecord = stale.reloadStateRead();
   check(so, 'signal dữ liệu kho nâng mốc cũ bằng đúng revision vừa tăng, mọi sheet đã vẽ trước đó thành cũ',
     [afterRecord.revision, afterRecord.viewsStaleRevision, stale.viewIsStale('!Lead'), stale.viewIsStale('!Chăm sóc')],
     [8, 8, true, true]);
@@ -179,10 +214,10 @@ function chay(so) {
   check(so, 'sheet chưa từng vẽ là cũ kể cả khi chưa có signal nào',
     dungHop({ sheets: ['Config', 'Log'] }).hop.viewIsStale('!Mới'), true);
   const onlyRecords = dungHop({ sheets: ['Config', 'Log'], props: { reloadRevision: '3', viewsStaleRevision: '2' } }).hop;
-  onlyRecords.dirtyStateMarkSignal({ records: ['KH0001'], allViews: false });
+  trongLanChay(onlyRecords, () => onlyRecords.dirtyStateMarkSignal({ records: ['KH0001'], allViews: false }));
   check(so, 'signal không mang allViews không đụng mốc cũ của view', onlyRecords.reloadStateRead().viewsStaleRevision, 2);
-  check(so, 'quyết định không có signal không đọc DocumentProperties và trả null',
-    dungHop({ sheets: ['Config', 'Log'] }).hop.dirtyStateMarkDecision({ signal: { records: [] } }), null);
+  check(so, 'quyết định không có signal không bỏ gì vào giỏ và trả false',
+    dungHop({ sheets: ['Config', 'Log'] }).hop.dirtyStateMarkDecision({ signal: { records: [] } }), false);
 
   return so;
 }

@@ -121,4 +121,10 @@ function napRieng(duongDan, stubs) {
   return duongDan.endsWith('.html') ? napClient(hopCat, duongDan) : napServer(hopCat, duongDan);
 }
 
-module.exports = { GAS_DIR, taoHopCat, napServer, napClient, napRieng, catRuotScript, docTep };
+/** Chạy `fn` trong giỏ thay đổi như một lần chạy GAS (`runEntryPoint`): dấu nạp lại gom lại và đổ một lần khi `fn` xong. Dùng cho test gọi thẳng cửa ghi mà không qua cửa vào. */
+function trongLanChay(hopCat, fn) {
+  hopCat.dirtyStateBasketBegin();
+  try { return fn(); } finally { hopCat.dirtyStateBasketEnd(); }
+}
+
+module.exports = { GAS_DIR, taoHopCat, napServer, napClient, napRieng, catRuotScript, docTep, trongLanChay };

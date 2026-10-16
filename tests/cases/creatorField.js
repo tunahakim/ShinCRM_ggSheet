@@ -5,6 +5,7 @@
  */
 
 const { dungHop, TEP_NEN } = require('../lib/dung-hop');
+const { trongLanChay } = require('../lib/load-gas');
 const { section, check } = require('../lib/assert');
 
 function dungDay(tenNguoiDung) {
@@ -27,21 +28,21 @@ function chay(so) {
   section('creatorField — cửa ghi tự điền và khóa cột Người tạo trên FBM');
 
   const nen = dungDay('Lê Tuấn Anh');
-  const tao = nen.hop.writeGateSave({ entity: 'activity', records: [giaoDich({ enteredBy: 'Gõ đè' })] });
+  const tao = trongLanChay(nen.hop, () => nen.hop.writeGateSave({ entity: 'activity', records: [giaoDich({ enteredBy: 'Gõ đè' })] }));
   check(so, 'giao dịch người dùng tạo mới lấy tên ở Config USER_NAME, bỏ giá trị client gửi', [tao.ok, nguoiTao(tao)], [true, ['Lê Tuấn Anh']]);
 
   const ma = tao.recordIds[0];
-  const sua = nen.hop.writeGateSave({ entity: 'activity', records: [{ id: ma, content: 'Sửa nội dung', enteredBy: 'Gõ đè' }] });
+  const sua = trongLanChay(nen.hop, () => nen.hop.writeGateSave({ entity: 'activity', records: [{ id: ma, content: 'Sửa nội dung', enteredBy: 'Gõ đè' }] }));
   check(so, 'người dùng sửa giao dịch không đổi được người tạo', [sua.ok, nguoiTao(sua)], [true, ['Lê Tuấn Anh']]);
 
-  const keo = nen.hop.writeGateSave({ entity: 'activity', records: [giaoDich({ enteredBy: 'Sale Cũ' })], source: 'pull' });
+  const keo = trongLanChay(nen.hop, () => nen.hop.writeGateSave({ entity: 'activity', records: [giaoDich({ enteredBy: 'Sale Cũ' })], source: 'pull' }));
   check(so, 'lượt kéo tạo giao dịch giữ đúng người tạo trên FBM, không thay bằng USER_NAME', [keo.ok, nguoiTao(keo)], [true, ['Sale Cũ']]);
 
-  const keoSua = nen.hop.writeGateSave({ entity: 'activity', records: [{ id: ma, enteredBy: 'Sale Mới' }], source: 'pull' });
+  const keoSua = trongLanChay(nen.hop, () => nen.hop.writeGateSave({ entity: 'activity', records: [{ id: ma, enteredBy: 'Sale Mới' }], source: 'pull' }));
   check(so, 'lượt kéo ghi đè người tạo của giao dịch đã có', [keoSua.ok, nguoiTao(keoSua)], [true, ['Sale Mới']]);
 
   const trong = dungDay('');
-  const taoTrong = trong.hop.writeGateSave({ entity: 'activity', records: [giaoDich({ enteredBy: 'Gõ đè' })] });
+  const taoTrong = trongLanChay(trong.hop, () => trong.hop.writeGateSave({ entity: 'activity', records: [giaoDich({ enteredBy: 'Gõ đè' })] }));
   check(so, 'Config USER_NAME trống thì cột để trống, không lấy giá trị client', [taoTrong.ok, nguoiTao(taoTrong)], [true, ['']]);
 }
 

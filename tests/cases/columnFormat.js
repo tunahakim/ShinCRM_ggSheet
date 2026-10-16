@@ -7,6 +7,7 @@
  */
 
 const { dungHop, TEP_NEN } = require('../lib/dung-hop');
+const { trongLanChay } = require('../lib/load-gas');
 const { section, check, checkThrows, ghiLoiNap } = require('../lib/assert');
 
 /** `SetupSheets.js` nằm ngoài bộ tệp nền, nhưng ở đây cần nó để kiểm cả `setupColumnFormats` và nhánh khuôn của `verifySheets`. */
@@ -83,7 +84,7 @@ function chay(so) {
   doiSangSo.Customer.sheet.getRange(4, cotMst, 50, 1).setNumberFormat('#,##0');
   doiSangSo.Customer.sheet.getRange(4, cotSdt, 50, 1).setNumberFormat('#,##0');
 
-  const themMoi = doiSangSo.hop.writeGateSave({ entity: 'customer', records: [khachMoi()] });
+  const themMoi = trongLanChay(doiSangSo.hop, () => doiSangSo.hop.writeGateSave({ entity: 'customer', records: [khachMoi()] }));
 
   check(so, 'thêm khách mới vào cột đã bị đổi khuôn: số 0 đầu của mã số thuế và số điện thoại vẫn còn',
     [themMoi.ok,
@@ -96,10 +97,10 @@ function chay(so) {
 
   // Đường sửa bản ghi đã có là đường khác trong cùng cửa ghi, và nó cũng phải tự đặt lại khuôn.
   doiSangSo.Customer.sheet.getRange(4, cotMst, 1, 1).setNumberFormat('#,##0');
-  const sua = doiSangSo.hop.writeGateSave({
+  const sua = trongLanChay(doiSangSo.hop, () => doiSangSo.hop.writeGateSave({
     entity: 'customer',
     records: [{ id: String(doiSangSo.Customer.sheet.getRange(4, cot(doiSangSo, 'Customer', '@CUS_MA_KH')).getValue()), taxNumber: '0311127395' }]
-  });
+  }));
 
   check(so, 'sửa một trường trên bản ghi đã có cũng đặt lại khuôn trước khi ghi',
     [sua.ok, doiSangSo.Customer.sheet.getRange(4, cotMst).getValue()], [true, '0311127395']);
@@ -109,13 +110,13 @@ function chay(so) {
   const cotGiaTri = cot(giuKhuonSo, 'Activity', '@ACT_GIA_TRI_HD');
   giuKhuonSo.Activity.sheet.getRange(4, cotGiaTri, 50, 1).setNumberFormat('#,##0.00 [$₫]');
 
-  const themGd = giuKhuonSo.hop.writeGateSave({
+  const themGd = trongLanChay(giuKhuonSo.hop, () => giuKhuonSo.hop.writeGateSave({
     entity: 'activity',
     records: [{
       customerId: 'CUS-000001', workDate: '2026-09-06', taskType: 'Gọi điện', content: 'Chào hàng',
       product: 'Thép hộp', contractValue: '1.500.000', fbmSyncPermission: 'Cho phép'
     }]
-  });
+  }));
 
   check(so, 'khuôn tiền tệ người dùng tự chọn cho cột số vẫn còn sau lượt Lưu',
     [themGd.ok,
