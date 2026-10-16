@@ -21,12 +21,13 @@ Nguyên tắc nền áp dụng: "Một hành vi, một chỗ định nghĩa", "M
 4. **Sidebar tự giới hạn bằng cấu trúc, không bằng hẹn giờ.** Không bao giờ có hai lời hỏi song song; tín hiệu đến lúc đang bận gộp thành đúng một lời hỏi kế tiếp (đã có, giữ nguyên). Nhịp nạp tối đa vì vậy bằng tốc độ một lời hỏi, không cần con số chờ lặng hay trần thời gian. Phương án "chờ lặng Q giây, trần M giây" và "khai báo thao tác còn tiếp" đã bàn và loại vì thêm độ trễ đoán bằng thời gian.
 5. **Độ trễ trigger sửa tay là luật của kênh `/bind`, không phải luật nạp.** Tín hiệu `/bind` đến trước khi trigger kịp ghi dấu bẩn (đo 2,6–3,8 giây, docstring `CHANGE_SIGNAL_DELAYS_MS` ở `Settings.js`), nên lời hỏi chưa thấy revision tăng thì hỏi lại theo lịch trễ như hiện nay.
 6. **Nạp nền chỉ hiện thanh loading, không dùng lớp phủ chặn.** Chỉ chặn khi người dùng đang chờ kết quả của chính thao tác mình vừa làm (ví dụ lưu form); kết quả đó trả ngay trong chính lời gọi ghi.
-7. **Vẽ lại view luôn đi cùng lần áp RAM** (khi công tắc tự làm mới bật và đang đứng ở sheet `!` đó), và chỉ vẽ khi giỏ có bản ghi thuộc view đó.
+7. **Vẽ lại view luôn đi cùng lần áp RAM** (khi công tắc tự làm mới bật và đang đứng ở sheet `!` đó). Giữ bất biến 6 của 07A: Customer/Activity đổi thì mọi sheet `!` thành cũ; vế "chỉ vẽ khi giỏ có bản ghi thuộc view" đã loại (chủ dự án duyệt 2026-10-16) vì bản ghi có thể vừa rời khỏi view sau khi sửa, lọc trước/sau rất dễ sót, mà số lần vẽ đã bị giới hạn bằng cấu trúc.
+8. **Bỏ chờ 3 giây sau lần sửa tay cuối** (`RELOAD_DECISION_DEBOUNCE_MS`, `recordsReadyAt`, `recordsDebounceMs`, `flushOnLeave`; chủ dự án duyệt 2026-10-16): lịch hỏi trễ của kênh `/bind` và cổng gom đã gom các lần sửa sát nhau. Hoãn chỉ còn một lý do: bảo vệ bản nháp Sidebar.
 
 Kỳ vọng với đồng bộ sau khi có cả phiên này và phiên Một cửa ghi: chỉ mỗi lô của cửa ghi có bản ghi đổi mới sinh một lần nạp; ngày FBM không đổi gì thì cả chuỗi nền không nạp lần nào; kết thúc lượt không có lần nạp riêng.
 
 ## Việc cần làm
 
-- [ ] Viết lại 07A trước khi code: thay dòng "Pull/push/background" và mọi luật hoãn riêng lẻ bằng luật chung ở trên; sửa 09 nếu có đoạn nhắc hoãn nạp khi đồng bộ chạy. Trình chủ dự án duyệt trước khi code.
+- [x] Viết lại 07A trước khi code (chủ dự án duyệt 2026-10-16; 07A bất biến 1a–1d, mục 3, ma trận dòng sửa tay/Sidebar/Pull, mục 6, 6.1; đồng bộ 05, 05A, 07): thay dòng "Pull/push/background" và mọi luật hoãn riêng lẻ bằng luật chung ở trên; sửa 09 nếu có đoạn nhắc hoãn nạp khi đồng bộ chạy. Trình chủ dự án duyệt trước khi code.
 - [ ] Liệt kê mọi cửa vào của GAS (lời gọi Sidebar, trigger, relay Extension, API) và mọi chỗ đang tự đánh dấu bẩn (`WriteCommit`, `Triggers`, các bên truyền `recordsDebounceMs`/`recordsReadyAt`); ghi kết quả vào tệp này rồi tách thành các mục `[Tự động]`/`[Cần kiểm chứng thật]`.
 - [ ] `node tests/run.js` đạt; đẩy GAS DEV; chủ dự án nghiệm thu trên Sheet DEV (chạy nền: Sheet đang xem cập nhật theo lô, chỉ có thanh loading, không lớp phủ); đổi tên tệp sang `[Đã xử lý]`.
