@@ -142,6 +142,19 @@ FbmSync.scheduleMarkerAdvance = function (kind, now) {
   FbmSync.props().setProperty(key, String(next));
   return next;
 };
+/** Dòng vết của lịch nền: chỉ ra Sheet `Log` khi `LOG_TRACE` phủ `fbm_sync`, để biết mỗi lần Extension hỏi GAS đã quyết gì. */
+FbmSync.scheduleTrace = function (action, reason, detail) {
+  if (typeof logTrace === 'function') { logTrace({ source: 'fbm_sync', action: action, outcome: 'trace', reason: reason, detail: detail || {} }); }
+};
+/** Câu "sớm nhất là X, còn N phút" cho dòng vết lần hỏi chưa có việc. */
+FbmSync.scheduleNextText = function (now) {
+  var props = FbmSync.props(), schedule = FbmSync.backgroundScheduleRead(), best = '', bestAt = 0;
+  Object.keys(FbmSync.SCHEDULE_MARKER_KEYS).forEach(function (kind) {
+    var at = Number(props.getProperty(FbmSync.SCHEDULE_MARKER_KEYS[kind]) || 0);
+    if (schedule[kind].enabled && at && (!bestAt || at < bestAt)) { best = kind; bestAt = at; }
+  });
+  return best ? 'sớm nhất là ' + FbmSync.SCHEDULE_LABELS[best] + ', còn ' + Math.max(0, Math.ceil((bestAt - now) / 60000)) + ' phút' : 'không có tiến trình nào đang bật';
+};
 FbmSync.scheduleNextAt = function () {
   var props = FbmSync.props(), schedule = FbmSync.backgroundScheduleRead();
   var times = Object.keys(FbmSync.SCHEDULE_MARKER_KEYS).filter(function (kind) { return schedule[kind].enabled; }).map(function (kind) { return Number(props.getProperty(FbmSync.SCHEDULE_MARKER_KEYS[kind]) || 0); }).filter(function (at) { return at > 0; });
@@ -155,12 +168,16 @@ FbmSync.schedulerPickDue = function (now, options) {
   var at = Number(now || Date.now()), opt = options || {}, schedule = FbmSync.backgroundScheduleRead(), state = FbmSync.stateRead();
   FbmSync.ensureScheduleMarkers(at);
   if (!FbmSync.masterEnabled() || schedule.enabled === false) { return { ok: false, code: 'BACKGROUND_DISABLED' }; }
-  if (FbmSync.runInProgress(state)) { return { ok: false, code: 'SYNC_ALREADY_RUNNING' }; }
+  if (FbmSync.runInProgress(state)) {
+    FbmSync.scheduleTrace('schedule_skip', 'Extension hỏi lịch nền: đang có lượt chạy, không mở thêm.', { phase: String(state.phase || '') });
+    return { ok: false, code: 'SYNC_ALREADY_RUNNING' };
+  }
   if (state.scheduledScan) { return { ok: true, kind: String(state.scheduledScan), existing: true }; }
   var due = FbmSync.scheduleDueKinds(at, []);
   // Mở Chrome là tùy chọn người dùng thấy được: được một lần Giữ phiên ngay, không sinh loạt việc bù.
   if (!due.length && opt.startup === true && FbmSync.extensionConfigRead().runOnStartup !== false && schedule.heartbeat.enabled) { due = ['heartbeat']; }
   if (!due.length) {
+    FbmSync.scheduleTrace('schedule_idle', 'Extension hỏi lịch nền: chưa có tiến trình đến hạn; ' + FbmSync.scheduleNextText(at) + '.');
     if (state.chain) { state.chain = null; FbmSync.stateWrite(state); }
     return { ok: false, code: 'NO_PROCESS_DUE' };
   }
@@ -308,6 +325,7 @@ function fbmSyncHeartbeatLocked(rawResponse, options) {
     state.scheduledScan = recount ? 'recount' : '';
     state.message = recount ? FbmSync.RECOUNT_MESSAGE : 'Heartbeat FBM OK.';
   }
+  FbmSync.scheduleTrace('heartbeat_ok', 'Giữ phiên FBM OK, FBM báo ' + countTotal + ' khách' + (state.scheduledScan === 'recount' ? '; số khách lệch nên chạy Quét nhanh.' : '.'), { customers: countTotal });
   state.cursor = {};
   FbmSync.stateWrite(state);
   state = FbmSync.stateRead();
