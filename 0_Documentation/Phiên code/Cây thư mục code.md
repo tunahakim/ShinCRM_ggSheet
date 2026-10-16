@@ -228,7 +228,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── transport\EntryPoints.js Entry point cho Sidebar, DEV runner và Web App relay.
     ├── control\ControlPort.js  Cổng lệnh trung lập và DTO thông báo; adapter kênh không chứa nghiệp vụ.
     ├── state\State.js            DocumentProperties, cursor và progress.
-    ├── state\PropertyBuffer.js   Phần riêng của đồng bộ FBM trên `server/state/DocumentStore.js`: `FbmSync.props()` ghi gộp trước khi nhả khóa điều phối, trace ghi một lần; bản chụp Sheet Customer/Activity/Category của lần gọi.
+    ├── state\PropertyBuffer.js   Phần riêng của đồng bộ FBM trên `server/state/DocumentStore.js`: `FbmSync.props()` ghi gộp trước khi nhả khóa điều phối, trace ghi một lần; `withLocalSnapshot` mở một lần gọi cho preflight chạy ngoài `runEntryPoint` (đọc Sheet đi qua bản đọc chung `server/sheet/SheetReadCopy.js`).
     ├── state\SyncSettings.js     Tham số vận hành FBM trong DocumentProperties, migration Config một lần.
     ├── state\AccountSettings.js  Cấu hình gắn tài khoản FBM: tiền tố/độ dài mã khách và mốc Activity; migration Config một lần.
     ├── state\RecordLocks.js      Khóa bản ghi và kiểm tra revision.
