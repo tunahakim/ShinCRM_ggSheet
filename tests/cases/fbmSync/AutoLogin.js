@@ -62,6 +62,20 @@ async function chay(so) {
   check(so, 'sau authorize GAS cap User grid de xac minh identity', [authorizeResponse.ok, authorizeResponse.request.meta.kind, authorizeResponse.request.body.controller], [true, 'identity_user_grid', 'User']);
   const userResponse = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[2037,"ANHLT","Le Tuan Anh"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: authorizeResponse.request.id }] } });
   check(so, 'chi identity khop moi tiep tuc heartbeat', [userResponse.ok, userResponse.code, userResponse.request.meta.kind, heartbeat.FbmSync.stateRead().session.accountUsername, heartbeat.FbmSync.stateRead().session.accountName], [true, 'AUTO_LOGIN_OK', 'heartbeat', 'ANHLT', 'Le Tuan Anh']);
+  check(so, 'Giữ phiên đi qua probe rồi cần đăng nhập không bị tính là lượt bấm tay: lần đăng nhập vẫn chịu chu kỳ chờ của chạy nền', autoLoginRequest.request && heartbeat.FbmSync.autoLoginAttemptOptions(Object.assign({}, heartbeat.FbmSync.stateRead(), { origin: 'manual', metadata: { sessionGate: { resumeCursor: { kind: 'heartbeat' } } } }), { kind: 'session_probe' }).manual, false);
+  // Gặp thật 2026-10-16 20:33: đăng nhập xong giữa Giữ phiên, response đếm khách về thì GAS trả "hết việc" mà lượt vẫn mở ở checking_session; Quét đầy đủ đến hạn không chạy, lần hỏi sau mới phát hiện lượt bỏ dở.
+  heartbeatData.FBM_SYNC_DONE_CUSTOMER_FULL_SCAN = '1';
+  const resumedLogs = [], savedResumedLog = heartbeat.logEvent;
+  heartbeat.logEvent = (event) => resumedLogs.push(event);
+  const resumedCount = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[1]],"ViewPage":{"Fields":[{"AliasName":"id"}]}}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: userResponse.request.id }] } });
+  heartbeat.logEvent = savedResumedLog;
+  const resumedState = heartbeat.FbmSync.stateRead();
+  check(so, 'Đăng nhập xong giữa Giữ phiên: response đếm khách về thì chuỗi chạy tiếp Quét đầy đủ đến hạn, không trả hết việc khi lượt còn mở', [
+    resumedCount.ok, !!resumedCount.request, resumedState.chain && resumedState.chain.current, resumedState.chain && resumedState.chain.ran.indexOf('heartbeat') >= 0, resumedLogs.some((event) => event.action === 'run_left_open')
+  ], [true, true, 'customerFull', true, false]);
+  // Các ca sau chỉ xét Giữ phiên: bỏ Quét đầy đủ vừa mở khỏi chuỗi.
+  heartbeatData.FBM_SYNC_DONE_CUSTOMER_FULL_SCAN = String(Date.now());
+  heartbeat.FbmSync.statePatch({ chain: null, scheduledScan: '' });
 
   // Phiên chết lần nữa ở lần hỏi nền sau (gặp thật 2026-10-16: đăng nhập 00:17, 00:32 phiên lại chết): cờ "đã thử đăng nhập" của lượt trước không được chặn lần đăng nhập mới.
   heartbeat.FbmSync.statePatch({ phase: 'done', cursor: {}, activeRequestId: '', deadlineAt: 0 });

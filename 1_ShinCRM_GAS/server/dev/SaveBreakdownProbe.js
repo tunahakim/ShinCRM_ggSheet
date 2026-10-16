@@ -52,8 +52,11 @@ function measureSaveBreakdown() {
     }
     var context = entityReadContext('customer');
     var started = Date.now();
+    writeGateRowById(context);
+    var rowByIdMs = Date.now() - started;
+    started = Date.now();
     var max = idGateMaxOnSheet(context);
-    out.push('Riêng idGateMaxOnSheet (đọc cả cột mã, ' + context.rowCount + ' dòng): ' + (Date.now() - started) + ' ms, max ' + max);
+    out.push('Cấp mã trên cùng bối cảnh (' + context.rowCount + ' dòng): tìm dòng theo mã ' + rowByIdMs + ' ms, rồi lưới an toàn idGateMaxOnSheet ' + (Date.now() - started) + ' ms, max ' + max);
   } finally {
     saveRecord('customer', { id: id, note: original });
     out.push('Đã trả ghi chú gốc: ' + (sheet.getRange(SHEET_FIRST_DATA_ROW, noteCol).getDisplayValue() === original));

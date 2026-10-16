@@ -29,6 +29,21 @@ function chay(so) {
     () => hong.hop.idGateIssue('customer', 1, hong.hop.entityReadContext('customer')), 'ID_COUNTER_CUSTOMER');
   check(so, 'bộ đếm hỏng vẫn giữ nguyên giá trị để người phụ trách sửa tay', hong.props.ID_COUNTER_CUSTOMER, 'abc');
 
+  section('Cột mã đọc một lần cho cả tìm dòng và lưới an toàn của cấp mã');
+
+  const mot = dungHop({ sheets: ['Config', 'Log', 'Customer'] });
+  const { ghiO } = require('../lib/dung-hop');
+  ghiO(mot, 'Customer', 4, '@CUS_MA_KH', 'CUS-000009');
+  const ctxMot = mot.hop.entityReadContext('customer');
+  const cotMa = ctxMot.indexes[ctxMot.idAt] + 1;
+  let lanDocCotMa = 0;
+  const layVung = ctxMot.sheet.getRange.bind(ctxMot.sheet);
+  ctxMot.sheet.getRange = function (row, col, rows, cols) { if (col === cotMa && cols === 1 && rows === ctxMot.rowCount) { lanDocCotMa += 1; } return layVung.apply(null, arguments); };
+  const dong = mot.hop.writeGateRowById(ctxMot);
+  const maMoi = mot.hop.idGateIssue('customer', 1, ctxMot);
+  check(so, 'cửa ghi tìm dòng rồi cấp mã mới chỉ đọc cột mã một lần, lưới an toàn vẫn nhảy qua số lớn nhất trên sheet',
+    [lanDocCotMa, dong['CUS-000009'], maMoi[0] > 'CUS-000009'], [1, 4, true]);
+
   return so;
 }
 
