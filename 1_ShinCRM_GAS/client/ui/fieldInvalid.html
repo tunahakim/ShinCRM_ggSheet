@@ -1,0 +1,42 @@
+<script>
+/*
+ * Hiện kết quả kiểm ô của GAS: tô đỏ ô thiếu hoặc sai và gộp câu báo. Dùng chung cho form bản ghi (`saveFlow`) và các card cấu hình FBM.
+ *
+ * GAS là nơi duy nhất quyết ô nào sai và vì sao, trả `invalid: [{ field, reason }]`; tệp này không tự kiểm gì. Bên gọi tự đổi `field` ra id ô của màn mình.
+ */
+
+/** Lớp tô ô đang lỗi, khai ở `client/style/components.html`. */
+var FIELD_INVALID_CLASS = 'shin-input-error';
+
+/** Tô đỏ các ô theo id, trả id ô sai đầu tiên. Dấu đỏ tự mất khi người dùng gõ lại — tai nghe `{ once: true }`, đúng nếp bản cũ. */
+function fieldInvalidPaint(ids) {
+  var dau = null;
+
+  (ids || []).forEach(function (id) {
+    var el = id ? document.getElementById(id) : null;
+    if (!el || !el.classList) { return; }
+
+    el.classList.add(FIELD_INVALID_CLASS);
+    if (el.addEventListener) {
+      el.addEventListener('input', function () { el.classList.remove(FIELD_INVALID_CLASS); }, { once: true });
+    }
+    if (!dau) { dau = el.id; }
+  });
+
+  return dau;
+}
+
+/** Bỏ dấu đỏ ở các ô theo id. Chạy trước mỗi lượt gửi, vì lượt trước có thể đã tô mà lần này chỗ đó đã sửa đúng. */
+function fieldInvalidClear(ids) {
+  (ids || []).forEach(function (id) {
+    var el = id ? document.getElementById(id) : null;
+    if (el && el.classList) { el.classList.remove(FIELD_INVALID_CLASS); }
+  });
+}
+
+/** Câu báo gộp mọi ô không đạt, mỗi dòng một ô. */
+function fieldInvalidMessage(invalid) {
+  var dong = (invalid || []).map(function (item) { return '• ' + item.reason; });
+  return 'Chưa lưu được. ' + (dong.length === 1 ? 'Một chỗ cần sửa:' : dong.length + ' chỗ cần sửa:') + '\n' + dong.join('\n');
+}
+</script>

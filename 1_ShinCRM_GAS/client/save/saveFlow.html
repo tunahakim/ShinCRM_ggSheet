@@ -8,9 +8,6 @@
 /** Trường máy — cửa ghi tự điền. Bản đối chiếu máy chủ là `WRITE_GATE_MACHINE_FIELDS`; sửa một bên thì mở bên kia. */
 var SAVE_FLOW_MACHINE = ['id', 'createdAt', 'recordStatus'];
 
-/** Lớp tô ô đang lỗi, khai ở `client/style/components.html`. */
-var SAVE_FLOW_ERROR_CLASS = 'shin-input-error';
-
 /** Cờ đang gửi, để hai cú bấm liền nhau không thành hai bản ghi. */
 var SAVE_FLOW = { dangGui: false };
 
@@ -56,34 +53,12 @@ function saveFlowRecord(top, thu) {
 
 /** Bỏ dấu đỏ ở mọi ô của form. Chạy trước mỗi lượt gửi, vì lượt trước có thể đã tô mà lần này chỗ đó đã sửa đúng. */
 function saveFlowClearErrors(entity) {
-  Object.keys(Schema[entity]).forEach(function (ten) {
-    var el = document.getElementById(renderFieldId({ entity: entity, name: ten }));
-    if (el && el.classList) { el.classList.remove(SAVE_FLOW_ERROR_CLASS); }
-  });
+  fieldInvalidClear(Object.keys(Schema[entity]).map(function (ten) { return renderFieldId({ entity: entity, name: ten }); }));
 }
 
-/** Tô đỏ ô cửa ghi trả về, trả `focusId` của ô sai đầu tiên. Dấu đỏ tự mất khi người dùng gõ lại — tai nghe `{ once: true }`, đúng nếp bản cũ. */
+/** Tô đỏ ô cửa ghi trả về, trả `focusId` của ô sai đầu tiên. */
 function saveFlowPaintInvalid(entity, invalid) {
-  var dau = null;
-
-  (invalid || []).forEach(function (item) {
-    var el = document.getElementById(renderFieldId({ entity: entity, name: item.field }));
-    if (!el || !el.classList) { return; }
-
-    el.classList.add(SAVE_FLOW_ERROR_CLASS);
-    if (el.addEventListener) {
-      el.addEventListener('input', function () { el.classList.remove(SAVE_FLOW_ERROR_CLASS); }, { once: true });
-    }
-    if (!dau) { dau = el.id; }
-  });
-
-  return dau;
-}
-
-/** Câu báo gộp mọi trường không đạt, mỗi dòng một trường. Dùng `alert` vì đó là đường hiện lỗi duy nhất của sidebar — xem `dispatchError`. */
-function saveFlowInvalidMessage(invalid) {
-  var dong = (invalid || []).map(function (item) { return '• ' + item.reason; });
-  return 'Chưa lưu được. ' + (dong.length === 1 ? 'Một chỗ cần sửa:' : dong.length + ' chỗ cần sửa:') + '\n' + dong.join('\n');
+  return fieldInvalidPaint((invalid || []).map(function (item) { return renderFieldId({ entity: entity, name: item.field }); }));
 }
 
 /** Đổ câu trả lời của cửa ghi vào RAM. Dùng `res.rows` chứ không dùng bản vừa gửi: hàng đọc lại có đủ mọi cột, kể cả mã vừa cấp. */
@@ -127,7 +102,8 @@ function saveFlowSubmit() {
       if (res.blocked) { throw new Error(res.message || 'Bản ghi đang được đồng bộ.'); }
       if (!res.ok) {
         var focusId = saveFlowPaintInvalid(entity, res.invalid);
-        alert(saveFlowInvalidMessage(res.invalid));
+        // `alert` vì đó là đường hiện lỗi duy nhất của form bản ghi — xem `dispatchError`.
+        alert(fieldInvalidMessage(res.invalid));
         return { focusId: focusId };
       }
 
