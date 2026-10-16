@@ -106,7 +106,8 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │       ├── ReloadMatrixProbe.js  Probe DEV tạo fixture nhỏ, mô phỏng onEdit theo ma trận reload và tự khôi phục dữ liệu/thuộc tính.
 │       ├── ReloadRefactorProbe.js Probe DEV thử công thức mảng cho bộ đọc Extension và đo chi phí trigger, lời dò, tô màu tab.
 │       ├── ReloadJournalProbe.js Probe DEV đếm lệnh DocumentProperties và đo thời gian của tín hiệu nạp lại và từng mức nạp (trước/sau sổ nhật ký).
-│       ├── SaveBreakdownProbe.js Probe DEV tách một lần lưu khách từ Sidebar thành từng đoạn (khóa, đọc, kiểm, ghi, đọc lại, đổ giỏ) để tìm chỗ tốn thời gian.
+│       ├── SaveBreakdownProbe.js Probe DEV tách một lần lưu khách từ Sidebar thành từng đoạn (khóa, đọc, kiểm, ghi, đọc lại, ghi nhận thay đổi) để tìm chỗ tốn thời gian.
+│       ├── SheetReadGapProbe.js Probe DEV đo phí cố định một lệnh đọc Sheet và phí mỗi dòng, ra ngưỡng gộp dòng của bản đọc Sheet.
 │       ├── DevToken.js           Thẻ bí mật của cửa trên. Không vào git, nhưng CÓ đẩy lên Google.
 │       ├── Smoke.js              Phép thử nhanh: mở được tệp Sheet không, đọc được gì.
 │       ├── DumpGrid.js           Đo lưới từng sheet: bao nhiêu hàng, bao nhiêu cột, còn chỗ ghi thêm bao nhiêu hàng.
