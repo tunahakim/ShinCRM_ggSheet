@@ -13,8 +13,10 @@ function fbmSyncClientTrace(stage, request, extra) {
 }
 
 /** Chỗ duy nhất đổi cờ lượt chạy (chỉ cho giao diện đồng bộ). Nạp lại RAM không phụ thuộc cờ này: mỗi lần chạy GAS có thay đổi phát một tín hiệu qua kênh báo thay đổi. */
+/** Bắt đầu một lượt mới thì quên mã phiên cũ: lỗi xảy ra trước khi GAS cấp mã mới chỉ được ghi Log, không được dừng nhầm phiên nào. */
 function fbmSyncSetRunning(on) {
   FBM_SYNC_CLIENT.running = on === true;
+  if (on === true) { FBM_SYNC_CLIENT.ownRunId = ''; }
 }
 
 /** Cất màn hiện tại trước khi FBM dùng chung bốn vùng render của Sidebar. */
@@ -902,10 +904,11 @@ function fbmSyncRetryPushFailures() {
   });
 }
 /** Hiển thị lỗi thao tác ngay trong màn hình hiện tại, không để Promise bị từ chối im lặng. */
-function fbmSyncLogClientError(error, fallback, action) {
+/** Ghi Log một lỗi Sidebar gặp. Chỉ vòng chạy phiên của chính Sidebar truyền `runId` (GAS mới dừng đúng phiên đó); thao tác cài đặt, kiểm tra liên kết… không truyền nên không bao giờ dừng phiên nền. Lỗi nhập sai của người dùng không đi qua đây. */
+function fbmSyncLogClientError(error, fallback, action, runId) {
   var reason = String(error && error.message || error || fallback || 'Thao tác đồng bộ thất bại.').slice(0, 500);
   if (typeof callServer !== 'function') { return Promise.resolve(null); }
-  return callServer('fbmLogSyncError', [reason, (FBM_SYNC_CLIENT.traceEvents || []).slice()], { silent: true }).catch(function () { return null; });
+  return callServer('fbmLogSyncError', [reason, (FBM_SYNC_CLIENT.traceEvents || []).slice(), String(action || 'sidebar_error'), String(runId || '')], { silent: true }).catch(function () { return null; });
 }
 function fbmSyncPaintError(error, fallback, action) {
   fbmSyncLogClientError(error, fallback, action || 'sidebar_error');
@@ -922,8 +925,7 @@ function fbmSyncCheckIdentity() {
   if (FBM_SYNC_CLIENT.running) { return Promise.resolve(null); }
   var identityTarget = typeof fbmSyncIdentityActionValues === 'function' ? fbmSyncIdentityActionValues() : {};
   if (!identityTarget.spreadsheetId || !identityTarget.userId || !identityTarget.username || !identityTarget.accountName) {
-    fbmSyncSetAccountNotice('identity', 'error', 'Cần đủ bốn giá trị nhận diện trước khi kiểm tra liên kết.');
-    fbmSyncPaintError(null, 'Cần đủ Spreadsheet ID, mã user, username và tên tài khoản FBM trước khi kiểm tra liên kết.');
+    fbmSyncSetAccountNotice('identity', 'error', 'Cần đủ Spreadsheet ID, mã user, username và tên tài khoản FBM trước khi kiểm tra liên kết.');
     return Promise.resolve(null);
   }
   fbmSyncSetRunning(true);
@@ -1330,12 +1332,12 @@ function fbmSyncSaveConnection(button) {
     if (button) { button.disabled = false; }
     return Promise.resolve(null);
   }
-  if (partialIdentity) { fbmSyncSetAccountNotice('identity', 'error', 'Identity incomplete.'); fbmSyncPaintError(null, 'Identity incomplete.'); if (button) { button.disabled = false; } return Promise.resolve(null); }
+  if (partialIdentity) { fbmSyncSetAccountNotice('identity', 'error', 'Cần đủ Spreadsheet ID, mã user, username và tên tài khoản FBM trước khi lưu.'); if (button) { button.disabled = false; } return Promise.resolve(null); }
   if (wantsCredentialDelete) {
     if (button) { button.disabled = false; }
     return fbmSyncDeleteLoginCredential(button, binding);
   }
-  if (hasUsername !== hasPassword && !preservingCredential) { fbmSyncSetAccountNotice('login', 'error', hasUsername ? 'Đã nhập username nhưng chưa có mật khẩu tương ứng.' : 'Đã nhập mật khẩu nhưng chưa có username tương ứng.'); fbmSyncPaintError(null, hasUsername ? 'Đã nhập username nhưng chưa có mật khẩu tương ứng.' : 'Đã nhập mật khẩu nhưng chưa có username tương ứng.'); if (button) { button.disabled = false; } return Promise.resolve(null); }
+  if (hasUsername !== hasPassword && !preservingCredential) { fbmSyncSetAccountNotice('login', 'error', hasUsername ? 'Đã nhập username nhưng chưa có mật khẩu tương ứng.' : 'Đã nhập mật khẩu nhưng chưa có username tương ứng.'); if (button) { button.disabled = false; } return Promise.resolve(null); }
   if (!fbmSyncConfirmConnectionUsernameMismatch(binding, credentials)) { if (button) { button.disabled = false; } return Promise.resolve(null); }
   var oldBinding = FBM_SYNC_CLIENT.identityStatus && FBM_SYNC_CLIENT.identityStatus.binding || {}, identityChanged = ['spreadsheetId', 'userId', 'username', 'accountName'].some(function (key) { return String(oldBinding[key] || '') !== String(binding[key] || ''); });
   var credential = { mode: hasPassword ? 'save' : (preservingCredential ? 'preserve' : (identityChanged ? 'clear' : 'preserve')), keepOnIdentityChange: preservingCredential }, encryptPromise = Promise.resolve(null);
@@ -1357,13 +1359,11 @@ function fbmSyncTestLogin(button) {
   var editing = fbmSyncConfigIsEditing('connection'), credentials = editing ? fbmSyncLoginCredentialsFromForm() : null, login = FBM_SYNC_CLIENT.loginStatus || {}, expectedIdentity = editing ? fbmSyncConnectionDraftValues() : (FBM_SYNC_CLIENT.identityStatus && FBM_SYNC_CLIENT.identityStatus.binding || {});
   if (editing && (!credentials.username || !credentials.password)) {
     fbmSyncSetAccountNotice('login', 'error', 'Đăng nhập thử không thành công: cần nhập username và mật khẩu FBM.');
-    fbmSyncPaintError(null, 'Cần nhập username và mật khẩu FBM trước khi đăng nhập thử.');
     if (button) { button.disabled = false; }
     return Promise.resolve(null);
   }
   if (!editing && (!login.configured || !login.credentialRef)) {
     fbmSyncSetAccountNotice('login', 'error', 'Chưa có thông tin đăng nhập đã lưu để thử. Hãy bấm Sửa thông tin và lưu credential trước.');
-    fbmSyncPaintError(null, 'Chưa có credential đã lưu để đăng nhập thử.');
     if (button) { button.disabled = false; }
     return Promise.resolve(null);
   }
@@ -1578,7 +1578,10 @@ function fbmSyncContinueServer(status, response) {
   });
 }
 /** Chạy chuỗi request GAS -> Extension cho tới khi hết cursor. */
+/** Mọi đường khởi chạy phiên của Sidebar đều vào đây, nên đây là chỗ duy nhất ghi nhớ mã phiên Sidebar đang sở hữu (`ownRunId`) — chỉ mã này mới được dùng để báo GAS dừng phiên. */
 function fbmSyncLoop(status) {
+  var startedRunId = status && String((status.status || status).runId || '');
+  if (startedRunId) { FBM_SYNC_CLIENT.ownRunId = startedRunId; }
   if (!FBM_SYNC_CLIENT.running && !FBM_SYNC_CLIENT.cancelRequested) { return fbmSyncStatusOnce(); }
   if (!status || !status.request) {
     // Hạ cờ trước khi vẽ: vẽ trong lúc `cancelRequested` còn bật thì nút kẹt ở "Đang dừng…" tới lần hỏi trạng thái kế tiếp.
@@ -1587,7 +1590,7 @@ function fbmSyncLoop(status) {
     // A terminal response without a request is a transport error; never leave Sidebar silent.
     if (!status) {
       var emptyResultError = 'GAS returned no sync result.';
-      fbmSyncLogClientError(new Error(emptyResultError), emptyResultError, 'empty_sync_result');
+      fbmSyncLogClientError(new Error(emptyResultError), emptyResultError, 'empty_sync_result', FBM_SYNC_CLIENT.ownRunId);
       fbmSyncPaint(fbmSyncClientErrorStatus(emptyResultError, { lastFailureCode: 'SYNC_EMPTY_RESULT' }));
     } else if (status.ok === false) {
       var terminal = status.status && typeof status.status === 'object' ? status.status : {};
@@ -1645,12 +1648,12 @@ function fbmSyncRunStart(mode) {
     if (err && err.code === 'GAS_CALLBACK_TIMEOUT') {
       var diagnostic = err.diagnostic || {};
       var timeoutStatus = fbmSyncClientErrorStatus(reason, Object.assign({}, diagnostic, { lastFailureCode: err.code }));
-      return callServer('fbmLogSyncError', [reason, FBM_SYNC_CLIENT.traceEvents.slice()]).catch(function () { return null; }).then(function () {
+      return fbmSyncLogClientError(err, reason, 'sync_run', FBM_SYNC_CLIENT.ownRunId).then(function () {
         fbmSyncPaint(timeoutStatus);
         return null;
       });
     }
-    return callServer('fbmLogSyncError', [reason, FBM_SYNC_CLIENT.traceEvents.slice()]).catch(function () { return null; }).then(function () {
+    return fbmSyncLogClientError(err, reason, 'sync_run', FBM_SYNC_CLIENT.ownRunId).then(function () {
       return err && err.transportReported ? null : callServer('fbmCancelSync').catch(function () { return null; });
     }).then(function () {
       fbmSyncPaint(fbmSyncClientErrorStatus(reason));
