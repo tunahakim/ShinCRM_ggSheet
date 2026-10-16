@@ -334,6 +334,19 @@ async function chay(so) {
   check(so, 'Hộp đen Extension: không có hộp đen thì nói rõ, worker chạy liền thì nói không bị tắt', [
     heartbeat.FbmSync.extensionTrailText(null, Date.now()), heartbeat.FbmSync.extensionTrailText({ stage: 'gas_response_sent', at: 1000, workerStartedAt: 50, currentWorkerStartedAt: 50 }, 1000)
   ], ['Hộp đen Extension: không có (Extension bản cũ hoặc chưa ghi được bước nào).', 'Hộp đen Extension: bước cuối (cách đây 0 phút) là đã gửi kết quả về GAS, chưa nhận trả lời. Phần chạy nền của Extension vẫn chạy liền, không bị Chrome tắt.']);
+  check(so, 'Hộp đen Extension: Extension đã chạy hết lượt thì không nói bị Chrome tắt dù worker dựng lại sau đó, chỉ ra lỗi phía GAS', heartbeat.FbmSync.extensionTrailText({ stage: 'chain_finished', at: 1000, workerStartedAt: 50, currentWorkerStartedAt: 900 }, 1000),
+    'Hộp đen Extension: bước cuối (cách đây 0 phút) là Extension đã chạy hết lượt vì GAS trả lời không còn request tiếp. Lượt còn mở là lỗi phía GAS, không phải Extension bỏ dở.');
+  const leftOpenLogs = [];
+  heartbeat.logEvent = (entry) => leftOpenLogs.push(entry);
+  heartbeat.FbmSync.statePatch({ runId: 'left-open-run', origin: 'background', phase: 'pull_customer', cursor: { kind: 'scan_job' }, activeRequestId: 'in-flight', deadlineAt: Date.now() + 60000 });
+  const inFlightReply = heartbeat.FbmSync.runSlice(() => ({ ok: true, request: null }));
+  const inFlightPhase = heartbeat.FbmSync.stateRead().phase;
+  heartbeat.FbmSync.statePatch({ activeRequestId: '', deadlineAt: 0 });
+  const leftOpenReply = heartbeat.FbmSync.runSlice(() => ({ ok: true, request: null }));
+  const leftOpenState = heartbeat.FbmSync.stateRead();
+  check(so, 'Lát trả hết việc khi lượt còn ở phase đang chạy và không request nào chờ: đóng lượt ngay với RUN_LEFT_OPEN và Log ghi lỗi phía GAS; còn request đang chờ thì không đụng', [
+    inFlightReply.ok, inFlightPhase, leftOpenReply.ok, leftOpenReply.code, leftOpenState.phase, leftOpenState.lastFailureCode, leftOpenLogs.filter((entry) => entry.action === 'run_left_open').length
+  ], [true, 'pull_customer', false, 'RUN_LEFT_OPEN', 'error', 'RUN_LEFT_OPEN', 1]);
   heartbeat.FbmSync.statePatch({ runId: 'write-lost-run', origin: 'background', phase: 'push', cursor: { kind: 'push_wait', entity: 'customer' }, activeRequestId: 'write-request', deadlineAt: Date.now() - 1000, scheduledScan: '', chain: null, locks: { 'customer:1': { owner: 'push' } } });
   heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   const lostWrite = heartbeat.FbmSync.stateRead();

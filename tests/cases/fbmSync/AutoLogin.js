@@ -65,6 +65,7 @@ async function chay(so) {
   check(so, 'Giữ phiên đi qua probe rồi cần đăng nhập không bị tính là lượt bấm tay: lần đăng nhập vẫn chịu chu kỳ chờ của chạy nền', autoLoginRequest.request && heartbeat.FbmSync.autoLoginAttemptOptions(Object.assign({}, heartbeat.FbmSync.stateRead(), { origin: 'manual', metadata: { sessionGate: { resumeCursor: { kind: 'heartbeat' } } } }), { kind: 'session_probe' }).manual, false);
   // Gặp thật 2026-10-16 20:33: đăng nhập xong giữa Giữ phiên, response đếm khách về thì GAS trả "hết việc" mà lượt vẫn mở ở checking_session; Quét đầy đủ đến hạn không chạy, lần hỏi sau mới phát hiện lượt bỏ dở.
   heartbeatData.FBM_SYNC_DONE_CUSTOMER_FULL_SCAN = '1';
+  heartbeat.FbmSync.customerBaselineWrite(1);
   const resumedLogs = [], savedResumedLog = heartbeat.logEvent;
   heartbeat.logEvent = (event) => resumedLogs.push(event);
   const resumedCount = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[1]],"ViewPage":{"Fields":[{"AliasName":"id"}]}}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: userResponse.request.id }] } });
@@ -76,6 +77,10 @@ async function chay(so) {
   // Các ca sau chỉ xét Giữ phiên: bỏ Quét đầy đủ vừa mở khỏi chuỗi.
   heartbeatData.FBM_SYNC_DONE_CUSTOMER_FULL_SCAN = String(Date.now());
   heartbeat.FbmSync.statePatch({ chain: null, scheduledScan: '' });
+  // Lượt tay đã tự đăng nhập thì cờ "đã thử đăng nhập" còn sót sau khi lượt xong: dựng lại dấu đó cho ca kế.
+  const leftoverState = heartbeat.FbmSync.stateRead();
+  heartbeat.FbmSync.sessionGateMeta(leftoverState).loginAttempted = true;
+  heartbeat.FbmSync.stateWrite(leftoverState);
 
   // Phiên chết lần nữa ở lần hỏi nền sau (gặp thật 2026-10-16: đăng nhập 00:17, 00:32 phiên lại chết): cờ "đã thử đăng nhập" của lượt trước không được chặn lần đăng nhập mới.
   heartbeat.FbmSync.statePatch({ phase: 'done', cursor: {}, activeRequestId: '', deadlineAt: 0 });
