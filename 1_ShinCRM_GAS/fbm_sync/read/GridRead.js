@@ -50,7 +50,9 @@ FbmSync.gridRequest = function (entity, options) {
     // Khi GAS chưa có payload cookie, để transport generic của Extension lấy từ trang FBM theo chỉ dẫn envelope.
     cookie: cfg.cookie || '{{FBM_PAYLOAD_COOKIE}}', query: null, parameter: null, variable: ''
   };
-  if (entity === 'customer' && cfg.userId) {
+  if (entity === 'customer') {
+    // Thiếu mã người dùng mà vẫn gửi thì FBM trả mọi khách mình đọc được, kể cả khách người khác; chỉ hàm tra mã khách không lọc quyền được bỏ điều kiện này.
+    if (!/^[A-Za-z0-9_-]+$/.test(String(cfg.userId || ''))) { var missingUser = new Error('thiếu mã người dùng FBM nên không dựng request đọc khách; kiểm tra lại tab FBM rồi chạy lại.'); missingUser.code = 'FBM_USER_ID_MISSING'; throw missingUser; }
     payload.externalKey.push({ Name: "stt_rec_kh in (select stt_rec_kh from dbo.zcFastBusiness$Function$GetCustomerValidate('" + cfg.userId + "')) and 1", Opr: '=', Value: 1, Type: 'String', Ignore: false });
   }
   var scope = entity === 'customer' && opt.includeScope !== false && typeof FbmSync.scope === 'function' ? FbmSync.scope() : null;
@@ -59,7 +61,7 @@ FbmSync.gridRequest = function (entity, options) {
     var inList = scope.fbm.length ? scope.fbm.map(function (code) { return "'" + code + "'"; }).join(',') : "''";
     payload.externalKey.push({ Name: 'ma_kh in (' + inList + ') and 1', Opr: '=', Value: 1, Type: 'String', Ignore: false });
   }
-  if (entity === 'customer' && payload.type === 0 && cfg.userId) {
+  if (entity === 'customer' && payload.type === 0) {
     payload.memvars = [{ Name: 'user_id', OldValue: null, NewValue: '' }];
   }
   return { url: cfg.baseUrl + FbmSync.ENDPOINTS.grid, body: payload, meta: { kind: 'grid', entity: entity } };

@@ -17,7 +17,7 @@ FbmSync.canWriteSheet = function (mode) { return mode === 'read' || mode === 'wr
 FbmSync.canWriteFbm = function (mode) { return mode === 'push' || mode === 'write'; };
 /**
  * Bộ đếm của một lượt, chỗ định nghĩa duy nhất. `succeeded` là bản ghi ghi vào Sheet từ FBM, `pushed` là bản ghi FBM đã đọc xác nhận sau khi đẩy; hai số tách riêng vì Sidebar hiện riêng.
- * `missingCustomer`/`missingActivity` là bản ghi mang cờ "không thấy bên FBM" sau lượt quét đủ, kể cả bản ghi đã mang cờ từ lượt trước.
+ * `missingCustomer`/`missingActivity` và `transferredCustomer`/`transferredActivity` là bản ghi cửa ghi gắn cờ "không thấy bên FBM" hoặc "đã chuyển cho người khác" trong lượt.
  */
 /**
  * Thông báo kết thúc lượt cho mọi chiều chạy. Lượt Hai chiều kết thúc ở bước đẩy nên ghi chú của phần đọc (khách lỗi khi đọc giao dịch) phải dựng cùng chỗ, không thì mất.
@@ -35,7 +35,7 @@ FbmSync.runDoneMessage = function (state) {
     + (customerErrors ? ' Có ' + customerErrors + ' khách lỗi khi đọc giao dịch (xem danh sách lỗi)' + (fullScan ? '; lượt này chưa đánh dấu giao dịch "không thấy bên FBM".' : '.') : '')
     + (markerCleanFailed > 0 ? ' Có ' + markerCleanFailed + ' giao dịch chưa bỏ được dấu #SC trên FBM; xem Log.' : '');
 };
-FbmSync.countsDefault = function () { return { total: 0, completed: 0, succeeded: 0, pushed: 0, missingCustomer: 0, missingActivity: 0, error: 0, conflict: 0, skipped: 0 }; };
+FbmSync.countsDefault = function () { return { total: 0, completed: 0, succeeded: 0, pushed: 0, missingCustomer: 0, missingActivity: 0, transferredCustomer: 0, transferredActivity: 0, error: 0, conflict: 0, skipped: 0 }; };
 FbmSync.SEEN_SHARD_HEX_LENGTH = 8000;
 // Apps Script giới hạn một giá trị DocumentProperties khoảng 9 KB. Chặn trước
 // khi gọi setProperty để không đẩy một JSON dở dang vào kho state.

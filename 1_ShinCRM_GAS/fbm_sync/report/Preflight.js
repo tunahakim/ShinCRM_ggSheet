@@ -24,22 +24,26 @@ FbmSync.preflightLocalScan = function (gate) {
 };
 
 FbmSync.preflightPushPermissions = function (issues, mode, scan) {
-  var customers = {}, counts = { customer: 0, activity: 0 }, invalid = { customer: [], activity: [] }, pending = String(FbmSync.SYNC_STATUS && FbmSync.SYNC_STATUS.pending || 'chờ đối soát');
+  var customers = {}, counts = { customer: 0, activity: 0 }, frozen = { customer: [], activity: [] }, invalid = { customer: [], activity: [] }, pending = String(FbmSync.SYNC_STATUS && FbmSync.SYNC_STATUS.pending || 'chờ đối soát');
   scan.customer.forEach(function (item) { customers[String(item.record.id || '')] = item.record; });
   ['customer', 'activity'].forEach(function (entity) {
     scan[entity].forEach(function (item) {
       var record = item.record, parent = entity === 'activity' ? customers[String(record.customerId || '')] : null;
       var own = FbmSync.syncPermission(record, entity);
       if (own.invalid) { invalid[entity].push(String(record.id || '')); return; }
-      if (FbmSync.syncPermission(record, entity, parent).push) { return; }
       var changed = !item.baseline || item.hash !== item.baseline || String(record.syncStatus || '') === pending;
       if (!changed) { return; }
-      counts[entity] += 1;
+      if (!FbmSync.syncPermission(record, entity, parent).push) { counts[entity] += 1; return; }
+      if (FbmSync.isPushFrozen(record, parent)) { frozen[entity].push(String(record.id || '')); }
     });
   });
   Object.keys(counts).forEach(function (entity) {
     var label = entity === 'activity' ? 'Activity' : 'Customer';
     if (counts[entity]) { FbmSync.preflightIssue(issues, 'FBM_RECORD_PUSH_PERMISSION_MISSING', 'warn', entity, 'Có ' + counts[entity] + ' bản ghi ' + label + ' đã thay đổi nhưng ô "Cho phép đồng bộ FBM" không cho đẩy lên FBM.', false); }
+    if (frozen[entity].length) {
+      var frozenShown = frozen[entity].slice(0, FbmSync.PREFLIGHT_ID_LIST_MAX).join(', ') + (frozen[entity].length > FbmSync.PREFLIGHT_ID_LIST_MAX ? '…' : '');
+      FbmSync.preflightIssue(issues, 'FBM_RECORD_PUSH_FROZEN', 'warn', entity, frozen[entity].length + ' bản ghi ' + label + ' đã sửa trên Sheet nhưng không đẩy lên FBM vì bản ghi hoặc khách của nó đang mang "' + FbmSync.SYNC_STATUS.missing + '" hoặc "' + FbmSync.SYNC_STATUS.transferred + '": ' + frozenShown + '. Nội dung sửa vẫn giữ trên Sheet.', false);
+    }
     // Nêu mã bản ghi để người dùng tìm được dòng cần sửa; danh sách dài thì cắt bớt để thông báo không bị cổng Log cắt mất phần hướng dẫn.
     if (invalid[entity].length) {
       var shown = invalid[entity].slice(0, FbmSync.PREFLIGHT_ID_LIST_MAX).join(', ') + (invalid[entity].length > FbmSync.PREFLIGHT_ID_LIST_MAX ? '…' : '');
