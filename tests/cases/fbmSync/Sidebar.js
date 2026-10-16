@@ -389,8 +389,8 @@ async function chay(so) {
     hop.fbmSyncStatusResultLines({ runId: 'r1', canPush: false }, { completed: 5 }).map((line) => line.split(':')[0]),
     hop.fbmSyncStatusResultLines({ runId: '' }, { completed: 5 })
   ], [
-    ['Đọc từ FBM: 1.445', 'Ghi vào Sheet: 3', 'Đẩy lên FBM: 1', 'Không thấy bên FBM: 0 khách, 2 giao dịch', 'Xung đột: 0', 'Lỗi: 0', 'Bỏ qua: 0'],
-    ['Đọc từ FBM', 'Ghi vào Sheet', 'Không thấy bên FBM', 'Xung đột', 'Lỗi', 'Bỏ qua'],
+    ['Đọc từ FBM: 1.445', 'Ghi vào Sheet: 3', 'Đẩy lên FBM: 1', 'Không thấy bên FBM: 0 khách, 2 giao dịch', 'Đã chuyển cho người khác: 0 khách, 0 giao dịch', 'Xung đột: 0', 'Lỗi: 0', 'Bỏ qua: 0'],
+    ['Đọc từ FBM', 'Ghi vào Sheet', 'Không thấy bên FBM', 'Đã chuyển cho người khác', 'Xung đột', 'Lỗi', 'Bỏ qua'],
     []
   ]);
   check(so, 'Thẻ Trạng thái phiên hiện thông tin lượt từng dòng; dòng Đang xử lý chỉ có khi lượt còn chạy', [

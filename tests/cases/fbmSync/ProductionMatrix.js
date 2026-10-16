@@ -189,7 +189,7 @@ async function chay(so) {
   function pushQueue(customers, activities) {
     const run = makeSync(), F = run.hop.FbmSync;
     run.local.customer.push(...customers); run.local.activity.push(...(activities || []));
-    F.scriptSettings = () => ({ accountName: 'Le Tuan Anh', customerPrefix: 'ALT', customerCodeLength: 8 });
+    F.scriptSettings = () => ({ accountName: 'Le Tuan Anh', userId: '2037', customerPrefix: 'ALT', customerCodeLength: 8 });
     F.validatePushCategories = () => [];
     F.nextEnvelope = (request) => request;
     const st = F.stateStart('', 'push', 0);
@@ -288,7 +288,7 @@ async function chay(so) {
   const cfRepull = CF.pullWrite('customer', cfIds.map((n) => CF.customerRecord(fbmRow('F-' + n, 'ALT0000' + n, 'Tên FBM khác ' + n), {})));
   check(so, 'FBM-024: pull lần sau bỏ qua dòng đang xung đột chờ quyết, không ghi đè và không đếm thêm xung đột',
     [cfRepull.conflicts, cfRepull.skipped, cf.local.customer.map((row) => row.companyName), cf.local.customer[0].syncStatus], [0, 3, ['Tên Shin 1', 'Tên Shin 2', 'Tên Shin 3'], 'xung đột chờ quyết']);
-  CF.scriptSettings = () => ({ accountName: 'Le Tuan Anh', customerPrefix: 'ALT', customerCodeLength: 8, baseUrl: 'https://fbm.test' });
+  CF.scriptSettings = () => ({ accountName: 'Le Tuan Anh', userId: '2037', customerPrefix: 'ALT', customerCodeLength: 8, baseUrl: 'https://fbm.test' });
   check(so, 'FBM-024: dòng đang xung đột chờ quyết không vào danh sách đẩy', CF.pushCandidates('customer').length, 0);
 
   const cfNewRun = CF.stateStart('', 'checking_session', 0);
@@ -437,7 +437,7 @@ async function chay(so) {
   const fbmActivity = (details, endDate) => ({ id: 'FBM-A1', ma_kh: 'ALT00001', ten_cv: 'Gọi điện', details, end_date: endDate });
   const ac = makeSync(), AC = ac.hop.FbmSync;
   AC.masterEnabled = () => true;
-  AC.scriptSettings = () => ({ baseUrl: 'https://fbm.test', accountName: 'Le Tuan Anh', customerPrefix: 'ALT', customerCodeLength: 8 });
+  AC.scriptSettings = () => ({ baseUrl: 'https://fbm.test', userId: '2037', accountName: 'Le Tuan Anh', customerPrefix: 'ALT', customerCodeLength: 8 });
   const acState = AC.stateStart('', 'pull_activity', 0); acState.mode = 'read';
   AC.readCategoryGate = () => ({ map: {}, names: {}, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true }, '@CAT_CONG_VIEC': { 'Gọi điện': true } }, warnings: [] });
   AC.stateWrite(acState);

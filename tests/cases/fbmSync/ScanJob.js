@@ -1,6 +1,7 @@
 /** Việc quét Customer: Extension gọi FBM một lần và cắt gói, GAS nhận từng gói theo cursor; kiểm cả nhánh gói trùng, gói lạ, mất response, mất tab, ghi lỗi và lượt thiếu dòng. */
 const { section, check } = require('../../lib/assert');
 const { workflowGas, executorSession, executorRaw, sendBatchThroughExecutor, gridResponse, row } = require('./Workflow');
+const { napServer } = require('../../lib/load-gas');
 
 const USER_RESPONSE = JSON.stringify({ d: { TotalRowCount: 1, Rows: [[2037, 'ANHLT', 'Le Tuan Anh']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] } } });
 const KHOA_TRANG = ['ngay_gd', 'datetime0', 'xorder', 'stt_rec_kh'];
@@ -314,6 +315,19 @@ async function chay(so) {
   check(so, 'Dòng khách vượt trần một gói: Log ghi scan_row_oversize từng dòng, lượt thiếu dòng nên FBM_SCAN_INCOMPLETE và không gắn cờ', [
     tooBig.logs.filter((event) => event.action === 'scan_row_oversize').length, tooBigEnd.status.lastFailureCode, tooBig.local.customer.find((item) => item.fbmId === 'FBM-CU').syncStatus
   ], [6, 'FBM_SCAN_INCOMPLETE', 'đã đồng bộ']);
+
+  // Thiếu mã người dùng thì request đọc khách không mang điều kiện quyền, FBM trả cả khách của người khác: không dựng request nào, phiên lỗi có lý do.
+  const noUser = scanHarness({ customers: 3 });
+  // Dòng Log lỗi của phiên do sổ bước ghi lúc đóng bước; GAS thật luôn nạp sổ bước.
+  napServer(noUser.flow.hop, 'fbm_sync/diagnostic/Trace.js');
+  const settingsWithUser = noUser.F.scriptSettings;
+  noUser.F.scriptSettings = () => Object.assign(settingsWithUser(), { userId: '' });
+  const noUserEnd = await noUser.run({ afterError: () => null });
+  const noUserStatus = noUser.F.statusView();
+  check(so, 'Thiếu mã người dùng FBM: không gửi request đọc khách nào, phiên dừng ở lỗi FBM_USER_ID_MISSING, Sidebar và Log báo "thiếu mã người dùng FBM"', [
+    noUser.trace.kinds.filter((kind) => /^(scan_job|customer_count|batch)/.test(kind)).length, noUser.F.stateRead().phase, noUser.F.stateRead().lastFailureCode,
+    /thiếu mã người dùng FBM/.test(String(noUserStatus.lastError || noUserStatus.message || '')), noUser.logs.some((event) => /thiếu mã người dùng FBM/.test(JSON.stringify(event))), noUserEnd && noUserEnd.request || null
+  ], [0, 'error', 'FBM_USER_ID_MISSING', true, true, null]);
 }
 
 module.exports = { chay, scanHarness };

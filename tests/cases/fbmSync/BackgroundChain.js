@@ -53,7 +53,7 @@ async function chay(so) {
   check(so, 'Hỏi 10 phút một lần, Giữ phiên chu kỳ 1 phút: mỗi lần hỏi Giữ phiên chạy đúng một lần, giờ chạy xong ghi là chính lúc vừa chạy xong', [
     giuPhienLan.map((list) => dem(list, 'heartbeat')), Number(giuPhien.flow.documentProperties.getProperty('FBM_SYNC_DONE_HEARTBEAT')) <= giuPhien.clock.now, giuPhien.clock.now - Number(giuPhien.flow.documentProperties.getProperty('FBM_SYNC_DONE_HEARTBEAT')) < PHUT
   ], [[1, 1, 1], true, true]);
-  check(so, 'LOG_TRACE: mỗi lần Giữ phiên chạy xong ghi một dòng vết heartbeat_ok kèm số khách FBM báo, lệch số khách thì nói sẽ chạy Quét nhanh', vetGiuPhien.filter((v) => v.action === 'heartbeat_ok').map((v) => [v.source, v.reason]), [['fbm_sync', 'Giữ phiên FBM OK, FBM báo 15 khách; số khách lệch nên chạy Quét nhanh.'], ['fbm_sync', 'Giữ phiên FBM OK, FBM báo 12 khách.'], ['fbm_sync', 'Giữ phiên FBM OK, FBM báo 12 khách.']]);
+  check(so, 'LOG_TRACE: mỗi lần Giữ phiên chạy xong ghi một dòng vết heartbeat_ok kèm số khách FBM báo, lệch số khách thì nói sẽ chạy Quét nhanh', vetGiuPhien.filter((v) => v.action === 'heartbeat_ok').map((v) => [v.source, v.reason]), [['fbm_sync', 'Giữ phiên FBM OK, FBM báo 12 khách; số khách lệch nên chạy Quét nhanh.'], ['fbm_sync', 'Giữ phiên FBM OK, FBM báo 12 khách.'], ['fbm_sync', 'Giữ phiên FBM OK, FBM báo 12 khách.']]);
 
   const cham = chuoiHarness({ heartbeat: { enabled: false }, customerFull: { enabled: false }, activityFull: { enabled: false }, detail: { enabled: true, minutes: 1 } });
   // Mỗi request 30 giây (dưới ngưỡng thu hồi phiên treo) nên cả lượt Vòng xoay kéo dài hơn 3 phút, gấp ba chu kỳ.

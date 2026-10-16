@@ -35,6 +35,17 @@ async function chay(so) {
   const pendingConflicts = write.issues.filter((item) => item.code === 'FBM_RECORD_CONFLICT_PENDING');
   check(so, 'FBM-024: preflight gộp mọi dòng xung đột chờ quyết thành một issue có số đếm, chặn chế độ ghi', [pendingConflicts.length, /Có 2 bản ghi/.test(pendingConflicts[0] && pendingConflicts[0].message), pendingConflicts[0] && pendingConflicts[0].blocking], [1, true, true]);
   check(so, 'preflight báo Activity đổi nhưng chưa bật quyền đẩy', write.issues.some((item) => item.code === 'FBM_RECORD_PUSH_PERMISSION_MISSING'), true);
+  {
+    const allow = hop.FbmSync.pullDefaultPermission(), sync = hop.FbmSync.SYNC_STATUS, readBefore = hop.FbmSync.readLocal;
+    hop.FbmSync.readLocal = (entity) => entity === 'customer'
+      ? [{ id: 'CUS-CHUYEN', fbmId: 'A1', fbmCustomerCode: 'ALT00012', fbmHash: 'cu', fbmSyncPermission: allow, syncStatus: sync.transferred, companyName: 'Sửa' }, { id: 'CUS-YEN', fbmId: 'A2', fbmCustomerCode: 'ALT00013', fbmHash: 'cu', fbmSyncPermission: allow, syncStatus: sync.synced }]
+      : [{ id: 'ACT-MAT', customerId: 'CUS-YEN', fbmId: '200001', fbmHash: 'cu', fbmSyncPermission: allow, syncStatus: sync.missing, content: 'Sửa' }];
+    const frozen = hop.FbmSync.runPreflight({ mode: 'write' }).issues.filter((item) => item.code === 'FBM_RECORD_PUSH_FROZEN');
+    hop.FbmSync.readLocal = readBefore;
+    check(so, 'Đóng băng: preflight cảnh báo không chặn, nêu mã bản ghi đã sửa mà không được đẩy vì vắng hoặc đã chuyển cho người khác',
+      frozen.map((item) => [item.scope, item.blocking, (/CUS-CHUYEN|ACT-MAT/.exec(item.message) || [''])[0], /Nội dung sửa vẫn giữ trên Sheet/.test(item.message)]),
+      [['customer', false, 'CUS-CHUYEN', true], ['activity', false, 'ACT-MAT', true]]);
+  }
   check(so, 'preflight gộp cảnh báo quyền đẩy theo tổng số', write.issues.filter((item) => item.code === 'FBM_RECORD_PUSH_PERMISSION_MISSING').length, 1);
   // Chủ dự án chốt 2026-10-07: năm giá trị cố định, so khớp đúng chữ; ô trống hoặc sai thì không đẩy, vẫn kéo về, và bị cảnh báo kèm mã.
   const quyen = (value, entity, parent) => { const r = hop.FbmSync.syncPermission({ fbmSyncPermission: value }, entity || 'customer', parent); return [r.push, r.pull, r.invalid]; };
