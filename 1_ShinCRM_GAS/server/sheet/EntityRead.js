@@ -32,6 +32,18 @@ function entityRowCount(entity) {
 }
 
 /**
+ * Cột mã của thực thể, đọc một lần cho mỗi `context` rồi nhớ trên chính `context`: cửa ghi tìm dòng theo mã và cửa cấp mã tìm số lớn nhất cùng dùng một lần đọc.
+ *
+ * Cạm bẫy: bản nhớ sống cùng `context`, giống `rowCount`; sau khi ghi thêm hay xóa dòng thì dựng `context` mới chứ không đọc lại cột mã từ `context` cũ.
+ */
+function entityReadIdColumn(context) {
+  if (!context.idColumn) {
+    context.idColumn = context.rowCount > 0 ? context.sheet.getRange(SHEET_FIRST_DATA_ROW, context.indexes[context.idAt] + 1, context.rowCount, 1).getValues() : [];
+  }
+  return context.idColumn;
+}
+
+/**
  * Gom sẵn mọi thứ cần cho việc đọc một thực thể: sheet, bảng tra mã cột, múi giờ tệp, và bảng chỉ số cột theo tên trường.
  *
  * Tách ra thành một hàm riêng vì đây là phần **đắt và không đổi** của phép đọc: mở sheet, đọc cả hàng 1, hỏi múi giờ tệp. Nạp giao dịch chia thành nhiều gói, nên nếu mỗi gói tự dựng lại mấy thứ này thì một tệp mười gói tốn thêm ba mươi lệnh gọi mạng cho cùng một câu trả lời. Dựng một lần rồi truyền vào từng gói.

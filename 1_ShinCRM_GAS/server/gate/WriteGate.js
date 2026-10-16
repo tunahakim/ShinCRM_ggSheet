@@ -112,10 +112,7 @@ function writeGateCast(value, spec, chayNormalize) {
  */
 function writeGateRowById(context) {
   var ra = {};
-  if (context.rowCount <= 0) { return ra; }
-
-  var cot = context.indexes[context.idAt] + 1;
-  var values = context.sheet.getRange(SHEET_FIRST_DATA_ROW, cot, context.rowCount, 1).getValues();
+  var values = entityReadIdColumn(context);
 
   for (var i = 0; i < values.length; i++) {
     var ma = String(values[i][0]).trim();

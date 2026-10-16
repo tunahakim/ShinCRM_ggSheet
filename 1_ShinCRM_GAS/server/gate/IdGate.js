@@ -49,12 +49,7 @@ function idGateNumberOf(value) {
 
 /** Số lớn nhất đang có ở cột mã của sheet. Đọc cả cột bằng một lệnh. Sheet trắng trả về 0. */
 function idGateMaxOnSheet(context) {
-  var soDong = context.rowCount;
-  if (soDong <= 0) { return 0; }
-
-  var cot = context.indexes[context.idAt] + 1;
-  var values = context.sheet.getRange(SHEET_FIRST_DATA_ROW, cot, soDong, 1).getValues();
-
+  var values = entityReadIdColumn(context);
   var max = 0;
   for (var i = 0; i < values.length; i++) {
     var so = idGateNumberOf(values[i][0]);
@@ -101,7 +96,7 @@ function idGateCounterValues() {
  *
  * **Lưới an toàn**: nếu bộ đếm nhỏ hơn hoặc bằng số lớn nhất đang có trên sheet thì nhảy lên `max + 1`. Bộ đếm tụt lại là chuyện có thật — người dùng xóa dòng bằng tay, hay dán một lô dữ liệu vào sheet thô, đều làm nó tụt. Không có lưới này thì mã mới trùng mã cũ, và một mã trùng nghĩa là hai bản ghi khác nhau cùng nhận một địa chỉ: bộ nhớ giữ một cái, sheet giữ hai cái, và không có phép kiểm nào của đường nạp nhìn ra chuyện đó.
  *
- * Phép đọc cột mã chỉ chạy khi cần: sheet nghìn dòng thì mỗi lượt lưu đọc thêm một cột nghìn ô, nên đọc luôn là trả tiền cho một chuyện gần như không bao giờ xảy ra.
+ * Lưới an toàn không tốn thêm lần đọc nào: cột mã đã được cửa ghi đọc để tìm dòng trong cùng `context` (`entityReadIdColumn`).
  */
 function idGateIssue(entity, soLuong, context) {
   var can = soLuong === undefined ? 1 : soLuong;
