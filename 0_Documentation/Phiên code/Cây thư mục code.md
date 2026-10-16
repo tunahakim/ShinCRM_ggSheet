@@ -339,6 +339,7 @@ tests\
     │   ├── CustomerCount.js        Kiểm bước đếm khách: FBM không đổi thì dừng sau một lần đếm, tổng tăng thì Quét nhanh đúng một lần, chưa có mốc thì Quét nhanh.
     │   ├── BackgroundChain.js      Kiểm chuỗi nền nhiều lần hỏi bằng đồng hồ giả: hết bỏ đói, mỗi tiến trình một lần mỗi chuỗi, lượt tay chen ngang không dời mốc.
     │   ├── Rotation.js             Kiểm Vòng xoay: đọc đủ N khách Sheet theo số CUS, theo lô, quay vòng, bỏ khách không đủ điều kiện, cursor chỉ qua lô đã ghi xong.
+    │   ├── Gate.js                 Kiểm cửa ghi chiều lấy về: danh sách đọc của lượt, tra mã khách không lọc quyền, khách vắng và giao dịch đổi khách cha, xét lại hai trạng thái đóng băng.
     │   ├── ScanPack.js             Kiểm gói quét: so giao dịch cuối, dừng sau chuỗi khách im lặng, gắn cờ "không thấy" chỉ trong khách đã đọc, mỗi gói đúng thao tác.
     │   ├── RelayResend.js          Kiểm Sidebar gửi lại cấu hình relay đang giữ khi Extension được tải lại, không gọi GAS.
     │   ├── Push.js                Kiểm cổng ghi, khóa, owner, builder ghi và xử lý lỗi push.
