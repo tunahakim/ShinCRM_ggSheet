@@ -13,6 +13,8 @@ Làm sau khi `[Đã xử lý] 2026.10.15 Chuỗi đồng bộ nền và vòng xo
 - 2026-10-16: trạng thái mới "đã chuyển cho người khác" dùng chung cho khách và giao dịch; giữ nội dung, đóng băng chiều đẩy, vẫn được xét lại khi khách đọc lại.
 - 2026-10-16: giao dịch đổi khách cha thì nối sang khách mới theo `stt_rec_kh` của khách được đọc, không qua `ma_kh`, và đưa khách cha cũ vào danh sách đọc của lượt.
 - 2026-10-16: request đọc khách thiếu mã người dùng thì không dựng; chỉ hàm "Tra mã khách không lọc quyền" được bỏ điều kiện quyền.
+- 2026-10-16: bản ghi mang "không thấy bên FBM" hoặc "đã chuyển cho người khác" không phải trạng thái cuối: lần quét hàng loạt sau thấy lại thì khách vào danh sách đọc, cửa ghi đặt trạng thái theo phép so ba chiều (không đổi thì "đã đồng bộ", chỉ Sheet sửa thì vào danh sách đẩy, hai bên cùng đổi thì xung đột).
+- 2026-10-16: giao dịch chuyển sang khách B mà B trên Sheet đã xóa mềm hoặc không cho lấy về thì không đọc B; chỉ đổi khách cha của giao dịch sang B, giữ nội dung, ghi Log `activity_parent_blocked`.
 - 2026-10-16: không cần đo số request trước và sau.
 - Chế độ `Kiểm tra` chạy cùng đường nhưng cửa ghi chỉ xem trước, không ghi Sheet.
 
