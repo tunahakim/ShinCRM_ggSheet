@@ -119,32 +119,26 @@ function reloadRecords(recordIds, expectedRevision, options) {
     var customerRowsAt = [];
     var activityRowsAt = [];
 
-    customerKeyRows.forEach(function (row, index) {
-      var id = String(row[0] || '').trim();
-      if (!id) { return; }
-      existingCustomerIds[id] = true;
-      if (requested[id]) {
-        customerIds[id] = true;
-        customerRowsAt.push(customerFirstRow + index);
-      }
-    });
-
-    activityKeyRows.forEach(function (row, index) {
+    activityKeyRows.forEach(function (row) {
       var activityId = String(row[0] || '').trim();
       var customerId = String(row[1] || '').trim();
       if (!activityId) { return; }
       existingActivityIds[activityId] = true;
       if (requested[activityId] && customerId) { customerIds[customerId] = true; }
-      if (customerIds[customerId]) { activityRowsAt.push(activityFirstRow + index); }
     });
 
     ids.forEach(function (id) {
       if (!existingActivityIds[id]) { customerIds[id] = true; }
     });
 
-    // A requested Activity can reveal its parent only in the first pass; scan again
-    // for all Activity rows belonging to the complete affected-customer set.
-    activityRowsAt = [];
+    // Đọc Customer sau khi Activity đã lộ khách cha: Sidebar coi khách có trong affectedCustomerIds mà vắng trong payload là khách đã bị xóa.
+    customerKeyRows.forEach(function (row, index) {
+      var id = String(row[0] || '').trim();
+      if (!id) { return; }
+      existingCustomerIds[id] = true;
+      if (customerIds[id]) { customerRowsAt.push(customerFirstRow + index); }
+    });
+
     activityKeyRows.forEach(function (row, index) {
       var activityId = String(row[0] || '').trim();
       var customerId = String(row[1] || '').trim();
