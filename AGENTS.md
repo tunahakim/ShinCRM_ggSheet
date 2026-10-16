@@ -96,4 +96,4 @@
 
 ## Nghiêm cấm:
 
-- Cấm sửa tài liệu ở `D:\ShinCRM_ggSheet\0_Documentation\Nghiên cứu FBM`.
+- Cấm sửa tài liệu ở `D:\ShinCRM_ggSheet\0_Documentation\Nghiên cứu FBM`, trừ khi chủ dự án yêu cầu rõ trong phiên; khi đó chỉ sửa đúng phần được yêu cầu. Kết quả nghiên cứu mới (request thử trên FBM thật) ghi thành chương mới và thêm vào mục lục `README.md` của thư mục đó.
