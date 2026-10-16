@@ -12,7 +12,7 @@ function chuoiHarness(lich, options) {
   h.flow.hop.__now = () => clock.now;
   vm.runInContext('Date.now = function () { return __now(); };', h.flow.hop);
   h.F.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-  h.F.backgroundScheduleSave(Object.assign({ enabled: true, direction: 'read' }, lich));
+  h.F.backgroundScheduleSave(Object.assign({ enabled: true, direction: 'read', confirmLow: true }, lich));
   const xong = [], advance = h.F.scheduleMarkerAdvance;
   h.F.scheduleMarkerAdvance = function (kind) { xong.push(kind); return advance.apply(this, arguments); };
   /** Hỏi một lần sau `phut` phút; mỗi request FBM tốn `moiRequest` mili-giây. Trả các tiến trình chạy xong trong lần hỏi đó. */
