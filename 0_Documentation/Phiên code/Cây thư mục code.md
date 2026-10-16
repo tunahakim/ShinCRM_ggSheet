@@ -105,6 +105,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │       ├── ViewProbe.js          Probe DEV tạo/xóa sheet quản trị tạm để nghiệm thu renderer thật trên Google.
 │       ├── ReloadMatrixProbe.js  Probe DEV tạo fixture nhỏ, mô phỏng onEdit theo ma trận reload và tự khôi phục dữ liệu/thuộc tính.
 │       ├── ReloadRefactorProbe.js Probe DEV thử công thức mảng cho bộ đọc Extension và đo chi phí trigger, lời dò, tô màu tab.
+│       ├── ReloadJournalProbe.js Probe DEV đếm lệnh DocumentProperties và đo thời gian của tín hiệu nạp lại và từng mức nạp (trước/sau sổ nhật ký).
 │       ├── DevToken.js           Thẻ bí mật của cửa trên. Không vào git, nhưng CÓ đẩy lên Google.
 │       ├── Smoke.js              Phép thử nhanh: mở được tệp Sheet không, đọc được gì.
 │       ├── DumpGrid.js           Đo lưới từng sheet: bao nhiêu hàng, bao nhiêu cột, còn chỗ ghi thêm bao nhiêu hàng.

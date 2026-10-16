@@ -26,7 +26,7 @@ var DEV_RUNNER_ALLOWED = [
   'probeEntityRead', 'probeCategoryRead', 'probeConfigRead', 'probeDirtyState', 'getReloadState', 'probeSelectionAndReload', 'measureProbeCheap', 'measureProbeFull', 'measureEntitySignal', 'reloadRecords', 'reloadConfig', 'renderAllManagedViews', 'renderAllManagedViewsIfAllowed',
   'probeErrorReport', 'probeEntryPoint', 'probeLoadAll', 'probeSidebarTemplate', 'probeClientTiming',
   'probeSaveGate', 'probeIdGate', 'viewProbeSelection', 'viewProbeRenderCurrent', 'viewProbeCreateRender', 'viewProbeAutoRender', 'viewProbeTabTint', 'viewWipeLegacyKeys',
-  'probeTriggerState', 'shinInstallTriggers', 'shinInstallSidebarOpenTrigger', 'reloadMatrixProbe', 'reloadPayloadProbe',
+  'measureReloadJournalBaseline', 'probeTriggerState', 'shinInstallTriggers', 'shinInstallSidebarOpenTrigger', 'reloadMatrixProbe', 'reloadPayloadProbe',
   'fbmSyncStart', 'fbmGetSyncStatus', 'fbmContinueSync', 'fbmReportSyncTransportFailure', 'fbmCancelSync', 'fbmStartIdentityCheck', 'fbmStartIdentityProbe', 'fbmSyncStartActivityBulk', 'fbmSyncPreflight', 'fbmSyncContinue', 'fbmSyncCancel', 'fbmSyncStatus', 'fbmSyncStateProbe', 'fbmGetMasterSwitch', 'fbmSetMasterSwitch', 'fbmGetBackgroundSwitch', 'fbmRetryPushFailures', 'fbmPrepareConflictResolution', 'fbmConfirmConflict', 'fbmGetRelayConfig', 'fbmRotateRelayKey', 'fbmSyncHeartbeatRequest', 'fbmSyncHeartbeat', 'fbmSyncHeartbeatTransportFailure', 'fbmSyncTrace', 'fbmGetSyncTrace', 'fbmLogSyncTrace', 'fbmSupervisorTrigger', 'fbmGetLoginConfig', 'fbmSetAutoLogin', 'fbmStartLoginTest', 'fbmSaveConnection', 'fbmRepairLoginUsername', 'fbmGetSyncSettings', 'fbmSaveSyncSettings', 'fbmSaveAccountSettings', 'fbmSaveExtensionConfig', 'fbmSaveBackgroundSchedule', 'fbmSaveLoginPolicy'
 ];
 
