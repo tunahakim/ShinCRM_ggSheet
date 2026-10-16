@@ -336,6 +336,17 @@ async function chay(so) {
   ], ['Hộp đen Extension: không có (Extension bản cũ hoặc chưa ghi được bước nào).', 'Hộp đen Extension: bước cuối (cách đây 0 phút) là đã gửi kết quả về GAS, chưa nhận trả lời. Phần chạy nền của Extension vẫn chạy liền, không bị Chrome tắt.']);
   check(so, 'Hộp đen Extension: Extension đã chạy hết lượt thì không nói bị Chrome tắt dù worker dựng lại sau đó, chỉ ra lỗi phía GAS', heartbeat.FbmSync.extensionTrailText({ stage: 'chain_finished', at: 1000, workerStartedAt: 50, currentWorkerStartedAt: 900 }, 1000),
     'Hộp đen Extension: bước cuối (cách đây 0 phút) là Extension đã chạy hết lượt vì GAS trả lời không còn request tiếp. Lượt còn mở là lỗi phía GAS, không phải Extension bỏ dở.');
+  check(so, 'Hộp đen Extension: GAS trả lỗi thì Log nêu mã lỗi Extension nhận được, chỉ giữ ký tự an toàn', heartbeat.FbmSync.extensionTrailText({ stage: 'gas_reply_failed', at: 1000, code: 'RELAY_TIMEOUT<script>' }, 1000),
+    'Hộp đen Extension: bước cuối (cách đây 0 phút) là GAS trả lời lỗi hoặc Extension không gọi được GAS, Extension dừng lượt. Mã lỗi: RELAY_TIMEOUTscript.');
+  heartbeat.FbmSync.logContextNote({ runId: 'r', origin: 'manual', phase: 'done', scan: 'full', chain: { current: 'heartbeat' } });
+  const ctxHeartbeat = heartbeat.FbmSync.logContextText();
+  heartbeat.FbmSync.logContextNote({ runId: 'r', origin: 'background', phase: 'pull_customer', scan: 'full', chain: { current: 'heartbeat' } });
+  const ctxRecount = heartbeat.FbmSync.logContextText();
+  heartbeat.FbmSync.logContextNote({ runId: 'r', origin: 'background', phase: 'pull_activity', scan: 'detail', chain: { current: 'detail' } });
+  const ctxDetail = heartbeat.FbmSync.logContextText();
+  heartbeat.FbmSync.logContextNote({ runId: 'r', origin: 'manual', phase: 'pull_customer', scan: 'full', chain: { current: 'heartbeat' } });
+  const ctxManual = heartbeat.FbmSync.logContextText();
+  check(so, 'Lượt trong Log: Giữ phiên là Nền dù lượt trước bấm tay; Quét nhanh do Giữ phiên gọi ghi cả hai; tiến trình nền ghi tên nó; lượt bấm tay ghi Tay và kiểu quét, không ghi chuỗi nền sót', [ctxHeartbeat, ctxRecount, ctxDetail, ctxManual], ['Nền · Giữ phiên FBM', 'Nền · Giữ phiên FBM · Quét nhanh', 'Nền · Vòng xoay giao dịch', 'Tay · Quét nhanh']);
   const leftOpenLogs = [];
   heartbeat.logEvent = (entry) => leftOpenLogs.push(entry);
   heartbeat.FbmSync.statePatch({ runId: 'left-open-run', origin: 'background', phase: 'pull_customer', cursor: { kind: 'scan_job' }, activeRequestId: 'in-flight', deadlineAt: Date.now() + 60000 });

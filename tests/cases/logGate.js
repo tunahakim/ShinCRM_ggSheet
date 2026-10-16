@@ -221,6 +221,20 @@ function chay(so) {
   vetTat.hop.FbmSync.businessStepStart({ runId: 'run-018', metadata: {}, counts: {} }, 'pull_customer', {});
   check(so, 'LOG_TRACE tắt: mốc bước không tốn lệnh ghi nào giữa lượt', vetTat.dem.setValues - ghiTruocVetTat, 0);
 
+  // Ngữ cảnh theo nguồn: mọi dòng của nguồn đã đăng ký mang khóa `luot` ở cột Chi tiết kỹ thuật; nguồn khác không đổi; hàm ngữ cảnh hỏng không làm mất dòng.
+  const ngCanh = dungLog();
+  ngCanh.hop.logRegisterContext('fbm_sync', () => 'Nền · Giữ phiên FBM');
+  ngCanh.hop.logEvent({ source: 'fbm_sync', action: 'a', outcome: ngCanh.hop.LOG_OK, reason: 'có detail', detail: { code: 'X' } });
+  ngCanh.hop.logEvent({ source: 'fbm_sync', action: 'b', outcome: ngCanh.hop.LOG_OK, reason: 'không detail' });
+  ngCanh.hop.logEvent({ source: 'core', action: 'c', outcome: ngCanh.hop.LOG_OK, reason: 'nguồn khác' });
+  ngCanh.hop.logRegisterContext('fbm_sync', () => { throw new Error('hỏng'); });
+  ngCanh.hop.logEvent({ source: 'fbm_sync', action: 'd', outcome: ngCanh.hop.LOG_OK, reason: 'ngữ cảnh hỏng' });
+  ngCanh.hop.flushLog();
+  const chiTiet = docLog(ngCanh).map((dong) => String(dong[8]));
+  check(so, 'Ngữ cảnh theo nguồn: dòng fbm_sync mang luot (đứng đầu detail), nguồn khác không có, hàm ngữ cảnh hỏng vẫn ghi dòng kèm lý do', [
+    chiTiet.some((o) => o.indexOf('"luot":"Nền · Giữ phiên FBM","code":"X"') >= 0), chiTiet.some((o) => o === '{"luot":"Nền · Giữ phiên FBM"}'), chiTiet.some((o) => o.indexOf('luot') < 0), chiTiet.some((o) => o.indexOf('không đọc được ngữ cảnh: hỏng') >= 0), chiTiet.length
+  ], [true, true, true, true, 4]);
+
   return so;
 }
 

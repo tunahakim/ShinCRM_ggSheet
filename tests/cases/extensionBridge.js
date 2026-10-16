@@ -274,10 +274,15 @@ async function chay(so) {
   check(so, 'heartbeat relay request dau qua cong heartbeat GAS', workerSource.indexOf("kind: 'heartbeat', spreadsheetId: config.spreadsheetId, response: rawFbmReply(reply)") >= 0 && workerSource.indexOf("relayScheduledRequests(tabId") >= 0, true);
   check(so, 'heartbeat relay request tiep theo qua cong background_sync chung', workerSource.indexOf("kind: 'background_sync'") >= 0 && workerSource.indexOf("command: 'continue'") >= 0 && workerSource.indexOf('payload: { response: raw }') >= 0, true);
   check(so, 'relay nền yêu cầu tìm lại tab và xử lý request retry GAS cấp', workerSource.indexOf('return ensureFbmTab(next)') >= 0 && workerSource.indexOf('relayScheduledRequests(null, config, failureReply') >= 0, true);
-  check(so, 'Hộp đen lượt nền: Extension cất bước cuối trước mỗi chặng (nhận request, gửi tab, tab trả, gửi GAS, báo lỗi, kết thúc) và lần hỏi sau mang lên GAS; hộp đen chỉ có tên bước, mã request, hop và giờ', [
-    ['gas_request_received', 'fbm_tab_sent', 'fbm_tab_replied', 'gas_response_sent', 'failure_sent', 'chain_finished'].every((stage) => workerSource.indexOf("noteChainStep('" + stage + "'") >= 0),
+  check(so, 'Hộp đen lượt nền: Extension cất bước cuối trước mỗi chặng (nhận request, gửi tab, tab trả, gửi GAS, báo lỗi, GAS trả lỗi, kết thúc) và lần hỏi sau mang lên GAS; hộp đen chỉ có tên bước, mã request, hop, giờ và mã lỗi', [
+    ['gas_request_received', 'fbm_tab_sent', 'fbm_tab_replied', 'gas_response_sent', 'failure_sent', 'gas_reply_failed', 'chain_finished'].every((stage) => workerSource.indexOf("noteChainStep('" + stage + "'") >= 0),
     workerSource.indexOf("kind: 'heartbeat_request', source: origin, spreadsheetId: config.spreadsheetId, trail: trail") >= 0,
-    workerSource.indexOf("var trail = { at: Date.now(), stage: String(stage || ''), requestId: String(request && request.id || ''), hop: Number(hop || 0), workerStartedAt: FBM_WORKER_STARTED_AT };") >= 0
+    workerSource.indexOf("var trail = { at: Date.now(), stage: String(stage || ''), requestId: String(request && request.id || ''), hop: Number(hop || 0), workerStartedAt: FBM_WORKER_STARTED_AT, code: String(code || '') };") >= 0
+  ], [true, true, true]);
+  check(so, 'Hộp đen: GAS trả ok:false hay lời gọi GAS hỏng/quá hạn ở bước nộp Giữ phiên đều để lại gas_reply_failed kèm mã, không dừng lặng lẽ', [
+    workerSource.indexOf("noteChainStep('gas_reply_failed', request, hop, gasReply && (gasReply.code || gasReply.error) || 'GAS_HEARTBEAT_FAILED');") >= 0,
+    workerSource.indexOf("noteChainStep('gas_reply_failed', request, hop, error && error.code || 'GAS_RELAY_FAILED');") >= 0,
+    workerSource.indexOf('failure.code = code;') >= 0
   ], [true, true, true]);
   check(so, 'alarm chi tim tab FBM sau khi co relay config', workerSource.indexOf("fbmHeartbeatNow('alarm')") >= 0 && workerSource.indexOf("if (!config) {") >= 0 && workerSource.indexOf('findFbmTab()') >= 0, true);
   check(so, 'relay config luu Spreadsheet ID', workerSource.indexOf('fbmSpreadsheetId: spreadsheetId') >= 0, true);
