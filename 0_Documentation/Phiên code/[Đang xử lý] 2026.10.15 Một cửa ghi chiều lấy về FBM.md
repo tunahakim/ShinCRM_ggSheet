@@ -1,6 +1,6 @@
 # Một cửa ghi chiều lấy về FBM
 
-Làm sau khi `[Đã xử lý] 2026.10.15 Chuỗi đồng bộ nền và vòng xoay giao dịch.md` đã xong và gộp vào `main`: phiên này dựa trên bước đếm khách, chuỗi và cursor của phiên đó. Làm sau phiên `[Đang xử lý] 2026.10.16 Luật chung nạp lại RAM và vẽ lại view.md` (chủ dự án đồng ý thứ tự 2026-10-16) để lúc nghiệm thu Sheet đã cập nhật theo lô đúng luật mới.
+Làm sau khi `[Đã xử lý] 2026.10.15 Chuỗi đồng bộ nền và vòng xoay giao dịch.md` đã xong và gộp vào `main`: phiên này dựa trên bước đếm khách, chuỗi và cursor của phiên đó. Làm sau phiên `[Đã xử lý] 2026.10.16 Luật chung nạp lại RAM và vẽ lại view.md` (chủ dự án đồng ý thứ tự 2026-10-16) để lúc nghiệm thu Sheet đã cập nhật theo lô đúng luật mới.
 
 ## Quyết định của chủ dự án (2026-10-15)
 
