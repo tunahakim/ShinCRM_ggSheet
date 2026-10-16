@@ -316,7 +316,7 @@ function chaySoTrangThai(so) {
 }
 
 function chayTabCam(so) {
-  section('ViewTabTint — tab cam khi sheet quản trị cũ, trả màu khi vẽ xong');
+  section('ViewTabTint — tab cam khi sheet quản trị cũ, trả màu gốc khi vẽ xong');
   let base;
   try {
     base = taoNen(['@CUS_MA_KH', '@CUS_TEN_CTY']);
@@ -341,7 +341,7 @@ function chayTabCam(so) {
     [base.view.getTabColor(), base.view._tabColors.length, care.getTabColor()], [null, 2, '#ff9900']);
 
   const realGuard = hop.viewAssertNoFormulas;
-  hop.viewAssertNoFormulas = function () { hop.reloadJournalAppend({ customer: ['KH0002'], allViews: true }); return realGuard.apply(this, arguments); };
+  hop.viewAssertNoFormulas = function () { trongLanChay(hop, () => hop.dirtyStateMarkSignal({ customer: ['KH0002'], allViews: true })); return realGuard.apply(this, arguments); };
   hop.renderViewSheet('!Chăm sóc');
   hop.viewAssertNoFormulas = realGuard;
   check(so, 'signal đến giữa lượt vẽ để sheet vẫn cũ thì không trả màu', [hop.viewIsStale('!Chăm sóc'), care.getTabColor()], [true, '#ff9900']);
@@ -349,12 +349,43 @@ function chayTabCam(so) {
   check(so, 'vẽ lại xong trả đúng màu người dùng tự đặt', care.getTabColor(), '#00ff00');
 
   trongLanChay(hop, () => hop.dirtyStateMarkSignal({ customer: ['KH0001'], allViews: true }));
-  check(so, 'đổ giỏ cuối lần chạy (tự lấy khóa) tô lại sheet cũ sau khi đã trả màu và nhả khóa',
+  check(so, 'ghi nhận thay đổi cuối lần chạy (tự lấy khóa) tô lại sheet vừa thành cũ sau khi đã trả màu và nhả khóa',
     [base.view.getTabColor(), care.getTabColor(), base.nen.stubs._khoa.dangGiu], ['#ff9900', '#ff9900', false]);
   const before = base.nen.book.getSheets().map((sheet) => sheet._tabColors.length);
   trongLanChay(hop, () => {});
   check(so, 'lần chạy không có thay đổi không quét sheet nào để tô',
     base.nen.book.getSheets().map((sheet) => sheet._tabColors.length), before);
+
+  // Mọi sheet ! đang cũ: lần ghi tiếp theo không có sheet nào chuyển trạng thái nên không được chạm Sheet để tô.
+  const dem = { getTabColor: 0, getSheets: 0 };
+  const realGetSheets = base.nen.book.getSheets;
+  base.nen.book.getSheets = function () { dem.getSheets += 1; return realGetSheets.apply(this, arguments); };
+  const realGetTab = [base.view.getTabColor, care.getTabColor];
+  base.view.getTabColor = function () { dem.getTabColor += 1; return realGetTab[0](); };
+  care.getTabColor = function () { dem.getTabColor += 1; return realGetTab[1](); };
+  ghi();
+  base.nen.book.getSheets = realGetSheets;
+  base.view.getTabColor = realGetTab[0];
+  care.getTabColor = realGetTab[1];
+  check(so, 'lần ghi khi không có sheet ! nào đang mới không đọc màu tab, không liệt kê sheet', dem, { getTabColor: 0, getSheets: 0 });
+
+  // Người dùng tự tô tab lúc sheet đang cũ (Google không báo): vẽ xong giữ màu đó làm màu gốc, không đè bằng màu đã cất.
+  care.setTabColor('#123456');
+  hop.renderViewSheet('!Chăm sóc');
+  check(so, 'người dùng tự đổi màu tab lúc sheet cũ: vẽ xong giữ màu người dùng, xóa màu gốc đã cất',
+    [care.getTabColor(), Object.prototype.hasOwnProperty.call(hop.viewTabTintRead(), String(care.getSheetId()))], ['#123456', false]);
+  care.setTabColor('#00ff00');
+
+  // Lượt vẽ hỏng làm sheet thành cũ (sổ vẽ ghi ok:false) nên tab phải cam, kể cả khi trước đó sheet đang mới.
+  hop.renderAllManagedViews();
+  const hongGuard = hop.viewAssertNoFormulas;
+  hop.viewAssertNoFormulas = function () { throw new Error('lượt vẽ thử hỏng'); };
+  try { hop.renderViewSheet('!Chăm sóc'); } catch (ignore) { /* lượt vẽ hỏng là điều đang thử */ }
+  hop.viewAssertNoFormulas = hongGuard;
+  check(so, 'lượt vẽ hỏng tô cam sheet đó, sheet khác vẫn giữ màu', [hop.viewIsStale('!Chăm sóc'), care.getTabColor(), base.view.getTabColor()], [true, '#ff9900', null]);
+  hop.renderViewSheet('!Chăm sóc');
+  check(so, 'vẽ lại thành công sau lượt hỏng trả đúng màu gốc', care.getTabColor(), '#00ff00');
+
 
   // Lưu từ Sidebar khi đứng ở sheet ! và công tắc bật: sheet đang xem sẽ được vẽ ngay nên không tô.
   hop.renderAllManagedViews();

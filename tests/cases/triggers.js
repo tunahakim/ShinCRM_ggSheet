@@ -218,6 +218,7 @@ function chay(so) {
   hop.shinOpenBook = realOpen;
   hop.documentProps = realProps;
 
+
   const doiCauTruc = (sheetName, changeType) => {
     clearState();
     nen.book.setActiveSheet(nen.sheet(sheetName));
@@ -306,6 +307,13 @@ function chay(so) {
   check(so, 'onEdit điều khiển view vẽ ngay đúng sheet đó dù autoRenderView=false, sheet khác không bị chạm',
     [controlResult.ok, controlLead.getRange(4, 1).getValue(), controlNen.hop.viewIsStale('!Lead'), controlCare.getRange(4, 1).getValue()],
     [true, 'KH000002', false, '']);
+
+  // Sheet ! mới (thêm sheet) chưa có mục trong sổ vẽ view nên là sheet cũ từ lúc sinh ra: tab phải cam như mọi sheet cũ.
+  const moi = controlNen.book.insertSheet('!Mới');
+  moi.getRange(1, 1, 1, 1).setValues([['@CUS_MA_KH']]);
+  controlNen.hop.shinOnChange({ changeType: 'INSERT_GRID' });
+  check(so, 'onChange thêm sheet tô cam sheet ! mới, không chạm sheet ! đã vẽ',
+    [moi.getTabColor(), controlLead.getTabColor()], [controlNen.hop.SETTINGS.VIEW_STALE_TAB_COLOR, null]);
 }
 
 const TEP_RENDER = TEP_NEN.concat([

@@ -134,10 +134,10 @@ function napRieng(duongDan, stubs) {
   return duongDan.endsWith('.html') ? napClient(hopCat, duongDan) : napServer(hopCat, duongDan);
 }
 
-/** Chạy `fn` trong giỏ thay đổi như một lần chạy GAS (`runEntryPoint`): dấu nạp lại gom lại và đổ một lần khi `fn` xong. Dùng cho test gọi thẳng cửa ghi mà không qua cửa vào. */
+/** Chạy `fn` trong danh sách thay đổi chờ ghi nhận như một lần chạy GAS (`runEntryPoint`): dấu nạp lại gom lại và ghi nhận một lần khi `fn` xong. Dùng cho test gọi thẳng cửa ghi mà không qua cửa vào. */
 function trongLanChay(hopCat, fn) {
-  hopCat.dirtyStateBasketBegin();
-  try { return fn(); } finally { hopCat.dirtyStateBasketEnd(); }
+  hopCat.pendingChangesBegin();
+  try { return fn(); } finally { hopCat.pendingChangesEnd(); }
 }
 
 /** Dòng sổ nhật ký nạp lại mới nhất (rỗng nếu chưa có), để ca kiểm xem một lần chạy đã báo đổi phần nào. */

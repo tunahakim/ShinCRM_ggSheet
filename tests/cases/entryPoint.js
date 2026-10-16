@@ -45,7 +45,7 @@ function chay(so) {
   checkThrows(so, 'cửa vào ngoài danh sách lần 2', () => goi('saveRecord', hong('lỗi C')), 'lỗi C');
   check(so, 'cửa vào ngoài danh sách (người bấm, FBM) vẫn ghi mọi lần lỗi', dem('lỗi C'), 2);
 
-  section('EntryPoint — giỏ thay đổi: một lần chạy một tín hiệu, đổ cả khi lỗi');
+  section('EntryPoint — thay đổi chờ ghi nhận: một lần chạy một tín hiệu, ghi nhận cả khi lỗi');
   const rev = () => hop.reloadStateRead().revision;
   const mark = (id) => hop.dirtyStateMarkSignal({ customer: [id] });
   const dongCuoi = () => hop.reloadJournalRead().entries.slice(-1)[0] || {};
@@ -54,7 +54,7 @@ function chay(so) {
   check(so, 'cửa vào ghi ba lô trong một lần chạy chỉ tăng một revision, đủ ba mã', [rev() - truoc, dongCuoi().customer], [1, ['KH0001', 'KH0002', 'KH0003']]);
   const truocLoi = rev();
   checkThrows(so, 'lần chạy lỗi sau khi đã ghi vẫn ném lỗi gốc', () => goi('fbmContinueSync', () => { mark('KH0004'); throw new Error('lỗi D'); }), 'lỗi D');
-  check(so, 'lần chạy lỗi sau khi đã ghi vẫn đổ giỏ: Sidebar được báo phần đã ghi', [rev() - truocLoi, (dongCuoi().customer || []).indexOf('KH0004') >= 0], [1, true]);
+  check(so, 'lần chạy lỗi sau khi đã ghi vẫn ghi nhận thay đổi: Sidebar được báo phần đã ghi', [rev() - truocLoi, (dongCuoi().customer || []).indexOf('KH0004') >= 0], [1, true]);
   const truocRong = rev();
   goi('fbmContinueSync', () => ({ ok: true }));
   check(so, 'lần chạy không ghi gì không tăng revision', rev() - truocRong, 0);

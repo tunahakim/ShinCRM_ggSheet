@@ -1,5 +1,5 @@
 /**
- * Ca kiểm cho `server/state/DirtyState.js`: sổ nhật ký nạp lại và giỏ thay đổi của một lần chạy (07A mục 1a, mục 4).
+ * Ca kiểm cho `server/state/DirtyState.js`: sổ nhật ký nạp lại và danh sách thay đổi chờ ghi nhận của một lần chạy (07A mục 1a, mục 4).
  *
  * Điều được canh: sổ chỉ ghi thêm (không có đường xóa tín hiệu khiến Sidebar khác mất thay đổi), cắt sổ luôn nâng `floor` để Sidebar tụt lại biết mình mất dấu, mỗi lần đổ giỏ chỉ một lệnh ghi kho, và chuyển đổi từ cờ đời cũ đẩy mọi Sidebar đang mở nạp lõi đúng một lần.
  */
@@ -40,7 +40,7 @@ function chay(so) {
   const hong = dungHop({ sheets: ['Config', 'Log'], props: { reloadJournal: '{"rev":' } }).hop;
   checkThrows(so, 'sổ hỏng thì báo lỗi to, không đoán là không có gì đổi', () => hong.reloadStateRead(), 'bị hỏng');
 
-  section('Giỏ thay đổi — một lần chạy GAS ghi đúng một dòng sổ');
+  section('Danh sách thay đổi chờ ghi nhận — một lần chạy GAS ghi đúng một dòng sổ');
 
   const gio = dungHop({ sheets: ['Config', 'Log'] });
   trongLanChay(gio.hop, () => gio.hop.dirtyStateMarkSignal({ customer: ['KH0000'] }));
@@ -49,16 +49,16 @@ function chay(so) {
     gio.hop.dirtyStateMarkSignal({ customer: ['KH0001', 'KH0001', ''] });
     gio.hop.dirtyStateMarkSignal({ customer: ['KH0002'], activity: ['GD0001'] });
     gio.hop.dirtyStateMarkSignal({ config: true });
-    check(so, 'trong lần chạy, dấu nằm trong giỏ, chưa tăng revision', gio.hop.reloadStateRead().revision, 1);
+    check(so, 'trong lần chạy, dấu nằm trong danh sách chờ, chưa tăng revision', gio.hop.reloadStateRead().revision, 1);
   });
   const dong = gio.hop.reloadJournalRead().entries.slice(-1)[0];
   check(so, 'ba lần đánh dấu thành một dòng sổ: mã theo từng thực thể, khử trùng, bỏ mã rỗng, kèm cờ',
     [gio.hop.reloadStateRead().revision, dong.r, dong.customer, dong.activity, dong.config, dong.category], [2, 2, ['KH0001', 'KH0002'], ['GD0001'], true, undefined]);
-  check(so, 'đổ giỏ chỉ một lệnh ghi kho (sổ và mốc view cùng một lệnh), không lệnh xóa nào',
+  check(so, 'ghi nhận thay đổi chỉ một lệnh ghi kho (sổ và mốc view cùng một lệnh), không lệnh xóa nào',
     [dem.setProperties || 0, dem.setProperty || 0, dem.deleteProperty || 0], [1, 0, 0]);
   trongLanChay(gio.hop, () => gio.hop.dirtyStateMarkSignal({ customer: ['KH0003'], allViews: true }));
-  check(so, 'dấu allViews nâng mốc cũ của view bằng revision vừa ghi; sổ và trạng thái tô tab đi chung một lệnh ghi lúc nhả khóa',
-    [gio.hop.reloadStateRead().viewsStaleRevision, dem.setProperties, dem.setProperty || 0, dem.deleteProperty || 0, !!gio.props.viewTabTint], [3, 2, 0, 0, true]);
+  check(so, 'dấu allViews nâng mốc cũ của view bằng revision vừa ghi trong cùng một lệnh ghi; chưa có sheet ! nào đang mới thì không ghi màu gốc tab',
+    [gio.hop.reloadStateRead().viewsStaleRevision, dem.setProperties, dem.setProperty || 0, dem.deleteProperty || 0, !!gio.props.viewTabTint], [3, 2, 0, 0, false]);
 
   checkThrows(so, 'đánh dấu ngoài lần chạy (thiếu runEntryPoint) ném lỗi to, không im lặng mất dấu',
     () => dungHop({ sheets: ['Config', 'Log'] }).hop.dirtyStateMarkSignal({ customer: ['KH0001'] }), 'ngoài runEntryPoint');
@@ -68,19 +68,19 @@ function chay(so) {
   try {
     trongLanChay(loi, () => { loi.dirtyStateMarkSignal({ customer: ['KH0009'] }); throw new Error('lỗi sau khi đã ghi'); });
   } catch (e) { daNem = true; }
-  check(so, 'lần chạy lỗi sau khi đã ghi vẫn đổ giỏ: Sidebar vẫn được báo phần đã xuống Sheet',
+  check(so, 'lần chạy lỗi sau khi đã ghi vẫn ghi nhận thay đổi: Sidebar vẫn được báo phần đã xuống Sheet',
     [daNem, loi.reloadStateRead().revision, loi.reloadJournalRead().entries[0].customer], [true, 1, ['KH0009']]);
 
   const long = dungHop({ sheets: ['Config', 'Log'] }).hop;
   trongLanChay(long, () => {
     trongLanChay(long, () => long.dirtyStateMarkSignal({ customer: ['KH0001'] }));
-    check(so, 'cửa vào lồng trong cửa vào không đổ giỏ ở lớp trong', long.reloadStateRead().revision, 0);
+    check(so, 'cửa vào lồng trong cửa vào không ghi nhận ở lớp trong', long.reloadStateRead().revision, 0);
     long.dirtyStateMarkSignal({ customer: ['KH0002'] });
   });
-  check(so, 'lớp ngoài cùng đổ một lần cho cả hai lớp', [long.reloadStateRead().revision, long.reloadJournalRead().entries[0].customer], [1, ['KH0001', 'KH0002']]);
+  check(so, 'lớp ngoài cùng ghi nhận một lần cho cả hai lớp', [long.reloadStateRead().revision, long.reloadJournalRead().entries[0].customer], [1, ['KH0001', 'KH0002']]);
 
   const rong = dungHop({ sheets: ['Config', 'Log'] }).hop;
-  check(so, 'quyết định không có signal không bỏ gì vào giỏ và trả false',
+  check(so, 'quyết định không có signal không thêm gì vào danh sách chờ và trả false',
     trongLanChay(rong, () => rong.dirtyStateMarkDecision({ signal: { records: [] } })), false);
   check(so, 'lần chạy không có thay đổi không tăng revision', rong.reloadStateRead().revision, 0);
 
