@@ -397,6 +397,14 @@ async function chay(so) {
       [dongY.ok, F.backgroundScheduleRead().heartbeat.minutes, F.backgroundScheduleRead().customerFull.minutes], [true, 0, 5]);
     const now = Date.UTC(2026, 9, 16, 8, 0);
     F.scheduleMarkerAdvance('heartbeat', now);
+    {
+      const hop = workflowGas().hop, vet = [];
+      hop.logTrace = (entry) => vet.push(entry);
+      hop.FbmSync.backgroundScheduleSave({ heartbeat: { enabled: true, minutes: '5' }, customerFull: { enabled: true, minutes: '60' }, activityFull: { enabled: false }, detail: { enabled: false } });
+      const hoi = hop.FbmSync.schedulerPickDue(Date.now() + 60000);
+      check(so, 'LOG_TRACE: lần Extension hỏi mà chưa có việc ghi một dòng vết nói tiến trình nào sớm nhất và còn bao lâu',
+        [hoi.code, vet.map((v) => [v.source, v.action, v.reason])], ['NO_PROCESS_DUE', [['fbm_sync', 'schedule_idle', 'Extension hỏi lịch nền: chưa có tiến trình đến hạn; sớm nhất là Giữ phiên FBM, còn 4 phút.']]]);
+    }
     check(so, 'Chu kỳ 0: chạy xong thì mốc là chính giờ chạy xong, lần hỏi kế tiếp đến hạn ngay',
       [Number(F.props().getProperty(F.SCHEDULE_MARKER_KEYS.heartbeat)), F.scheduleDueKinds(now + 1, []).indexOf('heartbeat') >= 0], [now, true]);
   }
