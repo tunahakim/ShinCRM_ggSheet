@@ -458,10 +458,7 @@ function sheetLinkApplyDecisionResult(result, options) {
   if (stateRevision && stateRevision <= SHEET_LINK_LAST_SEEN_REVISION && opts.forceReload !== true) {
     return result;
   }
-  // Giữ nguyên mốc revision đã thấy để lời hỏi `sync-finished` nhận lại đúng phần bị hoãn.
-  if (typeof refreshDeferredBySync === 'function' && refreshDeferredBySync()) {
-    return { deferred: true, reason: 'sync-running', reload: state };
-  }
+  // GAS đã tiêu dấu bẩn khi đọc payload, nên payload về là phải áp, kể cả khi lượt đồng bộ vừa bắt đầu sau lúc gửi lời hỏi; hoãn do GAS quyết từ cờ `syncRunning`.
   if (result.payload && typeof refreshReloadPayload === 'function') {
     var payloadWork = function () { return refreshReloadPayload(result.payload); };
     var payloadRun = typeof sidebarBusyRun === 'function' ? sidebarBusyRun('Đang đồng bộ dữ liệu vừa thay đổi…', payloadWork, { progress: true, block: true }) : payloadWork();
@@ -536,6 +533,7 @@ function sheetLinkProbeSelectionAndReload(reason, options) {
     needsSelection: opts.needsSelection === true,
     skipPosition: sheetLinkExtensionOwnsContext(),
     forceImmediate: opts.forceImmediate === true,
+    syncRunning: typeof refreshDeferredBySync === 'function' && refreshDeferredBySync(),
     extensionReadFailure: sheetLinkReaderFailureInput(),
     channelSilence: typeof changeSignalDeadReportInput === 'function' && changeSignalDeadReportInput()
   };

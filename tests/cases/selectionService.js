@@ -133,7 +133,10 @@ function chay(so) {
     [defer.requestId, defer.decision.ram.action, defer.payload, defer.waitMs > 0, defer.reload.records],
     ['r11-defer', 'defer', null, true, ['CUS-000004']]);
   hop.PropertiesService.getDocumentProperties().setProperty(hop.DIRTY_KEYS.recordsReadyAt, String(Date.now() - 1));
-  const ready = hop.probeSelectionAndReload({ requestId: 'r11-ready', previousSelectionContext: movedProbe.selection, previousCustomerId: movedProbe.customerId });
+  const syncDefer = hop.probeSelectionAndReload({ syncRunning: true, previousSelectionContext: movedProbe.selection, previousCustomerId: movedProbe.customerId });
+  check(so, 'lượt đồng bộ đang chạy phía Sidebar: GAS hoãn, không đọc payload và giữ dấu bẩn cho lời hỏi lúc xong lượt',
+    [syncDefer.decision.ram.action, syncDefer.payload, syncDefer.reload.records], ['defer', null, ['CUS-000004']]);
+  const ready =hop.probeSelectionAndReload({ requestId: 'r11-ready', previousSelectionContext: movedProbe.selection, previousCustomerId: movedProbe.customerId });
   check(so, 'R11 request sau readyAt nhận payload records và dọn dirty',
     [ready.requestId, ready.payload.mode, ready.payload.customer.rows.length, ready.processedRevision > 0, ready.reload.records],
     ['r11-ready', 'records', 1, true, []]);

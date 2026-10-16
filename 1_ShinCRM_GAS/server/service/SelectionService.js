@@ -284,6 +284,11 @@ function probeSelectionAndReload(input) {
       decision = Object.assign({}, decision, { ram: Object.assign({}, ram, { action: 'defer' }) });
       ram = decision.ram;
     }
+    // Đọc payload là tiêu dấu bẩn, nên lượt đồng bộ đang chạy phía Sidebar phải hoãn ở đây: đọc rồi để Sidebar bỏ thì lời hỏi lúc xong lượt không còn gì để nạp.
+    if (ram && ram.action === 'reload' && request.syncRunning === true && request.forceImmediate !== true) {
+      decision = Object.assign({}, decision, { ram: Object.assign({}, ram, { action: 'defer', waitMs: 0, reason: 'Lượt đồng bộ đang chạy; nạp một lần khi lượt kết thúc.' }) });
+      ram = decision.ram;
+    }
     var deferred = ram && ram.action === 'defer';
     var ready = !deferred && ram && ram.action === 'reload' && waitMs <= 0;
     if (ready) {
