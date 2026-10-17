@@ -8,6 +8,11 @@ FbmSync.DETAIL_CURSOR_KEY = 'FBM_SYNC_DETAIL_CURSOR_V1';
  * Chỉ ghi khi tiến trình chạy hết lượt (kể cả khi vài bản ghi lỗi hay xung đột); lượt hỏng giữa chừng không ghi gì nên tiến trình vẫn quá hạn và lần Extension hỏi sau chạy lại — đó là cơ chế tự phục hồi. Chưa từng chạy xong thì đến hạn ngay.
  */
 FbmSync.SCHEDULE_DONE_KEYS = { customerFull: 'FBM_SYNC_DONE_CUSTOMER_FULL_SCAN', activityFull: 'FBM_SYNC_DONE_ACTIVITY_FULL_SCAN', detail: 'FBM_SYNC_DONE_DETAIL_SCAN', heartbeat: 'FBM_SYNC_DONE_HEARTBEAT' };
+/**
+ * Lần thử lại của tiến trình nền vừa lỗi, mỗi tiến trình một khóa `{ failures, retryAt }`: tiến trình chưa tới `retryAt` thì không đến hạn, nên tiến trình khác trong chuỗi (nhất là Giữ phiên đứng cuối) vẫn chạy thay vì bị một tiến trình lỗi liên tục chặn mãi.
+ * Khoảng chờ nhân đôi mỗi lần lỗi liền nhau, từ `SETTINGS.FBM_SCHEDULE_RETRY_BASE_MINUTES` tới trần `SETTINGS.FBM_SCHEDULE_RETRY_MAX_MINUTES`; chạy xong thì xóa khóa.
+ */
+FbmSync.SCHEDULE_RETRY_KEYS = { customerFull: 'FBM_SYNC_RETRY_CUSTOMER_FULL_SCAN', activityFull: 'FBM_SYNC_RETRY_ACTIVITY_FULL_SCAN', detail: 'FBM_SYNC_RETRY_DETAIL_SCAN', heartbeat: 'FBM_SYNC_RETRY_HEARTBEAT' };
 /** Cursor Vòng xoay: số CUS của khách cuối cùng đã ghi xong giao dịch (09/02 "Chuỗi trong một lần hỏi" mục 7 và 9); `-1` khi chưa có, phiên bắt đầu từ khách số nhỏ nhất. Giá trị kiểu cũ (khóa trang FBM) không có `cus` nên cũng là `-1`. */
 FbmSync.detailCursorRead = function () {
   var parsed = FbmSync.documentPropertyJson(FbmSync.DETAIL_CURSOR_KEY, 'cursor Vòng xoay'), cus = parsed ? Number(parsed.cus) : NaN;
@@ -118,10 +123,15 @@ FbmSync.backgroundSchedulePublic = function () {
   var value = FbmSync.backgroundScheduleRead();
   return { enabled: value.enabled !== false, direction: value.direction, heartbeat: value.heartbeat, customerFull: value.customerFull, activityFull: value.activityFull, detail: value.detail };
 };
-/** Giờ đến hạn của một tiến trình; `0` là chưa từng chạy xong nên đến hạn ngay. Đọc chu kỳ hiện hành nên đổi chu kỳ là có hiệu lực ngay, không cần đặt lại mốc. */
+/** Giờ đến hạn của một tiến trình; `0` là chưa từng chạy xong nên đến hạn ngay. Tiến trình đang chờ thử lại sau lỗi thì đến hạn muộn nhất là giờ thử lại. Đọc chu kỳ hiện hành nên đổi chu kỳ là có hiệu lực ngay, không cần đặt lại mốc. */
 FbmSync.scheduleDueAt = function (kind, schedule, props) {
   var done = Number((props || FbmSync.props()).getProperty(FbmSync.SCHEDULE_DONE_KEYS[kind]) || 0);
-  return done ? done + (schedule || FbmSync.backgroundScheduleRead())[kind].minutes * 60 * 1000 : 0;
+  var dueAt = done ? done + (schedule || FbmSync.backgroundScheduleRead())[kind].minutes * 60 * 1000 : 0;
+  return Math.max(dueAt, FbmSync.scheduleRetryRead(kind).retryAt);
+};
+FbmSync.scheduleRetryRead = function (kind) {
+  var saved = FbmSync.documentPropertyJson(FbmSync.SCHEDULE_RETRY_KEYS[kind], 'lần thử lại của ' + FbmSync.SCHEDULE_LABELS[kind]) || {};
+  return { failures: Math.max(0, Math.floor(Number(saved.failures) || 0)), retryAt: Math.max(0, Number(saved.retryAt) || 0) };
 };
 /** Tiến trình bật và đã đến hạn, chưa chạy trong chuỗi này, theo ưu tiên: Quét nhanh, Lấy toàn bộ giao dịch, Vòng xoay, cuối cùng Giữ phiên. */
 FbmSync.scheduleDueKinds = function (now, ran) {
@@ -130,11 +140,23 @@ FbmSync.scheduleDueKinds = function (now, ran) {
     return schedule[kind].enabled && skip.indexOf(kind) < 0 && FbmSync.scheduleDueAt(kind, schedule, props) <= now;
   }).sort(function (a, b) { return schedule[a].priority - schedule[b].priority; });
 };
-/** Tiến trình vừa chạy hết lượt: ghi giờ chạy xong. Chỉ đường kết thúc thành công gọi hàm này. */
+/** Tiến trình vừa chạy hết lượt: ghi giờ chạy xong và bỏ lần thử lại sau lỗi. Chỉ đường kết thúc thành công gọi hàm này. */
 FbmSync.scheduleMarkDone = function (kind, now) {
-  var at = Number(now || Date.now());
-  FbmSync.props().setProperty(FbmSync.SCHEDULE_DONE_KEYS[kind], String(at));
+  var at = Number(now || Date.now()), props = FbmSync.props();
+  props.setProperty(FbmSync.SCHEDULE_DONE_KEYS[kind], String(at));
+  if (props.getProperty(FbmSync.SCHEDULE_RETRY_KEYS[kind])) { props.deleteProperty(FbmSync.SCHEDULE_RETRY_KEYS[kind]); }
   return at;
+};
+/** Tiến trình nền kết thúc lỗi hoặc tạm dừng: dời giờ thử lại của riêng nó và ghi Log; không ghi giờ chạy xong, nên thử lại tới hạn là chạy lại. */
+FbmSync.scheduleMarkFailed = function (kind, now, code) {
+  var at = Number(now || Date.now()), failures = FbmSync.scheduleRetryRead(kind).failures + 1;
+  var base = Number(SETTINGS.FBM_SCHEDULE_RETRY_BASE_MINUTES), cap = Number(SETTINGS.FBM_SCHEDULE_RETRY_MAX_MINUTES);
+  var minutes = Math.min(cap, base * Math.pow(2, Math.min(failures - 1, 30)));
+  FbmSync.props().setProperty(FbmSync.SCHEDULE_RETRY_KEYS[kind], JSON.stringify({ failures: failures, retryAt: at + minutes * 60 * 1000 }));
+  if (typeof logEvent === 'function') {
+    logEvent({ source: 'fbm_sync', action: 'schedule_retry_later', outcome: typeof LOG_WARN === 'undefined' ? 'warn' : LOG_WARN, reason: FbmSync.SCHEDULE_LABELS[kind] + ' chạy nền không xong' + (code ? ' (mã ' + code + ')' : '') + ', lỗi liền ' + failures + ' lần; thử lại sau ' + minutes + ' phút, các tiến trình khác vẫn chạy theo lịch.', detail: { kind: kind, failures: failures, retryMinutes: minutes } });
+  }
+  return { failures: failures, minutes: minutes };
 };
 /** Dòng vết của lịch nền: chỉ ra Sheet `Log` khi `LOG_TRACE` phủ `fbm_sync`, để biết mỗi lần Extension hỏi GAS đã quyết gì. */
 FbmSync.scheduleTrace = function (action, reason, detail) {
@@ -164,6 +186,11 @@ FbmSync.schedulerPickDue = function (now, options) {
   if (FbmSync.runInProgress(state)) {
     FbmSync.scheduleTrace('schedule_skip', 'Extension hỏi lịch nền: đang có lượt chạy, không mở thêm.', { phase: String(state.phase || '') });
     return { ok: false, code: 'SYNC_ALREADY_RUNNING' };
+  }
+  // Chuỗi còn sót mà lượt nền của tiến trình đang chạy dở đã kết thúc lỗi hay tạm dừng (kể cả bị bỏ dở rồi thu hồi): tiến trình đó lỗi, dời lần thử lại của riêng nó để lần hỏi này chạy các tiến trình khác. Lượt tay chen ngang không phải lỗi của tiến trình nền nên chỉ bỏ chuỗi.
+  if (state.chain && state.chain.current && state.chain.current !== state.scheduledScan) {
+    if (state.origin === 'background' && ['error', 'paused'].indexOf(String(state.phase || '')) >= 0) { FbmSync.scheduleMarkFailed(state.chain.current, at, state.lastFailureCode); }
+    state.chain = null; FbmSync.stateWrite(state);
   }
   if (state.scheduledScan) { return { ok: true, kind: String(state.scheduledScan), existing: true }; }
   var due = FbmSync.scheduleDueKinds(at, []);

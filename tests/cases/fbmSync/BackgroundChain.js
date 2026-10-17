@@ -101,6 +101,30 @@ async function chay(so) {
   tuDangNhap.trace.kinds.length = 0;
   const sauDangNhap = await tuDangNhap.hoi(10);
   check(so, 'Lượt trước còn dấu phiên hết hạn mà phiên FBM thật vẫn sống: chuỗi mới chạy Giữ phiên, không gửi lệnh đăng nhập', [sauDangNhap.xong, tuDangNhap.trace.kinds.indexOf('login') < 0], [['heartbeat'], true]);
+
+  // Quét nhanh lỗi liên tục (tab FBM không phản hồi) và đứng trước Giữ phiên trong chuỗi: trước đây mọi chuỗi gãy ở Quét nhanh nên Giữ phiên không bao giờ chạy.
+  const loi = chuoiHarness({ heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 5 }, activityFull: { enabled: false }, detail: { enabled: false } });
+  loi.F.customerBaselineWrite(12);
+  let hong = true;
+  const hongTab = { fail: (request) => hong && request.meta.kind === 'scan_job' ? 'FBM_TAB_NOT_READY' : '' };
+  const loiLan = [];
+  for (let i = 0; i < 8; i += 1) { loiLan.push((await loi.hoi(5, 1000, hongTab)).xong); }
+  const giaHan = loi.logs.filter((event) => event.action === 'schedule_retry_later');
+  check(so, 'Quét nhanh lỗi liền: chờ thử lại 5, 10, 20 phút; Giữ phiên chạy ở mọi lần hỏi không trùng lần thử lại của Quét nhanh, không lần nào bị chặn hai nhịp liền', [
+    loiLan, giaHan.map((event) => event.detail.retryMinutes), giaHan.every((event) => event.outcome === 'warn')
+  ], [[[], ['heartbeat'], [], ['heartbeat'], ['heartbeat'], [], ['heartbeat'], ['heartbeat']], [5, 10, 20], true]);
+  check(so, 'Dòng Log lần thử lại nói tiến trình nào, mã lỗi, lỗi liền mấy lần và bao lâu nữa thử lại', giaHan[1].reason, 'Quét nhanh chạy nền không xong (mã FBM_TAB_NOT_READY), lỗi liền 2 lần; thử lại sau 10 phút, các tiến trình khác vẫn chạy theo lịch.');
+  hong = false;
+  const hoiPhuc = [];
+  for (let i = 0; i < 6; i += 1) { hoiPhuc.push((await loi.hoi(5, 1000, hongTab)).xong); }
+  check(so, 'Tab FBM trở lại: Quét nhanh chạy khi tới giờ thử lại, chạy xong thì xóa lần thử lại và quay về chu kỳ thường', [hoiPhuc, loi.flow.documentProperties.getProperty('FBM_SYNC_RETRY_CUSTOMER_FULL_SCAN') || null], [[['heartbeat'], ['heartbeat'], ['customerFull', 'heartbeat'], ['customerFull', 'heartbeat'], ['customerFull', 'heartbeat'], ['customerFull', 'heartbeat']], null]);
+
+  // Lượt nền bị bỏ dở (Extension không bao giờ trả lời, lượt bị thu hồi khi quá hạn) cũng là lỗi của tiến trình đó.
+  const boDo = chuoiHarness({ heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false }, detail: { enabled: false } });
+  boDo.F.customerBaselineWrite(12);
+  boDo.F.statePatch({ runId: 'luot-bo-do', phase: 'pull_customer', origin: 'background', cursor: { kind: 'customer_grid' }, activeRequestId: 'mat', deadlineAt: boDo.clock.now - 60000, lastProgressAt: boDo.clock.now - 10 * PHUT, chain: { current: 'customerFull', ran: [], direction: 'read', startedAt: boDo.clock.now - 10 * PHUT } });
+  const sauBoDo = await boDo.hoi(1);
+  check(so, 'Lượt nền của Quét nhanh bị bỏ dở: lần hỏi sau dời lần thử lại của Quét nhanh và chạy ngay Giữ phiên', [sauBoDo.xong, boDo.logs.filter((event) => event.action === 'schedule_retry_later').map((event) => event.detail.kind)], [['heartbeat'], ['customerFull']]);
 }
 
 module.exports = { chay };
