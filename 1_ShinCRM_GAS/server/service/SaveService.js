@@ -16,15 +16,17 @@ var SAVE_SOURCE = 'sidebar';
  *
  * Trả về `{ ok: true, entity, fields, rows, dirty, ms }` khi lưu được, hoặc `{ ok: false, entity, invalid, dirty, ms }` khi có trường không đạt. `rows` là **dòng đọc lại từ sheet**, không phải bản ghi client vừa gửi — client đổ nó vào `Store.upsertRecord` nên nó phải đủ mọi trường, kể cả mấy trường máy vừa điền.
  *
+ * `old` là giá trị lúc mở form của các trường gửi lên, bắt buộc khi sửa bản ghi đã có; trường bị đổi trên Sheet trong lúc sửa thì trả `{ ok: false, conflicts }` và không ghi gì (tài liệu 06 Phần 4).
+ *
  * `invalid` là mảng `{ index, id, field, label, reason }`. Client tô đỏ đúng những `field` ấy rồi cuộn tới cái đầu tiên `[RÀNG BUỘC CỨNG]` tài liệu 06 Phần 4.
  *
  * Sửa bản ghi cũ thì hỏi khóa đồng bộ FBM và ghi trong **cùng một lời gọi** qua `fbmSaveGuarded`: tách thành hai lời gọi là tốn thêm một vòng đường truyền và để hở khoảng giữa lúc hỏi với lúc ghi. Bị chặn thì trả `{ ok: false, blocked: true, code, message }`, không ghi gì.
  */
-function saveRecord(entity, record) {
+function saveRecord(entity, record, old) {
   return runEntryPoint('saveRecord', SAVE_SOURCE, 'throw', function () {
     var batDau = Date.now();
     var id = String(record && record.id || '').trim();
-    var write = function () { return writeGateSave({ entity: entity, records: [record], source: 'user' }); };
+    var write = function () { return writeGateSave({ entity: entity, records: [record], source: 'user', old: [old] }); };
     var ra = id ? fbmSaveGuarded(entity, id, record.fbmHash || '', write) : write();
 
     // Ghi nhận thay đổi trước khi trả để phản hồi mang revision đã gồm lượt lưu này; Sidebar đã áp bản đọc lại nên không phải hỏi nạp thêm.

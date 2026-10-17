@@ -32,7 +32,7 @@ function chay(so) {
   check(so, 'giao dịch người dùng tạo mới lấy tên ở Config USER_NAME, bỏ giá trị client gửi', [tao.ok, nguoiTao(tao)], [true, ['Lê Tuấn Anh']]);
 
   const ma = tao.recordIds[0];
-  const sua = trongLanChay(nen.hop, () => nen.hop.writeGateSave({ entity: 'activity', records: [{ id: ma, content: 'Sửa nội dung', enteredBy: 'Gõ đè' }] }));
+  const sua = trongLanChay(nen.hop, () => nen.hop.writeGateSave({ entity: 'activity', records: [{ id: ma, content: 'Sửa nội dung', enteredBy: 'Gõ đè' }], old: [{ content: tao.rows[0][tao.fields.indexOf('content')], enteredBy: '' }] }));
   check(so, 'người dùng sửa giao dịch không đổi được người tạo', [sua.ok, nguoiTao(sua)], [true, ['Lê Tuấn Anh']]);
 
   const keo = trongLanChay(nen.hop, () => nen.hop.writeGateSave({ entity: 'activity', records: [giaoDich({ enteredBy: 'Sale Cũ' })], source: 'pull' }));

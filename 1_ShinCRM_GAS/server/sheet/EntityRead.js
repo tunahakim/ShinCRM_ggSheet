@@ -57,9 +57,12 @@ function entityPlace(context, ids) {
   return { sheetName: context.sheetName, rows: rows };
 }
 
-/** Bản ghi ở các vị trí đã định, theo thứ tự `ids`, qua tờ nháp của lần gọi. Đọc theo vị trí chứ không tìm lại theo mã, để lần đọc lại sau ghi thấy đúng dòng vừa ghi. */
+/**
+ * Bản ghi ở các vị trí đã định, đúng thứ tự `ids` và không bỏ dòng nào kể cả dòng mất mã, qua tờ nháp của lần gọi. Đọc theo vị trí chứ không tìm lại theo mã, để xác nhận sau ghi thấy đúng dòng vừa ghi đang mang mã gì.
+ */
 function entityReadPlaced(context, placement, ids) {
-  return entityReadRows(context, ids.map(function (id) { return placement.rows[id]; }));
+  var raws = sheetReadRows(context.sheet, ids.map(function (id) { return placement.rows[id]; }));
+  return { entity: context.entity, fields: context.names, rows: raws.map(function (raw) { return entityReadRecord(context, raw); }) };
 }
 
 /** Cột mã và một cột khác (theo mã cột `@`) của mọi dòng dữ liệu, cùng thứ tự: `{ ids, values }`. Dùng cho phép kiểm trùng cần bỏ qua chính bản ghi đang sửa. */
@@ -136,13 +139,18 @@ function entityReadRows(context, rowNumbers) {
   return entityReadRecords(context, sheetReadRows(context.sheet, rowNumbers));
 }
 
+/** Một dòng giá trị thô thành bản ghi của đường nạp, theo thứ tự trường của `context`. */
+function entityReadRecord(context, raw) {
+  return context.indexes.map(function (at, k) { return entityReadCell(raw[at], context.specs[k], context.timezone); });
+}
+
 /** Đổi các dòng giá trị thô thành bản ghi của đường nạp, bỏ dòng không có mã. */
 function entityReadRecords(context, block) {
   var rows = [];
   var blankRows = 0;
 
-  block.forEach(function (raw, offset) {
-    var record = context.indexes.map(function (at, k) { return entityReadCell(raw[at], context.specs[k], context.timezone); });
+  block.forEach(function (raw) {
+    var record = entityReadRecord(context, raw);
 
     if (!record[context.idAt]) {
       blankRows += 1;

@@ -99,7 +99,8 @@ function chay(so) {
   doiSangSo.Customer.sheet.getRange(4, cotMst, 1, 1).setNumberFormat('#,##0');
   const sua = trongLanChay(doiSangSo.hop, () => doiSangSo.hop.writeGateSave({
     entity: 'customer',
-    records: [{ id: String(doiSangSo.Customer.sheet.getRange(4, cot(doiSangSo, 'Customer', '@CUS_MA_KH')).getValue()), taxNumber: '0311127395' }]
+    records: [{ id: String(doiSangSo.Customer.sheet.getRange(4, cot(doiSangSo, 'Customer', '@CUS_MA_KH')).getValue()), taxNumber: '0311127395' }],
+    old: [{ taxNumber: String(doiSangSo.Customer.sheet.getRange(4, cotMst).getValue()) }]
   }));
 
   check(so, 'sửa một trường trên bản ghi đã có cũng đặt lại khuôn trước khi ghi',

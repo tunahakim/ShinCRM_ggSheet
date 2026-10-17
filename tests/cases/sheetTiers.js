@@ -89,6 +89,53 @@ function chay(so) {
     return hop.entityReadPlaced(c, written, ['KH000300', 'KH000002']).rows.map((row) => row[c.idAt] + ':' + row[at]);
   }));
   check(so, 'ghi sửa và nối thêm rồi đọc lại theo vị trí, đúng thứ tự mã, cột chữ giữ số 0 đầu', doc, ['KH000300:0123', 'KH000002:sửa']);
+
+  section('Cửa ghi: kiểm xung đột bằng giá trị cũ và xác nhận sau ghi');
+  let xd;
+  try {
+    xd = dungHop({ sheets: ['Customer', 'Activity', 'Category', 'Config', 'Log'] });
+    ghiO(xd, 'Customer', 4, '@CUS_MA_KH', 'KH000001');
+    ghiO(xd, 'Customer', 4, '@CUS_SDT', '0901000001');
+    ghiO(xd, 'Customer', 4, '@CUS_NGAY_DONG_THAU', new Date(2026, 9, 17));
+    xd.hop.shinViewSheetNames = () => [];
+    xd.hop.renderAllManagedViews = () => ({ ok: true });
+    xd.hop.renderViewSheet = () => ({ ok: true });
+  } catch (err) { return ghiLoiNap(so, 'dựng hộp cát kiểm xung đột', err); }
+  const h = xd.hop;
+  const o = (ma) => xd.Customer.sheet.getRange(4, xd.Customer.codes.indexOf(ma) + 1).getValue();
+  const luu = (record, old) => trongLanGoi(h, () => h.writeGateSave({ entity: 'customer', records: [record], source: 'user', old: [old] }));
+
+  const xungDot = luu({ id: 'KH000001', phone: '0902000002', note: 'ghi chú' }, { phone: '', note: '' });
+  check(so, 'cùng trường đổi ở hai phía thì không ghi gì và trả danh sách xung đột đủ ba giá trị',
+    [xungDot.ok, JSON.stringify(xungDot.conflicts), o('@CUS_SDT'), o('@CUS_GHI_CHU')],
+    [false, JSON.stringify([{ index: 0, id: 'KH000001', field: 'phone', label: 'Điện thoại', old: '', current: '0901000001', mine: '0902000002' }]), '0901000001', '']);
+
+  const motPhia = luu({ id: 'KH000001', phone: '0901000001', note: 'ghi chú' }, { phone: '', note: '' });
+  check(so, 'Sheet đổi mà giá trị gửi lên trùng giá trị đang có, trường kia chỉ đổi một phía: vẫn ghi', [motPhia.ok, o('@CUS_GHI_CHU')], [true, 'ghi chú']);
+
+  const ngayChu = trongLanGoi(h, () => h.documentLockRun(() => h.entityReadCell(o('@CUS_NGAY_DONG_THAU'), h.DATA_SCHEMA.customer.bidClosingDate, h.entityReadContext('customer').timezone)));
+  const ngay = luu({ id: 'KH000001', bidClosingDate: '20/10/2026' }, { bidClosingDate: ngayChu });
+  check(so, 'ô ngày dạng Date so với giá trị lúc mở dạng chữ không báo xung đột giả', [ngay.ok, JSON.stringify(ngay.conflicts || [])], [true, '[]']);
+
+  check(so, 'bản ghi sửa nguồn user thiếu giá trị lúc mở form thì ném lỗi, không ghi gì',
+    [/thiếu giá trị lúc mở form/.test(loiCua(() => trongLanGoi(h, () => h.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', note: 'x' }], source: 'user' })))), o('@CUS_GHI_CHU')],
+    [true, 'ghi chú']);
+
+  const ghiGoc = h.entityWriteRecords;
+  h.entityWriteRecords = function () {
+    const ketQuaGhi = ghiGoc.apply(null, arguments);
+    h.sheetCellsWrite(xd.Customer.sheet, 4, xd.Customer.codes.indexOf('@CUS_MA_KH') + 1, [['KH000777']]);
+    return ketQuaGhi;
+  };
+  h.pendingChangesBegin();
+  let loiDoiChu;
+  try { loiDoiChu = loiCua(() => trongLanGoi(h, () => h.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', note: 'y' }], source: 'pull' }))); } finally { h.pendingChangesEnd(); }
+  h.entityWriteRecords = ghiGoc;
+  h.flushLog();
+  const soCuoi = h.reloadJournalRead().entries.slice(-1)[0] || {};
+  check(so, 'dòng bị đổi chủ đúng lúc ghi thì báo lỗi bằng tiếng người, đánh dấu nạp lại trọn thực thể và ghi Log mức lỗi',
+    [/vừa bị đổi đúng lúc lưu/.test(loiDoiChu), soCuoi.customer === true, JSON.stringify(xd.Log.sheet.getRange(1, 1, Math.max(xd.Log.sheet.getLastRow(), 1), 12).getValues()).indexOf('writeGateConfirm') >= 0],
+    [true, true, true]);
 }
 
 module.exports = { chay };

@@ -138,21 +138,22 @@ function writeGateInvalid(plan, field, spec, reason) {
  *
  * Cùng một mã hai lần trong một lượt cũng ném lỗi: hai lệnh ghi vào cùng một dòng thì lệnh sau thắng, và bên gọi không có cách nào biết mình vừa mất một nửa dữ liệu.
  */
-function writeGatePlans(records) {
+function writeGatePlans(records, olds) {
   var daGap = {};
 
   return records.map(function (record, index) {
     var ban = record || {};
     var id = String(ban.id === null || ban.id === undefined ? '' : ban.id).trim();
 
-    if (!id) { return { index: index, record: ban, id: '', moi: true, values: {} }; }
+    var old = olds && olds[index] ? olds[index] : null;
+    if (!id) { return { index: index, record: ban, id: '', moi: true, values: {}, old: old }; }
 
     if (daGap.hasOwnProperty(id)) {
       throw new Error('Mã "' + id + '" xuất hiện hai lần trong cùng một lượt lưu (bản ghi thứ ' + (daGap[id] + 1) + ' và thứ ' + (index + 1) + ').');
     }
     daGap[id] = index;
 
-    return { index: index, record: ban, id: id, moi: false, values: {} };
+    return { index: index, record: ban, id: id, moi: false, values: {}, old: old };
   });
 }
 
@@ -266,6 +267,70 @@ function writeGateUniqueCheck(plans, names, fields, source, context, invalid) {
   });
 }
 
+/** Giá trị đã qua bộ đổi kiểu của đường nạp, thành chuỗi để so: hai phía cùng đi qua đúng một bộ đổi kiểu thì ngày dạng `Date` và chữ không báo khác giả. */
+function writeGateComparable(value, spec, timezone) {
+  var cell = entityReadCell(value, spec, timezone);
+  return cell === null || cell === undefined ? '' : String(cell).trim();
+}
+
+/**
+ * Kiểm xung đột bằng giá trị cũ (tài liệu 06 Phần 4), chỉ nguồn `user` sửa bản ghi đã có. `rows` là các dòng hiện tại trên Sheet của `plans` sửa, đọc trong khóa, cùng thứ tự.
+ * Trường là xung đột khi Sheet đã khác giá trị lúc mở form và giá trị gửi lên cũng khác giá trị đang có; đổi một phía thì không. Thiếu `old` thì ném lỗi: không có đường lưu nào bỏ qua phép này.
+ */
+function writeGateConflicts(plans, rows, fields, context) {
+  var conflicts = [];
+  plans.forEach(function (plan, i) {
+    if (!plan.old) { throw new Error('Lưu bản ghi "' + plan.id + '" thiếu giá trị lúc mở form nên không kiểm được xung đột; không ghi gì. Tải lại Sidebar rồi thử lại.'); }
+    Object.keys(plan.values).forEach(function (name) {
+      var at = context.names.indexOf(name);
+      if (at < 0) { return; }
+      if (!Object.prototype.hasOwnProperty.call(plan.old, name)) { throw new Error('Lưu bản ghi "' + plan.id + '" thiếu giá trị lúc mở form của trường "' + name + '"; không ghi gì. Tải lại Sidebar rồi thử lại.'); }
+      var spec = fields[name];
+      var old = writeGateComparable(plan.old[name], spec, context.timezone);
+      var current = writeGateComparable(rows[i][at], spec, context.timezone);
+      var mine = writeGateComparable(plan.values[name], spec, context.timezone);
+      if (current !== old && mine !== current) {
+        conflicts.push({ index: plan.index, id: plan.id, field: name, label: spec.label || name, old: old, current: current, mine: mine });
+      }
+    });
+  });
+  return conflicts;
+}
+
+/**
+ * Xác nhận sau ghi (tài liệu 06 Phần 4): đọc lại theo vị trí các dòng vừa ghi trên tờ nháp (không tốn lệnh đọc thêm ngoài lần đọc lại vốn có), kiểm ô mã đúng mã bản ghi và mọi trường vừa ghi khớp giá trị đọc lại.
+ * Lệch nghĩa là Sheet bị sắp xếp, chèn, xóa hàng đúng lúc ghi hoặc Google tự đổi giá trị: đánh dấu nạp lại trọn thực thể, ghi Log mức lỗi rồi ném lỗi bằng tiếng người, không bao giờ để thành lỗi âm thầm.
+ */
+function writeGateConfirm(entity, plans, fields, written) {
+  var confirmFields = { id: DATA_SCHEMA[entity].id };
+  Object.keys(fields).forEach(function (name) { confirmFields[name] = fields[name]; });
+  var context = entityReadContext(entity, confirmFields);
+  var rows = entityReadPlaced(context, written, plans.map(function (plan) { return plan.id; })).rows;
+  var mismatches = [];
+  plans.forEach(function (plan, i) {
+    var onSheet = String(rows[i][context.idAt]).trim();
+    if (onSheet !== plan.id) { mismatches.push({ id: plan.id, field: 'id', onSheet: onSheet }); return; }
+    Object.keys(plan.values).forEach(function (name) {
+      var at = context.names.indexOf(name);
+      var wrote = writeGateComparable(plan.values[name], fields[name], context.timezone);
+      var read = writeGateComparable(rows[i][at], fields[name], context.timezone);
+      if (wrote !== read) { mismatches.push({ id: plan.id, field: name, wrote: wrote, onSheet: read }); }
+    });
+  });
+  if (!mismatches.length) { return; }
+
+  var mark = dirtyStateBlankMark();
+  mark[entity + 'All'] = true;
+  dirtyStateMarkSignal(mark);
+  logEvent({
+    source: 'core', action: 'writeGateConfirm', outcome: LOG_ERROR, entity: entity,
+    recordId: mismatches.map(function (item) { return item.id; }).join(' '),
+    reason: 'Đọc lại sau ghi không khớp trên sheet "' + context.sheetName + '"',
+    detail: { lech: mismatches }
+  });
+  throw new Error('Sheet "' + context.sheetName + '" vừa bị đổi đúng lúc lưu (sắp xếp, chèn hoặc xóa hàng), hoặc Google tự đổi giá trị: dòng vừa ghi không còn khớp ở ' + mismatches.map(function (item) { return item.id + ' / ' + item.field; }).join(', ') + '. Sidebar sẽ nạp lại; kiểm tra lại các bản ghi này trên Sheet.');
+}
+
 /** Giá trị trường RAM hiện có trên Sheet của các bản ghi, theo mã, cùng bộ đổi kiểu với `writeGateReadBack` để so được với bản đọc lại. */
 function writeGateRowSnapshot(plans, context, placement) {
   var snap = {};
@@ -290,11 +355,11 @@ function writeGateReadBack(plans, context, placement) {
  *
  * **Cấp mã đứng sau mọi phép kiểm.** Cấp mã là một lệnh ghi — nó ghi bộ đếm xuống `Config`. Cấp trước rồi kiểm sau nghĩa là một lượt lưu bị chặn vì lỗi gõ vẫn làm bộ đếm nhảy, và luật "hoặc trọn vẹn, hoặc không xảy ra" đã hỏng ngay ở lệnh ghi đầu tiên.
  */
-function writeGateRun(entity, records, source, fields, batDau) {
+function writeGateRun(entity, records, source, fields, batDau, olds) {
   var context = entityReadContext(entity);
   var names = Object.keys(fields);
 
-  var plans = writeGatePlans(records);
+  var plans = writeGatePlans(records, olds);
   var placement = entityPlace(context, plans.filter(function (plan) { return !plan.moi; }).map(function (plan) { return plan.id; }));
   var invalid = [];
 
@@ -303,6 +368,8 @@ function writeGateRun(entity, records, source, fields, batDau) {
   if (source === 'user') { selectAllowed = writeGateSelectCatalog(fields); }
 
   plans.forEach(function (plan) { writeGateBuild(plan, names, fields, source, invalid, selectAllowed); });
+  var edits = plans.filter(function (plan) { return !plan.moi; });
+  var conflicts = source === 'user' && edits.length ? writeGateConflicts(edits, entityReadPlaced(context, placement, edits.map(function (plan) { return plan.id; })).rows, fields, context) : [];
   writeGateUniqueCheck(plans, names, fields, source, context, invalid);
 
   if (invalid.length) {
@@ -314,8 +381,18 @@ function writeGateRun(entity, records, source, fields, batDau) {
     return { ok: false, entity: entity, invalid: invalid, ms: Date.now() - batDau };
   }
 
+  if (conflicts.length) {
+    logEvent({
+      source: 'core', action: 'writeGateSave', outcome: LOG_WARN, entity: entity,
+      recordId: conflicts.map(function (item) { return item.id; }).join(' '),
+      reason: 'Chặn vì trường đã bị đổi trên Sheet trong lúc sửa, không ghi gì',
+      detail: { truong: conflicts.map(function (item) { return item.field; }).join(', ') }
+    });
+    return { ok: false, entity: entity, conflicts: conflicts, ms: Date.now() - batDau };
+  }
+
   var moi = plans.filter(function (plan) { return plan.moi; });
-  var cu = plans.filter(function (plan) { return !plan.moi; });
+  var cu = edits;
 
   idGateIssue(entity, moi.length, context).forEach(function (ma, i) {
     moi[i].id = ma;
@@ -334,6 +411,7 @@ function writeGateRun(entity, records, source, fields, batDau) {
   var before = writeGateRowSnapshot(touched, context, placement);
 
   var written = entityWriteRecords(context, fields, placement, plans.map(function (plan) { return { id: plan.id, values: plan.values, append: plan.moi }; }));
+  writeGateConfirm(entity, plans, fields, written);
 
   var doc = writeGateReadBack(plans, context, written);
   var after = {};
@@ -364,13 +442,13 @@ function writeGateRun(entity, records, source, fields, batDau) {
 }
 
 /**
- * **Cửa vào duy nhất của mọi lượt ghi dữ liệu.** Nhận `{ entity, records, source, schemas }`.
+ * **Cửa vào duy nhất của mọi lượt ghi dữ liệu.** Nhận `{ entity, records, source, schemas, old }`.
  *
- * `records` là mảng bản ghi phẳng, khóa là **tên trường** chứ không phải mã cột. Mã rỗng là thêm mới. `source` là `'user'` hay `'pull'` (tài liệu 06 Phần 4); bỏ trống thì hiểu là `'user'`, vì đó là đường của người ngồi trước máy và đường của người thì phải được kiểm nhiều nhất. `schemas` là mảng bảng khai; bỏ trống thì chỉ `DATA_SCHEMA`.
+ * `records` là mảng bản ghi phẳng, khóa là **tên trường** chứ không phải mã cột. Mã rỗng là thêm mới. `source` là `'user'` hay `'pull'` (tài liệu 06 Phần 4); bỏ trống thì hiểu là `'user'`, vì đó là đường của người ngồi trước máy và đường của người thì phải được kiểm nhiều nhất. `schemas` là mảng bảng khai; bỏ trống thì chỉ `DATA_SCHEMA`. `old` là mảng cùng thứ tự `records`, mỗi phần tử là giá trị lúc mở form của các trường gửi lên; bắt buộc với bản ghi sửa của nguồn `user`.
  *
- * Trả về `{ ok: true, entity, fields, rows, ms }` — đúng hình dạng của đường nạp, để client dùng lại đúng một bộ đổi hàng-thành-bản-ghi. Có trường không đạt thì trả về `{ ok: false, entity, invalid: [ { index, id, field, label, reason } ], ms }` và **không ghi gì**.
+ * Trả về `{ ok: true, entity, fields, rows, ms }` — đúng hình dạng của đường nạp, để client dùng lại đúng một bộ đổi hàng-thành-bản-ghi. Có trường không đạt thì trả về `{ ok: false, entity, invalid: [ { index, id, field, label, reason } ], ms }` và **không ghi gì**. Trường bị đổi trên Sheet trong lúc người dùng sửa thì trả `{ ok: false, entity, conflicts: [ { index, id, field, label, old, current, mine } ], ms }` và cũng không ghi gì.
  *
- * Ném lỗi chỉ ở chuyện hạ tầng: không lấy được khóa, mã đang sửa biến mất khỏi sheet, sheet có hai dòng cùng mã, bảng khai sai. Lỗi người dùng gõ thì không bao giờ ném — nó đi về theo `invalid` để hiện đỏ ngay tại ô đó.
+ * Ném lỗi chỉ ở chuyện hạ tầng: không lấy được khóa, mã đang sửa biến mất khỏi sheet, sheet có hai dòng cùng mã, bảng khai sai, thiếu `old`, dòng vừa ghi đọc lại không khớp. Lỗi người dùng gõ thì không bao giờ ném — nó đi về theo `invalid` để hiện đỏ ngay tại ô đó.
  *
  * `tryLock` chứ không `waitLock`, để câu báo hết giờ là câu tiếng người của dự án chứ không phải câu tiếng Anh của Google. Mười lăm giây là con số bản cũ đã chạy thật.
  */
@@ -404,7 +482,7 @@ function writeGateSave(yeuCau) {
   writeCommitAssertAvailable();
 
   return documentLockRun(function () {
-    var result = writeGateRun(entity, records, source, fields, batDau);
+    var result = writeGateRun(entity, records, source, fields, batDau, req.old);
     if (result && result.ok && result.changedIds && result.changedIds.length) {
       result.reloadDecision = writeCommitAfterSuccess({
         source: source,
