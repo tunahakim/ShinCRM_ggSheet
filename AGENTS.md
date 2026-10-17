@@ -1,100 +1,85 @@
 # Quy tắc làm việc với dự án ShinCRM
 
-## Nguyên tắc nền toàn repo
+Tệp này là quy tắc làm việc cho người và AI viết code trong repo. Nguồn chuẩn duy nhất của quy tắc nền là `0_Documentation/00. Tài liệu chính thức/01. Quy chuẩn nền ShinCRM.md`; mục 2 dưới đây chỉ nhắc những điều phải nhớ mỗi lần viết code, khi có chỗ vênh thì tài liệu 01 thắng và phải sửa tệp này cho khớp.
 
-- Một hành vi, một chỗ định nghĩa. Trước khi viết bất kỳ thứ gì — hàm, component, hằng số, config, hay đoạn logic — phải kiểm tra xem đã có thứ tương tự trong repo chưa. Nếu có — tái sử dụng hoặc mở rộng. Nếu chưa — tạo mới ở đúng vị trí chung, không viết inline tại chỗ dùng. [RÀNG BUỘC CỨNG]
-- Đừng viết code để bắt lỗi — hãy dựng kiến trúc mà lỗi đó không có đường xảy ra. Nguyên tắc này áp mạnh nhất ở nơi định nghĩa trường (Schema) và cửa ghi ra hệ ngoài (FBM,...); những chỗ khác chỉ cần đủ tốt, không cầu toàn. [RÀNG BUỘC CỨNG]
-- Mỗi state và mỗi quyết định chỉ có một nơi sở hữu duy nhất.
-- Tách biệt rõ việc thu thập/truyền tin, xử lý nghiệp vụ/state và hiển thị.
-- Module chỉ hoạt động trong đúng ranh giới trách nhiệm của mình.
-- Mọi thay đổi state phải đi qua hợp đồng hoặc cổng được quy định; không có đường tắt.
-- Giao tiếp giữa các module phải có điều kiện, tối thiểu và tránh thao tác thừa.
-- Ưu tiên tính đúng và nhất quán; cache hoặc dữ liệu cục bộ không thay thế nguồn sự thật.
-- Thao tác đắt phải được tối ưu theo chi phí thật, không theo cảm giác. Thao tác đắt là thứ có giá cố định mỗi lần (gọi GAS khoảng 2–3 giây đường truyền, gọi FBM, đọc/ghi Sheet, đọc/ghi DocumentProperties, hạn mức nền tảng) hoặc tốn token. Cách làm theo thứ tự: không làm khi kết quả không được dùng; không làm lại thứ đã có trong cùng lần gọi; gom nhiều việc vào một lần (một lần gọi GAS xử lý nhiều khách, một lần đọc cả Sheet, ghi một lần cuối lời gọi). Trước khi tối ưu phải đo để biết chi phí nằm ở đâu; tối ưu không được đổi lấy sai dữ liệu hay lỗi im lặng.
+Tệp này chỉ chứa quy tắc áp cho mọi phiên. Quy tắc riêng một loại phiên nằm ở mục 3 và chỉ đọc khi phiên chạm đến loại đó.
 
-## Mục tiêu và phạm vi
+## 1. Phiên đang làm
 
-- `D:\ShinCRM_ggSheet\0_Documentation\00. Tài liệu chính thức\01. Quy chuẩn nền ShinCRM.md` là nguồn chuẩn duy nhất của quy tắc nền. Đầu mỗi phiên chỉ đọc các phần liên quan đến công việc; chỉ đọc toàn bộ khi thay đổi kiến trúc lõi, Schema, ranh giới module hoặc xử lý mâu thuẫn tài liệu.
-- Trước khi đọc code, viết test hoặc sửa tệp, phải xác định và đọc các tài liệu chính thức, checklist và hợp đồng liên quan trực tiếp đến nhiệm vụ; không được suy ra yêu cầu từ code. Nếu chưa biết cần đọc tài liệu nào, phải tìm mục lục trước.
-- Không tạo bản tóm tắt lặp lại quy tắc nền ở nơi khác; tài liệu điều hướng (nếu có) chỉ được chỉ đến nguồn chuẩn và không được chứa quyết định nghiệp vụ.
-- Nếu đang làm phiên khác không phải phiên đồng bộ FBM thì bỏ qua các tài liệu liên quan đến FBM, cấm được đọc vì các file đó cực kỳ dài và tốn token.
-- Refactor phát hiện thay đổi, vẽ sheet quản trị và reload RAM (`feature/reload-refactor`) đã xong và gộp vào `main` ngày 2026-10-14; hồ sơ ở `0_Documentation/Phiên code/2026.10.14 Checklist refactor phát hiện thay đổi và reload.md`, chỉ đọc khi cần tra lại. Việc kế tiếp nằm trong các tệp `[Chờ xử lý]` ở `0_Documentation/Phiên code/`; khi mở phiên cho một tệp thì tạo branch riêng từ `main`, ghi mục tiêu phiên vào đây và trỏ về tệp đó.
-- Phiên chuỗi đồng bộ nền và Vòng xoay (`feature/fbm-background-chain`) đã xong và gộp vào `main` ngày 2026-10-16; hồ sơ ở `0_Documentation/Phiên code/[Đã xử lý] 2026.10.15 Chuỗi đồng bộ nền và vòng xoay giao dịch.md`, chỉ đọc khi cần tra lại.
-- Phiên luật chung nạp lại RAM và vẽ lại view (`feature/reload-unified-rule`) cùng phần lịch nền cho chu kỳ 0 và chặn lưu ô trống đã xong và gộp vào `main` ngày 2026-10-16; hồ sơ ở `0_Documentation/Phiên code/[Đã xử lý] 2026.10.16 Luật chung nạp lại RAM và vẽ lại view.md`, chỉ đọc khi cần tra lại.
-- Phiên một cửa ghi chiều lấy về FBM (`feature/fbm-pull-single-gate`) đã xong và gộp vào `main` ngày 2026-10-16; hồ sơ ở `0_Documentation/Phiên code/[Đã xử lý] 2026.10.15 Một cửa ghi chiều lấy về FBM.md`, chỉ đọc khi cần tra lại.
-- Phiên đang mở: sửa vi phạm luật thao tác đắt trên branch `feature/expensive-ops`. Tiến độ duy nhất ở `0_Documentation/Phiên code/[Đang xử lý] 2026.10.14 Vi phạm luật thao tác đắt.md`; sau khi ngữ cảnh bị nén chỉ đọc tệp này và tiếp tục từ dòng `[ ]` đầu tiên. Mỗi mục phải đo trên GAS DEV trước khi sửa và ghi số đo vào mục.
-- ShinCRM độc lập đã hoàn tất phần chính; không tự mở rộng sang bot tra cứu, Zalobot hoặc nạp 1.700 khách thật trước khi checklist cho phép.
-- Khi làm đồng bộ FBM, đọc `0_Documentation/00. Tài liệu chính thức/09. Đồng bộ FBM/00. Mục lục và phạm vi.md`, các chuyên đề 09 liên quan trực tiếp, checklist của phiên đang làm và `0_Documentation/Phiên code/Câu hỏi đêm.md`; không đọc toàn bộ 09 nếu công việc không cần. Sau khi ngữ cảnh bị nén thì đọc lại đúng các tài liệu thuộc phạm vi đang làm.
+- Phiên đang mở: sửa vi phạm luật thao tác đắt, branch `feature/expensive-ops`. Tiến độ duy nhất nằm ở `0_Documentation/Phiên code/[Đang xử lý] 2026.10.14 Vi phạm luật thao tác đắt.md`. Mỗi mục phải đo trên GAS DEV trước khi sửa và ghi số đo vào mục.
+- Việc kế tiếp nằm trong các tệp `[Chờ xử lý]` ở `0_Documentation/Phiên code/`. Mở phiên cho một tệp thì tạo branch riêng từ `main`, ghi mục tiêu phiên vào mục này và trỏ về tệp đó.
+- Hồ sơ phiên đã xong và đã gộp vào `main` là các tệp `[Đã xử lý]` trong `0_Documentation/Phiên code/`; chỉ đọc khi cần tra lại.
+- ShinCRM độc lập đã xong phần chính. Không tự mở rộng sang bot tra cứu, Zalobot hoặc nạp 1.700 khách thật khi checklist chưa cho phép.
+
+## 2. Nguyên tắc nền khi viết code
+
+- **Dựng kiến trúc để lỗi không có đường xảy ra, thay vì viết code bắt lỗi.** Đây là nguyên tắc quan trọng nhất. Áp mạnh nhất ở nơi định nghĩa trường (Schema), cửa ghi ra hệ ngoài (FBM...) và mọi chỗ quan trọng khác (state nghiệp vụ, dữ liệu khách, hash, quyết định ghi); chỉ những chỗ ít quan trọng mới được làm ở mức đủ tốt, không cầu toàn. **[RÀNG BUỘC CỨNG]**
+- **Một việc một công cụ, một công cụ một việc.** Mỗi việc chỉ có đúng một công cụ làm, viết một lần ở một chỗ; mỗi công cụ chỉ làm đúng một việc. Trước khi viết bất kỳ thứ gì (hàm, component, hằng số, config, đoạn logic) phải tìm xem repo đã có thứ tương tự chưa: có thì dùng lại hoặc mở rộng, chưa có thì tạo ở đúng vị trí dùng chung, không viết tại chỗ dùng. **[RÀNG BUỘC CỨNG]**
+- **Tiến trình là người điều phối gọi công cụ, công cụ trao nhau bằng dữ liệu.** Công cụ làm đúng một việc (đọc, kiểm, tính hoặc ghi) và không tự gọi công cụ khác loại: hàm kiểm không tự đọc Sheet, hàm ghi không tự kiểm. Người điều phối không biết cách làm việc nào, chỉ biết cần những công cụ nào và gọi theo thứ tự; đầu ra của công cụ trước là đầu vào của công cụ sau. Đọc – kiểm – ghi cần nhất quán thì người điều phối gọi cả ba trong cùng một lần cầm khóa. Không công cụ nào được dựa vào việc một công cụ khác "chắc đã chạy trước"; cái gì nó cần thì phải được truyền vào hoặc đọc qua đúng cổng của nơi sở hữu. "Một việc" là một trách nhiệm có nghĩa nghiệp vụ, không phải băm mỗi dòng thành một hàm. **[RÀNG BUỘC CỨNG]**
+- **Tiến trình lớn ghép từ tiến trình nhỏ.** Người điều phối được gọi người điều phối khác như gọi một công cụ. Chỗ nào cần đúng một tiến trình đã có thì gọi hàm điều phối của tiến trình đó, không tự chọn và xếp lại các công cụ. **[RÀNG BUỘC CỨNG]**
+- **Không có lỗi im lặng.** Mọi lỗi ở mọi phần của repo phải được báo rõ cho người dùng và ghi vào Sheet `Log`. Không che lỗi bằng `catch` rỗng, trả `null`/giá trị mặc định hay chỉ ghi console. Log và thông báo không được chứa cookie, mật khẩu, token, `authorized` hoặc payload nhạy cảm.
+- **Mỗi state và mỗi quyết định chỉ có một nơi sở hữu.** Mọi thay đổi state đi qua cổng hoặc hợp đồng đã quy định, không có đường tắt.
+- **Tách ba lớp:** thu thập và truyền tin; xử lý nghiệp vụ và state; hiển thị. Module chỉ làm trong ranh giới trách nhiệm của mình; giao tiếp giữa các module có điều kiện, tối thiểu, không thao tác thừa.
+- **Đúng và nhất quán trước.** Cache hay dữ liệu cục bộ không thay được nguồn sự thật.
+- **Thao tác đắt tối ưu theo chi phí thật, không theo cảm giác.** Thao tác đắt là thứ có giá cố định mỗi lần (gọi GAS mất khoảng 2–3 giây đường truyền, gọi FBM, đọc/ghi Sheet, đọc/ghi DocumentProperties, hạn mức nền tảng) hoặc tốn token. Làm theo thứ tự: không làm khi kết quả không được dùng; không làm lại thứ đã có trong cùng lần gọi; gom nhiều việc vào một lần (một lần gọi GAS xử lý nhiều khách, một lần đọc cả Sheet, ghi một lần cuối lời gọi). Đo trước để biết chi phí nằm ở đâu; tối ưu không được đổi lấy dữ liệu sai hay lỗi im lặng.
+
+## 3. Quy tắc riêng theo loại phiên
+
+Thư mục `0_Documentation/Quy tắc theo loại phiên/`. Phiên chạm đến loại nào thì đọc đúng tệp đó; phiên không chạm thì không đọc, kể cả tài liệu nghiệp vụ của loại đó (ví dụ phiên không làm đồng bộ FBM thì không đọc tài liệu 09 và hồ sơ FBM, vì chúng rất dài và tốn token).
+
+- `Đồng bộ FBM.md`: phiên chạm luồng đồng bộ FBM (GAS `fbm_sync`, Extension phía FBM, checklist, tài liệu 09).
+- `UI và Schema.md`: phiên chạm giao diện Sidebar, screen schema, component hoặc CSS.
+
+Quy tắc mới chỉ áp cho một loại phiên thì ghi vào tệp của loại đó (hoặc tạo tệp mới và thêm một dòng ở đây), không ghi vào `AGENTS.md`.
+
+## 4. Ranh giới Sheet – Extension – Sidebar – GAS
+
+- **Extension** chỉ quan sát và chuyển dữ liệu thô từ Sheet hoặc máy tính. Với FBM, nó chỉ tìm tab FBM, gọi `fetch` và trả response thô. Không xử lý nghiệp vụ, không quyết định reload.
+- **Sidebar** điều phối phía trình duyệt: giữ RAM và giao diện, chọn thời điểm gọi GAS, khởi chạy và hiển thị. Không tự thay quyết định nghiệp vụ.
+- **GAS** sở hữu state nghiệp vụ, cursor, hash, conflict và mọi quyết định nghiệp vụ, kể cả dirty, reload, payload và render.
+
+## 5. Đọc tài liệu trước khi làm
+
+- Trước khi đọc code, viết test hoặc sửa tệp, phải xác định và đọc tài liệu chính thức, checklist và hợp đồng liên quan trực tiếp đến nhiệm vụ. Không suy ra yêu cầu từ code. Chưa biết cần đọc gì thì tìm mục lục trước.
+- Tài liệu 01 (Quy chuẩn nền): đầu mỗi phiên chỉ đọc phần liên quan; đọc toàn bộ khi đổi kiến trúc lõi, Schema, ranh giới module hoặc phải xử lý mâu thuẫn tài liệu.
 - Chỉ đọc tệp khi dòng code sắp viết cần đến nó; không quét cả codebase để chuẩn bị.
-- Nếu tài liệu bắt buộc trong phạm vi đang làm đã lỗi thời hoặc mâu thuẫn với quyết định mới của chủ dự án, được phép và phải cập nhật tài liệu đó trong cùng nhóm thay đổi; không giữ quy tắc cũ chỉ vì tài liệu đang tồn tại.
-- Tự thực hiện liên tục các mục chỉ cần code, test offline hoặc GAS DEV. Khi đến mục cần người dùng giữ tab FBM, đăng nhập, bấm ghi thật hoặc kiểm tra dữ liệu live thì dừng và ghi rõ thao tác cần người dùng làm.
+- Sau khi ngữ cảnh bị nén: chỉ đọc lại tệp tiến độ của phiên đang mở, tệp quy tắc theo loại phiên và tài liệu thuộc phạm vi đang làm, rồi tiếp tục từ dòng `[ ]` đầu tiên.
+- Tài liệu trong phạm vi đang làm đã lỗi thời hoặc mâu thuẫn với quyết định mới của chủ dự án thì phải sửa nó trong cùng nhóm thay đổi; không giữ quy tắc cũ chỉ vì tài liệu còn đó.
+- Không viết bản tóm tắt lặp lại quy tắc nền ở nơi khác. Tài liệu điều hướng (nếu có) chỉ trỏ đến nguồn chuẩn, không chứa quyết định nghiệp vụ.
 
-## Quy tắc riêng phiên rà soát đồng bộ FBM
+## 6. Làm việc với chủ dự án
 
-- Đợt sửa lỗi sau audit theo dõi tiến độ duy nhất ở `0_Documentation/Phiên code/2026.10.07 Kế hoạch sửa lỗi FBM sau audit.md` (việc còn mở và bảng lỗi FBM-xxx còn mở). Sau khi ngữ cảnh bị nén, chỉ đọc file này và tiếp tục từ dòng `[ ]` đầu tiên. Phần đã xong và lỗi đã đóng nằm ở `0_Documentation/Phiên code/2026.10.06 Kế hoạch sửa lỗi FBM sau audit.md` (lưu trữ): chỉ tìm đúng mã G hoặc FBM-xxx khi cần, cấm đọc cả file. `Checklist rà soát đồng bộ FBM trước vận hành thật.md` (ma trận luồng F/E) và `Audit pipeline đồng bộ FBM.md` (hồ sơ lưu trữ) quá nặng: chỉ tìm đúng mục cần, cấm đọc cả file.
-- Tệp tài liệu mới tạo trong `0_Documentation/Phiên code/` đặt tiền tố ngày `YYYY.MM.DD ` (ví dụ `2026.10.06 Kế hoạch ...md`) để phân biệt tệp mới và cũ.
-- Checklist rà soát phải dựng từ tài liệu 09 và `tests/contracts/fbmSyncPipeline.js`, không được suy ra từ code. Mục nào mô tả bằng tên hàm nội bộ thay vì bằng hành vi người dùng quan sát được là sai gốc, phải viết lại.
-- Checklist phải bao phủ cả nhánh thành công và nhánh thất bại. Lỗi được nhóm theo lớp xử lý chứ không theo nguyên nhân: mọi lỗi mạng (DNS, TLS, timeout, đứt kết nối) quy về một lớp tại cổng request chung và chỉ cần một ca đại diện. Nếu mỗi nguyên nhân lại đi một đường xử lý khác nhau thì đó là lỗi kiến trúc phải sửa, không phải lý do viết thêm test. Các lớp cần tách riêng vì đường xử lý khác nhau: transport, HTTP/parse, đăng nhập/session, hạn mức và giới hạn nền tảng, conflict, ghi/đối soát.
-- Mỗi bước trong checklist chỉ mang đúng một nhãn `[Tự động]` hoặc `[Cần kiểm chứng thật]`. Cấm nhãn gộp kiểu `[Kết hợp]`; bước nào có cả hai phần thì tách thành hai dòng con.
-- Chỉ đánh dấu `[x]` khi trỏ được tới tên test cụ thể kiểm đúng nhánh đó. Test có sẵn từ trước chỉ được dùng làm bằng chứng nếu nó kiểm đúng nhánh đang xét, không phải chỉ vì nó cùng chủ đề.
-- Output kỳ vọng phải cụ thể đến mức có thể fail được. Cấm viết "hoạt động đúng" hoặc "theo hợp đồng"; phải nêu giá trị, trạng thái hoặc tên tài liệu và mục cụ thể.
-- Không có lỗi im lặng. Mọi lỗi phát sinh trong luồng đồng bộ, kể cả lỗi mạng và lỗi phát sinh khi Sidebar đang đóng, phải được thông báo rõ cho người dùng ở Sidebar và ghi vào Sheet `Log`; thiếu một trong hai thì use case vẫn chưa đạt và không được tick checklist.
-- Không che lỗi bằng `catch` rỗng, trả `null`/giá trị mặc định hoặc chỉ ghi console. Thông báo cho người dùng không được chứa cookie, mật khẩu, token, `authorized` hoặc payload nhạy cảm.
-- Mật khẩu FBM và envelope đăng nhập không được xuất hiện trong Log, Trace, thông báo lỗi Sidebar hay fixture test. Phải có ít nhất một kiểm thử tự động chốt luật này.
+- Trao đổi bằng tiếng Việt. Chủ dự án làm bán hàng, tự học code và sẽ tự tiếp quản dự án: giải thích lý do và cạm bẫy bằng lời dễ hiểu; thuật ngữ tiếng Anh kèm nghĩa tiếng Việt trong ngoặc khi cần.
+- Được phép và phải phản biện: nói rõ mâu thuẫn hoặc điểm chưa hợp lý. Quyết định quan trọng phải đưa cho chủ dự án biết trước khi ghi vào code hoặc tài liệu.
+- Tự làm liên tục những mục chỉ cần code, test offline hoặc GAS DEV. Đến mục cần người dùng thao tác hoặc kiểm tra dữ liệu thật thì dừng và ghi rõ người dùng cần làm gì.
+- Khi chủ dự án vắng mặt: ghi điểm mơ hồ vào `0_Documentation/Phiên code/Câu hỏi đêm.md`, chọn phương án an toàn nhất và ghi rõ đó là lựa chọn tạm để làm tiếp. Có câu trả lời rồi thì xóa hẳn mục hỏi; lịch sử đã nằm trong Git.
+- Mỗi kết quả chỉ báo cáo một lần; các lượt sau trỏ đến tài liệu hoặc commit đã ghi, không chép lại bảng số liệu cũ.
+- Trả lời xong, hoặc phải dừng vì cần người dùng giúp, thì phát tiếng chuông thông báo.
 
-## Nguyên tắc UI và Schema
+## 7. Viết code
 
-- UI schema chỉ mô tả ý định và hành vi người dùng: cấu trúc, vùng/ID, nhãn, `action`, dữ liệu và trạng thái tương tác; không mô tả cách trình bày.
-- Không đưa `className`, `rootClass`, `classes`, `*Class`, selector DOM, chuỗi CSS, `style` tự do hoặc token `primary/error/muted` vào screen schema.
-- `action` là hợp đồng hành vi; không thêm `purpose` hay trường diễn giải trùng lặp khi `action` đã đủ nghĩa.
-- Presentation (`variant`, `state`, `muted`...) được ánh xạ tập trung ở lớp UI/catalog/resolver; schema chỉ khai báo dữ liệu có nghĩa với người dùng.
-- Dùng chung component khi cấu trúc và hành vi giống nhau; khác nhãn, dữ liệu, `action` hoặc callback thì truyền tham số, không tạo component theo tên nghiệp vụ.
-- Mỗi quyết định presentation và mỗi trạng thái chỉ có một nơi sở hữu; không khai lại map/class và không ghép class trực tiếp ở controller.
-- Chỉ giữ ngoại lệ ở renderer primitive, DOM nội bộ component, slot domain có stylesheet riêng và host tĩnh; ngoại lệ phải được ghi rõ và không chảy ngược vào schema.
-- Mọi quy tắc schema/UI quan trọng phải có kiểm thử tự động để ngăn tái phạm, không chỉ dựa vào ghi nhớ hoặc review thủ công.
+- Mỗi tệp code làm một nhiệm vụ; chỉ tách tệp theo ranh giới trách nhiệm, không tách theo số dòng. Thêm tệp hoặc thư mục code thì cập nhật `0_Documentation/Phiên code/Cây thư mục code.md` trong cùng lượt.
+- Docstring ngắn, chỉ nói lý do, cạm bẫy và ranh giới mà đọc code không thấy; không kể lại code.
+- Tệp phía trình duyệt có đuôi `.html`, bọc trong `<script>` hoặc `<style>`. Trên Google Apps Script tên tệp là cả đường dẫn, nên `include()` phải dùng đường dẫn đầy đủ.
 
-## Ranh giới Sheet–Extension–Sidebar–GAS
+## 8. Kiểm thử và chạy thử
 
-- Extension chỉ quan sát và truyền dữ liệu thô từ Sheet hoặc máy tính; không xử lý nghiệp vụ và không quyết định reload.
-- Sidebar điều phối phía client, quản lý RAM/UI và thời điểm giao tiếp với GAS; không tự thay thế quyết định nghiệp vụ.
-- GAS sở hữu state nghiệp vụ và quyết định dirty, reload, payload và render.
-
-## Làm việc với chủ dự án
-
-- Trao đổi bằng tiếng Việt. Chủ dự án là người làm bán hàng, tự học code và sẽ tự tiếp quản dự án, nên giải thích lý do và cạm bẫy bằng ngôn ngữ dễ hiểu; thuật ngữ tiếng Anh cần kèm nghĩa tiếng Việt trong ngoặc khi cần.
-- Được phép phản biện và phải nói rõ mâu thuẫn hoặc điểm chưa hợp lý. Quyết định quan trọng cần đưa ra để chủ dự án biết trước khi ghi vào code hoặc tài liệu.
-- Khi chủ dự án vắng mặt, ghi điểm mơ hồ vào `0_Documentation/Phiên code/Câu hỏi đêm.md`, chọn phương án an toàn nhất và ghi rõ đó là lựa chọn tạm để tiếp tục. Khi đã có câu trả lời, xóa hẳn mục hỏi; lịch sử nằm trong Git.
-- Mỗi kết quả chỉ báo cáo một lần; các lượt sau trỏ đến tài liệu hoặc commit đã ghi, không lặp lại bảng số liệu cũ.
-- Khi trả lời xong/ phải dừng lại vì cần người dùng hỗ trợ, phải phát ra tiếng chuông thông báo để người dùng nắm được
-
-## Tài liệu và code
-
-- Không hard wrap (xuống dòng cứng) tài liệu, docstring hoặc nội dung commit. Mỗi ý trong mô tả commit là một dòng.
-- Todo đã xong thì xóa hẳn nếu tài liệu đó không phải checklist tick tiến độ. Không giữ mục "đã xong" làm lịch sử.
-- Docstring ngắn, chỉ giải thích lý do, cạm bẫy và ranh giới không đọc ra từ code; không kể lại code.
-- Mỗi tệp code làm một nhiệm vụ. Chỉ tách tệp theo ranh giới trách nhiệm, không tách theo số dòng.
-- Thêm tệp hoặc thư mục code thì cập nhật `0_Documentation/Phiên code/Cây thư mục code.md` trong cùng lượt.
-- Tệp client phải có đuôi `.html`, bọc trong `<script>` hoặc `<style>`. Tên tệp trên Google Apps Script là cả đường dẫn, nên `include()` phải dùng đường dẫn đầy đủ.
-- Giao diện dùng CSS thuần, SVG nội tuyến, không framework (khung thư viện). `spatialConfig` giữ các quyết định khoảng cách. Vẻ ngoài trong `9_Code_cu_tham_chieu/src/ui/Styles.html` là đặc tả hình thức; chỉ đọc code cũ, không sửa nó.
-- GAS là nơi giữ state, cursor, hash, conflict và quyết định nghiệp vụ. Extension chỉ tìm tab FBM, gọi `fetch` và trả response thô; Sidebar chỉ khởi chạy và hiển thị.
-- Không sửa nội dung fixture trong `0_Documentation/Nghiên cứu FBM/RequestFBM/`; không đưa cookie, mật khẩu, `authorized` hoặc payload nhạy cảm vào log.
-
-## Kiểm thử và an toàn
-
-- Ưu tiên chạy các kiểm thử có sẵn sau khi thay đổi nếu chúng đơn giản và nhanh; chỉ đọc phần tổng kết hoặc lỗi để không đưa toàn bộ đầu ra vào ngữ cảnh. Không cần viết thêm kiểm thử cho các chi tiết nhỏ mà chủ dự án có thể nghiệm thu trực tiếp trên Sheet DEV, nhưng vẫn phải viết kiểm thử cho nhánh có thể hỏng âm thầm, mở nhầm dữ liệu hoặc tốn hạn mức. Chạy bộ đầy đủ trước mốc bàn giao hoặc khi thay đổi hợp đồng dùng chung; ngoài các mốc đó vẫn có thể chạy bộ có sẵn nếu chi phí thời gian hợp lý.
-- Chạy `node tests/run.js` sau thay đổi code; chỉ đọc phần tổng kết hoặc lỗi. Bổ sung test cho nhánh có thể mở nhầm dữ liệu, ghi đè âm thầm, tạo trùng hoặc tốn hạn mức.
+- Sau mỗi thay đổi code chạy `node tests/run.js`, chỉ đọc phần tổng kết hoặc lỗi. Chạy bộ đầy đủ trước mốc bàn giao hoặc khi đổi hợp đồng dùng chung; ngoài các mốc đó vẫn chạy nếu chi phí thời gian hợp lý.
+- Bắt buộc viết test cho nhánh có thể hỏng âm thầm, mở nhầm dữ liệu, ghi đè âm thầm, tạo trùng hoặc tốn hạn mức. Chi tiết nhỏ mà chủ dự án nghiệm thu được ngay trên Sheet DEV thì không cần test riêng.
 - Nghiệm thu GAS bằng `node tests/gas.js <tên-hàm> --push`; thiếu `--push` là đang chạy bản cũ. Hàm dò mới phải có trong `DEV_RUNNER_ALLOWED`.
-- Chỉ thử trên Sheet DEV hoặc tệp trắng, không chạm Sheet có dữ liệu khách thật. Live FBM chỉ dùng `ALT00010`, không gửi request xóa; ghi thật chỉ chạy sau khi chủ dự án bật rõ cả chế độ và cờ an toàn.
-- Trước khi đưa dữ liệu thật vào production: xóa `server/dev/`, deployment DEV và tệp cấu hình chạy thử, tắt chia sẻ bằng liên kết và tắt `LOG_TRACE`.
-- Không sửa Extension đang chạy ngoài repo; code chính thức nằm trong `2_ShinCRM_Extension/`, chủ dự án tự tải lại sau mỗi commit Extension.
+- Chỉ thử trên Sheet DEV hoặc tệp trắng, không chạm Sheet có dữ liệu khách thật.
+- Code Extension chính thức nằm trong `2_ShinCRM_Extension/`; không sửa Extension đang chạy ngoài repo. Chủ dự án tự tải lại Extension sau mỗi commit Extension.
+- Trước khi đưa dữ liệu thật vào production: xóa `server/dev/`, deployment DEV và tệp cấu hình chạy thử, tắt chia sẻ bằng liên kết, tắt `LOG_TRACE`.
 
-## Git
+## 9. Tài liệu
 
-- Commit ngay khi hoàn thành một nhóm mục liên quan trong checklist (nếu có); tách lõi GAS, Category, Extension/Sidebar, test và tài liệu thành các commit có chủ đề rõ ràng khi hợp lý.
-- Mỗi commit phải cập nhật checklist tương ứng (nếu có); thêm tệp hoặc thư mục code thì cập nhật `0_Documentation/Phiên code/Cây thư mục code.md` trong cùng nhóm công việc.
-- Tiêu đề và mô tả commit viết tiếng Việt có dấu, ngắn gọn, không hard wrap.
-- Bảo toàn thay đổi có sẵn của chủ dự án; không đưa tệp không liên quan vào commit.
+- Không xuống dòng cứng (hard wrap) trong tài liệu, docstring hay nội dung commit.
+- Tệp mới trong `0_Documentation/Phiên code/` đặt tiền tố ngày `YYYY.MM.DD ` (ví dụ `2026.10.06 Kế hoạch ...md`) để phân biệt tệp mới và cũ. Khi phiên đổi trạng thái thì thêm hoặc đổi tiền tố `[Chờ xử lý]`, `[Đang xử lý]`, `[Đã xử lý]` trước ngày.
+- Việc đã xong thì xóa hẳn khỏi tài liệu, trừ checklist tick tiến độ; không giữ mục "đã xong" làm lịch sử.
 
-## Nghiêm cấm:
+## 10. Git
 
-- Cấm sửa tài liệu ở `D:\ShinCRM_ggSheet\0_Documentation\Nghiên cứu FBM`, trừ khi chủ dự án yêu cầu rõ trong phiên; khi đó chỉ sửa đúng phần được yêu cầu. Kết quả nghiên cứu mới (request thử trên FBM thật) ghi thành chương mới và thêm vào mục lục `README.md` của thư mục đó.
+- Commit ngay khi xong một nhóm mục liên quan; tách lõi GAS, Category, Extension/Sidebar, test và tài liệu thành các commit có chủ đề rõ khi hợp lý.
+- Mỗi commit cập nhật checklist tương ứng (nếu có) và `Cây thư mục code.md` khi có tệp hoặc thư mục code mới.
+- Tiêu đề và mô tả commit viết tiếng Việt có dấu, ngắn gọn, không xuống dòng cứng; mỗi ý trong mô tả là một dòng.
+- Giữ nguyên thay đổi có sẵn của chủ dự án; không đưa tệp không liên quan vào commit.
