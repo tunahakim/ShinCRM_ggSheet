@@ -9,7 +9,6 @@ function taoHop() {
   hop.shinViewSheetNames = () => ['!Lead', '!Chăm sóc'];
   hop.rendered = 0;
   hop.renderedWhileLocked = false;
-  hop.renderAllManagedViews = () => { hop.rendered += 1; return { ok: true }; };
   hop.renderViewSheet = () => { hop.rendered += 1; return { ok: true }; };
   return { nen, hop };
 }
@@ -98,7 +97,6 @@ function chay(so) {
   napServer(schemaEnv.hop, 'fbm_sync/SyncSchema.js', 'server/sheet/SyncColumnSetup.js');
   schemaEnv.hop.shinViewSheetNames = () => ['!Lead'];
   schemaEnv.hop.rendered = 0;
-  schemaEnv.hop.renderAllManagedViews = () => { schemaEnv.hop.rendered += 1; return { ok: true }; };
   const schema = trongLanChay(schemaEnv.hop, () => schemaEnv.hop.fbmEnsureSyncColumns('background'));
   const schemaState = schemaEnv.hop.reloadStateRead();
   const schemaEntry = dongSoCuoi(schemaEnv.hop);

@@ -99,10 +99,10 @@ function taoSheet(ten, dem, luoi) {
     setTabColor(color) { tabColor = color || null; tabColors.push(color); return sheet; },
     _tabColors: tabColors,
 
-    /** Dòng cuối có nội dung. Trả về 0 khi sheet trắng, đúng như Google. */
+    /** Dòng cuối có nội dung, ô có công thức cũng tính như Google. Trả về 0 khi sheet trắng. */
     getLastRow() {
-      for (let i = cells.length - 1; i >= 0; i -= 1) {
-        if (coNoiDung(cells[i])) { return i + 1; }
+      for (let i = Math.max(cells.length, formulas.length) - 1; i >= 0; i -= 1) {
+        if (coNoiDung(cells[i] || []) || coNoiDung(formulas[i] || [])) { return i + 1; }
       }
       return 0;
     },
@@ -244,6 +244,25 @@ function taoSheet(ten, dem, luoi) {
         },
         getFormula() { return (formulas[row - 1] || [])[col - 1] || ''; },
         getNote() { return oRong((notes[row - 1] || [])[col - 1]); },
+        getNotes() {
+          const ra = [];
+          for (let r = 0; r < soDong; r += 1) {
+            const nguon = notes[row - 1 + r] || [];
+            const dong = [];
+            for (let c = 0; c < soCot; c += 1) { dong.push(oRong(nguon[col - 1 + c])); }
+            ra.push(dong);
+          }
+          dem.getNotes = (dem.getNotes || 0) + 1;
+          return ra;
+        },
+        setNotes(matrix) {
+          for (let r = 0; r < soDong; r += 1) {
+            const dich = layDongNote(row - 1 + r);
+            for (let c = 0; c < soCot; c += 1) { dich[col - 1 + c] = String(matrix[r][c] || ''); }
+          }
+          dem.setNotes = (dem.setNotes || 0) + 1;
+          return range;
+        },
         setDataValidation(rule) {
           for (let r = 0; r < soDong; r += 1) {
             const dich = layDongValidation(row - 1 + r);

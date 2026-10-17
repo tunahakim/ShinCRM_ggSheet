@@ -38,7 +38,7 @@ function chay(so) {
   checkThrows(so, 'lỗi cũ quay lại sau khi đã hết', () => goi('renderViewIfDirty', hong('lỗi A')), 'lỗi A');
   check(so, 'lỗi quay lại sau khi đã hết thì ghi lại', dem('lỗi A'), 2);
 
-  checkThrows(so, 'cửa vào khác trong danh sách có sổ riêng', () => goi('inspectViewState', hong('lỗi A')), 'lỗi A');
+  checkThrows(so, 'cửa vào khác trong danh sách có sổ riêng', () => goi('getReloadState', hong('lỗi A')), 'lỗi A');
   check(so, 'mỗi cửa vào nhớ lỗi riêng', dem('lỗi A'), 3);
 
   checkThrows(so, 'cửa vào ngoài danh sách lần 1', () => goi('saveRecord', hong('lỗi C')), 'lỗi C');

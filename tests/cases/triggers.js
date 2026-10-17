@@ -4,6 +4,15 @@ const { section, check, ghiLoiNap } = require('../lib/assert');
 const fs = require('fs');
 const path = require('path');
 
+const TEP_RENDER = TEP_NEN.concat([
+  'server/view/FilterMessages.js',
+  'server/view/FilterParser.js',
+  'server/view/SortSpec.js',
+  'server/view/ViewSheetSetup.js',
+  'server/view/ViewSheetRenderer.js',
+  'server/Triggers.js'
+]);
+
 function eventRange(sheet, row, column, rows, columns) {
   return {
     getSheet: () => sheet,
@@ -21,7 +30,7 @@ function chay(so) {
   try {
     nen = dungHop({
       sheets: ['Customer', 'Activity', 'Category', 'Config', 'Log'],
-      tep: TEP_NEN.concat(['server/Triggers.js'])
+      tep: TEP_RENDER
     });
   } catch (err) {
     return ghiLoiNap(so, 'nạp server/Triggers.js', err);
@@ -31,8 +40,10 @@ function chay(so) {
   const lead = nen.book.insertSheet('!Lead');
   nen.book.insertSheet('!Chăm sóc');
   lead.getRange(1, 1, 1, 5).setValues([['@CUS_MA_KH', '@CUS_TEN_CTY', '@VIEW_SORT_COL', '@VIEW_SORT_LEVEL', 'Ghi chú thường']]);
+  // Trigger chỉ gắn cờ ô điều khiển; ghi lại sheet được gắn cờ ở cuối lần chạy.
   const rendered = [];
-  hop.renderAllManagedViews = (names) => { rendered.push(names ? names.join(',') : 'ALL'); return { ok: true }; };
+  const realMarkControls = hop.viewLedgerMarkControls;
+  hop.viewLedgerMarkControls = (names) => { rendered.push(names.join(',')); return realMarkControls(names); };
   hop.runEntryPoint = (name, source, channel, fn) => trongLanChay(hop, fn);
   hop.userPrefsRead = () => { throw new Error('Trigger không được đọc núm người dùng'); };
   // Xóa cả mốc cũ của view để `viewsStaleRevision > 0` nghĩa là signal sau lần xóa đã làm view cũ.
@@ -49,7 +60,7 @@ function chay(so) {
   hop.shinOnEdit({ range: eventRange(lead, 4, 3) });
   hop.shinOnEdit({ range: eventRange(lead, 4, 2) });
   hop.shinOnEdit({ range: eventRange(lead, 3, 5) });
-  check(so, 'hàng lọc dưới mã @ và cột sắp xếp vẽ đúng sheet bị sửa, không vẽ sheet khác, không đọc núm người dùng; ô dưới cột thường thì không vẽ', rendered, ['!Lead', '!Lead']);
+  check(so, 'hàng lọc dưới mã @ và cột sắp xếp gắn cờ đúng sheet bị sửa, không chạm sheet khác, không đọc núm người dùng; ô dưới cột thường thì không gắn cờ', rendered, ['!Lead', '!Lead']);
 
   const defaultSheets = ['Customer', 'Activity', 'Category', 'Config'];
   const schemaResults = defaultSheets.map((name) => {
@@ -146,16 +157,16 @@ function chay(so) {
 
   rendered.length = 0;
   hop.shinOnEdit({ range: eventRange(lead, 1, 1) });
-  check(so, 'sửa hàng 1 view, kể cả thêm/đổi/xóa mã @, vẽ đúng sheet đó', rendered, ['!Lead']);
+  check(so, 'sửa hàng 1 view, kể cả thêm/đổi/xóa mã @, gắn cờ đúng sheet đó', rendered, ['!Lead']);
 
   rendered.length = 0;
   hop.shinOnEdit({ range: eventRange(lead, 1, 5), oldValue: 'Ghi chú thường', value: 'Nhãn thường' });
-  check(so, 'sửa tiêu đề thường ở hàng 1 view không liên quan mã hợp lệ thì không vẽ', rendered, []);
+  check(so, 'sửa tiêu đề thường ở hàng 1 view không liên quan mã hợp lệ thì không gắn cờ', rendered, []);
 
   rendered.length = 0;
   lead.getRange(1, 6).setValue('Ghi chu 2');
   hop.shinOnEdit({ range: eventRange(lead, 1, 5, 1, 2) });
-  check(so, 'sua ca vung hang 1 thuong sang thuong khong ve', rendered, []);
+  check(so, 'sửa cả vùng hàng 1 thường sang thường không gắn cờ', rendered, []);
 
   const customerHeader = nen.sheet('Customer').getRange(1, 1);
   const customerCodeBeforeRange = customerHeader.getValue();
@@ -192,9 +203,9 @@ function chay(so) {
     clearState();
     hop.shinOnEdit({ range: eventRange(config, 4, column) });
   });
-  check(so, 'sửa @CFG_SORT_COL hoặc @CFG_SORT_LEVEL trong Config vẽ mọi sheet quản trị, kể cả khi không đọc núm người dùng',
-    [configSortColumn > 0, configLevelColumn > 0, rendered, trangThai().config],
-    [true, true, ['ALL', 'ALL'], true]);
+  check(so, 'sửa @CFG_SORT_COL hoặc @CFG_SORT_LEVEL trong Config chỉ làm mọi view cũ như tham số Config, không vẽ sheet nào',
+    [configSortColumn > 0, configLevelColumn > 0, rendered, trangThai().config, trangThai().viewsStaleRevision > 0],
+    [true, true, [], true, true]);
 
   clearState();
   rendered.length = 0;
@@ -302,11 +313,18 @@ function chay(so) {
   ghiO(controlNen, 'Customer', 4, '@CUS_TEN_CTY', 'Hai');
   const controlCare = controlNen.book.insertSheet('!Chăm sóc');
   controlCare.getRange(1, 1, 1, 2).setValues([['@CUS_MA_KH', '@CUS_TEN_CTY']]);
+  controlNen.hop.renderViewSheet('!Lead');
+  controlNen.hop.renderViewSheet('!Chăm sóc');
   controlLead.getRange(3, 2).setValue('Hai');
-  const controlResult = controlNen.hop.shinOnEdit({ range: eventRange(controlLead, 3, 2) });
-  check(so, 'onEdit điều khiển view vẽ ngay đúng sheet đó dù autoRenderView=false, sheet khác không bị chạm',
-    [controlResult.ok, controlLead.getRange(4, 1).getValue(), controlNen.hop.viewIsStale('!Lead'), controlCare.getRange(4, 1).getValue()],
-    [true, 'KH000002', false, '']);
+  controlNen.hop.shinOnEdit({ range: eventRange(controlLead, 3, 2) });
+  check(so, 'onEdit điều khiển view chỉ gắn cờ đúng sheet đó, không vẽ trong trigger, sheet khác không bị chạm',
+    [controlNen.hop.viewLedgerEntry('!Lead').controls, controlNen.hop.viewLedgerEntry('!Chăm sóc').controls, controlNen.hop.viewIsStale('!Chăm sóc')],
+    [true, undefined, false]);
+  const controlDecision = controlNen.hop.reloadDecisionForView({ sheetName: '!Lead', entry: controlNen.hop.viewLedgerEntry('!Lead'), viewsStaleRevision: controlNen.hop.reloadStateRead().viewsStaleRevision, autoRenderView: false, now: Date.now() });
+  const controlResult = controlNen.hop.renderViewIfDirty('!Lead');
+  check(so, 'cờ ô điều khiển làm lời hỏi chung chọn vẽ dù autoRenderView=false, rồi vẽ đúng sheet đó',
+    [controlDecision.action, controlResult.ok, controlLead.getRange(4, 1).getValue(), controlNen.hop.viewIsStale('!Lead')],
+    ['render', true, 'KH000002', false]);
 
   // Sheet ! mới (thêm sheet) chưa có mục trong sổ vẽ view nên là sheet cũ từ lúc sinh ra: tab phải cam như mọi sheet cũ.
   const moi = controlNen.book.insertSheet('!Mới');
@@ -315,14 +333,5 @@ function chay(so) {
   check(so, 'onChange thêm sheet tô cam sheet ! mới, không chạm sheet ! đã vẽ',
     [moi.getTabColor(), controlLead.getTabColor()], [controlNen.hop.SETTINGS.VIEW_STALE_TAB_COLOR, null]);
 }
-
-const TEP_RENDER = TEP_NEN.concat([
-  'server/view/FilterMessages.js',
-  'server/view/FilterParser.js',
-  'server/view/SortSpec.js',
-  'server/view/ViewSheetSetup.js',
-  'server/view/ViewSheetRenderer.js',
-  'server/Triggers.js'
-]);
 
 module.exports = { chay };

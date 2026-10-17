@@ -12,7 +12,6 @@ function taoHop() {
   const nen = dungHop({ sheets: ['Customer', 'Activity', 'Category', 'Config', 'Log'] });
   ghiO(nen, 'Customer', 4, '@CUS_MA_KH', 'KH000001');
   nen.hop.shinViewSheetNames = () => ['!Lead'];
-  nen.hop.renderAllManagedViewsIfAllowed = () => ({ ok: true, rendered: 0 });
   return nen;
 }
 

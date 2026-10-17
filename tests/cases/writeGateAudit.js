@@ -22,7 +22,6 @@ const RUNTIME_WRITERS = {
   'server/sheet/SheetHeader.js': 'infrastructure/header',
   'server/sheet/SetupSheets.js': 'infrastructure/setup',
   'server/sheet/SyncColumnSetup.js': 'sync/schema',
-  'server/view/ViewSheetRenderer.js': 'view/renderer',
   'server/view/ViewSheetSetup.js': 'view/setup',
   'server/view/ViewTabTint.js': 'view/tab-tint'
 };
@@ -39,7 +38,6 @@ const READ_COPY_RELATION = {
   'server/sheet/SheetHeader.js': 'drop',
   'server/sheet/SetupSheets.js': 'format',
   'server/sheet/SyncColumnSetup.js': 'format',
-  'server/view/ViewSheetRenderer.js': 'none',
   'server/view/ViewSheetSetup.js': 'none',
   'server/view/ViewTabTint.js': 'none'
 };

@@ -19,8 +19,8 @@ function chay(so) {
     source: 'edit', entity: 'customer', surface: 'record', recordIds: [' KH1 ', 'KH1', 'KH2']
   });
   check(so, 'sửa tay Customer gom mã, nạp ngay không chờ, làm mọi view cũ nhưng không vẽ',
-    [edit.kind, edit.signal.records, edit.signal.recordEntity, edit.signal.allViews, edit.ram.action, edit.ram.mode, 'waitMs' in edit.ram, edit.views.action, edit.notifySidebar],
-    ['records', ['KH1', 'KH2'], 'customer', true, 'reload', 'records', false, 'none', true]);
+    [edit.kind, edit.signal.records, edit.signal.recordEntity, edit.signal.allViews, edit.ram.action, edit.ram.mode, 'waitMs' in edit.ram, edit.signal.viewSheets, edit.notifySidebar],
+    ['records', ['KH1', 'KH2'], 'customer', true, 'reload', 'records', false, [], true]);
 
   const draft = hop.reloadDecisionForChange({
     source: 'edit', entity: 'customer', surface: 'record', recordIds: ['KH1', 'KH2'],
@@ -34,13 +34,13 @@ function chay(so) {
     source: 'user', entity: 'activity', surface: 'record', recordIds: ['GD1'], appliedByCaller: true
   });
   check(so, 'Sidebar đã áp dụng bản ghi đọc lại thì không reload RAM lần hai nhưng vẫn phát signal làm view cũ',
-    [applied.ram.action, applied.signal.records, applied.signal.allViews, applied.views.action],
-    ['none', ['GD1'], true, 'none']);
+    [applied.ram.action, applied.signal.records, applied.signal.allViews],
+    ['none', ['GD1'], true]);
 
   const category = hop.reloadDecisionForChange({ entity: 'category', surface: 'category' });
   check(so, 'Category bật scope riêng và làm mọi view cũ, không vẽ',
-    [category.kind, category.ram.mode, category.signal.category, category.signal.allViews, category.views.action],
-    ['category', 'category', true, true, 'none']);
+    [category.kind, category.ram.mode, category.signal.category, category.signal.allViews, category.signal.viewSheets],
+    ['category', 'category', true, true, []]);
 
   section('ReloadDecision — kế hoạch nạp từ sổ nhật ký, theo revision riêng của từng Sidebar');
 
@@ -72,13 +72,8 @@ function chay(so) {
 
   const config = hop.reloadDecisionForChange({ entity: 'config', surface: 'config' });
   check(so, 'Config dùng scope riêng và làm mọi view cũ, không vẽ',
-    [config.kind, config.ram.mode, config.signal.config, config.signal.allViews, config.views.action],
-    ['config', 'config', true, true, 'none']);
-
-  const configSort = hop.reloadDecisionForChange({ entity: 'config', surface: 'config', configSort: true });
-  check(so, 'sửa sắp xếp chung trong Config vẽ mọi sheet quản trị ngay',
-    [configSort.ram.mode, configSort.signal.config, configSort.signal.allViews, configSort.views.action, configSort.views.mode],
-    ['config', true, true, 'render', 'all']);
+    [config.kind, config.ram.mode, config.signal.config, config.signal.allViews, config.signal.viewSheets, 'views' in config],
+    ['config', 'config', true, true, [], false]);
 
   const configCore = hop.reloadDecisionForChange({ entity: 'config', surface: 'config', configAffectsSchema: true });
   check(so, 'Config được nâng full core khi GAS xác định ảnh hưởng Schema',
@@ -87,18 +82,18 @@ function chay(so) {
 
   const schema = hop.reloadDecisionForChange({ surface: 'schema', schema: true });
   check(so, 'Schema luôn bật full core và toàn bộ view',
-    [schema.kind, schema.ram.mode, schema.signal.schema, schema.signal.allCore, schema.signal.allViews, schema.views.action],
-    ['schema', 'fullCore', true, true, true, 'none']);
+    [schema.kind, schema.ram.mode, schema.signal.schema, schema.signal.allCore, schema.signal.allViews],
+    ['schema', 'fullCore', true, true, true]);
 
   const viewControl = hop.reloadDecisionForChange({ surface: 'view-control', sheetName: '!Lead' });
-  check(so, 'hàng điều khiển view vẽ đúng sheet bị sửa, không phát signal làm sheet khác cũ',
-    [viewControl.kind, viewControl.ram.action, viewControl.signal.allViews, viewControl.views.action, viewControl.views.mode, viewControl.views.sheetName],
-    ['view-control', 'none', false, 'render', 'sheet', '!Lead']);
+  check(so, 'ô điều khiển view chỉ gắn cờ đúng sheet bị sửa, không vẽ, không phát signal làm sheet khác cũ',
+    [viewControl.kind, viewControl.ram.action, viewControl.signal.allViews, viewControl.signal.viewSheets],
+    ['view-control', 'none', false, ['!Lead']]);
 
   const viewData = hop.reloadDecisionForChange({ surface: 'view-data', entity: 'customer', recordIds: ['KH1'] });
   check(so, 'dữ liệu sinh ở sheet quản trị không làm bẩn RAM hoặc view',
-    [viewData.kind, viewData.signal.records, viewData.signal.allViews, viewData.views.action],
-    ['none', [], false, 'none']);
+    [viewData.kind, viewData.signal.records, viewData.signal.allViews, viewData.signal.viewSheets],
+    ['none', [], false, []]);
 
   const okAt8 = { data: 8, ok: true };
   check(so, 'view đang xem: cũ + núm bật → render; cũ + núm tắt → notify; mới → none; chưa từng vẽ → cũ; sheet không ! → none',
@@ -110,7 +105,8 @@ function chay(so) {
       hop.reloadDecisionForView({ sheetName: 'Customer', viewsStaleRevision: 9 }).action
     ],
     ['render', 'notify', 'none', true, 'none']);
-  const failedAt9 = { data: 9, ok: false, error: 'lỗi lọc', at: 1000 };
+  const blocks = [{ title: 'Điều kiện lọc sai (hàng 3)', lines: ['Ô B3 (@CUS_TEN_CTY): lỗi lọc'], hint: '' }];
+  const failedAt9 = { data: 9, ok: false, problems: blocks, at: 1000 };
   const retryMs = hop.SETTINGS.VIEW_FAILED_RETRY_MS;
   check(so, 'lượt vẽ hỏng ở đúng dữ liệu này: chỉ báo, không xin vẽ lại dù núm bật; dữ liệu đổi hoặc quá hạn thử lại thì xin vẽ',
     [
@@ -118,7 +114,14 @@ function chay(so) {
       hop.reloadDecisionForView({ sheetName: '!Lead', viewsStaleRevision: 10, entry: failedAt9, autoRenderView: true, now: 1001 }).action,
       hop.reloadDecisionForView({ sheetName: '!Lead', viewsStaleRevision: 9, entry: failedAt9, autoRenderView: true, now: 1000 + retryMs }).action
     ],
-    [{ sheetName: '!Lead', stale: true, action: 'notify' }, 'render', 'render']);
+    [{ sheetName: '!Lead', stale: true, action: 'notify', problems: blocks }, 'render', 'render']);
+  check(so, 'cờ ô điều khiển buộc vẽ cả khi núm tắt hoặc lượt trước vừa hỏng; sheet mới thì không trả khối lỗi',
+    [
+      hop.reloadDecisionForView({ sheetName: '!Lead', viewsStaleRevision: 9, entry: { data: 9, ok: true, controls: true }, autoRenderView: false }).action,
+      hop.reloadDecisionForView({ sheetName: '!Lead', viewsStaleRevision: 9, entry: Object.assign({ controls: true }, failedAt9), autoRenderView: true, now: 1001 }).action,
+      hop.reloadDecisionForView({ sheetName: '!Lead', viewsStaleRevision: 9, entry: { data: 9, ok: true }, autoRenderView: true }).problems
+    ],
+    ['render', 'render', []]);
 }
 
 module.exports = { chay };

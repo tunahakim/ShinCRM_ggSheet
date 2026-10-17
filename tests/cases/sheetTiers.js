@@ -98,7 +98,6 @@ function chay(so) {
     ghiO(xd, 'Customer', 4, '@CUS_SDT', '0901000001');
     ghiO(xd, 'Customer', 4, '@CUS_NGAY_DONG_THAU', new Date(2026, 9, 17));
     xd.hop.shinViewSheetNames = () => [];
-    xd.hop.renderAllManagedViews = () => ({ ok: true });
     xd.hop.renderViewSheet = () => ({ ok: true });
   } catch (err) { return ghiLoiNap(so, 'dựng hộp cát kiểm xung đột', err); }
   const h = xd.hop;
