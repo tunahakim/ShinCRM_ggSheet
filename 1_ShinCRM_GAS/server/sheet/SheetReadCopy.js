@@ -1,18 +1,14 @@
 /**
- * Bản đọc chung của bốn sheet kho cho một lần gọi GAS: hàng mã, số dòng, đối tượng sheet, múi giờ, các dòng đã đọc và cột đã đọc riêng. Tài liệu 06 Phần 2 "Bản đọc Sheet của một lần gọi".
+ * Đọc ô thô và tờ nháp của một lần gọi GAS (tầng 1 đọc/ghi Sheet, tài liệu 06 Phần 2): hàng mã, số dòng, đối tượng sheet, múi giờ, các dòng đã đọc và cột đã đọc riêng.
  *
- * Sống cùng bản đọc kho DocumentProperties: chỉ có khi `documentStoreActive()`; vừa cầm khóa (`documentStoreRefresh`) thì bỏ phần của các sheet, hết lần gọi (`documentStoreClear`) thì bỏ hết. Ngoài lần gọi mọi hàm đọc thẳng Sheet như trước.
- * Sheet không phải sheet kho (sheet `!`, `Log`, sheet nháp) không được nhớ: người dùng sửa tay chúng tự do và không có người giữ khóa nào ghi thay họ.
- * Cạm bẫy: writer chạm sheet kho mà không gọi `sheetReadCopyDrop` thì phần còn lại của lần gọi đọc hàng mã cột hoặc số dòng cũ; test kiểm kê writer chặn việc này.
- * Hàm trả mảng thì trả bản sao, để bên gọi sửa mảng không làm bẩn bản đọc.
+ * Tờ nháp sống cùng bản đọc kho DocumentProperties: chỉ có khi `documentStoreActive()`; vừa cầm khóa (`documentStoreRefresh`) thì bỏ phần của các sheet, hết lần gọi (`documentStoreClear`) thì bỏ hết. Ngoài lần gọi mọi hàm đọc thẳng Sheet. Sheet nào được nhớ do `sheetPolicy` quyết.
+ * Công cụ ghi ô (`SheetCellWrite`) tự quên vùng vừa ghi và đánh dấu chờ `flush`; lần đọc Sheet kế tiếp `flush` trước, để Apps Script không trả về giá trị cũ của lệnh ghi còn gộp chờ.
+ * Cạm bẫy: lệnh ghi còn gọi thẳng Google (chưa qua `SheetCellWrite`) chạm sheet được nhớ mà không gọi `sheetReadCopyDrop` thì phần còn lại của lần gọi đọc giá trị cũ; test kiểm kê writer chặn việc này.
+ * Hàm trả mảng thì trả bản sao, để bên gọi sửa mảng không làm bẩn tờ nháp.
  */
-var SHEET_READ_COPY = { timezone: null, sheets: {} };
+var SHEET_READ_COPY = { timezone: null, sheets: {}, pendingFlush: false };
 
-/** Bốn sheet kho là các sheet có khai hình dáng mà không phải sheet ghi nhật ký. */
-function sheetReadCopyHolds(sheetName) {
-  var layout = SHEET_LAYOUT[sheetName];
-  return !!layout && !layout.plainHeaders;
-}
+function sheetReadCopyHolds(sheetName) { return sheetPolicy(sheetName).remembers; }
 
 function sheetReadCopySlot(sheetName) {
   if (!documentStoreActive() || !sheetReadCopyHolds(sheetName)) { return null; }
@@ -27,7 +23,7 @@ function sheetReadCopySlotOf(sheet) {
 /** Vừa cầm khóa: tiến trình khác có thể vừa ghi sheet kho trong lúc chờ. Múi giờ tệp không do writer nào đổi nên giữ. */
 function sheetReadCopyRefresh() { SHEET_READ_COPY.sheets = {}; }
 
-function sheetReadCopyClear() { SHEET_READ_COPY.timezone = null; SHEET_READ_COPY.sheets = {}; }
+function sheetReadCopyClear() { SHEET_READ_COPY.timezone = null; SHEET_READ_COPY.sheets = {}; SHEET_READ_COPY.pendingFlush = false; }
 
 /** Writer vừa chạm sheet kho (ngoài cửa ghi) gọi để lần đọc sau lấy lại từ Sheet. */
 function sheetReadCopyDrop(sheetName) { delete SHEET_READ_COPY.sheets[sheetName]; }
@@ -41,10 +37,18 @@ function sheetReadSheet(sheetName) {
   return sheet;
 }
 
+/** Mọi lệnh đọc Sheet của tầng 1 gọi ngay trước khi đọc: còn lệnh ghi chưa ép xuống thì ép một lần. */
+function sheetReadCopyBeforeRead() {
+  if (!SHEET_READ_COPY.pendingFlush) { return; }
+  SHEET_READ_COPY.pendingFlush = false;
+  SpreadsheetApp.flush();
+}
+
 /** Hàng 1 đã cắt khoảng trắng, dài đúng `getLastColumn()`. */
 function sheetReadHeader(sheet) {
   var slot = sheetReadCopySlotOf(sheet);
   if (slot && slot.header) { return slot.header.slice(); }
+  sheetReadCopyBeforeRead();
   var lastColumn = sheet.getLastColumn();
   var header = lastColumn < 1 ? [] : sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(function (cell) {
     return cell === null || cell === undefined ? '' : String(cell).trim();
@@ -57,6 +61,7 @@ function sheetReadHeader(sheet) {
 function sheetReadLastRow(sheet) {
   var slot = sheetReadCopySlotOf(sheet);
   if (slot && slot.lastRow !== undefined) { return slot.lastRow; }
+  sheetReadCopyBeforeRead();
   var lastRow = sheet.getLastRow();
   if (slot) { slot.lastRow = lastRow; }
   return lastRow;
@@ -77,13 +82,7 @@ function sheetReadRows(sheet, rowNumbers) {
     found[row] = true;
     missing.push(row);
   });
-  missing.sort(function (a, b) { return a - b; });
-  var groups = [];
-  missing.forEach(function (row) {
-    var last = groups[groups.length - 1];
-    if (last && row - last[1] <= SETTINGS.SHEET_READ_MERGE_GAP_ROWS) { last[1] = row; } else { groups.push([row, row]); }
-  });
-  groups.forEach(function (group) {
+  sheetRegionsReadGroups(missing, SETTINGS.SHEET_READ_MERGE_GAP_ROWS).forEach(function (group) {
     var block = width ? sheetGridReadBlock(sheet, group[0], group[1] - group[0] + 1, width) : [];
     for (var row = group[0]; row <= group[1]; row++) {
       var values = block[row - group[0]] || sheetReadBlankRow(width);
@@ -121,20 +120,26 @@ function sheetReadColumnValues(sheet, column, firstDataRow) {
     if (values) { return values; }
   }
   if (slot && slot.columns && slot.columns[column]) { return slot.columns[column].slice(); }
+  sheetReadCopyBeforeRead();
   var read = sheet.getRange(firstDataRow, column, count, 1).getValues().map(function (cells) { return cells[0]; });
   if (slot) { (slot.columns || (slot.columns = {}))[column] = read; }
   return read.slice();
 }
 
 /**
- * Chỉ cửa ghi gọi, trong khóa, ngay sau khi ghi và `flush`: quên các dòng vừa ghi và bản nhớ theo cột để lần đọc lại sau đó lấy giá trị thật từ Sheet (và nhớ luôn), các dòng khác giữ nguyên. `lastRow` là dòng cuối mới khi vừa nối thêm dòng.
+ * Chỉ `SheetCellWrite` gọi, ngay sau mỗi lệnh ghi: đánh dấu chờ `flush` và quên `rowCount` dòng từ `firstRow` cùng bản nhớ theo cột, để lần đọc sau lấy giá trị thật từ Sheet (và nhớ luôn); dòng khác giữ nguyên. Đụng hàng 1 thì quên hàng mã. `rowCount` là `null` khi dòng đã dịch chỗ (xóa dòng): bỏ cả phần của sheet.
+ * `grew`: lệnh ghi giá trị có thể nối dài sheet nên nâng dòng cuối đã nhớ; xóa nội dung có thể làm dòng cuối co lại nên quên dòng cuối đã nhớ.
  */
-function sheetReadCopyForgetRows(sheet, rowNumbers, lastRow) {
+function sheetReadCopyForget(sheet, firstRow, rowCount, grew) {
+  SHEET_READ_COPY.pendingFlush = true;
   var slot = sheetReadCopySlotOf(sheet);
   if (!slot) { return; }
-  if (slot.rows) { rowNumbers.forEach(function (row) { delete slot.rows[row]; }); }
+  if (rowCount === null) { sheetReadCopyDrop(sheet.getName()); return; }
+  var lastRow = firstRow + rowCount - 1;
+  if (slot.rows) { for (var row = firstRow; row <= lastRow; row++) { delete slot.rows[row]; } }
   delete slot.columns;
-  if (lastRow !== undefined && slot.lastRow !== undefined && lastRow > slot.lastRow) { slot.lastRow = lastRow; }
+  if (firstRow <= 1) { delete slot.header; }
+  if (!grew) { delete slot.lastRow; } else if (slot.lastRow !== undefined && lastRow > slot.lastRow) { slot.lastRow = lastRow; }
 }
 
 /** Múi giờ tệp Sheet, hỏi một lần cho mỗi lần gọi. */

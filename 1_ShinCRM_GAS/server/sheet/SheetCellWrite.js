@@ -1,0 +1,44 @@
+/**
+ * Ghi ô thô (tầng 1 đọc/ghi Sheet, tài liệu 06 Phần 2): chỉ biết sheet, tọa độ và giá trị; không biết trường, mã hay thực thể. Mọi lệnh Google làm đổi ô đi qua đây để hai việc không ai phải nhớ: chặn ghi sai chỗ theo chính sách loại sheet, và quên đúng vùng vừa ghi trong tờ nháp của lần gọi.
+ * Quên trong `finally`: lệnh ghi ném lỗi giữa chừng vẫn có thể đã ghi một phần, nên phần tờ nháp đó không còn đáng tin.
+ */
+
+/** Ghi ma trận giá trị bắt đầu từ ô (`firstRow`, `firstColumn`), mọi số 1-based. Ma trận rỗng không tốn lệnh nào. */
+function sheetCellsWrite(sheet, firstRow, firstColumn, matrix) {
+  if (!matrix.length || !matrix[0].length) { return; }
+  sheetPolicyAssertWritable(sheet);
+  try {
+    sheet.getRange(firstRow, firstColumn, matrix.length, matrix[0].length).setValues(matrix);
+  } finally {
+    sheetReadCopyForget(sheet, firstRow, matrix.length, true);
+  }
+}
+
+/** Đặt khuôn số cho một vùng. Không đổi giá trị đọc về nên không phải quên tờ nháp. */
+function sheetCellsFormat(sheet, firstRow, firstColumn, rowCount, columnCount, format) {
+  if (rowCount <= 0 || columnCount <= 0) { return; }
+  sheetPolicyAssertWritable(sheet);
+  sheet.getRange(firstRow, firstColumn, rowCount, columnCount).setNumberFormat(format);
+}
+
+/** Xóa nội dung (giữ khuôn) một vùng. Có thể làm dòng cuối co lại nên quên luôn số dòng cuối đã nhớ. */
+function sheetCellsClear(sheet, firstRow, firstColumn, rowCount, columnCount) {
+  if (rowCount <= 0 || columnCount <= 0) { return; }
+  sheetPolicyAssertWritable(sheet);
+  try {
+    sheet.getRange(firstRow, firstColumn, rowCount, columnCount).clearContent();
+  } finally {
+    sheetReadCopyForget(sheet, firstRow, rowCount, false);
+  }
+}
+
+/** Xóa hẳn các dòng theo số dòng, gom dải liền nhau thành một lệnh và xóa từ dưới lên để số dòng chưa xóa không trượt. Dòng dưới dịch lên nên bỏ cả phần tờ nháp của sheet. */
+function sheetRowsDelete(sheet, rowNumbers) {
+  if (!rowNumbers.length) { return; }
+  sheetPolicyAssertWritable(sheet);
+  try {
+    sheetRegionsSpans(rowNumbers).reverse().forEach(function (span) { sheet.deleteRows(span[0], span.length); });
+  } finally {
+    sheetReadCopyForget(sheet, 1, null, false);
+  }
+}

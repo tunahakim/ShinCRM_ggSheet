@@ -103,13 +103,16 @@ function capMaNguoiDungThu(hopCat) {
   hopCat.FbmSync.scriptSettings = function () { const cfg = goc.apply(this, arguments); if (!cfg.userId) { cfg.userId = MA_NGUOI_DUNG_THU; } return cfg; };
 }
 
+/** Tầng 1–2 đọc/ghi Sheet (tài liệu 06 Phần 2): mọi tệp chạm Sheet đi qua chúng. */
+const TEP_TANG_SHEET = ['server/sheet/SheetReadCopy.js', 'server/sheet/SheetPolicy.js', 'server/sheet/SheetCellWrite.js', 'server/sheet/SheetRegions.js', 'server/sheet/SheetLocate.js'];
+
 function napServer(hopCat, ...duongDans) {
-  // Trên GAS mọi tệp chung một không gian tên; cửa kho DocumentProperties và bản đọc Sheet đi cùng nó là phụ thuộc của gần như mọi tệp server nên luôn nạp trước, như bản thật.
+  // Trên GAS mọi tệp chung một không gian tên; cửa kho DocumentProperties và tầng đọc/ghi Sheet là phụ thuộc của gần như mọi tệp server nên luôn nạp trước, như bản thật.
   if (typeof hopCat.documentProps !== 'function' && duongDans.indexOf('server/state/DocumentStore.js') < 0) {
     vm.runInContext(docTep('server/state/DocumentStore.js'), hopCat, { filename: 'server/state/DocumentStore.js' });
   }
-  if (typeof hopCat.sheetReadHeader !== 'function' && duongDans.indexOf('server/sheet/SheetReadCopy.js') < 0) {
-    vm.runInContext(docTep('server/sheet/SheetReadCopy.js'), hopCat, { filename: 'server/sheet/SheetReadCopy.js' });
+  if (typeof hopCat.sheetReadHeader !== 'function') {
+    TEP_TANG_SHEET.filter((tep) => duongDans.indexOf(tep) < 0).forEach((tep) => vm.runInContext(docTep(tep), hopCat, { filename: tep }));
   }
   duongDans.forEach((duongDan) => {
     if (duongDan.indexOf('fbm_sync/') === 0) { capBangChoPhepDongBo(hopCat); }

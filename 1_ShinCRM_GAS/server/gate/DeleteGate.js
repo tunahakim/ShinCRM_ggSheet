@@ -112,7 +112,7 @@ function deleteGateRun(entity, ids, batDau) {
   soft.forEach(function (o) { context.sheet.getRange(o.row, cotStatus).setValue('deleted'); });
 
   // Xóa từ dưới lên, và mấy dòng liền nhau thì gộp thành một lệnh.
-  writeGateRanges(hard.map(function (o) { return o.row; })).reverse().forEach(function (dai) {
+  sheetRegionsSpans(hard.map(function (o) { return o.row; })).reverse().forEach(function (dai) {
     context.sheet.deleteRows(dai[0], dai.length);
   });
   // Bối cảnh đọc lại bên dưới phải thấy số dòng sau khi xóa.
@@ -125,7 +125,7 @@ function deleteGateRun(entity, ids, batDau) {
     // Đọc lại **sau** khi xóa hẳn, và đọc theo mã chứ theo số hàng thì sai: dòng xóa mềm có thể đã xê dịch lên vì một dòng bên trên nó vừa bị xóa hẳn.
     var sauKhiXoa = entityReadContext(entity);
     var rowMoi = writeGateRowById(sauKhiXoa);
-    writeGateRanges(soft.map(function (o) { return rowMoi[o.id]; }).filter(function (row) { return !!row; })).forEach(function (dai) {
+    sheetRegionsSpans(soft.map(function (o) { return rowMoi[o.id]; }).filter(function (row) { return !!row; })).forEach(function (dai) {
       entityReadRange(sauKhiXoa, dai[0], dai.length).rows.forEach(function (row) { doc.rows.push(row); });
     });
   }

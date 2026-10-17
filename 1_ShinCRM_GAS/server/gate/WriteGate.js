@@ -105,24 +105,9 @@ function writeGateCast(value, spec, chayNormalize) {
   return { value: sach };
 }
 
-/**
- * Bảng tra mã bản ghi sang số dòng, đọc cột mã bằng một lệnh. Trả về `{ '<mã>': số dòng }`.
- *
- * Mã trùng trên sheet thì ném lỗi kèm mã bị trùng. Đây là chỗ **phải** ném: hai dòng cùng mã nghĩa là mỗi lần sửa sẽ sửa một dòng và bỏ dòng kia, và người dùng thấy sửa xong rồi mở lại thì giá trị cũ quay về. Không có triệu chứng nào khó tìm hơn thế.
- */
+/** Bảng tra mã bản ghi sang số dòng của thực thể, `{ '<mã>': số dòng }`; mã trùng trên sheet thì ném lỗi (`sheetLocateRowMap`). */
 function writeGateRowById(context) {
-  var ra = {};
-  var values = entityReadIdColumn(context);
-
-  for (var i = 0; i < values.length; i++) {
-    var ma = String(values[i]).trim();
-    if (!ma) { continue; }
-    if (ra[ma]) {
-      throw new Error('Sheet "' + context.sheetName + '" có hai dòng cùng mã "' + ma + '" (dòng ' + ra[ma] + ' và dòng ' + (SHEET_FIRST_DATA_ROW + i) + '). Sửa trên sheet trước khi lưu.');
-    }
-    ra[ma] = SHEET_FIRST_DATA_ROW + i;
-  }
-  return ra;
+  return sheetLocateRowMap(entityReadIdColumn(context), SHEET_FIRST_DATA_ROW, context.sheetName);
 }
 
 /**
@@ -145,26 +130,6 @@ function writeGateUniqueTaken(context, spec, value, dongMinh) {
     if (String(values[i]).trim() === can) { return true; }
   }
   return false;
-}
-
-/**
- * Gom một danh sách số nguyên thành các dải liền nhau. Vào `[0,1,2,5,6,18]`, ra `[[0,1,2],[5,6],[18]]`.
- *
- * Đây là chỗ luật "một lần lưu thường tốn một tới hai lệnh ghi" thành sự thật. Mỗi dải là một `setValues`. Dải **chỉ được chứa cột sắp ghi**: chèn một cột không ghi vào giữa dải là ghi rỗng lên nó, và cột đó có thể là cột công thức của người dùng.
- *
- * Dùng cho cả **số dòng** ở đường đọc lại sau khi ghi, vì luật gom là một: mấy dòng liền nhau thì đọc bằng một lệnh.
- */
-function writeGateRanges(indexes) {
-  var sorted = indexes.slice().sort(function (a, b) { return a - b; });
-  var ra = [];
-
-  sorted.forEach(function (idx) {
-    var cuoi = ra[ra.length - 1];
-    if (cuoi && idx === cuoi[cuoi.length - 1] + 1) { cuoi.push(idx); return; }
-    ra.push([idx]);
-  });
-
-  return ra;
 }
 
 /** Một dòng trong danh sách trường không đạt. Có cả `label` để client không phải tra lại bảng khai chỉ để in một câu lỗi. */
@@ -319,13 +284,13 @@ function writeGateUniqueCheck(plans, names, fields, source, context, invalid) {
  *
  * Vì sao phải làm ở đây chứ không chỉ làm một lần lúc dựng khung: khuôn cột là thứ người dùng đổi được bằng hai cú bấm trên sheet, và đổi rồi thì lượt Lưu sau đó ghi `'0101243150'` vào một ô số — Sheets cắt số 0 đầu, không báo gì, và không có đường nào lấy lại. `verifySheets` phát hiện được chuyện đó nhưng chỉ khi có người chạy nó.
  *
- * **Chỉ cột chữ, và chỉ những ô sắp ghi.** Cột số và cột ngày không đặt lại: ghi số vào ô đang ở khuôn nào cũng không mất chữ số nào, nên đặt lại chỉ để xóa mất khuôn hiển thị người dùng tự chọn cho hàng của họ. Gom dải liền nhau bằng đúng `writeGateRanges` của đường ghi, nên một lượt lưu thường tốn thêm một lệnh.
+ * **Chỉ cột chữ, và chỉ những ô sắp ghi.** Cột số và cột ngày không đặt lại: ghi số vào ô đang ở khuôn nào cũng không mất chữ số nào, nên đặt lại chỉ để xóa mất khuôn hiển thị người dùng tự chọn cho hàng của họ. Gom dải liền nhau bằng đúng `sheetRegionsSpans` của đường ghi, nên một lượt lưu thường tốn thêm một lệnh.
  */
 function writeGateForceTextFormat(context, firstRow, soDong, cotChu) {
   if (!cotChu.length || soDong <= 0) { return; }
 
-  writeGateRanges(cotChu).forEach(function (dai) {
-    context.sheet.getRange(firstRow, dai[0] + 1, soDong, dai.length).setNumberFormat(COLUMN_FORMAT_TEXT);
+  sheetRegionsSpans(cotChu).forEach(function (dai) {
+    sheetCellsFormat(context.sheet, firstRow, dai[0] + 1, soDong, dai.length, COLUMN_FORMAT_TEXT);
   });
 }
 
@@ -360,7 +325,7 @@ function writeGateWriteNew(moi, context, colOf, nameAt, laCotChu) {
   var cols = Object.keys(keys).map(function (ten) { return colOf[ten]; });
   writeGateForceTextFormat(context, firstRow, moi.length, cols.filter(function (at) { return laCotChu[at]; }));
 
-  writeGateRanges(cols).forEach(function (dai) {
+  sheetRegionsSpans(cols).forEach(function (dai) {
     var values = moi.map(function (plan) {
       return dai.map(function (at) {
         var ten = nameAt[at];
@@ -368,7 +333,7 @@ function writeGateWriteNew(moi, context, colOf, nameAt, laCotChu) {
         return laCotChu[at] ? writeGateQuoteText(giaTri) : giaTri;
       });
     });
-    context.sheet.getRange(firstRow, dai[0] + 1, moi.length, dai.length).setValues(values);
+    sheetCellsWrite(context.sheet, firstRow, dai[0] + 1, values);
   });
 
   moi.forEach(function (plan, i) { plan.row = firstRow + i; });
@@ -390,14 +355,14 @@ function writeGateWriteExisting(cu, context, colOf, nameAt, laCotChu) {
   lots.forEach(function (lot) {
     var firstRow = lot.plans[0].row;
     writeGateForceTextFormat(context, firstRow, lot.plans.length, lot.cols.filter(function (at) { return laCotChu[at]; }));
-    writeGateRanges(lot.cols).forEach(function (dai) {
+    sheetRegionsSpans(lot.cols).forEach(function (dai) {
       var values = lot.plans.map(function (plan) {
         return dai.map(function (at) {
           var giaTri = plan.values[nameAt[at]];
           return laCotChu[at] ? writeGateQuoteText(giaTri) : giaTri;
         });
       });
-      context.sheet.getRange(firstRow, dai[0] + 1, lot.plans.length, dai.length).setValues(values);
+      sheetCellsWrite(context.sheet, firstRow, dai[0] + 1, values);
     });
   });
 }
@@ -415,7 +380,7 @@ function writeGateRowSnapshot(plans, context) {
  *
  * Đọc lại chứ không trả về thứ vừa gửi lên. Bên gọi chỉ gửi vài trường, mà `Store.upsertRecord` thay **cả** bản ghi trong bộ nhớ — trả về một bản ghi thiếu trường là xóa trắng phần còn lại của nó trong bộ nhớ. Đọc lại còn trả lời luôn câu "sheet thật sự đang giữ gì", nên bộ nhớ và sheet không thể lệch nhau sau một lượt lưu.
  *
- * Đọc qua bản đọc Sheet chung sau khi đã quên các dòng vừa ghi (`sheetReadCopyForgetRows`), nên dòng đọc lại cũng là bản đọc mới của các dòng đó cho phần còn lại của lần gọi. Dùng chung bộ đổi kiểu với đường nạp, nên giá trị về client đi qua đúng một bộ đổi kiểu — ngày ra chữ, số ra số. Hai bộ đổi kiểu là hai cơ hội lệch nhau.
+ * Đọc qua tờ nháp của lần gọi; công cụ ghi ô đã quên các dòng vừa ghi và ép lệnh ghi xuống trước lần đọc này, nên dòng đọc lại là giá trị thật và cũng thành bản nhớ mới của các dòng đó cho phần còn lại của lần gọi. Dùng chung bộ đổi kiểu với đường nạp, nên giá trị về client đi qua đúng một bộ đổi kiểu — ngày ra chữ, số ra số. Hai bộ đổi kiểu là hai cơ hội lệch nhau.
  */
 function writeGateReadBack(plans, context) {
   var rowNumbers = plans.map(function (plan) { return plan.row; }).sort(function (a, b) { return a - b; });
@@ -426,8 +391,6 @@ function writeGateReadBack(plans, context) {
  * Bốn bước bên trong khóa: đọc bối cảnh, kiểm hết, cấp mã, ghi. Tách khỏi `writeGateSave` để phần lấy và nhả khóa còn đọc được bằng mắt.
  *
  * **Cấp mã đứng sau mọi phép kiểm.** Cấp mã là một lệnh ghi — nó ghi bộ đếm xuống `Config`. Cấp trước rồi kiểm sau nghĩa là một lượt lưu bị chặn vì lỗi gõ vẫn làm bộ đếm nhảy, và luật "hoặc trọn vẹn, hoặc không xảy ra" đã hỏng ngay ở lệnh ghi đầu tiên.
- *
- * `flush` trước khi đọc lại: Apps Script gộp lệnh ghi, và đọc lại một vùng vừa ghi mà chưa ép xuống là đường ngắn nhất tới một phản hồi mang giá trị cũ.
  */
 function writeGateRun(entity, records, source, fields, batDau) {
   var context = entityReadContext(entity);
@@ -483,8 +446,6 @@ function writeGateRun(entity, records, source, fields, batDau) {
 
   writeGateWriteNew(moi, context, colOf, nameAt, laCotChu);
   writeGateWriteExisting(cu, context, colOf, nameAt, laCotChu);
-  SpreadsheetApp.flush();
-  sheetReadCopyForgetRows(context.sheet, plans.map(function (plan) { return plan.row; }), moi.length ? SHEET_FIRST_DATA_ROW + context.rowCount + moi.length - 1 : undefined);
 
   var doc = writeGateReadBack(plans, context);
   var after = {};
@@ -555,9 +516,7 @@ function writeGateSave(yeuCau) {
   writeCommitAssertAvailable();
 
   return documentLockRun(function () {
-    var result;
-    // Lượt ghi trọn vẹn tự sửa bản đọc bằng dòng đọc lại; lỗi giữa chừng có thể đã ghi một phần nên bỏ cả bản đọc của sheet.
-    try { result = writeGateRun(entity, records, source, fields, batDau); } catch (error) { sheetReadCopyDrop(ENTITY_SHEETS[entity]); throw error; }
+    var result = writeGateRun(entity, records, source, fields, batDau);
     if (result && result.ok && result.changedIds && result.changedIds.length) {
       result.reloadDecision = writeCommitAfterSuccess({
         source: source,

@@ -59,6 +59,7 @@ function sheetGridReadBlock(sheet, firstRow, rowCount, columnCount, firstColumn)
   var cols = Math.min(columnCount, sheet.getMaxColumns() - startColumn + 1);
   if (rows <= 0 || cols <= 0) { return []; }
 
+  sheetReadCopyBeforeRead();
   return sheet.getRange(firstRow, startColumn, rows, cols).getValues();
 }
 

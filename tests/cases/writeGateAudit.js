@@ -16,8 +16,8 @@ const GAS_DIR = path.join(__dirname, '..', '..', '1_ShinCRM_GAS');
 const RUNTIME_WRITERS = {
   'server/config/ConfigSheetSetup.js': 'config/setup',
   'server/gate/DeleteGate.js': 'record/delete',
-  'server/gate/WriteGate.js': 'record/write',
   'server/log/LogGate.js': 'infrastructure/log',
+  'server/sheet/SheetCellWrite.js': 'sheet/cell-write',
   'server/sheet/SheetGrid.js': 'helper/grid',
   'server/sheet/SheetHeader.js': 'infrastructure/header',
   'server/sheet/SetupSheets.js': 'infrastructure/setup',
@@ -28,13 +28,13 @@ const RUNTIME_WRITERS = {
 };
 
 /**
- * Quan hệ của mỗi writer với bản đọc Sheet chung (tài liệu 06 Phần 2): `update` = cửa ghi, quên các dòng vừa ghi rồi đọc lại để sửa bản đọc, lỗi giữa chừng thì bỏ cả bản đọc của sheet; `drop` = chạm giá trị, hàng mã hoặc số dòng của sheet kho nên phải bỏ bản đọc; `format` = chỉ đặt khuôn, chữ đậm, cố định hàng trên sheet kho, hàng mã đi qua `SheetHeader.js`; `none` = không chạm sheet kho.
+ * Quan hệ của mỗi writer với bản đọc Sheet chung (tài liệu 06 Phần 2): `forget` = công cụ ghi ô tầng 1, tự quên đúng vùng vừa ghi trong tờ nháp; `drop` = chạm giá trị, hàng mã hoặc số dòng của sheet kho nên phải bỏ bản đọc; `format` = chỉ đặt khuôn, chữ đậm, cố định hàng trên sheet kho, hàng mã đi qua `SheetHeader.js`; `none` = không chạm sheet kho.
  */
 const READ_COPY_RELATION = {
   'server/config/ConfigSheetSetup.js': 'drop',
   'server/gate/DeleteGate.js': 'drop',
-  'server/gate/WriteGate.js': 'update',
   'server/log/LogGate.js': 'none',
+  'server/sheet/SheetCellWrite.js': 'forget',
   'server/sheet/SheetGrid.js': 'format',
   'server/sheet/SheetHeader.js': 'drop',
   'server/sheet/SetupSheets.js': 'format',
@@ -151,12 +151,11 @@ function chay(so) {
   check(so, 'mỗi writer có khai quan hệ với bản đọc Sheet chung', Object.keys(READ_COPY_RELATION).sort(), Object.keys(RUNTIME_WRITERS).sort());
   check(so, 'writer chạm giá trị, hàng mã hoặc số dòng sheet kho đều bỏ bản đọc Sheet chung', Object.keys(READ_COPY_RELATION).filter((file) => READ_COPY_RELATION[file] === 'drop'
     && !/\bsheetReadCopyDrop\s*\(/.test(stripNonCode(fs.readFileSync(path.join(GAS_DIR, file), 'utf8')))), []);
-  check(so, 'chỉ cửa ghi được sửa bản đọc Sheet chung, và nó vừa quên dòng đã ghi vừa bỏ bản đọc khi lỗi', Object.keys(READ_COPY_RELATION).filter((file) => READ_COPY_RELATION[file] === 'update').map((file) => {
-    const source = stripNonCode(fs.readFileSync(path.join(GAS_DIR, file), 'utf8'));
-    return [file, /\bsheetReadCopyForgetRows\s*\(/.test(source), /\bsheetReadCopyDrop\s*\(/.test(source)];
-  }), [['server/gate/WriteGate.js', true, true]]);
-  check(so, 'ngoài cửa ghi không tệp runtime nào gọi sheetReadCopyForgetRows', runtime.filter((file) => file !== 'server/gate/WriteGate.js' && file !== 'server/sheet/SheetReadCopy.js'
-    && /\bsheetReadCopyForgetRows\s*\(/.test(stripNonCode(fs.readFileSync(path.join(GAS_DIR, file), 'utf8')))), []);
+  check(so, 'công cụ ghi ô tầng 1 tự quên vùng vừa ghi', Object.keys(READ_COPY_RELATION).filter((file) => READ_COPY_RELATION[file] === 'forget').map((file) => {
+    return [file, /\bsheetReadCopyForget\s*\(/.test(stripNonCode(fs.readFileSync(path.join(GAS_DIR, file), 'utf8')))];
+  }), [['server/sheet/SheetCellWrite.js', true]]);
+  check(so, 'ngoài công cụ ghi ô không tệp runtime nào gọi sheetReadCopyForget', runtime.filter((file) => file !== 'server/sheet/SheetCellWrite.js' && file !== 'server/sheet/SheetReadCopy.js'
+    && /\bsheetReadCopyForget\w*\s*\(/.test(stripNonCode(fs.readFileSync(path.join(GAS_DIR, file), 'utf8')))), []);
 
   const syncViolations = [];
   files.filter((file) => file.startsWith('fbm_sync/')).forEach((file) => {
