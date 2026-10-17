@@ -343,7 +343,7 @@ async function chay(so) {
   check(so, 'Lượt bị bỏ dở: request đang chờ quá hạn có đúng một dòng request_unanswered mang hộp đen; dòng stale_run chỉ nói lượt bị đóng, không lặp hộp đen', [lostLines.length, String(staleLine.reason).indexOf('Request FBM lost-request (bước customer_grid) không nhận được trả lời từ Extension') === 0, String((abandonLogs.find((entry) => entry.action === 'stale_run') || {}).reason).indexOf('Hộp đen') < 0], [1, true, true]);
   check(so, 'Dòng Log request không có trả lời mang hộp đen Extension: bước cuối, cách đây bao lâu, worker có bị Chrome tắt; không chép trường lạ từ Extension', [
     String(staleLine.reason).indexOf('Hộp đen Extension: bước cuối (cách đây 5 phút) là đã gửi request sang tab FBM, chưa nhận lại kết quả, request lost-request.') >= 0,
-    String(staleLine.reason).indexOf('đã bị Chrome tắt và dựng lại') >= 0, JSON.stringify(staleLine).indexOf('bi-mat-khong-duoc-chep') < 0
+    String(staleLine.reason).indexOf('đã khởi động lại sau bước đó nên lượt bị cắt giữa chừng') >= 0, JSON.stringify(staleLine).indexOf('bi-mat-khong-duoc-chep') < 0
   ], [true, true, true]);
   // Luật chung request không có trả lời: nằm ở cửa ghi state nên mọi loại request đều đi qua, kể cả Giữ phiên không thuộc lượt nào.
   const watchLogs = [];
@@ -370,11 +370,13 @@ async function chay(so) {
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0 });
   check(so, 'Hộp đen Extension: không có hộp đen thì nói rõ, worker chạy liền thì nói không bị tắt', [
     heartbeat.FbmSync.extensionTrailText(null, Date.now()), heartbeat.FbmSync.extensionTrailText({ stage: 'gas_response_sent', at: 1000, workerStartedAt: 50, currentWorkerStartedAt: 50 }, 1000)
-  ], ['Hộp đen Extension: không có (Extension bản cũ hoặc chưa ghi được bước nào).', 'Hộp đen Extension: bước cuối (cách đây 0 phút) là đã gửi kết quả về GAS, chưa nhận trả lời. Phần chạy nền của Extension vẫn chạy liền, không bị Chrome tắt.']);
+  ], ['Hộp đen Extension: không có (Extension bản cũ hoặc chưa ghi được bước nào).', 'Hộp đen Extension: bước cuối (cách đây 0 phút) là đã gửi kết quả về GAS, chưa nhận trả lời. Phần chạy nền của Extension vẫn chạy liền từ bước đó, không khởi động lại.']);
   check(so, 'Hộp đen Extension: Extension đã chạy hết lượt thì không nói bị Chrome tắt dù worker dựng lại sau đó, chỉ ra lỗi phía GAS', heartbeat.FbmSync.extensionTrailText({ stage: 'chain_finished', at: 1000, workerStartedAt: 50, currentWorkerStartedAt: 900 }, 1000),
     'Hộp đen Extension: bước cuối (cách đây 0 phút) là Extension đã chạy hết lượt vì GAS trả lời không còn request tiếp. Lượt còn mở là lỗi phía GAS, không phải Extension bỏ dở.');
   check(so, 'Hộp đen Extension: GAS trả lỗi thì Log nêu mã lỗi Extension nhận được, chỉ giữ ký tự an toàn', heartbeat.FbmSync.extensionTrailText({ stage: 'gas_reply_failed', at: 1000, code: 'RELAY_TIMEOUT<script>' }, 1000),
     'Hộp đen Extension: bước cuối (cách đây 0 phút) là GAS trả lời lỗi hoặc Extension không gọi được GAS, Extension dừng lượt. Mã lỗi: RELAY_TIMEOUTscript.');
+  check(so, 'Hộp đen Extension: lượt dừng lúc tự tải lại tab FBM thì Log nói rõ bước đó, mã lỗi và việc phần chạy nền khởi động lại', heartbeat.FbmSync.extensionTrailText({ stage: 'fbm_tab_reloading', requestId: 'r-1', code: 'FBM_TAB_NOT_READY', at: 1000, workerStartedAt: 50, currentWorkerStartedAt: 900 }, 1000),
+    'Hộp đen Extension: bước cuối (cách đây 0 phút) là tab FBM không phản hồi, Extension đang tự tải lại tab, request r-1. Mã lỗi: FBM_TAB_NOT_READY. Phần chạy nền của Extension đã khởi động lại sau bước đó nên lượt bị cắt giữa chừng (Chrome tắt phần chạy nền hoặc Extension được tải lại).');
   heartbeat.FbmSync.logContextNote({ runId: 'r', origin: 'manual', phase: 'done', scan: 'full', chain: { current: 'heartbeat' } });
   const ctxHeartbeat = heartbeat.FbmSync.logContextText();
   heartbeat.FbmSync.logContextNote({ runId: 'r', origin: 'background', phase: 'pull_customer', scan: 'full', chain: { current: 'heartbeat' } });

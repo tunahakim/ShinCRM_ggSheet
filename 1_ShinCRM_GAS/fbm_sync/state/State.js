@@ -452,6 +452,8 @@ FbmSync.recoverStaleRun = function (state, now, options) {
 /** Tên bước của hộp đen Extension. Bước lạ (Extension bản khác) vẫn được ghi nhưng không dịch, để không đoán bừa. */
 FbmSync.EXTENSION_TRAIL_STAGES = {
   gas_request_received: 'đã nhận request từ GAS, chưa gửi sang tab FBM',
+  fbm_tab_preparing: 'đang chuẩn bị tab FBM (chờ tab tải xong và có bộ chạy request)',
+  fbm_tab_reloading: 'tab FBM không phản hồi, Extension đang tự tải lại tab',
   fbm_tab_sent: 'đã gửi request sang tab FBM, chưa nhận lại kết quả',
   fbm_tab_replied: 'tab FBM đã trả kết quả, chưa gửi về GAS',
   gas_response_sent: 'đã gửi kết quả về GAS, chưa nhận trả lời',
@@ -464,17 +466,20 @@ FbmSync.extensionTrailSafe = function (trail) {
   if (!trail || typeof trail !== 'object') { return null; }
   return { stage: String(trail.stage || '').slice(0, 40), requestId: String(trail.requestId || '').slice(0, 80), hop: Number(trail.hop || 0), at: Number(trail.at || 0), workerStartedAt: Number(trail.workerStartedAt || 0), currentWorkerStartedAt: Number(trail.currentWorkerStartedAt || 0), code: String(trail.code || '').replace(/[^A-Za-z0-9_ .:-]/g, '').slice(0, 60) };
 };
-/** Câu tiếng người cho dòng Log lượt bị bỏ dở: Extension dừng ở bước nào, và phần chạy nền của nó có bị Chrome tắt rồi dựng lại sau bước đó không. */
+/**
+ * Câu tiếng người cho dòng Log request không có trả lời: Extension dừng ở bước nào, và phần chạy nền của nó có khởi động lại sau bước đó không.
+ * Phần chạy nền ngủ rồi khởi động lại giữa hai nhịp là bình thường; chỉ khi bước cuối nằm giữa lượt thì khởi động lại mới nghĩa là lượt bị cắt, và nguyên nhân có thể là Chrome tắt hoặc người dùng tải lại Extension, nên không quy cho một bên.
+ */
 FbmSync.extensionTrailText = function (trail, now) {
   var t = FbmSync.extensionTrailSafe(trail);
   if (!t || !t.stage) { return 'Hộp đen Extension: không có (Extension bản cũ hoặc chưa ghi được bước nào).'; }
   var ago = t.at ? Math.max(0, Math.round((Number(now || Date.now()) - t.at) / 60000)) : -1;
   var text = 'Hộp đen Extension: bước cuối' + (ago >= 0 ? ' (cách đây ' + ago + ' phút)' : '') + ' là ' + (FbmSync.EXTENSION_TRAIL_STAGES[t.stage] || t.stage) + (t.requestId ? ', request ' + t.requestId : '') + '.';
-  // Extension đã chạy hết lượt thì service worker ngủ rồi dựng lại sau đó là bình thường: lượt còn mở là do GAS, nói "bị Chrome tắt" ở đây là đổ lỗi sai chỗ.
   if (t.stage === 'chain_finished') { return text + ' Lượt còn mở là lỗi phía GAS, không phải Extension bỏ dở.'; }
-  if (t.stage === 'gas_reply_failed') { return text + ' Mã lỗi: ' + (t.code || 'không rõ') + '.'; }
+  if (t.code) { text += (t.stage === 'fbm_tab_preparing' ? ' Trạng thái tab lúc tìm thấy: ' : ' Mã lỗi: ') + t.code + '.'; } else if (t.stage === 'gas_reply_failed') { text += ' Mã lỗi: không rõ.'; }
+  if (t.stage === 'gas_reply_failed') { return text; }
   if (t.workerStartedAt && t.currentWorkerStartedAt) {
-    text += t.currentWorkerStartedAt > t.workerStartedAt ? ' Phần chạy nền của Extension đã bị Chrome tắt và dựng lại sau bước đó.' : ' Phần chạy nền của Extension vẫn chạy liền, không bị Chrome tắt.';
+    text += t.currentWorkerStartedAt > t.workerStartedAt ? ' Phần chạy nền của Extension đã khởi động lại sau bước đó nên lượt bị cắt giữa chừng (Chrome tắt phần chạy nền hoặc Extension được tải lại).' : ' Phần chạy nền của Extension vẫn chạy liền từ bước đó, không khởi động lại.';
   }
   return text;
 };
