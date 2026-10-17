@@ -109,6 +109,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │       ├── ReloadJournalProbe.js Probe DEV đếm lệnh DocumentProperties và đo thời gian của tín hiệu nạp lại và từng mức nạp (trước/sau sổ nhật ký).
 │       ├── ConfigReadProbe.js   Probe DEV đếm số lần đọc sheet `Config` và thời gian từng đoạn trong một lượt `loadCore` và `reloadConfig`.
 │       ├── SaveBreakdownProbe.js Probe DEV tách một lần lưu khách từ Sidebar thành từng đoạn (khóa, đọc, kiểm, ghi, đọc lại, ghi nhận thay đổi) để tìm chỗ tốn thời gian.
+│       ├── ViewRenderProbe.js   Probe DEV tách lượt vẽ sheet quản trị và "Làm mới tất cả" (tạm thêm hai sheet `!` thử, xóa và dọn sổ vẽ trong lượt).
 │       ├── SheetReadGapProbe.js Probe DEV đo phí cố định một lệnh đọc Sheet và phí mỗi dòng, ra ngưỡng gộp dòng của bản đọc Sheet; so `loadCore` và một lần sửa ô khi tắt và bật bản đọc.
 │       ├── DevToken.js           Thẻ bí mật của cửa trên. Không vào git, nhưng CÓ đẩy lên Google.
 │       ├── Smoke.js              Phép thử nhanh: mở được tệp Sheet không, đọc được gì.
