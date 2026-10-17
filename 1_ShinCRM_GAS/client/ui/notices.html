@@ -1,0 +1,79 @@
+<script>
+/*
+ * Thông báo của Sidebar: nơi duy nhất giữ các việc người dùng cần biết đang còn (lỗi sheet quản trị đang đứng, Extension không chạy, sheet quản trị chưa cập nhật), dòng báo ở đáy và màn thông báo dùng chung.
+ * Nguồn nào cũng chỉ gọi `noticeSet(key, notice)`; thứ tự, chữ ở dòng đáy và lúc thân Sidebar chuyển sang màn thông báo đều quyết ở đây. Dòng đáy nhường chỗ cho dải hoàn tác trong lúc đếm ngược và ẩn khi màn đồng bộ FBM giữ khung.
+ * `notice`: `{ line, blocks, button, takeover }` — `line` là chữ ở dòng đáy; `blocks` là các khối của màn thông báo (xem `client/schema/status/notices.html`); `button` (`{ label, action }`) là nút ở dòng đáy; `takeover` là việc thay hẳn thân Sidebar ngay khi xuất hiện.
+ */
+
+var NOTICE_HOST_ID = 'shin-notice';
+var NOTICE_TEXT_ID = 'shin-notice-text';
+var NOTICE_BUTTON_ID = 'shin-notice-btn';
+var NOTICE_UNDO_ID = 'shin-undo';
+var NOTICE_SCREEN_ROOT_ID = 'shin-notice-screen';
+
+/** Số nhỏ đứng trước ở dòng đáy và trên màn thông báo. Khóa ngoài bảng này là lỗi lập trình. */
+var NOTICE_PRIORITY = { viewProblems: 1, extension: 2, viewStale: 3 };
+
+var NOTICES = {};
+
+function noticeList() {
+  return Object.keys(NOTICES).sort(function (a, b) { return NOTICE_PRIORITY[a] - NOTICE_PRIORITY[b]; }).map(function (key) { return NOTICES[key]; });
+}
+
+/** Đặt hoặc bỏ (`null`) một việc. Màn thông báo đang hiện thì vẽ lại theo danh sách mới; việc thay thân vừa hết thì trả lại màn xem khách. */
+function noticeSet(key, notice) {
+  if (!NOTICE_PRIORITY[key]) { throw new Error('Loại thông báo "' + key + '" không có trong NOTICE_PRIORITY.'); }
+  var previous = NOTICES[key] || null;
+  if (!previous && !notice) { return null; }
+  if (notice) { NOTICES[key] = notice; } else { delete NOTICES[key]; }
+  noticePaint();
+
+  if (notice && notice.takeover) { return noticeScreenOpen(); }
+  if (!noticeScreenShowing()) { return null; }
+  if (!noticeList().length || (previous && previous.takeover && !notice)) { return noticeScreenClose(); }
+  return noticeScreenOpen();
+}
+
+/** Khung đang bận việc khác thì không hiện gì của tệp này: màn FBM giữ khung, hoặc dải hoàn tác đang đếm ngược. */
+function noticeShellBusy() {
+  if (typeof FBM_SYNC_CLIENT !== 'undefined' && FBM_SYNC_CLIENT && FBM_SYNC_CLIENT.active === true) { return true; }
+  var undo = typeof document !== 'undefined' && document.getElementById ? document.getElementById(NOTICE_UNDO_ID) : null;
+  return !!undo && undo.hidden === false;
+}
+
+/** Dòng đáy: việc ưu tiên cao nhất kèm số việc còn lại; bấm vào mở hoặc đóng màn thông báo. */
+function noticePaint() {
+  if (typeof document === 'undefined' || !document.getElementById) { return; }
+  var host = document.getElementById(NOTICE_HOST_ID);
+  var text = document.getElementById(NOTICE_TEXT_ID);
+  var button = document.getElementById(NOTICE_BUTTON_ID);
+  if (!host || !text || !button) { return; }
+  var list = noticeList();
+  host.hidden = !list.length || noticeShellBusy();
+  if (!list.length) { return; }
+  var top = list[0];
+  text.textContent = top.line + (list.length > 1 ? ' · +' + (list.length - 1) : '');
+  button.hidden = !top.button;
+  if (top.button) {
+    button.textContent = top.button.label;
+    button.setAttribute('data-action', top.button.action);
+  }
+}
+
+function noticeScreenShowing() {
+  return typeof document !== 'undefined' && !!document.getElementById && !!document.getElementById(NOTICE_SCREEN_ROOT_ID);
+}
+
+/** Chỉ thay thân khi đang ở màn xem khách: thay lúc đang mở form là mất chữ người dùng đang gõ. */
+function noticeScreenOpen() {
+  var list = noticeList();
+  if (!list.length || noticeShellBusy()) { return null; }
+  if (typeof ScreenState !== 'undefined' && ScreenState.screen !== SCREEN_VIEW) { return null; }
+  var blocks = list.reduce(function (all, notice) { return all.concat(notice.blocks || []); }, []);
+  return statusNotices(list[0].line, blocks, screenBuild(UI_SCHEMA.view, 'view').header);
+}
+
+function noticeScreenClose() {
+  return typeof ScreenState !== 'undefined' && ScreenState.screen === SCREEN_VIEW ? screenViewRender() : null;
+}
+</script>

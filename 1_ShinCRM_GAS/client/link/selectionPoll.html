@@ -7,11 +7,16 @@
  */
 
 var SELECTION_POLL_STABLE_LIMIT = 3;
-var SELECTION_POLL_BANNER_ID = 'shin-extension-warning';
 var SELECTION_POLL_BANNER_TEXT = {
   missing: 'Thiếu Extension — sidebar tự dò, chậm hơn',
   readerDown: 'Extension không đọc được dữ liệu Sheet — sidebar hỏi máy chủ, chậm hơn',
   channelDead: 'Mất kênh báo thay đổi của Sheet — sidebar tự kiểm tra định kỳ, chậm hơn'
+};
+/** Phần chi tiết của khối trên màn thông báo, theo cùng khóa với `SELECTION_POLL_BANNER_TEXT`. */
+var SELECTION_POLL_NOTICE_DETAIL = {
+  missing: 'Không thấy ShinCRM Extension nên Sidebar tự hỏi máy chủ theo nhịp: bám ô và cập nhật sau khi sửa Sheet đều chậm hơn. Bật hoặc cài lại Extension rồi tải lại trang Sheet.',
+  readerDown: 'Extension vẫn chạy nhưng không đọc được ô trên Sheet, nên Sidebar hỏi máy chủ thay: bám ô chậm hơn. Tải lại trang Sheet để thử lại.',
+  channelDead: 'Sidebar không còn nghe được tín hiệu Sheet thay đổi nên tự kiểm tra định kỳ: dữ liệu sửa trên Sheet hiện lên Sidebar chậm hơn. Tải lại trang Sheet để nối lại.'
 };
 var SELECTION_POLL = {
   installed: false,
@@ -19,6 +24,7 @@ var SELECTION_POLL = {
   bootAt: 0,
   timer: null,
   inFlight: false,
+  noticeReason: '',
   safetyTimer: null,
   lastPosition: '',
   stableCount: 0,
@@ -167,12 +173,8 @@ function selectionPollPaint() {
   var channelDead = !missing && !readerDown && typeof changeSignalChannelDead === 'function' && changeSignalChannelDead();
   var on = typeof Prefs !== 'undefined' && Prefs && Prefs.followSelection === true;
   var bolt = document.querySelector ? document.querySelector('[data-action="toggleFollowSelection"]') : null;
-  var banner = document.getElementById ? document.getElementById(SELECTION_POLL_BANNER_ID) : null;
 
-  if (banner) {
-    banner.hidden = !(missing || readerDown || channelDead);
-    banner.textContent = SELECTION_POLL_BANNER_TEXT[readerDown ? 'readerDown' : (channelDead ? 'channelDead' : 'missing')];
-  }
+  selectionPollNotice(readerDown ? 'readerDown' : channelDead ? 'channelDead' : missing ? 'missing' : '');
   if (!bolt) { return; }
 
   bolt.classList.toggle('shin-extension-missing', missing || readerDown);
@@ -186,6 +188,16 @@ function selectionPollPaint() {
   if (readerDown) { tooltip = on ? SELECTION_POLL_BANNER_TEXT.readerDown : 'Không bám ô, và Extension không đọc được dữ liệu Sheet'; }
   bolt.setAttribute('title', tooltip);
   bolt.setAttribute('aria-label', tooltip);
+}
+
+/** Chỉ báo khi lý do đổi: hàm vẽ chạy sau mỗi lượt vẽ màn, còn màn thông báo đang hiện thì tự vẽ lại khi danh sách đổi, báo mỗi lần là vòng lặp. */
+function selectionPollNotice(reason) {
+  if (reason === SELECTION_POLL.noticeReason || typeof noticeSet !== 'function') { return; }
+  SELECTION_POLL.noticeReason = reason;
+  noticeSet('extension', reason ? {
+    line: SELECTION_POLL_BANNER_TEXT[reason],
+    blocks: [{ variant: 'warning', title: SELECTION_POLL_BANNER_TEXT[reason], lines: [SELECTION_POLL_NOTICE_DETAIL[reason]] }]
+  } : null);
 }
 
 /** Gọi từ nhịp bắt tay: đây là đồng hồ phát hiện ACK hết hạn, hoàn toàn không nhìn `CRM_CONTEXT`. */

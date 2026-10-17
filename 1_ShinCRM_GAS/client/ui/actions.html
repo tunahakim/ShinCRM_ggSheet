@@ -126,6 +126,13 @@ ACTIONS.renderActiveViewSheet = function () {
   }, { block: true });
 };
 
+/** Bấm dòng báo ở đáy: đang xem màn thông báo thì trả màn xem khách, ngược lại mở màn thông báo. */
+ACTIONS.toggleNotices = function () {
+  if (noticeScreenShowing()) { return noticeScreenClose(); }
+  screenStateGoView();
+  return noticeScreenOpen();
+};
+
 /** Nạp lại từ đầu. Đóng hết form trước khi gọi, vì `sidebarBoot` dọn sạch `Store` và một form đang mở sẽ trỏ vào bản ghi vừa bị bỏ. */
 ACTIONS.reloadAll = function () {
   screenStateGoView();

@@ -20,27 +20,39 @@ function statusRender(name, model) {
   return renderScreen(STATUS_SCHEMA[name](model || {}), { records: {} });
 }
 
-function statusBudgetModel(budget) {
-  return {
-    total: statusNumber(budget.total),
-    ceiling: statusNumber(budget.ceiling),
-    sheets: (budget.sheets || []).map(function (sheet) {
-      return {
-        name: sheet.name,
-        rows: statusNumber(sheet.rows),
-        columns: statusNumber(sheet.columns),
-        cells: statusNumber(sheet.cells)
-      };
-    })
-  };
+function statusBudgetTable(budget) {
+  return (budget.sheets || []).map(function (sheet) {
+    return { name: sheet.name, rows: statusNumber(sheet.rows), columns: statusNumber(sheet.columns), cells: statusNumber(sheet.cells) };
+  });
+}
+
+/** Vẽ màn thông báo dùng chung. `header` là hàng icon của màn đang dùng, để người dùng vẫn tìm khách hay làm mới được trong lúc đọc thông báo; bỏ trống thì màn không có hàng icon. */
+function statusNotices(infoText, blocks, header) {
+  return statusRender('notices', { infoText: infoText, blocks: blocks || [], header: header || null });
 }
 
 function statusBudgetBlocked(budget) {
-  return statusRender('budgetBlocked', statusBudgetModel(budget));
+  return statusNotices('Đang chặn — chưa nạp dữ liệu', [{
+    variant: 'warning',
+    title: 'Tệp đã vượt trần ngân sách ô',
+    lines: [
+      'Tệp đang có ' + statusNumber(budget.total) + ' ô lưới, trần đang đặt là ' + statusNumber(budget.ceiling) + ' ô.',
+      'ShinCRM dừng ở đây và không đọc một ô dữ liệu nào, vì chạy tiếp trên một tệp quá nặng thì mọi thao tác đều có thể hết thời gian giữa đường.',
+      'Trần tính bằng tổng số ô lưới của mọi sheet, kể cả ô rỗng. Vì vậy nguyên nhân thường gặp nhất không phải nhiều dữ liệu, mà là một sheet còn nguyên hàng và cột trống thừa.'
+    ],
+    table: statusBudgetTable(budget),
+    hint: 'Việc cần làm: mở sheet đứng đầu bảng, xóa hẳn các hàng và cột trống ở cuối lưới (chọn hàng, bấm phải, Xóa hàng — không phải xóa nội dung), rồi mở lại bảng làm việc. Muốn nới trần thì sửa tham số CELL_BUDGET ở sheet Config.'
+  }]);
 }
 
 function statusLoadError(message) {
-  return statusRender('loadError', { message: message });
+  return statusNotices('Nạp thất bại', [{
+    variant: 'error',
+    title: 'Không nạp được dữ liệu',
+    lines: [message],
+    button: { label: 'Thử lại', action: 'reloadAll', busy: 'Đang thử lại…' },
+    hint: 'Lượt chạy này đã ghi một dòng vào sheet Log kèm vết gọi. Bấm Thử lại, hoặc đóng rồi mở lại bảng làm việc nếu bấm mấy lần vẫn vỡ.'
+  }]);
 }
 
 /** Một dòng ngắn trong khối thông tin chung, dùng để báo tiến độ nạp nền. */

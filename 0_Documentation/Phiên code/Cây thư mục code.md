@@ -165,8 +165,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── screens\activityForm.html Schema riêng của màn thêm/sửa giao dịch.
 │   │   ├── screens\noteForm.html Schema riêng của màn ghi chú khách.
 │   │   ├── status\common.html    Primitive schema và slot thông tin cho các màn trạng thái.
-│   │   ├── status\budgetBlocked.html Schema màn chặn vì vượt trần ngân sách ô.
-│   │   ├── status\loadError.html Schema màn lỗi nạp dữ liệu.
+│   │   ├── status\notices.html   Schema màn thông báo dùng chung: mỗi việc một khối có tiêu đề và chi tiết (lỗi vẽ sheet quản trị, mất Extension, vượt ngân sách ô, nạp thất bại).
 │   │   ├── status\loadSummary.html Schema màn tóm tắt lượt nạp.
 │   │   ├── sync\screens\           Registry và schema riêng cho bốn màn hình FBM: run, account, results, settings.
 │   │   │   ├── run.html             Schema màn Chạy đồng bộ.
@@ -198,6 +197,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── actions.html          Mười lăm hành động của cả hệ thống, tra theo tên. Không chạm DOM và không gọi máy chủ trực tiếp, nên mười lăm thân hàm kiểm được offline. Việc chặng sau thì ném lỗi có tên chứ không để thân rỗng.
 │   │   ├── dispatch.html         Một tai nghe click duy nhất đặt ở khung. Chỗ DUY NHẤT đọc data-* thành payload, đặt con trỏ theo focusId, và đưa lỗi vào alert — nhờ vậy actions.html không chạm DOM.
 │   │   ├── fieldInvalid.html     Hiện kết quả kiểm ô của GAS: tô đỏ ô sai, bỏ dấu khi gõ lại, gộp câu báo. Dùng chung cho form bản ghi và các card cấu hình FBM; tự nó không kiểm gì.
+│   │   ├── notices.html          Nơi duy nhất giữ các việc người dùng cần biết, dòng báo ở đáy và lúc thân Sidebar chuyển sang màn thông báo.
 │   │   ├── unsavedChanges.html   Cổng dirty dùng chung: giữ action chờ, modal ba lựa chọn, highlight trường thay đổi và cảnh báo mặc định khi đóng tab.
 │   │   ├── menu.html             Lớp menu nổi dựng từ dấu data-menu của engine. Dấu tích và chấm tròn đọc ở Prefs. Mục con vẫn mang data-action, nên menu không mở thêm đường gọi hàm nào.
 │   │   ├── collapse.html         Đo xem khối có tràn trần chiều cao hay không rồi mới quyết có nút Xem thêm — phép đo mà bản khai không nói được vì nó phụ thuộc nội dung thật.
@@ -206,7 +206,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── choiceMenu.html       Control menu chọn ít mục: trigger là button, popup dùng chung và không chọn/bôi đen chữ như combo nhập liệu.
 │   │   └── inputs.html           Hai nếp gõ chung của mọi form: Enter nhảy sang ô kế tiếp và dừng ở nút Lưu, và dán một khối nhiều dòng thành nhiều ô rồi nhuộm vàng chỗ máy tự điền.
 │   ├── screen\                   Một tệp một màn người dùng nhìn thấy. Màn được mang theo style riêng, vì style đó chết cùng màn đó.
-│   │   ├── statusScreen.html     Điều phối dữ liệu cho ba màn trạng thái; không ghép HTML và không chạm DOM.
+│   │   ├── statusScreen.html     Điều phối dữ liệu cho màn tóm tắt nạp và màn thông báo dùng chung; không ghép HTML và không chạm DOM.
 │   │   ├── viewScreen.html       Màn xem khách — màn mặc định. Biết KHI NÀO vẽ lại cái gì, không biết vẽ ra sao. Chỗ duy nhất nối ScreenState.currentCustomerId với Store.
 │   │   └── formScreen.html       Ba màn form dùng chung một trình tự: mở sửa, mở thêm mới, mở lồng, đóng từng lớp. Suy tiêu đề rồi chèn vào vùng header, và tính id ô nhập đầu tiên cho bên đặt con trỏ.
 │   ├── save\                     Đường ghi và đường xóa phía client. Tách khỏi ui\ vì đây là ba tệp duy nhất biết hình dạng câu trả lời của hai cửa máy chủ.

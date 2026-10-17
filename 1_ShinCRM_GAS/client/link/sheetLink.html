@@ -30,9 +30,6 @@ var SHEET_LINK_LAST_CONTEXT = null;
 var SHEET_LINK_RAM_READY = true;
 var SHEET_LINK_APPLY_TICKET = 0;
 var SHEET_LINK_VIEW_STATES = {};
-// Sheet `!` đang hiện dòng báo "View chưa cập nhật"; rỗng là không báo. Chỉ `sheetLinkSetViewNotice` được đổi.
-var SHEET_LINK_VIEW_NOTICE_SHEET = '';
-var SHEET_LINK_VIEW_NOTICE_ID = 'shin-view-stale';
 var SHEET_LINK_DATA_PENDING = null;
 var SHEET_LINK_RELOAD_CHECKING = null;
 var SHEET_LINK_WAKE_TIMER = null;
@@ -266,52 +263,52 @@ function sheetLinkOnMessage(event) {
 
 function sheetLinkViewState(sheetName) {
   if (!SHEET_LINK_VIEW_STATES[sheetName]) {
-    SHEET_LINK_VIEW_STATES[sheetName] = { revision: 0, metaReady: false, filterColumns: [], sortColumns: [], watch: null, needsSync: false, pending: null, inspecting: null, renderRequestedRevision: 0 };
+    SHEET_LINK_VIEW_STATES[sheetName] = { pending: null, renderRequestedRevision: 0 };
   }
   return SHEET_LINK_VIEW_STATES[sheetName];
 }
 
-function sheetLinkViewControlCell(state, row, col) {
-  if (row === 1) { return true; }
-  if (!state.metaReady) { return row === 3; }
-  if (row === 3) { return state.filterColumns.indexOf(col) >= 0; }
-  return row >= 4 && state.sortColumns.indexOf(col) >= 0;
+/**
+ * Hai thông báo của sheet `!` đang đứng: khối lỗi vẽ do GAS gửi (thay hẳn thân Sidebar) và dòng "chưa cập nhật" khi tự làm mới đang tắt. Có lỗi thì không báo chưa cập nhật, vì sửa lỗi xong mới vẽ được.
+ * Kết quả của sheet đã rời bị bỏ qua: thông báo chỉ nói về sheet người dùng đang đứng.
+ */
+function sheetLinkViewNotices(sheetName, problems, stale) {
+  if (typeof noticeSet !== 'function' || sheetName !== SHEET_LINK_LAST_SHEET) { return; }
+  var list = Array.isArray(problems) ? problems : [];
+  noticeSet('viewStale', stale && !list.length ? {
+    line: 'Sheet ' + sheetName + ' chưa cập nhật',
+    button: { label: 'Làm mới', action: 'renderActiveViewSheet' },
+    blocks: [{ variant: 'warning', title: 'Sheet ' + sheetName + ' chưa cập nhật', lines: ['Dữ liệu đã đổi nhưng tự động làm mới sheet quản trị đang tắt.'], button: { label: 'Làm mới', action: 'renderActiveViewSheet' } }]
+  } : null);
+  noticeSet('viewProblems', list.length ? {
+    line: 'Sheet ' + sheetName + ' chưa vẽ được — đang giữ dữ liệu cũ',
+    takeover: true,
+    blocks: list.map(function (problem) { return { variant: 'error', title: problem.title, lines: problem.lines || [], hint: problem.hint || '' }; })
+  } : null);
 }
 
+/** Rời sheet `!` thì bỏ thông báo của nó. */
+function sheetLinkViewNoticesClear() {
+  if (typeof noticeSet !== 'function') { return; }
+  noticeSet('viewStale', null);
+  noticeSet('viewProblems', null);
+}
+
+/** Kết quả một lượt vẽ (tự động hay bấm Làm mới): lỗi thì hiện khối lỗi, vẽ được hoặc sheet đã mới thì bỏ mọi thông báo của sheet đó. */
 function sheetLinkViewApplyResult(sheetName, result) {
   if (!result) { return result; }
-  if (result.viewMeta) {
-    var state = sheetLinkViewState(sheetName);
-    state.needsSync = false;
-    state.revision = Number(result.viewMeta.revision) || 0;
-    state.filterColumns = result.viewMeta.filterColumns || [];
-    state.sortColumns = result.viewMeta.sortColumns || [];
-    state.metaReady = true;
-    if (state.watch && !sheetLinkViewControlCell(state, state.watch.row, state.watch.col)) { state.watch = null; }
-  }
-  // GAS trả `ok: false` khi lượt thử gần nhất ở đúng đầu vào này đã hỏng: sheet vẫn cũ, người dùng sửa xong thì bấm làm mới.
-  if (result.ok === false) { sheetLinkSetViewNotice(sheetName); }
-  else if (result.ok && !result.skipped && SHEET_LINK_VIEW_NOTICE_SHEET === sheetName) { sheetLinkSetViewNotice(''); }
+  sheetLinkViewNotices(sheetName, result.ok === false ? result.problems : [], false);
   return result;
 }
 
-/** Dòng báo nằm ở host tĩnh của Sidebar; nút trong đó mang action làm mới thủ công sẵn có. */
-function sheetLinkSetViewNotice(sheetName) {
-  SHEET_LINK_VIEW_NOTICE_SHEET = String(sheetName || '');
-  var host = typeof document !== 'undefined' && document.getElementById ? document.getElementById(SHEET_LINK_VIEW_NOTICE_ID) : null;
-  if (!host) { return; }
-  var syncOwnsShell = typeof FBM_SYNC_CLIENT !== 'undefined' && !!FBM_SYNC_CLIENT && FBM_SYNC_CLIENT.active === true;
-  host.hidden = !SHEET_LINK_VIEW_NOTICE_SHEET || syncOwnsShell;
-}
-
 /**
- * GAS đã quyết sheet `!` đang xem cũ hay mới và có được tự vẽ theo núm người dùng; Sidebar chỉ thực hiện.
- * Mỗi revision chỉ xin vẽ một lần: hai câu trả lời liên tiếp cùng revision (lời hỏi thứ hai gửi đi trước khi lượt vẽ đầu xong) không sinh lượt vẽ thứ hai. Vẽ lỗi cũng không xin lại cùng revision, để lỗi công thức hay cú pháp lọc không lặp ở mỗi lời hỏi.
+ * GAS đã quyết sheet `!` đang xem cũ hay mới, có được tự vẽ, và gửi kèm khối lỗi của lượt vẽ hỏng gần nhất; Sidebar chỉ thực hiện.
+ * Mỗi revision chỉ xin vẽ một lần: hai câu trả lời liên tiếp cùng revision (lời hỏi thứ hai gửi đi trước khi lượt vẽ đầu xong) không sinh lượt vẽ thứ hai.
  */
 function sheetLinkApplyViewDecision(result) {
   var view = result && result.view;
   if (!view || !view.sheetName) { return null; }
-  if (view.action !== 'render') { sheetLinkSetViewNotice(view.action === 'notify' ? view.sheetName : ''); return null; }
+  if (view.action !== 'render') { sheetLinkViewNotices(view.sheetName, view.problems, view.action === 'notify'); return null; }
   var state = sheetLinkViewState(view.sheetName);
   if (state.pending) { return state.pending; }
   var revision = Number(sheetLinkReloadState(result).revision || 0);
@@ -510,55 +507,20 @@ function sheetLinkPositionKey(ctx) {
 }
 
 /** Một sheet chỉ có một lượt làm mới đang bay; mọi lựa chọn đến trong lúc đó cùng chờ đúng lượt này. */
-function sheetLinkSyncView(sheetName, options) {
+function sheetLinkSyncView(sheetName) {
   var state = sheetLinkViewState(sheetName);
   if (state.pending) { return state.pending; }
   var settled = false;
-  var request = callServer('renderViewIfDirty', [sheetName, options || {}]).then(function (result) {
+  var request = callServer('renderViewIfDirty', [sheetName]).then(function (result) {
     settled = true;
     state.pending = null;
     return sheetLinkViewApplyResult(sheetName, result);
   }, function (err) {
     settled = true;
     state.pending = null;
-    sheetLinkSetViewNotice(sheetName);
     throw err;
   });
   if (!settled) { state.pending = request; }
-  return request;
-}
-
-/** Rời ô cấu hình chỉ hỏi trạng thái; chỉ thay đổi thật mới làm mới view. */
-function sheetLinkInspectView(sheetName) {
-  var state = sheetLinkViewState(sheetName);
-  if (state.pending) { return state.pending; }
-  if (state.inspecting) { return state.inspecting; }
-  var settled = false;
-  var work = callServer('inspectViewState', [sheetName, state.revision], { silent: true }).then(function (result) {
-    if (!result) { return result; }
-    var refreshData = sheetLinkReloadIsNewer(sheetLinkReloadState(result));
-    var refreshView = !state.metaReady || result.changed || result.needsRender;
-    if (!refreshData && !refreshView) { return result; }
-
-    var sync = function () {
-      var dataWork = refreshData ? sheetLinkSyncDirtyData({ reason: 'view-inspect' }) : null;
-      var afterData = function () { return refreshView ? sheetLinkSyncView(sheetName, { controlsOnly: true }) : result; };
-      return dataWork && typeof dataWork.then === 'function' ? dataWork.then(afterData) : afterData();
-    };
-    var message = refreshData ? 'Đang cập nhật dữ liệu và sheet ' + sheetName + '…' : 'Đang cập nhật sheet ' + sheetName + '…';
-    // Người dùng chỉ rời ô cấu hình, không chờ kết quả thao tác của mình: thanh loading, không chặn.
-    return typeof sidebarBusyRun === 'function' ? sidebarBusyRun(message, sync, { block: false, progress: true }) : sync();
-  });
-  var request = work.then(function (result) {
-    settled = true;
-    state.inspecting = null;
-    return result;
-  }, function (err) {
-    settled = true;
-    state.inspecting = null;
-    throw err;
-  });
-  if (!settled) { state.inspecting = request; }
   return request;
 }
 
@@ -575,20 +537,9 @@ function sheetLinkApplyContext(ctx, options) {
   var changedSheet = ctx.sheetName !== previousSheet;
   var isView = ctx.sheetName && ctx.sheetName.charAt(0) === '!';
   var viewState = isView ? sheetLinkViewState(ctx.sheetName) : null;
-  var positionKey = sheetLinkPositionKey(ctx);
-  var inspectAfterControl = false;
-
-  if (viewState && viewState.watch && viewState.watch.key !== positionKey) {
-    inspectAfterControl = true;
-    viewState.watch = null;
-  }
-  if (viewState && sheetLinkViewControlCell(viewState, ctx.row, ctx.col)) {
-    viewState.watch = { key: positionKey, row: ctx.row, col: ctx.col };
-  }
-  if (viewState && changedSheet && !viewState.metaReady) { viewState.needsSync = true; }
 
   SHEET_LINK_LAST_SHEET = ctx.sheetName || '';
-  if (SHEET_LINK_VIEW_NOTICE_SHEET && SHEET_LINK_VIEW_NOTICE_SHEET !== SHEET_LINK_LAST_SHEET) { sheetLinkSetViewNotice(''); }
+  if (changedSheet && previousSheet.charAt(0) === '!') { sheetLinkViewNoticesClear(); }
   if (!SHEET_LINK_RAM_READY) { return; }
 
   // Đổi khách từ context Extension là đường cục bộ và không được chờ RPC
@@ -603,7 +554,7 @@ function sheetLinkApplyContext(ctx, options) {
     var queue = function (next) { pending = pending ? pending.then(next) : next(); };
 
     if (viewState && changedSheet) {
-      // Sheet cũ hay mới và có được tự vẽ do GAS quyết trong lời hỏi chung. Metadata hàng điều khiển về cùng lượt vẽ, hoặc lấy lười ở lần nhấp sau (`needsSync`).
+      // Sheet cũ hay mới, có được tự vẽ và đang lỗi gì đều do GAS quyết trong lời hỏi chung.
       if (!fromProbe) { queue(function () { return sheetLinkProbeSelectionAndReload('view-enter'); }); }
     } else {
       if (leavingDataSheet && typeof callServer === 'function') {
@@ -611,13 +562,7 @@ function sheetLinkApplyContext(ctx, options) {
       }
       else if (SHEET_LINK_DATA_PENDING) { queue(function () { return SHEET_LINK_DATA_PENDING; }); }
 
-      if (viewState && (viewState.pending || viewState.inspecting)) {
-        queue(function () { return viewState.pending || viewState.inspecting; });
-      } else if (viewState && viewState.needsSync) {
-        queue(function () { return sheetLinkSyncView(ctx.sheetName, { controlsOnly: true }); });
-      } else if (viewState && inspectAfterControl) {
-        queue(function () { return sheetLinkInspectView(ctx.sheetName); });
-      }
+      if (viewState && viewState.pending) { queue(function () { return viewState.pending; }); }
     }
 
     var applyLatest = function () {
@@ -651,6 +596,8 @@ function sheetLinkApplyCustomerContext(ctx) {
   // Sync overlays the normal `view` screen; changing the selected customer must
   // never repaint the underlying screen while that module owns the shell.
   if (!Prefs.followSelection || ScreenState.screen !== SCREEN_VIEW || (typeof FBM_SYNC_CLIENT !== 'undefined' && FBM_SYNC_CLIENT.active)) { return false; }
+  // Đứng ở sheet `!` đang lỗi thì thân Sidebar là màn lỗi; nhấp dòng trên sheet đó (dữ liệu cũ) không thay màn. Tìm khách bằng icon vẫn mở khách như thường.
+  if (typeof NOTICES !== 'undefined' && NOTICES.viewProblems && noticeScreenShowing()) { return false; }
 
   var ma = sheetLinkCustomerIdFromContext(ctx);
   if (ma) {

@@ -24,7 +24,7 @@ function fbmSyncCaptureReturnScreen() {
   FBM_SYNC_CLIENT.returnScreen = typeof ScreenState !== 'undefined' && ScreenState.screen ? ScreenState.screen : 'view';
   if (FBM_SYNC_CLIENT.returnScreen !== 'view' && typeof screenFormStash === 'function') { screenFormStash(); }
   FBM_SYNC_CLIENT.returnUi = {};
-  ['shin-search', 'shin-undo', 'shin-extension-warning', 'shin-view-stale'].forEach(function (id) {
+  ['shin-search', 'shin-undo', 'shin-notice'].forEach(function (id) {
     var el = document.getElementById(id);
     if (el) { FBM_SYNC_CLIENT.returnUi[id] = el.hidden; el.hidden = true; }
   });
@@ -693,8 +693,8 @@ function syncScreenClose() {
     if (el) { el.hidden = !!savedUi[id]; }
   });
   FBM_SYNC_CLIENT.returnUi = null;
-  // Dòng báo view cũ có thể đổi trong lúc màn FBM mở; vẽ lại theo chủ sở hữu thay vì trả trạng thái đã cất.
-  if (typeof sheetLinkSetViewNotice === 'function') { sheetLinkSetViewNotice(SHEET_LINK_VIEW_NOTICE_SHEET); }
+  // Thông báo có thể đổi trong lúc màn FBM mở; vẽ lại theo chủ sở hữu thay vì trả trạng thái đã cất.
+  if (typeof noticePaint === 'function') { noticePaint(); }
   return restored;
 }
 /** Chuyển một envelope sang tab FBM và chờ response thô. */

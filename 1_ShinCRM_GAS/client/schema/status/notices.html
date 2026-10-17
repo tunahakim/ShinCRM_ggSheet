@@ -1,0 +1,22 @@
+<script>
+/*
+ * Màn thông báo dùng chung: mỗi việc cần người dùng biết là một khối có tiêu đề và phần chi tiết, nhiều việc cùng lúc thì xếp nhiều khối theo thứ tự bên gọi đưa vào.
+ * Khối chỉ mang dữ liệu: `title`, `lines`, `hint`, mức `variant` (`error`, `warning`), và tùy chọn `table` (bảng sheet của ngân sách ô) hoặc `button` (`{ label, action, busy }`).
+ */
+STATUS_SCHEMA.notices = function (model) {
+  var screen = statusSchemaRoot(model.infoText, (model.blocks || []).map(statusSchemaNoticeBlock), NOTICE_SCREEN_ROOT_ID);
+  if (model.header) { screen.header = model.header; }
+  return screen;
+};
+
+function statusSchemaNoticeBlock(block) {
+  var elements = [statusSchemaText(block.title, 'strong')];
+  (block.lines || []).forEach(function (line) { elements.push(statusSchemaText(line)); });
+  if (block.table) { elements.push(statusSchemaTable(block.table)); }
+  if (block.hint) { elements.push(statusSchemaText(block.hint)); }
+  if (block.button) {
+    elements.push(Row({ elements: [Button({ label: block.button.label, action: block.button.action, data: block.button.busy ? { busy: block.button.busy } : undefined })] }));
+  }
+  return statusSchemaBox(elements, block.variant || 'error');
+}
+</script>

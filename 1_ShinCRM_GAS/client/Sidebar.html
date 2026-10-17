@@ -73,12 +73,10 @@
       <button type="button" class="shin-undo-btn" data-action="undoDelete">Hoàn tác</button>
     </div>
 
-    <div id="shin-extension-warning" class="shin-extension-warning" hidden></div>
-
-    <!-- Dòng báo sheet quản trị đang xem đã cũ khi công tắc tự động làm mới tắt; `sheetLinkSetViewNotice` sở hữu ẩn/hiện. Cùng khuôn chữ + nút như thanh hoàn tác. -->
-    <div id="shin-view-stale" class="shin-undo" hidden>
-      <span class="shin-undo-text">View chưa cập nhật</span>
-      <button type="button" class="shin-undo-btn" data-action="renderActiveViewSheet">Làm mới</button>
+    <!-- Dòng báo duy nhất ở đáy: việc ưu tiên cao nhất kèm số việc còn lại, bấm vào mở màn thông báo. `client/ui/notices` sở hữu chữ, nút và ẩn/hiện. -->
+    <div id="shin-notice" class="shin-notice-bar" role="button" tabindex="0" data-action="toggleNotices" hidden>
+      <span id="shin-notice-text" class="shin-notice-bar-text"></span>
+      <button type="button" id="shin-notice-btn" class="shin-undo-btn" hidden></button>
     </div>
 
   </div>
@@ -134,10 +132,10 @@
   <?!= include('client/ui/unsavedChanges') ?>
   <?!= include('client/sync/fbmSync') ?>
   <?!= include('client/schema/status/common') ?>
-  <?!= include('client/schema/status/budgetBlocked') ?>
-  <?!= include('client/schema/status/loadError') ?>
+  <?!= include('client/schema/status/notices') ?>
   <?!= include('client/schema/status/loadSummary') ?>
   <?!= include('client/screen/statusScreen') ?>
+  <?!= include('client/ui/notices') ?>
   <?!= include('client/screen/viewScreen') ?>
   <?!= include('client/screen/formScreen') ?>
   <?!= include('client/ui/fieldInvalid') ?>

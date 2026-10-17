@@ -14,14 +14,15 @@ function statusSchemaBox(elements, variant) {
   return Box({ className: className, elements: elements || [] });
 }
 
-function statusSchemaRoot(infoText, elements) {
+/** `id` gắn vào khối gốc của thân để bên ngoài hỏi được màn này còn đang hiện hay đã bị màn khác vẽ đè. */
+function statusSchemaRoot(infoText, elements, id) {
   return {
     entity: 'status',
     infoBar: true,
     infoSlot: 'statusInfo',
     infoText: infoText || '',
     header: [],
-    body: [RowGroup({ className: uiResolveStatusClass('root'), elements: elements || [] })],
+    body: [RowGroup({ id: id || null, className: uiResolveStatusClass('root'), elements: elements || [] })],
     footer: []
   };
 }

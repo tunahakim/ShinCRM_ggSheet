@@ -45,11 +45,12 @@ function pendingDeletePaint() {
   if (!strip || !text) { return null; }
 
   var so = PENDING_DELETE.ids.length;
-  if (!so) { strip.hidden = true; return null; }
+  // Dòng báo ở đáy nhường chỗ cho dải này trong lúc đếm ngược.
+  if (!so) { strip.hidden = true; if (typeof noticePaint === 'function') { noticePaint(); } return null; }
 
   var giay = Math.max(1, Math.ceil((PENDING_DELETE.deadline - Date.now()) / 1000));
   text.textContent = 'Đã xóa ' + so + ' ' + (PENDING_DELETE_LABEL[PENDING_DELETE.entity] || 'bản ghi') + ' — ' + giay + ' giây';
-  strip.hidden = false;
+  if (strip.hidden) { strip.hidden = false; if (typeof noticePaint === 'function') { noticePaint(); } }
   return giay;
 }
 

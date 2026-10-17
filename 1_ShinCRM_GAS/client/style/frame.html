@@ -204,15 +204,22 @@ html, body {
 
 .shin-undo-btn:hover { background: var(--shin-warn-soft); }
 
-.shin-extension-warning {
+/* Dòng báo ở đáy: một dòng, cắt bằng dấu ba chấm khi dài; nút (nếu có) ghim mép phải như dải hoàn tác. */
+.shin-notice-bar {
   flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--shin-gap-2);
   padding: var(--shin-gap-1) var(--shin-gap-2);
   border-top: 1px solid var(--shin-warn);
   background: var(--shin-warn-soft);
   color: var(--shin-warn);
   font-size: clamp(var(--shin-text-2xs), 3.4vw, var(--shin-text-xs));
   line-height: var(--shin-line-height);
-  text-align: center;
-  white-space: nowrap;
+  cursor: pointer;
 }
+
+.shin-notice-bar[hidden] { display: none; }
+
+.shin-notice-bar-text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>
