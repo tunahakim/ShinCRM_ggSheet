@@ -60,7 +60,9 @@ function chay(so) {
   hop.shinOnEdit({ range: eventRange(lead, 4, 3) });
   hop.shinOnEdit({ range: eventRange(lead, 4, 2) });
   hop.shinOnEdit({ range: eventRange(lead, 3, 5) });
-  check(so, 'hàng lọc dưới mã @ và cột sắp xếp gắn cờ đúng sheet bị sửa, không chạm sheet khác, không đọc núm người dùng; ô dưới cột thường thì không gắn cờ', rendered, ['!Lead', '!Lead']);
+  hop.shinOnEdit({ range: eventRange(lead, 20, 5) });
+  hop.shinOnEdit({ range: eventRange(lead, 2, 1) });
+  check(so, 'hàng lọc dưới mã @, cột sắp xếp và ô dữ liệu dưới cột ShinCRM vẽ (thêm công thức, xóa giá trị) gắn cờ đúng sheet bị sửa, không chạm sheet khác, không đọc núm người dùng; ô dưới cột thường và hàng nhãn thì không gắn cờ', rendered, ['!Lead', '!Lead', '!Lead']);
 
   const defaultSheets = ['Customer', 'Activity', 'Category', 'Config'];
   const schemaResults = defaultSheets.map((name) => {

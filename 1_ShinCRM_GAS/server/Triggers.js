@@ -47,15 +47,12 @@ function shinHeaderRangeHasValidCode(sheet, range, event, validCode) {
   return false;
 }
 
-/** Hàng 3 chỉ là hàng lọc dưới cột mang mã `@`; chữ ghi chú dưới cột thường không phải cấu hình view. */
-function shinRangeTouchesCodedFilter(sheet, range) {
-  if (!shinRangeTouchesRow(range, sheetControlRow(sheet.getName(), 'filter'))) { return false; }
-  var first = range.getColumn();
-  var count = range.getLastColumn() - first + 1;
-  return sheet.getRange(1, first, 1, count).getValues()[0].some(function (value) {
-    var code = String(value === null || value === undefined ? '' : value).trim();
-    return shinViewCodeIsValid(code);
-  });
+/**
+ * Ô dưới cột ShinCRM vẽ (mã nguồn `@CUS_`/`@ACT_`) ở hàng lọc hoặc hàng dữ liệu. Hàng lọc là cấu hình. Hàng dữ liệu do ShinCRM sở hữu: sửa tay (thêm công thức, xóa hay đổi giá trị) phải được vẽ lại hoặc báo lỗi ngay, không để sheet sai âm thầm hay lỗi hiện trễ tới lần kho đổi. Hàng nhãn và cột không mã không tính.
+ */
+function shinRangeTouchesDrawnCell(sheet, range) {
+  if (range.getLastRow() < sheetControlRow(sheet.getName(), 'filter')) { return false; }
+  return viewDrawnColumns(shinHeaderSlice(sheet, range.getColumn(), range.getLastColumn())).length > 0;
 }
 
 /** Cột module (mã @ có thật trên sheet kho nhưng ngoài DATA_SCHEMA): sheet `!` đọc được cột đó dù RAM không giữ. */
@@ -115,7 +112,7 @@ function shinViewHeaderCodeIsValid(code) {
 }
 
 /**
- * Sửa này có phải gắn cờ ô điều khiển cho sheet `!` không: hàng 1 có mã hợp lệ, hàng lọc ở cột có mã, hàng 4–13 của hai cột sắp xếp, hoặc ô bất kỳ khi sheet đang lỗi (người dùng gỡ công thức hay sửa chỗ sai không nằm trong ô điều khiển). Sheet đang lỗi xét trước vì chỉ đọc sổ vẽ trong kho, không tốn lệnh Sheet.
+ * Sửa này có phải gắn cờ ô điều khiển cho sheet `!` không: hàng 1 có mã hợp lệ, hàng lọc hoặc hàng dữ liệu ở cột ShinCRM vẽ, hàng 4–13 của hai cột sắp xếp, hoặc ô bất kỳ khi sheet đang lỗi (người dùng gỡ công thức hay sửa chỗ sai không nằm trong ô điều khiển). Sheet đang lỗi xét trước vì chỉ đọc sổ vẽ trong kho, không tốn lệnh Sheet.
  */
 function shinViewEditMarksControls(sheet, range, event) {
   var entry = viewLedgerEntry(sheet.getName());
@@ -123,7 +120,7 @@ function shinViewEditMarksControls(sheet, range, event) {
   if (shinRangeTouchesRow(range, 1)) {
     return shinHeaderRangeHasValidCode(sheet, range, event, shinViewHeaderCodeIsValid);
   }
-  if (shinRangeTouchesCodedFilter(sheet, range)) { return true; }
+  if (shinRangeTouchesDrawnCell(sheet, range)) { return true; }
   var lastSortRow = SHEET_FIRST_DATA_ROW + VIEW_SORT_MAX_LEVELS - 1;
   if (range.getLastRow() < SHEET_FIRST_DATA_ROW || range.getRow() > lastSortRow) { return false; }
   return shinRangeTouchesColumn(range, selectionColumnIndex(sheet, '@VIEW_SORT_COL'))
