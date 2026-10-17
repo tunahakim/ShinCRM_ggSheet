@@ -58,7 +58,7 @@ async function chay(so) {
       stateRead: () => readFinishState,
       stateWrite: (next) => { readFinishState = next; return next; },
       recoverStaleRun: (state) => ({ state, recovered: false }),
-      responseRequestId: () => 'read-request',
+      responseRequestId: () => 'read-request', requestAnswered: (state, id) => !!id && String(state.activeRequestId || '') === id,
       protocol: { parse: (value) => value, assertSuccess: () => ({ ok: true }), contractMismatch: () => null },
       traceImport: () => {}, traceEvent: () => {}, traceResponse: () => ({}), applyTransportSession: () => false,
       rowsToRecords: () => ({ rows: [], fields: [], total: 0 }), isTemporaryRecord: () => false, customerPageItem: () => '', customerPageValue: () => [], seenStoreReader: () => () => true, seenStoreMark: () => {}, readLocal: () => [],

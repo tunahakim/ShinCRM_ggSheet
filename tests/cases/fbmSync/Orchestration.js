@@ -339,11 +339,35 @@ async function chay(so) {
   check(so, 'Lần hỏi nền gặp lượt dở không còn request chờ: lượt cũ kết thúc SYNC_ABANDONED_RUN có dòng Log lỗi, lượt mới mở bằng probe User, không gửi lại trang Customer đang dở', [
     abandonLogs.some((entry) => JSON.stringify(entry).indexOf('SYNC_ABANDONED_RUN') >= 0), afterAbandon.ok, afterAbandon.request && afterAbandon.request.meta.kind, abandonState.runId !== 'abandoned-run'
   ], [true, true, 'session_probe', true]);
-  const staleLine = abandonLogs.find((entry) => entry.action === 'stale_run') || {};
-  check(so, 'Dòng Log lượt bị bỏ dở mang hộp đen Extension: bước cuối, cách đây bao lâu, worker có bị Chrome tắt; không chép trường lạ từ Extension', [
+  const lostLines = abandonLogs.filter((entry) => entry.action === 'request_unanswered'), staleLine = lostLines[0] || {};
+  check(so, 'Lượt bị bỏ dở: request đang chờ quá hạn có đúng một dòng request_unanswered mang hộp đen; dòng stale_run chỉ nói lượt bị đóng, không lặp hộp đen', [lostLines.length, String(staleLine.reason).indexOf('Request FBM lost-request (bước customer_grid) không nhận được trả lời từ Extension') === 0, String((abandonLogs.find((entry) => entry.action === 'stale_run') || {}).reason).indexOf('Hộp đen') < 0], [1, true, true]);
+  check(so, 'Dòng Log request không có trả lời mang hộp đen Extension: bước cuối, cách đây bao lâu, worker có bị Chrome tắt; không chép trường lạ từ Extension', [
     String(staleLine.reason).indexOf('Hộp đen Extension: bước cuối (cách đây 5 phút) là đã gửi request sang tab FBM, chưa nhận lại kết quả, request lost-request.') >= 0,
     String(staleLine.reason).indexOf('đã bị Chrome tắt và dựng lại') >= 0, JSON.stringify(staleLine).indexOf('bi-mat-khong-duoc-chep') < 0
   ], [true, true, true]);
+  // Luật chung request không có trả lời: nằm ở cửa ghi state nên mọi loại request đều đi qua, kể cả Giữ phiên không thuộc lượt nào.
+  const watchLogs = [];
+  heartbeat.logEvent = (entry) => watchLogs.push(entry);
+  const unanswered = () => watchLogs.filter((entry) => entry.action === 'request_unanswered');
+  heartbeat.FbmSync.statePatch({ runId: '', phase: 'done', cursor: { kind: 'heartbeat' }, activeRequestId: 'hb-lost', deadlineAt: Date.now() - 4 * 60000, scheduledScan: '', chain: null });
+  heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
+  const afterLostHeartbeat = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm', extensionTrail: { stage: 'gas_request_received', requestId: 'hb-lost', hop: 0, at: Date.now() - 6 * 60000 } });
+  const lostHeartbeat = unanswered()[0] || {};
+  check(so, 'Giữ phiên hết hạn không có trả lời (không thuộc lượt nào): lần hỏi nền kế tiếp có dòng Log lỗi nêu request, bước, số phút quá hạn và hộp đen Extension, rồi vẫn cấp request mới', [
+    unanswered().length, lostHeartbeat.outcome, String(lostHeartbeat.reason).indexOf('Request FBM hb-lost (bước heartbeat) không nhận được trả lời từ Extension, đã quá hạn chờ 4 phút; GAS bỏ request này. Hộp đen Extension: bước cuối (cách đây 6 phút) là đã nhận request từ GAS, chưa gửi sang tab FBM, request hb-lost.') === 0, !!(afterLostHeartbeat.request && afterLostHeartbeat.request.id)
+  ], [1, 'error', true, true]);
+  watchLogs.length = 0;
+  heartbeat.FbmSync.statePatch({ runId: '', phase: 'done', cursor: { kind: 'heartbeat' }, activeRequestId: 'hb-late', deadlineAt: Date.now() - 60000, scheduledScan: '', chain: null });
+  heartbeat.fbmSyncHeartbeat({ d: { TotalRowCount: 2 }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'hb-late' }] } });
+  heartbeat.FbmSync.statePatch({ activeRequestId: 'in-time', deadlineAt: Date.now() + 60000 });
+  heartbeat.FbmSync.statePatch({ activeRequestId: '', deadlineAt: 0 });
+  check(so, 'Không báo nhầm: trả lời đến muộn vẫn là có trả lời; GAS tự bỏ request còn trong hạn (dừng, cổng phiên chặn) không phải request mất', unanswered().length, 0);
+  heartbeat.FbmSync.requestWatch.trail = undefined;
+  heartbeat.FbmSync.statePatch({ runId: 'manual-run', origin: 'manual', phase: 'pull_customer', cursor: { kind: 'customer_grid' }, activeRequestId: 'manual-lost', deadlineAt: Date.now() - 60000 });
+  heartbeat.FbmSync.stateStart('', 'checking_session', 0, { origin: 'manual', mode: 'read', scan: 'full' });
+  const manualLost = unanswered()[0] || {};
+  check(so, 'Lượt bấm tay mở lượt mới đè request quá hạn của lượt trước: cũng có dòng request_unanswered, không nhắc hộp đen vì lần gọi không đến từ Extension', [unanswered().length, String(manualLost.reason).indexOf('manual-lost') >= 0, String(manualLost.reason).indexOf('Hộp đen') < 0], [1, true, true]);
+  heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0 });
   check(so, 'Hộp đen Extension: không có hộp đen thì nói rõ, worker chạy liền thì nói không bị tắt', [
     heartbeat.FbmSync.extensionTrailText(null, Date.now()), heartbeat.FbmSync.extensionTrailText({ stage: 'gas_response_sent', at: 1000, workerStartedAt: 50, currentWorkerStartedAt: 50 }, 1000)
   ], ['Hộp đen Extension: không có (Extension bản cũ hoặc chưa ghi được bước nào).', 'Hộp đen Extension: bước cuối (cách đây 0 phút) là đã gửi kết quả về GAS, chưa nhận trả lời. Phần chạy nền của Extension vẫn chạy liền, không bị Chrome tắt.']);
