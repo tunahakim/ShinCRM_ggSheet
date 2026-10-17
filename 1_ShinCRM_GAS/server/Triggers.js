@@ -108,35 +108,40 @@ function shinReloadDecision(input) {
   return decision;
 }
 
-/** Trigger chỉ vẽ khi người dùng sửa bộ điều khiển và không đọc công tắc người dùng; dữ liệu kho đổi chỉ làm view cũ để Sidebar vẽ khi có người xem. */
-function shinRenderForDecision(decision) {
-  var views = decision && decision.views;
-  if (!views || views.action !== 'render') { return decision; }
-  // Ghi nhận thay đổi trước khi vẽ: sheet vẽ ghi revision đã dùng, ghi nhận sau lượt vẽ sẽ làm chính sheet vừa vẽ thành cũ.
-  recordChangesAfterWrite();
-  return renderAllManagedViews(views.mode === 'sheet' ? [views.sheetName] : undefined);
-}
-
-/** Sắp xếp chung trong Config là bộ điều khiển của mọi sheet quản trị chưa khai sắp xếp riêng. */
-function shinConfigSortTouched(sheet, range) {
-  return shinHeaderSlice(sheet, range.getColumn(), range.getLastColumn()).some(function (code) {
-    return code === '@CFG_SORT_COL' || code === '@CFG_SORT_LEVEL';
-  });
-}
-
-/** Chỉ ba vùng cấu hình của sheet quản trị được phép kích hoạt một lượt làm mới tự động. */
+/** Mã hàng 1 của sheet quản trị mà sửa vào là sửa ô điều khiển: mã cột nguồn hợp lệ và hai cột sắp xếp. */
 function shinViewHeaderCodeIsValid(code) {
   var value = String(code === null || code === undefined ? '' : code).trim();
   return shinViewCodeIsValid(value) || value === '@VIEW_SORT_COL' || value === '@VIEW_SORT_LEVEL';
 }
 
-function shinViewEditNeedsRender(sheet, range, event) {
+/**
+ * Sửa này có phải gắn cờ ô điều khiển cho sheet `!` không: hàng 1 có mã hợp lệ, hàng lọc ở cột có mã, hàng 4–13 của hai cột sắp xếp, hoặc ô bất kỳ khi sheet đang lỗi (người dùng gỡ công thức hay sửa chỗ sai không nằm trong ô điều khiển). Sheet đang lỗi xét trước vì chỉ đọc sổ vẽ trong kho, không tốn lệnh Sheet.
+ */
+function shinViewEditMarksControls(sheet, range, event) {
+  var entry = viewLedgerEntry(sheet.getName());
+  if (entry && entry.ok !== true) { return true; }
   if (shinRangeTouchesRow(range, 1)) {
     return shinHeaderRangeHasValidCode(sheet, range, event, shinViewHeaderCodeIsValid);
   }
   if (shinRangeTouchesCodedFilter(sheet, range)) { return true; }
+  var lastSortRow = SHEET_FIRST_DATA_ROW + VIEW_SORT_MAX_LEVELS - 1;
+  if (range.getLastRow() < SHEET_FIRST_DATA_ROW || range.getRow() > lastSortRow) { return false; }
   return shinRangeTouchesColumn(range, selectionColumnIndex(sheet, '@VIEW_SORT_COL'))
     || shinRangeTouchesColumn(range, selectionColumnIndex(sheet, '@VIEW_SORT_LEVEL'));
+}
+
+/** Bỏ khỏi sổ vẽ tên không còn là sheet `!`. Gọi khi xóa sheet hoặc đổi tên, nên phải liệt kê tab. */
+function shinViewLedgerPrune(book) {
+  var names = shinViewSheetNames(book);
+  documentLockRun(function () { viewLedgerPrune(names); });
+  return names;
+}
+
+/** Sheet `!` chưa có trong sổ vẽ (vừa thêm hoặc vừa đổi tên thành `!`): chuẩn bị đúng sheet đó và tô cam, vì nó chưa từng được vẽ. */
+function shinViewSheetArrived(name) {
+  if (name.charAt(0) !== '!' || viewLedgerEntry(name)) { return; }
+  prepareViewSheet(name);
+  viewTabColorSyncUnrendered([name]);
 }
 
 function shinOnEdit(event) {
@@ -148,8 +153,8 @@ function shinOnEdit(event) {
     result = runEntryPoint('shinOnEdit', 'core', ERROR_CHANNEL_THROW, function () {
     var name = sheet.getName();
     if (name.charAt(0) === '!') {
-      if (shinViewEditNeedsRender(sheet, range, event)) {
-        return shinRenderForDecision(shinReloadDecision({ source: 'edit', surface: 'view-control', sheetName: name }));
+      if (shinViewEditMarksControls(sheet, range, event)) {
+        return shinReloadDecision({ source: 'edit', surface: 'view-control', sheetName: name });
       }
       return;
     }
@@ -159,8 +164,7 @@ function shinOnEdit(event) {
     if (name === 'Config' || name === 'Category') {
       if (range.getRow() < SHEET_FIRST_DATA_ROW) { return; }
       if (!shinDefaultCodeIsValid(sheet, name.toLowerCase(), range.getColumn(), range.getLastColumn())) { return; }
-      var configSort = name === 'Config' && shinConfigSortTouched(sheet, range);
-      return shinRenderForDecision(shinReloadDecision({ source: 'edit', surface: name.toLowerCase(), entity: name.toLowerCase(), configSort: configSort }));
+      return shinReloadDecision({ source: 'edit', surface: name.toLowerCase(), entity: name.toLowerCase() });
     }
     var entity = name === ENTITY_SHEETS.customer ? 'customer' : name === ENTITY_SHEETS.activity ? 'activity' : '';
     if (!entity || range.getRow() < SHEET_FIRST_DATA_ROW) { return; }
@@ -197,22 +201,19 @@ function shinOnChange(event) {
     // Vết để biết thao tác nào của người dùng sinh loại nào (nhất là `OTHER`); chỉ ra sheet khi `LOG_TRACE` bật.
     logTrace({ source: 'core', action: 'shinOnChange', outcome: LOG_OK, reason: 'changeType ' + type, detail: { changeType: type, sheetName: name } });
 
-    // Sheet `!` mới chưa có revision đã vẽ nên tự là sheet cũ; Sidebar vẽ khi có người mở nó. Xóa sheet không làm sheet nào khác cũ.
-    if (type === 'INSERT_GRID') {
-      var viewNames = shinViewSheetNames(book);
-      viewNames.forEach(function (sheetName) { prepareViewSheet(sheetName); });
-      viewTabColorSyncUnrendered(viewNames);
-      return null;
-    }
-    if (type === 'REMOVE_GRID') { return null; }
+    // Thêm sheet: chỉ sheet đang đứng có thể là sheet vừa thêm. Xóa sheet không làm sheet nào khác cũ, chỉ dọn sổ vẽ.
+    if (type === 'INSERT_GRID') { shinViewSheetArrived(name); return null; }
+    if (type === 'REMOVE_GRID') { shinViewLedgerPrune(book); return null; }
 
     // onChange không có range đáng tin cậy nên đánh dấu bảo thủ theo sheet đang active. Thêm/xóa hàng và `OTHER` (sắp xếp, có thể chỉ trên một phần cột) trên Customer/Activity nạp trọn đúng thực thể đó; thêm/xóa cột có thể đổi schema nên vẫn full core.
     var entity = name === ENTITY_SHEETS.customer ? 'customer' : name === ENTITY_SHEETS.activity ? 'activity' : '';
     if (type === 'OTHER') {
       if (entity) { return shinReloadDecision({ source: 'change', surface: 'entity', entities: [entity] }); }
       if (name === 'Category' || name === 'Config') { return shinReloadDecision({ source: 'change', surface: name.toLowerCase(), entity: name.toLowerCase() }); }
-      // Đổi tên sheet cũng báo `OTHER`: tên `!` mới chưa có trong sổ vẽ view nên là sheet cũ.
-      if (name.charAt(0) === '!') { viewTabColorSyncUnrendered([name]); }
+      // Đổi tên sheet cũng báo `OTHER`: tên `!` mới chưa có trong sổ vẽ thì chuẩn bị sheet đó; tên cũ (kể cả khi đổi thành tên thường) bỏ khỏi sổ.
+      if (name.charAt(0) === '!' && viewLedgerEntry(name)) { return null; }
+      shinViewLedgerPrune(book);
+      shinViewSheetArrived(name);
       return null;
     }
     if (['INSERT_ROW', 'REMOVE_ROW', 'INSERT_COLUMN', 'REMOVE_COLUMN'].indexOf(type) >= 0) {
@@ -230,7 +231,7 @@ function shinOnChange(event) {
       } else {
         structural = shinReloadDecision({ source: 'change', surface: 'structure', structure: true, allCore: true });
       }
-      return shinRenderForDecision(structural);
+      return structural;
     }
 
     return null;

@@ -38,44 +38,67 @@ function viewSetupSourceCodes() {
   }, []);
 }
 
-function viewSetupHeader(sheet) {
-  var lastColumn = sheet.getLastColumn();
-  if (lastColumn < 1) { return []; }
-  return sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(function (value) { return String(value || '').trim(); });
-}
+/** Tiền tố và dấu ngăn của note ⛔ đời cũ (bộ vẽ từng báo lỗi bằng note ở hàng lọc). Chỉ còn để dọn note cũ khi chuẩn bị sheet. */
+var VIEW_LEGACY_ERROR_NOTE_PREFIX = '⛔ ShinCRM:';
+var VIEW_LEGACY_USER_NOTE_MARKER = '\n\nGhi chú trước đó:\n';
 
 function viewEnsureControlColumns(sheet) {
-  var header = viewSetupHeader(sheet);
+  var header = sheetReadHeader(sheet);
   var missing = VIEW_CONTROL_COLUMNS.filter(function (column) { return header.indexOf(column.code) < 0; });
   if (!missing.length) { return []; }
-  sheet.insertColumnsBefore(1, missing.length);
-  sheet.getRange(1, 1, 2, missing.length).setValues([
+  sheetColumnsInsertBefore(sheet, 1, missing.length);
+  sheetCellsWrite(sheet, 1, 1, [
     missing.map(function (column) { return column.code; }),
     missing.map(function (column) { return column.label; })
   ]);
   return missing.map(function (column) { return column.code; });
 }
 
+/** Note hàng lọc mong muốn của một cột: cột sắp xếp mang hướng dẫn của nó; note ⛔ cũ trả lại phần ghi chú của người dùng; cột nguồn chưa có note mang bảng tra cú pháp lọc. */
+function viewSetupFilterNote(code, current) {
+  var control = VIEW_CONTROL_COLUMNS.filter(function (column) { return column.code === code; })[0];
+  if (control) { return control.note; }
+  var note = String(current || '');
+  if (note.indexOf(VIEW_LEGACY_ERROR_NOTE_PREFIX) === 0) {
+    var markerAt = note.indexOf(VIEW_LEGACY_USER_NOTE_MARKER);
+    note = markerAt >= 0 ? note.slice(markerAt + VIEW_LEGACY_USER_NOTE_MARKER.length) : '';
+  }
+  if (!note && /^@(CUS|ACT)_/.test(code)) { return FILTER_QUICK_REFERENCE; }
+  return note;
+}
+
+/** Note hàng lọc: đọc cả hàng một lệnh, ghi một lệnh cho đoạn từ cột đổi đầu tiên tới cột đổi cuối cùng; không đổi gì thì không ghi. */
+function viewSetupFilterNotes(sheet, header) {
+  var current = sheetReadNotes(sheet, VIEW_FILTER_ROW, 1, 1, header.length)[0] || [];
+  var wanted = header.map(function (code, i) { return viewSetupFilterNote(code, current[i]); });
+  var changed = wanted.map(function (note, i) { return note !== String(current[i] || '') ? i : -1; }).filter(function (i) { return i >= 0; });
+  if (!changed.length) { return 0; }
+  var first = changed[0];
+  var last = changed[changed.length - 1];
+  sheetCellsSetNotes(sheet, VIEW_FILTER_ROW, first + 1, [wanted.slice(first, last + 1)]);
+  return changed.length;
+}
+
+/** Chuẩn bị một sheet `!` trong khóa tài liệu: cột sắp xếp, nhãn hàng 2, note hàng lọc, khuôn chữ hàng lọc, ô kiểm dữ liệu sắp xếp, cố định hàng. Chỉ ghi ô đổi. */
 function prepareViewSheet(sheetName) {
   var name = String(sheetName || '').trim();
-  var sheet = shinOpenBook().getSheetByName(name);
-  if (!sheet || name.charAt(0) !== '!') { throw new Error('Không tìm thấy sheet quản trị "' + name + '".'); }
+  var sheet = name.charAt(0) === '!' ? shinOpenBook().getSheetByName(name) : null;
+  if (!sheet) { throw new Error('Không tìm thấy sheet quản trị "' + name + '".'); }
+  return documentLockRun(function () { return viewPrepareLocked(sheet, name); });
+}
 
+function viewPrepareLocked(sheet, name) {
   var added = viewEnsureControlColumns(sheet);
-  var header = viewSetupHeader(sheet);
+  var header = sheetReadHeader(sheet);
   var headerMap = viewHeaderMap(header, name);
+  var labels = sheetReadRows(sheet, [2])[0];
   VIEW_CONTROL_COLUMNS.forEach(function (control) {
     var column = headerMap[control.code];
-    sheet.getRange(2, column).setValue(control.label);
-    sheet.getRange(3, column).setNote(control.note);
+    if (String(labels[column - 1] || '') !== control.label) { sheetCellsWrite(sheet, 2, column, [[control.label]]); }
   });
+  viewSetupFilterNotes(sheet, header);
   var filterColumns = [];
-  header.forEach(function (code, index) {
-    if (!/^@(CUS|ACT)_/.test(code)) { return; }
-    filterColumns.push(index + 1);
-    var cell = sheet.getRange(3, index + 1);
-    if (!cell.getNote()) { cell.setNote(FILTER_QUICK_REFERENCE); }
-  });
+  header.forEach(function (code, index) { if (/^@(CUS|ACT)_/.test(code)) { filterColumns.push(index + 1); } });
   viewFormatFilterRowText(sheet, filterColumns);
 
   var lastSortRow = SHEET_FIRST_DATA_ROW + VIEW_SORT_MAX_LEVELS - 1;
@@ -109,15 +132,16 @@ function createViewSheet(requestedName) {
 
   var columns = viewStarterColumns();
   var sheet = file.insertSheet(name);
-  sheet.getRange(1, 1, SHEET_HEADER_ROWS, columns.length).setValues([
-    columns.map(function (column) { return column.code; }),
-    columns.map(function (column) { return column.label; }),
-    columns.map(function () { return ''; })
-  ]);
-  sheet.getRange(1, 1, 1, columns.length).setFontWeight('bold').setBackground('#d9ead3');
-  sheet.getRange(2, 1, 1, columns.length).setFontWeight('bold');
-  prepareViewSheet(name);
+  documentLockRun(function () {
+    sheetCellsWrite(sheet, 1, 1, [
+      columns.map(function (column) { return column.code; }),
+      columns.map(function (column) { return column.label; })
+    ]);
+    sheet.getRange(1, 1, 1, columns.length).setFontWeight('bold').setBackground('#d9ead3');
+    sheet.getRange(2, 1, 1, columns.length).setFontWeight('bold');
+    viewPrepareLocked(sheet, name);
+  });
   var rendered = renderViewSheet(name);
   if (typeof file.setActiveSheet === 'function') { file.setActiveSheet(sheet); }
-  return { ok: true, sheetName: name, rows: rendered.rows, viewMeta: rendered.viewMeta };
+  return { ok: rendered.ok, sheetName: name, rows: rendered.rows, problems: rendered.problems };
 }

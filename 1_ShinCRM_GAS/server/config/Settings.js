@@ -106,7 +106,9 @@ var SETTINGS = {
   /** Màu tab sheet quản trị đang cũ (dữ liệu đã đổi nhưng sheet chưa vẽ lại). Cam để khác các màu nhóm sheet thường dùng. */
   VIEW_STALE_TAB_COLOR: '#ff9900',
   /** Lượt vẽ sheet quản trị hỏng thì không tự thử lại với cùng dữ liệu và cùng ô điều khiển, để lỗi không tự đánh thức thành vòng lặp; quá khoảng này thì thử lại một lần, phòng lỗi tạm của Google. Bấm làm mới luôn thử ngay. */
-  VIEW_FAILED_RETRY_MS: 600000
+  VIEW_FAILED_RETRY_MS: 600000,
+  /** Số dòng chi tiết tối đa mỗi khối lỗi vẽ sheet quản trị giữ trong sổ vẽ. Sổ của mọi sheet `!` nằm chung một DocumentProperty (trần khoảng 9 KB), nên lỗi dài (công thức ở hàng trăm cột) phải cắt bớt và báo số dòng còn lại. */
+  VIEW_PROBLEM_MAX_LINES: 20
 };
 
 /**

@@ -7,8 +7,7 @@ function sheetPolicy(sheetName) {
   var layout = SHEET_LAYOUT[sheetName];
   if (layout && layout.plainHeaders) { return { kind: 'log', remembers: false, writable: true, needsLock: false }; }
   if (layout) { return { kind: 'store', remembers: true, writable: true, needsLock: true }; }
-  // Sheet `!` chưa được nhớ: bộ vẽ còn gọi thẳng lệnh Google không qua `SheetCellWrite`, nhớ lúc này là đọc giá trị cũ sau lượt vẽ.
-  if (String(sheetName || '').charAt(0) === '!') { return { kind: 'view', remembers: false, writable: true, needsLock: true }; }
+  if (String(sheetName || '').charAt(0) === '!') { return { kind: 'view', remembers: true, writable: true, needsLock: true }; }
   return { kind: 'free', remembers: false, writable: false, needsLock: false };
 }
 

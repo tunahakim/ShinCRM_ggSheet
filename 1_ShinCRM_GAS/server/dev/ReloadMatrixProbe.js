@@ -210,7 +210,7 @@ function reloadMatrixProbe() {
       customerId: function (i) { return customerIds[i % customerIds.length]; }
     });
     reloadMatrixProbeWriteRows(activity.sheet, activityStartRow, activityFixture);
-    renderAllManagedViews();
+    shinViewSheetNames(book).forEach(renderViewSheet);
     report.push('Fixture nối sau dữ liệu hiện có: Customer ' + customerRows + ' dòng từ hàng ' + customerStartRow + ', Activity ' + activityRows + ' dòng từ hàng ' + activityStartRow + '; view quản trị ' + expectedViews + ' sheet.');
 
     var customerEdit = reloadMatrixProbeFindDataColumn(customer, 'companyName');
@@ -350,7 +350,7 @@ function reloadMatrixProbe() {
       SpreadsheetApp.flush();
       if (temporaryView) { book.deleteSheet(book.getSheetByName(RELOAD_MATRIX_PROBE_VIEW)); }
       if (extraInvalidColumn) { customer.sheet.deleteColumn(customer.sheet.getMaxColumns()); }
-      renderAllManagedViews();
+      shinViewSheetNames(book).forEach(renderViewSheet);
       reloadMatrixProbeRestoreProperties(propSnapshot);
       reloadMatrixProbeRestoreUserPrefs(userPrefsSnapshot);
       resetSettingsCache();

@@ -1,4 +1,10 @@
-/** Vẽ một sheet quản trị từ kho Customer/Activity. Sheet quản trị không bao giờ là nguồn sự thật. */
+/**
+ * Vẽ một sheet quản trị từ kho Customer/Activity. Sheet quản trị không bao giờ là nguồn sự thật. Tài liệu 07.
+ *
+ * Mọi lệnh đọc và ghi sheet `!` đi qua tầng 1 (`SheetReadCopy`, `SheetCellWrite`): hàng 1, hàng lọc và khối sắp xếp đọc một lần rồi nằm trong tờ nháp của lần gọi; ghi tự quên vùng vừa ghi.
+ * Vẽ đè chứ không xóa rồi ghi: mỗi dải cột ShinCRM vẽ là một lệnh ghi cao bằng số dòng cũ hoặc mới (lấy số lớn hơn), dòng thừa ghi ô rỗng.
+ * Lỗi chặn vẽ (hàng 1 sai, lọc sai, sắp xếp sai, công thức trong cột ShinCRM vẽ) dừng trước khi chạm ô nào và trả về các khối `{ title, lines, hint }` cho màn thông báo của Sidebar; không còn note trên ô.
+ */
 
 /** Áp dụng hiến pháp đọc cột: Code Schema, rồi Sheet Schema, cuối cùng mặc định TEXT. */
 function viewFieldMaps(sheetSchema, sourceHeaders) {
@@ -100,24 +106,6 @@ function viewSortRows(rows, specs) {
   return rows.sort(sortSpecComparator(list, function (row, code) { return row.values[code]; }));
 }
 
-function viewReadSortPairs(sheet, headerMap, firstRow, lastRow) {
-  var colAt = headerMap['@VIEW_SORT_COL'];
-  var levelAt = headerMap['@VIEW_SORT_LEVEL'];
-  var cappedLastRow = Math.min(lastRow, firstRow + VIEW_SORT_MAX_LEVELS - 1);
-  if (!colAt || !levelAt || cappedLastRow < firstRow) { return []; }
-  var rows = sheet.getRange(firstRow, 1, cappedLastRow - firstRow + 1, Math.max(colAt, levelAt)).getValues();
-  return rows.map(function (row) { return { col: String(row[colAt - 1] || '').trim(), level: String(row[levelAt - 1] || '').trim() }; });
-}
-
-function viewColumnA1(column, row) {
-  var label = '';
-  var n = column;
-  while (n > 0) { n -= 1; label = String.fromCharCode(65 + n % 26) + label; n = Math.floor(n / 26); }
-  return label + row;
-}
-
-var VIEW_ERROR_NOTE_PREFIX = '⛔ ShinCRM:';
-var VIEW_USER_NOTE_MARKER = '\n\nGhi chú trước đó:\n';
 var VIEW_FILTER_ROW = 3;
 
 /** Múi giờ tệp, đọc lười: chỉ ô lọc kiểu ngày mới cần, nên lượt vẽ thường không tốn lệnh này. */
@@ -135,233 +123,200 @@ function viewFilterCellText(value, timezone) {
   return String(value === null || value === undefined ? '' : value).trim();
 }
 
-function viewHeaderRow(sheet, lastColumn) {
-  return sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(function (value) { return String(value === null || value === undefined ? '' : value).trim(); });
-}
-
-/** Dấu vân tay của đúng các ô người dùng dùng để điều khiển một sheet quản trị. Không ném lỗi khi hàng 1 có mã trùng: lượt vẽ hỏng vì mã trùng vẫn phải được sổ nhớ theo dấu vân tay này. */
-function viewInputSignature(sheet, timezone) {
-  var lastColumn = sheet.getLastColumn();
-  if (lastColumn < 1) { return 'empty'; }
-
-  var header = viewHeaderRow(sheet, lastColumn);
-  var rawFilterRow = sheet.getRange(VIEW_FILTER_ROW, 1, 1, lastColumn).getValues()[0];
-  var filterRow = rawFilterRow.map(function (value, i) { return header[i].charAt(0) === '@' ? viewFilterCellText(value, timezone) : ''; });
-  var sortMap = { '@VIEW_SORT_COL': header.indexOf('@VIEW_SORT_COL') + 1, '@VIEW_SORT_LEVEL': header.indexOf('@VIEW_SORT_LEVEL') + 1 };
-  var sortPairs = viewReadSortPairs(sheet, sortMap, SHEET_FIRST_DATA_ROW, sheet.getLastRow()).filter(function (pair) { return pair.col || pair.level; });
-  var raw = JSON.stringify([header, filterRow, sortPairs]);
-  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, raw);
-  return bytes.map(function (byte) { return ('0' + (byte & 0xFF).toString(16)).slice(-2); }).join('');
-}
-
-function viewInputMetaFromHeader(header, revision) {
-  var filterColumns = [];
-  var sortColumns = [];
-  header.forEach(function (code, i) {
-    if (code.charAt(0) === '@') { filterColumns.push(i + 1); }
-    if (code === '@VIEW_SORT_COL' || code === '@VIEW_SORT_LEVEL') { sortColumns.push(i + 1); }
+/** Ô điều khiển của sheet: hàng 1, hàng lọc, mười cặp sắp xếp (hàng 4–13) và dòng cuối. Hàng 3–13 đọc chung một lệnh và nằm lại trong tờ nháp. */
+function viewControls(sheet) {
+  var header = sheetReadHeader(sheet);
+  var lastRow = sheetReadLastRow(sheet);
+  if (!header.length) { return { header: [], filterRow: [], sortPairs: [], lastRow: lastRow }; }
+  var rowNumbers = [VIEW_FILTER_ROW];
+  for (var row = SHEET_FIRST_DATA_ROW; row < SHEET_FIRST_DATA_ROW + VIEW_SORT_MAX_LEVELS; row++) { rowNumbers.push(row); }
+  var rows = sheetReadRows(sheet, rowNumbers);
+  var colAt = header.indexOf('@VIEW_SORT_COL');
+  var levelAt = header.indexOf('@VIEW_SORT_LEVEL');
+  var sortPairs = colAt < 0 || levelAt < 0 ? [] : rows.slice(1).map(function (values) {
+    return { col: String(values[colAt] || '').trim(), level: String(values[levelAt] || '').trim() };
   });
-  return { revision: Number(revision) || 0, filterColumns: filterColumns, sortColumns: sortColumns };
+  return { header: header, filterRow: rows[0], sortPairs: sortPairs, lastRow: lastRow };
 }
 
-function viewInputMeta(sheet, entry) {
-  var lastColumn = sheet.getLastColumn();
-  var revision = entry ? entry.revision : 0;
-  return viewInputMetaFromHeader(lastColumn < 1 ? [] : viewHeaderRow(sheet, lastColumn), revision);
+/** Một khối lỗi cho màn thông báo. Cắt bớt dòng chi tiết vì sổ vẽ của mọi sheet nằm chung một DocumentProperty. */
+function viewProblem(title, lines, hint) {
+  var max = SETTINGS.VIEW_PROBLEM_MAX_LINES;
+  var list = lines.slice(0, max);
+  if (lines.length > max) { list.push('… và ' + (lines.length - max) + ' dòng khác.'); }
+  return { title: title, lines: list, hint: hint || '' };
+}
+
+/** Các khối lỗi thành chữ, cho Log và hộp báo của lệnh menu. */
+function viewProblemsText(problems) {
+  return (problems || []).map(function (problem) {
+    return problem.title + ':\n' + problem.lines.map(function (line) { return '- ' + line; }).join('\n') + (problem.hint ? '\n' + problem.hint : '');
+  }).join('\n\n');
+}
+
+function viewProblemsError(problems) {
+  var error = new Error(viewProblemsText(problems));
+  error.viewProblems = problems;
+  return error;
 }
 
 function viewFilterErrorText(error) {
   return [error.reason, error.hint].filter(function (part, i, all) { return part && all.indexOf(part) === i; }).join(' ');
 }
 
-/** Lỗi lượt vẽ mang theo note cần đặt và ô công thức chặn (nếu có); cửa thử vẽ quyết có ghi note hay không. */
-function viewRenderError(message, notes, blocker) {
-  var error = new Error(message);
-  error.viewNotes = notes || [];
-  error.viewBlocker = blocker || null;
-  return error;
-}
-
-function viewSetErrorNote(sheet, column, message) {
-  var cell = sheet.getRange(VIEW_FILTER_ROW, column);
-  var current = typeof cell.getNote === 'function' ? String(cell.getNote() || '') : '';
-  var userNote = current;
-  if (current.indexOf(VIEW_ERROR_NOTE_PREFIX) === 0) {
-    var markerAt = current.indexOf(VIEW_USER_NOTE_MARKER);
-    userNote = markerAt >= 0 ? current.slice(markerAt + VIEW_USER_NOTE_MARKER.length) : '';
-  }
-  cell.setNote(VIEW_ERROR_NOTE_PREFIX + ' ' + message + (userNote ? VIEW_USER_NOTE_MARKER + userNote : ''));
-}
-
-function viewClearErrorNotes(sheet, columns) {
-  columns.forEach(function (column) {
-    var cell = sheet.getRange(VIEW_FILTER_ROW, column);
-    if (typeof cell.getNote !== 'function') { return; }
-    var current = String(cell.getNote() || '');
-    if (current.indexOf(VIEW_ERROR_NOTE_PREFIX) !== 0) { return; }
-    var markerAt = current.indexOf(VIEW_USER_NOTE_MARKER);
-    if (markerAt >= 0) { cell.setNote(current.slice(markerAt + VIEW_USER_NOTE_MARKER.length)); }
-    else { cell.clearNote(); }
+/** Cột ShinCRM vẽ mà đang có công thức ở hàng dữ liệu: vẽ đè sẽ xóa mất công thức, nên báo đủ mọi cột như vậy. Mỗi dải cột một lệnh đọc. */
+function viewFormulaProblem(sheet, header, writable, lastRow) {
+  var rows = lastRow - SHEET_FIRST_DATA_ROW + 1;
+  if (rows < 1) { return null; }
+  var lines = [];
+  sheetRegionsSpans(writable).forEach(function (span) {
+    var formulas = sheetReadFormulas(sheet, SHEET_FIRST_DATA_ROW, span[0], rows, span.length);
+    span.forEach(function (column, i) {
+      var found = formulas.some(function (cells) { return !!cells[i]; });
+      if (found) { lines.push('Cột ' + selectionColumnLetters(column) + ', stt: ' + column + ', Mã cột: ' + header[column - 1]); }
+    });
   });
-}
-
-/** Ô công thức trong vùng bộ vẽ ghi sẽ bị xóa mất ở lần vẽ, nên dừng trước khi chạm bất kỳ ô nào. Note đặt ở ô hàng lọc của cột đó; ô công thức là `blocker` để sổ biết thử lại khi nó được gỡ. */
-function viewAssertNoFormulas(sheet, name, spans) {
-  var rows = sheet.getLastRow() - SHEET_FIRST_DATA_ROW + 1;
-  if (rows < 1) { return; }
-  var found = null;
-  spans.some(function (span) {
-    var formulas = sheet.getRange(SHEET_FIRST_DATA_ROW, span[0], rows, span[1]).getFormulas();
-    for (var r = 0; r < formulas.length && !found; r++) {
-      for (var c = 0; c < formulas[r].length; c++) {
-        if (formulas[r][c]) { found = { row: SHEET_FIRST_DATA_ROW + r, column: span[0] + c, formula: formulas[r][c] }; break; }
-      }
-    }
-    return !!found;
-  });
-  if (!found) { return; }
-  var cell = viewColumnA1(found.column, found.row);
-  var hint = 'Ô ' + cell + ' có công thức ' + found.formula + ' nằm trong cột ShinCRM tự vẽ. Chuyển công thức sang cột không có mã @ hoặc sang sheet khác.';
-  throw viewRenderError('Sheet "' + name + '", ô ' + cell + ': ' + hint + ' Sheet chưa được vẽ lại.', [{ column: found.column, text: hint }], { row: found.row, column: found.column });
-}
-
-function viewColumnSpans(columns) {
-  var sorted = columns.slice().sort(function (a, b) { return a - b; });
-  var spans = [];
-  sorted.forEach(function (column) {
-    var last = spans[spans.length - 1];
-    if (last && column === last[0] + last[1]) { last[1] += 1; }
-    else { spans.push([column, 1]); }
-  });
-  return spans;
+  if (!lines.length) { return null; }
+  return viewProblem('Có công thức trong các cột ShinCRM tự vẽ', lines, 'Chuyển công thức sang cột không có mã @ hoặc sang sheet khác.');
 }
 
 /** Hàng lọc khuôn chữ để người dùng gõ gì ô giữ đúng chữ đó, kể cả `2026-10-01` mà Sheets hay tự đổi thành ngày. */
 function viewFormatFilterRowText(sheet, columns) {
-  viewColumnSpans(columns).forEach(function (span) {
-    sheet.getRange(VIEW_FILTER_ROW, span[0], 1, span[1]).setNumberFormat(COLUMN_FORMAT_TEXT);
+  sheetRegionsSpans(columns).forEach(function (span) {
+    sheetCellsFormat(sheet, VIEW_FILTER_ROW, span[0], 1, span.length, COLUMN_FORMAT_TEXT);
   });
 }
 
-/** Ô đã thành ngày từ trước thì ghi lại chữ một lần. Dấu vân tay đọc ô ngày và ô chữ ra cùng chuỗi nên lần ghi lại không sinh lượt vẽ thứ hai. */
+/** Ô đã thành ngày từ trước thì ghi lại chữ một lần. */
 function viewKeepFilterRowText(sheet, writable, filterRow, timezone) {
   viewFormatFilterRowText(sheet, writable);
   writable.forEach(function (column) {
     var value = filterRow[column - 1];
-    if (dateTextIsDate(value)) { sheet.getRange(VIEW_FILTER_ROW, column).setValue(viewFilterCellText(value, timezone)); }
+    if (dateTextIsDate(value)) { sheetCellsWrite(sheet, VIEW_FILTER_ROW, column, [[viewFilterCellText(value, timezone)]]); }
   });
 }
 
-/** Vẽ một lượt; không ghi sổ, không ghi note lỗi — việc của `viewAttemptLocked`. `clearNotes`: lượt trước hỏng hoặc chưa có sổ thì mới dò gỡ note ⛔. */
-function viewRenderSheetLocked(sheet, name, timezone, clearNotes) {
+/** Kiểm mọi lỗi chặn vẽ trước khi đọc kho; có lỗi thì ném một lỗi mang đủ các khối, chưa chạm ô nào. Trả các cột được vẽ, bộ lọc và thứ tự sắp đã hiểu. */
+function viewRenderPlan(sheet, name, controls, config, fieldByCode, sourceFieldByCode, customerContext, activityContext, timezone) {
+  var header = controls.header;
+  var writable;
+  try {
+    viewHeaderMap(header, name);
+    writable = viewWritableColumns(header, customerContext, activityContext);
+  } catch (headerError) {
+    throw viewProblemsError([viewProblem('Hàng mã cột (hàng 1) sai', [errorMessage(headerError)])]);
+  }
+
+  var problems = [];
+  var filters = {};
+  var filterLines = [];
+  writable.forEach(function (column) {
+    var raw = viewFilterCellText(controls.filterRow[column - 1], timezone);
+    if (!raw) { return; }
+    var parsed = filterParseCell(raw, fieldByCode[header[column - 1]]);
+    if (!parsed.errors.length) { filters[column] = parsed; return; }
+    parsed.errors.forEach(function (error) {
+      filterLines.push('Ô ' + selectionColumnLetters(column) + VIEW_FILTER_ROW + ' (' + header[column - 1] + '): bạn gõ "' + error.raw + '". ' + viewFilterErrorText(error));
+    });
+  });
+  if (filterLines.length) { problems.push(viewProblem('Điều kiện lọc sai (hàng 3)', filterLines)); }
+
+  var localSort = sortSpecParse(controls.sortPairs, sourceFieldByCode);
+  if (localSort.errors.length) { problems.push(viewProblem('Quy tắc sắp xếp của sheet sai (hai cột sắp xếp, hàng 4–13)', localSort.errors)); }
+  var configSort = localSort.specs.length || localSort.errors.length ? { specs: [], errors: [] } : sortSpecParse(config.sort, sourceFieldByCode);
+  if (configSort.errors.length) { problems.push(viewProblem('Sắp xếp chung trong Config sai', configSort.errors)); }
+
+  var formulas = viewFormulaProblem(sheet, header, writable, controls.lastRow);
+  if (formulas) { problems.push(formulas); }
+  if (problems.length) { throw viewProblemsError(problems); }
+
+  var specs = localSort.specs.length ? localSort.specs : configSort.specs.length ? configSort.specs : [
+    { code: DATA_SCHEMA.activity.workDate.code, direction: 'desc', field: DATA_SCHEMA.activity.workDate },
+    { code: DATA_SCHEMA.activity.id.code, direction: 'desc', field: DATA_SCHEMA.activity.id }
+  ];
+  return { writable: writable, filters: filters, specs: specs };
+}
+
+/** Vẽ đè các cột ShinCRM vẽ: mỗi dải cột một lệnh ghi cao bằng số dòng cũ hoặc mới, dòng thừa là ô rỗng nên không cần lệnh xóa. */
+function viewWriteRows(sheet, header, writable, rows, oldRows, fieldByCode) {
+  var height = Math.max(oldRows, rows.length);
+  if (!height) { return; }
+  sheetGridEnsureRoom(sheet, SHEET_FIRST_DATA_ROW + height - 1, SHEET_GRID_SLACK);
+  var textColumns = writable.filter(function (column) { return columnFormatIsText(fieldByCode[header[column - 1]]); });
+  sheetRegionsSpans(textColumns).forEach(function (span) {
+    sheetCellsFormat(sheet, SHEET_FIRST_DATA_ROW, span[0], height, span.length, COLUMN_FORMAT_TEXT);
+  });
+  sheetRegionsSpans(writable).forEach(function (span) {
+    var matrix = [];
+    for (var i = 0; i < height; i++) {
+      var row = rows[i];
+      matrix.push(span.map(function (column) {
+        var value = row ? row.values[header[column - 1]] : '';
+        return value === undefined ? '' : value;
+      }));
+    }
+    sheetCellsWrite(sheet, SHEET_FIRST_DATA_ROW, span[0], matrix);
+  });
+}
+
+/** Vẽ một lượt; không ghi sổ — việc của `viewAttemptLocked`. Lỗi chặn vẽ ném ra mang `viewProblems`. */
+function viewRenderSheetLocked(sheet, name, timezone) {
+  var controls = viewControls(sheet);
+  var header = controls.header;
+  if (!header.length) { return { header: [], rows: 0 }; }
   var config = configReadAll();
   var customerContext = entityReadContext('customer');
   var activityContext = entityReadContext('activity');
   var sourceHeaders = customerContext.columnMap.headerRow.concat(activityContext.columnMap.headerRow);
   var fieldByCode = viewFieldMaps(config.sheetSchema, sourceHeaders);
   var sourceFieldByCode = viewSourceFieldMaps(fieldByCode, sourceHeaders);
-  var lastColumn = sheet.getLastColumn();
-  if (lastColumn < 1) { return { header: [], rows: 0 }; }
-  var header = viewHeaderRow(sheet, lastColumn);
-  var filterRow = sheet.getRange(VIEW_FILTER_ROW, 1, 1, lastColumn).getValues()[0];
-  var headerMap = viewHeaderMap(header, name);
-  var writable = viewWritableColumns(header, customerContext, activityContext);
-  var filters = {};
-  var filterErrors = [];
-  writable.forEach(function (column) {
-    var raw = viewFilterCellText(filterRow[column - 1], timezone);
-    if (!raw) { return; }
-    var parsed = filterParseCell(raw, fieldByCode[header[column - 1]]);
-    if (parsed.errors.length) { parsed.errors.forEach(function (error) { filterErrors.push({ cell: viewColumnA1(column, VIEW_FILTER_ROW), column: column, error: error }); }); }
-    else { filters[column] = parsed; }
-  });
-  if (filterErrors.length) {
-    var notes = {};
-    filterErrors.forEach(function (item) {
-      if (!notes[item.column]) { notes[item.column] = []; }
-      notes[item.column].push(viewFilterErrorText(item.error));
-    });
-    throw viewRenderError(
-      filterErrors.map(function (item) { return 'Sheet "' + name + '", ô ' + item.cell + ': bạn gõ "' + item.error.raw + '". ' + viewFilterErrorText(item.error) + ' Sheet chưa được vẽ lại.'; }).join('\n'),
-      Object.keys(notes).map(function (column) { return { column: Number(column), text: notes[column].join('\n') }; })
-    );
-  }
-
-  var localSort = sortSpecParse(viewReadSortPairs(sheet, headerMap, SHEET_FIRST_DATA_ROW, sheet.getLastRow()), sourceFieldByCode);
-  if (localSort.errors.length) { throw new Error(localSort.errors.join('\n') + '\nSheet chưa được vẽ lại.'); }
-  var configSort = localSort.specs.length ? { specs: [], errors: [] } : sortSpecParse(config.sort, sourceFieldByCode);
-  if (configSort.errors.length) { throw new Error(configSort.errors.join('\n') + '\nSheet chưa được vẽ lại.'); }
-  var specs = localSort.specs.length ? localSort.specs : configSort.specs.length ? configSort.specs : [
-    { code: DATA_SCHEMA.activity.workDate.code, direction: 'desc', field: DATA_SCHEMA.activity.workDate },
-    { code: DATA_SCHEMA.activity.id.code, direction: 'desc', field: DATA_SCHEMA.activity.id }
-  ];
+  var plan = viewRenderPlan(sheet, name, controls, config, fieldByCode, sourceFieldByCode, customerContext, activityContext, timezone);
 
   var customers = viewReadEntity(customerContext, fieldByCode);
   var activities = viewLatestActivity(viewReadEntity(activityContext, fieldByCode));
   var customerIdCode = DATA_SCHEMA.customer.id.code;
   var rows = customers.map(function (customer) {
-    var activity = activities[customer[customerIdCode]];
-    var values = viewValues(customer, activity);
-    var filtered = false;
-    writable.forEach(function (column) {
+    var values = viewValues(customer, activities[customer[customerIdCode]]);
+    var filtered = plan.writable.some(function (column) {
       var code = header[column - 1];
-      if (filters[column] && !filterCellMatches(values[code], filters[column], fieldByCode[code])) { filtered = true; }
+      return !!plan.filters[column] && !filterCellMatches(values[code], plan.filters[column], fieldByCode[code]);
     });
     return { customer: customer, values: values, filtered: filtered };
   }).filter(function (row) { return !row.filtered; });
-  viewSortRows(rows, specs);
+  viewSortRows(rows, plan.specs);
 
-  var spans = viewColumnSpans(writable);
-  viewAssertNoFormulas(sheet, name, spans);
-  viewKeepFilterRowText(sheet, writable, filterRow, timezone);
-  var oldLast = Math.max(sheet.getLastRow(), SHEET_FIRST_DATA_ROW - 1);
-  var oldRows = oldLast - SHEET_FIRST_DATA_ROW + 1;
-  var formatRows = Math.max(oldRows, rows.length);
-  var textColumns = writable.filter(function (column) { return columnFormatIsText(fieldByCode[header[column - 1]]); });
-  if (formatRows > 0) {
-    viewColumnSpans(textColumns).forEach(function (span) {
-      sheet.getRange(SHEET_FIRST_DATA_ROW, span[0], formatRows, span[1]).setNumberFormat(COLUMN_FORMAT_TEXT);
-    });
-  }
-  if (oldRows > 0) { spans.forEach(function (span) { sheet.getRange(SHEET_FIRST_DATA_ROW, span[0], oldRows, span[1]).clearContent(); }); }
-  if (rows.length) {
-    spans.forEach(function (span) {
-      var matrix = rows.map(function (row) { return header.slice(span[0] - 1, span[0] - 1 + span[1]).map(function (code) { return row.values[code] === undefined ? '' : row.values[code]; }); });
-      sheet.getRange(SHEET_FIRST_DATA_ROW, span[0], rows.length, span[1]).setValues(matrix);
-    });
-  }
-  if (clearNotes) { viewClearErrorNotes(sheet, writable); }
-  SpreadsheetApp.flush();
+  viewKeepFilterRowText(sheet, plan.writable, controls.filterRow, timezone);
+  viewWriteRows(sheet, header, plan.writable, rows, Math.max(0, controls.lastRow - SHEET_FIRST_DATA_ROW + 1), fieldByCode);
   return { header: header, rows: rows.length };
 }
 
 /**
- * Cửa duy nhất của mọi lượt thử vẽ (tự động, trigger, bấm làm mới): ghi sổ trước khi trả hay ném.
- * Note ⛔ chỉ ghi khi lỗi khác lỗi của lượt hỏng trước, vì ghi note là ghi Sheet và đánh thức Sidebar lần nữa. Lỗi lặp lại vẫn ném (người bấm làm mới phải thấy lỗi) nhưng mang `viewRepeated` để bên gọi không ghi Log thêm.
- * `data` đọc lúc bắt đầu: tín hiệu đến giữa lượt vẽ để sheet vẫn cũ.
+ * Cửa duy nhất của mọi lượt thử vẽ (Sidebar hỏi, bấm làm mới, tạo sheet): ghi sổ rồi trả kết quả, kể cả khi hỏng — lỗi đi vào sổ và về Sidebar dưới dạng khối, không ném.
+ * Lỗi giống hệt lượt hỏng trước không ghi Log lần nữa, để lỗi không tự đánh thức thành chuỗi dòng Log. Lỗi ngoài dự kiến (lỗi Google, lỗi code) cũng thành một khối và ghi Log mức lỗi.
+ * `data` đọc lúc bắt đầu: tín hiệu đến giữa lượt vẽ để sheet vẫn cũ. Mục sổ mới không mang cờ ô điều khiển: lượt thử này đã xét đúng các ô đó.
  */
-function viewAttemptLocked(sheet, name, input, timezone) {
+function viewAttemptLocked(sheet, name, timezone) {
   var previous = viewLedgerEntry(name);
   var data = reloadStateRead().revision;
   var revision = previous ? Number(previous.revision) || 0 : 0;
   var drawn;
   try {
-    drawn = viewRenderSheetLocked(sheet, name, timezone, !previous || previous.ok !== true);
+    drawn = viewRenderSheetLocked(sheet, name, timezone);
   } catch (error) {
-    var message = String(error && error.message || error);
-    var repeated = !!previous && previous.ok !== true && previous.error === message;
-    if (!repeated && error && error.viewNotes && error.viewNotes.length) {
-      error.viewNotes.forEach(function (note) { viewSetErrorNote(sheet, note.column, note.text); });
-      SpreadsheetApp.flush();
-    }
-    viewLedgerWrite(name, { data: data, input: input, ok: false, error: message, at: Date.now(), revision: revision, blocker: error && error.viewBlocker || null });
+    var expected = !!(error && error.viewProblems);
+    var problems = expected ? error.viewProblems : [viewProblem('Lỗi khi vẽ sheet', [errorMessage(error)])];
+    var repeated = !!previous && previous.ok !== true && JSON.stringify(previous.problems || []) === JSON.stringify(problems);
+    viewLedgerWrite(name, { data: data, ok: false, problems: problems, at: Date.now(), revision: revision });
     viewTabColorSync([sheet]);
-    if (error && typeof error === 'object') { error.viewRepeated = repeated; }
-    throw error;
+    if (!repeated) {
+      logEvent({ source: 'core', action: 'renderView', outcome: expected ? LOG_WARN : LOG_ERROR, reason: 'Sheet "' + name + '" chưa được vẽ lại.', detail: { sheetName: name, problems: viewProblemsText(problems) } });
+    }
+    return { ok: false, sheetName: name, problems: problems, reload: reloadStateRead() };
   }
-  viewLedgerWrite(name, { data: data, input: input, ok: true, error: '', at: Date.now(), revision: revision + 1, blocker: null });
+  viewLedgerWrite(name, { data: data, ok: true, problems: [], at: Date.now(), revision: revision + 1 });
   viewTabColorSync([sheet]);
-  return { ok: true, sheetName: name, viewMeta: viewInputMetaFromHeader(drawn.header, revision + 1), rows: drawn.rows, reload: reloadStateRead() };
+  if (previous && previous.ok !== true) { logEvent({ source: 'core', action: 'renderView', outcome: LOG_OK, reason: 'Sheet "' + name + '" đã vẽ lại được, hết lỗi.', detail: { sheetName: name } }); }
+  return { ok: true, sheetName: name, rows: drawn.rows, problems: [], reload: reloadStateRead() };
 }
 
 function viewOpenLocked(sheetName, work) {
@@ -371,87 +326,34 @@ function viewOpenLocked(sheetName, work) {
   return documentLockRun(function () { return work(sheet, name); });
 }
 
-/** Người dùng yêu cầu vẽ (bấm làm mới, menu, tạo sheet): luôn thử, kể cả khi sổ nói đầu vào này đã hỏng. */
+/** Người dùng yêu cầu vẽ (bấm làm mới, menu, tạo sheet): luôn thử, kể cả khi sổ nói lượt trước đã hỏng. */
 function renderViewSheet(sheetName) {
   return viewOpenLocked(sheetName, function (sheet, name) {
-    var timezone = viewTimezoneReader();
-    return viewAttemptLocked(sheet, name, viewInputSignature(sheet, timezone), timezone);
+    return viewAttemptLocked(sheet, name, viewTimezoneReader());
   });
-}
-
-/** Vẽ nhiều sheet quản trị, sheet lỗi không chặn sheet sau. Không truyền tên thì vẽ mọi sheet `!`. Không đọc công tắc người dùng: chỉ gọi khi người dùng sửa bộ điều khiển. */
-function renderAllManagedViews(sheetNames) {
-  var names = Array.isArray(sheetNames) ? sheetNames : shinViewSheetNames(shinOpenBook());
-  var results = names.map(function (name) {
-    try {
-      return renderViewSheet(name);
-    } catch (error) {
-      // Sheet lỗi không chặn sheet sau, nhưng không được im lặng: note trên sheet báo tại chỗ, Log giữ vết khi không ai đứng ở sheet đó. Lỗi trùng lượt hỏng trước đã có trong Log.
-      if (!(error && error.viewRepeated)) { logEvent({ source: 'core', action: 'renderView', outcome: LOG_WARN, reason: errorMessage(error), detail: { sheetName: name } }); }
-      return { ok: false, sheetName: name, error: String(error && error.message || error), reload: reloadStateRead() };
-    }
-  });
-  var failed = results.filter(function (result) { return result.ok !== true; });
-  return {
-    ok: failed.length === 0,
-    results: results,
-    failed: failed,
-    rendered: results.filter(function (result) { return result.ok === true; }),
-    reload: reloadStateRead()
-  };
 }
 
 function viewProbeRenderCurrent() {
   var sheet = shinOpenBook().getActiveSheet();
   var result = renderViewSheet(sheet.getName());
-  var report = ['Sheet: ' + result.sheetName, 'Số dòng: ' + result.rows];
+  var report = ['Sheet: ' + result.sheetName, result.ok ? 'Số dòng: ' + result.rows : 'Lỗi:\n' + viewProblemsText(result.problems)];
   report.forEach(function (line) { Logger.log(line); });
   return report;
 }
 
-/**
- * Sidebar gọi khi có người xem sheet: thử vẽ khi sổ nói cần thử (dữ liệu đổi, ô điều khiển đổi, công thức chặn đã gỡ, lượt hỏng đến hạn thử lại). Ngoài đó chỉ trả `viewMeta` và kết quả lượt thử gần nhất, kể cả lỗi, mà không ghi Sheet.
- * `controlsOnly`: đường lấy metadata hàng điều khiển bỏ qua phần dữ liệu; sheet cũ thì để lời hỏi `probeSelectionAndReload` quyết theo núm người dùng, không vẽ lén khi núm tắt.
- */
-function renderViewIfDirty(sheetName, options) {
-  return runEntryPoint('renderViewIfDirty', 'sidebar', 'throw', function () { return viewRenderIfStale(sheetName, options); });
+/** Sidebar gọi khi lời hỏi chung quyết vẽ sheet đang xem: thử vẽ khi sổ nói cần thử (chưa có mục, cờ ô điều khiển, dữ liệu đổi, lượt hỏng đến hạn thử lại). Ngoài đó chỉ trả kết quả lượt thử gần nhất, kể cả các khối lỗi, mà không chạm Sheet. */
+function renderViewIfDirty(sheetName) {
+  return runEntryPoint('renderViewIfDirty', 'sidebar', 'throw', function () { return viewRenderIfStale(sheetName); });
 }
 
 /** Phần ruột không bọc cửa vào, cho đường nội bộ và probe DEV. */
-function viewRenderIfStale(sheetName, options) {
-  var controlsOnly = !!(options && options.controlsOnly);
+function viewRenderIfStale(sheetName) {
   return viewOpenLocked(sheetName, function (sheet, name) {
-    var now = Date.now();
-    var timezone = viewTimezoneReader();
     var entry = viewLedgerEntry(name);
-    var input = viewInputSignature(sheet, timezone);
     var reload = reloadStateRead();
-    if (viewLedgerControlsNeedAttempt(entry, sheet, input, now) || (!controlsOnly && viewLedgerDataNeedsAttempt(entry, reload.viewsStaleRevision, now))) {
-      return viewAttemptLocked(sheet, name, input, timezone);
+    if (viewLedgerNeedsAttempt(entry, reload.viewsStaleRevision, Date.now())) {
+      return viewAttemptLocked(sheet, name, viewTimezoneReader());
     }
-    return { ok: entry.ok === true, skipped: true, sheetName: name, error: entry.ok === true ? '' : entry.error, viewMeta: viewInputMeta(sheet, entry), reload: reload };
-  });
-}
-
-/** Kiểm tra nhẹ trước khi client quyết định có cần khóa sidebar và làm mới view hay không. */
-function inspectViewState(sheetName, knownRevision) {
-  return runEntryPoint('inspectViewState', 'sidebar', 'throw', function () {
-    var started = Date.now();
-    return viewOpenLocked(sheetName, function (sheet, name) {
-      var reload = reloadStateRead();
-      var entry = viewLedgerEntry(name);
-      var revision = entry ? Number(entry.revision) || 0 : 0;
-      return {
-        ok: true,
-        sheetName: name,
-        changed: revision !== (Number(knownRevision) || 0),
-        // Chỉ phần điều khiển; sheet cũ do lời hỏi probe quyết theo núm người dùng.
-        needsRender: viewLedgerControlsNeedAttempt(entry, sheet, viewInputSignature(sheet, viewTimezoneReader()), started),
-        dirty: reload,
-        reload: reload,
-        revision: revision,
-        ms: Date.now() - started
-      };
-    });
+    return { ok: entry.ok === true, skipped: true, sheetName: name, problems: entry.ok === true ? [] : entry.problems || [], reload: reload };
   });
 }

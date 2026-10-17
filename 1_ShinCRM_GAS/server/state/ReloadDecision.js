@@ -6,19 +6,18 @@
  * bảo vệ bản nháp. Nhờ vậy RAM và renderer dùng cùng một bảng luật nhưng
  * không biến hàm quyết định thành một cửa ghi ẩn.
  *
- * Sheet quản trị vẽ khi có người xem: dữ liệu kho đổi chỉ làm view cũ
- * (`signal.allViews`). Trigger chỉ vẽ khi người dùng sửa bộ điều khiển: hàng
- * 1/hàng 3/cột sắp xếp của một sheet `!` thì vẽ đúng sheet đó, cột sắp xếp
- * chung trong Config thì vẽ mọi sheet `!`. Hai nhánh này bỏ qua công tắc
- * người dùng vì đó là lệnh trực tiếp.
+ * Sheet quản trị chỉ vẽ khi có người xem, qua lời hỏi chung của Sidebar;
+ * không đường nào vẽ mọi sheet `!` một lượt. Dữ liệu kho hay Config đổi chỉ
+ * làm mọi view cũ (`signal.allViews`). Người dùng sửa ô điều khiển của một
+ * sheet `!` thì chỉ gắn cờ cho đúng sheet đó (`signal.viewSheets`); cờ này
+ * vẽ cả khi người dùng tắt tự làm mới vì đó là lệnh trực tiếp.
  */
 
 function reloadDecisionBlank(reason) {
   return {
     kind: 'none',
     ram: { action: 'none', mode: 'none', recordIds: [], deferredRecordIds: [], reason: reason || '' },
-    views: { action: 'none', mode: 'none', sheetName: '', reason: reason || '' },
-    signal: { records: [], recordEntity: '', entities: [], category: false, config: false, schema: false, allCore: false, allViews: false },
+    signal: { records: [], recordEntity: '', entities: [], category: false, config: false, schema: false, allCore: false, allViews: false, viewSheets: [] },
     notifySidebar: false,
     reason: reason || ''
   };
@@ -82,7 +81,7 @@ function reloadDecisionForChange(input) {
   if (isViewControl) {
     var sheetName = String(change.sheetName || '').trim();
     decision.kind = 'view-control';
-    if (sheetName) { decision.views = { action: 'render', mode: 'sheet', sheetName: sheetName, reason: 'Thay đổi điều khiển trực tiếp sheet quản trị.' }; }
+    if (sheetName) { decision.signal.viewSheets = [sheetName]; }
     decision.reason = 'Thay đổi điều khiển view.';
     return decision;
   }
@@ -150,7 +149,6 @@ function reloadDecisionForChange(input) {
     reloadDecisionWithRam(decision, configNeedsFullCore ? 'fullCore' : 'config', [], change, configNeedsFullCore
       ? 'Config ảnh hưởng Schema nên phải nạp lại full core.'
       : 'Config đổi, nạp riêng toàn bộ khối Config.');
-    if (change.configSort === true) { decision.views = { action: 'render', mode: 'all', sheetName: '', reason: 'Sắp xếp chung trong Config là bộ điều khiển của mọi sheet quản trị.' }; }
     decision.notifySidebar = true;
     decision.reason = 'Config đổi.';
     return decision;
@@ -219,14 +217,18 @@ function reloadDecisionForState(input) {
 }
 
 /**
- * Quyết định cho sheet `!` người dùng đang xem, theo sổ trạng thái (`entry`): cũ và cần thử thì Sidebar gọi vẽ nếu công tắc bật, tắt thì chỉ báo.
+ * Quyết định cho sheet `!` người dùng đang xem, theo sổ trạng thái (`entry`): cũ và cần thử thì Sidebar gọi vẽ nếu công tắc bật, tắt thì chỉ báo; cờ ô điều khiển thì luôn vẽ.
  * Cũ mà lượt hỏng ở đúng dữ liệu này chưa đến hạn thử lại thì chỉ báo: thử lại lúc này cho ra đúng lỗi cũ và tự đánh thức lần nữa.
+ * `problems`: các khối lỗi của lượt hỏng gần nhất (rỗng khi lượt gần nhất thành công), để Sidebar hiện màn thông báo mà không phải gọi thêm.
  */
 function reloadDecisionForView(input) {
   var view = input || {};
   var sheetName = String(view.sheetName || '').trim();
-  if (sheetName.charAt(0) !== '!') { return { sheetName: sheetName, stale: false, action: 'none' }; }
-  var stale = viewLedgerStale(view.entry || null, view.viewsStaleRevision);
-  var attempt = stale && viewLedgerDataNeedsAttempt(view.entry || null, view.viewsStaleRevision, Number(view.now) || 0);
-  return { sheetName: sheetName, stale: stale, action: !stale ? 'none' : !attempt || view.autoRenderView === false ? 'notify' : 'render' };
+  if (sheetName.charAt(0) !== '!') { return { sheetName: sheetName, stale: false, action: 'none', problems: [] }; }
+  var entry = view.entry || null;
+  var stale = viewLedgerStale(entry, view.viewsStaleRevision);
+  var attempt = stale && viewLedgerNeedsAttempt(entry, view.viewsStaleRevision, Number(view.now) || 0);
+  var forced = !!entry && entry.controls === true;
+  var problems = entry && entry.ok !== true && Array.isArray(entry.problems) ? entry.problems : [];
+  return { sheetName: sheetName, stale: stale, action: !stale ? 'none' : forced ? 'render' : !attempt || view.autoRenderView === false ? 'notify' : 'render', problems: problems };
 }

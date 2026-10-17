@@ -16,7 +16,7 @@
  * Vì sao: mỗi dòng Log là một lần ghi Sheet, kênh báo thay đổi đánh thức Sidebar hỏi lại; ghi lỗi trùng ở mỗi lần là tự nuôi vòng lặp. Sidebar vẫn nhận lỗi mỗi lần nên không có lỗi im lặng.
  * Không gồm cửa vào FBM: luật đồng bộ FBM đòi mọi lỗi vào Log.
  */
-var ENTRY_POINT_LOG_ON_CHANGE = ['probeSelectionAndReload', 'getReloadState', 'reloadRecords', 'inspectViewState', 'renderViewIfDirty'];
+var ENTRY_POINT_LOG_ON_CHANGE = ['probeSelectionAndReload', 'getReloadState', 'reloadRecords', 'renderViewIfDirty'];
 var ENTRY_FAILURES_KEY = 'entryFailures';
 
 function entryFailuresRead() {

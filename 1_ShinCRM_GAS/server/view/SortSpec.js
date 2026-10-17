@@ -15,9 +15,11 @@ function sortSpecParse(levels, fieldByCode) {
     var code = String(item && item.col || '').trim();
     var direction = sortSpecLevel(item && item.level);
     if (!code && !item.level) { return; }
+    // Hàng thiếu một vế bị bỏ qua, nhưng vế có mặt vẫn phải hợp lệ: giá trị dán đè qua ô kiểm dữ liệu không được lặng lẽ mất tác dụng.
+    var codeOk = /^@(?:CUS|ACT)_/.test(code) && !!fieldByCode && !!fieldByCode[code];
+    if (code && !codeOk) { errors.push('Không tìm thấy cột ' + code + ' trong kho dữ liệu.'); return; }
+    if (item.level && !direction) { errors.push('Không hiểu chiều sắp xếp "' + item.level + '".'); return; }
     if (!code || !item.level) { return; }
-    if (!/^@(?:CUS|ACT)_/.test(code) || !fieldByCode || !fieldByCode[code]) { errors.push('Không tìm thấy cột ' + code + ' trong kho dữ liệu.'); return; }
-    if (!direction) { errors.push('Không hiểu chiều sắp xếp "' + item.level + '".'); return; }
     result.push({ code: code, direction: direction, field: fieldByCode[code] });
   });
   return { specs: result, errors: errors };

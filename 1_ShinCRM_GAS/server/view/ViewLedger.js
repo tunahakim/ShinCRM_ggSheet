@@ -1,15 +1,15 @@
 /**
- * Sổ trạng thái của sheet quản trị: mỗi sheet `!` một mục ghi lượt thử vẽ gần nhất — với revision dữ liệu nào, dấu vân tay ô điều khiển nào, kết quả ra sao.
+ * Sổ trạng thái của sheet quản trị: mỗi sheet `!` một mục ghi lượt thử vẽ gần nhất — với revision dữ liệu nào, kết quả ra sao — và cờ ô điều khiển vừa đổi.
  *
- * Vì sao là một sổ: kênh báo thay đổi đánh thức GAS cả khi chính GAS vừa ghi (Log, note, lượt vẽ). Phản ứng chỉ hội tụ khi GAS nhớ "đầu vào này đã xét, kết quả thế này" — kể cả khi hỏng. Hai sổ cũ chỉ ghi khi vẽ thành công nên lượt hỏng bị thử lại ở mọi lần đánh thức, và mỗi lần thử lại ghi Log, note, thành vòng lặp.
+ * Vì sao là một sổ: kênh báo thay đổi đánh thức GAS cả khi chính GAS vừa ghi (Log, lượt vẽ). Phản ứng chỉ hội tụ khi GAS nhớ "đầu vào này đã xét, kết quả thế này" — kể cả khi hỏng; lượt hỏng chỉ thử lại khi dữ liệu đổi, người dùng sửa sheet đó (cờ `controls`) hoặc đến hạn thử lại.
  *
- * Mục sổ: `{ data, input, ok, error, at, revision, blocker }`.
+ * Mục sổ: `{ data, ok, problems, at, revision, controls }`.
  * - `data`: `ReloadState.revision` đọc lúc bắt đầu lượt thử; tín hiệu đến giữa lượt vẽ để sheet vẫn cũ.
- * - `input`: dấu vân tay ô điều khiển lúc thử. `revision`: bộ đếm cho Sidebar biết metadata hàng điều khiển đổi.
- * - `blocker`: ô công thức chặn lượt vẽ; người dùng gỡ công thức không đổi dấu vân tay nên phải dò riêng đúng ô đó.
+ * - `problems`: các khối lỗi `{ title, lines }` của lượt hỏng, để Sidebar hiện mà không phải vẽ lại. `revision`: số lượt vẽ thành công.
+ * - `controls`: trigger thấy người dùng sửa ô điều khiển (hoặc sửa bất kỳ ô nào trên sheet đang lỗi). Chỉ trigger bật, chỉ lượt thử vẽ tắt; cờ bật thì vẽ cả khi người dùng tắt tự làm mới, vì đó là lệnh trực tiếp.
  *
- * Theo tên sheet chứ không theo sheetId để lời hỏi của Sidebar quyết mà không phải mở bảng tính; đổi tên sheet chỉ làm sheet đó vẽ lại một lần.
- * Tệp này không chạm Sheet trừ một lần đọc công thức ô `blocker`; ghi sổ chỉ gọi trong DocumentLock.
+ * Theo tên sheet chứ không theo sheetId để lời hỏi của Sidebar quyết mà không phải mở bảng tính; đổi tên sheet chỉ làm sheet đó vẽ lại một lần, tên cũ dọn bằng `viewLedgerPrune`.
+ * Tệp này không chạm Sheet; ghi sổ chỉ gọi trong DocumentLock.
  */
 
 var VIEW_LEDGER_KEY = 'viewLedger';
@@ -28,16 +28,46 @@ function viewLedgerEntry(sheetName) {
   return entry && typeof entry === 'object' ? entry : null;
 }
 
-function viewLedgerWrite(sheetName, entry) {
-  var map = viewLedgerRead();
-  map[String(sheetName)] = entry;
+function viewLedgerSave(map) {
   documentProps().setProperty(VIEW_LEDGER_KEY, JSON.stringify(map));
 }
 
-/** Nội dung sheet chưa khớp dữ liệu: chưa từng vẽ, lượt thử gần nhất hỏng, hoặc dữ liệu đổi sau lượt vẽ. Dùng cho tô tab và báo Sidebar. */
+function viewLedgerWrite(sheetName, entry) {
+  var map = viewLedgerRead();
+  map[String(sheetName)] = entry;
+  viewLedgerSave(map);
+}
+
+/** Bật cờ ô điều khiển cho các sheet đã có mục. Sheet chưa có mục vốn đã cần vẽ nên không thêm mục rỗng. */
+function viewLedgerMarkControls(sheetNames) {
+  var map = viewLedgerRead();
+  var changed = false;
+  (sheetNames || []).forEach(function (name) {
+    var entry = map[String(name)];
+    if (!entry || entry.controls === true) { return; }
+    entry.controls = true;
+    changed = true;
+  });
+  if (changed) { viewLedgerSave(map); }
+  return changed;
+}
+
+/** Bỏ mục của tên không còn là sheet `!` (đã xóa hoặc đổi tên). Không có gì để bỏ thì không ghi. */
+function viewLedgerPrune(liveNames) {
+  var live = {};
+  (liveNames || []).forEach(function (name) { live[String(name)] = true; });
+  var map = viewLedgerRead();
+  var gone = Object.keys(map).filter(function (name) { return !live[name]; });
+  if (!gone.length) { return []; }
+  gone.forEach(function (name) { delete map[name]; });
+  viewLedgerSave(map);
+  return gone;
+}
+
+/** Nội dung sheet chưa khớp dữ liệu hoặc ô điều khiển: chưa từng vẽ, ô điều khiển vừa đổi, lượt thử gần nhất hỏng, hoặc dữ liệu đổi sau lượt vẽ. Dùng cho tô tab và báo Sidebar. */
 function viewLedgerStale(entry, viewsStaleRevision) {
   if (!entry) { return true; }
-  return entry.ok !== true || Number(entry.data) < Number(viewsStaleRevision || 0);
+  return entry.controls === true || entry.ok !== true || Number(entry.data) < Number(viewsStaleRevision || 0);
 }
 
 /** Lượt hỏng đã đủ cũ để thử lại: lưới an toàn cho lỗi tạm của Google, không phụ thuộc người dùng sửa gì. */
@@ -45,17 +75,10 @@ function viewLedgerRetryDue(entry, now) {
   return !!entry && entry.ok !== true && now - (Number(entry.at) || 0) >= SETTINGS.VIEW_FAILED_RETRY_MS;
 }
 
-/** Phần dữ liệu cần thử: dữ liệu đổi sau lượt thử, hoặc lượt hỏng đã đến hạn thử lại. Không đọc Sheet nên lời hỏi của Sidebar dùng được. */
-function viewLedgerDataNeedsAttempt(entry, viewsStaleRevision, now) {
+/** Cần thử vẽ: chưa có mục, cờ ô điều khiển bật, dữ liệu đổi sau lượt thử, hoặc lượt hỏng đến hạn thử lại. Không đọc Sheet nên lời hỏi của Sidebar dùng được. */
+function viewLedgerNeedsAttempt(entry, viewsStaleRevision, now) {
   if (!entry) { return true; }
-  return Number(entry.data) < Number(viewsStaleRevision || 0) || viewLedgerRetryDue(entry, now);
-}
-
-/** Phần điều khiển cần thử: dấu vân tay khác lượt thử, ô công thức chặn đã được gỡ, hoặc lượt hỏng đến hạn thử lại. */
-function viewLedgerControlsNeedAttempt(entry, sheet, input, now) {
-  if (!entry || entry.input !== input || viewLedgerRetryDue(entry, now)) { return true; }
-  if (entry.ok === true || !entry.blocker) { return false; }
-  return !sheet.getRange(entry.blocker.row, entry.blocker.column).getFormula();
+  return entry.controls === true || Number(entry.data) < Number(viewsStaleRevision || 0) || viewLedgerRetryDue(entry, now);
 }
 
 function viewIsStale(sheetName) {

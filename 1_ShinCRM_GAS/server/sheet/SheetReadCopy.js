@@ -142,6 +142,22 @@ function sheetReadCopyForget(sheet, firstRow, rowCount, grew) {
   if (!grew) { delete slot.lastRow; } else if (slot.lastRow !== undefined && lastRow > slot.lastRow) { slot.lastRow = lastRow; }
 }
 
+/**
+ * Note của một vùng, đọc thẳng Sheet, không nhớ: note không phải giá trị nên không đi chung các dòng đã nhớ, và người dùng sửa note không phát trigger để ai quên hộ. Vùng rỗng trả mảng rỗng.
+ */
+function sheetReadNotes(sheet, firstRow, firstColumn, rowCount, columnCount) {
+  if (rowCount <= 0 || columnCount <= 0) { return []; }
+  sheetReadCopyBeforeRead();
+  return sheet.getRange(firstRow, firstColumn, rowCount, columnCount).getNotes();
+}
+
+/** Công thức của một vùng (ô không có công thức là chuỗi rỗng), đọc thẳng Sheet, không nhớ: công thức tự tính lại nên giá trị đã nhớ không nói được ô nào đang là công thức. */
+function sheetReadFormulas(sheet, firstRow, firstColumn, rowCount, columnCount) {
+  if (rowCount <= 0 || columnCount <= 0) { return []; }
+  sheetReadCopyBeforeRead();
+  return sheet.getRange(firstRow, firstColumn, rowCount, columnCount).getFormulas();
+}
+
 /** Múi giờ tệp Sheet, hỏi một lần cho mỗi lần gọi. */
 function sheetReadTimezone() {
   if (documentStoreActive() && SHEET_READ_COPY.timezone) { return SHEET_READ_COPY.timezone; }

@@ -139,6 +139,8 @@ function recordChangesAfterWrite() {
   PENDING_CHANGES.mark = null;
   return documentLockRun(function () {
     var turningStale = mark.allViews ? viewLedgerFreshNames() : [];
+    // Cờ ô điều khiển không tô cam: người sửa đang đứng ở chính sheet đó và lời hỏi kế tiếp của Sidebar vẽ lại ngay.
+    if (mark.viewSheets.length) { viewLedgerMarkControls(mark.viewSheets); }
     var state = reloadJournalAppend(mark);
     viewTabColorSyncNames(turningStale, { fromSidebar: mark.fromSidebar === true });
     return state;
@@ -147,7 +149,7 @@ function recordChangesAfterWrite() {
 
 /** Danh sách thay đổi rỗng của một lần chạy: mã theo từng thực thể, cờ cả sheet, cờ cấu hình. */
 function dirtyStateBlankMark() {
-  return { customer: [], activity: [], customerAll: false, activityAll: false, category: false, config: false, core: false, allViews: false, fromSidebar: false };
+  return { customer: [], activity: [], customerAll: false, activityAll: false, category: false, config: false, core: false, allViews: false, viewSheets: [], fromSidebar: false };
 }
 
 /** Thêm một dấu vào danh sách thay đổi của lần chạy hiện tại. */
@@ -156,7 +158,7 @@ function dirtyStateMarkSignal(mark) {
     throw new Error('Đánh dấu nạp lại ngoài runEntryPoint: không có danh sách thay đổi để ghi nhận, Sidebar sẽ không biết dữ liệu đã đổi. Bọc cửa vào bằng runEntryPoint.');
   }
   var basket = PENDING_CHANGES.mark || dirtyStateBlankMark();
-  RELOAD_RECORD_PARTS.forEach(function (part) { basket[part] = basket[part].concat(mark[part] || []); });
+  RELOAD_RECORD_PARTS.concat(['viewSheets']).forEach(function (part) { basket[part] = basket[part].concat(mark[part] || []); });
   ['customerAll', 'activityAll', 'category', 'config', 'core', 'allViews', 'fromSidebar'].forEach(function (key) { if (mark[key] === true) { basket[key] = true; } });
   PENDING_CHANGES.mark = basket;
 }
@@ -170,7 +172,8 @@ function dirtyStateMarkDecision(decision, fromSidebar) {
   if (!signal) { return false; }
   var records = Array.isArray(signal.records) ? signal.records : [];
   var entities = Array.isArray(signal.entities) ? signal.entities : [];
-  var hasSignal = records.length || entities.length || signal.category || signal.config || signal.schema || signal.allCore || signal.allViews;
+  var viewSheets = Array.isArray(signal.viewSheets) ? signal.viewSheets : [];
+  var hasSignal = records.length || entities.length || viewSheets.length || signal.category || signal.config || signal.schema || signal.allCore || signal.allViews;
   if (!hasSignal) { return false; }
   if (records.length && RELOAD_RECORD_PARTS.indexOf(signal.recordEntity) < 0) {
     throw new Error('Tín hiệu nạp lại có mã bản ghi mà thiếu thực thể (customer/activity): không biết sheet nào cần nạp lại.');
@@ -182,6 +185,7 @@ function dirtyStateMarkDecision(decision, fromSidebar) {
   mark.config = signal.config === true;
   mark.core = signal.schema === true || signal.allCore === true;
   mark.allViews = signal.allViews === true;
+  mark.viewSheets = viewSheets;
   mark.fromSidebar = fromSidebar === true;
   dirtyStateMarkSignal(mark);
   return true;

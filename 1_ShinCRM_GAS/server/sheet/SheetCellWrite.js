@@ -32,6 +32,24 @@ function sheetCellsClear(sheet, firstRow, firstColumn, rowCount, columnCount) {
   }
 }
 
+/** Đặt note cho một vùng từ ma trận chữ (chuỗi rỗng là gỡ note). Không đổi giá trị đọc về nên không phải quên tờ nháp; note luôn đọc thẳng (`sheetReadNotes`). */
+function sheetCellsSetNotes(sheet, firstRow, firstColumn, notes) {
+  if (!notes.length || !notes[0].length) { return; }
+  sheetPolicyAssertWritable(sheet);
+  sheet.getRange(firstRow, firstColumn, notes.length, notes[0].length).setNotes(notes);
+}
+
+/** Chèn `count` cột trước cột `column`. Cột bên phải dịch chỗ nên bỏ cả phần tờ nháp của sheet. */
+function sheetColumnsInsertBefore(sheet, column, count) {
+  if (count <= 0) { return; }
+  sheetPolicyAssertWritable(sheet);
+  try {
+    sheet.insertColumnsBefore(column, count);
+  } finally {
+    sheetReadCopyForget(sheet, 1, null, false);
+  }
+}
+
 /** Xóa hẳn các dòng theo số dòng, gom dải liền nhau thành một lệnh và xóa từ dưới lên để số dòng chưa xóa không trượt. Dòng dưới dịch lên nên bỏ cả phần tờ nháp của sheet. */
 function sheetRowsDelete(sheet, rowNumbers) {
   if (!rowNumbers.length) { return; }

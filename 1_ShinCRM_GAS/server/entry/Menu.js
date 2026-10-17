@@ -19,7 +19,6 @@ function onOpen() {
     .addSeparator()
     .addItem('Tạo sheet quản trị mới…', 'shinCreateViewSheet')
     .addItem('Làm mới dữ liệu sheet quản trị đang mở', 'shinRenderCurrentView')
-    .addItem('Làm mới dữ liệu tất cả sheet quản trị', 'shinRenderAllViews')
     .addItem('Chuẩn bị sheet quản trị', 'shinPrepareCurrentView')
     .addItem('Bảng tra nhanh cú pháp lọc', 'shinShowFilterQuickReference')
     .addSeparator()
@@ -48,14 +47,9 @@ function shinRenderCurrentView(source) {
   var fromSidebar = source === 'sidebar';
   return runEntryPoint('shinRenderCurrentView', fromSidebar ? 'sidebar' : 'core', fromSidebar ? ERROR_CHANNEL_THROW : ERROR_CHANNEL_ALERT, function () {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-    return renderViewSheet(sheet.getName());
-  });
-}
-
-function shinRenderAllViews() {
-  return runEntryPoint('shinRenderAllViews', 'core', ERROR_CHANNEL_ALERT, function () {
-    var result = renderAllManagedViews();
-    if (!result.ok) { throw new Error(result.failed.map(function (item) { return item.error; }).join('\n')); }
+    var result = renderViewSheet(sheet.getName());
+    // Lỗi vẽ đã vào sổ và Log; bấm từ menu thì báo ngay bằng hộp thoại, bấm từ Sidebar thì Sidebar hiện màn thông báo.
+    if (!result.ok && !fromSidebar) { SpreadsheetApp.getUi().alert('Sheet "' + result.sheetName + '" chưa được vẽ lại', viewProblemsText(result.problems), SpreadsheetApp.getUi().ButtonSet.OK); }
     return result;
   });
 }
