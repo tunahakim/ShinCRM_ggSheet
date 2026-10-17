@@ -51,6 +51,29 @@ function saveFlowRecord(top, thu) {
   return saveFlowCarryReadonly(top, record);
 }
 
+/**
+ * Giá trị lúc mở form của mọi trường sắp gửi, để cửa ghi kiểm xung đột (tài liệu 06 Phần 4). Lấy từ `top.record` vì đó là ảnh chụp lúc mở: `Store.upsertRecord` thay hẳn object trong RAM chứ không sửa tại chỗ, nên lượt nạp nền không làm ảnh chụp này trôi theo Sheet.
+ * Thêm mới thì không có giá trị cũ, trả `null`.
+ */
+function saveFlowOld(top, record) {
+  if (top.themMoi) { return null; }
+  var base = top.record || {};
+  var old = {};
+  Object.keys(record).forEach(function (ten) {
+    if (ten === 'id') { return; }
+    old[ten] = base[ten] === undefined || base[ten] === null ? '' : base[ten];
+  });
+  return old;
+}
+
+/** Câu báo xung đột tạm bằng chữ, cho tới khi có màn chọn giá trị từng trường. */
+function saveFlowConflictMessage(conflicts) {
+  var hien = function (v) { return v === '' ? '(trống)' : '"' + v + '"'; };
+  return 'Có trường đã bị đổi trên Sheet trong lúc bạn sửa, nên chưa lưu gì:\n' +
+    conflicts.map(function (c) { return '- ' + c.label + ': lúc mở form ' + hien(c.old) + ', trên Sheet giờ là ' + hien(c.current) + ', bạn đang gõ ' + hien(c.mine); }).join('\n') +
+    '\n\nBấm Lưu lần nữa để ghi đè bằng giá trị bạn đang gõ. Muốn giữ giá trị trên Sheet thì bấm Hủy rồi mở lại form.';
+}
+
 /** Bỏ dấu đỏ ở mọi ô của form. Chạy trước mỗi lượt gửi, vì lượt trước có thể đã tô mà lần này chỗ đó đã sửa đúng. */
 function saveFlowClearErrors(entity) {
   fieldInvalidClear(Object.keys(Schema[entity]).map(function (ten) { return renderFieldId({ entity: entity, name: ten }); }));
@@ -96,10 +119,16 @@ function saveFlowSubmit() {
 
   SAVE_FLOW.dangGui = true;
   return sidebarBusyRun(entity === 'customer' ? 'Đang lưu khách hàng…' : 'Đang lưu giao dịch…', function () {
-    return callServer('saveRecord', [entity, record]).then(function (res) {
+    return callServer('saveRecord', [entity, record, saveFlowOld(top, record)]).then(function (res) {
       SAVE_FLOW.dangGui = false;
 
       if (res.blocked) { throw new Error(res.message || 'Bản ghi đang được đồng bộ.'); }
+      if (!res.ok && res.conflicts) {
+        // Người dùng đã thấy giá trị trên Sheet: nhận nó làm mốc mới, bấm Lưu lần nữa là chủ ý ghi đè.
+        screenStateSetBaseline(res.conflicts.reduce(function (acc, c) { acc[c.field] = c.current; return acc; }, {}));
+        alert(saveFlowConflictMessage(res.conflicts));
+        return { focusId: saveFlowPaintInvalid(entity, res.conflicts) };
+      }
       if (!res.ok) {
         var focusId = saveFlowPaintInvalid(entity, res.invalid);
         // `alert` vì đó là đường hiện lỗi duy nhất của form bản ghi — xem `dispatchError`.

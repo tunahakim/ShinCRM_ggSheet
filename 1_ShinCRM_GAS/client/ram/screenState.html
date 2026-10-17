@@ -103,6 +103,18 @@ function screenStateSetDraft(draft) {
   return top;
 }
 
+/** Đắp `values` lên ảnh chụp lúc mở form của form đang hiện, trên một bản sao để không chạm object đang nằm trong RAM. Dùng khi người dùng đã được cho xem giá trị mới trên Sheet: giá trị đó thành mốc kiểm xung đột của lần lưu kế. */
+function screenStateSetBaseline(values) {
+  var top = screenStateTop();
+  if (!top) { throw new Error('Không có form nào đang mở để cập nhật giá trị lúc mở.'); }
+
+  var record = {};
+  Object.keys(top.record || {}).forEach(function (ten) { record[ten] = top.record[ten]; });
+  Object.keys(values || {}).forEach(function (ten) { record[ten] = values[ten]; });
+  top.record = record;
+  return top;
+}
+
 /**
  * Đóng form đang hiện. Trả về form cần vẽ lại, hoặc `null` khi đã về màn `view`.
  *
