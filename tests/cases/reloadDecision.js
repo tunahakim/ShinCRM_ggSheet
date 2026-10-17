@@ -30,6 +30,16 @@ function chay(so) {
     [draft.ram.action, draft.ram.recordIds, draft.ram.deferredRecordIds, draft.signal.allViews],
     ['defer', ['KH1', 'KH2'], ['KH2'], true]);
 
+  {
+    // Sidebar báo người dùng theo `deferKind`: mã đang sửa vừa đổi thì "khi lưu sẽ hỏi lại", nạp trọn thì "chờ đóng form".
+    const theoMa = hop.reloadDecisionForState({ journal: { rev: 2, floor: 0, entries: [{ r: 2, customer: ['KH2'] }] }, lastSeenRevision: 1, localDraft: { recordIds: ['KH2'] } });
+    const tron = hop.reloadDecisionForState({ journal: { rev: 2, floor: 2, entries: [] }, lastSeenRevision: 1, localDraft: { recordIds: ['KH9'] } });
+    const khongHoan = hop.reloadDecisionForState({ journal: { rev: 2, floor: 0, entries: [{ r: 2, customer: ['KH1'] }] }, lastSeenRevision: 1, localDraft: { recordIds: ['KH2'] } });
+    check(so, 'lời hỏi của Sidebar nói rõ lý do hoãn: mã đang sửa vừa đổi, hay nạp trọn chờ đóng form; không hoãn thì để trống',
+      [theoMa.ram.action, theoMa.ram.deferKind, tron.ram.action, tron.ram.deferKind, khongHoan.ram.action, khongHoan.ram.deferKind],
+      ['defer', 'records', 'defer', 'whole', 'reload', '']);
+  }
+
   const applied = hop.reloadDecisionForChange({
     source: 'user', entity: 'activity', surface: 'record', recordIds: ['GD1'], appliedByCaller: true
   });

@@ -408,7 +408,7 @@ function sheetLinkDeferredNotice(result) {
   var ram = result && result.decision && result.decision.ram;
   if (!ram || typeof noticeSet !== 'function') { return; }
   SHEET_LINK_DEFERRED = ram.action === 'defer';
-  var title = ram.mode === 'records' ? 'Khách này vừa được sửa trên Sheet, khi lưu sẽ hỏi lại' : 'Dữ liệu vừa đổi trên Sheet, sẽ nạp lại khi đóng form';
+  var title = ram.deferKind === 'records' ? 'Khách này vừa được sửa trên Sheet, khi lưu sẽ hỏi lại' : 'Dữ liệu vừa đổi trên Sheet, sẽ nạp lại khi đóng form';
   noticeSet('recordDeferred', SHEET_LINK_DEFERRED ? {
     line: title,
     blocks: [{ variant: 'warning', title: title, lines: ['Sidebar giữ nguyên chữ đang gõ và chưa nạp dữ liệu mới vào form đang mở.'] }]

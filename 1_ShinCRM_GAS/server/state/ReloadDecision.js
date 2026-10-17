@@ -42,7 +42,7 @@ function reloadDecisionDraftIds(localDraft) {
   return reloadDecisionIds(localDraft.recordIds || localDraft.ids || localDraft.id);
 }
 
-/** `replacesWholeSheet`: kế hoạch nạp có phần thay cả một sheet, nên bản nháp chặn như nạp trọn. */
+/** `replacesWholeSheet`: kế hoạch nạp có phần thay cả một sheet, nên bản nháp chặn như nạp trọn. `deferKind` nói lý do hoãn cho Sidebar báo đúng: `records` là mã đang sửa vừa đổi, `whole` là nạp trọn chờ đóng form. */
 function reloadDecisionWithRam(decision, mode, ids, input, reason, replacesWholeSheet) {
   var normalized = reloadDecisionIds(ids);
   var draftIds = reloadDecisionDraftIds(input && input.localDraft);
@@ -57,6 +57,7 @@ function reloadDecisionWithRam(decision, mode, ids, input, reason, replacesWhole
     mode: mode,
     recordIds: normalized,
     deferredRecordIds: fullCoreBlocked ? draftIds : deferred,
+    deferKind: action !== 'defer' ? '' : (fullCoreBlocked ? 'whole' : 'records'),
     reason: fullCoreBlocked ? 'Bảo vệ bản nháp Sidebar trước khi nạp trọn dữ liệu.' : (deferred.length ? 'Bảo vệ bản nháp Sidebar của mã đang sửa.' : reason)
   };
 }

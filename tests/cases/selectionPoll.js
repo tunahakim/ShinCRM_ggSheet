@@ -432,9 +432,9 @@ async function chay(so) {
     check(so, 'mã gửi GAS là mọi form đang mở, không trùng, kể cả form chưa gõ và mã xem trước của form thêm mới', khoa.sheetLinkLocalDraftInput(), { recordIds: ['ACT-000035', 'CUS-000001'] });
 
     khoa._calls = [];
-    await khoa.sheetLinkApplyDecisionResult({ reload: { revision: 7 }, decision: { ram: { action: 'defer', mode: 'records', deferredRecordIds: ['CUS-000001'] } }, processedRevision: 0 });
+    await khoa.sheetLinkApplyDecisionResult({ reload: { revision: 7 }, decision: { ram: { action: 'defer', mode: 'parts', deferKind: 'records', deferredRecordIds: ['CUS-000001'] } }, processedRevision: 0 });
     const dongHoan = [khoa._banner.hidden, khoa._banner.textContent, khoa._calls.length];
-    await khoa.sheetLinkApplyDecisionResult({ reload: { revision: 7 }, decision: { ram: { action: 'defer', mode: 'fullCore', deferredRecordIds: ['CUS-000001'] } }, processedRevision: 0 });
+    await khoa.sheetLinkApplyDecisionResult({ reload: { revision: 7 }, decision: { ram: { action: 'defer', mode: 'fullCore', deferKind: 'whole', deferredRecordIds: ['CUS-000001'] } }, processedRevision: 0 });
     const dongTron = khoa._banner.textContent;
     khoa.ScreenState.formStack = [];
     khoa.sheetLinkFormClosed();
