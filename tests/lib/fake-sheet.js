@@ -101,6 +101,7 @@ function taoSheet(ten, dem, luoi) {
 
     /** Dòng cuối có nội dung, ô có công thức cũng tính như Google. Trả về 0 khi sheet trắng. */
     getLastRow() {
+      dem.doc.getLastRow += 1;
       for (let i = Math.max(cells.length, formulas.length) - 1; i >= 0; i -= 1) {
         if (coNoiDung(cells[i] || []) || coNoiDung(formulas[i] || [])) { return i + 1; }
       }
@@ -108,6 +109,7 @@ function taoSheet(ten, dem, luoi) {
     },
 
     getLastColumn() {
+      dem.doc.getLastColumn += 1;
       let max = 0;
       cells.forEach((row) => {
         if (!Array.isArray(row)) { return; }
@@ -171,7 +173,36 @@ function taoSheet(ten, dem, luoi) {
      *
      * Cố ý không dựng đủ mặt API của Google: một tệp giả càng giống thật càng dễ tin, mà càng dễ tin thì càng dễ quên nó là giả. Thiếu phương pháp nào thì phép kiểm ném lỗi "is not a function" và người viết sẽ thấy ngay là mình vừa dùng một API chưa có ở đây.
      */
+    /** Vùng từ A1 tới dòng cuối × cột cuối có nội dung, như Google; sheet trắng trả đúng ô A1. Không tính thêm lệnh `getLastRow`/`getLastColumn` vì Google không tốn lệnh riêng cho chúng. */
+    getDataRange() {
+      const truoc = { r: dem.doc.getLastRow, c: dem.doc.getLastColumn };
+      const vung = sheet.getRange(1, 1, Math.max(1, sheet.getLastRow()), Math.max(1, sheet.getLastColumn()));
+      dem.doc.getLastRow = truoc.r;
+      dem.doc.getLastColumn = truoc.c;
+      return vung;
+    },
+
     getRange(row, col, numRows, numCols) {
+      // Dạng A1 cả hàng `'1:13'`: rộng hết lưới; vượt lưới không ném mà trả dòng rỗng, đúng như đo trên Google.
+      if (typeof row === 'string') {
+        const khop = /^(\d+):(\d+)$/.exec(row);
+        if (!khop) { throw new Error('getRange: tệp giả chỉ hiểu A1 dạng cả hàng "1:13", nhận được "' + row + '".'); }
+        const dau = Number(khop[1]);
+        const soHang = Number(khop[2]) - dau + 1;
+        return {
+          getValues() {
+            dem.doc.getValues += 1;
+            const ra = [];
+            for (let r = 0; r < soHang; r += 1) {
+              const nguon = cells[dau - 1 + r] || [];
+              const dong = [];
+              for (let c = 0; c < maxCols; c += 1) { dong.push(oRong(nguon[c])); }
+              ra.push(dong);
+            }
+            return ra;
+          }
+        };
+      }
       const soDong = numRows === undefined ? 1 : numRows;
       const soCot = numCols === undefined ? 1 : numCols;
 
@@ -188,6 +219,7 @@ function taoSheet(ten, dem, luoi) {
 
       const range = {
         getValues() {
+          dem.doc.getValues += 1;
           const ra = [];
           for (let r = 0; r < soDong; r += 1) {
             const nguon = cells[row - 1 + r] || [];
@@ -367,6 +399,8 @@ function taoSheet(ten, dem, luoi) {
  */
 function taoBook(tenSheets) {
   const dem = { setValues: 0, deleteRows: 0, insertSheet: 0, insertRows: 0, insertColumns: 0, deleteColumns: 0, setNumberFormat: 0, setDataValidation: 0, toast: 0 };
+  // Lệnh đọc đếm riêng và ẩn khỏi phép chép/so `dem`, vì các test "không ghi gì" so cả bộ đếm lệnh ghi.
+  Object.defineProperty(dem, 'doc', { value: { getValues: 0, getLastRow: 0, getLastColumn: 0 }, enumerable: false });
   const sheets = {};
   let activeSheet = null;
 

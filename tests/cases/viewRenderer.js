@@ -71,6 +71,11 @@ function chay(so) {
   check(so, 'lượt vẽ không đọc ngược hàng 4 trở xuống làm nguồn sự thật',
     [base.view.getRange(4, 1).getValue(), base.view.getRange(5, 1).getValue()].sort(), ['KH0001', 'KH0002']);
   check(so, 'lượt vẽ không bật toast nhỏ ở Sheet và luôn nhả khóa', [base.nen.dem.toast, base.nen.stubs._khoa.dangGiu], [0, false]);
+  const docTruoc = Object.assign({}, base.nen.dem.doc);
+  base.nen.hop.renderViewSheet('!Lead');
+  const doc = base.nen.dem.doc;
+  check(so, 'mỗi sheet một yêu cầu đọc: lượt vẽ tốn 4 lệnh đọc giá trị (vài hàng đầu sheet `!`, cả khối Config, Customer, Activity), 1 getLastRow của sheet `!`, không getLastColumn nào',
+    [doc.getValues - docTruoc.getValues, doc.getLastRow - docTruoc.getLastRow, doc.getLastColumn - docTruoc.getLastColumn], [4, 1, 0]);
 
   // Vẽ đè: lọc thu hẹp còn một dòng, dòng thừa được ghi rỗng trong cùng lệnh ghi, không có lệnh xóa riêng.
   base.view.getRange(3, 2).setValue('Hai');
@@ -179,7 +184,7 @@ function chay(so) {
     [3, 4, 5, 1].map((column) => fresh.view.getRange(3, column).getNumberFormat() === fresh.nen.hop.COLUMN_FORMAT_TEXT), [true, false, true, false]);
 
   base.view.getRange(14, 1, 1, 2).setValues([['@CUS_TEN_CTY', 'Tăng dần (A → Z)']]);
-  check(so, 'chỉ đọc 10 cặp sắp xếp từ hàng 4 đến 13, bỏ qua hàng 14', base.nen.hop.viewControls(base.view).sortPairs.length, 10);
+  check(so, 'chỉ đọc 10 cặp sắp xếp từ hàng 4 đến 13, bỏ qua hàng 14', base.nen.hop.viewReadInputs(base.view, base.view.getName()).sortPairs.length, 10);
 
   const leadingZero = taoNen(['@CUS_MST']);
   ghiO(leadingZero.nen, 'Customer', 4, '@CUS_MA_KH', 'KH0001');

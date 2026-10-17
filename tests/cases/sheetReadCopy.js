@@ -209,6 +209,48 @@ function chay(so) {
   nen.book.getSpreadsheetTimeZone = () => { tz.n += 1; return goc(); };
   trongLanGoi(hop, () => { hop.entityReadContext('customer'); hop.entityReadContext('activity'); hop.documentLockRun(() => hop.entityReadContext('customer')); });
   check(so, 'múi giờ tệp hỏi một lần cho cả lần gọi, kể cả sau khi cầm khóa', tz.n, 1);
+
+  section('Bản đọc Sheet chung — đọc một sheet theo yêu cầu dạng dữ liệu');
+  {
+    const nb = taoHop();
+    const hb = nb.hop;
+    const kh = nb.book.getSheetByName('Customer');
+    const lenh = nb.dem.doc;
+    const cotMa = nb.Customer.codes.indexOf('@CUS_MA_KH');
+    const t0 = Object.assign({}, lenh);
+    const khoi = trongLanGoi(hb, () => hb.documentLockRun(() => {
+      const a = hb.sheetReadBlock(kh, { data: 'all' });
+      const lenhSauKhoi = lenh.getValues - t0.getValues;
+      const lai = hb.sheetReadBlock(kh, { data: 'all' });
+      const map = hb.readColumnMap('Customer');
+      const dong = hb.sheetReadRows(kh, [5])[0];
+      const lenhTruocGhi = [lenh.getValues - t0.getValues, lenh.getLastRow - t0.getLastRow, lenh.getLastColumn - t0.getLastColumn];
+      a.rows[5][cotMa] = 'sửa bản sao';
+      hb.sheetCellsWrite(kh, 5, cotMa + 1, [['KH000009']]);
+      const sauGhi = hb.sheetReadBlock(kh, { data: 'all' });
+      return [a.lastRow, a.header.length, lenhSauKhoi, lai.rows[5][cotMa], map.map['@CUS_MA_KH'], dong[cotMa], lenhTruocGhi, sauGhi.rows[5][cotMa], lenh.getValues - t0.getValues];
+    }));
+    check(so, 'data all: một lệnh getDataRange cho hàng 1, dòng cuối và mọi dòng; hỏi lại khối, hàng mã, dòng lẻ không tốn lệnh; sửa mảng trả về không bẩn tờ nháp; ghi xong đọc lại thấy giá trị mới',
+      khoi, [5, nb.Customer.codes.length, 1, 'KH000002', cotMa + 1, 'KH000002', [1, 0, 0], 'KH000009', 2]);
+
+    const trong = nb.book.insertSheet('Trống');
+    check(so, 'sheet trắng: getDataRange trả ô A1 rỗng nhưng khối là không cột, không dòng', [hb.sheetReadBlock(trong, { data: 'all' }).header, hb.sheetReadBlock(trong, { data: 'all' }).lastRow], [[], 0]);
+
+    const xem = nb.book.insertSheet('!Xem');
+    xem.getRange(1, 1, 1, 2).setValues([['@CUS_MA_KH', '@CUS_TEN_CTY']]);
+    xem.getRange(3, 2).setValue('Hai');
+    xem.getRange(20, 1).setValue('dòng vẽ cũ');
+    const t1 = Object.assign({}, lenh);
+    const tren = hb.sheetReadBlock(xem, { rows: [3, 13], lastRow: true });
+    check(so, 'vài hàng đầu: một lệnh đọc từ hàng 1 tới hàng xa nhất cộng một getLastRow, hàng 1 bỏ ô trống cuối, không đọc vùng dữ liệu cũ',
+      [tren.header, tren.rows[3][1], tren.rows[13].length > 2, tren.lastRow, lenh.getValues - t1.getValues, lenh.getLastRow - t1.getLastRow, lenh.getLastColumn - t1.getLastColumn],
+      [['@CUS_MA_KH', '@CUS_TEN_CTY'], 'Hai', true, 20, 1, 1, 0]);
+
+    const hangLoi = (ten, hang) => { try { hb.sheetControlRow(ten, hang); return 'không ném'; } catch (err) { return 'ném'; } };
+    check(so, 'dịch hàng điều khiển theo tên: sheet kho có hàng mã và nhãn, sheet `!` có thêm hàng lọc; hàng không khai thì ném chứ không đoán',
+      [hb.sheetControlRow('Customer', 'label'), hb.sheetControlRow('!Xem', 'filter'), hangLoi('Customer', 'filter'), hangLoi('Log', 'label'), hangLoi('Trống', 'header')],
+      [2, 3, 'ném', 'ném', 'ném']);
+  }
 }
 
 module.exports = { chay };
