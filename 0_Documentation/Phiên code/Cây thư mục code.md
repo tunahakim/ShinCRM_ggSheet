@@ -58,7 +58,11 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── Book.js               Mở đúng tệp Sheet. Tách riêng vì đường mở khi có người ngồi trước máy khác đường mở lúc chạy tự động.
 │   │   ├── SheetHeader.js        Cửa duy nhất đặt hàng tiêu đề: đối chiếu theo mã, mã thiếu nối vào cuối, không đổi chỗ cột đã có (FBM-056).
 │   │   ├── SheetIo.js            Đọc hàng 1 thành bảng tra "mã cột → số cột". Mọi thao tác cột đi qua đây, không ai được đếm cột bằng tay.
-│   │   ├── SheetReadCopy.js      Bản đọc chung của bốn sheet kho cho một lần gọi GAS (hàng mã, số dòng, đối tượng sheet, múi giờ); bỏ khi vừa cầm khóa, cùng chỗ bỏ bản đọc kho.
+│   │   ├── SheetReadCopy.js      Tầng 1 đọc ô thô và tờ nháp của một lần gọi GAS (hàng mã, số dòng, đối tượng sheet, múi giờ, dòng đã đọc); bỏ khi vừa cầm khóa, tự `flush` trước lần đọc kế khi còn lệnh ghi chờ.
+│   │   ├── SheetCellWrite.js     Tầng 1 ghi ô thô: ghi giá trị, đặt khuôn, xóa nội dung, xóa dòng; chặn ghi theo chính sách loại sheet và tự quên vùng vừa ghi trong tờ nháp.
+│   │   ├── SheetPolicy.js        Chính sách loại sheet (kho, `!`, Log, tự do): có được nhớ, được ghi, ghi có cần khóa tài liệu.
+│   │   ├── SheetRegions.js       Tầng 2 lập kế hoạch vùng: gom số hàng/cột thành dải liền nhau, gom dòng đọc theo ngưỡng cách dòng.
+│   │   ├── SheetLocate.js        Tầng 2 định vị: đổi cột mã đã đọc ra bảng mã → số dòng, ném lỗi khi trùng mã.
 │   │   ├── SheetGrid.js          Sự thật về lưới: đếm hàng dữ liệu, đọc một khối ô, nới lưới trước khi ghi. Ra đời từ lỗi thật làm sheet Log co xuống 7 hàng rồi tắt log trong im lặng.
 │   │   ├── CellBudget.js         Đo tổng số ô cả tệp và so với trần ở Config. Vượt trần thì chặn hẳn lượt nạp, kèm bảng chỉ mặt sheet nào phình to.
 │   │   ├── EntityRead.js         Đọc bản ghi Customer và Activity ra dạng { fields, rows } truyền được sang client. Bỏ hàng không có mã và đếm số hàng đã bỏ.
