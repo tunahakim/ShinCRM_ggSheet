@@ -77,9 +77,9 @@ function configReadSort(columnMap, rows) {
 function configReadAll() {
   var sheetName = 'Config';
   var sheet = shinOpenSheet(sheetName);
-  var columnMap = readColumnMap(sheetName);
-  var rowCount = sheetGridDataRowCount(sheet, SHEET_FIRST_DATA_ROW);
-  var rows = sheetGridReadBlock(sheet, SHEET_FIRST_DATA_ROW, rowCount, columnMap.lastColumn);
+  var block = sheetReadBlock(sheet, { data: 'all' });
+  var columnMap = readColumnMap(sheetName, block.header);
+  var rows = sheetReadBlockRows(block, SHEET_FIRST_DATA_ROW);
 
   return {
     sheetSchema: configReadBlock(CONFIG_READ_BLOCKS.sheetSchema, columnMap, rows),

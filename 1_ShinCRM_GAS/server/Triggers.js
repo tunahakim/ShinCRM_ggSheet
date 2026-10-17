@@ -49,7 +49,7 @@ function shinHeaderRangeHasValidCode(sheet, range, event, validCode) {
 
 /** Hàng 3 chỉ là hàng lọc dưới cột mang mã `@`; chữ ghi chú dưới cột thường không phải cấu hình view. */
 function shinRangeTouchesCodedFilter(sheet, range) {
-  if (!shinRangeTouchesRow(range, 3)) { return false; }
+  if (!shinRangeTouchesRow(range, sheetControlRow(sheet.getName(), 'filter'))) { return false; }
   var first = range.getColumn();
   var count = range.getLastColumn() - first + 1;
   return sheet.getRange(1, first, 1, count).getValues()[0].some(function (value) {

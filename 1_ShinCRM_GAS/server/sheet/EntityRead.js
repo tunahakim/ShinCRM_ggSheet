@@ -76,8 +76,9 @@ function entityReadColumnWithIds(context, code) {
  * Tách ra thành một hàm riêng vì đây là phần **đắt và không đổi** của phép đọc: mở sheet, đọc cả hàng 1, hỏi múi giờ tệp. Nạp giao dịch chia thành nhiều gói, nên nếu mỗi gói tự dựng lại mấy thứ này thì một tệp mười gói tốn thêm ba mươi lệnh gọi mạng cho cùng một câu trả lời. Dựng một lần rồi truyền vào từng gói.
  *
  * Múi giờ lấy từ tệp Sheet chứ không chốt cứng trong code — lý do ở `DateText.gs`.
+ * `need` là `{ data: 'all' }` khi người gọi cần mọi dòng (bộ vẽ): hàng 1, dòng cuối và mọi dòng đọc chung một lệnh, mọi dòng dữ liệu nằm ở `dataRows`. Không có `need` thì chỉ đọc hàng 1 và dòng cuối, vì đọc cả kho đắt hơn nhiều khi chỉ cần vài dòng.
  */
-function entityReadContext(entity, schema) {
+function entityReadContext(entity, schema, need) {
   var fields = schema || DATA_SCHEMA[entity];
   var names = entityReadFields(entity, fields);
   var sheetName = ENTITY_SHEETS[entity];
@@ -87,7 +88,8 @@ function entityReadContext(entity, schema) {
   }
 
   var sheet = shinOpenSheet(sheetName);
-  var columnMap = readColumnMap(sheetName);
+  var block = need && need.data === 'all' ? sheetReadBlock(sheet, need) : null;
+  var columnMap = readColumnMap(sheetName, block ? block.header : undefined);
 
   return {
     entity: entity,
@@ -99,7 +101,8 @@ function entityReadContext(entity, schema) {
     specs: names.map(function (name) { return fields[name]; }),
     indexes: names.map(function (name) { return columnIndex(columnMap, fields[name].code) - 1; }),
     idAt: names.indexOf('id'),
-    rowCount: sheetGridDataRowCount(sheet, SHEET_FIRST_DATA_ROW)
+    rowCount: block ? Math.max(0, block.lastRow - SHEET_FIRST_DATA_ROW + 1) : sheetGridDataRowCount(sheet, SHEET_FIRST_DATA_ROW),
+    dataRows: block ? sheetReadBlockRows(block, SHEET_FIRST_DATA_ROW) : null
   };
 }
 

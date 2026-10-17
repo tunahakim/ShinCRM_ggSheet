@@ -50,11 +50,74 @@ function sheetReadHeader(sheet) {
   if (slot && slot.header) { return slot.header.slice(); }
   sheetReadCopyBeforeRead();
   var lastColumn = sheet.getLastColumn();
-  var header = lastColumn < 1 ? [] : sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(function (cell) {
-    return cell === null || cell === undefined ? '' : String(cell).trim();
-  });
+  var header = lastColumn < 1 ? [] : sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(sheetReadCellText);
   if (slot) { slot.header = header; }
   return header.slice();
+}
+
+function sheetReadCellText(cell) { return cell === null || cell === undefined ? '' : String(cell).trim(); }
+
+/**
+ * Đọc một sheet theo một yêu cầu dạng dữ liệu bằng ít lệnh Google nhất. Trả `{ header, lastRow, rows }`, `rows[số dòng]` là giá trị thô.
+ * - `{ data: 'all' }`: một lệnh `getDataRange` cho hàng 1, dòng cuối và mọi dòng, rồi nhớ cả vào tờ nháp; hàng 1 dài đúng `getLastColumn()` như `sheetReadHeader`. Tờ nháp đã đủ thì không tốn lệnh nào.
+ * - `{ rows: [...], lastRow: true }`: một lệnh từ hàng 1 tới dòng xa nhất, rộng hết lưới, cộng `getLastRow` khi xin. Hàng 1 trả về tới mã cuối cùng (bỏ ô trống cuối) nên không vào tờ nháp, vì không dài đúng `getLastColumn()`. Dành cho sheet chỉ cần vài hàng đầu (sheet quản trị), để khỏi đọc cả vùng dữ liệu cũ sắp bị vẽ đè.
+ * Đo trên GAS DEV: `getLastRow`, `getLastColumn` mỗi lệnh 60–90 ms và Google không nhớ hộ; `getMaxColumns` gần 0 ms; đọc A1 kiểu `'1:13'` vượt lưới không ném mà trả dòng rỗng.
+ */
+function sheetReadBlock(sheet, need) {
+  return need.data === 'all' ? sheetReadWhole(sheet) : sheetReadTop(sheet, need.rows || [], !!need.lastRow);
+}
+
+function sheetReadWhole(sheet) {
+  var slot = sheetReadCopySlotOf(sheet);
+  var held = slot ? sheetReadCopyWhole(slot) : null;
+  if (held) { return held; }
+  sheetReadCopyBeforeRead();
+  var values = sheet.getDataRange().getValues();
+  var empty = values.length === 1 && values[0].length === 1 && sheetReadCellText(values[0][0]) === '';
+  var block = { header: empty ? [] : values[0].map(sheetReadCellText), lastRow: empty ? 0 : values.length, rows: {} };
+  for (var row = 2; row <= block.lastRow; row++) { block.rows[row] = values[row - 1]; }
+  if (slot) {
+    slot.header = block.header;
+    slot.lastRow = block.lastRow;
+    slot.rows = slot.rows || {};
+    Object.keys(block.rows).forEach(function (row) { slot.rows[row] = block.rows[row]; });
+  }
+  return sheetReadBlockCopy(block);
+}
+
+/** Tờ nháp đã có hàng 1, dòng cuối và mọi dòng từ hàng 2 thì dựng lại khối từ đó; thiếu một dòng là `null`. */
+function sheetReadCopyWhole(slot) {
+  if (!slot.header || slot.lastRow === undefined) { return null; }
+  var rows = {};
+  for (var row = 2; row <= slot.lastRow; row++) {
+    if (!slot.rows || !slot.rows[row]) { return null; }
+    rows[row] = slot.rows[row];
+  }
+  return sheetReadBlockCopy({ header: slot.header, lastRow: slot.lastRow, rows: rows });
+}
+
+function sheetReadBlockCopy(block) {
+  var rows = {};
+  Object.keys(block.rows).forEach(function (row) { rows[row] = block.rows[row].slice(); });
+  return { header: block.header.slice(), lastRow: block.lastRow, rows: rows };
+}
+
+function sheetReadTop(sheet, rowNumbers, wantsLastRow) {
+  var lastRead = Math.max.apply(null, [1].concat(rowNumbers));
+  sheetReadCopyBeforeRead();
+  var values = sheet.getRange('1:' + lastRead).getValues();
+  var header = values[0].map(sheetReadCellText);
+  while (header.length && !header[header.length - 1]) { header.pop(); }
+  var rows = {};
+  rowNumbers.forEach(function (row) { rows[row] = values[row - 1].slice(); });
+  return { header: header, lastRow: wantsLastRow ? sheetReadLastRow(sheet) : undefined, rows: rows };
+}
+
+/** Các dòng của khối từ `firstRow` tới dòng cuối, đúng thứ tự, thành mảng. */
+function sheetReadBlockRows(block, firstRow) {
+  var list = [];
+  for (var row = firstRow; row <= block.lastRow; row++) { list.push(block.rows[row]); }
+  return list;
 }
 
 /** `getLastRow()` của sheet; chỉ có giá trị trong khóa nơi nó được đọc. */

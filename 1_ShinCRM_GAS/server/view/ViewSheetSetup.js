@@ -68,14 +68,15 @@ function viewSetupFilterNote(code, current) {
 }
 
 /** Note hàng lọc: đọc cả hàng một lệnh, ghi một lệnh cho đoạn từ cột đổi đầu tiên tới cột đổi cuối cùng; không đổi gì thì không ghi. */
-function viewSetupFilterNotes(sheet, header) {
-  var current = sheetReadNotes(sheet, VIEW_FILTER_ROW, 1, 1, header.length)[0] || [];
+function viewSetupFilterNotes(sheet, name, header) {
+  var filterRow = sheetControlRow(name, 'filter');
+  var current = sheetReadNotes(sheet, filterRow, 1, 1, header.length)[0] || [];
   var wanted = header.map(function (code, i) { return viewSetupFilterNote(code, current[i]); });
   var changed = wanted.map(function (note, i) { return note !== String(current[i] || '') ? i : -1; }).filter(function (i) { return i >= 0; });
   if (!changed.length) { return 0; }
   var first = changed[0];
   var last = changed[changed.length - 1];
-  sheetCellsSetNotes(sheet, VIEW_FILTER_ROW, first + 1, [wanted.slice(first, last + 1)]);
+  sheetCellsSetNotes(sheet, filterRow, first + 1, [wanted.slice(first, last + 1)]);
   return changed.length;
 }
 
@@ -91,15 +92,14 @@ function viewPrepareLocked(sheet, name) {
   var added = viewEnsureControlColumns(sheet);
   var header = sheetReadHeader(sheet);
   var headerMap = viewHeaderMap(header, name);
-  var labels = sheetReadRows(sheet, [2])[0];
+  var labelRow = sheetControlRow(name, 'label');
+  var labels = sheetReadRows(sheet, [labelRow])[0];
   VIEW_CONTROL_COLUMNS.forEach(function (control) {
     var column = headerMap[control.code];
-    if (String(labels[column - 1] || '') !== control.label) { sheetCellsWrite(sheet, 2, column, [[control.label]]); }
+    if (String(labels[column - 1] || '') !== control.label) { sheetCellsWrite(sheet, labelRow, column, [[control.label]]); }
   });
-  viewSetupFilterNotes(sheet, header);
-  var filterColumns = [];
-  header.forEach(function (code, index) { if (/^@(CUS|ACT)_/.test(code)) { filterColumns.push(index + 1); } });
-  viewFormatFilterRowText(sheet, filterColumns);
+  viewSetupFilterNotes(sheet, name, header);
+  viewFormatFilterRowText(sheet, sheetControlRow(name, 'filter'), viewDrawnColumns(header));
 
   var lastSortRow = SHEET_FIRST_DATA_ROW + VIEW_SORT_MAX_LEVELS - 1;
   sheetGridEnsureRoom(sheet, lastSortRow, 0);

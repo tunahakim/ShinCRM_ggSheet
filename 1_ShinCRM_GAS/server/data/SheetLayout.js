@@ -13,6 +13,9 @@
 var SHEET_HEADER_ROWS = 3;
 var SHEET_FIRST_DATA_ROW = 4;
 
+/** Hàng điều khiển của sheet kho theo tên. Nơi gọi nói bằng tên, `sheetControlRow` dịch ra số hàng. */
+var SHEET_CONTROL_ROWS = { header: 1, label: 2 };
+
 /**
  * Danh mục của sheet `Category`, theo tài liệu 02 Phần 9. Ba danh mục có cột đi kèm hậu tố `_FBM` là ba danh mục
  * thực sự đồng bộ với FBM; sự tồn tại của cột đi kèm chính là câu trả lời cho "danh mục nào tham gia đồng bộ",
@@ -65,12 +68,23 @@ var LOG_HEADERS = ['Lúc', 'Nguồn', 'Việc', 'Kết quả', 'Thực thể', '
  * Một sheet chỉ được có một trong hai, không được có cả hai.
  */
 var SHEET_LAYOUT = {
-  Customer: { entity: 'customer', headerRows: SHEET_HEADER_ROWS, firstDataRow: SHEET_FIRST_DATA_ROW, headerColor: '#d9e2f3' },
-  Activity: { entity: 'activity', headerRows: SHEET_HEADER_ROWS, firstDataRow: SHEET_FIRST_DATA_ROW, headerColor: '#d9e2f3' },
-  Category: { columns: CATEGORY_COLUMNS, headerRows: SHEET_HEADER_ROWS, firstDataRow: SHEET_FIRST_DATA_ROW, headerColor: '#e2efd9' },
-  Config: { columns: CONFIG_COLUMNS, headerRows: SHEET_HEADER_ROWS, firstDataRow: SHEET_FIRST_DATA_ROW, headerColor: '#fff2cc' },
-  Log: { plainHeaders: LOG_HEADERS, headerRows: 1, firstDataRow: 2, headerColor: '#fce4d6' }
+  Customer: { entity: 'customer', headerRows: SHEET_HEADER_ROWS, firstDataRow: SHEET_FIRST_DATA_ROW, controlRows: SHEET_CONTROL_ROWS, headerColor: '#d9e2f3' },
+  Activity: { entity: 'activity', headerRows: SHEET_HEADER_ROWS, firstDataRow: SHEET_FIRST_DATA_ROW, controlRows: SHEET_CONTROL_ROWS, headerColor: '#d9e2f3' },
+  Category: { columns: CATEGORY_COLUMNS, headerRows: SHEET_HEADER_ROWS, firstDataRow: SHEET_FIRST_DATA_ROW, controlRows: SHEET_CONTROL_ROWS, headerColor: '#e2efd9' },
+  Config: { columns: CONFIG_COLUMNS, headerRows: SHEET_HEADER_ROWS, firstDataRow: SHEET_FIRST_DATA_ROW, controlRows: SHEET_CONTROL_ROWS, headerColor: '#fff2cc' },
+  Log: { plainHeaders: LOG_HEADERS, headerRows: 1, firstDataRow: 2, controlRows: { header: 1 }, headerColor: '#fce4d6' }
 };
+
+/** Hình dáng chung của mọi sheet quản trị (tên bắt đầu bằng `!`): khác sheet kho ở hàng lọc. Tên sheet do người dùng đặt nên không nằm trong `SHEET_LAYOUT`. */
+var VIEW_SHEET_LAYOUT = { headerRows: SHEET_HEADER_ROWS, firstDataRow: SHEET_FIRST_DATA_ROW, controlRows: { header: 1, label: 2, filter: 3 } };
+
+/** Tầng 2: tên hàng điều khiển (`header`, `label`, `filter`) → số hàng của sheet đó. Sheet không khai hàng đó thì ném, không đoán. */
+function sheetControlRow(sheetName, rowName) {
+  var layout = SHEET_LAYOUT[sheetName] || (sheetPolicy(sheetName).kind === 'view' ? VIEW_SHEET_LAYOUT : null);
+  var row = layout && layout.controlRows[rowName];
+  if (!row) { throw new Error('Sheet "' + sheetName + '" không có hàng điều khiển "' + rowName + '" khai trong SHEET_LAYOUT.'); }
+  return row;
+}
 
 /**
  * Trả về danh sách `[mã cột, nhãn]` theo thứ tự bày ra trên sheet, cho phần cột mà **lõi** sở hữu.

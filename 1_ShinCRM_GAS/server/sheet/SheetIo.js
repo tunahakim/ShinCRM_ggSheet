@@ -14,14 +14,15 @@
  *
  * Ném lỗi nêu thẳng tên mã trong hai trường hợp: một mã xuất hiện hai lần trên sheet, hoặc một mã lõi cần mà sheet không có.
  * Cả hai đều là đọc lệch cột nếu để chạy tiếp — mà đọc lệch cột thì ghi số tiền của khách này vào dòng khách khác.
+ * `header` (tùy chọn) là hàng 1 người điều phối vừa đọc chung khối dữ liệu (`sheetReadBlock`), để khỏi tốn lệnh đọc lại.
  */
-function readColumnMap(sheetName) {
+function readColumnMap(sheetName, header) {
   var layout = SHEET_LAYOUT[sheetName];
   if (!layout) {
     throw new Error('Không có khai hình dáng cho sheet "' + sheetName + '" trong SHEET_LAYOUT.');
   }
 
-  var headerRow = sheetReadHeader(shinOpenSheet(sheetName));
+  var headerRow = header || sheetReadHeader(shinOpenSheet(sheetName));
   var lastColumn = headerRow.length;
   if (lastColumn < 1) {
     throw new Error('Sheet "' + sheetName + '" chưa có cột nào. Chạy setupSheets trước.');
