@@ -55,7 +55,7 @@ FbmSync.openConflict = function () {
 FbmSync.conflictRefreshRead = function (state, stage, rawResponse) {
   var refresh = state.metadata && state.metadata.conflictRefresh || {}, responseRequestId = FbmSync.responseRequestId ? FbmSync.responseRequestId(rawResponse) : '';
   if (!refresh.entity || refresh.stage !== stage) { return { failure: FbmSync.conflictFail('CONFLICT_REFRESH_NOT_FOUND', 'Không còn lượt đọc lại conflict tương ứng.') }; }
-  if (!state.activeRequestId || !responseRequestId || responseRequestId !== String(state.activeRequestId) || !state.cursor || state.cursor.kind !== 'conflict_refresh') {
+  if (!state.cursor || state.cursor.kind !== 'conflict_refresh' || !FbmSync.requestAnswered(state, responseRequestId)) {
     return { failure: FbmSync.conflictFail('STALE_RESPONSE', 'Response đọc lại xung đột đã cũ hoặc không thuộc request đang chờ.') };
   }
   state.activeRequestId = ''; state.deadlineAt = 0; state.lastProgressAt = Date.now(); state.cursor = {};

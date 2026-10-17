@@ -247,6 +247,7 @@ function fbmSyncHeartbeatRequest(options) {
     var identity = FbmSync.identityPreflight('background');
     if (identity.blocking) { return { ok: true, noop: true, code: identity.status && identity.status.status === 'UNBOUND' ? 'FBM_IDENTITY_UNBOUND' : 'REBIND_REQUIRED', request: null, message: identity.message, status: FbmSync.statusView() }; }
   }
+  FbmSync.requestWatchTrail(opt.extensionTrail);
   var lock = FbmSync.orchestrationLock(), waitMs = typeof SETTINGS !== 'undefined' && SETTINGS && SETTINGS.LOCK_WAIT_MS ? SETTINGS.LOCK_WAIT_MS : 10000;
   if (!documentStoreTryLock(lock, waitMs)) { return fbmSyncLockResult('BUSY', 'GAS đang bận; chưa cấp request heartbeat mới.'); }
   try {
@@ -256,7 +257,7 @@ function fbmSyncHeartbeatRequest(options) {
       return fbmSyncLockResult('REQUEST_IN_FLIGHT', 'Đã có request FBM đang chờ response; không cấp request heartbeat chồng.');
     }
     // Lượt dở không còn request nào chờ trong hạn (Extension bị tắt giữa chừng, response mất): kết thúc có Log rồi mở lượt mới, không gửi lại request của lượt cũ (09/02 Phần 3 "Mỗi lần hỏi nền là một lượt mới").
-    if (state.runId && activePhase) { FbmSync.recoverStaleRun(state, now, { abandoned: true, extensionTrail: opt.extensionTrail }); }
+    if (state.runId && activePhase) { FbmSync.recoverStaleRun(state, now, { abandoned: true }); }
     // Chọn tiến trình đến hạn trước, để nhịp hỏi kỹ thuật không tự mở việc mỗi lần.
     var picked = FbmSync.schedulerPickDue(now, { startup: source === 'startup' });
     if (!picked.ok) {
@@ -294,7 +295,7 @@ function fbmSyncHeartbeatLocked(rawResponse, options) {
   // Sau heartbeat, mọi request của phiên nền dùng đúng bộ xử lý continuation chung.
   // Worker chỉ chuyển envelope nên không cần và không được biết cursor nào đang chạy.
   if (cursor.kind !== 'heartbeat') { return FbmSync.continueRun(rawResponse); }
-  if (!state.activeRequestId || !responseRequestId || responseRequestId !== String(state.activeRequestId)) {
+  if (!FbmSync.requestAnswered(state, responseRequestId)) {
     FbmSync.logStaleResponse(state, responseRequestId, 'heartbeat_stale_response');
     return { ok: false, code: 'STALE_RESPONSE', request: null, status: FbmSync.statusView(), error: 'Response heartbeat không còn thuộc request đang chờ.' };
   }
@@ -353,7 +354,7 @@ function fbmSyncHeartbeatTransportFailure(payload) {
   if (!documentStoreTryLock(lock, waitMs)) { return fbmSyncLockResult('BUSY', 'GAS đang bận; chưa ghi nhận lỗi cầu nối.'); }
   try {
     var state = FbmSync.stateRead();
-    if (!requestId || String(state.activeRequestId || '') !== requestId) {
+    if (!FbmSync.requestAnswered(state, requestId)) {
       if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, 'STALE_RESPONSE', 'Lỗi cầu nối không còn thuộc request đang chờ.', 'transport_failure_stale'); }
       return { ok: false, code: 'STALE_RESPONSE', request: null, status: FbmSync.statusView(), error: 'Lỗi cầu nối không còn thuộc request đang chờ.' };
     }

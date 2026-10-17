@@ -276,6 +276,7 @@ FbmSync.stateRead = function () {
   var metadata = parsed.metadata || {};
   var read = Object.assign(fallback, parsed, { schemaVersion: Number(parsed.schemaVersion || 1), counts: Object.assign(fallback.counts, parsed.counts || {}), session: Object.assign(fallback.session, parsed.session || {}), metadata: Object.assign(fallback.metadata, metadata, { conflictCount: Number(metadata.conflictCount || 0), preflightIssues: Array.isArray(metadata.preflightIssues) ? metadata.preflightIssues : [], manualPending: metadata.manualPending || null }), progress: Object.assign(fallback.progress, parsed.progress || {}), locks: parsed.locks || {} });
   if (typeof FbmSync.logContextNote === 'function') { FbmSync.logContextNote(read); }
+  FbmSync.requestWatchNote(read);
   return read;
 };
 /** Ghi state, cập nhật timestamp và giữ cấu trúc nhất quán. */
@@ -309,12 +310,42 @@ FbmSync.stateWrite = function (state) {
     FbmSync.businessFinishOpenSteps(next, next.phase, { error: String(next.lastError || next.message || '') });
   }
   if (typeof FbmSync.logContextNote === 'function') { FbmSync.logContextNote(next); }
+  FbmSync.requestWatchCheck(next);
   var stateWrite = FbmSync.documentPropertySet(FbmSync.STATE_KEY, JSON.stringify(next), 'state');
-  if (stateWrite.ok) { return next; }
+  if (stateWrite.ok) { FbmSync.requestWatchNote(next); return next; }
   // Đóng phiên mà ghi hỏng thì phiên đứng mãi ở pha đang chạy và màn đồng bộ kẹt (FBM-044); lát giữa chừng thì vẫn ném để phiên chuyển sang lỗi.
   var minimal = FbmSync.TERMINAL_PHASES.indexOf(String(next.phase || '')) >= 0 ? FbmSync.stateWriteMinimal(next, stateWrite) : null;
   if (!minimal) { throw stateWrite.error; }
   return minimal;
+};
+/**
+ * Luật chung cho mọi request GAS phát cho Extension (Giữ phiên, lượt nền, lượt bấm tay, đăng nhập): request đã quá hạn chờ mà rời khỏi state không qua trả lời thì có một dòng Log lỗi.
+ * Đặt ở cửa đọc/ghi state vì mọi đường bỏ request (cấp request mới đè lên, mở lượt mới, đóng lượt, dừng) đều phải ghi state; đường mới thêm sau này cũng không lọt.
+ * Chỉ nhớ trong RAM của lần gọi: request đang chờ theo lần đọc/ghi gần nhất, các request đã được trả lời (kể cả trả lời muộn) và hộp đen Extension gửi kèm lần hỏi nền. Không tốn thêm lần đọc kho.
+ * Bỏ request khi còn trong hạn (dừng, cổng phiên chặn) là GAS chủ động, không ghi ở đây.
+ */
+FbmSync.requestWatch = { open: null, answered: {}, trail: undefined };
+FbmSync.requestWatchNote = function (state) {
+  // Bước và lượt lấy lúc request mới xuất hiện: về sau GAS có thể đổi cursor (chọn tiến trình, đóng lượt) khi request cũ vẫn nằm đó.
+  var id = String(state && state.activeRequestId || ''), seen = FbmSync.requestWatch.open && FbmSync.requestWatch.open.id === id ? FbmSync.requestWatch.open : null;
+  FbmSync.requestWatch.open = id ? { id: id, deadlineAt: Number(state.deadlineAt || 0), kind: seen ? seen.kind : String(state.cursor && state.cursor.kind || ''), runId: seen ? seen.runId : String(state.runId || '') } : null;
+};
+/** Cổng duy nhất nhận ra response thuộc request đang chờ; đánh dấu đã trả lời để luật request quá hạn không báo nhầm trả lời muộn. */
+FbmSync.requestAnswered = function (state, responseRequestId) {
+  var id = String(state && state.activeRequestId || '');
+  if (!id || !responseRequestId || String(responseRequestId) !== id) { return false; }
+  FbmSync.requestWatch.answered[id] = true;
+  return true;
+};
+/** Hộp đen Extension gửi kèm lần hỏi nền; chỉ lần gọi đến từ Extension mới có, nên dòng Log của lượt Sidebar không nhắc hộp đen. */
+FbmSync.requestWatchTrail = function (trail) { FbmSync.requestWatch.trail = trail || null; };
+FbmSync.requestWatchCheck = function (next, now) {
+  var open = FbmSync.requestWatch.open, at = Number(now || Date.now());
+  if (!open || String(next && next.activeRequestId || '') === open.id || FbmSync.requestWatch.answered[open.id] || at < open.deadlineAt) { return; }
+  FbmSync.requestWatch.answered[open.id] = true;
+  if (typeof logEvent !== 'function') { return; }
+  var trail = FbmSync.requestWatch.trail, overdue = open.deadlineAt ? Math.max(0, Math.round((at - open.deadlineAt) / 60000)) : 0;
+  logEvent({ source: 'fbm_sync', action: 'request_unanswered', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: open.runId, reason: 'Request FBM ' + open.id + (open.kind ? ' (bước ' + open.kind + ')' : '') + ' không nhận được trả lời từ Extension, đã quá hạn chờ ' + overdue + ' phút; GAS bỏ request này.' + (trail !== undefined ? ' ' + FbmSync.extensionTrailText(trail, at) : ''), detail: { code: 'REQUEST_UNANSWERED', requestId: open.id, kind: open.kind, runId: open.runId, extensionTrail: trail !== undefined ? FbmSync.extensionTrailSafe(trail) : undefined } });
 };
 FbmSync.STATE_MINIMAL_TEXT_LIMIT = 1000;
 FbmSync.STATE_MINIMAL_NOTE = ' (Không lưu được đầy đủ trạng thái phiên; đã lưu bản rút gọn, xem Log.)';
@@ -414,9 +445,8 @@ FbmSync.recoverStaleRun = function (state, now, options) {
     current.locks = kept;
   }
   var written = FbmSync.stateWrite(current);
-  var trailText = abandoned ? FbmSync.extensionTrailText(options && options.extensionTrail, at) : '';
   // Lượt bị thu hồi có thể không còn bước nào đang mở để tự ghi Log kết thúc, nên ghi riêng một dòng: không có lỗi im lặng.
-  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'stale_run', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(current.runId || ''), reason: message + (trailText ? ' ' + trailText : ''), detail: { code: current.lastFailureCode, runId: String(current.runId || ''), cursor: String(cursor.kind || ''), extensionTrail: FbmSync.extensionTrailSafe(options && options.extensionTrail) } }); }
+  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'stale_run', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(current.runId || ''), reason: message, detail: { code: current.lastFailureCode, runId: String(current.runId || ''), cursor: String(cursor.kind || '') } }); }
   return { state: written, recovered: true, waitingWrite: waitingWrite };
 };
 /** Tên bước của hộp đen Extension. Bước lạ (Extension bản khác) vẫn được ghi nhưng không dịch, để không đoán bừa. */
