@@ -140,16 +140,21 @@ function screenFormFirstCellId(man) {
   return found;
 }
 
-/** Vẽ form đang ở đỉnh ngăn xếp. Trả về bốn chuỗi engine dựng, cộng `focusId` để bên gọi đặt con trỏ. */
+/**
+ * Vẽ form đang ở đỉnh ngăn xếp. Trả về bốn chuỗi engine dựng, cộng `focusId` để bên gọi đặt con trỏ.
+ *
+ * Màn hình đang hiện đúng khung này thì cất chữ trên màn hình vào bản nháp trước khi vẽ: mọi đường vẽ lại (làm mới, nạp trọn, quay về từ màn khác) đi qua đây nên không đường nào làm mất chữ đang gõ. Mốc kiểm xung đột vẫn là ảnh chụp lúc mở, không đổi ở đây.
+ */
 function screenFormRender() {
   var top = screenStateTop();
   if (!top) { throw new Error('Không có form nào đang mở để vẽ. Màn hiện tại là "' + ScreenState.screen + '".'); }
+  if (renderPaintedFrame() === String(top.frame)) { screenFormStash(); }
 
   var decl = screenFormDecl(top.screen), title = screenFormTitle(decl.title, top.themMoi);
   var man = screenBuild(Object.assign({}, decl, { header: screenFormHeader(decl.header, title) }), top.screen);
   var record = screenStateFormRecord();
 
-  var html = renderScreen(man, { records: screenFormRecords(man, record), carried: top.carried });
+  var html = renderScreen(man, { records: screenFormRecords(man, record), carried: top.carried, frame: top.frame });
   html.focusId = screenFormFirstCellId(man);
   return html;
 }
@@ -202,6 +207,8 @@ function screenFormClose() {
   var top = screenStateTop();
   if (top) { screenFormSyncUnlock(top.entity, top.record); }
   var duoi = screenStateCloseForm();
-  return duoi ? screenFormRender() : screenViewRender();
+  var html = duoi ? screenFormRender() : screenViewRender();
+  if (typeof sheetLinkFormClosed === 'function') { sheetLinkFormClosed(); }
+  return html;
 }
 </script>

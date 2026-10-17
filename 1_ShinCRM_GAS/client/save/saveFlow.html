@@ -96,10 +96,10 @@ function saveFlowApply(entity, res) {
 /** Đóng **một** lớp form: đóng cả ngăn xếp thì lưu ghi chú lồng trên form giao dịch là mất giao dịch đang gõ dở. Lưu khách mới thì màn xem chuyển sang chính khách đó. */
 function saveFlowClose(entity, ban, themMoi) {
   var duoi = screenStateCloseForm();
-  if (duoi) { return screenFormRender(); }
-
-  if (themMoi && entity === 'customer' && ban && ban.id) { screenStateSetCustomer(ban.id); }
-  return screenViewRender();
+  if (!duoi && themMoi && entity === 'customer' && ban && ban.id) { screenStateSetCustomer(ban.id); }
+  var html = duoi ? screenFormRender() : screenViewRender();
+  if (typeof sheetLinkFormClosed === 'function') { sheetLinkFormClosed(); }
+  return html;
 }
 
 /** Toàn bộ đường bấm Lưu, trả `Promise` để bộ phát click bắt được lượt gửi thất bại. Bấm lần hai lúc lượt đầu còn bay thì lặng lẽ bỏ qua — dải tiến trình đang chạy đã là câu trả lời. */

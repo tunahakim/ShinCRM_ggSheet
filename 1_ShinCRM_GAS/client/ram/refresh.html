@@ -1,10 +1,12 @@
 <script>
 /** Làm mới đúng các mã do trạng thái bẩn trả về; không tự đọc sheet hay đổi Store ngoài hai cửa của Store. */
+
+/** Mã của mọi form trong ngăn xếp, kể cả form chưa gõ và form thêm mới (mã xem trước): form đang mở là đang khóa, vì chữ trên màn hình chưa cất vẫn là chữ người dùng đang gõ. Ngăn xếp là nơi duy nhất giữ "đang sửa", không suy từ bản nháp đã cất. */
 function refreshLocalDraftIds() {
   var out = [];
   var stack = typeof ScreenState !== 'undefined' && Array.isArray(ScreenState.formStack) ? ScreenState.formStack : [];
   stack.forEach(function (form) {
-    if (!form || !form.draft || !Object.keys(form.draft).length) { return; }
+    if (!form) { return; }
     var id = String(form.record && form.record.id || '').trim();
     if (id && out.indexOf(id) < 0) { out.push(id); }
   });

@@ -1,6 +1,6 @@
 <script>
 /*
- * Thông báo của Sidebar: nơi duy nhất giữ các việc người dùng cần biết đang còn (lỗi sheet quản trị đang đứng, Extension không chạy, sheet quản trị chưa cập nhật), dòng báo ở đáy và màn thông báo dùng chung.
+ * Thông báo của Sidebar: nơi duy nhất giữ các việc người dùng cần biết đang còn (nạp lại bị hoãn vì form đang mở, lỗi sheet quản trị đang đứng, Extension không chạy, sheet quản trị chưa cập nhật), dòng báo ở đáy và màn thông báo dùng chung.
  * Nguồn nào cũng chỉ gọi `noticeSet(key, notice)`; thứ tự, chữ ở dòng đáy và lúc thân Sidebar chuyển sang màn thông báo đều quyết ở đây. Dòng đáy nhường chỗ cho dải hoàn tác trong lúc đếm ngược và ẩn khi màn đồng bộ FBM giữ khung.
  * `notice`: `{ line, blocks, button, takeover }` — `line` là chữ ở dòng đáy; `blocks` là các khối của màn thông báo (xem `client/schema/status/notices.html`); `button` (`{ label, action }`) là nút ở dòng đáy; `takeover` là việc thay hẳn thân Sidebar ngay khi xuất hiện.
  */
@@ -11,8 +11,8 @@ var NOTICE_BUTTON_ID = 'shin-notice-btn';
 var NOTICE_UNDO_ID = 'shin-undo';
 var NOTICE_SCREEN_ROOT_ID = 'shin-notice-screen';
 
-/** Số nhỏ đứng trước ở dòng đáy và trên màn thông báo. Khóa ngoài bảng này là lỗi lập trình. */
-var NOTICE_PRIORITY = { viewProblems: 1, extension: 2, viewStale: 3 };
+/** Số nhỏ đứng trước ở dòng đáy và trên màn thông báo. Khóa ngoài bảng này là lỗi lập trình. Hoãn nạp đứng đầu vì nó chỉ có khi form đang mở và nói về chính chữ người dùng đang gõ. */
+var NOTICE_PRIORITY = { recordDeferred: 1, viewProblems: 2, extension: 3, viewStale: 4 };
 
 var NOTICES = {};
 

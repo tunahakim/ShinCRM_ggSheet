@@ -16,6 +16,9 @@ var SCREEN_VIEW = 'view';
  *
  * `screen` vẫn là một trường thật chứ không suy ra từ đỉnh ngăn xếp, vì tài liệu khai nó là một trong ba thứ của trạng thái — push và pop có nhiệm vụ giữ hai bên khớp nhau.
  */
+/** Bộ đếm cấp mã khung form: mỗi lần mở form là một khung mới, kể cả mở lại đúng bản ghi cũ, để chữ trên màn hình của khung đã đóng không bị thu nhầm vào khung sau. */
+var SCREEN_STATE_FRAME_SEQ = 0;
+
 var ScreenState = {
   currentCustomerId: '',
   screen: SCREEN_VIEW,
@@ -69,7 +72,7 @@ function screenStatePushForm(man, entity, record, carried, themMoi) {
   }
 
   ScreenState.formStack.push({
-    screen: man, entity: entity, record: record || {}, draft: {},
+    frame: ++SCREEN_STATE_FRAME_SEQ, screen: man, entity: entity, record: record || {}, draft: {},
     carried: carried || [], themMoi: themMoi === true
   });
   ScreenState.screen = man;
