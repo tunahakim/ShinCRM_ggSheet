@@ -298,20 +298,17 @@ function writeGateConflicts(plans, rows, fields, context) {
 }
 
 /**
- * Xác nhận sau ghi (tài liệu 06 Phần 4): đọc lại theo vị trí các dòng vừa ghi trên tờ nháp (không tốn lệnh đọc thêm ngoài lần đọc lại vốn có), kiểm ô mã đúng mã bản ghi và mọi trường vừa ghi khớp giá trị đọc lại.
+ * Xác nhận sau ghi (tài liệu 06 Phần 4) trên chính các dòng của lần đọc lại vốn có (`rows`, cùng thứ tự `plans`), nên không tốn lệnh đọc nào thêm: ô mã phải đúng mã bản ghi và mọi trường vừa ghi có trong bối cảnh nạp phải khớp giá trị đọc lại. Trường ngoài bối cảnh (cột riêng của đồng bộ) không được nạp nên không kiểm; ô mã đúng đã chặn được ca dòng bị đổi chủ.
  * Lệch nghĩa là Sheet bị sắp xếp, chèn, xóa hàng đúng lúc ghi hoặc Google tự đổi giá trị: đánh dấu nạp lại trọn thực thể, ghi Log mức lỗi rồi ném lỗi bằng tiếng người, không bao giờ để thành lỗi âm thầm.
  */
-function writeGateConfirm(entity, plans, fields, written) {
-  var confirmFields = { id: DATA_SCHEMA[entity].id };
-  Object.keys(fields).forEach(function (name) { confirmFields[name] = fields[name]; });
-  var context = entityReadContext(entity, confirmFields);
-  var rows = entityReadPlaced(context, written, plans.map(function (plan) { return plan.id; })).rows;
+function writeGateConfirm(entity, plans, fields, context, rows) {
   var mismatches = [];
   plans.forEach(function (plan, i) {
     var onSheet = String(rows[i][context.idAt]).trim();
     if (onSheet !== plan.id) { mismatches.push({ id: plan.id, field: 'id', onSheet: onSheet }); return; }
     Object.keys(plan.values).forEach(function (name) {
       var at = context.names.indexOf(name);
+      if (at < 0) { return; }
       var wrote = writeGateComparable(plan.values[name], fields[name], context.timezone);
       var read = writeGateComparable(rows[i][at], fields[name], context.timezone);
       if (wrote !== read) { mismatches.push({ id: plan.id, field: name, wrote: wrote, onSheet: read }); }
@@ -411,9 +408,8 @@ function writeGateRun(entity, records, source, fields, batDau, olds) {
   var before = writeGateRowSnapshot(touched, context, placement);
 
   var written = entityWriteRecords(context, fields, placement, plans.map(function (plan) { return { id: plan.id, values: plan.values, append: plan.moi }; }));
-  writeGateConfirm(entity, plans, fields, written);
-
   var doc = writeGateReadBack(plans, context, written);
+  writeGateConfirm(entity, plans, fields, context, doc.rows);
   var after = {};
   doc.rows.forEach(function (row) { after[String(row[context.idAt]).trim()] = JSON.stringify(row); });
   var ms = Date.now() - batDau;

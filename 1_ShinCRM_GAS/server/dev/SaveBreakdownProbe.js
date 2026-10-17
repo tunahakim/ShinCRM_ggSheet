@@ -27,7 +27,7 @@ var SAVE_BREAKDOWN_PROBE_PARTS = [
   'FbmSync.withOrchestrationLock', 'fbmSyncSaveAllowed',
   'documentLockRun', 'documentLockSettle',
   'entityReadContext', 'entityPlace', 'writeGateSelectCatalog', 'writeGateUniqueCheck', 'idGateIssue',
-  'writeGateRowSnapshot', 'entityWriteRecords', 'writeGateReadBack', 'logEvent',
+  'writeGateConflicts', 'writeGateRowSnapshot', 'entityWriteRecords', 'writeGateConfirm', 'writeGateReadBack', 'logEvent',
   'recordChangesAfterWrite', 'reloadStateRead'
 ];
 
@@ -39,6 +39,7 @@ function measureSaveBreakdown() {
   var noteCol = selectionColumnIndex(sheet, DATA_SCHEMA.customer.note.code);
   var original = sheet.getRange(SHEET_FIRST_DATA_ROW, noteCol).getDisplayValue();
   out.push('Khách thử: ' + id + ', ghi chú gốc dài ' + original.length + ' ký tự');
+  var onSheet = original;
   try {
     for (var round = 1; round <= 3; round++) {
       var times = {};
@@ -46,7 +47,8 @@ function measureSaveBreakdown() {
       var restoreStore = reloadJournalProbeCountStore(counter);
       var restore = saveBreakdownProbeWrap(SAVE_BREAKDOWN_PROBE_PARTS, times);
       var result;
-      try { result = saveRecord('customer', { id: id, note: original + ' [đo ' + round + ']' }); } finally { restore(); restoreStore(); }
+      try { result = saveRecord('customer', { id: id, note: original + ' [đo ' + round + ']' }, { note: onSheet }); } finally { restore(); restoreStore(); }
+      if (result && result.ok) { onSheet = original + ' [đo ' + round + ']'; }
       var line = Object.keys(times).map(function (name) { return name + ' ' + times[name].ms + (times[name].n > 1 ? '×' + times[name].n : ''); }).join(', ');
       out.push('Lượt ' + round + ' (' + (result && result.ok ? 'đạt' : 'KHÔNG ĐẠT ' + JSON.stringify(result)) + '): ' + line + ' · lệnh kho ' + JSON.stringify(counter));
     }
@@ -58,7 +60,7 @@ function measureSaveBreakdown() {
     var max = idGateMaxOnSheet(context);
     out.push('Cấp mã trên cùng bối cảnh (' + context.rowCount + ' dòng): tìm dòng theo mã ' + rowByIdMs + ' ms, rồi lưới an toàn idGateMaxOnSheet ' + (Date.now() - started) + ' ms, max ' + max);
   } finally {
-    saveRecord('customer', { id: id, note: original });
+    saveRecord('customer', { id: id, note: original }, { note: onSheet });
     out.push('Đã trả ghi chú gốc: ' + (sheet.getRange(SHEET_FIRST_DATA_ROW, noteCol).getDisplayValue() === original));
   }
   return out;

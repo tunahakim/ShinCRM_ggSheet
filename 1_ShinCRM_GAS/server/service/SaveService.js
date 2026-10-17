@@ -88,7 +88,7 @@ function probeSaveGate() {
   report.push('  mã số thuế đọc lại: "' + them.rows[0][them.fields.indexOf('taxNumber')] + '" — còn số 0 đầu thì khuôn cột đang đúng');
   report.push('  mốc tạo đọc lại: "' + them.rows[0][them.fields.indexOf('createdAt')] + '"');
 
-  var sua = saveRecord('customer', { id: ma, phone: '0987000111' });
+  var sua = saveRecord('customer', { id: ma, phone: '0987000111' }, { phone: '0912345678' });
   report.push('Sửa một trường: ok=' + sua.ok + ', ' + sua.ms + 'ms, điện thoại đọc lại: "' + sua.rows[0][sua.fields.indexOf('phone')] + '"');
   report.push('  tên công ty vẫn nguyên sau khi chỉ gửi một trường? ' + (sua.rows[0][sua.fields.indexOf('companyName')] === 'THỬ CỬA GHI — xóa được'));
 
