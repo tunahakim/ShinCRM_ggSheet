@@ -34,13 +34,15 @@ function dungHopPoll() {
   const windowListeners = {};
   const rootListeners = {};
   let nextTimer = 1;
-  const banner = { hidden: true };
-  const viewNotice = { hidden: true };
+  // Dòng báo ở đáy: `_banner.textContent` đọc chữ của nó để các phép kiểm Extension giữ nguyên cách viết.
+  const noticeText = { textContent: '' };
+  const noticeButton = { hidden: true, textContent: '', setAttribute(name, value) { this[name] = value; } };
+  const banner = { hidden: true, get textContent() { return noticeText.textContent; } };
   const root = { addEventListener: (name, fn) => { rootListeners[name] = fn; } };
   const document = {
     hidden: false,
     addEventListener: (name, fn) => { documentListeners[name] = fn; },
-    getElementById: (id) => ({ 'sidebar-root': root, 'shin-extension-warning': banner, 'shin-view-stale': viewNotice })[id] || null,
+    getElementById: (id) => ({ 'sidebar-root': root, 'shin-notice': banner, 'shin-notice-text': noticeText, 'shin-notice-btn': noticeButton, 'shin-notice-screen': hop && hop._noticeScreen ? {} : null })[id] || null,
     querySelector: () => null
   };
   const window = { addEventListener: (name, fn) => { windowListeners[name] = fn; } };
@@ -60,13 +62,19 @@ function dungHopPoll() {
   hop.Store = { hasCustomer: () => false };
   hop._clock = clock; hop._timers = timers; hop._intervals = intervals;
   hop._documentListeners = documentListeners; hop._windowListeners = windowListeners; hop._rootListeners = rootListeners;
-  hop._banner = banner; hop._viewNotice = viewNotice; hop._calls = []; hop._options = [];
+  hop._banner = banner; hop._noticeButton = noticeButton; hop._calls = []; hop._options = [];
+  // Màn thông báo: chỉ ghi lại lần vẽ, cờ `_noticeScreen` đứng thay cho khối gốc trong DOM.
+  hop._screens = [];
+  hop.UI_SCHEMA = { view: {} };
+  hop.screenBuild = () => ({ header: [] });
+  hop.statusNotices = (infoText, blocks) => { hop._noticeScreen = true; hop._screens.push({ infoText, titles: blocks.map((block) => block.title) }); return null; };
+  hop.screenViewRender = () => { hop._noticeScreen = false; hop._screens.push('view'); return null; };
   hop.callServer = (name, args, options) => {
     hop._calls.push(name);
     hop._options.push(options || {});
     return syncValue({ ok: true, spreadsheetId: 'sheet-1', gid: '1', sheetName: 'Customer', row: 4, col: 1, rowEnd: 4, colEnd: 1, customerId: '', reload: { revision: 0 } });
   };
-  napClient(hop, 'client/ram/refresh.html', 'client/link/sheetLink.html', 'client/link/selectionPoll.html', 'client/link/changeSignal.html');
+  napClient(hop, 'client/ram/refresh.html', 'client/ui/notices.html', 'client/link/sheetLink.html', 'client/link/selectionPoll.html', 'client/link/changeSignal.html');
   // Các phép kiểm request giữ hợp đồng bàn giao im lặng; bản chạy DEV trực quan bật cờ này ở runtime.
   hop.SETTINGS.SHOW_PROBE_PROGRESS_DEBUG = true;
   return hop;
@@ -442,20 +450,6 @@ async function chay(so) {
   await failedReload.sheetLinkApplyDecisionResult({ reload: { revision: 8 }, processedRevision: 8, payload: { parts: [{ mode: 'fullCore', core: { ok: false } }] } });
   check(so, 'gói áp không thành công không đánh dấu revision đã xử lý', failedReload.SHEET_LINK_LAST_SEEN_REVISION, 0);
 
-  // Rời ô điều khiển sheet `!`: chỉ so revision sổ với revision đã thấy rồi hỏi GAS một lời; Sidebar không tự chọn API nạp.
-  const inspect = dungHopPoll(); batDau(inspect);
-  inspect._synced = [];
-  inspect.sheetLinkSyncDirtyData = (opts) => { inspect._synced.push(opts.reason); return syncValue({ ok: true }); };
-  inspect.callServer = (name) => syncValue(name === 'inspectViewState' ? { reload: { revision: 5 }, changed: false, needsRender: false } : { ok: true });
-  inspect.sheetLinkViewState('!Lead').metaReady = true;
-  inspect.SHEET_LINK_LAST_SEEN_REVISION = 5;
-  await inspect.sheetLinkInspectView('!Lead');
-  const inspectDaThay = inspect._synced.slice();
-  inspect.SHEET_LINK_LAST_SEEN_REVISION = 4;
-  await inspect.sheetLinkInspectView('!Lead');
-  check(so, 'rời ô điều khiển sheet !: sổ không có gì mới thì không nạp; có revision mới thì một lời hỏi GAS',
-    [inspectDaThay, inspect._synced], [[], ['view-inspect']]);
-
   const failedEvent = dungHopPoll(); batDau(failedEvent);
   failedEvent.SHEET_LINK_LAST_SEEN_REVISION = 0;
   failedEvent.sheetLinkSyncDirtyData = () => syncValue({ ok: false, error: 'reload failed' });
@@ -601,8 +595,8 @@ async function chayView(so) {
   const once = dungHopView({ probeSelectionAndReload: probeRender, renderViewIfDirty: drawn });
   await once.sheetLinkProbeSelectionAndReload('wake');
   await once.sheetLinkProbeSelectionAndReload('wake');
-  check(so, 'view.action = render: Sidebar gọi renderViewIfDirty đúng một lần cho hai phản hồi cùng revision, không kèm controlsOnly',
-    [tenGoi(once, 'probeSelectionAndReload').length, tenGoi(once, 'renderViewIfDirty').length, tenGoi(once, 'renderViewIfDirty')[0].options], [2, 1, {}]);
+  check(so, 'view.action = render: Sidebar gọi renderViewIfDirty đúng một lần cho hai phản hồi cùng revision, chỉ gửi tên sheet',
+    [tenGoi(once, 'probeSelectionAndReload').length, tenGoi(once, 'renderViewIfDirty').length, tenGoi(once, 'renderViewIfDirty')[0].options === undefined], [2, 1, true]);
   once._answers.probeSelectionAndReload = Object.assign({}, probeRender, { reload: { revision: 6 } });
   await once.sheetLinkProbeSelectionAndReload('wake');
   check(so, 'revision mới thì được xin vẽ lần nữa', tenGoi(once, 'renderViewIfDirty').length, 2);
@@ -621,31 +615,56 @@ async function chayView(so) {
     [open, enter, visible].map((hop) => tenGoi(hop, 'probeSelectionAndReload').map((item) => item.reason)),
     [['sidebar-open'], ['view-enter'], ['visible']]);
   check(so, 'vào sheet ! không gọi bộ vẽ riêng ngoài quyết định của lời hỏi', tenGoi(enter, 'renderViewIfDirty'), []);
+  enter.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: '!Lead', row: 3, col: 2 });
   enter.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: '!Lead', row: 5, col: 1 });
-  check(so, 'nhấp tiếp trên sheet ! chưa có metadata chỉ lấy metadata với controlsOnly, không vẽ sheet cũ',
-    tenGoi(enter, 'renderViewIfDirty').map((item) => item.options), [{ controlsOnly: true }]);
+  check(so, 'nhấp ô điều khiển rồi rời ô trên sheet ! không gọi máy chủ: trigger gắn cờ, lời hỏi chung vẽ',
+    [tenGoi(enter, 'renderViewIfDirty').length, enter._log.map((item) => item.name).filter((name) => name !== 'probeSelectionAndReload')], [0, []]);
 
-  // Núm tắt: dòng báo hiện, bấm Làm mới vẽ xong thì mất; rời sheet cũng mất.
-  const notify = dungHopView({ probeSelectionAndReload: Object.assign({}, probeRender, { view: { sheetName: '!Lead', stale: true, action: 'notify' } }) });
+  // Núm tắt: dòng báo "chưa cập nhật" kèm nút Làm mới; vẽ xong thì mất; rời sheet cũng mất.
+  const notify = dungHopView({ probeSelectionAndReload: Object.assign({}, probeRender, { view: { sheetName: '!Lead', stale: true, action: 'notify', problems: [] } }) });
   notify.SHEET_LINK_LAST_SHEET = '!Lead';
   await notify.sheetLinkProbeSelectionAndReload('wake');
-  const shown = [notify._viewNotice.hidden, notify.SHEET_LINK_VIEW_NOTICE_SHEET, tenGoi(notify, 'renderViewIfDirty').length];
+  const shown = [notify._banner.hidden, notify._banner.textContent, notify._noticeButton.hidden, notify._noticeButton['data-action'], tenGoi(notify, 'renderViewIfDirty').length, notify._screens];
   notify.sheetLinkViewApplyResult('!Lead', { ok: true, sheetName: '!Lead', rows: 3 });
-  const afterRefresh = notify._viewNotice.hidden;
+  const afterRefresh = notify._banner.hidden;
   await notify.sheetLinkProbeSelectionAndReload('wake');
   notify.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: 'Customer', row: 4, col: 1 });
-  check(so, 'view.action = notify hiện dòng báo, không vẽ; vẽ thủ công xong thì dòng báo mất; rời sheet ! thì dòng báo mất',
-    [shown, afterRefresh, notify._viewNotice.hidden], [[false, '!Lead', 0], true, true]);
-  notify.SHEET_LINK_LAST_SHEET = '!Lead';
-  notify.sheetLinkViewApplyResult('!Lead', { ok: false, skipped: true, sheetName: '!Lead', error: 'ô B3', viewMeta: { revision: 2, filterColumns: [2], sortColumns: [] } });
-  check(so, 'GAS trả lượt thử gần nhất đã hỏng (ok:false) thì hiện dòng báo sheet cũ và thôi xin lấy metadata',
-    [notify._viewNotice.hidden, notify.SHEET_LINK_VIEW_NOTICE_SHEET, notify.sheetLinkViewState('!Lead').needsSync], [false, '!Lead', false]);
+  check(so, 'view.action = notify hiện dòng báo kèm nút Làm mới, không vẽ, không thay thân; vẽ thủ công xong thì mất; rời sheet ! thì mất',
+    [shown, afterRefresh, notify._banner.hidden], [[false, 'Sheet !Lead chưa cập nhật', false, 'renderActiveViewSheet', 0, []], true, true]);
+
+  // Lỗi vẽ: thân Sidebar thành màn thông báo nhiều khối, tự vẽ lại khi lỗi đổi, hết lỗi tự trả màn xem khách.
+  const blocks = [{ title: 'Điều kiện lọc sai (hàng 3)', lines: ['Ô B3 (@CUS_TEN_CTY): sai'], hint: '' }, { title: 'Có công thức trong các cột ShinCRM tự vẽ', lines: ['Cột C, stt: 3, Mã cột: @CUS_MST'], hint: 'Chuyển công thức.' }];
+  const failed = dungHopView({ probeSelectionAndReload: Object.assign({}, probeRender, { view: { sheetName: '!Lead', stale: true, action: 'notify', problems: blocks } }) });
+  failed.SHEET_LINK_LAST_SHEET = '!Lead';
+  await failed.sheetLinkProbeSelectionAndReload('wake');
+  const firstScreen = failed._screens.slice();
+  const lineFailed = [failed._banner.textContent, failed._noticeButton.hidden];
+  let picked = 0;
+  failed.ACTIONS.setCurrentCustomer = () => { picked += 1; };
+  failed.Store = { hasCustomer: () => true };
+  failed.sheetLinkApplyCustomerContext({ sheetName: '!Lead', customerId: 'KH1' });
+  failed.sheetLinkViewApplyResult('!Lead', { ok: false, sheetName: '!Lead', problems: blocks.slice(1) });
+  failed.sheetLinkViewApplyResult('!Lead', { ok: true, sheetName: '!Lead', rows: 2 });
+  check(so, 'lỗi vẽ: thân thành màn thông báo mỗi lỗi một khối, dòng đáy báo sheet chưa vẽ được, nhấp dòng sheet lỗi không thay màn, lỗi đổi thì vẽ lại, hết lỗi trả màn xem khách',
+    [firstScreen, lineFailed, picked, failed._screens.slice(1), failed._banner.hidden],
+    [[{ infoText: 'Sheet !Lead chưa vẽ được — đang giữ dữ liệu cũ', titles: blocks.map((block) => block.title) }], ['Sheet !Lead chưa vẽ được — đang giữ dữ liệu cũ', true], 0,
+      [{ infoText: 'Sheet !Lead chưa vẽ được — đang giữ dữ liệu cũ', titles: [blocks[1].title] }, 'view'], true]);
+
+  // Nhiều việc cùng lúc: dòng đáy báo việc ưu tiên nhất kèm số việc còn lại, màn thông báo xếp khối theo thứ tự ưu tiên.
+  const many = dungHopView();
+  many.SHEET_LINK_LAST_SHEET = '!Lead';
+  many.noticeSet('extension', { line: 'Thiếu Extension', blocks: [{ title: 'Thiếu Extension', lines: [] }] });
+  many.sheetLinkViewApplyResult('!Lead', { ok: false, sheetName: '!Lead', problems: blocks });
+  many.sheetLinkViewApplyResult('!Other', { ok: false, sheetName: '!Other', problems: blocks });
+  check(so, 'lỗi sheet đang đứng xếp trước mất Extension, dòng đáy kèm +N; kết quả của sheet đã rời bị bỏ qua',
+    [many._banner.textContent, many._screens], ['Sheet !Lead chưa vẽ được — đang giữ dữ liệu cũ · +1', [{ infoText: 'Sheet !Lead chưa vẽ được — đang giữ dữ liệu cũ', titles: blocks.map((block) => block.title).concat(['Thiếu Extension']) }]]);
+
   const sidebarHtml = fs.readFileSync(path.join(GAS_DIR, 'client', 'Sidebar.html'), 'utf8');
-  const noticeHost = (sidebarHtml.match(/<div id="shin-view-stale"[\s\S]*?<\/div>/) || [''])[0];
   const actionsHtml = fs.readFileSync(path.join(GAS_DIR, 'client', 'ui', 'actions.html'), 'utf8');
-  check(so, 'dòng báo dùng khuôn chữ + nút dùng chung, nút gọi action làm mới thủ công sẵn có và action đó áp kết quả vào trạng thái view',
-    [noticeHost.indexOf('View chưa cập nhật') >= 0, noticeHost.indexOf('data-action="renderActiveViewSheet"') >= 0, noticeHost.indexOf('class="shin-undo"') >= 0,
-      /renderActiveViewSheet[\s\S]*?sheetLinkViewApplyResult/.test(actionsHtml)], [true, true, true, true]);
+  const sources = ['client/link/sheetLink.html', 'client/link/selectionPoll.html', 'client/sync/fbmSync.html', 'client/ui/actions.html'].map((rel) => fs.readFileSync(path.join(GAS_DIR, rel), 'utf8')).join(' ');
+  check(so, 'đáy Sidebar chỉ còn một dòng báo do tệp thông báo sở hữu; nút Làm mới áp kết quả vào thông báo; không còn đường dò ô điều khiển phía Sidebar',
+    [/id="shin-notice"[^>]*data-action="toggleNotices"/.test(sidebarHtml), /shin-extension-warning|shin-view-stale/.test(sidebarHtml + sources),
+      /renderActiveViewSheet[\s\S]*?sheetLinkViewApplyResult/.test(actionsHtml), /inspectViewState|controlsOnly|viewMeta/.test(sources)], [true, false, true, false]);
 
   // Công tắc tự động làm mới.
   const viewSchema = fs.readFileSync(path.join(GAS_DIR, 'client', 'schema', 'screens', 'view.html'), 'utf8');

@@ -85,7 +85,7 @@ async function testSharedShellLifecycle(so) {
   const footer = dom.document.getElementById('sidebar-footer');
   const search = dom.document.createElement('div'); search.id = 'shin-search'; search.hidden = false; dom.root.appendChild(search);
   const undo = dom.document.createElement('div'); undo.id = 'shin-undo'; undo.hidden = true; dom.root.appendChild(undo);
-  const warning = dom.document.createElement('div'); warning.id = 'shin-extension-warning'; warning.hidden = false; dom.root.appendChild(warning);
+  const warning = dom.document.createElement('div'); warning.id = 'shin-notice'; warning.hidden = false; dom.root.appendChild(warning);
   const lifecycleCalls = [];
   hop.ScreenState = { screen: 'activityForm', formStack: [{ screen: 'activityForm' }] };
   hop.screenStateTop = () => hop.ScreenState.formStack[hop.ScreenState.formStack.length - 1] || null;

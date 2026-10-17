@@ -27,7 +27,7 @@ function chay(so) {
   check(so, 'năm tệp schema lõi nằm cùng thư mục screens',
     coreSchemas.filter((name) => listHtml('client/schema/screens').includes(name)), coreSchemas);
 
-  const statusSchemas = ['budgetBlocked.html', 'common.html', 'loadError.html', 'loadSummary.html'];
+  const statusSchemas = ['common.html', 'loadSummary.html', 'notices.html'];
   check(so, 'các màn trạng thái có schema riêng trong thư mục status',
     statusSchemas.filter((name) => listHtml('client/schema/status').includes(name)), statusSchemas);
 
@@ -139,8 +139,7 @@ function chay(so) {
     ['client/schema/screens/activityForm', 'client/screen/formScreen'],
     ['client/schema/screens/noteForm', 'client/screen/formScreen'],
     ['client/schema/status/common', 'client/screen/statusScreen'],
-    ['client/schema/status/budgetBlocked', 'client/screen/statusScreen'],
-    ['client/schema/status/loadError', 'client/screen/statusScreen'],
+    ['client/schema/status/notices', 'client/screen/statusScreen'],
     ['client/schema/status/loadSummary', 'client/screen/statusScreen'],
     ['client/schema/sync/screens/run', 'client/sync/screens/run'],
     ['client/schema/sync/screens/account', 'client/sync/screens/account'],
