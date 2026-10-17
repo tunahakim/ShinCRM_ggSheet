@@ -65,8 +65,9 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── SheetLocate.js        Tầng 2 định vị: đổi cột mã đã đọc ra bảng mã → số dòng, ném lỗi khi trùng mã.
 │   │   ├── SheetGrid.js          Sự thật về lưới: đếm hàng dữ liệu, đọc một khối ô, nới lưới trước khi ghi. Ra đời từ lỗi thật làm sheet Log co xuống 7 hàng rồi tắt log trong im lặng.
 │   │   ├── CellBudget.js         Đo tổng số ô cả tệp và so với trần ở Config. Vượt trần thì chặn hẳn lượt nạp, kèm bảng chỉ mặt sheet nào phình to.
-│   │   ├── EntityRead.js         Đọc bản ghi Customer và Activity ra dạng { fields, rows } truyền được sang client. Bỏ hàng không có mã và đếm số hàng đã bỏ.
-│   │   ├── CategoryRead.js       Đọc sheet Category thành "mã danh mục → danh sách giá trị". Biết loại cột đi kèm _FBM mà không loại nhầm @CAT_CHO_PHEP_FBM.
+│   │   ├── EntityRead.js         Tầng 3 đọc bản ghi Customer và Activity ra dạng { fields, rows } truyền được sang client; định vị bản ghi theo mã (`placement`) và đọc lại theo vị trí. Bỏ hàng không có mã và đếm số hàng đã bỏ.
+│   │   ├── EntityWrite.js        Tầng 3 ghi bản ghi theo tên trường: định vị cột, dấu nháy và khuôn chữ cho cột chữ, gom vùng, gọi công cụ ghi ô. Không kiểm, không cầm khóa.
+│   │   ├── CategoryRead.js       Tầng 3 đọc sheet Category: các cột danh mục theo mã `@` qua tờ nháp, và bảng "mã danh mục → danh sách giá trị". Biết loại cột đi kèm _FBM mà không loại nhầm @CAT_CHO_PHEP_FBM.
 │   │   ├── ConfigRead.js         Đọc các khối bảng của Config và trả hợp đồng counters riêng dù bộ đếm đã lưu chung trong khối tham số.
 │   │   ├── SyncColumnSetup.js    Dựng các cột metadata đồng bộ qua cửa ghi chung; module fbm_sync chỉ khai báo schema.
 │   │   └── SetupSheets.js        Dựng và kiểm khung năm sheet từ hai tệp khai ở data\, rồi gọi lớp chuẩn bị Config. Chạy được nhiều lần, không phá dữ liệu đang có.
