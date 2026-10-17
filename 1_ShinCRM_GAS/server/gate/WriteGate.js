@@ -105,11 +105,6 @@ function writeGateCast(value, spec, chayNormalize) {
   return { value: sach };
 }
 
-/** Bảng tra mã bản ghi sang số dòng của thực thể, `{ '<mã>': số dòng }`; mã trùng trên sheet thì ném lỗi (`sheetLocateRowMap`). */
-function writeGateRowById(context) {
-  return sheetLocateRowMap(entityReadIdColumn(context), SHEET_FIRST_DATA_ROW, context.sheetName);
-}
-
 /**
  * Giá trị này đã có ở cột `unique` nào khác chưa. Đọc **cột trên sheet**, không đọc bộ nhớ, và **đếm cả dòng đã xóa mềm** `[RÀNG BUỘC CỨNG]`.
  *
@@ -117,17 +112,16 @@ function writeGateRowById(context) {
  *
  * Vì sao đọc sheet mà không đọc bộ nhớ: bộ nhớ là ảnh chụp lúc mở sidebar. Người khác vừa thêm một khách xong thì bộ nhớ của máy này không biết, và `unique` mà tin vào một ảnh chụp cũ thì nó không còn là `unique`.
  */
-function writeGateUniqueTaken(context, spec, value, dongMinh) {
+function writeGateUniqueTaken(context, spec, value, selfId) {
   if (value === null || value === undefined || String(value).trim() === '') { return false; }
   if (context.rowCount <= 0) { return false; }
 
-  var cot = columnIndex(context.columnMap, spec.code);
-  var values = sheetReadColumnValues(context.sheet, cot, SHEET_FIRST_DATA_ROW);
+  var column = entityReadColumnWithIds(context, spec.code);
   var can = String(value).trim();
 
-  for (var i = 0; i < values.length; i++) {
-    if (SHEET_FIRST_DATA_ROW + i === dongMinh) { continue; }
-    if (String(values[i]).trim() === can) { return true; }
+  for (var i = 0; i < column.values.length; i++) {
+    if (selfId && String(column.ids[i]).trim() === selfId) { continue; }
+    if (String(column.values[i]).trim() === can) { return true; }
   }
   return false;
 }
@@ -138,34 +132,27 @@ function writeGateInvalid(plan, field, spec, reason) {
 }
 
 /**
- * Xếp từng bản ghi vào một trong hai đường: thêm mới, hay sửa dòng nào.
+ * Xếp từng bản ghi vào một trong hai đường: thêm mới hay sửa. Mã đang sửa có trên sheet hay không do `entityPlace` kiểm ngay sau bước này.
  *
  * **Mã rỗng là bản ghi mới**, và mã do cửa cấp mã cấp bên trong khóa. Client tuyệt đối không được gửi mã xem trước lên đây: mã xem trước tính lúc mở form, mà giữa lúc mở form và lúc bấm Lưu thì người khác hoàn toàn có thể đã dùng đúng mã đó.
  *
- * **Mã có mà không có trên sheet thì ném lỗi**, không âm thầm thêm dòng mới. Bản ghi đang sửa mà biến mất khỏi sheet nghĩa là có người vừa xóa dòng đó, hoặc bộ nhớ của sidebar đã cũ; thêm một dòng mới trong hoàn cảnh đó là dựng ra một bản ghi thứ hai mà người dùng tin là mình vừa sửa bản ghi cũ.
- *
  * Cùng một mã hai lần trong một lượt cũng ném lỗi: hai lệnh ghi vào cùng một dòng thì lệnh sau thắng, và bên gọi không có cách nào biết mình vừa mất một nửa dữ liệu.
  */
-function writeGatePlans(records, rowById, context) {
+function writeGatePlans(records) {
   var daGap = {};
 
   return records.map(function (record, index) {
     var ban = record || {};
     var id = String(ban.id === null || ban.id === undefined ? '' : ban.id).trim();
 
-    if (!id) { return { index: index, record: ban, id: '', row: 0, moi: true, values: {} }; }
+    if (!id) { return { index: index, record: ban, id: '', moi: true, values: {} }; }
 
     if (daGap.hasOwnProperty(id)) {
       throw new Error('Mã "' + id + '" xuất hiện hai lần trong cùng một lượt lưu (bản ghi thứ ' + (daGap[id] + 1) + ' và thứ ' + (index + 1) + ').');
     }
     daGap[id] = index;
 
-    var row = rowById[id];
-    if (!row) {
-      throw new Error('Không tìm thấy mã "' + id + '" trên sheet "' + context.sheetName + '". Có thể dòng đó vừa bị xóa. Bấm Nạp lại rồi thử lại.');
-    }
-
-    return { index: index, record: ban, id: id, row: row, moi: false, values: {} };
+    return { index: index, record: ban, id: id, moi: false, values: {} };
   });
 }
 
@@ -272,106 +259,18 @@ function writeGateUniqueCheck(plans, names, fields, source, context, invalid) {
       }
       trongLo[khoa] = true;
 
-      if (writeGateUniqueTaken(context, spec, giaTri, plan.row)) {
+      if (writeGateUniqueTaken(context, spec, giaTri, plan.id)) {
         invalid.push(writeGateInvalid(plan, ten, spec, 'Đã có bản ghi khác mang ' + String(spec.label || ten).toLowerCase() + ' "' + giaTri + '".'));
       }
     });
   });
 }
 
-/**
- * Đặt lại khuôn văn bản thuần cho các ô của cột chữ sắp ghi, **ngay trước** lệnh ghi.
- *
- * Vì sao phải làm ở đây chứ không chỉ làm một lần lúc dựng khung: khuôn cột là thứ người dùng đổi được bằng hai cú bấm trên sheet, và đổi rồi thì lượt Lưu sau đó ghi `'0101243150'` vào một ô số — Sheets cắt số 0 đầu, không báo gì, và không có đường nào lấy lại. `verifySheets` phát hiện được chuyện đó nhưng chỉ khi có người chạy nó.
- *
- * **Chỉ cột chữ, và chỉ những ô sắp ghi.** Cột số và cột ngày không đặt lại: ghi số vào ô đang ở khuôn nào cũng không mất chữ số nào, nên đặt lại chỉ để xóa mất khuôn hiển thị người dùng tự chọn cho hàng của họ. Gom dải liền nhau bằng đúng `sheetRegionsSpans` của đường ghi, nên một lượt lưu thường tốn thêm một lệnh.
- */
-function writeGateForceTextFormat(context, firstRow, soDong, cotChu) {
-  if (!cotChu.length || soDong <= 0) { return; }
-
-  sheetRegionsSpans(cotChu).forEach(function (dai) {
-    sheetCellsFormat(context.sheet, firstRow, dai[0] + 1, soDong, dai.length, COLUMN_FORMAT_TEXT);
-  });
-}
-
-/**
- * Thêm dấu nháy đơn vào đầu mọi chuỗi ghi vào cột chữ — quyết định bắt buộc của chủ dự án ngày 08/09/2026.
- *
- * Vì sao: khuôn `@` giữ số 0 đầu lúc **code** ghi, nhưng không giữ được lúc **người dùng** đổi khuôn ô sang số hoặc Tự động rồi gõ lại ô đó. Dấu nháy đơn là dấu "đây là văn bản" của chính Google — ô mang nó thì thanh công thức hiện `'0101243150` còn ô hiện `0101243150`, và `getValue` đọc về chuỗi không có dấu nháy, nên đường nạp và mọi phép kiểm trùng không hề biết chuyện gì xảy ra. Thừa một dấu nháy dễ dọn hơn mất số 0 đầu.
- *
- * Đặt ở đây chứ không ở `writeGateBuild`: mọi phép kiểm — bắt buộc, hợp lệ, trùng — phải chạy trên giá trị sạch, và thêm dấu nháy trước chúng là tự làm lệch phép trùng với sheet. Chuỗi rỗng không thêm: ô rỗng phải ở lại rỗng.
- */
-function writeGateQuoteText(giaTri) {
-  if (typeof giaTri !== 'string' || giaTri === '') { return giaTri; }
-  return "'" + giaTri;
-}
-
-/**
- * Ghi các bản ghi mới thành **một khối liền mạch** ngay dưới dòng cuối đang có dữ liệu.
- *
- * Tập cột của khối là **hợp** các khóa mà các bản ghi trong lô mang; bản ghi nào thiếu một khóa của tập đó thì ô ấy ghi rỗng. Đây là chỗ duy nhất cửa ghi ghi rỗng lên một khóa bản ghi không mang, và nó đúng vì dòng đang được dựng mới: ô đó vốn trống.
- *
- * Nới lưới trước khi ghi, vì `setValues` không tự nới — bài học ở `SheetGrid.gs`.
- */
-function writeGateWriteNew(moi, context, colOf, nameAt, laCotChu) {
-  if (!moi.length) { return; }
-
-  var keys = {};
-  moi.forEach(function (plan) { Object.keys(plan.values).forEach(function (ten) { keys[ten] = true; }); });
-
-  var firstRow = SHEET_FIRST_DATA_ROW + context.rowCount;
-  sheetGridEnsureRoom(context.sheet, firstRow + moi.length - 1, SHEET_GRID_SLACK);
-
-  var cols = Object.keys(keys).map(function (ten) { return colOf[ten]; });
-  writeGateForceTextFormat(context, firstRow, moi.length, cols.filter(function (at) { return laCotChu[at]; }));
-
-  sheetRegionsSpans(cols).forEach(function (dai) {
-    var values = moi.map(function (plan) {
-      return dai.map(function (at) {
-        var ten = nameAt[at];
-        var giaTri = Object.prototype.hasOwnProperty.call(plan.values, ten) ? plan.values[ten] : '';
-        return laCotChu[at] ? writeGateQuoteText(giaTri) : giaTri;
-      });
-    });
-    sheetCellsWrite(context.sheet, firstRow, dai[0] + 1, values);
-  });
-
-  moi.forEach(function (plan, i) { plan.row = firstRow + i; });
-}
-
-/**
- * Ghi các bản ghi đã có. Các bản ghi nằm ở dòng liền nhau và mang đúng cùng tập cột gom thành một lô, mỗi dải cột liền nhau của lô một lệnh; lô chỉ gồm dòng của chính các bản ghi trong lượt nên không ghi đè dòng nào khác. Bản ghi không mang khóa nào thì không tốn lệnh nào.
- */
-function writeGateWriteExisting(cu, context, colOf, nameAt, laCotChu) {
-  var lots = [];
-  cu.filter(function (plan) { return Object.keys(plan.values).length > 0; }).sort(function (a, b) { return a.row - b.row; }).forEach(function (plan) {
-    var cols = Object.keys(plan.values).map(function (ten) { return colOf[ten]; }).sort(function (a, b) { return a - b; });
-    var key = cols.join(',');
-    var last = lots[lots.length - 1];
-    if (last && last.key === key && last.plans[last.plans.length - 1].row === plan.row - 1) { last.plans.push(plan); return; }
-    lots.push({ key: key, cols: cols, plans: [plan] });
-  });
-
-  lots.forEach(function (lot) {
-    var firstRow = lot.plans[0].row;
-    writeGateForceTextFormat(context, firstRow, lot.plans.length, lot.cols.filter(function (at) { return laCotChu[at]; }));
-    sheetRegionsSpans(lot.cols).forEach(function (dai) {
-      var values = lot.plans.map(function (plan) {
-        return dai.map(function (at) {
-          var giaTri = plan.values[nameAt[at]];
-          return laCotChu[at] ? writeGateQuoteText(giaTri) : giaTri;
-        });
-      });
-      sheetCellsWrite(context.sheet, firstRow, dai[0] + 1, values);
-    });
-  });
-}
-
-/** Giá trị trường RAM hiện có trên Sheet của các bản ghi, theo mã, qua bản đọc Sheet chung và cùng bộ đổi kiểu với `writeGateReadBack` để so được với bản đọc lại. */
-function writeGateRowSnapshot(plans, context) {
+/** Giá trị trường RAM hiện có trên Sheet của các bản ghi, theo mã, cùng bộ đổi kiểu với `writeGateReadBack` để so được với bản đọc lại. */
+function writeGateRowSnapshot(plans, context, placement) {
   var snap = {};
   if (!plans.length) { return snap; }
-  entityReadRows(context, plans.map(function (plan) { return plan.row; })).rows.forEach(function (row) { snap[String(row[context.idAt]).trim()] = JSON.stringify(row); });
+  entityReadPlaced(context, placement, plans.map(function (plan) { return plan.id; })).rows.forEach(function (row) { snap[String(row[context.idAt]).trim()] = JSON.stringify(row); });
   return snap;
 }
 
@@ -382,9 +281,8 @@ function writeGateRowSnapshot(plans, context) {
  *
  * Đọc qua tờ nháp của lần gọi; công cụ ghi ô đã quên các dòng vừa ghi và ép lệnh ghi xuống trước lần đọc này, nên dòng đọc lại là giá trị thật và cũng thành bản nhớ mới của các dòng đó cho phần còn lại của lần gọi. Dùng chung bộ đổi kiểu với đường nạp, nên giá trị về client đi qua đúng một bộ đổi kiểu — ngày ra chữ, số ra số. Hai bộ đổi kiểu là hai cơ hội lệch nhau.
  */
-function writeGateReadBack(plans, context) {
-  var rowNumbers = plans.map(function (plan) { return plan.row; }).sort(function (a, b) { return a - b; });
-  return { fields: context.names, rows: entityReadRows(context, rowNumbers).rows };
+function writeGateReadBack(plans, context, placement) {
+  return { fields: context.names, rows: entityReadPlaced(context, placement, plans.map(function (plan) { return plan.id; })).rows };
 }
 
 /**
@@ -395,18 +293,9 @@ function writeGateReadBack(plans, context) {
 function writeGateRun(entity, records, source, fields, batDau) {
   var context = entityReadContext(entity);
   var names = Object.keys(fields);
-  var colOf = {};
-  var nameAt = {};
-  var laCotChu = {};
 
-  names.forEach(function (ten) {
-    var at = columnIndex(context.columnMap, fields[ten].code) - 1;
-    colOf[ten] = at;
-    nameAt[at] = ten;
-    if (columnFormatIsText(fields[ten])) { laCotChu[at] = true; }
-  });
-
-  var plans = writeGatePlans(records, writeGateRowById(context), context);
+  var plans = writeGatePlans(records);
+  var placement = entityPlace(context, plans.filter(function (plan) { return !plan.moi; }).map(function (plan) { return plan.id; }));
   var invalid = [];
 
   // Đọc bảng danh mục một lần cho cả lô, chỉ khi nguồn là `user` — nguồn `pull` bỏ qua mọi phép kiểm giá trị. `Category` đọc từ sheet chứ không từ bộ nhớ, vì giá trị danh mục có thể đã đổi giữa hai lượt mở sidebar.
@@ -442,12 +331,11 @@ function writeGateRun(entity, records, source, fields, batDau) {
 
   // Chụp giá trị cũ của bản ghi sửa có chạm trường RAM, để chỉ bản ghi đổi thật mới báo Sidebar nạp lại.
   var touched = cu.filter(function (plan) { return Object.keys(plan.values).some(function (ten) { return context.names.indexOf(ten) >= 0; }); });
-  var before = writeGateRowSnapshot(touched, context);
+  var before = writeGateRowSnapshot(touched, context, placement);
 
-  writeGateWriteNew(moi, context, colOf, nameAt, laCotChu);
-  writeGateWriteExisting(cu, context, colOf, nameAt, laCotChu);
+  var written = entityWriteRecords(context, fields, placement, plans.map(function (plan) { return { id: plan.id, values: plan.values, append: plan.moi }; }));
 
-  var doc = writeGateReadBack(plans, context);
+  var doc = writeGateReadBack(plans, context, written);
   var after = {};
   doc.rows.forEach(function (row) { after[String(row[context.idAt]).trim()] = JSON.stringify(row); });
   var ms = Date.now() - batDau;
@@ -456,7 +344,7 @@ function writeGateRun(entity, records, source, fields, batDau) {
     source: 'core', action: 'writeGateSave', outcome: LOG_OK, entity: entity,
     recordId: plans.map(function (plan) { return plan.id; }).join(' '),
     reason: 'Lưu ' + moi.length + ' bản ghi mới, ' + cu.length + ' bản ghi sửa',
-    detail: { nguon: source, cot: Object.keys(colOf).length, ms: ms }
+    detail: { nguon: source, cot: names.length, ms: ms }
   });
 
   return {

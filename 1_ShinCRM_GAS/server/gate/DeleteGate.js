@@ -84,7 +84,7 @@ function deleteGateRemove(yeuCau) {
  */
 function deleteGateRun(entity, ids, batDau) {
   var context = entityReadContext(entity);
-  var rowById = writeGateRowById(context);
+  var rowById = entityRowMap(context);
   var specStatus = DATA_SCHEMA[entity].recordStatus;
   var cotStatus = columnIndex(context.columnMap, specStatus.code);
 
@@ -124,7 +124,7 @@ function deleteGateRun(entity, ids, batDau) {
   if (soft.length) {
     // Đọc lại **sau** khi xóa hẳn, và đọc theo mã chứ theo số hàng thì sai: dòng xóa mềm có thể đã xê dịch lên vì một dòng bên trên nó vừa bị xóa hẳn.
     var sauKhiXoa = entityReadContext(entity);
-    var rowMoi = writeGateRowById(sauKhiXoa);
+    var rowMoi = entityRowMap(sauKhiXoa);
     sheetRegionsSpans(soft.map(function (o) { return rowMoi[o.id]; }).filter(function (row) { return !!row; })).forEach(function (dai) {
       entityReadRange(sauKhiXoa, dai[0], dai.length).rows.forEach(function (row) { doc.rows.push(row); });
     });

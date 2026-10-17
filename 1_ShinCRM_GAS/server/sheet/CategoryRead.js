@@ -37,25 +37,18 @@ function categoryCodes() {
  * Giá trị trùng nhau trong cùng một danh mục thì **giữ lại một và ghi cảnh báo**, không ném lỗi. Ném lỗi ở đây là chặn lượt mở sidebar vì một ô gõ lặp, mà màn chặn lại chiếm trọn khung nên người dùng mất luôn đường vào để sửa. Cảnh báo đi kèm kết quả nạp và hiện lên cho người dùng thấy, còn danh sách chọn thì vẫn dùng được ngay.
  */
 function categoryReadAll() {
-  var sheetName = 'Category';
-  var sheet = shinOpenSheet(sheetName);
-  var columnMap = readColumnMap(sheetName);
   var codes = categoryCodes();
-  var rowCount = sheetGridDataRowCount(sheet, SHEET_FIRST_DATA_ROW);
-  var block = sheetGridReadBlock(sheet, SHEET_FIRST_DATA_ROW, rowCount, columnMap.lastColumn);
+  var columns = categoryReadColumns(codes);
 
   var categories = {};
   var warnings = [];
 
   codes.forEach(function (code) {
-    var at = columnIndex(columnMap, code) - 1;
     var values = [];
     var seen = {};
     var duplicates = [];
 
-    block.forEach(function (row) {
-      var value = row[at];
-      var text = String(value === null || value === undefined ? '' : value).trim();
+    columns[code].forEach(function (text) {
       if (!text) { return; }
 
       if (Object.prototype.hasOwnProperty.call(seen, text)) {
@@ -75,6 +68,21 @@ function categoryReadAll() {
   });
 
   return { categories: categories, warnings: warnings };
+}
+
+/**
+ * Đọc các cột danh mục theo mã cột `@` (tầng 3 đọc/ghi Sheet): `{ '<mã>': [chuỗi đã cắt khoảng trắng của từng dòng dữ liệu] }`, các mảng cùng thứ tự dòng để ghép được cột thật với cột đi kèm `_FBM` cùng dòng. Đọc cả vùng dữ liệu một lệnh qua tờ nháp của lần gọi, nên lõi và đồng bộ FBM hỏi cùng lần gọi chỉ tốn một lần đọc.
+ */
+function categoryReadColumns(codes) {
+  var sheet = shinOpenSheet('Category');
+  var columnMap = readColumnMap('Category');
+  var rows = sheetReadDataRows(sheet, SHEET_FIRST_DATA_ROW);
+  var columns = {};
+  codes.forEach(function (code) {
+    var at = columnIndex(columnMap, code) - 1;
+    columns[code] = rows.map(function (row) { return String(row[at] === null || row[at] === undefined ? '' : row[at]).trim(); });
+  });
+  return columns;
 }
 
 /** Phép nghiệm thu chạy được trên Google: in số giá trị của từng danh mục trên tệp thật, kèm danh sách cột đi kèm đã loại. */

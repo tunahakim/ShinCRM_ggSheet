@@ -75,6 +75,20 @@ function chay(so) {
     return hop.sheetReadRows(customer, [4])[0][cotMa - 1];
   }));
   check(so, 'xóa dòng thì bỏ tờ nháp của sheet, dòng dưới dịch lên được đọc lại', sauXoaDong, 'KH000002');
+
+  section('Tầng 3 ghi bản ghi');
+  const ctx = trongLanGoi(hop, () => hop.documentLockRun(() => hop.entityReadContext('customer')));
+  check(so, 'định vị mã không có trên sheet thì ném lỗi, không coi là bản ghi mới', /Không tìm thấy mã "KH999"/.test(loiCua(() => trongLanGoi(hop, () => hop.documentLockRun(() => hop.entityPlace(hop.entityReadContext('customer'), ['KH999']))))), true);
+  check(so, 'ghi bản ghi ngoài khóa thì ném lỗi', /ngoài khóa tài liệu/.test(loiCua(() => hop.entityWriteRecords(ctx, { note: hop.DATA_SCHEMA.customer.note }, { sheetName: 'Customer', rows: { KH000002: 4 } }, [{ id: 'KH000002', values: { note: 'x' } }]))), true);
+  const doc = trongLanGoi(hop, () => hop.documentLockRun(() => {
+    const c = hop.entityReadContext('customer');
+    const fields = { id: hop.DATA_SCHEMA.customer.id, note: hop.DATA_SCHEMA.customer.note };
+    const placement = hop.entityPlace(c, ['KH000002']);
+    const written = hop.entityWriteRecords(c, fields, placement, [{ id: 'KH000002', values: { note: 'sửa' } }, { id: 'KH000300', values: { id: 'KH000300', note: '0123' }, append: true }]);
+    const at = c.names.indexOf('note');
+    return hop.entityReadPlaced(c, written, ['KH000300', 'KH000002']).rows.map((row) => row[c.idAt] + ':' + row[at]);
+  }));
+  check(so, 'ghi sửa và nối thêm rồi đọc lại theo vị trí, đúng thứ tự mã, cột chữ giữ số 0 đầu', doc, ['KH000300:0123', 'KH000002:sửa']);
 }
 
 module.exports = { chay };

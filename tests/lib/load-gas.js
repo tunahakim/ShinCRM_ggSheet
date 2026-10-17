@@ -103,8 +103,8 @@ function capMaNguoiDungThu(hopCat) {
   hopCat.FbmSync.scriptSettings = function () { const cfg = goc.apply(this, arguments); if (!cfg.userId) { cfg.userId = MA_NGUOI_DUNG_THU; } return cfg; };
 }
 
-/** Tầng 1–2 đọc/ghi Sheet (tài liệu 06 Phần 2): mọi tệp chạm Sheet đi qua chúng. */
-const TEP_TANG_SHEET = ['server/sheet/SheetReadCopy.js', 'server/sheet/SheetPolicy.js', 'server/sheet/SheetCellWrite.js', 'server/sheet/SheetRegions.js', 'server/sheet/SheetLocate.js'];
+/** Công cụ đọc/ghi Sheet tầng 1–3 (tài liệu 06 Phần 2): mọi tệp chạm Sheet đi qua chúng. */
+const TEP_TANG_SHEET = ['server/sheet/SheetReadCopy.js', 'server/sheet/SheetPolicy.js', 'server/sheet/SheetCellWrite.js', 'server/sheet/SheetRegions.js', 'server/sheet/SheetLocate.js', 'server/sheet/EntityWrite.js'];
 
 function napServer(hopCat, ...duongDans) {
   // Trên GAS mọi tệp chung một không gian tên; cửa kho DocumentProperties và tầng đọc/ghi Sheet là phụ thuộc của gần như mọi tệp server nên luôn nạp trước, như bản thật.

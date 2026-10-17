@@ -26,8 +26,8 @@ var SAVE_BREAKDOWN_PROBE_PARTS = [
   'saveRecord',
   'FbmSync.withOrchestrationLock', 'fbmSyncSaveAllowed',
   'documentLockRun', 'documentLockSettle',
-  'entityReadContext', 'writeGateRowById', 'writeGateSelectCatalog', 'writeGateUniqueCheck', 'idGateIssue',
-  'writeGateRowSnapshot', 'writeGateWriteNew', 'writeGateWriteExisting', 'writeGateReadBack', 'logEvent',
+  'entityReadContext', 'entityPlace', 'writeGateSelectCatalog', 'writeGateUniqueCheck', 'idGateIssue',
+  'writeGateRowSnapshot', 'entityWriteRecords', 'writeGateReadBack', 'logEvent',
   'recordChangesAfterWrite', 'reloadStateRead'
 ];
 
@@ -52,7 +52,7 @@ function measureSaveBreakdown() {
     }
     var context = entityReadContext('customer');
     var started = Date.now();
-    writeGateRowById(context);
+    entityRowMap(context);
     var rowByIdMs = Date.now() - started;
     started = Date.now();
     var max = idGateMaxOnSheet(context);

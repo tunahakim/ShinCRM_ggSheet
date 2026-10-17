@@ -41,7 +41,7 @@ function chay(so) {
   let lanDocCotMa = 0;
   const layVung = ctxMot.sheet.getRange.bind(ctxMot.sheet);
   ctxMot.sheet.getRange = function (row, col, rows, cols) { if (col === cotMa && cols === 1 && rows === ctxMot.rowCount) { lanDocCotMa += 1; } return layVung.apply(null, arguments); };
-  const dong = mot.hop.writeGateRowById(ctxMot);
+  const dong = mot.hop.entityRowMap(ctxMot);
   const maMoi = mot.hop.idGateIssue('customer', 1, ctxMot);
   mot.hop.documentStoreEnd();
   check(so, 'cửa ghi tìm dòng rồi cấp mã mới chỉ đọc cột mã một lần, lưới an toàn vẫn nhảy qua số lớn nhất trên sheet',

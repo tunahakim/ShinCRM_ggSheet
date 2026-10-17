@@ -38,6 +38,35 @@ function entityReadIdColumn(context) {
   return sheetReadColumnValues(context.sheet, context.indexes[context.idAt] + 1, SHEET_FIRST_DATA_ROW);
 }
 
+/** Bảng mã bản ghi → số dòng của thực thể; hai dòng cùng mã thì ném lỗi. Số dòng không ra khỏi tầng 1–3: tầng 4 dùng `entityPlace`. */
+function entityRowMap(context) {
+  return sheetLocateRowMap(entityReadIdColumn(context), SHEET_FIRST_DATA_ROW, context.sheetName);
+}
+
+/**
+ * Vị trí các bản ghi theo mã, chỉ đúng trong lần cầm khóa đã đọc nó. Tầng 4 chỉ cầm `placement` rồi trả lại cho `entityReadPlaced`/`entityWriteRecords`, không đọc số dòng bên trong.
+ * Mã không có trên sheet thì ném lỗi, không âm thầm coi là bản ghi mới: bản ghi đang sửa biến mất nghĩa là có người vừa xóa dòng hoặc bộ nhớ Sidebar đã cũ, thêm dòng mới lúc đó là dựng bản ghi thứ hai mà người dùng tin là mình vừa sửa bản ghi cũ.
+ */
+function entityPlace(context, ids) {
+  var rowMap = ids.length ? entityRowMap(context) : {};
+  var rows = {};
+  ids.forEach(function (id) {
+    if (!rowMap[id]) { throw new Error('Không tìm thấy mã "' + id + '" trên sheet "' + context.sheetName + '". Có thể dòng đó vừa bị xóa. Bấm Nạp lại rồi thử lại.'); }
+    rows[id] = rowMap[id];
+  });
+  return { sheetName: context.sheetName, rows: rows };
+}
+
+/** Bản ghi ở các vị trí đã định, theo thứ tự `ids`, qua tờ nháp của lần gọi. Đọc theo vị trí chứ không tìm lại theo mã, để lần đọc lại sau ghi thấy đúng dòng vừa ghi. */
+function entityReadPlaced(context, placement, ids) {
+  return entityReadRows(context, ids.map(function (id) { return placement.rows[id]; }));
+}
+
+/** Cột mã và một cột khác (theo mã cột `@`) của mọi dòng dữ liệu, cùng thứ tự: `{ ids, values }`. Dùng cho phép kiểm trùng cần bỏ qua chính bản ghi đang sửa. */
+function entityReadColumnWithIds(context, code) {
+  return { ids: entityReadIdColumn(context), values: sheetReadColumnValues(context.sheet, columnIndex(context.columnMap, code), SHEET_FIRST_DATA_ROW) };
+}
+
 /**
  * Gom sẵn mọi thứ cần cho việc đọc một thực thể: sheet, bảng tra mã cột, múi giờ tệp, và bảng chỉ số cột theo tên trường.
  *

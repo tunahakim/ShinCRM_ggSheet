@@ -29,21 +29,23 @@ FbmSync.categoryMapFromRows = function (rows) {
   return map;
 };
 
-/** Đọc cặp danh mục thật/companion qua bản đọc Sheet chung: trong một lần gọi chỉ tốn một lần đọc Sheet; lần gọi sau đọc lại nên sửa Category có hiệu lực ngay. */
+/** Đọc cặp danh mục thật/companion qua tầng 3 (`categoryReadColumns`): trong một lần gọi chỉ tốn một lần đọc Sheet; lần gọi sau đọc lại nên sửa Category có hiệu lực ngay. */
 FbmSync.readCategoryGate = function () {
-  if (typeof shinOpenSheet !== 'function' || typeof CATEGORY_COLUMNS === 'undefined') { return { map: {}, names: {}, valid: {}, warnings: [] }; }
-  var sheet = shinOpenSheet('Category'), columns = readColumnMap('Category'), codes = CATEGORY_COLUMNS.map(function (pair) { return pair[0]; });
-  var rows = sheetReadDataRows(sheet, SHEET_FIRST_DATA_ROW);
-  var entries = [], names = {}, warnings = [];
-  codes.forEach(function (source) {
+  if (typeof categoryReadColumns !== 'function' || typeof CATEGORY_COLUMNS === 'undefined') { return { map: {}, names: {}, valid: {}, warnings: [] }; }
+  var pairs = [];
+  CATEGORY_COLUMNS.forEach(function (pair) {
+    var source = pair[0];
     if (typeof categoryIsCompanion === 'function' && categoryIsCompanion(source)) { return; }
     var companionCode = source + (typeof CATEGORY_FBM_SUFFIX === 'undefined' ? '_FBM' : CATEGORY_FBM_SUFFIX);
     if (typeof categoryIsCompanion === 'function' && !categoryIsCompanion(companionCode)) { return; }
-    var sourceAt = columnIndex(columns, source) - 1, companionAt = columnIndex(columns, companionCode) - 1;
-    rows.forEach(function (row) {
-      var value = String(row[sourceAt] === null || row[sourceAt] === undefined ? '' : row[sourceAt]).trim();
-      var companion = String(row[companionAt] === null || row[companionAt] === undefined ? '' : row[companionAt]).trim();
-      if (value && companion) { entries.push({ source: source, value: value, companion: companion }); }
+    pairs.push([source, companionCode]);
+  });
+  var columns = categoryReadColumns([].concat.apply([], pairs));
+  var entries = [], names = {}, warnings = [];
+  pairs.forEach(function (pair) {
+    columns[pair[0]].forEach(function (value, i) {
+      var companion = columns[pair[1]][i];
+      if (value && companion) { entries.push({ source: pair[0], value: value, companion: companion }); }
     });
   });
   var map = FbmSync.categoryMapFromRows(entries), valid = {}, namesBySource = {};
