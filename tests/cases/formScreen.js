@@ -167,6 +167,45 @@ function chay(so) {
   checkThrows(so, 'tên màn không có trong UI_SCHEMA thì hét ngay kèm ba tên đúng',
     () => hop.screenFormOpen('customerFrm', {}), 'customerForm');
 
+  section('formScreen — vẽ lại form đang gõ không làm mất chữ');
+  {
+    // Chữ "trên màn hình" do bộ thu thập giả trả về; bộ thu thập thật đọc DOM.
+    let manHinh = {};
+    hop.saveFlowStashDraft = () => { if (!hop.screenStateTop()) { return null; } const draft = Object.assign({}, manHinh); hop.screenStateSetDraft(draft); return draft; };
+    const khach = hop.Store.getCustomer('CUS-000001');
+
+    hop.screenFormOpen('noteForm', khach);
+    manHinh = { note: 'Ghi chú sidebar 1' };
+    // Sheet đổi cùng khách (làm mới theo mã), Category đổi hay nạp trọn ở `bootstrap` đều vẽ lại form bằng chính hàm này.
+    hop.screenFormRender();
+    hop.screenFormRender();
+    check(so, 'gõ dở rồi form bị vẽ lại: chữ đang gõ được cất vào bản nháp và vẽ ra lại, mốc kiểm xung đột vẫn là giá trị lúc mở',
+      [hop.screenStateTop().draft.note, els['sidebar-body'].innerHTML.indexOf('Ghi chú sidebar 1') > 0, hop.screenStateTop().record.note],
+      ['Ghi chú sidebar 1', true, 'Khách quen, gọi buổi sáng']);
+
+    manHinh = { note: 'chữ của màn khác' };
+    els['sidebar-body'].innerHTML = '<div>màn đồng bộ FBM</div>';
+    hop.screenFormRender();
+    check(so, 'thân Sidebar đang là màn khác thì không thu chữ của màn đó vào form', hop.screenStateTop().draft.note, 'Ghi chú sidebar 1');
+    hop.screenFormClose();
+
+    hop.screenFormOpenNew('activityForm', { customerId: 'CUS-000001' });
+    manHinh = { content: 'Giao dịch đang gõ' };
+    hop.screenFormOpen('noteForm', khach);
+    manHinh = { note: 'Ghi chú lồng đang gõ' };
+    hop.screenFormRender();
+    hop.screenFormClose();
+    check(so, 'đóng form lồng: form dưới vẽ lại đúng bản nháp của chính nó, không thu chữ của form lồng vừa đóng',
+      [hop.screenStateTop().draft, els['sidebar-body'].innerHTML.indexOf('Giao dịch đang gõ') > 0],
+      [{ content: 'Giao dịch đang gõ' }, true]);
+    hop.screenFormClose();
+
+    hop.screenFormOpen('noteForm', khach);
+    check(so, 'mở lại đúng bản ghi vừa đóng là một khung mới: không mang bản nháp hay chữ của khung cũ', hop.screenStateTop().draft, {});
+    hop.screenFormClose();
+    delete hop.saveFlowStashDraft;
+  }
+
   check(so, 'tệp màn không tự chạm DOM và không tự gọi máy chủ — mọi đường vẽ đi qua engine, `[RÀNG BUỘC CỨNG]` tài liệu 04 Phần 6',
     /google\.script|document\./.test(stripComments(catRuotScript(docTep('client/screen/formScreen.html'), 'formScreen'))), false);
 }

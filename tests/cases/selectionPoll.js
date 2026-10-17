@@ -421,6 +421,32 @@ async function chay(so) {
   await noPayload.sheetLinkApplyDecisionResult({ reload: { revision: 7 }, decision: { ram: { action: 'defer' } }, processedRevision: 0 });
   check(so, 'không có gói (hoãn vì bản nháp, hoặc không gì mới) thì giữ nguyên revision đã thấy để lời hỏi sau nhận đủ', noPayload.SHEET_LINK_LAST_SEEN_REVISION, 3);
 
+  {
+    // Form đang mở là đang khóa: mã của mọi khung trong ngăn xếp, kể cả form chưa gõ và form thêm mới, chứ không chỉ khung đã cất bản nháp.
+    const khoa = dungHopPoll(); batDau(khoa);
+    khoa.ScreenState.formStack = [
+      { record: { id: 'ACT-000035' }, draft: {}, themMoi: true },
+      { record: { id: 'CUS-000001' }, draft: {} },
+      { record: { id: 'CUS-000001' }, draft: { note: 'x' } }
+    ];
+    check(so, 'mã gửi GAS là mọi form đang mở, không trùng, kể cả form chưa gõ và mã xem trước của form thêm mới', khoa.sheetLinkLocalDraftInput(), { recordIds: ['ACT-000035', 'CUS-000001'] });
+
+    khoa._calls = [];
+    await khoa.sheetLinkApplyDecisionResult({ reload: { revision: 7 }, decision: { ram: { action: 'defer', mode: 'records', deferredRecordIds: ['CUS-000001'] } }, processedRevision: 0 });
+    const dongHoan = [khoa._banner.hidden, khoa._banner.textContent, khoa._calls.length];
+    await khoa.sheetLinkApplyDecisionResult({ reload: { revision: 7 }, decision: { ram: { action: 'defer', mode: 'fullCore', deferredRecordIds: ['CUS-000001'] } }, processedRevision: 0 });
+    const dongTron = khoa._banner.textContent;
+    khoa.ScreenState.formStack = [];
+    khoa.sheetLinkFormClosed();
+    const goiKhiDong = khoa._calls.slice();
+    await khoa.sheetLinkApplyDecisionResult({ reload: { revision: 7 }, decision: { ram: { action: 'none', mode: 'none', deferredRecordIds: [] } }, processedRevision: 0 });
+    khoa._calls = [];
+    khoa.sheetLinkFormClosed();
+    check(so, 'GAS hoãn thì dòng đáy báo ngay từ chính kết quả lời hỏi, không thêm lời gọi; đóng form lúc đang hoãn thì hỏi lại ngay; hết hoãn thì bỏ dòng báo và đóng form không tốn lời gọi nào',
+      [dongHoan, dongTron, goiKhiDong, khoa._banner.hidden, khoa._calls],
+      [[false, 'Khách này vừa được sửa trên Sheet, khi lưu sẽ hỏi lại', 0], 'Dữ liệu vừa đổi trên Sheet, sẽ nạp lại khi đóng form', ['probeSelectionAndReload'], true, []]);
+  }
+
   const directPayload = dungHopPoll(); batDau(directPayload);
   directPayload.SHEET_LINK_LAST_SEEN_REVISION = 0;
   directPayload._payloads = [];
