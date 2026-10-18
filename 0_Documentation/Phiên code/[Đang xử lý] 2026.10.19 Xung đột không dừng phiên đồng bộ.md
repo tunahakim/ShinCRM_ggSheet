@@ -4,7 +4,7 @@ Branch `claude/fix-conflict-no-stop-f8d187`, tách từ `feature/expensive-ops`.
 
 ## Gốc lỗi
 
-- Luật đúng ở `09/04` "Chế độ xử lý xung đột riêng": khóa nằm trên dòng, pull và push bỏ qua dòng đó; người dùng xử lý lúc nào là việc của họ. Phần thực thi đã làm đúng (`isConflictPending` ở pull, `pushCandidates` loại dòng xung đột và bản ghi từng đẩy lỗi khi hash chưa đổi).
+- Luật lúc đó ở `09/04` "Chế độ xử lý xung đột riêng": khóa nằm trên dòng, pull và push bỏ qua dòng đó; người dùng xử lý lúc nào là việc của họ. Sau đó chủ dự án chốt bỏ khóa (phần "Xung đột so lại mỗi kỳ" bên dưới). Phần thực thi đã làm đúng (`isConflictPending` ở pull, `pushCandidates` loại dòng xung đột và bản ghi từng đẩy lỗi khi hash chưa đổi).
 - Nơi quyết thứ hai, rộng hơn luật: `FbmSync.preflightCandidates` đặt `blocking = (mode === 'write')` cho lỗi của riêng từng bản ghi (`FBM_RECORD_CONFLICT_PENDING`, `FBM_PREVIOUS_PUSH_FAILURE`, `FBM_CATEGORY_MAPPING_MISSING`, `FBM_ACTIVITY_OWNER_MISMATCH`), và `preflightApply` dừng cả lượt khi có một lỗi chặn.
 - Chỗ dừng thứ hai: `FbmSync.stopPushOnConflicts` (gọi ở `nextPushRequest` và `pullFinishOrPush`) dừng cả chiều đẩy khi chiều Lấy cùng lượt phát hiện xung đột, dù `pushCandidates` đọc lại trạng thái trên dòng nên đã tự loại dòng đó.
 - Hai `catch` rỗng, vi phạm "không có lỗi im lặng": `pushCandidates` (đọc state/sổ lỗi đẩy hỏng thì sổ rỗng và đẩy lại âm thầm bản ghi từng lỗi) và `preflightCandidates` (đọc cài đặt hỏng thì cài đặt rỗng).
@@ -39,3 +39,13 @@ Branch `claude/fix-conflict-no-stop-f8d187`, tách từ `feature/expensive-ops`.
 - [x] 6. Sửa tài liệu 09/02 bước 3 và rà 09 còn nói ngược.
 - [x] 7. `node tests/run.js` 0 lỗi.
 - [ ] 8. Chủ dự án nghiệm thu trên Sheet DEV: để một dòng xung đột, chạy Hai chiều, thấy phiên chạy tiếp, dòng đó giữ nguyên, Log có một dòng "còn N xung đột".
+
+## Xung đột so lại mỗi kỳ (chủ dự án chốt 2026-10-19)
+
+"Xung đột chờ quyết" là trạng thái cho người thấy và hàng đợi của màn hình xung đột, không phải khóa. Gốc: `Pull.js` bỏ qua dòng chờ quyết trước khi so, trong khi bước đánh dấu vẫn đọc chi tiết những khách đó mỗi kỳ (dấu vân FBM khác baseline) rồi bỏ kết quả; dòng đã khớp lại vẫn kẹt xung đột. Dùng lại `FbmSync.threeWay` và các nhánh ghi sẵn có của `pullWrite`, `readAgainStatus` cho phần đọc lại, `conflictPendingNote` cho phần báo; nhánh "dòng đã rời trạng thái chờ quyết" của `conflictSettle` lo ca màn hình xung đột đang mở.
+
+- [x] 9. `pullWrite` so ba chiều dòng chờ quyết với baseline cũ; còn xung đột thì giữ nguyên, không ghi lại, không Log từng dòng. Xung đột định danh (dấu của FBM ID khác trỏ vào) vẫn giữ.
+- [x] 10. `readAgainStatus` gồm "xung đột chờ quyết" để dòng luôn được đọc lại kể cả khi FBM đã quay về gốc.
+- [x] 11. Test: bốn tình huống (khớp nhau, FBM về gốc, ShinCRM về gốc, vẫn khác) ở `ProductionMatrix.js`; xung đột định danh không bị gỡ ở `Pull.js`.
+- [x] 12. Sửa `09/04` và bảng nguồn ghi ở tài liệu 06.
+- [ ] 13. Chủ dự án nghiệm thu trên Sheet DEV: sửa một dòng đang xung đột cho hai phía khớp nhau, chạy Hai chiều, dòng về "đã đồng bộ" và Log có "Hai phía đã khớp nhau; gỡ xung đột".
