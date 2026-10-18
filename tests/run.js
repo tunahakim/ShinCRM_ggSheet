@@ -56,6 +56,7 @@ const NHOM_CA = [
   require('./cases/uiSchema'),
   require('./cases/renderEngine'),
   require('./cases/choiceMenu'),
+  require('./cases/listPicker'),
   require('./cases/slots'),
   require('./cases/viewScreen'),
   require('./cases/formScreen'),

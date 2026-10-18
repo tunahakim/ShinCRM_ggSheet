@@ -332,7 +332,7 @@ function chay(so) {
     Store: { categories: { '@CAT_SAN_PHAM': ['Sản phẩm A', 'Sản phẩm B', 'Sản phẩm C'] } },
     customerPickerIsInput: () => false
   });
-  napClient(comboHop, 'client/util/textNormalize.html', 'client/ui/popupList.html', 'client/ui/combo.html');
+  napClient(comboHop, 'client/util/textNormalize.html', 'client/ui/popupList.html', 'client/ui/listPicker.html', 'client/ui/combo.html');
   const comboInput = (value) => ({
     value: value,
     getAttribute: (name) => name === 'data-field' ? 'customer.product' : null
@@ -354,7 +354,7 @@ function chay(so) {
       { companyName: 'Công ty B', id: 'CUS-2', province: 'HCM' }
     ] }
   });
-  napClient(pickerHop, 'client/util/textNormalize.html', 'client/ui/popupList.html', 'client/ui/customerPicker.html', 'client/ui/combo.html');
+  napClient(pickerHop, 'client/util/textNormalize.html', 'client/ui/popupList.html', 'client/ui/listPicker.html', 'client/ui/customerPicker.html', 'client/ui/combo.html');
   const pickerInput = { value: 'Công ty', getAttribute: (name) => name === 'data-picker' ? 'customer' : null };
   const pickerResult = pickerHop.comboMatches(pickerInput, pickerInput.value, 'search');
   check(so, 'Công ty mẹ dùng luồng tìm khách và bôi xanh khách đầu tiên',
@@ -395,7 +395,7 @@ function quetDuongGan(so) {
   const thay = Object.keys(dem).sort().map((tep) => tep + ':' + dem[tep]);
   check(so, 'chỉ renderer và hộp tìm kiếm được gán innerHTML; màn trạng thái cũng đi qua renderer',
     thay,
-    ['client/ui/renderEngine.html:3', 'client/ui/search.html:3']);
+    ['client/ui/renderEngine.html:3', 'client/ui/search.html:2']);
 
   check(so, 'thông báo khóa form dùng lớp Notice chung, không tạo lớp Sync generic riêng',
     [docTep('client/ui/inputs.html').indexOf('shin-sync-lock-notice') >= 0, docTep('client/ui/inputs.html').indexOf('shin-notice-warning') >= 0, docTep('client/screen/formScreen.html').indexOf('shin-sync-lock-notice') >= 0],

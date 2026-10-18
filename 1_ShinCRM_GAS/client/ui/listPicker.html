@@ -1,0 +1,196 @@
+<script>
+/*
+ * Hành vi chung của mọi ô gõ có danh sách gợi ý nổi: hộp tìm khách và ô gõ-để-lọc (`select`, `customerPicker`).
+ *
+ * `PopupList` lo cái vỏ (vị trí, tô dòng, ẩn). Tệp này lo phần còn lại, viết một lần: bung khi con trỏ vào ô, bôi đen chữ có sẵn, sáng dòng chạy vòng, `Enter`/`Tab` chọn, `Esc`, rời ô thì ẩn, bấm lại ô hoặc `↓` thì bung lại.
+ *
+ * Hai ô chỉ khác nhau ở bốn chỗ và bốn chỗ đó là tham số của `ListPicker.create`: nguồn dòng (`fill`), việc làm khi chọn (`pick`, bỏ trống nếu dòng đã mang `data-action` tự lo), thẻ nào là ô (`isInput`, `listOf`, `inputOfRow`) và việc làm khi `Esc` lúc danh sách đã ẩn (`onEscape`). Thêm một ô gợi ý mới là khai bốn chỗ đó, không viết lại bàn phím.
+ *
+ * **Mọi cú chọn đều là một cú `click` lên dòng**, kể cả bằng bàn phím (`Enter` gọi `row.click()`). Nhờ vậy chuột và phím chung một đường, và dòng mang `data-action` (hộp tìm khách) vẫn nổi lên bộ phát click như mọi nút. Danh sách ẩn ngay trong cú chọn đó, không đợi hẹn giờ rời ô.
+ *
+ * Dòng sáng đọc từ chính DOM (`is-active`) chứ không giữ một biến chỉ số: hai chỗ nhớ một việc thì có ngày lệch.
+ *
+ * Tai nghe đặt ở khung chứ không gắn từng ô, vì lượt vẽ thay sạch ruột cả vùng nên ô nào gắn riêng cũng mất nó ở lượt sau.
+ */
+var ListPicker = (function () {
+  /** Dòng chọn được. Dòng chú thích ("Không tìm thấy") không mang lớp này nên con trỏ không bao giờ trỏ vào một dòng không điền được gì. */
+  var ROW = '.shin-popup-item';
+
+  /** Nhịp chờ trước khi bôi đen chữ có sẵn, milli giây. Bôi ngay lúc `focus` thì cú nhấp chuột đặt lại con trỏ ngay sau đó và xóa mất phần bôi. */
+  var SELECT_DELAY = 50;
+
+  /** Nhịp chờ trước khi ẩn danh sách lúc rời ô, milli giây. Ngắn hơn thì cú bấm chuột vào một dòng rơi vào chỗ trống. */
+  var BLUR_DELAY = 200;
+
+  function create(spec) {
+    var markName = 'data-picker-' + spec.name;
+
+    /**
+     * Hẹn giờ bôi đen dùng chung một biến vì thân hẹn giờ kiểm lại con trỏ đang ở đâu trước khi bôi.
+     * Hẹn giờ ẩn thì gắn lên chính thẻ ô (`_pickerBlur`): Tab nhanh qua hai ô trong 200 milli giây mà chung một biến thì cú hủy của ô sau xóa luôn hẹn giờ của ô trước, và danh sách ô trước treo lại.
+     */
+    var selectTimer = null;
+
+    function boxOf(inp) { return spec.listOf(inp); }
+
+    function rows(inp) { return PopupList.rows(boxOf(inp), ROW); }
+
+    function isOpen(inp) {
+      var box = boxOf(inp);
+      return !!box && !box.hidden;
+    }
+
+    function activeIndex(inp) {
+      var list = rows(inp);
+      for (var i = 0; i < list.length; i += 1) {
+        if (list[i].classList.contains('is-active')) { return i; }
+      }
+      return -1;
+    }
+
+    /** Sáng đúng một dòng, chạy vòng ở hai đầu. */
+    function mark(inp, at) {
+      var list = rows(inp);
+      if (!list.length) { return -1; }
+
+      var i = at;
+      if (i >= list.length) { i = 0; }
+      if (i < 0) { i = list.length - 1; }
+      return PopupList.mark(boxOf(inp), i, ROW);
+    }
+
+    /** Bỏ hết dòng sáng. Ca ô rỗng: sáng dòng đầu thì bấm Enter cho qua ô là điền bừa mục đầu tiên. */
+    function unmark(inp) {
+      rows(inp).forEach(function (r) { r.classList.remove('is-active'); r.setAttribute('aria-selected', 'false'); });
+      return -1;
+    }
+
+    /** Gọi lúc đã ẩn cũng không sao — hẹn giờ rời ô gọi hàm này mà không hỏi trước. */
+    function hide(inp) {
+      var box = boxOf(inp);
+      if (!box) { return null; }
+
+      PopupList.hide(box, ROW);
+      inp.setAttribute('aria-expanded', 'false');
+      return box;
+    }
+
+    /** Vẽ lại danh sách theo chữ đang có trong ô rồi hiện nó. `fill` trả `null` nghĩa là không có gì để hiện. */
+    function paint(inp, mode) {
+      var box = boxOf(inp);
+      if (!box) { return null; }
+
+      var ket = spec.fill(inp, mode || 'search');
+      if (!ket) { hide(inp); return null; }
+
+      var opts = {};
+      Object.keys(ket.show || {}).forEach(function (k) { opts[k] = ket.show[k]; });
+      opts.onClose = function () { inp.setAttribute('aria-expanded', 'false'); };
+
+      box.setAttribute('role', 'listbox');
+      rows(inp).forEach(function (r) { r.setAttribute('role', 'option'); });
+      PopupList.show(box, inp, opts);
+      inp.setAttribute('aria-expanded', 'true');
+
+      if (ket.markFirst) { mark(inp, 0); } else { unmark(inp); }
+      return ket;
+    }
+
+    /** Mở danh sách và hẹn giờ bôi đen chữ có sẵn, để gõ đè là thay hết. */
+    function open(inp) {
+      if (spec.canOpen && !spec.canOpen(inp)) { return null; }
+      // Hẹn giờ ẩn của lần rời ô trước còn treo thì phải hủy, nếu không nó ẩn nhầm danh sách vừa bung (đóng hộp rồi mở lại ngay).
+      if (inp._pickerBlur) { clearTimeout(inp._pickerBlur); inp._pickerBlur = null; }
+      paint(inp, 'open');
+
+      if (selectTimer) { clearTimeout(selectTimer); }
+      selectTimer = setTimeout(function () {
+        if (document.activeElement === inp && inp.select) { inp.select(); }
+      }, SELECT_DELAY);
+      return inp;
+    }
+
+    function keydown(e) {
+      var inp = e.target;
+      if (!spec.isInput(inp)) { return; }
+
+      if (e.key === 'Escape' || e.keyCode === 27) {
+        if (isOpen(inp)) { hide(inp); } else if (spec.onEscape) { spec.onEscape(inp); }
+        return;
+      }
+
+      if (!isOpen(inp)) {
+        if (e.key === 'ArrowDown') { e.preventDefault(); open(inp); }
+        return;
+      }
+
+      var list = rows(inp);
+      var at = activeIndex(inp);
+
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        if (!list.length || at === -1) { hide(inp); return; }
+        e.preventDefault();
+        list[at].click();
+        return;
+      }
+
+      if (!list.length) { return; }
+      if (e.key === 'ArrowDown') { e.preventDefault(); mark(inp, at + 1); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); mark(inp, at - 1); }
+    }
+
+    /** Cú bấm lên một dòng thì chọn dòng đó rồi ẩn; lên chính ô lúc danh sách đang ẩn thì bung lại. */
+    function click(e) {
+      var goc = e.target;
+      if (!goc || !goc.closest) { return; }
+
+      var dong = goc.closest(ROW);
+      if (dong) {
+        var inp = spec.inputOfRow(dong);
+        if (!inp) { return; }
+        if (spec.pick) { spec.pick(inp, dong); }
+        hide(inp);
+        return;
+      }
+
+      if (spec.isInput(goc) && !isOpen(goc)) { open(goc); }
+    }
+
+    function focusout(e) {
+      var inp = e.target;
+      if (!spec.isInput(inp)) { return; }
+      // Di chuyển focus trong chính popup không phải là rời control; ẩn ở đây thì click/Tab vào một dòng bị mất trước khi cú chọn chạy.
+      if (e.relatedTarget && spec.inputOfRow(e.relatedTarget) === inp) { return; }
+      if (inp._pickerBlur) { clearTimeout(inp._pickerBlur); }
+      inp._pickerBlur = setTimeout(function () { hide(inp); }, BLUR_DELAY);
+    }
+
+    /** Gắn tai nghe vào khung. Gọi nhiều lần cũng chỉ gắn một lần. */
+    function install(root) {
+      if (!root) {
+        throw new Error('Thiếu khung để gắn danh sách gợi ý "' + spec.name + '", nên ô gõ không bung được danh sách.');
+      }
+      if (root.getAttribute(markName) === '1') { return false; }
+
+      root.addEventListener('focusin', function (e) { if (spec.isInput(e.target)) { open(e.target); } });
+      root.addEventListener('input', function (e) { if (spec.isInput(e.target)) { paint(e.target, 'search'); } });
+      root.addEventListener('keydown', keydown);
+      root.addEventListener('click', click);
+      root.addEventListener('focusout', focusout);
+
+      // Giữ con trỏ ở ô đến khi cú bấm vào dòng hoàn tất: trình duyệt phát focusout trước click nên hẹn giờ ẩn có thể thắng trên máy chậm.
+      root.addEventListener('mousedown', function (e) {
+        var dong = e.target && e.target.closest ? e.target.closest(ROW) : null;
+        if (dong && spec.inputOfRow(dong)) { e.preventDefault(); }
+      });
+
+      root.setAttribute(markName, '1');
+      return true;
+    }
+
+    return { install: install, open: open, paint: paint, hide: hide, isOpen: isOpen, rows: rows, mark: mark, unmark: unmark, activeIndex: activeIndex };
+  }
+
+  return { create: create };
+}());
+</script>

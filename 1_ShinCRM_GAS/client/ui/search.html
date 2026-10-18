@@ -4,11 +4,11 @@
  *
  * Vì sao ô gõ **không** nằm trong bốn vùng engine vẽ: mỗi lượt vẽ thay sạch ruột cả vùng, nên ô `<input>` bị dựng lại sau từng chữ và con trỏ nhảy ra khỏi ô — tài liệu 04 Phần 4. Nó ở ngoài `RENDER_REGIONS` đúng như dải tiến trình, và cũng như dải tiến trình thì tệp này tự chạm DOM của riêng mình.
  *
- * Danh sách gợi ý thì vẫn do engine dựng: `SLOTS.searchSuggestions` sinh Block, `renderNodes` đổi thành chuỗi. Các Block đó không mang `id` và không mang `menu` nên chúng không ghi gì vào `RENDER_INDEX`, và lượt vẽ màn sau vẫn sạch.
+ * Bàn phím, bung/ẩn danh sách và bôi đen chữ cũ là `client/ui/listPicker.html`, dùng chung với ô gõ-để-lọc. Tệp này chỉ khai phần riêng của hộp tìm: nguồn dòng là `Store.searchCustomers`, và cú chọn **không có đường riêng** — dòng mang `data-action="setCurrentCustomer"` nên nó nổi lên bộ phát click như mọi nút, tên hành động vẫn chịu phép kiểm lúc khởi động.
  *
- * Cú chọn một dòng gợi ý **không có đường riêng**: dòng mang `data-action="setCurrentCustomer"` nên nó bay lên tai nghe của bộ phát click như mọi nút khác, và bàn phím cũng đi đúng đường đó — `Enter` gọi `.click()` chứ không gọi `ACTIONS` trực tiếp. Nhờ vậy tên hành động vẫn chịu phép kiểm lúc khởi động.
+ * Danh sách gợi ý do engine dựng: `SLOTS.searchSuggestions` sinh Block, `renderNodes` đổi thành chuỗi. Các Block đó không mang `id` và không mang `menu` nên chúng không ghi gì vào `RENDER_INDEX`, và lượt vẽ màn sau vẫn sạch.
  *
- * Nếp bàn phím giữ y bản cũ `9_Code_cu_tham_chieu/src/ui/UI_Logic.html`: mũi lên xuống chạy vòng, `Enter` và `Tab` chọn dòng đang sáng, gõ tới đâu tự sáng dòng đầu, rời ô thì đợi một nhịp mới ẩn danh sách để cú bấm chuột kịp hạ cánh.
+ * Đóng hộp **không xóa chữ**: mở lại trong cùng phiên thì chữ cũ còn đó, được bôi đen và danh sách bung theo. Sidebar tải lại thì DOM mới, chữ tự mất.
  */
 
 /** Ba thẻ của món đồ cố định, viết cứng trong `client/Sidebar.html`. */
@@ -22,17 +22,8 @@ var SEARCH_TOGGLE_ACTION = 'toggleSearchPanel';
 /** Trần số dòng gợi ý. Bản cũ cũng 20: cuộn qua danh sách dài trong khung 300px còn chậm hơn gõ thêm một chữ. */
 var SEARCH_LIMIT = 20;
 
-/** Nhịp chờ trước khi ẩn danh sách lúc rời ô, tính bằng milli giây. Ngắn hơn thì cú bấm chuột vào một dòng rơi vào chỗ trống. */
-var SEARCH_BLUR_DELAY = 200;
-
-/** Dòng đang sáng, `-1` là không dòng nào. */
-var searchFocusAt = -1;
-
 /** Hộp đang mở nhưng tạm ẩn vì người dùng sang màn form; quay lại màn xem thì hiện lại nguyên chữ đã gõ. */
 var searchHeldOpen = false;
-
-/** Hẹn giờ ẩn danh sách, giữ lại để lần rời ô sau hủy cái cũ thay vì xếp thêm cái mới. */
-var searchBlurTimer = null;
 
 /** Khung hộp tìm. Thiếu thẻ là lỗi nối dây trong `Sidebar.html`, không phải người dùng làm sai. */
 function searchPanelEl() {
@@ -54,86 +45,52 @@ function searchIsOpen() {
 }
 
 
-/* ─── Danh sách gợi ý ─── */
-
-/** Các dòng bấm được. Mảng thật chứ không phải `NodeList`, để `length` và chỉ số dùng thẳng. */
-function searchRows() {
-  var box = searchListEl();
-  return PopupList.rows(box, '[role="option"]');
-}
+/* ─── Khai báo cho ListPicker ─── */
 
 /**
- * Sáng đúng một dòng, chạy vòng ở hai đầu.
+ * Vẽ nội dung danh sách gợi ý theo chữ đang gõ.
  *
- * Chạy vòng chứ không dừng ở mép: danh sách nhiều nhất 20 dòng nên bấm mũi xuống quá đà là chuyện thường, và quay về đầu rẻ hơn bắt người dùng đếm.
+ * Ô rỗng thì không hiện gì chứ không hiện câu "không có khách nào khớp": lúc mới mở hộp thì ô vốn rỗng, và một câu báo không tìm thấy khi chưa gõ gì là một câu sai.
+ *
+ * Hỏi `storeSearchTokens` chứ không hỏi `normalizeText`: một ô chỉ có dấu ngoặc kép vừa mở thì chuẩn hóa ra chuỗi không rỗng nhưng cắt mẩu ra rỗng — vẫn là ca "chưa gõ gì".
+ *
+ * Luôn sáng dòng đầu, nên gõ xong bấm `Enter` là ra khách mà không phải với tay tới mũi xuống.
  */
-function searchMark(at) {
-  var rows = searchRows();
-  if (!rows.length) { searchFocusAt = -1; return -1; }
-
-  var i = at;
-  if (i >= rows.length) { i = 0; }
-  if (i < 0) { i = rows.length - 1; }
-
-  searchFocusAt = PopupList.mark(searchListEl(), i, '[role="option"]');
-  return i;
-}
-
-/** Ẩn danh sách nhưng **giữ hộp mở**, đúng nếp bản cũ: chọn xong một khách thì gợi ý biến đi, còn ô gõ vẫn đó để tìm khách tiếp theo. */
-function searchHideList() {
+function searchFill(inp) {
   var box = searchListEl();
-  if (!box) { return null; }
-
-  PopupList.hide(box, '[role="option"]');
-  searchFocusAt = -1;
-  return box;
-}
-
-/**
- * Chạy truy vấn rồi vẽ lại danh sách gợi ý.
- *
- * Ô rỗng thì ẩn hẳn danh sách chứ không hiện câu "không có khách nào khớp": lúc mới mở hộp thì ô vốn rỗng, và một câu báo không tìm thấy khi chưa gõ gì là một câu sai.
- *
- * Hỏi `storeSearchTokens` chứ không hỏi `normalizeText`: một ô chỉ có dấu ngoặc kép vừa mở thì chuẩn hóa ra chuỗi không rỗng nhưng cắt mẩu ra rỗng — vẫn là ca "chưa gõ gì", và báo không tìm thấy ở đó cũng là một câu sai.
- *
- * Gõ tới đâu tự sáng dòng đầu, nên gõ xong bấm `Enter` là ra khách mà không phải với tay tới mũi xuống.
- */
-function searchPaint() {
-  var box = searchListEl();
-  var inp = searchInputEl();
-  if (!box || !inp) { return null; }
-
   if (!storeSearchTokens(inp.value).length) {
     box.innerHTML = '';
-    PopupList.hide(box, '[role="option"]');
-    searchFocusAt = -1;
     return null;
   }
 
   var ket = Store.searchCustomers(inp.value, SEARCH_LIMIT);
   var boiCanh = { records: { search: ket } };
-
   box.innerHTML = renderNodes(SLOTS.searchSuggestions(boiCanh), boiCanh);
-  box.setAttribute('role', 'listbox');
-  searchRows().forEach(function (row) { row.setAttribute('role', 'option'); });
-  PopupList.show(box, inp, {
-    width: 'anchor',
-    region: 'viewport',
-    minHeight: 0,
-    maxHeight: 220,
-    onClose: function () { searchFocusAt = -1; }
-  });
-  searchMark(0);
-  return ket;
+
+  return { markFirst: true, show: { width: 'anchor', region: 'viewport', minHeight: 0, maxHeight: 220 } };
 }
 
-/** Chọn một dòng: bấm hộ người dùng rồi ẩn danh sách. Đi qua `.click()` để cú chọn bằng bàn phím và cú chọn bằng chuột dùng chung một đường — bộ phát click. */
-function searchPick(row) {
-  if (!row) { return null; }
-  row.click();
-  searchHideList();
-  return row;
+function searchIsInput(el) {
+  return !!el && el === searchInputEl();
 }
+
+/** Dòng của hộp tìm → ô gõ của nó. Dòng của danh sách khác (ô combo) không thuộc về hộp này. */
+function searchInputOfRow(dong) {
+  var box = dong && dong.closest ? dong.closest('#' + SEARCH_LIST_ID) : null;
+  return box ? searchInputEl() : null;
+}
+
+/** `Esc` lúc danh sách đã ẩn thì đóng cả hộp; lúc danh sách đang mở thì `ListPicker` chỉ ẩn danh sách. */
+function searchEscape() { return searchClose(); }
+
+var searchPicker = ListPicker.create({
+  name: 'search',
+  isInput: searchIsInput,
+  listOf: searchListEl,
+  inputOfRow: searchInputOfRow,
+  fill: searchFill,
+  onEscape: searchEscape
+});
 
 
 /* ─── Mở, đóng, và dấu bật trên nút ─── */
@@ -148,7 +105,7 @@ function searchStampToggle() {
 }
 
 /**
- * Mở hộp. Trả về `focusId` chứ không tự đặt con trỏ: đặt con trỏ là việc của bộ phát click, và mọi hành động khác cũng xin con trỏ theo đúng cách đó.
+ * Mở hộp. Trả về `focusId` chứ không tự đặt con trỏ: đặt con trỏ là việc của bộ phát click, và mọi hành động khác cũng xin con trỏ theo đúng cách đó. Con trỏ vào ô thì `ListPicker` bôi đen chữ cũ (nếu có) và bung danh sách.
  */
 function searchOpen() {
   var panel = searchPanelEl();
@@ -157,17 +114,13 @@ function searchOpen() {
   return { focusId: SEARCH_INPUT_ID };
 }
 
-/** Đóng hộp: xóa chữ đã gõ, ẩn cả hộp lẫn danh sách. Không vẽ lại màn xem — khác bản cũ, vì ở đây hộp là lớp nổi nên thân màn chưa từng bị thay. */
+/** Đóng hộp: ẩn danh sách và khung, **giữ chữ đã gõ** cho lần mở sau. Không vẽ lại màn xem — hộp là lớp nổi nên thân màn chưa từng bị thay. */
 function searchClose() {
   var panel = document.getElementById(SEARCH_PANEL_ID);
   if (!panel) { return null; }
 
   var inp = searchInputEl();
-  if (inp) { inp.value = ''; }
-
-  var box = searchListEl();
-  if (box) { box.innerHTML = ''; }
-  searchHideList();
+  if (inp) { searchPicker.hide(inp); }
 
   panel.hidden = true;
   searchHeldOpen = false;
@@ -180,33 +133,7 @@ function searchToggle() {
 }
 
 
-/* ─── Bàn phím và nối dây ─── */
-
-/**
- * Bàn phím trong ô gõ, đúng bốn nếp của bản cũ cộng thêm `Esc`.
- *
- * `Tab` chọn dòng đang sáng chứ không nhảy ra khỏi ô: đang có danh sách mở thì cú `Tab` gần như luôn có nghĩa "lấy dòng này", còn muốn ra khỏi hộp thì đã có `Esc`.
- *
- * Chặn nếp sẵn của trình duyệt ở mũi lên xuống, vì mặc định chúng đẩy con trỏ về đầu hoặc cuối chữ đang gõ — người dùng tưởng mình đang đi trong danh sách mà thật ra là đang mất chỗ gõ.
- */
-function searchKeydown(e) {
-  if (e.key === 'Escape' || e.keyCode === 27) { searchClose(); return; }
-
-  var box = searchListEl();
-  if (!box || box.hidden) { return; }
-
-  var rows = searchRows();
-  if (!rows.length) { return; }
-
-  if (e.key === 'Enter' || e.key === 'Tab') {
-    e.preventDefault();
-    searchPick(rows[searchFocusAt] || rows[0]);
-    return;
-  }
-
-  if (e.key === 'ArrowDown') { e.preventDefault(); searchMark(searchFocusAt + 1); return; }
-  if (e.key === 'ArrowUp') { e.preventDefault(); searchMark(searchFocusAt - 1); }
-}
+/* ─── Nối dây ─── */
 
 /**
  * Việc dọn sau mỗi hành động, do bộ phát click gọi: hộp tìm chỉ sống trên màn xem, nhưng **không mất đi** khi rời màn xem.
@@ -233,31 +160,14 @@ function searchSyncScreen() {
   return true;
 }
 
-/** Dấu đã gắn tai nghe, để nút Nạp lại chạy lại trình tự khởi động mà không gắn thêm cái thứ hai. */
-var SEARCH_MARK = 'data-search';
-
-/**
- * Gắn tai nghe cho ô gõ. Gọi nhiều lần cũng chỉ gắn một lần.
- *
- * Rời ô thì đợi một nhịp mới ẩn danh sách: cú bấm chuột vào một dòng làm ô mất con trỏ **trước khi** cú bấm hạ cánh, nên ẩn ngay là ẩn đúng cái người dùng vừa nhắm vào.
- */
+/** Gắn tai nghe cho hộp tìm. Gọi nhiều lần cũng chỉ gắn một lần. */
 function searchInstall() {
-  var inp = searchInputEl();
-  if (!inp) {
+  if (!searchInputEl()) {
     throw new Error('Khung sidebar thiếu ô gõ "' + SEARCH_INPUT_ID + '" nên hộp tìm khách không nhận chữ. Kiểm tra `client/Sidebar.html`.');
   }
-  if (inp.getAttribute(SEARCH_MARK) === '1') { return false; }
 
-  inp.addEventListener('input', function () { searchPaint(); });
-  inp.addEventListener('focus', function () { searchPaint(); });
-  inp.addEventListener('keydown', searchKeydown);
-  inp.addEventListener('blur', function () {
-    if (searchBlurTimer) { clearTimeout(searchBlurTimer); }
-    searchBlurTimer = setTimeout(searchHideList, SEARCH_BLUR_DELAY);
-  });
-
-  inp.setAttribute(SEARCH_MARK, '1');
+  var installed = searchPicker.install(document.getElementById(DISPATCH_ROOT_ID));
   searchStampToggle();
-  return true;
+  return installed;
 }
 </script>

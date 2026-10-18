@@ -74,6 +74,7 @@ function chay(so) {
   const combo = docTep('client/ui/combo.html');
   const choiceMenu = docTep('client/ui/choiceMenu.html');
   const search = docTep('client/ui/search.html');
+  const listPicker = docTep('client/ui/listPicker.html');
   const menu = docTep('client/ui/menu.html');
 
   check(so, 'FBM dung shell bon vung chung, khong con overlay hoac vung cuon rieng',
@@ -116,9 +117,9 @@ function chay(so) {
       menu.indexOf("className = 'shin-popup-item'") >= 0],
     [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true]);
   check(so, 'cac controller popup dung API PopupList chung',
-    [combo.indexOf('PopupList.show(box, inp') >= 0,
+    [listPicker.indexOf('PopupList.show(box, inp') >= 0 && combo.indexOf('ListPicker.create(') >= 0,
       choiceMenu.indexOf('PopupList.show(list, trigger') >= 0,
-      search.indexOf('PopupList.show(box, inp') >= 0,
+      search.indexOf('ListPicker.create(') >= 0 && search.indexOf('PopupList.show') === -1,
       menu.indexOf('PopupList.show(lop, nut') >= 0,
       (combo + choiceMenu + search + menu).indexOf('box.style.left =') === -1],
     [true, true, true, true, true]);
