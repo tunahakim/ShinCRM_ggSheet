@@ -319,16 +319,6 @@ FbmSync.pushOwnerError = function (candidate, settings) {
   return '';
 };
 
-/** Xung đột phát hiện trong phiên này dừng cả chiều đẩy; xung đột tồn đọng từ trước chỉ khóa đúng dòng của nó. */
-FbmSync.stopPushOnConflicts = function (state) {
-  var conflictCount = Number(state && state.counts && state.counts.conflict || 0);
-  if (!conflictCount) { return false; }
-  state.phase = 'conflict'; state.entity = ''; state.current = ''; state.cursor = {};
-  state.message = 'Đã phát hiện ' + conflictCount + ' xung đột; chiều đẩy tạm dừng để người dùng quyết định.';
-  FbmSync.stateWrite(state);
-  return true;
-};
-
 /** Cầu dao lỗi đẩy: chạm `pushFailuresMax` thì dừng cả chiều đẩy, đến khi người dùng sửa nguyên nhân và mở lại các bản ghi lỗi. */
 FbmSync.pushFailuresGuard = function (state) {
   var count = Object.keys(FbmSync.pushFailuresRead().hashes).length;
@@ -354,7 +344,6 @@ FbmSync.nextPushRequest = function (state) {
   if (globalCategoryBlock) {
     state.phase = 'paused'; state.message = 'Đã đọc xong nhưng tạm dừng chiều đẩy vì danh mục chưa khớp FBM.'; FbmSync.stateWrite(state); return null;
   }
-  if (FbmSync.stopPushOnConflicts(state)) { return null; }
   // `cursor.index` là vị trí dòng Sheet kế tiếp cần xét, không phải thứ tự trong danh sách ứng viên (FBM-032).
   var entity = state.cursor.entity || 'customer', from = Number(state.cursor.index || 0), candidates = FbmSync.pushCandidates(entity).filter(function (item) { return item.position >= from; }), pushStep = 'push_' + entity;
   if (typeof FbmSync.businessStepStart === 'function' && FbmSync.businessStepStart(state, pushStep, { mode: state.mode, scan: state.scan, entity: entity })) {

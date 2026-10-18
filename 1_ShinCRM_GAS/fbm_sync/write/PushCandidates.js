@@ -75,11 +75,10 @@ FbmSync.pushCandidates = function (entity, scan) {
   var local = scan || FbmSync.localScan(), records = local.records(entity), customers = {}, state = {}, pushFailures = {};
   var categoryGate = {};
   var scope = typeof FbmSync.scope === 'function' ? FbmSync.scope() : null;
-  try {
-    state = FbmSync.stateRead();
-    categoryGate = FbmSync.stateCategoryGate(state);
-    pushFailures = FbmSync.pushFailuresRead().hashes;
-  } catch (ignore) {}
+  // Đọc hỏng thì ném lên cổng báo lỗi chung: coi sổ lỗi đẩy là rỗng sẽ đẩy lại âm thầm bản ghi từng lỗi.
+  state = FbmSync.stateRead();
+  categoryGate = FbmSync.stateCategoryGate(state);
+  pushFailures = FbmSync.pushFailuresRead().hashes;
   if (entity === 'activity') {
     local.records('customer').forEach(function (customer) { customers[String(customer.id || '')] = customer; });
   }

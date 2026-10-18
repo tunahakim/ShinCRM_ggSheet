@@ -23,6 +23,21 @@ FbmSync.isConflictPending = function (record) {
   return String(record && record.syncStatus || '') === FbmSync.SYNC_STATUS.conflict;
 };
 
+/**
+ * Số dòng xung đột chờ quyết đếm từ Sheet lúc preflight: cập nhật số hiện cho Sidebar và ghi Log một dòng khi số khác lần ghi trước, để lượt nền chạy mỗi vài phút không lặp lại cùng một dòng.
+ * `conflictLogged` đi theo state sang lượt sau như `conflictCount`. Phiên không dừng vì xung đột: dòng đó bị pull và push bỏ qua cho tới khi người dùng quyết.
+ */
+FbmSync.conflictPendingNote = function (state, count) {
+  var now = Number(count || 0), before = Number(state.metadata.conflictLogged || 0);
+  state.metadata.conflictCount = now;
+  if (now === before) { return false; }
+  state.metadata.conflictLogged = now;
+  if (typeof logEvent === 'function') {
+    logEvent({ source: 'fbm_sync', action: 'conflict_pending_changed', outcome: now ? (typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn') : (typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok'), cycleId: String(state.runId || ''), reason: now ? 'Còn ' + now + ' bản ghi xung đột chờ quyết (lần ghi trước: ' + before + '); phiên bỏ qua các dòng này, mở chế độ xử lý xung đột để quyết.' : 'Không còn bản ghi xung đột chờ quyết (lần ghi trước: ' + before + ').', detail: { count: now, previous: before } });
+  }
+  return true;
+};
+
 /** Lỗi chung của chế độ xung đột; trả status để Sidebar vẽ lại đúng state hiện tại. */
 FbmSync.conflictFail = function (code, message) {
   return { ok: false, code: code, message: message, status: FbmSync.statusView() };

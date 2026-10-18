@@ -7,6 +7,9 @@ async function chay(so) {
   section("FBM sync — push");
   const pushed = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {} });
   napServer(pushed, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
+  // pushCandidates không còn nuốt lỗi đọc state, nên hộp thử phải có state và sổ lỗi đẩy dù rỗng.
+  pushed.FbmSync.stateRead = () => ({ metadata: {} });
+  pushed.FbmSync.pushFailuresRead = () => ({ hashes: {}, details: {} });
   pushed.FbmSync.readLocal = () => [{ id: 'CUS-1', fbmId: 'A1', fbmCustomerCode: 'ALT1', companyName: 'X', fbmSyncPermission: 'Cho phép', syncStatus: pushed.FbmSync.SYNC_STATUS.pushed, fbmHash: '' }];
   const props = { data: {} };
   const propertyApi = { getProperty: (key) => props.data[key] || null, setProperty: (key, value) => { props.data[key] = String(value); } };
@@ -161,7 +164,8 @@ async function chay(so) {
   conflictPushState.counts.conflict = 1;
   conflictPushState.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
   push.FbmSync.stateWrite(conflictPushState);
-  check(so, 'push dung lai khi pull da phat hien conflict', [push.FbmSync.nextPushRequest(conflictPushState), push.FbmSync.stateRead().phase, push.FbmSync.stateRead().cursor], [null, 'conflict', {}]);
+  const conflictPushRequest = push.FbmSync.nextPushRequest(conflictPushState);
+  check(so, 'pull phát hiện xung đột giữa lượt không dừng chiều đẩy: bản ghi khác vẫn được phát request đẩy', [!!conflictPushRequest, push.FbmSync.stateRead().phase, push.FbmSync.stateRead().current], [true, 'push', 'C-1']);
   push.FbmSync.pushCandidates = () => [];
   const emptyWriteState = push.FbmSync.stateStart('', 'push', 0); emptyWriteState.mode = 'write'; emptyWriteState.cursor = { kind: 'push_scan', entity: 'customer', index: 0 }; push.FbmSync.stateWrite(emptyWriteState);
   push.FbmSync.nextPushRequest(emptyWriteState);
@@ -255,6 +259,15 @@ async function chay(so) {
     : [];
   check(so, 'Customer moi chua cho phep chi pull khong push', pushed.FbmSync.pushCandidates('customer').length, 0);
   pushed.FbmSync.readLocal = (entity) => entity === 'customer'
+    ? [{ id: 'CUS-XUNGDOT', fbmId: 'F1', fbmCustomerCode: 'ALT2', fbmSyncPermission: 'Cho phép', syncStatus: pushed.FbmSync.SYNC_STATUS.conflict, companyName: 'Sửa', fbmHash: 'cu' }, { id: 'CUS-KHAC', fbmId: '', fbmCustomerCode: '', fbmSyncPermission: 'Cho phép', companyName: 'Mới' }]
+    : [];
+  check(so, 'dòng vừa thành xung đột bị pushCandidates loại vì đọc lại trạng thái trên dòng; bản ghi khác vẫn vào danh sách đẩy', pushed.FbmSync.pushCandidates('customer').map((item) => item.id), ['CUS-KHAC']);
+  pushed.FbmSync.stateRead = () => { throw new Error('Không đọc được state'); };
+  let stateReadFailure = '';
+  try { pushed.FbmSync.pushCandidates('customer'); } catch (error) { stateReadFailure = String(error && error.message || error); }
+  check(so, 'pushCandidates không nuốt lỗi đọc state: ném lỗi rõ thay vì coi sổ lỗi đẩy là rỗng', stateReadFailure, 'Không đọc được state');
+  pushed.FbmSync.stateRead = () => ({ metadata: {} });
+  pushed.FbmSync.readLocal = (entity) => entity === 'customer'
     ? [{ id: 'CUS-PARENT', fbmId: 'FBM-PARENT', fbmCustomerCode: 'ALT-PARENT', fbmSyncPermission: pushed.FbmSync.pullDefaultPermission() }]
     : [{ id: 'ACT-NEW', customerId: 'CUS-PARENT', fbmId: '', fbmSyncPermission: pushed.FbmSync.pullDefaultPermission(), taskType: 'Goi', content: 'Noi dung', workDate: '2026-09-09' }];
   check(so, 'Activity moi co Customer cha lien ket duoc dua vao queue', pushed.FbmSync.pushCandidates('activity').length, 1);
@@ -320,8 +333,7 @@ async function chay(so) {
     pushLogs.push(event);
     skippedLogs.push(event);
   };
-  const countedConflict = { counts: { conflict: 1 }, metadata: {} };
-  check(so, 'Push dung lai khi bo dem conflict duong du chi tiet bi thieu', [push.FbmSync.stopPushOnConflicts(countedConflict), countedConflict.phase, countedConflict.cursor], [true, 'conflict', {}]);
+  check(so, 'Xung đột phát hiện giữa lượt không còn công tắc dừng cả chiều đẩy: chỉ dòng xung đột bị pushCandidates loại', typeof push.FbmSync.stopPushOnConflicts, 'undefined');
 
   const activityCandidate = { entity: 'activity', kind: 'create', id: 'ACT-NEW', position: 0, record: { id: 'ACT-NEW', fbmId: '', customerFbmCode: 'ALT00010', stt_rec: 'A-CUS', taskType: 'Gọi', content: 'Nội dung', workDate: '2026-09-09', fbmSyncPermission: push.FbmSync.pullDefaultPermission() } };
   push.FbmSync.pushCandidates = () => [activityCandidate];

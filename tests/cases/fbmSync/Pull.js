@@ -64,7 +64,7 @@ async function chay(so) {
       rowsToRecords: () => ({ rows: [], fields: [], total: 0 }), isTemporaryRecord: () => false, customerPageItem: () => '', customerPageValue: () => [], seenStoreReader: () => () => true, seenStoreMark: () => {}, readLocal: () => [],
       pullWrite: () => ({ ok: true, written: 0, conflicts: 0, skipped: 0 }), previewRecords: () => {}, customerNext: () => false,
       canWriteSheet: (mode) => mode === 'read' || mode === 'write', canWriteFbm: (mode) => mode === 'push' || mode === 'write',
-      stopPushOnConflicts: () => false, nextPushRequest: () => { readFinishPushRequests += 1; return {}; },
+      nextPushRequest: () => { readFinishPushRequests += 1; return {}; },
       runDoneMessage: () => 'Đồng bộ hoàn tất.',
       statusView: () => ({ phase: readFinishState.phase, mode: readFinishState.mode })
     }

@@ -603,7 +603,6 @@ async function chay(so) {
   compactLookupFlow.hop.FbmSync.pushEligibilityErrors = () => [];
   compactLookupFlow.hop.FbmSync.readLocal = (entity) => compactLookupFlow.hop.FbmSync.pushCandidates(entity).map((candidate) => candidate.record);
   compactLookupFlow.hop.writeGateSave = () => ({ ok: true });
-  compactLookupFlow.hop.FbmSync.stopPushOnConflicts = () => false;
   compactLookupFlow.hop.FbmSync.activityEditOpenRequest = () => ({ url: 'https://example.test', meta: { kind: 'activity_edit_open' } });
   const pushRequest = compactLookupFlow.hop.FbmSync.nextPushRequest(pushState);
   const pushWaitState = compactLookupFlow.hop.FbmSync.stateRead();
@@ -1312,7 +1311,6 @@ async function chay(so) {
   ], [true, true, true, true]);
   const sangDay = soBuoc('write');
   ['pull_activity', 'reconcile_activity'].forEach((key) => sangDay.F.businessStepStart(sangDay.st, key, {}));
-  sangDay.F.stopPushOnConflicts = () => false;
   sangDay.F.nextPushRequest = (state) => { sangDay.F.businessStepStart(state, 'push_customer', {}); return null; };
   sangDay.F.pullFinishOrPush(sangDay.st, {});
   check(so, 'Log sổ bước: lượt hai chiều đóng mọi bước Lấy trước khi mở bước đẩy', ['pull_customer_finished', 'reconcile_customer_finished', 'pull_activity_finished', 'reconcile_activity_finished'].every((action) => viTri(sangDay.nhatKy, action) >= 0 && viTri(sangDay.nhatKy, action) < viTri(sangDay.nhatKy, 'push_customer_started')), true);
