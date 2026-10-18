@@ -66,12 +66,66 @@ function saveFlowOld(top, record) {
   return old;
 }
 
-/** Câu báo xung đột tạm bằng chữ, cho tới khi có màn chọn giá trị từng trường. */
-function saveFlowConflictMessage(conflicts) {
-  var hien = function (v) { return v === '' ? '(trống)' : '"' + v + '"'; };
-  return 'Có trường đã bị đổi trên Sheet trong lúc bạn sửa, nên chưa lưu gì:\n' +
-    conflicts.map(function (c) { return '- ' + c.label + ': lúc mở form ' + hien(c.old) + ', trên Sheet giờ là ' + hien(c.current) + ', bạn đang gõ ' + hien(c.mine); }).join('\n') +
-    '\n\nBấm Lưu lần nữa để ghi đè bằng giá trị bạn đang gõ. Muốn giữ giá trị trên Sheet thì bấm Hủy rồi mở lại form.';
+/**
+ * Popup xung đột khi lưu: mỗi ô bị đổi trên Sheet trong lúc sửa một dòng, ba lựa chọn áp chung cho mọi ô xung đột. Trả `Promise` mang `mine`, `sheet` hoặc `cancel`.
+ * Tên lựa chọn phải tự nói nó làm gì với giá trị nào; đóng nhầm (nền, Esc) là `cancel`, không lưu gì.
+ */
+function saveFlowConflictChoice(conflicts) {
+  var hien = function (v) { return v === '' || v === null || v === undefined ? '(trống)' : '"' + v + '"'; };
+  var mot = conflicts.length === 1;
+  return uiDecisionChoose({
+    title: mot ? 'Ô ' + conflicts[0].label + ' vừa được sửa trên Sheet' : conflicts.length + ' ô vừa được sửa trên Sheet',
+    message: 'Trong lúc bạn sửa form, ' + (mot ? 'ô này' : 'các ô này') + ' đã bị đổi trên Sheet nên chưa lưu gì. Chọn giá trị muốn giữ:',
+    lines: conflicts.map(function (c) { return c.label + ': trên Sheet là ' + hien(c.current) + ', bạn đang nhập ' + hien(c.mine) + ' (lúc mở form: ' + hien(c.old) + ')'; }),
+    choices: [
+      { id: 'mine', label: 'Lưu giá trị bạn đang nhập, thay giá trị trên Sheet', variant: 'primary' },
+      { id: 'sheet', label: 'Dùng giá trị trên Sheet, bỏ giá trị bạn đang nhập', variant: 'neutral' },
+      { id: 'cancel', label: 'Quay lại form, chưa lưu gì', variant: 'neutral' }
+    ]
+  });
+}
+
+/**
+ * Làm theo lựa chọn của popup xung đột. Lúc này mốc kiểm đã là giá trị trên Sheet, nên `mine` chỉ cần lưu lại; `sheet` đưa giá trị trên Sheet vào các ô xung đột, ô khác giữ chữ đang nhập, form vẫn mở.
+ */
+function saveFlowResolveConflict(entity, conflicts) {
+  return saveFlowConflictChoice(conflicts).then(function (choice) {
+    if (choice === 'mine') { return saveFlowSubmit(); }
+    if (choice === 'sheet') {
+      var names = conflicts.map(function (c) { return c.field; });
+      saveFlowRestoreFields(screenStateTop(), names);
+      saveFlowStashDraft();
+      return { focusId: renderFieldId({ entity: entity, name: names[0] }) };
+    }
+    return { focusId: saveFlowPaintInvalid(entity, conflicts) };
+  });
+}
+
+/** Popup trường nhập sai khi lưu: ô sai đã tô đỏ, popup liệt kê lỗi, đóng thì con trỏ về ô sai đầu tiên. */
+function saveFlowShowInvalid(entity, invalid) {
+  var focusId = saveFlowPaintInvalid(entity, invalid);
+  return uiDecisionChoose({
+    title: 'Chưa lưu được',
+    message: fieldInvalidCount((invalid || []).length),
+    lines: fieldInvalidLines(invalid),
+    choices: [{ id: 'cancel', label: 'Quay lại sửa', variant: 'primary' }]
+  }).then(function () { return { focusId: focusId }; });
+}
+
+/** Đưa ô trên màn hình về giá trị mốc (`top.record`); `names` rỗng là mọi ô của thực thể form. Dùng khi bỏ thay đổi và khi chọn giá trị trên Sheet lúc xung đột. */
+function saveFlowRestoreFields(top, names) {
+  if (!top || typeof document === 'undefined' || !document.querySelectorAll) { return; }
+  document.querySelectorAll('[data-field]').forEach(function (control) {
+    var path = String(control.getAttribute('data-field') || '').split('.');
+    if (path.length !== 2 || path[0] !== top.entity) { return; }
+    if (names && names.length && names.indexOf(path[1]) < 0) { return; }
+    var value = top.record && top.record[path[1]];
+    if (typeof renderControlValue === 'function' && control.id) {
+      renderControlValue(control.id, value === undefined || value === null ? '' : value);
+    } else if ('value' in control) {
+      control.value = value === undefined || value === null ? '' : String(value);
+    }
+  });
 }
 
 /** Bỏ dấu đỏ ở mọi ô của form. Chạy trước mỗi lượt gửi, vì lượt trước có thể đã tô mà lần này chỗ đó đã sửa đúng. */
@@ -124,17 +178,11 @@ function saveFlowSubmit() {
 
       if (res.blocked) { throw new Error(res.message || 'Bản ghi đang được đồng bộ.'); }
       if (!res.ok && res.conflicts) {
-        // Người dùng đã thấy giá trị trên Sheet: nhận nó làm mốc mới, bấm Lưu lần nữa là chủ ý ghi đè.
+        // Người dùng sắp được cho xem giá trị trên Sheet: nhận nó làm mốc mới, nên lưu lại sau đó là chủ ý ghi đè.
         screenStateSetBaseline(res.conflicts.reduce(function (acc, c) { acc[c.field] = c.current; return acc; }, {}));
-        alert(saveFlowConflictMessage(res.conflicts));
-        return { focusId: saveFlowPaintInvalid(entity, res.conflicts) };
+        return { conflicts: res.conflicts };
       }
-      if (!res.ok) {
-        var focusId = saveFlowPaintInvalid(entity, res.invalid);
-        // `alert` vì đó là đường hiện lỗi duy nhất của form bản ghi — xem `dispatchError`.
-        alert(fieldInvalidMessage(res.invalid));
-        return { focusId: focusId };
-      }
+      if (!res.ok) { return { invalid: res.invalid }; }
 
       if (typeof screenFormSyncUnlock === 'function') { screenFormSyncUnlock(entity, top.record); }
       var ban = saveFlowApply(entity, res);
@@ -143,7 +191,12 @@ function saveFlowSubmit() {
       SAVE_FLOW.dangGui = false;
       throw err;
     });
-  }, { block: true });
+  }, { block: true }).then(function (outcome) {
+    // Popup mở sau khi lớp phủ bận đã gỡ: lớp phủ khóa cả Sidebar nên nút của popup mở trong lúc bận không bấm được.
+    if (outcome && outcome.conflicts) { return saveFlowResolveConflict(entity, outcome.conflicts); }
+    if (outcome && outcome.invalid) { return saveFlowShowInvalid(entity, outcome.invalid); }
+    return outcome;
+  });
 }
 
 /* Provider dirty cho form lõi: dùng lại đúng bộ thu thập của luồng lưu, chỉ chạy khi dirty guard hỏi. */
@@ -182,18 +235,7 @@ function saveFlowUnsavedProvider() {
       /* Pending action như mở form lồng sẽ gọi `screenFormStash` trước khi
          chạy. Khôi phục DOM ngay tại đây để giá trị đã bỏ không bị thu lại
          thành draft lần nữa. */
-      if (top && typeof document !== 'undefined' && document.querySelectorAll) {
-        document.querySelectorAll('[data-field]').forEach(function (control) {
-          var path = String(control.getAttribute('data-field') || '').split('.');
-          if (path.length !== 2 || path[0] !== top.entity) { return; }
-          var value = top.record && top.record[path[1]];
-          if (typeof renderControlValue === 'function' && control.id) {
-            renderControlValue(control.id, value === undefined || value === null ? '' : value);
-          } else if ('value' in control) {
-            control.value = value === undefined || value === null ? '' : String(value);
-          }
-        });
-      }
+      saveFlowRestoreFields(top, []);
       return { ok: true };
     }
   };

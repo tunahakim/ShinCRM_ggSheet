@@ -36,7 +36,16 @@ function fieldInvalidClear(ids) {
 
 /** Câu báo gộp mọi ô không đạt, mỗi dòng một ô. */
 function fieldInvalidMessage(invalid) {
-  var dong = (invalid || []).map(function (item) { return '• ' + item.reason; });
-  return 'Chưa lưu được. ' + (dong.length === 1 ? 'Một chỗ cần sửa:' : dong.length + ' chỗ cần sửa:') + '\n' + dong.join('\n');
+  var dong = fieldInvalidLines(invalid);
+  return 'Chưa lưu được. ' + fieldInvalidCount(dong.length) + '\n' + dong.join('\n');
+}
+
+/** Mỗi chỗ sai một dòng, dùng chung cho câu báo bằng chữ và popup của Sidebar. */
+function fieldInvalidLines(invalid) {
+  return (invalid || []).map(function (item) { return '• ' + item.reason; });
+}
+
+function fieldInvalidCount(n) {
+  return n === 1 ? 'Một chỗ cần sửa:' : n + ' chỗ cần sửa:';
 }
 </script>

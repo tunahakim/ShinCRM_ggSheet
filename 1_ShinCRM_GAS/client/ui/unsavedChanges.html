@@ -98,22 +98,28 @@ function unsavedChangesClearFields() {
 
 function unsavedChangesDialog() { return document.getElementById('shin-unsaved-dialog'); }
 
-/* Dialog quyết định dùng chung cho các thao tác nguy hiểm của Sidebar. Khối nghiệp vụ
-   chỉ truyền nội dung và callback; host, renderer và nút lựa chọn vẫn thuộc core. */
-function uiDecisionOpen(options) {
+/** Lớp nút theo mức của lựa chọn: `primary` là việc chính, `danger` là việc khó lùi, `neutral` là quay lại. */
+var UI_DECISION_VARIANT_CLASS = { primary: 'shin-unsaved-save', danger: 'shin-unsaved-discard', neutral: 'shin-unsaved-continue' };
+
+/**
+ * Popup của Sidebar, công cụ duy nhất hỏi người dùng chọn một trong nhiều lựa chọn. Khối nghiệp vụ chỉ truyền nội dung (`title`, `message`, `lines`) và `choices` (`{ id, label, variant }`); host, renderer và nút vẫn thuộc core. Trả `Promise` mang `id` của lựa chọn.
+ * Nút đóng nền và Esc luôn ra `cancel`, nên `choices` phải có lựa chọn `cancel` mang nghĩa quay lại, không làm gì: đóng nhầm không được chạy việc nào.
+ */
+function uiDecisionChoose(options) {
   var opts = options || {}, dialog = unsavedChangesDialog();
+  var choices = Array.isArray(opts.choices) ? opts.choices : [];
+  if (!choices.some(function (choice) { return choice.id === 'cancel'; })) { throw new Error('Popup Sidebar phải có lựa chọn `cancel` cho nút đóng nền và Esc.'); }
   if (!dialog || typeof renderReplaceChildren !== 'function') { return Promise.reject(new Error('Sidebar thiếu host dialog quyết định.')); }
-  if (UI_DECISION_DIALOG.open) { return Promise.resolve(false); }
+  if (UI_DECISION_DIALOG.open) { return Promise.resolve('cancel'); }
+  var body = [Text({ id: 'shin-decision-title', className: 'shin-unsaved-title', text: String(opts.title || '') })];
+  if (opts.message) { body.push(Text({ id: 'shin-decision-message', className: 'shin-unsaved-message', text: String(opts.message) })); }
+  (opts.lines || []).forEach(function (line) { body.push(Text({ className: 'shin-unsaved-message', text: String(line) })); });
+  body.push(RowGroup({ className: 'shin-unsaved-actions', elements: choices.map(function (choice) {
+    return Button({ className: UI_DECISION_VARIANT_CLASS[choice.variant] || UI_DECISION_VARIANT_CLASS.neutral, data: { 'ui-decision-choice': String(choice.id) }, label: String(choice.label || '') });
+  }) }));
   renderReplaceChildren(dialog, [
     Box({ className: 'shin-unsaved-backdrop', data: { 'ui-decision-choice': 'cancel' } }),
-    RowGroup({ className: 'shin-unsaved-panel', elements: [
-      Text({ id: 'shin-decision-title', className: 'shin-unsaved-title', text: String(opts.title || '') }),
-      Text({ id: 'shin-decision-message', className: 'shin-unsaved-message', text: String(opts.message || '') }),
-      RowGroup({ className: 'shin-unsaved-actions', elements: [
-        Button({ className: 'shin-unsaved-continue', data: { 'ui-decision-choice': 'cancel' }, label: String(opts.cancelLabel || 'Quay lại') }),
-        Button({ className: 'shin-unsaved-discard', data: { 'ui-decision-choice': 'confirm' }, label: String(opts.confirmLabel || 'Xác nhận') })
-      ] })
-    ] })
+    RowGroup({ className: 'shin-unsaved-panel', elements: body })
   ], {});
   dialog.hidden = false;
   dialog.setAttribute('aria-hidden', 'false');
@@ -121,14 +127,23 @@ function uiDecisionOpen(options) {
   UI_DECISION_DIALOG.busy = false;
   return new Promise(function (resolve) { UI_DECISION_DIALOG.resolve = resolve; });
 }
+
+/* Dạng hai nút (quay lại / xác nhận) cho các thao tác nguy hiểm; trả `true` khi xác nhận. */
+function uiDecisionOpen(options) {
+  var opts = options || {};
+  return uiDecisionChoose({
+    title: opts.title, message: opts.message,
+    choices: [{ id: 'cancel', label: opts.cancelLabel || 'Quay lại', variant: 'neutral' }, { id: 'confirm', label: opts.confirmLabel || 'Xác nhận', variant: 'danger' }]
+  }).then(function (choice) { return choice === 'confirm'; });
+}
 function uiDecisionResolve(choice) {
   if (!UI_DECISION_DIALOG.open || UI_DECISION_DIALOG.busy) { return; }
-  var dialog = unsavedChangesDialog(), confirmed = choice === 'confirm';
+  var dialog = unsavedChangesDialog();
   var resolve = UI_DECISION_DIALOG.resolve;
   UI_DECISION_DIALOG.open = false;
   UI_DECISION_DIALOG.resolve = null;
   if (dialog) { dialog.hidden = true; dialog.setAttribute('aria-hidden', 'true'); }
-  if (resolve) { resolve(confirmed); }
+  if (resolve) { resolve(choice); }
 }
 
 function unsavedChangesSetBusy(busy) {
@@ -237,12 +252,7 @@ function unsavedChangesInstall() {
     var decision = event.target && event.target.closest ? event.target.closest('[data-ui-decision-choice]') : null;
     if (decision && UI_DECISION_DIALOG.open) {
       event.preventDefault();
-      var choice = decision.getAttribute('data-ui-decision-choice'), resolver = UI_DECISION_DIALOG.resolve;
-      UI_DECISION_DIALOG.open = false;
-      UI_DECISION_DIALOG.resolve = null;
-      var dialog = unsavedChangesDialog();
-      if (dialog) { dialog.hidden = true; dialog.setAttribute('aria-hidden', 'true'); }
-      if (resolver) { resolver(choice === 'confirm'); }
+      uiDecisionResolve(decision.getAttribute('data-ui-decision-choice'));
       return;
     }
     var target = event.target && event.target.closest ? event.target.closest('[data-unsaved-choice]') : null;
